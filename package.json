@@ -1,0 +1,15 @@
+{
+  "name": "clarevo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "app": "npm --workspace apps/app run start",
+    "web": "npm --workspace apps/app run web",
+    "test": "npm --workspace packages/core run test",
+    "typecheck": "npm --workspace packages/core run typecheck && npm --workspace apps/app run typecheck",
+    "test:db": "bash supabase/tests/run_local.sh"
+  }
+}
