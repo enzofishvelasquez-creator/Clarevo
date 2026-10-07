@@ -1,10 +1,11 @@
 import { ERROR_TEXT, formatDateBR, formatMonthBR } from '@clarevo/core';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { RecordRow } from '@/components/record-row';
-import { EmptyState, ErrorState, LoadingState } from '@/components/states';
-import { Card, FitMoney, Money, Screen, Txt } from '@/components/ui';
+import { ContextPill, SubHeader } from '@/components/header';
+import { EmptyState, ErrorState } from '@/components/states';
+import { Card, FitMoney, Money, Screen, Skeleton, Txt } from '@/components/ui';
 import { useCommitments, useMonthRecords, useSpace, useView } from '@/state/data';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -47,22 +48,23 @@ export default function ComposicaoScreen() {
         ];
 
   return (
-    <Screen contentStyle={{ padding: space[6], gap: space[4] }}>
-      <Stack.Screen options={{ title: copy.title }} />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <SubHeader title={copy.title} right={<ContextPill label="Pessoal" />} />
+    <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
       <View style={{ gap: space[1] }}>
         <Txt variant="caption" color={colors.textSecondary}>
           Pessoal · {formatMonthBR(month)}
         </Txt>
         {kind === 'apagar' ? (
           commitments.isPending ? (
-            <LoadingState />
+            <Skeleton width={180} height={40} />
           ) : commitments.isError || !commitments.summary ? (
             <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => commitments.refetch()} />
           ) : (
             <FitMoney cents={commitments.summary.toPayCents} />
           )
         ) : records.isPending ? (
-          <LoadingState />
+          <Skeleton width={180} height={40} />
         ) : records.isError || !s ? (
           <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => records.refetch()} />
         ) : (
@@ -73,7 +75,7 @@ export default function ComposicaoScreen() {
       {kind === 'apagar' && commitments.summary ? (
         <Card>
           {commitments.summary.items.length === 0 ? (
-            <EmptyState title="Nenhum compromisso registrado" />
+            <EmptyState title="Nenhum compromisso registrado" art="compromissos" />
           ) : (
             commitments.summary.items.map((c, i, arr) => (
               <View key={c.id} style={[styles.commitment, i < arr.length - 1 && styles.divider]}>
@@ -107,6 +109,7 @@ export default function ComposicaoScreen() {
         </Card>
       ))}
     </Screen>
+    </View>
   );
 }
 

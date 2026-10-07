@@ -50,7 +50,7 @@ export default function RecuperarAcesso() {
   };
 
   return (
-    <AuthShell title="Recuperar acesso" subtitle="Informe o e-mail da sua conta. Enviaremos um link para você definir uma nova senha.">
+    <AuthShell back title="Recuperar acesso" subtitle="Informe o e-mail da sua conta. Enviaremos um link para você definir uma nova senha.">
       <TextField
         label="E-mail"
         value={email}

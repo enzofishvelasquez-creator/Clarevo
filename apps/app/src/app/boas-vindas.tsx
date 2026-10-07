@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
+import { ShieldCheck } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { AuthShell } from '@/components/auth-shell';
@@ -18,6 +19,12 @@ export default function BoasVindas() {
         Seu dinheiro,{'\n'}mais claro.
       </Txt>
       <Txt color={colors.textSecondary}>Acompanhe o seu mês e construa planos para você e sua família.</Txt>
+      <View style={{ flexDirection: 'row', gap: space[2], alignItems: 'flex-start' }}>
+        <ShieldCheck size={18} color={colors.success} style={{ marginTop: 2 }} />
+        <Txt variant="caption" color={colors.textSecondary} style={{ flex: 1 }}>
+          Seus registros pessoais são só seus. Se uma empresa oferecer o plano, ela não vê suas finanças.
+        </Txt>
+      </View>
       <View style={{ gap: space[3], marginTop: space[2] }}>
         <Button label="Criar conta" onPress={() => router.push('/criar-conta')} />
         <Button label="Entrar" tone="soft" onPress={() => router.push('/entrar')} />

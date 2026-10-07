@@ -2,7 +2,8 @@ import { router } from 'expo-router';
 import { ArrowRight } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Screen, TopInset, Txt } from '@/components/ui';
+import { AppHeader } from '@/components/header';
+import { Body, Screen, Txt } from '@/components/ui';
 import { TOPICS } from '@/lib/topics';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -16,11 +17,9 @@ const TONES = [
 export default function AprenderScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <TopInset color={colors.background} />
-      <Screen contentStyle={{ padding: space[6], gap: space[4] }}>
-        <Txt variant="title" style={{ fontSize: 24, lineHeight: 32 }} accessibilityRole="header">
-          Aprender
-        </Txt>
+      <Screen wide>
+        <AppHeader title="Aprender" />
+        <Body>
         <Txt color={colors.textSecondary}>Explicações curtas e opcionais, ligadas ao que você faz no app.</Txt>
         {TOPICS.map((t, i) => {
           const tone = TONES[i % TONES.length]!;
@@ -42,6 +41,7 @@ export default function AprenderScreen() {
             </Pressable>
           );
         })}
+        </Body>
       </Screen>
     </View>
   );

@@ -1,6 +1,8 @@
 import {
   ERROR_TEXT,
   NO_CATEGORY_LABEL,
+  deviceTimeZone,
+  formatDateTimeBR,
   formatBRL,
   formatDateBR,
   formatMonthBR,
@@ -9,17 +11,19 @@ import {
   newOperationKey,
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
-import { AlertCircle, ArrowDownLeft, ArrowLeft, ArrowUpRight, Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react-native';
+import { AlertCircle, ArrowDownLeft, ArrowUpRight, Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ConfirmDialog } from '@/components/dialog';
-import { BrandHeader, ContextSwitch } from '@/components/header';
-import { ErrorState, LoadingState } from '@/components/states';
+import { ContextPill, SubHeader } from '@/components/header';
+import { ErrorState } from '@/components/states';
 import { FlashBanner, useFlash } from '@/components/flash';
-import { Banner, Button, Card, FitMoney, Screen, TopInset, Txt } from '@/components/ui';
+import { Banner, Button, Card, FitMoney, Screen, Skeleton, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
-import { useDeleteRecord, useRecord, useSpace, useView, type SpaceKind } from '@/state/data';
+import { totalChange } from '@/lib/highlight';
+import { useDeleteRecord, useRecord, useSpace, useView } from '@/state/data';
+import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
 /** Detalhe do registro (CL C002/C003): data, contexto, conta, valor, situação e período afetado. */
@@ -28,6 +32,7 @@ export default function DetalheRegistro() {
   const record = useRecord(id);
   const personal = useSpace().data;
   const view = useView();
+  const { user } = useSession();
   const remove = useDeleteRecord();
   const [notice] = useFlash();
   const [confirming, setConfirming] = useState(false);
@@ -35,10 +40,6 @@ export default function DetalheRegistro() {
   const deleteKey = useRef(newOperationKey());
 
   const toList = () => (router.canGoBack() ? router.back() : router.replace('/movimentacoes'));
-  const switchContext = (next: SpaceKind) => {
-    view.setSpace(next);
-    router.replace('/');
-  };
 
   const r = record.data;
   const account = personal?.accounts.find((a) => a.id === r?.accountId);
@@ -50,6 +51,7 @@ export default function DetalheRegistro() {
       await remove.mutateAsync({ key: deleteKey.current, id: r.id, version: r.version });
       setConfirming(false);
       flash.set('Registro excluído');
+      totalChange.set({ total: r.kind === 'despesa' ? 'pago' : 'recebido', month: monthOf(r.occurredOn), deltaCents: -r.amountCents });
       toList();
     } catch (e) {
       setConfirming(false);
@@ -64,17 +66,16 @@ export default function DetalheRegistro() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <TopInset color={colors.brand} />
+      <SubHeader title={r ? (r.kind === 'despesa' ? 'Gasto' : 'Recebimento') : 'Registro'} onBack={toList} right={<ContextPill label="Pessoal" />} />
       <Screen>
-        <View style={styles.hero}>
-          <BrandHeader />
-          <ContextSwitch onRequest={switchContext} />
-        </View>
         <View style={styles.body}>
-          <Button label="Voltar" icon={ArrowLeft} tone="ghost" onPress={toList} style={styles.back} />
-
           {record.isPending ? (
-            <LoadingState />
+            <Card style={{ gap: space[3] }}>
+              <Skeleton width={110} height={26} />
+              <Skeleton width="60%" height={28} />
+              <Skeleton width="45%" height={40} />
+              <Skeleton width="100%" height={120} />
+            </Card>
           ) : record.isError ? (
             <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => record.refetch()} />
           ) : !r ? (
@@ -110,6 +111,16 @@ export default function DetalheRegistro() {
                   <Row label="Data" value={formatDateBR(r.occurredOn)} />
                   <Row label="Categoria" value={r.category ?? NO_CATEGORY_LABEL} />
                   <Row label="Resumo afetado" value={formatMonthBR(monthOf(r.occurredOn))} last />
+                </View>
+                <View style={styles.trail} accessible>
+                  <Txt variant="caption" color={colors.textSecondary}>
+                    Anotado por {r.createdBy === user?.id ? 'você' : 'outra pessoa da família'} em {formatDateTimeBR(r.createdAt, deviceTimeZone())}
+                  </Txt>
+                  {r.version > 1 ? (
+                    <Txt variant="caption" color={colors.textSecondary}>
+                      Última alteração em {formatDateTimeBR(r.updatedAt, deviceTimeZone())}
+                    </Txt>
+                  ) : null}
                 </View>
               </Card>
 
@@ -174,9 +185,8 @@ function Row({ label, value, last }: { label: string; value: string; last?: bool
 }
 
 const styles = StyleSheet.create({
-  hero: { backgroundColor: colors.brand, paddingHorizontal: space[6], paddingTop: space[4], paddingBottom: space[5] },
-  body: { padding: space[6], gap: space[3] },
-  back: { alignSelf: 'flex-start', paddingHorizontal: space[2], minHeight: 44 },
+  body: { padding: space[5], gap: space[3] },
+  trail: { gap: 2, paddingTop: space[1] },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',

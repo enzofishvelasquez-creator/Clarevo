@@ -5,7 +5,7 @@ import { Card } from '@/components/ui';
 export function FamilyNotLinked() {
   return (
     <Card>
-      <EmptyState title="Nenhuma família vinculada">
+      <EmptyState title="Nenhuma família vinculada" art="familia">
         Em uma próxima versão você poderá convidar pessoas e escolher o que compartilhar. Seus registros pessoais continuam visíveis só para
         você.
       </EmptyState>

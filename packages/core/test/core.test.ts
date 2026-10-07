@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   DEMO_TODAY,
   addDays,
+  formatDateTimeBR,
+  formatDayHeader,
   maskDateBR,
   ERROR_TEXT,
   MemoryRepository,
@@ -84,6 +86,13 @@ describe('datas civis', () => {
     expect(maskDateBR('06')).toBe('06');
     expect(addDays('2026-10-01', -1)).toBe('2026-09-30');
     expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
+  });
+
+  it('data e hora no fuso da pessoa e títulos de dia', () => {
+    expect(formatDateTimeBR('2026-10-07T17:32:00Z', 'America/Sao_Paulo')).toBe('07/10/2026 às 14:32');
+    expect(formatDayHeader('2026-10-07', '2026-10-07')).toBe('Hoje');
+    expect(formatDayHeader('2026-10-06', '2026-10-07')).toBe('Ontem');
+    expect(formatDayHeader('2026-10-05', '2026-10-07')).toBe('5 de outubro');
   });
 
   it('dia atual usa o fuso da pessoa', () => {

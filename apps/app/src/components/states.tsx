@@ -1,6 +1,7 @@
 import { RotateCcw } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import Animated, { FadeInDown, ReduceMotion } from 'react-native-reanimated';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 import { Button, Txt } from '@/components/ui';
@@ -9,6 +10,7 @@ import { colors, radius, space } from '@/theme/tokens';
 /** Ilustração orgânica: formas abertas em lima e azul, com um cartão de anotação. */
 export function WelcomeArt({ width = 300 }: { width?: number }) {
   return (
+    <Animated.View entering={FadeInDown.duration(300).reduceMotion(ReduceMotion.System)}>
     <Svg width={width} height={width * 0.72} viewBox="0 0 300 216" accessible={false}>
       <Path d="M70 20C112 4 150 30 156 72C162 116 132 150 92 156C50 162 12 138 8 96C4 58 30 34 70 20Z" fill={colors.accent} />
       <Path d="M226 74C262 70 292 96 290 132C288 172 254 200 216 196C182 192 162 166 166 134C170 100 192 78 226 74Z" fill={colors.brand} />
@@ -17,25 +19,66 @@ export function WelcomeArt({ width = 300 }: { width?: number }) {
       <Rect x="106" y="98" width="82" height="9" rx="4.5" fill="#E3E8F2" transform="rotate(-8 147 104)" />
       <Rect x="106" y="118" width="58" height="9" rx="4.5" fill={colors.brand} transform="rotate(-8 147 104)" />
     </Svg>
+    </Animated.View>
   );
 }
 
-/** Pequena composição para estados vazios. */
-function EmptyArt() {
-  return (
-    <Svg width={120} height={84} viewBox="0 0 120 84" accessible={false}>
+export type EmptyArtKind = 'registros' | 'familia' | 'metas' | 'compromissos';
+
+/** Composições orgânicas por contexto (formas abertas em lima e azul). */
+function EmptyArt({ kind }: { kind: EmptyArtKind }) {
+  const blobs = (
+    <>
       <Path d="M30 8C52 0 72 14 74 36C76 58 60 74 38 76C16 78 2 64 2 44C2 26 12 14 30 8Z" fill={colors.accent} />
       <Path d="M92 30C108 28 120 40 118 56C116 72 102 82 88 80C74 78 66 66 68 52C70 40 78 32 92 30Z" fill={colors.brand} opacity={0.9} />
-      <Circle cx={60} cy={42} r={16} fill={colors.surface} />
-      <Path d="M53 42h14" stroke={colors.text} strokeWidth={3} strokeLinecap="round" />
+    </>
+  );
+  return (
+    <Svg width={120} height={84} viewBox="0 0 120 84" accessible={false}>
+      {blobs}
+      {kind === 'registros' ? (
+        <>
+          <Rect x={40} y={18} width={40} height={50} rx={8} fill={colors.surface} transform="rotate(-6 60 43)" />
+          <Rect x={47} y={32} width={26} height={4} rx={2} fill="#E3E8F2" transform="rotate(-6 60 43)" />
+          <Rect x={47} y={42} width={18} height={4} rx={2} fill={colors.brand} transform="rotate(-6 60 43)" />
+        </>
+      ) : kind === 'familia' ? (
+        <>
+          <Circle cx={50} cy={38} r={14} fill={colors.surface} />
+          <Circle cx={70} cy={46} r={12} fill={colors.surface} stroke={colors.brand} strokeWidth={3} />
+        </>
+      ) : kind === 'metas' ? (
+        <>
+          <Circle cx={60} cy={42} r={20} fill={colors.surface} />
+          <Path d="M66 30C56 30 48 36 48 42C48 48 56 54 66 54C61 51 58 47 58 42C58 37 61 33 66 30Z" fill={colors.accent} />
+        </>
+      ) : (
+        <>
+          <Rect x={40} y={22} width={40} height={40} rx={8} fill={colors.surface} />
+          <Rect x={40} y={22} width={40} height={10} rx={4} fill={colors.brand} />
+          <Circle cx={52} cy={44} r={3} fill={colors.text} />
+          <Circle cx={60} cy={44} r={3} fill={colors.text} />
+          <Circle cx={68} cy={44} r={3} fill={colors.accent} />
+        </>
+      )}
     </Svg>
   );
 }
 
-export function EmptyState({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
+export function EmptyState({
+  title,
+  children,
+  action,
+  art = 'registros',
+}: {
+  title: string;
+  children?: ReactNode;
+  action?: ReactNode;
+  art?: EmptyArtKind;
+}) {
   return (
     <View style={styles.empty}>
-      <EmptyArt />
+      <EmptyArt kind={art} />
       <Txt variant="title" style={{ textAlign: 'center' }}>
         {title}
       </Txt>

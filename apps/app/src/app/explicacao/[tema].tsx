@@ -1,7 +1,8 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 
+import { SubHeader } from '@/components/header';
 import { Button, Card, Screen, Txt } from '@/components/ui';
 import { topicBySlug } from '@/lib/topics';
 import { colors, radius, space } from '@/theme/tokens';
@@ -21,8 +22,9 @@ export default function ExplicacaoScreen() {
   }
 
   return (
-    <Screen contentStyle={{ padding: space[6], gap: space[4] }}>
-      <Stack.Screen options={{ title: topic.title }} />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <SubHeader title="Aprender" />
+    <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
       <View style={{ backgroundColor: colors.accent, borderRadius: radius.lg, overflow: 'hidden' }} accessible={false}>
         <Svg width="100%" height={120} viewBox="0 0 320 120" preserveAspectRatio="xMidYMid slice">
           <Path d="M40 30C80 0 140 20 150 60C160 100 110 124 70 114C30 104 8 56 40 30Z" fill={colors.brand} />
@@ -46,5 +48,6 @@ export default function ExplicacaoScreen() {
       </Card>
       <Button label="Voltar à tarefa" onPress={() => (router.canGoBack() ? router.back() : router.navigate('/'))} />
     </Screen>
+    </View>
   );
 }

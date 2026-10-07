@@ -45,22 +45,17 @@ export const TabButton = forwardRef<View, ButtonProps>(function TabButton({ isFo
 export function TabBar({ children, ...props }: TabListProps) {
   const insets = useSafeAreaInsets();
   return (
-    <View {...props} style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-      {children}
+    <View style={[styles.barWrap, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+      <View {...props} style={styles.bar}>
+        {children}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bar: {
-    flexDirection: 'row',
-    backgroundColor: colors.surface,
-    paddingTop: 8,
-    paddingHorizontal: 8,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    justifyContent: 'space-around',
-  },
+  barWrap: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8 },
+  bar: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 8, width: '100%', maxWidth: 560, alignSelf: 'center' },
   button: { flex: 1, minHeight: 56, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', gap: 4 },
   buttonActive: { backgroundColor: colors.brandTint },
 });

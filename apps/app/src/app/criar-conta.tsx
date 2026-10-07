@@ -53,7 +53,7 @@ export default function CriarConta() {
   };
 
   return (
-    <AuthShell title="Criar conta" subtitle="Leva menos de um minuto. Você confirma o e-mail e já começa a organizar o mês.">
+    <AuthShell back title="Criar conta" subtitle="Leva menos de um minuto. Você confirma o e-mail e já começa a organizar o mês.">
       <TextField
         ref={refs.name}
         label="Nome de apresentação"

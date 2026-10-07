@@ -29,6 +29,8 @@ Beleza visual, fluidez de uso e informação útil têm o mesmo peso.
 | D-015 | 07/10/2026 | Valor aceita ponto como decimal quando não há vírgula e há 1 ou 2 casas (`12.50`): não é agrupamento de milhar válido, então não é ambíguo. | Revisão de design |
 | D-016 | 07/10/2026 | Demonstração só abre em desenvolvimento ou com `EXPO_PUBLIC_MODO_DEMO=1`; build de produção sem servidor mostra "Configuração incompleta". | Revisão de código |
 | D-017 | 07/10/2026 | O fuso horário vem do aparelho no primeiro acesso; o dia atual é recalculado ao voltar para o app. | Revisão de código |
+| D-018 | 07/10/2026 | Formulário e detalhe usam cabeçalho compacto com o contexto fixo ("Salvando em Pessoal"); o seletor Pessoal/Família fica nas abas. Trocar de contexto exige sair do formulário (com aviso de descarte). | Revisão de design; "contexto visível e fixo durante o preenchimento" |
+| D-019 | 07/10/2026 | Depois de salvar, editar ou excluir, o Resumo mostra por alguns segundos o efeito no total ("+ R$ 80,00" em Pago), sem animar a contagem do valor. | CL-V008 |
 
 ## Decisões pendentes (alteram o que construímos)
 

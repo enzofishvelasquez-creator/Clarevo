@@ -24,7 +24,7 @@ export default function Carregando() {
 
   return (
     <View style={styles.wrap}>
-      <LogoSymbol size={64} variant="reverso" />
+      <LogoSymbol size={72} variant="reverso" animated />
       {status === 'erro' ? (
         <View style={{ alignSelf: 'stretch' }}>
           <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={retry} onBrand />

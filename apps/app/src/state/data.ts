@@ -98,6 +98,8 @@ export interface ViewState {
   setSpace: (s: SpaceKind) => void;
   month: IsoMonth;
   setMonth: (m: IsoMonth) => void;
+  /** Direção da última troca de mês (1 = adiante, -1 = para trás), para a transição. */
+  monthDirection: 1 | -1;
   currentMonth: IsoMonth;
 }
 

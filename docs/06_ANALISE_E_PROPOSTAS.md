@@ -61,19 +61,21 @@ Executado: testes de regras (49), banco (isolamento e sequência de aceite), app
 - Navegação entre telas respeita "reduzir movimento".
 - Travessão removido do detalhe; "Sair" deixou de ser vermelho (não é ação destrutiva).
 
-### Próximo ciclo de acabamento (proposta)
+### Ciclo de acabamento (feito em 07/10/2026)
 
-| Tema | O que muda | Por quê |
-|---|---|---|
-| Cabeçalho único | Mesmo topo azul com logo e avatar em todas as abas; topo compacto em formulário e detalhe | Hoje cada tela tem um cabeçalho diferente |
-| Formulário mais curto | Botão Salvar fixo acima do teclado; valor com máscara que preenche pelos centavos; calendário | Anotar gasto hoje exige rolagem |
-| Foco visível só no teclado | Anel de foco aparece ao navegar por Tab, não ao tocar | Hoje aparece também no toque |
-| Confiança no detalhe | "Anotado por você em 07/10/2026 às 14:32" e última alteração | Autoria visível transmite segurança |
-| Conta | Seção Segurança: alterar senha, encerrar sessões, exportar dados | Esperado em um app pago |
-| Movimentações | Totais do mês no topo, agrupamento por dia, filtro Recebido/Pago | Leitura mais rápida |
-| Estados vazios | Ilustrações orgânicas diferentes por contexto | Hoje o mesmo desenho aparece em tudo |
-| Carregamento | Esqueletos no lugar do indicador giratório | Sensação de rapidez |
-| Entrada | Mostrar senha, voltar visível, promessas de privacidade verificáveis na boas-vindas | Fluidez e confiança |
+| Tema | O que mudou |
+|---|---|
+| Cabeçalho único | Mesmo topo azul com logo, selo de demonstração e avatar em todas as abas, de ponta a ponta com conteúdo centralizado em telas largas; topo compacto com voltar, título e contexto em formulário, detalhe, composição, conta e explicações |
+| Formulário mais curto | Botões Cancelar e Salvar fixos no rodapé, acima do teclado; "R$" fixo no campo de valor, que se formata ao sair do campo ("80" vira "80,00"); contexto fixo "Salvando em Pessoal" |
+| Foco visível só no teclado | Na web, o anel de foco aparece ao navegar por Tab e some no toque ou clique |
+| Confiança no detalhe | "Anotado por você em 07/10/2026 às 14:32" e "Última alteração em…" |
+| Conta | Seção Segurança: alterar senha (link no e-mail) e encerrar sessão em todos os aparelhos; "Sair deste aparelho" |
+| Movimentações | Totais do mês, filtro Todos/Recebidos/Pagos e agrupamento por dia (Hoje, Ontem, 5 de outubro) |
+| Estados vazios | Ilustrações orgânicas por contexto: registros, família, metas e compromissos |
+| Carregamento | Esqueletos no formato do conteúdo, parados com "reduzir movimento" |
+| Entrada | Mostrar senha, voltar visível em Criar conta, Entrar e Recuperar acesso, e uma linha de privacidade verificável na boas-vindas |
+
+Exportar dados fica para quando houver o relatório mensal (não há botão sem destino).
 
 ## 4. Propostas de funcionalidades
 
@@ -157,6 +159,8 @@ O Bíos usava movimento ambiente: arcos que "respiram", ondas e órbitas. No Cla
 - **Ilustrações:** formas orgânicas entram uma única vez nas telas de boas-vindas e Aprender.
 
 **Como fazer:** Reanimated 4 (já instalado) para transições e microinterações; `expo-haptics` para vibração; Lottie ou Rive só se houver ilustrações animadas de marca. Tudo com `ReduceMotion.System`, durações em `theme/tokens.ts` e verificação na web e no aparelho.
+
+**Implementado em 07/10/2026:** crescente do logo na tela de abertura; escala de 0,98 em 120 ms em botões e opções; pílula do seletor Pessoal/Família deslizando em 200 ms; troca de mês deslizando na direção escolhida; avisos e erros com fade de 150 a 240 ms; vibração leve só depois da gravação confirmada (no celular); selo lima "+ R$ 80,00" ao lado de Pago ou Recebido por alguns segundos, com o valor final mostrado direto; linhas que recolhem ao excluir; ilustração da boas-vindas entrando uma vez. Tudo testado também com "reduzir movimento" ligado. Falta conferir em aparelho físico.
 
 ## 6. Preço e posicionamento
 

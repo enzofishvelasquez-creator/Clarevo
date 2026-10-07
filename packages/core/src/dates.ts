@@ -76,6 +76,29 @@ export function monthRange(month: IsoMonth): { start: IsoDate; endExclusive: Iso
   return { start: `${month}-01`, endExclusive: `${addMonths(month, 1)}-01` };
 }
 
+/** Instante (ISO) no fuso da pessoa: "07/10/2026 às 14:32". */
+export function formatDateTimeBR(isoInstant: string, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('pt-BR', {
+    timeZone,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(isoInstant));
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
+  return `${get('day')}/${get('month')}/${get('year')} às ${get('hour')}:${get('minute')}`;
+}
+
+/** Título de grupo por dia em listas: "Hoje", "Ontem" ou "5 de outubro". */
+export function formatDayHeader(date: IsoDate, today: IsoDate): string {
+  if (date === today) return 'Hoje';
+  if (date === addDays(today, -1)) return 'Ontem';
+  const [, m, d] = date.split('-');
+  return `${Number(d)} de ${MONTHS[Number(m) - 1] ?? ''}`;
+}
+
 /** "2026-10" → "Outubro de 2026". */
 export function formatMonthBR(month: IsoMonth): string {
   const [y, m] = month.split('-');

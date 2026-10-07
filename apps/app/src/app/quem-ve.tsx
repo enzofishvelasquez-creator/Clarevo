@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { User } from 'lucide-react-native';
 import { View } from 'react-native';
 
+import { ContextPill, SubHeader } from '@/components/header';
 import { Button, Card, Screen, Txt } from '@/components/ui';
 import { useView } from '@/state/data';
 import { useSession } from '@/state/session';
@@ -12,10 +13,9 @@ export default function QuemVeScreen() {
   const { user } = useSession();
   const { space: kind } = useView();
   return (
-    <Screen contentStyle={{ padding: space[6], gap: space[4] }}>
-      <Txt variant="title" accessibilityRole="header">
-        Contexto: {kind === 'pessoal' ? 'Pessoal' : 'Família'}
-      </Txt>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <SubHeader title="Quem vê estes dados?" right={<ContextPill label={kind === 'pessoal' ? 'Pessoal' : 'Família'} />} />
+    <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
       {kind === 'pessoal' ? (
         <Card style={{ flexDirection: 'row', gap: space[3], alignItems: 'center' }}>
           <User size={22} color={colors.brand} />
@@ -37,5 +37,6 @@ export default function QuemVeScreen() {
       </Txt>
       <Button label="Entendi" onPress={() => router.back()} />
     </Screen>
+    </View>
   );
 }

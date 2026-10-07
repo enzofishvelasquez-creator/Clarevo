@@ -49,7 +49,8 @@ export interface AuthService {
   resendConfirmation(email: string): Promise<void>;
   requestPasswordReset(email: string): Promise<void>;
   updatePassword(password: string): Promise<void>;
-  signOut(): Promise<void>;
+  /** 'local': só neste aparelho; 'global': em todos os aparelhos. */
+  signOut(scope?: 'local' | 'global'): Promise<void>;
   /** Trata o link aberto a partir do e-mail (confirmação ou recuperação). */
   handleLink(url: string): Promise<'ok' | 'invalido' | null>;
   repositoryFor(user: AuthUser): RecordsRepository;

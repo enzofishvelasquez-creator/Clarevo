@@ -151,10 +151,10 @@ export class SupabaseAuth implements AuthService {
     // para a pessoa não entrar no app com a sessão do link.
   }
 
-  async signOut() {
+  async signOut(scope: 'local' | 'global' = 'local') {
     this.setRecovery(false);
-    // 'local': encerra a sessão neste aparelho e apaga o que ela guardou aqui.
-    await this.client.auth.signOut({ scope: 'local' });
+    // 'local': encerra a sessão neste aparelho e apaga o que ela guardou aqui; 'global': também nos outros aparelhos.
+    await this.client.auth.signOut({ scope });
   }
 
   async handleLink(link: string) {

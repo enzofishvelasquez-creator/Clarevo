@@ -37,7 +37,13 @@ export default function RootLayout() {
 
   useEffect(() => {
     // Leitores de tela na web precisam do idioma da página.
-    if (Platform.OS === 'web' && typeof document !== 'undefined') document.documentElement.lang = 'pt-BR';
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      document.documentElement.lang = 'pt-BR';
+      // O anel de foco aparece ao navegar pelo teclado e some no toque ou clique.
+      const style = document.createElement('style');
+      style.textContent = '*:focus:not(:focus-visible) { outline: none !important; }';
+      document.head.appendChild(style);
+    }
   }, []);
 
   useEffect(() => {
@@ -141,10 +147,10 @@ function Navigation() {
           <Stack.Screen name="registro/novo" />
           <Stack.Screen name="registro/[id]/index" />
           <Stack.Screen name="registro/[id]/editar" />
-          <Stack.Screen name="composicao" options={{ headerShown: true, title: 'Composição' }} />
-          <Stack.Screen name="quem-ve" options={{ headerShown: true, title: 'Quem vê estes dados?' }} />
-          <Stack.Screen name="conta" options={{ headerShown: true, title: 'Conta' }} />
-          <Stack.Screen name="explicacao/[tema]" options={{ headerShown: true, title: 'Aprender' }} />
+          <Stack.Screen name="composicao" />
+          <Stack.Screen name="quem-ve" />
+          <Stack.Screen name="conta" />
+          <Stack.Screen name="explicacao/[tema]" />
         </Stack.Protected>
         <Stack.Screen name="carregando" />
         <Stack.Screen name="confirmado" />

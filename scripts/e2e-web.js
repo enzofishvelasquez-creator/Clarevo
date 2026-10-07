@@ -62,9 +62,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await shot('04_resumo_conta_nova');
 
   // Sair limpa a sessão
-  await p.getByRole('button', { name: 'Conta: perfil e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
+  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
   await shot('05_conta');
-  await btn('Sair').click(); await waitText('Seu dinheiro');
+  await shot('05b_conta_seguranca', true);
+  await btn('Sair deste aparelho').click(); await waitText('Seu dinheiro');
   ok('sair volta para boas-vindas', (await body()).includes('Seu dinheiro'));
 
   // Entrar com senha errada e certa
@@ -85,8 +86,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('e-mail preenchido depois da nova senha', (await field('E-mail').inputValue()) === 'ana@exemplo.com');
   await field('Senha').fill('nova12345'); await btn('Entrar').click(); await waitText('Diferença do mês');
   ok('nova senha funciona e volta ao resumo', true);
-  await p.getByRole('button', { name: 'Conta: perfil e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
-  await btn('Sair').click(); await waitText('Seu dinheiro');
+  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
+  await btn('Sair deste aparelho').click(); await waitText('Seu dinheiro');
 
   // 2. Conta de demonstração e sequência de aceite
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('R$ 2.100,00');
@@ -139,6 +140,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('detalhe após salvar: contexto, conta, data, período', t.includes('Conta principal') && t.includes('07/10/2026') && t.includes('Outubro de 2026') && t.includes('Pessoal'));
   await shot('10_detalhe_gasto_salvo');
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
+  await p.getByText('+ R$ 80,00').filter({ visible: true }).first().waitFor({ timeout: 2500 }).catch(() => {});
+  ok('resumo mostra o efeito do gasto salvo', (await body()).includes('+ R$ 80,00'));
   await expectTotals('criar gasto 80 → 3.980 / 2.020', 'R$ 6.000,00', 'R$ 3.980,00', 'R$ 2.020,00');
   await shot('11_resumo_apos_gasto');
 
@@ -165,6 +168,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Recebimento 200 → 250 → excluir
   await p.getByRole('tab', { name: 'Movimentações' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
   await shot('13_movimentacoes');
+  ok('movimentações agrupadas por dia com totais do mês', /ONTEM|Ontem/.test(await body()) && (await body()).includes('Pago em outubro'));
+  await p.getByRole('radio', { name: 'Recebidos' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+  ok('filtro Recebidos mostra só recebimentos', !(await body()).includes('Pago · '));
+  await p.getByRole('radio', { name: 'Todos' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
   await btn('Registrar recebimento').click(); await waitText('Data do recebimento');
   await field('Descrição').fill('<b>Freela</b>'); await field('Valor em reais').fill('200');
   await btn('Salvar recebimento').click(); await waitText('Recebimento salvo');
@@ -217,14 +224,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await shot('15_familia');
   await p.getByRole('tab', { name: 'Ver dados de Pessoal' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês');
 
-  // Trocar de contexto com rascunho pede confirmação
+  // Contexto fixo durante o preenchimento; descartar não salva nada
   await btn('Anotar gasto').click(); await waitText('Será salvo em');
+  ok('contexto visível e fixo no formulário', (await body()).includes('Salvando em Pessoal') && (await p.getByRole('tab', { name: 'Ver dados de Família' }).filter({ visible: true }).count()) === 0);
   await field('Descrição').fill('Rascunho');
-  await p.getByRole('tab', { name: 'Ver dados de Família' }).filter({ visible: true }).first().click(); await waitText('Descartar o preenchimento?');
-  ok('troca de contexto com rascunho pede confirmação', true);
-  await btn('Descartar alterações').click(); await waitText('Nenhuma família vinculada');
-  ok('descartar não salva o rascunho em outro contexto', !(await body()).includes('Rascunho'));
-  await p.getByRole('tab', { name: 'Ver dados de Pessoal' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês');
+  await btn('Cancelar').click(); await waitText('Descartar o preenchimento?');
+  await btn('Descartar alterações').click(); await waitText('Diferença do mês');
+  ok('descartar não salva o rascunho', !(await body()).includes('Rascunho'));
 
   // Metas, Aprender
   await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Metas chegam em uma próxima versão');

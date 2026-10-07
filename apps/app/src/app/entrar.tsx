@@ -51,7 +51,7 @@ export default function Entrar() {
   };
 
   return (
-    <AuthShell title="Entrar">
+    <AuthShell back title="Entrar">
       {params.aviso === 'senha-atualizada' ? (
         <Banner tone="sucesso" icon={CheckCircle2}>
           <Txt variant="label" color={colors.successText}>

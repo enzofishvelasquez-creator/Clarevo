@@ -24,7 +24,7 @@ interface SessionValue extends AuthState {
   /** Link de e-mail inválido ou expirado aberto no app. */
   linkProblem: boolean;
   clearLinkProblem: () => void;
-  signOut: () => Promise<void>;
+  signOut: (scope?: 'local' | 'global') => Promise<void>;
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
@@ -99,9 +99,9 @@ function SessionProviderInner({ auth, children }: { auth: AuthService; children:
     return () => sub.remove();
   }, [auth]);
 
-  const signOut = useCallback(async () => {
+  const signOut = useCallback(async (scope: 'local' | 'global' = 'local') => {
     pendingCredentials.clear();
-    await auth.signOut();
+    await auth.signOut(scope);
     queryClient.clear();
   }, [queryClient, auth]);
 
