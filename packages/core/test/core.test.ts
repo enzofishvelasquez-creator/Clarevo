@@ -1,137 +1,275 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEMO_EVENTS,
-  DEMO_MONTH,
-  Ledger,
-  expenseFromDraft,
+  DEMO_TODAY,
+  ERROR_TEXT,
+  MemoryRepository,
+  centsToInput,
+  createDemoRepository,
   formatBRL,
+  formatDateBR,
+  isRepoError,
+  newOperationKey,
   parseBRL,
+  parseDateBR,
+  summarizeCommitments,
   summarizeMonth,
-  validateExpenseDraft,
-  type ExpenseDraft,
+  todayIn,
+  validateRecordDraft,
+  type RecordDraft,
 } from '../src';
 
-const now = '2026-10-07T15:00:00.000Z';
+const OCT = '2026-10';
 
-function draft(overrides: Partial<ExpenseDraft> = {}): ExpenseDraft {
-  return {
-    contextId: 'ctx-pessoal',
-    amountText: '80,00',
-    description: 'Farmácia',
-    category: 'Saúde',
-    paidOn: '2026-10-07',
-    idempotencyKey: 'form-1',
-    ...overrides,
+async function setup() {
+  const repo = await createDemoRepository();
+  const space = (await repo.getSpace())!;
+  const ctx = space.personalContextId;
+  const accountId = space.accounts[0]!.id;
+  const totals = async (month = OCT) => {
+    const s = summarizeMonth(await repo.listRecords(ctx, month), ctx, month);
+    return [s.receivedCents / 100, s.paidCents / 100, s.differenceCents / 100];
   };
-}
-
-function save(ledger: Ledger, d: ExpenseDraft, id = 'novo-1') {
-  const v = validateExpenseDraft(d);
-  if (!v.ok) throw new Error(JSON.stringify(v.errors));
-  return ledger.add(expenseFromDraft(d, v.amountCents, { id, createdBy: 'pessoa-demo', now }));
+  const input = (reais: number, occurredOn = '2026-10-07', description = 'Café') => ({
+    accountId,
+    amountCents: Math.round(reais * 100),
+    occurredOn,
+    description,
+    category: null,
+  });
+  return { repo, ctx, accountId, totals, input };
 }
 
 describe('dinheiro', () => {
   it('formata em reais', () => {
     expect(formatBRL(210000)).toBe('R$ 2.100,00');
     expect(formatBRL(-5050)).toBe('-R$ 50,50');
+    expect(centsToInput(123456)).toBe('1.234,56');
   });
 
   it.each([
-    ['1.400,00', 140000],
-    ['1400', 140000],
+    ['80', 8000],
+    ['80,00', 8000],
     ['80,5', 8050],
+    ['1.234,56', 123456],
+    ['1234,56', 123456],
     ['R$ 80', 8000],
-    ['0,01', 1],
-  ])('lê "%s"', (input, expected) => {
-    expect(parseBRL(input)).toBe(expected);
+    ['9.999.999,99', 999999999],
+  ])('lê "%s"', (text, cents) => expect(parseBRL(text)).toBe(cents));
+
+  it.each(['', 'abc', '1,234', '12.34', '1.40', '-10', '10,', '80,001', '1.2345,00'])('rejeita "%s"', (text) =>
+    expect(parseBRL(text)).toBeNull(),
+  );
+});
+
+describe('datas civis', () => {
+  it('converte DD/MM/AAAA sem deslocar o dia', () => {
+    expect(parseDateBR('07/10/2026')).toBe('2026-10-07');
+    expect(parseDateBR('7/1/2026')).toBe('2026-01-07');
+    expect(formatDateBR('2026-10-07')).toBe('07/10/2026');
   });
 
-  it.each(['', 'abc', '1,234', '12.34', '1.40', '-10', '10,'])('rejeita "%s"', (input) => {
-    expect(parseBRL(input)).toBeNull();
+  it.each(['31/09/2026', '29/02/2026', '00/10/2026', '2026-10-07', '07/13/2026'])('rejeita data impossível "%s"', (d) =>
+    expect(parseDateBR(d)).toBeNull(),
+  );
+
+  it('dia atual usa o fuso da pessoa', () => {
+    // 02:30 UTC de 8/10 ainda é 7/10 em São Paulo (UTC−3).
+    expect(todayIn('America/Sao_Paulo', new Date('2026-10-08T02:30:00Z'))).toBe('2026-10-07');
   });
 });
 
-describe('resumo do mês (CL-V003)', () => {
-  it('cenário de aceite: 6.000 recebidos, 3.900 pagos, 2.100 de diferença, 650 a pagar separados', () => {
-    const s = summarizeMonth(DEMO_EVENTS, 'ctx-pessoal', DEMO_MONTH);
-    expect(s.receivedCents).toBe(600000);
-    expect(s.paidCents).toBe(390000);
-    expect(s.differenceCents).toBe(210000);
-    expect(s.toPayCents).toBe(65000);
-    expect(s.hasData).toBe(true);
+describe('validação do formulário (CL C002)', () => {
+  const draft = (over: Partial<RecordDraft> = {}): RecordDraft => ({
+    accountId: 'conta-1',
+    amountText: '80,00',
+    description: '  Café  ',
+    category: null,
+    dateText: '07/10/2026',
+    ...over,
   });
 
-  it('novo pagamento de R$ 80 muda pago para 3.980 e diferença para 2.020; a pagar continua 650', () => {
-    const ledger = new Ledger(DEMO_EVENTS);
-    save(ledger, draft());
-    const s = summarizeMonth(ledger.all(), 'ctx-pessoal', DEMO_MONTH);
-    expect(s.paidCents).toBe(398000);
-    expect(s.differenceCents).toBe(202000);
-    expect(s.toPayCents).toBe(65000);
+  it('aceita e normaliza', () => {
+    const v = validateRecordDraft(draft(), DEMO_TODAY);
+    expect(v).toEqual({
+      ok: true,
+      input: { accountId: 'conta-1', amountCents: 8000, occurredOn: '2026-10-07', description: 'Café', category: null },
+    });
   });
 
-  it('a composição soma exatamente o total, pelo mesmo critério', () => {
-    const s = summarizeMonth(DEMO_EVENTS, 'ctx-pessoal', DEMO_MONTH);
-    const total = (xs: { amountCents: number }[]) => xs.reduce((a, e) => a + e.amountCents, 0);
-    expect(total(s.composition.paid)).toBe(s.paidCents);
-    expect(total(s.composition.received)).toBe(s.receivedCents);
-    expect(total(s.composition.toPay)).toBe(s.toPayCents);
-  });
-
-  it('contextos não se misturam: gasto da Família não entra no Pessoal', () => {
-    const ledger = new Ledger(DEMO_EVENTS);
-    save(ledger, draft({ contextId: 'ctx-familia' }));
-    expect(summarizeMonth(ledger.all(), 'ctx-pessoal', DEMO_MONTH).paidCents).toBe(390000);
-    expect(summarizeMonth(ledger.all(), 'ctx-familia', DEMO_MONTH).paidCents).toBe(248000);
-  });
-
-  it('pagamento de outro mês não entra no total de outubro', () => {
-    const ledger = new Ledger(DEMO_EVENTS);
-    save(ledger, draft({ paidOn: '2026-11-01' }));
-    expect(summarizeMonth(ledger.all(), 'ctx-pessoal', DEMO_MONTH).paidCents).toBe(390000);
-  });
-
-  it('mês sem registros informa ausência de dados em vez de fingir zero', () => {
-    const s = summarizeMonth(DEMO_EVENTS, 'ctx-pessoal', '2026-09');
-    expect(s.hasData).toBe(false);
-  });
-});
-
-describe('registro, edição e exclusão (CL-V004)', () => {
-  it('envio repetido com a mesma chave não duplica', () => {
-    const ledger = new Ledger(DEMO_EVENTS);
-    const a = save(ledger, draft(), 'x1');
-    const b = save(ledger, draft(), 'x2');
-    expect(a.created).toBe(true);
-    expect(b.created).toBe(false);
-    expect(b.event.id).toBe('x1');
-    expect(summarizeMonth(ledger.all(), 'ctx-pessoal', DEMO_MONTH).paidCents).toBe(398000);
-  });
-
-  it('edição atualiza o resumo', () => {
-    const ledger = new Ledger(DEMO_EVENTS);
-    save(ledger, draft());
-    ledger.update('novo-1', { amountCents: 10000 }, now);
-    expect(summarizeMonth(ledger.all(), 'ctx-pessoal', DEMO_MONTH).paidCents).toBe(400000);
-  });
-
-  it('exclusão retira do resumo e da composição', () => {
-    const ledger = new Ledger(DEMO_EVENTS);
-    save(ledger, draft());
-    ledger.remove('novo-1', now);
-    const s = summarizeMonth(ledger.all(), 'ctx-pessoal', DEMO_MONTH);
-    expect(s.paidCents).toBe(390000);
-    expect(s.composition.paid.some((e) => e.id === 'novo-1')).toBe(false);
-  });
-
-  it('valida campos e mantém mensagens por campo', () => {
-    const v = validateExpenseDraft(draft({ amountText: '0', description: ' ', paidOn: '2026-02-30' }));
+  it('mensagens exatas por campo', () => {
+    const v = validateRecordDraft(draft({ description: '   ', amountText: '0', dateText: '31/09/2026' }), DEMO_TODAY);
     expect(v.ok).toBe(false);
     if (!v.ok) {
-      expect(v.errors.amountText).toBe('Confira o valor informado');
-      expect(v.errors.description).toBeDefined();
-      expect(v.errors.paidOn).toBeDefined();
+      expect(v.errors.description).toBe('Dê um nome para este registro.');
+      expect(v.errors.amountText).toBe('Informe um valor maior que zero, como 80,00.');
+      expect(v.errors.dateText).toBe('Confira a data informada.');
     }
+  });
+
+  it('recusa data futura, descrição longa e valor acima do limite', () => {
+    const v = validateRecordDraft(draft({ dateText: '08/10/2026', description: 'x'.repeat(81), amountText: '10.000.000,00' }), DEMO_TODAY);
+    expect(v.ok).toBe(false);
+    if (!v.ok) {
+      expect(v.errors.dateText).toBe(ERROR_TEXT.data_futura);
+      expect(v.errors.description).toBe(ERROR_TEXT.descricao_longa);
+      expect(v.errors.amountText).toBe(ERROR_TEXT.valor_acima_do_limite);
+    }
+  });
+
+  it('80 caracteres é aceito', () => {
+    expect(validateRecordDraft(draft({ description: 'x'.repeat(80) }), DEMO_TODAY).ok).toBe(true);
+  });
+});
+
+describe('sequência de aceite do primeiro ciclo (mesmo mês e contexto)', () => {
+  it('reproduz a tabela do handoff, com R$ 650 previstos sempre separados', async () => {
+    const { repo, ctx, totals, input } = await setup();
+    const toPay = async () => summarizeCommitments(await repo.listCommitments(ctx, OCT), ctx, OCT).toPayCents / 100;
+
+    expect(await totals()).toEqual([6000, 3900, 2100]);
+    expect(await toPay()).toBe(650);
+
+    const gasto = await repo.createRecord(newOperationKey(), ctx, 'despesa', input(80));
+    expect(await totals()).toEqual([6000, 3980, 2020]);
+
+    const editado = await repo.updateRecord(newOperationKey(), gasto.id, gasto.version, input(95));
+    expect(editado.id).toBe(gasto.id);
+    expect(editado.version).toBe(gasto.version + 1);
+    expect(await totals()).toEqual([6000, 3995, 2005]);
+
+    await repo.deleteRecord(newOperationKey(), gasto.id, editado.version);
+    expect(await totals()).toEqual([6000, 3900, 2100]);
+
+    const renda = await repo.createRecord(newOperationKey(), ctx, 'receita', input(200, '2026-10-07', 'Freelance'));
+    expect(await totals()).toEqual([6200, 3900, 2300]);
+
+    const rendaEditada = await repo.updateRecord(newOperationKey(), renda.id, renda.version, input(250, '2026-10-07', 'Freelance'));
+    expect(await totals()).toEqual([6250, 3900, 2350]);
+
+    await repo.deleteRecord(newOperationKey(), renda.id, rendaEditada.version);
+    expect(await totals()).toEqual([6000, 3900, 2100]);
+    expect(await toPay()).toBe(650);
+  });
+
+  it('a composição soma exatamente o total', async () => {
+    const { repo, ctx } = await setup();
+    const s = summarizeMonth(await repo.listRecords(ctx, OCT), ctx, OCT);
+    const total = (xs: { amountCents: number }[]) => xs.reduce((a, r) => a + r.amountCents, 0);
+    expect(total(s.composition.paid)).toBe(s.paidCents);
+    expect(total(s.composition.received)).toBe(s.receivedCents);
+  });
+
+  it('gasto de 30/09 não entra em outubro; mover para outubro atualiza os dois meses', async () => {
+    const { repo, ctx, totals, input } = await setup();
+    const before = await totals('2026-09');
+    const r = await repo.createRecord(newOperationKey(), ctx, 'despesa', input(80, '2026-09-30'));
+    expect(await totals()).toEqual([6000, 3900, 2100]);
+    expect((await totals('2026-09'))[1]).toBe(before[1]! + 80);
+    await repo.updateRecord(newOperationKey(), r.id, r.version, input(80, '2026-10-01'));
+    expect(await totals('2026-09')).toEqual(before);
+    expect(await totals()).toEqual([6000, 3980, 2020]);
+  });
+});
+
+describe('duplicidade, versões e falhas', () => {
+  it('mesma operação enviada duas vezes cria um único registro', async () => {
+    const { repo, ctx, totals, input } = await setup();
+    const key = newOperationKey();
+    const a = await repo.createRecord(key, ctx, 'despesa', input(80));
+    const b = await repo.createRecord(key, ctx, 'despesa', input(80));
+    expect(b.id).toBe(a.id);
+    expect(await totals()).toEqual([6000, 3980, 2020]);
+  });
+
+  it('timeout depois de gravar + nova tentativa com a mesma chave: um único registro', async () => {
+    const { repo, ctx, totals, input } = await setup();
+    const key = newOperationKey();
+    repo.failNextWrite = 'depois';
+    await expect(repo.createRecord(key, ctx, 'despesa', input(80))).rejects.toMatchObject({ code: 'rede' });
+    expect(await repo.findOperation(key)).not.toBeNull(); // reconciliação antes de repetir
+    await repo.createRecord(key, ctx, 'despesa', input(80));
+    expect(await totals()).toEqual([6000, 3980, 2020]);
+  });
+
+  it('falha antes de gravar não altera nada e a operação não existe', async () => {
+    const { repo, ctx, totals, input } = await setup();
+    const key = newOperationKey();
+    repo.failNextWrite = 'antes';
+    await expect(repo.createRecord(key, ctx, 'despesa', input(80))).rejects.toMatchObject({ code: 'rede' });
+    expect(await repo.findOperation(key)).toBeNull();
+    expect(await totals()).toEqual([6000, 3900, 2100]);
+  });
+
+  it('reutilizar a chave com outro conteúdo é recusado', async () => {
+    const { repo, ctx, input } = await setup();
+    const key = newOperationKey();
+    await repo.createRecord(key, ctx, 'despesa', input(80));
+    await expect(repo.createRecord(key, ctx, 'despesa', input(81))).rejects.toMatchObject({ code: 'chave_reutilizada' });
+  });
+
+  it('edição com versão antiga não sobrescreve a alteração de outro aparelho', async () => {
+    const { repo, ctx, totals, input } = await setup();
+    const r = await repo.createRecord(newOperationKey(), ctx, 'despesa', input(80));
+    repo.simulateRemoteEdit(r.id, { amountCents: 9000 });
+    await expect(repo.updateRecord(newOperationKey(), r.id, r.version, input(95))).rejects.toMatchObject({
+      code: 'versao_desatualizada',
+    });
+    expect((await repo.getRecord(r.id))!.amountCents).toBe(9000);
+    expect(await totals()).toEqual([6000, 3990, 2010]);
+  });
+
+  it('excluir muda o total uma única vez, e registro excluído não pode ser editado', async () => {
+    const { repo, ctx, totals, input } = await setup();
+    const r = await repo.createRecord(newOperationKey(), ctx, 'despesa', input(80));
+    const key = newOperationKey();
+    const del = await repo.deleteRecord(key, r.id, r.version);
+    await repo.deleteRecord(key, r.id, r.version); // repetição da mesma operação
+    expect(await totals()).toEqual([6000, 3900, 2100]);
+    expect(await repo.getRecord(r.id)).toBeNull();
+    await expect(repo.updateRecord(newOperationKey(), r.id, del.version, input(1))).rejects.toMatchObject({ code: 'nao_encontrado' });
+  });
+
+  it('descrição com < e > é guardada como texto', async () => {
+    const { repo, ctx, input } = await setup();
+    const r = await repo.createRecord(newOperationKey(), ctx, 'despesa', input(1, '2026-10-07', '<b>café</b> & <script>'));
+    expect((await repo.getRecord(r.id))!.description).toBe('<b>café</b> & <script>');
+  });
+
+  it('o repositório também valida (não confia só no formulário)', async () => {
+    const { repo, ctx, input } = await setup();
+    await expect(repo.createRecord(newOperationKey(), ctx, 'despesa', input(80, '2026-10-08'))).rejects.toMatchObject({ code: 'data_futura' });
+    await expect(repo.createRecord(newOperationKey(), ctx, 'despesa', input(10_000_000))).rejects.toMatchObject({
+      code: 'valor_acima_do_limite',
+    });
+    await expect(repo.createRecord(newOperationKey(), 'outro-contexto', 'despesa', input(80))).rejects.toMatchObject({
+      code: 'sem_permissao',
+    });
+  });
+
+  it('falha de leitura é erro, não zero', async () => {
+    const { repo, ctx } = await setup();
+    repo.failNextRead = true;
+    const err = await repo.listRecords(ctx, OCT).catch((e) => e);
+    expect(isRepoError(err, 'rede')).toBe(true);
+  });
+});
+
+describe('primeira conta (CL C001)', () => {
+  it('conta nova começa vazia e o espaço pessoal é criado uma única vez', async () => {
+    const repo = new MemoryRepository({ actorId: 'p1', displayName: 'Ana', today: () => DEMO_TODAY });
+    expect(await repo.getSpace()).toBeNull();
+    const a = await repo.ensurePersonalSpace('Conta principal');
+    const b = await repo.ensurePersonalSpace('Outro nome');
+    expect(b.personalContextId).toBe(a.personalContextId);
+    expect(b.accounts).toHaveLength(1);
+    expect(b.accounts[0]!.name).toBe('Conta principal');
+    expect(b.accounts[0]!.initialBalanceCents).toBeNull(); // desconhecido, não zero
+    expect(await repo.listRecords(a.personalContextId, OCT)).toEqual([]);
+    expect(await repo.listCommitments(a.personalContextId, OCT)).toEqual([]);
+  });
+
+  it('nome da conta é validado', async () => {
+    const repo = new MemoryRepository({ actorId: 'p1', displayName: 'Ana', today: () => DEMO_TODAY });
+    await expect(repo.ensurePersonalSpace('   ')).rejects.toMatchObject({ code: 'nome_da_conta_invalido' });
   });
 });

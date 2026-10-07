@@ -8,7 +8,7 @@
     "scheme": "clarevo",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/icon.png",
       "bundleIdentifier": "app.clarevo"
     },
     "android": {
@@ -32,7 +32,7 @@
         {
           "backgroundColor": "#2457F5",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 140
         }
       ]
     ],

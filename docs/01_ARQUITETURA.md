@@ -1,50 +1,70 @@
 # Arquitetura
 
-07/10/2026 · versão 0.1
+07/10/2026 · versão 0.2 (primeiro ciclo)
 
-## Escolhas e motivo
+## Escolhas (aprovadas)
 
 | Camada | Escolha | Por quê |
 |---|---|---|
-| App | Expo SDK 57 + React Native + Expo Router | Um código para iOS, Android e web. Publicação nas lojas e atualizações pela nuvem (EAS), sem precisar de Mac para compilar. |
-| Fonte e ícones | Manrope (licença OFL) e Lucide (licença ISC) | Recomendados no handoff; uso livre comercial. |
-| Regras financeiras | Pacote `@clarevo/core` em TypeScript puro | As mesmas regras rodam no app, nos testes e, depois, no servidor. Testável sem interface. |
-| Backend | Supabase: Postgres, autenticação, RLS | Autorização validada no banco em cada acesso, inclusive acesso direto à API. Região São Paulo disponível. Plano gratuito para começar. |
-| Testes | Vitest (regras), SQL com Postgres local (permissões), Playwright (fluxo na web) | Cada camada testada onde a falha acontece. |
+| App | Expo SDK 57 + React Native + Expo Router | Um código para iOS, Android e web. Publicação e atualizações pela nuvem (EAS), sem precisar de Mac para compilar. |
+| Dados no app | TanStack Query | Estados de carregando, erro e nova tentativa; cache limpo ao sair ou trocar de pessoa. |
+| Regras financeiras | `@clarevo/core` (TypeScript puro) | As mesmas regras no app e nos testes; o banco repete as validações. |
+| Backend | Supabase: Postgres, Auth, RLS | Confirmação de e-mail e recuperação reais; autorização no banco em cada acesso, inclusive por ID. Região São Paulo. |
+| Fonte e ícones | Manrope (OFL), Lucide (ISC), Lexend (OFL) no nome do logo | Licenças livres para uso comercial. |
+| Testes | Vitest (regras), SQL em Postgres local (permissões), Playwright (fluxos na web) | Cada camada testada onde a falha acontece. |
 
-## Estrutura do repositório
+## Estrutura
 
 ```
-clarevo/
-  apps/app/            App Expo (telas em src/app, componentes em src/components)
-    src/theme/tokens.ts  Cores, espaçamento, tipografia e movimento (CL-V001)
-    src/state/finance.tsx  Estado do protótipo (troca para Supabase no próximo passo)
-  packages/core/       Regras financeiras e testes
-  supabase/
-    migrations/        Esquema do banco e permissões
-    tests/             Testes de isolamento entre pessoas, famílias e empresas
-  docs/                Decisões, regras, acessos, roteiro e referências
+apps/app/src/
+  app/                  telas (Expo Router)
+    boas-vindas, criar-conta, confirmar-email, entrar, recuperar-acesso, nova-senha
+    primeira-conta, carregando, confirmado
+    (tabs)/             Resumo, Movimentações, Metas, Aprender
+    registro/novo, registro/[id], registro/[id]/editar
+    composicao, quem-ve, conta, explicacao/[tema]
+  components/           interface (logo, campos, botões, formulário de registro, estados)
+  lib/                  autenticação (Supabase e demonstração), conteúdos de Aprender
+  state/                sessão, dados (consultas e gravações), contexto e mês
+  theme/                tokens de cor, tipografia, movimento e vetores do logo
+packages/core/          regras financeiras, validação, repositório em memória, testes
+supabase/
+  migrations/           esquema, funções e permissões
+  tests/                testes de isolamento e da sequência de aceite
+scripts/e2e-web.js      roteiro de verificação na versão web
+docs/                   decisões, regras, acessos, Supabase, roteiro, marca, telas
 ```
+
+## Navegação protegida
+
+- Sem sessão: só as telas de entrada.
+- Sessão de recuperação de senha: só "Nova senha".
+- Com sessão e sem conta financeira: só "Sua primeira conta".
+- Com conta: o app.
+- Sessão expirada: volta para Entrar e, depois do login, para a tela onde a pessoa estava.
+
+A navegação organiza a experiência; **quem protege os dados é o banco**.
 
 ## Modelo de dados
 
 ```
-pessoa ──< vínculo >── contexto financeiro (pessoal | família) ──< evento financeiro
-   │
+pessoa ──< vínculo (permissões por ação) >── contexto (pessoal | família) ──< conta financeira ──< registro
+   │                                                                    └──< compromisso (previsto)
+   ├──< operação (chave de idempotência, ação, registro resultante)
    └──< direito ao plano >── licença >── contrato de benefício >── organização ──< administrador
 ```
 
-- **Pessoa** existe independentemente de qualquer empresa.
-- **Contexto** é onde o registro é salvo. Cada pessoa nasce com um contexto Pessoal.
-- **Vínculo** guarda as permissões de cada pessoa em cada contexto (ler, anotar, editar registros de outros, administrar).
-- **Organização / contrato / licença** controlam vagas e convites empresariais.
-- **Direito ao plano** diz de onde vem o acesso (benefício, particular, cortesia). Encerrar não apaga nada.
-- **Evento financeiro** é a fonte única: resumo, listas e composição consultam a mesma tabela.
+## Como executar
 
-## Próximos passos técnicos
+```bash
+npm install
+npm run web          # navegador (demonstração se não houver .env)
+npm run app          # Expo Go no celular (QR code)
+npm test             # regras financeiras
+npm run typecheck
+npm run test:db      # banco (Postgres local)
+npm run test:api     # app contra a API (PostgREST)
+npm run test:web     # fluxos completos na versão web
+```
 
-1. Criar projeto Supabase (região São Paulo), aplicar a migração, configurar login por e-mail.
-2. Trocar o estado em memória por chamadas ao Supabase, mantendo `@clarevo/core` para cálculos e validação.
-3. Fluxo de convite familiar (token com validade, aceite, revogação) e saída voluntária.
-4. Configurar EAS (builds de teste para iOS e Android).
-5. Integração contínua no GitHub: testes e typecheck em cada envio.
+Para dados reais: `docs/05_SUPABASE.md`.

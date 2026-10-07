@@ -1,37 +1,41 @@
 import { router } from 'expo-router';
+import { User } from 'lucide-react-native';
 import { View } from 'react-native';
 
-import { Card, PrimaryButton, Screen, Txt } from '@/components/ui';
-import { useFinance } from '@/state/finance';
+import { Button, Card, Screen, Txt } from '@/components/ui';
+import { useView } from '@/state/data';
+import { useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
-// Membros FICTÍCIOS. Na versão com backend, a lista vem de context_memberships (nomes e permissões reais).
-const MEMBERS = {
-  pessoal: [{ name: 'Você', perms: 'Ver, anotar e editar' }],
-  familia: [
-    { name: 'Você (titular)', perms: 'Ver, anotar, editar e convidar' },
-    { name: 'Bruno', perms: 'Ver e anotar; edita só os próprios registros' },
-  ],
-};
-
+/** Nomes e permissões reais do contexto, sem selo genérico. */
 export default function QuemVeScreen() {
-  const { activeContext } = useFinance();
+  const { user } = useSession();
+  const { space: kind } = useView();
   return (
     <Screen contentStyle={{ padding: space[6], gap: space[4] }}>
-      <Txt variant="title">Contexto: {activeContext.name}</Txt>
-      <Card>
-        {MEMBERS[activeContext.kind].map((m) => (
-          <View key={m.name} style={{ paddingVertical: space[2] }}>
-            <Txt variant="label">{m.name}</Txt>
-            <Txt variant="caption" color={colors.textSecondary}>{m.perms}</Txt>
-          </View>
-        ))}
-      </Card>
-      <Txt color={colors.textSecondary}>
-        A empresa administra seu acesso ao plano. Seus registros financeiros têm permissões próprias.
+      <Txt variant="title" accessibilityRole="header">
+        Contexto: {kind === 'pessoal' ? 'Pessoal' : 'Família'}
       </Txt>
-      <Txt variant="caption" color={colors.textSecondary}>Protótipo com dados fictícios.</Txt>
-      <PrimaryButton label="Entendi" onPress={() => router.back()} />
+      {kind === 'pessoal' ? (
+        <Card style={{ flexDirection: 'row', gap: space[3], alignItems: 'center' }}>
+          <User size={22} color={colors.brand} />
+          <View style={{ flex: 1 }}>
+            <Txt variant="label">{user?.displayName} (você)</Txt>
+            <Txt variant="caption" color={colors.textSecondary}>
+              Única pessoa que vê, anota, edita e exclui registros em Pessoal.
+            </Txt>
+          </View>
+        </Card>
+      ) : (
+        <Card>
+          <Txt>Nenhuma família vinculada. Quando houver, esta tela mostrará o nome e as permissões de cada pessoa.</Txt>
+        </Card>
+      )}
+      <Txt color={colors.textSecondary}>
+        Se uma empresa oferecer o Clarevo como benefício, ela administra seu acesso ao plano. Seus registros financeiros têm permissões
+        próprias e não ficam visíveis para a empresa.
+      </Txt>
+      <Button label="Entendi" onPress={() => router.back()} />
     </Screen>
   );
 }

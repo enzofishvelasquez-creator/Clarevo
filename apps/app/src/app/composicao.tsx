@@ -1,60 +1,74 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { ERROR_TEXT, formatMonthBR } from '@clarevo/core';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { Card, EventRow, Money, Screen, Txt } from '@/components/ui';
-import { monthLabel, useFinance } from '@/state/finance';
+import { RecordRow } from '@/components/record-row';
+import { EmptyState, ErrorState, LoadingState } from '@/components/states';
+import { Card, Money, Screen, Txt } from '@/components/ui';
+import { useMonthRecords, useSpace, useView } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
 const COPY = {
-  recebido: { title: 'Recebido', criterio: 'Entradas confirmadas com data de recebimento neste mês.' },
-  pago: { title: 'Pago', criterio: 'Saídas confirmadas com data de pagamento neste mês.' },
-  apagar: { title: 'Ainda a pagar neste mês', criterio: 'Saídas previstas com vencimento neste mês. Ainda não saíram da conta.' },
+  recebido: { title: 'Recebido', criterio: 'Recebimentos realizados com data de recebimento neste mês.' },
+  pago: { title: 'Pago', criterio: 'Gastos pagos com data de pagamento neste mês.' },
   diferenca: {
     title: 'Diferença do mês',
-    criterio: 'Recebimentos menos pagamentos confirmados no período. Não é o saldo da conta, que também depende do saldo inicial e de outras movimentações.',
+    criterio:
+      'Recebimentos menos pagamentos confirmados no período. Não é o saldo da conta nem dinheiro disponível: o saldo também depende do saldo inicial e de outros movimentos. Compromissos previstos não entram.',
   },
 } as const;
 
-/** Composição de cada total, pelo mesmo critério do resumo (CL-V003). */
+/** Composição de cada total, com o mesmo critério e a mesma origem do resumo (CL C004). */
 export default function ComposicaoScreen() {
-  const { tipo = 'pago' } = useLocalSearchParams<{ tipo?: keyof typeof COPY }>();
-  const { summary, activeContext, month } = useFinance();
-  const copy = COPY[tipo] ?? COPY.pago;
+  const { tipo } = useLocalSearchParams<{ tipo?: keyof typeof COPY }>();
+  const kind = tipo && tipo in COPY ? tipo : 'pago';
+  const copy = COPY[kind];
+  const { month } = useView();
+  const personal = useSpace().data;
+  const records = useMonthRecords(personal?.personalContextId, month);
+  const s = records.summary;
 
-  const sections =
-    tipo === 'diferenca'
+  const sections = !s
+    ? []
+    : kind === 'diferenca'
       ? [
-          { label: 'Recebido', total: summary.receivedCents, events: summary.composition.received },
-          { label: 'Pago', total: summary.paidCents, events: summary.composition.paid },
+          { label: 'Recebido', total: s.receivedCents, list: s.composition.received },
+          { label: 'Pago', total: s.paidCents, list: s.composition.paid },
         ]
       : [
-          {
-            label: copy.title,
-            total: tipo === 'recebido' ? summary.receivedCents : tipo === 'apagar' ? summary.toPayCents : summary.paidCents,
-            events: tipo === 'recebido' ? summary.composition.received : tipo === 'apagar' ? summary.composition.toPay : summary.composition.paid,
-          },
+          kind === 'recebido'
+            ? { label: 'Recebido', total: s.receivedCents, list: s.composition.received }
+            : { label: 'Pago', total: s.paidCents, list: s.composition.paid },
         ];
 
   return (
     <Screen contentStyle={{ padding: space[6], gap: space[4] }}>
+      <Stack.Screen options={{ title: copy.title }} />
       <View style={{ gap: space[1] }}>
         <Txt variant="caption" color={colors.textSecondary}>
-          {activeContext.name} · {monthLabel(month)}
+          Pessoal · {formatMonthBR(month)}
         </Txt>
-        <Txt variant="title" style={{ fontSize: 22 }}>{copy.title}</Txt>
-        <Money cents={tipo === 'diferenca' ? summary.differenceCents : sections[0]!.total} variant="hero" />
+        {records.isPending ? (
+          <LoadingState />
+        ) : records.isError || !s ? (
+          <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => records.refetch()} />
+        ) : (
+          <Money cents={kind === 'diferenca' ? s.differenceCents : sections[0]!.total} variant="hero" />
+        )}
         <Txt color={colors.textSecondary}>{copy.criterio}</Txt>
       </View>
-      {sections.map((s) => (
-        <Card key={s.label}>
+      {sections.map((sec) => (
+        <Card key={sec.label}>
           <View style={styles.head}>
-            <Txt variant="title">{s.label}</Txt>
-            <Money cents={s.total} variant="title" />
+            <Txt variant="title">{sec.label}</Txt>
+            <Money cents={sec.total} variant="title" />
           </View>
-          {s.events.length === 0 ? (
-            <Txt color={colors.textSecondary}>Nenhum evento neste critério.</Txt>
+          {sec.list.length === 0 ? (
+            <EmptyState title="Nenhum registro neste critério" />
           ) : (
-            s.events.map((e) => <EventRow key={e.id} event={e} onPress={() => router.push('/movimentos')} />)
+            sec.list.map((r, i) => (
+              <RecordRow key={r.id} record={r} last={i === sec.list.length - 1} onPress={() => router.push(`/registro/${r.id}`)} />
+            ))
           )}
         </Card>
       ))}
@@ -63,5 +77,5 @@ export default function ComposicaoScreen() {
 }
 
 const styles = StyleSheet.create({
-  head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space[1] },
+  head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space[1], gap: space[2] },
 });

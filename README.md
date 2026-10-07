@@ -2,31 +2,42 @@
 
 Organização e educação financeira para pessoas e famílias, com fundação preparada para empresas oferecerem o plano como benefício.
 
-Primeiro incremento: 07/10/2026. Dados de demonstração são **fictícios**.
+<p>
+  <img src="docs/telas/01_boas_vindas.png" width="200" alt="Boas-vindas">
+  <img src="docs/telas/06_resumo_demo.png" width="200" alt="Resumo">
+  <img src="docs/telas/08_anotar_preenchido.png" width="200" alt="Anotar gasto">
+  <img src="docs/telas/10_detalhe_gasto_salvo.png" width="200" alt="Detalhe do registro">
+</p>
 
-![Resumo pessoal](docs/telas/01_resumo_pessoal.png)
+Primeiro ciclo: 07/10/2026. Sem Supabase configurado, o app roda em **demonstração** (acesso simulado e dados fictícios, com selo visível).
 
-## O que existe hoje
+## O que funciona
 
-| Parte | Onde | Situação |
-|---|---|---|
-| App (iOS, Android e web, um só código) | `apps/app` | Resumo, Movimentos, Metas, Aprender, Anotar gasto, Composição dos totais, Quem vê estes dados. Dados em memória. |
-| Regras financeiras | `packages/core` | Dinheiro em centavos, resumo do mês, validação, proteção contra duplicidade. 23 testes. |
-| Banco e permissões | `supabase/migrations` | Pessoas, contextos, família, empresa, licenças, direito ao plano, eventos. Permissões no banco (RLS). Testes de isolamento. |
-| Decisões e planejamento | `docs/` | Visão, arquitetura, regras, acessos e roteiro de lançamento. |
+- Entrada: boas-vindas, criar conta, confirmar e-mail, entrar, recuperar acesso e nova senha.
+- Sua primeira conta, criada uma única vez.
+- Gasto pago e recebimento já recebido: anotar, conferir no detalhe, editar e excluir com confirmação.
+- Resumo do mês e composição de cada total pela mesma origem; troca de mês.
+- Rascunho preservado, aviso antes de descartar, estados de carregamento, erro e vazio.
+- Banco com permissões por pessoa, contexto e ação; empresa não vê finanças.
 
 ## Como rodar
 
 Requer Node 20+.
 
 ```bash
-cd clarevo
 npm install
-npm run web        # abre no navegador
-npm run app        # abre o Expo; leia o QR code com o app Expo Go no celular
-npm test           # regras financeiras
+npm run web        # navegador
+npm run app        # celular com o app Expo Go (QR code)
+```
+
+## Como verificar
+
+```bash
+npm test           # regras financeiras (core)
 npm run typecheck
-npm run test:db    # permissões no banco (requer Postgres local)
+npm run test:db    # permissões e sequência de aceite no banco (Postgres local)
+npm run test:api   # código do app contra a API real do banco (PostgREST)
+npm run test:web   # fluxos completos na versão web (Playwright)
 ```
 
 ## Documentação
@@ -36,4 +47,6 @@ npm run test:db    # permissões no banco (requer Postgres local)
 3. [Regras financeiras](docs/02_REGRAS_FINANCEIRAS.md)
 4. [Acesso e permissões](docs/03_ACESSO_E_PERMISSOES.md)
 5. [Roteiro até o lançamento](docs/04_ROTEIRO_LANCAMENTO.md)
-6. [Referências recebidas](docs/referencias/) (instruções v2.1, handoff visual v1.0, pesquisa de mercado)
+6. [Ligar ao Supabase](docs/05_SUPABASE.md)
+7. [Marca](docs/marca/) e [telas](docs/telas/)
+8. [Referências recebidas](docs/referencias/)

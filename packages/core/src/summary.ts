@@ -1,16 +1,15 @@
-import type { FinancialEvent, IsoMonth } from './events';
-import { monthOf } from './events';
+import type { IsoMonth } from './dates';
+import { monthOf } from './dates';
 import type { Cents } from './money';
+import type { Commitment, FinancialRecord } from './records';
 
 /**
- * Resumo do mês de um contexto (CL-V003).
+ * Resumo do mês de um contexto (CL C004).
  *
- * Critérios:
- * - Recebido / Pago: eventos confirmados cuja data de recebimento/pagamento (settledOn) cai no mês.
- * - Diferença do mês: recebido − pago. Não é saldo da conta.
- * - Ainda a pagar: saídas previstas com vencimento no mês (ou, sem vencimento, competência no mês).
- * - A receber: entradas previstas pelo mesmo critério.
- * Cada total traz a lista de eventos que o compõem, pelo mesmo critério.
+ * Critério único: registros realizados do contexto cuja data de pagamento/recebimento cai no mês.
+ * - Recebido: receitas. Pago: despesas.
+ * - Diferença do mês = recebido − pago. Não é saldo da conta nem dinheiro disponível.
+ * Registros excluídos não chegam aqui (o repositório não os devolve).
  */
 export interface MonthSummary {
   contextId: string;
@@ -18,63 +17,40 @@ export interface MonthSummary {
   receivedCents: Cents;
   paidCents: Cents;
   differenceCents: Cents;
-  toPayCents: Cents;
-  toReceiveCents: Cents;
-  composition: {
-    received: FinancialEvent[];
-    paid: FinancialEvent[];
-    toPay: FinancialEvent[];
-    toReceive: FinancialEvent[];
-  };
-  /** Falso quando não há nenhum evento no mês: a interface mostra "sem registros", não R$ 0,00. */
-  hasData: boolean;
+  composition: { received: FinancialRecord[]; paid: FinancialRecord[] };
+  recordCount: number;
 }
 
-function forecastMonth(e: FinancialEvent): IsoMonth {
-  return e.dueOn ? monthOf(e.dueOn) : e.competence;
-}
+const sum = (xs: { amountCents: Cents }[]): Cents => xs.reduce((acc, x) => acc + x.amountCents, 0);
 
-const sum = (events: FinancialEvent[]): Cents => events.reduce((acc, e) => acc + e.amountCents, 0);
+const newestFirst = (a: FinancialRecord, b: FinancialRecord) =>
+  b.occurredOn.localeCompare(a.occurredOn) || b.createdAt.localeCompare(a.createdAt);
 
-export function summarizeMonth(
-  events: readonly FinancialEvent[],
-  contextId: string,
-  month: IsoMonth,
-): MonthSummary {
-  const live = events.filter((e) => e.contextId === contextId && !e.deletedAt);
-
-  const confirmedInMonth = live.filter(
-    (e) => e.status === 'confirmado' && e.settledOn !== undefined && monthOf(e.settledOn) === month,
-  );
-  const forecastInMonth = live.filter((e) => e.status === 'previsto' && forecastMonth(e) === month);
-
-  const received = confirmedInMonth.filter((e) => e.direction === 'entrada');
-  const paid = confirmedInMonth.filter((e) => e.direction === 'saida');
-  const toPay = forecastInMonth.filter((e) => e.direction === 'saida');
-  const toReceive = forecastInMonth.filter((e) => e.direction === 'entrada');
-
-  const byDateDesc = (a: FinancialEvent, b: FinancialEvent) =>
-    (b.settledOn ?? b.dueOn ?? '').localeCompare(a.settledOn ?? a.dueOn ?? '') ||
-    b.createdAt.localeCompare(a.createdAt);
-
+export function summarizeMonth(records: readonly FinancialRecord[], contextId: string, month: IsoMonth): MonthSummary {
+  const inMonth = records.filter((r) => r.contextId === contextId && r.status === 'realizado' && monthOf(r.occurredOn) === month);
+  const received = inMonth.filter((r) => r.kind === 'receita').sort(newestFirst);
+  const paid = inMonth.filter((r) => r.kind === 'despesa').sort(newestFirst);
   const receivedCents = sum(received);
   const paidCents = sum(paid);
-
   return {
     contextId,
     month,
     receivedCents,
     paidCents,
     differenceCents: receivedCents - paidCents,
-    toPayCents: sum(toPay),
-    toReceiveCents: sum(toReceive),
-    composition: {
-      received: received.sort(byDateDesc),
-      paid: paid.sort(byDateDesc),
-      // Previstos: o próximo vencimento primeiro.
-      toPay: toPay.sort((a, b) => byDateDesc(b, a)),
-      toReceive: toReceive.sort((a, b) => byDateDesc(b, a)),
-    },
-    hasData: confirmedInMonth.length + forecastInMonth.length > 0,
+    composition: { received, paid },
+    recordCount: inMonth.length,
   };
+}
+
+/** "Ainda a pagar neste mês": compromissos abertos com vencimento no mês. Origem separada. */
+export function summarizeCommitments(commitments: readonly Commitment[], contextId: string, month: IsoMonth) {
+  const items = commitments
+    .filter((c) => c.contextId === contextId && c.status === 'aberto' && monthOf(c.dueOn) === month)
+    .sort((a, b) => a.dueOn.localeCompare(b.dueOn));
+  return { toPayCents: sum(items), items };
+}
+
+export function sortNewestFirst(records: readonly FinancialRecord[]): FinancialRecord[] {
+  return [...records].sort(newestFirst);
 }

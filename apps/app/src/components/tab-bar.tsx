@@ -7,26 +7,32 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Txt } from '@/components/ui';
 import { colors, fonts, radius } from '@/theme/tokens';
 
-export const TABS: { name: string; href: '/' | '/movimentos' | '/metas' | '/aprender'; label: string; icon: LucideIcon }[] = [
-  { name: 'index', href: '/', label: 'Resumo', icon: House },
-  { name: 'movimentos', href: '/movimentos', label: 'Movimentos', icon: ArrowLeftRight },
-  { name: 'metas', href: '/metas', label: 'Metas', icon: Flag },
-  { name: 'aprender', href: '/aprender', label: 'Aprender', icon: BookOpen },
+/** Navegação: Resumo, Movimentações, Metas e Aprender. "Movimentos" é o rótulo compacto; o nome acessível é completo. */
+export const TABS: { name: string; href: '/' | '/movimentacoes' | '/metas' | '/aprender'; label: string; a11y: string; icon: LucideIcon }[] = [
+  { name: 'index', href: '/', label: 'Resumo', a11y: 'Resumo', icon: House },
+  { name: 'movimentacoes', href: '/movimentacoes', label: 'Movimentos', a11y: 'Movimentações', icon: ArrowLeftRight },
+  { name: 'metas', href: '/metas', label: 'Metas', a11y: 'Metas', icon: Flag },
+  { name: 'aprender', href: '/aprender', label: 'Aprender', a11y: 'Aprender', icon: BookOpen },
 ];
 
-type ButtonProps = TabTriggerSlotProps & { label: string; icon: LucideIcon };
+type ButtonProps = TabTriggerSlotProps & { label: string; a11y: string; icon: LucideIcon };
 
-export const TabButton = forwardRef<View, ButtonProps>(function TabButton({ isFocused, label, icon: Icon, ...props }, ref) {
+export const TabButton = forwardRef<View, ButtonProps>(function TabButton({ isFocused, label, a11y, icon: Icon, ...props }, ref) {
   const color = isFocused ? colors.brand : colors.textSecondary;
   return (
     <Pressable
       ref={ref}
       {...props}
       accessibilityRole="tab"
+      accessibilityLabel={a11y}
       accessibilityState={{ selected: !!isFocused }}
-      style={[styles.button, isFocused && styles.buttonActive]}>
+      style={(s) => [
+        styles.button,
+        isFocused && styles.buttonActive,
+        (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid' },
+      ]}>
       <Icon size={22} color={color} strokeWidth={isFocused ? 2.25 : 2} />
-      <Txt variant="caption" color={color} style={{ fontFamily: fonts.bold }}>
+      <Txt variant="caption" color={color} style={{ fontFamily: fonts.bold }} numberOfLines={1}>
         {label}
       </Txt>
     </Pressable>
@@ -53,13 +59,6 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     justifyContent: 'space-around',
   },
-  button: {
-    flex: 1,
-    minHeight: 60,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
+  button: { flex: 1, minHeight: 56, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', gap: 4 },
   buttonActive: { backgroundColor: colors.brandTint },
 });

@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { TABS, TabBar, TabButton } from '@/components/tab-bar';
 import { colors } from '@/theme/tokens';
 
-/** Quatro destinos (CL-V002): Resumo, Movimentos, Metas e Aprender. */
+/** Quatro destinos: Resumo, Movimentações, Metas e Aprender. Conta fica no avatar. */
 export default function TabsLayout() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -14,7 +14,7 @@ export default function TabsLayout() {
           <TabBar>
             {TABS.map((t) => (
               <TabTrigger key={t.name} name={t.name} href={t.href} asChild>
-                <TabButton label={t.label} icon={t.icon} />
+                <TabButton label={t.label} a11y={t.a11y} icon={t.icon} />
               </TabTrigger>
             ))}
           </TabBar>
