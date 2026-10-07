@@ -34,10 +34,31 @@ export function formatShortDate(iso: IsoDate): string {
   return `${Number(d)} ${(MONTHS[Number(m) - 1] ?? '').slice(0, 3)}`;
 }
 
+/** Fuso horário do aparelho (ex.: America/Rio_Branco); São Paulo se não for possível descobrir. */
+export function deviceTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Sao_Paulo';
+  } catch {
+    return 'America/Sao_Paulo';
+  }
+}
+
 /** Dia atual no fuso da pessoa (ex.: America/Sao_Paulo), como data civil. */
 export function todayIn(timeZone: string, now: Date = new Date()): IsoDate {
   // en-CA formata como AAAA-MM-DD.
   return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+}
+
+/** Soma dias a uma data civil sem passar pelo fuso local. */
+export function addDays(date: IsoDate, delta: number): IsoDate {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  return new Date(Date.UTC(y, m - 1, d + delta)).toISOString().slice(0, 10);
+}
+
+/** Máscara de data enquanto a pessoa digita: "06102026" vira "06/10/2026". */
+export function maskDateBR(text: string): string {
+  const d = text.replace(/\D/g, '').slice(0, 8);
+  return d.slice(0, 2) + (d.length > 2 ? `/${d.slice(2, 4)}` : '') + (d.length > 4 ? `/${d.slice(4)}` : '');
 }
 
 export function monthOf(date: IsoDate): IsoMonth {

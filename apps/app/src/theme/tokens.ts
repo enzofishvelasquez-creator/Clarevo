@@ -12,15 +12,18 @@ export const colors = {
   text: '#17223B',
   textSecondary: '#4B5873',
   textOnBrand: '#FFFFFF',
-  textOnBrandSoft: '#DCE5FF',
+  textOnBrandSoft: '#EEF2FF', // 5,0:1 sobre o azul
   surface: '#FFFFFF',
   background: '#F6F8FC',
   brandTint: '#EAF0FF',
-  border: '#E3E8F2',
+  border: '#E3E8F2', // divisórias decorativas
+  borderStrong: '#7D8AA6', // contorno de campos e chips: 3,4:1 sobre branco
   error: '#B42318',
   errorTint: '#FDECEA',
   success: '#087E58',
+  successText: '#06704F', // texto sobre successTint: 5,6:1
   successTint: '#E3F5EE',
+  placeholder: '#68748C', // 4,7:1 sobre branco
 } as const;
 
 export const space = { 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 24, 8: 32, 10: 40 } as const;

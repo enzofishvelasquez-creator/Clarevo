@@ -60,7 +60,7 @@ export default function ContaScreen() {
         </Txt>
         {msg ? (
           <Banner tone={msg.tone} icon={msg.tone === 'erro' ? AlertCircle : Check}>
-            <Txt variant="label" color={msg.tone === 'erro' ? colors.error : colors.success}>
+            <Txt variant="label" color={msg.tone === 'erro' ? colors.error : colors.successText}>
               {msg.text}
             </Txt>
           </Banner>
@@ -87,7 +87,7 @@ export default function ContaScreen() {
       <Button
         label="Sair"
         icon={LogOut}
-        tone="danger"
+        tone="soft"
         onPress={() => {
           signOutIntent.mark();
           signOut();

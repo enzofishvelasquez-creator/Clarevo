@@ -41,7 +41,8 @@ docs/                   decisões, regras, acessos, Supabase, roteiro, marca, te
 - Sessão de recuperação de senha: só "Nova senha".
 - Com sessão e sem conta financeira: só "Sua primeira conta".
 - Com conta: o app.
-- Sessão expirada: volta para Entrar e, depois do login, para a tela onde a pessoa estava.
+- Sessão expirada: volta para Entrar e, depois do login da mesma pessoa, para a tela onde ela estava.
+- Uma falha momentânea de rede não tira a pessoa da tela em que está (os dados já carregados continuam valendo).
 
 A navegação organiza a experiência; **quem protege os dados é o banco**.
 

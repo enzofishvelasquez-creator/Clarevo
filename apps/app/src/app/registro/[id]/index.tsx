@@ -8,15 +8,16 @@ import {
   monthOf,
   newOperationKey,
 } from '@clarevo/core';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { AlertCircle, ArrowDownLeft, ArrowLeft, ArrowUpRight, Check, Pencil, ShieldCheck, Trash2 } from 'lucide-react-native';
-import { useCallback, useRef, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { AlertCircle, ArrowDownLeft, ArrowLeft, ArrowUpRight, Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react-native';
+import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { BrandHeader, ContextSwitch } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
-import { Banner, Button, Card, Money, Screen, TopInset, Txt } from '@/components/ui';
+import { FlashBanner, useFlash } from '@/components/flash';
+import { Banner, Button, Card, FitMoney, Screen, TopInset, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { useDeleteRecord, useRecord, useSpace, useView, type SpaceKind } from '@/state/data';
 import { colors, fonts, radius, space } from '@/theme/tokens';
@@ -28,17 +29,10 @@ export default function DetalheRegistro() {
   const personal = useSpace().data;
   const view = useView();
   const remove = useDeleteRecord();
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice] = useFlash();
   const [confirming, setConfirming] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const deleteKey = useRef(newOperationKey());
-
-  useFocusEffect(
-    useCallback(() => {
-      const m = flash.take();
-      if (m) setNotice(m);
-    }, []),
-  );
 
   const toList = () => (router.canGoBack() ? router.back() : router.replace('/movimentacoes'));
   const switchContext = (next: SpaceKind) => {
@@ -55,7 +49,8 @@ export default function DetalheRegistro() {
     try {
       await remove.mutateAsync({ key: deleteKey.current, id: r.id, version: r.version });
       setConfirming(false);
-      router.replace('/movimentacoes');
+      flash.set('Registro excluído');
+      toList();
     } catch (e) {
       setConfirming(false);
       if (isRepoError(e, 'versao_desatualizada')) {
@@ -76,7 +71,7 @@ export default function DetalheRegistro() {
           <ContextSwitch onRequest={switchContext} />
         </View>
         <View style={styles.body}>
-          <Button label="Movimentações" icon={ArrowLeft} tone="ghost" onPress={toList} style={styles.back} />
+          <Button label="Voltar" icon={ArrowLeft} tone="ghost" onPress={toList} style={styles.back} />
 
           {record.isPending ? (
             <LoadingState />
@@ -89,13 +84,7 @@ export default function DetalheRegistro() {
             </Card>
           ) : (
             <>
-              {notice ? (
-                <Banner tone="sucesso" icon={Check}>
-                  <Txt variant="label" color={colors.success} style={{ fontFamily: fonts.bold }}>
-                    {notice}
-                  </Txt>
-                </Banner>
-              ) : null}
+              <FlashBanner message={notice} />
               {deleteError ? (
                 <Banner tone="erro" icon={AlertCircle}>
                   <Txt variant="label" color={colors.error}>
@@ -106,25 +95,32 @@ export default function DetalheRegistro() {
 
               <Card style={{ gap: space[3] }}>
                 <View style={[styles.badge, r.kind === 'receita' && { backgroundColor: colors.successTint }]}>
-                  {r.kind === 'despesa' ? <ArrowUpRight size={16} color={colors.brand} /> : <ArrowDownLeft size={16} color={colors.success} />}
-                  <Txt variant="label" color={r.kind === 'despesa' ? colors.brand : colors.success} style={{ fontFamily: fonts.bold }}>
+                  {r.kind === 'despesa' ? <ArrowUpRight size={16} color={colors.brand} /> : <ArrowDownLeft size={16} color={colors.successText} />}
+                  <Txt variant="label" color={r.kind === 'despesa' ? colors.brand : colors.successText} style={{ fontFamily: fonts.bold }}>
                     {r.kind === 'despesa' ? 'Gasto pago' : 'Recebido'}
                   </Txt>
                 </View>
                 <Txt variant="title" style={{ fontSize: 24, lineHeight: 32 }} accessibilityRole="header">
                   {r.description}
                 </Txt>
-                <Money cents={r.amountCents} variant="hero" />
+                <FitMoney cents={r.amountCents} />
                 <View>
                   <Row label="Contexto" value="Pessoal" />
-                  <Row label="Conta" value={account?.name ?? '—'} />
+                  <Row label="Conta" value={account?.name ?? 'Conta não encontrada'} />
                   <Row label="Data" value={formatDateBR(r.occurredOn)} />
-                  <Row label="Situação" value={r.kind === 'despesa' ? 'Pago' : 'Recebido'} />
                   <Row label="Categoria" value={r.category ?? NO_CATEGORY_LABEL} />
                   <Row label="Resumo afetado" value={formatMonthBR(monthOf(r.occurredOn))} last />
                 </View>
               </Card>
 
+              {notice === 'Gasto salvo' || notice === 'Recebimento salvo' ? (
+                <Button
+                  label={r.kind === 'despesa' ? 'Anotar outro gasto' : 'Registrar outro recebimento'}
+                  icon={Plus}
+                  tone="soft"
+                  onPress={() => router.replace({ pathname: '/registro/novo', params: { tipo: r.kind } })}
+                />
+              ) : null}
               <Button label="Editar registro" icon={Pencil} onPress={() => router.push(`/registro/${r.id}/editar`)} />
               <Button label="Excluir registro" icon={Trash2} tone="danger" onPress={() => setConfirming(true)} />
               <Button
@@ -154,7 +150,7 @@ export default function DetalheRegistro() {
                 <Txt style={{ fontFamily: fonts.bold }}>
                   {r.description} · {formatBRL(r.amountCents)} · Pessoal
                 </Txt>
-                <Txt color={colors.textSecondary}>O valor deixa de contar no resumo de {formatMonthBR(monthOf(r.occurredOn))}.</Txt>
+                <Txt color={colors.textSecondary}>O valor deixa de contar no resumo de {formatMonthBR(monthOf(r.occurredOn)).toLowerCase()}.</Txt>
               </ConfirmDialog>
             </>
           )}

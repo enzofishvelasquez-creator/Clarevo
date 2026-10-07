@@ -26,6 +26,9 @@ Beleza visual, fluidez de uso e informação útil têm o mesmo peso.
 | D-012 | 07/10/2026 | Escrita só por funções do banco com chave de idempotência por pessoa e versão do registro; leitura filtrada por permissão. | CL C006 |
 | D-013 | 07/10/2026 | Sem Supabase configurado, o app roda em demonstração (acesso simulado, selo visível). Conta nova nunca recebe dados fictícios. | CL C001 |
 | D-014 | 07/10/2026 | Senha: mínimo de 8 caracteres, com letras e números, informado antes do envio. | Proposta Claude (OWASP), revisável |
+| D-015 | 07/10/2026 | Valor aceita ponto como decimal quando não há vírgula e há 1 ou 2 casas (`12.50`): não é agrupamento de milhar válido, então não é ambíguo. | Revisão de design |
+| D-016 | 07/10/2026 | Demonstração só abre em desenvolvimento ou com `EXPO_PUBLIC_MODO_DEMO=1`; build de produção sem servidor mostra "Configuração incompleta". | Revisão de código |
+| D-017 | 07/10/2026 | O fuso horário vem do aparelho no primeiro acesso; o dia atual é recalculado ao voltar para o app. | Revisão de código |
 
 ## Decisões pendentes (alteram o que construímos)
 

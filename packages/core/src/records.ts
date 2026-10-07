@@ -62,4 +62,7 @@ export interface RecordInput {
 }
 
 export const NO_CATEGORY_LABEL = 'Sem categoria';
-export const CATEGORIES = ['Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Renda'] as const;
+export const CATEGORIES: Record<RecordKind, readonly string[]> = {
+  despesa: ['Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer'],
+  receita: ['Salário', 'Renda extra', 'Reembolso'],
+};

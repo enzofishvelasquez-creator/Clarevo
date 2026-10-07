@@ -1,16 +1,17 @@
-import {
-  Manrope_400Regular,
-  Manrope_500Medium,
-  Manrope_600SemiBold,
-  Manrope_700Bold,
-  Manrope_800ExtraBold,
-  useFonts,
-} from '@expo-google-fonts/manrope';
+// Só os pesos usados (importar o pacote inteiro levaria todos os pesos para o app).
+import { Manrope_400Regular } from '@expo-google-fonts/manrope/400Regular';
+import { Manrope_500Medium } from '@expo-google-fonts/manrope/500Medium';
+import { Manrope_600SemiBold } from '@expo-google-fonts/manrope/600SemiBold';
+import { Manrope_700Bold } from '@expo-google-fonts/manrope/700Bold';
+import { Manrope_800ExtraBold } from '@expo-google-fonts/manrope/800ExtraBold';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import { Stack, usePathname } from 'expo-router';
+import { router, Stack, useGlobalSearchParams, usePathname } from 'expo-router';
+import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { afterLogin, signOutIntent } from '@/lib/nav';
@@ -33,6 +34,11 @@ export default function RootLayout() {
   const [queryClient] = useState(
     () => new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 }, mutations: { retry: 0 } } }),
   );
+
+  useEffect(() => {
+    // Leitores de tela na web precisam do idioma da página.
+    if (Platform.OS === 'web' && typeof document !== 'undefined') document.documentElement.lang = 'pt-BR';
+  }, []);
 
   useEffect(() => {
     // Se a fonte falhar, segue com a fonte do sistema (alternativa prevista no CL-V001).
@@ -62,6 +68,7 @@ export default function RootLayout() {
 function Navigation() {
   const { ready, user, recovery, repo } = useSession();
   const pathname = usePathname();
+  const params = useGlobalSearchParams();
   const lastPath = useRef(pathname);
   const prevUser = useRef(user);
 
@@ -71,25 +78,38 @@ function Navigation() {
     enabled: Boolean(user && repo && !recovery),
   });
 
-  // Sessão encerrada sem a pessoa pedir (expirou): voltar à entrada e retomar o destino depois.
+  // Sessão encerrada sem a pessoa pedir (expirou): voltar à entrada e retomar o destino depois,
+  // só se a mesma pessoa entrar de novo.
   useEffect(() => {
-    if (prevUser.current && !user && !signOutIntent.consume()) afterLogin.set(lastPath.current);
+    if (prevUser.current && !user && !signOutIntent.consume()) {
+      afterLogin.set(lastPath.current, prevUser.current.id);
+      // As rotas protegidas já saíram da pilha; levar a pessoa direto para Entrar.
+      setTimeout(() => router.replace('/entrar'), 0);
+    }
     prevUser.current = user;
   }, [user]);
   useEffect(() => {
-    if (user) lastPath.current = pathname;
-  }, [pathname, user]);
+    if (!user) return;
+    const query = new URLSearchParams(
+      Object.entries(params).flatMap(([k, v]) => (typeof v === 'string' ? [[k, v]] : [])),
+    ).toString();
+    lastPath.current = query ? `${pathname}?${query}` : pathname;
+  }, [pathname, params, user]);
 
+  // Navegação entre telas respeita "reduzir movimento".
+  const reduceMotion = useReducedMotion();
+
+  // Dados já carregados prevalecem: uma falha de atualização em segundo plano não tira a pessoa da tela.
   const status: SpaceStatus = !ready
     ? 'pendente'
     : !user
       ? 'sem-sessao'
-      : space.isPending
-        ? 'pendente'
-        : space.isError
-          ? 'erro'
-          : space.data
-            ? 'pronto'
+      : space.data
+        ? 'pronto'
+        : space.isPending
+          ? 'pendente'
+          : space.isError
+            ? 'erro'
             : 'sem-conta';
 
   const signedOut = ready && !user;
@@ -104,7 +124,7 @@ function Navigation() {
           headerTitleStyle: { fontFamily: fonts.bold, color: colors.text },
           headerBackButtonDisplayMode: 'minimal',
           contentStyle: { backgroundColor: colors.background },
-          animation: 'default',
+          animation: reduceMotion ? 'none' : 'default',
         }}>
         <Stack.Protected guard={signedOut}>
           <Stack.Screen name="boas-vindas" />

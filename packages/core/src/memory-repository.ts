@@ -74,7 +74,7 @@ export class MemoryRepository implements RecordsRepository {
     return this.read(() => this.space);
   }
 
-  async ensurePersonalSpace(accountName: string) {
+  async ensurePersonalSpace(accountName: string, timeZone?: string) {
     return this.write(() => {
       if (this.space) return this.space;
       const name = accountName.trim();
@@ -84,7 +84,7 @@ export class MemoryRepository implements RecordsRepository {
       this.space = {
         personId: this.opts.actorId,
         displayName: this.opts.displayName,
-        timeZone: this.opts.timeZone ?? 'America/Sao_Paulo',
+        timeZone: timeZone ?? this.opts.timeZone ?? 'America/Sao_Paulo',
         personalContextId: contextId,
         accounts: [account],
       };
@@ -213,7 +213,8 @@ export class MemoryRepository implements RecordsRepository {
     if (!Number.isSafeInteger(input.amountCents) || input.amountCents < 1) throw new RepoError('valor_invalido');
     if (input.amountCents > MAX_RECORD_CENTS) throw new RepoError('valor_acima_do_limite');
     if (input.description.length === 0) throw new RepoError('descricao_obrigatoria');
-    if (input.description.length > 80) throw new RepoError('descricao_longa');
+    if ([...input.description].length > 80) throw new RepoError('descricao_longa');
+    if (input.category && [...input.category].length > 40) throw new RepoError('categoria_invalida');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(input.occurredOn)) throw new RepoError('data_invalida');
     if (input.occurredOn > this.opts.today()) throw new RepoError('data_futura');
     const acc = this.space?.accounts.find((a) => a.id === input.accountId);

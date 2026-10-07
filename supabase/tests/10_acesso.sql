@@ -60,12 +60,17 @@ end $$;
 
 select set_config('request.jwt.claim.sub', :davi, true);
 select pg_temp.expect_error($$select public.ensure_personal_space('   ')$$, 'nome_da_conta_invalido');
-select public.ensure_personal_space('Conta principal');
-do $$ begin assert (select display_name from public.persons where id = auth.uid()) = 'davi', 'sem nome, usa o início do e-mail'; end $$;
+select public.ensure_personal_space('Conta principal', 'America/Rio_Branco');
+do $$ begin
+  assert (select display_name from public.persons where id = auth.uid()) = 'davi', 'sem nome, usa o início do e-mail';
+  assert (select time_zone from public.persons where id = auth.uid()) = 'America/Rio_Branco', 'fuso do aparelho é guardado';
+end $$;
+select pg_temp.expect_error($$update public.persons set time_zone = 'Marte/Olimpo' where id = auth.uid()$$, 'permission denied%');
 select set_config('request.jwt.claim.sub', :bruno, true);
 insert into ids select 'bruno_ctx', (public.ensure_personal_space('Conta do Bruno') ->> 'context_id')::uuid;
 select set_config('request.jwt.claim.sub', :carla, true);
-select public.ensure_personal_space('Conta principal');
+select public.ensure_personal_space('Conta principal', 'Marte/Olimpo');
+do $$ begin assert (select time_zone from public.persons where id = auth.uid()) = 'America/Sao_Paulo', 'fuso inválido vira São Paulo'; end $$;
 
 -- Preparação feita pelo backend (convites e benefício ficam para ciclos seguintes).
 reset role;
@@ -162,6 +167,14 @@ do $$ begin
   assert (select count(*) from public.plan_entitlements) = 0, 'Carla NÃO vê direitos ao plano de outras pessoas';
   assert (select count(*) from public.commitments) = 0, 'Carla NÃO vê compromissos';
 end $$;
+select pg_temp.expect_error(format($$select * from public.month_totals(%L, '2026-10-01')$$, (select id from ids where name = 'ana_ctx')), 'sem_permissao');
+-- Empresa convida por e-mail, mas não escolhe beneficiário nem ativa a licença.
+select pg_temp.expect_error($$insert into public.licenses (contract_id, invited_email, person_id)
+  values ('20000000-0000-0000-0000-000000000001', 'davi@exemplo.test', '00000000-0000-0000-0000-00000000000d')$$, 'permission denied%');
+insert into public.licenses (contract_id, invited_email) values ('20000000-0000-0000-0000-000000000001', 'novo@exemplo.test');
+do $$ begin assert (select status from public.licenses where invited_email = 'novo@exemplo.test') = 'convidada', 'convite nasce como convidada'; end $$;
+select pg_temp.expect_error($$update public.licenses set status = 'ativa' where invited_email = 'novo@exemplo.test'$$, '%licenses_check%');
+select pg_temp.expect_error($$update public.licenses set person_id = '00000000-0000-0000-0000-00000000000d'$$, 'permission denied%');
 
 -- 5. Davi (externo) e sem sessão: nada de ninguém.
 select set_config('request.jwt.claim.sub', :davi, true);
@@ -185,11 +198,19 @@ set role authenticated;
 
 -- 6. Ana revoga Bruno: bloqueio imediato de leitura e escrita.
 select set_config('request.jwt.claim.sub', :ana, true);
+update public.context_memberships set revoked_at = now() where person_id = auth.uid();
+do $$ begin
+  assert (select count(*) from public.context_memberships where person_id = auth.uid() and revoked_at is not null) = 0, 'titular NÃO revoga o próprio vínculo';
+  assert (select count(*) from public.financial_contexts) = 2, 'Ana continua vendo pessoal e família';
+end $$;
 update public.context_memberships set revoked_at = now() where person_id = '00000000-0000-0000-0000-00000000000b';
 select set_config('request.jwt.claim.sub', :bruno, true);
 do $$ begin assert (select count(*) from public.financial_records) = 0, 'Bruno revogado não vê a família'; end $$;
 select pg_temp.expect_error(format($$select public.create_record('chave-bru-0007', %L, %L, 'despesa', 100, '2026-10-05', 'Depois da revogação')$$,
   (select id from ids where name = 'familia'), (select id from ids where name = 'familia_conta')), 'sem_permissao');
+-- Repetir uma operação antiga (mesma chave e conteúdo) não devolve o registro depois da revogação.
+select pg_temp.expect_error(format($$select public.create_record('chave-bru-0006', %L, %L, 'despesa', 20000, '2026-10-06', 'Transporte')$$,
+  (select id from ids where name = 'familia'), (select id from ids where name = 'familia_conta')), 'nao_encontrado');
 
 -- 7. Fim do benefício não apaga conta, histórico ou família.
 reset role;

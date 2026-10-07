@@ -68,4 +68,11 @@ Se preferir, me envie só a **Project URL** e a **chave pública** (são públic
 - "Esqueci minha senha" → chega o e-mail → abrir o link → "Nova senha".
 - Anotar um gasto, fechar o app, abrir de novo: o gasto continua lá.
 
-Os testes de permissão do banco (`npm run test:db`) rodaram em Postgres local com uma simulação do esquema de autenticação do Supabase. Depois de criar o projeto, vale repeti-los no `clarevo-teste`.
+Os testes de permissão do banco (`npm run test:db`) rodam em Postgres local com uma simulação do esquema de autenticação do Supabase; esses scripts não devem ser aplicados no Supabase. Depois de criar o projeto, repetir os fluxos pelo app no `clarevo-teste`.
+
+## Custos (consultados em 07/10/2026 no repositório oficial do Supabase)
+
+- **Free (US$ 0):** bom para desenvolvimento. Pausa o projeto após 1 semana sem uso, não tem backup automático e o e-mail embutido envia cerca de 2 mensagens por hora, só para a equipe do projeto. Não serve para pessoas reais.
+- **Pro (a partir de US$ 25 por mês por organização):** não pausa, backup diário de 7 dias, 100 mil usuários ativos por mês incluídos e proteção contra senhas vazadas. Cada projeto a mais (por exemplo, `clarevo-teste`) soma cerca de US$ 10 por mês.
+- **E-mail próprio (SMTP):** sem custo no Supabase; o custo é do provedor escolhido.
+- **Recuperação para um ponto no tempo (PITR):** cerca de US$ 105 por mês a mais; pode esperar haver volume real.

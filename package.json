@@ -11,7 +11,7 @@
     "test": "npm --workspace packages/core run test",
     "typecheck": "npm --workspace packages/core run typecheck && npm --workspace apps/app run typecheck",
     "test:db": "bash supabase/tests/run_local.sh",
-    "test:web": "npm --workspace apps/app run export:web && node scripts/e2e-web.js",
+    "test:web": "npm --workspace apps/app run export:demo && node scripts/e2e-web.js",
     "test:api": "bash supabase/tests/run_api.sh"
   },
   "devDependencies": {

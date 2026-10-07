@@ -1,13 +1,19 @@
-import { DEMO_TODAY, todayIn, type IsoDate, type RecordsRepository } from '@clarevo/core';
+import { DEMO_TODAY, deviceTimeZone, todayIn, type IsoDate, type RecordsRepository } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Linking from 'expo-linking';
 import { createContext, use, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { AppState, Text, View } from 'react-native';
 
 import { pendingCredentials, type AuthService, type AuthState } from '@/lib/auth';
 import { DemoAuth } from '@/lib/demo-auth';
 import { SupabaseAuth, supabaseConfigured } from '@/lib/supabase';
 
-const auth: AuthService = supabaseConfigured ? new SupabaseAuth() : new DemoAuth();
+/**
+ * Sem Supabase configurado, a demonstração só roda em desenvolvimento ou quando pedida
+ * explicitamente (EXPO_PUBLIC_MODO_DEMO=1). Um build de produção sem configuração não vira demonstração em silêncio.
+ */
+const demoAllowed = __DEV__ || process.env.EXPO_PUBLIC_MODO_DEMO === '1';
+const auth: AuthService | null = supabaseConfigured ? new SupabaseAuth() : demoAllowed ? new DemoAuth() : null;
 
 interface SessionValue extends AuthState {
   ready: boolean;
@@ -24,10 +30,42 @@ interface SessionValue extends AuthState {
 const SessionContext = createContext<SessionValue | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
+  if (!auth) return <ConfigMissing />;
+  return <SessionProviderInner auth={auth}>{children}</SessionProviderInner>;
+}
+
+function ConfigMissing() {
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: '#FFFFFF' }}>
+      <Text style={{ fontSize: 18, fontWeight: '700', color: '#17223B', textAlign: 'center' }}>Configuração incompleta</Text>
+      <Text style={{ fontSize: 16, color: '#4B5873', textAlign: 'center', marginTop: 8 }}>
+        Este aplicativo foi gerado sem a ligação com o servidor. Consulte docs/05_SUPABASE.md.
+      </Text>
+    </View>
+  );
+}
+
+/** Dia atual no fuso do aparelho, recalculado a cada minuto e ao voltar para o app. */
+function useToday(mode: AuthService['mode']): IsoDate {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const tick = () => setNow(Date.now());
+    const timer = setInterval(tick, 60_000);
+    const sub = AppState.addEventListener('change', (s) => s === 'active' && tick());
+    return () => {
+      clearInterval(timer);
+      sub.remove();
+    };
+  }, []);
+  return mode === 'demo' ? DEMO_TODAY : todayIn(deviceTimeZone(), new Date(now));
+}
+
+function SessionProviderInner({ auth, children }: { auth: AuthService; children: ReactNode }) {
   const queryClient = useQueryClient();
   const [state, setState] = useState<AuthState>({ user: null, recovery: false });
   const [ready, setReady] = useState(false);
   const [linkProblem, setLinkProblem] = useState(false);
+  const today = useToday(auth.mode);
 
   useEffect(() => {
     let alive = true;
@@ -48,7 +86,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       alive = false;
       unsubscribe();
     };
-  }, [queryClient]);
+  }, [queryClient, auth]);
 
   // Links de confirmação e recuperação abertos a partir do e-mail.
   useEffect(() => {
@@ -59,13 +97,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     Linking.getInitialURL().then(handle);
     const sub = Linking.addEventListener('url', (e) => handle(e.url));
     return () => sub.remove();
-  }, []);
+  }, [auth]);
 
   const signOut = useCallback(async () => {
     pendingCredentials.clear();
     await auth.signOut();
     queryClient.clear();
-  }, [queryClient]);
+  }, [queryClient, auth]);
 
   const repo = useMemo(() => (state.user ? auth.repositoryFor(state.user) : null), [state.user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -75,12 +113,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       ready,
       auth,
       repo,
-      today: auth.mode === 'demo' ? DEMO_TODAY : todayIn('America/Sao_Paulo'),
+      today,
       linkProblem,
       clearLinkProblem: () => setLinkProblem(false),
       signOut,
     }),
-    [state, ready, repo, linkProblem, signOut],
+    [state, ready, repo, linkProblem, signOut, today, auth],
   );
 
   return <SessionContext value={value}>{children}</SessionContext>;

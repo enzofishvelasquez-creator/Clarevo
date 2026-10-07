@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEMO_TODAY,
+  addDays,
+  maskDateBR,
   ERROR_TEXT,
   MemoryRepository,
   centsToInput,
@@ -54,9 +56,12 @@ describe('dinheiro', () => {
     ['1234,56', 123456],
     ['R$ 80', 8000],
     ['9.999.999,99', 999999999],
+    ['12.50', 1250],
+    ['12.5', 1250],
+    [' 80,00 ', 8000],
   ])('lê "%s"', (text, cents) => expect(parseBRL(text)).toBe(cents));
 
-  it.each(['', 'abc', '1,234', '12.34', '1.40', '-10', '10,', '80,001', '1.2345,00'])('rejeita "%s"', (text) =>
+  it.each(['', 'abc', '1,234', '-10', '10,', '80,001', '1.2345,00', '12 34', '1.2.3', '12.345.6'])('rejeita "%s"', (text) =>
     expect(parseBRL(text)).toBeNull(),
   );
 });
@@ -71,6 +76,15 @@ describe('datas civis', () => {
   it.each(['31/09/2026', '29/02/2026', '00/10/2026', '2026-10-07', '07/13/2026'])('rejeita data impossível "%s"', (d) =>
     expect(parseDateBR(d)).toBeNull(),
   );
+
+  it('máscara de data e soma de dias', () => {
+    expect(maskDateBR('06102026')).toBe('06/10/2026');
+    expect(maskDateBR('06/10/2026')).toBe('06/10/2026');
+    expect(maskDateBR('061')).toBe('06/1');
+    expect(maskDateBR('06')).toBe('06');
+    expect(addDays('2026-10-01', -1)).toBe('2026-09-30');
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
+  });
 
   it('dia atual usa o fuso da pessoa', () => {
     // 02:30 UTC de 8/10 ainda é 7/10 em São Paulo (UTC−3).
@@ -114,6 +128,17 @@ describe('validação do formulário (CL C002)', () => {
       expect(v.errors.description).toBe(ERROR_TEXT.descricao_longa);
       expect(v.errors.amountText).toBe(ERROR_TEXT.valor_acima_do_limite);
     }
+  });
+
+  it('valor com dígitos demais mostra a mensagem de limite', () => {
+    const v = validateRecordDraft(draft({ amountText: '99999999999999999' }), DEMO_TODAY);
+    expect(v.ok).toBe(false);
+    if (!v.ok) expect(v.errors.amountText).toBe(ERROR_TEXT.valor_acima_do_limite);
+  });
+
+  it('descrição conta caracteres como o banco (emoji conta 1)', () => {
+    expect(validateRecordDraft(draft({ description: '🍞'.repeat(80) }), DEMO_TODAY).ok).toBe(true);
+    expect(validateRecordDraft(draft({ description: '🍞'.repeat(81) }), DEMO_TODAY).ok).toBe(false);
   });
 
   it('80 caracteres é aceito', () => {

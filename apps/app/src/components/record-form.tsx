@@ -1,6 +1,10 @@
 import {
   CATEGORIES,
+  DESCRIPTION_MAX,
   ERROR_TEXT,
+  addDays,
+  charCount,
+  maskDateBR,
   FIELD_ORDER,
   NO_CATEGORY_LABEL,
   centsToInput,
@@ -21,6 +25,7 @@ import {
   type RecordInput,
   type RecordKind,
 } from '@clarevo/core';
+import { useQueryClient } from '@tanstack/react-query';
 import { router, useNavigation } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { AlertCircle, ArrowLeft, Info, User } from 'lucide-react-native';
@@ -48,7 +53,7 @@ const COPY = {
   receita: {
     newTitle: 'Registrar recebimento',
     editTitle: 'Editar recebimento',
-    situation: 'Recebimento já recebido',
+    situation: 'Recebimento já realizado',
     dateLabel: 'Data do recebimento',
     save: 'Salvar recebimento',
   },
@@ -62,6 +67,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   const navigation = useNavigation();
   const create = useCreateRecord();
   const update = useUpdateRecord();
+  const qc = useQueryClient();
 
   const kind = mode.type === 'novo' ? mode.kind : mode.record.kind;
   const copy = COPY[kind];
@@ -91,7 +97,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   const [confirmDiscard, setConfirmDiscard] = useState<null | (() => void)>(null);
 
   const opKey = useRef(newOperationKey());
-  const failed = useRef<{ key: string; snapshot: string } | null>(null);
+  /** Tentativas com resultado incerto (falha de rede), da mais antiga para a mais recente. */
+  const pending = useRef<{ key: string; snapshot: string }[]>([]);
   const refs = {
     description: useRef<TextInput>(null),
     amountText: useRef<TextInput>(null),
@@ -139,6 +146,27 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     return update.mutateAsync({ key, id: mode.record.id, version, input });
   };
 
+  /**
+   * Resultado de rede incerto: antes de repetir, conferir se alguma tentativa anterior foi gravada.
+   * Se foi, e o preenchimento mudou depois da falha, aplica o preenchimento atual como edição
+   * desse mesmo registro (nunca cria um segundo). Devolve o ID do registro, ou null se nada foi gravado.
+   */
+  const reconcile = async (input: RecordInput, snapshot: string): Promise<string | null> => {
+    for (const attempt of [...pending.current].reverse()) {
+      const op = await repo.findOperation(attempt.key);
+      if (!op) continue;
+      pending.current = [];
+      qc.invalidateQueries({ queryKey: ['records'] });
+      qc.invalidateQueries({ queryKey: ['record', op.recordId] });
+      if (attempt.snapshot === snapshot) return op.recordId;
+      const current = await repo.getRecord(op.recordId);
+      if (!current) return op.recordId;
+      const updated = await update.mutateAsync({ key: newOperationKey(), id: current.id, version: current.version, input });
+      return updated.id;
+    }
+    return null;
+  };
+
   const submit = async (versionOverride?: number) => {
     if (busy) return; // envio repetido bloqueado enquanto o anterior não termina
     const v = validateRecordDraft(draft, today);
@@ -151,45 +179,51 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     setBanner(null);
     setBusy(true);
     const version = versionOverride ?? baseVersion;
+    const snapshot = JSON.stringify([v.input, version]);
     try {
-      // Resultado de rede incerto: reconciliar antes de repetir.
-      if (failed.current) {
-        const op = await repo.findOperation(failed.current.key);
-        if (op) {
-          failed.current = null;
-          finish(op.recordId);
+      if (pending.current.length > 0) {
+        const saved = await reconcile(v.input, snapshot);
+        if (saved) {
+          finish(saved);
           return;
         }
-        if (failed.current.snapshot !== JSON.stringify([v.input, version])) opKey.current = newOperationKey();
+        // Nada foi gravado: repetir com a mesma chave se o conteúdo é o mesmo da última tentativa.
+        const last = pending.current[pending.current.length - 1];
+        if (!last || last.snapshot !== snapshot) opKey.current = newOperationKey();
       }
       const key = opKey.current;
       try {
         const saved = await send(key, v.input, version);
-        failed.current = null;
+        pending.current = [];
         finish(saved.id);
       } catch (e) {
-        if (isRepoError(e)) {
+        if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
+          opKey.current = newOperationKey();
           const field = fieldForErrorCode(e.code);
           if (field) {
             const errs = { [field]: ERROR_TEXT[e.code as keyof typeof ERROR_TEXT] };
             setErrors(errs);
             focusFirst(errs);
-            opKey.current = newOperationKey();
             return;
           }
           if (e.code === 'versao_desatualizada' && mode.type === 'editar') {
-            const current = await repo.getRecord(mode.record.id).catch(() => null);
-            if (current) setConflict(current);
-            else setBanner(ERROR_TEXT.nao_encontrado);
-            opKey.current = newOperationKey();
+            try {
+              const current = await repo.getRecord(mode.record.id);
+              qc.invalidateQueries({ queryKey: ['records'] });
+              if (current) {
+                qc.setQueryData(['record', current.id], current);
+                setConflict(current);
+              } else setBanner(ERROR_TEXT.nao_encontrado);
+            } catch {
+              setBanner(`${ERROR_TEXT.versao_desatualizada} ${ERROR_TEXT.carregar_falhou}`);
+            }
             return;
           }
-          if (e.code === 'nao_encontrado' || e.code === 'sem_permissao') {
-            setBanner(ERROR_TEXT[e.code]);
-            return;
-          }
+          setBanner(e.code in ERROR_TEXT ? ERROR_TEXT[e.code as keyof typeof ERROR_TEXT] : ERROR_TEXT.salvar_falhou);
+          return;
         }
-        failed.current = { key, snapshot: JSON.stringify([v.input, version]) };
+        // Falha de rede: a gravação pode ou não ter acontecido. Guardar a tentativa para reconciliar.
+        pending.current = [...pending.current, { key, snapshot }];
         setBanner(ERROR_TEXT.salvar_falhou);
       }
     } catch {
@@ -272,8 +306,10 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
               value={draft.description}
               onChangeText={(t) => set('description', t)}
               placeholder={kind === 'despesa' ? 'Ex.: Café' : 'Ex.: Salário'}
-              maxLength={120}
+              maxLength={DESCRIPTION_MAX}
+              autoFocus={mode.type === 'novo'}
               error={errors.description}
+              hint={charCount(draft.description) >= 60 ? `${charCount(draft.description)} de ${DESCRIPTION_MAX} caracteres` : undefined}
               returnKeyType="next"
               onSubmitEditing={() => refs.amountText.current?.focus()}
             />
@@ -294,13 +330,22 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
               ref={refs.dateText}
               label={copy.dateLabel}
               value={draft.dateText}
-              onChangeText={(t) => set('dateText', t)}
+              onChangeText={(t) => set('dateText', maskDateBR(t))}
               placeholder="DD/MM/AAAA"
-              keyboardType="numbers-and-punctuation"
+              keyboardType="number-pad"
+              inputMode="numeric"
               maxLength={10}
               error={errors.dateText}
-              hint="Formato DD/MM/AAAA. Só datas até hoje."
+              hint="Digite só os números. Só datas até hoje."
             />
+            <View style={styles.chips}>
+              <Chip label="Hoje" selected={draft.dateText === formatDateBR(today)} onPress={() => set('dateText', formatDateBR(today))} />
+              <Chip
+                label="Ontem"
+                selected={draft.dateText === formatDateBR(addDays(today, -1))}
+                onPress={() => set('dateText', formatDateBR(addDays(today, -1)))}
+              />
+            </View>
 
             {personal.accounts.length > 1 ? (
               <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel="Conta">
@@ -326,7 +371,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
               </Txt>
               <View style={styles.chips}>
                 <Chip label={NO_CATEGORY_LABEL} selected={draft.category === null} onPress={() => set('category', null)} />
-                {CATEGORIES.map((c) => (
+                {CATEGORIES[kind].map((c) => (
                   <Chip key={c} label={c} selected={draft.category === c} onPress={() => set('category', c)} />
                 ))}
               </View>
@@ -335,7 +380,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             {movesMonth && parsedDate ? (
               <Banner tone="info" icon={Info}>
                 <Txt variant="label">
-                  O registro sai de {formatMonthBR(monthOf(mode.record.occurredOn))} e passa a contar em {formatMonthBR(monthOf(parsedDate))}.
+                  O registro sai de {formatMonthBR(monthOf(mode.record.occurredOn)).toLowerCase()} e passa a contar em{' '}
+                  {formatMonthBR(monthOf(parsedDate)).toLowerCase()}.
                 </Txt>
               </Banner>
             ) : null}

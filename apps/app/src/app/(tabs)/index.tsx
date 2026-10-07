@@ -1,14 +1,15 @@
-import { ERROR_TEXT, formatMonthBR } from '@clarevo/core';
+import { ERROR_TEXT, formatBRL, formatDateBR, formatMonthBR } from '@clarevo/core';
 import { router } from 'expo-router';
 import { ArrowRight, CalendarClock, Plus, ShieldCheck } from 'lucide-react-native';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
 import { FamilyNotLinked } from '@/components/family-state';
+import { FlashBanner, useFlash } from '@/components/flash';
 import { BrandHeader, ContextSwitch, MonthSwitcher } from '@/components/header';
 import { RecordRow } from '@/components/record-row';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
-import { Button, Card, DemoBadge, LinkButton, Money, Screen, TopInset, Txt } from '@/components/ui';
+import { Button, Card, DemoBadge, FitMoney, LinkButton, Money, Screen, TopInset, Txt } from '@/components/ui';
 import { useCommitments, useMonthRecords, useSpace, useView } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
@@ -16,8 +17,10 @@ import { colors, fonts, radius, space } from '@/theme/tokens';
 const fade = FadeIn.duration(200).reduceMotion(ReduceMotion.System);
 
 export default function ResumoScreen() {
-  const { auth } = useSession();
-  const { space: kind, month } = useView();
+  const { auth, today } = useSession();
+  const { space: kind, month, currentMonth } = useView();
+  const narrow = useWindowDimensions().width < 360;
+  const [notice] = useFlash();
   const personal = useSpace().data;
   const contextId = kind === 'pessoal' ? personal?.personalContextId : undefined;
   const records = useMonthRecords(contextId, month);
@@ -52,15 +55,22 @@ export default function ResumoScreen() {
                   <Txt variant="label" color={colors.textOnBrand} style={styles.heroLabel}>
                     Diferença do mês
                   </Txt>
-                  <Money cents={s.differenceCents} variant="hero" color={colors.textOnBrand} adjustsFontSizeToFit numberOfLines={1} />
+                  <FitMoney cents={s.differenceCents} color={colors.textOnBrand} />
                   <Txt variant="caption" color={colors.textOnBrandSoft}>
                     Recebimentos menos pagamentos confirmados
+                    {month === currentMonth ? ` · até ${formatDateBR(today).slice(0, 5)}` : ''}
                   </Txt>
+                  {s.differenceCents < 0 ? (
+                    <Txt variant="caption" color={colors.textOnBrand} style={{ fontFamily: fonts.bold }}>
+                      Pagamentos acima dos recebimentos no período
+                    </Txt>
+                  ) : null}
                 </Pressable>
                 <View style={styles.split}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`Recebido: ver composição`}
+                    accessibilityLabel={`Recebido, ${formatBRL(s.receivedCents)}`}
+                    accessibilityHint="Abre a composição"
                     onPress={() => router.push({ pathname: '/composicao', params: { tipo: 'recebido' } })}
                     style={styles.splitItem}>
                     <Txt variant="caption" color={colors.textOnBrandSoft} style={{ fontFamily: fonts.bold }}>
@@ -70,9 +80,10 @@ export default function ResumoScreen() {
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`Pago: ver composição`}
+                    accessibilityLabel={`Pago, ${formatBRL(s.paidCents)}`}
+                    accessibilityHint="Abre a composição"
                     onPress={() => router.push({ pathname: '/composicao', params: { tipo: 'pago' } })}
-                    style={[styles.splitItem, { alignItems: 'flex-end' }]}>
+                    style={[styles.splitItem, !narrow && { alignItems: 'flex-end' }]}>
                     <Txt variant="caption" color={colors.textOnBrandSoft} style={{ fontFamily: fonts.bold }}>
                       Pago
                     </Txt>
@@ -86,6 +97,7 @@ export default function ResumoScreen() {
 
         <View style={styles.body}>
           {auth.mode === 'demo' ? <DemoBadge /> : null}
+          <FlashBanner message={notice} />
 
           {kind === 'familia' ? (
             <FamilyNotLinked />
@@ -93,10 +105,15 @@ export default function ResumoScreen() {
             <>
               <Button label="Anotar gasto" icon={Plus} onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } })} />
 
+              <Pressable
+                accessibilityRole="button"
+                accessibilityHint="Mostra os compromissos que compõem o total"
+                disabled={!commitments.summary?.items.length}
+                onPress={() => router.push({ pathname: '/composicao', params: { tipo: 'apagar' } })}>
               <Card style={styles.cardRow}>
                 <View style={{ flex: 1, gap: space[1] }}>
                   <Txt variant="label" color={colors.textSecondary}>
-                    Ainda a pagar neste mês
+                    {month === currentMonth ? 'Ainda a pagar neste mês' : `Previsto para ${monthName.toLowerCase()}`}
                   </Txt>
                   {commitments.isPending ? (
                     <LoadingState />
@@ -118,13 +135,14 @@ export default function ResumoScreen() {
                 </View>
                 <CalendarClock size={22} color={colors.textSecondary} />
               </Card>
+              </Pressable>
 
               <Card>
                 <View style={styles.cardHead}>
                   <Txt variant="title" accessibilityRole="header">
                     Pagamentos do mês
                   </Txt>
-                  <LinkButton label="Ver todos" onPress={() => router.push('/movimentacoes')} />
+                  <LinkButton label="Ver todos" onPress={() => router.push({ pathname: '/composicao', params: { tipo: 'pago' } })} />
                 </View>
                 {records.isPending ? (
                   <LoadingState />
@@ -178,7 +196,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: radius.xl,
   },
   heroLabel: { fontFamily: fonts.extrabold, fontSize: 18 },
-  split: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space[4], gap: space[4], flexWrap: 'wrap' },
+  split: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space[4], columnGap: space[4], rowGap: space[2], flexWrap: 'wrap' },
   splitItem: { minHeight: 44, justifyContent: 'center' },
   splitValue: { fontFamily: fonts.extrabold, fontSize: 18, lineHeight: 26 },
   body: { padding: space[6], gap: space[4] },

@@ -47,6 +47,7 @@ const KNOWN: RepoErrorCode[] = [
   'data_invalida',
   'data_futura',
   'conta_invalida',
+  'categoria_invalida',
   'nome_da_conta_invalido',
 ];
 
@@ -115,8 +116,8 @@ export class SupabaseRepository implements RecordsRepository {
     };
   }
 
-  async ensurePersonalSpace(accountName: string) {
-    const { error } = await this.db.rpc('ensure_personal_space', { p_account_name: accountName });
+  async ensurePersonalSpace(accountName: string, timeZone?: string) {
+    const { error } = await this.db.rpc('ensure_personal_space', { p_account_name: accountName, p_time_zone: timeZone ?? null });
     if (error) throw repoError(error);
     const space = await this.getSpace();
     if (!space) throw new RepoError('desconhecido');
@@ -129,17 +130,26 @@ export class SupabaseRepository implements RecordsRepository {
     if (count === 0) throw new RepoError('nao_encontrado');
   }
 
+  /** Lê o mês inteiro em páginas: a API limita cada resposta, e um total incompleto não pode aparecer como confirmado. */
   async listRecords(contextId: string, month: IsoMonth) {
     const { start, endExclusive } = monthRange(month);
-    const { data, error } = await this.db
-      .from('financial_records')
-      .select('*')
-      .eq('context_id', contextId)
-      .gte('occurred_on', start)
-      .lt('occurred_on', endExclusive)
-      .order('occurred_on', { ascending: false });
-    if (error) throw repoError(error);
-    return (data as RecordRow[]).map(toRecord);
+    const PAGE = 500;
+    const rows: RecordRow[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await this.db
+        .from('financial_records')
+        .select('*')
+        .eq('context_id', contextId)
+        .gte('occurred_on', start)
+        .lt('occurred_on', endExclusive)
+        .order('occurred_on', { ascending: false })
+        .order('id')
+        .range(from, from + PAGE - 1);
+      if (error) throw repoError(error);
+      rows.push(...(data as RecordRow[]));
+      if (data.length < PAGE) break;
+    }
+    return rows.map(toRecord);
   }
 
   async getRecord(id: string) {

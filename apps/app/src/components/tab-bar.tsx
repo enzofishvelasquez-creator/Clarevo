@@ -1,7 +1,7 @@
 import type { TabListProps, TabTriggerSlotProps } from 'expo-router/ui';
 import { ArrowLeftRight, BookOpen, Flag, House, type LucideIcon } from 'lucide-react-native';
 import { forwardRef } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Txt } from '@/components/ui';
@@ -19,6 +19,7 @@ type ButtonProps = TabTriggerSlotProps & { label: string; a11y: string; icon: Lu
 
 export const TabButton = forwardRef<View, ButtonProps>(function TabButton({ isFocused, label, a11y, icon: Icon, ...props }, ref) {
   const color = isFocused ? colors.brand : colors.textSecondary;
+  const narrow = useWindowDimensions().width < 360;
   return (
     <Pressable
       ref={ref}
@@ -26,13 +27,14 @@ export const TabButton = forwardRef<View, ButtonProps>(function TabButton({ isFo
       accessibilityRole="tab"
       accessibilityLabel={a11y}
       accessibilityState={{ selected: !!isFocused }}
+      aria-selected={!!isFocused}
       style={(s) => [
         styles.button,
         isFocused && styles.buttonActive,
         (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid' },
       ]}>
       <Icon size={22} color={color} strokeWidth={isFocused ? 2.25 : 2} />
-      <Txt variant="caption" color={color} style={{ fontFamily: fonts.bold }} numberOfLines={1}>
+      <Txt variant="caption" color={color} style={{ fontFamily: fonts.bold, fontSize: narrow ? 11.5 : 13 }} numberOfLines={1} maxFontSizeMultiplier={1.3}>
         {label}
       </Txt>
     </Pressable>

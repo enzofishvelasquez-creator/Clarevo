@@ -32,7 +32,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const body = () => p.locator('body').innerText();
   const btn = (name) => p.getByRole('button', { name, exact: true }).filter({ visible: true }).first();
   const field = (name) => p.getByLabel(name, { exact: true }).filter({ visible: true }).first();
-  const shot = (n, full=false) => p.screenshot({ path: `${OUT}/${n}.png`, fullPage: full });
+  // Espera as transições terminarem antes de capturar.
+  const shot = async (n, full=false) => { await p.waitForTimeout(450); await p.screenshot({ path: `${OUT}/${n}.png`, fullPage: full }); };
   const waitText = (t, timeout=8000) => p.getByText(t, { exact: false }).filter({ visible: true }).first().waitFor({ timeout });
 
   // 1. Cadastro de uma conta nova (acesso simulado)
@@ -80,6 +81,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Demonstração: simular abertura do link').click(); await waitText('Salvar nova senha');
   await field('Nova senha').fill('nova12345'); await btn('Salvar nova senha').click();
   await waitText('Senha atualizada. Entre com a nova senha.');
+  await btn('Entrar').click(); await waitText('Esqueci minha senha');
+  ok('e-mail preenchido depois da nova senha', (await field('E-mail').inputValue()) === 'ana@exemplo.com');
   await field('Senha').fill('nova12345'); await btn('Entrar').click(); await waitText('Diferença do mês');
   ok('nova senha funciona e volta ao resumo', true);
   await p.getByRole('button', { name: 'Conta: perfil e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
@@ -111,6 +114,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('data impossível 31/09: erro e campos preservados', (await body()).includes('Confira a data informada.') && (await field('Descrição').inputValue()) === 'Café' && (await field('Valor em reais').inputValue()) === '80,00');
   await field('Data do pagamento').fill('08/10/2026'); await btn('Salvar gasto').click(); await p.waitForTimeout(300);
   ok('data futura recusada', (await body()).includes('Use uma data até hoje.'));
+  await field('Data do pagamento').fill(''); await field('Data do pagamento').pressSequentially('06102026');
+  ok('data digitada só com números ganha as barras', (await field('Data do pagamento').inputValue()) === '06/10/2026');
+  await p.getByRole('radio', { name: 'Hoje' }).filter({ visible: true }).first().click();
+  ok('atalho Hoje preenche a data', (await field('Data do pagamento').inputValue()) === '07/10/2026');
 
   // Explicação preserva o rascunho
   await field('Data do pagamento').fill('07/10/2026');
@@ -150,7 +157,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await shot('12_confirmar_exclusao');
   await btn('Cancelar').click(); await p.waitForTimeout(300);
   await btn('Excluir registro').click(); await waitText('Excluir registro?');
-  await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Excluir registro' }).last().click(); await waitText('Movimentações');
+  await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Excluir registro' }).last().click(); await waitText('Registro excluído');
+  ok('excluir volta para a tela de origem com aviso', (await body()).includes('Diferença do mês'));
   await goResumo();
   await expectTotals('excluir gasto → 3.900 / 2.100', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00');
 
@@ -163,7 +171,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('descrição com < e > aparece como texto', (await body()).includes('<b>Freela</b>'));
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
   await expectTotals('criar recebimento 200 → 6.200 / 2.300', 'R$ 6.200,00', 'R$ 3.900,00', 'R$ 2.300,00');
-  await p.getByRole('button', { name: 'Recebido: ver composição' }).filter({ visible: true }).first().click(); await waitText('Recebimentos realizados');
+  await p.getByRole('button', { name: /^Recebido, R\$/ }).filter({ visible: true }).first().click(); await waitText('Recebimentos realizados');
   await shot('14_composicao_recebido');
   await p.getByRole('button', { name: /<b>Freela<\/b>, Recebido/ }).click(); await waitText('Editar registro');
   await btn('Editar registro').click(); await waitText('Editar recebimento');
@@ -173,7 +181,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('tab', { name: 'Movimentações' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
   await p.getByRole('button', { name: /<b>Freela<\/b>, Recebido/ }).click(); await waitText('Editar registro');
   await btn('Excluir registro').click(); await waitText('Excluir registro?');
-  await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Excluir registro' }).last().click(); await waitText('Registrar recebimento');
+  await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Excluir registro' }).last().click(); await waitText('Registro excluído');
   await goResumo();
   await expectTotals('excluir recebimento → 6.000 / 2.100', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00');
 
@@ -192,7 +200,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('button', { name: /Farmácia, Pago · 30\/09\/2026/ }).click(); await waitText('Editar registro');
   await btn('Editar registro').click(); await waitText('Editar gasto');
   await field('Data do pagamento').fill('01/10/2026'); await p.waitForTimeout(200);
-  ok('aviso de mudança de mês', (await body()).includes('O registro sai de Setembro de 2026 e passa a contar em Outubro de 2026.'));
+  ok('aviso de mudança de mês', (await body()).includes('O registro sai de setembro de 2026 e passa a contar em outubro de 2026.'));
   await btn('Salvar gasto').click(); await waitText('Alterações salvas');
   await btn('Ver resumo do mês').click(); await waitText('Outubro de 2026'); await p.waitForTimeout(500);
   t = await body();
@@ -231,6 +239,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     const overflow = await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
     const small = await p.evaluate(() => [...document.querySelectorAll('[role=button],[role=tab],button')].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.height < 43.5; }).map(e => (e.getAttribute('aria-label') || e.textContent || '').slice(0,30)));
     ok(`largura ${w}px sem transbordamento`, !overflow);
+    const cut = await p.evaluate(() => [...document.querySelectorAll('div[dir="auto"], span')].filter((e) => /R\$/.test(e.textContent || '') && e.children.length === 0 && e.getBoundingClientRect().width > 0 && e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent));
+    ok(`largura ${w}px: nenhum valor em reais cortado`, cut.length === 0, cut.join(' | '));
     ok(`largura ${w}px: alvos de toque ≥ 44 px`, small.length === 0, small.join(' | '));
     await shot(`18_resumo_${w}px`, true);
   }
@@ -241,4 +251,4 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   console.log(`\n${passed}/${results.length} verificações OK`);
   server.close();
   process.exit(passed === results.length ? 0 : 1);
-})().catch(async (e) => { try { await globalThis.__page?.screenshot({ path: '/tmp/claude-0/e2e/erro.png' }); console.log((await globalThis.__page?.locator('body').innerText())?.slice(0, 600)); } catch {} for (const r of results) console.log(r.join('  ')); console.error('ERRO NO ROTEIRO:', e.message.split('\n')[0]); server.close(); process.exit(1); });
+})().catch(async (e) => { try { await globalThis.__page?.screenshot({ path: path.join(OUT, 'erro.png') }); console.log((await globalThis.__page?.locator('body').innerText())?.slice(0, 600)); } catch {} for (const r of results) console.log(r.join('  ')); console.error('ERRO NO ROTEIRO:', e.message.split('\n')[0]); server.close(); process.exit(1); });

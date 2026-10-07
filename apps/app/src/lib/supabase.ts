@@ -58,10 +58,40 @@ function authError(e: SupabaseAuthError | Error | null | undefined): AuthError {
   return new AuthError('desconhecido');
 }
 
+const RECOVERY_KEY = 'clarevo.recuperacao';
+
+/** Na web, a marca de recuperação sobrevive a recarregar a página até a nova senha ser salva. */
+const webSession = {
+  get: () => (Platform.OS === 'web' && typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(RECOVERY_KEY) === '1' : false),
+  set: (on: boolean) => {
+    if (Platform.OS !== 'web' || typeof sessionStorage === 'undefined') return;
+    if (on) sessionStorage.setItem(RECOVERY_KEY, '1');
+    else sessionStorage.removeItem(RECOVERY_KEY);
+  },
+};
+
 export class SupabaseAuth implements AuthService {
   readonly mode = 'producao' as const;
   readonly client = createSupabase();
-  private recovery = false;
+  private recovery = webSession.get();
+
+  constructor() {
+    // Na web, o link de recuperação abre /nova-senha?code=...; a troca do código acontece ao criar o cliente.
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (url.pathname.includes('nova-senha') && url.searchParams.has('code')) this.setRecovery(true);
+    }
+    // Ouvinte criado junto com o cliente, para não perder o evento de recuperação.
+    this.client.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') this.setRecovery(true);
+      if (event === 'SIGNED_OUT') this.setRecovery(false);
+    });
+  }
+
+  private setRecovery(on: boolean) {
+    this.recovery = on;
+    webSession.set(on);
+  }
 
   private redirect(path: string) {
     return Linking.createURL(path);
@@ -74,8 +104,8 @@ export class SupabaseAuth implements AuthService {
 
   subscribe(listener: (s: AuthState) => void) {
     const { data } = this.client.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') this.recovery = true;
-      if (event === 'SIGNED_OUT') this.recovery = false;
+      if (event === 'PASSWORD_RECOVERY') this.setRecovery(true);
+      if (event === 'SIGNED_OUT') this.setRecovery(false);
       // Evita chamar o Supabase dentro do callback (recomendação da biblioteca): agenda a notificação.
       setTimeout(() => listener({ user: session ? toUser(session.user) : null, recovery: this.recovery }), 0);
     });
@@ -117,11 +147,12 @@ export class SupabaseAuth implements AuthService {
   async updatePassword(password: string) {
     const { error } = await this.client.auth.updateUser({ password });
     if (error) throw authError(error);
-    this.recovery = false;
+    // A marca de recuperação só sai com o encerramento da sessão (feito em seguida pela tela),
+    // para a pessoa não entrar no app com a sessão do link.
   }
 
   async signOut() {
-    this.recovery = false;
+    this.setRecovery(false);
     // 'local': encerra a sessão neste aparelho e apaga o que ela guardou aqui.
     await this.client.auth.signOut({ scope: 'local' });
   }
@@ -135,9 +166,9 @@ export class SupabaseAuth implements AuthService {
     if (params.error || params.error_code) return isRecovery ? 'invalido' : null;
     if (!params.code) return null;
     if (Platform.OS === 'web') return 'ok'; // detectSessionInUrl já troca o código
-    if (isRecovery) this.recovery = true;
+    if (isRecovery) this.setRecovery(true);
     const { error } = await this.client.auth.exchangeCodeForSession(params.code);
-    if (error) this.recovery = false;
+    if (error) this.setRecovery(false);
     return error ? (isRecovery ? 'invalido' : null) : 'ok';
   }
 

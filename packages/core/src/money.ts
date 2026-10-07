@@ -26,18 +26,30 @@ export function centsToInput(cents: Cents): string {
 
 /**
  * Lê o que a pessoa digitou em "Valor em reais".
- * Aceita "80", "80,00", "80,5", "1.234,56", "1234,56" e "R$ 80".
- * Rejeita (retorna null): vazio, negativo, mais de duas casas, ponto como decimal ("12.34")
- * e agrupamento ambíguo ("1.40", "1,234").
+ * Aceita "80", "80,00", "80,5", "1.234,56", "1234,56", "R$ 80" e, sem vírgula, ponto como decimal
+ * com 1 ou 2 casas ("12.50"), comum em teclados numéricos.
+ * Rejeita (retorna null): vazio, negativo, mais de duas casas, espaços no meio ("12 34")
+ * e agrupamento ambíguo ("1,234", "1.2345,00").
  * Converte direto para centavos inteiros, sem passar por ponto flutuante.
+ * Valores com dígitos demais voltam acima do limite, para a mensagem de limite aparecer.
  */
 export function parseBRL(input: string): Cents | null {
-  const raw = input.replace(/R\$/gi, '').replace(/\s/g, '');
+  const raw = input.trim().replace(/^R\$\s*/i, '');
   if (raw === '') return null;
-  if (!/^(\d{1,3}(\.\d{3})+|\d+)(,\d{1,2})?$/.test(raw)) return null;
-  const [intPart = '0', decPart = ''] = raw.replace(/\./g, '').split(',');
+  let intPart: string;
+  let decPart = '';
+  const brl = /^(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?$/.exec(raw);
+  const dotDecimal = /^(\d+)\.(\d{1,2})$/.exec(raw);
+  if (brl) {
+    intPart = brl[1]!.replace(/\./g, '');
+    decPart = brl[2] ?? '';
+  } else if (dotDecimal) {
+    intPart = dotDecimal[1]!;
+    decPart = dotDecimal[2]!;
+  } else {
+    return null;
+  }
   const intDigits = intPart.replace(/^0+(?=\d)/, '');
-  if (intDigits.length > 13) return null;
-  const cents = Number(intDigits) * 100 + Number(decPart.padEnd(2, '0'));
-  return Number.isSafeInteger(cents) ? cents : null;
+  if (intDigits.length > 13) return MAX_RECORD_CENTS + 1;
+  return Number(intDigits) * 100 + Number(decPart.padEnd(2, '0'));
 }

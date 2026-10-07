@@ -63,11 +63,11 @@ export function LoadingState({ label = 'Carregando…', color = colors.brand }: 
 /** Falha de consulta: nunca exibida como zero. */
 export function ErrorState({ message, onRetry, onBrand }: { message: string; onRetry: () => void; onBrand?: boolean }) {
   return (
-    <View style={[styles.error, onBrand && { backgroundColor: 'rgba(255,255,255,0.14)' }]} accessibilityRole="alert">
-      <Txt variant="label" color={onBrand ? colors.textOnBrand : colors.error}>
+    <View style={[styles.error, onBrand && { backgroundColor: colors.surface }]} accessibilityRole="alert">
+      <Txt variant="label" color={colors.error}>
         {message}
       </Txt>
-      <Button label="Tentar novamente" icon={RotateCcw} tone={onBrand ? 'soft' : 'soft'} onPress={onRetry} />
+      <Button label="Tentar novamente" icon={RotateCcw} tone="soft" onPress={onRetry} />
     </View>
   );
 }

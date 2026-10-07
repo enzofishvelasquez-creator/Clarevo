@@ -31,11 +31,16 @@
 9. Revogação bloqueia leitura e escrita imediatamente.
 10. Fim do benefício mantém conta, histórico e família.
 11. Autoria, contexto e tipo do registro são imutáveis.
-12. Sequência de aceite, idempotência, versões, mudança de mês e validações (ver Regras financeiras).
+12. Repetir uma operação antiga depois da revogação não devolve o registro.
+13. O titular não revoga nem altera o próprio vínculo (todo contexto mantém um titular).
+14. A empresa convida por e-mail e encerra licenças, mas não escolhe beneficiário nem ativa licença.
+15. Totais do mês de um contexto sem permissão são recusados, não aparecem como zero.
+16. Fuso horário vem do aparelho no primeiro acesso, é validado e não pode ser trocado pela API.
+17. Sequência de aceite, idempotência, versões, mudança de mês e validações (ver Regras financeiras).
 
 **API (`npm run test:api`):** o código do app (`SupabaseRepository`) contra o PostgREST, o mesmo servidor de API usado pelo Supabase, com tokens de pessoas diferentes: sequência de aceite, duplicidade, conflito de versão, validação no banco, acesso por ID, filtro e operação de outra pessoa, gravação direta recusada, sessão anônima.
 
-**Limite:** os testes rodaram fora do Supabase real. Depois de criar o projeto, repetir no ambiente `clarevo-teste`.
+**Limite:** os testes rodaram fora do Supabase real (Postgres local com uma simulação do `auth`). Depois de criar o projeto, repetir os fluxos de login e permissão no ambiente `clarevo-teste` pelo app; os scripts de teste locais não devem ser aplicados no Supabase.
 
 ## Pendente
 

@@ -1,18 +1,22 @@
 /**
- * Destino a retomar depois de entrar (sessão expirada ou link direto para uma tela interna).
+ * Destino a retomar depois que a sessão expira e a mesma pessoa entra de novo.
  * Guardado só em memória.
  */
-let destination: string | null = null;
+let destination: { path: string; userId: string } | null = null;
 let manualSignOut = false;
 
 export const afterLogin = {
-  set(path: string | null) {
-    destination = path && path !== '/' && !path.startsWith('/carregando') ? path : null;
+  set(path: string | null, userId: string) {
+    destination = path && path !== '/' && !path.startsWith('/carregando') ? { path, userId } : null;
   },
-  take(): string | null {
+  /** Há um destino pendente (para decidir entre Entrar e Boas-vindas)? */
+  pending(): boolean {
+    return destination !== null;
+  },
+  take(userId: string): string | null {
     const d = destination;
     destination = null;
-    return d;
+    return d && d.userId === userId ? d.path : null;
   },
 };
 

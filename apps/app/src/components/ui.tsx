@@ -38,6 +38,26 @@ export function Money({
   );
 }
 
+/**
+ * Valor de destaque que nunca é cortado: reduz a fonte em degraus até caber na largura disponível.
+ * (adjustsFontSizeToFit não funciona na web.)
+ */
+export function FitMoney({ cents, color = colors.text, maxSize = 36, minSize = 22 }: { cents: number; color?: string; maxSize?: number; minSize?: number }) {
+  const [width, setWidth] = useState(0);
+  const text = formatBRL(cents);
+  // Manrope ExtraBold com números tabulares: ~0,62 em por caractere.
+  const fits = (size: number) => text.length * size * 0.62 <= width;
+  let size = maxSize;
+  if (width > 0) while (size > minSize && !fits(size)) size -= 2;
+  return (
+    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ alignSelf: 'stretch' }}>
+      <Txt variant="hero" color={color} style={[tabular, { fontSize: size, lineHeight: Math.round(size * 1.22) }]} maxFontSizeMultiplier={1.4}>
+        {text}
+      </Txt>
+    </View>
+  );
+}
+
 export function Screen({
   children,
   contentStyle,
@@ -95,7 +115,8 @@ export function Button({
       disabled={disabled}
       style={(state) => [
         styles.button,
-        { backgroundColor: state.pressed ? t.bgPressed : t.bg, opacity: disabled ? 0.65 : 1 },
+        // Ocupado mantém a cor (o texto muda para "Salvando…"); só desabilitado fica esmaecido.
+        { backgroundColor: state.pressed ? t.bgPressed : t.bg, opacity: props.disabled && !busy ? 0.65 : 1 },
         tone === 'danger' && { borderWidth: 1, borderColor: colors.border },
         state.pressed && { transform: [{ scale: 0.98 }] },
         (state as { focused?: boolean }).focused && styles.focusRing,
@@ -137,7 +158,7 @@ export const TextField = forwardRef<
         ref={ref}
         accessibilityLabel={label}
         accessibilityHint={error ?? hint}
-        placeholderTextColor={colors.textSecondary}
+        placeholderTextColor={colors.placeholder}
         {...props}
         onFocus={(e) => {
           setFocused(true);
@@ -174,6 +195,7 @@ export function Chip({ label, selected, onPress }: { label: string; selected: bo
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ checked: selected }}
+      aria-checked={selected}
       onPress={onPress}
       style={(s) => [styles.chip, selected && styles.chipSelected, (s as { focused?: boolean }).focused && styles.focusRing]}>
       <Txt variant="label" color={selected ? colors.brand : colors.text}>
@@ -185,7 +207,7 @@ export function Chip({ label, selected, onPress }: { label: string; selected: bo
 
 export function Banner({ tone, children, icon: Icon }: { tone: 'erro' | 'sucesso' | 'info'; children: ReactNode; icon?: LucideIcon }) {
   const bg = tone === 'erro' ? colors.errorTint : tone === 'sucesso' ? colors.successTint : colors.brandTint;
-  const fg = tone === 'erro' ? colors.error : tone === 'sucesso' ? colors.success : colors.text;
+  const fg = tone === 'erro' ? colors.error : tone === 'sucesso' ? colors.successText : colors.text;
   return (
     <View style={[styles.banner, { backgroundColor: bg }]} accessibilityRole="alert" accessibilityLiveRegion="polite">
       {Icon ? <Icon size={20} color={fg} /> : null}
@@ -234,7 +256,7 @@ export const styles = StyleSheet.create({
     minHeight: 52,
     borderRadius: radius.sm,
     borderWidth: 1.5,
-    borderColor: '#C9D3E6',
+    borderColor: colors.borderStrong,
     backgroundColor: colors.surface,
     paddingHorizontal: space[4],
     paddingVertical: space[3],
@@ -251,7 +273,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: radius.pill,
     borderWidth: 1.5,
-    borderColor: colors.border,
+    borderColor: colors.borderStrong,
     backgroundColor: colors.surface,
   },
   chipSelected: { borderColor: colors.brand, backgroundColor: colors.brandTint },

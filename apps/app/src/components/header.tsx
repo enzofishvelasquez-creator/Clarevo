@@ -25,7 +25,7 @@ export function BrandHeader() {
         accessibilityLabel="Conta: perfil e acesso ao plano"
         onPress={() => router.push('/conta')}
         style={(s) => [styles.avatar, (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.accent, outlineStyle: 'solid' }]}>
-        <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.extrabold }}>
+        <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.extrabold }} maxFontSizeMultiplier={1.3}>
           {initialsOf(user?.displayName ?? '')}
         </Txt>
       </Pressable>
@@ -53,6 +53,7 @@ export function ContextSwitch({ onRequest }: { onRequest?: (next: SpaceKind) => 
             key={o.kind}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
+            aria-selected={selected}
             accessibilityLabel={`Ver dados de ${o.label}`}
             onPress={() => (selected ? undefined : onRequest ? onRequest(o.kind) : setSpace(o.kind))}
             style={(s) => [

@@ -22,13 +22,15 @@ Primeiro ciclo: 07/10/2026. Sem Supabase configurado, o app roda em **demonstra�
 
 ## Como rodar
 
-Requer Node 20+.
+Requer Node 22.12 ou mais recente.
 
 ```bash
 npm install
-npm run web        # navegador
+npm run web        # navegador (em desenvolvimento, sem Supabase, abre em demonstração)
 npm run app        # celular com o app Expo Go (QR code)
 ```
+
+Uma versão web de demonstração para apresentar: `npm --workspace apps/app run export:demo` (gera `apps/app/dist`). Um build de produção sem Supabase configurado mostra "Configuração incompleta" em vez de abrir a demonstração.
 
 ## Como verificar
 
@@ -49,4 +51,5 @@ npm run test:web   # fluxos completos na versão web (Playwright)
 5. [Roteiro até o lançamento](docs/04_ROTEIRO_LANCAMENTO.md)
 6. [Ligar ao Supabase](docs/05_SUPABASE.md)
 7. [Marca](docs/marca/) e [telas](docs/telas/)
-8. [Referências recebidas](docs/referencias/)
+8. [Análise e propostas (07/10/2026)](docs/06_ANALISE_E_PROPOSTAS.md)
+9. [Referências recebidas](docs/referencias/)

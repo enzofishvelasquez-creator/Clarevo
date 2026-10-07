@@ -116,7 +116,8 @@ begin
       array['1000000000', '2026-10-07', 'x', 'valor_acima_do_limite'],
       array['100', '2026-10-08', 'x', 'data_futura'],
       array['100', '2026-10-07', '   ', 'descricao_obrigatoria'],
-      array['100', '2026-10-07', repeat('x', 81), 'descricao_longa']
+      array['100', '2026-10-07', repeat('x', 81), 'descricao_longa'],
+      array['100', '2026-10-07', E'\t \n', 'descricao_obrigatoria']
     ];
     i int;
   begin
@@ -129,6 +130,16 @@ begin
     end loop;
   end;
   perform public.create_record('vali-000099', ctx, acc, 'despesa', 999999999, '2026-10-07', repeat('x', 80));
+  -- Espaços, tabulações e quebras nas pontas são removidos; categoria acima de 40 caracteres é recusada.
+  g := public.create_record('vali-000100', ctx, acc, 'despesa', 100, '2026-10-07', E'\t Café \n', E' Mercado\t');
+  assert g.description = 'Café' and g.category = 'Mercado', 'normalização igual à do app';
+  begin
+    perform public.create_record('vali-000101', ctx, acc, 'despesa', 100, '2026-10-07', 'x', repeat('c', 41));
+    raise exception 'FALHA: categoria longa aceita';
+  exception when others then assert sqlerrm = 'categoria_invalida', sqlerrm;
+  end;
+  -- 80 caracteres contados como caracteres (emoji conta 1), como no app.
+  perform public.create_record('vali-000102', ctx, acc, 'despesa', 100, '2026-10-07', repeat('🍞', 80));
 
   -- month_totals exige o primeiro dia do mês.
   begin

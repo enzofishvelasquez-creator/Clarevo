@@ -17,14 +17,9 @@ export default function Carregando() {
 
   useEffect(() => {
     if (recovery && user) router.replace('/nova-senha');
-    else if (status === 'sem-sessao') {
-      const dest = afterLogin.take();
-      if (dest) {
-        afterLogin.set(dest);
-        router.replace('/entrar');
-      } else router.replace('/boas-vindas');
-    } else if (status === 'sem-conta') router.replace('/primeira-conta');
-    else if (status === 'pronto') router.replace((afterLogin.take() ?? '/') as '/');
+    else if (status === 'sem-sessao') router.replace(afterLogin.pending() ? '/entrar' : '/boas-vindas');
+    else if (status === 'sem-conta') router.replace('/primeira-conta');
+    else if (status === 'pronto' && user) router.replace((afterLogin.take(user.id) ?? '/') as '/');
   }, [status, recovery, user]);
 
   return (

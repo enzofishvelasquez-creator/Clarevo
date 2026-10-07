@@ -4,6 +4,7 @@ import { Minus, Plus } from 'lucide-react-native';
 import { StyleSheet, View } from 'react-native';
 
 import { FamilyNotLinked } from '@/components/family-state';
+import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextSwitch, MonthSwitcher } from '@/components/header';
 import { RecordRow } from '@/components/record-row';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
@@ -17,6 +18,7 @@ export default function MovimentacoesScreen() {
   const contextId = kind === 'pessoal' ? personal?.personalContextId : undefined;
   const records = useMonthRecords(contextId, month);
   const list = records.data ? sortNewestFirst(records.data) : [];
+  const [notice] = useFlash();
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -30,6 +32,7 @@ export default function MovimentacoesScreen() {
           <MonthSwitcher />
         </View>
         <View style={{ padding: space[6], gap: space[3] }}>
+          <FlashBanner message={notice} />
           {kind === 'familia' ? (
             <FamilyNotLinked />
           ) : (

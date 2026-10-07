@@ -1,16 +1,20 @@
-import { ERROR_TEXT, formatMonthBR } from '@clarevo/core';
+import { ERROR_TEXT, formatDateBR, formatMonthBR } from '@clarevo/core';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { RecordRow } from '@/components/record-row';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
-import { Card, Money, Screen, Txt } from '@/components/ui';
-import { useMonthRecords, useSpace, useView } from '@/state/data';
-import { colors, space } from '@/theme/tokens';
+import { Card, FitMoney, Money, Screen, Txt } from '@/components/ui';
+import { useCommitments, useMonthRecords, useSpace, useView } from '@/state/data';
+import { colors, fonts, space } from '@/theme/tokens';
 
 const COPY = {
   recebido: { title: 'Recebido', criterio: 'Recebimentos realizados com data de recebimento neste mês.' },
   pago: { title: 'Pago', criterio: 'Gastos pagos com data de pagamento neste mês.' },
+  apagar: {
+    title: 'Ainda a pagar',
+    criterio: 'Compromissos previstos com vencimento neste mês. Ainda não saíram da conta e não entram em Pago nem na diferença do mês.',
+  },
   diferenca: {
     title: 'Diferença do mês',
     criterio:
@@ -26,6 +30,7 @@ export default function ComposicaoScreen() {
   const { month } = useView();
   const personal = useSpace().data;
   const records = useMonthRecords(personal?.personalContextId, month);
+  const commitments = useCommitments(personal?.personalContextId, month);
   const s = records.summary;
 
   const sections = !s
@@ -48,16 +53,45 @@ export default function ComposicaoScreen() {
         <Txt variant="caption" color={colors.textSecondary}>
           Pessoal · {formatMonthBR(month)}
         </Txt>
-        {records.isPending ? (
+        {kind === 'apagar' ? (
+          commitments.isPending ? (
+            <LoadingState />
+          ) : commitments.isError || !commitments.summary ? (
+            <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => commitments.refetch()} />
+          ) : (
+            <FitMoney cents={commitments.summary.toPayCents} />
+          )
+        ) : records.isPending ? (
           <LoadingState />
         ) : records.isError || !s ? (
           <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => records.refetch()} />
         ) : (
-          <Money cents={kind === 'diferenca' ? s.differenceCents : sections[0]!.total} variant="hero" />
+          <FitMoney cents={kind === 'diferenca' ? s.differenceCents : sections[0]!.total} />
         )}
         <Txt color={colors.textSecondary}>{copy.criterio}</Txt>
       </View>
-      {sections.map((sec) => (
+      {kind === 'apagar' && commitments.summary ? (
+        <Card>
+          {commitments.summary.items.length === 0 ? (
+            <EmptyState title="Nenhum compromisso registrado" />
+          ) : (
+            commitments.summary.items.map((c, i, arr) => (
+              <View key={c.id} style={[styles.commitment, i < arr.length - 1 && styles.divider]}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Txt variant="label" style={{ fontFamily: fonts.bold }}>
+                    {c.description}
+                  </Txt>
+                  <Txt variant="caption" color={colors.textSecondary}>
+                    Previsto · vence em {formatDateBR(c.dueOn)}
+                  </Txt>
+                </View>
+                <Money cents={c.amountCents} variant="label" style={{ fontFamily: fonts.bold, flexShrink: 0 }} />
+              </View>
+            ))
+          )}
+        </Card>
+      ) : null}
+      {(kind === 'apagar' ? [] : sections).map((sec) => (
         <Card key={sec.label}>
           <View style={styles.head}>
             <Txt variant="title">{sec.label}</Txt>
@@ -78,4 +112,6 @@ export default function ComposicaoScreen() {
 
 const styles = StyleSheet.create({
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space[1], gap: space[2] },
+  commitment: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: space[3], minHeight: 56 },
+  divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
 });

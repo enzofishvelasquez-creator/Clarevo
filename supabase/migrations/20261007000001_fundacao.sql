@@ -167,7 +167,9 @@ create table public.licenses (
   status public.license_status not null default 'convidada',
   created_at timestamptz not null default now(),
   activated_at timestamptz,
-  ended_at timestamptz
+  ended_at timestamptz,
+  -- Licença ativa sempre tem beneficiário aceito; isso é definido pelo servidor no aceite, não pela empresa.
+  check (status <> 'ativa' or (person_id is not null and activated_at is not null))
 );
 
 create unique index one_open_license_per_email_per_contract
@@ -178,7 +180,7 @@ create table public.plan_entitlements (
   id uuid primary key default gen_random_uuid(),
   person_id uuid not null references public.persons (id) on delete cascade,
   source public.entitlement_source not null,
-  license_id uuid references public.licenses (id) on delete set null,
+  license_id uuid references public.licenses (id) on delete restrict,
   plan text not null check (plan in ('individual', 'familiar')),
   valid_from timestamptz not null default now(),
   valid_until timestamptz,
@@ -242,14 +244,18 @@ begin
     return v_override::date;
   end if;
   select time_zone into v_tz from public.persons where id = p_person;
-  return (now() at time zone coalesce(v_tz, 'America/Sao_Paulo'))::date;
+  begin
+    return (now() at time zone coalesce(v_tz, 'America/Sao_Paulo'))::date;
+  exception when others then
+    return (now() at time zone 'America/Sao_Paulo')::date;
+  end;
 end;
 $$;
 
 -- ---------------------------------------------------------------------------
 -- Primeira entrada: espaço pessoal e primeira conta (idempotente)
 -- ---------------------------------------------------------------------------
-create or replace function public.ensure_personal_space(p_account_name text default 'Conta principal')
+create or replace function public.ensure_personal_space(p_account_name text default 'Conta principal', p_time_zone text default null)
 returns jsonb
 language plpgsql
 volatile
@@ -275,7 +281,11 @@ begin
   perform pg_advisory_xact_lock(hashtext('space:' || v_uid::text));
 
   v_name := left(coalesce(nullif(btrim(v_user.raw_user_meta_data ->> 'display_name'), ''), split_part(v_user.email, '@', 1), 'Pessoa'), 80);
-  insert into public.persons (id, display_name) values (v_uid, v_name) on conflict (id) do nothing;
+  -- Fuso do aparelho no primeiro acesso (validado); sem ele, São Paulo.
+  insert into public.persons (id, display_name, time_zone)
+  values (v_uid, v_name,
+          coalesce((select name from pg_timezone_names where name = p_time_zone limit 1), 'America/Sao_Paulo'))
+  on conflict (id) do nothing;
 
   select id into v_ctx from public.financial_contexts where owner_person_id = v_uid and kind = 'pessoal';
   if v_ctx is null then
@@ -307,9 +317,20 @@ $$;
 -- Registros: criar, editar, excluir (atômico, idempotente, versionado)
 -- ---------------------------------------------------------------------------
 
+-- Remove espaços em branco das pontas (espaço, tabulação, quebra de linha), como o trim() do app.
+create or replace function public.clarevo_trim(p text)
+returns text
+language sql
+immutable
+set search_path = public
+as $$
+  select regexp_replace(coalesce(p, ''), '^\s+|\s+$', '', 'g');
+$$;
+
 -- Validação comum (mesmas regras do app em packages/core/src/validation.ts).
 create or replace function public.clarevo_validate_record(
-  p_actor uuid, p_context_id uuid, p_account_id uuid, p_amount_cents bigint, p_occurred_on date, p_description text
+  p_actor uuid, p_context_id uuid, p_account_id uuid, p_amount_cents bigint, p_occurred_on date, p_description text,
+  p_category text default null
 )
 returns public.financial_accounts
 language plpgsql
@@ -331,6 +352,9 @@ begin
   end if;
   if char_length(p_description) > 80 then
     raise exception 'descricao_longa' using errcode = '22023';
+  end if;
+  if p_category is not null and char_length(p_category) > 40 then
+    raise exception 'categoria_invalida' using errcode = '22023';
   end if;
   if p_occurred_on is null then
     raise exception 'data_invalida' using errcode = '22023';
@@ -365,8 +389,8 @@ set search_path = public
 as $$
 declare
   v_uid uuid := auth.uid();
-  v_description text := btrim(coalesce(p_description, ''));
-  v_category text := nullif(btrim(coalesce(p_category, '')), '');
+  v_description text := public.clarevo_trim(p_description);
+  v_category text := nullif(public.clarevo_trim(p_category), '');
   v_hash text;
   v_op public.record_operations%rowtype;
   v_account public.financial_accounts%rowtype;
@@ -383,6 +407,10 @@ begin
     if v_op.request_hash <> v_hash then
       raise exception 'chave_reutilizada' using errcode = 'PT409';
     end if;
+    -- Repetição só devolve o registro se a pessoa ainda pode ler o contexto (vínculo revogado não vê nada).
+    if not public.context_permission(v_op.context_id, 'read') then
+      raise exception 'nao_encontrado' using errcode = 'P0002';
+    end if;
     select * into v_record from public.financial_records where id = v_op.record_id;
     return v_record;
   end if;
@@ -390,7 +418,7 @@ begin
   if not public.context_permission(p_context_id, 'write') then
     raise exception 'sem_permissao' using errcode = '42501';
   end if;
-  v_account := public.clarevo_validate_record(v_uid, p_context_id, p_account_id, p_amount_cents, p_occurred_on, v_description);
+  v_account := public.clarevo_validate_record(v_uid, p_context_id, p_account_id, p_amount_cents, p_occurred_on, v_description, v_category);
 
   insert into public.financial_records
     (context_id, account_id, kind, amount_cents, currency, occurred_on, description, category, created_by)
@@ -446,8 +474,8 @@ set search_path = public
 as $$
 declare
   v_uid uuid := auth.uid();
-  v_description text := btrim(coalesce(p_description, ''));
-  v_category text := nullif(btrim(coalesce(p_category, '')), '');
+  v_description text := public.clarevo_trim(p_description);
+  v_category text := nullif(public.clarevo_trim(p_category), '');
   v_hash text;
   v_op public.record_operations%rowtype;
   v_record public.financial_records%rowtype;
@@ -463,6 +491,10 @@ begin
     if v_op.request_hash <> v_hash then
       raise exception 'chave_reutilizada' using errcode = 'PT409';
     end if;
+    -- Repetição só devolve o registro se a pessoa ainda pode ler o contexto (vínculo revogado não vê nada).
+    if not public.context_permission(v_op.context_id, 'read') then
+      raise exception 'nao_encontrado' using errcode = 'P0002';
+    end if;
     select * into v_record from public.financial_records where id = v_op.record_id;
     return v_record;
   end if;
@@ -471,7 +503,7 @@ begin
   if v_record.version <> p_expected_version then
     raise exception 'versao_desatualizada' using errcode = 'PT409', detail = 'versao_atual=' || v_record.version;
   end if;
-  perform public.clarevo_validate_record(v_uid, v_record.context_id, p_account_id, p_amount_cents, p_occurred_on, v_description);
+  perform public.clarevo_validate_record(v_uid, v_record.context_id, p_account_id, p_amount_cents, p_occurred_on, v_description, v_category);
 
   update public.financial_records
      set account_id = p_account_id,
@@ -518,6 +550,10 @@ begin
     if v_op.request_hash <> v_hash then
       raise exception 'chave_reutilizada' using errcode = 'PT409';
     end if;
+    -- Repetição só devolve o registro se a pessoa ainda pode ler o contexto (vínculo revogado não vê nada).
+    if not public.context_permission(v_op.context_id, 'read') then
+      raise exception 'nao_encontrado' using errcode = 'P0002';
+    end if;
     select * into v_record from public.financial_records where id = v_op.record_id;
     return v_record;
   end if;
@@ -551,6 +587,9 @@ as $$
 begin
   if p_month is null or extract(day from p_month) <> 1 then
     raise exception 'mes_invalido' using errcode = '22023';
+  end if;
+  if not public.context_permission(p_context_id, 'read') then
+    raise exception 'sem_permissao' using errcode = '42501';
   end if;
   return query
   select coalesce(sum(r.amount_cents) filter (where r.kind = 'receita'), 0)::bigint,
@@ -616,9 +655,11 @@ create policy contexts_read on public.financial_contexts for select to authentic
 
 create policy memberships_read on public.context_memberships for select to authenticated
   using (person_id = auth.uid() or public.context_permission(context_id, 'read'));
+-- O titular gerencia os demais vínculos; o vínculo de titular não pode ser alterado nem revogado por aqui
+-- (todo contexto mantém um titular).
 create policy memberships_manage on public.context_memberships for update to authenticated
-  using (public.context_permission(context_id, 'manage'))
-  with check (public.context_permission(context_id, 'manage'));
+  using (public.context_permission(context_id, 'manage') and role <> 'titular')
+  with check (public.context_permission(context_id, 'manage') and role <> 'titular');
 
 create policy accounts_read on public.financial_accounts for select to authenticated
   using (public.context_permission(context_id, 'read'));
@@ -660,12 +701,15 @@ revoke all on all functions in schema public from public, anon, authenticated;
 
 grant usage on schema public to authenticated;
 grant select on all tables in schema public to authenticated;
-grant update (display_name, time_zone, locale) on public.persons to authenticated;
+grant update (display_name, locale) on public.persons to authenticated;
 grant update (name) on public.financial_accounts to authenticated;
 grant update (can_read, can_write, can_edit_others, revoked_at) on public.context_memberships to authenticated;
-grant insert, update, delete on public.licenses to authenticated;
+-- Empresa: convida (e-mail), encerra e apaga convites não aceitos. Beneficiário e ativação são definidos no aceite.
+grant insert (contract_id, invited_email) on public.licenses to authenticated;
+grant update (status, ended_at) on public.licenses to authenticated;
+grant delete on public.licenses to authenticated;
 
-grant execute on function public.ensure_personal_space(text) to authenticated;
+grant execute on function public.ensure_personal_space(text, text) to authenticated;
 grant execute on function public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text) to authenticated;
 grant execute on function public.update_record(text, uuid, integer, uuid, bigint, date, text, text) to authenticated;
 grant execute on function public.delete_record(text, uuid, integer) to authenticated;

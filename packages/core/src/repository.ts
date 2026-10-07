@@ -9,8 +9,8 @@ import type { Commitment, FinancialRecord, PersonalSpace, RecordInput, RecordKin
 export interface RecordsRepository {
   /** Espaço pessoal da pessoa autenticada; null se ainda não passou por "Sua primeira conta". */
   getSpace(): Promise<PersonalSpace | null>;
-  /** Cria (uma única vez) contexto pessoal e primeira conta. Idempotente. */
-  ensurePersonalSpace(accountName: string): Promise<PersonalSpace>;
+  /** Cria (uma única vez) contexto pessoal e primeira conta. Idempotente. O fuso vem do aparelho. */
+  ensurePersonalSpace(accountName: string, timeZone?: string): Promise<PersonalSpace>;
   renameAccount(accountId: string, name: string): Promise<void>;
 
   listRecords(contextId: string, month: IsoMonth): Promise<FinancialRecord[]>;
@@ -39,6 +39,7 @@ export type RepoErrorCode =
   | 'data_invalida'
   | 'data_futura'
   | 'conta_invalida'
+  | 'categoria_invalida'
   | 'nome_da_conta_invalido'
   | 'desconhecido';
 

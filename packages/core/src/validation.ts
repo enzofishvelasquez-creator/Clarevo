@@ -12,6 +12,7 @@ export const ERROR_TEXT = {
   descricao_longa: 'Use no máximo 80 caracteres.',
   valor_invalido: 'Informe um valor maior que zero, como 80,00.',
   valor_acima_do_limite: 'O valor máximo por registro é R$ 9.999.999,99.',
+  categoria_invalida: 'Use uma categoria de até 40 caracteres.',
   data_invalida: 'Confira a data informada.',
   data_futura: 'Use uma data até hoje. Aqui entram só valores já pagos ou recebidos.',
   conta_invalida: 'Escolha a conta.',
@@ -38,6 +39,12 @@ export interface RecordDraft {
 }
 
 export const DESCRIPTION_MAX = 80;
+export const CATEGORY_MAX = 40;
+
+/** Conta caracteres como a pessoa vê (emoji conta 1), igual ao banco. */
+export function charCount(text: string): number {
+  return [...text].length;
+}
 
 /** Ordem dos campos na tela: o foco vai para o primeiro erro. */
 export const FIELD_ORDER: DraftField[] = ['description', 'amountText', 'dateText', 'accountId'];
@@ -49,7 +56,7 @@ export function validateRecordDraft(draft: RecordDraft, today: IsoDate): DraftVa
 
   const description = draft.description.trim();
   if (description === '') errors.description = ERROR_TEXT.descricao_obrigatoria;
-  else if (description.length > DESCRIPTION_MAX) errors.description = ERROR_TEXT.descricao_longa;
+  else if (charCount(description) > DESCRIPTION_MAX) errors.description = ERROR_TEXT.descricao_longa;
 
   const amount = parseBRL(draft.amountText);
   if (amount === null || amount <= 0) errors.amountText = ERROR_TEXT.valor_invalido;

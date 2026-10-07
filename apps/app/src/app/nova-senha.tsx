@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { AlertCircle } from 'lucide-react-native';
+import { AlertCircle, CheckCircle2 } from 'lucide-react-native';
 import { useState } from 'react';
 
 import { AuthShell } from '@/components/auth-shell';
@@ -16,6 +16,21 @@ export default function NovaSenha() {
   const [error, setError] = useState<string | undefined>();
   const [banner, setBanner] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Depois de salvar, a sessão do link é encerrada; a tela mostra a confirmação mesmo sem sessão.
+  const [doneFor, setDoneFor] = useState<string | null>(null);
+
+  if (doneFor) {
+    return (
+      <AuthShell title="Senha atualizada">
+        <Banner tone="sucesso" icon={CheckCircle2}>
+          <Txt variant="label" color={colors.successText}>
+            Senha atualizada. Entre com a nova senha.
+          </Txt>
+        </Banner>
+        <Button label="Entrar" onPress={() => router.replace({ pathname: '/entrar', params: { email: doneFor } })} />
+      </AuthShell>
+    );
+  }
 
   if (!user || !recovery) {
     return (
@@ -40,9 +55,9 @@ export default function NovaSenha() {
     setBanner(null);
     try {
       await auth.updatePassword(password);
+      setDoneFor(user.email);
       signOutIntent.mark();
       await signOut();
-      router.replace({ pathname: '/entrar', params: { email: user.email, aviso: 'senha-atualizada' } });
     } catch (e) {
       if (e instanceof AuthError && e.code === 'senha_fraca') setError(PASSWORD_RULE);
       else if (e instanceof AuthError && e.code === 'sem_sessao') setBanner('O link expirou ou já foi usado.');

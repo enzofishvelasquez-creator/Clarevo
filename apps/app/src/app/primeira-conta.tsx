@@ -1,4 +1,4 @@
-import { isRepoError } from '@clarevo/core';
+import { deviceTimeZone, isRepoError } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Landmark } from 'lucide-react-native';
 import { useState } from 'react';
@@ -31,7 +31,7 @@ export default function PrimeiraConta() {
     setBanner(null);
     setBusy(true);
     try {
-      const space = await repo.ensurePersonalSpace(trimmed);
+      const space = await repo.ensurePersonalSpace(trimmed, deviceTimeZone());
       qc.setQueryData(['space', user?.id], space);
     } catch (e) {
       if (isRepoError(e, 'nome_da_conta_invalido')) setError('Dê um nome de 1 a 40 caracteres para a conta.');
