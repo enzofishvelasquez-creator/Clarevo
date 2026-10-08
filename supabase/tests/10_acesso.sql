@@ -164,12 +164,43 @@ select set_config('request.jwt.claim.sub', :ana, true);
 with c as (
   select public.create_commitment('chave-ana-c001', (select id from ids where name = 'familia'), 9000, '2026-10-12', 'Gás') as res
 ) insert into ids select 'familia_gas', (res #>> '{commitment,id}')::uuid from c;
+-- Gastos fixos (D-024) seguem as mesmas permissões: Ana cadastra um na família (desde novembro) e um no pessoal.
+with s as (
+  select public.create_series('chave-ana-s001', (select id from ids where name = 'familia'), 'mensal', 'conta', 'Condomínio', 'Moradia',
+    50000, 'fixo', 20, '2026-11-01', 1, null, null) as res
+) insert into ids select 'familia_condominio', (res #>> '{series,id}')::uuid from s;
+with s as (
+  select public.create_series('chave-ana-s002', (select id from ids where name = 'ana_ctx'), 'mensal', 'conta', 'Aluguel', 'Moradia',
+    250000, 'fixo', 5, '2026-10-01', 1, null, null) as res
+) insert into ids select 'ana_aluguel', (res #>> '{series,id}')::uuid from s;
 select set_config('request.jwt.claim.sub', :bruno, true);
 do $$ begin
   assert (select count(*) from public.commitments where description = 'Gás') = 1, 'Bruno vê o Gás da família';
   assert (select count(*) from public.commitment_items where description = 'Gás') = 1, 'Bruno vê o Gás na visão';
   assert (select count(*) from public.commitments where description = 'Internet') = 0, 'Bruno NÃO vê a Internet pessoal da Ana';
   assert (select count(*) from public.commitment_items where description = 'Internet') = 0, 'Bruno NÃO vê a Internet na visão';
+  assert (select count(*) from public.series_items) = 1 and (select count(*) from public.commitment_series) = 1
+     and (select count(*) from public.series_terms) = 1, 'Bruno vê só o gasto fixo da família';
+  assert (select count(*) from public.series_items where id = (select id from ids where name = 'ana_aluguel')) = 0,
+    'Bruno NÃO vê o gasto fixo pessoal da Ana';
+  assert (select count(*) from public.commitment_items where description = 'Aluguel') = 0, 'Bruno NÃO vê as contas do Aluguel da Ana';
+end $$;
+select pg_temp.expect_error(format($$select public.create_series('chave-bru-s001', %L, 'mensal', 'conta', 'Intruso', null, 100, 'fixo', 10,
+  '2026-10-01', 1, null, null)$$, (select id from ids where name = 'ana_ctx')), 'sem_permissao');
+-- Gasto fixo pessoal da Ana: não revela que existe.
+select pg_temp.expect_error(format($$select public.update_series_from('chave-bru-s002', %L, 1, 1, '[]', 'conta', 'Aluguel', null, 100, 'fixo', 5)$$,
+  (select id from ids where name = 'ana_aluguel')), 'nao_encontrado');
+select pg_temp.expect_error(format($$select public.end_series('chave-bru-s003', %L, 1, 1, '[]')$$,
+  (select id from ids where name = 'ana_aluguel')), 'nao_encontrado');
+select pg_temp.expect_error(format($$select public.delete_series('chave-bru-s004', %L, 1, '[]')$$,
+  (select id from ids where name = 'ana_aluguel')), 'nao_encontrado');
+select pg_temp.expect_error(format($$select public.sync_series_occurrences(%L)$$, (select id from ids where name = 'ana_ctx')), 'sem_permissao');
+-- Gasto fixo da Ana na família: Bruno lê e dispara a geração, mas não altera sem "editar de outras pessoas".
+select pg_temp.expect_error(format($$select public.end_series('chave-bru-s005', %L, 1, 0, '[]')$$,
+  (select id from ids where name = 'familia_condominio')), 'sem_permissao');
+do $$ begin
+  assert public.sync_series_occurrences((select id from ids where name = 'familia')) = '{"created": 0, "created_overdue": 0}'::jsonb,
+    'Bruno sincroniza a família (nada novo)';
 end $$;
 select pg_temp.expect_error(format($$select public.create_commitment('chave-bru-c000', %L, 100, '2026-10-12', 'Intruso')$$,
   (select id from ids where name = 'ana_ctx')), 'sem_permissao');
@@ -227,9 +258,17 @@ do $$ begin
   assert (select count(*) from public.plan_entitlements) = 0, 'Carla NÃO vê direitos ao plano de outras pessoas';
   assert (select count(*) from public.commitments) = 0, 'Carla NÃO vê compromissos';
   assert (select count(*) from public.commitment_items) = 0, 'Carla NÃO vê contas a pagar';
+  assert (select count(*) from public.commitment_series) = 0, 'Carla NÃO vê gastos fixos';
+  assert (select count(*) from public.series_terms) = 0, 'Carla NÃO vê os valores dos gastos fixos';
+  assert (select count(*) from public.series_items) = 0, 'Carla NÃO vê gastos fixos na visão';
 end $$;
 select pg_temp.expect_error(format($$select public.create_commitment('chave-car-c001', %L, 100, '2026-10-12', 'Intruso')$$,
   (select id from ids where name = 'ana_ctx')), 'sem_permissao');
+select pg_temp.expect_error(format($$select public.create_series('chave-car-s001', %L, 'mensal', 'conta', 'Intruso', null, 100, 'fixo', 10,
+  '2026-10-01', 1, null, null)$$, (select id from ids where name = 'ana_ctx')), 'sem_permissao');
+select pg_temp.expect_error(format($$select public.delete_series('chave-car-s002', %L, 1, '[]')$$,
+  (select id from ids where name = 'ana_aluguel')), 'nao_encontrado');
+select pg_temp.expect_error(format($$select public.sync_series_occurrences(%L)$$, (select id from ids where name = 'familia')), 'sem_permissao');
 select pg_temp.expect_error(format($$select public.pay_commitment('chave-car-c002', %L, 1, %L, 15000, '2026-10-07')$$,
   (select id from ids where name = 'ana_internet'), (select id from ids where name = 'ana_conta')), 'nao_encontrado');
 select pg_temp.expect_error(format($$select * from public.month_totals(%L, '2026-10-01')$$, (select id from ids where name = 'ana_ctx')), 'sem_permissao');
@@ -248,6 +287,7 @@ do $$ begin
   assert (select count(*) from public.licenses) = 0, 'Davi não vê licenças';
   assert (select count(*) from public.organizations) = 0, 'Davi não vê organizações';
   assert (select count(*) from public.persons) = 1, 'Davi só vê a si';
+  assert (select count(*) from public.series_items) = 0 and (select count(*) from public.series_terms) = 0, 'Davi não vê gastos fixos';
 end $$;
 select set_config('request.jwt.claim.sub', '', true);
 do $$ begin assert (select count(*) from public.financial_records) = 0, 'sem sessão não vê registros'; end $$;
@@ -260,6 +300,12 @@ select pg_temp.expect_error($$select count(*) from public.financial_records$$, '
 select pg_temp.expect_error($$select public.ensure_personal_space('Conta principal')$$, 'permission denied%');
 select pg_temp.expect_error($$select public.create_commitment('chave-anon-c01', gen_random_uuid(), 100, '2026-10-12', 'x')$$, 'permission denied%');
 select pg_temp.expect_error($$select count(*) from public.commitment_items$$, 'permission denied%');
+select pg_temp.expect_error($$select count(*) from public.commitment_series$$, 'permission denied%');
+select pg_temp.expect_error($$select count(*) from public.series_terms$$, 'permission denied%');
+select pg_temp.expect_error($$select count(*) from public.series_items$$, 'permission denied%');
+select pg_temp.expect_error($$select public.sync_series_occurrences(gen_random_uuid())$$, 'permission denied%');
+select pg_temp.expect_error($$select public.create_series('chave-anon-s01', gen_random_uuid(), 'mensal', 'conta', 'x', null, 100, 'fixo', 10,
+  '2026-10-01', 1, null, null)$$, 'permission denied%');
 reset role;
 set role authenticated;
 
@@ -283,6 +329,13 @@ select pg_temp.expect_error(format($$select public.pay_commitment('chave-bru-c00
 select pg_temp.expect_error(format($$select public.create_commitment('chave-bru-c004', %L, 100, '2026-10-12', 'Depois da revogação')$$,
   (select id from ids where name = 'familia')), 'sem_permissao');
 do $$ begin assert (select count(*) from public.commitments) = 0, 'Bruno revogado não vê contas a pagar da família'; end $$;
+do $$ begin
+  assert (select count(*) from public.series_items) = 0 and (select count(*) from public.commitment_series) = 0
+     and (select count(*) from public.series_terms) = 0, 'Bruno revogado não vê gastos fixos da família';
+end $$;
+select pg_temp.expect_error(format($$select public.sync_series_occurrences(%L)$$, (select id from ids where name = 'familia')), 'sem_permissao');
+select pg_temp.expect_error(format($$select public.create_series('chave-bru-s006', %L, 'mensal', 'conta', 'Depois da revogação', null, 100,
+  'fixo', 10, '2026-10-01', 1, null, null)$$, (select id from ids where name = 'familia')), 'sem_permissao');
 
 -- 7. Fim do benefício não apaga conta, histórico ou família.
 reset role;

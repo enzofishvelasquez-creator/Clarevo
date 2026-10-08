@@ -27,6 +27,7 @@ import {
   isRepoError,
   newOperationKey,
   nextMonthPrefill,
+  occurrenceLabel,
   parseBRL,
   parseDateBR,
   summarizeMonth,
@@ -332,7 +333,7 @@ describe('primeira conta (CL C001)', () => {
     const s = summarizeToPay(commitments, a.personalContextId, OCT, DEMO_TODAY);
     expect(s.toPayCents).toBe(0);
     expect(s.hasAny).toBe(false);
-    expect(toPayCaption(s, DEMO_TODAY)).toEqual({ main: null, overdue: null, includes: null });
+    expect(toPayCaption(s, DEMO_TODAY)).toEqual({ main: null, overdue: null, includes: null, estimated: null });
   });
 
   it('nome da conta é validado', async () => {
@@ -352,6 +353,9 @@ const commitment = (over: Partial<Commitment> = {}): Commitment => ({
   category: 'Moradia',
   status: 'aberto',
   payment: null,
+  series: null,
+  seriesOverride: false,
+  amountIsEstimate: false,
   createdBy: 'pessoa',
   version: 1,
   createdAt: '2026-10-01T12:00:00.000Z',
@@ -574,16 +578,23 @@ describe('contas a pagar', () => {
       const gas = commitment({ id: 'g', description: 'Gás', amountCents: 4000, dueOn: '2026-09-28' });
 
       it('dois ou mais itens com próxima', () => {
-        expect(caption([internet, condominio])).toEqual({ main: '2 contas · próxima: Internet, 15/10', overdue: null, includes: null });
+        expect(caption([internet, condominio])).toEqual({
+          main: '2 contas · próxima: Internet, 15/10',
+          overdue: null,
+          includes: null,
+          estimated: null,
+        });
         expect(caption([internet, condominio, agua])).toEqual({
           main: '3 contas · próxima: Internet, 15/10',
           overdue: '1 conta vencida',
           includes: null,
+          estimated: null,
         });
         expect(caption([internet, condominio, agua, gas])).toEqual({
           main: '4 contas · próxima: Internet, 15/10',
           overdue: '2 contas vencidas',
           includes: 'Inclui R$ 40,00 de contas vencidas antes de outubro.',
+          estimated: null,
         });
         expect(caption([commitment({ dueOn: '2026-10-07' }), condominio]).main).toBe('2 contas · próxima: Internet, hoje');
         expect(caption([commitment({ dueOn: '2026-10-08' }), condominio]).main).toBe('2 contas · próxima: Internet, amanhã');
@@ -593,7 +604,12 @@ describe('contas a pagar', () => {
         expect(caption([internet]).main).toBe('Internet · vence em 15/10');
         expect(caption([commitment({ dueOn: '2026-10-07' })]).main).toBe('Internet · vence hoje');
         expect(caption([commitment({ dueOn: '2026-10-08' })]).main).toBe('Internet · vence amanhã');
-        expect(caption([commitment({ dueOn: '2026-10-05' })])).toEqual({ main: 'Internet · venceu em 05/10', overdue: null, includes: null });
+        expect(caption([commitment({ dueOn: '2026-10-05' })])).toEqual({
+          main: 'Internet · venceu em 05/10',
+          overdue: null,
+          includes: null,
+          estimated: null,
+        });
       });
 
       it('todos vencidos, mês passado e sem itens', () => {
@@ -601,10 +617,11 @@ describe('contas a pagar', () => {
           main: '2 contas vencidas',
           overdue: null,
           includes: 'Inclui R$ 40,00 de contas vencidas antes de outubro.',
+          estimated: null,
         });
-        expect(caption([internet, gas], SEP)).toEqual({ main: '1 conta em aberto', overdue: null, includes: null });
+        expect(caption([internet, gas], SEP)).toEqual({ main: '1 conta em aberto', overdue: null, includes: null, estimated: null });
         expect(caption([gas, commitment({ id: 'g2', dueOn: '2026-09-10' })], SEP).main).toBe('2 contas em aberto');
-        expect(caption([paidCommitment('2026-10-10', '2026-10-07')])).toEqual({ main: null, overdue: null, includes: null });
+        expect(caption([paidCommitment('2026-10-10', '2026-10-07')])).toEqual({ main: null, overdue: null, includes: null, estimated: null });
       });
     });
 
@@ -858,8 +875,9 @@ describe('contas a pagar', () => {
       expect(moved.version).toBe(agua.version + 1);
       expect(await toPay()).toBe(650);
       const nov = summarizeToPay(await repo.listCommitments(ctx, NOV), ctx, NOV, DEMO_TODAY);
-      expect(nov.items.map((c) => c.description)).toEqual(['Água', 'Seguro do carro']);
-      expect(nov.toPayCents).toBe(39000);
+      // Novembro também tem as contas dos gastos fixos da demonstração (Aluguel, Financiamento do carro e Luz).
+      expect(nov.items.map((c) => c.description)).toEqual(['Aluguel', 'Água', 'Financiamento do carro', 'Seguro do carro', 'Luz']);
+      expect(nov.toPayCents).toBe(250000 + 9000 + 85000 + 30000 + 18000);
     });
 
     it('19. excluir tira a conta de tudo; versão antiga é recusada', async () => {
@@ -867,7 +885,14 @@ describe('contas a pagar', () => {
       const internet = await bill('Internet');
       const deleted = await repo.deleteCommitment(newOperationKey(), internet.id, internet.version);
       expect(deleted.commitment.version).toBe(internet.version + 1);
-      expect((await repo.listCommitments(ctx, OCT)).map((c) => c.description)).toEqual(['Condomínio', 'Seguro do carro']);
+      expect((await repo.listCommitments(ctx, OCT)).map((c) => c.description)).toEqual([
+        'Aluguel',
+        'Condomínio',
+        'Aluguel',
+        'Financiamento do carro',
+        'Seguro do carro',
+        'Luz',
+      ]);
       expect(await repo.getCommitment(internet.id)).toBeNull();
       expect(await toPay()).toBe(500);
       const input = { description: 'Internet', amountCents: 15000, dueOn: '2026-10-15', category: null };
@@ -923,7 +948,12 @@ describe('contas a pagar', () => {
       });
       const internet = await bill('Internet');
       await expect(
-        repo.updateCommitment(newOperationKey(), internet.id, internet.version, { ...internet, dueOn: '2028-10-08' }),
+        repo.updateCommitment(newOperationKey(), internet.id, internet.version, {
+          description: internet.description,
+          amountCents: internet.amountCents,
+          dueOn: '2028-10-08',
+          category: internet.category,
+        }),
       ).rejects.toMatchObject({ code: 'vencimento_fora_do_intervalo' });
       repo.checkInvariants();
     });
@@ -950,19 +980,20 @@ describe('contas a pagar', () => {
         return { list: names(list), s: summarizeToPay(list, ctx, month, DEMO_TODAY) };
       };
 
-      // Seguro do carro vence em novembro e é pago adiantado em outubro.
+      // Seguro do carro vence em novembro e é pago adiantado em outubro. O Aluguel de outubro é a conta do
+      // gasto fixo, paga em 05/10; Aluguel, Financiamento do carro e Luz de novembro continuam em aberto.
       const seguro = await bill('Seguro do carro');
       const paid = await repo.payCommitment(newOperationKey(), seguro.id, seguro.version, payment(300));
       let oct = await view(OCT);
-      expect(oct.list).toEqual(['Internet', 'Condomínio', 'Seguro do carro']);
-      expect(names(oct.s.paidInMonth)).toEqual(['Seguro do carro']);
-      expect(oct.s.later).toEqual([]);
+      expect(oct.list).toEqual(['Aluguel', 'Internet', 'Condomínio', 'Aluguel', 'Financiamento do carro', 'Seguro do carro', 'Luz']);
+      expect(names(oct.s.paidInMonth)).toEqual(['Aluguel', 'Seguro do carro']);
+      expect(names(oct.s.later)).toEqual(['Aluguel', 'Financiamento do carro', 'Luz']);
       expect(await toPay()).toBe(650);
       expect(await totals()).toEqual([6000, 4200, 1800]);
       const nov = await view(NOV);
       expect(names(nov.s.paidInMonth)).toEqual(['Seguro do carro']);
-      expect(await toPay(NOV)).toBe(0);
-      expect((await view(SEP)).list).toEqual(['Internet', 'Condomínio']);
+      expect(await toPay(NOV)).toBe(2500 + 850 + 180);
+      expect((await view(SEP)).list).toEqual(['Internet', 'Condomínio', 'Aluguel', 'Financiamento do carro', 'Luz']);
 
       // Gás vence em setembro e é pago em outubro; Luz vence e é paga em setembro.
       const gas = (await note('Gás', 40, '2026-09-28')).commitment;
@@ -970,8 +1001,8 @@ describe('contas a pagar', () => {
       const luz = (await note('Luz', 120, '2026-09-10')).commitment;
       await repo.payCommitment(newOperationKey(), luz.id, luz.version, payment(120, '2026-09-09'));
       oct = await view(OCT);
-      expect(oct.list).toEqual(['Gás', 'Internet', 'Condomínio', 'Seguro do carro']);
-      expect(names(oct.s.paidInMonth)).toEqual(['Gás', 'Seguro do carro']);
+      expect(oct.list).toEqual(['Gás', 'Aluguel', 'Internet', 'Condomínio', 'Aluguel', 'Financiamento do carro', 'Seguro do carro', 'Luz']);
+      expect(names(oct.s.paidInMonth)).toEqual(['Gás', 'Aluguel', 'Seguro do carro']);
       expect(names(oct.s.items)).toEqual(['Internet', 'Condomínio']);
       expect(await toPay()).toBe(650);
       expect(await totals()).toEqual([6000, 4240, 1760]);
@@ -982,8 +1013,8 @@ describe('contas a pagar', () => {
       // Desfazer devolve o seguro a "Próximos meses".
       await repo.undoCommitmentPayment(newOperationKey(), seguro.id, paid.commitment.version);
       oct = await view(OCT);
-      expect(names(oct.s.paidInMonth)).toEqual(['Gás']);
-      expect(names(oct.s.later)).toEqual(['Seguro do carro']);
+      expect(names(oct.s.paidInMonth)).toEqual(['Gás', 'Aluguel']);
+      expect(names(oct.s.later)).toEqual(['Aluguel', 'Financiamento do carro', 'Seguro do carro', 'Luz']);
       expect((await view(NOV)).s.paidInMonth).toEqual([]);
 
       // O mês do pagamento segue o gasto vivo: mudar a data do gasto para setembro tira o Gás de outubro.
@@ -995,8 +1026,8 @@ describe('contas a pagar', () => {
         category: 'Moradia',
       });
       oct = await view(OCT);
-      expect(oct.list).toEqual(['Internet', 'Condomínio', 'Seguro do carro']);
-      expect(oct.s.paidInMonth).toEqual([]);
+      expect(oct.list).toEqual(['Aluguel', 'Internet', 'Condomínio', 'Aluguel', 'Financiamento do carro', 'Seguro do carro', 'Luz']);
+      expect(names(oct.s.paidInMonth)).toEqual(['Aluguel']);
       expect(names((await view(SEP)).s.paidInMonth)).toEqual(['Luz', 'Gás']);
       expect(await toPay()).toBe(650);
       repo.checkInvariants();
@@ -1063,22 +1094,30 @@ describe('contas a pagar', () => {
       repo.checkInvariants();
     });
 
-    it('22. demonstração: três contas a pagar em aberto, R$ 650 em outubro e nada em setembro', async () => {
+    it('22. demonstração: Aluguel de outubro pago pelo gasto fixo, duas contas em aberto, R$ 650 em outubro e nada em setembro', async () => {
       const { repo, ctx, toPay } = await setup();
       const list = await repo.listCommitments(ctx, OCT);
-      expect(list.map((c) => [c.description, c.amountCents, c.dueOn, c.category, c.status, c.payment, c.version])).toEqual([
-        ['Internet', 15000, '2026-10-15', 'Moradia', 'aberto', null, 1],
-        ['Condomínio', 50000, '2026-10-20', 'Moradia', 'aberto', null, 1],
-        ['Seguro do carro', 30000, '2026-11-10', 'Transporte', 'aberto', null, 1],
+      expect(
+        list.map((c) => [c.description, c.amountCents, c.dueOn, c.category, c.status, c.payment?.paidOn ?? null, occurrenceLabel(c), c.amountIsEstimate]),
+      ).toEqual([
+        ['Aluguel', 250000, '2026-10-05', 'Moradia', 'quitado', '2026-10-05', 'Todo mês', false],
+        ['Internet', 15000, '2026-10-15', 'Moradia', 'aberto', null, null, false],
+        ['Condomínio', 50000, '2026-10-20', 'Moradia', 'aberto', null, null, false],
+        ['Aluguel', 250000, '2026-11-05', 'Moradia', 'aberto', null, 'Todo mês', false],
+        ['Financiamento do carro', 85000, '2026-11-10', 'Transporte', 'aberto', null, 'Parcela 13 de 48', false],
+        ['Seguro do carro', 30000, '2026-11-10', 'Transporte', 'aberto', null, null, false],
+        ['Luz', 18000, '2026-11-12', 'Moradia', 'aberto', null, 'Todo mês', true],
       ]);
       expect(await toPay()).toBe(650);
       expect(await toPay(SEP)).toBe(0);
       const s = summarizeToPay(list, ctx, OCT, DEMO_TODAY);
       expect(s.items.map((c) => c.description)).toEqual(['Internet', 'Condomínio']);
       expect(s.nextDue?.description).toBe('Internet');
-      expect(s.later.map((c) => c.description)).toEqual(['Seguro do carro']);
+      expect(s.paidInMonth.map((c) => c.description)).toEqual(['Aluguel']);
+      expect(s.later.map((c) => c.description)).toEqual(['Aluguel', 'Financiamento do carro', 'Seguro do carro', 'Luz']);
       expect(s.overdueCount).toBe(0);
-      expect(toPayCaption(s, DEMO_TODAY)).toEqual({ main: '2 contas · próxima: Internet, 15/10', overdue: null, includes: null });
+      expect(s.estimatedCents).toBe(0);
+      expect(toPayCaption(s, DEMO_TODAY)).toEqual({ main: '2 contas · próxima: Internet, 15/10', overdue: null, includes: null, estimated: null });
       repo.checkInvariants();
     });
   });

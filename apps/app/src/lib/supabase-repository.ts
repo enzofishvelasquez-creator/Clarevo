@@ -1,9 +1,12 @@
 import {
   RepoError,
   monthRange,
+  type AffectedRef,
+  type AmountMode,
   type Commitment,
   type CommitmentAction,
   type CommitmentInput,
+  type CommitmentSeries,
   type CommitmentWrite,
   type FinancialRecord,
   type IsoMonth,
@@ -13,6 +16,12 @@ import {
   type RecordKind,
   type RecordsRepository,
   type RepoErrorCode,
+  type SeriesAction,
+  type SeriesEditInput,
+  type SeriesInput,
+  type SeriesKind,
+  type SeriesNature,
+  type SeriesWrite,
 } from '@clarevo/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -38,7 +47,7 @@ interface RecordRow {
   updated_at: string;
 }
 
-/** Colunas da visão commitment_items (conta a pagar + gasto vivo que a quitou). */
+/** Colunas da visão commitment_items (conta a pagar + gasto vivo que a quitou + série, quando houver). */
 interface CommitmentRow {
   id: string;
   context_id: string;
@@ -56,12 +65,60 @@ interface CommitmentRow {
   paid_on: string | null;
   paid_amount_cents: number | null;
   paid_account_id: string | null;
+  // Ocorrência de série (nulos na conta avulsa). Tipo e total de parcelas vêm da série pela junção.
+  series_id: string | null;
+  occurrence_number: number | null;
+  series_override: boolean;
+  amount_is_estimate: boolean;
+  series_kind: SeriesKind | null;
+  series_nature: SeriesNature | null;
+  series_installment_total: number | null;
 }
 
 /** Retorno (jsonb) das funções de conta a pagar. record: gasto criado (pagar) ou excluído (desfazer). */
 interface CommitmentResult {
   commitment: CommitmentRow | null;
   record: RecordRow | null;
+}
+
+/** Vigência viva, como em series_items.terms. */
+interface SeriesTermRow {
+  from_number: number;
+  description: string;
+  category: string | null;
+  amount_cents: number;
+  amount_mode: AmountMode;
+  due_day: number;
+}
+
+/** Colunas da visão series_items (e o objeto series do retorno das funções de série). */
+interface SeriesRow {
+  id: string;
+  context_id: string;
+  kind: SeriesKind;
+  nature: SeriesNature;
+  /** Primeiro dia do mês (AAAA-MM-01). */
+  first_due_month: string;
+  first_number: number;
+  last_number: number | null;
+  installment_total: number | null;
+  currency: 'BRL';
+  created_by: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  terms: SeriesTermRow[];
+  skipped_numbers: number[];
+  paid_count: number;
+  open_count: number;
+  generating: boolean;
+}
+
+/** Retorno (jsonb) das funções de série: ocorrências vivas por número crescente; changed conforme a função. */
+interface SeriesResult {
+  series: SeriesRow | null;
+  occurrences: CommitmentRow[] | null;
+  changed: number;
 }
 
 const RECORD_ACTIONS = ['criar', 'editar', 'excluir'];
@@ -72,6 +129,7 @@ const COMMITMENT_ACTIONS: CommitmentAction[] = [
   'pagar_compromisso',
   'desfazer_pagamento',
 ];
+const SERIES_ACTIONS: SeriesAction[] = ['criar_serie', 'alterar_serie', 'encerrar_serie', 'excluir_serie'];
 
 const KNOWN: RepoErrorCode[] = [
   'versao_desatualizada',
@@ -92,6 +150,22 @@ const KNOWN: RepoErrorCode[] = [
   'vencimento_fora_do_intervalo',
   'compromisso_quitado',
   'compromisso_aberto',
+  'tipo_invalido',
+  'natureza_invalida',
+  'modo_de_valor_invalido',
+  'dia_invalido',
+  'inicio_fora_do_intervalo',
+  'parcelas_invalidas',
+  'parcela_inicial_invalida',
+  'fim_invalido',
+  'numero_fora_da_serie',
+  'inicio_em_conta_paga',
+  'limite_de_gastos_fixos',
+  'serie_tem_pagamento_posterior',
+  'serie_tem_pagamentos',
+  'vencimento_fora_do_mes',
+  'estimativa_invalida',
+  'serie_inconsistente',
 ];
 
 /**
@@ -101,7 +175,8 @@ const KNOWN: RepoErrorCode[] = [
  */
 function repoError(e: { message?: string; code?: string } | null): RepoError {
   const msg = e?.message ?? '';
-  const known = KNOWN.find((k) => msg === k || msg.endsWith(k));
+  // O mais longo vence: 'modo_de_valor_invalido' termina com 'valor_invalido'.
+  const known = KNOWN.filter((k) => msg === k || msg.endsWith(k)).sort((a, b) => b.length - a.length)[0];
   if (known) return new RepoError(known);
   if (e?.code === '42501') return new RepoError('sem_permissao');
   if (/fetch|network|Failed to fetch|timeout/i.test(msg) || !e?.code) return new RepoError('rede');
@@ -128,13 +203,21 @@ function toRecord(r: RecordRow): FinancialRecord {
   };
 }
 
-/** Paga se e somente se há gasto vivo vinculado. Qualquer outra combinação é recusada: nunca mostrar "paga" sem o gasto. */
+/**
+ * Paga se e somente se há gasto vivo vinculado. Qualquer outra combinação é recusada: nunca mostrar "paga" sem o gasto.
+ * Ocorrência de série só com número e tipo da série; conta avulsa sem marcas de série (como commitments_series_marcas).
+ */
 function toCommitment(c: CommitmentRow): Commitment {
   const paid = c.status === 'quitado';
   const hasPayment =
     c.paid_record_id != null && c.paid_on != null && c.paid_amount_cents != null && c.paid_account_id != null;
   const consistent = paid ? hasPayment : c.status === 'aberto' && c.paid_record_id == null;
   if (!consistent) throw new RepoError('desconhecido', 'vinculo_inconsistente');
+  const inSeries = c.series_id != null;
+  const seriesConsistent = inSeries
+    ? c.occurrence_number != null && c.series_kind != null && c.series_nature != null
+    : c.occurrence_number == null && !c.series_override && !c.amount_is_estimate;
+  if (!seriesConsistent) throw new RepoError('desconhecido', 'serie_inconsistente');
   return {
     id: c.id,
     contextId: c.context_id,
@@ -152,12 +235,59 @@ function toCommitment(c: CommitmentRow): Commitment {
           accountId: c.paid_account_id!,
         }
       : null,
+    series: inSeries
+      ? {
+          id: c.series_id!,
+          number: c.occurrence_number!,
+          kind: c.series_kind!,
+          nature: c.series_nature!,
+          installmentTotal: c.series_installment_total ?? null,
+        }
+      : null,
+    seriesOverride: c.series_override === true,
+    amountIsEstimate: c.amount_is_estimate === true,
     createdBy: c.created_by,
     version: c.version,
     createdAt: c.created_at,
     updatedAt: c.updated_at,
   };
 }
+
+/** Toda série tem vigência viva no primeiro número (S5); sem ela, nenhum vencimento ou valor pode ser calculado. */
+function toSeries(s: SeriesRow): CommitmentSeries {
+  const terms = s.terms ?? [];
+  if (terms[0]?.from_number !== s.first_number) throw new RepoError('desconhecido', 'serie_inconsistente');
+  return {
+    id: s.id,
+    contextId: s.context_id,
+    kind: s.kind,
+    nature: s.nature,
+    firstDueMonth: s.first_due_month.slice(0, 7),
+    firstNumber: s.first_number,
+    lastNumber: s.last_number,
+    installmentTotal: s.installment_total,
+    currency: s.currency,
+    terms: terms.map((t) => ({
+      fromNumber: t.from_number,
+      description: t.description,
+      category: t.category,
+      amountCents: Number(t.amount_cents),
+      amountMode: t.amount_mode,
+      dueDay: t.due_day,
+    })),
+    skippedNumbers: s.skipped_numbers ?? [],
+    paidCount: s.paid_count,
+    openCount: s.open_count,
+    generating: s.generating,
+    createdBy: s.created_by,
+    version: s.version,
+    createdAt: s.created_at,
+    updatedAt: s.updated_at,
+  };
+}
+
+/** Só {id, version}: um campo a mais faria a conferência de conjunto do banco recusar a escrita. */
+const affectedJson = (list: readonly AffectedRef[]) => list.map((a) => ({ id: a.id, version: a.version }));
 
 export class SupabaseRepository implements RecordsRepository {
   constructor(
@@ -301,6 +431,18 @@ export class SupabaseRepository implements RecordsRepository {
       : null;
   }
 
+  /** Só operações de série: o alvo fica em target_id. */
+  async findSeriesOperation(key: string) {
+    const { data, error } = await this.db
+      .from('record_operations')
+      .select('action, target_id')
+      .eq('idempotency_key', key)
+      .in('action', SERIES_ACTIONS)
+      .maybeSingle();
+    if (error) throw repoError(error);
+    return data ? { action: data.action as SeriesAction, seriesId: data.target_id as string } : null;
+  }
+
   private async call(fn: string, args: Record<string, unknown>) {
     const { data, error } = await this.db.rpc(fn, args).single();
     if (error) throw repoError(error);
@@ -364,6 +506,10 @@ export class SupabaseRepository implements RecordsRepository {
     });
   }
 
+  /**
+   * p_amount_is_estimate só vai em "Informar o valor da conta" (false). Sem ele, o banco mantém a marca e calcula
+   * o mesmo hash da assinatura antiga: uma repetição em trânsito continua reconhecida.
+   */
   updateCommitment(key: string, id: string, expectedVersion: number, input: CommitmentInput) {
     return this.callCommitment('update_commitment', {
       p_idempotency_key: key,
@@ -373,6 +519,7 @@ export class SupabaseRepository implements RecordsRepository {
       p_due_on: input.dueOn,
       p_description: input.description,
       p_category: input.category,
+      ...(input.amountIsEstimate === false ? { p_amount_is_estimate: false } : {}),
     });
   }
 
@@ -402,5 +549,124 @@ export class SupabaseRepository implements RecordsRepository {
       p_commitment_id: id,
       p_expected_version: expectedVersion,
     });
+  }
+
+  /** Gastos fixos e parcelamentos do contexto (inclusive encerrados), em páginas como as demais listas. */
+  async listSeries(contextId: string): Promise<CommitmentSeries[]> {
+    const PAGE = 500;
+    const rows: SeriesRow[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await this.db
+        .from('series_items')
+        .select('*')
+        .eq('context_id', contextId)
+        .order('created_at')
+        .order('id')
+        .range(from, from + PAGE - 1);
+      if (error) throw repoError(error);
+      rows.push(...(data as SeriesRow[]));
+      if (data.length < PAGE) break;
+    }
+    return rows.map(toSeries);
+  }
+
+  async getSeries(id: string) {
+    const { data, error } = await this.db.from('series_items').select('*').eq('id', id).maybeSingle();
+    if (error) throw repoError(error);
+    return data ? toSeries(data as SeriesRow) : null;
+  }
+
+  /** Ocorrências vivas (abertas e pagas), da mais recente para a mais antiga, até 60. */
+  async listSeriesOccurrences(seriesId: string) {
+    const { data, error } = await this.db
+      .from('commitment_items')
+      .select('*')
+      .eq('series_id', seriesId)
+      .order('occurrence_number', { ascending: false })
+      .limit(60);
+    if (error) throw repoError(error);
+    return (data as CommitmentRow[]).map(toCommitment);
+  }
+
+  /** Funções de série devolvem jsonb {series, occurrences, changed}: sem .single(). */
+  private async callSeries(fn: string, args: Record<string, unknown>): Promise<SeriesWrite> {
+    const { data, error } = await this.db.rpc(fn, args);
+    if (error) throw repoError(error);
+    const result = data as SeriesResult | null;
+    if (!result?.series) throw new RepoError('desconhecido');
+    return {
+      series: toSeries(result.series),
+      occurrences: (result.occurrences ?? []).map(toCommitment),
+      changed: Number(result.changed),
+    };
+  }
+
+  createSeries(key: string, contextId: string, input: SeriesInput) {
+    return this.callSeries('create_series', {
+      p_idempotency_key: key,
+      p_context_id: contextId,
+      p_kind: input.kind,
+      p_nature: input.nature,
+      p_description: input.description,
+      p_category: input.category,
+      p_amount_cents: input.amountCents,
+      p_amount_mode: input.amountMode,
+      p_due_day: input.dueDay,
+      p_first_due_month: `${input.firstDueMonth}-01`,
+      p_first_number: input.firstNumber,
+      p_installment_total: input.installmentTotal,
+      p_last_month: input.lastMonth ? `${input.lastMonth}-01` : null,
+    });
+  }
+
+  updateSeriesFrom(
+    key: string,
+    id: string,
+    expectedVersion: number,
+    fromNumber: number,
+    expectedAffected: AffectedRef[],
+    input: SeriesEditInput,
+  ) {
+    return this.callSeries('update_series_from', {
+      p_idempotency_key: key,
+      p_series_id: id,
+      p_expected_version: expectedVersion,
+      p_from_number: fromNumber,
+      p_expected_affected: affectedJson(expectedAffected),
+      p_nature: input.nature,
+      p_description: input.description,
+      p_category: input.category,
+      p_amount_cents: input.amountCents,
+      p_amount_mode: input.amountMode,
+      p_due_day: input.dueDay,
+    });
+  }
+
+  endSeries(key: string, id: string, expectedVersion: number, lastNumber: number | null, expectedAffected: AffectedRef[]) {
+    return this.callSeries('end_series', {
+      p_idempotency_key: key,
+      p_series_id: id,
+      p_expected_version: expectedVersion,
+      p_last_number: lastNumber,
+      p_expected_affected: affectedJson(expectedAffected),
+    });
+  }
+
+  deleteSeries(key: string, id: string, expectedVersion: number, expectedAffected: AffectedRef[]) {
+    return this.callSeries('delete_series', {
+      p_idempotency_key: key,
+      p_series_id: id,
+      p_expected_version: expectedVersion,
+      p_expected_affected: affectedJson(expectedAffected),
+    });
+  }
+
+  /** Volátil: vai por POST (padrão do rpc). Leitura basta; a autoria das contas criadas é de quem criou a série. */
+  async syncSeriesOccurrences(contextId: string) {
+    const { data, error } = await this.db.rpc('sync_series_occurrences', { p_context_id: contextId });
+    if (error) throw repoError(error);
+    const result = data as { created: number; created_overdue: number } | null;
+    if (!result) throw new RepoError('desconhecido');
+    return { created: Number(result.created), createdOverdue: Number(result.created_overdue) };
   }
 }

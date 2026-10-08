@@ -149,9 +149,16 @@ function Navigation() {
           <Stack.Screen name="registro/[id]/editar" />
           <Stack.Screen name="a-pagar/index" />
           <Stack.Screen name="a-pagar/nova" />
+          {/* Rota estática: tem precedência sobre a-pagar/[id]. */}
+          <Stack.Screen name="a-pagar/vencidas" />
           <Stack.Screen name="a-pagar/[id]/index" />
           <Stack.Screen name="a-pagar/[id]/editar" />
           <Stack.Screen name="a-pagar/[id]/pagar" />
+          <Stack.Screen name="gastos-fixos/index" />
+          <Stack.Screen name="gastos-fixos/novo" />
+          <Stack.Screen name="gastos-fixos/[id]/index" />
+          <Stack.Screen name="gastos-fixos/[id]/editar" />
+          <Stack.Screen name="gastos-fixos/[id]/encerrar" />
           <Stack.Screen name="composicao" />
           <Stack.Screen name="quem-ve" />
           <Stack.Screen name="conta" />

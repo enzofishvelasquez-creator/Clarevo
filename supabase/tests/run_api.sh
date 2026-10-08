@@ -36,10 +36,24 @@ insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) value
   ('$BRUNO', 'bruno@exemplo.test', now(), '{"display_name":"Bruno"}'),
   ('$EVA', 'eva@exemplo.test', null, '{"display_name":"Eva"}');
 alter database "$DB" set clarevo.today = '2026-10-07';
+-- Só neste banco descartável: o cabeçalho x-clarevo-today muda o "hoje" de uma requisição, para conferir a geração
+-- de contas de gasto fixo com o passar dos meses. Sem o cabeçalho, vale o dia fixo acima.
+create schema clarevo_teste;
+create function clarevo_teste.hoje_da_requisicao() returns void language plpgsql as \$\$
+declare
+  v_today text := coalesce(nullif(current_setting('request.headers', true), ''), '{}')::json ->> 'x-clarevo-today';
+begin
+  if v_today is not null then
+    perform set_config('clarevo.today', v_today::date::text, true);
+  end if;
+end \$\$;
+grant usage on schema clarevo_teste to anon, authenticated;
+grant execute on function clarevo_teste.hoje_da_requisicao() to anon, authenticated;
 SQL
 
 PGRST_DB_URI="postgres://clarevo_api_teste:senha-local-de-teste@127.0.0.1:${PGPORT:-5432}/$DB" \
 PGRST_DB_SCHEMAS=public PGRST_DB_ANON_ROLE=anon PGRST_JWT_SECRET="$SECRET" PGRST_SERVER_PORT=$API_PORT \
+PGRST_DB_PRE_REQUEST=clarevo_teste.hoje_da_requisicao \
   postgrest > /tmp/clarevo-postgrest.log 2>&1 &
 PGRST_PID=$!
 node tests/api-proxy.js $PROXY_PORT $API_PORT &

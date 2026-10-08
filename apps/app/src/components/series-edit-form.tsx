@@ -1,0 +1,526 @@
+import {
+  CATEGORIES,
+  DESCRIPTION_MAX,
+  INSTALLMENT_NATURES,
+  MAX_RECORD_CENTS,
+  NO_CATEGORY_LABEL,
+  SERIES_ERROR_TEXT,
+  SERIES_NATURE_LABEL,
+  affectedByEditFrom,
+  centsToInput,
+  charCount,
+  currentTerm,
+  fieldForErrorCode,
+  formatDayMonth,
+  formatMonthInputBR,
+  formatMonthName,
+  formatMonthYearBR,
+  isRepoError,
+  maskMonthBR,
+  monthOf,
+  monthsBetween,
+  numberOfMonth,
+  parseBRL,
+  parseMonthBR,
+  seriesErrorText,
+  seriesMonthOf,
+  seriesTermError,
+  termFor,
+  type AmountMode,
+  type Commitment,
+  type CommitmentSeries,
+  type EditFromPlan,
+  type SeriesEditInput,
+  type SeriesField,
+  type SeriesFieldErrors,
+  type SeriesNature,
+} from '@clarevo/core';
+import { useQueryClient } from '@tanstack/react-query';
+import { router, useNavigation } from 'expo-router';
+import { usePreventRemove } from 'expo-router/react-navigation';
+import * as Haptics from 'expo-haptics';
+import { AlertCircle } from 'lucide-react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { KeyboardAvoidingView, Platform, View, type TextInput } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { ConfirmDialog } from '@/components/dialog';
+import { ContextPill, SubHeader } from '@/components/header';
+import { ChoiceGroup, monthChipLabel, seriesStyles as styles } from '@/components/series-parts';
+import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
+import { flash } from '@/lib/flash';
+import { useSeries, useSeriesOccurrences, useSeriesOperationKey, useUpdateSeriesFrom } from '@/state/data';
+import { useRepo, useSession } from '@/state/session';
+import { colors, space } from '@/theme/tokens';
+
+interface EditDraft {
+  nature: SeriesNature;
+  description: string;
+  amountText: string;
+  amountMode: AmountMode;
+  dueDayText: string;
+  category: string | null;
+}
+
+type EditField = Extract<SeriesField, 'description' | 'nature' | 'amountText' | 'dueDayText'>;
+const EDIT_FIELD_ORDER: EditField[] = ['description', 'nature', 'amountText', 'dueDayText'];
+
+/** "Aplicar a partir de": um número da série ou "Outro mês" (campo MM/AAAA). */
+type FromPick = number | 'outro';
+
+/** Confirmação aberta: o conjunto afetado e a versão que a pessoa viu. */
+interface Pending {
+  k: number;
+  plan: Extract<EditFromPlan, { ok: true }>;
+  version: number;
+  input: SeriesEditInput;
+}
+
+/** Mesma ordem do banco (clarevo_validate_series_term, depois natureza_invalida); um texto por campo. */
+function validateEdit(d: EditDraft, kind: CommitmentSeries['kind']): { ok: true; input: SeriesEditInput } | { ok: false; errors: SeriesFieldErrors } {
+  const errors: SeriesFieldErrors = {};
+  const amount = parseBRL(d.amountText);
+  if (amount === null || amount <= 0) errors.amountText = SERIES_ERROR_TEXT.valor_invalido;
+  else if (amount > MAX_RECORD_CENTS) errors.amountText = SERIES_ERROR_TEXT.valor_acima_do_limite;
+  const description = d.description.trim();
+  if (description === '') errors.description = SERIES_ERROR_TEXT.descricao_obrigatoria;
+  else if (charCount(description) > DESCRIPTION_MAX) errors.description = SERIES_ERROR_TEXT.descricao_longa;
+  const day = /^\s*\d{1,2}\s*$/.test(d.dueDayText) ? Number(d.dueDayText.trim()) : null;
+  if (day === null || day < 1 || day > 31) errors.dueDayText = SERIES_ERROR_TEXT.dia_invalido;
+  if ((kind === 'mensal') !== (d.nature === 'conta')) errors.nature = SERIES_ERROR_TEXT.natureza_invalida;
+  if (Object.keys(errors).length > 0 || amount === null || day === null) return { ok: false, errors };
+  const input: SeriesEditInput = {
+    nature: d.nature,
+    description,
+    category: d.category?.trim() ? d.category.trim() : null,
+    amountCents: amount,
+    amountMode: d.amountMode,
+    dueDay: day,
+  };
+  // Conferência final com a regra do core (a mesma do banco).
+  const code = seriesTermError(input);
+  if (code) {
+    const field = fieldForErrorCode(code, 'series');
+    return { ok: false, errors: field ? { [field]: SERIES_ERROR_TEXT[code as keyof typeof SERIES_ERROR_TEXT] } : { amountText: SERIES_ERROR_TEXT.salvar_falhou } };
+  }
+  return { ok: true, input };
+}
+
+/**
+ * "Esta e as próximas" (D-024, regra 5): vigência nova a partir da conta escolhida, que sempre muda; as contas em aberto
+ * seguintes também mudam, menos as alteradas só no mês. A pessoa confirma o conjunto afetado; se ele mudar até gravar,
+ * o banco recusa e a tela recalcula. Mesmos cuidados dos outros formulários: chave guardada, reconciliação e rodapé fixo.
+ */
+export function SeriesEditForm({
+  series: opened,
+  contextId,
+  fromNumber,
+  suggestedCents,
+}: {
+  series: CommitmentSeries;
+  contextId: string;
+  /** a-partir=<n> da rota. */
+  fromNumber?: number;
+  /** "Usar como novo valor de referência": valor sugerido, em centavos. */
+  suggestedCents?: number;
+}) {
+  const { today } = useSession();
+  const repo = useRepo();
+  const qc = useQueryClient();
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+  const update = useUpdateSeriesFrom();
+  const keys = useSeriesOperationKey();
+  const live = useSeries(opened.id, contextId);
+  const occ = useSeriesOccurrences(opened.id, contextId);
+  const s = live.data ?? opened;
+  const occurrences = occ.data ? [...occ.data].reverse() : []; // número crescente
+  const parcelada = s.kind === 'parcelada';
+  const noun = parcelada ? 'Parcelamento' : 'Gasto fixo';
+  const currentMonth = monthOf(today);
+  // Mesmo limite do banco para séries sem término: até 12 meses depois do mês atual.
+  const maxNumber = s.lastNumber ?? s.firstNumber + monthsBetween(s.firstDueMonth, currentMonth) + 12;
+
+  // Chips: as contas em aberto e até 6 meses depois da última conta criada.
+  const choices = useMemo(() => {
+    const open = occurrences.filter((c) => c.status === 'aberto');
+    const maxLive = Math.max(s.firstNumber - 1, ...occurrences.map((c) => c.series!.number));
+    const start = Math.max(maxLive + 1, numberOfMonth(s, currentMonth), s.firstNumber);
+    const future: number[] = [];
+    for (let n = start; n <= Math.min(maxNumber, start + 5); n++) if (!s.skippedNumbers.includes(n)) future.push(n);
+    const dueLabel = (c: Commitment) => (c.dueOn < today ? `venceu em ${formatDayMonth(c.dueOn)}` : `vence em ${formatDayMonth(c.dueOn)}`);
+    return [
+      ...open.map((c) => ({ n: c.series!.number, label: `${monthChipLabel(monthOf(c.dueOn), today)} (${dueLabel(c)})` })),
+      ...future.map((n) => ({ n, label: monthChipLabel(seriesMonthOf(s, n), today) })),
+    ];
+  }, [occ.data, live.data]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const initial = useMemo(() => {
+    const requested = fromNumber !== undefined && fromNumber >= opened.firstNumber && fromNumber <= maxNumber ? fromNumber : null;
+    const k0 = requested ?? choices[0]?.n ?? null;
+    const term = (k0 !== null ? termFor(opened.terms, k0) : null) ?? currentTerm(opened, today);
+    const draft: EditDraft = {
+      nature: opened.nature,
+      description: term.description,
+      amountText: centsToInput(suggestedCents ?? term.amountCents),
+      amountMode: term.amountMode,
+      dueDayText: String(term.dueDay),
+      category: term.category,
+    };
+    const pick: FromPick = k0 === null ? 'outro' : choices.some((c) => c.n === k0) ? k0 : 'outro';
+    const otherText = pick === 'outro' && k0 !== null ? formatMonthInputBR(seriesMonthOf(opened, k0)) : '';
+    return { draft, pick, otherText };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [draft, setDraft] = useState<EditDraft>(initial.draft);
+  const [pick, setPick] = useState<FromPick>(initial.pick);
+  const [otherText, setOtherText] = useState(initial.otherText);
+  const [errors, setErrors] = useState<SeriesFieldErrors>({});
+  const [fromError, setFromError] = useState<string | null>(null);
+  const [banner, setBanner] = useState<string | null>(null);
+  const [retry, setRetry] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState<Pending | null>(null);
+  const [leaveTo, setLeaveTo] = useState<null | (() => void)>(null);
+  const [confirmDiscard, setConfirmDiscard] = useState<null | (() => void)>(null);
+
+  // O tipo é um grupo de chips, sem campo para receber o foco.
+  const refs = {
+    description: useRef<TextInput>(null),
+    amountText: useRef<TextInput>(null),
+    dueDayText: useRef<TextInput>(null),
+  } satisfies Partial<Record<EditField, React.RefObject<TextInput | null>>>;
+  const otherRef = useRef<TextInput>(null);
+
+  const dirty = JSON.stringify({ draft, pick, otherText }) !== JSON.stringify(initial);
+
+  usePreventRemove(dirty && !leaveTo, ({ data }) => {
+    setConfirmDiscard(() => () => navigation.dispatch(data.action));
+  });
+
+  useEffect(() => {
+    if (leaveTo) leaveTo();
+  }, [leaveTo]);
+
+  const leave = (fn: () => void) => setLeaveTo(() => fn);
+  const goBack = () => (router.canGoBack() ? router.back() : router.replace(`/gastos-fixos/${s.id}`));
+
+  const set = <K extends keyof EditDraft>(k: K, v: EditDraft[K]) => {
+    setDraft((d) => ({ ...d, [k]: v }));
+    if (k in errors) setErrors((e) => ({ ...e, [k]: undefined }));
+  };
+
+  const focusFirst = (errs: SeriesFieldErrors) => {
+    const first = EDIT_FIELD_ORDER.find((f) => errs[f] && f !== 'nature');
+    if (first && first !== 'nature') refs[first].current?.focus();
+  };
+
+  /** Mês do número, com o ano quando não é o de hoje: "novembro", "janeiro de 2027". */
+  const monthName = (k: number) => {
+    const m = seriesMonthOf(s, k);
+    return m.slice(0, 4) === today.slice(0, 4) ? formatMonthName(m) : formatMonthYearBR(m);
+  };
+
+  /** Número escolhido em "Aplicar a partir de", ou null com o erro do campo. */
+  const chosenNumber = (): number | null => {
+    if (pick !== 'outro') return pick;
+    const m = parseMonthBR(otherText);
+    const n = m === null ? null : numberOfMonth(s, m);
+    if (n === null || n < s.firstNumber || n > maxNumber) {
+      setFromError(SERIES_ERROR_TEXT.numero_fora_da_serie);
+      otherRef.current?.focus();
+      return null;
+    }
+    return n;
+  };
+
+  /** Monta a confirmação com os dados atuais: a conta escolhida e as afetadas, como o banco vai conferir. */
+  const prepare = (series: CommitmentSeries, list: readonly Commitment[], k: number, input: SeriesEditInput) => {
+    const plan = affectedByEditFrom(list, series, k);
+    if (!plan.ok) {
+      setFromError(SERIES_ERROR_TEXT.inicio_em_conta_paga);
+      return;
+    }
+    setConfirm({ k, plan, version: series.version, input });
+  };
+
+  /** Recarrega a série e as contas (depois de uma recusa ou de uma gravação feita antes da falha de conexão). */
+  const reload = async () => {
+    const [fresh, list] = await Promise.all([repo.getSeries(s.id), repo.listSeriesOccurrences(s.id)]);
+    qc.setQueryData(['series', 'one', s.id], fresh);
+    qc.setQueryData(['series', 'occurrences', s.id], list);
+    qc.invalidateQueries({ queryKey: ['commitments'] });
+    return fresh ? { series: fresh, list: [...list].reverse() } : null;
+  };
+
+  const submit = () => {
+    if (busy) return;
+    const v = validateEdit(draft, s.kind);
+    if (!v.ok) {
+      setErrors(v.errors);
+      focusFirst(v.errors);
+      return;
+    }
+    setErrors({});
+    setBanner(null);
+    setFromError(null);
+    const k = chosenNumber();
+    if (k === null) return;
+    prepare(s, occurrences, k, v.input);
+  };
+
+  const finish = (k: number) => {
+    if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    flash.set(`${noun} atualizado a partir de ${monthName(k)}.`);
+    leave(goBack);
+  };
+
+  const apply = async () => {
+    if (!confirm || busy) return;
+    const { k, plan, version, input } = confirm;
+    const snapshot = JSON.stringify({ k, input, version, affected: plan.affected });
+    setBusy(true);
+    setBanner(null);
+    try {
+      if (keys.hasPending()) {
+        const saved = await keys.findSaved();
+        if (saved && saved.action === 'alterar_serie') {
+          keys.settled();
+          const prev = JSON.parse(saved.snapshot) as { k: number; input: SeriesEditInput };
+          if (prev.k === k && JSON.stringify(prev.input) === JSON.stringify(input)) {
+            setRetry(false);
+            setConfirm(null);
+            finish(k);
+            return;
+          }
+          // Outro preenchimento foi gravado antes da falha: recalcular com a versão atual e confirmar de novo.
+          const fresh = await reload();
+          setRetry(false);
+          if (!fresh) {
+            setConfirm(null);
+            setBanner(SERIES_ERROR_TEXT.nao_encontrado);
+            return;
+          }
+          const again = affectedByEditFrom(fresh.list, fresh.series, k);
+          setConfirm(again.ok ? { k, plan: again, version: fresh.series.version, input } : null);
+          if (!again.ok) setFromError(SERIES_ERROR_TEXT.inicio_em_conta_paga);
+          return;
+        }
+      }
+      const key = keys.keyFor(snapshot);
+      try {
+        await update.mutateAsync({ key, id: s.id, version, fromNumber: k, affected: plan.affected, input });
+        keys.settled();
+        setRetry(false);
+        setConfirm(null);
+        finish(k);
+      } catch (e) {
+        setConfirm(null);
+        if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
+          keys.refused();
+          setRetry(false);
+          const field = fieldForErrorCode(e.code, 'series');
+          if (field && (EDIT_FIELD_ORDER as SeriesField[]).includes(field)) {
+            const errs = { [field]: seriesErrorText(e.code, today) };
+            setErrors(errs);
+            focusFirst(errs);
+            return;
+          }
+          if (e.code === 'inicio_em_conta_paga' || e.code === 'numero_fora_da_serie') {
+            setFromError(seriesErrorText(e.code, today));
+            await reload().catch(() => null);
+            return;
+          }
+          if (e.code === 'versao_desatualizada') await reload().catch(() => null);
+          setBanner(seriesErrorText(e.code, today));
+          return;
+        }
+        // Falha de rede: a alteração pode ou não ter sido gravada. Guardar a tentativa para reconciliar.
+        keys.uncertain(key, snapshot);
+        setRetry(true);
+        setBanner(SERIES_ERROR_TEXT.salvar_falhou);
+      }
+    } catch (e) {
+      setConfirm(null);
+      setRetry(true);
+      setBanner(isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido' ? seriesErrorText(e.code, today) : SERIES_ERROR_TEXT.salvar_falhou);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const requestCancel = () => {
+    if (dirty) setConfirmDiscard(() => goBack);
+    else goBack();
+  };
+
+  const formatAmountOnBlur = () => {
+    const cents = parseBRL(draft.amountText);
+    if (cents !== null && cents > 0 && cents <= MAX_RECORD_CENTS) setDraft((d) => ({ ...d, amountText: centsToInput(cents) }));
+  };
+
+  const variable = draft.amountMode === 'variavel';
+  const day = /^\d{1,2}$/.test(draft.dueDayText) ? Number(draft.dueDayText) : null;
+
+  return (
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <SubHeader
+        title={parcelada ? 'Editar parcelamento' : 'Editar gasto fixo'}
+        onBack={requestCancel}
+        right={<ContextPill label="Salvando em Pessoal" />}
+      />
+      <Screen contentStyle={{ padding: space[5], gap: space[4], paddingBottom: space[6] }}>
+        <Txt color={colors.textSecondary}>
+          As alterações valem a partir do mês escolhido. Contas pagas e contas alteradas só no mês delas não mudam.
+        </Txt>
+        <Card style={{ gap: space[4] }}>
+          <View style={{ gap: space[2] }}>
+            <ChoiceGroup label="Aplicar a partir de" error={pick !== 'outro' ? (fromError ?? undefined) : undefined}>
+              {choices.map((c) => (
+                <Chip
+                  key={c.n}
+                  label={c.label}
+                  selected={pick === c.n}
+                  onPress={() => {
+                    setPick(c.n);
+                    setFromError(null);
+                  }}
+                />
+              ))}
+              <Chip
+                label="Outro mês"
+                selected={pick === 'outro'}
+                onPress={() => {
+                  setPick('outro');
+                  setFromError(null);
+                }}
+              />
+            </ChoiceGroup>
+            {pick === 'outro' ? (
+              <TextField
+                ref={otherRef}
+                label="Mês (MM/AAAA)"
+                value={otherText}
+                onChangeText={(t) => {
+                  setOtherText(maskMonthBR(t));
+                  setFromError(null);
+                }}
+                placeholder="MM/AAAA"
+                keyboardType="number-pad"
+                inputMode="numeric"
+                maxLength={7}
+                error={fromError ?? undefined}
+                hint="Por exemplo, um reajuste a partir de janeiro."
+              />
+            ) : null}
+          </View>
+
+          <TextField
+            ref={refs.description}
+            label="Descrição"
+            value={draft.description}
+            onChangeText={(t) => set('description', t)}
+            maxLength={DESCRIPTION_MAX}
+            error={errors.description}
+            hint={charCount(draft.description) >= 60 ? `${charCount(draft.description)} de ${DESCRIPTION_MAX} caracteres` : undefined}
+            returnKeyType="next"
+            onSubmitEditing={() => refs.amountText.current?.focus()}
+          />
+
+          {parcelada ? (
+            <ChoiceGroup label="Tipo do parcelamento" hint="O tipo vale para o parcelamento inteiro, inclusive parcelas já pagas." error={errors.nature}>
+              {INSTALLMENT_NATURES.map((n) => (
+                <Chip key={n} label={SERIES_NATURE_LABEL[n]} selected={draft.nature === n} onPress={() => set('nature', n)} />
+              ))}
+            </ChoiceGroup>
+          ) : null}
+
+          <ChoiceGroup label={parcelada ? 'A parcela muda de um mês para outro?' : 'O valor muda de um mês para outro?'}>
+            <Chip label={parcelada ? 'Parcela igual todo mês' : 'Não, é sempre o mesmo'} selected={!variable} onPress={() => set('amountMode', 'fixo')} />
+            <Chip
+              label={parcelada ? 'Parcela muda (financiamento corrigido)' : 'Sim, muda (como luz e água)'}
+              selected={variable}
+              onPress={() => set('amountMode', 'variavel')}
+            />
+          </ChoiceGroup>
+
+          <TextField
+            ref={refs.amountText}
+            label={variable ? 'Valor de referência' : parcelada ? 'Valor da parcela' : 'Valor por mês'}
+            prefix="R$"
+            value={draft.amountText}
+            onChangeText={(t) => set('amountText', t)}
+            onBlur={formatAmountOnBlur}
+            placeholder="0,00"
+            keyboardType="decimal-pad"
+            inputMode="decimal"
+            large
+            error={errors.amountText}
+            hint={variable ? 'Use o valor de uma conta recente. Ele aparece como estimado até você informar o valor de cada conta.' : undefined}
+          />
+
+          <TextField
+            ref={refs.dueDayText}
+            label="Dia do vencimento"
+            value={draft.dueDayText}
+            onChangeText={(t) => set('dueDayText', t.replace(/\D/g, '').slice(0, 2))}
+            keyboardType="number-pad"
+            inputMode="numeric"
+            maxLength={2}
+            error={errors.dueDayText}
+            hint={day !== null && day >= 29 ? 'Nos meses mais curtos, vence no último dia do mês.' : 'De 1 a 31.'}
+          />
+
+          <ChoiceGroup label="Categoria">
+            <Chip label={NO_CATEGORY_LABEL} selected={draft.category === null} onPress={() => set('category', null)} />
+            {CATEGORIES.despesa.map((c) => (
+              <Chip key={c} label={c} selected={draft.category === c} onPress={() => set('category', c)} />
+            ))}
+          </ChoiceGroup>
+        </Card>
+      </Screen>
+
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space[3]) }]}>
+        <View style={styles.footerInner}>
+          {banner ? (
+            <Banner tone="erro" icon={AlertCircle}>
+              <Txt variant="label" color={colors.error}>
+                {banner}
+              </Txt>
+            </Banner>
+          ) : null}
+          <View style={styles.footerRow}>
+            <Button label="Cancelar" tone="ghost" onPress={requestCancel} style={styles.cancel} />
+            <Button label={retry ? 'Tentar novamente' : 'Salvar alterações'} busy={busy} busyLabel="Salvando…" onPress={submit} style={styles.save} />
+          </View>
+        </View>
+      </View>
+
+      <ConfirmDialog
+        visible={Boolean(confirm)}
+        title={confirm ? `Aplicar a partir de ${monthName(confirm.k)}?` : ''}
+        cancelLabel="Voltar"
+        confirmLabel="Aplicar"
+        confirmTone="brand"
+        busy={busy}
+        onCancel={() => setConfirm(null)}
+        onConfirm={apply}>
+        <Txt>{confirm?.plan.text}</Txt>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        visible={Boolean(confirmDiscard)}
+        title="Descartar o preenchimento?"
+        cancelLabel="Continuar editando"
+        confirmLabel="Descartar alterações"
+        onCancel={() => setConfirmDiscard(null)}
+        onConfirm={() => {
+          const action = confirmDiscard;
+          setConfirmDiscard(null);
+          if (action) leave(action);
+        }}>
+        <Txt color={colors.textSecondary}>Você tem alterações que ainda não foram salvas em Pessoal.</Txt>
+      </ConfirmDialog>
+    </KeyboardAvoidingView>
+  );
+}

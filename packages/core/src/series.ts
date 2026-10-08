@@ -130,6 +130,15 @@ function planned(s: SeriesWithTerms, n: number): PlannedOccurrence {
   };
 }
 
+/**
+ * Primeiro número conhecido pela lista. listSeriesOccurrences traz só as 60 mais recentes: se a lista tem menos
+ * ocorrências vivas do que a série conta, os números anteriores ao menor listado são desconhecidos, não ausentes.
+ */
+function knownFrom(s: Pick<CommitmentSeries, 'firstNumber'> & Partial<Pick<CommitmentSeries, 'paidCount' | 'openCount'>>, live: Map<number, Commitment>): number {
+  const total = (s.paidCount ?? 0) + (s.openCount ?? 0);
+  return live.size >= total ? s.firstNumber : Math.min(...live.keys());
+}
+
 /** Números das ocorrências vivas desta série na lista (o repositório não devolve excluídas). */
 function liveByNumber(s: Pick<CommitmentSeries, 'id'>, list: readonly Commitment[]): Map<number, Commitment> {
   const out = new Map<number, Commitment>();
@@ -180,13 +189,9 @@ export function occurrenceLabel(c: Pick<Commitment, 'series'>): string | null {
   return c.series.kind === 'parcelada' ? `Parcela ${c.series.number} de ${c.series.installmentTotal}` : 'Todo mês';
 }
 
-/** Vigência do mês atual (limitada ao período da série); sem hoje, a mais recente. */
+/** Vigência do mês atual (limitada ao período da série); sem hoje, a da última conta (ou a mais recente, sem término). */
 export function currentTerm(s: SeriesRange, today?: IsoDate): SeriesTerm {
-  if (today === undefined) {
-    const last = [...s.terms].sort((a, b) => b.fromNumber - a.fromNumber)[0];
-    if (!last) throw new Error('serie_inconsistente');
-    return last;
-  }
+  if (today === undefined) return requireTerm(s, s.lastNumber === null ? Number.MAX_SAFE_INTEGER : Math.max(s.firstNumber, s.lastNumber));
   let n = Math.max(s.firstNumber, numberOfMonth(s, monthOf(today)));
   if (s.lastNumber !== null) n = Math.max(s.firstNumber, Math.min(n, s.lastNumber));
   return requireTerm(s, n);
@@ -211,7 +216,8 @@ export function termHistory(s: SeriesRange): { term: SeriesTerm; fromMonth: IsoM
   return terms
     .map((term, i) => {
       const next = terms[i + 1];
-      const lastN = next ? next.fromNumber - 1 : s.lastNumber;
+      const untilNext = next ? next.fromNumber - 1 : null;
+      const lastN = untilNext === null ? s.lastNumber : s.lastNumber === null ? untilNext : Math.min(untilNext, s.lastNumber);
       const fromMonth = seriesMonthOf(s, term.fromNumber);
       const toMonth = lastN === null ? null : seriesMonthOf(s, lastN);
       const amount = `${formatBRL(term.amountCents)}${term.amountMode === 'variavel' ? ' (estimado)' : ''}`;
@@ -239,13 +245,15 @@ export interface InstallmentProgress {
 }
 
 export function installmentProgress(
-  s: SeriesRange & Pick<CommitmentSeries, 'id' | 'skippedNumbers' | 'installmentTotal'>,
+  s: SeriesRange & Pick<CommitmentSeries, 'id' | 'skippedNumbers' | 'installmentTotal'> & Partial<Pick<CommitmentSeries, 'paidCount'>>,
   occurrences: readonly Commitment[],
   today: IsoDate,
 ): InstallmentProgress {
   const live = liveByNumber(s, occurrences);
-  let paidInApp = 0;
-  for (const c of live.values()) if (c.status === 'quitado') paidInApp += 1;
+  let paidInList = 0;
+  for (const c of live.values()) if (c.status === 'quitado') paidInList += 1;
+  // A contagem da série vale mesmo quando a lista de ocorrências vem cortada.
+  const paidInApp = Math.max(paidInList, s.paidCount ?? 0);
   const base = { total: s.installmentTotal, paidBefore: s.firstNumber - 1, paidInApp };
   if (s.lastNumber === null) return { ...base, remaining: null, lastDueOn: null, remainingCents: null, approximate: false };
   const skipped = new Set(s.skippedNumbers);
@@ -273,7 +281,7 @@ export function installmentProgress(
 
 /** Números até o mês atual sem ocorrência viva e não pulados: "Janeiro de 2027: sem conta registrada". */
 export function missingMonths(
-  s: SeriesShape & Pick<CommitmentSeries, 'id' | 'lastNumber' | 'skippedNumbers'>,
+  s: SeriesShape & Pick<CommitmentSeries, 'id' | 'lastNumber' | 'skippedNumbers'> & Partial<Pick<CommitmentSeries, 'paidCount' | 'openCount'>>,
   occurrences: readonly Commitment[],
   today: IsoDate,
 ): { number: number; month: IsoMonth }[] {
@@ -282,7 +290,7 @@ export function missingMonths(
   const current = numberOfMonth(s, monthOf(today));
   const to = s.lastNumber === null ? current : Math.min(current, s.lastNumber);
   const out: { number: number; month: IsoMonth }[] = [];
-  for (let n = s.firstNumber; n <= to; n++) if (!live.has(n) && !skipped.has(n)) out.push({ number: n, month: seriesMonthOf(s, n) });
+  for (let n = knownFrom(s, live); n <= to; n++) if (!live.has(n) && !skipped.has(n)) out.push({ number: n, month: seriesMonthOf(s, n) });
   return out;
 }
 
