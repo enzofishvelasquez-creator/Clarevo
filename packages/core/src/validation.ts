@@ -3,6 +3,8 @@ import { addMonths, addYearsClamped, formatMonthYearBR, isValidIsoMonth, monthOf
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS, parseBRL } from './money';
 import type { AmountMode, CommitmentInput, PaymentInput, RecordInput, SeriesInput, SeriesKind, SeriesNature } from './records';
+import { PARTS_PER_YEAR_MAX } from './records';
+import { ANNUAL_MAX_YEARS, annualLastMonth } from './series';
 
 /**
  * Códigos de erro compartilhados entre app e banco (mesmas mensagens de exceção do Postgres).
@@ -62,12 +64,14 @@ export const SERIES_ERROR_TEXT = {
   /** Genérico; no formulário, firstMonthRangeText(today) dá os meses. */
   inicio_fora_do_intervalo: 'Escolha um primeiro mês entre o mês passado e 12 meses à frente.',
   parcelas_invalidas: 'Informe de 2 a 480 parcelas.',
+  parcelas_no_ano_invalidas: 'Informe de 2 a 12 parcelas por ano.',
   parcela_inicial_invalida: 'A próxima parcela precisa estar entre 1 e o total de parcelas.',
   fim_invalido: 'O último mês precisa ser igual ou depois do primeiro, em até 50 anos.',
   natureza_invalida: 'Escolha o tipo do parcelamento.',
   numero_fora_da_serie: 'Este mês está fora do período do gasto fixo.',
   inicio_em_conta_paga: 'A conta deste mês já foi paga. Escolha uma conta em aberto ou um mês seguinte.',
-  limite_de_gastos_fixos: 'Você chegou a 100 gastos fixos ativos. Encerre algum para adicionar outro.',
+  limite_de_gastos_fixos:
+    'Você chegou a 100 contas que se repetem (gastos fixos, parcelamentos e contas do ano). Encerre alguma para adicionar outra.',
   serie_tem_pagamento_posterior: 'Há conta paga depois do mês escolhido. Desfaça esse pagamento ou escolha um mês depois dele.',
   serie_tem_pagamentos: 'Este gasto fixo já tem conta paga. Para parar a repetição, use Encerrar.',
   versao_desatualizada: 'Algo mudou neste gasto fixo em outro aparelho. Confira as contas afetadas e confirme de novo.',
@@ -78,16 +82,51 @@ export const SERIES_ERROR_TEXT = {
   serie_inconsistente: ERROR_TEXT.salvar_falhou,
 } as const;
 
-/** "Escolha um primeiro mês entre setembro de 2026 e outubro de 2027." (meses calculados a partir de hoje) */
-export function firstMonthRangeText(today: IsoDate): string {
-  const { min, max } = firstMonthBounds(today);
-  return `Escolha um primeiro mês entre ${formatMonthYearBR(min)} e ${formatMonthYearBR(max)}.`;
+/** Textos da conta do ano (seção 1.4 da especificação do Ciclo A3): só o que muda em relação a SERIES_ERROR_TEXT. */
+export const ANNUAL_SERIES_ERROR_TEXT = {
+  ...SERIES_ERROR_TEXT,
+  descricao_obrigatoria: 'Dê um nome para esta conta do ano.',
+  /** Genérico; no formulário, firstMonthRangeText(today, 'anual') dá os meses. */
+  inicio_fora_do_intervalo: 'Escolha um primeiro vencimento entre o mês passado e 23 meses à frente.',
+  fim_invalido: 'O último ano precisa ser igual ou depois do primeiro, em até 50 anos.',
+  numero_fora_da_serie: 'Este ano está fora do período da conta do ano.',
+  inicio_em_conta_paga: 'Esta conta já foi paga. Escolha uma conta em aberto ou uma seguinte.',
+  vencimento_fora_do_mes:
+    'Numa conta do ano, o vencimento fica no mesmo mês. Para mudar o dia de todos os anos, edite a conta do ano.',
+  serie_tem_pagamentos: 'Esta conta do ano já tem conta paga. Para parar a repetição, use Encerrar.',
+  serie_tem_pagamento_posterior: 'Há conta paga depois do ano escolhido. Desfaça esse pagamento ou escolha um ano depois dele.',
+  versao_desatualizada: 'Algo mudou nesta conta do ano em outro aparelho. Confira as contas afetadas e confirme de novo.',
+  nao_encontrado: 'Esta conta do ano não está mais disponível.',
+} as const;
+
+/**
+ * "Escolha um primeiro mês entre setembro de 2026 e outubro de 2027." ou, na conta do ano, "Escolha um primeiro
+ * vencimento entre setembro de 2026 e setembro de 2028." (meses calculados a partir de hoje)
+ */
+export function firstMonthRangeText(today: IsoDate, kind?: SeriesKind): string {
+  const { min, max } = firstMonthBounds(today, kind);
+  const what = kind === 'anual' ? 'vencimento' : 'mês';
+  return `Escolha um primeiro ${what} entre ${formatMonthYearBR(min)} e ${formatMonthYearBR(max)}.`;
 }
 
-/** Texto do código, com os meses de hoje em inicio_fora_do_intervalo; código desconhecido → falha genérica. */
-export function seriesErrorText(code: string, today: IsoDate): string {
-  if (code === 'inicio_fora_do_intervalo') return firstMonthRangeText(today);
-  return code in SERIES_ERROR_TEXT ? SERIES_ERROR_TEXT[code as keyof typeof SERIES_ERROR_TEXT] : SERIES_ERROR_TEXT.salvar_falhou;
+/**
+ * Texto do código, com os meses de hoje em inicio_fora_do_intervalo; com kind 'anual', as variantes da conta do ano.
+ * Código desconhecido → falha genérica.
+ */
+export function seriesErrorText(code: string, today: IsoDate, kind?: SeriesKind): string {
+  if (code === 'inicio_fora_do_intervalo') return firstMonthRangeText(today, kind);
+  const texts: Record<string, string> = kind === 'anual' ? ANNUAL_SERIES_ERROR_TEXT : SERIES_ERROR_TEXT;
+  return code in texts ? texts[code]! : SERIES_ERROR_TEXT.salvar_falhou;
+}
+
+/**
+ * Erros de "Informar o valor de 2027" e "Tirar as parcelas de 2027" (informSeriesYear, skipSeriesYear):
+ * versao_desatualizada vira "Algo mudou nas contas de 2027 em outro aparelho. Confira e tente de novo.".
+ */
+export function annualYearErrorText(code: string, yearLabel: string): string {
+  if (code === 'versao_desatualizada') return `Algo mudou nas contas de ${yearLabel} em outro aparelho. Confira e tente de novo.`;
+  const texts: Record<string, string> = ANNUAL_SERIES_ERROR_TEXT;
+  return code in texts ? texts[code]! : SERIES_ERROR_TEXT.salvar_falhou;
 }
 
 export type DraftField = 'description' | 'amountText' | 'dateText' | 'accountId';
@@ -211,10 +250,13 @@ export function validatePaymentDraft(
   return { ok: true, input: { accountId: draft.accountId, amountCents: amount, paidOn, category: normalizeCategory(draft.category) } };
 }
 
-/** Primeiro mês aceito (igual ao banco): do mês anterior a 12 meses depois do mês de hoje. */
-export function firstMonthBounds(today: IsoDate): { min: IsoMonth; max: IsoMonth } {
+/**
+ * Primeiro mês aceito (igual ao banco): do mês anterior a 12 meses depois do mês de hoje. Conta do ano: até 23 meses
+ * depois (a conta do ano seguinte, quando a deste já passou ou foi paga).
+ */
+export function firstMonthBounds(today: IsoDate, kind?: SeriesKind): { min: IsoMonth; max: IsoMonth } {
   const m = monthOf(today);
-  return { min: addMonths(m, -1), max: addMonths(m, 12) };
+  return { min: addMonths(m, -1), max: addMonths(m, kind === 'anual' ? 23 : 12) };
 }
 
 /** Códigos de clarevo_validate_series, na ordem do banco. */
@@ -230,12 +272,13 @@ export const SERIES_CODE_ORDER = [
   'dia_invalido',
   'inicio_fora_do_intervalo',
   'parcelas_invalidas',
+  'parcelas_no_ano_invalidas',
   'parcela_inicial_invalida',
   'fim_invalido',
 ] as const;
 export type SeriesErrorCode = (typeof SERIES_CODE_ORDER)[number];
 
-const SERIES_KINDS: readonly string[] = ['mensal', 'parcelada'];
+const SERIES_KINDS: readonly string[] = ['mensal', 'parcelada', 'anual'];
 const NATURES: readonly string[] = ['conta', 'financiamento', 'compra_parcelada', 'outro_parcelamento'];
 const isInt = (n: unknown): n is number => typeof n === 'number' && Number.isSafeInteger(n);
 
@@ -257,48 +300,78 @@ export function seriesTermError(term: {
   return null;
 }
 
-/** Cadastro de série (mesma ordem de clarevo_validate_series). Textos já aparados. */
+/**
+ * Cadastro de série (mesma ordem de clarevo_validate_series). Textos já aparados.
+ * Conta do ano: natureza 'conta', primeiro mês até 23 meses à frente, partsPerYear de 1 a 12, firstNumber de 1 a k e
+ * lastMonth nulo ou o mês da última parcela de um ano, de 0 a 49 anos depois do primeiro.
+ */
 export function seriesInputError(input: SeriesInput, today: IsoDate): SeriesErrorCode | null {
   const { kind, nature } = input;
   if (!SERIES_KINDS.includes(kind)) return 'tipo_invalido';
-  if (kind === 'mensal' ? nature !== 'conta' : nature === 'conta' || !NATURES.includes(nature)) return 'natureza_invalida';
+  const natureOk = kind === 'parcelada' ? nature !== 'conta' && NATURES.includes(nature) : nature === 'conta';
+  if (!natureOk) return 'natureza_invalida';
   const term = seriesTermError(input);
   if (term) return term;
-  const { min, max } = firstMonthBounds(today);
+  const { min, max } = firstMonthBounds(today, kind);
   const first = input.firstDueMonth;
   if (typeof first !== 'string' || !isValidIsoMonth(first) || first < min || first > max) return 'inicio_fora_do_intervalo';
   const total = input.installmentTotal;
   if (kind === 'parcelada' ? !isInt(total) || total < 2 || total > 480 : total !== null) return 'parcelas_invalidas';
-  if (kind === 'parcelada' ? !isInt(input.firstNumber) || input.firstNumber < 1 || input.firstNumber > total! : input.firstNumber !== 1) {
-    return 'parcela_inicial_invalida';
-  }
+  // Ausente vale como nulo, como p_parts_per_year default null.
+  const k = input.partsPerYear ?? null;
+  if (kind === 'anual' ? !isInt(k) || k < 1 || k > PARTS_PER_YEAR_MAX : k !== null) return 'parcelas_no_ano_invalidas';
+  const n = input.firstNumber;
+  const nMax = kind === 'parcelada' ? total! : kind === 'anual' ? k! : 1;
+  if (kind === 'mensal' ? n !== 1 : !isInt(n) || n < 1 || n > nMax) return 'parcela_inicial_invalida';
   const last = input.lastMonth;
-  if (kind === 'parcelada') return last !== null ? 'fim_invalido' : null;
-  if (last !== null) {
-    if (typeof last !== 'string' || !isValidIsoMonth(last)) return 'fim_invalido';
-    const months = monthsBetween(first, last);
-    if (months < 0 || months > 599) return 'fim_invalido';
+  switch (kind) {
+    case 'parcelada':
+      return last !== null ? 'fim_invalido' : null;
+    case 'mensal':
+      if (last !== null) {
+        if (typeof last !== 'string' || !isValidIsoMonth(last)) return 'fim_invalido';
+        const months = monthsBetween(first, last);
+        if (months < 0 || months > 599) return 'fim_invalido';
+      }
+      return null;
+    case 'anual':
+      if (last !== null) {
+        // Mês da última parcela de um ano: d = meses(âncora, último), d ≥ 0, d mod 12 = k − 1 e até 49 anos depois.
+        if (typeof last !== 'string' || !isValidIsoMonth(last)) return 'fim_invalido';
+        const d = monthsBetween(addMonths(first, -(n - 1)), last);
+        if (d < 0 || d % 12 !== k! - 1 || Math.floor(d / 12) > ANNUAL_MAX_YEARS - 1) return 'fim_invalido';
+      }
+      return null;
+    default:
+      return 'tipo_invalido';
   }
-  return null;
 }
 
 /** Rascunho do formulário de série. Os textos guardam o que a pessoa digitou. */
 export interface SeriesDraft {
   kind: SeriesKind;
-  /** Parcelado: tipo escolhido (null antes de escolher). Ignorado no gasto fixo, que é sempre 'conta'. */
+  /** Parcelado: tipo escolhido (null antes de escolher). Ignorado no gasto fixo e na conta do ano, que são sempre 'conta'. */
   nature: SeriesNature | null;
   description: string;
   amountText: string;
   amountMode: AmountMode;
   /** 1 a 31. */
   dueDayText: string;
-  /** MM/AAAA: primeira conta (todo mês) ou mês da próxima parcela (parcelado). */
+  /**
+   * MM/AAAA: primeira conta (todo mês), mês da próxima parcela (parcelado) ou, na conta do ano, mês da próxima parcela a
+   * pagar (o 1º mês do primeiro ano, ou o da parcela escolhida num ano já começado; annualStartChoices).
+   */
   firstMonthText: string;
-  /** Parcelado: número da próxima parcela a pagar. Ignorado no gasto fixo. */
+  /** Parcelado: número da próxima parcela a pagar. Todo ano: posição no primeiro ano (vazio = 1). Ignorado no gasto fixo. */
   firstNumberText: string;
-  /** Parcelado: total de parcelas. Ignorado no gasto fixo. */
+  /** Parcelado: total de parcelas. Ignorado nos outros. */
   installmentTotalText: string;
-  /** Todo mês: último mês (MM/AAAA) ou vazio para "Sem data para terminar". Ignorado no parcelado. */
+  /** Todo ano: parcelas por ano, "1" para cota única. Ignorado nos outros. */
+  partsPerYearText: string;
+  /**
+   * Todo mês: último mês (MM/AAAA). Todo ano: "Último ano" (AAAA, o rótulo do ano). Vazio para "Sem data para terminar".
+   * Ignorado no parcelado.
+   */
   lastMonthText: string;
   category: string | null;
 }
@@ -310,6 +383,7 @@ export type SeriesField =
   | 'dueDayText'
   | 'firstMonthText'
   | 'installmentTotalText'
+  | 'partsPerYearText'
   | 'firstNumberText'
   | 'lastMonthText';
 export type SeriesFieldErrors = Partial<Record<SeriesField, string>>;
@@ -322,6 +396,7 @@ export const SERIES_FIELD_ORDER: SeriesField[] = [
   'dueDayText',
   'firstMonthText',
   'installmentTotalText',
+  'partsPerYearText',
   'firstNumberText',
   'lastMonthText',
 ];
@@ -331,7 +406,9 @@ const intText = (text: string): number | null => (/^\s*\d{1,9}\s*$/.test(text) ?
 /**
  * Formulário de série com as mesmas regras e a mesma ordem do banco. errors traz um texto por campo;
  * code é o primeiro erro na ordem do banco (o mesmo que create_series devolveria).
- * Campos escondidos pelo tipo (término no parcelado; total, próxima e tipo no gasto fixo) são ignorados.
+ * Campos escondidos pelo tipo (término no parcelado; total, próxima e tipo no gasto fixo; total e tipo na conta do ano;
+ * parcelas por ano fora da conta do ano) são ignorados. Na conta do ano, lastMonthText é o "Último ano" (AAAA) e vira
+ * input.lastMonth = mês da última parcela desse ano.
  */
 export function validateSeriesDraft(
   draft: SeriesDraft,
@@ -339,12 +416,14 @@ export function validateSeriesDraft(
 ): { ok: true; input: SeriesInput } | { ok: false; errors: SeriesFieldErrors; code: SeriesErrorCode } {
   const codes = new Set<SeriesErrorCode>();
   const errors: SeriesFieldErrors = {};
+  const kind = draft.kind;
+  const texts: Record<SeriesErrorCode, string> = kind === 'anual' ? ANNUAL_SERIES_ERROR_TEXT : SERIES_ERROR_TEXT;
   const fail = (code: SeriesErrorCode, field: SeriesField | null) => {
     codes.add(code);
-    if (field && !errors[field]) errors[field] = code === 'inicio_fora_do_intervalo' ? firstMonthRangeText(today) : SERIES_ERROR_TEXT[code];
+    if (field && !errors[field]) errors[field] = code === 'inicio_fora_do_intervalo' ? firstMonthRangeText(today, kind) : texts[code];
   };
-  const kind = draft.kind;
   const parcelada = kind === 'parcelada';
+  const anual = kind === 'anual';
   if (!SERIES_KINDS.includes(kind)) fail('tipo_invalido', null);
 
   const nature: SeriesNature | null = parcelada ? draft.nature : 'conta';
@@ -365,14 +444,34 @@ export function validateSeriesDraft(
   const dueDay = intText(draft.dueDayText);
   if (dueDay === null || dueDay < 1 || dueDay > 31) fail('dia_invalido', 'dueDayText');
 
-  const { min, max } = firstMonthBounds(today);
+  const { min, max } = firstMonthBounds(today, kind);
   const first = parseMonthBR(draft.firstMonthText);
   if (first === null || first < min || first > max) fail('inicio_fora_do_intervalo', 'firstMonthText');
 
   let total: number | null = null;
   let firstNumber = 1;
   let lastMonth: IsoMonth | null = null;
-  if (parcelada) {
+  let partsPerYear: number | null = null;
+  if (anual) {
+    partsPerYear = intText(draft.partsPerYearText);
+    const kOk = partsPerYear !== null && partsPerYear >= 1 && partsPerYear <= PARTS_PER_YEAR_MAX;
+    if (!kOk) fail('parcelas_no_ano_invalidas', 'partsPerYearText');
+    const n = draft.firstNumberText.trim() === '' ? 1 : intText(draft.firstNumberText);
+    const nOk = n !== null && n >= 1 && n <= (kOk ? partsPerYear! : PARTS_PER_YEAR_MAX);
+    if (!nOk) fail('parcela_inicial_invalida', 'firstNumberText');
+    firstNumber = n ?? 0;
+    const yearText = draft.lastMonthText.trim();
+    if (yearText !== '') {
+      if (!/^\d{4}$/.test(yearText)) fail('fim_invalido', 'lastMonthText');
+      else if (first !== null && kOk && nOk) {
+        const input = { firstDueMonth: first, firstNumber: n!, partsPerYear: partsPerYear! };
+        const firstYear = Number(addMonths(first, -(n! - 1)).slice(0, 4));
+        const years = Number(yearText) - firstYear;
+        if (years < 0 || years > ANNUAL_MAX_YEARS - 1) fail('fim_invalido', 'lastMonthText');
+        else lastMonth = annualLastMonth(input, Number(yearText));
+      }
+    }
+  } else if (parcelada) {
     total = intText(draft.installmentTotalText);
     const totalOk = total !== null && total >= 2 && total <= 480;
     if (!totalOk) fail('parcelas_invalidas', 'installmentTotalText');
@@ -400,6 +499,7 @@ export function validateSeriesDraft(
       firstDueMonth: first!,
       firstNumber,
       installmentTotal: total,
+      partsPerYear,
       lastMonth,
     },
   };
@@ -463,6 +563,8 @@ function seriesFieldForErrorCode(code: string): SeriesField | null {
       return 'firstMonthText';
     case 'parcelas_invalidas':
       return 'installmentTotalText';
+    case 'parcelas_no_ano_invalidas':
+      return 'partsPerYearText';
     case 'parcela_inicial_invalida':
       return 'firstNumberText';
     case 'fim_invalido':

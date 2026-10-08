@@ -1,5 +1,5 @@
 import type { IsoDate, IsoMonth } from './dates';
-import { dateInMonth, isValidIsoDate, monthOf, monthsBetween } from './dates';
+import { addMonths, dateInMonth, isValidIsoDate, monthOf, monthsBetween } from './dates';
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS } from './money';
 import type {
@@ -18,11 +18,14 @@ import type {
 } from './records';
 import type { AffectedRef, CommitmentAction, CommitmentWrite, RecordsRepository, SeriesAction, SeriesWrite } from './repository';
 import { RepoError } from './repository';
+import { PARTS_PER_YEAR_MAX } from './records';
 import {
+  ANNUAL_MAX_YEARS,
   SERIES_LIMIT,
   affectedByDelete,
   affectedByEditFrom,
   affectedByEnd,
+  affectedByYear,
   occurrencesToMaterialize,
   seriesCountsTowardLimit,
   seriesMonthOf,
@@ -58,7 +61,7 @@ type StoredSeries = Omit<CommitmentSeries, 'terms' | 'skippedNumbers' | 'paidCou
 type StoredTerm = SeriesTerm & { id: string; seriesId: string; contextId: string; createdAt: string; supersededAt?: string };
 
 const NATURES: readonly string[] = ['conta', 'financiamento', 'compra_parcelada', 'outro_parcelamento'];
-const SERIES_ACTIONS: readonly string[] = ['criar_serie', 'alterar_serie', 'encerrar_serie', 'excluir_serie'];
+const SERIES_ACTIONS: readonly string[] = ['criar_serie', 'alterar_serie', 'encerrar_serie', 'excluir_serie', 'informar_ano', 'tirar_ano'];
 
 export interface MemoryRepositoryOptions {
   actorId: string;
@@ -74,7 +77,8 @@ export interface MemoryRepositoryOptions {
  * Repositório em memória com as mesmas regras do banco:
  * idempotência por (pessoa, chave), versão contra sobrescrita, exclusão lógica e validação.
  * Contas a pagar seguem as funções do banco (D-021): pagar e desfazer são atômicos e mantêm a invariante I1.
- * Gastos fixos seguem D-024: ocorrências são contas a pagar comuns, criadas na janela de geração, com S1 a S8.
+ * Gastos fixos seguem D-024 e contas do ano D-029: ocorrências são contas a pagar comuns, criadas na janela de geração,
+ * com S1 a S10.
  * Usado na demonstração (acesso simulado) e nos testes.
  */
 export class MemoryRepository implements RecordsRepository {
@@ -118,7 +122,7 @@ export class MemoryRepository implements RecordsRepository {
    * Escrita atômica, como uma transação do banco: fn() faz todas as leituras e validações antes da
    * primeira mutação e as mutações rodam em sequência, sem await. Objetos guardados nunca são alterados
    * no lugar (sempre substituídos), então a cópia rasa dos mapas basta. Se algo falhar, inclusive as
-   * invariantes I1 e S1 a S8, registros, contas a pagar, séries, vigências e operações voltam ao estado anterior.
+   * invariantes I1 e S1 a S10, registros, contas a pagar, séries, vigências e operações voltam ao estado anterior.
    */
   private async write<T>(fn: () => T): Promise<T> {
     await this.delay();
@@ -480,7 +484,9 @@ export class MemoryRepository implements RecordsRepository {
   async createSeries(key: string, contextId: string, input: SeriesInput) {
     return this.write(() => {
       const norm = normalizeSeries(input);
-      const payload = [contextId, norm];
+      // Sem parcelas por ano, o conteúdo da repetição é o mesmo do Ciclo A (hash idêntico, como create_series).
+      const { partsPerYear: _k, ...cycleA } = norm;
+      const payload = [contextId, norm.partsPerYear === null ? cycleA : norm];
       const replay = this.replaySeries(key, 'criar_serie', payload);
       if (replay) return replay;
       if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
@@ -491,13 +497,27 @@ export class MemoryRepository implements RecordsRepository {
         (s) => !s.deletedAt && s.contextId === contextId && seriesCountsTowardLimit(s, today),
       );
       if (active.length >= SERIES_LIMIT) throw new RepoError('limite_de_gastos_fixos');
-      const mensal = norm.kind === 'mensal';
-      const firstNumber = mensal ? 1 : norm.firstNumber;
-      const lastNumber = !mensal
-        ? norm.installmentTotal
-        : norm.lastMonth === null
-          ? null
-          : 1 + monthsBetween(norm.firstDueMonth, norm.lastMonth);
+      let firstNumber: number;
+      let lastNumber: number | null;
+      switch (norm.kind) {
+        case 'mensal':
+          firstNumber = 1;
+          lastNumber = norm.lastMonth === null ? null : 1 + monthsBetween(norm.firstDueMonth, norm.lastMonth);
+          break;
+        case 'parcelada':
+          firstNumber = norm.firstNumber;
+          lastNumber = norm.installmentTotal;
+          break;
+        case 'anual': {
+          // Último ano: (meses(âncora, último mês) / 12 + 1)·k.
+          firstNumber = norm.firstNumber;
+          const anchor = addMonths(norm.firstDueMonth, -(firstNumber - 1));
+          lastNumber = norm.lastMonth === null ? null : (Math.floor(monthsBetween(anchor, norm.lastMonth) / 12) + 1) * norm.partsPerYear!;
+          break;
+        }
+        default:
+          throw new RepoError('tipo_invalido');
+      }
       const now = new Date().toISOString();
       const series: StoredSeries = {
         id: this.id('serie'),
@@ -507,7 +527,8 @@ export class MemoryRepository implements RecordsRepository {
         firstDueMonth: norm.firstDueMonth,
         firstNumber,
         lastNumber,
-        installmentTotal: mensal ? null : norm.installmentTotal,
+        installmentTotal: norm.kind === 'parcelada' ? norm.installmentTotal : null,
+        partsPerYear: norm.kind === 'anual' ? norm.partsPerYear : null,
         currency: 'BRL',
         createdBy: this.opts.actorId,
         version: 1,
@@ -537,11 +558,19 @@ export class MemoryRepository implements RecordsRepository {
       if (replay) return replay;
       const s = this.liveSeries(id);
       if (s.version !== expectedVersion) throw new RepoError('versao_desatualizada');
-      const max = s.lastNumber ?? s.firstNumber + monthsBetween(s.firstDueMonth, monthOf(this.opts.today())) + 12;
+      // Até o último número; sem término, até 12 meses depois do mês atual (reajuste programado). Conta do ano: até a
+      // última parcela do ano que começa até 12 meses depois do mês atual.
+      const month = monthOf(this.opts.today());
+      const max =
+        s.lastNumber ??
+        (s.kind === 'anual'
+          ? (Math.floor(Math.max(0, monthsBetween(seriesMonthOf(s, 1), addMonths(month, 12))) / 12) + 1) * s.partsPerYear!
+          : s.firstNumber + monthsBetween(s.firstDueMonth, month) + 12);
       if (!Number.isSafeInteger(fromNumber) || fromNumber < s.firstNumber || fromNumber > max) throw new RepoError('numero_fora_da_serie');
       const code = seriesTermError(norm);
       if (code) throw new RepoError(code);
-      if (!NATURES.includes(norm.nature) || (s.kind === 'mensal') !== (norm.nature === 'conta')) throw new RepoError('natureza_invalida');
+      // Gasto fixo e conta do ano: 'conta'; parcelamento: um dos tipos de parcelamento.
+      if (!NATURES.includes(norm.nature) || (s.kind !== 'parcelada') !== (norm.nature === 'conta')) throw new RepoError('natureza_invalida');
       // Afetadas: a conta escolhida (sempre) e as seguintes em aberto que não foram alteradas só no mês.
       const plan = affectedByEditFrom(this.liveOccurrences(s.id).map((c) => this.toCommitment(c)), s, fromNumber);
       if (!plan.ok) throw new RepoError(plan.code);
@@ -581,10 +610,20 @@ export class MemoryRepository implements RecordsRepository {
       const s = this.liveSeries(id);
       if (s.version !== expectedVersion) throw new RepoError('versao_desatualizada');
       const int = lastNumber !== null && Number.isSafeInteger(lastNumber);
-      const valid =
-        s.kind === 'mensal'
-          ? lastNumber === null || (int && lastNumber >= 0 && lastNumber <= 600)
-          : int && lastNumber >= s.firstNumber - 1 && lastNumber <= s.installmentTotal!;
+      let valid: boolean;
+      switch (s.kind) {
+        case 'mensal':
+          valid = lastNumber === null || (int && lastNumber >= 0 && lastNumber <= 600);
+          break;
+        case 'parcelada':
+          valid = int && lastNumber >= s.firstNumber - 1 && lastNumber <= s.installmentTotal!;
+          break;
+        case 'anual':
+          valid = lastNumber === null || (int && lastNumber >= s.firstNumber - 1 && lastNumber <= ANNUAL_MAX_YEARS * s.partsPerYear!);
+          break;
+        default:
+          valid = false;
+      }
       if (!valid) throw new RepoError('fim_invalido');
       // Retomar um gasto fixo que já não contava faz ele contar de novo: mesmo limite de create_series.
       const today = this.opts.today();
@@ -626,6 +665,70 @@ export class MemoryRepository implements RecordsRepository {
     });
   }
 
+  /** Como inform_series_year: muda as parcelas do ano em aberto e estimadas; a série não muda de versão. */
+  async informSeriesYear(key: string, seriesId: string, number: number, expectedAffected: AffectedRef[], amountCents: Cents) {
+    return this.write(() => {
+      const payload = [seriesId, number, normalizeRefs(expectedAffected), amountCents];
+      const replay = this.replaySeries(key, 'informar_ano', payload);
+      if (replay) return replay;
+      return this.writeYear(key, 'informar_ano', payload, seriesId, number, expectedAffected, amountCents);
+    });
+  }
+
+  /** Como skip_series_year: exclui as parcelas do ano em aberto com a marca "excluída só neste mês". */
+  async skipSeriesYear(key: string, seriesId: string, number: number, expectedAffected: AffectedRef[]) {
+    return this.write(() => {
+      const payload = [seriesId, number, normalizeRefs(expectedAffected)];
+      const replay = this.replaySeries(key, 'tirar_ano', payload);
+      if (replay) return replay;
+      return this.writeYear(key, 'tirar_ano', payload, seriesId, number, expectedAffected, null);
+    });
+  }
+
+  /**
+   * Corpo comum de informar e tirar (mesma ordem do banco): trava e permissão da série, tipo, número, valor, conjunto
+   * afetado (vazio ou diferente do confirmado: versao_desatualizada), escrita e operação com target_id.
+   */
+  private writeYear(
+    key: string,
+    action: 'informar_ano' | 'tirar_ano',
+    payload: unknown[],
+    seriesId: string,
+    number: number,
+    expectedAffected: AffectedRef[],
+    amountCents: Cents | null,
+  ): SeriesWrite {
+    const s = this.liveSeries(seriesId);
+    if (s.kind !== 'anual') throw new RepoError('tipo_invalido');
+    if (!Number.isSafeInteger(number) || number < s.firstNumber || (s.lastNumber !== null && number > s.lastNumber)) {
+      throw new RepoError('numero_fora_da_serie');
+    }
+    if (action === 'informar_ano') {
+      if (!Number.isSafeInteger(amountCents) || amountCents! < 1) throw new RepoError('valor_invalido');
+      if (amountCents! > MAX_RECORD_CENTS) throw new RepoError('valor_acima_do_limite');
+    }
+    const plan = affectedByYear(
+      this.liveOccurrences(s.id).map((c) => this.toCommitment(c)),
+      s,
+      number,
+      action === 'informar_ano' ? 'informar' : 'tirar',
+    );
+    const actual = plan.ok ? plan.affected : [];
+    if (actual.length === 0 || !sameAffected(actual, expectedAffected)) throw new RepoError('versao_desatualizada');
+    const now = new Date().toISOString();
+    for (const c of plan.ok ? plan.changing : []) {
+      this.bumpCommitment(
+        c.id,
+        action === 'informar_ano'
+          ? { amountCents: amountCents!, amountIsEstimate: false, seriesOverride: true }
+          : { deletedAt: now, seriesSkipped: true },
+        now,
+      );
+    }
+    this.saveOperation(key, action, payload, { contextId: s.contextId, recordId: null, commitmentId: null, seriesId: s.id });
+    return this.seriesResult(s.id, actual.length);
+  }
+
   /** Como sync_series_occurrences: leitura basta; a autoria e as regras são da série. Não grava operação. */
   async syncSeriesOccurrences(contextId: string) {
     return this.write(() => {
@@ -646,7 +749,7 @@ export class MemoryRepository implements RecordsRepository {
    * Invariantes do vínculo (no banco: restrição adiada, FK composta e checagem de tipo).
    * I1: conta paga, não excluída, com exatamente 1 gasto vivo vinculado, ou em aberto com 0.
    * I2: o gasto vinculado é despesa do mesmo contexto. Lança Error('vinculo_inconsistente').
-   * S1, S2, S4, S5, S6 e S8 dos gastos fixos (S3 e S7 comparam com o estado anterior em checkTransitions).
+   * S1, S2, S4, S5, S6, S8, S9 e S10 das séries (S3 e S7 comparam com o estado anterior em checkTransitions).
    * Lança Error('serie_inconsistente').
    */
   checkInvariants() {
@@ -671,18 +774,46 @@ export class MemoryRepository implements RecordsRepository {
       throw new Error('serie_inconsistente');
     };
     for (const s of this.seriesById.values()) {
-      // Forma da série (commitment_series_forma).
-      const shapeOk =
-        s.kind === 'mensal'
-          ? s.nature === 'conta' && s.installmentTotal === null && s.firstNumber === 1 && (s.lastNumber === null || (s.lastNumber >= 0 && s.lastNumber <= 600))
-          : s.nature !== 'conta' &&
+      // Forma da série (commitment_series_forma), com S9 da conta do ano.
+      let shapeOk: boolean;
+      switch (s.kind) {
+        case 'mensal':
+          shapeOk =
+            s.nature === 'conta' &&
+            s.installmentTotal === null &&
+            s.partsPerYear === null &&
+            s.firstNumber === 1 &&
+            (s.lastNumber === null || (s.lastNumber >= 0 && s.lastNumber <= 600));
+          break;
+        case 'parcelada':
+          shapeOk =
+            s.nature !== 'conta' &&
             s.installmentTotal !== null &&
+            s.partsPerYear === null &&
             s.installmentTotal >= 2 &&
             s.installmentTotal <= 480 &&
             s.firstNumber <= s.installmentTotal &&
             s.lastNumber !== null &&
             s.lastNumber >= s.firstNumber - 1 &&
             s.lastNumber <= s.installmentTotal;
+          break;
+        case 'anual': {
+          const k = s.partsPerYear;
+          shapeOk =
+            s.nature === 'conta' &&
+            s.installmentTotal === null &&
+            k !== null &&
+            Number.isSafeInteger(k) &&
+            k >= 1 &&
+            k <= PARTS_PER_YEAR_MAX &&
+            s.firstNumber >= 1 &&
+            s.firstNumber <= k &&
+            (s.lastNumber === null || (s.lastNumber >= s.firstNumber - 1 && s.lastNumber <= ANNUAL_MAX_YEARS * k));
+          break;
+        }
+        default:
+          shapeOk = false;
+      }
       if (!shapeOk) fail();
       // S5: vigência viva em firstNumber, nenhuma viva antes dele e no máximo uma viva por número.
       const live = [...this.terms.values()].filter((t) => t.seriesId === s.id && !t.supersededAt);
@@ -693,6 +824,8 @@ export class MemoryRepository implements RecordsRepository {
       if (this.seriesById.get(t.seriesId)?.contextId !== t.contextId) fail(); // S2
     }
     const liveKeys = new Set<string>();
+    // S10: nenhuma ocorrência viva vence depois do fim do 13º mês após o mês de hoje (conta do ano: até mês + 2 + 11).
+    const s10 = addMonths(monthOf(this.opts.today()), 13);
     for (const c of this.commitments.values()) {
       if (c.seriesId === null) {
         // Conta avulsa não tem número nem marcas de série (commitments_series_marcas).
@@ -710,6 +843,7 @@ export class MemoryRepository implements RecordsRepository {
       if (s!.deletedAt) fail(); // S6
       if (n < s!.firstNumber || (s!.lastNumber !== null && n > s!.lastNumber)) fail(); // S4
       if (monthOf(c.dueOn) !== seriesMonthOf(s!, n)) fail(); // S8
+      if (monthOf(c.dueOn) > s10) fail(); // S10
     }
   }
 
@@ -758,6 +892,7 @@ export class MemoryRepository implements RecordsRepository {
         old.firstDueMonth !== s.firstDueMonth ||
         old.firstNumber !== s.firstNumber ||
         old.installmentTotal !== s.installmentTotal ||
+        old.partsPerYear !== s.partsPerYear ||
         old.createdBy !== s.createdBy ||
         old.createdAt !== s.createdAt
       ) {
@@ -886,8 +1021,9 @@ export class MemoryRepository implements RecordsRepository {
   }
 
   /**
-   * Como clarevo_materialize_series: cria as contas da janela (mês anterior ao seguinte a hoje) que ainda não
-   * existem vivas nem foram excluídas só neste mês, com a vigência de cada número e a autoria de quem criou a série.
+   * Como clarevo_materialize_series: cria as contas da janela (mês anterior ao seguinte a hoje; conta do ano: o ano
+   * inteiro, dois meses antes) que ainda não existem vivas nem foram excluídas só neste mês, com a vigência de cada
+   * número e a autoria de quem criou a série.
    */
   private materialize(seriesId: string): { created: number; createdOverdue: number } {
     const s = this.seriesById.get(seriesId);
@@ -949,7 +1085,14 @@ export class MemoryRepository implements RecordsRepository {
       ...rest,
       series:
         s && occurrenceNumber !== null
-          ? { id: s.id, number: occurrenceNumber, kind: s.kind, nature: s.nature, installmentTotal: s.installmentTotal }
+          ? {
+              id: s.id,
+              number: occurrenceNumber,
+              kind: s.kind,
+              nature: s.nature,
+              installmentTotal: s.installmentTotal,
+              partsPerYear: s.partsPerYear,
+            }
           : null,
       payment: r ? { recordId: r.id, amountCents: r.amountCents, paidOn: r.occurredOn, accountId: r.accountId } : null,
     };
@@ -1084,6 +1227,8 @@ function normalizeSeries(input: SeriesInput): SeriesInput {
     firstDueMonth: input.firstDueMonth,
     firstNumber: input.firstNumber,
     installmentTotal: input.installmentTotal,
+    // Ausente vale como nulo (p_parts_per_year default null).
+    partsPerYear: input.partsPerYear ?? null,
     lastMonth: input.lastMonth,
   };
 }

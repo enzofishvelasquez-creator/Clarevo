@@ -1,4 +1,5 @@
 import type { IsoMonth } from './dates';
+import type { Cents } from './money';
 import type {
   Commitment,
   CommitmentInput,
@@ -21,8 +22,8 @@ export interface CommitmentWrite {
   record: FinancialRecord | null;
 }
 
-/** Ações de gasto fixo gravadas em record_operations (alvo em target_id). */
-export type SeriesAction = 'criar_serie' | 'alterar_serie' | 'encerrar_serie' | 'excluir_serie';
+/** Ações de série gravadas em record_operations (alvo em target_id); 'informar_ano' e 'tirar_ano' só em contas do ano. */
+export type SeriesAction = 'criar_serie' | 'alterar_serie' | 'encerrar_serie' | 'excluir_serie' | 'informar_ano' | 'tirar_ano';
 
 /** Conta afetada que a pessoa confirmou: se o conjunto mudar até gravar, a escrita é recusada. */
 export interface AffectedRef {
@@ -82,7 +83,7 @@ export interface RecordsRepository {
   /** Reconciliação de conta a pagar: a operação com esta chave já foi concluída? */
   findCommitmentOperation(key: string): Promise<{ action: CommitmentAction; commitmentId: string; recordId: string | null } | null>;
 
-  /** Gastos fixos e parcelamentos do contexto, sem excluídos (inclusive encerrados). */
+  /** Gastos fixos, parcelamentos e contas do ano do contexto, sem excluídos (inclusive encerrados). */
   listSeries(contextId: string): Promise<CommitmentSeries[]>;
   getSeries(id: string): Promise<CommitmentSeries | null>;
   /** Ocorrências vivas da série (abertas e pagas), por número decrescente, até 60. */
@@ -107,6 +108,19 @@ export interface RecordsRepository {
   endSeries(key: string, id: string, expectedVersion: number, lastNumber: number | null, expectedAffected: AffectedRef[]): Promise<SeriesWrite>;
   /** Só sem conta paga. changed = contas em aberto removidas; occurrences vem vazio. */
   deleteSeries(key: string, id: string, expectedVersion: number, expectedAffected: AffectedRef[]): Promise<SeriesWrite>;
+  /**
+   * Conta do ano, "Informar o valor de 2027": as parcelas do ano da parcela `number` em aberto e estimadas passam a
+   * amountCents, deixam de ser estimadas e ficam alteradas só naquele ano (versão + 1). Não mexe nas pagas, nas não
+   * estimadas, nas vigências nem na série (a versão da série não muda). expectedAffected: affectedByYear(…, 'informar').
+   * changed = contas alteradas.
+   */
+  informSeriesYear(key: string, seriesId: string, number: number, expectedAffected: AffectedRef[], amountCents: Cents): Promise<SeriesWrite>;
+  /**
+   * Conta do ano, "Tirar as parcelas de 2027": exclui de uma vez as parcelas do ano da parcela `number` em aberto, com a
+   * marca "excluída só neste mês" (nunca voltam, nem se um pagamento for desfeito). As pagas continuam e a série segue.
+   * expectedAffected: affectedByYear(…, 'tirar'). changed = contas excluídas.
+   */
+  skipSeriesYear(key: string, seriesId: string, number: number, expectedAffected: AffectedRef[]): Promise<SeriesWrite>;
   /** Cria as contas da janela de geração. Idempotente, sem chave. */
   syncSeriesOccurrences(contextId: string): Promise<{ created: number; createdOverdue: number }>;
   /** Reconciliação de gasto fixo: a operação com esta chave já foi concluída? */
@@ -139,6 +153,7 @@ export type RepoErrorCode =
   | 'dia_invalido'
   | 'inicio_fora_do_intervalo'
   | 'parcelas_invalidas'
+  | 'parcelas_no_ano_invalidas'
   | 'parcela_inicial_invalida'
   | 'fim_invalido'
   | 'numero_fora_da_serie'

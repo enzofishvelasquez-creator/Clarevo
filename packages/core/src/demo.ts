@@ -7,6 +7,9 @@ import { newOperationKey } from './repository';
  * Outubro reproduz a base de aceite: R$ 6.000 recebidos, R$ 3.900 pagos e R$ 650 em contas a pagar.
  * O aluguel de outubro é a conta do gasto fixo, paga em 05/10. Em "Próximos meses": Aluguel (05/11),
  * Financiamento do carro (parcela 13 de 48, 10/11), Seguro do carro (10/11) e Luz estimada (12/11).
+ * Contas do ano: IPVA (cota única, 20/01, desde 2027) e IPTU (10 parcelas de fevereiro a novembro, dia 10, desde 2027),
+ * ambos com valor que muda. Em 07/10/2026 nenhuma conta delas existe (entram em novembro e dezembro de 2026), então
+ * nenhum total de outubro, novembro ou dezembro de 2026 muda.
  */
 export const DEMO_TODAY = '2026-10-07';
 export const DEMO_EMAIL = 'demo@clarevo.app';
@@ -43,6 +46,7 @@ export async function createDemoRepository(opts: { latencyMs?: number } = {}) {
       firstDueMonth,
       firstNumber: 1,
       installmentTotal: null,
+      partsPerYear: null,
       lastMonth: null,
     });
   const aluguel = await fixed('Aluguel', 2500, 5, '2026-10', 'fixo', 'Moradia');
@@ -66,8 +70,27 @@ export async function createDemoRepository(opts: { latencyMs?: number } = {}) {
     firstDueMonth: '2026-11',
     firstNumber: 13,
     installmentTotal: 48,
+    partsPerYear: null,
     lastMonth: null,
   });
+  // Contas do ano (D-029): valor de referência estimado; o ano inteiro entra em Contas a pagar dois meses antes.
+  const annual = (description: string, reais: number, partsPerYear: number, dueDay: number, firstDueMonth: string, category: string) =>
+    repo.createSeries(newOperationKey(), ctx, {
+      kind: 'anual',
+      nature: 'conta',
+      description,
+      category,
+      amountCents: reais * 100,
+      amountMode: 'variavel',
+      dueDay,
+      firstDueMonth,
+      firstNumber: 1,
+      installmentTotal: null,
+      partsPerYear,
+      lastMonth: null,
+    });
+  await annual('IPVA', 2400, 1, 20, '2027-01', 'Transporte');
+  await annual('IPTU', 180, 10, 10, '2027-02', 'Moradia');
 
   const bill = (description: string, reais: number, dueOn: string, category: string) =>
     repo.createCommitment(newOperationKey(), ctx, { description, amountCents: reais * 100, dueOn, category });
