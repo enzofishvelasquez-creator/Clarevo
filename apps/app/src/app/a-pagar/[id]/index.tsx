@@ -26,6 +26,7 @@ import {
   type Commitment,
   type IsoDate,
   type IsoMonth,
+  type YearPlan,
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AlertCircle, CalendarSync, Check, Info, Pencil, Plus, Repeat, ShieldCheck, Trash2, Undo2 } from 'lucide-react-native';
@@ -33,7 +34,7 @@ import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ChoiceDialog } from '@/components/choice-dialog';
-import { bySeries, ofSeries, SERIES_NOUN } from '@/components/series-parts';
+import { bySeries, ofSeries, SERIES_NOUN, yearA11yLabel } from '@/components/series-parts';
 import { SITUATION_LOOK } from '@/components/commitment-row';
 import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
@@ -100,6 +101,14 @@ export default function DetalheContaAPagar() {
   const [skipping, setSkipping] = useState(false);
   const skip = useSkipSeriesYear();
   const skipKeys = useSeriesOperationKey();
+  /**
+   * Tirar com resultado incerto: o plano enviado (para a faixa de sucesso) e o botão "Tentar novamente" na faixa de erro.
+   * O botão não depende do plano atual: se a escrita foi gravada, as listas recarregadas já não têm parcelas do ano em
+   * aberto, e o diálogo de confirmação some.
+   */
+  const skipAttempt = useRef<Extract<YearPlan, { ok: true }> | null>(null);
+  /** Texto da faixa de resultado incerto, com "Tentar novamente" (null: nada pendente). */
+  const [skipFailed, setSkipFailed] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const deleteKey = useRef(newOperationKey());
   const undoKey = useRef(newOperationKey());
@@ -195,50 +204,90 @@ export default function DetalheContaAPagar() {
 
   /**
    * "Tirar todas as parcelas de 2027 em aberto" (skip_series_year): saem de uma vez e não voltam. Resultado incerto (rede):
-   * antes de repetir, findSeriesOperation confere se a tentativa anterior foi gravada; a repetição usa a mesma chave.
+   * confere na hora com findSeriesOperation se a escrita foi gravada; se a conferência também falhar, "Tentar novamente"
+   * confere de novo antes de repetir, e a repetição usa a mesma chave.
    */
   const doSkip = async () => {
-    if (!c || !ref || !yearPlan?.ok || skipping) return;
-    const plan = yearPlan;
+    const current = yearPlan?.ok ? yearPlan : null;
+    if (!c || !ref || skipping || (!current && !skipKeys.hasPending())) return;
+    const label = current?.year.label ?? skipAttempt.current?.year.label ?? annual?.label ?? '';
     setActionError(null);
     setSkipping(true);
-    const snapshot = JSON.stringify([ref.id, ref.number, plan.affected]);
-    const failed = `Não foi possível tirar as parcelas de ${plan.year.label}. Tente novamente.`;
-    const done = () => {
+    const failed = `Não foi possível tirar as parcelas de ${label}. Tente novamente.`;
+    const done = (text: string) => {
+      skipKeys.settled();
+      skipAttempt.current = null;
+      setSkipFailed(null);
       setConfirming(null);
-      flash.set(plan.doneText);
+      flash.set(text);
       toList();
+    };
+    const reloadAll = () => {
+      commitment.refetch();
+      seriesOcc.refetch();
+      seriesOpen.refetch();
     };
     try {
       if (skipKeys.hasPending()) {
         const saved = await skipKeys.findSaved();
         if (saved?.action === 'tirar_ano') {
+          done(skipAttempt.current?.doneText ?? current?.doneText ?? `As parcelas de ${label} saíram de Contas a pagar.`);
+          return;
+        }
+        if (!yearPlan && yearLists) {
+          // Nada foi gravado, mas as listas do ano ainda não voltaram: conferir de novo depois que carregarem.
+          reloadAll();
+          setSkipFailed(failed);
+          return;
+        }
+        if (!current) {
+          // Nada foi gravado, e as parcelas do ano em aberto mudaram (pagas ou tiradas em outro aparelho): nada a repetir.
           skipKeys.settled();
-          done();
+          skipAttempt.current = null;
+          setSkipFailed(null);
+          setConfirming(null);
+          setActionError(annualYearErrorText('versao_desatualizada', label));
+          reloadAll();
           return;
         }
       }
+      if (!current) return;
+      const plan = current;
+      const snapshot = JSON.stringify([ref.id, ref.number, plan.affected]);
       const key = skipKeys.keyFor(snapshot);
       try {
         await skip.mutateAsync({ key, seriesId: ref.id, number: ref.number, affected: plan.affected });
-        skipKeys.settled();
-        done();
+        done(plan.doneText);
       } catch (e) {
         setConfirming(null);
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
           skipKeys.refused();
+          skipAttempt.current = null;
+          setSkipFailed(null);
           setActionError(annualYearErrorText(e.code, plan.year.label));
-          commitment.refetch();
-          seriesOcc.refetch();
-          seriesOpen.refetch();
+          reloadAll();
           return;
         }
         skipKeys.uncertain(key, snapshot);
-        setActionError(failed);
+        skipAttempt.current = plan;
+        // Conferir já: se foi gravada, esta parcela já saiu de Contas a pagar.
+        try {
+          const saved = await skipKeys.findSaved();
+          if (saved?.action === 'tirar_ano') {
+            done(plan.doneText);
+            return;
+          }
+        } catch {
+          // A conferência também falhou: recarregar para não mostrar como aberta uma parcela que pode já ter saído.
+          // "Tentar novamente" confere de novo antes de repetir.
+          reloadAll();
+        }
+        setSkipFailed(failed);
       }
     } catch {
       setConfirming(null);
-      setActionError(failed);
+      if (skipKeys.hasPending()) setSkipFailed(failed);
+      else setActionError(failed);
     } finally {
       setSkipping(false);
     }
@@ -306,9 +355,17 @@ export default function DetalheContaAPagar() {
               <FlashBanner message={notice} />
               {actionError ? (
                 <Banner tone="erro" icon={AlertCircle}>
-                  <Txt variant="label" color={colors.error}>
+                  <Txt variant="label" color={colors.error} accessibilityLabel={yearA11yLabel(actionError)}>
                     {actionError}
                   </Txt>
+                </Banner>
+              ) : null}
+              {skipFailed ? (
+                <Banner tone="erro" icon={AlertCircle}>
+                  <Txt variant="label" color={colors.error} accessibilityLabel={yearA11yLabel(skipFailed)}>
+                    {skipFailed}
+                  </Txt>
+                  <Button label="Tentar novamente" tone="soft" busy={skipping} busyLabel="Aguarde…" onPress={doSkip} />
                 </Banner>
               ) : null}
 
@@ -333,7 +390,9 @@ export default function DetalheContaAPagar() {
                 </Txt>
                 {ref ? (
                   <View style={{ gap: space[1] }}>
-                    <Txt variant="label">{partOf}</Txt>
+                    <Txt variant="label" accessibilityLabel={partOf ? yearA11yLabel(partOf) : undefined}>
+                      {partOf}
+                    </Txt>
                     <LinkButton
                       label={`Ver ${seriesNoun}`}
                       style={styles.inlineLink}
@@ -378,6 +437,7 @@ export default function DetalheContaAPagar() {
                   <Txt variant="label">Valor estimado pela referência da conta do ano. Quando o carnê ou o boleto chegar, informe o valor.</Txt>
                   <Button
                     label={`Informar o valor de ${annual.label}`}
+                    accessibilityLabel={yearA11yLabel(`Informar o valor de ${annual.label}`)}
                     tone="soft"
                     onPress={() => router.push({ pathname: '/gastos-fixos/[id]/informar', params: { id: ref.id, numero: String(ref.number) } })}
                   />

@@ -56,7 +56,7 @@ Não há contradição na `spec3`. O "5. Calcular" do Anexo A é texto antigo, e
 | Aba | Papel | O que muda |
 |---|---|---|
 | Resumo | Ver o mês e anotar gasto | Nada |
-| Movimentos | Tudo o que entra, sai ou vence | Bloco "Organizar" com 3 linhas (as duas primeiras já estão em andamento como "atalhos em Movimentações") |
+| Movimentos | Tudo o que entra, sai ou vence | Bloco "Organizar" com 3 linhas (as duas primeiras já existem, com legendas fixas, D-033) |
 | Metas | Até o Ciclo C, porta para as contas de guardar | Card com 2 calculadoras, além do texto atual |
 | Aprender | Entender e calcular | Card "Calculadoras" no topo; nos temas de juros, o link "Fazer a conta com os seus números" |
 
@@ -272,7 +272,7 @@ Recalculei em Python todos os exemplos abaixo, e eles batem com a `spec3` §3.11
   - Com a primeira parcela em 30 dias: 1,96% ao mês (26,27% ao ano).
   - Com a primeira na compra: 2,42% ao mês (33,28% ao ano).
 - **Cuidados:**
-  - Não compara com rendimento, que fica no Ciclo D e depende do parecer de P-016.
+  - Não compara com rendimento, que fica no Ciclo D (só simulação, sem indicar produto; D-034(5)).
   - Cita a Lei 13.455/2017 só no tema.
   - O botão "Anotar como parcelamento" aparece **só fora do cartão**, porque parcelas no cartão estão fora (D-023 e D-024). Com "Cartão de crédito", aparece o aviso de fatura que já existe.
   - O botão abre `/gastos-fixos/novo?tipo=parcelada` preenchido. A rota já aceita `tipo`, `descricao`, `valor`, `categoria` e `dia`. O parâmetro `parcelas` hoje vale só para a conta do ano (1 a 12), então o número de parcelas do parcelamento (2 a 480) e o tipo do parcelamento entram como ampliação da rota, só no app.
@@ -396,7 +396,7 @@ Recalculei em Python todos os exemplos abaixo, e eles batem com a `spec3` §3.11
 - **Ciclo D:** é a primeira parte do simulador de D-028, com as mesmas regras.
   - No D, a mesma tela ganha "Taxa de rendimento ao ano (%)", vazia, de 0% a 30%. O resultado com a taxa aparece ao lado do sem rendimento: R$ 1.184,52 por mês na hipótese de 10% ao ano.
   - Ganha também a inflação opcional, o modo "Quanto posso ter" e o aviso fixo de D-028.
-  - Tudo isso depois do parecer de P-016.
+  - Sem parecer jurídico (D-034(5)): o app só presta informação pública já disponível, com fonte, e não indica produto.
 - **Onde aparece:**
   - em Calculadoras;
   - na aba Metas;
@@ -448,7 +448,7 @@ Recalculei em Python todos os exemplos abaixo, e eles batem com a `spec3` §3.11
 - **Correção pela inflação (IPCA):** exige baixar e manter a série oficial, e D-032(5) não deixa número mensal fixo no texto.
 - **13º, férias, salário líquido e imposto de renda:** as tabelas mudam todo ano, o que traz custo de manutenção e risco jurídico.
 - **Tabela Price e SAC:** o tema `amortizacao-price-sac` e o link "Quanto das parcelas é juros?" já cobrem.
-- **Comparar parcelado com rendimento:** depende do Ciclo D e de P-016.
+- **Comparar parcelado com rendimento:** depende do Ciclo D.
 
 ## 4. O que já existe, o que está desenhado e o que falta
 
@@ -458,12 +458,12 @@ Recalculei em Python todos os exemplos abaixo, e eles batem com a `spec3` §3.11
 | Anotar gasto e recebimento, detalhe, editar, excluir | Existe | Resumo, Movimentos |
 | Resumo, composição, troca de mês | Existe (sem visão por categoria) | Resumo |
 | Contas a pagar: vencidas, pagar, desfazer, próximos meses | Existe ("Já paguei" só na revisão de vencidas) | Card "Ainda a pagar" › `/a-pagar` |
-| Gastos fixos e parcelamentos | Existe (link pouco visível) | `/a-pagar` › link; chips "Todo mês" e "Parcelado" |
-| Contas do ano (IPVA, IPTU, matrícula) | Em andamento (A3) | Gastos fixos › Contas do ano |
+| Gastos fixos e parcelamentos | Existe | Movimentos › "Organizar"; `/a-pagar` › link; chips "Todo mês" e "Parcelado" |
+| Contas do ano (IPVA, IPTU, matrícula) | Existe (A3, D-029) | Gastos fixos › Contas do ano; chip "Todo ano" |
 | Conta, segurança, "Quem vê estes dados?" | Existe | Avatar, rodapés |
 | Aprender com 8 temas | Existe | Aba Aprender |
 | Metas | Só tela de espera | Aba Metas |
-| Primeiros passos e "Organizar" em Movimentos | Em andamento (ainda não está no código) | Faixa temporária no Resumo; Movimentos |
+| Primeiros passos e "Organizar" em Movimentos | Existe (D-033; "Organizar" ainda sem Calculadoras e com legendas fixas) | Card temporário no Resumo; Movimentos |
 | Seus últimos meses (A4) | Desenhado (`spec3` §2) | Faixa temporária no Resumo, `/retomar` |
 | Aprender e dúvidas: busca, 5 seções, 35 temas, "O que é isso?" (A5) | Desenhado (`spec3` §3) | Aba Aprender |
 | Lembretes de vencimento (A2) | Desenhado (`spec2` §1.3) | Conta › interruptor; aviso no celular |
@@ -496,13 +496,13 @@ Ordem pelo valor para a pessoa e para a empresa que oferece o benefício. Valor:
    - [E] O parcelado sem juros respondeu por 41% do volume do cartão em 2024 (Abecs).
    - [E] Fernandes, Lynch e Netemeyer (2014): o efeito da educação financeira cai com o tempo, e por isso ela funciona melhor perto da decisão.
    - Depende de: `learn/math.ts`.
-   - Risco: a simulação ser lida como recomendação. Mitigação: as regras de 3.1 e o parecer de P-016.
+   - Risco: a simulação ser lida como recomendação. Mitigação: as regras de 3.1 e só informação pública já disponível, com fonte (D-034(5)).
 3. **Achar tudo.**
    - Bloco "Organizar", Metas com saída, "Já paguei" na lista, estados vazios com ação e Primeiros passos.
    - Valor: pessoa A, empresa M. Esforço: S/M.
    - [E] Esconder a navegação reduz quase pela metade a descoberta (NN/g).
    - [E] 35% dos cancelamentos de planos anuais acontecem no primeiro mês, e só cerca de 5% de quem cancela um plano anual volta (RevenueCat, State of Subscription Apps 2026, mais de 115 mil apps). Num produto pago, o primeiro mês decide.
-   - Depende de: nada no banco; reaproveita Primeiros passos e o bloco "Organizar", que já estão em andamento.
+   - Depende de: nada no banco; reaproveita Primeiros passos e o bloco "Organizar", que já existem (D-033).
    - Riscos: virar tutorial. Conta nova continua sem dados de exemplo.
 4. **Renda comprometida (B).**
    - Proposta extra: incluir "consignado" no texto de ajuda do tipo "Financiamento ou empréstimo", só no texto, sem mudar o banco.
@@ -602,7 +602,7 @@ Ordem pelo valor para a pessoa e para a empresa que oferece o benefício. Valor:
 
 | Passo | O quê | Esforço | O que Enzo vê |
 |---|---|---|---|
-| 0 | Fechar o A3 (contas do ano) e terminar Primeiros passos e "Organizar" em Movimentos (em andamento) | Em andamento | IPVA e IPTU em Gastos fixos › Contas do ano; conta nova com 3 primeiros passos; Contas a pagar e Gastos fixos com nome em Movimentos |
+| 0 | Fechar o A3 (contas do ano) e terminar Primeiros passos e "Organizar" em Movimentos | Feito em 08/10/2026 (D-029, D-033) | IPVA e IPTU em Gastos fixos › Contas do ano; conta nova com 3 primeiros passos; Contas a pagar e Gastos fixos com nome em Movimentos |
 | 1 | **Achar tudo**, sem banco: card em Metas, "Já paguei" na lista, "Por categoria" na composição, atalhos do ícone na web | S/M, 3 a 5 dias | Pagar uma conta com 3 toques; quanto foi para Mercado no mês; atalho "Contas a pagar" ao pressionar o ícone no Android |
 | 2 | **Calculadoras**, sem banco: `learn/math.ts` adiantado, `/calcular` com 7 (ou 8) calculadoras, "Somar valores", links de contexto, linha em Movimentos, cards em Aprender e Metas, link na Família | M/L, 8 a 12 dias | "Parcelado ou à vista? Fazer a conta" no parcelamento; "Calcular multa e juros" numa conta vencida; "35,90" e "12,50" viram R$ 48,40 |
 | 2' | **A2 Lembretes**, em paralelo, com ocultar valores e biometria no mesmo build de desenvolvimento | M | Interruptor em Conta; aviso "Você tem 3 contas com vencimento amanhã."; olho para ocultar valores |
@@ -610,7 +610,7 @@ Ordem pelo valor para a pessoa e para a empresa que oferece o benefício. Valor:
 | 4 | **A5** Aprender e dúvidas, mais leve porque o motor de contas já existe | M | Busca, 35 temas, "O que é isso?" nas telas, "Fazer a conta com os seus números" |
 | 5 | **B** Renda comprometida, com a previsão dos pagamentos do mês em `/a-pagar` | M | Linha dentro do card "Ainda a pagar"; tela com medidor e próximos meses |
 | 6 | **C** Metas e reserva | L | Aba Metas completa; a calculadora da reserva passa a "Criar reserva" |
-| 7 | **D** Simulador, depois do parecer de P-016 | S/M | "Juntar para um objetivo" ganha a taxa, a inflação e "Quanto posso ter" |
+| 7 | **D** Simulador, só simulação e sem indicar produto (D-028, D-034(5)) | S/M | "Juntar para um objetivo" ganha a taxa, a inflação e "Quanto posso ter" |
 | 8 | Seção 5, nesta ordem: busca de registros, orçamento por categoria, plano para sair das dívidas, assinaturas, "Seu mês", exportar, NFC-e e widget com valores ocultos | Varia | Uma entrega por vez |
 
 - **Ciclos seguintes:** o Ciclo 2 (Família) e os demais continuam como em `docs/04`. O conteúdo de época (item 13) pode sair antes, como texto para o RH.
@@ -624,6 +624,8 @@ Ordem pelo valor para a pessoa e para a empresa que oferece o benefício. Valor:
   - Arquivos novos: `app/calcular/index.tsx`, `app/calcular/[slug].tsx` e as contas em `packages/core`.
 
 ## 7. Decisões que precisam do Enzo
+
+Respondidas em 08/10/2026 (D-034): 1, 2 e 3 aprovadas; 4 refeita de forma mais simples, com o Resumo como está até a resposta; 5, sem parecer jurídico: o app presta só informações públicas já disponíveis.
 
 1. **Ordem:** posso fazer o "Achar tudo" e as calculadoras logo depois das contas do ano, antes de "Seus últimos meses"?
    - Isso muda a ordem combinada em D-023, mas não muda nenhuma tela aprovada.

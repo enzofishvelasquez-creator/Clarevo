@@ -10,8 +10,9 @@ import { useSpace } from '@/state/data';
  * dia (1 a 31), inicio (AAAA-MM), vencimento (AAAA-MM-DD, vira dia e primeiro mês quando dia e inicio faltam)
  * gasto (AAAA-MM-DD, data do gasto anotado em "Tornar gasto fixo") e origem=digitado (o preenchimento veio do que a
  * pessoa digitou em "Anotar conta a pagar": sair sem salvar pede confirmação).
- * Conta do ano: parcelas (1 a 12; 1 = cota única), mes (1 a 12), ano (primeiro ano, AAAA), modo=fixo|variavel e
- * apos (rótulo do último ano da conta do ano encerrada em "Mudar a forma de pagamento").
+ * Conta do ano: parcelas (1 a 12; 1 = cota única), mes (1 a 12), ano (primeiro ano, AAAA), modo=fixo|variavel,
+ * apos (rótulo do último ano da conta do ano encerrada em "Mudar a forma de pagamento") e inicio-minimo (AAAA-MM, o mês
+ * seguinte ao último vencimento dela: a nova não começa antes).
  */
 type Params = {
   tipo?: string;
@@ -20,6 +21,7 @@ type Params = {
   ano?: string;
   modo?: string;
   apos?: string;
+  'inicio-minimo'?: string;
   descricao?: string;
   valor?: string;
   categoria?: string;
@@ -57,6 +59,8 @@ function prefillFrom(p: Params): SeriesPrefill | undefined {
   if (year !== undefined) out.startYear = year;
   if (p.modo === 'fixo' || p.modo === 'variavel') out.amountMode = p.modo;
   if (typeof p.apos === 'string' && /^\d{4}(\/\d{4})?$/.test(p.apos)) out.endedYear = p.apos;
+  const notBefore = p['inicio-minimo'];
+  if (typeof notBefore === 'string' && isValidIsoMonth(notBefore)) out.notBefore = notBefore;
   return Object.keys(out).length > 0 ? out : undefined;
 }
 

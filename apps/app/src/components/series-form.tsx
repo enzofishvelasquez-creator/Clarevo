@@ -14,7 +14,9 @@ import {
   charCount,
   fieldForErrorCode,
   findSeriesConflicts,
+  firstMonthBounds,
   firstMonthChoices,
+  firstMonthRangeText,
   formatDateBR,
   formatMonthInputBR,
   formatMonthName,
@@ -49,7 +51,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
-import { ChoiceGroup, joinList, MONTH_FULL, MONTH_SHORT, monthChipLabel, seriesStyles as styles } from '@/components/series-parts';
+import {
+  ChoiceGroup,
+  joinList,
+  lastYearHint,
+  MONTH_FULL,
+  MONTH_SHORT,
+  monthChipLabel,
+  seriesStyles as styles,
+  yearA11y,
+  yearA11yLabel,
+} from '@/components/series-parts';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { useCommitments, useCreateSeries, useMonthRecords, useSeriesList, useSeriesOperationKey, useUpdateSeriesFrom } from '@/state/data';
@@ -77,6 +89,11 @@ export interface SeriesPrefill {
   amountMode?: AmountMode;
   /** "Mudar a forma de pagamento": rótulo do último ano da conta do ano encerrada. */
   endedYear?: string;
+  /**
+   * "Mudar a forma de pagamento": primeiro mês aceito para a nova conta do ano (o seguinte ao último vencimento da
+   * encerrada). Os chips de início antes dele não aparecem: as duas contas do ano nunca criam contas no mesmo mês.
+   */
+  notBefore?: IsoMonth;
 }
 
 /** Descrição que sugere cartão ou fatura: parcelas do cartão já entram na fatura. */
@@ -84,6 +101,16 @@ const INVOICE_HINT = /\bfatura\b|cart[aã]o/i;
 
 /** Primeira conta: o padrão (primeiro vencimento a partir de hoje), um dos chips ou "Outro mês" (campo MM/AAAA). */
 type MonthPick = 'auto' | 'outro' | IsoMonth;
+
+/**
+ * Início da conta do ano: o padrão (primeiro vencimento a partir de hoje) ou o ano escolhido (ano civil da 1ª parcela do
+ * ano) e a parcela (1, ou a próxima a pagar num ano já começado). O ano escolhido continua o mesmo quando o mês ou o
+ * número de parcelas muda; se ele não couber mais, a tela diz por quê e não troca de ano sozinha.
+ */
+type AnnualStart = 'auto' | { year: number; part: number };
+
+/** Trocar o mês ou o número de parcelas mantém o ano escolhido; a parcela de um ano já começado volta ao padrão. */
+const keepYear = (st: AnnualStart): AnnualStart => (st === 'auto' || st.part === 1 ? st : 'auto');
 
 const intOrNull = (text: string) => (/^\s*\d{1,2}\s*$/.test(text) ? Number(text.trim()) : null);
 const validDay = (text: string) => {
@@ -108,6 +135,9 @@ const structureOf = (i: SeriesInput) => JSON.stringify([i.kind, i.firstDueMonth,
 
 /** Chave de um chip de início da conta do ano. */
 const startKey = (c: Pick<AnnualStartChoice, 'firstDueMonth' | 'firstNumber'>) => `${c.firstDueMonth}|${c.firstNumber}`;
+
+/** Faixa de "Mudar a forma de pagamento", com o último ano da conta do ano encerrada. */
+const endedText = (year: string) => `Conta do ano encerrada em ${year}. Agora cadastre a nova forma de pagamento, a partir do ano seguinte.`;
 
 /** Texto da faixa depois de salvar: o da prévia na conta do ano; nos outros, savedText(w). */
 function savedTextFor(w: SeriesWrite, input: SeriesInput | null, today: IsoDate): string {
@@ -169,10 +199,10 @@ export function SeriesForm({
     // Conta do ano: mês (1 a 12) e primeiro ano vindos da rota.
     const month = p.month ?? (first ? Number(first.slice(5, 7)) : null);
     const year = p.startYear ?? (first ? Number(first.slice(0, 4)) : null);
-    const annual = {
+    const annual: { inParts: boolean; month: number | null; start: AnnualStart } = {
       inParts: parts !== null,
       month: month !== null && month >= 1 && month <= 12 ? month : null,
-      start: month !== null && year !== null ? `${year}-${String(month).padStart(2, '0')}|1` : 'auto',
+      start: month !== null && year !== null ? { year, part: 1 } : 'auto',
     };
     return { draft, monthPick, ending: false, annual };
   };
@@ -235,9 +265,14 @@ export function SeriesForm({
   };
 
   const setAnnualField = <K extends keyof typeof annual>(k: K, v: (typeof annual)[K]) => {
-    setAnnual((a) => ({ ...a, [k]: v }));
+    // Mês e forma de pagamento mudam as parcelas: o ano escolhido fica, a parcela de um ano já começado volta ao padrão.
+    setAnnual((a) => ({ ...a, [k]: v, ...(k === 'start' ? {} : { start: keepYear(a.start) }) }));
     setErrors((e) => ({ ...e, firstMonthText: undefined, firstNumberText: undefined, partsPerYearText: k === 'inParts' ? undefined : e.partsPerYearText }));
   };
+
+  /** Chip de início tocado: o ano civil da 1ª parcela daquele ano e a parcela escolhida. */
+  const pickStart = (c: Pick<AnnualStartChoice, 'firstDueMonth' | 'firstNumber'>) =>
+    setAnnualField('start', { year: Number(addMonths(c.firstDueMonth, -(c.firstNumber - 1)).slice(0, 4)), part: c.firstNumber });
 
   // Primeira conta: com o dia válido, os chips mostram o vencimento; o padrão acompanha o dia até a pessoa escolher.
   const day = validDay(draft.dueDayText);
@@ -249,8 +284,40 @@ export function SeriesForm({
   const k = annual.inParts ? partsTyped : 1;
   const kOk = k !== null && k >= 1 && k <= 12 && (!annual.inParts || k >= 2);
   const startChoices = anual && kOk && annual.month !== null && day !== null ? annualStartChoices(k!, annual.month, day, today) : null;
-  const allStarts = startChoices ? [...startChoices.years, ...(startChoices.started?.parts ?? [])] : [];
-  const start = allStarts.find((c) => startKey(c) === annual.start) ?? allStarts.find((c) => c.isDefault) ?? null;
+  // "Mudar a forma de pagamento": só inícios depois do último vencimento da conta do ano encerrada.
+  const notBefore = prefill?.notBefore ?? null;
+  const fits = (c: AnnualStartChoice) => notBefore === null || c.firstDueMonth >= notBefore;
+  const yearChips = startChoices ? startChoices.years.filter(fits) : [];
+  const startedParts = startChoices?.started ? startChoices.started.parts.filter(fits) : [];
+  const startedGroup = startChoices?.started && startedParts.length > 0 ? startChoices.started : null;
+  const allStarts = [...yearChips, ...startedParts];
+  // Padrão: o primeiro vencimento a partir de hoje entre os chips mostrados (sem chips depois de hoje, o último).
+  const byDue = [...allStarts].sort((a, b) => a.dueOn.localeCompare(b.dueOn));
+  const autoStart = byDue.find((c) => c.dueOn >= today) ?? byDue[byDue.length - 1] ?? null;
+  const chosenStart = annual.start === 'auto' ? null : annual.start;
+  const mm = annual.month === null ? null : String(annual.month).padStart(2, '0');
+  /** 1º mês do ano escolhido e o mês da parcela escolhida (num ano já começado, a próxima a pagar). */
+  const chosenYearMonth: IsoMonth | null = chosenStart && mm ? `${chosenStart.year}-${mm}` : null;
+  const chosenMonth = chosenStart && chosenYearMonth ? addMonths(chosenYearMonth, chosenStart.part - 1) : null;
+  const start = chosenStart
+    ? (allStarts.find((c) => chosenMonth !== null && startKey(c) === startKey({ firstDueMonth: chosenMonth, firstNumber: chosenStart.part })) ?? null)
+    : autoStart;
+  /** Ano escolhido (ou vindo de outra tela) sem chip: o motivo, sem trocar de ano sozinho. */
+  const startMissing = (() => {
+    if (!startChoices || start || k === null) return null;
+    const afterEnded =
+      notBefore !== null
+        ? `A conta do ano encerrada vai até ${formatMonthYearBR(addMonths(notBefore, -1))}. Escolha um primeiro ano com vencimento depois disso.`
+        : null;
+    // Sem escolha e sem chip possível (só com o filtro da conta do ano encerrada).
+    if (!chosenStart || !chosenYearMonth || !chosenMonth) return afterEnded ?? firstMonthRangeText(today, 'anual');
+    const label = annualYearOf({ kind: 'anual', firstDueMonth: chosenYearMonth, firstNumber: 1, partsPerYear: k }, 1).label;
+    const { min, max } = firstMonthBounds(today, 'anual');
+    if (afterEnded && notBefore !== null && chosenMonth < notBefore) return afterEnded;
+    if (chosenMonth > max) return `O primeiro ano ${label} só pode ser cadastrado a partir de ${formatMonthYearBR(addMonths(chosenMonth, -23))}.`;
+    if (chosenMonth < min) return `Não é possível começar em ${label}: ${k === 1 ? 'a conta venceu' : 'a primeira parcela venceu'} em ${formatMonthYearBR(chosenMonth)}. Escolha outro ano.`;
+    return firstMonthRangeText(today, 'anual');
+  })();
 
   const firstMonthText = anual
     ? start
@@ -293,6 +360,12 @@ export function SeriesForm({
       : null;
 
   /** Rótulo do primeiro ano da conta do ano na prévia ("2027" ou "2026/2027"). */
+  // Conta do ano: "Começar em 2028" só aparece se o ano seguinte tem chip (dentro da faixa aceita).
+  const canStartNext =
+    !anual ||
+    (conflicts !== null &&
+      allStarts.some((c) => startKey(c) === startKey({ firstDueMonth: conflicts.suggestedFirstMonth, firstNumber: conflicts.suggestedFirstNumber ?? 1 })));
+
   const firstYearLabel =
     anual && preview && k !== null
       ? annualYearOf({ kind: 'anual', firstDueMonth: preview.firstMonth, firstNumber: preview.firstNumber, partsPerYear: k }, preview.firstNumber).label
@@ -305,7 +378,7 @@ export function SeriesForm({
   const startNext = () => {
     if (!conflicts) return;
     if (anual) {
-      setAnnualField('start', startKey({ firstDueMonth: conflicts.suggestedFirstMonth, firstNumber: conflicts.suggestedFirstNumber ?? 1 }));
+      pickStart({ firstDueMonth: conflicts.suggestedFirstMonth, firstNumber: conflicts.suggestedFirstNumber ?? 1 });
       return;
     }
     if (conflicts.suggestedFirstNumber !== null) set('firstNumberText', String(conflicts.suggestedFirstNumber));
@@ -389,6 +462,8 @@ export function SeriesForm({
     if (anual) {
       if (annual.month === null) errs.firstMonthText = annual.inParts ? 'Escolha o mês da primeira parcela.' : 'Escolha o mês do vencimento.';
       if (annual.inParts && (partsTyped === null || partsTyped < 2 || partsTyped > 12)) errs.partsPerYearText = SERIES_ERROR_TEXT.parcelas_no_ano_invalidas;
+      // O ano escolhido não cabe: nunca salvar em outro ano sem a pessoa escolher.
+      if (startMissing) errs.firstMonthText = startMissing;
     }
     // "Termina em…" sem o mês (ou o ano): sem esta conferência, seria salvo sem término.
     if (!parcelada && ending && draft.lastMonthText.trim() === '') {
@@ -587,6 +662,10 @@ export function SeriesForm({
     />
   );
 
+  // Conta do ano que atravessa dezembro: o último ano é o do começo do período ("2027" para 2027/2028).
+  const annualLastYearHint =
+    anual && annual.month !== null && k !== null ? lastYearHint(annual.month, k, chosenStart?.year ?? Number(today.slice(0, 4))) : null;
+
   const endingBlock = !parcelada ? (
     <View style={{ gap: space[2] }}>
       <ChoiceGroup label="Até quando?" hint={anual ? 'Útil quando você vai vender o carro ou o imóvel.' : 'Útil para escola, curso ou contrato com prazo.'}>
@@ -604,13 +683,15 @@ export function SeriesForm({
           inputMode="numeric"
           maxLength={anual ? 4 : 7}
           error={errors.lastMonthText}
-          hint="Digite só os números."
+          hint={(anual ? annualLastYearHint : null) ?? 'Digite só os números.'}
         />
       ) : null}
     </View>
   ) : null;
 
   const startError = errors.firstNumberText ?? (annual.month !== null ? errors.firstMonthText : undefined);
+  // O motivo de um ano sem chip aparece na hora, antes de salvar.
+  const startErrorShown = startMissing ?? startError;
 
   /** Todo ano: forma, parcelas, mês, dia, modo, valor, primeiro ano (ou próxima parcela) e término (seção 1.7). */
   const annualFields = (
@@ -627,6 +708,7 @@ export function SeriesForm({
           value={draft.partsPerYearText}
           onChangeText={(t) => {
             set('partsPerYearText', t.replace(/\D/g, '').slice(0, 2));
+            setAnnual((a) => ({ ...a, start: keepYear(a.start) }));
             setErrors((e) => ({ ...e, firstMonthText: undefined, firstNumberText: undefined }));
           }}
           placeholder="Ex.: 10"
@@ -665,27 +747,37 @@ export function SeriesForm({
 
       {startChoices ? (
         <>
-          {startChoices.years.length > 0 ? (
-            <ChoiceGroup label="Primeiro ano" error={startChoices.started ? undefined : startError}>
-              {startChoices.years.map((c) => (
+          {yearChips.length > 0 ? (
+            <ChoiceGroup label="Primeiro ano" error={startedGroup ? undefined : startErrorShown}>
+              {yearChips.map((c) => (
                 <Chip
                   key={startKey(c)}
                   label={c.label}
-                  accessibilityLabel={c.label.replace(/^(\d{4})\/(\d{4})/, '$1 a $2')}
+                  accessibilityLabel={yearA11y(c.label)}
                   selected={start !== null && startKey(start) === startKey(c)}
-                  onPress={() => setAnnualField('start', startKey(c))}
+                  onPress={() => pickStart(c)}
                 />
               ))}
             </ChoiceGroup>
+          ) : !startedGroup ? (
+            // Nenhum ano cabe (por exemplo, a nova forma de pagamento começaria longe demais): só o motivo.
+            <View style={{ gap: space[2] }}>
+              <Txt variant="label" style={{ fontFamily: fonts.bold }}>
+                Primeiro ano
+              </Txt>
+              <Txt variant="label" color={colors.error} accessibilityLiveRegion="polite" accessibilityRole="alert">
+                {startErrorShown ?? firstMonthRangeText(today, 'anual')}
+              </Txt>
+            </View>
           ) : null}
-          {startChoices.started ? (
-            <ChoiceGroup label={startChoices.started.title} hint={startChoices.started.hint} error={startError}>
-              {startChoices.started.parts.map((c) => (
+          {startedGroup ? (
+            <ChoiceGroup label={startedGroup.title} hint={startedGroup.hint} error={startErrorShown}>
+              {startedParts.map((c) => (
                 <Chip
                   key={startKey(c)}
                   label={c.label}
                   selected={start !== null && startKey(start) === startKey(c)}
-                  onPress={() => setAnnualField('start', startKey(c))}
+                  onPress={() => pickStart(c)}
                 />
               ))}
             </ChoiceGroup>
@@ -718,8 +810,12 @@ export function SeriesForm({
       <Screen contentStyle={{ padding: space[5], gap: space[4], paddingBottom: space[6] }}>
         {prefill?.endedYear ? (
           <Banner tone="sucesso" icon={Check}>
-            <Txt variant="label" color={colors.successText} style={{ fontFamily: fonts.bold }}>
-              Conta do ano encerrada em {prefill.endedYear}. Agora cadastre a nova forma de pagamento, a partir do ano seguinte.
+            <Txt
+              variant="label"
+              color={colors.successText}
+              style={{ fontFamily: fonts.bold }}
+              accessibilityLabel={yearA11yLabel(endedText(prefill.endedYear))}>
+              {endedText(prefill.endedYear)}
             </Txt>
           </Banner>
         ) : null}
@@ -835,9 +931,11 @@ export function SeriesForm({
             <Txt variant="label" style={{ fontFamily: fonts.bold }}>
               Como vai ficar
             </Txt>
-            <Txt variant="label">{preview.text}</Txt>
+            <Txt variant="label" accessibilityLabel={yearA11yLabel(preview.text)}>
+              {preview.text}
+            </Txt>
             {preview.lines.map((line) => (
-              <Txt key={line} variant="caption">
+              <Txt key={line} variant="caption" accessibilityLabel={yearA11yLabel(line)}>
                 {line}
               </Txt>
             ))}
@@ -847,14 +945,23 @@ export function SeriesForm({
         {conflicts?.texts.record ? (
           <Banner tone="info" icon={Info}>
             <Txt variant="label">{conflicts.texts.record}</Txt>
-            {conflicts.texts.startNext ? <Button label={conflicts.texts.startNext} tone="soft" onPress={startNext} /> : null}
+            {conflicts.texts.startNext && canStartNext ? (
+              <Button label={conflicts.texts.startNext} accessibilityLabel={yearA11yLabel(conflicts.texts.startNext)} tone="soft" onPress={startNext} />
+            ) : null}
           </Banner>
         ) : null}
         {showCommitmentConflict && conflicts && preview ? (
           <Banner tone="info" icon={Info}>
             <Txt variant="label">{conflicts.texts.commitment}</Txt>
-            {conflicts.texts.startNext ? <Button label={conflicts.texts.startNext} tone="soft" onPress={startNext} /> : null}
-            <Button label={`Manter ${firstMonthName}`} tone="ghost" onPress={() => setKept((k) => [...k, preview.firstMonth])} />
+            {conflicts.texts.startNext && canStartNext ? (
+              <Button label={conflicts.texts.startNext} accessibilityLabel={yearA11yLabel(conflicts.texts.startNext)} tone="soft" onPress={startNext} />
+            ) : null}
+            <Button
+              label={`Manter ${firstMonthName}`}
+              accessibilityLabel={yearA11yLabel(`Manter ${firstMonthName}`)}
+              tone="ghost"
+              onPress={() => setKept((k) => [...k, preview.firstMonth])}
+            />
           </Banner>
         ) : null}
         {conflicts?.texts.similar ? (

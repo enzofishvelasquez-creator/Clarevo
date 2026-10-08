@@ -8,6 +8,7 @@ import Animated, { FadeIn, FadeInLeft, FadeInRight, FadeOut, ReduceMotion } from
 import { FamilyNotLinked } from '@/components/family-state';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { AppHeader, ContextSwitch, MonthSwitcher } from '@/components/header';
+import { PrimeirosPassos } from '@/components/primeiros-passos';
 import { RecordRow } from '@/components/record-row';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, FitMoney, LinkButton, Money, Screen, Skeleton, Txt } from '@/components/ui';
@@ -122,6 +123,8 @@ export default function ResumoScreen() {
 
         <Body>
           <FlashBanner message={notice} />
+          {/* Aviso temporário de conta nova (só Pessoal, mês corrente): não muda a ordem dos blocos aprovados. */}
+          <PrimeirosPassos contextId={contextId} />
 
           {kind === 'familia' ? (
             <FamilyNotLinked />

@@ -266,9 +266,9 @@ describe('gastos fixos: regras puras', () => {
     expect(occurrenceLabel(occ(carro(), 13))).toBe('Parcela 13 de 48');
     expect(occurrenceLabel(occ(series(), 2))).toBe('Todo mês');
     expect(occurrenceLabel({ series: null })).toBeNull();
-    expect(seriesCaption(series())).toBe('Todo mês, dia 5 · desde outubro de 2026');
+    expect(seriesCaption(series())).toBe('Todo mês, dia\u00a05 · desde outubro de 2026');
     expect(seriesCaption(carro())).toBe('Parcelamento · financiamento · parcelas 13 a 48');
-    expect(seriesCaption(series({ lastNumber: 3, terms: [term(1, { dueDay: 10 })] }))).toBe('Todo mês, dia 10 · de outubro a dezembro de 2026');
+    expect(seriesCaption(series({ lastNumber: 3, terms: [term(1, { dueDay: 10 })] }))).toBe('Todo mês, dia\u00a010 · de outubro a dezembro de 2026');
     const reajuste = series({ terms: [term(1), term(4, { amountCents: 265000 })] });
     expect(termHistory(reajuste).map((h) => h.text)).toEqual([
       'R$ 2.500,00 de outubro a dezembro de 2026',
@@ -1549,11 +1549,11 @@ describe('demonstração do Ciclo A (com as contas do ano do A3)', () => {
 
     const list = await repo.listSeries(ctx);
     expect(list.map((s) => [currentTerm(s).description, seriesCaption(s, DEMO_TODAY)])).toEqual([
-      ['Aluguel', 'Todo mês, dia 5 · desde outubro de 2026'],
-      ['Luz', 'Todo mês, dia 12 · desde novembro de 2026'],
+      ['Aluguel', 'Todo mês, dia\u00a05 · desde outubro de 2026'],
+      ['Luz', 'Todo mês, dia\u00a012 · desde novembro de 2026'],
       ['Financiamento do carro', 'Parcelamento · financiamento · parcelas 13 a 48'],
       ['IPVA', 'Todo ano em 20/01 · desde 2027'],
-      ['IPTU', 'Todo ano, 10 parcelas de fevereiro a novembro, dia 10 · desde 2027'],
+      ['IPTU', 'Todo ano, 10 parcelas de fevereiro a novembro, dia\u00a010 · desde 2027'],
     ]);
     // Contas do ano ficam fora do "Por mês"; nenhuma conta delas existe em 07/10/2026.
     expect(seriesMonthlyTotal(list, DEMO_TODAY)).toEqual({ totalCents: 353000, estimatedCents: 18000 });

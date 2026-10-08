@@ -13,6 +13,7 @@ import {
   centsToInput,
   currentTerm,
   fieldForErrorCode,
+  firstMonthBounds,
   formatBRL,
   formatDateBR,
   formatMonthName,
@@ -41,6 +42,7 @@ import {
   type Commitment,
   type CommitmentSeries,
   type FieldErrors,
+  type IsoMonth,
   type PaymentDraft,
   type PaymentInput,
   type PersonalSpace,
@@ -57,7 +59,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
-import { CheckOption, ChoiceGroup, joinList, monthChipLabel, seriesStyles as styles } from '@/components/series-parts';
+import { CheckOption, ChoiceGroup, joinList, lastYearHint, monthChipLabel, seriesStyles as styles, yearA11yLabel } from '@/components/series-parts';
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { totalChange } from '@/lib/highlight';
@@ -134,6 +136,14 @@ export function SeriesEndForm({
   const [resume] = useState(() => seriesEnded(opened, today));
   const currentMonth = monthOf(today);
   const total = s.installmentTotal;
+  /**
+   * "Mudar a forma de pagamento": 1º mês do ano seguinte ao último ano n (onde a nova começa, no mesmo mês) e se ele já
+   * pode ser cadastrado (até 23 meses depois do mês atual). Encerrar num ano mais distante deixaria a nova sem como
+   * começar logo depois.
+   */
+  const newStartAfter = (n: number): IsoMonth => addMonths(annualYearOf(s, n).firstMonth, 12);
+  const newStartMax = firstMonthBounds(today, 'anual').max;
+  const newFits = (n: number) => !anual || !thenNew || n < s.firstNumber || newStartAfter(n) <= newStartMax;
 
   // Chips de "Qual é a última conta?": do mês anterior (ou da conta mais antiga em aberto) até 6 meses depois da última conta criada.
   // Conta do ano, "Qual é o último ano?": do ano de hoje (ou do ano da conta mais antiga em aberto) até 3 anos depois
@@ -150,7 +160,7 @@ export function SeriesEndForm({
       const topIdx = Math.max(curIdx, ...liveNumbers.map(yearIdx)) + 3;
       for (let idx = startIdx; idx <= topIdx; idx++) {
         const n = (idx + 1) * k;
-        if (n !== s.lastNumber && n <= maxLast) out.push(n);
+        if (n !== s.lastNumber && n <= maxLast && newFits(n)) out.push(n);
       }
       return out;
     }
@@ -223,6 +233,11 @@ export function SeriesEndForm({
     return n === null ? undefined : n;
   })();
   const inRange = chosen === undefined || (chosen === null ? !parcelada : chosen >= s.firstNumber - 1 && chosen <= maxLast);
+  /** "Mudar a forma de pagamento" com um último ano tão distante que a nova ainda não pode ser cadastrada: o motivo. */
+  const newTooLate =
+    typeof chosen === 'number' && inRange && !newFits(chosen)
+      ? `Com ${yearLabelOf(chosen)} como último ano, a nova forma de pagamento só poderia ser cadastrada a partir de ${formatMonthYearBR(addMonths(newStartAfter(chosen), -23))}. Escolha um ano anterior.`
+      : null;
   const plan = chosen !== undefined && inRange ? affectedByEnd(allOccurrences, s, chosen) : null;
   /** Conta viva do número escolhido, aberta ou paga (null se ainda não foi criada). */
   const chosenOcc = typeof chosen === 'number' ? (allOccurrences.find((c) => c.series!.number === chosen) ?? null) : null;
@@ -279,6 +294,8 @@ export function SeriesEndForm({
       const term = termFor(fresh.terms, Math.max(fresh.firstNumber, last)) ?? currentTerm(fresh, today);
       const lastYear = last >= fresh.firstNumber ? annualYearOf(fresh, last) : null;
       const start = addMonths(lastYear ? lastYear.firstMonth : annualYearOf(fresh, fresh.firstNumber).firstMonth, lastYear ? 12 : 0);
+      // A nova nunca começa antes do mês seguinte ao último vencimento da encerrada (nada vence duas vezes no mesmo mês).
+      const notBefore = lastYear ? addMonths(seriesMonthOf(fresh, last), 1) : null;
       const params: Record<string, string> = {
         tipo: 'anual',
         descricao: term.description,
@@ -290,6 +307,7 @@ export function SeriesEndForm({
         ano: start.slice(0, 4),
         ...(term.category ? { categoria: term.category } : {}),
         ...(lastYear ? { apos: lastYear.label } : {}),
+        ...(notBefore ? { 'inicio-minimo': notBefore } : {}),
       };
       leave(() => router.replace({ pathname: '/gastos-fixos/novo', params }));
       return;
@@ -428,6 +446,10 @@ export function SeriesEndForm({
       setChoiceError(texts.fim_invalido);
       return;
     }
+    if (newTooLate) {
+      setChoiceError(newTooLate);
+      return;
+    }
     // Listas que falharam ao recarregar: o efeito e a parcela a quitar não são conhecidos. Recarregar antes de gravar.
     if (!listsReady) {
       live.refetch();
@@ -548,6 +570,9 @@ export function SeriesEndForm({
         : 'Encerrar gasto fixo';
   const yesterday = addDays(today, -1);
   const lastDue = parcelada && total !== null ? seriesDueOn(s, total) : null;
+  // "Outro ano" numa conta do ano que atravessa dezembro: o ano digitado é o do começo do período.
+  const firstYearMonth = anual ? annualYearOf(s, s.firstNumber).firstMonth : null;
+  const otherYearHint = firstYearMonth ? lastYearHint(Number(firstYearMonth.slice(5, 7)), k, Number(firstYearMonth.slice(0, 4))) : null;
 
   // Efeito da escolha, antes de confirmar. Retomar (ou estender): as contas que a geração recria agora.
   const extending = chosen === null || (typeof chosen === 'number' && s.lastNumber !== null && chosen > s.lastNumber);
@@ -624,9 +649,10 @@ export function SeriesEndForm({
               hint={anual && thenNew ? 'Escolha o último ano com a forma de pagamento atual. Depois, você cadastra a nova a partir do ano seguinte.' : undefined}
               error={choice !== 'outro' ? (choiceError ?? undefined) : undefined}>
               {numbers.map((n) => (
-                <Chip key={n} label={chipLabel(n)} selected={choice === n} onPress={() => pick(n)} />
+                <Chip key={n} label={chipLabel(n)} accessibilityLabel={yearA11yLabel(chipLabel(n))} selected={choice === n} onPress={() => pick(n)} />
               ))}
-              {!parcelada && s.lastNumber !== null ? (
+              {/* "Mudar a forma de pagamento" sempre encerra: sem a opção de voltar a repetir. */}
+              {!parcelada && s.lastNumber !== null && !thenNew ? (
                 <Chip label="Sem data para terminar" selected={choice === 'sem'} onPress={() => pick('sem')} />
               ) : null}
               {parcelada && total !== null && s.lastNumber !== null && s.lastNumber < total ? (
@@ -649,8 +675,8 @@ export function SeriesEndForm({
               keyboardType="number-pad"
               inputMode="numeric"
               maxLength={anual ? 4 : 7}
-              error={choiceError ?? undefined}
-              hint={anual ? 'Útil quando você vai vender o carro ou o imóvel.' : 'Digite só os números.'}
+              error={choiceError ?? newTooLate ?? undefined}
+              hint={anual ? (otherYearHint ?? 'Útil quando você vai vender o carro ou o imóvel.') : 'Digite só os números.'}
             />
           ) : null}
 
@@ -660,9 +686,11 @@ export function SeriesEndForm({
                 {texts.serie_tem_pagamento_posterior}
               </Txt>
             </Banner>
-          ) : effect ? (
+          ) : newTooLate ? null : effect ? (
             <Banner tone="info" icon={Info} live={false}>
-              <Txt variant="label">{effect}</Txt>
+              <Txt variant="label" accessibilityLabel={yearA11yLabel(effect)}>
+                {effect}
+              </Txt>
             </Banner>
           ) : null}
 

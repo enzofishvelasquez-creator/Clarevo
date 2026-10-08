@@ -2,6 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { Check } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 
+import { yearA11yLabel } from '@/components/series-parts';
 import { Banner, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { colors, fonts } from '@/theme/tokens';
@@ -22,7 +23,7 @@ export function FlashBanner({ message }: { message: string | null }) {
   if (!message) return null;
   return (
     <Banner tone="sucesso" icon={Check}>
-      <Txt variant="label" color={colors.successText} style={{ fontFamily: fonts.bold }}>
+      <Txt variant="label" color={colors.successText} style={{ fontFamily: fonts.bold }} accessibilityLabel={yearA11yLabel(message)}>
         {message}
       </Txt>
     </Banner>

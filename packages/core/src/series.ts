@@ -213,6 +213,26 @@ export function annualLastMonth(input: Pick<SeriesInput, 'firstDueMonth' | 'firs
 }
 
 /**
+ * Maior número aceito em "Esta e as próximas" (mesmo limite de update_series_from, que recusa acima dele com
+ * numero_fora_da_serie): o último número; sem término, até 12 meses depois do mês atual (reajuste programado). Conta do
+ * ano sem término: até a última parcela do ano que começa até 12 meses depois do mês atual,
+ * (⌊max(0, meses(mês(1), mês(hoje) + 12))/12⌋ + 1)·k. Use também nos chips e no "Outro ano" da edição.
+ */
+export function editFromMaxNumber(s: SeriesShape & Pick<CommitmentSeries, 'lastNumber'>, today: IsoDate): number {
+  if (s.lastNumber !== null) return s.lastNumber;
+  const top = addMonths(monthOf(today), 12);
+  switch (s.kind) {
+    case 'mensal':
+    case 'parcelada':
+      return s.firstNumber + monthsBetween(s.firstDueMonth, top);
+    case 'anual':
+      return (Math.floor(Math.max(0, monthsBetween(seriesMonthOf(s, 1), top)) / 12) + 1) * partsOf(s);
+    default:
+      return unknownKind(s.kind);
+  }
+}
+
+/**
  * Janela de geração: do mês anterior ao seguinte a hoje (floor a top). Conta do ano: o ano inteiro entra quando a 1ª
  * parcela dele vence até o fim de annualTop (mês atual + 2), menos as parcelas antes de floor.
  */
@@ -439,7 +459,8 @@ export function seriesCaption(s: SeriesRange & Pick<CommitmentSeries, 'nature'>,
       return last < s.firstNumber ? `${head} · encerrado antes da parcela ${s.firstNumber}` : `${head} · parcelas ${s.firstNumber} a ${last}`;
     }
     case 'mensal': {
-      const head = `Todo mês, dia ${currentTerm(s, today).dueDay}`;
+      // "dia 5" nunca quebra a linha (espaço não separável).
+      const head = `Todo mês, dia ${currentTerm(s, today).dueDay}`;
       if (s.lastNumber === null) return `${head} · desde ${formatMonthYearBR(s.firstDueMonth)}`;
       if (s.lastNumber < s.firstNumber) return `${head} · encerrado antes da primeira conta`;
       return `${head} · ${formatMonthSpanBR(s.firstDueMonth, seriesMonthOf(s, s.lastNumber))}`;
@@ -451,7 +472,7 @@ export function seriesCaption(s: SeriesRange & Pick<CommitmentSeries, 'nature'>,
       const head =
         k === 1
           ? `Todo ano em ${formatDayMonth(seriesDueOn(s, n))}`
-          : `Todo ano, ${k} parcelas de ${formatMonthName(year.firstMonth)} a ${formatMonthName(year.lastMonth)}, dia ${requireTerm(s, n).dueDay}`;
+          : `Todo ano, ${k} parcelas de ${formatMonthName(year.firstMonth)} a ${formatMonthName(year.lastMonth)}, dia ${requireTerm(s, n).dueDay}`;
       const first = annualYearOf(s, s.firstNumber).label;
       if (s.lastNumber === null) return `${head} · desde ${first}`;
       if (s.lastNumber < s.firstNumber) return `${head} · encerrada antes da primeira conta`;
@@ -1570,22 +1591,31 @@ export interface AnnualReferenceSuggestion {
 /**
  * Sugestão de referência (nunca aplicada sozinha): o valor pago da parcela paga de maior número, se o ano dela não tem
  * parcela tirada, a série continua no ano seguinte e a vigência do ano seguinte tem outro valor. Lista:
- * listSeriesOccurrences. Para aplicar, o conjunto esperado é affectedByEditFrom(lista completa, s, fromNumber).
+ * listSeriesOccurrences ou a lista completa (mergeOccurrences). Para aplicar, o conjunto esperado é
+ * affectedByEditFrom(lista completa, s, fromNumber).
+ * Sem sugestão (null) também quando:
+ * - o banco ainda recusaria fromNumber (numero_fora_da_serie): conta do ano paga antes do mês da 1ª parcela do ano. A
+ *   sugestão aparece sozinha no mês em que esse ano começa (editFromMaxNumber);
+ * - alguma parcela do ano seguinte em aberto tem valor informado ou alterado só naquele ano (seriesOverride): aplicar
+ *   trocaria esse valor pela referência e o voltaria a estimado. A próxima sugestão nasce do pagamento desse ano.
  */
 export function suggestedAnnualReference(
   s: SeriesRange & Pick<CommitmentSeries, 'id' | 'nature' | 'skippedNumbers'>,
   occurrences: readonly Commitment[],
+  today: IsoDate,
 ): AnnualReferenceSuggestion | null {
   if (s.kind !== 'anual') return null;
   const k = partsOf(s);
-  const last = [...liveByNumber(s, occurrences).values()]
-    .filter((c) => c.status === 'quitado' && c.payment !== null)
-    .sort((a, b) => b.series!.number - a.series!.number)[0];
+  const live = [...liveByNumber(s, occurrences).values()];
+  const last = live.filter((c) => c.status === 'quitado' && c.payment !== null).sort((a, b) => b.series!.number - a.series!.number)[0];
   if (!last) return null;
   const paidYear = annualYearOf(s, last.series!.number);
   if (s.skippedNumbers.some((n) => n >= paidYear.firstNumber && n <= paidYear.lastNumber)) return null;
   const fromNumber = paidYear.lastNumber + 1;
-  if (s.lastNumber !== null && fromNumber > s.lastNumber) return null;
+  // Inclui o término (lastNumber) e o limite do reajuste programado de update_series_from.
+  if (fromNumber > editFromMaxNumber(s, today)) return null;
+  const nextLast = fromNumber + k - 1;
+  if (live.some((c) => c.status === 'aberto' && c.seriesOverride && c.series!.number >= fromNumber && c.series!.number <= nextLast)) return null;
   const amountCents = last.payment!.amountCents;
   const term = requireTerm(s, fromNumber);
   if (term.amountCents === amountCents) return null;

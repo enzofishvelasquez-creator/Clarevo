@@ -1,5 +1,6 @@
 import {
   ANNUAL_SERIES_ERROR_TEXT,
+  ERROR_TEXT,
   MAX_RECORD_CENTS,
   affectedByYear,
   annualYearErrorText,
@@ -22,7 +23,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
-import { seriesStyles as styles } from '@/components/series-parts';
+import { seriesStyles as styles, yearA11y, yearA11yLabel } from '@/components/series-parts';
+import { ErrorState } from '@/components/states';
 import { Banner, Button, Card, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { useInformSeriesYear, useSeriesOccurrences, useSeriesOpenOccurrences, useSeriesOperationKey } from '@/state/data';
@@ -60,6 +62,8 @@ export function YearInformForm({ series: s, number, contextId }: { series: Commi
   const validAmount = amount !== null && amount > 0 && amount <= MAX_RECORD_CENTS ? amount : undefined;
   const plan = list ? affectedByYear(list, s, number, 'informar', validAmount) : null;
   const yearLabel = plan && plan.ok ? plan.year.label : plan && plan.code === 'nada_a_mudar' ? plan.year.label : '';
+  /** Uma das listas falhou ao carregar: sem elas não há prévia nem envio; a pessoa tenta de novo ali mesmo. */
+  const loadFailed = !list && (occ.isError || openOcc.isError);
   const dirty = amountText.trim() !== '';
 
   usePreventRemove(dirty && !leaveTo, ({ data }) => {
@@ -168,6 +172,7 @@ export function YearInformForm({ series: s, number, contextId }: { series: Commi
 
   const term = currentTerm(s, today);
   const title = yearLabel ? `Informar o valor de ${yearLabel}` : 'Informar o valor do ano';
+  const fieldLabel = k > 1 ? `Valor de cada parcela de ${yearLabel}` : `Valor da conta de ${yearLabel}`;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -182,7 +187,9 @@ export function YearInformForm({ series: s, number, contextId }: { series: Commi
           </Txt>
         </Card>
 
-        {!plan ? (
+        {loadFailed ? (
+          <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={reloadLists} />
+        ) : !plan ? (
           <Txt color={colors.textSecondary}>Carregando as contas do ano…</Txt>
         ) : !plan.ok && plan.code !== 'nada_a_mudar' ? (
           <Card style={{ gap: space[3] }}>
@@ -191,10 +198,14 @@ export function YearInformForm({ series: s, number, contextId }: { series: Commi
           </Card>
         ) : (
           <Card style={{ gap: space[4] }}>
-            <Txt>Use o valor do carnê ou do boleto de {yearLabel}.</Txt>
+            <Txt accessibilityLabel={yearA11yLabel(`Use o valor do carnê ou do boleto de ${yearLabel}.`)}>
+              Use o valor do carnê ou do boleto de {yearLabel}.
+            </Txt>
             <TextField
               ref={amountRef}
-              label={k > 1 ? `Valor de cada parcela de ${yearLabel}` : `Valor da conta de ${yearLabel}`}
+              label={fieldLabel}
+              // Sempre um texto: o campo repassa o nome ao TextInput (undefined apagaria o rótulo).
+              accessibilityLabel={yearA11y(fieldLabel)}
               prefix="R$"
               value={amountText}
               onChangeText={(t) => {
@@ -216,7 +227,9 @@ export function YearInformForm({ series: s, number, contextId }: { series: Commi
             />
             {/* Prévia que muda a cada tecla: sem região viva, para não ser anunciada de novo a cada dígito. */}
             <Banner tone="info" icon={Info} live={false}>
-              <Txt variant="label">{plan.text}</Txt>
+              <Txt variant="label" accessibilityLabel={yearA11yLabel(plan.text)}>
+                {plan.text}
+              </Txt>
             </Banner>
           </Card>
         )}

@@ -15,6 +15,7 @@ import {
   affectedByEditFrom,
   affectedByEnd,
   affectedByYear,
+  annualLastYearHint,
   annualStartChoices,
   annualYearErrorText,
   annualYearRange,
@@ -121,6 +122,7 @@ describe('textos do core', () => {
       firstMonthRangeText(DEMO_TODAY, 'anual'),
       seriesErrorText('fim_invalido', DEMO_TODAY, 'anual'),
       annualYearErrorText('versao_desatualizada', '2027'),
+      annualLastYearHint(4, 11, 2026, '2027')!,
     ];
     for (const [k, month] of [
       [1, 1],
@@ -193,7 +195,7 @@ describe('textos do core', () => {
         if (end.ok && end.text) texts.push(end.text);
         // Pagar a primeira para gerar a sugestão de referência.
         await repo.payCommitment(newOperationKey(), open[0]!.id, open[0]!.version, { accountId, amountCents: 13000, paidOn: today, category: null });
-        const sug = suggestedAnnualReference((await repo.getSeries(s.id))!, await repo.listSeriesOccurrences(s.id));
+        const sug = suggestedAnnualReference((await repo.getSeries(s.id))!, await repo.listSeriesOccurrences(s.id), today);
         if (sug) texts.push(sug.text, sug.action);
       }
     }

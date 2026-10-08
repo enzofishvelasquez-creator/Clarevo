@@ -10,9 +10,11 @@ import {
   seriesEnded,
   seriesErrorText,
   suggestedAnnualReference,
+  type AnnualReferenceSuggestion,
   type AnnualYearSummary,
   type Commitment,
   type CommitmentSeries,
+  type EditFromPlan,
   type IsoDate,
   type YearPlan,
 } from '@clarevo/core';
@@ -24,7 +26,7 @@ import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-
 
 import { CommitmentRow } from '@/components/commitment-row';
 import { ConfirmDialog } from '@/components/dialog';
-import { yearA11y } from '@/components/series-parts';
+import { yearA11y, yearA11yLabel } from '@/components/series-parts';
 import { Button, Card, LinkButton, Txt } from '@/components/ui';
 import { useSeriesOperationKey, useSkipSeriesYear, useUpdateSeriesFrom } from '@/state/data';
 import { colors, fonts, motion, space, tabular } from '@/theme/tokens';
@@ -35,6 +37,7 @@ const rowExit = FadeOut.duration(motion.detail).reduceMotion(ReduceMotion.System
 const rowLayout = LinearTransition.duration(motion.detail).reduceMotion(ReduceMotion.System);
 
 type YearPlanOk = Extract<YearPlan, { ok: true }>;
+type EditFromPlanOk = Extract<EditFromPlan, { ok: true }>;
 
 /** Anos mostrados em "Ano a ano": até os 5 mais recentes, do primeiro ano da série ao próximo ainda previsto. */
 const MAX_YEARS = 5;
@@ -71,7 +74,8 @@ export function AnnualYears({
   const range = annualYearRange(s, today);
   const years: AnnualYearSummary[] = [];
   for (let a = Math.max(range.from, range.to - (MAX_YEARS - 1)); a <= range.to; a++) years.push(annualYearSummary(s, occurrences, open, a, today));
-  const suggestion = ended ? null : suggestedAnnualReference(s, occurrences);
+  // Com a lista completa: a sugestão some quando o ano seguinte já tem valor informado (seriesOverride).
+  const suggestion = ended ? null : suggestedAnnualReference(s, list, today);
 
   const skip = useSkipSeriesYear();
   const update = useUpdateSeriesFrom();
@@ -79,6 +83,11 @@ export function AnnualYears({
   const refKeys = useSeriesOperationKey();
   const [expanded, setExpanded] = useState<number[]>([]);
   const [confirm, setConfirm] = useState<{ plan: YearPlanOk; number: number } | null>(null);
+  /**
+   * "Usar R$ X a partir de 2028": o que muda e o que não muda, confirmado antes de gravar. A sugestão, o plano e a versão
+   * ficam congelados até a resposta (as listas podem recarregar com o diálogo aberto).
+   */
+  const [refConfirm, setRefConfirm] = useState<{ plan: EditFromPlanOk; suggestion: AnnualReferenceSuggestion; version: number } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const success = (text: string) => {
@@ -129,32 +138,45 @@ export function AnnualYears({
     }
   };
 
-  /** "Usar R$ 2.512,30 a partir de 2028": "esta e as próximas" a partir do 1º número do ano seguinte (pode ainda não existir). */
-  const applySuggestion = async () => {
+  /**
+   * "Usar R$ 2.512,30 a partir de 2028", passo 1: o conjunto que o banco vai conferir e o texto do que muda (as contas em
+   * aberto do ano seguinte e as próximas) e do que não muda, para a pessoa confirmar.
+   */
+  const askSuggestion = () => {
     if (!suggestion || busy) return;
     const plan = affectedByEditFrom(list, s, suggestion.fromNumber);
     if (!plan.ok) {
       onError(ANNUAL_SERIES_ERROR_TEXT.inicio_em_conta_paga);
       return;
     }
-    const snapshot = JSON.stringify([s.id, s.version, suggestion.fromNumber, suggestion.edit, plan.affected]);
-    const doneText = `Referência atualizada: ${suggestion.action.replace(/^Usar /, '')}.`;
+    setRefConfirm({ plan, suggestion, version: s.version });
+  };
+
+  /** Passo 2, confirmado: "esta e as próximas" a partir do 1º número do ano seguinte (pode ainda não existir). */
+  const applySuggestion = async () => {
+    if (!refConfirm || busy) return;
+    const { plan, suggestion: chosen, version } = refConfirm;
+    const snapshot = JSON.stringify([s.id, version, chosen.fromNumber, chosen.edit, plan.affected]);
+    const doneText = `Referência atualizada: ${chosen.action.replace(/^Usar /, '')}.`;
     setBusy(true);
     try {
       if (refKeys.hasPending()) {
         const saved = await refKeys.findSaved();
         if (saved?.action === 'alterar_serie') {
           refKeys.settled();
+          setRefConfirm(null);
           success(doneText);
           return;
         }
       }
       const key = refKeys.keyFor(snapshot);
       try {
-        await update.mutateAsync({ key, id: s.id, version: s.version, fromNumber: suggestion.fromNumber, affected: plan.affected, input: suggestion.edit });
+        await update.mutateAsync({ key, id: s.id, version, fromNumber: chosen.fromNumber, affected: plan.affected, input: chosen.edit });
         refKeys.settled();
+        setRefConfirm(null);
         success(doneText);
       } catch (e) {
+        setRefConfirm(null);
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
           refKeys.refused();
           onError(seriesErrorText(e.code, today, 'anual'));
@@ -165,6 +187,7 @@ export function AnnualYears({
         onError(ANNUAL_SERIES_ERROR_TEXT.salvar_falhou);
       }
     } catch {
+      setRefConfirm(null);
       onError(ANNUAL_SERIES_ERROR_TEXT.salvar_falhou);
     } finally {
       setBusy(false);
@@ -203,13 +226,15 @@ export function AnnualYears({
                 {y.texts.line}
               </Txt>
               {y.texts.paidBefore ? (
-                <Txt variant="caption" color={colors.textSecondary}>
+                <Txt variant="caption" color={colors.textSecondary} accessibilityLabel={yearA11yLabel(y.texts.paidBefore)}>
                   {y.texts.paidBefore}
                 </Txt>
               ) : null}
               {y.texts.missing ? (
                 <View style={{ gap: space[1] }}>
-                  <Txt variant="label">{y.texts.missing}</Txt>
+                  <Txt variant="label" accessibilityLabel={yearA11yLabel(y.texts.missing)}>
+                    {y.texts.missing}
+                  </Txt>
                   <LinkButton label="Anotar gasto" style={styles.inlineLink} onPress={() => router.push('/registro/novo')} />
                 </View>
               ) : null}
@@ -245,6 +270,7 @@ export function AnnualYears({
                   {inform?.ok ? (
                     <Button
                       label={`Informar o valor de ${label}`}
+                      accessibilityLabel={`Informar o valor de ${yearA11y(label)}`}
                       tone="soft"
                       style={styles.action}
                       onPress={() => router.push({ pathname: '/gastos-fixos/[id]/informar', params: { id: s.id, numero: String(n) } })}
@@ -253,6 +279,7 @@ export function AnnualYears({
                   {remove?.ok ? (
                     <Button
                       label={k > 1 ? `Tirar as parcelas de ${label} em aberto` : `Não houve em ${label}`}
+                      accessibilityLabel={k > 1 ? `Tirar as parcelas de ${yearA11y(label)} em aberto` : `Não houve em ${yearA11y(label)}`}
                       tone="ghost"
                       style={styles.action}
                       disabled={busy}
@@ -268,10 +295,18 @@ export function AnnualYears({
 
       {suggestion ? (
         <Card style={{ gap: space[2] }}>
-          <Txt variant="label" style={tabular}>
+          <Txt variant="label" style={tabular} accessibilityLabel={yearA11yLabel(suggestion.text)}>
             {suggestion.text}
           </Txt>
-          <Button label={suggestion.action} tone="soft" busy={busy} busyLabel="Salvando…" onPress={applySuggestion} />
+          <Button
+            label={suggestion.action}
+            accessibilityLabel={yearA11yLabel(suggestion.action)}
+            tone="soft"
+            busy={busy && refConfirm !== null}
+            busyLabel="Salvando…"
+            disabled={busy}
+            onPress={askSuggestion}
+          />
         </Card>
       ) : null}
 
@@ -284,10 +319,26 @@ export function AnnualYears({
           busy={busy}
           onCancel={() => setConfirm(null)}
           onConfirm={doSkip}>
-          <Txt color={colors.textSecondary}>{confirm.plan.text}</Txt>
+          <Txt color={colors.textSecondary} accessibilityLabel={yearA11yLabel(confirm.plan.text)}>
+            {confirm.plan.text}
+          </Txt>
           <Txt color={colors.textSecondary}>
             {k > 1 ? 'Os valores deixam' : 'O valor deixa'} de contar em Ainda a pagar. Recebido, Pago e a diferença do mês não mudam.
           </Txt>
+        </ConfirmDialog>
+      ) : null}
+
+      {refConfirm ? (
+        <ConfirmDialog
+          visible
+          title={`${refConfirm.suggestion.action}?`}
+          cancelLabel="Voltar"
+          confirmLabel="Usar como referência"
+          confirmTone="brand"
+          busy={busy}
+          onCancel={() => setRefConfirm(null)}
+          onConfirm={applySuggestion}>
+          <Txt accessibilityLabel={yearA11yLabel(refConfirm.plan.text)}>{refConfirm.plan.text}</Txt>
         </ConfirmDialog>
       ) : null}
     </>

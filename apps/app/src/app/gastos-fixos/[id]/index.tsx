@@ -38,7 +38,7 @@ import { CommitmentRow } from '@/components/commitment-row';
 import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
-import { estimateText, InstallmentBar, occurrenceMonthLabel } from '@/components/series-parts';
+import { estimateText, InstallmentBar, occurrenceMonthLabel, yearA11yLabel } from '@/components/series-parts';
 import { ErrorState } from '@/components/states';
 import { Banner, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
@@ -157,7 +157,7 @@ export default function DetalheGastoFixo() {
               <FlashBanner message={notice} />
               {actionError ? (
                 <Banner tone="erro" icon={AlertCircle}>
-                  <Txt variant="label" color={colors.error}>
+                  <Txt variant="label" color={colors.error} accessibilityLabel={yearA11yLabel(actionError)}>
                     {actionError}
                   </Txt>
                 </Banner>

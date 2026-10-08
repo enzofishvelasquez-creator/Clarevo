@@ -26,6 +26,7 @@ import {
   affectedByEditFrom,
   affectedByEnd,
   affectedByYear,
+  editFromMaxNumber,
   occurrencesToMaterialize,
   seriesCountsTowardLimit,
   seriesMonthOf,
@@ -560,12 +561,7 @@ export class MemoryRepository implements RecordsRepository {
       if (s.version !== expectedVersion) throw new RepoError('versao_desatualizada');
       // Até o último número; sem término, até 12 meses depois do mês atual (reajuste programado). Conta do ano: até a
       // última parcela do ano que começa até 12 meses depois do mês atual.
-      const month = monthOf(this.opts.today());
-      const max =
-        s.lastNumber ??
-        (s.kind === 'anual'
-          ? (Math.floor(Math.max(0, monthsBetween(seriesMonthOf(s, 1), addMonths(month, 12))) / 12) + 1) * s.partsPerYear!
-          : s.firstNumber + monthsBetween(s.firstDueMonth, month) + 12);
+      const max = editFromMaxNumber(s, this.opts.today());
       if (!Number.isSafeInteger(fromNumber) || fromNumber < s.firstNumber || fromNumber > max) throw new RepoError('numero_fora_da_serie');
       const code = seriesTermError(norm);
       if (code) throw new RepoError(code);

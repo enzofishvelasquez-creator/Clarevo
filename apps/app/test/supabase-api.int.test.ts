@@ -1453,10 +1453,10 @@ describe('API real: contas do ano', () => {
   it('passo 17: sugestão do IPVA aplicada com update_series_from a partir de 2028; o IPTU, com parcelas tiradas, fica sem sugestão', async () => {
     const repo = at(FEB10);
     ipva = (await repo.getSeries(ipva.id))!;
-    const suggestion = suggestedAnnualReference(ipva, await repo.listSeriesOccurrences(ipva.id));
+    const suggestion = suggestedAnnualReference(ipva, await repo.listSeriesOccurrences(ipva.id), FEB10);
     if (!suggestion) throw new Error('sem sugestão');
     expect([suggestion.amountCents, suggestion.fromNumber, suggestion.fromLabel, suggestion.paidYear.label]).toEqual([251230, 2, '2028', '2027']);
-    expect(suggestedAnnualReference(iptu, await repo.listSeriesOccurrences(iptu.id))).toBeNull();
+    expect(suggestedAnnualReference(iptu, await repo.listSeriesOccurrences(iptu.id), FEB10)).toBeNull();
     // A parcela 2 ainda não existe: conjunto esperado vazio, como o reajuste programado do Ciclo A.
     const plan = affectedByEditFrom(await full(repo, ipva.id), ipva, suggestion.fromNumber);
     if (!plan.ok) throw new Error(plan.code);
@@ -1570,6 +1570,70 @@ describe('API real: contas do ano', () => {
     );
     expect(annualYearSummary(s, occ, open, 1, LONG).texts.missing).toBe('2028: parcelas 1 a 3 sem conta registrada.');
     await checkedToPay(ANA, anaCtx, '2028-06', LONG);
+  });
+
+  it('sugestão de referência (Ana): paga antes do ano começar, só aparece quando o banco aceita; com o ano seguinte informado, some', async () => {
+    const space = (await ana.getSpace())!;
+    const anaCtx = space.personalContextId;
+    const pay = (amountCents: Cents, paidOn: IsoDate): PaymentInput => ({ accountId: space.accounts[0]!.id, amountCents, paidOn, category: null });
+    // Matrícula da escola de 10/12, desde 2028, referência R$ 1.200,00 que muda; criada e paga adiantada em 15/10/2028.
+    const OCT28 = '2028-10-15';
+    const created = await repoFor(ANA, OCT28).createSeries(
+      newOperationKey(),
+      anaCtx,
+      annual('Matrícula da escola', 1200, 1, '2028-12', 10, 'variavel', 'Educação'),
+    );
+    const id = created.series.id;
+    expect(created.occurrences.map((c) => [c.series!.number, c.dueOn])).toEqual([[1, '2028-12-10']]);
+    const n1 = created.occurrences[0]!;
+    await repoFor(ANA, OCT28).payCommitment(newOperationKey(), n1.id, n1.version, pay(125000, OCT28));
+    const edit: SeriesEditInput = { nature: 'conta', description: 'Matrícula da escola', category: 'Educação', amountCents: 125000, amountMode: 'variavel', dueDay: 10 };
+    // Antes de dezembro de 2028, o banco recusa "a partir de 2029" (numero_fora_da_serie), e o core não sugere.
+    for (const today of [OCT28, '2028-11-30']) {
+      const repo = repoFor(ANA, today);
+      const s = (await repo.getSeries(id))!;
+      expect(suggestedAnnualReference(s, await full(repo, id), today)).toBeNull();
+      expect(await err(repo.updateSeriesFrom(newOperationKey(), id, s.version, 2, [], edit))).toBe('numero_fora_da_serie');
+    }
+    // Em 01/12/2028 a sugestão aparece e o banco aceita.
+    const DEC28 = '2028-12-01';
+    const dec = repoFor(ANA, DEC28);
+    const s = (await dec.getSeries(id))!;
+    const suggestion = suggestedAnnualReference(s, await dec.listSeriesOccurrences(id), DEC28);
+    if (!suggestion) throw new Error('sem sugestão');
+    expect([suggestion.fromNumber, suggestion.edit, suggestion.text]).toEqual([
+      2,
+      edit,
+      'Em 2028 você pagou R$ 1.250,00. Usar esse valor como referência a partir de 2029?',
+    ]);
+    const plan = affectedByEditFrom(await full(dec, id), s, suggestion.fromNumber);
+    if (!plan.ok) throw new Error(plan.code);
+    const applied = await dec.updateSeriesFrom(newOperationKey(), id, s.version, suggestion.fromNumber, plan.affected, suggestion.edit);
+    expect(applied.series.terms.map((t) => [t.fromNumber, t.amountCents])).toEqual([
+      [1, 120000],
+      [2, 125000],
+    ]);
+
+    // 2029 paga com R$ 1.300,00 (sugestão para 2030 em aberto); em 01/10/2030, 2030 entra e é informada com R$ 1.350,00.
+    await repoFor(ANA, '2029-10-01').syncSeriesOccurrences(anaCtx);
+    const DEC29 = '2029-12-10';
+    const n2 = byNumber(await repoFor(ANA, DEC29).listSeriesOccurrences(id), 2);
+    expect([n2.dueOn, n2.amountCents, n2.amountIsEstimate]).toEqual(['2029-12-10', 125000, true]);
+    await repoFor(ANA, DEC29).payCommitment(newOperationKey(), n2.id, n2.version, pay(130000, DEC29));
+    const OCT30 = '2030-10-01';
+    const oct30 = repoFor(ANA, OCT30);
+    await oct30.syncSeriesOccurrences(anaCtx);
+    let current = (await oct30.getSeries(id))!;
+    expect(suggestedAnnualReference(current, await full(oct30, id), OCT30)).toMatchObject({ fromNumber: 3, amountCents: 130000 });
+    const year = affectedByYear(await full(oct30, id), current, 3, 'informar', 135000);
+    if (!year.ok) throw new Error(year.code);
+    await oct30.informSeriesYear(newOperationKey(), id, 3, year.affected, 135000);
+    current = (await oct30.getSeries(id))!;
+    // Aplicar agora trocaria os R$ 1.350,00 informados pela referência (o banco muda sempre a conta escolhida).
+    expect(suggestedAnnualReference(current, await full(oct30, id), OCT30)).toBeNull();
+    expect(suggestedAnnualReference(current, await oct30.listSeriesOccurrences(id), OCT30)).toBeNull();
+    const stale = affectedByEditFrom(await full(oct30, id), current, 3);
+    expect(stale.ok && stale.chosen).toMatchObject({ amountCents: 135000, amountIsEstimate: false, seriesOverride: true });
   });
 });
 

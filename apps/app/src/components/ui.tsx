@@ -26,6 +26,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { yearA11y, yearA11yLabel } from '@/lib/years';
 import { colors, fonts, motion, radius, space, tabular, type } from '@/theme/tokens';
 
 type Variant = keyof typeof type;
@@ -221,6 +222,8 @@ export const TextField = forwardRef<
   const [revealed, setRevealed] = useState(false);
   const id = useId().replace(/:/g, '');
   const describedBy = error ? `${id}-erro` : hint ? `${id}-dica` : undefined;
+  // Dica ou erro com um ano como "2026/2027": lidos "2026 a 2027" (spec 1.7).
+  const spokenHint = error ?? hint;
   // Atributos ARIA que o React Native Web repassa ao campo na web.
   const aria = { 'aria-invalid': Boolean(error), 'aria-describedby': describedBy } as object;
   return (
@@ -237,7 +240,7 @@ export const TextField = forwardRef<
         <TextInput
           ref={ref}
           accessibilityLabel={label}
-          accessibilityHint={error ?? hint}
+          accessibilityHint={spokenHint === undefined ? undefined : yearA11y(spokenHint)}
           placeholderTextColor={colors.placeholder}
           secureTextEntry={secureTextEntry && !revealed}
           {...aria}
@@ -264,13 +267,19 @@ export const TextField = forwardRef<
         ) : null}
       </View>
       {hint && !error ? (
-        <Txt variant="caption" color={colors.textSecondary} nativeID={`${id}-dica`}>
+        <Txt variant="caption" color={colors.textSecondary} nativeID={`${id}-dica`} accessibilityLabel={yearA11yLabel(hint)}>
           {hint}
         </Txt>
       ) : null}
       {error ? (
         <Animated.View entering={FadeIn.duration(150).reduceMotion(ReduceMotion.System)}>
-          <Txt variant="label" color={colors.error} accessibilityLiveRegion="polite" accessibilityRole="alert" nativeID={`${id}-erro`}>
+          <Txt
+            variant="label"
+            color={colors.error}
+            accessibilityLiveRegion="polite"
+            accessibilityRole="alert"
+            nativeID={`${id}-erro`}
+            accessibilityLabel={yearA11yLabel(error)}>
             {error}
           </Txt>
         </Animated.View>

@@ -1,9 +1,10 @@
-import { formatBRL, formatMonthName, formatMonthYearBR, monthOf, type Cents, type IsoDate, type IsoMonth, type SeriesKind } from '@clarevo/core';
+import { annualLastYearHint, formatBRL, formatMonthName, formatMonthYearBR, monthOf, type Cents, type IsoDate, type IsoMonth, type SeriesKind } from '@clarevo/core';
 import { Check } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { spaceKeyPress, Txt } from '@/components/ui';
+import { yearA11y, yearA11yLabel } from '@/lib/years';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
 /** Nome da série sem artigo: "gasto fixo", "parcelamento", "conta do ano". */
@@ -32,14 +33,18 @@ export const MONTH_FULL = [
   'Dezembro',
 ] as const;
 
-/** "2026/2027" lido como "2026 a 2027", em qualquer ponto do texto (datas como 10/02/2027 não mudam). */
-export const yearA11y = (text: string) => text.replace(/\b(\d{4})\/(\d{4})\b/g, '$1 a $2');
+/** "2026/2027" lido como "2026 a 2027" (lib/years.ts, também usado pelos campos de texto de ui.tsx). */
+export { yearA11y, yearA11yLabel };
 
-/** Nome acessível só quando o texto tem um ano como "2026/2027" (undefined: o leitor de tela lê o próprio texto). */
-export const yearA11yLabel = (text: string): string | undefined => {
-  const spoken = yearA11y(text);
-  return spoken === text ? undefined : spoken;
-};
+/**
+ * Dica do campo "Último ano (AAAA)" de uma conta do ano que atravessa dezembro (como novembro a fevereiro): o ano digitado
+ * é o do começo do período, como nos rótulos "2026/2027". null quando o período cabe num ano só.
+ * month: mês da 1ª parcela do ano (1 a 12); k: parcelas por ano; example: ano do exemplo.
+ */
+export function lastYearHint(month: number, k: number, example: number): string | null {
+  // Mesmo texto que o core acrescenta ao erro fim_invalido do último ano.
+  return annualLastYearHint(k, month, example);
+}
 
 /** "outubro" → "Outubro". */
 export const cap = (text: string) => (text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : text);
@@ -81,7 +86,7 @@ export function ChoiceGroup({ label, hint, error, children }: { label: string; h
           {hint}
         </Txt>
       ) : null}
-      <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel={label}>
+      <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel={yearA11y(label)}>
         {children}
       </View>
       {error ? (
@@ -106,12 +111,13 @@ export function CheckOption({ label, hint, checked, onPress }: { label: string; 
       {...spaceKeyPress(onPress)}
       style={(st) => [styles.check, (st as { focused?: boolean }).focused && styles.focusRing]}>
       <View style={[styles.box, checked && styles.boxChecked]}>{checked ? <Check size={16} color={colors.textOnBrand} strokeWidth={3} /> : null}</View>
+      {/* Na web, o nome da caixa vem do texto (rótulo e dica): cada parte com "2026/2027" leva o nome falado. */}
       <View style={{ flex: 1, gap: 2 }}>
-        <Txt variant="label" style={{ fontFamily: fonts.bold }}>
+        <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityLabel={yearA11yLabel(label)}>
           {label}
         </Txt>
         {hint ? (
-          <Txt variant="caption" color={colors.textSecondary}>
+          <Txt variant="caption" color={colors.textSecondary} accessibilityLabel={yearA11yLabel(hint)}>
             {hint}
           </Txt>
         ) : null}

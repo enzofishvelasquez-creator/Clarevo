@@ -1,8 +1,8 @@
 import { ERROR_TEXT, formatDayHeader, formatMonthBR, sortNewestFirst, type FinancialRecord } from '@clarevo/core';
 import { router } from 'expo-router';
-import { Minus, Plus } from 'lucide-react-native';
+import { CalendarClock, ChevronRight, Minus, Plus, Repeat, type LucideIcon } from 'lucide-react-native';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
 import { FamilyNotLinked } from '@/components/family-state';
@@ -13,7 +13,7 @@ import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, Chip, Money, Screen, Skeleton, Txt } from '@/components/ui';
 import { useMonthRecords, useSpace, useView } from '@/state/data';
 import { useSession } from '@/state/session';
-import { colors, fonts, motion, space } from '@/theme/tokens';
+import { colors, fonts, motion, radius, space } from '@/theme/tokens';
 
 type Filter = 'todos' | 'receita' | 'despesa';
 const FILTERS: { value: Filter; label: string }[] = [
@@ -32,6 +32,22 @@ function groupByDay(list: FinancialRecord[]) {
   }
   return groups;
 }
+
+/** Atalhos para o que vence e o que se repete, com nome visível (só no contexto Pessoal). */
+const SHORTCUTS: { icon: LucideIcon; title: string; caption: string; open: () => void }[] = [
+  {
+    icon: CalendarClock,
+    title: 'Contas a pagar',
+    caption: 'Vencidas, a vencer e próximos meses',
+    open: () => router.push('/a-pagar'),
+  },
+  {
+    icon: Repeat,
+    title: 'Gastos fixos e parcelamentos',
+    caption: 'Aluguel, escola, financiamentos e contas do ano',
+    open: () => router.push('/gastos-fixos'),
+  },
+];
 
 const rowExit = FadeOut.duration(motion.detail).reduceMotion(ReduceMotion.System);
 const rowLayout = LinearTransition.duration(motion.detail).reduceMotion(ReduceMotion.System);
@@ -76,6 +92,17 @@ export default function MovimentacoesScreen() {
                   onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'receita' } })}
                 />
               </View>
+
+              <Card style={styles.shortcuts}>
+                <Txt variant="title" accessibilityRole="header" aria-level={2}>
+                  Organizar
+                </Txt>
+                <View>
+                  {SHORTCUTS.map((sc, i) => (
+                    <ShortcutRow key={sc.title} {...sc} last={i === SHORTCUTS.length - 1} />
+                  ))}
+                </View>
+              </Card>
 
               {s ? (
                 <View style={styles.totals}>
@@ -138,6 +165,35 @@ export default function MovimentacoesScreen() {
   );
 }
 
+/** Linha de atalho: ícone, nome, legenda curta e seta; nome acessível com a legenda. */
+function ShortcutRow({ icon: Icon, title, caption, open, last }: (typeof SHORTCUTS)[number] & { last: boolean }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${caption}`}
+      onPress={open}
+      style={(st) => [
+        styles.shortcut,
+        !last && styles.divider,
+        st.pressed && { opacity: 0.7 },
+        (st as { focused?: boolean }).focused && styles.focusRing,
+      ]}>
+      <View style={styles.shortcutIcon}>
+        <Icon size={20} color={colors.brand} strokeWidth={2.25} aria-hidden />
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>
+          {title}
+        </Txt>
+        <Txt variant="caption" color={colors.textSecondary}>
+          {caption}
+        </Txt>
+      </View>
+      <ChevronRight size={20} color={colors.textSecondary} aria-hidden />
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space[3] },
   action: { flexGrow: 1, flexBasis: 220, alignSelf: 'auto' },
@@ -146,4 +202,9 @@ const styles = StyleSheet.create({
   totalValue: { fontFamily: fonts.extrabold, fontSize: 18, lineHeight: 26 },
   filters: { flexDirection: 'row', gap: space[2], flexWrap: 'wrap' },
   day: { fontFamily: fonts.bold, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: space[2] },
+  shortcuts: { gap: space[1], paddingVertical: space[4] },
+  shortcut: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: 10, minHeight: 56 },
+  divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
+  shortcutIcon: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.brandTint, alignItems: 'center', justifyContent: 'center' },
+  focusRing: { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid', outlineOffset: 2 } as object,
 });

@@ -7,12 +7,12 @@ import {
   NO_CATEGORY_LABEL,
   SERIES_ERROR_TEXT,
   SERIES_NATURE_LABEL,
-  addMonths,
   affectedByEditFrom,
   annualYearOf,
   centsToInput,
   charCount,
   currentTerm,
+  editFromMaxNumber,
   fieldForErrorCode,
   formatDateBR,
   formatDayMonth,
@@ -24,7 +24,6 @@ import {
   maskMonthBR,
   mergeOccurrences,
   monthOf,
-  monthsBetween,
   numberAtOrAfter,
   numberOfMonth,
   parseBRL,
@@ -159,11 +158,7 @@ export function SeriesEditForm({
   const currentMonth = monthOf(today);
   // Mesmo limite do banco para séries sem término: até 12 meses depois do mês atual (conta do ano: até a última parcela
   // do ano que começa até 12 meses depois do mês atual).
-  const maxNumber =
-    s.lastNumber ??
-    (anual
-      ? (Math.floor(Math.max(0, monthsBetween(seriesMonthOf(s, 1), addMonths(currentMonth, 12))) / 12) + 1) * k
-      : s.firstNumber + monthsBetween(s.firstDueMonth, currentMonth) + 12);
+  const maxNumber = editFromMaxNumber(s, today);
 
   /** Conta do ano: "2027" (cota única) ou "Parcela 3 de 2027". */
   const annualName = (n: number) => {

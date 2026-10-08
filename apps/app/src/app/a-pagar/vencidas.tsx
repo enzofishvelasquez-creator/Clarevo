@@ -32,7 +32,7 @@ import { ChoiceDialog } from '@/components/choice-dialog';
 import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
-import { CheckOption } from '@/components/series-parts';
+import { CheckOption, yearA11y, yearA11yLabel } from '@/components/series-parts';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Banner, Button, Card, Chip, Screen, Skeleton, Txt } from '@/components/ui';
 import { totalChange } from '@/lib/highlight';
@@ -325,6 +325,21 @@ export default function ContasVencidas() {
   const target = pending && (pending.type === 'pagar' || pending.type === 'tirar') ? pending.commitment : null;
   const yearTarget = pending?.type === 'tirar-ano' ? pending.group : null;
   const yearTargetPlan = yearTarget ? yearPlanFor(yearTarget) : null;
+  // O que sai de fato: todas as parcelas do ano em aberto, também as que ainda não venceram (o grupo mostra só as vencidas).
+  const yearTargetSummary =
+    yearTarget && yearTargetPlan
+      ? (() => {
+          const n = yearTargetPlan.changing.length;
+          const total = yearTargetPlan.changing.reduce((acc, c) => acc + c.amountCents, 0);
+          const approximate = yearTargetPlan.changing.some((c) => c.amountIsEstimate);
+          const notDue = n - yearTargetPlan.changing.filter((c) => c.dueOn < today).length;
+          return {
+            line: `${yearTarget.title} · ${n === 1 ? '1 parcela' : `${n} parcelas`} · ${approximate ? 'cerca de ' : ''}${formatBRL(total)}`,
+            notDue:
+              notDue === 0 ? null : notDue === 1 ? 'Inclui 1 parcela que ainda não venceu.' : `Inclui ${notDue} parcelas que ainda não venceram.`,
+          };
+        })()
+      : null;
   const batchTotal = chosen.reduce((acc, c) => acc + c.amountCents, 0);
   const batchLabel =
     chosen.length === 0
@@ -350,7 +365,7 @@ export default function ContasVencidas() {
       <View style={styles.actions}>
         <Button
           label="Já paguei"
-          accessibilityLabel={`Já paguei ${billName(c, today)}`}
+          accessibilityLabel={`Já paguei ${yearA11y(billName(c, today))}`}
           tone="soft"
           disabled={busy || !account}
           style={styles.action}
@@ -362,7 +377,7 @@ export default function ContasVencidas() {
         />
         <Button
           label="Não houve"
-          accessibilityLabel={`Não houve ${billName(c, today)}`}
+          accessibilityLabel={`Não houve ${yearA11y(billName(c, today))}`}
           tone="ghost"
           disabled={busy}
           style={styles.action}
@@ -421,14 +436,24 @@ export default function ContasVencidas() {
                 return (
                   <Animated.View key={`ano-${group.seriesId}-${group.index}`} exiting={rowExit} layout={rowLayout} style={!last && styles.divider}>
                     <View style={styles.groupHead}>
-                      <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} accessibilityRole="header" aria-level={3}>
+                      <Txt
+                        variant="label"
+                        style={{ fontFamily: fonts.bold, fontSize: 15 }}
+                        accessibilityRole="header"
+                        aria-level={3}
+                        accessibilityLabel={yearA11yLabel(`${group.title} · ${group.count} parcelas vencidas`)}>
                         {group.title} · {group.count} parcelas vencidas
                       </Txt>
                       <View style={styles.actions}>
                         {group.allFixed ? (
                           <Button
                             label={allSelected ? 'Selecionadas' : `Selecionar as ${group.count}`}
-                            accessibilityLabel={`Selecionar as ${group.count} parcelas de ${group.description} de ${group.label.replace('/', ' a ')}`}
+                            // O nome falado começa pelo texto visível ("Selecionadas" depois de selecionar todas).
+                            accessibilityLabel={
+                              allSelected
+                                ? `Selecionadas: as ${group.count} parcelas de ${group.description} de ${yearA11y(group.label)}`
+                                : `Selecionar as ${group.count} parcelas de ${group.description} de ${yearA11y(group.label)}`
+                            }
                             icon={allSelected ? Check : ListChecks}
                             tone="soft"
                             disabled={busy || allSelected}
@@ -438,7 +463,7 @@ export default function ContasVencidas() {
                         ) : null}
                         <Button
                           label={`Não houve em ${group.label}`}
-                          accessibilityLabel={`Não houve ${group.description} em ${group.label.replace('/', ' a ')}`}
+                          accessibilityLabel={`Não houve ${group.description} em ${yearA11y(group.label)}`}
                           tone="ghost"
                           disabled={busy || !yearPlanFor(group)}
                           style={styles.action}
@@ -504,7 +529,7 @@ export default function ContasVencidas() {
         </ChoiceDialog>
       ) : null}
 
-      {yearTarget && yearTargetPlan ? (
+      {yearTarget && yearTargetPlan && yearTargetSummary ? (
         <ConfirmDialog
           visible
           title={
@@ -517,11 +542,13 @@ export default function ContasVencidas() {
           busy={busy}
           onCancel={() => setPending(null)}
           onConfirm={() => doSkipYear(yearTarget)}>
-          <Txt style={[{ fontFamily: fonts.bold }, tabular]}>
-            {yearTarget.title} · {yearTarget.count} parcelas · {yearTarget.approximate ? 'cerca de ' : ''}
-            {formatBRL(yearTarget.totalCents)}
+          <Txt style={[{ fontFamily: fonts.bold }, tabular]} accessibilityLabel={yearA11yLabel(yearTargetSummary.line)}>
+            {yearTargetSummary.line}
           </Txt>
-          <Txt color={colors.textSecondary}>{yearTargetPlan.text}</Txt>
+          {yearTargetSummary.notDue ? <Txt color={colors.textSecondary}>{yearTargetSummary.notDue}</Txt> : null}
+          <Txt color={colors.textSecondary} accessibilityLabel={yearA11yLabel(yearTargetPlan.text)}>
+            {yearTargetPlan.text}
+          </Txt>
         </ConfirmDialog>
       ) : null}
 

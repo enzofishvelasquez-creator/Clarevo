@@ -369,8 +369,8 @@ export interface SeriesDraft {
   /** Todo ano: parcelas por ano, "1" para cota única. Ignorado nos outros. */
   partsPerYearText: string;
   /**
-   * Todo mês: último mês (MM/AAAA). Todo ano: "Último ano" (AAAA, o rótulo do ano). Vazio para "Sem data para terminar".
-   * Ignorado no parcelado.
+   * Todo mês: último mês (MM/AAAA). Todo ano: "Último ano" (AAAA, o ano da primeira parcela do último ano: 2026 para
+   * "2026/2027"; dica em annualLastYearHint). Vazio para "Sem data para terminar". Ignorado no parcelado.
    */
   lastMonthText: string;
   category: string | null;
@@ -402,6 +402,21 @@ export const SERIES_FIELD_ORDER: SeriesField[] = [
 ];
 
 const intText = (text: string): number | null => (/^\s*\d{1,9}\s*$/.test(text) ? Number(text.trim()) : null);
+
+/**
+ * Dica do campo "Último ano (AAAA)" da conta do ano (cadastro e "Outro ano" ao encerrar) quando o ano dela atravessa
+ * dezembro (k parcelas a partir do mês `month`, de 1 a 12, com a última no ano seguinte). Nesse caso o rótulo do ano é
+ * "2026/2027" e o ano digitado é o da primeira parcela (D-029), o que a dica diz com o ano digitado (4 dígitos, de
+ * firstYear a firstYear + 49) ou, sem ele, com firstYear, o ano da primeira parcela do primeiro ano da série:
+ * "Digite o ano em que começa o último período, como 2027 para 2027/2028.". null quando o ano não atravessa dezembro
+ * (o app mantém a dica dele). Para uma série s: month e firstYear de seriesMonthOf(s, 1).
+ */
+export function annualLastYearHint(k: number, month: number, firstYear: number, yearText = ''): string | null {
+  if (!isInt(k) || k < 2 || k > PARTS_PER_YEAR_MAX || !isInt(month) || month < 1 || month > 12 || month + k - 1 <= 12) return null;
+  const typed = /^\d{4}$/.test(yearText.trim()) ? Number(yearText.trim()) : null;
+  const y = typed !== null && typed >= firstYear && typed - firstYear <= ANNUAL_MAX_YEARS - 1 ? typed : firstYear;
+  return `Digite o ano em que começa o último período, como ${y} para ${y}/${y + 1}.`;
+}
 
 /**
  * Formulário de série com as mesmas regras e a mesma ordem do banco. errors traz um texto por campo;
@@ -469,6 +484,12 @@ export function validateSeriesDraft(
         const years = Number(yearText) - firstYear;
         if (years < 0 || years > ANNUAL_MAX_YEARS - 1) fail('fim_invalido', 'lastMonthText');
         else lastMonth = annualLastMonth(input, Number(yearText));
+      }
+      // Ano que atravessa dezembro ("2026/2027"): o erro ocupa o lugar da dica, então diz também qual ano digitar.
+      if (errors.lastMonthText && first !== null && kOk && nOk) {
+        const anchor = addMonths(first, -(n! - 1));
+        const hint = annualLastYearHint(partsPerYear!, Number(anchor.slice(5, 7)), Number(anchor.slice(0, 4)));
+        if (hint) errors.lastMonthText = `${errors.lastMonthText} ${hint}`;
       }
     }
   } else if (parcelada) {

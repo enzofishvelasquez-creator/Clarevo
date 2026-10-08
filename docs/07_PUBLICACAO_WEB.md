@@ -38,4 +38,4 @@ Os dois são publicados sozinhos a cada atualização da branch `main` do GitHub
 
 1. **Domínio e e-mail próprios:** os modelos de e-mail em português só podem ser editados com SMTP próprio. O envio padrão do Supabase manda poucos e-mails por hora e só para membros da organização. Registrar um domínio do Clarevo, configurar um provedor de e-mail (por exemplo, Resend ou Amazon SES) e então aplicar os textos de `docs/05_SUPABASE.md`.
 2. **Plano Pro do Supabase** antes de pessoas reais usarem (o plano grátis pausa o projeto sem uso e não tem cópia de segurança).
-3. **Migrações novas:** cada migração que entra na `main` precisa ser colada no SQL Editor do Supabase, na ordem dos nomes, antes ou junto da publicação (ver `docs/05_SUPABASE.md`).
+3. **Migrações novas:** cada migração que entra na `main` precisa ser colada no SQL Editor do Supabase, na ordem dos nomes, antes ou junto da publicação (ver `docs/05_SUPABASE.md`). Em 08/10/2026, `20261008000002_contas_do_ano.sql` (Ciclo A3, contas do ano) ainda não tinha sido colada no Supabase do `clarevo`: colar antes de o Ciclo A3 entrar na `main`.

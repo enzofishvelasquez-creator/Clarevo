@@ -6,6 +6,7 @@ import {
   PAYMENT_ERROR_TEXT,
   PAYMENT_FIELD_ORDER,
   addDays,
+  annualYearLabelOf,
   centsToInput,
   fieldForErrorCode,
   formatBRL,
@@ -39,7 +40,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
-import { CheckOption } from '@/components/series-parts';
+import { CheckOption, yearA11yLabel } from '@/components/series-parts';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { totalChange } from '@/lib/highlight';
@@ -110,6 +111,8 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
   const [busy, setBusy] = useState(false);
   /** "Paguei o ano todo de uma vez" marcada. */
   const [wholeYear, setWholeYear] = useState(false);
+  /** A caixa foi desmarcada sozinha: as outras parcelas do ano deixaram de estar em aberto (em outro aparelho). */
+  const [wholeGone, setWholeGone] = useState(false);
   const [leaveTo, setLeaveTo] = useState<null | (() => void)>(null);
   const [confirmDiscard, setConfirmDiscard] = useState<null | (() => void)>(null);
 
@@ -128,6 +131,18 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
     yearParts && yearSeries.data && yearOcc.data && yearOpen.data
       ? wholeYearPayment(mergeOccurrences(yearOcc.data, yearOpen.data), yearSeries.data, shown)
       : null;
+  /** As três listas carregadas: só então "nenhuma outra parcela em aberto" é um fato, e não uma falha ao carregar. */
+  const yearListsLoaded = yearParts && yearSeries.isSuccess && yearOcc.isSuccess && yearOpen.isSuccess;
+  // Textos da caixa do último plano conhecido: marcada, ela continua na tela (e pode ser desmarcada) mesmo se uma lista
+  // falhar ao recarregar; enviar fica bloqueado até as listas voltarem.
+  const [lastBox, setLastBox] = useState<{ label: string; hint: string; yearLabel: string } | null>(null);
+  const boxLabel = whole?.label;
+  const boxHint = whole?.hint;
+  const boxYear = whole?.year.label;
+  useEffect(() => {
+    if (boxLabel !== undefined && boxHint !== undefined && boxYear !== undefined) setLastBox({ label: boxLabel, hint: boxHint, yearLabel: boxYear });
+  }, [boxLabel, boxHint, boxYear]);
+  const box = whole ? { label: whole.label, hint: whole.hint, yearLabel: whole.year.label } : wholeYear ? lastBox : null;
   const account = personal.accounts.find((a) => a.id === draft.accountId) ?? personal.accounts[0];
 
   // Sair com alterações não salvas pede confirmação (voltar, gesto, botão do sistema).
@@ -138,6 +153,16 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
   useEffect(() => {
     if (leaveTo) leaveTo();
   }, [leaveTo]);
+
+  // Listas carregadas e nenhuma outra parcela do ano em aberto (pagas ou tiradas em outro aparelho): a caixa sai da tela
+  // desmarcada, com um aviso, em vez de bloquear o pagamento sem ter como desmarcar.
+  const hasWhole = whole !== null;
+  useEffect(() => {
+    if (wholeYear && yearListsLoaded && !hasWhole) {
+      setWholeYear(false);
+      setWholeGone(true);
+    }
+  }, [wholeYear, yearListsLoaded, hasWhole]);
 
   const leave = (fn: () => void) => setLeaveTo(() => fn);
   const goBack = () => (router.canGoBack() ? router.back() : router.replace(`/a-pagar/${c.id}`));
@@ -269,6 +294,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
     // "Paguei o ano todo": o plano é o das listas atuais, congelado no envio; sem as listas, nada é enviado.
     const plan = wholeYear ? whole : null;
     if (wholeYear && !plan) {
+      yearSeries.refetch();
       yearOcc.refetch();
       yearOpen.refetch();
       setBanner(COMMITMENT_ERROR_TEXT.carregar_falhou);
@@ -350,6 +376,12 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
   const valid = amount !== null && amount > 0 && amount <= MAX_RECORD_CENTS && paidOn !== null && paidOn <= today;
   const yesterday = addDays(today, -1);
   const overdue = shown.dueOn < today;
+  const sumText = (w: WholeYearPayment) =>
+    `Soma das ${w.others.length + 1} parcelas de ${w.year.label} em aberto: ${w.approximate ? 'cerca de ' : ''}${formatBRL(w.openTotalCents)}. Informe o valor que saiu da conta, com desconto, se houver.`;
+  const afterText = (w: WholeYearPayment) =>
+    `Depois, ${w.others.length === 1 ? 'a outra parcela' : `as outras ${w.others.length} parcelas`} de ${w.year.label} em aberto ${w.others.length === 1 ? 'sai' : 'saem'} de Contas a pagar.`;
+  const goneLabel = shown.series?.kind === 'anual' ? annualYearLabelOf(shown) : null;
+  const goneText = `As outras parcelas${goneLabel ? ` de ${goneLabel}` : ''} não estão mais em aberto, então a opção Paguei o ano todo foi desmarcada. Confira o valor pago.`;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -391,21 +423,38 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
             Gasto já pago · {account?.name}
           </Txt>
 
-          {whole ? (
+          {box ? (
             <View style={{ gap: space[1] }}>
-              <CheckOption label={whole.label} hint={whole.hint} checked={wholeYear} onPress={() => setWholeYear((w) => !w)} />
-              {wholeYear ? (
-                <Txt variant="caption" color={colors.textSecondary} style={{ paddingLeft: 24 + space[3] }}>
-                  Soma das {whole.others.length + 1} parcelas de {whole.year.label} em aberto: {whole.approximate ? 'cerca de ' : ''}
-                  {formatBRL(whole.openTotalCents)}. Informe o valor que saiu da conta, com desconto, se houver.
+              <CheckOption
+                label={box.label}
+                hint={box.hint}
+                checked={wholeYear}
+                onPress={() => {
+                  setWholeGone(false);
+                  setWholeYear((w) => !w);
+                }}
+              />
+              {wholeYear && whole ? (
+                <Txt variant="caption" color={colors.textSecondary} style={{ paddingLeft: 24 + space[3] }} accessibilityLabel={yearA11yLabel(sumText(whole))}>
+                  {sumText(whole)}
+                </Txt>
+              ) : wholeYear ? (
+                <Txt variant="caption" color={colors.error} style={{ paddingLeft: 24 + space[3] }}>
+                  {`Não foi possível carregar as parcelas de ${box.yearLabel}. Toque em Confirmar pagamento para tentar de novo ou desmarque a opção.`}
                 </Txt>
               ) : null}
             </View>
+          ) : wholeGone ? (
+            <Banner tone="info" icon={Info}>
+              <Txt variant="label" accessibilityLabel={yearA11yLabel(goneText)}>
+                {goneText}
+              </Txt>
+            </Banner>
           ) : null}
 
           <TextField
             ref={refs.amountText}
-            label={wholeYear && whole ? 'Valor total pago' : 'Valor pago'}
+            label={wholeYear ? 'Valor total pago' : 'Valor pago'}
             prefix="R$"
             value={draft.amountText}
             onChangeText={(t) => set('amountText', t)}
@@ -491,9 +540,8 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
                 sai de Ainda a pagar.
               </Txt>
               {wholeYear && whole ? (
-                <Txt variant="label">
-                  Depois, {whole.others.length === 1 ? 'a outra parcela' : `as outras ${whole.others.length} parcelas`} de {whole.year.label} em aberto
-                  {whole.others.length === 1 ? ' sai' : ' saem'} de Contas a pagar.
+                <Txt variant="label" accessibilityLabel={yearA11yLabel(afterText(whole))}>
+                  {afterText(whole)}
                 </Txt>
               ) : amount !== shown.amountCents && !shown.amountIsEstimate ? (
                 <Txt variant="label">O valor pago é diferente do previsto ({formatBRL(shown.amountCents)}). Pago usa o valor pago.</Txt>

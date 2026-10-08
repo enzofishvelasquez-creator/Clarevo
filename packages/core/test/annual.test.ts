@@ -12,6 +12,7 @@ import {
   affectedByEnd,
   affectedByYear,
   annualLastMonth,
+  annualLastYearHint,
   annualStartChoices,
   annualYearErrorText,
   annualYearLabel,
@@ -21,6 +22,7 @@ import {
   annualYearSummary,
   createDemoRepository,
   currentTerm,
+  editFromMaxNumber,
   fieldForErrorCode,
   findSeriesConflicts,
   firstMonthBounds,
@@ -194,9 +196,9 @@ describe('contas do ano: mês, vencimento e numeração (1.3)', () => {
     expect(annualYearLabel(anual(), 1)).toBe('2028');
 
     expect(seriesCaption(ipva(), DEMO_TODAY)).toBe('Todo ano em 20/01 · desde 2027');
-    expect(seriesCaption(anual(), DEMO_TODAY)).toBe('Todo ano, 10 parcelas de fevereiro a novembro, dia 10 · desde 2027');
-    expect(seriesCaption(seguro(), DEMO_TODAY)).toBe('Todo ano, 4 parcelas de novembro a fevereiro, dia 31 · desde 2026/2027');
-    expect(seriesCaption(anual({ lastNumber: 30 }))).toBe('Todo ano, 10 parcelas de fevereiro a novembro, dia 10 · de 2027 a 2029');
+    expect(seriesCaption(anual(), DEMO_TODAY)).toBe('Todo ano, 10 parcelas de fevereiro a novembro, dia\u00a010 · desde 2027');
+    expect(seriesCaption(seguro(), DEMO_TODAY)).toBe('Todo ano, 4 parcelas de novembro a fevereiro, dia\u00a031 · desde 2026/2027');
+    expect(seriesCaption(anual({ lastNumber: 30 }))).toBe('Todo ano, 10 parcelas de fevereiro a novembro, dia\u00a010 · de 2027 a 2029');
     expect(seriesCaption(matricula({ lastNumber: 1 }))).toBe('Todo ano em 10/12 · em 2026');
     expect(seriesCaption(ipva({ lastNumber: 0 }))).toBe('Todo ano em 20/01 · encerrada antes da primeira conta');
 
@@ -464,6 +466,54 @@ describe('contas do ano: cadastro (validação na ordem do banco)', () => {
     expect(seriesPreview({ ...input(), kind: 'mensal', partsPerYear: null, firstDueMonth: '2026-10' }, DEMO_TODAY).savedText).toBeNull();
   });
 
+  it('"Último ano" de conta do ano que atravessa dezembro: o ano da primeira parcela, com dica e erro que dizem isso', () => {
+    expect(annualLastYearHint(4, 11, 2026)).toBe('Digite o ano em que começa o último período, como 2026 para 2026/2027.');
+    expect(annualLastYearHint(4, 11, 2026, ' 2027 ')).toBe('Digite o ano em que começa o último período, como 2027 para 2027/2028.');
+    expect(annualLastYearHint(4, 11, 2026, '2075')).toBe('Digite o ano em que começa o último período, como 2075 para 2075/2076.');
+    for (const typed of ['2025', '2076', '20', '', 'abcd']) {
+      expect(annualLastYearHint(4, 11, 2026, typed)).toBe('Digite o ano em que começa o último período, como 2026 para 2026/2027.');
+    }
+    expect(annualLastYearHint(2, 12, 2027)).toBe('Digite o ano em que começa o último período, como 2027 para 2027/2028.');
+    // Sem ambiguidade (cota única, fevereiro a novembro, janeiro a dezembro, novembro e dezembro) ou números inválidos: null.
+    for (const [k, month] of [[1, 12], [10, 2], [12, 1], [2, 11], [0, 11], [13, 11], [4, 0], [4, 13], [1.5, 11]] as const) {
+      expect(annualLastYearHint(k, month, 2026)).toBeNull();
+    }
+
+    // Seguro de 4 parcelas a partir de novembro: "2026" termina em fevereiro de 2027; "2027", em fevereiro de 2028.
+    const seguroDraft = draft({ description: 'Seguro residencial', partsPerYearText: '4', firstMonthText: '11/2026', dueDayText: '15' });
+    const v2026 = validateSeriesDraft({ ...seguroDraft, lastMonthText: '2026' }, DEMO_TODAY);
+    expect(v2026.ok && v2026.input.lastMonth).toBe('2027-02');
+    const v2027 = validateSeriesDraft({ ...seguroDraft, lastMonthText: '2027' }, DEMO_TODAY);
+    expect(v2027.ok && v2027.input.lastMonth).toBe('2028-02');
+    expect(v2027.ok && seriesPreview(v2027.input, DEMO_TODAY).text).toContain('de 2026/2027 a 2027/2028');
+    // O erro ocupa o lugar da dica: também diz qual ano digitar. O código continua fim_invalido.
+    for (const lastMonthText of ['2025', '2076', '27', '02/2027']) {
+      const v = validateSeriesDraft({ ...seguroDraft, lastMonthText }, DEMO_TODAY);
+      expect(v.ok ? null : [v.code, v.errors.lastMonthText]).toEqual([
+        'fim_invalido',
+        'O último ano precisa ser igual ou depois do primeiro, em até 50 anos. Digite o ano em que começa o último período, como 2026 para 2026/2027.',
+      ]);
+    }
+    // Ano já começado (próxima a pagar: parcela 3 de 2026/2027, em janeiro de 2027): o primeiro ano continua sendo 2026.
+    const started = { ...seguroDraft, firstMonthText: '01/2027', firstNumberText: '3' };
+    const s2026 = validateSeriesDraft({ ...started, lastMonthText: '2026' }, '2027-01-05');
+    expect(s2026.ok && s2026.input).toMatchObject({ firstDueMonth: '2027-01', firstNumber: 3, lastMonth: '2027-02' });
+    const s2025 = validateSeriesDraft({ ...started, lastMonthText: '2025' }, '2027-01-05');
+    expect(s2025.ok ? null : s2025.errors.lastMonthText).toBe(
+      'O último ano precisa ser igual ou depois do primeiro, em até 50 anos. Digite o ano em que começa o último período, como 2026 para 2026/2027.',
+    );
+    // Sem atravessar dezembro, o erro não muda.
+    const iptu = validateSeriesDraft(draft({ lastMonthText: '2026' }), DEMO_TODAY);
+    expect(iptu.ok ? null : iptu.errors.lastMonthText).toBe(ANNUAL_SERIES_ERROR_TEXT.fim_invalido);
+    // Legenda: "dia 15" nunca quebra a linha (espaço não separável).
+    const v = validateSeriesDraft(seguroDraft, DEMO_TODAY);
+    if (!v.ok) throw new Error(v.code);
+    expect(seriesCaption(seguro({}), DEMO_TODAY)).not.toMatch(/dia \d/);
+    expect(seriesCaption({ ...seguro(), terms: [{ ...seguro().terms[0]!, dueDay: 15 }] }, DEMO_TODAY)).toBe(
+      'Todo ano, 4 parcelas de novembro a fevereiro, dia\u00a015 · desde 2026/2027',
+    );
+  });
+
   it('chips de início: "Primeiro ano" e "Próxima parcela a pagar em 2026"', () => {
     expect(annualStartChoices(1, 1, 20, DEMO_TODAY)).toEqual({
       years: [
@@ -679,22 +729,99 @@ describe('contas do ano: totais, ano a ano, informar, tirar e sugestão', () => 
   it('suggestedAnnualReference: R$ 2.512,30 a partir de 2028; nada com parcelas tiradas, já aplicada ou sem ano seguinte', () => {
     const s = ipva();
     const paid = [paidOcc(s, 1, 251230, '2027-01-20')];
-    const sug = suggestedAnnualReference(s, paid)!;
+    const T = '2027-02-10';
+    const sug = suggestedAnnualReference(s, paid, T)!;
     expect([sug.amountCents, sug.fromNumber, sug.fromLabel, sug.paidYear.label]).toEqual([251230, 2, '2028', '2027']);
     expect(sug.text).toBe('Em 2027 você pagou R$ 2.512,30. Usar esse valor como referência a partir de 2028?');
     expect(sug.action).toBe('Usar R$ 2.512,30 a partir de 2028');
     expect(sug.edit).toEqual({ nature: 'conta', description: 'IPVA', category: 'Transporte', amountCents: 251230, amountMode: 'variavel', dueDay: 20 });
-    expect(suggestedAnnualReference(anual({ skippedNumbers: range(2, 10) }), [paidOcc(anual(), 1, 170910, '2027-02-10')])).toBeNull();
-    expect(suggestedAnnualReference({ ...s, terms: [...s.terms, { ...s.terms[0]!, fromNumber: 2, amountCents: 251230 }] }, paid)).toBeNull();
-    expect(suggestedAnnualReference(ipva({ lastNumber: 1 }), paid)).toBeNull();
-    expect(suggestedAnnualReference(s, [occ(s, 1)])).toBeNull();
-    const k10 = suggestedAnnualReference(anual(), [paidOcc(anual(), 9, 19000, '2027-10-10'), paidOcc(anual(), 10, 19500, '2027-11-10')])!;
+    expect(suggestedAnnualReference(anual({ skippedNumbers: range(2, 10) }), [paidOcc(anual(), 1, 170910, '2027-02-10')], T)).toBeNull();
+    expect(suggestedAnnualReference({ ...s, terms: [...s.terms, { ...s.terms[0]!, fromNumber: 2, amountCents: 251230 }] }, paid, T)).toBeNull();
+    expect(suggestedAnnualReference(ipva({ lastNumber: 1 }), paid, T)).toBeNull();
+    expect(suggestedAnnualReference(s, [occ(s, 1)], T)).toBeNull();
+    const k10 = suggestedAnnualReference(anual(), [paidOcc(anual(), 9, 19000, '2027-10-10'), paidOcc(anual(), 10, 19500, '2027-11-10')], '2027-11-10')!;
     expect([k10.amountCents, k10.fromNumber, k10.text, k10.action]).toEqual([
       19500,
       11,
       'Em 2027 você pagou R$ 195,00 na parcela 10. Usar esse valor como referência de cada parcela a partir de 2028?',
       'Usar R$ 195,00 por parcela a partir de 2028',
     ]);
+  });
+
+  it('editFromMaxNumber: o mesmo limite de update_series_from (término, reajuste programado e ano que começa até mês + 12)', () => {
+    // Sem término: até 12 meses depois do mês atual (gasto fixo) ou até o fim do ano que começa nele (conta do ano).
+    const mensal = { ...anual(), kind: 'mensal' as const, firstDueMonth: '2026-10', partsPerYear: null };
+    expect(editFromMaxNumber(mensal, DEMO_TODAY)).toBe(13);
+    expect(editFromMaxNumber({ ...mensal, lastNumber: 3 }, DEMO_TODAY)).toBe(3);
+    expect(editFromMaxNumber(ipva(), '2026-12-31')).toBe(1);
+    expect(editFromMaxNumber(ipva(), '2027-01-01')).toBe(2);
+    expect(editFromMaxNumber(anual(), '2027-01-31')).toBe(10);
+    expect(editFromMaxNumber(anual(), '2027-02-01')).toBe(20);
+    expect(editFromMaxNumber(seguro(), '2026-10-31')).toBe(4);
+    expect(editFromMaxNumber(seguro(), '2026-11-01')).toBe(8);
+    // Conta do ano que começa daqui a mais de 12 meses (como a "Taxa futura" de 45_contas_do_ano.sql): o primeiro ano.
+    expect(editFromMaxNumber(anual({ firstDueMonth: '2028-01', partsPerYear: 2 }), DEMO_TODAY)).toBe(2);
+    expect(editFromMaxNumber(ipva({ lastNumber: 5 }), '2026-12-31')).toBe(5);
+  });
+
+  it('suggestedAnnualReference: paga antes do ano começar, só aparece quando o banco aceita (numero_fora_da_serie)', () => {
+    // Matrícula de 10/12 desde 2026, R$ 1.200,00 fixo, paga adiantada em 15/10/2026 com R$ 1.250,00.
+    const m = matricula();
+    const early = [paidOcc(m, 1, 125000, '2026-10-15')];
+    for (const today of ['2026-10-15', '2026-11-15', '2026-11-30']) {
+      expect(suggestedAnnualReference(m, early, today)).toBeNull();
+      expect(editFromMaxNumber(m, today)).toBe(1);
+    }
+    const dec = suggestedAnnualReference(m, early, '2026-12-01')!;
+    expect([dec.fromNumber, dec.text]).toEqual([2, 'Em 2026 você pagou R$ 1.250,00. Usar esse valor como referência a partir de 2027?']);
+    expect(dec.fromNumber).toBeLessThanOrEqual(editFromMaxNumber(m, '2026-12-01'));
+
+    // IPVA de 2027 pago em 15/12/2026; IPVA de 2028 pago em 05/11/2027: a sugestão espera o mês de janeiro.
+    const s = ipva();
+    expect(suggestedAnnualReference(s, [paidOcc(s, 1, 251230, '2026-12-15')], '2026-12-15')).toBeNull();
+    expect(suggestedAnnualReference(s, [paidOcc(s, 1, 251230, '2026-12-15')], '2027-01-01')!.fromNumber).toBe(2);
+    const twoYears = [paidOcc(s, 2, 260000, '2027-11-05'), paidOcc(s, 1, 251230, '2027-01-20')];
+    expect(suggestedAnnualReference(s, twoYears, '2027-11-05')).toBeNull();
+    expect(suggestedAnnualReference(s, twoYears, '2027-12-31')).toBeNull();
+    expect(suggestedAnnualReference(s, twoYears, '2028-01-01')).toMatchObject({
+      fromNumber: 3,
+      text: 'Em 2028 você pagou R$ 2.600,00. Usar esse valor como referência a partir de 2029?',
+    });
+
+    // IPTU de 10 parcelas: a parcela 1 de 2027 paga em 15/12/2026 só sugere a partir de fevereiro de 2027.
+    const t = anual();
+    const p1 = [paidOcc(t, 1, 19000, '2026-12-15')];
+    expect(suggestedAnnualReference(t, p1, '2027-01-31')).toBeNull();
+    expect(suggestedAnnualReference(t, p1, '2027-02-01')!.fromNumber).toBe(11);
+  });
+
+  it('suggestedAnnualReference: sem sugestão quando o valor do ano seguinte já foi informado (não sobrescreve)', () => {
+    const s = ipva();
+    const n1 = paidOcc(s, 1, 251230, '2027-01-20');
+    const T = '2027-12-01';
+    // 2028 criada pela referência, estimada: a sugestão continua.
+    expect(suggestedAnnualReference(s, [occ(s, 2), n1], T)!.fromNumber).toBe(2);
+    // 2028 informada (R$ 2.650,00, alterada só naquele ano): aplicar a voltaria a estimada com R$ 2.512,30.
+    const informed = occ(s, 2, { amountCents: 265000, amountIsEstimate: false, seriesOverride: true });
+    expect(suggestedAnnualReference(s, [informed, n1], T)).toBeNull();
+    expect(suggestedAnnualReference(s, mergeOccurrences([informed, n1], [informed]), T)).toBeNull();
+    // Valor fixo (não estimado) sem alteração: a sugestão vale.
+    const fixed = ipva();
+    const fixedS = { ...fixed, terms: [{ ...fixed.terms[0]!, amountMode: 'fixo' as const }] };
+    expect(suggestedAnnualReference(fixedS, [occ(fixedS, 2), paidOcc(fixedS, 1, 251230, '2027-01-20')], T)).not.toBeNull();
+    // Alterada só num ano depois do seguinte: update_series_from não a muda, e a sugestão continua.
+    const later = [occ(s, 3, { amountCents: 270000, amountIsEstimate: false, seriesOverride: true }), occ(s, 2), n1];
+    expect(suggestedAnnualReference(s, later, '2028-11-01')!.fromNumber).toBe(2);
+
+    // IPTU: 2027 paga com R$ 189,90 por parcela e 2028 informada com R$ 195,00; também com uma só parcela de 2028 alterada.
+    const t = anual();
+    const paid2027 = range(1, 10).map((n) => paidOcc(t, n, 18990, `2027-${String(n + 1).padStart(2, '0')}-10`));
+    const open2028 = range(11, 20).map((n) => occ(t, n));
+    expect(suggestedAnnualReference(t, [...open2028, ...paid2027], T)!.fromNumber).toBe(11);
+    const informed2028 = open2028.map((c) => ({ ...c, amountCents: 19500, amountIsEstimate: false, seriesOverride: true }));
+    expect(suggestedAnnualReference(t, [...informed2028, ...paid2027], T)).toBeNull();
+    const one = open2028.map((c) => (c.series!.number === 15 ? { ...c, amountCents: 20000, seriesOverride: true } : c));
+    expect(suggestedAnnualReference(t, [...one, ...paid2027], T)).toBeNull();
   });
 
   it('groupAnnualLater: o seguro de 4 parcelas vira um grupo; a Matrícula fica como conta', () => {
@@ -959,7 +1086,7 @@ describe('contas do ano: MemoryRepository', () => {
 
     // 17. Sugestão do IPVA aceita: a partir de 2 (ainda não criada), R$ 2.512,30, muda, esperadas []. IPTU sem sugestão.
     const ipvaNow = (await repo.getSeries(ipvaW.series.id))!;
-    const sug = suggestedAnnualReference(ipvaNow, await repo.listSeriesOccurrences(ipvaNow.id))!;
+    const sug = suggestedAnnualReference(ipvaNow, await repo.listSeriesOccurrences(ipvaNow.id), today())!;
     expect([sug.fromNumber, sug.amountCents, sug.text]).toEqual([2, 251230, 'Em 2027 você pagou R$ 2.512,30. Usar esse valor como referência a partir de 2028?']);
     const editPlan = affectedByEditFrom(await occurrences(ipvaNow.id), ipvaNow, sug.fromNumber);
     expect(editPlan.ok && editPlan.affected).toEqual([]);
@@ -968,8 +1095,8 @@ describe('contas do ano: MemoryRepository', () => {
       [1, 240000, 'variavel'],
       [2, 251230, 'variavel'],
     ]);
-    expect(suggestedAnnualReference(accepted.series, await repo.listSeriesOccurrences(ipvaNow.id))).toBeNull();
-    expect(suggestedAnnualReference((await repo.getSeries(iptuId))!, await repo.listSeriesOccurrences(iptuId))).toBeNull();
+    expect(suggestedAnnualReference(accepted.series, await repo.listSeriesOccurrences(ipvaNow.id), today())).toBeNull();
+    expect(suggestedAnnualReference((await repo.getSeries(iptuId))!, await repo.listSeriesOccurrences(iptuId), today())).toBeNull();
     await step([0, 1709.1]);
 
     // 18. 01/11/2027: IPVA n2 20/01/2028, R$ 2.512,30 estimado; Matrícula n2 10/12/2027.
@@ -1005,6 +1132,66 @@ describe('contas do ano: MemoryRepository', () => {
     expect(seriesNumbers(await occurrences(ipvaW.series.id))).toEqual([2, 1]);
     expect(await byNumber(matW.series.id, 3)).toMatchObject({ dueOn: '2028-12-10' });
     expect(await repo.syncSeriesOccurrences(ctx)).toEqual({ created: 0, createdOverdue: 0 });
+    repo.checkInvariants();
+  });
+
+  it('sugestão de referência: aparece só quando updateSeriesFrom aceita; com o ano seguinte informado, some', async () => {
+    const { repo, ctx, annualInput, payment, occurrences, byNumber, setToday, today } = await freshRepo();
+    // Matrícula de 10/12 desde 2026, R$ 1.200,00 fixo, paga adiantada em 15/10/2026 com R$ 1.250,00.
+    const { series: m } = await repo.createSeries(newOperationKey(), ctx, annualInput('Matrícula', 120000, 1, 10, '2026-12', 'fixo', 'Educação'));
+    setToday('2026-10-15');
+    const n1 = await byNumber(m.id, 1);
+    await repo.payCommitment(newOperationKey(), n1.id, n1.version, payment(125000, '2026-10-15'));
+    const edit = { nature: 'conta' as const, description: 'Matrícula', category: 'Educação', amountCents: 125000, amountMode: 'fixo' as const, dueDay: 10 };
+    for (const d of ['2026-10-15', '2026-11-15', '2026-11-30']) {
+      setToday(d);
+      const s = (await repo.getSeries(m.id))!;
+      expect(suggestedAnnualReference(s, await repo.listSeriesOccurrences(s.id), today())).toBeNull();
+      const plan = affectedByEditFrom(await occurrences(s.id), s, 2);
+      if (!plan.ok) throw new Error(plan.code);
+      await expect(repo.updateSeriesFrom(newOperationKey(), s.id, s.version, 2, plan.affected, edit)).rejects.toMatchObject({ code: 'numero_fora_da_serie' });
+    }
+    setToday('2026-12-01');
+    const mDec = (await repo.getSeries(m.id))!;
+    const sug = suggestedAnnualReference(mDec, await repo.listSeriesOccurrences(m.id), today())!;
+    expect([sug.fromNumber, sug.edit]).toEqual([2, edit]);
+    const plan = affectedByEditFrom(await occurrences(m.id), mDec, sug.fromNumber);
+    if (!plan.ok) throw new Error(plan.code);
+    const w = await repo.updateSeriesFrom(newOperationKey(), m.id, mDec.version, sug.fromNumber, plan.affected, sug.edit);
+    expect(w.series.terms.map((t) => [t.fromNumber, t.amountCents])).toEqual([
+      [1, 120000],
+      [2, 125000],
+    ]);
+
+    // IPVA: 2027 paga com R$ 2.512,30, sugestão não aplicada; em 01/12/2027, 2028 informada com R$ 2.650,00.
+    setToday('2027-01-20');
+    const { series: ipvaS } = await repo.createSeries(newOperationKey(), ctx, annualInput('IPVA', 240000, 1, 20, '2027-01', 'variavel', 'Transporte'));
+    const i1 = await byNumber(ipvaS.id, 1);
+    await repo.payCommitment(newOperationKey(), i1.id, i1.version, payment(251230, '2027-01-20'));
+    setToday('2027-12-01');
+    await repo.syncSeriesOccurrences(ctx);
+    expect(suggestedAnnualReference(ipvaS, await occurrences(ipvaS.id), today())!.fromNumber).toBe(2);
+    const year = affectedByYear(await occurrences(ipvaS.id), ipvaS, 2, 'informar', 265000);
+    if (!year.ok) throw new Error(year.code);
+    await repo.informSeriesYear(newOperationKey(), ipvaS.id, 2, year.affected, 265000);
+    const after = (await repo.getSeries(ipvaS.id))!;
+    expect(suggestedAnnualReference(after, await repo.listSeriesOccurrences(after.id), today())).toBeNull();
+    expect(suggestedAnnualReference(after, await occurrences(after.id), today())).toBeNull();
+    // Se o app ainda tiver uma sugestão antiga na tela, o plano mostra a troca: chosen alterada só naquele ano.
+    const stale = affectedByEditFrom(await occurrences(after.id), after, 2);
+    expect(stale.ok && [stale.chosen?.seriesOverride, stale.text]).toEqual([
+      true,
+      'Vai mudar: 2028 (20/01). Não muda: 2027 (paga). As contas criadas depois já seguem o novo valor. ' +
+        'A conta de 2028 tinha o valor informado ou alterado só naquele ano (R$ 2.650,00) e passa a seguir o novo valor.',
+    ]);
+    // Paga 2028, a sugestão volta, agora pelo valor de 2028.
+    setToday('2028-01-20');
+    const i2 = await byNumber(ipvaS.id, 2);
+    await repo.payCommitment(newOperationKey(), i2.id, i2.version, payment(265000, '2028-01-20'));
+    expect(suggestedAnnualReference(after, await repo.listSeriesOccurrences(after.id), today())).toMatchObject({
+      fromNumber: 3,
+      text: 'Em 2028 você pagou R$ 2.650,00. Usar esse valor como referência a partir de 2029?',
+    });
     repo.checkInvariants();
   });
 
@@ -1254,7 +1441,7 @@ describe('demonstração com contas do ano', () => {
     const annuals = list.filter((s) => s.kind === 'anual');
     expect(annuals.map((s) => [currentTerm(s).description, s.partsPerYear, s.firstDueMonth, seriesCaption(s, DEMO_TODAY)])).toEqual([
       ['IPVA', 1, '2027-01', 'Todo ano em 20/01 · desde 2027'],
-      ['IPTU', 10, '2027-02', 'Todo ano, 10 parcelas de fevereiro a novembro, dia 10 · desde 2027'],
+      ['IPTU', 10, '2027-02', 'Todo ano, 10 parcelas de fevereiro a novembro, dia\u00a010 · desde 2027'],
     ]);
     for (const s of annuals) expect(await repo.listSeriesOccurrences(s.id)).toEqual([]);
     const totals: number[] = [];

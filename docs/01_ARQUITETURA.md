@@ -1,6 +1,6 @@
 # Arquitetura
 
-08/10/2026 · versão 0.5 (primeiro ciclo, contas a pagar, gastos fixos e contas do ano)
+08/10/2026 · versão 0.6 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano e primeiros passos)
 
 ## Escolhas (aprovadas)
 
@@ -27,7 +27,7 @@ apps/app/src/
     gastos-fixos/[id]/informar
     composicao, quem-ve, conta, explicacao/[tema]
   components/           interface (logo, campos, botões, formulários de registro, conta a pagar, pagamento, gasto fixo e conta do ano, "Ano a ano", estados)
-  lib/                  autenticação (Supabase e demonstração), conteúdos de Aprender
+  lib/                  autenticação (Supabase e demonstração), conteúdos de Aprender, situação do card Primeiros passos (só no aparelho)
   state/                sessão, dados (consultas e gravações), contexto e mês
   theme/                tokens de cor, tipografia, movimento e vetores do logo
 packages/core/          regras financeiras, validação, repositório em memória, testes
@@ -86,7 +86,7 @@ pessoa ──< vínculo (permissões por ação) >── contexto (pessoal | fam
 - **Funções novas:** `inform_series_year(chave, série, número, conjunto, valor)` e `skip_series_year(chave, série, número, conjunto)`, só para séries anuais (`tipo_invalido` nas outras). O número é qualquer parcela do ano, de `first_number` em diante; o ano vai de ⌊(n - 1) / k⌋ × k + 1 a ⌊(n - 1) / k⌋ × k + k. Afetadas: ao informar, as parcelas vivas do ano em aberto e estimadas, que recebem o valor, perdem a marca de estimado, ficam com `series_override` e somam 1 à versão; ao tirar, todas as vivas em aberto do ano, excluídas com `series_skipped` (entram em `skipped_numbers` e nunca voltam). O conjunto `[{id, version}]` confirmado é comparado depois de travar a série e as contas por número crescente; diferente ou vazio é recusado (`versao_desatualizada`, detalhe `contas_afetadas_mudaram`). A versão da série não muda. Retorno `{series, occurrences, changed}`, como as outras funções de série.
 - **`create_series`:** um parâmetro a mais no fim, `p_parts_per_year`, com padrão nulo. A assinatura de 13 argumentos foi removida, mas a chamada com 13 argumentos nomeados continua funcionando, e com o parâmetro nulo o hash é o mesmo da 0003 (uma repetição em trânsito continua reconhecida). Na anual, `p_last_month` é o mês da última parcela do último ano, e o banco guarda `last_number = k × (anos até esse mês + 1)`. A validação segue a ordem do core, com o código novo `parcelas_no_ano_invalidas` logo depois de `parcelas_invalidas`; o início da anual vai do mês anterior ao atual até 23 meses depois.
 - **Leitura:** `commitment_items` ganhou `series_parts_per_year` no fim, e `series_items`, `parts_per_year` depois de `generating`; as duas visões foram recriadas com as mesmas opções da 0003. O conversor do app recusa, como dado inconsistente, série ou conta em que o tipo e as parcelas por ano não combinam.
-- **No core e no app:** `affectedByYear` monta o conjunto de informar e de tirar, com os textos do que muda e do que não muda; `wholeYearPayment`, o de "Paguei o ano todo de uma vez" (pagar a parcela escolhida com o valor total e depois tirar as outras em aberto do ano, com o conjunto calculado antes de pagar); `suggestedAnnualReference`, a sugestão de referência, aplicada por `update_series_from` com `affectedByEditFrom`; `annualYearSummary`, o "Ano a ano"; `groupAnnualLater`, os grupos por ano em "Próximos meses"; `seriesYearlyTotal`, o "Por ano" (e `seriesMonthlyTotal` ignora as contas do ano). `affectedByYear`, `wholeYearPayment` e `affectedByEditFrom` recebem todas as contas de `mergeOccurrences`, como no Ciclo A. Uma gravação de resultado incerto em informar ou tirar é reconciliada por `findSeriesOperation` (`informar_ano`, `tirar_ano`).
+- **No core e no app:** `affectedByYear` monta o conjunto de informar e de tirar, com os textos do que muda e do que não muda; `wholeYearPayment`, o de "Paguei o ano todo de uma vez" (pagar a parcela escolhida com o valor total e depois tirar as outras em aberto do ano, com o conjunto calculado antes de pagar); `suggestedAnnualReference`, a sugestão de referência, aplicada por `update_series_from` com `affectedByEditFrom` e oferecida só quando o banco a aceitaria (`editFromMaxNumber`, o mesmo limite de `update_series_from`) e o ano seguinte não tem valor informado; `annualYearSummary`, o "Ano a ano"; `groupAnnualLater`, os grupos por ano em "Próximos meses"; `seriesYearlyTotal`, o "Por ano" (e `seriesMonthlyTotal` ignora as contas do ano). `affectedByYear`, `wholeYearPayment` e `affectedByEditFrom` recebem todas as contas de `mergeOccurrences`, como no Ciclo A. Uma gravação de resultado incerto em informar ou tirar é reconciliada por `findSeriesOperation` (`informar_ano`, `tirar_ano`).
 
 ## Como executar
 
