@@ -48,6 +48,7 @@ export function summarizeMonth(records: readonly FinancialRecord[], contextId: s
  * - Mês corrente: em aberto com vencimento até o fim do mês, inclusive as vencidas de meses anteriores.
  * - Outros meses: em aberto com vencimento naquele mês.
  * Contas a pagar nunca entram em Recebido, Pago ou Diferença. Repetido no banco por month_to_pay.
+ * Ocorrências de gasto fixo são contas a pagar comuns; as previstas além do mês seguinte nunca chegam aqui.
  */
 export interface ToPaySummary {
   month: IsoMonth;
@@ -58,6 +59,8 @@ export interface ToPaySummary {
   dueInMonthCents: Cents;
   /** Em aberto vencidas antes do mês (só no mês corrente). */
   overdueBeforeCents: Cents;
+  /** Parte do total com valor estimado (gasto fixo que muda, como luz): "Inclui R$ 180,00 em valores estimados." */
+  estimatedCents: Cents;
   /** Compõem o total; ordem: vencimento, criação, id. */
   items: Commitment[];
   /** Itens com vencimento antes de hoje. */
@@ -95,6 +98,7 @@ export function summarizeToPay(list: readonly Commitment[], contextId: string, m
     toPayCents: sum(items),
     dueInMonthCents: sum(items.filter((c) => c.dueOn >= start)),
     overdueBeforeCents: sum(items.filter((c) => c.dueOn < start)),
+    estimatedCents: sum(items.filter((c) => c.amountIsEstimate)),
     items,
     overdue,
     upcomingInMonth,

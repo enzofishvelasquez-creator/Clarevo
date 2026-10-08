@@ -4,6 +4,7 @@ export * from './records';
 export * from './validation';
 export * from './summary';
 export * from './commitments';
+export * from './series';
 export * from './repository';
 export * from './memory-repository';
 export * from './demo';

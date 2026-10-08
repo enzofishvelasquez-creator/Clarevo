@@ -1,5 +1,16 @@
 import type { IsoMonth } from './dates';
-import type { Commitment, CommitmentInput, FinancialRecord, PaymentInput, PersonalSpace, RecordInput, RecordKind } from './records';
+import type {
+  Commitment,
+  CommitmentInput,
+  CommitmentSeries,
+  FinancialRecord,
+  PaymentInput,
+  PersonalSpace,
+  RecordInput,
+  RecordKind,
+  SeriesEditInput,
+  SeriesInput,
+} from './records';
 
 /** Ações de conta a pagar gravadas em record_operations (mesmo espaço de chaves dos registros). */
 export type CommitmentAction = 'criar_compromisso' | 'editar_compromisso' | 'excluir_compromisso' | 'pagar_compromisso' | 'desfazer_pagamento';
@@ -8,6 +19,22 @@ export type CommitmentAction = 'criar_compromisso' | 'editar_compromisso' | 'exc
 export interface CommitmentWrite {
   commitment: Commitment;
   record: FinancialRecord | null;
+}
+
+/** Ações de gasto fixo gravadas em record_operations (alvo em target_id). */
+export type SeriesAction = 'criar_serie' | 'alterar_serie' | 'encerrar_serie' | 'excluir_serie';
+
+/** Conta afetada que a pessoa confirmou: se o conjunto mudar até gravar, a escrita é recusada. */
+export interface AffectedRef {
+  id: string;
+  version: number;
+}
+
+/** Resultado das escritas de gasto fixo: a série, as ocorrências vivas (número crescente) e quantas contas mudaram. */
+export interface SeriesWrite {
+  series: CommitmentSeries;
+  occurrences: Commitment[];
+  changed: number;
 }
 
 /**
@@ -41,7 +68,12 @@ export interface RecordsRepository {
   listCommitments(contextId: string, month: IsoMonth): Promise<Commitment[]>;
   getCommitment(id: string): Promise<Commitment | null>;
   createCommitment(key: string, contextId: string, input: CommitmentInput): Promise<CommitmentWrite>;
+  /**
+   * Numa ocorrência de série, o vencimento fica no mesmo mês (vencimento_fora_do_mes) e a conta passa a ser
+   * "alterada só neste mês". input.amountIsEstimate === false tira a marca de estimado.
+   */
   updateCommitment(key: string, id: string, expectedVersion: number, input: CommitmentInput): Promise<CommitmentWrite>;
+  /** Numa ocorrência de série, exclui só este mês: o número nunca volta a ser criado. */
   deleteCommitment(key: string, id: string, expectedVersion: number): Promise<CommitmentWrite>;
   /** Atômico: cria o gasto e quita a conta. record = gasto criado. */
   payCommitment(key: string, id: string, expectedVersion: number, input: PaymentInput): Promise<CommitmentWrite & { record: FinancialRecord }>;
@@ -49,6 +81,30 @@ export interface RecordsRepository {
   undoCommitmentPayment(key: string, id: string, expectedVersion: number): Promise<CommitmentWrite & { record: FinancialRecord }>;
   /** Reconciliação de conta a pagar: a operação com esta chave já foi concluída? */
   findCommitmentOperation(key: string): Promise<{ action: CommitmentAction; commitmentId: string; recordId: string | null } | null>;
+
+  /** Gastos fixos e parcelamentos do contexto, sem excluídos (inclusive encerrados). */
+  listSeries(contextId: string): Promise<CommitmentSeries[]>;
+  getSeries(id: string): Promise<CommitmentSeries | null>;
+  /** Ocorrências vivas da série (abertas e pagas), por número decrescente, até 60. */
+  listSeriesOccurrences(seriesId: string): Promise<Commitment[]>;
+  createSeries(key: string, contextId: string, input: SeriesInput): Promise<SeriesWrite>;
+  /** "Esta e as próximas" a partir do número fromNumber. changed = contas alteradas. */
+  updateSeriesFrom(
+    key: string,
+    id: string,
+    expectedVersion: number,
+    fromNumber: number,
+    expectedAffected: AffectedRef[],
+    input: SeriesEditInput,
+  ): Promise<SeriesWrite>;
+  /** Encerrar (lastNumber) ou retomar (null ou maior). changed = contas em aberto removidas. */
+  endSeries(key: string, id: string, expectedVersion: number, lastNumber: number | null, expectedAffected: AffectedRef[]): Promise<SeriesWrite>;
+  /** Só sem conta paga. changed = contas em aberto removidas; occurrences vem vazio. */
+  deleteSeries(key: string, id: string, expectedVersion: number, expectedAffected: AffectedRef[]): Promise<SeriesWrite>;
+  /** Cria as contas da janela de geração. Idempotente, sem chave. */
+  syncSeriesOccurrences(contextId: string): Promise<{ created: number; createdOverdue: number }>;
+  /** Reconciliação de gasto fixo: a operação com esta chave já foi concluída? */
+  findSeriesOperation(key: string): Promise<{ action: SeriesAction; seriesId: string } | null>;
 }
 
 export type RepoErrorCode =
@@ -71,6 +127,22 @@ export type RepoErrorCode =
   | 'vencimento_fora_do_intervalo'
   | 'compromisso_quitado'
   | 'compromisso_aberto'
+  | 'tipo_invalido'
+  | 'natureza_invalida'
+  | 'modo_de_valor_invalido'
+  | 'dia_invalido'
+  | 'inicio_fora_do_intervalo'
+  | 'parcelas_invalidas'
+  | 'parcela_inicial_invalida'
+  | 'fim_invalido'
+  | 'numero_fora_da_serie'
+  | 'inicio_em_conta_paga'
+  | 'limite_de_gastos_fixos'
+  | 'serie_tem_pagamento_posterior'
+  | 'serie_tem_pagamentos'
+  | 'vencimento_fora_do_mes'
+  | 'estimativa_invalida'
+  | 'serie_inconsistente'
   | 'desconhecido';
 
 export class RepoError extends Error {

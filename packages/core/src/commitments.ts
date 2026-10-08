@@ -72,7 +72,7 @@ function singleDue(dueOn: IsoDate, today: IsoDate): string {
 export function toPayCaption(
   s: ToPaySummary,
   today: IsoDate,
-): { main: string | null; overdue: string | null; includes: string | null } {
+): { main: string | null; overdue: string | null; includes: string | null; estimated: string | null } {
   const n = s.items.length;
   const first = s.items[0];
   let main: string | null;
@@ -86,5 +86,6 @@ export function toPayCaption(
     overdue: s.isCurrentMonth && s.overdueCount > 0 && s.overdueCount < n ? vencidas(s.overdueCount) : null,
     includes:
       s.overdueBeforeCents > 0 ? `Inclui ${formatBRL(s.overdueBeforeCents)} de contas vencidas antes de ${formatMonthName(s.month)}.` : null,
+    estimated: s.estimatedCents > 0 ? `Inclui ${formatBRL(s.estimatedCents)} em valores estimados.` : null,
   };
 }
