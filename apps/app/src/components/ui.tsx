@@ -307,7 +307,7 @@ export function Chip({ label, selected, onPress }: { label: string; selected: bo
         onPressIn={press.onPressIn}
         onPressOut={press.onPressOut}
         style={(s) => [styles.chip, selected && styles.chipSelected, (s as { focused?: boolean }).focused && styles.focusRing]}>
-        {selected ? <Check size={16} color={colors.brand} strokeWidth={2.5} /> : null}
+        {selected ? <Check size={16} color={colors.brand} strokeWidth={2.5} style={{ flexShrink: 0 }} /> : null}
         <Txt variant="label" color={selected ? colors.brand : colors.text} style={{ flexShrink: 1 }}>
           {label}
         </Txt>

@@ -76,7 +76,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     const cut = await p.evaluate(() => [...document.querySelectorAll('div[dir="auto"], span')].filter((e) => /R\$/.test(e.textContent || '') && e.children.length === 0 && e.getBoundingClientRect().width > 0 && e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent));
     ok(`${prefix}: nenhum valor em reais cortado`, cut.length === 0, cut.join(' | '));
     // "R$" (e "≈") nunca ficam sozinhos no fim da linha: o espaço até o valor não quebra.
-    const loose = await p.evaluate(() => [...document.querySelectorAll('div[dir="auto"], span')].filter((e) => e.getBoundingClientRect().width > 0 && [...e.childNodes].some((n) => n.nodeType === 3 && /(R\$|≈) (\d|$)/.test(n.textContent))).map((e) => e.textContent.slice(0, 40)));
+    const loose = await p.evaluate(() => [...document.querySelectorAll('div[dir="auto"], span')].filter((e) => e.getBoundingClientRect().width > 0 && [...e.childNodes].some((n) => n.nodeType === 3 && /R\$ (\d|$)|≈ /.test(n.textContent))).map((e) => e.textContent.slice(0, 40)));
     ok(`${prefix}: "R$" junto do valor`, loose.length === 0, loose.slice(0, 3).join(' | '));
     ok(`${prefix}: alvos de toque ≥ 44 px`, small.length === 0, small.join(' | '));
     const avatarOut = await p.evaluate(() => [...document.querySelectorAll('[aria-label^="Conta: perfil"]')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && (b.left < -0.5 || b.right > window.innerWidth + 0.5); }).length);
@@ -515,6 +515,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Pagar hoje a Escola de novembro: o gasto conta em Pago de outubro; desfazer volta à base.
   await openToPay();
   await openRow(/^Escola, vence em 10\/11\/2026, R\$ 900,00, gasto fixo/); await waitText('Marcar como paga');
+  await waitText('Parte de: Escola · todo mês, dia 10').catch(() => {});
   ok('conta do gasto fixo: "Parte de" e "Ver gasto fixo"', (await body()).includes('Parte de: Escola · todo mês, dia 10') && (await visibleCount('button', 'Ver gasto fixo')) === 1);
   await btn('Marcar como paga').click(); await waitText('Confirmar pagamento');
   ok('pagar a Escola: valor previsto e hoje', (await field('Valor pago').inputValue()) === '900,00' && (await field('Data do pagamento').inputValue()) === '07/10/2026');
@@ -542,6 +543,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('esta e as próximas: confirma o que muda e o que não muda', (await dialogText()).includes('Vão mudar: novembro (05/11). Não mudam: outubro (paga). As contas criadas depois já seguem o novo valor.'));
   await shot('29_esta_e_as_proximas');
   await confirmIn('Aplicar'); await waitText('Gasto fixo atualizado a partir de novembro.');
+  // A conta aberta é lida de novo depois da gravação: espera a leitura nova.
+  await waitText('R$ 2.650,00').catch(() => {});
   ok('Aluguel de novembro passa a R$ 2.650,00', (await body()).includes('R$ 2.650,00'));
   await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
   await waitRows('Próximos meses', (rows) => (rows ?? []).includes('Aluguel, vence em 05/11/2026, R$ 2.650,00, gasto fixo'));
@@ -550,6 +553,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // Luz de novembro: informar o valor tira "estimado"; depois, excluir só esta conta.
   await openRow(/^Luz, vence em 12\/11\/2026, cerca de R\$ 180,00, valor estimado/); await waitText('Informar o valor da conta');
+  await waitText('Parte de: Luz · todo mês, dia 12').catch(() => {});
   t = await body();
   ok('conta estimada: aviso e "Informar o valor da conta"', t.includes('Valor estimado pela referência do gasto fixo. Quando a conta chegar, informe o valor.') && t.includes('Parte de: Luz · todo mês, dia 12'));
   await shot('30_conta_estimada');
@@ -606,6 +610,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await openRow(/^Aluguel, Pago · 05\/09\/2026/); await waitText('Tornar gasto fixo');
   await btn('Tornar gasto fixo').click(); await waitText('Baseado no gasto de 05/09/2026');
   await waitText('Você já tem o gasto fixo Aluguel.').catch(() => {});
+  await waitText('Você já anotou o gasto Aluguel').catch(() => {});
   t = await body();
   ok('tornar gasto fixo: preenchido pelo gasto de setembro, começando em outubro', (await field('Descrição').inputValue()) === 'Aluguel' && (await field('Valor por mês').inputValue()) === '2.500,00' &&
     (await field('Dia do vencimento').inputValue()) === '5' && (await radio('Outubro (venceu em 05/10)').getAttribute('aria-checked')) === 'true' &&
