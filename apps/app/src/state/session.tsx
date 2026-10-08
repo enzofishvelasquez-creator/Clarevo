@@ -9,11 +9,18 @@ import { DemoAuth } from '@/lib/demo-auth';
 import { SupabaseAuth, supabaseConfigured } from '@/lib/supabase';
 
 /**
- * Sem Supabase configurado, a demonstração só roda em desenvolvimento ou quando pedida
- * explicitamente (EXPO_PUBLIC_MODO_DEMO=1). Um build de produção sem configuração não vira demonstração em silêncio.
+ * Demonstração pedida explicitamente (EXPO_PUBLIC_MODO_DEMO=1, como em `npm run export:demo`) sempre usa dados
+ * fictícios, mesmo com o Supabase configurado. Sem Supabase configurado, a demonstração só roda em
+ * desenvolvimento. Um build de produção sem configuração não vira demonstração em silêncio.
  */
-const demoAllowed = __DEV__ || process.env.EXPO_PUBLIC_MODO_DEMO === '1';
-const auth: AuthService | null = supabaseConfigured ? new SupabaseAuth() : demoAllowed ? new DemoAuth() : null;
+const demoRequested = process.env.EXPO_PUBLIC_MODO_DEMO === '1';
+const auth: AuthService | null = demoRequested
+  ? new DemoAuth()
+  : supabaseConfigured
+    ? new SupabaseAuth()
+    : __DEV__
+      ? new DemoAuth()
+      : null;
 
 interface SessionValue extends AuthState {
   ready: boolean;
