@@ -159,6 +159,7 @@ function Navigation() {
           <Stack.Screen name="gastos-fixos/[id]/index" />
           <Stack.Screen name="gastos-fixos/[id]/editar" />
           <Stack.Screen name="gastos-fixos/[id]/encerrar" />
+          <Stack.Screen name="gastos-fixos/[id]/informar" />
           <Stack.Screen name="composicao" />
           <Stack.Screen name="quem-ve" />
           <Stack.Screen name="conta" />

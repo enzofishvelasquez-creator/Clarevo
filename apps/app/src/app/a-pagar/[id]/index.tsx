@@ -3,6 +3,9 @@ import {
   ERROR_TEXT,
   NO_CATEGORY_LABEL,
   addMonths,
+  affectedByYear,
+  annualYearLabelOf,
+  annualYearErrorText,
   commitmentSituation,
   deviceTimeZone,
   dueText,
@@ -14,6 +17,7 @@ import {
   formatMonthBR,
   formatMonthName,
   isRepoError,
+  mergeOccurrences,
   monthOf,
   newOperationKey,
   nextMonthPrefill,
@@ -24,11 +28,12 @@ import {
   type IsoMonth,
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
-import { AlertCircle, Check, Info, Pencil, Plus, Repeat, ShieldCheck, Trash2, Undo2 } from 'lucide-react-native';
+import { AlertCircle, CalendarSync, Check, Info, Pencil, Plus, Repeat, ShieldCheck, Trash2, Undo2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ChoiceDialog } from '@/components/choice-dialog';
+import { bySeries, ofSeries, SERIES_NOUN } from '@/components/series-parts';
 import { SITUATION_LOOK } from '@/components/commitment-row';
 import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
@@ -38,7 +43,19 @@ import { Banner, Button, Card, FitMoney, LinkButton, Screen, Skeleton, Txt } fro
 import { flash } from '@/lib/flash';
 import { openSummary } from '@/lib/nav';
 import { totalChange } from '@/lib/highlight';
-import { useCommitment, useCommitments, useDeleteCommitment, useSeries, useSpace, useUndoCommitmentPayment, useView } from '@/state/data';
+import {
+  useCommitment,
+  useCommitments,
+  useDeleteCommitment,
+  useSeries,
+  useSeriesOccurrences,
+  useSeriesOpenOccurrences,
+  useSeriesOperationKey,
+  useSkipSeriesYear,
+  useSpace,
+  useUndoCommitmentPayment,
+  useView,
+} from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -47,6 +64,9 @@ const textFor = (code: string) =>
 
 /** "novembro" no ano de hoje; "janeiro de 2027" em outro ano. */
 const monthWord = (dueOn: IsoDate, today: IsoDate) => `${formatMonthName(monthOf(dueOn))}${dueOn.slice(0, 4) === today.slice(0, 4) ? '' : ` de ${dueOn.slice(0, 4)}`}`;
+
+/** Conta do ano: posição da conta no ano (1 a k). */
+const partOfYear = (c: Commitment) => ((c.series!.number - 1) % (c.series!.partsPerYear ?? 1)) + 1;
 
 /**
  * Primeiro mês de um gasto fixo criado a partir de uma conta paga ("Repetir todo mês"): o mês seguinte ao vencimento,
@@ -73,7 +93,11 @@ export default function DetalheContaAPagar() {
   const remove = useDeleteCommitment();
   const undo = useUndoCommitmentPayment();
   const [notice, setNotice] = useFlash();
-  const [confirming, setConfirming] = useState<null | 'excluir' | 'desfazer' | 'editar'>(null);
+  const [confirming, setConfirming] = useState<null | 'excluir' | 'desfazer' | 'editar' | 'excluir-escolha' | 'tirar'>(null);
+  /** "Tirar todas as parcelas de 2027 em aberto" em andamento, inclusive a conferência de uma tentativa anterior. */
+  const [skipping, setSkipping] = useState(false);
+  const skip = useSkipSeriesYear();
+  const skipKeys = useSeriesOperationKey();
   const [actionError, setActionError] = useState<string | null>(null);
   const deleteKey = useRef(newOperationKey());
   const undoKey = useRef(newOperationKey());
@@ -87,7 +111,17 @@ export default function DetalheContaAPagar() {
   const paid = c?.status === 'quitado' ? c.payment : null;
   const ref = c?.series ?? null;
   const series = useSeries(ref?.id, c?.contextId);
-  const occurrenceWord = c && ref ? monthWord(c.dueOn, today) : '';
+  const annual = ref?.kind === 'anual' ? { k: ref.partsPerYear ?? 1, label: annualYearLabelOf(c!)!, part: partOfYear(c!) } : null;
+  // Conta do ano com parcelas em aberto: as listas completas da série, para "Tirar todas as parcelas de 2027 em aberto".
+  const yearLists = annual && annual.k > 1 && c?.status === 'aberto';
+  const seriesOcc = useSeriesOccurrences(yearLists ? ref!.id : undefined, c?.contextId);
+  const seriesOpen = useSeriesOpenOccurrences(yearLists ? ref!.id : undefined, c?.contextId);
+  const yearPlan =
+    yearLists && series.data && seriesOcc.data && seriesOpen.data
+      ? affectedByYear(mergeOccurrences(seriesOcc.data, seriesOpen.data), series.data, ref!.number, 'tirar')
+      : null;
+  // Mês da conta ("novembro", "janeiro de 2027"); na conta do ano, "2027" (cota única) ou "parcela 3 de 2027".
+  const occurrenceWord = !c || !ref ? '' : annual ? (annual.k === 1 ? annual.label : `parcela ${annual.part} de ${annual.label}`) : monthWord(c.dueOn, today);
 
   const doDelete = async () => {
     if (!c) return;
@@ -96,7 +130,15 @@ export default function DetalheContaAPagar() {
       await remove.mutateAsync({ key: deleteKey.current, id: c.id, version: c.version });
       deleteKey.current = newOperationKey();
       setConfirming(null);
-      flash.set(ref ? `Conta de ${occurrenceWord} excluída. O ${seriesNoun} continua nos outros meses.` : 'Conta a pagar excluída');
+      flash.set(
+        !ref
+          ? 'Conta a pagar excluída'
+          : annual
+            ? annual.k === 1
+              ? `Conta de ${annual.label} excluída. A conta do ano continua nos outros anos.`
+              : `Parcela ${annual.part} de ${annual.label} excluída. A conta do ano continua nas outras parcelas.`
+            : `Conta de ${occurrenceWord} excluída. O ${seriesNoun} continua nos outros meses.`,
+      );
       toList();
     } catch (e) {
       setConfirming(null);
@@ -149,6 +191,57 @@ export default function DetalheContaAPagar() {
     }
   };
 
+  /**
+   * "Tirar todas as parcelas de 2027 em aberto" (skip_series_year): saem de uma vez e não voltam. Resultado incerto (rede):
+   * antes de repetir, findSeriesOperation confere se a tentativa anterior foi gravada; a repetição usa a mesma chave.
+   */
+  const doSkip = async () => {
+    if (!c || !ref || !yearPlan?.ok || skipping) return;
+    const plan = yearPlan;
+    setActionError(null);
+    setSkipping(true);
+    const snapshot = JSON.stringify([ref.id, ref.number, plan.affected]);
+    const failed = `Não foi possível tirar as parcelas de ${plan.year.label}. Tente novamente.`;
+    const done = () => {
+      setConfirming(null);
+      flash.set(plan.doneText);
+      toList();
+    };
+    try {
+      if (skipKeys.hasPending()) {
+        const saved = await skipKeys.findSaved();
+        if (saved?.action === 'tirar_ano') {
+          skipKeys.settled();
+          done();
+          return;
+        }
+      }
+      const key = skipKeys.keyFor(snapshot);
+      try {
+        await skip.mutateAsync({ key, seriesId: ref.id, number: ref.number, affected: plan.affected });
+        skipKeys.settled();
+        done();
+      } catch (e) {
+        setConfirming(null);
+        if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
+          skipKeys.refused();
+          setActionError(annualYearErrorText(e.code, plan.year.label));
+          commitment.refetch();
+          seriesOcc.refetch();
+          seriesOpen.refetch();
+          return;
+        }
+        skipKeys.uncertain(key, snapshot);
+        setActionError(failed);
+      }
+    } catch {
+      setConfirming(null);
+      setActionError(failed);
+    } finally {
+      setSkipping(false);
+    }
+  };
+
   const showSummary = () => {
     if (!c) return;
     // Paga: o mês da data do pagamento. Em aberto: o mês do vencimento, ou o corrente se ela ainda vai vencer depois dele.
@@ -167,19 +260,24 @@ export default function DetalheContaAPagar() {
         : `Ainda a pagar de ${formatMonthBR(monthOf(c.dueOn)).toLowerCase()}`;
   const look = situation ? SITUATION_LOOK[situation] : null;
 
-  // "Parte de: Aluguel · todo mês, dia 5" ou "Parcela 13 de 48 de Financiamento do carro". O nome e o dia vêm da vigência
-  // desta conta; enquanto a série carrega, só o rótulo da conta.
+  // "Parte de: Aluguel · todo mês, dia 5", "Parcela 13 de 48 de Financiamento do carro" ou, na conta do ano, "Parte de:
+  // IPTU · parcela 3 de 10 de 2027". O nome e o dia vêm da vigência desta conta; enquanto a série carrega, só o rótulo da conta.
   const term = ref && series.data ? termFor(series.data.terms, ref.number) : null;
+  const label = c && ref ? occurrenceLabel(c) : null;
   const partOf = !ref
     ? null
     : ref.kind === 'parcelada'
       ? term
-        ? `${occurrenceLabel(c!)} de ${term.description}`
-        : occurrenceLabel(c!)
-      : term
-        ? `Parte de: ${term.description} · todo mês, dia ${term.dueDay}`
-        : 'Parte de um gasto fixo · todo mês';
-  const seriesNoun = ref?.kind === 'parcelada' ? 'parcelamento' : 'gasto fixo';
+        ? `${label} de ${term.description}`
+        : label
+      : ref.kind === 'anual'
+        ? term
+          ? `Parte de: ${term.description} · ${label!.charAt(0).toLowerCase()}${label!.slice(1)}`
+          : `Parte de uma conta do ano · ${label!.charAt(0).toLowerCase()}${label!.slice(1)}`
+        : term
+          ? `Parte de: ${term.description} · todo mês, dia ${term.dueDay}`
+          : 'Parte de um gasto fixo · todo mês';
+  const seriesNoun = SERIES_NOUN[ref?.kind ?? 'mensal'];
   const estimateOpen = Boolean(c && !paid && c.amountIsEstimate);
 
   return (
@@ -241,7 +339,7 @@ export default function DetalheContaAPagar() {
                     />
                     {c.seriesOverride ? (
                       <Txt variant="label" color={colors.textSecondary}>
-                        Alterada só neste mês.
+                        {annual ? 'Valor informado ou alterado só nesta conta.' : 'Alterada só neste mês.'}
                       </Txt>
                     ) : null}
                   </View>
@@ -262,7 +360,7 @@ export default function DetalheContaAPagar() {
                 <View style={styles.trail} accessible>
                   <Txt variant="caption" color={colors.textSecondary}>
                     {ref
-                      ? `Criada pelo ${seriesNoun} em ${formatDateTimeBR(c.createdAt, deviceTimeZone())}`
+                      ? `Criada ${bySeries(ref.kind)} em ${formatDateTimeBR(c.createdAt, deviceTimeZone())}`
                       : `Anotada por ${c.createdBy === user?.id ? 'você' : 'outra pessoa da família'} em ${formatDateTimeBR(c.createdAt, deviceTimeZone())}`}
                   </Txt>
                   {c.version > 1 ? (
@@ -273,9 +371,18 @@ export default function DetalheContaAPagar() {
                 </View>
               </Card>
 
-              {estimateOpen ? (
+              {estimateOpen && annual && ref ? (
                 <Banner tone="info" icon={Info} live={false}>
-                  <Txt variant="label">Valor estimado pela referência do {seriesNoun}. Quando a conta chegar, informe o valor.</Txt>
+                  <Txt variant="label">Valor estimado pela referência da conta do ano. Quando o carnê ou o boleto chegar, informe o valor.</Txt>
+                  <Button
+                    label={`Informar o valor de ${annual.label}`}
+                    tone="soft"
+                    onPress={() => router.push({ pathname: '/gastos-fixos/[id]/informar', params: { id: ref.id, numero: String(ref.number) } })}
+                  />
+                </Banner>
+              ) : estimateOpen ? (
+                <Banner tone="info" icon={Info} live={false}>
+                  <Txt variant="label">Valor estimado pela referência {ref ? ofSeries(ref.kind) : 'do gasto fixo'}. Quando a conta chegar, informe o valor.</Txt>
                   <Button
                     label="Informar o valor da conta"
                     tone="soft"
@@ -310,6 +417,27 @@ export default function DetalheContaAPagar() {
                           })
                         }
                       />
+                      {/* Conta do ano a partir do ano seguinte ao vencimento, no mesmo mês e dia (cota única). */}
+                      <Button
+                        label="Repetir todo ano"
+                        icon={CalendarSync}
+                        tone="soft"
+                        onPress={() =>
+                          router.push({
+                            pathname: '/gastos-fixos/novo',
+                            params: {
+                              tipo: 'anual',
+                              descricao: c.description,
+                              valor: String(c.amountCents),
+                              dia: String(Number(c.dueOn.slice(8, 10))),
+                              mes: String(Number(c.dueOn.slice(5, 7))),
+                              ano: String(Number(c.dueOn.slice(0, 4)) + 1),
+                              parcelas: '1',
+                              ...(c.category ? { categoria: c.category } : {}),
+                            },
+                          })
+                        }
+                      />
                     </>
                   )}
                   <Txt variant="caption" color={colors.textSecondary}>
@@ -328,12 +456,16 @@ export default function DetalheContaAPagar() {
                     tone="soft"
                     onPress={() => (ref ? setConfirming('editar') : router.push(`/a-pagar/${c.id}/editar`))}
                   />
-                  <Button
-                    label={ref ? `Excluir só a conta de ${occurrenceWord}` : 'Excluir conta a pagar'}
-                    icon={Trash2}
-                    tone="danger"
-                    onPress={() => setConfirming('excluir')}
-                  />
+                  {annual && annual.k > 1 ? (
+                    <Button label="Excluir parcela" icon={Trash2} tone="danger" onPress={() => setConfirming('excluir-escolha')} />
+                  ) : (
+                    <Button
+                      label={ref ? `Excluir só a conta de ${occurrenceWord}` : 'Excluir conta a pagar'}
+                      icon={Trash2}
+                      tone="danger"
+                      onPress={() => setConfirming('excluir')}
+                    />
+                  )}
                 </>
               )}
               <Button label="Ver resumo do mês" tone="soft" onPress={showSummary} />
@@ -346,7 +478,7 @@ export default function DetalheContaAPagar() {
 
               <ConfirmDialog
                 visible={confirming === 'excluir'}
-                title={ref ? `Excluir a conta de ${occurrenceWord}?` : 'Excluir conta a pagar?'}
+                title={ref ? (annual && annual.k > 1 ? `Excluir a ${occurrenceWord}?` : `Excluir a conta de ${occurrenceWord}?`) : 'Excluir conta a pagar?'}
                 cancelLabel="Cancelar"
                 confirmLabel={ref ? 'Excluir só esta' : 'Excluir conta a pagar'}
                 busy={remove.isPending}
@@ -357,11 +489,43 @@ export default function DetalheContaAPagar() {
                 </Txt>
                 {ref ? (
                   <Txt color={colors.textSecondary}>
-                    O {seriesNoun} continua nos outros meses, e esta conta não volta a ser criada.
+                    {annual
+                      ? annual.k > 1
+                        ? 'A conta do ano continua nas outras parcelas, e esta parcela não volta a ser criada.'
+                        : 'A conta do ano continua nos outros anos, e esta conta não volta a ser criada.'
+                      : `O ${seriesNoun} continua nos outros meses, e esta conta não volta a ser criada.`}
                   </Txt>
                 ) : null}
                 <Txt color={colors.textSecondary}>O valor deixa de contar em Ainda a pagar. Recebido, Pago e a diferença do mês não mudam.</Txt>
               </ConfirmDialog>
+
+              {annual && annual.k > 1 && ref && !paid ? (
+                <ChoiceDialog
+                  visible={confirming === 'excluir-escolha'}
+                  title="O que você quer excluir?"
+                  onCancel={() => setConfirming(null)}
+                  choices={[
+                    { label: 'Excluir só esta parcela', onPress: () => setConfirming('excluir') },
+                    ...(yearPlan?.ok && yearPlan.changing.length > 1
+                      ? [{ label: `Tirar todas as parcelas de ${annual.label} em aberto`, onPress: () => setConfirming('tirar') }]
+                      : []),
+                  ]}
+                />
+              ) : null}
+
+              {yearPlan?.ok ? (
+                <ConfirmDialog
+                  visible={confirming === 'tirar'}
+                  title={yearPlan.title}
+                  cancelLabel="Cancelar"
+                  confirmLabel="Tirar parcelas"
+                  busy={skipping || skip.isPending}
+                  onCancel={() => setConfirming(null)}
+                  onConfirm={doSkip}>
+                  <Txt color={colors.textSecondary}>{yearPlan.text}</Txt>
+                  <Txt color={colors.textSecondary}>Os valores deixam de contar em Ainda a pagar. Recebido, Pago e a diferença do mês não mudam.</Txt>
+                </ConfirmDialog>
+              ) : null}
 
               {ref && !paid ? (
                 <ChoiceDialog
@@ -370,14 +534,22 @@ export default function DetalheContaAPagar() {
                   onCancel={() => setConfirming(null)}
                   choices={[
                     {
-                      label: `Só a conta de ${occurrenceWord}`,
+                      label: annual
+                        ? annual.k === 1
+                          ? `Só a conta de ${annual.label}`
+                          : `Só a parcela ${annual.part} de ${annual.label}`
+                        : `Só a conta de ${occurrenceWord}`,
                       onPress: () => {
                         setConfirming(null);
                         router.push(`/a-pagar/${c.id}/editar`);
                       },
                     },
                     {
-                      label: `${occurrenceWord.charAt(0).toUpperCase()}${occurrenceWord.slice(1)} e os próximos meses`,
+                      label: annual
+                        ? annual.k === 1
+                          ? `${annual.label} e os próximos anos`
+                          : `A parcela ${annual.part} de ${annual.label} e as próximas`
+                        : `${occurrenceWord.charAt(0).toUpperCase()}${occurrenceWord.slice(1)} e os próximos meses`,
                       onPress: () => {
                         setConfirming(null);
                         router.push({ pathname: '/gastos-fixos/[id]/editar', params: { id: ref.id, 'a-partir': String(ref.number) } });
