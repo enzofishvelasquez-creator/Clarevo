@@ -41,7 +41,7 @@ export function AuthShell({
               <ArrowLeft size={22} color={colors.textOnBrand} />
             </Pressable>
           ) : null}
-          <Logo height={34} variant="reverso" />
+          <Logo height={26} variant="reverso" />
           <View style={{ flex: 1 }} />
           {auth.mode === 'demo' ? <DemoPill /> : null}
         </View>

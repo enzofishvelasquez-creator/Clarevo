@@ -21,11 +21,11 @@ const focusOnBrand = { outlineWidth: 3, outlineColor: colors.accent, outlineStyl
 /** Logo reverso, selo de demonstração e acesso à Conta (perfil, segurança e benefício). */
 function BrandRow() {
   const { user, auth } = useSession();
-  // Abaixo de 360 px, logo, selo de demonstração e avatar não cabem lado a lado no tamanho normal.
+  // Abaixo de 360 px, logotipo, selo de demonstração e avatar não cabem lado a lado no tamanho normal.
   const narrow = useWindowDimensions().width < 360;
   return (
     <View style={[styles.top, narrow && { gap: space[2] }]}>
-      <Logo height={narrow ? 24 : 32} variant="reverso" />
+      <Logo height={narrow ? 20 : 24} variant="reverso" />
       <View style={[styles.topRight, narrow && { gap: space[2] }]}>
         {auth.mode === 'demo' ? <DemoPill /> : null}
         <Pressable
