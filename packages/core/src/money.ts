@@ -53,3 +53,13 @@ export function parseBRL(input: string): Cents | null {
   if (intDigits.length > 13) return MAX_RECORD_CENTS + 1;
   return Number(intDigits) * 100 + Number(decPart.padEnd(2, '0'));
 }
+
+/** Divisão de inteiros não negativos com metade para cima: floor((2a + b) / (2b)). */
+export function roundDiv(a: number, b: number): number {
+  return Math.floor((2 * a + b) / (2 * b));
+}
+
+/** Divisão de inteiros não negativos para cima: floor((a + b − 1) / b). */
+export function ceilDiv(a: number, b: number): number {
+  return Math.floor((a + b - 1) / b);
+}

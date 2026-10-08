@@ -75,6 +75,43 @@ export function monthOf(date: IsoDate): IsoMonth {
   return date.slice(0, 7);
 }
 
+export function isValidIsoMonth(value: string): boolean {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
+}
+
+/** Meses entre dois meses (to − from): meses(m1, m2) = (ano2·12 + mês2) − (ano1·12 + mês1). */
+export function monthsBetween(from: IsoMonth, to: IsoMonth): number {
+  const [y1, m1] = from.split('-').map(Number) as [number, number];
+  const [y2, m2] = to.split('-').map(Number) as [number, number];
+  return y2 * 12 + m2 - (y1 * 12 + m1);
+}
+
+/** Dia escolhido (1 a 31) no mês, limitado ao último dia: dia 31 em fevereiro de 2028 → "2028-02-29". */
+export function dateInMonth(month: IsoMonth, day: number): IsoDate {
+  const [y, m] = month.split('-').map(Number) as [number, number];
+  return `${month}-${String(Math.min(day, daysInMonth(y, m))).padStart(2, '0')}`;
+}
+
+/** "11/2026" → "2026-11". Mês impossível ou formato inválido → null. */
+export function parseMonthBR(input: string): IsoMonth | null {
+  const m = /^\s*(\d{1,2})\/(\d{4})\s*$/.exec(input);
+  if (!m) return null;
+  const month = `${m[2]}-${m[1]!.padStart(2, '0')}`;
+  return isValidIsoMonth(month) ? month : null;
+}
+
+/** "2026-11" → "11/2026" (campo MM/AAAA). */
+export function formatMonthInputBR(month: IsoMonth): string {
+  const [y, m] = month.split('-');
+  return `${m}/${y}`;
+}
+
+/** Máscara de mês enquanto a pessoa digita: "112026" vira "11/2026". */
+export function maskMonthBR(text: string): string {
+  const d = text.replace(/\D/g, '').slice(0, 6);
+  return d.slice(0, 2) + (d.length > 2 ? `/${d.slice(2)}` : '');
+}
+
 export function addMonths(month: IsoMonth, delta: number): IsoMonth {
   const [y, m] = month.split('-').map(Number) as [number, number];
   const total = y * 12 + (m - 1) + delta;
@@ -141,4 +178,16 @@ export function formatMonthBR(month: IsoMonth): string {
   const [y, m] = month.split('-');
   const name = MONTHS[Number(m) - 1] ?? '';
   return `${name.charAt(0).toUpperCase()}${name.slice(1)} de ${y}`;
+}
+
+/** "2026-10" → "outubro de 2026". */
+export function formatMonthYearBR(month: IsoMonth): string {
+  return `${formatMonthName(month)} de ${month.slice(0, 4)}`;
+}
+
+/** Período entre dois meses: "de outubro a dezembro de 2026", "de outubro de 2026 a março de 2027" ou "em outubro de 2026". */
+export function formatMonthSpanBR(from: IsoMonth, to: IsoMonth): string {
+  if (from === to) return `em ${formatMonthYearBR(from)}`;
+  if (from.slice(0, 4) === to.slice(0, 4)) return `de ${formatMonthName(from)} a ${formatMonthYearBR(to)}`;
+  return `de ${formatMonthYearBR(from)} a ${formatMonthYearBR(to)}`;
 }
