@@ -139,6 +139,11 @@ create function pg_temp.terms(p_series text) returns text language sql as $$
                     order by (t ->> 'from_number')::int)
     from public.series_items s, jsonb_array_elements(s.terms) t where s.id = pg_temp.id(p_series)
 $$;
+-- Linhas excluídas da série, que a RLS esconde: "número:versão:tirada:quem excluiu (final do id)", por número.
+create function pg_temp.gone(p_series text) returns text language sql security definer set search_path = public, pg_temp as $$
+  select string_agg(format('%s:%s:%s:%s', occurrence_number, version, series_skipped::text, right(deleted_by::text, 2)), ' ' order by occurrence_number)
+    from public.commitments where series_id = pg_temp.id(p_series) and deleted_at is not null
+$$;
 -- Série de mentira para as auxiliares puras (só as colunas que a fórmula lê).
 create function pg_temp.ser(p_kind text, p_first date, p_first_number int, p_k int) returns public.commitment_series language sql as $$
   select jsonb_populate_record(null::public.commitment_series, jsonb_build_object('kind', p_kind, 'first_due_month', p_first,
@@ -537,8 +542,7 @@ begin
      and res #> '{series,skipped_numbers}' = '[2, 3, 4, 5, 6, 7, 8, 9, 10]'::jsonb and (res #>> '{series,open_count}')::int = 0
      and (res #>> '{series,paid_count}')::int = 1, 'passo 13: 9 parcelas tiradas; a série não muda de versão';
   assert pg_temp.occs('iptu') = '1:2027-02-10:18990:false:true:quitado', 'passo 13: só a n1, paga';
-  assert (select count(*) from public.commitments where series_id = iptu and occurrence_number between 2 and 10
-            and deleted_at is not null and series_skipped and deleted_by = auth.uid() and version = 3) = 9,
+  assert pg_temp.gone('iptu') = '2:3:true:a5 3:3:true:a5 4:3:true:a5 5:3:true:a5 6:3:true:a5 7:3:true:a5 8:3:true:a5 9:3:true:a5 10:3:true:a5',
     'tiradas: excluídas, marcadas, com autoria e versão + 1';
   assert (select (action, target_id) from public.record_operations where idempotency_key = 'a3-a-0013b') = ('tirar_ano'::text, iptu),
     'operação tirar_ano';
@@ -688,6 +692,7 @@ end $$;
 -- Varredura de datas (Joel): oito formas anuais, geração no dia 1 e no último dia de cada mês, de 07/10/2026 a 31/12/2030.
 -- Em toda data: S10; nenhum ano entra antes de a 1ª parcela vencer até o fim do 2º mês depois do mês de hoje; todo ano
 -- que já entrou tem todas as parcelas a partir do piso; gerar duas vezes não cria nada; nada é criado já vencido.
+set local clarevo.today = '2026-10-07';
 set role authenticated;
 select set_config('request.jwt.claim.sub', :joel, true);
 do $$
@@ -908,6 +913,7 @@ begin
   assert res -> 'changed' = '2'::jsonb and (res #>> '{series,version}')::int = 1 and res #> '{series,skipped_numbers}' = '[2, 3]'::jsonb
      and (res #>> '{series,open_count}')::int = 0 and (res #>> '{series,paid_count}')::int = 1, 'n2 e n3 tiradas; a paga continua';
   assert pg_temp.occs('material') = '1:2026-11-10:30000:false:false:quitado', 'só a n1, paga';
+  assert pg_temp.gone('material') = '2:2:true:a5 3:2:true:a5', 'n2 e n3 excluídas com a marca, pela Elisa';
   assert not exists (select 1 from public.financial_records where commitment_id in (select (e ->> 'id')::uuid from jsonb_array_elements(seen) e)),
     'tiradas sem gasto vinculado (I1)';
   assert pg_temp.sync('fam') = '{"created": 0, "created_overdue": 0}'::jsonb, 'a geração não recria as tiradas';
@@ -994,7 +1000,8 @@ begin
   res := public.end_series('a3-f-0008', escolar, 2, 3, pg_temp.refs('escolar', '{4}'));
   assert res -> 'changed' = '1'::jsonb and (res #>> '{series,last_number}')::int = 3 and (res #>> '{series,version}')::int = 3,
     'termina na parcela 3; a 4 sai';
-  assert (select skipped_numbers from public.series_items where id = escolar) = '[]'::jsonb, 'encerrar não marca número tirado';
+  assert (select skipped_numbers from public.series_items where id = escolar) = '[]'::jsonb and pg_temp.gone('escolar') = '4:3:false:a5',
+    'encerrar exclui sem marcar número tirado';
   perform pg_temp.expect_error(format($f$select public.inform_series_year('a3-f-0009', %L, 4, '[]', 100)$f$, escolar), 'numero_fora_da_serie');
   perform pg_temp.expect_error(format($f$select public.skip_series_year('a3-f-0010', %L, 4, '[]')$f$, escolar), 'numero_fora_da_serie');
   perform pg_temp.expect_error(format($f$select public.update_series_from('a3-f-0011', %L, 3, 4, '[]', 'conta', 'Uniforme', null, 1, 'fixo', 1)$f$,
@@ -1031,8 +1038,9 @@ select pg_temp.expect_error(format($$insert into public.commitment_series (conte
   values (%L, 'mensal', 'conta', '2027-01-01', 1, 1, %L)$$, pg_temp.id('ctx'), :elisa), '%commitment_series_forma%');
 select pg_temp.expect_error(format($$insert into public.commitment_series (context_id, kind, nature, first_due_month, first_number, last_number, installment_total, parts_per_year, created_by)
   values (%L, 'parcelada', 'financiamento', '2027-01-01', 1, 12, 12, 1, %L)$$, pg_temp.id('ctx'), :elisa), '%commitment_series_forma%');
+-- Tipo fora da lista: a forma (conferida antes, em ordem alfabética) já recusa; commitment_series_kind_check está na 14.
 select pg_temp.expect_error(format($$insert into public.commitment_series (context_id, kind, nature, first_due_month, first_number, parts_per_year, created_by)
-  values (%L, 'semanal', 'conta', '2027-01-01', 1, 1, %L)$$, pg_temp.id('ctx'), :elisa), '%commitment_series_kind_check%');
+  values (%L, 'semanal', 'conta', '2027-01-01', 1, 1, %L)$$, pg_temp.id('ctx'), :elisa), '%commitment_series_forma%');
 -- Limites aceitos pela forma (desfeitos): 12 parcelas e último número 50 × k; encerrada sem conta (first_number - 1).
 do $$
 begin
@@ -1258,6 +1266,8 @@ do $$ begin
     'create_series: só a assinatura com p_parts_per_year';
   assert to_regprocedure('public.clarevo_validate_series(uuid, text, text, text, text, bigint, text, integer, date, integer, integer, date)') is null,
     'clarevo_validate_series: só a assinatura nova';
+  assert (select pg_get_constraintdef(oid) from pg_constraint where conname = 'commitment_series_kind_check')
+    = 'CHECK ((kind = ANY (ARRAY[''mensal''::text, ''parcelada''::text, ''anual''::text])))', 'tipos: mensal, parcelada e anual';
   assert to_regprocedure('public.inform_series_year(text, uuid, integer, jsonb, bigint)') is not null
      and to_regprocedure('public.skip_series_year(text, uuid, integer, jsonb)') is not null, 'funções novas';
   assert to_regprocedure('public.month_to_pay(uuid, date)') is not null
