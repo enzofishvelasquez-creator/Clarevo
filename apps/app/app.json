@@ -23,6 +23,7 @@
     },
     "web": {
       "output": "single",
+      "lang": "pt-BR",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
