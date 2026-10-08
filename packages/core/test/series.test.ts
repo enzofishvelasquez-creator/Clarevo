@@ -85,6 +85,7 @@ const series = (over: Partial<CommitmentSeries> = {}): CommitmentSeries => ({
   firstNumber: 1,
   lastNumber: null,
   installmentTotal: null,
+  partsPerYear: null,
   currency: 'BRL',
   terms: [term(1)],
   skippedNumbers: [],
@@ -125,7 +126,7 @@ const occ = (s: CommitmentSeries, n: number, over: Partial<Commitment> = {}): Co
     category: t.category,
     status: 'aberto',
     payment: null,
-    series: { id: s.id, number: n, kind: s.kind, nature: s.nature, installmentTotal: s.installmentTotal },
+    series: { id: s.id, number: n, kind: s.kind, nature: s.nature, installmentTotal: s.installmentTotal, partsPerYear: s.partsPerYear },
     seriesOverride: false,
     amountIsEstimate: t.amountMode === 'variavel',
     createdBy: 'pessoa',
@@ -188,8 +189,8 @@ describe('gastos fixos: regras puras', () => {
     });
 
     it('janela de geração', () => {
-      expect(generationWindow('2026-10-07')).toEqual({ floor: '2026-09', top: '2026-11' });
-      expect(generationWindow('2027-01-15')).toEqual({ floor: '2026-12', top: '2027-02' });
+      expect(generationWindow('2026-10-07')).toEqual({ floor: '2026-09', top: '2026-11', annualTop: '2026-12' });
+      expect(generationWindow('2027-01-15')).toEqual({ floor: '2026-12', top: '2027-02', annualTop: '2027-03' });
     });
   });
 
@@ -389,6 +390,7 @@ describe('gastos fixos: regras puras', () => {
       firstDueMonth: OCT,
       firstNumber: 1,
       installmentTotal: null,
+      partsPerYear: null,
       lastMonth: DEC,
       ...over,
     });
@@ -464,6 +466,7 @@ describe('gastos fixos: regras puras', () => {
         firstDueMonth: OCT,
         firstNumber: 1,
         installmentTotal: null,
+        partsPerYear: null,
         lastMonth: null,
       },
       DEMO_TODAY,
@@ -520,6 +523,7 @@ describe('gastos fixos: regras puras', () => {
       firstDueMonth: OCT,
       firstNumber: 12,
       installmentTotal: 48,
+      partsPerYear: null,
       lastMonth: null,
     };
     const record: FinancialRecord = {
@@ -601,6 +605,7 @@ describe('validateSeriesDraft (mesmas regras e ordem do banco)', () => {
     firstMonthText: '10/2026',
     firstNumberText: '',
     installmentTotalText: '',
+    partsPerYearText: '',
     lastMonthText: '12/2026',
     category: 'Educação',
     ...over,
@@ -637,6 +642,7 @@ describe('validateSeriesDraft (mesmas regras e ordem do banco)', () => {
         firstDueMonth: OCT,
         firstNumber: 1,
         installmentTotal: null,
+        partsPerYear: null,
         lastMonth: DEC,
       },
     });
@@ -680,7 +686,7 @@ describe('validateSeriesDraft (mesmas regras e ordem do banco)', () => {
       draft = { ...draft, ...fix };
       expect(codeOf(draft)).toBe(code);
     }
-    expect(codeOf(mensal({ kind: 'anual' as SeriesKind, description: '' }))).toBe('tipo_invalido');
+    expect(codeOf(mensal({ kind: 'semanal' as SeriesKind, description: '' }))).toBe('tipo_invalido');
     expect(codeOf(mensal({ lastMonthText: '13/2026' }))).toBe('fim_invalido');
     expect(codeOf(parcelada({ nature: 'conta' }))).toBe('natureza_invalida');
   });
@@ -766,6 +772,7 @@ describe('validateSeriesDraft (mesmas regras e ordem do banco)', () => {
       firstDueMonth: OCT,
       firstNumber: 1,
       installmentTotal: null,
+      partsPerYear: null,
       lastMonth: null,
     };
     const err = (over: Partial<SeriesInput>) => seriesInputError({ ...ok, ...over }, DEMO_TODAY);
@@ -798,6 +805,7 @@ async function freshRepo(start = '2026-10-07') {
     firstDueMonth: first,
     firstNumber: 1,
     installmentTotal: null,
+    partsPerYear: null,
     lastMonth: last,
   });
   const edit = (s: SeriesInput, over: Partial<SeriesEditInput> = {}): SeriesEditInput => ({
@@ -865,6 +873,7 @@ describe('gastos fixos: MemoryRepository', () => {
       firstDueMonth: OCT,
       firstNumber: 14,
       installmentTotal: 48,
+      partsPerYear: null,
       lastMonth: null,
     };
     const carroW = await repo.createSeries(newOperationKey(), ctx, carroInput);
@@ -1346,6 +1355,7 @@ describe('gastos fixos: MemoryRepository', () => {
       firstDueMonth: '2026-09',
       firstNumber: 1,
       installmentTotal: 360,
+      partsPerYear: null,
       lastMonth: null,
     };
     const { series: created } = await repo.createSeries(newOperationKey(), ctx, input);
@@ -1514,8 +1524,8 @@ describe('gastos fixos: MemoryRepository', () => {
   });
 });
 
-describe('demonstração do Ciclo A', () => {
-  it('outubro 6.000 / 3.900 / 2.100 e R$ 650 a pagar; séries Aluguel, Luz e Financiamento do carro', async () => {
+describe('demonstração do Ciclo A (com as contas do ano do A3)', () => {
+  it('outubro 6.000 / 3.900 / 2.100 e R$ 650 a pagar; séries Aluguel, Luz, Financiamento do carro, IPVA e IPTU', async () => {
     const repo = await createDemoRepository();
     const ctx = (await repo.getSpace())!.personalContextId;
     const oct = summarizeMonth(await repo.listRecords(ctx, OCT), ctx, OCT);
@@ -1542,8 +1552,15 @@ describe('demonstração do Ciclo A', () => {
       ['Aluguel', 'Todo mês, dia 5 · desde outubro de 2026'],
       ['Luz', 'Todo mês, dia 12 · desde novembro de 2026'],
       ['Financiamento do carro', 'Parcelamento · financiamento · parcelas 13 a 48'],
+      ['IPVA', 'Todo ano em 20/01 · desde 2027'],
+      ['IPTU', 'Todo ano, 10 parcelas de fevereiro a novembro, dia 10 · desde 2027'],
     ]);
+    // Contas do ano ficam fora do "Por mês"; nenhuma conta delas existe em 07/10/2026.
     expect(seriesMonthlyTotal(list, DEMO_TODAY)).toEqual({ totalCents: 353000, estimatedCents: 18000 });
+    expect(list.slice(3).map((s) => [s.openCount, s.paidCount])).toEqual([
+      [0, 0],
+      [0, 0],
+    ]);
     const carroDemo = list[2]!;
     const carroOpen = await repo.listOpenSeriesOccurrences(carroDemo.id);
     expect(installmentProgress(carroDemo, await repo.listSeriesOccurrences(carroDemo.id), carroOpen, DEMO_TODAY)).toMatchObject({

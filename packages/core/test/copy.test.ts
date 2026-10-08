@@ -57,7 +57,8 @@ describe('textos do core', () => {
     for (const s of await repo.listSeries(ctx)) {
       const occurrences = await repo.listSeriesOccurrences(s.id);
       texts.push(seriesCaption(s, DEMO_TODAY), ...termHistory(s).map((h) => h.text));
-      const n = Math.max(...occurrences.map((c) => c.series!.number));
+      // Conta do ano sem conta criada (IPVA e IPTU em 07/10/2026): sem Math.max de lista vazia (-Infinity).
+      const n = occurrences.length ? Math.max(...occurrences.map((c) => c.series!.number)) : s.firstNumber;
       const edit = affectedByEditFrom(occurrences, s, n);
       if (edit.ok) texts.push(edit.text);
       const end = affectedByEnd(occurrences, s, s.firstNumber - 1);
@@ -77,6 +78,7 @@ describe('textos do core', () => {
           firstDueMonth: s.firstDueMonth,
           firstNumber: s.firstNumber,
           installmentTotal: s.installmentTotal,
+          partsPerYear: s.partsPerYear,
           lastMonth: null,
         },
         DEMO_TODAY,
