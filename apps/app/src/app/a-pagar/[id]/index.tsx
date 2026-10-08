@@ -82,7 +82,9 @@ function startAfter(date: IsoDate, today: IsoDate): IsoMonth {
  * Detalhe da conta a pagar: situação, vencimento, efeito no resumo e as ações permitidas em cada estado (D-021).
  * Conta de gasto fixo (D-024): mostra de qual série faz parte, "Só esta conta" ou "esta e as próximas" ao editar,
  * "Excluir só a conta de novembro" (não volta a ser criada) e, se estimada, "Informar o valor da conta".
- * "Adicionar a conta do próximo mês" só em conta avulsa.
+ * Conta do ano (D-029): "Parte de: IPTU · parcela 3 de 10 de 2027", "Informar o valor de 2027" e, com parcelas,
+ * "Excluir só esta parcela" ou "Tirar todas as parcelas de 2027 em aberto".
+ * "Adicionar a conta do próximo mês", "Repetir todo mês" e "Repetir todo ano" só em conta avulsa paga.
  */
 export default function DetalheContaAPagar() {
   const { id } = useLocalSearchParams<{ id: string }>();

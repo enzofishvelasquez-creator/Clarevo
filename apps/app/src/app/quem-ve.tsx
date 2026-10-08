@@ -37,7 +37,7 @@ export default function QuemVeScreen() {
       </Txt>
       <Txt color={colors.textSecondary}>
         Gastos fixos e parcelamentos também são só seus. A empresa que oferece o benefício não vê nada disso, nem em números somados aos de
-        outras pessoas.
+        outras pessoas. Contas do ano, como IPVA, IPTU e matrícula, seguem a mesma regra.
       </Txt>
       <Button label="Entendi" onPress={() => router.back()} />
     </Screen>

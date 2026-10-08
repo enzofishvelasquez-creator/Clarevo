@@ -1,6 +1,6 @@
 /**
- * Roteiro de verificação do primeiro ciclo e do Ciclo A (gastos fixos e parcelamentos) na versão web,
- * em modo demonstração (acesso simulado).
+ * Roteiro de verificação do primeiro ciclo, do Ciclo A (gastos fixos e parcelamentos) e do Ciclo A3 (contas do ano)
+ * na versão web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/. Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  */
@@ -57,6 +57,17 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     }, title);
   // Espera a lista de uma seção atender à condição; se não atender, a conferência seguinte acusa.
   const waitRows = async (title, pred, timeout = 3000) => { for (const end = Date.now() + timeout; Date.now() < end && !pred(await sectionRows(title));) await p.waitForTimeout(100); };
+  // Espera uma condição qualquer (por exemplo, uma linha sair com FadeOut); se não acontecer, a conferência seguinte acusa.
+  const waitUntil = async (pred, timeout = 3000) => { for (const end = Date.now() + timeout; Date.now() < end && !(await pred());) await p.waitForTimeout(100); };
+  // Termos proibidos (spec2 §5, como em copy.test.ts) e travessões longos, conferidos no texto das telas novas.
+  // A expressão proibida é montada por partes para não aparecer escrita aqui.
+  const FORBIDDEN = new RegExp(
+    '\\b(recomendamos|recomendo|invista|aplique|tesouro|cdb|lci|lca|caixinha|cofrinho)\\b|fundo de investimento|rentabilidade garantida|' +
+      'rendimento garantido|retorno garantido|enriquec|' + ['faz(er|endo)?', 'sentido'].join('\\s+') + '|[\\u2013\\u2014]',
+    'i',
+  );
+  const screenTexts = [];
+  const keepText = async () => { screenTexts.push(await body()); };
   // Símbolo C aberto (docs/marca): só ícone do app e abertura, nunca nas telas (D-022).
   const symbolCount = () => p.evaluate(() => [...document.querySelectorAll('path')].filter((e) => e.getBoundingClientRect().width > 0 && (e.getAttribute('d') || '').startsWith('M186 0C232')).length);
   // Logotipo "clarevo." (D-022) no cabeçalho azul das abas: imagem "Clarevo" no alto, nome branco e ponto lima.
@@ -297,12 +308,17 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('lista: próximos meses com Aluguel, parcela 13 de 48, Seguro e Luz estimada', JSON.stringify(laterNow) === JSON.stringify(laterBase) && ['Vence em 05/11/2026 · Todo mês', 'Vence em 10/11/2026 · Parcela 13 de 48', 'Vence em 12/11/2026 · Todo mês · estimado', '≈ R$ 180,00'].every((x) => t.includes(x)), (laterNow ?? []).join(' | '));
   ok('lista: aluguel de outubro pago pelo gasto fixo, em Pagas', JSON.stringify(await sectionRows('Pagas')) === JSON.stringify(['Aluguel, paga em 05/10/2026, R$ 2.500,00, gasto fixo']) && t.includes('Paga em 05/10/2026 · Todo mês'));
   ok('lista: sem valores estimados no total de outubro', !t.includes('em valores estimados'));
-  await waitText('3 cadastrados').catch(() => {});
-  ok('lista: link "Gastos fixos e parcelamentos" com a contagem', (await visibleCount('button', 'Gastos fixos e parcelamentos, 3 cadastrados')) === 1);
+  // Ciclo A3: IPVA (20/01/2027) e IPTU (fevereiro a novembro de 2027) só entram dois meses antes do primeiro vencimento.
+  ok('contas do ano: IPVA e IPTU ainda fora de Contas a pagar em outubro', !t.includes('IPVA') && !t.includes('IPTU') && !t.includes('Contas do ano aparecem aqui'));
+  // Aluguel, Luz, Financiamento do carro e as contas do ano IPVA e IPTU.
+  await waitText('5 cadastrados').catch(() => {});
+  ok('lista: link "Gastos fixos e parcelamentos" com a contagem', (await visibleCount('button', 'Gastos fixos e parcelamentos, 5 cadastrados')) === 1);
   await shot('19_contas_a_pagar');
 
   await btn('Anotar conta a pagar').click(); await waitText('Salvando em Pessoal');
-  ok('anotar conta a pagar: "Com que frequência?" começa em "Só uma vez"', (await visibleCount('radiogroup', 'Com que frequência?')) === 1 && (await radio('Só uma vez').getAttribute('aria-checked')) === 'true' && (await radio('Todo mês').getAttribute('aria-checked')) === 'false' && (await radio('Parcelado').getAttribute('aria-checked')) === 'false');
+  ok('anotar conta a pagar: "Com que frequência?" começa em "Só uma vez"', (await visibleCount('radiogroup', 'Com que frequência?')) === 1 && (await radio('Só uma vez').getAttribute('aria-checked')) === 'true' && (await radio('Todo mês').getAttribute('aria-checked')) === 'false' && (await radio('Todo ano').getAttribute('aria-checked')) === 'false' && (await radio('Parcelado').getAttribute('aria-checked')) === 'false');
+  const kindChips = await p.getByRole('radiogroup', { name: 'Com que frequência?' }).filter({ visible: true }).first().getByRole('radio').evaluateAll((es) => es.map((e) => e.textContent));
+  ok('anotar conta a pagar: chips "Só uma vez", "Todo mês", "Todo ano" e "Parcelado", nessa ordem', JSON.stringify(kindChips) === JSON.stringify(['Só uma vez', 'Todo mês', 'Todo ano', 'Parcelado']), kindChips.join(' | '));
   // "Todo mês" leva o que foi digitado para o cadastro do gasto fixo, que pede confirmação antes de descartá-lo.
   await field('Descrição').fill('Academia'); await field('Valor em reais').fill('120');
   await radio('Todo mês').click(); await waitText('Novo gasto fixo');
@@ -382,6 +398,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado');
   t = await body();
   ok('detalhe da conta paga: pago e previsto', t.includes('Paga') && t.includes('R$ 155,00') && t.includes('Valor previsto') && t.includes('R$ 150,00'));
+  ok('conta avulsa paga: "Repetir todo mês" e "Repetir todo ano"', (await visibleCount('button', 'Repetir todo mês')) === 1 && (await visibleCount('button', 'Repetir todo ano')) === 1);
   await shot('22_conta_paga');
 
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
@@ -474,8 +491,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar').click(); await waitText('Diferença do mês');
 
   // Ciclo A · gastos fixos e parcelamentos (D-023, D-024). Começa e termina com outubro na base: 6.000 / 3.900 / 2.100 e 650.
-  await openToPay(); await waitText('3 cadastrados');
-  await btn('Gastos fixos e parcelamentos, 3 cadastrados').click(); await waitText('Por mês, se os valores não mudarem');
+  await openToPay(); await waitText('5 cadastrados');
+  await btn('Gastos fixos e parcelamentos, 5 cadastrados').click(); await waitText('Por mês, se os valores não mudarem');
   t = await body();
   ok('gastos fixos: soma por mês com a parte estimada', t.includes('Por mês, se os valores não mudarem: R$ 3.530,00 (inclui R$ 180,00 estimados).'));
   ok('gastos fixos: seções e linhas com rótulos em texto',
@@ -483,8 +500,36 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
       JSON.stringify(await sectionRows('Parcelamentos')) === JSON.stringify(['Financiamento do carro, Parcela 13 de 48, R$ 850,00, termina em outubro de 2029, parcelamento']) &&
       ['R$ 2.500,00 · todo dia 5', '≈ R$ 180,00 · todo dia 12 · valor muda', 'Parcela 13 de 48 · R$ 850,00 · termina em outubro de 2029'].every((x) => t.includes(x)));
   await shot('25_gastos_fixos');
+  // Ciclo A3: a demonstração já tem IPVA e IPTU em "Contas do ano" (seção entre Parcelamentos e Encerrados).
+  // "Por mês" continua R$ 3.530,00 (as contas do ano ficam fora) e "Por ano" soma R$ 4.200,00, todos estimados.
+  const headings = await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
+  ok('contas do ano: seção depois de Gastos fixos e Parcelamentos', JSON.stringify(headings) === JSON.stringify(['Gastos fixos', 'Parcelamentos', 'Contas do ano']), headings.join(' | '));
+  ok('contas do ano: IPVA e IPTU com rótulos em texto e "Nova conta do ano"',
+    JSON.stringify(await sectionRows('Contas do ano')) === JSON.stringify(['IPVA, cerca de R$ 2.400,00, todo ano em 20/01, valor muda, conta do ano', 'IPTU, 10 parcelas de cerca de R$ 180,00, fevereiro a novembro, dia 10, valor muda, conta do ano', 'Nova conta do ano']) &&
+      ['IPVA, IPTU, matrícula, material escolar e seguro anual. Entram em Contas a pagar dois meses antes de vencer.', '≈ R$ 2.400,00 · todo ano em 20/01 · valor muda', '10 parcelas de ≈ R$ 180,00 · fevereiro a novembro, dia 10 · valor muda'].every((x) => t.includes(x)),
+    ((await sectionRows('Contas do ano')) ?? []).join(' | '));
+  ok('contas do ano: "Por ano" com a parte estimada e "Por mês" continua R$ 3.530,00, sem elas',
+    t.includes('Por ano, se os valores não mudarem: R$ 4.200,00 (inclui R$ 4.200,00 estimados).') && t.includes('Por mês, se os valores não mudarem: R$ 3.530,00 (inclui R$ 180,00 estimados). Contas do ano ficam fora desta soma.'));
+  await keepText();
+  await shot('36_contas_do_ano', true);
+  await openRow(/^IPVA, cerca de R\$ 2\.400,00/); await waitText('Ano a ano');
+  await waitText('entra em Contas a pagar em novembro de 2026').catch(() => {});
+  t = await body();
+  ok('IPVA: "Todo ano em 20/01 · desde 2027" e o ano de 2027 previsto, que entra em novembro de 2026',
+    ['Todo ano em 20/01 · desde 2027', 'Valor muda: referência de R$ 2.400,00 (estimado)', 'Cada ano entra em Contas a pagar dois meses antes do primeiro vencimento e só entra em Ainda a pagar no mês em que vence.',
+      '2027 · previsto · cerca de R$ 2.400,00 · entra em Contas a pagar em novembro de 2026', 'R$ 2.400,00 (estimado) a partir de 2027'].every((x) => t.includes(x)) &&
+      (await visibleCount('button', /^Informar o valor de|^Não houve em|^Tirar as parcelas/)) === 0, t.slice(0, 200));
+  ok('IPVA: ações da conta do ano', (await Promise.all(['Mudar valor ou dia a partir de uma conta', 'Mudar a forma de pagamento', 'Encerrar conta do ano', 'Excluir conta do ano'].map((n) => visibleCount('button', n)))).every((n) => n === 1));
+  await btn('Mudar a forma de pagamento').click(); await waitText('Mudar a forma de pagamento?');
+  ok('"Mudar a forma de pagamento": encerrar e cadastrar outra, com o histórico mantido', (await dialogText()).includes('Para passar de cota única para parcelas, mudar o número de parcelas ou o mês, encerre esta conta do ano no último ano com a forma atual e cadastre uma nova. O histórico continua aqui.') &&
+    (await dialogText()).includes('Encerrar e cadastrar nova'));
+  await confirmIn('Voltar'); await waitGone('Mudar a forma de pagamento?');
+  await keepText();
+  await shot('37_conta_do_ano_prevista', true);
+  await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
   await btn('Quem vê estes dados?').click(); await waitText('Gastos fixos e parcelamentos também são só seus.');
   ok('"Quem vê estes dados?": gastos fixos e parcelamentos também são só seus', (await body()).includes('Gastos fixos e parcelamentos também são só seus. A empresa que oferece o benefício não vê nada disso, nem em números somados aos de outras pessoas.'));
+  ok('"Quem vê estes dados?": contas do ano seguem a mesma regra', (await body()).includes('Contas do ano, como IPVA, IPTU e matrícula, seguem a mesma regra.'));
   await btn('Entendi').click(); await waitText('Por mês, se os valores não mudarem');
 
   await openRow(/^Financiamento do carro, Parcela 13 de 48/); await waitText('Pagas antes do Clarevo');
@@ -503,13 +548,18 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await body();
   ok('gasto fixo vazio: mensagens exatas e foco no primeiro erro', ['Dê um nome para este gasto fixo ou parcelamento.', 'Informe um valor maior que zero, como 80,00.', 'Informe um dia de 1 a 31.'].every((x) => t.includes(x)) &&
     (await field('Descrição').evaluate((e) => e === document.activeElement)));
-  ok('chips com papel de rádio em grupo com nome', (await visibleCount('radiogroup', 'Com que frequência?')) === 1 && (await radio('Todo mês').getAttribute('aria-checked')) === 'true' && (await radio('Parcelado').getAttribute('aria-checked')) === 'false');
+  ok('chips com papel de rádio em grupo com nome', (await visibleCount('radiogroup', 'Com que frequência?')) === 1 && (await radio('Todo mês').getAttribute('aria-checked')) === 'true' && (await radio('Todo ano').getAttribute('aria-checked')) === 'false' && (await radio('Parcelado').getAttribute('aria-checked')) === 'false');
+  // Chips na ordem "Todo mês", "Todo ano" e "Parcelado" (a mesma de Anotar conta a pagar).
+  const focusRing = () => p.evaluate(() => { const e = document.activeElement; const s = getComputedStyle(e); return [e.getAttribute('role'), e.textContent, s.outlineWidth, s.outlineStyle].join(' '); });
   await radio('Todo mês').focus(); await p.keyboard.press('Tab');
-  const ring = await p.evaluate(() => { const e = document.activeElement; const s = getComputedStyle(e); return [e.getAttribute('role'), e.textContent, s.outlineWidth, s.outlineStyle].join(' '); });
-  ok('Tab leva ao chip seguinte, com foco visível de 3 px', ring === 'radio Parcelado 3px solid', ring);
+  const ring = await focusRing();
+  ok('Tab leva ao chip seguinte, com foco visível de 3 px', ring === 'radio Todo ano 3px solid', ring);
+  await p.keyboard.press('Tab');
+  const ring2 = await focusRing();
+  ok('Tab de novo leva a "Parcelado", com foco visível de 3 px', ring2 === 'radio Parcelado 3px solid', ring2);
   await p.keyboard.press('Enter'); await waitText('Novo parcelamento');
   ok('Enter escolhe o chip: formulário de parcelamento', (await radio('Parcelado').getAttribute('aria-checked')) === 'true' && (await radio('Todo mês').getAttribute('aria-checked')) === 'false' && (await field('Total de parcelas').count()) === 1);
-  await p.keyboard.press('Shift+Tab'); await p.keyboard.press(' '); await waitText('Novo gasto fixo').catch(() => {});
+  await p.keyboard.press('Shift+Tab'); await p.keyboard.press('Shift+Tab'); await p.keyboard.press(' '); await waitText('Novo gasto fixo').catch(() => {});
   ok('Espaço escolhe o chip: volta para todo mês, com o foco no chip', (await radio('Todo mês').getAttribute('aria-checked')) === 'true' && (await p.evaluate(() => document.activeElement?.textContent)) === 'Todo mês');
   await field('Descrição').fill('Escola'); await field('Valor por mês').fill('900'); await field('Dia do vencimento').fill('10');
   ok('primeira conta: chips com o vencimento e o primeiro a partir de hoje escolhido', (await radio('Outubro (vence em 10/10)').getAttribute('aria-checked')) === 'true' && (await radio('Novembro (vence em 10/11)').getAttribute('aria-checked')) === 'false');
@@ -538,7 +588,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Marcar como paga').click(); await waitText('Confirmar pagamento');
   ok('pagar a Escola: valor previsto e hoje', (await field('Valor pago').inputValue()) === '900,00' && (await field('Data do pagamento').inputValue()) === '07/10/2026');
   await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado');
-  ok('Escola paga: sem "Adicionar a conta do próximo mês" nem "Repetir todo mês"', (await visibleCount('button', 'Adicionar a conta do próximo mês')) === 0 && (await visibleCount('button', 'Repetir todo mês')) === 0 && (await body()).includes('Pago de outubro de 2026'));
+  ok('Escola paga: sem "Adicionar a conta do próximo mês" nem "Repetir todo mês"', (await visibleCount('button', 'Adicionar a conta do próximo mês')) === 0 && (await visibleCount('button', 'Repetir todo mês')) === 0 && (await visibleCount('button', 'Repetir todo ano')) === 0 && (await body()).includes('Pago de outubro de 2026'));
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
   await expectTotals('pagar a Escola de novembro hoje → Pago de outubro 4.800, a pagar 650', 'R$ 6.000,00', 'R$ 4.800,00', 'R$ 1.200,00', 'R$ 650,00');
   await openToPay();
@@ -593,8 +643,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Luz de novembro sai de Contas a pagar', !((await sectionRows('Próximos meses')) ?? ['Luz']).some((r) => r.startsWith('Luz')));
 
   // Encerrar a Escola em novembro e retomar sem data para terminar.
-  await waitText('4 cadastrados');
-  await btn('Gastos fixos e parcelamentos, 4 cadastrados').click(); await waitText('Por mês, se os valores não mudarem');
+  await waitText('6 cadastrados');
+  await btn('Gastos fixos e parcelamentos, 6 cadastrados').click(); await waitText('Por mês, se os valores não mudarem');
   await openRow(/^Escola, R\$ 900,00, todo dia 10, termina em dezembro de 2026, gasto fixo/); await waitText('Encerrar gasto fixo');
   await btn('Encerrar gasto fixo').click(); await waitText('Qual é a última conta?');
   await radio('Novembro').click(); await waitText('Nenhuma conta em aberto vai sair da lista.');
@@ -669,6 +719,291 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar').click(); await waitText('Setembro de 2026');
   await p.getByRole('button', { name: /Próximo mês/ }).filter({ visible: true }).first().click(); await waitText('Outubro de 2026');
   await expectTotals('Ciclo A termina com outubro na base', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+
+  // Ciclo A3 · contas do ano (D-029). Começa e termina com outubro na base: 6.000 / 3.900 / 2.100 e 650.
+  // Telas novas: conferidas a 390 e a 320 px (cabeçalho, largura, valores inteiros, alvos de toque) e contra termos proibidos.
+  const widthChecks = async (prefix, shotName, { full = false, scrollTo = null } = {}) => {
+    await innerChecks(`${prefix} 390px`);
+    await keepText();
+    await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+    await innerChecks(`${prefix} 320px`);
+    if (scrollTo) await p.getByText(scrollTo, { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
+    if (shotName) await shot(shotName, full);
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  };
+  // Grade de meses: 12 chips inteiros, nenhum rótulo cortado nem fora da tela, alvos de 44 px.
+  const monthGrid = (label) =>
+    p.evaluate((label) => {
+      const g = [...document.querySelectorAll('[role=radiogroup]')].find((e) => e.getAttribute('aria-label') === label && e.getBoundingClientRect().width > 0);
+      if (!g) return null;
+      const rs = [...g.querySelectorAll('[role=radio]')];
+      const boxes = rs.map((r) => r.getBoundingClientRect());
+      return {
+        n: rs.length,
+        cut: rs.filter((r) => [...r.querySelectorAll('div[dir="auto"]')].some((x) => x.scrollWidth > x.clientWidth + 1)).map((r) => r.textContent),
+        minW: Math.round(Math.min(...boxes.map((b) => b.width))),
+        minH: Math.round(Math.min(...boxes.map((b) => b.height))),
+        rows: new Set(boxes.map((b) => Math.round(b.top))).size,
+        outside: boxes.filter((b) => b.left < -0.5 || b.right > window.innerWidth + 0.5).length,
+      };
+    }, label);
+  const gridOk = (g, maxRows) => g !== null && g.n === 12 && g.cut.length === 0 && g.outside === 0 && g.minW >= 44 && g.minH >= 44 && g.rows <= maxRows;
+  const openSeriesList = async () => { await p.getByRole('button', { name: /^Gastos fixos e parcelamentos, / }).filter({ visible: true }).first().click(); await waitText('Por ano, se os valores não mudarem'); };
+
+  // "Todo ano" em Anotar conta a pagar leva descrição e valor para "Nova conta do ano".
+  await openToPay();
+  await btn('Anotar conta a pagar').click(); await waitText('Salvando em Pessoal');
+  await field('Descrição').fill('Matrícula'); await field('Valor em reais').fill('1200');
+  await radio('Todo ano').click(); await waitText('Como você paga?');
+  ok('"Todo ano" leva a "Nova conta do ano" sem perder descrição nem valor', (await p.locator('h1').filter({ visible: true }).first().textContent()) === 'Nova conta do ano' &&
+    (await field('Descrição').inputValue()) === 'Matrícula' && (await field('Valor de referência').inputValue()) === '1.200,00' && (await radio('Todo ano').getAttribute('aria-checked')) === 'true');
+  t = await body();
+  ok('conta do ano: cota única e "Sim, muda todo ano" como padrão, com a dica do valor de referência',
+    (await radio('Uma vez no ano (cota única)').getAttribute('aria-checked')) === 'true' && (await radio('Sim, muda todo ano (como IPVA e IPTU)').getAttribute('aria-checked')) === 'true' &&
+      ['Use o valor do último ano. Ele aparece como estimado até você informar o valor do ano.', 'Ex.: IPVA, IPTU, Matrícula, Material escolar, Seguro do carro. Não é preciso citar pessoas.',
+        'Escolha o mês e o dia para escolher o primeiro ano.'].every((x) => t.includes(x)));
+  const monthChips = await p.getByRole('radiogroup', { name: 'Mês do vencimento' }).filter({ visible: true }).first().getByRole('radio').evaluateAll((es) => es.map((e) => `${e.getAttribute('aria-label')}=${e.textContent}`));
+  ok('mês do vencimento: 12 chips como rádio, "Jan" na tela e "Janeiro" no leitor de tela', monthChips.length === 12 && monthChips[0] === 'Janeiro=Jan' && monthChips[11] === 'Dezembro=Dez', monthChips.join(' '));
+  await radio('Dezembro').click(); await field('Dia do vencimento').fill('10');
+  await waitText('2026 (vence em 10/12/2026)');
+  ok('primeiro ano: chips com o vencimento, o primeiro a partir de hoje escolhido', (await visibleCount('radiogroup', 'Primeiro ano')) === 1 &&
+    (await radio('2026 (vence em 10/12/2026)').getAttribute('aria-checked')) === 'true' && (await radio('2027 (vence em 10/12/2027)').getAttribute('aria-checked')) === 'false');
+  await radio('Não, é sempre o mesmo').click(); await radio('Educação').click();
+  ok('valor fixo: o campo passa a "Valor da conta", com o valor digitado', (await field('Valor da conta').inputValue()) === '1.200,00');
+  await radio('2027 (vence em 10/12/2027)').click(); await waitText('a partir de 2027');
+  ok('prévia acompanha o primeiro ano: a conta de 2027 entra em outubro de 2027', (await body()).includes('Matrícula · R$ 1.200,00 · todo ano em 10/12 · a partir de 2027. A conta de 2027 entra em Contas a pagar em outubro de 2027, dois meses antes de vencer, e só entra em Ainda a pagar em dezembro.'));
+  await radio('2026 (vence em 10/12/2026)').click(); await waitText('A conta de 2026 já entra em Contas a pagar');
+  ok('prévia da Matrícula: a conta de 2026 já entra, em Próximos meses', (await body()).includes('Matrícula · R$ 1.200,00 · todo ano em 10/12 · a partir de 2026. A conta de 2026 já entra em Contas a pagar, em Próximos meses.'));
+  const grid390 = await monthGrid('Mês do vencimento');
+  ok('390 px: grade de meses com 4 por linha, inteira', gridOk(grid390, 3), JSON.stringify(grid390));
+  await p.getByText('Mês do vencimento', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
+  await shot('38_nova_conta_do_ano');
+  await p.getByText('Como vai ficar', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
+  await shot('39_conta_do_ano_previa');
+  await widthChecks('nova conta do ano');
+  await btn('Salvar conta do ano').click(); await waitText('Conta do ano salva');
+  await waitText('entra em Contas a pagar em outubro de 2027').catch(() => {});
+  t = await body();
+  ok('Matrícula salva: faixa de sucesso e "Ano a ano" com 2026 em aberto e 2027 previsto', t.includes('Conta do ano salva. A conta de 2026 já está em Contas a pagar.') &&
+    ['Todo ano em 10/12 · desde 2026', 'R$ 1.200,00 por ano', '2026 · em aberto · R$ 1.200,00', '2027 · previsto · R$ 1.200,00 · entra em Contas a pagar em outubro de 2027'].every((x) => t.includes(x)) &&
+    (await visibleCount('button', /^Matrícula, vence em 10\/12\/2026, R\$ 1\.200,00, conta do ano de 2026$/)) === 1 && (await visibleCount('button', 'Não houve em 2026')) === 1 &&
+    (await visibleCount('button', 'Informar o valor de 2026')) === 0, t.slice(0, 300));
+  await widthChecks('conta do ano salva', '40_conta_do_ano_salva_320px', { full: true });
+  await goResumo();
+  await expectTotals('criar Matrícula (10/12/2026) → outubro sem mudança', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  ok('criar Matrícula: card de outubro sem mudança', (await body()).includes('2 contas · próxima: Internet, 15/10'));
+  await openToPay();
+  await waitRows('Próximos meses', (rows) => (rows ?? []).some((r) => r.startsWith('Matrícula')));
+  t = await body();
+  ok('Contas a pagar: Matrícula em Próximos meses, com "Conta do ano de 2026", e a nota da seção',
+    ((await sectionRows('Próximos meses')) ?? []).includes('Matrícula, vence em 10/12/2026, R$ 1.200,00, conta do ano de 2026') &&
+      t.includes('Vence em 10/12/2026 · Conta do ano de 2026') && t.includes('Não entram no total deste mês. Contas do ano aparecem aqui dois meses antes de vencer.'));
+
+  // Seguro residencial: 4 parcelas por ano de novembro a fevereiro, valor que muda. O ano "2026/2027" entra inteiro agora.
+  await openSeriesList();
+  await btn('Nova conta do ano').click(); await waitText('Como você paga?');
+  await field('Descrição').fill('Seguro residencial');
+  await radio('Em parcelas no ano').click(); await field('Quantas parcelas por ano?').fill('4');
+  ok('"Em parcelas no ano": "Quantas parcelas por ano?" e "Mês da primeira parcela"', (await visibleCount('radiogroup', 'Mês da primeira parcela')) === 1 &&
+    (await body()).includes('As parcelas vencem em meses seguidos, como um IPTU de fevereiro a novembro. Parcelas no cartão já entram na fatura: anote aqui só carnê, boleto ou débito.'));
+  await radio('Novembro').click(); await field('Dia do vencimento').fill('15'); await field('Valor de referência').fill('120');
+  await radio('Moradia').click();
+  await waitText('2026/2027 (primeira vence em 15/11/2026)');
+  ok('primeiro ano que atravessa a virada: "2026/2027" na tela e "2026 a 2027" no leitor de tela',
+    (await radio('2026 a 2027 (primeira vence em 15/11/2026)').getAttribute('aria-checked')) === 'true' && (await visibleCount('radio', '2027 a 2028 (primeira vence em 15/11/2027)')) === 1);
+  await waitText('Cerca de R$ 480,00 por ano.').catch(() => {});
+  ok('prévia do Seguro residencial: as 4 parcelas de 2026/2027 já entram', (await body()).includes('Seguro residencial · 4 parcelas de cerca de R$ 120,00 (estimado) · todo dia 15, de novembro a fevereiro · a partir de 2026/2027. Cerca de R$ 480,00 por ano. As 4 parcelas de 2026/2027 já entram em Contas a pagar; cada uma só entra em Ainda a pagar no mês em que vence.'));
+  await innerChecks('nova conta do ano em parcelas 390px');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  const grid320 = await monthGrid('Mês da primeira parcela');
+  ok('320 px: grade de meses inteira, sem rótulo cortado', gridOk(grid320, 4), JSON.stringify(grid320));
+  await innerChecks('nova conta do ano em parcelas 320px');
+  await keepText();
+  await p.getByText('Quantas parcelas por ano?', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
+  await shot('41_nova_conta_do_ano_320px');
+  await p.getByText('Como vai ficar', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
+  await shot('41_nova_conta_do_ano_previa_320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  await btn('Salvar conta do ano').click(); await waitText('Conta do ano salva');
+  await waitText('2026/2027 · 4 parcelas · 4 em aberto').catch(() => {});
+  t = await body();
+  ok('Seguro residencial salvo: faixa, legenda, valor por ano e "Ano a ano"', t.includes('Conta do ano salva. As 4 parcelas de 2026/2027 já estão em Contas a pagar.') &&
+    ['Todo ano, 4 parcelas de novembro a fevereiro, dia 15 · desde 2026/2027', 'Valor muda: referência de R$ 120,00 por parcela (estimado) · cerca de R$ 480,00 por ano',
+      '2026/2027 · 4 parcelas · 4 em aberto · cerca de R$ 480,00', '2027/2028 · previsto · cerca de R$ 480,00 · entra em Contas a pagar em setembro de 2027'].every((x) => t.includes(x)) &&
+    (await visibleCount('button', 'Ver as 4 parcelas')) === 1 && (await visibleCount('button', 'Tirar as parcelas de 2026/2027 em aberto')) === 1, t.slice(0, 300));
+  await goResumo();
+  await expectTotals('criar Seguro residencial (15/11/2026 a 15/02/2027) → outubro sem mudança', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  await openToPay();
+  const seguroGroup = 'Seguro residencial de 2026 a 2027, 4 parcelas de cerca de R$ 120,00, valor estimado, de 15/11/2026 a 15/02/2027, conta do ano. Toque para ver as parcelas.';
+  await waitRows('Próximos meses', (rows) => (rows ?? []).includes(seguroGroup));
+  let later = (await sectionRows('Próximos meses')) ?? [];
+  t = await body();
+  ok('Próximos meses: as 4 parcelas num único grupo do ano, com nome acessível único ("cerca de")',
+    later.filter((r) => r.startsWith('Seguro residencial')).length === 1 && later.includes(seguroGroup) &&
+      ['Seguro residencial de 2026/2027', '4 parcelas, de 15/11/2026 a 15/02/2027 · estimado', '≈ R$ 480,00'].every((x) => t.includes(x)), later.join(' | '));
+  await widthChecks('contas a pagar com grupo do ano', '42_proximos_meses_conta_do_ano_320px', { full: true });
+  await shot('42_proximos_meses_conta_do_ano', true);
+
+  // Informar o valor de 2026/2027 (R$ 114,00 por parcela): as parcelas deixam de ser estimadas; total do ano R$ 456,00.
+  await openRow(seguroGroup); await waitText('Ano a ano'); await waitText('Ver as 4 parcelas');
+  await btn('Informar o valor de 2026/2027').click(); await waitText('Use o valor do carnê ou do boleto de 2026/2027.');
+  ok('informar: título com o ano, campo de cada parcela com foco e a dica', (await p.locator('h1').filter({ visible: true }).first().textContent()) === 'Informar o valor de 2026/2027' &&
+    (await field('Valor de cada parcela de 2026/2027').evaluate((e) => e === document.activeElement)) &&
+    (await body()).includes('Se as parcelas têm valores diferentes, informe o valor mais comum e ajuste as outras em cada conta.'));
+  await field('Valor de cada parcela de 2026/2027').fill('114,00');
+  await waitText('Total de 2026/2027: R$ 456,00.');
+  ok('informar: prévia com o que muda, o total do ano e o que não muda', (await body()).includes('Vão mudar: as 4 parcelas de 2026/2027 em aberto com valor estimado. Total de 2026/2027: R$ 456,00. Não mudam: parcelas pagas e parcelas com valor já informado.'));
+  await shot('43_informar_valor_do_ano');
+  await widthChecks('informar o valor do ano', '43_informar_valor_do_ano_320px');
+  await btn('Informar valor').click(); await waitText('Valor de 2026/2027 informado');
+  await waitText('2026/2027 · 4 parcelas · 4 em aberto · R$ 456,00').catch(() => {});
+  t = await body();
+  ok('valor informado: faixa e o total de 2026/2027 em R$ 456,00, sem "cerca de"', t.includes('Valor de 2026/2027 informado. As parcelas deixaram de ser estimadas.') &&
+    t.includes('2026/2027 · 4 parcelas · 4 em aberto · R$ 456,00') && (await visibleCount('button', 'Informar o valor de 2026/2027')) === 0, t.slice(0, 300));
+  await btn('Ver as 4 parcelas').click(); await waitText('Esconder as parcelas');
+  const partRow = (n, rest = 'R\\$ 114,00') => new RegExp(`^Seguro residencial, vence em [0-9/]+, ${rest}, parcela ${n} de 4 de 2026 a 2027, conta do ano$`);
+  ok('"Ver as 4 parcelas": linhas tocáveis com a parcela e o ano, sem estimado', (await Promise.all([1, 2, 3, 4].map((n) => visibleCount('button', partRow(n))))).every((n) => n === 1) &&
+    (await p.getByRole('button', { name: 'Esconder as parcelas', exact: true }).filter({ visible: true }).first().getAttribute('aria-expanded')) === 'true');
+  await shot('44_conta_do_ano_parcelas', true);
+  await widthChecks('conta do ano com as parcelas', '44_conta_do_ano_parcelas_320px', { full: true });
+  await goResumo(); await openToPay();
+  await waitRows('Próximos meses', (rows) => (rows ?? []).some((r) => r.startsWith('Seguro residencial de 2026 a 2027, 4 parcelas de R$ 114,00')));
+  t = await body();
+  ok('"estimado" sai do grupo: 4 parcelas de R$ 114,00, total R$ 456,00', ((await sectionRows('Próximos meses')) ?? []).includes('Seguro residencial de 2026 a 2027, 4 parcelas de R$ 114,00, de 15/11/2026 a 15/02/2027, conta do ano. Toque para ver as parcelas.') &&
+    t.includes('4 parcelas, de 15/11/2026 a 15/02/2027') && !t.includes('4 parcelas, de 15/11/2026 a 15/02/2027 · estimado') && t.includes('R$ 456,00'));
+
+  // Excluir uma parcela oferece tirar todas as do ano em aberto (só conferência: Cancelar).
+  await openRow(/^Seguro residencial de 2026 a 2027/); await waitText('Ver as 4 parcelas');
+  await btn('Ver as 4 parcelas').click(); await waitText('Esconder as parcelas');
+  await openRow(partRow(2)); await waitText('Parte de: Seguro residencial');
+  t = await body();
+  ok('parcela da conta do ano: "Parte de", "Ver conta do ano", valor informado e "Excluir parcela"', t.includes('Parte de: Seguro residencial · parcela 2 de 4 de 2026/2027') &&
+    t.includes('Valor informado ou alterado só nesta conta.') && (await visibleCount('button', 'Ver conta do ano')) === 1 && (await visibleCount('button', 'Excluir parcela')) === 1);
+  await btn('Editar conta a pagar').click(); await waitText('O que você quer alterar?');
+  ok('editar parcela: "Só a parcela 2 de 2026/2027" ou "A parcela 2 de 2026/2027 e as próximas"', (await Promise.all(['Só a parcela 2 de 2026/2027', 'A parcela 2 de 2026/2027 e as próximas'].map((n) => visibleCount('button', n)))).every((n) => n === 1));
+  await btn('Cancelar').click(); await p.waitForTimeout(300);
+  await btn('Excluir parcela').click(); await waitText('O que você quer excluir?');
+  ok('excluir parcela: "Excluir só esta parcela" ou "Tirar todas as parcelas de 2026/2027 em aberto"', (await Promise.all(['Excluir só esta parcela', 'Tirar todas as parcelas de 2026/2027 em aberto'].map((n) => visibleCount('button', n)))).every((n) => n === 1));
+  await btn('Tirar todas as parcelas de 2026/2027 em aberto').click(); await waitText('Tirar as 4 parcelas de 2026/2027 em aberto?');
+  ok('tirar as parcelas do ano: diz que saem, não voltam e que a conta do ano continua', (await dialogText()).includes('Elas saem de Contas a pagar e não voltam a ser criadas. A conta do ano continua em 2027/2028.'));
+  await keepText();
+  await shot('45_tirar_parcelas_do_ano');
+  await btn('Cancelar').click(); await p.waitForTimeout(300);
+  ok('cancelar não tira nada', (await visibleCount('button', 'Marcar como paga')) === 1 && (await body()).includes('R$ 114,00'));
+  await btn('Voltar').click(); await waitText('Esconder as parcelas');
+
+  // "Paguei o ano todo de uma vez": a parcela 1 paga com R$ 433,20 e as outras 3 tiradas. Desfazer não traz as 3 de volta.
+  await openRow(partRow(1)); await waitText('Marcar como paga');
+  await btn('Marcar como paga').click(); await waitText('Confirmar pagamento');
+  const wholeBox = p.getByRole('checkbox', { name: /^Paguei o ano todo de uma vez \(cota única\)/ }).filter({ visible: true }).first();
+  await wholeBox.waitFor({ timeout: 8000 }).catch(() => {});
+  ok('pagamento da parcela: caixa "Paguei o ano todo de uma vez", desmarcada, com o aviso', (await wholeBox.count()) === 1 && (await wholeBox.getAttribute('aria-checked')) === 'false' &&
+    (await body()).includes('Informe o valor total pago. As outras 3 parcelas de 2026/2027 em aberto saem de Contas a pagar e não voltam, mesmo se você desfizer este pagamento.') &&
+    (await field('Valor pago').inputValue()) === '114,00');
+  await wholeBox.click(); await waitText('Soma das 4 parcelas de 2026/2027 em aberto');
+  ok('caixa marcada: "Valor total pago" e a soma das parcelas em aberto como referência', (await wholeBox.getAttribute('aria-checked')) === 'true' && (await field('Valor total pago').count()) === 1 &&
+    (await body()).includes('Soma das 4 parcelas de 2026/2027 em aberto: R$ 456,00. Informe o valor que saiu da conta, com desconto, se houver.'));
+  await field('Valor total pago').fill('433,20'); await waitText('Um gasto de R$ 433,20');
+  ok('pagar o ano todo: o gasto em Pago de outubro e as outras 3 parcelas saem depois', (await body()).includes('Um gasto de R$ 433,20 será registrado em Pago de outubro de 2026') &&
+    (await body()).includes('Depois, as outras 3 parcelas de 2026/2027 em aberto saem de Contas a pagar.'));
+  await p.getByText('Depois, as outras 3 parcelas', { exact: false }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
+  await shot('46_paguei_o_ano_todo');
+  await widthChecks('paguei o ano todo', '46_paguei_o_ano_todo_320px', { scrollTo: 'Valor total pago' });
+  await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado');
+  t = await firstBodyWith('saíram de Contas a pagar');
+  ok('pagamento do ano todo: faixa diz que as outras 3 parcelas saíram', t.includes('Pagamento registrado. As outras 3 parcelas de 2026/2027 saíram de Contas a pagar.'));
+  await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
+  await expectTotals('pagar o ano todo do Seguro residencial (R$ 433,20) → 4.333,20 / 1.666,80, a pagar 650', 'R$ 6.000,00', 'R$ 4.333,20', 'R$ 1.666,80', 'R$ 650,00');
+  await openToPay();
+  await waitRows('Próximos meses', (rows) => rows !== null && !rows.some((r) => r.startsWith('Seguro residencial')));
+  ok('o grupo sai de Próximos meses e a parcela 1 aparece em Pagas', !((await sectionRows('Próximos meses')) ?? ['Seguro residencial']).some((r) => r.startsWith('Seguro residencial')) &&
+    ((await sectionRows('Pagas')) ?? []).some((r) => /^Seguro residencial, paga em 07\/10\/2026, R\$ 433,20, conta em Pago de outubro de 2026/.test(r)));
+  await openRow(/^Seguro residencial, paga em 07\/10\/2026/); await waitText('Desfazer pagamento');
+  await btn('Desfazer pagamento').click(); await waitText('Desfazer pagamento?');
+  await confirmIn('Desfazer pagamento'); await waitText('Pagamento desfeito');
+  await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
+  await expectTotals('desfazer o pagamento do ano todo → Pago 3.900, a pagar 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  await openToPay();
+  await waitRows('Próximos meses', (rows) => (rows ?? []).some((r) => r.startsWith('Seguro residencial, vence em 15/11/2026')));
+  const seguroRows = ((await sectionRows('Próximos meses')) ?? []).filter((r) => r.startsWith('Seguro residencial'));
+  ok('desfazer: a parcela 1 volta sozinha, sem grupo, e as parcelas 2 a 4 continuam fora',
+    JSON.stringify(seguroRows) === JSON.stringify(['Seguro residencial, vence em 15/11/2026, R$ 114,00, parcela 1 de 4 de 2026 a 2027, conta do ano']), seguroRows.join(' | '));
+
+  // "Não houve em 2026" na Matrícula (cota única): a conta sai e não volta.
+  await openSeriesList();
+  await openRow(/^Matrícula, R\$ 1\.200,00, todo ano em 10\/12, conta do ano$/); await waitText('Ano a ano');
+  await btn('Não houve em 2026').click(); await waitText('Tirar a conta de 2026?');
+  ok('"Não houve em 2026": a conta sai, não volta, e a conta do ano continua em 2027', (await dialogText()).includes('Ela sai de Contas a pagar e não volta a ser criada. A conta do ano continua em 2027.'));
+  await shot('47_nao_houve_no_ano');
+  await confirmIn('Tirar conta'); await waitText('A conta de 2026 saiu de Contas a pagar.');
+  await waitUntil(async () => (await visibleCount('button', /^Matrícula, vence em 10\/12\/2026/)) === 0);
+  t = await body();
+  ok('Matrícula de 2026 tirada: "2026 · não houve" e 2027 previsto', (await visibleCount('button', /^Matrícula, vence em 10\/12\/2026/)) === 0 && t.includes('2026 · não houve') &&
+    t.includes('2027 · previsto · R$ 1.200,00 · entra em Contas a pagar em outubro de 2027'));
+
+  // "Tirar as parcelas de 2026/2027 em aberto" no detail do Seguro residencial: a parcela 1, que voltou ao desfazer.
+  await btn('Voltar').click(); await waitText('Por ano, se os valores não mudarem');
+  await openRow(/^Seguro residencial, 4 parcelas de cerca de R\$ 120,00/); await waitText('Ano a ano');
+  await waitText('2026/2027 · 4 parcelas · 1 em aberto · 3 tiradas · R$ 114,00').catch(() => {});
+  ok('Ano a ano depois de desfazer: 1 em aberto e 3 tiradas', (await body()).includes('2026/2027 · 4 parcelas · 1 em aberto · 3 tiradas · R$ 114,00'));
+  await btn('Tirar as parcelas de 2026/2027 em aberto').click(); await waitText('Tirar a parcela 1 de 2026/2027?');
+  ok('tirar a última em aberto: "Tirar a parcela 1 de 2026/2027?"', (await dialogText()).includes('Ela sai de Contas a pagar e não volta a ser criada. A conta do ano continua em 2027/2028.'));
+  await confirmIn('Tirar parcelas'); await waitText('A parcela 1 de 2026/2027 saiu de Contas a pagar.');
+  await waitText('2026/2027 · 4 parcelas · 4 tiradas').catch(() => {});
+  ok('Seguro residencial: as 4 parcelas de 2026/2027 tiradas, a conta do ano continua', (await body()).includes('2026/2027 · 4 parcelas · 4 tiradas') &&
+    (await visibleCount('button', 'Tirar as parcelas de 2026/2027 em aberto')) === 0 && (await visibleCount('button', 'Encerrar conta do ano')) === 1);
+
+  // Ano já começado e parcelas vencidas: Material escolar, 2 parcelas (05/09 e 05/10/2026), agrupadas em Contas vencidas.
+  await btn('Voltar').click(); await waitText('Por ano, se os valores não mudarem');
+  await btn('Nova conta do ano').click(); await waitText('Como você paga?');
+  await field('Descrição').fill('Material escolar');
+  await radio('Em parcelas no ano').click(); await field('Quantas parcelas por ano?').fill('2');
+  await radio('Setembro').click(); await field('Dia do vencimento').fill('5');
+  await radio('Não, é sempre o mesmo').click(); await field('Valor de cada parcela').fill('150'); await radio('Educação').click();
+  await waitText('Próxima parcela a pagar em 2026');
+  ok('ano já começado: "Próxima parcela a pagar em 2026", com o próximo vencimento a partir de hoje escolhido',
+    (await radio('2027 (primeira vence em 05/09/2027)').getAttribute('aria-checked')) === 'true' && (await radio('2026 (primeira venceu em 05/09/2026)').getAttribute('aria-checked')) === 'false' &&
+      (await radio('Parcela 2 (venceu em 05/10)').getAttribute('aria-checked')) === 'false' && (await body()).includes('As parcelas anteriores deste ano não viram gastos.'));
+  await radio('2026 (primeira venceu em 05/09/2026)').click(); await waitText('Esta conta já venceu.');
+  ok('primeira parcela vencida: aviso e prévia com as 2 parcelas de 2026', (await body()).includes('Material escolar · 2 parcelas de R$ 150,00 · todo dia 5, de setembro a outubro · a partir de 2026. R$ 300,00 por ano. As 2 parcelas de 2026 já entram em Contas a pagar; cada uma só entra em Ainda a pagar no mês em que vence.'));
+  await btn('Salvar conta do ano').click(); await waitText('Conta do ano salva');
+  ok('Material escolar salvo', (await body()).includes('Conta do ano salva. As 2 parcelas de 2026 já estão em Contas a pagar.'));
+  await goResumo();
+  await expectTotals('criar Material escolar (2 parcelas vencidas) → a pagar 950', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 950,00');
+  await openToPay();
+  await btn('Revisar vencidas').click(); await waitText('Marque o que você já pagou e tire o que não houve.');
+  await waitText('Material escolar de 2026 · 2 parcelas vencidas');
+  t = await body();
+  ok('vencidas: as 2 parcelas sob o cabeçalho do ano, com "Selecionar as 2" e "Não houve em 2026"',
+    (await visibleCount('heading', 'Material escolar de 2026 · 2 parcelas vencidas')) === 1 && (await visibleCount('button', 'Selecionar as 2 parcelas de Material escolar de 2026')) === 1 &&
+      (await visibleCount('button', 'Não houve Material escolar em 2026')) === 1 && t.includes('Venceu em 05/09/2026 · Parcela 1 de 2 de 2026 · R$ 150,00') && t.includes('Venceu em 05/10/2026 · Parcela 2 de 2 de 2026 · R$ 150,00'));
+  await shot('48_vencidas_conta_do_ano');
+  await widthChecks('vencidas com grupo do ano', '48_vencidas_conta_do_ano_320px', { full: true });
+  await btn('Não houve Material escolar em 2026').click(); await waitText('Tirar as 2 parcelas de 2026?');
+  t = await dialogText();
+  ok('"Não houve em 2026" nas vencidas: as 2 parcelas, o total e o que continua', t.includes('Material escolar de 2026 · 2 parcelas · R$ 300,00') && t.includes('Elas saem de Contas a pagar e não voltam a ser criadas. A conta do ano continua em 2027.'));
+  await confirmIn('Tirar parcelas'); await waitText('2 parcelas de 2026 saíram de Contas a pagar.');
+  await waitText('Nenhuma conta vencida').catch(() => {});
+  ok('as 2 parcelas saem de Contas vencidas', (await body()).includes('Nenhuma conta vencida') && !(await body()).includes('Material escolar'));
+  await goResumo();
+  await expectTotals('tirar as 2 parcelas vencidas → a pagar volta a 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+
+  // Sair e entrar de novo na demonstração: as listas são lidas de novo e a geração do dia roda outra vez.
+  // Nada do que foi tirado volta (Matrícula de 2026, parcelas do Seguro residencial e do Material escolar).
+  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
+  await btn('Sair deste aparelho').click(); await waitText('Seu dinheiro');
+  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+  await expectTotals('depois de entrar de novo: outubro na base', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  await openToPay(); await waitText('Próximos meses');
+  t = await body();
+  ok('depois de uma nova geração, nada do que foi tirado ou pago de uma vez volta', ['Matrícula', 'Seguro residencial', 'Material escolar'].every((x) => !t.includes(x)) && t.includes('Seguro do carro'));
+  await openSeriesList();
+  t = await body();
+  ok('"Por ano" com as 5 contas do ano (IPVA, IPTU, Matrícula, Seguro residencial e Material escolar)', t.includes('Por ano, se os valores não mudarem: R$ 6.180,00 (inclui R$ 4.680,00 estimados).') &&
+    ((await sectionRows('Contas do ano')) ?? []).length === 6);
+  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  // Fim do Ciclo A3.
 
   // Setembro → outubro
   await btn('Anotar gasto').click(); await waitText('Será salvo em');
@@ -791,9 +1126,31 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     }
     await btn('Cancelar').click(); await waitText('Descartar o preenchimento?');
     await btn('Descartar alterações').click(); await waitText('Por mês, se os valores não mudarem');
+    // Telas do Ciclo A3: conta do ano (IPTU, com o ano previsto) e "Nova conta do ano" com a grade de meses e a prévia.
+    await openRow(/^IPTU, 10 parcelas/); await waitText('Ano a ano'); await waitText('entra em Contas a pagar em dezembro de 2026'); await p.waitForTimeout(300);
+    await innerChecks(`conta do ano ${w}px`);
+    await keepText();
+    if (w === 320) await shot('49_conta_do_ano_iptu_320px', true);
+    await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
+    await btn('Nova conta do ano').click(); await waitText('Como você paga?');
+    await field('Descrição').fill('IPVA da moto'); await radio('Em parcelas no ano').click(); await field('Quantas parcelas por ano?').fill('3');
+    await radio('Janeiro').click(); await field('Dia do vencimento').fill('31'); await field('Valor de referência').fill('12345,67');
+    await waitText('Como vai ficar'); await p.waitForTimeout(300);
+    const grid = await monthGrid('Mês da primeira parcela');
+    ok(`nova conta do ano ${w}px: grade de meses inteira`, gridOk(grid, w === 320 ? 4 : 3), JSON.stringify(grid));
+    await innerChecks(`nova conta do ano ${w}px`);
+    await keepText();
+    if (w === 320) {
+      await p.getByText('Como vai ficar', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
+      await shot('49_nova_conta_do_ano_previa_320px');
+    }
+    await btn('Cancelar').click(); await waitText('Descartar o preenchimento?');
+    await btn('Descartar alterações').click(); await waitText('Por mês, se os valores não mudarem');
     await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
     await btn('Voltar').click(); await waitText('Diferença do mês');
   }
+  const forbidden = screenTexts.map((s) => s.match(FORBIDDEN)?.[0]).filter(Boolean);
+  ok('contas do ano: nenhum termo proibido nem travessão longo nas telas novas', screenTexts.length > 0 && forbidden.length === 0, `${screenTexts.length} telas ${forbidden.join(' | ')}`);
   ok('sem erros de JavaScript no console', errors.length === 0, errors.slice(0,3).join(' | '));
   await b.close();
   for (const r of results) console.log(r.join('  '));

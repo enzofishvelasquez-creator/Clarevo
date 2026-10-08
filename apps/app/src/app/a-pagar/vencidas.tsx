@@ -1,13 +1,19 @@
 import {
   COMMITMENT_ERROR_TEXT,
   ERROR_TEXT,
+  affectedByYear,
+  annualYearErrorText,
   formatBRL,
   formatDateBR,
   formatMonthBR,
   formatMonthName,
+  annualYearLabelOf,
+  groupAnnualLater,
   isRepoError,
   monthOf,
   newOperationKey,
+  occurrenceLabel,
+  type AnnualGroup,
   type Commitment,
   type FinancialRecord,
   type IsoDate,
@@ -30,7 +36,7 @@ import { CheckOption } from '@/components/series-parts';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Banner, Button, Card, Chip, Screen, Skeleton, Txt } from '@/components/ui';
 import { totalChange } from '@/lib/highlight';
-import { useCommitments, useDeleteCommitment, usePayCommitment, useSpace, useUpdateRecord } from '@/state/data';
+import { useCommitments, useDeleteCommitment, usePayCommitment, useSeriesList, useSkipSeriesYear, useSpace, useUpdateRecord } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, motion, space, tabular } from '@/theme/tokens';
 
@@ -38,14 +44,24 @@ import { colors, fonts, motion, space, tabular } from '@/theme/tokens';
 const rowExit = FadeOut.duration(motion.detail).reduceMotion(ReduceMotion.System);
 const rowLayout = LinearTransition.duration(motion.detail).reduceMotion(ReduceMotion.System);
 
-/** "Aluguel de fevereiro"; em outro ano, "Aluguel de fevereiro de 2027". */
+/** "Aluguel de fevereiro"; em outro ano, "Aluguel de fevereiro de 2027". Conta do ano: "IPVA de 2027" ou "IPTU, parcela 3 de 2027". */
 function billName(c: Commitment, today: IsoDate): string {
+  if (c.series?.kind === 'anual') {
+    const k = c.series.partsPerYear ?? 1;
+    const label = annualYearLabelOf(c)!;
+    return k === 1 ? `${c.description} de ${label}` : `${c.description}, parcela ${((c.series.number - 1) % k) + 1} de ${label}`;
+  }
   const year = c.dueOn.slice(0, 4);
   return `${c.description} de ${formatMonthName(monthOf(c.dueOn))}${year === today.slice(0, 4) ? '' : ` de ${year}`}`;
 }
 
-/** "fevereiro" ou "fevereiro de 2027". */
+/** "fevereiro" ou "fevereiro de 2027"; conta do ano, "2027" ou "parcela 3 de 2027". */
 function monthWord(c: Commitment, today: IsoDate): string {
+  if (c.series?.kind === 'anual') {
+    const k = c.series.partsPerYear ?? 1;
+    const label = annualYearLabelOf(c)!;
+    return k === 1 ? label : `parcela ${((c.series.number - 1) % k) + 1} de ${label}`;
+  }
   const year = c.dueOn.slice(0, 4);
   return `${formatMonthName(monthOf(c.dueOn))}${year === today.slice(0, 4) ? '' : ` de ${year}`}`;
 }
@@ -122,7 +138,12 @@ function usePayOnce() {
   };
 }
 
-type Pending = { type: 'pagar'; commitment: Commitment } | { type: 'tirar'; commitment: Commitment } | { type: 'lote' } | null;
+type Pending =
+  | { type: 'pagar'; commitment: Commitment }
+  | { type: 'tirar'; commitment: Commitment }
+  | { type: 'tirar-ano'; group: AnnualGroup }
+  | { type: 'lote' }
+  | null;
 
 /**
  * Revisar contas vencidas (D-024): "Já paguei" e "Não houve" por linha e o pagamento em lote, no vencimento, das contas
@@ -136,6 +157,8 @@ export default function ContasVencidas() {
   const ctx = personal?.personalContextId;
   const commitments = useCommitments(ctx, monthOf(today));
   const remove = useDeleteCommitment();
+  const skipYear = useSkipSeriesYear();
+  const seriesList = useSeriesList(ctx);
   const payOnce = usePayOnce();
   // "Pagamento registrado" ao voltar do formulário de pagamento ("Mudar valor ou data" e contas estimadas).
   const [notice] = useFlash();
@@ -149,6 +172,11 @@ export default function ContasVencidas() {
   const [result, setResult] = useState<{ tone: 'sucesso' | 'erro'; text: string } | null>(null);
   /** Chave da exclusão por conta: a mesma depois de uma falha de rede, outra depois de uma recusa. */
   const deleteKeys = useRef(new Map<string, string>());
+  /**
+   * "Não houve em 2027": chave por grupo (série e ano) e o conteúdo enviado. Depois de uma falha de rede, o mesmo conteúdo
+   * vai com a mesma chave e o banco reconhece a repetição; outro conteúdo usa outra chave.
+   */
+  const skipKeys = useRef(new Map<string, { key: string; snapshot: string }>());
 
   const account = personal?.accounts.find((a) => a.id === accountChoice) ?? personal?.accounts[0] ?? null;
   const fixed = overdue.filter((c) => !c.amountIsEstimate);
@@ -255,7 +283,48 @@ export default function ContasVencidas() {
     }
   };
 
-  const target = pending && pending.type !== 'lote' ? pending.commitment : null;
+  /** Plano de "Não houve em 2027" com todas as contas em aberto do contexto (a lista de Contas a pagar traz todas). */
+  const yearPlanFor = (g: AnnualGroup) => {
+    const series = seriesList.data?.find((x) => x.id === g.seriesId);
+    if (!series || !commitments.data) return null;
+    const plan = affectedByYear(commitments.data, series, g.commitments[0]!.series!.number, 'tirar');
+    return plan.ok ? plan : null;
+  };
+
+  const doSkipYear = async (g: AnnualGroup) => {
+    const plan = yearPlanFor(g);
+    if (busy || !plan) return;
+    setBusy(true);
+    setResult(null);
+    const groupKey = `${g.seriesId}|${g.index}`;
+    const snapshot = JSON.stringify([g.seriesId, plan.affected]);
+    const prev = skipKeys.current.get(groupKey);
+    const key = prev && prev.snapshot === snapshot ? prev.key : newOperationKey();
+    skipKeys.current.set(groupKey, { key, snapshot });
+    try {
+      await skipYear.mutateAsync({ key, seriesId: g.seriesId, number: g.commitments[0]!.series!.number, affected: plan.affected });
+      skipKeys.current.delete(groupKey);
+      setPending(null);
+      setSelected((cur) => cur.filter((x) => !plan.changing.some((c) => c.id === x)));
+      success(plan.doneText);
+    } catch (e) {
+      setPending(null);
+      if (isUncertain(e)) {
+        // Rede: repetir com a mesma chave é seguro.
+        setResult({ tone: 'erro', text: `Não foi possível tirar as parcelas de ${g.label}. Tente novamente.` });
+        return;
+      }
+      skipKeys.current.delete(groupKey);
+      setResult({ tone: 'erro', text: annualYearErrorText(isRepoError(e) ? e.code : 'desconhecido', g.label) });
+      commitments.refetch();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const target = pending && (pending.type === 'pagar' || pending.type === 'tirar') ? pending.commitment : null;
+  const yearTarget = pending?.type === 'tirar-ano' ? pending.group : null;
+  const yearTargetPlan = yearTarget ? yearPlanFor(yearTarget) : null;
   const batchTotal = chosen.reduce((acc, c) => acc + c.amountCents, 0);
   const batchLabel =
     chosen.length === 0
@@ -271,6 +340,37 @@ export default function ContasVencidas() {
     </Banner>
   ) : null;
   const hasFooter = commitments.isSuccess && fixed.length > 0;
+  // Parcelas da mesma conta do ano e do mesmo ano ficam juntas, sob um cabeçalho com "Não houve em 2027".
+  const grouped = groupAnnualLater(overdue);
+
+  /** Linha de conta vencida: caixa (valor fixo) ou valor estimado, "Já paguei" e "Não houve". */
+  const renderRow = (c: Commitment, last: boolean, inGroup = false) => (
+    <Animated.View key={c.id} exiting={rowExit} layout={rowLayout} style={[styles.row, inGroup && styles.inGroup, !last && styles.divider]}>
+      <OverdueInfo commitment={c} checked={selected.includes(c.id)} onToggle={() => toggle(c.id)} />
+      <View style={styles.actions}>
+        <Button
+          label="Já paguei"
+          accessibilityLabel={`Já paguei ${billName(c, today)}`}
+          tone="soft"
+          disabled={busy || !account}
+          style={styles.action}
+          onPress={() =>
+            c.amountIsEstimate
+              ? router.push({ pathname: '/a-pagar/[id]/pagar', params: { id: c.id, data: 'vencimento' } })
+              : setPending({ type: 'pagar', commitment: c })
+          }
+        />
+        <Button
+          label="Não houve"
+          accessibilityLabel={`Não houve ${billName(c, today)}`}
+          tone="ghost"
+          disabled={busy}
+          style={styles.action}
+          onPress={() => setPending({ type: 'tirar', commitment: c })}
+        />
+      </View>
+    </Animated.View>
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -312,37 +412,44 @@ export default function ContasVencidas() {
             ) : null}
 
             <Card>
-              {overdue.map((c, i) => (
-                <Animated.View key={c.id} exiting={rowExit} layout={rowLayout} style={[styles.row, i < overdue.length - 1 && styles.divider]}>
-                  <OverdueInfo
-                    commitment={c}
-                    checked={selected.includes(c.id)}
-                    onToggle={() => toggle(c.id)}
-                  />
-                  <View style={styles.actions}>
-                    <Button
-                      label="Já paguei"
-                      accessibilityLabel={`Já paguei ${billName(c, today)}`}
-                      tone="soft"
-                      disabled={busy || !account}
-                      style={styles.action}
-                      onPress={() =>
-                        c.amountIsEstimate
-                          ? router.push({ pathname: '/a-pagar/[id]/pagar', params: { id: c.id, data: 'vencimento' } })
-                          : setPending({ type: 'pagar', commitment: c })
-                      }
-                    />
-                    <Button
-                      label="Não houve"
-                      accessibilityLabel={`Não houve ${billName(c, today)}`}
-                      tone="ghost"
-                      disabled={busy}
-                      style={styles.action}
-                      onPress={() => setPending({ type: 'tirar', commitment: c })}
-                    />
-                  </View>
-                </Animated.View>
-              ))}
+              {grouped.map((g, i) => {
+                const last = i === grouped.length - 1;
+                if (g.type === 'conta') return renderRow(g.commitment, last);
+                const group = g.group;
+                const ids = group.commitments.map((c) => c.id);
+                const allSelected = ids.every((id) => selected.includes(id));
+                return (
+                  <Animated.View key={`ano-${group.seriesId}-${group.index}`} exiting={rowExit} layout={rowLayout} style={!last && styles.divider}>
+                    <View style={styles.groupHead}>
+                      <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} accessibilityRole="header" aria-level={3}>
+                        {group.title} · {group.count} parcelas vencidas
+                      </Txt>
+                      <View style={styles.actions}>
+                        {group.allFixed ? (
+                          <Button
+                            label={allSelected ? 'Selecionadas' : `Selecionar as ${group.count}`}
+                            accessibilityLabel={`Selecionar as ${group.count} parcelas de ${group.description} de ${group.label.replace('/', ' a ')}`}
+                            icon={allSelected ? Check : ListChecks}
+                            tone="soft"
+                            disabled={busy || allSelected}
+                            style={styles.action}
+                            onPress={() => setSelected((cur) => [...cur, ...ids.filter((id) => !cur.includes(id))])}
+                          />
+                        ) : null}
+                        <Button
+                          label={`Não houve em ${group.label}`}
+                          accessibilityLabel={`Não houve ${group.description} em ${group.label.replace('/', ' a ')}`}
+                          tone="ghost"
+                          disabled={busy || !yearPlanFor(group)}
+                          style={styles.action}
+                          onPress={() => setPending({ type: 'tirar-ano', group })}
+                        />
+                      </View>
+                    </View>
+                    {group.commitments.map((c, j) => renderRow(c, j === group.commitments.length - 1, true))}
+                  </Animated.View>
+                );
+              })}
             </Card>
 
             {fixed.length > 0 ? (
@@ -397,10 +504,35 @@ export default function ContasVencidas() {
         </ChoiceDialog>
       ) : null}
 
+      {yearTarget && yearTargetPlan ? (
+        <ConfirmDialog
+          visible
+          title={
+            yearTargetPlan.changing.length === yearTarget.count
+              ? `Tirar as ${yearTarget.count} parcelas de ${yearTarget.label}?`
+              : yearTargetPlan.title
+          }
+          cancelLabel="Cancelar"
+          confirmLabel="Tirar parcelas"
+          busy={busy}
+          onCancel={() => setPending(null)}
+          onConfirm={() => doSkipYear(yearTarget)}>
+          <Txt style={[{ fontFamily: fonts.bold }, tabular]}>
+            {yearTarget.title} · {yearTarget.count} parcelas · {yearTarget.approximate ? 'cerca de ' : ''}
+            {formatBRL(yearTarget.totalCents)}
+          </Txt>
+          <Txt color={colors.textSecondary}>{yearTargetPlan.text}</Txt>
+        </ConfirmDialog>
+      ) : null}
+
       {target && pending?.type === 'tirar' ? (
         <ConfirmDialog
           visible
-          title={`Tirar a conta de ${monthWord(target, today)}?`}
+          title={
+            target.series?.kind === 'anual' && (target.series.partsPerYear ?? 1) > 1
+              ? `Tirar a ${monthWord(target, today)}?`
+              : `Tirar a conta de ${monthWord(target, today)}?`
+          }
           cancelLabel="Cancelar"
           confirmLabel="Tirar conta"
           busy={busy}
@@ -440,12 +572,14 @@ export default function ContasVencidas() {
 
 /** Descrição, "Venceu em 12/02/2027" e o valor. Valor fixo: caixa de seleção para o lote; estimado: "≈ R$ 180,00 · estimado". */
 function OverdueInfo({ commitment: c, checked, onToggle }: { commitment: Commitment; checked: boolean; onToggle: () => void }) {
-  const due = `Venceu em ${formatDateBR(c.dueOn)}`;
+  // Conta do ano: a parcela e o ano junto do vencimento ("Venceu em 10/02/2027 · Parcela 1 de 10 de 2027").
+  const yearPart = c.series?.kind === 'anual' ? ` · ${occurrenceLabel(c)}` : '';
+  const due = `Venceu em ${formatDateBR(c.dueOn)}${yearPart}`;
   if (!c.amountIsEstimate) {
     return <CheckOption label={c.description} hint={`${due} · ${formatBRL(c.amountCents)}`} checked={checked} onPress={onToggle} />;
   }
   return (
-    <View style={styles.estimate} accessible accessibilityLabel={`${c.description}, ${due.toLowerCase()}, cerca de ${formatBRL(c.amountCents)}, valor estimado`}>
+    <View style={styles.estimate} accessible accessibilityLabel={`${c.description}, ${due.toLowerCase().replace(/ · /g, ', ').replace(/(\d{4})\/(\d{4})/, '$1 a $2')}, cerca de ${formatBRL(c.amountCents)}, valor estimado`}>
       <Txt variant="label" style={{ fontFamily: fonts.bold }}>
         {c.description}
       </Txt>
@@ -464,6 +598,9 @@ const styles = StyleSheet.create({
   // Alinhada ao texto das linhas com caixa de seleção (caixa de 24 px + espaço).
   estimate: { gap: 2, paddingVertical: space[2], paddingLeft: 24 + space[3] },
   action: { alignSelf: 'auto', flexGrow: 1, flexBasis: 140 },
+  groupHead: { gap: space[2], paddingTop: space[3] },
+  // Linhas de um grupo: recuo à esquerda, ligadas ao cabeçalho do ano.
+  inGroup: { paddingLeft: space[3], borderLeftWidth: 3, borderLeftColor: colors.brandTint },
   footer: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space[3], paddingHorizontal: space[5] },
   footerInner: { width: '100%', maxWidth: 560, alignSelf: 'center', gap: space[3] },
 });

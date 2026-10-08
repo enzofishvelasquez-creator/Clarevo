@@ -72,6 +72,19 @@ export const TOPICS: Topic[] = [
     hypotheses: 'Contas fictícias de R$ 165,30, R$ 180,00 e R$ 171,90: média de R$ 172,40.',
   },
   {
+    slug: 'contas-do-ano',
+    title: 'Contas que chegam uma vez por ano',
+    subtitle: 'IPVA, IPTU, matrícula e material escolar',
+    paragraphs: [
+      'Algumas contas não vêm todo mês, mas dá para saber que vão chegar: IPVA, IPTU, matrícula, material escolar e seguros anuais. Muitas se concentram no começo do ano.',
+      'Uma forma de se preparar é somar o valor do ano e dividir por 12. Esse valor por mês mostra quanto da renda essas contas ocupam, mesmo nos meses em que nada vence.',
+      'As condições de pagamento à vista ou parcelado são definidas por cada estado ou prefeitura. Confira datas e condições no site oficial da Secretaria da Fazenda do seu estado ou da sua prefeitura.',
+      'No Clarevo, cadastre cada uma como conta do ano: o ano inteiro aparece em Contas a pagar dois meses antes do primeiro vencimento, e cada conta só entra em Ainda a pagar no mês em que vence.',
+      'Exemplo: IPVA de R$ 1.800,00, IPTU de R$ 1.200,00, matrícula de R$ 900,00 e material escolar de R$ 600,00 somam R$ 4.500,00 no ano, ou R$ 375,00 por mês.',
+    ],
+    hypotheses: 'Valores fictícios, sem desconto à vista nem parcelamento.',
+  },
+  {
     slug: 'quitar-antes',
     title: 'Quitar antes do prazo',
     subtitle: 'O que a soma das parcelas não mostra',

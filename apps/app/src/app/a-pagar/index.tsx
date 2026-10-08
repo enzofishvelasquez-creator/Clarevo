@@ -1,10 +1,10 @@
-import { ERROR_TEXT, formatMonthBR, toPayCaption, type Commitment } from '@clarevo/core';
+import { ERROR_TEXT, formatMonthBR, groupAnnualLater, toPayCaption, type Commitment, type GroupedCommitment } from '@clarevo/core';
 import { router } from 'expo-router';
 import { Info, ListChecks, Plus, Repeat, ShieldCheck } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
-import { CommitmentRow } from '@/components/commitment-row';
+import { AnnualGroupRow, CommitmentRow } from '@/components/commitment-row';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { EmptyState, ErrorState } from '@/components/states';
@@ -43,14 +43,23 @@ export default function ContasAPagarScreen() {
   const createdOverdue = sync.data?.createdOverdue ?? 0;
   const showCreatedOverdue = isCurrent && createdOverdue > 0 && Boolean(s?.overdue.some((c) => c.series));
 
-  const sections: { title: string; legend?: string; list: Commitment[]; review?: boolean }[] = !s
+  // Próximos meses: parcelas da mesma conta do ano e do mesmo ano viram um grupo (o toque abre a conta do ano).
+  const laterHasAnnual = Boolean(s?.later.some((c) => c.series?.kind === 'anual'));
+  const sections: { title: string; legend?: string; list: Commitment[]; grouped?: GroupedCommitment[]; review?: boolean }[] = !s
     ? []
     : isCurrent
       ? [
           { title: 'Vencidas', list: s.overdue, review: s.overdue.length >= 2 },
           { title: `A vencer em ${monthName.toLowerCase()}`, list: s.upcomingInMonth },
           { title: 'Pagas', legend: 'Já contam em Pago, no mês da data do pagamento.', list: s.paidInMonth },
-          { title: 'Próximos meses', legend: 'Não entram no total deste mês.', list: s.later },
+          {
+            title: 'Próximos meses',
+            legend: laterHasAnnual
+              ? 'Não entram no total deste mês. Contas do ano aparecem aqui dois meses antes de vencer.'
+              : 'Não entram no total deste mês.',
+            list: s.later,
+            grouped: groupAnnualLater(s.later),
+          },
         ]
       : [
           { title: 'Em aberto', list: s.items },
@@ -130,11 +139,32 @@ export default function ContasAPagarScreen() {
                 {sec.review ? (
                   <LinkButton label="Revisar vencidas" icon={ListChecks} style={styles.inlineLink} onPress={() => router.push('/a-pagar/vencidas')} />
                 ) : null}
-                {sec.list.map((c, i) => (
-                  <Animated.View key={c.id} exiting={rowExit} layout={rowLayout}>
-                    <CommitmentRow commitment={c} today={today} last={i === sec.list.length - 1} onPress={() => router.push(`/a-pagar/${c.id}`)} />
-                  </Animated.View>
-                ))}
+                {sec.grouped
+                  ? sec.grouped.map((g, i) =>
+                      g.type === 'conta' ? (
+                        <Animated.View key={g.commitment.id} exiting={rowExit} layout={rowLayout}>
+                          <CommitmentRow
+                            commitment={g.commitment}
+                            today={today}
+                            last={i === sec.grouped!.length - 1}
+                            onPress={() => router.push(`/a-pagar/${g.commitment.id}`)}
+                          />
+                        </Animated.View>
+                      ) : (
+                        <Animated.View key={`ano-${g.group.seriesId}-${g.group.index}`} exiting={rowExit} layout={rowLayout}>
+                          <AnnualGroupRow
+                            group={g.group}
+                            last={i === sec.grouped!.length - 1}
+                            onPress={() => router.push(`/gastos-fixos/${g.group.seriesId}`)}
+                          />
+                        </Animated.View>
+                      ),
+                    )
+                  : sec.list.map((c, i) => (
+                      <Animated.View key={c.id} exiting={rowExit} layout={rowLayout}>
+                        <CommitmentRow commitment={c} today={today} last={i === sec.list.length - 1} onPress={() => router.push(`/a-pagar/${c.id}`)} />
+                      </Animated.View>
+                    ))}
               </Card>
             </Animated.View>
           ))

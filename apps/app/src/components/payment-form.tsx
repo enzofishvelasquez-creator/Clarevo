@@ -13,17 +13,20 @@ import {
   formatMonthBR,
   isRepoError,
   maskDateBR,
+  mergeOccurrences,
   monthOf,
   newOperationKey,
   parseBRL,
   parseDateBR,
   validatePaymentDraft,
+  wholeYearPayment,
   type Commitment,
   type DraftField,
   type FieldErrors,
   type PaymentDraft,
   type PaymentInput,
   type PersonalSpace,
+  type WholeYearPayment,
 } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useNavigation } from 'expo-router';
@@ -36,10 +39,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
+import { CheckOption } from '@/components/series-parts';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { totalChange } from '@/lib/highlight';
-import { usePayCommitment, useUpdateRecord } from '@/state/data';
+import {
+  usePayCommitment,
+  useSeries,
+  useSeriesOccurrences,
+  useSeriesOpenOccurrences,
+  useSeriesOperationKey,
+  useSkipSeriesYear,
+  useUpdateRecord,
+} from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -54,6 +66,9 @@ const paymentText = (code: string) =>
  * O gasto entra em Pago do mês da data do pagamento; a conta sai de "Ainda a pagar".
  * Conta com valor estimado (gasto fixo que muda): o valor abre vazio, porque o valor pago é o real (D-024, regra 4).
  * paidOnDue: a data abre no vencimento ("Mudar valor ou data" em Contas vencidas).
+ * Parcela de conta do ano com outras em aberto no ano (D-029, regra 4): "Paguei o ano todo de uma vez (cota única)" paga
+ * esta parcela com o valor total e, só depois do pagamento confirmado, tira as outras (skip_series_year). Se a segunda
+ * escrita falhar, o pagamento continua registrado e a faixa diz o que fazer.
  */
 export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { commitment: Commitment; space: PersonalSpace; paidOnDue?: boolean }) {
   const { today } = useSession();
@@ -62,8 +77,16 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
   const navigation = useNavigation();
   const pay = usePayCommitment();
   const updateRecord = useUpdateRecord();
+  const skipYear = useSkipSeriesYear();
+  const skipKeys = useSeriesOperationKey();
   const qc = useQueryClient();
   const contextName = 'Pessoal';
+  // Conta do ano com parcelas: a série e todas as contas dela, para a caixa "Paguei o ano todo de uma vez".
+  const yearParts = c.series?.kind === 'anual' && (c.series.partsPerYear ?? 1) > 1;
+  const seriesId = yearParts ? c.series!.id : undefined;
+  const yearSeries = useSeries(seriesId, c.contextId);
+  const yearOcc = useSeriesOccurrences(seriesId, c.contextId);
+  const yearOpen = useSeriesOpenOccurrences(seriesId, c.contextId);
 
   const initial = useMemo<PaymentDraft>(
     () => ({
@@ -85,6 +108,8 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
   const [paidElsewhere, setPaidElsewhere] = useState(false);
   const [baseVersion, setBaseVersion] = useState(c.version);
   const [busy, setBusy] = useState(false);
+  /** "Paguei o ano todo de uma vez" marcada. */
+  const [wholeYear, setWholeYear] = useState(false);
   const [leaveTo, setLeaveTo] = useState<null | (() => void)>(null);
   const [confirmDiscard, setConfirmDiscard] = useState<null | (() => void)>(null);
 
@@ -98,7 +123,11 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
     accountId: useRef<TextInput>(null),
   } satisfies Record<DraftField, React.RefObject<TextInput | null>>;
 
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || wholeYear;
+  const whole =
+    yearParts && yearSeries.data && yearOcc.data && yearOpen.data
+      ? wholeYearPayment(mergeOccurrences(yearOcc.data, yearOpen.data), yearSeries.data, shown)
+      : null;
   const account = personal.accounts.find((a) => a.id === draft.accountId) ?? personal.accounts[0];
 
   // Sair com alterações não salvas pede confirmação (voltar, gesto, botão do sistema).
@@ -123,12 +152,53 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
     if (first) refs[first].current?.focus();
   };
 
-  const finish = (saved?: { amountCents: number; occurredOn: string }) => {
+  const finish = (saved?: { amountCents: number; occurredOn: string }, text = 'Pagamento registrado') => {
     // Confirmação tátil e efeito em Pago só depois da gravação confirmada.
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (saved) totalChange.set({ total: 'pago', month: monthOf(saved.occurredOn), deltaCents: saved.amountCents });
-    flash.set('Pagamento registrado');
+    flash.set(text);
     leave(goBack);
+  };
+
+  /**
+   * "Paguei o ano todo de uma vez", passo 2 (o pagamento já está confirmado): tirar as outras parcelas do ano em aberto.
+   * Devolve o texto da faixa: o de sucesso ou, se a escrita falhar, o que diz que o pagamento ficou e como repetir.
+   * Resultado incerto: confere uma vez com findSeriesOperation se a escrita foi gravada.
+   */
+  const skipOthers = async (plan: WholeYearPayment): Promise<string> => {
+    const ref = c.series!;
+    const snapshot = JSON.stringify([ref.id, ref.number, plan.affectedAfterPayment]);
+    const key = skipKeys.keyFor(snapshot);
+    try {
+      await skipYear.mutateAsync({ key, seriesId: ref.id, number: ref.number, affected: plan.affectedAfterPayment });
+      skipKeys.settled();
+      return plan.doneText;
+    } catch (e) {
+      if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
+        skipKeys.refused();
+        return plan.failedText;
+      }
+      skipKeys.uncertain(key, snapshot);
+      try {
+        const saved = await skipKeys.findSaved();
+        if (saved?.action === 'tirar_ano') {
+          skipKeys.settled();
+          return plan.doneText;
+        }
+      } catch {
+        // A conferência também falhou: o pagamento está registrado; a pessoa repete pela conta do ano.
+      }
+      return plan.failedText;
+    }
+  };
+
+  /** Depois do pagamento confirmado: com a caixa marcada, tira as outras parcelas e mostra o texto certo. */
+  const afterPayment = async (saved: { amountCents: number; occurredOn: string } | undefined, plan: WholeYearPayment | null) => {
+    if (!plan) {
+      finish(saved);
+      return;
+    }
+    finish(saved, await skipOthers(plan));
   };
 
   /**
@@ -196,6 +266,14 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
       focusFirst(v.errors);
       return;
     }
+    // "Paguei o ano todo": o plano é o das listas atuais, congelado no envio; sem as listas, nada é enviado.
+    const plan = wholeYear ? whole : null;
+    if (wholeYear && !plan) {
+      yearOcc.refetch();
+      yearOpen.refetch();
+      setBanner(COMMITMENT_ERROR_TEXT.carregar_falhou);
+      return;
+    }
     setErrors({});
     setBanner(null);
     setConflict(false);
@@ -207,7 +285,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
         const saved = await reconcile(v.input, snapshot);
         if (saved) {
           setRetry(false);
-          finish(saved === true ? undefined : saved);
+          await afterPayment(saved === true ? undefined : saved, plan);
           return;
         }
         // Nada foi gravado: repetir com a mesma chave se o conteúdo é o mesmo da última tentativa.
@@ -219,7 +297,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
         const saved = await pay.mutateAsync({ key, id: c.id, version, input: v.input });
         pending.current = [];
         setRetry(false);
-        finish(saved.record);
+        await afterPayment(saved.record, plan);
       } catch (e) {
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
           opKey.current = newOperationKey();
@@ -313,9 +391,21 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
             Gasto já pago · {account?.name}
           </Txt>
 
+          {whole ? (
+            <View style={{ gap: space[1] }}>
+              <CheckOption label={whole.label} hint={whole.hint} checked={wholeYear} onPress={() => setWholeYear((w) => !w)} />
+              {wholeYear ? (
+                <Txt variant="caption" color={colors.textSecondary} style={{ paddingLeft: 24 + space[3] }}>
+                  Soma das {whole.others.length + 1} parcelas de {whole.year.label} em aberto: {whole.approximate ? 'cerca de ' : ''}
+                  {formatBRL(whole.openTotalCents)}. Informe o valor que saiu da conta, com desconto, se houver.
+                </Txt>
+              ) : null}
+            </View>
+          ) : null}
+
           <TextField
             ref={refs.amountText}
-            label="Valor pago"
+            label={wholeYear && whole ? 'Valor total pago' : 'Valor pago'}
             prefix="R$"
             value={draft.amountText}
             onChangeText={(t) => set('amountText', t)}
@@ -400,7 +490,12 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
                 Um gasto de {formatBRL(amount)} será registrado em Pago de {formatMonthBR(monthOf(paidOn)).toLowerCase()}, e esta conta a pagar
                 sai de Ainda a pagar.
               </Txt>
-              {amount !== shown.amountCents && !shown.amountIsEstimate ? (
+              {wholeYear && whole ? (
+                <Txt variant="label">
+                  Depois, {whole.others.length === 1 ? 'a outra parcela' : `as outras ${whole.others.length} parcelas`} de {whole.year.label} em aberto
+                  {whole.others.length === 1 ? ' sai' : ' saem'} de Contas a pagar.
+                </Txt>
+              ) : amount !== shown.amountCents && !shown.amountIsEstimate ? (
                 <Txt variant="label">O valor pago é diferente do previsto ({formatBRL(shown.amountCents)}). Pago usa o valor pago.</Txt>
               ) : null}
             </Banner>

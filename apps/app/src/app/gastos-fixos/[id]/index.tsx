@@ -1,4 +1,5 @@
 import {
+  ANNUAL_SERIES_ERROR_TEXT,
   DEBT_NATURES,
   ERROR_TEXT,
   NO_CATEGORY_LABEL,
@@ -27,10 +28,12 @@ import {
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { AlertCircle, CalendarX, Info, Pencil, Repeat, ShieldCheck, Trash2 } from 'lucide-react-native';
+import { AlertCircle, CalendarSync, CalendarX, Info, Pencil, Repeat, ShieldCheck, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
+import { AnnualYears } from '@/components/annual-years';
+import { ChoiceDialog } from '@/components/choice-dialog';
 import { CommitmentRow } from '@/components/commitment-row';
 import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
@@ -56,14 +59,20 @@ export default function DetalheGastoFixo() {
   const openOcc = useSeriesOpenOccurrences(id, ctx);
   const remove = useDeleteSeries();
   const keys = useSeriesOperationKey();
-  const [notice] = useFlash();
+  const [notice, setNotice] = useFlash();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  /** Conta do ano: diálogo "Mudar a forma de pagamento?". */
+  const [changeForm, setChangeForm] = useState(false);
   /** Exclusão em andamento, inclusive a conferência de uma tentativa anterior: Cancelar e Excluir ficam bloqueados. */
   const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const s = series.data;
-  const noun = s?.kind === 'parcelada' ? 'parcelamento' : 'gasto fixo';
+  const annual = s?.kind === 'anual';
+  const noun = s?.kind === 'parcelada' ? 'parcelamento' : annual ? 'conta do ano' : 'gasto fixo';
+  /** Com artigo: "o gasto fixo", "o parcelamento", "a conta do ano". */
+  const theNoun = `${annual ? 'a' : 'o'} ${noun}`;
+  const texts: Record<keyof typeof SERIES_ERROR_TEXT, string> = annual ? ANNUAL_SERIES_ERROR_TEXT : SERIES_ERROR_TEXT;
   const occurrences = occ.data ? [...occ.data].reverse() : null; // número crescente, as 60 mais recentes
   // Todas as em aberto (o banco confere o conjunto inteiro), não só as que cabem na lista de 60.
   const allOccurrences = occ.data && openOcc.data ? mergeOccurrences(occ.data, openOcc.data).reverse() : null;
@@ -74,14 +83,14 @@ export default function DetalheGastoFixo() {
     setActionError(null);
     if (!deletePlan.ok) {
       setConfirmDelete(false);
-      setActionError(SERIES_ERROR_TEXT.serie_tem_pagamentos);
+      setActionError(texts.serie_tem_pagamentos);
       return;
     }
     const snapshot = JSON.stringify([s.id, s.version, deletePlan.affected]);
     const done = () => {
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setConfirmDelete(false);
-      flash.set(s.kind === 'parcelada' ? 'Parcelamento excluído.' : 'Gasto fixo excluído.');
+      flash.set(s.kind === 'parcelada' ? 'Parcelamento excluído.' : s.kind === 'anual' ? 'Conta do ano excluída.' : 'Gasto fixo excluído.');
       router.dismissTo('/gastos-fixos');
     };
     setDeleting(true);
@@ -104,18 +113,18 @@ export default function DetalheGastoFixo() {
         setConfirmDelete(false);
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
           keys.refused();
-          setActionError(e.code in SERIES_ERROR_TEXT ? SERIES_ERROR_TEXT[e.code as keyof typeof SERIES_ERROR_TEXT] : SERIES_ERROR_TEXT.salvar_falhou);
+          setActionError(e.code in texts ? texts[e.code as keyof typeof SERIES_ERROR_TEXT] : texts.salvar_falhou);
           series.refetch();
           occ.refetch();
           openOcc.refetch();
           return;
         }
         keys.uncertain(key, snapshot);
-        setActionError(`Não foi possível excluir o ${noun}. Tente novamente.`);
+        setActionError(`Não foi possível excluir ${theNoun}. Tente novamente.`);
       }
     } catch {
       setConfirmDelete(false);
-      setActionError(`Não foi possível excluir o ${noun}. Tente novamente.`);
+      setActionError(`Não foi possível excluir ${theNoun}. Tente novamente.`);
     } finally {
       setDeleting(false);
     }
@@ -124,7 +133,7 @@ export default function DetalheGastoFixo() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader
-        title={s?.kind === 'parcelada' ? 'Parcelamento' : 'Gasto fixo'}
+        title={s?.kind === 'parcelada' ? 'Parcelamento' : s?.kind === 'anual' ? 'Conta do ano' : 'Gasto fixo'}
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/gastos-fixos'))}
         right={<ContextPill label="Pessoal" />}
       />
@@ -140,7 +149,7 @@ export default function DetalheGastoFixo() {
             <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => series.refetch()} />
           ) : !s ? (
             <Card style={{ gap: space[3] }}>
-              <Txt>{SERIES_ERROR_TEXT.nao_encontrado}</Txt>
+              <Txt>{texts.nao_encontrado}</Txt>
               <Button label="Ir para Gastos fixos" onPress={() => router.replace('/gastos-fixos')} />
             </Card>
           ) : (
@@ -169,16 +178,43 @@ export default function DetalheGastoFixo() {
                     openOcc.refetch();
                   }}
                 />
+              ) : annual ? (
+                <AnnualYears
+                  series={s}
+                  occurrences={occurrences}
+                  open={openOcc.data}
+                  today={today}
+                  onNotice={(text) => {
+                    setActionError(null);
+                    setNotice(text);
+                  }}
+                  onError={(text) => {
+                    setNotice(null);
+                    setActionError(text);
+                  }}
+                  onRefused={() => {
+                    series.refetch();
+                    occ.refetch();
+                    openOcc.refetch();
+                  }}
+                />
               ) : (
                 <Occurrences series={s} occurrences={occurrences} open={openOcc.data} today={today} />
               )}
 
               <Txt variant="label" color={colors.textSecondary}>
-                Contas pagas nunca mudam. Contas que você alterou só no mês delas também não mudam quando você altera o gasto fixo a partir de
-                outro mês.
+                {annual
+                  ? 'Contas pagas nunca mudam. Contas que você alterou, ou cujo valor informou só naquele ano, também não mudam quando você altera a conta do ano a partir de outro ano.'
+                  : 'Contas pagas nunca mudam. Contas que você alterou só no mês delas também não mudam quando você altera o gasto fixo a partir de outro mês.'}
               </Txt>
 
-              <Actions series={s} today={today} canDelete={s.paidCount === 0 && Boolean(deletePlan)} onDelete={() => setConfirmDelete(true)} />
+              <Actions
+                series={s}
+                today={today}
+                canDelete={s.paidCount === 0 && Boolean(deletePlan)}
+                onDelete={() => setConfirmDelete(true)}
+                onChangeForm={() => setChangeForm(true)}
+              />
 
               <Pressable accessibilityRole="button" onPress={() => router.push('/quem-ve')} style={styles.privacy}>
                 <ShieldCheck size={18} color={colors.textSecondary} />
@@ -189,7 +225,7 @@ export default function DetalheGastoFixo() {
 
               <ConfirmDialog
                 visible={confirmDelete}
-                title={`Excluir o ${noun} ${currentTerm(s, today).description}?`}
+                title={`Excluir ${theNoun} ${currentTerm(s, today).description}?`}
                 cancelLabel="Cancelar"
                 confirmLabel={`Excluir ${noun}`}
                 busy={deleting || remove.isPending}
@@ -198,6 +234,29 @@ export default function DetalheGastoFixo() {
                 {deletePlan?.ok && deletePlan.text ? <Txt style={{ fontFamily: fonts.bold }}>{deletePlan.text}</Txt> : null}
                 <Txt color={colors.textSecondary}>Prefere só parar de repetir? Use Encerrar.</Txt>
               </ConfirmDialog>
+
+              {annual ? (
+                <ChoiceDialog
+                  visible={changeForm}
+                  title="Mudar a forma de pagamento?"
+                  cancelLabel="Voltar"
+                  onCancel={() => setChangeForm(false)}
+                  choices={[
+                    {
+                      label: 'Encerrar e cadastrar nova',
+                      tone: 'brand',
+                      onPress: () => {
+                        setChangeForm(false);
+                        router.push({ pathname: '/gastos-fixos/[id]/encerrar', params: { id: s.id, depois: 'nova' } });
+                      },
+                    },
+                  ]}>
+                  <Txt color={colors.textSecondary}>
+                    Para passar de cota única para parcelas, mudar o número de parcelas ou o mês, encerre esta conta do ano no último ano com a
+                    forma atual e cadastre uma nova. O histórico continua aqui.
+                  </Txt>
+                </ChoiceDialog>
+              ) : null}
             </>
           )}
         </View>
@@ -211,9 +270,17 @@ function Overview({ series: s, today }: { series: CommitmentSeries; today: IsoDa
   const term = currentTerm(s, today);
   const variable = term.amountMode === 'variavel';
   const history = termHistory(s);
-  const value = variable
-    ? `Valor muda: referência de ${formatBRL(term.amountCents)} (estimado)`
-    : `${formatBRL(term.amountCents)} ${s.kind === 'parcelada' ? 'por parcela' : 'por mês'}`;
+  const annual = s.kind === 'anual';
+  const k = s.partsPerYear ?? 1;
+  // Conta do ano: "Valor muda: referência de R$ 180,00 por parcela (estimado) · cerca de R$ 1.800,00 por ano".
+  const perYear = annual && k > 1 ? ` · ${variable ? 'cerca de ' : ''}${formatBRL(k * term.amountCents)} por ano` : '';
+  const value = annual
+    ? variable
+      ? `Valor muda: referência de ${formatBRL(term.amountCents)}${k > 1 ? ' por parcela' : ''} (estimado)${perYear}`
+      : `${formatBRL(term.amountCents)} ${k > 1 ? 'por parcela' : 'por ano'}${perYear}`
+    : variable
+      ? `Valor muda: referência de ${formatBRL(term.amountCents)} (estimado)`
+      : `${formatBRL(term.amountCents)} ${s.kind === 'parcelada' ? 'por parcela' : 'por mês'}`;
   return (
     <>
       <Card style={{ gap: space[3] }}>
@@ -226,6 +293,11 @@ function Overview({ series: s, today }: { series: CommitmentSeries; today: IsoDa
         <Txt variant="title" style={tabular}>
           {value}
         </Txt>
+        {annual ? (
+          <Txt variant="label" color={colors.textSecondary}>
+            Cada ano entra em Contas a pagar dois meses antes do primeiro vencimento e só entra em Ainda a pagar no mês em que vence.
+          </Txt>
+        ) : null}
         <View>
           <Row label="Contexto" value="Pessoal" />
           {s.kind === 'parcelada' ? <Row label="Tipo" value={SERIES_NATURE_LABEL[s.nature]} /> : null}
@@ -233,7 +305,11 @@ function Overview({ series: s, today }: { series: CommitmentSeries; today: IsoDa
         </View>
         {!s.generating ? (
           <Banner tone="info" icon={Info}>
-            <Txt variant="label">Este gasto fixo parou de criar contas porque quem o criou não pode mais anotar neste espaço.</Txt>
+            <Txt variant="label">
+              {annual
+                ? 'Esta conta do ano parou de criar contas porque quem a criou não pode mais anotar neste espaço.'
+                : 'Este gasto fixo parou de criar contas porque quem o criou não pode mais anotar neste espaço.'}
+            </Txt>
           </Banner>
         ) : null}
       </Card>
@@ -388,9 +464,49 @@ function Occurrences({
   );
 }
 
-function Actions({ series: s, today, canDelete, onDelete }: { series: CommitmentSeries; today: IsoDate; canDelete: boolean; onDelete: () => void }) {
+function Actions({
+  series: s,
+  today,
+  canDelete,
+  onDelete,
+  onChangeForm,
+}: {
+  series: CommitmentSeries;
+  today: IsoDate;
+  canDelete: boolean;
+  onDelete: () => void;
+  /** Conta do ano: "Mudar a forma de pagamento". */
+  onChangeForm: () => void;
+}) {
   const parcelada = s.kind === 'parcelada';
   const ended = seriesEnded(s, today);
+  if (s.kind === 'anual') {
+    return (
+      <View style={{ gap: space[3] }}>
+        {!ended ? (
+          <>
+            <View style={{ gap: space[1] }}>
+              <Button
+                label="Mudar valor ou dia a partir de uma conta"
+                icon={Pencil}
+                tone="soft"
+                accessibilityHint="O mês do vencimento não muda aqui."
+                onPress={() => router.push(`/gastos-fixos/${s.id}/editar`)}
+              />
+              <Txt variant="caption" color={colors.textSecondary}>
+                O mês do vencimento não muda aqui.
+              </Txt>
+            </View>
+            <Button label="Mudar a forma de pagamento" icon={CalendarSync} tone="soft" onPress={onChangeForm} />
+            <Button label="Encerrar conta do ano" icon={CalendarX} tone="soft" onPress={() => router.push(`/gastos-fixos/${s.id}/encerrar`)} />
+          </>
+        ) : (
+          <Button label="Voltar a repetir" icon={Repeat} tone="soft" onPress={() => router.push(`/gastos-fixos/${s.id}/encerrar`)} />
+        )}
+        {canDelete ? <Button label="Excluir conta do ano" icon={Trash2} tone="danger" onPress={onDelete} /> : null}
+      </View>
+    );
+  }
   // Parcelamento encerrado só retoma se ainda houver parcelas até o total.
   const canResume = ended && (!parcelada || (s.lastNumber ?? 0) < (s.installmentTotal ?? 0));
   return (

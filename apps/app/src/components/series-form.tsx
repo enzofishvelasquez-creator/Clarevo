@@ -186,7 +186,7 @@ export function SeriesForm({
   /** Todo ano: "Em parcelas no ano", mês da 1ª parcela (1 a 12) e chip de início ("auto" = o padrão). */
   const [annual, setAnnual] = useState(initial.annual);
   /** A pessoa escolheu se o valor muda: trocar de frequência não muda mais o padrão. */
-  const modeTouched = useRef(false);
+  const modeTouched = useRef(prefill?.amountMode !== undefined);
   const [errors, setErrors] = useState<SeriesFieldErrors>({});
   const [banner, setBanner] = useState<string | null>(null);
   const [retry, setRetry] = useState(false);
