@@ -1,4 +1,4 @@
--- Registros realizados: sequência de aceite do primeiro ciclo, idempotência, versões, períodos e validação.
+-- Registros realizados: sequência de aceite do primeiro ciclo, idempotência, versões (inclusive ausente), períodos e validação.
 -- Pessoa FICTÍCIA: Ana.
 \set ON_ERROR_STOP 1
 \set ana '''00000000-0000-0000-0000-0000000000a1'''
@@ -91,6 +91,24 @@ begin
   exception when others then assert sqlerrm = 'versao_desatualizada', sqlerrm;
   end;
   perform public.delete_record('vers-000004', g.id, r.version);
+
+  -- Versão ausente (NULL) é recusada como desatualizada: não passa sem conferir conflito.
+  g := public.create_record('nulo-000000', ctx, acc, 'despesa', 500, '2026-10-07', 'Banca');
+  begin
+    perform public.update_record('nulo-000001', g.id, null, acc, 600, '2026-10-07', 'Banca');
+    raise exception 'FALHA: editou sem versão';
+  exception when others then assert sqlerrm = 'versao_desatualizada', sqlerrm;
+  end;
+  begin
+    perform public.delete_record('nulo-000002', g.id, null);
+    raise exception 'FALHA: excluiu sem versão';
+  exception when others then assert sqlerrm = 'versao_desatualizada', sqlerrm;
+  end;
+  assert (select (version, amount_cents, deleted_at is null) from public.financial_records where id = g.id) = (1, 500::bigint, true),
+    'sem versão: registro mantém versão e valor';
+  assert (select count(*) from public.record_operations where idempotency_key in ('nulo-000001', 'nulo-000002')) = 0,
+    'sem versão: nenhuma operação gravada';
+  perform public.delete_record('nulo-000003', g.id, g.version);
 
   -- Período: 30/09 não entra em outubro; mover para 01/10 atualiza os dois meses.
   sep := public.create_record('peri-000001', ctx, acc, 'despesa', 8000, '2026-09-30', 'Farmácia');

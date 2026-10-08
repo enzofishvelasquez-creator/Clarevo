@@ -36,20 +36,59 @@ export interface FinancialRecord {
   description: string;
   /** null = "Sem categoria". */
   category: string | null;
+  /** Conta a pagar que este gasto quitou; null para registros comuns. Imutável. */
+  commitmentId: string | null;
   createdBy: string;
   version: number;
   createdAt: string;
   updatedAt: string;
 }
 
-/** Compromisso previsto. Origem separada dos registros realizados; não entra em Recebido ou Pago. */
+/** Conta a pagar (compromisso previsto). Origem separada; só o gasto gerado ao pagar entra em Pago. */
 export interface Commitment {
   id: string;
   contextId: string;
   description: string;
+  /** Valor PREVISTO. Não muda ao pagar com outro valor. */
+  amountCents: Cents;
+  currency: 'BRL';
+  /** Vencimento (data civil). */
+  dueOn: IsoDate;
+  /** null = "Sem categoria". Sugerida ao pagar. */
+  category: string | null;
+  /** 'cancelado' existe no enum do banco, mas é proibido por restrição neste ciclo. */
+  status: 'aberto' | 'quitado';
+  /** Presente se e somente se status === 'quitado'. Lido do gasto vivo vinculado (fonte única, sem cópia). */
+  payment: CommitmentPayment | null;
+  createdBy: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommitmentPayment {
+  recordId: string;
+  /** Valor pago (pode diferir do previsto). */
+  amountCents: Cents;
+  /** = occurredOn do gasto. */
+  paidOn: IsoDate;
+  accountId: string;
+}
+
+/** Campos que a pessoa informa ao anotar ou editar uma conta a pagar. */
+export interface CommitmentInput {
+  description: string;
   amountCents: Cents;
   dueOn: IsoDate;
-  status: 'aberto' | 'quitado' | 'cancelado';
+  category: string | null;
+}
+
+/** Campos que a pessoa informa ao marcar uma conta a pagar como paga. */
+export interface PaymentInput {
+  accountId: string;
+  amountCents: Cents;
+  paidOn: IsoDate;
+  category: string | null;
 }
 
 /** Campos que a pessoa informa ao criar ou editar um registro. */

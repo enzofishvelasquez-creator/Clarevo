@@ -84,8 +84,10 @@ insert into public.context_memberships (context_id, person_id, role, can_read, c
 with c as (
   insert into public.financial_accounts (context_id, name, created_by) select id, 'Conta da casa', :ana from ids where name = 'familia' returning id
 ) insert into ids select 'familia_conta', id from c;
-insert into public.commitments (context_id, description, amount_cents, due_on, created_by)
-  select id, 'Internet', 15000, '2026-10-15', :ana from ids where name = 'ana_ctx';
+with c as (
+  insert into public.commitments (context_id, description, amount_cents, due_on, created_by)
+    select id, 'Internet', 15000, '2026-10-15', :ana from ids where name = 'ana_ctx' returning id
+) insert into ids select 'ana_internet', id from c;
 insert into public.organizations (id, name) values ('10000000-0000-0000-0000-000000000001', 'Empresa Fictícia');
 insert into public.organization_admins values ('10000000-0000-0000-0000-000000000001', :carla);
 insert into public.benefit_contracts (id, organization_id, seats, plan, starts_on)
@@ -156,6 +158,64 @@ do $$ begin
   assert (select count(*) from public.record_operations where actor_id <> auth.uid()) = 0, 'operações de outras pessoas ocultas';
 end $$;
 
+-- 3b. Contas a pagar seguem as permissões de registro: quem tem escrita anota; altera, paga e desfaz só o que criou,
+-- salvo "editar de outras pessoas". A família ainda não tem tela, mas as regras já valem no banco.
+select set_config('request.jwt.claim.sub', :ana, true);
+with c as (
+  select public.create_commitment('chave-ana-c001', (select id from ids where name = 'familia'), 9000, '2026-10-12', 'Gás') as res
+) insert into ids select 'familia_gas', (res #>> '{commitment,id}')::uuid from c;
+select set_config('request.jwt.claim.sub', :bruno, true);
+do $$ begin
+  assert (select count(*) from public.commitments where description = 'Gás') = 1, 'Bruno vê o Gás da família';
+  assert (select count(*) from public.commitment_items where description = 'Gás') = 1, 'Bruno vê o Gás na visão';
+  assert (select count(*) from public.commitments where description = 'Internet') = 0, 'Bruno NÃO vê a Internet pessoal da Ana';
+  assert (select count(*) from public.commitment_items where description = 'Internet') = 0, 'Bruno NÃO vê a Internet na visão';
+end $$;
+select pg_temp.expect_error(format($$select public.create_commitment('chave-bru-c000', %L, 100, '2026-10-12', 'Intruso')$$,
+  (select id from ids where name = 'ana_ctx')), 'sem_permissao');
+-- Conta a pagar pessoal da Ana: não revela que existe.
+select pg_temp.expect_error(format($$select public.update_commitment('chave-bru-c010', %L, 1, 100, '2026-10-15', 'Internet')$$,
+  (select id from ids where name = 'ana_internet')), 'nao_encontrado');
+select pg_temp.expect_error(format($$select public.delete_commitment('chave-bru-c011', %L, 1)$$,
+  (select id from ids where name = 'ana_internet')), 'nao_encontrado');
+select pg_temp.expect_error(format($$select public.pay_commitment('chave-bru-c012', %L, 1, %L, 15000, '2026-10-07')$$,
+  (select id from ids where name = 'ana_internet'), (select id from ids where name = 'familia_conta')), 'nao_encontrado');
+select pg_temp.expect_error(format($$select public.undo_commitment_payment('chave-bru-c013', %L, 1)$$,
+  (select id from ids where name = 'ana_internet')), 'nao_encontrado');
+-- Gás criado pela Ana na família: Bruno lê, mas não tem "editar de outras pessoas".
+select pg_temp.expect_error(format($$select public.update_commitment('chave-bru-c020', %L, 1, 100, '2026-10-12', 'Gás')$$,
+  (select id from ids where name = 'familia_gas')), 'sem_permissao');
+select pg_temp.expect_error(format($$select public.delete_commitment('chave-bru-c021', %L, 1)$$,
+  (select id from ids where name = 'familia_gas')), 'sem_permissao');
+select pg_temp.expect_error(format($$select public.pay_commitment('chave-bru-c022', %L, 1, %L, 9000, '2026-10-07')$$,
+  (select id from ids where name = 'familia_gas'), (select id from ids where name = 'familia_conta')), 'sem_permissao');
+select pg_temp.expect_error(format($$select public.undo_commitment_payment('chave-bru-c023', %L, 1)$$,
+  (select id from ids where name = 'familia_gas')), 'sem_permissao');
+-- Bruno anota e paga a própria conta a pagar na família, só com conta da família.
+with c as (
+  select public.create_commitment('chave-bru-c001', (select id from ids where name = 'familia'), 4000, '2026-10-12', 'Feira') as res
+) insert into ids select 'familia_feira', (res #>> '{commitment,id}')::uuid from c;
+select pg_temp.expect_error(format($$select public.pay_commitment('chave-bru-c003', %L, 1, %L, 4000, '2026-10-07')$$,
+  (select id from ids where name = 'familia_feira'), (select id from ids where name = 'ana_conta')), 'conta_invalida');
+select public.pay_commitment('chave-bru-c002', (select id from ids where name = 'familia_feira'), 1,
+  (select id from ids where name = 'familia_conta'), 4000, '2026-10-07');
+do $$ begin
+  assert (select (status, version, paid_amount_cents) from public.commitment_items where id = (select id from ids where name = 'familia_feira'))
+    = ('quitado'::public.commitment_status, 2, 4000::bigint), 'Bruno pagou a Feira';
+  assert (select to_pay_cents from public.month_to_pay((select id from ids where name = 'familia'), '2026-10-01')) = 9000,
+    'família: só o Gás a pagar (Feira paga)';
+end $$;
+select pg_temp.expect_error(format($$select * from public.month_to_pay(%L, '2026-10-01')$$, (select id from ids where name = 'ana_ctx')), 'sem_permissao');
+select pg_temp.expect_error($$update public.commitments set amount_cents = 1$$, 'permission denied%');
+select pg_temp.expect_error($$delete from public.commitments$$, 'permission denied%');
+-- Ana (titular, com "editar de outras pessoas") desfaz o pagamento feito pelo Bruno.
+select set_config('request.jwt.claim.sub', :ana, true);
+select public.undo_commitment_payment('chave-ana-c002', (select id from ids where name = 'familia_feira'), 2);
+do $$ begin
+  assert (select (status, version, paid_record_id is null) from public.commitment_items where id = (select id from ids where name = 'familia_feira'))
+    = ('aberto'::public.commitment_status, 3, true), 'Ana desfez o pagamento do Bruno';
+end $$;
+
 -- 4. Carla (RH): vê a licença, não vê finanças nem família.
 select set_config('request.jwt.claim.sub', :carla, true);
 do $$ begin
@@ -166,7 +226,12 @@ do $$ begin
   assert (select count(*) from public.context_memberships where person_id <> auth.uid()) = 0, 'Carla NÃO vê composição familiar';
   assert (select count(*) from public.plan_entitlements) = 0, 'Carla NÃO vê direitos ao plano de outras pessoas';
   assert (select count(*) from public.commitments) = 0, 'Carla NÃO vê compromissos';
+  assert (select count(*) from public.commitment_items) = 0, 'Carla NÃO vê contas a pagar';
 end $$;
+select pg_temp.expect_error(format($$select public.create_commitment('chave-car-c001', %L, 100, '2026-10-12', 'Intruso')$$,
+  (select id from ids where name = 'ana_ctx')), 'sem_permissao');
+select pg_temp.expect_error(format($$select public.pay_commitment('chave-car-c002', %L, 1, %L, 15000, '2026-10-07')$$,
+  (select id from ids where name = 'ana_internet'), (select id from ids where name = 'ana_conta')), 'nao_encontrado');
 select pg_temp.expect_error(format($$select * from public.month_totals(%L, '2026-10-01')$$, (select id from ids where name = 'ana_ctx')), 'sem_permissao');
 -- Empresa convida por e-mail, mas não escolhe beneficiário nem ativa a licença.
 select pg_temp.expect_error($$insert into public.licenses (contract_id, invited_email, person_id)
@@ -193,6 +258,8 @@ reset role;
 set role anon;
 select pg_temp.expect_error($$select count(*) from public.financial_records$$, 'permission denied%');
 select pg_temp.expect_error($$select public.ensure_personal_space('Conta principal')$$, 'permission denied%');
+select pg_temp.expect_error($$select public.create_commitment('chave-anon-c01', gen_random_uuid(), 100, '2026-10-12', 'x')$$, 'permission denied%');
+select pg_temp.expect_error($$select count(*) from public.commitment_items$$, 'permission denied%');
 reset role;
 set role authenticated;
 
@@ -211,6 +278,11 @@ select pg_temp.expect_error(format($$select public.create_record('chave-bru-0007
 -- Repetir uma operação antiga (mesma chave e conteúdo) não devolve o registro depois da revogação.
 select pg_temp.expect_error(format($$select public.create_record('chave-bru-0006', %L, %L, 'despesa', 20000, '2026-10-06', 'Transporte')$$,
   (select id from ids where name = 'familia'), (select id from ids where name = 'familia_conta')), 'nao_encontrado');
+select pg_temp.expect_error(format($$select public.pay_commitment('chave-bru-c002', %L, 1, %L, 4000, '2026-10-07')$$,
+  (select id from ids where name = 'familia_feira'), (select id from ids where name = 'familia_conta')), 'nao_encontrado');
+select pg_temp.expect_error(format($$select public.create_commitment('chave-bru-c004', %L, 100, '2026-10-12', 'Depois da revogação')$$,
+  (select id from ids where name = 'familia')), 'sem_permissao');
+do $$ begin assert (select count(*) from public.commitments) = 0, 'Bruno revogado não vê contas a pagar da família'; end $$;
 
 -- 7. Fim do benefício não apaga conta, histórico ou família.
 reset role;
@@ -227,5 +299,7 @@ end $$;
 reset role;
 select pg_temp.expect_error($$update public.financial_records set created_by = '00000000-0000-0000-0000-00000000000d' where description = 'Mercado'$$, 'campo_imutavel');
 select pg_temp.expect_error($$update public.financial_records set kind = 'receita' where description = 'Mercado'$$, 'campo_imutavel');
+-- Vínculo entre contas a pagar e gastos coerente no fim de tudo (invariante adiada conferida agora).
+set constraints all immediate;
 
 rollback;

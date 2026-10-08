@@ -10,8 +10,12 @@ export function isValidIsoDate(value: string): boolean {
   if (!m) return false;
   const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
   if (mo < 1 || mo > 12 || d < 1) return false;
-  const daysInMonth = new Date(Date.UTC(y, mo, 0)).getUTCDate();
-  return d <= daysInMonth;
+  return d <= daysInMonth(y, mo);
+}
+
+/** Dias do mês (mo de 1 a 12). */
+function daysInMonth(y: number, mo: number): number {
+  return new Date(Date.UTC(y, mo, 0)).getUTCDate();
 }
 
 /** "07/10/2026" → "2026-10-07". Data impossível (31/09) ou formato inválido → null. */
@@ -26,6 +30,12 @@ export function parseDateBR(input: string): IsoDate | null {
 export function formatDateBR(iso: IsoDate): string {
   const [y, m, d] = iso.split('-');
   return `${d}/${m}/${y}`;
+}
+
+/** "2026-10-15" → "15/10". */
+export function formatDayMonth(iso: IsoDate): string {
+  const [, m, d] = iso.split('-');
+  return `${d}/${m}`;
 }
 
 /** "2026-10-07" → "7 out". */
@@ -71,6 +81,28 @@ export function addMonths(month: IsoMonth, delta: number): IsoMonth {
   return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`;
 }
 
+/** Soma meses a uma data civil; o dia fica limitado ao fim do mês ("2026-01-31" + 1 → "2026-02-28"). */
+export function addMonthsToDate(date: IsoDate, delta: number): IsoDate {
+  const month = addMonths(monthOf(date), delta);
+  const [y, m] = month.split('-').map(Number) as [number, number];
+  const d = Math.min(Number(date.slice(8, 10)), daysInMonth(y, m));
+  return `${month}-${String(d).padStart(2, '0')}`;
+}
+
+/** Soma anos como o Postgres (date ± interval 'n years'): "2028-02-29" − 1 → "2027-02-28". */
+export function addYearsClamped(date: IsoDate, delta: number): IsoDate {
+  return addMonthsToDate(date, delta * 12);
+}
+
+/** Diferença em dias civis (to − from), sem passar pelo fuso local. */
+export function daysBetween(from: IsoDate, to: IsoDate): number {
+  const utc = (iso: IsoDate) => {
+    const [y, m, d] = iso.split('-').map(Number) as [number, number, number];
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((utc(to) - utc(from)) / 86_400_000);
+}
+
 /** Intervalo [início, fim) do mês, em datas civis. */
 export function monthRange(month: IsoMonth): { start: IsoDate; endExclusive: IsoDate } {
   return { start: `${month}-01`, endExclusive: `${addMonths(month, 1)}-01` };
@@ -97,6 +129,11 @@ export function formatDayHeader(date: IsoDate, today: IsoDate): string {
   if (date === addDays(today, -1)) return 'Ontem';
   const [, m, d] = date.split('-');
   return `${Number(d)} de ${MONTHS[Number(m) - 1] ?? ''}`;
+}
+
+/** "2026-10" → "outubro" (minúsculas, sem ano). */
+export function formatMonthName(month: IsoMonth): string {
+  return MONTHS[Number(month.slice(5, 7)) - 1] ?? '';
 }
 
 /** "2026-10" → "Outubro de 2026". */

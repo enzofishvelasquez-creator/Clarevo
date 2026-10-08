@@ -1,5 +1,14 @@
 import type { IsoMonth } from './dates';
-import type { Commitment, FinancialRecord, PersonalSpace, RecordInput, RecordKind } from './records';
+import type { Commitment, CommitmentInput, FinancialRecord, PaymentInput, PersonalSpace, RecordInput, RecordKind } from './records';
+
+/** Ações de conta a pagar gravadas em record_operations (mesmo espaço de chaves dos registros). */
+export type CommitmentAction = 'criar_compromisso' | 'editar_compromisso' | 'excluir_compromisso' | 'pagar_compromisso' | 'desfazer_pagamento';
+
+/** Resultado das escritas de conta a pagar: a conta no estado atual e, quando houver, o gasto envolvido. */
+export interface CommitmentWrite {
+  commitment: Commitment;
+  record: FinancialRecord | null;
+}
 
 /**
  * Contrato de acesso a dados usado pelo app. Duas implementações:
@@ -15,13 +24,30 @@ export interface RecordsRepository {
 
   listRecords(contextId: string, month: IsoMonth): Promise<FinancialRecord[]>;
   getRecord(id: string): Promise<FinancialRecord | null>;
-  listCommitments(contextId: string, month: IsoMonth): Promise<Commitment[]>;
 
   createRecord(key: string, contextId: string, kind: RecordKind, input: RecordInput): Promise<FinancialRecord>;
+  /** Num gasto de conta a pagar, também soma 1 à versão da conta (o previsto não muda). */
   updateRecord(key: string, id: string, expectedVersion: number, input: RecordInput): Promise<FinancialRecord>;
+  /** Num gasto de conta a pagar, também reabre a conta (versão +1). */
   deleteRecord(key: string, id: string, expectedVersion: number): Promise<FinancialRecord>;
-  /** Reconciliação: a operação com esta chave já foi concluída? Devolve o registro resultante. */
+  /** Reconciliação: a operação de registro (criar, editar, excluir) com esta chave já foi concluída? */
   findOperation(key: string): Promise<{ recordId: string } | null>;
+
+  /**
+   * Contas a pagar do contexto, sem excluídas: todas com vencimento no mês (abertas e pagas)
+   * e todas as abertas com vencimento fora do mês. A seleção do total é feita por summarizeToPay.
+   */
+  listCommitments(contextId: string, month: IsoMonth): Promise<Commitment[]>;
+  getCommitment(id: string): Promise<Commitment | null>;
+  createCommitment(key: string, contextId: string, input: CommitmentInput): Promise<CommitmentWrite>;
+  updateCommitment(key: string, id: string, expectedVersion: number, input: CommitmentInput): Promise<CommitmentWrite>;
+  deleteCommitment(key: string, id: string, expectedVersion: number): Promise<CommitmentWrite>;
+  /** Atômico: cria o gasto e quita a conta. record = gasto criado. */
+  payCommitment(key: string, id: string, expectedVersion: number, input: PaymentInput): Promise<CommitmentWrite & { record: FinancialRecord }>;
+  /** Atômico: exclui o gasto e reabre a conta. record = gasto excluído. */
+  undoCommitmentPayment(key: string, id: string, expectedVersion: number): Promise<CommitmentWrite & { record: FinancialRecord }>;
+  /** Reconciliação de conta a pagar: a operação com esta chave já foi concluída? */
+  findCommitmentOperation(key: string): Promise<{ action: CommitmentAction; commitmentId: string; recordId: string | null } | null>;
 }
 
 export type RepoErrorCode =
@@ -41,6 +67,9 @@ export type RepoErrorCode =
   | 'conta_invalida'
   | 'categoria_invalida'
   | 'nome_da_conta_invalido'
+  | 'vencimento_fora_do_intervalo'
+  | 'compromisso_quitado'
+  | 'compromisso_aberto'
   | 'desconhecido';
 
 export class RepoError extends Error {
