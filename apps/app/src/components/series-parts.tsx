@@ -32,8 +32,14 @@ export const MONTH_FULL = [
   'Dezembro',
 ] as const;
 
-/** "2026/2027" lido como "2026 a 2027". */
-export const yearA11y = (label: string) => label.replace('/', ' a ');
+/** "2026/2027" lido como "2026 a 2027", em qualquer ponto do texto (datas como 10/02/2027 não mudam). */
+export const yearA11y = (text: string) => text.replace(/\b(\d{4})\/(\d{4})\b/g, '$1 a $2');
+
+/** Nome acessível só quando o texto tem um ano como "2026/2027" (undefined: o leitor de tela lê o próprio texto). */
+export const yearA11yLabel = (text: string): string | undefined => {
+  const spoken = yearA11y(text);
+  return spoken === text ? undefined : spoken;
+};
 
 /** "outubro" → "Outubro". */
 export const cap = (text: string) => (text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : text);
@@ -94,7 +100,8 @@ export function CheckOption({ label, hint, checked, onPress }: { label: string; 
       accessibilityRole="checkbox"
       accessibilityState={{ checked }}
       aria-checked={checked}
-      accessibilityHint={hint}
+      accessibilityLabel={yearA11yLabel(label)}
+      accessibilityHint={hint === undefined ? undefined : yearA11y(hint)}
       onPress={onPress}
       {...spaceKeyPress(onPress)}
       style={(st) => [styles.check, (st as { focused?: boolean }).focused && styles.focusRing]}>

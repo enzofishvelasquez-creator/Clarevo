@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { Logo } from '@/components/brand';
+import { yearA11yLabel } from '@/components/series-parts';
 import { DemoPill, TopInset, Txt } from '@/components/ui';
 import { canGoForward, useView, type SpaceKind } from '@/state/data';
 import { useSession } from '@/state/session';
@@ -84,7 +85,13 @@ export function SubHeader({ title, onBack, right }: { title: string; onBack?: ()
           <ArrowLeft size={22} color={colors.textOnBrand} />
         </Pressable>
         <View style={styles.subMain}>
-          <Txt variant="title" color={colors.textOnBrand} style={styles.subTitle} accessibilityRole="header" aria-level={1}>
+          <Txt
+            variant="title"
+            color={colors.textOnBrand}
+            style={styles.subTitle}
+            accessibilityRole="header"
+            aria-level={1}
+            accessibilityLabel={yearA11yLabel(title)}>
             {title}
           </Txt>
           {right}

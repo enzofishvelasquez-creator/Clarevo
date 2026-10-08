@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Modal, StyleSheet, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
+import { yearA11yLabel } from '@/components/series-parts';
 import { Button, Txt } from '@/components/ui';
 import { colors, radius, space } from '@/theme/tokens';
 
@@ -33,7 +34,8 @@ export function ConfirmDialog({
     <Modal visible={visible} transparent animationType={reduced ? 'none' : 'fade'} onRequestClose={busy ? () => {} : onCancel}>
       <View style={styles.backdrop}>
         <View style={styles.box} accessibilityViewIsModal accessibilityRole="alert">
-          <Txt variant="title" accessibilityRole="header">
+          {/* "2026/2027" no título é lido como "2026 a 2027". */}
+          <Txt variant="title" accessibilityRole="header" accessibilityLabel={yearA11yLabel(title)}>
             {title}
           </Txt>
           <View style={{ gap: space[2] }}>{children}</View>

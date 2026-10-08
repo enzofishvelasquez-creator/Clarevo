@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Modal, StyleSheet, View } from 'react-native';
 
+import { yearA11yLabel } from '@/components/series-parts';
 import { Button, Txt } from '@/components/ui';
 import { colors, radius, space } from '@/theme/tokens';
 
@@ -38,7 +39,8 @@ export function ChoiceDialog({
     <Modal visible={visible} transparent animationType="none" onRequestClose={onCancel}>
       <View style={styles.backdrop}>
         <View style={styles.box} accessibilityViewIsModal accessibilityRole="alert">
-          <Txt variant="title" accessibilityRole="header">
+          {/* "2026/2027" no título e nas escolhas é lido como "2026 a 2027". */}
+          <Txt variant="title" accessibilityRole="header" accessibilityLabel={yearA11yLabel(title)}>
             {title}
           </Txt>
           {children ? <View style={{ gap: space[2] }}>{children}</View> : null}
@@ -47,6 +49,7 @@ export function ChoiceDialog({
               <Button
                 key={c.label}
                 label={c.label}
+                accessibilityLabel={yearA11yLabel(c.label)}
                 tone={c.tone ?? 'soft'}
                 onPress={c.onPress}
                 busy={busy && i === 0}
