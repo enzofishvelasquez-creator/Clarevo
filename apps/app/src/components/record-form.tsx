@@ -14,6 +14,7 @@ import {
   formatBRL,
   formatDateBR,
   formatMonthBR,
+  formatMonthName,
   isRepoError,
   monthOf,
   newOperationKey,
@@ -41,7 +42,7 @@ import { ContextPill, SubHeader } from '@/components/header';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { totalChange } from '@/lib/highlight';
-import { useCreateRecord, useUpdateRecord } from '@/state/data';
+import { useCommitments, useCreateRecord, useUpdateRecord } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -269,6 +270,22 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   const parsedDate = parseDateBR(draft.dateText);
   const movesMonth = mode.type === 'editar' && parsedDate && monthOf(parsedDate) !== monthOf(mode.record.occurredOn);
 
+  // Aviso contra contar duas vezes (D-024): gasto com a descrição de uma conta de gasto fixo em aberto no mês da data.
+  // Gasto que já é o pagamento de uma conta a pagar não precisa do aviso.
+  const seriesCheckMonth =
+    kind === 'despesa' && !(mode.type === 'editar' && mode.record.commitmentId) && parsedDate ? monthOf(parsedDate) : null;
+  const monthBills = useCommitments(seriesCheckMonth ? contextId : undefined, seriesCheckMonth ?? monthOf(today));
+  const typed = draft.description.trim().toLocaleLowerCase('pt-BR');
+  const openSeriesBill =
+    seriesCheckMonth && typed
+      ? (monthBills.data?.find(
+          (c) => c.series !== null && c.status === 'aberto' && monthOf(c.dueOn) === seriesCheckMonth && c.description.trim().toLocaleLowerCase('pt-BR') === typed,
+        ) ?? null)
+      : null;
+  const billMonth = openSeriesBill
+    ? `${formatMonthName(monthOf(openSeriesBill.dueOn))}${openSeriesBill.dueOn.slice(0, 4) === today.slice(0, 4) ? '' : ` de ${openSeriesBill.dueOn.slice(0, 4)}`}`
+    : '';
+
   const formatAmountOnBlur = () => {
     const cents = parseBRL(draft.amountText);
     if (cents !== null && cents > 0 && cents <= MAX_RECORD_CENTS) setDraft((d) => ({ ...d, amountText: centsToInput(cents) }));
@@ -322,6 +339,20 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             returnKeyType="next"
             onSubmitEditing={() => refs.amountText.current?.focus()}
           />
+
+          {openSeriesBill ? (
+            <Banner tone="info" icon={Info}>
+              <Txt variant="label">
+                Você tem a conta {openSeriesBill.description} de {billMonth} em aberto. Se este gasto é o pagamento dela, marque a conta como paga
+                para não contar duas vezes.
+              </Txt>
+              <LinkButton
+                label={`Abrir a conta de ${billMonth}`}
+                style={styles.inlineLink}
+                onPress={() => router.push(`/a-pagar/${openSeriesBill.id}`)}
+              />
+            </Banner>
+          ) : null}
 
           <TextField
             ref={refs.amountText}
@@ -450,6 +481,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
 const styles = StyleSheet.create({
   body: { padding: space[5], gap: space[4], paddingBottom: space[6] },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
+  inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
   footer: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space[3], paddingHorizontal: space[5] },
   footerInner: { width: '100%', maxWidth: 560, alignSelf: 'center', gap: space[3] },
   footerRow: { flexDirection: 'row', gap: space[3], alignItems: 'center' },

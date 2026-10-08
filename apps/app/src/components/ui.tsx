@@ -1,7 +1,8 @@
 import { formatBRL } from '@clarevo/core';
 import { Check, Eye, EyeOff, type LucideIcon } from 'lucide-react-native';
-import { forwardRef, useEffect, useId, useState, type ReactNode, type Ref } from 'react';
+import { Children, forwardRef, useEffect, useId, useState, type ReactNode, type Ref } from 'react';
 import {
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -29,8 +30,16 @@ import { colors, fonts, motion, radius, space, tabular, type } from '@/theme/tok
 
 type Variant = keyof typeof type;
 
-export function Txt({ variant = 'body', color = colors.text, style, ...props }: TextProps & { variant?: Variant; color?: string }) {
-  return <Text {...props} style={[type[variant], { color }, style]} />;
+/** "R$" e "≈" nunca ficam sozinhos no fim da linha: o espaço depois deles vira não separável (só no texto mostrado). */
+const glueMoney = (children: ReactNode) =>
+  Children.map(children, (c) => (typeof c === 'string' ? c.replace(/(R\$|≈) /g, '$1\u00a0') : c));
+
+export function Txt({ variant = 'body', color = colors.text, style, children, ...props }: TextProps & { variant?: Variant; color?: string }) {
+  return (
+    <Text {...props} style={[type[variant], { color }, style]}>
+      {glueMoney(children)}
+    </Text>
+  );
 }
 
 export function Money({
@@ -270,20 +279,36 @@ export const TextField = forwardRef<
   );
 });
 
+/**
+ * Na web, o Pressable só responde ao Enter fora de botões. Rádios e caixas de seleção também respondem ao Espaço,
+ * como pede o padrão de acessibilidade, sem rolar a página.
+ */
+export function spaceKeyPress(onPress: () => void): object {
+  if (Platform.OS !== 'web') return {};
+  return {
+    onKeyDown: (e: { key?: string; repeat?: boolean; preventDefault?: () => void }) => {
+      if (e.key !== ' ' && e.key !== 'Spacebar') return;
+      e.preventDefault?.();
+      if (!e.repeat) onPress();
+    },
+  };
+}
+
 export function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
   const press = usePressScale();
   return (
-    <Animated.View style={press.style}>
+    <Animated.View style={[press.style, styles.chipWrap]}>
       <Pressable
         accessibilityRole="radio"
         accessibilityState={{ checked: selected }}
         aria-checked={selected}
         onPress={onPress}
+        {...spaceKeyPress(onPress)}
         onPressIn={press.onPressIn}
         onPressOut={press.onPressOut}
         style={(s) => [styles.chip, selected && styles.chipSelected, (s as { focused?: boolean }).focused && styles.focusRing]}>
         {selected ? <Check size={16} color={colors.brand} strokeWidth={2.5} /> : null}
-        <Txt variant="label" color={selected ? colors.brand : colors.text}>
+        <Txt variant="label" color={selected ? colors.brand : colors.text} style={{ flexShrink: 1 }}>
           {label}
         </Txt>
       </Pressable>
@@ -404,11 +429,14 @@ export const styles = StyleSheet.create({
   reveal: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: -space[3] },
   inputFocused: { borderColor: colors.text, borderWidth: 2 },
   inputError: { borderColor: colors.error, backgroundColor: colors.errorTint },
+  // Rótulos longos quebram dentro do chip em telas estreitas (nunca passam da largura do grupo).
+  chipWrap: { maxWidth: '100%' },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space[1],
     paddingHorizontal: space[4],
+    paddingVertical: space[2],
     minHeight: 44,
     justifyContent: 'center',
     borderRadius: radius.pill,

@@ -10,8 +10,9 @@ import { Button, Card, Txt } from '@/components/ui';
 import { useCommitment, useSpace } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
+/** /a-pagar/[id]/pagar?data=vencimento: a data do pagamento abre no vencimento (Contas vencidas). */
 export default function MarcarComoPaga() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, data } = useLocalSearchParams<{ id: string; data?: string }>();
   const personal = useSpace().data;
   const commitment = useCommitment(id);
   const c = commitment.data;
@@ -19,7 +20,7 @@ export default function MarcarComoPaga() {
   const [opened, setOpened] = useState<Commitment | null>(null);
   if (!opened && c && c.status === 'aberto') setOpened(c);
 
-  if (opened && personal) return <PaymentForm key={opened.id} commitment={opened} space={personal} />;
+  if (opened && personal) return <PaymentForm key={opened.id} commitment={opened} space={personal} paidOnDue={data === 'vencimento'} />;
   if (commitment.isPending || !personal) return <LoadingState />;
   if (commitment.isError) return <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => commitment.refetch()} />;
   return (

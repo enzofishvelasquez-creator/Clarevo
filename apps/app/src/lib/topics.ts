@@ -51,6 +51,37 @@ export const TOPICS: Topic[] = [
     ],
     hypotheses: 'Exemplo fictício: uma única compra à vista no cartão, sem parcelas, juros ou estornos.',
   },
+  {
+    slug: 'gasto-fixo',
+    title: 'Gasto fixo, conta a pagar e gasto anotado',
+    subtitle: 'Como cada um entra no mês',
+    paragraphs: [
+      'Um gasto fixo é uma regra: todo mês ele cria uma conta a pagar. Só quando você marca a conta como paga entra um gasto em Pago, uma única vez.',
+      'Anotar o mesmo aluguel como gasto e como gasto fixo contaria duas vezes. Parcelas de compras no cartão ficam na fatura.',
+    ],
+    hypotheses: 'Exemplo fictício: aluguel de R$ 2.500,00 com vencimento no dia 5.',
+  },
+  {
+    slug: 'estimativa',
+    title: 'Contas que mudam de valor',
+    subtitle: 'Luz, água e gás',
+    paragraphs: [
+      'Usamos o valor de referência que você informou, marcado como estimado, até você informar o valor de cada conta.',
+      'Quando houver contas pagas, mostramos a média das últimas três como sugestão, e você decide se usa.',
+    ],
+    hypotheses: 'Contas fictícias de R$ 165,30, R$ 180,00 e R$ 171,90: média de R$ 172,40.',
+  },
+  {
+    slug: 'quitar-antes',
+    title: 'Quitar antes do prazo',
+    subtitle: 'O que a soma das parcelas não mostra',
+    paragraphs: [
+      'Em financiamentos e compras parceladas, parte de cada parcela é juros.',
+      'O Código de Defesa do Consumidor (art. 52, § 2º) garante quitar antes, total ou parcialmente, com redução proporcional dos juros.',
+      'Peça ao credor o valor atualizado: a soma das parcelas que faltam costuma ser maior.',
+    ],
+    hypotheses: 'Exemplo fictício: 36 parcelas de R$ 850,00.',
+  },
 ];
 
 export const topicBySlug = (slug: string) => TOPICS.find((t) => t.slug === slug);

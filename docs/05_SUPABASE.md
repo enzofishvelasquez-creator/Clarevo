@@ -1,6 +1,6 @@
 # Ligar o Clarevo ao Supabase (login e dados reais)
 
-08/10/2026. Sem esta configuração, o app roda em **demonstração**: acesso simulado, nenhum e-mail enviado, dados só na memória do aparelho. Com ela, cadastro, confirmação de e-mail, recuperação de senha, registros e contas a pagar passam a ser reais.
+08/10/2026. Sem esta configuração, o app roda em **demonstração**: acesso simulado, nenhum e-mail enviado, dados só na memória do aparelho. Com ela, cadastro, confirmação de e-mail, recuperação de senha, registros, contas a pagar e gastos fixos passam a ser reais.
 
 Não consegui abrir a documentação do Supabase deste ambiente (acesso bloqueado pela rede). Os nomes dos menus abaixo podem variar um pouco no painel; o conteúdo de cada passo é o mesmo.
 
@@ -15,9 +15,12 @@ Não consegui abrir a documentação do Supabase deste ambiente (acesso bloquead
 
 1. No projeto, abra **SQL Editor** → **New query**.
 2. Cole todo o conteúdo de `supabase/migrations/20261007000001_fundacao.sql` e clique em **Run**.
-3. **Depois**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261007000002_contas_a_pagar.sql` e clique em **Run**. A ordem importa: a segunda altera tabelas e funções criadas pela primeira. Cada arquivo roda uma única vez; se o projeto já tinha a primeira, rode só a segunda.
-4. As duas devem terminar sem erro. Se aparecer erro, me envie a mensagem.
-5. Se o app mostrar erro ao abrir as contas a pagar logo depois, a API ainda não leu o esquema novo: no SQL Editor, rode `notify pgrst, 'reload schema';`.
+3. **Depois**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261007000002_contas_a_pagar.sql` e clique em **Run**.
+4. **Por último**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261008000001_gastos_fixos.sql` (gastos fixos e parcelamentos) e clique em **Run**.
+5. A ordem importa: cada arquivo altera tabelas e funções criadas pelos anteriores. Cada arquivo roda uma única vez; se o projeto já tinha os primeiros, rode só os que faltam, na ordem dos nomes.
+6. Todos devem terminar sem erro. Se aparecer erro, me envie a mensagem.
+7. Se o app mostrar erro ao abrir as contas a pagar ou os gastos fixos logo depois, a API ainda não leu o esquema novo: no SQL Editor, rode `notify pgrst, 'reload schema';`.
+8. O consultor de segurança do Supabase (**Advisors**) pode apontar a visão `series_items` como visão com os privilégios de quem a criou. É intencional: ela precisa ler as contas excluídas só em um mês, filtra a permissão de leitura de forma explícita e usa `security_barrier` (ver `docs/01_ARQUITETURA.md`).
 
 ## 3. Configurar o login
 
@@ -70,8 +73,9 @@ Se preferir, me envie só a **Project URL** e a **chave pública** (são públic
 - "Esqueci minha senha" → chega o e-mail → abrir o link → "Nova senha".
 - Anotar um gasto, fechar o app, abrir de novo: o gasto continua lá.
 - Anotar uma conta a pagar e marcar como paga: o gasto aparece em Movimentações e Pago sobe; desfazer o pagamento volta tudo.
+- Cadastrar um gasto fixo com primeira conta neste mês: as contas deste mês e do próximo aparecem em Contas a pagar; fechar e abrir o app de novo não cria contas repetidas.
 
-Os testes de permissão do banco (`npm run test:db`) rodam em Postgres local com uma simulação do esquema de autenticação do Supabase; esses scripts não devem ser aplicados no Supabase. Depois de criar o projeto, repetir os fluxos pelo app no `clarevo-teste`.
+Os testes de permissão do banco (`npm run test:db`) rodam em Postgres local com uma simulação do esquema de autenticação do Supabase; esses scripts não devem ser aplicados no Supabase. O mesmo vale para o gancho de teste de `supabase/tests/run_api.sh`, que muda o "hoje" de uma requisição só no banco descartável dos testes de API. Depois de criar o projeto, repetir os fluxos pelo app no `clarevo-teste`.
 
 ## Custos (consultados em 07/10/2026 no repositório oficial do Supabase)
 

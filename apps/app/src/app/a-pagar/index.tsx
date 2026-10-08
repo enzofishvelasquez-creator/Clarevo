@@ -1,6 +1,6 @@
 import { ERROR_TEXT, formatMonthBR, toPayCaption, type Commitment } from '@clarevo/core';
 import { router } from 'expo-router';
-import { Plus, ShieldCheck } from 'lucide-react-native';
+import { Info, ListChecks, Plus, Repeat, ShieldCheck } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
@@ -8,32 +8,46 @@ import { CommitmentRow } from '@/components/commitment-row';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { EmptyState, ErrorState } from '@/components/states';
-import { Button, Card, FitMoney, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
-import { useCommitments, useSpace, useView } from '@/state/data';
+import { Banner, Button, Card, FitMoney, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
+import { useCommitments, useSeriesList, useSeriesSync, useSpace, useView } from '@/state/data';
 import { useSession } from '@/state/session';
-import { colors, motion, space } from '@/theme/tokens';
+import { colors, fonts, motion, radius, space } from '@/theme/tokens';
 
 // Linhas saem e se reacomodam devagar (CL-V008); nada anima antes da resposta do servidor.
 const rowExit = FadeOut.duration(motion.detail).reduceMotion(ReduceMotion.System);
 const rowLayout = LinearTransition.duration(motion.detail).reduceMotion(ReduceMotion.System);
+
+/** "1 conta de gasto fixo que já venceu" ou "2 contas de gastos fixos que já venceram". */
+const createdOverdueText = (n: number) =>
+  n === 1
+    ? 'O Clarevo criou 1 conta de gasto fixo que já venceu. Confira se você já pagou.'
+    : `O Clarevo criou ${n} contas de gastos fixos que já venceram. Confira se você já pagou.`;
+
+const registeredText = (n: number) => (n === 0 ? 'Nenhum cadastrado' : n === 1 ? '1 cadastrado' : `${n} cadastrados`);
 
 /** Contas a pagar do contexto Pessoal no mês em exibição, com a mesma origem do card do Resumo. */
 export default function ContasAPagarScreen() {
   const { today } = useSession();
   const { month, currentMonth } = useView();
   const personal = useSpace().data;
-  const commitments = useCommitments(personal?.personalContextId, month);
+  const ctx = personal?.personalContextId;
+  const commitments = useCommitments(ctx, month);
+  const seriesList = useSeriesList(ctx);
+  const sync = useSeriesSync(ctx);
   const [notice] = useFlash();
   const s = commitments.summary;
   const monthName = formatMonthBR(month);
   const isCurrent = month === currentMonth;
-  const includes = s ? toPayCaption(s, today).includes : null;
+  const caption = s ? toPayCaption(s, today) : null;
+  // A sincronização do dia criou contas já vencidas: a faixa fica enquanto alguma conta de gasto fixo continuar vencida.
+  const createdOverdue = sync.data?.createdOverdue ?? 0;
+  const showCreatedOverdue = isCurrent && createdOverdue > 0 && Boolean(s?.overdue.some((c) => c.series));
 
-  const sections: { title: string; legend?: string; list: Commitment[] }[] = !s
+  const sections: { title: string; legend?: string; list: Commitment[]; review?: boolean }[] = !s
     ? []
     : isCurrent
       ? [
-          { title: 'Vencidas', list: s.overdue },
+          { title: 'Vencidas', list: s.overdue, review: s.overdue.length >= 2 },
           { title: `A vencer em ${monthName.toLowerCase()}`, list: s.upcomingInMonth },
           { title: 'Pagas', legend: 'Já contam em Pago, no mês da data do pagamento.', list: s.paidInMonth },
           { title: 'Próximos meses', legend: 'Não entram no total deste mês.', list: s.later },
@@ -49,6 +63,12 @@ export default function ContasAPagarScreen() {
       <SubHeader title="Contas a pagar" right={<ContextPill label="Pessoal" />} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <FlashBanner message={notice} />
+        {showCreatedOverdue ? (
+          <Banner tone="info" icon={Info}>
+            <Txt variant="label">{createdOverdueText(createdOverdue)}</Txt>
+            <LinkButton label="Revisar vencidas" icon={ListChecks} style={styles.inlineLink} onPress={() => router.push('/a-pagar/vencidas')} />
+          </Banner>
+        ) : null}
 
         <View style={{ gap: space[1] }}>
           <Txt variant="caption" color={colors.textSecondary}>
@@ -64,7 +84,8 @@ export default function ContasAPagarScreen() {
           ) : (
             <>
               <FitMoney cents={s.toPayCents} />
-              {includes ? <Txt variant="label">{includes}</Txt> : null}
+              {caption?.includes ? <Txt variant="label">{caption.includes}</Txt> : null}
+              {caption?.estimated ? <Txt variant="label">{caption.estimated}</Txt> : null}
             </>
           )}
           <Txt color={colors.textSecondary}>
@@ -75,6 +96,7 @@ export default function ContasAPagarScreen() {
         </View>
 
         <Button label="Anotar conta a pagar" icon={Plus} onPress={() => router.push('/a-pagar/nova')} />
+        <SeriesLink count={seriesList.data?.length ?? null} />
 
         {commitments.isPending ? (
           <View style={{ gap: space[3] }}>
@@ -105,6 +127,9 @@ export default function ContasAPagarScreen() {
                     {sec.legend}
                   </Txt>
                 ) : null}
+                {sec.review ? (
+                  <LinkButton label="Revisar vencidas" icon={ListChecks} style={styles.inlineLink} onPress={() => router.push('/a-pagar/vencidas')} />
+                ) : null}
                 {sec.list.map((c, i) => (
                   <Animated.View key={c.id} exiting={rowExit} layout={rowLayout}>
                     <CommitmentRow commitment={c} today={today} last={i === sec.list.length - 1} onPress={() => router.push(`/a-pagar/${c.id}`)} />
@@ -130,6 +155,36 @@ export default function ContasAPagarScreen() {
   );
 }
 
+/**
+ * "Gastos fixos e parcelamentos" com a legenda "{n} cadastrados", num único alvo tocável.
+ * A legenda só aparece com a lista carregada (nunca um "0" de uma falha).
+ */
+function SeriesLink({ count }: { count: number | null }) {
+  const legend = count === null ? null : registeredText(count);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={legend ? `Gastos fixos e parcelamentos, ${legend}` : 'Gastos fixos e parcelamentos'}
+      onPress={() => router.push('/gastos-fixos')}
+      style={(st) => [styles.seriesLink, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && styles.focusRing]}>
+      <Repeat size={20} color={colors.brand} strokeWidth={2.25} />
+      <View style={{ flexShrink: 1 }}>
+        <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.bold, fontSize: 16 }}>
+          Gastos fixos e parcelamentos
+        </Txt>
+        {legend ? (
+          <Txt variant="caption" color={colors.textSecondary}>
+            {legend}
+          </Txt>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   privacy: { flexDirection: 'row', alignSelf: 'center', alignItems: 'center', gap: space[2], minHeight: 44 },
+  inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
+  seriesLink: { flexDirection: 'row', alignItems: 'center', alignSelf: 'center', gap: space[2], minHeight: 44, paddingHorizontal: space[2], borderRadius: radius.sm },
+  focusRing: { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid', outlineOffset: 2 } as object,
 });

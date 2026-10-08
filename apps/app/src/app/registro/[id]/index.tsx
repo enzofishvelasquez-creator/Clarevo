@@ -1,7 +1,10 @@
 import {
+  CATEGORIES,
   ERROR_TEXT,
   NO_CATEGORY_LABEL,
+  addMonths,
   deviceTimeZone,
+  firstMonthBounds,
   formatDateTimeBR,
   formatBRL,
   formatDateBR,
@@ -9,9 +12,11 @@ import {
   isRepoError,
   monthOf,
   newOperationKey,
+  type FinancialRecord,
+  type IsoDate,
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
-import { AlertCircle, ArrowDownLeft, ArrowUpRight, Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react-native';
+import { AlertCircle, ArrowDownLeft, ArrowUpRight, Pencil, Plus, Repeat, ShieldCheck, Trash2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -27,13 +32,35 @@ import { useDeleteRecord, useRecord, useSpace, useView } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
+/**
+ * "Tornar gasto fixo": abre o cadastro de gasto fixo com descrição, valor, categoria, o dia do gasto e o início no mês
+ * seguinte (dentro do intervalo aceito; o mês atual, se o seguinte já ficou para trás). O gasto anotado não muda.
+ */
+function openAsSeries(r: FinancialRecord, today: IsoDate) {
+  const { min, max } = firstMonthBounds(today);
+  const next = addMonths(monthOf(r.occurredOn), 1);
+  const inicio = next < min ? monthOf(today) : next > max ? max : next;
+  router.push({
+    pathname: '/gastos-fixos/novo',
+    params: {
+      tipo: 'mensal',
+      descricao: r.description,
+      valor: String(r.amountCents),
+      dia: String(Number(r.occurredOn.slice(8, 10))),
+      inicio,
+      gasto: r.occurredOn,
+      ...(r.category && CATEGORIES.despesa.includes(r.category) ? { categoria: r.category } : {}),
+    },
+  });
+}
+
 /** Detalhe do registro (CL C002/C003): data, contexto, conta, valor, situação e período afetado. */
 export default function DetalheRegistro() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const record = useRecord(id);
   const personal = useSpace().data;
   const view = useView();
-  const { user } = useSession();
+  const { user, today } = useSession();
   const remove = useDeleteRecord();
   const [notice] = useFlash();
   const [confirming, setConfirming] = useState(false);
@@ -136,6 +163,10 @@ export default function DetalheRegistro() {
                 />
               ) : null}
               <Button label="Editar registro" icon={Pencil} onPress={() => router.push(`/registro/${r.id}/editar`)} />
+              {/* Gasto anotado sem conta a pagar: pode virar um gasto fixo, que começa no próximo vencimento. */}
+              {r.kind === 'despesa' && !r.commitmentId ? (
+                <Button label="Tornar gasto fixo" icon={Repeat} tone="soft" onPress={() => openAsSeries(r, today)} />
+              ) : null}
               {r.commitmentId ? (
                 <Button label="Ver conta a pagar" tone="soft" onPress={() => router.push(`/a-pagar/${r.commitmentId}`)} />
               ) : null}

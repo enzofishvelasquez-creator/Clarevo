@@ -212,7 +212,7 @@ function ToPayCard({ contextId }: { contextId: string | undefined }) {
   const a11y = !s
     ? label
     : caption?.main
-      ? `${label}, ${formatBRL(s.toPayCents)}. ${caption.main}.${caption.overdue ? ` ${caption.overdue}.` : ''}${caption.includes ? ` ${caption.includes}` : ''}`
+      ? `${label}, ${formatBRL(s.toPayCents)}. ${caption.main}.${caption.overdue ? ` ${caption.overdue}.` : ''}${caption.includes ? ` ${caption.includes}` : ''}${caption.estimated ? ` ${caption.estimated}` : ''}`
       : `${label}, ${formatBRL(s.toPayCents)}. ${zeroText}`;
 
   return (
@@ -254,6 +254,8 @@ function ToPayCard({ contextId }: { contextId: string | undefined }) {
               </View>
             ) : null}
             {caption.includes ? <Txt variant="caption">{caption.includes}</Txt> : null}
+            {/* Gastos fixos que mudam de valor (luz, água): parte do total é a referência, ainda estimada. */}
+            {caption.estimated ? <Txt variant="caption">{caption.estimated}</Txt> : null}
             <Txt variant="caption" color={colors.textSecondary}>
               Valores previstos, separados do que já foi pago.
             </Txt>

@@ -3,7 +3,7 @@ import { Check } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Txt } from '@/components/ui';
+import { spaceKeyPress, Txt } from '@/components/ui';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
 /** "outubro" → "Outubro". */
@@ -67,6 +67,7 @@ export function CheckOption({ label, hint, checked, onPress }: { label: string; 
       aria-checked={checked}
       accessibilityHint={hint}
       onPress={onPress}
+      {...spaceKeyPress(onPress)}
       style={(st) => [styles.check, (st as { focused?: boolean }).focused && styles.focusRing]}>
       <View style={[styles.box, checked && styles.boxChecked]}>{checked ? <Check size={16} color={colors.textOnBrand} strokeWidth={3} /> : null}</View>
       <View style={{ flex: 1, gap: 2 }}>

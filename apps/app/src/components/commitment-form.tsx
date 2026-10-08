@@ -12,6 +12,7 @@ import {
   formatBRL,
   formatDateBR,
   formatMonthBR,
+  formatMonthName,
   isRepoError,
   maskDateBR,
   monthOf,
@@ -37,13 +38,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
+import { ChoiceGroup } from '@/components/series-parts';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { useCreateCommitment, useUpdateCommitment } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
-export type CommitmentFormMode = { type: 'nova'; prefill?: Partial<CommitmentInput> } | { type: 'editar'; commitment: Commitment };
+export type CommitmentFormMode =
+  | { type: 'nova'; prefill?: Partial<CommitmentInput> }
+  /** informValue: "Informar o valor da conta" numa conta estimada (valor vazio com foco; envia amountIsEstimate: false). */
+  | { type: 'editar'; commitment: Commitment; informValue?: boolean };
 
 /** Descrição que sugere fatura de cartão: pagar a fatura como conta a pagar contaria as compras duas vezes. */
 const INVOICE_HINT = /\bfatura\b|cart[aã]o/i;
@@ -51,7 +56,14 @@ const INVOICE_HINT = /\bfatura\b|cart[aã]o/i;
 const commitmentText = (code: string) =>
   code in COMMITMENT_ERROR_TEXT ? COMMITMENT_ERROR_TEXT[code as keyof typeof COMMITMENT_ERROR_TEXT] : COMMITMENT_ERROR_TEXT.salvar_falhou;
 
-/** Anotar e editar conta a pagar. Mesmos cuidados do RecordForm: rascunho preservado, chave por conteúdo e reconciliação. */
+/** "novembro" no ano de hoje; "janeiro de 2027" em outro ano. */
+const monthWord = (dueOn: string, today: string) => `${formatMonthName(monthOf(dueOn))}${dueOn.slice(0, 4) === today.slice(0, 4) ? '' : ` de ${dueOn.slice(0, 4)}`}`;
+
+/**
+ * Anotar e editar conta a pagar. Mesmos cuidados do RecordForm: rascunho preservado, chave por conteúdo e reconciliação.
+ * Conta de gasto fixo ("Só esta conta"): o vencimento fica no mesmo mês (o banco recusa outro mês) e a conta passa a ser
+ * alterada só neste mês. "Informar o valor da conta" tira a marca de estimado, mesmo com o valor igual à estimativa.
+ */
 export function CommitmentForm({ mode, space: personal }: { mode: CommitmentFormMode; space: PersonalSpace }) {
   const { today } = useSession();
   const repo = useRepo();
@@ -63,12 +75,17 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
 
   const contextId = mode.type === 'nova' ? personal.personalContextId : mode.commitment.contextId;
   const contextName = 'Pessoal';
+  /** Conta de gasto fixo em edição: o número e o mês nunca mudam. */
+  const occurrence = mode.type === 'editar' && mode.commitment.series ? mode.commitment : null;
+  const occurrenceMonth = occurrence ? monthOf(occurrence.dueOn) : null;
+  const informValue = mode.type === 'editar' && Boolean(mode.informValue) && mode.commitment.amountIsEstimate;
 
   // O inicial já inclui o preenchimento da rota: abrir preenchido e sair sem mexer não pede confirmação.
   const initial = useMemo<CommitmentDraft>(() => {
     if (mode.type === 'editar') {
       const c = mode.commitment;
-      return { description: c.description, amountText: centsToInput(c.amountCents), dateText: formatDateBR(c.dueOn), category: c.category };
+      // Informar o valor: o campo abre vazio, para a estimativa não passar por valor da conta.
+      return { description: c.description, amountText: informValue ? '' : centsToInput(c.amountCents), dateText: formatDateBR(c.dueOn), category: c.category };
     }
     const p = mode.prefill ?? {};
     return {
@@ -133,7 +150,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
       flash.set('Conta a pagar salva');
       leave(() => router.replace(`/a-pagar/${id}`));
     } else {
-      flash.set('Alterações salvas');
+      flash.set(informValue ? 'Valor da conta informado' : 'Alterações salvas');
       leave(() => (router.canGoBack() ? router.back() : router.replace(`/a-pagar/${id}`)));
     }
   };
@@ -194,15 +211,23 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
       focusFirst(v.errors);
       return;
     }
+    // Conta de gasto fixo: o vencimento fica no mês dela (o banco confere de novo).
+    if (occurrenceMonth && monthOf(v.input.dueOn) !== occurrenceMonth) {
+      const errs = { dateText: COMMITMENT_ERROR_TEXT.vencimento_fora_do_mes };
+      setErrors(errs);
+      focusFirst(errs);
+      return;
+    }
+    const input: CommitmentInput = informValue ? { ...v.input, amountIsEstimate: false } : v.input;
     setErrors({});
     setBanner(null);
     setPaidElsewhere(false);
     setBusy(true);
     const version = current?.version ?? 0;
-    const snapshot = JSON.stringify([v.input, version]);
+    const snapshot = JSON.stringify([input, version]);
     try {
       if (pending.current.length > 0) {
-        const savedId = await reconcile(v.input, snapshot);
+        const savedId = await reconcile(input, snapshot);
         if (savedId) {
           setRetry(false);
           finish(savedId);
@@ -214,7 +239,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
       }
       const key = opKey.current;
       try {
-        const saved = await send(key, v.input, version);
+        const saved = await send(key, input, version);
         pending.current = [];
         setRetry(false);
         finish(saved.commitment.id);
@@ -279,16 +304,36 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
     if (cents !== null && cents > 0 && cents <= MAX_RECORD_CENTS) setDraft((d) => ({ ...d, amountText: centsToInput(cents) }));
   };
 
+  /** "Todo mês" e "Parcelado": abrem o formulário de série com o que já foi digitado (valores válidos, campo a campo). */
+  const toSeries = (tipo: 'mensal' | 'parcelada') => {
+    const params: Record<string, string> = { tipo };
+    const description = draft.description.trim();
+    if (description) params.descricao = description;
+    const cents = parseBRL(draft.amountText);
+    if (cents !== null && cents > 0 && cents <= MAX_RECORD_CENTS) params.valor = String(cents);
+    if (draft.category) params.categoria = draft.category;
+    const due = parseDateBR(draft.dateText);
+    if (due) params.vencimento = due;
+    leave(() => router.replace({ pathname: '/gastos-fixos/novo', params }));
+  };
+
   // Avisos ao vivo (informativos; a validação continua no salvar).
   const dueOn = parseDateBR(draft.dateText);
   const alreadyDue = dueOn !== null && dueOn < today;
-  const movesFrom = base && dueOn && monthOf(dueOn) !== monthOf(base.dueOn) ? monthOf(base.dueOn) : null;
+  // Conta de gasto fixo não muda de mês: em vez do aviso, o salvar mostra o erro no campo.
+  const movesFrom = !occurrence && base && dueOn && monthOf(dueOn) !== monthOf(base.dueOn) ? monthOf(base.dueOn) : null;
   const looksLikeInvoice = INVOICE_HINT.test(draft.description);
+  const occurrenceWord = occurrence ? monthWord(occurrence.dueOn, today) : '';
+  const seriesNoun = occurrence?.series?.kind === 'parcelada' ? 'parcelamento' : 'gasto fixo';
+  const tomorrow = addDays(today, 1);
+  // Atalhos de vencimento: numa conta de gasto fixo, só os que ficam no mês dela.
+  const showToday = !occurrenceMonth || monthOf(today) === occurrenceMonth;
+  const showTomorrow = !occurrenceMonth || monthOf(tomorrow) === occurrenceMonth;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <SubHeader
-        title={mode.type === 'nova' ? 'Anotar conta a pagar' : 'Editar conta a pagar'}
+        title={mode.type === 'nova' ? 'Anotar conta a pagar' : informValue ? 'Informar o valor da conta' : 'Editar conta a pagar'}
         onBack={requestCancel}
         right={<ContextPill label={`Salvando em ${contextName}`} />}
       />
@@ -316,9 +361,23 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
         ) : null}
 
         <Card style={{ gap: space[4] }}>
+          {mode.type === 'nova' ? (
+            <ChoiceGroup label="Com que frequência?">
+              <Chip label="Só uma vez" selected onPress={() => {}} />
+              <Chip label="Todo mês" selected={false} onPress={() => toSeries('mensal')} />
+              <Chip label="Parcelado" selected={false} onPress={() => toSeries('parcelada')} />
+            </ChoiceGroup>
+          ) : null}
           <Txt variant="caption" color={colors.textSecondary}>
             Prevista · só entra em Pago quando for marcada como paga
           </Txt>
+          {occurrence ? (
+            <Txt variant="label" color={colors.textSecondary}>
+              {informValue
+                ? `Informe o valor que veio na conta de ${occurrenceWord}. Ela deixa de ser estimada.`
+                : `Só a conta de ${occurrenceWord}. Ela fica marcada como alterada só neste mês; o ${seriesNoun} continua igual nos outros meses.`}
+            </Txt>
+          ) : null}
 
           <TextField
             ref={refs.description}
@@ -355,8 +414,15 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
             keyboardType="decimal-pad"
             inputMode="decimal"
             large
+            autoFocus={informValue}
             error={errors.amountText}
-            hint="Valor previsto. Ao marcar como paga, você informa o valor que saiu da conta."
+            hint={
+              informValue
+                ? `A estimativa era ${formatBRL(occurrence?.amountCents ?? 0)}.`
+                : occurrence?.amountIsEstimate
+                  ? `Valor estimado pela referência do ${seriesNoun}. Para tirar a marca de estimado, use Informar o valor da conta.`
+                  : 'Valor previsto. Ao marcar como paga, você informa o valor que saiu da conta.'
+            }
           />
 
           <View style={{ gap: space[2] }}>
@@ -370,16 +436,22 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
               inputMode="numeric"
               maxLength={10}
               error={errors.dateText}
-              hint="Digite só os números."
+              hint={
+                occurrence
+                  ? `O vencimento fica em ${occurrenceWord}. Para mudar o dia de todos os meses, edite o ${seriesNoun}.`
+                  : 'Digite só os números.'
+              }
             />
-            <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Atalhos de vencimento">
-              <Chip label="Hoje" selected={draft.dateText === formatDateBR(today)} onPress={() => set('dateText', formatDateBR(today))} />
-              <Chip
-                label="Amanhã"
-                selected={draft.dateText === formatDateBR(addDays(today, 1))}
-                onPress={() => set('dateText', formatDateBR(addDays(today, 1)))}
-              />
-            </View>
+            {showToday || showTomorrow ? (
+              <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Atalhos de vencimento">
+                {showToday ? (
+                  <Chip label="Hoje" selected={draft.dateText === formatDateBR(today)} onPress={() => set('dateText', formatDateBR(today))} />
+                ) : null}
+                {showTomorrow ? (
+                  <Chip label="Amanhã" selected={draft.dateText === formatDateBR(tomorrow)} onPress={() => set('dateText', formatDateBR(tomorrow))} />
+                ) : null}
+              </View>
+            ) : null}
           </View>
 
           <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel="Categoria">

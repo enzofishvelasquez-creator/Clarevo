@@ -52,8 +52,10 @@ const paymentText = (code: string) =>
 /**
  * "Marcar como paga": uma única operação no banco cria o gasto realizado e quita a conta a pagar (D-021).
  * O gasto entra em Pago do mês da data do pagamento; a conta sai de "Ainda a pagar".
+ * Conta com valor estimado (gasto fixo que muda): o valor abre vazio, porque o valor pago é o real (D-024, regra 4).
+ * paidOnDue: a data abre no vencimento ("Mudar valor ou data" em Contas vencidas).
  */
-export function PaymentForm({ commitment: c, space: personal }: { commitment: Commitment; space: PersonalSpace }) {
+export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { commitment: Commitment; space: PersonalSpace; paidOnDue?: boolean }) {
   const { today } = useSession();
   const repo = useRepo();
   const insets = useSafeAreaInsets();
@@ -66,8 +68,8 @@ export function PaymentForm({ commitment: c, space: personal }: { commitment: Co
   const initial = useMemo<PaymentDraft>(
     () => ({
       accountId: personal.accounts[0]?.id ?? '',
-      amountText: centsToInput(c.amountCents),
-      dateText: formatDateBR(today),
+      amountText: c.amountIsEstimate ? '' : centsToInput(c.amountCents),
+      dateText: formatDateBR(paidOnDue && c.dueOn <= today ? c.dueOn : today),
       category: c.category,
     }),
     [], // eslint-disable-line react-hooks/exhaustive-deps
@@ -301,7 +303,8 @@ export function PaymentForm({ commitment: c, space: personal }: { commitment: Co
             {shown.description}
           </Txt>
           <Txt variant="caption" color={overdue ? colors.error : colors.textSecondary}>
-            {overdue ? 'Venceu em' : 'Vence em'} {formatDateBR(shown.dueOn)} · previsto {keepTogether(formatBRL(shown.amountCents))}
+            {overdue ? 'Venceu em' : 'Vence em'} {formatDateBR(shown.dueOn)} ·{' '}
+            {shown.amountIsEstimate ? `estimado ≈ ${keepTogether(formatBRL(shown.amountCents))}` : `previsto ${keepTogether(formatBRL(shown.amountCents))}`}
           </Txt>
         </Card>
 
@@ -321,8 +324,13 @@ export function PaymentForm({ commitment: c, space: personal }: { commitment: Co
             keyboardType="decimal-pad"
             inputMode="decimal"
             large
+            autoFocus={c.amountIsEstimate}
             error={errors.amountText}
-            hint="Use o valor que saiu da conta, com juros ou desconto, se houver."
+            hint={
+              c.amountIsEstimate
+                ? `Digite o valor da conta. A estimativa era ${formatBRL(c.amountCents)}.`
+                : 'Use o valor que saiu da conta, com juros ou desconto, se houver.'
+            }
           />
 
           <View style={{ gap: space[2] }}>
@@ -392,7 +400,7 @@ export function PaymentForm({ commitment: c, space: personal }: { commitment: Co
                 Um gasto de {formatBRL(amount)} será registrado em Pago de {formatMonthBR(monthOf(paidOn)).toLowerCase()}, e esta conta a pagar
                 sai de Ainda a pagar.
               </Txt>
-              {amount !== shown.amountCents ? (
+              {amount !== shown.amountCents && !shown.amountIsEstimate ? (
                 <Txt variant="label">O valor pago é diferente do previsto ({formatBRL(shown.amountCents)}). Pago usa o valor pago.</Txt>
               ) : null}
             </Banner>

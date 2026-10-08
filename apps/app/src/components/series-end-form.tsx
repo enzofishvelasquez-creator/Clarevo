@@ -148,6 +148,8 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
 
   /** Número da última conta escolhida; undefined se ainda não dá para saber (sem escolha ou mês inválido). */
   const chosen: number | null | undefined = (() => {
+    // Depois do pagamento de "Quitei o restante", a última conta é a parcela paga.
+    if (paidDone) return paidDone.number;
     if (choice === null) return undefined;
     if (choice === 'sem') return null;
     if (choice !== 'outro') return choice;
@@ -366,12 +368,13 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
   };
 
   const title = resume ? (parcelada ? 'Retomar parcelas' : 'Voltar a repetir') : parcelada ? 'Encerrar parcelamento' : 'Encerrar gasto fixo';
-  const actionLabel = resume ? (parcelada ? 'Retomar parcelas' : 'Voltar a repetir') : paidDone ? 'Encerrar agora' : 'Encerrar';
   const yesterday = addDays(today, -1);
   const lastDue = parcelada && total !== null ? seriesDueOn(s, total) : null;
 
   // Efeito da escolha, antes de confirmar. Retomar (ou estender): as contas que a geração recria agora.
   const extending = chosen === null || (typeof chosen === 'number' && s.lastNumber !== null && chosen > s.lastNumber);
+  // Estender o término ("Sem data para terminar", "Até a última parcela") é retomar, como diz a faixa depois de salvar.
+  const actionLabel = resume || extending ? (parcelada ? 'Retomar parcelas' : 'Voltar a repetir') : paidDone ? 'Encerrar agora' : 'Encerrar';
   const comingBack =
     plan?.ok && extending ? occurrencesToMaterialize({ ...s, lastNumber: chosen ?? null }, occurrences, today).map((o) => formatMonthName(o.month)) : [];
   const effect = !plan?.ok
@@ -418,10 +421,9 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
           {resume && parcelada ? (
             <Txt variant="label">
               As parcelas voltam até a {total}
-              {lastDue ? `, com a última em ${formatDateBR(lastDue)}` : ''}. As contas em aberto aparecem em Contas a pagar um mês antes de
-              vencer.
+              {lastDue ? `, com a última em ${formatDateBR(lastDue)}` : ''}.
             </Txt>
-          ) : resume ? (
+          ) : paidDone ? null : resume ? (
             <ChoiceGroup label="Até quando?" error={choice !== 'outro' ? (choiceError ?? undefined) : undefined}>
               <Chip label="Sem data para terminar" selected={choice === 'sem'} onPress={() => pick('sem')} />
               <Chip label="Termina em…" selected={choice === 'outro'} onPress={() => pick('outro')} />
@@ -441,7 +443,7 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
             </ChoiceGroup>
           )}
 
-          {choice === 'outro' ? (
+          {choice === 'outro' && !paidDone ? (
             <TextField
               ref={otherRef}
               label="Último mês (MM/AAAA)"

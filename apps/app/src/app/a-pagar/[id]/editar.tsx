@@ -10,8 +10,9 @@ import { Button, Card, Txt } from '@/components/ui';
 import { useCommitment, useSpace } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
+/** /a-pagar/[id]/editar ("Só esta conta" numa conta de gasto fixo) e ?informar=1 ("Informar o valor da conta"). */
 export default function EditarContaAPagar() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, informar } = useLocalSearchParams<{ id: string; informar?: string }>();
   const personal = useSpace().data;
   const commitment = useCommitment(id);
   const c = commitment.data;
@@ -19,7 +20,9 @@ export default function EditarContaAPagar() {
   const [opened, setOpened] = useState<Commitment | null>(null);
   if (!opened && c && c.status === 'aberto') setOpened(c);
 
-  if (opened && personal) return <CommitmentForm key={opened.id} mode={{ type: 'editar', commitment: opened }} space={personal} />;
+  if (opened && personal) {
+    return <CommitmentForm key={opened.id} mode={{ type: 'editar', commitment: opened, informValue: informar === '1' }} space={personal} />;
+  }
   if (commitment.isPending || !personal) return <LoadingState />;
   if (commitment.isError) return <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => commitment.refetch()} />;
   // Conta paga não se edita: é preciso desfazer o pagamento antes (D-021, regra 3).

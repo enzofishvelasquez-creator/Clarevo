@@ -2,10 +2,12 @@ import {
   COMMITMENT_ERROR_TEXT,
   ERROR_TEXT,
   NO_CATEGORY_LABEL,
+  addMonths,
   commitmentSituation,
   deviceTimeZone,
   dueText,
   findNextMonthCommitment,
+  firstMonthBounds,
   formatBRL,
   formatDateBR,
   formatDateTimeBR,
@@ -15,13 +17,18 @@ import {
   monthOf,
   newOperationKey,
   nextMonthPrefill,
+  occurrenceLabel,
+  termFor,
   type Commitment,
+  type IsoDate,
+  type IsoMonth,
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
-import { AlertCircle, Check, Pencil, Plus, ShieldCheck, Trash2, Undo2 } from 'lucide-react-native';
+import { AlertCircle, Check, Info, Pencil, Plus, Repeat, ShieldCheck, Trash2, Undo2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { ChoiceDialog } from '@/components/choice-dialog';
 import { SITUATION_LOOK } from '@/components/commitment-row';
 import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
@@ -31,14 +38,32 @@ import { Banner, Button, Card, FitMoney, LinkButton, Screen, Skeleton, Txt } fro
 import { flash } from '@/lib/flash';
 import { openSummary } from '@/lib/nav';
 import { totalChange } from '@/lib/highlight';
-import { useCommitment, useCommitments, useDeleteCommitment, useSpace, useUndoCommitmentPayment, useView } from '@/state/data';
+import { useCommitment, useCommitments, useDeleteCommitment, useSeries, useSpace, useUndoCommitmentPayment, useView } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
 const textFor = (code: string) =>
   code in COMMITMENT_ERROR_TEXT ? COMMITMENT_ERROR_TEXT[code as keyof typeof COMMITMENT_ERROR_TEXT] : COMMITMENT_ERROR_TEXT.salvar_falhou;
 
-/** Detalhe da conta a pagar: situação, vencimento, efeito no resumo e as ações permitidas em cada estado (D-021). */
+/** "novembro" no ano de hoje; "janeiro de 2027" em outro ano. */
+const monthWord = (dueOn: IsoDate, today: IsoDate) => `${formatMonthName(monthOf(dueOn))}${dueOn.slice(0, 4) === today.slice(0, 4) ? '' : ` de ${dueOn.slice(0, 4)}`}`;
+
+/**
+ * Primeiro mês de um gasto fixo criado a partir de uma conta paga ("Repetir todo mês"): o mês seguinte ao vencimento,
+ * dentro do intervalo aceito pelo cadastro (o mês atual, se o seguinte já ficou para trás).
+ */
+function startAfter(date: IsoDate, today: IsoDate): IsoMonth {
+  const next = addMonths(monthOf(date), 1);
+  const { min, max } = firstMonthBounds(today);
+  return next < min ? monthOf(today) : next > max ? max : next;
+}
+
+/**
+ * Detalhe da conta a pagar: situação, vencimento, efeito no resumo e as ações permitidas em cada estado (D-021).
+ * Conta de gasto fixo (D-024): mostra de qual série faz parte, "Só esta conta" ou "esta e as próximas" ao editar,
+ * "Excluir só a conta de novembro" (não volta a ser criada) e, se estimada, "Informar o valor da conta".
+ * "Adicionar a conta do próximo mês" só em conta avulsa.
+ */
 export default function DetalheContaAPagar() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const commitment = useCommitment(id);
@@ -48,7 +73,7 @@ export default function DetalheContaAPagar() {
   const remove = useDeleteCommitment();
   const undo = useUndoCommitmentPayment();
   const [notice, setNotice] = useFlash();
-  const [confirming, setConfirming] = useState<null | 'excluir' | 'desfazer'>(null);
+  const [confirming, setConfirming] = useState<null | 'excluir' | 'desfazer' | 'editar'>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const deleteKey = useRef(newOperationKey());
   const undoKey = useRef(newOperationKey());
@@ -60,6 +85,9 @@ export default function DetalheContaAPagar() {
   const c = commitment.data;
   const situation = c ? commitmentSituation(c, today) : null;
   const paid = c?.status === 'quitado' ? c.payment : null;
+  const ref = c?.series ?? null;
+  const series = useSeries(ref?.id, c?.contextId);
+  const occurrenceWord = c && ref ? monthWord(c.dueOn, today) : '';
 
   const doDelete = async () => {
     if (!c) return;
@@ -68,7 +96,7 @@ export default function DetalheContaAPagar() {
       await remove.mutateAsync({ key: deleteKey.current, id: c.id, version: c.version });
       deleteKey.current = newOperationKey();
       setConfirming(null);
-      flash.set('Conta a pagar excluída');
+      flash.set(ref ? `Conta de ${occurrenceWord} excluída. O ${seriesNoun} continua nos outros meses.` : 'Conta a pagar excluída');
       toList();
     } catch (e) {
       setConfirming(null);
@@ -139,6 +167,21 @@ export default function DetalheContaAPagar() {
         : `Ainda a pagar de ${formatMonthBR(monthOf(c.dueOn)).toLowerCase()}`;
   const look = situation ? SITUATION_LOOK[situation] : null;
 
+  // "Parte de: Aluguel · todo mês, dia 5" ou "Parcela 13 de 48 de Financiamento do carro". O nome e o dia vêm da vigência
+  // desta conta; enquanto a série carrega, só o rótulo da conta.
+  const term = ref && series.data ? termFor(series.data.terms, ref.number) : null;
+  const partOf = !ref
+    ? null
+    : ref.kind === 'parcelada'
+      ? term
+        ? `${occurrenceLabel(c!)} de ${term.description}`
+        : occurrenceLabel(c!)
+      : term
+        ? `Parte de: ${term.description} · todo mês, dia ${term.dueDay}`
+        : 'Parte de um gasto fixo · todo mês';
+  const seriesNoun = ref?.kind === 'parcelada' ? 'parcelamento' : 'gasto fixo';
+  const estimateOpen = Boolean(c && !paid && c.amountIsEstimate);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title="Conta a pagar" onBack={toList} right={<ContextPill label="Pessoal" />} />
@@ -180,9 +223,29 @@ export default function DetalheContaAPagar() {
                   {c.description}
                 </Txt>
                 <FitMoney cents={paid ? paid.amountCents : c.amountCents} />
+                {estimateOpen ? (
+                  <Txt variant="label" color={colors.textSecondary}>
+                    Valor estimado
+                  </Txt>
+                ) : null}
                 <Txt variant="label" color={situation === 'vencida' ? colors.error : colors.textSecondary}>
                   {dueText(c, today)}
                 </Txt>
+                {ref ? (
+                  <View style={{ gap: space[1] }}>
+                    <Txt variant="label">{partOf}</Txt>
+                    <LinkButton
+                      label={`Ver ${seriesNoun}`}
+                      style={styles.inlineLink}
+                      onPress={() => router.push(`/gastos-fixos/${ref.id}`)}
+                    />
+                    {c.seriesOverride ? (
+                      <Txt variant="label" color={colors.textSecondary}>
+                        Alterada só neste mês.
+                      </Txt>
+                    ) : null}
+                  </View>
+                ) : null}
                 <View>
                   <Row label="Contexto" value="Pessoal" />
                   <Row label="Vencimento" value={formatDateBR(c.dueOn)} />
@@ -198,7 +261,9 @@ export default function DetalheContaAPagar() {
                 </View>
                 <View style={styles.trail} accessible>
                   <Txt variant="caption" color={colors.textSecondary}>
-                    Anotada por {c.createdBy === user?.id ? 'você' : 'outra pessoa da família'} em {formatDateTimeBR(c.createdAt, deviceTimeZone())}
+                    {ref
+                      ? `Criada pelo ${seriesNoun} em ${formatDateTimeBR(c.createdAt, deviceTimeZone())}`
+                      : `Anotada por ${c.createdBy === user?.id ? 'você' : 'outra pessoa da família'} em ${formatDateTimeBR(c.createdAt, deviceTimeZone())}`}
                   </Txt>
                   {c.version > 1 ? (
                     <Txt variant="caption" color={colors.textSecondary}>
@@ -208,11 +273,45 @@ export default function DetalheContaAPagar() {
                 </View>
               </Card>
 
+              {estimateOpen ? (
+                <Banner tone="info" icon={Info} live={false}>
+                  <Txt variant="label">Valor estimado pela referência do {seriesNoun}. Quando a conta chegar, informe o valor.</Txt>
+                  <Button
+                    label="Informar o valor da conta"
+                    tone="soft"
+                    onPress={() => router.push({ pathname: '/a-pagar/[id]/editar', params: { id: c.id, informar: '1' } })}
+                  />
+                </Banner>
+              ) : null}
+
               {paid ? (
                 <>
                   <Button label="Ver gasto registrado" tone="soft" onPress={() => router.push(`/registro/${paid.recordId}`)} />
                   <Button label="Desfazer pagamento" icon={Undo2} tone="danger" onPress={() => setConfirming('desfazer')} />
-                  <NextMonth commitment={c} />
+                  {/* Conta de gasto fixo: a do próximo mês é criada pela série (D-024, regra 10). */}
+                  {ref ? null : (
+                    <>
+                      <NextMonth commitment={c} />
+                      <Button
+                        label="Repetir todo mês"
+                        icon={Repeat}
+                        tone="soft"
+                        onPress={() =>
+                          router.push({
+                            pathname: '/gastos-fixos/novo',
+                            params: {
+                              tipo: 'mensal',
+                              descricao: c.description,
+                              valor: String(c.amountCents),
+                              dia: String(Number(c.dueOn.slice(8, 10))),
+                              inicio: startAfter(c.dueOn, today),
+                              ...(c.category ? { categoria: c.category } : {}),
+                            },
+                          })
+                        }
+                      />
+                    </>
+                  )}
                   <Txt variant="caption" color={colors.textSecondary}>
                     Para alterar esta conta a pagar, desfaça o pagamento. O gasto registrado pode ser editado em Movimentações.
                   </Txt>
@@ -223,8 +322,18 @@ export default function DetalheContaAPagar() {
                   {notice === 'Conta a pagar salva' ? (
                     <Button label="Anotar outra conta a pagar" icon={Plus} tone="soft" onPress={() => router.replace('/a-pagar/nova')} />
                   ) : null}
-                  <Button label="Editar conta a pagar" icon={Pencil} tone="soft" onPress={() => router.push(`/a-pagar/${c.id}/editar`)} />
-                  <Button label="Excluir conta a pagar" icon={Trash2} tone="danger" onPress={() => setConfirming('excluir')} />
+                  <Button
+                    label="Editar conta a pagar"
+                    icon={Pencil}
+                    tone="soft"
+                    onPress={() => (ref ? setConfirming('editar') : router.push(`/a-pagar/${c.id}/editar`))}
+                  />
+                  <Button
+                    label={ref ? `Excluir só a conta de ${occurrenceWord}` : 'Excluir conta a pagar'}
+                    icon={Trash2}
+                    tone="danger"
+                    onPress={() => setConfirming('excluir')}
+                  />
                 </>
               )}
               <Button label="Ver resumo do mês" tone="soft" onPress={showSummary} />
@@ -237,17 +346,46 @@ export default function DetalheContaAPagar() {
 
               <ConfirmDialog
                 visible={confirming === 'excluir'}
-                title="Excluir conta a pagar?"
+                title={ref ? `Excluir a conta de ${occurrenceWord}?` : 'Excluir conta a pagar?'}
                 cancelLabel="Cancelar"
-                confirmLabel="Excluir conta a pagar"
+                confirmLabel={ref ? 'Excluir só esta' : 'Excluir conta a pagar'}
                 busy={remove.isPending}
                 onCancel={() => setConfirming(null)}
                 onConfirm={doDelete}>
                 <Txt style={{ fontFamily: fonts.bold }}>
                   {c.description} · {formatBRL(c.amountCents)} · vence em {formatDateBR(c.dueOn)} · Pessoal
                 </Txt>
+                {ref ? (
+                  <Txt color={colors.textSecondary}>
+                    O {seriesNoun} continua nos outros meses, e esta conta não volta a ser criada.
+                  </Txt>
+                ) : null}
                 <Txt color={colors.textSecondary}>O valor deixa de contar em Ainda a pagar. Recebido, Pago e a diferença do mês não mudam.</Txt>
               </ConfirmDialog>
+
+              {ref && !paid ? (
+                <ChoiceDialog
+                  visible={confirming === 'editar'}
+                  title="O que você quer alterar?"
+                  onCancel={() => setConfirming(null)}
+                  choices={[
+                    {
+                      label: `Só a conta de ${occurrenceWord}`,
+                      onPress: () => {
+                        setConfirming(null);
+                        router.push(`/a-pagar/${c.id}/editar`);
+                      },
+                    },
+                    {
+                      label: `${occurrenceWord.charAt(0).toUpperCase()}${occurrenceWord.slice(1)} e os próximos meses`,
+                      onPress: () => {
+                        setConfirming(null);
+                        router.push({ pathname: '/gastos-fixos/[id]/editar', params: { id: ref.id, 'a-partir': String(ref.number) } });
+                      },
+                    },
+                  ]}
+                />
+              ) : null}
 
               {paid ? (
                 <ConfirmDialog
@@ -347,4 +485,5 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: space[4], paddingVertical: space[3], minHeight: 44, alignItems: 'center' },
   privacy: { flexDirection: 'row', alignSelf: 'center', alignItems: 'center', gap: space[2], minHeight: 44 },
+  inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
 });
