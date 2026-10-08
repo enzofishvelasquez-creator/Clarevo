@@ -1,8 +1,10 @@
 import {
+  PARTS_PER_YEAR_MAX,
   RepoError,
   monthRange,
   type AffectedRef,
   type AmountMode,
+  type Cents,
   type Commitment,
   type CommitmentAction,
   type CommitmentInput,
@@ -65,7 +67,7 @@ interface CommitmentRow {
   paid_on: string | null;
   paid_amount_cents: number | null;
   paid_account_id: string | null;
-  // Ocorrência de série (nulos na conta avulsa). Tipo e total de parcelas vêm da série pela junção.
+  // Ocorrência de série (nulos na conta avulsa). Tipo, total de parcelas e parcelas por ano vêm da série pela junção.
   series_id: string | null;
   occurrence_number: number | null;
   series_override: boolean;
@@ -73,6 +75,8 @@ interface CommitmentRow {
   series_kind: SeriesKind | null;
   series_nature: SeriesNature | null;
   series_installment_total: number | null;
+  /** Só na conta do ano (1 = cota única); nulo nas outras. */
+  series_parts_per_year: number | null;
 }
 
 /** Retorno (jsonb) das funções de conta a pagar. record: gasto criado (pagar) ou excluído (desfazer). */
@@ -112,6 +116,8 @@ interface SeriesRow {
   paid_count: number;
   open_count: number;
   generating: boolean;
+  /** Só na conta do ano, de 1 (cota única) a 12; nulo nas outras. */
+  parts_per_year: number | null;
 }
 
 /** Retorno (jsonb) das funções de série: ocorrências vivas por número crescente; changed conforme a função. */
@@ -129,7 +135,7 @@ const COMMITMENT_ACTIONS: CommitmentAction[] = [
   'pagar_compromisso',
   'desfazer_pagamento',
 ];
-const SERIES_ACTIONS: SeriesAction[] = ['criar_serie', 'alterar_serie', 'encerrar_serie', 'excluir_serie'];
+const SERIES_ACTIONS: SeriesAction[] = ['criar_serie', 'alterar_serie', 'encerrar_serie', 'excluir_serie', 'informar_ano', 'tirar_ano'];
 
 const KNOWN: RepoErrorCode[] = [
   'versao_desatualizada',
@@ -156,6 +162,7 @@ const KNOWN: RepoErrorCode[] = [
   'dia_invalido',
   'inicio_fora_do_intervalo',
   'parcelas_invalidas',
+  'parcelas_no_ano_invalidas',
   'parcela_inicial_invalida',
   'fim_invalido',
   'numero_fora_da_serie',
@@ -204,6 +211,17 @@ function toRecord(r: RecordRow): FinancialRecord {
 }
 
 /**
+ * Parcelas por ano coerentes com o tipo da série (S9): de 1 a 12 na conta do ano, nulo nas outras. Sem isso, o mês, o
+ * ano e os rótulos das parcelas sairiam errados.
+ */
+function partsPerYearOf(kind: SeriesKind, value: number | null | undefined): number | null {
+  const k = value == null ? null : Number(value);
+  const consistent = kind === 'anual' ? k !== null && Number.isInteger(k) && k >= 1 && k <= PARTS_PER_YEAR_MAX : k === null;
+  if (!consistent) throw new RepoError('desconhecido', 'serie_inconsistente');
+  return k;
+}
+
+/**
  * Paga se e somente se há gasto vivo vinculado. Qualquer outra combinação é recusada: nunca mostrar "paga" sem o gasto.
  * Ocorrência de série só com número e tipo da série; conta avulsa sem marcas de série (como commitments_series_marcas).
  */
@@ -218,6 +236,7 @@ function toCommitment(c: CommitmentRow): Commitment {
     ? c.occurrence_number != null && c.series_kind != null && c.series_nature != null
     : c.occurrence_number == null && !c.series_override && !c.amount_is_estimate;
   if (!seriesConsistent) throw new RepoError('desconhecido', 'serie_inconsistente');
+  const partsPerYear = inSeries ? partsPerYearOf(c.series_kind!, c.series_parts_per_year) : null;
   return {
     id: c.id,
     contextId: c.context_id,
@@ -242,6 +261,7 @@ function toCommitment(c: CommitmentRow): Commitment {
           kind: c.series_kind!,
           nature: c.series_nature!,
           installmentTotal: c.series_installment_total ?? null,
+          partsPerYear,
         }
       : null,
     seriesOverride: c.series_override === true,
@@ -257,6 +277,7 @@ function toCommitment(c: CommitmentRow): Commitment {
 function toSeries(s: SeriesRow): CommitmentSeries {
   const terms = s.terms ?? [];
   if (terms[0]?.from_number !== s.first_number) throw new RepoError('desconhecido', 'serie_inconsistente');
+  const partsPerYear = partsPerYearOf(s.kind, s.parts_per_year);
   return {
     id: s.id,
     contextId: s.context_id,
@@ -266,6 +287,7 @@ function toSeries(s: SeriesRow): CommitmentSeries {
     firstNumber: s.first_number,
     lastNumber: s.last_number,
     installmentTotal: s.installment_total,
+    partsPerYear,
     currency: s.currency,
     terms: terms.map((t) => ({
       fromNumber: t.from_number,
@@ -551,7 +573,7 @@ export class SupabaseRepository implements RecordsRepository {
     });
   }
 
-  /** Gastos fixos e parcelamentos do contexto (inclusive encerrados), em páginas como as demais listas. */
+  /** Gastos fixos, parcelamentos e contas do ano do contexto (inclusive encerrados), em páginas como as demais listas. */
   async listSeries(contextId: string): Promise<CommitmentSeries[]> {
     const PAGE = 500;
     const rows: SeriesRow[] = [];
@@ -624,6 +646,10 @@ export class SupabaseRepository implements RecordsRepository {
     };
   }
 
+  /**
+   * p_parts_per_year só vai na conta do ano. Sem ele, o banco calcula o mesmo hash do Ciclo A: uma repetição em
+   * trânsito de gasto fixo ou parcelamento continua reconhecida.
+   */
   createSeries(key: string, contextId: string, input: SeriesInput) {
     return this.callSeries('create_series', {
       p_idempotency_key: key,
@@ -639,6 +665,7 @@ export class SupabaseRepository implements RecordsRepository {
       p_first_number: input.firstNumber,
       p_installment_total: input.installmentTotal,
       p_last_month: input.lastMonth ? `${input.lastMonth}-01` : null,
+      ...(input.partsPerYear != null ? { p_parts_per_year: input.partsPerYear } : {}),
     });
   }
 
@@ -680,6 +707,33 @@ export class SupabaseRepository implements RecordsRepository {
       p_idempotency_key: key,
       p_series_id: id,
       p_expected_version: expectedVersion,
+      p_expected_affected: affectedJson(expectedAffected),
+    });
+  }
+
+  /**
+   * Conta do ano, "Informar o valor de 2027": o ano é o da parcela `number`. O banco confere o conjunto esperado
+   * (affectedByYear(…, 'informar')) e não muda a versão da série.
+   */
+  informSeriesYear(key: string, seriesId: string, number: number, expectedAffected: AffectedRef[], amountCents: Cents) {
+    return this.callSeries('inform_series_year', {
+      p_idempotency_key: key,
+      p_series_id: seriesId,
+      p_number: number,
+      p_expected_affected: affectedJson(expectedAffected),
+      p_amount_cents: amountCents,
+    });
+  }
+
+  /**
+   * Conta do ano, "Tirar as parcelas de 2027" e a segunda etapa de "Paguei o ano todo de uma vez": o conjunto esperado
+   * vem de affectedByYear(…, 'tirar') ou de wholeYearPayment(…).affectedAfterPayment.
+   */
+  skipSeriesYear(key: string, seriesId: string, number: number, expectedAffected: AffectedRef[]) {
+    return this.callSeries('skip_series_year', {
+      p_idempotency_key: key,
+      p_series_id: seriesId,
+      p_number: number,
       p_expected_affected: affectedJson(expectedAffected),
     });
   }

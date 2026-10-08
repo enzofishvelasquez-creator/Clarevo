@@ -1,4 +1,6 @@
 import {
+  ANNUAL_MAX_YEARS,
+  ANNUAL_SERIES_ERROR_TEXT,
   ERROR_TEXT,
   PAYMENT_ERROR_TEXT,
   PAYMENT_FIELD_ORDER,
@@ -7,6 +9,7 @@ import {
   addDays,
   addMonths,
   affectedByEnd,
+  annualYearOf,
   centsToInput,
   currentTerm,
   fieldForErrorCode,
@@ -19,7 +22,10 @@ import {
   maskMonthBR,
   mergeOccurrences,
   monthOf,
+  lastNumberFromEndYear,
   newOperationKey,
+  numberAtOrAfter,
+  numberAtOrBefore,
   numberOfMonth,
   occurrencesToMaterialize,
   parseBRL,
@@ -30,6 +36,7 @@ import {
   seriesEnded,
   seriesErrorText,
   seriesMonthOf,
+  termFor,
   validatePaymentDraft,
   type Commitment,
   type CommitmentSeries,
@@ -84,8 +91,18 @@ const paymentText = (code: string) =>
  * Encerrar, retomar ou "Quitei o restante nesta parcela" (D-024, regra 6). Encerrar define a última conta e tira as
  * em aberto depois dela (recusado se houver conta paga depois); retomar recria, dentro da janela, as removidas.
  * "Quitei o restante" faz pay_commitment com o valor informado e só então end_series com esta parcela como a última.
+ * Conta do ano (D-029): a escolha é o último ano; thenNew ("Mudar a forma de pagamento") abre, depois de encerrar, o
+ * cadastro de uma nova conta do ano preenchido, a partir do ano seguinte (duas ações confirmadas pela pessoa).
  */
-export function SeriesEndForm({ series: opened, space: personal }: { series: CommitmentSeries; space: PersonalSpace }) {
+export function SeriesEndForm({
+  series: opened,
+  space: personal,
+  thenNew = false,
+}: {
+  series: CommitmentSeries;
+  space: PersonalSpace;
+  thenNew?: boolean;
+}) {
   const { today } = useSession();
   const repo = useRepo();
   const qc = useQueryClient();
@@ -106,21 +123,40 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
   /** As duas listas carregadas; depois de uma falha ao recarregar, o efeito e a parcela a quitar não são conhecidos. */
   const listsReady = occ.isSuccess && openOcc.isSuccess;
   const parcelada = s.kind === 'parcelada';
-  const noun = parcelada ? 'Parcelamento' : 'Gasto fixo';
+  const anual = s.kind === 'anual';
+  const k = s.partsPerYear ?? 1;
+  const texts: Record<keyof typeof SERIES_ERROR_TEXT, string> = anual ? ANNUAL_SERIES_ERROR_TEXT : SERIES_ERROR_TEXT;
+  const noun = parcelada ? 'Parcelamento' : anual ? 'Conta do ano' : 'Gasto fixo';
+  /** Maior último número aceito: parcelamento, o total; gasto fixo, 600 contas; conta do ano, 50 anos. */
+  const maxLast = parcelada ? (s.installmentTotal ?? 0) : anual ? ANNUAL_MAX_YEARS * k : 600;
+  const yearLabelOf = (n: number) => annualYearOf(s, n).label;
   // Aberta para retomar: a série já estava encerrada ao abrir a tela (não muda no meio do preenchimento).
   const [resume] = useState(() => seriesEnded(opened, today));
   const currentMonth = monthOf(today);
   const total = s.installmentTotal;
 
   // Chips de "Qual é a última conta?": do mês anterior (ou da conta mais antiga em aberto) até 6 meses depois da última conta criada.
+  // Conta do ano, "Qual é o último ano?": do ano de hoje (ou do ano da conta mais antiga em aberto) até 3 anos depois
+  // do último ano com conta criada; cada chip é a última parcela do ano.
   const numbers = useMemo(() => {
     const liveNumbers = occurrences.map((c) => c.series!.number);
     const oldestOpen = occurrences.find((c) => c.status === 'aberto')?.series?.number;
-    const start = Math.max(s.firstNumber, Math.min(oldestOpen ?? Infinity, numberOfMonth(s, addMonths(currentMonth, -1))));
-    const top = Math.max(...liveNumbers, numberOfMonth(s, currentMonth)) + 6;
-    const limit = parcelada ? (total ?? 0) : 600;
     const out: number[] = [];
-    for (let n = start; n <= Math.min(top, limit); n++) if (n !== s.lastNumber && !s.skippedNumbers.includes(n)) out.push(n);
+    if (anual) {
+      const yearIdx = (n: number) => Math.floor((n - 1) / k);
+      const firstIdx = yearIdx(s.firstNumber);
+      const curIdx = yearIdx(Math.max(s.firstNumber, numberAtOrBefore(s, currentMonth)));
+      const startIdx = Math.max(firstIdx, Math.min(oldestOpen === undefined ? Infinity : yearIdx(oldestOpen), curIdx));
+      const topIdx = Math.max(curIdx, ...liveNumbers.map(yearIdx)) + 3;
+      for (let idx = startIdx; idx <= topIdx; idx++) {
+        const n = (idx + 1) * k;
+        if (n !== s.lastNumber && n <= maxLast) out.push(n);
+      }
+      return out;
+    }
+    const start = Math.max(s.firstNumber, Math.min(oldestOpen ?? Infinity, numberAtOrAfter(s, addMonths(currentMonth, -1))));
+    const top = Math.max(...liveNumbers, numberAtOrAfter(s, currentMonth)) + 6;
+    for (let n = start; n <= Math.min(top, maxLast); n++) if (n !== s.lastNumber && !s.skippedNumbers.includes(n)) out.push(n);
     return out;
   }, [occ.data, live.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -177,12 +213,16 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
     if (choice === null) return undefined;
     if (choice === 'sem') return null;
     if (choice !== 'outro') return choice;
+    if (anual) {
+      // "Último ano (AAAA)": a última parcela daquele ano.
+      const text = otherText.trim();
+      return /^\d{4}$/.test(text) ? lastNumberFromEndYear(s, Number(text)) : undefined;
+    }
     const m = parseMonthBR(otherText);
-    return m === null ? undefined : numberOfMonth(s, m);
+    const n = m === null ? null : numberOfMonth(s, m);
+    return n === null ? undefined : n;
   })();
-  const inRange =
-    chosen === undefined ||
-    (chosen === null ? !parcelada : chosen >= s.firstNumber - 1 && chosen <= (parcelada ? (total ?? 0) : 600));
+  const inRange = chosen === undefined || (chosen === null ? !parcelada : chosen >= s.firstNumber - 1 && chosen <= maxLast);
   const plan = chosen !== undefined && inRange ? affectedByEnd(allOccurrences, s, chosen) : null;
   /** Conta viva do número escolhido, aberta ou paga (null se ainda não foi criada). */
   const chosenOcc = typeof chosen === 'number' ? (allOccurrences.find((c) => c.series!.number === chosen) ?? null) : null;
@@ -192,6 +232,7 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
 
   const monthOfNumber = (n: number) => formatMonthName(seriesMonthOf(s, n));
   const chipLabel = (n: number) => {
+    if (anual) return yearLabelOf(n);
     const month = monthChipLabel(seriesMonthOf(s, n), today);
     return parcelada ? `${month} (parcela ${n})` : month;
   };
@@ -217,16 +258,43 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
     if (last === null || (prevLast !== null && last > prevLast)) {
       // Retomar: as contas recriadas pela geração (número depois da antiga última conta).
       const before = prevLast ?? Infinity;
-      const back = w.occurrences.filter((c) => c.status === 'aberto' && c.series!.number > before).map((c) => formatMonthName(monthOf(c.dueOn)));
-      const tail =
-        back.length === 0
-          ? ''
-          : back.length === 1
-            ? ` A conta de ${back[0]} voltou para Contas a pagar.`
-            : ` As contas de ${joinList(back)} voltaram para Contas a pagar.`;
-      flash.set(`${noun} retomado.${tail}`);
+      const recreated = w.occurrences.filter((c) => c.status === 'aberto' && c.series!.number > before);
+      if (anual) {
+        const n = recreated.length;
+        const tail = n === 0 ? '' : n === 1 ? ' 1 conta voltou para Contas a pagar.' : ` ${n} contas voltaram para Contas a pagar.`;
+        flash.set(`Conta do ano retomada.${tail}`);
+      } else {
+        const back = recreated.map((c) => formatMonthName(monthOf(c.dueOn)));
+        const tail =
+          back.length === 0
+            ? ''
+            : back.length === 1
+              ? ` A conta de ${back[0]} voltou para Contas a pagar.`
+              : ` As contas de ${joinList(back)} voltaram para Contas a pagar.`;
+        flash.set(`${noun} retomado.${tail}`);
+      }
+    } else if (anual && thenNew) {
+      // "Mudar a forma de pagamento": a nova conta do ano começa no ano seguinte ao último, com o formulário preenchido.
+      const fresh = w.series;
+      const term = termFor(fresh.terms, Math.max(fresh.firstNumber, last)) ?? currentTerm(fresh, today);
+      const lastYear = last >= fresh.firstNumber ? annualYearOf(fresh, last) : null;
+      const start = addMonths(lastYear ? lastYear.firstMonth : annualYearOf(fresh, fresh.firstNumber).firstMonth, lastYear ? 12 : 0);
+      const params: Record<string, string> = {
+        tipo: 'anual',
+        descricao: term.description,
+        valor: String(term.amountCents),
+        dia: String(term.dueDay),
+        modo: term.amountMode,
+        parcelas: String(k),
+        mes: String(Number(start.slice(5, 7))),
+        ano: start.slice(0, 4),
+        ...(term.category ? { categoria: term.category } : {}),
+        ...(lastYear ? { apos: lastYear.label } : {}),
+      };
+      leave(() => router.replace({ pathname: '/gastos-fixos/novo', params }));
+      return;
     } else {
-      flash.set(`${noun} encerrado.`);
+      flash.set(`${noun} ${anual ? 'encerrada' : 'encerrado'}.`);
     }
     leave(goBack);
   };
@@ -351,13 +419,13 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
     setBanner(null);
     if (chosen === undefined) {
       if (choice === 'outro') {
-        setChoiceError(SERIES_ERROR_TEXT.fim_invalido);
+        setChoiceError(texts.fim_invalido);
         otherRef.current?.focus();
-      } else setChoiceError('Escolha a última conta.');
+      } else setChoiceError(anual ? 'Escolha o último ano.' : 'Escolha a última conta.');
       return;
     }
     if (!inRange) {
-      setChoiceError(SERIES_ERROR_TEXT.fim_invalido);
+      setChoiceError(texts.fim_invalido);
       return;
     }
     // Listas que falharam ao recarregar: o efeito e a parcela a quitar não são conhecidos. Recarregar antes de gravar.
@@ -369,7 +437,7 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
       return;
     }
     if (!plan || !plan.ok) {
-      setChoiceError(SERIES_ERROR_TEXT.serie_tem_pagamento_posterior);
+      setChoiceError(texts.serie_tem_pagamento_posterior);
       return;
     }
     // Última conta antes desta gravação, para a faixa: depois de uma falha, a série recarregada pode já trazer a nova.
@@ -442,17 +510,17 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
             occ.refetch();
             openOcc.refetch();
             if (afterPayment) setBanner(PAYOFF_FAILED_END);
-            else if (e.code === 'serie_tem_pagamento_posterior' || e.code === 'fim_invalido') setChoiceError(seriesErrorText(e.code, today));
-            else setBanner(seriesErrorText(e.code, today));
+            else if (e.code === 'serie_tem_pagamento_posterior' || e.code === 'fim_invalido') setChoiceError(seriesErrorText(e.code, today, s.kind));
+            else setBanner(seriesErrorText(e.code, today, s.kind));
             return;
           }
           keys.uncertain(key, snapshot);
           setRetry(true);
-          setBanner(afterPayment ? PAYOFF_FAILED_END : SERIES_ERROR_TEXT.salvar_falhou);
+          setBanner(afterPayment ? PAYOFF_FAILED_END : texts.salvar_falhou);
         }
       } catch {
         setRetry(true);
-        setBanner(afterPayment ? PAYOFF_FAILED_END : SERIES_ERROR_TEXT.salvar_falhou);
+        setBanner(afterPayment ? PAYOFF_FAILED_END : texts.salvar_falhou);
       }
     } finally {
       setBusy(false);
@@ -469,7 +537,15 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
     if (cents !== null && cents > 0 && cents <= MAX_RECORD_CENTS) setPayDraft((d) => ({ ...d, amountText: centsToInput(cents) }));
   };
 
-  const title = resume ? (parcelada ? 'Retomar parcelas' : 'Voltar a repetir') : parcelada ? 'Encerrar parcelamento' : 'Encerrar gasto fixo';
+  const title = resume
+    ? parcelada
+      ? 'Retomar parcelas'
+      : 'Voltar a repetir'
+    : parcelada
+      ? 'Encerrar parcelamento'
+      : anual
+        ? 'Encerrar conta do ano'
+        : 'Encerrar gasto fixo';
   const yesterday = addDays(today, -1);
   const lastDue = parcelada && total !== null ? seriesDueOn(s, total) : null;
 
@@ -484,13 +560,21 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
   const effect = !plan?.ok
     ? null
     : plan.text ??
-      (comingBack.length === 1
-        ? `A conta de ${comingBack[0]} volta para Contas a pagar.`
-        : comingBack.length > 1
-          ? `As contas de ${joinList(comingBack)} voltam para Contas a pagar.`
-          : extending
-            ? 'As próximas contas aparecem em Contas a pagar um mês antes de vencer.'
-            : 'Nenhuma conta em aberto vai sair da lista.');
+      (anual
+        ? comingBack.length === 1
+          ? '1 conta volta para Contas a pagar.'
+          : comingBack.length > 1
+            ? `${comingBack.length} contas voltam para Contas a pagar.`
+            : extending
+              ? 'Os próximos anos entram em Contas a pagar dois meses antes do primeiro vencimento.'
+              : 'Nenhuma conta em aberto vai sair da lista.'
+        : comingBack.length === 1
+          ? `A conta de ${comingBack[0]} volta para Contas a pagar.`
+          : comingBack.length > 1
+            ? `As contas de ${joinList(comingBack)} voltam para Contas a pagar.`
+            : extending
+              ? 'As próximas contas aparecem em Contas a pagar um mês antes de vencer.'
+              : 'Nenhuma conta em aberto vai sair da lista.');
 
   // "Quitei o restante": o gasto que o pagamento vai registrar, só com valor e data válidos.
   const payAmount = parseBRL(payDraft.amountText);
@@ -535,7 +619,10 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
               <Chip label="Termina em…" selected={choice === 'outro'} onPress={() => pick('outro')} />
             </ChoiceGroup>
           ) : (
-            <ChoiceGroup label="Qual é a última conta?" error={choice !== 'outro' ? (choiceError ?? undefined) : undefined}>
+            <ChoiceGroup
+              label={anual ? 'Qual é o último ano?' : 'Qual é a última conta?'}
+              hint={anual && thenNew ? 'Escolha o último ano com a forma de pagamento atual. Depois, você cadastra a nova a partir do ano seguinte.' : undefined}
+              error={choice !== 'outro' ? (choiceError ?? undefined) : undefined}>
               {numbers.map((n) => (
                 <Chip key={n} label={chipLabel(n)} selected={choice === n} onPress={() => pick(n)} />
               ))}
@@ -545,32 +632,32 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
               {parcelada && total !== null && s.lastNumber !== null && s.lastNumber < total ? (
                 <Chip label={`Até a última parcela (${total})`} selected={choice === total} onPress={() => pick(total)} />
               ) : null}
-              <Chip label="Outro mês" selected={choice === 'outro'} onPress={() => pick('outro')} />
+              <Chip label={anual ? 'Outro ano' : 'Outro mês'} selected={choice === 'outro'} onPress={() => pick('outro')} />
             </ChoiceGroup>
           )}
 
           {choice === 'outro' && !paidDone ? (
             <TextField
               ref={otherRef}
-              label="Último mês (MM/AAAA)"
+              label={anual ? 'Último ano (AAAA)' : 'Último mês (MM/AAAA)'}
               value={otherText}
               onChangeText={(t) => {
-                setOtherText(maskMonthBR(t));
+                setOtherText(anual ? t.replace(/\D/g, '').slice(0, 4) : maskMonthBR(t));
                 setChoiceError(null);
               }}
-              placeholder="MM/AAAA"
+              placeholder={anual ? 'AAAA' : 'MM/AAAA'}
               keyboardType="number-pad"
               inputMode="numeric"
-              maxLength={7}
+              maxLength={anual ? 4 : 7}
               error={choiceError ?? undefined}
-              hint="Digite só os números."
+              hint={anual ? 'Útil quando você vai vender o carro ou o imóvel.' : 'Digite só os números.'}
             />
           ) : null}
 
           {plan && !plan.ok ? (
             <Banner tone="erro" icon={AlertCircle}>
               <Txt variant="label" color={colors.error}>
-                {SERIES_ERROR_TEXT.serie_tem_pagamento_posterior}
+                {texts.serie_tem_pagamento_posterior}
               </Txt>
             </Banner>
           ) : effect ? (

@@ -364,6 +364,34 @@ export function useDeleteSeries() {
   });
 }
 
+/**
+ * Conta do ano, "Informar o valor de 2027": as parcelas do ano em aberto e estimadas recebem o valor (versão + 1 em cada
+ * uma; a versão da série não muda). Mesmas invalidações das outras escritas de série.
+ */
+export function useInformSeriesYear() {
+  const repo = useRepo();
+  const invalidate = useInvalidateSeries();
+  return useMutation({
+    mutationFn: (v: { key: string; seriesId: string; number: number; affected: AffectedRef[]; amountCents: number }) =>
+      repo.informSeriesYear(v.key, v.seriesId, v.number, v.affected, v.amountCents),
+    onSuccess: (w) => invalidate(w),
+  });
+}
+
+/**
+ * Conta do ano, "Tirar as parcelas de 2027" (e "Não houve em 2027"): as parcelas do ano em aberto saem de Contas a pagar
+ * e nunca voltam. As contas tiradas recarregam como não encontradas (useInvalidateSeries invalida todas as contas).
+ */
+export function useSkipSeriesYear() {
+  const repo = useRepo();
+  const invalidate = useInvalidateSeries();
+  return useMutation({
+    mutationFn: (v: { key: string; seriesId: string; number: number; affected: AffectedRef[] }) =>
+      repo.skipSeriesYear(v.key, v.seriesId, v.number, v.affected),
+    onSuccess: (w) => invalidate(w),
+  });
+}
+
 /** Tentativa de escrita de gasto fixo com resultado incerto (falha de rede). snapshot = conteúdo enviado. */
 export interface SeriesAttempt {
   key: string;

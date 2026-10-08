@@ -8,6 +8,8 @@ import {
   SERIES_NATURE_LABEL,
   addMonths,
   affectedByEditFrom,
+  annualStartChoices,
+  annualYearOf,
   centsToInput,
   charCount,
   fieldForErrorCode,
@@ -26,6 +28,7 @@ import {
   seriesPreview,
   validateSeriesDraft,
   type AmountMode,
+  type AnnualStartChoice,
   type IsoDate,
   type IsoMonth,
   type PersonalSpace,
@@ -39,21 +42,24 @@ import {
 import { router, useNavigation } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import * as Haptics from 'expo-haptics';
-import { AlertCircle, Info } from 'lucide-react-native';
+import { AlertCircle, Check, Info } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, View, type TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
-import { ChoiceGroup, joinList, monthChipLabel, seriesStyles as styles } from '@/components/series-parts';
+import { ChoiceGroup, joinList, MONTH_FULL, MONTH_SHORT, monthChipLabel, seriesStyles as styles } from '@/components/series-parts';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { useCommitments, useCreateSeries, useMonthRecords, useSeriesList, useSeriesOperationKey, useUpdateSeriesFrom } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
-/** Preenchimento vindo de outra tela: "Com que frequência?", "Repetir todo mês" ou "Tornar gasto fixo". */
+/**
+ * Preenchimento vindo de outra tela: "Com que frequência?", "Repetir todo mês", "Repetir todo ano", "Tornar gasto fixo"
+ * ou "Mudar a forma de pagamento" (conta do ano).
+ */
 export interface SeriesPrefill {
   description?: string;
   amountCents?: number;
@@ -62,6 +68,15 @@ export interface SeriesPrefill {
   firstMonth?: IsoMonth;
   /** "Tornar gasto fixo": data do gasto anotado que serviu de base. */
   basedOn?: IsoDate;
+  /** Conta do ano: parcelas por ano (1 = cota única). */
+  partsPerYear?: number;
+  /** Conta do ano: mês da 1ª parcela do ano (1 a 12). */
+  month?: number;
+  /** Conta do ano: primeiro ano (o chip desse ano abre escolhido). */
+  startYear?: number;
+  amountMode?: AmountMode;
+  /** "Mudar a forma de pagamento": rótulo do último ano da conta do ano encerrada. */
+  endedYear?: string;
 }
 
 /** Descrição que sugere cartão ou fatura: parcelas do cartão já entram na fatura. */
@@ -89,11 +104,20 @@ function savedText(w: SeriesWrite): string {
 }
 
 /** Partes do cadastro que "Esta e as próximas" não muda (período e numeração). */
-const structureOf = (i: SeriesInput) => JSON.stringify([i.kind, i.firstDueMonth, i.firstNumber, i.installmentTotal, i.lastMonth]);
+const structureOf = (i: SeriesInput) => JSON.stringify([i.kind, i.firstDueMonth, i.firstNumber, i.installmentTotal, i.partsPerYear, i.lastMonth]);
+
+/** Chave de um chip de início da conta do ano. */
+const startKey = (c: Pick<AnnualStartChoice, 'firstDueMonth' | 'firstNumber'>) => `${c.firstDueMonth}|${c.firstNumber}`;
+
+/** Texto da faixa depois de salvar: o da prévia na conta do ano; nos outros, savedText(w). */
+function savedTextFor(w: SeriesWrite, input: SeriesInput | null, today: IsoDate): string {
+  if (w.series.kind !== 'anual') return savedText(w);
+  return (input ? seriesPreview(input, today).savedText : null) ?? 'Conta do ano salva.';
+}
 
 /**
- * Novo gasto fixo ("Todo mês") ou parcelamento. Mesmos cuidados do formulário de conta a pagar: rascunho preservado,
- * chave por conteúdo, reconciliação depois de rede incerta, confirmação ao sair e rodapé fixo.
+ * Novo gasto fixo ("Todo mês"), parcelamento ou conta do ano ("Todo ano", D-029). Mesmos cuidados do formulário de conta
+ * a pagar: rascunho preservado, chave por conteúdo, reconciliação depois de rede incerta, confirmação ao sair e rodapé fixo.
  * As regras e a ordem de validação são as do banco (validateSeriesDraft).
  */
 export function SeriesForm({
@@ -124,29 +148,45 @@ export function SeriesForm({
   // a pessoa digitou em "Anotar conta a pagar" (typed) se perderia ao sair, então conta como alteração (blank).
   const initialFor = (p: SeriesPrefill) => {
     const first = p.firstMonth;
-    const monthPick: MonthPick = !first ? 'auto' : chipMonths.includes(first) ? first : 'outro';
+    const annualStart = initialKind === 'anual';
+    const monthPick: MonthPick = annualStart || !first ? 'auto' : chipMonths.includes(first) ? first : 'outro';
+    const parts = p.partsPerYear !== undefined && p.partsPerYear >= 2 && p.partsPerYear <= 12 ? p.partsPerYear : null;
     const draft: SeriesDraft = {
       kind: initialKind,
       nature: null,
       description: p.description ?? '',
       amountText: p.amountCents ? centsToInput(p.amountCents) : '',
-      amountMode: 'fixo',
+      // Conta do ano: por padrão o valor muda de um ano para outro (IPVA, IPTU).
+      amountMode: p.amountMode ?? (annualStart ? 'variavel' : 'fixo'),
       dueDayText: p.dueDay ? String(p.dueDay) : '',
-      firstMonthText: monthPick === 'outro' && first ? formatMonthInputBR(first) : '',
+      firstMonthText: !annualStart && monthPick === 'outro' && first ? formatMonthInputBR(first) : '',
       firstNumberText: '',
       installmentTotalText: '',
+      partsPerYearText: parts ? String(parts) : '',
       lastMonthText: '',
       category: p.category ?? null,
     };
-    return { draft, monthPick, ending: false };
+    // Conta do ano: mês (1 a 12) e primeiro ano vindos da rota.
+    const month = p.month ?? (first ? Number(first.slice(5, 7)) : null);
+    const year = p.startYear ?? (first ? Number(first.slice(0, 4)) : null);
+    const annual = {
+      inParts: parts !== null,
+      month: month !== null && month >= 1 && month <= 12 ? month : null,
+      start: month !== null && year !== null ? `${year}-${String(month).padStart(2, '0')}|1` : 'auto',
+    };
+    return { draft, monthPick, ending: false, annual };
   };
   const initial = useMemo(() => initialFor(prefill ?? {}), []); // eslint-disable-line react-hooks/exhaustive-deps
   const blank = useMemo(() => (typed ? initialFor({}) : initial), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [draft, setDraft] = useState<SeriesDraft>(initial.draft);
   const [monthPick, setMonthPick] = useState<MonthPick>(initial.monthPick);
-  /** Todo mês: "Termina em…" escolhido. */
+  /** Todo mês e todo ano: "Termina em…" escolhido. */
   const [ending, setEnding] = useState(initial.ending);
+  /** Todo ano: "Em parcelas no ano", mês da 1ª parcela (1 a 12) e chip de início ("auto" = o padrão). */
+  const [annual, setAnnual] = useState(initial.annual);
+  /** A pessoa escolheu se o valor muda: trocar de frequência não muda mais o padrão. */
+  const modeTouched = useRef(false);
   const [errors, setErrors] = useState<SeriesFieldErrors>({});
   const [banner, setBanner] = useState<string | null>(null);
   const [retry, setRetry] = useState(false);
@@ -162,12 +202,14 @@ export function SeriesForm({
     dueDayText: useRef<TextInput>(null),
     firstMonthText: useRef<TextInput>(null),
     installmentTotalText: useRef<TextInput>(null),
+    partsPerYearText: useRef<TextInput>(null),
     firstNumberText: useRef<TextInput>(null),
     lastMonthText: useRef<TextInput>(null),
   } satisfies Partial<Record<SeriesField, React.RefObject<TextInput | null>>>;
 
   const parcelada = draft.kind === 'parcelada';
-  const dirty = JSON.stringify({ draft, monthPick, ending }) !== JSON.stringify(blank);
+  const anual = draft.kind === 'anual';
+  const dirty = JSON.stringify({ draft, monthPick, ending, annual }) !== JSON.stringify(blank);
 
   // Sair com alterações não salvas pede confirmação (voltar, gesto, botão do sistema).
   usePreventRemove(dirty && !leaveTo, ({ data }) => {
@@ -186,15 +228,50 @@ export function SeriesForm({
     if (k in errors) setErrors((e) => ({ ...e, [k]: undefined }));
   };
 
+  /** "Com que frequência?": a conta do ano começa com "Sim, muda todo ano"; as outras, com valor fixo (até a pessoa escolher). */
+  const setKind = (k: SeriesKind) => {
+    setDraft((d) => ({ ...d, kind: k, amountMode: modeTouched.current ? d.amountMode : k === 'anual' ? 'variavel' : 'fixo' }));
+    setErrors({});
+  };
+
+  const setAnnualField = <K extends keyof typeof annual>(k: K, v: (typeof annual)[K]) => {
+    setAnnual((a) => ({ ...a, [k]: v }));
+    setErrors((e) => ({ ...e, firstMonthText: undefined, firstNumberText: undefined, partsPerYearText: k === 'inParts' ? undefined : e.partsPerYearText }));
+  };
+
   // Primeira conta: com o dia válido, os chips mostram o vencimento; o padrão acompanha o dia até a pessoa escolher.
   const day = validDay(draft.dueDayText);
   const choices = firstMonthChoices(day ?? 1, today);
   const defaultMonth = day === null ? currentMonth : (choices.find((c) => c.isDefault)?.month ?? currentMonth);
-  const firstMonthText =
-    monthPick === 'auto' ? formatMonthInputBR(defaultMonth) : monthPick === 'outro' ? draft.firstMonthText : formatMonthInputBR(monthPick);
-  const effective: SeriesDraft = { ...draft, firstMonthText, lastMonthText: !parcelada && ending ? draft.lastMonthText : '' };
+
+  // Conta do ano: parcelas por ano, chips de início (anos e, num ano já começado, a próxima parcela a pagar).
+  const partsTyped = /^\s*\d{1,2}\s*$/.test(draft.partsPerYearText) ? Number(draft.partsPerYearText.trim()) : null;
+  const k = annual.inParts ? partsTyped : 1;
+  const kOk = k !== null && k >= 1 && k <= 12 && (!annual.inParts || k >= 2);
+  const startChoices = anual && kOk && annual.month !== null && day !== null ? annualStartChoices(k!, annual.month, day, today) : null;
+  const allStarts = startChoices ? [...startChoices.years, ...(startChoices.started?.parts ?? [])] : [];
+  const start = allStarts.find((c) => startKey(c) === annual.start) ?? allStarts.find((c) => c.isDefault) ?? null;
+
+  const firstMonthText = anual
+    ? start
+      ? formatMonthInputBR(start.firstDueMonth)
+      : ''
+    : monthPick === 'auto'
+      ? formatMonthInputBR(defaultMonth)
+      : monthPick === 'outro'
+        ? draft.firstMonthText
+        : formatMonthInputBR(monthPick);
+  const effective: SeriesDraft = {
+    ...draft,
+    firstMonthText,
+    firstNumberText: anual ? (start ? String(start.firstNumber) : '') : draft.firstNumberText,
+    partsPerYearText: anual ? (annual.inParts ? draft.partsPerYearText : '1') : '',
+    lastMonthText: !parcelada && ending ? draft.lastMonthText : '',
+  };
   const checked = validateSeriesDraft(effective, today);
-  const preview = checked.ok ? seriesPreview(checked.input, today) : null;
+  // Conta do ano: sem mês, ou "Em parcelas" com menos de 2, não há prévia (o salvar mostra o erro).
+  const annualReady = !anual || (annual.month !== null && kOk);
+  const preview = checked.ok && annualReady ? seriesPreview(checked.input, today) : null;
 
   const pickMonth = (m: IsoMonth) => {
     if (chipMonths.includes(m)) setMonthPick(m);
@@ -215,12 +292,22 @@ export function SeriesForm({
       ? findSeriesConflicts(preview, monthCommitments.data, monthRecords.data, seriesList.data)
       : null;
 
+  /** Rótulo do primeiro ano da conta do ano na prévia ("2027" ou "2026/2027"). */
+  const firstYearLabel =
+    anual && preview && k !== null
+      ? annualYearOf({ kind: 'anual', firstDueMonth: preview.firstMonth, firstNumber: preview.firstNumber, partsPerYear: k }, preview.firstNumber).label
+      : '';
+
   /**
    * "Começar em novembro": o mês seguinte. No parcelamento, também a parcela seguinte: a conta ou o gasto do primeiro
-   * mês já é aquela parcela, e a numeração não pode ficar um número atrás.
+   * mês já é aquela parcela, e a numeração não pode ficar um número atrás. Conta do ano: o ano seguinte, desde a parcela 1.
    */
   const startNext = () => {
     if (!conflicts) return;
+    if (anual) {
+      setAnnualField('start', startKey({ firstDueMonth: conflicts.suggestedFirstMonth, firstNumber: conflicts.suggestedFirstNumber ?? 1 }));
+      return;
+    }
     if (conflicts.suggestedFirstNumber !== null) set('firstNumberText', String(conflicts.suggestedFirstNumber));
     pickMonth(conflicts.suggestedFirstMonth);
   };
@@ -228,7 +315,9 @@ export function SeriesForm({
   /** Ordem visual dos campos: o foco vai para o primeiro erro com campo de texto na tela. */
   const visualOrder: SeriesField[] = parcelada
     ? ['description', 'nature', 'amountText', 'dueDayText', 'installmentTotalText', 'firstNumberText', 'firstMonthText']
-    : ['description', 'amountText', 'dueDayText', 'firstMonthText', 'lastMonthText'];
+    : anual
+      ? ['description', 'partsPerYearText', 'dueDayText', 'amountText', 'firstMonthText', 'firstNumberText', 'lastMonthText']
+      : ['description', 'amountText', 'dueDayText', 'firstMonthText', 'lastMonthText'];
   const focusFirst = (errs: SeriesFieldErrors) => {
     for (const f of visualOrder) {
       if (!errs[f]) continue;
@@ -240,10 +329,10 @@ export function SeriesForm({
     }
   };
 
-  const finish = (w: SeriesWrite) => {
+  const finish = (w: SeriesWrite, input: SeriesInput | null) => {
     // Confirmação tátil só depois da gravação confirmada.
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    flash.set(savedText(w));
+    flash.set(savedTextFor(w, input, today));
     leave(() => router.replace(`/gastos-fixos/${w.series.id}`));
   };
 
@@ -265,7 +354,7 @@ export function SeriesForm({
     const occurrences = [...list].reverse();
     if (saved.snapshot === snapshot) {
       keys.settled();
-      finish({ series, occurrences, changed: 0 });
+      finish({ series, occurrences, changed: 0 }, input);
       return true;
     }
     // O período não muda por edição, e uma primeira conta já paga não muda mais: mostrar o que foi salvo,
@@ -275,9 +364,8 @@ export function SeriesForm({
     if (structureOf(savedInput) !== structureOf(input) || !plan.ok) {
       keys.settled();
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      flash.set(
-        `${series.kind === 'parcelada' ? 'Parcelamento salvo' : 'Gasto fixo salvo'} antes da falha de conexão, com o preenchimento do primeiro envio. Confira abaixo.`,
-      );
+      const what = series.kind === 'parcelada' ? 'Parcelamento salvo' : series.kind === 'anual' ? 'Conta do ano salva' : 'Gasto fixo salvo';
+      flash.set(`${what} antes da falha de conexão, com o preenchimento do primeiro envio. Confira abaixo.`);
       leave(() => router.replace(`/gastos-fixos/${series.id}`));
       return true;
     }
@@ -291,18 +379,36 @@ export function SeriesForm({
       input: { nature, description, category, amountCents, amountMode, dueDay },
     });
     keys.settled();
-    finish(w);
+    finish(w, input);
     return true;
+  };
+
+  /** Erros que só o formulário conhece (o banco recusaria com outro código ou nem chegaria a receber). */
+  const formErrors = (): SeriesFieldErrors => {
+    const errs: SeriesFieldErrors = {};
+    if (anual) {
+      if (annual.month === null) errs.firstMonthText = annual.inParts ? 'Escolha o mês da primeira parcela.' : 'Escolha o mês do vencimento.';
+      if (annual.inParts && (partsTyped === null || partsTyped < 2 || partsTyped > 12)) errs.partsPerYearText = SERIES_ERROR_TEXT.parcelas_no_ano_invalidas;
+    }
+    // "Termina em…" sem o mês (ou o ano): sem esta conferência, seria salvo sem término.
+    if (!parcelada && ending && draft.lastMonthText.trim() === '') {
+      errs.lastMonthText = anual ? 'Informe o último ano, como 2030.' : 'Informe o último mês, como 12/2026.';
+    }
+    return errs;
   };
 
   const submit = async () => {
     if (busy) return; // envio repetido bloqueado enquanto o anterior não termina
     const v = validateSeriesDraft(effective, today);
-    // "Termina em…" sem o mês: sem esta conferência, o gasto fixo seria salvo sem término.
-    const endMissing = !parcelada && ending && draft.lastMonthText.trim() === '';
-    if (!v.ok || endMissing) {
+    const own = formErrors();
+    if (!v.ok || Object.keys(own).length > 0) {
       const errs: SeriesFieldErrors = v.ok ? {} : { ...v.errors };
-      if (endMissing) errs.lastMonthText = 'Informe o último mês, como 12/2026.';
+      // Conta do ano sem mês ou dia: o início não existe ainda; o erro aparece no mês, no dia ou nas parcelas.
+      if (anual && !start) {
+        delete errs.firstMonthText;
+        delete errs.firstNumberText;
+      }
+      Object.assign(errs, own);
       setErrors(errs);
       focusFirst(errs);
       return;
@@ -321,19 +427,19 @@ export function SeriesForm({
         const saved = await create.mutateAsync({ key, contextId, input: v.input });
         keys.settled();
         setRetry(false);
-        finish(saved);
+        finish(saved, v.input);
       } catch (e) {
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
           keys.refused();
           setRetry(false);
           const field = fieldForErrorCode(e.code, 'series');
           if (field && visualOrder.includes(field)) {
-            const errs = { [field]: seriesErrorText(e.code, today) };
+            const errs = { [field]: seriesErrorText(e.code, today, draft.kind) };
             setErrors(errs);
             focusFirst(errs);
             return;
           }
-          setBanner(seriesErrorText(e.code, today));
+          setBanner(seriesErrorText(e.code, today, draft.kind));
           return;
         }
         // Falha de rede: a gravação pode ou não ter acontecido. Guardar a tentativa para reconciliar.
@@ -344,7 +450,9 @@ export function SeriesForm({
     } catch (e) {
       // Falhou a reconciliação: a tentativa pendente continua guardada e é conferida de novo na próxima vez.
       setRetry(true);
-      setBanner(isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido' ? seriesErrorText(e.code, today) : SERIES_ERROR_TEXT.salvar_falhou);
+      setBanner(
+        isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido' ? seriesErrorText(e.code, today, draft.kind) : SERIES_ERROR_TEXT.salvar_falhou,
+      );
     } finally {
       setBusy(false);
     }
@@ -360,13 +468,25 @@ export function SeriesForm({
     if (cents !== null && cents > 0 && cents <= MAX_RECORD_CENTS) setDraft((d) => ({ ...d, amountText: centsToInput(cents) }));
   };
 
-  const setMode = (m: AmountMode) => set('amountMode', m);
+  const setMode = (m: AmountMode) => {
+    modeTouched.current = true;
+    set('amountMode', m);
+  };
   const variable = draft.amountMode === 'variavel';
   const looksLikeCard = INVOICE_HINT.test(draft.description);
-  const firstMonthName = preview ? formatMonthName(preview.firstMonth) : '';
+  const firstMonthName = preview ? (anual ? firstYearLabel : formatMonthName(preview.firstMonth)) : '';
   const showCommitmentConflict = Boolean(conflicts?.texts.commitment && preview && !kept.includes(preview.firstMonth));
-  const amountLabel = variable ? 'Valor de referência' : parcelada ? 'Valor da parcela' : 'Valor por mês';
-  const saveLabel = parcelada ? 'Salvar parcelamento' : 'Salvar gasto fixo';
+  const amountLabel = variable
+    ? 'Valor de referência'
+    : parcelada
+      ? 'Valor da parcela'
+      : anual
+        ? annual.inParts
+          ? 'Valor de cada parcela'
+          : 'Valor da conta'
+        : 'Valor por mês';
+  const saveLabel = parcelada ? 'Salvar parcelamento' : anual ? 'Salvar conta do ano' : 'Salvar gasto fixo';
+  const title = parcelada ? 'Novo parcelamento' : anual ? 'Nova conta do ano' : 'Novo gasto fixo';
 
   const monthChips = (
     <>
@@ -400,14 +520,209 @@ export function SeriesForm({
       </Txt>
     ) : null;
 
+  const descriptionField = (
+    <TextField
+      ref={refs.description}
+      label="Descrição"
+      value={draft.description}
+      onChangeText={(t) => set('description', t)}
+      placeholder={parcelada ? 'Ex.: Financiamento do carro' : anual ? 'Ex.: IPVA' : 'Ex.: Aluguel'}
+      maxLength={DESCRIPTION_MAX}
+      autoFocus={!prefill?.description}
+      error={errors.description}
+      hint={
+        charCount(draft.description) >= 60
+          ? `${charCount(draft.description)} de ${DESCRIPTION_MAX} caracteres`
+          : parcelada
+            ? 'Ex.: Financiamento do carro, Parcelas do imóvel'
+            : anual
+              ? 'Ex.: IPVA, IPTU, Matrícula, Material escolar, Seguro do carro. Não é preciso citar pessoas.'
+              : 'Ex.: Aluguel, Escola, Luz, Internet. Nomes curtos bastam; não é preciso citar pessoas.'
+      }
+      returnKeyType="next"
+      onSubmitEditing={() => refs.amountText.current?.focus()}
+    />
+  );
+
+  const amountField = (
+    <>
+      <TextField
+        ref={refs.amountText}
+        label={amountLabel}
+        prefix="R$"
+        value={draft.amountText}
+        onChangeText={(t) => set('amountText', t)}
+        onBlur={formatAmountOnBlur}
+        placeholder="0,00"
+        keyboardType="decimal-pad"
+        inputMode="decimal"
+        large
+        error={errors.amountText}
+        hint={
+          variable
+            ? anual
+              ? 'Use o valor do último ano. Ele aparece como estimado até você informar o valor do ano.'
+              : 'Use o valor de uma conta recente. Ele aparece como estimado até você informar o valor de cada conta.'
+            : undefined
+        }
+      />
+      {variable && !anual ? (
+        <LinkButton label="Contas que mudam de valor" style={styles.inlineLink} onPress={() => router.push('/explicacao/estimativa')} />
+      ) : null}
+    </>
+  );
+
+  const dayField = (
+    <TextField
+      ref={refs.dueDayText}
+      label="Dia do vencimento"
+      value={draft.dueDayText}
+      onChangeText={(t) => set('dueDayText', t.replace(/\D/g, '').slice(0, 2))}
+      placeholder="Ex.: 10"
+      keyboardType="number-pad"
+      inputMode="numeric"
+      maxLength={2}
+      error={errors.dueDayText}
+      hint={day !== null && day >= 29 ? 'Nos meses mais curtos, vence no último dia do mês.' : 'De 1 a 31.'}
+    />
+  );
+
+  const endingBlock = !parcelada ? (
+    <View style={{ gap: space[2] }}>
+      <ChoiceGroup label="Até quando?" hint={anual ? 'Útil quando você vai vender o carro ou o imóvel.' : 'Útil para escola, curso ou contrato com prazo.'}>
+        <Chip label="Sem data para terminar" selected={!ending} onPress={() => setEnding(false)} />
+        <Chip label="Termina em…" selected={ending} onPress={() => setEnding(true)} />
+      </ChoiceGroup>
+      {ending ? (
+        <TextField
+          ref={refs.lastMonthText}
+          label={anual ? 'Último ano (AAAA)' : 'Último mês (MM/AAAA)'}
+          value={draft.lastMonthText}
+          onChangeText={(t) => set('lastMonthText', anual ? t.replace(/\D/g, '').slice(0, 4) : maskMonthBR(t))}
+          placeholder={anual ? 'AAAA' : 'MM/AAAA'}
+          keyboardType="number-pad"
+          inputMode="numeric"
+          maxLength={anual ? 4 : 7}
+          error={errors.lastMonthText}
+          hint="Digite só os números."
+        />
+      ) : null}
+    </View>
+  ) : null;
+
+  const startError = errors.firstNumberText ?? (annual.month !== null ? errors.firstMonthText : undefined);
+
+  /** Todo ano: forma, parcelas, mês, dia, modo, valor, primeiro ano (ou próxima parcela) e término (seção 1.7). */
+  const annualFields = (
+    <>
+      <ChoiceGroup label="Como você paga?">
+        <Chip label="Uma vez no ano (cota única)" selected={!annual.inParts} onPress={() => setAnnualField('inParts', false)} />
+        <Chip label="Em parcelas no ano" selected={annual.inParts} onPress={() => setAnnualField('inParts', true)} />
+      </ChoiceGroup>
+
+      {annual.inParts ? (
+        <TextField
+          ref={refs.partsPerYearText}
+          label="Quantas parcelas por ano?"
+          value={draft.partsPerYearText}
+          onChangeText={(t) => {
+            set('partsPerYearText', t.replace(/\D/g, '').slice(0, 2));
+            setErrors((e) => ({ ...e, firstMonthText: undefined, firstNumberText: undefined }));
+          }}
+          placeholder="Ex.: 10"
+          keyboardType="number-pad"
+          inputMode="numeric"
+          maxLength={2}
+          error={errors.partsPerYearText}
+          hint="As parcelas vencem em meses seguidos, como um IPTU de fevereiro a novembro. Parcelas no cartão já entram na fatura: anote aqui só carnê, boleto ou débito."
+        />
+      ) : null}
+
+      <ChoiceGroup
+        label={annual.inParts ? 'Mês da primeira parcela' : 'Mês do vencimento'}
+        error={annual.month === null ? errors.firstMonthText : undefined}>
+        {MONTH_SHORT.map((m, i) => (
+          <Chip
+            key={m}
+            label={m}
+            accessibilityLabel={MONTH_FULL[i]}
+            compact
+            style={styles.monthChip}
+            selected={annual.month === i + 1}
+            onPress={() => setAnnualField('month', i + 1)}
+          />
+        ))}
+      </ChoiceGroup>
+
+      {dayField}
+
+      <ChoiceGroup label="O valor muda de um ano para outro?">
+        <Chip label="Sim, muda todo ano (como IPVA e IPTU)" selected={variable} onPress={() => setMode('variavel')} />
+        <Chip label="Não, é sempre o mesmo" selected={!variable} onPress={() => setMode('fixo')} />
+      </ChoiceGroup>
+
+      {amountField}
+
+      {startChoices ? (
+        <>
+          {startChoices.years.length > 0 ? (
+            <ChoiceGroup label="Primeiro ano" error={startChoices.started ? undefined : startError}>
+              {startChoices.years.map((c) => (
+                <Chip
+                  key={startKey(c)}
+                  label={c.label}
+                  accessibilityLabel={c.label.replace(/^(\d{4})\/(\d{4})/, '$1 a $2')}
+                  selected={start !== null && startKey(start) === startKey(c)}
+                  onPress={() => setAnnualField('start', startKey(c))}
+                />
+              ))}
+            </ChoiceGroup>
+          ) : null}
+          {startChoices.started ? (
+            <ChoiceGroup label={startChoices.started.title} hint={startChoices.started.hint} error={startError}>
+              {startChoices.started.parts.map((c) => (
+                <Chip
+                  key={startKey(c)}
+                  label={c.label}
+                  selected={start !== null && startKey(start) === startKey(c)}
+                  onPress={() => setAnnualField('start', startKey(c))}
+                />
+              ))}
+            </ChoiceGroup>
+          ) : null}
+        </>
+      ) : (
+        <View style={{ gap: space[2] }}>
+          <Txt variant="label" style={{ fontFamily: fonts.bold }}>
+            Primeiro ano
+          </Txt>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {annual.inParts ? 'Informe as parcelas, o mês e o dia para escolher o primeiro ano.' : 'Escolha o mês e o dia para escolher o primeiro ano.'}
+          </Txt>
+        </View>
+      )}
+
+      {preview?.firstOverdue ? (
+        <Banner tone="info" icon={Info}>
+          <Txt variant="label">Esta conta já venceu. Ela vai aparecer em Vencidas até você marcar como paga.</Txt>
+        </Banner>
+      ) : null}
+
+      {endingBlock}
+    </>
+  );
+
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <SubHeader
-        title={parcelada ? 'Novo parcelamento' : 'Novo gasto fixo'}
-        onBack={requestCancel}
-        right={<ContextPill label={`Salvando em ${contextName}`} />}
-      />
+      <SubHeader title={title} onBack={requestCancel} right={<ContextPill label={`Salvando em ${contextName}`} />} />
       <Screen contentStyle={{ padding: space[5], gap: space[4], paddingBottom: space[6] }}>
+        {prefill?.endedYear ? (
+          <Banner tone="sucesso" icon={Check}>
+            <Txt variant="label" color={colors.successText} style={{ fontFamily: fonts.bold }}>
+              Conta do ano encerrada em {prefill.endedYear}. Agora cadastre a nova forma de pagamento, a partir do ano seguinte.
+            </Txt>
+          </Banner>
+        ) : null}
         {prefill?.basedOn ? (
           <Banner tone="info" icon={Info} live={false}>
             <Txt variant="label">
@@ -418,29 +733,12 @@ export function SeriesForm({
 
         <Card style={{ gap: space[4] }}>
           <ChoiceGroup label="Com que frequência?">
-            <Chip label="Todo mês" selected={!parcelada} onPress={() => set('kind', 'mensal')} />
-            <Chip label="Parcelado" selected={parcelada} onPress={() => set('kind', 'parcelada')} />
+            <Chip label="Todo mês" selected={draft.kind === 'mensal'} onPress={() => setKind('mensal')} />
+            <Chip label="Todo ano" selected={anual} onPress={() => setKind('anual')} />
+            <Chip label="Parcelado" selected={parcelada} onPress={() => setKind('parcelada')} />
           </ChoiceGroup>
 
-          <TextField
-            ref={refs.description}
-            label="Descrição"
-            value={draft.description}
-            onChangeText={(t) => set('description', t)}
-            placeholder={parcelada ? 'Ex.: Financiamento do carro' : 'Ex.: Aluguel'}
-            maxLength={DESCRIPTION_MAX}
-            autoFocus={!prefill?.description}
-            error={errors.description}
-            hint={
-              charCount(draft.description) >= 60
-                ? `${charCount(draft.description)} de ${DESCRIPTION_MAX} caracteres`
-                : parcelada
-                  ? 'Ex.: Financiamento do carro, Parcelas do imóvel'
-                  : 'Ex.: Aluguel, Escola, Luz, Internet. Nomes curtos bastam; não é preciso citar pessoas.'
-            }
-            returnKeyType="next"
-            onSubmitEditing={() => refs.amountText.current?.focus()}
-          />
+          {descriptionField}
 
           {looksLikeCard ? (
             <Banner tone="info" icon={Info}>
@@ -452,118 +750,76 @@ export function SeriesForm({
             </Banner>
           ) : null}
 
-          {parcelada ? (
-            <ChoiceGroup label="Tipo do parcelamento" hint="Os dois primeiros contam como dívida na renda comprometida." error={errors.nature}>
-              {INSTALLMENT_NATURES.map((n) => (
-                <Chip key={n} label={SERIES_NATURE_LABEL[n]} selected={draft.nature === n} onPress={() => set('nature', n)} />
-              ))}
-            </ChoiceGroup>
-          ) : null}
-
-          <ChoiceGroup label={parcelada ? 'A parcela muda de um mês para outro?' : 'O valor muda de um mês para outro?'}>
-            <Chip label={parcelada ? 'Parcela igual todo mês' : 'Não, é sempre o mesmo'} selected={!variable} onPress={() => setMode('fixo')} />
-            <Chip
-              label={parcelada ? 'Parcela muda (financiamento corrigido)' : 'Sim, muda (como luz e água)'}
-              selected={variable}
-              onPress={() => setMode('variavel')}
-            />
-          </ChoiceGroup>
-
-          <TextField
-            ref={refs.amountText}
-            label={amountLabel}
-            prefix="R$"
-            value={draft.amountText}
-            onChangeText={(t) => set('amountText', t)}
-            onBlur={formatAmountOnBlur}
-            placeholder="0,00"
-            keyboardType="decimal-pad"
-            inputMode="decimal"
-            large
-            error={errors.amountText}
-            hint={variable ? 'Use o valor de uma conta recente. Ele aparece como estimado até você informar o valor de cada conta.' : undefined}
-          />
-          {variable ? (
-            <LinkButton label="Contas que mudam de valor" style={styles.inlineLink} onPress={() => router.push('/explicacao/estimativa')} />
-          ) : null}
-
-          <TextField
-            ref={refs.dueDayText}
-            label="Dia do vencimento"
-            value={draft.dueDayText}
-            onChangeText={(t) => set('dueDayText', t.replace(/\D/g, '').slice(0, 2))}
-            placeholder="Ex.: 10"
-            keyboardType="number-pad"
-            inputMode="numeric"
-            maxLength={2}
-            error={errors.dueDayText}
-            hint={day !== null && day >= 29 ? 'Nos meses mais curtos, vence no último dia do mês.' : 'De 1 a 31.'}
-          />
-
-          {parcelada ? (
-            <>
-              <TextField
-                ref={refs.installmentTotalText}
-                label="Total de parcelas"
-                value={draft.installmentTotalText}
-                onChangeText={(t) => set('installmentTotalText', t.replace(/\D/g, '').slice(0, 3))}
-                placeholder="Ex.: 48"
-                keyboardType="number-pad"
-                inputMode="numeric"
-                maxLength={3}
-                error={errors.installmentTotalText}
-                hint="De 2 a 480."
-              />
-              <TextField
-                ref={refs.firstNumberText}
-                label="Número da próxima parcela a pagar"
-                value={draft.firstNumberText}
-                onChangeText={(t) => set('firstNumberText', t.replace(/\D/g, '').slice(0, 3))}
-                placeholder="Ex.: 1"
-                keyboardType="number-pad"
-                inputMode="numeric"
-                maxLength={3}
-                error={errors.firstNumberText}
-                hint="Se você já pagou parcelas antes de usar o Clarevo, informe o número da próxima. As anteriores não viram gastos."
-              />
-              <ChoiceGroup label="Mês da próxima parcela">{monthChips}</ChoiceGroup>
-              {otherMonthField}
-            </>
+          {anual ? (
+            annualFields
           ) : (
             <>
-              <ChoiceGroup label="Primeira conta">{monthChips}</ChoiceGroup>
-              {otherMonthField}
+              {parcelada ? (
+                <ChoiceGroup label="Tipo do parcelamento" hint="Os dois primeiros contam como dívida na renda comprometida." error={errors.nature}>
+                  {INSTALLMENT_NATURES.map((n) => (
+                    <Chip key={n} label={SERIES_NATURE_LABEL[n]} selected={draft.nature === n} onPress={() => set('nature', n)} />
+                  ))}
+                </ChoiceGroup>
+              ) : null}
+
+              <ChoiceGroup label={parcelada ? 'A parcela muda de um mês para outro?' : 'O valor muda de um mês para outro?'}>
+                <Chip label={parcelada ? 'Parcela igual todo mês' : 'Não, é sempre o mesmo'} selected={!variable} onPress={() => setMode('fixo')} />
+                <Chip
+                  label={parcelada ? 'Parcela muda (financiamento corrigido)' : 'Sim, muda (como luz e água)'}
+                  selected={variable}
+                  onPress={() => setMode('variavel')}
+                />
+              </ChoiceGroup>
+
+              {amountField}
+
+              {dayField}
+
+              {parcelada ? (
+                <>
+                  <TextField
+                    ref={refs.installmentTotalText}
+                    label="Total de parcelas"
+                    value={draft.installmentTotalText}
+                    onChangeText={(t) => set('installmentTotalText', t.replace(/\D/g, '').slice(0, 3))}
+                    placeholder="Ex.: 48"
+                    keyboardType="number-pad"
+                    inputMode="numeric"
+                    maxLength={3}
+                    error={errors.installmentTotalText}
+                    hint="De 2 a 480."
+                  />
+                  <TextField
+                    ref={refs.firstNumberText}
+                    label="Número da próxima parcela a pagar"
+                    value={draft.firstNumberText}
+                    onChangeText={(t) => set('firstNumberText', t.replace(/\D/g, '').slice(0, 3))}
+                    placeholder="Ex.: 1"
+                    keyboardType="number-pad"
+                    inputMode="numeric"
+                    maxLength={3}
+                    error={errors.firstNumberText}
+                    hint="Se você já pagou parcelas antes de usar o Clarevo, informe o número da próxima. As anteriores não viram gastos."
+                  />
+                  <ChoiceGroup label="Mês da próxima parcela">{monthChips}</ChoiceGroup>
+                  {otherMonthField}
+                </>
+              ) : (
+                <>
+                  <ChoiceGroup label="Primeira conta">{monthChips}</ChoiceGroup>
+                  {otherMonthField}
+                </>
+              )}
+
+              {preview?.firstOverdue ? (
+                <Banner tone="info" icon={Info}>
+                  <Txt variant="label">Esta conta já venceu. Ela vai aparecer em Vencidas até você marcar como paga.</Txt>
+                </Banner>
+              ) : null}
+
+              {endingBlock}
             </>
           )}
-
-          {preview?.firstOverdue ? (
-            <Banner tone="info" icon={Info}>
-              <Txt variant="label">Esta conta já venceu. Ela vai aparecer em Vencidas até você marcar como paga.</Txt>
-            </Banner>
-          ) : null}
-
-          {!parcelada ? (
-            <View style={{ gap: space[2] }}>
-              <ChoiceGroup label="Até quando?" hint="Útil para escola, curso ou contrato com prazo.">
-                <Chip label="Sem data para terminar" selected={!ending} onPress={() => setEnding(false)} />
-                <Chip label="Termina em…" selected={ending} onPress={() => setEnding(true)} />
-              </ChoiceGroup>
-              {ending ? (
-                <TextField
-                  ref={refs.lastMonthText}
-                  label="Último mês (MM/AAAA)"
-                  value={draft.lastMonthText}
-                  onChangeText={(t) => set('lastMonthText', maskMonthBR(t))}
-                  placeholder="MM/AAAA"
-                  keyboardType="number-pad"
-                  inputMode="numeric"
-                  maxLength={7}
-                  error={errors.lastMonthText}
-                  hint="Digite só os números."
-                />
-              ) : null}
-            </View>
-          ) : null}
 
           <ChoiceGroup label="Categoria">
             <Chip label={NO_CATEGORY_LABEL} selected={draft.category === null} onPress={() => set('category', null)} />
@@ -607,11 +863,31 @@ export function SeriesForm({
           </Banner>
         ) : null}
 
-        <Txt variant="label" color={colors.textSecondary}>
-          Será salvo em <Txt variant="label" style={{ fontFamily: fonts.bold }}>{contextName}</Txt>. Cada mês vira uma conta a pagar, e só o
-          que você marca como paga entra em Pago.
-        </Txt>
-        <LinkButton label="Gasto fixo, conta a pagar e gasto anotado" color={colors.textSecondary} onPress={() => router.push('/explicacao/gasto-fixo')} />
+        {anual ? (
+          <>
+            <Txt variant="label" color={colors.textSecondary}>
+              Será salva em <Txt variant="label" style={{ fontFamily: fonts.bold }}>{contextName}</Txt>. Cada conta do ano vira uma conta a pagar,
+              e só o que você marca como paga entra em Pago.
+            </Txt>
+            <LinkButton
+              label="Contas que chegam uma vez por ano"
+              color={colors.textSecondary}
+              onPress={() => router.push('/explicacao/contas-do-ano')}
+            />
+          </>
+        ) : (
+          <>
+            <Txt variant="label" color={colors.textSecondary}>
+              Será salvo em <Txt variant="label" style={{ fontFamily: fonts.bold }}>{contextName}</Txt>. Cada mês vira uma conta a pagar, e só o
+              que você marca como paga entra em Pago.
+            </Txt>
+            <LinkButton
+              label="Gasto fixo, conta a pagar e gasto anotado"
+              color={colors.textSecondary}
+              onPress={() => router.push('/explicacao/gasto-fixo')}
+            />
+          </>
+        )}
       </Screen>
 
       {/* Rodapé fixo: a ação principal fica sempre visível, acima do teclado. */}

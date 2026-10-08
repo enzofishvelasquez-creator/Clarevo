@@ -8,9 +8,14 @@ import { createHmac, randomUUID } from 'node:crypto';
 
 import {
   RepoError,
+  addMonths,
   affectedByDelete,
   affectedByEditFrom,
   affectedByEnd,
+  affectedByYear,
+  annualYearSummary,
+  groupAnnualLater,
+  lastNumberFromEndYear,
   mergeOccurrences,
   missingMonths,
   monthOf,
@@ -20,9 +25,13 @@ import {
   occurrencesToMaterialize,
   seriesInputError,
   seriesPreview,
+  suggestedAnnualReference,
   summarizeMonth,
   summarizeToPay,
+  wholeYearPayment,
+  type AffectedRef,
   type AmountMode,
+  type Cents,
   type Commitment,
   type CommitmentInput,
   type CommitmentSeries,
@@ -32,6 +41,7 @@ import {
   type PaymentInput,
   type PlannedOccurrence,
   type RecordInput,
+  type RecordKind,
   type SeriesEditInput,
   type SeriesInput,
   type SeriesKind,
@@ -70,6 +80,87 @@ function clientFor(personId: string | null, today?: IsoDate, fetchImpl?: typeof 
 const repoFor = (id: string, today?: IsoDate) => new SupabaseRepository(clientFor(id, today), { id });
 
 const err = (p: Promise<unknown>) => p.then(() => null, (e: unknown) => (e instanceof RepoError ? e.code : String(e)));
+
+const cents = (reais: number) => Math.round(reais * 100);
+
+/** A escrita chega ao banco, mas a resposta se perde: o app não sabe o resultado. */
+const lostResponse: typeof fetch = async (input, init) => {
+  const res = await fetch(input, init);
+  await res.arrayBuffer();
+  throw new TypeError('Failed to fetch');
+};
+
+/** O que importa numa conta gerada: número, vencimento, textos, valor e marca de estimado. */
+const planOf = (c: Commitment) => ({
+  number: c.series!.number,
+  dueOn: c.dueOn,
+  description: c.description,
+  category: c.category,
+  amountCents: c.amountCents,
+  amountIsEstimate: c.amountIsEstimate,
+});
+const planned = ({ month: _month, ...p }: PlannedOccurrence) => p;
+const byNumber = (list: readonly Commitment[], n: number) => list.find((c) => c.series!.number === n)!;
+
+/**
+ * "Ainda a pagar" pelo core (summarizeToPay sobre listCommitments) e pelo banco (month_to_pay), no mesmo dia e pela
+ * mesma pessoa; a parte estimada também é somada direto em commitment_items, com o critério de D-021(5).
+ */
+async function checkedToPay(person: string, ctx: string, month: IsoMonth, today: IsoDate) {
+  const s = summarizeToPay(await repoFor(person, today).listCommitments(ctx, month), ctx, month, today);
+  const db = clientFor(person, today);
+  const { data, error } = await db.rpc('month_to_pay', { p_context_id: ctx, p_month: `${month}-01` }).single();
+  expect(error).toBeNull();
+  const t = data as { due_in_month_cents: number; overdue_before_cents: number; to_pay_cents: number; open_count: number };
+  expect([t.to_pay_cents, t.due_in_month_cents, t.overdue_before_cents, t.open_count].map(Number)).toEqual([
+    s.toPayCents,
+    s.dueInMonthCents,
+    s.overdueBeforeCents,
+    s.items.length,
+  ]);
+  const { start, endExclusive } = monthRange(month);
+  let estimated = db
+    .from('commitment_items')
+    .select('amount_cents')
+    .eq('context_id', ctx)
+    .eq('status', 'aberto')
+    .eq('amount_is_estimate', true)
+    .lt('due_on', endExclusive);
+  if (monthOf(today) !== month) estimated = estimated.gte('due_on', start);
+  const direct = await estimated;
+  expect(direct.error).toBeNull();
+  expect(s.estimatedCents).toBe(direct.data!.reduce((sum, r) => sum + Number(r.amount_cents), 0));
+  return s;
+}
+
+/**
+ * Gerar pela API cria exatamente o que occurrencesToMaterialize calcula para cada série do contexto, com a autoria de
+ * quem criou a série; gerar de novo não cria nada. Devolve o que foi criado, na ordem das séries.
+ */
+async function checkedSync(person: string, ctx: string, today: IsoDate) {
+  const repo = repoFor(person, today);
+  const expected = new Map<string, ReturnType<typeof planned>[]>();
+  for (const s of await repo.listSeries(ctx)) {
+    expected.set(s.id, occurrencesToMaterialize(s, await repo.listSeriesOccurrences(s.id), today).map(planned));
+  }
+  const all = [...expected.values()].flat();
+  expect(await repo.syncSeriesOccurrences(ctx)).toEqual({
+    created: all.length,
+    createdOverdue: all.filter((p) => p.dueOn < today).length,
+  });
+  for (const [id, plan] of expected) {
+    const series = (await repo.getSeries(id))!;
+    const live = await repo.listSeriesOccurrences(id);
+    for (const p of plan) {
+      const c = byNumber(live, p.number);
+      expect(planOf(c)).toEqual(p);
+      expect(c).toMatchObject({ status: 'aberto', payment: null, version: 1, seriesOverride: false, createdBy: series.createdBy });
+    }
+    expect(occurrencesToMaterialize(series, live, today)).toEqual([]);
+  }
+  expect(await repo.syncSeriesOccurrences(ctx)).toEqual({ created: 0, createdOverdue: 0 });
+  return all;
+}
 
 describe('API real: espaço pessoal, registros e permissões', () => {
   const ana = repoFor(ANA);
@@ -522,7 +613,6 @@ describe('API real: gastos fixos e parcelamentos', () => {
   let luz: CommitmentSeries;
   let luzPayKey = '';
 
-  const cents = (reais: number) => Math.round(reais * 100);
   const monthly = (
     description: string,
     reais: number,
@@ -542,6 +632,7 @@ describe('API real: gastos fixos e parcelamentos', () => {
     firstDueMonth,
     firstNumber: 1,
     installmentTotal: null,
+    partsPerYear: null,
     lastMonth,
   });
   const carroInput: SeriesInput = {
@@ -555,6 +646,7 @@ describe('API real: gastos fixos e parcelamentos', () => {
     firstDueMonth: '2026-10',
     firstNumber: 14,
     installmentTotal: 48,
+    partsPerYear: null,
     lastMonth: null,
   };
   const escolaInput = monthly('Escola', 1200, 10, '2026-10', '2026-12', 'Educação');
@@ -565,77 +657,8 @@ describe('API real: gastos fixos e parcelamentos', () => {
     return [s.receivedCents / 100, s.paidCents / 100, s.differenceCents / 100];
   };
   const names = (list: Commitment[]) => list.map((c) => c.description);
-  /** O que importa numa conta gerada: número, vencimento, textos, valor e marca de estimado. */
-  const planOf = (c: Commitment) => ({
-    number: c.series!.number,
-    dueOn: c.dueOn,
-    description: c.description,
-    category: c.category,
-    amountCents: c.amountCents,
-    amountIsEstimate: c.amountIsEstimate,
-  });
-  const planned = ({ month: _month, ...p }: PlannedOccurrence) => p;
-  const byNumber = (list: Commitment[], n: number) => list.find((c) => c.series!.number === n)!;
-
-  /**
-   * "Ainda a pagar" pelo core (summarizeToPay sobre listCommitments) e pelo banco (month_to_pay), no mesmo dia;
-   * a parte estimada também é somada direto em commitment_items, com o critério de D-021(5).
-   */
-  const toPay = async (month: IsoMonth, today: IsoDate = TODAY) => {
-    const s = summarizeToPay(await repoFor(ANA, today).listCommitments(ctx, month), ctx, month, today);
-    const db = clientFor(ANA, today);
-    const { data, error } = await db.rpc('month_to_pay', { p_context_id: ctx, p_month: `${month}-01` }).single();
-    expect(error).toBeNull();
-    const t = data as { due_in_month_cents: number; overdue_before_cents: number; to_pay_cents: number; open_count: number };
-    expect([t.to_pay_cents, t.due_in_month_cents, t.overdue_before_cents, t.open_count].map(Number)).toEqual([
-      s.toPayCents,
-      s.dueInMonthCents,
-      s.overdueBeforeCents,
-      s.items.length,
-    ]);
-    const { start, endExclusive } = monthRange(month);
-    let estimated = db
-      .from('commitment_items')
-      .select('amount_cents')
-      .eq('context_id', ctx)
-      .eq('status', 'aberto')
-      .eq('amount_is_estimate', true)
-      .lt('due_on', endExclusive);
-    if (monthOf(today) !== month) estimated = estimated.gte('due_on', start);
-    const direct = await estimated;
-    expect(direct.error).toBeNull();
-    expect(s.estimatedCents).toBe(direct.data!.reduce((sum, r) => sum + Number(r.amount_cents), 0));
-    return s;
-  };
-
-  /**
-   * Gerar pela API cria exatamente o que occurrencesToMaterialize calcula para cada série, com a autoria de quem
-   * criou a série; gerar de novo não cria nada.
-   */
-  const syncMatchesCore = async (today: IsoDate) => {
-    const repo = repoFor(ANA, today);
-    const expected = new Map<string, ReturnType<typeof planned>[]>();
-    for (const s of await repo.listSeries(ctx)) {
-      expected.set(s.id, occurrencesToMaterialize(s, await repo.listSeriesOccurrences(s.id), today).map(planned));
-    }
-    const all = [...expected.values()].flat();
-    expect(await repo.syncSeriesOccurrences(ctx)).toEqual({
-      created: all.length,
-      createdOverdue: all.filter((p) => p.dueOn < today).length,
-    });
-    for (const [id, plan] of expected) {
-      const series = (await repo.getSeries(id))!;
-      const live = await repo.listSeriesOccurrences(id);
-      for (const p of plan) {
-        const c = byNumber(live, p.number);
-        expect(planOf(c)).toEqual(p);
-        expect(c).toMatchObject({ status: 'aberto', payment: null, version: 1, seriesOverride: false, createdBy: series.createdBy });
-      }
-      expect(occurrencesToMaterialize(series, live, today)).toEqual([]);
-    }
-    expect(await repo.syncSeriesOccurrences(ctx)).toEqual({ created: 0, createdOverdue: 0 });
-    return all;
-  };
+  const toPay = (month: IsoMonth, today: IsoDate = TODAY) => checkedToPay(ANA, ctx, month, today);
+  const syncMatchesCore = (today: IsoDate) => checkedSync(ANA, ctx, today);
 
   beforeAll(async () => {
     const space = (await ana.getSpace())!;
@@ -669,6 +692,7 @@ describe('API real: gastos fixos e parcelamentos', () => {
         firstNumber: input.firstNumber,
         lastNumber: preview.lastNumber,
         installmentTotal: input.installmentTotal,
+        partsPerYear: null,
         currency: 'BRL',
         terms: [
           {
@@ -695,7 +719,7 @@ describe('API real: gastos fixos e parcelamentos', () => {
           contextId: ctx,
           status: 'aberto',
           payment: null,
-          series: { id: w.series.id, kind: input.kind, nature: input.nature, installmentTotal: input.installmentTotal },
+          series: { id: w.series.id, kind: input.kind, nature: input.nature, installmentTotal: input.installmentTotal, partsPerYear: null },
           seriesOverride: false,
           amountIsEstimate: input.amountMode === 'variavel',
           createdBy: ANA,
@@ -732,7 +756,7 @@ describe('API real: gastos fixos e parcelamentos', () => {
 
   it('3. validação também no banco, com o mesmo código e a mesma ordem do core', async () => {
     const invalid: SeriesInput[] = [
-      { ...escolaInput, kind: 'anual' as SeriesKind },
+      { ...escolaInput, kind: 'semanal' as SeriesKind },
       { ...carroInput, nature: 'conta' },
       { ...escolaInput, nature: 'financiamento' },
       { ...escolaInput, amountCents: 0 },
@@ -747,6 +771,7 @@ describe('API real: gastos fixos e parcelamentos', () => {
       { ...carroInput, installmentTotal: 1 },
       { ...carroInput, installmentTotal: 481 },
       { ...escolaInput, installmentTotal: 12 },
+      { ...escolaInput, partsPerYear: 1 },
       { ...carroInput, firstNumber: 49 },
       { ...carroInput, firstNumber: 0 },
       { ...escolaInput, firstNumber: 2 },
@@ -773,6 +798,7 @@ describe('API real: gastos fixos e parcelamentos', () => {
         'dia_invalido',
         'inicio_fora_do_intervalo',
         'parcelas_invalidas',
+        'parcelas_no_ano_invalidas',
         'parcela_inicial_invalida',
         'fim_invalido',
       ]),
@@ -914,12 +940,7 @@ describe('API real: gastos fixos e parcelamentos', () => {
 
   it('8. reconciliação por findSeriesOperation depois de falha de rede; excluir o gasto fixo', async () => {
     // A criação chega ao banco, mas a resposta se perde: o app não sabe nem o id da série.
-    const lost: typeof fetch = async (input, init) => {
-      const res = await fetch(input, init);
-      await res.arrayBuffer();
-      throw new TypeError('Failed to fetch');
-    };
-    const flaky = new SupabaseRepository(clientFor(ANA, undefined, lost), { id: ANA });
+    const flaky = new SupabaseRepository(clientFor(ANA, undefined, lostResponse), { id: ANA });
     // Dia 31 desde setembro: 30/09 (vencida), 31/10 e 30/11.
     const input = monthly('Academia', 99.9, 31, '2026-09', null, 'Lazer');
     const key = newOperationKey();
@@ -1089,6 +1110,469 @@ describe('API real: gastos fixos e parcelamentos', () => {
   });
 });
 
+describe('API real: contas do ano', () => {
+  // Bruno, sem nenhum dado até aqui, faz a sequência de aceite A3: base de outubro de 2026 com Recebido 6.000,00,
+  // Pago 3.900,00 e Ainda a pagar 650,00 (Internet em 15/10 e Condomínio em 20/10), mais Seguro do carro em 10/11.
+  // Cada passo usa o "hoje" da tabela da sequência. Ana é a pessoa de fora. Pessoas e contas fictícias.
+  const OCT = '2026-10-07';
+  const NOV = '2026-11-01';
+  const DEC = '2026-12-01';
+  const DEC10 = '2026-12-10';
+  const JAN15 = '2027-01-15';
+  const JAN20 = '2027-01-20';
+  const FEB10 = '2027-02-10';
+  const NOV27 = '2027-11-01';
+  const DEC27 = '2027-12-01';
+  const NOV28 = '2028-11-01';
+  const bruno = repoFor(BRUNO);
+  const ana = repoFor(ANA);
+  let ctx = '';
+  let account = '';
+  let ipva: CommitmentSeries;
+  let iptu: CommitmentSeries;
+  let matricula: CommitmentSeries;
+  let informKey = '';
+
+  const annual = (
+    description: string,
+    reais: number,
+    partsPerYear: number,
+    firstDueMonth: IsoMonth,
+    dueDay: number,
+    amountMode: AmountMode,
+    category: string,
+  ): SeriesInput => ({
+    kind: 'anual',
+    nature: 'conta',
+    description,
+    category,
+    amountCents: cents(reais),
+    amountMode,
+    dueDay,
+    firstDueMonth,
+    firstNumber: 1,
+    installmentTotal: null,
+    partsPerYear,
+    lastMonth: null,
+  });
+  // Passos 1 a 3: IPVA em cota única, IPTU em 10 parcelas de fevereiro a novembro e Matrícula com valor fixo.
+  const ipvaInput = annual('IPVA', 2400, 1, '2027-01', 20, 'variavel', 'Transporte');
+  const iptuInput = annual('IPTU', 180, 10, '2027-02', 10, 'variavel', 'Moradia');
+  const matriculaInput = annual('Matrícula', 1200, 1, '2026-12', 10, 'fixo', 'Educação');
+
+  const at = (today: IsoDate) => repoFor(BRUNO, today);
+  const payment = (amountCents: Cents, paidOn: IsoDate): PaymentInput => ({ accountId: account, amountCents, paidOn, category: null });
+  /** Colunas da sequência A3, em reais: Ainda a pagar (conferido no core e no banco) e Pago do mês de hoje. */
+  const columns = async (today: IsoDate) => {
+    const month = monthOf(today);
+    const toPay = await checkedToPay(BRUNO, ctx, month, today);
+    const paid = summarizeMonth(await at(today).listRecords(ctx, month), ctx, month).paidCents;
+    return [toPay.toPayCents / 100, paid / 100];
+  };
+  /** Geração conferida com o core; nenhuma conta viva vence depois do fim do 13º mês a partir do mês de hoje (S10). */
+  const sync = async (today: IsoDate) => {
+    const created = await checkedSync(BRUNO, ctx, today);
+    const limit = `${addMonths(monthOf(today), 14)}-01`;
+    for (const s of await at(today).listSeries(ctx)) {
+      for (const c of await at(today).listSeriesOccurrences(s.id)) expect(c.dueOn < limit).toBe(true);
+    }
+    return created.map((p) => [p.description, p.number, p.dueOn, p.amountCents, p.amountIsEstimate]);
+  };
+  /** Lista completa da série (as 60 mais recentes e todas as em aberto), como pedem affectedByYear e wholeYearPayment. */
+  const full = async (repo: SupabaseRepository, id: string) =>
+    mergeOccurrences(await repo.listSeriesOccurrences(id), await repo.listOpenSeriesOccurrences(id));
+  /** Parcelas de um ano do IPTU (dia 10, de fevereiro a novembro). */
+  const iptuYear = (year: number, firstNumber: number, reais: number) =>
+    Array.from({ length: 10 }, (_, i) => ['IPTU', firstNumber + i, `${year}-${String(i + 2).padStart(2, '0')}-10`, cents(reais), true]);
+
+  beforeAll(async () => {
+    const space = (await bruno.getSpace())!;
+    ctx = space.personalContextId;
+    account = space.accounts[0]!.id;
+    expect(await bruno.listSeries(ctx)).toEqual([]);
+    expect(await bruno.listRecords(ctx, '2026-10')).toEqual([]);
+  });
+
+  it('base da sequência A3: outubro com 6.000,00 recebidos, 3.900,00 pagos e 650,00 a pagar', async () => {
+    const record = (kind: RecordKind, description: string, reais: number, occurredOn: IsoDate) =>
+      bruno.createRecord(newOperationKey(), ctx, kind, { accountId: account, amountCents: cents(reais), occurredOn, description, category: null });
+    await record('receita', 'Salário', 6000, '2026-10-01');
+    await record('despesa', 'Aluguel', 2500, '2026-10-05');
+    await record('despesa', 'Mercado', 1400, '2026-10-06');
+    const bills = [
+      ['Internet', 150, '2026-10-15'],
+      ['Condomínio', 500, '2026-10-20'],
+      ['Seguro do carro', 300, '2026-11-10'],
+    ] as const;
+    for (const [description, reais, dueOn] of bills) {
+      await bruno.createCommitment(newOperationKey(), ctx, { description, amountCents: cents(reais), dueOn, category: null });
+    }
+    expect(await columns(OCT)).toEqual([650, 3900]);
+  });
+
+  it('passos 1 a 4: o banco gera o que a prévia do core calcula; parcelas por ano mapeadas na série e nas contas', async () => {
+    const created: CommitmentSeries[] = [];
+    for (const input of [ipvaInput, iptuInput, matriculaInput]) {
+      const preview = seriesPreview(input, OCT);
+      const key = newOperationKey();
+      const w = await bruno.createSeries(key, ctx, input);
+      expect(w.occurrences.map(planOf)).toEqual(preview.createdNow.map(planned));
+      expect(w.changed).toBe(preview.createdNow.length);
+      expect(w.series).toMatchObject({
+        contextId: ctx,
+        kind: 'anual',
+        nature: 'conta',
+        firstDueMonth: input.firstDueMonth,
+        firstNumber: 1,
+        lastNumber: null,
+        installmentTotal: null,
+        partsPerYear: input.partsPerYear,
+        currency: 'BRL',
+        terms: [
+          {
+            fromNumber: 1,
+            description: input.description,
+            category: input.category,
+            amountCents: input.amountCents,
+            amountMode: input.amountMode,
+            dueDay: input.dueDay,
+          },
+        ],
+        skippedNumbers: [],
+        paidCount: 0,
+        openCount: preview.createdNow.length,
+        generating: true,
+        createdBy: BRUNO,
+        version: 1,
+      });
+      expect(await bruno.getSeries(w.series.id)).toEqual(w.series);
+      for (const c of w.occurrences) {
+        expect(await bruno.getCommitment(c.id)).toEqual(c);
+        expect(c.series).toEqual({ id: w.series.id, number: c.series!.number, kind: 'anual', nature: 'conta', installmentTotal: null, partsPerYear: input.partsPerYear });
+      }
+      expect(await bruno.findSeriesOperation(key)).toEqual({ action: 'criar_serie', seriesId: w.series.id });
+      // Repetir devolve a mesma conta do ano; outro número de parcelas por ano com a mesma chave é outro pedido.
+      expect(await bruno.createSeries(key, ctx, input)).toEqual({ ...w, changed: 0 });
+      expect(await err(bruno.createSeries(key, ctx, { ...input, partsPerYear: input.partsPerYear! + 1 }))).toBe('chave_reutilizada');
+      created.push(w.series);
+    }
+    [ipva, iptu, matricula] = created as [CommitmentSeries, CommitmentSeries, CommitmentSeries];
+    expect(await bruno.listSeries(ctx)).toEqual(created);
+
+    // IPVA e IPTU sem conta criada; Matrícula 10/12/2026 em Próximos meses, como conta do ano de 2026. Nada muda nos totais.
+    expect(created.map((s) => s.openCount)).toEqual([0, 0, 1]);
+    const out = await checkedToPay(BRUNO, ctx, '2026-10', OCT);
+    expect(out.later.map((c) => [c.description, c.dueOn, occurrenceLabel(c)])).toEqual([
+      ['Seguro do carro', '2026-11-10', null],
+      ['Matrícula', '2026-12-10', 'Conta do ano de 2026'],
+    ]);
+    expect(await columns(OCT)).toEqual([650, 3900]);
+    // Passo 4: gerar de novo não cria nada.
+    expect(await sync(OCT)).toEqual([]);
+  });
+
+  it('validação da conta do ano no banco, com o mesmo código e a mesma ordem do core', async () => {
+    const invalid: SeriesInput[] = [
+      { ...ipvaInput, kind: 'semanal' as SeriesKind },
+      { ...ipvaInput, nature: 'financiamento' },
+      { ...ipvaInput, firstDueMonth: '2026-08' },
+      { ...ipvaInput, firstDueMonth: '2028-10' },
+      { ...iptuInput, installmentTotal: 10 },
+      { ...iptuInput, partsPerYear: 0 },
+      { ...iptuInput, partsPerYear: 13 },
+      { ...iptuInput, partsPerYear: null },
+      { ...ipvaInput, kind: 'mensal' },
+      { ...iptuInput, firstNumber: 0 },
+      { ...iptuInput, firstNumber: 11 },
+      { ...iptuInput, lastMonth: '2026-11' },
+      { ...iptuInput, lastMonth: '2029-10' },
+      { ...ipvaInput, lastMonth: '2077-01' },
+    ];
+    const codes: (string | null)[] = [];
+    for (const input of invalid) {
+      const code = seriesInputError(input, OCT);
+      expect(await err(bruno.createSeries(newOperationKey(), ctx, input))).toBe(code);
+      codes.push(code);
+    }
+    expect(codes).toEqual([
+      'tipo_invalido',
+      'natureza_invalida',
+      'inicio_fora_do_intervalo',
+      'inicio_fora_do_intervalo',
+      'parcelas_invalidas',
+      'parcelas_no_ano_invalidas',
+      'parcelas_no_ano_invalidas',
+      'parcelas_no_ano_invalidas',
+      'parcelas_no_ano_invalidas',
+      'parcela_inicial_invalida',
+      'parcela_inicial_invalida',
+      'fim_invalido',
+      'fim_invalido',
+      'fim_invalido',
+    ]);
+    // Limites aceitos: primeiro vencimento até setembro de 2028; último ano em até 50 anos.
+    expect(seriesInputError({ ...ipvaInput, firstDueMonth: '2028-09' }, OCT)).toBeNull();
+    expect(seriesInputError({ ...ipvaInput, lastMonth: '2076-01' }, OCT)).toBeNull();
+    // IPTU até 2029: o último mês vai como o da última parcela de 2029, e o banco grava a parcela 30, como o core.
+    const until2029: SeriesInput = { ...iptuInput, description: 'IPTU até 2029', lastMonth: '2029-11' };
+    const w = await bruno.createSeries(newOperationKey(), ctx, until2029);
+    expect([w.series.lastNumber, seriesPreview(until2029, OCT).lastNumber, w.occurrences.length]).toEqual([30, 30, 0]);
+    await bruno.deleteSeries(newOperationKey(), w.series.id, w.series.version, []);
+    // As recusas não gravam nada.
+    expect((await bruno.listSeries(ctx)).map((s) => s.id)).toEqual([ipva.id, iptu.id, matricula.id]);
+  });
+
+  it('passos 5 a 8: em 01/11/2026 entra o IPVA e em 01/12/2026 as 10 parcelas do IPTU, sem mudar Ainda a pagar', async () => {
+    // Passo 5: pagar Internet, Condomínio e Seguro do carro em 07/10.
+    for (const c of (await bruno.listCommitments(ctx, '2026-10')).filter((x) => x.series === null)) {
+      await bruno.payCommitment(newOperationKey(), c.id, c.version, payment(c.amountCents, OCT));
+    }
+    expect(await columns(OCT)).toEqual([0, 4850]);
+
+    // Passo 6: o IPVA de 2027 entra dois meses antes de vencer, estimado, só em Próximos meses.
+    expect(await sync(NOV)).toEqual([['IPVA', 1, '2027-01-20', 240000, true]]);
+    expect(await columns(NOV)).toEqual([0, 0]);
+    const nov = await checkedToPay(BRUNO, ctx, '2026-11', NOV);
+    expect(nov.later.map((c) => [c.description, occurrenceLabel(c), c.amountIsEstimate])).toEqual([
+      ['Matrícula', 'Conta do ano de 2026', false],
+      ['IPVA', 'Conta do ano de 2027', true],
+    ]);
+    // Mês que não é o atual: janeiro de 2027 visto em 01/11/2026.
+    const jan = await checkedToPay(BRUNO, ctx, '2027-01', NOV);
+    expect([jan.dueInMonthCents, jan.overdueBeforeCents, jan.toPayCents, jan.items.length, jan.estimatedCents]).toEqual([
+      240000, 0, 240000, 1, 240000,
+    ]);
+
+    // Passo 7: as 10 parcelas de 2027 do IPTU, estimadas; Ainda a pagar de dezembro só com a Matrícula.
+    expect(await sync(DEC)).toEqual(iptuYear(2027, 1, 180));
+    expect(await columns(DEC)).toEqual([1200, 0]);
+    const grouped = groupAnnualLater((await checkedToPay(BRUNO, ctx, '2026-12', DEC)).later);
+    expect(grouped.map((g) => (g.type === 'conta' ? g.commitment.description : g.group.title))).toEqual(['IPVA', 'IPTU de 2027']);
+    expect(grouped[1]).toMatchObject({
+      type: 'ano',
+      group: { seriesId: iptu.id, count: 10, totalCents: 180000, approximate: true, caption: '10 parcelas, de 10/02 a 10/11/2027 · estimado' },
+    });
+
+    // Passo 8: pagar a Matrícula em 10/12.
+    const mat = byNumber(await at(DEC10).listSeriesOccurrences(matricula.id), 1);
+    await at(DEC10).payCommitment(newOperationKey(), mat.id, mat.version, payment(120000, DEC10));
+    expect(await columns(DEC10)).toEqual([0, 1200]);
+  });
+
+  it('passos 9 a 12: "Informar o valor de 2027" por RPC, com conjunto conferido, repetição e reconciliação depois de falha de rede', async () => {
+    const repo = at(JAN15);
+    const plan = affectedByYear(await full(repo, iptu.id), iptu, 1, 'informar', 18990);
+    if (!plan.ok) throw new Error(plan.code);
+    expect([plan.affected.length, plan.totalCents]).toEqual([10, 189900]);
+    // Conjunto diferente do que o banco vê: recusa sem gravar.
+    const stale = (affected: AffectedRef[]) => err(repo.informSeriesYear(newOperationKey(), iptu.id, 1, affected, 18990));
+    expect(await stale(plan.affected.slice(1))).toBe('versao_desatualizada');
+    expect(await stale(plan.affected.map((a) => ({ ...a, version: 2 })))).toBe('versao_desatualizada');
+    expect(await stale([])).toBe('versao_desatualizada');
+    expect(await full(repo, iptu.id)).toEqual(plan.changing.slice().reverse());
+
+    // Passo 9: n1 a n10 com 189,90, não estimadas e alteradas só neste ano; a versão da série não muda.
+    informKey = newOperationKey();
+    const w = await repo.informSeriesYear(informKey, iptu.id, 1, plan.affected, 18990);
+    expect(w.changed).toBe(10);
+    expect(w.series).toEqual(await repo.getSeries(iptu.id));
+    expect(w.series.version).toBe(iptu.version);
+    expect(w.occurrences.map((c) => [c.series!.number, c.amountCents, c.amountIsEstimate, c.seriesOverride, c.version])).toEqual(
+      Array.from({ length: 10 }, (_, i) => [i + 1, 18990, false, true, 2]),
+    );
+    for (const c of w.occurrences) expect(await repo.getCommitment(c.id)).toEqual(c);
+    expect(await repo.findSeriesOperation(informKey)).toEqual({ action: 'informar_ano', seriesId: iptu.id });
+    expect(await repo.findCommitmentOperation(informKey)).toBeNull();
+    expect(await repo.findOperation(informKey)).toBeNull();
+    // Passo 10: repetir com a mesma chave não muda nada; outro valor com a mesma chave é recusado.
+    expect(await repo.informSeriesYear(informKey, iptu.id, 1, plan.affected, 18990)).toEqual({ ...w, changed: 0 });
+    expect(await err(repo.informSeriesYear(informKey, iptu.id, 1, plan.affected, 19000))).toBe('chave_reutilizada');
+    const summary = annualYearSummary(w.series, await repo.listSeriesOccurrences(iptu.id), await repo.listOpenSeriesOccurrences(iptu.id), 0, JAN15);
+    expect([summary.open, summary.totalCents, summary.approximate]).toEqual([10, 189900, false]);
+    expect(await columns(JAN15)).toEqual([2400, 0]);
+    expect((await checkedToPay(BRUNO, ctx, '2027-01', JAN15)).estimatedCents).toBe(240000);
+
+    // Passo 11, com a resposta perdida: o valor chega ao banco e a chave mostra que a operação foi concluída.
+    const ipvaPlan = affectedByYear(await full(repo, ipva.id), ipva, 1, 'informar', 251230);
+    if (!ipvaPlan.ok) throw new Error(ipvaPlan.code);
+    const flaky = new SupabaseRepository(clientFor(BRUNO, JAN15, lostResponse), { id: BRUNO });
+    const key = newOperationKey();
+    expect(await err(flaky.informSeriesYear(key, ipva.id, 1, ipvaPlan.affected, 251230))).toBe('rede');
+    expect(await repo.findSeriesOperation(key)).toEqual({ action: 'informar_ano', seriesId: ipva.id });
+    expect(await ana.findSeriesOperation(key)).toBeNull();
+    const again = await repo.informSeriesYear(key, ipva.id, 1, ipvaPlan.affected, 251230);
+    expect(again.changed).toBe(0);
+    expect(again.occurrences.map((c) => [c.series!.number, c.amountCents, c.amountIsEstimate, c.version])).toEqual([[1, 251230, false, 2]]);
+    expect(await columns(JAN15)).toEqual([2512.3, 0]);
+
+    // Passo 12: pagar o IPVA em 20/01/2027.
+    const n1 = byNumber(await at(JAN20).listSeriesOccurrences(ipva.id), 1);
+    await at(JAN20).payCommitment(newOperationKey(), n1.id, n1.version, payment(251230, JAN20));
+    expect(await columns(JAN20)).toEqual([0, 2512.3]);
+  });
+
+  it('passos 13 a 16: "Paguei o ano todo de uma vez" paga a parcela 1 e tira as outras 9, que não voltam', async () => {
+    const repo = at(FEB10);
+    const n1 = byNumber(await repo.listSeriesOccurrences(iptu.id), 1);
+    const whole = wholeYearPayment(await full(repo, iptu.id), iptu, n1);
+    if (!whole) throw new Error('sem cota única');
+    expect([whole.others.length, whole.openTotalCents, whole.approximate]).toEqual([9, 189900, false]);
+    // Passo 13: cota única com 10% de desconto, 189.900 × 0,9 = 170.910; depois, tirar as outras.
+    const paid = await repo.payCommitment(newOperationKey(), n1.id, n1.version, payment(170910, FEB10));
+    expect(paid.record).toMatchObject({ amountCents: 170910, commitmentId: n1.id, occurredOn: FEB10 });
+    // O pagamento não muda a versão das outras; com a parcela paga no conjunto, o banco recusa.
+    const withPaid = [{ id: n1.id, version: n1.version }, ...whole.affectedAfterPayment];
+    expect(await err(repo.skipSeriesYear(newOperationKey(), iptu.id, 1, withPaid))).toBe('versao_desatualizada');
+    const skipKey = newOperationKey();
+    const skip = await repo.skipSeriesYear(skipKey, iptu.id, n1.series!.number, whole.affectedAfterPayment);
+    expect(skip.changed).toBe(9);
+    expect(skip.series).toMatchObject({ skippedNumbers: [2, 3, 4, 5, 6, 7, 8, 9, 10], paidCount: 1, openCount: 0, version: iptu.version });
+    expect(skip.occurrences.map((c) => [c.series!.number, c.status])).toEqual([[1, 'quitado']]);
+    expect(await repo.getSeries(iptu.id)).toEqual(skip.series);
+    for (const c of whole.others) expect(await repo.getCommitment(c.id)).toBeNull();
+    expect(await repo.skipSeriesYear(skipKey, iptu.id, 1, whole.affectedAfterPayment)).toEqual({ ...skip, changed: 0 });
+    expect(await repo.findSeriesOperation(skipKey)).toEqual({ action: 'tirar_ano', seriesId: iptu.id });
+    expect(await columns(FEB10)).toEqual([0, 1709.1]);
+    // Passo 14: gerar não recria as parcelas tiradas.
+    expect(await sync(FEB10)).toEqual([]);
+
+    // Passo 15: desfazer o pagamento traz só a parcela 1 de volta (189,90); 2 a 10 continuam fora, mesmo ao gerar.
+    const undone = await repo.undoCommitmentPayment(newOperationKey(), n1.id, paid.commitment.version);
+    expect(undone.commitment).toMatchObject({ status: 'aberto', amountCents: 18990 });
+    expect(await sync(FEB10)).toEqual([]);
+    expect((await repo.listSeriesOccurrences(iptu.id)).map((c) => c.series!.number)).toEqual([1]);
+    expect(await columns(FEB10)).toEqual([189.9, 0]);
+    // Passo 16: pagar de novo.
+    await repo.payCommitment(newOperationKey(), n1.id, undone.commitment.version, payment(170910, FEB10));
+    expect(await columns(FEB10)).toEqual([0, 1709.1]);
+    iptu = (await repo.getSeries(iptu.id))!;
+    const summary = annualYearSummary(iptu, await repo.listSeriesOccurrences(iptu.id), await repo.listOpenSeriesOccurrences(iptu.id), 0, FEB10);
+    expect([summary.paid, summary.skipped, summary.open, summary.totalCents]).toEqual([1, 9, 0, 170910]);
+  });
+
+  it('passo 17: sugestão do IPVA aplicada com update_series_from a partir de 2028; o IPTU, com parcelas tiradas, fica sem sugestão', async () => {
+    const repo = at(FEB10);
+    ipva = (await repo.getSeries(ipva.id))!;
+    const suggestion = suggestedAnnualReference(ipva, await repo.listSeriesOccurrences(ipva.id));
+    if (!suggestion) throw new Error('sem sugestão');
+    expect([suggestion.amountCents, suggestion.fromNumber, suggestion.fromLabel, suggestion.paidYear.label]).toEqual([251230, 2, '2028', '2027']);
+    expect(suggestedAnnualReference(iptu, await repo.listSeriesOccurrences(iptu.id))).toBeNull();
+    // A parcela 2 ainda não existe: conjunto esperado vazio, como o reajuste programado do Ciclo A.
+    const plan = affectedByEditFrom(await full(repo, ipva.id), ipva, suggestion.fromNumber);
+    if (!plan.ok) throw new Error(plan.code);
+    expect(plan.affected).toEqual([]);
+    const key = newOperationKey();
+    const w = await repo.updateSeriesFrom(key, ipva.id, ipva.version, suggestion.fromNumber, plan.affected, suggestion.edit);
+    expect(w.changed).toBe(0);
+    expect(w.series).toMatchObject({
+      version: 2,
+      partsPerYear: 1,
+      terms: [
+        { fromNumber: 1, amountCents: 240000, amountMode: 'variavel', dueDay: 20 },
+        { fromNumber: 2, amountCents: 251230, amountMode: 'variavel', dueDay: 20 },
+      ],
+    });
+    expect(w.occurrences.map((c) => [c.series!.number, c.status, c.amountCents])).toEqual([[1, 'quitado', 251230]]);
+    expect(await repo.findSeriesOperation(key)).toEqual({ action: 'alterar_serie', seriesId: ipva.id });
+    ipva = w.series;
+    expect(await columns(FEB10)).toEqual([0, 1709.1]);
+  });
+
+  it('passos 18 a 21: geração em 01/11/2027, 01/12/2027 e 01/11/2028; encerrar o IPVA em 2028', async () => {
+    // Passo 18: IPVA de 2028 pela referência nova, estimado; Matrícula de 2027.
+    expect(await sync(NOV27)).toEqual([
+      ['IPVA', 2, '2028-01-20', 251230, true],
+      ['Matrícula', 2, '2027-12-10', 120000, false],
+    ]);
+    expect(await columns(NOV27)).toEqual([0, 0]);
+    // Passo 19: as 10 parcelas de 2028 do IPTU pela referência, que não mudou.
+    expect(await sync(DEC27)).toEqual(iptuYear(2028, 11, 180));
+    expect(await columns(DEC27)).toEqual([1200, 0]);
+
+    // Passo 20: encerrar o IPVA com a última conta em 2028; nada sai.
+    const repo = at(DEC27);
+    const last = lastNumberFromEndYear(ipva, 2028);
+    const end = affectedByEnd(await full(repo, ipva.id), ipva, last);
+    if (!end.ok) throw new Error(end.code);
+    expect([last, end.removed]).toEqual([2, []]);
+    const ended = await repo.endSeries(newOperationKey(), ipva.id, ipva.version, last, end.affected);
+    expect(ended).toMatchObject({ changed: 0, series: { lastNumber: 2, version: 3, openCount: 1, paidCount: 1, partsPerYear: 1 } });
+    ipva = ended.series;
+    expect(await columns(DEC27)).toEqual([1200, 0]);
+
+    // Passo 21: o IPVA de 2029 não é criado; a Matrícula de 2028 sim.
+    expect(await sync(NOV28)).toEqual([['Matrícula', 3, '2028-12-10', 120000, false]]);
+    await checkedToPay(BRUNO, ctx, '2028-11', NOV28);
+  });
+
+  it('informar e tirar: validação no banco; outra pessoa não lê nem altera', async () => {
+    const repo = at(NOV28);
+    const before = await full(repo, iptu.id);
+    const year2028 = affectedByYear(before, iptu, 11, 'tirar');
+    if (!year2028.ok) throw new Error(year2028.code);
+    expect(year2028.affected).toHaveLength(10);
+
+    // Outra pessoa não encontra a conta do ano, as parcelas nem a operação.
+    expect(await ana.getSeries(iptu.id)).toBeNull();
+    expect(await ana.listSeries(ctx)).toEqual([]);
+    expect(await ana.listOpenSeriesOccurrences(iptu.id)).toEqual([]);
+    expect(await err(ana.informSeriesYear(newOperationKey(), iptu.id, 11, year2028.affected, 19000))).toBe('nao_encontrado');
+    expect(await err(ana.skipSeriesYear(newOperationKey(), iptu.id, 11, year2028.affected))).toBe('nao_encontrado');
+    expect(await ana.findSeriesOperation(informKey)).toBeNull();
+    // Só conta do ano: no gasto fixo de Ana, tipo_invalido.
+    const anaCtx = (await ana.getSpace())!.personalContextId;
+    const monthly = (await ana.listSeries(anaCtx)).find((s) => s.kind === 'mensal')!;
+    expect(affectedByYear([], monthly, 1, 'informar')).toEqual({ ok: false, code: 'tipo_invalido' });
+    expect(await err(ana.informSeriesYear(newOperationKey(), monthly.id, 1, [], 1000))).toBe('tipo_invalido');
+    expect(await err(ana.skipSeriesYear(newOperationKey(), monthly.id, 1, []))).toBe('tipo_invalido');
+
+    // Número fora da conta do ano (antes da primeira ou depois do término) e valor inválido.
+    expect(affectedByYear([], ipva, 3, 'informar')).toEqual({ ok: false, code: 'numero_fora_da_serie' });
+    expect(await err(repo.informSeriesYear(newOperationKey(), ipva.id, 3, [], 1000))).toBe('numero_fora_da_serie');
+    expect(await err(repo.skipSeriesYear(newOperationKey(), iptu.id, 0, year2028.affected))).toBe('numero_fora_da_serie');
+    expect(await err(repo.informSeriesYear(newOperationKey(), iptu.id, 11, year2028.affected, 0))).toBe('valor_invalido');
+    expect(await err(repo.informSeriesYear(newOperationKey(), iptu.id, 11, year2028.affected, 1_000_000_000))).toBe('valor_acima_do_limite');
+    // Ano sem parcela a mudar: o core não monta o pedido, e o banco recusa o conjunto vazio.
+    expect(affectedByYear(before, iptu, 1, 'informar')).toMatchObject({ ok: false, code: 'nada_a_mudar' });
+    expect(affectedByYear(before, iptu, 1, 'tirar')).toMatchObject({ ok: false, code: 'nada_a_mudar' });
+    expect(await err(repo.informSeriesYear(newOperationKey(), iptu.id, 1, [], 19000))).toBe('versao_desatualizada');
+    expect(await err(repo.skipSeriesYear(newOperationKey(), iptu.id, 1, []))).toBe('versao_desatualizada');
+
+    // Gravação direta é recusada; as recusas não gravam nada.
+    const db = clientFor(BRUNO);
+    expect((await db.from('commitment_series').update({ parts_per_year: 12 }).eq('id', iptu.id)).error).not.toBeNull();
+    expect((await clientFor(null).rpc('skip_series_year', {
+      p_idempotency_key: newOperationKey(),
+      p_series_id: iptu.id,
+      p_number: 11,
+      p_expected_affected: year2028.affected,
+    })).error).not.toBeNull();
+    expect(await full(repo, iptu.id)).toEqual(before);
+    expect((await repo.getSeries(iptu.id))!.partsPerYear).toBe(10);
+  });
+
+  it('ausência longa (Ana): IPTU criado em 07/10/2026 e app aberto só em 15/06/2028 cria 7 parcelas, 2 vencidas', async () => {
+    const LONG = '2028-06-15';
+    const anaCtx = (await ana.getSpace())!.personalContextId;
+    const w = await ana.createSeries(newOperationKey(), anaCtx, { ...iptuInput, description: 'IPTU do apartamento' });
+    expect(w.occurrences).toEqual([]);
+    const created = (await checkedSync(ANA, anaCtx, LONG)).filter((p) => p.description === 'IPTU do apartamento');
+    expect(created.map((p) => [p.number, p.dueOn])).toEqual(
+      Array.from({ length: 7 }, (_, i) => [14 + i, `2028-${String(5 + i).padStart(2, '0')}-10`]),
+    );
+    expect(created.filter((p) => p.dueOn < LONG)).toHaveLength(2);
+    const repo = repoFor(ANA, LONG);
+    const s = (await repo.getSeries(w.series.id))!;
+    const occ = await repo.listSeriesOccurrences(s.id);
+    const open = await repo.listOpenSeriesOccurrences(s.id);
+    expect(annualYearSummary(s, occ, open, 0, LONG).texts.missing).toBe(
+      '2027: as 10 parcelas ficaram sem conta registrada. Se você pagou, anote o gasto em Anotar gasto.',
+    );
+    expect(annualYearSummary(s, occ, open, 1, LONG).texts.missing).toBe('2028: parcelas 1 a 3 sem conta registrada.');
+    await checkedToPay(ANA, anaCtx, '2028-06', LONG);
+  });
+});
+
 describe('conversor de contas a pagar e gastos fixos', () => {
   // Defesa de último nível, sem rede: o banco garante o vínculo (I1), mas o app nunca mostra "paga" sem o gasto.
   const row = {
@@ -1148,6 +1632,7 @@ describe('conversor de contas a pagar e gastos fixos', () => {
     series_kind: null,
     series_nature: null,
     series_installment_total: null,
+    series_parts_per_year: null,
   };
   const occurrence = {
     ...avulsa,
@@ -1159,10 +1644,20 @@ describe('conversor de contas a pagar e gastos fixos', () => {
     series_nature: 'financiamento',
     series_installment_total: 48,
   };
+  /** Parcela 3 de um IPTU de 10 parcelas de fevereiro a novembro de 2027. */
+  const annualOccurrence = {
+    ...occurrence,
+    occurrence_number: 3,
+    due_on: '2027-04-10',
+    series_kind: 'anual',
+    series_nature: 'conta',
+    series_installment_total: null,
+    series_parts_per_year: 10,
+  };
 
   it('ocorrência de série com número, tipo e marcas; conta avulsa sem nenhuma marca de série', async () => {
     expect(await repoWith(occurrence).getCommitment('c1')).toMatchObject({
-      series: { id: 's1', number: 13, kind: 'parcelada', nature: 'financiamento', installmentTotal: 48 },
+      series: { id: 's1', number: 13, kind: 'parcelada', nature: 'financiamento', installmentTotal: 48, partsPerYear: null },
       seriesOverride: true,
       amountIsEstimate: true,
     });
@@ -1179,28 +1674,61 @@ describe('conversor de contas a pagar e gastos fixos', () => {
     for (const r of bad) expect(await failure(repoWith(r).getCommitment('c1'))).toEqual(['desconhecido', 'serie_inconsistente']);
   });
 
+  it('conta do ano: parcelas por ano mapeadas na conta (rótulo com o ano); tipo e parcelas por ano incoerentes são recusados', async () => {
+    const c = (await repoWith(annualOccurrence).getCommitment('c1'))!;
+    expect(c.series).toEqual({ id: 's1', number: 3, kind: 'anual', nature: 'conta', installmentTotal: null, partsPerYear: 10 });
+    expect(occurrenceLabel(c)).toBe('Parcela 3 de 10 de 2027');
+    expect((await create(annualOccurrence)).commitment).toEqual(c);
+    const single = (await repoWith({ ...annualOccurrence, occurrence_number: 1, due_on: '2027-01-20', series_parts_per_year: 1 }).getCommitment('c1'))!;
+    expect([single.series?.partsPerYear, occurrenceLabel(single)]).toEqual([1, 'Conta do ano de 2027']);
+    const bad = [
+      { ...annualOccurrence, series_parts_per_year: null },
+      { ...annualOccurrence, series_parts_per_year: 0 },
+      { ...annualOccurrence, series_parts_per_year: 13 },
+      { ...annualOccurrence, series_parts_per_year: 2.5 },
+      { ...occurrence, series_parts_per_year: 10 },
+      { ...occurrence, series_kind: 'mensal', series_nature: 'conta', series_installment_total: null, series_parts_per_year: 1 },
+    ];
+    for (const r of bad) {
+      expect(await failure(repoWith(r).getCommitment('c1'))).toEqual(['desconhecido', 'serie_inconsistente']);
+      expect(await failure(create(r))).toEqual(['desconhecido', 'serie_inconsistente']);
+    }
+  });
+
+  const term = { from_number: 1, description: 'Luz', category: null, amount_cents: 18000, amount_mode: 'variavel', due_day: 12, created_at: '2026-10-07T12:00:00Z' };
+  const series = {
+    id: 's1',
+    context_id: 'ctx',
+    kind: 'mensal',
+    nature: 'conta',
+    first_due_month: '2026-11-01',
+    first_number: 1,
+    last_number: null,
+    installment_total: null,
+    currency: 'BRL',
+    created_by: 'p1',
+    version: 2,
+    created_at: '2026-10-07T12:00:00Z',
+    updated_at: '2026-10-08T12:00:00Z',
+    terms: [term, { ...term, from_number: 3, amount_cents: 19000, amount_mode: 'fixo', due_day: 31 }],
+    skipped_numbers: [2],
+    paid_count: 1,
+    open_count: 1,
+    generating: false,
+    parts_per_year: null,
+  };
+  /** IPTU de 10 parcelas por ano desde fevereiro de 2027, como a visão series_items e o objeto series das funções o devolvem. */
+  const annualSeries = {
+    ...series,
+    kind: 'anual',
+    first_due_month: '2027-02-01',
+    last_number: 30,
+    terms: [{ ...term, description: 'IPTU', amount_cents: 18000, due_day: 10 }],
+    skipped_numbers: [],
+    parts_per_year: 10,
+  };
+
   it('série: mês, vigências, números pulados e generating; sem vigência no primeiro número é recusada', async () => {
-    const term = { from_number: 1, description: 'Luz', category: null, amount_cents: 18000, amount_mode: 'variavel', due_day: 12, created_at: '2026-10-07T12:00:00Z' };
-    const series = {
-      id: 's1',
-      context_id: 'ctx',
-      kind: 'mensal',
-      nature: 'conta',
-      first_due_month: '2026-11-01',
-      first_number: 1,
-      last_number: null,
-      installment_total: null,
-      currency: 'BRL',
-      created_by: 'p1',
-      version: 2,
-      created_at: '2026-10-07T12:00:00Z',
-      updated_at: '2026-10-08T12:00:00Z',
-      terms: [term, { ...term, from_number: 3, amount_cents: 19000, amount_mode: 'fixo', due_day: 31 }],
-      skipped_numbers: [2],
-      paid_count: 1,
-      open_count: 1,
-      generating: false,
-    };
     expect(await repoWith(series).getSeries('s1')).toEqual({
       id: 's1',
       contextId: 'ctx',
@@ -1210,6 +1738,7 @@ describe('conversor de contas a pagar e gastos fixos', () => {
       firstNumber: 1,
       lastNumber: null,
       installmentTotal: null,
+      partsPerYear: null,
       currency: 'BRL',
       terms: [
         { fromNumber: 1, description: 'Luz', category: null, amountCents: 18000, amountMode: 'variavel', dueDay: 12 },
@@ -1227,5 +1756,62 @@ describe('conversor de contas a pagar e gastos fixos', () => {
     for (const bad of [{ ...series, terms: [] }, { ...series, terms: [{ ...term, from_number: 2 }] }]) {
       expect(await failure(repoWith(bad).getSeries('s1'))).toEqual(['desconhecido', 'serie_inconsistente']);
     }
+  });
+
+  it('conta do ano: parcelas por ano mapeadas na série; tipo e parcelas por ano incoerentes são recusados', async () => {
+    expect(await repoWith(annualSeries).getSeries('s1')).toMatchObject({ kind: 'anual', firstDueMonth: '2027-02', lastNumber: 30, partsPerYear: 10 });
+    const bad = [
+      { ...annualSeries, parts_per_year: null },
+      { ...annualSeries, parts_per_year: 0 },
+      { ...annualSeries, parts_per_year: 13 },
+      { ...series, parts_per_year: 1 },
+      { ...series, kind: 'parcelada', nature: 'financiamento', installment_total: 48, parts_per_year: 10 },
+    ];
+    for (const r of bad) expect(await failure(repoWith(r).getSeries('s1'))).toEqual(['desconhecido', 'serie_inconsistente']);
+  });
+
+  it('contas do ano por RPC: parcelas por ano só na conta do ano; informar e tirar mandam só {id, version}', async () => {
+    const calls: [string, Record<string, unknown>][] = [];
+    const db = {
+      rpc: async (fn: string, args: Record<string, unknown>) => {
+        calls.push([fn, args]);
+        return { data: { series: annualSeries, occurrences: [annualOccurrence], changed: 1 }, error: null };
+      },
+    };
+    const repo = new SupabaseRepository(db as unknown as SupabaseClient, { id: 'p1' });
+    const monthlyInput: SeriesInput = {
+      kind: 'mensal',
+      nature: 'conta',
+      description: 'Luz',
+      category: null,
+      amountCents: 18000,
+      amountMode: 'variavel',
+      dueDay: 12,
+      firstDueMonth: '2026-11',
+      firstNumber: 1,
+      installmentTotal: null,
+      partsPerYear: null,
+      lastMonth: null,
+    };
+    const annualInput: SeriesInput = { ...monthlyInput, kind: 'anual', description: 'IPTU', dueDay: 10, firstDueMonth: '2027-02', partsPerYear: 10, lastMonth: '2029-11' };
+    // Uma conta inteira serve de conjunto afetado: o repositório manda só {id, version}.
+    const occurrence = (await repo.createSeries('chave-0003', 'ctx', annualInput)).occurrences[0]!;
+    await repo.createSeries('chave-0004', 'ctx', monthlyInput);
+    const w = await repo.informSeriesYear('chave-0005', 's1', 3, [occurrence], 18990);
+    await repo.skipSeriesYear('chave-0006', 's1', 3, [occurrence]);
+    expect(w).toMatchObject({ series: { id: 's1', partsPerYear: 10 }, occurrences: [{ id: 'c1', series: { partsPerYear: 10 } }], changed: 1 });
+    expect(calls.map(([fn]) => fn)).toEqual(['create_series', 'create_series', 'inform_series_year', 'skip_series_year']);
+    expect(calls[0]![1]).toMatchObject({ p_kind: 'anual', p_first_due_month: '2027-02-01', p_installment_total: null, p_last_month: '2029-11-01', p_parts_per_year: 10 });
+    // Sem parcelas por ano, o pedido é o mesmo do Ciclo A (o banco calcula o mesmo hash).
+    expect(calls[1]![1]).not.toHaveProperty('p_parts_per_year');
+    expect(Object.keys(calls[1]![1])).toHaveLength(13);
+    expect(calls[2]![1]).toEqual({
+      p_idempotency_key: 'chave-0005',
+      p_series_id: 's1',
+      p_number: 3,
+      p_expected_affected: [{ id: 'c1', version: 1 }],
+      p_amount_cents: 18990,
+    });
+    expect(calls[3]![1]).toEqual({ p_idempotency_key: 'chave-0006', p_series_id: 's1', p_number: 3, p_expected_affected: [{ id: 'c1', version: 1 }] });
   });
 });

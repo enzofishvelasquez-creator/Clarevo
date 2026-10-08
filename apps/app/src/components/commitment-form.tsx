@@ -1,4 +1,5 @@
 import {
+  ANNUAL_SERIES_ERROR_TEXT,
   CATEGORIES,
   COMMITMENT_ERROR_TEXT,
   COMMITMENT_FIELD_ORDER,
@@ -6,6 +7,7 @@ import {
   MAX_RECORD_CENTS,
   NO_CATEGORY_LABEL,
   addDays,
+  annualYearLabelOf,
   centsToInput,
   charCount,
   fieldForErrorCode,
@@ -38,7 +40,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
-import { ChoiceGroup } from '@/components/series-parts';
+import { ChoiceGroup, ofSeries, SERIES_NOUN } from '@/components/series-parts';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { useCreateCommitment, useUpdateCommitment } from '@/state/data';
@@ -213,7 +215,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
     }
     // Conta de gasto fixo: o vencimento fica no mês dela (o banco confere de novo).
     if (occurrenceMonth && monthOf(v.input.dueOn) !== occurrenceMonth) {
-      const errs = { dateText: COMMITMENT_ERROR_TEXT.vencimento_fora_do_mes };
+      const errs = { dateText: annualName ? ANNUAL_SERIES_ERROR_TEXT.vencimento_fora_do_mes : COMMITMENT_ERROR_TEXT.vencimento_fora_do_mes };
       setErrors(errs);
       focusFirst(errs);
       return;
@@ -249,7 +251,9 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
           setRetry(false);
           const field = fieldForErrorCode(e.code);
           if (field && COMMITMENT_FIELD_ORDER.includes(field)) {
-            const errs = { [field]: commitmentText(e.code) };
+            const errs = {
+              [field]: e.code === 'vencimento_fora_do_mes' && annualName ? ANNUAL_SERIES_ERROR_TEXT.vencimento_fora_do_mes : commitmentText(e.code),
+            };
             setErrors(errs);
             focusFirst(errs);
             return;
@@ -304,8 +308,8 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
     if (cents !== null && cents > 0 && cents <= MAX_RECORD_CENTS) setDraft((d) => ({ ...d, amountText: centsToInput(cents) }));
   };
 
-  /** "Todo mês" e "Parcelado": abrem o formulário de série com o que já foi digitado (valores válidos, campo a campo). */
-  const toSeries = (tipo: 'mensal' | 'parcelada') => {
+  /** "Todo mês", "Todo ano" e "Parcelado": abrem o formulário de série com o que já foi digitado (valores válidos, campo a campo). */
+  const toSeries = (tipo: 'mensal' | 'anual' | 'parcelada') => {
     const params: Record<string, string> = { tipo };
     const description = draft.description.trim();
     if (description) params.descricao = description;
@@ -326,7 +330,16 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
   const movesFrom = !occurrence && base && dueOn && monthOf(dueOn) !== monthOf(base.dueOn) ? monthOf(base.dueOn) : null;
   const looksLikeInvoice = INVOICE_HINT.test(draft.description);
   const occurrenceWord = occurrence ? monthWord(occurrence.dueOn, today) : '';
-  const seriesNoun = occurrence?.series?.kind === 'parcelada' ? 'parcelamento' : 'gasto fixo';
+  const occurrenceKind = occurrence?.series?.kind ?? 'mensal';
+  const seriesNoun = SERIES_NOUN[occurrenceKind];
+  /** Conta do ano: "a conta de 2027" (cota única) ou "a parcela 3 de 2027". */
+  const annualName = (() => {
+    if (!occurrence?.series || occurrence.series.kind !== 'anual') return null;
+    const label = annualYearLabelOf(occurrence)!;
+    const k = occurrence.series.partsPerYear ?? 1;
+    const part = ((occurrence.series.number - 1) % k) + 1;
+    return k === 1 ? `a conta de ${label}` : `a parcela ${part} de ${label}`;
+  })();
   const tomorrow = addDays(today, 1);
   // Atalhos de vencimento: numa conta de gasto fixo, só os que ficam no mês dela.
   const showToday = !occurrenceMonth || monthOf(today) === occurrenceMonth;
@@ -367,6 +380,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
             <ChoiceGroup label="Com que frequência?">
               <Chip label="Só uma vez" selected onPress={() => {}} />
               <Chip label="Todo mês" selected={false} onPress={() => toSeries('mensal')} />
+              <Chip label="Todo ano" selected={false} onPress={() => toSeries('anual')} />
               <Chip label="Parcelado" selected={false} onPress={() => toSeries('parcelada')} />
             </ChoiceGroup>
           ) : null}
@@ -375,9 +389,13 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
           </Txt>
           {occurrence ? (
             <Txt variant="label" color={colors.textSecondary}>
-              {informValue
-                ? `Informe o valor que veio na conta de ${occurrenceWord}. Ela deixa de ser estimada.`
-                : `Só a conta de ${occurrenceWord}. Ela fica marcada como alterada só neste mês; o ${seriesNoun} continua igual nos outros meses.`}
+              {annualName
+                ? informValue
+                  ? `Informe o valor que veio n${annualName}. Ela deixa de ser estimada.`
+                  : `Só ${annualName}. Ela fica marcada como alterada só nesta conta; a conta do ano continua igual nas outras.`
+                : informValue
+                  ? `Informe o valor que veio na conta de ${occurrenceWord}. Ela deixa de ser estimada.`
+                  : `Só a conta de ${occurrenceWord}. Ela fica marcada como alterada só neste mês; o ${seriesNoun} continua igual nos outros meses.`}
             </Txt>
           ) : null}
 
@@ -422,7 +440,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
               informValue
                 ? `A estimativa era ${formatBRL(occurrence?.amountCents ?? 0)}.`
                 : occurrence?.amountIsEstimate
-                  ? `Valor estimado pela referência do ${seriesNoun}. Para tirar a marca de estimado, use Informar o valor da conta.`
+                  ? `Valor estimado pela referência ${ofSeries(occurrenceKind)}. Para tirar a marca de estimado, use Informar o valor da conta.`
                   : 'Valor previsto. Ao marcar como paga, você informa o valor que saiu da conta.'
             }
           />
@@ -440,7 +458,9 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
               error={errors.dateText}
               hint={
                 occurrence
-                  ? `O vencimento fica em ${occurrenceWord}. Para mudar o dia de todos os meses, edite o ${seriesNoun}.`
+                  ? annualName
+                    ? `O vencimento fica em ${occurrenceWord}. Para mudar o dia de todos os anos, edite a conta do ano.`
+                    : `O vencimento fica em ${occurrenceWord}. Para mudar o dia de todos os meses, edite o ${seriesNoun}.`
                   : 'Digite só os números.'
               }
             />

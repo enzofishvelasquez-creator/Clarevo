@@ -10,9 +10,12 @@ import { Button, Card, Txt } from '@/components/ui';
 import { useSeries, useSeriesOccurrences, useSeriesOpenOccurrences, useSpace } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
-/** Encerrar ou retomar o gasto fixo (e "Quitei o restante nesta parcela" no parcelamento). */
+/**
+ * Encerrar ou retomar o gasto fixo (e "Quitei o restante nesta parcela" no parcelamento).
+ * ?depois=nova (conta do ano, "Mudar a forma de pagamento"): depois de encerrar, abre o cadastro da nova conta do ano.
+ */
 export default function EncerrarGastoFixo() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, depois } = useLocalSearchParams<{ id: string; depois?: string }>();
   const personal = useSpace().data;
   const ctx = personal?.personalContextId;
   const series = useSeries(id, ctx);
@@ -23,7 +26,7 @@ export default function EncerrarGastoFixo() {
   const [opened, setOpened] = useState<CommitmentSeries | null>(null);
   if (!opened && series.data && occ.data && openOcc.data) setOpened(series.data);
 
-  if (opened && personal) return <SeriesEndForm key={opened.id} series={opened} space={personal} />;
+  if (opened && personal) return <SeriesEndForm key={opened.id} series={opened} space={personal} thenNew={depois === 'nova'} />;
   if (series.isPending || occ.isPending || openOcc.isPending || !personal) return <LoadingState />;
   if (series.isError || occ.isError || openOcc.isError) {
     return (

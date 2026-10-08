@@ -1,10 +1,39 @@
-import { formatBRL, formatMonthName, formatMonthYearBR, monthOf, type Cents, type IsoDate, type IsoMonth } from '@clarevo/core';
+import { formatBRL, formatMonthName, formatMonthYearBR, monthOf, type Cents, type IsoDate, type IsoMonth, type SeriesKind } from '@clarevo/core';
 import { Check } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { spaceKeyPress, Txt } from '@/components/ui';
 import { colors, fonts, radius, space } from '@/theme/tokens';
+
+/** Nome da série sem artigo: "gasto fixo", "parcelamento", "conta do ano". */
+export const SERIES_NOUN: Record<SeriesKind, string> = { mensal: 'gasto fixo', parcelada: 'parcelamento', anual: 'conta do ano' };
+
+/** Com preposição e artigo: "do gasto fixo", "do parcelamento", "da conta do ano". */
+export const ofSeries = (kind: SeriesKind) => (kind === 'anual' ? 'da conta do ano' : `do ${SERIES_NOUN[kind]}`);
+
+/** "pelo gasto fixo", "pelo parcelamento", "pela conta do ano". */
+export const bySeries = (kind: SeriesKind) => (kind === 'anual' ? 'pela conta do ano' : `pelo ${SERIES_NOUN[kind]}`);
+
+/** Chips de mês da conta do ano: rótulo curto na tela e nome completo no leitor de tela. */
+export const MONTH_SHORT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'] as const;
+export const MONTH_FULL = [
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
+] as const;
+
+/** "2026/2027" lido como "2026 a 2027". */
+export const yearA11y = (label: string) => label.replace('/', ' a ');
 
 /** "outubro" → "Outubro". */
 export const cap = (text: string) => (text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : text);
@@ -110,6 +139,8 @@ export function InstallmentBar({ paid, total }: { paid: number; total: number })
 
 export const seriesStyles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
+  /** Grade de meses: 4 por linha; abaixo de cerca de 300 px de largura útil, 3 por linha (nenhum rótulo cortado). */
+  monthChip: { flexBasis: '22%', flexGrow: 1, minWidth: 64 },
   inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
   footer: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space[3], paddingHorizontal: space[5] },
   footerInner: { width: '100%', maxWidth: 560, alignSelf: 'center', gap: space[3] },

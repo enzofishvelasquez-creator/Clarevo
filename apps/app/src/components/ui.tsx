@@ -294,19 +294,43 @@ export function spaceKeyPress(onPress: () => void): object {
   };
 }
 
-export function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+/**
+ * Chip de escolha (rádio). accessibilityLabel: nome completo quando o rótulo é abreviado ("Jan" → "Janeiro").
+ * compact: menos espaço lateral, para grades (meses); style: largura do chip na grade.
+ */
+export function Chip({
+  label,
+  selected,
+  onPress,
+  accessibilityLabel,
+  compact,
+  style,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+  accessibilityLabel?: string;
+  compact?: boolean;
+  style?: StyleProp<ViewStyle>;
+}) {
   const press = usePressScale();
   return (
-    <Animated.View style={[press.style, styles.chipWrap]}>
+    <Animated.View style={[press.style, styles.chipWrap, style]}>
       <Pressable
         accessibilityRole="radio"
         accessibilityState={{ checked: selected }}
         aria-checked={selected}
+        accessibilityLabel={accessibilityLabel}
         onPress={onPress}
         {...spaceKeyPress(onPress)}
         onPressIn={press.onPressIn}
         onPressOut={press.onPressOut}
-        style={(s) => [styles.chip, selected && styles.chipSelected, (s as { focused?: boolean }).focused && styles.focusRing]}>
+        style={(s) => [
+          styles.chip,
+          compact && styles.chipCompact,
+          selected && styles.chipSelected,
+          (s as { focused?: boolean }).focused && styles.focusRing,
+        ]}>
         {selected ? <Check size={16} color={colors.brand} strokeWidth={2.5} style={{ flexShrink: 0 }} /> : null}
         <Txt variant="label" color={selected ? colors.brand : colors.text} style={{ flexShrink: 1 }}>
           {label}
@@ -444,6 +468,7 @@ export const styles = StyleSheet.create({
     borderColor: colors.borderStrong,
     backgroundColor: colors.surface,
   },
+  chipCompact: { paddingHorizontal: space[2] },
   chipSelected: { borderColor: colors.brand, backgroundColor: colors.brandTint },
   banner: { flexDirection: 'row', gap: space[3], padding: space[4], borderRadius: radius.md, alignItems: 'flex-start' },
   demo: { backgroundColor: colors.accent, paddingHorizontal: space[2], paddingVertical: 2, borderRadius: radius.pill },

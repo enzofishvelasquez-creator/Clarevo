@@ -1,4 +1,5 @@
 import {
+  ANNUAL_SERIES_ERROR_TEXT,
   CATEGORIES,
   DESCRIPTION_MAX,
   INSTALLMENT_NATURES,
@@ -6,20 +7,25 @@ import {
   NO_CATEGORY_LABEL,
   SERIES_ERROR_TEXT,
   SERIES_NATURE_LABEL,
+  addMonths,
   affectedByEditFrom,
+  annualYearOf,
   centsToInput,
   charCount,
   currentTerm,
   fieldForErrorCode,
+  formatDateBR,
   formatDayMonth,
   formatMonthInputBR,
   formatMonthName,
   formatMonthYearBR,
   isRepoError,
+  lastNumberFromEndYear,
   maskMonthBR,
   mergeOccurrences,
   monthOf,
   monthsBetween,
+  numberAtOrAfter,
   numberOfMonth,
   parseBRL,
   parseMonthBR,
@@ -66,7 +72,7 @@ interface EditDraft {
 type EditField = Extract<SeriesField, 'description' | 'nature' | 'amountText' | 'dueDayText'>;
 const EDIT_FIELD_ORDER: EditField[] = ['description', 'nature', 'amountText', 'dueDayText'];
 
-/** "Aplicar a partir de": um número da série ou "Outro mês" (campo MM/AAAA). */
+/** "Aplicar a partir de": um número da série ou "Outro mês" (campo MM/AAAA; na conta do ano, "Outro ano", AAAA). */
 type FromPick = number | 'outro';
 
 /** Confirmação aberta: o conjunto afetado e a versão que a pessoa viu. */
@@ -77,18 +83,24 @@ interface Pending {
   input: SeriesEditInput;
 }
 
+/** Textos de erro do tipo da série (a conta do ano tem variantes próprias). */
+const textsFor = (kind: CommitmentSeries['kind']): Record<keyof typeof SERIES_ERROR_TEXT, string> =>
+  kind === 'anual' ? ANNUAL_SERIES_ERROR_TEXT : SERIES_ERROR_TEXT;
+
 /** Mesma ordem do banco (clarevo_validate_series_term, depois natureza_invalida); um texto por campo. */
 function validateEdit(d: EditDraft, kind: CommitmentSeries['kind']): { ok: true; input: SeriesEditInput } | { ok: false; errors: SeriesFieldErrors } {
+  const texts = textsFor(kind);
   const errors: SeriesFieldErrors = {};
   const amount = parseBRL(d.amountText);
-  if (amount === null || amount <= 0) errors.amountText = SERIES_ERROR_TEXT.valor_invalido;
-  else if (amount > MAX_RECORD_CENTS) errors.amountText = SERIES_ERROR_TEXT.valor_acima_do_limite;
+  if (amount === null || amount <= 0) errors.amountText = texts.valor_invalido;
+  else if (amount > MAX_RECORD_CENTS) errors.amountText = texts.valor_acima_do_limite;
   const description = d.description.trim();
-  if (description === '') errors.description = SERIES_ERROR_TEXT.descricao_obrigatoria;
-  else if (charCount(description) > DESCRIPTION_MAX) errors.description = SERIES_ERROR_TEXT.descricao_longa;
+  if (description === '') errors.description = texts.descricao_obrigatoria;
+  else if (charCount(description) > DESCRIPTION_MAX) errors.description = texts.descricao_longa;
   const day = /^\s*\d{1,2}\s*$/.test(d.dueDayText) ? Number(d.dueDayText.trim()) : null;
-  if (day === null || day < 1 || day > 31) errors.dueDayText = SERIES_ERROR_TEXT.dia_invalido;
-  if ((kind === 'mensal') !== (d.nature === 'conta')) errors.nature = SERIES_ERROR_TEXT.natureza_invalida;
+  if (day === null || day < 1 || day > 31) errors.dueDayText = texts.dia_invalido;
+  // Gasto fixo e conta do ano são sempre do tipo 'conta'; o parcelamento nunca.
+  if ((kind !== 'parcelada') !== (d.nature === 'conta')) errors.nature = texts.natureza_invalida;
   if (Object.keys(errors).length > 0 || amount === null || day === null) return { ok: false, errors };
   const input: SeriesEditInput = {
     nature: d.nature,
@@ -102,7 +114,7 @@ function validateEdit(d: EditDraft, kind: CommitmentSeries['kind']): { ok: true;
   const code = seriesTermError(input);
   if (code) {
     const field = fieldForErrorCode(code, 'series');
-    return { ok: false, errors: field ? { [field]: SERIES_ERROR_TEXT[code as keyof typeof SERIES_ERROR_TEXT] } : { amountText: SERIES_ERROR_TEXT.salvar_falhou } };
+    return { ok: false, errors: field ? { [field]: texts[code as keyof typeof SERIES_ERROR_TEXT] } : { amountText: texts.salvar_falhou } };
   }
   return { ok: true, input };
 }
@@ -140,22 +152,51 @@ export function SeriesEditForm({
   // Conjunto afetado: todas as em aberto, também as que não cabem na lista de 60 (o banco confere o conjunto inteiro).
   const allOccurrences = mergeOccurrences(occ.data ?? [], openOcc.data ?? []).reverse();
   const parcelada = s.kind === 'parcelada';
-  const noun = parcelada ? 'Parcelamento' : 'Gasto fixo';
+  const anual = s.kind === 'anual';
+  const k = s.partsPerYear ?? 1;
+  const texts = textsFor(s.kind);
+  const noun = parcelada ? 'Parcelamento' : anual ? 'Conta do ano' : 'Gasto fixo';
   const currentMonth = monthOf(today);
-  // Mesmo limite do banco para séries sem término: até 12 meses depois do mês atual.
-  const maxNumber = s.lastNumber ?? s.firstNumber + monthsBetween(s.firstDueMonth, currentMonth) + 12;
+  // Mesmo limite do banco para séries sem término: até 12 meses depois do mês atual (conta do ano: até a última parcela
+  // do ano que começa até 12 meses depois do mês atual).
+  const maxNumber =
+    s.lastNumber ??
+    (anual
+      ? (Math.floor(Math.max(0, monthsBetween(seriesMonthOf(s, 1), addMonths(currentMonth, 12))) / 12) + 1) * k
+      : s.firstNumber + monthsBetween(s.firstDueMonth, currentMonth) + 12);
 
-  // Chips: as contas em aberto e até 6 meses depois da última conta criada.
+  /** Conta do ano: "2027" (cota única) ou "Parcela 3 de 2027". */
+  const annualName = (n: number) => {
+    const y = annualYearOf(s, n);
+    return k === 1 ? y.label : `Parcela ${y.part} de ${y.label}`;
+  };
+
+  // Chips: as contas em aberto e até 6 meses depois da última conta criada (conta do ano: a próxima e o início dos dois
+  // anos seguintes).
   const choices = useMemo(() => {
     const open = occurrences.filter((c) => c.status === 'aberto');
     const maxLive = Math.max(s.firstNumber - 1, ...occurrences.map((c) => c.series!.number));
-    const start = Math.max(maxLive + 1, numberOfMonth(s, currentMonth), s.firstNumber);
+    const start = Math.max(maxLive + 1, numberAtOrAfter(s, currentMonth), s.firstNumber);
     const future: number[] = [];
-    for (let n = start; n <= Math.min(maxNumber, start + 5); n++) if (!s.skippedNumbers.includes(n)) future.push(n);
-    const dueLabel = (c: Commitment) => (c.dueOn < today ? `venceu em ${formatDayMonth(c.dueOn)}` : `vence em ${formatDayMonth(c.dueOn)}`);
+    if (anual) {
+      const candidates = [start];
+      for (let i = 1; i <= 2; i++) candidates.push((Math.floor((start - 1) / k) + i) * k + 1);
+      for (const n of candidates) if (n <= maxNumber && !s.skippedNumbers.includes(n) && !future.includes(n)) future.push(n);
+    } else {
+      for (let n = start; n <= Math.min(maxNumber, start + 5); n++) if (!s.skippedNumbers.includes(n)) future.push(n);
+    }
+    const dueLabel = (c: Commitment, withYear: boolean) => {
+      const date = withYear ? formatDateBR(c.dueOn) : formatDayMonth(c.dueOn);
+      return c.dueOn < today ? `venceu em ${date}` : `vence em ${date}`;
+    };
     return [
-      ...open.map((c) => ({ n: c.series!.number, label: `${monthChipLabel(monthOf(c.dueOn), today)} (${dueLabel(c)})` })),
-      ...future.map((n) => ({ n, label: monthChipLabel(seriesMonthOf(s, n), today) })),
+      ...open.map((c) => ({
+        n: c.series!.number,
+        label: anual
+          ? `${annualName(c.series!.number)} (${dueLabel(c, k === 1)})`
+          : `${monthChipLabel(monthOf(c.dueOn), today)} (${dueLabel(c, false)})`,
+      })),
+      ...future.map((n) => ({ n, label: anual ? annualName(n) : monthChipLabel(seriesMonthOf(s, n), today) })),
     ];
   }, [occ.data, live.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -172,7 +213,12 @@ export function SeriesEditForm({
       category: term.category,
     };
     const pick: FromPick = k0 === null ? 'outro' : choices.some((c) => c.n === k0) ? k0 : 'outro';
-    const otherText = pick === 'outro' && k0 !== null ? formatMonthInputBR(seriesMonthOf(opened, k0)) : '';
+    const otherText =
+      pick === 'outro' && k0 !== null
+        ? anual
+          ? annualYearOf(opened, k0).firstMonth.slice(0, 4)
+          : formatMonthInputBR(seriesMonthOf(opened, k0))
+        : '';
     return { draft, pick, otherText };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -219,19 +265,34 @@ export function SeriesEditForm({
     if (first && first !== 'nature') refs[first].current?.focus();
   };
 
-  /** Mês do número, com o ano quando não é o de hoje: "novembro", "janeiro de 2027". */
-  const monthName = (k: number) => {
-    const m = seriesMonthOf(s, k);
-    return m.slice(0, 4) === today.slice(0, 4) ? formatMonthName(m) : formatMonthYearBR(m);
+  /**
+   * Onde a alteração começa, no texto: "a partir de novembro", "a partir de janeiro de 2027"; conta do ano: "a partir
+   * de 2028" ou "a partir da parcela 3 de 2027".
+   */
+  const fromText = (n: number) => {
+    if (anual) {
+      const y = annualYearOf(s, n);
+      return k === 1 || y.part === 1 || n === s.firstNumber ? `a partir de ${y.label}` : `a partir da parcela ${y.part} de ${y.label}`;
+    }
+    const m = seriesMonthOf(s, n);
+    return `a partir de ${m.slice(0, 4) === today.slice(0, 4) ? formatMonthName(m) : formatMonthYearBR(m)}`;
   };
 
   /** Número escolhido em "Aplicar a partir de", ou null com o erro do campo. */
   const chosenNumber = (): number | null => {
     if (pick !== 'outro') return pick;
-    const m = parseMonthBR(otherText);
-    const n = m === null ? null : numberOfMonth(s, m);
+    let n: number | null = null;
+    if (anual) {
+      // "Outro ano": a partir da 1ª parcela daquele ano (no primeiro ano, da primeira parcela da série).
+      const text = otherText.trim();
+      if (/^\d{4}$/.test(text)) n = Math.max(s.firstNumber, lastNumberFromEndYear(s, Number(text)) - k + 1);
+      if (n !== null && annualYearOf(s, n).firstMonth.slice(0, 4) !== text) n = null;
+    } else {
+      const m = parseMonthBR(otherText);
+      n = m === null ? null : numberOfMonth(s, m);
+    }
     if (n === null || n < s.firstNumber || n > maxNumber) {
-      setFromError(SERIES_ERROR_TEXT.numero_fora_da_serie);
+      setFromError(texts.numero_fora_da_serie);
       otherRef.current?.focus();
       return null;
     }
@@ -242,7 +303,7 @@ export function SeriesEditForm({
   const prepare = (series: CommitmentSeries, list: readonly Commitment[], k: number, input: SeriesEditInput) => {
     const plan = affectedByEditFrom(list, series, k);
     if (!plan.ok) {
-      setFromError(SERIES_ERROR_TEXT.inicio_em_conta_paga);
+      setFromError(texts.inicio_em_conta_paga);
       return;
     }
     setConfirm({ k, plan, version: series.version, input });
@@ -276,7 +337,7 @@ export function SeriesEditForm({
 
   const finish = (k: number) => {
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    flash.set(`${noun} atualizado a partir de ${monthName(k)}.`);
+    flash.set(`${noun} ${anual ? 'atualizada' : 'atualizado'} ${fromText(k)}.`);
     leave(goBack);
   };
 
@@ -303,12 +364,12 @@ export function SeriesEditForm({
           setRetry(false);
           if (!fresh) {
             setConfirm(null);
-            setBanner(SERIES_ERROR_TEXT.nao_encontrado);
+            setBanner(texts.nao_encontrado);
             return;
           }
           const again = affectedByEditFrom(fresh.list, fresh.series, k);
           setConfirm(again.ok ? { k, plan: again, version: fresh.series.version, input } : null);
-          if (!again.ok) setFromError(SERIES_ERROR_TEXT.inicio_em_conta_paga);
+          if (!again.ok) setFromError(texts.inicio_em_conta_paga);
           return;
         }
       }
@@ -326,18 +387,18 @@ export function SeriesEditForm({
           setRetry(false);
           const field = fieldForErrorCode(e.code, 'series');
           if (field && (EDIT_FIELD_ORDER as SeriesField[]).includes(field)) {
-            const errs = { [field]: seriesErrorText(e.code, today) };
+            const errs = { [field]: seriesErrorText(e.code, today, s.kind) };
             setErrors(errs);
             focusFirst(errs);
             return;
           }
           if (e.code === 'inicio_em_conta_paga' || e.code === 'numero_fora_da_serie') {
-            setFromError(seriesErrorText(e.code, today));
+            setFromError(seriesErrorText(e.code, today, s.kind));
             await reload().catch(() => null);
             return;
           }
           if (e.code === 'versao_desatualizada') await reload().catch(() => null);
-          setBanner(seriesErrorText(e.code, today));
+          setBanner(seriesErrorText(e.code, today, s.kind));
           return;
         }
         // Falha de rede: a alteração pode ou não ter sido gravada. Guardar a tentativa para reconciliar.
@@ -348,7 +409,7 @@ export function SeriesEditForm({
     } catch (e) {
       setConfirm(null);
       setRetry(true);
-      setBanner(isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido' ? seriesErrorText(e.code, today) : SERIES_ERROR_TEXT.salvar_falhou);
+      setBanner(isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido' ? seriesErrorText(e.code, today, s.kind) : SERIES_ERROR_TEXT.salvar_falhou);
     } finally {
       setBusy(false);
     }
@@ -370,13 +431,15 @@ export function SeriesEditForm({
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <SubHeader
-        title={parcelada ? 'Editar parcelamento' : 'Editar gasto fixo'}
+        title={parcelada ? 'Editar parcelamento' : anual ? 'Editar conta do ano' : 'Editar gasto fixo'}
         onBack={requestCancel}
         right={<ContextPill label="Salvando em Pessoal" />}
       />
       <Screen contentStyle={{ padding: space[5], gap: space[4], paddingBottom: space[6] }}>
         <Txt color={colors.textSecondary}>
-          As alterações valem a partir do mês escolhido. Contas pagas e contas alteradas só no mês delas não mudam.
+          {anual
+            ? 'As alterações valem a partir da conta escolhida. Contas pagas e contas cujo valor você informou ou alterou só naquele ano não mudam. O mês do vencimento não muda aqui.'
+            : 'As alterações valem a partir do mês escolhido. Contas pagas e contas alteradas só no mês delas não mudam.'}
         </Txt>
         <Card style={{ gap: space[4] }}>
           <View style={{ gap: space[2] }}>
@@ -393,7 +456,7 @@ export function SeriesEditForm({
                 />
               ))}
               <Chip
-                label="Outro mês"
+                label={anual ? 'Outro ano' : 'Outro mês'}
                 selected={pick === 'outro'}
                 onPress={() => {
                   setPick('outro');
@@ -404,18 +467,18 @@ export function SeriesEditForm({
             {pick === 'outro' ? (
               <TextField
                 ref={otherRef}
-                label="Mês (MM/AAAA)"
+                label={anual ? 'Ano (AAAA)' : 'Mês (MM/AAAA)'}
                 value={otherText}
                 onChangeText={(t) => {
-                  setOtherText(maskMonthBR(t));
+                  setOtherText(anual ? t.replace(/\D/g, '').slice(0, 4) : maskMonthBR(t));
                   setFromError(null);
                 }}
-                placeholder="MM/AAAA"
+                placeholder={anual ? 'AAAA' : 'MM/AAAA'}
                 keyboardType="number-pad"
                 inputMode="numeric"
-                maxLength={7}
+                maxLength={anual ? 4 : 7}
                 error={fromError ?? undefined}
-                hint="Por exemplo, um reajuste a partir de janeiro."
+                hint={anual ? 'A alteração vale a partir da primeira parcela desse ano.' : 'Por exemplo, um reajuste a partir de janeiro.'}
               />
             ) : null}
           </View>
@@ -440,18 +503,35 @@ export function SeriesEditForm({
             </ChoiceGroup>
           ) : null}
 
-          <ChoiceGroup label={parcelada ? 'A parcela muda de um mês para outro?' : 'O valor muda de um mês para outro?'}>
-            <Chip label={parcelada ? 'Parcela igual todo mês' : 'Não, é sempre o mesmo'} selected={!variable} onPress={() => set('amountMode', 'fixo')} />
-            <Chip
-              label={parcelada ? 'Parcela muda (financiamento corrigido)' : 'Sim, muda (como luz e água)'}
-              selected={variable}
-              onPress={() => set('amountMode', 'variavel')}
-            />
-          </ChoiceGroup>
+          {anual ? (
+            <ChoiceGroup label="O valor muda de um ano para outro?">
+              <Chip label="Sim, muda todo ano (como IPVA e IPTU)" selected={variable} onPress={() => set('amountMode', 'variavel')} />
+              <Chip label="Não, é sempre o mesmo" selected={!variable} onPress={() => set('amountMode', 'fixo')} />
+            </ChoiceGroup>
+          ) : (
+            <ChoiceGroup label={parcelada ? 'A parcela muda de um mês para outro?' : 'O valor muda de um mês para outro?'}>
+              <Chip label={parcelada ? 'Parcela igual todo mês' : 'Não, é sempre o mesmo'} selected={!variable} onPress={() => set('amountMode', 'fixo')} />
+              <Chip
+                label={parcelada ? 'Parcela muda (financiamento corrigido)' : 'Sim, muda (como luz e água)'}
+                selected={variable}
+                onPress={() => set('amountMode', 'variavel')}
+              />
+            </ChoiceGroup>
+          )}
 
           <TextField
             ref={refs.amountText}
-            label={variable ? 'Valor de referência' : parcelada ? 'Valor da parcela' : 'Valor por mês'}
+            label={
+              variable
+                ? 'Valor de referência'
+                : parcelada
+                  ? 'Valor da parcela'
+                  : anual
+                    ? k === 1
+                      ? 'Valor da conta'
+                      : 'Valor de cada parcela'
+                    : 'Valor por mês'
+            }
             prefix="R$"
             value={draft.amountText}
             onChangeText={(t) => set('amountText', t)}
@@ -461,7 +541,13 @@ export function SeriesEditForm({
             inputMode="decimal"
             large
             error={errors.amountText}
-            hint={variable ? 'Use o valor de uma conta recente. Ele aparece como estimado até você informar o valor de cada conta.' : undefined}
+            hint={
+              variable
+                ? anual
+                  ? 'Use o valor do último ano. Ele aparece como estimado até você informar o valor do ano.'
+                  : 'Use o valor de uma conta recente. Ele aparece como estimado até você informar o valor de cada conta.'
+                : undefined
+            }
           />
 
           <TextField
@@ -503,7 +589,7 @@ export function SeriesEditForm({
 
       <ConfirmDialog
         visible={Boolean(confirm)}
-        title={confirm ? `Aplicar a partir de ${monthName(confirm.k)}?` : ''}
+        title={confirm ? `Aplicar ${fromText(confirm.k)}?` : ''}
         cancelLabel="Voltar"
         confirmLabel="Aplicar"
         confirmTone="brand"
