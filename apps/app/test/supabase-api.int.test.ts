@@ -11,6 +11,7 @@ import {
   affectedByDelete,
   affectedByEditFrom,
   affectedByEnd,
+  mergeOccurrences,
   missingMonths,
   monthOf,
   monthRange,
@@ -1064,6 +1065,27 @@ describe('API real: gastos fixos e parcelamentos', () => {
     expect(mar.overdueCount).toBeGreaterThan(0);
     expect(mar.estimatedCents).toBe(4 * 21000);
     await toPay('2027-04', MAR);
+  });
+
+  it('12. listOpenSeriesOccurrences: todas as em aberto, por número crescente, com o mesmo conversor da visão', async () => {
+    const anaMar = repoFor(ANA, MAR);
+    // Escola: 2 excluída só esta. Carro: 17 sem conta registrada. Luz: 1 paga, 4 sem conta registrada.
+    const cases: [CommitmentSeries, number[]][] = [
+      [escola, [1, 3]],
+      [carro, [14, 15, 16, 18, 19, 20]],
+      [luz, [2, 3, 5, 6, 7]],
+    ];
+    for (const [s, numbers] of cases) {
+      const capped = await anaMar.listSeriesOccurrences(s.id);
+      const open = await anaMar.listOpenSeriesOccurrences(s.id);
+      expect(open.map((c) => c.series!.number)).toEqual(numbers);
+      expect(open).toEqual(capped.filter((c) => c.status === 'aberto').reverse());
+      for (const c of open) expect(await anaMar.getCommitment(c.id)).toEqual(c);
+      expect((await anaMar.getSeries(s.id))!.openCount).toBe(open.length);
+      expect(mergeOccurrences(capped, open)).toEqual(capped);
+    }
+    expect(await bruno.listOpenSeriesOccurrences(carro.id)).toEqual([]);
+    expect(await anaMar.listOpenSeriesOccurrences(randomUUID())).toEqual([]);
   });
 });
 

@@ -21,6 +21,7 @@ import {
   installmentProgress,
   lastNumberFromEndMonth,
   maskMonthBR,
+  mergeOccurrences,
   missingMonths,
   monthsBetween,
   newOperationKey,
@@ -32,6 +33,7 @@ import {
   projectSeries,
   roundDiv,
   seriesCaption,
+  seriesCountsTowardLimit,
   seriesDueOn,
   seriesEnded,
   seriesErrorText,
@@ -350,7 +352,7 @@ describe('gastos fixos: regras puras', () => {
 
   it('installmentProgress e missingMonths: 12 antes, faltam 36, soma R$ 30.600,00, última 10/10/2029', () => {
     const s = carro();
-    expect(installmentProgress(s, [occ(s, 13)], DEMO_TODAY)).toEqual({
+    expect(installmentProgress(s, [occ(s, 13)], [occ(s, 13)], DEMO_TODAY)).toEqual({
       total: 48,
       paidBefore: 12,
       paidInApp: 0,
@@ -365,13 +367,14 @@ describe('gastos fixos: regras puras', () => {
     const later = { ...s, skippedNumbers: [14] };
     const list = [paidOcc(s, 13, 85000, '2026-11-10'), occ(s, 16), occ(s, 17), occ(s, 18)];
     expect(missingMonths(later, list, '2027-03-15')).toEqual([{ number: 15, month: '2027-01' }]);
-    expect(installmentProgress(later, list, '2027-03-15')).toMatchObject({ paidInApp: 1, remaining: 33, remainingCents: 33 * 85000 });
+    const open = list.filter((c) => c.status === 'aberto');
+    expect(installmentProgress(later, list, open, '2027-03-15')).toMatchObject({ paidInApp: 1, remaining: 33, remainingCents: 33 * 85000 });
 
     // Parcela que muda: a soma é aproximada.
     const variable = carro({ terms: [term(13, { amountCents: 85000, amountMode: 'variavel', dueDay: 10 })] });
-    expect(installmentProgress(variable, [], DEMO_TODAY).approximate).toBe(true);
+    expect(installmentProgress(variable, [], [], DEMO_TODAY).approximate).toBe(true);
     // Gasto fixo sem término: sem contagem.
-    expect(installmentProgress(series(), [], DEMO_TODAY)).toMatchObject({ total: null, paidBefore: 0, remaining: null, remainingCents: null });
+    expect(installmentProgress(series(), [], [], DEMO_TODAY)).toMatchObject({ total: null, paidBefore: 0, remaining: null, remainingCents: null });
   });
 
   describe('seriesPreview', () => {
@@ -1194,7 +1197,191 @@ describe('gastos fixos: MemoryRepository', () => {
     // A lista cortada não vira "sem conta registrada": os números antes da 7ª são desconhecidos, não ausentes.
     expect(missingMonths(full, list, '2032-01-01')).toEqual([]);
     expect(missingMonths({ ...full, openCount: 0 }, list, '2032-01-01').map((m) => m.number)).toEqual([1, 2, 3, 4, 5, 6]);
-    expect(installmentProgress({ ...full, paidCount: 3 }, list, '2032-01-01').paidInApp).toBe(3);
+    expect(installmentProgress({ ...full, paidCount: 3 }, list, await repo.listOpenSeriesOccurrences(s.id), '2032-01-01').paidInApp).toBe(3);
+  });
+
+  it('mergeOccurrences: sem repetir conta, fica a de maior versão, por número decrescente', () => {
+    const s = series();
+    const old = occ(s, 2);
+    const newer = occ(s, 2, { version: 3, amountCents: 1 });
+    expect(mergeOccurrences([occ(s, 3), old], [occ(s, 1), newer, occ(s, 3)])).toEqual([occ(s, 3), newer, occ(s, 1)]);
+    expect(mergeOccurrences([newer], [old])).toEqual([newer]);
+    expect(mergeOccurrences()).toEqual([]);
+  });
+
+  it('mais de 60 contas em aberto: com listOpenSeriesOccurrences, o conjunto afetado é o que a escrita confere', async () => {
+    const { repo, ctx, mensal, edit, setToday } = await freshRepo('2026-09-01');
+    const inputs = ['Aluguel', 'Escola', 'Academia'].map((d) => mensal(d, 100000, 5, '2026-09', null));
+    const ids: string[] = [];
+    for (const input of inputs) ids.push((await repo.createSeries(newOperationKey(), ctx, input)).series.id);
+    for (let i = 1; i <= 64; i++) {
+      setToday(`${addMonths('2026-09', i)}-01`);
+      await repo.syncSeriesOccurrences(ctx);
+    }
+    const lists = async (id: string) => {
+      const capped = await repo.listSeriesOccurrences(id);
+      const open = await repo.listOpenSeriesOccurrences(id);
+      return { s: (await repo.getSeries(id))!, capped, open, all: mergeOccurrences(capped, open) };
+    };
+    const [a, b, c] = [await lists(ids[0]!), await lists(ids[1]!), await lists(ids[2]!)];
+    // Todas as 66 em aberto, por número crescente, sem limite; a lista do histórico continua com 60.
+    expect(a.s.openCount).toBe(66);
+    expect(a.capped).toHaveLength(60);
+    expect(seriesNumbers(a.open)).toEqual(Array.from({ length: 66 }, (_, i) => i + 1));
+    expect(a.open.every((o) => o.status === 'aberto')).toBe(true);
+    expect(seriesNumbers(a.all)).toEqual(Array.from({ length: 66 }, (_, i) => 66 - i));
+    expect(await repo.listOpenSeriesOccurrences('serie-inexistente')).toEqual([]);
+
+    // "Esta e as próximas" a partir da 2: a lista cortada vê 60 contas; o banco confere 65.
+    const newTerm = edit(inputs[0]!, { amountCents: 110000 });
+    const editCapped = affectedByEditFrom(a.capped, a.s, 2);
+    const editAll = affectedByEditFrom(a.all, a.s, 2);
+    if (!editCapped.ok || !editAll.ok) throw new Error('esperava ok');
+    expect([editCapped.affected.length, editAll.affected.length]).toEqual([60, 65]);
+    await expect(repo.updateSeriesFrom(newOperationKey(), a.s.id, a.s.version, 2, editCapped.affected, newTerm)).rejects.toMatchObject({
+      code: 'versao_desatualizada',
+    });
+    const edited = await repo.updateSeriesFrom(newOperationKey(), a.s.id, a.s.version, 2, editAll.affected, newTerm);
+    expect(edited.changed).toBe(65);
+    expect(edited.occurrences.filter((o) => o.amountCents === 110000).map((o) => o.series!.number)).toEqual(
+      Array.from({ length: 65 }, (_, i) => i + 2),
+    );
+
+    // Encerrar com a última conta em novembro de 2026 (3): saem 63, não 60.
+    const endCapped = affectedByEnd(b.capped, b.s, 3);
+    const endAll = affectedByEnd(b.all, b.s, 3);
+    if (!endCapped.ok || !endAll.ok) throw new Error('esperava ok');
+    expect([endCapped.removed.length, endAll.removed.length]).toEqual([60, 63]);
+    expect(endAll.text).toBe('63 contas em aberto depois de novembro vão sair da lista. As contas pagas continuam no histórico.');
+    await expect(repo.endSeries(newOperationKey(), b.s.id, b.s.version, 3, endCapped.affected)).rejects.toMatchObject({
+      code: 'versao_desatualizada',
+    });
+    const ended = await repo.endSeries(newOperationKey(), b.s.id, b.s.version, 3, endAll.affected);
+    expect([ended.changed, seriesNumbers(ended.occurrences)]).toEqual([63, [1, 2, 3]]);
+
+    // Excluir: saem as 66.
+    const delCapped = affectedByDelete(c.capped, c.s);
+    const delAll = affectedByDelete(c.all, c.s);
+    if (!delCapped.ok || !delAll.ok) throw new Error('esperava ok');
+    expect([delCapped.removed.length, delAll.removed.length]).toEqual([60, 66]);
+    await expect(repo.deleteSeries(newOperationKey(), c.s.id, c.s.version, delCapped.affected)).rejects.toMatchObject({
+      code: 'versao_desatualizada',
+    });
+    const deleted = await repo.deleteSeries(newOperationKey(), c.s.id, c.s.version, delAll.affected);
+    expect(deleted.changed).toBe(66);
+    expect(await repo.listOpenSeriesOccurrences(c.s.id)).toEqual([]);
+    repo.checkInvariants();
+  });
+
+  it('parcelamento com mais de 60 contas vivas e uma parcela antiga em aberto: "Faltam" e a soma contam essa parcela', async () => {
+    const { repo, ctx, payment, setToday } = await freshRepo('2026-09-01');
+    const input: SeriesInput = {
+      kind: 'parcelada',
+      nature: 'financiamento',
+      description: 'Financiamento da casa',
+      category: 'Moradia',
+      amountCents: 100000,
+      amountMode: 'fixo',
+      dueDay: 5,
+      firstDueMonth: '2026-09',
+      firstNumber: 1,
+      installmentTotal: 360,
+      lastMonth: null,
+    };
+    const { series: created } = await repo.createSeries(newOperationKey(), ctx, input);
+    const pay = async (n: number, paidOn: string) => {
+      const c = (await repo.listOpenSeriesOccurrences(created.id)).find((o) => o.series!.number === n)!;
+      await repo.payCommitment(newOperationKey(), c.id, c.version, payment(100000, paidOn));
+    };
+    // Paga todo mês por 63 meses, menos a parcela 2 (outubro de 2026), que fica em aberto.
+    await pay(1, '2026-09-01');
+    let today = '2026-09-01';
+    for (let i = 1; i <= 62; i++) {
+      today = `${addMonths('2026-09', i)}-01`;
+      setToday(today);
+      await repo.syncSeriesOccurrences(ctx);
+      if (i + 1 !== 2) await pay(i + 1, today);
+    }
+    expect(today).toBe('2031-11-01');
+    const s = (await repo.getSeries(created.id))!;
+    expect([s.paidCount, s.openCount]).toEqual([62, 2]);
+    const capped = await repo.listSeriesOccurrences(s.id);
+    const open = await repo.listOpenSeriesOccurrences(s.id);
+    expect([capped.length, capped[capped.length - 1]!.series!.number]).toEqual([60, 5]);
+    expect(seriesNumbers(open)).toEqual([2, 64]);
+    // As parcelas antes da 5 não são "sem conta registrada": são desconhecidas pela lista cortada.
+    expect(missingMonths(s, capped, today)).toEqual([]);
+
+    // Faltam: a 2 (em aberto, fora das 60 mais recentes), a 64 e as 296 ainda não criadas.
+    expect(installmentProgress(s, capped, open, today)).toEqual({
+      total: 360,
+      paidBefore: 0,
+      paidInApp: 62,
+      remaining: 298,
+      lastDueOn: '2056-08-05',
+      remainingCents: 298 * 100000,
+      approximate: false,
+    });
+
+    // A parcela antiga entra com o valor dela: alterada só neste mês para R$ 1.200,00 e com valor que muda.
+    const old = open[0]!;
+    await repo.updateCommitment(newOperationKey(), old.id, old.version, {
+      description: old.description,
+      amountCents: 120000,
+      dueOn: old.dueOn,
+      category: old.category,
+    });
+    const open2 = await repo.listOpenSeriesOccurrences(s.id);
+    // A lista em aberto mais nova vence a cópia antiga da mesma conta.
+    expect(installmentProgress(s, [...capped, old], open2, today)).toMatchObject({ remaining: 298, remainingCents: 297 * 100000 + 120000 });
+
+    // Paga a 2: sai da soma; nada antes da 5 vira parcela que falta.
+    await pay(2, today);
+    const s2 = (await repo.getSeries(s.id))!;
+    expect(installmentProgress(s2, await repo.listSeriesOccurrences(s.id), await repo.listOpenSeriesOccurrences(s.id), today)).toMatchObject({
+      paidInApp: 63,
+      remaining: 297,
+      remainingCents: 297 * 100000,
+    });
+    repo.checkInvariants();
+  });
+
+  it('retomar um gasto fixo que já não contava respeita o limite de 100 ativos (como end_series)', async () => {
+    const { repo, ctx, mensal, occurrences } = await freshRepo();
+    const today = '2026-10-07';
+    // X desde setembro; "nenhuma conta" (último mês agosto, antes de setembro) faz ele deixar de contar.
+    const { series: x0 } = await repo.createSeries(newOperationKey(), ctx, mensal('X', 1000, 1, '2026-09', null));
+    const stop = affectedByEnd(await occurrences(x0.id), x0, 0);
+    if (!stop.ok) throw new Error(stop.code);
+    const x = (await repo.endSeries(newOperationKey(), x0.id, x0.version, 0, stop.affected)).series;
+    expect(seriesCountsTowardLimit(x, today)).toBe(false);
+    const ids: string[] = [];
+    for (let i = 0; i < 100; i++) ids.push((await repo.createSeries(newOperationKey(), ctx, mensal(`Gasto ${i}`, 1000, 1, '2027-01', null))).series.id);
+
+    // Sem término, até outubro ou até setembro (o mês anterior a hoje): X voltaria a contar. Nada é gravado.
+    for (const last of [null, 2, 1]) {
+      const key = newOperationKey();
+      await expect(repo.endSeries(key, x.id, x.version, last, [])).rejects.toMatchObject({ code: 'limite_de_gastos_fixos' });
+      expect(await repo.findSeriesOperation(key)).toBeNull();
+    }
+    expect(await repo.getSeries(x.id)).toEqual(x);
+    expect(await occurrences(x.id)).toEqual([]);
+    // Continuar sem contar passa.
+    const still = await repo.endSeries(newOperationKey(), x.id, x.version, 0, []);
+    expect(still.series).toMatchObject({ lastNumber: 0, version: x.version + 1 });
+
+    // Quem já conta pode encerrar e retomar no limite.
+    const g = (await repo.getSeries(ids[0]!))!;
+    const ended = await repo.endSeries(newOperationKey(), g.id, g.version, 5, []);
+    expect(seriesCountsTowardLimit(ended.series, today)).toBe(true);
+    expect((await repo.endSeries(newOperationKey(), g.id, ended.series.version, null, [])).series.lastNumber).toBeNull();
+
+    // Excluir um libera a vaga: X volta a repetir e recria setembro a novembro.
+    await repo.deleteSeries(newOperationKey(), ids[1]!, 1, []);
+    const back = await repo.endSeries(newOperationKey(), x.id, still.series.version, null, []);
+    expect([back.series.lastNumber, seriesNumbers(back.occurrences)]).toEqual([null, [1, 2, 3]]);
+    expect((await repo.listSeries(ctx)).filter((s) => seriesCountsTowardLimit(s, today))).toHaveLength(100);
+    repo.checkInvariants();
   });
 
   describe('invariantes S1 a S8', () => {
@@ -1298,7 +1485,8 @@ describe('demonstração do Ciclo A', () => {
     ]);
     expect(seriesMonthlyTotal(list, DEMO_TODAY)).toEqual({ totalCents: 353000, estimatedCents: 18000 });
     const carroDemo = list[2]!;
-    expect(installmentProgress(carroDemo, await repo.listSeriesOccurrences(carroDemo.id), DEMO_TODAY)).toMatchObject({
+    const carroOpen = await repo.listOpenSeriesOccurrences(carroDemo.id);
+    expect(installmentProgress(carroDemo, await repo.listSeriesOccurrences(carroDemo.id), carroOpen, DEMO_TODAY)).toMatchObject({
       paidBefore: 12,
       remaining: 36,
       remainingCents: 3_060_000,

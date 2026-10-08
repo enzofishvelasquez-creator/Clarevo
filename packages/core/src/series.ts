@@ -147,6 +147,23 @@ function liveByNumber(s: Pick<CommitmentSeries, 'id'>, list: readonly Commitment
 }
 
 /**
+ * Junta listas de ocorrências sem repetir conta (por id; fica a de maior versão), por número decrescente, como
+ * listSeriesOccurrences. Uso: listSeriesOccurrences (as 60 mais recentes) + listOpenSeriesOccurrences (todas em aberto),
+ * para affectedByEditFrom, affectedByEnd e affectedByDelete, que precisam de todas as contas em aberto (o banco confere
+ * o conjunto inteiro). missingMonths continua com a lista cortada: knownFrom depende dela.
+ */
+export function mergeOccurrences(...lists: readonly (readonly Commitment[])[]): Commitment[] {
+  const byId = new Map<string, Commitment>();
+  for (const list of lists) {
+    for (const c of list) {
+      const seen = byId.get(c.id);
+      if (!seen || c.version > seen.version) byId.set(c.id, c);
+    }
+  }
+  return [...byId.values()].sort((a, b) => (b.series?.number ?? 0) - (a.series?.number ?? 0) || a.id.localeCompare(b.id));
+}
+
+/**
  * Contas que a geração cria hoje (mesma regra de clarevo_materialize_series): do mês anterior ao seguinte,
  * dentro de [firstNumber, lastNumber], sem as que já existem vivas e sem as excluídas só neste mês.
  * Números anteriores ao piso nunca são criados (ficam como "sem conta registrada").
@@ -244,12 +261,25 @@ export interface InstallmentProgress {
   approximate: boolean;
 }
 
+/**
+ * "Faltam X parcelas" e a soma do que falta.
+ * - occurrences: listSeriesOccurrences (as 60 mais recentes, abertas e pagas);
+ * - open: listOpenSeriesOccurrences (todas as em aberto, sem limite). Sem ela, uma parcela antiga em aberto fora das
+ *   60 mais recentes sumiria da conta.
+ * Número fora das duas listas: até o mês atual, não falta (paga fora da lista cortada, excluída só esta ou sem conta
+ * registrada); depois do mês atual, ainda não criado, entra com a vigência dele. Antes do primeiro número conhecido pela
+ * lista cortada nada é deduzido como ausente: todas as em aberto já vêm em open.
+ */
 export function installmentProgress(
-  s: SeriesRange & Pick<CommitmentSeries, 'id' | 'skippedNumbers' | 'installmentTotal'> & Partial<Pick<CommitmentSeries, 'paidCount'>>,
+  s: SeriesRange &
+    Pick<CommitmentSeries, 'id' | 'skippedNumbers' | 'installmentTotal'> &
+    Partial<Pick<CommitmentSeries, 'paidCount' | 'openCount'>>,
   occurrences: readonly Commitment[],
+  open: readonly Commitment[],
   today: IsoDate,
 ): InstallmentProgress {
-  const live = liveByNumber(s, occurrences);
+  const listed = liveByNumber(s, occurrences);
+  const live = liveByNumber(s, mergeOccurrences(occurrences, open));
   let paidInList = 0;
   for (const c of live.values()) if (c.status === 'quitado') paidInList += 1;
   // A contagem da série vale mesmo quando a lista de ocorrências vem cortada.
@@ -258,6 +288,8 @@ export function installmentProgress(
   if (s.lastNumber === null) return { ...base, remaining: null, lastDueOn: null, remainingCents: null, approximate: false };
   const skipped = new Set(s.skippedNumbers);
   const current = numberOfMonth(s, monthOf(today));
+  // Sem nenhuma conta na lista cortada, nada é conhecido antes: vale o primeiro número.
+  const known = listed.size === 0 ? s.firstNumber : knownFrom(s, listed);
   let remaining = 0;
   let remainingCents = 0;
   let approximate = false;
@@ -268,7 +300,7 @@ export function installmentProgress(
       remaining += 1;
       remainingCents += c.amountCents;
       approximate ||= c.amountIsEstimate;
-    } else if (!skipped.has(n) && n > current) {
+    } else if (!skipped.has(n) && n > current && n >= known) {
       const t = requireTerm(s, n);
       remaining += 1;
       remainingCents += t.amountCents;

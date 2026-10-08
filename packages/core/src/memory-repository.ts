@@ -459,6 +459,17 @@ export class MemoryRepository implements RecordsRepository {
     });
   }
 
+  async listOpenSeriesOccurrences(seriesId: string) {
+    return this.read(() => {
+      const s = this.seriesById.get(seriesId);
+      if (!s || s.deletedAt || !this.canRead(s.contextId)) return [];
+      return this.liveOccurrences(seriesId)
+        .filter((c) => c.status === 'aberto')
+        .sort((a, b) => a.occurrenceNumber! - b.occurrenceNumber!)
+        .map((c) => this.toCommitment(c));
+    });
+  }
+
   async findSeriesOperation(key: string) {
     return this.read(() => {
       const op = this.operations.get(key);
@@ -575,6 +586,14 @@ export class MemoryRepository implements RecordsRepository {
           ? lastNumber === null || (int && lastNumber >= 0 && lastNumber <= 600)
           : int && lastNumber >= s.firstNumber - 1 && lastNumber <= s.installmentTotal!;
       if (!valid) throw new RepoError('fim_invalido');
+      // Retomar um gasto fixo que já não contava faz ele contar de novo: mesmo limite de create_series.
+      const today = this.opts.today();
+      if (seriesCountsTowardLimit({ ...s, lastNumber }, today) && !seriesCountsTowardLimit(s, today)) {
+        const others = [...this.seriesById.values()].filter(
+          (o) => o.id !== s.id && !o.deletedAt && o.contextId === s.contextId && seriesCountsTowardLimit(o, today),
+        );
+        if (others.length >= SERIES_LIMIT) throw new RepoError('limite_de_gastos_fixos');
+      }
       // Primeiro a seleção (trava, no banco), só então a conferência: conta paga depois recusa.
       const plan = affectedByEnd(this.liveOccurrences(s.id).map((c) => this.toCommitment(c)), s, lastNumber);
       if (!plan.ok) throw new RepoError(plan.code);

@@ -87,6 +87,12 @@ export interface RecordsRepository {
   getSeries(id: string): Promise<CommitmentSeries | null>;
   /** Ocorrências vivas da série (abertas e pagas), por número decrescente, até 60. */
   listSeriesOccurrences(seriesId: string): Promise<Commitment[]>;
+  /**
+   * Todas as ocorrências vivas em aberto da série, sem limite, por número crescente. Junto de listSeriesOccurrences
+   * (mergeOccurrences), dá o conjunto completo que o banco confere em update_series_from, end_series e delete_series,
+   * e as parcelas em aberto de installmentProgress.
+   */
+  listOpenSeriesOccurrences(seriesId: string): Promise<Commitment[]>;
   createSeries(key: string, contextId: string, input: SeriesInput): Promise<SeriesWrite>;
   /** "Esta e as próximas" a partir do número fromNumber. changed = contas alteradas. */
   updateSeriesFrom(

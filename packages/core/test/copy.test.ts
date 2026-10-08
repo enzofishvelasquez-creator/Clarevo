@@ -58,7 +58,8 @@ describe('textos do core', () => {
       if (edit.ok) texts.push(edit.text);
       const end = affectedByEnd(occurrences, s, s.firstNumber - 1);
       if (end.ok && end.text) texts.push(end.text);
-      expect(installmentProgress(s, occurrences, DEMO_TODAY).remainingCents ?? 0).toBeGreaterThanOrEqual(0);
+      const open = await repo.listOpenSeriesOccurrences(s.id);
+      expect(installmentProgress(s, occurrences, open, DEMO_TODAY).remainingCents ?? 0).toBeGreaterThanOrEqual(0);
       const term = s.terms[0]!;
       const preview = seriesPreview(
         {

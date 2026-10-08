@@ -588,6 +588,29 @@ export class SupabaseRepository implements RecordsRepository {
     return (data as CommitmentRow[]).map(toCommitment);
   }
 
+  /**
+   * Todas as ocorrências vivas em aberto, por número crescente, sem limite: em páginas, como listCommitments,
+   * porque o banco confere o conjunto inteiro nas escritas de série.
+   */
+  async listOpenSeriesOccurrences(seriesId: string): Promise<Commitment[]> {
+    const PAGE = 500;
+    const rows: CommitmentRow[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await this.db
+        .from('commitment_items')
+        .select('*')
+        .eq('series_id', seriesId)
+        .eq('status', 'aberto')
+        .order('occurrence_number')
+        .order('id')
+        .range(from, from + PAGE - 1);
+      if (error) throw repoError(error);
+      rows.push(...(data as CommitmentRow[]));
+      if (data.length < PAGE) break;
+    }
+    return rows.map(toCommitment);
+  }
+
   /** Funções de série devolvem jsonb {series, occurrences, changed}: sem .single(). */
   private async callSeries(fn: string, args: Record<string, unknown>): Promise<SeriesWrite> {
     const { data, error } = await this.db.rpc(fn, args);

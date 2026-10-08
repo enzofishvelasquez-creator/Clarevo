@@ -711,6 +711,27 @@ select pg_temp.expect_error(format($$update public.commitments set due_on = '202
 select pg_temp.expect_error(format($$update public.commitments set deleted_at = null, deleted_by = null where id = %L; set constraints all immediate$$,
   (select id from public.commitments where series_id = pg_temp.id('luz') and occurrence_number = 2 and deleted_at is not null)),
   '%commitments_one_live_occurrence%');
+-- S5 e S3 também na exclusão física: sem a vigência viva do primeiro número, a geração falharia para o contexto
+-- inteiro; sem a linha do número "excluído só neste mês" (Escola de novembro), a geração o recriaria.
+select pg_temp.expect_error(format($$delete from public.series_terms where series_id = %L and superseded_at is null;
+  set constraints all immediate$$, pg_temp.id('escola')), 'serie_inconsistente');
+select pg_temp.expect_error(format($$delete from public.commitments where id = %L; set constraints all immediate$$, pg_temp.id('escola2')),
+  'serie_inconsistente');
+-- Apagar histórico sem marca continua possível: vigência substituída e conta removida por encerramento.
+do $$
+begin
+  begin
+    delete from public.series_terms where series_id = pg_temp.id('agua') and superseded_at is not null;
+    delete from public.commitments where series_id = pg_temp.id('luz') and occurrence_number = 2 and deleted_at is not null;
+    set constraints all immediate;
+    set constraints all deferred;
+    raise exception 'desfeito';
+  exception when others then
+    if sqlerrm <> 'desfeito' then
+      raise exception 'apagar histórico sem marca deveria passar: %', sqlerrm;
+    end if;
+  end;
+end $$;
 select pg_temp.check_series();
 
 -- 7. "Esta e as próximas": a conta escolhida sempre muda (inclusive alterada só no mês, que perde a marca);
@@ -1114,6 +1135,7 @@ do $$
 declare
   ctx uuid := pg_temp.id('davi_ctx');
   res jsonb;
+  sid uuid;
   i int;
 begin
   res := public.create_series('gf-lim-0000', ctx, 'mensal', 'conta', 'Antiga', null, 100, 'fixo', 1, '2026-09-01', 1, null, null);
@@ -1135,6 +1157,31 @@ begin
   perform pg_temp.expect_error(format($f$select public.create_series('gf-lim-0103', %L, 'mensal', 'conta', 'Gasto 101', null, 100, 'fixo', 10,
     '2026-10-01', 1, null, null)$f$, ctx), 'limite_de_gastos_fixos');
   assert (select count(*) from public.record_operations where idempotency_key in ('gf-lim-0100', 'gf-lim-0103')) = 0, 'recusas não gravam operação';
+
+  -- Retomar a que já não contava (sem data para terminar, ou terminando em setembro) a faz contar de novo: mesmo limite.
+  perform pg_temp.expect_error(format($f$select public.end_series('gf-lim-0104', %L, 2, null, '[]')$f$, pg_temp.id('antiga')),
+    'limite_de_gastos_fixos');
+  perform pg_temp.expect_error(format($f$select public.end_series('gf-lim-0105', %L, 2, 1, '[]')$f$, pg_temp.id('antiga')),
+    'limite_de_gastos_fixos');
+  assert (select (last_number, version) from public.series_items where id = pg_temp.id('antiga')) = (0, 2) and pg_temp.occs('antiga') is null
+     and (select count(*) from public.record_operations where idempotency_key in ('gf-lim-0104', 'gf-lim-0105')) = 0,
+    'retomada recusada não muda nada';
+  -- A que já conta pode ser encerrada e retomada no limite.
+  sid := (select target_id from public.record_operations where idempotency_key = 'gf-lim-0001');
+  perform public.end_series('gf-lim-0106', sid, 1, 1, (select jsonb_agg(jsonb_build_object('id', id, 'version', version))
+    from public.commitment_items where series_id = sid and occurrence_number > 1));
+  res := public.end_series('gf-lim-0107', sid, 2, null, '[]');
+  assert res #>> '{series,last_number}' is null and (res #>> '{series,version}')::int = 3, 'encerrar e retomar uma que já conta';
+  -- Com uma vaga, a retomada passa, as contas voltam e o limite vale de novo.
+  sid := (select target_id from public.record_operations where idempotency_key = 'gf-lim-0102');
+  perform public.delete_series('gf-lim-0108', sid, 1, (select jsonb_agg(jsonb_build_object('id', id, 'version', version))
+    from public.commitment_items where series_id = sid));
+  res := public.end_series('gf-lim-0109', pg_temp.id('antiga'), 2, null, '[]');
+  assert res #>> '{series,last_number}' is null and (res #>> '{series,version}')::int = 3, 'retomada com uma vaga';
+  assert pg_temp.occs('antiga') = '1:2026-09-01:100:false:false:aberto 2:2026-10-01:100:false:false:aberto 3:2026-11-01:100:false:false:aberto',
+    'setembro a novembro recriados';
+  perform pg_temp.expect_error(format($f$select public.create_series('gf-lim-0110', %L, 'mensal', 'conta', 'Gasto 101', null, 100, 'fixo', 10,
+    '2026-10-01', 1, null, null)$f$, ctx), 'limite_de_gastos_fixos');
   perform pg_temp.check_series();
 end $$;
 

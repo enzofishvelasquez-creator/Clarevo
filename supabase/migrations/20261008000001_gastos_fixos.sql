@@ -13,7 +13,8 @@
 -- S7. Conta paga não muda (guarda da 0002, estendida à marca de estimado).
 -- S8. O vencimento da ocorrência fica no mês dela.
 -- I1 a I4 da 0002 continuam valendo para toda ocorrência.
--- Ordem de travas: série → contas a pagar (por número crescente) → registro.
+-- Ordem de travas: série → limite do contexto (só end_series ao retomar) → contas a pagar (por número crescente) → registro.
+-- create_series pega só a trava do limite (nenhuma série existente).
 
 -- ---------------------------------------------------------------------------
 -- Séries, vigências e ocorrências
@@ -179,6 +180,7 @@ create trigger series_terms_guard
 
 -- S4, S5, S6 e S8, conferidas no fim da transação (no modelo de clarevo_check_commitment_payment):
 -- "esta e as próximas" e encerrar passam por estados intermediários.
+-- Também na exclusão física de vigência ou de conta da série (S5, e S3: a marca "excluída só neste mês" não some).
 -- security definer: dispara no commit com o papel de quem chamou e precisa ler as linhas excluídas.
 create or replace function public.clarevo_check_series_consistency()
 returns trigger
@@ -192,13 +194,23 @@ declare
 begin
   if tg_table_name = 'commitment_series' then
     v_sid := new.id;
+  elsif tg_op = 'DELETE' then
+    v_sid := old.series_id;
   else
     v_sid := new.series_id;
   end if;
   select * into v_s from public.commitment_series where id = v_sid;
-  -- Contexto apagado na mesma transação: não sobra série para conferir.
+  -- Contexto (ou série inteira) apagado na mesma transação: não sobra série para conferir.
   if not found then
     return null;
+  end if;
+  -- S3: apagar a linha de um número "excluído só neste mês" faria a geração recriá-lo.
+  if tg_op = 'DELETE' and tg_table_name = 'commitments' then
+    if old.series_skipped and not exists (select 1 from public.commitments
+                                           where series_id = v_sid and occurrence_number = old.occurrence_number
+                                             and series_skipped) then
+      raise exception 'serie_inconsistente' using errcode = '23514';
+    end if;
   end if;
   if (v_s.deleted_at is not null and exists (                                         -- S6
         select 1 from public.commitments where series_id = v_sid and deleted_at is null))
@@ -232,6 +244,17 @@ create constraint trigger series_terms_consistency
   after insert or update on public.series_terms
   deferrable initially deferred
   for each row execute function public.clarevo_check_series_consistency();
+-- Exclusão física (escrita manual no banco): a vigência viva do primeiro número e as marcas de "excluída só neste
+-- mês" continuam obrigatórias. Apagar o contexto inteiro passa (a série some junto).
+create constraint trigger series_terms_consistency_del
+  after delete on public.series_terms
+  deferrable initially deferred
+  for each row execute function public.clarevo_check_series_consistency();
+create constraint trigger commitments_series_consistency_del
+  after delete on public.commitments
+  deferrable initially deferred
+  for each row when (old.series_id is not null)
+  execute function public.clarevo_check_series_consistency();
 
 -- ---------------------------------------------------------------------------
 -- Funções auxiliares (sem execute para authenticated)
@@ -730,6 +753,7 @@ declare
   v_hash text;
   v_op public.record_operations%rowtype;
   v_s public.commitment_series%rowtype;
+  v_floor date;
   v_actual jsonb;
   v_changed int;
 begin
@@ -759,6 +783,21 @@ begin
      or (v_s.kind = 'parcelada' and (p_last_number is null or p_last_number < v_s.first_number - 1
                                      or p_last_number > v_s.installment_total)) then
     raise exception 'fim_invalido' using errcode = '22023';
+  end if;
+  -- Retomar uma série que já não contava no limite (último mês antes do mês anterior a hoje) a faz contar de novo:
+  -- mesmo critério e mesma trava de create_series. Sem inversão: create_series só pega essa trava, nunca a da série.
+  v_floor := (date_trunc('month', public.clarevo_today(v_uid)::timestamp) - interval '1 month')::date;
+  if (p_last_number is null
+      or (v_s.first_due_month + make_interval(months => p_last_number - v_s.first_number))::date >= v_floor)
+     and not (v_s.last_number is null
+              or (v_s.first_due_month + make_interval(months => v_s.last_number - v_s.first_number))::date >= v_floor) then
+    perform pg_advisory_xact_lock(hashtext('series:' || v_s.context_id::text));
+    if (select count(*) from public.commitment_series s
+         where s.context_id = v_s.context_id and s.deleted_at is null and s.id <> v_s.id
+           and (s.last_number is null
+                or (s.first_due_month + make_interval(months => s.last_number - s.first_number))::date >= v_floor)) >= 100 then
+      raise exception 'limite_de_gastos_fixos' using errcode = 'PT409';
+    end if;
   end if;
   -- Trava as contas depois do último número e só então confere: um pagamento em andamento termina antes.
   perform 1 from public.commitments
