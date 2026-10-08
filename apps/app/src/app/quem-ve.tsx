@@ -35,6 +35,10 @@ export default function QuemVeScreen() {
         Se uma empresa oferecer o Clarevo como benefício, ela administra seu acesso ao plano. Seus registros financeiros têm permissões
         próprias e não ficam visíveis para a empresa.
       </Txt>
+      <Txt color={colors.textSecondary}>
+        Gastos fixos e parcelamentos também são só seus. A empresa que oferece o benefício não vê nada disso, nem em números somados aos de
+        outras pessoas.
+      </Txt>
       <Button label="Entendi" onPress={() => router.back()} />
     </Screen>
     </View>

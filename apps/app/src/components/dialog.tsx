@@ -29,7 +29,8 @@ export function ConfirmDialog({
 }) {
   const reduced = useReducedMotion();
   return (
-    <Modal visible={visible} transparent animationType={reduced ? 'none' : 'fade'} onRequestClose={onCancel}>
+    // Durante a ação (busy), nem Cancelar nem o voltar do sistema fecham o diálogo: a ação já começou.
+    <Modal visible={visible} transparent animationType={reduced ? 'none' : 'fade'} onRequestClose={busy ? () => {} : onCancel}>
       <View style={styles.backdrop}>
         <View style={styles.box} accessibilityViewIsModal accessibilityRole="alert">
           <Txt variant="title" accessibilityRole="header">

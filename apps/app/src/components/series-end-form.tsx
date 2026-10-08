@@ -1,4 +1,5 @@
 import {
+  ERROR_TEXT,
   PAYMENT_ERROR_TEXT,
   PAYMENT_FIELD_ORDER,
   SERIES_ERROR_TEXT,
@@ -16,6 +17,7 @@ import {
   isRepoError,
   maskDateBR,
   maskMonthBR,
+  mergeOccurrences,
   monthOf,
   newOperationKey,
   numberOfMonth,
@@ -52,7 +54,15 @@ import { CheckOption, ChoiceGroup, joinList, monthChipLabel, seriesStyles as sty
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { totalChange } from '@/lib/highlight';
-import { useEndSeries, usePayCommitment, useSeries, useSeriesOccurrences, useSeriesOperationKey, useUpdateRecord } from '@/state/data';
+import {
+  useEndSeries,
+  usePayCommitment,
+  useSeries,
+  useSeriesOccurrences,
+  useSeriesOpenOccurrences,
+  useSeriesOperationKey,
+  useUpdateRecord,
+} from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -60,6 +70,12 @@ import { colors, fonts, space } from '@/theme/tokens';
 type EndChoice = number | 'sem' | 'outro' | null;
 
 const PAYOFF_FAILED_END = 'Pagamento registrado. Não foi possível encerrar agora. Tente de novo.';
+
+/** "Quitei o restante" numa parcela que a lista atual mostra como paga, sem pagamento novo registrado agora. */
+const alreadyPaidText = (n: number) => `A parcela ${n} já está paga, e nenhum pagamento novo foi registrado. Confira e toque em Encerrar de novo.`;
+
+/** Pagamento incerto gravado: em qual parcela, e se é outra que não a escolhida agora. */
+type PaySaved = { number: number; moved: boolean } | null;
 
 const paymentText = (code: string) =>
   code in PAYMENT_ERROR_TEXT ? PAYMENT_ERROR_TEXT[code as keyof typeof PAYMENT_ERROR_TEXT] : PAYMENT_ERROR_TEXT.pagar_falhou;
@@ -82,8 +98,13 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
   const contextId = personal.personalContextId;
   const live = useSeries(opened.id, contextId);
   const occ = useSeriesOccurrences(opened.id, contextId);
+  const openOcc = useSeriesOpenOccurrences(opened.id, contextId);
   const s = live.data ?? opened;
-  const occurrences = occ.data ? [...occ.data].reverse() : []; // número crescente
+  const occurrences = occ.data ? [...occ.data].reverse() : []; // número crescente, as 60 mais recentes (chips)
+  // Conjunto afetado e parcela a quitar: todas as em aberto, também as que não cabem na lista de 60.
+  const allOccurrences = mergeOccurrences(occ.data ?? [], openOcc.data ?? []).reverse();
+  /** As duas listas carregadas; depois de uma falha ao recarregar, o efeito e a parcela a quitar não são conhecidos. */
+  const listsReady = occ.isSuccess && openOcc.isSuccess;
   const parcelada = s.kind === 'parcelada';
   const noun = parcelada ? 'Parcelamento' : 'Gasto fixo';
   // Aberta para retomar: a série já estava encerrada ao abrir a tela (não muda no meio do preenchimento).
@@ -117,8 +138,11 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
   const [banner, setBanner] = useState<string | null>(null);
   const [retry, setRetry] = useState(false);
   const [busy, setBusy] = useState(false);
-  /** "Quitei o restante": o pagamento já foi confirmado; falta só encerrar. */
-  const [paidDone, setPaidDone] = useState<{ number: number } | null>(null);
+  /**
+   * "Quitei o restante": o pagamento já foi confirmado; falta só encerrar. moved: o pagamento incerto foi gravado
+   * numa parcela diferente da escolhida depois da falha; a pessoa confere e encerra nela.
+   */
+  const [paidDone, setPaidDone] = useState<{ number: number; moved: boolean } | null>(null);
   const [leaveTo, setLeaveTo] = useState<null | (() => void)>(null);
   const [confirmDiscard, setConfirmDiscard] = useState<null | (() => void)>(null);
 
@@ -159,10 +183,11 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
   const inRange =
     chosen === undefined ||
     (chosen === null ? !parcelada : chosen >= s.firstNumber - 1 && chosen <= (parcelada ? (total ?? 0) : 600));
-  const plan = chosen !== undefined && inRange ? affectedByEnd(occurrences, s, chosen) : null;
+  const plan = chosen !== undefined && inRange ? affectedByEnd(allOccurrences, s, chosen) : null;
+  /** Conta viva do número escolhido, aberta ou paga (null se ainda não foi criada). */
+  const chosenOcc = typeof chosen === 'number' ? (allOccurrences.find((c) => c.series!.number === chosen) ?? null) : null;
   // "Quitei o restante" só vale para uma parcela já criada e em aberto: é ela que recebe o pagamento.
-  const payTarget: Commitment | null =
-    parcelada && !resume && typeof chosen === 'number' ? (occurrences.find((c) => c.series!.number === chosen && c.status === 'aberto') ?? null) : null;
+  const payTarget: Commitment | null = parcelada && !resume && chosenOcc?.status === 'aberto' ? chosenOcc : null;
   const paying = payoff && payTarget !== null && !paidDone;
 
   const monthOfNumber = (n: number) => formatMonthName(seriesMonthOf(s, n));
@@ -182,11 +207,16 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
     if (c === 'outro') setTimeout(() => otherRef.current?.focus(), 0);
   };
 
-  const done = (w: SeriesWrite, last: number | null) => {
+  /**
+   * Faixa depois de gravar. prevLast = última conta antes desta gravação (guardada no envio: depois de uma falha de
+   * conexão, a série recarregada já pode trazer o término novo). Retomar ou estender diz "retomado"; encurtar, mesmo
+   * na tela de retomar, diz "encerrado".
+   */
+  const done = (w: SeriesWrite, last: number | null, prevLast: number | null) => {
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    if (resume || last === null || (s.lastNumber !== null && last > s.lastNumber)) {
+    if (last === null || (prevLast !== null && last > prevLast)) {
       // Retomar: as contas recriadas pela geração (número depois da antiga última conta).
-      const before = s.lastNumber ?? Infinity;
+      const before = prevLast ?? Infinity;
       const back = w.occurrences.filter((c) => c.status === 'aberto' && c.series!.number > before).map((c) => formatMonthName(monthOf(c.dueOn)));
       const tail =
         back.length === 0
@@ -202,29 +232,49 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
   };
 
   /**
-   * Pagamento com resultado incerto: conferir se alguma tentativa foi gravada antes de repetir. Se foi e o preenchimento
-   * mudou, aplica o atual como edição do gasto gerado (nunca há um segundo pagamento). true se o pagamento existe.
+   * Pagamento com resultado incerto: conferir se alguma tentativa foi gravada antes de repetir.
+   * - Gravada nesta parcela (target): se o preenchimento mudou, aplica o atual como edição do gasto gerado (nunca há
+   *   um segundo pagamento). input null: não edita.
+   * - Gravada em outra parcela (a escolha mudou depois da falha): não mexe nela nem encerra em outra; devolve moved.
+   * null se nenhuma tentativa foi gravada.
    */
-  const reconcilePay = async (input: PaymentInput, snapshot: string): Promise<boolean> => {
+  const reconcilePay = async (target: Commitment | null, input: PaymentInput | null, snapshot: string | null): Promise<PaySaved> => {
     for (const attempt of [...payPending.current].reverse()) {
       const op = await repo.findCommitmentOperation(attempt.key);
       if (!op || op.action !== 'pagar_compromisso' || !op.recordId) continue;
       qc.invalidateQueries({ queryKey: ['commitments'] });
       qc.invalidateQueries({ queryKey: ['series'] });
       qc.invalidateQueries({ queryKey: ['records'] });
-      const expense = await repo.getRecord(op.recordId);
-      if (expense && attempt.snapshot !== snapshot) {
-        await updateRecord.mutateAsync({
-          key: newOperationKey(),
-          id: expense.id,
-          version: expense.version,
-          input: { accountId: input.accountId, amountCents: input.amountCents, occurredOn: input.paidOn, description: expense.description, category: input.category },
-        });
+      if (target && op.commitmentId === target.id) {
+        const expense = await repo.getRecord(op.recordId);
+        if (expense && input && attempt.snapshot !== snapshot) {
+          await updateRecord.mutateAsync({
+            key: newOperationKey(),
+            id: expense.id,
+            version: expense.version,
+            input: { accountId: input.accountId, amountCents: input.amountCents, occurredOn: input.paidOn, description: expense.description, category: input.category },
+          });
+        }
+        payPending.current = [];
+        payKey.current = newOperationKey();
+        return { number: target.series!.number, moved: false };
       }
+      const paid = allOccurrences.find((c) => c.id === op.commitmentId) ?? (await repo.getCommitment(op.commitmentId));
+      const number = paid?.series?.number;
+      if (number === undefined) continue;
       payPending.current = [];
-      return true;
+      payKey.current = newOperationKey();
+      return { number, moved: true };
     }
-    return false;
+    return null;
+  };
+
+  /** O pagamento incerto foi gravado em outra parcela: a última conta passa a ser ela, e a pessoa confirma o encerramento. */
+  const paidElsewhere = (n: number) => {
+    setPaidDone({ number: n, moved: true });
+    setChoice(n);
+    setChoiceError(null);
+    setRetry(false);
   };
 
   /** Passo 1 de "Quitei o restante": pagar a parcela escolhida. true quando o pagamento está confirmado. */
@@ -240,8 +290,13 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
     const snapshot = JSON.stringify([v.input, target.id, target.version]);
     try {
       if (payPending.current.length > 0) {
-        if (await reconcilePay(v.input, snapshot)) {
-          setPaidDone({ number: target.series!.number });
+        const saved = await reconcilePay(target, v.input, snapshot);
+        if (saved?.moved) {
+          paidElsewhere(saved.number);
+          return false;
+        }
+        if (saved) {
+          setPaidDone({ number: saved.number, moved: false });
           totalChange.set({ total: 'pago', month: monthOf(v.input.paidOn), deltaCents: v.input.amountCents });
           return true;
         }
@@ -253,7 +308,7 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
         await pay.mutateAsync({ key, id: target.id, version: target.version, input: v.input });
         payPending.current = [];
         payKey.current = newOperationKey();
-        setPaidDone({ number: target.series!.number });
+        setPaidDone({ number: target.series!.number, moved: false });
         totalChange.set({ total: 'pago', month: monthOf(v.input.paidOn), deltaCents: v.input.amountCents });
         return true;
       } catch (e) {
@@ -268,6 +323,7 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
           }
           if (e.code === 'versao_desatualizada' || e.code === 'compromisso_quitado' || e.code === 'nao_encontrado') {
             occ.refetch();
+            openOcc.refetch();
             setBanner(e.code === 'compromisso_quitado' ? PAYMENT_ERROR_TEXT.ja_paga_em_outro_aparelho : paymentText(e.code));
             return false;
           }
@@ -304,15 +360,58 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
       setChoiceError(SERIES_ERROR_TEXT.fim_invalido);
       return;
     }
+    // Listas que falharam ao recarregar: o efeito e a parcela a quitar não são conhecidos. Recarregar antes de gravar.
+    if (!listsReady) {
+      live.refetch();
+      occ.refetch();
+      openOcc.refetch();
+      setBanner(ERROR_TEXT.carregar_falhou);
+      return;
+    }
     if (!plan || !plan.ok) {
       setChoiceError(SERIES_ERROR_TEXT.serie_tem_pagamento_posterior);
       return;
     }
+    // Última conta antes desta gravação, para a faixa: depois de uma falha, a série recarregada pode já trazer a nova.
+    const prevLast = s.lastNumber;
     setBusy(true);
     try {
-      if (paying && payTarget && !(await payStep(payTarget))) return;
-      const afterPayment = Boolean(paidDone) || paying;
-      const snapshot = JSON.stringify([s.id, s.version, chosen, plan.affected]);
+      let paidNow = false;
+      // "Quitei o restante" marcado, mas a parcela escolhida já não está em aberto na lista: um pagamento incerto
+      // pode ter sido gravado, nesta ou em outra parcela. Nunca encerrar sem o pagamento pedido.
+      if (payoff && !paidDone && parcelada && !resume && typeof chosen === 'number' && !payTarget && (payPending.current.length > 0 || chosenOcc?.status === 'quitado')) {
+        let saved: PaySaved = null;
+        try {
+          saved = payPending.current.length > 0 ? await reconcilePay(chosenOcc, null, null) : null;
+        } catch {
+          setRetry(true);
+          setBanner(PAYMENT_ERROR_TEXT.pagar_falhou);
+          return;
+        }
+        if (saved?.moved) {
+          paidElsewhere(saved.number);
+          return;
+        }
+        if (!saved) {
+          // Nenhum pagamento registrado agora e a parcela já está paga: confirmar o encerramento sem pagamento novo.
+          if (chosenOcc?.status === 'quitado') {
+            setPayoff(false);
+            setRetry(false);
+            setBanner(alreadyPaidText(chosen));
+            return;
+          }
+        } else {
+          setPaidDone({ number: saved.number, moved: false });
+          paidNow = true;
+        }
+      }
+      if (paying && payTarget) {
+        if (!(await payStep(payTarget))) return;
+        paidNow = true;
+      }
+      const afterPayment = Boolean(paidDone) || paidNow;
+      // A última conta anterior entra no conteúdo: a reconciliação de uma gravação incerta usa a dela.
+      const snapshot = JSON.stringify([s.id, s.version, chosen, plan.affected, prevLast]);
       try {
         if (keys.hasPending()) {
           const saved = await keys.findSaved();
@@ -322,7 +421,9 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
             const list = await repo.listSeriesOccurrences(s.id);
             if (fresh) {
               setRetry(false);
-              done({ series: fresh, occurrences: [...list].reverse(), changed: 0 }, fresh.lastNumber);
+              // O término e a última conta anterior da tentativa que foi gravada, não os da série recarregada.
+              const [, , savedLast, , savedPrev] = JSON.parse(saved.snapshot) as [string, number, number | null, unknown, number | null];
+              done({ series: fresh, occurrences: [...list].reverse(), changed: 0 }, savedLast, savedPrev);
               return;
             }
           }
@@ -332,13 +433,14 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
           const w = await end.mutateAsync({ key, id: s.id, version: s.version, lastNumber: chosen, affected: plan.affected });
           keys.settled();
           setRetry(false);
-          done(w, chosen);
+          done(w, chosen, prevLast);
         } catch (e) {
           if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
             keys.refused();
             setRetry(false);
             live.refetch();
             occ.refetch();
+            openOcc.refetch();
             if (afterPayment) setBanner(PAYOFF_FAILED_END);
             else if (e.code === 'serie_tem_pagamento_posterior' || e.code === 'fim_invalido') setChoiceError(seriesErrorText(e.code, today));
             else setBanner(seriesErrorText(e.code, today));
@@ -373,10 +475,12 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
 
   // Efeito da escolha, antes de confirmar. Retomar (ou estender): as contas que a geração recria agora.
   const extending = chosen === null || (typeof chosen === 'number' && s.lastNumber !== null && chosen > s.lastNumber);
-  // Estender o término ("Sem data para terminar", "Até a última parcela") é retomar, como diz a faixa depois de salvar.
-  const actionLabel = resume || extending ? (parcelada ? 'Retomar parcelas' : 'Voltar a repetir') : paidDone ? 'Encerrar agora' : 'Encerrar';
+  // Estender o término ("Sem data para terminar", "Até a última parcela") é retomar, como diz a faixa depois de salvar;
+  // um mês antes do término atual, mesmo na tela de retomar, encerra antes.
+  const actionLabel =
+    (resume && chosen === undefined) || extending ? (parcelada ? 'Retomar parcelas' : 'Voltar a repetir') : paidDone ? 'Encerrar agora' : 'Encerrar';
   const comingBack =
-    plan?.ok && extending ? occurrencesToMaterialize({ ...s, lastNumber: chosen ?? null }, occurrences, today).map((o) => formatMonthName(o.month)) : [];
+    plan?.ok && extending ? occurrencesToMaterialize({ ...s, lastNumber: chosen ?? null }, allOccurrences, today).map((o) => formatMonthName(o.month)) : [];
   const effect = !plan?.ok
     ? null
     : plan.text ??
@@ -412,7 +516,9 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
         {paidDone ? (
           <Banner tone="sucesso" icon={Check}>
             <Txt variant="label" color={colors.successText} style={{ fontFamily: fonts.bold }}>
-              Pagamento registrado. Falta encerrar o parcelamento na parcela {paidDone.number}.
+              {paidDone.moved
+                ? `O pagamento foi registrado na parcela ${paidDone.number}. Falta encerrar o parcelamento nela.`
+                : `Pagamento registrado. Falta encerrar o parcelamento na parcela ${paidDone.number}.`}
             </Txt>
           </Banner>
         ) : null}

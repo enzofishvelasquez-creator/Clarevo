@@ -96,7 +96,18 @@ const structureOf = (i: SeriesInput) => JSON.stringify([i.kind, i.firstDueMonth,
  * chave por conteúdo, reconciliação depois de rede incerta, confirmação ao sair e rodapé fixo.
  * As regras e a ordem de validação são as do banco (validateSeriesDraft).
  */
-export function SeriesForm({ kind: initialKind, prefill, space: personal }: { kind: SeriesKind; prefill?: SeriesPrefill; space: PersonalSpace }) {
+export function SeriesForm({
+  kind: initialKind,
+  prefill,
+  typed = false,
+  space: personal,
+}: {
+  kind: SeriesKind;
+  prefill?: SeriesPrefill;
+  /** O preenchimento veio do que a pessoa digitou em "Anotar conta a pagar": sair sem salvar pede confirmação. */
+  typed?: boolean;
+  space: PersonalSpace;
+}) {
   const { today } = useSession();
   const repo = useRepo();
   const insets = useSafeAreaInsets();
@@ -109,9 +120,9 @@ export function SeriesForm({ kind: initialKind, prefill, space: personal }: { ki
   const currentMonth = monthOf(today);
   const chipMonths = [currentMonth, addMonths(currentMonth, 1)];
 
-  // O inicial já inclui o preenchimento da rota: abrir preenchido e sair sem mexer não pede confirmação.
-  const initial = useMemo(() => {
-    const p = prefill ?? {};
+  // O inicial já inclui o preenchimento da rota: abrir preenchido e sair sem mexer não pede confirmação. Exceção: o que
+  // a pessoa digitou em "Anotar conta a pagar" (typed) se perderia ao sair, então conta como alteração (blank).
+  const initialFor = (p: SeriesPrefill) => {
     const first = p.firstMonth;
     const monthPick: MonthPick = !first ? 'auto' : chipMonths.includes(first) ? first : 'outro';
     const draft: SeriesDraft = {
@@ -128,7 +139,9 @@ export function SeriesForm({ kind: initialKind, prefill, space: personal }: { ki
       category: p.category ?? null,
     };
     return { draft, monthPick, ending: false };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  };
+  const initial = useMemo(() => initialFor(prefill ?? {}), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const blank = useMemo(() => (typed ? initialFor({}) : initial), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [draft, setDraft] = useState<SeriesDraft>(initial.draft);
   const [monthPick, setMonthPick] = useState<MonthPick>(initial.monthPick);
@@ -154,7 +167,7 @@ export function SeriesForm({ kind: initialKind, prefill, space: personal }: { ki
   } satisfies Partial<Record<SeriesField, React.RefObject<TextInput | null>>>;
 
   const parcelada = draft.kind === 'parcelada';
-  const dirty = JSON.stringify({ draft, monthPick, ending }) !== JSON.stringify(initial);
+  const dirty = JSON.stringify({ draft, monthPick, ending }) !== JSON.stringify(blank);
 
   // Sair com alterações não salvas pede confirmação (voltar, gesto, botão do sistema).
   usePreventRemove(dirty && !leaveTo, ({ data }) => {
@@ -201,6 +214,16 @@ export function SeriesForm({ kind: initialKind, prefill, space: personal }: { ki
     preview && monthRecords.data && monthCommitments.data && seriesList.data
       ? findSeriesConflicts(preview, monthCommitments.data, monthRecords.data, seriesList.data)
       : null;
+
+  /**
+   * "Começar em novembro": o mês seguinte. No parcelamento, também a parcela seguinte: a conta ou o gasto do primeiro
+   * mês já é aquela parcela, e a numeração não pode ficar um número atrás.
+   */
+  const startNext = () => {
+    if (!conflicts) return;
+    if (conflicts.suggestedFirstNumber !== null) set('firstNumberText', String(conflicts.suggestedFirstNumber));
+    pickMonth(conflicts.suggestedFirstMonth);
+  };
 
   /** Ordem visual dos campos: o foco vai para o primeiro erro com campo de texto na tela. */
   const visualOrder: SeriesField[] = parcelada
@@ -341,7 +364,6 @@ export function SeriesForm({ kind: initialKind, prefill, space: personal }: { ki
   const variable = draft.amountMode === 'variavel';
   const looksLikeCard = INVOICE_HINT.test(draft.description);
   const firstMonthName = preview ? formatMonthName(preview.firstMonth) : '';
-  const suggestedName = conflicts ? formatMonthName(conflicts.suggestedFirstMonth) : '';
   const showCommitmentConflict = Boolean(conflicts?.texts.commitment && preview && !kept.includes(preview.firstMonth));
   const amountLabel = variable ? 'Valor de referência' : parcelada ? 'Valor da parcela' : 'Valor por mês';
   const saveLabel = parcelada ? 'Salvar parcelamento' : 'Salvar gasto fixo';
@@ -569,13 +591,13 @@ export function SeriesForm({ kind: initialKind, prefill, space: personal }: { ki
         {conflicts?.texts.record ? (
           <Banner tone="info" icon={Info}>
             <Txt variant="label">{conflicts.texts.record}</Txt>
-            <Button label={conflicts.texts.startNext} tone="soft" onPress={() => pickMonth(conflicts.suggestedFirstMonth)} />
+            {conflicts.texts.startNext ? <Button label={conflicts.texts.startNext} tone="soft" onPress={startNext} /> : null}
           </Banner>
         ) : null}
         {showCommitmentConflict && conflicts && preview ? (
           <Banner tone="info" icon={Info}>
             <Txt variant="label">{conflicts.texts.commitment}</Txt>
-            <Button label={`Começar em ${suggestedName}`} tone="soft" onPress={() => pickMonth(conflicts.suggestedFirstMonth)} />
+            {conflicts.texts.startNext ? <Button label={conflicts.texts.startNext} tone="soft" onPress={startNext} /> : null}
             <Button label={`Manter ${firstMonthName}`} tone="ghost" onPress={() => setKept((k) => [...k, preview.firstMonth])} />
           </Banner>
         ) : null}

@@ -37,6 +37,12 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Espera as transições terminarem antes de capturar.
   const shot = async (n, full=false) => { await p.waitForTimeout(450); await p.screenshot({ path: `${OUT}/${n}.png`, fullPage: full }); };
   const waitText = (t, timeout=8000) => p.getByText(t, { exact: false }).filter({ visible: true }).first().waitFor({ timeout });
+  // Texto da tela no primeiro instante em que um texto aparece (leitura contínua, sem o intervalo de espera do Playwright):
+  // mostra o que a tela exibe junto com uma faixa, antes de qualquer nova leitura de dados terminar.
+  const firstBodyWith = async (text, timeout = 8000) => {
+    for (const end = Date.now() + timeout; Date.now() < end;) { const t = await body(); if (t.includes(text)) return t; }
+    return body();
+  };
   // Espera um texto sumir (linhas saem com FadeOut); se não sumir, a conferência seguinte acusa.
   const waitGone = async (t, timeout=3000) => { for (const end = Date.now() + timeout; Date.now() < end && (await body()).includes(t);) await p.waitForTimeout(100); };
   const confirmIn = (name) => p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name }).last().click();
@@ -297,6 +303,15 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   await btn('Anotar conta a pagar').click(); await waitText('Salvando em Pessoal');
   ok('anotar conta a pagar: "Com que frequência?" começa em "Só uma vez"', (await visibleCount('radiogroup', 'Com que frequência?')) === 1 && (await radio('Só uma vez').getAttribute('aria-checked')) === 'true' && (await radio('Todo mês').getAttribute('aria-checked')) === 'false' && (await radio('Parcelado').getAttribute('aria-checked')) === 'false');
+  // "Todo mês" leva o que foi digitado para o cadastro do gasto fixo, que pede confirmação antes de descartá-lo.
+  await field('Descrição').fill('Academia'); await field('Valor em reais').fill('120');
+  await radio('Todo mês').click(); await waitText('Novo gasto fixo');
+  ok('"Todo mês" leva o que foi digitado para o gasto fixo', (await field('Descrição').inputValue()) === 'Academia' && (await field('Valor por mês').inputValue()) === '120,00');
+  await btn('Cancelar').click(); await waitText('Descartar o preenchimento?');
+  ok('cancelar o gasto fixo com o que foi digitado pede "Descartar o preenchimento?"', (await dialogText()).includes('Você tem alterações que ainda não foram salvas em Pessoal.'));
+  await btn('Descartar alterações').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
+  ok('descartar volta para Contas a pagar sem salvar', !(await body()).includes('Academia'));
+  await btn('Anotar conta a pagar').click(); await waitText('Salvando em Pessoal');
   await btn('Salvar conta a pagar').click(); await p.waitForTimeout(300);
   t = await body();
   ok('conta a pagar vazia: mensagens exatas', t.includes('Dê um nome para esta conta a pagar.') && t.includes('Informe um valor maior que zero, como 80,00.'));
@@ -468,6 +483,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
       JSON.stringify(await sectionRows('Parcelamentos')) === JSON.stringify(['Financiamento do carro, Parcela 13 de 48, R$ 850,00, termina em outubro de 2029, parcelamento']) &&
       ['R$ 2.500,00 · todo dia 5', '≈ R$ 180,00 · todo dia 12 · valor muda', 'Parcela 13 de 48 · R$ 850,00 · termina em outubro de 2029'].every((x) => t.includes(x)));
   await shot('25_gastos_fixos');
+  await btn('Quem vê estes dados?').click(); await waitText('Gastos fixos e parcelamentos também são só seus.');
+  ok('"Quem vê estes dados?": gastos fixos e parcelamentos também são só seus', (await body()).includes('Gastos fixos e parcelamentos também são só seus. A empresa que oferece o benefício não vê nada disso, nem em números somados aos de outras pessoas.'));
+  await btn('Entendi').click(); await waitText('Por mês, se os valores não mudarem');
 
   await openRow(/^Financiamento do carro, Parcela 13 de 48/); await waitText('Pagas antes do Clarevo');
   t = await body();
@@ -542,10 +560,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Salvar alterações').click(); await waitText('Aplicar a partir de novembro?');
   ok('esta e as próximas: confirma o que muda e o que não muda', (await dialogText()).includes('Vão mudar: novembro (05/11). Não mudam: outubro (paga). As contas criadas depois já seguem o novo valor.'));
   await shot('29_esta_e_as_proximas');
-  await confirmIn('Aplicar'); await waitText('Gasto fixo atualizado a partir de novembro.');
-  // A conta aberta é lida de novo depois da gravação: espera a leitura nova.
-  await waitText('R$ 2.650,00').catch(() => {});
-  ok('Aluguel de novembro passa a R$ 2.650,00', (await body()).includes('R$ 2.650,00'));
+  await confirmIn('Aplicar');
+  // A conta aberta já mostra o valor confirmado pela gravação junto da faixa, sem esperar outra leitura.
+  t = await firstBodyWith('Gasto fixo atualizado a partir de novembro.');
+  ok('Aluguel de novembro passa a R$ 2.650,00 junto da faixa de sucesso', t.includes('Gasto fixo atualizado a partir de novembro.') && t.includes('R$ 2.650,00') && !t.includes('R$ 2.500,00'));
   await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
   await waitRows('Próximos meses', (rows) => (rows ?? []).includes('Aluguel, vence em 05/11/2026, R$ 2.650,00, gasto fixo'));
   ok('Aluguel: novembro com o novo valor e outubro (pago) sem mudança', ((await sectionRows('Próximos meses')) ?? []).includes('Aluguel, vence em 05/11/2026, R$ 2.650,00, gasto fixo') &&
@@ -623,6 +641,21 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await shot('33_tornar_gasto_fixo');
   await btn('Começar em novembro').click(); await waitGone('Você já anotou o gasto Aluguel');
   ok('"Começar em novembro" muda a primeira conta e tira o aviso', (await radio('Novembro (vence em 05/11)').getAttribute('aria-checked')) === 'true' && !(await body()).includes('Você já anotou o gasto Aluguel'));
+  // Parcelamento: o gasto de outubro já é a parcela informada, então "Começar em novembro" passa também à parcela seguinte.
+  await radio('Parcelado').click(); await waitText('Total de parcelas');
+  await radio('Compra parcelada (boleto ou crediário)').click();
+  await field('Total de parcelas').fill('48'); await field('Número da próxima parcela a pagar').fill('12');
+  await radio('Outubro (venceu em 05/10)').click(); await waitText('o parcelamento pode começar com a parcela 13, em novembro');
+  ok('parcelamento: aviso de gasto já anotado com a parcela seguinte', (await body()).includes('Você já anotou o gasto Aluguel em 05/10 (R$ 2.500,00). Para não contar duas vezes, o parcelamento pode começar com a parcela 13, em novembro.') &&
+    (await visibleCount('button', 'Começar em novembro (parcela 13)')) === 1 && (await visibleCount('button', 'Começar em novembro')) === 0);
+  await btn('Começar em novembro (parcela 13)').click(); await waitGone('o parcelamento pode começar com a parcela 13');
+  ok('"Começar em novembro (parcela 13)" muda o mês e a parcela juntos', (await radio('Novembro (vence em 05/11)').getAttribute('aria-checked')) === 'true' && (await field('Número da próxima parcela a pagar').inputValue()) === '13' &&
+    (await body()).includes('Parcelas 13 a 48 de R$ 2.500,00, todo dia 5, de 05/11/2026 a 05/10/2029. Soma das 36 parcelas: R$ 90.000,00.') && !(await body()).includes('Você já anotou o gasto Aluguel'));
+  // A parcela informada já é a última: sem mês seguinte para começar, o aviso fica sem o botão.
+  await field('Número da próxima parcela a pagar').fill('48'); await radio('Outubro (venceu em 05/10)').click(); await waitText('Se esse gasto foi a parcela 48, a última');
+  ok('parcelamento na última parcela: aviso sem "Começar em…"', (await body()).includes('Se esse gasto foi a parcela 48, a última, não há mais parcelas a cadastrar.') && (await visibleCount('button', /^Começar em/)) === 0);
+  await radio('Todo mês').click(); await waitText('Primeira conta');
+  await radio('Novembro (vence em 05/11)').click(); await waitGone('Você já anotou o gasto Aluguel');
   await field('Descrição').fill('Parcelas do cartão'); await waitText('Parcelas de compras no cartão já entram na fatura.');
   ok('aviso de cartão no gasto fixo', (await body()).includes('Parcelas de compras no cartão já entram na fatura. Para não contar duas vezes, anote aqui só parcelamentos em boleto, débito ou financiamento.'));
   await field('Descrição').fill('Internet'); await field('Valor por mês').fill('150'); await field('Dia do vencimento').fill('15');

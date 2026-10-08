@@ -8,9 +8,20 @@ import { useSpace } from '@/state/data';
 /**
  * Parâmetros da rota (todos opcionais): tipo=mensal|parcelada, descricao, valor (centavos), categoria,
  * dia (1 a 31), inicio (AAAA-MM), vencimento (AAAA-MM-DD, vira dia e primeiro mês quando dia e inicio faltam)
- * e gasto (AAAA-MM-DD, data do gasto anotado em "Tornar gasto fixo").
+ * gasto (AAAA-MM-DD, data do gasto anotado em "Tornar gasto fixo") e origem=digitado (o preenchimento veio do que a
+ * pessoa digitou em "Anotar conta a pagar": sair sem salvar pede confirmação).
  */
-type Params = { tipo?: string; descricao?: string; valor?: string; categoria?: string; dia?: string; inicio?: string; vencimento?: string; gasto?: string };
+type Params = {
+  tipo?: string;
+  descricao?: string;
+  valor?: string;
+  categoria?: string;
+  dia?: string;
+  inicio?: string;
+  vencimento?: string;
+  gasto?: string;
+  origem?: string;
+};
 
 /** Só entram valores válidos, campo a campo. */
 function prefillFrom(p: Params): SeriesPrefill | undefined {
@@ -36,5 +47,13 @@ export default function NovoGastoFixo() {
   const params = useLocalSearchParams<Params>();
   const space = useSpace().data;
   if (!space) return <LoadingState />;
-  return <SeriesForm kind={params.tipo === 'parcelada' ? 'parcelada' : 'mensal'} prefill={prefillFrom(params)} space={space} />;
+  const prefill = prefillFrom(params);
+  return (
+    <SeriesForm
+      kind={params.tipo === 'parcelada' ? 'parcelada' : 'mensal'}
+      prefill={prefill}
+      typed={params.origem === 'digitado' && prefill !== undefined}
+      space={space}
+    />
+  );
 }

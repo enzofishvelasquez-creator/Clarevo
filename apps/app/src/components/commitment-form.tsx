@@ -314,6 +314,8 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
     if (draft.category) params.categoria = draft.category;
     const due = parseDateBR(draft.dateText);
     if (due) params.vencimento = due;
+    // O que foi digitado aqui segue para o cadastro, que pede "Descartar o preenchimento?" antes de sair, como este pediria.
+    if (dirty) params.origem = 'digitado';
     leave(() => router.replace({ pathname: '/gastos-fixos/novo', params }));
   };
 

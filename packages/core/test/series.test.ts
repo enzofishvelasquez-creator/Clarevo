@@ -508,6 +508,66 @@ describe('gastos fixos: regras puras', () => {
     expect([none.record, none.commitment, none.similar]).toEqual([null, null, null]);
   });
 
+  it('findSeriesConflicts no parcelamento: começar no mês seguinte é começar na parcela seguinte', () => {
+    const input: SeriesInput = {
+      kind: 'parcelada',
+      nature: 'compra_parcelada',
+      description: 'Aluguel',
+      category: 'Moradia',
+      amountCents: 250000,
+      amountMode: 'fixo',
+      dueDay: 5,
+      firstDueMonth: OCT,
+      firstNumber: 12,
+      installmentTotal: 48,
+      lastMonth: null,
+    };
+    const record: FinancialRecord = {
+      id: 'reg',
+      contextId: 'ctx',
+      accountId: 'conta-1',
+      kind: 'despesa',
+      status: 'realizado',
+      amountCents: 250000,
+      currency: 'BRL',
+      occurredOn: '2026-10-05',
+      description: 'Aluguel',
+      category: 'Moradia',
+      commitmentId: null,
+      createdBy: 'pessoa',
+      version: 1,
+      createdAt: CREATED_AT,
+      updatedAt: CREATED_AT,
+    };
+    const avulsa = { ...occ(series(), 1), id: 'cp-avulsa', dueOn: '2026-10-15', series: null };
+    const c = findSeriesConflicts(seriesPreview(input, DEMO_TODAY), [avulsa], [record], [carro({ terms: [term(13, { description: 'aluguel' })] })]);
+    expect(c.suggestedFirstMonth).toBe(NOV);
+    expect(c.suggestedFirstNumber).toBe(13);
+    expect(c.texts).toEqual({
+      record: 'Você já anotou o gasto Aluguel em 05/10 (R$ 2.500,00). Para não contar duas vezes, o parcelamento pode começar com a parcela 13, em novembro.',
+      commitment: 'Você já tem a conta a pagar Aluguel com vencimento em 15/10. Começar o parcelamento com a parcela 13, em novembro?',
+      similar: 'Você já tem o parcelamento aluguel. Quer cadastrar outro mesmo assim?',
+      startNext: 'Começar em novembro (parcela 13)',
+    });
+    // Mês e parcela andam juntos: a prévia com a sugestão aplicada mantém a última parcela no mesmo mês.
+    const shifted = seriesPreview({ ...input, firstDueMonth: NOV, firstNumber: 13 }, DEMO_TODAY);
+    expect(shifted.lastDueOn).toBe(seriesPreview(input, DEMO_TODAY).lastDueOn);
+    expect(shifted.text).toBe(
+      'Parcelas 13 a 48 de R$ 2.500,00, todo dia 5, de 05/11/2026 a 05/10/2029. Soma das 36 parcelas: R$ 90.000,00. Não é o valor para quitar.',
+    );
+    // A parcela informada já é a última: sem mês seguinte para começar, sem botão e sem número sugerido.
+    const last = findSeriesConflicts(seriesPreview({ ...input, firstNumber: 48 }, DEMO_TODAY), [avulsa], [record], []);
+    expect(last.suggestedFirstNumber).toBeNull();
+    expect(last.texts).toEqual({
+      record: 'Você já anotou o gasto Aluguel em 05/10 (R$ 2.500,00). Se esse gasto foi a parcela 48, a última, não há mais parcelas a cadastrar.',
+      commitment: 'Você já tem a conta a pagar Aluguel com vencimento em 15/10. Se ela é a parcela 48, a última, não há mais parcelas a cadastrar.',
+      similar: null,
+      startNext: null,
+    });
+    // Gasto fixo: sem número sugerido.
+    expect(findSeriesConflicts(seriesPreview({ ...input, kind: 'mensal', nature: 'conta', firstNumber: 1, installmentTotal: null }, DEMO_TODAY), [], [record], []).suggestedFirstNumber).toBeNull();
+  });
+
   it('seriesMonthlyTotal: por mês, se os valores não mudarem', () => {
     const luz = series({ id: 'luz', firstDueMonth: NOV, terms: [term(1, { amountCents: 18000, amountMode: 'variavel', dueDay: 12 })] });
     expect(seriesMonthlyTotal([series(), luz, carro(), series({ id: 'escola', lastNumber: 0 })], DEMO_TODAY)).toEqual({

@@ -49,9 +49,10 @@ export interface SeriesSyncResult {
 
 /**
  * Cria as contas dos gastos fixos do contexto que entram na janela de hoje (do mês anterior ao seguinte).
- * Uma vez por dia e por contexto: a chave inclui hoje, e a geração no banco é idempotente.
+ * Uma vez por dia e por contexto: a chave inclui hoje, e a geração no banco é idempotente. As escritas de gasto fixo
+ * não pedem outra: create_series, update_series_from e end_series já criam as contas da janela na mesma transação.
  * As contagens se somam no mesmo dia, para a faixa "O Clarevo criou 2 contas..." não sumir depois de uma
- * nova sincronização que não cria nada (as escritas de gasto fixo pedem uma).
+ * nova sincronização que não cria nada (por exemplo, ao tentar de novo depois de uma falha).
  */
 export function useSeriesSync(contextId: string | undefined) {
   const repo = useRepo();
@@ -85,12 +86,17 @@ export type SyncedQuery<T> = {
   | { data: undefined; error: Error | null; isPending: boolean; isError: boolean; isSuccess: false }
 );
 
+/** A sincronização do dia já terminou bem uma vez: uma nova tentativa que falha depois não desfaz as contas criadas. */
+const synced = (sync: UseQueryResult<SeriesSyncResult>) => sync.data !== undefined;
+
 function afterSync<T>(sync: UseQueryResult<SeriesSyncResult>, query: UseQueryResult<T>): SyncedQuery<T> {
-  const refetch = () => (sync.isError ? sync.refetch() : query.refetch());
+  const done = synced(sync);
+  const refetch = () => (!done ? sync.refetch() : query.refetch());
   const isFetching = sync.isFetching || query.isFetching;
-  // Dados já carregados prevalecem: uma falha de atualização em segundo plano não apaga a lista.
-  if (sync.isSuccess && query.isSuccess) return { data: query.data, error: null, isPending: false, isError: false, isSuccess: true, isFetching, refetch };
-  const error = sync.isError ? sync.error : query.isError ? query.error : null;
+  // Sincronização já feita prevalece: uma falha dela em segundo plano não apaga listas carregadas. Uma falha da
+  // própria consulta continua mostrando erro (por exemplo, depois de um pagamento), nunca um total antigo.
+  if (done && query.isSuccess) return { data: query.data, error: null, isPending: false, isError: false, isSuccess: true, isFetching, refetch };
+  const error = !done && sync.isError ? sync.error : query.isError ? query.error : null;
   return { data: undefined, error, isPending: !error, isError: Boolean(error), isSuccess: false, isFetching, refetch };
 }
 
@@ -105,7 +111,7 @@ export function useCommitments(contextId: string | undefined, month: IsoMonth) {
   const query = useQuery({
     queryKey: ['commitments', contextId, month],
     queryFn: () => repo.listCommitments(contextId!, month),
-    enabled: Boolean(contextId) && sync.isSuccess,
+    enabled: Boolean(contextId) && synced(sync),
   });
   const result = afterSync(sync, query);
   const summary = result.data && contextId ? summarizeToPay(result.data, contextId, month, today) : null;
@@ -245,7 +251,7 @@ export function useSeriesList(contextId: string | undefined) {
   const query = useQuery({
     queryKey: ['series', 'list', contextId],
     queryFn: () => repo.listSeries(contextId!),
-    enabled: Boolean(contextId) && sync.isSuccess,
+    enabled: Boolean(contextId) && synced(sync),
   });
   return afterSync(sync, query);
 }
@@ -257,7 +263,7 @@ export function useSeries(id: string | undefined, contextId: string | undefined)
   const query = useQuery({
     queryKey: ['series', 'one', id],
     queryFn: () => repo.getSeries(id!),
-    enabled: Boolean(id) && Boolean(contextId) && sync.isSuccess,
+    enabled: Boolean(id) && Boolean(contextId) && synced(sync),
   });
   return afterSync(sync, query);
 }
@@ -269,14 +275,31 @@ export function useSeriesOccurrences(id: string | undefined, contextId: string |
   const query = useQuery({
     queryKey: ['series', 'occurrences', id],
     queryFn: () => repo.listSeriesOccurrences(id!),
-    enabled: Boolean(id) && Boolean(contextId) && sync.isSuccess,
+    enabled: Boolean(id) && Boolean(contextId) && synced(sync),
   });
   return afterSync(sync, query);
 }
 
 /**
- * Depois de gravar um gasto fixo: série e contas confirmadas pelo servidor na hora; listas, contas a pagar,
- * a sincronização do dia e os detalhes de conta recarregam. Escritas de série não criam gastos.
+ * Contas vivas em aberto do gasto fixo, todas (sem o limite de 60), por número crescente. Junto da lista de
+ * useSeriesOccurrences (mergeOccurrences), é o conjunto que o banco confere em "esta e as próximas", encerrar e
+ * excluir, e as parcelas em aberto de "Faltam".
+ */
+export function useSeriesOpenOccurrences(id: string | undefined, contextId: string | undefined) {
+  const repo = useRepo();
+  const sync = useSeriesSync(contextId);
+  const query = useQuery({
+    queryKey: ['series', 'open', id],
+    queryFn: () => repo.listOpenSeriesOccurrences(id!),
+    enabled: Boolean(id) && Boolean(contextId) && synced(sync),
+  });
+  return afterSync(sync, query);
+}
+
+/**
+ * Depois de gravar um gasto fixo: série, contas da série e o detalhe de cada conta confirmados pelo servidor na hora;
+ * listas, contas a pagar e os detalhes de conta recarregam. Escritas de série não criam gastos, e a sincronização do
+ * dia não roda de novo: a própria escrita cria as contas da janela.
  */
 function useInvalidateSeries() {
   const qc = useQueryClient();
@@ -285,14 +308,19 @@ function useInvalidateSeries() {
     if (deleted) {
       qc.invalidateQueries({ queryKey: ['series', 'one', id], refetchType: 'none' });
       qc.invalidateQueries({ queryKey: ['series', 'occurrences', id], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['series', 'open', id], refetchType: 'none' });
     } else {
       qc.setQueryData(['series', 'one', id], w.series);
-      // O resultado vem em número crescente; a consulta guarda as 60 mais recentes, em número decrescente.
+      // O resultado vem em número crescente e com todas as contas vivas; a consulta guarda as 60 mais recentes, em
+      // número decrescente, e a das em aberto, todas, em número crescente.
       qc.setQueryData<Commitment[]>(['series', 'occurrences', id], [...w.occurrences].reverse().slice(0, 60));
+      qc.setQueryData<Commitment[]>(['series', 'open', id], w.occurrences.filter((c) => c.status === 'aberto'));
+      // A conta aberta logo depois (detalhe em Contas a pagar) já mostra o valor e a versão novos.
+      for (const c of w.occurrences) qc.setQueryData(['commitment', c.id], c);
     }
     qc.invalidateQueries({ queryKey: ['series', 'list'] });
-    qc.invalidateQueries({ queryKey: ['seriesSync'] });
     qc.invalidateQueries({ queryKey: ['commitments'] });
+    // Contas tiradas por encerrar ou excluir recarregam como não encontradas.
     qc.invalidateQueries({ queryKey: ['commitment'] });
   };
 }

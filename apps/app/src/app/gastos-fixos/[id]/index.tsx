@@ -12,6 +12,7 @@ import {
   formatMonthBR,
   installmentProgress,
   isRepoError,
+  mergeOccurrences,
   missingMonths,
   monthOf,
   projectSeries,
@@ -38,7 +39,7 @@ import { estimateText, InstallmentBar, occurrenceMonthLabel } from '@/components
 import { ErrorState } from '@/components/states';
 import { Banner, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
-import { useDeleteSeries, useSeries, useSeriesOccurrences, useSeriesOperationKey, useSpace } from '@/state/data';
+import { useDeleteSeries, useSeries, useSeriesOccurrences, useSeriesOpenOccurrences, useSeriesOperationKey, useSpace } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
 
@@ -52,19 +53,24 @@ export default function DetalheGastoFixo() {
   const ctx = personal?.personalContextId;
   const series = useSeries(id, ctx);
   const occ = useSeriesOccurrences(id, ctx);
+  const openOcc = useSeriesOpenOccurrences(id, ctx);
   const remove = useDeleteSeries();
   const keys = useSeriesOperationKey();
   const [notice] = useFlash();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  /** Exclusão em andamento, inclusive a conferência de uma tentativa anterior: Cancelar e Excluir ficam bloqueados. */
+  const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const s = series.data;
   const noun = s?.kind === 'parcelada' ? 'parcelamento' : 'gasto fixo';
-  const occurrences = occ.data ? [...occ.data].reverse() : null; // número crescente
-  const deletePlan = s && occurrences ? affectedByDelete(occurrences, s) : null;
+  const occurrences = occ.data ? [...occ.data].reverse() : null; // número crescente, as 60 mais recentes
+  // Todas as em aberto (o banco confere o conjunto inteiro), não só as que cabem na lista de 60.
+  const allOccurrences = occ.data && openOcc.data ? mergeOccurrences(occ.data, openOcc.data).reverse() : null;
+  const deletePlan = s && allOccurrences ? affectedByDelete(allOccurrences, s) : null;
 
   const doDelete = async () => {
-    if (!s || !deletePlan) return;
+    if (!s || !deletePlan || deleting) return;
     setActionError(null);
     if (!deletePlan.ok) {
       setConfirmDelete(false);
@@ -78,6 +84,7 @@ export default function DetalheGastoFixo() {
       flash.set(s.kind === 'parcelada' ? 'Parcelamento excluído.' : 'Gasto fixo excluído.');
       router.dismissTo('/gastos-fixos');
     };
+    setDeleting(true);
     try {
       // Resultado incerto antes: a exclusão pode já ter acontecido.
       if (keys.hasPending()) {
@@ -100,6 +107,7 @@ export default function DetalheGastoFixo() {
           setActionError(e.code in SERIES_ERROR_TEXT ? SERIES_ERROR_TEXT[e.code as keyof typeof SERIES_ERROR_TEXT] : SERIES_ERROR_TEXT.salvar_falhou);
           series.refetch();
           occ.refetch();
+          openOcc.refetch();
           return;
         }
         keys.uncertain(key, snapshot);
@@ -108,6 +116,8 @@ export default function DetalheGastoFixo() {
     } catch {
       setConfirmDelete(false);
       setActionError(`Não foi possível excluir o ${noun}. Tente novamente.`);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -146,15 +156,21 @@ export default function DetalheGastoFixo() {
 
               <Overview series={s} today={today} />
 
-              {occ.isPending ? (
+              {occ.isPending || openOcc.isPending ? (
                 <Card style={{ gap: space[3] }}>
                   <Skeleton width="50%" height={22} />
                   <Skeleton width="100%" height={56} />
                 </Card>
-              ) : occ.isError || !occurrences ? (
-                <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => occ.refetch()} />
+              ) : occ.isError || openOcc.isError || !occurrences || !openOcc.data ? (
+                <ErrorState
+                  message={ERROR_TEXT.carregar_falhou}
+                  onRetry={() => {
+                    occ.refetch();
+                    openOcc.refetch();
+                  }}
+                />
               ) : (
-                <Occurrences series={s} occurrences={occurrences} today={today} />
+                <Occurrences series={s} occurrences={occurrences} open={openOcc.data} today={today} />
               )}
 
               <Txt variant="label" color={colors.textSecondary}>
@@ -176,7 +192,7 @@ export default function DetalheGastoFixo() {
                 title={`Excluir o ${noun} ${currentTerm(s, today).description}?`}
                 cancelLabel="Cancelar"
                 confirmLabel={`Excluir ${noun}`}
-                busy={remove.isPending}
+                busy={deleting || remove.isPending}
                 onCancel={() => setConfirmDelete(false)}
                 onConfirm={doDelete}>
                 {deletePlan?.ok && deletePlan.text ? <Txt style={{ fontFamily: fonts.bold }}>{deletePlan.text}</Txt> : null}
@@ -239,7 +255,19 @@ function Overview({ series: s, today }: { series: CommitmentSeries; today: IsoDa
 }
 
 /** Progresso, próximas contas (criadas e previstas), pagas, meses sem conta e sugestão de referência. */
-function Occurrences({ series: s, occurrences, today }: { series: CommitmentSeries; occurrences: Commitment[]; today: IsoDate }) {
+function Occurrences({
+  series: s,
+  occurrences,
+  open: allOpen,
+  today,
+}: {
+  series: CommitmentSeries;
+  /** As 60 mais recentes (abertas e pagas), por número crescente. */
+  occurrences: Commitment[];
+  /** Todas as em aberto, sem limite (useSeriesOpenOccurrences). */
+  open: readonly Commitment[];
+  today: IsoDate;
+}) {
   const currentMonth = monthOf(today);
   const ended = seriesEnded(s, today);
   const open = occurrences.filter((c) => c.status === 'aberto');
@@ -250,7 +278,7 @@ function Occurrences({ series: s, occurrences, today }: { series: CommitmentSeri
   const suggestion = variable ? suggestedReference(occurrences) : null;
   // "Usar como novo valor de referência" = esta e as próximas a partir da primeira conta em aberto (ou da próxima prevista).
   const applyFrom = open[0]?.series?.number ?? projected[0]?.number ?? null;
-  const progress = s.kind === 'parcelada' ? installmentProgress(s, occurrences, today) : null;
+  const progress = s.kind === 'parcelada' ? installmentProgress(s, occurrences, allOpen, today) : null;
 
   return (
     <>

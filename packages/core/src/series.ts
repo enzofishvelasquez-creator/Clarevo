@@ -574,7 +574,14 @@ export interface SeriesConflicts {
   similar: CommitmentSeries | null;
   /** Mês seguinte ao primeiro ("Começar em novembro"). */
   suggestedFirstMonth: IsoMonth;
-  texts: { record: string | null; commitment: string | null; similar: string | null; startNext: string };
+  /**
+   * Parcelamento: a parcela do mês seguinte (a conta ou o gasto do primeiro mês já é a parcela informada), que
+   * "Começar em novembro (parcela 13)" põe no cadastro junto do mês. null no gasto fixo e quando a parcela informada
+   * já é a última (não há mês seguinte para começar).
+   */
+  suggestedFirstNumber: number | null;
+  /** startNext null: sem botão "Começar em…" (parcela informada já é a última). */
+  texts: { record: string | null; commitment: string | null; similar: string | null; startNext: string | null };
 }
 
 const sameText = (text: string) => text.trim().toLocaleLowerCase('pt-BR');
@@ -593,6 +600,10 @@ export function findSeriesConflicts(
   const month = preview.firstMonth;
   const next = addMonths(month, 1);
   const nextName = formatMonthName(next);
+  const parcelada = preview.input.kind === 'parcelada';
+  const n = preview.input.firstNumber;
+  const last = parcelada && n >= (preview.input.installmentTotal ?? n);
+  const nextNumber = parcelada && !last ? n + 1 : null;
   const record = records.find((r) => r.kind === 'despesa' && monthOf(r.occurredOn) === month && sameText(r.description) === name) ?? null;
   const commitment =
     commitments.find((c) => c.series === null && monthOf(c.dueOn) === month && sameText(c.description) === name) ?? null;
@@ -608,20 +619,34 @@ export function findSeriesConflicts(
       break;
     }
   }
+  // Parcelamento: começar no mês seguinte é começar na parcela seguinte; se a informada já é a última, não há seguinte.
+  const recordTail = !parcelada
+    ? `Para não contar duas vezes, o gasto fixo pode começar em ${nextName}.`
+    : last
+      ? `Se esse gasto foi a parcela ${n}, a última, não há mais parcelas a cadastrar.`
+      : `Para não contar duas vezes, o parcelamento pode começar com a parcela ${nextNumber}, em ${nextName}.`;
+  const commitmentTail = !parcelada
+    ? `Começar a repetição em ${nextName}?`
+    : last
+      ? `Se ela é a parcela ${n}, a última, não há mais parcelas a cadastrar.`
+      : `Começar o parcelamento com a parcela ${nextNumber}, em ${nextName}?`;
   return {
     record,
     commitment,
     similar,
     suggestedFirstMonth: next,
+    suggestedFirstNumber: nextNumber,
     texts: {
       record: record
-        ? `Você já anotou o gasto ${record.description} em ${formatDayMonth(record.occurredOn)} (${formatBRL(record.amountCents)}). Para não contar duas vezes, o gasto fixo pode começar em ${nextName}.`
+        ? `Você já anotou o gasto ${record.description} em ${formatDayMonth(record.occurredOn)} (${formatBRL(record.amountCents)}). ${recordTail}`
         : null,
       commitment: commitment
-        ? `Você já tem a conta a pagar ${commitment.description} com vencimento em ${formatDayMonth(commitment.dueOn)}. Começar a repetição em ${nextName}?`
+        ? `Você já tem a conta a pagar ${commitment.description} com vencimento em ${formatDayMonth(commitment.dueOn)}. ${commitmentTail}`
         : null,
-      similar: similar ? `Você já tem o gasto fixo ${similarName}. Quer cadastrar outro mesmo assim?` : null,
-      startNext: `Começar em ${nextName}`,
+      similar: similar
+        ? `Você já tem o ${similar.kind === 'parcelada' ? 'parcelamento' : 'gasto fixo'} ${similarName}. Quer cadastrar outro mesmo assim?`
+        : null,
+      startNext: !parcelada ? `Começar em ${nextName}` : last ? null : `Começar em ${nextName} (parcela ${nextNumber})`,
     },
   };
 }

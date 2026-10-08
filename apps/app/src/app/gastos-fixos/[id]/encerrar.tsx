@@ -7,7 +7,7 @@ import { SubHeader } from '@/components/header';
 import { SeriesEndForm } from '@/components/series-end-form';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Card, Txt } from '@/components/ui';
-import { useSeries, useSeriesOccurrences, useSpace } from '@/state/data';
+import { useSeries, useSeriesOccurrences, useSeriesOpenOccurrences, useSpace } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
 /** Encerrar ou retomar o gasto fixo (e "Quitei o restante nesta parcela" no parcelamento). */
@@ -17,19 +17,22 @@ export default function EncerrarGastoFixo() {
   const ctx = personal?.personalContextId;
   const series = useSeries(id, ctx);
   const occ = useSeriesOccurrences(id, ctx);
+  // Todas as em aberto: o conjunto afetado que o banco confere vai além das 60 da lista.
+  const openOcc = useSeriesOpenOccurrences(id, ctx);
   // Aberto o formulário, ele fica na tela: uma recusa mostra o aviso ali, sem perder a escolha.
   const [opened, setOpened] = useState<CommitmentSeries | null>(null);
-  if (!opened && series.data && occ.data) setOpened(series.data);
+  if (!opened && series.data && occ.data && openOcc.data) setOpened(series.data);
 
   if (opened && personal) return <SeriesEndForm key={opened.id} series={opened} space={personal} />;
-  if (series.isPending || occ.isPending || !personal) return <LoadingState />;
-  if (series.isError || occ.isError) {
+  if (series.isPending || occ.isPending || openOcc.isPending || !personal) return <LoadingState />;
+  if (series.isError || occ.isError || openOcc.isError) {
     return (
       <ErrorState
         message={ERROR_TEXT.carregar_falhou}
         onRetry={() => {
           series.refetch();
           occ.refetch();
+          openOcc.refetch();
         }}
       />
     );

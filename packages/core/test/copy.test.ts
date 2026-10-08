@@ -1,3 +1,7 @@
+/// <reference types="node" />
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   COMMITMENT_ERROR_TEXT,
@@ -85,5 +89,37 @@ describe('textos do core', () => {
     texts.push(...Object.values(caption).filter((t): t is string => t !== null));
     expect(texts.length).toBeGreaterThan(15);
     for (const text of texts) expect(text).not.toMatch(FORBIDDEN);
+  });
+});
+
+/**
+ * Textos do app (seção 5, "equivalente no app"): lib/topics.ts (Aprender e "O que é isso?") e os textos das telas.
+ * Os arquivos são lidos como texto, sem importar o app (que depende do Expo): a lista vale para o arquivo inteiro,
+ * inclusive comentários. Um regex que lê o texto digitado pela pessoa, como SAVINGS_HINT, fica fora (IGNORED).
+ */
+const APP_SRC = fileURLToPath(new URL('../../../apps/app/src/', import.meta.url));
+const IGNORED: string[] = [];
+
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) return sourceFiles(path);
+    return /\.(ts|tsx)$/.test(name) && !IGNORED.includes(path.slice(APP_SRC.length)) ? [path] : [];
+  });
+}
+
+describe('textos do app', () => {
+  it('lib/topics.ts: títulos, subtítulos, parágrafos e hipóteses', () => {
+    const topics = readFileSync(join(APP_SRC, 'lib', 'topics.ts'), 'utf8');
+    // O arquivo certo, com os temas do Ciclo A: a conferência não passa por estar vazia.
+    for (const slug of ['gasto-fixo', 'estimativa', 'quitar-antes']) expect(topics).toContain(`slug: '${slug}'`);
+    expect(topics).not.toMatch(FORBIDDEN);
+  });
+
+  it('telas e componentes', () => {
+    const files = sourceFiles(APP_SRC);
+    expect(files.length).toBeGreaterThan(30);
+    const bad = files.filter((f) => FORBIDDEN.test(readFileSync(f, 'utf8'))).map((f) => f.slice(APP_SRC.length));
+    expect(bad).toEqual([]);
   });
 });

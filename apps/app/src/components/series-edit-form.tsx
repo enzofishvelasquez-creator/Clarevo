@@ -17,6 +17,7 @@ import {
   formatMonthYearBR,
   isRepoError,
   maskMonthBR,
+  mergeOccurrences,
   monthOf,
   monthsBetween,
   numberOfMonth,
@@ -49,7 +50,7 @@ import { ContextPill, SubHeader } from '@/components/header';
 import { ChoiceGroup, monthChipLabel, seriesStyles as styles } from '@/components/series-parts';
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
-import { useSeries, useSeriesOccurrences, useSeriesOperationKey, useUpdateSeriesFrom } from '@/state/data';
+import { useSeries, useSeriesOccurrences, useSeriesOpenOccurrences, useSeriesOperationKey, useUpdateSeriesFrom } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -133,8 +134,11 @@ export function SeriesEditForm({
   const keys = useSeriesOperationKey();
   const live = useSeries(opened.id, contextId);
   const occ = useSeriesOccurrences(opened.id, contextId);
+  const openOcc = useSeriesOpenOccurrences(opened.id, contextId);
   const s = live.data ?? opened;
-  const occurrences = occ.data ? [...occ.data].reverse() : []; // número crescente
+  const occurrences = occ.data ? [...occ.data].reverse() : []; // número crescente, as 60 mais recentes (chips)
+  // Conjunto afetado: todas as em aberto, também as que não cabem na lista de 60 (o banco confere o conjunto inteiro).
+  const allOccurrences = mergeOccurrences(occ.data ?? [], openOcc.data ?? []).reverse();
   const parcelada = s.kind === 'parcelada';
   const noun = parcelada ? 'Parcelamento' : 'Gasto fixo';
   const currentMonth = monthOf(today);
@@ -246,11 +250,12 @@ export function SeriesEditForm({
 
   /** Recarrega a série e as contas (depois de uma recusa ou de uma gravação feita antes da falha de conexão). */
   const reload = async () => {
-    const [fresh, list] = await Promise.all([repo.getSeries(s.id), repo.listSeriesOccurrences(s.id)]);
+    const [fresh, list, open] = await Promise.all([repo.getSeries(s.id), repo.listSeriesOccurrences(s.id), repo.listOpenSeriesOccurrences(s.id)]);
     qc.setQueryData(['series', 'one', s.id], fresh);
     qc.setQueryData(['series', 'occurrences', s.id], list);
+    qc.setQueryData(['series', 'open', s.id], open);
     qc.invalidateQueries({ queryKey: ['commitments'] });
-    return fresh ? { series: fresh, list: [...list].reverse() } : null;
+    return fresh ? { series: fresh, list: mergeOccurrences(list, open).reverse() } : null;
   };
 
   const submit = () => {
@@ -266,7 +271,7 @@ export function SeriesEditForm({
     setFromError(null);
     const k = chosenNumber();
     if (k === null) return;
-    prepare(s, occurrences, k, v.input);
+    prepare(s, allOccurrences, k, v.input);
   };
 
   const finish = (k: number) => {

@@ -27,8 +27,8 @@ Ordem a partir de 08/10/2026 (D-023): Ciclos A, A2, B, C e D vêm antes do Ciclo
 - [x] Core: vencimentos, geração, prévia, "esta e as próximas", encerrar, retomar, excluir, progresso do parcelamento, valor estimado e avisos contra contar duas vezes; repositório em memória e demonstração com Aluguel, Luz e Financiamento do carro
 - [x] App ligado ao banco (`SupabaseRepository`) com testes pela API
 - [x] Telas: lista "Gastos fixos e parcelamentos", cadastro (todo mês ou parcelado), detalhe, "esta e as próximas", encerrar ou retomar
-- [ ] Telas: "Com que frequência?" em Anotar conta a pagar, revisar contas vencidas, rótulos e "Informar o valor da conta" nas contas de série, "Repetir todo mês" e "Tornar gasto fixo", explicações em Aprender
-- [ ] Roteiro web (`npm run test:web`) com os passos do Ciclo A
+- [x] Telas: "Com que frequência?" em Anotar conta a pagar, revisar contas vencidas, rótulos e "Informar o valor da conta" nas contas de série, "Repetir todo mês" e "Tornar gasto fixo", explicações em Aprender
+- [x] Roteiro web (`npm run test:web`) com os passos do Ciclo A
 - [ ] Teste manual em iOS, Android e web, com e sem movimento reduzido e com leitor de tela
 
 ## Próximos ciclos (D-023)
