@@ -75,6 +75,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     ok(`${prefix}: nada passa da largura da tela`, outside.length === 0, outside.slice(0, 3).join(' | '));
     const cut = await p.evaluate(() => [...document.querySelectorAll('div[dir="auto"], span')].filter((e) => /R\$/.test(e.textContent || '') && e.children.length === 0 && e.getBoundingClientRect().width > 0 && e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent));
     ok(`${prefix}: nenhum valor em reais cortado`, cut.length === 0, cut.join(' | '));
+    // "R$" (e "≈") nunca ficam sozinhos no fim da linha: o espaço até o valor não quebra.
+    const loose = await p.evaluate(() => [...document.querySelectorAll('div[dir="auto"], span')].filter((e) => e.getBoundingClientRect().width > 0 && [...e.childNodes].some((n) => n.nodeType === 3 && /(R\$|≈) (\d|$)/.test(n.textContent))).map((e) => e.textContent.slice(0, 40)));
+    ok(`${prefix}: "R$" junto do valor`, loose.length === 0, loose.slice(0, 3).join(' | '));
     ok(`${prefix}: alvos de toque ≥ 44 px`, small.length === 0, small.join(' | '));
     const avatarOut = await p.evaluate(() => [...document.querySelectorAll('[aria-label^="Conta: perfil"]')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && (b.left < -0.5 || b.right > window.innerWidth + 0.5); }).length);
     ok(`${prefix}: avatar da conta inteiro na tela`, avatarOut === 0);
@@ -741,7 +744,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await radio('Novembro (vence em 10/11)').click(); await waitText('Soma das 36 parcelas'); await p.waitForTimeout(300);
     if (w === 320) ok('prévia do parcelamento: parcelas que faltam, período e soma que não é o valor para quitar', (await body()).includes('Parcelas 13 a 48 de R$ 850,00, todo dia 10, de 10/11/2026 a 10/10/2029. Soma das 36 parcelas: R$ 30.600,00. Não é o valor para quitar.'));
     await innerChecks(`novo parcelamento ${w}px`);
-    if (w === 320) await shot('35_novo_parcelamento_320px', true);
+    if (w === 320) {
+      // Tipos com rótulos longos quebram dentro do chip; a prévia mostra a soma sem cortar o valor.
+      await p.getByText('Tipo do parcelamento', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
+      await shot('35_novo_parcelamento_320px');
+      await p.getByText('Como vai ficar', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
+      await shot('35_novo_parcelamento_previa_320px');
+    }
     await btn('Cancelar').click(); await waitText('Descartar o preenchimento?');
     await btn('Descartar alterações').click(); await waitText('Por mês, se os valores não mudarem');
     await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
