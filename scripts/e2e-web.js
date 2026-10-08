@@ -67,7 +67,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     'i',
   );
   // Rola até um texto (as telas rolam dentro de uma área própria, e a captura de página inteira mostra só o topo).
-  const scrollTo = (text) => p.getByText(text, { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
+  const scrollTo = async (text) => {
+    await p.getByText(text, { exact: true }).filter({ visible: true }).first().evaluate((e) => e.scrollIntoView({ block: 'start' }));
+    await p.waitForTimeout(200);
+  };
   const screenTexts = [];
   const keepText = async () => { screenTexts.push(await body()); };
   // Símbolo C aberto (docs/marca): só ícone do app e abertura, nunca nas telas (D-022).
@@ -842,7 +845,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await openToPay();
   const seguroGroup = 'Seguro residencial de 2026 a 2027, 4 parcelas de cerca de R$ 120,00, valor estimado, de 15/11/2026 a 15/02/2027, conta do ano. Toque para ver as parcelas.';
   await waitRows('Próximos meses', (rows) => (rows ?? []).includes(seguroGroup));
-  let later = (await sectionRows('Próximos meses')) ?? [];
+  const later = (await sectionRows('Próximos meses')) ?? [];
   t = await body();
   ok('Próximos meses: as 4 parcelas num único grupo do ano, com nome acessível único ("cerca de")',
     later.filter((r) => r.startsWith('Seguro residencial')).length === 1 && later.includes(seguroGroup) &&
@@ -916,7 +919,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     (await body()).includes('Depois, as outras 3 parcelas de 2026/2027 em aberto saem de Contas a pagar.'));
   await scrollTo('Paguei o ano todo de uma vez (cota única)');
   await shot('46_paguei_o_ano_todo');
-  await widthChecks('paguei o ano todo', '46_paguei_o_ano_todo_320px', { to: 'Valor total pago' });
+  await widthChecks('paguei o ano todo', '46_paguei_o_ano_todo_320px', { to: 'Paguei o ano todo de uma vez (cota única)' });
   await p.getByText('Depois, as outras 3 parcelas', { exact: false }).filter({ visible: true }).first().scrollIntoViewIfNeeded();
   await shot('46_paguei_o_ano_todo_previa');
   await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado');
