@@ -7,7 +7,9 @@ import {
   addMonths,
   affectedByEnd,
   centsToInput,
+  currentTerm,
   fieldForErrorCode,
+  formatBRL,
   formatDateBR,
   formatMonthName,
   formatMonthYearBR,
@@ -17,7 +19,9 @@ import {
   monthOf,
   newOperationKey,
   numberOfMonth,
+  occurrencesToMaterialize,
   parseBRL,
+  parseDateBR,
   parseMonthBR,
   seriesCaption,
   seriesDueOn,
@@ -366,12 +370,28 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
   const yesterday = addDays(today, -1);
   const lastDue = parcelada && total !== null ? seriesDueOn(s, total) : null;
 
-  // Efeito da escolha, antes de confirmar.
-  const effect = !plan
+  // Efeito da escolha, antes de confirmar. Retomar (ou estender): as contas que a geração recria agora.
+  const extending = chosen === null || (typeof chosen === 'number' && s.lastNumber !== null && chosen > s.lastNumber);
+  const comingBack =
+    plan?.ok && extending ? occurrencesToMaterialize({ ...s, lastNumber: chosen ?? null }, occurrences, today).map((o) => formatMonthName(o.month)) : [];
+  const effect = !plan?.ok
     ? null
-    : !plan.ok
-      ? null
-      : plan.text ?? (resume || chosen === null ? null : 'Nenhuma conta em aberto vai sair da lista.');
+    : plan.text ??
+      (comingBack.length === 1
+        ? `A conta de ${comingBack[0]} volta para Contas a pagar.`
+        : comingBack.length > 1
+          ? `As contas de ${joinList(comingBack)} voltam para Contas a pagar.`
+          : extending
+            ? 'As próximas contas aparecem em Contas a pagar um mês antes de vencer.'
+            : 'Nenhuma conta em aberto vai sair da lista.');
+
+  // "Quitei o restante": o gasto que o pagamento vai registrar, só com valor e data válidos.
+  const payAmount = parseBRL(payDraft.amountText);
+  const payDate = parseDateBR(payDraft.dateText);
+  const payPreview =
+    paying && payTarget && payAmount !== null && payAmount > 0 && payAmount <= MAX_RECORD_CENTS && payDate !== null && payDate <= today
+      ? `Um gasto de ${formatBRL(payAmount)} será registrado em Pago de ${formatMonthYearBR(monthOf(payDate))}. Depois, o parcelamento termina na parcela ${payTarget.series!.number}.`
+      : null;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -379,7 +399,7 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
       <Screen contentStyle={{ padding: space[5], gap: space[4], paddingBottom: space[6] }}>
         <Card style={{ gap: space[1] }}>
           <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 16 }}>
-            {s.terms[s.terms.length - 1]?.description}
+            {currentTerm(s, today).description}
           </Txt>
           <Txt variant="caption" color={colors.textSecondary}>
             {seriesCaption(s, today)}
@@ -505,9 +525,12 @@ export function SeriesEndForm({ series: opened, space: personal }: { series: Com
                   {payErrors.accountId}
                 </Txt>
               ) : null}
-              <Txt variant="caption" color={colors.textSecondary}>
-                O pagamento entra em Pago de {formatMonthYearBR(monthOf(payTarget.dueOn < today ? today : today))} como um gasto, uma única vez.
-              </Txt>
+              {payPreview ? (
+                // Prévia que muda a cada tecla: sem região viva, para não ser anunciada de novo a cada dígito.
+                <Banner tone="info" icon={Info} live={false}>
+                  <Txt variant="label">{payPreview}</Txt>
+                </Banner>
+              ) : null}
             </View>
           ) : null}
         </Card>

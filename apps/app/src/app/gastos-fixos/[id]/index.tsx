@@ -40,7 +40,7 @@ import { Banner, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/compo
 import { flash } from '@/lib/flash';
 import { useDeleteSeries, useSeries, useSeriesOccurrences, useSeriesOperationKey, useSpace } from '@/state/data';
 import { useSession } from '@/state/session';
-import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
+import { colors, fonts, space, tabular } from '@/theme/tokens';
 
 const parcelas = (n: number) => (n === 1 ? '1 parcela' : `${n} parcelas`);
 
@@ -459,5 +459,4 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: space[4], paddingVertical: space[3], minHeight: 44, alignItems: 'center' },
   inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
   privacy: { flexDirection: 'row', alignSelf: 'center', alignItems: 'center', gap: space[2], minHeight: 44 },
-  badge: { borderRadius: radius.sm },
 });

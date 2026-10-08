@@ -240,22 +240,21 @@ export function SeriesForm({ kind: initialKind, prefill, space: personal }: { ki
       return true;
     }
     const occurrences = [...list].reverse();
-    const savedInput = JSON.parse(saved.snapshot) as SeriesInput;
-    if (saved.snapshot === snapshot || structureOf(savedInput) !== structureOf(input)) {
+    if (saved.snapshot === snapshot) {
       keys.settled();
-      if (saved.snapshot !== snapshot) {
-        // O período não muda por edição: mostrar o que foi salvo, sem aplicar nada em silêncio.
-        if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-        flash.set(`${series.kind === 'parcelada' ? 'Parcelamento salvo' : 'Gasto fixo salvo'} antes da falha de conexão, com o período do primeiro envio. Confira abaixo.`);
-        leave(() => router.replace(`/gastos-fixos/${series.id}`));
-        return true;
-      }
       finish({ series, occurrences, changed: 0 });
       return true;
     }
+    // O período não muda por edição, e uma primeira conta já paga não muda mais: mostrar o que foi salvo,
+    // sem aplicar nada em silêncio.
+    const savedInput = JSON.parse(saved.snapshot) as SeriesInput;
     const plan = affectedByEditFrom(occurrences, series, series.firstNumber);
-    if (!plan.ok) {
+    if (structureOf(savedInput) !== structureOf(input) || !plan.ok) {
       keys.settled();
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      flash.set(
+        `${series.kind === 'parcelada' ? 'Parcelamento salvo' : 'Gasto fixo salvo'} antes da falha de conexão, com o preenchimento do primeiro envio. Confira abaixo.`,
+      );
       leave(() => router.replace(`/gastos-fixos/${series.id}`));
       return true;
     }
