@@ -60,9 +60,12 @@ export interface Commitment {
   status: 'aberto' | 'quitado';
   /** Presente se e somente se status === 'quitado'. Lido do gasto vivo vinculado (fonte única, sem cópia). */
   payment: CommitmentPayment | null;
-  /** Ocorrência de gasto fixo ou parcelamento; null para conta avulsa. Lida pela junção com a série, sem cópia. */
+  /** Ocorrência de gasto fixo, parcelamento ou conta do ano; null para conta avulsa. Lida pela junção com a série, sem cópia. */
   series: CommitmentSeriesRef | null;
-  /** Alterada só neste mês ("Só esta conta"): "esta e as próximas" a partir de outro mês não a muda. */
+  /**
+   * Alterada só neste mês ("Só esta conta") ou com o valor do ano informado (conta do ano): "esta e as próximas"
+   * a partir de outra conta não a muda.
+   */
   seriesOverride: boolean;
   /** Valor de referência de um gasto fixo que muda (luz, água) até a pessoa informar o valor da conta. */
   amountIsEstimate: boolean;
@@ -88,6 +91,8 @@ export interface CommitmentSeriesRef {
   kind: SeriesKind;
   nature: SeriesNature;
   installmentTotal: number | null;
+  /** Conta do ano: parcelas por ano (1 = cota única). null nas outras. */
+  partsPerYear: number | null;
 }
 
 /** Campos que a pessoa informa ao anotar ou editar uma conta a pagar. */
@@ -120,7 +125,12 @@ export interface RecordInput {
   category: string | null;
 }
 
-export type SeriesKind = 'mensal' | 'parcelada';
+/** Gasto fixo (todo mês), parcelamento ou conta do ano (todo ano, D-029). */
+export type SeriesKind = 'mensal' | 'parcelada' | 'anual';
+/** Conta do ano: o ano inteiro entra em Contas a pagar quando a 1ª parcela dele vence até o fim do 2º mês depois do atual. */
+export const ANNUAL_LEAD_MONTHS = 2;
+/** Conta do ano: de 1 (cota única) a 12 parcelas por ano, em meses seguidos. */
+export const PARTS_PER_YEAR_MAX = 12;
 export type SeriesNature = 'conta' | 'financiamento' | 'compra_parcelada' | 'outro_parcelamento';
 /** Tipos que contam como dívida na renda comprometida (referência de 30%). */
 export const DEBT_NATURES: readonly SeriesNature[] = ['financiamento', 'compra_parcelada'];
@@ -140,8 +150,8 @@ export interface SeriesTerm {
 }
 
 /**
- * Gasto fixo (série mensal) ou parcelamento. Cada mês da série é uma conta a pagar comum (ocorrência),
- * criada do mês anterior ao seguinte a hoje; o resto é só previsão.
+ * Gasto fixo (série mensal), parcelamento ou conta do ano (série anual). Cada ocorrência é uma conta a pagar comum,
+ * criada do mês anterior ao seguinte a hoje (conta do ano: o ano inteiro, dois meses antes); o resto é só previsão.
  */
 export interface CommitmentSeries {
   id: string;
@@ -150,11 +160,16 @@ export interface CommitmentSeries {
   nature: SeriesNature;
   /** Mês da ocorrência firstNumber. */
   firstDueMonth: IsoMonth;
-  /** Mensal: 1. Parcelada: a próxima parcela a pagar no cadastro; as anteriores foram pagas antes do Clarevo. */
+  /**
+   * Mensal: 1. Parcelada: a próxima parcela a pagar no cadastro; as anteriores foram pagas antes do Clarevo.
+   * Anual: de 1 a partsPerYear, a próxima parcela a pagar no primeiro ano; a numeração continua entre os anos.
+   */
   firstNumber: number;
-  /** null = sem término (só mensal). firstNumber − 1 = nenhuma conta (só por encerramento). */
+  /** null = sem término (mensal e anual). firstNumber − 1 = nenhuma conta (só por encerramento). */
   lastNumber: number | null;
   installmentTotal: number | null;
+  /** Só anual: parcelas por ano, de 1 a 12, em meses seguidos. null nas outras. */
+  partsPerYear: number | null;
   currency: 'BRL';
   /** Vigências vivas, por fromNumber crescente. */
   terms: SeriesTerm[];
@@ -170,7 +185,7 @@ export interface CommitmentSeries {
   updatedAt: string;
 }
 
-/** Cadastro de gasto fixo ou parcelamento. */
+/** Cadastro de gasto fixo, parcelamento ou conta do ano. */
 export interface SeriesInput {
   kind: SeriesKind;
   nature: SeriesNature;
@@ -179,11 +194,16 @@ export interface SeriesInput {
   amountCents: Cents;
   amountMode: AmountMode;
   dueDay: number;
-  /** Mês da primeira conta (mensal) ou da próxima parcela (parcelada). */
+  /** Mês da primeira conta (mensal) ou da próxima parcela (parcelada e anual). */
   firstDueMonth: IsoMonth;
   firstNumber: number;
   installmentTotal: number | null;
-  /** Último mês (só mensal); null = sem data para terminar. */
+  /** Só anual: parcelas por ano (1 = cota única); null nas outras. */
+  partsPerYear: number | null;
+  /**
+   * Último mês; null = sem data para terminar. Mensal: o mês da última conta. Anual: o mês da última parcela do
+   * último ano (lastMonthOfYear). Parcelada: sempre null.
+   */
   lastMonth: IsoMonth | null;
 }
 

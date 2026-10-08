@@ -613,14 +613,15 @@ do $$ begin
 end $$;
 
 -- 20. Privilégios: authenticated executa só as funções expostas; anon não executa nada; sem escrita direta.
--- A lista inclui as funções de séries da migração de gastos fixos (testadas em 40_gastos_fixos.sql).
+-- A lista inclui as funções de séries das migrações de gastos fixos e de contas do ano (testadas em 40 e 45).
 reset role;
 do $$ begin
   assert (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
     = array['context_permission', 'create_commitment', 'create_record', 'create_series', 'delete_commitment', 'delete_record',
-            'delete_series', 'end_series', 'ensure_personal_space', 'is_org_admin', 'month_to_pay', 'month_totals', 'pay_commitment',
-            'sync_series_occurrences', 'undo_commitment_payment', 'update_commitment', 'update_record', 'update_series_from'],
+            'delete_series', 'end_series', 'ensure_personal_space', 'inform_series_year', 'is_org_admin', 'month_to_pay', 'month_totals',
+            'pay_commitment', 'skip_series_year', 'sync_series_occurrences', 'undo_commitment_payment', 'update_commitment', 'update_record',
+            'update_series_from'],
     'authenticated executa só as funções expostas';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')), 'anon não executa nenhuma função';

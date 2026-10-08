@@ -159,7 +159,7 @@ declare
   ctx uuid := pg_temp.id('ctx');
   -- tipo, natureza, descrição, categoria, valor, modo, dia, primeiro mês, próxima parcela, total, último mês, erro
   cases text[][] := array[
-    array['anual', 'conta', 'Escola', null, '100', 'fixo', '10', '2026-10-01', '1', null, null, 'tipo_invalido'],
+    array['semanal', 'conta', 'Escola', null, '100', 'fixo', '10', '2026-10-01', '1', null, null, 'tipo_invalido'],
     array[null, 'conta', 'Escola', null, '100', 'fixo', '10', '2026-10-01', '1', null, null, 'tipo_invalido'],
     array['mensal', 'financiamento', 'Escola', null, '100', 'fixo', '10', '2026-10-01', '1', null, null, 'natureza_invalida'],
     array['mensal', null, 'Escola', null, '100', 'fixo', '10', '2026-10-01', '1', null, null, 'natureza_invalida'],
@@ -193,7 +193,7 @@ declare
     array['mensal', 'conta', 'Escola', null, '100', 'fixo', '10', '2026-10-01', '1', null, '2026-12-15', 'fim_invalido'],
     array['parcelada', 'financiamento', 'Carro', null, '100', 'fixo', '10', '2026-10-01', '1', '12', '2027-09-01', 'fim_invalido'],
     -- Ordem: o primeiro erro da lista vence.
-    array['anual', 'financiamento', 'Escola', null, '0', 'fixo', '10', '2026-10-01', '1', null, null, 'tipo_invalido'],
+    array['semanal', 'financiamento', 'Escola', null, '0', 'fixo', '10', '2026-10-01', '1', null, null, 'tipo_invalido'],
     array['mensal', 'financiamento', 'Escola', null, '0', 'fixo', '10', '2026-10-01', '1', null, null, 'natureza_invalida'],
     array['mensal', 'conta', '', null, '0', 'fixo', '0', null, '1', null, null, 'valor_invalido'],
     array['mensal', 'conta', 'Escola', null, '100', 'misto', '0', null, '1', null, null, 'modo_de_valor_invalido'],
@@ -1209,8 +1209,9 @@ do $$ begin
   assert (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
     = array['context_permission', 'create_commitment', 'create_record', 'create_series', 'delete_commitment', 'delete_record',
-            'delete_series', 'end_series', 'ensure_personal_space', 'is_org_admin', 'month_to_pay', 'month_totals', 'pay_commitment',
-            'sync_series_occurrences', 'undo_commitment_payment', 'update_commitment', 'update_record', 'update_series_from'],
+            'delete_series', 'end_series', 'ensure_personal_space', 'inform_series_year', 'is_org_admin', 'month_to_pay', 'month_totals',
+            'pay_commitment', 'skip_series_year', 'sync_series_occurrences', 'undo_commitment_payment', 'update_commitment', 'update_record',
+            'update_series_from'],
     'authenticated executa só as funções expostas';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')), 'anon não executa nenhuma função';
