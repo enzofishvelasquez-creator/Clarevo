@@ -1,37 +1,37 @@
-import { ERROR_TEXT, formatDateBR, formatMonthBR } from '@clarevo/core';
-import { router, useLocalSearchParams } from 'expo-router';
+import { ERROR_TEXT, formatMonthBR } from '@clarevo/core';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { RecordRow } from '@/components/record-row';
 import { ContextPill, SubHeader } from '@/components/header';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Card, FitMoney, Money, Screen, Skeleton, Txt } from '@/components/ui';
-import { useCommitments, useMonthRecords, useSpace, useView } from '@/state/data';
-import { colors, fonts, space } from '@/theme/tokens';
+import { useMonthRecords, useSpace, useView } from '@/state/data';
+import { colors, space } from '@/theme/tokens';
 
 const COPY = {
   recebido: { title: 'Recebido', criterio: 'Recebimentos realizados com data de recebimento neste mês.' },
   pago: { title: 'Pago', criterio: 'Gastos pagos com data de pagamento neste mês.' },
-  apagar: {
-    title: 'Ainda a pagar',
-    criterio: 'Compromissos previstos com vencimento neste mês. Ainda não saíram da conta e não entram em Pago nem na diferença do mês.',
-  },
   diferenca: {
     title: 'Diferença do mês',
     criterio:
-      'Recebimentos menos pagamentos confirmados no período. Não é o saldo da conta nem dinheiro disponível: o saldo também depende do saldo inicial e de outros movimentos. Compromissos previstos não entram.',
+      'Recebimentos menos pagamentos confirmados no período. Não é o saldo da conta nem dinheiro disponível: o saldo também depende do saldo inicial e de outros movimentos. Contas a pagar não entram.',
   },
 } as const;
 
 /** Composição de cada total, com o mesmo critério e a mesma origem do resumo (CL C004). */
 export default function ComposicaoScreen() {
-  const { tipo } = useLocalSearchParams<{ tipo?: keyof typeof COPY }>();
-  const kind = tipo && tipo in COPY ? tipo : 'pago';
+  const { tipo } = useLocalSearchParams<{ tipo?: string }>();
+  // Endereço antigo de "Ainda a pagar": a lista agora é /a-pagar.
+  if (tipo === 'apagar') return <Redirect href="/a-pagar" />;
+  return <Composicao kind={tipo && tipo in COPY ? (tipo as keyof typeof COPY) : 'pago'} />;
+}
+
+function Composicao({ kind }: { kind: keyof typeof COPY }) {
   const copy = COPY[kind];
   const { month } = useView();
   const personal = useSpace().data;
   const records = useMonthRecords(personal?.personalContextId, month);
-  const commitments = useCommitments(personal?.personalContextId, month);
   const s = records.summary;
 
   const sections = !s
@@ -55,15 +55,7 @@ export default function ComposicaoScreen() {
         <Txt variant="caption" color={colors.textSecondary}>
           Pessoal · {formatMonthBR(month)}
         </Txt>
-        {kind === 'apagar' ? (
-          commitments.isPending ? (
-            <Skeleton width={180} height={40} />
-          ) : commitments.isError || !commitments.summary ? (
-            <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => commitments.refetch()} />
-          ) : (
-            <FitMoney cents={commitments.summary.toPayCents} />
-          )
-        ) : records.isPending ? (
+        {records.isPending ? (
           <Skeleton width={180} height={40} />
         ) : records.isError || !s ? (
           <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => records.refetch()} />
@@ -72,28 +64,7 @@ export default function ComposicaoScreen() {
         )}
         <Txt color={colors.textSecondary}>{copy.criterio}</Txt>
       </View>
-      {kind === 'apagar' && commitments.summary ? (
-        <Card>
-          {commitments.summary.items.length === 0 ? (
-            <EmptyState title="Nenhum compromisso registrado" art="compromissos" />
-          ) : (
-            commitments.summary.items.map((c, i, arr) => (
-              <View key={c.id} style={[styles.commitment, i < arr.length - 1 && styles.divider]}>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Txt variant="label" style={{ fontFamily: fonts.bold }}>
-                    {c.description}
-                  </Txt>
-                  <Txt variant="caption" color={colors.textSecondary}>
-                    Previsto · vence em {formatDateBR(c.dueOn)}
-                  </Txt>
-                </View>
-                <Money cents={c.amountCents} variant="label" style={{ fontFamily: fonts.bold, flexShrink: 0 }} />
-              </View>
-            ))
-          )}
-        </Card>
-      ) : null}
-      {(kind === 'apagar' ? [] : sections).map((sec) => (
+      {sections.map((sec) => (
         <Card key={sec.label}>
           <View style={styles.head}>
             <Txt variant="title">{sec.label}</Txt>
@@ -115,6 +86,4 @@ export default function ComposicaoScreen() {
 
 const styles = StyleSheet.create({
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space[1], gap: space[2] },
-  commitment: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: space[3], minHeight: 56 },
-  divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
 });

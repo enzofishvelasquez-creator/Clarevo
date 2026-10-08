@@ -1,31 +1,30 @@
 import {
   CATEGORIES,
+  COMMITMENT_ERROR_TEXT,
+  COMMITMENT_FIELD_ORDER,
   DESCRIPTION_MAX,
   MAX_RECORD_CENTS,
-  parseBRL,
-  ERROR_TEXT,
-  addDays,
-  charCount,
-  maskDateBR,
-  FIELD_ORDER,
   NO_CATEGORY_LABEL,
+  addDays,
   centsToInput,
+  charCount,
   fieldForErrorCode,
   formatBRL,
   formatDateBR,
   formatMonthBR,
   isRepoError,
+  maskDateBR,
   monthOf,
   newOperationKey,
+  parseBRL,
   parseDateBR,
-  validateRecordDraft,
+  validateCommitmentDraft,
+  type Commitment,
+  type CommitmentDraft,
+  type CommitmentInput,
   type DraftField,
   type FieldErrors,
-  type FinancialRecord,
   type PersonalSpace,
-  type RecordDraft,
-  type RecordInput,
-  type RecordKind,
 } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useNavigation } from 'expo-router';
@@ -40,63 +39,54 @@ import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
-import { totalChange } from '@/lib/highlight';
-import { useCreateRecord, useUpdateRecord } from '@/state/data';
+import { useCreateCommitment, useUpdateCommitment } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
-type Mode = { type: 'novo'; kind: RecordKind } | { type: 'editar'; record: FinancialRecord };
+export type CommitmentFormMode = { type: 'nova'; prefill?: Partial<CommitmentInput> } | { type: 'editar'; commitment: Commitment };
 
-const COPY = {
-  despesa: {
-    newTitle: 'Anotar gasto',
-    editTitle: 'Editar gasto',
-    situation: 'Gasto já pago',
-    dateLabel: 'Data do pagamento',
-    save: 'Salvar gasto',
-  },
-  receita: {
-    newTitle: 'Registrar recebimento',
-    editTitle: 'Editar recebimento',
-    situation: 'Recebimento já realizado',
-    dateLabel: 'Data do recebimento',
-    save: 'Salvar recebimento',
-  },
-} as const;
+/** Descrição que sugere fatura de cartão: pagar a fatura como conta a pagar contaria as compras duas vezes. */
+const INVOICE_HINT = /\bfatura\b|cart[aã]o/i;
 
-/** Formulário único de criar e editar (CL C002, C003, C005). */
-export function RecordForm({ mode, space: personal }: { mode: Mode; space: PersonalSpace }) {
+const commitmentText = (code: string) =>
+  code in COMMITMENT_ERROR_TEXT ? COMMITMENT_ERROR_TEXT[code as keyof typeof COMMITMENT_ERROR_TEXT] : COMMITMENT_ERROR_TEXT.salvar_falhou;
+
+/** Anotar e editar conta a pagar. Mesmos cuidados do RecordForm: rascunho preservado, chave por conteúdo e reconciliação. */
+export function CommitmentForm({ mode, space: personal }: { mode: CommitmentFormMode; space: PersonalSpace }) {
   const { today } = useSession();
   const repo = useRepo();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const create = useCreateRecord();
-  const update = useUpdateRecord();
+  const create = useCreateCommitment();
+  const update = useUpdateCommitment();
   const qc = useQueryClient();
 
-  const kind = mode.type === 'novo' ? mode.kind : mode.record.kind;
-  const copy = COPY[kind];
-  const contextId = mode.type === 'novo' ? personal.personalContextId : mode.record.contextId;
+  const contextId = mode.type === 'nova' ? personal.personalContextId : mode.commitment.contextId;
+  const contextName = 'Pessoal';
 
-  const initial = useMemo<RecordDraft>(
-    () =>
-      mode.type === 'novo'
-        ? { accountId: personal.accounts[0]?.id ?? '', amountText: '', description: '', category: null, dateText: formatDateBR(today) }
-        : {
-            accountId: mode.record.accountId,
-            amountText: centsToInput(mode.record.amountCents),
-            description: mode.record.description,
-            category: mode.record.category,
-            dateText: formatDateBR(mode.record.occurredOn),
-          },
-    [], // eslint-disable-line react-hooks/exhaustive-deps
-  );
+  // O inicial já inclui o preenchimento da rota: abrir preenchido e sair sem mexer não pede confirmação.
+  const initial = useMemo<CommitmentDraft>(() => {
+    if (mode.type === 'editar') {
+      const c = mode.commitment;
+      return { description: c.description, amountText: centsToInput(c.amountCents), dateText: formatDateBR(c.dueOn), category: c.category };
+    }
+    const p = mode.prefill ?? {};
+    return {
+      description: p.description ?? '',
+      amountText: p.amountCents ? centsToInput(p.amountCents) : '',
+      dateText: p.dueOn ? formatDateBR(p.dueOn) : '',
+      category: p.category ?? null,
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const [draft, setDraft] = useState<RecordDraft>(initial);
+  const [draft, setDraft] = useState<CommitmentDraft>(initial);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [banner, setBanner] = useState<string | null>(null);
-  const [conflict, setConflict] = useState<FinancialRecord | null>(null);
-  const [baseVersion, setBaseVersion] = useState(mode.type === 'editar' ? mode.record.version : 0);
+  const [retry, setRetry] = useState(false);
+  const [conflict, setConflict] = useState<Commitment | null>(null);
+  const [paidElsewhere, setPaidElsewhere] = useState(false);
+  // Versão e vencimento de base: os da versão em que as alterações serão aplicadas.
+  const [base, setBase] = useState(mode.type === 'editar' ? { version: mode.commitment.version, dueOn: mode.commitment.dueOn } : null);
   const [busy, setBusy] = useState(false);
   const [leaveTo, setLeaveTo] = useState<null | (() => void)>(null);
   const [confirmDiscard, setConfirmDiscard] = useState<null | (() => void)>(null);
@@ -112,8 +102,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   } satisfies Record<DraftField, React.RefObject<TextInput | null>>;
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
-  const account = personal.accounts.find((a) => a.id === draft.accountId) ?? personal.accounts[0];
-  const contextName = 'Pessoal';
+  const editingId = mode.type === 'editar' ? mode.commitment.id : null;
 
   // Sair com alterações não salvas pede confirmação (voltar, gesto, botão do sistema).
   usePreventRemove(dirty && !leaveTo, ({ data }) => {
@@ -125,63 +114,76 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   }, [leaveTo]);
 
   const leave = (fn: () => void) => setLeaveTo(() => fn);
+  const goBack = () => (router.canGoBack() ? router.back() : router.replace(editingId ? `/a-pagar/${editingId}` : '/a-pagar'));
 
-  const set = <K extends keyof RecordDraft>(k: K, v: RecordDraft[K]) => {
+  const set = <K extends keyof CommitmentDraft>(k: K, v: CommitmentDraft[K]) => {
     setDraft((d) => ({ ...d, [k]: v }));
     if (k in errors) setErrors((e) => ({ ...e, [k]: undefined }));
   };
 
   const focusFirst = (errs: FieldErrors) => {
-    const first = FIELD_ORDER.find((f) => errs[f]);
+    const first = COMMITMENT_FIELD_ORDER.find((f) => errs[f]);
     if (first) refs[first].current?.focus();
   };
 
-  const finish = (recordId: string, saved?: Pick<FinancialRecord, 'amountCents' | 'occurredOn'>) => {
+  const finish = (id: string) => {
     // Confirmação tátil só depois da gravação confirmada.
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    if (saved) {
-      const total = kind === 'despesa' ? 'pago' : 'recebido';
-      const month = monthOf(saved.occurredOn);
-      if (mode.type === 'novo') totalChange.set({ total, month, deltaCents: saved.amountCents });
-      else if (monthOf(mode.record.occurredOn) === month) totalChange.set({ total, month, deltaCents: saved.amountCents - mode.record.amountCents });
-      else totalChange.set({ total, month, deltaCents: saved.amountCents });
-    }
-    if (mode.type === 'novo') {
-      flash.set(kind === 'despesa' ? 'Gasto salvo' : 'Recebimento salvo');
-      leave(() => router.replace(`/registro/${recordId}`));
+    if (mode.type === 'nova') {
+      flash.set('Conta a pagar salva');
+      leave(() => router.replace(`/a-pagar/${id}`));
     } else {
       flash.set('Alterações salvas');
-      leave(() => router.back());
+      leave(() => (router.canGoBack() ? router.back() : router.replace(`/a-pagar/${id}`)));
     }
   };
 
-  const send = async (key: string, input: RecordInput, version: number) => {
-    if (mode.type === 'novo') return create.mutateAsync({ key, contextId, kind, input });
-    return update.mutateAsync({ key, id: mode.record.id, version, input });
+  const send = async (key: string, input: CommitmentInput, version: number) => {
+    if (mode.type === 'nova') return create.mutateAsync({ key, contextId, input });
+    return update.mutateAsync({ key, id: mode.commitment.id, version, input });
   };
 
   /**
    * Resultado de rede incerto: antes de repetir, conferir se alguma tentativa anterior foi gravada.
-   * Se foi, e o preenchimento mudou depois da falha, aplica o preenchimento atual como edição
-   * desse mesmo registro (nunca cria um segundo). Devolve o ID do registro, ou null se nada foi gravado.
+   * Se foi e o preenchimento mudou depois da falha, aplica o preenchimento atual como edição
+   * dessa mesma conta a pagar (nunca cria uma segunda). Devolve o ID, ou null se nada foi gravado.
    */
-  const reconcile = async (input: RecordInput, snapshot: string): Promise<{ id: string } & Partial<FinancialRecord> | null> => {
+  const reconcile = async (input: CommitmentInput, snapshot: string): Promise<string | null> => {
     for (const attempt of [...pending.current].reverse()) {
-      const op = await repo.findOperation(attempt.key);
-      if (!op) continue;
+      const op = await repo.findCommitmentOperation(attempt.key);
+      if (!op || (op.action !== 'criar_compromisso' && op.action !== 'editar_compromisso')) continue;
       pending.current = [];
-      qc.invalidateQueries({ queryKey: ['records'] });
-      qc.invalidateQueries({ queryKey: ['record', op.recordId] });
-      const current = await repo.getRecord(op.recordId);
-      if (attempt.snapshot === snapshot || !current) return current ?? { id: op.recordId };
-      return update.mutateAsync({ key: newOperationKey(), id: current.id, version: current.version, input });
+      qc.invalidateQueries({ queryKey: ['commitments'] });
+      qc.invalidateQueries({ queryKey: ['commitment', op.commitmentId] });
+      const current = await repo.getCommitment(op.commitmentId);
+      if (attempt.snapshot === snapshot || !current) return op.commitmentId;
+      const saved = await update.mutateAsync({ key: newOperationKey(), id: current.id, version: current.version, input });
+      return saved.commitment.id;
     }
     return null;
   };
 
-  const submit = async (versionOverride?: number) => {
+  /** Versão desatualizada na edição: recarrega e mostra o que mudou, sem perder o preenchimento. */
+  const showConflict = async (id: string) => {
+    try {
+      const current = await repo.getCommitment(id);
+      qc.invalidateQueries({ queryKey: ['commitments'] });
+      if (!current) {
+        setBanner(COMMITMENT_ERROR_TEXT.nao_encontrado);
+        return;
+      }
+      qc.setQueryData(['commitment', current.id], current);
+      if (current.status === 'quitado') setPaidElsewhere(true);
+      else setConflict(current);
+    } catch {
+      setBanner(`${COMMITMENT_ERROR_TEXT.versao_desatualizada} ${COMMITMENT_ERROR_TEXT.carregar_falhou}`);
+    }
+  };
+
+  const submit = async (override?: { version: number; dueOn: string }) => {
     if (busy) return; // envio repetido bloqueado enquanto o anterior não termina
-    const v = validateRecordDraft(draft, today);
+    const current = override ?? base;
+    const v = validateCommitmentDraft(draft, today, { originalDueOn: current?.dueOn });
     if (!v.ok) {
       setErrors(v.errors);
       focusFirst(v.errors);
@@ -189,14 +191,16 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     }
     setErrors({});
     setBanner(null);
+    setPaidElsewhere(false);
     setBusy(true);
-    const version = versionOverride ?? baseVersion;
+    const version = current?.version ?? 0;
     const snapshot = JSON.stringify([v.input, version]);
     try {
       if (pending.current.length > 0) {
-        const saved = await reconcile(v.input, snapshot);
-        if (saved) {
-          finish(saved.id, saved.amountCents !== undefined && saved.occurredOn ? { amountCents: saved.amountCents, occurredOn: saved.occurredOn } : undefined);
+        const savedId = await reconcile(v.input, snapshot);
+        if (savedId) {
+          setRetry(false);
+          finish(savedId);
           return;
         }
         // Nada foi gravado: repetir com a mesma chave se o conteúdo é o mesmo da última tentativa.
@@ -207,39 +211,38 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       try {
         const saved = await send(key, v.input, version);
         pending.current = [];
-        finish(saved.id, saved);
+        setRetry(false);
+        finish(saved.commitment.id);
       } catch (e) {
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
           opKey.current = newOperationKey();
+          setRetry(false);
           const field = fieldForErrorCode(e.code);
-          if (field) {
-            const errs = { [field]: ERROR_TEXT[e.code as keyof typeof ERROR_TEXT] };
+          if (field && COMMITMENT_FIELD_ORDER.includes(field)) {
+            const errs = { [field]: commitmentText(e.code) };
             setErrors(errs);
             focusFirst(errs);
             return;
           }
-          if (e.code === 'versao_desatualizada' && mode.type === 'editar') {
-            try {
-              const current = await repo.getRecord(mode.record.id);
-              qc.invalidateQueries({ queryKey: ['records'] });
-              if (current) {
-                qc.setQueryData(['record', current.id], current);
-                setConflict(current);
-              } else setBanner(ERROR_TEXT.nao_encontrado);
-            } catch {
-              setBanner(`${ERROR_TEXT.versao_desatualizada} ${ERROR_TEXT.carregar_falhou}`);
-            }
+          if (e.code === 'versao_desatualizada' && editingId) {
+            await showConflict(editingId);
             return;
           }
-          setBanner(e.code in ERROR_TEXT ? ERROR_TEXT[e.code as keyof typeof ERROR_TEXT] : ERROR_TEXT.salvar_falhou);
+          if (e.code === 'compromisso_quitado') {
+            setPaidElsewhere(true);
+            return;
+          }
+          setBanner(commitmentText(e.code));
           return;
         }
         // Falha de rede: a gravação pode ou não ter acontecido. Guardar a tentativa para reconciliar.
         pending.current = [...pending.current, { key, snapshot }];
-        setBanner(ERROR_TEXT.salvar_falhou);
+        setRetry(true);
+        setBanner(COMMITMENT_ERROR_TEXT.salvar_falhou);
       }
     } catch {
-      setBanner(ERROR_TEXT.salvar_falhou);
+      setRetry(true);
+      setBanner(COMMITMENT_ERROR_TEXT.salvar_falhou);
     } finally {
       setBusy(false);
     }
@@ -247,28 +250,32 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
 
   const applyOverConflict = () => {
     if (!conflict) return;
-    setBaseVersion(conflict.version);
+    const next = { version: conflict.version, dueOn: conflict.dueOn };
+    setBase(next);
     setConflict(null);
-    submit(conflict.version);
+    submit(next);
   };
 
   const requestCancel = () => {
-    if (dirty) setConfirmDiscard(() => () => router.back());
-    else router.back();
+    if (dirty) setConfirmDiscard(() => goBack);
+    else goBack();
   };
-
-  const parsedDate = parseDateBR(draft.dateText);
-  const movesMonth = mode.type === 'editar' && parsedDate && monthOf(parsedDate) !== monthOf(mode.record.occurredOn);
 
   const formatAmountOnBlur = () => {
     const cents = parseBRL(draft.amountText);
     if (cents !== null && cents > 0 && cents <= MAX_RECORD_CENTS) setDraft((d) => ({ ...d, amountText: centsToInput(cents) }));
   };
 
+  // Avisos ao vivo (informativos; a validação continua no salvar).
+  const dueOn = parseDateBR(draft.dateText);
+  const alreadyDue = dueOn !== null && dueOn < today;
+  const movesFrom = base && dueOn && monthOf(dueOn) !== monthOf(base.dueOn) ? monthOf(base.dueOn) : null;
+  const looksLikeInvoice = INVOICE_HINT.test(draft.description);
+
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <SubHeader
-        title={mode.type === 'novo' ? copy.newTitle : copy.editTitle}
+        title={mode.type === 'nova' ? 'Anotar conta a pagar' : 'Editar conta a pagar'}
         onBack={requestCancel}
         right={<ContextPill label={`Salvando em ${contextName}`} />}
       />
@@ -276,28 +283,28 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
         {conflict ? (
           <Banner tone="erro" icon={AlertCircle}>
             <Txt variant="label" color={colors.error}>
-              {ERROR_TEXT.versao_desatualizada}
+              {COMMITMENT_ERROR_TEXT.versao_desatualizada}
             </Txt>
             <Txt variant="caption">
-              Versão atual: {conflict.description} · {formatBRL(conflict.amountCents)} · {formatDateBR(conflict.occurredOn)}
+              Versão atual: {conflict.description} · {formatBRL(conflict.amountCents)} · vence em {formatDateBR(conflict.dueOn)}
             </Txt>
             <Txt variant="caption">Seu preenchimento foi mantido abaixo.</Txt>
             <Button label="Aplicar minhas alterações na versão atual" tone="soft" onPress={applyOverConflict} />
-            <Button label="Descartar minhas alterações" tone="ghost" onPress={() => leave(() => router.back())} />
+            <Button label="Descartar minhas alterações" tone="ghost" onPress={() => leave(goBack)} />
           </Banner>
         ) : null}
-
-        {mode.type === 'editar' && mode.record.commitmentId ? (
-          <Banner tone="info" icon={Info}>
-            <Txt variant="label">
-              Este gasto é o pagamento de uma conta a pagar. Mudar valor, data ou conta altera Pago; o valor previsto da conta a pagar não muda.
+        {paidElsewhere && editingId ? (
+          <Banner tone="erro" icon={AlertCircle}>
+            <Txt variant="label" color={colors.error}>
+              {COMMITMENT_ERROR_TEXT.compromisso_quitado}
             </Txt>
+            <Button label="Ver conta a pagar" tone="soft" onPress={() => leave(goBack)} />
           </Banner>
         ) : null}
 
         <Card style={{ gap: space[4] }}>
           <Txt variant="caption" color={colors.textSecondary}>
-            {copy.situation} · {account?.name}
+            Prevista · só entra em Pago quando for marcada como paga
           </Txt>
 
           <TextField
@@ -305,14 +312,24 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             label="Descrição"
             value={draft.description}
             onChangeText={(t) => set('description', t)}
-            placeholder={kind === 'despesa' ? 'Ex.: Café' : 'Ex.: Salário'}
+            placeholder="Ex.: Internet"
             maxLength={DESCRIPTION_MAX}
-            autoFocus={mode.type === 'novo'}
+            autoFocus={mode.type === 'nova' && !mode.prefill?.description}
             error={errors.description}
             hint={charCount(draft.description) >= 60 ? `${charCount(draft.description)} de ${DESCRIPTION_MAX} caracteres` : undefined}
             returnKeyType="next"
             onSubmitEditing={() => refs.amountText.current?.focus()}
           />
+
+          {looksLikeInvoice ? (
+            <Banner tone="info" icon={Info}>
+              <Txt variant="label">
+                Se as compras do cartão já foram anotadas como gastos, não anote a fatura como conta a pagar: ao pagar, o valor contaria duas
+                vezes em Pago.
+              </Txt>
+              <LinkButton label="Fatura sem contar duas vezes" style={styles.inlineLink} onPress={() => router.push('/explicacao/fatura')} />
+            </Banner>
+          ) : null}
 
           <TextField
             ref={refs.amountText}
@@ -326,12 +343,13 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             inputMode="decimal"
             large
             error={errors.amountText}
+            hint="Valor previsto. Ao marcar como paga, você informa o valor que saiu da conta."
           />
 
           <View style={{ gap: space[2] }}>
             <TextField
               ref={refs.dateText}
-              label={copy.dateLabel}
+              label="Data de vencimento"
               value={draft.dateText}
               onChangeText={(t) => set('dateText', maskDateBR(t))}
               placeholder="DD/MM/AAAA"
@@ -339,35 +357,17 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
               inputMode="numeric"
               maxLength={10}
               error={errors.dateText}
-              hint="Digite só os números. Só datas até hoje."
+              hint="Digite só os números."
             />
-            <View style={styles.chips}>
+            <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Atalhos de vencimento">
               <Chip label="Hoje" selected={draft.dateText === formatDateBR(today)} onPress={() => set('dateText', formatDateBR(today))} />
               <Chip
-                label="Ontem"
-                selected={draft.dateText === formatDateBR(addDays(today, -1))}
-                onPress={() => set('dateText', formatDateBR(addDays(today, -1)))}
+                label="Amanhã"
+                selected={draft.dateText === formatDateBR(addDays(today, 1))}
+                onPress={() => set('dateText', formatDateBR(addDays(today, 1)))}
               />
             </View>
           </View>
-
-          {personal.accounts.length > 1 ? (
-            <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel="Conta">
-              <Txt variant="label" style={{ fontFamily: fonts.bold }}>
-                Conta
-              </Txt>
-              <View style={styles.chips}>
-                {personal.accounts.map((a) => (
-                  <Chip key={a.id} label={a.name} selected={draft.accountId === a.id} onPress={() => set('accountId', a.id)} />
-                ))}
-              </View>
-              {errors.accountId ? (
-                <Txt variant="label" color={colors.error}>
-                  {errors.accountId}
-                </Txt>
-              ) : null}
-            </View>
-          ) : null}
 
           <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel="Categoria">
             <Txt variant="label" style={{ fontFamily: fonts.bold }}>
@@ -375,27 +375,34 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             </Txt>
             <View style={styles.chips}>
               <Chip label={NO_CATEGORY_LABEL} selected={draft.category === null} onPress={() => set('category', null)} />
-              {CATEGORIES[kind].map((c) => (
+              {CATEGORIES.despesa.map((c) => (
                 <Chip key={c} label={c} selected={draft.category === c} onPress={() => set('category', c)} />
               ))}
             </View>
           </View>
 
-          {movesMonth && parsedDate ? (
+          {alreadyDue ? (
+            <Banner tone="info" icon={Info}>
+              <Txt variant="label">Esta conta a pagar já venceu. Ela aparece como vencida até ser marcada como paga.</Txt>
+            </Banner>
+          ) : null}
+          {movesFrom && dueOn ? (
             <Banner tone="info" icon={Info}>
               <Txt variant="label">
-                O registro sai de {formatMonthBR(monthOf(mode.record.occurredOn)).toLowerCase()} e passa a contar em{' '}
-                {formatMonthBR(monthOf(parsedDate)).toLowerCase()}.
+                A conta a pagar sai de {formatMonthBR(movesFrom).toLowerCase()} e passa a contar em {formatMonthBR(monthOf(dueOn)).toLowerCase()}.
               </Txt>
             </Banner>
           ) : null}
-
-          <Txt variant="label" color={colors.textSecondary}>
-            Será salvo em <Txt variant="label" style={{ fontFamily: fonts.bold }}>{contextName}</Txt>, {account?.name}.
-          </Txt>
         </Card>
 
-        <LinkButton label="Como este registro entra no mês?" color={colors.textSecondary} onPress={() => router.push('/explicacao/diferenca')} />
+        <Txt variant="label" color={colors.textSecondary}>
+          Será salva em <Txt variant="label" style={{ fontFamily: fonts.bold }}>{contextName}</Txt> como conta a pagar prevista.
+        </Txt>
+        <LinkButton
+          label="Como uma conta a pagar entra no mês?"
+          color={colors.textSecondary}
+          onPress={() => router.push('/explicacao/realizado-previsto')}
+        />
       </Screen>
 
       {/* Rodapé fixo: a ação principal fica sempre visível, acima do teclado. */}
@@ -411,7 +418,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
           <View style={styles.footerRow}>
             <Button label="Cancelar" tone="ghost" onPress={requestCancel} style={styles.cancel} />
             <Button
-              label={banner && !conflict ? 'Tentar novamente' : copy.save}
+              label={retry ? 'Tentar novamente' : 'Salvar conta a pagar'}
               busy={busy}
               busyLabel="Salvando…"
               onPress={() => submit()}
@@ -441,6 +448,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
 const styles = StyleSheet.create({
   body: { padding: space[5], gap: space[4], paddingBottom: space[6] },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
+  inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
   footer: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space[3], paddingHorizontal: space[5] },
   footerInner: { width: '100%', maxWidth: 560, alignSelf: 'center', gap: space[3] },
   footerRow: { flexDirection: 'row', gap: space[3], alignItems: 'center' },

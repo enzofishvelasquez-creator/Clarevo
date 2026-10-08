@@ -1,6 +1,6 @@
-import { ERROR_TEXT, formatBRL, formatDateBR, formatMonthBR } from '@clarevo/core';
+import { ERROR_TEXT, formatBRL, formatDateBR, formatMonthBR, toPayCaption } from '@clarevo/core';
 import { router, useFocusEffect } from 'expo-router';
-import { ArrowRight, CalendarClock, Plus, ShieldCheck } from 'lucide-react-native';
+import { AlertCircle, ArrowRight, CalendarClock, Plus, ShieldCheck } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, FadeInLeft, FadeInRight, FadeOut, ReduceMotion } from 'react-native-reanimated';
@@ -24,7 +24,6 @@ export default function ResumoScreen() {
   const personal = useSpace().data;
   const contextId = kind === 'pessoal' ? personal?.personalContextId : undefined;
   const records = useMonthRecords(contextId, month);
-  const commitments = useCommitments(contextId, month);
   const s = records.summary;
   const monthName = formatMonthBR(month);
 
@@ -120,37 +119,7 @@ export default function ResumoScreen() {
             <>
               <Button label="Anotar gasto" icon={Plus} onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } })} />
 
-              <Pressable
-                accessibilityRole="button"
-                accessibilityHint="Mostra os compromissos que compõem o total"
-                disabled={!commitments.summary?.items.length}
-                onPress={() => router.push({ pathname: '/composicao', params: { tipo: 'apagar' } })}>
-                <Card style={styles.cardRow}>
-                  <View style={{ flex: 1, gap: space[1] }}>
-                    <Txt variant="label" color={colors.textSecondary}>
-                      {month === currentMonth ? 'Ainda a pagar neste mês' : `Previsto para ${monthName.toLowerCase()}`}
-                    </Txt>
-                    {commitments.isPending ? (
-                      <Skeleton width={140} height={28} />
-                    ) : commitments.isError || !commitments.summary ? (
-                      <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => commitments.refetch()} />
-                    ) : commitments.summary.items.length === 0 ? (
-                      <Txt variant="label">Nenhum compromisso registrado.</Txt>
-                    ) : (
-                      <>
-                        <Money cents={commitments.summary.toPayCents} />
-                        <Txt variant="caption" color={colors.textSecondary}>
-                          {commitments.summary.items.map((c) => c.description).join(' e ')}
-                        </Txt>
-                      </>
-                    )}
-                    <Txt variant="caption" color={colors.textSecondary}>
-                      Valores previstos, separados do que já foi pago.
-                    </Txt>
-                  </View>
-                  <CalendarClock size={22} color={colors.textSecondary} />
-                </Card>
-              </Pressable>
+              <ToPayCard contextId={contextId} />
 
               <Card>
                 <View style={styles.cardHead}>
@@ -199,6 +168,79 @@ export default function ResumoScreen() {
         </Body>
       </Screen>
     </View>
+  );
+}
+
+/**
+ * "Ainda a pagar" (D-021): rótulo fora da área tocável, resumo tocável que abre /a-pagar e,
+ * como irmão (nunca dentro), o link "Anotar conta a pagar". Falha de carga nunca vira R$ 0,00.
+ */
+function ToPayCard({ contextId }: { contextId: string | undefined }) {
+  const { today } = useSession();
+  const { month, currentMonth } = useView();
+  const commitments = useCommitments(contextId, month);
+  const s = commitments.summary;
+  const isCurrent = month === currentMonth;
+  const monthName = formatMonthBR(month).toLowerCase();
+  const label = isCurrent ? 'Ainda a pagar neste mês' : `Previsto para ${monthName}`;
+  const caption = s ? toPayCaption(s, today) : null;
+  // Total zero é um total conhecido: mostra R$ 0,00 e explica por quê.
+  const zeroText = !s
+    ? null
+    : !s.hasAny
+      ? 'Nenhuma conta a pagar em aberto.'
+      : s.paidInMonth.length > 0
+        ? isCurrent
+          ? 'Todas as contas a pagar deste mês foram pagas.'
+          : `Todas as contas a pagar de ${monthName} foram pagas.`
+        : isCurrent
+          ? 'Nenhuma conta a pagar vence neste mês.'
+          : `Nenhuma conta a pagar em aberto com vencimento em ${monthName}.`;
+  const a11y = !s
+    ? label
+    : caption?.main
+      ? `${label}, ${formatBRL(s.toPayCents)}. ${caption.main}.${caption.overdue ? ` ${caption.overdue}.` : ''}${caption.includes ? ` ${caption.includes}` : ''}`
+      : `${label}, ${formatBRL(s.toPayCents)}. ${zeroText}`;
+
+  return (
+    <Card style={{ gap: space[2] }}>
+      <Txt variant="label" color={colors.textSecondary}>
+        {label}
+      </Txt>
+      {commitments.isPending ? (
+        <Skeleton width={140} height={28} />
+      ) : commitments.isError || !s || !caption ? (
+        <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => commitments.refetch()} />
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={a11y}
+          accessibilityHint="Abre as contas a pagar"
+          onPress={() => router.push('/a-pagar')}
+          style={(st) => [styles.toPayArea, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && styles.focusRing]}>
+          <View style={{ flex: 1, gap: space[1] }}>
+            <Money cents={s.toPayCents} />
+            <Txt variant="caption" color={colors.textSecondary}>
+              {caption.main ?? zeroText}
+            </Txt>
+            {caption.overdue ? (
+              <View style={styles.overdueRow}>
+                <AlertCircle size={16} color={colors.error} aria-hidden />
+                <Txt variant="caption" color={colors.error} style={{ fontFamily: fonts.bold }}>
+                  {caption.overdue}
+                </Txt>
+              </View>
+            ) : null}
+            {caption.includes ? <Txt variant="caption">{caption.includes}</Txt> : null}
+            <Txt variant="caption" color={colors.textSecondary}>
+              Valores previstos, separados do que já foi pago.
+            </Txt>
+          </View>
+          <CalendarClock size={22} color={colors.textSecondary} aria-hidden />
+        </Pressable>
+      )}
+      <LinkButton label="Anotar conta a pagar" icon={Plus} style={styles.toPayLink} onPress={() => router.push('/a-pagar/nova')} />
+    </Card>
   );
 }
 
@@ -254,7 +296,10 @@ const styles = StyleSheet.create({
   totalLabelRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
   changePill: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: space[2], paddingVertical: 1 },
   focusOnBrand: { outlineWidth: 3, outlineColor: colors.accent, outlineStyle: 'solid', outlineOffset: 2 } as object,
-  cardRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3] },
+  toPayArea: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3], minHeight: 44, borderRadius: radius.sm },
+  overdueRow: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
+  toPayLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
+  focusRing: { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid', outlineOffset: 2 } as object,
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space[2], flexWrap: 'wrap' },
   learn: {
     backgroundColor: colors.accent,

@@ -175,14 +175,21 @@ export function Button({
   );
 }
 
-export function LinkButton({ label, color = colors.brand, ...props }: PressableProps & { label: string; color?: string }) {
+export function LinkButton({
+  label,
+  color = colors.brand,
+  icon: Icon,
+  style,
+  ...props
+}: PressableProps & { label: string; color?: string; icon?: LucideIcon; style?: StyleProp<ViewStyle> }) {
   return (
     <Pressable
       accessibilityRole="button"
       hitSlop={10}
       {...props}
-      style={(s) => [styles.link, (s as { focused?: boolean }).focused && styles.focusRing]}>
-      <Txt variant="label" color={color} style={{ fontFamily: fonts.bold, fontSize: 16 }}>
+      style={(s) => [styles.link, Icon && styles.linkWithIcon, style, (s as { focused?: boolean }).focused && styles.focusRing]}>
+      {Icon ? <Icon size={18} color={color} strokeWidth={2.25} /> : null}
+      <Txt variant="label" color={color} style={{ fontFamily: fonts.bold, fontSize: 16, flexShrink: 1 }}>
         {label}
       </Txt>
     </Pressable>
@@ -350,6 +357,7 @@ export const styles = StyleSheet.create({
   },
   buttonText: { fontFamily: fonts.bold, fontSize: 16, textAlign: 'center', flexShrink: 1 },
   link: { minHeight: 44, justifyContent: 'center', alignSelf: 'center', paddingHorizontal: space[2] },
+  linkWithIcon: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
   focusRing: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.brand, outlineOffset: 2 },
   focusRingOnBrand: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.accent, outlineOffset: 2 },
   input: {

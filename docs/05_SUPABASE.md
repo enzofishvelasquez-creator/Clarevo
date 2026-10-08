@@ -1,6 +1,6 @@
 # Ligar o Clarevo ao Supabase (login e dados reais)
 
-07/10/2026. Sem esta configuração, o app roda em **demonstração**: acesso simulado, nenhum e-mail enviado, dados só na memória do aparelho. Com ela, cadastro, confirmação de e-mail, recuperação de senha e registros passam a ser reais.
+08/10/2026. Sem esta configuração, o app roda em **demonstração**: acesso simulado, nenhum e-mail enviado, dados só na memória do aparelho. Com ela, cadastro, confirmação de e-mail, recuperação de senha, registros e contas a pagar passam a ser reais.
 
 Não consegui abrir a documentação do Supabase deste ambiente (acesso bloqueado pela rede). Os nomes dos menus abaixo podem variar um pouco no painel; o conteúdo de cada passo é o mesmo.
 
@@ -15,7 +15,9 @@ Não consegui abrir a documentação do Supabase deste ambiente (acesso bloquead
 
 1. No projeto, abra **SQL Editor** → **New query**.
 2. Cole todo o conteúdo de `supabase/migrations/20261007000001_fundacao.sql` e clique em **Run**.
-3. Deve terminar sem erro. Se aparecer erro, me envie a mensagem.
+3. **Depois**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261007000002_contas_a_pagar.sql` e clique em **Run**. A ordem importa: a segunda altera tabelas e funções criadas pela primeira. Cada arquivo roda uma única vez; se o projeto já tinha a primeira, rode só a segunda.
+4. As duas devem terminar sem erro. Se aparecer erro, me envie a mensagem.
+5. Se o app mostrar erro ao abrir as contas a pagar logo depois, a API ainda não leu o esquema novo: no SQL Editor, rode `notify pgrst, 'reload schema';`.
 
 ## 3. Configurar o login
 
@@ -67,6 +69,7 @@ Se preferir, me envie só a **Project URL** e a **chave pública** (são públic
 - Criar conta com um e-mail seu → chega o e-mail de confirmação → abrir o link → "Sua primeira conta".
 - "Esqueci minha senha" → chega o e-mail → abrir o link → "Nova senha".
 - Anotar um gasto, fechar o app, abrir de novo: o gasto continua lá.
+- Anotar uma conta a pagar e marcar como paga: o gasto aparece em Movimentações e Pago sobe; desfazer o pagamento volta tudo.
 
 Os testes de permissão do banco (`npm run test:db`) rodam em Postgres local com uma simulação do esquema de autenticação do Supabase; esses scripts não devem ser aplicados no Supabase. Depois de criar o projeto, repetir os fluxos pelo app no `clarevo-teste`.
 

@@ -147,6 +147,11 @@ function Navigation() {
           <Stack.Screen name="registro/novo" />
           <Stack.Screen name="registro/[id]/index" />
           <Stack.Screen name="registro/[id]/editar" />
+          <Stack.Screen name="a-pagar/index" />
+          <Stack.Screen name="a-pagar/nova" />
+          <Stack.Screen name="a-pagar/[id]/index" />
+          <Stack.Screen name="a-pagar/[id]/editar" />
+          <Stack.Screen name="a-pagar/[id]/pagar" />
           <Stack.Screen name="composicao" />
           <Stack.Screen name="quem-ve" />
           <Stack.Screen name="conta" />

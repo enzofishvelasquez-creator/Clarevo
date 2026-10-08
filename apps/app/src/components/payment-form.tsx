@@ -1,31 +1,29 @@
 import {
   CATEGORIES,
-  DESCRIPTION_MAX,
+  COMMITMENT_ERROR_TEXT,
   MAX_RECORD_CENTS,
-  parseBRL,
-  ERROR_TEXT,
-  addDays,
-  charCount,
-  maskDateBR,
-  FIELD_ORDER,
   NO_CATEGORY_LABEL,
+  PAYMENT_ERROR_TEXT,
+  PAYMENT_FIELD_ORDER,
+  addDays,
   centsToInput,
   fieldForErrorCode,
   formatBRL,
   formatDateBR,
   formatMonthBR,
   isRepoError,
+  maskDateBR,
   monthOf,
   newOperationKey,
+  parseBRL,
   parseDateBR,
-  validateRecordDraft,
+  validatePaymentDraft,
+  type Commitment,
   type DraftField,
   type FieldErrors,
-  type FinancialRecord,
+  type PaymentDraft,
+  type PaymentInput,
   type PersonalSpace,
-  type RecordDraft,
-  type RecordInput,
-  type RecordKind,
 } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useNavigation } from 'expo-router';
@@ -41,62 +39,46 @@ import { ContextPill, SubHeader } from '@/components/header';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { totalChange } from '@/lib/highlight';
-import { useCreateRecord, useUpdateRecord } from '@/state/data';
+import { usePayCommitment, useUpdateRecord } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
-type Mode = { type: 'novo'; kind: RecordKind } | { type: 'editar'; record: FinancialRecord };
+const paymentText = (code: string) =>
+  code in PAYMENT_ERROR_TEXT ? PAYMENT_ERROR_TEXT[code as keyof typeof PAYMENT_ERROR_TEXT] : PAYMENT_ERROR_TEXT.pagar_falhou;
 
-const COPY = {
-  despesa: {
-    newTitle: 'Anotar gasto',
-    editTitle: 'Editar gasto',
-    situation: 'Gasto já pago',
-    dateLabel: 'Data do pagamento',
-    save: 'Salvar gasto',
-  },
-  receita: {
-    newTitle: 'Registrar recebimento',
-    editTitle: 'Editar recebimento',
-    situation: 'Recebimento já realizado',
-    dateLabel: 'Data do recebimento',
-    save: 'Salvar recebimento',
-  },
-} as const;
-
-/** Formulário único de criar e editar (CL C002, C003, C005). */
-export function RecordForm({ mode, space: personal }: { mode: Mode; space: PersonalSpace }) {
+/**
+ * "Marcar como paga": uma única operação no banco cria o gasto realizado e quita a conta a pagar (D-021).
+ * O gasto entra em Pago do mês da data do pagamento; a conta sai de "Ainda a pagar".
+ */
+export function PaymentForm({ commitment: c, space: personal }: { commitment: Commitment; space: PersonalSpace }) {
   const { today } = useSession();
   const repo = useRepo();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const create = useCreateRecord();
-  const update = useUpdateRecord();
+  const pay = usePayCommitment();
+  const updateRecord = useUpdateRecord();
   const qc = useQueryClient();
+  const contextName = 'Pessoal';
 
-  const kind = mode.type === 'novo' ? mode.kind : mode.record.kind;
-  const copy = COPY[kind];
-  const contextId = mode.type === 'novo' ? personal.personalContextId : mode.record.contextId;
-
-  const initial = useMemo<RecordDraft>(
-    () =>
-      mode.type === 'novo'
-        ? { accountId: personal.accounts[0]?.id ?? '', amountText: '', description: '', category: null, dateText: formatDateBR(today) }
-        : {
-            accountId: mode.record.accountId,
-            amountText: centsToInput(mode.record.amountCents),
-            description: mode.record.description,
-            category: mode.record.category,
-            dateText: formatDateBR(mode.record.occurredOn),
-          },
+  const initial = useMemo<PaymentDraft>(
+    () => ({
+      accountId: personal.accounts[0]?.id ?? '',
+      amountText: centsToInput(c.amountCents),
+      dateText: formatDateBR(today),
+      category: c.category,
+    }),
     [], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  const [draft, setDraft] = useState<RecordDraft>(initial);
+  const [draft, setDraft] = useState<PaymentDraft>(initial);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [banner, setBanner] = useState<string | null>(null);
-  const [conflict, setConflict] = useState<FinancialRecord | null>(null);
-  const [baseVersion, setBaseVersion] = useState(mode.type === 'editar' ? mode.record.version : 0);
+  const [retry, setRetry] = useState(false);
+  // Conta mostrada: a aberta no início ou, depois de um conflito, a versão atual (mudou em outro aparelho e continua em aberto).
+  const [shown, setShown] = useState<Commitment>(c);
+  const [conflict, setConflict] = useState(false);
+  const [paidElsewhere, setPaidElsewhere] = useState(false);
+  const [baseVersion, setBaseVersion] = useState(c.version);
   const [busy, setBusy] = useState(false);
   const [leaveTo, setLeaveTo] = useState<null | (() => void)>(null);
   const [confirmDiscard, setConfirmDiscard] = useState<null | (() => void)>(null);
@@ -113,7 +95,6 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
   const account = personal.accounts.find((a) => a.id === draft.accountId) ?? personal.accounts[0];
-  const contextName = 'Pessoal';
 
   // Sair com alterações não salvas pede confirmação (voltar, gesto, botão do sistema).
   usePreventRemove(dirty && !leaveTo, ({ data }) => {
@@ -125,63 +106,79 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   }, [leaveTo]);
 
   const leave = (fn: () => void) => setLeaveTo(() => fn);
+  const goBack = () => (router.canGoBack() ? router.back() : router.replace(`/a-pagar/${c.id}`));
 
-  const set = <K extends keyof RecordDraft>(k: K, v: RecordDraft[K]) => {
+  const set = <K extends keyof PaymentDraft>(k: K, v: PaymentDraft[K]) => {
     setDraft((d) => ({ ...d, [k]: v }));
     if (k in errors) setErrors((e) => ({ ...e, [k]: undefined }));
   };
 
   const focusFirst = (errs: FieldErrors) => {
-    const first = FIELD_ORDER.find((f) => errs[f]);
+    const first = PAYMENT_FIELD_ORDER.find((f) => errs[f]);
     if (first) refs[first].current?.focus();
   };
 
-  const finish = (recordId: string, saved?: Pick<FinancialRecord, 'amountCents' | 'occurredOn'>) => {
-    // Confirmação tátil só depois da gravação confirmada.
+  const finish = (saved?: { amountCents: number; occurredOn: string }) => {
+    // Confirmação tátil e efeito em Pago só depois da gravação confirmada.
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    if (saved) {
-      const total = kind === 'despesa' ? 'pago' : 'recebido';
-      const month = monthOf(saved.occurredOn);
-      if (mode.type === 'novo') totalChange.set({ total, month, deltaCents: saved.amountCents });
-      else if (monthOf(mode.record.occurredOn) === month) totalChange.set({ total, month, deltaCents: saved.amountCents - mode.record.amountCents });
-      else totalChange.set({ total, month, deltaCents: saved.amountCents });
-    }
-    if (mode.type === 'novo') {
-      flash.set(kind === 'despesa' ? 'Gasto salvo' : 'Recebimento salvo');
-      leave(() => router.replace(`/registro/${recordId}`));
-    } else {
-      flash.set('Alterações salvas');
-      leave(() => router.back());
-    }
-  };
-
-  const send = async (key: string, input: RecordInput, version: number) => {
-    if (mode.type === 'novo') return create.mutateAsync({ key, contextId, kind, input });
-    return update.mutateAsync({ key, id: mode.record.id, version, input });
+    if (saved) totalChange.set({ total: 'pago', month: monthOf(saved.occurredOn), deltaCents: saved.amountCents });
+    flash.set('Pagamento registrado');
+    leave(goBack);
   };
 
   /**
    * Resultado de rede incerto: antes de repetir, conferir se alguma tentativa anterior foi gravada.
-   * Se foi, e o preenchimento mudou depois da falha, aplica o preenchimento atual como edição
-   * desse mesmo registro (nunca cria um segundo). Devolve o ID do registro, ou null se nada foi gravado.
+   * Se foi e o preenchimento mudou, aplica o preenchimento atual como edição do gasto gerado.
+   * Nunca há um segundo pagamento. Devolve o gasto (ou só true, se ele já não existe), ou null se nada foi gravado.
    */
-  const reconcile = async (input: RecordInput, snapshot: string): Promise<{ id: string } & Partial<FinancialRecord> | null> => {
+  const reconcile = async (input: PaymentInput, snapshot: string): Promise<{ amountCents: number; occurredOn: string } | true | null> => {
     for (const attempt of [...pending.current].reverse()) {
-      const op = await repo.findOperation(attempt.key);
-      if (!op) continue;
+      const op = await repo.findCommitmentOperation(attempt.key);
+      if (!op || op.action !== 'pagar_compromisso' || !op.recordId) continue;
       pending.current = [];
+      qc.invalidateQueries({ queryKey: ['commitments'] });
+      qc.invalidateQueries({ queryKey: ['commitment', op.commitmentId] });
       qc.invalidateQueries({ queryKey: ['records'] });
-      qc.invalidateQueries({ queryKey: ['record', op.recordId] });
-      const current = await repo.getRecord(op.recordId);
-      if (attempt.snapshot === snapshot || !current) return current ?? { id: op.recordId };
-      return update.mutateAsync({ key: newOperationKey(), id: current.id, version: current.version, input });
+      const expense = await repo.getRecord(op.recordId);
+      if (!expense) return true;
+      if (attempt.snapshot === snapshot) return expense;
+      // O useInvalidate dos registros já recarrega as contas a pagar.
+      return updateRecord.mutateAsync({
+        key: newOperationKey(),
+        id: expense.id,
+        version: expense.version,
+        input: { accountId: input.accountId, amountCents: input.amountCents, occurredOn: input.paidOn, description: expense.description, category: input.category },
+      });
     }
     return null;
   };
 
-  const submit = async (versionOverride?: number) => {
+  /** Versão desatualizada ou conta já paga: recarrega para mostrar o estado atual sem perder o preenchimento. */
+  const reload = async () => {
+    try {
+      const current = await repo.getCommitment(c.id);
+      qc.invalidateQueries({ queryKey: ['commitments'] });
+      if (!current) {
+        setBanner(COMMITMENT_ERROR_TEXT.nao_encontrado);
+        return;
+      }
+      // O detalhe mostra a versão atual ao voltar; a rota mantém este formulário aberto.
+      qc.setQueryData(['commitment', current.id], current);
+      if (current.status === 'quitado') {
+        setPaidElsewhere(true);
+        return;
+      }
+      setBaseVersion(current.version);
+      setShown(current);
+      setConflict(true);
+    } catch {
+      setBanner(`${COMMITMENT_ERROR_TEXT.versao_desatualizada} ${COMMITMENT_ERROR_TEXT.carregar_falhou}`);
+    }
+  };
+
+  const submit = async () => {
     if (busy) return; // envio repetido bloqueado enquanto o anterior não termina
-    const v = validateRecordDraft(draft, today);
+    const v = validatePaymentDraft(draft, today);
     if (!v.ok) {
       setErrors(v.errors);
       focusFirst(v.errors);
@@ -189,14 +186,16 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     }
     setErrors({});
     setBanner(null);
+    setConflict(false);
     setBusy(true);
-    const version = versionOverride ?? baseVersion;
+    const version = baseVersion;
     const snapshot = JSON.stringify([v.input, version]);
     try {
       if (pending.current.length > 0) {
         const saved = await reconcile(v.input, snapshot);
         if (saved) {
-          finish(saved.id, saved.amountCents !== undefined && saved.occurredOn ? { amountCents: saved.amountCents, occurredOn: saved.occurredOn } : undefined);
+          setRetry(false);
+          finish(saved === true ? undefined : saved);
           return;
         }
         // Nada foi gravado: repetir com a mesma chave se o conteúdo é o mesmo da última tentativa.
@@ -205,118 +204,100 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       }
       const key = opKey.current;
       try {
-        const saved = await send(key, v.input, version);
+        const saved = await pay.mutateAsync({ key, id: c.id, version, input: v.input });
         pending.current = [];
-        finish(saved.id, saved);
+        setRetry(false);
+        finish(saved.record);
       } catch (e) {
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
           opKey.current = newOperationKey();
+          setRetry(false);
           const field = fieldForErrorCode(e.code);
-          if (field) {
-            const errs = { [field]: ERROR_TEXT[e.code as keyof typeof ERROR_TEXT] };
+          if (field && PAYMENT_FIELD_ORDER.includes(field)) {
+            const errs = { [field]: paymentText(e.code) };
             setErrors(errs);
             focusFirst(errs);
             return;
           }
-          if (e.code === 'versao_desatualizada' && mode.type === 'editar') {
-            try {
-              const current = await repo.getRecord(mode.record.id);
-              qc.invalidateQueries({ queryKey: ['records'] });
-              if (current) {
-                qc.setQueryData(['record', current.id], current);
-                setConflict(current);
-              } else setBanner(ERROR_TEXT.nao_encontrado);
-            } catch {
-              setBanner(`${ERROR_TEXT.versao_desatualizada} ${ERROR_TEXT.carregar_falhou}`);
-            }
+          if (e.code === 'versao_desatualizada' || e.code === 'compromisso_quitado') {
+            await reload();
             return;
           }
-          setBanner(e.code in ERROR_TEXT ? ERROR_TEXT[e.code as keyof typeof ERROR_TEXT] : ERROR_TEXT.salvar_falhou);
+          setBanner(paymentText(e.code));
           return;
         }
-        // Falha de rede: a gravação pode ou não ter acontecido. Guardar a tentativa para reconciliar.
+        // Falha de rede: o pagamento pode ou não ter sido gravado. Guardar a tentativa para reconciliar.
         pending.current = [...pending.current, { key, snapshot }];
-        setBanner(ERROR_TEXT.salvar_falhou);
+        setRetry(true);
+        setBanner(PAYMENT_ERROR_TEXT.pagar_falhou);
       }
     } catch {
-      setBanner(ERROR_TEXT.salvar_falhou);
+      setRetry(true);
+      setBanner(PAYMENT_ERROR_TEXT.pagar_falhou);
     } finally {
       setBusy(false);
     }
   };
 
-  const applyOverConflict = () => {
-    if (!conflict) return;
-    setBaseVersion(conflict.version);
-    setConflict(null);
-    submit(conflict.version);
-  };
-
   const requestCancel = () => {
-    if (dirty) setConfirmDiscard(() => () => router.back());
-    else router.back();
+    if (dirty) setConfirmDiscard(() => goBack);
+    else goBack();
   };
-
-  const parsedDate = parseDateBR(draft.dateText);
-  const movesMonth = mode.type === 'editar' && parsedDate && monthOf(parsedDate) !== monthOf(mode.record.occurredOn);
 
   const formatAmountOnBlur = () => {
     const cents = parseBRL(draft.amountText);
     if (cents !== null && cents > 0 && cents <= MAX_RECORD_CENTS) setDraft((d) => ({ ...d, amountText: centsToInput(cents) }));
   };
 
+  // Avisos ao vivo, só com valor e data válidos: o mês de Pago afetado e a diferença do previsto.
+  const amount = parseBRL(draft.amountText);
+  const paidOn = parseDateBR(draft.dateText);
+  const valid = amount !== null && amount > 0 && amount <= MAX_RECORD_CENTS && paidOn !== null && paidOn <= today;
+  const yesterday = addDays(today, -1);
+  const overdue = shown.dueOn < today;
+
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <SubHeader
-        title={mode.type === 'novo' ? copy.newTitle : copy.editTitle}
-        onBack={requestCancel}
-        right={<ContextPill label={`Salvando em ${contextName}`} />}
-      />
+      <SubHeader title="Marcar como paga" onBack={requestCancel} right={<ContextPill label={`Salvando em ${contextName}`} />} />
       <Screen contentStyle={styles.body}>
         {conflict ? (
           <Banner tone="erro" icon={AlertCircle}>
             <Txt variant="label" color={colors.error}>
-              {ERROR_TEXT.versao_desatualizada}
+              {COMMITMENT_ERROR_TEXT.versao_desatualizada}
             </Txt>
             <Txt variant="caption">
-              Versão atual: {conflict.description} · {formatBRL(conflict.amountCents)} · {formatDateBR(conflict.occurredOn)}
+              Versão atual: {shown.description} · previsto {formatBRL(shown.amountCents)} · vence em {formatDateBR(shown.dueOn)}
             </Txt>
             <Txt variant="caption">Seu preenchimento foi mantido abaixo.</Txt>
-            <Button label="Aplicar minhas alterações na versão atual" tone="soft" onPress={applyOverConflict} />
-            <Button label="Descartar minhas alterações" tone="ghost" onPress={() => leave(() => router.back())} />
+            <Button label="Confirmar pagamento na versão atual" tone="soft" onPress={() => submit()} />
+          </Banner>
+        ) : null}
+        {paidElsewhere ? (
+          <Banner tone="erro" icon={AlertCircle}>
+            <Txt variant="label" color={colors.error}>
+              {COMMITMENT_ERROR_TEXT.ja_paga_em_outro_aparelho}
+            </Txt>
+            <Button label="Ver conta a pagar" tone="soft" onPress={() => leave(goBack)} />
           </Banner>
         ) : null}
 
-        {mode.type === 'editar' && mode.record.commitmentId ? (
-          <Banner tone="info" icon={Info}>
-            <Txt variant="label">
-              Este gasto é o pagamento de uma conta a pagar. Mudar valor, data ou conta altera Pago; o valor previsto da conta a pagar não muda.
-            </Txt>
-          </Banner>
-        ) : null}
+        <Card style={{ gap: space[1] }}>
+          <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 16 }}>
+            {shown.description}
+          </Txt>
+          <Txt variant="caption" color={overdue ? colors.error : colors.textSecondary}>
+            {overdue ? 'Venceu em' : 'Vence em'} {formatDateBR(shown.dueOn)} · previsto {formatBRL(shown.amountCents)}
+          </Txt>
+        </Card>
 
         <Card style={{ gap: space[4] }}>
           <Txt variant="caption" color={colors.textSecondary}>
-            {copy.situation} · {account?.name}
+            Gasto já pago · {account?.name}
           </Txt>
 
           <TextField
-            ref={refs.description}
-            label="Descrição"
-            value={draft.description}
-            onChangeText={(t) => set('description', t)}
-            placeholder={kind === 'despesa' ? 'Ex.: Café' : 'Ex.: Salário'}
-            maxLength={DESCRIPTION_MAX}
-            autoFocus={mode.type === 'novo'}
-            error={errors.description}
-            hint={charCount(draft.description) >= 60 ? `${charCount(draft.description)} de ${DESCRIPTION_MAX} caracteres` : undefined}
-            returnKeyType="next"
-            onSubmitEditing={() => refs.amountText.current?.focus()}
-          />
-
-          <TextField
             ref={refs.amountText}
-            label="Valor em reais"
+            label="Valor pago"
             prefix="R$"
             value={draft.amountText}
             onChangeText={(t) => set('amountText', t)}
@@ -326,12 +307,13 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             inputMode="decimal"
             large
             error={errors.amountText}
+            hint="Use o valor que saiu da conta, com juros ou desconto, se houver."
           />
 
           <View style={{ gap: space[2] }}>
             <TextField
               ref={refs.dateText}
-              label={copy.dateLabel}
+              label="Data do pagamento"
               value={draft.dateText}
               onChangeText={(t) => set('dateText', maskDateBR(t))}
               placeholder="DD/MM/AAAA"
@@ -341,13 +323,16 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
               error={errors.dateText}
               hint="Digite só os números. Só datas até hoje."
             />
-            <View style={styles.chips}>
+            <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Atalhos da data do pagamento">
               <Chip label="Hoje" selected={draft.dateText === formatDateBR(today)} onPress={() => set('dateText', formatDateBR(today))} />
-              <Chip
-                label="Ontem"
-                selected={draft.dateText === formatDateBR(addDays(today, -1))}
-                onPress={() => set('dateText', formatDateBR(addDays(today, -1)))}
-              />
+              <Chip label="Ontem" selected={draft.dateText === formatDateBR(yesterday)} onPress={() => set('dateText', formatDateBR(yesterday))} />
+              {shown.dueOn < yesterday ? (
+                <Chip
+                  label="Dia do vencimento"
+                  selected={draft.dateText === formatDateBR(shown.dueOn)}
+                  onPress={() => set('dateText', formatDateBR(shown.dueOn))}
+                />
+              ) : null}
             </View>
           </View>
 
@@ -367,6 +352,10 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
                 </Txt>
               ) : null}
             </View>
+          ) : errors.accountId ? (
+            <Txt variant="label" color={colors.error}>
+              {errors.accountId}
+            </Txt>
           ) : null}
 
           <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel="Categoria">
@@ -375,27 +364,30 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             </Txt>
             <View style={styles.chips}>
               <Chip label={NO_CATEGORY_LABEL} selected={draft.category === null} onPress={() => set('category', null)} />
-              {CATEGORIES[kind].map((c) => (
-                <Chip key={c} label={c} selected={draft.category === c} onPress={() => set('category', c)} />
+              {CATEGORIES.despesa.map((cat) => (
+                <Chip key={cat} label={cat} selected={draft.category === cat} onPress={() => set('category', cat)} />
               ))}
             </View>
           </View>
 
-          {movesMonth && parsedDate ? (
+          {valid ? (
             <Banner tone="info" icon={Info}>
               <Txt variant="label">
-                O registro sai de {formatMonthBR(monthOf(mode.record.occurredOn)).toLowerCase()} e passa a contar em{' '}
-                {formatMonthBR(monthOf(parsedDate)).toLowerCase()}.
+                Um gasto de {formatBRL(amount)} será registrado em Pago de {formatMonthBR(monthOf(paidOn)).toLowerCase()}, e esta conta a pagar
+                sai de Ainda a pagar.
               </Txt>
+              {amount !== shown.amountCents ? (
+                <Txt variant="label">O valor pago é diferente do previsto ({formatBRL(shown.amountCents)}). Pago usa o valor pago.</Txt>
+              ) : null}
             </Banner>
           ) : null}
-
-          <Txt variant="label" color={colors.textSecondary}>
-            Será salvo em <Txt variant="label" style={{ fontFamily: fonts.bold }}>{contextName}</Txt>, {account?.name}.
-          </Txt>
         </Card>
 
-        <LinkButton label="Como este registro entra no mês?" color={colors.textSecondary} onPress={() => router.push('/explicacao/diferenca')} />
+        <LinkButton
+          label="Como o pagamento entra no mês?"
+          color={colors.textSecondary}
+          onPress={() => router.push('/explicacao/realizado-previsto')}
+        />
       </Screen>
 
       {/* Rodapé fixo: a ação principal fica sempre visível, acima do teclado. */}
@@ -411,9 +403,10 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
           <View style={styles.footerRow}>
             <Button label="Cancelar" tone="ghost" onPress={requestCancel} style={styles.cancel} />
             <Button
-              label={banner && !conflict ? 'Tentar novamente' : copy.save}
+              label={retry ? 'Tentar novamente' : 'Confirmar pagamento'}
               busy={busy}
               busyLabel="Salvando…"
+              disabled={paidElsewhere}
               onPress={() => submit()}
               style={styles.save}
             />

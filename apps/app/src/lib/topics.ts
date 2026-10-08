@@ -25,8 +25,9 @@ export const TOPICS: Topic[] = [
     title: 'Realizado e previsto',
     subtitle: 'O que já aconteceu e o que ainda vai acontecer',
     paragraphs: [
-      'Realizado é o que já foi pago ou recebido. Previsto é um compromisso que ainda vai vencer, como a internet do dia 15.',
-      'Valores previstos aparecem em "Ainda a pagar neste mês" e não entram em Recebido, Pago ou na diferença do mês.',
+      'Realizado é o que já foi pago ou recebido. Previsto é uma conta a pagar que ainda não foi paga, como a internet que vence no dia 15.',
+      'Contas a pagar aparecem em "Ainda a pagar neste mês" e não entram em Recebido, Pago ou na diferença do mês. Quando você marca uma conta como paga, o Clarevo registra um gasto com o valor e a data do pagamento, e só esse gasto entra em Pago, no mês da data do pagamento.',
+      'Uma conta vencida e ainda não paga continua em "Ainda a pagar" nos meses seguintes, até ser paga ou excluída. Se você anotou o pagamento como gasto em vez de marcar a conta como paga, exclua a conta a pagar para ela não continuar em "Ainda a pagar".',
     ],
     hypotheses: 'Exemplo fictício.',
   },

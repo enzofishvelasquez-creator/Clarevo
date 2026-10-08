@@ -9,7 +9,7 @@ Organização e educação financeira para pessoas e famílias, com fundação p
   <img src="docs/telas/10_detalhe_gasto_salvo.png" width="200" alt="Detalhe do registro">
 </p>
 
-Primeiro ciclo: 07/10/2026. Sem Supabase configurado, o app roda em **demonstração** (acesso simulado e dados fictícios, com selo visível).
+Primeiro ciclo: 07/10/2026. Contas a pagar: 08/10/2026. Sem Supabase configurado, o app roda em **demonstração** (acesso simulado e dados fictícios, com selo visível).
 
 ## O que funciona
 
@@ -17,6 +17,7 @@ Primeiro ciclo: 07/10/2026. Sem Supabase configurado, o app roda em **demonstra�
 - Sua primeira conta, criada uma única vez.
 - Gasto pago e recebimento já recebido: anotar, conferir no detalhe, editar e excluir com confirmação.
 - Resumo do mês e composição de cada total pela mesma origem; troca de mês.
+- Contas a pagar: anotar, editar e excluir; marcar como paga (o gasto entra em Pago na mesma operação) e desfazer; lista com vencidas, a vencer, pagas e próximos meses; "Ainda a pagar neste mês" no Resumo.
 - Rascunho preservado, aviso antes de descartar, estados de carregamento, erro e vazio.
 - Banco com permissões por pessoa, contexto e ação; empresa não vê finanças.
 

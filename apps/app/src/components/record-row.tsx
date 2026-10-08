@@ -14,7 +14,8 @@ export function RecordRow({ record, onPress, last }: { record: FinancialRecord; 
   const stacked = width < 360 || fontScale > 1.3;
   const isIn = record.kind === 'receita';
   const Icon = isIn ? ArrowDownLeft : ArrowUpRight;
-  const when = `${kindLabel(record)} · ${formatDateBR(record.occurredOn)}`;
+  // Gasto gerado ao marcar uma conta a pagar como paga: a origem aparece na legenda.
+  const when = `${kindLabel(record)} · ${formatDateBR(record.occurredOn)}${record.commitmentId ? ' · conta a pagar' : ''}`;
   return (
     <Pressable
       onPress={onPress}

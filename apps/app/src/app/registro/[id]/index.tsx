@@ -50,7 +50,8 @@ export default function DetalheRegistro() {
     try {
       await remove.mutateAsync({ key: deleteKey.current, id: r.id, version: r.version });
       setConfirming(false);
-      flash.set('Registro excluído');
+      // Excluir o gasto de uma conta a pagar reabre a conta na mesma operação do banco (D-021, regra 2).
+      flash.set(r.commitmentId ? 'Registro excluído. A conta a pagar voltou para Ainda a pagar.' : 'Registro excluído');
       totalChange.set({ total: r.kind === 'despesa' ? 'pago' : 'recebido', month: monthOf(r.occurredOn), deltaCents: -r.amountCents });
       toList();
     } catch (e) {
@@ -110,6 +111,7 @@ export default function DetalheRegistro() {
                   <Row label="Conta" value={account?.name ?? 'Conta não encontrada'} />
                   <Row label="Data" value={formatDateBR(r.occurredOn)} />
                   <Row label="Categoria" value={r.category ?? NO_CATEGORY_LABEL} />
+                  {r.commitmentId ? <Row label="Origem" value="Conta a pagar" /> : null}
                   <Row label="Resumo afetado" value={formatMonthBR(monthOf(r.occurredOn))} last />
                 </View>
                 <View style={styles.trail} accessible>
@@ -133,6 +135,9 @@ export default function DetalheRegistro() {
                 />
               ) : null}
               <Button label="Editar registro" icon={Pencil} onPress={() => router.push(`/registro/${r.id}/editar`)} />
+              {r.commitmentId ? (
+                <Button label="Ver conta a pagar" tone="soft" onPress={() => router.push(`/a-pagar/${r.commitmentId}`)} />
+              ) : null}
               <Button label="Excluir registro" icon={Trash2} tone="danger" onPress={() => setConfirming(true)} />
               <Button
                 label="Ver resumo do mês"
@@ -162,6 +167,7 @@ export default function DetalheRegistro() {
                   {r.description} · {formatBRL(r.amountCents)} · Pessoal
                 </Txt>
                 <Txt color={colors.textSecondary}>O valor deixa de contar no resumo de {formatMonthBR(monthOf(r.occurredOn)).toLowerCase()}.</Txt>
+                {r.commitmentId ? <Txt color={colors.textSecondary}>A conta a pagar ligada a este gasto volta para Ainda a pagar.</Txt> : null}
               </ConfirmDialog>
             </>
           )}

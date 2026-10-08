@@ -18,7 +18,7 @@ import {
   type PaymentInput,
   type RecordInput,
 } from '@clarevo/core';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { SupabaseRepository } from '../src/lib/supabase-repository';
@@ -429,5 +429,56 @@ describe('API real: contas a pagar', () => {
     expect(s.overdueCount).toBe(0);
     expect((await toPay('2026-09')).toPayCents).toBe(0);
     expect(await totals()).toEqual([6000, 3900, 2100]);
+  });
+});
+
+describe('conversor de contas a pagar', () => {
+  // Defesa de último nível, sem rede: o banco garante o vínculo (I1), mas o app nunca mostra "paga" sem o gasto.
+  const row = {
+    id: 'c1',
+    context_id: 'ctx',
+    description: 'Internet',
+    amount_cents: 15000,
+    currency: 'BRL',
+    due_on: '2026-10-15',
+    status: 'aberto',
+    category: null,
+    created_by: 'p1',
+    version: 1,
+    created_at: '2026-10-07T12:00:00Z',
+    updated_at: '2026-10-07T12:00:00Z',
+    paid_record_id: null,
+    paid_on: null,
+    paid_amount_cents: null,
+    paid_account_id: null,
+  };
+  const paidCols = { paid_record_id: 'r1', paid_on: '2026-10-07', paid_amount_cents: 15500, paid_account_id: 'a1' };
+  /** Cliente falso que devolve a mesma linha pela visão (getCommitment) e pela função (createCommitment). */
+  const repoWith = (r: object) => {
+    const db = {
+      from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: r, error: null }) }) }) }),
+      rpc: async () => ({ data: { commitment: r, record: null }, error: null }),
+    };
+    return new SupabaseRepository(db as unknown as SupabaseClient, { id: 'p1' });
+  };
+  const failure = (p: Promise<unknown>) =>
+    p.then(() => null, (e: unknown) => (e instanceof RepoError ? [e.code, e.message] : String(e)));
+  const create = (r: object) => repoWith(r).createCommitment('chave-0001', 'ctx', { description: 'Internet', amountCents: 15000, dueOn: '2026-10-15', category: null });
+
+  it('aberta sem gasto e paga com gasto', async () => {
+    expect((await repoWith(row).getCommitment('c1'))!.payment).toBeNull();
+    const paid = { ...row, status: 'quitado', ...paidCols };
+    const expected = { recordId: 'r1', amountCents: 15500, paidOn: '2026-10-07', accountId: 'a1' };
+    expect((await repoWith(paid).getCommitment('c1'))!.payment).toEqual(expected);
+    expect((await create(paid)).commitment.payment).toEqual(expected);
+    // Pagar e desfazer sem o gasto no retorno também são recusados.
+    expect(await failure(repoWith(paid).undoCommitmentPayment('chave-0002', 'c1', 1))).toEqual(['desconhecido', 'desconhecido']);
+  });
+
+  it('paga sem gasto, aberta com gasto e status desconhecido são recusados', async () => {
+    for (const bad of [{ ...row, status: 'quitado' }, { ...row, ...paidCols }, { ...row, status: 'cancelado' }]) {
+      expect(await failure(repoWith(bad).getCommitment('c1'))).toEqual(['desconhecido', 'vinculo_inconsistente']);
+      expect(await failure(create(bad))).toEqual(['desconhecido', 'vinculo_inconsistente']);
+    }
   });
 });

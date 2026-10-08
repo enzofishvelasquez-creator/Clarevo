@@ -1,6 +1,6 @@
 # Arquitetura
 
-07/10/2026 · versão 0.2 (primeiro ciclo)
+08/10/2026 · versão 0.3 (primeiro ciclo e contas a pagar)
 
 ## Escolhas (aprovadas)
 
@@ -22,15 +22,16 @@ apps/app/src/
     primeira-conta, carregando, confirmado
     (tabs)/             Resumo, Movimentações, Metas, Aprender
     registro/novo, registro/[id], registro/[id]/editar
+    a-pagar, a-pagar/nova, a-pagar/[id], a-pagar/[id]/editar, a-pagar/[id]/pagar
     composicao, quem-ve, conta, explicacao/[tema]
-  components/           interface (logo, campos, botões, formulário de registro, estados)
+  components/           interface (logo, campos, botões, formulários de registro, conta a pagar e pagamento, estados)
   lib/                  autenticação (Supabase e demonstração), conteúdos de Aprender
   state/                sessão, dados (consultas e gravações), contexto e mês
   theme/                tokens de cor, tipografia, movimento e vetores do logo
 packages/core/          regras financeiras, validação, repositório em memória, testes
 supabase/
-  migrations/           esquema, funções e permissões
-  tests/                testes de isolamento e da sequência de aceite
+  migrations/           esquema, funções e permissões (0001 fundação, 0002 contas a pagar)
+  tests/                testes de isolamento, da sequência de aceite e de contas a pagar
 scripts/e2e-web.js      roteiro de verificação na versão web
 docs/                   decisões, regras, acessos, Supabase, roteiro, marca, telas
 ```
@@ -50,10 +51,17 @@ A navegação organiza a experiência; **quem protege os dados é o banco**.
 
 ```
 pessoa ──< vínculo (permissões por ação) >── contexto (pessoal | família) ──< conta financeira ──< registro
-   │                                                                    └──< compromisso (previsto)
-   ├──< operação (chave de idempotência, ação, registro resultante)
+   │                                                                    └──< conta a pagar (previsto) ── 0 ou 1 gasto vivo que a quitou (registro)
+   ├──< operação (chave de idempotência, ação, registro e/ou conta a pagar resultante)
    └──< direito ao plano >── licença >── contrato de benefício >── organização ──< administrador
 ```
+
+**Contas a pagar** (`commitments`) são origem separada dos registros realizados e nunca entram em Recebido, Pago ou Diferença.
+
+- **Vínculo:** ao marcar como paga, `pay_commitment` cria um gasto com `financial_records.commitment_id` apontando para a conta a pagar. A chave estrangeira é composta com o contexto (mesmo contexto garantido), o gasto é sempre `despesa`, há no máximo um gasto vivo por conta a pagar e o vínculo nunca muda.
+- **Leitura:** a visão `commitment_items` junta a conta a pagar e o gasto vivo que a quitou (`paid_record_id`, `paid_on`, `paid_amount_cents`, `paid_account_id`). Ela usa `security_invoker`, então a RLS de quem consulta vale nas duas tabelas. Os dados do pagamento não são copiados para a conta a pagar: vêm sempre do gasto.
+- **Coerência:** uma restrição adiada confere, no fim de cada transação, que conta paga tem exatamente um gasto vivo vinculado e conta em aberto nenhum.
+- **"Ainda a pagar":** calculado por `summarizeToPay` no core e repetido no banco por `month_to_pay`; o teste de API compara os dois.
 
 ## Como executar
 

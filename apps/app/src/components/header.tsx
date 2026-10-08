@@ -79,7 +79,7 @@ export function SubHeader({ title, onBack, right }: { title: string; onBack?: ()
           style={(s) => [styles.backBtn, (s as { focused?: boolean }).focused && focusOnBrand]}>
           <ArrowLeft size={22} color={colors.textOnBrand} />
         </Pressable>
-        <Txt variant="title" color={colors.textOnBrand} style={styles.subTitle} numberOfLines={1} accessibilityRole="header" aria-level={1}>
+        <Txt variant="title" color={colors.textOnBrand} style={styles.subTitle} numberOfLines={2} accessibilityRole="header" aria-level={1}>
           {title}
         </Txt>
         {right}

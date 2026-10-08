@@ -1,6 +1,6 @@
 # Análise geral e propostas
 
-07/10/2026 · versão 1.0. Três análises independentes (código, design e pesquisa de mercado) e as correções feitas em seguida. Propostas seguem o formato das instruções do projeto: problema, solução, lugar no app, alcance, risco e decisão. Fontes consultadas em 07/10/2026; itens marcados como "não verificado" precisam de conferência antes de decisão.
+07/10/2026 · versão 1.0, atualizada em 08/10/2026 (contas a pagar). Três análises independentes (código, design e pesquisa de mercado) e as correções feitas em seguida. Propostas seguem o formato das instruções do projeto: problema, solução, lugar no app, alcance, risco e decisão. Fontes consultadas em 07/10/2026; itens marcados como "não verificado" precisam de conferência antes de decisão.
 
 ## 1. Respostas diretas
 
@@ -136,7 +136,7 @@ Exportar dados fica para quando houver o relatório mensal (não há botão sem 
 
 | Ideia | Valor | Observação |
 |---|---|---|
-| Contas a pagar com lembrete | O que vence e quando, com aviso no dia anterior | É o "Ainda a pagar", que hoje só tem leitura |
+| Contas a pagar com lembrete | O que vence e quando, com aviso no dia anterior | Cadastro, pagamento e lista feitos em 08/10/2026 (D-020); lembrete e recorrência pendentes (P-011) |
 | Orçamento por categoria | Limite por categoria com aviso neutro ao se aproximar | Sem culpa nem julgamento |
 | Resumo da semana | Notificação curta: recebido, pago e o que vence | Cria hábito sem exigir abrir o app |
 | Família (ciclo 2) | Convite com permissões, quem vê o quê | Diferencial frente a apps só individuais |
@@ -172,7 +172,7 @@ O Bíos usava movimento ambiente: arcos que "respiram", ondas e órbitas. No Cla
 ## 7. Próximos passos sugeridos
 
 1. Ciclo de acabamento de design (seção 3) e animações (seção 5).
-2. Contas a pagar (compromissos) com lembrete.
+2. Contas a pagar: feito em 08/10/2026 (D-020, D-021), sem lembretes nem recorrência, que ficam em P-011.
 3. Calculadoras 1, 2 e 3.
 4. Notas fiscais, fase 1 (QR code), após parecer jurídico.
 5. Login real com Supabase Pro e e-mail próprio, quando for abrir para pessoas de fora.
