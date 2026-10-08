@@ -38,15 +38,16 @@ export function nextMonthPrefill(c: Commitment): CommitmentInput {
   return { description: c.description, amountCents: c.amountCents, dueOn: addMonthsToDate(c.dueOn, 1), category: c.category };
 }
 
-/** Conta do mês seguinte já anotada: em aberto, mesmo vencimento do preenchimento e mesma descrição (sem caixa nem espaços nas pontas). */
+/**
+ * Conta do mês seguinte já anotada, em aberto ou paga: mesmo vencimento do preenchimento e mesma descrição
+ * (sem caixa nem espaços nas pontas). A lista vem do repositório, que não devolve excluídas; para achar
+ * também a paga, o app consulta o mês de nextMonthPrefill(c).dueOn.
+ */
 export function findNextMonthCommitment(list: readonly Commitment[], c: Commitment): Commitment | null {
   const { dueOn } = nextMonthPrefill(c);
   const same = (text: string) => text.trim().toLocaleLowerCase('pt-BR');
   return (
-    list.find(
-      (x) =>
-        x.id !== c.id && x.contextId === c.contextId && x.status === 'aberto' && x.dueOn === dueOn && same(x.description) === same(c.description),
-    ) ?? null
+    list.find((x) => x.id !== c.id && x.contextId === c.contextId && x.dueOn === dueOn && same(x.description) === same(c.description)) ?? null
   );
 }
 

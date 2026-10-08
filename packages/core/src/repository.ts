@@ -34,8 +34,9 @@ export interface RecordsRepository {
   findOperation(key: string): Promise<{ recordId: string } | null>;
 
   /**
-   * Contas a pagar do contexto, sem excluídas: todas com vencimento no mês (abertas e pagas)
-   * e todas as abertas com vencimento fora do mês. A seleção do total é feita por summarizeToPay.
+   * Contas a pagar do contexto, sem excluídas: todas com vencimento no mês (abertas e pagas),
+   * as pagas com data de pagamento no mês (qualquer vencimento) e todas as abertas com vencimento
+   * fora do mês. A seleção do total é feita por summarizeToPay.
    */
   listCommitments(contextId: string, month: IsoMonth): Promise<Commitment[]>;
   getCommitment(id: string): Promise<Commitment | null>;

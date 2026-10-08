@@ -22,6 +22,7 @@ import { FlashBanner, useFlash } from '@/components/flash';
 import { Banner, Button, Card, FitMoney, Screen, Skeleton, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { totalChange } from '@/lib/highlight';
+import { openSummary } from '@/lib/nav';
 import { useDeleteRecord, useRecord, useSpace, useView } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
@@ -102,7 +103,7 @@ export default function DetalheRegistro() {
                     {r.kind === 'despesa' ? 'Gasto pago' : 'Recebido'}
                   </Txt>
                 </View>
-                <Txt variant="title" style={{ fontSize: 24, lineHeight: 32 }} accessibilityRole="header">
+                <Txt variant="title" style={{ fontSize: 24, lineHeight: 32 }} accessibilityRole="header" aria-level={2}>
                   {r.description}
                 </Txt>
                 <FitMoney cents={r.amountCents} />
@@ -145,7 +146,7 @@ export default function DetalheRegistro() {
                 onPress={() => {
                   view.setMonth(monthOf(r.occurredOn));
                   view.setSpace('pessoal');
-                  router.navigate('/');
+                  openSummary();
                 }}
               />
               <Pressable accessibilityRole="button" onPress={() => router.push('/quem-ve')} style={styles.privacy}>

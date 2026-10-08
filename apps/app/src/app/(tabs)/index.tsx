@@ -1,8 +1,8 @@
-import { ERROR_TEXT, formatBRL, formatDateBR, formatMonthBR, toPayCaption } from '@clarevo/core';
+import { ERROR_TEXT, formatBRL, formatDateBR, formatMonthBR, monthOf, toPayCaption } from '@clarevo/core';
 import { router, useFocusEffect } from 'expo-router';
 import { AlertCircle, ArrowRight, CalendarClock, Plus, ShieldCheck } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, StyleSheet, useWindowDimensions, View, type ScrollView } from 'react-native';
 import Animated, { FadeIn, FadeInLeft, FadeInRight, FadeOut, ReduceMotion } from 'react-native-reanimated';
 
 import { FamilyNotLinked } from '@/components/family-state';
@@ -12,6 +12,7 @@ import { RecordRow } from '@/components/record-row';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, FitMoney, LinkButton, Money, Screen, Skeleton, Txt } from '@/components/ui';
 import { totalChange, type TotalChange } from '@/lib/highlight';
+import { summaryTop } from '@/lib/nav';
 import { useCommitments, useMonthRecords, useSpace, useView } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space } from '@/theme/tokens';
@@ -26,6 +27,15 @@ export default function ResumoScreen() {
   const records = useMonthRecords(contextId, month);
   const s = records.summary;
   const monthName = formatMonthBR(month);
+
+  // "Ver resumo do mês" volta a este Resumo, que continua na pilha: mostrar do topo, com os totais à vista.
+  // Voltar com "Voltar" mantém a posição da rolagem.
+  const scroll = useRef<ScrollView>(null);
+  useFocusEffect(
+    useCallback(() => {
+      if (summaryTop.take()) scroll.current?.scrollTo({ y: 0, animated: false });
+    }, []),
+  );
 
   // Efeito do último registro salvo ("+ R$ 80,00"), mostrado por alguns segundos e anunciado uma vez.
   const [change, setChange] = useState<TotalChange | null>(null);
@@ -46,7 +56,7 @@ export default function ResumoScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Screen wide>
+      <Screen wide scrollRef={scroll}>
         <AppHeader>
           <ContextSwitch />
           <MonthSwitcher />
@@ -184,12 +194,15 @@ function ToPayCard({ contextId }: { contextId: string | undefined }) {
   const monthName = formatMonthBR(month).toLowerCase();
   const label = isCurrent ? 'Ainda a pagar neste mês' : `Previsto para ${monthName}`;
   const caption = s ? toPayCaption(s, today) : null;
-  // Total zero é um total conhecido: mostra R$ 0,00 e explica por quê.
+  // Todas as que compõem o total já venceram: a linha principal leva o mesmo destaque da linha de vencidas.
+  const allOverdue = Boolean(s && s.isCurrentMonth && s.overdueCount > 0 && s.overdueCount === s.items.length);
+  // Total zero é um total conhecido: mostra R$ 0,00 e explica por quê. Uma conta de mês futuro paga adiantada
+  // aparece nas pagas do mês, mas não era deste mês: não conta para "todas foram pagas".
   const zeroText = !s
     ? null
     : !s.hasAny
       ? 'Nenhuma conta a pagar em aberto.'
-      : s.paidInMonth.length > 0
+      : s.paidInMonth.some((c) => monthOf(c.dueOn) <= month)
         ? isCurrent
           ? 'Todas as contas a pagar deste mês foram pagas.'
           : `Todas as contas a pagar de ${monthName} foram pagas.`
@@ -220,9 +233,18 @@ function ToPayCard({ contextId }: { contextId: string | undefined }) {
           style={(st) => [styles.toPayArea, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && styles.focusRing]}>
           <View style={{ flex: 1, gap: space[1] }}>
             <Money cents={s.toPayCents} />
-            <Txt variant="caption" color={colors.textSecondary}>
-              {caption.main ?? zeroText}
-            </Txt>
+            {allOverdue && caption.main ? (
+              <View style={styles.overdueRow}>
+                <AlertCircle size={16} color={colors.error} aria-hidden />
+                <Txt variant="caption" color={colors.error} style={{ fontFamily: fonts.bold, flexShrink: 1 }}>
+                  {caption.main}
+                </Txt>
+              </View>
+            ) : (
+              <Txt variant="caption" color={colors.textSecondary}>
+                {caption.main ?? zeroText}
+              </Txt>
+            )}
             {caption.overdue ? (
               <View style={styles.overdueRow}>
                 <AlertCircle size={16} color={colors.error} aria-hidden />

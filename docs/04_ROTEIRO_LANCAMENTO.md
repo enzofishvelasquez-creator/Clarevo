@@ -36,7 +36,7 @@ Convite empresarial, vagas e licenças; tela "Acesso pelo benefício da sua empr
 | Item | Para quê | Custo aproximado |
 |---|---|---|
 | Conta Supabase | Login e dados reais | Gratuito para começar |
-| Provedor de e-mail (ex.: Resend) e domínio | E-mails de confirmação e recuperação com a marca | Gratuito no início; domínio ~R$ 40–150/ano |
+| Provedor de e-mail (ex.: Resend) e domínio | E-mails de confirmação e recuperação com a marca | Gratuito no início; domínio ~R$ 40 a 150/ano |
 | Conta Expo | Builds e publicação | Gratuito para começar |
 | Apple Developer (preferencialmente em CNPJ) | Publicar no iPhone | US$ 99/ano |
 | Google Play Console | Publicar no Android | US$ 25, uma vez |

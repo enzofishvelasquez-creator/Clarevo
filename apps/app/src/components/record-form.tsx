@@ -164,17 +164,26 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
    * Resultado de rede incerto: antes de repetir, conferir se alguma tentativa anterior foi gravada.
    * Se foi, e o preenchimento mudou depois da falha, aplica o preenchimento atual como edição
    * desse mesmo registro (nunca cria um segundo). Devolve o ID do registro, ou null se nada foi gravado.
+   * As tentativas só são esquecidas depois que a leitura e a edição de acompanhamento dão certo: se uma delas
+   * falhar, a próxima tentativa reconcilia de novo em vez de repetir a criação.
    */
   const reconcile = async (input: RecordInput, snapshot: string): Promise<{ id: string } & Partial<FinancialRecord> | null> => {
     for (const attempt of [...pending.current].reverse()) {
       const op = await repo.findOperation(attempt.key);
       if (!op) continue;
-      pending.current = [];
       qc.invalidateQueries({ queryKey: ['records'] });
       qc.invalidateQueries({ queryKey: ['record', op.recordId] });
+      // Editar o gasto de uma conta a pagar muda a conta (versão e valor pago): o detalhe e a lista recarregam.
+      qc.invalidateQueries({ queryKey: ['commitments'] });
+      qc.invalidateQueries({ queryKey: ['commitment'] });
       const current = await repo.getRecord(op.recordId);
-      if (attempt.snapshot === snapshot || !current) return current ?? { id: op.recordId };
-      return update.mutateAsync({ key: newOperationKey(), id: current.id, version: current.version, input });
+      if (attempt.snapshot === snapshot || !current) {
+        pending.current = [];
+        return current ?? { id: op.recordId };
+      }
+      const saved = await update.mutateAsync({ key: newOperationKey(), id: current.id, version: current.version, input });
+      pending.current = [];
+      return saved;
     }
     return null;
   };

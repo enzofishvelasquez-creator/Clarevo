@@ -17,6 +17,7 @@ import {
   formatDayMonth,
   formatMonthName,
   maskDateBR,
+  monthOf,
   ERROR_TEXT,
   MemoryRepository,
   centsToInput,
@@ -397,9 +398,22 @@ describe('contas a pagar', () => {
         if (!v.ok) {
           expect(v.errors.description).toBe('Dê um nome para esta conta a pagar.');
           expect(v.errors.amountText).toBe('Informe um valor maior que zero, como 80,00.');
-          expect(v.errors.dateText).toBe('Confira a data informada.');
+          expect(v.errors.dateText).toBe('Informe a data de vencimento, como 15/10/2026.');
           expect(v.errors.accountId).toBeUndefined();
         }
+      });
+
+      it('vencimento em branco pede a data; preenchido e impossível pede conferência', () => {
+        expect(COMMITMENT_ERROR_TEXT.vencimento_obrigatorio).toBe('Informe a data de vencimento, como 15/10/2026.');
+        expect(dateError('')).toBe(COMMITMENT_ERROR_TEXT.vencimento_obrigatorio);
+        expect(dateError('   ')).toBe(COMMITMENT_ERROR_TEXT.vencimento_obrigatorio);
+        expect(dateError('15/10')).toBe(COMMITMENT_ERROR_TEXT.data_invalida);
+        expect(dateError('31/09/2026')).toBe(COMMITMENT_ERROR_TEXT.data_invalida);
+        // Só no app: o banco não conhece este código, e nenhum campo depende dele.
+        expect(fieldForErrorCode('vencimento_obrigatorio')).toBeNull();
+        // Data do pagamento e do registro continuam com o texto de sempre.
+        const p = validatePaymentDraft({ accountId: 'conta-1', amountText: '1', dateText: '', category: null }, DEMO_TODAY);
+        expect(p.ok ? null : p.errors.dateText).toBe(PAYMENT_ERROR_TEXT.data_invalida);
       });
 
       it('data impossível e valor acima do limite', () => {
@@ -519,6 +533,39 @@ describe('contas a pagar', () => {
       expect(sep.later).toEqual([]);
     });
 
+    it('5b. summarizeToPay: paga entra em "Pagas" do mês do vencimento e do mês do pagamento, sem mudar totais', () => {
+      const open = [
+        commitment({ id: 'i', description: 'Internet', dueOn: '2026-10-15' }),
+        commitment({ id: 'c', description: 'Condomínio', amountCents: 50000, dueOn: '2026-10-20' }),
+      ];
+      const seguro = paidCommitment('2026-11-10', '2026-10-07', { id: 's', description: 'Seguro do carro', amountCents: 30000 });
+      const gas = paidCommitment('2026-09-28', '2026-10-02', { id: 'g', description: 'Gás', amountCents: 4000 });
+      const luz = paidCommitment('2026-09-10', '2026-09-09', { id: 'l', description: 'Luz', amountCents: 12000 });
+      const adiantada = paidCommitment('2026-10-25', '2026-09-30', { id: 'a', description: 'Água', amountCents: 9000 });
+      const outro = paidCommitment('2026-11-10', '2026-10-07', { id: 'x', contextId: 'outro', description: 'De outro contexto' });
+      const list = [seguro, ...open, gas, luz, adiantada, outro];
+      const names = (xs: Commitment[]) => xs.map((c) => c.description);
+
+      const oct = summarizeToPay(list, 'ctx', OCT, DEMO_TODAY);
+      expect(names(oct.paidInMonth)).toEqual(['Gás', 'Água', 'Seguro do carro']);
+      expect(names(oct.items)).toEqual(['Internet', 'Condomínio']);
+      expect(oct.toPayCents).toBe(65000);
+      expect([oct.dueInMonthCents, oct.overdueBeforeCents, oct.overdueCount]).toEqual([65000, 0, 0]);
+      expect(oct.later).toEqual([]);
+      expect(oct).toEqual(summarizeToPay(open.concat(oct.paidInMonth), 'ctx', OCT, DEMO_TODAY));
+
+      const sep = summarizeToPay(list, 'ctx', SEP, DEMO_TODAY);
+      expect(names(sep.paidInMonth)).toEqual(['Luz', 'Gás', 'Água']);
+      expect(sep.toPayCents).toBe(0);
+
+      const nov = summarizeToPay(list, 'ctx', NOV, DEMO_TODAY);
+      expect(names(nov.paidInMonth)).toEqual(['Seguro do carro']);
+      expect(nov.toPayCents).toBe(0);
+
+      // Sem pagamento (dado incompleto), vale só o vencimento.
+      expect(summarizeToPay([{ ...seguro, payment: null }], 'ctx', OCT, DEMO_TODAY).paidInMonth).toEqual([]);
+    });
+
     describe('6. toPayCaption', () => {
       const caption = (list: Commitment[], month = OCT) => toPayCaption(summarizeToPay(list, 'ctx', month, DEMO_TODAY), DEMO_TODAY);
       const internet = commitment({ id: 'i' });
@@ -561,7 +608,7 @@ describe('contas a pagar', () => {
       });
     });
 
-    it('7. nextMonthPrefill e findNextMonthCommitment', () => {
+    it('7. nextMonthPrefill e findNextMonthCommitment (a conta seguinte pode estar em aberto ou paga)', () => {
       const internet = paidCommitment('2026-10-15', '2026-10-07');
       expect(nextMonthPrefill(internet)).toEqual({ description: 'Internet', amountCents: 15000, dueOn: '2026-11-15', category: 'Moradia' });
       expect(nextMonthPrefill(commitment({ dueOn: '2026-01-31' })).dueOn).toBe('2026-02-28');
@@ -571,7 +618,12 @@ describe('contas a pagar', () => {
       expect(findNextMonthCommitment([internet], internet)).toBeNull();
       expect(findNextMonthCommitment([internet, { ...next, dueOn: '2026-11-16' }], internet)).toBeNull();
       expect(findNextMonthCommitment([internet, { ...next, description: 'Internet fibra' }], internet)).toBeNull();
-      expect(findNextMonthCommitment([internet, paidCommitment('2026-11-15', '2026-10-07', { id: 'cp-3' })], internet)).toBeNull();
+      expect(findNextMonthCommitment([internet, { ...next, contextId: 'outro' }], internet)).toBeNull();
+      const nextPaid = paidCommitment('2026-11-15', '2026-10-07', { id: 'cp-3' });
+      expect(findNextMonthCommitment([internet, nextPaid], internet)?.id).toBe('cp-3');
+      // A própria conta nunca é a seguinte.
+      expect(findNextMonthCommitment([internet], { ...internet, dueOn: '2026-11-15' })).toBeNull();
+      expect(findNextMonthCommitment([nextPaid], nextPaid)).toBeNull();
     });
   });
 
@@ -888,6 +940,127 @@ describe('contas a pagar', () => {
       await expect(
         repo.updateCommitment(newOperationKey(), agua.id, edited.commitment.version, { ...input, dueOn: '2026-11-06' }),
       ).rejects.toMatchObject({ code: 'vencimento_fora_do_intervalo' });
+    });
+
+    it('23. conta paga em outro mês: aparece em "Pagas" do vencimento e do pagamento; totais não mudam', async () => {
+      const { repo, ctx, accountId, totals, toPay, bill, payment, note } = await setup();
+      const names = (xs: Commitment[]) => xs.map((c) => c.description);
+      const view = async (month: string) => {
+        const list = await repo.listCommitments(ctx, month);
+        return { list: names(list), s: summarizeToPay(list, ctx, month, DEMO_TODAY) };
+      };
+
+      // Seguro do carro vence em novembro e é pago adiantado em outubro.
+      const seguro = await bill('Seguro do carro');
+      const paid = await repo.payCommitment(newOperationKey(), seguro.id, seguro.version, payment(300));
+      let oct = await view(OCT);
+      expect(oct.list).toEqual(['Internet', 'Condomínio', 'Seguro do carro']);
+      expect(names(oct.s.paidInMonth)).toEqual(['Seguro do carro']);
+      expect(oct.s.later).toEqual([]);
+      expect(await toPay()).toBe(650);
+      expect(await totals()).toEqual([6000, 4200, 1800]);
+      const nov = await view(NOV);
+      expect(names(nov.s.paidInMonth)).toEqual(['Seguro do carro']);
+      expect(await toPay(NOV)).toBe(0);
+      expect((await view(SEP)).list).toEqual(['Internet', 'Condomínio']);
+
+      // Gás vence em setembro e é pago em outubro; Luz vence e é paga em setembro.
+      const gas = (await note('Gás', 40, '2026-09-28')).commitment;
+      const gasPaid = await repo.payCommitment(newOperationKey(), gas.id, gas.version, payment(40, '2026-10-02'));
+      const luz = (await note('Luz', 120, '2026-09-10')).commitment;
+      await repo.payCommitment(newOperationKey(), luz.id, luz.version, payment(120, '2026-09-09'));
+      oct = await view(OCT);
+      expect(oct.list).toEqual(['Gás', 'Internet', 'Condomínio', 'Seguro do carro']);
+      expect(names(oct.s.paidInMonth)).toEqual(['Gás', 'Seguro do carro']);
+      expect(names(oct.s.items)).toEqual(['Internet', 'Condomínio']);
+      expect(await toPay()).toBe(650);
+      expect(await totals()).toEqual([6000, 4240, 1760]);
+      const sep = await view(SEP);
+      expect(names(sep.s.paidInMonth)).toEqual(['Luz', 'Gás']);
+      expect(await toPay(SEP)).toBe(0);
+
+      // Desfazer devolve o seguro a "Próximos meses".
+      await repo.undoCommitmentPayment(newOperationKey(), seguro.id, paid.commitment.version);
+      oct = await view(OCT);
+      expect(names(oct.s.paidInMonth)).toEqual(['Gás']);
+      expect(names(oct.s.later)).toEqual(['Seguro do carro']);
+      expect((await view(NOV)).s.paidInMonth).toEqual([]);
+
+      // O mês do pagamento segue o gasto vivo: mudar a data do gasto para setembro tira o Gás de outubro.
+      await repo.updateRecord(newOperationKey(), gasPaid.record.id, gasPaid.record.version, {
+        accountId,
+        amountCents: 4000,
+        occurredOn: '2026-09-30',
+        description: 'Gás',
+        category: 'Moradia',
+      });
+      oct = await view(OCT);
+      expect(oct.list).toEqual(['Internet', 'Condomínio', 'Seguro do carro']);
+      expect(oct.s.paidInMonth).toEqual([]);
+      expect(names((await view(SEP)).s.paidInMonth)).toEqual(['Luz', 'Gás']);
+      expect(await toPay()).toBe(650);
+      repo.checkInvariants();
+    });
+
+    it('24. "Adicionar a conta do próximo mês": a conta seguinte paga, mesmo adiantada, também é encontrada', async () => {
+      const { repo, ctx, bill, payment } = await setup();
+      const internet = await bill('Internet');
+      const { commitment: paid } = await repo.payCommitment(newOperationKey(), internet.id, internet.version, payment(150));
+      // O app consulta o mês do vencimento seguinte, que traz as contas daquele mês em qualquer situação.
+      const nextMonth = monthOf(nextMonthPrefill(paid).dueOn);
+      expect(nextMonth).toBe(NOV);
+      expect(findNextMonthCommitment(await repo.listCommitments(ctx, nextMonth), paid)).toBeNull();
+
+      const { commitment: next } = await repo.createCommitment(newOperationKey(), ctx, nextMonthPrefill(paid));
+      expect(findNextMonthCommitment(await repo.listCommitments(ctx, nextMonth), paid)).toMatchObject({ id: next.id, status: 'aberto' });
+      // Paga adiantada, em outubro: continua em novembro (vencimento) e também aparece em outubro (pagamento).
+      const nextPaid = await repo.payCommitment(newOperationKey(), next.id, next.version, payment(150));
+      for (const month of [nextMonth, OCT]) {
+        expect(findNextMonthCommitment(await repo.listCommitments(ctx, month), paid)).toMatchObject({ id: next.id, status: 'quitado' });
+      }
+
+      // Excluída não conta: desfazer e excluir liberam o atalho de novo.
+      const undone = await repo.undoCommitmentPayment(newOperationKey(), next.id, nextPaid.commitment.version);
+      await repo.deleteCommitment(newOperationKey(), next.id, undone.commitment.version);
+      expect(findNextMonthCommitment(await repo.listCommitments(ctx, nextMonth), paid)).toBeNull();
+      repo.checkInvariants();
+    });
+
+    it('25. versão ausente (null) é recusada como desatualizada e nada é gravado', async () => {
+      const { repo, ctx, accountId, totals, toPay, bill, payment, input } = await setup();
+      const none = null as unknown as number;
+      const internet = await bill('Internet');
+      const paid = await repo.payCommitment(newOperationKey(), internet.id, internet.version, payment(150));
+      const condominio = await bill('Condomínio');
+      const cafe = await repo.createRecord(newOperationKey(), ctx, 'despesa', input(80));
+      const before = { totals: await totals(), toPay: await toPay(), records: await repo.listRecords(ctx, OCT) };
+      const recordInput = { accountId, amountCents: 15800, occurredOn: '2026-10-07', description: 'Internet', category: 'Moradia' };
+      const commitmentInput = { description: 'Condomínio', amountCents: 1, dueOn: '2026-10-20', category: null };
+
+      const attempts: [string, () => Promise<unknown>][] = [];
+      const attempt = (fn: (key: string) => Promise<unknown>) => {
+        const key = newOperationKey();
+        attempts.push([key, () => fn(key)]);
+      };
+      attempt((k) => repo.updateRecord(k, cafe.id, none, input(95)));
+      attempt((k) => repo.deleteRecord(k, cafe.id, none));
+      attempt((k) => repo.updateRecord(k, paid.record.id, none, recordInput));
+      attempt((k) => repo.deleteRecord(k, paid.record.id, none));
+      attempt((k) => repo.updateCommitment(k, condominio.id, none, commitmentInput));
+      attempt((k) => repo.deleteCommitment(k, condominio.id, none));
+      attempt((k) => repo.undoCommitmentPayment(k, internet.id, none));
+      for (const [key, run] of attempts) {
+        await expect(run()).rejects.toMatchObject({ code: 'versao_desatualizada' });
+        expect(await repo.findOperation(key)).toBeNull();
+        expect(await repo.findCommitmentOperation(key)).toBeNull();
+      }
+
+      expect(await repo.getRecord(cafe.id)).toEqual(cafe);
+      expect(await repo.getRecord(paid.record.id)).toEqual(paid.record);
+      expect(await repo.getCommitment(internet.id)).toEqual(paid.commitment);
+      expect(await repo.getCommitment(condominio.id)).toEqual(condominio);
+      expect({ totals: await totals(), toPay: await toPay(), records: await repo.listRecords(ctx, OCT) }).toEqual(before);
+      repo.checkInvariants();
     });
 
     it('22. demonstração: três contas a pagar em aberto, R$ 650 em outubro e nada em setembro', async () => {

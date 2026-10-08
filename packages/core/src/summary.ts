@@ -67,7 +67,10 @@ export interface ToPaySummary {
   overdueCount: number;
   /** Primeiro item com vencimento de hoje em diante. */
   nextDue: Commitment | null;
-  /** Pagas com vencimento no mês. */
+  /**
+   * Pagas que pertencem ao mês: com vencimento no mês ou com pagamento no mês (o gasto entra em Pago
+   * pela data do pagamento). Uma conta paga em outro mês aparece nos dois. Não muda nenhum total.
+   */
   paidInMonth: Commitment[];
   /** Só no mês corrente: em aberto com vencimento depois do mês. */
   later: Commitment[];
@@ -97,7 +100,9 @@ export function summarizeToPay(list: readonly Commitment[], contextId: string, m
     upcomingInMonth,
     overdueCount: overdue.length,
     nextDue: upcomingInMonth[0] ?? null,
-    paidInMonth: all.filter((c) => c.status === 'quitado' && monthOf(c.dueOn) === month),
+    paidInMonth: all.filter(
+      (c) => c.status === 'quitado' && (monthOf(c.dueOn) === month || (c.payment !== null && monthOf(c.payment.paidOn) === month)),
+    ),
     later: isCurrentMonth ? open.filter((c) => c.dueOn >= endExclusive) : [],
     hasAny: all.length > 0,
   };

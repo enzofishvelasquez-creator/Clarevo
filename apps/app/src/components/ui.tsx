@@ -1,6 +1,6 @@
 import { formatBRL } from '@clarevo/core';
 import { Check, Eye, EyeOff, type LucideIcon } from 'lucide-react-native';
-import { forwardRef, useEffect, useId, useState, type ReactNode } from 'react';
+import { forwardRef, useEffect, useId, useState, type ReactNode, type Ref } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -72,16 +72,20 @@ export function Screen({
   contentStyle,
   bottomInset = true,
   wide,
+  scrollRef,
 }: {
   children: ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
   bottomInset?: boolean;
   /** Sem limite de largura (o cabeçalho ocupa a tela inteira; use Body para o conteúdo). */
   wide?: boolean;
+  /** Acesso à rolagem (por exemplo, para voltar ao topo). */
+  scrollRef?: Ref<ScrollView>;
 }) {
   const insets = useSafeAreaInsets();
   return (
     <ScrollView
+      ref={scrollRef}
       style={styles.screen}
       contentContainerStyle={[!wide && styles.screenContent, bottomInset && { paddingBottom: insets.bottom + space[10] }, contentStyle]}
       keyboardShouldPersistTaps="handled">
@@ -287,15 +291,29 @@ export function Chip({ label, selected, onPress }: { label: string; selected: bo
   );
 }
 
-export function Banner({ tone, children, icon: Icon }: { tone: 'erro' | 'sucesso' | 'info'; children: ReactNode; icon?: LucideIcon }) {
+/**
+ * Aviso em faixa. Por padrão é anunciado por leitores de tela ao aparecer; `live={false}` serve para textos
+ * que mudam enquanto a pessoa digita (prévias), que não devem ser anunciados de novo a cada tecla.
+ */
+export function Banner({
+  tone,
+  children,
+  icon: Icon,
+  live = true,
+}: {
+  tone: 'erro' | 'sucesso' | 'info';
+  children: ReactNode;
+  icon?: LucideIcon;
+  live?: boolean;
+}) {
   const bg = tone === 'erro' ? colors.errorTint : tone === 'sucesso' ? colors.successTint : colors.brandTint;
   const fg = tone === 'erro' ? colors.error : tone === 'sucesso' ? colors.successText : colors.text;
   return (
     <Animated.View
       entering={FadeIn.duration(motion.confirm).reduceMotion(ReduceMotion.System)}
       style={[styles.banner, { backgroundColor: bg }]}
-      accessibilityRole="alert"
-      accessibilityLiveRegion="polite">
+      accessibilityRole={live ? 'alert' : undefined}
+      accessibilityLiveRegion={live ? 'polite' : undefined}>
       {Icon ? <Icon size={20} color={fg} /> : null}
       <View style={{ flex: 1, gap: space[1] }}>{children}</View>
     </Animated.View>

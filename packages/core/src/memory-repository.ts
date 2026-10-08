@@ -219,10 +219,17 @@ export class MemoryRepository implements RecordsRepository {
     });
   }
 
+  /** Mesmo critério do Supabase: vencimento no mês, pagamento no mês (gasto vivo) ou em aberto. */
   async listCommitments(contextId: string, month: IsoMonth) {
+    const paidInMonth = (c: StoredCommitment) => {
+      const r = c.status === 'quitado' ? this.livePayment(c.id) : undefined;
+      return r !== undefined && monthOf(r.occurredOn) === month;
+    };
     return this.read(() =>
       [...this.commitments.values()]
-        .filter((c) => !c.deletedAt && c.contextId === contextId && (monthOf(c.dueOn) === month || c.status === 'aberto'))
+        .filter(
+          (c) => !c.deletedAt && c.contextId === contextId && (monthOf(c.dueOn) === month || c.status === 'aberto' || paidInMonth(c)),
+        )
         .sort(byDue)
         .map((c) => this.toCommitment(c)),
     );

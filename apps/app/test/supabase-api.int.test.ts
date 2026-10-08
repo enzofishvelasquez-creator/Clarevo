@@ -430,6 +430,56 @@ describe('API real: contas a pagar', () => {
     expect((await toPay('2026-09')).toPayCents).toBe(0);
     expect(await totals()).toEqual([6000, 3900, 2100]);
   });
+
+  it('12. conta paga em outro mês aparece em "Pagas" do mês do pagamento (paid_on), sem mudar os totais', async () => {
+    const seguro = (await ana.createCommitment(newOperationKey(), ctx, bill('Seguro do carro', 300, '2026-11-10', 'Transporte'))).commitment;
+    const luz = (await ana.createCommitment(newOperationKey(), ctx, bill('Luz', 120, '2026-09-25'))).commitment;
+    expect(names(await ana.listCommitments(ctx, '2026-10'))).toEqual(['Luz', 'Internet', 'Condomínio', 'Seguro do carro']);
+
+    // Seguro vence em novembro e é pago adiantado em outubro; Luz vence em setembro e é paga em outubro.
+    await ana.payCommitment(newOperationKey(), seguro.id, seguro.version, payment(300));
+    const luzPaid = await ana.payCommitment(newOperationKey(), luz.id, luz.version, payment(120, '2026-10-02'));
+    expect(await totals()).toEqual([6000, 4320, 1680]);
+    const oct = await ana.listCommitments(ctx, '2026-10');
+    expect(oct.map((c) => [c.description, c.status])).toEqual([
+      ['Luz', 'quitado'],
+      ['Internet', 'aberto'],
+      ['Condomínio', 'aberto'],
+      ['Seguro do carro', 'quitado'],
+    ]);
+    const s = await toPay('2026-10');
+    expect(names(s.paidInMonth)).toEqual(['Luz', 'Seguro do carro']);
+    expect(names(s.items)).toEqual(['Internet', 'Condomínio']);
+    expect(s.later).toEqual([]);
+    expect(s.toPayCents).toBe(65000);
+    // Também no mês do vencimento.
+    expect(names((await toPay('2026-11')).paidInMonth)).toEqual(['Seguro do carro']);
+    const sep = await toPay('2026-09');
+    expect(names(sep.paidInMonth)).toEqual(['Luz']);
+    expect(sep.toPayCents).toBe(0);
+
+    // O mês do pagamento segue o gasto vivo: com a data do gasto em setembro, Luz sai de outubro.
+    await ana.updateRecord(newOperationKey(), luzPaid.record.id, luzPaid.record.version, {
+      accountId: account,
+      amountCents: 12000,
+      occurredOn: '2026-09-30',
+      description: 'Luz',
+      category: 'Moradia',
+    });
+    expect(names(await ana.listCommitments(ctx, '2026-10'))).toEqual(['Internet', 'Condomínio', 'Seguro do carro']);
+    expect(names((await toPay('2026-09')).paidInMonth)).toEqual(['Luz']);
+    expect(await totals()).toEqual([6000, 4200, 1800]);
+    expect(await bruno.listCommitments(ctx, '2026-10')).toEqual([]);
+
+    // Limpeza: desfazer e excluir voltam à base.
+    for (const id of [seguro.id, luz.id]) {
+      const undone = await ana.undoCommitmentPayment(newOperationKey(), id, (await ana.getCommitment(id))!.version);
+      await ana.deleteCommitment(newOperationKey(), id, undone.commitment.version);
+    }
+    expect(names(await ana.listCommitments(ctx, '2026-10'))).toEqual(['Internet', 'Condomínio']);
+    expect((await toPay('2026-10')).toPayCents).toBe(65000);
+    expect(await totals()).toEqual([6000, 3900, 2100]);
+  });
 });
 
 describe('conversor de contas a pagar', () => {

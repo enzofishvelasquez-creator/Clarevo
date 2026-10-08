@@ -29,6 +29,7 @@ import { ContextPill, SubHeader } from '@/components/header';
 import { ErrorState } from '@/components/states';
 import { Banner, Button, Card, FitMoney, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
+import { openSummary } from '@/lib/nav';
 import { totalChange } from '@/lib/highlight';
 import { useCommitment, useCommitments, useDeleteCommitment, useSpace, useUndoCommitmentPayment, useView } from '@/state/data';
 import { useSession } from '@/state/session';
@@ -51,6 +52,8 @@ export default function DetalheContaAPagar() {
   const [actionError, setActionError] = useState<string | null>(null);
   const deleteKey = useRef(newOperationKey());
   const undoKey = useRef(newOperationKey());
+  /** Versão a que a chave do desfazer se refere: outra versão (por exemplo, paga de novo) é outra operação. */
+  const undoFor = useRef<number | null>(null);
 
   const toList = () => (router.canGoBack() ? router.back() : router.replace('/a-pagar'));
 
@@ -84,6 +87,11 @@ export default function DetalheContaAPagar() {
   const doUndo = async () => {
     if (!c || !paid) return;
     setActionError(null);
+    // Repetir depois de uma falha de rede usa a mesma chave; outra versão da conta pede chave nova.
+    if (undoFor.current !== c.version) {
+      undoKey.current = newOperationKey();
+      undoFor.current = c.version;
+    }
     try {
       await undo.mutateAsync({ key: undoKey.current, id: c.id, version: c.version });
       // Chave nova: um próximo desfazer (depois de pagar de novo) é outra operação.
@@ -113,13 +121,13 @@ export default function DetalheContaAPagar() {
     }
   };
 
-  const openSummary = () => {
+  const showSummary = () => {
     if (!c) return;
     // Paga: o mês da data do pagamento. Em aberto: o mês do vencimento, ou o corrente se ela ainda vai vencer depois dele.
     const target = paid ? monthOf(paid.paidOn) : monthOf(c.dueOn) < view.currentMonth ? monthOf(c.dueOn) : view.currentMonth;
     view.setMonth(target);
     view.setSpace('pessoal');
-    router.navigate('/');
+    openSummary();
   };
 
   const affected = !c
@@ -168,7 +176,7 @@ export default function DetalheContaAPagar() {
                     {look.label}
                   </Txt>
                 </View>
-                <Txt variant="title" style={{ fontSize: 24, lineHeight: 32 }} accessibilityRole="header">
+                <Txt variant="title" style={{ fontSize: 24, lineHeight: 32 }} accessibilityRole="header" aria-level={2}>
                   {c.description}
                 </Txt>
                 <FitMoney cents={paid ? paid.amountCents : c.amountCents} />
@@ -219,7 +227,7 @@ export default function DetalheContaAPagar() {
                   <Button label="Excluir conta a pagar" icon={Trash2} tone="danger" onPress={() => setConfirming('excluir')} />
                 </>
               )}
-              <Button label="Ver resumo do mês" tone="soft" onPress={openSummary} />
+              <Button label="Ver resumo do mês" tone="soft" onPress={showSummary} />
               <Pressable accessibilityRole="button" onPress={() => router.push('/quem-ve')} style={styles.privacy}>
                 <ShieldCheck size={18} color={colors.textSecondary} />
                 <Txt variant="label" color={colors.textSecondary}>
@@ -268,17 +276,17 @@ export default function DetalheContaAPagar() {
 }
 
 /**
- * Atalho "Adicionar a conta do próximo mês" (sem recorrência neste ciclo). Só aparece com a consulta confirmada:
- * enquanto carrega ou se falhar, nada aparece, para não arriscar uma conta duplicada.
+ * Atalho "Adicionar a conta do próximo mês" (sem recorrência neste ciclo). Consulta o mês do vencimento seguinte,
+ * que traz a conta dele em aberto ou já paga. Só aparece com a consulta confirmada: enquanto carrega ou se falhar,
+ * nada aparece, para não arriscar uma conta duplicada.
  */
 function NextMonth({ commitment: c }: { commitment: Commitment }) {
-  const { currentMonth } = useView();
-  const list = useCommitments(c.contextId, currentMonth);
-  if (!list.isSuccess) return null;
   const prefill = nextMonthPrefill(c);
+  const month = monthOf(prefill.dueOn);
+  const list = useCommitments(c.contextId, month);
+  if (!list.isSuccess) return null;
   const existing = findNextMonthCommitment(list.data, c);
   if (existing) {
-    const month = monthOf(prefill.dueOn);
     return (
       <View style={{ gap: space[1] }}>
         <Txt variant="label" color={colors.textSecondary}>

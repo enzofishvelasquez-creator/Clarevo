@@ -106,13 +106,20 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await shot('06_resumo_demo');
 
   const expectTotals = async (name, rec, pago, dif, aPagar = 'R$ 650,00') => {
-    // Só a cópia visível: telas de Resumo anteriores continuam montadas na pilha.
+    // Só a cópia visível: as outras abas e as telas da pilha continuam montadas, escondidas.
     await p.getByText(dif, { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 8000 }).catch(() => {});
     await p.getByText(aPagar, { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 8000 }).catch(() => {});
     const s = await body();
     ok(name, s.includes(rec) && s.includes(pago) && s.includes(dif) && s.includes(aPagar), `${rec} ${pago} ${dif} ${aPagar}`);
   };
+  // "Ver resumo do mês" volta ao Resumo que já está na pilha (dismissTo): um único Resumo montado, nada para voltar,
+  // mostrado do topo (o acesso à Conta, no alto do cabeçalho, fica dentro da tela).
+  const singleResumo = async (name) => {
+    const top = await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().boundingBox();
+    ok(name, (await p.getByText('Diferença do mês', { exact: true }).count()) === 1 && (await p.getByRole('button', { name: 'Voltar', exact: true }).filter({ visible: true }).count()) === 0 && top !== null && top.y >= 0, `topo y=${top?.y}`);
+  };
   // Telas empilhadas (detalhe, lista) escondem a barra de abas: volta até ela aparecer.
+  // dismissTo não muda isso: depois de anotar ou pagar, a pessoa continua no detalhe, acima da lista.
   const goResumo = async () => {
     const tab = () => p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true });
     for (let i = 0; i < 5 && (await tab().count()) === 0; i++) { await btn('Voltar').click(); await p.waitForTimeout(400); }
@@ -159,6 +166,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
   await p.getByText('+ R$ 80,00').filter({ visible: true }).first().waitFor({ timeout: 2500 }).catch(() => {});
   ok('resumo mostra o efeito do gasto salvo', (await body()).includes('+ R$ 80,00'));
+  await singleResumo('ver resumo do mês (gasto) volta ao Resumo da pilha, sem outra cópia');
   await expectTotals('criar gasto 80 → 3.980 / 2.020', 'R$ 6.000,00', 'R$ 3.980,00', 'R$ 2.020,00');
   await shot('11_resumo_apos_gasto');
 
@@ -271,9 +279,15 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
   await p.getByText('+ R$ 155,00').filter({ visible: true }).first().waitFor({ timeout: 2500 }).catch(() => {});
   ok('resumo mostra o efeito do pagamento em Pago', (await body()).includes('+ R$ 155,00'));
+  await singleResumo('ver resumo do mês (conta a pagar) volta ao Resumo da pilha, sem outra cópia');
   await expectTotals('pagar Internet 155 → 4.055 / 1.945', 'R$ 6.000,00', 'R$ 4.055,00', 'R$ 1.945,00', 'R$ 630,00');
   await p.getByRole('tab', { name: 'Movimentações' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
   ok('movimentações: gasto gerado pela conta a pagar', (await p.getByRole('button', { name: /^Internet, Pago · 07\/10\/2026 · conta a pagar/ }).filter({ visible: true }).count()) > 0);
+  // A partir da aba Movimentações, "Ver resumo do mês" também seleciona a aba Resumo.
+  await openRow(/^Internet, Pago · 07\/10\/2026 · conta a pagar/); await waitText('Ver conta a pagar');
+  await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
+  ok('ver resumo do mês a partir de Movimentações abre a aba Resumo', (await p.getByRole('tab', { name: 'Resumo', selected: true }).filter({ visible: true }).count()) === 1);
+  await singleResumo('ver resumo do mês a partir de Movimentações não deixa cópia na pilha');
 
   await goResumo(); await openToPay();
   await openRow(/^Internet, paga em 07\/10\/2026/); await waitText('Desfazer pagamento');
@@ -318,6 +332,31 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('lista volta à base, sem Água nem Gás', t.includes('R$ 650,00') && t.includes('Seguro do carro') && !t.includes('Água') && !t.includes('Gás'));
   await btn('Voltar').click(); await waitText('Diferença do mês');
   await expectTotals('excluir Água, Gás e Internet de novembro → base', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00');
+
+  // Conta de novembro paga em outubro: o gasto conta em Pago de outubro e a conta aparece em "Pagas" de outubro.
+  // Ainda a pagar não muda (ela estava em Próximos meses). Desfazer volta à base.
+  await openToPay();
+  await openRow(/^Seguro do carro, vence em 10\/11\/2026/); await waitText('Marcar como paga');
+  await btn('Marcar como paga').click(); await waitText('Confirmar pagamento');
+  await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado');
+  ok('seguro pago em outubro: resumo afetado é Pago de outubro', (await body()).includes('Pago de outubro de 2026'));
+  await btn('Voltar').click(); await waitText('Já contam em Pago, no mês da data do pagamento.');
+  await waitGone('Próximos meses');
+  t = await body();
+  ok('conta de novembro paga em outubro aparece em Pagas de outubro',
+    (await p.getByRole('button', { name: /^Seguro do carro, paga em 07\/10\/2026, R\$ 300,00, conta em Pago de outubro de 2026/ }).filter({ visible: true }).count()) === 1 &&
+      t.includes('Pagas') && t.includes('R$ 650,00') && !t.includes('Próximos meses'));
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  await expectTotals('pagar Seguro em outubro → 4.200 / 1.800, a pagar 650', 'R$ 6.000,00', 'R$ 4.200,00', 'R$ 1.800,00', 'R$ 650,00');
+  await openToPay();
+  await openRow(/^Seguro do carro, paga em 07\/10\/2026/); await waitText('Desfazer pagamento');
+  await btn('Desfazer pagamento').click(); await waitText('Desfazer pagamento?');
+  await confirmIn('Desfazer pagamento'); await waitText('Pagamento desfeito');
+  await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
+  await expectTotals('desfazer Seguro → base', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00');
+  await openToPay(); await waitText('Próximos meses');
+  ok('seguro volta para Próximos meses', (await p.getByRole('button', { name: /^Seguro do carro, vence em 10\/11\/2026/ }).filter({ visible: true }).count()) === 1 && !(await body()).includes('Já contam em Pago'));
+  await btn('Voltar').click(); await waitText('Diferença do mês');
 
   // Setembro → outubro
   await btn('Anotar gasto').click(); await waitText('Será salvo em');
@@ -375,6 +414,19 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     const cut = await p.evaluate(() => [...document.querySelectorAll('div[dir="auto"], span')].filter((e) => /R\$/.test(e.textContent || '') && e.children.length === 0 && e.getBoundingClientRect().width > 0 && e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent));
     ok(`${prefix}: nenhum valor em reais cortado`, cut.length === 0, cut.join(' | '));
     ok(`${prefix}: alvos de toque ≥ 44 px`, small.length === 0, small.join(' | '));
+    const avatarOut = await p.evaluate(() => [...document.querySelectorAll('[aria-label^="Conta: perfil"]')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && (b.left < -0.5 || b.right > window.innerWidth + 0.5); }).length);
+    ok(`${prefix}: avatar da conta inteiro na tela`, avatarOut === 0);
+  };
+  // Cabeçalho das telas internas: nenhum h1 cortado (altura ou largura) e uma pílula de contexto inteira na tela.
+  const headerChecks = async (prefix) => {
+    const r = await p.evaluate(() => {
+      const shown = (e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0; };
+      const cut = [...document.querySelectorAll('h1')].filter(shown).filter((e) => e.scrollHeight > e.clientHeight + 1 || e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent);
+      const pills = [...document.querySelectorAll('[aria-label^="Contexto:"]')].filter(shown);
+      const outside = pills.filter((e) => { const b = e.getBoundingClientRect(); return b.left < 0 || b.right > window.innerWidth + 0.5; }).map((e) => e.getAttribute('aria-label'));
+      return { cut, h1: [...document.querySelectorAll('h1')].filter(shown).length, pills: pills.length, outside };
+    });
+    ok(`${prefix}: título inteiro e contexto visível`, r.h1 === 1 && r.cut.length === 0 && r.pills === 1 && r.outside.length === 0, `h1=${r.h1} pílulas=${r.pills} ${[...r.cut, ...r.outside].join(' | ')}`);
   };
   for (const w of [320, 736]) {
     await p.setViewportSize({ width: w, height: 800 });
@@ -384,6 +436,23 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await p.getByRole('button', { name: /^Ainda a pagar neste mês/ }).filter({ visible: true }).first().click(); await waitText('Contas a pagar'); await waitText('Seguro do carro'); await p.waitForTimeout(400);
     await layoutChecks(`contas a pagar ${w}px`);
     await shot(`24_contas_${w}px`, true);
+    await headerChecks(`contas a pagar ${w}px`);
+    // Telas novas: título inteiro (nenhum h1 cortado) e o contexto visível no cabeçalho.
+    await openRow(/^Internet, vence em 15\/10\/2026/); await waitText('Marcar como paga'); await p.waitForTimeout(300);
+    await headerChecks(`detalhe da conta ${w}px`);
+    await layoutChecks(`detalhe da conta ${w}px`);
+    if (w === 320) await shot('24_detalhe_conta_320px');
+    await btn('Marcar como paga').click(); await waitText('Confirmar pagamento'); await p.waitForTimeout(300);
+    await headerChecks(`marcar como paga ${w}px`);
+    await layoutChecks(`marcar como paga ${w}px`);
+    if (w === 320) await shot('24_marcar_como_paga_320px');
+    await btn('Cancelar').click(); await waitText('Excluir conta a pagar');
+    await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
+    await btn('Anotar conta a pagar').click(); await waitText('Salvar conta a pagar'); await p.waitForTimeout(300);
+    await headerChecks(`anotar conta a pagar ${w}px`);
+    await layoutChecks(`anotar conta a pagar ${w}px`);
+    if (w === 320) await shot('24_anotar_conta_320px');
+    await btn('Cancelar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
     await btn('Voltar').click(); await waitText('Diferença do mês');
   }
   ok('sem erros de JavaScript no console', errors.length === 0, errors.slice(0,3).join(' | '));

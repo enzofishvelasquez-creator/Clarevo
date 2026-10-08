@@ -239,7 +239,8 @@ export class SupabaseRepository implements RecordsRepository {
   }
 
   /**
-   * Contas a pagar do contexto: todas com vencimento no mês (abertas e pagas) e as abertas de outros meses.
+   * Contas a pagar do contexto: todas com vencimento no mês (abertas e pagas), as pagas com data de
+   * pagamento no mês (paid_on vem do gasto vivo) e as abertas de outros meses.
    * Em páginas, como listRecords: um total incompleto não pode aparecer como confirmado.
    */
   async listCommitments(contextId: string, month: IsoMonth): Promise<Commitment[]> {
@@ -251,7 +252,9 @@ export class SupabaseRepository implements RecordsRepository {
         .from('commitment_items')
         .select('*')
         .eq('context_id', contextId)
-        .or(`and(due_on.gte.${start},due_on.lt.${endExclusive}),status.eq.aberto`)
+        .or(
+          `and(due_on.gte.${start},due_on.lt.${endExclusive}),and(paid_on.gte.${start},paid_on.lt.${endExclusive}),status.eq.aberto`,
+        )
         .order('due_on')
         .order('created_at')
         .order('id')

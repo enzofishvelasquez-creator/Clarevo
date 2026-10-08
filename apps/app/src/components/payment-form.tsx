@@ -43,6 +43,9 @@ import { usePayCommitment, useUpdateRecord } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
+/** "R$" e os dígitos na mesma linha em textos corridos. */
+const keepTogether = (money: string) => money.replace(' ', '\u00A0');
+
 const paymentText = (code: string) =>
   code in PAYMENT_ERROR_TEXT ? PAYMENT_ERROR_TEXT[code as keyof typeof PAYMENT_ERROR_TEXT] : PAYMENT_ERROR_TEXT.pagar_falhou;
 
@@ -130,25 +133,30 @@ export function PaymentForm({ commitment: c, space: personal }: { commitment: Co
    * Resultado de rede incerto: antes de repetir, conferir se alguma tentativa anterior foi gravada.
    * Se foi e o preenchimento mudou, aplica o preenchimento atual como edição do gasto gerado.
    * Nunca há um segundo pagamento. Devolve o gasto (ou só true, se ele já não existe), ou null se nada foi gravado.
+   * As tentativas só são esquecidas depois que a leitura e a edição do gasto dão certo: se uma delas falhar,
+   * a próxima tentativa reconcilia de novo em vez de repetir o pagamento.
    */
   const reconcile = async (input: PaymentInput, snapshot: string): Promise<{ amountCents: number; occurredOn: string } | true | null> => {
     for (const attempt of [...pending.current].reverse()) {
       const op = await repo.findCommitmentOperation(attempt.key);
       if (!op || op.action !== 'pagar_compromisso' || !op.recordId) continue;
-      pending.current = [];
       qc.invalidateQueries({ queryKey: ['commitments'] });
       qc.invalidateQueries({ queryKey: ['commitment', op.commitmentId] });
       qc.invalidateQueries({ queryKey: ['records'] });
       const expense = await repo.getRecord(op.recordId);
-      if (!expense) return true;
-      if (attempt.snapshot === snapshot) return expense;
+      if (!expense || attempt.snapshot === snapshot) {
+        pending.current = [];
+        return expense ?? true;
+      }
       // O useInvalidate dos registros já recarrega as contas a pagar.
-      return updateRecord.mutateAsync({
+      const saved = await updateRecord.mutateAsync({
         key: newOperationKey(),
         id: expense.id,
         version: expense.version,
         input: { accountId: input.accountId, amountCents: input.amountCents, occurredOn: input.paidOn, description: expense.description, category: input.category },
       });
+      pending.current = [];
+      return saved;
     }
     return null;
   };
@@ -165,6 +173,8 @@ export function PaymentForm({ commitment: c, space: personal }: { commitment: Co
       // O detalhe mostra a versão atual ao voltar; a rota mantém este formulário aberto.
       qc.setQueryData(['commitment', current.id], current);
       if (current.status === 'quitado') {
+        // O gasto do pagamento já conta em Pago: o Resumo e as Movimentações abertos recarregam.
+        qc.invalidateQueries({ queryKey: ['records'] });
         setPaidElsewhere(true);
         return;
       }
@@ -228,12 +238,17 @@ export function PaymentForm({ commitment: c, space: personal }: { commitment: Co
         }
         // Falha de rede: o pagamento pode ou não ter sido gravado. Guardar a tentativa para reconciliar.
         pending.current = [...pending.current, { key, snapshot }];
+        // Se foi gravado, o detalhe, a lista e o Resumo que ficaram abertos recarregam e mostram a conta paga.
+        qc.invalidateQueries({ queryKey: ['commitments'] });
+        qc.invalidateQueries({ queryKey: ['commitment', c.id] });
+        qc.invalidateQueries({ queryKey: ['records'] });
         setRetry(true);
         setBanner(PAYMENT_ERROR_TEXT.pagar_falhou);
       }
-    } catch {
+    } catch (e) {
+      // Falhou a reconciliação: a tentativa pendente continua guardada e é conferida de novo na próxima vez.
       setRetry(true);
-      setBanner(PAYMENT_ERROR_TEXT.pagar_falhou);
+      setBanner(isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido' ? paymentText(e.code) : PAYMENT_ERROR_TEXT.pagar_falhou);
     } finally {
       setBusy(false);
     }
@@ -286,7 +301,7 @@ export function PaymentForm({ commitment: c, space: personal }: { commitment: Co
             {shown.description}
           </Txt>
           <Txt variant="caption" color={overdue ? colors.error : colors.textSecondary}>
-            {overdue ? 'Venceu em' : 'Vence em'} {formatDateBR(shown.dueOn)} · previsto {formatBRL(shown.amountCents)}
+            {overdue ? 'Venceu em' : 'Vence em'} {formatDateBR(shown.dueOn)} · previsto {keepTogether(formatBRL(shown.amountCents))}
           </Txt>
         </Card>
 
@@ -371,7 +386,8 @@ export function PaymentForm({ commitment: c, space: personal }: { commitment: Co
           </View>
 
           {valid ? (
-            <Banner tone="info" icon={Info}>
+            // Prévia que muda a cada tecla: sem região viva, para não ser anunciada de novo a cada dígito.
+            <Banner tone="info" icon={Info} live={false}>
               <Txt variant="label">
                 Um gasto de {formatBRL(amount)} será registrado em Pago de {formatMonthBR(monthOf(paidOn)).toLowerCase()}, e esta conta a pagar
                 sai de Ainda a pagar.

@@ -108,6 +108,41 @@ begin
   assert (select count(*) from public.commitments) = 3, 'nenhuma conta a pagar nova';
 end $$;
 
+-- 3b. Hash sem ambiguidade: um '|' na descrição ou na categoria não faz um pedido diferente parecer repetição
+-- (com campos unidos por '|', 'Luz|Casa' + 'Moradia' e 'Luz' + 'Casa|Moradia' dariam o mesmo hash).
+-- A data entra em ISO no hash, qualquer que seja o DateStyle da sessão.
+do $$
+declare
+  ctx uuid := pg_temp.id('ctx');
+  v_datestyle text := current_setting('datestyle');
+  res jsonb;
+  again jsonb;
+  luz uuid;
+begin
+  res := public.create_commitment('cp-hash-0001', ctx, 100, '2026-10-15', 'Luz|Casa', 'Moradia');
+  luz := (res #>> '{commitment,id}')::uuid;
+  perform pg_temp.expect_error(format($f$select public.create_commitment('cp-hash-0001', %L, 100, '2026-10-15', 'Luz', 'Casa|Moradia')$f$,
+    ctx), 'chave_reutilizada');
+  again := public.create_commitment('cp-hash-0001', ctx, 100, '2026-10-15', 'Luz|Casa', 'Moradia');
+  assert (again #>> '{commitment,id}')::uuid = luz, 'repetição exata continua devolvendo a mesma conta a pagar';
+
+  res := public.update_commitment('cp-hash-0002', luz, 1, 100, '2026-10-15', 'Luz|Conta', 'Moradia');
+  assert (res #>> '{commitment,version}')::int = 2, 'edição com | gravada';
+  perform pg_temp.expect_error(format($f$select public.update_commitment('cp-hash-0002', %L, 1, 100, '2026-10-15', 'Luz', 'Conta|Moradia')$f$,
+    luz), 'chave_reutilizada');
+  assert (select (description, category, version) from public.commitments where id = luz) = ('Luz|Conta'::text, 'Moradia'::text, 2),
+    'pedido diferente com a mesma chave não altera nada';
+
+  perform set_config('datestyle', 'SQL, DMY', true);
+  res := public.create_commitment('cp-base-0001', ctx, 15000, '2026-10-15', 'Internet', 'Moradia');
+  assert (res #>> '{commitment,id}')::uuid = pg_temp.id('internet'), 'repetição com outro DateStyle devolve a mesma conta a pagar';
+  perform set_config('datestyle', v_datestyle, true);
+
+  perform public.delete_commitment('cp-hash-0003', luz, 2);
+  perform pg_temp.check_links();
+  assert (select count(*) from public.commitments) = 3, 'só as 3 contas a pagar da base';
+end $$;
+
 -- 4. Validação no banco (mesmos códigos e mesma ordem do app). Vencimento: de 1 ano antes a 2 anos depois de hoje.
 do $$
 declare
@@ -480,6 +515,38 @@ select pg_temp.expect_error(format($$update public.commitments set status = 'qui
   pg_temp.id('condominio')), 'vinculo_inconsistente');
 select pg_temp.expect_error(format($$update public.financial_records set deleted_at = now() where id = %L; set constraints all immediate$$,
   pg_temp.id('gasto3')), 'vinculo_inconsistente');
+-- I1 também na exclusão física: apagar o gasto vivo de uma conta paga deixaria a conta 'quitado' sem gasto.
+select pg_temp.expect_error(format($$delete from public.financial_records where id = %L; set constraints all immediate$$,
+  pg_temp.id('gasto3')), 'vinculo_inconsistente');
+-- Apagar só o rastro (gasto já excluído logicamente) não quebra o vínculo; apagar a conta a pagar e os gastos
+-- na mesma transação (exclusão do contexto inteiro) também passa. Cada caso é desfeito em seguida.
+do $$
+begin
+  begin
+    delete from public.financial_records where id = pg_temp.id('gasto1');
+    set constraints all immediate;
+    set constraints all deferred;
+    raise exception 'desfeito';
+  exception when others then
+    if sqlerrm <> 'desfeito' then
+      raise exception 'apagar o rastro do pagamento deveria passar: %', sqlerrm;
+    end if;
+  end;
+  begin
+    delete from public.financial_records where context_id = pg_temp.id('ctx');
+    delete from public.financial_contexts where id = pg_temp.id('ctx');
+    set constraints all immediate;
+    set constraints all deferred;
+    raise exception 'desfeito';
+  exception when others then
+    if sqlerrm <> 'desfeito' then
+      raise exception 'apagar o contexto inteiro deveria passar: %', sqlerrm;
+    end if;
+  end;
+  assert (select count(*) from public.financial_records where id = pg_temp.id('gasto1')) = 1, 'rastro de volta';
+  assert (select (status, version) from public.commitments where id = pg_temp.id('internet'))
+    = ('quitado'::public.commitment_status, 9), 'Internet continua paga';
+end $$;
 -- Um único gasto vivo por conta a pagar; só despesa; mesmo contexto da conta a pagar.
 select pg_temp.expect_error(format($$insert into public.financial_records
     (context_id, account_id, kind, amount_cents, currency, occurred_on, description, created_by, commitment_id)

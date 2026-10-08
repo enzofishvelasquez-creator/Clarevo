@@ -24,7 +24,7 @@ Executado: testes de regras (49), banco (isolamento e sequência de aceite), app
 |---|---|---|
 | Alta | Uma falha momentânea de rede ao atualizar dados em segundo plano tirava a pessoa da tela e apagava o rascunho | Dados já carregados prevalecem sobre falha de atualização |
 | Média (segurança) | Repetir uma operação antiga devolvia o registro mesmo depois de o acesso ser revogado | A repetição confere permissão de leitura; teste novo |
-| Média (segurança) | O titular podia revogar o próprio vínculo e perder o acesso à família | Vínculo de titular não pode ser alterado; teste novo |
+| Média (segurança) | Quem é titular podia revogar o próprio vínculo e perder o acesso à família | Vínculo de titular não pode ser alterado; teste novo |
 | Média | Depois de uma falha de rede incerta, os totais não eram atualizados e correções feitas depois da falha eram ignoradas | Reconciliação atualiza os totais e aplica a correção como edição do mesmo registro |
 | Média | Em produção, a confirmação "Senha atualizada" não apareceria e, na web, recarregar a página perdia a recuperação | Fluxo de nova senha refeito; marca de recuperação guardada na sessão do navegador |
 | Baixa | A empresa podia vincular qualquer pessoa a uma licença | Empresa só convida por e-mail e encerra; vínculo e ativação ficam para o aceite; teste novo |

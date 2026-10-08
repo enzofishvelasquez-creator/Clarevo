@@ -2,7 +2,7 @@ import { addMonths, formatMonthBR } from '@clarevo/core';
 import { router } from 'expo-router';
 import { ArrowLeft, ChevronLeft, ChevronRight, Users } from 'lucide-react-native';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { Logo } from '@/components/brand';
@@ -21,10 +21,12 @@ const focusOnBrand = { outlineWidth: 3, outlineColor: colors.accent, outlineStyl
 /** Logo reverso, selo de demonstração e acesso à Conta (perfil, segurança e benefício). */
 function BrandRow() {
   const { user, auth } = useSession();
+  // Abaixo de 360 px, logo, selo de demonstração e avatar não cabem lado a lado no tamanho normal.
+  const narrow = useWindowDimensions().width < 360;
   return (
-    <View style={styles.top}>
-      <Logo height={32} variant="reverso" />
-      <View style={styles.topRight}>
+    <View style={[styles.top, narrow && { gap: space[2] }]}>
+      <Logo height={narrow ? 24 : 32} variant="reverso" />
+      <View style={[styles.topRight, narrow && { gap: space[2] }]}>
         {auth.mode === 'demo' ? <DemoPill /> : null}
         <Pressable
           accessibilityRole="button"
@@ -63,7 +65,9 @@ export function AppHeader({ title, children }: { title?: string; children?: Reac
 
 /**
  * Cabeçalho compacto das telas internas (formulário, detalhe, composição, conta):
- * voltar, título e, à direita, o contexto fixo ou outra informação.
+ * voltar, título e, à direita, o contexto fixo ou outra informação. Quando não há espaço
+ * para os dois lado a lado (telas estreitas, letra grande), o contexto desce para baixo do
+ * título, alinhado a ele: nem o título nem o contexto são cortados.
  */
 export function SubHeader({ title, onBack, right }: { title: string; onBack?: () => void; right?: ReactNode }) {
   const back = onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/')));
@@ -79,10 +83,12 @@ export function SubHeader({ title, onBack, right }: { title: string; onBack?: ()
           style={(s) => [styles.backBtn, (s as { focused?: boolean }).focused && focusOnBrand]}>
           <ArrowLeft size={22} color={colors.textOnBrand} />
         </Pressable>
-        <Txt variant="title" color={colors.textOnBrand} style={styles.subTitle} numberOfLines={2} accessibilityRole="header" aria-level={1}>
-          {title}
-        </Txt>
-        {right}
+        <View style={styles.subMain}>
+          <Txt variant="title" color={colors.textOnBrand} style={styles.subTitle} accessibilityRole="header" aria-level={1}>
+            {title}
+          </Txt>
+          {right}
+        </View>
       </View>
     </View>
   );
@@ -192,7 +198,9 @@ const styles = StyleSheet.create({
   subBand: { backgroundColor: colors.brand },
   subInner: { flexDirection: 'row', alignItems: 'center', gap: space[2], paddingTop: space[2], paddingBottom: space[3], paddingHorizontal: space[3] },
   backBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  subTitle: { flex: 1, minWidth: 0 },
+  subMain: { flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[2], rowGap: space[1] },
+  // O título ocupa a largura natural: se não couber numa linha ao lado do contexto, o contexto passa para baixo.
+  subTitle: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 },
   pill: { backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: space[1], marginRight: space[3] },
   track: { flexDirection: 'row', backgroundColor: colors.brandDeep, borderRadius: radius.md, padding: 4 },
   indicator: { position: 'absolute', left: 4, top: 4, bottom: 4, borderRadius: 13, backgroundColor: colors.surface },

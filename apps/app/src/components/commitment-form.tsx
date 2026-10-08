@@ -147,17 +147,22 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
    * Resultado de rede incerto: antes de repetir, conferir se alguma tentativa anterior foi gravada.
    * Se foi e o preenchimento mudou depois da falha, aplica o preenchimento atual como edição
    * dessa mesma conta a pagar (nunca cria uma segunda). Devolve o ID, ou null se nada foi gravado.
+   * As tentativas só são esquecidas depois que a leitura e a edição de acompanhamento dão certo: se uma delas
+   * falhar, a próxima tentativa reconcilia de novo em vez de repetir a criação.
    */
   const reconcile = async (input: CommitmentInput, snapshot: string): Promise<string | null> => {
     for (const attempt of [...pending.current].reverse()) {
       const op = await repo.findCommitmentOperation(attempt.key);
       if (!op || (op.action !== 'criar_compromisso' && op.action !== 'editar_compromisso')) continue;
-      pending.current = [];
       qc.invalidateQueries({ queryKey: ['commitments'] });
       qc.invalidateQueries({ queryKey: ['commitment', op.commitmentId] });
       const current = await repo.getCommitment(op.commitmentId);
-      if (attempt.snapshot === snapshot || !current) return op.commitmentId;
+      if (attempt.snapshot === snapshot || !current) {
+        pending.current = [];
+        return op.commitmentId;
+      }
       const saved = await update.mutateAsync({ key: newOperationKey(), id: current.id, version: current.version, input });
+      pending.current = [];
       return saved.commitment.id;
     }
     return null;
@@ -237,12 +242,20 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
         }
         // Falha de rede: a gravação pode ou não ter acontecido. Guardar a tentativa para reconciliar.
         pending.current = [...pending.current, { key, snapshot }];
+        // Se foi gravada, a lista e o Resumo que ficaram abertos recarregam e mostram a conta.
+        qc.invalidateQueries({ queryKey: ['commitments'] });
+        if (editingId) qc.invalidateQueries({ queryKey: ['commitment', editingId] });
         setRetry(true);
         setBanner(COMMITMENT_ERROR_TEXT.salvar_falhou);
       }
-    } catch {
+    } catch (e) {
+      // Falhou a reconciliação: a tentativa pendente continua guardada e é conferida de novo na próxima vez.
       setRetry(true);
-      setBanner(COMMITMENT_ERROR_TEXT.salvar_falhou);
+      if (isRepoError(e) && e.code === 'compromisso_quitado') {
+        setPaidElsewhere(true);
+        return;
+      }
+      setBanner(isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido' ? commitmentText(e.code) : COMMITMENT_ERROR_TEXT.salvar_falhou);
     } finally {
       setBusy(false);
     }

@@ -32,6 +32,8 @@ export const COMMITMENT_ERROR_TEXT = {
   descricao_obrigatoria: 'Dê um nome para esta conta a pagar.',
   valor_acima_do_limite: 'O valor máximo por conta a pagar é R$ 9.999.999,99.',
   vencimento_fora_do_intervalo: 'Use um vencimento entre 1 ano atrás e 2 anos à frente.',
+  /** Só no app, com o vencimento em branco; o banco recusa como data_invalida. */
+  vencimento_obrigatorio: 'Informe a data de vencimento, como 15/10/2026.',
   versao_desatualizada: 'Esta conta a pagar foi alterada em outro aparelho. Confira a versão atual antes de salvar.',
   nao_encontrado: 'Esta conta a pagar não está mais disponível.',
   compromisso_quitado: 'Esta conta a pagar já foi paga. Para alterar, desfaça o pagamento.',
@@ -140,7 +142,8 @@ export function validateCommitmentDraft(
   const amount = checkAmount(draft.amountText, COMMITMENT_ERROR_TEXT, errors);
 
   const dueOn = parseDateBR(draft.dateText);
-  if (dueOn === null) errors.dateText = COMMITMENT_ERROR_TEXT.data_invalida;
+  if (draft.dateText.trim() === '') errors.dateText = COMMITMENT_ERROR_TEXT.vencimento_obrigatorio;
+  else if (dueOn === null) errors.dateText = COMMITMENT_ERROR_TEXT.data_invalida;
   else if (dueOn !== opts.originalDueOn) {
     const { min, max } = dueDateBounds(today);
     if (dueOn < min || dueOn > max) errors.dateText = COMMITMENT_ERROR_TEXT.vencimento_fora_do_intervalo;

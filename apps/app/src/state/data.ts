@@ -34,7 +34,7 @@ export function useMonthRecords(contextId: string | undefined, month: IsoMonth) 
   return { ...query, summary };
 }
 
-/** Contas a pagar do mês (abertas e pagas) e as abertas de outros meses; o total sai de summarizeToPay. */
+/** Contas a pagar com vencimento no mês (abertas e pagas), as pagas com data de pagamento no mês e as abertas de outros meses; o total sai de summarizeToPay. */
 export function useCommitments(contextId: string | undefined, month: IsoMonth) {
   const repo = useRepo();
   const { today } = useSession();

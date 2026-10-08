@@ -97,7 +97,8 @@ create trigger commitments_guard
 
 -- Invariante I1, conferida no fim da transação (pagar e desfazer passam por um estado intermediário).
 -- security definer: dispara no commit com o papel de quem chamou (authenticated).
--- Defesa de último nível: as funções nunca a disparam; ela pega escrita manual no banco.
+-- Defesa de último nível: as funções nunca a disparam; ela pega escrita manual no banco,
+-- inclusive a exclusão física do gasto vivo de uma conta paga.
 create or replace function public.clarevo_check_commitment_payment()
 returns trigger
 language plpgsql
@@ -109,11 +110,21 @@ declare
   v_c public.commitments%rowtype;
   v_live int;
 begin
-  if tg_table_name = 'commitments' then v_id := new.id; else v_id := new.commitment_id; end if;
+  if tg_table_name = 'commitments' then
+    v_id := new.id;
+  elsif tg_op = 'DELETE' then
+    v_id := old.commitment_id;
+  else
+    v_id := new.commitment_id;
+  end if;
   if v_id is null then
     return null;
   end if;
   select * into v_c from public.commitments where id = v_id;
+  -- Conta a pagar apagada na mesma transação (exclusão do contexto inteiro): não sobra vínculo para conferir.
+  if not found then
+    return null;
+  end if;
   select count(*) into v_live from public.financial_records where commitment_id = v_id and deleted_at is null;
   if not ((v_c.status = 'quitado' and v_c.deleted_at is null and v_live = 1) or (v_c.status = 'aberto' and v_live = 0)) then
     raise exception 'vinculo_inconsistente' using errcode = '23514';
@@ -130,6 +141,12 @@ create constraint trigger records_payment_consistency
   after insert or update on public.financial_records
   deferrable initially deferred
   for each row when (new.commitment_id is not null)
+  execute function public.clarevo_check_commitment_payment();
+-- Exclusão física de um gasto vinculado: a conta não pode ficar 'quitado' sem gasto vivo.
+create constraint trigger records_payment_consistency_del
+  after delete on public.financial_records
+  deferrable initially deferred
+  for each row when (old.commitment_id is not null)
   execute function public.clarevo_check_commitment_payment();
 
 -- ---------------------------------------------------------------------------
@@ -247,8 +264,11 @@ $$;
 
 -- ---------------------------------------------------------------------------
 -- Contas a pagar: anotar, editar, excluir, pagar, desfazer (atômico, idempotente, versionado)
--- Estrutura comum: sessão; chave; texto aparado; hash com todo argumento em coalesce(::text, '');
+-- Estrutura comum: sessão; chave; texto aparado; hash de jsonb_build_array(ação, argumentos)::text;
 -- trava da chave; repetição (ação e hash iguais, leitura do contexto); travas; versão; situação; validação; escrita.
+-- O hash em JSON não é ambíguo: textos ficam entre aspas e escapados (um '|' na descrição não se confunde com a
+-- separação de campos), NULL é diferente de texto vazio e datas saem em ISO, qualquer que seja o DateStyle.
+-- As funções de registro (create_record, update_record, delete_record) mantêm o hash da 0001.
 -- ---------------------------------------------------------------------------
 create or replace function public.create_commitment(
   p_idempotency_key text,
@@ -276,8 +296,7 @@ begin
     raise exception 'nao_autenticado' using errcode = '42501';
   end if;
   perform public.clarevo_check_key(p_idempotency_key);
-  v_hash := md5(concat_ws('|', 'criar_compromisso', coalesce(p_context_id::text, ''), coalesce(p_amount_cents::text, ''),
-                          coalesce(p_due_on::text, ''), v_description, coalesce(v_category, '')));
+  v_hash := md5(jsonb_build_array('criar_compromisso', p_context_id, p_amount_cents, p_due_on, v_description, v_category)::text);
   perform pg_advisory_xact_lock(hashtext('op:' || v_uid::text || ':' || p_idempotency_key));
 
   select * into v_op from public.record_operations where actor_id = v_uid and idempotency_key = p_idempotency_key;
@@ -335,8 +354,8 @@ begin
     raise exception 'nao_autenticado' using errcode = '42501';
   end if;
   perform public.clarevo_check_key(p_idempotency_key);
-  v_hash := md5(concat_ws('|', 'editar_compromisso', coalesce(p_commitment_id::text, ''), coalesce(p_expected_version::text, ''),
-                          coalesce(p_amount_cents::text, ''), coalesce(p_due_on::text, ''), v_description, coalesce(v_category, '')));
+  v_hash := md5(jsonb_build_array('editar_compromisso', p_commitment_id, p_expected_version, p_amount_cents, p_due_on,
+                                  v_description, v_category)::text);
   perform pg_advisory_xact_lock(hashtext('op:' || v_uid::text || ':' || p_idempotency_key));
 
   select * into v_op from public.record_operations where actor_id = v_uid and idempotency_key = p_idempotency_key;
@@ -397,7 +416,7 @@ begin
     raise exception 'nao_autenticado' using errcode = '42501';
   end if;
   perform public.clarevo_check_key(p_idempotency_key);
-  v_hash := md5(concat_ws('|', 'excluir_compromisso', coalesce(p_commitment_id::text, ''), coalesce(p_expected_version::text, '')));
+  v_hash := md5(jsonb_build_array('excluir_compromisso', p_commitment_id, p_expected_version)::text);
   perform pg_advisory_xact_lock(hashtext('op:' || v_uid::text || ':' || p_idempotency_key));
 
   select * into v_op from public.record_operations where actor_id = v_uid and idempotency_key = p_idempotency_key;
@@ -460,9 +479,8 @@ begin
     raise exception 'nao_autenticado' using errcode = '42501';
   end if;
   perform public.clarevo_check_key(p_idempotency_key);
-  v_hash := md5(concat_ws('|', 'pagar_compromisso', coalesce(p_commitment_id::text, ''), coalesce(p_expected_version::text, ''),
-                          coalesce(p_account_id::text, ''), coalesce(p_amount_cents::text, ''), coalesce(p_paid_on::text, ''),
-                          coalesce(v_category, '')));
+  v_hash := md5(jsonb_build_array('pagar_compromisso', p_commitment_id, p_expected_version, p_account_id, p_amount_cents,
+                                  p_paid_on, v_category)::text);
   perform pg_advisory_xact_lock(hashtext('op:' || v_uid::text || ':' || p_idempotency_key));
 
   select * into v_op from public.record_operations where actor_id = v_uid and idempotency_key = p_idempotency_key;
@@ -528,7 +546,7 @@ begin
     raise exception 'nao_autenticado' using errcode = '42501';
   end if;
   perform public.clarevo_check_key(p_idempotency_key);
-  v_hash := md5(concat_ws('|', 'desfazer_pagamento', coalesce(p_commitment_id::text, ''), coalesce(p_expected_version::text, '')));
+  v_hash := md5(jsonb_build_array('desfazer_pagamento', p_commitment_id, p_expected_version)::text);
   perform pg_advisory_xact_lock(hashtext('op:' || v_uid::text || ':' || p_idempotency_key));
 
   select * into v_op from public.record_operations where actor_id = v_uid and idempotency_key = p_idempotency_key;
