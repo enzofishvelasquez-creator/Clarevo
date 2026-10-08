@@ -615,6 +615,18 @@ function partsText(parts: readonly number[]): string {
 
 const monthOfDue = (c: Commitment) => formatMonthName(monthOf(c.dueOn));
 
+/** Contas do ano com parcelas, por ano, na ordem da lista: "parcelas 3 a 10 de 2027 e parcela 1 de 2028". */
+function annualPartsText(items: readonly Commitment[]): string {
+  const byYear: { label: string; parts: number[] }[] = [];
+  for (const c of items) {
+    const label = annualYearLabelOf(c)!;
+    const last = byYear[byYear.length - 1];
+    if (last && last.label === label) last.parts.push(partOf(c)!);
+    else byYear.push({ label, parts: [partOf(c)!] });
+  }
+  return joinList(byYear.map((y) => `${y.parts.length === 1 ? 'parcela' : 'parcelas'} ${partsText(y.parts)} de ${y.label}`));
+}
+
 /** Nome curto da conta no texto: "novembro" (mês), "2028" (cota única) ou "parcela 3 de 2027". */
 function occurrenceName(c: Commitment): string {
   const label = annualYearLabelOf(c);
@@ -656,11 +668,30 @@ export function affectedByEditFrom(list: readonly Commitment[], s: Pick<Commitme
     }));
   const annual = live[0]?.series?.kind === 'anual';
   const single = annual && (live[0]!.series!.partsPerYear ?? 1) === 1;
-  const reasonText = !annual
-    ? { paga: 'paga', alterada: 'alterada só para aquele mês', anterior: 'antes do mês escolhido' }
-    : single
+  let changingText: string;
+  let unchangedText: string;
+  if (annual && !single) {
+    // Conta do ano com parcelas: agrupadas por ano ("parcelas 3 a 10 de 2027 e parcelas 1 a 10 de 2028").
+    const reasonText = {
+      paga: ['paga', 'pagas'],
+      alterada: ['valor informado ou alterado à parte', 'valores informados ou alterados à parte'],
+      anterior: ['antes da parcela escolhida', 'antes da parcela escolhida'],
+    } as const;
+    changingText = annualPartsText(changing);
+    const groups = (['paga', 'alterada', 'anterior'] as const)
+      .map((reason) => {
+        const items = unchanged.filter((u) => u.reason === reason).map((u) => u.commitment);
+        return items.length ? `${annualPartsText(items)} (${reasonText[reason][items.length === 1 ? 0 : 1]})` : null;
+      })
+      .filter((t): t is string => t !== null);
+    unchangedText = joinList(groups);
+  } else {
+    const reasonText = single
       ? { paga: 'paga', alterada: 'valor informado ou alterado só naquele ano', anterior: 'antes do ano escolhido' }
-      : { paga: 'paga', alterada: 'valor informado ou alterado à parte', anterior: 'antes da parcela escolhida' };
+      : { paga: 'paga', alterada: 'alterada só para aquele mês', anterior: 'antes do mês escolhido' };
+    changingText = joinList(changing.map((c) => `${occurrenceName(c)} (${formatDayMonth(c.dueOn)})`));
+    unchangedText = joinList(unchanged.map((u) => `${occurrenceName(u.commitment)} (${reasonText[u.reason]})`));
+  }
   let chosenText: string | null = null;
   if (chosen?.seriesOverride) {
     const amount = formatBRL(chosen.amountCents);
@@ -671,8 +702,9 @@ export function affectedByEditFrom(list: readonly Commitment[], s: Pick<Commitme
         : `A ${occurrenceName(chosen)} tinha o valor informado ou alterado à parte (${amount}) e passa a seguir o novo valor.`;
   }
   const parts = [
-    changing.length ? `Vão mudar: ${joinList(changing.map((c) => `${occurrenceName(c)} (${formatDayMonth(c.dueOn)})`))}.` : null,
-    unchanged.length ? `Não mudam: ${joinList(unchanged.map((u) => `${occurrenceName(u.commitment)} (${reasonText[u.reason]})`))}.` : null,
+    // Gasto fixo e parcelamento: texto do Ciclo A, sempre no plural (conferido no ponta a ponta).
+    changing.length ? `${annual && changing.length === 1 ? 'Vai mudar' : 'Vão mudar'}: ${changingText}.` : null,
+    unchanged.length ? `${annual && unchanged.length === 1 ? 'Não muda' : 'Não mudam'}: ${unchangedText}.` : null,
     'As contas criadas depois já seguem o novo valor.',
     chosenText,
   ];
@@ -1014,8 +1046,10 @@ export interface AnnualStartChoices {
 
 /**
  * Chips do início da conta do ano (k parcelas, 1ª parcela do ano no mês `month`, de 1 a 12, no dia `day`), dentro da
- * faixa aceita pelo banco (do mês passado a 23 meses à frente). Um único padrão nas duas listas: o primeiro vencimento a
- * partir de hoje (num ano já começado, a próxima parcela a pagar).
+ * faixa aceita pelo banco (do mês passado a 23 meses à frente). "Primeiro ano": a parcela 1 de cada ano que começa na
+ * faixa. Ano já começado (2 ou mais parcelas, a 1ª vencida antes de hoje): as parcelas 2 a k dele na faixa. Um único
+ * padrão nas duas listas: o primeiro vencimento a partir de hoje, em ordem de vencimento (num ano já começado, a
+ * próxima parcela a pagar).
  */
 export function annualStartChoices(k: number, month: number, day: number, today: IsoDate): AnnualStartChoices {
   const current = monthOf(today);
@@ -1028,11 +1062,13 @@ export function annualStartChoices(k: number, month: number, day: number, today:
   let started: AnnualStartChoices['started'] = null;
   for (let y = y0 - 1; y <= y0 + 3; y++) {
     const start = `${y}-${mm}`;
+    const firstDue = dateInMonth(start, day);
     if (start >= min && start <= max) {
-      const dueOn = dateInMonth(start, day);
-      const when = whenDue(dueOn, today, true);
-      years.push({ firstDueMonth: start, firstNumber: 1, dueOn, label: `${label(start)} (${k === 1 ? when : `primeira ${when}`})`, isDefault: false });
-    } else if (k > 1 && start < min && addMonths(start, k - 1) >= min) {
+      const when = whenDue(firstDue, today, true);
+      years.push({ firstDueMonth: start, firstNumber: 1, dueOn: firstDue, label: `${label(start)} (${k === 1 ? when : `primeira ${when}`})`, isDefault: false });
+    }
+    // Ano já começado: o mais recente com a 1ª parcela vencida e alguma das seguintes na faixa.
+    if (k > 1 && firstDue < today && addMonths(start, k - 1) >= min) {
       const parts: AnnualStartChoice[] = [];
       for (let p = 2; p <= k; p++) {
         const m = addMonths(start, p - 1);
@@ -1048,7 +1084,7 @@ export function annualStartChoices(k: number, month: number, day: number, today:
       };
     }
   }
-  const all = [...(started?.parts ?? []), ...years];
+  const all = [...years, ...(started?.parts ?? [])].sort((a, b) => a.dueOn.localeCompare(b.dueOn));
   const def = all.find((c) => c.dueOn >= today) ?? all[all.length - 1];
   if (def) def.isDefault = true;
   return { years, started };

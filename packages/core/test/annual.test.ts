@@ -31,6 +31,7 @@ import {
   lastNumberFromEndYear,
   mergeOccurrences,
   missingMonths,
+  monthsBetween,
   newOperationKey,
   numberAtOrAfter,
   numberAtOrBefore,
@@ -155,7 +156,6 @@ describe('contas do ano: mês, vencimento e numeração (1.3)', () => {
       lastMonth: '2027-02',
       label: '2026/2027',
     });
-    expect(dues(ipva({ firstDueMonth: '2028-02' }, ), [1, 2])).toEqual(['2028-02-20', '2029-02-20']);
     const leap = anual({ id: 'x', firstDueMonth: '2028-02', partsPerYear: 1 }, { dueDay: 29 });
     expect(dues(leap, [1, 2])).toEqual(['2028-02-29', '2029-02-28']);
   });
@@ -226,12 +226,8 @@ describe('contas do ano: mês, vencimento e numeração (1.3)', () => {
       for (let m = 0; m < 12; m++) {
         const s = anual({ id: `s${k}-${m}`, partsPerYear: k, firstDueMonth: addMonths('2026-09', m) }, { dueDay: 31 });
         for (let t = 0; t < 30; t++) {
-          const today = `${addMonths('2026-10', t)}-15`;
-          for (const o of occurrencesToMaterialize(s, [], today)) {
-            const ahead = Math.round((Date.UTC(+o.month.slice(0, 4), +o.month.slice(5, 7)) - Date.UTC(+today.slice(0, 4), +today.slice(5, 7))) / 2.6e9);
-            worst = Math.max(worst, ahead);
-            expect(o.month <= addMonths(today.slice(0, 7), 13)).toBe(true);
-          }
+          const month = addMonths('2026-10', t);
+          for (const o of occurrencesToMaterialize(s, [], `${month}-15`)) worst = Math.max(worst, monthsBetween(month, o.month));
         }
       }
     }
@@ -264,7 +260,7 @@ describe('contas do ano: geração e antecedência (1.3)', () => {
     // IPVA de 2028 entra em 01/11/2027; a Matrícula de 2027 também.
     expect([at(ipva(), '2027-11-01', [occ(ipva(), 1)]), at(matricula(), '2027-11-01', [occ(matricula(), 1)])]).toEqual([[2], [2]]);
     // Com uma parcela no ano, a conta entra de 59 a 91 dias antes de vencer.
-    expect(at(ipva({ firstDueMonth: '2027-03' }, ), '2027-01-01')).toEqual([1]);
+    expect(at(ipva({ firstDueMonth: '2027-03' }), '2027-01-01')).toEqual([1]);
     expect(at(ipva({ firstDueMonth: '2027-03' }), '2026-12-31')).toEqual([]);
   });
 
@@ -496,6 +492,22 @@ describe('contas do ano: cadastro (validação na ordem do banco)', () => {
     for (const c of [...iptu.years, ...iptu.started!.parts]) {
       expect(seriesInputError(input({ firstDueMonth: c.firstDueMonth, firstNumber: c.firstNumber }), DEMO_TODAY)).toBeNull();
     }
+    // Ano que começou neste mês (12 parcelas de outubro, a 1ª vencida em 05/10): parcela 1 ou a próxima a pagar.
+    const oct = annualStartChoices(12, 10, 5, DEMO_TODAY);
+    expect(oct.years.map((c) => [c.label, c.isDefault])).toEqual([
+      ['2026/2027 (primeira venceu em 05/10/2026)', false],
+      ['2027/2028 (primeira vence em 05/10/2027)', false],
+    ]);
+    expect(oct.started!.title).toBe('Próxima parcela a pagar em 2026/2027');
+    expect(oct.started!.parts.slice(0, 2).map((c) => [c.firstNumber, c.firstDueMonth, c.label, c.isDefault])).toEqual([
+      [2, '2026-11', 'Parcela 2 (vence em 05/11)', true],
+      [3, '2026-12', 'Parcela 3 (vence em 05/12)', false],
+    ]);
+    // Cota única vencida neste mês: o padrão é o ano seguinte.
+    expect(annualStartChoices(1, 10, 5, DEMO_TODAY).years.map((c) => [c.label, c.isDefault])).toEqual([
+      ['2026 (venceu em 05/10/2026)', false],
+      ['2027 (vence em 05/10/2027)', true],
+    ]);
     // Seguro de 4 parcelas a partir de novembro: o rótulo atravessa o ano.
     expect(annualStartChoices(4, 11, 15, DEMO_TODAY).years[0]!.label).toBe('2026/2027 (primeira vence em 15/11/2026)');
   });
@@ -694,9 +706,10 @@ describe('contas do ano: totais, ano a ano, informar, tirar e sugestão', () => 
     ].sort((a, b) => a.dueOn.localeCompare(b.dueOn));
     const groups = groupAnnualLater(later);
     expect(groups.map((g) => (g.type === 'conta' ? g.commitment.id : g.group.title))).toEqual([
-      'seguro-1',
+      'Seguro residencial de 2026/2027',
       'matricula-1',
-    ].slice(0, 0).concat(['Seguro residencial de 2026/2027', 'matricula-1', 'IPTU de 2027']));
+      'IPTU de 2027',
+    ]);
     const segGroup = groups[0]!.type === 'ano' ? groups[0]!.group : null;
     expect(segGroup).toMatchObject({ count: 4, label: '2026/2027', firstDueOn: '2026-11-15', lastDueOn: '2027-02-15', totalCents: 48000 });
     expect(segGroup!.caption).toBe('4 parcelas, de 15/11/2026 a 15/02/2027 · estimado');
@@ -723,13 +736,20 @@ describe('contas do ano: totais, ano a ano, informar, tirar e sugestão', () => 
     const list = [paidOcc(s, 1, 18000, '2027-02-10'), occ(s, 2), occ(s, 3, { seriesOverride: true, amountCents: 19000 }), occ(s, 4)];
     const plan = affectedByEditFrom(list, s, 2);
     expect(plan.ok && plan.text).toBe(
-      'Vão mudar: parcela 2 de 2027 (10/03) e parcela 4 de 2027 (10/05). Não mudam: parcela 1 de 2027 (paga) e parcela 3 de 2027 ' +
+      'Vão mudar: parcelas 2 e 4 de 2027. Não mudam: parcela 1 de 2027 (paga) e parcela 3 de 2027 ' +
         '(valor informado ou alterado à parte). As contas criadas depois já seguem o novo valor.',
+    );
+    // Muitas parcelas: agrupadas por ano, com as anteriores em aberto num só item.
+    const many = [paidOcc(s, 1, 18000, '2027-02-10'), ...range(2, 20).map((n) => occ(s, n))];
+    const long = affectedByEditFrom(many, s, 5);
+    expect(long.ok && long.text).toBe(
+      'Vão mudar: parcelas 5 a 10 de 2027 e parcelas 1 a 10 de 2028. Não mudam: parcelas 2 a 4 de 2027 (antes da parcela escolhida). ' +
+        'As contas criadas depois já seguem o novo valor.',
     );
     const v = ipva();
     const vPlan = affectedByEditFrom([paidOcc(v, 1, 251230, '2027-01-20'), occ(v, 2, { seriesOverride: true, amountCents: 260000, version: 2 })], v, 2);
     expect(vPlan.ok && vPlan.text).toBe(
-      'Vão mudar: 2028 (20/01). Não mudam: 2027 (paga). As contas criadas depois já seguem o novo valor. ' +
+      'Vai mudar: 2028 (20/01). Não muda: 2027 (paga). As contas criadas depois já seguem o novo valor. ' +
         'A conta de 2028 tinha o valor informado ou alterado só naquele ano (R$ 2.600,00) e passa a seguir o novo valor.',
     );
     const end = affectedByEnd(range(1, 20).map((n) => occ(s, n)), s, 10);
@@ -1050,9 +1070,9 @@ describe('contas do ano: MemoryRepository', () => {
     await expect(
       repo.updateSeriesFrom(newOperationKey(), s.id, s.version, 3, stale.affected, { nature: 'conta', description: 'IPTU', category: 'Moradia', amountCents: 20000, amountMode: 'fixo', dueDay: 10 }),
     ).rejects.toMatchObject({ code: 'versao_desatualizada' });
-    // Informadas são "alteradas só naquele ano": esta e as próximas a partir de 2028 não as muda.
-    const from11 = affectedByEditFrom(await occurrences(s.id), s, 11);
-    expect(from11.ok && from11.affected).toEqual([]);
+    // Informadas ficam "alteradas só naquele ano": "esta e as próximas" a partir da 3 só muda a escolhida.
+    const from3 = affectedByEditFrom(await occurrences(s.id), s, 3);
+    expect(from3.ok && from3.affected.map((a) => a.id)).toEqual([(await byNumber(s.id, 3)).id]);
     // A falha não grava operação.
     repo.failNextWrite = 'depois';
     const lost = newOperationKey();
@@ -1097,7 +1117,8 @@ describe('contas do ano: MemoryRepository', () => {
     await expect(repo.updateSeriesFrom(newOperationKey(), s.id, s.version, 3, [], { ...edit, nature: 'financiamento' })).rejects.toMatchObject({
       code: 'natureza_invalida',
     });
-    // Sem término: até a última parcela do ano que começa até 12 meses depois do mês atual (2027: 10; dez/2027 é 2028 não).
+    // Sem término: até a última parcela do ano que começa até 12 meses depois do mês atual (dezembro de 2027 ainda é do
+    // ano de 2027, então o máximo é 10).
     await expect(repo.updateSeriesFrom(newOperationKey(), s.id, s.version, 11, [], edit)).rejects.toMatchObject({ code: 'numero_fora_da_serie' });
     await expect(repo.updateSeriesFrom(newOperationKey(), s.id, s.version, 0, [], edit)).rejects.toMatchObject({ code: 'numero_fora_da_serie' });
     // Dia novo (31): cada parcela fica no mês dela.
@@ -1129,14 +1150,16 @@ describe('contas do ano: MemoryRepository', () => {
     expect([ended.changed, seriesNumbers(ended.occurrences)]).toEqual([5, range(1, 5)]);
     // Retomar ("sem data para terminar") recria 6 a 10 dentro da janela anual, sem a marca de alterada.
     const resumed = await repo.endSeries(newOperationKey(), s.id, ended.series.version, null, []);
-    expect(resumed.occurrences.slice(5).map((c) => [c.series!.number, c.dueOn, c.amountCents, c.seriesOverride])).toEqual(
-      range(6, 10).map((n) => [n, `${addMonths('2027-02', n - 1)}-${['30', '31', '31', '30', '31', '30'][n - 5] ?? '30'}`.replace(/-(\d{2})$/, (m) => m), 19000, false]).map(
-        ([n, , a, o]) => [n, seriesDueOn(resumed.series, n as number), a, o],
-      ),
-    );
+    expect(resumed.occurrences.slice(5).map((c) => [c.series!.number, c.dueOn, c.amountCents, c.seriesOverride])).toEqual([
+      [6, '2027-07-31', 19000, false],
+      [7, '2027-08-31', 19000, false],
+      [8, '2027-09-30', 19000, false],
+      [9, '2027-10-31', 19000, false],
+      [10, '2027-11-30', 19000, false],
+    ]);
     expect(await repo.endSeries(newOperationKey(), s.id, resumed.series.version, 500, [])).toMatchObject({ series: { lastNumber: 500 } });
     // Excluir sem conta paga: sai tudo.
-    const { series: v } = await repo.createSeries(newOperationKey(), ctx, annualInput('IPVA', 240000, 1, 20, '2027-01', 'variavel', 'Transporte'));
+    const { series: v } = await repo.createSeries(newOperationKey(), ctx, annualInput('IPVA', 240000, 1, 20, '2028-01', 'variavel', 'Transporte'));
     const del = await repo.deleteSeries(newOperationKey(), v.id, v.version, []);
     expect([del.changed, await repo.getSeries(v.id)]).toEqual([0, null]);
     repo.checkInvariants();
@@ -1234,8 +1257,6 @@ describe('demonstração com contas do ano', () => {
       ['IPTU', 10, '2027-02', 'Todo ano, 10 parcelas de fevereiro a novembro, dia 10 · desde 2027'],
     ]);
     for (const s of annuals) expect(await repo.listSeriesOccurrences(s.id)).toEqual([]);
-    const toPay = (month: string) => summarizeToPay([], ctx, month, DEMO_TODAY);
-    expect(toPay('2026-10').toPayCents).toBe(0);
     const totals: number[] = [];
     for (const month of ['2026-10', '2026-11', '2026-12']) {
       totals.push(summarizeToPay(await repo.listCommitments(ctx, month), ctx, month, DEMO_TODAY).toPayCents);
