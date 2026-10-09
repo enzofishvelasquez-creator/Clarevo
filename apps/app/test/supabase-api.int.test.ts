@@ -13,32 +13,65 @@ import {
   affectedByEditFrom,
   affectedByEnd,
   affectedByYear,
+  annualCommitmentIds,
   annualYearSummary,
   buildReturnReview,
+  committedGoalLines,
+  coverageTenths,
+  emergencyTarget,
   emptyMonthCaption,
+  essentialMonthly,
+  firstNegativeDay,
+  formatPermille,
+  goalComposition,
+  goalPlan,
+  goalProgress,
+  goalSaved,
   groupAnnualLater,
   installmentProgress,
+  isSavingsStepDone,
   lastClosedMonth,
+  lastIncomeReferenceChange,
   loadReturnReview,
   lastNumberFromEndYear,
   mergeOccurrences,
+  minimumReserveInput,
   missingMonths,
   monthOf,
   monthRange,
+  monthReachedWithPlan,
+  monthlyNeeded,
   monthsOverview,
+  negativeDayFromDetail,
   newOperationKey,
   occurrenceLabel,
   occurrencesToMaterialize,
+  organizeGoals,
+  paymentsForecast,
+  plannedForGoals,
+  projectCommitted,
   returnBannerText,
   returnWindow,
   reviewDecision,
   reviewExpectedVersion,
+  savedInMonth,
+  savingsAnswerError,
+  savingsAskAgainOn,
+  savingsCardState,
+  savingsPlan,
+  savingsReserveInput,
   seriesGapsInRange,
   seriesInputError,
   seriesPreview,
+  shouldAskSavings,
+  suggestReference,
   suggestedAnnualReference,
+  summarizeCommitted,
   summarizeMonth,
   summarizeToPay,
+  updateSavedValue,
+  upcomingCommittedMonths,
+  weeklySavingsToMonthly,
   wholeYearPayment,
   type AffectedRef,
   type AmountMode,
@@ -46,9 +79,17 @@ import {
   type Commitment,
   type CommitmentInput,
   type CommitmentSeries,
+  type CommittedSummary,
   type FinancialRecord,
+  type Goal,
+  type GoalInput,
+  type GoalMovementInput,
+  type GoalMovementKind,
+  type GoalStatus,
+  type IncomeReference,
   type IsoDate,
   type IsoMonth,
+  type NewGoalInput,
   type OccurrenceMode,
   type PaymentInput,
   type PlannedOccurrence,
@@ -57,12 +98,14 @@ import {
   type ReturnDecision,
   type ReturnReview,
   type ReviewRow,
+  type SavingsAnswer,
+  type SavingsCheck,
   type SeriesEditInput,
   type SeriesInput,
   type SeriesKind,
 } from '@clarevo/core';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { SupabaseRepository } from '../src/lib/supabase-repository';
 
@@ -2342,5 +2385,1421 @@ describe('conversor da revisão dos últimos meses', () => {
       ['decide_return_review', { p_idempotency_key: 'chave-0007', p_context_id: 'ctx', p_expected_version: 0, p_reviewed_through: '2026-09-01', p_decision: 'seguiu' }],
       ['create_series_occurrence', { p_idempotency_key: 'chave-0008', p_series_id: 's1', p_expected_version: 3, p_number: 7, p_mode: 'nao_houve' }],
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ciclo B · renda comprometida (D-026)
+// ---------------------------------------------------------------------------
+
+/** Linha de month_committed pela API (bigint como número; datas AAAA-MM-DD). */
+interface CommittedRow {
+  fixed_cents: number;
+  annual_cents: number;
+  installment_cents: number;
+  debt_cents: number;
+  other_cents: number;
+  committed_cents: number;
+  paid_part_cents: number;
+  open_part_cents: number;
+  estimated_open_cents: number;
+  overdue_before_cents: number;
+  reference_cents: number | null;
+  reference_from: string | null;
+  reference_varies: boolean | null;
+  outside_cents: number | null;
+  committed_permille: number | null;
+  debt_permille: number | null;
+  fixed_permille: number | null;
+  annual_permille: number | null;
+  installment_permille: number | null;
+  other_permille: number | null;
+}
+
+/**
+ * Os números de um mês, em quatro grupos: [fixos, contas do ano, parcelamentos, dívidas, outras, comprometido],
+ * [pago, em aberto, estimado, vencidas antes], [referência, a partir de, fora dos compromissos] e os milésimos
+ * [comprometido, dívidas, fixos, contas do ano, parcelamentos, outras].
+ */
+const committedShape = (s: CommittedSummary) => [
+  [s.fixedCents, s.annualCents, s.installmentCents, s.debtCents, s.otherCents, s.committedCents],
+  [s.paidPartCents, s.openPartCents, s.estimatedOpenCents, s.overdueBeforeCents],
+  [s.referenceCents, s.referenceFrom, s.outsideCents],
+  [s.committedPermille, s.debtPermille, s.fixedPermille, s.annualPermille, s.installmentPermille, s.otherPermille],
+];
+
+const NO_PERMILLE = [null, null, null, null, null, null];
+
+describe('API real: renda comprometida (Ciclo B, D-026)', () => {
+  // Bruno refaz a demonstração um ano antes dos blocos anteriores (hoje 07/10/2025), num período em que ele não tem nenhum
+  // dado: os números da spec (52,5%, 63,8%, 69,0%...) valem em qualquer ano, e os de 2026 em diante dos outros blocos ficam
+  // fora do mês, dos próximos meses e das sugestões. Ana é a pessoa de fora. Pessoas e contas fictícias.
+  const T0 = '2025-10-07';
+  const AUG = '2025-08';
+  const SEP = '2025-09';
+  const OCT = '2025-10';
+  const NOV = '2025-11';
+  const at = (today: IsoDate = T0) => repoFor(BRUNO, today);
+  const ana = repoFor(ANA, T0);
+  let ctx = '';
+  let account = '';
+  let internet: Commitment;
+  let aluguel: CommitmentSeries;
+  let refSep: IncomeReference;
+  // O que a sequência acrescenta à base e a limpeza final desfaz.
+  let conserto: Commitment;
+  let gas: Commitment;
+  let aluguelNov: Commitment;
+  let mercado200: FinancialRecord;
+  let cafe: FinancialRecord;
+
+  const record = (kind: RecordKind, description: string, reais: number, occurredOn: IsoDate, category: string | null) =>
+    at().createRecord(newOperationKey(), ctx, kind, { accountId: account, amountCents: cents(reais), occurredOn, description, category });
+  const pay = (c: Commitment, amountCents: Cents, paidOn: IsoDate) =>
+    at().payCommitment(newOperationKey(), c.id, c.version, { accountId: account, amountCents, paidOn, category: 'Moradia' });
+  const setRef = (fromMonth: IsoMonth, expectedVersion: number, reais: number, varies = false) =>
+    at().setIncomeReference(newOperationKey(), ctx, fromMonth, expectedVersion, cents(reais), varies);
+  const totals = async (month: IsoMonth) => {
+    const s = summarizeMonth(await at().listRecords(ctx, month), ctx, month);
+    return [s.receivedCents, s.paidCents, s.differenceCents];
+  };
+
+  /**
+   * month_committed pela API é igual ao summarizeCommitted do core sobre as leituras do app (campo a campo, inclusive os
+   * milésimos de cada grupo), e a identidade com "Ainda a pagar" vale: comprometido = pagas do mês + em aberto do mês.
+   */
+  const committed = async (month: IsoMonth, today: IsoDate = T0) => {
+    const repo = at(today);
+    const list = await repo.listCommitments(ctx, month);
+    const s = summarizeCommitted(list, ctx, month, today, await repo.listIncomeReferences(ctx), await repo.listSeries(ctx));
+    const { data, error } = await clientFor(BRUNO, today).rpc('month_committed', { p_context_id: ctx, p_month: `${month}-01` }).single();
+    expect(error).toBeNull();
+    const r = data as CommittedRow;
+    const n = (v: number | null) => (v === null ? null : Number(v));
+    expect({
+      fixed: n(r.fixed_cents),
+      annual: n(r.annual_cents),
+      installment: n(r.installment_cents),
+      debt: n(r.debt_cents),
+      other: n(r.other_cents),
+      committed: n(r.committed_cents),
+      paid: n(r.paid_part_cents),
+      open: n(r.open_part_cents),
+      estimated: n(r.estimated_open_cents),
+      overdueBefore: n(r.overdue_before_cents),
+      reference: n(r.reference_cents),
+      referenceFrom: r.reference_from === null ? null : r.reference_from.slice(0, 7),
+      referenceVaries: r.reference_varies,
+      outside: n(r.outside_cents),
+      permille: [n(r.committed_permille), n(r.debt_permille), n(r.fixed_permille), n(r.annual_permille), n(r.installment_permille), n(r.other_permille)],
+    }).toEqual({
+      fixed: s.fixedCents,
+      annual: s.annualCents,
+      installment: s.installmentCents,
+      debt: s.debtCents,
+      other: s.otherCents,
+      committed: s.committedCents,
+      paid: s.paidPartCents,
+      open: s.openPartCents,
+      estimated: s.estimatedOpenCents,
+      overdueBefore: s.overdueBeforeCents,
+      reference: s.referenceCents,
+      referenceFrom: s.referenceFrom,
+      referenceVaries: s.reference?.varies ?? null,
+      outside: s.outsideCents,
+      permille: [s.committedPermille, s.debtPermille, s.fixedPermille, s.annualPermille, s.installmentPermille, s.otherPermille],
+    });
+    const toPay = await checkedToPay(BRUNO, ctx, month, today);
+    const paidOfMonth = list.filter((c) => monthOf(c.dueOn) === month && c.status === 'quitado').reduce((sum, c) => sum + c.payment!.amountCents, 0);
+    expect(s.committedCents).toBe(paidOfMonth + toPay.dueInMonthCents);
+    expect(s.paidPartCents).toBe(paidOfMonth);
+    expect(s.openPartCents).toBe(toPay.dueInMonthCents);
+    expect(s.overdueBeforeCents).toBe(toPay.overdueBeforeCents);
+    expect(s.overReference).toBe(s.outsideCents !== null && s.outsideCents < 0);
+    return s;
+  };
+  /** Paridade com o banco e os números esperados do mês (committedShape). */
+  const expectMonth = async (month: IsoMonth, shape: unknown[][], today: IsoDate = T0) => {
+    const s = await committed(month, today);
+    expect(committedShape(s)).toEqual(shape);
+    return s;
+  };
+
+  beforeAll(async () => {
+    const space = (await at().getSpace())!;
+    ctx = space.personalContextId;
+    account = space.accounts[0]!.id;
+    expect(await at().listRecords(ctx, SEP)).toEqual([]);
+    expect(await at().listCommitmentsDueBetween(ctx, '2025-07', '2025-12')).toEqual([]);
+    expect(await at().listIncomeReferences(ctx)).toEqual([]);
+  });
+
+  it('sem referência nem contas: uma linha de zeros e nenhum percentual; a base da demonstração tem a renda sem referência', async () => {
+    expect(await at().listIncomeReferences(ctx)).toEqual([]);
+    const zero = [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0], [null, null, null], NO_PERMILLE];
+    await expectMonth(OCT, zero);
+
+    await record('receita', 'Salário', 6000, '2025-09-01', 'Salário');
+    await record('despesa', 'Aluguel', 2500, '2025-09-05', 'Moradia');
+    await record('despesa', 'Mercado', 1250, '2025-09-12', 'Mercado');
+    await record('receita', 'Salário', 6000, '2025-10-01', 'Salário');
+    await record('despesa', 'Mercado', 1400, '2025-10-06', 'Mercado');
+    const series = (input: Partial<SeriesInput> & Pick<SeriesInput, 'kind' | 'description' | 'category' | 'amountCents' | 'dueDay' | 'firstDueMonth'>): SeriesInput => ({
+      nature: 'conta',
+      amountMode: 'fixo',
+      firstNumber: 1,
+      installmentTotal: null,
+      partsPerYear: null,
+      lastMonth: null,
+      ...input,
+    });
+    aluguel = (await at().createSeries(newOperationKey(), ctx, series({ kind: 'mensal', description: 'Aluguel', category: 'Moradia', amountCents: 250000, dueDay: 5, firstDueMonth: OCT }))).series;
+    await pay(byNumber(await at().listSeriesOccurrences(aluguel.id), 1), 250000, '2025-10-05');
+    await at().createSeries(newOperationKey(), ctx, series({ kind: 'mensal', description: 'Luz', category: 'Moradia', amountCents: 18000, amountMode: 'variavel', dueDay: 12, firstDueMonth: NOV }));
+    await at().createSeries(
+      newOperationKey(),
+      ctx,
+      series({ kind: 'parcelada', nature: 'financiamento', description: 'Financiamento do carro', category: 'Transporte', amountCents: 85000, dueDay: 10, firstDueMonth: NOV, firstNumber: 13, installmentTotal: 48 }),
+    );
+    await at().createSeries(newOperationKey(), ctx, series({ kind: 'anual', description: 'IPVA', category: 'Transporte', amountCents: 240000, amountMode: 'variavel', dueDay: 20, firstDueMonth: '2026-01', partsPerYear: 1 }));
+    await at().createSeries(newOperationKey(), ctx, series({ kind: 'anual', description: 'IPTU', category: 'Moradia', amountCents: 18000, amountMode: 'variavel', dueDay: 10, firstDueMonth: '2026-02', partsPerYear: 10 }));
+    internet = (await at().createCommitment(newOperationKey(), ctx, { description: 'Internet', amountCents: 15000, dueOn: '2025-10-15', category: 'Moradia' })).commitment;
+    await at().createCommitment(newOperationKey(), ctx, { description: 'Condomínio', amountCents: 50000, dueOn: '2025-10-20', category: 'Moradia' });
+    await at().createCommitment(newOperationKey(), ctx, { description: 'Seguro do carro', amountCents: 30000, dueOn: '2025-11-10', category: 'Transporte' });
+
+    // Base de outubro: Recebido 6.000,00, Pago 3.900,00, Diferença 2.100,00, Ainda a pagar 650,00.
+    expect(await totals(OCT)).toEqual([600000, 390000, 210000]);
+    const toPay = await checkedToPay(BRUNO, ctx, OCT, T0);
+    expect([toPay.toPayCents, toPay.dueInMonthCents, toPay.overdueBeforeCents, toPay.items.length]).toEqual([65000, 65000, 0, 2]);
+    // Sem referência: só os valores em reais; a identidade com "Ainda a pagar" vale.
+    const s = await expectMonth(OCT, [[250000, 0, 0, 0, 65000, 315000], [250000, 65000, 0, 0], [null, null, null], NO_PERMILLE]);
+    expect([s.count, s.items.fixos.length, s.items.outras.length, s.annualShare !== null]).toEqual([3, 1, 2, true]);
+  });
+
+  it('referência de R$ 6.000,00 desde setembro: outubro 52,5%, novembro 63,8% com dívidas 14,2% e R$ 180,00 estimados', async () => {
+    refSep = await setRef(SEP, 0, 6000);
+    expect(refSep).toMatchObject({ contextId: ctx, fromMonth: SEP, amountCents: 600000, varies: false, createdBy: BRUNO, version: 1 });
+    expect(await at().listIncomeReferences(ctx)).toEqual([refSep]);
+    const oct = await expectMonth(OCT, [[250000, 0, 0, 0, 65000, 315000], [250000, 65000, 0, 0], [600000, SEP, 285000], [525, 0, 417, 0, 0, 108]]);
+    expect(formatPermille(oct.committedPermille!, oct.committedCents)).toBe('52,5%');
+    const nov = await expectMonth(NOV, [[268000, 0, 85000, 85000, 30000, 383000], [0, 383000, 18000, 0], [600000, SEP, 217000], [638, 142, 447, 0, 142, 50]]);
+    expect(formatPermille(nov.committedPermille!, nov.committedCents)).toBe('63,8%');
+    // Setembro: o Aluguel anotado como gasto comum não entra. Agosto: nenhuma referência começa até agosto.
+    await expectMonth(SEP, [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0], [600000, SEP, 600000], [0, 0, 0, 0, 0, 0]]);
+    await expectMonth(AUG, [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0], [null, null, null], NO_PERMILLE]);
+    // A referência nunca entra em Recebido, e Pago e Ainda a pagar continuam os da base.
+    expect(await totals(OCT)).toEqual([600000, 390000, 210000]);
+    expect((await checkedToPay(BRUNO, ctx, OCT, T0)).toPayCents).toBe(65000);
+  });
+
+  it('Internet paga com R$ 159,90 (52,7%) e desfeita; Conserto da geladeira (57,5%); Mercado e Gás vencido', async () => {
+    const w = await pay(internet, 15990, '2025-10-07');
+    await expectMonth(OCT, [[250000, 0, 0, 0, 65990, 315990], [265990, 50000, 0, 0], [600000, SEP, 284010], [527, 0, 417, 0, 0, 110]]);
+    expect((await checkedToPay(BRUNO, ctx, OCT, T0)).toPayCents).toBe(50000);
+    await at().undoCommitmentPayment(newOperationKey(), w.commitment.id, w.commitment.version);
+    await expectMonth(OCT, [[250000, 0, 0, 0, 65000, 315000], [250000, 65000, 0, 0], [600000, SEP, 285000], [525, 0, 417, 0, 0, 108]]);
+
+    conserto = (await at().createCommitment(newOperationKey(), ctx, { description: 'Conserto da geladeira', amountCents: 30000, dueOn: '2025-10-28', category: 'Casa' })).commitment;
+    const base = [[250000, 0, 0, 0, 95000, 345000], [250000, 95000, 0, 0], [600000, SEP, 255000], [575, 0, 417, 0, 0, 158]];
+    await expectMonth(OCT, base);
+
+    // Gasto comum "Mercado" de R$ 200,00: muda Pago, não o comprometido.
+    mercado200 = await record('despesa', 'Mercado', 200, '2025-10-07', 'Mercado');
+    await expectMonth(OCT, base);
+    expect(await totals(OCT)).toEqual([600000, 410000, 190000]);
+
+    // Gás de R$ 40,00 com vencimento em 28/09: linha à parte em outubro (só no mês de hoje); em setembro, 0,7%.
+    gas = (await at().createCommitment(newOperationKey(), ctx, { description: 'Gás', amountCents: 4000, dueOn: '2025-09-28', category: 'Moradia' })).commitment;
+    const withGas = [base[0]!, [250000, 95000, 0, 4000], base[2]!, base[3]!];
+    const oct = await expectMonth(OCT, withGas);
+    expect(oct.overdueBefore.map((c) => c.description)).toEqual(['Gás']);
+    await expectMonth(SEP, [[0, 0, 0, 0, 4000, 4000], [0, 4000, 0, 0], [600000, SEP, 596000], [7, 0, 0, 0, 0, 7]]);
+    const toPay = await checkedToPay(BRUNO, ctx, OCT, T0);
+    expect([toPay.toPayCents, toPay.dueInMonthCents, toPay.overdueBeforeCents, toPay.items.length]).toEqual([99000, 95000, 4000, 4]);
+  });
+
+  it('pagar hoje o Aluguel de novembro muda Pago de outubro e nenhum comprometido; previsão dos pagamentos do mês', async () => {
+    const forecastBefore = paymentsForecast((await totals(OCT))[1]!, await checkedToPay(BRUNO, ctx, OCT, T0));
+    // Pago 4.100,00 + Ainda a pagar 990,00 (inclui o Gás vencido): sem as palavras que o texto da previsão nunca usa.
+    expect([forecastBefore!.totalCents, forecastBefore!.estimatedCents]).toEqual([509000, 0]);
+    expect(forecastBefore!.text).toBe('Se pagar tudo o que está em aberto, os pagamentos de outubro chegam a R$ 5.090,00.');
+
+    const nov1 = byNumber(await at().listSeriesOccurrences(aluguel.id), 2);
+    expect(nov1.dueOn).toBe('2025-11-05');
+    aluguelNov = (await pay(nov1, 250000, '2025-10-07')).commitment;
+    await expectMonth(OCT, [[250000, 0, 0, 0, 95000, 345000], [250000, 95000, 0, 4000], [600000, SEP, 255000], [575, 0, 417, 0, 0, 158]]);
+    await expectMonth(NOV, [[268000, 0, 85000, 85000, 30000, 383000], [250000, 133000, 18000, 0], [600000, SEP, 217000], [638, 142, 447, 0, 142, 50]]);
+    expect(await totals(OCT)).toEqual([600000, 660000, -60000]);
+  });
+
+  it('referência de R$ 5.000,00 desde outubro: 69,0% e novembro 76,6%; excluir volta à anterior; sem nenhuma, só valores', async () => {
+    const refOct = await setRef(OCT, 0, 5000);
+    expect((await at().listIncomeReferences(ctx)).map((r) => [r.fromMonth, r.amountCents])).toEqual([[SEP, 600000], [OCT, 500000]]);
+    const oct = await expectMonth(OCT, [[250000, 0, 0, 0, 95000, 345000], [250000, 95000, 0, 4000], [500000, OCT, 155000], [690, 0, 500, 0, 0, 190]]);
+    expect(formatPermille(oct.committedPermille!, oct.committedCents)).toBe('69,0%');
+    await expectMonth(SEP, [[0, 0, 0, 0, 4000, 4000], [0, 4000, 0, 0], [600000, SEP, 596000], [7, 0, 0, 0, 0, 7]]);
+    await expectMonth(NOV, [[268000, 0, 85000, 85000, 30000, 383000], [250000, 133000, 18000, 0], [500000, OCT, 117000], [766, 170, 536, 0, 170, 60]]);
+    expect(await totals(OCT)).toEqual([600000, 660000, -60000]);
+
+    // Excluir a de outubro: a de setembro volta a valer. A referência excluída sai da leitura.
+    const deleted = await at().deleteIncomeReference(newOperationKey(), refOct.id, refOct.version);
+    expect([deleted.id, deleted.version]).toEqual([refOct.id, 2]);
+    expect(await at().listIncomeReferences(ctx)).toEqual([refSep]);
+    await expectMonth(OCT, [[250000, 0, 0, 0, 95000, 345000], [250000, 95000, 0, 4000], [600000, SEP, 255000], [575, 0, 417, 0, 0, 158]]);
+    await expectMonth(NOV, [[268000, 0, 85000, 85000, 30000, 383000], [250000, 133000, 18000, 0], [600000, SEP, 217000], [638, 142, 447, 0, 142, 50]]);
+
+    // Excluir também a de setembro: sem percentual e sem "fora dos compromissos"; Pago e Ainda a pagar não mudam.
+    await at().deleteIncomeReference(newOperationKey(), refSep.id, refSep.version);
+    expect(await at().listIncomeReferences(ctx)).toEqual([]);
+    await expectMonth(OCT, [[250000, 0, 0, 0, 95000, 345000], [250000, 95000, 0, 4000], [null, null, null], NO_PERMILLE]);
+    await expectMonth(SEP, [[0, 0, 0, 0, 4000, 4000], [0, 4000, 0, 0], [null, null, null], NO_PERMILLE]);
+    expect(await totals(OCT)).toEqual([600000, 660000, -60000]);
+    expect((await checkedToPay(BRUNO, ctx, OCT, T0)).toPayCents).toBe(99000);
+  });
+
+  it('acima de 100% (valor real, fora negativo), exatamente 100% com "minha renda varia" e conta excluída fora', async () => {
+    const over = await setRef(OCT, 0, 3000);
+    const s115 = await expectMonth(OCT, [[250000, 0, 0, 0, 95000, 345000], [250000, 95000, 0, 4000], [300000, OCT, -45000], [1150, 0, 833, 0, 0, 317]]);
+    expect([s115.overReference, formatPermille(s115.committedPermille!, s115.committedCents)]).toEqual([true, '115,0%']);
+    const exact = await at().setIncomeReference(newOperationKey(), ctx, OCT, over.version, 345000, true);
+    expect([exact.version, exact.varies, exact.amountCents]).toEqual([2, true, 345000]);
+    const s100 = await expectMonth(OCT, [[250000, 0, 0, 0, 95000, 345000], [250000, 95000, 0, 4000], [345000, OCT, 0], [1000, 0, 725, 0, 0, 275]]);
+    expect([s100.overReference, s100.needsReview, s100.reference?.varies]).toEqual([false, false, true]);
+    // Referência "varia" de um mês anterior pede revisão no mês mostrado (nov), sem bloquear o cálculo.
+    const nov = await committed(NOV);
+    expect([nov.needsReview, nov.referenceFrom, nov.referenceCents]).toEqual([true, OCT, 345000]);
+    await at().deleteIncomeReference(newOperationKey(), exact.id, exact.version);
+
+    const extra = (await at().createCommitment(newOperationKey(), ctx, { description: 'Teste', amountCents: 1000, dueOn: '2025-10-25', category: null })).commitment;
+    expect((await committed(OCT)).committedCents).toBe(346000);
+    await at().deleteCommitment(newOperationKey(), extra.id, extra.version);
+    await expectMonth(OCT, [[250000, 0, 0, 0, 95000, 345000], [250000, 95000, 0, 4000], [null, null, null], NO_PERMILLE]);
+  });
+
+  it('validação também no banco, com o mesmo código e a mesma ordem do core; limites do intervalo; recusa não gasta a chave', async () => {
+    const repo = at();
+    const key = newOperationKey();
+    // Hoje é 07/10/2025: de outubro de 2023 a outubro de 2026.
+    expect(await err(repo.setIncomeReference(key, ctx, '2023-09', 0, 100, false))).toBe('referencia_fora_do_intervalo');
+    expect(await err(repo.setIncomeReference(key, ctx, '2026-11', 0, 100, false))).toBe('referencia_fora_do_intervalo');
+    expect(await err(repo.setIncomeReference(key, ctx, '2025-10', 0, 0, false))).toBe('valor_invalido');
+    expect(await err(repo.setIncomeReference(key, ctx, '2025-10', 0, 1_000_000_000, false))).toBe('valor_acima_do_limite');
+    expect(await err(repo.setIncomeReference(key, ctx, '2025-10', 0, 100, null as unknown as boolean))).toBe('tipo_invalido');
+    // Versão antes da validação do mês (como em todas as funções de escrita); o detalhe traz a versão atual.
+    const first = await setRef(OCT, 0, 1);
+    const stale = (await repo.setIncomeReference(newOperationKey(), ctx, OCT, 0, 100, false).catch((e: unknown) => e)) as RepoError;
+    expect([stale.code, stale.detail]).toEqual(['versao_desatualizada', 'versao_atual=1']);
+    expect(await err(repo.setIncomeReference(newOperationKey(), ctx, OCT, null as unknown as number, 100, false))).toBe('versao_desatualizada');
+    expect(await err(repo.setIncomeReference(newOperationKey(), ctx, OCT, 5, 100, false))).toBe('versao_desatualizada');
+    expect(await err(repo.deleteIncomeReference(newOperationKey(), first.id, 7))).toBe('versao_desatualizada');
+    expect(await err(repo.deleteIncomeReference(newOperationKey(), randomUUID(), 1))).toBe('nao_encontrado');
+    await repo.deleteIncomeReference(newOperationKey(), first.id, first.version);
+    // Os dois limites são aceitos, e a mesma chave recusada antes ainda vale com argumentos certos (nada foi gravado).
+    const low = await repo.setIncomeReference(key, ctx, '2023-10', 0, 100, false);
+    expect(low.fromMonth).toBe('2023-10');
+    const high = await setRef('2026-10', 0, 1);
+    expect(high.fromMonth).toBe('2026-10');
+    expect((await repo.listIncomeReferences(ctx)).map((r) => [r.fromMonth, r.amountCents])).toEqual([['2023-10', 100], ['2026-10', 100]]);
+    await repo.deleteIncomeReference(newOperationKey(), low.id, low.version);
+    await repo.deleteIncomeReference(newOperationKey(), high.id, high.version);
+    // Mês fora do dia 1 (o app sempre manda AAAA-MM-01; aqui direto): mes_invalido, também em month_committed.
+    const db = clientFor(BRUNO, T0);
+    const badDay = await db.rpc('set_income_reference', {
+      p_idempotency_key: newOperationKey(),
+      p_context_id: ctx,
+      p_from_month: '2025-10-15',
+      p_expected_version: 0,
+      p_amount_cents: 100,
+      p_varies: false,
+    });
+    expect(badDay.error?.message).toBe('mes_invalido');
+    expect((await db.rpc('month_committed', { p_context_id: ctx, p_month: '2025-10-15' })).error?.message).toBe('mes_invalido');
+    expect(await at().listIncomeReferences(ctx)).toEqual([]);
+  });
+
+  it('repetição, chave reutilizada e resultado incerto: repetir a mesma chave reconcilia, sem referência duplicada', async () => {
+    const repo = at();
+    const key = newOperationKey();
+    const a = await repo.setIncomeReference(key, ctx, SEP, 0, 600000, false);
+    // Mesma chave e mesmo pedido: a mesma referência. Outro conteúdo, outra ação ou chave de outra operação: chave_reutilizada.
+    expect(await repo.setIncomeReference(key, ctx, SEP, 0, 600000, false)).toEqual(a);
+    expect(await err(repo.setIncomeReference(key, ctx, SEP, 0, 600001, false))).toBe('chave_reutilizada');
+    expect(await err(repo.setIncomeReference(key, ctx, SEP, 0, 600000, true))).toBe('chave_reutilizada');
+    expect(await err(repo.deleteIncomeReference(key, a.id, 1))).toBe('chave_reutilizada');
+    const recordKey = newOperationKey();
+    cafe = await repo.createRecord(recordKey, ctx, 'despesa', { accountId: account, amountCents: 100, occurredOn: '2025-10-07', description: 'Café', category: null });
+    expect(await err(repo.setIncomeReference(recordKey, ctx, SEP, 0, 600000, false))).toBe('chave_reutilizada');
+    // Depois de alterada, a repetição da primeira chave devolve a linha atual (versão 2), sem gravar de novo.
+    const changed = await repo.setIncomeReference(newOperationKey(), ctx, SEP, 1, 650000, false);
+    expect(await repo.setIncomeReference(key, ctx, SEP, 0, 600000, false)).toEqual(changed);
+    // A alteração conta como mudança da renda de referência no dia em que foi feita (savings.lastIncomeReferenceChange).
+    expect(lastIncomeReferenceChange(await repo.listIncomeReferences(ctx))).toBe(changed.updatedAt.slice(0, 10));
+    expect(lastIncomeReferenceChange([{ ...changed, version: 1 }])).toBeNull();
+
+    // A resposta se perde: o app não sabe o resultado. Repetir a mesma chave e o mesmo conteúdo devolve a referência criada.
+    const lost = new SupabaseRepository(clientFor(BRUNO, T0, lostResponse), { id: BRUNO });
+    const lostKey = newOperationKey();
+    expect(await err(lost.setIncomeReference(lostKey, ctx, OCT, 0, 700000, false))).toBe('rede');
+    const created = await repo.setIncomeReference(lostKey, ctx, OCT, 0, 700000, false);
+    expect((await repo.listIncomeReferences(ctx)).filter((r) => r.fromMonth === OCT)).toEqual([created]);
+    expect(created.version).toBe(1);
+    // A exclusão perdida também se reconcilia repetindo a chave: devolve a referência já excluída, sem erro.
+    const deleteKey = newOperationKey();
+    expect(await err(lost.deleteIncomeReference(deleteKey, created.id, 1))).toBe('rede');
+    const deleted = await repo.deleteIncomeReference(deleteKey, created.id, 1);
+    expect([deleted.id, deleted.version]).toEqual([created.id, 2]);
+    // De volta aos R$ 6.000,00 de setembro para os blocos seguintes.
+    const restored = await repo.setIncomeReference(newOperationKey(), ctx, SEP, changed.version, 600000, false);
+    expect([restored.version, restored.amountCents]).toEqual([3, 600000]);
+    expect(await repo.listIncomeReferences(ctx)).toEqual([restored]);
+  });
+
+  it('outra pessoa não lê nem altera a referência, nem consulta a renda comprometida; gravação direta é recusada', async () => {
+    const mine = (await at().listIncomeReferences(ctx))[0]!;
+    expect(await ana.listIncomeReferences(ctx)).toEqual([]);
+    expect(await err(ana.setIncomeReference(newOperationKey(), ctx, SEP, 1, 100, false))).toBe('sem_permissao');
+    expect(await err(ana.deleteIncomeReference(newOperationKey(), mine.id, mine.version))).toBe('nao_encontrado');
+    const db = clientFor(ANA, T0);
+    expect((await db.rpc('month_committed', { p_context_id: ctx, p_month: '2025-10-01' }).single()).error?.message).toBe('sem_permissao');
+    const direct = await clientFor(BRUNO, T0)
+      .from('income_references')
+      .insert({ context_id: ctx, from_month: '2025-07-01', amount_cents: 1, varies: false, created_by: BRUNO });
+    expect(direct.error).not.toBeNull();
+    expect((await clientFor(BRUNO, T0).from('income_references').update({ amount_cents: 1 }).eq('id', mine.id)).error).not.toBeNull();
+    expect((await clientFor(BRUNO, T0).from('income_references').delete().eq('id', mine.id)).error).not.toBeNull();
+    const anon = await clientFor(null).from('income_references').select('id');
+    expect(anon.error !== null || (anon.data ?? []).length === 0).toBe(true);
+    expect(await at().listIncomeReferences(ctx)).toEqual([mine]);
+    // A referência é lida só pelo Pessoal de quem a criou: Ana não vê a de Bruno, e a de Ana (nenhuma) não aparece para ele.
+    expect(await ana.listIncomeReferences((await ana.getSpace())!.personalContextId)).toEqual([]);
+  });
+
+  it('Próximos meses: as contas criadas e a previsão das séries; marco da última parcela; sugestão de referência', async () => {
+    const repo = at();
+    const months = upcomingCommittedMonths(OCT);
+    expect(months).toEqual(['2025-11', '2025-12', '2026-01', '2026-02', '2026-03', '2026-04']);
+    const due = await repo.listCommitmentsDueBetween(ctx, months[0]!, months[5]!);
+    const refs = await repo.listIncomeReferences(ctx);
+    const series = await repo.listSeries(ctx);
+    const projection = projectCommitted(series, due, refs, months, T0);
+    // Novembro já tem as contas criadas (o mesmo número de month_committed); dezembro a abril são previsão: 3.530,00 em dezembro
+    // (58,8%), 5.930,00 em janeiro com o IPVA (98,8%, contas do ano 40,0%) e 3.710,00 de fevereiro em diante (61,8%).
+    expect(projection.months.map((m) => [m.month, m.committedCents, m.committedPermille, m.plannedCents])).toEqual([
+      ['2025-11', 383000, 638, 0],
+      ['2025-12', 353000, 588, 353000],
+      ['2026-01', 593000, 988, 593000],
+      ['2026-02', 371000, 618, 371000],
+      ['2026-03', 371000, 618, 371000],
+      ['2026-04', 371000, 618, 371000],
+    ]);
+    expect((await committed(NOV)).committedCents).toBe(projection.months[0]!.committedCents);
+    expect(projection.months[2]!.annualPermille).toBe(400);
+    expect(projection.months[3]!.annualPermille).toBe(30);
+    expect(projection.milestones.map((m) => m.text)).toEqual(
+      expect.arrayContaining([
+        'Janeiro de 2026: IPVA, cerca de R$ 2.400,00.',
+        'Fevereiro de 2026: IPTU, 10 parcelas de cerca de R$ 180,00.',
+        'Outubro de 2028: última parcela de Financiamento do carro (R$ 850,00).',
+      ]),
+    );
+
+    // Sugestão: entre os 3 meses fechados anteriores, só setembro tem recebimentos (média de R$ 6.000,00).
+    const records = [];
+    for (const m of ['2025-07', '2025-08', '2025-09']) records.push(...(await repo.listRecords(ctx, m)));
+    expect(suggestReference(records, OCT)).toEqual({ amountCents: 600000, months: [SEP] });
+  });
+
+  it('limpeza: desfazer o que a sequência acrescentou volta exatamente à base (52,5% em outubro, 63,8% em novembro)', async () => {
+    const repo = at();
+    const undone = await repo.undoCommitmentPayment(newOperationKey(), aluguelNov.id, aluguelNov.version);
+    expect(undone.commitment.status).toBe('aberto');
+    await repo.deleteCommitment(newOperationKey(), conserto.id, conserto.version);
+    await repo.deleteCommitment(newOperationKey(), gas.id, gas.version);
+    await repo.deleteRecord(newOperationKey(), mercado200.id, mercado200.version);
+    await repo.deleteRecord(newOperationKey(), cafe.id, cafe.version);
+    expect(await totals(OCT)).toEqual([600000, 390000, 210000]);
+    expect((await checkedToPay(BRUNO, ctx, OCT, T0)).toPayCents).toBe(65000);
+    await expectMonth(OCT, [[250000, 0, 0, 0, 65000, 315000], [250000, 65000, 0, 0], [600000, SEP, 285000], [525, 0, 417, 0, 0, 108]]);
+    await expectMonth(NOV, [[268000, 0, 85000, 85000, 30000, 383000], [0, 383000, 18000, 0], [600000, SEP, 217000], [638, 142, 447, 0, 142, 50]]);
+    await expectMonth(SEP, [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0], [600000, SEP, 600000], [0, 0, 0, 0, 0, 0]]);
+  });
+
+  it('contas do ano (hoje 05/01/2026): month_committed separa o IPVA e o IPTU, que não são dívida, igual ao core', async () => {
+    const JAN5 = '2026-01-05';
+    await checkedSync(BRUNO, ctx, JAN5);
+    // Janeiro: Aluguel, Luz (estimada), parcela do carro e IPVA (estimado): 5.930,00, 98,8% (contas do ano 40,0%, dívidas 14,2%).
+    const jan = await committed('2026-01', JAN5);
+    expect([jan.fixedCents, jan.annualCents, jan.installmentCents, jan.debtCents, jan.otherCents, jan.committedCents]).toEqual([268000, 240000, 85000, 85000, 0, 593000]);
+    expect([jan.committedPermille, jan.debtPermille, jan.fixedPermille, jan.annualPermille, jan.installmentPermille, jan.otherPermille]).toEqual([988, 142, 447, 400, 142, 0]);
+    expect([jan.estimatedOpenCents, jan.outsideCents, jan.overReference]).toEqual([258000, 7000, false]);
+    expect(jan.items.anuais.map((c) => [c.description, c.series!.partsPerYear])).toEqual([['IPVA', 1]]);
+    // Fevereiro: a 1ª das 10 parcelas do IPTU (3,0%); o IPVA não aparece e nenhuma conta do ano entra em dívidas.
+    const feb = await committed('2026-02', JAN5);
+    expect([feb.annualCents, feb.debtCents, feb.committedCents, feb.committedPermille, feb.annualPermille]).toEqual([18000, 85000, 371000, 618, 30]);
+    expect(feb.items.anuais.map((c) => [c.description, c.series!.partsPerYear])).toEqual([['IPTU', 10]]);
+    // A linha informativa das contas do ano (÷ 12) vem das séries, fora do percentual.
+    expect(feb.annualShare).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ciclo C · metas e reserva para imprevistos (D-027)
+// ---------------------------------------------------------------------------
+
+describe('API real: metas e reserva para imprevistos (Ciclo C, D-027)', () => {
+  // Bruno, na montagem do bloco anterior (hoje 07/10/2025, base de outubro de volta: Recebido 6.000,00, Pago 3.900,00,
+  // Diferença 2.100,00, Ainda a pagar 650,00, renda comprometida 52,5%). A sequência de aceite C não pode mudar nenhum desses
+  // números em nenhum passo (G3). Ana é a pessoa de fora. Pessoas e contas fictícias.
+  const T0 = '2025-10-07';
+  const SEP = '2025-09';
+  const OCT = '2025-10';
+  const NOV = '2025-11';
+  const at = (today: IsoDate = T0) => repoFor(BRUNO, today);
+  const ana = repoFor(ANA, T0);
+  let ctx = '';
+  let reserve: Goal;
+  /** Chave do aporte da demonstração: uma operação de metas que a pessoa de fora não consegue buscar. */
+  let demoKey = '';
+  let base: Awaited<ReturnType<typeof money>>;
+
+  const reserveInput = (over: Partial<NewGoalInput> = {}): NewGoalInput => ({
+    goalType: 'emergencia',
+    name: 'Reserva para imprevistos',
+    targetCents: null,
+    targetMonth: null,
+    plannedMonthlyCents: null,
+    essentialBaseCents: 375000,
+    essentialMonths: 6,
+    essentialBaseSource: 'media_gastos',
+    initialCents: 300000,
+    initialOn: '2025-10-01',
+    ...over,
+  });
+  const goalInput = (over: Partial<NewGoalInput> = {}): NewGoalInput => ({
+    goalType: 'objetivo',
+    name: 'Curso',
+    targetCents: 120000,
+    targetMonth: '2026-03',
+    plannedMonthlyCents: 5000,
+    essentialBaseCents: null,
+    essentialMonths: null,
+    essentialBaseSource: null,
+    initialCents: 10000,
+    initialOn: '2025-10-01',
+    ...over,
+  });
+  const move = (reais: number, occurredOn: IsoDate, note: string | null = null): GoalMovementInput => ({ amountCents: cents(reais), occurredOn, note });
+
+  /** O dinheiro do mês pelas leituras do app e pelas funções do banco: nada disso muda com uma meta (G3). */
+  async function money() {
+    const repo = at();
+    const db = clientFor(BRUNO, T0);
+    const rows = async (fn: string, month: IsoMonth) => {
+      const { data, error } = await db.rpc(fn, { p_context_id: ctx, p_month: `${month}-01` });
+      expect(error).toBeNull();
+      return data;
+    };
+    return {
+      records: [await repo.listRecords(ctx, SEP), await repo.listRecords(ctx, OCT)],
+      commitments: [await repo.listCommitments(ctx, OCT), await repo.listCommitments(ctx, NOV)],
+      refs: await repo.listIncomeReferences(ctx),
+      totals: [await rows('month_totals', SEP), await rows('month_totals', OCT)],
+      toPay: await rows('month_to_pay', OCT),
+      committed: [await rows('month_committed', OCT), await rows('month_committed', NOV)],
+    };
+  }
+  const same = async () => expect(await money()).toEqual(base);
+
+  /** goal_items pela API é o que o core calcula sobre os movimentos lidos (guardado, composição, último movimento). */
+  const checkGoal = async (id: string) => {
+    const repo = at();
+    const goal = (await repo.getGoal(id))!;
+    const movements = await repo.listGoalMovements(id);
+    const c = goalComposition(movements);
+    expect(goalSaved(movements)).toBe(goal.savedCents);
+    expect({
+      savedCents: goal.savedCents,
+      initialCents: goal.initialCents,
+      depositsCents: goal.depositsCents,
+      withdrawalsCents: goal.withdrawalsCents,
+      incomeCents: goal.incomeCents,
+      appreciationCents: goal.appreciationCents,
+      depreciationCents: goal.depreciationCents,
+      lastMovementOn: goal.lastMovementOn,
+    }).toEqual(c);
+    expect(await repo.listGoals(ctx)).toContainEqual(goal);
+    // Do mais recente ao mais antigo.
+    expect(movements.map((m) => m.occurredOn)).toEqual([...movements.map((m) => m.occurredOn)].sort().reverse());
+    return goal;
+  };
+  const percent = (g: Goal) => goalProgress(g.savedCents, g.targetCents).percent;
+  const tenths = (g: Goal) => coverageTenths(g.savedCents, g.essentialBaseCents);
+  const fail = async (p: Promise<unknown>) => (await p.then(() => null, (e: unknown) => e)) as RepoError;
+
+  beforeAll(async () => {
+    ctx = (await at().getSpace())!.personalContextId;
+    base = await money();
+    // A base do bloco anterior: outubro 52,5% com a referência de setembro.
+    const oct = base.committed[0] as { committed_cents: number; committed_permille: number; outside_cents: number }[];
+    expect([oct[0]!.committed_cents, oct[0]!.committed_permille, oct[0]!.outside_cents].map(Number)).toEqual([315000, 525, 285000]);
+  });
+
+  it('conta sem metas; gastos essenciais pelo core sobre as leituras: R$ 3.750,00 em setembro (Moradia e Mercado)', async () => {
+    const repo = at();
+    expect(await repo.listGoals(ctx)).toEqual([]);
+    expect(await repo.listGoalMovementsInMonth(ctx, OCT)).toEqual([]);
+    const records: FinancialRecord[] = [];
+    for (let i = 1; i <= 6; i += 1) records.push(...(await repo.listRecords(ctx, addMonths(OCT, -i))));
+    const annualIds = annualCommitmentIds(
+      (await Promise.all((await repo.listSeries(ctx)).filter((s) => s.kind === 'anual').map((s) => repo.listSeriesOccurrences(s.id)))).flat(),
+    );
+    const committedNow = summarizeCommitted(await repo.listCommitments(ctx, OCT), ctx, OCT, T0, await repo.listIncomeReferences(ctx)).committedCents;
+    const estimate = essentialMonthly(records, OCT, committedNow, annualIds);
+    expect(estimate).toMatchObject({ source: 'media_gastos', amountCents: 375000, months: [SEP], excludedAnnualCents: 0 });
+    expect(emergencyTarget(375000, 6)).toBe(2250000);
+    // Sem meses com gastos, as contas do mês; sem elas, digitado.
+    expect(essentialMonthly([], OCT, committedNow, annualIds)).toEqual({ source: 'contas_do_mes', amountCents: 315000, month: OCT });
+    expect(essentialMonthly([], OCT, null, annualIds)).toEqual({ source: 'informado', amountCents: null });
+  });
+
+  it('sequência de aceite C: 13% e 0,8 mês, aporte, resgate retroativo recusado, valorização; o dinheiro do mês não muda', async () => {
+    const repo = at();
+    // Passo 1: reserva com essenciais de R$ 3.750,00 e 6 meses (alvo R$ 22.500,00) e R$ 3.000,00 já guardados em 01/10.
+    const created = await repo.createGoal(newOperationKey(), ctx, reserveInput());
+    reserve = created.goal;
+    expect(reserve).toMatchObject({
+      contextId: ctx,
+      goalType: 'emergencia',
+      name: 'Reserva para imprevistos',
+      targetCents: 2250000,
+      targetMonth: null,
+      plannedMonthlyCents: null,
+      essentialBaseCents: 375000,
+      essentialMonths: 6,
+      essentialBaseSource: 'media_gastos',
+      status: 'ativa',
+      createdBy: BRUNO,
+      version: 1,
+      savedCents: 300000,
+      initialCents: 300000,
+      depositsCents: 0,
+      withdrawalsCents: 0,
+      lastMovementOn: '2025-10-01',
+    });
+    expect(created.movement).toMatchObject({ goalId: reserve.id, contextId: ctx, kind: 'saldo_inicial', amountCents: 300000, occurredOn: '2025-10-01', note: null, version: 1 });
+    expect([percent(reserve), tenths(reserve)]).toEqual([13, 8]);
+    expect(await checkGoal(reserve.id)).toEqual(reserve);
+    await same();
+
+    // Passo 2: aporte de R$ 1.500,00 em 06/10. A versão da meta não sobe com movimento.
+    const deposit = await repo.addGoalMovement(newOperationKey(), reserve.id, 'aporte', move(1500, '2025-10-06'));
+    expect(deposit.goal).toMatchObject({ savedCents: 450000, depositsCents: 150000, version: 1, lastMovementOn: '2025-10-06' });
+    expect(deposit.movement).toMatchObject({ kind: 'aporte', amountCents: 150000, occurredOn: '2025-10-06', createdBy: BRUNO, version: 1 });
+    expect([percent(deposit.goal), tenths(deposit.goal)]).toEqual([20, 12]);
+    // Com R$ 4.500,00 e aporte em outubro, P0 é novembro: até dezembro de 2026 são 14 meses (R$ 1.285,72 por mês); com R$ 1.000,00
+    // por mês, chega em abril de 2027.
+    const plan = goalPlan(deposit.goal, await repo.listGoalMovementsInMonth(ctx, OCT), T0);
+    expect(plan.firstProjectedMonth).toBe('2025-11');
+    expect(monthlyNeeded(plan.progress.missingCents, plan.firstProjectedMonth, '2026-12')).toBe(128572);
+    expect(monthReachedWithPlan(plan.progress.missingCents, 100000, plan.firstProjectedMonth)).toBe('2027-04');
+    await checkGoal(reserve.id);
+    await same();
+
+    // Passo 3: resgate de R$ 3.500,00 com data 02/10: em 02/10 ficaria -R$ 500,00. Recusado, com o dia no detalhe.
+    const refusedKey = newOperationKey();
+    const before = await repo.listGoalMovements(reserve.id);
+    const refused = await fail(repo.addGoalMovement(refusedKey, reserve.id, 'resgate', move(3500, '2025-10-02')));
+    expect([refused.code, refused.detail, refused.message]).toEqual(['saldo_da_meta_insuficiente', 'dia=2025-10-02', 'saldo_da_meta_insuficiente']);
+    expect(negativeDayFromDetail(refused.detail)).toBe('2025-10-02');
+    expect(firstNegativeDay(before, { op: 'add', kind: 'resgate', amountCents: 350000, occurredOn: '2025-10-02' })).toBe('2025-10-02');
+    expect(await repo.findGoalOperation(refusedKey)).toBeNull();
+    expect(await repo.listGoalMovements(reserve.id)).toEqual(before);
+    await same();
+
+    // Passo 4: resgate de R$ 500,00 em 07/10 (com a chave recusada: a recusa não gastou a chave).
+    const withdrawal = await repo.addGoalMovement(refusedKey, reserve.id, 'resgate', move(500, '2025-10-07'));
+    expect(withdrawal.goal).toMatchObject({ savedCents: 400000, withdrawalsCents: 50000, version: 1 });
+    expect([percent(withdrawal.goal), tenths(withdrawal.goal)]).toEqual([17, 10]);
+    expect(await repo.findGoalOperation(refusedKey)).toEqual({ action: 'registrar_movimento_meta', goalId: reserve.id, movementId: withdrawal.movement!.id });
+    await same();
+
+    // Passo 5: "Atualizar valor guardado" para R$ 4.037,20: valorização de R$ 37,20 (17% e 1,0 mês; R$ 1.318,78 por mês).
+    const change = updateSavedValue(withdrawal.goal.savedCents, 403720)!;
+    expect(change).toEqual({ kind: 'valorizacao', amountCents: 3720 });
+    const appreciation = await repo.addGoalMovement(newOperationKey(), reserve.id, change.kind, { amountCents: change.amountCents, occurredOn: T0, note: null });
+    expect(appreciation.goal).toMatchObject({ savedCents: 403720, appreciationCents: 3720, version: 1 });
+    expect([percent(appreciation.goal), tenths(appreciation.goal)]).toEqual([17, 10]);
+    expect(monthlyNeeded(appreciation.goal.targetCents - appreciation.goal.savedCents, '2025-11', '2026-12')).toBe(131878);
+    await same();
+
+    // Passo 6: resgate de R$ 4.100,00 em 07/10: ficaria -R$ 62,80. Recusado.
+    const second = await fail(repo.addGoalMovement(newOperationKey(), reserve.id, 'resgate', move(4100, T0)));
+    expect([second.code, second.detail]).toEqual(['saldo_da_meta_insuficiente', 'dia=2025-10-07']);
+
+    // Guardado em outubro: aportes menos resgates (sem o já guardado e sem a valorização) = R$ 1.000,00.
+    expect(savedInMonth(await repo.listGoalMovementsInMonth(ctx, OCT), OCT)).toBe(100000);
+    reserve = await checkGoal(reserve.id);
+    expect(reserve.version).toBe(1);
+    await same();
+  });
+
+  it('repetição, chave reutilizada e resultado incerto: findGoalOperation e repetir a chave reconciliam; nada duplica', async () => {
+    const repo = at();
+    const lost = new SupabaseRepository(clientFor(BRUNO, T0, lostResponse), { id: BRUNO });
+    const course = (await repo.createGoal(newOperationKey(), ctx, goalInput())).goal;
+    const key = newOperationKey();
+    const a = await repo.addGoalMovement(key, course.id, 'aporte', move(50, '2025-10-05', 'Parte "extra" | bônus'));
+    expect(a.movement!.note).toBe('Parte "extra" | bônus');
+    expect(await repo.addGoalMovement(key, course.id, 'aporte', move(50, '2025-10-05', 'Parte "extra" | bônus'))).toEqual(a);
+    expect(await err(repo.addGoalMovement(key, course.id, 'aporte', move(51, '2025-10-05', 'Parte "extra" | bônus')))).toBe('chave_reutilizada');
+    expect(await err(repo.addGoalMovement(key, course.id, 'resgate', move(50, '2025-10-05', 'Parte "extra" | bônus')))).toBe('chave_reutilizada');
+    expect(await err(repo.deleteGoalMovement(key, a.movement!.id, 1))).toBe('chave_reutilizada');
+    expect((await repo.listGoalMovements(course.id)).filter((m) => m.kind === 'aporte')).toHaveLength(1);
+    const op = (await repo.findGoalOperation(key))!;
+    expect(op).toEqual({ action: 'registrar_movimento_meta', goalId: course.id, movementId: a.movement!.id });
+    // Chave de outra operação (registro, conta a pagar, renda de referência) não vale em metas, e a busca só olha metas.
+    const recordKey = newOperationKey();
+    const coffee = await repo.createRecord(recordKey, ctx, 'despesa', { accountId: (await repo.getSpace())!.accounts[0]!.id, amountCents: 100, occurredOn: T0, description: 'Café', category: null });
+    expect(await err(repo.addGoalMovement(recordKey, course.id, 'aporte', move(1, T0)))).toBe('chave_reutilizada');
+    expect(await repo.findGoalOperation(recordKey)).toBeNull();
+    await repo.deleteRecord(newOperationKey(), coffee.id, coffee.version);
+    // Observação vazia vira nula, e a de 81 caracteres é recusada.
+    const blank = await repo.addGoalMovement(newOperationKey(), course.id, 'rendimento', move(1, T0, '   '));
+    expect(blank.movement!.note).toBeNull();
+    expect(await err(repo.addGoalMovement(newOperationKey(), course.id, 'rendimento', move(1, T0, 'x'.repeat(81))))).toBe('observacao_longa');
+    expect((await repo.addGoalMovement(newOperationKey(), course.id, 'rendimento', move(1, T0, 'x'.repeat(80)))).movement!.note).toHaveLength(80);
+
+    // A resposta se perde: a operação existe; repetir a chave devolve o mesmo movimento, sem duplicar.
+    const lostKey = newOperationKey();
+    expect(await err(lost.addGoalMovement(lostKey, course.id, 'aporte', move(20, '2025-10-06')))).toBe('rede');
+    const found = (await repo.findGoalOperation(lostKey))!;
+    expect([found.action, found.goalId]).toEqual(['registrar_movimento_meta', course.id]);
+    const again = await repo.addGoalMovement(lostKey, course.id, 'aporte', move(20, '2025-10-06'));
+    expect(again.movement!.id).toBe(found.movementId);
+    expect((await repo.listGoalMovements(course.id)).filter((m) => m.id === found.movementId)).toHaveLength(1);
+
+    // Alterar o movimento: versão do movimento (não a da meta), com a versão atual no detalhe; a repetição devolve o estado atual.
+    const updateKey = newOperationKey();
+    const updated = await repo.updateGoalMovement(updateKey, found.movementId!, 1, move(25, '2025-10-06', 'Ajuste'));
+    expect(updated.movement).toMatchObject({ amountCents: 2500, note: 'Ajuste', version: 2 });
+    expect(updated.goal.version).toBe(course.version);
+    const stale = await fail(repo.updateGoalMovement(newOperationKey(), found.movementId!, 1, move(26, '2025-10-06')));
+    expect([stale.code, stale.detail]).toEqual(['versao_desatualizada', 'versao_atual=2']);
+    expect(await repo.updateGoalMovement(updateKey, found.movementId!, 1, move(25, '2025-10-06', 'Ajuste'))).toEqual(updated);
+    expect(await err(repo.updateGoalMovement(newOperationKey(), found.movementId!, null as unknown as number, move(25, '2025-10-06')))).toBe('versao_desatualizada');
+    // Excluir o movimento: a RLS esconde o excluído, então a busca devolve a ação e o movimento, com a meta em branco.
+    const deleteKey = newOperationKey();
+    expect(await err(lost.deleteGoalMovement(deleteKey, found.movementId!, 2))).toBe('rede');
+    expect(await repo.findGoalOperation(deleteKey)).toEqual({ action: 'excluir_movimento_meta', goalId: '', movementId: found.movementId });
+    const deleted = await repo.deleteGoalMovement(deleteKey, found.movementId!, 2);
+    expect([deleted.movement!.id, deleted.movement!.version]).toEqual([found.movementId, 3]);
+    expect((await repo.listGoalMovements(course.id)).map((m) => m.id)).not.toContain(found.movementId);
+    expect(await err(repo.deleteGoalMovement(newOperationKey(), found.movementId!, 3))).toBe('nao_encontrado');
+    await checkGoal(course.id);
+
+    // Excluir a meta tira os movimentos junto; a repetição devolve a meta excluída; depois, nao_encontrado em tudo.
+    const delKey = newOperationKey();
+    const current = (await repo.getGoal(course.id))!;
+    const gone = await repo.deleteGoal(delKey, course.id, current.version);
+    expect([gone.goal.id, gone.goal.version, gone.goal.savedCents, gone.movement]).toEqual([course.id, current.version + 1, 0, null]);
+    expect(await repo.deleteGoal(delKey, course.id, current.version)).toEqual(gone);
+    expect(await repo.findGoalOperation(delKey)).toEqual({ action: 'excluir_meta', goalId: course.id, movementId: null });
+    expect(await repo.getGoal(course.id)).toBeNull();
+    expect(await repo.listGoalMovements(course.id)).toEqual([]);
+    expect((await repo.listGoalMovementsInMonth(ctx, OCT)).filter((m) => m.goalId === course.id)).toEqual([]);
+    expect(await err(repo.addGoalMovement(newOperationKey(), course.id, 'aporte', move(1, T0)))).toBe('nao_encontrado');
+    expect(await err(repo.updateGoal(newOperationKey(), course.id, gone.goal.version, goalInput()))).toBe('nao_encontrado');
+    expect(await err(repo.setGoalStatus(newOperationKey(), course.id, gone.goal.version, 'arquivada'))).toBe('nao_encontrado');
+    expect(await err(repo.deleteGoal(newOperationKey(), course.id, gone.goal.version))).toBe('nao_encontrado');
+    expect((await repo.listGoals(ctx)).map((g) => g.id)).toEqual([reserve.id]);
+    await same();
+  });
+
+  it('validação também no banco, com o mesmo código e a mesma ordem do core; recusa não grava nada', async () => {
+    const repo = at();
+    const key = () => newOperationKey();
+    const create = (over: Partial<NewGoalInput>) => err(repo.createGoal(key(), ctx, goalInput(over)));
+    const reserveWith = (over: Partial<NewGoalInput>) => err(repo.createGoal(key(), ctx, reserveInput(over)));
+    expect(await create({ goalType: 'outro' as NewGoalInput['goalType'] })).toBe('tipo_invalido');
+    expect(await create({ name: '' })).toBe('nome_da_meta_invalido');
+    expect(await create({ name: 'x'.repeat(41) })).toBe('nome_da_meta_invalido');
+    expect(await create({ targetCents: 0 })).toBe('valor_invalido');
+    expect(await create({ targetCents: 1_000_000_000 })).toBe('alvo_acima_do_limite');
+    expect(await create({ essentialMonths: 6 })).toBe('tipo_invalido');
+    expect(await create({ targetMonth: '2025-09' })).toBe('prazo_invalido');
+    expect(await create({ targetMonth: '2075-11' })).toBe('prazo_invalido');
+    expect(await create({ plannedMonthlyCents: 0 })).toBe('plano_invalido');
+    expect(await create({ initialCents: -1 })).toBe('saldo_inicial_invalido');
+    expect(await create({ initialCents: 100, initialOn: null })).toBe('data_invalida');
+    expect(await create({ initialCents: 100, initialOn: '2025-10-08' })).toBe('data_futura');
+    expect(await reserveWith({ essentialBaseCents: 0 })).toBe('valor_invalido');
+    expect(await reserveWith({ essentialMonths: 25 })).toBe('meses_invalidos');
+    expect(await reserveWith({ essentialBaseSource: null })).toBe('origem_invalida');
+    expect(await reserveWith({ essentialBaseCents: 999_999_999, essentialMonths: 2 })).toBe('alvo_acima_do_limite');
+    expect(await reserveWith({ targetCents: 2250001 })).toBe('alvo_invalido');
+    // Já existe uma reserva viva e não arquivada: reserva_ja_existe (depois da validação dos campos).
+    expect(await reserveWith({})).toBe('reserva_ja_existe');
+    expect(await reserveWith({ name: '' })).toBe('nome_da_meta_invalido');
+    // Reserva com o alvo igual ao produto é aceita no formato (aqui só recusada por já existir uma).
+    expect(await reserveWith({ targetCents: 2250000 })).toBe('reserva_ja_existe');
+    expect((await repo.listGoals(ctx)).map((g) => g.id)).toEqual([reserve.id]);
+
+    const move1 = (kind: GoalMovementKind, input: GoalMovementInput) => err(repo.addGoalMovement(key(), reserve.id, kind, input));
+    expect(await move1('saldo_inicial', move(1, T0))).toBe('tipo_invalido');
+    expect(await move1('aporte', { amountCents: 0, occurredOn: T0, note: null })).toBe('valor_invalido');
+    expect(await move1('aporte', { amountCents: 1_000_000_000, occurredOn: T0, note: null })).toBe('valor_acima_do_limite');
+    expect(await move1('aporte', { amountCents: 100, occurredOn: null as unknown as IsoDate, note: null })).toBe('data_invalida');
+    expect(await move1('aporte', move(1, '2025-10-08'))).toBe('data_futura');
+    // update_goal: versão antes da validação; prazo só é conferido quando muda (a reserva tem prazo vencido? não: nulo).
+    const asGoalInput = (g: Goal, over: Partial<GoalInput> = {}): GoalInput => ({
+      goalType: g.goalType,
+      name: g.name,
+      targetCents: g.targetCents,
+      targetMonth: g.targetMonth,
+      plannedMonthlyCents: g.plannedMonthlyCents,
+      essentialBaseCents: g.essentialBaseCents,
+      essentialMonths: g.essentialMonths,
+      essentialBaseSource: g.essentialBaseSource,
+      ...over,
+    });
+    expect(await err(repo.updateGoal(key(), reserve.id, 9, asGoalInput(reserve, { name: '' })))).toBe('versao_desatualizada');
+    expect(await err(repo.updateGoal(key(), reserve.id, reserve.version, asGoalInput(reserve, { name: '' })))).toBe('nome_da_meta_invalido');
+    expect(await err(repo.updateGoal(key(), reserve.id, reserve.version, asGoalInput(reserve, { plannedMonthlyCents: 0 })))).toBe('plano_invalido');
+    expect(await err(repo.setGoalStatus(key(), reserve.id, reserve.version, 'pausada' as GoalStatus))).toBe('situacao_invalida');
+    expect(await err(repo.setGoalStatus(key(), reserve.id, 99, 'concluida'))).toBe('versao_desatualizada');
+    expect((await repo.getGoal(reserve.id))!).toEqual(reserve);
+    await same();
+  });
+
+  it('uma reserva por contexto, inclusive ao reativar; meta arquivada não recebe movimento; concluir e reativar', async () => {
+    const repo = at();
+    const status = (g: Goal, s: GoalStatus) => repo.setGoalStatus(newOperationKey(), g.id, g.version, s);
+    const archived = (await status(reserve, 'arquivada')).goal;
+    expect([archived.status, archived.version]).toEqual(['arquivada', 2]);
+    // Arquivada: movimento recusado nas três funções; editar a meta continua valendo.
+    const mv = (await repo.listGoalMovements(archived.id))[0]!;
+    expect(await err(repo.addGoalMovement(newOperationKey(), archived.id, 'aporte', move(1, T0)))).toBe('meta_arquivada');
+    expect(await err(repo.updateGoalMovement(newOperationKey(), mv.id, mv.version, move(1, mv.occurredOn)))).toBe('meta_arquivada');
+    expect(await err(repo.deleteGoalMovement(newOperationKey(), mv.id, mv.version))).toBe('meta_arquivada');
+    // Com a antiga arquivada, uma nova reserva é aceita; reativar a antiga é recusado enquanto a nova existir.
+    const second = (await repo.createGoal(newOperationKey(), ctx, reserveInput({ name: 'Reserva nova', initialCents: null, initialOn: null }))).goal;
+    expect(second.goalType).toBe('emergencia');
+    expect(await err(status(archived, 'ativa'))).toBe('reserva_ja_existe');
+    expect(await err(status(archived, 'concluida'))).toBe('reserva_ja_existe');
+    // Virar reserva também respeita a vaga.
+    const trip = (await repo.createGoal(newOperationKey(), ctx, goalInput({ name: 'Viagem', initialCents: null, initialOn: null }))).goal;
+    expect(await err(repo.updateGoal(newOperationKey(), trip.id, trip.version, { ...reserveInput(), targetCents: null, name: 'Viagem' }))).toBe('reserva_ja_existe');
+    await repo.deleteGoal(newOperationKey(), trip.id, trip.version);
+    // Concluída ainda ocupa a vaga e continua recebendo movimentos (por exemplo, o resgate de quem usou o dinheiro).
+    const done = (await status(second, 'concluida')).goal;
+    expect(await err(status(archived, 'ativa'))).toBe('reserva_ja_existe');
+    const used = await repo.addGoalMovement(newOperationKey(), done.id, 'aporte', move(10, T0));
+    expect(used.goal.status).toBe('concluida');
+    await repo.deleteGoal(newOperationKey(), done.id, done.version);
+    // Excluída libera a vaga: a antiga volta a ser a reserva.
+    reserve = (await status(archived, 'ativa')).goal;
+    expect([reserve.status, reserve.version]).toEqual(['ativa', 3]);
+    expect(organizeGoals(await repo.listGoals(ctx)).reserve?.id).toBe(reserve.id);
+    await same();
+  });
+
+  it('demonstração do Ciclo C: reserva 15% e 0,9 mês (dezembro de 2028), viagem 20% e R$ 480,00 por mês; guardado, planejado e fora', async () => {
+    const repo = at();
+    await repo.deleteGoal(newOperationKey(), reserve.id, reserve.version);
+    expect(await repo.listGoals(ctx)).toEqual([]);
+    reserve = (await repo.createGoal(newOperationKey(), ctx, reserveInput({ plannedMonthlyCents: 50000 }))).goal;
+    demoKey = newOperationKey();
+    await repo.addGoalMovement(demoKey, reserve.id, 'aporte', move(500, '2025-10-06'));
+    const trip = (
+      await repo.createGoal(newOperationKey(), ctx, goalInput({ name: 'Viagem de férias', targetCents: 600000, targetMonth: '2026-07', plannedMonthlyCents: 48000, initialCents: 120000 }))
+    ).goal;
+    reserve = (await repo.getGoal(reserve.id))!;
+    const month = await repo.listGoalMovementsInMonth(ctx, OCT);
+    expect(month.map((m) => [m.goalId === reserve.id ? 'reserva' : 'viagem', m.kind, m.amountCents]).sort()).toEqual([
+      ['reserva', 'aporte', 50000],
+      ['reserva', 'saldo_inicial', 300000],
+      ['viagem', 'saldo_inicial', 120000],
+    ]);
+    expect([reserve.savedCents, percent(reserve), tenths(reserve)]).toEqual([350000, 15, 9]);
+    expect([trip.savedCents, percent(trip)]).toEqual([120000, 20]);
+    const reservePlan = goalPlan(reserve, month, T0);
+    const tripPlan = goalPlan(trip, month, T0);
+    // Reserva: P0 novembro (houve aporte em outubro), 38 aportes de R$ 500,00 → dezembro de 2028.
+    expect([reservePlan.firstProjectedMonth, reservePlan.reachMonth]).toEqual(['2025-11', '2028-12']);
+    // Viagem: sem aporte em outubro, P0 outubro; até julho de 2026, 10 meses → R$ 480,00 por mês, chega em julho de 2026.
+    expect([tripPlan.firstProjectedMonth, tripPlan.deadline]).toEqual(['2025-10', { month: '2026-07', months: 10, monthlyCents: 48000 }]);
+    expect(tripPlan.reachMonth).toBe('2026-07');
+    const organized = organizeGoals(await repo.listGoals(ctx));
+    expect([organized.reserve?.id, organized.active.map((g) => g.id)]).toEqual([reserve.id, [trip.id]]);
+
+    // Guardado em outubro R$ 500,00, planejado R$ 980,00 por mês e fora dos compromissos depois do planejado R$ 1.870,00,
+    // tudo fora do percentual (52,5% e fora R$ 2.850,00 continuam os mesmos).
+    const goals = await repo.listGoals(ctx);
+    const summary = summarizeCommitted(await repo.listCommitments(ctx, OCT), ctx, OCT, T0, await repo.listIncomeReferences(ctx));
+    const lines = committedGoalLines(summary, savedInMonth(month, OCT), plannedForGoals(goals));
+    expect([lines.savedInMonthCents, lines.plannedCents, lines.outsideAfterPlannedCents]).toEqual([50000, 98000, 187000]);
+    expect(lines.outsideAfterPlanned).toBe('Fora dos compromissos depois do planejado: R$ 1.870,00');
+    expect([summary.committedPermille, summary.outsideCents]).toEqual([525, 285000]);
+    await same();
+  });
+
+  it('outra pessoa não lê nem altera metas, movimentos nem operações; gravação direta é recusada', async () => {
+    const repo = at();
+    const [reserveNow] = await repo.listGoals(ctx);
+    const mv = (await repo.listGoalMovements(reserveNow!.id))[0]!;
+    const anaCtx = (await ana.getSpace())!.personalContextId;
+    expect(await ana.listGoals(ctx)).toEqual([]);
+    expect(await ana.getGoal(reserveNow!.id)).toBeNull();
+    expect(await ana.listGoalMovements(reserveNow!.id)).toEqual([]);
+    expect(await ana.listGoalMovementsInMonth(ctx, OCT)).toEqual([]);
+    expect(await ana.listGoals(anaCtx)).toEqual([]);
+    expect(await err(ana.createGoal(newOperationKey(), ctx, goalInput()))).toBe('sem_permissao');
+    expect(await err(ana.updateGoal(newOperationKey(), reserveNow!.id, reserveNow!.version, goalInput()))).toBe('nao_encontrado');
+    expect(await err(ana.setGoalStatus(newOperationKey(), reserveNow!.id, reserveNow!.version, 'arquivada'))).toBe('nao_encontrado');
+    expect(await err(ana.deleteGoal(newOperationKey(), reserveNow!.id, reserveNow!.version))).toBe('nao_encontrado');
+    expect(await err(ana.addGoalMovement(newOperationKey(), reserveNow!.id, 'aporte', move(1, T0)))).toBe('nao_encontrado');
+    expect(await err(ana.updateGoalMovement(newOperationKey(), mv.id, mv.version, move(1, T0)))).toBe('nao_encontrado');
+    expect(await err(ana.deleteGoalMovement(newOperationKey(), mv.id, mv.version))).toBe('nao_encontrado');
+    expect((await repo.findGoalOperation(demoKey))!.action).toBe('registrar_movimento_meta');
+    expect(await ana.findGoalOperation(demoKey)).toBeNull();
+    // Gravação direta nas tabelas e na visão, por quem tem acesso e por quem não tem sessão.
+    const db = clientFor(BRUNO, T0);
+    expect((await db.from('goals').insert({ context_id: ctx, goal_type: 'objetivo', name: 'x', target_cents: 1, created_by: BRUNO })).error).not.toBeNull();
+    expect((await db.from('goals').update({ name: 'x' }).eq('id', reserveNow!.id)).error).not.toBeNull();
+    expect((await db.from('goals').delete().eq('id', reserveNow!.id)).error).not.toBeNull();
+    expect((await db.from('goal_movements').insert({ goal_id: reserveNow!.id, context_id: ctx, kind: 'aporte', amount_cents: 1, occurred_on: T0, created_by: BRUNO })).error).not.toBeNull();
+    expect((await db.from('goal_movements').update({ amount_cents: 1 }).eq('id', mv.id)).error).not.toBeNull();
+    for (const table of ['goals', 'goal_movements', 'goal_items']) {
+      const anon = await clientFor(null).from(table).select('id');
+      expect(anon.error !== null || (anon.data ?? []).length === 0).toBe(true);
+      const outsider = await clientFor(ANA, T0).from(table).select('id');
+      expect(outsider.error).toBeNull();
+      expect(outsider.data).toEqual([]);
+    }
+    const sent = await clientFor(null).rpc('create_goal', {
+      p_idempotency_key: newOperationKey(),
+      p_context_id: ctx,
+      p_goal_type: 'objetivo',
+      p_name: 'x',
+      p_target_cents: 1,
+      p_target_month: null,
+      p_planned_monthly_cents: null,
+      p_essential_base_cents: null,
+      p_essential_months: null,
+      p_essential_base_source: null,
+      p_initial_cents: null,
+      p_initial_on: null,
+    });
+    expect(sent.error).not.toBeNull();
+    expect((await repo.getGoal(reserveNow!.id))!.withdrawalsCents).toBe(reserveNow!.withdrawalsCents);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plano de guardar (D-036)
+// ---------------------------------------------------------------------------
+
+describe('API real: plano de guardar (D-036)', () => {
+  // Bruno, com as metas da demonstração do bloco anterior (reserva R$ 3.500,00 guardados, viagem R$ 1.200,00), hoje 07/10/2025.
+  // As datas de volta são do banco: cada resposta é feita no "hoje" que a tabela do teste indica. A resposta não é anotação
+  // e não mexe em nenhum outro dado. Ana é a pessoa de fora. Pessoas e contas fictícias.
+  const T0 = '2025-10-07';
+  const OCT = '2025-10';
+  const at = (today: IsoDate = T0) => repoFor(BRUNO, today);
+  const ana = repoFor(ANA, T0);
+  let ctx = '';
+
+  const fail = async (p: Promise<unknown>) => (await p.then(() => null, (e: unknown) => e)) as RepoError;
+  /** Responde no "hoje" indicado, com a versão atual (0 = ainda não há resposta). */
+  const answer = async (today: IsoDate, a: SavingsAnswer, monthlyCents: Cents | null = null) => {
+    const repo = at(today);
+    const current = await repo.getSavingsCheck(ctx);
+    return repo.setSavingsAnswer(newOperationKey(), ctx, current?.version ?? 0, a, monthlyCents);
+  };
+  const shape = (c: SavingsCheck | null) => c && [c.answer, c.monthlyCents, c.answeredOn, c.askAgainOn, c.version];
+
+  beforeAll(async () => {
+    ctx = (await at().getSpace())!.personalContextId;
+  });
+
+  it('sem resposta: o card pergunta pela primeira vez e o 4º passo de Primeiros passos não está concluído', async () => {
+    expect(await at().getSavingsCheck(ctx)).toBeNull();
+    expect(isSavingsStepDone(null)).toBe(false);
+    expect(savingsCardState(null, T0, null)).toMatchObject({ kind: 'pergunta', reason: 'primeira' });
+    expect(shouldAskSavings(null, T0, null)).toBe(true);
+  });
+
+  it('"Responder depois": o banco calcula a data de volta (+ 7 dias); repetição, chave reutilizada e versão', async () => {
+    const repo = at();
+    const key = newOperationKey();
+    const first = await repo.setSavingsAnswer(key, ctx, 0, 'depois');
+    expect(first).toMatchObject({ contextId: ctx, answer: 'depois', monthlyCents: null, answeredOn: T0, askAgainOn: '2025-10-14', version: 1 });
+    expect(await repo.getSavingsCheck(ctx)).toEqual(first);
+    expect(shouldAskSavings(first, '2025-10-13', null)).toBe(false);
+    expect(shouldAskSavings(first, '2025-10-14', null)).toBe(true);
+    // Mesma chave e mesmo pedido: a mesma resposta, sem gravar de novo; outro conteúdo ou outra operação: chave reutilizada.
+    expect(await repo.setSavingsAnswer(key, ctx, 0, 'depois')).toEqual(first);
+    expect(await err(repo.setSavingsAnswer(key, ctx, 0, 'agora_nao'))).toBe('chave_reutilizada');
+    expect(await err(repo.setSavingsAnswer(key, ctx, 1, 'depois'))).toBe('chave_reutilizada');
+    expect(await err(repo.setSavingsAnswer(key, ctx, 0, 'consigo', 30000))).toBe('chave_reutilizada');
+    // Versão: 0 só vale sem resposta; nula, negativa e antiga são recusadas, com a versão atual no detalhe.
+    const stale = await fail(repo.setSavingsAnswer(newOperationKey(), ctx, 0, 'agora_nao'));
+    expect([stale.code, stale.detail]).toEqual(['versao_desatualizada', 'versao_atual=1']);
+    expect(await err(repo.setSavingsAnswer(newOperationKey(), ctx, null as unknown as number, 'agora_nao'))).toBe('versao_desatualizada');
+    expect(await err(repo.setSavingsAnswer(newOperationKey(), ctx, -1, 'agora_nao'))).toBe('versao_desatualizada');
+    expect(await err(repo.setSavingsAnswer(newOperationKey(), ctx, 2, 'agora_nao'))).toBe('versao_desatualizada');
+    expect(shape(await repo.getSavingsCheck(ctx))).toEqual(['depois', null, T0, '2025-10-14', 1]);
+  });
+
+  it('validação antes da versão, com o mesmo código do core; a recusa não gasta a chave', async () => {
+    const repo = at();
+    const key = newOperationKey();
+    const monthly = (cents: number | null) => err(repo.setSavingsAnswer(key, ctx, 1, 'consigo', cents));
+    // Resposta e valor são conferidos antes da versão: com a versão errada (0) o código é o da validação.
+    expect(await err(repo.setSavingsAnswer(key, ctx, 0, 'talvez' as SavingsAnswer))).toBe('resposta_invalida');
+    expect(await err(repo.setSavingsAnswer(key, ctx, 0, null as unknown as SavingsAnswer))).toBe('resposta_invalida');
+    expect(await monthly(null)).toBe('valor_invalido');
+    expect(await monthly(99)).toBe('valor_invalido');
+    expect(await monthly(1_000_000_000)).toBe('valor_acima_do_limite');
+    expect(await err(repo.setSavingsAnswer(key, ctx, 1, 'agora_nao', 100))).toBe('valor_invalido');
+    expect(await err(repo.setSavingsAnswer(key, ctx, 1, 'depois', 0))).toBe('valor_invalido');
+    for (const [a, v] of [['talvez', null], ['consigo', null], ['consigo', 99], ['consigo', 1_000_000_000], ['agora_nao', 100]] as const) {
+      expect(savingsAnswerError(a as SavingsAnswer, v)).toBe(
+        a === 'talvez' ? 'resposta_invalida' : v === 1_000_000_000 ? 'valor_acima_do_limite' : 'valor_invalido',
+      );
+    }
+    expect(shape(await repo.getSavingsCheck(ctx))).toEqual(['depois', null, T0, '2025-10-14', 1]);
+    // A chave das recusas segue livre: vale com os argumentos certos (limites de R$ 1,00 e R$ 9.999.999,99 aceitos).
+    const low = await repo.setSavingsAnswer(key, ctx, 1, 'consigo', 100);
+    expect(shape(low)).toEqual(['consigo', 100, T0, null, 2]);
+    const high = await repo.setSavingsAnswer(newOperationKey(), ctx, 2, 'consigo', 999_999_999);
+    expect(shape(high)).toEqual(['consigo', 999_999_999, T0, null, 3]);
+  });
+
+  it('"Sim, consigo" e "Agora não": a resposta nova substitui a anterior (apaga o valor); datas do banco iguais ao core', async () => {
+    const repo = at();
+    const yes = await answer(T0, 'consigo', 30000);
+    expect(shape(yes)).toEqual(['consigo', 30000, T0, null, 4]);
+    expect(isSavingsStepDone(yes)).toBe(true);
+    expect(savingsCardState(yes, T0, null)).toEqual({ kind: 'plano', monthlyCents: 30000 });
+    // "Manter o valor" (renda de referência mudou): "consigo" de novo com o mesmo valor renova o dia e some a pergunta.
+    const later = await answer('2025-11-10', 'consigo', 30000);
+    expect(shape(later)).toEqual(['consigo', 30000, '2025-11-10', null, 5]);
+    expect(savingsCardState(later, '2025-11-10', '2025-11-09').kind).toBe('plano');
+    expect(savingsCardState(later, '2025-11-10', '2025-11-11')).toMatchObject({ kind: 'pergunta', reason: 'renda_mudou' });
+
+    // "Agora não" por cima de "consigo" apaga o valor por mês; volta em 30 dias.
+    const no = await answer('2025-11-10', 'agora_nao');
+    expect(shape(no)).toEqual(['agora_nao', null, '2025-11-10', '2025-12-10', 6]);
+    expect(isSavingsStepDone(no)).toBe(true);
+    expect(shouldAskSavings(no, '2025-12-09', null)).toBe(false);
+    expect(savingsCardState(no, '2025-12-10', null)).toMatchObject({ kind: 'pergunta', reason: 'agora_nao' });
+    // O banco e o core calculam as mesmas datas, inclusive na virada de ano e de mês e em ano bissexto.
+    for (const [today, a] of [
+      ['2025-12-28', 'depois'],
+      ['2025-12-20', 'agora_nao'],
+      ['2026-02-01', 'agora_nao'],
+      ['2025-10-31', 'agora_nao'],
+      ['2028-02-01', 'agora_nao'],
+      ['2028-02-25', 'depois'],
+      ['2025-01-01', 'depois'],
+    ] as const) {
+      const c = await answer(today, a);
+      expect([c.answeredOn, c.askAgainOn]).toEqual([today, savingsAskAgainOn(a, today)]);
+      expect(c.monthlyCents).toBeNull();
+    }
+    expect((await repo.getSavingsCheck(ctx))!.askAgainOn).toBe('2025-01-08');
+    expect(await answer(T0, 'agora_nao')).toMatchObject({ askAgainOn: '2025-11-06', version: 14 });
+  });
+
+  it('a resposta é só da pessoa e não grava nada além dela: sem anotação, sem meta, sem conta; operação sem alvo', async () => {
+    const repo = at();
+    const before = await Promise.all([repo.getReturnReviewState(ctx), repo.listGoals(ctx), repo.listGoalMovementsInMonth(ctx, OCT), repo.listRecords(ctx, OCT), repo.listIncomeReferences(ctx)]);
+    const key = newOperationKey();
+    const current = (await repo.getSavingsCheck(ctx))!;
+    const saved = await repo.setSavingsAnswer(key, ctx, current.version, 'consigo', 50000);
+    expect(await Promise.all([repo.getReturnReviewState(ctx), repo.listGoals(ctx), repo.listGoalMovementsInMonth(ctx, OCT), repo.listRecords(ctx, OCT), repo.listIncomeReferences(ctx)])).toEqual(before);
+    const ops = await clientFor(BRUNO, T0).from('record_operations').select('action, context_id, record_id, commitment_id, target_id').eq('idempotency_key', key);
+    expect(ops.data).toEqual([{ action: 'responder_guardar', context_id: ctx, record_id: null, commitment_id: null, target_id: null }]);
+    // As operações de metas e de renda não são buscadas como se fossem resposta, e vice-versa.
+    expect(await repo.findGoalOperation(key)).toBeNull();
+    expect(await repo.findOperation(key)).toBeNull();
+    // Outra pessoa não lê a resposta, nem pelo repositório nem direto, e não responde no contexto dele; sem sessão, nada.
+    expect(await ana.getSavingsCheck(ctx)).toBeNull();
+    expect(await err(ana.setSavingsAnswer(newOperationKey(), ctx, saved.version, 'consigo', 50000))).toBe('sem_permissao');
+    expect(await err(ana.setSavingsAnswer(newOperationKey(), randomUUID(), 0, 'depois'))).toBe('sem_permissao');
+    const outsider = await clientFor(ANA, T0).from('savings_checks').select('context_id');
+    expect(outsider.error).toBeNull();
+    expect(outsider.data).toEqual([]);
+    const anon = await clientFor(null).from('savings_checks').select('context_id');
+    expect(anon.error !== null || (anon.data ?? []).length === 0).toBe(true);
+    const db = clientFor(BRUNO, T0);
+    expect((await db.from('savings_checks').insert({ person_id: BRUNO, context_id: ctx, answer: 'depois', answered_on: T0, ask_again_on: '2025-10-14' })).error).not.toBeNull();
+    expect((await db.from('savings_checks').update({ answer: 'depois' }).eq('context_id', ctx)).error).not.toBeNull();
+    expect((await db.from('savings_checks').delete().eq('context_id', ctx)).error).not.toBeNull();
+    // Resultado incerto: a resposta se perde; repetir a mesma chave devolve a linha atual, sem gravar de novo.
+    const lost = new SupabaseRepository(clientFor(BRUNO, T0, lostResponse), { id: BRUNO });
+    const lostKey = newOperationKey();
+    const version = (await repo.getSavingsCheck(ctx))!.version;
+    expect(await err(lost.setSavingsAnswer(lostKey, ctx, version, 'consigo', 45000))).toBe('rede');
+    const landed = await repo.setSavingsAnswer(lostKey, ctx, version, 'consigo', 45000);
+    expect(shape(landed)).toEqual(['consigo', 45000, T0, null, version + 1]);
+    expect((await repo.getSavingsCheck(ctx))!.version).toBe(version + 1);
+  });
+
+  it('o plano com as metas da demonstração: etapas da reserva e das metas iguais ao core; "Usar este plano" e reserva mínima', async () => {
+    const repo = at();
+    const goals = await repo.listGoals(ctx);
+    const movements = await repo.listGoalMovementsInMonth(ctx, OCT);
+    const reserve = goals.find((g) => g.goalType === 'emergencia')!;
+    const trip = goals.find((g) => g.name === 'Viagem de férias')!;
+    expect(reserve.savedCents).toBe(350000);
+    const plan = savingsPlan({ monthlyCents: 50000, essentialCents: reserve.essentialBaseCents, goals, movements, today: T0 });
+    // Gastos essenciais R$ 3.750,00 e R$ 500,00 por mês, P0 em novembro (houve aporte em outubro): 1 mês falta R$ 250,00;
+    // 3 meses faltam R$ 7.750,00; 6 meses faltam R$ 19.000,00 (a mesma data do plano da reserva); a viagem entra depois da 1ª etapa.
+    expect(plan.firstProjectedMonth).toBe('2025-11');
+    expect(plan.chosenStageId).toBe('reserva-1');
+    expect(plan.stages.map((s) => [s.id, s.targetCents, s.missingCents, s.reachMonth])).toEqual([
+      ['reserva-1', 375000, 25000, '2025-11'],
+      ['reserva-3', 1125000, 775000, '2027-02'],
+      ['reserva-6', 2250000, 1900000, '2028-12'],
+      [`meta-${trip.id}`, 600000, 480000, '2026-09'],
+    ]);
+    expect(goalPlan(reserve, movements, T0).reachMonth).toBe('2028-12');
+
+    // "Usar este plano": o banco aceita os campos que o core monta (etapa de 3 meses, valor por mês igual ao informado).
+    const input = savingsReserveInput(plan, 'media_gastos', { stageId: 'reserva-3', existing: reserve })!;
+    const updated = await repo.updateGoal(newOperationKey(), reserve.id, reserve.version, input);
+    expect(updated.goal).toMatchObject({ targetCents: 1125000, essentialBaseCents: 375000, essentialMonths: 3, plannedMonthlyCents: 50000, name: 'Reserva para imprevistos', version: reserve.version + 1 });
+    expect(updated.goal.savedCents).toBe(350000);
+    // A lista segue a ordem de criação mesmo depois de a reserva ser alterada (a linha alterada não passa para o fim).
+    expect((await repo.listGoals(ctx)).map((g) => g.id)).toEqual([reserve.id, trip.id]);
+
+    // "Agora não" → reserva mínima: sem reserva (a antiga é excluída), o banco aceita a mínima de R$ 300,00 com o passo semanal.
+    expect(weeklySavingsToMonthly(1000)).toBe(4333);
+    await repo.deleteGoal(newOperationKey(), reserve.id, updated.goal.version);
+    const minimum = await repo.createGoal(newOperationKey(), ctx, minimumReserveInput(30000, weeklySavingsToMonthly(1000)));
+    expect(minimum.goal).toMatchObject({
+      goalType: 'emergencia',
+      name: 'Reserva para imprevistos',
+      targetCents: 30000,
+      essentialBaseCents: 30000,
+      essentialMonths: 1,
+      essentialBaseSource: 'informado',
+      plannedMonthlyCents: 4333,
+      savedCents: 0,
+      status: 'ativa',
+    });
+    expect(minimum.movement).toBeNull();
+    // Sem o plano da reserva mínima, as etapas voltam a contar o que a nova reserva guarda (nada).
+    const none = savingsPlan({ monthlyCents: 4333, essentialCents: 375000, goals: await repo.listGoals(ctx), movements: await repo.listGoalMovementsInMonth(ctx, OCT), today: T0 });
+    expect(none.stages[0]).toMatchObject({ id: 'reserva-1', missingCents: 375000, reachMonth: '2032-12' });
+  });
+});
+
+describe('conversor da renda de referência, das metas e do plano de guardar', () => {
+  // Sem rede: os argumentos das funções, a leitura das linhas (mês AAAA-MM-01 ↔ AAAA-MM, bigint) e os códigos de erro.
+  const calls: [string, Record<string, unknown>][] = [];
+  const ref = { id: 'r1', context_id: 'ctx', from_month: '2026-09-01', amount_cents: 600000, varies: false, created_by: 'p1', version: 1, created_at: 'a', updated_at: 'b' };
+  const goal = {
+    id: 'g1',
+    context_id: 'ctx',
+    goal_type: 'emergencia',
+    name: 'Reserva para imprevistos',
+    target_cents: 2250000,
+    target_month: '2029-12-01',
+    planned_monthly_cents: 50000,
+    essential_base_cents: 375000,
+    essential_months: 6,
+    essential_base_source: 'media_gastos',
+    status: 'ativa',
+    created_by: 'p1',
+    version: 1,
+    created_at: 'a',
+    updated_at: 'b',
+    saved_cents: 350000,
+    initial_cents: 300000,
+    deposits_cents: 50000,
+    withdrawals_cents: 0,
+    income_cents: 0,
+    appreciation_cents: 0,
+    depreciation_cents: 0,
+    last_movement_on: '2026-10-06',
+    deleted_at: null,
+    deleted_by: null,
+  };
+  const movement = { id: 'm1', goal_id: 'g1', context_id: 'ctx', kind: 'aporte', amount_cents: 50000, occurred_on: '2026-10-06', note: null, created_by: 'p1', version: 1, created_at: 'a', updated_at: 'b' };
+  const check = { person_id: 'p1', context_id: 'ctx', answer: 'consigo', monthly_cents: 30000, answered_on: '2026-10-07', ask_again_on: null, version: 1, created_at: 'a', updated_at: 'b' };
+  const goalInput: NewGoalInput = {
+    goalType: 'objetivo',
+    name: 'Curso',
+    targetCents: 120000,
+    targetMonth: '2027-03',
+    plannedMonthlyCents: 5000,
+    essentialBaseCents: null,
+    essentialMonths: null,
+    essentialBaseSource: null,
+    initialCents: 10000,
+    initialOn: '2026-10-01',
+  };
+
+  const query = (result: { data: unknown; error: unknown }) => {
+    const q: Record<string, unknown> = {};
+    for (const m of ['select', 'eq', 'in', 'is', 'gte', 'lt', 'order', 'range']) q[m] = () => q;
+    q.maybeSingle = async () => ({ data: Array.isArray(result.data) ? (result.data[0] ?? null) : result.data, error: result.error });
+    q.then = (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) => Promise.resolve(result).then(resolve, reject);
+    return q;
+  };
+  const fake = (rpc: Record<string, unknown>, tables: Record<string, { data: unknown; error?: unknown }> = {}, error: unknown = null) => {
+    const db = {
+      from: (table: string) => query(error ? { data: null, error } : { data: tables[table]?.data ?? null, error: tables[table]?.error ?? null }),
+      rpc: async (fn: string, args: Record<string, unknown>) => {
+        calls.push([fn, args]);
+        return error ? { data: null, error } : { data: rpc[fn] ?? null, error: null };
+      },
+    };
+    return new SupabaseRepository(db as unknown as SupabaseClient, { id: 'p1' });
+  };
+  const failure = (p: Promise<unknown>) => p.then(() => null, (e: unknown) => (e instanceof RepoError ? [e.code, e.message, e.detail ?? null] : String(e)));
+
+  it('renda de referência: AAAA-MM vira AAAA-MM-01 e volta; linha incoerente é recusada', async () => {
+    calls.length = 0;
+    const repo = fake({ set_income_reference: ref, delete_income_reference: { ...ref, version: 2, deleted_at: 'c', deleted_by: 'p1' } }, { income_references: { data: [ref] } });
+    const expected = { id: 'r1', contextId: 'ctx', fromMonth: '2026-09', amountCents: 600000, varies: false, createdBy: 'p1', version: 1, createdAt: 'a', updatedAt: 'b' };
+    expect(await repo.listIncomeReferences('ctx')).toEqual([expected]);
+    expect(await repo.setIncomeReference('chave-0001', 'ctx', '2026-09', 0, 600000, false)).toEqual(expected);
+    expect(await repo.deleteIncomeReference('chave-0002', 'r1', 1)).toEqual({ ...expected, version: 2 });
+    expect(calls).toEqual([
+      ['set_income_reference', { p_idempotency_key: 'chave-0001', p_context_id: 'ctx', p_from_month: '2026-09-01', p_expected_version: 0, p_amount_cents: 600000, p_varies: false }],
+      ['delete_income_reference', { p_idempotency_key: 'chave-0002', p_id: 'r1', p_expected_version: 1 }],
+    ]);
+    for (const bad of [{ ...ref, from_month: '2026-09-15' }, { ...ref, amount_cents: 0 }, { ...ref, amount_cents: 1_000_000_000 }, { ...ref, varies: null }, { ...ref, version: 0 }, { ...ref, amount_cents: 1.5 }]) {
+      expect(await failure(fake({ set_income_reference: bad }).setIncomeReference('chave-0003', 'ctx', '2026-09', 0, 600000, false))).toEqual(['desconhecido', expect.stringMatching(/inconsistente$/), null]);
+    }
+    // bigint como texto (valores grandes) é aceito; texto qualquer, não.
+    expect((await fake({ set_income_reference: { ...ref, amount_cents: '600000' } }).setIncomeReference('chave-0004', 'ctx', '2026-09', 0, 600000, false)).amountCents).toBe(600000);
+    expect(await failure(fake({ set_income_reference: { ...ref, amount_cents: 'muito' } }).setIncomeReference('chave-0005', 'ctx', '2026-09', 0, 600000, false))).toEqual(['desconhecido', 'valor_inconsistente', null]);
+    // Sem retorno, nunca uma referência inventada.
+    expect(await failure(fake({}).setIncomeReference('chave-0006', 'ctx', '2026-09', 0, 600000, false))).toEqual(['desconhecido', 'desconhecido', null]);
+  });
+
+  it('metas: argumentos de cada função, prazo como AAAA-MM-01, observação nula e leitura da meta e do movimento', async () => {
+    calls.length = 0;
+    const result = { goal, movement };
+    const repo = fake(
+      { create_goal: result, update_goal: { goal, movement: null }, set_goal_status: { goal, movement: null }, delete_goal: { goal: { ...goal, deleted_at: 'c', saved_cents: 0, initial_cents: 0, deposits_cents: 0, last_movement_on: null }, movement: null }, add_goal_movement: result, update_goal_movement: result, delete_goal_movement: result },
+      { goal_items: { data: [goal] }, goal_movements: { data: [movement] } },
+    );
+    const goalOut = {
+      id: 'g1',
+      contextId: 'ctx',
+      goalType: 'emergencia',
+      name: 'Reserva para imprevistos',
+      targetCents: 2250000,
+      targetMonth: '2029-12',
+      plannedMonthlyCents: 50000,
+      essentialBaseCents: 375000,
+      essentialMonths: 6,
+      essentialBaseSource: 'media_gastos',
+      status: 'ativa',
+      createdBy: 'p1',
+      version: 1,
+      createdAt: 'a',
+      updatedAt: 'b',
+      savedCents: 350000,
+      initialCents: 300000,
+      depositsCents: 50000,
+      withdrawalsCents: 0,
+      incomeCents: 0,
+      appreciationCents: 0,
+      depreciationCents: 0,
+      lastMovementOn: '2026-10-06',
+    };
+    const movementOut = { id: 'm1', goalId: 'g1', contextId: 'ctx', kind: 'aporte', amountCents: 50000, occurredOn: '2026-10-06', note: null, createdBy: 'p1', version: 1, createdAt: 'a', updatedAt: 'b' };
+    expect(await repo.listGoals('ctx')).toEqual([goalOut]);
+    expect(await repo.getGoal('g1')).toEqual(goalOut);
+    expect(await repo.listGoalMovements('g1')).toEqual([movementOut]);
+    expect(await repo.listGoalMovementsInMonth('ctx', '2026-10')).toEqual([movementOut]);
+    expect(await fake({}, { goal_items: { data: null } }).getGoal('nada')).toBeNull();
+
+    expect(await repo.createGoal('chave-1001', 'ctx', goalInput)).toEqual({ goal: goalOut, movement: movementOut });
+    await repo.createGoal('chave-1002', 'ctx', { ...goalInput, targetMonth: null, initialCents: null, initialOn: null });
+    await repo.updateGoal('chave-1003', 'g1', 2, goalInput);
+    await repo.setGoalStatus('chave-1004', 'g1', 3, 'arquivada');
+    const deleted = await repo.deleteGoal('chave-1005', 'g1', 4);
+    expect([deleted.goal.savedCents, deleted.goal.lastMovementOn, deleted.movement]).toEqual([0, null, null]);
+    await repo.addGoalMovement('chave-1006', 'g1', 'resgate', { amountCents: 100, occurredOn: '2026-10-07', note: 'Conserto' });
+    await repo.updateGoalMovement('chave-1007', 'm1', 2, { amountCents: 200, occurredOn: '2026-10-07', note: null });
+    await repo.deleteGoalMovement('chave-1008', 'm1', 3);
+    const fields = (input: NewGoalInput, month: string | null) => ({
+      p_goal_type: input.goalType,
+      p_name: input.name,
+      p_target_cents: input.targetCents,
+      p_target_month: month,
+      p_planned_monthly_cents: input.plannedMonthlyCents,
+      p_essential_base_cents: null,
+      p_essential_months: null,
+      p_essential_base_source: null,
+    });
+    expect(calls.slice(-8)).toEqual([
+      ['create_goal', { p_idempotency_key: 'chave-1001', p_context_id: 'ctx', ...fields(goalInput, '2027-03-01'), p_initial_cents: 10000, p_initial_on: '2026-10-01' }],
+      ['create_goal', { p_idempotency_key: 'chave-1002', p_context_id: 'ctx', ...fields(goalInput, null), p_initial_cents: null, p_initial_on: null }],
+      ['update_goal', { p_idempotency_key: 'chave-1003', p_goal_id: 'g1', p_expected_version: 2, ...fields(goalInput, '2027-03-01') }],
+      ['set_goal_status', { p_idempotency_key: 'chave-1004', p_goal_id: 'g1', p_expected_version: 3, p_status: 'arquivada' }],
+      ['delete_goal', { p_idempotency_key: 'chave-1005', p_goal_id: 'g1', p_expected_version: 4 }],
+      ['add_goal_movement', { p_idempotency_key: 'chave-1006', p_goal_id: 'g1', p_kind: 'resgate', p_amount_cents: 100, p_occurred_on: '2026-10-07', p_note: 'Conserto' }],
+      ['update_goal_movement', { p_idempotency_key: 'chave-1007', p_movement_id: 'm1', p_expected_version: 2, p_amount_cents: 200, p_occurred_on: '2026-10-07', p_note: null }],
+      ['delete_goal_movement', { p_idempotency_key: 'chave-1008', p_movement_id: 'm1', p_expected_version: 3 }],
+    ]);
+  });
+
+  it('meta e movimento incoerentes são recusados: nunca mostrar um guardado ou um alvo errado', async () => {
+    const bad = (g: object) => failure(fake({ create_goal: { goal: g, movement: null } }).createGoal('chave-2001', 'ctx', goalInput));
+    const code = ['desconhecido', 'meta_inconsistente', null];
+    expect(await bad({ ...goal, goal_type: 'poupanca' })).toEqual(code);
+    expect(await bad({ ...goal, status: 'pausada' })).toEqual(code);
+    expect(await bad({ ...goal, target_month: '2029-12-15' })).toEqual(code);
+    expect(await bad({ ...goal, target_cents: 2250001 })).toEqual(code);
+    expect(await bad({ ...goal, essential_base_source: 'chute' })).toEqual(code);
+    expect(await bad({ ...goal, essential_months: null })).toEqual(code);
+    expect(await bad({ ...goal, goal_type: 'objetivo' })).toEqual(code);
+    expect(await bad({ ...goal, saved_cents: 350001 })).toEqual(code);
+    expect(await bad({ ...goal, last_movement_on: '06/10/2026' })).toEqual(code);
+    const objective = { ...goal, goal_type: 'objetivo', essential_base_cents: null, essential_months: null, essential_base_source: null };
+    expect(await bad(objective)).toBeNull();
+    const withMovement = (m: object) => failure(fake({ add_goal_movement: { goal, movement: m } }).addGoalMovement('chave-2002', 'g1', 'aporte', { amountCents: 1, occurredOn: '2026-10-07', note: null }));
+    const movementCode = ['desconhecido', 'movimento_inconsistente', null];
+    expect(await withMovement({ ...movement, kind: 'doacao' })).toEqual(movementCode);
+    expect(await withMovement({ ...movement, amount_cents: 0 })).toEqual(movementCode);
+    expect(await withMovement({ ...movement, amount_cents: -5 })).toEqual(movementCode);
+    expect(await withMovement({ ...movement, occurred_on: '2026-10-6' })).toEqual(movementCode);
+    expect(await withMovement({ ...movement, note: '' })).toEqual(movementCode);
+    expect(await withMovement({ ...movement, note: 'x'.repeat(81) })).toEqual(movementCode);
+    expect(await withMovement({ ...movement, note: 'x'.repeat(80) })).toBeNull();
+    // Retorno sem meta: nunca uma meta inventada.
+    expect(await failure(fake({ add_goal_movement: { goal: null, movement } }).addGoalMovement('chave-2003', 'g1', 'aporte', { amountCents: 1, occurredOn: '2026-10-07', note: null }))).toEqual(['desconhecido', 'desconhecido', null]);
+  });
+
+  it('findGoalOperation: meta pelo alvo; movimento pela meta do movimento; movimento ou meta ilegível devolve a meta em branco', async () => {
+    expect(await fake({}, { record_operations: { data: null } }).findGoalOperation('x')).toBeNull();
+    expect(await fake({}, { record_operations: { data: { action: 'criar_meta', target_id: 'g9' } } }).findGoalOperation('x')).toEqual({ action: 'criar_meta', goalId: 'g9', movementId: null });
+    expect(await fake({}, { record_operations: { data: { action: 'excluir_meta', target_id: 'g9' } } }).findGoalOperation('x')).toEqual({ action: 'excluir_meta', goalId: 'g9', movementId: null });
+    const tables = (row: unknown) => ({ record_operations: { data: { action: 'alterar_movimento_meta', target_id: 'm9' } }, goal_movements: { data: row } });
+    expect(await fake({}, tables({ goal_id: 'g1' })).findGoalOperation('x')).toEqual({ action: 'alterar_movimento_meta', goalId: 'g1', movementId: 'm9' });
+    expect(await fake({}, tables(null)).findGoalOperation('x')).toEqual({ action: 'alterar_movimento_meta', goalId: '', movementId: 'm9' });
+    expect(await failure(fake({}, { record_operations: { data: { action: 'criar_meta', target_id: null } } }).findGoalOperation('x'))).toEqual(['desconhecido', 'operacao_inconsistente', null]);
+  });
+
+  it('plano de guardar: argumentos (valor nulo explícito), leitura da linha e linha incoerente recusada', async () => {
+    calls.length = 0;
+    const repo = fake({ set_savings_answer: check }, { savings_checks: { data: check } });
+    const expected = { contextId: 'ctx', answer: 'consigo', monthlyCents: 30000, answeredOn: '2026-10-07', askAgainOn: null, version: 1, createdAt: 'a', updatedAt: 'b' };
+    expect(await repo.getSavingsCheck('ctx')).toEqual(expected);
+    expect(await fake({}, { savings_checks: { data: null } }).getSavingsCheck('ctx')).toBeNull();
+    expect(await repo.setSavingsAnswer('chave-3001', 'ctx', 0, 'consigo', 30000)).toEqual(expected);
+    await repo.setSavingsAnswer('chave-3002', 'ctx', 1, 'depois');
+    expect(calls).toEqual([
+      ['set_savings_answer', { p_idempotency_key: 'chave-3001', p_context_id: 'ctx', p_expected_version: 0, p_answer: 'consigo', p_monthly_cents: 30000 }],
+      ['set_savings_answer', { p_idempotency_key: 'chave-3002', p_context_id: 'ctx', p_expected_version: 1, p_answer: 'depois', p_monthly_cents: null }],
+    ]);
+    const bad = (row: object) => failure(fake({ set_savings_answer: row }).setSavingsAnswer('chave-3003', 'ctx', 0, 'consigo', 30000));
+    const code = ['desconhecido', 'guardar_inconsistente', null];
+    expect(await bad({ ...check, answer: 'talvez' })).toEqual(code);
+    expect(await bad({ ...check, monthly_cents: null })).toEqual(code);
+    expect(await bad({ ...check, monthly_cents: 99 })).toEqual(code);
+    expect(await bad({ ...check, ask_again_on: '2026-11-06' })).toEqual(code);
+    expect(await bad({ ...check, answer: 'agora_nao' })).toEqual(code);
+    expect(await bad({ ...check, answer: 'agora_nao', monthly_cents: null, ask_again_on: null })).toEqual(code);
+    expect(await bad({ ...check, answer: 'agora_nao', monthly_cents: null, ask_again_on: '2026-10-07' })).toEqual(code);
+    expect(await bad({ ...check, answer: 'agora_nao', monthly_cents: null, ask_again_on: '2026-11-06' })).toBeNull();
+    expect(await bad({ ...check, answered_on: '7/10/2026' })).toEqual(code);
+    expect(await bad({ ...check, version: 0 })).toEqual(code);
+  });
+
+  it('listas longas são lidas em páginas de 500, na ordem, até a última (uma lista incompleta nunca aparece como completa)', async () => {
+    const rows = Array.from({ length: 1203 }, (_, i) => ({ ...movement, id: `m${String(i).padStart(4, '0')}` }));
+    const ranges: [number, number][] = [];
+    const db = {
+      from: () => {
+        const q: Record<string, unknown> = {};
+        for (const m of ['select', 'eq', 'is', 'gte', 'lt', 'order']) q[m] = () => q;
+        q.range = (from: number, to: number) => {
+          ranges.push([from, to]);
+          const page = { data: rows.slice(from, to + 1), error: null };
+          return { then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) => Promise.resolve(page).then(resolve, reject) };
+        };
+        return q;
+      },
+    };
+    const repo = new SupabaseRepository(db as unknown as SupabaseClient, { id: 'p1' });
+    const list = await repo.listGoalMovements('g1');
+    expect(list.map((m) => m.id)).toEqual(rows.map((m) => m.id));
+    expect(ranges).toEqual([[0, 499], [500, 999], [1000, 1499]]);
+    // Uma página exata de 500 pede a seguinte, que vem vazia.
+    ranges.length = 0;
+    rows.length = 500;
+    expect(await repo.listGoalMovementsInMonth('ctx', '2026-10')).toHaveLength(500);
+    expect(ranges).toEqual([[0, 499], [500, 999]]);
+  });
+
+  it('códigos de erro: cada um volta com o próprio nome (o mais longo vence); só dois detalhes seguem, e nada é registrado em log', async () => {
+    const codes = [
+      'referencia_fora_do_intervalo',
+      'mes_invalido',
+      'reserva_ja_existe',
+      'nome_da_meta_invalido',
+      'alvo_acima_do_limite',
+      'alvo_invalido',
+      'prazo_invalido',
+      'meses_invalidos',
+      'origem_invalida',
+      'plano_invalido',
+      'saldo_inicial_invalido',
+      'observacao_longa',
+      'situacao_invalida',
+      'meta_arquivada',
+      'saldo_da_meta_insuficiente',
+      'resposta_invalida',
+      // Os que já existiam e as metas reaproveitam, inclusive o que termina com outro código.
+      'valor_invalido',
+      'valor_acima_do_limite',
+      'modo_de_valor_invalido',
+      'tipo_invalido',
+      'data_invalida',
+      'data_futura',
+      'versao_desatualizada',
+      'chave_reutilizada',
+      'nao_encontrado',
+      'sem_permissao',
+    ] as const;
+    const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((m) => vi.spyOn(console, m).mockImplementation(() => undefined));
+    try {
+      for (const code of codes) {
+        // O PostgREST manda o nome em message (às vezes com prefixo) e o texto do Postgres em details.
+        for (const message of [code, `ERROR: ${code}`]) {
+          const repo = fake({}, {}, { message, code: 'PT409', details: 'Key (id)=(0000)=(segredo) já existe. 12345678' });
+          expect(await failure(repo.addGoalMovement('chave-4001', 'g1', 'aporte', { amountCents: 1, occurredOn: '2026-10-07', note: null }))).toEqual([code, code, null]);
+          expect(await failure(repo.setSavingsAnswer('chave-4002', 'ctx', 0, 'depois'))).toEqual([code, code, null]);
+          expect(await failure(repo.setIncomeReference('chave-4003', 'ctx', '2026-09', 0, 100, false))).toEqual([code, code, null]);
+        }
+      }
+      // Detalhes: só "dia=AAAA-MM-DD" (saldo da meta) e "versao_atual=N" (versão), e só nesses dois códigos.
+      const withDetails = (message: string, details: unknown) =>
+        failure(fake({}, {}, { message, code: 'PT409', details }).addGoalMovement('chave-4004', 'g1', 'resgate', { amountCents: 1, occurredOn: '2026-10-07', note: null }));
+      expect(await withDetails('saldo_da_meta_insuficiente', 'dia=2026-10-02')).toEqual(['saldo_da_meta_insuficiente', 'saldo_da_meta_insuficiente', 'dia=2026-10-02']);
+      expect(await withDetails('saldo_da_meta_insuficiente', 'dia=2026-10-02 (valor R$ 3.500,00)')).toEqual(['saldo_da_meta_insuficiente', 'saldo_da_meta_insuficiente', null]);
+      expect(await withDetails('saldo_da_meta_insuficiente', 'versao_atual=2')).toEqual(['saldo_da_meta_insuficiente', 'saldo_da_meta_insuficiente', null]);
+      expect(await withDetails('versao_desatualizada', 'versao_atual=12')).toEqual(['versao_desatualizada', 'versao_desatualizada', 'versao_atual=12']);
+      expect(await withDetails('versao_desatualizada', 'dia=2026-10-02')).toEqual(['versao_desatualizada', 'versao_desatualizada', null]);
+      expect(await withDetails('versao_desatualizada', 'versao_atual=2; Key (id)=(1)')).toEqual(['versao_desatualizada', 'versao_desatualizada', null]);
+      expect(await withDetails('versao_desatualizada', null)).toEqual(['versao_desatualizada', 'versao_desatualizada', null]);
+      expect(await withDetails('sem_permissao', 'versao_atual=2')).toEqual(['sem_permissao', 'sem_permissao', null]);
+      // Erro de rede e erro desconhecido não carregam nenhum detalhe.
+      expect(await failure(fake({}, {}, { message: 'Failed to fetch' }).listGoals('ctx'))).toEqual(['rede', 'rede', null]);
+      expect(await failure(fake({}, {}, { message: 'falha estranha', code: 'XX000', details: 'dia=2026-10-02' }).setSavingsAnswer('chave-4005', 'ctx', 0, 'depois'))).toEqual(['desconhecido', 'falha estranha', null]);
+      for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+    } finally {
+      for (const spy of spies) spy.mockRestore();
+    }
   });
 });

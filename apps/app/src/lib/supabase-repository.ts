@@ -178,6 +178,84 @@ interface MonthOverviewRow {
   paid_cents: number;
 }
 
+/** Linha de income_references (e retorno de set/delete_income_reference, que traz também deleted_at e deleted_by). */
+interface IncomeReferenceRow {
+  id: string;
+  context_id: string;
+  /** Sempre o dia 1 (AAAA-MM-01). */
+  from_month: string;
+  amount_cents: number;
+  varies: boolean;
+  created_by: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Linha da visão goal_items (e a meta do retorno das funções de metas, que traz também deleted_at e deleted_by). */
+interface GoalRow {
+  id: string;
+  context_id: string;
+  goal_type: Goal['goalType'];
+  name: string;
+  target_cents: number;
+  target_month: string | null;
+  planned_monthly_cents: number | null;
+  essential_base_cents: number | null;
+  essential_months: number | null;
+  essential_base_source: Goal['essentialBaseSource'];
+  status: GoalStatus;
+  created_by: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  saved_cents: number;
+  initial_cents: number;
+  deposits_cents: number;
+  withdrawals_cents: number;
+  income_cents: number;
+  appreciation_cents: number;
+  depreciation_cents: number;
+  last_movement_on: string | null;
+}
+
+/** Linha de goal_movements. */
+interface GoalMovementRow {
+  id: string;
+  goal_id: string;
+  context_id: string;
+  kind: GoalMovementKind;
+  amount_cents: number;
+  occurred_on: string;
+  note: string | null;
+  created_by: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Retorno (jsonb) das sete funções de metas: a meta no estado atual e o movimento envolvido (ou null). */
+interface GoalResult {
+  goal: GoalRow | null;
+  movement: GoalMovementRow | null;
+}
+
+/** Linha de savings_checks (e retorno de set_savings_answer). person_id é sempre o da sessão. */
+interface SavingsCheckRow {
+  context_id: string;
+  answer: SavingsAnswer;
+  monthly_cents: number | null;
+  answered_on: string;
+  ask_again_on: string | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+const INCOME_REFERENCE_COLUMNS = 'id, context_id, from_month, amount_cents, varies, created_by, version, created_at, updated_at';
+const GOAL_MOVEMENT_COLUMNS = 'id, goal_id, context_id, kind, amount_cents, occurred_on, note, created_by, version, created_at, updated_at';
+const SAVINGS_CHECK_COLUMNS = 'context_id, answer, monthly_cents, answered_on, ask_again_on, version, created_at, updated_at';
+
 const RECORD_ACTIONS = ['criar', 'editar', 'excluir'];
 /**
  * 'criar_ocorrencia' (conta de mês passado de uma série, create_series_occurrence) é ação de conta a pagar: a conta
@@ -192,6 +270,17 @@ const COMMITMENT_ACTIONS: CommitmentAction[] = [
   'criar_ocorrencia',
 ];
 const SERIES_ACTIONS: SeriesAction[] = ['criar_serie', 'alterar_serie', 'encerrar_serie', 'excluir_serie', 'informar_ano', 'tirar_ano'];
+/** Ações de metas: o alvo (target_id) é a meta nas quatro primeiras e o movimento nas três últimas. */
+const GOAL_ACTIONS: GoalAction[] = [
+  'criar_meta',
+  'alterar_meta',
+  'situacao_meta',
+  'excluir_meta',
+  'registrar_movimento_meta',
+  'alterar_movimento_meta',
+  'excluir_movimento_meta',
+];
+const GOAL_MOVEMENT_ACTIONS: readonly GoalAction[] = ['registrar_movimento_meta', 'alterar_movimento_meta', 'excluir_movimento_meta'];
 
 const KNOWN: RepoErrorCode[] = [
   'versao_desatualizada',
@@ -236,18 +325,47 @@ const KNOWN: RepoErrorCode[] = [
   'decisao_invalida',
   'mes_invalido',
   'periodo_invalido',
+  // Renda de referência (D-026). Nenhum é sufixo de outro código da lista, nem tem outro como sufixo.
+  'referencia_fora_do_intervalo',
+  // Metas e reserva (D-027).
+  'reserva_ja_existe',
+  'nome_da_meta_invalido',
+  'alvo_acima_do_limite',
+  'alvo_invalido',
+  'prazo_invalido',
+  'meses_invalidos',
+  'origem_invalida',
+  'plano_invalido',
+  'saldo_inicial_invalido',
+  'observacao_longa',
+  'situacao_invalida',
+  'meta_arquivada',
+  'saldo_da_meta_insuficiente',
+  // Plano de guardar (D-036).
+  'resposta_invalida',
 ];
+
+/**
+ * Dos detalhes do banco, só dois seguem adiante, e só para montar uma mensagem para a pessoa: "dia=AAAA-MM-DD" (primeiro
+ * dia em que o valor guardado ficaria negativo) e "versao_atual=N". Qualquer outro texto é descartado.
+ */
+function safeDetail(code: RepoErrorCode, details: string | null | undefined): string | undefined {
+  if (typeof details !== 'string') return undefined;
+  if (code === 'saldo_da_meta_insuficiente' && /^dia=\d{4}-\d{2}-\d{2}$/.test(details)) return details;
+  if (code === 'versao_desatualizada' && /^versao_atual=\d{1,9}$/.test(details)) return details;
+  return undefined;
+}
 
 /**
  * Converte o erro da API pelo nome (message) que o banco lança.
  * Privacidade: nunca registrar error.details (o Postgres pode incluir valores da linha), nem valores
- * ou descrições, em log ou evento. Só o nome do erro segue adiante.
+ * ou descrições, em log ou evento. Só o nome do erro segue adiante, mais os dois detalhes de safeDetail (para a mensagem).
  */
-function repoError(e: { message?: string; code?: string } | null): RepoError {
+function repoError(e: { message?: string; code?: string; details?: string | null } | null): RepoError {
   const msg = e?.message ?? '';
   // O mais longo vence: 'modo_de_valor_invalido' termina com 'valor_invalido'.
   const known = KNOWN.filter((k) => msg === k || msg.endsWith(k)).sort((a, b) => b.length - a.length)[0];
-  if (known) return new RepoError(known);
+  if (known) return new RepoError(known, undefined, safeDetail(known, e?.details));
   if (e?.code === '42501') return new RepoError('sem_permissao');
   if (/fetch|network|Failed to fetch|timeout/i.test(msg) || !e?.code) return new RepoError('rede');
   return new RepoError('desconhecido', msg);
@@ -399,6 +517,156 @@ function toMonthOverview(m: MonthOverviewRow): MonthOverview {
     paidCount: Number(m.paid_count),
     paidCents: Number(m.paid_cents),
   };
+}
+
+/** Número inteiro seguro vindo do banco (bigint sai como número JSON); qualquer outra coisa é inconsistência. */
+function whole(v: unknown): number {
+  const n = typeof v === 'string' && v.trim() !== '' ? Number(v) : v;
+  if (typeof n !== 'number' || !Number.isSafeInteger(n)) throw new RepoError('desconhecido', 'valor_inconsistente');
+  return n;
+}
+
+const wholeOrNull = (v: unknown): number | null => (v === null || v === undefined ? null : whole(v));
+
+/** Referência de renda: mês no dia 1 (AAAA-MM-01 vira AAAA-MM), valor de 1 a 999.999.999 e versão a partir de 1. */
+function toIncomeReference(r: IncomeReferenceRow): IncomeReference {
+  const amountCents = whole(r.amount_cents);
+  const version = whole(r.version);
+  const consistent = FIRST_DAY.test(r.from_month) && amountCents >= 1 && amountCents <= MAX_RECORD_CENTS && typeof r.varies === 'boolean' && version >= 1;
+  if (!consistent) throw new RepoError('desconhecido', 'referencia_inconsistente');
+  return {
+    id: r.id,
+    contextId: r.context_id,
+    fromMonth: r.from_month.slice(0, 7),
+    amountCents,
+    varies: r.varies,
+    createdBy: r.created_by,
+    version,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+/**
+ * Meta com os totais dos movimentos vivos (goal_items). Recusa o que o banco nunca devolve: tipo ou situação fora da lista,
+ * prazo fora do dia 1, reserva sem os três campos (ou outra meta com algum) ou com alvo diferente de base × meses, e guardado
+ * que não fecha com os totais. Nunca mostrar um guardado errado.
+ */
+function toGoal(g: GoalRow): Goal {
+  const targetCents = whole(g.target_cents);
+  const base = wholeOrNull(g.essential_base_cents);
+  const months = wholeOrNull(g.essential_months);
+  const source = g.essential_base_source ?? null;
+  const initialCents = whole(g.initial_cents);
+  const depositsCents = whole(g.deposits_cents);
+  const withdrawalsCents = whole(g.withdrawals_cents);
+  const incomeCents = whole(g.income_cents);
+  const appreciationCents = whole(g.appreciation_cents);
+  const depreciationCents = whole(g.depreciation_cents);
+  const savedCents = whole(g.saved_cents);
+  const reserve = g.goal_type === 'emergencia';
+  const consistent =
+    GOAL_TYPES.includes(g.goal_type) &&
+    GOAL_STATUSES.includes(g.status) &&
+    (g.target_month === null || FIRST_DAY.test(g.target_month)) &&
+    (g.last_movement_on === null || ISO_DATE.test(g.last_movement_on)) &&
+    (reserve
+      ? base !== null && months !== null && source !== null && ESSENTIAL_BASE_SOURCES.includes(source) && targetCents === base * months
+      : base === null && months === null && source === null) &&
+    savedCents === initialCents + depositsCents + incomeCents + appreciationCents - withdrawalsCents - depreciationCents;
+  if (!consistent) throw new RepoError('desconhecido', 'meta_inconsistente');
+  return {
+    id: g.id,
+    contextId: g.context_id,
+    goalType: g.goal_type,
+    name: g.name,
+    targetCents,
+    targetMonth: g.target_month === null ? null : g.target_month.slice(0, 7),
+    plannedMonthlyCents: wholeOrNull(g.planned_monthly_cents),
+    essentialBaseCents: base,
+    essentialMonths: months,
+    essentialBaseSource: source,
+    status: g.status,
+    createdBy: g.created_by,
+    version: whole(g.version),
+    createdAt: g.created_at,
+    updatedAt: g.updated_at,
+    savedCents,
+    initialCents,
+    depositsCents,
+    withdrawalsCents,
+    incomeCents,
+    appreciationCents,
+    depreciationCents,
+    lastMovementOn: g.last_movement_on,
+  };
+}
+
+/** Movimento: tipo da lista, valor positivo (o sentido vem do tipo), data AAAA-MM-DD e observação de 1 a 80 caracteres. */
+function toGoalMovement(m: GoalMovementRow): GoalMovement {
+  const amountCents = whole(m.amount_cents);
+  const consistent =
+    GOAL_MOVEMENT_KINDS.includes(m.kind) &&
+    amountCents >= 1 &&
+    ISO_DATE.test(m.occurred_on) &&
+    (m.note === null || (typeof m.note === 'string' && m.note.length >= 1 && m.note.length <= GOAL_NOTE_MAX));
+  if (!consistent) throw new RepoError('desconhecido', 'movimento_inconsistente');
+  return {
+    id: m.id,
+    goalId: m.goal_id,
+    contextId: m.context_id,
+    kind: m.kind,
+    amountCents,
+    occurredOn: m.occurred_on,
+    note: m.note,
+    createdBy: m.created_by,
+    version: whole(m.version),
+    createdAt: m.created_at,
+    updatedAt: m.updated_at,
+  };
+}
+
+/**
+ * Resposta do plano de guardar. "consigo" tem valor (R$ 1,00 a R$ 9.999.999,99) e nenhuma data de volta; as outras duas não
+ * têm valor e voltam depois do dia da resposta (savings_checks_valor e savings_checks_retorno).
+ */
+function toSavingsCheck(r: SavingsCheckRow): SavingsCheck {
+  const monthly = wholeOrNull(r.monthly_cents);
+  const version = whole(r.version);
+  const answered = ISO_DATE.test(r.answered_on);
+  const consistent =
+    SAVINGS_ANSWERS.includes(r.answer) &&
+    answered &&
+    version >= 1 &&
+    (r.answer === 'consigo'
+      ? monthly !== null && monthly >= SAVINGS_MIN_MONTHLY_CENTS && monthly <= MAX_RECORD_CENTS && r.ask_again_on === null
+      : monthly === null && r.ask_again_on !== null && ISO_DATE.test(r.ask_again_on) && r.ask_again_on > r.answered_on);
+  if (!consistent) throw new RepoError('desconhecido', 'guardar_inconsistente');
+  return {
+    contextId: r.context_id,
+    answer: r.answer,
+    monthlyCents: monthly,
+    answeredOn: r.answered_on,
+    askAgainOn: r.ask_again_on,
+    version,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+/** Páginas de 500 linhas até acabar: a API limita cada resposta, e uma lista incompleta não pode aparecer como confirmada. */
+async function readAll<T>(
+  fetchPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message?: string; code?: string; details?: string | null } | null }>,
+): Promise<T[]> {
+  const PAGE = 500;
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await fetchPage(from, from + PAGE - 1);
+    if (error) throw repoError(error);
+    rows.push(...(data ?? []));
+    if ((data?.length ?? 0) < PAGE) break;
+  }
+  return rows;
 }
 
 /** Só {id, version}: um campo a mais faria a conferência de conjunto do banco recusar a escrita. */
@@ -941,5 +1209,249 @@ export class SupabaseRepository implements RecordsRepository {
     if (error) throw repoError(error);
     if (!data) throw new RepoError('desconhecido');
     return toReviewMark(data as ReturnReviewRow);
+  }
+
+  // -------------------------------------------------------------------------
+  // Renda de referência (D-026, Ciclo B)
+  // -------------------------------------------------------------------------
+
+  /** Referências vivas do contexto, por mês de início crescente (a RLS já tira as excluídas e o que a pessoa não lê). */
+  async listIncomeReferences(contextId: string): Promise<IncomeReference[]> {
+    const rows = await readAll<IncomeReferenceRow>((from, to) =>
+      this.db
+        .from('income_references')
+        .select(INCOME_REFERENCE_COLUMNS)
+        .eq('context_id', contextId)
+        .is('deleted_at', null)
+        .order('from_month', { ascending: true })
+        .order('id')
+        .range(from, to),
+    );
+    return rows.map(toIncomeReference);
+  }
+
+  /** As duas funções da renda de referência devolvem jsonb (a linha): sem .single(). */
+  private async callReference(fn: string, args: Record<string, unknown>): Promise<IncomeReference> {
+    const { data, error } = await this.db.rpc(fn, args);
+    if (error) throw repoError(error);
+    if (!data) throw new RepoError('desconhecido');
+    return toIncomeReference(data as IncomeReferenceRow);
+  }
+
+  /**
+   * Versão 0 cria a referência do mês; a versão atual altera. O mês vai como AAAA-MM-01. Uma repetição com a mesma chave e o
+   * mesmo conteúdo devolve a linha atual, que pode ser mais nova (ou até excluída): é assim que se reconcilia um resultado incerto.
+   */
+  setIncomeReference(key: string, contextId: string, fromMonth: IsoMonth, expectedVersion: number, amountCents: Cents, varies: boolean) {
+    return this.callReference('set_income_reference', {
+      p_idempotency_key: key,
+      p_context_id: contextId,
+      p_from_month: `${fromMonth}-01`,
+      p_expected_version: expectedVersion,
+      p_amount_cents: amountCents,
+      p_varies: varies,
+    });
+  }
+
+  /** Exclusão lógica: devolve a referência excluída (versão + 1). A anterior volta a valer. */
+  deleteIncomeReference(key: string, id: string, expectedVersion: number) {
+    return this.callReference('delete_income_reference', {
+      p_idempotency_key: key,
+      p_id: id,
+      p_expected_version: expectedVersion,
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Metas e reserva para imprevistos (D-027, Ciclo C)
+  // -------------------------------------------------------------------------
+
+  /** Metas vivas do contexto, de todas as situações, por criação, com os totais dos movimentos (goal_items). */
+  async listGoals(contextId: string): Promise<Goal[]> {
+    const rows = await readAll<GoalRow>((from, to) =>
+      this.db.from('goal_items').select('*').eq('context_id', contextId).order('created_at').order('id').range(from, to),
+    );
+    return rows.map(toGoal);
+  }
+
+  async getGoal(id: string): Promise<Goal | null> {
+    const { data, error } = await this.db.from('goal_items').select('*').eq('id', id).maybeSingle();
+    if (error) throw repoError(error);
+    return data ? toGoal(data as GoalRow) : null;
+  }
+
+  /** Movimentos vivos da meta, do mais recente ao mais antigo (data, criação, id). */
+  async listGoalMovements(goalId: string): Promise<GoalMovement[]> {
+    const rows = await readAll<GoalMovementRow>((from, to) =>
+      this.db
+        .from('goal_movements')
+        .select(GOAL_MOVEMENT_COLUMNS)
+        .eq('goal_id', goalId)
+        .order('occurred_on', { ascending: false })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to),
+    );
+    return rows.map(toGoalMovement);
+  }
+
+  /** Movimentos vivos de todas as metas do contexto com data no mês, do mais recente ao mais antigo. */
+  async listGoalMovementsInMonth(contextId: string, month: IsoMonth): Promise<GoalMovement[]> {
+    const { start, endExclusive } = monthRange(month);
+    const rows = await readAll<GoalMovementRow>((from, to) =>
+      this.db
+        .from('goal_movements')
+        .select(GOAL_MOVEMENT_COLUMNS)
+        .eq('context_id', contextId)
+        .gte('occurred_on', start)
+        .lt('occurred_on', endExclusive)
+        .order('occurred_on', { ascending: false })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to),
+    );
+    return rows.map(toGoalMovement);
+  }
+
+  /** As sete funções de metas devolvem jsonb {goal, movement}: sem .single(). */
+  private async callGoal(fn: string, args: Record<string, unknown>): Promise<GoalWrite> {
+    const { data, error } = await this.db.rpc(fn, args);
+    if (error) throw repoError(error);
+    const result = data as GoalResult | null;
+    if (!result?.goal) throw new RepoError('desconhecido');
+    return { goal: toGoal(result.goal), movement: result.movement ? toGoalMovement(result.movement) : null };
+  }
+
+  /** Os campos da meta, na ordem dos argumentos das funções (o prazo vai como AAAA-MM-01). */
+  private goalFields(input: GoalInput) {
+    return {
+      p_goal_type: input.goalType,
+      p_name: input.name,
+      p_target_cents: input.targetCents,
+      p_target_month: input.targetMonth ? `${input.targetMonth}-01` : null,
+      p_planned_monthly_cents: input.plannedMonthlyCents,
+      p_essential_base_cents: input.essentialBaseCents,
+      p_essential_months: input.essentialMonths,
+      p_essential_base_source: input.essentialBaseSource,
+    };
+  }
+
+  createGoal(key: string, contextId: string, input: NewGoalInput) {
+    return this.callGoal('create_goal', {
+      p_idempotency_key: key,
+      p_context_id: contextId,
+      ...this.goalFields(input),
+      p_initial_cents: input.initialCents ?? null,
+      p_initial_on: input.initialOn ?? null,
+    });
+  }
+
+  updateGoal(key: string, goalId: string, expectedVersion: number, input: GoalInput) {
+    return this.callGoal('update_goal', {
+      p_idempotency_key: key,
+      p_goal_id: goalId,
+      p_expected_version: expectedVersion,
+      ...this.goalFields(input),
+    });
+  }
+
+  setGoalStatus(key: string, goalId: string, expectedVersion: number, status: GoalStatus) {
+    return this.callGoal('set_goal_status', {
+      p_idempotency_key: key,
+      p_goal_id: goalId,
+      p_expected_version: expectedVersion,
+      p_status: status,
+    });
+  }
+
+  deleteGoal(key: string, goalId: string, expectedVersion: number) {
+    return this.callGoal('delete_goal', { p_idempotency_key: key, p_goal_id: goalId, p_expected_version: expectedVersion });
+  }
+
+  /** Sem versão (como create_record): a versão da meta não sobe. saldo_da_meta_insuficiente traz o dia em RepoError.detail. */
+  addGoalMovement(key: string, goalId: string, kind: GoalMovementKind, input: GoalMovementInput) {
+    return this.callGoal('add_goal_movement', {
+      p_idempotency_key: key,
+      p_goal_id: goalId,
+      p_kind: kind,
+      p_amount_cents: input.amountCents,
+      p_occurred_on: input.occurredOn,
+      p_note: input.note,
+    });
+  }
+
+  updateGoalMovement(key: string, movementId: string, expectedVersion: number, input: GoalMovementInput) {
+    return this.callGoal('update_goal_movement', {
+      p_idempotency_key: key,
+      p_movement_id: movementId,
+      p_expected_version: expectedVersion,
+      p_amount_cents: input.amountCents,
+      p_occurred_on: input.occurredOn,
+      p_note: input.note,
+    });
+  }
+
+  deleteGoalMovement(key: string, movementId: string, expectedVersion: number) {
+    return this.callGoal('delete_goal_movement', {
+      p_idempotency_key: key,
+      p_movement_id: movementId,
+      p_expected_version: expectedVersion,
+    });
+  }
+
+  /**
+   * Só operações de metas, da própria pessoa. Nas ações de meta, target_id é a meta. Nas de movimento, é o movimento e a meta
+   * sai de goal_movements; como a RLS esconde movimento excluído (e o de meta excluída), nesse caso goalId vem vazio: quem
+   * chama já sabe qual meta estava aberta, e a tela recarrega as metas inteiras.
+   */
+  async findGoalOperation(key: string) {
+    const { data, error } = await this.db
+      .from('record_operations')
+      .select('action, target_id')
+      .eq('idempotency_key', key)
+      .in('action', GOAL_ACTIONS)
+      .maybeSingle();
+    if (error) throw repoError(error);
+    if (!data) return null;
+    const action = data.action as GoalAction;
+    const target = data.target_id as string | null;
+    if (!target) throw new RepoError('desconhecido', 'operacao_inconsistente');
+    if (!GOAL_MOVEMENT_ACTIONS.includes(action)) return { action, goalId: target, movementId: null };
+    const movement = await this.db.from('goal_movements').select('goal_id').eq('id', target).maybeSingle();
+    if (movement.error) throw repoError(movement.error);
+    return { action, goalId: (movement.data?.goal_id as string | undefined) ?? '', movementId: target };
+  }
+
+  // -------------------------------------------------------------------------
+  // Plano de guardar (D-036)
+  // -------------------------------------------------------------------------
+
+  /** Resposta da própria pessoa no contexto, ou null (nunca respondeu). A RLS já limita à pessoa; o filtro é redundante de propósito. */
+  async getSavingsCheck(contextId: string): Promise<SavingsCheck | null> {
+    const { data, error } = await this.db
+      .from('savings_checks')
+      .select(SAVINGS_CHECK_COLUMNS)
+      .eq('context_id', contextId)
+      .eq('person_id', this.user.id)
+      .maybeSingle();
+    if (error) throw repoError(error);
+    return data ? toSavingsCheck(data as SavingsCheckRow) : null;
+  }
+
+  /**
+   * Versão 0 = ainda não há resposta. As datas de volta são do banco (o app não manda data). Uma repetição com a mesma chave e o
+   * mesmo conteúdo devolve a linha atual: é assim que se reconcilia um resultado incerto.
+   */
+  async setSavingsAnswer(key: string, contextId: string, expectedVersion: number, answer: SavingsAnswer, monthlyCents: Cents | null = null) {
+    const { data, error } = await this.db.rpc('set_savings_answer', {
+      p_idempotency_key: key,
+      p_context_id: contextId,
+      p_expected_version: expectedVersion,
+      p_answer: answer,
+      p_monthly_cents: monthlyCents ?? null,
+    });
+    if (error) throw repoError(error);
+    if (!data) throw new RepoError('desconhecido');
+    return toSavingsCheck(data as SavingsCheckRow);
   }
 }
