@@ -68,7 +68,10 @@ export const QUITAR_FIELDS: Record<QuitarField, CalcFieldSpec> = {
     ],
     errors: { vazio: 'Escolha entre quitar tudo ou adiantar as últimas.' },
   },
-  quantas: countField('Quantas das últimas', 'quantas parcelas adiantar', 1, 480, 'Use de 1 até o número de parcelas que faltam.'),
+  quantas: (() => {
+    const spec = countField('Quantas das últimas', 'quantas parcelas adiantar', 1, 480, 'Use de 1 até o número de parcelas que faltam.');
+    return { ...spec, errors: { ...spec.errors, vazio: 'Digite quantas das últimas parcelas adiantar.' } };
+  })(),
 };
 
 export function calcQuitarAntes(input: QuitarInput): CalcOutcome<QuitarResult, QuitarField> {

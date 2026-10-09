@@ -65,7 +65,7 @@ export function rateField(label: string, what: string, example: string, min: num
     errors: {
       vazio: `Digite ${what}, como ${example}.`,
       invalido: `Use só números, como ${example}.`,
-      casas_demais: `Use até 2 casas depois da vírgula, como ${example}.`,
+      casas_demais: 'Use até 2 casas depois da vírgula, como 1,96.',
       fora_da_faixa: rangeText,
     },
   };
