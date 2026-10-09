@@ -6,8 +6,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(cd .. && pwd)"
 DB="clarevo_api_$$"
-API_PORT=54399
-PROXY_PORT=54321
+API_PORT="${CLAREVO_API_PORT:-54399}"
+PROXY_PORT="${CLAREVO_PROXY_PORT:-54321}"
 SECRET="segredo-de-teste-local-clarevo-0123456789abcdef"
 ANA=00000000-0000-0000-0000-0000000000a1
 BRUNO=00000000-0000-0000-0000-0000000000b1

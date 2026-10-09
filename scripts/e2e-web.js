@@ -14,7 +14,7 @@ const { chromium } = require('playwright');
 
 const DIST = path.join(__dirname, '..', 'apps', 'app', 'dist');
 const OUT = process.argv[2] || path.join(__dirname, '..', 'docs', 'telas');
-const PORT = 8099;
+const PORT = Number(process.env.E2E_PORT || 8099);
 const TYPES = { '.js': 'text/javascript', '.html': 'text/html', '.ttf': 'font/ttf', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json', '.css': 'text/css', '.webmanifest': 'application/manifest+json' };
 const server = http
   .createServer((q, r) => {
@@ -199,7 +199,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   };
 
   // 1. Cadastro de uma conta nova (acesso simulado)
-  await p.goto('http://localhost:8099/'); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
   await shot('01_boas_vindas');
   await btn('Criar conta').click(); await waitText('Nome de apresentação');
   await field('Nome de apresentação').fill('Ana Teste');
@@ -2087,7 +2087,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     ['Anotar gasto', '/registro/novo?tipo=despesa', 1], ['Registrar recebimento', '/registro/novo?tipo=receita', 1], ['Contas a pagar', '/a-pagar', 1], ['Calculadoras', '/calcular', 1]]) &&
     manifest.icons.length > 0 && manifest.icons.every(Boolean), JSON.stringify(manifest));
   const viaEntry = async (url, ready) => {
-    await p.goto(`http://localhost:8099${url}`); await waitText('Seu dinheiro');
+    await p.goto(`http://localhost:${PORT}${url}`); await waitText('Seu dinheiro');
     const atEntry = new URL(p.url()).pathname;
     await btn('Ver demonstração com dados fictícios').click(); await waitText(ready, 12000).catch(() => {});
     return atEntry;
