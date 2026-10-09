@@ -11,7 +11,7 @@
 
 ## 2. Catálogo
 
-37 temas: 35 publicados e 2 rascunhos. Por seção, publicados: Usar o Clarevo 8, Organizar o mês 3, Juros e crédito 13, Dinheiro no tempo 4 e Dúvidas frequentes 7. "Comece por aqui": `diferenca`, `juros-simples-compostos` e `gasto-fixo`. Leitura a 200 palavras por minuto, contando título, subtítulo, parágrafos e exemplo. A calculadora é a de "Fazer a conta com os seus números" (sem a taxa, D-035(2)).
+42 temas: 40 publicados e 2 rascunhos (37 do Ciclo A5 mais os cinco dos Ciclos B, C e D). Por seção, publicados: Usar o Clarevo 8, Organizar o mês 7, Juros e crédito 13, Dinheiro no tempo 5 e Dúvidas frequentes 7. "Comece por aqui": `diferenca`, `juros-simples-compostos` e `gasto-fixo`. Leitura a 200 palavras por minuto, contando título, subtítulo, parágrafos e exemplo. A calculadora é a de "Fazer a conta com os seus números" (sem a taxa, D-035(2)).
 
 | # | Slug | Título | Seção | Tipo | Situação | Revisar até | Leitura | Calculadora | Apelidos |
 |---|---|---|---|---|---|---|---|---|---|
@@ -27,33 +27,38 @@
 | 10 | `contas-do-ano` | Contas que chegam uma vez por ano | Organizar o mês | tema | publicado | 09/10/2027 | 2 min (205 palavras) | `parcelado-ou-a-vista?modo=cota-unica` | - |
 | 11 | `orcamento-50-30-20` | Orçamento e a referência 50-30-20 | Organizar o mês | tema | rascunho | 09/10/2027 | 1 min (140 palavras) | - | - |
 | 12 | `reserva-imprevistos` | Reserva para imprevistos | Organizar o mês | tema | publicado | 09/10/2027 | 1 min (193 palavras) | `reserva` | `reservas` |
-| 13 | `juros-simples-compostos` | Juros simples e juros compostos | Juros e crédito | tema | publicado | 09/10/2027 | 1 min (140 palavras) | `custo-da-divida` | `juros`, `juros-compostos` |
-| 14 | `taxa-mes-ano` | Taxa ao mês e taxa ao ano | Juros e crédito | tema | publicado | 09/10/2027 | 1 min (147 palavras) | `custo-da-divida` | `taxa-mensal-anual` |
-| 15 | `taxa-e-tarifa` | Taxa, tarifa e encargo | Juros e crédito | tema | publicado | 09/10/2027 | 1 min (100 palavras) | - | - |
-| 16 | `cet` | CET, o Custo Efetivo Total | Juros e crédito | tema | publicado | 09/10/2027 | 1 min (174 palavras) | `custo-da-divida?modo=emprestimo` | - |
-| 17 | `iof-credito` | IOF no crédito | Juros e crédito | tema | publicado | 09/04/2027 | 1 min (132 palavras) | - | - |
-| 18 | `parcelado-ou-a-vista` | Parcelado, sem juros ou à vista | Juros e crédito | tema | publicado | 09/10/2027 | 2 min (241 palavras) | `parcelado-ou-a-vista` | - |
-| 19 | `rotativo-cartao` | Rotativo do cartão e parcelamento da fatura | Juros e crédito | tema | publicado | 09/04/2027 | 2 min (283 palavras) | `custo-da-divida?modo=rotativo` | `cartao-rotativo` |
-| 20 | `cheque-especial` | Cheque especial | Juros e crédito | tema | publicado | 09/04/2027 | 1 min (137 palavras) | `custo-da-divida?modo=cheque_especial` | - |
-| 21 | `amortizacao-price-sac` | Amortização, Tabela Price e SAC | Juros e crédito | tema | publicado | 09/10/2027 | 2 min (201 palavras) | - | `juros-no-parcelamento` |
-| 22 | `quitar-antes` | Quitar antes do prazo | Juros e crédito | tema | publicado | 09/10/2027 | 2 min (247 palavras) | `quitar-antes` | - |
-| 23 | `multa-juros-atraso` | Multa e juros por atraso | Juros e crédito | tema | publicado | 09/10/2027 | 1 min (183 palavras) | `multa-e-juros` | `atraso` |
-| 24 | `score-credito` | Score de crédito | Juros e crédito | tema | publicado | 09/10/2027 | 1 min (187 palavras) | - | - |
-| 25 | `superendividamento` | Quando as dívidas não cabem na renda | Juros e crédito | tema | publicado | 09/10/2027 | 1 min (162 palavras) | - | - |
-| 26 | `inflacao-ipca` | Inflação e IPCA | Dinheiro no tempo | tema | publicado | 09/10/2027 | 1 min (174 palavras) | - | `inflacao` |
-| 27 | `selic` | Selic, a taxa básica de juros | Dinheiro no tempo | tema | publicado | 09/10/2027 | 1 min (200 palavras) | - | - |
-| 28 | `liquidez-risco-retorno` | Liquidez, risco e retorno | Dinheiro no tempo | tema | publicado | 09/10/2027 | 1 min (170 palavras) | - | `liquidez` |
-| 29 | `fgc` | Garantia do FGC | Dinheiro no tempo | tema | publicado | 09/10/2027 | 1 min (141 palavras) | - | - |
-| 30 | `quem-ve-meus-dados` | Quem vê meus dados? | Dúvidas frequentes | pergunta | publicado | - | 1 min (42 palavras) | - | - |
-| 31 | `empresa-ve` | A empresa que oferece o benefício vê meus gastos? | Dúvidas frequentes | pergunta | publicado | - | 1 min (38 palavras) | - | - |
-| 32 | `demonstracao` | O que é a demonstração? | Dúvidas frequentes | pergunta | publicado | - | 1 min (31 palavras) | - | - |
-| 33 | `marcar-como-paga` | Como marcar uma conta como paga? | Dúvidas frequentes | pergunta | publicado | - | 1 min (62 palavras) | - | - |
-| 34 | `contei-duas-vezes` | Anotei duas vezes. Como corrigir? | Dúvidas frequentes | pergunta | publicado | - | 1 min (64 palavras) | - | - |
-| 35 | `voltei-depois` | Fiquei um tempo sem abrir o app. O que acontece? | Dúvidas frequentes | pergunta | publicado | - | 1 min (87 palavras) | - | - |
-| 36 | `apagar-dados` | Como apagar meus dados? | Dúvidas frequentes | pergunta | rascunho | 09/10/2027 | 1 min (45 palavras) | - | - |
-| 37 | `o-que-o-clarevo-nao-faz` | O Clarevo se conecta ao meu banco ou indica investimentos? | Dúvidas frequentes | pergunta | publicado | - | 1 min (58 palavras) | - | - |
+| 13 | `renda-comprometida` | Renda comprometida e a referência de 30% | Organizar o mês | tema | publicado | 09/10/2027 | 1 min (189 palavras) | - | - |
+| 14 | `renda-variavel` | Quando a renda muda todo mês | Organizar o mês | tema | publicado | 09/10/2027 | 2 min (274 palavras) | - | - |
+| 15 | `aporte` | O que muda ao registrar um aporte | Organizar o mês | tema | publicado | 09/10/2027 | 2 min (259 palavras) | - | - |
+| 16 | `essenciais` | Gastos essenciais | Organizar o mês | tema | publicado | 09/10/2027 | 2 min (240 palavras) | - | - |
+| 17 | `juros-simples-compostos` | Juros simples e juros compostos | Juros e crédito | tema | publicado | 09/10/2027 | 1 min (140 palavras) | `custo-da-divida` | `juros`, `juros-compostos` |
+| 18 | `taxa-mes-ano` | Taxa ao mês e taxa ao ano | Juros e crédito | tema | publicado | 09/10/2027 | 1 min (147 palavras) | `custo-da-divida` | `taxa-mensal-anual` |
+| 19 | `taxa-e-tarifa` | Taxa, tarifa e encargo | Juros e crédito | tema | publicado | 09/10/2027 | 1 min (100 palavras) | - | - |
+| 20 | `cet` | CET, o Custo Efetivo Total | Juros e crédito | tema | publicado | 09/10/2027 | 1 min (174 palavras) | `custo-da-divida?modo=emprestimo` | - |
+| 21 | `iof-credito` | IOF no crédito | Juros e crédito | tema | publicado | 09/04/2027 | 1 min (132 palavras) | - | - |
+| 22 | `parcelado-ou-a-vista` | Parcelado, sem juros ou à vista | Juros e crédito | tema | publicado | 09/10/2027 | 2 min (241 palavras) | `parcelado-ou-a-vista` | - |
+| 23 | `rotativo-cartao` | Rotativo do cartão e parcelamento da fatura | Juros e crédito | tema | publicado | 09/04/2027 | 2 min (283 palavras) | `custo-da-divida?modo=rotativo` | `cartao-rotativo` |
+| 24 | `cheque-especial` | Cheque especial | Juros e crédito | tema | publicado | 09/04/2027 | 1 min (137 palavras) | `custo-da-divida?modo=cheque_especial` | - |
+| 25 | `amortizacao-price-sac` | Amortização, Tabela Price e SAC | Juros e crédito | tema | publicado | 09/10/2027 | 2 min (201 palavras) | - | `juros-no-parcelamento` |
+| 26 | `quitar-antes` | Quitar antes do prazo | Juros e crédito | tema | publicado | 09/10/2027 | 2 min (247 palavras) | `quitar-antes` | - |
+| 27 | `multa-juros-atraso` | Multa e juros por atraso | Juros e crédito | tema | publicado | 09/10/2027 | 1 min (183 palavras) | `multa-e-juros` | `atraso` |
+| 28 | `score-credito` | Score de crédito | Juros e crédito | tema | publicado | 09/10/2027 | 1 min (187 palavras) | - | - |
+| 29 | `superendividamento` | Quando as dívidas não cabem na renda | Juros e crédito | tema | publicado | 09/10/2027 | 1 min (162 palavras) | - | - |
+| 30 | `inflacao-ipca` | Inflação e IPCA | Dinheiro no tempo | tema | publicado | 09/10/2027 | 1 min (174 palavras) | - | `inflacao` |
+| 31 | `selic` | Selic, a taxa básica de juros | Dinheiro no tempo | tema | publicado | 09/10/2027 | 1 min (200 palavras) | - | - |
+| 32 | `liquidez-risco-retorno` | Liquidez, risco e retorno | Dinheiro no tempo | tema | publicado | 09/10/2027 | 1 min (170 palavras) | - | `liquidez` |
+| 33 | `fgc` | Garantia do FGC | Dinheiro no tempo | tema | publicado | 09/10/2027 | 1 min (141 palavras) | - | - |
+| 34 | `simulacao` | Como ler uma simulação | Dinheiro no tempo | tema | publicado | 09/10/2027 | 2 min (307 palavras) | - | - |
+| 35 | `quem-ve-meus-dados` | Quem vê meus dados? | Dúvidas frequentes | pergunta | publicado | - | 1 min (42 palavras) | - | - |
+| 36 | `empresa-ve` | A empresa que oferece o benefício vê meus gastos? | Dúvidas frequentes | pergunta | publicado | - | 1 min (38 palavras) | - | - |
+| 37 | `demonstracao` | O que é a demonstração? | Dúvidas frequentes | pergunta | publicado | - | 1 min (31 palavras) | - | - |
+| 38 | `marcar-como-paga` | Como marcar uma conta como paga? | Dúvidas frequentes | pergunta | publicado | - | 1 min (62 palavras) | - | - |
+| 39 | `contei-duas-vezes` | Anotei duas vezes. Como corrigir? | Dúvidas frequentes | pergunta | publicado | - | 1 min (64 palavras) | - | - |
+| 40 | `voltei-depois` | Fiquei um tempo sem abrir o app. O que acontece? | Dúvidas frequentes | pergunta | publicado | - | 1 min (87 palavras) | - | - |
+| 41 | `apagar-dados` | Como apagar meus dados? | Dúvidas frequentes | pergunta | rascunho | 09/10/2027 | 1 min (45 palavras) | - | - |
+| 42 | `o-que-o-clarevo-nao-faz` | O Clarevo se conecta ao meu banco ou indica investimentos? | Dúvidas frequentes | pergunta | publicado | - | 1 min (58 palavras) | - | - |
 
-Os slugs antigos abrem o tema novo pelos apelidos. Entram depois: `renda-comprometida` e `renda-variavel` (Ciclo B), `aporte` e `essenciais` (Ciclo C) e `simulacao` (Ciclo D).
+Os slugs antigos abrem o tema novo pelos apelidos. Os cinco últimos temas entraram em 09/10/2026 com os ciclos que eles explicam: `renda-comprometida` e `renda-variavel` (Ciclo B, D-026), `aporte` e `essenciais` (Ciclo C, D-027) e `simulacao` (Ciclo D, D-028). Nenhum deles liga uma calculadora em "Fazer a conta com os seus números"; as ações "No Clarevo" levam às telas do ciclo (renda comprometida, renda de referência, Metas, reserva e simulador).
 
 Temas que citam só decisões do Clarevo (sem revisão periódica; números só dos exemplos fictícios):
 
@@ -143,6 +148,65 @@ Calculadora: `/calcular/reserva`. Revisar até 09/10/2027 (12 meses).
 Ressalvas e ajustes:
 
 - "Dinheiro para aproveitar uma oportunidade é outra meta" é enquadramento do Clarevo (proposta do Clarevo), sem fonte externa e sem número.
+
+### `renda-comprometida` · Renda comprometida e a referência de 30% (publicado)
+
+Revisar até 09/10/2027 (12 meses). Fatos de norma declarados: "30%" (fonte 1); "50%" (fonte 2). A referência de 30% é de uma fonte privada, identificada como referência de mercado (P-024); o nome da empresa só aparece neste tema.
+
+1. Referência de mercado. Serasa: Página sobre comprometimento de renda (blog Serasa). <https://www.serasa.com.br/credito/blog/comprometimento-renda/>. Trecho: o comprometimento de renda com dívidas não deve ultrapassar 30% do rendimento líquido mensal; gastos essenciais (água, luz, supermercado) não entram na soma de dívidas. Consulta: 09/10/2026.
+2. Oficial. Banco Central do Brasil: Estudo Especial nº 80, Indicadores de endividamento de risco e perfil do tomador de crédito. <https://www.bcb.gov.br/conteudo/relatorioinflacao/EstudosEspeciais/EE080_Indicadores_de_endividamento_de_risco_e_perfil_do_tomador_de_credito.pdf>. Trecho: quatro critérios (atrasos acima de 90 dias; comprometimento da renda mensal com o serviço das dívidas acima de 50%; uso simultâneo de cheque especial, crédito pessoal sem consignação e rotativo; renda disponível abaixo da linha de pobreza); entra no indicador quem atende a dois ou mais. Consulta: 09/10/2026.
+3. Oficial. Banco Central do Brasil: Série Cidadania Financeira nº 6, Endividamento de risco no Brasil (2020). <https://www.bcb.gov.br/content/cidadaniafinanceira/documentos_cidadania/serie_cidadania/serie_cidadania_financeira_6_endividamento_risco.pdf>. Trecho: endividado de risco é quem atende a dois ou mais dos critérios. Consulta: 09/10/2026.
+4. Oficial. Banco Central do Brasil: Série Cidadania Financeira nº 8, Endividamento de risco no Brasil, atualização (novembro de 2023). <https://aprendervalor.bcb.gov.br/content/cidadaniafinanceira/documentos_cidadania/serie_cidadania/serie_cidadania_financeira_8_endividamento_risco_2ed.pdf>. Trecho: edição 8, novembro de 2023, atualização do estudo de 2020 (ficha técnica). Consulta: 09/10/2026.
+5. Oficial. Banco Central do Brasil: Relatório de Cidadania Financeira, glossário. <https://www.bcb.gov.br/nor/relcidfin/glossario.html>. Trecho: comprometimento de renda do tomador é a razão entre o serviço da dívida mensal e a renda disponível. Consulta: 09/10/2026.
+6. Clarevo: D-026.
+
+Ressalvas e ajustes:
+
+- A Serasa indexa a página com outro título ("Por que meu score é bom, mas não consigo crédito?"); o endereço é o do blog. Abrir a página e conferir o título atual quando a rede permitir. Outra página da mesma empresa usa 30% da renda bruta (financiamento imobiliário) e não é citada: o tema fala em renda líquida.
+- A frase "Série 8, novembro de 2023" veio do resumo da ficha técnica pelo buscador; o PDF não foi aberto. O critério de mais de 50% e a regra de dois ou mais critérios foram confirmados nos trechos do domínio do Banco Central (estudo nº 80 e Série 6) e na republicação da Agência Gov (30/11/2023), que não é fonte do app.
+- O indicador do Banco Central usa outra base de renda (serviço da dívida sobre a renda disponível); por isso o tema diz que os números não são diretamente comparáveis com os 30% da Serasa.
+- A referência de 30% é "referência de mercado, não uma lei nem uma regra" e só aparece na linha de dívidas de `/renda-comprometida`, com fonte e data (P-024).
+
+### `renda-variavel` · Quando a renda muda todo mês (publicado)
+
+Revisar até 09/10/2027 (12 meses). Em materiais da CVM e do Banco Central, "renda variável" costuma significar investimento; por isso o título fala da renda que muda de um mês para o outro, e o texto diz que aqui não é tipo de aplicação.
+
+1. Oficial. Banco Central do Brasil: Caderno de Educação Financeira: Gestão de Finanças Pessoais (Conteúdo Básico), 2013. <https://www.bcb.gov.br/pre/pef/port/caderno_cidadania_financeira.pdf>. Trecho: Módulo 2, receitas fixas não variam ou variam pouco (salário, aposentadoria, aluguel) e receitas variáveis mudam de um mês para o outro (comissões por vendas, aulas particulares); o planejamento usa a rotina passada como base para prever receitas e despesas futuras. Consulta: 09/10/2026.
+2. Oficial. Superintendência de Seguros Privados (Susep): Meu Futuro Seguro, Educação Financeira. <https://www.gov.br/susep/pt-br/assuntos/meu-futuro-seguro/educacao-financeira>. Trecho: anotar só valores que se tem certeza de receber, sem acréscimos variáveis como gorjetas e gratificações; quem trabalha por conta própria, com receitas que variam de mês a mês, deve deixar de seis meses a um ano. Consulta: 09/10/2026.
+3. Oficial. CVM, Portal do Investidor: Emergências e aposentadoria. <https://www.gov.br/investidor/pt-br/investir/antes-de-investir/defina-seus-objetivos/emergencias-e-aposentadoria>. Trecho: o valor da reserva depende do tipo de renda, se fixa ou variável, da estabilidade no emprego e de quantas pessoas contribuem para a renda familiar. Consulta: 09/10/2026.
+4. Clarevo: D-026.
+
+Ressalvas e ajustes:
+
+- Nenhuma fonte oficial prescreve um método para a renda de referência (média de N meses, menor mês). A sugestão do app (média dos meses fechados com recebimentos anotados, sem reembolsos) é escolha do Clarevo e o texto diz isso; "usar o menor valor dos últimos meses" aparece como opção, sem atribuição.
+- A faixa de seis meses a um ano é da Susep, com base na renda; a da CVM é em gastos. O tema atribui cada uma à sua fonte e não mapeia 12 meses a renda variável pela autoridade da CVM.
+- Há uma 2ª edição do Caderno do Banco Central (2026) que não foi conferida; a citação é da edição de 2013. Nenhum limite de imposto ou de INSS entra no texto, porque mudam por ano.
+
+### `aporte` · O que muda ao registrar um aporte (publicado)
+
+Revisar até 09/10/2027 (12 meses).
+
+1. Oficial. CVM, Portal do Investidor: Planejamento e gestão de reservas financeiras. <https://www.gov.br/investidor/pt-br/penso-logo-invisto/planejamento-e-gestao-de-reservas-financeiras>. Trecho: definir uma meta para a reserva ajuda a manter o foco e a determinação; em seguida, criar um plano para economizar uma parte da renda mensal. Consulta: 09/10/2026.
+2. Clarevo: D-027.
+
+Ressalvas e ajustes:
+
+- Só o último parágrafo cita a CVM. As regras de aporte, resgate, rendimento recebido e valorização são do Clarevo (D-027), sem definição externa de "aporte". Os valores do exemplo (R$ 3.000,00, R$ 500,00, R$ 300,00 e o Pago de R$ 3.900,00) são fictícios e saem de `learn/examples.ts`.
+
+### `essenciais` · Gastos essenciais (publicado)
+
+Revisar até 09/10/2027 (12 meses).
+
+1. Oficial. Banco Central do Brasil: Caderno de Educação Financeira: Gestão de Finanças Pessoais (Conteúdo Básico), 2013. <https://www.bcb.gov.br/pre/pef/port/caderno_cidadania_financeira.pdf>. Trecho: gastos necessários, considerados imprescindíveis e ligados às necessidades, como alimentação, moradia e vestuário. Consulta: 09/10/2026.
+2. Oficial. CVM, Portal do Investidor: Emergências e aposentadoria. <https://www.gov.br/investidor/pt-br/investir/antes-de-investir/defina-seus-objetivos/emergencias-e-aposentadoria>. Trecho: o montante da reserva para emergências deve estar entre 6 e 12 meses de gastos. Consulta: 09/10/2026.
+3. Oficial. CVM, Portal do Investidor: Planejamento e gestão de reservas financeiras. <https://www.gov.br/investidor/pt-br/penso-logo-invisto/planejamento-e-gestao-de-reservas-financeiras>. Trecho: reserva só para imprevistos, o que exclui gastos sazonais (só numa época do ano, mas previsíveis), como tributos e matrículas. Consulta: 09/10/2026.
+4. Clarevo: D-027 (a lista de categorias e a regra da média, resolvendo P-017).
+
+Ressalvas e ajustes:
+
+- A lista Moradia, Mercado, Transporte, Saúde e Educação (Lazer e "Sem categoria" fora) é escolha do Clarevo, dita no texto, e não é atribuída a nenhuma instituição.
+- **A conferir (R5):** a classificação do Banco Central (necessários, supérfluos e desperdícios) e o exemplo de alimentação, moradia e vestuário foram confirmados só por resumos do buscador e por uma cópia do mesmo texto em material de outra instituição; não houve trecho literal de `bcb.gov.br`. Quem publicar de novo abre o PDF e confere o parágrafo dos gastos necessários.
+- O parágrafo 3 diz "impostos e matrículas", e não "IPVA e IPTU", porque a busca indexa os parágrafos e a palavra IPVA levaria a este tema; o exemplo, que não entra na busca, usa o IPVA. O tema cita só `D-027` como fonte do Clarevo (o validador aceita referências D-nnn ou CL-nnn; P-017 está resolvida em D-027(6)).
 
 ### `juros-simples-compostos` · Juros simples e juros compostos (publicado)
 
@@ -393,6 +457,23 @@ Ressalvas e ajustes:
 - Trechos literais do estatuto e do regulamento são das versões de 2024; existem versões de 2026 não comparadas (comunicados de 2026 repetem os mesmos valores).
 - Situação do PLP 135/2026 depois de 12/05/2026 (nota de revisão; não está no texto).
 
+### `simulacao` · Como ler uma simulação (publicado)
+
+Revisar até 09/10/2027 (12 meses). Fatos de norma declarados: "de 0% a 30%" (fonte 5, a decisão D-028, que é do Clarevo).
+
+1. Oficial. Banco Central do Brasil: Glossário Simplificado de Termos Financeiros (2013). <https://www.bcb.gov.br/content/cidadaniafinanceira/documentos_cidadania/Informacoes_gerais/glossario_cidadania_financeira.pdf>. Trecho: verbete "Juros compostos", em que, após cada período de capitalização (normalmente um mês), os juros são incorporados ao capital e passam a render juros (juros sobre juros ou juros capitalizados). Consulta: 09/10/2026.
+2. Oficial. Banco Central do Brasil: Calculadora do Cidadão, metodologia da aplicação com depósitos regulares. <https://www3.bcb.gov.br/CALCIDADAO/publico/exibirMetodologiaAplicacaoDepositosRegulares.do?method=exibirMetodologiaAplicacaoDepositosRegulares>. Trecho: fórmula Sn = (1 + j) × [((1 + j)^n - 1) / j] × p, com n pagamentos iguais realizados no início de cada período; o fator (1 + j) faz cada depósito render já no mês em que é feito. Consulta: 09/10/2026.
+3. Oficial. IBGE: IBGE Explica, Inflação. <https://www.ibge.gov.br/explica/inflacao.php>. Trecho: inflação é o nome dado ao aumento dos preços de produtos e serviços. Consulta: 09/10/2026.
+4. Oficial. CVM e Senacon: Boletim Consumidor Investidor nº 1, objetivos e riscos. <https://www.gov.br/mj/pt-br/assuntos/seus-direitos/consumidor/boletins-para-o-consumo/boletim-consumidor-investidor/anexos/boletim-cvm-01>. Trecho: há risco em qualquer investimento. Consulta: 09/10/2026.
+5. Clarevo: D-028.
+
+Ressalvas e ajustes:
+
+- **Convenção dos aportes:** aportes no início de cada mês, como na Calculadora do Cidadão, por resposta "a" de Enzo em 09/10/2026 (a especificação de 08/10/2026 usava o fim do mês). O trecho da metodologia veio de um resultado de busca; a página e a calculadora não foram abertas, e nenhum resultado dela foi comparado com o do simulador. Conferir ao abrir.
+- A frase "rentabilidade passada não garante rentabilidade futura" não foi encontrada em página da CVM e ficou fora do texto: o tema diz só que as taxas mudam e que a CVM lembra que há risco em qualquer investimento.
+- O tema não cita as Resoluções CVM 19, 20 e 30 (não verificadas); elas só justificam, em D-028(4), que o simulador não indique produto nem taxa.
+- O exemplo (R$ 500,00 por mês por 10 anos a 10% ao ano: R$ 100.728,79, e R$ 64.862,05 em dinheiro de hoje com inflação de 4,5%) vem de `learn/examples.ts` e bate com o vetor do simulador; a taxa de 10% é só para a conta e o texto diz que não é sugestão.
+
 ### `apagar-dados` · Como apagar meus dados? (rascunho)
 
 Revisar até 09/10/2027 (12 meses).
@@ -415,7 +496,7 @@ Ressalvas e ajustes:
 | `orcamento-50-30-20` · Orçamento e a referência 50-30-20 | A divisão 50% / 30% / 20% e a base "renda líquida" não foram confirmadas no próprio livro nem na página da editora; as buscas só trouxeram resenhas e resumos de terceiros, que P-024 não aceita | Abrir o livro (Elizabeth Warren e Amelia Warren Tyagi, *All Your Worth*, Free Press, 2005, ISBN 9780743279741) ou a página da editora, confirmar a divisão e a base, registrar capítulo ou página e a data de consulta, e mudar para `publicado` |
 | `apagar-dados` · Como apagar meus dados? | Depende do canal de pedidos de titular (P-023); o resumo ainda tem a marca "{canal de P-023}", que a validação recusa em tema publicado | Criar o endereço de P-023, trocar a marca pelo canal e publicar |
 
-Mudança em relação à especificação de 08/10/2026: ela previa "Taxa, tarifa e encargo" em rascunho e o 50-30-20 publicado. A Res. CMN 3.919/2010 foi conferida (o tema saiu publicado, com "Na conta corrente" e "Quando uma conta atrasa, entram encargos"), e o 50-30-20 ficou em rascunho. O total continua 35 publicados e 2 rascunhos.
+Mudança em relação à especificação de 08/10/2026: ela previa "Taxa, tarifa e encargo" em rascunho e o 50-30-20 publicado. A Res. CMN 3.919/2010 foi conferida (o tema saiu publicado, com "Na conta corrente" e "Quando uma conta atrasa, entram encargos"), e o 50-30-20 ficou em rascunho. Com os cinco temas dos Ciclos B, C e D, o total passou a 40 publicados e 2 rascunhos. Antes de publicar `orcamento-50-30-20`, reescrever o parágrafo 1, que diz "o que sobra" (o Clarevo não usa "sobra" para o dinheiro que fica); como é rascunho, o texto não aparece em nenhuma tela.
 
 ## 6. Ressalvas para conferir quando as páginas abrirem
 
@@ -431,6 +512,9 @@ Nenhuma muda o texto publicado hoje; todas estão também na seção 4, no tema.
 - Res. CMN 3.919/2010 (versão 7) e Res. CMN 4.881/2020: conferidas só por trechos de busca; nenhuma revogação encontrada (`taxa-e-tarifa`, `cet`).
 - Res. CMN 5.141/2024 (meta de inflação): número e conteúdo confirmados nos boxes do Relatório de Política Monetária, não no texto da resolução (`inflacao-ipca`).
 - MP 1.393/2026 (rotativo) e PLP 135/2026 (limite do FGC): acompanhar a votação; nenhuma das duas está no texto.
+- Série 8 do Banco Central e título atual da página da Serasa: o trecho da Série 8 (edição 8, novembro de 2023) e o título que o buscador indexa para a página de comprometimento de renda diferem do que está no tema; abrir as duas páginas (`renda-comprometida`).
+- Caderno de Educação Financeira do Banco Central (2013): o parágrafo dos gastos necessários, com alimentação, moradia e vestuário, foi confirmado sem trecho literal de `bcb.gov.br`; há uma 2ª edição, de 2026, não conferida (`essenciais`, `renda-variavel`).
+- Calculadora do Cidadão, aplicação com depósitos regulares: a fórmula e o "início de cada período" vieram de um resultado de busca; abrir a página e comparar um resultado com o do simulador (`simulacao`).
 - A página da CVM sobre a reserva (6 a 12 meses de gastos) foi confirmada por busca para o tema `reserva-imprevistos`. A calculadora de reserva do Ciclo A6 ainda mostra a referência sem link e sem número (`RESERVA_REFERENCIA`, D-035(3)); usar a mesma conferência ali depende de decisão.
 
 ## 7. Prazos de revisão
@@ -460,6 +544,7 @@ Em relação ao conteúdo checado da especificação de 08/10/2026 (Anexo A e te
 - `liquidez-risco-retorno`: a definição de liquidez segue a da CVM.
 - `fgc`: a garantia "só é acionada em intervenção, liquidação extrajudicial ou insolvência reconhecida pelo Banco Central" (estatuto), no lugar de uma frase sem texto do FGC.
 - `iof-credito`: hipóteses com a data de 09/10/2026 e a frase do crédito parcelado.
+- `renda-comprometida`, `renda-variavel`, `aporte`, `essenciais` e `simulacao` (Ciclos B, C e D): textos novos da especificação de 09/10/2026, reescritos com o que cada fonte diz. Em `essenciais`, o parágrafo 2 diz que a sugestão olha "os seis meses fechados mais recentes e usa até três deles, os mais recentes com gastos anotados", como `essentialMonthly`, e o parágrafo 3 diz "impostos e matrículas" no lugar de "IPVA e IPTU" (ver o tema na seção 4). Em `simulacao`, o parágrafo 2 registra que os aportes são no início de cada mês. As seções "Organizar o mês" (agora cita renda comprometida, reserva e aportes) e "Dinheiro no tempo" (cita como ler uma simulação) ganharam descrições novas, e `reserva-imprevistos` passou a relacionar `essenciais`, `contas-do-ano` e `liquidez-risco-retorno`.
 - `contas-do-ano`: texto do Anexo A, com o parágrafo da CVM, mais o parágrafo do app; `sem-registro`: texto do Ciclo A4.
 
 ## 9. Registro de revisões
@@ -469,6 +554,7 @@ Em relação ao conteúdo checado da especificação de 08/10/2026 (Anexo A e te
 | 08/10/2026 | 21 temas do Anexo A da especificação | Conteúdo escrito e checado, com os exemplos recalculados em frações exatas | Trechos indexados das fontes, sem abrir as páginas |
 | 09/10/2026 | Catálogo inteiro (37 temas) | Primeira versão no app: 35 publicados e 2 rascunhos, `reviewedOn` 09/10/2026, os ajustes da seção 8 e os domínios da seção 3 | Busca na web, fato a fato, com o endereço e o trecho de cada fonte e a data 09/10/2026 (seção 4) |
 | 09/10/2026 | `quitar-antes`, `estimativa` | `quitar-antes`: o corte da tarifa passou de "desde dezembro de 2007" para "a partir de 10 de dezembro de 2007", a data do trecho do STJ (fonte 4); `estimativa`: exemplo e hipóteses (seção 8) | Trecho da fonte 4 de `quitar-antes` e a conta do exemplo recalculada em `learn/math.ts` (`npm test`) |
+| 09/10/2026 | `renda-comprometida`, `renda-variavel`, `aporte`, `essenciais`, `simulacao` | Cinco temas novos, todos publicados (`reviewedOn` 09/10/2026, revisão a cada 12 meses): o catálogo passa a 42 temas, 40 publicados; decisões D-026, D-027 e D-028 citadas e registradas em `docs/00`; atalho "Simular" em Aprender e ações "No Clarevo" nas telas dos ciclos | Busca na web, fato a fato (CVM: duas frases do `aporte`; Banco Central: Estudo Especial nº 80, Séries 6 e 8, glossário e Caderno; Susep; IBGE; Calculadora do Cidadão), com as ressalvas da seção 4 e da seção 6 |
 
 ## 10. Como revisar um tema
 

@@ -1,6 +1,6 @@
 # Arquitetura
 
-09/10/2026 · versão 0.8 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos, calculadoras, seus últimos meses e Aprender e dúvidas)
+09/10/2026 · versão 0.9 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos, calculadoras, seus últimos meses, Aprender e dúvidas, lembretes, ocultar valores e biometria, renda comprometida, metas e reserva, plano de guardar e simulador)
 
 ## Escolhas (aprovadas)
 
@@ -20,7 +20,7 @@ apps/app/src/
   app/                  telas (Expo Router)
     boas-vindas, criar-conta, confirmar-email, entrar, recuperar-acesso, nova-senha
     primeira-conta, carregando, confirmado
-    (tabs)/             Resumo, Movimentações, Metas, Aprender
+    (tabs)/             Resumo, Movimentações, Metas (reserva, metas, plano de guardar), Aprender
     registro/novo, registro/[id], registro/[id]/editar
     a-pagar, a-pagar/nova, a-pagar/vencidas, a-pagar/[id], a-pagar/[id]/editar, a-pagar/[id]/pagar
     gastos-fixos, gastos-fixos/novo, gastos-fixos/[id], gastos-fixos/[id]/editar, gastos-fixos/[id]/encerrar,
@@ -28,20 +28,36 @@ apps/app/src/
     composicao, quem-ve, conta, explicacao/[tema]
     calcular, calcular/[slug]  calculadoras (nada é gravado)
     retomar, retomar/atualizar, retomar/pagar  seus últimos meses (revisão depois de ausência)
+    renda-comprometida, renda-comprometida/referencia  renda comprometida e renda de referência
+    reserva, meta/nova, meta/[id], meta/[id]/editar, meta/[id]/movimento  reserva para imprevistos, metas e movimentos
+    guardar, guardar/minima  plano de guardar e reserva mínima
+    simular  simulador (nada é gravado)
   components/           interface (logo, campos, botões, formulários de registro, conta a pagar, pagamento, gasto fixo e conta do ano, "Ano a ano", "Somar valores", estados)
     retorno-*           faixa do Resumo, linha da revisão, ações e folha do detalhe da série
     term-hint, topic-link, learn-art, topic-example, faq-item  "O que é isso?", links e partes da explicação
     calc/               uma tela por calculadora e as partes comuns (campos, chips de 48 px, resultado anunciado)
-  lib/                  autenticação (Supabase e demonstração), learn.ts (links e ações de Aprender), situação do card Primeiros passos (só no aparelho)
+    committed-parts     medidor da renda comprometida, barra por grupo e legenda
+    goal-*, reserve-form, minimum-reserve, essentials-block, savings-card, savings-plan-form  metas, reserva, plano de guardar
+    sim-result, sim-year-bars  resultado do simulador e barras por ano
+    device-features, device-settings, setting-switch  lembretes, ocultar valores e biometria (Conta e layout)
+  lib/                  autenticação (Supabase e demonstração), learn.ts (links e ações de Aprender), situação do card Primeiros passos (só no aparelho),
+                        reminders.ts, device.ts e device-prefs.ts (lembretes e preferências só do aparelho), privacy.ts (ocultar valores), essentials.ts
   state/                sessão, dados (consultas e gravações), contexto e mês
   theme/                tokens de cor, tipografia, movimento e vetores do logo
 packages/core/          regras financeiras, validação, repositório em memória, testes
   src/retorno.ts        revisão dos últimos meses: ausência, período, lacunas, montagem e textos
-  src/learn/            conteúdo de Aprender (37 temas), busca, tempo de leitura, validação do catálogo e contas exatas de juros, parcelas e divisão (centavos e pontos-base)
+  src/learn/            conteúdo de Aprender (42 temas), busca, tempo de leitura, validação do catálogo e contas exatas de juros, parcelas e divisão (centavos e pontos-base)
+  src/reminders.ts      plano dos lembretes de vencimento (um aviso por dia, no máximo 30, sem valor nem descrição)
+  src/committed.ts      renda comprometida, renda de referência, projeção dos próximos meses e previsão dos pagamentos do mês
+  src/goals.ts          metas, movimentos, reserva para imprevistos, gastos essenciais e textos
+  src/savings.ts        plano de guardar: resposta, quando perguntar, etapas, reserva mínima e textos
+  src/simulate.ts       simulador: contas com taxa, formulário, textos, criar meta e links
   src/calculators/      as 8 calculadoras, campos, textos e links de contexto
 supabase/
-  migrations/           esquema, funções e permissões (0001 fundação, 0002 contas a pagar, 0003 gastos fixos, 0004 contas do ano, 0005 seus últimos meses)
-  tests/                testes de isolamento, da sequência de aceite, de contas a pagar, de gastos fixos, de contas do ano e da revisão dos últimos meses
+  migrations/           esquema, funções e permissões (0001 fundação, 0002 contas a pagar, 0003 gastos fixos, 0004 contas do ano, 0005 seus últimos meses,
+                        0006 renda comprometida, 0007 metas e plano de guardar)
+  tests/                testes de isolamento, da sequência de aceite, de contas a pagar, de gastos fixos, de contas do ano, da revisão dos últimos meses,
+                        da renda comprometida (50), das metas (60) e do plano de guardar (65)
 scripts/e2e-web.js      roteiro de verificação na versão web
 docs/                   decisões, regras, acessos, Supabase, roteiro, Aprender, marca, telas
 ```
@@ -63,11 +79,14 @@ A navegação organiza a experiência; **quem protege os dados é o banco**.
 ```
 pessoa ──< vínculo (permissões por ação) >── contexto (pessoal | família) ──< conta financeira ──< registro
    │                                                                    ├──< conta a pagar (previsto) ── 0 ou 1 gasto vivo que a quitou (registro)
+   │                                                                    ├──< renda de referência (a partir de um mês; nunca é Recebido)
+   │                                                                    ├──< meta (reserva, oportunidade ou objetivo) ──< movimento (aporte, resgate, rendimento, valorização...)
    │                                                                    └──< série (gasto fixo, parcelamento ou conta do ano) ──< vigência
    │                                                                                  └──< ocorrência = conta a pagar com número
    ├──< operação (chave de idempotência, ação, registro, conta a pagar ou série resultante) ── gatilho ──> atividade
    ├──< atividade por contexto (dia da última anotação e última ausência longa; só datas)
    ├──< revisão dos últimos meses por contexto (último mês revisado, decisão e versão)
+   ├──< resposta do plano de guardar por contexto (resposta, valor por mês informado e data de voltar a perguntar; só da própria pessoa)
    └──< direito ao plano >── licença >── contrato de benefício >── organização ──< administrador
 ```
 
@@ -109,9 +128,33 @@ pessoa ──< vínculo (permissões por ação) >── contexto (pessoal | fam
 - **Leitura e privilégios:** políticas `context_activity_own` e `return_reviews_own`: só a própria pessoa lê, e só enquanto lê o contexto. Sem escrita direta. Com sessão, executam-se 23 funções: as 20 de antes e as três novas; as auxiliares e as guardas não são executáveis.
 - **No core e no app:** `retorno.ts` repete a regra de ausência (`isLongAbsence`, `ABSENCE_MIN_DAYS`), calcula o período (`returnWindow`), as contas sem registro pela lista de contas do período (`seriesGapsInRange`, sobre `listCommitmentsDueBetween`, nunca sobre as 60 mais recentes) e monta a revisão (`buildReturnReview`), com as ações de cada linha, o lote, o modo "Dia" e todos os textos (`RETURN_TEXT`). `loadReturnReview` lê `getReturnReviewState`, `monthsOverview`, `listCommitmentsDueBetween` e `listSeries`, sempre depois de a geração do dia dar certo; no app, `useReturnReview` usa a consulta `['returnReview', contexto, dia]`, que toda gravação invalida e que recarrega ao voltar para o app. Se a geração ou a leitura falham, a faixa não aparece e `/retomar` mostra erro, nunca uma lista parcial. O `MemoryRepository` repete o gatilho, as três funções, a ordem das conferências e os códigos.
 
+**Renda comprometida** (migração `20261009000002_renda_comprometida.sql`, D-026) mostra quanto da renda de referência já tem destino no mês. O banco guarda só a renda de referência e repete a conta do mês; as listas de contas e de séries que o core usa já existiam.
+
+- **Tabela:** `income_references` (contexto, `from_month` sempre dia 1, `amount_cents` de 1 a 999.999.999, `varies` para "Minha renda varia", autoria, versão e exclusão lógica). Um índice único parcial garante no máximo uma referência viva por contexto e mês (B1); uma excluída não bloqueia a nova. Vale a referência viva com o maior mês de início até o mês mostrado. Ela é só o denominador do percentual: nenhuma função grava `financial_records` ou `commitments` (B4), e a referência nunca entra em Recebido.
+- **Funções:** `set_income_reference(chave, contexto, mês, versão, valor, varia)` cria (versão 0) ou altera a referência de um mês, e `delete_income_reference(chave, id, versão)` a exclui. A validação segue a ordem do core: sessão, chave, permissão, mês, intervalo (de 24 meses antes a 12 meses depois do mês de hoje, `referencia_fora_do_intervalo`), valor e tipo, depois a versão. O mês de início nunca muda: para outro mês, exclui e cria.
+- **`month_committed(contexto, mês)`** repete no banco `summarizeCommitted`: comprometido = contas a pagar não excluídas com vencimento no mês (pagas pelo valor do gasto vinculado, em aberto pelo valor previsto), por grupo (gastos fixos, contas do ano, parcelamentos e outras), dívidas (financiamento, empréstimo e compra parcelada; contas do ano nunca), em aberto vencidas antes do mês, referência vigente e o percentual em milésimos (`(2000 × valor + referência) div (2 × referência)`, metade para cima; nulo sem referência). A identidade `comprometido = pagas + due_in_month_cents` de `month_to_pay` é conferida em cada passo do teste. Recusa contexto sem leitura em vez de devolver zero.
+- **No core e no app:** `committed.ts` calcula o resumo, os textos, "Próximos meses" e "O que muda" (`projectCommitted`, sobre `listCommitmentsDueBetween` e `listSeries`), a sugestão de referência (média dos recebimentos dos meses fechados, sem reembolsos, aplicada só com confirmação) e a previsão dos pagamentos do mês em `/a-pagar`. A linha fica dentro do card "Ainda a pagar" do Resumo; `/renda-comprometida` e `/renda-comprometida/referencia` são telas internas. O percentual é sempre calculado de listas confirmadas pelo servidor: se alguma leitura falha, a tela mostra erro e "Tentar novamente", nunca 0%.
+
+**Metas e reserva para imprevistos** (migração `20261009000003_metas.sql`, D-027) guarda metas e os movimentos que a pessoa registra. O Clarevo não guarda nem movimenta dinheiro.
+
+- **Tabelas:** `goals` (tipo `emergencia`, `oportunidade` ou `objetivo`, nome de até 40 caracteres, alvo, mês do prazo, valor planejado por mês, e, na reserva, `essential_base_cents`, `essential_months` de 1 a 24 e `essential_base_source` `media_gastos`, `contas_do_mes` ou `informado`, com alvo igual a base × meses; situação `ativa`, `concluida` ou `arquivada`; autoria, versão e exclusão lógica) e `goal_movements` (`saldo_inicial`, `aporte`, `resgate`, `rendimento`, `valorizacao` ou `desvalorizacao`, valor, data até hoje, observação de até 80 caracteres). Meta e movimentos ficam no mesmo contexto por chave estrangeira composta (G2). A visão `goal_items` (`security_invoker`) soma os movimentos vivos: `saved_cents` (saldo inicial, aportes, rendimentos e valorizações menos resgates e desvalorizações) e a composição por tipo. Não existe contador de valor guardado.
+- **Funções:** `create_goal`, `update_goal`, `set_goal_status`, `delete_goal`, `add_goal_movement`, `update_goal_movement` e `delete_goal_movement`, com chave de idempotência, hash em JSON e versão como as demais. Os códigos novos incluem `meta_arquivada`, `reserva_ja_existe`, `data_futura` e `saldo_da_meta_insuficiente`, este com o detalhe `dia=AAAA-MM-DD`.
+- **Invariantes:** o valor guardado ao fim de cada dia nunca fica negativo (G1, conferido nas funções e por um gatilho de restrição adiado, também para escrita direta); no máximo uma reserva para imprevistos não excluída e não arquivada por contexto (G6); excluir a meta exclui os movimentos vivos (G4); meta arquivada não recebe, altera nem exclui movimento (G5); identidade, contexto, autoria, criação e tipo do movimento nunca mudam (G7). Nenhum objeto de metas tem gatilho ou escrita em registros ou contas a pagar (G3): `month_totals`, `month_to_pay` e `month_committed` ficam iguais antes e depois de qualquer movimento.
+- **No core e no app:** `goals.ts` calcula o progresso (para baixo; "Meta alcançada" só com guardado maior ou igual ao alvo), o valor por mês necessário, o mês previsto com o plano (P0 é o mês atual, ou o seguinte quando já houve aporte nele), a sugestão de gastos essenciais (`essentialMonthly`: média do Pago em Moradia, Mercado, Transporte, Saúde e Educação nos até 3 meses mais recentes com gastos entre os 6 fechados, sem os gastos gerados por pagamento de conta do ano), a cobertura em meses e todos os textos. As telas são a aba Metas, `/reserva`, `/meta/nova`, `/meta/[id]` (com `editar` e `movimento`); "Criar reserva" sai da calculadora de reserva, e a renda comprometida mostra as metas fora do percentual.
+
+**Plano de guardar** (mesma migração 0007, D-036) guarda a resposta à pergunta "Você consegue guardar algum valor por mês?".
+
+- **Tabela:** `savings_checks`, uma linha por pessoa e contexto (chave primária composta): `answer` (`consigo`, `agora_nao` ou `depois`), `monthly_cents` (só em `consigo`, de 100 a 999.999.999), `answered_on`, `ask_again_on` (nula em `consigo`; nas outras, depois do dia da resposta), versão e carimbos. A política `savings_checks_own` deixa ler só a própria linha e só enquanto a pessoa lê o contexto; nenhuma visão ou função agrega a tabela, então nem a Família nem a empresa a veem, nem somada.
+- **Função:** `set_savings_answer(chave, contexto, versão, resposta, valor)` exige escrita no contexto, valida antes de conferir a versão e calcula `ask_again_on` no banco (`depois`: hoje + 7 dias; `agora_nao`: hoje + 30). A resposta nova substitui a anterior, inclusive o valor. A ação `responder_guardar` não aponta para nada e, como `decidir_revisao`, não conta como anotação para a atividade do A4. A lista de ações de `record_operations` tem agora 26 itens.
+- **No core e no app:** `savings.ts` decide quando perguntar (`shouldAskSavings`; a pergunta volta quando a renda de referência muda de valor depois de um "consigo"), monta o plano em etapas (`savingsPlan`: reserva de 1, 3 e 6 meses de gastos essenciais e depois as metas por prazo, sem rendimento), a reserva mínima a partir de R$ 100,00 e os passos pequenos. A resposta é lida por `getSavingsCheck` e gravada por `setSavingsAnswer`; o 4º passo de "Primeiros passos" usa `isSavingsStepDone`. "Usar este plano" são duas escritas em sequência, cada uma com a própria chave de operação: a resposta e a reserva (`create_goal` ou `update_goal`).
+
+**Simulador** (D-028) não muda o banco. `simulate.ts` calcula com a taxa digitada pela pessoa (0% a 30% ao ano, campo vazio por padrão): taxa mensal equivalente `(1 + a)^(1/12) - 1`, aportes no início de cada mês, ponto flutuante só no fator de juros (`log1p` e `expm1`) e centavos inteiros nas entradas e saídas, com arredondamento só no fim. A tela `/simular` valida o formulário no core, mostra o resultado só depois de tocar em "Simular", sempre com o resultado sem rendimento ao lado, as hipóteses e o aviso fixo. Nada é gravado, nem a taxa; "Criar meta com estes valores" abre `/meta/nova` preenchida, sem a taxa no endereço.
+
+**Lembretes, ocultar valores e biometria** (D-025) não mudam o banco e valem só no aparelho. `reminders.ts` (core) monta o plano (`reminderPlan`: um aviso por dia com conta em aberto vencendo no dia seguinte, no máximo 30, nunca com valor nem descrição); `lib/reminders.ts` cancela os agendamentos `clarevo-lembrete-*` e agenda o plano ao abrir o app, ao voltar para ele e depois de escritas, escutando o cache do TanStack Query a partir de `device-features.tsx`, montado no layout, sem mexer em `state/data.ts`. As preferências (lembretes e horário, oferta já mostrada, ocultar valores ao abrir, biometria ao abrir) ficam em `lib/device-prefs.ts`, por pessoa, no armazenamento do aparelho; na demonstração, só na memória. "Ocultar valores" é um estado de sessão em `lib/privacy.ts`: `Money`, `FitMoney` e `MoneyTxt` mostram "R$ ••••" e o nome acessível "valor oculto" para dados guardados (a política completa está no comentário do arquivo e em `privacy-app.test.ts`). Na web, `device.web.ts` não oferece lembretes nem biometria.
+
 **Aprender e dúvidas** (D-031 e D-032) não muda o banco: o conteúdo é público, vem no app e funciona sem internet.
 
-- **Core (`src/learn/`):** `types.ts` (seções, os 37 slugs e o formato do tema, das fontes e dos fatos de norma), `sections.ts` (as cinco seções e "Comece por aqui"), `topics/` (o conteúdo, um arquivo por seção), `reading.ts` (palavras e tempo de leitura), `search.ts` (busca no aparelho), `examples.ts` (os números esperados de cada exemplo, calculados por `math.ts`), `validate.ts` (validação do catálogo: tamanhos, fontes, domínios, prazos de revisão, números conferidos e hipóteses), `ui-text.ts` (`LEARN_UI_TEXT`) e `math.ts` e `format.ts`, do A6. O catálogo, as fontes e o registro de revisões estão em `docs/09_APRENDER.md`.
+- **Core (`src/learn/`):** `types.ts` (seções, os 42 slugs e o formato do tema, das fontes e dos fatos de norma), `sections.ts` (as cinco seções e "Comece por aqui"), `topics/` (o conteúdo, um arquivo por seção), `reading.ts` (palavras e tempo de leitura), `search.ts` (busca no aparelho), `examples.ts` (os números esperados de cada exemplo, calculados por `math.ts`), `validate.ts` (validação do catálogo: tamanhos, fontes, domínios, prazos de revisão, números conferidos e hipóteses), `ui-text.ts` (`LEARN_UI_TEXT`) e `math.ts` e `format.ts`, do A6. O catálogo, as fontes e o registro de revisões estão em `docs/09_APRENDER.md`.
 - **App:** `lib/learn.ts` reexporta o core e define `explanationHref(slug, origem)`, que a rota `/explicacao/[tema]` recebe com `origem` (`tarefa` ou `aprender`); com `typedRoutes`, o `typecheck` recusa um slug ou uma rota que não existem. Ali ficam também as ações "No Clarevo" e o link de cada tema para a calculadora. `lib/topics.ts` foi removido: nenhum `/explicacao/` é escrito à mão fora de `lib/learn.ts` (conferido por `learn-links.test.ts`). `TermHint` e `TopicLink` não desenham nada para tema em rascunho. A busca fica só na memória da aba; nada é gravado nem enviado.
 
 ## Como executar

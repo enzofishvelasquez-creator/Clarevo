@@ -86,7 +86,7 @@ Exportar dados fica para quando houver o relatório mensal (não há botão sem 
   1. Parcelado ou à vista (com desconto à vista e juros informados pela pessoa).
   2. Reserva para imprevistos: meses de despesas essenciais e tempo para chegar lá.
   3. Dividir as contas da casa: em partes iguais, proporcional à renda ou por item.
-  4. Quanto guardar por mês para um objetivo.
+  4. Quanto guardar por mês para um objetivo. Entregue: "Juntar para um objetivo" (Ciclo A6, sem rendimento) e, com a taxa digitada pela pessoa, o simulador do Ciclo D (`/simular`, D-028), que mostra o resultado sem rendimento ao lado e não sugere taxa, produto nem instituição.
   5. Quanto custa sair de uma dívida (rotativo, cheque especial) e ordem de pagamento.
   6. Correção de um valor pela inflação (IPCA, série oficial do Banco Central).
 - **Lugar:** Aprender → Calcular; atalhos contextuais (ex.: "Parcelado ou à vista?" ao anotar um gasto alto).
@@ -136,11 +136,11 @@ Exportar dados fica para quando houver o relatório mensal (não há botão sem 
 
 | Ideia | Valor | Observação |
 |---|---|---|
-| Contas a pagar com lembrete | O que vence e quando, com aviso no dia anterior | Cadastro, pagamento e lista feitos em 08/10/2026 (D-020); lembrete e recorrência pendentes (P-011) |
+| Contas a pagar com lembrete | O que vence e quando, com aviso no dia anterior | Cadastro, pagamento e lista feitos em 08/10/2026 (D-020), recorrência pelos gastos fixos (D-024) e lembrete no dia anterior, só no aparelho, em 09/10/2026 (D-025, que resolve P-011); o teste em aparelho está em aberto (`docs/04`) |
 | Orçamento por categoria | Limite por categoria com aviso neutro ao se aproximar | Sem culpa nem julgamento |
 | Resumo da semana | Notificação curta: recebido, pago e o que vence | Cria hábito sem exigir abrir o app |
 | Família (ciclo 2) | Convite com permissões, quem vê o quê | Diferencial frente a apps só individuais |
-| Bloqueio do app | Biometria ou senha do aparelho ao abrir; botão para ocultar valores | Segurança visível |
+| Bloqueio do app | Biometria ou senha do aparelho ao abrir; botão para ocultar valores | Segurança visível. Feito em 09/10/2026 (D-025): "Ocultar valores ao abrir" e "Pedir biometria ao abrir" em Conta, só no aparelho; teste em aparelho em aberto |
 | Verificação em duas etapas | Código de aplicativo autenticador no login | Disponível no Supabase (MFA) |
 | Exportar dados | Planilha ou PDF do mês | Confiança e portabilidade (LGPD) |
 | Relatório mensal | "Seu mês em 30 segundos" com 3 números e uma explicação | Valor percebido do plano |
@@ -172,7 +172,7 @@ O Bíos usava movimento ambiente: arcos que "respiram", ondas e órbitas. No Cla
 ## 7. Próximos passos sugeridos
 
 1. Ciclo de acabamento de design (seção 3) e animações (seção 5).
-2. Contas a pagar: feito em 08/10/2026 (D-020, D-021), sem lembretes nem recorrência, que ficam em P-011.
+2. Contas a pagar: feito em 08/10/2026 (D-020, D-021); a recorrência veio com os gastos fixos (D-024) e o lembrete no dia anterior, com ocultar valores e biometria, em 09/10/2026 (D-025).
 3. Calculadoras 1, 2 e 3.
 4. Notas fiscais, fase 1 (QR code), após parecer jurídico.
 5. Login real com Supabase Pro e e-mail próprio, quando for abrir para pessoas de fora.

@@ -454,7 +454,7 @@ Recalculei em Python todos os exemplos abaixo, e eles batem com a `spec3` §3.11
 
 ## 4. O que já existe, o que está desenhado e o que falta
 
-Situação em 09/10/2026, depois dos Ciclos A6 (D-035), A4 (D-030) e A5 (D-031 e D-032).
+Situação em 09/10/2026, depois dos Ciclos A6 (D-035), A4 (D-030), A5 (D-031 e D-032), A2 (D-025), B (D-026), C (D-027 e D-036) e D (D-028).
 
 | Função | Situação | Onde fica ou ficaria |
 |---|---|---|
@@ -465,19 +465,19 @@ Situação em 09/10/2026, depois dos Ciclos A6 (D-035), A4 (D-030) e A5 (D-031 e
 | Gastos fixos e parcelamentos | Existe, com os links "Quanto custa por ano?", "Quanto economizo se quitar antes?" e "Dividir estas contas" (A6) | Movimentos › "Organizar"; `/a-pagar` › link; chips "Todo mês" e "Parcelado" |
 | Contas do ano (IPVA, IPTU, matrícula) | Existe (A3, D-029), com "Cota única ou parcelado? Fazer a conta" no detalhe (A6) | Gastos fixos › Contas do ano; chip "Todo ano" |
 | Conta, segurança, "Quem vê estes dados?" | Existe | Avatar, rodapés |
-| Metas | Tela de espera com o card "Enquanto isso, faça as contas" (Reserva, Juntar para um objetivo e Todas as calculadoras, A6) | Aba Metas |
+| Metas e reserva (C) | Existe (D-027): aba Metas com a pergunta do plano de guardar (D-036), "Seu mês", reserva para imprevistos, metas, aportes, resgates e "Atualizar valor guardado"; as calculadoras continuam em um acesso no fim da aba. Falta: o roteiro web e o teste em aparelho (`docs/04`) | Aba Metas, `/reserva`, `/meta/*`, `/guardar` |
 | Primeiros passos e "Organizar" em Movimentos | Existe (D-033); "Organizar" com 3 linhas, Calculadoras e legendas com valores (D-035(8)) | Card temporário no Resumo; Movimentos |
 | Seus últimos meses (A4) | Existe (D-030): faixa, resumo mês a mês, "Atualizar agora" e "Seguir adiante", com "Ver resumo dos últimos meses" em Contas a pagar, "Registrar parcelas" na conta do ano e o cenário da demonstração pelo endereço, todos no roteiro web. Falta: o teste em aparelho (`docs/04`) | Faixa temporária no Resumo, `/retomar` |
-| Aprender e dúvidas: busca, 5 seções, 35 temas, "O que é isso?" (A5) | Existe (D-031 e D-032), com o card "Calculadoras" no topo e "Fazer a conta com os seus números" nos temas; catálogo e fontes em `docs/09_APRENDER.md`. Falta: o teste em aparelho (`docs/04`) | Aba Aprender; "O que é isso?" nas telas |
-| Lembretes de vencimento (A2) | Desenhado (`spec2` §1.3) | Conta › interruptor; aviso no celular |
-| Renda comprometida (B) | Desenhado (`spec2` §1.4) | Linha dentro do card "Ainda a pagar", `/renda-comprometida` |
-| Metas e reserva (C) | Desenhado (`spec2` §1.5) | Aba Metas, `/reserva`, `/meta/*` |
-| Simulador (D) | Desenhado (`spec2` §1.6) | Nesta proposta: taxa em "Juntar para um objetivo" |
+| Aprender e dúvidas: busca, 5 seções, 42 temas (40 publicados), "O que é isso?" (A5) | Existe (D-031 e D-032), com o card "Calculadoras" e o atalho "Simular" no topo, "Fazer a conta com os seus números" nos temas e os temas dos Ciclos B, C e D; catálogo e fontes em `docs/09_APRENDER.md`. Falta: o teste em aparelho (`docs/04`) | Aba Aprender; "O que é isso?" nas telas |
+| Lembretes de vencimento (A2) | Existe (D-025), só no aparelho: um aviso no dia anterior, sem valor nem descrição. Falta: o teste em aparelho, que Enzo fará com o app pronto (`docs/04`) | Conta › interruptor; aviso no celular |
+| Renda comprometida (B) | Existe (D-026), com renda de referência, "Próximos meses" e linha informativa das contas do ano. Falta: o roteiro web (`docs/04`) | Linha dentro do card "Ainda a pagar", `/renda-comprometida` |
+| Simulador (D) | Existe (D-028): `/simular` com três modos, taxa digitada, resultado sem rendimento ao lado, ano a ano e "Criar meta com estes valores"; "Simular com rendimento" na calculadora "Juntar para um objetivo". Falta: o roteiro web (`docs/04`) | `/simular`; Metas; detalhe da meta; calculadora; Aprender |
 | Calculadoras, "Somar valores", atalhos do ícone na web | Existe (A6, D-035): 8 calculadoras, "Somar valores" em todos os campos Valor, 4 atalhos no manifesto e volta à tela pedida depois de entrar. Falta: teste em aparelho e link da CVM na reserva (`docs/04`) | `/calcular`; campos Valor; manifesto |
 | "Já paguei" na lista e "Por categoria" | Existe (A6, D-035(5) e (6)) | `/a-pagar`; composição |
-| Previsão dos pagamentos do mês | Proposto aqui (seção 5) | Topo de `/a-pagar`, só no mês atual |
+| Previsão dos pagamentos do mês | Existe (D-026(10)) | Topo de `/a-pagar`, só no mês atual |
 | Busca de registros, orçamento por categoria | Falta, sem ciclo (o orçamento está no "núcleo proposto" das Instruções v2.1) | Movimentos; Metas ou Movimentos |
-| Assinaturas, plano para sair das dívidas, ocultar valores e biometria, revisão do mês, exportar dados, aviso de valor fora do habitual, "Parece um gasto fixo" | Falta (só sugestão em `spec2` §7) | Seção 5 |
+| Ocultar valores e biometria | Existe (D-025). Falta: o teste em aparelho (`docs/04`) | Conta; olho no cabeçalho das abas quando couber |
+| Assinaturas, plano para sair das dívidas, revisão do mês, exportar dados, aviso de valor fora do habitual, "Parece um gasto fixo" | Falta (só sugestão em `spec2` §7) | Seção 5 |
 | Notas fiscais NFC-e por QR | Falta (depende de parecer jurídico; `docs/06` §4.2) | "Ler nota fiscal" em Anotar gasto |
 | Família, cartões, integração bancária, IA, crédito, painel de empresas | Fora do ciclo atual; a Família sem vínculo ganhou só o link "Enquanto isso, dividir as contas da casa" (fora do Resumo, A6) | Ciclos seguintes de `docs/04`, ou nunca (crédito) |
 
@@ -491,6 +491,7 @@ Ordem pelo valor para a pessoa e para a empresa que oferece o benefício. Valor:
    - [E] Medina (*Review of Financial Studies*, 2021), em experimento no Brasil: o lembrete da fatura reduziu em 14% a multa por atraso, mas aumentou em 9% as tarifas de cheque especial. Juntar as contas e lembrar "confira se foi debitado" no débito automático reduz esse efeito.
    - [E] Em agosto de 2026, 29,9% das famílias tinham contas em atraso e 82% tinham dívidas, o sétimo mês seguido no maior nível da série; nas famílias com renda de até 3 salários mínimos, o atraso chegou a 38,8% (Peic/CNC, divulgada em 10/09/2026). O tempo médio de atraso foi de 64,6 dias em julho. A Peic de setembro ainda não foi encontrada.
    - Depende de: build de desenvolvimento e `expo-notifications` instalado com `npx expo install`.
+   - Situação: feito em 09/10/2026 (D-025). Falta o teste em aparelho.
    - Riscos: a atenção mudar de uma conta para outra; cansaço com pedidos de permissão. Não há lembrete na web.
 2. **Calculadoras (seção 3).**
    - Valor: pessoa A, empresa A. Esforço: M/L (8 a 12 dias, com textos, acessibilidade e testes).
@@ -513,6 +514,7 @@ Ordem pelo valor para a pessoa e para a empresa que oferece o benefício. Valor:
    - [E] O comprometimento da renda com dívidas bateu o recorde de 29,3% (Banco Central, janeiro de 2026).
    - [E] O consignado para quem tem carteira assinada somou R$ 117,1 bilhões no primeiro ano, sendo R$ 82,9 bilhões em contratos novos, com parcela de até 35% do salário. Isso toca diretamente quem recebe o benefício pela empresa.
    - Depende de: A3 e P-019.
+   - Situação: feito em 09/10/2026 (D-026); P-019 resolvida com a linha informativa fora do percentual.
    - Riscos: percentual errado sem a renda informada; nada de cor de alerta nem sugestão de crédito.
 5. **Para onde foi o dinheiro.**
    - Primeiro "Por categoria" na composição, sem banco. Depois "Buscar" em Movimentos ("quanto paguei de luz?").
@@ -525,6 +527,7 @@ Ordem pelo valor para a pessoa e para a empresa que oferece o benefício. Valor:
    - [E] 31% das pessoas não têm nenhuma reserva (Anbima, Raio X 2026).
    - [E] Karlan e outros (2016): lembretes que citam a meta da própria pessoa aumentam a poupança.
    - Depende de: B.
+   - Situação: feito em 09/10/2026 (D-027), com o plano de guardar (D-036) e o simulador do Ciclo D (D-028).
    - Risco: dizer onde guardar, o que esbarra nas regras da CVM. Fica fora.
 7. **Previsão dos pagamentos do mês, só em `/a-pagar` e só no mês atual.**
    - Texto: "Se pagar tudo o que está em aberto, os pagamentos de outubro chegam a R$ X", com a linha "Inclui R$ Y estimados".
@@ -532,11 +535,13 @@ Ordem pelo valor para a pessoa e para a empresa que oferece o benefício. Valor:
    - [E] Simplifi e Monarch mostram previsão do mês.
    - [O] O número vale só no mês atual: vencidas antigas pagas hoje entram em Pago do mês corrente (D-021(1)). Não usa "Diferença", que o CL C004 reserva para valores realizados, e nunca vai para o Resumo.
    - Depende de: nada no banco; usa os mesmos totais do card "Ainda a pagar". Pode sair junto com o B.
+   - Situação: feito em 09/10/2026, junto com o B (D-026(10)).
    - Risco: ser lido como saldo. Por isso nunca usa "disponível" nem "sobra".
 8. **Ocultar valores e bloqueio por biometria.**
    - Valor: pessoa M, empresa A. Esforço: S.
    - [O] O app é usado no ambiente de trabalho, e isso é condição para um widget no futuro (`spec2` §7.11).
    - Depende de: `expo-local-authentication` instalado com `npx expo install`, no mesmo build do A2.
+   - Situação: feito em 09/10/2026 (D-025). Falta o teste em aparelho.
    - Risco: a pessoa ficar sem acesso. Saída: usar a senha do aparelho.
 9. **Orçamento por categoria e limite pessoal de comprometimento** (`spec2` §7.4).
    - A pessoa escolhe o limite e recebe um aviso neutro ao chegar perto.

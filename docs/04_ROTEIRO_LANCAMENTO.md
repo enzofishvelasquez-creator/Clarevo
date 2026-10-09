@@ -2,7 +2,7 @@
 
 Atualizado em 09/10/2026. Prazos são estimativas de trabalho, não compromissos; dependem das decisões pendentes.
 
-Ordem a partir de 08/10/2026 (D-023, D-029, D-033 e D-034): o Ciclo A, o Ciclo A3 (contas do ano) e os Primeiros passos com os atalhos em Movimentações estão feitos. O Ciclo A6 ("Achar tudo" e calculadoras, D-035) está implementado e no roteiro web, com o teste manual em aberto. Os Ciclos A4 (seus últimos meses, D-030) e A5 (Aprender e dúvidas, D-031 e D-032) começaram em 09/10/2026 e estão implementados (o A4 no banco, no core e nas telas; o A5, sem mudança no banco, no core e nas telas) e no roteiro web, com os itens abertos de cada seção abaixo (entre eles, o teste manual em aparelho). Seguem o A2 (lembretes) e depois B, C e D, todos antes do Ciclo 2 (família). Cada ciclo começa depois de o anterior passar em `npm test`, `npm run typecheck`, `npm run test:db`, `npm run test:api` e `npm run test:web`; A2 pode correr em paralelo, porque não mexe no banco.
+Ordem a partir de 08/10/2026 (D-023, D-029, D-033 e D-034): o Ciclo A, o Ciclo A3 (contas do ano) e os Primeiros passos com os atalhos em Movimentações estão feitos. O Ciclo A6 ("Achar tudo" e calculadoras, D-035) está implementado e no roteiro web, com o teste manual em aberto. Os Ciclos A4 (seus últimos meses, D-030) e A5 (Aprender e dúvidas, D-031 e D-032) estão implementados e no roteiro web, com os itens abertos de cada seção abaixo. Em 09/10/2026 foram implementados os Ciclos A2 (lembretes, ocultar valores e biometria, D-025), B (renda comprometida, D-026), C (metas e reserva, D-027, com o plano de guardar, D-036) e D (simulador, D-028), todos antes do Ciclo 2 (família). Neles, o que falta é o mesmo em todos: o roteiro web (`scripts/e2e-web.js`) ainda não cobre as telas novas e precisa ser atualizado, as migrações 0006 e 0007 precisam ser coladas no Supabase, e o teste em aparelho fica para depois de o app estar pronto. Cada ciclo começa depois de o anterior passar em `npm test`, `npm run typecheck`, `npm run test:db`, `npm run test:api` e `npm run test:web`.
 
 ## Primeiro ciclo (entregue em demonstração; falta ligar o Supabase)
 
@@ -55,7 +55,7 @@ Sem mudança no banco. Nas telas, os fluxos estão no roteiro web (`scripts/e2e-
 
 - [x] Core: `learn/math.ts` adiantado do Ciclo A5 (contas exatas em centavos e pontos-base, com os vetores da `spec3` §3.11 conferidos à parte com frações em Python), as 8 calculadoras com textos, faixas e mensagens, os links de contexto, "Somar valores", "Por categoria", "Já paguei" e as legendas do "Organizar"; teste de textos ampliado às calculadoras (`npm test`: 19 arquivos, 316 testes; `npm run typecheck`)
 - [x] Tela "Calculadoras" (`/calcular`) com abertura e aviso visíveis sem rolar em 360 px, 3 grupos e as 8 calculadoras em `/calcular/<nome>`: resultado enquanto a pessoa digita, anunciado ao leitor de tela, hipóteses logo abaixo, chips de 48 px e nada gravado
-- [x] Portas: linha "Calculadoras" no "Organizar" de Movimentações, card "Calculadoras" no topo de Aprender e card "Enquanto isso, faça as contas" em Metas
+- [x] Portas: linha "Calculadoras" no "Organizar" de Movimentações, card "Calculadoras" no topo de Aprender e card "Enquanto isso, faça as contas" em Metas (o card de Metas foi substituído pela aba Metas completa do Ciclo C, que mantém um acesso a "Calculadoras")
 - [x] Links na hora da decisão: "Parcelado ou à vista? Fazer a conta" no cadastro de parcelamento, "Cota única ou parcelado? Fazer a conta" na conta do ano, "Quanto custa por ano?" no gasto fixo mensal, "Quanto economizo se quitar antes?" no financiamento e na compra parcelada, "Calcular multa e juros" na conta vencida, "Dividir estas contas" na lista de gastos fixos e "Enquanto isso, dividir as contas da casa" na Família sem vínculo (fora do Resumo)
 - [x] "Anotar como parcelamento" e "Anotar como gasto fixo" depois do resultado; `/gastos-fixos/novo?tipo=parcelada` aceita `parcelas` de 2 a 480 e `natureza`
 - [x] Cadastro aberto por "Anotar como parcelamento" com "Parcelado", o valor da parcela, o total de parcelas e "Compra parcelada" preenchidos (conferido no roteiro web)
@@ -67,7 +67,7 @@ Sem mudança no banco. Nas telas, os fluxos estão no roteiro web (`scripts/e2e-
 - [x] Atalhos do ícone na versão web (manifesto com 4 atalhos) e, sem sessão, volta à tela pedida depois de entrar (endereço só em memória)
 - [x] Roteiro web (`npm run test:web` e `REDUZIR_MOVIMENTO=1 node scripts/e2e-web.js`, 923 verificações em cada um) com os passos do Ciclo A6 (spec4 §3) e as legendas novas do "Organizar". "Nada gravado" compara o repositório da pessoa (registros, contas a pagar de outubro e dezembro e gastos fixos) antes da primeira calculadora e depois da última, e antes e depois dos links de contexto; o atalho "Anotar gasto" aberto sem sessão volta ao Resumo por "Voltar", "Cancelar" e "Descartar alterações"
 - [ ] Teste manual em iOS, Android e web, com e sem movimento reduzido e com leitor de tela (teclados decimal e numérico, anúncio do resultado e do total da soma no VoiceOver e no TalkBack, foco do leitor de tela no campo Valor depois de "Usar o total", vibração depois de "Já paguei" e as contas com BigInt no Hermes)
-- [ ] Conferir a página do Portal do Investidor (CVM) e completar `RESERVA_REFERENCIA` com o texto de 6 a 12 meses, o endereço e a data, para a reserva mostrar o link
+- [ ] Completar `RESERVA_REFERENCIA` da calculadora de reserva com o texto de 6 a 12 meses, o endereço e a data da página do Portal do Investidor (CVM): a tela `/reserva` do Ciclo C já mostra a referência conferida, com fonte e data, mas a calculadora ainda mostra o texto sem link e sem número
 
 ## Ciclo A4: seus últimos meses (D-030)
 
@@ -105,14 +105,70 @@ Sem mudança no banco. Rodados em 09/10/2026, depois das correções da revisão
 - [ ] Revisar IOF, rotativo e cheque especial até 09/04/2027 e os demais temas com fonte externa até 09/10/2027 (o teste avisa 30 dias antes)
 - [ ] Teste manual em iOS, Android e web, com leitor de tela (anúncio da contagem da busca, "O que é isso?", foco em "Ir para"), movimento reduzido e texto a 200%
 
+## Ciclo A2: lembretes, ocultar valores e biometria (D-025)
+
+Sem mudança no banco. Última execução registrada pelas frentes de trabalho em 09/10/2026: `npm test` (30 arquivos, 594 testes) e `npm run typecheck` passando. O `npm run test:web` ainda não cobre o que o ciclo traz (item abaixo).
+
+- [x] Core: `reminderPlan` (um aviso por dia na véspera do vencimento, no horário de 8h, 9h, 12h ou 19h, no máximo 30, sem valor, descrição nem identificador de conta) e os textos (`reminders.test.ts`, 11 testes)
+- [x] App: "Lembretes de contas a pagar" e "Horário do aviso" em Conta, oferta depois do primeiro gasto fixo salvo, permissão do sistema só depois do toque, "Abrir configurações" quando negada, reagendamento ao abrir, ao voltar ao app e depois de escritas (módulo próprio, sem mexer em `state/data.ts`), toque no aviso abre Contas a pagar, ícone de notificação do Android em uma cor (`docs/marca/`) e o texto da web "Lembretes estão disponíveis no app para celular."
+- [x] Ocultar valores: "Ocultar valores ao abrir" em Conta (também na web), olho no cabeçalho das abas quando cabe sem cortar o logotipo (a 390 px na demonstração não cabe, e o ocultar fica em Conta), "R$ ••••" e "valor oculto" para o leitor de tela em todos os valores de dados guardados, com a política e a guarda em `privacy-app.test.ts` (11 testes); varredura no navegador de todas as rotas, com valores ocultos, sem vazamento de valor
+- [x] "Pedir biometria ao abrir" (desligado por padrão; só em aparelho com biometria cadastrada; senha do aparelho se a biometria falhar; nunca impede de sair da conta)
+- [ ] Roteiro web (`npm run test:web`): texto da web em Conta e ocultar valores na web, sem erro
+- [ ] Gerar o build de desenvolvimento (iOS e Android) para testar lembretes e biometria, que não existem na web
+- [ ] **Você:** teste em aparelho, depois de o app estar pronto (Enzo, 08/10/2026: "O teste será feito, após o app estar pronto"): permissão só depois do toque, aviso no horário, texto sem valor, ícone em uma cor, pagar e reabrir reagenda, desligar cancela tudo, biometria com falha e com senha do aparelho, VoiceOver e TalkBack lendo "valor oculto"
+
+## Ciclo B: renda comprometida (D-026)
+
+Última execução registrada pelas frentes de trabalho em 09/10/2026: `npm test` (30 arquivos, 594 testes), `npm run typecheck`, `npm run test:db` (10, 20, 30, 40, 45, 47, 50, 60 e 65) e `npm run test:api` (92 testes, com as sequências de B e C). O `npm run test:web` não passa por falta de atualização do roteiro (item abaixo).
+
+- [x] Banco: `income_references`, `set_income_reference`, `delete_income_reference` e `month_committed` (migração `20261009000002_renda_comprometida.sql`), com testes de permissão, validação, sequência de aceite, contas do ano, ações de `record_operations`, guarda e privilégios (`supabase/tests/50_renda_comprometida.sql`)
+- [x] Core: comprometido por grupo, dívidas, percentual em milésimos, "Fora dos compromissos", renda de referência com vigência, sugestão, "Próximos meses" com "O que muda", linha das contas do ano fora do percentual (P-019), previsão dos pagamentos do mês e textos; repositório em memória com as mesmas regras e demonstração com renda de referência de R$ 6.000,00 (`committed.test.ts`, 30 testes)
+- [x] App ligado ao banco (`SupabaseRepository`), com testes pela API: `month_committed` igual a `summarizeCommitted`, referências com versão e os códigos do core
+- [x] Telas: a linha "Renda comprometida" dentro do card "Ainda a pagar" do Resumo (estrutura inalterada), `/renda-comprometida` (medidor, grupos, "Fora dos compromissos", recebido, contas do mês, "Próximos meses", "O que muda", "Como calculamos", metas fora do percentual), `/renda-comprometida/referencia` (sugestão, mês de início, "Minha renda varia", excluir) e a previsão dos pagamentos do mês em Contas a pagar; falha de carga mostra erro, nunca 0%
+- [x] Temas "Renda comprometida e a referência de 30%" e "Quando a renda muda todo mês" em Aprender, com "O que é isso?" nas telas
+- [ ] **Você:** colar `supabase/migrations/20261009000002_renda_comprometida.sql` no SQL Editor do Supabase, depois da 0005 (`docs/05_SUPABASE.md`, passo 7)
+- [ ] Roteiro web (`npm run test:web`): linha "Renda comprometida em outubro" dentro de "Ainda a pagar" e a ordem dos títulos do Resumo (Anotar gasto, Ainda a pagar neste mês, Pagamentos do mês, Fatura sem contar duas vezes, Quem vê estes dados?); `/renda-comprometida` com legenda, grupos e "Fora dos compromissos"; novembro com a linha de dívidas; referência de R$ 5.000,00 a partir de outubro (69,0%); excluir as referências; falha simulada sem 0%; rótulo acessível do medidor; previsão em Contas a pagar; nenhum termo proibido
+- [ ] Teste manual em iOS, Android e web, com e sem movimento reduzido e com leitor de tela (medidor, troca de mês e formulário da referência)
+
+## Ciclo C: metas e reserva para imprevistos (D-027)
+
+Mesmas execuções do Ciclo B. A migração é a `20261009000003_metas.sql`, que também traz o plano de guardar (seção seguinte).
+
+- [x] Banco: `goals`, `goal_movements`, a visão `goal_items` e as sete funções de metas (migração `20261009000003_metas.sql`), com saldo diário nunca negativo, uma reserva por contexto, meta arquivada, exclusão em cascata lógica, totais intocados, permissões e privilégios (`supabase/tests/60_metas.sql`)
+- [x] Core: progresso, valor por mês, mês previsto, gastos essenciais sem os pagamentos de contas do ano (P-017 resolvida), reserva, cobertura em meses, "Atualizar valor guardado", validação na ordem do banco e textos; repositório em memória e demonstração com a reserva (15%, 0,9 mês) e a "Viagem de férias" (20%, R$ 480,00 por mês), sem mudar os totais de outubro (`goals.test.ts`, 39 testes)
+- [x] App ligado ao banco, com testes pela API (sequência de aceite C, `goal_items.saved_cents` igual a `goalSaved`, reconciliação de movimentos por `findGoalOperation`)
+- [x] Telas: aba Metas ("Seu mês", reserva, metas, acesso a "Calculadoras"), `/reserva`, `/meta/nova`, `/meta/[id]` com editar, aportes, resgates, rendimento e "Atualizar valor guardado", "Criar reserva" na calculadora de reserva, a dica "Dinheiro guardado não é gasto" no formulário de gasto, as metas em `/renda-comprometida` (fora do percentual) e a linha nova em "Quem vê estes dados?"
+- [x] Temas "O que muda ao registrar um aporte" e "Gastos essenciais" em Aprender
+- [ ] **Você:** colar `supabase/migrations/20261009000003_metas.sql` no SQL Editor do Supabase, depois da 0006 (`docs/05_SUPABASE.md`, passo 8)
+- [ ] Roteiro web (`npm run test:web`): hoje ele aborta em "Metas chegam em uma próxima versão" e tem critérios que o ciclo mudou (reserva sem botão "Criar reserva", referência da reserva sem link, 35 temas publicados, agora 40: 33 nas seções e 7 dúvidas). A atualizar com: aba Metas da demonstração com o logotipo no cabeçalho (reserva 15% e "0,9 mês"; viagem 20% e R$ 480,00 por mês), calculadora com chips sem pré-seleção, aporte que anima a barra e não muda o Resumo, resgate retroativo recusado com a mensagem, movimento reduzido sem animação, aviso "Dinheiro guardado não é gasto", texto novo de "Quem vê estes dados?"
+- [ ] Teste manual em iOS, Android e web, com e sem movimento reduzido e com leitor de tela (barra de progresso, formulários de movimento e exclusão)
+- [ ] Opcional, sem ciclo: meta "Contas do ano" pré-preenchida com o valor do ano dividido por 12 (a recomendação de P-019 previa; não entrou)
+
+## Plano de guardar (D-036), dentro do Ciclo C
+
+- [x] Banco: `savings_checks` e `set_savings_answer` na migração 0007, com datas de voltar a perguntar calculadas no banco, leitura só pela própria pessoa, resposta que não conta como atividade e privilégios (`supabase/tests/65_guardar.sql`)
+- [x] Core: quando perguntar, plano em etapas (reserva de 1, 3 e 6 meses dos gastos essenciais e metas por prazo), "Usar este plano", reserva mínima a partir de R$ 100,00, passos pequenos e textos; repositório em memória e demonstração com a resposta "consigo" de R$ 500,00 (`savings.test.ts`, 45 testes)
+- [x] App ligado ao banco, com testes pela API (responder, repetir a chave, versão e outra pessoa sem leitura)
+- [x] Telas: o card da pergunta no topo da aba Metas, `/guardar` (plano, escolha da etapa e "Usar este plano"), `/guardar/minima` (reserva mínima e passos pequenos) e o 4º passo, "Planejar quanto guardar", no card "Primeiros passos" do Resumo (a conta nova passa a ter quatro passos); a reconciliação de resultado incerto repete a mesma chave
+- [ ] Roteiro web (`npm run test:web`): hoje espera três passos em "Primeiros passos" (oito critérios falham por isso); a atualizar com os quatro passos, as três respostas, o plano de R$ 300,00 e de R$ 500,00 por mês, a reserva mínima e a volta da pergunta quando a renda de referência muda
+- [ ] Revisão dos textos por Enzo antes de publicar (tom sem cobrança, sem "você deveria")
+
+## Ciclo D: simulador (D-028)
+
+Sem mudança no banco. Mesmas execuções do Ciclo B, mais `simulate.test.ts` (35 testes) dentro do `npm test`.
+
+- [x] Core: contas com taxa digitada (aportes no início de cada mês, resposta "a" de Enzo em 09/10/2026), três modos, formulário e erros na ordem da tela, hipóteses (`previewHypotheses`), ano a ano, "Criar meta com estes valores" sem a taxa, links de contexto e textos
+- [x] Tela `/simular`: aviso fixo e abertura visíveis sem rolar a 360 × 640, taxa vazia por padrão, resultado sem rendimento ao lado, gráfico por ano com tabela equivalente, nada gravado; conferida no navegador em 390, 360 e 320 px, com movimento reduzido, em roteiros avulsos fora do `npm run test:web`
+- [x] Entradas: aba Metas ("Simular um plano"), detalhe da meta ("Simular com rendimento"), calculadora "Juntar para um objetivo" ("Simular com rendimento"), atalho "Simular" no topo de "Dinheiro no tempo" em Aprender, o tema "Como ler uma simulação" e o endereço direto
+- [ ] Abrir a Calculadora do Cidadão, do Banco Central, e comparar um resultado de "Aplicação com depósitos regulares" com o do simulador, com tolerância de 1 centavo: a página só foi vista por trecho de busca (`docs/02`)
+- [ ] Roteiro web (`npm run test:web`), que ainda não tem os passos do Ciclo D: taxa vazia por padrão; resultado sem rendimento ao lado; aviso e abertura sem rolagem em 360 px; tabela ano a ano; "Criar meta com estes valores" sem a taxa no endereço; as quatro entradas e o endereço direto; nenhum termo proibido
+- [ ] Decidir com Enzo: "hipóteses e aviso visíveis sem rolagem em 360 px" vale só para o aviso e a abertura; as hipóteses ficam abaixo do formulário. Subir as hipóteses para antes dos campos empurra os campos para baixo
+- [ ] Teste manual em iOS, Android e web, com e sem movimento reduzido e com leitor de tela (anúncio do resultado e rolagem até ele, teclado numérico, tabela ano a ano)
+
+
 ## Próximos ciclos
 
-Nesta ordem (D-023 com a mudança de D-034). Os Ciclos A6, A4 e A5, que vinham primeiro, estão nas seções acima.
-
-- **A2. Lembretes de contas a pagar:** aviso local no aparelho no dia anterior ao vencimento, sem valor nem descrição na tela bloqueada (P-011). Exige build de desenvolvimento e teste em aparelho. Pode correr em paralelo aos outros ciclos.
-- **B. Renda comprometida:** quanto da renda de referência já tem destino no mês, com gastos fixos, contas do ano, parcelamentos e outras contas, sem cor de alerta; decidir antes a reserva para contas do ano (P-019).
-- **C. Metas e reserva para imprevistos:** aba Metas com reserva, metas, aportes, resgates e atualizações registrados; a média de gastos essenciais não conta os pagamentos de contas do ano.
-- **D. Simulador:** quanto guardar por mês, em quanto tempo e quanto posso ter, com a taxa digitada pela pessoa; só simulação, sem indicar produto, e só informação pública já disponível (D-034).
+Os Ciclos A6, A4, A5, A2, B, C e D, que vinham primeiro (D-023 com a mudança de D-034), estão nas seções acima. Seguem a Família (Ciclo 2), os cartões e o benefício empresarial, abaixo.
 
 ## Ciclo 2: família
 
@@ -120,7 +176,7 @@ Convite com permissões e validade, aceite, saída e revogação; "Quem vê este
 
 ## Ciclo 3: cartões
 
-Cartão e fatura sem contar duas vezes, com as parcelas de compras no cartão. A recorrência de contas a pagar foi para o Ciclo A, e lembretes e metas foram para os Ciclos A2 e C (D-023).
+Cartão e fatura sem contar duas vezes, com as parcelas de compras no cartão. A recorrência de contas a pagar foi para o Ciclo A, e lembretes e metas foram para os Ciclos A2 e C (D-023), já implementados.
 
 ## Ciclo 4: benefício empresarial e comercialização
 
