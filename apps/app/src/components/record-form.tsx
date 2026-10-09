@@ -641,7 +641,7 @@ function DayField({
           {...aria}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          style={[ui.inputText, styles.dayInput]}
+          style={styles.dayInput}
         />
         <Txt color={colors.textSecondary} style={tabular} accessibilityElementsHidden importantForAccessibility="no">
           {RETURN_TEXT.daySuffix(month)}
@@ -664,7 +664,18 @@ function DayField({
 
 const styles = StyleSheet.create({
   body: { padding: space[5], gap: space[4], paddingBottom: space[6] },
-  dayInput: { flex: 0, width: 48, textAlign: 'right' },
+  // Só o dia (2 algarismos), alinhado à direita, colado ao sufixo "/06/2026".
+  dayInput: {
+    width: 40,
+    alignSelf: 'stretch',
+    paddingVertical: space[3],
+    fontFamily: fonts.medium,
+    fontSize: 16,
+    color: colors.text,
+    textAlign: 'right',
+    fontVariant: ['tabular-nums'],
+    outlineStyle: 'none',
+  } as object,
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
   inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
   footer: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space[3], paddingHorizontal: space[5] },

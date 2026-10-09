@@ -283,11 +283,16 @@ export default function AtualizarMeses() {
     router.push({ pathname: '/retomar/pagar', params: { serie: current.series.id, numero: String(current.series.number) } });
   };
 
-  // Na volta das telas de pagamento e do modo "Dia": aplica o que foi confirmado lá.
+  // Na volta das telas de pagamento e do modo "Dia": aplica o que foi confirmado lá (é uma ação do passo atual).
+  const stepMonth = step?.month ?? null;
   useFocusEffect(
     useCallback(() => {
       const taken = returnSession.take();
-      if (taken.acted) setActed(true);
+      const actedHere = () => {
+        setActed(true);
+        if (stepMonth) setActedIn((cur) => ({ ...cur, [stepMonth]: true }));
+      };
+      if (taken.acted || taken.outcomes.length > 0) actedHere();
       for (const [rowKey, outcome] of taken.outcomes) {
         setOutcomes((cur) => ({ ...cur, [rowKey]: outcome }));
         setNotes(({ [rowKey]: _gone, ...rest }) => rest);
@@ -303,11 +308,11 @@ export default function AtualizarMeses() {
             setOutcomes((cur) => ({ ...cur, [check.rowKey]: { type: 'paga', commitment: c } }));
             setNotes(({ [check.rowKey]: _gone, ...rest }) => rest);
             setSelected((cur) => cur.filter((k) => k !== check.rowKey));
-            setActed(true);
+            actedHere();
           })
           .catch(() => {});
       }
-    }, [repo]),
+    }, [repo, stepMonth]),
   );
 
   // Ao trocar de passo: rolagem no topo e foco no título do mês.
