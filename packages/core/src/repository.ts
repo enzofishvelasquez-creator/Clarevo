@@ -414,12 +414,14 @@ export interface RecordsRepository {
   deleteCard(key: string, id: string, expectedVersion: number): Promise<CardWrite>;
   /**
    * add_card_purchase: sem versão (como create_record). A 1ª parcela cai na fatura cujo período contém a data; as outras, nas
-   * seguintes. Fatura já paga (por exemplo, paga antes do fechamento) NÃO recusa a compra: ela vai para a primeira fatura
-   * seguinte em que nenhuma parcela cruza fatura paga (`purchaseFirstInvoiceMonth` com `paidInvoiceMonths`; o `invoiceMonth` da
-   * compra devolvida diz qual foi). Ordem: repetição; nao_encontrado; sem_permissao; cartao_arquivado; CARD_PURCHASE_CODE_ORDER
+   * seguintes. Fatura natural ainda ABERTA e paga cedo NÃO recusa a compra: ela vai para a primeira fatura seguinte em que
+   * nenhuma parcela cruza fatura paga (`purchaseFirstInvoiceMonth` com `paidInvoiceMonths` e a data de hoje; o `invoiceMonth`
+   * da compra devolvida diz qual foi). Fatura natural já FECHADA e paga (ou com parcela adiante em fatura paga) recusa com
+   * fatura_paga (texto: `cardErrorText('fatura_paga', { purchase: true })`): a compra não vai para a fatura atual; quem foi
+   * cobrado depois registra um encargo ou ajuste na fatura atual. Ordem: repetição; nao_encontrado; sem_permissao; cartao_arquivado; CARD_PURCHASE_CODE_ORDER
    * (valor_invalido, valor_acima_do_limite, descricao_obrigatoria, descricao_longa, categoria_invalida, parcelas_invalidas,
    * data_invalida, data_futura); com receiptKey (o resumo SHA-256 da chave, nunca a chave): chave_de_nota_invalida,
-   * nota_ja_anotada (detalhe "registro=<id>" ou "compra=<id>"); limite_de_lancamentos. entry = a compra.
+   * nota_ja_anotada (detalhe "registro=<id>" ou "compra=<id>"); limite_de_lancamentos; fatura_paga. entry = a compra.
    */
   addCardPurchase(key: string, cardId: string, input: CardPurchaseInput): Promise<CardWrite>;
   /**

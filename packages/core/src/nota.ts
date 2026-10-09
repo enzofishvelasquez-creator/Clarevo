@@ -81,6 +81,12 @@ export type ReceiptErrorCode = (typeof RECEIPT_ERROR_CODES)[number];
 /** 55 = NF-e (compras online, DANFE em PDF); 65 = NFC-e (varejo presencial, QR). */
 export type ReceiptModel = '55' | '65';
 
+/**
+ * Atenção (privacidade): `AccessKeyInfo` e o resultado de `readReceiptCode` guardam a chave de 44 caracteres, que numa nota de
+ * pessoa física contém o CPF do emitente. Só existem em memória, para a tela de confirmação. O que pode ir para o banco, para
+ * o rascunho mantido sem conexão e para qualquer armazenamento do aparelho é o `ReceiptDraft` (com `receiptKey`, o resumo
+ * SHA-256), nunca a leitura, a chave nem `key`.
+ */
 export interface AccessKeyInfo {
   /**
    * A chave inteira (44 caracteres, maiúsculas). Só em memória: NÃO é o que o registro guarda (a de pessoa física tem o CPF
@@ -544,20 +550,44 @@ function validHost(host: string): boolean {
 }
 
 /**
- * O domínio é de governo (termina em ".gov.br") e coerente com a UF da chave: algum rótulo dele é a sigla da UF, como em
- * "fazenda.sp.gov.br", "sefaz.go.gov.br" ou "nfce.sefaz.pe.gov.br". Regra de Enzo (spec9 §5) para os estados fora da lista de
- * `SEFAZ_QR_HOSTS`, que fica como a rota preferida; vale também quando um estado muda de endereço, até a lista ser atualizada.
+ * Rótulos que identificam o órgão fiscal da UF (Sefaz, Fazenda, Sefin e os portais de nota). O rótulo logo antes da sigla da UF
+ * precisa ser um destes: assim "nfce.sefaz.pe.gov.br" e "www.fazenda.df.gov.br" passam, e prefeituras ("www.recife.pe.gov.br",
+ * "fazenda.recife.pe.gov.br"), secretarias de outras áreas e o portal geral do estado ("pe.gov.br") não.
+ */
+export const SEFAZ_HOST_LABELS: readonly string[] = [
+  'sefaz',
+  'sefaznet',
+  'sefa',
+  'sef',
+  'set',
+  'sefin',
+  'fazenda',
+  'receita',
+  'nfce',
+  'nfe',
+  'nfeweb',
+  'dfe',
+  'portalsped',
+  'portalnfce',
+];
+
+/**
+ * O domínio é de governo e de órgão fiscal da UF da chave: termina em "<sigla da UF>.gov.br" (a sigla é o rótulo LOGO ANTES de
+ * "gov.br", então "sp.qualquer.rj.gov.br" não vale para SP nem para RJ) e o rótulo logo antes da sigla é um de
+ * `SEFAZ_HOST_LABELS`, como em "fazenda.sp.gov.br", "sefaz.go.gov.br" ou "nfce.sefaz.pe.gov.br". Regra de Enzo (spec9 §5) para
+ * os estados fora da lista de `SEFAZ_QR_HOSTS`, que fica como a rota preferida; vale também quando um estado muda de endereço,
+ * até a lista ser atualizada.
  */
 function govHostOfUf(host: string, uf: UfSigla): boolean {
   if (!host.endsWith('.gov.br') || !validHost(host)) return false;
   const labels = host.split('.');
-  return labels.slice(0, -2).includes(uf.toLowerCase());
+  return labels.length >= 4 && labels[labels.length - 3] === uf.toLowerCase() && SEFAZ_HOST_LABELS.includes(labels[labels.length - 4]!);
 }
 
 /**
  * Endereço para "Ver a nota no site da Sefaz": o endereço do QR lido, só quando o domínio é oficial da UF da chave. Dois
- * caminhos: (1) o domínio está na lista `SEFAZ_QR_HOSTS` da UF; (2) para os outros estados, qualquer domínio ".gov.br" coerente
- * com a UF da chave (a sigla da UF é um dos rótulos do domínio). O RJ só aceita o domínio confirmado (o endereço antigo
+ * caminhos: (1) o domínio está na lista `SEFAZ_QR_HOSTS` da UF; (2) para os outros estados, um domínio de órgão fiscal ".gov.br" coerente
+ * com a UF da chave ("<Sefaz, Fazenda...>.<sigla da UF>.gov.br", ver `SEFAZ_HOST_LABELS`; prefeituras não valem). O RJ só aceita o domínio confirmado (o endereço antigo
  * deixou de valer de propósito). Devolve `esquema://domínio/caminho?consulta` (sem usuário, porta nem trecho "#"; domínio em
  * minúsculas) ou null quando o domínio não serve, o endereço tem usuário, porta, espaço ou contra-barra, o esquema não é http
  * nem https, ou não há consulta. Sem esquema, usa https. Só chama o endereço quem toca no botão; nada é guardado.

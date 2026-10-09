@@ -5,6 +5,7 @@ import {
   NOTA_ERROR_TEXT,
   NOTA_TEXT,
   RECEIPT_ERROR_CODES,
+  SEFAZ_HOST_LABELS,
   SEFAZ_QR_HOSTS,
   UF_BY_CODE,
   UF_SIGLAS,
@@ -538,7 +539,7 @@ describe('página oficial da Sefaz', () => {
     }
     expect(SEFAZ_QR_HOSTS.RJ).toEqual(['consultadfe.fazenda.rj.gov.br']);
     expect(Object.keys(SEFAZ_QR_HOSTS).length).toBeGreaterThanOrEqual(19);
-    // Sem confirmação nesta conferência: fora da lista. O botão vem da regra geral (domínio ".gov.br" coerente com a UF), não
+    // Sem confirmação nesta conferência: fora da lista. O botão vem da regra geral ("<Sefaz ou Fazenda>.<UF>.gov.br"), não
     // de um domínio anotado; um ".gov.br" sem a sigla da UF não serve.
     for (const uf of ['AC', 'AP', 'MA', 'SE', 'MT', 'PA', 'PE', 'RR'] as const) {
       expect(SEFAZ_QR_HOSTS[uf], uf).toBeUndefined();
@@ -549,18 +550,18 @@ describe('página oficial da Sefaz', () => {
     expect(officialQueryUrl('RR', 'https://portalapp.sefaz.rr.gov.br/nfce/servlet/qrcode?p=A')).toBe('https://portalapp.sefaz.rr.gov.br/nfce/servlet/qrcode?p=A');
   });
 
-  it('regra de Enzo para os outros estados: qualquer ".gov.br" coerente com a UF da chave (a lista é a rota preferida)', () => {
+  it('regra de Enzo para os outros estados: ".gov.br" de órgão fiscal da UF da chave (a lista é a rota preferida)', () => {
     // PE, PA, MT, MA ... não estão na lista e ganham o botão pelo próprio endereço do QR.
     const pe = 'http://nfce.sefaz.pe.gov.br/nfce/consulta?p=26261000052998224725550010000001241000000026|2|1|1|ABC';
     expect(officialQueryUrl('PE', pe)).toBe(pe);
     expect(officialQueryUrl('PA', 'https://app.sefa.pa.gov.br/consulta?p=A')).toBe('https://app.sefa.pa.gov.br/consulta?p=A');
     expect(officialQueryUrl('MA', 'https://sefaz.ma.gov.br/q?p=A')).toBe('https://sefaz.ma.gov.br/q?p=A');
-    // Domínio fictício, só para a regra: qualquer host .gov.br com a sigla como rótulo.
-    expect(officialQueryUrl('PE', 'https://qualquer.coisa.pe.gov.br/x/y?p=A#frag')).toBe('https://qualquer.coisa.pe.gov.br/x/y?p=A');
-    expect(officialQueryUrl('PE', 'https://PE.GOV.BR/x?p=A')).toBe('https://pe.gov.br/x?p=A');
+    // Domínio fictício, só para a regra: "<rótulo da Sefaz ou Fazenda>.<sigla da UF>.gov.br", com subdomínios na frente.
+    expect(officialQueryUrl('PE', 'https://consulta.nfce.sefaz.pe.gov.br/x/y?p=A#frag')).toBe('https://consulta.nfce.sefaz.pe.gov.br/x/y?p=A');
+    expect(officialQueryUrl('PE', 'https://SEFAZ.PE.GOV.BR/x?p=A')).toBe('https://sefaz.pe.gov.br/x?p=A');
     expect(officialQueryUrl('DF', 'fazenda.df.gov.br/nfce/qrcode?p=A')).toBe('https://fazenda.df.gov.br/nfce/qrcode?p=A');
     // Um estado da lista que muda de endereço não perde o botão até a próxima versão.
-    expect(officialQueryUrl('RN', 'https://novo-endereco.rn.gov.br/consultar?p=A')).toBe('https://novo-endereco.rn.gov.br/consultar?p=A');
+    expect(officialQueryUrl('RN', 'https://novo-endereco.sefaz.rn.gov.br/consultar?p=A')).toBe('https://novo-endereco.sefaz.rn.gov.br/consultar?p=A');
     expect(officialQueryUrl('SP', 'https://portal.fazenda.sp.gov.br/nfce?p=A')).not.toBeNull();
     // A lista continua valendo, mesmo sem a sigla no domínio.
     expect(officialQueryUrl('SC', 'https://sat.sef.sc.gov.br/nfce/consulta?p=A')).not.toBeNull();
@@ -586,6 +587,29 @@ describe('página oficial da Sefaz', () => {
       'https://sefaz.pe.gov.br/q?p=A B',
     ]) {
       expect(officialQueryUrl('PE', url), url).toBeNull();
+    }
+    // A sigla da UF é o rótulo LOGO ANTES de "gov.br": um host de outra UF com a sigla no meio não vale para nenhuma das duas.
+    expect(officialQueryUrl('SP', 'https://sp.qualquer.rj.gov.br/x?p=1')).toBeNull();
+    expect(officialQueryUrl('RJ', 'https://sp.qualquer.rj.gov.br/x?p=1')).toBeNull();
+    expect(officialQueryUrl('SP', 'https://sefaz.sp.rj.gov.br/x?p=1')).toBeNull();
+    expect(officialQueryUrl('PE', 'https://sefaz.pe.sp.gov.br/x?p=1')).toBeNull();
+    expect(officialQueryUrl('SP', 'https://sefaz.rj.gov.br/x?p=1')).toBeNull();
+    // Só órgão fiscal: o rótulo antes da sigla é Sefaz, Fazenda, Sefin, Sef, Set, NFC-e, DFe ou portal de nota (SEFAZ_HOST_LABELS).
+    for (const label of SEFAZ_HOST_LABELS) expect(officialQueryUrl('PE', `https://${label}.pe.gov.br/x?p=A`), label).toBe(`https://${label}.pe.gov.br/x?p=A`);
+    expect(SEFAZ_HOST_LABELS).toEqual(expect.arrayContaining(['sefaz', 'fazenda', 'sef', 'set', 'sefin', 'nfce', 'dfe', 'portalsped']));
+    // Prefeituras e outros órgãos do estado ou do município não são Sefaz, mesmo com a sigla da UF certa.
+    for (const [uf, url] of [
+      ['PE', 'https://www.recife.pe.gov.br/nfse?p=A'],
+      ['PE', 'https://fazenda.recife.pe.gov.br/q?p=A'],
+      ['PE', 'https://nfse.recife.pe.gov.br/q?p=A'],
+      ['PE', 'https://pe.gov.br/x?p=A'],
+      ['PE', 'https://qualquer.coisa.pe.gov.br/x?p=A'],
+      ['PE', 'https://novo-endereco.pe.gov.br/x?p=A'],
+      ['SP', 'https://www.prefeitura.sp.gov.br/q?p=A'],
+      ['SP', 'https://educacao.sp.gov.br/q?p=A'],
+      ['SP', 'https://sefaz-sp.gov.br/q?p=A'],
+    ] as const) {
+      expect(officialQueryUrl(uf, url), url).toBeNull();
     }
     // O RJ é o único com leitura automática: só o domínio confirmado, nenhum outro ".gov.br" do estado.
     expect(officialQueryUrl('RJ', 'https://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode?p=A')).not.toBeNull();

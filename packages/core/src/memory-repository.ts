@@ -1603,9 +1603,10 @@ export class MemoryRepository implements RecordsRepository {
 
   /**
    * Como add_card_purchase. Ordem: repetição; trava; cartao_arquivado; campos (cardPurchaseError); chave da nota
-   * (chave_de_nota_invalida, nota_ja_anotada); limite_de_lancamentos; escrita (a fatura da 1ª parcela é a do período que contém
-   * a data, com os dias que o cartão tem hoje, e fica fixada; se ela, ou alguma fatura das parcelas, já está paga, a compra vai
-   * para a primeira fatura seguinte livre: pagar cedo não trava o cartão).
+   * (chave_de_nota_invalida, nota_ja_anotada); limite_de_lancamentos; fatura_paga; escrita (a fatura da 1ª parcela é a do
+   * período que contém a data, com os dias que o cartão tem hoje, e fica fixada; se ela ainda está ABERTA e foi paga cedo, ou
+   * alguma fatura das parcelas está paga, a compra vai para a primeira fatura seguinte livre: pagar cedo não trava o cartão.
+   * Se ela já FECHOU e está paga, a compra é recusada com fatura_paga).
    */
   async addCardPurchase(key: string, cardId: string, input: CardPurchaseInput) {
     return this.write(() => {
@@ -1623,7 +1624,9 @@ export class MemoryRepository implements RecordsRepository {
         this.checkReceiptFree(card.contextId, norm.receiptKey);
       }
       this.checkEntryCap(cardId, norm.installments);
-      const first = purchaseFirstInvoiceMonth(card, norm.purchasedOn, norm.installments, this.paidMonths(cardId));
+      const first = purchaseFirstInvoiceMonth(card, norm.purchasedOn, norm.installments, this.paidMonths(cardId), today);
+      // Fatura natural já fechada e paga (ou outra parcela em fatura paga): recusa, sem empurrar a compra para a fatura atual.
+      for (let k = 0; k < norm.installments; k++) if (this.invoicePaid(cardId, addMonths(first, k))) throw new RepoError('fatura_paga');
       const entry = this.newEntry(card, {
         kind: 'compra',
         description: norm.description,
@@ -1727,7 +1730,7 @@ export class MemoryRepository implements RecordsRepository {
         const change = norm.totalCents !== entry.amountCents || norm.installments !== entry.installments || norm.purchasedOn !== entry.purchasedOn;
         if (change) {
           const first =
-            norm.purchasedOn === entry.purchasedOn ? entry.invoiceMonth : purchaseFirstInvoiceMonth(card, norm.purchasedOn, norm.installments, this.paidMonths(card.id));
+            norm.purchasedOn === entry.purchasedOn ? entry.invoiceMonth : purchaseFirstInvoiceMonth(card, norm.purchasedOn, norm.installments, this.paidMonths(card.id), today);
           for (let k = 0; k < entry.installments; k++) if (this.invoicePaid(card.id, addMonths(entry.invoiceMonth, k))) throw new RepoError('fatura_paga');
           for (let k = 0; k < norm.installments; k++) if (this.invoicePaid(card.id, addMonths(first, k))) throw new RepoError('fatura_paga');
           if (norm.installments > entry.installments) this.checkEntryCap(card.id, norm.installments - entry.installments);

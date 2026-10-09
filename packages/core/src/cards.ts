@@ -46,9 +46,11 @@ import { calcLinkParams } from './calculators/links';
  *   do fechamento fica nessa fatura; só a compra DEPOIS do fechamento vai para a seguinte.
  * - Compra em n parcelas: o valor total dividido por n, com o resto de centavos na primeira; a parcela 1 cai na fatura
  *   cujo período contém a data da compra e as outras nas n - 1 faturas seguintes. A fatura da parcela 1 é fixada ao gravar.
- * - Fatura paga antes do fechamento (permitido) não trava o cartão: a compra do mesmo ciclo vai para a primeira fatura
- *   seguinte em que nenhuma parcela cruza fatura paga (`purchaseFirstInvoiceMonth` com as faturas pagas), a conta dessa fatura
- *   cresce, o dinheiro é conservado e a pessoa continua podendo pagar o que falta. O aviso da compra mostra a fatura real.
+ * - Fatura paga antes do fechamento (permitido) não trava o cartão: a compra do mesmo ciclo, feita enquanto a fatura natural
+ *   ainda está aberta, vai para a primeira fatura seguinte em que nenhuma parcela cruza fatura paga (`purchaseFirstInvoiceMonth`
+ *   com as faturas pagas e a data de hoje), a conta dessa fatura cresce, o dinheiro é conservado e a pessoa continua podendo
+ *   pagar o que falta. O aviso da compra mostra a fatura real. Se a fatura natural já FECHOU e está paga, a compra é recusada
+ *   (fatura_paga): o banco já a cobrou ali, e empurrá-la para a fatura atual faria a pessoa pagar de novo.
  * - Total da fatura = parcelas + encargos + saldo anterior - estornos. Nunca negativo no pagamento: com total negativo, o
  *   crédito vira um estorno automático (gravado, com a fatura de origem) na fatura seguinte, mantido pelas funções de cartão.
  * - Situação: aberta (hoje até o dia do fechamento), fechada (depois do fechamento, sem pagamento), paga ou paga em parte.
@@ -171,13 +173,19 @@ export function purchaseInstallments(entry: Pick<CardEntry, 'id' | 'amountCents'
 }
 
 /**
- * Fatura da 1ª parcela de uma compra feita na data (fixada ao gravar). Pagar a fatura antes do fechamento é permitido e não
- * trava o cartão: com `paidMonths` (as faturas já pagas ou pagas em parte, `paidInvoiceMonths`), a compra vai para a primeira
- * fatura, a partir da do período da data, em que nenhuma das `installments` parcelas seguidas cruza uma fatura paga (mesma regra
- * de clarevo_first_free_month no banco). Sem faturas pagas, é a fatura cujo período contém a data.
+ * Fatura da 1ª parcela de uma compra feita na data (fixada ao gravar). Pagar a fatura ANTES do fechamento é permitido e não
+ * trava o cartão: quando a fatura natural (a do período que contém a data) ainda está aberta (`today` até o fechamento), a
+ * compra vai, com `paidMonths` (as faturas já pagas ou pagas em parte, `paidInvoiceMonths`), para a primeira fatura, a partir
+ * da natural, em que nenhuma das `installments` parcelas seguidas cruza uma fatura paga (mesma regra de
+ * clarevo_purchase_first_month no banco). Sem faturas pagas, é a fatura cujo período contém a data.
+ *
+ * Fatura natural já FECHADA: devolve a própria fatura natural, sem desvio. Se ela (ou outra parcela) estiver paga, quem grava
+ * recusa com `fatura_paga`: o banco já cobrou aquela compra na fatura fechada, e empurrá-la para a fatura atual faria a pessoa
+ * pagar de novo. Quem cobrou depois registra um encargo ou ajuste na fatura atual.
  */
-export function purchaseFirstInvoiceMonth(card: CardDays, purchasedOn: IsoDate, installments = 1, paidMonths: Iterable<IsoMonth> = []): IsoMonth {
+export function purchaseFirstInvoiceMonth(card: CardDays, purchasedOn: IsoDate, installments: number, paidMonths: Iterable<IsoMonth>, today: IsoDate): IsoMonth {
   let month = invoiceMonthOf(card, purchasedOn);
+  if (today > invoiceClosingOn(card, month)) return month;
   const paid = [...paidMonths].sort();
   if (paid.length === 0) return month;
   const count = Math.max(1, installments);
@@ -212,7 +220,7 @@ export type CardInputErrorCode = (typeof CARD_INPUT_CODE_ORDER)[number];
 export function cardInputError(input: CardInput): CardInputErrorCode | null {
   const name = input.name;
   if (typeof name !== 'string' || name !== name.trim() || charCount(name) < 1 || charCount(name) > CARD_NAME_MAX) return 'apelido_invalido';
-  // O apelido não é lugar de número de cartão: 13 a 19 dígitos (ignorando tudo que não é dígito) são recusados.
+  // O apelido não é lugar de número de cartão (`looksLikeCardNumber`).
   if (looksLikeCardNumber(name)) return 'apelido_invalido';
   if (input.lastDigits !== null && (typeof input.lastDigits !== 'string' || !/^\d{4}$/.test(input.lastDigits))) return 'final_invalido';
   if (!isInt(input.closingDay) || input.closingDay < 1 || input.closingDay > 31) return 'dia_de_fechamento_invalido';
@@ -224,11 +232,24 @@ export function cardInputError(input: CardInput): CardInputErrorCode | null {
 }
 
 /**
- * 13 a 19 dígitos no texto, ignorando todo caractere que não seja dígito (espaço, ponto, hífen, barra, vírgula, sublinhado,
- * letras...): parece número de cartão (nunca guardado). Mesma regra de cards_apelido_sem_numero no banco.
+ * Parece número de cartão (nunca guardado): 13 a 19 dígitos seguidos, ou em grupos de 3 ou mais dígitos separados por UM só
+ * espaço, ponto, hífen, barra, vírgula ou sublinhado ("4111 1111 1111 1111", "3782-822463-10005"). Dígitos espalhados entre
+ * palavras ou em grupos curtos não contam ("Conta 0001 12345678-9", "Cartão 2024/2025 nº 123456"). Mesma regra de
+ * clarevo_looks_like_card_number no banco.
  */
 export function looksLikeCardNumber(text: string): boolean {
-  return /[0-9]{13,19}/.test(text.replace(/[^0-9]/g, ''));
+  for (const chain of text.match(/[0-9]{3,}(?:[ .,/_-][0-9]{3,})*/g) ?? []) {
+    const sizes = chain.split(/[^0-9]/).map((g) => g.length);
+    for (let i = 0; i < sizes.length; i++) {
+      let sum = 0;
+      for (let j = i; j < sizes.length; j++) {
+        sum += sizes[j]!;
+        if (sum >= 13 && (sum <= 19 || j === i)) return true;
+        if (sum > 19) break;
+      }
+    }
+  }
+  return false;
 }
 
 /** Campos do cartão como o banco os grava: apelido e final aparados (final vazio vira nulo), ausentes viram nulos. */
@@ -857,7 +878,7 @@ export function validateCardDraft(draft: CardDraft): { ok: true; input: CardInpu
   // Todos os erros de uma vez, na ordem dos campos; o código devolvido é o primeiro, como no banco.
   for (const code of CARD_INPUT_CODE_ORDER) {
     const probe = { ...DUMMY_CARD, [CODE_PROBE_FIELD[code]]: input[CODE_PROBE_FIELD[code]] } as CardInput;
-    if (cardInputError(probe) === code) errors[FIELD_OF_CODE[code]] = CARD_ERROR_TEXT[code];
+    if (cardInputError(probe) === code) errors[FIELD_OF_CODE[code]] = cardErrorText(code, { nickname: input.name });
   }
   const code = cardInputError(input);
   return code ? { ok: false, errors, code } : { ok: true, input };
@@ -927,7 +948,7 @@ export interface InvoicePaymentDraft {
 /** "Pagar fatura": total ou "Outro valor", e a data do pagamento. */
 export function validateInvoicePaymentDraft(
   draft: InvoicePaymentDraft,
-  invoice: Pick<Invoice, 'totalCents'> & Partial<Pick<Invoice, 'periodStartOn'>>,
+  invoice: Pick<Invoice, 'totalCents' | 'periodStartOn'>,
   today: IsoDate,
 ): { ok: true; amountCents: Cents; paidOn: IsoDate; partial: boolean } | { ok: false; errors: Partial<Record<'amountText' | 'dateText', string>>; code: InvoicePaymentErrorCode } {
   const amountCents = draft.mode === 'total' ? invoice.totalCents : (parseBRL(draft.amountText) ?? Number.NaN);
@@ -1159,7 +1180,7 @@ export function cardSummaryTexts(s: CardSummary, today: IsoDate): CardSummaryTex
 /** Mensagens de erro de cartões, faturas e lançamentos (códigos do banco). Sem "disponível" nem julgamento. */
 export const CARD_ERROR_TEXT = {
   ...ERROR_TEXT,
-  apelido_invalido: 'Dê um apelido de 1 a 30 caracteres, como Nubank. Não use o número do cartão.',
+  apelido_invalido: 'Dê um apelido de 1 a 30 caracteres, como Nubank.',
   final_invalido: 'Informe só os 4 últimos dígitos, sem o número completo.',
   dia_de_fechamento_invalido: 'Informe o dia do fechamento, de 1 a 31.',
   dia_de_vencimento_invalido: 'Informe o dia do vencimento, de 1 a 31.',
@@ -1194,8 +1215,15 @@ export const CARD_ERROR_TEXT = {
   desfazer_falhou: 'Não foi possível desfazer o pagamento da fatura. Tente novamente.',
 } as const;
 
-/** Texto do código; código desconhecido: falha genérica. */
-export function cardErrorText(code: string): string {
+/**
+ * Texto do código; código desconhecido: falha genérica. Com o contexto, explica o motivo certo: `nickname` (apelido que parece
+ * número de cartão) e `purchase` (compra de uma fatura já fechada e paga).
+ */
+export function cardErrorText(code: string, context: { nickname?: string; purchase?: boolean } = {}): string {
+  if (code === 'apelido_invalido' && typeof context.nickname === 'string' && looksLikeCardNumber(context.nickname)) {
+    return CARDS_TEXT.form.nameHasNumber;
+  }
+  if (code === 'fatura_paga' && context.purchase) return CARDS_TEXT.expense.paidInvoicePurchase;
   const texts: Record<string, string> = CARD_ERROR_TEXT;
   return code in texts ? texts[code]! : ERROR_TEXT.salvar_falhou;
 }
@@ -1219,6 +1247,7 @@ export const CARDS_TEXT = {
     editTitle: 'Editar cartão',
     name: 'Apelido do cartão',
     nameHint: 'Por exemplo: Nubank ou Cartão do mercado',
+    nameHasNumber: 'Não use o número do cartão no apelido. Use os 4 últimos dígitos no campo próprio.',
     lastDigits: 'Últimos 4 dígitos (opcional)',
     lastDigitsHint: 'Só os 4 últimos dígitos. Nunca o número completo, o código de segurança nem a validade.',
     closingDay: 'Dia do fechamento',
@@ -1257,6 +1286,8 @@ export const CARDS_TEXT = {
     cash: 'Dinheiro, débito ou Pix',
     credit: 'Cartão de crédito',
     chooseCard: 'Escolha o cartão',
+    paidInvoicePurchase:
+      'Esta compra é de uma fatura já paga. Se o banco cobrou depois, registre como encargo ou ajuste na fatura atual, em Informar encargos.',
     registerCard: 'Cadastrar cartão',
     installments: 'Em quantas vezes?',
     installmentsHint: 'De 1 a 48 parcelas.',

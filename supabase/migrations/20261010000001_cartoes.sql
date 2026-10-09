@@ -33,8 +33,10 @@
 --     existe como UM saldo anterior vivo na fatura seguinte, e só nesse caso.
 -- C4. O estorno automático de uma fatura seguinte = crédito (total negativo) da anterior.
 -- C5. Fatura paga não muda: encargos e estornos novos, e lançamentos alterados ou excluídos numa fatura paga, são recusados
---     (fatura_paga). Uma COMPRA nova (ou com data nova) cujo ciclo cairia numa fatura paga não é recusada: vai para a primeira
---     fatura seguinte livre (clarevo_first_free_month), para que pagar a fatura aberta cedo não trave o cartão.
+--     (fatura_paga). Uma COMPRA nova (ou com data nova) cuja fatura natural ainda está ABERTA e foi paga cedo não é recusada: vai
+--     para a primeira fatura seguinte livre (clarevo_purchase_first_month), para que pagar a fatura aberta cedo não trave o
+--     cartão. Se a fatura natural já FECHOU e está paga (ou outra parcela cai em fatura paga), a compra é recusada (fatura_paga):
+--     o banco já a cobrou ali, e ela não vai para a fatura atual.
 -- C6. Nota fiscal: o resumo SHA-256 da chave de acesso é único por contexto entre gastos e compras no cartão vivos.
 -- Ordem de travas: chave → cartão → compra (parcelas por número) → contas das faturas (por mês) → registro.
 -- A atividade (gatilho de record_operations, 0005) é a última, como em toda escrita. Pagar fatura de outra pessoa exige
@@ -43,6 +45,44 @@
 -- ---------------------------------------------------------------------------
 -- Cartões
 -- ---------------------------------------------------------------------------
+-- Parece número de cartão (13 a 19 dígitos seguidos, ou em grupos de 3 ou mais dígitos separados por UM só espaço, ponto, hífen,
+-- barra, vírgula ou sublinhado). Dígitos espalhados entre palavras ou em grupos curtos não contam ("Conta 0001 12345678-9",
+-- "Cartão 2024/2025 nº 123456"). Mesma regra de looksLikeCardNumber em packages/core (cards.ts).
+create or replace function public.clarevo_looks_like_card_number(p_text text)
+returns boolean
+language plpgsql
+immutable
+set search_path = public
+as $$
+declare
+  v_chain text;
+  v_groups text[];
+  v_sum integer;
+  i integer;
+  j integer;
+begin
+  if p_text is null then
+    return false;
+  end if;
+  for v_chain in select m[1] from regexp_matches(p_text, '([0-9]{3,}([ .,/_-][0-9]{3,})*)', 'g') as m loop
+    v_groups := regexp_split_to_array(v_chain, '[^0-9]');
+    for i in 1 .. array_length(v_groups, 1) loop
+      v_sum := 0;
+      for j in i .. array_length(v_groups, 1) loop
+        v_sum := v_sum + char_length(v_groups[j]);
+        if v_sum >= 13 and (v_sum <= 19 or j = i) then
+          return true;
+        end if;
+        if v_sum > 19 then
+          exit;
+        end if;
+      end loop;
+    end loop;
+  end loop;
+  return false;
+end;
+$$;
+
 create table public.cards (
   id uuid primary key default gen_random_uuid(),
   context_id uuid not null references public.financial_contexts (id) on delete cascade,
@@ -61,9 +101,8 @@ create table public.cards (
   deleted_by uuid references public.persons (id),
   constraint cards_id_context_key unique (id, context_id),
   constraint cards_exclusao check ((deleted_at is null) = (deleted_by is null)),
-  -- O apelido não é lugar de número de cartão: 13 a 19 dígitos (ignorando todo caractere que não seja dígito: espaço,
-  -- ponto, hífen, barra, vírgula, sublinhado...) são recusados.
-  constraint cards_apelido_sem_numero check (regexp_replace(nickname, '[^0-9]', '', 'g') !~ '[0-9]{13,19}')
+  -- O apelido não é lugar de número de cartão (clarevo_looks_like_card_number).
+  constraint cards_apelido_sem_numero check (not public.clarevo_looks_like_card_number(nickname))
 );
 create index cards_ctx on public.cards (context_id) where deleted_at is null;
 comment on table public.cards is
@@ -470,7 +509,7 @@ set search_path = public
 as $$
 begin
   if p_nickname is null or p_nickname = '' or char_length(p_nickname) > 30
-     or regexp_replace(p_nickname, '[^0-9]', '', 'g') ~ '[0-9]{13,19}' then
+     or public.clarevo_looks_like_card_number(p_nickname) then
     raise exception 'apelido_invalido' using errcode = '22023';
   end if;
   if p_last_digits is not null and p_last_digits !~ '^[0-9]{4}$' then
@@ -728,6 +767,28 @@ begin
     v_m := (v_paid + interval '1 month')::date;
   end loop;
   return v_m;
+end;
+$$;
+
+-- Fatura da 1ª parcela de uma compra com a data p_date. Só quando a fatura natural (a do período que contém a data) ainda
+-- está ABERTA (hoje <= fechamento) o desvio para a primeira fatura livre vale: ali, uma fatura paga cedo não trava o cartão.
+-- Fatura natural já FECHADA devolve a própria fatura natural (se ela, ou outra parcela, estiver paga, quem chama recusa com
+-- fatura_paga: o banco já cobrou aquela compra na fatura fechada, e ela não pode ser empurrada para a fatura atual).
+create or replace function public.clarevo_purchase_first_month(p_card_id uuid, p_closing_day integer, p_due_day integer,
+                                                               p_date date, p_n integer)
+returns date
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_natural date := public.invoice_month_for(p_closing_day, p_due_day, p_date);
+begin
+  if public.my_today() <= public.invoice_closing_on(p_closing_day, p_due_day, v_natural) then
+    return public.clarevo_first_free_month(p_card_id, v_natural, p_n);
+  end if;
+  return v_natural;
 end;
 $$;
 
@@ -1695,11 +1756,12 @@ $$;
 
 -- Compra no cartão: p_installments parcelas (1 a 48) a partir da fatura que contém a data da compra. Cartão arquivado
 -- não recebe compra (cartao_arquivado). p_receipt_key: resumo SHA-256 da chave de acesso da nota (opcional, só na primeira
--- parcela). Fatura paga (por exemplo, paga antes do fechamento): a compra NÃO é recusada; ela vai para a primeira fatura
--- seguinte em que nenhuma parcela cruza fatura paga (clarevo_first_free_month), e a conta dessa fatura cresce.
+-- parcela). Fatura natural ainda ABERTA e paga cedo: a compra NÃO é recusada; ela vai para a primeira fatura seguinte em que
+-- nenhuma parcela cruza fatura paga (clarevo_purchase_first_month), e a conta dessa fatura cresce. Fatura natural já FECHADA e
+-- paga (ou parcela adiante em fatura paga): fatura_paga, sem desvio.
 -- Ordem: sessão; chave; repetição; trava (nao_encontrado, sem_permissao); cartao_arquivado; validação (valor_invalido,
 -- valor_acima_do_limite, descricao_obrigatoria, descricao_longa, categoria_invalida, parcelas_invalidas, data_invalida,
--- data_futura); chave da nota (chave_de_nota_invalida, nota_ja_anotada); limite_de_lancamentos; escrita.
+-- data_futura); chave da nota (chave_de_nota_invalida, nota_ja_anotada); limite_de_lancamentos; fatura_paga; escrita.
 create or replace function public.add_card_purchase(
   p_idempotency_key text,
   p_card_id uuid,
@@ -1764,8 +1826,12 @@ begin
     perform public.clarevo_check_receipt_free(v_card.context_id, v_receipt);
   end if;
   perform public.clarevo_check_entry_cap(v_card.id, p_installments);
-  v_m1 := public.clarevo_first_free_month(v_card.id, public.invoice_month_for(v_card.closing_day, v_card.due_day, p_purchased_on),
-                                          p_installments);
+  v_m1 := public.clarevo_purchase_first_month(v_card.id, v_card.closing_day, v_card.due_day, p_purchased_on, p_installments);
+  for k in 0 .. p_installments - 1 loop
+    if public.clarevo_invoice_paid(v_card.id, (v_m1 + make_interval(months => k))::date) then
+      raise exception 'fatura_paga' using errcode = 'PT409';
+    end if;
+  end loop;
 
   for k in 1 .. p_installments loop
     insert into public.card_entries (id, context_id, card_id, kind, invoice_month, amount_cents, description, category,
@@ -1790,7 +1856,7 @@ $$;
 --   compra (todas as parcelas): p_amount_cents = valor total; p_occurred_on = data da compra; p_description;
 --     p_category; p_installments. Sem mudar valor, data nem parcelas, só descrição e categoria mudam (também com
 --     parcelas em fatura paga). Com mudança, nenhuma parcela de hoje ou de depois pode estar em fatura paga (fatura_paga);
---     a primeira fatura só é recalculada se a data muda (e então vai para a primeira fatura livre, como em add_card_purchase);
+--     a primeira fatura só é recalculada se a data muda (e então vai para a primeira fatura livre só se a fatura natural da data nova ainda está aberta, como em add_card_purchase; fechada e paga: fatura_paga);
 --     mais parcelas ou menos parcelas ajustam o fim da compra.
 --   encargo: p_amount_cents; p_charge_kind; p_invoice_month.
 --   estorno: p_amount_cents; p_description; p_category; p_invoice_month.
@@ -1878,7 +1944,7 @@ begin
     v_change := p_amount_cents <> v_first.purchase_total_cents or v_n <> v_old_n or p_occurred_on <> v_first.purchased_on;
     if v_change then
       v_m1 := case when p_occurred_on = v_first.purchased_on then v_first.invoice_month
-                   else public.clarevo_first_free_month(v_card.id, public.invoice_month_for(v_card.closing_day, v_card.due_day, p_occurred_on), v_n) end;
+                   else public.clarevo_purchase_first_month(v_card.id, v_card.closing_day, v_card.due_day, p_occurred_on, v_n) end;
       if exists (select 1 from public.card_entries x
                   where x.purchase_id = v_e.purchase_id and x.deleted_at is null
                     and public.clarevo_invoice_paid(x.card_id, x.invoice_month)) then
@@ -2159,7 +2225,7 @@ $$;
 -- R$ 0,01 até o total da fatura; data até hoje e não antes do menor entre 1 ano atrás e o primeiro dia do período da fatura
 -- (o dia seguinte ao fechamento da fatura anterior), para que uma fatura antiga possa ser paga na data real. A fatura não
 -- precisa ter fechado (a pessoa pode pagar antes): as compras seguintes do ciclo vão para a primeira fatura seguinte livre
--- (clarevo_first_free_month) e a fatura paga não recebe lançamentos (fatura_paga em encargo e estorno). Pagamento parcial: a diferença vira o "saldo anterior" da fatura
+-- (clarevo_purchase_first_month) e a fatura paga não recebe lançamentos (fatura_paga em encargo e estorno). Pagamento parcial: a diferença vira o "saldo anterior" da fatura
 -- seguinte (sem juros: os encargos entram quando a pessoa informar a fatura seguinte); a fatura seguinte não pode estar
 -- paga (fatura_seguinte_paga). p_expected_version é a versão da conta da fatura (commitment_version de invoice_items).
 -- p_account_id (opcional, depois da data): a conta de saída; sem ela, a conta ativa mais antiga do contexto. O gasto:

@@ -1165,14 +1165,12 @@ begin
     'pagamento total: paga, sem saldo anterior';
   assert (select request_hash from public.record_operations where idempotency_key = 'ce-b-0701')
        = md5(format('["pagar_fatura", "%s", "2026-11-01", %s, 78270, "2026-11-12", "%s"]', c, pg_temp.iv_ver(c, '2026-11-01') - 1, acc)), 'hash com a conta de saída';
-  -- Compra do ciclo de uma fatura já paga: NÃO é recusada (pagar cedo não trava o cartão); vai para a primeira fatura livre
-  -- (dezembro) e a conta de dezembro cresce. A fatura paga continua intacta.
-  res := public.add_card_purchase('ce-b-0702', c, '2026-10-20', 1000, 1, 'Fora de hora');
-  assert res #>> '{entry,invoice_month}' = '2026-12-01' and pg_temp.cm(c, '2026-12-01') like '41000 % aberto %'
-     and pg_temp.iv(c, '2026-11-01') = 'paga 78270 conta0v' || pg_temp.iv_ver(c, '2026-11-01'), 'compra da fatura paga vai para dezembro';
-  perform pg_temp.check_links();
-  perform public.delete_card_entry('ce-b-0702x', (res #>> '{entry,id}')::uuid, 1);
-  assert pg_temp.cm(c, '2026-12-01') like '40000 % aberto %', 'e sai de dezembro ao excluir';
+  -- Compra do ciclo de uma fatura FECHADA e paga (hoje 12/11, novembro fechou em 03/11): é recusada (fatura_paga). O banco já
+  -- cobrou essa compra na fatura fechada; empurrá-la para dezembro faria a pessoa pagar de novo. Nada muda.
+  perform pg_temp.expect_code(pg_temp.ap('ce-b-0702', c, '2026-10-20', 1000, 1, 'Fora de hora'), 'fatura_paga', 'PT409');
+  assert pg_temp.cm(c, '2026-12-01') like '40000 % aberto %' and pg_temp.iv(c, '2026-11-01') = 'paga 78270 conta0v' || pg_temp.iv_ver(c, '2026-11-01'),
+    'a recusa não grava: dezembro e novembro intactas';
+  assert not exists (select 1 from public.record_operations where idempotency_key = 'ce-b-0702'), 'recusa não grava operação';
   perform pg_temp.expect_code(pg_temp.ach('ce-b-0703', c, '2026-11-01', 'multa', 100), 'fatura_paga', 'PT409');
   perform pg_temp.expect_code(pg_temp.arf('ce-b-0704', c, '2026-11-01', 100, 'Devolução'), 'fatura_paga', 'PT409');
   perform pg_temp.expect_code(pg_temp.de('ce-b-0705', (select id from public.card_entry_items where card_id = c and kind = 'encargo'), 1), 'fatura_paga', 'PT409');
@@ -2441,14 +2439,17 @@ begin
   assert pg_temp.ivs(c) = '2026-10:2000 2026-11:30400 2026-12:10000 2027-01:5900 2027-02:5400 2027-03:2000', 'faturas depois das compras do ciclo';
   assert (select sum(total_cents) from public.invoice_items where card_id = c) = 2000 + 30000 + 7000 + 9000 + 6000 + 500 + 400 + 800,
     'o dinheiro continua conservado (total das faturas = total das compras)';
-  -- Mudar a data de uma compra para o ciclo de uma fatura paga (outubro) a deixa na primeira livre (novembro), sem recusa.
-  res := public.add_card_purchase('li-a-0014', c, '2026-10-07', 1000, 1, 'Mudar data');
+  -- Fatura natural FECHADA e paga (outubro, que fechou em 03/10 e foi paga): a compra com data nesse ciclo é recusada, na criação
+  -- e na mudança de data (fatura_paga). Não vai para a fatura atual: o banco já cobrou essa compra em outubro.
+  perform pg_temp.expect_code(pg_temp.ap('li-a-0014', c, '2026-10-02', 1000, 1, 'Esquecida'), 'fatura_paga', 'PT409');
+  perform pg_temp.expect_code(pg_temp.ap('li-a-0014b', c, '2026-09-20', 1000, 1, 'Esquecida'), 'fatura_paga', 'PT409');
+  assert (select count(*) from public.record_operations where idempotency_key in ('li-a-0014', 'li-a-0014b')) = 0, 'recusas não gravam';
+  res := public.add_card_purchase('li-a-0015', c, '2026-10-07', 1000, 1, 'Mudar data');
   p := (res #>> '{entry,id}')::uuid;
   assert res #>> '{entry,invoice_month}' = '2026-11-01', 'nasce em novembro';
-  res := public.update_card_entry('li-a-0015', p, 1, 'compra', 1000, '2026-10-02', 'Mudar data', null, 1);
-  assert res #>> '{entry,invoice_month}' = '2026-11-01' and res #>> '{entry,purchased_on}' = '2026-10-02' and (res #>> '{entry,version}')::int = 2,
-    'data no ciclo de outubro (paga): a compra fica em novembro';
-  assert pg_temp.iv(c, '2026-10-01') like 'paga 2000 %' and pg_temp.cm(c, '2026-11-01') like '31400 % aberto %', 'outubro intacta; novembro com a compra';
+  perform pg_temp.expect_code(pg_temp.ue('li-a-0015b', p, 1, 'compra', 1000, '2026-10-02', 'Mudar data', null, 1), 'fatura_paga', 'PT409');
+  assert pg_temp.entv(p) = 1 and pg_temp.iv(c, '2026-10-01') like 'paga 2000 %' and pg_temp.cm(c, '2026-11-01') like '31400 % aberto %',
+    'a mudança recusada não grava: outubro intacta; novembro com a compra';
   -- Encargo e estorno escolhem a fatura (vêm da fatura do banco): fatura paga continua recusada.
   perform pg_temp.expect_code(pg_temp.ach('li-a-0016', c, '2026-10-01', 'multa', 100), 'fatura_paga', 'PT409');
   perform pg_temp.expect_code(pg_temp.arf('li-a-0017', c, '2026-12-01', 100, 'Devolução'), 'fatura_paga', 'PT409');
@@ -2466,6 +2467,15 @@ begin
     'novembro paga em parte; 100,00 de saldo anterior em dezembro';
   res := public.add_card_purchase('li-a-0033', c, '2026-10-07', 5000, 1, 'Depois do pagamento');
   assert res #>> '{entry,invoice_month}' = '2026-12-01' and pg_temp.ivs(c) = '2026-11:30000 2026-12:15000', 'a compra vai para dezembro, junto do saldo';
+  -- Mudar a data para o ciclo aberto de novembro (paga em parte) também desvia para dezembro; uma compra de setembro (fatura de
+  -- outubro, fechada e ainda a pagar) fica em outubro.
+  res := public.add_card_purchase('li-a-0033b', c, '2026-09-20', 1000, 1, 'Troca de data');
+  p := (res #>> '{entry,id}')::uuid;
+  assert res #>> '{entry,invoice_month}' = '2026-10-01', 'compra de setembro: fatura de outubro (fechada, não paga)';
+  res := public.update_card_entry('li-a-0033c', p, 1, 'compra', 1000, '2026-10-06', 'Troca de data', null, 1);
+  assert res #>> '{entry,invoice_month}' = '2026-12-01' and pg_temp.ivs(c) = '2026-11:30000 2026-12:16000',
+    'data no ciclo aberto de novembro (paga em parte): a compra vai para dezembro';
+  perform public.delete_card_entry('li-a-0033d', p, 2);
   assert (select sum(total_cents) from public.invoice_items where card_id = c and status in ('aberta', 'fechada')) + 20000 = 35000,
     'o que falta pagar (150,00) mais o já pago (200,00) é o que se comprou (350,00)';
   res := public.pay_invoice('li-a-0034', c, '2026-12-01', pg_temp.iv_ver(c, '2026-12-01'), 15000, '2026-10-07', acc);
@@ -2512,24 +2522,54 @@ begin
   perform pg_temp.check_links();
   perform pg_temp.views_agree();
 
-  -- d) Apelido sem número de cartão, com qualquer separador (13 a 19 dígitos em todo o apelido).
+  -- d) Apelido sem número de cartão: 13 a 19 dígitos seguidos ou em grupos de 3+ dígitos com UM separador (espaço, ponto, hífen,
+  -- barra, vírgula, sublinhado). Dígitos espalhados entre palavras ou em grupos curtos são aceitos.
   perform pg_temp.expect_code(pg_temp.cc('li-d-0001', ctx, '4111/1111/1111/1111', null, 3, 10, null), 'apelido_invalido', '22023');
   perform pg_temp.expect_code(pg_temp.cc('li-d-0002', ctx, '4111_1111_1111_1111', null, 3, 10, null), 'apelido_invalido', '22023');
   perform pg_temp.expect_code(pg_temp.cc('li-d-0003', ctx, '4111,1111,1111,1111', null, 3, 10, null), 'apelido_invalido', '22023');
-  perform pg_temp.expect_code(pg_temp.cc('li-d-0004', ctx, 'a4111b1111c1111d1111', null, 3, 10, null), 'apelido_invalido', '22023');
+  perform pg_temp.expect_code(pg_temp.cc('li-d-0004', ctx, '3782 822463 10005', null, 3, 10, null), 'apelido_invalido', '22023');
   perform pg_temp.expect_code(pg_temp.cc('li-d-0005', ctx, '4111 1111 1111 111', null, 3, 10, null), 'apelido_invalido', '22023');
   perform pg_temp.expect_code(pg_temp.cc('li-d-0006', ctx, '4111.1111-1111 1111', null, 3, 10, null), 'apelido_invalido', '22023');
   perform pg_temp.expect_code(pg_temp.cc('li-d-0007', ctx, '41111111111111111111', null, 3, 10, null), 'apelido_invalido', '22023');
+  perform pg_temp.expect_code(pg_temp.cc('li-d-0008', ctx, 'Visa 4111 1111 1111 1111', null, 3, 10, null), 'apelido_invalido', '22023');
   c := (public.create_card('li-d-0010', ctx, 'Loja 1234 / 2026', '1234', 3, 10, null) #>> '{card,id}')::uuid;   -- 8 dígitos: aceito
   perform pg_temp.expect_code(pg_temp.uc('li-d-0011', c, 1, '4111/1111/1111/1111', null, 3, 10, null), 'apelido_invalido', '22023');
   assert (select nickname from public.card_items where id = c) = 'Loja 1234 / 2026' and pg_temp.cardv(c) = 1, 'recusa não altera o cartão';
+  -- Aceitos: 13 e 14 dígitos que não são um número (conta bancária com agência, anos e número de documento), e letras no meio.
+  res := public.create_card('li-d-0020', ctx, 'Conta 0001 12345678-9', null, 3, 10, null);
+  assert res #>> '{card,nickname}' = 'Conta 0001 12345678-9', 'conta bancária com agência: 13 dígitos espalhados, aceita';
+  res := public.create_card('li-d-0021', ctx, 'Cartão 2024/2025 nº 123456', null, 3, 10, null);
+  assert res #>> '{card,nickname}' = 'Cartão 2024/2025 nº 123456', 'anos e número solto: 14 dígitos espalhados, aceito';
+  res := public.create_card('li-d-0022', ctx, 'a4111b1111c1111d1111', null, 3, 10, null);
+  assert res #>> '{card,nickname}' = 'a4111b1111c1111d1111', 'dígitos separados por letras não são um número';
+  res := public.update_card('li-d-0023', (res #>> '{card,id}')::uuid, 1, 'Cartão 2024/2025 nº 123456', null, 3, 10, null);
+  assert res #>> '{card,nickname}' = 'Cartão 2024/2025 nº 123456', 'o mesmo na alteração';
 end $$;
 reset role;
--- Escrita direta (backend): a restrição da tabela também recusa o apelido com separadores.
+-- Escrita direta (backend): a restrição da tabela também recusa o apelido com separadores e aceita os dígitos espalhados.
 select pg_temp.expect_error(format($f$insert into public.cards (context_id, nickname, closing_day, due_day, created_by)
   values (%L, '4111/1111/1111/1111', 3, 10, %L)$f$, pg_temp.id('lia_ctx'), pg_temp.id('lia')), '%cards_apelido_sem_numero%');
 select pg_temp.expect_error(format($f$insert into public.cards (context_id, nickname, closing_day, due_day, created_by)
   values (%L, '4111,1111,1111,1111', 3, 10, %L)$f$, pg_temp.id('lia_ctx'), pg_temp.id('lia')), '%cards_apelido_sem_numero%');
+select pg_temp.expect_ok(format($f$insert into public.cards (context_id, nickname, closing_day, due_day, created_by)
+  values (%L, 'Conta 0001 12345678-9', 3, 10, %L)$f$, pg_temp.id('lia_ctx'), pg_temp.id('lia')));
+-- A função, caso a caso (os mesmos casos de looksLikeCardNumber em packages/core/test/cards.test.ts).
+do $$
+declare
+  t text;
+begin
+  foreach t in array array['4111 1111 1111 1111', '4111-1111-1111-1111', '4111.1111.1111.1111', '4111111111111', 'Cartão 41111111111111111111',
+    '4111/1111/1111/1111', '4111_1111_1111_1111', '4111,1111,1111,1111', '4111 1111 1111 111', '4111.1111-1111 1111', '3782 822463 10005',
+    '3782-822463-10005', '1234567890123456789', 'final 1234567890123', 'Visa 4111 1111 1111 1111', '2024 4111 1111 1111 1111'] loop
+    assert public.clarevo_looks_like_card_number(t), 'deveria parecer número de cartão: ' || t;
+  end loop;
+  foreach t in array array['Cartão 1234', 'Cartão 2026', '123456789012', 'Nubank 12 meses', 'Loja 1234 / 2026', '12/34/56/78/90/12',
+    'Conta 0001 12345678-9', 'Cartão 2024/2025 nº 123456', 'a4111b1111c1111d1111', 'Ag 1234 Conta 123456-7', 'Mercado 2024 2025 2026',
+    'Loja 12 34 56 78 90 12 34 56', ''] loop
+    assert not public.clarevo_looks_like_card_number(t), 'não deveria parecer número de cartão: ' || t;
+  end loop;
+  assert not public.clarevo_looks_like_card_number(null), 'nulo não é número';
+end $$;
 
 -- e) Tempo perto do limite de 5.000 lançamentos. O backend monta 100 compras de 48 parcelas (4.800 lançamentos) sem disparar os
 -- gatilhos (session_replication_role), como carga de dados; depois cada função de cartão roda com as conferências do fim da
@@ -2701,8 +2741,8 @@ do $$ begin
              'clarevo_check_receipt_free', 'clarevo_card_derived', 'clarevo_card_json', 'clarevo_invoice_json', 'clarevo_entry_json',
              'clarevo_card_result', 'clarevo_card_entry_result', 'clarevo_pay_result', 'clarevo_sync_card', 'clarevo_check_card_month',
              'clarevo_check_card_credit', 'clarevo_check_purchase', 'clarevo_check_invoice_payment', 'clarevo_check_card_consistency',
-             'clarevo_check_receipt_unique', 'clarevo_first_free_month')
-             and not has_function_privilege('authenticated', p.oid, 'execute')) = 33, '33 auxiliares sem execute para authenticated';
+             'clarevo_check_receipt_unique', 'clarevo_first_free_month', 'clarevo_purchase_first_month', 'clarevo_looks_like_card_number')
+             and not has_function_privilege('authenticated', p.oid, 'execute')) = 35, '35 auxiliares sem execute para authenticated';
   -- Nomes dos argumentos (chamada por nome no PostgREST) e retornos.
   assert pg_get_function_arguments('public.create_card(text, uuid, text, text, integer, integer, bigint)'::regprocedure)
        = 'p_idempotency_key text, p_context_id uuid, p_nickname text, p_last_digits text, p_closing_day integer, p_due_day integer, p_limit_cents bigint'
