@@ -786,10 +786,10 @@ export const RETURN_TEXT = {
     `${shortName}: ${formatBRL(amountCents)} em ${formatDateBR(paidOn)}, da conta ${accountName}.`,
   payChange: 'Mudar valor ou data',
   confirm: 'Confirmar',
-  /** "Não houve esta conta em julho?" */
   /** Linha em negrito do diálogo "Não houve": "Aluguel · R$ 2.500,00" ou "Luz · cerca de R$ 180,00 (estimado)". */
   rowAmountLine: (row: Pick<ReviewRow, 'description' | 'amountCents' | 'amountIsEstimate'>) =>
     `${row.description} · ${money(row.amountCents, row.amountIsEstimate)}${row.amountIsEstimate ? ` (${STATE_ESTIMATE})` : ''}`,
+  /** "Não houve esta conta em julho?" */
   notHappenedGapTitle: (month: IsoMonth) => `Não houve esta conta em ${formatMonthName(month)}?`,
   /** "A conta de julho de Academia fica registrada como não houve e não volta a aparecer. Os outros meses não mudam." */
   notHappenedGapBody: (month: IsoMonth, description: string) =>
@@ -809,6 +809,8 @@ export const RETURN_TEXT = {
   announcePaid: (shortName: string) => `Pagamento registrado: ${shortName}.`,
   announceNotHappened: (shortName: string) => `Registrada como não houve: ${shortName}.`,
   announceStillOpen: (shortName: string) => `Registrada em aberto: ${shortName}.`,
+  /** "Já paguei" numa conta que já estava paga (em outro aparelho): nada foi pago de novo. Aviso na tela de origem, anunciado no iOS. */
+  paidElsewhere: 'Esta conta já foi paga em outro aparelho.',
   /** "Recebimentos: R$ 6.000,00 · 1" ou "Recebimentos: nenhum anotado" */
   receiptsLine: (o: MonthOverview) => (o.receivedCount > 0 ? `Recebimentos: ${formatBRL(o.receivedCents)} · ${o.receivedCount}` : 'Recebimentos: nenhum anotado'),
   expensesLine: (o: MonthOverview) => (o.paidCount > 0 ? `Gastos: ${formatBRL(o.paidCents)} · ${o.paidCount}` : 'Gastos: nenhum anotado'),

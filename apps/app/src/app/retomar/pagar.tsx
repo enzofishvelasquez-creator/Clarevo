@@ -38,7 +38,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
-import { PayRowError, codeOf, isUncertain, openRowFrom, returnSession, useReturnWriter } from '@/components/retorno-acoes';
+import { PayRowError, codeOf, isConflict, isUncertain, openRowFrom, returnSession, useReturnWriter } from '@/components/retorno-acoes';
 import { ErrorState, LoadingState } from '@/components/states';
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
@@ -196,21 +196,28 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: Person
     try {
       const { paid, alreadyPaid } = await payLine(v.input);
       returnSession.setOutcome(row.key, { type: 'paga', commitment: paid });
-      if (!alreadyPaid) {
+      // O aviso aparece na tela de origem (revisão ou detalhe do gasto fixo), onde o FlashBanner o anuncia uma vez no iOS.
+      if (alreadyPaid) {
+        // Paga em outro aparelho: nada foi pago aqui (sem retorno tátil nem efeito em Pago).
+        flash.set(RETURN_TEXT.paidElsewhere);
+      } else {
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         if (paid.payment) totalChange.set({ total: 'pago', month: monthOf(paid.payment.paidOn), deltaCents: paid.payment.amountCents });
-        // Anunciado uma vez na tela de origem (revisão ou detalhe do gasto fixo).
         flash.set(RETURN_TEXT.announcePaid(short));
       }
       leave(goBack);
     } catch (e) {
       const err = e instanceof PayRowError ? e : new PayRowError(e, null);
       const created = err.created ?? writer.createdFor(row.key) ?? existing.current;
+      // Algo mudou em outro aparelho (conta paga lá, versão nova): a conta lida antes ficou velha. A próxima tentativa
+      // lê a conta de novo, em vez de repetir o pagamento com a cópia velha e receber a mesma recusa.
+      if (!isUncertain(err.cause) && isConflict(err.cause)) existing.current = null;
       if (created) {
         // Conta registrada, pagamento não: ela já aparece em Contas a pagar; "Salvar de novo" repete só o pagamento.
         setPartial(true);
-        // A revisão mostra a linha com a conta registrada em aberto, e não mais "sem conta registrada".
-        returnSession.setOutcome(row.key, { type: 'registrada', commitment: created });
+        // Sem resultado para a linha ("Registrada em aberto" a daria por resolvida): a revisão recarrega ao voltar e a
+        // mostra em aberto, com "Já paguei". A conta registrada já conta como ação da sessão.
+        returnSession.noteAction();
         const field = !isUncertain(err.cause) ? fieldForErrorCode(codeOf(err.cause)) : null;
         if (field && PAYMENT_FIELD_ORDER.includes(field)) {
           const errs = { [field]: returnErrorText(codeOf(err.cause)) };

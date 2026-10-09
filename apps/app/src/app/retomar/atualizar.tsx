@@ -602,7 +602,8 @@ export default function AtualizarMeses() {
               title={RETURN_TEXT.emptyTitle}
               art="compromissos"
               action={<Button label={RETURN_TEXT.backToSummary} tone="soft" onPress={() => router.dismissTo('/')} />}>
-              {RETURN_TEXT.emptyBody}
+              {/* "Já estão registrados" só com revisão ativa e vazia; sem revisão ativa, a linha neutra (como em /retomar). */}
+              {review ? RETURN_TEXT.emptyBody : RETURN_TEXT.noActiveReview}
             </EmptyState>
           </Card>
         ) : (

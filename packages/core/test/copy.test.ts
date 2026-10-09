@@ -595,9 +595,11 @@ describe('textos de Aprender', () => {
       expect(text, text).not.toMatch(COLLECTION);
       expect(text, text).not.toMatch(ABSENCE);
     }
-    // Sem revisão ativa, valor estimado no diálogo "Não houve" e lacunas da conta do ano no detalhe: todos varridos.
+    // Sem revisão ativa, conta paga em outro aparelho, valor estimado no diálogo "Não houve" e lacunas da conta do ano no
+    // detalhe: todos varridos.
     for (const text of [
       RETURN_TEXT.noActiveReview,
+      RETURN_TEXT.paidElsewhere,
       RETURN_TEXT.whyNoBill,
       RETURN_TEXT.registerParts,
       RETURN_TEXT.registerMonth,

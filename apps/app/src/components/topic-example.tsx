@@ -18,7 +18,8 @@ export function calculationLines(calculation: string): string[] {
 /**
  * Exemplo fictício de um tema (spec3 §3.8): cartão "Exemplo", "Ver a conta" recolhido (abre só com esmaecimento de
  * 200 ms, sem animar altura) e o cartão "Hipóteses do exemplo". Os passos da conta ficam agrupados para o leitor de
- * tela. Tema com conta e sem exemplo (estimativa) mostra "Ver a conta" no cartão das hipóteses.
+ * tela. O catálogo exige exemplo em todo tema com conta (calculo_sem_exemplo), então "Ver a conta" fica no cartão
+ * Exemplo; sem exemplo, por segurança, ele aparece no cartão das hipóteses ou num cartão só dele.
  */
 export function TopicExample({ topic }: { topic: Topic }) {
   const [open, setOpen] = useState(false);

@@ -71,7 +71,7 @@ export const returnSession = {
     outcomes.set(rowKey, outcome);
     actedElsewhere = true;
   },
-  /** Recebimento ou gasto anotado no modo "Dia" a partir da revisão. */
+  /** Recebimento ou gasto anotado no modo "Dia" a partir da revisão, ou conta registrada cujo pagamento não foi salvo. */
   noteAction() {
     actedElsewhere = true;
   },
@@ -291,6 +291,9 @@ export function useReturnWriter() {
         createdFor.current.delete(row.key);
         return paid;
       } catch (e) {
+        // Algo mudou em outro aparelho (conta paga lá, versão nova): a cópia guardada ficou velha. Esquecida, a próxima
+        // tentativa pede o registro de novo (o banco responde ocorrencia_existente) e lê a conta atual, sem repetir a recusa.
+        if (!isUncertain(e) && isConflict(e)) createdFor.current.delete(row.key);
         throw new PayRowError(e, row.commitment ? null : target);
       }
     },

@@ -22,7 +22,7 @@ import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
 type Step = { type: 'linha' } | { type: 'pagar' } | { type: 'nao_houve' };
 
-/** Espera para o anúncio no iOS: o VoiceOver volta ao detalhe depois de a folha fechar. */
+/** Espera para o anúncio de falha no iOS: o conteúdo da folha troca (volta à linha) e o VoiceOver precisa assentar antes. */
 const ANNOUNCE_DELAY = 500;
 
 /**
@@ -30,7 +30,8 @@ const ANNOUNCE_DELAY = 500;
  * conta do ano: a mesma linha da revisão dos últimos meses numa folha, com "Já paguei", "Não houve" (só gasto fixo
  * mensal) e "Ainda não paguei". Com várias linhas (parcelas de um ano), cada uma tem as suas ações e a folha fecha ao
  * confirmar uma; as que faltam continuam no detalhe. Valor que muda abre o formulário de pagamento com o valor vazio.
- * Só fecha com o resultado confirmado pelo servidor, que também é anunciado no iOS.
+ * Só fecha com o resultado confirmado pelo servidor; quem recebe o texto (onDone) o mostra num FlashBanner, que o anuncia
+ * no iOS. As falhas ficam na folha e são anunciadas aqui.
  */
 export function RegisterMonthSheet({
   rows,
@@ -43,7 +44,7 @@ export function RegisterMonthSheet({
   /** Título com várias linhas ("IPTU de 2026"); com uma só, o nome dela ("Aluguel de julho"). */
   title?: string;
   onClose: () => void;
-  /** Resultado confirmado (texto do anúncio). */
+  /** Resultado confirmado (texto do aviso, mostrado e anunciado por um FlashBanner de quem recebe). */
   onDone: (text: string) => void;
 }) {
   const reduced = useReducedMotion();
@@ -65,10 +66,13 @@ export function RegisterMonthSheet({
   const row = view(active);
   const short = rowShortName(row);
 
-  /** Falha de uma linha: abaixo dela e, no iOS (sem região viva), anunciada. */
+  /**
+   * Falha de uma linha: abaixo dela e, no iOS (sem região viva), anunciada. Com a espera, porque o conteúdo da folha
+   * muda ao mesmo tempo (de "Marcar como paga?" de volta à linha) e a troca cortaria o anúncio.
+   */
   const note = (key: string, text: string) => {
     setNotes((cur) => ({ ...cur, [key]: text }));
-    announceOnIOS(text);
+    announceOnIOS(text, { delay: ANNOUNCE_DELAY });
   };
 
   const failed = (key: string, e: unknown) => {
@@ -88,10 +92,8 @@ export function RegisterMonthSheet({
     setBusy(true);
     setNotes(({ [target.key]: _gone, ...rest }) => rest);
     try {
-      const text = await fn();
-      // No iOS o resultado não tem região viva: é anunciado depois de a folha fechar.
-      announceOnIOS(text, { delay: ANNOUNCE_DELAY });
-      onDone(text);
+      // O resultado vai para o FlashBanner do detalhe, que o anuncia no iOS depois de a folha fechar.
+      onDone(await fn());
     } catch (e) {
       if (e instanceof PayRowError) {
         if (e.created) {

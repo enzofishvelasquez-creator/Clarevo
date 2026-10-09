@@ -13,6 +13,7 @@ import {
   rowShortName,
   seriesEnded,
   seriesErrorText,
+  seriesMonthOf,
   suggestedAnnualReference,
   type AnnualReferenceSuggestion,
   type AnnualYearSummary,
@@ -233,6 +234,11 @@ export function AnnualYears({
           const registerLabel = k === 1 ? RETURN_TEXT.registerMonth : RETURN_TEXT.registerParts;
           const gapTitle = gapRows[0] ? `${gapRows[0].description} de ${label}` : label;
           const gapText = k === 1 && gapRows[0] ? RETURN_TEXT.seriesGap(gapRows[0].month) : RETURN_TEXT.annualGap(label, reviewable);
+          // O ano inteiro fora dos 11 meses: sem linha para registrar, só o texto com "Anotar gasto".
+          const oldText =
+            k === 1 && y.missingParts[0] !== undefined
+              ? RETURN_TEXT.seriesGapOld(seriesMonthOf(s, y.year.firstNumber + y.missingParts[0] - 1))
+              : RETURN_TEXT.annualGapOld(label, y.missingParts);
           return (
             <Animated.View key={y.year.index} layout={rowLayout} style={[styles.year, i < years.length - 1 && styles.divider]}>
               <Txt
@@ -268,12 +274,14 @@ export function AnnualYears({
                   <TopicLink slug="sem-registro" label={RETURN_TEXT.whyNoBill} style={styles.inlineLink} />
                 </View>
               ) : y.texts.missing ? (
-                // Todas as partes fora dos 11 meses fechados: o texto de antes, com "Anotar gasto".
+                // Todas as partes fora dos 11 meses fechados: o mesmo texto do caso misto (seriesGapOld ou annualGapOld),
+                // com "Anotar gasto" e o tema "Por que este mês não tem conta?".
                 <View style={{ gap: space[1] }}>
-                  <Txt variant="label" accessibilityLabel={yearA11yLabel(y.texts.missing)}>
-                    {y.texts.missing}
+                  <Txt variant="label" accessibilityLabel={yearA11yLabel(oldText)}>
+                    {oldText}
                   </Txt>
                   <LinkButton label="Anotar gasto" style={styles.inlineLink} onPress={() => router.push('/registro/novo')} />
+                  <TopicLink slug="sem-registro" label={RETURN_TEXT.whyNoBill} style={styles.inlineLink} />
                 </View>
               ) : null}
 

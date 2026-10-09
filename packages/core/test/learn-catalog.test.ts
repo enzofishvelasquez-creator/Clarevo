@@ -309,7 +309,7 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
     mark.paragraphs = [...mark.paragraphs, 'Trecho a confirmar [conferir].'];
     expectCode(withTopic(mark), 'marca_pendente', 'fgc');
 
-    // "Ver a conta" só aparece dentro do cartão Exemplo: calculation exige example.
+    // "Ver a conta" detalha o exemplo do tema: calculation exige example.
     const calcWithoutExample = clone('estimativa');
     calcWithoutExample.example = null;
     expectCode(withTopic(calcWithoutExample), 'calculo_sem_exemplo', 'estimativa');

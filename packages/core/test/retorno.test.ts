@@ -738,6 +738,8 @@ describe('rowActions, batchEligible, rowPaymentDraft e looseExpenseFor', () => {
     expect(RETURN_TEXT.rowAmountLine(carro!)).toBe('Financiamento do carro · R$ 850,00');
     expect(RETURN_TEXT.noActiveReview).toBe('Não há revisão dos últimos meses agora.');
     expect(RETURN_TEXT.noActiveReview).not.toBe(RETURN_TEXT.emptyBody);
+    // Conta que já estava paga em outro aparelho: aviso na tela de origem, sem pagar de novo.
+    expect(RETURN_TEXT.paidElsewhere).toBe('Esta conta já foi paga em outro aparelho.');
     expect(RETURN_TEXT.dayGapHint(aluguel!)).toBe('O gasto fixo Aluguel não tem conta registrada em julho. Para contar no gasto fixo, use Já paguei na revisão.');
     expect(RETURN_TEXT.estimateHint(18_000)).toBe('Digite o valor da conta. A estimativa era R$ 180,00.');
     expect(RETURN_TEXT.seriesGap('2026-07')).toBe('Julho de 2026: sem conta registrada.');
