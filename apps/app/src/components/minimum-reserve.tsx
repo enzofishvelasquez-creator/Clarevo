@@ -23,7 +23,7 @@ import { formatMoneyText } from '@/components/calc/parts';
 import { FormFooter } from '@/components/form-footer';
 import { ContextPill, SubHeader } from '@/components/header';
 import { useLeaveGuard } from '@/components/leave-guard';
-import { MoneyTxt, useMoneyLabelMask, useMoneyMask } from '@/components/money-text';
+import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { SAVINGS_NOTICE } from '@/components/savings-card';
 import { ChoiceGroup } from '@/components/series-parts';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
@@ -40,7 +40,6 @@ import { colors, fonts, space } from '@/theme/tokens';
  */
 export function MinimumReserve({ contextId, check, inputs }: { contextId: string; check: SavingsCheck | null; inputs: SavingsPlanInputs }) {
   const qc = useQueryClient();
-  const mask = useMoneyMask();
   const maskLabel = useMoneyLabelMask();
   const createGoal = useCreateGoal();
   const setAnswer = useSetSavingsAnswer();
@@ -187,9 +186,17 @@ export function MinimumReserve({ contextId, check, inputs }: { contextId: string
                 />
               ) : null}
               {option && option.kind !== 'outro' && option.cents !== null ? (
-                <MoneyTxt variant="label" style={{ fontFamily: fonts.bold }}>
-                  {`Reserva mínima: ${formatBRL(option.cents)}`}
-                </MoneyTxt>
+                // Os valores sugeridos (R$ 100,00, R$ 300,00...) são do app, não da pessoa, e as opções já estão à vista; só o valor
+                // calculado dos gastos essenciais dela segue "Ocultar valores".
+                option.kind === 'essenciais' ? (
+                  <MoneyTxt variant="label" style={{ fontFamily: fonts.bold }}>
+                    {`Reserva mínima: ${formatBRL(option.cents)}`}
+                  </MoneyTxt>
+                ) : (
+                  <Txt variant="label" style={{ fontFamily: fonts.bold }}>
+                    {`Reserva mínima: ${formatBRL(option.cents)}`}
+                  </Txt>
+                )
               ) : null}
             </Card>
 
@@ -204,8 +211,8 @@ export function MinimumReserve({ contextId, check, inputs }: { contextId: string
                 {steps.map((s) => (
                   <Chip
                     key={s.id}
-                    label={s.monthlyLabel ? `${s.label} · ${mask(s.monthlyLabel)}` : s.label}
-                    accessibilityLabel={s.monthlyLabel ? maskLabel(`${s.label}, ${s.monthlyLabel}`) : undefined}
+                    // O passo semanal e o equivalente por mês são sugestões fixas do app: ficam à vista.
+                    label={s.monthlyLabel ? `${s.label} · ${s.monthlyLabel}` : s.label}
                     selected={stepId === s.id}
                     onPress={() => setStepId(stepId === s.id ? null : s.id)}
                   />
