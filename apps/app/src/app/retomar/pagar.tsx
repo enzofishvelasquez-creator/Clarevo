@@ -217,7 +217,7 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: Person
         setPartial(true);
         // Sem resultado para a linha ("Registrada em aberto" a daria por resolvida): a revisão recarrega ao voltar e a
         // mostra em aberto, com "Já paguei". A conta registrada já conta como ação da sessão.
-        returnSession.setOutcome(row.key, { type: 'registrada', commitment: created });
+        returnSession.noteAction();
         const field = !isUncertain(err.cause) ? fieldForErrorCode(codeOf(err.cause)) : null;
         if (field && PAYMENT_FIELD_ORDER.includes(field)) {
           const errs = { [field]: returnErrorText(codeOf(err.cause)) };
