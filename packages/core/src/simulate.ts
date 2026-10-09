@@ -493,6 +493,20 @@ export function simulate(input: SimulationInput): SimulationResult {
   };
 }
 
+/**
+ * Hipóteses para mostrar já na abertura da tela e enquanto a pessoa digita (as hipóteses são sempre visíveis): as mesmas
+ * do resultado, com a taxa dita como "a que você informar" até haver uma taxa válida, e sem a linha de arredondamento
+ * (que depende do modo) até haver um modo. Com um formulário válido, é igual a `result.hypotheses`. Nunca sugere taxa.
+ */
+export function previewHypotheses(draft: Pick<SimulationDraft, 'mode' | 'rateText' | 'inflationOn' | 'inflationText'>): string[] {
+  const rate = parseRateBp(draft.rateText);
+  const inflation = draft.inflationOn ? parseRateBp(draft.inflationText) : null;
+  const lines = SIMULATE_TEXT.hypotheses(draft.mode ?? 'quanto-guardar', rate ?? 0, inflation);
+  if (rate === null) lines[0] = SIMULATE_TEXT.ratePending;
+  if (draft.mode === null) lines.pop();
+  return lines;
+}
+
 /** Todas as linhas do resultado, na ordem da tela (abertura, destaque e demais). */
 export function simulationResultLines(result: SimulationResult): string[] {
   return [...(result.texts.intro ? [result.texts.intro] : []), result.texts.highlight, ...result.texts.lines];
@@ -703,7 +717,12 @@ export const SIMULATE_TEXT = {
     inflationHint: 'Você informa a inflação que quer testar, de 0% a 30% ao ano.',
   },
   simulateButton: 'Simular',
+  resultTitle: 'Resultado',
+  /** Antes do primeiro resultado, e sempre que a pessoa muda um campo depois de simular. */
+  waiting: 'Escolha o que quer saber, preencha os campos e toque em Simular.',
   hypothesesTitle: 'Hipóteses',
+  /** Hipótese da taxa enquanto a pessoa ainda não digitou uma taxa válida (nunca um valor sugerido). */
+  ratePending: 'Taxa de rendimento: a que você informar, constante no período.',
   disclaimer: SIMULATE_DISCLAIMER,
   reached: 'Com estes números, você já tem o valor que quer juntar.',
   unreachable: 'Com estes valores, a meta não é alcançada em 50 anos na hipótese informada. Mude o valor por mês ou quanto quer juntar.',

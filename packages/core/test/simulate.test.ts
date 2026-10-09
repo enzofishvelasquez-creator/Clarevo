@@ -18,6 +18,7 @@ import {
   monthlyRateText,
   monthsForTarget,
   parseRateBp,
+  previewHypotheses,
   simulate,
   simulateGrowth,
   simulateLinkParams,
@@ -615,5 +616,56 @@ describe('criar meta, links e entradas', () => {
       alvoCents: 100_000,
       origem: 'meta',
     });
+  });
+});
+
+describe('hipóteses antes do resultado (tela /simular)', () => {
+  it('sem modo e sem taxa: a taxa é "a que você informar" e a linha de arredondamento do modo não aparece', () => {
+    const lines = previewHypotheses(emptySimulationDraft());
+    expect(lines).toEqual([
+      T.ratePending,
+      'Aportes no início de cada mês, como na Calculadora do Cidadão do Banco Central.',
+      'Valores brutos, sem imposto de renda, IOF ou taxas.',
+      'Sem inflação, salvo se informada.',
+    ]);
+    // Nunca sugere uma taxa: nenhum número de percentual antes de a pessoa digitar.
+    expect(lines.join(' ')).not.toMatch(/\d+\s?%/);
+  });
+
+  it('taxa inválida ou incompleta volta ao texto de espera; taxa válida mostra a taxa equivalente ao mês', () => {
+    for (const rateText of ['', 'abc', '30,01', '10,555', ',']) {
+      expect(previewHypotheses(draft({ mode: 'quanto-ter', rateText }))[0], rateText).toBe(T.ratePending);
+    }
+    expect(previewHypotheses(draft({ mode: 'quanto-ter', rateText: '10' }))[0]).toBe('Taxa de 10% ao ano (0,80% ao mês, taxa equivalente), constante no período.');
+    expect(previewHypotheses(draft({ mode: 'quanto-ter', rateText: '0' }))[0]).toBe('Taxa de 0% ao ano: sem rendimento.');
+  });
+
+  it('a inflação só entra com o interruptor ligado e um número válido', () => {
+    const base = { mode: 'quanto-guardar', rateText: '10' } as const;
+    expect(previewHypotheses(draft({ ...base, inflationOn: false, inflationText: '4,5' }))[3]).toBe('Sem inflação, salvo se informada.');
+    expect(previewHypotheses(draft({ ...base, inflationOn: true, inflationText: '' }))[3]).toBe('Sem inflação, salvo se informada.');
+    expect(previewHypotheses(draft({ ...base, inflationOn: true, inflationText: '4,5' }))[3]).toBe(
+      'Inflação de 4,5% ao ano (0,37% ao mês, taxa equivalente), constante no período, só para o valor em dinheiro de hoje.',
+    );
+  });
+
+  it('com o formulário válido, é igual às hipóteses do resultado (nos três modos)', () => {
+    for (const mode of SIMULATION_MODES) {
+      for (const inflation of [null, '4,5']) {
+        const d = draft({
+          mode,
+          targetText: '22.500,00',
+          initialText: '4.500,00',
+          monthsText: '14',
+          monthlyText: '1.000,00',
+          rateText: '10',
+          inflationOn: inflation !== null,
+          inflationText: inflation ?? '',
+        });
+        const out = validateSimulationDraft(d);
+        expect(out.ok, mode).toBe(true);
+        if (out.ok) expect(previewHypotheses(d), mode).toEqual(out.result.hypotheses);
+      }
+    }
   });
 });
