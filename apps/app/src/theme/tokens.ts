@@ -7,6 +7,7 @@ export const colors = {
   brand: '#2457F5',
   brandPressed: '#1D47CC',
   brandDeep: '#1E4BD8', // trilho do seletor sobre o azul
+  brandSoft: '#7FA0F7', // segmento em aberto; 2,5:1 sobre branco, só com rótulo e listras
   accent: '#D4F05B',
   accentTint: '#F2FAD0', // fundo do resumo de explicação ("O que é isso?"): texto 14,57:1; brandDeep 6,34:1
   illustration: '#F56545',

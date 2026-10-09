@@ -1,10 +1,11 @@
-import { ERROR_TEXT, emptyMonthCaption, formatBRL, formatDateBR, formatMonthBR, monthOf, toPayCaption } from '@clarevo/core';
+import { COMMITTED_TEXT, ERROR_TEXT, committedLine, emptyMonthCaption, formatBRL, formatDateBR, formatMonthBR, monthOf, toPayCaption } from '@clarevo/core';
 import { router, useFocusEffect } from 'expo-router';
-import { AlertCircle, ArrowRight, CalendarClock, Plus, ShieldCheck } from 'lucide-react-native';
+import { AlertCircle, ArrowRight, CalendarClock, ChevronRight, Plus, ShieldCheck } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View, type ScrollView } from 'react-native';
 import Animated, { FadeIn, FadeInLeft, FadeInRight, FadeOut, ReduceMotion } from 'react-native-reanimated';
 
+import { Meter, useMoneyMask } from '@/components/committed-parts';
 import { FamilyNotLinked } from '@/components/family-state';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { AppHeader, ContextSwitch, MonthSwitcher } from '@/components/header';
@@ -16,9 +17,9 @@ import { Body, Button, Card, FitMoney, LinkButton, Money, Screen, Skeleton, Txt 
 import { totalChange, type TotalChange } from '@/lib/highlight';
 import { explanationHref } from '@/lib/learn';
 import { summaryTop } from '@/lib/nav';
-import { useCommitments, useMonthRecords, useSpace, useView } from '@/state/data';
+import { useCommitments, useCommittedSummary, useMonthRecords, useSpace, useView } from '@/state/data';
 import { useSession } from '@/state/session';
-import { colors, fonts, motion, radius, space } from '@/theme/tokens';
+import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 
 export default function ResumoScreen() {
   const { today } = useSession();
@@ -285,8 +286,70 @@ function ToPayCard({ contextId }: { contextId: string | undefined }) {
           <CalendarClock size={22} color={colors.textSecondary} aria-hidden />
         </Pressable>
       )}
+      <CommittedRow contextId={contextId} />
       <LinkButton label="Anotar conta a pagar" icon={Plus} style={styles.toPayLink} onPress={() => router.push('/a-pagar/nova')} />
     </Card>
+  );
+}
+
+/**
+ * "Renda comprometida" (D-026(7)): linha dentro do card "Ainda a pagar", irmã do resumo tocável e do link "Anotar conta a
+ * pagar" (nunca dentro de um deles), com área tocável própria que abre /renda-comprometida no mês em exibição. Sem
+ * referência de renda: só o convite. Mês sem contas: "0,0%" com a explicação. Falha de carga: erro com "Tentar novamente",
+ * nunca 0%. Os valores em reais do nome acessível seguem "Ocultar valores".
+ */
+function CommittedRow({ contextId }: { contextId: string | undefined }) {
+  const { month } = useView();
+  const committed = useCommittedSummary(contextId, month);
+  const mask = useMoneyMask();
+  const s = committed.data;
+  if (committed.isPending) {
+    return (
+      <View style={styles.committed}>
+        <Skeleton width="100%" height={44} />
+      </View>
+    );
+  }
+  if (committed.isError || !s) {
+    return (
+      <View style={styles.committed}>
+        <ErrorState message={COMMITTED_TEXT.loadError} onRetry={() => committed.refetch()} />
+      </View>
+    );
+  }
+  const line = committedLine(s);
+  return (
+    <View style={styles.committed}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={mask.label(line.a11yLabel)}
+        onPress={() => router.push({ pathname: '/renda-comprometida', params: { mes: month } })}
+        style={(st) => [styles.committedArea, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && styles.focusRing]}>
+        {line.kind === 'sem_referencia' ? (
+          <Txt variant="label" style={{ fontFamily: fonts.bold, flex: 1 }}>
+            {line.title}
+          </Txt>
+        ) : (
+          <View style={{ flex: 1, gap: space[1] }}>
+            <View style={styles.committedHead}>
+              <Txt variant="label" color={colors.textSecondary} style={{ flexShrink: 1 }}>
+                {line.title}
+              </Txt>
+              <Txt variant="label" style={[styles.committedValue, tabular]}>
+                {line.value}
+              </Txt>
+            </View>
+            <Meter paidPermille={line.meter.paidPermille} openPermille={line.meter.openPermille} over={line.meter.over} height={8} />
+            {line.caption ? (
+              <Txt variant="caption" color={colors.textSecondary}>
+                {line.caption}
+              </Txt>
+            ) : null}
+          </View>
+        )}
+        <ChevronRight size={20} color={colors.textSecondary} aria-hidden />
+      </Pressable>
+    </View>
   );
 }
 
@@ -345,6 +408,10 @@ const styles = StyleSheet.create({
   toPayArea: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3], minHeight: 44, borderRadius: radius.sm },
   overdueRow: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
   toPayLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
+  committed: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space[2], marginTop: space[1] },
+  committedArea: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44, paddingVertical: space[1], borderRadius: radius.sm },
+  committedHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', columnGap: space[2], flexWrap: 'wrap' },
+  committedValue: { fontFamily: fonts.extrabold, fontSize: 18, lineHeight: 24 },
   focusRing: { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid', outlineOffset: 2 } as object,
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space[2], flexWrap: 'wrap' },
   learn: {

@@ -1,18 +1,18 @@
-import { DEMO_EMAIL } from '@clarevo/core';
+import { DEMO_EMAIL, SAVINGS_TEXT } from '@clarevo/core';
 import { router } from 'expo-router';
-import { ArrowDownLeft, ArrowUpRight, Check, ChevronRight, Repeat, type LucideIcon } from 'lucide-react-native';
+import { ArrowDownLeft, ArrowUpRight, Check, ChevronRight, PiggyBank, Repeat, type LucideIcon } from 'lucide-react-native';
 import { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, ReduceMotion } from 'react-native-reanimated';
 
 import { Card, LinkButton, Txt } from '@/components/ui';
 import { useFirstSteps } from '@/lib/onboarding';
-import { useMonthRecords, useSeriesList, useView } from '@/state/data';
+import { useMonthRecords, useSavingsStepDone, useSeriesList, useView } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space } from '@/theme/tokens';
 
 interface Step {
-  key: 'fixos' | 'recebido' | 'pago';
+  key: 'fixos' | 'recebido' | 'pago' | 'guardar';
   icon: LucideIcon;
   title: string;
   text: string;
@@ -41,6 +41,14 @@ const STEPS: Step[] = [
     text: 'Mercado, farmácia ou transporte.',
     open: () => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } }),
   },
+  {
+    // D-036: abre a aba Metas, onde está o card da pergunta "Você consegue guardar algum valor por mês?".
+    key: 'guardar',
+    icon: PiggyBank,
+    title: SAVINGS_TEXT.firstStepTitle,
+    text: SAVINGS_TEXT.firstStepText,
+    open: () => router.navigate('/metas'),
+  },
 ];
 
 /** Fechar o card (três passos prontos ou "Agora não") é a única transição: esmaece em 240 ms (CL-V008). */
@@ -50,8 +58,10 @@ const cardExit = FadeOut.duration(motion.confirm).reduceMotion(ReduceMotion.Syst
  * "Primeiros passos" no Resumo, na área dos avisos temporários, antes de "Anotar gasto". Só no contexto Pessoal,
  * no mês corrente, fora da conta de demonstração com dados e com tudo carregado: um passo só aparece concluído
  * quando a lista que o comprova carregou bem (nunca um sinal de concluído por engano). Some de vez, por pessoa,
- * quando os três passos ficam prontos ou depois de "Agora não" (lib/onboarding.ts). Conta nova continua vazia:
+ * quando os quatro passos ficam prontos ou depois de "Agora não" (lib/onboarding.ts). Conta nova continua vazia:
  * o card só leva às telas de cadastro, sem dados de exemplo.
+ * O 4º passo, "Planejar quanto guardar" (D-036), abre a aba Metas e conta como concluído com a resposta "consigo" ou
+ * "agora não" ao plano de guardar. Se a resposta não carregar, o passo fica como não concluído (e o card continua).
  */
 export function PrimeirosPassos({ contextId }: { contextId: string | undefined }) {
   const { user, auth } = useSession();
@@ -63,14 +73,16 @@ export function PrimeirosPassos({ contextId }: { contextId: string | undefined }
   // e a sincronização do dia é a mesma de "Ainda a pagar"; só a lista de gastos fixos é lida a mais.
   const series = useSeriesList(eligible ? contextId : undefined);
   const records = useMonthRecords(eligible ? contextId : undefined, currentMonth);
+  const savings = useSavingsStepDone(eligible ? contextId : undefined);
   const summary = records.summary;
   const ready = eligible && series.isSuccess && records.isSuccess && summary !== null;
   const done: Record<Step['key'], boolean> = {
     fixos: Boolean(series.data && series.data.length > 0),
     recebido: Boolean(summary && summary.composition.received.length > 0),
     pago: Boolean(summary && summary.composition.paid.length > 0),
+    guardar: savings.isSuccess && savings.data === true,
   };
-  const allDone = done.fixos && done.recebido && done.pago;
+  const allDone = done.fixos && done.recebido && done.pago && done.guardar;
   const { close } = firstSteps;
 
   useEffect(() => {
@@ -87,7 +99,7 @@ export function PrimeirosPassos({ contextId }: { contextId: string | undefined }
             Primeiros passos
           </Txt>
           <Txt variant="caption" color={colors.textSecondary}>
-            Três passos para o Clarevo mostrar o seu mês de verdade.
+            Quatro passos para o Clarevo mostrar o seu mês de verdade.
           </Txt>
         </View>
         <View>

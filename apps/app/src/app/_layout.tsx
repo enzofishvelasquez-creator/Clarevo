@@ -28,7 +28,7 @@ SplashScreen.preventAutoHideAsync();
  * página recarregada). As telas de entrada, de confirmação e de nova senha ficam fora.
  */
 const ENTRY_PATH =
-  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|conta|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes|metas|aprender)\/?$/;
+  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/referencia)?|reserva|meta\/(nova|[^/]+(\/(editar|movimento))?)|guardar(\/minima)?|conta|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes|metas|aprender)\/?$/;
 
 /**
  * Endereço pedido ao abrir a versão web. Sem sessão (ou enquanto a sessão é conferida), as rotas protegidas levam à
@@ -214,6 +214,18 @@ function Navigation() {
           <Stack.Screen name="explicacao/[tema]" />
           <Stack.Screen name="calcular/index" />
           <Stack.Screen name="calcular/[slug]" />
+          {/* Renda comprometida (D-026) e renda de referência. */}
+          <Stack.Screen name="renda-comprometida/index" />
+          <Stack.Screen name="renda-comprometida/referencia" />
+          {/* Metas e reserva para imprevistos (D-027). /meta/nova é rota estática e tem precedência sobre /meta/[id]. */}
+          <Stack.Screen name="reserva" />
+          <Stack.Screen name="meta/nova" />
+          <Stack.Screen name="meta/[id]/index" />
+          <Stack.Screen name="meta/[id]/editar" />
+          <Stack.Screen name="meta/[id]/movimento" />
+          {/* Plano de guardar (D-036): "Sim, consigo" e a reserva mínima de "Agora não". */}
+          <Stack.Screen name="guardar/index" />
+          <Stack.Screen name="guardar/minima" />
           {/* Seus últimos meses (D-030): resumo, passo a passo e registrar e pagar uma conta sem registro. */}
           <Stack.Screen name="retomar/index" />
           <Stack.Screen name="retomar/atualizar" />

@@ -1,4 +1,4 @@
-import { RETURN_TEXT } from '@clarevo/core';
+import { GOALS_TEXT, RETURN_TEXT, SAVINGS_TEXT } from '@clarevo/core';
 import { router } from 'expo-router';
 import { User } from 'lucide-react-native';
 import { View } from 'react-native';
@@ -43,6 +43,10 @@ export default function QuemVeScreen() {
       </Txt>
       {/* Revisão dos últimos meses (D-030(9)): só datas, lidas só pela própria pessoa. */}
       <Txt color={colors.textSecondary}>{RETURN_TEXT.privacy}</Txt>
+      {/* Ciclos B, C e D: renda de referência, renda comprometida, metas e simulações. */}
+      <Txt color={colors.textSecondary}>{GOALS_TEXT.whoSeesGoals}</Txt>
+      {/* Plano de guardar (D-036): a resposta, o valor por mês e as datas de volta. */}
+      <Txt color={colors.textSecondary}>{SAVINGS_TEXT.privacy}</Txt>
       <TopicLink slug="empresa-ve" label="A empresa vê meus gastos?" style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
       <Button label="Entendi" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
     </Screen>

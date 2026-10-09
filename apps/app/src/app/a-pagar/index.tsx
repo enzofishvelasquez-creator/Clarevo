@@ -13,17 +13,19 @@ import {
   type Commitment,
   type FinancialRecord,
   type GroupedCommitment,
+  type IsoMonth,
   type PaymentInput,
 } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { AlertCircle, Check, Info, ListChecks, Pencil, Plus, Repeat, ShieldCheck } from 'lucide-react-native';
+import { AlertCircle, CalendarClock, Check, Info, ListChecks, Pencil, Plus, Repeat, ShieldCheck } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
 import { ChoiceDialog } from '@/components/choice-dialog';
+import { useMoneyMask } from '@/components/committed-parts';
 import { AnnualGroupRow, CommitmentRow, type RowAction } from '@/components/commitment-row';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
@@ -35,7 +37,7 @@ import { Banner, Button, Card, FitMoney, LinkButton, Screen, Skeleton, Txt } fro
 import { announceOnIOS } from '@/lib/a11y';
 import { totalChange } from '@/lib/highlight';
 import { explanationHref } from '@/lib/learn';
-import { useCommitments, usePayCommitment, useSeriesList, useSeriesSync, useSpace, useUpdateRecord, useView } from '@/state/data';
+import { useCommitments, usePayCommitment, usePaymentsForecast, useSeriesList, useSeriesSync, useSpace, useUpdateRecord, useView } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 
@@ -313,6 +315,9 @@ export default function ContasAPagarScreen() {
           </Txt>
         </View>
 
+        {/* Previsão dos pagamentos do mês (docs/08 §5 item 7): só aqui e só no mês de hoje; nunca no Resumo. */}
+        {isCurrent && s ? <PaymentsForecastNote contextId={ctx} month={month} /> : null}
+
         <Button label="Anotar conta a pagar" icon={Plus} onPress={() => router.push('/a-pagar/nova')} />
         <SeriesLink count={seriesList.data?.length ?? null} />
 
@@ -442,6 +447,32 @@ export default function ContasAPagarScreen() {
         </ChoiceDialog>
       ) : null}
     </View>
+  );
+}
+
+/**
+ * "Se pagar tudo o que está em aberto, os pagamentos de outubro chegam a R$ X" (Pago do mês mais Ainda a pagar) e, se
+ * houver, "Inclui R$ Y estimados". Informativo: sem "disponível", "sobra" nem "Diferença". Sem nada em aberto, nada aparece;
+ * falha de carga mostra o erro, nunca um valor.
+ */
+function PaymentsForecastNote({ contextId, month }: { contextId: string | undefined; month: IsoMonth }) {
+  const forecast = usePaymentsForecast(contextId, month);
+  const mask = useMoneyMask();
+  if (forecast.isPending) return null;
+  if (forecast.isError) return <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => forecast.refetch()} />;
+  const f = forecast.data;
+  if (!f) return null;
+  return (
+    <Banner tone="info" icon={CalendarClock} live={false}>
+      <Txt variant="label" style={tabular}>
+        {mask.text(f.text)}
+      </Txt>
+      {f.estimatedText ? (
+        <Txt variant="caption" color={colors.textSecondary}>
+          {mask.text(f.estimatedText)}
+        </Txt>
+      ) : null}
+    </Banner>
   );
 }
 

@@ -8,6 +8,7 @@ import {
   charCount,
   maskDateBR,
   FIELD_ORDER,
+  GOALS_TEXT,
   NO_CATEGORY_LABEL,
   RETURN_TEXT,
   centsToInput,
@@ -20,6 +21,7 @@ import {
   formatMonthName,
   formatMonthYearBR,
   isRepoError,
+  looksLikeSavings,
   monthOf,
   newOperationKey,
   parseDateBR,
@@ -422,6 +424,14 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
                 style={styles.inlineLink}
                 onPress={() => router.push(`/a-pagar/${openSeriesBill.id}`)}
               />
+            </Banner>
+          ) : null}
+
+          {/* Dinheiro guardado não é gasto (D-027): a descrição lembra reserva, poupança, aporte etc. Só um lembrete, nada é bloqueado. */}
+          {kind === 'despesa' && looksLikeSavings(draft.description) ? (
+            <Banner tone="info" icon={Info} live={false}>
+              <Txt variant="label">{GOALS_TEXT.savingsHint}</Txt>
+              <LinkButton label={GOALS_TEXT.savingsHintLink} style={styles.inlineLink} onPress={() => router.navigate('/metas')} />
             </Banner>
           ) : null}
 
