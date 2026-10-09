@@ -26,6 +26,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { HIDDEN_MONEY, HIDDEN_MONEY_A11Y, maskMoneyLabel, useValuesHidden } from '@/lib/privacy';
 import { yearA11y, yearA11yLabel } from '@/lib/years';
 import { colors, fonts, motion, radius, space, tabular, type } from '@/theme/tokens';
 
@@ -43,16 +44,20 @@ export function Txt({ variant = 'body', color = colors.text, style, children, ..
   );
 }
 
+/** Valor em reais. Com valores ocultos (lib/privacy.ts), mostra "R$ ••••" e o leitor de tela diz "valor oculto". */
 export function Money({
   cents,
   variant = 'amount',
   color = colors.text,
   style,
+  accessibilityLabel,
   ...props
 }: TextProps & { cents: number; variant?: Variant; color?: string }) {
+  const hidden = useValuesHidden();
+  const label = hidden ? (accessibilityLabel ? maskMoneyLabel(accessibilityLabel, true) : HIDDEN_MONEY_A11Y) : accessibilityLabel;
   return (
-    <Txt variant={variant} color={color} style={[tabular, style]} {...props}>
-      {formatBRL(cents)}
+    <Txt variant={variant} color={color} style={[tabular, style]} {...props} accessibilityLabel={label}>
+      {hidden ? HIDDEN_MONEY : formatBRL(cents)}
     </Txt>
   );
 }
@@ -63,14 +68,20 @@ export function Money({
  */
 export function FitMoney({ cents, color = colors.text, maxSize = 36, minSize = 22 }: { cents: number; color?: string; maxSize?: number; minSize?: number }) {
   const [width, setWidth] = useState(0);
-  const text = formatBRL(cents);
+  const hidden = useValuesHidden();
+  const text = hidden ? HIDDEN_MONEY : formatBRL(cents);
   // Manrope ExtraBold com números tabulares: ~0,62 em por caractere.
   const fits = (size: number) => text.length * size * 0.62 <= width;
   let size = maxSize;
   if (width > 0) while (size > minSize && !fits(size)) size -= 2;
   return (
     <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ alignSelf: 'stretch' }}>
-      <Txt variant="hero" color={color} style={[tabular, { fontSize: size, lineHeight: Math.round(size * 1.22) }]} maxFontSizeMultiplier={1.4}>
+      <Txt
+        variant="hero"
+        color={color}
+        style={[tabular, { fontSize: size, lineHeight: Math.round(size * 1.22) }]}
+        maxFontSizeMultiplier={1.4}
+        accessibilityLabel={hidden ? HIDDEN_MONEY_A11Y : undefined}>
         {text}
       </Txt>
     </View>

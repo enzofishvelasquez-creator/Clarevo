@@ -5,7 +5,15 @@ import type {
   CommitmentInput,
   CommitmentSeries,
   FinancialRecord,
+  Goal,
+  GoalInput,
+  GoalMovement,
+  GoalMovementInput,
+  GoalMovementKind,
+  GoalStatus,
+  IncomeReference,
   MonthOverview,
+  NewGoalInput,
   OccurrenceMode,
   PaymentInput,
   PersonalSpace,
@@ -14,6 +22,8 @@ import type {
   ReturnDecision,
   ReturnReviewMark,
   ReturnReviewState,
+  SavingsAnswer,
+  SavingsCheck,
   SeriesEditInput,
   SeriesInput,
 } from './records';
@@ -32,6 +42,42 @@ export type CommitmentAction =
 
 /** Decisão da revisão dos últimos meses (decide_return_review); não conta como anotação (D-030). */
 export type ReturnReviewAction = 'decidir_revisao';
+
+/**
+ * Renda de referência (D-026, Ciclo B), gravada em record_operations com a referência em target_id:
+ * set_income_reference ('definir_renda_referencia') e delete_income_reference ('excluir_renda_referencia').
+ * Contam como anotação na atividade (D-030), como as demais escritas.
+ */
+export type IncomeReferenceAction = 'definir_renda_referencia' | 'excluir_renda_referencia';
+
+/**
+ * Resposta do plano de guardar (set_savings_answer, spec7), gravada em record_operations sem alvo. Como 'decidir_revisao',
+ * não conta como anotação na atividade (D-030).
+ */
+export type SavingsAction = 'responder_guardar';
+
+/**
+ * Metas (D-027, Ciclo C), gravadas em record_operations com o alvo em target_id: a meta em criar_meta, alterar_meta,
+ * situacao_meta e excluir_meta; o movimento em registrar_movimento_meta, alterar_movimento_meta e
+ * excluir_movimento_meta. Contam como anotação na atividade (D-030), como as demais escritas.
+ */
+export type GoalAction =
+  | 'criar_meta'
+  | 'alterar_meta'
+  | 'situacao_meta'
+  | 'excluir_meta'
+  | 'registrar_movimento_meta'
+  | 'alterar_movimento_meta'
+  | 'excluir_movimento_meta';
+
+/**
+ * Resultado das escritas de metas: a meta no estado atual (com os totais de goal_items, inclusive excluída) e o
+ * movimento envolvido (o saldo inicial em createGoal; o registrado, alterado ou excluído nas escritas de movimento).
+ */
+export interface GoalWrite {
+  goal: Goal;
+  movement: GoalMovement | null;
+}
 
 /** Resultado das escritas de conta a pagar: a conta no estado atual e, quando houver, o gasto envolvido. */
 export interface CommitmentWrite {
@@ -174,6 +220,96 @@ export interface RecordsRepository {
     reviewedThrough: IsoMonth,
     decision: ReturnDecision,
   ): Promise<ReturnReviewMark>;
+
+  // Renda de referência (D-026, Ciclo B). Para "Próximos meses", as contas por vencimento vêm de
+  // listCommitmentsDueBetween (mesma leitura de commitment_items).
+
+  /** Referências vivas do contexto, por mês de início crescente. Sem leitura: lista vazia (RLS). */
+  listIncomeReferences(contextId: string): Promise<IncomeReference[]>;
+  /**
+   * Cria (expectedVersion 0) ou altera (versão atual) a referência viva do mês fromMonth. Exige escrita no contexto.
+   * Ordem do banco: repetição; sem_permissao; mes_invalido; referencia_fora_do_intervalo (fora de mês atual − 24 a
+   * mês atual + 12); valor_invalido e valor_acima_do_limite; tipo_invalido (varies nulo); versao_desatualizada (versão
+   * nula ou negativa, 0 com referência viva no mês, maior que 0 sem referência viva ou com outra versão); autoria ou
+   * "editar de outras pessoas" (sem_permissao). Mesma chave e conteúdo: devolve o estado atual; outro conteúdo ou outra
+   * ação: chave_reutilizada.
+   */
+  setIncomeReference(
+    key: string,
+    contextId: string,
+    fromMonth: IsoMonth,
+    expectedVersion: number,
+    amountCents: Cents,
+    varies: boolean,
+  ): Promise<IncomeReference>;
+  /**
+   * Exclusão lógica com versão (a anterior volta a valer). Ordem: repetição; nao_encontrado (sem leitura ou já
+   * excluída); sem_permissao (sem escrita); versao_desatualizada; autoria. Devolve a referência excluída.
+   */
+  deleteIncomeReference(key: string, id: string, expectedVersion: number): Promise<IncomeReference>;
+
+  // Metas e reservas (D-027, Ciclo C). Ordem das conferências e códigos em goals.ts (GOAL_*_CODE_ORDER).
+
+  /** Metas vivas do contexto (todas as situações), por criação; com os totais de goal_items. Sem leitura: lista vazia. */
+  listGoals(contextId: string): Promise<Goal[]>;
+  /** Meta viva (com os totais de goal_items) ou null (excluída, inexistente ou sem leitura). */
+  getGoal(id: string): Promise<Goal | null>;
+  /** Movimentos vivos da meta, do mais recente ao mais antigo (data, criação, id). Sem leitura: lista vazia. */
+  listGoalMovements(goalId: string): Promise<GoalMovement[]>;
+  /** Movimentos vivos de todas as metas do contexto com data no mês, do mais recente ao mais antigo. */
+  listGoalMovementsInMonth(contextId: string, month: IsoMonth): Promise<GoalMovement[]>;
+  /**
+   * create_goal. Exige escrita no contexto. Na reserva ('emergencia'), o alvo gravado é base × meses (targetCents nulo
+   * ou igual ao produto, senão alvo_invalido). Com initialCents > 0, cria o movimento 'saldo_inicial' em initialOn.
+   * Ordem: repetição; sem_permissao; GOAL_INPUT_CODE_ORDER; saldo inicial (saldo_inicial_invalido, data_invalida,
+   * data_futura); reserva_ja_existe.
+   */
+  createGoal(key: string, contextId: string, input: NewGoalInput): Promise<GoalWrite>;
+  /**
+   * update_goal (mesmos campos, sem o saldo inicial), em qualquer situação. Ordem: repetição; nao_encontrado;
+   * sem_permissao (inclusive autoria sem "editar de outras pessoas", só no banco); versao_desatualizada;
+   * GOAL_INPUT_CODE_ORDER (o intervalo do prazo só quando ele muda); reserva_ja_existe. Movimentos não mudam.
+   */
+  updateGoal(key: string, goalId: string, expectedVersion: number, input: GoalInput): Promise<GoalWrite>;
+  /**
+   * set_goal_status: concluir, arquivar e reativar. Ordem: repetição; nao_encontrado; sem_permissao;
+   * versao_desatualizada; situacao_invalida; reserva_ja_existe (reserva saindo de arquivada com outra reserva não
+   * arquivada no contexto).
+   */
+  setGoalStatus(key: string, goalId: string, expectedVersion: number, status: GoalStatus): Promise<GoalWrite>;
+  /** delete_goal: exclui a meta e os movimentos vivos (versão + 1 em cada), em qualquer situação. Ordem: repetição; trava; versão. */
+  deleteGoal(key: string, goalId: string, expectedVersion: number): Promise<GoalWrite>;
+  /**
+   * add_goal_movement: sem versão (como create_record); a versão da meta não sobe. Ordem: repetição; nao_encontrado;
+   * sem_permissao; meta_arquivada; tipo_invalido ('saldo_inicial' só por createGoal); valor_invalido;
+   * valor_acima_do_limite; data_invalida; data_futura; observacao_longa; saldo_da_meta_insuficiente (o primeiro dia
+   * negativo em RepoError.detail, "dia=AAAA-MM-DD"; negativeDayFromDetail).
+   */
+  addGoalMovement(key: string, goalId: string, kind: GoalMovementKind, input: GoalMovementInput): Promise<GoalWrite>;
+  /**
+   * update_goal_movement: o tipo nunca muda (o 'saldo_inicial' também pode ser corrigido). Ordem: repetição;
+   * nao_encontrado; sem_permissao (autoria, só no banco); versao_desatualizada; meta_arquivada; valor, data e
+   * observação; saldo_da_meta_insuficiente.
+   */
+  updateGoalMovement(key: string, movementId: string, expectedVersion: number, input: GoalMovementInput): Promise<GoalWrite>;
+  /** delete_goal_movement. Ordem: repetição; nao_encontrado; sem_permissao; versao_desatualizada; meta_arquivada; saldo. */
+  deleteGoalMovement(key: string, movementId: string, expectedVersion: number): Promise<GoalWrite>;
+  /** Reconciliação de metas: a operação com esta chave já foi concluída? movementId só nas ações de movimento. */
+  findGoalOperation(key: string): Promise<{ action: GoalAction; goalId: string; movementId: string | null } | null>;
+
+  // Plano de guardar (spec7). A resposta e as datas são só da própria pessoa (RLS como a atividade do A4).
+
+  /** Resposta da própria pessoa no contexto (savings_checks) ou null (ainda não respondeu, sem leitura ou outra pessoa). */
+  getSavingsCheck(contextId: string): Promise<SavingsCheck | null>;
+  /**
+   * set_savings_answer. Grava (versão 0 = ainda não existe) ou substitui a resposta viva da pessoa no contexto. Exige
+   * escrita no contexto. Ordem: repetição; sem_permissao; resposta_invalida; valor_invalido e valor_acima_do_limite
+   * (monthlyCents de 100 a 999.999.999 só com 'consigo'; nulo nas outras respostas); versao_desatualizada (versão nula ou
+   * negativa também; RepoError.detail "versao_atual=N"). As datas são calculadas aqui, no dia da pessoa: answeredOn = hoje; askAgainOn = hoje + 7
+   * ('depois'), hoje + 30 ('agora_nao') ou nula ('consigo'). Mesma chave e conteúdo: devolve o estado atual; outro
+   * conteúdo ou outra ação: chave_reutilizada. Não conta como anotação na atividade. Reconciliação: repetir a chave.
+   */
+  setSavingsAnswer(key: string, contextId: string, expectedVersion: number, answer: SavingsAnswer, monthlyCents?: Cents | null): Promise<SavingsCheck>;
 }
 
 export type RepoErrorCode =
@@ -219,12 +355,29 @@ export type RepoErrorCode =
   | 'decisao_invalida'
   | 'mes_invalido'
   | 'periodo_invalido'
+  | 'referencia_fora_do_intervalo'
+  | 'reserva_ja_existe'
+  | 'nome_da_meta_invalido'
+  | 'alvo_acima_do_limite'
+  | 'prazo_invalido'
+  | 'meses_invalidos'
+  | 'origem_invalida'
+  | 'alvo_invalido'
+  | 'plano_invalido'
+  | 'saldo_inicial_invalido'
+  | 'observacao_longa'
+  | 'situacao_invalida'
+  | 'meta_arquivada'
+  | 'saldo_da_meta_insuficiente'
+  | 'resposta_invalida'
   | 'desconhecido';
 
 export class RepoError extends Error {
   constructor(
     readonly code: RepoErrorCode,
     message?: string,
+    /** Detalhe do banco, quando houver (saldo_da_meta_insuficiente: o primeiro dia negativo, AAAA-MM-DD). */
+    readonly detail?: string,
   ) {
     super(message ?? code);
     this.name = 'RepoError';

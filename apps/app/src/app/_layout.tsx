@@ -14,6 +14,7 @@ import { Platform } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { DeviceFeatures } from '@/components/device-features';
 import { afterLogin, restoreTarget, signOutIntent } from '@/lib/nav';
 import { SessionProvider, useSession } from '@/state/session';
 import { SpaceStatusContext, type SpaceStatus } from '@/state/space-status';
@@ -224,6 +225,8 @@ function Navigation() {
           <Stack.Screen name="nova-senha" />
         </Stack.Protected>
       </Stack>
+      {/* Lembretes, ocultar valores e biometria ao abrir (A2). */}
+      <DeviceFeatures />
     </SpaceStatusContext>
   );
 }

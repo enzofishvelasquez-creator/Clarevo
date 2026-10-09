@@ -13,3 +13,8 @@ export * from './calculators';
 export * from './sum';
 export * from './shortcuts';
 export * from './retorno';
+export * from './committed';
+export * from './reminders';
+export * from './goals';
+export * from './savings';
+export * from './simulate';

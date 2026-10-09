@@ -247,6 +247,25 @@ export interface ReturnReviewState {
   mark: ReturnReviewMark | null;
 }
 
+/** Resposta a "Você consegue guardar algum valor por mês?" (plano de guardar, spec7): "consigo", "agora não" ou "responder depois". */
+export type SavingsAnswer = 'consigo' | 'agora_nao' | 'depois';
+
+/**
+ * Resposta da própria pessoa no contexto (savings_checks): uma linha viva por pessoa e contexto, só dela (nem a Família
+ * nem a empresa leem). monthlyCents (100 a 999.999.999) só com 'consigo'; askAgainOn (calculada no banco: depois = hoje + 7,
+ * agora_nao = hoje + 30) é nula com 'consigo'. O banco guarda também person_id (a própria pessoa), que o app não usa.
+ */
+export interface SavingsCheck {
+  contextId: string;
+  answer: SavingsAnswer;
+  monthlyCents: Cents | null;
+  answeredOn: IsoDate;
+  askAgainOn: IsoDate | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** Recebimentos e gastos anotados num mês (months_overview, mesmo critério de month_totals). */
 export interface MonthOverview {
   month: IsoMonth;
@@ -258,6 +277,123 @@ export interface MonthOverview {
 
 /** create_series_occurrence: a conta do mês passado fica em aberto ou registrada como "não houve". */
 export type OccurrenceMode = 'aberta' | 'nao_houve';
+
+/**
+ * Renda de referência mensal líquida (D-026(2)): informada pela pessoa, vale a partir de um mês (a mais recente com
+ * início até o mês mostrado). Só calcula percentuais: não confirma recebimento e nunca entra em Recebido.
+ * Gravada só por set_income_reference e delete_income_reference; no máximo uma viva por contexto e mês.
+ */
+export interface IncomeReference {
+  id: string;
+  contextId: string;
+  /** Primeiro mês em que vale (no banco, o dia 1 desse mês). */
+  fromMonth: IsoMonth;
+  amountCents: Cents;
+  /** "Minha renda varia": o app pede revisão quando a referência vigente é de um mês anterior. */
+  varies: boolean;
+  createdBy: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Metas e reservas (D-027, Ciclo C), no contexto Pessoal. Reserva é meta, não conta: o Clarevo não guarda nem movimenta
+ * dinheiro, e movimentos de meta nunca entram em Recebido, Pago, Diferença, Ainda a pagar nem na renda comprometida.
+ * - 'emergencia': reserva para imprevistos (no máximo uma não arquivada por contexto), alvo = gastos essenciais × meses;
+ * - 'oportunidade': reserva de oportunidade, separada da reserva para imprevistos;
+ * - 'objetivo': viagem, curso, troca do carro, entrada de um imóvel.
+ */
+export type GoalType = 'emergencia' | 'oportunidade' | 'objetivo';
+/** Concluir é escolha da pessoa (sem celebração automática); arquivada não recebe movimentos. */
+export type GoalStatus = 'ativa' | 'concluida' | 'arquivada';
+/**
+ * Movimentos registrados pela pessoa, com data até hoje. 'saldo_inicial' (já guardado ao criar, no máximo um, só por
+ * create_goal), 'aporte', 'rendimento' (recebido, informado pela pessoa) e 'valorizacao' somam; 'resgate' e
+ * 'desvalorizacao' subtraem. "Atualizar valor guardado" registra a diferença como valorização ou desvalorização.
+ */
+export type GoalMovementKind = 'saldo_inicial' | 'aporte' | 'resgate' | 'rendimento' | 'valorizacao' | 'desvalorizacao';
+/** De onde veio a base de gastos essenciais da reserva: média do Pago, contas do mês ou valor digitado. */
+export type EssentialBaseSource = 'media_gastos' | 'contas_do_mes' | 'informado';
+
+/** Meta (goals) com os totais dos movimentos vivos (visão goal_items). Gravada só pelas funções de metas do banco. */
+export interface Goal {
+  id: string;
+  contextId: string;
+  goalType: GoalType;
+  /** 1 a 40 caracteres, sem espaços nas pontas. */
+  name: string;
+  /** Valor alvo. Na reserva para imprevistos, sempre essentialBaseCents × essentialMonths. */
+  targetCents: Cents;
+  /** Prazo opcional (mês). */
+  targetMonth: IsoMonth | null;
+  /** Plano por mês, opcional: intenção, nunca aporte. */
+  plannedMonthlyCents: Cents | null;
+  /** Só na reserva para imprevistos (os três juntos): base confirmada, meses (1 a 24) e origem da base. */
+  essentialBaseCents: Cents | null;
+  essentialMonths: number | null;
+  essentialBaseSource: EssentialBaseSource | null;
+  status: GoalStatus;
+  createdBy: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  /** goal_items: soma com sinal dos movimentos vivos (o valor guardado; nunca negativo ao fim de um dia). */
+  savedCents: Cents;
+  /** goal_items: totais por tipo, sem sinal. */
+  initialCents: Cents;
+  depositsCents: Cents;
+  withdrawalsCents: Cents;
+  incomeCents: Cents;
+  appreciationCents: Cents;
+  depreciationCents: Cents;
+  /** goal_items: data do movimento vivo mais recente (null sem movimentos). */
+  lastMovementOn: IsoDate | null;
+}
+
+/** Movimento de meta (goal_movements). O tipo nunca muda; a versão da meta não sobe com movimentos. */
+export interface GoalMovement {
+  id: string;
+  goalId: string;
+  contextId: string;
+  kind: GoalMovementKind;
+  /** Sempre positivo; o sinal vem do tipo (MOVEMENT_SIGN). */
+  amountCents: Cents;
+  occurredOn: IsoDate;
+  /** Observação opcional, 1 a 80 caracteres (vazia vira null). */
+  note: string | null;
+  createdBy: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Campos de create_goal e update_goal (sem o saldo inicial). */
+export interface GoalInput {
+  goalType: GoalType;
+  name: string;
+  /** Objetivo e oportunidade: o valor da meta. Na reserva, ignorado: o alvo gravado é base × meses. */
+  targetCents: Cents | null;
+  targetMonth: IsoMonth | null;
+  plannedMonthlyCents: Cents | null;
+  /** Só na reserva (os três juntos); nulos nos outros tipos. */
+  essentialBaseCents: Cents | null;
+  essentialMonths: number | null;
+  essentialBaseSource: EssentialBaseSource | null;
+}
+
+/** create_goal: com initialCents > 0, cria o movimento 'saldo_inicial' na data initialOn (até hoje). */
+export interface NewGoalInput extends GoalInput {
+  initialCents: Cents | null;
+  initialOn: IsoDate | null;
+}
+
+/** Campos de add_goal_movement e update_goal_movement (o tipo vem à parte e nunca muda). */
+export interface GoalMovementInput {
+  amountCents: Cents;
+  occurredOn: IsoDate;
+  note: string | null;
+}
 
 export const NO_CATEGORY_LABEL = 'Sem categoria';
 export const CATEGORIES: Record<RecordKind, readonly string[]> = {

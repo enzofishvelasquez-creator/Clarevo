@@ -7,7 +7,10 @@ import type { IsoDate } from '../dates';
  */
 export type LearnSectionId = 'usar' | 'organizar' | 'juros' | 'tempo' | 'duvidas';
 
-/** Os 37 temas do catálogo, na ordem de spec3 §3.3. Um slug nunca é reaproveitado (R1). */
+/**
+ * Os 42 temas do catálogo, na ordem das seções (spec3 §3.3, com os temas dos Ciclos B, C e D). Um slug nunca é
+ * reaproveitado (R1).
+ */
 export const TOPIC_SLUGS = [
   'diferenca',
   'realizado-previsto',
@@ -21,6 +24,10 @@ export const TOPIC_SLUGS = [
   'contas-do-ano',
   'orcamento-50-30-20',
   'reserva-imprevistos',
+  'renda-comprometida',
+  'renda-variavel',
+  'aporte',
+  'essenciais',
   'juros-simples-compostos',
   'taxa-mes-ano',
   'taxa-e-tarifa',
@@ -38,6 +45,7 @@ export const TOPIC_SLUGS = [
   'selic',
   'liquidez-risco-retorno',
   'fgc',
+  'simulacao',
   'quem-ve-meus-dados',
   'empresa-ve',
   'demonstracao',

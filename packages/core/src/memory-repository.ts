@@ -9,6 +9,14 @@ import type {
   ContextActivity,
   FinancialAccount,
   FinancialRecord,
+  Goal,
+  GoalInput,
+  GoalMovement,
+  GoalMovementInput,
+  GoalMovementKind,
+  GoalStatus,
+  IncomeReference,
+  NewGoalInput,
   OccurrenceMode,
   PaymentInput,
   PersonalSpace,
@@ -16,6 +24,8 @@ import type {
   RecordKind,
   ReturnDecision,
   ReturnReviewMark,
+  SavingsAnswer,
+  SavingsCheck,
   SeriesEditInput,
   SeriesInput,
   SeriesTerm,
@@ -24,14 +34,38 @@ import type {
   AffectedRef,
   CommitmentAction,
   CommitmentWrite,
+  GoalAction,
+  GoalWrite,
+  IncomeReferenceAction,
   RecordsRepository,
   ReturnReviewAction,
+  SavingsAction,
   SeriesAction,
   SeriesWrite,
 } from './repository';
 import { RepoError } from './repository';
+import { referenceMonthError } from './committed';
+import {
+  GOAL_MOVEMENT_KINDS,
+  GOAL_NAME_MAX,
+  GOAL_NOTE_MAX,
+  GOAL_STATUSES,
+  GOAL_TYPES,
+  ESSENTIAL_BASE_SOURCES,
+  RESERVE_MONTHS_MAX,
+  RESERVE_MONTHS_MIN,
+  firstNegativeDay,
+  goalComposition,
+  goalInputError,
+  goalMovementError,
+  goalTargetOf,
+  initialMovementError,
+  normalizeGoalNote,
+  type GoalMovementChange,
+} from './goals';
 import { PARTS_PER_YEAR_MAX } from './records';
 import { isLongAbsence, isReviewableMonth, monthsOverview as overviewOf } from './retorno';
+import { savingsAnswerError, savingsAskAgainOn } from './savings';
 import {
   ANNUAL_MAX_YEARS,
   SERIES_LIMIT,
@@ -50,13 +84,18 @@ import { dueDateBounds, seriesInputError, seriesTermError } from './validation';
 type RecordAction = 'criar' | 'editar' | 'excluir';
 
 interface Operation {
-  action: RecordAction | CommitmentAction | SeriesAction | ReturnReviewAction;
+  action: RecordAction | CommitmentAction | SeriesAction | ReturnReviewAction | IncomeReferenceAction | GoalAction | SavingsAction;
   hash: string;
   contextId: string;
   recordId: string | null;
   commitmentId: string | null;
   /** Alvo genérico (target_id): a série nas ações de gasto fixo. */
   seriesId: string | null;
+  /** Alvo genérico (target_id): a renda de referência nas ações de renda de referência. */
+  referenceId: string | null;
+  /** Ações de metas: a meta e, nas ações de movimento, o movimento (target_id). */
+  goalId: string | null;
+  movementId: string | null;
 }
 
 type StoredRecord = FinancialRecord & { deletedAt?: string };
@@ -74,9 +113,27 @@ type StoredCommitment = Omit<Commitment, 'payment' | 'series'> & {
 type StoredSeries = Omit<CommitmentSeries, 'terms' | 'skippedNumbers' | 'paidCount' | 'openCount' | 'generating'> & { deletedAt?: string };
 /** Vigência: nunca editada; "esta e as próximas" marca as substituídas. */
 type StoredTerm = SeriesTerm & { id: string; seriesId: string; contextId: string; createdAt: string; supersededAt?: string };
+/** Renda de referência (income_references): exclusão lógica; no máximo uma viva por contexto e mês. */
+type StoredIncomeReference = IncomeReference & { deletedAt?: string; deletedBy?: string };
+/** Meta (goals) sem os totais de goal_items, que são calculados dos movimentos vivos. */
+type StoredGoal = Omit<
+  Goal,
+  'savedCents' | 'initialCents' | 'depositsCents' | 'withdrawalsCents' | 'incomeCents' | 'appreciationCents' | 'depreciationCents' | 'lastMovementOn'
+> & { deletedAt?: string; deletedBy?: string };
+/** Movimento de meta (goal_movements): exclusão lógica. */
+type StoredGoalMovement = GoalMovement & { deletedAt?: string; deletedBy?: string };
 
 const NATURES: readonly string[] = ['conta', 'financiamento', 'compra_parcelada', 'outro_parcelamento'];
 const SERIES_ACTIONS: readonly string[] = ['criar_serie', 'alterar_serie', 'encerrar_serie', 'excluir_serie', 'informar_ano', 'tirar_ano'];
+const GOAL_ACTIONS: readonly string[] = [
+  'criar_meta',
+  'alterar_meta',
+  'situacao_meta',
+  'excluir_meta',
+  'registrar_movimento_meta',
+  'alterar_movimento_meta',
+  'excluir_movimento_meta',
+];
 const COMMITMENT_ACTIONS: readonly string[] = [
   'criar_compromisso',
   'editar_compromisso',
@@ -107,6 +164,13 @@ export interface MemoryRepositoryOptions {
  * com S1 a S10.
  * Revisão dos últimos meses (D-030): toda operação gravada, menos a decisão da revisão, atualiza a atividade da pessoa no
  * contexto (como o gatilho clarevo_track_activity); a geração não grava operação e não mexe nela.
+ * Renda de referência (D-026): set_income_reference e delete_income_reference, com versão, exclusão lógica e no máximo
+ * uma viva por contexto e mês.
+ * Metas (D-027): as sete funções de metas, com G1 a G6 (saldo dia a dia nunca negativo, mesmo contexto, nenhuma escrita
+ * em registros ou contas a pagar, meta excluída sem movimento vivo, meta arquivada sem movimento novo e no máximo uma
+ * reserva não arquivada por contexto). Movimentos nunca mexem em registros, contas a pagar nem na versão da meta.
+ * Plano de guardar (spec7): set_savings_answer, uma resposta viva por contexto, só da própria pessoa; não conta como
+ * anotação na atividade (como a decisão da revisão) e não mexe em nenhum total.
  * Usado na demonstração (acesso simulado) e nos testes.
  */
 export class MemoryRepository implements RecordsRepository {
@@ -119,6 +183,11 @@ export class MemoryRepository implements RecordsRepository {
   /** context_activity e return_reviews da pessoa (só ela usa este repositório), por contexto. */
   private activity = new Map<string, ContextActivity>();
   private reviews = new Map<string, ReturnReviewMark>();
+  private incomeRefs = new Map<string, StoredIncomeReference>();
+  private goals = new Map<string, StoredGoal>();
+  private goalMovements = new Map<string, StoredGoalMovement>();
+  /** savings_checks da pessoa (só ela usa este repositório), por contexto: uma resposta viva por contexto. */
+  private savingsChecks = new Map<string, SavingsCheck>();
   private seq = 0;
   /** Simula falha de rede: 'antes' (nada gravado) ou 'depois' (gravado, resposta perdida). */
   failNextWrite: 'antes' | 'depois' | null = null;
@@ -168,6 +237,10 @@ export class MemoryRepository implements RecordsRepository {
       operations: new Map(this.operations),
       activity: new Map(this.activity),
       reviews: new Map(this.reviews),
+      incomeRefs: new Map(this.incomeRefs),
+      goals: new Map(this.goals),
+      goalMovements: new Map(this.goalMovements),
+      savingsChecks: new Map(this.savingsChecks),
     };
     let result: T;
     try {
@@ -183,6 +256,10 @@ export class MemoryRepository implements RecordsRepository {
         operations: this.operations,
         activity: this.activity,
         reviews: this.reviews,
+        incomeRefs: this.incomeRefs,
+        goals: this.goals,
+        goalMovements: this.goalMovements,
+        savingsChecks: this.savingsChecks,
       } = saved);
       throw e;
     }
@@ -890,6 +967,514 @@ export class MemoryRepository implements RecordsRepository {
     });
   }
 
+  /** Como a leitura de income_references (RLS): vivas do contexto, por mês de início crescente; sem leitura, nada. */
+  async listIncomeReferences(contextId: string) {
+    return this.read(() =>
+      [...this.incomeRefs.values()]
+        .filter((r) => !r.deletedAt && r.contextId === contextId && this.canRead(r.contextId))
+        .sort((a, b) => a.fromMonth.localeCompare(b.fromMonth) || a.id.localeCompare(b.id))
+        .map(stripReference),
+    );
+  }
+
+  /**
+   * Como set_income_reference: versão 0 cria; maior que 0 altera a referência viva do mês (fromMonth não muda: para
+   * outro mês, exclua e crie). Ordem do banco: repetição, escrita no contexto, mês, faixa, valor, tipo, versão.
+   */
+  async setIncomeReference(key: string, contextId: string, fromMonth: IsoMonth, expectedVersion: number, amountCents: Cents, varies: boolean) {
+    return this.write(() => {
+      const payload = [contextId, fromMonth, expectedVersion, amountCents, varies];
+      const replayed = this.replay(key, 'definir_renda_referencia', payload);
+      if (replayed) return stripReference(this.incomeRefs.get(replayed.referenceId!)!);
+      if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      const monthError = referenceMonthError(fromMonth, this.opts.today());
+      if (monthError) throw new RepoError(monthError);
+      if (!Number.isSafeInteger(amountCents) || amountCents < 1) throw new RepoError('valor_invalido');
+      if (amountCents > MAX_RECORD_CENTS) throw new RepoError('valor_acima_do_limite');
+      if (typeof varies !== 'boolean') throw new RepoError('tipo_invalido');
+      if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0) throw new RepoError('versao_desatualizada');
+      const current = [...this.incomeRefs.values()].find((r) => !r.deletedAt && r.contextId === contextId && r.fromMonth === fromMonth);
+      if (expectedVersion !== (current?.version ?? 0)) throw new RepoError('versao_desatualizada');
+      const now = new Date().toISOString();
+      const next: StoredIncomeReference = current
+        ? { ...current, amountCents, varies, version: current.version + 1, updatedAt: now }
+        : {
+            id: this.id('ref'),
+            contextId,
+            fromMonth,
+            amountCents,
+            varies,
+            createdBy: this.opts.actorId,
+            version: 1,
+            createdAt: now,
+            updatedAt: now,
+          };
+      this.incomeRefs.set(next.id, next);
+      this.saveOperation(key, 'definir_renda_referencia', payload, { contextId, recordId: null, commitmentId: null, referenceId: next.id });
+      return stripReference(next);
+    });
+  }
+
+  /** Como delete_income_reference: exclusão lógica com versão; a referência anterior volta a valer. */
+  async deleteIncomeReference(key: string, id: string, expectedVersion: number) {
+    return this.write(() => {
+      const payload = [id, expectedVersion];
+      const replayed = this.replay(key, 'excluir_renda_referencia', payload);
+      if (replayed) return stripReference(this.incomeRefs.get(replayed.referenceId!)!);
+      const current = this.incomeRefs.get(id);
+      if (!current || current.deletedAt || !this.canRead(current.contextId)) throw new RepoError('nao_encontrado');
+      if (!this.canWrite(current.contextId)) throw new RepoError('sem_permissao');
+      if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
+      const now = new Date().toISOString();
+      const next: StoredIncomeReference = {
+        ...current,
+        version: current.version + 1,
+        updatedAt: now,
+        deletedAt: now,
+        deletedBy: this.opts.actorId,
+      };
+      this.incomeRefs.set(id, next);
+      this.saveOperation(key, 'excluir_renda_referencia', payload, { contextId: current.contextId, recordId: null, commitmentId: null, referenceId: id });
+      return stripReference(next);
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Metas (D-027): mesmas regras e mesma ordem das funções do banco (goals.ts, GOAL_INPUT_CODE_ORDER)
+  // ---------------------------------------------------------------------------
+
+  /** Como a leitura de goal_items (RLS): metas vivas do contexto, por criação; sem leitura, nada. */
+  async listGoals(contextId: string) {
+    return this.read(() =>
+      [...this.goals.values()]
+        .filter((g) => !g.deletedAt && g.contextId === contextId && this.canRead(g.contextId))
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
+        .map((g) => this.toGoal(g)),
+    );
+  }
+
+  async getGoal(id: string) {
+    return this.read(() => {
+      const g = this.goals.get(id);
+      return g && !g.deletedAt && this.canRead(g.contextId) ? this.toGoal(g) : null;
+    });
+  }
+
+  /** Movimentos vivos da meta, do mais recente ao mais antigo (data, criação, id). */
+  async listGoalMovements(goalId: string) {
+    return this.read(() => {
+      const g = this.goals.get(goalId);
+      if (!g || g.deletedAt || !this.canRead(g.contextId)) return [];
+      return this.liveGoalMovements(goalId).sort(byMovementDesc).map(stripMovement);
+    });
+  }
+
+  /** Movimentos vivos de todas as metas do contexto com data no mês, do mais recente ao mais antigo. */
+  async listGoalMovementsInMonth(contextId: string, month: IsoMonth) {
+    return this.read(() =>
+      [...this.goalMovements.values()]
+        .filter((m) => !m.deletedAt && m.contextId === contextId && this.canRead(m.contextId) && monthOf(m.occurredOn) === month)
+        .sort(byMovementDesc)
+        .map(stripMovement),
+    );
+  }
+
+  async findGoalOperation(key: string) {
+    return this.read(() => {
+      const op = this.operations.get(key);
+      return op && op.goalId && isGoalAction(op.action) ? { action: op.action, goalId: op.goalId, movementId: op.movementId } : null;
+    });
+  }
+
+  /**
+   * Como create_goal (migração 0007). Ordem: repetição; sem_permissao; campos (goalInputError, como
+   * clarevo_validate_goal); saldo inicial (saldo_inicial_invalido, data_invalida, data_futura); reserva_ja_existe. Na
+   * reserva, o alvo gravado é base × meses (targetCents nulo ou igual). Com saldo inicial > 0, o movimento
+   * 'saldo_inicial' na data informada.
+   */
+  async createGoal(key: string, contextId: string, input: NewGoalInput) {
+    return this.write(() => {
+      const norm = normalizeGoalInput(input);
+      const initialCents = input.initialCents ?? null;
+      const initialOn = input.initialOn ?? null;
+      const payload = [contextId, ...goalPayload(norm), initialCents, initialOn];
+      const replayed = this.replay(key, 'criar_meta', payload);
+      if (replayed) return this.goalResult(replayed.goalId!, replayed.movementId);
+      if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      const today = this.opts.today();
+      const code = goalInputError(norm, today) ?? initialMovementError(initialCents, initialOn, today);
+      if (code) throw new RepoError(code);
+      if (norm.goalType === 'emergencia' && this.otherReserve(contextId, null)) throw new RepoError('reserva_ja_existe');
+      const now = new Date().toISOString();
+      const goal: StoredGoal = {
+        id: this.id('meta'),
+        contextId,
+        goalType: norm.goalType,
+        name: norm.name,
+        targetCents: goalTargetOf(norm),
+        targetMonth: norm.targetMonth,
+        plannedMonthlyCents: norm.plannedMonthlyCents,
+        essentialBaseCents: norm.essentialBaseCents,
+        essentialMonths: norm.essentialMonths,
+        essentialBaseSource: norm.essentialBaseSource,
+        status: 'ativa',
+        createdBy: this.opts.actorId,
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      };
+      this.goals.set(goal.id, goal);
+      let movementId: string | null = null;
+      if (initialCents !== null && initialCents > 0) {
+        const m = this.newMovement(goal, 'saldo_inicial', { amountCents: initialCents, occurredOn: initialOn!, note: null }, now);
+        movementId = m.id;
+      }
+      this.saveOperation(key, 'criar_meta', payload, { contextId, recordId: null, commitmentId: null, goalId: goal.id, movementId });
+      return this.goalResult(goal.id, movementId);
+    });
+  }
+
+  /**
+   * Como update_goal. Ordem: repetição; trava (nao_encontrado, sem_permissao); versão; campos (o intervalo do prazo só
+   * quando o prazo muda); reserva_ja_existe (virar ou continuar reserva, fora de arquivada). Em qualquer situação; os
+   * movimentos não mudam.
+   */
+  async updateGoal(key: string, goalId: string, expectedVersion: number, input: GoalInput) {
+    return this.write(() => {
+      const norm = normalizeGoalInput(input);
+      const payload = [goalId, expectedVersion, ...goalPayload(norm)];
+      const replayed = this.replay(key, 'alterar_meta', payload);
+      if (replayed) return this.goalResult(replayed.goalId!, null);
+      const current = this.liveGoal(goalId);
+      if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
+      const code = goalInputError(norm, this.opts.today(), { checkDeadline: norm.targetMonth !== current.targetMonth });
+      if (code) throw new RepoError(code);
+      if (norm.goalType === 'emergencia' && current.status !== 'arquivada' && this.otherReserve(current.contextId, goalId)) {
+        throw new RepoError('reserva_ja_existe');
+      }
+      const now = new Date().toISOString();
+      this.goals.set(goalId, {
+        ...current,
+        goalType: norm.goalType,
+        name: norm.name,
+        targetCents: goalTargetOf(norm),
+        targetMonth: norm.targetMonth,
+        plannedMonthlyCents: norm.plannedMonthlyCents,
+        essentialBaseCents: norm.essentialBaseCents,
+        essentialMonths: norm.essentialMonths,
+        essentialBaseSource: norm.essentialBaseSource,
+        version: current.version + 1,
+        updatedAt: now,
+      });
+      this.saveOperation(key, 'alterar_meta', payload, { contextId: current.contextId, recordId: null, commitmentId: null, goalId, movementId: null });
+      return this.goalResult(goalId, null);
+    });
+  }
+
+  /** Como set_goal_status: concluir, arquivar e reativar. Ordem: repetição; trava; versão; situacao_invalida; reserva_ja_existe. */
+  async setGoalStatus(key: string, goalId: string, expectedVersion: number, status: GoalStatus) {
+    return this.write(() => {
+      const payload = [goalId, expectedVersion, status];
+      const replayed = this.replay(key, 'situacao_meta', payload);
+      if (replayed) return this.goalResult(replayed.goalId!, null);
+      const current = this.liveGoal(goalId);
+      if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
+      if (!GOAL_STATUSES.includes(status)) throw new RepoError('situacao_invalida');
+      // Só ao tirar uma reserva de 'arquivada' (fora dela, G6 já garante que não há outra).
+      if (current.goalType === 'emergencia' && current.status === 'arquivada' && status !== 'arquivada' && this.otherReserve(current.contextId, goalId)) {
+        throw new RepoError('reserva_ja_existe');
+      }
+      const now = new Date().toISOString();
+      this.goals.set(goalId, { ...current, status, version: current.version + 1, updatedAt: now });
+      this.saveOperation(key, 'situacao_meta', payload, { contextId: current.contextId, recordId: null, commitmentId: null, goalId, movementId: null });
+      return this.goalResult(goalId, null);
+    });
+  }
+
+  /** Como delete_goal: exclusão lógica da meta e dos movimentos vivos (versão + 1 em cada). */
+  async deleteGoal(key: string, goalId: string, expectedVersion: number) {
+    return this.write(() => {
+      const payload = [goalId, expectedVersion];
+      const replayed = this.replay(key, 'excluir_meta', payload);
+      if (replayed) return this.goalResult(replayed.goalId!, null);
+      const current = this.liveGoal(goalId);
+      if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
+      const now = new Date().toISOString();
+      for (const m of this.liveGoalMovements(goalId)) {
+        this.goalMovements.set(m.id, { ...m, version: m.version + 1, updatedAt: now, deletedAt: now, deletedBy: this.opts.actorId });
+      }
+      this.goals.set(goalId, { ...current, version: current.version + 1, updatedAt: now, deletedAt: now, deletedBy: this.opts.actorId });
+      this.saveOperation(key, 'excluir_meta', payload, { contextId: current.contextId, recordId: null, commitmentId: null, goalId, movementId: null });
+      return this.goalResult(goalId, null);
+    });
+  }
+
+  /**
+   * Como add_goal_movement: trava a meta (serializa o saldo), sem versão; a versão da meta não sobe. Ordem: repetição;
+   * trava; meta_arquivada; tipo, valor, data e observação; saldo_da_meta_insuficiente (dia no detalhe).
+   */
+  async addGoalMovement(key: string, goalId: string, kind: GoalMovementKind, input: GoalMovementInput) {
+    return this.write(() => {
+      const norm = normalizeMovementInput(input);
+      const payload = [goalId, kind, norm.amountCents, norm.occurredOn, norm.note];
+      const replayed = this.replay(key, 'registrar_movimento_meta', payload);
+      if (replayed) return this.goalResult(replayed.goalId!, replayed.movementId);
+      const goal = this.liveGoal(goalId);
+      if (goal.status === 'arquivada') throw new RepoError('meta_arquivada');
+      const code = goalMovementError(kind, norm, this.opts.today());
+      if (code) throw new RepoError(code);
+      this.checkGoalBalance(goalId, { op: 'add', kind, amountCents: norm.amountCents, occurredOn: norm.occurredOn });
+      const m = this.newMovement(goal, kind, norm, new Date().toISOString());
+      this.saveOperation(key, 'registrar_movimento_meta', payload, {
+        contextId: goal.contextId,
+        recordId: null,
+        commitmentId: null,
+        goalId,
+        movementId: m.id,
+      });
+      return this.goalResult(goalId, m.id);
+    });
+  }
+
+  /**
+   * Como update_goal_movement: o tipo nunca muda. Ordem: repetição; trava (meta, depois movimento); versão;
+   * meta_arquivada; valor, data e observação; saldo_da_meta_insuficiente.
+   */
+  async updateGoalMovement(key: string, movementId: string, expectedVersion: number, input: GoalMovementInput) {
+    return this.write(() => {
+      const norm = normalizeMovementInput(input);
+      const payload = [movementId, expectedVersion, norm.amountCents, norm.occurredOn, norm.note];
+      const replayed = this.replay(key, 'alterar_movimento_meta', payload);
+      if (replayed) return this.goalResult(replayed.goalId!, replayed.movementId);
+      const { goal, movement } = this.liveMovement(movementId);
+      if (movement.version !== expectedVersion) throw new RepoError('versao_desatualizada');
+      if (goal.status === 'arquivada') throw new RepoError('meta_arquivada');
+      const code = goalMovementError(movement.kind, norm, this.opts.today(), { allowInitial: true });
+      if (code) throw new RepoError(code);
+      this.checkGoalBalance(goal.id, { op: 'update', id: movementId, amountCents: norm.amountCents, occurredOn: norm.occurredOn });
+      const now = new Date().toISOString();
+      this.goalMovements.set(movementId, { ...movement, ...norm, version: movement.version + 1, updatedAt: now });
+      this.saveOperation(key, 'alterar_movimento_meta', payload, {
+        contextId: goal.contextId,
+        recordId: null,
+        commitmentId: null,
+        goalId: goal.id,
+        movementId,
+      });
+      return this.goalResult(goal.id, movementId);
+    });
+  }
+
+  /** Como delete_goal_movement. Ordem: repetição; trava; versão; meta_arquivada; saldo_da_meta_insuficiente. */
+  async deleteGoalMovement(key: string, movementId: string, expectedVersion: number) {
+    return this.write(() => {
+      const payload = [movementId, expectedVersion];
+      const replayed = this.replay(key, 'excluir_movimento_meta', payload);
+      if (replayed) return this.goalResult(replayed.goalId!, replayed.movementId);
+      const { goal, movement } = this.liveMovement(movementId);
+      if (movement.version !== expectedVersion) throw new RepoError('versao_desatualizada');
+      if (goal.status === 'arquivada') throw new RepoError('meta_arquivada');
+      this.checkGoalBalance(goal.id, { op: 'delete', id: movementId });
+      const now = new Date().toISOString();
+      this.goalMovements.set(movementId, { ...movement, version: movement.version + 1, updatedAt: now, deletedAt: now, deletedBy: this.opts.actorId });
+      this.saveOperation(key, 'excluir_movimento_meta', payload, {
+        contextId: goal.contextId,
+        recordId: null,
+        commitmentId: null,
+        goalId: goal.id,
+        movementId,
+      });
+      return this.goalResult(goal.id, movementId);
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Plano de guardar (spec7): savings_checks e set_savings_answer
+  // ---------------------------------------------------------------------------
+
+  /** Como a leitura de savings_checks (RLS: só a própria pessoa; sem leitura, nada). */
+  async getSavingsCheck(contextId: string) {
+    return this.read(() => (this.canRead(contextId) ? (this.savingsChecks.get(contextId) ?? null) : null));
+  }
+
+  /**
+   * Como set_savings_answer (migração 0007, lida em 09/10/2026). Ordem: repetição; sem_permissao (escrita no contexto);
+   * resposta_invalida; valor_invalido e valor_acima_do_limite (savingsAnswerError: 'consigo' de 100 a 999.999.999
+   * centavos, as outras sem valor); versao_desatualizada (versão 0 = ainda não existe; nula, negativa ou diferente da
+   * atual também; detalhe "versao_atual=N"). A resposta nova substitui a anterior, inclusive o valor. As datas vêm daqui,
+   * do dia da pessoa: answeredOn = hoje e askAgainOn = hoje + 7 ('depois'), hoje + 30 ('agora_nao') ou nula ('consigo').
+   * Operação sem alvo; não conta como anotação na atividade.
+   */
+  async setSavingsAnswer(key: string, contextId: string, expectedVersion: number, answer: SavingsAnswer, monthlyCents: Cents | null = null) {
+    return this.write(() => {
+      const monthly = monthlyCents ?? null;
+      const payload = [contextId, expectedVersion, answer, monthly];
+      const replayed = this.replay(key, 'responder_guardar', payload);
+      if (replayed) return this.savingsChecks.get(replayed.contextId)!;
+      if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      const code = savingsAnswerError(answer, monthly);
+      if (code) throw new RepoError(code);
+      const current = this.savingsChecks.get(contextId);
+      if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0 || expectedVersion !== (current?.version ?? 0)) {
+        throw new RepoError('versao_desatualizada', undefined, `versao_atual=${current?.version ?? 0}`);
+      }
+      const today = this.opts.today();
+      const now = new Date().toISOString();
+      const next: SavingsCheck = {
+        contextId,
+        answer,
+        monthlyCents: monthly,
+        answeredOn: today,
+        askAgainOn: savingsAskAgainOn(answer, today),
+        version: (current?.version ?? 0) + 1,
+        createdAt: current?.createdAt ?? now,
+        updatedAt: now,
+      };
+      this.savingsChecks.set(contextId, next);
+      this.saveOperation(key, 'responder_guardar', payload, { contextId, recordId: null, commitmentId: null });
+      return next;
+    });
+  }
+
+  /** Outra reserva viva e não arquivada no contexto (G6)? */
+  private otherReserve(contextId: string, exceptId: string | null) {
+    return [...this.goals.values()].some(
+      (g) => !g.deletedAt && g.contextId === contextId && g.goalType === 'emergencia' && g.status !== 'arquivada' && g.id !== exceptId,
+    );
+  }
+
+  /** Como clarevo_goal_negative_day antes de gravar: dia negativo → saldo_da_meta_insuficiente, com o dia no detalhe. */
+  private checkGoalBalance(goalId: string, change: GoalMovementChange) {
+    const day = firstNegativeDay(this.liveGoalMovements(goalId), change);
+    if (day) throw new RepoError('saldo_da_meta_insuficiente', undefined, `dia=${day}`);
+  }
+
+  private newMovement(goal: StoredGoal, kind: GoalMovementKind, input: GoalMovementInput, now: string): StoredGoalMovement {
+    const m: StoredGoalMovement = {
+      id: this.id('mov'),
+      goalId: goal.id,
+      contextId: goal.contextId,
+      kind,
+      amountCents: input.amountCents,
+      occurredOn: input.occurredOn,
+      note: input.note,
+      createdBy: this.opts.actorId,
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.goalMovements.set(m.id, m);
+    return m;
+  }
+
+  private liveGoalMovements(goalId: string): StoredGoalMovement[] {
+    return [...this.goalMovements.values()].filter((m) => m.goalId === goalId && !m.deletedAt);
+  }
+
+  /** Como a trava da meta: sem leitura ou excluída, não revela a existência; sem escrita, sem_permissao. */
+  private liveGoal(id: string) {
+    const g = this.goals.get(id);
+    if (!g || g.deletedAt || !this.canRead(g.contextId)) throw new RepoError('nao_encontrado');
+    if (!this.canWrite(g.contextId)) throw new RepoError('sem_permissao');
+    return g;
+  }
+
+  /** Trava da meta e depois do movimento (G4: movimento vivo sempre tem meta viva). */
+  private liveMovement(id: string) {
+    const m = this.goalMovements.get(id);
+    if (!m || m.deletedAt || !this.canRead(m.contextId)) throw new RepoError('nao_encontrado');
+    const goal = this.liveGoal(m.goalId);
+    return { goal, movement: m };
+  }
+
+  /** Meta com os totais de goal_items (movimentos vivos), inclusive excluída (resultado de delete_goal e repetições). */
+  private toGoal(g: StoredGoal): Goal {
+    const { deletedAt: _deleted, deletedBy: _by, ...rest } = g;
+    const c = goalComposition(this.liveGoalMovements(g.id));
+    return { ...rest, ...c };
+  }
+
+  private goalResult(goalId: string, movementId: string | null): GoalWrite {
+    const m = movementId ? this.goalMovements.get(movementId) : undefined;
+    return { goal: this.toGoal(this.goals.get(goalId)!), movement: m ? stripMovement(m) : null };
+  }
+
+  /**
+   * G1 a G6 e as restrições de coluna de goals e goal_movements (no banco: checks, índices únicos parciais, FK composta e
+   * o gatilho adiado do saldo). Lança Error('meta_inconsistente').
+   */
+  private checkGoalInvariants() {
+    const fail = () => {
+      throw new Error('meta_inconsistente');
+    };
+    const reserves = new Set<string>();
+    for (const g of this.goals.values()) {
+      if (
+        !GOAL_TYPES.includes(g.goalType) ||
+        !GOAL_STATUSES.includes(g.status) ||
+        g.name !== g.name.trim() ||
+        [...g.name].length < 1 ||
+        [...g.name].length > GOAL_NAME_MAX ||
+        !Number.isSafeInteger(g.targetCents) ||
+        g.targetCents < 1 ||
+        g.targetCents > MAX_RECORD_CENTS ||
+        (g.targetMonth !== null && !isValidIsoMonth(g.targetMonth)) ||
+        (g.plannedMonthlyCents !== null && (!Number.isSafeInteger(g.plannedMonthlyCents) || g.plannedMonthlyCents < 1 || g.plannedMonthlyCents > MAX_RECORD_CENTS)) ||
+        g.version < 1
+      ) {
+        fail();
+      }
+      const isReserve = g.goalType === 'emergencia';
+      const hasBase = g.essentialBaseCents !== null && g.essentialMonths !== null && g.essentialBaseSource !== null;
+      if (isReserve !== hasBase) fail();
+      if (
+        isReserve &&
+        (g.essentialBaseCents! < 1 ||
+          g.essentialBaseCents! > MAX_RECORD_CENTS ||
+          g.essentialMonths! < RESERVE_MONTHS_MIN ||
+          g.essentialMonths! > RESERVE_MONTHS_MAX ||
+          !ESSENTIAL_BASE_SOURCES.includes(g.essentialBaseSource!) ||
+          g.targetCents !== g.essentialBaseCents! * g.essentialMonths!)
+      ) {
+        fail();
+      }
+      // G6: no máximo uma reserva viva e não arquivada por contexto.
+      if (isReserve && !g.deletedAt && g.status !== 'arquivada') {
+        if (reserves.has(g.contextId)) fail();
+        reserves.add(g.contextId);
+      }
+    }
+    const initials = new Set<string>();
+    for (const m of this.goalMovements.values()) {
+      const g = this.goals.get(m.goalId);
+      // G2: meta e movimento no mesmo contexto (FK composta).
+      if (!g || g.contextId !== m.contextId) fail();
+      if (
+        !GOAL_MOVEMENT_KINDS.includes(m.kind) ||
+        !Number.isSafeInteger(m.amountCents) ||
+        m.amountCents < 1 ||
+        m.amountCents > MAX_RECORD_CENTS ||
+        !isValidIsoDate(m.occurredOn) ||
+        (m.note !== null && (m.note !== m.note.trim() || [...m.note].length < 1 || [...m.note].length > GOAL_NOTE_MAX)) ||
+        m.version < 1
+      ) {
+        fail();
+      }
+      if (m.deletedAt) continue;
+      // G4: meta excluída não tem movimento vivo.
+      if (g!.deletedAt) fail();
+      // No máximo um "já guardado ao criar" vivo por meta.
+      if (m.kind === 'saldo_inicial') {
+        if (initials.has(m.goalId)) fail();
+        initials.add(m.goalId);
+      }
+    }
+    // G1: o guardado ao fim de cada dia nunca fica negativo.
+    for (const g of this.goals.values()) {
+      if (!g.deletedAt && firstNegativeDay(this.liveGoalMovements(g.id)) !== null) fail();
+    }
+  }
+
   /**
    * Invariantes do vínculo (no banco: restrição adiada, FK composta e checagem de tipo).
    * I1: conta paga, não excluída, com exatamente 1 gasto vivo vinculado, ou em aberto com 0.
@@ -912,6 +1497,51 @@ export class MemoryRepository implements RecordsRepository {
       }
     }
     this.checkSeriesInvariants();
+    this.checkReferenceInvariants();
+    this.checkGoalInvariants();
+    this.checkSavingsInvariants();
+  }
+
+  /**
+   * Plano de guardar (no banco: restrições de coluna de savings_checks): resposta da lista; valor de 1 a MAX_RECORD_CENTS
+   * só com 'consigo'; data de volta nula só com 'consigo' e depois do dia da resposta nas outras; versão a partir de 1.
+   * Lança Error('guardar_inconsistente').
+   */
+  private checkSavingsInvariants() {
+    for (const c of this.savingsChecks.values()) {
+      if (
+        savingsAnswerError(c.answer, c.monthlyCents) !== null ||
+        !isValidIsoDate(c.answeredOn) ||
+        (c.answer === 'consigo' ? c.askAgainOn !== null : c.askAgainOn === null || !isValidIsoDate(c.askAgainOn) || c.askAgainOn <= c.answeredOn) ||
+        !Number.isSafeInteger(c.version) ||
+        c.version < 1
+      ) {
+        throw new Error('guardar_inconsistente');
+      }
+    }
+  }
+
+  /**
+   * Renda de referência (no banco: índice único das vivas e restrições de coluna): no máximo uma viva por contexto e
+   * mês; mês válido; valor de 1 a MAX_RECORD_CENTS; versão a partir de 1. Lança Error('referencia_inconsistente').
+   */
+  private checkReferenceInvariants() {
+    const live = new Set<string>();
+    for (const r of this.incomeRefs.values()) {
+      if (
+        !isValidIsoMonth(r.fromMonth) ||
+        !Number.isSafeInteger(r.amountCents) ||
+        r.amountCents < 1 ||
+        r.amountCents > MAX_RECORD_CENTS ||
+        r.version < 1
+      ) {
+        throw new Error('referencia_inconsistente');
+      }
+      if (r.deletedAt) continue;
+      const k = `${r.contextId}|${r.fromMonth}`;
+      if (live.has(k)) throw new Error('referencia_inconsistente');
+      live.add(k);
+    }
   }
 
   private checkSeriesInvariants() {
@@ -1005,6 +1635,10 @@ export class MemoryRepository implements RecordsRepository {
     /** Ausentes em instantâneos antigos (testes de S3 e S7): as guardas da revisão só comparam quando vêm. */
     activity?: Map<string, ContextActivity>;
     reviews?: Map<string, ReturnReviewMark>;
+    incomeRefs?: Map<string, StoredIncomeReference>;
+    goals?: Map<string, StoredGoal>;
+    goalMovements?: Map<string, StoredGoalMovement>;
+    savingsChecks?: Map<string, SavingsCheck>;
   }) {
     const fail = () => {
       throw new Error('campo_imutavel');
@@ -1015,6 +1649,54 @@ export class MemoryRepository implements RecordsRepository {
       if (old && a.lastWriteOn < old.lastWriteOn) fail();
       if ((a.absenceFromOn === null) !== (a.absenceUntilOn === null)) fail();
       if (a.absenceFromOn !== null && !(a.absenceFromOn < a.absenceUntilOn! && a.absenceUntilOn! <= a.lastWriteOn)) fail();
+    }
+    // Renda de referência: contexto, mês, autoria e criação não mudam; excluída não volta; versão + 1 por escrita.
+    for (const [id, r] of this.incomeRefs) {
+      const old = before.incomeRefs?.get(id);
+      if (!old || old === r) continue;
+      if (
+        old.deletedAt ||
+        old.contextId !== r.contextId ||
+        old.fromMonth !== r.fromMonth ||
+        old.createdBy !== r.createdBy ||
+        old.createdAt !== r.createdAt ||
+        r.version !== old.version + 1
+      ) {
+        fail();
+      }
+    }
+    // Metas: contexto, autoria e criação não mudam; excluída não volta; versão + 1 por escrita.
+    for (const [id, g] of this.goals) {
+      const old = before.goals?.get(id);
+      if (!old || old === g) continue;
+      if (old.deletedAt || old.contextId !== g.contextId || old.createdBy !== g.createdBy || old.createdAt !== g.createdAt || g.version !== old.version + 1) {
+        fail();
+      }
+    }
+    // Movimentos: meta, contexto, tipo, autoria e criação não mudam; excluído não volta; versão + 1 por escrita.
+    // G5: meta arquivada não recebe movimento novo nem alterado (a exclusão junto com a meta continua possível).
+    for (const [id, m] of this.goalMovements) {
+      const old = before.goalMovements?.get(id);
+      if (old === m) continue;
+      if (
+        old &&
+        (old.deletedAt ||
+          old.goalId !== m.goalId ||
+          old.contextId !== m.contextId ||
+          old.kind !== m.kind ||
+          old.createdBy !== m.createdBy ||
+          old.createdAt !== m.createdAt ||
+          m.version !== old.version + 1)
+      ) {
+        fail();
+      }
+      if (before.goalMovements && !m.deletedAt && this.goals.get(m.goalId)?.status === 'arquivada') fail();
+    }
+    // Plano de guardar: criação não muda; versão + 1 por escrita.
+    for (const [ctx, c] of this.savingsChecks) {
+      const old = before.savingsChecks?.get(ctx);
+      if (!old || old === c) continue;
+      if (old.contextId !== c.contextId || old.createdAt !== c.createdAt || c.version !== old.version + 1) fail();
     }
     // Revisão: mês revisado e dia da decisão nunca recuam; versão + 1 por escrita.
     for (const [ctx, r] of this.reviews) {
@@ -1118,19 +1800,32 @@ export class MemoryRepository implements RecordsRepository {
     key: string,
     action: Operation['action'],
     payload: unknown[],
-    ids: Omit<Operation, 'action' | 'hash' | 'seriesId'> & { seriesId?: string },
+    ids: Omit<Operation, 'action' | 'hash' | 'seriesId' | 'referenceId' | 'goalId' | 'movementId'> & {
+      seriesId?: string;
+      referenceId?: string;
+      goalId?: string;
+      movementId?: string | null;
+    },
   ) {
-    this.operations.set(key, { action, hash: hash([action, ...payload]), ...ids, seriesId: ids.seriesId ?? null });
+    this.operations.set(key, {
+      action,
+      hash: hash([action, ...payload]),
+      ...ids,
+      seriesId: ids.seriesId ?? null,
+      referenceId: ids.referenceId ?? null,
+      goalId: ids.goalId ?? null,
+      movementId: ids.movementId ?? null,
+    });
     this.trackActivity(action, ids.contextId);
   }
 
   /**
-   * Como o gatilho clarevo_track_activity em record_operations: toda operação nova, menos decidir_revisao, deixa o
-   * último dia com anotação >= hoje; se o intervalo desde o último for uma ausência longa, ela passa a ser a última
-   * ausência. Mesmo dia ou relógio para trás: nada muda.
+   * Como o gatilho clarevo_track_activity em record_operations: toda operação nova, menos decidir_revisao e
+   * responder_guardar, deixa o último dia com anotação >= hoje; se o intervalo desde o último for uma ausência longa,
+   * ela passa a ser a última ausência. Mesmo dia ou relógio para trás: nada muda.
    */
   private trackActivity(action: Operation['action'], contextId: string) {
-    if (action === 'decidir_revisao') return;
+    if (action === 'decidir_revisao' || action === 'responder_guardar') return;
     const day = this.opts.today();
     const a = this.activity.get(contextId);
     if (!a) {
@@ -1352,6 +2047,10 @@ function isSeriesAction(action: Operation['action']): action is SeriesAction {
   return SERIES_ACTIONS.includes(action);
 }
 
+function isGoalAction(action: Operation['action']): action is GoalAction {
+  return GOAL_ACTIONS.includes(action);
+}
+
 function isCommitmentAction(action: Operation['action']): action is CommitmentAction {
   return COMMITMENT_ACTIONS.includes(action);
 }
@@ -1444,6 +2143,42 @@ function withRecord(w: CommitmentWrite): CommitmentWrite & { record: FinancialRe
 
 function hash(payload: unknown) {
   return JSON.stringify(payload);
+}
+
+/** Campos de create_goal e update_goal aparados (nome; categoria não existe), na forma do hash. */
+function normalizeGoalInput(input: GoalInput): GoalInput {
+  return {
+    goalType: input.goalType,
+    name: typeof input.name === 'string' ? input.name.trim() : input.name,
+    targetCents: input.targetCents ?? null,
+    targetMonth: input.targetMonth ?? null,
+    plannedMonthlyCents: input.plannedMonthlyCents ?? null,
+    essentialBaseCents: input.essentialBaseCents ?? null,
+    essentialMonths: input.essentialMonths ?? null,
+    essentialBaseSource: input.essentialBaseSource ?? null,
+  };
+}
+
+/** Argumentos da meta na ordem das funções do banco (p_goal_type ... p_essential_base_source). */
+function goalPayload(g: GoalInput): unknown[] {
+  return [g.goalType, g.name, g.targetCents, g.targetMonth, g.plannedMonthlyCents, g.essentialBaseCents, g.essentialMonths, g.essentialBaseSource];
+}
+
+function normalizeMovementInput(input: GoalMovementInput): GoalMovementInput {
+  return { amountCents: input.amountCents, occurredOn: input.occurredOn, note: normalizeGoalNote(input.note) };
+}
+
+const byMovementDesc = (a: StoredGoalMovement, b: StoredGoalMovement) =>
+  b.occurredOn.localeCompare(a.occurredOn) || b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id);
+
+function stripMovement(m: StoredGoalMovement): GoalMovement {
+  const { deletedAt: _deleted, deletedBy: _by, ...rest } = m;
+  return rest;
+}
+
+function stripReference(r: StoredIncomeReference): IncomeReference {
+  const { deletedAt: _deleted, deletedBy: _by, ...rest } = r;
+  return rest;
 }
 
 function strip(r: StoredRecord): FinancialRecord {

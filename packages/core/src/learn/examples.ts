@@ -1,4 +1,7 @@
+import { emergencyTarget, goalSaved } from '../goals';
 import type { Cents } from '../money';
+import { roundDiv } from '../money';
+import { simulateGrowth } from '../simulate';
 import { formatBp, formatTenths } from './format';
 import {
   IOF_DAILY_PPM,
@@ -150,6 +153,41 @@ export const EXAMPLE_NUMBERS: Partial<Record<TopicSlug, () => ExampleNumbers>> =
     return { money: [2_000_000, sold, 2_000_000 - sold], bp: [1_000] };
   },
   fgc: () => ({ money: [30_000_000, 30_000_000 - 25_000_000], bp: [] }),
+  // Ciclo B: renda comprometida (D-026(3), uma casa em décimos) e renda que muda de um mês para outro.
+  'renda-comprometida': () => {
+    const debts = [85_000, 30_000];
+    const total = debts.reduce((a, b) => a + b, 0); // 115.000
+    return { money: [600_000, ...debts, total, (600_000 * 30) / 100], bp: [], tenths: [percentTenths(total, 600_000)] }; // 192
+  },
+  'renda-variavel': () => {
+    const months = [430_000, 620_000, 510_000];
+    const avg = averageCents(months); // 520.000
+    return {
+      money: [...months, months.reduce((a, b) => a + b, 0), avg, 315_000],
+      bp: [],
+      tenths: [percentTenths(315_000, avg), percentTenths(315_000, Math.min(...months))], // 606 e 733
+    };
+  },
+  // Ciclo C: aporte (valor guardado = soma dos movimentos, D-027(2)) e gastos essenciais (média de três meses).
+  aporte: () => {
+    const saved = goalSaved([
+      { kind: 'saldo_inicial', amountCents: 300_000 },
+      { kind: 'aporte', amountCents: 50_000 },
+    ]); // 350.000
+    return { money: [300_000, 50_000, saved, 390_000, 30_000, 390_000 + 30_000, saved - 30_000], bp: [], tenths: [] };
+  },
+  essenciais: () => {
+    const months = [370_000, 375_000, 380_000];
+    const total = months.reduce((a, b) => a + b, 0); // 1.125.000
+    const avg = roundDiv(total, months.length); // 375.000
+    return { money: [...months, total, avg, 20_000, 240_000, emergencyTarget(avg, 6)!], bp: [], tenths: [] }; // 2.250.000
+  },
+  // Ciclo D: simulação com aportes no início de cada mês (D-028(2)).
+  simulacao: () => {
+    const g = simulateGrowth({ initial: 0, monthly: 50_000, months: 120, rateBp: 1_000, inflationBp: 450 });
+    // 10.072.879, 6.000.000, 4.072.879 e 6.486.205
+    return { money: [50_000, g.finalCents, g.contributedCents, g.earningsCents, g.todayValueCents!], bp: [1_000, equivalentMonthlyBp(1_000), 450], tenths: [] };
+  },
 };
 
 /** Partes por milhão como percentual, com todas as casas necessárias: 3.800 → "0,38%", 82 → "0,0082%", 33.730 → "3,373%". */

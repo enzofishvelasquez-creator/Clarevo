@@ -35,6 +35,35 @@ describe('searchTopics (spec3 §3.11)', () => {
     expect(slugs(searchTopics('IPVA'))).toEqual(['contas-do-ano']);
   });
 
+  it('temas dos Ciclos B, C e D: cada busca natural leva ao tema certo primeiro', () => {
+    const first = (q: string) => slugs(searchTopics(q))?.[0];
+    expect(first('renda comprometida')).toBe('renda-comprometida');
+    expect(first('quanto da renda pode ir para dívidas')).toBe('renda-comprometida');
+    expect(first('renda variável')).toBe('renda-variavel');
+    expect(first('renda que varia')).toBe('renda-variavel');
+    expect(first('freelancer')).toBe('renda-variavel');
+    expect(first('autônomo')).toBe('renda-variavel');
+    expect(first('aporte')).toBe('aporte');
+    expect(first('dinheiro guardado entra como gasto')).toBe('aporte');
+    expect(first('gastos essenciais')).toBe('essenciais');
+    expect(first('custo de vida')).toBe('essenciais');
+    expect(first('simulador')).toBe('simulacao');
+    expect(first('simulação')).toBe('simulacao');
+    expect(first('dinheiro de hoje')).toBe('simulacao');
+    expect(first('quanto vou ter')).toBe('simulacao');
+  });
+
+  it('"reserva" encontra a reserva para imprevistos, os gastos essenciais e o aporte, e a reserva vem primeiro', () => {
+    const r = slugs(searchTopics('reserva'))!;
+    expect(r[0]).toBe('reserva-imprevistos');
+    expect(r).toEqual(expect.arrayContaining(['essenciais', 'aporte']));
+  });
+
+  it('"IPVA" continua levando só às contas do ano (os gastos essenciais falam em impostos, sem a sigla)', () => {
+    expect(slugs(searchTopics('IPVA'))).toEqual(['contas-do-ano']);
+    expect(slugs(searchTopics('IPTU'))).toEqual(['contas-do-ano']);
+  });
+
   it('"empresa vê meus gastos" tem empresa-ve primeiro', () => {
     expect(slugs(searchTopics('empresa vê meus gastos'))![0]).toBe('empresa-ve');
   });

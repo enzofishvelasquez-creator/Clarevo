@@ -1,7 +1,10 @@
 import type { Topic } from '../types';
-import { REVIEWED_ON, bcb, cvm, mercado, oficial, planalto } from './common';
+import { BCB_GLOSSARIO, CALC_CIDADAO_DEPOSITOS, REVIEWED_ON, bcb, clarevo, cvm, mercado, oficial, planalto } from './common';
 
-/** Seção "Dinheiro no tempo" (Anexo A, temas 18 a 21, com os ajustes da conferência de fontes de 09/10/2026). */
+/**
+ * Seção "Dinheiro no tempo" (Anexo A, temas 18 a 21, com os ajustes da conferência de fontes de 09/10/2026) e o tema
+ * do Ciclo D (como ler uma simulação).
+ */
 export const TEMPO_TOPICS: Topic[] = [
   {
     slug: 'inflacao-ipca',
@@ -201,6 +204,63 @@ export const TEMPO_TOPICS: Topic[] = [
         'Entidade privada, sem fins lucrativos; custeio pelas contribuições mensais das associadas',
       ),
       mercado('FGC', 'Pagamento de garantia', 'https://fgc.org.br/en/pagamento-de-garantia', 'O que passa do limite fica como saldo a ser habilitado na instituição em liquidação'),
+    ],
+    reviewedOn: REVIEWED_ON,
+    reviewEveryMonths: 12,
+  },
+  {
+    slug: 'simulacao',
+    section: 'tempo',
+    kind: 'tema',
+    status: 'publicado',
+    title: 'Como ler uma simulação',
+    subtitle: 'Hipóteses, rendimento e dinheiro de hoje',
+    question: 'O valor que o simulador mostra é garantido?',
+    short:
+      'Uma simulação mostra um caminho possível com a taxa, o prazo e os valores que você informou. Não é promessa: na vida real a taxa muda, e o resultado sem rendimento aparece sempre ao lado.',
+    paragraphs: [
+      'No simulador, você informa quanto já tem, quanto vai guardar por mês, o prazo e a taxa ao ano que quer testar, de 0% a 30%. O Clarevo não sugere taxas, produtos nem instituições. A taxa ao ano vira uma taxa ao mês equivalente, e o rendimento de cada mês passa a render nos meses seguintes: são os juros compostos, ou juros sobre juros, como diz o Banco Central.',
+      'Leia o resultado junto com as hipóteses: a mesma taxa em cada mês, aporte no início de cada mês e valores brutos, sem imposto de renda, IOF ou taxas. É a mesma convenção da Calculadora do Cidadão, do Banco Central, para depósitos regulares: o aporte do mês já rende naquele mês.',
+      'Na vida real, as taxas mudam com o tempo, e a CVM lembra que há risco em qualquer investimento. Uma simulação mostra um caminho possível, não um resultado certo. Por isso o resultado sem rendimento aparece sempre ao lado, porque depende só do que você guardar.',
+      'Inflação é o aumento dos preços de produtos e serviços, como define o IBGE: com o tempo, o mesmo dinheiro compra menos. Se você informar uma inflação ao ano, o simulador mostra também o valor final em dinheiro de hoje, já descontada essa inflação.',
+      'Nada da simulação é gravado. Se quiser, crie uma meta com os mesmos valores: a taxa não vai para a meta, e o progresso só anda com o que você registrar.',
+    ],
+    example:
+      'Você testa guardar R$ 500,00 por mês por 10 anos, com taxa de 10% ao ano (0,80% ao mês). Na hipótese informada, o valor chega a R$ 100.728,79: R$ 60.000,00 aportados e R$ 40.728,79 de rendimento. Sem rendimento, seriam R$ 60.000,00. Com inflação de 4,5% ao ano, isso equivale a R$ 64.862,05 em dinheiro de hoje.',
+    calculation:
+      'i = 1,10^(1/12) - 1 = 0,0079741 (0,80% ao mês) · final = 500,00 × (1 + i) × ((1 + i)^120 - 1) ÷ i = 100.728,79 (para baixo no centavo) · aportado = 500,00 × 120 = 60.000,00 · rendimento = 100.728,79 - 60.000,00 = 40.728,79 · dinheiro de hoje = 100.728,79 ÷ 1,045^10 = 64.862,05 (para baixo no centavo).',
+    hypotheses:
+      'Exemplo fictício: taxa de 10% ao ano e inflação de 4,5% ao ano escolhidas só para a conta, constantes nos 10 anos, aportes no início de cada mês (como na Calculadora do Cidadão, do Banco Central) e valores brutos, sem imposto de renda, IOF ou taxas. Não é uma taxa sugerida.',
+    facts: [{ text: 'de 0% a 30%', source: 4 }],
+    keywords: [
+      'simulador',
+      'simulação',
+      'simular',
+      'quanto vou ter',
+      'quanto guardar por mês',
+      'em quanto tempo',
+      'rendimento',
+      'juros compostos',
+      'taxa equivalente',
+      'dinheiro de hoje',
+      'hipóteses',
+    ],
+    related: ['taxa-mes-ano', 'juros-simples-compostos', 'inflacao-ipca'],
+    sources: [
+      BCB_GLOSSARIO(
+        'Verbete "Juros compostos": após cada período de capitalização (normalmente um mês), os juros são incorporados ao capital e passam a render juros; são os chamados juros sobre juros ou juros capitalizados',
+      ),
+      CALC_CIDADAO_DEPOSITOS(
+        'Fórmula Sn = (1 + j) × [((1 + j)^n - 1) / j] × p, com n = número de meses, j = taxa de juros mensal, p = valor do depósito regular e Sn = valor obtido ao final; o fator (1 + j) faz cada depósito render já no mês em que é feito',
+      ),
+      oficial('IBGE', 'IBGE Explica: Inflação', 'https://www.ibge.gov.br/explica/inflacao.php', 'Inflação é o nome dado ao aumento dos preços de produtos e serviços'),
+      oficial(
+        'CVM e Senacon',
+        'Boletim Consumidor Investidor nº 1: objetivos e riscos',
+        'https://www.gov.br/mj/pt-br/assuntos/seus-direitos/consumidor/boletins-para-o-consumo/boletim-consumidor-investidor/anexos/boletim-cvm-01',
+        'Há risco em qualquer investimento',
+      ),
+      clarevo('D-028'),
     ],
     reviewedOn: REVIEWED_ON,
     reviewEveryMonths: 12,

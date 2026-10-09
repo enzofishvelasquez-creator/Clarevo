@@ -1208,10 +1208,10 @@ do $$ begin
 
   assert (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
-    = array['context_permission', 'create_commitment', 'create_record', 'create_series', 'create_series_occurrence',
-            'decide_return_review', 'delete_commitment', 'delete_record', 'delete_series', 'end_series', 'ensure_personal_space',
-            'inform_series_year', 'is_org_admin', 'month_to_pay', 'month_totals', 'months_overview',
-            'pay_commitment', 'skip_series_year', 'sync_series_occurrences', 'undo_commitment_payment', 'update_commitment', 'update_record',
+    = array['add_goal_movement', 'context_permission', 'create_commitment', 'create_goal', 'create_record', 'create_series', 'create_series_occurrence',
+            'decide_return_review', 'delete_commitment', 'delete_goal', 'delete_goal_movement', 'delete_income_reference', 'delete_record', 'delete_series', 'end_series', 'ensure_personal_space',
+            'inform_series_year', 'is_org_admin', 'month_committed', 'month_to_pay', 'month_totals', 'months_overview',
+            'pay_commitment', 'set_goal_status', 'set_income_reference', 'set_savings_answer', 'skip_series_year', 'sync_series_occurrences', 'undo_commitment_payment', 'update_commitment', 'update_goal', 'update_goal_movement', 'update_record',
             'update_series_from'],
     'authenticated executa só as funções expostas';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

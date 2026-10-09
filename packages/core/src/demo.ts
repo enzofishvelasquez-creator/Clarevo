@@ -10,6 +10,16 @@ import { newOperationKey } from './repository';
  * Contas do ano: IPVA (cota única, 20/01, desde 2027) e IPTU (10 parcelas de fevereiro a novembro, dia 10, desde 2027),
  * ambos com valor que muda. Em 07/10/2026 nenhuma conta delas existe (entram em novembro e dezembro de 2026), então
  * nenhum total de outubro, novembro ou dezembro de 2026 muda.
+ * Renda de referência (D-026): R$ 6.000,00 desde setembro de 2026, renda fixa. Renda comprometida de outubro: 52,5%
+ * (R$ 3.150,00); novembro: 63,8% (R$ 3.830,00). Recebido, Pago, Diferença e Ainda a pagar não mudam.
+ * Metas (D-027): "Reserva para imprevistos" (gastos essenciais de setembro, R$ 3.750,00, × 6 meses = R$ 22.500,00; já
+ * guardado R$ 3.000,00 em 01/10 e aporte de R$ 500,00 em 06/10; plano de R$ 500,00 por mês): 15%, cobre 0,9 mês, chega
+ * lá em dezembro de 2029. "Viagem de férias" (R$ 6.000,00 até julho de 2027, já guardado R$ 1.200,00 em 01/10, plano de
+ * R$ 480,00): 20%, R$ 480,00 por mês até julho de 2027. Guardado em metas em outubro: R$ 500,00; planejado: R$ 980,00 por
+ * mês. Movimentos de meta não entram em nenhum total do mês nem na renda comprometida.
+ * Plano de guardar (spec7): resposta "consigo" com R$ 500,00 por mês em 07/10/2026 (sem data de volta), igual ao plano da
+ * reserva. Com os gastos essenciais de R$ 3.750,00 e R$ 3.500,00 guardados na reserva, as etapas chegam em novembro de 2026
+ * (1 mês), fevereiro de 2028 (3 meses) e dezembro de 2029 (6 meses).
  */
 export const DEMO_TODAY = '2026-10-07';
 export const DEMO_EMAIL = 'demo@clarevo.app';
@@ -116,6 +126,38 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   await bill('Condomínio', 500, '2026-10-20', 'Moradia');
   await bill('Seguro do carro', 300, '2026-11-10', 'Transporte'); // só em "Próximos meses"
   await repo.syncSeriesOccurrences(ctx); // o app sincroniza ao abrir; aqui não cria nada
+  // Renda de referência (D-026): R$ 6.000,00 por mês desde setembro de 2026, renda fixa. Só calcula percentuais (52,5% em
+  // outubro, 63,8% em novembro); não entra em Recebido.
+  await repo.setIncomeReference(newOperationKey(), ctx, '2026-09', 0, 600_000, false);
+  // Metas (D-027), pelas mesmas funções do cadastro. A reserva usa a média de setembro (Moradia e Mercado).
+  const reserva = await repo.createGoal(newOperationKey(), ctx, {
+    goalType: 'emergencia',
+    name: 'Reserva para imprevistos',
+    targetCents: 2_250_000,
+    targetMonth: null,
+    plannedMonthlyCents: 50_000,
+    essentialBaseCents: 375_000,
+    essentialMonths: 6,
+    essentialBaseSource: 'media_gastos',
+    initialCents: 300_000,
+    initialOn: '2026-10-01',
+  });
+  await repo.addGoalMovement(newOperationKey(), reserva.goal.id, 'aporte', { amountCents: 50_000, occurredOn: '2026-10-06', note: null });
+  await repo.createGoal(newOperationKey(), ctx, {
+    goalType: 'objetivo',
+    name: 'Viagem de férias',
+    targetCents: 600_000,
+    targetMonth: '2027-07',
+    plannedMonthlyCents: 48_000,
+    essentialBaseCents: null,
+    essentialMonths: null,
+    essentialBaseSource: null,
+    initialCents: 120_000,
+    initialOn: '2026-10-01',
+  });
+  // Plano de guardar (spec7): a pessoa respondeu "consigo" com R$ 500,00 por mês, o mesmo plano da reserva. Só é lida pela
+  // própria pessoa; não conta como anotação e não muda nenhum total.
+  await repo.setSavingsAnswer(newOperationKey(), ctx, 0, 'consigo', 50_000);
 
   // A latência só passa a valer depois de semear, para a demonstração abrir rápido.
   repo.latencyMs = opts.latencyMs ?? 0;

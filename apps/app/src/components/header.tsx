@@ -1,15 +1,17 @@
 import { addMonths, formatMonthBR } from '@clarevo/core';
 import { router } from 'expo-router';
-import { ArrowLeft, ChevronLeft, ChevronRight, Users } from 'lucide-react-native';
+import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, Users } from 'lucide-react-native';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { PixelRatio, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { Logo } from '@/components/brand';
 import { yearA11yLabel } from '@/components/series-parts';
 import { DemoPill, TopInset, Txt } from '@/components/ui';
+import { PRIVACY_TEXT, setValuesHidden, useValuesHidden } from '@/lib/privacy';
 import { canGoForward, useView, type SpaceKind } from '@/state/data';
 import { useSession } from '@/state/session';
+import { LOGOTYPE_HEIGHT, LOGOTYPE_WIDTH } from '@/theme/logo-paths';
 import { colors, fonts, motion, radius, space } from '@/theme/tokens';
 
 export function initialsOf(name: string) {
@@ -19,16 +21,50 @@ export function initialsOf(name: string) {
 
 const focusOnBrand = { outlineWidth: 3, outlineColor: colors.accent, outlineStyle: 'solid', outlineOffset: 2 } as const;
 
+/** "Demonstração" em Manrope Bold 12 px (85,4 px) mais a margem interna do selo. */
+const DEMO_PILL_WIDTH = 102;
+
+/**
+ * Olho do cabeçalho (ocultar valores, A2): ação secundária ao lado do avatar, só quando cabe sem apertar o logotipo.
+ * Largura da faixa: até 560 px menos as margens; logotipo, selo de demonstração (se houver), olho e avatar com os
+ * espaços entre eles. Sem a demonstração, cabe a partir de 320 px; com o selo, só em telas mais largas. Quando não
+ * cabe, ocultar e mostrar valores ficam em Conta.
+ */
+function eyeFits(windowWidth: number, narrow: boolean, demo: boolean): boolean {
+  const gap = narrow ? space[2] : space[3];
+  const row = Math.min(windowWidth, 560) - 2 * space[6];
+  const logo = (narrow ? 20 : 24) * (LOGOTYPE_WIDTH / LOGOTYPE_HEIGHT);
+  const pill = demo ? DEMO_PILL_WIDTH * Math.max(1, PixelRatio.getFontScale()) + gap : 0;
+  return logo + gap + pill + 44 + gap + 44 <= row;
+}
+
+/** Mostrar ou ocultar os valores nesta sessão (a preferência "Ocultar valores ao abrir" fica em Conta). */
+function HideValuesButton() {
+  const hidden = useValuesHidden();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={hidden ? PRIVACY_TEXT.showNow : PRIVACY_TEXT.hideNow}
+      onPress={() => setValuesHidden(!hidden)}
+      style={(s) => [styles.eye, (s as { focused?: boolean }).focused && focusOnBrand]}>
+      {hidden ? <Eye size={24} color={colors.textOnBrand} /> : <EyeOff size={24} color={colors.textOnBrand} />}
+    </Pressable>
+  );
+}
+
 /** Logo reverso, selo de demonstração e acesso à Conta (perfil, segurança e benefício). */
 function BrandRow() {
   const { user, auth } = useSession();
+  const { width } = useWindowDimensions();
   // Abaixo de 360 px, logotipo, selo de demonstração e avatar não cabem lado a lado no tamanho normal.
-  const narrow = useWindowDimensions().width < 360;
+  const narrow = width < 360;
+  const demo = auth.mode === 'demo';
   return (
     <View style={[styles.top, narrow && { gap: space[2] }]}>
       <Logo height={narrow ? 20 : 24} variant="reverso" />
       <View style={[styles.topRight, narrow && { gap: space[2] }]}>
-        {auth.mode === 'demo' ? <DemoPill /> : null}
+        {demo ? <DemoPill /> : null}
+        {eyeFits(width, narrow, demo) ? <HideValuesButton /> : null}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Conta: perfil, segurança e acesso ao plano"
@@ -202,6 +238,7 @@ const styles = StyleSheet.create({
   topRight: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   title: { fontSize: 24, lineHeight: 32, marginBottom: space[4] },
   avatar: { minWidth: 44, height: 44, paddingHorizontal: 4, borderRadius: 22, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  eye: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   subBand: { backgroundColor: colors.brand },
   subInner: { flexDirection: 'row', alignItems: 'center', gap: space[2], paddingTop: space[2], paddingBottom: space[3], paddingHorizontal: space[3] },
   backBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },

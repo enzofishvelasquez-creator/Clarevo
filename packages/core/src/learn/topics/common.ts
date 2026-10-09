@@ -50,6 +50,9 @@ export const cvm = (title: string, url: string, locator: string | null = null): 
 export const CVM_RESERVAS = (locator: string): LearnSource =>
   cvm('Planejamento e gestão de reservas financeiras', 'https://www.gov.br/investidor/pt-br/penso-logo-invisto/planejamento-e-gestao-de-reservas-financeiras', locator);
 
+export const CVM_EMERGENCIAS = (locator: string): LearnSource =>
+  cvm('Emergências e aposentadoria', 'https://www.gov.br/investidor/pt-br/investir/antes-de-investir/defina-seus-objetivos/emergencias-e-aposentadoria', locator);
+
 export const CVM_GUIA = (locator: string): LearnSource =>
   cvm(
     'Guia de Planejamento Financeiro',
@@ -71,6 +74,13 @@ export const CALC_CIDADAO_FINANCIAMENTO = (locator: string): LearnSource =>
   bcb(
     'Calculadora do Cidadão: metodologia do financiamento com prestações fixas',
     'https://www3.bcb.gov.br/CALCIDADAO/publico/exibirMetodologiaFinanciamentoPrestacoesFixas.do?method=exibirMetodologiaFinanciamentoPrestacoesFixas',
+    locator,
+  );
+
+export const CALC_CIDADAO_DEPOSITOS = (locator: string): LearnSource =>
+  bcb(
+    'Calculadora do Cidadão: metodologia da aplicação com depósitos regulares',
+    'https://www3.bcb.gov.br/CALCIDADAO/publico/exibirMetodologiaAplicacaoDepositosRegulares.do?method=exibirMetodologiaAplicacaoDepositosRegulares',
     locator,
   );
 

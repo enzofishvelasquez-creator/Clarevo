@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { RETURN_TOPIC_SLUG, START_HERE, TOPIC_SLUGS, isTopicPublished, resolveTopicSlug, topicBySlug, type TopicSlug } from '../src';
+import { RETURN_TOPIC_SLUG, SIMULATE_TOPICS, START_HERE, TOPIC_SLUGS, isTopicPublished, resolveTopicSlug, topicBySlug, type TopicSlug } from '../src';
 
 /**
  * R13 (spec3 §3.6): as telas só apontam para temas do catálogo, e os temas ligados hoje estão publicados.
@@ -53,6 +53,16 @@ describe('ligações das telas com Aprender (R13)', () => {
     expect(isTopicPublished('contas-do-ano')).toBe(true);
     expect(RETURN_TOPIC_SLUG).toBe('sem-registro');
     expect(isTopicPublished(RETURN_TOPIC_SLUG as TopicSlug)).toBe(true);
+  });
+
+  it('temas dos Ciclos B, C e D que as telas ligam (renda comprometida, renda que muda, aporte, gastos essenciais e simulação) estão publicados', () => {
+    for (const slug of ['renda-comprometida', 'renda-variavel', 'aporte', 'essenciais', 'simulacao'] as const) {
+      expect(TOPIC_SLUGS, slug).toContain(slug);
+      expect(topicBySlug(slug)?.slug, slug).toBe(slug);
+    }
+    // O simulador do core liga taxa, inflação, resultado e leitura da simulação: todos publicados.
+    for (const slug of Object.values(SIMULATE_TOPICS)) expect(isTopicPublished(slug), slug).toBe(true);
+    expect(SIMULATE_TOPICS.reading).toBe('simulacao');
   });
 
   it('START_HERE aponta para slugs do catálogo', () => {

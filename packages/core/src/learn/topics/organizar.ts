@@ -1,7 +1,10 @@
 import type { Topic } from '../types';
-import { BCB_CADERNO, CVM_GUIA, CVM_RESERVAS, REVIEWED_ON, clarevo, cvm, oficial } from './common';
+import { BCB_CADERNO, CVM_EMERGENCIAS, CVM_GUIA, CVM_RESERVAS, REVIEWED_ON, bcb, clarevo, mercado, oficial } from './common';
 
-/** Seção "Organizar o mês" (Anexo A, temas 1, 2, 3 e 5, com os ajustes de spec3 §3.4 e da conferência de fontes). */
+/**
+ * Seção "Organizar o mês" (Anexo A, temas 1, 2, 3 e 5, com os ajustes de spec3 §3.4 e da conferência de fontes) e os
+ * temas dos Ciclos B (renda comprometida e renda que muda) e C (aporte e gastos essenciais).
+ */
 export const ORGANIZAR_TOPICS: Topic[] = [
   {
     slug: 'gasto-fixo-variavel',
@@ -146,13 +149,9 @@ export const ORGANIZAR_TOPICS: Topic[] = [
     hypotheses: 'Gastos essenciais fictícios. Sem rendimento e sem resgates no período.',
     facts: [],
     keywords: ['reserva de emergência', 'emergência', 'imprevisto', 'colchão', 'meses de gastos'],
-    related: ['contas-do-ano', 'liquidez-risco-retorno'],
+    related: ['essenciais', 'contas-do-ano', 'liquidez-risco-retorno'],
     sources: [
-      cvm(
-        'Emergências e aposentadoria',
-        'https://www.gov.br/investidor/pt-br/investir/antes-de-investir/defina-seus-objetivos/emergencias-e-aposentadoria',
-        'Entre 6 e 12 meses de gastos, conforme o tipo de renda, a estabilidade no emprego e quantas pessoas contribuem para a renda; reserva de baixo risco e liquidez diária',
-      ),
+      CVM_EMERGENCIAS('Entre 6 e 12 meses de gastos, conforme o tipo de renda, a estabilidade no emprego e quantas pessoas contribuem para a renda; reserva de baixo risco e liquidez diária'),
       CVM_RESERVAS('1, 3 ou 6 meses de despesas, por exemplo; reserva só para imprevistos, como problemas médicos, demissão ou reparo em casa'),
       CVM_GUIA('Custo de vida de 6 a 12 meses; por prudência, 12 meses'),
     ],
@@ -160,5 +159,165 @@ export const ORGANIZAR_TOPICS: Topic[] = [
     reviewEveryMonths: 12,
     aliases: ['reservas'],
     calculator: { slug: 'reserva', params: {} },
+  },
+  {
+    slug: 'renda-comprometida',
+    section: 'organizar',
+    kind: 'tema',
+    status: 'publicado',
+    title: 'Renda comprometida e a referência de 30%',
+    subtitle: 'Como ler este número',
+    question: 'Quanto da renda pode ir para dívidas?',
+    short:
+      'A parte da renda que já tem destino: contas fixas, parcelas e outras contas a pagar do mês. Para dívidas, a Serasa usa como referência até 30% da renda líquida. É uma referência, não uma regra.',
+    paragraphs: [
+      'Renda comprometida é a parte da renda que já tem destino antes de o mês começar: contas fixas, parcelas e outras contas a pagar. No Clarevo, a conta usa as contas que vencem no mês e a renda de referência que você informa.',
+      'Para dívidas (parcelas de empréstimos, financiamentos, compras parceladas e carnês), a Serasa usa como referência até 30% da renda líquida. É uma referência de mercado, não uma lei nem uma regra para a sua vida.',
+      'Num indicador do Banco Central, comprometer mais de 50% da renda com dívidas é um dos quatro critérios de endividamento de risco, e o indicador só considera a situação quando há pelo menos dois critérios ao mesmo tempo. As bases de renda são diferentes, e os números não são diretamente comparáveis.',
+      'Cada casa tem sua realidade. O número serve para planejar, não para julgar.',
+    ],
+    example:
+      'Com renda líquida de R$ 6.000,00 e parcelas de R$ 850,00 (financiamento do carro) e R$ 300,00 (compra parcelada), as dívidas somam R$ 1.150,00, ou 19,2% da renda. A referência de 30% corresponde a R$ 1.800,00.',
+    calculation:
+      '850,00 + 300,00 = 1.150,00 · 1.150,00 ÷ 6.000,00 = 0,19166... → 19,2% (uma casa, metade para cima) · 6.000,00 × 30% = 1.800,00.',
+    hypotheses: 'Exemplo fictício: renda líquida de referência e parcelas de um mês.',
+    facts: [
+      { text: '30%', source: 0 },
+      { text: '50%', source: 1 },
+    ],
+    keywords: ['comprometimento de renda', 'quanto da renda', 'peso das parcelas', 'parcelas', 'dívidas', 'trinta por cento'],
+    related: ['renda-variavel', 'contas-do-ano', 'quitar-antes'],
+    sources: [
+      mercado(
+        'Serasa',
+        'Página sobre comprometimento de renda (blog Serasa)',
+        'https://www.serasa.com.br/credito/blog/comprometimento-renda/',
+        'O comprometimento de renda com dívidas não deve ultrapassar 30% do rendimento líquido mensal; gastos essenciais (água, luz, supermercado) não entram na soma de dívidas',
+      ),
+      bcb(
+        'Estudo Especial nº 80: Indicadores de endividamento de risco e perfil do tomador de crédito',
+        'https://www.bcb.gov.br/conteudo/relatorioinflacao/EstudosEspeciais/EE080_Indicadores_de_endividamento_de_risco_e_perfil_do_tomador_de_credito.pdf',
+        'Critérios: atrasos superiores a 90 dias; comprometimento da renda mensal com o serviço das dívidas acima de 50%; exposição simultânea a cheque especial, crédito pessoal sem consignação e crédito rotativo; renda disponível abaixo da linha de pobreza. Entra no indicador quem atende a dois ou mais',
+      ),
+      bcb(
+        'Série Cidadania Financeira nº 6: Endividamento de risco no Brasil (2020)',
+        'https://www.bcb.gov.br/content/cidadaniafinanceira/documentos_cidadania/serie_cidadania/serie_cidadania_financeira_6_endividamento_risco.pdf',
+        'Considera-se endividado de risco o tomador de crédito que atende a dois ou mais dos critérios relacionados',
+      ),
+      bcb(
+        'Série Cidadania Financeira nº 8: Endividamento de risco no Brasil, atualização (novembro de 2023)',
+        'https://aprendervalor.bcb.gov.br/content/cidadaniafinanceira/documentos_cidadania/serie_cidadania/serie_cidadania_financeira_8_endividamento_risco_2ed.pdf',
+        'Edição 8, novembro de 2023: atualização do estudo de 2020 e qualificação dos indicadores (ficha técnica)',
+      ),
+      bcb(
+        'Relatório de Cidadania Financeira: glossário',
+        'https://www.bcb.gov.br/nor/relcidfin/glossario.html',
+        'Comprometimento de renda do tomador: razão entre o serviço da dívida mensal e a renda disponível',
+      ),
+      clarevo('D-026'),
+    ],
+    reviewedOn: REVIEWED_ON,
+    reviewEveryMonths: 12,
+  },
+  {
+    slug: 'renda-variavel',
+    section: 'organizar',
+    kind: 'tema',
+    status: 'publicado',
+    title: 'Quando a renda muda todo mês',
+    subtitle: 'Como escolher a renda de referência',
+    question: 'Como planejar quando a renda muda de um mês para outro?',
+    short:
+      'Comissões, aulas, vendas e serviços fazem a renda mudar de um mês para outro. Para planejar, olhe os meses passados e conte com a parte que você tem certeza de receber.',
+    paragraphs: [
+      'Renda fixa é a que muda pouco, como salário, aposentadoria ou aluguel recebido. Renda variável muda de um mês para outro, como comissões por vendas ou aulas particulares. É a definição do material de educação financeira do Banco Central. Aqui, renda variável é o dinheiro que entra, não um tipo de aplicação.',
+      'Para planejar, o Banco Central sugere estimar receitas e despesas usando os meses passados como base. A Susep orienta anotar só os valores que você tem certeza de receber, sem contar gorjetas e gratificações, porque não se deve contar com o que não é certo.',
+      'No Clarevo, a renda de referência é um valor por mês que você informa e pode mudar quando quiser. Com "Minha renda varia", o app pede uma revisão no começo de cada mês. A sugestão do app é a média dos meses fechados com recebimentos anotados, sem reembolsos; é uma escolha do Clarevo, não uma regra oficial. Para contar só com o que é certo, uma opção é usar o menor valor dos últimos meses.',
+      'Renda que muda também pesa no tamanho da reserva para imprevistos. A CVM diz que o valor depende do tipo de renda, fixa ou variável, e a Susep cita de seis meses a um ano de renda guardada para quem trabalha por conta própria com receitas que mudam todo mês.',
+    ],
+    example:
+      'Recebimentos de julho a setembro: R$ 4.300,00, R$ 6.200,00 e R$ 5.100,00. A média é R$ 5.200,00. Com R$ 3.150,00 em contas no mês, a renda comprometida fica em 60,6% pela média e em 73,3% pelo menor mês (R$ 4.300,00).',
+    calculation:
+      '4.300,00 + 6.200,00 + 5.100,00 = 15.600,00 · 15.600,00 ÷ 3 = 5.200,00 · 3.150,00 ÷ 5.200,00 = 0,60576... → 60,6% · 3.150,00 ÷ 4.300,00 = 0,73255... → 73,3% (uma casa, metade para cima).',
+    hypotheses: 'Exemplo fictício: recebimentos de três meses fechados, sem reembolsos, e contas a pagar de um mês.',
+    facts: [],
+    keywords: ['renda que varia', 'trabalho autônomo', 'autônoma', 'conta própria', 'comissão', 'freelancer', 'bico', 'renda de referência'],
+    related: ['renda-comprometida', 'reserva-imprevistos'],
+    sources: [
+      BCB_CADERNO(
+        'Módulo 2: receitas fixas não variam ou variam pouco (salário, aposentadoria, aluguel); receitas variáveis mudam de um mês para o outro (comissões por vendas, aulas particulares); o planejamento usa a rotina passada como base para prever receitas e despesas futuras',
+      ),
+      oficial(
+        'Superintendência de Seguros Privados (Susep)',
+        'Meu Futuro Seguro: Educação Financeira',
+        'https://www.gov.br/susep/pt-br/assuntos/meu-futuro-seguro/educacao-financeira',
+        'Só anotar valores que se tem certeza de receber, sem acréscimos variáveis como gorjetas e gratificações; quem trabalha por conta própria, com receitas que variam de mês a mês, deve deixar de seis meses a um ano',
+      ),
+      CVM_EMERGENCIAS('O valor da reserva depende do tipo de renda, se fixa ou variável, da estabilidade no emprego e de quantas pessoas contribuem para a renda familiar'),
+      clarevo('D-026'),
+    ],
+    reviewedOn: REVIEWED_ON,
+    reviewEveryMonths: 12,
+  },
+  {
+    slug: 'aporte',
+    section: 'organizar',
+    kind: 'tema',
+    status: 'publicado',
+    title: 'O que muda ao registrar um aporte',
+    subtitle: 'Guardar não é gastar',
+    question: 'Dinheiro guardado entra como gasto?',
+    short: 'Aporte é o dinheiro que você já separou para uma meta. Ele aumenta o valor guardado e não entra em Pago, porque o dinheiro continua seu.',
+    paragraphs: [
+      'Um aporte é o registro do dinheiro que você já separou para uma meta, como a reserva para imprevistos. Ele mostra o progresso da meta e não entra em Pago nem diminui a Diferença do mês, porque o dinheiro continua seu, só mudou de lugar. Intenção de guardar não é aporte: o valor que você pretende guardar por mês aparece só como plano.',
+      'Se depois você usar o dinheiro guardado, anote o gasto normalmente, com a data em que pagou, e registre um resgate na meta. O gasto entra em Pago uma vez, e o resgate diminui o valor guardado. Resgate não é renda: ele não entra em Recebido.',
+      'Rendimento recebido e valorização são registros diferentes do aporte. Use Registrar rendimento recebido para o que apareceu no seu extrato e Atualizar valor guardado quando o valor que você tem guardado mudar. O Clarevo não estima rendimentos e não guarda nem movimenta dinheiro.',
+      'O Portal do Investidor, da CVM, sugere definir uma meta para a reserva, porque ela ajuda a manter o foco, e montar um plano para guardar uma parte da renda todo mês.',
+    ],
+    example:
+      'A reserva tem R$ 3.000,00 guardados. Você registra um aporte de R$ 500,00 em 06/10: o valor guardado passa a R$ 3.500,00, e o Pago de outubro continua em R$ 3.900,00. Depois, um conserto de R$ 300,00 é pago com esse dinheiro: você anota o gasto, e o Pago vai a R$ 4.200,00; na reserva, o resgate de R$ 300,00 deixa R$ 3.200,00 guardados.',
+    calculation: '3.000,00 + 500,00 = 3.500,00 · Pago de outubro: 3.900,00 antes e depois do aporte · 3.900,00 + 300,00 = 4.200,00 · 3.500,00 - 300,00 = 3.200,00.',
+    hypotheses: 'Exemplo fictício: reserva com R$ 3.000,00 já guardados, Pago de outubro de R$ 3.900,00 e um conserto pago com o dinheiro da reserva.',
+    facts: [],
+    keywords: ['guardar dinheiro', 'dinheiro guardado', 'separar dinheiro', 'aporte', 'resgate', 'valorização', 'rendimento recebido', 'meta', 'reserva'],
+    related: ['reserva-imprevistos', 'essenciais', 'liquidez-risco-retorno'],
+    sources: [
+      CVM_RESERVAS('Definir uma meta para a reserva ajuda a manter o foco e a determinação; em seguida, criar um plano para economizar uma parte da renda mensal'),
+      clarevo('D-027'),
+    ],
+    reviewedOn: REVIEWED_ON,
+    reviewEveryMonths: 12,
+  },
+  {
+    slug: 'essenciais',
+    section: 'organizar',
+    kind: 'tema',
+    status: 'publicado',
+    title: 'Gastos essenciais',
+    subtitle: 'A base da reserva para imprevistos',
+    question: 'Quais gastos contam como essenciais na reserva?',
+    short:
+      'São os gastos ligados às necessidades, como moradia e mercado. No Clarevo, a reserva parte da média do que você pagou em Moradia, Mercado, Transporte, Saúde e Educação, e você ajusta o valor.',
+    paragraphs: [
+      'O Banco Central chama de necessários os gastos ligados às necessidades, como alimentação, moradia e vestuário. A reserva para imprevistos parte desses gastos, e não da renda: o Portal do Investidor, da CVM, fala em meses de gastos.',
+      'No Clarevo, a sugestão olha os seis meses fechados mais recentes e usa até três deles, os mais recentes com gastos anotados. Soma o que você pagou em Moradia, Mercado, Transporte, Saúde e Educação em cada um e faz a média. Lazer e gastos sem categoria ficam fora. A lista de categorias é uma escolha do Clarevo, não uma regra oficial.',
+      'Pagamentos de contas do ano, como impostos e matrículas, também ficam fora da média. A CVM lembra que a reserva não é para gastos sazonais e previsíveis, como tributos e matrículas: eles ficam no planejamento do ano. Sem meses com gastos anotados, o Clarevo começa pelas contas a pagar do mês, e você completa o valor.',
+      'O valor é sempre uma sugestão. Ajuste quando souber que algum mês foi diferente do comum, por exemplo com uma compra maior que a de costume.',
+    ],
+    example:
+      'Em julho, agosto e setembro, os gastos em Moradia, Mercado, Transporte, Saúde e Educação somaram R$ 3.700,00, R$ 3.750,00 e R$ 3.800,00. A média é R$ 3.750,00. Os R$ 200,00 de Lazer e os R$ 2.400,00 do IPVA não entram. Com 6 meses de cobertura, a reserva fica em R$ 22.500,00.',
+    calculation: '3.700,00 + 3.750,00 + 3.800,00 = 11.250,00 · 11.250,00 ÷ 3 = 3.750,00 · 3.750,00 × 6 = 22.500,00.',
+    hypotheses: 'Exemplo fictício: três meses fechados com gastos anotados, um IPVA pago em agosto e 6 meses de cobertura escolhidos por você.',
+    facts: [],
+    keywords: ['gastos essenciais', 'essencial', 'necessidades', 'custo de vida', 'quanto gasto por mês', 'base da reserva', 'média de gastos'],
+    related: ['reserva-imprevistos', 'contas-do-ano', 'gasto-fixo-variavel'],
+    sources: [
+      BCB_CADERNO('Gastos necessários: considerados imprescindíveis e ligados às necessidades, como alimentação, moradia e vestuário'),
+      CVM_EMERGENCIAS('O montante da reserva para emergências deve estar entre 6 e 12 meses de gastos'),
+      CVM_RESERVAS('Reserva só para imprevistos, o que exclui gastos sazonais (que ocorrem só numa época do ano, mas são previsíveis), como tributos e matrículas'),
+      clarevo('D-027'),
+    ],
+    reviewedOn: REVIEWED_ON,
+    reviewEveryMonths: 12,
   },
 ];

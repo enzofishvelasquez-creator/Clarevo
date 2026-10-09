@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import { ConfirmDialog } from '@/components/dialog';
+import { PrivacyCard, RemindersCard } from '@/components/device-settings';
 import { SubHeader } from '@/components/header';
 import { TermHint } from '@/components/term-hint';
 import { TopicLink } from '@/components/topic-link';
@@ -29,7 +30,7 @@ function Message({ msg }: { msg: Msg }) {
   );
 }
 
-/** Conta: perfil, conta financeira, segurança e situação do acesso ao plano. */
+/** Conta: perfil, conta financeira, segurança, lembretes, privacidade neste aparelho e situação do acesso ao plano. */
 export default function ContaScreen() {
   const { user, auth, signOut } = useSession();
   const repo = useRepo();
@@ -153,6 +154,9 @@ export default function ContaScreen() {
           />
           <Button label="Encerrar sessão em todos os aparelhos" icon={MonitorSmartphone} tone="soft" onPress={() => setConfirmAll(true)} />
         </Card>
+
+        <RemindersCard />
+        <PrivacyCard />
 
         <Card style={{ gap: space[2] }}>
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
