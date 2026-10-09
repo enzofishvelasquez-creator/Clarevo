@@ -14,6 +14,7 @@ import { ReturnBand, useReturnBand } from '@/components/retorno-faixa';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, FitMoney, LinkButton, Money, Screen, Skeleton, Txt } from '@/components/ui';
 import { totalChange, type TotalChange } from '@/lib/highlight';
+import { explanationHref } from '@/lib/learn';
 import { summaryTop } from '@/lib/nav';
 import { useCommitments, useMonthRecords, useSpace, useView } from '@/state/data';
 import { useSession } from '@/state/session';
@@ -177,7 +178,7 @@ export default function ResumoScreen() {
 
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.push('/explicacao/fatura')}
+            onPress={() => router.push(explanationHref('fatura'))}
             style={(st) => [styles.learn, st.pressed && { opacity: 0.85 }]}>
             <View style={{ flex: 1 }}>
               <Txt variant="label" style={{ fontFamily: fonts.extrabold, fontSize: 17 }}>

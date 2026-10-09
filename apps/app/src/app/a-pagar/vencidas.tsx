@@ -34,6 +34,7 @@ import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { CheckOption, yearA11y, yearA11yLabel } from '@/components/series-parts';
 import { EmptyState, ErrorState } from '@/components/states';
+import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Chip, Screen, Skeleton, Txt } from '@/components/ui';
 import { totalChange } from '@/lib/highlight';
 import { useCommitments, useDeleteCommitment, usePayCommitment, useSeriesList, useSkipSeriesYear, useSpace, useUpdateRecord } from '@/state/data';
@@ -391,7 +392,10 @@ export default function ContasVencidas() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title="Contas vencidas" onBack={toList} right={<ContextPill label="Pessoal" />} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
-        <Txt color={colors.textSecondary}>Marque o que você já pagou e tire o que não houve.</Txt>
+        <View style={{ gap: space[1] }}>
+          <Txt color={colors.textSecondary}>Marque o que você já pagou e tire o que não houve.</Txt>
+          <TopicLink slug="voltei-depois" label="Por que só aparecem meses recentes?" style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
+        </View>
         <FlashBanner message={notice} />
         {hasFooter ? null : resultBanner}
 

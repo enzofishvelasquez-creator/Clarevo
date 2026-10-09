@@ -50,6 +50,7 @@ import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt, styles as ui } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { totalChange } from '@/lib/highlight';
+import { explanationHref } from '@/lib/learn';
 import { useCommitments, useCreateRecord, useReturnReview, useUpdateRecord } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
@@ -535,7 +536,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
           </Txt>
         </Card>
 
-        <LinkButton label="Como este registro entra no mês?" color={colors.textSecondary} onPress={() => router.push('/explicacao/diferenca')} />
+        <LinkButton label="Como este registro entra no mês?" color={colors.textSecondary} onPress={() => router.push(explanationHref('diferenca'))} />
       </Screen>
 
       {/* Rodapé fixo: a ação principal fica sempre visível, acima do teclado. */}

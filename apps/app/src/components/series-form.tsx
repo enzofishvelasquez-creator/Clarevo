@@ -67,8 +67,10 @@ import {
   yearA11yLabel,
 } from '@/components/series-parts';
 import { SumValues } from '@/components/sum-values';
+import { TermHint } from '@/components/term-hint';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
+import { explanationHref } from '@/lib/learn';
 import { useCommitments, useCreateSeries, useMonthRecords, useSeriesList, useSeriesOperationKey, useUpdateSeriesFrom } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
@@ -667,7 +669,7 @@ export function SeriesForm({
       />
       <SumValues target={refs.amountText} onUse={(t) => set('amountText', t)} />
       {variable && !anual ? (
-        <LinkButton label="Contas que mudam de valor" style={styles.inlineLink} onPress={() => router.push('/explicacao/estimativa')} />
+        <LinkButton label="Contas que mudam de valor" style={styles.inlineLink} onPress={() => router.push(explanationHref('estimativa'))} />
       ) : null}
     </>
   );
@@ -767,6 +769,7 @@ export function SeriesForm({
         <Chip label="Sim, muda todo ano (como IPVA e IPTU)" selected={variable} onPress={() => setMode('variavel')} />
         <Chip label="Não, é sempre o mesmo" selected={!variable} onPress={() => setMode('fixo')} />
       </ChoiceGroup>
+      <TermHint term="Valor que muda" slug="estimativa" />
 
       {amountField}
 
@@ -867,7 +870,7 @@ export function SeriesForm({
                 Parcelas de compras no cartão já entram na fatura. Para não contar duas vezes, anote aqui só parcelamentos em boleto, débito ou
                 financiamento.
               </Txt>
-              <LinkButton label="Fatura sem contar duas vezes" style={styles.inlineLink} onPress={() => router.push('/explicacao/fatura')} />
+              <LinkButton label="Fatura sem contar duas vezes" style={styles.inlineLink} onPress={() => router.push(explanationHref('fatura'))} />
             </Banner>
           ) : null}
 
@@ -876,11 +879,14 @@ export function SeriesForm({
           ) : (
             <>
               {parcelada ? (
-                <ChoiceGroup label="Tipo do parcelamento" hint="Os dois primeiros contam como dívida na renda comprometida." error={errors.nature}>
-                  {INSTALLMENT_NATURES.map((n) => (
-                    <Chip key={n} label={SERIES_NATURE_LABEL[n]} selected={draft.nature === n} onPress={() => set('nature', n)} />
-                  ))}
-                </ChoiceGroup>
+                <>
+                  <ChoiceGroup label="Tipo do parcelamento" hint="Os dois primeiros contam como dívida na renda comprometida." error={errors.nature}>
+                    {INSTALLMENT_NATURES.map((n) => (
+                      <Chip key={n} label={SERIES_NATURE_LABEL[n]} selected={draft.nature === n} onPress={() => set('nature', n)} />
+                    ))}
+                  </ChoiceGroup>
+                  <TermHint term="Juros nas parcelas" slug="amortizacao-price-sac" />
+                </>
               ) : null}
 
               <ChoiceGroup label={parcelada ? 'A parcela muda de um mês para outro?' : 'O valor muda de um mês para outro?'}>
@@ -891,6 +897,7 @@ export function SeriesForm({
                   onPress={() => setMode('variavel')}
                 />
               </ChoiceGroup>
+              {parcelada ? null : <TermHint term="Valor que muda" slug="estimativa" />}
 
               {amountField}
 
@@ -923,6 +930,7 @@ export function SeriesForm({
                     error={errors.firstNumberText}
                     hint="Se você já pagou parcelas antes de usar o Clarevo, informe o número da próxima. As anteriores não viram gastos."
                   />
+                  <TermHint term="Parcelas pagas antes" slug="parcelamentos" />
                   <ChoiceGroup label="Mês da próxima parcela">{monthChips}</ChoiceGroup>
                   {otherMonthField}
                 </>
@@ -1005,7 +1013,7 @@ export function SeriesForm({
             <LinkButton
               label="Contas que chegam uma vez por ano"
               color={colors.textSecondary}
-              onPress={() => router.push('/explicacao/contas-do-ano')}
+              onPress={() => router.push(explanationHref('contas-do-ano'))}
             />
           </>
         ) : (
@@ -1017,7 +1025,7 @@ export function SeriesForm({
             <LinkButton
               label="Gasto fixo, conta a pagar e gasto anotado"
               color={colors.textSecondary}
-              onPress={() => router.push('/explicacao/gasto-fixo')}
+              onPress={() => router.push(explanationHref('gasto-fixo'))}
             />
           </>
         )}

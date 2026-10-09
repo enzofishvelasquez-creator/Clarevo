@@ -27,9 +27,12 @@ import { AnnualGroupRow, CommitmentRow, type RowAction } from '@/components/comm
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { EmptyState, ErrorState } from '@/components/states';
+import { TermHint } from '@/components/term-hint';
+import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, FitMoney, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
 import { totalChange } from '@/lib/highlight';
+import { explanationHref } from '@/lib/learn';
 import { useCommitments, usePayCommitment, useSeriesList, useSeriesSync, useSpace, useUpdateRecord, useView } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
@@ -169,11 +172,20 @@ export default function ContasAPagarScreen() {
 
   // Próximos meses: parcelas da mesma conta do ano e do mesmo ano viram um grupo (o toque abre a conta do ano).
   const laterHasAnnual = Boolean(s?.later.some((c) => c.series?.kind === 'anual'));
-  const sections: { title: string; legend?: string; list: Commitment[]; grouped?: GroupedCommitment[]; review?: boolean; quickPay?: boolean }[] = !s
+  const sections: {
+    title: string;
+    legend?: string;
+    list: Commitment[];
+    grouped?: GroupedCommitment[];
+    review?: boolean;
+    quickPay?: boolean;
+    /** "Quanto custa pagar depois do vencimento?" no fim da seção (spec3 §3.7). */
+    lateCost?: boolean;
+  }[] = !s
     ? []
     : isCurrent
       ? [
-          { title: 'Vencidas', list: s.overdue, review: s.overdue.length >= 2 },
+          { title: 'Vencidas', list: s.overdue, review: s.overdue.length >= 2, lateCost: true },
           { title: `A vencer em ${monthName.toLowerCase()}`, list: s.upcomingInMonth, quickPay: true },
           { title: 'Pagas', legend: 'Já contam em Pago, no mês da data do pagamento.', list: s.paidInMonth },
           {
@@ -278,7 +290,12 @@ export default function ContasAPagarScreen() {
             <>
               <FitMoney cents={s.toPayCents} />
               {caption?.includes ? <Txt variant="label">{caption.includes}</Txt> : null}
-              {caption?.estimated ? <Txt variant="label">{caption.estimated}</Txt> : null}
+              {caption?.estimated ? (
+                <>
+                  <Txt variant="label">{caption.estimated}</Txt>
+                  <TermHint term="Valor estimado" slug="estimativa" />
+                </>
+              ) : null}
             </>
           )}
           <Txt color={colors.textSecondary}>
@@ -371,6 +388,9 @@ export default function ContasAPagarScreen() {
                         />
                       </Animated.View>
                     ))}
+                {sec.lateCost ? (
+                  <TopicLink slug="multa-juros-atraso" label="Quanto custa pagar depois do vencimento?" style={styles.inlineLink} />
+                ) : null}
               </Card>
             </Animated.View>
           ))
@@ -379,7 +399,7 @@ export default function ContasAPagarScreen() {
         <Txt variant="label" color={colors.textSecondary}>
           Já anotou o pagamento como gasto? Exclua a conta a pagar para ela não continuar em Ainda a pagar.
         </Txt>
-        <LinkButton label="O que é previsto e realizado?" color={colors.textSecondary} onPress={() => router.push('/explicacao/realizado-previsto')} />
+        <LinkButton label="O que é previsto e realizado?" color={colors.textSecondary} onPress={() => router.push(explanationHref('realizado-previsto'))} />
         <Pressable accessibilityRole="button" onPress={() => router.push('/quem-ve')} style={styles.privacy}>
           <ShieldCheck size={18} color={colors.textSecondary} />
           <Txt variant="label" color={colors.textSecondary}>

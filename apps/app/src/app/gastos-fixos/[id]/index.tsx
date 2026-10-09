@@ -50,8 +50,10 @@ import { RegisterMonthSheet } from '@/components/retorno-folha';
 import { ContextPill, SubHeader } from '@/components/header';
 import { estimateText, InstallmentBar, occurrenceMonthLabel, yearA11yLabel } from '@/components/series-parts';
 import { ErrorState } from '@/components/states';
+import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
+import { explanationHref } from '@/lib/learn';
 import { useDeleteSeries, useSeries, useSeriesOccurrences, useSeriesOpenOccurrences, useSeriesOperationKey, useSpace } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
@@ -436,7 +438,8 @@ function Occurrences({
                   onPress={() => openCalc('quitar-antes', payoff)}
                 />
               ) : null}
-              <LinkButton label="Quitar antes do prazo" style={styles.inlineLink} onPress={() => router.push('/explicacao/quitar-antes')} />
+              <LinkButton label="Quitar antes do prazo" style={styles.inlineLink} onPress={() => router.push(explanationHref('quitar-antes'))} />
+              <TopicLink slug="amortizacao-price-sac" label="Quanto das parcelas é juros?" style={styles.inlineLink} />
             </View>
           ) : null}
         </Card>
@@ -511,6 +514,7 @@ function Occurrences({
           {missing.some((m) => m.month < monthOf(today) && !isReviewableMonth(m.month, today)) ? (
             <LinkButton label="Anotar gasto" style={styles.inlineLink} onPress={() => router.push('/registro/novo')} />
           ) : null}
+          <TopicLink slug="sem-registro" label="Por que este mês não tem conta?" style={styles.inlineLink} />
         </Card>
       ) : null}
 
@@ -539,7 +543,7 @@ function Occurrences({
               onPress={() => router.push(`/gastos-fixos/${s.id}/editar?a-partir=${applyFrom}&valor=${suggestion.amountCents}`)}
             />
           ) : null}
-          <LinkButton label="Contas que mudam de valor" style={styles.inlineLink} onPress={() => router.push('/explicacao/estimativa')} />
+          <LinkButton label="Contas que mudam de valor" style={styles.inlineLink} onPress={() => router.push(explanationHref('estimativa'))} />
         </Card>
       ) : null}
     </>

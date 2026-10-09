@@ -6,6 +6,8 @@ import { View } from 'react-native';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { SubHeader } from '@/components/header';
+import { TermHint } from '@/components/term-hint';
+import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Screen, TextField, Txt } from '@/components/ui';
 import { AuthError, RESEND_INTERVAL_SECONDS } from '@/lib/auth';
 import { signOutIntent } from '@/lib/nav';
@@ -110,9 +112,12 @@ export default function ContaScreen() {
           <Txt variant="title">{user?.displayName}</Txt>
           <Txt color={colors.textSecondary}>{user?.email}</Txt>
           {auth.mode === 'demo' ? (
-            <Txt variant="caption" color={colors.textSecondary}>
-              Demonstração: acesso simulado e dados fictícios, guardados só neste aparelho enquanto o app está aberto.
-            </Txt>
+            <>
+              <Txt variant="caption" color={colors.textSecondary}>
+                Demonstração: acesso simulado e dados fictícios, guardados só neste aparelho enquanto o app está aberto.
+              </Txt>
+              <TopicLink slug="demonstracao" label="O que é a demonstração?" style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
+            </>
           ) : null}
         </Card>
 
@@ -124,6 +129,7 @@ export default function ContaScreen() {
           <Txt variant="caption" color={colors.textSecondary}>
             Saldo inicial: não informado. Sem ele, o Clarevo não calcula o saldo da conta.
           </Txt>
+          <TermHint term="Saldo inicial" slug="saldo" />
           <Message msg={nameMsg} />
           <Button label="Salvar nome" tone="soft" busy={busy === 'nome'} busyLabel="Salvando…" onPress={saveName} />
         </Card>

@@ -41,6 +41,7 @@ import { ErrorState, LoadingState } from '@/components/states';
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
+import { explanationHref } from '@/lib/learn';
 import { totalChange } from '@/lib/highlight';
 import { useReturnReview, useSeries, useSpace } from '@/state/data';
 import { useSession } from '@/state/session';
@@ -307,7 +308,7 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: Person
           ) : null}
         </Card>
 
-        <LinkButton label="Como o pagamento entra no mês?" color={colors.textSecondary} onPress={() => router.push('/explicacao/realizado-previsto')} />
+        <LinkButton label="Como o pagamento entra no mês?" color={colors.textSecondary} onPress={() => router.push(explanationHref('realizado-previsto'))} />
       </Screen>
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space[3]) }]}>

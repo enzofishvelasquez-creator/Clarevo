@@ -42,8 +42,10 @@ import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { SumValues } from '@/components/sum-values';
 import { ChoiceGroup, ofSeries, SERIES_NOUN } from '@/components/series-parts';
+import { TermHint } from '@/components/term-hint';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
+import { explanationHref } from '@/lib/learn';
 import { useCreateCommitment, useUpdateCommitment } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
@@ -378,12 +380,15 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
 
         <Card style={{ gap: space[4] }}>
           {mode.type === 'nova' ? (
-            <ChoiceGroup label="Com que frequência?">
-              <Chip label="Só uma vez" selected onPress={() => {}} />
-              <Chip label="Todo mês" selected={false} onPress={() => toSeries('mensal')} />
-              <Chip label="Todo ano" selected={false} onPress={() => toSeries('anual')} />
-              <Chip label="Parcelado" selected={false} onPress={() => toSeries('parcelada')} />
-            </ChoiceGroup>
+            <>
+              <ChoiceGroup label="Com que frequência?">
+                <Chip label="Só uma vez" selected onPress={() => {}} />
+                <Chip label="Todo mês" selected={false} onPress={() => toSeries('mensal')} />
+                <Chip label="Todo ano" selected={false} onPress={() => toSeries('anual')} />
+                <Chip label="Parcelado" selected={false} onPress={() => toSeries('parcelada')} />
+              </ChoiceGroup>
+              <TermHint term="Gasto fixo" slug="gasto-fixo" />
+            </>
           ) : null}
           <Txt variant="caption" color={colors.textSecondary}>
             Prevista · só entra em Pago quando for marcada como paga
@@ -420,7 +425,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
                 Se as compras do cartão já foram anotadas como gastos, não anote a fatura como conta a pagar: ao pagar, o valor contaria duas
                 vezes em Pago.
               </Txt>
-              <LinkButton label="Fatura sem contar duas vezes" style={styles.inlineLink} onPress={() => router.push('/explicacao/fatura')} />
+              <LinkButton label="Fatura sem contar duas vezes" style={styles.inlineLink} onPress={() => router.push(explanationHref('fatura'))} />
             </Banner>
           ) : null}
 
@@ -510,7 +515,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
         <LinkButton
           label="Como uma conta a pagar entra no mês?"
           color={colors.textSecondary}
-          onPress={() => router.push('/explicacao/realizado-previsto')}
+          onPress={() => router.push(explanationHref('realizado-previsto'))}
         />
       </Screen>
 

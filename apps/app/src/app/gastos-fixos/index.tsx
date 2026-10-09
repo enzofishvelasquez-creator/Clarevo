@@ -27,6 +27,7 @@ import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { estimateText, SERIES_NOUN, yearA11y } from '@/components/series-parts';
 import { EmptyState, ErrorState } from '@/components/states';
+import { TopicLink } from '@/components/topic-link';
 import { Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { useSeriesList, useSpace } from '@/state/data';
 import { useSession } from '@/state/session';
@@ -162,9 +163,12 @@ export default function GastosFixosScreen() {
       <SubHeader title="Gastos fixos e parcelamentos" right={<ContextPill label="Pessoal" />} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <FlashBanner message={notice} />
-        <Txt color={colors.textSecondary}>
-          Contas que se repetem. Cada mês vira uma conta a pagar, e só o que você marca como paga entra em Pago.
-        </Txt>
+        <View style={{ gap: space[1] }}>
+          <Txt color={colors.textSecondary}>
+            Contas que se repetem. Cada mês vira uma conta a pagar, e só o que você marca como paga entra em Pago.
+          </Txt>
+          <TopicLink slug="gasto-fixo" label="O que é um gasto fixo?" style={styles.inlineLink} />
+        </View>
 
         {list.isPending ? (
           <Skeleton width="80%" height={20} />
@@ -239,6 +243,7 @@ export default function GastosFixosScreen() {
                 <SeriesRow key={s.id} series={s} today={today} last={i === annualActive.length - 1} />
               ))}
               <LinkButton label="Nova conta do ano" icon={Plus} style={styles.inlineLink} onPress={() => router.push('/gastos-fixos/novo?tipo=anual')} />
+              <TopicLink slug="contas-do-ano" label="Como se preparar para as contas do ano?" style={styles.inlineLink} />
             </Card>
 
             {ended.length > 0 ? (

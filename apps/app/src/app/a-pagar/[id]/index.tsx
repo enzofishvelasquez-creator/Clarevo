@@ -43,6 +43,7 @@ import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { ErrorState } from '@/components/states';
+import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, FitMoney, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { openSummary } from '@/lib/nav';
@@ -394,12 +395,15 @@ export default function DetalheContaAPagar() {
                   {dueText(c, today)}
                 </Txt>
                 {lateCalc ? (
-                  <LinkButton
-                    label={CALC_UI_TEXT.links.multa}
-                    icon={Calculator}
-                    style={styles.inlineLink}
-                    onPress={() => openCalc('multa-e-juros', lateCalc)}
-                  />
+                  <>
+                    <LinkButton
+                      label={CALC_UI_TEXT.links.multa}
+                      icon={Calculator}
+                      style={styles.inlineLink}
+                      onPress={() => openCalc('multa-e-juros', lateCalc)}
+                    />
+                    <TopicLink slug="multa-juros-atraso" label="Quanto custa pagar depois do vencimento?" style={styles.inlineLink} />
+                  </>
                 ) : null}
                 {ref ? (
                   <View style={{ gap: space[1] }}>

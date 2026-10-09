@@ -21,6 +21,7 @@ import { codeOf, isConflict, isUncertain, useReturnWriter } from '@/components/r
 import { EmptyState, ErrorState } from '@/components/states';
 import { Banner, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
+import { explanationHref } from '@/lib/learn';
 import { useReturnReview, useSpace } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, motion, space, tabular } from '@/theme/tokens';
@@ -92,7 +93,7 @@ export default function SeusUltimosMeses() {
                 label={RETURN_TEXT.learnMore}
                 accessibilityLabel={RETURN_TEXT.learnMoreA11y}
                 style={styles.inlineLink}
-                onPress={() => router.push(`/explicacao/${RETURN_TOPIC_SLUG}`)}
+                onPress={() => router.push(explanationHref(RETURN_TOPIC_SLUG))}
               />
             </Banner>
 

@@ -4,6 +4,7 @@ import { User } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { ContextPill, SubHeader } from '@/components/header';
+import { TopicLink } from '@/components/topic-link';
 import { Button, Card, Screen, Txt } from '@/components/ui';
 import { useView } from '@/state/data';
 import { useSession } from '@/state/session';
@@ -42,6 +43,7 @@ export default function QuemVeScreen() {
       </Txt>
       {/* Revisão dos últimos meses (D-030(9)): só datas, lidas só pela própria pessoa. */}
       <Txt color={colors.textSecondary}>{RETURN_TEXT.privacy}</Txt>
+      <TopicLink slug="empresa-ve" label="A empresa vê meus gastos?" style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
       <Button label="Entendi" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
     </Screen>
     </View>

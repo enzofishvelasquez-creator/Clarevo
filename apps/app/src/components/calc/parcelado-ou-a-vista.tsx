@@ -12,6 +12,7 @@ import { useState } from 'react';
 
 import { CalcChoice, CalcField, CalcResult, CalcScreen, CalcYesNo, calcInlineLink, useCalcForm, useNoteHidden, type CalcBinding } from '@/components/calc/parts';
 import { Banner, Button, Card, LinkButton, Txt } from '@/components/ui';
+import { explanationHref } from '@/lib/learn';
 import { space } from '@/theme/tokens';
 
 type Key = 'aVista' | 'parcelas' | 'parcela';
@@ -54,7 +55,7 @@ export function ParceladoCalc({ prefill }: { prefill: CalcPrefill<'parcelado-ou-
             Parcelas de compras no cartão já entram na fatura. Para não contar duas vezes, anote como parcelamento só o que for pago em boleto,
             débito ou financiamento.
           </Txt>
-          <LinkButton label="Fatura sem contar duas vezes" style={calcInlineLink} onPress={() => router.push('/explicacao/fatura')} />
+          <LinkButton label="Fatura sem contar duas vezes" style={calcInlineLink} onPress={() => router.push(explanationHref('fatura'))} />
         </Banner>
       ) : null}
 

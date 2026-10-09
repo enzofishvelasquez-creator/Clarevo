@@ -7,6 +7,7 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { RecordRow } from '@/components/record-row';
 import { ContextPill, SubHeader } from '@/components/header';
 import { EmptyState, ErrorState } from '@/components/states';
+import { TopicLink } from '@/components/topic-link';
 import { Button, Card, FitMoney, Money, Screen, Skeleton, spaceKeyPress, Txt } from '@/components/ui';
 import { useMonthRecords, useSpace, useView } from '@/state/data';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
@@ -107,6 +108,8 @@ function Composicao({ kind }: { kind: keyof typeof COPY }) {
             </Card>
           ))
         )}
+
+        <TopicLink slug="diferenca" label="Como este total é calculado?" color={colors.textSecondary} />
       </Screen>
     </View>
   );

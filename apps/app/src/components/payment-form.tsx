@@ -42,8 +42,10 @@ import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { CheckOption, yearA11yLabel } from '@/components/series-parts';
 import { SumValues } from '@/components/sum-values';
+import { TermHint } from '@/components/term-hint';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
+import { explanationHref } from '@/lib/learn';
 import { totalChange } from '@/lib/highlight';
 import {
   usePayCommitment,
@@ -473,6 +475,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
             }
           />
           <SumValues target={refs.amountText} onUse={(t) => set('amountText', t)} />
+          <TermHint term="Pagou com multa ou desconto?" slug="multa-juros-atraso" />
 
           <View style={{ gap: space[2] }}>
             <TextField
@@ -555,7 +558,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
         <LinkButton
           label="Como o pagamento entra no mês?"
           color={colors.textSecondary}
-          onPress={() => router.push('/explicacao/realizado-previsto')}
+          onPress={() => router.push(explanationHref('realizado-previsto'))}
         />
       </Screen>
 
