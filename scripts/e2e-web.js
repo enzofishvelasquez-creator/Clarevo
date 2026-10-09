@@ -2867,6 +2867,79 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('"Registrar esta parcela" > "Já paguei": a folha fecha, com o aviso de pagamento e o detalhe atualizado (2 pagas, 1 sem conta)', (await visibleCount('button', 'Ainda não paguei: Financiamento do carro de julho')) === 0 &&
     (await body()).includes('Pagas no Clarevo: 2 · Sem conta registrada: 1'));
 
+  // g) "Já paguei" numa conta que outro aparelho registrou E pagou: ninguém paga de novo. A revisão mostra a conta como
+  // paga, com o aviso "Esta conta já foi paga em outro aparelho." (uma só vez na tela, sem o texto de pagamento feito aqui).
+  const luzJulhoPagamentos = () => otherDevice(async (repo, ctx) => (await repo.listRecords(ctx, '2026-07')).filter((r) => r.commitmentId && /^Luz/.test(r.description)).map((r) => r.amountCents));
+  const PAID_ELSEWHERE = 'Esta conta já foi paga em outro aparelho.';
+  await enterReturnDemo(); await toStep(1);
+  await btn('Já paguei: Luz de julho').click(); await waitText('Registrar pagamento');
+  await otherDevice(async (repo, ctx) => {
+    const luz = (await repo.listSeries(ctx)).find((s) => s.terms[0].description === 'Luz');
+    const w = await repo.createSeriesOccurrence(crypto.randomUUID(), luz.id, luz.version, 3, 'aberta');
+    const space = await repo.getSpace();
+    await repo.payCommitment(crypto.randomUUID(), w.commitment.id, w.commitment.version, { accountId: space.accounts[0].id, amountCents: 16500, paidOn: '2026-07-14', category: null });
+  });
+  await field('Valor pago').fill('175,00'); await btn('Salvar pagamento').click();
+  await waitText(PAID_ELSEWHERE); await waitText('Mês 2 de 5');
+  await keepReturnText();
+  t = await body();
+  const pagosG = await luzJulhoPagamentos();
+  ok('conta registrada e paga em outro aparelho, "Salvar pagamento": volta à revisão com o aviso "Esta conta já foi paga em outro aparelho." uma só vez, sem texto de pagamento feito aqui',
+    new URL(p.url()).pathname === '/retomar/atualizar' && (await p.getByText(PAID_ELSEWHERE, { exact: true }).filter({ visible: true }).count()) === 1 &&
+    !t.includes('Pagamento registrado: Luz de julho.') && !t.includes('Esta conta já foi registrada'), `${p.url()} ${t.slice(0, 400)}`);
+  ok('conta paga em outro aparelho: a linha da Luz de julho aparece como paga com o valor de lá (R$ 165,00), e há um único pagamento (nada de R$ 175,00)',
+    t.includes('Paga em 14/07/2026 · R$ 165,00') && pagosG.length === 1 && pagosG[0] === 16500, `${JSON.stringify(pagosG)} ${t.slice(0, 400)}`);
+
+  // h) /retomar/atualizar sem revisão ativa (demonstração padrão): a mesma linha neutra de /retomar, nunca "já estão registrados".
+  await viaEntry('/retomar/atualizar', 'Nada para conferir');
+  t = await body();
+  await keepReturnText();
+  ok('/retomar/atualizar sem revisão ativa: "Nada para conferir" com "Não há revisão dos últimos meses agora.", sem dizer que os meses já estão registrados',
+    new URL(p.url()).pathname === '/retomar/atualizar' && t.includes('Nada para conferir') && t.includes('Não há revisão dos últimos meses agora.') && !t.includes('já estão registrados') &&
+    (await visibleCount('button', 'Voltar ao Resumo')) === 1 && (await visibleCount('button', 'Pular este mês')) === 0, `${p.url()} ${t.slice(0, 300)}`);
+  await btn('Voltar ao Resumo').click(); await waitText('Diferença do mês');
+  ok('/retomar/atualizar sem revisão: "Voltar ao Resumo" volta ao Resumo', new URL(p.url()).pathname === '/', p.url());
+
+  // i) Falha parcial: a conta foi registrada aqui e outro aparelho a alterou antes do pagamento (a cópia lida ficou velha).
+  // "Salvar de novo" lê a conta atual e paga uma única vez, em vez de repetir a recusa de versão.
+  const staleOnNextPay = () => p.evaluate(async () => {
+    const repo = await window.__e2e.repo();
+    repo.payCommitment = function (key, id, version, input) {
+      delete repo.payCommitment;
+      repo.simulateRemoteCommitmentEdit(id, {});
+      return repo.payCommitment(key, id, version, input);
+    };
+  });
+  const PARTIAL = 'A conta de julho foi registrada, mas o pagamento não foi salvo. Tente salvar de novo.';
+  await enterReturnDemo(); await toStep(1);
+  await btn('Já paguei: Luz de julho').click(); await waitText('Registrar pagamento');
+  await staleOnNextPay();
+  await field('Valor pago').fill('165,00'); await btn('Salvar pagamento').click();
+  await waitText(PARTIAL);
+  ok('falha parcial (conta registrada, alterada em outro aparelho): o aviso de pagamento não salvo e "Salvar de novo", na mesma tela', new URL(p.url()).pathname === '/retomar/pagar' &&
+    (await visibleCount('button', 'Salvar de novo')) === 1 && (await visibleCount('button', 'Salvar pagamento')) === 0, p.url());
+  await btn('Salvar de novo').click(); await waitText('Mês 2 de 5'); await waitText('Paga em 12/07/2026 · R$ 165,00');
+  await keepReturnText();
+  t = await body();
+  const pagosI = await luzJulhoPagamentos();
+  ok('"Salvar de novo" depois da conta alterada em outro aparelho: lê a conta atual e paga uma única vez, com o aviso de pagamento registrado',
+    new URL(p.url()).pathname === '/retomar/atualizar' && t.includes('Pagamento registrado: Luz de julho.') && !t.includes(PAID_ELSEWHERE) && pagosI.length === 1 && pagosI[0] === 16500, `${JSON.stringify(pagosI)} ${t.slice(0, 400)}`);
+
+  // j) Falha parcial e a pessoa sai: a linha volta em aberto, com "Já paguei" (não como "Registrada em aberto"), e o passo conta como ação.
+  await enterReturnDemo(); await toStep(1);
+  await btn('Já paguei: Luz de julho').click(); await waitText('Registrar pagamento');
+  await staleOnNextPay();
+  await field('Valor pago').fill('165,00'); await btn('Salvar pagamento').click();
+  await waitText(PARTIAL);
+  await btn('Cancelar').click(); await waitText('Descartar o preenchimento?');
+  await btn('Descartar alterações').click(); await waitText('Mês 2 de 5');
+  await waitUntil(async () => (await body()).includes('cerca de R$ 180,00 (estimado) · venceu em 12/07/2026 · em aberto'), 6000);
+  await keepReturnText();
+  t = await body();
+  ok('falha parcial e "Cancelar": a Luz de julho volta como conta em aberto com "Já paguei", sem o resultado "Registrada em aberto", e o passo conta como ação ("Próximo mês")',
+    new URL(p.url()).pathname === '/retomar/atualizar' && t.includes('cerca de R$ 180,00 (estimado) · venceu em 12/07/2026 · em aberto') && !t.includes('Registrada em aberto') &&
+    (await visibleCount('button', 'Já paguei: Luz de julho')) === 1 && (await visibleCount('button', 'Próximo mês')) === 1 && (await visibleCount('button', 'Pular este mês')) === 0, t.slice(0, 500));
+
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);
   const forbidden = screenTexts.map((s) => s.match(FORBIDDEN)?.[0]).filter(Boolean);
