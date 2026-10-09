@@ -211,13 +211,13 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: Person
       const created = err.created ?? writer.createdFor(row.key) ?? existing.current;
       // Algo mudou em outro aparelho (conta paga lá, versão nova): a conta lida antes ficou velha. A próxima tentativa
       // lê a conta de novo, em vez de repetir o pagamento com a cópia velha e receber a mesma recusa.
-      // MUTACAO
+      if (!isUncertain(err.cause) && isConflict(err.cause)) existing.current = null;
       if (created) {
         // Conta registrada, pagamento não: ela já aparece em Contas a pagar; "Salvar de novo" repete só o pagamento.
         setPartial(true);
         // Sem resultado para a linha ("Registrada em aberto" a daria por resolvida): a revisão recarrega ao voltar e a
         // mostra em aberto, com "Já paguei". A conta registrada já conta como ação da sessão.
-        returnSession.noteAction();
+        returnSession.setOutcome(row.key, { type: 'registrada', commitment: created });
         const field = !isUncertain(err.cause) ? fieldForErrorCode(codeOf(err.cause)) : null;
         if (field && PAYMENT_FIELD_ORDER.includes(field)) {
           const errs = { [field]: returnErrorText(codeOf(err.cause)) };

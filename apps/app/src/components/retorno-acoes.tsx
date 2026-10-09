@@ -293,7 +293,7 @@ export function useReturnWriter() {
       } catch (e) {
         // Algo mudou em outro aparelho (conta paga lá, versão nova): a cópia guardada ficou velha. Esquecida, a próxima
         // tentativa pede o registro de novo (o banco responde ocorrencia_existente) e lê a conta atual, sem repetir a recusa.
-        // MUTACAO
+        if (!isUncertain(e) && isConflict(e)) createdFor.current.delete(row.key);
         throw new PayRowError(e, row.commitment ? null : target);
       }
     },
