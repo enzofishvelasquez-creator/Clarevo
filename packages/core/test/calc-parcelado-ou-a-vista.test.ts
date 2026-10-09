@@ -55,7 +55,7 @@ describe('1. Parcelado ou à vista? (docs/08 §3.2)', () => {
 
   it('"Anotar como parcelamento" só fora do cartão; com cartão, o aviso de fatura', () => {
     expect(run().action).toBe('anotar_parcelamento');
-    expect(run().noteParams).toEqual({ tipo: 'parcelada', parcelas: 10, valor: 12_000 });
+    expect(run().noteParams).toEqual({ tipo: 'parcelada', natureza: 'compra_parcelada', parcelas: 10, valor: 12_000 });
     expect(run({ formaPagamento: 'boleto' }).action).toBe('anotar_parcelamento');
     expect(run({ formaPagamento: 'debito' }).action).toBe('anotar_parcelamento');
     const card = run({ formaPagamento: 'cartao' });

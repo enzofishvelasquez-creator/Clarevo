@@ -46,8 +46,11 @@ export interface ParceladoResult extends CalcTexts {
    * 'aviso_cartao' com cartão de crédito (o app mostra o aviso de fatura que já existe); null no modo 'cota-unica'.
    */
   action: 'anotar_parcelamento' | 'aviso_cartao' | null;
-  /** Parâmetros de /gastos-fixos/novo?tipo=parcelada (valor em centavos), quando action = 'anotar_parcelamento'. */
-  noteParams: { tipo: 'parcelada'; parcelas: number; valor: Cents } | null;
+  /**
+   * Parâmetros de /gastos-fixos/novo?tipo=parcelada&natureza=compra_parcelada&parcelas=N&valor=<centavos da parcela>,
+   * quando action = 'anotar_parcelamento'.
+   */
+  noteParams: { tipo: 'parcelada'; natureza: 'compra_parcelada'; parcelas: number; valor: Cents } | null;
 }
 
 export const PARCELADO_RANGE = { compra: { min: 2, max: 480 }, 'cota-unica': { min: 2, max: 12 } } as const;
@@ -157,7 +160,7 @@ export function calcParceladoOuAVista(input: ParceladoInput): CalcOutcome<Parcel
       monthlyRate,
       annualRate,
       action,
-      noteParams: action === 'anotar_parcelamento' ? { tipo: 'parcelada', parcelas: n, valor: parcela } : null,
+      noteParams: action === 'anotar_parcelamento' ? { tipo: 'parcelada', natureza: 'compra_parcelada', parcelas: n, valor: parcela } : null,
       resultLines,
       hypotheses,
       notes: [],

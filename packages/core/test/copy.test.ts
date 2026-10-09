@@ -5,6 +5,41 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   ANNUAL_SERIES_ERROR_TEXT,
+  CALCULATORS,
+  CALC_DISCLAIMER,
+  CALC_ERROR_TEXT,
+  CALC_GROUPS,
+  CALC_INTRO,
+  CALC_SLUGS,
+  CALC_UI_TEXT,
+  COTA_UNICA_SUBTITLE,
+  COTA_UNICA_TITLE,
+  DIVIDA_TEXT,
+  DIVIDIR_TEXT,
+  MULTA_EXACT_TEXT,
+  ORGANIZE_TEXT,
+  QUICK_PAY_TEXT,
+  QUITAR_ESTIMATE_TEXT,
+  RESERVA_REFERENCIA,
+  SUM_TEXT,
+  calcCustoDaDivida,
+  calcCustoPorAno,
+  calcDividirContas,
+  calcErrorText,
+  calcFields,
+  calcJuntarParaObjetivo,
+  calcMultaEJuros,
+  calcParceladoOuAVista,
+  calcQuitarAntes,
+  calcReserva,
+  categoryBreakdown,
+  payablesCaption,
+  seriesCaptionShort,
+  shortcutA11yLabel,
+  summarizeMonth,
+  type CalcErrorCode,
+  type CalcOutcome,
+  type CalcTexts,
   COMMITMENT_ERROR_TEXT,
   DEMO_TODAY,
   ERROR_TEXT,
@@ -203,6 +238,184 @@ describe('textos do core', () => {
     for (const g of groupAnnualLater(later)) if (g.type === 'ano') texts.push(g.group.title, g.group.caption, g.group.a11yLabel);
     expect(texts.length).toBeGreaterThan(40);
     for (const text of texts) expect(text).not.toMatch(FORBIDDEN);
+  });
+});
+
+/**
+ * Calculadoras e "Achar tudo" (spec4 §1.2): os arquivos-fonte novos do core passam pelo mesmo FORBIDDEN e pelas
+ * palavras de julgamento; os textos montados (resultado, hipóteses, avisos, rótulos e mensagens) são gerados com
+ * várias entradas e conferidos um a um. O resultado de "Multa e juros" nunca fala em atraso.
+ */
+const JUDGMENT =
+  /vale a pena|\bruim\b|\bcuidado|desperd[ií]cio|\bcortes?\b|\batrasad[oa]s?\b|\bestour|\binvista\b|\bcaixinha\b|saldo devedor/i;
+
+const CORE_SRC = fileURLToPath(new URL('../src/', import.meta.url));
+
+function coreFiles(dir: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) return coreFiles(path);
+    return /\.ts$/.test(name) ? [path] : [];
+  });
+}
+
+/** Junta os textos de um resultado ok (e do parcelamento da fatura, quando houver). */
+function outcomeTexts(out: CalcOutcome<CalcTexts & { parcelamento?: CalcOutcome<CalcTexts, string> | null }, string>): string[] {
+  if (!out.ok) return [];
+  const r = out.result;
+  const nested = r.parcelamento && r.parcelamento.ok ? [...r.parcelamento.result.resultLines, ...r.parcelamento.result.hypotheses, ...r.parcelamento.result.notes] : [];
+  return [...r.resultLines, ...r.hypotheses, ...r.notes, ...nested];
+}
+
+/** Resultados de todas as calculadoras com entradas comuns e de borda. */
+function calculatorResultTexts(): { all: string[]; multa: string[]; quitar: string[] } {
+  const all: string[] = [];
+  for (const modo of ['compra', 'cota-unica'] as const)
+    for (const primeiraNaCompra of [false, true])
+      for (const [aVista, parcelas, parcela] of [
+        ['1.080,00', '10', '120,00'],
+        ['1.080,00', '10', '100,00'],
+        ['100,00', '2', '100,00'],
+        ['1,00', '2', '9.999.999,99'],
+      ] as const)
+        for (const formaPagamento of [null, 'boleto', 'cartao'] as const)
+          all.push(...outcomeTexts(calcParceladoOuAVista({ modo, aVista, parcelas, parcela, primeiraNaCompra, formaPagamento })));
+  for (const frequencia of ['dia_util', 'semana', 'mes'] as const) all.push(...outcomeTexts(calcCustoPorAno({ valor: '25,00', frequencia })));
+  for (const taxaMes of ['2', '8', '8,01', '14', '99,99'])
+    for (const [parcelarTaxaMes, parcelarParcelas] of [['', ''], ['8', '24'], ['8', '12'], ['8', '']]) {
+      all.push(...outcomeTexts(calcCustoDaDivida({ tipo: 'rotativo', valor: '700,00', taxaMes, parcelarTaxaMes, parcelarParcelas })));
+      all.push(...outcomeTexts(calcCustoDaDivida({ tipo: 'cheque_especial', valor: '1.000,00', taxaMes, meses: '1' })));
+      all.push(...outcomeTexts(calcCustoDaDivida({ tipo: 'cheque_especial', valor: '1.000,00', taxaMes, meses: '3' })));
+      all.push(...outcomeTexts(calcCustoDaDivida({ tipo: 'emprestimo', valor: '5.000,00', taxaMes, parcelas: '1' })));
+      all.push(...outcomeTexts(calcCustoDaDivida({ tipo: 'emprestimo', valor: '5.000,00', taxaMes, parcelas: '12' })));
+    }
+  const quitar: string[] = [];
+  for (const [modo, quantas] of [['tudo', ''], ['ultimas', '1'], ['ultimas', '3']] as const)
+    for (const prazosEmDias of [undefined, Array.from({ length: 36 }, (_, k) => 34 + 30 * k)])
+      quitar.push(...outcomeTexts(calcQuitarAntes({ parcela: '850,00', restantes: '36', taxaMes: '1,5', modo, quantas, prazosEmDias })));
+  quitar.push(...outcomeTexts(calcQuitarAntes({ parcela: '850,00', restantes: '1', taxaMes: '1,5', modo: 'tudo' })));
+  const multa: string[] = [];
+  for (const dias of ['1', '10', '3.650']) multa.push(...outcomeTexts(calcMultaEJuros({ valor: '200,00', multaPct: '2', jurosMesPct: '1', dias })));
+  for (const [guardado, mensal] of [['', ''], ['4.500,00', '500,00'], ['50,00', '1'], ['30.000,00', '10'], ['7.500,00', '']])
+    all.push(...outcomeTexts(calcReserva({ essenciais: '3.750,00', meses: '6', guardado, mensal })));
+  all.push(...outcomeTexts(calcReserva({ essenciais: '3.750,00', meses: '1', guardado: '1.000,00', mensal: '100,00' })));
+  for (const input of [
+    { alvo: '22.500,00', jaTem: '4.500,00', modo: 'prazo' as const, meses: '14' },
+    { alvo: '22.500,00', jaTem: '4.500,00', modo: 'mensal' as const, mensal: '1.100,00' },
+    { alvo: '22.500,00', jaTem: '22.500,00', modo: 'prazo' as const, meses: '1' },
+    { alvo: '1.000,00', modo: 'prazo' as const, meses: '600' },
+  ])
+    all.push(...outcomeTexts(calcJuntarParaObjetivo(input)));
+  all.push(...outcomeTexts(calcDividirContas({ total: '100,00', modo: 'iguais', pessoas: [{}, { apelido: 'Ana' }, {}] })));
+  all.push(...outcomeTexts(calcDividirContas({ total: '3.000,00', modo: 'renda', pessoas: [{ renda: '4.000,00' }, { renda: '6.000,00' }] })));
+  all.push(...outcomeTexts(calcDividirContas({ total: '0,01', modo: 'renda', pessoas: [{ renda: '9.999.999,99' }, { renda: '9.999.999,99' }] })));
+  return { all: [...all, ...multa, ...quitar], multa, quitar };
+}
+
+/** Rótulos, dicas, opções e mensagens de erro de todos os campos. */
+function fieldTexts(): string[] {
+  const out: string[] = [];
+  const codes = Object.keys(CALC_ERROR_TEXT) as CalcErrorCode[];
+  for (const slug of CALC_SLUGS)
+    for (const modo of slug === 'parcelado-ou-a-vista' ? [undefined, 'cota-unica'] : [undefined])
+      for (const [name, spec] of Object.entries(calcFields(slug, modo))) {
+        out.push(spec.label, ...(spec.hint ? [spec.hint] : []), ...(spec.options ?? []).map((o) => o.label));
+        for (const code of codes) out.push(calcErrorText(slug, name, code, modo));
+      }
+  return out;
+}
+
+describe('textos das calculadoras e de "Achar tudo"', () => {
+  it('a lista de julgamento reprova o que deve e não reprova os textos obrigatórios', () => {
+    for (const bad of ['Não vale a pena', 'ruim', 'Cuidado', 'desperdício', 'corte', 'conta atrasada', 'estourou', 'Invista', 'caixinha', 'saldo devedor'])
+      expect(JUDGMENT.test(bad)).toBe(true);
+    for (const ok of [CALC_DISCLAIMER, QUITAR_ESTIMATE_TEXT, MULTA_EXACT_TEXT, 'Multa e juros por atraso', 'Dívidas e atrasos', 'Ainda a pagar'])
+      expect(JUDGMENT.test(ok)).toBe(false);
+  });
+
+  it('arquivos-fonte: calculators/**, learn/**, sum.ts e shortcuts.ts', () => {
+    const files = [...coreFiles(join(CORE_SRC, 'calculators')), ...coreFiles(join(CORE_SRC, 'learn')), join(CORE_SRC, 'sum.ts'), join(CORE_SRC, 'shortcuts.ts')];
+    expect(files.length).toBeGreaterThan(15);
+    for (const slug of ['parcelado-ou-a-vista', 'quitar-antes', 'dividir-contas']) expect(files.some((f) => f.endsWith(`${slug}.ts`))).toBe(true);
+    const bad = files.filter((f) => {
+      const text = readFileSync(f, 'utf8');
+      return FORBIDDEN.test(text) || JUDGMENT.test(text);
+    });
+    expect(bad.map((f) => f.slice(CORE_SRC.length))).toEqual([]);
+  });
+
+  it('resultados, hipóteses e avisos montados', () => {
+    const { all, multa, quitar } = calculatorResultTexts();
+    expect(all.length).toBeGreaterThan(300);
+    for (const text of all) {
+      expect(text).not.toMatch(FORBIDDEN);
+      expect(text).not.toMatch(JUDGMENT);
+    }
+    expect(multa.length).toBeGreaterThan(5);
+    for (const text of multa) expect(text).not.toMatch(/atras/i);
+    expect(multa.some((t) => t.includes('depois do vencimento'))).toBe(true);
+    expect(quitar.filter((t) => t === QUITAR_ESTIMATE_TEXT).length).toBeGreaterThan(5);
+  });
+
+  it('catálogo, rótulos, mensagens e textos fixos', async () => {
+    const quick = QUICK_PAY_TEXT;
+    const texts: string[] = [
+      CALC_DISCLAIMER,
+      CALC_INTRO,
+      COTA_UNICA_TITLE,
+      COTA_UNICA_SUBTITLE,
+      QUITAR_ESTIMATE_TEXT,
+      MULTA_EXACT_TEXT,
+      RESERVA_REFERENCIA.text,
+      ...CALCULATORS.flatMap((c) => [c.title, c.subtitle]),
+      ...CALC_GROUPS.map((g) => g.title),
+      ...Object.values(CALC_ERROR_TEXT),
+      ...Object.values(DIVIDA_TEXT),
+      ...Object.values(CALC_UI_TEXT).flatMap((v) => (typeof v === 'string' ? [v] : Array.isArray(v) ? [] : Object.values(v as Record<string, string>))),
+      DIVIDIR_TEXT.addPerson,
+      DIVIDIR_TEXT.removePerson('Pessoa 1'),
+      DIVIDIR_TEXT.nicknameLabel(0),
+      DIVIDIR_TEXT.nicknameHint,
+      DIVIDIR_TEXT.incomeLabel('Pessoa 2'),
+      DIVIDIR_TEXT.peopleRange,
+      SUM_TEXT.open,
+      SUM_TEXT.add,
+      SUM_TEXT.use,
+      SUM_TEXT.close,
+      SUM_TEXT.maxReached,
+      SUM_TEXT.total(4_840),
+      SUM_TEXT.itemLabel(0),
+      SUM_TEXT.remove(1),
+      ...Object.values(SUM_TEXT.errors),
+      quick.button,
+      quick.estimateButton,
+      quick.title('Luz'),
+      quick.line(18_000, '2026-10-08'),
+      quick.confirm,
+      quick.change,
+      quick.cancel,
+      quick.a11y('Luz', '2026-10-12', '2026-10-08'),
+      quick.estimateA11y('Luz', '2026-10-08', '2026-10-08'),
+      quick.done('Internet'),
+      ORGANIZE_TEXT.title,
+      ...[ORGANIZE_TEXT.payables, ORGANIZE_TEXT.series, ORGANIZE_TEXT.calculators].flatMap((o) => Object.values(o)),
+      ...[0, 1, 2].map((n) => payablesCaption({ openCents: 65_000 * Math.min(n, 1), overdueCount: n, month: '2026-10', currentMonth: '2026-10' })),
+      payablesCaption({ openCents: 30_000, overdueCount: 0, month: '2027-01', currentMonth: '2026-10' }),
+      seriesCaptionShort([]),
+      seriesCaptionShort([{ kind: 'mensal' }]),
+      seriesCaptionShort([{ kind: 'mensal' }, { kind: 'anual' }]),
+      shortcutA11yLabel('Contas a pagar', 'R$ 650,00 em aberto neste mês · 1 vencida'),
+      ...fieldTexts(),
+    ];
+    const repo = await createDemoRepository();
+    const ctx = (await repo.getSpace())!.personalContextId;
+    const s = summarizeMonth(await repo.listRecords(ctx, '2026-10'), ctx, '2026-10');
+    texts.push(...categoryBreakdown(s.composition.paid).flatMap((r) => [r.label, r.percentText, r.a11yLabel]));
+    expect(texts.length).toBeGreaterThan(400);
+    for (const text of texts) {
+      expect(text).not.toMatch(FORBIDDEN);
+      expect(text).not.toMatch(JUDGMENT);
+    }
   });
 });
 
