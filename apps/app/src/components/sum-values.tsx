@@ -4,6 +4,7 @@ import { useRef, useState, type RefObject } from 'react';
 import { AccessibilityInfo, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Button, LinkButton, Txt } from '@/components/ui';
+import { announceOnIOS } from '@/lib/a11y';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
 type Item = { id: number; text: string };
@@ -18,7 +19,8 @@ const emptyItems = (): Item[] => [
  * ("Total: R$ 48,40", anunciado ao leitor de tela) e "Usar o total", que preenche o campo com o total formatado
  * ("48,40") e fecha. A conta é do core (sumAmounts): centavos inteiros, até R$ 9.999.999,99 e até 10 valores.
  * Nada é gravado aqui; só o total vai para o campo, e o formulário segue igual.
- * target: o campo Valor. Na web, o foco volta para ele ao usar o total ou fechar (o painel sai da tela).
+ * target: o campo Valor. Ao usar o total ou fechar, o foco volta para ele (o painel sai da tela): na web, o foco do
+ * teclado; no iOS e no Android, só o do leitor de tela, sem abrir o teclado. No iOS, o total usado também é anunciado.
  */
 export function SumValues({ onUse, target }: { onUse: (text: string) => void; target?: RefObject<TextInput | null> }) {
   const [open, setOpen] = useState(false);
@@ -43,10 +45,19 @@ export function SumValues({ onUse, target }: { onUse: (text: string) => void; ta
     nextId.current = 3;
   };
 
-  const close = () => {
+  const close = (applied?: string) => {
     setOpen(false);
     reset();
-    if (Platform.OS === 'web') target?.current?.focus();
+    if (Platform.OS === 'web') {
+      target?.current?.focus();
+      return;
+    }
+    // Depois de o painel sair da tela (o botão que tinha o foco sai junto).
+    setTimeout(() => {
+      const field = target?.current;
+      if (field) AccessibilityInfo.sendAccessibilityEvent(field, 'focus');
+      if (applied) announceOnIOS(applied, { queue: true });
+    }, FOCUS_DELAY);
   };
 
   const toggle = () => {
@@ -62,7 +73,7 @@ export function SumValues({ onUse, target }: { onUse: (text: string) => void; ta
   const use = () => {
     if (!result.ok || result.count === 0) return;
     onUse(centsToInput(result.cents));
-    close();
+    close(SUM_TEXT.total(result.cents));
   };
 
   const setText = (id: number, text: string) => setItems((list) => list.map((i) => (i.id === id ? { ...i, text } : i)));
@@ -165,13 +176,16 @@ export function SumValues({ onUse, target }: { onUse: (text: string) => void; ta
 
           <View style={styles.actions}>
             <Button label={SUM_TEXT.use} tone="soft" disabled={!canUse} onPress={use} style={styles.action} />
-            <Button label={SUM_TEXT.close} tone="ghost" onPress={close} style={styles.action} />
+            <Button label={SUM_TEXT.close} tone="ghost" onPress={() => close()} style={styles.action} />
           </View>
         </View>
       ) : null}
     </View>
   );
 }
+
+/** Espera para mover o foco do leitor de tela: o painel já saiu da tela. */
+const FOCUS_DELAY = 150;
 
 const styles = StyleSheet.create({
   link: { alignSelf: 'flex-start', paddingHorizontal: 0 },

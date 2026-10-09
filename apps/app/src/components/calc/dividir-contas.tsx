@@ -13,7 +13,7 @@ import { UserMinus, UserPlus } from 'lucide-react-native';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { CalcChoice, CalcField, CalcResult, CalcScreen, CalcTextField, formatMoneyText, showError, useCalcForm, type CalcBinding } from '@/components/calc/parts';
+import { CalcChoice, CalcField, CalcResult, CalcScreen, CalcTextField, calcInlineLink, formatMoneyText, showError, useCalcForm, type CalcBinding } from '@/components/calc/parts';
 import { Button, Card, LinkButton, Txt } from '@/components/ui';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -116,7 +116,7 @@ export function DividirContasCalc({ prefill }: { prefill: CalcPrefill<'dividir-c
                   label={DIVIDIR_TEXT.removePerson(name)}
                   icon={UserMinus}
                   color={colors.textSecondary}
-                  style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
+                  style={calcInlineLink}
                   onPress={() => remove(p.id)}
                 />
               ) : null}

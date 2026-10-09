@@ -43,6 +43,11 @@ export const RESERVA_REFERENCIA: ReservaReference = {
 /** Chips de "Quantos meses cobrir", além de "Outro" (1 a 24). */
 export const RESERVA_MONTH_CHIPS: readonly number[] = [1, 3, 6, 12];
 
+export const RESERVA_TEXT = {
+  /** Erro dos chips quando nenhum foi marcado; o campo "Outro" usa a mensagem do campo meses ("Digite ..."). */
+  chooseMonths: 'Escolha quantos meses cobrir.',
+} as const;
+
 export interface ReservaResult extends CalcTexts {
   essenciaisCents: Cents;
   meses: number;

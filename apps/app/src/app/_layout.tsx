@@ -58,6 +58,9 @@ function takeEntryTarget(): string | null {
 }
 const hasEntryTarget = () => entryTarget !== null;
 
+/** Abas: substituem a pilha. As demais telas abrem por cima do Resumo, para que voltar, cancelar ou descartar cheguem a ele. */
+const TAB_TARGET = /^\/(movimentacoes|metas|aprender)\/?(\?|$)/;
+
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -162,7 +165,12 @@ function Navigation() {
   useEffect(() => {
     if (!user || inRecovery || status !== 'pronto' || !hasEntryTarget()) return;
     const target = takeEntryTarget();
-    if (target) router.replace(target as Href);
+    if (!target) return;
+    if (TAB_TARGET.test(target)) router.replace(target as Href);
+    else {
+      router.replace('/');
+      router.push(target as Href);
+    }
   }, [status, user, inRecovery]);
 
   return (

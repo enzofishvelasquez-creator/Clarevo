@@ -21,6 +21,7 @@ import {
   QUICK_PAY_TEXT,
   QUITAR_ESTIMATE_TEXT,
   RESERVA_REFERENCIA,
+  RESERVA_TEXT,
   SUM_TEXT,
   calcCustoDaDivida,
   calcCustoPorAno,
@@ -28,6 +29,7 @@ import {
   calcErrorText,
   calcFields,
   calcJuntarParaObjetivo,
+  calcRowA11yLabel,
   calcMultaEJuros,
   calcParceladoOuAVista,
   calcQuitarAntes,
@@ -277,6 +279,7 @@ function calculatorResultTexts(): { all: string[]; multa: string[]; quitar: stri
         ['1.080,00', '10', '100,00'],
         ['100,00', '2', '100,00'],
         ['1,00', '2', '9.999.999,99'],
+        ['1.000,00', '12', '83,34'],
       ] as const)
         for (const formaPagamento of [null, 'boleto', 'cartao'] as const)
           all.push(...outcomeTexts(calcParceladoOuAVista({ modo, aVista, parcelas, parcela, primeiraNaCompra, formaPagamento })));
@@ -367,7 +370,8 @@ describe('textos das calculadoras e de "Achar tudo"', () => {
       QUITAR_ESTIMATE_TEXT,
       MULTA_EXACT_TEXT,
       RESERVA_REFERENCIA.text,
-      ...CALCULATORS.flatMap((c) => [c.title, c.subtitle]),
+      ...Object.values(RESERVA_TEXT),
+      ...CALCULATORS.flatMap((c) => [c.title, c.subtitle, calcRowA11yLabel(c.title, c.subtitle)]),
       ...CALC_GROUPS.map((g) => g.title),
       ...Object.values(CALC_ERROR_TEXT),
       ...Object.values(DIVIDA_TEXT),

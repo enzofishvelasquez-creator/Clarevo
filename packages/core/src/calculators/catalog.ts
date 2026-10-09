@@ -68,6 +68,15 @@ export function calcTitle(slug: CalcSlug, modo?: string): string {
   return calculatorBySlug(slug)!.title;
 }
 
+/**
+ * Nome acessível de uma linha com título e legenda: "Reserva para imprevistos. Quantos meses seus gastos essenciais
+ * cobrem"; título que já termina em "?", "!" ou "." não ganha outro ponto ("Parcelado ou à vista? Descubra ...").
+ */
+export function calcRowA11yLabel(title: string, caption?: string | null): string {
+  if (!caption) return title;
+  return `${title}${/[?!.]$/.test(title) ? '' : '.'} ${caption}`;
+}
+
 /** Textos fixos das telas e das portas para as calculadoras. */
 export const CALC_UI_TEXT = {
   screenTitle: 'Calculadoras',

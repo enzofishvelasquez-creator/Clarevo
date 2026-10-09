@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DIVIDA_TEXT, calcCustoDaDivida, calcErrorText, type DividaInput } from '../src';
+import { DEBT_RESULT_MAX_CENTS, DIVIDA_TEXT, calcCustoDaDivida, calcErrorText, formatBRL, type DividaInput } from '../src';
 
 const run = (input: DividaInput) => {
   const out = calcCustoDaDivida(input);
@@ -101,10 +101,39 @@ describe('2. Quanto custa uma dívida? (docs/08 §3.2)', () => {
   });
 
   it('valor e prazo extremos no cheque especial: resultado_alto em vez de número errado', () => {
-    const out = calcCustoDaDivida({ tipo: 'cheque_especial', valor: '9.999.999,99', taxaMes: '99,99', meses: '24' });
-    expect(out.ok ? null : out.errors).toEqual({ meses: 'resultado_alto' });
+    const errors = (valor: string, meses: string) => {
+      const out = calcCustoDaDivida({ tipo: 'cheque_especial', valor, taxaMes: '99,99', meses });
+      return out.ok ? null : out.errors;
+    };
+    expect(errors('9.999.999,99', '24')).toEqual({ meses: 'resultado_alto' });
+    // Total de 8.378.547.473.174.854 centavos: cabe em um número inteiro seguro, mas formatBRL erraria o centavo.
+    expect(errors('5.000.000,01', '24')).toEqual({ meses: 'resultado_alto' });
+    // 1.047.527.920.876.682 centavos, logo acima de R$ 10 trilhões.
+    expect(errors('9.999.999,99', '20')).toEqual({ meses: 'resultado_alto' });
     expect(calcErrorText('custo-da-divida', 'meses', 'resultado_alto')).toContain('passa do que a calculadora mostra');
-    // Logo abaixo do limite, calcula normalmente.
-    expect(calcCustoDaDivida({ tipo: 'cheque_especial', valor: '9.999.999,99', taxaMes: '99,99', meses: '20' }).ok).toBe(true);
+    // Logo abaixo do limite, calcula normalmente e com o centavo exato.
+    const r = run({ tipo: 'cheque_especial', valor: '9.999.999,99', taxaMes: '99,99', meses: '19' });
+    expect([r.totalCents, r.interestCents]).toEqual([523_790_149_945_838, 523_789_149_945_839]);
+    expect(r.resultLines.slice(0, 2)).toEqual([
+      'Com estes números, a dívida vai a R$ 5.237.901.499.458,38 em 19 meses.',
+      'Juros: R$ 5.237.891.499.458,39',
+    ]);
+  });
+
+  it('até DEBT_RESULT_MAX_CENTS, formatBRL mostra o centavo exato', () => {
+    expect(DEBT_RESULT_MAX_CENTS).toBe(10 ** 15);
+    const exact = (cents: bigint) => {
+      const reais = (cents / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      return `R$ ${reais},${(cents % 100n).toString().padStart(2, '0')}`;
+    };
+    const max = BigInt(DEBT_RESULT_MAX_CENTS);
+    const samples = [max, max - 1n, max - 5n, max - 49n, max - 51n, 999_999_999_999_995n, 703_687_441_776_645n, 123_456_789_012_345n];
+    // Amostra fixa ao longo da faixa (gerador congruencial).
+    let x = 20_261_009n;
+    for (let k = 0; k < 2_000; k++) {
+      x = (x * 6_364_136_223_846_793_005n + 1_442_695_040_888_963_407n) % 2n ** 64n;
+      samples.push(x % (max + 1n));
+    }
+    for (const c of samples) expect(formatBRL(Number(c))).toBe(exact(c));
   });
 });

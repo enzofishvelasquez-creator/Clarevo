@@ -1450,8 +1450,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Fim do Ciclo A3.
 
   // Ciclo A6 · Achar tudo e calculadoras (D-034, D-035). Começa e termina com outubro na base: 6.000 / 3.900 / 2.100 e 650.
-  // Calculadoras: o resultado aparece enquanto a pessoa digita, sem botão "Calcular", e nada é gravado (nem pela rede,
-  // nem no aparelho). Telas conferidas a 390 e a 320 px (título, largura, valores inteiros, alvos de toque).
+  // Calculadoras: o resultado aparece enquanto a pessoa digita, sem botão "Calcular", e nada é gravado (nem no repositório
+  // da pessoa, nem no aparelho). Telas conferidas a 390 e a 320 px (título, largura, valores inteiros, alvos de toque).
   const DISCLAIMER = 'Simulação com os valores e as taxas que você informou. Não é recomendação de produto financeiro nem oferta de crédito.';
   const INTRO = 'Contas rápidas com os valores que você informa. Nada é gravado.';
   const CALC_LIST = [
@@ -1462,9 +1462,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Palavras de julgamento que nunca aparecem num resultado (spec4 §1.2, como em copy.test.ts).
   const JUDGMENT = /vale a pena|\bruim\b|\bcuidado\b|desperd[ií]cio|\bcorte\b|\batras(o|ad[oa])\b|estourou|\binvista\b|caixinha|saldo devedor/i;
   const resultTexts = [];
-  // Texto do cartão do resultado (região viva educada), guardado para a conferência de termos no fim.
+  // Linhas do resultado (região viva educada: só elas são relidas a cada mudança).
   const liveText = () => p.evaluate(() => [...document.querySelectorAll('[aria-live="polite"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.innerText).join('\n').replace(/ /g, ' '));
-  const keepResult = async () => { resultTexts.push(await liveText()); await keepText(); };
+  // Cartão inteiro do resultado (título, linhas, avisos e hipóteses), guardado para a conferência de termos no fim.
+  const resultCardText = () => p.evaluate(() => [...document.querySelectorAll('[aria-live="polite"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.parentElement.innerText).join('\n').replace(/ /g, ' '));
+  const keepResult = async () => { resultTexts.push(await resultCardText()); await keepText(); };
   // Digita e sai do campo (os erros só aparecem depois de sair do campo).
   const typeIn = async (label, text) => { const f = field(label); await f.fill(text); await f.press('Tab'); };
   // O resultado acompanha a digitação: espera até 3 s todos os textos aparecerem.
@@ -1477,7 +1479,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     }
   };
   const openCalc = async (title) => {
-    await p.getByRole('button', { name: new RegExp(`^${title.replace(/[?]/g, '\\?')}\\. `) }).filter({ visible: true }).first().click();
+    // Nome acessível "Título. legenda", sem o ponto depois de um título que termina em "?" (calcRowA11yLabel).
+    await p.getByRole('button', { name: new RegExp(`^${title.replace(/[?]/g, '\\?')}${/[?.!]$/.test(title) ? '' : '\\.'} `) }).filter({ visible: true }).first().click();
     await waitUntil(async () => (await h1Name()) === title, 8000);
   };
   const backToCalcList = async () => { await btn('Voltar').click(); await waitUntil(async () => (await h1Name()) === 'Calculadoras', 8000); };
@@ -1519,18 +1522,37 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await shot(name);
   };
   const storageNow = () => p.evaluate(() => { try { return JSON.stringify(Object.keys(localStorage).sort().map((k) => [k, localStorage.getItem(k)])); } catch { return 'erro'; } });
+  // Retrato do repositório da pessoa: registros e contas a pagar de outubro e de dezembro de 2026 e os gastos fixos,
+  // parcelamentos e contas do ano. Na demonstração, as gravações ficam no repositório em memória da página e nunca passam
+  // pela rede; por isso "nada gravado" se confere comparando dois retratos, e não só pelas requisições.
+  const repoSnapshot = () => p.evaluate(async () => {
+    const repo = await window.__e2e.repo();
+    const ctx = (await repo.getSpace()).personalContextId;
+    const out = {};
+    for (const m of ['2026-10', '2026-12']) { out[`registros ${m}`] = await repo.listRecords(ctx, m); out[`contas ${m}`] = await repo.listCommitments(ctx, m); }
+    out.series = await repo.listSeries(ctx);
+    return JSON.stringify(out);
+  });
+  // Diferença curta entre dois retratos (para a mensagem da conferência).
+  const snapshotDiff = (a, b) => {
+    if (a === b) return '';
+    const x = JSON.parse(a); const y = JSON.parse(b);
+    return Object.keys(x).filter((k) => JSON.stringify(x[k]) !== JSON.stringify(y[k])).map((k) => `${k}: ${x[k].length} → ${y[k].length}`).join(' | ');
+  };
 
   // 1 e 2. Movimentos › Organizar › Calculadoras: 3 grupos, as 8 calculadoras, a abertura e o aviso.
   await p.getByRole('tab', { name: 'Movimentações' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
   await btn(SC.calc).click(); await waitText('Decidir uma compra');
   const writesBefore = writes.length;
   const storageBefore = await storageNow();
+  const repoBeforeCalc = await repoSnapshot();
   const calcSections = await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((h) => {
     let box = h.parentElement;
     while (box && !box.querySelector('[role=button]')) box = box.parentElement;
     return [h.textContent, box ? [...box.querySelectorAll('[role=button]')].map((x) => x.getAttribute('aria-label')) : []];
   }));
-  const calcExpected = CALC_LIST.map(([g, items]) => [g, items.map(([a, b]) => `${a}. ${b}`)]);
+  // Título e legenda no nome; sem ponto depois de um título que já termina em "?" (calcRowA11yLabel no core).
+  const calcExpected = CALC_LIST.map(([g, items]) => [g, items.map(([a, b]) => `${a}${/[?.!]$/.test(a) ? '' : '.'} ${b}`)]);
   ok('calculadoras: 3 grupos e as 8 calculadoras, na ordem, com título e subtítulo no nome', JSON.stringify(calcSections) === JSON.stringify(calcExpected), JSON.stringify(calcSections));
   t = await body();
   ok('calculadoras: abertura e aviso fixo, sem pílula de contexto', t.includes(INTRO) && t.includes(DISCLAIMER) && (await p.locator('[aria-label^="Contexto:"]').filter({ visible: true }).count()) === 0);
@@ -1609,7 +1631,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await openCalc('Multa e juros por atraso');
   await typeIn('Valor da conta', '200,00'); await typeIn('Multa (%)', '2'); await typeIn('Juros ao mês (%)', '1'); await typeIn('Dias depois do vencimento', '10');
   ok('multa e juros: R$ 204,67, "depois do vencimento" e o boleto atualizado', await shows('Com estes números, 10 dias depois do vencimento a conta fica em R$ 204,67.', 'O valor exato é o do boleto atualizado.'));
-  ok('multa e juros: o resultado não fala em atraso', !/atras/i.test(await liveText()));
+  ok('multa e juros: o resultado não fala em atraso', !/atras/i.test(await resultCardText()));
   await calcShot('60_calc_multa_e_juros');
   await calcWidths('multa e juros', 'Multa e juros por atraso');
   await backToCalcList();
@@ -1670,13 +1692,21 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await waitUntil(async () => (await h1Name()) === 'Quanto custa por ano?', 8000);
   await backToCalcList();
 
-  // 11. Nada gravado: nenhuma requisição de escrita (POST, PATCH, PUT ou DELETE) e nada novo no armazenamento do aparelho.
-  ok('calculadoras: digitar não faz requisição de escrita nem grava no aparelho', writes.length === writesBefore && (await storageNow()) === storageBefore, writes.slice(writesBefore, writesBefore + 3).join(' | '));
+  // 11. Nada gravado: o repositório da pessoa (registros, contas a pagar e gastos fixos) igual ao de antes da primeira
+  // calculadora, mesmo depois de abrir e cancelar os cadastros de "Anotar como...", nada novo no armazenamento do aparelho
+  // e nenhuma requisição de escrita (POST, PATCH, PUT ou DELETE).
+  const repoAfterCalc = await repoSnapshot();
+  ok('calculadoras: nada gravado (repositório igual ao de antes da primeira calculadora, nada novo no aparelho, nenhuma requisição de escrita)',
+    repoAfterCalc === repoBeforeCalc && (await storageNow()) === storageBefore && writes.length === writesBefore,
+    [snapshotDiff(repoBeforeCalc, repoAfterCalc), ...writes.slice(writesBefore, writesBefore + 3)].filter(Boolean).join(' | '));
   const judged = resultTexts.map((s) => s.match(JUDGMENT)?.[0] ?? s.match(FORBIDDEN)?.[0]).filter(Boolean);
   ok('calculadoras: nenhum termo de julgamento, proibido ou travessão longo nos resultados', resultTexts.length >= 8 && resultTexts.every((s) => s.length > 0) && judged.length === 0, `${resultTexts.length} resultados ${judged.join(' | ')}`);
   await btn('Voltar').click(); await waitText('Registrar recebimento');
 
   // 12. Links na hora da decisão. Família sem vínculo (em Movimentos; o Resumo não muda).
+  // Os links só abrem calculadoras: o repositório fica igual até o "outro aparelho" anotar a conta vencida.
+  const repoBeforeLinks = await repoSnapshot();
+  const writesBeforeLinks = writes.length;
   await p.getByRole('tab', { name: 'Ver dados de Família' }).filter({ visible: true }).first().click(); await waitText('Nenhuma família vinculada');
   await btn('Enquanto isso, dividir as contas da casa').click();
   await waitUntil(async () => (await h1Name()) === 'Dividir as contas da casa', 8000);
@@ -1731,6 +1761,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar').click(); await waitText('Próximas contas');
   await btn('Voltar').click(); await waitText('Por ano, se os valores não mudarem');
   await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
+  const repoAfterLinks = await repoSnapshot();
+  ok('links de contexto: nada gravado (repositório igual ao de antes do primeiro link, nenhuma requisição de escrita)', repoAfterLinks === repoBeforeLinks && writes.length === writesBeforeLinks,
+    [snapshotDiff(repoBeforeLinks, repoAfterLinks), ...writes.slice(writesBeforeLinks, writesBeforeLinks + 3)].filter(Boolean).join(' | '));
   // Conta vencida (anotada em outro aparelho, 200,00 em 01/10): "Calcular multa e juros" com o valor e os 6 dias.
   await otherDevice((repo, contextId) => repo.createCommitment(`e2e-a6-vencida-${Date.now()}`, contextId, { description: 'Conta de água', amountCents: 20000, dueOn: '2026-10-01', category: null }));
   await waitText('Conta de água');
@@ -1742,7 +1775,6 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Excluir conta a pagar').click(); await waitText('Excluir conta a pagar?');
   await confirmIn('Excluir conta a pagar'); await waitText('Conta a pagar excluída'); await waitText('Contas em aberto com vencimento até o fim do mês');
   await waitGone('Conta de água');
-  ok('nenhuma escrita de rede nos links de contexto', writes.length === writesBefore, writes.slice(writesBefore, writesBefore + 3).join(' | '));
   await btn('Voltar').click(); await waitText('Diferença do mês');
   await expectTotals('links de contexto: outubro na base', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
 
@@ -1924,7 +1956,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Metas › Juntar para um objetivo: a calculadora funciona (1.200,00 em 12 meses → R$ 100,00 por mês)', await shows('R$ 100,00 por mês'));
   await btn('Voltar').click(); await waitText('Enquanto isso, faça as contas');
   await fromGoals('Todas as calculadoras', 'Calculadoras');
-  ok('Metas › Todas as calculadoras: a lista com as 8', (await p.getByRole('button', { name: /\. / }).filter({ visible: true }).count()) === 8);
+  const calcNames = calcExpected.flatMap(([, items]) => items);
+  ok('Metas › Todas as calculadoras: a lista com as 8', calcNames.length === 8 && (await Promise.all(calcNames.map((n) => visibleCount('button', n)))).every((n) => n === 1));
   await btn('Voltar').click(); await waitText('Enquanto isso, faça as contas');
   await p.getByRole('tab', { name: 'Aprender' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês e saldo da conta');
   await shot('17_aprender');
@@ -2063,6 +2096,30 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('atalho "Calculadoras" sem sessão: entrada e, depois de entrar, /calcular', entry === '/boas-vindas' && new URL(p.url()).pathname === '/calcular' && (await h1Name()) === 'Calculadoras', `${entry} → ${p.url()}`);
   entry = await viaEntry('/registro/novo?tipo=receita', 'Data do recebimento');
   ok('atalho "Registrar recebimento" sem sessão: depois de entrar, o registro de recebimento', entry === '/boas-vindas' && (await visibleCount('button', 'Salvar recebimento')) === 1, `${entry} → ${p.url()}`);
+  // Atalho "Anotar gasto" retomado depois de entrar: o Resumo fica embaixo do cadastro, e "Voltar", "Cancelar" e
+  // "Descartar alterações" (rascunho alterado) levam a ele, também na versão instalada, sem o botão de voltar do navegador.
+  const backToResumo = async () => {
+    await waitText('Diferença do mês').catch(() => {});
+    // A tela do cadastro sai deslizando: espera o "Voltar" dela sumir.
+    await waitUntil(async () => new URL(p.url()).pathname === '/' && (await visibleCount('button', 'Voltar')) === 0, 5000);
+    return { path: new URL(p.url()).pathname, resumo: await p.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).count(), voltar: await visibleCount('button', 'Voltar') };
+  };
+  const atResumo = (r) => r.path === '/' && r.resumo === 1 && r.voltar === 0;
+  entry = await viaEntry('/registro/novo?tipo=despesa', 'Data do pagamento');
+  ok('atalho "Anotar gasto" sem sessão: depois de entrar, o registro de gasto', entry === '/boas-vindas' && (await visibleCount('button', 'Salvar gasto')) === 1, `${entry} → ${p.url()}`);
+  await btn('Voltar').click();
+  let back = await backToResumo();
+  ok('atalho "Anotar gasto": "Voltar" leva ao Resumo', atResumo(back), JSON.stringify(back));
+  await viaEntry('/registro/novo?tipo=despesa', 'Data do pagamento');
+  await btn('Cancelar').click();
+  back = await backToResumo();
+  ok('atalho "Anotar gasto": "Cancelar" leva ao Resumo', atResumo(back), JSON.stringify(back));
+  await viaEntry('/registro/novo?tipo=despesa', 'Data do pagamento');
+  await field('Descrição').fill('Padaria');
+  await btn('Cancelar').click(); await waitText('Descartar o preenchimento?');
+  await btn('Descartar alterações').click();
+  back = await backToResumo();
+  ok('atalho "Anotar gasto": rascunho alterado, "Cancelar" e "Descartar alterações" levam ao Resumo', atResumo(back), JSON.stringify(back));
   entry = await viaEntry('/a-pagar', 'Contas em aberto com vencimento até o fim do mês');
   ok('atalho "Contas a pagar" sem sessão: depois de entrar, Contas a pagar', entry === '/boas-vindas' && (await h1Name()) === 'Contas a pagar', `${entry} → ${p.url()}`);
   entry = await viaEntry('/calcular/multa-e-juros?valor=12345&dias=7', 'Dias depois do vencimento');

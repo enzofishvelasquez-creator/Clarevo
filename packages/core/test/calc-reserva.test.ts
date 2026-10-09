@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RESERVA_MONTH_CHIPS, RESERVA_REFERENCIA, calcReserva, type ReservaInput } from '../src';
+import { RESERVA_MONTH_CHIPS, RESERVA_REFERENCIA, RESERVA_TEXT, calcErrorText, calcReserva, type ReservaInput } from '../src';
 
 const run = (input: ReservaInput) => {
   const out = calcReserva(input);
@@ -30,6 +30,9 @@ describe('5. Reserva para imprevistos (docs/08 §3.2)', () => {
 
   it('chips 1, 3, 6 e 12; 1 a 24 meses; 1 mês no singular', () => {
     expect(RESERVA_MONTH_CHIPS).toEqual([1, 3, 6, 12]);
+    // Nenhum chip marcado: escolha, sem pedir para digitar; o campo "Outro" pede para digitar.
+    expect(RESERVA_TEXT.chooseMonths).toBe('Escolha quantos meses cobrir.');
+    expect(calcErrorText('reserva', 'meses', 'vazio')).toBe('Digite quantos meses cobrir, de 1 a 24.');
     expect([1, 3, 6, 12].map((m) => run({ essenciais: '3.750,00', meses: String(m) }).targetCents)).toEqual([
       375_000, 1_125_000, 2_250_000, 4_500_000,
     ]);

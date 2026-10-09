@@ -15,13 +15,14 @@ import {
 } from '@clarevo/core';
 import { router, useNavigation } from 'expo-router';
 import { Check, ChevronRight, Info, type LucideIcon } from 'lucide-react-native';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { ReduceMotion, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { SubHeader } from '@/components/header';
 import { ChoiceGroup } from '@/components/series-parts';
 import { LinkButton, Screen, TextField, Txt, spaceKeyPress, styles as ui } from '@/components/ui';
+import { announceOnIOS } from '@/lib/a11y';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 
 /**
@@ -42,7 +43,7 @@ export function CalcScreen({ slug, modo, children }: { slug: CalcSlug; modo?: st
         <CalcDisclaimer />
         {children}
         {/* Aberta por um link de contexto ou pelo endereço: a lista fica a um toque (volta para ela se já estiver na pilha). */}
-        <LinkButton label={CALC_UI_TEXT.seeAll} onPress={() => router.dismissTo('/calcular')} />
+        <LinkButton label={CALC_UI_TEXT.seeAll} style={styles.link48} onPress={() => router.dismissTo('/calcular')} />
       </Screen>
     </KeyboardAvoidingView>
   );
@@ -86,9 +87,10 @@ export function CalcNote({ children }: { children: ReactNode }) {
 }
 
 /**
- * Cartão do resultado, anunciado com accessibilityLiveRegion="polite". Fica sempre na tela (com o texto de espera
- * antes do primeiro resultado), para o leitor de tela anunciar a troca. A primeira linha é o destaque; depois vêm as
- * outras linhas, os avisos e as hipóteses.
+ * Cartão do resultado. As linhas do resultado (ou o texto de espera) ficam numa região viva educada, sem o título, os
+ * avisos e as hipóteses, para o leitor de tela não reler tudo a cada tecla. Fica sempre na tela, para a troca ser
+ * anunciada. No iOS, sem região viva, a linha de destaque é anunciada quando a pessoa para de digitar.
+ * A primeira linha é o destaque; depois vêm as outras linhas, os avisos e as hipóteses.
  */
 export function CalcResult({
   texts,
@@ -104,23 +106,43 @@ export function CalcResult({
   children?: ReactNode;
 }) {
   const [lead, ...rest] = texts?.resultLines ?? [];
+  const shown = texts && lead !== undefined;
+  const spoken = shown ? lead : waiting;
+  // O que já foi dito (ou estava na tela ao abrir): só uma troca é anunciada.
+  const lastSpoken = useRef(spoken);
+  useEffect(() => {
+    if (Platform.OS !== 'ios' || spoken === lastSpoken.current) return;
+    const timer = setTimeout(() => {
+      lastSpoken.current = spoken;
+      announceOnIOS(spoken);
+    }, ANNOUNCE_DELAY);
+    return () => clearTimeout(timer);
+  }, [spoken]);
   return (
-    <View style={[ui.card, { gap: space[3] }]} accessibilityLiveRegion="polite" aria-live="polite">
+    <View style={[ui.card, { gap: space[3] }]}>
       <Txt variant="title" accessibilityRole="header" aria-level={level}>
         {title}
       </Txt>
-      {texts && lead !== undefined ? (
+      <View style={{ gap: space[3] }} accessibilityLiveRegion="polite" aria-live="polite">
+        {shown ? (
+          <>
+            <Txt style={[styles.lead, tabular]}>{lead}</Txt>
+            {rest.length > 0 ? (
+              <View style={{ gap: space[1] }}>
+                {rest.map((line, i) => (
+                  <Txt key={`${i}-${line}`} style={tabular}>
+                    {line}
+                  </Txt>
+                ))}
+              </View>
+            ) : null}
+          </>
+        ) : (
+          <Txt color={colors.textSecondary}>{waiting}</Txt>
+        )}
+      </View>
+      {texts && shown ? (
         <>
-          <Txt style={[styles.lead, tabular]}>{lead}</Txt>
-          {rest.length > 0 ? (
-            <View style={{ gap: space[1] }}>
-              {rest.map((line, i) => (
-                <Txt key={`${i}-${line}`} style={tabular}>
-                  {line}
-                </Txt>
-              ))}
-            </View>
-          ) : null}
           {texts.notes.map((n, i) => (
             <CalcNote key={`${i}-${n}`}>{n}</CalcNote>
           ))}
@@ -142,13 +164,14 @@ export function CalcResult({
             </View>
           ) : null}
         </>
-      ) : (
-        <Txt color={colors.textSecondary}>{waiting}</Txt>
-      )}
+      ) : null}
       {children}
     </View>
   );
 }
+
+/** Pausa na digitação antes do anúncio no iOS: um anúncio por resultado, não um por tecla. */
+const ANNOUNCE_DELAY = 600;
 
 // ---------------------------------------------------------------------------------------------------------------
 // Estado dos campos e regra dos erros
@@ -367,7 +390,10 @@ export function CalcChip({ label, selected, onPress, accessibilityLabel }: { lab
 // ---------------------------------------------------------------------------------------------------------------
 // Linhas com seta (lista de calculadoras, Metas)
 
-/** Linha com ícone, nome, legenda e seta; nome acessível com a legenda ("Reserva para imprevistos. Quantos meses…"). */
+/**
+ * Linha com ícone, nome, legenda e seta; nome acessível com a legenda ("Reserva para imprevistos. Quantos meses…").
+ * Nome que já termina em pontuação não ganha ponto ("Parcelado ou à vista? Descubra…").
+ */
 export function CalcNavRow({
   icon: Icon,
   title,
@@ -384,7 +410,7 @@ export function CalcNavRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={caption ? `${title}. ${caption}` : title}
+      accessibilityLabel={caption ? `${title}${/[?.!]$/.test(title) ? '' : '.'} ${caption}` : title}
       onPress={onPress}
       style={(st) => [styles.row, !last && styles.divider, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && ui.focusRing]}>
       <View style={styles.rowIcon}>
@@ -411,7 +437,15 @@ const styles = StyleSheet.create({
   lead: { fontFamily: fonts.extrabold, fontSize: 20, lineHeight: 28 },
   bullet: { flexDirection: 'row', gap: space[2], alignItems: 'flex-start' },
   chip48: { minHeight: CALC_TARGET },
+  link48: { minHeight: CALC_TARGET },
+  inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0, minHeight: CALC_TARGET },
   row: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: 10, minHeight: 56 },
   divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
   rowIcon: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.brandTint, alignItems: 'center', justifyContent: 'center' },
 });
+
+/**
+ * Link dentro de uma calculadora, alinhado ao texto, com alvo de 48 px também na web (lá o Pressable ignora o hitSlop
+ * do LinkButton).
+ */
+export const calcInlineLink = styles.inlineLink;

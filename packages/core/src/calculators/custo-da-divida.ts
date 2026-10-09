@@ -101,6 +101,13 @@ export const DIVIDA_FIELDS: Record<DividaField | ParcelarFaturaField, CalcFieldS
   parcelarParcelas: countField('Em quantas parcelas', 'o número de parcelas', 1, 24, 'Use de 1 a 24 parcelas.', 'De 1 a 24'),
 };
 
+/**
+ * Maior total do cheque especial mostrado: 10^15 centavos (R$ 10 trilhões). Abaixo disso (até 15 algarismos), centavos
+ * ÷ 100 em ponto flutuante volta ao mesmo número, e formatBRL mostra o centavo exato; acima, resultado_alto (perto de
+ * 8 × 10^15 centavos, ainda um inteiro seguro, formatBRL já erraria o centavo).
+ */
+export const DEBT_RESULT_MAX_CENTS = 10 ** 15;
+
 const parcelasText = (n: number) => (n === 1 ? '1 parcela' : `${n} parcelas`);
 
 function parcelarFatura(valor: Cents, saldo: Cents, input: DividaInput): CalcOutcome<ParcelarFaturaResult, ParcelarFaturaField> | null {
@@ -183,7 +190,7 @@ export function calcCustoDaDivida(input: DividaInput): CalcOutcome<DividaResult,
   if (tipo === 'cheque_especial') {
     if (meses === undefined) return { ok: false, errors: r.errors };
     const total = compoundTotalBig(valor, bp, meses);
-    if (total > BigInt(Number.MAX_SAFE_INTEGER)) return { ok: false, errors: { meses: 'resultado_alto' } };
+    if (total > BigInt(DEBT_RESULT_MAX_CENTS)) return { ok: false, errors: { meses: 'resultado_alto' } };
     const totalCents = Number(total);
     const aboveCap = bp > CHEQUE_ESPECIAL_CAP_BP;
     return {

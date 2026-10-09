@@ -474,7 +474,7 @@ Situação em 09/10/2026, depois do Ciclo A6 (D-035).
 | Renda comprometida (B) | Desenhado (`spec2` §1.4) | Linha dentro do card "Ainda a pagar", `/renda-comprometida` |
 | Metas e reserva (C) | Desenhado (`spec2` §1.5) | Aba Metas, `/reserva`, `/meta/*` |
 | Simulador (D) | Desenhado (`spec2` §1.6) | Nesta proposta: taxa em "Juntar para um objetivo" |
-| Calculadoras, "Somar valores", atalhos do ícone na web | Existe (A6, D-035): 8 calculadoras, "Somar valores" em todos os campos Valor, 4 atalhos no manifesto e volta à tela pedida depois de entrar. Falta: roteiro web, teste em aparelho, link da CVM na reserva e o total de parcelas no cadastro aberto por "Anotar como parcelamento" (`docs/04`) | `/calcular`; campos Valor; manifesto |
+| Calculadoras, "Somar valores", atalhos do ícone na web | Existe (A6, D-035): 8 calculadoras, "Somar valores" em todos os campos Valor, 4 atalhos no manifesto e volta à tela pedida depois de entrar. Falta: roteiro web, teste em aparelho e link da CVM na reserva (`docs/04`) | `/calcular`; campos Valor; manifesto |
 | "Já paguei" na lista e "Por categoria" | Existe (A6, D-035(5) e (6)) | `/a-pagar`; composição |
 | Previsão dos pagamentos do mês | Proposto aqui (seção 5) | Topo de `/a-pagar`, só no mês atual |
 | Busca de registros, orçamento por categoria | Falta, sem ciclo (o orçamento está no "núcleo proposto" das Instruções v2.1) | Movimentos; Metas ou Movimentos |

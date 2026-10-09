@@ -105,7 +105,7 @@ export default function MovimentacoesScreen() {
         <Body>
           <FlashBanner message={notice} />
           {kind === 'familia' ? (
-            <FamilyNotLinked />
+            <FamilyNotLinked splitLink />
           ) : (
             <>
               <View style={styles.actions}>

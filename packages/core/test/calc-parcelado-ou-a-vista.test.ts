@@ -48,6 +48,22 @@ describe('1. Parcelado ou à vista? (docs/08 §3.2)', () => {
     expect(r.resultLines[1]).toBe('Como a primeira parcela já cobre o preço à vista, não há uma taxa ao mês para mostrar.');
   });
 
+  it('taxa positiva que arredonda para 0,00% aparece como "menos de 0,01%"', () => {
+    const r = run({ aVista: '1.000,00', parcelas: '12', parcela: '83,34' });
+    expect(r.differenceCents).toBe(8);
+    expect(r.monthlyRate).toBeGreaterThan(0);
+    expect(r.resultLines).toEqual([
+      'Com estes números, o parcelado custa R$ 0,08 a mais.',
+      'Isso equivale a juros de menos de 0,01% ao mês (0,01% ao ano).',
+      'Total parcelado: R$ 1.000,08 (12 × R$ 83,34).',
+    ]);
+    // As duas taxas abaixo de 0,005%: "menos de 0,01%" ao mês e ao ano.
+    expect(run({ aVista: '5.000,00', parcelas: '24', parcela: '208,34' }).resultLines[1]).toBe(
+      'Isso equivale a juros de menos de 0,01% ao mês (menos de 0,01% ao ano).',
+    );
+    for (const text of run({ aVista: '2.000,00', parcelas: '10', parcela: '200,01' }).resultLines) expect(text).not.toContain('0,00%');
+  });
+
   it('taxa altíssima aparece como "mais de 10.000%"', () => {
     const r = run({ aVista: '1,00', parcelas: '2', parcela: '9.999.999,99' });
     expect(r.resultLines[1]).toContain('mais de 10.000% ao mês');

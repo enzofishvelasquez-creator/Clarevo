@@ -130,7 +130,12 @@ export function daysCount(n: number): string {
 /** Acima disto (10.000% ao mês ou ao ano), a taxa aparece como "mais de 10.000%". */
 export const RATE_DISPLAY_MAX = 100;
 
-/** Taxa (fração) para o texto, com o teto de RATE_DISPLAY_MAX: "1,96%" ou "mais de 10.000%". */
+/**
+ * Taxa (fração) para o texto, com o teto de RATE_DISPLAY_MAX: "1,96%" ou "mais de 10.000%". Uma taxa positiva que
+ * arredonda para 0,00% aparece como "menos de 0,01%", para não contradizer uma diferença em reais.
+ */
 export function rateText(rate: number): string {
-  return rate > RATE_DISPLAY_MAX ? 'mais de 10.000%' : formatRate(rate);
+  if (rate > RATE_DISPLAY_MAX) return 'mais de 10.000%';
+  const text = formatRate(rate);
+  return rate > 0 && text === '0,00%' ? 'menos de 0,01%' : text;
 }

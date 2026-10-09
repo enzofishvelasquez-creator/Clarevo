@@ -8,6 +8,7 @@ import {
   CALC_SLUGS,
   CALC_ERROR_TEXT,
   calcErrorText,
+  calcRowA11yLabel,
   calcTitle,
   calculatorBySlug,
   calculatorsInGroup,
@@ -111,6 +112,16 @@ describe('calculadoras: catálogo e textos fixos', () => {
     expect(isCalcSlug('Reserva')).toBe(false);
     expect(calcTitle('parcelado-ou-a-vista', 'cota-unica')).toBe('Cota única ou parcelado?');
     expect(calcTitle('parcelado-ou-a-vista')).toBe('Parcelado ou à vista?');
+  });
+
+  it('nome acessível da linha: ponto entre título e legenda, sem "?." depois de pergunta', () => {
+    const labels = CALCULATORS.map((c) => calcRowA11yLabel(c.title, c.subtitle));
+    expect(labels[0]).toBe('Parcelado ou à vista? Descubra os juros embutidos no parcelado');
+    expect(labels[2]).toBe('Quanto custa uma dívida? Rotativo, cheque especial ou empréstimo');
+    expect(labels[5]).toBe('Reserva para imprevistos. Quantos meses seus gastos essenciais cobrem');
+    for (const label of labels) expect(label).not.toMatch(/[?!.]\./);
+    expect(calcRowA11yLabel('Todas as calculadoras')).toBe('Todas as calculadoras');
+    expect(calcRowA11yLabel('Calculadoras', '')).toBe('Calculadoras');
   });
 
   it('aviso e introdução exatos', () => {

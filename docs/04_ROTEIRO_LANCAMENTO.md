@@ -58,7 +58,7 @@ Sem mudança no banco. Nas telas, os fluxos foram conferidos por sondas Playwrig
 - [x] Portas: linha "Calculadoras" no "Organizar" de Movimentações, card "Calculadoras" no topo de Aprender e card "Enquanto isso, faça as contas" em Metas
 - [x] Links na hora da decisão: "Parcelado ou à vista? Fazer a conta" no cadastro de parcelamento, "Cota única ou parcelado? Fazer a conta" na conta do ano, "Quanto custa por ano?" no gasto fixo mensal, "Quanto economizo se quitar antes?" no financiamento e na compra parcelada, "Calcular multa e juros" na conta vencida, "Dividir estas contas" na lista de gastos fixos e "Enquanto isso, dividir as contas da casa" na Família sem vínculo (fora do Resumo)
 - [x] "Anotar como parcelamento" e "Anotar como gasto fixo" depois do resultado; `/gastos-fixos/novo?tipo=parcelada` aceita `parcelas` de 2 a 480 e `natureza`
-- [ ] Cadastro aberto por "Anotar como parcelamento" com o total de parcelas e o tipo preenchidos: a rota já entrega os dois, mas o formulário de gasto fixo ainda não os lê (abre com "Parcelado" e o valor da parcela)
+- [x] Cadastro aberto por "Anotar como parcelamento" com "Parcelado", o valor da parcela, o total de parcelas e "Compra parcelada" preenchidos (conferido no roteiro web)
 - [x] "Já paguei" nas contas a vencer do mês em Contas a pagar, com "Confirmar pagamento", "Mudar valor ou data" e "Cancelar"; "Informar valor e pagar" nas estimadas; chave de operação e conferência do resultado incerto, sem segundo pagamento
 - [x] "Por categoria" na composição de Pago, com barras que somam Pago e 100%
 - [x] "Somar valores" em todos os campos Valor (gasto e recebimento, conta a pagar, pagamento, gasto fixo novo e edição, valor do ano e encerrar)
@@ -66,9 +66,8 @@ Sem mudança no banco. Nas telas, os fluxos foram conferidos por sondas Playwrig
 - [x] Estados vazios com ação em Movimentações, Contas a pagar e na composição
 - [x] Atalhos do ícone na versão web (manifesto com 4 atalhos) e, sem sessão, volta à tela pedida depois de entrar (endereço só em memória)
 - [ ] Roteiro web (`npm run test:web` e `REDUZIR_MOVIMENTO=1 node scripts/e2e-web.js`) com os passos do Ciclo A6 (spec4 §3) e as legendas novas do "Organizar"
-- [ ] Teste manual em iOS, Android e web, com e sem movimento reduzido e com leitor de tela (teclados decimal e numérico, anúncio do resultado e do total da soma no VoiceOver e no TalkBack, vibração depois de "Já paguei" e as contas com BigInt no Hermes)
+- [ ] Teste manual em iOS, Android e web, com e sem movimento reduzido e com leitor de tela (teclados decimal e numérico, anúncio do resultado e do total da soma no VoiceOver e no TalkBack, foco do leitor de tela no campo Valor depois de "Usar o total", vibração depois de "Já paguei" e as contas com BigInt no Hermes)
 - [ ] Conferir a página do Portal do Investidor (CVM) e completar `RESERVA_REFERENCIA` com o texto de 6 a 12 meses, o endereço e a data, para a reserva mostrar o link
-- [ ] **Você:** confirmar a atualização da linha 10 do `CLAUDE.md` (tirar "'Achar tudo' e calculadoras" da lista de próximos ciclos), como em D-029
 
 ## Próximos ciclos
 

@@ -1,10 +1,10 @@
-import { RESERVA_MONTH_CHIPS, RESERVA_REFERENCIA, calcErrorText, calcFields, calcReserva, type CalcPrefill } from '@clarevo/core';
+import { RESERVA_MONTH_CHIPS, RESERVA_REFERENCIA, RESERVA_TEXT, calcFields, calcReserva, type CalcPrefill } from '@clarevo/core';
 import * as Linking from 'expo-linking';
 import { ExternalLink } from 'lucide-react-native';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { CalcChip, CalcField, CalcResult, CalcScreen, onlyChoicesMissing, useCalcForm, type CalcBinding } from '@/components/calc/parts';
+import { CalcChip, CalcField, CalcResult, CalcScreen, calcInlineLink, onlyChoicesMissing, useCalcForm, type CalcBinding } from '@/components/calc/parts';
 import { ChoiceGroup } from '@/components/series-parts';
 import { Card, LinkButton, Txt } from '@/components/ui';
 import { colors, space } from '@/theme/tokens';
@@ -29,7 +29,7 @@ export function ReservaCalc({ prefill }: { prefill: CalcPrefill<'reserva'> }) {
   const outcome = calcReserva({ ...form.values, meses: monthsText });
   const errors = outcome.ok ? {} : outcome.errors;
   const calc: CalcBinding<Key> = { slug: 'reserva', form, errors };
-  // Sem mês escolhido, o aviso aparece quando é a única coisa que falta.
+  // Sem mês escolhido, o aviso ("Escolha ...") aparece quando é a única coisa que falta. O "Digite ..." fica para "Outro".
   const showChoice = pick === null && onlyChoicesMissing(errors, ['meses']);
 
   return (
@@ -39,7 +39,7 @@ export function ReservaCalc({ prefill }: { prefill: CalcPrefill<'reserva'> }) {
         <ChoiceGroup
           label={specs.meses!.label}
           hint={specs.meses!.hint}
-          error={showChoice ? calcErrorText('reserva', 'meses', 'vazio') : undefined}>
+          error={showChoice ? RESERVA_TEXT.chooseMonths : undefined}>
           {RESERVA_MONTH_CHIPS.map((n) => (
             <CalcChip key={n} label={monthsLabel(n)} selected={pick === n} onPress={() => setPick(n)} />
           ))}
@@ -60,7 +60,7 @@ export function ReservaCalc({ prefill }: { prefill: CalcPrefill<'reserva'> }) {
           <LinkButton
             label="Abrir a página do Portal do Investidor"
             icon={ExternalLink}
-            style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
+            style={calcInlineLink}
             onPress={() => Linking.openURL(RESERVA_REFERENCIA.url!)}
           />
         ) : null}

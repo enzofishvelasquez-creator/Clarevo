@@ -28,6 +28,7 @@ import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Banner, Button, Card, FitMoney, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
+import { announceOnIOS } from '@/lib/a11y';
 import { totalChange } from '@/lib/highlight';
 import { useCommitments, usePayCommitment, useSeriesList, useSeriesSync, useSpace, useUpdateRecord, useView } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
@@ -44,6 +45,9 @@ const createdOverdueText = (n: number) =>
     : `O Clarevo criou ${n} contas de gastos fixos que já venceram. Confira se você já pagou.`;
 
 const registeredText = (n: number) => (n === 0 ? 'Nenhum cadastrado' : n === 1 ? '1 cadastrado' : `${n} cadastrados`);
+
+/** Espera para o anúncio no iOS: o diálogo de confirmação fecha e o VoiceOver volta à lista antes. */
+const QUICK_PAY_ANNOUNCE_DELAY = 500;
 
 const isUncertain = (e: unknown) => !isRepoError(e) || e.code === 'rede' || e.code === 'desconhecido';
 
@@ -231,10 +235,15 @@ export default function ContasAPagarScreen() {
       // Confirmação tátil e efeito em Pago no Resumo só depois da gravação confirmada.
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       if (record) totalChange.set({ total: 'pago', month: monthOf(record.occurredOn), deltaCents: record.amountCents });
-      setResult({ tone: 'sucesso', text: QUICK_PAY_TEXT.done(c.description) });
+      const done = QUICK_PAY_TEXT.done(c.description);
+      setResult({ tone: 'sucesso', text: done });
+      // No iOS o aviso não tem região viva: é anunciado depois de o diálogo fechar.
+      announceOnIOS(done, { delay: QUICK_PAY_ANNOUNCE_DELAY });
     } catch (e) {
       setTarget(null);
-      setResult({ tone: 'erro', text: `${c.description}: ${payReason(e)}` });
+      const text = `${c.description}: ${payReason(e)}`;
+      setResult({ tone: 'erro', text });
+      announceOnIOS(text, { delay: QUICK_PAY_ANNOUNCE_DELAY });
       if (!isUncertain(e)) commitments.refetch();
     } finally {
       setBusy(false);

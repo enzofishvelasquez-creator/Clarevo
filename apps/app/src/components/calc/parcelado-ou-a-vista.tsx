@@ -10,7 +10,7 @@ import { router } from 'expo-router';
 import { Info, Layers } from 'lucide-react-native';
 import { useState } from 'react';
 
-import { CalcChoice, CalcField, CalcResult, CalcScreen, CalcYesNo, useCalcForm, useNoteHidden, type CalcBinding } from '@/components/calc/parts';
+import { CalcChoice, CalcField, CalcResult, CalcScreen, CalcYesNo, calcInlineLink, useCalcForm, useNoteHidden, type CalcBinding } from '@/components/calc/parts';
 import { Banner, Button, Card, LinkButton, Txt } from '@/components/ui';
 import { space } from '@/theme/tokens';
 
@@ -54,7 +54,7 @@ export function ParceladoCalc({ prefill }: { prefill: CalcPrefill<'parcelado-ou-
             Parcelas de compras no cartão já entram na fatura. Para não contar duas vezes, anote como parcelamento só o que for pago em boleto,
             débito ou financiamento.
           </Txt>
-          <LinkButton label="Fatura sem contar duas vezes" style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} onPress={() => router.push('/explicacao/fatura')} />
+          <LinkButton label="Fatura sem contar duas vezes" style={calcInlineLink} onPress={() => router.push('/explicacao/fatura')} />
         </Banner>
       ) : null}
 
