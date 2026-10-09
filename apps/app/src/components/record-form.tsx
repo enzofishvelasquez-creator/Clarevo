@@ -127,6 +127,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   }, [leaveTo]);
 
   const leave = (fn: () => void) => setLeaveTo(() => fn);
+  // Aberto por atalho ou endereço recarregado, o formulário pode ser a única tela da pilha: volta ao registro ou ao Resumo.
+  const goBack = () => (router.canGoBack() ? router.back() : router.replace(mode.type === 'editar' ? `/registro/${mode.record.id}` : '/'));
 
   const set = <K extends keyof RecordDraft>(k: K, v: RecordDraft[K]) => {
     setDraft((d) => ({ ...d, [k]: v }));
@@ -153,7 +155,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       leave(() => router.replace(`/registro/${recordId}`));
     } else {
       flash.set('Alterações salvas');
-      leave(() => router.back());
+      leave(goBack);
     }
   };
 
@@ -264,8 +266,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   };
 
   const requestCancel = () => {
-    if (dirty) setConfirmDiscard(() => () => router.back());
-    else router.back();
+    if (dirty) setConfirmDiscard(() => goBack);
+    else goBack();
   };
 
   const parsedDate = parseDateBR(draft.dateText);
@@ -310,7 +312,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             </Txt>
             <Txt variant="caption">Seu preenchimento foi mantido abaixo.</Txt>
             <Button label="Aplicar minhas alterações na versão atual" tone="soft" onPress={applyOverConflict} />
-            <Button label="Descartar minhas alterações" tone="ghost" onPress={() => leave(() => router.back())} />
+            <Button label="Descartar minhas alterações" tone="ghost" onPress={() => leave(goBack)} />
           </Banner>
         ) : null}
 

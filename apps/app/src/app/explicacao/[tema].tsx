@@ -16,7 +16,7 @@ export default function ExplicacaoScreen() {
     return (
       <Screen contentStyle={{ padding: space[6], gap: space[4] }}>
         <Txt>Conteúdo não encontrado.</Txt>
-        <Button label="Voltar" onPress={() => router.back()} />
+        <Button label="Voltar" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
       </Screen>
     );
   }
