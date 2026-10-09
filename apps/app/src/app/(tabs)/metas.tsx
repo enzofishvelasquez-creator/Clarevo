@@ -13,7 +13,6 @@ import { EmptyState, ErrorState } from '@/components/states';
 import { TopicRow } from '@/components/topic-link';
 import { Body, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { explanationHref, isTopicPublished, topicBySlug } from '@/lib/learn';
-import { SIMULATOR_READY } from '@/lib/simulator-route';
 import { useCommittedSummary, useGoalsOverview, useSavingsCard, useSpace, type GoalsOverview } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
@@ -71,9 +70,7 @@ export default function MetasScreen() {
           )}
 
           <Card style={{ paddingVertical: space[2] }}>
-            {SIMULATOR_READY ? (
-              <CalcNavRow icon={ChartLine} title={GOALS_TEXT.simulateTitle} caption={GOALS_TEXT.simulateBody} onPress={() => router.push('/simular')} />
-            ) : null}
+            <CalcNavRow icon={ChartLine} title={GOALS_TEXT.simulateTitle} caption={GOALS_TEXT.simulateBody} onPress={() => router.push('/simular')} />
             <CalcNavRow
               icon={Calculator}
               title={GOALS_TEXT.calculators}

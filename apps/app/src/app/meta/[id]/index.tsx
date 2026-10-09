@@ -35,7 +35,6 @@ import { Banner, Body, Button, Card, FitMoney, LinkButton, Screen, Skeleton, Txt
 import { showsCoverage } from '@/lib/essentials';
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
-import { SIMULATOR_READY } from '@/lib/simulator-route';
 import { useDeleteGoal, useGoalDetail, useGoalOperationKey, useSetGoalStatus } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
@@ -239,7 +238,7 @@ function GoalBody({
   const groups = movementsByMonth(movements);
   const coverage = reserve && showsCoverage(goal) ? t.coverage : null;
   // "Simular com rendimento": só enquanto falta guardar (o simulador começa do guardado e do prazo da meta).
-  const simulate = reached || !SIMULATOR_READY ? null : simulateLinkParams(simulateValuesFromGoal(plan));
+  const simulate = reached ? null : simulateLinkParams(simulateValuesFromGoal(plan));
   const planLines = [t.deadline, t.planned, coverage].filter((x): x is string => Boolean(x));
   const a11yBar = GOALS_TEXT.progressA11y(goal.name, plan.progress.percent, goal.savedCents, goal.targetCents);
   const a11yValue = `${GOALS_TEXT.savedOfTarget(goal.savedCents, goal.targetCents)}, ${GOALS_TEXT.percent(plan.progress.percent)}`;

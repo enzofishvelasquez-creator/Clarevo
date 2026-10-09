@@ -1,15 +1,18 @@
-import { calcFields, calcJuntarParaObjetivo, type CalcPrefill, type ObjetivoModo } from '@clarevo/core';
+import { SIMULATE_TEXT, calcFields, calcJuntarParaObjetivo, simulateLinkParams, simulateValuesFromObjetivo, type CalcPrefill, type ObjetivoModo } from '@clarevo/core';
+import { router } from 'expo-router';
+import { ChartLine } from 'lucide-react-native';
 import { useState } from 'react';
 
-import { CalcChoice, CalcField, CalcResult, CalcScreen, useCalcForm, type CalcBinding } from '@/components/calc/parts';
-import { Card } from '@/components/ui';
+import { CalcChoice, CalcField, CalcResult, CalcScreen, calcInlineLink, useCalcForm, type CalcBinding } from '@/components/calc/parts';
+import { Card, LinkButton } from '@/components/ui';
 import { space } from '@/theme/tokens';
 
 type Key = 'alvo' | 'jaTem' | 'meses' | 'mensal';
 
 /**
  * 7. Juntar para um objetivo: quanto guardar por mês (informando o prazo) ou em quanto tempo (informando o valor por
- * mês). Sem rendimento, como diz a hipótese; no Ciclo D a mesma tela ganha a taxa de rendimento opcional.
+ * mês). Sem rendimento, como diz a hipótese. Com o resultado, "Simular com rendimento" (Ciclo D) abre /simular com o modo e
+ * os mesmos valores; a taxa é sempre digitada lá e nunca vai no endereço.
  */
 export function JuntarParaObjetivoCalc({ prefill }: { prefill: CalcPrefill<'juntar-para-objetivo'> }) {
   const specs = calcFields('juntar-para-objetivo');
@@ -28,7 +31,16 @@ export function JuntarParaObjetivoCalc({ prefill }: { prefill: CalcPrefill<'junt
         {modo === 'prazo' ? <CalcField calc={calc} name="meses" /> : <CalcField calc={calc} name="mensal" />}
       </Card>
 
-      <CalcResult texts={outcome.ok ? outcome.result : null} />
+      <CalcResult texts={outcome.ok ? outcome.result : null}>
+        {outcome.ok && !outcome.result.reached ? (
+          <LinkButton
+            label={SIMULATE_TEXT.calcLink}
+            icon={ChartLine}
+            style={calcInlineLink}
+            onPress={() => router.push({ pathname: '/simular', params: simulateLinkParams(simulateValuesFromObjetivo(outcome.result)) })}
+          />
+        ) : null}
+      </CalcResult>
     </CalcScreen>
   );
 }

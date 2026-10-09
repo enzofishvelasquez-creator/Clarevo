@@ -1,10 +1,11 @@
-import { CALC_UI_TEXT, type LearnSection, type LearnSectionId } from '@clarevo/core';
+import { CALC_UI_TEXT, SIMULATE_TEXT, type LearnSection, type LearnSectionId } from '@clarevo/core';
 import { router } from 'expo-router';
-import { ArrowRight, Calculator, Search, SearchX, X } from 'lucide-react-native';
+import { ArrowRight, Calculator, ChartLine, Search, SearchX, X } from 'lucide-react-native';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { AccessibilityInfo, Platform, Pressable, StyleSheet, TextInput, View, type ScrollView } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
+import { CalcNavRow } from '@/components/calc/parts';
 import { FaqItem } from '@/components/faq-item';
 import { AppHeader } from '@/components/header';
 import { LearnArt } from '@/components/learn-art';
@@ -157,6 +158,15 @@ export default function AprenderScreen() {
                           }}
                         />
                         <View>
+                          {/* Simulador (D-028, Ciclo D): atalho no topo de "Dinheiro no tempo". */}
+                          {section.id === 'tempo' ? (
+                            <CalcNavRow
+                              icon={ChartLine}
+                              title={SIMULATE_TEXT.learnShortcut}
+                              caption={SIMULATE_TEXT.learnShortcutHint}
+                              onPress={() => router.push({ pathname: '/simular', params: { origem: 'aprender' } })}
+                            />
+                          ) : null}
                           {section.id === 'duvidas'
                             ? topics.map((t, i) => <FaqItem key={t.slug} topic={t} actions={LEARN_ACTIONS[t.slug]} last={i === topics.length - 1} />)
                             : topics.map((t, i) => <TopicRow key={t.slug} topic={t} last={i === topics.length - 1} onPress={() => open(t)} />)}

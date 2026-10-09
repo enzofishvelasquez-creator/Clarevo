@@ -72,6 +72,7 @@ export const LEARN_ACTIONS: Partial<Record<TopicSlug, readonly LearnAction[]>> =
   'marcar-como-paga': [{ label: 'Abrir Contas a pagar', href: '/a-pagar' }],
   'contei-duas-vezes': [{ label: 'Ver Movimentações', href: '/movimentacoes' }],
   'voltei-depois': [{ label: 'Revisar contas vencidas', href: '/a-pagar/vencidas' }],
+  simulacao: [{ label: 'Simular um plano', href: '/simular' }],
 };
 
 /** Ações de um tema na ordem da tela: as do app e, por último, a calculadora correspondente (quando houver). */

@@ -28,7 +28,7 @@ SplashScreen.preventAutoHideAsync();
  * página recarregada). As telas de entrada, de confirmação e de nova senha ficam fora.
  */
 const ENTRY_PATH =
-  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/referencia)?|reserva|meta\/(nova|[^/]+(\/(editar|movimento))?)|guardar(\/minima)?|conta|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes|metas|aprender)\/?$/;
+  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/referencia)?|reserva|meta\/(nova|[^/]+(\/(editar|movimento))?)|guardar(\/minima)?|simular|conta|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes|metas|aprender)\/?$/;
 
 /**
  * Endereço pedido ao abrir a versão web. Sem sessão (ou enquanto a sessão é conferida), as rotas protegidas levam à
@@ -226,6 +226,8 @@ function Navigation() {
           {/* Plano de guardar (D-036): "Sim, consigo" e a reserva mínima de "Agora não". */}
           <Stack.Screen name="guardar/index" />
           <Stack.Screen name="guardar/minima" />
+          {/* Simulador (D-028): só conta, nada é gravado. */}
+          <Stack.Screen name="simular" />
           {/* Seus últimos meses (D-030): resumo, passo a passo e registrar e pagar uma conta sem registro. */}
           <Stack.Screen name="retomar/index" />
           <Stack.Screen name="retomar/atualizar" />
