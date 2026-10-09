@@ -113,7 +113,7 @@ Explicações curtas e opcionais, ligadas ao que você faz no app.
 (temas atuais)
 ```
 
-- Com o A5, o card fica logo abaixo da busca e acima do card lima "Comece por aqui". Isso ajusta o texto de D-031(2), ainda não registrado.
+- Com o A5, o card fica logo abaixo da busca e acima do card lima "Comece por aqui". Isso ajusta o texto de D-031(2), registrado assim em 09/10/2026.
 - O atalho "Simular", previsto em Dinheiro no tempo, continua como D-031(7) já prevê.
 
 **`/calcular`** é uma tela interna com `SubHeader`. Não tem pílula de contexto, porque nada é gravado.
@@ -454,7 +454,7 @@ Recalculei em Python todos os exemplos abaixo, e eles batem com a `spec3` §3.11
 
 ## 4. O que já existe, o que está desenhado e o que falta
 
-Situação em 09/10/2026, depois do Ciclo A6 (D-035).
+Situação em 09/10/2026, depois dos Ciclos A6 (D-035), A4 (D-030) e A5 (D-031 e D-032).
 
 | Função | Situação | Onde fica ou ficaria |
 |---|---|---|
@@ -465,11 +465,10 @@ Situação em 09/10/2026, depois do Ciclo A6 (D-035).
 | Gastos fixos e parcelamentos | Existe, com os links "Quanto custa por ano?", "Quanto economizo se quitar antes?" e "Dividir estas contas" (A6) | Movimentos › "Organizar"; `/a-pagar` › link; chips "Todo mês" e "Parcelado" |
 | Contas do ano (IPVA, IPTU, matrícula) | Existe (A3, D-029), com "Cota única ou parcelado? Fazer a conta" no detalhe (A6) | Gastos fixos › Contas do ano; chip "Todo ano" |
 | Conta, segurança, "Quem vê estes dados?" | Existe | Avatar, rodapés |
-| Aprender com 8 temas | Existe, com o card "Calculadoras" no topo (A6) | Aba Aprender |
 | Metas | Tela de espera com o card "Enquanto isso, faça as contas" (Reserva, Juntar para um objetivo e Todas as calculadoras, A6) | Aba Metas |
 | Primeiros passos e "Organizar" em Movimentos | Existe (D-033); "Organizar" com 3 linhas, Calculadoras e legendas com valores (D-035(8)) | Card temporário no Resumo; Movimentos |
-| Seus últimos meses (A4) | Desenhado (`spec3` §2) | Faixa temporária no Resumo, `/retomar` |
-| Aprender e dúvidas: busca, 5 seções, 35 temas, "O que é isso?" (A5) | Desenhado (`spec3` §3) | Aba Aprender |
+| Seus últimos meses (A4) | Existe (D-030): faixa, resumo mês a mês, "Atualizar agora" e "Seguir adiante". Falta: o botão em Contas a pagar com a faixa ativa, "Registrar parcelas" na conta do ano, o cenário da demonstração pelo endereço, o roteiro web e o teste em aparelho (`docs/04`) | Faixa temporária no Resumo, `/retomar` |
+| Aprender e dúvidas: busca, 5 seções, 35 temas, "O que é isso?" (A5) | Existe (D-031 e D-032), com o card "Calculadoras" no topo e "Fazer a conta com os seus números" nos temas; catálogo e fontes em `docs/09_APRENDER.md`. Falta: o roteiro web e o teste em aparelho (`docs/04`) | Aba Aprender; "O que é isso?" nas telas |
 | Lembretes de vencimento (A2) | Desenhado (`spec2` §1.3) | Conta › interruptor; aviso no celular |
 | Renda comprometida (B) | Desenhado (`spec2` §1.4) | Linha dentro do card "Ainda a pagar", `/renda-comprometida` |
 | Metas e reserva (C) | Desenhado (`spec2` §1.5) | Aba Metas, `/reserva`, `/meta/*` |

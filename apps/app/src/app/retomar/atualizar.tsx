@@ -320,8 +320,19 @@ export default function AtualizarMeses() {
     scroll.current?.scrollTo({ y: 0, animated: false });
     const node = titleRef.current;
     if (!node) return;
-    if (Platform.OS === 'web') (node as unknown as { focus?: () => void }).focus?.();
-    else {
+    if (Platform.OS === 'web') {
+      // Na web, o passo que entra com FadeInRight fica invisível até a animação começar, e um elemento invisível não
+      // recebe foco: tenta a cada quadro, por pouco tempo, até o título estar com o foco.
+      const el = node as unknown as HTMLElement;
+      let tries = 0;
+      let frame = 0;
+      const tryFocus = () => {
+        el.focus?.();
+        if (document.activeElement !== el && tries++ < 30) frame = requestAnimationFrame(tryFocus);
+      };
+      tryFocus();
+      return () => cancelAnimationFrame(frame);
+    } else {
       const handle = findNodeHandle(node);
       if (handle) AccessibilityInfo.setAccessibilityFocus(handle);
     }

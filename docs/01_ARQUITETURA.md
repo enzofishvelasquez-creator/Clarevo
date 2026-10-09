@@ -1,6 +1,6 @@
 # Arquitetura
 
-09/10/2026 · versão 0.7 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos e calculadoras)
+09/10/2026 · versão 0.8 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos, calculadoras, seus últimos meses e Aprender e dúvidas)
 
 ## Escolhas (aprovadas)
 
@@ -27,19 +27,23 @@ apps/app/src/
     gastos-fixos/[id]/informar
     composicao, quem-ve, conta, explicacao/[tema]
     calcular, calcular/[slug]  calculadoras (nada é gravado)
+    retomar, retomar/atualizar, retomar/pagar  seus últimos meses (revisão depois de ausência)
   components/           interface (logo, campos, botões, formulários de registro, conta a pagar, pagamento, gasto fixo e conta do ano, "Ano a ano", "Somar valores", estados)
+    retorno-*           faixa do Resumo, linha da revisão, ações e folha do detalhe da série
+    term-hint, topic-link, learn-art, topic-example, faq-item  "O que é isso?", links e partes da explicação
     calc/               uma tela por calculadora e as partes comuns (campos, chips de 48 px, resultado anunciado)
-  lib/                  autenticação (Supabase e demonstração), conteúdos de Aprender, situação do card Primeiros passos (só no aparelho)
+  lib/                  autenticação (Supabase e demonstração), learn.ts (links e ações de Aprender), situação do card Primeiros passos (só no aparelho)
   state/                sessão, dados (consultas e gravações), contexto e mês
   theme/                tokens de cor, tipografia, movimento e vetores do logo
 packages/core/          regras financeiras, validação, repositório em memória, testes
-  src/learn/            contas exatas de juros, parcelas e divisão (centavos e pontos-base)
+  src/retorno.ts        revisão dos últimos meses: ausência, período, lacunas, montagem e textos
+  src/learn/            conteúdo de Aprender (37 temas), busca, tempo de leitura, validação do catálogo e contas exatas de juros, parcelas e divisão (centavos e pontos-base)
   src/calculators/      as 8 calculadoras, campos, textos e links de contexto
 supabase/
-  migrations/           esquema, funções e permissões (0001 fundação, 0002 contas a pagar, 0003 gastos fixos, 0004 contas do ano)
-  tests/                testes de isolamento, da sequência de aceite, de contas a pagar, de gastos fixos e de contas do ano
+  migrations/           esquema, funções e permissões (0001 fundação, 0002 contas a pagar, 0003 gastos fixos, 0004 contas do ano, 0005 seus últimos meses)
+  tests/                testes de isolamento, da sequência de aceite, de contas a pagar, de gastos fixos, de contas do ano e da revisão dos últimos meses
 scripts/e2e-web.js      roteiro de verificação na versão web
-docs/                   decisões, regras, acessos, Supabase, roteiro, marca, telas
+docs/                   decisões, regras, acessos, Supabase, roteiro, Aprender, marca, telas
 ```
 
 ## Navegação protegida
@@ -61,7 +65,9 @@ pessoa ──< vínculo (permissões por ação) >── contexto (pessoal | fam
    │                                                                    ├──< conta a pagar (previsto) ── 0 ou 1 gasto vivo que a quitou (registro)
    │                                                                    └──< série (gasto fixo, parcelamento ou conta do ano) ──< vigência
    │                                                                                  └──< ocorrência = conta a pagar com número
-   ├──< operação (chave de idempotência, ação, registro, conta a pagar ou série resultante)
+   ├──< operação (chave de idempotência, ação, registro, conta a pagar ou série resultante) ── gatilho ──> atividade
+   ├──< atividade por contexto (dia da última anotação e última ausência longa; só datas)
+   ├──< revisão dos últimos meses por contexto (último mês revisado, decisão e versão)
    └──< direito ao plano >── licença >── contrato de benefício >── organização ──< administrador
 ```
 
@@ -92,6 +98,21 @@ pessoa ──< vínculo (permissões por ação) >── contexto (pessoal | fam
 - **`create_series`:** um parâmetro a mais no fim, `p_parts_per_year`, com padrão nulo. A assinatura de 13 argumentos foi removida, mas a chamada com 13 argumentos nomeados continua funcionando, e com o parâmetro nulo o hash é o mesmo da 0003 (uma repetição em trânsito continua reconhecida). Na anual, `p_last_month` é o mês da última parcela do último ano, e o banco guarda `last_number = k × (anos até esse mês + 1)`. A validação segue a ordem do core, com o código novo `parcelas_no_ano_invalidas` logo depois de `parcelas_invalidas`; o início da anual vai do mês anterior ao atual até 23 meses depois.
 - **Leitura:** `commitment_items` ganhou `series_parts_per_year` no fim, e `series_items`, `parts_per_year` depois de `generating`; as duas visões foram recriadas com as mesmas opções da 0003. O conversor do app recusa, como dado inconsistente, série ou conta em que o tipo e as parcelas por ano não combinam.
 - **No core e no app:** `affectedByYear` monta o conjunto de informar e de tirar, com os textos do que muda e do que não muda; `wholeYearPayment`, o de "Paguei o ano todo de uma vez" (pagar a parcela escolhida com o valor total e depois tirar as outras em aberto do ano, com o conjunto calculado antes de pagar); `suggestedAnnualReference`, a sugestão de referência, aplicada por `update_series_from` com `affectedByEditFrom` e oferecida só quando o banco a aceitaria (`editFromMaxNumber`, o mesmo limite de `update_series_from`) e o ano seguinte não tem valor informado; `annualYearSummary`, o "Ano a ano"; `groupAnnualLater`, os grupos por ano em "Próximos meses"; `seriesYearlyTotal`, o "Por ano" (e `seriesMonthlyTotal` ignora as contas do ano). `affectedByYear`, `wholeYearPayment` e `affectedByEditFrom` recebem todas as contas de `mergeOccurrences`, como no Ciclo A. Uma gravação de resultado incerto em informar ou tirar é reconciliada por `findSeriesOperation` (`informar_ano`, `tirar_ano`).
+
+**Seus últimos meses** (migração `20261009000001_retorno.sql`, D-030) é a revisão oferecida depois de um tempo sem anotar. O banco guarda só datas e a decisão da pessoa; o resumo mês a mês é montado no core, sobre leituras que já existiam.
+
+- **Tabelas:** `context_activity` (uma linha por pessoa e contexto: `last_write_on`, o dia da última anotação no fuso da pessoa, e `absence_from_on` e `absence_until_on`, a última ausência longa, os dois nulos ou os dois preenchidos) e `return_reviews` (uma linha por pessoa e contexto: `reviewed_through`, sempre dia 1, `decision` `atualizou` ou `seguiu`, `decided_on` e `version`). Chaves estrangeiras para a pessoa e o contexto em cascata. Conta nova não tem linha em nenhuma das duas.
+- **Atividade:** o gatilho `record_operations_activity` (depois de cada operação gravada, função `clarevo_track_activity`, sem execução para ninguém) trata como anotação toda ação menos `decidir_revisao`. Usa o dia de hoje de quem anotou (`clarevo_today`); só muda quando o dia é maior que o último, e, se o intervalo é uma ausência longa (`clarevo_long_absence`: 45 dias ou mais, ou ao menos um mês inteiro fechado entre os dois), grava esse intervalo como a última ausência. A geração `sync_series_occurrences`, recusas e repetições não gravam operação e por isso não contam. A migração carrega uma vez a atividade de quem já usava o app, pelo maior dia de `record_operations.created_at` no fuso da pessoa, sem ausência; contextos já apagados ficam de fora. A tabela própria não depende da retenção de `record_operations` (P-010).
+- **Guardas:** as chaves e a criação não mudam; `last_write_on`, `reviewed_through` e `decided_on` nunca recuam (`campo_imutavel`); a versão da revisão sobe de 1 em 1; uma ausência gravada precisa ser longa (`atividade_inconsistente`), conferida só quando ela muda, para que um ajuste futuro do limiar (P-021) não invalide as já gravadas.
+- **Funções novas:** `create_series_occurrence(chave, série, versão da série, número, modo)` cria a conta de um mês passado de série, com `'aberta'` (em aberto) ou `'nao_houve'` (gravada já excluída só naquele mês, `series_skipped`, que a geração nunca recria). Aceita só números dos 11 meses fechados anteriores ao mês atual de quem chama (`mes_fora_da_revisao`), dentro da série (`numero_fora_da_serie`) e sem conta viva nem excluída só naquele mês (`ocorrencia_existente`); um número removido por encerramento e depois retomado pode ser registrado. A conta usa a vigência do número, com a autoria de quem criou a série (que precisa continuar com leitura e escrita), não muda a versão da série e não grava gasto; o pagamento continua sendo `pay_commitment`, em outra chamada. A operação fica como `criar_ocorrencia`, com a conta e a série (`target_id`), e o app a reconhece em `findCommitmentOperation`. Uma conta criada assim entra no conjunto afetado de "esta e as próximas", encerrar, informar e tirar, que recusam o conjunto antigo. `decide_return_review(chave, contexto, versão, mês revisado, decisão)` grava só a marca da própria pessoa (basta leitura), com o maior mês revisado e o maior dia de decisão; o mês precisa ser um dos 11 fechados anteriores ao atual (`mes_invalido`). A operação fica como `decidir_revisao`, sem registro, conta ou série. `months_overview(contexto, de, até)` devolve, mês a mês (até 12 meses, `periodo_invalido`), a soma e a quantidade de recebimentos e de gastos, com o critério de `month_totals` e a RLS de quem consulta; mês sem anotação vem com zeros. As três usam o hash em JSON de D-021(7) e o mesmo espaço de chaves.
+- **Operações:** as restrições de `record_operations` foram recriadas com a lista completa vigente, de 16 ações (com `informar_ano` e `tirar_ano` do A3 e as duas novas). As migrações seguintes que mexerem nelas precisam levar a lista inteira.
+- **Leitura e privilégios:** políticas `context_activity_own` e `return_reviews_own`: só a própria pessoa lê, e só enquanto lê o contexto. Sem escrita direta. Com sessão, executam-se 23 funções: as 20 de antes e as três novas; as auxiliares e as guardas não são executáveis.
+- **No core e no app:** `retorno.ts` repete a regra de ausência (`isLongAbsence`, `ABSENCE_MIN_DAYS`), calcula o período (`returnWindow`), as contas sem registro pela lista de contas do período (`seriesGapsInRange`, sobre `listCommitmentsDueBetween`, nunca sobre as 60 mais recentes) e monta a revisão (`buildReturnReview`), com as ações de cada linha, o lote, o modo "Dia" e todos os textos (`RETURN_TEXT`). `loadReturnReview` lê `getReturnReviewState`, `monthsOverview`, `listCommitmentsDueBetween` e `listSeries`, sempre depois de a geração do dia dar certo; no app, `useReturnReview` usa a consulta `['returnReview', contexto, dia]`, que toda gravação invalida e que recarrega ao voltar para o app. Se a geração ou a leitura falham, a faixa não aparece e `/retomar` mostra erro, nunca uma lista parcial. O `MemoryRepository` repete o gatilho, as três funções, a ordem das conferências e os códigos.
+
+**Aprender e dúvidas** (D-031 e D-032) não muda o banco: o conteúdo é público, vem no app e funciona sem internet.
+
+- **Core (`src/learn/`):** `types.ts` (seções, os 37 slugs e o formato do tema, das fontes e dos fatos de norma), `sections.ts` (as cinco seções e "Comece por aqui"), `topics/` (o conteúdo, um arquivo por seção), `reading.ts` (palavras e tempo de leitura), `search.ts` (busca no aparelho), `examples.ts` (os números esperados de cada exemplo, calculados por `math.ts`), `validate.ts` (validação do catálogo: tamanhos, fontes, domínios, prazos de revisão, números conferidos e hipóteses), `ui-text.ts` (`LEARN_UI_TEXT`) e `math.ts` e `format.ts`, do A6. O catálogo, as fontes e o registro de revisões estão em `docs/09_APRENDER.md`.
+- **App:** `lib/learn.ts` reexporta o core e define `explanationHref(slug, origem)`, que a rota `/explicacao/[tema]` recebe com `origem` (`tarefa` ou `aprender`); com `typedRoutes`, o `typecheck` recusa um slug ou uma rota que não existem. Ali ficam também as ações "No Clarevo" e o link de cada tema para a calculadora. `lib/topics.ts` foi removido: nenhum `/explicacao/` é escrito à mão fora de `lib/learn.ts` (conferido por `learn-links.test.ts`). `TermHint` e `TopicLink` não desenham nada para tema em rascunho. A busca fica só na memória da aba; nada é gravado nem enviado.
 
 ## Como executar
 

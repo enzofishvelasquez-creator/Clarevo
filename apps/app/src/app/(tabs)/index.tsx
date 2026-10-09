@@ -57,6 +57,8 @@ export default function ResumoScreen() {
     const t = setTimeout(() => setChange(null), 3200);
     return () => clearTimeout(t);
   }, [change]);
+  // Só no mês do registro: trocar de mês antes de o destaque sumir não leva o "+ R$" para outro mês.
+  const shownChange = change && change.month === month && kind === 'pessoal' ? change : null;
 
   // Troca de mês desliza na direção escolhida; troca de contexto só esmaece (CL-V008).
   const entering = (monthDirection > 0 ? FadeInRight : FadeInLeft).duration(motion.context).reduceMotion(ReduceMotion.System);
@@ -117,14 +119,14 @@ export default function ResumoScreen() {
                   <TotalItem
                     label="Recebido"
                     cents={s.receivedCents}
-                    change={change?.total === 'recebido' ? change.deltaCents : null}
+                    change={shownChange?.total === 'recebido' ? shownChange.deltaCents : null}
                     onPress={() => router.push({ pathname: '/composicao', params: { tipo: 'recebido' } })}
                   />
                   <TotalItem
                     label="Pago"
                     cents={s.paidCents}
                     alignEnd={!narrow}
-                    change={change?.total === 'pago' ? change.deltaCents : null}
+                    change={shownChange?.total === 'pago' ? shownChange.deltaCents : null}
                     onPress={() => router.push({ pathname: '/composicao', params: { tipo: 'pago' } })}
                   />
                 </View>

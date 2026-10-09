@@ -1,6 +1,19 @@
-import { DEMO_EMAIL, DEMO_TODAY, MemoryRepository, createDemoRepository, type RecordsRepository } from '@clarevo/core';
+import { DEMO_EMAIL, DEMO_TODAY, MemoryRepository, createDemoRepository, demoScenarioFrom, type DemoScenario, type RecordsRepository } from '@clarevo/core';
 
 import { AuthError, type AuthService, type AuthState, type AuthUser } from './auth';
+
+/**
+ * Cenário fictício da conta de demonstração, lido uma vez do endereço de entrada na web ("?cenario=retorno", Ciclo A4).
+ * Sem o parâmetro, fora da web ou com valor desconhecido: a demonstração padrão. Contas novas nunca recebem cenário.
+ */
+function scenarioFromAddress(): DemoScenario {
+  try {
+    const search = (globalThis as { location?: { search?: unknown } }).location?.search;
+    return typeof search === 'string' ? demoScenarioFrom(new URLSearchParams(search).get('cenario')) : 'padrao';
+  } catch {
+    return 'padrao';
+  }
+}
 
 interface DemoAccount {
   user: AuthUser;
@@ -19,6 +32,7 @@ export class DemoAuth implements AuthService {
   private state: AuthState = { user: null, recovery: false };
   private listeners = new Set<(s: AuthState) => void>();
   private demoRepo: Promise<MemoryRepository> | null = null;
+  private readonly scenario: DemoScenario = scenarioFromAddress();
 
   constructor() {
     this.accounts.set(DEMO_EMAIL, {
@@ -109,7 +123,7 @@ export class DemoAuth implements AuthService {
 
   repositoryFor(user: AuthUser): RecordsRepository {
     if (user.email === DEMO_EMAIL) {
-      this.demoRepo ??= createDemoRepository({ latencyMs: 300 });
+      this.demoRepo ??= createDemoRepository({ latencyMs: 300, scenario: this.scenario });
       return lazy(this.demoRepo);
     }
     const acc = this.accounts.get(user.email)!;

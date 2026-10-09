@@ -1,6 +1,7 @@
 import {
   ERROR_TEXT,
   QUICK_PAY_TEXT,
+  RETURN_TEXT,
   formatMonthBR,
   groupAnnualLater,
   isRepoError,
@@ -26,6 +27,7 @@ import { ChoiceDialog } from '@/components/choice-dialog';
 import { AnnualGroupRow, CommitmentRow, type RowAction } from '@/components/commitment-row';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
+import { useReturnBand } from '@/components/retorno-faixa';
 import { EmptyState, ErrorState } from '@/components/states';
 import { TermHint } from '@/components/term-hint';
 import { TopicLink } from '@/components/topic-link';
@@ -169,6 +171,8 @@ export default function ContasAPagarScreen() {
   // A sincronização do dia criou contas já vencidas: a faixa fica enquanto alguma conta de gasto fixo continuar vencida.
   const createdOverdue = sync.data?.createdOverdue ?? 0;
   const showCreatedOverdue = isCurrent && createdOverdue > 0 && Boolean(s?.overdue.some((c) => c.series));
+  // Com a faixa "Seus últimos meses" ativa no Resumo, o aviso leva ao mesmo resumo (um só pedido, D-030).
+  const returnBandOn = useReturnBand(isCurrent ? ctx : undefined).status === 'visivel';
 
   // Próximos meses: parcelas da mesma conta do ano e do mesmo ano viram um grupo (o toque abre a conta do ano).
   const laterHasAnnual = Boolean(s?.later.some((c) => c.series?.kind === 'anual'));
@@ -271,7 +275,11 @@ export default function ContasAPagarScreen() {
         {showCreatedOverdue ? (
           <Banner tone="info" icon={Info}>
             <Txt variant="label">{createdOverdueText(createdOverdue)}</Txt>
-            <LinkButton label="Revisar vencidas" icon={ListChecks} style={styles.inlineLink} onPress={() => router.push('/a-pagar/vencidas')} />
+            {returnBandOn ? (
+              <LinkButton label={RETURN_TEXT.toPayAction} icon={ListChecks} style={styles.inlineLink} onPress={() => router.push('/retomar')} />
+            ) : (
+              <LinkButton label="Revisar vencidas" icon={ListChecks} style={styles.inlineLink} onPress={() => router.push('/a-pagar/vencidas')} />
+            )}
           </Banner>
         ) : null}
 
