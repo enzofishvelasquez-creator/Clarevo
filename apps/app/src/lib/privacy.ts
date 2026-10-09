@@ -1,12 +1,24 @@
 import { formatBRL, type Cents } from '@clarevo/core';
 import { useSyncExternalStore } from 'react';
 
-import { yearA11y } from '@/lib/years';
+import { yearA11y } from './years';
 
 /**
  * Ocultar valores (docs/08 §5 item 8): com valores ocultos, os valores em reais aparecem como "R$ ••••" e o leitor de
  * tela diz "valor oculto". O estado vale para a sessão do app: começa pela preferência "Ocultar valores ao abrir"
  * (guardada só neste aparelho, lib/device-prefs.ts) e muda pelo olho do cabeçalho das abas ou pelo interruptor em Conta.
+ *
+ * O que é ocultado (todo valor em reais de dados guardados, no texto e no nome acessível): totais do Resumo, linhas de
+ * registros e de contas a pagar, gastos fixos e parcelamentos, composição, renda comprometida, metas e reserva, plano de
+ * guardar, revisão dos últimos meses, avisos de resultado (FlashBanner), títulos e textos de diálogos e o anúncio do iOS
+ * (announceOnIOS). Como usar: `Money` e `FitMoney` (components/ui.tsx) para um valor; `MoneyTxt` (components/money-text.tsx)
+ * para uma frase com valores, pronta do core ou montada com formatBRL; moneyText, moneyA11y, maskMoneyText, maskMoneyLabel
+ * e spokenText daqui para textos que não são Txt (rótulo de botão, nome acessível, dica de campo com `moneyHint`).
+ *
+ * O que continua à vista, por decisão: o que a pessoa digita ou edita (campos de texto, inclusive o que vem preenchido
+ * com um valor guardado ao abrir um formulário de edição), calculadoras e simulador (entrada e resultado são o que ela
+ * digitou), a soma de "Somar valores", os exemplos de Aprender (números de exemplo, não dela), limites fixos ("até
+ * R$ 9.999.999,99") e percentuais. Ver packages/core/test/privacy-app.test.ts.
  */
 export const HIDDEN_MONEY = 'R$ ••••';
 export const HIDDEN_MONEY_A11Y = 'valor oculto';

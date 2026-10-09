@@ -30,6 +30,7 @@ import { TermHint } from '@/components/term-hint';
 import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Chip, LinkButton, Screen, Skeleton, Txt, styles as ui } from '@/components/ui';
 import { LEARN_UI_TEXT } from '@/lib/learn';
+import { HIDDEN_MONEY_A11Y } from '@/lib/privacy';
 import { useCommittedGoalLines, useCommittedSummary, useCommittedUpcoming, useMonthRecords, useSpace, useView } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
@@ -161,7 +162,7 @@ function Highlight({ s, t }: { s: CommittedSummary; t: CommittedTexts }) {
           <Txt variant="label" color={colors.textSecondary}>
             {t.noReference.label}
           </Txt>
-          <FitText text={mask.text(t.noReference.amount)} accessibilityLabel={mask.hidden ? 'valor oculto' : undefined} />
+          <FitText text={mask.text(t.noReference.amount)} accessibilityLabel={mask.hidden ? HIDDEN_MONEY_A11Y : undefined} />
         </View>
         <Txt>{t.noReference.hint}</Txt>
         <Button label={t.noReference.button} onPress={() => openReference(s.month)} />

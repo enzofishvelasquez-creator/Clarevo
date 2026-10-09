@@ -72,6 +72,11 @@ export const LEARN_ACTIONS: Partial<Record<TopicSlug, readonly LearnAction[]>> =
   'marcar-como-paga': [{ label: 'Abrir Contas a pagar', href: '/a-pagar' }],
   'contei-duas-vezes': [{ label: 'Ver Movimentações', href: '/movimentacoes' }],
   'voltei-depois': [{ label: 'Revisar contas vencidas', href: '/a-pagar/vencidas' }],
+  // Ciclos B, C e D: cada tema dos novos leva à tela do app em que o assunto aparece.
+  'renda-comprometida': [{ label: 'Ver minha renda comprometida', href: '/renda-comprometida' }],
+  'renda-variavel': [{ label: 'Revisar minha renda de referência', href: '/renda-comprometida/referencia' }],
+  aporte: [{ label: 'Abrir Metas', href: '/metas' }],
+  essenciais: [{ label: 'Calcular minha reserva', href: '/reserva' }],
   simulacao: [{ label: 'Simular um plano', href: '/simular' }],
 };
 
