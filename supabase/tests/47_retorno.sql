@@ -1196,8 +1196,8 @@ begin
     = array['alterar_meta', 'alterar_movimento_meta', 'alterar_serie', 'criar', 'criar_compromisso', 'criar_meta', 'criar_ocorrencia', 'criar_serie', 'decidir_revisao',
             'definir_renda_referencia', 'desfazer_pagamento', 'editar', 'editar_compromisso', 'encerrar_serie', 'excluir',
             'excluir_compromisso', 'excluir_meta', 'excluir_movimento_meta', 'excluir_renda_referencia', 'excluir_serie', 'informar_ano', 'pagar_compromisso',
-            'registrar_movimento_meta', 'situacao_meta', 'tirar_ano'],
-    'as 25 ações vigentes (com as 2 da renda comprometida, testadas em 50, e as 7 de metas, testadas em 60)';
+            'registrar_movimento_meta', 'responder_guardar', 'situacao_meta', 'tirar_ano'],
+    'as 26 ações vigentes (com as 2 da renda comprometida, testadas em 50, as 7 de metas, testadas em 60, e a de guardar, testada em 65)';
   assert not exists (select 1 from public.record_operations
                       where (action = 'criar_ocorrencia' and (commitment_id is null or target_id is null or record_id is not null))
                          or (action = 'decidir_revisao' and (record_id is not null or commitment_id is not null or target_id is not null))),
@@ -1221,7 +1221,7 @@ do $$ begin
     = array['add_goal_movement', 'context_permission', 'create_commitment', 'create_goal', 'create_record', 'create_series', 'create_series_occurrence',
             'decide_return_review', 'delete_commitment', 'delete_goal', 'delete_goal_movement', 'delete_income_reference', 'delete_record', 'delete_series', 'end_series', 'ensure_personal_space',
             'inform_series_year', 'is_org_admin', 'month_committed', 'month_to_pay', 'month_totals', 'months_overview',
-            'pay_commitment', 'set_goal_status', 'set_income_reference', 'skip_series_year', 'sync_series_occurrences', 'undo_commitment_payment', 'update_commitment', 'update_goal', 'update_goal_movement', 'update_record',
+            'pay_commitment', 'set_goal_status', 'set_income_reference', 'set_savings_answer', 'skip_series_year', 'sync_series_occurrences', 'undo_commitment_payment', 'update_commitment', 'update_goal', 'update_goal_movement', 'update_record',
             'update_series_from'],
     'authenticated executa só as funções expostas (3 novas)';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

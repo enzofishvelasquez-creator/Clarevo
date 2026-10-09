@@ -34,8 +34,12 @@ import {
 } from '../src';
 
 /**
- * Simulador (D-028, Ciclo D): vetores da spec2 §2.6 (taxa equivalente, aportes no fim de cada mês, fator em ponto
- * flutuante e arredondamento só no fim: final para baixo, valor por mês e prazo para cima) e textos da §4.7.
+ * Simulador (D-028, Ciclo D): vetores da spec2 §2.6 (taxa equivalente, fator em ponto flutuante e arredondamento só no
+ * fim: final para baixo, valor por mês e prazo para cima) e textos da §4.7. Decisão de Enzo de 09/10/2026: os aportes
+ * contam no INÍCIO de cada mês, a convenção da Calculadora do Cidadão do Banco Central (Aplicação com depósitos
+ * regulares: Sn = (1 + j) × (((1 + j)^n − 1) ÷ j) × p), no lugar do fim do mês da spec2 §2.6. Todos os vetores foram
+ * recalculados com um script independente em Python (decimal, 80 dígitos), que também confere o ponto flutuante do
+ * core em 20.000 entradas aleatórias, em 6.000 valores por mês e em 6.000 prazos.
  */
 
 const T = SIMULATE_TEXT;
@@ -93,30 +97,35 @@ describe('taxa', () => {
   });
 });
 
-describe('vetores da spec2 §2.6 (10% ao ano)', () => {
-  it('mensal para juntar R$ 22.500,00 em 14 meses com R$ 4.500,00: R$ 1.184,52; sem rendimento, R$ 1.285,72', () => {
-    expect(monthlyForTarget(2_250_000, 450_000, 14, 1_000)).toBe(118_452);
-    // Conferência do mensal: final(118.452) = 2.250.010 ≥ 2.250.000 > final(118.451) = 2.249.996.
-    expect(finalValueCents(450_000, 118_452, 14, 1_000)).toBe(2_250_010);
-    expect(finalValueCents(450_000, 118_451, 14, 1_000)).toBe(2_249_996);
-    expect(finalValueCents(450_000, 118_452, 14, 1_000)).toBeGreaterThanOrEqual(2_250_000);
-    expect(finalValueCents(450_000, 118_451, 14, 1_000)).toBeLessThan(2_250_000);
+describe('vetores da spec2 §2.6 com aportes no início de cada mês (10% ao ano)', () => {
+  it('mensal para juntar R$ 22.500,00 em 14 meses com R$ 4.500,00: R$ 1.175,15; sem rendimento, R$ 1.285,72', () => {
+    // Antes (aportes no fim do mês): R$ 1.184,52.
+    expect(monthlyForTarget(2_250_000, 450_000, 14, 1_000)).toBe(117_515);
+    // Conferência do mensal: final(117.515) = 2.250.012 ≥ 2.250.000 > final(117.514) = 2.249.997.
+    expect(finalValueCents(450_000, 117_515, 14, 1_000)).toBe(2_250_012);
+    expect(finalValueCents(450_000, 117_514, 14, 1_000)).toBe(2_249_997);
+    expect(finalValueCents(450_000, 117_515, 14, 1_000)).toBeGreaterThanOrEqual(2_250_000);
+    expect(finalValueCents(450_000, 117_514, 14, 1_000)).toBeLessThan(2_250_000);
     // Sem rendimento: o mesmo número da meta (spec2 §2.5, monthlyNeeded).
     expect(monthlyForTarget(2_250_000, 450_000, 14, 0)).toBe(128_572);
     expect(monthlyNeeded(1_800_000, '2026-11', '2027-12')).toBe(128_572);
-    const g = simulateGrowth({ initial: 450_000, monthly: 118_452, months: 14, rateBp: 1_000 });
-    expect(g).toMatchObject({ finalCents: 2_250_010, contributedCents: 2_108_328, earningsCents: 141_682, todayValueCents: null });
+    const g = simulateGrowth({ initial: 450_000, monthly: 117_515, months: 14, rateBp: 1_000 });
+    expect(g).toMatchObject({ finalCents: 2_250_012, contributedCents: 2_095_210, earningsCents: 154_802, todayValueCents: null });
   });
 
-  it('quanto posso ter com R$ 1.000,00 por mês, 14 meses e R$ 4.500,00: R$ 19.778,56; sem rendimento, R$ 18.500,00', () => {
-    expect(finalValueCents(450_000, 100_000, 14, 1_000)).toBe(1_977_856);
+  it('quanto posso ter com R$ 1.000,00 por mês, 14 meses e R$ 4.500,00: R$ 19.896,17; sem rendimento, R$ 18.500,00', () => {
+    // Antes (aportes no fim do mês): R$ 19.778,56.
+    expect(finalValueCents(450_000, 100_000, 14, 1_000)).toBe(1_989_617);
     expect(finalValueCents(450_000, 100_000, 14, 0)).toBe(1_850_000);
     const g = simulateGrowth({ initial: 450_000, monthly: 100_000, months: 14, rateBp: 1_000 });
-    expect(g).toMatchObject({ finalCents: 1_977_856, contributedCents: 1_850_000, earningsCents: 127_856 });
+    expect(g).toMatchObject({ finalCents: 1_989_617, contributedCents: 1_850_000, earningsCents: 139_617 });
   });
 
   it('em quanto tempo chego a R$ 22.500,00 com R$ 1.000,00 por mês e R$ 4.500,00: 17 meses; sem rendimento, 18', () => {
+    // O prazo continua em 17 meses (era 17 com aportes no fim do mês): final(16) = 2.223.874 e final(17) = 2.342.404.
     expect(monthsForTarget(2_250_000, 450_000, 100_000, 1_000)).toBe(17);
+    expect(finalValueCents(450_000, 100_000, 17, 1_000)).toBe(2_342_404);
+    expect(finalValueCents(450_000, 100_000, 16, 1_000)).toBe(2_223_874);
     expect(finalValueCents(450_000, 100_000, 17, 1_000)).toBeGreaterThanOrEqual(2_250_000);
     expect(finalValueCents(450_000, 100_000, 16, 1_000)).toBeLessThan(2_250_000);
     expect(monthsForTarget(2_250_000, 450_000, 100_000, 0)).toBe(18);
@@ -124,15 +133,34 @@ describe('vetores da spec2 §2.6 (10% ao ano)', () => {
     expect(finalValueCents(450_000, 100_000, 17, 0)).toBe(2_150_000);
   });
 
-  it('R$ 500,00 por mês por 10 anos: R$ 99.931,92; com inflação de 4,5% ao ano, R$ 64.348,92 em dinheiro de hoje', () => {
-    expect(finalValueCents(0, 50_000, 120, 1_000)).toBe(9_993_192);
+  it('R$ 500,00 por mês por 10 anos: R$ 100.728,79; com inflação de 4,5% ao ano, R$ 64.862,05 em dinheiro de hoje', () => {
+    // Antes (aportes no fim do mês): R$ 99.931,92 e R$ 64.348,92.
+    expect(finalValueCents(0, 50_000, 120, 1_000)).toBe(10_072_879);
+    expect(todayValueCents(10_072_879, 120, 450)).toBe(6_486_205);
+    // O dinheiro de hoje só depende do valor e da inflação: o vetor antigo continua valendo como conta isolada.
     expect(todayValueCents(9_993_192, 120, 450)).toBe(6_434_892);
     const g = simulateGrowth({ initial: 0, monthly: 50_000, months: 120, rateBp: 1_000, inflationBp: 450 });
-    expect(g.finalCents).toBe(9_993_192);
+    expect(g.finalCents).toBe(10_072_879);
     expect(g.contributedCents).toBe(6_000_000);
-    expect(g.earningsCents).toBe(3_993_192);
-    expect(g.todayValueCents).toBe(6_434_892);
+    expect(g.earningsCents).toBe(4_072_879);
+    expect(g.todayValueCents).toBe(6_486_205);
     expect(finalValueCents(0, 50_000, 120, 0)).toBe(6_000_000);
+  });
+
+  it('convenção: o aporte de cada mês já rende naquele mês (início do mês), como na Calculadora do Cidadão', () => {
+    // Um mês: o aporte rende uma vez (no fim do mês seria o próprio aporte). R$ 1.000,00 a 10% ao ano: 1.000,00 × 1,0079741.
+    expect(finalValueCents(0, 100_000, 1, 1_000)).toBe(100_797);
+    // Dois meses: 1.000,00 × (1,0079741 + 1,0079741²) = 2.023,98 (no fim do mês, 2.007,97).
+    expect(finalValueCents(0, 100_000, 2, 1_000)).toBe(202_398);
+    // O valor inicial não muda com a convenção: ele rende os n meses; sem aporte, nada muda.
+    expect(finalValueCents(450_000, 0, 1, 1_000)).toBe(453_588);
+    expect(finalValueCents(450_000, 100_000, 1, 0)).toBe(550_000);
+    // Fórmula do Banco Central: Sn = (1 + j) × (((1 + j)^n − 1) ÷ j) × p, com a taxa mensal equivalente j (dentro de 1 centavo).
+    for (const [p, n, bp] of [[50_000, 120, 1_000], [100_000, 14, 1_000], [123_456, 36, 450], [9_999, 600, 3_000], [78_901, 7, 1], [250_000, 60, 2_550]] as const) {
+      const j = Math.pow(1 + bp / 10_000, 1 / 12) - 1;
+      const sn = (1 + j) * ((Math.pow(1 + j, n) - 1) / j) * p;
+      expect(Math.abs(finalValueCents(0, p, n, bp) - Math.floor(sn)), `${p} ${n} ${bp}`).toBeLessThanOrEqual(1);
+    }
   });
 });
 
@@ -157,14 +185,19 @@ describe('contas', () => {
     expect(finalValueCents(450_000, 0, 14, 1_000)).toBe(502_925);
     expect(monthlyForTarget(500_000, 450_000, 14, 1_000)).toBe(0);
     expect(monthlyForTarget(502_926, 450_000, 14, 1_000)).toBe(1);
-    expect(monthlyForTarget(503_000, 450_000, 14, 1_000)).toBe(6);
+    // Antes (aportes no fim do mês): 6. Agora cada centavo por mês rende em 14 meses cerca de 14,86 centavos (o do 1º mês
+    // rende 14 vezes): 5 centavos por mês chegam a 503.000 e 4 centavos, a 502.985.
+    expect(monthlyForTarget(503_000, 450_000, 14, 1_000)).toBe(5);
+    expect(finalValueCents(450_000, 5, 14, 1_000)).toBe(503_000);
+    expect(finalValueCents(450_000, 4, 14, 1_000)).toBe(502_985);
   });
 
   it('inalcançável em 600 meses: null', () => {
     expect(monthsForTarget(999_999_999, 0, 10_000, 1_000)).toBeNull();
-    expect(monthsForTarget(999_999_999, 0, 100_000, 1_000)).toBe(553);
+    // Antes (aportes no fim do mês): 553 e 277.
+    expect(monthsForTarget(999_999_999, 0, 100_000, 1_000)).toBe(552);
     expect(monthsForTarget(999_999_999, 0, 0, 3_000)).toBeNull();
-    expect(monthsForTarget(100_000_000, 0, 100_000, 1_000)).toBe(277);
+    expect(monthsForTarget(100_000_000, 0, 100_000, 1_000)).toBe(276);
   });
 
   it('dinheiro de hoje: inflação 0 ou prazo 0 devolvem o próprio valor', () => {
@@ -174,11 +207,73 @@ describe('contas', () => {
   });
 
   it('precisão: o fator usa log1p e expm1 (referência com 80 dígitos, Python Decimal)', () => {
-    // Um mês com aporte no fim: o valor é o próprio aporte. (1 + i)^1 − 1 em ponto flutuante direto dava 1 centavo a menos.
-    expect(finalValueCents(0, 78_892_711, 1, 13)).toBe(78_892_711);
-    // Referências: 11.878.050.463,99794... e 53.002.475.437,99783... (a conta direta arredondava para cima, por ruído).
-    expect(finalValueCents(0, 742_192_611, 16, 4)).toBe(11_878_050_463);
-    expect(finalValueCents(0, 999_180_418, 53, 4)).toBe(53_002_475_437);
+    // Referências com aportes no início do mês: 1.888.265.366,0058..., 162.548.675.352,9979... e 10.226.023.922,0015...
+    // A conta direta, com Math.pow(1 + i, n), dava 1.888.265.365, 162.548.675.353 e 10.226.023.921: um centavo a menos,
+    // a mais e a menos, por ruído do ponto flutuante.
+    expect(finalValueCents(0, 944_120_882, 2, 1)).toBe(1_888_265_366);
+    expect(finalValueCents(0, 220_940_145, 224, 1_152)).toBe(162_548_675_352);
+    expect(finalValueCents(31_391, 639_079_265, 16, 1)).toBe(10_226_023_922);
+  });
+
+  it('referência independente (Python, decimal de 80 dígitos): final, valor por mês e prazo', () => {
+    // [inicial, por mês, meses, taxa em pontos-base, final]
+    const FINAL_REF: [number, number, number, number, number][] = [
+      [42_880_483, 1, 2, 1, 42_881_199],
+      [80_668_968, 74_700_088, 12, 13, 977_805_984],
+      [450_000, 78_721_496, 600, 450, 172_710_947_743],
+      [340_220, 1, 12, 1_000, 374_254],
+      [450_000, 1_542_005, 14, 1_050, 23_496_680],
+      [450_000, 50_000, 36, 2_500, 3_465_620],
+      [50_512_102, 1, 36, 3_000, 110_975_143],
+      [12_034_628, 50_000, 36, 7, 13_861_861],
+      [0, 50_000, 14, 1, 700_043],
+      [450_000, 48_793_813, 1, 13, 49_249_144],
+      [450_000, 78_613_715, 120, 450, 11_873_621_575],
+      [57_102_035, 80_552_816, 2, 1_000, 221_054_117],
+      [450_000, 56_366_903, 408, 1_050, 195_979_237_947],
+      [0, 100_000, 526, 2_500, 96_049_017_591],
+      [6_561_596, 1, 133, 3_000, 120_194_483],
+      [0, 100_000, 440, 7, 44_570_627],
+    ];
+    for (const [initial, monthly, months, rateBp, expected] of FINAL_REF) {
+      expect(finalValueCents(initial, monthly, months, rateBp), [initial, monthly, months, rateBp].join(', ')).toBe(expected);
+    }
+    // [alvo, inicial, meses, taxa, menor valor por mês com final ≥ alvo]
+    const MONTHLY_REF: [number, number, number, number, number][] = [
+      [504_120_890, 7_663_770, 6, 1_000, 80_406_347],
+      [10_000_000, 450_000, 60, 1_050, 118_491],
+      [160_993_498, 0, 60, 3_000, 1_283_377],
+      [2_250_000, 450_000, 600, 7, 2_922],
+      [10_000_000, 450_000, 60, 1, 159_123],
+      [2_250_000, 0, 300, 13, 7_379],
+      [2_250_000, 450_000, 60, 450, 25_123],
+      [10_000_000, 0, 300, 1_050, 7_442],
+      [209_035_783, 0, 600, 2_500, 55],
+    ];
+    for (const [target, initial, months, rateBp, expected] of MONTHLY_REF) {
+      const label = [target, initial, months, rateBp].join(', ');
+      expect(monthlyForTarget(target, initial, months, rateBp), label).toBe(expected);
+      expect(finalValueCents(initial, expected, months, rateBp), label).toBeGreaterThanOrEqual(target);
+      expect(finalValueCents(initial, expected - 1, months, rateBp), label).toBeLessThan(target);
+    }
+    // [alvo, inicial, por mês, taxa, menor prazo em meses (null: não alcança em 600 meses)]
+    const MONTHS_REF: [number, number, number, number, number | null][] = [
+      [2_250_000, 0, 10_000, 2_500, 89],
+      [718_771_848, 0, 50_000, 3_000, 263],
+      [714_588_766, 0, 50_000, 7, null],
+      [508_862_197, 450_000, 100_000, 1, null],
+      [10_000_000, 2_201_443, 50_000, 13, 154],
+      [10_000_000, 0, 50_000, 450, 150],
+      [2_250_000, 0, 100_000, 1_000, 21],
+      [10_000_000, 450_000, 10_000, 1_050, 230],
+      [352_929_677, 0, 215_599, 2_500, 185],
+      [10_000_000, 450_000, 10_000, 3_000, 112],
+      [635_862_558, 9_590_162, 100_000, 7, null],
+      [2_250_000, 450_000, 2_823_085, 1, 1],
+    ];
+    for (const [target, initial, monthly, rateBp, expected] of MONTHS_REF) {
+      expect(monthsForTarget(target, initial, monthly, rateBp), [target, initial, monthly, rateBp].join(', ')).toBe(expected);
+    }
   });
 
   it('limites: valores, prazo, taxa e inflação fora da faixa lançam RangeError', () => {
@@ -230,8 +325,9 @@ describe('ano a ano', () => {
   it('10 anos: uma linha por ano, acumulada, a última igual ao total', () => {
     const g = simulateGrowth({ initial: 0, monthly: 50_000, months: 120, rateBp: 1_000, inflationBp: 450 });
     expect(g.byYear.map((y) => y.months)).toEqual([12, 24, 36, 48, 60, 72, 84, 96, 108, 120]);
-    expect(g.byYear.map((y) => y.finalCents)).toEqual([627_026, 1_316_756, 2_075_458, 2_910_031, 3_828_061, 4_837_894, 5_948_710, 7_170_608, 8_514_696, 9_993_192]);
-    expect(g.byYear.map((y) => y.todayValueCents)).toEqual([600_024, 1_205_792, 1_818_716, 2_440_239, 3_071_831, 3_714_998, 4_371_281, 5_042_264, 5_729_576, 6_434_892]);
+    // Antes (aportes no fim do mês): 627.026, 1.316.756, ... 9.993.192 e, em dinheiro de hoje, 600.024, ... 6.434.892.
+    expect(g.byYear.map((y) => y.finalCents)).toEqual([632_026, 1_327_256, 2_092_008, 2_933_236, 3_858_587, 4_876_472, 5_996_146, 7_227_788, 8_582_593, 10_072_879]);
+    expect(g.byYear.map((y) => y.todayValueCents)).toEqual([604_809, 1_215_408, 1_833_219, 2_459_698, 3_096_327, 3_744_622, 4_406_138, 5_082_473, 5_775_264, 6_486_205]);
     expect(g.byYear.every((y) => !y.partial)).toBe(true);
     for (const y of g.byYear) {
       expect(y.contributedCents).toBe(50_000 * y.months);
@@ -243,15 +339,15 @@ describe('ano a ano', () => {
   });
 
   it('14 meses: o segundo ano é parcial; sem inflação, sem dinheiro de hoje', () => {
-    const g = simulateGrowth({ initial: 450_000, monthly: 118_452, months: 14, rateBp: 1_000 });
+    const g = simulateGrowth({ initial: 450_000, monthly: 117_515, months: 14, rateBp: 1_000 });
     expect(g.byYear).toEqual([
-      { year: 1, months: 12, partial: false, contributedCents: 1_871_424, earningsCents: 109_027, finalCents: 1_980_451, todayValueCents: null },
-      { year: 2, months: 14, partial: true, contributedCents: 2_108_328, earningsCents: 141_682, finalCents: 2_250_010, todayValueCents: null },
+      { year: 1, months: 12, partial: false, contributedCents: 1_860_180, earningsCents: 120_272, finalCents: 1_980_452, todayValueCents: null },
+      { year: 2, months: 14, partial: true, contributedCents: 2_095_210, earningsCents: 154_802, finalCents: 2_250_012, todayValueCents: null },
     ]);
     expect(T.yearLabel(g.byYear[0]!)).toBe('Ano 1');
     expect(T.yearLabel(g.byYear[1]!)).toBe('Ano 2 (até o mês 14)');
-    expect(T.yearA11y(g.byYear[1]!)).toBe('Ano 2 (até o mês 14): aportado R$ 21.083,28, rendimento na hipótese R$ 1.416,82, total R$ 22.500,10.');
-    expect(T.chartA11y(g, 14)).toBe('Gráfico por ano, até 14 meses: R$ 21.083,28 aportados e R$ 1.416,82 de rendimento na hipótese, total de R$ 22.500,10.');
+    expect(T.yearA11y(g.byYear[1]!)).toBe('Ano 2 (até o mês 14): aportado R$ 20.952,10, rendimento na hipótese R$ 1.548,02, total R$ 22.500,12.');
+    expect(T.chartA11y(g, 14)).toBe('Gráfico por ano, até 14 meses: R$ 20.952,10 aportados e R$ 1.548,02 de rendimento na hipótese, total de R$ 22.500,12.');
     expect(simulateGrowth({ initial: 0, monthly: 100, months: 8, rateBp: 0 }).byYear).toEqual([
       { year: 1, months: 8, partial: true, contributedCents: 800, earningsCents: 0, finalCents: 800, todayValueCents: null },
     ]);
@@ -259,18 +355,18 @@ describe('ano a ano', () => {
 });
 
 describe('formulário e textos (spec2 §4.7)', () => {
-  it('quanto guardar por mês: R$ 1.184,52 na hipótese; sem rendimento, R$ 1.285,72', () => {
+  it('quanto guardar por mês: R$ 1.175,15 na hipótese; sem rendimento, R$ 1.285,72', () => {
     const r = ok({ mode: 'quanto-guardar', targetText: '22.500,00', initialText: '4.500,00', monthsText: '14', rateText: '10' });
-    expect(r).toMatchObject({ reached: false, unreachable: false, monthlyCents: 118_452, monthlyWithoutYieldCents: 128_572, months: 14, monthsWithoutYield: null });
-    expect(r.growth).toMatchObject({ finalCents: 2_250_010, contributedCents: 2_108_328, earningsCents: 141_682 });
+    expect(r).toMatchObject({ reached: false, unreachable: false, monthlyCents: 117_515, monthlyWithoutYieldCents: 128_572, months: 14, monthsWithoutYield: null });
+    expect(r.growth).toMatchObject({ finalCents: 2_250_012, contributedCents: 2_095_210, earningsCents: 154_802 });
     expect(r.texts).toEqual({
       intro: 'Para juntar R$ 22.500,00 em 14 meses, começando com R$ 4.500,00:',
-      highlight: 'R$ 1.184,52 por mês na hipótese informada',
+      highlight: 'R$ 1.175,15 por mês na hipótese informada',
       lines: ['Sem rendimento, seriam R$ 1.285,72 por mês.'],
     });
     expect(r.hypotheses).toEqual([
       'Taxa de 10% ao ano (0,80% ao mês, taxa equivalente), constante no período.',
-      'Aportes no fim de cada mês.',
+      'Aportes no início de cada mês, como na Calculadora do Cidadão do Banco Central.',
       'Valores brutos, sem imposto de renda, IOF ou taxas.',
       'Sem inflação, salvo se informada.',
       'Valor por mês arredondado para cima, no centavo; valores finais para baixo.',
@@ -278,16 +374,18 @@ describe('formulário e textos (spec2 §4.7)', () => {
     expect(r.disclaimer).toBe('Simulação com as hipóteses que você informou. Não é promessa de rendimento nem recomendação de investimento.');
     expect(r.disclaimer).toBe(SIMULATE_DISCLAIMER);
     expect(r.input).toEqual({ mode: 'quanto-guardar', targetCents: 2_250_000, initialCents: 450_000, months: 14, monthlyCents: null, rateBp: 1_000, inflationBp: null });
+    // Taxa 0: aportes no início ou no fim do mês dão o mesmo número.
+    expect(ok({ mode: 'quanto-guardar', targetText: '22.500,00', initialText: '4.500,00', monthsText: '14', rateText: '0' }).monthlyCents).toBe(128_572);
   });
 
-  it('quanto posso ter: R$ 99.931,92 em 120 meses; aportado, rendimento, dinheiro de hoje e sem rendimento', () => {
+  it('quanto posso ter: R$ 100.728,79 em 120 meses; aportado, rendimento, dinheiro de hoje e sem rendimento', () => {
     const r = ok({ mode: 'quanto-ter', monthlyText: '500,00', monthsText: '120', rateText: '10', inflationOn: true, inflationText: '4,5' });
     expect(simulationResultLines(r)).toEqual([
       'Guardando R$ 500,00 por mês por 120 meses:',
-      'Na hipótese informada: R$ 99.931,92 em 120 meses',
+      'Na hipótese informada: R$ 100.728,79 em 120 meses',
       'Total aportado: R$ 60.000,00',
-      'Rendimento na hipótese: R$ 39.931,92',
-      'Em dinheiro de hoje, com inflação de 4,5% ao ano: R$ 64.348,92',
+      'Rendimento na hipótese: R$ 40.728,79',
+      'Em dinheiro de hoje, com inflação de 4,5% ao ano: R$ 64.862,05',
       'Sem rendimento, seriam R$ 60.000,00.',
     ]);
     expect(r.hypotheses[3]).toBe('Inflação de 4,5% ao ano (0,37% ao mês, taxa equivalente), constante no período, só para o valor em dinheiro de hoje.');
@@ -296,9 +394,9 @@ describe('formulário e textos (spec2 §4.7)', () => {
     const withInitial = ok({ mode: 'quanto-ter', initialText: '4.500,00', monthlyText: '1.000,00', monthsText: '14', rateText: '10' });
     expect(simulationResultLines(withInitial)).toEqual([
       'Guardando R$ 1.000,00 por mês por 14 meses, começando com R$ 4.500,00:',
-      'Na hipótese informada: R$ 19.778,56 em 14 meses',
+      'Na hipótese informada: R$ 19.896,17 em 14 meses',
       'Total aportado: R$ 18.500,00',
-      'Rendimento na hipótese: R$ 1.278,56',
+      'Rendimento na hipótese: R$ 1.396,17',
       'Sem rendimento, seriam R$ 18.500,00.',
     ]);
     const alone = ok({ mode: 'quanto-ter', initialText: '4.500,00', monthlyText: '0', monthsText: '14', rateText: '10' });
@@ -314,10 +412,12 @@ describe('formulário e textos (spec2 §4.7)', () => {
       highlight: 'Com R$ 1.000,00 por mês: 17 meses na hipótese informada; 18 meses sem rendimento.',
       lines: [],
     });
-    expect(r.growth!.finalCents).toBe(2_327_948);
+    expect(r.growth!.finalCents).toBe(2_342_404);
     expect(r.hypotheses[4]).toBe('Prazo em meses inteiros, arredondado para cima; valores finais para baixo, no centavo.');
     const far = ok({ mode: 'em-quanto-tempo', targetText: '1.000.000,00', monthlyText: '1.000,00', rateText: '10', inflationOn: true, inflationText: '4,5' });
-    expect(far.texts.highlight).toBe('Com R$ 1.000,00 por mês: 277 meses na hipótese informada; sem rendimento, não alcança em 50 anos.');
+    // Antes (aportes no fim do mês): 277 meses.
+    expect(far.texts.highlight).toBe('Com R$ 1.000,00 por mês: 276 meses na hipótese informada; sem rendimento, não alcança em 50 anos.');
+    expect(far.growth).toMatchObject({ finalCents: 100_546_651, contributedCents: 27_600_000, todayValueCents: 36_533_638 });
     expect(far.texts.intro).toBe('Para juntar R$ 1.000.000,00:');
     expect(far.texts.lines).toEqual([T.todayValue(450, far.growth!.todayValueCents!)]);
     expect(far.monthsWithoutYield).toBeNull();
@@ -442,7 +542,7 @@ describe('criar meta, links e entradas', () => {
   it('"Criar meta com estes valores": alvo, prazo, já guardado e plano; a taxa não vai para a meta', () => {
     const r = ok({ mode: 'quanto-guardar', targetText: '22.500,00', initialText: '4.500,00', monthsText: '14', rateText: '10' });
     const prefill = simulationGoalPrefill(r, DEMO_TODAY)!;
-    expect(prefill).toEqual({ goalType: 'objetivo', targetText: '22.500,00', targetMonthText: '11/2027', initialText: '4.500,00', plannedText: '1.184,52' });
+    expect(prefill).toEqual({ goalType: 'objetivo', targetText: '22.500,00', targetMonthText: '11/2027', initialText: '4.500,00', plannedText: '1.175,15' });
     expect(Object.keys(prefill).some((k) => /taxa|rate|infla/i.test(k))).toBe(false);
     // A meta criada com estes valores: P0 = outubro (sem aporte), 14 meses até novembro de 2027, R$ 1.285,72 sem rendimento.
     const goal = validateGoalDraft(
@@ -451,11 +551,11 @@ describe('criar meta, links e entradas', () => {
     );
     expect(goal.ok).toBe(true);
     if (goal.ok) {
-      expect(goal.input).toMatchObject({ targetCents: 2_250_000, targetMonth: '2027-11', initialCents: 450_000, plannedMonthlyCents: 118_452 });
+      expect(goal.input).toMatchObject({ targetCents: 2_250_000, targetMonth: '2027-11', initialCents: 450_000, plannedMonthlyCents: 117_515 });
       expect(monthlyNeeded(2_250_000 - 450_000, '2026-10', goal.input.targetMonth!)).toBe(r.monthlyWithoutYieldCents);
     }
     const total = ok({ mode: 'quanto-ter', monthlyText: '500,00', monthsText: '120', rateText: '10' });
-    expect(simulationGoalPrefill(total, DEMO_TODAY)).toEqual({ goalType: 'objetivo', targetText: '99.931,92', targetMonthText: '09/2036', initialText: '', plannedText: '500,00' });
+    expect(simulationGoalPrefill(total, DEMO_TODAY)).toEqual({ goalType: 'objetivo', targetText: '100.728,79', targetMonthText: '09/2036', initialText: '', plannedText: '500,00' });
     const time = ok({ mode: 'em-quanto-tempo', targetText: '22.500,00', initialText: '4.500,00', monthlyText: '1.000,00', rateText: '10' });
     expect(simulationGoalPrefill(time, DEMO_TODAY)).toMatchObject({ targetText: '22.500,00', targetMonthText: '02/2028', plannedText: '1.000,00' });
     // Valor na hipótese acima de R$ 9.999.999,99: o alvo fica em branco para a pessoa digitar.

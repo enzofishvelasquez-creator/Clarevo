@@ -17,6 +17,9 @@ import { newOperationKey } from './repository';
  * lá em dezembro de 2029. "Viagem de férias" (R$ 6.000,00 até julho de 2027, já guardado R$ 1.200,00 em 01/10, plano de
  * R$ 480,00): 20%, R$ 480,00 por mês até julho de 2027. Guardado em metas em outubro: R$ 500,00; planejado: R$ 980,00 por
  * mês. Movimentos de meta não entram em nenhum total do mês nem na renda comprometida.
+ * Plano de guardar (spec7): resposta "consigo" com R$ 500,00 por mês em 07/10/2026 (sem data de volta), igual ao plano da
+ * reserva. Com os gastos essenciais de R$ 3.750,00 e R$ 3.500,00 guardados na reserva, as etapas chegam em novembro de 2026
+ * (1 mês), fevereiro de 2028 (3 meses) e dezembro de 2029 (6 meses).
  */
 export const DEMO_TODAY = '2026-10-07';
 export const DEMO_EMAIL = 'demo@clarevo.app';
@@ -152,6 +155,9 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
     initialCents: 120_000,
     initialOn: '2026-10-01',
   });
+  // Plano de guardar (spec7): a pessoa respondeu "consigo" com R$ 500,00 por mês, o mesmo plano da reserva. Só é lida pela
+  // própria pessoa; não conta como anotação e não muda nenhum total.
+  await repo.setSavingsAnswer(newOperationKey(), ctx, 0, 'consigo', 50_000);
 
   // A latência só passa a valer depois de semear, para a demonstração abrir rápido.
   repo.latencyMs = opts.latencyMs ?? 0;

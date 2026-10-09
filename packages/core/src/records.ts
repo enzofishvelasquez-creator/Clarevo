@@ -247,6 +247,25 @@ export interface ReturnReviewState {
   mark: ReturnReviewMark | null;
 }
 
+/** Resposta a "Você consegue guardar algum valor por mês?" (plano de guardar, spec7): "consigo", "agora não" ou "responder depois". */
+export type SavingsAnswer = 'consigo' | 'agora_nao' | 'depois';
+
+/**
+ * Resposta da própria pessoa no contexto (savings_checks): uma linha viva por pessoa e contexto, só dela (nem a Família
+ * nem a empresa leem). monthlyCents (100 a 999.999.999) só com 'consigo'; askAgainOn (calculada no banco: depois = hoje + 7,
+ * agora_nao = hoje + 30) é nula com 'consigo'. O banco guarda também person_id (a própria pessoa), que o app não usa.
+ */
+export interface SavingsCheck {
+  contextId: string;
+  answer: SavingsAnswer;
+  monthlyCents: Cents | null;
+  answeredOn: IsoDate;
+  askAgainOn: IsoDate | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** Recebimentos e gastos anotados num mês (months_overview, mesmo critério de month_totals). */
 export interface MonthOverview {
   month: IsoMonth;

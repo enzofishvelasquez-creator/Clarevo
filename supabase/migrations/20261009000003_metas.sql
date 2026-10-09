@@ -1,8 +1,10 @@
--- Clarevo · migração 0007 · metas e reserva para imprevistos (D-027). Depois de 20261009000002_renda_comprometida.sql.
+-- Clarevo · migração 0007 · metas e reserva para imprevistos (D-027) e resposta do plano de guardar (D-036).
+-- Depois de 20261009000002_renda_comprometida.sql.
 -- Metas só por create_goal, update_goal, set_goal_status e delete_goal; movimentos só por add_goal_movement,
 -- update_goal_movement e delete_goal_movement: autoria da sessão, chave de idempotência por pessoa (o mesmo espaço das
 -- outras operações), hash em JSON (D-021, regra 7), versão e exclusão lógica.
 -- A reserva é meta, não conta: o Clarevo não guarda nem movimenta dinheiro. Um movimento é um fato registrado pela pessoa.
+-- A resposta "você consegue guardar algum valor por mês?" só por set_savings_answer (uma linha viva por pessoa e contexto).
 --
 -- Sinal dos movimentos: saldo_inicial (já guardado ao criar), aporte, rendimento (recebido) e valorizacao somam;
 -- resgate e desvalorizacao subtraem. Guardado = soma dos movimentos vivos (todos com data até hoje: data futura é recusada).
@@ -18,8 +20,15 @@
 -- G6. No máximo uma reserva para imprevistos não excluída e não arquivada por contexto.
 -- G7. Identidade, contexto, autoria e criação nunca mudam; o tipo do movimento nunca muda; excluídos não mudam mais;
 --     versão +1 por escrita; no máximo um "já guardado ao criar" vivo por meta.
+-- G8. Plano de guardar (savings_checks): no máximo uma resposta por pessoa e contexto; o valor por mês só existe na
+--     resposta "consigo" (100 a 999.999.999 centavos); a data de voltar a perguntar é calculada no banco (depois: hoje + 7
+--     dias; agora_nao: hoje + 30; consigo: nenhuma); a resposta e as datas são lidas só pela própria pessoa (nem Família,
+--     nem empresa, nem somadas); responder não é anotação (não conta como atividade do A4, como decidir_revisao); o
+--     Clarevo não grava nada em metas, registros ou contas a pagar por causa da resposta (o plano é criado pelas funções
+--     de metas, em outra chamada).
 -- Ordem de travas: chave → meta → (reserva do contexto, consultiva) → movimentos. A atividade (gatilho de
--- record_operations, 0005) é a última, como em toda escrita.
+-- record_operations, 0005) é a última, como em toda escrita. Resposta de guardar: chave → trava consultiva da pessoa e do
+-- contexto → linha da resposta.
 
 -- ---------------------------------------------------------------------------
 -- Metas
@@ -90,8 +99,39 @@ comment on table public.goal_movements is
   'Movimentos registrados de uma meta. Nunca entram em Recebido, Pago, Diferença, Ainda a pagar nem na renda comprometida.';
 
 -- ---------------------------------------------------------------------------
+-- Plano de guardar (D-036): a resposta da pessoa à pergunta "Você consegue guardar algum valor por mês?".
+-- Uma linha viva por pessoa e contexto (a resposta nova substitui a anterior, com versão +1). Só datas e o valor que a
+-- própria pessoa informou; lida só por ela. ask_again_on: quando a pergunta volta (nulo em "consigo").
+-- ---------------------------------------------------------------------------
+create table public.savings_checks (
+  person_id uuid not null references public.persons (id) on delete cascade,
+  context_id uuid not null references public.financial_contexts (id) on delete cascade,
+  answer text not null,
+  -- Só em "consigo": quanto a pessoa consegue guardar por mês (R$ 1,00 a R$ 9.999.999,99).
+  monthly_cents bigint,
+  answered_on date not null,
+  ask_again_on date,
+  version integer not null default 1 check (version >= 1),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (person_id, context_id),
+  constraint savings_checks_resposta check (answer in ('consigo', 'agora_nao', 'depois')),
+  constraint savings_checks_valor check (
+    (answer = 'consigo' and monthly_cents is not null and monthly_cents between 100 and 999999999)
+    or (answer <> 'consigo' and monthly_cents is null)),
+  -- Só "consigo" não volta a perguntar; as outras voltam depois do dia da resposta (7 e 30 dias: set_savings_answer).
+  constraint savings_checks_retorno check (
+    (answer = 'consigo' and ask_again_on is null)
+    or (answer <> 'consigo' and ask_again_on is not null and ask_again_on > answered_on))
+);
+create index savings_checks_ctx on public.savings_checks (context_id);
+comment on table public.savings_checks is
+  'Resposta do plano de guardar (consigo, agora_nao ou depois), o valor por mês informado e quando voltar a perguntar. Lida só pela própria pessoa.';
+
+-- ---------------------------------------------------------------------------
 -- Operações: lista completa vigente (0002, 0003, 0004, 0005 e 0006) mais as sete ações novas, que apontam só para o
--- alvo (target_id): a meta nas ações de meta, o movimento nas ações de movimento.
+-- alvo (target_id): a meta nas ações de meta, o movimento nas ações de movimento; e responder_guardar (D-036), que não
+-- aponta para nada (o contexto já está em context_id), como decidir_revisao.
 -- ---------------------------------------------------------------------------
 alter table public.record_operations drop constraint record_operations_action_check;
 alter table public.record_operations add constraint record_operations_action_check check (action in (
@@ -101,7 +141,8 @@ alter table public.record_operations add constraint record_operations_action_che
   'criar_ocorrencia', 'decidir_revisao',
   'definir_renda_referencia', 'excluir_renda_referencia',
   'criar_meta', 'alterar_meta', 'situacao_meta', 'excluir_meta',
-  'registrar_movimento_meta', 'alterar_movimento_meta', 'excluir_movimento_meta'));
+  'registrar_movimento_meta', 'alterar_movimento_meta', 'excluir_movimento_meta',
+  'responder_guardar'));
 alter table public.record_operations drop constraint record_operations_target_check;
 alter table public.record_operations add constraint record_operations_target_check check (
   (action in ('criar', 'editar', 'excluir') and record_id is not null and target_id is null)
@@ -115,7 +156,7 @@ alter table public.record_operations add constraint record_operations_target_che
                  'registrar_movimento_meta', 'alterar_movimento_meta', 'excluir_movimento_meta')
       and target_id is not null and record_id is null and commitment_id is null)
   or (action = 'criar_ocorrencia' and commitment_id is not null and target_id is not null and record_id is null)
-  or (action = 'decidir_revisao' and record_id is null and commitment_id is null and target_id is null));
+  or (action in ('decidir_revisao', 'responder_guardar') and record_id is null and commitment_id is null and target_id is null));
 
 -- ---------------------------------------------------------------------------
 -- Gatilhos de proteção (G7): defesa adicional, só as sete funções gravam.
@@ -161,6 +202,54 @@ $$;
 create trigger goal_movements_guard
   before update on public.goal_movements
   for each row execute function public.goal_movements_guard();
+
+-- Pode mudar: a resposta, o valor por mês, as datas, version (+1) e updated_at. Pessoa, contexto e criação nunca mudam.
+create or replace function public.savings_checks_guard()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.person_id <> old.person_id or new.context_id <> old.context_id or new.created_at <> old.created_at
+     or new.version <> old.version + 1 then
+    raise exception 'campo_imutavel' using errcode = '42501';
+  end if;
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+create trigger savings_checks_guard
+  before update on public.savings_checks
+  for each row execute function public.savings_checks_guard();
+
+-- Atividade (A4, 0005): responder o plano de guardar não é anotação, como decidir_revisao. É a mesma função da 0005 com
+-- a exceção nova; o gatilho record_operations_activity continua o mesmo. Uma resposta não encurta nem cria ausência.
+create or replace function public.clarevo_track_activity()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_day date;
+begin
+  if new.action in ('decidir_revisao', 'responder_guardar') then
+    return null;
+  end if;
+  v_day := public.clarevo_today(new.actor_id);
+  insert into public.context_activity as a (person_id, context_id, last_write_on)
+  values (new.actor_id, new.context_id, v_day)
+  on conflict (person_id, context_id) do update
+    set absence_from_on  = case when public.clarevo_long_absence(a.last_write_on, excluded.last_write_on)
+                                then a.last_write_on else a.absence_from_on end,
+        absence_until_on = case when public.clarevo_long_absence(a.last_write_on, excluded.last_write_on)
+                                then excluded.last_write_on else a.absence_until_on end,
+        last_write_on    = excluded.last_write_on
+    where excluded.last_write_on > a.last_write_on;
+  return null;
+end;
+$$;
 
 -- ---------------------------------------------------------------------------
 -- Saldo diário (G1): o primeiro dia em que a soma acumulada, por data, dos movimentos vivos fica negativa; nulo se
@@ -954,16 +1043,116 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- Leitura: RLS (negado por padrão; só quem lê o contexto vê metas e movimentos vivos) e a visão goal_items.
--- Sem escrita direta.
+-- Plano de guardar (D-036): responder "Você consegue guardar algum valor por mês?".
+-- p_answer: 'consigo' (com p_monthly_cents de 100 a 999.999.999), 'agora_nao' (volta em 30 dias) ou 'depois' (volta em 7
+-- dias); as duas últimas sem valor. A data de voltar a perguntar é calculada aqui, a partir do dia de hoje da pessoa
+-- (clarevo_today). Exige escrita no contexto (a resposta é da própria pessoa e só ela a lê). p_expected_version 0 = ainda
+-- não há resposta; nulo é recusado. A resposta nova substitui a anterior (versão +1), inclusive o valor: "agora_nao" ou
+-- "depois" depois de "consigo" apaga o valor por mês (para manter o valor, responder "consigo" com ele de novo).
+-- Nada além da resposta é gravado (nenhuma meta, registro ou conta a pagar) e a operação não conta como atividade (A4).
+-- Ordem: sessão; chave; repetição; sem_permissao; resposta_invalida; valor_invalido ou valor_acima_do_limite; trava;
+-- versao_desatualizada; escrita; operação. Recusa não grava nada (a chave pode ser usada de novo).
+-- Retorno: a linha de savings_checks em JSON (na repetição, a linha atual).
+-- ---------------------------------------------------------------------------
+create or replace function public.set_savings_answer(
+  p_idempotency_key text,
+  p_context_id uuid,
+  p_expected_version integer,
+  p_answer text,
+  p_monthly_cents bigint default null
+)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_hash text;
+  v_op public.record_operations%rowtype;
+  v_r public.savings_checks%rowtype;
+  v_today date;
+  v_again date;
+begin
+  if v_uid is null then
+    raise exception 'nao_autenticado' using errcode = '42501';
+  end if;
+  perform public.clarevo_check_key(p_idempotency_key);
+  v_hash := md5(jsonb_build_array('responder_guardar', p_context_id, p_expected_version, p_answer, p_monthly_cents)::text);
+  perform pg_advisory_xact_lock(hashtext('op:' || v_uid::text || ':' || p_idempotency_key));
+
+  select * into v_op from public.record_operations where actor_id = v_uid and idempotency_key = p_idempotency_key;
+  if found then
+    if v_op.action <> 'responder_guardar' or v_op.request_hash <> v_hash then
+      raise exception 'chave_reutilizada' using errcode = 'PT409';
+    end if;
+    if not public.context_permission(v_op.context_id, 'read') then
+      raise exception 'nao_encontrado' using errcode = 'P0002';
+    end if;
+    return (select to_jsonb(r) from public.savings_checks r where r.person_id = v_uid and r.context_id = v_op.context_id);
+  end if;
+
+  if not public.context_permission(p_context_id, 'write') then
+    raise exception 'sem_permissao' using errcode = '42501';
+  end if;
+  if p_answer is null or p_answer not in ('consigo', 'agora_nao', 'depois') then
+    raise exception 'resposta_invalida' using errcode = '22023';
+  end if;
+  if p_answer = 'consigo' then
+    if p_monthly_cents is null or p_monthly_cents < 100 then
+      raise exception 'valor_invalido' using errcode = '22023';
+    end if;
+    if p_monthly_cents > 999999999 then
+      raise exception 'valor_acima_do_limite' using errcode = '22023';
+    end if;
+  elsif p_monthly_cents is not null then
+    raise exception 'valor_invalido' using errcode = '22023';
+  end if;
+
+  -- A linha pode ainda não existir: a trava consultiva serializa a primeira resposta; depois, a linha.
+  perform pg_advisory_xact_lock(hashtext('guardar:' || v_uid::text || ':' || p_context_id::text));
+  select * into v_r from public.savings_checks where person_id = v_uid and context_id = p_context_id for update;
+  if p_expected_version is distinct from coalesce(v_r.version, 0) then
+    raise exception 'versao_desatualizada' using errcode = 'PT409', detail = 'versao_atual=' || coalesce(v_r.version, 0);
+  end if;
+
+  v_today := public.clarevo_today(v_uid);
+  v_again := case p_answer when 'depois' then v_today + 7 when 'agora_nao' then v_today + 30 else null end;
+
+  insert into public.savings_checks as s (person_id, context_id, answer, monthly_cents, answered_on, ask_again_on)
+  values (v_uid, p_context_id, p_answer, p_monthly_cents, v_today, v_again)
+  on conflict (person_id, context_id) do update
+    set answer = excluded.answer,
+        monthly_cents = excluded.monthly_cents,
+        answered_on = excluded.answered_on,
+        ask_again_on = excluded.ask_again_on,
+        version = s.version + 1
+  returning * into v_r;
+
+  insert into public.record_operations (actor_id, idempotency_key, action, context_id, request_hash, record_id, commitment_id, target_id)
+  values (v_uid, p_idempotency_key, 'responder_guardar', p_context_id, v_hash, null, null, null);
+
+  return to_jsonb(v_r);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Leitura: RLS (negado por padrão; só quem lê o contexto vê metas e movimentos vivos; a resposta de guardar, só a própria
+-- pessoa) e a visão goal_items. Sem escrita direta.
 -- ---------------------------------------------------------------------------
 alter table public.goals enable row level security;
 alter table public.goal_movements enable row level security;
+alter table public.savings_checks enable row level security;
 
 create policy goals_read on public.goals for select to authenticated
   using (deleted_at is null and public.context_permission(context_id, 'read'));
 create policy goal_movements_read on public.goal_movements for select to authenticated
   using (deleted_at is null and public.context_permission(context_id, 'read'));
+-- Resposta do plano de guardar: só a própria pessoa, e só enquanto lê o contexto (vínculo revogado não vê nada).
+-- Nem Família, nem empresa, nem somadas: nenhuma visão ou função agrega esta tabela.
+create policy savings_checks_own on public.savings_checks for select to authenticated
+  using (person_id = auth.uid() and public.context_permission(context_id, 'read'));
 
 -- Metas não excluídas com as somas dos movimentos vivos. security_invoker: a RLS de quem consulta vale nas duas tabelas.
 create view public.goal_items with (security_invoker = true) as
@@ -990,9 +1179,9 @@ comment on view public.goal_items is
   'Metas não excluídas com o valor guardado (soma com sinal dos movimentos vivos) e a composição por tipo de movimento.';
 
 -- ---------------------------------------------------------------------------
--- Privilégios: bloco inteiro da 0006 (idempotente), mais as sete funções públicas novas.
--- goals, goal_movements e goal_items ficam sem insert, update ou delete diretos; auxiliares, guardas e o gatilho de
--- consistência ficam sem execute para authenticated.
+-- Privilégios: bloco inteiro da 0006 (idempotente), mais as oito funções públicas novas (sete de metas e
+-- set_savings_answer). goals, goal_movements, goal_items e savings_checks ficam sem insert, update ou delete diretos;
+-- auxiliares, guardas e o gatilho de consistência ficam sem execute para authenticated.
 -- ---------------------------------------------------------------------------
 revoke all on all tables in schema public from anon, authenticated;
 revoke all on all sequences in schema public from anon, authenticated;
@@ -1047,3 +1236,4 @@ grant execute on function public.delete_goal(text, uuid, integer) to authenticat
 grant execute on function public.add_goal_movement(text, uuid, text, bigint, date, text) to authenticated;
 grant execute on function public.update_goal_movement(text, uuid, integer, bigint, date, text) to authenticated;
 grant execute on function public.delete_goal_movement(text, uuid, integer) to authenticated;
+grant execute on function public.set_savings_answer(text, uuid, integer, text, bigint) to authenticated;

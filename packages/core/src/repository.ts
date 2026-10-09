@@ -22,6 +22,8 @@ import type {
   ReturnDecision,
   ReturnReviewMark,
   ReturnReviewState,
+  SavingsAnswer,
+  SavingsCheck,
   SeriesEditInput,
   SeriesInput,
 } from './records';
@@ -47,6 +49,12 @@ export type ReturnReviewAction = 'decidir_revisao';
  * Contam como anotação na atividade (D-030), como as demais escritas.
  */
 export type IncomeReferenceAction = 'definir_renda_referencia' | 'excluir_renda_referencia';
+
+/**
+ * Resposta do plano de guardar (set_savings_answer, spec7), gravada em record_operations sem alvo. Como 'decidir_revisao',
+ * não conta como anotação na atividade (D-030).
+ */
+export type SavingsAction = 'responder_guardar';
 
 /**
  * Metas (D-027, Ciclo C), gravadas em record_operations com o alvo em target_id: a meta em criar_meta, alterar_meta,
@@ -288,6 +296,20 @@ export interface RecordsRepository {
   deleteGoalMovement(key: string, movementId: string, expectedVersion: number): Promise<GoalWrite>;
   /** Reconciliação de metas: a operação com esta chave já foi concluída? movementId só nas ações de movimento. */
   findGoalOperation(key: string): Promise<{ action: GoalAction; goalId: string; movementId: string | null } | null>;
+
+  // Plano de guardar (spec7). A resposta e as datas são só da própria pessoa (RLS como a atividade do A4).
+
+  /** Resposta da própria pessoa no contexto (savings_checks) ou null (ainda não respondeu, sem leitura ou outra pessoa). */
+  getSavingsCheck(contextId: string): Promise<SavingsCheck | null>;
+  /**
+   * set_savings_answer. Grava (versão 0 = ainda não existe) ou substitui a resposta viva da pessoa no contexto. Exige
+   * escrita no contexto. Ordem: repetição; sem_permissao; resposta_invalida; valor_invalido e valor_acima_do_limite
+   * (monthlyCents de 100 a 999.999.999 só com 'consigo'; nulo nas outras respostas); versao_desatualizada (versão nula ou
+   * negativa também; RepoError.detail "versao_atual=N"). As datas são calculadas aqui, no dia da pessoa: answeredOn = hoje; askAgainOn = hoje + 7
+   * ('depois'), hoje + 30 ('agora_nao') ou nula ('consigo'). Mesma chave e conteúdo: devolve o estado atual; outro
+   * conteúdo ou outra ação: chave_reutilizada. Não conta como anotação na atividade. Reconciliação: repetir a chave.
+   */
+  setSavingsAnswer(key: string, contextId: string, expectedVersion: number, answer: SavingsAnswer, monthlyCents?: Cents | null): Promise<SavingsCheck>;
 }
 
 export type RepoErrorCode =
@@ -347,6 +369,7 @@ export type RepoErrorCode =
   | 'situacao_invalida'
   | 'meta_arquivada'
   | 'saldo_da_meta_insuficiente'
+  | 'resposta_invalida'
   | 'desconhecido';
 
 export class RepoError extends Error {

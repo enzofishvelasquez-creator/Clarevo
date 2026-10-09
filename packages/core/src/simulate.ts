@@ -14,14 +14,16 @@ import { MAX_RECORD_CENTS, centsToInput, formatBRL, type Cents } from './money';
  * é sempre digitada pela pessoa (0% a 30% ao ano, sem valor padrão) e nunca é gravada, nem na meta.
  *
  * - Taxa mensal equivalente: i = (1 + a)^(1/12) − 1, com a = pontos-base ÷ 10.000; a = 0 → i = 0.
- * - Aportes no fim de cada mês: final(n) = piso(inicial × (1 + i)^n + mensal × ((1 + i)^n − 1) ÷ i);
+ * - Aportes no início de cada mês, a convenção da Calculadora do Cidadão do Banco Central (Aplicação com depósitos
+ *   regulares: Sn = (1 + j) × (((1 + j)^n − 1) ÷ j) × p; decisão de Enzo de 09/10/2026, no lugar do fim do mês da
+ *   spec2 §2.6): final(n) = piso(inicial × (1 + i)^n + mensal × (1 + i) × ((1 + i)^n − 1) ÷ i);
  *   i = 0 → inicial + mensal × n.
  * - Valor por mês para um alvo: o menor inteiro com final ≥ alvo (para cima); i = 0 → teto((alvo − inicial) ÷ n).
  * - Prazo: o menor n de 1 a 600 com final(n) ≥ alvo (para cima); senão null ("não alcança em 50 anos").
  * - Dinheiro de hoje: piso(final ÷ (1 + π)^n), com π a inflação mensal equivalente.
  * - Só o fator de juros usa ponto flutuante de 64 bits; entradas e saídas são centavos inteiros. O fator é calculado
- *   com log1p e expm1 ((1 + i)^n = e^(n × ln(1 + a) ÷ 12)), a mesma conta da spec2 sem a perda de precisão de
- *   (1 + i) − 1 com taxas pequenas e prazos longos.
+ *   com log1p e expm1 ((1 + i)^n = e^(n × ln(1 + a) ÷ 12), 1 + i = e^(ln(1 + a) ÷ 12)), a mesma conta da spec2 sem a
+ *   perda de precisão de (1 + i) − 1 com taxas pequenas e prazos longos.
  * - Sem produto, banco, emissor, ranking, perfil de quem investe ou taxa sugerida (Resoluções CVM 19, 20 e 30).
  */
 
@@ -83,12 +85,23 @@ export function monthlyRateText(rateBp: number): string {
   return bp === 0 && rateBp > 0 ? 'menos de 0,01%' : formatBp(bp);
 }
 
-/** Valor sem piso nem conferência de tamanho: inicial × (1 + i)^n + mensal × ((1 + i)^n − 1) ÷ i, nunca abaixo do aportado. */
+/**
+ * Fator dos aportes no início de cada mês, por centavo aportado por mês: (1 + i) × ((1 + i)^n − 1) ÷ i
+ * = expm1(n × l) ÷ expm1(l) × e^l, com l = ln(1 + i). Com i > 0 fica acima de n (o aporte do mês já rende no mês).
+ */
+function depositsFactor(months: number, l: number): number {
+  return (Math.expm1(months * l) / Math.expm1(l)) * Math.exp(l);
+}
+
+/**
+ * Valor sem piso nem conferência de tamanho, com aportes no início de cada mês:
+ * inicial × (1 + i)^n + mensal × (1 + i) × ((1 + i)^n − 1) ÷ i, nunca abaixo do aportado.
+ */
 function rawFinal(initial: Cents, monthly: Cents, months: number, rateBp: number): number {
   const contributed = initial + monthly * months;
   if (rateBp === 0) return contributed;
   const l = logMonthly(rateBp);
-  const value = Math.floor(initial * Math.exp(months * l) + (monthly * Math.expm1(months * l)) / Math.expm1(l));
+  const value = Math.floor(initial * Math.exp(months * l) + monthly * depositsFactor(months, l));
   // Com taxa de 0% ou mais, o valor nunca fica abaixo do aportado: o máximo só corrige o ruído do ponto flutuante.
   return Math.max(value, contributed);
 }
@@ -106,8 +119,8 @@ function safe(value: number): Cents {
 }
 
 /**
- * Valor ao fim de n meses, para baixo no centavo, com aportes no fim de cada mês. n = 0 → o valor inicial.
- * finalValueCents(450.000, 118.452, 14, 1.000) = 2.250.010; finalValueCents(0, 50.000, 120, 1.000) = 9.993.192.
+ * Valor ao fim de n meses, para baixo no centavo, com aportes no início de cada mês. n = 0 → o valor inicial.
+ * finalValueCents(450.000, 117.515, 14, 1.000) = 2.250.012; finalValueCents(0, 50.000, 120, 1.000) = 10.072.879.
  */
 export function finalValueCents(initial: Cents, monthly: Cents, months: number, rateBp: number): Cents {
   checkAmounts(initial, monthly, months, rateBp, 0);
@@ -116,7 +129,7 @@ export function finalValueCents(initial: Cents, monthly: Cents, months: number, 
 
 /**
  * Valor em dinheiro de hoje: piso(valor ÷ (1 + π)^n), π = (1 + inflação)^(1/12) − 1. Inflação 0: o próprio valor.
- * todayValueCents(9.993.192, 120, 450) = 6.434.892.
+ * todayValueCents(10.072.879, 120, 450) = 6.486.205.
  */
 export function todayValueCents(valueCents: Cents, months: number, inflationBp: number): Cents {
   checkInt(valueCents, 'valor', 0, Number.MAX_SAFE_INTEGER);
@@ -166,7 +179,7 @@ export interface SimulationGrowth {
 /**
  * Composição na hipótese: aportado, rendimento, final, dinheiro de hoje e o ano a ano.
  * simulateGrowth({ initial: 0, monthly: 50.000, months: 120, rateBp: 1.000, inflationBp: 450 }) →
- * { finalCents: 9.993.192, contributedCents: 6.000.000, earningsCents: 3.993.192, todayValueCents: 6.434.892, byYear: [10 anos] }.
+ * { finalCents: 10.072.879, contributedCents: 6.000.000, earningsCents: 4.072.879, todayValueCents: 6.486.205, byYear: [10 anos] }.
  */
 export function simulateGrowth(input: SimulationGrowthInput): SimulationGrowth {
   const { initial, monthly, months, rateBp } = input;
@@ -193,7 +206,7 @@ export function simulateGrowth(input: SimulationGrowthInput): SimulationGrowth {
 
 /**
  * Valor por mês para juntar o alvo em n meses: o menor inteiro com final ≥ alvo (para cima no centavo); 0 quando o
- * inicial já chega lá. Taxa 0: teto((alvo − inicial) ÷ n). monthlyForTarget(2.250.000, 450.000, 14, 1.000) = 118.452;
+ * inicial já chega lá. Taxa 0: teto((alvo − inicial) ÷ n). monthlyForTarget(2.250.000, 450.000, 14, 1.000) = 117.515;
  * com taxa 0, 128.572.
  */
 export function monthlyForTarget(target: Cents, initial: Cents, months: number, rateBp: number): Cents {
@@ -201,10 +214,10 @@ export function monthlyForTarget(target: Cents, initial: Cents, months: number, 
   checkAmounts(initial, 0, months, rateBp, SIMULATE_MONTHS_MIN);
   if (initial >= target) return 0;
   if (rateBp === 0) return monthlyShareCents(target - initial, months);
-  // Fórmula da spec2: max(0, teto((alvo − inicial × f) × i ÷ (f − 1))), conferida e ajustada pelo próprio final(),
-  // para que o resultado seja sempre o menor valor que alcança o alvo.
+  // Fórmula da spec2 com aportes no início do mês: max(0, teto((alvo − inicial × f) × i ÷ ((f − 1) × (1 + i)))),
+  // conferida e ajustada pelo próprio final(), para que o resultado seja sempre o menor valor que alcança o alvo.
   const l = logMonthly(rateBp);
-  let m = Math.max(0, Math.ceil((target - initial * Math.exp(months * l)) / (Math.expm1(months * l) / Math.expm1(l))));
+  let m = Math.max(0, Math.ceil((target - initial * Math.exp(months * l)) / depositsFactor(months, l)));
   while (m > 0 && rawFinal(initial, m - 1, months, rateBp) >= target) m -= 1;
   while (rawFinal(initial, m, months, rateBp) < target) m += 1;
   return m;
@@ -284,7 +297,7 @@ export interface SimulationInput {
 export interface SimulationTexts {
   /** Linha de abertura ("Para juntar R$ 22.500,00 em 14 meses, começando com R$ 4.500,00:"); null quando não há. */
   intro: string | null;
-  /** Destaque ("R$ 1.184,52 por mês na hipótese informada"). */
+  /** Destaque ("R$ 1.175,15 por mês na hipótese informada"). */
   highlight: string;
   /** Demais linhas, na ordem (sem rendimento, composição, dinheiro de hoje). */
   lines: string[];
@@ -727,7 +740,7 @@ export const SIMULATE_TEXT = {
     monthlyCents > 0
       ? `Guardando ${brl(monthlyCents)} por mês por ${monthsCount(months)}${initialCents > 0 ? `, começando com ${brl(initialCents)}` : ''}:`
       : `Com ${brl(initialCents)} por ${monthsCount(months)}, sem guardar mais nada por mês:`,
-  /** "R$ 1.184,52 por mês na hipótese informada" */
+  /** "R$ 1.175,15 por mês na hipótese informada" */
   monthlyHighlight: (monthlyCents: Cents) => `${brl(monthlyCents)} por mês na hipótese informada`,
   /** "Sem rendimento, seriam R$ 1.285,72 por mês." */
   monthlyWithoutYield: (monthlyCents: Cents) => `Sem rendimento, seriam ${brl(monthlyCents)} por mês.`,
@@ -739,15 +752,15 @@ export const SIMULATE_TEXT = {
     `Com ${brl(monthlyCents)} por mês: ${monthsCount(months)} na hipótese informada; ${
       monthsWithoutYield === null ? 'sem rendimento, não alcança em 50 anos' : `${monthsCount(monthsWithoutYield)} sem rendimento`
     }.`,
-  /** "Na hipótese informada: R$ 99.931,92 em 120 meses" */
+  /** "Na hipótese informada: R$ 100.728,79 em 120 meses" */
   totalHighlight: (finalCents: Cents, months: number) => `Na hipótese informada: ${brl(finalCents)} em ${monthsCount(months)}`,
   /** "Total aportado: R$ 60.000,00" */
   contributed: (cents: Cents) => `Total aportado: ${brl(cents)}`,
-  /** "Rendimento na hipótese: R$ 39.931,92" */
+  /** "Rendimento na hipótese: R$ 40.728,79" */
   earnings: (cents: Cents) => `Rendimento na hipótese: ${brl(cents)}`,
   /** "Sem rendimento, seriam R$ 60.000,00." */
   totalWithoutYield: (cents: Cents) => `Sem rendimento, seriam ${brl(cents)}.`,
-  /** "Em dinheiro de hoje, com inflação de 4,5% ao ano: R$ 64.348,92" */
+  /** "Em dinheiro de hoje, com inflação de 4,5% ao ano: R$ 64.862,05" */
   todayValue: (inflationBp: number, cents: Cents) => `Em dinheiro de hoje, com inflação de ${formatBpCompact(inflationBp)} ao ano: ${brl(cents)}`,
 
   /** Hipóteses, sempre visíveis, na ordem da spec2 §4.7, mais o arredondamento do modo. */
@@ -755,7 +768,7 @@ export const SIMULATE_TEXT = {
     rateBp === 0
       ? 'Taxa de 0% ao ano: sem rendimento.'
       : `Taxa de ${formatBpCompact(rateBp)} ao ano (${monthlyRateText(rateBp)} ao mês, taxa equivalente), constante no período.`,
-    'Aportes no fim de cada mês.',
+    'Aportes no início de cada mês, como na Calculadora do Cidadão do Banco Central.',
     'Valores brutos, sem imposto de renda, IOF ou taxas.',
     inflationBp === null
       ? 'Sem inflação, salvo se informada.'

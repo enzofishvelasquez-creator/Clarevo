@@ -1301,7 +1301,8 @@ end $$;
 reset role;
 
 -- ---------------------------------------------------------------------------
--- 10. record_operations: as sete ações novas apontam só para o alvo (target_id); a lista vigente tem 25 ações.
+-- 10. record_operations: as sete ações novas apontam só para o alvo (target_id); a lista vigente tem 26 ações (a 26ª,
+-- responder_guardar, é testada em 65).
 -- G3: nenhuma operação de metas grava registro ou conta a pagar.
 -- ---------------------------------------------------------------------------
 do $$
@@ -1334,8 +1335,8 @@ begin
     = array['alterar_meta', 'alterar_movimento_meta', 'alterar_serie', 'criar', 'criar_compromisso', 'criar_meta', 'criar_ocorrencia',
             'criar_serie', 'decidir_revisao', 'definir_renda_referencia', 'desfazer_pagamento', 'editar', 'editar_compromisso',
             'encerrar_serie', 'excluir', 'excluir_compromisso', 'excluir_meta', 'excluir_movimento_meta', 'excluir_renda_referencia',
-            'excluir_serie', 'informar_ano', 'pagar_compromisso', 'registrar_movimento_meta', 'situacao_meta', 'tirar_ano'],
-    'as 25 ações vigentes';
+            'excluir_serie', 'informar_ano', 'pagar_compromisso', 'registrar_movimento_meta', 'responder_guardar', 'situacao_meta', 'tirar_ano'],
+    'as 26 ações vigentes (as 7 de metas e a de guardar, testada em 65)';
   -- Toda operação de meta aponta para uma meta do mesmo contexto (a exclusão, para uma excluída); toda operação de
   -- movimento, para um movimento do mesmo contexto (a exclusão, para um excluído).
   assert not exists (select 1 from public.record_operations o
@@ -1503,7 +1504,7 @@ do $$ begin
             'create_series_occurrence', 'decide_return_review', 'delete_commitment', 'delete_goal', 'delete_goal_movement',
             'delete_income_reference', 'delete_record', 'delete_series', 'end_series', 'ensure_personal_space', 'inform_series_year',
             'is_org_admin', 'month_committed', 'month_to_pay', 'month_totals', 'months_overview', 'pay_commitment', 'set_goal_status',
-            'set_income_reference', 'skip_series_year', 'sync_series_occurrences', 'undo_commitment_payment', 'update_commitment',
+            'set_income_reference', 'set_savings_answer', 'skip_series_year', 'sync_series_occurrences', 'undo_commitment_payment', 'update_commitment',
             'update_goal', 'update_goal_movement', 'update_record', 'update_series_from'],
     'authenticated executa só as funções expostas (7 novas)';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

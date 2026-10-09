@@ -24,6 +24,8 @@ import type {
   RecordKind,
   ReturnDecision,
   ReturnReviewMark,
+  SavingsAnswer,
+  SavingsCheck,
   SeriesEditInput,
   SeriesInput,
   SeriesTerm,
@@ -37,6 +39,7 @@ import type {
   IncomeReferenceAction,
   RecordsRepository,
   ReturnReviewAction,
+  SavingsAction,
   SeriesAction,
   SeriesWrite,
 } from './repository';
@@ -62,6 +65,7 @@ import {
 } from './goals';
 import { PARTS_PER_YEAR_MAX } from './records';
 import { isLongAbsence, isReviewableMonth, monthsOverview as overviewOf } from './retorno';
+import { savingsAnswerError, savingsAskAgainOn } from './savings';
 import {
   ANNUAL_MAX_YEARS,
   SERIES_LIMIT,
@@ -80,7 +84,7 @@ import { dueDateBounds, seriesInputError, seriesTermError } from './validation';
 type RecordAction = 'criar' | 'editar' | 'excluir';
 
 interface Operation {
-  action: RecordAction | CommitmentAction | SeriesAction | ReturnReviewAction | IncomeReferenceAction | GoalAction;
+  action: RecordAction | CommitmentAction | SeriesAction | ReturnReviewAction | IncomeReferenceAction | GoalAction | SavingsAction;
   hash: string;
   contextId: string;
   recordId: string | null;
@@ -165,6 +169,8 @@ export interface MemoryRepositoryOptions {
  * Metas (D-027): as sete funções de metas, com G1 a G6 (saldo dia a dia nunca negativo, mesmo contexto, nenhuma escrita
  * em registros ou contas a pagar, meta excluída sem movimento vivo, meta arquivada sem movimento novo e no máximo uma
  * reserva não arquivada por contexto). Movimentos nunca mexem em registros, contas a pagar nem na versão da meta.
+ * Plano de guardar (spec7): set_savings_answer, uma resposta viva por contexto, só da própria pessoa; não conta como
+ * anotação na atividade (como a decisão da revisão) e não mexe em nenhum total.
  * Usado na demonstração (acesso simulado) e nos testes.
  */
 export class MemoryRepository implements RecordsRepository {
@@ -180,6 +186,8 @@ export class MemoryRepository implements RecordsRepository {
   private incomeRefs = new Map<string, StoredIncomeReference>();
   private goals = new Map<string, StoredGoal>();
   private goalMovements = new Map<string, StoredGoalMovement>();
+  /** savings_checks da pessoa (só ela usa este repositório), por contexto: uma resposta viva por contexto. */
+  private savingsChecks = new Map<string, SavingsCheck>();
   private seq = 0;
   /** Simula falha de rede: 'antes' (nada gravado) ou 'depois' (gravado, resposta perdida). */
   failNextWrite: 'antes' | 'depois' | null = null;
@@ -232,6 +240,7 @@ export class MemoryRepository implements RecordsRepository {
       incomeRefs: new Map(this.incomeRefs),
       goals: new Map(this.goals),
       goalMovements: new Map(this.goalMovements),
+      savingsChecks: new Map(this.savingsChecks),
     };
     let result: T;
     try {
@@ -250,6 +259,7 @@ export class MemoryRepository implements RecordsRepository {
         incomeRefs: this.incomeRefs,
         goals: this.goals,
         goalMovements: this.goalMovements,
+        savingsChecks: this.savingsChecks,
       } = saved);
       throw e;
     }
@@ -1278,6 +1288,54 @@ export class MemoryRepository implements RecordsRepository {
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // Plano de guardar (spec7): savings_checks e set_savings_answer
+  // ---------------------------------------------------------------------------
+
+  /** Como a leitura de savings_checks (RLS: só a própria pessoa; sem leitura, nada). */
+  async getSavingsCheck(contextId: string) {
+    return this.read(() => (this.canRead(contextId) ? (this.savingsChecks.get(contextId) ?? null) : null));
+  }
+
+  /**
+   * Como set_savings_answer (migração 0007, lida em 09/10/2026). Ordem: repetição; sem_permissao (escrita no contexto);
+   * resposta_invalida; valor_invalido e valor_acima_do_limite (savingsAnswerError: 'consigo' de 100 a 999.999.999
+   * centavos, as outras sem valor); versao_desatualizada (versão 0 = ainda não existe; nula, negativa ou diferente da
+   * atual também; detalhe "versao_atual=N"). A resposta nova substitui a anterior, inclusive o valor. As datas vêm daqui,
+   * do dia da pessoa: answeredOn = hoje e askAgainOn = hoje + 7 ('depois'), hoje + 30 ('agora_nao') ou nula ('consigo').
+   * Operação sem alvo; não conta como anotação na atividade.
+   */
+  async setSavingsAnswer(key: string, contextId: string, expectedVersion: number, answer: SavingsAnswer, monthlyCents: Cents | null = null) {
+    return this.write(() => {
+      const monthly = monthlyCents ?? null;
+      const payload = [contextId, expectedVersion, answer, monthly];
+      const replayed = this.replay(key, 'responder_guardar', payload);
+      if (replayed) return this.savingsChecks.get(replayed.contextId)!;
+      if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      const code = savingsAnswerError(answer, monthly);
+      if (code) throw new RepoError(code);
+      const current = this.savingsChecks.get(contextId);
+      if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0 || expectedVersion !== (current?.version ?? 0)) {
+        throw new RepoError('versao_desatualizada', undefined, `versao_atual=${current?.version ?? 0}`);
+      }
+      const today = this.opts.today();
+      const now = new Date().toISOString();
+      const next: SavingsCheck = {
+        contextId,
+        answer,
+        monthlyCents: monthly,
+        answeredOn: today,
+        askAgainOn: savingsAskAgainOn(answer, today),
+        version: (current?.version ?? 0) + 1,
+        createdAt: current?.createdAt ?? now,
+        updatedAt: now,
+      };
+      this.savingsChecks.set(contextId, next);
+      this.saveOperation(key, 'responder_guardar', payload, { contextId, recordId: null, commitmentId: null });
+      return next;
+    });
+  }
+
   /** Outra reserva viva e não arquivada no contexto (G6)? */
   private otherReserve(contextId: string, exceptId: string | null) {
     return [...this.goals.values()].some(
@@ -1441,6 +1499,26 @@ export class MemoryRepository implements RecordsRepository {
     this.checkSeriesInvariants();
     this.checkReferenceInvariants();
     this.checkGoalInvariants();
+    this.checkSavingsInvariants();
+  }
+
+  /**
+   * Plano de guardar (no banco: restrições de coluna de savings_checks): resposta da lista; valor de 1 a MAX_RECORD_CENTS
+   * só com 'consigo'; data de volta nula só com 'consigo' e depois do dia da resposta nas outras; versão a partir de 1.
+   * Lança Error('guardar_inconsistente').
+   */
+  private checkSavingsInvariants() {
+    for (const c of this.savingsChecks.values()) {
+      if (
+        savingsAnswerError(c.answer, c.monthlyCents) !== null ||
+        !isValidIsoDate(c.answeredOn) ||
+        (c.answer === 'consigo' ? c.askAgainOn !== null : c.askAgainOn === null || !isValidIsoDate(c.askAgainOn) || c.askAgainOn <= c.answeredOn) ||
+        !Number.isSafeInteger(c.version) ||
+        c.version < 1
+      ) {
+        throw new Error('guardar_inconsistente');
+      }
+    }
   }
 
   /**
@@ -1560,6 +1638,7 @@ export class MemoryRepository implements RecordsRepository {
     incomeRefs?: Map<string, StoredIncomeReference>;
     goals?: Map<string, StoredGoal>;
     goalMovements?: Map<string, StoredGoalMovement>;
+    savingsChecks?: Map<string, SavingsCheck>;
   }) {
     const fail = () => {
       throw new Error('campo_imutavel');
@@ -1612,6 +1691,12 @@ export class MemoryRepository implements RecordsRepository {
         fail();
       }
       if (before.goalMovements && !m.deletedAt && this.goals.get(m.goalId)?.status === 'arquivada') fail();
+    }
+    // Plano de guardar: criação não muda; versão + 1 por escrita.
+    for (const [ctx, c] of this.savingsChecks) {
+      const old = before.savingsChecks?.get(ctx);
+      if (!old || old === c) continue;
+      if (old.contextId !== c.contextId || old.createdAt !== c.createdAt || c.version !== old.version + 1) fail();
     }
     // Revisão: mês revisado e dia da decisão nunca recuam; versão + 1 por escrita.
     for (const [ctx, r] of this.reviews) {
@@ -1735,12 +1820,12 @@ export class MemoryRepository implements RecordsRepository {
   }
 
   /**
-   * Como o gatilho clarevo_track_activity em record_operations: toda operação nova, menos decidir_revisao, deixa o
-   * último dia com anotação >= hoje; se o intervalo desde o último for uma ausência longa, ela passa a ser a última
-   * ausência. Mesmo dia ou relógio para trás: nada muda.
+   * Como o gatilho clarevo_track_activity em record_operations: toda operação nova, menos decidir_revisao e
+   * responder_guardar, deixa o último dia com anotação >= hoje; se o intervalo desde o último for uma ausência longa,
+   * ela passa a ser a última ausência. Mesmo dia ou relógio para trás: nada muda.
    */
   private trackActivity(action: Operation['action'], contextId: string) {
-    if (action === 'decidir_revisao') return;
+    if (action === 'decidir_revisao' || action === 'responder_guardar') return;
     const day = this.opts.today();
     const a = this.activity.get(contextId);
     if (!a) {

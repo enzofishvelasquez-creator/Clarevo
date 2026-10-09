@@ -12,6 +12,18 @@ import {
   simulationErrorText,
   simulationResultLines,
   validateSimulationDraft,
+  SAVINGS_ERROR_TEXT,
+  SAVINGS_TEXT,
+  lastIncomeReferenceChange,
+  minimumReserveOptions,
+  savingsCardState,
+  savingsErrorText,
+  savingsPlan,
+  savingsPlanTexts,
+  savingsReferenceText,
+  savingsSmallSteps,
+  validateMinimumReserveDraft,
+  validateSavingsDraft,
   GOALS_TEXT,
   GOAL_ERROR_TEXT,
   GOAL_MOVEMENT_KINDS,
@@ -711,6 +723,141 @@ describe('textos de metas (Ciclo C)', () => {
     expect(text).not.toMatch(FORBIDDEN);
     expect(text).not.toMatch(JUDGMENT);
     expect(text).not.toMatch(CELEBRATION);
+  });
+});
+
+/**
+ * Plano de guardar (spec7): os textos da pergunta, de "Sim, consigo", de "Agora não", da reserva mínima e dos passos
+ * pequenos passam por todas as listas do Ciclo C, mais "você deveria" e "cortar" (nada de dizer o que fazer com o dinheiro).
+ * Textos montados com várias entradas (plano da demonstração, sem gastos essenciais, alcançado, passa de 50 anos, valor
+ * fora da faixa) e o arquivo-fonte savings.ts.
+ */
+const SAVINGS_EXTRA = /voc[eê] deveria|\bdeveria\b|\bcortar\b|\bcorte\b|\bgaste menos\b|\bevite gastar\b/i;
+
+describe('textos do plano de guardar (spec7)', () => {
+  it('as listas reprovam o que deve', () => {
+    for (const bad of ['Você deveria guardar mais', 'Que tal cortar gastos?', 'Gaste menos', 'Corte o lazer']) expect(SAVINGS_EXTRA.test(bad), bad).toBe(true);
+    for (const ok of [SAVINGS_TEXT.askTitle, SAVINGS_TEXT.notNowBody, SAVINGS_TEXT.afterStage]) expect(SAVINGS_EXTRA.test(ok), ok).toBe(false);
+  });
+
+  it('textos fixos da especificação, palavra por palavra', () => {
+    const T = SAVINGS_TEXT;
+    expect(T.askTitle).toBe('Você consegue guardar algum valor por mês?');
+    expect(T.askBody).toBe('Sua resposta ajuda a montar um plano com os seus números. Ela fica só com você.');
+    expect([T.yes, T.notNow, T.later]).toEqual(['Sim, consigo', 'Agora não', 'Responder depois']);
+    expect(T.askAgainTitle).toBe('Sua situação mudou? Você consegue guardar algum valor por mês?');
+    expect(T.incomeChangedTitle).toBe('Sua renda de referência mudou. Quer rever quanto guardar por mês?');
+    expect(T.changeValue).toBe('Mudar valor');
+    expect(T.firstStepTitle).toBe('Planejar quanto guardar');
+    expect(T.amountLabel).toBe('Quanto você consegue guardar por mês?');
+    expect(T.useThisPlan).toBe('Usar este plano');
+    expect(T.afterStage).toBe('Depois, o mesmo valor pode ir para as suas metas.');
+    expect(T.notNowBody).toBe('Tudo bem. Muita gente começa com valores pequenos, e qualquer valor guardado ajuda num imprevisto.');
+    expect(T.minimumTitle).toBe('Quer começar uma reserva mínima?');
+    expect([T.minimumEssentials, T.minimumOther, T.minimumCreate]).toEqual(['1 mês dos seus gastos essenciais', 'Outro valor', 'Criar reserva mínima']);
+    expect(T.weeklyStep(1_000)).toBe('Guardar R$ 10,00 por semana');
+    expect(T.weeklyStepMonthly(4_333)).toBe('R$ 43,33 por mês');
+    expect(T.extraStep).toBe('Guardar quando entrar um valor extra');
+    expect([T.helpWhere, T.helpCommitted, T.askNextMonth]).toEqual(['Ver para onde foi o dinheiro', 'Ver renda comprometida', 'Me pergunte de novo no próximo mês']);
+    expect(T.stageWithMonth(30_000, T.stageSubjectReserve(1, 375_000, '1 mês dos seus gastos essenciais'), '2027-11')).toBe(
+      'Com R$ 300,00 por mês, a primeira etapa (R$ 3.750,00, 1 mês dos seus gastos essenciais) chega em novembro de 2027.',
+    );
+  });
+
+  it('SAVINGS_TEXT, SAVINGS_ERROR_TEXT e os textos montados', async () => {
+    const T = SAVINGS_TEXT;
+    const texts: string[] = [
+      ...staticStrings(T),
+      ...staticStrings(SAVINGS_ERROR_TEXT),
+      T.planMonthly(50_000),
+      T.planMonthly(1),
+      T.weeklyStep(1_000),
+      T.weeklyStepMonthly(4_333),
+      ...[1, 2, 3].map((n) => T.stageSubjectReserve(n, 375_000, `${n} meses dos seus gastos essenciais`)),
+      T.stageSubjectGoal('Viagem de férias', 600_000),
+      T.stageWithMonth(50_000, T.stageSubjectGoal('Viagem de férias', 600_000), '2027-09'),
+      T.stageReachedSentence(T.stageSubjectGoal('Viagem de férias', 600_000), false),
+      T.stageReachedSentence(T.stageSubjectReserve(1, 375_000, '1 mês dos seus gastos essenciais'), true),
+      T.stageBeyondSentence(100, T.stageSubjectGoal('Viagem de férias', 600_000)),
+      T.stageNoForecast(T.stageSubjectGoal('Viagem de férias', 600_000), 480_000),
+      T.stageMonth('2029-12'),
+      ...['valor_invalido', 'valor_acima_do_limite', 'versao_desatualizada', 'resposta_invalida', 'sem_permissao', 'desconhecido'].map(savingsErrorText),
+    ];
+    const draftErrors = ['', 'abc', '0', '99.999.999,99'].map((v) => validateSavingsDraft(v));
+    for (const d of draftErrors) if (!d.ok) texts.push(d.error);
+    for (const v of ['', '99,99', '10.000.000,00']) {
+      const d = validateMinimumReserveDraft(v);
+      if (!d.ok) texts.push(d.error);
+    }
+    for (const e of [null, 375_000, 20_000]) texts.push(...minimumReserveOptions(e).map((o) => o.label));
+    for (const s of savingsSmallSteps()) texts.push(s.label, s.monthlyLabel ?? '');
+
+    // Cartões da pergunta, em todos os estados.
+    const back = (answer: 'consigo' | 'agora_nao' | 'depois') => ({
+      contextId: 'ctx',
+      answer,
+      monthlyCents: answer === 'consigo' ? 50_000 : null,
+      answeredOn: '2026-10-07',
+      askAgainOn: answer === 'consigo' ? null : '2026-10-14',
+      version: 1,
+      createdAt: '',
+      updatedAt: '',
+    });
+    for (const c of [null, back('depois'), back('agora_nao'), back('consigo')]) {
+      for (const day of ['2026-10-08', '2026-12-01']) {
+        const s = savingsCardState(c, day, '2026-10-08');
+        if (s.kind === 'pergunta') texts.push(s.title);
+      }
+    }
+
+    // Plano da demonstração (com metas e reserva), sem metas, sem gastos essenciais, alcançado e além do limite.
+    const repo = await createDemoRepository();
+    const ctx = (await repo.getSpace())!.personalContextId;
+    const goals = await repo.listGoals(ctx);
+    const movements = await repo.listGoalMovementsInMonth(ctx, '2026-10');
+    const reserve = goals.find((g) => g.goalType === 'emergencia')!;
+    const variants = [
+      { monthlyCents: 50_000, essentialCents: reserve.essentialBaseCents, goals, movements },
+      { monthlyCents: 50_000, essentialCents: reserve.essentialBaseCents, goals, movements, chosenStageId: 'reserva-6' },
+      { monthlyCents: 30_000, essentialCents: 375_000, goals: [], movements: [] },
+      { monthlyCents: 30_000, essentialCents: null, goals, movements },
+      { monthlyCents: 100, essentialCents: 375_000, goals, movements },
+      { monthlyCents: 0, essentialCents: 375_000, goals, movements },
+      { monthlyCents: 100_000, essentialCents: 10_000, goals, movements },
+      { monthlyCents: 100_000, essentialCents: 300_000_000, goals: [], movements: [] },
+    ];
+    for (const v of variants) {
+      const p = savingsPlan({ ...v, today: DEMO_TODAY });
+      const t = savingsPlanTexts(p);
+      texts.push(t.monthly, t.headline ?? '', t.afterStage ?? '', t.needsEssentials ?? '', t.reference, t.referenceSource, t.noInterest);
+      for (const s of t.stages) texts.push(s.title, s.amount, s.missing, s.month ?? '', s.sentence);
+    }
+    // Com a referência do mês.
+    const refs = await repo.listIncomeReferences(ctx);
+    const list = await repo.listCommitments(ctx, '2026-10');
+    texts.push(savingsReferenceText(summarizeCommitted(list, ctx, '2026-10', DEMO_TODAY, refs), '2026-10') ?? '');
+    texts.push(savingsReferenceText(summarizeCommitted(list, ctx, '2026-10', DEMO_TODAY, refs.map((r) => ({ ...r, amountCents: 100_000 }))), '2026-10') ?? '');
+
+    expect(texts.length).toBeGreaterThan(100);
+    expect(lastIncomeReferenceChange(refs)).toBeNull();
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(NEUTRAL);
+      expect(text, text).not.toMatch(CELEBRATION);
+      expect(text, text).not.toMatch(SAVINGS_EXTRA);
+      // Nenhum produto, banco ou taxa sugerida; nenhum rendimento prometido.
+      expect(text, text).not.toMatch(/\b(tesouro|cdb|lci|lca|poupan[cç]a|selic|nubank|banco do brasil|caixa econ|rende|rendendo|garantid)/i);
+    }
+  });
+
+  it('arquivo-fonte savings.ts', () => {
+    const text = readFileSync(join(CORE_SRC, 'savings.ts'), 'utf8');
+    expect(text).not.toMatch(FORBIDDEN);
+    expect(text).not.toMatch(JUDGMENT);
+    expect(text).not.toMatch(NEUTRAL);
+    expect(text).not.toMatch(CELEBRATION);
+    expect(text).not.toMatch(SAVINGS_EXTRA);
   });
 });
 
