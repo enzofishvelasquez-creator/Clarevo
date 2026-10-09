@@ -1,4 +1,4 @@
-import { SAVINGS_ERROR_TEXT, SAVINGS_TEXT, savingsErrorText, savingsPlan, savingsPlanTexts, type Cents, type SavingsAnswer } from '@clarevo/core';
+import { SAVINGS_ERROR_TEXT, SAVINGS_STAGE_MONTHS, SAVINGS_TEXT, organizeGoals, savingsErrorText, savingsPlan, savingsPlanTexts, type Cents, type SavingsAnswer } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { CircleAlert, PiggyBank } from 'lucide-react-native';
@@ -54,6 +54,8 @@ export function SavingsCard({
     setError(null);
     const result = await guardedWrite(keys, JSON.stringify([next, monthlyCents, version]), (key) =>
       set.mutateAsync({ key, contextId, expectedVersion: version, answer: next, monthlyCents }),
+    undefined,
+    { retryOnce: true },
     );
     setBusy(null);
     if (result.status === 'ok' || result.status === 'reconciled') {
@@ -88,6 +90,7 @@ export function SavingsCard({
 
   if (state.kind === 'plano') {
     const planInputs = inputs.data;
+    const reserve = planInputs ? organizeGoals(planInputs.goals).reserve : null;
     const headline = planInputs
       ? savingsPlanTexts(
           savingsPlan({
@@ -96,6 +99,8 @@ export function SavingsCard({
             goals: planInputs.goals,
             movements: planInputs.movements,
             today,
+            // O resumo fala da etapa que a reserva já tem como alvo (1, 3 ou 6 meses), quando ela é uma das etapas do plano.
+            chosenStageId: reserve && reserve.essentialMonths !== null && SAVINGS_STAGE_MONTHS.includes(reserve.essentialMonths) ? `reserva-${reserve.essentialMonths}` : null,
           }),
         ).headline
       : null;

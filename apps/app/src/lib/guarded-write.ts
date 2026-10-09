@@ -34,6 +34,23 @@ export async function guardedWrite<T, F extends object>(
   snapshot: string,
   send: (key: string) => Promise<T>,
   accept?: (saved: OperationAttempt & F) => boolean,
+  /**
+   * Escritas sem busca de operação (renda de referência e resposta do plano de guardar): repetir uma vez, com a mesma chave e o
+   * mesmo conteúdo, é a reconciliação (o banco devolve o estado atual, sem gravar de novo). Se a rede continua fora, a
+   * segunda tentativa também fica incerta e quem chama mostra a falha.
+   */
+  options: { retryOnce?: boolean } = {},
+): Promise<WriteResult<T, F>> {
+  const first = await attempt(keys, snapshot, send, accept);
+  if (first.status === 'uncertain' && options.retryOnce) return attempt(keys, snapshot, send, accept);
+  return first;
+}
+
+async function attempt<T, F extends object>(
+  keys: OperationKeys<F>,
+  snapshot: string,
+  send: (key: string) => Promise<T>,
+  accept?: (saved: OperationAttempt & F) => boolean,
 ): Promise<WriteResult<T, F>> {
   if (keys.hasPending()) {
     try {

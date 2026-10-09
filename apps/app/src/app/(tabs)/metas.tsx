@@ -12,7 +12,8 @@ import { SavingsCard } from '@/components/savings-card';
 import { EmptyState, ErrorState } from '@/components/states';
 import { TopicRow } from '@/components/topic-link';
 import { Body, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
-import { LEARN_UI_TEXT, explanationHref, isTopicPublished, topicBySlug } from '@/lib/learn';
+import { explanationHref, isTopicPublished, topicBySlug } from '@/lib/learn';
+import { SIMULATOR_READY } from '@/lib/simulator-route';
 import { useCommittedSummary, useGoalsOverview, useSavingsCard, useSpace, type GoalsOverview } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
@@ -70,7 +71,9 @@ export default function MetasScreen() {
           )}
 
           <Card style={{ paddingVertical: space[2] }}>
-            <CalcNavRow icon={ChartLine} title={GOALS_TEXT.simulateTitle} caption={GOALS_TEXT.simulateBody} onPress={() => router.push('/simular')} />
+            {SIMULATOR_READY ? (
+              <CalcNavRow icon={ChartLine} title={GOALS_TEXT.simulateTitle} caption={GOALS_TEXT.simulateBody} onPress={() => router.push('/simular')} />
+            ) : null}
             <CalcNavRow
               icon={Calculator}
               title={GOALS_TEXT.calculators}
@@ -177,7 +180,7 @@ function LearnCard() {
   return (
     <View style={styles.learn}>
       <Txt variant="title" style={{ fontFamily: fonts.extrabold }} accessibilityRole="header" aria-level={2}>
-        {LEARN_UI_TEXT.title}
+        Aprender
       </Txt>
       {shown.map((r, i) => (
         <TopicRow key={r.slug} topic={r.topic} caption={null} onAccent last={i === shown.length - 1} onPress={() => router.push(explanationHref(r.slug))} />

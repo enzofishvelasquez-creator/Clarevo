@@ -2,6 +2,7 @@ import {
   GOALS_TEXT,
   MAX_RECORD_CENTS,
   SAVINGS_ERROR_TEXT,
+  SAVINGS_STAGE_MONTHS,
   SAVINGS_TEXT,
   GOAL_ERROR_TEXT,
   centsToInput,
@@ -87,7 +88,10 @@ export function SavingsPlanForm({
   const initialEssential = inputs.suggestedEssentialCents !== null ? centsToInput(inputs.suggestedEssentialCents) : '';
   const [amountText, setAmountText] = useState(initialAmount);
   const [essentialText, setEssentialText] = useState(initialEssential);
-  const [stageId, setStageId] = useState<string | null>(null);
+  // Etapa escolhida: a da reserva que já existe (se tem 1, 3 ou 6 meses), para "Usar este plano" nunca diminuir o alvo sem a
+  // pessoa escolher; sem reserva, o padrão do core (a primeira etapa ainda não alcançada).
+  const initialStage = reserve && reserve.essentialMonths !== null && SAVINGS_STAGE_MONTHS.includes(reserve.essentialMonths) ? `reserva-${reserve.essentialMonths}` : null;
+  const [stageId, setStageId] = useState<string | null>(initialStage);
   const [amountError, setAmountError] = useState<string | undefined>();
   const [essentialError, setEssentialError] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +99,7 @@ export function SavingsPlanForm({
   const amountRef = useRef<TextInput>(null);
   const essentialRef = useRef<TextInput>(null);
 
-  const dirty = amountText !== initialAmount || essentialText !== initialEssential || stageId !== null;
+  const dirty = amountText !== initialAmount || essentialText !== initialEssential || stageId !== initialStage;
   const guard = useLeaveGuard(dirty && !busy, '/metas');
 
   // Plano ao vivo: função pura do core a cada digitação.
@@ -167,6 +171,8 @@ export function SavingsPlanForm({
         const version = check?.version ?? 0;
         const r = await guardedWrite(savingsKeys, JSON.stringify(['consigo', v.monthlyCents, version]), (key) =>
           setAnswer.mutateAsync({ key, contextId, expectedVersion: version, answer: 'consigo', monthlyCents: v.monthlyCents }),
+          undefined,
+          { retryOnce: true },
         );
         if (r.status !== 'ok' && r.status !== 'reconciled') {
           failFromResult(r, 'resposta');
@@ -252,7 +258,7 @@ export function SavingsPlanForm({
           ) : null}
         </Card>
 
-        {plan && texts ? (
+        {plan && texts && texts.stages.length > 0 ? (
           <Card style={{ gap: space[4] }}>
             <Txt variant="title" accessibilityRole="header" aria-level={2}>
               {SAVINGS_TEXT.stagesTitle}

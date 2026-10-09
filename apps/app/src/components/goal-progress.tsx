@@ -68,7 +68,11 @@ export function GoalProgress({
       accessible
       accessibilityRole="progressbar"
       accessibilityLabel={label === undefined ? undefined : mask(label)}
-      accessibilityValue={{ min: 0, max: 100, now: bar, text: valueText === undefined ? undefined : mask(valueText) }}>
+      accessibilityValue={{ min: 0, max: 100, now: bar, text: valueText === undefined ? undefined : mask(valueText) }}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={bar}
+      aria-valuetext={valueText === undefined ? undefined : mask(valueText)}>
       <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         {track}
       </View>

@@ -35,7 +35,7 @@ import { colors, fonts, space } from '@/theme/tokens';
 /**
  * "Agora não" (spec7 §3): texto acolhedor, sem julgamento, e a reserva mínima a partir de R$ 100,00, escolhida pela pessoa
  * (nenhum valor vem marcado). Passos pequenos opcionais, só como ideia: nada é gravado até "Criar reserva mínima", e o valor
- * por mês escolhido vira o plano da reserva. Ajudas só como links, sem dizer o que cortar. A resposta "agora não" já foi
+ * por mês escolhido vira o plano da reserva. Ajudas só como links, sem dizer o que mudar. A resposta "agora não" já foi
  * gravada no card; "Me pergunte de novo no próximo mês" a grava de novo com a data nova.
  */
 export function MinimumReserve({ contextId, check, inputs }: { contextId: string; check: SavingsCheck | null; inputs: SavingsPlanInputs }) {
@@ -114,6 +114,8 @@ export function MinimumReserve({ contextId, check, inputs }: { contextId: string
     try {
       const r = await guardedWrite(savingsKeys, JSON.stringify(['agora_nao', null, version]), (key) =>
         setAnswer.mutateAsync({ key, contextId, expectedVersion: version, answer: 'agora_nao', monthlyCents: null }),
+        undefined,
+        { retryOnce: true },
       );
       if (r.status === 'ok' || r.status === 'reconciled') {
         flash.set(SAVINGS_NOTICE.later);
@@ -150,7 +152,7 @@ export function MinimumReserve({ contextId, check, inputs }: { contextId: string
               <Txt variant="title" accessibilityRole="header" aria-level={2}>
                 {SAVINGS_TEXT.minimumTitle}
               </Txt>
-              <ChoiceGroup label="Valor da reserva mínima">
+              <ChoiceGroup label="Valor para começar">
                 {options.map((o) => (
                   <Chip
                     key={o.id}
