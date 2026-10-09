@@ -236,29 +236,17 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
       await p.waitForTimeout(100);
     }
   };
-  const tabsBack2 = async () => {
-    const tab = () => p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true });
-    for (let i = 0; i < 8 && (await tab().count()) === 0; i++) { await btn('Voltar').click(); await p.waitForTimeout(400); }
-    await tab().first().click(); await waitText('Diferença do mês');
-  };
-  const newAccount = async (name, email) => {
-    await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
-    await btn('Criar conta').click(); await waitText('Nome de apresentação');
-    await field('Nome de apresentação').fill(name); await field('E-mail').fill(email); await field('Senha').fill('senha1234');
-    await btn('Criar conta').click(); await waitText('Confira seu e-mail');
-    await btn('Simular abertura do link').click();
-    await btn('Já confirmei meu e-mail').click(); await waitText('Sua primeira conta');
-    await btn('Começar meu mês').click(); await waitText('Diferença do mês'); await waitText('Primeiros passos');
-  };
-  const dump = async (label) => { await p.waitForTimeout(900); console.log('=== ' + label + '\n' + await body()); console.log(JSON.stringify(await p.evaluate(() => [...document.querySelectorAll('[role=button],[role=radio],[role=link],[role=checkbox],[role=switch],input')].filter(e=>e.getBoundingClientRect().width>0).map(e => e.getAttribute('role')+':'+(e.getAttribute('aria-label')||e.textContent||e.value))))); };
-  await newAccount('Caio Teste', 'caio@exemplo.com');
-  await p.getByRole('button', { name: /^Planejar quanto guardar/ }).filter({ visible: true }).first().click(); await waitText('Você consegue guardar');
-  await btn('Sim, consigo').click(); await p.waitForTimeout(900);
-  await field('Quanto você consegue guardar por mês?').fill('300'); 
-  await field('Gastos essenciais por mês').fill('3750'); await p.waitForTimeout(700);
-  await dump('SIM 300 3750');
-  await btn('Usar este plano').click(); await p.waitForTimeout(1500);
-  await dump('USADO');
+  const dump = async (label, n=2500) => { await p.waitForTimeout(900); console.log('=== ' + label + '\n' + (await body()).slice(0,n)); console.log(JSON.stringify(await p.evaluate(() => [...document.querySelectorAll('[role=button],[role=radio],[role=link],[role=checkbox],[role=switch],input')].filter(e=>e.getBoundingClientRect().width>0).map(e => e.getAttribute('role')+':'+(e.getAttribute('aria-label')||e.textContent||e.value))))); };
+  await enterDemo();
+  await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu mês');
+  await btn('Ver detalhes').click(); await waitText('Registrar resgate');
+  await btn('Atualizar valor guardado').click(); await p.waitForTimeout(900);
+  await dump('ATUALIZAR FORM', 1500);
+  await field('Valor guardado hoje').fill('4000').catch(async (e) => console.log('ERRO campo', e.message.slice(0,100)));
+  await btn('Atualizar valor guardado').click(); await p.waitForTimeout(1500);
+  await dump('APOS ATUALIZAR', 1800);
+  await p.getByRole('button', { name: /^Valorização/ }).filter({ visible: true }).first().click().catch(()=>{});
+  await dump('MOV', 1500);
   ok('sem erros de JavaScript no console', errors.length === 0, errors.slice(0,3).join(' | '));
   await b.close();
   for (const r of results) console.log(r.join('  '));
