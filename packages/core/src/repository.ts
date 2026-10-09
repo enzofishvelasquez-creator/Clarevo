@@ -5,16 +5,33 @@ import type {
   CommitmentInput,
   CommitmentSeries,
   FinancialRecord,
+  MonthOverview,
+  OccurrenceMode,
   PaymentInput,
   PersonalSpace,
   RecordInput,
   RecordKind,
+  ReturnDecision,
+  ReturnReviewMark,
+  ReturnReviewState,
   SeriesEditInput,
   SeriesInput,
 } from './records';
 
-/** Ações de conta a pagar gravadas em record_operations (mesmo espaço de chaves dos registros). */
-export type CommitmentAction = 'criar_compromisso' | 'editar_compromisso' | 'excluir_compromisso' | 'pagar_compromisso' | 'desfazer_pagamento';
+/**
+ * Ações de conta a pagar gravadas em record_operations (mesmo espaço de chaves dos registros). 'criar_ocorrencia':
+ * conta de mês passado de uma série (create_series_occurrence), com a conta em commitment_id e a série em target_id.
+ */
+export type CommitmentAction =
+  | 'criar_compromisso'
+  | 'editar_compromisso'
+  | 'excluir_compromisso'
+  | 'pagar_compromisso'
+  | 'desfazer_pagamento'
+  | 'criar_ocorrencia';
+
+/** Decisão da revisão dos últimos meses (decide_return_review); não conta como anotação (D-030). */
+export type ReviewAction = 'decidir_revisao';
 
 /** Resultado das escritas de conta a pagar: a conta no estado atual e, quando houver, o gasto envolvido. */
 export interface CommitmentWrite {
@@ -125,6 +142,38 @@ export interface RecordsRepository {
   syncSeriesOccurrences(contextId: string): Promise<{ created: number; createdOverdue: number }>;
   /** Reconciliação de gasto fixo: a operação com esta chave já foi concluída? */
   findSeriesOperation(key: string): Promise<{ action: SeriesAction; seriesId: string } | null>;
+
+  // Revisão dos últimos meses (D-030, Ciclo A4).
+
+  /** Atividade e marca da revisão da própria pessoa no contexto (context_activity e return_reviews, RLS). */
+  getReturnReviewState(contextId: string): Promise<ReturnReviewState>;
+  /**
+   * Recebimentos e gastos anotados por mês, de `from` a `to` (no máximo 12 meses), um item por mês, do mais antigo ao
+   * mais recente. Mesmo critério de month_totals. periodo_invalido; sem leitura, sem_permissao.
+   */
+  monthsOverview(contextId: string, from: IsoMonth, to: IsoMonth): Promise<MonthOverview[]>;
+  /** Contas vivas (abertas e pagas) com vencimento do dia 1 de `from` até o fim de `to`, por vencimento. */
+  listCommitmentsDueBetween(contextId: string, from: IsoMonth, to: IsoMonth): Promise<Commitment[]>;
+  /**
+   * Conta do número n de uma série num dos 11 meses fechados anteriores ao atual, com a vigência de n e a autoria de
+   * quem criou a série. 'aberta': fica em aberto (para "Já paguei", pague depois com payCommitment; para "Ainda não
+   * paguei", nada mais). 'nao_houve': gravada como excluída só neste mês (nunca volta). A versão da série não muda.
+   * Códigos: versao_desatualizada, modo_invalido, numero_fora_da_serie, mes_fora_da_revisao, ocorrencia_existente,
+   * nao_encontrado, sem_permissao, chave_reutilizada. Reconciliação: findCommitmentOperation (criar_ocorrencia).
+   */
+  createSeriesOccurrence(key: string, seriesId: string, expectedSeriesVersion: number, n: number, mode: OccurrenceMode): Promise<CommitmentWrite>;
+  /**
+   * Grava a decisão (versão 0 = ainda não existe). reviewedThrough: um dos 11 meses fechados anteriores ao atual;
+   * o mês revisado e o dia da decisão nunca recuam. Basta leitura no contexto. Códigos: versao_desatualizada,
+   * decisao_invalida, mes_invalido, sem_permissao, chave_reutilizada. Não conta como anotação.
+   */
+  decideReturnReview(
+    key: string,
+    contextId: string,
+    expectedVersion: number,
+    reviewedThrough: IsoMonth,
+    decision: ReturnDecision,
+  ): Promise<ReturnReviewMark>;
 }
 
 export type RepoErrorCode =
@@ -164,6 +213,12 @@ export type RepoErrorCode =
   | 'vencimento_fora_do_mes'
   | 'estimativa_invalida'
   | 'serie_inconsistente'
+  | 'ocorrencia_existente'
+  | 'mes_fora_da_revisao'
+  | 'modo_invalido'
+  | 'decisao_invalida'
+  | 'mes_invalido'
+  | 'periodo_invalido'
   | 'desconhecido';
 
 export class RepoError extends Error {
