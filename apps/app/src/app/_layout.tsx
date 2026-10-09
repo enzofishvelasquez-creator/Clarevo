@@ -14,7 +14,7 @@ import { Platform } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { afterLogin, signOutIntent } from '@/lib/nav';
+import { afterLogin, restoreTarget, signOutIntent } from '@/lib/nav';
 import { SessionProvider, useSession } from '@/state/session';
 import { SpaceStatusContext, type SpaceStatus } from '@/state/space-status';
 import { ViewProvider } from '@/state/view';
@@ -59,7 +59,6 @@ function takeEntryTarget(): string | null {
 const hasEntryTarget = () => entryTarget !== null;
 
 /** Abas: substituem a pilha. As demais telas abrem por cima do Resumo, para que voltar, cancelar ou descartar cheguem a ele. */
-const TAB_TARGET = /^\/(movimentacoes|metas|aprender)\/?(\?|$)/;
 
 
 export default function RootLayout() {
@@ -166,11 +165,7 @@ function Navigation() {
     if (!user || inRecovery || status !== 'pronto' || !hasEntryTarget()) return;
     const target = takeEntryTarget();
     if (!target) return;
-    if (TAB_TARGET.test(target)) router.replace(target as Href);
-    else {
-      router.replace('/');
-      router.push(target as Href);
-    }
+    restoreTarget(target);
   }, [status, user, inRecovery]);
 
   return (

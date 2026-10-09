@@ -45,9 +45,11 @@ export function SumValues({ onUse, target }: { onUse: (text: string) => void; ta
     nextId.current = 3;
   };
 
-  const close = (applied?: string) => {
+  const close = (applied?: string, keepFocus = false) => {
     setOpen(false);
     reset();
+    // Fechado pelo próprio "Somar valores", o foco fica nele, que continua na tela.
+    if (keepFocus) return;
     if (Platform.OS === 'web') {
       target?.current?.focus();
       return;
@@ -62,7 +64,7 @@ export function SumValues({ onUse, target }: { onUse: (text: string) => void; ta
 
   const toggle = () => {
     if (open) {
-      close();
+      close(undefined, true);
       return;
     }
     reset();

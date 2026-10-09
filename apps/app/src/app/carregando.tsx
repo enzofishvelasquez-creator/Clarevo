@@ -5,7 +5,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { LogoSymbol } from '@/components/brand';
 import { ErrorState, LoadingState } from '@/components/states';
-import { afterLogin } from '@/lib/nav';
+import { afterLogin, restoreTarget } from '@/lib/nav';
 import { useSession } from '@/state/session';
 import { useSpaceStatus } from '@/state/space-status';
 import { colors, space } from '@/theme/tokens';
@@ -19,7 +19,11 @@ export default function Carregando() {
     if (recovery && user) router.replace('/nova-senha');
     else if (status === 'sem-sessao') router.replace(afterLogin.pending() ? '/entrar' : '/boas-vindas');
     else if (status === 'sem-conta') router.replace('/primeira-conta');
-    else if (status === 'pronto' && user) router.replace((afterLogin.take(user.id) ?? '/') as '/');
+    else if (status === 'pronto' && user) {
+      const target = afterLogin.take(user.id);
+      if (target) restoreTarget(target);
+      else router.replace('/');
+    }
   }, [status, recovery, user]);
 
   return (

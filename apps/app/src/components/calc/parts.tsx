@@ -4,6 +4,7 @@ import {
   MAX_RECORD_CENTS,
   calcErrorText,
   calcFields,
+  calcRowA11yLabel,
   calcTitle,
   centsToInput,
   parseBRL,
@@ -107,14 +108,15 @@ export function CalcResult({
 }) {
   const [lead, ...rest] = texts?.resultLines ?? [];
   const shown = texts && lead !== undefined;
-  const spoken = shown ? lead : waiting;
+  // Anuncia o resultado inteiro: uma troca que mantém a primeira linha (como a taxa) também é dita.
+  const spoken = shown ? texts.resultLines.join(' ') : waiting;
   // O que já foi dito (ou estava na tela ao abrir): só uma troca é anunciada.
   const lastSpoken = useRef(spoken);
   useEffect(() => {
     if (Platform.OS !== 'ios' || spoken === lastSpoken.current) return;
     const timer = setTimeout(() => {
       lastSpoken.current = spoken;
-      announceOnIOS(spoken);
+      announceOnIOS(spoken, { queue: true });
     }, ANNOUNCE_DELAY);
     return () => clearTimeout(timer);
   }, [spoken]);
@@ -123,7 +125,7 @@ export function CalcResult({
       <Txt variant="title" accessibilityRole="header" aria-level={level}>
         {title}
       </Txt>
-      <View style={{ gap: space[3] }} accessibilityLiveRegion="polite" aria-live="polite">
+      <View collapsable={false} style={{ gap: space[3] }} accessibilityLiveRegion="polite" aria-live="polite">
         {shown ? (
           <>
             <Txt style={[styles.lead, tabular]}>{lead}</Txt>
@@ -410,7 +412,7 @@ export function CalcNavRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={caption ? `${title}${/[?.!]$/.test(title) ? '' : '.'} ${caption}` : title}
+      accessibilityLabel={calcRowA11yLabel(title, caption)}
       onPress={onPress}
       style={(st) => [styles.row, !last && styles.divider, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && ui.focusRing]}>
       <View style={styles.rowIcon}>

@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 
 /**
  * Destino a retomar depois que a sessão expira e a mesma pessoa entra de novo.
@@ -52,3 +52,17 @@ export const summaryTop = {
     return t;
   },
 };
+
+const TAB_TARGET = /^\/(movimentacoes|metas|aprender)\/?(\?|$)/;
+
+/**
+ * Abre uma tela pedida (endereço da versão web ou destino depois de entrar de novo). Abas substituem a pilha;
+ * as outras telas ficam por cima do Resumo, para "Voltar" sempre ter para onde ir.
+ */
+export function restoreTarget(target: string) {
+  if (TAB_TARGET.test(target)) router.replace(target as Href);
+  else {
+    router.replace('/');
+    router.push(target as Href);
+  }
+}
