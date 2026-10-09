@@ -560,7 +560,6 @@ export function installmentProgress(
   open: readonly Commitment[],
   today: IsoDate,
 ): InstallmentProgress {
-  const listed = liveByNumber(s, occurrences);
   const live = liveByNumber(s, mergeOccurrences(occurrences, open));
   let paidInList = 0;
   for (const c of live.values()) if (c.status === 'quitado') paidInList += 1;
@@ -568,29 +567,58 @@ export function installmentProgress(
   const paidInApp = Math.max(paidInList, s.paidCount ?? 0);
   const base = { total: s.installmentTotal, paidBefore: s.firstNumber - 1, paidInApp };
   if (s.lastNumber === null) return { ...base, remaining: null, lastDueOn: null, remainingCents: null, approximate: false };
+  const items = remainingInstallments(s, occurrences, open, today)!;
+  const lastDueOn = s.lastNumber >= s.firstNumber ? seriesDueOn(s, s.lastNumber) : null;
+  return {
+    ...base,
+    remaining: items.length,
+    lastDueOn,
+    remainingCents: items.reduce((acc, x) => acc + x.amountCents, 0),
+    approximate: items.some((x) => x.amountIsEstimate),
+  };
+}
+
+/** Parcela que ainda falta pagar: em aberto (criada) ou ainda não criada (com a vigência dela). */
+export interface RemainingInstallment {
+  number: number;
+  /** Vencimento: o da conta criada (pode ter sido alterado só nela) ou o calculado pela série. */
+  dueOn: IsoDate;
+  amountCents: Cents;
+  amountIsEstimate: boolean;
+  /** Conta a pagar já criada (em aberto); null quando ainda não foi criada. */
+  commitmentId: string | null;
+}
+
+/**
+ * As parcelas que entram em "Faltam X parcelas" (installmentProgress), por número crescente: as em aberto e as ainda
+ * não criadas depois do mês atual, sem as pagas, as excluídas só neste mês e os meses sem conta registrada. Mesmas
+ * listas de installmentProgress. Série sem término: null.
+ */
+export function remainingInstallments(
+  s: SeriesRange & Pick<CommitmentSeries, 'id' | 'skippedNumbers'> & SeriesCounts,
+  occurrences: readonly Commitment[],
+  open: readonly Commitment[],
+  today: IsoDate,
+): RemainingInstallment[] | null {
+  if (s.lastNumber === null) return null;
+  const listed = liveByNumber(s, occurrences);
+  const live = liveByNumber(s, mergeOccurrences(occurrences, open));
   const skipped = new Set(s.skippedNumbers);
   const current = numberAtOrBefore(s, monthOf(today));
   // Sem nenhuma conta na lista cortada, nada é conhecido antes: vale o primeiro número.
   const known = listed.size === 0 ? s.firstNumber : knownFrom(s, listed);
-  let remaining = 0;
-  let remainingCents = 0;
-  let approximate = false;
+  const out: RemainingInstallment[] = [];
   for (let n = s.firstNumber; n <= s.lastNumber; n++) {
     const c = live.get(n);
     if (c) {
       if (c.status === 'quitado') continue;
-      remaining += 1;
-      remainingCents += c.amountCents;
-      approximate ||= c.amountIsEstimate;
+      out.push({ number: n, dueOn: c.dueOn, amountCents: c.amountCents, amountIsEstimate: c.amountIsEstimate, commitmentId: c.id });
     } else if (!skipped.has(n) && n > current && n >= known) {
       const t = requireTerm(s, n);
-      remaining += 1;
-      remainingCents += t.amountCents;
-      approximate ||= t.amountMode === 'variavel';
+      out.push({ number: n, dueOn: seriesDueOn(s, n), amountCents: t.amountCents, amountIsEstimate: t.amountMode === 'variavel', commitmentId: null });
     }
   }
-  const lastDueOn = s.lastNumber >= s.firstNumber ? seriesDueOn(s, s.lastNumber) : null;
-  return { ...base, remaining, lastDueOn, remainingCents, approximate };
+  return out;
 }
 
 /** Números até o mês atual sem ocorrência viva e não pulados: "Janeiro de 2027: sem conta registrada". */
