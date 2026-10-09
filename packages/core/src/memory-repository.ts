@@ -1,24 +1,37 @@
 import type { IsoDate, IsoMonth } from './dates';
-import { addMonths, dateInMonth, isValidIsoDate, monthOf, monthsBetween } from './dates';
+import { addMonths, dateInMonth, isValidIsoDate, isValidIsoMonth, monthOf, monthsBetween } from './dates';
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS } from './money';
 import type {
   Commitment,
   CommitmentInput,
   CommitmentSeries,
+  ContextActivity,
   FinancialAccount,
   FinancialRecord,
+  OccurrenceMode,
   PaymentInput,
   PersonalSpace,
   RecordInput,
   RecordKind,
+  ReturnDecision,
+  ReturnReviewMark,
   SeriesEditInput,
   SeriesInput,
   SeriesTerm,
 } from './records';
-import type { AffectedRef, CommitmentAction, CommitmentWrite, RecordsRepository, SeriesAction, SeriesWrite } from './repository';
+import type {
+  AffectedRef,
+  CommitmentAction,
+  CommitmentWrite,
+  RecordsRepository,
+  ReturnReviewAction,
+  SeriesAction,
+  SeriesWrite,
+} from './repository';
 import { RepoError } from './repository';
 import { PARTS_PER_YEAR_MAX } from './records';
+import { isLongAbsence, isReviewableMonth, monthsOverview as overviewOf } from './retorno';
 import {
   ANNUAL_MAX_YEARS,
   SERIES_LIMIT,
@@ -30,13 +43,14 @@ import {
   occurrencesToMaterialize,
   seriesCountsTowardLimit,
   seriesMonthOf,
+  termFor,
 } from './series';
 import { dueDateBounds, seriesInputError, seriesTermError } from './validation';
 
 type RecordAction = 'criar' | 'editar' | 'excluir';
 
 interface Operation {
-  action: RecordAction | CommitmentAction | SeriesAction;
+  action: RecordAction | CommitmentAction | SeriesAction | ReturnReviewAction;
   hash: string;
   contextId: string;
   recordId: string | null;
@@ -63,12 +77,23 @@ type StoredTerm = SeriesTerm & { id: string; seriesId: string; contextId: string
 
 const NATURES: readonly string[] = ['conta', 'financiamento', 'compra_parcelada', 'outro_parcelamento'];
 const SERIES_ACTIONS: readonly string[] = ['criar_serie', 'alterar_serie', 'encerrar_serie', 'excluir_serie', 'informar_ano', 'tirar_ano'];
+const COMMITMENT_ACTIONS: readonly string[] = [
+  'criar_compromisso',
+  'editar_compromisso',
+  'excluir_compromisso',
+  'pagar_compromisso',
+  'desfazer_pagamento',
+  'criar_ocorrencia',
+];
 
 export interface MemoryRepositoryOptions {
   actorId: string;
   displayName: string;
   timeZone?: string;
-  /** Dia atual usado para recusar datas futuras e para a janela de geração dos gastos fixos. */
+  /**
+   * Dia atual (no fuso da pessoa) usado para recusar datas futuras, para a janela de geração dos gastos fixos e para a
+   * atividade da revisão dos últimos meses. Pode mudar entre chamadas (testes e cenário de demonstração).
+   */
   today: () => IsoDate;
   /** Atraso artificial (ms) para exibir estados de envio no protótipo. */
   latencyMs?: number;
@@ -80,6 +105,8 @@ export interface MemoryRepositoryOptions {
  * Contas a pagar seguem as funções do banco (D-021): pagar e desfazer são atômicos e mantêm a invariante I1.
  * Gastos fixos seguem D-024 e contas do ano D-029: ocorrências são contas a pagar comuns, criadas na janela de geração,
  * com S1 a S10.
+ * Revisão dos últimos meses (D-030): toda operação gravada, menos a decisão da revisão, atualiza a atividade da pessoa no
+ * contexto (como o gatilho clarevo_track_activity); a geração não grava operação e não mexe nela.
  * Usado na demonstração (acesso simulado) e nos testes.
  */
 export class MemoryRepository implements RecordsRepository {
@@ -89,6 +116,9 @@ export class MemoryRepository implements RecordsRepository {
   private seriesById = new Map<string, StoredSeries>();
   private terms = new Map<string, StoredTerm>();
   private operations = new Map<string, Operation>();
+  /** context_activity e return_reviews da pessoa (só ela usa este repositório), por contexto. */
+  private activity = new Map<string, ContextActivity>();
+  private reviews = new Map<string, ReturnReviewMark>();
   private seq = 0;
   /** Simula falha de rede: 'antes' (nada gravado) ou 'depois' (gravado, resposta perdida). */
   failNextWrite: 'antes' | 'depois' | null = null;
@@ -136,6 +166,8 @@ export class MemoryRepository implements RecordsRepository {
       seriesById: new Map(this.seriesById),
       terms: new Map(this.terms),
       operations: new Map(this.operations),
+      activity: new Map(this.activity),
+      reviews: new Map(this.reviews),
     };
     let result: T;
     try {
@@ -149,6 +181,8 @@ export class MemoryRepository implements RecordsRepository {
         seriesById: this.seriesById,
         terms: this.terms,
         operations: this.operations,
+        activity: this.activity,
+        reviews: this.reviews,
       } = saved);
       throw e;
     }
@@ -741,6 +775,121 @@ export class MemoryRepository implements RecordsRepository {
     });
   }
 
+  /** Como as leituras de context_activity e return_reviews (RLS: só a própria pessoa; sem leitura, nada). */
+  async getReturnReviewState(contextId: string) {
+    return this.read(() =>
+      this.canRead(contextId)
+        ? { activity: this.activity.get(contextId) ?? null, mark: this.reviews.get(contextId) ?? null }
+        : { activity: null, mark: null },
+    );
+  }
+
+  /** Como months_overview: primeiro o período (até 12 meses), depois a permissão. */
+  async monthsOverview(contextId: string, from: IsoMonth, to: IsoMonth) {
+    return this.read(() => {
+      // clarevo_months_between(p_from, p_to) > 11: no máximo 12 meses.
+      if (!isValidIsoMonth(from) || !isValidIsoMonth(to) || to < from || monthsBetween(from, to) > 11) throw new RepoError('periodo_invalido');
+      if (!this.canRead(contextId)) throw new RepoError('sem_permissao');
+      const live = [...this.records.values()].filter((r) => !r.deletedAt).map(strip);
+      return overviewOf(live, contextId, from, to);
+    });
+  }
+
+  /** Contas vivas (abertas e pagas) com vencimento de from-01 até o fim de to, por vencimento. */
+  async listCommitmentsDueBetween(contextId: string, from: IsoMonth, to: IsoMonth) {
+    const start = `${from}-01`;
+    const endExclusive = `${addMonths(to, 1)}-01`;
+    return this.read(() =>
+      [...this.commitments.values()]
+        .filter((c) => !c.deletedAt && c.contextId === contextId && this.canRead(c.contextId) && c.dueOn >= start && c.dueOn < endExclusive)
+        .sort(byDue)
+        .map((c) => this.toCommitment(c)),
+    );
+  }
+
+  /**
+   * Como create_series_occurrence: conta de um dos 11 meses fechados anteriores ao atual, com a vigência do número e a
+   * autoria de quem criou a série; 'nao_houve' grava a conta excluída só neste mês. A versão da série não muda.
+   * Ordem do banco: trava e permissão da série, versão, modo, número, mês, autoria, existência.
+   */
+  async createSeriesOccurrence(key: string, seriesId: string, expectedSeriesVersion: number, n: number, mode: OccurrenceMode) {
+    return this.write(() => {
+      const payload = [seriesId, expectedSeriesVersion, n, mode];
+      const replay = this.replayCommitment(key, 'criar_ocorrencia', payload);
+      if (replay) return replay;
+      const s = this.liveSeries(seriesId);
+      if (s.version !== expectedSeriesVersion) throw new RepoError('versao_desatualizada');
+      if (mode !== 'aberta' && mode !== 'nao_houve') throw new RepoError('modo_invalido');
+      if (!Number.isSafeInteger(n) || n < s.firstNumber || (s.lastNumber !== null && n > s.lastNumber)) throw new RepoError('numero_fora_da_serie');
+      const month = seriesMonthOf(s, n);
+      if (!isReviewableMonth(month, this.opts.today())) throw new RepoError('mes_fora_da_revisao');
+      // A conta leva a autoria de quem criou a série, que precisa poder anotar no contexto.
+      if (!this.isGenerating(s)) throw new RepoError('sem_permissao');
+      const exists = [...this.commitments.values()].some(
+        (c) => c.seriesId === s.id && c.occurrenceNumber === n && (!c.deletedAt || c.seriesSkipped),
+      );
+      if (exists) throw new RepoError('ocorrencia_existente');
+      const term = termFor(this.toSeries(s).terms, n);
+      if (!term) throw new Error('serie_inconsistente');
+      const now = new Date().toISOString();
+      const skip = mode === 'nao_houve';
+      const c: StoredCommitment = {
+        id: this.id('cp'),
+        contextId: s.contextId,
+        description: term.description,
+        amountCents: term.amountCents,
+        currency: 'BRL',
+        dueOn: dateInMonth(month, term.dueDay),
+        category: term.category,
+        status: 'aberto',
+        seriesId: s.id,
+        occurrenceNumber: n,
+        seriesOverride: false,
+        seriesSkipped: skip,
+        amountIsEstimate: term.amountMode === 'variavel',
+        createdBy: s.createdBy,
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+        ...(skip ? { deletedAt: now } : {}),
+      };
+      this.commitments.set(c.id, c);
+      this.saveOperation(key, 'criar_ocorrencia', payload, { contextId: s.contextId, recordId: null, commitmentId: c.id, seriesId: s.id });
+      return this.commitmentResult(c.id, null);
+    });
+  }
+
+  /**
+   * Como decide_return_review: basta leitura no contexto; versão 0 = ainda não existe. O mês revisado e o dia da
+   * decisão nunca recuam. Não conta como anotação.
+   */
+  async decideReturnReview(key: string, contextId: string, expectedVersion: number, reviewedThrough: IsoMonth, decision: ReturnDecision) {
+    return this.write(() => {
+      const payload = [contextId, expectedVersion, reviewedThrough, decision];
+      const replayed = this.replay(key, 'decidir_revisao', payload);
+      if (replayed) return this.reviews.get(replayed.contextId)!;
+      if (!this.canRead(contextId)) throw new RepoError('sem_permissao');
+      if (decision !== 'atualizou' && decision !== 'seguiu') throw new RepoError('decisao_invalida');
+      const today = this.opts.today();
+      if (typeof reviewedThrough !== 'string' || !isValidIsoMonth(reviewedThrough) || !isReviewableMonth(reviewedThrough, today)) {
+        throw new RepoError('mes_invalido');
+      }
+      const current = this.reviews.get(contextId);
+      if (expectedVersion !== (current?.version ?? 0)) throw new RepoError('versao_desatualizada');
+      const mark: ReturnReviewMark = current
+        ? {
+            reviewedThrough: current.reviewedThrough > reviewedThrough ? current.reviewedThrough : reviewedThrough,
+            decision,
+            decidedOn: current.decidedOn > today ? current.decidedOn : today,
+            version: current.version + 1,
+          }
+        : { reviewedThrough, decision, decidedOn: today, version: 1 };
+      this.reviews.set(contextId, mark);
+      this.saveOperation(key, 'decidir_revisao', payload, { contextId, recordId: null, commitmentId: null });
+      return mark;
+    });
+  }
+
   /**
    * Invariantes do vínculo (no banco: restrição adiada, FK composta e checagem de tipo).
    * I1: conta paga, não excluída, com exatamente 1 gasto vivo vinculado, ou em aberto com 0.
@@ -849,10 +998,30 @@ export class MemoryRepository implements RecordsRepository {
    * Série: campos de identidade imutáveis e excluída não muda mais. Vigência: só passa a substituída.
    * Lança Error('campo_imutavel').
    */
-  private checkTransitions(before: { commitments: Map<string, StoredCommitment>; seriesById: Map<string, StoredSeries>; terms: Map<string, StoredTerm> }) {
+  private checkTransitions(before: {
+    commitments: Map<string, StoredCommitment>;
+    seriesById: Map<string, StoredSeries>;
+    terms: Map<string, StoredTerm>;
+    /** Ausentes em instantâneos antigos (testes de S3 e S7): as guardas da revisão só comparam quando vêm. */
+    activity?: Map<string, ContextActivity>;
+    reviews?: Map<string, ReturnReviewMark>;
+  }) {
     const fail = () => {
       throw new Error('campo_imutavel');
     };
+    // Atividade: o último dia com anotação não recua; ausência com os dois dias ou nenhum, de < até <= último.
+    for (const [ctx, a] of this.activity) {
+      const old = before.activity?.get(ctx);
+      if (old && a.lastWriteOn < old.lastWriteOn) fail();
+      if ((a.absenceFromOn === null) !== (a.absenceUntilOn === null)) fail();
+      if (a.absenceFromOn !== null && !(a.absenceFromOn < a.absenceUntilOn! && a.absenceUntilOn! <= a.lastWriteOn)) fail();
+    }
+    // Revisão: mês revisado e dia da decisão nunca recuam; versão + 1 por escrita.
+    for (const [ctx, r] of this.reviews) {
+      const old = before.reviews?.get(ctx);
+      if (!old || old === r) continue;
+      if (r.reviewedThrough < old.reviewedThrough || r.decidedOn < old.decidedOn || r.version !== old.version + 1) fail();
+    }
     for (const [id, c] of this.commitments) {
       const old = before.commitments.get(id);
       if (!old || old === c) continue;
@@ -952,6 +1121,29 @@ export class MemoryRepository implements RecordsRepository {
     ids: Omit<Operation, 'action' | 'hash' | 'seriesId'> & { seriesId?: string },
   ) {
     this.operations.set(key, { action, hash: hash([action, ...payload]), ...ids, seriesId: ids.seriesId ?? null });
+    this.trackActivity(action, ids.contextId);
+  }
+
+  /**
+   * Como o gatilho clarevo_track_activity em record_operations: toda operação nova, menos decidir_revisao, deixa o
+   * último dia com anotação >= hoje; se o intervalo desde o último for uma ausência longa, ela passa a ser a última
+   * ausência. Mesmo dia ou relógio para trás: nada muda.
+   */
+  private trackActivity(action: Operation['action'], contextId: string) {
+    if (action === 'decidir_revisao') return;
+    const day = this.opts.today();
+    const a = this.activity.get(contextId);
+    if (!a) {
+      this.activity.set(contextId, { lastWriteOn: day, absenceFromOn: null, absenceUntilOn: null });
+      return;
+    }
+    if (day <= a.lastWriteOn) return;
+    const long = isLongAbsence(a.lastWriteOn, day);
+    this.activity.set(contextId, {
+      lastWriteOn: day,
+      absenceFromOn: long ? a.lastWriteOn : a.absenceFromOn,
+      absenceUntilOn: long ? day : a.absenceUntilOn,
+    });
   }
 
   /** Série, ocorrências vivas por número crescente e quantas contas a escrita mudou. */
@@ -1161,7 +1353,7 @@ function isSeriesAction(action: Operation['action']): action is SeriesAction {
 }
 
 function isCommitmentAction(action: Operation['action']): action is CommitmentAction {
-  return !isRecordAction(action) && !isSeriesAction(action);
+  return COMMITMENT_ACTIONS.includes(action);
 }
 
 /**

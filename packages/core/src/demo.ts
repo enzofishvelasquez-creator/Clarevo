@@ -14,7 +14,25 @@ import { newOperationKey } from './repository';
 export const DEMO_TODAY = '2026-10-07';
 export const DEMO_EMAIL = 'demo@clarevo.app';
 
-export async function createDemoRepository(opts: { latencyMs?: number } = {}) {
+/**
+ * Cenários da demonstração (D-016), só no modo de demonstração e sempre com a pílula "Demonstração":
+ * - 'padrao': a base de aceite de outubro de 2026 (tudo anotado em 07/10/2026, sem faixa de retorno);
+ * - 'retorno': a montagem FICTÍCIA da sequência R do Ciclo A4 (D-030), anotada em 20/05/2026 e aberta em 07/10/2026.
+ * Conta nova nunca recebe nenhum dos dois.
+ */
+export type DemoScenario = 'padrao' | 'retorno';
+export const DEMO_SCENARIOS: readonly DemoScenario[] = ['padrao', 'retorno'];
+/** Dia da montagem do cenário 'retorno' (última anotação antes do tempo sem usar). */
+export const DEMO_RETURN_SETUP_DAY = '2026-05-20';
+
+/** Parâmetro "?cenario=retorno" → 'retorno'; ausente ou desconhecido → 'padrao'. */
+export function demoScenarioFrom(param: string | null | undefined): DemoScenario {
+  const value = (param ?? '').trim().toLowerCase();
+  return (DEMO_SCENARIOS as readonly string[]).includes(value) ? (value as DemoScenario) : 'padrao';
+}
+
+export async function createDemoRepository(opts: { latencyMs?: number; scenario?: DemoScenario } = {}) {
+  if (opts.scenario === 'retorno') return createReturnDemoRepository(opts.latencyMs);
   const repo = new MemoryRepository({
     actorId: 'pessoa-demo',
     displayName: 'Maria Alves',
@@ -101,5 +119,83 @@ export async function createDemoRepository(opts: { latencyMs?: number } = {}) {
 
   // A latência só passa a valer depois de semear, para a demonstração abrir rápido.
   repo.latencyMs = opts.latencyMs ?? 0;
+  return repo;
+}
+
+/**
+ * Cenário 'retorno' (FICTÍCIO, identificado como demonstração): montagem da sequência R do Ciclo A4. Em 20/05/2026,
+ * Maria cadastra Aluguel (todo mês, R$ 2.500,00, dia 5, desde maio), Luz (todo mês, valor que muda, referência
+ * R$ 180,00, dia 12, desde maio) e Financiamento do carro (48 parcelas de R$ 850,00, próxima 8 em maio, dia 10), paga as
+ * contas de maio e anota Salário (R$ 6.000,00 em 01/05) e Mercado (R$ 1.250,00 em 15/05). Depois o dia passa a
+ * 07/10/2026 sem nenhuma anotação: a geração das contas fica para a abertura do app (useSeriesSync), como na volta real.
+ * Maio: Recebido R$ 6.000,00, Pago R$ 4.765,30. Ao abrir: faixa "Seus últimos meses" com 4 meses com algo sem
+ * registro e 13 contas para conferir.
+ */
+async function createReturnDemoRepository(latencyMs?: number) {
+  let today = DEMO_RETURN_SETUP_DAY;
+  const repo = new MemoryRepository({
+    actorId: 'pessoa-demo',
+    displayName: 'Maria Alves',
+    today: () => today,
+    latencyMs: 0,
+  });
+  const space = await repo.ensurePersonalSpace('Conta principal');
+  const ctx = space.personalContextId;
+  const accountId = space.accounts[0]!.id;
+  const monthly = (description: string, amountCents: number, dueDay: number, amountMode: 'fixo' | 'variavel') =>
+    repo.createSeries(newOperationKey(), ctx, {
+      kind: 'mensal',
+      nature: 'conta',
+      description,
+      category: 'Moradia',
+      amountCents,
+      amountMode,
+      dueDay,
+      firstDueMonth: '2026-05',
+      firstNumber: 1,
+      installmentTotal: null,
+      partsPerYear: null,
+      lastMonth: null,
+    });
+  const aluguel = await monthly('Aluguel', 250_000, 5, 'fixo');
+  const luz = await monthly('Luz', 18_000, 12, 'variavel');
+  const carro = await repo.createSeries(newOperationKey(), ctx, {
+    kind: 'parcelada',
+    nature: 'financiamento',
+    description: 'Financiamento do carro',
+    category: 'Transporte',
+    amountCents: 85_000,
+    amountMode: 'fixo',
+    dueDay: 10,
+    firstDueMonth: '2026-05',
+    firstNumber: 8,
+    installmentTotal: 48,
+    partsPerYear: null,
+    lastMonth: null,
+  });
+  // Contas de maio pagas (os gastos nascem do pagamento).
+  const payMay = async (occurrences: readonly { id: string; version: number; dueOn: string; category: string | null }[], amountCents: number) => {
+    const c = occurrences.find((o) => o.dueOn.startsWith('2026-05'))!;
+    await repo.payCommitment(newOperationKey(), c.id, c.version, { accountId, amountCents, paidOn: c.dueOn, category: c.category });
+  };
+  await payMay(aluguel.occurrences, 250_000);
+  await payMay(luz.occurrences, 16_530);
+  await payMay(carro.occurrences, 85_000);
+  await repo.createRecord(newOperationKey(), ctx, 'receita', {
+    accountId,
+    amountCents: 600_000,
+    occurredOn: '2026-05-01',
+    description: 'Salário',
+    category: 'Salário',
+  });
+  await repo.createRecord(newOperationKey(), ctx, 'despesa', {
+    accountId,
+    amountCents: 125_000,
+    occurredOn: '2026-05-15',
+    description: 'Mercado',
+    category: 'Mercado',
+  });
+  today = DEMO_TODAY;
+  repo.latencyMs = latencyMs ?? 0;
   return repo;
 }

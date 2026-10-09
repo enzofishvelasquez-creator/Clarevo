@@ -31,7 +31,7 @@ export type CommitmentAction =
   | 'criar_ocorrencia';
 
 /** Decisão da revisão dos últimos meses (decide_return_review); não conta como anotação (D-030). */
-export type ReviewAction = 'decidir_revisao';
+export type ReturnReviewAction = 'decidir_revisao';
 
 /** Resultado das escritas de conta a pagar: a conta no estado atual e, quando houver, o gasto envolvido. */
 export interface CommitmentWrite {

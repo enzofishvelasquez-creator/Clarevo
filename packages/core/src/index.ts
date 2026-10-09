@@ -12,3 +12,4 @@ export * from './learn';
 export * from './calculators';
 export * from './sum';
 export * from './shortcuts';
+export * from './retorno';
