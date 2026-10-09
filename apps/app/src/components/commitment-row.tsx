@@ -9,7 +9,7 @@ import {
   type Commitment,
   type IsoDate,
 } from '@clarevo/core';
-import { AlertCircle, CalendarClock, CalendarRange, Check } from 'lucide-react-native';
+import { AlertCircle, CalendarClock, CalendarRange, Check, type LucideIcon } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Txt } from '@/components/ui';
@@ -23,11 +23,33 @@ export const SITUATION_LOOK = {
   paga: { Icon: Check, fg: colors.successText, bg: colors.successTint, label: 'Paga' },
 } as const;
 
+/** Ação rápida abaixo da linha, como "Já paguei" (nome acessível com a conta e o vencimento). */
+export interface RowAction {
+  label: string;
+  accessibilityLabel: string;
+  onPress: () => void;
+  icon?: LucideIcon;
+  disabled?: boolean;
+}
+
 /**
  * Linha de conta a pagar: abre o detalhe; nenhuma ação aninhada. Conta de gasto fixo leva o rótulo em texto
  * ("Todo mês", "Parcela 13 de 48") e, com valor estimado, "≈" no valor e "estimado" na legenda (nunca só a cor).
+ * action: botão secundário pequeno logo abaixo, irmão da linha (nunca dentro dela), alinhado ao texto.
  */
-export function CommitmentRow({ commitment: c, today, onPress, last }: { commitment: Commitment; today: IsoDate; onPress: () => void; last?: boolean }) {
+export function CommitmentRow({
+  commitment: c,
+  today,
+  onPress,
+  last,
+  action,
+}: {
+  commitment: Commitment;
+  today: IsoDate;
+  onPress: () => void;
+  last?: boolean;
+  action?: RowAction;
+}) {
   const { width, fontScale } = useWindowDimensions();
   const stacked = width < 360 || fontScale > 1.3;
   const situation = commitmentSituation(c, today);
@@ -63,7 +85,7 @@ export function CommitmentRow({ commitment: c, today, onPress, last }: { commitm
     </View>
   );
 
-  return (
+  const row = (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
@@ -71,7 +93,7 @@ export function CommitmentRow({ commitment: c, today, onPress, last }: { commitm
       accessibilityHint="Abre a conta a pagar"
       style={(s) => [
         styles.row,
-        !last && styles.divider,
+        action ? styles.rowWithAction : !last && styles.divider,
         s.pressed && { opacity: 0.7 },
         (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid' },
       ]}>
@@ -91,6 +113,35 @@ export function CommitmentRow({ commitment: c, today, onPress, last }: { commitm
         {stacked ? amount : null}
       </View>
       {stacked ? null : amount}
+    </Pressable>
+  );
+  if (!action) return row;
+  return (
+    <View style={[styles.withAction, !last && styles.divider]}>
+      {row}
+      <RowActionButton {...action} />
+    </View>
+  );
+}
+
+/** Botão secundário pequeno (alvo de 44 px), no tom suave da marca; sem cor de alerta. */
+function RowActionButton({ label, accessibilityLabel, onPress, icon: Icon = Check, disabled }: RowAction) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled: Boolean(disabled) }}
+      disabled={disabled}
+      onPress={onPress}
+      style={(s) => [
+        styles.action,
+        { backgroundColor: s.pressed ? '#DCE6FF' : colors.brandTint, opacity: disabled ? 0.65 : 1 },
+        !disabled && (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid', outlineOffset: 2 },
+      ]}>
+      <Icon size={18} color={colors.brand} strokeWidth={2.25} />
+      <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.bold, flexShrink: 1 }}>
+        {label}
+      </Txt>
     </Pressable>
   );
 }
@@ -148,6 +199,19 @@ export function AnnualGroupRow({ group: g, onPress, last }: { group: AnnualGroup
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: space[3], minHeight: 56 },
+  rowWithAction: { paddingBottom: space[2] },
+  withAction: { paddingBottom: space[3] },
+  // Alinhado ao texto da linha (ícone de 40 px + espaço).
+  action: {
+    alignSelf: 'flex-start',
+    marginLeft: 40 + space[3],
+    minHeight: 44,
+    paddingHorizontal: space[4],
+    borderRadius: radius.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+  },
   divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
   amountCol: { flexShrink: 0, alignItems: 'flex-end' },
   amount: { fontFamily: fonts.bold, fontSize: 15 },

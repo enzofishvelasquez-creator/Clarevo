@@ -4,7 +4,7 @@ import { FieldReader, countField, monthsDuration, moneyField, type CalcFieldSpec
 import { parseCount, parseMoney, parseOptionalMoney } from './inputs';
 
 /**
- * 6. Juntar para um objetivo (docs/08 §3.2). falta = alvo − já tem; por mês = teto(falta ÷ meses);
+ * 7. Juntar para um objetivo (docs/08 §3.2). falta = alvo − já tem; por mês = teto(falta ÷ meses);
  * prazo = teto(falta ÷ por mês). Sem rendimento, dito na hipótese.
  */
 export type ObjetivoModo = 'prazo' | 'mensal';

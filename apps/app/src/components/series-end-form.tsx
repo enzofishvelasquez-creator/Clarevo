@@ -60,6 +60,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { CheckOption, ChoiceGroup, joinList, lastYearHint, monthChipLabel, seriesStyles as styles, yearA11yLabel } from '@/components/series-parts';
+import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { totalChange } from '@/lib/highlight';
@@ -719,6 +720,7 @@ export function SeriesEndForm({
                 error={payErrors.amountText}
                 hint={`Valor que saiu da conta para quitar, incluindo a parcela de ${monthOfNumber(payTarget.series!.number)}.`}
               />
+              <SumValues target={payRefs.amountText} onUse={(t) => setPay('amountText', t)} />
               <View style={{ gap: space[2] }}>
                 <TextField
                   ref={payRefs.dateText}

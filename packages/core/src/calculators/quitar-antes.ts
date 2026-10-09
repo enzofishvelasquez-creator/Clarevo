@@ -5,7 +5,7 @@ import { parseCount, parseMoney, parsePercentBp } from './inputs';
 import { DEBT_RATE_RANGE } from './custo-da-divida';
 
 /**
- * 3. Quitar antes ou adiantar parcelas (docs/08 §3.2; D-034(3); spec4 §1.2). Sempre uma estimativa, nunca o valor
+ * 4. Quitar antes ou adiantar parcelas (docs/08 §3.2; D-034(3); spec4 §1.2). Sempre uma estimativa, nunca o valor
  * oficial da instituição. soma = parcela × k; valor presente = Σ parcela ÷ (1 + i)^t. Sem prazos, t = 1, 2, …
  * (próxima parcela em 1 mês; "as últimas N" são as de prazo restantes − N + 1 a restantes). Com prazosEmDias (um por
  * parcela restante, em ordem), t = dias ÷ 30 (antes de hoje conta como 0).

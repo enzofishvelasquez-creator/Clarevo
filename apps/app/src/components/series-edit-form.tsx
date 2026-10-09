@@ -53,6 +53,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { ChoiceGroup, monthChipLabel, seriesStyles as styles } from '@/components/series-parts';
+import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { useSeries, useSeriesOccurrences, useSeriesOpenOccurrences, useSeriesOperationKey, useUpdateSeriesFrom } from '@/state/data';
@@ -544,6 +545,7 @@ export function SeriesEditForm({
                 : undefined
             }
           />
+          <SumValues target={refs.amountText} onUse={(t) => set('amountText', t)} />
 
           <TextField
             ref={refs.dueDayText}

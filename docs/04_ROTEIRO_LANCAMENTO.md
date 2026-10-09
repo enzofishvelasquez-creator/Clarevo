@@ -1,8 +1,8 @@
 # Roteiro até o lançamento
 
-Atualizado em 08/10/2026. Prazos são estimativas de trabalho, não compromissos; dependem das decisões pendentes.
+Atualizado em 09/10/2026. Prazos são estimativas de trabalho, não compromissos; dependem das decisões pendentes.
 
-Ordem a partir de 08/10/2026 (D-023, D-029 e D-033): o Ciclo A, o Ciclo A3 (contas do ano) e os Primeiros passos com os atalhos em Movimentações estão feitos. Seguem os Ciclos A4 (seus últimos meses), A5 (Aprender e dúvidas) e A2 (lembretes) e depois B, C e D, todos antes do Ciclo 2 (família); as decisões do A4 e do A5 são registradas ao iniciar cada um. Cada ciclo começa depois de o anterior passar em `npm test`, `npm run typecheck`, `npm run test:db`, `npm run test:api` e `npm run test:web`; A2 pode correr em paralelo, porque não mexe no banco.
+Ordem a partir de 08/10/2026 (D-023, D-029, D-033 e D-034): o Ciclo A, o Ciclo A3 (contas do ano) e os Primeiros passos com os atalhos em Movimentações estão feitos. O Ciclo A6 ("Achar tudo" e calculadoras, D-035) está implementado, com o roteiro web e o teste manual em aberto. Seguem os Ciclos A4 (seus últimos meses), A5 (Aprender e dúvidas) e A2 (lembretes) e depois B, C e D, todos antes do Ciclo 2 (família); as decisões do A4 e do A5 são registradas ao iniciar cada um. Cada ciclo começa depois de o anterior passar em `npm test`, `npm run typecheck`, `npm run test:db`, `npm run test:api` e `npm run test:web`; A2 pode correr em paralelo, porque não mexe no banco.
 
 ## Primeiro ciclo (entregue em demonstração; falta ligar o Supabase)
 
@@ -49,11 +49,31 @@ Ordem a partir de 08/10/2026 (D-023, D-029 e D-033): o Ciclo A, o Ciclo A3 (cont
 - [x] Passos do card e do bloco "Organizar" no roteiro web (`npm run test:web`)
 - [ ] Teste manual em iOS, Android e web, com e sem movimento reduzido e com leitor de tela
 
+## Achar tudo e calculadoras (D-034, D-035)
+
+Sem mudança no banco. Nas telas, os fluxos foram conferidos por sondas Playwright sobre a versão web de demonstração, também com movimento reduzido; o roteiro do repositório (`scripts/e2e-web.js`) é o item em aberto abaixo.
+
+- [x] Core: `learn/math.ts` adiantado do Ciclo A5 (contas exatas em centavos e pontos-base, com os vetores da `spec3` §3.11 conferidos à parte com frações em Python), as 8 calculadoras com textos, faixas e mensagens, os links de contexto, "Somar valores", "Por categoria", "Já paguei" e as legendas do "Organizar"; teste de textos ampliado às calculadoras (`npm test`: 19 arquivos, 313 testes; `npm run typecheck`)
+- [x] Tela "Calculadoras" (`/calcular`) com abertura e aviso visíveis sem rolar em 360 px, 3 grupos e as 8 calculadoras em `/calcular/<nome>`: resultado enquanto a pessoa digita, anunciado ao leitor de tela, hipóteses logo abaixo, chips de 48 px e nada gravado
+- [x] Portas: linha "Calculadoras" no "Organizar" de Movimentações, card "Calculadoras" no topo de Aprender e card "Enquanto isso, faça as contas" em Metas
+- [x] Links na hora da decisão: "Parcelado ou à vista? Fazer a conta" no cadastro de parcelamento, "Cota única ou parcelado? Fazer a conta" na conta do ano, "Quanto custa por ano?" no gasto fixo mensal, "Quanto economizo se quitar antes?" no financiamento e na compra parcelada, "Calcular multa e juros" na conta vencida, "Dividir estas contas" na lista de gastos fixos e "Enquanto isso, dividir as contas da casa" na Família sem vínculo (fora do Resumo)
+- [x] "Anotar como parcelamento" e "Anotar como gasto fixo" depois do resultado; `/gastos-fixos/novo?tipo=parcelada` aceita `parcelas` de 2 a 480 e `natureza`
+- [ ] Cadastro aberto por "Anotar como parcelamento" com o total de parcelas e o tipo preenchidos: a rota já entrega os dois, mas o formulário de gasto fixo ainda não os lê (abre com "Parcelado" e o valor da parcela)
+- [x] "Já paguei" nas contas a vencer do mês em Contas a pagar, com "Confirmar pagamento", "Mudar valor ou data" e "Cancelar"; "Informar valor e pagar" nas estimadas; chave de operação e conferência do resultado incerto, sem segundo pagamento
+- [x] "Por categoria" na composição de Pago, com barras que somam Pago e 100%
+- [x] "Somar valores" em todos os campos Valor (gasto e recebimento, conta a pagar, pagamento, gasto fixo novo e edição, valor do ano e encerrar)
+- [x] "Organizar" com 3 linhas e legendas com valores; medido em 360 × 640, os cards de totais ficam como estão (D-035(8))
+- [x] Estados vazios com ação em Movimentações, Contas a pagar e na composição
+- [x] Atalhos do ícone na versão web (manifesto com 4 atalhos) e, sem sessão, volta à tela pedida depois de entrar (endereço só em memória)
+- [ ] Roteiro web (`npm run test:web` e `REDUZIR_MOVIMENTO=1 node scripts/e2e-web.js`) com os passos do Ciclo A6 (spec4 §3) e as legendas novas do "Organizar"
+- [ ] Teste manual em iOS, Android e web, com e sem movimento reduzido e com leitor de tela (teclados decimal e numérico, anúncio do resultado e do total da soma no VoiceOver e no TalkBack, vibração depois de "Já paguei" e as contas com BigInt no Hermes)
+- [ ] Conferir a página do Portal do Investidor (CVM) e completar `RESERVA_REFERENCIA` com o texto de 6 a 12 meses, o endereço e a data, para a reserva mostrar o link
+- [ ] **Você:** confirmar a atualização da linha 10 do `CLAUDE.md` (tirar "'Achar tudo' e calculadoras" da lista de próximos ciclos), como em D-029
+
 ## Próximos ciclos
 
-Nesta ordem (D-023 com a mudança de D-034).
+Nesta ordem (D-023 com a mudança de D-034). O Ciclo A6, que vinha primeiro, está na seção acima.
 
-- **A6. Achar tudo e calculadoras:** tela "Calculadoras" com 8 contas rápidas (parcelado ou à vista, quanto custa por ano, quanto custa uma dívida, quitar antes, multa e juros, reserva, juntar para um objetivo e dividir as contas da casa), portas em Movimentos, Metas e Aprender, links na hora da decisão, "Já paguei" na lista de contas, "Por categoria" na composição do Pago, "Somar valores" nos campos de valor e atalhos do ícone na versão web. Sem mudança no banco (`docs/08_ACESSOS_E_ROTEIRO.md`).
 - **A4. Seus últimos meses:** depois de um tempo sem anotar, uma faixa discreta no Resumo oferece um resumo mês a mês do que ficou sem registro (contas em aberto e meses sem conta de gastos fixos, parcelamentos e contas do ano), com "Atualizar agora" ou "Seguir adiante"; nada é preenchido sozinho, e não há notificação nem e-mail. Proposto na especificação de 08/10/2026; a decisão (D-030) é registrada ao iniciar o ciclo, depois da resposta de Enzo.
 - **A5. Aprender e dúvidas:** aba com busca, cinco seções e temas curtos com exemplo fictício, fonte com data e "Revisado em", mais o "O que é isso?" nas telas, sem indicar produtos. Pedido de Enzo de 08/10/2026; as decisões (D-031 e D-032) são registradas ao iniciar o ciclo.
 - **A2. Lembretes de contas a pagar:** aviso local no aparelho no dia anterior ao vencimento, sem valor nem descrição na tela bloqueada (P-011). Exige build de desenvolvimento e teste em aparelho. Pode correr em paralelo aos outros ciclos.

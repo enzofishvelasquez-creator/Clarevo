@@ -1,6 +1,16 @@
-import { ERROR_TEXT, formatDayHeader, formatMonthBR, sortNewestFirst, type FinancialRecord } from '@clarevo/core';
+import {
+  ERROR_TEXT,
+  ORGANIZE_TEXT,
+  formatDayHeader,
+  formatMonthBR,
+  payablesCaptionFromSummary,
+  seriesCaptionShort,
+  shortcutA11yLabel,
+  sortNewestFirst,
+  type FinancialRecord,
+} from '@clarevo/core';
 import { router } from 'expo-router';
-import { CalendarClock, ChevronRight, Minus, Plus, Repeat, type LucideIcon } from 'lucide-react-native';
+import { Calculator, CalendarClock, ChevronRight, Minus, Plus, Repeat, type LucideIcon } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
@@ -11,7 +21,7 @@ import { AppHeader, ContextSwitch, MonthSwitcher } from '@/components/header';
 import { RecordRow } from '@/components/record-row';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, Chip, Money, Screen, Skeleton, Txt } from '@/components/ui';
-import { useMonthRecords, useSpace, useView } from '@/state/data';
+import { useCommitments, useMonthRecords, useSeriesList, useSpace, useView } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space } from '@/theme/tokens';
 
@@ -33,21 +43,35 @@ function groupByDay(list: FinancialRecord[]) {
   return groups;
 }
 
-/** Atalhos para o que vence e o que se repete, com nome visível (só no contexto Pessoal). */
-const SHORTCUTS: { icon: LucideIcon; title: string; caption: string; open: () => void }[] = [
-  {
-    icon: CalendarClock,
-    title: 'Contas a pagar',
-    caption: 'Vencidas, a vencer e próximos meses',
-    open: () => router.push('/a-pagar'),
-  },
-  {
-    icon: Repeat,
-    title: 'Gastos fixos e parcelamentos',
-    caption: 'Aluguel, escola, financiamentos e contas do ano',
-    open: () => router.push('/gastos-fixos'),
-  },
-];
+type Shortcut = { icon: LucideIcon; title: string; caption: string; open: () => void };
+
+/**
+ * Bloco "Organizar" (D-033, D-034): Contas a pagar e Gastos fixos e parcelamentos com legendas do mês (a mesma origem
+ * do card "Ainda a pagar", D-021(5)) e Calculadoras com a legenda fixa. Enquanto carrega ou com erro, as duas primeiras
+ * mostram a legenda fixa (nunca um "0" de uma falha). Nenhuma cor de alerta.
+ */
+function organizeShortcuts(payables: string | null, series: string | null): Shortcut[] {
+  return [
+    {
+      icon: CalendarClock,
+      title: ORGANIZE_TEXT.payables.title,
+      caption: payables ?? ORGANIZE_TEXT.payables.fallback,
+      open: () => router.push('/a-pagar'),
+    },
+    {
+      icon: Repeat,
+      title: ORGANIZE_TEXT.series.title,
+      caption: series ?? ORGANIZE_TEXT.series.fallback,
+      open: () => router.push('/gastos-fixos'),
+    },
+    {
+      icon: Calculator,
+      title: ORGANIZE_TEXT.calculators.title,
+      caption: ORGANIZE_TEXT.calculators.caption,
+      open: () => router.push('/calcular'),
+    },
+  ];
+}
 
 const rowExit = FadeOut.duration(motion.detail).reduceMotion(ReduceMotion.System);
 const rowLayout = LinearTransition.duration(motion.detail).reduceMotion(ReduceMotion.System);
@@ -58,6 +82,13 @@ export default function MovimentacoesScreen() {
   const personal = useSpace().data;
   const contextId = kind === 'pessoal' ? personal?.personalContextId : undefined;
   const records = useMonthRecords(contextId, month);
+  // Só no contexto Pessoal (na Família, contextId fica vazio e as consultas não rodam).
+  const commitments = useCommitments(contextId, month);
+  const seriesList = useSeriesList(contextId);
+  const shortcuts = organizeShortcuts(
+    commitments.summary ? payablesCaptionFromSummary(commitments.summary, today) : null,
+    seriesList.data ? seriesCaptionShort(seriesList.data) : null,
+  );
   const [filter, setFilter] = useState<Filter>('todos');
   const [notice] = useFlash();
   const s = records.summary;
@@ -95,11 +126,11 @@ export default function MovimentacoesScreen() {
 
               <Card style={styles.shortcuts}>
                 <Txt variant="title" accessibilityRole="header" aria-level={2}>
-                  Organizar
+                  {ORGANIZE_TEXT.title}
                 </Txt>
                 <View>
-                  {SHORTCUTS.map((sc, i) => (
-                    <ShortcutRow key={sc.title} {...sc} last={i === SHORTCUTS.length - 1} />
+                  {shortcuts.map((sc, i) => (
+                    <ShortcutRow key={sc.title} {...sc} last={i === shortcuts.length - 1} />
                   ))}
                 </View>
               </Card>
@@ -137,7 +168,14 @@ export default function MovimentacoesScreen() {
                 ) : records.isError ? (
                   <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => records.refetch()} />
                 ) : list.length === 0 ? (
-                  <EmptyState title={`Nenhum registro em ${formatMonthBR(month).toLowerCase()}`}>
+                  <EmptyState
+                    title={`Nenhum registro em ${formatMonthBR(month).toLowerCase()}`}
+                    // Filtro sem registros num mês que tem outros: a ação volta para todos.
+                    action={
+                      filter !== 'todos' && (records.data?.length ?? 0) > 0 ? (
+                        <Button label="Mostrar todos" tone="soft" onPress={() => setFilter('todos')} />
+                      ) : undefined
+                    }>
                     {filter === 'todos'
                       ? 'Recebimentos e gastos já realizados aparecem aqui, do mais recente para o mais antigo.'
                       : 'Nenhum registro deste tipo no mês.'}
@@ -165,12 +203,12 @@ export default function MovimentacoesScreen() {
   );
 }
 
-/** Linha de atalho: ícone, nome, legenda curta e seta; nome acessível com a legenda. */
-function ShortcutRow({ icon: Icon, title, caption, open, last }: (typeof SHORTCUTS)[number] & { last: boolean }) {
+/** Linha de atalho: ícone, nome, legenda curta e seta; nome acessível com a legenda ("Contas a pagar, R$ 650,00 em aberto neste mês, 1 vencida"). */
+function ShortcutRow({ icon: Icon, title, caption, open, last }: Shortcut & { last: boolean }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${title}. ${caption}`}
+      accessibilityLabel={shortcutA11yLabel(title, caption)}
       onPress={open}
       style={(st) => [
         styles.shortcut,

@@ -3,7 +3,7 @@ import { FieldReader, moneyField, type CalcFieldSpec, type CalcOutcome, type Cal
 import { parseMoney } from './inputs';
 
 /**
- * 8. Quanto custa por ano? (docs/08 §3.2). ano = valor × 12, × 52, ou × 22 × 12 no dia útil;
+ * 2. Quanto custa por ano? (docs/08 §3.2). ano = valor × 12, × 52, ou × 22 × 12 no dia útil;
  * mês = valor × 22 no dia útil, arredonda(valor × 52 ÷ 12) na semana, ou o próprio valor.
  */
 export type Frequencia = 'dia_util' | 'semana' | 'mes';

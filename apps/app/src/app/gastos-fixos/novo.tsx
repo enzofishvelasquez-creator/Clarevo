@@ -1,4 +1,13 @@
-import { CATEGORIES, DESCRIPTION_MAX, MAX_RECORD_CENTS, charCount, isValidIsoDate, isValidIsoMonth, monthOf } from '@clarevo/core';
+import {
+  CATEGORIES,
+  DESCRIPTION_MAX,
+  INSTALLMENT_NATURES,
+  MAX_RECORD_CENTS,
+  charCount,
+  isValidIsoDate,
+  isValidIsoMonth,
+  monthOf,
+} from '@clarevo/core';
 import { useLocalSearchParams } from 'expo-router';
 
 import { SeriesForm, type SeriesPrefill } from '@/components/series-form';
@@ -13,6 +22,8 @@ import { useSpace } from '@/state/data';
  * Conta do ano: parcelas (1 a 12; 1 = cota única), mes (1 a 12), ano (primeiro ano, AAAA), modo=fixo|variavel,
  * apos (rótulo do último ano da conta do ano encerrada em "Mudar a forma de pagamento") e inicio-minimo (AAAA-MM, o mês
  * seguinte ao último vencimento dela: a nova não começa antes).
+ * Parcelamento (tipo=parcelada, como em "Anotar como parcelamento" da calculadora): parcelas (total de parcelas, 2 a
+ * 480) e natureza=compra_parcelada|financiamento|outro_parcelamento (o tipo do parcelamento).
  */
 type Params = {
   tipo?: string;
@@ -30,9 +41,13 @@ type Params = {
   vencimento?: string;
   gasto?: string;
   origem?: string;
+  natureza?: string;
 };
 
-/** Só entram valores válidos, campo a campo. */
+/**
+ * Só entram valores válidos, campo a campo. installmentTotal (total de parcelas) e nature (tipo do parcelamento) só
+ * valem no parcelamento.
+ */
 function prefillFrom(p: Params): SeriesPrefill | undefined {
   const out: SeriesPrefill = {};
   const description = typeof p.descricao === 'string' ? p.descricao.trim() : '';
@@ -51,8 +66,15 @@ function prefillFrom(p: Params): SeriesPrefill | undefined {
   if (typeof p.gasto === 'string' && isValidIsoDate(p.gasto)) out.basedOn = p.gasto;
   const int = (v: string | undefined, min: number, max: number) =>
     typeof v === 'string' && /^\d{1,4}$/.test(v) && Number(v) >= min && Number(v) <= max ? Number(v) : undefined;
-  const parts = int(p.parcelas, 1, 12);
-  if (parts !== undefined) out.partsPerYear = parts;
+  if (p.tipo === 'parcelada') {
+    const total = int(p.parcelas, 2, 480);
+    if (total !== undefined) out.installmentTotal = total;
+    const nature = INSTALLMENT_NATURES.find((n) => n === p.natureza);
+    if (nature !== undefined) out.nature = nature;
+  } else {
+    const parts = int(p.parcelas, 1, 12);
+    if (parts !== undefined) out.partsPerYear = parts;
+  }
   const month = int(p.mes, 1, 12);
   if (month !== undefined) out.month = month;
   const year = int(p.ano, 2000, 2200);

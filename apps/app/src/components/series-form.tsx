@@ -1,4 +1,5 @@
 import {
+  CALC_UI_TEXT,
   CATEGORIES,
   DESCRIPTION_MAX,
   INSTALLMENT_NATURES,
@@ -10,6 +11,7 @@ import {
   affectedByEditFrom,
   annualStartChoices,
   annualYearOf,
+  calcLinkParams,
   centsToInput,
   charCount,
   fieldForErrorCode,
@@ -26,6 +28,7 @@ import {
   monthOf,
   newOperationKey,
   parseBRL,
+  parseCount,
   seriesErrorText,
   seriesPreview,
   validateSeriesDraft,
@@ -39,12 +42,13 @@ import {
   type SeriesFieldErrors,
   type SeriesInput,
   type SeriesKind,
+  type SeriesNature,
   type SeriesWrite,
 } from '@clarevo/core';
 import { router, useNavigation } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import * as Haptics from 'expo-haptics';
-import { AlertCircle, Check, Info } from 'lucide-react-native';
+import { AlertCircle, Calculator, Check, Info } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, View, type TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -62,6 +66,7 @@ import {
   yearA11y,
   yearA11yLabel,
 } from '@/components/series-parts';
+import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { useCommitments, useCreateSeries, useMonthRecords, useSeriesList, useSeriesOperationKey, useUpdateSeriesFrom } from '@/state/data';
@@ -94,6 +99,10 @@ export interface SeriesPrefill {
    * encerrada). Os chips de início antes dele não aparecem: as duas contas do ano nunca criam contas no mesmo mês.
    */
   notBefore?: IsoMonth;
+  /** Parcelamento ("Anotar como parcelamento" da calculadora): total de parcelas (2 a 480). */
+  installmentTotal?: number;
+  /** Parcelamento: tipo escolhido (compra parcelada, financiamento ou outro). */
+  nature?: SeriesNature;
 }
 
 /** Descrição que sugere cartão ou fatura: parcelas do cartão já entram na fatura. */
@@ -183,7 +192,7 @@ export function SeriesForm({
     const parts = p.partsPerYear !== undefined && p.partsPerYear >= 2 && p.partsPerYear <= 12 ? p.partsPerYear : null;
     const draft: SeriesDraft = {
       kind: initialKind,
-      nature: null,
+      nature: initialKind === 'parcelada' && p.nature && INSTALLMENT_NATURES.includes(p.nature) ? p.nature : null,
       description: p.description ?? '',
       amountText: p.amountCents ? centsToInput(p.amountCents) : '',
       // Conta do ano: por padrão o valor muda de um ano para outro (IPVA, IPTU).
@@ -191,7 +200,8 @@ export function SeriesForm({
       dueDayText: p.dueDay ? String(p.dueDay) : '',
       firstMonthText: !annualStart && monthPick === 'outro' && first ? formatMonthInputBR(first) : '',
       firstNumberText: '',
-      installmentTotalText: '',
+      installmentTotalText:
+        initialKind === 'parcelada' && p.installmentTotal !== undefined && p.installmentTotal >= 2 && p.installmentTotal <= 480 ? String(p.installmentTotal) : '',
       partsPerYearText: parts ? String(parts) : '',
       lastMonthText: '',
       category: p.category ?? null,
@@ -619,6 +629,20 @@ export function SeriesForm({
     />
   );
 
+  /**
+   * "Parcelado ou à vista? Fazer a conta" (chip Parcelado): abre a calculadora com o valor da parcela e o número de
+   * parcelas já digitados (só os válidos). Nada deste formulário muda; ele continua aberto ao voltar.
+   */
+  const openInstallmentCalc = () => {
+    const parcela = parseBRL(draft.amountText);
+    const parcelas = parseCount(draft.installmentTotalText, 2, 480);
+    const params = calcLinkParams('parcelado-ou-a-vista', {
+      parcelaCents: parcela !== null && parcela > 0 && parcela <= MAX_RECORD_CENTS ? parcela : undefined,
+      parcelas: parcelas.ok ? parcelas.value : undefined,
+    });
+    router.push({ pathname: '/calcular/[slug]', params: { slug: 'parcelado-ou-a-vista', ...params } });
+  };
+
   const amountField = (
     <>
       <TextField
@@ -641,6 +665,7 @@ export function SeriesForm({
             : undefined
         }
       />
+      <SumValues target={refs.amountText} onUse={(t) => set('amountText', t)} />
       {variable && !anual ? (
         <LinkButton label="Contas que mudam de valor" style={styles.inlineLink} onPress={() => router.push('/explicacao/estimativa')} />
       ) : null}
@@ -885,6 +910,7 @@ export function SeriesForm({
                     error={errors.installmentTotalText}
                     hint="De 2 a 480."
                   />
+                  <LinkButton label={CALC_UI_TEXT.links.parcelado} icon={Calculator} style={styles.inlineLink} onPress={openInstallmentCalc} />
                   <TextField
                     ref={refs.firstNumberText}
                     label="Número da próxima parcela a pagar"

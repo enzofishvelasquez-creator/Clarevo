@@ -1,6 +1,6 @@
 # Arquitetura
 
-08/10/2026 · versão 0.6 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano e primeiros passos)
+09/10/2026 · versão 0.7 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos e calculadoras)
 
 ## Escolhas (aprovadas)
 
@@ -26,11 +26,15 @@ apps/app/src/
     gastos-fixos, gastos-fixos/novo, gastos-fixos/[id], gastos-fixos/[id]/editar, gastos-fixos/[id]/encerrar,
     gastos-fixos/[id]/informar
     composicao, quem-ve, conta, explicacao/[tema]
-  components/           interface (logo, campos, botões, formulários de registro, conta a pagar, pagamento, gasto fixo e conta do ano, "Ano a ano", estados)
+    calcular, calcular/[slug]  calculadoras (nada é gravado)
+  components/           interface (logo, campos, botões, formulários de registro, conta a pagar, pagamento, gasto fixo e conta do ano, "Ano a ano", "Somar valores", estados)
+    calc/               uma tela por calculadora e as partes comuns (campos, chips de 48 px, resultado anunciado)
   lib/                  autenticação (Supabase e demonstração), conteúdos de Aprender, situação do card Primeiros passos (só no aparelho)
   state/                sessão, dados (consultas e gravações), contexto e mês
   theme/                tokens de cor, tipografia, movimento e vetores do logo
 packages/core/          regras financeiras, validação, repositório em memória, testes
+  src/learn/            contas exatas de juros, parcelas e divisão (centavos e pontos-base)
+  src/calculators/      as 8 calculadoras, campos, textos e links de contexto
 supabase/
   migrations/           esquema, funções e permissões (0001 fundação, 0002 contas a pagar, 0003 gastos fixos, 0004 contas do ano)
   tests/                testes de isolamento, da sequência de aceite, de contas a pagar, de gastos fixos e de contas do ano
@@ -46,6 +50,7 @@ docs/                   decisões, regras, acessos, Supabase, roteiro, marca, te
 - Com conta: o app.
 - Sessão expirada: volta para Entrar e, depois do login da mesma pessoa, para a tela onde ela estava.
 - Uma falha momentânea de rede não tira a pessoa da tela em que está (os dados já carregados continuam valendo).
+- Na web, um endereço de tela do app aberto sem sessão (atalho do ícone, link salvo) fica só em memória e é retomado depois de entrar; parâmetros de links de e-mail (`token`, `code`, `type`, `error`) são descartados (D-035(10)).
 
 A navegação organiza a experiência; **quem protege os dados é o banco**.
 

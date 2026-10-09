@@ -1,17 +1,37 @@
-import { ERROR_TEXT, formatMonthBR, groupAnnualLater, toPayCaption, type Commitment, type GroupedCommitment } from '@clarevo/core';
+import {
+  ERROR_TEXT,
+  QUICK_PAY_TEXT,
+  formatMonthBR,
+  groupAnnualLater,
+  isRepoError,
+  monthOf,
+  newOperationKey,
+  quickPayAction,
+  quickPayDraft,
+  toPayCaption,
+  type Commitment,
+  type FinancialRecord,
+  type GroupedCommitment,
+  type PaymentInput,
+} from '@clarevo/core';
+import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Info, ListChecks, Plus, Repeat, ShieldCheck } from 'lucide-react-native';
-import { Pressable, StyleSheet, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { AlertCircle, Check, Info, ListChecks, Pencil, Plus, Repeat, ShieldCheck } from 'lucide-react-native';
+import { useRef, useState } from 'react';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
-import { AnnualGroupRow, CommitmentRow } from '@/components/commitment-row';
+import { ChoiceDialog } from '@/components/choice-dialog';
+import { AnnualGroupRow, CommitmentRow, type RowAction } from '@/components/commitment-row';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Banner, Button, Card, FitMoney, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
-import { useCommitments, useSeriesList, useSeriesSync, useSpace, useView } from '@/state/data';
-import { useSession } from '@/state/session';
-import { colors, fonts, motion, radius, space } from '@/theme/tokens';
+import { totalChange } from '@/lib/highlight';
+import { useCommitments, usePayCommitment, useSeriesList, useSeriesSync, useSpace, useUpdateRecord, useView } from '@/state/data';
+import { useRepo, useSession } from '@/state/session';
+import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 
 // Linhas saem e se reacomodam devagar (CL-V008); nada anima antes da resposta do servidor.
 const rowExit = FadeOut.duration(motion.detail).reduceMotion(ReduceMotion.System);
@@ -25,16 +45,116 @@ const createdOverdueText = (n: number) =>
 
 const registeredText = (n: number) => (n === 0 ? 'Nenhum cadastrado' : n === 1 ? '1 cadastrado' : `${n} cadastrados`);
 
+const isUncertain = (e: unknown) => !isRepoError(e) || e.code === 'rede' || e.code === 'desconhecido';
+
+/** Motivo curto de uma recusa, depois do nome da conta: "Luz: a conta mudou em outro aparelho." */
+function payReason(e: unknown): string {
+  if (isRepoError(e, 'versao_desatualizada')) return 'a conta mudou em outro aparelho. Confira e tente de novo.';
+  if (isRepoError(e, 'compromisso_quitado')) return 'a conta já foi marcada como paga em outro aparelho.';
+  if (isRepoError(e, 'nao_encontrado')) return 'a conta não está mais disponível.';
+  if (isRepoError(e, 'sem_permissao')) return 'você não tem permissão para esta ação.';
+  if (!isUncertain(e)) return 'não foi possível registrar o pagamento.';
+  return 'não foi possível confirmar o pagamento. Tente novamente.';
+}
+
+/**
+ * "Já paguei" na lista: pay_commitment pelo usePayCommitment, com chave própria por conta, guardada entre tentativas
+ * (mesmo padrão do PaymentForm e da revisão de vencidas):
+ * - recusa do servidor: nada foi gravado; a próxima tentativa usa outra chave;
+ * - falha de rede: a tentativa fica guardada e é conferida na hora, uma vez, com findCommitmentOperation; se a conferência
+ *   também falhar ou não achar nada, a próxima tentativa confere de novo antes de repetir (com a mesma chave, se o conteúdo
+ *   é o mesmo). Se uma tentativa foi gravada e o conteúdo mudou, o gasto gerado é editado; nunca há um segundo pagamento.
+ */
+function usePayOnce() {
+  const repo = useRepo();
+  const qc = useQueryClient();
+  const pay = usePayCommitment();
+  const updateRecord = useUpdateRecord();
+  const attempts = useRef(new Map<string, { key: string; pending: { key: string; snapshot: string }[] }>());
+
+  /** Gasto da tentativa gravada (null se ele já não existe) ou undefined se nenhuma tentativa foi gravada. */
+  const reconcile = async (
+    c: Commitment,
+    input: PaymentInput,
+    snapshot: string,
+    pending: { key: string; snapshot: string }[],
+  ): Promise<FinancialRecord | null | undefined> => {
+    for (const attempt of [...pending].reverse()) {
+      const op = await repo.findCommitmentOperation(attempt.key);
+      if (!op || op.action !== 'pagar_compromisso' || !op.recordId) continue;
+      qc.invalidateQueries({ queryKey: ['commitments'] });
+      qc.invalidateQueries({ queryKey: ['commitment', op.commitmentId] });
+      qc.invalidateQueries({ queryKey: ['records'] });
+      if (c.series) qc.invalidateQueries({ queryKey: ['series'] });
+      const expense = await repo.getRecord(op.recordId);
+      if (!expense || attempt.snapshot === snapshot) {
+        attempts.current.delete(c.id);
+        return expense;
+      }
+      const saved = await updateRecord.mutateAsync({
+        key: newOperationKey(),
+        id: expense.id,
+        version: expense.version,
+        input: { accountId: input.accountId, amountCents: input.amountCents, occurredOn: input.paidOn, description: expense.description, category: input.category },
+      });
+      attempts.current.delete(c.id);
+      return saved;
+    }
+    return undefined;
+  };
+
+  return async (c: Commitment, input: PaymentInput): Promise<FinancialRecord | null> => {
+    const snapshot = JSON.stringify([input, c.version]);
+    const a = attempts.current.get(c.id) ?? { key: newOperationKey(), pending: [] };
+    if (a.pending.length > 0) {
+      const found = await reconcile(c, input, snapshot, a.pending);
+      if (found !== undefined) return found;
+      // Nada foi gravado: repetir com a mesma chave só se o conteúdo é o mesmo da última tentativa.
+      if (a.pending[a.pending.length - 1]!.snapshot !== snapshot) a.key = newOperationKey();
+    }
+    try {
+      const w = await pay.mutateAsync({ key: a.key, id: c.id, version: c.version, input });
+      attempts.current.delete(c.id);
+      return w.record;
+    } catch (e) {
+      if (!isUncertain(e)) {
+        attempts.current.delete(c.id);
+        throw e;
+      }
+      a.pending = [...a.pending, { key: a.key, snapshot }];
+      attempts.current.set(c.id, a);
+      // Se foi gravado, a lista recarrega e a conta sai de "A vencer".
+      qc.invalidateQueries({ queryKey: ['commitments'] });
+      qc.invalidateQueries({ queryKey: ['records'] });
+      let found: FinancialRecord | null | undefined;
+      try {
+        found = await reconcile(c, input, snapshot, a.pending);
+      } catch {
+        found = undefined; // a conferência também falhou: fica para a próxima tentativa
+      }
+      if (found !== undefined) return found;
+      throw e;
+    }
+  };
+}
+
 /** Contas a pagar do contexto Pessoal no mês em exibição, com a mesma origem do card do Resumo. */
 export default function ContasAPagarScreen() {
   const { today } = useSession();
-  const { month, currentMonth } = useView();
+  const { month, currentMonth, setMonth } = useView();
   const personal = useSpace().data;
   const ctx = personal?.personalContextId;
   const commitments = useCommitments(ctx, month);
   const seriesList = useSeriesList(ctx);
   const sync = useSeriesSync(ctx);
   const [notice] = useFlash();
+  const payOnce = usePayOnce();
+  /** Conta do diálogo "Marcar Luz como paga hoje?". */
+  const [target, setTarget] = useState<Commitment | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ tone: 'sucesso' | 'erro'; text: string } | null>(null);
+  // Mesma conta de saída que o formulário de pagamento abre escolhida; "Mudar valor ou data" permite trocar.
+  const account = personal?.accounts[0] ?? null;
   const s = commitments.summary;
   const monthName = formatMonthBR(month);
   const isCurrent = month === currentMonth;
@@ -45,12 +165,12 @@ export default function ContasAPagarScreen() {
 
   // Próximos meses: parcelas da mesma conta do ano e do mesmo ano viram um grupo (o toque abre a conta do ano).
   const laterHasAnnual = Boolean(s?.later.some((c) => c.series?.kind === 'anual'));
-  const sections: { title: string; legend?: string; list: Commitment[]; grouped?: GroupedCommitment[]; review?: boolean }[] = !s
+  const sections: { title: string; legend?: string; list: Commitment[]; grouped?: GroupedCommitment[]; review?: boolean; quickPay?: boolean }[] = !s
     ? []
     : isCurrent
       ? [
           { title: 'Vencidas', list: s.overdue, review: s.overdue.length >= 2 },
-          { title: `A vencer em ${monthName.toLowerCase()}`, list: s.upcomingInMonth },
+          { title: `A vencer em ${monthName.toLowerCase()}`, list: s.upcomingInMonth, quickPay: true },
           { title: 'Pagas', legend: 'Já contam em Pago, no mês da data do pagamento.', list: s.paidInMonth },
           {
             title: 'Próximos meses',
@@ -66,6 +186,61 @@ export default function ContasAPagarScreen() {
           { title: 'Pagas', legend: 'Já contam em Pago, no mês da data do pagamento.', list: s.paidInMonth },
         ];
   const visible = sections.filter((sec) => sec.list.length > 0);
+
+  const openPaymentForm = (c: Commitment) => router.push({ pathname: '/a-pagar/[id]/pagar', params: { id: c.id } });
+
+  /**
+   * "Já paguei" (valor fixo, a vencer): diálogo de confirmação; estimada: "Informar valor e pagar", que abre o formulário
+   * de pagamento com o valor vazio (o valor pago vem da pessoa, D-024(4)). Paga ou vencida: nada (as vencidas seguem na
+   * revisão de vencidas). Só na seção "A vencer" do mês atual.
+   */
+  const actionFor = (c: Commitment): RowAction | undefined => {
+    const kind = quickPayAction(c, today);
+    if (kind === 'pagar') {
+      return {
+        label: QUICK_PAY_TEXT.button,
+        accessibilityLabel: QUICK_PAY_TEXT.a11y(c.description, c.dueOn, today),
+        disabled: busy || !account,
+        onPress: () => {
+          setResult(null);
+          setTarget(c);
+        },
+      };
+    }
+    if (kind === 'informar') {
+      return {
+        label: QUICK_PAY_TEXT.estimateButton,
+        accessibilityLabel: QUICK_PAY_TEXT.estimateA11y(c.description, c.dueOn, today),
+        icon: Pencil,
+        disabled: busy,
+        onPress: () => openPaymentForm(c),
+      };
+    }
+    return undefined;
+  };
+
+  /** Confirmar no diálogo: só depois da resposta do servidor a linha sai da lista (com a mesma transição das outras). */
+  const confirmPay = async (c: Commitment) => {
+    const draft = quickPayDraft(c, today);
+    if (!draft || !account || busy) return;
+    setBusy(true);
+    setResult(null);
+    try {
+      const record = await payOnce(c, { accountId: account.id, ...draft });
+      setTarget(null);
+      // Confirmação tátil e efeito em Pago no Resumo só depois da gravação confirmada.
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      if (record) totalChange.set({ total: 'pago', month: monthOf(record.occurredOn), deltaCents: record.amountCents });
+      setResult({ tone: 'sucesso', text: QUICK_PAY_TEXT.done(c.description) });
+    } catch (e) {
+      setTarget(null);
+      setResult({ tone: 'erro', text: `${c.description}: ${payReason(e)}` });
+      if (!isUncertain(e)) commitments.refetch();
+    } finally {
+      setBusy(false);
+    }
+  };
+  const targetDraft = target ? quickPayDraft(target, today) : null;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -107,6 +282,14 @@ export default function ContasAPagarScreen() {
         <Button label="Anotar conta a pagar" icon={Plus} onPress={() => router.push('/a-pagar/nova')} />
         <SeriesLink count={seriesList.data?.length ?? null} />
 
+        {result ? (
+          <Banner tone={result.tone} icon={result.tone === 'erro' ? AlertCircle : Check}>
+            <Txt variant="label" color={result.tone === 'erro' ? colors.error : colors.successText} style={{ fontFamily: fonts.bold }}>
+              {result.text}
+            </Txt>
+          </Banner>
+        ) : null}
+
         {commitments.isPending ? (
           <View style={{ gap: space[3] }}>
             <Skeleton width="100%" height={56} />
@@ -122,7 +305,15 @@ export default function ContasAPagarScreen() {
         ) : visible.length === 0 ? (
           // Mês passado só com contas em aberto de outros meses: nada vence neste mês.
           <Card>
-            <EmptyState title={`Nenhuma conta a pagar com vencimento em ${monthName.toLowerCase()}`} art="compromissos" />
+            <EmptyState
+              title={`Nenhuma conta a pagar com vencimento em ${monthName.toLowerCase()}`}
+              art="compromissos"
+              action={
+                isCurrent ? undefined : (
+                  <Button label={`Ver ${formatMonthBR(currentMonth).toLowerCase()}`} tone="soft" onPress={() => setMonth(currentMonth)} />
+                )
+              }
+            />
           </Card>
         ) : (
           visible.map((sec) => (
@@ -162,7 +353,13 @@ export default function ContasAPagarScreen() {
                     )
                   : sec.list.map((c, i) => (
                       <Animated.View key={c.id} exiting={rowExit} layout={rowLayout}>
-                        <CommitmentRow commitment={c} today={today} last={i === sec.list.length - 1} onPress={() => router.push(`/a-pagar/${c.id}`)} />
+                        <CommitmentRow
+                          commitment={c}
+                          today={today}
+                          last={i === sec.list.length - 1}
+                          onPress={() => router.push(`/a-pagar/${c.id}`)}
+                          action={sec.quickPay ? actionFor(c) : undefined}
+                        />
                       </Animated.View>
                     ))}
               </Card>
@@ -181,6 +378,32 @@ export default function ContasAPagarScreen() {
           </Txt>
         </Pressable>
       </Screen>
+
+      {target && targetDraft && account ? (
+        <ChoiceDialog
+          visible
+          title={QUICK_PAY_TEXT.title(target.description)}
+          busy={busy}
+          cancelLabel={QUICK_PAY_TEXT.cancel}
+          // Durante a gravação, o diálogo não fecha (o resultado ainda não chegou).
+          onCancel={() => (busy ? undefined : setTarget(null))}
+          choices={[
+            { label: QUICK_PAY_TEXT.confirm, tone: 'brand', onPress: () => confirmPay(target) },
+            {
+              label: QUICK_PAY_TEXT.change,
+              onPress: () => {
+                setTarget(null);
+                openPaymentForm(target);
+              },
+            },
+          ]}>
+          <Txt style={[{ fontFamily: fonts.bold }, tabular]}>{QUICK_PAY_TEXT.line(targetDraft.amountCents, targetDraft.paidOn)}</Txt>
+          <Txt color={colors.textSecondary}>
+            Um gasto com esse valor entra em Pago de {formatMonthBR(monthOf(targetDraft.paidOn)).toLowerCase()}
+            {personal && personal.accounts.length > 1 ? `, saindo da conta ${account.name}` : ''}, e a conta sai de Ainda a pagar.
+          </Txt>
+        </ChoiceDialog>
+      ) : null}
     </View>
   );
 }

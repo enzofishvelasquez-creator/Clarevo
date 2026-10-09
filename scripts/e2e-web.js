@@ -1,6 +1,7 @@
 /**
  * Roteiro de verificação do primeiro ciclo, do Ciclo A (gastos fixos e parcelamentos), do Ciclo A3 (contas do ano),
- * de "Primeiros passos" no Resumo e dos atalhos de Movimentações na versão web, em modo demonstração (acesso simulado).
+ * de "Primeiros passos" no Resumo, dos atalhos de Movimentações e do Ciclo A6 (achar tudo e calculadoras) na versão web,
+ * em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -14,7 +15,7 @@ const { chromium } = require('playwright');
 const DIST = path.join(__dirname, '..', 'apps', 'app', 'dist');
 const OUT = process.argv[2] || path.join(__dirname, '..', 'docs', 'telas');
 const PORT = 8099;
-const TYPES = { '.js': 'text/javascript', '.html': 'text/html', '.ttf': 'font/ttf', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json', '.css': 'text/css' };
+const TYPES = { '.js': 'text/javascript', '.html': 'text/html', '.ttf': 'font/ttf', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json', '.css': 'text/css', '.webmanifest': 'application/manifest+json' };
 const server = http
   .createServer((q, r) => {
     let p = path.join(DIST, decodeURIComponent(q.url.split('?')[0]));
@@ -90,6 +91,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
       .map((n) => `${n.role.value}: ${slash.test(n.name?.value ?? '') ? n.name.value : `(descrição) ${n.description.value}`}`.slice(0, 120));
   };
   const errors = []; p.on('pageerror', e => errors.push(e.message)); p.on('console', m => m.type()==='error' && errors.push(m.text().slice(0,200)));
+  // Requisições de escrita (Ciclo A6: as calculadoras nunca gravam nada, nem pela rede).
+  const writes = []; p.on('request', (r) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(r.method()) && writes.push(`${r.method()} ${r.url()}`));
   // Texto da tela, com o espaço não separável ("R$\u00a0900,00" nunca quebra a linha) lido como espaço comum.
   const body = async () => (await p.locator('body').innerText()).replace(/\u00a0/g, ' ');
   const btn = (name) => p.getByRole('button', { name, exact: true }).filter({ visible: true }).first();
@@ -470,16 +473,21 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('radio', { name: 'Recebidos' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
   ok('filtro Recebidos mostra só recebimentos', !(await body()).includes('Pago · '));
   await p.getByRole('radio', { name: 'Todos' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
-  // Atalhos de Movimentações: "Organizar", com Contas a pagar e Gastos fixos e parcelamentos (nome com a legenda).
+  // Atalhos de Movimentações: "Organizar", com Contas a pagar, Gastos fixos e parcelamentos e Calculadoras (Ciclo A6).
+  // As duas primeiras legendas vêm dos dados (a mesma origem do card "Ainda a pagar"); o nome acessível junta título e legenda.
   const SC = {
-    pagar: 'Contas a pagar. Vencidas, a vencer e próximos meses',
-    fixos: 'Gastos fixos e parcelamentos. Aluguel, escola, financiamentos e contas do ano',
+    pagar: 'Contas a pagar, R$ 650,00 em aberto neste mês',
+    fixos: 'Gastos fixos e parcelamentos, 5 cadastrados, com as contas do ano',
+    calc: 'Calculadoras, Parcelado ou à vista, dívidas, reserva e outras contas',
   };
+  await waitText('5 cadastrados, com as contas do ano').catch(() => {});
+  t = await body();
   const scOrder = await p.evaluate(() => {
     const top = (sel, text) => [...document.querySelectorAll(sel)].find((e) => e.textContent === text && e.getBoundingClientRect().width > 0)?.getBoundingClientRect().top ?? null;
     return { anotar: top('[role=button]', 'Anotar gasto'), organizar: top('[role=heading]', 'Organizar'), totais: top('div[dir="auto"]', 'Pago em outubro') };
   });
-  ok('movimentações: "Organizar" com os dois atalhos, entre os botões e os totais do mês', JSON.stringify(await sectionRows('Organizar')) === JSON.stringify([SC.pagar, SC.fixos]) &&
+  ok('movimentações: "Organizar" com os três atalhos e as legendas de outubro, entre os botões e os totais do mês', JSON.stringify(await sectionRows('Organizar')) === JSON.stringify([SC.pagar, SC.fixos, SC.calc]) &&
+    ['R$ 650,00 em aberto neste mês', '5 cadastrados, com as contas do ano', 'Parcelado ou à vista, dívidas, reserva e outras contas'].every((x) => t.includes(x)) &&
     scOrder.anotar !== null && scOrder.organizar !== null && scOrder.totais !== null && scOrder.anotar < scOrder.organizar && scOrder.organizar < scOrder.totais, `${JSON.stringify(await sectionRows('Organizar'))} ${JSON.stringify(scOrder)}`);
   await layoutChecks('movimentações com atalhos 390px');
   await scrollTo('Organizar');
@@ -494,6 +502,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar').click(); await waitText('Registrar recebimento');
   await btn(SC.fixos).click(); await waitText('Por mês, se os valores não mudarem');
   ok('atalho "Gastos fixos e parcelamentos" abre a lista, com as contas do ano', (await h1Name()) === 'Gastos fixos e parcelamentos' && (await body()).includes('Contas do ano'));
+  await btn('Voltar').click(); await waitText('Registrar recebimento');
+  await btn(SC.calc).click(); await waitText('Decidir uma compra');
+  ok('atalho "Calculadoras" abre /calcular', new URL(p.url()).pathname === '/calcular' && (await h1Name()) === 'Calculadoras', p.url());
   await btn('Voltar').click(); await waitText('Registrar recebimento');
   ok('voltar dos atalhos devolve Movimentações', (await p.getByRole('tab', { name: 'Movimentações', selected: true }).filter({ visible: true }).count()) === 1);
   await btn('Registrar recebimento').click(); await waitText('Data do recebimento');
@@ -1438,6 +1449,407 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await expectTotals('revisão do Ciclo A3 termina com outubro na base', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
   // Fim do Ciclo A3.
 
+  // Ciclo A6 · Achar tudo e calculadoras (D-034, D-035). Começa e termina com outubro na base: 6.000 / 3.900 / 2.100 e 650.
+  // Calculadoras: o resultado aparece enquanto a pessoa digita, sem botão "Calcular", e nada é gravado (nem pela rede,
+  // nem no aparelho). Telas conferidas a 390 e a 320 px (título, largura, valores inteiros, alvos de toque).
+  const DISCLAIMER = 'Simulação com os valores e as taxas que você informou. Não é recomendação de produto financeiro nem oferta de crédito.';
+  const INTRO = 'Contas rápidas com os valores que você informa. Nada é gravado.';
+  const CALC_LIST = [
+    ['Decidir uma compra', [['Parcelado ou à vista?', 'Descubra os juros embutidos no parcelado'], ['Quanto custa por ano?', 'Assinaturas e gastos que se repetem']]],
+    ['Dívidas e atrasos', [['Quanto custa uma dívida?', 'Rotativo, cheque especial ou empréstimo'], ['Quitar antes ou adiantar parcelas', 'Uma estimativa de quanto dos juros sai da conta'], ['Multa e juros por atraso', 'Com os valores do boleto']]],
+    ['Guardar e dividir', [['Reserva para imprevistos', 'Quantos meses seus gastos essenciais cobrem'], ['Juntar para um objetivo', 'Quanto guardar por mês ou em quanto tempo'], ['Dividir as contas da casa', 'Partes iguais ou pela renda de cada pessoa']]],
+  ];
+  // Palavras de julgamento que nunca aparecem num resultado (spec4 §1.2, como em copy.test.ts).
+  const JUDGMENT = /vale a pena|\bruim\b|\bcuidado\b|desperd[ií]cio|\bcorte\b|\batras(o|ad[oa])\b|estourou|\binvista\b|caixinha|saldo devedor/i;
+  const resultTexts = [];
+  // Texto do cartão do resultado (região viva educada), guardado para a conferência de termos no fim.
+  const liveText = () => p.evaluate(() => [...document.querySelectorAll('[aria-live="polite"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.innerText).join('\n').replace(/ /g, ' '));
+  const keepResult = async () => { resultTexts.push(await liveText()); await keepText(); };
+  // Digita e sai do campo (os erros só aparecem depois de sair do campo).
+  const typeIn = async (label, text) => { const f = field(label); await f.fill(text); await f.press('Tab'); };
+  // O resultado acompanha a digitação: espera até 3 s todos os textos aparecerem.
+  const shows = async (...texts) => {
+    for (const end = Date.now() + 3000; ;) {
+      const s = await body();
+      if (texts.every((x) => s.includes(x))) return true;
+      if (Date.now() > end) return false;
+      await p.waitForTimeout(100);
+    }
+  };
+  const openCalc = async (title) => {
+    await p.getByRole('button', { name: new RegExp(`^${title.replace(/[?]/g, '\\?')}\\. `) }).filter({ visible: true }).first().click();
+    await waitUntil(async () => (await h1Name()) === title, 8000);
+  };
+  const backToCalcList = async () => { await btn('Voltar').click(); await waitUntil(async () => (await h1Name()) === 'Calculadoras', 8000); };
+  // Aviso fixo no topo, visível sem rolar.
+  const onScreen = (text) => p.evaluate((text) => {
+    const e = [...document.querySelectorAll('div[dir="auto"]')].find((x) => x.textContent === text && x.getBoundingClientRect().width > 0);
+    if (!e) return null;
+    const r = e.getBoundingClientRect();
+    return r.top >= 0 && r.bottom <= window.innerHeight;
+  }, text);
+  // Calculadoras: um título inteiro, sem pílula de contexto (nada é gravado em Pessoal nem em Família).
+  const calcHeader = async (prefix, title) => {
+    const r = await p.evaluate(() => {
+      const shown = (e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0; };
+      const h1s = [...document.querySelectorAll('h1')].filter(shown);
+      return { h1: h1s.map((e) => e.getAttribute('aria-label') || e.textContent), cut: h1s.filter((e) => e.scrollHeight > e.clientHeight + 1 || e.scrollWidth > e.clientWidth + 1).length,
+        pills: [...document.querySelectorAll('[aria-label^="Contexto:"]')].filter(shown).length };
+    });
+    ok(`${prefix}: título "${title}" inteiro, sem pílula de contexto`, r.h1.length === 1 && r.h1[0] === title && r.cut === 0 && r.pills === 0, JSON.stringify(r));
+  };
+  const calcWidths = async (prefix, title, shot320 = null) => {
+    await calcHeader(`${prefix} 390px`, title);
+    await layoutChecks(`${prefix} 390px`);
+    ok(`${prefix}: sem o símbolo C`, (await symbolCount()) === 0);
+    await keepResult();
+    await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+    await calcHeader(`${prefix} 320px`, title);
+    await layoutChecks(`${prefix} 320px`);
+    if (shot320) await calcShot(shot320);
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  };
+  // Captura da calculadora: tira o foco deixado pelo Tab (anel de foco ou texto selecionado) e mostra o cartão do resultado
+  // (o último, quando há dois, como no parcelamento da fatura).
+  const calcShot = async (name, last = false) => {
+    await p.evaluate(() => document.activeElement?.blur?.());
+    const r = p.getByText('Resultado', { exact: true }).filter({ visible: true });
+    await (last ? r.last() : r.first()).evaluate((e) => e.scrollIntoView({ block: 'start' }));
+    await p.waitForTimeout(200);
+    await shot(name);
+  };
+  const storageNow = () => p.evaluate(() => { try { return JSON.stringify(Object.keys(localStorage).sort().map((k) => [k, localStorage.getItem(k)])); } catch { return 'erro'; } });
+
+  // 1 e 2. Movimentos › Organizar › Calculadoras: 3 grupos, as 8 calculadoras, a abertura e o aviso.
+  await p.getByRole('tab', { name: 'Movimentações' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
+  await btn(SC.calc).click(); await waitText('Decidir uma compra');
+  const writesBefore = writes.length;
+  const storageBefore = await storageNow();
+  const calcSections = await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((h) => {
+    let box = h.parentElement;
+    while (box && !box.querySelector('[role=button]')) box = box.parentElement;
+    return [h.textContent, box ? [...box.querySelectorAll('[role=button]')].map((x) => x.getAttribute('aria-label')) : []];
+  }));
+  const calcExpected = CALC_LIST.map(([g, items]) => [g, items.map(([a, b]) => `${a}. ${b}`)]);
+  ok('calculadoras: 3 grupos e as 8 calculadoras, na ordem, com título e subtítulo no nome', JSON.stringify(calcSections) === JSON.stringify(calcExpected), JSON.stringify(calcSections));
+  t = await body();
+  ok('calculadoras: abertura e aviso fixo, sem pílula de contexto', t.includes(INTRO) && t.includes(DISCLAIMER) && (await p.locator('[aria-label^="Contexto:"]').filter({ visible: true }).count()) === 0);
+  await calcHeader('calculadoras 390px', 'Calculadoras');
+  await layoutChecks('calculadoras 390px');
+  await keepText();
+  await shot('56_calculadoras');
+  await p.setViewportSize({ width: 360, height: 640 }); await p.waitForTimeout(400);
+  ok('calculadoras 360 × 640: abertura e aviso visíveis sem rolar', (await onScreen(INTRO)) === true && (await onScreen(DISCLAIMER)) === true);
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await calcHeader('calculadoras 320px', 'Calculadoras');
+  await layoutChecks('calculadoras 320px');
+  await shot('56_calculadoras_320px', true);
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+
+  // 3. Parcelado ou à vista?: 1.080,00 à vista ou 10 × 120,00.
+  await openCalc('Parcelado ou à vista?');
+  ok('parcelado: aviso fixo no topo, sem rolar, e espera sem botão "Calcular"', (await onScreen(DISCLAIMER)) === true && (await shows('Preencha os campos para ver o resultado.')) &&
+    (await visibleCount('button', /^Calcular/)) === 0);
+  await typeIn('Preço à vista', '1080');
+  ok('parcelado: valor formatado ao sair do campo', (await field('Preço à vista').inputValue()) === '1.080,00');
+  await field('Número de parcelas').fill('1');
+  const earlyError = await shows('Use de 2 a 480 parcelas.');
+  await field('Número de parcelas').press('Tab');
+  ok('parcelado: o erro de faixa aparece só depois de sair do campo', !earlyError && (await shows('Use de 2 a 480 parcelas.')));
+  await typeIn('Número de parcelas', '10'); await typeIn('Valor de cada parcela', '120,00');
+  ok('parcelado: R$ 120,00 a mais, 1,96% ao mês e 26,27% ao ano, enquanto digita', await shows('Com estes números, o parcelado custa R$ 120,00 a mais.', 'Isso equivale a juros de 1,96% ao mês (26,27% ao ano).'));
+  ok('parcelado: resultado na região viva educada (leitor de tela)', (await liveText()).includes('1,96% ao mês'));
+  ok('parcelado: "Anotar como parcelamento" sem forma de pagamento escolhida', (await visibleCount('button', 'Anotar como parcelamento')) === 1);
+  await calcShot('57_calc_parcelado');
+  await radio('Sim').click();
+  ok('parcelado: primeira parcela na compra → 2,42% ao mês e 33,28% ao ano', await shows('2,42% ao mês (33,28% ao ano)'));
+  await radio('Cartão de crédito').click();
+  await waitUntil(async () => (await visibleCount('button', 'Anotar como parcelamento')) === 0);
+  ok('parcelado: "Cartão de crédito" esconde "Anotar como parcelamento" e mostra o aviso de fatura', (await visibleCount('button', 'Anotar como parcelamento')) === 0 &&
+    (await shows('Parcelas de compras no cartão já entram na fatura')));
+  await calcWidths('parcelado', 'Parcelado ou à vista?', '57_calc_parcelado_320px');
+  await radio('Boleto ou carnê').click(); await radio('Não').click();
+  await btn('Anotar como parcelamento').click(); await waitText('Total de parcelas');
+  ok('"Anotar como parcelamento" abre o cadastro com Parcelado, o valor, as 10 parcelas e "Compra parcelada"', (await h1Name()) === 'Novo parcelamento' &&
+    (await radio('Parcelado').getAttribute('aria-checked')) === 'true' && (await field('Valor da parcela').inputValue()) === '120,00' && (await field('Total de parcelas').inputValue()) === '10' &&
+    (await radio('Compra parcelada (boleto ou crediário)').getAttribute('aria-checked')) === 'true', `${await field('Total de parcelas').inputValue()}`);
+  await btn('Cancelar').click(); await p.waitForTimeout(400);
+  if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
+  await waitUntil(async () => (await h1Name()) === 'Parcelado ou à vista?', 8000);
+  ok('voltar do cadastro sem salvar devolve a calculadora com o resultado', await shows('Com estes números, o parcelado custa R$ 120,00 a mais.'));
+  await backToCalcList();
+
+  // 4. Quanto custa uma dívida?: empréstimo, rotativo e parcelamento da fatura com o limite da Lei 14.690/2023.
+  await openCalc('Quanto custa uma dívida?');
+  await radio('Empréstimo ou outra dívida').click();
+  await typeIn('Valor da dívida', '5.000,00'); await typeIn('Taxa de juros ao mês (%)', '2'); await typeIn('Número de parcelas', '12');
+  ok('dívida: empréstimo de 5.000,00 a 2% em 12 → R$ 472,80 por parcela e R$ 5.673,60, com o lembrete do CET', await shows('Com estes números, são 12 parcelas de R$ 472,80.', 'Total: R$ 5.673,60', 'Confira o CET no contrato.'));
+  await keepResult();
+  await radio('Rotativo do cartão').click();
+  await typeIn('Valor da dívida', '700,00'); await typeIn('Taxa de juros ao mês (%)', '14');
+  ok('dívida: rotativo de 700,00 a 14% → R$ 98,00 de juros em 1 mês', await shows('Com estes números, os juros do rotativo somam R$ 98,00 em 1 mês.', 'O valor vai para R$ 798,00 na fatura seguinte.'));
+  await typeIn('Taxa do parcelamento ao mês (%)', '8'); await typeIn('Em quantas parcelas', '24');
+  ok('dívida: parcelar em 24 a 8% → total limitado a R$ 1.400,00, dizendo que o limite foi aplicado', await shows('R$ 1.818,96', 'Pelo limite da Lei 14.690/2023, juros e encargos não passam do valor original: o total fica em no máximo R$ 1.400,00.'));
+  await calcShot('58_calc_divida', true);
+  await calcWidths('dívida', 'Quanto custa uma dívida?');
+  await backToCalcList();
+
+  // 5. Quitar antes: 36 parcelas de 850,00 a 1,5% ao mês.
+  await openCalc('Quitar antes ou adiantar parcelas');
+  await typeIn('Valor da parcela', '850,00'); await typeIn('Parcelas que faltam', '36'); await typeIn('Taxa de juros ao mês do contrato (%)', '1,5');
+  t = await body();
+  ok('quitar antes: R$ 23.511,58 para quitar hoje e R$ 7.088,42 de desconto estimado', await shows('Valor estimado para quitar hoje: R$ 23.511,58', 'Desconto estimado sobre a soma das parcelas: R$ 7.088,42'));
+  t = await body();
+  ok('quitar antes: texto de estimativa e nunca "saldo devedor"', t.includes('Estimativa. O valor oficial é o que a instituição informar; peça o valor atualizado.') && !/saldo devedor/i.test(t));
+  await calcShot('59_calc_quitar_antes');
+  await calcWidths('quitar antes', 'Quitar antes ou adiantar parcelas');
+  await backToCalcList();
+
+  // 6. Multa e juros: 200,00 com 2% de multa e 1% ao mês, 10 dias depois do vencimento.
+  await openCalc('Multa e juros por atraso');
+  await typeIn('Valor da conta', '200,00'); await typeIn('Multa (%)', '2'); await typeIn('Juros ao mês (%)', '1'); await typeIn('Dias depois do vencimento', '10');
+  ok('multa e juros: R$ 204,67, "depois do vencimento" e o boleto atualizado', await shows('Com estes números, 10 dias depois do vencimento a conta fica em R$ 204,67.', 'O valor exato é o do boleto atualizado.'));
+  ok('multa e juros: o resultado não fala em atraso', !/atras/i.test(await liveText()));
+  await calcShot('60_calc_multa_e_juros');
+  await calcWidths('multa e juros', 'Multa e juros por atraso');
+  await backToCalcList();
+
+  // 7. Reserva: 3.750,00 por mês e 6 meses; 4.500,00 guardados; 500,00 por mês.
+  await openCalc('Reserva para imprevistos');
+  await typeIn('Gastos essenciais por mês', '3.750,00');
+  await radio('6 meses').click();
+  ok('reserva: 6 meses de 3.750,00 → R$ 22.500,00', await shows('Com estes números, a reserva de 6 meses é de R$ 22.500,00.'));
+  await typeIn('Quanto já tem guardado', '4.500,00');
+  ok('reserva: 4.500,00 guardados cobrem 1,2 mês', await shows('O que você já guardou cobre 1,2 mês de gastos essenciais.'));
+  await typeIn('Quanto guarda por mês', '500,00');
+  ok('reserva: guardando 500,00 por mês, 36 meses', await shows('Guardando R$ 500,00 por mês, a reserva fica completa em 36 meses (3 anos).'));
+  ok('reserva: referência com fonte, sem link nem número enquanto a página não for conferida', (await shows('Portal do Investidor, da CVM')) &&
+    (await p.getByRole('link', { name: /Portal do Investidor/ }).count()) + (await p.getByRole('button', { name: /Portal do Investidor/ }).count()) === 0);
+  ok('reserva: nenhum botão de ação neste ciclo', (await visibleCount('button', /^(Criar reserva|Anotar)/)) === 0);
+  await calcShot('61_calc_reserva');
+  await calcWidths('reserva', 'Reserva para imprevistos');
+  await backToCalcList();
+
+  // 8. Juntar para um objetivo: 22.500,00 com 4.500,00 em 14 meses; ou 1.000,00 por mês.
+  await openCalc('Juntar para um objetivo');
+  await typeIn('Quanto quer juntar', '22.500,00'); await typeIn('Quanto já tem', '4.500,00'); await typeIn('Em quantos meses', '14');
+  ok('objetivo: R$ 1.285,72 por mês em 14 meses, sem rendimento (dito na hipótese)', await shows('Com estes números, são R$ 1.285,72 por mês, por 14 meses (1 ano e 2 meses).', 'Sem rendimento: o valor guardado não cresce com juros.'));
+  await radio('Em quanto tempo').click();
+  await typeIn('Quanto vai guardar por mês', '1.000,00');
+  ok('objetivo: guardando 1.000,00 por mês, 18 meses', await shows('Com estes números, guardando R$ 1.000,00 por mês, você chega lá em 18 meses (1 ano e 6 meses).'));
+  await calcShot('62_calc_juntar_para_objetivo');
+  await calcWidths('objetivo', 'Juntar para um objetivo');
+  await backToCalcList();
+
+  // 9. Dividir as contas: 3.000,00 pela renda (4.000,00 e 6.000,00); 100,00 em 3 partes iguais.
+  await openCalc('Dividir as contas da casa');
+  await typeIn('Total das contas', '3.000,00');
+  await radio('Pela renda de cada pessoa').click();
+  await typeIn('Renda de Pessoa 1', '4.000,00'); await typeIn('Renda de Pessoa 2', '6.000,00');
+  ok('dividir: pela renda → R$ 1.200,00 (40%) e R$ 1.800,00 (60%)', await shows('Pessoa 1: R$ 1.200,00 (40%)', 'Pessoa 2: R$ 1.800,00 (60%)'));
+  await calcShot('63_calc_dividir_contas');
+  await keepResult();
+  await radio('Em partes iguais').click();
+  await typeIn('Total das contas', '100,00');
+  await btn('Adicionar pessoa').click();
+  ok('dividir: 100,00 em 3 partes iguais → R$ 33,34, R$ 33,33 e R$ 33,33 (o maior resto fecha a soma)', await shows('Pessoa 1: R$ 33,34 (33,3%)', 'Pessoa 2: R$ 33,33 (33,3%)', 'Pessoa 3: R$ 33,33 (33,3%)'));
+  await calcWidths('dividir', 'Dividir as contas da casa', '63_calc_dividir_contas_320px');
+  await backToCalcList();
+
+  // 10. Quanto custa por ano?: 25,00 por semana.
+  await openCalc('Quanto custa por ano?');
+  await typeIn('Valor', '25,00');
+  await radio('Por semana').click();
+  ok('custo por ano: 25,00 por semana → R$ 108,33 por mês e R$ 1.300,00 por ano, com "52 semanas por ano"', await shows('R$ 108,33', 'R$ 1.300,00', '52 semanas por ano.'));
+  await calcShot('64_calc_custo_por_ano');
+  await calcWidths('custo por ano', 'Quanto custa por ano?');
+  await btn('Anotar como gasto fixo').click(); await waitText('Valor por mês');
+  ok('"Anotar como gasto fixo" abre o cadastro em "Todo mês" com o valor por mês', (await radio('Todo mês').getAttribute('aria-checked')) === 'true' && (await field('Valor por mês').inputValue()) === '108,33');
+  await btn('Cancelar').click(); await p.waitForTimeout(400);
+  if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
+  await waitUntil(async () => (await h1Name()) === 'Quanto custa por ano?', 8000);
+  await backToCalcList();
+
+  // 11. Nada gravado: nenhuma requisição de escrita (POST, PATCH, PUT ou DELETE) e nada novo no armazenamento do aparelho.
+  ok('calculadoras: digitar não faz requisição de escrita nem grava no aparelho', writes.length === writesBefore && (await storageNow()) === storageBefore, writes.slice(writesBefore, writesBefore + 3).join(' | '));
+  const judged = resultTexts.map((s) => s.match(JUDGMENT)?.[0] ?? s.match(FORBIDDEN)?.[0]).filter(Boolean);
+  ok('calculadoras: nenhum termo de julgamento, proibido ou travessão longo nos resultados', resultTexts.length >= 8 && resultTexts.every((s) => s.length > 0) && judged.length === 0, `${resultTexts.length} resultados ${judged.join(' | ')}`);
+  await btn('Voltar').click(); await waitText('Registrar recebimento');
+
+  // 12. Links na hora da decisão. Família sem vínculo (em Movimentos; o Resumo não muda).
+  await p.getByRole('tab', { name: 'Ver dados de Família' }).filter({ visible: true }).first().click(); await waitText('Nenhuma família vinculada');
+  await btn('Enquanto isso, dividir as contas da casa').click();
+  await waitUntil(async () => (await h1Name()) === 'Dividir as contas da casa', 8000);
+  ok('Família sem vínculo: "Enquanto isso, dividir as contas da casa" abre "Dividir as contas da casa"', (await h1Name()) === 'Dividir as contas da casa' && (await field('Total das contas').count()) === 1);
+  await btn('Voltar').click(); await waitText('Nenhuma família vinculada');
+  await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Nenhuma família vinculada'); await p.waitForTimeout(300);
+  ok('Família no Resumo: sem o link (o Resumo não muda)', (await visibleCount('button', 'Enquanto isso, dividir as contas da casa')) === 0);
+  await p.getByRole('tab', { name: 'Ver dados de Pessoal' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês');
+
+  // Lista de gastos fixos: "Dividir estas contas" com o "Por mês" da tela.
+  await openToPay(); await openSeriesList();
+  const perMonth = ((await body()).match(/Por mês, se os valores não mudarem: R\$ ([\d.]+,\d\d)/) ?? [])[1];
+  await btn('Dividir estas contas').click(); await waitText('Total das contas');
+  ok('gastos fixos: "Dividir estas contas" abre a calculadora com o "Por mês" da lista', perMonth !== undefined && (await h1Name()) === 'Dividir as contas da casa' && (await field('Total das contas').inputValue()) === perMonth,
+    `${perMonth} / ${await field('Total das contas').inputValue()}`);
+  await btn('Voltar').click(); await waitText('Por ano, se os valores não mudarem');
+  // Conta do ano (IPTU, 10 parcelas de 180,00): "Cota única ou parcelado? Fazer a conta".
+  await openRow(/^IPTU, 10 parcelas/); await waitText('Ano a ano');
+  await btn('Cota única ou parcelado? Fazer a conta').click(); await waitText('Valor da cota única');
+  ok('IPTU: abre "Cota única ou parcelado?" com 10 parcelas de 180,00 e "vence junto" marcado', (await h1Name()) === 'Cota única ou parcelado?' &&
+    (await field('Número de parcelas').inputValue()) === '10' && (await field('Valor de cada parcela').inputValue()) === '180,00' && (await radio('Sim').getAttribute('aria-checked')) === 'true' &&
+    (await visibleCount('radiogroup', 'Como vai pagar as parcelas?')) === 0);
+  await typeIn('Valor da cota única', '1.700,00');
+  ok('cota única: a frase compara com a cota única', await shows('parcelar custa R$ 100,00 a mais que a cota única'));
+  await calcShot('65_calc_cota_unica');
+  await keepResult();
+  await btn('Voltar').click(); await waitText('Ano a ano');
+  await btn('Voltar').click(); await waitText('Por ano, se os valores não mudarem');
+  // IPVA (cota única de 2.400,00).
+  await openRow(/^IPVA, cerca de R\$ 2\.400,00/); await waitText('Ano a ano');
+  await btn('Cota única ou parcelado? Fazer a conta').click(); await waitText('Valor da cota única');
+  ok('IPVA: abre "Cota única ou parcelado?" com a cota única de 2.400,00', (await h1Name()) === 'Cota única ou parcelado?' && (await field('Valor da cota única').inputValue()) === '2.400,00');
+  await btn('Voltar').click(); await waitText('Ano a ano');
+  await btn('Voltar').click(); await waitText('Por ano, se os valores não mudarem');
+  // Financiamento: parcela, parcelas que faltam e os vencimentos que a série já calcula.
+  await openRow(/^Financiamento do carro, Parcela 13 de 48/); await waitText('Pagas antes do Clarevo');
+  await btn('Quanto economizo se quitar antes?').click(); await waitText('Parcelas que faltam');
+  await typeIn('Taxa de juros ao mês do contrato (%)', '1,5');
+  ok('financiamento: "Quitar antes" com 850,00 e 36 parcelas, contadas pelos vencimentos (R$ 23.389,42)', (await h1Name()) === 'Quitar antes ou adiantar parcelas' &&
+    (await field('Valor da parcela').inputValue()) === '850,00' && (await field('Parcelas que faltam').inputValue()) === '36' &&
+    (await shows('Valor estimado para quitar hoje: R$ 23.389,42', 'Prazos contados pelos vencimentos das parcelas, com 30 dias por mês.')));
+  await calcShot('66_calc_quitar_financiamento');
+  await keepResult();
+  await btn('Voltar').click(); await waitText('Pagas antes do Clarevo');
+  await btn('Voltar').click(); await waitText('Por ano, se os valores não mudarem');
+  // Gasto fixo mensal (Aluguel): "Quanto custa por ano?" com o valor e "Por mês", sem "Anotar como gasto fixo".
+  await openRow(/^Aluguel, R\$ [\d.]+,\d\d, todo dia 5/); await waitText('Próximas contas');
+  await btn('Quanto custa por ano?').click(); await waitText('Com que frequência?');
+  // O valor de outubro (R$ 2.500,00; o aumento do Ciclo A vale a partir de novembro): por ano, 12 vezes.
+  ok('Aluguel: "Quanto custa por ano?" com o valor atual e "Por mês" → R$ 30.000,00 por ano, sem "Anotar como gasto fixo"', (await radio('Por mês').getAttribute('aria-checked')) === 'true' &&
+    (await field('Valor').inputValue()) === '2.500,00' && (await shows('R$ 30.000,00')) && (await visibleCount('button', 'Anotar como gasto fixo')) === 0, await field('Valor').inputValue());
+  await btn('Voltar').click(); await waitText('Próximas contas');
+  await btn('Voltar').click(); await waitText('Por ano, se os valores não mudarem');
+  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
+  // Conta vencida (anotada em outro aparelho, 200,00 em 01/10): "Calcular multa e juros" com o valor e os 6 dias.
+  await otherDevice((repo, contextId) => repo.createCommitment(`e2e-a6-vencida-${Date.now()}`, contextId, { description: 'Conta de água', amountCents: 20000, dueOn: '2026-10-01', category: null }));
+  await waitText('Conta de água');
+  await openRow(/^Conta de água, venceu em 01\/10\/2026/); await waitText('Calcular multa e juros');
+  await btn('Calcular multa e juros').click(); await waitText('Dias depois do vencimento');
+  ok('conta vencida: "Calcular multa e juros" abre com 200,00 e 6 dias depois do vencimento', (await h1Name()) === 'Multa e juros por atraso' &&
+    (await field('Valor da conta').inputValue()) === '200,00' && (await field('Dias depois do vencimento').inputValue()) === '6');
+  await btn('Voltar').click(); await waitText('Calcular multa e juros');
+  await btn('Excluir conta a pagar').click(); await waitText('Excluir conta a pagar?');
+  await confirmIn('Excluir conta a pagar'); await waitText('Conta a pagar excluída'); await waitText('Contas em aberto com vencimento até o fim do mês');
+  await waitGone('Conta de água');
+  ok('nenhuma escrita de rede nos links de contexto', writes.length === writesBefore, writes.slice(writesBefore, writesBefore + 3).join(' | '));
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  await expectTotals('links de contexto: outubro na base', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+
+  // 13. Contas a pagar: "Já paguei" nas contas a vencer de valor fixo; "Informar valor e pagar" nas estimadas.
+  // Outro aparelho cadastra um gasto fixo de valor estimado com conta em 28/10.
+  await otherDevice((repo, contextId) => repo.createSeries(`e2e-a6-estimada-${Date.now()}`, contextId, { kind: 'mensal', nature: 'conta', description: 'Gás de cozinha', category: 'Moradia', amountCents: 8000, amountMode: 'variavel', dueDay: 28, firstDueMonth: '2026-10', firstNumber: 1, installmentTotal: null, partsPerYear: null, lastMonth: null }));
+  await expectTotals('gás de cozinha estimado em 28/10 → a pagar 730', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 730,00');
+  await openToPay(); await waitText('Gás de cozinha');
+  const quickNames = ['Já paguei Internet, vence 15/10', 'Já paguei Condomínio, vence 20/10', 'Informar valor e pagar Gás de cozinha, vence 28/10'];
+  ok('a vencer: "Já paguei" nas de valor fixo e "Informar valor e pagar" na estimada, com nome acessível completo', (await Promise.all(quickNames.map((n) => visibleCount('button', n)))).every((n) => n === 1) &&
+    (await visibleCount('button', /^Já paguei Gás/)) === 0 && (await visibleCount('button', /^Já paguei (Aluguel|Seguro|Luz|Financiamento)/)) === 0);
+  await layoutChecks('contas a pagar com "Já paguei" 390px');
+  await scrollTo('A vencer em outubro de 2026');
+  await shot('67_a_pagar_ja_paguei');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await layoutChecks('contas a pagar com "Já paguei" 320px');
+  await scrollTo('A vencer em outubro de 2026');
+  await shot('67_a_pagar_ja_paguei_320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  await btn('Já paguei Internet, vence 15/10').click(); await waitText('Marcar Internet como paga hoje?');
+  t = await dialogText();
+  ok('"Já paguei": diálogo com a conta, o valor e a data de hoje, e os três botões', t.includes('R$ 150,00 em 07/10/2026') &&
+    (await Promise.all(['Confirmar pagamento', 'Mudar valor ou data', 'Cancelar'].map((n) => p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: n, exact: true }).count()))).every((n) => n === 1), t);
+  await shot('67_ja_paguei_dialogo');
+  await btn('Cancelar').click(); await waitGone('Marcar Internet como paga hoje?');
+  ok('"Cancelar" não grava nada', (await visibleCount('button', 'Já paguei Internet, vence 15/10')) === 1);
+  await btn('Já paguei Internet, vence 15/10').click(); await waitText('Marcar Internet como paga hoje?');
+  await confirmIn('Mudar valor ou data'); await waitText('Valor pago');
+  ok('"Mudar valor ou data" abre o pagamento completo com o valor previsto', (await field('Valor pago').inputValue()) === '150,00' && (await field('Data do pagamento').inputValue()) === '07/10/2026');
+  await btn('Cancelar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
+  await btn('Já paguei Internet, vence 15/10').click(); await waitText('Marcar Internet como paga hoje?');
+  await confirmIn('Confirmar pagamento'); await waitText('Internet marcada como paga.');
+  await waitUntil(async () => (await visibleCount('button', 'Já paguei Internet, vence 15/10')) === 0);
+  ok('"Confirmar pagamento": a Internet sai de "A vencer" e entra em "Pagas"', !((await sectionRows('A vencer em outubro de 2026')) ?? ['Internet']).some((r) => r.startsWith('Internet')) &&
+    ((await sectionRows('Pagas')) ?? []).some((r) => /^Internet, paga em 07\/10\/2026, R\$ 150,00/.test(r)));
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  await expectTotals('"Já paguei" na Internet → Pago sobe R$ 150,00 (4.050), a pagar 580', 'R$ 6.000,00', 'R$ 4.050,00', 'R$ 1.950,00', 'R$ 580,00');
+  // Resultado incerto (gravado, resposta perdida): a tela confere na hora e não paga duas vezes.
+  await openToPay();
+  await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
+  await btn('Já paguei Condomínio, vence 20/10').click(); await waitText('Marcar Condomínio como paga hoje?');
+  await confirmIn('Confirmar pagamento'); await waitText('Condomínio marcada como paga.');
+  const condoPaid = await otherDevice(async (repo, contextId) => (await repo.listRecords(contextId, '2026-10')).filter((r) => r.description === 'Condomínio' && r.commitmentId).length);
+  ok('"Já paguei" com resultado incerto: conferido na hora, sucesso e um único gasto', condoPaid === 1, String(condoPaid));
+  // Estimada: "Informar valor e pagar" abre o pagamento com o valor vazio.
+  await btn('Informar valor e pagar Gás de cozinha, vence 28/10').click(); await waitText('Valor pago');
+  ok('"Informar valor e pagar": pagamento com o valor vazio', (await field('Valor pago').inputValue()) === '' && (await visibleCount('button', 'Confirmar pagamento')) === 1);
+  await btn('Cancelar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
+  // Volta à base: desfaz os dois pagamentos e exclui o gasto fixo estimado.
+  for (const name of ['Internet', 'Condomínio']) {
+    await openRow(new RegExp(`^${name}, paga em 07/10/2026`)); await waitText('Desfazer pagamento');
+    await btn('Desfazer pagamento').click(); await waitText('Desfazer pagamento?');
+    await confirmIn('Desfazer pagamento'); await waitText('Pagamento desfeito');
+    await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
+  }
+  await openSeriesList();
+  await openRow(/^Gás de cozinha/); await waitText('Excluir gasto fixo');
+  await btn('Excluir gasto fixo').click(); await waitText('Excluir o gasto fixo');
+  await confirmIn('Excluir gasto fixo'); await waitText('Gasto fixo excluído.');
+  await goResumo();
+  await expectTotals('desfazer os pagamentos e excluir o gás → base', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+
+  // 14. Composição › "Por categoria" (só em Pago): barras que somam o Pago e 100%.
+  await p.getByRole('button', { name: /^Pago, R\$ 3\.900,00/ }).filter({ visible: true }).first().click(); await waitText('Gastos pagos com data de pagamento neste mês.');
+  ok('Pago: segmento "Por registro | Por categoria" como grupo de rádios, começando em "Por registro"', (await visibleCount('radiogroup', 'Mostrar Pago')) === 1 &&
+    (await radio('Por registro').getAttribute('aria-checked')) === 'true' && (await radio('Por categoria').getAttribute('aria-checked')) === 'false');
+  await radio('Por categoria').click();
+  await waitUntil(async () => (await p.locator('[role=listitem][aria-label$=" do pago"]').count()) > 0);
+  const bars = await p.locator('[role=listitem][aria-label$=" do pago"]').filter({ visible: true }).evaluateAll((es) => es.map((e) => e.getAttribute('aria-label').replace(/ /g, ' ')));
+  const barCents = bars.map((l) => Number((l.match(/R\$ ([\d.]+,\d\d)/) ?? ['', '0'])[1].replace(/\D/g, '')));
+  const barTenths = bars.map((l) => Math.round(Number((l.match(/, ([\d,]+)% do pago$/) ?? ['', 'NaN'])[1].replace(',', '.')) * 10));
+  ok('"Por categoria": barras com valor e percentual que somam o Pago (R$ 3.900,00) e 100%', bars.length >= 2 && barCents.reduce((a, b) => a + b, 0) === 390000 && barTenths.reduce((a, b) => a + b, 0) === 1000 &&
+    bars.every((l) => /^.+, R\$ [\d.]+,\d\d, [\d,]+% do pago$/.test(l)) && barCents.every((c, i) => i === 0 || c <= barCents[i - 1]), bars.join(' | '));
+  await layoutChecks('por categoria 390px');
+  await keepText();
+  await shot('68_por_categoria');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await layoutChecks('por categoria 320px');
+  await shot('68_por_categoria_320px', true);
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  await p.getByRole('button', { name: /^Recebido, R\$/ }).filter({ visible: true }).first().click(); await waitText('Recebimentos realizados');
+  ok('Recebido: sem o segmento "Por categoria"', (await visibleCount('radiogroup', 'Mostrar Pago')) === 0 && (await visibleCount('radio', 'Por categoria')) === 0);
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+
+  // 15. "Somar valores" em Anotar gasto: 35,90 + 12,50 → "Total: R$ 48,40" → "Usar o total" preenche 48,40.
+  await btn('Anotar gasto').click(); await waitText('Será salvo em');
+  await btn('Somar valores').click(); await field('Valor 1 da soma').waitFor({ timeout: 8000 });
+  ok('"Somar valores" abre com dois campos e o botão com estado expandido', (await field('Valor 2 da soma').count()) === 1 &&
+    (await p.getByRole('button', { name: 'Somar valores', exact: true }).filter({ visible: true }).first().getAttribute('aria-expanded')) === 'true');
+  await field('Valor 1 da soma').fill('35,90'); await field('Valor 2 da soma').fill('12,50');
+  await waitText('Total: R$ 48,40');
+  ok('somar: 35,90 + 12,50 → "Total: R$ 48,40"', (await body()).includes('Total: R$ 48,40'));
+  await layoutChecks('somar valores 390px');
+  await scrollTo('Somar valores');
+  await shot('69_somar_valores');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await layoutChecks('somar valores 320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  await btn('Usar o total').click(); await waitGone('Total: R$ 48,40');
+  ok('"Usar o total" preenche 48,40, fecha a soma e devolve o foco ao Valor', (await field('Valor em reais').inputValue()) === '48,40' && (await field('Valor 1 da soma').count()) === 0 &&
+    (await field('Valor em reais').evaluate((e) => e === document.activeElement)));
+  await btn('Cancelar').click(); await waitText('Descartar o preenchimento?');
+  await btn('Descartar alterações').click(); await waitText('Diferença do mês');
+  await expectTotals('Ciclo A6 termina com outubro na base', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  // Fim do Ciclo A6 (Metas, Aprender, manifesto e endereços de entrada ficam mais abaixo).
+
   // Setembro → outubro
   await btn('Anotar gasto').click(); await waitText('Será salvo em');
   await field('Descrição').fill('Farmácia'); await field('Valor em reais').fill('80'); await field('Data do pagamento').fill('30/09/2026');
@@ -1490,8 +1902,48 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   });
   ok('Metas: o título da aba fica abaixo do logotipo', metasTitle !== null && metasTitle >= 0, `distância=${metasTitle}`);
   await shot('16_metas');
+  // Ciclo A6: "Enquanto isso, faça as contas", com as 3 linhas que abrem telas que funcionam.
+  ok('Metas: card "Enquanto isso, faça as contas" com Reserva, Juntar e Todas as calculadoras', JSON.stringify(await cardButtons('Enquanto isso, faça as contas')) === JSON.stringify([
+    'Reserva para imprevistos. Quantos meses seus gastos essenciais cobrem', 'Juntar para um objetivo. Quanto guardar por mês ou em quanto tempo', 'Todas as calculadoras']), JSON.stringify(await cardButtons('Enquanto isso, faça as contas')));
+  await layoutChecks('metas com as calculadoras 390px');
+  await scrollTo('Enquanto isso, faça as contas');
+  await shot('70_metas_calculadoras');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await layoutChecks('metas com as calculadoras 320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  const fromGoals = async (row, title) => {
+    await p.getByRole('button', { name: new RegExp(`^${row}`) }).filter({ visible: true }).first().click();
+    await waitUntil(async () => (await h1Name()) === title, 8000);
+  };
+  await fromGoals('Reserva para imprevistos', 'Reserva para imprevistos');
+  await typeIn('Gastos essenciais por mês', '1.000,00'); await radio('3 meses').click();
+  ok('Metas › Reserva para imprevistos: a calculadora funciona (3 meses de 1.000,00 → R$ 3.000,00)', await shows('Com estes números, a reserva de 3 meses é de R$ 3.000,00.'));
+  await btn('Voltar').click(); await waitText('Enquanto isso, faça as contas');
+  await fromGoals('Juntar para um objetivo', 'Juntar para um objetivo');
+  await typeIn('Quanto quer juntar', '1.200,00'); await typeIn('Em quantos meses', '12');
+  ok('Metas › Juntar para um objetivo: a calculadora funciona (1.200,00 em 12 meses → R$ 100,00 por mês)', await shows('R$ 100,00 por mês'));
+  await btn('Voltar').click(); await waitText('Enquanto isso, faça as contas');
+  await fromGoals('Todas as calculadoras', 'Calculadoras');
+  ok('Metas › Todas as calculadoras: a lista com as 8', (await p.getByRole('button', { name: /\. / }).filter({ visible: true }).count()) === 8);
+  await btn('Voltar').click(); await waitText('Enquanto isso, faça as contas');
   await p.getByRole('tab', { name: 'Aprender' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês e saldo da conta');
   await shot('17_aprender');
+  // Ciclo A6: card "Calculadoras" no topo de Aprender, antes dos temas.
+  const learnFirst = await p.evaluate(() => {
+    const top = (e) => e.getBoundingClientRect().top;
+    const shown = [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && !/^Conta:/.test(e.getAttribute('aria-label') || ''));
+    const main = shown.filter((e) => !e.closest('[role=tablist]')).sort((a, b) => top(a) - top(b));
+    return main[0] ? main[0].getAttribute('aria-label') || main[0].textContent : null;
+  });
+  ok('Aprender: card "Calculadoras" no topo', learnFirst === 'Calculadoras. Parcelado ou à vista, dívidas, reserva e outras contas com os seus números', learnFirst);
+  await layoutChecks('aprender com as calculadoras 390px');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await layoutChecks('aprender com as calculadoras 320px');
+  await shot('71_aprender_calculadoras_320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  await btn('Calculadoras. Parcelado ou à vista, dívidas, reserva e outras contas com os seus números').click(); await waitText('Decidir uma compra');
+  ok('Aprender › Calculadoras abre /calcular', new URL(p.url()).pathname === '/calcular' && (await h1Name()) === 'Calculadoras');
+  await btn('Voltar').click(); await waitText('Diferença do mês e saldo da conta');
 
   // Larguras 320 e 736: sem transbordamento horizontal, botões com 44 px
   for (const w of [320, 736]) {
@@ -1588,8 +2040,40 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
     await btn('Voltar').click(); await waitText('Diferença do mês');
   }
+  // Ciclo A6 · atalhos do ícone na web (manifesto) e endereço pedido sem sessão: a entrada e, depois de entrar, a tela
+  // pedida. Cada endereço recarrega a página (a demonstração volta ao começo), por isso fica no fim.
+  const manifest = await p.evaluate(async () => {
+    const link = document.querySelector('link[rel="manifest"]');
+    if (!link) return null;
+    const m = await (await fetch(link.getAttribute('href'))).json();
+    const srcs = [...new Set((m.shortcuts ?? []).flatMap((x) => (x.icons ?? []).map((i) => i.src)))];
+    const icons = await Promise.all(srcs.map(async (src) => { const r = await fetch(src); return r.ok && (r.headers.get('content-type') || '').startsWith('image/png'); }));
+    return { shortcuts: (m.shortcuts ?? []).map((x) => [x.name, x.url, (x.icons ?? []).length]), icons };
+  });
+  ok('manifesto: 4 atalhos (Anotar gasto, Registrar recebimento, Contas a pagar, Calculadoras) com ícones que existem', manifest !== null && JSON.stringify(manifest.shortcuts) === JSON.stringify([
+    ['Anotar gasto', '/registro/novo?tipo=despesa', 1], ['Registrar recebimento', '/registro/novo?tipo=receita', 1], ['Contas a pagar', '/a-pagar', 1], ['Calculadoras', '/calcular', 1]]) &&
+    manifest.icons.length > 0 && manifest.icons.every(Boolean), JSON.stringify(manifest));
+  const viaEntry = async (url, ready) => {
+    await p.goto(`http://localhost:8099${url}`); await waitText('Seu dinheiro');
+    const atEntry = new URL(p.url()).pathname;
+    await btn('Ver demonstração com dados fictícios').click(); await waitText(ready, 12000).catch(() => {});
+    return atEntry;
+  };
+  let entry = await viaEntry('/calcular', 'Decidir uma compra');
+  ok('atalho "Calculadoras" sem sessão: entrada e, depois de entrar, /calcular', entry === '/boas-vindas' && new URL(p.url()).pathname === '/calcular' && (await h1Name()) === 'Calculadoras', `${entry} → ${p.url()}`);
+  entry = await viaEntry('/registro/novo?tipo=receita', 'Data do recebimento');
+  ok('atalho "Registrar recebimento" sem sessão: depois de entrar, o registro de recebimento', entry === '/boas-vindas' && (await visibleCount('button', 'Salvar recebimento')) === 1, `${entry} → ${p.url()}`);
+  entry = await viaEntry('/a-pagar', 'Contas em aberto com vencimento até o fim do mês');
+  ok('atalho "Contas a pagar" sem sessão: depois de entrar, Contas a pagar', entry === '/boas-vindas' && (await h1Name()) === 'Contas a pagar', `${entry} → ${p.url()}`);
+  entry = await viaEntry('/calcular/multa-e-juros?valor=12345&dias=7', 'Dias depois do vencimento');
+  ok('link de calculadora sem sessão: depois de entrar, a calculadora preenchida', (await h1Name()) === 'Multa e juros por atraso' &&
+    (await field('Valor da conta').inputValue()) === '123,45' && (await field('Dias depois do vencimento').inputValue()) === '7', p.url());
+  entry = await viaEntry('/calcular/nao-existe', 'Esta calculadora não está disponível.');
+  ok('calculadora desconhecida: "Esta calculadora não está disponível." com "Ver todas as calculadoras"', (await body()).includes('Esta calculadora não está disponível.') && (await visibleCount('button', 'Ver todas as calculadoras')) === 1);
+  await btn('Ver todas as calculadoras').click(); await waitText('Decidir uma compra');
+  ok('"Ver todas as calculadoras" abre a lista', new URL(p.url()).pathname === '/calcular' && (await h1Name()) === 'Calculadoras');
   const forbidden = screenTexts.map((s) => s.match(FORBIDDEN)?.[0]).filter(Boolean);
-  ok('contas do ano: nenhum termo proibido nem travessão longo nas telas novas', screenTexts.length > 0 && forbidden.length === 0, `${screenTexts.length} telas ${forbidden.join(' | ')}`);
+  ok('contas do ano e calculadoras: nenhum termo proibido nem travessão longo nas telas novas', screenTexts.length > 0 && forbidden.length === 0, `${screenTexts.length} telas ${forbidden.join(' | ')}`);
   ok('sem erros de JavaScript no console', errors.length === 0, errors.slice(0,3).join(' | '));
   await b.close();
   for (const r of results) console.log(r.join('  '));

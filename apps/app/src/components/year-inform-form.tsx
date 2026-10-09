@@ -25,6 +25,7 @@ import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { seriesStyles as styles, yearA11y, yearA11yLabel } from '@/components/series-parts';
 import { ErrorState } from '@/components/states';
+import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { useInformSeriesYear, useSeriesOccurrences, useSeriesOpenOccurrences, useSeriesOperationKey } from '@/state/data';
@@ -224,6 +225,13 @@ export function YearInformForm({ series: s, number, contextId }: { series: Commi
                   ? 'Se as parcelas têm valores diferentes, informe o valor mais comum e ajuste as outras em cada conta.'
                   : `A referência era ${formatBRL(term.amountCents)}.`
               }
+            />
+            <SumValues
+              target={amountRef}
+              onUse={(t) => {
+                setAmountText(t);
+                setError(null);
+              }}
             />
             {/* Prévia que muda a cada tecla: sem região viva, para não ser anunciada de novo a cada dígito. */}
             <Banner tone="info" icon={Info} live={false}>

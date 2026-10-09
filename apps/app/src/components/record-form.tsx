@@ -39,6 +39,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
+import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { totalChange } from '@/lib/highlight';
@@ -367,6 +368,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             large
             error={errors.amountText}
           />
+          <SumValues target={refs.amountText} onUse={(t) => set('amountText', t)} />
 
           <View style={{ gap: space[2] }}>
             <TextField

@@ -1,5 +1,6 @@
 import {
   ANNUAL_SERIES_ERROR_TEXT,
+  CALC_UI_TEXT,
   DEBT_NATURES,
   ERROR_TEXT,
   NO_CATEGORY_LABEL,
@@ -7,7 +8,9 @@ import {
   SERIES_NATURE_LABEL,
   addMonths,
   affectedByDelete,
+  cotaUnicaLink,
   currentTerm,
+  custoPorAnoLink,
   formatBRL,
   formatDateBR,
   formatMonthBR,
@@ -17,6 +20,7 @@ import {
   missingMonths,
   monthOf,
   projectSeries,
+  quitarAntesLink,
   seriesCaption,
   seriesEnded,
   suggestedReference,
@@ -28,11 +32,12 @@ import {
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { AlertCircle, CalendarSync, CalendarX, Info, Pencil, Repeat, ShieldCheck, Trash2 } from 'lucide-react-native';
+import { AlertCircle, CalendarSync, CalendarX, Calculator, Info, Pencil, Repeat, ShieldCheck, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { AnnualYears } from '@/components/annual-years';
+import { openCalc } from '@/components/calc/open';
 import { ChoiceDialog } from '@/components/choice-dialog';
 import { CommitmentRow } from '@/components/commitment-row';
 import { ConfirmDialog } from '@/components/dialog';
@@ -293,6 +298,7 @@ function Overview({ series: s, today }: { series: CommitmentSeries; today: IsoDa
         <Txt variant="title" style={tabular}>
           {value}
         </Txt>
+        <CalcLink series={s} today={today} />
         {annual ? (
           <Txt variant="label" color={colors.textSecondary}>
             Cada ano entra em Contas a pagar dois meses antes do primeiro vencimento e só entra em Ainda a pagar no mês em que vence.
@@ -330,6 +336,25 @@ function Overview({ series: s, today }: { series: CommitmentSeries; today: IsoDa
   );
 }
 
+/**
+ * Calculadora na hora da decisão (D-034): conta do ano, "Cota única ou parcelado? Fazer a conta" (parcelas e valor de
+ * referência, ou o valor da cota única); gasto fixo mensal, "Quanto custa por ano?" (valor por mês). Nada é gravado.
+ */
+function CalcLink({ series: s, today }: { series: CommitmentSeries; today: IsoDate }) {
+  if (seriesEnded(s, today)) return null;
+  const annual = cotaUnicaLink(s, today);
+  if (annual) {
+    return (
+      <LinkButton label={CALC_UI_TEXT.links.cotaUnica} icon={Calculator} style={styles.inlineLink} onPress={() => openCalc('parcelado-ou-a-vista', annual)} />
+    );
+  }
+  const monthly = custoPorAnoLink(s, today);
+  if (monthly) {
+    return <LinkButton label={CALC_UI_TEXT.links.custoAno} icon={Calculator} style={styles.inlineLink} onPress={() => openCalc('custo-por-ano', monthly)} />;
+  }
+  return null;
+}
+
 /** Progresso, próximas contas (criadas e previstas), pagas, meses sem conta e sugestão de referência. */
 function Occurrences({
   series: s,
@@ -355,6 +380,9 @@ function Occurrences({
   // "Usar como novo valor de referência" = esta e as próximas a partir da primeira conta em aberto (ou da próxima prevista).
   const applyFrom = open[0]?.series?.number ?? projected[0]?.number ?? null;
   const progress = s.kind === 'parcelada' ? installmentProgress(s, occurrences, allOpen, today) : null;
+  // "Quanto economizo se quitar antes?": financiamento ou compra parcelada com parcelas em aberto, com os prazos de cada
+  // vencimento que falta (mesmas listas do progresso). Nunca para imposto, taxa ou outro parcelamento.
+  const payoff = s.kind === 'parcelada' ? quitarAntesLink(s, occurrences, allOpen, today) : null;
 
   return (
     <>
@@ -380,6 +408,14 @@ function Occurrences({
               <Txt variant="label" color={colors.textSecondary}>
                 Quitar antes do prazo dá direito a desconto proporcional dos juros.
               </Txt>
+              {payoff ? (
+                <LinkButton
+                  label={CALC_UI_TEXT.links.quitar}
+                  icon={Calculator}
+                  style={styles.inlineLink}
+                  onPress={() => openCalc('quitar-antes', payoff)}
+                />
+              ) : null}
               <LinkButton label="Quitar antes do prazo" style={styles.inlineLink} onPress={() => router.push('/explicacao/quitar-antes')} />
             </View>
           ) : null}

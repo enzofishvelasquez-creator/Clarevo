@@ -12,5 +12,31 @@
     { "src": "/icons/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Anotar gasto",
+      "short_name": "Anotar gasto",
+      "url": "/registro/novo?tipo=despesa",
+      "icons": [{ "src": "/icons/icone-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Registrar recebimento",
+      "short_name": "Recebimento",
+      "url": "/registro/novo?tipo=receita",
+      "icons": [{ "src": "/icons/icone-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Contas a pagar",
+      "short_name": "Contas a pagar",
+      "url": "/a-pagar",
+      "icons": [{ "src": "/icons/icone-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Calculadoras",
+      "short_name": "Calculadoras",
+      "url": "/calcular",
+      "icons": [{ "src": "/icons/icone-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
   ]
 }

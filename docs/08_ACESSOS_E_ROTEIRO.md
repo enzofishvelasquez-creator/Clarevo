@@ -2,6 +2,8 @@
 
 Documento para Enzo, 08/10/2026. Nenhum arquivo do repositório foi alterado. Conferi no código e nas especificações os nomes, as rotas e os números usados aqui. Os números de pesquisa foram checados por busca na web e vêm de matérias e resumos, não das páginas originais. Antes de entrar no app ou em material de venda, cada um precisa ser conferido na fonte.
 
+Atualização de 09/10/2026: o Ciclo A6 entregou as calculadoras e o "Achar tudo" com as regras de D-035. A situação de cada função está na seção 4; o restante do texto é a proposta de 08/10/2026, mantida como registro.
+
 Legenda: **[E]** evidência com fonte · **[O]** opinião minha · **[!]** dado frágil, a conferir.
 
 ## Resumo em 10 linhas
@@ -452,31 +454,33 @@ Recalculei em Python todos os exemplos abaixo, e eles batem com a `spec3` §3.11
 
 ## 4. O que já existe, o que está desenhado e o que falta
 
+Situação em 09/10/2026, depois do Ciclo A6 (D-035).
+
 | Função | Situação | Onde fica ou ficaria |
 |---|---|---|
 | Entrada, cadastro, recuperação, demonstração | Existe | Fluxo de entrada |
 | Anotar gasto e recebimento, detalhe, editar, excluir | Existe | Resumo, Movimentos |
-| Resumo, composição, troca de mês | Existe (sem visão por categoria) | Resumo |
-| Contas a pagar: vencidas, pagar, desfazer, próximos meses | Existe ("Já paguei" só na revisão de vencidas) | Card "Ainda a pagar" › `/a-pagar` |
-| Gastos fixos e parcelamentos | Existe | Movimentos › "Organizar"; `/a-pagar` › link; chips "Todo mês" e "Parcelado" |
-| Contas do ano (IPVA, IPTU, matrícula) | Existe (A3, D-029) | Gastos fixos › Contas do ano; chip "Todo ano" |
+| Resumo, composição, troca de mês | Existe; a composição de Pago tem "Por registro \| Por categoria" (A6, D-035(6)) | Resumo › toque em "Pago" |
+| Contas a pagar: vencidas, pagar, desfazer, próximos meses | Existe, com "Já paguei" nas contas a vencer do mês atual e "Informar valor e pagar" nas estimadas (A6, D-035(5)); as vencidas seguem na revisão de vencidas | Card "Ainda a pagar" › `/a-pagar`; Movimentos › "Organizar" |
+| Gastos fixos e parcelamentos | Existe, com os links "Quanto custa por ano?", "Quanto economizo se quitar antes?" e "Dividir estas contas" (A6) | Movimentos › "Organizar"; `/a-pagar` › link; chips "Todo mês" e "Parcelado" |
+| Contas do ano (IPVA, IPTU, matrícula) | Existe (A3, D-029), com "Cota única ou parcelado? Fazer a conta" no detalhe (A6) | Gastos fixos › Contas do ano; chip "Todo ano" |
 | Conta, segurança, "Quem vê estes dados?" | Existe | Avatar, rodapés |
-| Aprender com 8 temas | Existe | Aba Aprender |
-| Metas | Só tela de espera | Aba Metas |
-| Primeiros passos e "Organizar" em Movimentos | Existe (D-033; "Organizar" ainda sem Calculadoras e com legendas fixas) | Card temporário no Resumo; Movimentos |
+| Aprender com 8 temas | Existe, com o card "Calculadoras" no topo (A6) | Aba Aprender |
+| Metas | Tela de espera com o card "Enquanto isso, faça as contas" (Reserva, Juntar para um objetivo e Todas as calculadoras, A6) | Aba Metas |
+| Primeiros passos e "Organizar" em Movimentos | Existe (D-033); "Organizar" com 3 linhas, Calculadoras e legendas com valores (D-035(8)) | Card temporário no Resumo; Movimentos |
 | Seus últimos meses (A4) | Desenhado (`spec3` §2) | Faixa temporária no Resumo, `/retomar` |
 | Aprender e dúvidas: busca, 5 seções, 35 temas, "O que é isso?" (A5) | Desenhado (`spec3` §3) | Aba Aprender |
 | Lembretes de vencimento (A2) | Desenhado (`spec2` §1.3) | Conta › interruptor; aviso no celular |
 | Renda comprometida (B) | Desenhado (`spec2` §1.4) | Linha dentro do card "Ainda a pagar", `/renda-comprometida` |
 | Metas e reserva (C) | Desenhado (`spec2` §1.5) | Aba Metas, `/reserva`, `/meta/*` |
 | Simulador (D) | Desenhado (`spec2` §1.6) | Nesta proposta: taxa em "Juntar para um objetivo" |
-| Calculadoras, "Somar valores", atalhos do ícone na web | Proposto aqui | `/calcular`; campos Valor; manifesto |
-| "Já paguei" na lista e "Por categoria" | Proposto aqui | `/a-pagar`; composição |
+| Calculadoras, "Somar valores", atalhos do ícone na web | Existe (A6, D-035): 8 calculadoras, "Somar valores" em todos os campos Valor, 4 atalhos no manifesto e volta à tela pedida depois de entrar. Falta: roteiro web, teste em aparelho, link da CVM na reserva e o total de parcelas no cadastro aberto por "Anotar como parcelamento" (`docs/04`) | `/calcular`; campos Valor; manifesto |
+| "Já paguei" na lista e "Por categoria" | Existe (A6, D-035(5) e (6)) | `/a-pagar`; composição |
 | Previsão dos pagamentos do mês | Proposto aqui (seção 5) | Topo de `/a-pagar`, só no mês atual |
 | Busca de registros, orçamento por categoria | Falta, sem ciclo (o orçamento está no "núcleo proposto" das Instruções v2.1) | Movimentos; Metas ou Movimentos |
 | Assinaturas, plano para sair das dívidas, ocultar valores e biometria, revisão do mês, exportar dados, aviso de valor fora do habitual, "Parece um gasto fixo" | Falta (só sugestão em `spec2` §7) | Seção 5 |
 | Notas fiscais NFC-e por QR | Falta (depende de parecer jurídico; `docs/06` §4.2) | "Ler nota fiscal" em Anotar gasto |
-| Família, cartões, integração bancária, IA, crédito, painel de empresas | Fora do ciclo atual | Ciclos seguintes de `docs/04`, ou nunca (crédito) |
+| Família, cartões, integração bancária, IA, crédito, painel de empresas | Fora do ciclo atual; a Família sem vínculo ganhou só o link "Enquanto isso, dividir as contas da casa" (fora do Resumo, A6) | Ciclos seguintes de `docs/04`, ou nunca (crédito) |
 
 ## 5. Sugestões fundamentais com base em pesquisa
 

@@ -40,6 +40,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
+import { SumValues } from '@/components/sum-values';
 import { ChoiceGroup, ofSeries, SERIES_NOUN } from '@/components/series-parts';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
@@ -444,6 +445,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
                   : 'Valor previsto. Ao marcar como paga, você informa o valor que saiu da conta.'
             }
           />
+          <SumValues target={refs.amountText} onUse={(t) => set('amountText', t)} />
 
           <View style={{ gap: space[2] }}>
             <TextField

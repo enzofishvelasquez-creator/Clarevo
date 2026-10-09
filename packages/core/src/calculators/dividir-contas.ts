@@ -5,7 +5,7 @@ import { FieldReader, moneyField, type CalcFieldSpec, type CalcOutcome, type Cal
 import { parseMoney } from './inputs';
 
 /**
- * 7. Dividir as contas da casa (docs/08 §3.2). Partes iguais ou proporcionais à renda, com sharesCents (maior resto:
+ * 8. Dividir as contas da casa (docs/08 §3.2). Partes iguais ou proporcionais à renda, com sharesCents (maior resto:
  * a soma fecha com o total) e percentuais com percentTenths. Não pede nome real e não grava nada (LGPD); não é o
  * plano Família.
  */

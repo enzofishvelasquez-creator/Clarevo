@@ -5,7 +5,7 @@ import { FieldReader, countField, monthsCount, moneyField, rateField, type CalcF
 import { parseCount, parseMoney, parsePercentBp } from './inputs';
 
 /**
- * 2. Quanto custa uma dívida? (docs/08 §3.2; spec4 §1.2).
+ * 3. Quanto custa uma dívida? (docs/08 §3.2; spec4 §1.2).
  * - Rotativo: 1 ciclo só (até a fatura seguinte); depois, "E se parcelar a fatura?" com taxa e parcelas (1 a 24),
  *   e juros e encargos limitados ao valor original (total máximo = 2 × valor, sem o IOF).
  * - Cheque especial: juros compostos por 1 a 24 meses; acima de 8% ao mês, o aviso do teto.

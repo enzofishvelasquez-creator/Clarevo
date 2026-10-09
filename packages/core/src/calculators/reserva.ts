@@ -5,7 +5,7 @@ import { formatInteger } from '../learn/format';
 import { parseCount, parseMoney, parseOptionalMoney } from './inputs';
 
 /**
- * 5. Reserva para imprevistos (docs/08 §3.2). alvo = essenciais × meses; cobertura em décimos de mês =
+ * 6. Reserva para imprevistos (docs/08 §3.2). alvo = essenciais × meses; cobertura em décimos de mês =
  * piso(guardado × 10 ÷ essenciais); prazo = teto((alvo − guardado) ÷ por mês). Sem rendimento. Não diz onde guardar.
  */
 export type ReservaField = 'essenciais' | 'meses' | 'guardado' | 'mensal';

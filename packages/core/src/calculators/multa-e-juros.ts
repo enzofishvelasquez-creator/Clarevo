@@ -4,7 +4,7 @@ import { FieldReader, countField, daysCount, moneyField, rateField, type CalcFie
 import { parseCount, parseMoney, parsePercentBp } from './inputs';
 
 /**
- * 4. Multa e juros por atraso (docs/08 §3.2). multa = arredonda(valor × multa); juros = arredonda(valor × juros ×
+ * 5. Multa e juros por atraso (docs/08 §3.2). multa = arredonda(valor × multa); juros = arredonda(valor × juros ×
  * dias ÷ 30), simples e proporcionais (lateChargesCents). O resultado fala em "depois do vencimento".
  */
 export type MultaField = 'valor' | 'multaPct' | 'jurosMesPct' | 'dias';

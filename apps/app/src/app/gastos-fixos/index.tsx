@@ -1,5 +1,7 @@
 import {
+  CALC_UI_TEXT,
   ERROR_TEXT,
+  MAX_RECORD_CENTS,
   annualYearOf,
   currentTerm,
   formatBRL,
@@ -17,9 +19,10 @@ import {
   type IsoDate,
 } from '@clarevo/core';
 import { router } from 'expo-router';
-import { CalendarSync, Layers, Plus, Repeat, ShieldCheck } from 'lucide-react-native';
+import { CalendarSync, Layers, Plus, Repeat, ShieldCheck, Users } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
+import { openCalc } from '@/components/calc/open';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { estimateText, SERIES_NOUN, yearA11y } from '@/components/series-parts';
@@ -179,6 +182,15 @@ export default function GastosFixosScreen() {
                 Por ano, se os valores não mudarem: {formatBRL(yearly.totalCents)}
                 {yearly.estimatedCents > 0 ? ` (inclui ${formatBRL(yearly.estimatedCents)} estimados)` : ''}.
               </Txt>
+            ) : null}
+            {/* Com 2 ou mais contas no "Por mês": a calculadora de dividir as contas da casa, com esse total (nada é gravado). */}
+            {monthlyActive.length >= 2 && monthly.totalCents > 0 && monthly.totalCents <= MAX_RECORD_CENTS ? (
+              <LinkButton
+                label={CALC_UI_TEXT.links.dividir}
+                icon={Users}
+                style={styles.inlineLink}
+                onPress={() => openCalc('dividir-contas', { totalCents: monthly.totalCents, origem: 'gastos-fixos' })}
+              />
             ) : null}
           </>
         )}

@@ -5,7 +5,7 @@ import { Manrope_600SemiBold } from '@expo-google-fonts/manrope/600SemiBold';
 import { Manrope_700Bold } from '@expo-google-fonts/manrope/700Bold';
 import { Manrope_800ExtraBold } from '@expo-google-fonts/manrope/800ExtraBold';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import { router, Stack, useGlobalSearchParams, usePathname } from 'expo-router';
+import { router, Stack, useGlobalSearchParams, usePathname, type Href } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -21,6 +21,42 @@ import { ViewProvider } from '@/state/view';
 import { colors, fonts } from '@/theme/tokens';
 
 SplashScreen.preventAutoHideAsync();
+
+/**
+ * Telas do app que podem ser abertas direto pelo endereço (atalhos do ícone na versão web instalada, link salvo ou
+ * página recarregada). As telas de entrada, de confirmação e de nova senha ficam fora.
+ */
+const ENTRY_PATH =
+  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|composicao|conta|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes|metas|aprender)\/?$/;
+
+/**
+ * Endereço pedido ao abrir a versão web. Sem sessão (ou enquanto a sessão é conferida), as rotas protegidas levam à
+ * entrada ou à tela de carregamento, e o endereço se perderia. Ele fica só em memória (nunca no aparelho) e é retomado
+ * quando o espaço da pessoa estiver pronto. Parâmetros de links de e-mail (código, token) nunca entram.
+ */
+function readEntryTarget(): string | null {
+  if (Platform.OS !== 'web' || typeof window === 'undefined' || !window.location) return null;
+  const { pathname, search } = window.location;
+  if (!ENTRY_PATH.test(pathname)) return null;
+  const params = new URLSearchParams(search);
+  for (const key of [...params.keys()]) if (/token|code|type|error/i.test(key)) params.delete(key);
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
+
+/** Lido uma vez, ao carregar o app, antes de a navegação trocar o endereço. */
+let entryTarget = readEntryTarget();
+
+/**
+ * Devolve o endereço guardado uma única vez. Fica fora dos componentes de propósito: o React Compiler trata variáveis
+ * do módulo como constantes dentro de componentes e efeitos, e leria o valor já apagado.
+ */
+function takeEntryTarget(): string | null {
+  const target = entryTarget;
+  entryTarget = null;
+  return target;
+}
+const hasEntryTarget = () => entryTarget !== null;
 
 
 export default function RootLayout() {
@@ -121,6 +157,14 @@ function Navigation() {
   const signedOut = ready && !user;
   const inRecovery = Boolean(user && recovery);
 
+  // Endereço pedido ao abrir a versão web: depois de entrar (ou de conferir a sessão), a pessoa chega à tela pedida.
+  // Roda depois de "carregando" decidir o destino (efeitos do pai rodam depois dos do filho), então prevalece.
+  useEffect(() => {
+    if (!user || inRecovery || status !== 'pronto' || !hasEntryTarget()) return;
+    const target = takeEntryTarget();
+    if (target) router.replace(target as Href);
+  }, [status, user, inRecovery]);
+
   return (
     <SpaceStatusContext value={{ status, retry: () => space.refetch() }}>
       <Stack
@@ -164,6 +208,8 @@ function Navigation() {
           <Stack.Screen name="quem-ve" />
           <Stack.Screen name="conta" />
           <Stack.Screen name="explicacao/[tema]" />
+          <Stack.Screen name="calcular/index" />
+          <Stack.Screen name="calcular/[slug]" />
         </Stack.Protected>
         <Stack.Screen name="carregando" />
         <Stack.Screen name="confirmado" />

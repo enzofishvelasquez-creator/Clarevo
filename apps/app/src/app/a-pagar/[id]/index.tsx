@@ -1,4 +1,5 @@
 import {
+  CALC_UI_TEXT,
   COMMITMENT_ERROR_TEXT,
   ERROR_TEXT,
   NO_CATEGORY_LABEL,
@@ -19,6 +20,7 @@ import {
   isRepoError,
   mergeOccurrences,
   monthOf,
+  multaLink,
   newOperationKey,
   nextMonthPrefill,
   occurrenceLabel,
@@ -29,10 +31,11 @@ import {
   type YearPlan,
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
-import { AlertCircle, CalendarSync, Check, Info, Pencil, Plus, Repeat, ShieldCheck, Trash2, Undo2 } from 'lucide-react-native';
+import { AlertCircle, Calculator, CalendarSync, Check, Info, Pencil, Plus, Repeat, ShieldCheck, Trash2, Undo2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { openCalc } from '@/components/calc/open';
 import { ChoiceDialog } from '@/components/choice-dialog';
 import { bySeries, ofSeries, SERIES_NOUN, yearA11yLabel } from '@/components/series-parts';
 import { SITUATION_LOOK } from '@/components/commitment-row';
@@ -330,6 +333,8 @@ export default function DetalheContaAPagar() {
           : 'Parte de um gasto fixo · todo mês';
   const seriesNoun = SERIES_NOUN[ref?.kind ?? 'mensal'];
   const estimateOpen = Boolean(c && !paid && c.amountIsEstimate);
+  // Conta vencida em aberto: "Calcular multa e juros", com o valor e os dias depois do vencimento (D-034).
+  const lateCalc = c ? multaLink(c, today) : null;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -388,6 +393,14 @@ export default function DetalheContaAPagar() {
                 <Txt variant="label" color={situation === 'vencida' ? colors.error : colors.textSecondary}>
                   {dueText(c, today)}
                 </Txt>
+                {lateCalc ? (
+                  <LinkButton
+                    label={CALC_UI_TEXT.links.multa}
+                    icon={Calculator}
+                    style={styles.inlineLink}
+                    onPress={() => openCalc('multa-e-juros', lateCalc)}
+                  />
+                ) : null}
                 {ref ? (
                   <View style={{ gap: space[1] }}>
                     <Txt variant="label" accessibilityLabel={partOf ? yearA11yLabel(partOf) : undefined}>
