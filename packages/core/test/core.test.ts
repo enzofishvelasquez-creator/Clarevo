@@ -48,7 +48,7 @@ const SEP = '2026-09';
 const NOV = '2026-11';
 
 async function setup() {
-  const repo = await createDemoRepository();
+  const repo = await createDemoRepository({ cards: false });
   const space = (await repo.getSpace())!;
   const ctx = space.personalContextId;
   const accountId = space.accounts[0]!.id;
@@ -355,6 +355,7 @@ const commitment = (over: Partial<Commitment> = {}): Commitment => ({
   payment: null,
   series: null,
   seriesOverride: false,
+  invoice: null,
   amountIsEstimate: false,
   createdBy: 'pessoa',
   version: 1,

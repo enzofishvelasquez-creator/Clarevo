@@ -125,6 +125,7 @@ const occ = (s: CommitmentSeries, n: number, over: Partial<Commitment> = {}): Co
     payment: null,
     series: { id: s.id, number: n, kind: s.kind, nature: s.nature, installmentTotal: s.installmentTotal, partsPerYear: s.partsPerYear },
     seriesOverride: false,
+    invoice: null,
     amountIsEstimate: t.amountMode === 'variavel',
     createdBy: 'pessoa',
     version: 1,
@@ -1435,7 +1436,7 @@ describe('contas do ano: MemoryRepository', () => {
 
 describe('demonstração com contas do ano', () => {
   it('IPVA e IPTU sem contas em 07/10/2026; totais de outubro, novembro e dezembro iguais ao Ciclo A', async () => {
-    const repo = await createDemoRepository();
+    const repo = await createDemoRepository({ cards: false });
     const ctx = (await repo.getSpace())!.personalContextId;
     const list = await repo.listSeries(ctx);
     const annuals = list.filter((s) => s.kind === 'anual');

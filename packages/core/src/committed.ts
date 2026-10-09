@@ -16,8 +16,8 @@ import { ERROR_TEXT } from './validation';
  * - C(M) = contas a pagar não excluídas do contexto com vencimento no mês M; cada conta conta uma vez: paga pelo valor
  *   do gasto vinculado, em aberto pelo valor previsto (estimado ou não).
  * - Grupos: gastos fixos (séries mensais), contas do ano (séries anuais, que não são dívida), parcelamentos (séries
- *   parceladas) e outras contas a pagar (avulsas). "Dívidas" = parcelamentos de financiamento ou empréstimo e de compra
- *   parcelada (parte de "parcelamentos").
+ *   parceladas), faturas de cartão (D-037, contas ligadas a um cartão e a um mês, fora de "Dívidas") e outras contas a pagar
+ *   (avulsas). "Dívidas" = parcelamentos de financiamento ou empréstimo e de compra parcelada (parte de "parcelamentos").
  * - Gastos anotados sem conta a pagar não entram. Contas em aberto vencidas antes do mês aparecem à parte (só no mês de
  *   hoje) e contam no mês do vencimento delas.
  * - Renda considerada = renda de referência viva com o maior "a partir de" até M; sem ela, só valores em reais.
@@ -47,9 +47,9 @@ export const DEBT_REFERENCE = {
   consultedOn: '2026-10-09',
 } as const;
 
-export type CommittedGroup = 'fixos' | 'anuais' | 'parcelamentos' | 'outras';
+export type CommittedGroup = 'fixos' | 'anuais' | 'parcelamentos' | 'faturas' | 'outras';
 /** Ordem da composição na tela. */
-export const COMMITTED_GROUPS: readonly CommittedGroup[] = ['fixos', 'anuais', 'parcelamentos', 'outras'];
+export const COMMITTED_GROUPS: readonly CommittedGroup[] = ['fixos', 'anuais', 'parcelamentos', 'faturas', 'outras'];
 
 /** Tipo fora da lista (dado corrompido): nunca tratar como outro grupo. */
 function unknownKind(kind: never): never {
@@ -72,8 +72,9 @@ function groupOfKind(kind: SeriesKind | null): CommittedGroup {
   }
 }
 
-/** Grupo da conta: série mensal, anual ou parcelada; sem série, "outras contas a pagar". */
-export function committedGroupOf(c: Pick<Commitment, 'series'>): CommittedGroup {
+/** Grupo da conta: fatura de cartão; série mensal, anual ou parcelada; sem série, "outras contas a pagar". */
+export function committedGroupOf(c: Pick<Commitment, 'series'> & Partial<Pick<Commitment, 'invoice'>>): CommittedGroup {
+  if (c.invoice) return 'faturas';
   return groupOfKind(c.series ? c.series.kind : null);
 }
 
@@ -150,6 +151,7 @@ interface GroupTotals {
   fixos: Cents;
   anuais: Cents;
   parcelamentos: Cents;
+  faturas: Cents;
   outras: Cents;
   debt: Cents;
   committed: Cents;
@@ -158,7 +160,7 @@ interface GroupTotals {
   estimatedOpen: Cents;
 }
 
-const emptyTotals = (): GroupTotals => ({ fixos: 0, anuais: 0, parcelamentos: 0, outras: 0, debt: 0, committed: 0, paid: 0, open: 0, estimatedOpen: 0 });
+const emptyTotals = (): GroupTotals => ({ fixos: 0, anuais: 0, parcelamentos: 0, faturas: 0, outras: 0, debt: 0, committed: 0, paid: 0, open: 0, estimatedOpen: 0 });
 
 function addTo(t: GroupTotals, group: CommittedGroup, debt: boolean, value: Cents, paid: boolean, estimate: boolean) {
   t[group] += value;
@@ -184,9 +186,11 @@ export interface CommittedSummary {
   installmentCents: Cents;
   /** month_committed.debt_cents: parcelamentos de financiamento ou compra parcelada (parte de installmentCents). */
   debtCents: Cents;
+  /** month_committed.card_cents: faturas de cartão (contas ligadas a um cartão). Não são dívida. */
+  cardCents: Cents;
   /** month_committed.other_cents: contas avulsas. */
   otherCents: Cents;
-  /** month_committed.committed_cents = fixed + annual + installment + other. */
+  /** month_committed.committed_cents = fixed + annual + installment + invoice + other. */
   committedCents: Cents;
   /** month_committed.paid_part_cents: das pagas, pelo valor pago. */
   paidPartCents: Cents;
@@ -205,6 +209,7 @@ export interface CommittedSummary {
   fixedPermille: number | null;
   annualPermille: number | null;
   installmentPermille: number | null;
+  cardPermille: number | null;
   otherPermille: number | null;
   debtPermille: number | null;
   /** "Fora dos compromissos" = referência − comprometido (pode ser negativo); null sem referência. */
@@ -245,7 +250,7 @@ export function summarizeCommitted(
   const { start } = monthRange(month);
   const own = list.filter((c) => c.contextId === contextId).sort(byDue);
   const inMonth = own.filter((c) => monthOf(c.dueOn) === month);
-  const items: Record<CommittedGroup, Commitment[]> = { fixos: [], anuais: [], parcelamentos: [], outras: [] };
+  const items: Record<CommittedGroup, Commitment[]> = { fixos: [], anuais: [], parcelamentos: [], faturas: [], outras: [] };
   const t = emptyTotals();
   for (const c of inMonth) {
     const group = committedGroupOf(c);
@@ -266,6 +271,7 @@ export function summarizeCommitted(
     annualCents: t.anuais,
     installmentCents: t.parcelamentos,
     debtCents: t.debt,
+    cardCents: t.faturas,
     otherCents: t.outras,
     committedCents: t.committed,
     paidPartCents: t.paid,
@@ -279,6 +285,7 @@ export function summarizeCommitted(
     fixedPermille: committedPermille(t.fixos, ref),
     annualPermille: committedPermille(t.anuais, ref),
     installmentPermille: committedPermille(t.parcelamentos, ref),
+    cardPermille: committedPermille(t.faturas, ref),
     otherPermille: committedPermille(t.outras, ref),
     debtPermille: committedPermille(t.debt, ref),
     outsideCents: ref === null ? null : ref - t.committed,
@@ -311,6 +318,7 @@ export interface CommittedProjectionMonth {
   annualCents: Cents;
   installmentCents: Cents;
   debtCents: Cents;
+  cardCents: Cents;
   otherCents: Cents;
   committedCents: Cents;
   /** Contas pagas antes do mês, pelo valor pago. */
@@ -386,6 +394,7 @@ function projectionMonth(month: IsoMonth, t: GroupTotals, planned: Cents, refere
     annualCents: t.anuais,
     installmentCents: t.parcelamentos,
     debtCents: t.debt,
+    cardCents: t.faturas,
     otherCents: t.outras,
     committedCents: t.committed,
     paidPartCents: t.paid,
@@ -696,6 +705,7 @@ export const COMMITTED_TEXT = {
     fixos: 'Gastos fixos',
     anuais: 'Contas do ano',
     parcelamentos: 'Parcelamentos',
+    faturas: 'Faturas de cartão',
     outras: 'Outras contas a pagar',
   } satisfies Record<CommittedGroup, string>,
   /** "Gastos fixos · R$ 2.500,00 · 41,7%" (sem percentual quando não há referência). */
@@ -747,6 +757,8 @@ export const COMMITTED_TEXT = {
     `Somamos as contas a pagar com vencimento em ${formatMonthName(month)}: o valor pago das que já foram pagas e o valor previsto das que estão em aberto. ` +
     'Gastos anotados sem conta a pagar, como mercado, ficam fora. Por isso este número é diferente de Pago e de Ainda a pagar.',
   howLink: 'Como ler este número',
+  /** Compras no cartão entram pela fatura (D-037); não é dívida. */
+  invoiceNote: 'Compras no cartão entram pela fatura, no mês do vencimento dela. A linha de dívidas continua só com financiamento e compra parcelada.',
   links: {
     series: 'Gastos fixos e parcelamentos',
     payables: 'Contas a pagar',
@@ -894,6 +906,8 @@ export interface CommittedTexts {
   outside: string | null;
   outsideNote: string | null;
   estimated: string | null;
+  /** Só com faturas de cartão no mês. */
+  invoiceNote: string | null;
   overdueBefore: string | null;
   overReference: string | null;
   annualShare: string | null;
@@ -910,15 +924,24 @@ export interface CommittedTexts {
 export function committedTexts(s: CommittedSummary, receivedCents: Cents | null = null): CommittedTexts {
   const ref = s.referenceCents;
   const pct = pctOrNull(s.committedPermille, s.committedCents);
-  const groupCents: Record<CommittedGroup, Cents> = { fixos: s.fixedCents, anuais: s.annualCents, parcelamentos: s.installmentCents, outras: s.otherCents };
+  const groupCents: Record<CommittedGroup, Cents> = {
+    fixos: s.fixedCents,
+    anuais: s.annualCents,
+    parcelamentos: s.installmentCents,
+    faturas: s.cardCents,
+    outras: s.otherCents,
+  };
   const groupPermille: Record<CommittedGroup, number | null> = {
     fixos: s.fixedPermille,
     anuais: s.annualPermille,
     parcelamentos: s.installmentPermille,
+    faturas: s.cardPermille,
     outras: s.otherPermille,
   };
-  // Contas do ano só aparecem na composição quando há alguma no mês (antes do Ciclo A3, o grupo não existia).
-  const groups = COMMITTED_GROUPS.filter((g) => g !== 'anuais' || s.annualCents > 0 || s.items.anuais.length > 0).map((group) => {
+  // Contas do ano e faturas de cartão só aparecem na composição quando há alguma no mês (os grupos vieram depois dos outros).
+  const groups = COMMITTED_GROUPS.filter(
+    (g) => (g !== 'anuais' || s.annualCents > 0 || s.items.anuais.length > 0) && (g !== 'faturas' || s.cardCents > 0 || s.items.faturas.length > 0),
+  ).map((group) => {
     const label = COMMITTED_TEXT.groupLabel[group];
     const cents = groupCents[group];
     const percentText = pctOrNull(groupPermille[group], cents);
@@ -945,6 +968,7 @@ export function committedTexts(s: CommittedSummary, receivedCents: Cents | null 
     outside: s.outsideCents === null || s.outsideCents < 0 ? null : COMMITTED_TEXT.outside(s.outsideCents),
     outsideNote: s.outsideCents === null || s.outsideCents < 0 ? null : COMMITTED_TEXT.outsideNote,
     estimated: s.estimatedOpenCents > 0 ? COMMITTED_TEXT.estimated(s.estimatedOpenCents) : null,
+    invoiceNote: s.items.faturas.length > 0 ? COMMITTED_TEXT.invoiceNote : null,
     overdueBefore: s.overdueBeforeCents > 0 ? COMMITTED_TEXT.overdueBefore(s.overdueBeforeCents, s.month) : null,
     overReference: s.overReference && ref !== null ? COMMITTED_TEXT.overReference(s.committedCents - ref) : null,
     annualShare: s.annualShare ? COMMITTED_TEXT.annualShare(s.annualShare.monthlyCents) : null,

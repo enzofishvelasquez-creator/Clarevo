@@ -1,8 +1,16 @@
 import type { IsoDate, IsoMonth } from './dates';
-import { addMonths, dateInMonth, isValidIsoDate, isValidIsoMonth, monthOf, monthsBetween } from './dates';
+import { addMonths, addYearsClamped, dateInMonth, isValidIsoDate, isValidIsoMonth, monthOf, monthsBetween } from './dates';
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS } from './money';
 import type {
+  Card,
+  CardChargeInput,
+  CardEntry,
+  CardEntryInput,
+  CardInput,
+  CardPurchaseInput,
+  CardRefundInput,
+  CardStatus,
   Commitment,
   CommitmentInput,
   CommitmentSeries,
@@ -32,11 +40,14 @@ import type {
 } from './records';
 import type {
   AffectedRef,
+  CardAction,
+  CardWrite,
   CommitmentAction,
   CommitmentWrite,
   GoalAction,
   GoalWrite,
   IncomeReferenceAction,
+  InvoicePaymentWrite,
   RecordsRepository,
   ReturnReviewAction,
   SavingsAction,
@@ -45,6 +56,32 @@ import type {
 } from './repository';
 import { RepoError } from './repository';
 import { referenceMonthError } from './committed';
+import {
+  CARDS_ACTIVE_MAX,
+  CARD_CHARGE_TYPES,
+  CARD_ENTRIES_MAX,
+  CARD_INSTALLMENTS_MAX,
+  CARD_STATUSES,
+  buildInvoices,
+  cardChargeError,
+  cardInputError,
+  cardLimitUsed,
+  cardPurchaseError,
+  cardRefundError,
+  invoiceClosingOn,
+  invoiceCommitmentDescription,
+  invoiceDueOn,
+  invoiceItemOf,
+  invoiceMonthOf,
+  invoiceRecordDescription,
+  normalizeCardInput,
+  normalizePurchaseInput,
+  normalizeRefundInput,
+  purchaseFirstInvoiceMonth,
+  purchaseInstallments,
+  receiptKeyValid,
+  type Invoice,
+} from './cards';
 import {
   GOAL_MOVEMENT_KINDS,
   GOAL_NAME_MAX,
@@ -84,7 +121,7 @@ import { dueDateBounds, seriesInputError, seriesTermError } from './validation';
 type RecordAction = 'criar' | 'editar' | 'excluir';
 
 interface Operation {
-  action: RecordAction | CommitmentAction | SeriesAction | ReturnReviewAction | IncomeReferenceAction | GoalAction | SavingsAction;
+  action: RecordAction | CommitmentAction | SeriesAction | ReturnReviewAction | IncomeReferenceAction | GoalAction | SavingsAction | CardAction;
   hash: string;
   contextId: string;
   recordId: string | null;
@@ -96,6 +133,9 @@ interface Operation {
   /** Ações de metas: a meta e, nas ações de movimento, o movimento (target_id). */
   goalId: string | null;
   movementId: string | null;
+  /** Ações de cartões: o cartão e, nas ações de lançamento, o lançamento (target_id e entry_id). */
+  cardId: string | null;
+  entryId: string | null;
 }
 
 type StoredRecord = FinancialRecord & { deletedAt?: string };
@@ -103,11 +143,16 @@ type StoredRecord = FinancialRecord & { deletedAt?: string };
  * Conta a pagar guardada sem o pagamento (lido do gasto vivo vinculado) e sem os dados da série (lidos pela junção).
  * seriesSkipped: excluída só neste mês; o número nunca volta a ser criado.
  */
-type StoredCommitment = Omit<Commitment, 'payment' | 'series'> & {
+type StoredCommitment = Omit<Commitment, 'payment' | 'series' | 'invoice'> & {
   deletedAt?: string;
   seriesId: string | null;
   occurrenceNumber: number | null;
   seriesSkipped: boolean;
+  /** Fatura de cartão (cartão e mês do vencimento); null nas outras contas. Imutável. */
+  invoiceCardId: string | null;
+  invoiceMonth: IsoMonth | null;
+  /** Fechamento da fatura quando a conta foi mantida pela última vez (card_closing_on): base da marca "estimado". */
+  cardClosingOn: IsoDate | null;
 };
 /** Série guardada sem o que é calculado (vigências, números pulados, contagens). */
 type StoredSeries = Omit<CommitmentSeries, 'terms' | 'skippedNumbers' | 'paidCount' | 'openCount' | 'generating'> & { deletedAt?: string };
@@ -122,6 +167,9 @@ type StoredGoal = Omit<
 > & { deletedAt?: string; deletedBy?: string };
 /** Movimento de meta (goal_movements): exclusão lógica. */
 type StoredGoalMovement = GoalMovement & { deletedAt?: string; deletedBy?: string };
+/** Cartão (cards) sem o que é calculado (card_items: limite usado e fatura atual) e lançamento do cartão (card_entries): exclusão lógica. */
+type StoredCard = Omit<Card, 'usedCents' | 'currentMonth' | 'currentClosingOn' | 'currentDueOn'> & { deletedAt?: string; deletedBy?: string };
+type StoredCardEntry = CardEntry & { deletedAt?: string; deletedBy?: string };
 
 const NATURES: readonly string[] = ['conta', 'financiamento', 'compra_parcelada', 'outro_parcelamento'];
 const SERIES_ACTIONS: readonly string[] = ['criar_serie', 'alterar_serie', 'encerrar_serie', 'excluir_serie', 'informar_ano', 'tirar_ano'];
@@ -133,6 +181,19 @@ const GOAL_ACTIONS: readonly string[] = [
   'registrar_movimento_meta',
   'alterar_movimento_meta',
   'excluir_movimento_meta',
+];
+const CARD_ACTIONS: readonly string[] = [
+  'criar_cartao',
+  'alterar_cartao',
+  'situacao_cartao',
+  'excluir_cartao',
+  'criar_compra_cartao',
+  'alterar_lancamento_cartao',
+  'excluir_lancamento_cartao',
+  'criar_encargo_cartao',
+  'criar_estorno_cartao',
+  'pagar_fatura',
+  'desfazer_pagamento_fatura',
 ];
 const COMMITMENT_ACTIONS: readonly string[] = [
   'criar_compromisso',
@@ -171,6 +232,10 @@ export interface MemoryRepositoryOptions {
  * reserva não arquivada por contexto). Movimentos nunca mexem em registros, contas a pagar nem na versão da meta.
  * Plano de guardar (spec7): set_savings_answer, uma resposta viva por contexto, só da própria pessoa; não conta como
  * anotação na atividade (como a decisão da revisão) e não mexe em nenhum total.
+ * Cartões (D-037): as onze funções de cartões. A fatura é uma conta a pagar (commitments com cartão e mês) mantida na
+ * mesma transação de cada escrita do cartão; update_commitment, delete_commitment, pay_commitment e
+ * undo_commitment_payment recusam essa conta (conta_de_fatura) e update_record e delete_record recusam o gasto de um
+ * pagamento de fatura (pagamento_de_fatura). Compra no cartão nunca cria gasto: só o pagamento da fatura entra em Pago.
  * Usado na demonstração (acesso simulado) e nos testes.
  */
 export class MemoryRepository implements RecordsRepository {
@@ -188,6 +253,8 @@ export class MemoryRepository implements RecordsRepository {
   private goalMovements = new Map<string, StoredGoalMovement>();
   /** savings_checks da pessoa (só ela usa este repositório), por contexto: uma resposta viva por contexto. */
   private savingsChecks = new Map<string, SavingsCheck>();
+  private cards = new Map<string, StoredCard>();
+  private cardEntries = new Map<string, StoredCardEntry>();
   private seq = 0;
   /** Simula falha de rede: 'antes' (nada gravado) ou 'depois' (gravado, resposta perdida). */
   failNextWrite: 'antes' | 'depois' | null = null;
@@ -241,6 +308,8 @@ export class MemoryRepository implements RecordsRepository {
       goals: new Map(this.goals),
       goalMovements: new Map(this.goalMovements),
       savingsChecks: new Map(this.savingsChecks),
+      cards: new Map(this.cards),
+      cardEntries: new Map(this.cardEntries),
     };
     let result: T;
     try {
@@ -260,6 +329,8 @@ export class MemoryRepository implements RecordsRepository {
         goals: this.goals,
         goalMovements: this.goalMovements,
         savingsChecks: this.savingsChecks,
+        cards: this.cards,
+        cardEntries: this.cardEntries,
       } = saved);
       throw e;
     }
@@ -322,11 +393,17 @@ export class MemoryRepository implements RecordsRepository {
   async createRecord(key: string, contextId: string, kind: RecordKind, input: RecordInput) {
     return this.write(() => {
       const norm = normalize(input);
-      const payload = [contextId, kind, norm];
+      // Com a chave da nota (D-038) o conteúdo ganha o último item; sem ela, o hash é o de antes.
+      const receipt = input.receiptKey?.trim() ? input.receiptKey.trim() : null;
+      const payload = receipt === null ? [contextId, kind, norm] : [contextId, kind, norm, receipt];
       const replay = this.replayRecord(key, 'criar', payload);
       if (replay) return replay;
       if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
       this.validate(contextId, norm);
+      if (receipt !== null) {
+        if (kind !== 'despesa' || !receiptKeyValid(receipt)) throw new RepoError('chave_de_nota_invalida');
+        this.checkReceiptFree(contextId, receipt);
+      }
       const now = new Date().toISOString();
       const record: FinancialRecord = {
         id: this.id('reg'),
@@ -336,6 +413,8 @@ export class MemoryRepository implements RecordsRepository {
         currency: 'BRL',
         ...norm,
         commitmentId: null,
+        invoice: null,
+        receiptKey: receipt,
         createdBy: this.opts.actorId,
         version: 1,
         createdAt: now,
@@ -355,6 +434,10 @@ export class MemoryRepository implements RecordsRepository {
       if (replay) return replay;
       const current = this.liveRecord(id);
       if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
+      // Gasto de pagamento de fatura: valor, descrição e categoria vêm da fatura; só a conta de saída e a data mudam.
+      if (current.invoice && (norm.amountCents !== current.amountCents || norm.description !== current.description || norm.category !== current.category)) {
+        throw new RepoError('pagamento_de_fatura');
+      }
       this.validate(current.contextId, norm);
       const now = new Date().toISOString();
       const next = { ...current, ...norm, version: current.version + 1, updatedAt: now };
@@ -373,6 +456,8 @@ export class MemoryRepository implements RecordsRepository {
       if (replay) return replay;
       const current = this.liveRecord(id);
       if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
+      // Pagamento de fatura: o caminho é undo_invoice_payment, que também desfaz o saldo anterior.
+      if (current.invoice) throw new RepoError('pagamento_de_fatura');
       const now = new Date().toISOString();
       const next = { ...current, version: current.version + 1, updatedAt: now, deletedAt: now };
       this.records.set(id, next);
@@ -435,6 +520,9 @@ export class MemoryRepository implements RecordsRepository {
         seriesOverride: false,
         seriesSkipped: false,
         amountIsEstimate: false,
+        invoiceCardId: null,
+        invoiceMonth: null,
+        cardClosingOn: null,
         createdBy: this.opts.actorId,
         version: 1,
         createdAt: now,
@@ -455,6 +543,8 @@ export class MemoryRepository implements RecordsRepository {
       const replay = this.replayCommitment(key, 'editar_compromisso', payload);
       if (replay) return replay;
       const current = this.liveCommitment(id);
+      // Fatura de cartão: muda só pelos lançamentos do cartão.
+      if (current.invoiceCardId) throw new RepoError('conta_de_fatura');
       if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
       if (current.status !== 'aberto') throw new RepoError('compromisso_quitado');
       // Só ausente (mantém) ou false (valor da conta informado).
@@ -480,6 +570,7 @@ export class MemoryRepository implements RecordsRepository {
       const replay = this.replayCommitment(key, 'excluir_compromisso', payload);
       if (replay) return replay;
       const current = this.liveCommitment(id);
+      if (current.invoiceCardId) throw new RepoError('conta_de_fatura');
       if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
       if (current.status !== 'aberto') throw new RepoError('compromisso_quitado');
       const now = new Date().toISOString();
@@ -497,6 +588,8 @@ export class MemoryRepository implements RecordsRepository {
       const replay = this.replayCommitment(key, 'pagar_compromisso', payload);
       if (replay) return withRecord(replay);
       const current = this.liveCommitment(id);
+      // Pagar a fatura sem distribuir o saldo seria contar o pagamento sem o saldo anterior: só pay_invoice.
+      if (current.invoiceCardId) throw new RepoError('conta_de_fatura');
       if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
       if (current.status !== 'aberto') throw new RepoError('compromisso_quitado');
       // Mesmas regras do gasto realizado: valor, categoria, data até hoje e conta do contexto.
@@ -517,6 +610,8 @@ export class MemoryRepository implements RecordsRepository {
         currency: 'BRL',
         ...recordInput,
         commitmentId: id,
+        invoice: null,
+        receiptKey: null,
         createdBy: this.opts.actorId,
         version: 1,
         createdAt: now,
@@ -535,6 +630,7 @@ export class MemoryRepository implements RecordsRepository {
       const replay = this.replayCommitment(key, 'desfazer_pagamento', payload);
       if (replay) return withRecord(replay);
       const current = this.liveCommitment(id);
+      if (current.invoiceCardId) throw new RepoError('conta_de_fatura');
       if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
       if (current.status !== 'quitado') throw new RepoError('compromisso_aberto');
       // Permissão também sobre o gasto, como clarevo_lock_record.
@@ -848,6 +944,15 @@ export class MemoryRepository implements RecordsRepository {
         created += r.created;
         createdOverdue += r.createdOverdue;
       }
+      // Faturas de cartão em aberto: o dia do fechamento passa sem gravação, então a marca "estimado" (hoje até o fechamento)
+      // é atualizada aqui, com versão + 1 (como sync_series_occurrences na migração 0008).
+      const today = this.opts.today();
+      const now = new Date().toISOString();
+      for (const c of [...this.commitments.values()]) {
+        if (c.contextId !== contextId || !c.invoiceCardId || c.deletedAt || c.status !== 'aberto' || c.cardClosingOn === null) continue;
+        const estimate = today <= c.cardClosingOn;
+        if (c.amountIsEstimate !== estimate) this.bumpCommitment(c.id, { amountIsEstimate: estimate }, now);
+      }
       return { created, createdOverdue };
     });
   }
@@ -924,6 +1029,9 @@ export class MemoryRepository implements RecordsRepository {
         seriesOverride: false,
         seriesSkipped: skip,
         amountIsEstimate: term.amountMode === 'variavel',
+        invoiceCardId: null,
+        invoiceMonth: null,
+        cardClosingOn: null,
         createdBy: s.createdBy,
         version: 1,
         createdAt: now,
@@ -1336,6 +1444,875 @@ export class MemoryRepository implements RecordsRepository {
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // Cartões de crédito (D-037): mesmas regras e mesma ordem das funções do banco (migração 0008, cards.ts)
+  // ---------------------------------------------------------------------------
+
+  /** Como a leitura de card_items (RLS): cartões vivos do contexto, por criação, com limite usado e fatura atual; sem leitura, nada. */
+  async listCards(contextId: string) {
+    return this.read(() =>
+      [...this.cards.values()]
+        .filter((c) => !c.deletedAt && c.contextId === contextId && this.canRead(c.contextId))
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
+        .map((c) => this.cardView(c)),
+    );
+  }
+
+  async getCard(id: string) {
+    return this.read(() => {
+      const c = this.cards.get(id);
+      return c && !c.deletedAt && this.canRead(c.contextId) ? this.cardView(c) : null;
+    });
+  }
+
+  async getCardEntry(id: string) {
+    return this.read(() => {
+      const e = this.cardEntries.get(id);
+      return e && !e.deletedAt && this.canRead(e.contextId) ? stripEntry(e) : null;
+    });
+  }
+
+  async listCardEntries(cardId: string) {
+    return this.read(() => {
+      const c = this.cards.get(cardId);
+      if (!c || c.deletedAt || !this.canRead(c.contextId)) return [];
+      return this.liveEntries(cardId).map(stripEntry);
+    });
+  }
+
+  async listInvoiceCommitments(cardId: string) {
+    return this.read(() => {
+      const c = this.cards.get(cardId);
+      if (!c || c.deletedAt || !this.canRead(c.contextId)) return [];
+      return this.invoiceCommitments(cardId).map((x) => this.toCommitment(x));
+    });
+  }
+
+  async listInvoiceItems(cardId: string) {
+    return this.read(() => {
+      const c = this.cards.get(cardId);
+      if (!c || c.deletedAt || !this.canRead(c.contextId)) return [];
+      return this.invoicesOf(c).map(invoiceItemOf);
+    });
+  }
+
+  async findCardOperation(key: string) {
+    return this.read(() => {
+      const op = this.operations.get(key);
+      return op && op.cardId && isCardAction(op.action)
+        ? { action: op.action, cardId: op.cardId, entryId: op.entryId, commitmentId: op.commitmentId, recordId: op.recordId }
+        : null;
+    });
+  }
+
+  /** Como create_card. Ordem: repetição; sem_permissao; campos (cardInputError); limite_de_cartoes. */
+  async createCard(key: string, contextId: string, input: CardInput) {
+    return this.write(() => {
+      const norm = normalizeCardInput(input);
+      const payload = [contextId, ...cardPayload(norm)];
+      const replayed = this.replay(key, 'criar_cartao', payload);
+      if (replayed) return this.cardResult(replayed.cardId!, null, []);
+      if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      const code = cardInputError(norm);
+      if (code) throw new RepoError(code);
+      if (this.activeCardCount(contextId, null) >= CARDS_ACTIVE_MAX) throw new RepoError('limite_de_cartoes');
+      const now = new Date().toISOString();
+      const card: StoredCard = {
+        id: this.id('cartao'),
+        contextId,
+        ...norm,
+        status: 'ativo',
+        createdBy: this.opts.actorId,
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      };
+      this.cards.set(card.id, card);
+      this.saveOperation(key, 'criar_cartao', payload, { contextId, recordId: null, commitmentId: null, cardId: card.id });
+      return this.cardResult(card.id, null, []);
+    });
+  }
+
+  /** Como update_card. Ordem: repetição; trava; versão; campos. As contas de fatura em aberto seguem o apelido e os dias novos. */
+  async updateCard(key: string, id: string, expectedVersion: number, input: CardInput) {
+    return this.write(() => {
+      const norm = normalizeCardInput(input);
+      const payload = [id, expectedVersion, ...cardPayload(norm)];
+      const replayed = this.replay(key, 'alterar_cartao', payload);
+      if (replayed) return this.cardResult(replayed.cardId!, null, []);
+      const current = this.liveCard(id);
+      if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${current.version}`);
+      const code = cardInputError(norm);
+      if (code) throw new RepoError(code);
+      this.cards.set(id, { ...current, ...norm, version: current.version + 1, updatedAt: new Date().toISOString() });
+      this.syncInvoices(id);
+      this.saveOperation(key, 'alterar_cartao', payload, { contextId: current.contextId, recordId: null, commitmentId: null, cardId: id });
+      return this.cardResult(id, null, []);
+    });
+  }
+
+  /** Como set_card_status. Ordem: repetição; trava; versão; situacao_invalida; limite_de_cartoes (reativar com 20 ativos). */
+  async setCardStatus(key: string, id: string, expectedVersion: number, status: CardStatus) {
+    return this.write(() => {
+      const payload = [id, expectedVersion, status];
+      const replayed = this.replay(key, 'situacao_cartao', payload);
+      if (replayed) return this.cardResult(replayed.cardId!, null, []);
+      const current = this.liveCard(id);
+      if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${current.version}`);
+      if (!CARD_STATUSES.includes(status)) throw new RepoError('situacao_invalida');
+      if (current.status === 'arquivado' && status === 'ativo' && this.activeCardCount(current.contextId, id) >= CARDS_ACTIVE_MAX) {
+        throw new RepoError('limite_de_cartoes');
+      }
+      this.cards.set(id, { ...current, status, version: current.version + 1, updatedAt: new Date().toISOString() });
+      this.saveOperation(key, 'situacao_cartao', payload, { contextId: current.contextId, recordId: null, commitmentId: null, cardId: id });
+      return this.cardResult(id, null, []);
+    });
+  }
+
+  /** Como delete_card: só sem lançamento nem conta de fatura vivos. Ordem: repetição; trava; versão; cartao_com_lancamentos. */
+  async deleteCard(key: string, id: string, expectedVersion: number) {
+    return this.write(() => {
+      const payload = [id, expectedVersion];
+      const replayed = this.replay(key, 'excluir_cartao', payload);
+      if (replayed) return this.cardResult(replayed.cardId!, null, []);
+      const current = this.liveCard(id);
+      if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${current.version}`);
+      if (this.liveEntries(id).length > 0 || this.invoiceCommitments(id).length > 0) throw new RepoError('cartao_com_lancamentos');
+      const now = new Date().toISOString();
+      this.cards.set(id, { ...current, version: current.version + 1, updatedAt: now, deletedAt: now, deletedBy: this.opts.actorId });
+      this.saveOperation(key, 'excluir_cartao', payload, { contextId: current.contextId, recordId: null, commitmentId: null, cardId: id });
+      return this.cardResult(id, null, []);
+    });
+  }
+
+  /**
+   * Como add_card_purchase. Ordem: repetição; trava; cartao_arquivado; campos (cardPurchaseError); chave da nota
+   * (chave_de_nota_invalida, nota_ja_anotada); limite_de_lancamentos; fatura_paga; escrita (a fatura da 1ª parcela é a do período
+   * que contém a data, com os dias que o cartão tem hoje, e fica fixada).
+   */
+  async addCardPurchase(key: string, cardId: string, input: CardPurchaseInput) {
+    return this.write(() => {
+      const norm = normalizePurchaseInput(input);
+      const payload = [cardId, norm.purchasedOn, norm.totalCents, norm.installments, norm.description, norm.category, ...(norm.receiptKey ? [norm.receiptKey] : [])];
+      const replayed = this.replay(key, 'criar_compra_cartao', payload);
+      if (replayed) return this.entryResult(replayed.cardId!, replayed.entryId!);
+      const card = this.liveCard(cardId);
+      if (card.status !== 'ativo') throw new RepoError('cartao_arquivado');
+      const today = this.opts.today();
+      const code = cardPurchaseError(norm, today, true);
+      if (code) throw new RepoError(code);
+      if (norm.receiptKey) {
+        if (!receiptKeyValid(norm.receiptKey)) throw new RepoError('chave_de_nota_invalida');
+        this.checkReceiptFree(card.contextId, norm.receiptKey);
+      }
+      this.checkEntryCap(cardId, norm.installments);
+      const first = purchaseFirstInvoiceMonth(card, norm.purchasedOn);
+      for (let k = 0; k < norm.installments; k++) if (this.invoicePaid(cardId, addMonths(first, k))) throw new RepoError('fatura_paga');
+      const entry = this.newEntry(card, {
+        kind: 'compra',
+        description: norm.description,
+        category: norm.category,
+        chargeType: null,
+        purchasedOn: norm.purchasedOn,
+        amountCents: norm.totalCents,
+        installments: norm.installments,
+        invoiceMonth: first,
+        sourceMonth: null,
+        paymentRecordId: null,
+        receiptKey: norm.receiptKey ?? null,
+      });
+      this.syncInvoices(cardId);
+      this.saveOperation(key, 'criar_compra_cartao', payload, { contextId: card.contextId, recordId: null, commitmentId: null, cardId, entryId: entry.id });
+      return this.entryResult(cardId, entry.id);
+    });
+  }
+
+  /** Como add_card_charge: cartão arquivado também aceita. Ordem: repetição; trava; campos (cardChargeError); limite_de_lancamentos; fatura_paga. */
+  async addCardCharge(key: string, cardId: string, input: CardChargeInput) {
+    return this.write(() => {
+      const payload = [cardId, input.invoiceMonth, input.chargeType, input.amountCents];
+      const replayed = this.replay(key, 'criar_encargo_cartao', payload);
+      if (replayed) return this.entryResult(replayed.cardId!, replayed.entryId!);
+      const card = this.liveCard(cardId);
+      const code = cardChargeError(input, this.opts.today(), true);
+      if (code) throw new RepoError(code);
+      this.checkEntryCap(cardId, 1);
+      if (this.invoicePaid(cardId, input.invoiceMonth)) throw new RepoError('fatura_paga');
+      const entry = this.newEntry(card, {
+        kind: 'encargo',
+        description: null,
+        category: null,
+        chargeType: input.chargeType,
+        purchasedOn: null,
+        amountCents: input.amountCents,
+        installments: 1,
+        invoiceMonth: input.invoiceMonth,
+        sourceMonth: null,
+        paymentRecordId: null,
+        receiptKey: null,
+      });
+      this.syncInvoices(cardId);
+      this.saveOperation(key, 'criar_encargo_cartao', payload, { contextId: card.contextId, recordId: null, commitmentId: null, cardId, entryId: entry.id });
+      return this.entryResult(cardId, entry.id);
+    });
+  }
+
+  /** Como add_card_refund: cartão arquivado também aceita. Ordem: repetição; trava; campos (cardRefundError); limite_de_lancamentos; fatura_paga. */
+  async addCardRefund(key: string, cardId: string, input: CardRefundInput) {
+    return this.write(() => {
+      const norm = normalizeRefundInput(input);
+      const payload = [cardId, norm.invoiceMonth, norm.amountCents, norm.description, norm.category];
+      const replayed = this.replay(key, 'criar_estorno_cartao', payload);
+      if (replayed) return this.entryResult(replayed.cardId!, replayed.entryId!);
+      const card = this.liveCard(cardId);
+      const code = cardRefundError(norm, this.opts.today(), true);
+      if (code) throw new RepoError(code);
+      this.checkEntryCap(cardId, 1);
+      if (this.invoicePaid(cardId, norm.invoiceMonth)) throw new RepoError('fatura_paga');
+      const entry = this.newEntry(card, {
+        kind: 'estorno',
+        description: norm.description,
+        category: norm.category,
+        chargeType: null,
+        purchasedOn: null,
+        amountCents: norm.amountCents,
+        installments: 1,
+        invoiceMonth: norm.invoiceMonth,
+        sourceMonth: null,
+        paymentRecordId: null,
+        receiptKey: null,
+      });
+      this.syncInvoices(cardId);
+      this.saveOperation(key, 'criar_estorno_cartao', payload, { contextId: card.contextId, recordId: null, commitmentId: null, cardId, entryId: entry.id });
+      return this.entryResult(cardId, entry.id);
+    });
+  }
+
+  /**
+   * Como update_card_entry. Ordem: repetição; trava (lançamento, cartão); lancamento_automatico; tipo_invalido (o tipo é o do
+   * lançamento); versão; campos como em add_* (a data da compra e a fatura de encargo e estorno só são conferidas no intervalo
+   * quando mudam); fatura_paga; limite_de_lancamentos (mais parcelas). Sem mudar valor, data nem parcelas, só descrição e
+   * categoria mudam, mesmo numa fatura paga.
+   */
+  async updateCardEntry(key: string, entryId: string, expectedVersion: number, input: CardEntryInput) {
+    return this.write(() => {
+      const norm = normalizeEntryInput(input);
+      const payload = [entryId, expectedVersion, ...entryPayload(norm)];
+      const replayed = this.replay(key, 'alterar_lancamento_cartao', payload);
+      if (replayed) return this.entryResult(replayed.cardId!, replayed.entryId!);
+      const { card, entry } = this.liveEntry(entryId);
+      if (norm.kind !== entry.kind) throw new RepoError('tipo_invalido');
+      if (entry.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${entry.version}`);
+      const today = this.opts.today();
+      const now = new Date().toISOString();
+      if (norm.kind === 'compra') {
+        const code = cardPurchaseError(norm, today, norm.purchasedOn !== entry.purchasedOn);
+        if (code) throw new RepoError(code);
+        const change = norm.totalCents !== entry.amountCents || norm.installments !== entry.installments || norm.purchasedOn !== entry.purchasedOn;
+        if (change) {
+          const first = norm.purchasedOn === entry.purchasedOn ? entry.invoiceMonth : purchaseFirstInvoiceMonth(card, norm.purchasedOn);
+          for (let k = 0; k < entry.installments; k++) if (this.invoicePaid(card.id, addMonths(entry.invoiceMonth, k))) throw new RepoError('fatura_paga');
+          for (let k = 0; k < norm.installments; k++) if (this.invoicePaid(card.id, addMonths(first, k))) throw new RepoError('fatura_paga');
+          if (norm.installments > entry.installments) this.checkEntryCap(card.id, norm.installments - entry.installments);
+          this.cardEntries.set(entryId, {
+            ...entry,
+            description: norm.description,
+            category: norm.category,
+            purchasedOn: norm.purchasedOn,
+            amountCents: norm.totalCents,
+            installments: norm.installments,
+            invoiceMonth: first,
+            version: entry.version + 1,
+            updatedAt: now,
+          });
+          this.syncInvoices(card.id);
+        } else {
+          this.cardEntries.set(entryId, { ...entry, description: norm.description, category: norm.category, version: entry.version + 1, updatedAt: now });
+        }
+      } else if (norm.kind === 'encargo') {
+        const code = cardChargeError(norm, today, norm.invoiceMonth !== entry.invoiceMonth);
+        if (code) throw new RepoError(code);
+        if (this.invoicePaid(card.id, entry.invoiceMonth) || this.invoicePaid(card.id, norm.invoiceMonth)) throw new RepoError('fatura_paga');
+        this.cardEntries.set(entryId, {
+          ...entry,
+          invoiceMonth: norm.invoiceMonth,
+          amountCents: norm.amountCents,
+          chargeType: norm.chargeType,
+          version: entry.version + 1,
+          updatedAt: now,
+        });
+        this.syncInvoices(card.id);
+      } else {
+        const code = cardRefundError(norm, today, norm.invoiceMonth !== entry.invoiceMonth);
+        if (code) throw new RepoError(code);
+        if (this.invoicePaid(card.id, entry.invoiceMonth) || this.invoicePaid(card.id, norm.invoiceMonth)) throw new RepoError('fatura_paga');
+        this.cardEntries.set(entryId, {
+          ...entry,
+          invoiceMonth: norm.invoiceMonth,
+          amountCents: norm.amountCents,
+          description: norm.description,
+          category: norm.category,
+          version: entry.version + 1,
+          updatedAt: now,
+        });
+        this.syncInvoices(card.id);
+      }
+      this.saveOperation(key, 'alterar_lancamento_cartao', payload, { contextId: card.contextId, recordId: null, commitmentId: null, cardId: card.id, entryId });
+      return this.entryResult(card.id, entryId);
+    });
+  }
+
+  /** Como delete_card_entry (a compra inteira). Ordem: repetição; trava; lancamento_automatico; versão; fatura_paga. */
+  async deleteCardEntry(key: string, entryId: string, expectedVersion: number) {
+    return this.write(() => {
+      const payload = [entryId, expectedVersion];
+      const replayed = this.replay(key, 'excluir_lancamento_cartao', payload);
+      if (replayed) return this.entryResult(replayed.cardId!, replayed.entryId!);
+      const { card, entry } = this.liveEntry(entryId);
+      if (entry.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${entry.version}`);
+      for (const m of entryMonths(entry)) if (this.invoicePaid(card.id, m)) throw new RepoError('fatura_paga');
+      const now = new Date().toISOString();
+      this.cardEntries.set(entryId, { ...entry, version: entry.version + 1, updatedAt: now, deletedAt: now, deletedBy: this.opts.actorId });
+      this.syncInvoices(card.id);
+      this.saveOperation(key, 'excluir_lancamento_cartao', payload, { contextId: card.contextId, recordId: null, commitmentId: null, cardId: card.id, entryId });
+      return this.entryResult(card.id, entryId);
+    });
+  }
+
+  /**
+   * Como pay_invoice. Ordem: repetição; trava do cartão; mes_invalido; nao_encontrado (fatura sem conta); versão;
+   * compromisso_quitado; valor_invalido; valor_acima_da_fatura; data_invalida (inválida ou há mais de 1 ano); data_futura;
+   * conta_invalida; fatura_seguinte_paga. Cria UM gasto sem categoria, ligado ao cartão e ao mês, na conta informada (sem ela, a
+   * mais antiga do contexto) e, no pagamento parcial, o saldo anterior na fatura seguinte.
+   */
+  async payInvoice(key: string, cardId: string, month: IsoMonth, expectedVersion: number, amountCents: Cents, paidOn: IsoDate, accountId: string | null = null) {
+    return this.write(() => {
+      const payload = [cardId, month, expectedVersion, amountCents, paidOn, ...(accountId ? [accountId] : [])];
+      const replayed = this.replay(key, 'pagar_fatura', payload);
+      if (replayed) return this.paymentResult(replayed, month);
+      const card = this.liveCard(cardId);
+      if (typeof month !== 'string' || !isValidIsoMonth(month)) throw new RepoError('mes_invalido');
+      const c = this.invoiceCommitmentOf(cardId, month);
+      if (!c) throw new RepoError('nao_encontrado');
+      if (c.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${c.version}`);
+      if (c.status !== 'aberto') throw new RepoError('compromisso_quitado');
+      const today = this.opts.today();
+      if (!Number.isSafeInteger(amountCents) || amountCents < 1) throw new RepoError('valor_invalido');
+      if (amountCents > c.amountCents) throw new RepoError('valor_acima_da_fatura');
+      if (typeof paidOn !== 'string' || !isValidIsoDate(paidOn) || paidOn < addYearsClamped(today, -1)) throw new RepoError('data_invalida');
+      if (paidOn > today) throw new RepoError('data_futura');
+      const account = accountId
+        ? this.space?.accounts.find((a) => a.id === accountId && a.contextId === card.contextId)
+        : this.space?.accounts.find((a) => a.contextId === card.contextId);
+      if (!account) throw new RepoError('conta_invalida');
+      const left = c.amountCents - amountCents;
+      const next = addMonths(month, 1);
+      if (left > 0 && this.invoicePaid(cardId, next)) throw new RepoError('fatura_seguinte_paga');
+      const now = new Date().toISOString();
+      const record: FinancialRecord = {
+        id: this.id('reg'),
+        contextId: card.contextId,
+        accountId: account.id,
+        kind: 'despesa',
+        status: 'realizado',
+        amountCents,
+        currency: 'BRL',
+        occurredOn: paidOn,
+        description: invoiceRecordDescription(card.name, month, paidOn),
+        category: null,
+        commitmentId: c.id,
+        invoice: { cardId, month },
+        receiptKey: null,
+        createdBy: this.opts.actorId,
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      };
+      this.records.set(record.id, record);
+      this.bumpCommitment(c.id, { status: 'quitado', amountIsEstimate: false }, now);
+      let balanceId: string | null = null;
+      if (left > 0) {
+        balanceId = this.newEntry(card, {
+          kind: 'saldo_anterior',
+          description: null,
+          category: null,
+          chargeType: null,
+          purchasedOn: null,
+          amountCents: left,
+          installments: 1,
+          invoiceMonth: next,
+          sourceMonth: month,
+          paymentRecordId: record.id,
+          receiptKey: null,
+        }).id;
+        this.syncInvoices(cardId, month, next);
+      }
+      this.saveOperation(key, 'pagar_fatura', payload, { contextId: card.contextId, recordId: record.id, commitmentId: c.id, cardId, entryId: balanceId });
+      return this.paymentResult(this.operations.get(key)!, month);
+    });
+  }
+
+  /**
+   * Como undo_invoice_payment. Ordem: repetição; trava do cartão; mes_invalido; nao_encontrado (sem conta); versão; compromisso_aberto;
+   * fatura_seguinte_paga (há saldo anterior e a fatura seguinte já foi paga). Apaga o gasto, reabre a conta e apaga o saldo
+   * anterior criado pelo pagamento.
+   */
+  async undoInvoicePayment(key: string, cardId: string, month: IsoMonth, expectedVersion: number) {
+    return this.write(() => {
+      const payload = [cardId, month, expectedVersion];
+      const replayed = this.replay(key, 'desfazer_pagamento_fatura', payload);
+      if (replayed) return this.paymentResult(replayed, month);
+      const card = this.liveCard(cardId);
+      if (typeof month !== 'string' || !isValidIsoMonth(month)) throw new RepoError('mes_invalido');
+      const c = this.invoiceCommitmentOf(cardId, month);
+      if (!c) throw new RepoError('nao_encontrado');
+      if (c.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${c.version}`);
+      if (c.status !== 'quitado') throw new RepoError('compromisso_aberto');
+      const paid = this.livePayment(c.id);
+      if (!paid) throw new Error('vinculo_inconsistente');
+      const next = addMonths(month, 1);
+      const balance = this.liveEntries(cardId).find((e) => e.kind === 'saldo_anterior' && e.paymentRecordId === paid.id) ?? null;
+      if (balance && this.invoicePaid(cardId, next)) throw new RepoError('fatura_seguinte_paga');
+      const now = new Date().toISOString();
+      if (balance) this.cardEntries.set(balance.id, { ...balance, version: balance.version + 1, updatedAt: now, deletedAt: now, deletedBy: this.opts.actorId });
+      this.records.set(paid.id, { ...paid, version: paid.version + 1, updatedAt: now, deletedAt: now });
+      this.bumpCommitment(c.id, { status: 'aberto' }, now);
+      this.syncInvoices(cardId, month, next);
+      this.saveOperation(key, 'desfazer_pagamento_fatura', payload, {
+        contextId: card.contextId,
+        recordId: paid.id,
+        commitmentId: c.id,
+        cardId,
+        entryId: balance ? balance.id : null,
+      });
+      return this.paymentResult(this.operations.get(key)!, month);
+    });
+  }
+
+  /** Cartão vivo: sem leitura ou excluído, não revela a existência; sem escrita, sem_permissao. */
+  private liveCard(id: string) {
+    const c = this.cards.get(id);
+    if (!c || c.deletedAt || !this.canRead(c.contextId)) throw new RepoError('nao_encontrado');
+    if (!this.canWrite(c.contextId)) throw new RepoError('sem_permissao');
+    return c;
+  }
+
+  /** Trava do lançamento e depois do cartão; saldo anterior e estorno automático não se alteram (lancamento_automatico). */
+  private liveEntry(id: string) {
+    const e = this.cardEntries.get(id);
+    if (!e || e.deletedAt || !this.canRead(e.contextId)) throw new RepoError('nao_encontrado');
+    const card = this.liveCard(e.cardId);
+    if (e.kind === 'saldo_anterior' || (e.kind === 'estorno' && e.sourceMonth !== null)) throw new RepoError('lancamento_automatico');
+    return { card, entry: e };
+  }
+
+  private activeCardCount(contextId: string, exceptId: string | null) {
+    return [...this.cards.values()].filter((c) => !c.deletedAt && c.contextId === contextId && c.status === 'ativo' && c.id !== exceptId).length;
+  }
+
+  private liveEntries(cardId: string): StoredCardEntry[] {
+    return [...this.cardEntries.values()]
+      .filter((e) => e.cardId === cardId && !e.deletedAt)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+  }
+
+  /** Até 5.000 lançamentos vivos por cartão (cada parcela conta como um). */
+  private checkEntryCap(cardId: string, adding: number) {
+    const count = this.liveEntries(cardId).reduce((acc, e) => acc + e.installments, 0);
+    if (count + adding > CARD_ENTRIES_MAX) throw new RepoError('limite_de_lancamentos');
+  }
+
+  private newEntry(card: StoredCard, fields: Omit<CardEntry, 'id' | 'contextId' | 'cardId' | 'createdBy' | 'version' | 'createdAt' | 'updatedAt'>) {
+    const now = new Date().toISOString();
+    const entry: StoredCardEntry = {
+      id: this.id('lanc'),
+      contextId: card.contextId,
+      cardId: card.id,
+      ...fields,
+      createdBy: this.opts.actorId,
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.cardEntries.set(entry.id, entry);
+    return entry;
+  }
+
+  /** Contas de fatura vivas do cartão, por mês da fatura. */
+  private invoiceCommitments(cardId: string): StoredCommitment[] {
+    return [...this.commitments.values()]
+      .filter((c) => c.invoiceCardId === cardId && !c.deletedAt)
+      .sort((a, b) => a.invoiceMonth!.localeCompare(b.invoiceMonth!) || a.id.localeCompare(b.id));
+  }
+
+  private invoiceCommitmentOf(cardId: string, month: IsoMonth) {
+    return this.invoiceCommitments(cardId).find((c) => c.invoiceMonth === month);
+  }
+
+  /** Fatura paga ou paga em parte: a conta viva do cartão e mês está quitada (clarevo_invoice_paid). */
+  private invoicePaid(cardId: string, month: IsoMonth): boolean {
+    return this.invoiceCommitmentOf(cardId, month)?.status === 'quitado';
+  }
+
+  /** Faturas do cartão com os lançamentos e as contas vivas de agora (cards.ts, buildInvoices). */
+  private invoicesOf(card: StoredCard): Invoice[] {
+    return buildInvoices(
+      card,
+      this.liveEntries(card.id),
+      this.invoiceCommitments(card.id).map((c) => this.toCommitment(c)),
+      this.opts.today(),
+    );
+  }
+
+  /**
+   * Como clarevo_sync_card, na mesma transação de cada escrita: do mês `from` ao `to` (padrão: do primeiro ao último mês com
+   * lançamento ou conta), em ordem crescente: (1) o total da fatura; total maior que zero: a conta existe e acompanha o total, o
+   * vencimento, o fechamento, o apelido e a marca "estimado" (hoje até o fechamento); total zero ou negativo: a conta é
+   * excluída; conta paga não muda (total diferente do pago: fatura_paga); (2) total negativo: o crédito vira UM estorno
+   * automático na fatura seguinte (criado, ajustado ou excluído; fatura_seguinte_paga se ela já foi paga), e a rodada segue até
+   * ela. A rodada começa na fatura negativa mais antiga e o crédito só é levado adiante enquanto houver, na fatura seguinte ou
+   * depois dela, um lançamento comum para recebê-lo (senão ele fica parado na própria fatura, sem encadeamento infinito).
+   */
+  private syncInvoices(cardId: string, from?: IsoMonth, to?: IsoMonth) {
+    const card = this.cards.get(cardId)!;
+    const today = this.opts.today();
+    const entries = this.liveEntries(cardId);
+    const totals = monthTotalsOf(entries);
+    const bills = new Map<IsoMonth, StoredCommitment>(this.invoiceCommitments(cardId).map((c) => [c.invoiceMonth!, c]));
+    const autos = new Map<IsoMonth, StoredCardEntry>();
+    for (const e of entries) if (e.kind === 'estorno' && e.sourceMonth !== null) autos.set(e.sourceMonth, e);
+    const months = [...new Set([...totals.keys(), ...bills.keys()])].sort();
+    let start = from ?? months[0];
+    let last = to ?? months[months.length - 1];
+    if (start === undefined || last === undefined) return;
+    // A rodada começa na fatura negativa mais antiga (um lançamento novo mais adiante recebe o crédito que estava parado e a
+    // exclusão do último lançamento comum desfaz o encadeamento).
+    for (const [m, t] of totals) if (t < 0 && m < start) start = m;
+    // O crédito só é levado adiante enquanto houver, na fatura seguinte ou depois dela, um lançamento comum para recebê-lo.
+    const lastRegular = lastRegularMonthOf(entries);
+    const now = new Date().toISOString();
+    const description = invoiceCommitmentDescription(card.name);
+    let guard = 0;
+    for (let m = start; m <= last; m = addMonths(m, 1)) {
+      guard += 1;
+      if (guard > 700) throw new Error('fatura_inconsistente');
+      const next = addMonths(m, 1);
+      const total = totals.get(m) ?? 0;
+      const c = bills.get(m);
+      if (c && c.status === 'quitado') {
+        if (total !== c.amountCents) throw new RepoError('fatura_paga');
+      } else {
+        const dueOn = invoiceDueOn(card, m);
+        const closingOn = invoiceClosingOn(card, m);
+        const estimate = today <= closingOn;
+        if (total > MAX_RECORD_CENTS) throw new RepoError('valor_acima_do_limite');
+        if (total > 0) {
+          if (!c) {
+            const bill: StoredCommitment = {
+              id: this.id('cp'),
+              contextId: card.contextId,
+              description,
+              amountCents: total,
+              currency: 'BRL',
+              dueOn,
+              category: null,
+              status: 'aberto',
+              seriesId: null,
+              occurrenceNumber: null,
+              seriesOverride: false,
+              seriesSkipped: false,
+              amountIsEstimate: estimate,
+              invoiceCardId: cardId,
+              invoiceMonth: m,
+              cardClosingOn: closingOn,
+              createdBy: card.createdBy,
+              version: 1,
+              createdAt: now,
+              updatedAt: now,
+            };
+            this.commitments.set(bill.id, bill);
+            bills.set(m, bill);
+          } else if (
+            c.amountCents !== total ||
+            c.dueOn !== dueOn ||
+            c.description !== description ||
+            c.amountIsEstimate !== estimate ||
+            c.cardClosingOn !== closingOn
+          ) {
+            this.bumpCommitment(c.id, { amountCents: total, dueOn, description, amountIsEstimate: estimate, cardClosingOn: closingOn }, now);
+            bills.set(m, this.commitments.get(c.id)!);
+          }
+        } else if (c) {
+          this.bumpCommitment(c.id, { deletedAt: now }, now);
+          bills.delete(m);
+        }
+      }
+      // Crédito levado à fatura seguinte.
+      const credit = lastRegular !== null && next <= lastRegular ? Math.max(0, -total) : 0;
+      const auto = autos.get(m);
+      let changed = false;
+      if (credit > 0) {
+        if (!auto) {
+          if (this.invoicePaid(cardId, next)) throw new RepoError('fatura_seguinte_paga');
+          const created = this.newEntry(card, {
+            kind: 'estorno',
+            description: null,
+            category: null,
+            chargeType: null,
+            purchasedOn: null,
+            amountCents: credit,
+            installments: 1,
+            invoiceMonth: next,
+            sourceMonth: m,
+            paymentRecordId: null,
+            receiptKey: null,
+          });
+          autos.set(m, created);
+          totals.set(next, (totals.get(next) ?? 0) - credit);
+          changed = true;
+        } else if (auto.amountCents !== credit) {
+          if (this.invoicePaid(cardId, next)) throw new RepoError('fatura_seguinte_paga');
+          const updated = { ...auto, amountCents: credit, version: auto.version + 1, updatedAt: now };
+          this.cardEntries.set(auto.id, updated);
+          autos.set(m, updated);
+          totals.set(next, (totals.get(next) ?? 0) + auto.amountCents - credit);
+          changed = true;
+        }
+      } else if (auto) {
+        if (this.invoicePaid(cardId, next)) throw new RepoError('fatura_seguinte_paga');
+        this.cardEntries.set(auto.id, { ...auto, version: auto.version + 1, updatedAt: now, deletedAt: now, deletedBy: this.opts.actorId });
+        autos.delete(m);
+        totals.set(next, (totals.get(next) ?? 0) + auto.amountCents);
+        changed = true;
+      }
+      if (changed && next > last) last = next;
+    }
+  }
+
+  /** Chave da nota já anotada neste contexto (gasto ou compra no cartão vivos): nota_ja_anotada, detalhe registro=<id> ou compra=<id>. */
+  private checkReceiptFree(contextId: string, key: string) {
+    for (const r of this.records.values()) {
+      if (!r.deletedAt && r.contextId === contextId && r.receiptKey === key) throw new RepoError('nota_ja_anotada', undefined, `registro=${r.id}`);
+    }
+    for (const e of this.cardEntries.values()) {
+      if (!e.deletedAt && e.contextId === contextId && e.receiptKey === key) throw new RepoError('nota_ja_anotada', undefined, `compra=${e.id}`);
+    }
+  }
+
+  /** O cartão como card_items: com o limite usado (faturas ainda não pagas, nunca negativo) e a fatura que recebe uma compra de hoje. */
+  private cardView(c: StoredCard, invoices: readonly Invoice[] = this.invoicesOf(c)): Card {
+    const month = invoiceMonthOf(c, this.opts.today());
+    const { deletedAt: _deleted, deletedBy: _by, ...rest } = c;
+    return {
+      ...rest,
+      usedCents: cardLimitUsed(invoices),
+      currentMonth: month,
+      currentClosingOn: invoiceClosingOn(c, month),
+      currentDueOn: invoiceDueOn(c, month),
+    };
+  }
+
+  /** O cartão no estado atual (inclusive excluído), o lançamento envolvido, as faturas envolvidas que ainda existem e as contas de fatura vivas. */
+  private cardResult(cardId: string, entryId: string | null, months: readonly IsoMonth[]): CardWrite {
+    const card = this.cards.get(cardId)!;
+    const e = entryId ? this.cardEntries.get(entryId) : undefined;
+    const invoices = this.invoicesOf(card);
+    return {
+      card: this.cardView(card, invoices),
+      entry: e ? stripEntry(e) : null,
+      invoices: invoices.filter((i) => months.includes(i.month)).map(invoiceItemOf),
+      commitments: this.invoiceCommitments(cardId).map((c) => this.toCommitment(c)),
+    };
+  }
+
+  private entryResult(cardId: string, entryId: string): CardWrite {
+    return this.cardResult(cardId, entryId, entryMonths(this.cardEntries.get(entryId)!));
+  }
+
+  private paymentResult(op: Operation, month: IsoMonth): InvoicePaymentWrite {
+    const record = this.records.get(op.recordId!)!;
+    return {
+      ...this.cardResult(op.cardId!, op.entryId, [month, addMonths(month, 1)]),
+      commitment: this.toCommitment(this.commitments.get(op.commitmentId!)!),
+      record: strip(record),
+    };
+  }
+
+  /**
+   * Cartões e lançamentos (no banco: restrições de coluna e índices únicos). Lança Error('cartao_inconsistente').
+   * Cartão: apelido, final, dias e limite como cardInputError; no máximo 20 ativos por contexto. Lançamento: forma de cada tipo
+   * (card_entries_forma); no máximo um saldo anterior e um estorno automático vivos por fatura de origem; origem sempre o mês
+   * anterior; lançamento vivo só em cartão vivo.
+   */
+  private checkCardInvariants() {
+    const fail = () => {
+      throw new Error('cartao_inconsistente');
+    };
+    const active = new Map<string, number>();
+    for (const c of this.cards.values()) {
+      if (cardInputError(c) !== null || !CARD_STATUSES.includes(c.status) || !Number.isSafeInteger(c.version) || c.version < 1) fail();
+      if (!c.deletedAt && c.status === 'ativo') {
+        const n = (active.get(c.contextId) ?? 0) + 1;
+        if (n > CARDS_ACTIVE_MAX) fail();
+        active.set(c.contextId, n);
+      }
+    }
+    const carried = new Set<string>();
+    const text = (v: string | null, max: number) => v !== null && v === v.trim() && [...v].length >= 1 && [...v].length <= max;
+    for (const e of this.cardEntries.values()) {
+      const card = this.cards.get(e.cardId);
+      if (!card || card.contextId !== e.contextId) fail();
+      const common =
+        Number.isSafeInteger(e.amountCents) &&
+        e.amountCents >= 1 &&
+        e.amountCents <= MAX_RECORD_CENTS &&
+        isValidIsoMonth(e.invoiceMonth) &&
+        (e.category === null || text(e.category, 40)) &&
+        (e.receiptKey === null || /^[0-9]{44}$/.test(e.receiptKey)) &&
+        e.version >= 1;
+      const origin = e.sourceMonth !== null && isValidIsoMonth(e.sourceMonth) && addMonths(e.sourceMonth, 1) === e.invoiceMonth;
+      let kindOk: boolean;
+      switch (e.kind) {
+        case 'compra':
+          kindOk =
+            text(e.description, 80) &&
+            e.chargeType === null &&
+            e.sourceMonth === null &&
+            e.paymentRecordId === null &&
+            e.purchasedOn !== null &&
+            isValidIsoDate(e.purchasedOn) &&
+            Number.isSafeInteger(e.installments) &&
+            e.installments >= 1 &&
+            e.installments <= CARD_INSTALLMENTS_MAX &&
+            e.amountCents >= e.installments;
+          break;
+        case 'encargo':
+          kindOk =
+            e.description === null &&
+            e.category === null &&
+            e.chargeType !== null &&
+            CARD_CHARGE_TYPES.includes(e.chargeType) &&
+            e.purchasedOn === null &&
+            e.installments === 1 &&
+            e.sourceMonth === null &&
+            e.paymentRecordId === null &&
+            e.receiptKey === null;
+          break;
+        case 'estorno':
+          kindOk =
+            e.chargeType === null &&
+            e.purchasedOn === null &&
+            e.installments === 1 &&
+            e.paymentRecordId === null &&
+            e.receiptKey === null &&
+            (e.sourceMonth === null ? text(e.description, 80) : origin && e.description === null && e.category === null);
+          break;
+        case 'saldo_anterior':
+          kindOk =
+            origin &&
+            e.paymentRecordId !== null &&
+            e.description === null &&
+            e.category === null &&
+            e.chargeType === null &&
+            e.purchasedOn === null &&
+            e.installments === 1 &&
+            e.receiptKey === null;
+          break;
+        default:
+          kindOk = false;
+      }
+      if (!kindOk || !common) fail();
+      if (e.deletedAt) continue;
+      if (card!.deletedAt) fail(); // lançamento vivo sempre tem cartão vivo
+      if (e.sourceMonth !== null) {
+        const k = `${e.cardId}|${e.kind}|${e.sourceMonth}`;
+        if (carried.has(k)) fail(); // no máximo um saldo anterior e um estorno automático vivos por fatura de origem
+        carried.add(k);
+      }
+    }
+  }
+
+  /**
+   * Faturas (no banco: C1, C3 e C4 conferidas no fim da transação): para cada cartão vivo, a conta da fatura existe quando o total
+   * é maior que zero, tem o valor do total (em aberto: vencimento, fechamento e apelido atuais), é única por fatura e não existe
+   * com total zero ou negativo; conta paga tem 1 gasto vivo com o mesmo vínculo e valor de R$ 0,01 até o total; o saldo anterior
+   * existe se e somente se o pagamento foi parcial, com a diferença; o estorno automático de uma fatura é o crédito da anterior.
+   * Lança Error('fatura_inconsistente').
+   */
+  private checkInvoiceInvariants() {
+    const fail = () => {
+      throw new Error('fatura_inconsistente');
+    };
+    for (const c of this.commitments.values()) {
+      if (!c.invoiceCardId) continue;
+      if (c.invoiceMonth === null || c.cardClosingOn === null || c.seriesId !== null) fail();
+      const card = this.cards.get(c.invoiceCardId);
+      if (!card || card.contextId !== c.contextId || (!c.deletedAt && card.deletedAt)) fail();
+    }
+    for (const r of this.records.values()) {
+      if (!r.invoice) continue;
+      const c = r.commitmentId ? this.commitments.get(r.commitmentId) : undefined;
+      if (!c || c.invoiceCardId !== r.invoice.cardId || c.invoiceMonth !== r.invoice.month || r.kind !== 'despesa') return fail();
+      // Saldo anterior vivo depende de um gasto de pagamento vivo.
+      const balances = [...this.cardEntries.values()].filter((e) => e.paymentRecordId === r.id && !e.deletedAt);
+      if (r.deletedAt) {
+        if (balances.length > 0) fail();
+        continue;
+      }
+      if (r.amountCents > c.amountCents) fail();
+      if (r.amountCents === c.amountCents) {
+        if (balances.length !== 0) fail();
+      } else if (balances.length !== 1 || balances[0]!.amountCents !== c.amountCents - r.amountCents || balances[0]!.sourceMonth !== r.invoice.month) {
+        fail();
+      }
+    }
+    for (const card of this.cards.values()) {
+      if (card.deletedAt) continue;
+      const live = this.invoiceCommitments(card.id);
+      if (new Set(live.map((c) => c.invoiceMonth)).size !== live.length) fail();
+      const entries = this.liveEntries(card.id);
+      const totals = monthTotalsOf(entries);
+      const lastRegular = lastRegularMonthOf(entries);
+      const autoSum = new Map<IsoMonth, Cents>();
+      for (const e of entries) if (e.kind === 'estorno' && e.sourceMonth !== null) autoSum.set(e.invoiceMonth, (autoSum.get(e.invoiceMonth) ?? 0) + e.amountCents);
+      const months = new Set<IsoMonth>([...totals.keys(), ...live.map((c) => c.invoiceMonth!)]);
+      for (const m of [...months]) months.add(addMonths(m, 1));
+      const bills = new Map(live.map((c) => [c.invoiceMonth!, c]));
+      for (const m of months) {
+        const total = totals.get(m) ?? 0;
+        const c = bills.get(m);
+        if (c) {
+          if (c.amountCents !== total) fail();
+          if (c.status === 'aberto') {
+            if (c.dueOn !== invoiceDueOn(card, m) || c.cardClosingOn !== invoiceClosingOn(card, m) || c.description !== invoiceCommitmentDescription(card.name)) fail();
+          } else if (!this.livePayment(c.id)?.invoice) {
+            fail();
+          }
+        } else if (total > 0) {
+          fail();
+        }
+        const expected = lastRegular !== null && m <= lastRegular ? Math.max(0, -(totals.get(addMonths(m, -1)) ?? 0)) : 0;
+        if ((autoSum.get(m) ?? 0) !== expected) fail();
+      }
+    }
+  }
+
+  /** C6: a chave da nota é única por contexto entre gastos e compras no cartão vivos. Lança Error('nota_inconsistente'). */
+  private checkReceiptInvariants() {
+    const seen = new Set<string>();
+    const add = (contextId: string, key: string | null) => {
+      if (key === null) return;
+      const k = `${contextId}|${key}`;
+      if (!/^[0-9]{44}$/.test(key) || seen.has(k)) throw new Error('nota_inconsistente');
+      seen.add(k);
+    };
+    for (const r of this.records.values()) {
+      if (r.receiptKey !== null && (r.kind !== 'despesa' || r.invoice !== null)) throw new Error('nota_inconsistente');
+      if (!r.deletedAt) add(r.contextId, r.receiptKey);
+    }
+    for (const e of this.cardEntries.values()) if (!e.deletedAt) add(e.contextId, e.receiptKey);
+  }
+
   /** Outra reserva viva e não arquivada no contexto (G6)? */
   private otherReserve(contextId: string, exceptId: string | null) {
     return [...this.goals.values()].some(
@@ -1500,6 +2477,9 @@ export class MemoryRepository implements RecordsRepository {
     this.checkReferenceInvariants();
     this.checkGoalInvariants();
     this.checkSavingsInvariants();
+    this.checkCardInvariants();
+    this.checkInvoiceInvariants();
+    this.checkReceiptInvariants();
   }
 
   /**
@@ -1604,7 +2584,7 @@ export class MemoryRepository implements RecordsRepository {
     for (const c of this.commitments.values()) {
       if (c.seriesId === null) {
         // Conta avulsa não tem número nem marcas de série (commitments_series_marcas).
-        if (c.occurrenceNumber !== null || c.seriesOverride || c.seriesSkipped || c.amountIsEstimate) fail();
+        if (c.occurrenceNumber !== null || c.seriesOverride || c.seriesSkipped || (c.amountIsEstimate && !c.invoiceCardId)) fail();
         continue;
       }
       const s = this.seriesById.get(c.seriesId);
@@ -1639,6 +2619,8 @@ export class MemoryRepository implements RecordsRepository {
     goals?: Map<string, StoredGoal>;
     goalMovements?: Map<string, StoredGoalMovement>;
     savingsChecks?: Map<string, SavingsCheck>;
+    cards?: Map<string, StoredCard>;
+    cardEntries?: Map<string, StoredCardEntry>;
   }) {
     const fail = () => {
       throw new Error('campo_imutavel');
@@ -1692,6 +2674,33 @@ export class MemoryRepository implements RecordsRepository {
       }
       if (before.goalMovements && !m.deletedAt && this.goals.get(m.goalId)?.status === 'arquivada') fail();
     }
+    // Cartões: contexto, autoria e criação não mudam; excluído não volta; versão + 1 por escrita.
+    for (const [id, c] of this.cards) {
+      const old = before.cards?.get(id);
+      if (!old || old === c) continue;
+      if (old.deletedAt || old.contextId !== c.contextId || old.createdBy !== c.createdBy || old.createdAt !== c.createdAt || c.version !== old.version + 1) {
+        fail();
+      }
+    }
+    // Lançamentos: cartão, contexto, tipo, autoria e criação não mudam; excluído não volta; versão + 1 por escrita.
+    for (const [id, e] of this.cardEntries) {
+      const old = before.cardEntries?.get(id);
+      if (!old || old === e) continue;
+      if (
+        old.deletedAt ||
+        old.cardId !== e.cardId ||
+        old.contextId !== e.contextId ||
+        old.kind !== e.kind ||
+        old.sourceMonth !== e.sourceMonth ||
+        old.paymentRecordId !== e.paymentRecordId ||
+        old.receiptKey !== e.receiptKey ||
+        old.createdBy !== e.createdBy ||
+        old.createdAt !== e.createdAt ||
+        e.version !== old.version + 1
+      ) {
+        fail();
+      }
+    }
     // Plano de guardar: criação não muda; versão + 1 por escrita.
     for (const [ctx, c] of this.savingsChecks) {
       const old = before.savingsChecks?.get(ctx);
@@ -1713,6 +2722,8 @@ export class MemoryRepository implements RecordsRepository {
         old.createdAt !== c.createdAt ||
         old.seriesId !== c.seriesId ||
         old.occurrenceNumber !== c.occurrenceNumber ||
+        old.invoiceCardId !== c.invoiceCardId ||
+        old.invoiceMonth !== c.invoiceMonth ||
         (old.seriesSkipped && !c.seriesSkipped)
       ) {
         fail();
@@ -1800,11 +2811,13 @@ export class MemoryRepository implements RecordsRepository {
     key: string,
     action: Operation['action'],
     payload: unknown[],
-    ids: Omit<Operation, 'action' | 'hash' | 'seriesId' | 'referenceId' | 'goalId' | 'movementId'> & {
+    ids: Omit<Operation, 'action' | 'hash' | 'seriesId' | 'referenceId' | 'goalId' | 'movementId' | 'cardId' | 'entryId'> & {
       seriesId?: string;
       referenceId?: string;
       goalId?: string;
       movementId?: string | null;
+      cardId?: string;
+      entryId?: string | null;
     },
   ) {
     this.operations.set(key, {
@@ -1815,6 +2828,8 @@ export class MemoryRepository implements RecordsRepository {
       referenceId: ids.referenceId ?? null,
       goalId: ids.goalId ?? null,
       movementId: ids.movementId ?? null,
+      cardId: ids.cardId ?? null,
+      entryId: ids.entryId ?? null,
     });
     this.trackActivity(action, ids.contextId);
   }
@@ -1931,6 +2946,9 @@ export class MemoryRepository implements RecordsRepository {
         seriesOverride: false,
         seriesSkipped: false,
         amountIsEstimate: o.amountIsEstimate,
+        invoiceCardId: null,
+        invoiceMonth: null,
+        cardClosingOn: null,
         createdBy: s.createdBy,
         version: 1,
         createdAt: now,
@@ -1961,11 +2979,12 @@ export class MemoryRepository implements RecordsRepository {
   }
 
   private toCommitment(c: StoredCommitment): Commitment {
-    const { deletedAt: _deleted, seriesId, occurrenceNumber, seriesSkipped: _skipped, ...rest } = c;
+    const { deletedAt: _deleted, seriesId, occurrenceNumber, seriesSkipped: _skipped, invoiceCardId, invoiceMonth, cardClosingOn: _closing, ...rest } = c;
     const r = this.livePayment(c.id);
     const s = seriesId ? this.seriesById.get(seriesId) : undefined;
     return {
       ...rest,
+      invoice: invoiceCardId && invoiceMonth ? { cardId: invoiceCardId, month: invoiceMonth } : null,
       series:
         s && occurrenceNumber !== null
           ? {
@@ -2014,7 +3033,7 @@ export class MemoryRepository implements RecordsRepository {
 
   private validate(contextId: string, input: RecordInput) {
     validateCommon(input.amountCents, input.description, input.category);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.occurredOn)) throw new RepoError('data_invalida');
+    if (typeof input.occurredOn !== 'string' || !isValidIsoDate(input.occurredOn)) throw new RepoError('data_invalida');
     if (input.occurredOn > this.opts.today()) throw new RepoError('data_futura');
     const acc = this.space?.accounts.find((a) => a.id === input.accountId);
     if (!acc || acc.contextId !== contextId) throw new RepoError('conta_invalida');
@@ -2049,6 +3068,10 @@ function isSeriesAction(action: Operation['action']): action is SeriesAction {
 
 function isGoalAction(action: Operation['action']): action is GoalAction {
   return GOAL_ACTIONS.includes(action);
+}
+
+function isCardAction(action: Operation['action']): action is CardAction {
+  return CARD_ACTIONS.includes(action);
 }
 
 function isCommitmentAction(action: Operation['action']): action is CommitmentAction {
@@ -2170,6 +3193,67 @@ function normalizeMovementInput(input: GoalMovementInput): GoalMovementInput {
 
 const byMovementDesc = (a: StoredGoalMovement, b: StoredGoalMovement) =>
   b.occurredOn.localeCompare(a.occurredOn) || b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id);
+
+/** Campos do cartão na ordem das funções do banco (p_name ... p_limit_cents), na forma do hash. */
+function cardPayload(c: CardInput): unknown[] {
+  return [c.name, c.lastDigits, c.closingDay, c.dueDay, c.limitCents];
+}
+
+/** Lançamento aparado (descrição; categoria vazia vira nula), na forma do hash. */
+function normalizeEntryInput(input: CardEntryInput): CardEntryInput {
+  switch (input.kind) {
+    case 'compra':
+      return { kind: 'compra', ...normalizePurchaseInput(input) };
+    case 'estorno':
+      return { kind: 'estorno', ...normalizeRefundInput(input) };
+    default:
+      return { kind: input.kind, chargeType: input.chargeType, amountCents: input.amountCents, invoiceMonth: input.invoiceMonth } as CardEntryInput;
+  }
+}
+
+/** Argumentos de update_card_entry depois da versão, na ordem da função: valor, data, descrição, categoria, parcelas, fatura, tipo do encargo. */
+function entryPayload(input: CardEntryInput): unknown[] {
+  switch (input.kind) {
+    case 'compra':
+      return [input.totalCents, input.purchasedOn, input.description, input.category, input.installments, null, null];
+    case 'estorno':
+      return [input.amountCents, null, input.description, input.category, null, input.invoiceMonth, null];
+    default:
+      return [input.amountCents, null, null, null, null, input.invoiceMonth, input.chargeType];
+  }
+}
+
+/** Total de cada mês de fatura (parcelas, encargos e saldo anterior menos estornos, inclusive o automático), como clarevo_sync_card. */
+function monthTotalsOf(entries: readonly Pick<CardEntry, 'kind' | 'amountCents' | 'installments' | 'invoiceMonth' | 'id'>[]): Map<IsoMonth, Cents> {
+  const totals = new Map<IsoMonth, Cents>();
+  const add = (month: IsoMonth, cents: Cents) => totals.set(month, (totals.get(month) ?? 0) + cents);
+  for (const e of entries) {
+    if (e.kind === 'compra') for (const p of purchaseInstallments(e)) add(p.invoiceMonth, p.amountCents);
+    else add(e.invoiceMonth, e.kind === 'estorno' ? -e.amountCents : e.amountCents);
+  }
+  return totals;
+}
+
+/** Último mês com lançamento comum (tudo menos o estorno automático): parcela, encargo, estorno comum ou saldo anterior. */
+function lastRegularMonthOf(entries: readonly Pick<CardEntry, 'kind' | 'sourceMonth' | 'installments' | 'invoiceMonth'>[]): IsoMonth | null {
+  let last: IsoMonth | null = null;
+  for (const e of entries) {
+    if (e.kind === 'estorno' && e.sourceMonth !== null) continue;
+    const m = addMonths(e.invoiceMonth, e.kind === 'compra' ? e.installments - 1 : 0);
+    if (last === null || m > last) last = m;
+  }
+  return last;
+}
+
+/** Meses de fatura de um lançamento: as parcelas da compra, uma por mês, ou a fatura dele. */
+function entryMonths(e: Pick<CardEntry, 'kind' | 'installments' | 'invoiceMonth'>): IsoMonth[] {
+  return Array.from({ length: e.kind === 'compra' ? e.installments : 1 }, (_, i) => addMonths(e.invoiceMonth, i));
+}
+
+function stripEntry(e: StoredCardEntry): CardEntry {
+  const { deletedAt: _deleted, deletedBy: _by, ...rest } = e;
+  return rest;
+}
 
 function stripMovement(m: StoredGoalMovement): GoalMovement {
   const { deletedAt: _deleted, deletedBy: _by, ...rest } = m;

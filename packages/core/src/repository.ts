@@ -1,6 +1,14 @@
-import type { IsoMonth } from './dates';
+import type { IsoDate, IsoMonth } from './dates';
 import type { Cents } from './money';
 import type {
+  Card,
+  CardChargeInput,
+  CardEntry,
+  CardEntryInput,
+  CardInput,
+  CardPurchaseInput,
+  CardRefundInput,
+  CardStatus,
   Commitment,
   CommitmentInput,
   CommitmentSeries,
@@ -12,6 +20,7 @@ import type {
   GoalMovementKind,
   GoalStatus,
   IncomeReference,
+  InvoiceItem,
   MonthOverview,
   NewGoalInput,
   OccurrenceMode,
@@ -77,6 +86,48 @@ export type GoalAction =
 export interface GoalWrite {
   goal: Goal;
   movement: GoalMovement | null;
+}
+
+/**
+ * Cartões de crédito (D-037, Ciclo E), gravados em record_operations com o cartão em target_id; nas cinco ações de
+ * lançamento (criar_compra_cartao, alterar_lancamento_cartao, excluir_lancamento_cartao, criar_encargo_cartao e
+ * criar_estorno_cartao) o lançamento fica também em entry_id (na compra, o id da parcela 1); em pagar_fatura e
+ * desfazer_pagamento_fatura, a conta da fatura em commitment_id e o gasto em record_id. Contam como anotação na atividade
+ * (D-030), como as demais escritas.
+ */
+export type CardAction =
+  | 'criar_cartao'
+  | 'alterar_cartao'
+  | 'situacao_cartao'
+  | 'excluir_cartao'
+  | 'criar_compra_cartao'
+  | 'alterar_lancamento_cartao'
+  | 'excluir_lancamento_cartao'
+  | 'criar_encargo_cartao'
+  | 'criar_estorno_cartao'
+  | 'pagar_fatura'
+  | 'desfazer_pagamento_fatura';
+
+/**
+ * Resultado das escritas de cartão (o JSON {card, entry, invoices, commitments, commitment, record} do banco): o cartão no
+ * estado atual (inclusive excluído, com o limite usado e a fatura atual), o lançamento envolvido (a compra inteira; criado,
+ * alterado ou excluído; null nas escritas do cartão), as faturas envolvidas que ainda existem, como invoice_items, e todas as
+ * contas de fatura vivas do cartão, já com o valor mantido na mesma transação.
+ */
+export interface CardWrite {
+  card: Card;
+  entry: CardEntry | null;
+  invoices: InvoiceItem[];
+  commitments: Commitment[];
+}
+
+/**
+ * Resultado de pay_invoice e undo_invoice_payment: a conta da fatura (paga ou reaberta), o gasto do pagamento (criado ou
+ * excluído) e, em entry, o saldo anterior criado (pagamento parcial) ou removido (desfazer); null sem saldo.
+ */
+export interface InvoicePaymentWrite extends CardWrite {
+  commitment: Commitment;
+  record: FinancialRecord;
 }
 
 /** Resultado das escritas de conta a pagar: a conta no estado atual e, quando houver, o gasto envolvido. */
@@ -310,6 +361,110 @@ export interface RecordsRepository {
    * conteúdo ou outra ação: chave_reutilizada. Não conta como anotação na atividade. Reconciliação: repetir a chave.
    */
   setSavingsAnswer(key: string, contextId: string, expectedVersion: number, answer: SavingsAnswer, monthlyCents?: Cents | null): Promise<SavingsCheck>;
+
+  // Cartões de crédito (D-037, Ciclo E). Regras e ordem das conferências em cards.ts (CARD_*_CODE_ORDER), iguais às da migração 0008.
+
+  /** Cartões vivos do contexto (ativos e arquivados), por criação, com o limite usado e a fatura atual (card_items). Sem leitura: lista vazia. */
+  listCards(contextId: string): Promise<Card[]>;
+  /** Cartão vivo ou null (excluído, inexistente ou sem leitura). */
+  getCard(id: string): Promise<Card | null>;
+  /** Lançamento vivo (a compra pelo id dela) ou null. Serve a "Esta nota já foi anotada" (nota_ja_anotada, detalhe compra=<id>). */
+  getCardEntry(id: string): Promise<CardEntry | null>;
+  /**
+   * Lançamentos vivos do cartão: compras (uma por compra, com as parcelas calculadas por purchaseInstallments), encargos,
+   * estornos (inclusive o automático) e saldos anteriores, por criação. Sem leitura: lista vazia.
+   */
+  listCardEntries(cardId: string): Promise<CardEntry[]>;
+  /**
+   * Contas de fatura vivas do cartão (uma por fatura com total maior que zero, abertas e pagas), por mês da fatura. Junto de
+   * listCardEntries, dão buildInvoices (cards.ts).
+   */
+  listInvoiceCommitments(cardId: string): Promise<Commitment[]>;
+  /** Faturas do cartão como a visão invoice_items (uma por mês com lançamento ou conta viva), do mês mais antigo ao mais novo. */
+  listInvoiceItems(cardId: string): Promise<InvoiceItem[]>;
+  /**
+   * create_card. Exige escrita no contexto. Ordem: repetição; sem_permissao; CARD_INPUT_CODE_ORDER (apelido_invalido,
+   * final_invalido, dia_de_fechamento_invalido, dia_de_vencimento_invalido, limite_invalido); limite_de_cartoes (20 ativos).
+   */
+  createCard(key: string, contextId: string, input: CardInput): Promise<CardWrite>;
+  /**
+   * update_card, em qualquer situação. Ordem: repetição; nao_encontrado; sem_permissao; versao_desatualizada;
+   * CARD_INPUT_CODE_ORDER. As contas de fatura em aberto passam a ter o novo apelido e vencimento (mesma transação); as
+   * compras já feitas ficam nas faturas em que foram lançadas.
+   */
+  updateCard(key: string, id: string, expectedVersion: number, input: CardInput): Promise<CardWrite>;
+  /**
+   * set_card_status: arquivar e reativar. Ordem: repetição; trava; versão; situacao_invalida; limite_de_cartoes (reativar
+   * com 20 ativos). Mesma situação é aceita (versão + 1).
+   */
+  setCardStatus(key: string, id: string, expectedVersion: number, status: CardStatus): Promise<CardWrite>;
+  /**
+   * delete_card: exclusão lógica, só sem lançamentos vivos nem conta de fatura viva (cartao_com_lancamentos). Ordem: repetição;
+   * trava; versão; lançamentos.
+   */
+  deleteCard(key: string, id: string, expectedVersion: number): Promise<CardWrite>;
+  /**
+   * add_card_purchase: sem versão (como create_record). A 1ª parcela cai na fatura cujo período contém a data; as outras, nas
+   * seguintes. Ordem: repetição; nao_encontrado; sem_permissao; cartao_arquivado; CARD_PURCHASE_CODE_ORDER (valor_invalido,
+   * valor_acima_do_limite, descricao_obrigatoria, descricao_longa, categoria_invalida, parcelas_invalidas, data_invalida,
+   * data_futura); com receiptKey: chave_de_nota_invalida, nota_ja_anotada (detalhe "registro=<id>" ou "compra=<id>");
+   * limite_de_lancamentos; fatura_paga (alguma fatura das parcelas já paga). entry = a compra.
+   */
+  addCardPurchase(key: string, cardId: string, input: CardPurchaseInput): Promise<CardWrite>;
+  /**
+   * update_card_entry (compra, encargo ou estorno manual; o tipo vem em input.kind e precisa ser o do lançamento). Ordem:
+   * repetição; nao_encontrado; sem_permissao; lancamento_automatico (saldo anterior e estorno automático); tipo_invalido;
+   * versao_desatualizada; campos como em add_* (a data da compra e a fatura de encargo e estorno só são conferidas no
+   * intervalo quando mudam); fatura_paga (mudar valor, data ou parcelas da compra, ou o valor ou a fatura de encargo e
+   * estorno, numa fatura já paga; mudar só descrição e categoria da compra vale). entry = a compra ou o lançamento.
+   */
+  updateCardEntry(key: string, entryId: string, expectedVersion: number, input: CardEntryInput): Promise<CardWrite>;
+  /** delete_card_entry (exclusão lógica; a compra inteira). Ordem: repetição; trava; lancamento_automatico; versão; fatura_paga. */
+  deleteCardEntry(key: string, entryId: string, expectedVersion: number): Promise<CardWrite>;
+  /**
+   * add_card_charge: encargo informado a partir da fatura do banco; cartão arquivado também aceita. Ordem: repetição;
+   * nao_encontrado; sem_permissao; CARD_CHARGE_CODE_ORDER (tipo_de_encargo_invalido, valor_invalido, valor_acima_do_limite,
+   * mes_invalido); limite_de_lancamentos; fatura_paga.
+   */
+  addCardCharge(key: string, cardId: string, input: CardChargeInput): Promise<CardWrite>;
+  /**
+   * add_card_refund: estorno (crédito) numa fatura escolhida; cartão arquivado também aceita. Ordem: repetição; trava;
+   * CARD_REFUND_CODE_ORDER (valor_invalido, valor_acima_do_limite, descricao_obrigatoria, descricao_longa,
+   * categoria_invalida, mes_invalido); limite_de_lancamentos; fatura_paga. Crédito maior que o total da fatura vira um estorno
+   * automático na seguinte, enquanto houver lançamento comum nela ou depois dela (fatura_seguinte_paga se ela já foi paga).
+   */
+  addCardRefund(key: string, cardId: string, input: CardRefundInput): Promise<CardWrite>;
+  /**
+   * pay_invoice: cria UM gasto "Fatura Nubank (outubro)" na data do pagamento e marca a conta da fatura como paga.
+   * expectedVersion = versão da conta da fatura (Invoice.commitmentVersion). accountId: a conta de saída; ausente, a conta ativa
+   * mais antiga do contexto. Ordem: repetição; nao_encontrado; sem_permissao; mes_invalido; nao_encontrado (a fatura não tem
+   * conta); versao_desatualizada; compromisso_quitado; valor_invalido; valor_acima_da_fatura; data_invalida (inválida ou há
+   * mais de 1 ano); data_futura; conta_invalida; fatura_seguinte_paga (pagamento parcial com a fatura seguinte já paga).
+   * Pagamento parcial: a diferença vira o lançamento "saldo anterior" na fatura do mês seguinte (entry). O gasto não tem categoria.
+   */
+  payInvoice(
+    key: string,
+    cardId: string,
+    month: IsoMonth,
+    expectedVersion: number,
+    amountCents: Cents,
+    paidOn: IsoDate,
+    accountId?: string | null,
+  ): Promise<InvoicePaymentWrite>;
+  /**
+   * undo_invoice_payment: apaga o gasto, reabre a conta e apaga o saldo anterior criado. Ordem: repetição; nao_encontrado;
+   * sem_permissao; mes_invalido; nao_encontrado (sem conta); versao_desatualizada; compromisso_aberto (a conta não está paga);
+   * fatura_seguinte_paga (há saldo anterior e a fatura seguinte já foi paga).
+   */
+  undoInvoicePayment(key: string, cardId: string, month: IsoMonth, expectedVersion: number): Promise<InvoicePaymentWrite>;
+  /** Reconciliação de cartões: a operação com esta chave já foi concluída? entryId só nas ações de lançamento. */
+  findCardOperation(key: string): Promise<{
+    action: CardAction;
+    cardId: string;
+    entryId: string | null;
+    commitmentId: string | null;
+    recordId: string | null;
+  } | null>;
 }
 
 export type RepoErrorCode =
@@ -370,13 +525,35 @@ export type RepoErrorCode =
   | 'meta_arquivada'
   | 'saldo_da_meta_insuficiente'
   | 'resposta_invalida'
+  | 'conta_de_fatura'
+  | 'pagamento_de_fatura'
+  | 'fatura_paga'
+  | 'fatura_seguinte_paga'
+  | 'valor_acima_da_fatura'
+  | 'lancamento_automatico'
+  | 'campo_nao_se_aplica'
+  | 'apelido_invalido'
+  | 'final_invalido'
+  | 'dia_de_fechamento_invalido'
+  | 'dia_de_vencimento_invalido'
+  | 'limite_invalido'
+  | 'limite_de_cartoes'
+  | 'limite_de_lancamentos'
+  | 'cartao_arquivado'
+  | 'cartao_com_lancamentos'
+  | 'tipo_de_encargo_invalido'
+  | 'chave_de_nota_invalida'
+  | 'nota_ja_anotada'
   | 'desconhecido';
 
 export class RepoError extends Error {
   constructor(
     readonly code: RepoErrorCode,
     message?: string,
-    /** Detalhe do banco, quando houver (saldo_da_meta_insuficiente: o primeiro dia negativo, AAAA-MM-DD). */
+    /**
+     * Detalhe do banco, quando houver (saldo_da_meta_insuficiente: o primeiro dia negativo, AAAA-MM-DD; versao_desatualizada:
+     * "versao_atual=N"; nota_ja_anotada: "registro=<id>" ou "compra=<id>").
+     */
     readonly detail?: string,
   ) {
     super(message ?? code);

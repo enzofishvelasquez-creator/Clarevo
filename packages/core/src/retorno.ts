@@ -438,6 +438,8 @@ export type ReviewAction = 'ja_paguei' | 'nao_houve' | 'ainda_nao_paguei';
  * - Parcela de parcelamento: sem "Não houve" (parcela não paga continua devida; quem precisar exclui no detalhe da conta).
  */
 export function rowActions(row: ReviewRow): ReviewAction[] {
+  // Fatura de cartão: sem "Já paguei" nem "Não houve" (pay_commitment e delete_commitment recusam); a tela abre a fatura.
+  if (row.commitment?.invoice) return [];
   const installment = row.series?.kind === 'parcelada';
   if (row.state === 'sem_conta') return installment ? ['ja_paguei', 'ainda_nao_paguei'] : ['ja_paguei', 'nao_houve', 'ainda_nao_paguei'];
   return installment ? ['ja_paguei'] : ['ja_paguei', 'nao_houve'];
@@ -452,7 +454,7 @@ export function groupActions(group: ReviewAnnualGroup): ReviewGroupAction[] {
 
 /** Marcação em lote "pagas no vencimento": só valor fixo (estimada fica de fora). */
 export function batchEligible(row: ReviewRow): boolean {
-  return !row.amountIsEstimate;
+  return !row.amountIsEstimate && !row.commitment?.invoice;
 }
 
 /**

@@ -23,7 +23,7 @@ describe('Movimentos › Organizar: legendas', () => {
   });
 
   it('mesma origem do card "Ainda a pagar" na demonstração', async () => {
-    const repo = await createDemoRepository();
+    const repo = await createDemoRepository({ cards: false });
     const ctx = (await repo.getSpace())!.personalContextId;
     const oct = summarizeToPay(await repo.listCommitments(ctx, '2026-10'), ctx, '2026-10', DEMO_TODAY);
     expect(payablesCaptionFromSummary(oct, DEMO_TODAY)).toBe('R$ 650,00 em aberto neste mês');

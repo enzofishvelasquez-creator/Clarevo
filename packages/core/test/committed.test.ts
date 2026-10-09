@@ -75,6 +75,7 @@ const bill = (dueOn: string, over: Partial<Commitment> = {}): Commitment => {
     payment: null,
     series: null,
     seriesOverride: false,
+    invoice: null,
     amountIsEstimate: false,
     createdBy: 'pessoa',
     version: 1,
@@ -121,6 +122,8 @@ const receipt = (occurredOn: string, amountCents: number, category: string | nul
     description: 'Recebimento',
     category,
     commitmentId: null,
+    invoice: null,
+    receiptKey: null,
     createdBy: 'pessoa',
     version: 1,
     createdAt: CREATED_AT,
@@ -130,7 +133,7 @@ const receipt = (occurredOn: string, amountCents: number, category: string | nul
 
 /** Demonstração com atalhos para os números da sequência de aceite. */
 async function demo() {
-  const repo = await createDemoRepository();
+  const repo = await createDemoRepository({ cards: false });
   const space = (await repo.getSpace())!;
   const ctx = space.personalContextId;
   const accountId = space.accounts[0]!.id;
@@ -197,7 +200,11 @@ describe('percentual em milésimos e formato', () => {
     expect(committedGroupOf(bill(OCT + '-01', { series: ref('mensal') }))).toBe('fixos');
     expect(committedGroupOf(bill(OCT + '-01', { series: ref('anual') }))).toBe('anuais');
     expect(committedGroupOf(bill(OCT + '-01', { series: ref('parcelada', 'outro_parcelamento') }))).toBe('parcelamentos');
-    expect(COMMITTED_GROUPS).toEqual(['fixos', 'anuais', 'parcelamentos', 'outras']);
+    expect(committedGroupOf(bill(OCT + '-01', { invoice: { cardId: 'cartao-1', month: '2026-10' } }))).toBe('faturas');
+    expect(committedGroupOf(bill(OCT + '-01', { series: ref('parcelada', 'financiamento'), invoice: { cardId: 'cartao-1', month: '2026-10' } }))).toBe('faturas');
+    expect(COMMITTED_GROUPS).toEqual(['fixos', 'anuais', 'parcelamentos', 'faturas', 'outras']);
+    // Fatura de cartão nunca é dívida.
+    expect(isDebtCommitment(bill(OCT + '-01', { invoice: { cardId: 'cartao-1', month: '2026-10' } }))).toBe(false);
     expect(isDebtCommitment(bill(OCT + '-01', { series: ref('parcelada', 'financiamento') }))).toBe(true);
     expect(isDebtCommitment(bill(OCT + '-01', { series: ref('parcelada', 'compra_parcelada') }))).toBe(true);
     expect(isDebtCommitment(bill(OCT + '-01', { series: ref('parcelada', 'outro_parcelamento') }))).toBe(false);

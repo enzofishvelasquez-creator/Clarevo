@@ -99,7 +99,8 @@ export function quickPayDraft(
   c: Commitment,
   today: IsoDate,
 ): { amountCents: number; paidOn: IsoDate; category: string | null } | null {
-  if (c.status !== 'aberto' || c.amountIsEstimate || c.dueOn < today) return null;
+  // Fatura de cartão: paga pela fatura (pay_invoice), nunca por "Já paguei" (pay_commitment recusa com conta_de_fatura).
+  if (c.invoice || c.status !== 'aberto' || c.amountIsEstimate || c.dueOn < today) return null;
   return { amountCents: c.amountCents, paidOn: today, category: c.category };
 }
 
@@ -108,7 +109,7 @@ export function quickPayDraft(
  * formulário de pagamento) ou null (paga ou vencida).
  */
 export function quickPayAction(c: Commitment, today: IsoDate): 'pagar' | 'informar' | null {
-  if (c.status !== 'aberto' || c.dueOn < today) return null;
+  if (c.invoice || c.status !== 'aberto' || c.dueOn < today) return null;
   return c.amountIsEstimate ? 'informar' : 'pagar';
 }
 
