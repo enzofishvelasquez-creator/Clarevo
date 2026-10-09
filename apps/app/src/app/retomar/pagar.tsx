@@ -211,7 +211,7 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: Person
       const created = err.created ?? writer.createdFor(row.key) ?? existing.current;
       // Algo mudou em outro aparelho (conta paga lá, versão nova): a conta lida antes ficou velha. A próxima tentativa
       // lê a conta de novo, em vez de repetir o pagamento com a cópia velha e receber a mesma recusa.
-      if (!isUncertain(err.cause) && isConflict(err.cause)) existing.current = null;
+      // MUTACAO
       if (created) {
         // Conta registrada, pagamento não: ela já aparece em Contas a pagar; "Salvar de novo" repete só o pagamento.
         setPartial(true);
