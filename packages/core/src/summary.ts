@@ -1,7 +1,11 @@
 import type { IsoDate, IsoMonth } from './dates';
 import { monthOf, monthRange } from './dates';
 import type { Cents } from './money';
+import { formatTenths } from './learn/format';
+import { sharesCents } from './learn/math';
+import { formatBRL } from './money';
 import type { Commitment, FinancialRecord } from './records';
+import { NO_CATEGORY_LABEL } from './records';
 
 /**
  * Resumo do mês de um contexto (CL C004).
@@ -114,4 +118,44 @@ export function summarizeToPay(list: readonly Commitment[], contextId: string, m
 
 export function sortNewestFirst(records: readonly FinancialRecord[]): FinancialRecord[] {
   return [...records].sort(newestFirst);
+}
+
+/** Uma barra de "Por categoria" na composição de Pago. */
+export interface CategoryShare {
+  /** null = "Sem categoria". */
+  category: string | null;
+  label: string;
+  cents: Cents;
+  /** Percentual de Pago em décimos; a soma de todas é 1.000 (maior resto). */
+  tenths: number;
+  /** "23,4%" */
+  percentText: string;
+  /** "Mercado, R$ 412,30, 23,4% do pago" */
+  a11yLabel: string;
+}
+
+/**
+ * "Por categoria" na composição de Pago (spec4 §1.2): soma dos gastos por categoria, em ordem decrescente de valor
+ * (empate: nome), com "Sem categoria" por último. Percentuais em décimos pelo maior resto, para somarem 1.000; a soma
+ * dos centavos é igual a Pago. Recebimentos que vierem na lista ficam de fora.
+ */
+export function categoryBreakdown(paid: readonly FinancialRecord[]): CategoryShare[] {
+  const byCategory = new Map<string | null, Cents>();
+  for (const r of paid) {
+    if (r.kind !== 'despesa') continue;
+    byCategory.set(r.category, (byCategory.get(r.category) ?? 0) + r.amountCents);
+  }
+  const rows = [...byCategory.entries()]
+    .map(([category, cents]) => ({ category, label: category ?? NO_CATEGORY_LABEL, cents }))
+    .sort((a, b) => {
+      if ((a.category === null) !== (b.category === null)) return a.category === null ? 1 : -1;
+      return b.cents - a.cents || a.label.localeCompare(b.label, 'pt-BR');
+    });
+  const total = rows.reduce((acc, r) => acc + r.cents, 0);
+  if (total <= 0) return [];
+  const tenths = sharesCents(1000, rows.map((r) => r.cents));
+  return rows.map((r, i) => {
+    const percentText = formatTenths(tenths[i]!);
+    return { ...r, tenths: tenths[i]!, percentText, a11yLabel: `${r.label}, ${formatBRL(r.cents)}, ${percentText} do pago` };
+  });
 }

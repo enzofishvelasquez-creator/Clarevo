@@ -89,3 +89,47 @@ export function toPayCaption(
     estimated: s.estimatedCents > 0 ? `Inclui ${formatBRL(s.estimatedCents)} em valores estimados.` : null,
   };
 }
+
+/**
+ * "Já paguei" na lista de Contas a pagar (spec4 §1.2): pagamento hoje, com o valor previsto, de uma conta em aberto
+ * que vence hoje ou depois e tem valor fixo. Estimada, paga ou vencida: null (estimada usa "Informar valor e pagar";
+ * vencidas seguem pela revisão de vencidas). A gravação continua sendo pay_commitment.
+ */
+export function quickPayDraft(
+  c: Commitment,
+  today: IsoDate,
+): { amountCents: number; paidOn: IsoDate; category: string | null } | null {
+  if (c.status !== 'aberto' || c.amountIsEstimate || c.dueOn < today) return null;
+  return { amountCents: c.amountCents, paidOn: today, category: c.category };
+}
+
+/**
+ * Botão da linha: 'pagar' ("Já paguei", diálogo de confirmação), 'informar' ("Informar valor e pagar", abre o
+ * formulário de pagamento) ou null (paga ou vencida).
+ */
+export function quickPayAction(c: Commitment, today: IsoDate): 'pagar' | 'informar' | null {
+  if (c.status !== 'aberto' || c.dueOn < today) return null;
+  return c.amountIsEstimate ? 'informar' : 'pagar';
+}
+
+/** Vencimento curto do nome acessível: "vence hoje" ou "vence 12/10". */
+const dueShort = (dueOn: IsoDate, today: IsoDate) => (dueOn === today ? 'vence hoje' : `vence ${formatDayMonth(dueOn)}`);
+
+/** Textos de "Já paguei" na lista (diálogo e nomes acessíveis). `name` é o nome mostrado na linha. */
+export const QUICK_PAY_TEXT = {
+  button: 'Já paguei',
+  estimateButton: 'Informar valor e pagar',
+  /** "Marcar Luz como paga hoje?" */
+  title: (name: string) => `Marcar ${name} como paga hoje?`,
+  /** "R$ 180,00 em 08/10/2026" */
+  line: (amountCents: number, paidOn: IsoDate) => `${formatBRL(amountCents)} em ${formatDateBR(paidOn)}`,
+  confirm: 'Confirmar pagamento',
+  change: 'Mudar valor ou data',
+  cancel: 'Cancelar',
+  /** "Já paguei Luz, vence 12/10" */
+  a11y: (name: string, dueOn: IsoDate, today: IsoDate) => `Já paguei ${name}, ${dueShort(dueOn, today)}`,
+  /** "Informar valor e pagar Luz, vence 12/10" */
+  estimateA11y: (name: string, dueOn: IsoDate, today: IsoDate) => `Informar valor e pagar ${name}, ${dueShort(dueOn, today)}`,
+  /** Faixa depois da confirmação do servidor. */
+  done: (name: string) => `${name} marcada como paga.`,
+} as const;

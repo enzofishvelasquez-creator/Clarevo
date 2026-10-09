@@ -8,3 +8,7 @@ export * from './series';
 export * from './repository';
 export * from './memory-repository';
 export * from './demo';
+export * from './learn';
+export * from './calculators';
+export * from './sum';
+export * from './shortcuts';
