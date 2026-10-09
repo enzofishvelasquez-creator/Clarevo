@@ -104,9 +104,14 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
   const draft: GoalMovementDraft = { kind, amountText, dateText, note };
   const saved = mode.type === 'atualizar' ? validateSavedValueDraft(savedText, goal.savedCents) : null;
 
-  /** Fim comum: o servidor confirmou (ou uma tentativa anterior estava gravada). */
-  function done(text: string) {
+  /**
+   * Fim comum: o servidor confirmou (ou uma tentativa anterior estava gravada). A meta confirmada já está no cache; o
+   * histórico recarrega antes de voltar, para a tela anterior mostrar o valor guardado e a lista de movimentos do mesmo
+   * estado (a falha de rede nesse recarregamento não impede de voltar: a lista se atualiza quando a conexão voltar).
+   */
+  async function done(text: string) {
     flash.set(text);
+    await qc.refetchQueries({ queryKey: ['goals', 'movements', goal.id] }).catch(() => undefined);
     guard.leave(() => (router.canGoBack() ? router.back() : router.replace(`/meta/${goal.id}`)));
   }
 
@@ -145,7 +150,7 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
         const r = await guardedWrite(keys, JSON.stringify([goal.id, change.kind, input]), (key) =>
           add.mutateAsync({ key, goalId: goal.id, kind: change.kind, input }),
         );
-        if (r.status === 'ok' || r.status === 'reconciled') return done(M[change.kind].saved);
+        if (r.status === 'ok' || r.status === 'reconciled') return await done(M[change.kind].saved);
         if (r.status === 'refused') return fail(r.code, r.detail);
         setError(GOAL_ERROR_TEXT.salvar_falhou);
       } finally {
@@ -183,7 +188,7 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
           ? edit.mutateAsync({ key, movementId: editing.id, version: current.version, input: v.input })
           : add.mutateAsync({ key, goalId: goal.id, kind, input: v.input }),
       );
-      if (r.status === 'ok' || r.status === 'reconciled') return done(editing ? M.updated : M[kind === 'saldo_inicial' ? 'aporte' : kind].saved);
+      if (r.status === 'ok' || r.status === 'reconciled') return await done(editing ? M.updated : M[kind === 'saldo_inicial' ? 'aporte' : kind].saved);
       if (r.status === 'refused') return fail(r.code, r.detail);
       setError(GOAL_ERROR_TEXT.salvar_falhou);
     } finally {
@@ -206,7 +211,7 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
         remove.mutateAsync({ key, movementId: current.id, version: current.version }),
       );
       setConfirmDelete(false);
-      if (r.status === 'ok' || r.status === 'reconciled') return done(M.deleted);
+      if (r.status === 'ok' || r.status === 'reconciled') return await done(M.deleted);
       if (r.status === 'refused') return fail(r.code, r.detail);
       setError(GOAL_ERROR_TEXT.salvar_falhou);
     } finally {
