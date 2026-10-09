@@ -194,28 +194,41 @@ const KEY_ERROR_RANK: Record<string, number> = { modelo_nao_suportado: 5, cnpj_i
  * Procura uma chave de acesso válida num texto (mensagem colada, texto de um PDF). A chave pode vir em grupos de 4 separados por
  * espaços ou quebras de linha, como no DANFE. Com `after`, prefere a primeira chave que aparece depois desse trecho (o rótulo
  * "CHAVE DE ACESSO"); sem ele ou sem chave depois dele, a primeira válida do texto. Sem nenhuma válida, devolve o erro do candidato
- * que mais se aproximou ('chave_nao_encontrada' quando nada parece chave).
+ * que mais se aproximou ('chave_nao_encontrada' quando nada parece chave). Tolera extratores de PDF que colam o rótulo no começo da
+ * chave ("CHAVE DE ACESSO3326 1012...", "NFe3326...") ou texto no fim dela ("...3214NATUREZA"); um número com mais de 44 dígitos
+ * não é chave.
  */
 export function findAccessKey(text: string, after?: RegExp): KeySearch {
   const tokens: { text: string; start: number }[] = [];
   const re = /\S+/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) tokens.push({ text: m[0], start: m.index });
+  // Pontos de partida: palavras que começam por número. Alguns extratores de PDF colam o rótulo no valor ("ACESSO3326", "NFe3326..."):
+  // a chave nunca começa por letra (UF e AAMM são números), então o trecho depois das letras iniciais também serve de partida.
+  const starts: { i: number; skip: number }[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const word = tokens[i]!.text;
+    if (/^[0-9]/.test(word)) starts.push({ i, skip: 0 });
+    else {
+      const glued = /^[^\d\s]+(?=\d)/.exec(word);
+      if (glued) starts.push({ i, skip: glued[0].length });
+    }
+  }
   const found: { info: AccessKeyInfo; index: number }[] = [];
   let bestError: ReceiptErrorCode | null = null;
-  for (let i = 0; i < tokens.length; i++) {
-    if (!/^[0-9]/.test(tokens[i]!.text)) continue;
+  for (const { i, skip } of starts) {
     let joined = '';
     for (let j = i; j < tokens.length && j < i + 44; j++) {
-      const t = tokens[j]!.text;
+      const t = j === i ? tokens[i]!.text.slice(skip) : tokens[j]!.text;
       if (!/^[0-9A-Za-z]+$/.test(t)) break;
       joined += t;
-      if (joined.length > 44) break;
       if (joined.length < 44) continue;
-      const upper = joined.toUpperCase();
+      // Mais de 44 só vale quando o excesso é texto colado no fim da chave ("...3214NATUREZA"); número maior que a chave não é chave.
+      if (joined.length > 44 && !/[A-Za-z]/.test(joined[44]!)) break;
+      const upper = joined.slice(0, 44).toUpperCase();
       if (KEY_SHAPE.test(upper)) {
         const parsed = parseAccessKey(upper);
-        if (parsed.ok) found.push({ info: parsed.info, index: tokens[i]!.start });
+        if (parsed.ok) found.push({ info: parsed.info, index: tokens[i]!.start + skip });
         else if (bestError === null || (KEY_ERROR_RANK[parsed.code] ?? 0) > (KEY_ERROR_RANK[bestError] ?? 0)) bestError = parsed.code;
       }
       break;
@@ -430,62 +443,74 @@ export function readReceiptCode(raw: string): ReceiptReading {
 // ---------------------------------------------------------------------------
 
 /**
- * Domínios oficiais de consulta pública da NFC-e por QR Code, por UF, conferidos por busca em 09/10/2026. Só o domínio vale
- * (o caminho e a consulta são os do QR lido). Cada fonte é a página da própria Sefaz, salvo onde dito. Estados que não aparecem
- * (AC, AP, MA, SE) não tiveram o domínio do QR confirmado em fonte oficial: para eles o botão não aparece, o resto funciona.
- * Para somar um estado: conferir no portal da Sefaz (ou em nfce.encat.org/desenvolvedor/qrcode) e acrescentar aqui e no teste.
+ * Domínios oficiais de consulta pública da NFC-e por QR Code, por UF, reconferidos por busca em 09/10/2026. Só o domínio vale
+ * (o caminho e a consulta são os do QR lido). Cada domínio é do próprio governo do estado (Sefaz, Sefin ou Sefa) e vem de uma
+ * destas fontes: página oficial da Sefaz, nota impressa com o QR de uma compra recente, ou mais de uma fonte da comunidade que
+ * emite NFC-e (fórum do ACBr, base de conhecimento de fornecedores), anotada em cada linha. A lista de cada UF no portal nacional
+ * da NFC-e (nfce.encat.org/desenvolvedor/qrcode) não pôde ser aberta nesta conferência (só havia busca); vale conferir lá.
+ *
+ * Fora da lista, por falta de confirmação nesta conferência: AC, AP, MA, SE, MT, PA, PE e RR. Para eles o botão "Ver a nota no
+ * site da Sefaz" não aparece e todo o resto funciona. Para somar um estado: conferir no portal da Sefaz (ou em nota real) e
+ * acrescentar aqui e no teste (conferência com notas reais é P-025).
  */
 export const SEFAZ_QR_HOSTS: Readonly<Partial<Record<UfSigla, readonly string[]>>> = {
-  // https://portal.fazenda.rj.gov.br/dfe (atualizada em 14/04/2026): QR da NFC-e em https://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode
-  // desde 19/12/2023; o endereço antigo, www4.fazenda.rj.gov.br, valeu até 02/09/2024 e não é aceito aqui.
+  // https://portal.fazenda.rj.gov.br/dfe (atualizada em 14/04/2026) e https://ndd.tech/fiscal-blog/sefaz-rj-alteracao-na-url-do-qrcode-da-nfce-impacta-nas-operacoes-fiscais-das-empresas/:
+  // QR da NFC-e em https://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode desde 19/12/2023; o endereço antigo, www4.fazenda.rj.gov.br,
+  // valeu até 02/09/2024 e não é aceito aqui.
   RJ: ['consultadfe.fazenda.rj.gov.br'],
-  // https://portal.fazenda.sp.gov.br/servicos/nfce/Paginas/WebServices.aspx: https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaQRCode.aspx
-  // (também https://www.nfce.fazenda.sp.gov.br/qrcode).
+  // https://portal.fazenda.sp.gov.br/servicos/nfce/Paginas/WebServices.aspx (consulta do QR, ConsultaQRCode.aspx) e QR de produção
+  // https://www.nfce.fazenda.sp.gov.br/qrcode?p=... em XML real (https://www.projetoacbr.com.br/forum/topic/40056-link-url-qr-code-nfce-400-sp/).
   SP: ['www.nfce.fazenda.sp.gov.br'],
-  // https://portalsped.fazenda.mg.gov.br/spedmg/nfce/web-services/ : https://portalsped.fazenda.mg.gov.br/portalnfce/sistema/qrcode.xhtml;
-  // o endereço anterior, nfce.fazenda.mg.gov.br, também atende (Sefaz-MG, página do QR).
-  MG: ['portalsped.fazenda.mg.gov.br', 'nfce.fazenda.mg.gov.br'],
-  // https://app.sefaz.es.gov.br/ConsultaNFCe/QRCode.aspx (página de web services) e www2.sefaz.es.gov.br/nfce/consulta (https://sefaz.es.gov.br/qr-code).
-  ES: ['app.sefaz.es.gov.br', 'www2.sefaz.es.gov.br'],
-  // https://sped.fazenda.pr.gov.br/NFCe/Pagina/QR-Code: http://www.fazenda.pr.gov.br/nfce/qrcode
+  // Sefaz-MG trocou o endereço do QR em 2022, para o portal SPED, e desativou o antigo (nfce.fazenda.mg.gov.br) em 04/04/2022:
+  // https://portalsped.fazenda.mg.gov.br/portalnfce/sistema/qrcode.xhtml (https://inventti.com.br/sefaz-mg-nota-fiscal-consumidor-eletronica-alteracao-da-url-de-consultas-via-qrcode/
+  // e https://www.projetoacbr.com.br/forum/topic/66167-sefaz-mg-troca-da-url-de-consulta-a-nfc-e-via-qr-code/).
+  MG: ['portalsped.fazenda.mg.gov.br'],
+  // https://sefaz.es.gov.br/qr-code (Sefaz-ES): consulta por QR em www2.sefaz.es.gov.br/nfce/consulta; app.sefaz.es.gov.br é o endereço
+  // de consulta por chave da página https://sefaz.es.gov.br/url-dos-web-services e já apareceu em QR de produção (fórum do ACBr).
+  ES: ['www2.sefaz.es.gov.br', 'app.sefaz.es.gov.br'],
+  // https://sped.fazenda.pr.gov.br/NFCe/Pagina/QR-Code (NFC-e 4.0): http://www.fazenda.pr.gov.br/nfce/qrcode
+  // (https://www.projetoacbr.com.br/forum/topic/38060-nfc-e-40-paran%C3%A1-pr-exception-na-transmiss%C3%A3o/).
   PR: ['www.fazenda.pr.gov.br'],
   // https://www.sef.sc.gov.br/api-portal/Documento/ver/1398 (URL do QR Code e da consulta em SC): https://sat.sef.sc.gov.br/nfce/consulta
+  // (QR de produção também no fórum do ACBr, https://www.projetoacbr.com.br/forum/topic/61960-nfce-sc-999-qr-code-inv%C3%A1lido/).
   SC: ['sat.sef.sc.gov.br'],
-  // Fonte secundária (a Sefaz-RS publica o endereço só no portal nacional da NFC-e): https://www.sefaz.rs.gov.br/NFCE/NFCE-COM.aspx, como
-  // configurado no ACBr e na base da Oobj. O domínio é o da própria Sefaz-RS.
+  // Fonte secundária (a Sefaz-RS publica o endereço só no portal nacional): base de conhecimento da Oobj sobre a rejeição 395,
+  // https://oobj.com.br/bc/rejeicao-395-como-resolver/, que dá https://www.sefaz.rs.gov.br/NFCE/NFCE-COM.aspx como o esperado para o RS.
   RS: ['www.sefaz.rs.gov.br'],
-  // https://www.sefaz.ba.gov.br/docs/inspetoria-eletronica/icms/nfce_configuracao_programa_emissor.pdf: nfe.sefaz.ba.gov.br/servicos/nfce/qrcode.aspx
+  // Notas impressas de 2026 com o QR http://nfe.sefaz.ba.gov.br/servicos/nfce/qrcode.aspx?p=... (por exemplo
+  // https://www.camara.leg.br/cota-parlamentar/documentos/publ/3200/2026/8057417.pdf) e https://www.sefaz.ba.gov.br/docs/inspetoria-eletronica/icms/nfce_configuracao_programa_emissor.pdf.
   BA: ['nfe.sefaz.ba.gov.br'],
-  // Novo endereço do QR (Informe Técnico 2025.003, em vigor desde 16/06/2025, o antigo só até 30/08/2025): https://nfeweb.sefaz.go.gov.br/nfeweb/sites/nfce/danfeNFCe.
-  // Fonte do domínio: Inventti, Tecnospeed e fórum ACBr; a mudança em si está em https://goias.gov.br/economia/alteracao-na-url-de-consulta-nfc-e/.
+  // Informe Técnico 2025.003, obrigatório desde 31/08/2025: https://goias.gov.br/economia/alteracao-na-url-de-consulta-nfc-e/ e
+  // https://inventti.com.br/informe-tecnico-2025-003-alteracao-da-url-do-qr-code-para-consulta-da-nfc-e-em-goias/ (https://nfeweb.sefaz.go.gov.br/nfeweb/sites/nfce/danfeNFCe).
   GO: ['nfeweb.sefaz.go.gov.br'],
-  // https://www.dfe.ms.gov.br/nfce/qrcode (página de web services da Sefaz-MS, https://www.nfce.ms.gov.br/urls-webservices/).
-  MS: ['www.dfe.ms.gov.br'],
-  // Cupom de NFC-e do DF autorizado em 2025 traz http://www.fazenda.df.gov.br/nfce/qrcode (a nota só é autorizada com o endereço previsto pela Sefaz, regra de rejeição 395).
+  // Notas impressas com o QR em dfe.ms.gov.br/nfce/qrcode (documentos de transparência do Senado, por exemplo
+  // https://www6g.senado.leg.br/transparencia/sen/download/ceaps/documento/180081) e página de web services da Sefaz-MS (https://www.nfce.ms.gov.br/urls-webservices/).
+  MS: ['www.dfe.ms.gov.br', 'dfe.ms.gov.br'],
+  // Nota do DF de setembro de 2025 com o QR http://www.fazenda.df.gov.br/nfce/qrcode?p=... (https://www.camara.leg.br/cota-parlamentar/documentos/publ/3200/2025/8002838.pdf).
   DF: ['www.fazenda.df.gov.br'],
-  // http://www.sefaz.mt.gov.br/nfce/consultanfce (portal da NFC-e da Sefaz-MT, https://www.sefaz.mt.gov.br/portal/nfce/).
-  MT: ['www.sefaz.mt.gov.br'],
-  // http://nfce.sefaz.ce.gov.br/pages/ShowNFCe.html (página de web services da Sefaz-CE, http://nfce.sefaz.ce.gov.br/pages/informacoes/web_services.jsf).
+  // QR de produção em nfce.sefaz.ce.gov.br (várias mensagens do fórum do ACBr, por exemplo https://www.projetoacbr.com.br/forum/profile/8630-atilacamurca/content/)
+  // e consulta em http://nfce.sefaz.ce.gov.br/pages/consultaNota.jsf (https://infosimples.com/consultas/sefaz-ce-nfce/).
   CE: ['nfce.sefaz.ce.gov.br'],
-  // https://appnfc.sefa.pa.gov.br/portal/view/consultas/nfce/nfceForm.seam (página do desenvolvedor, http://nfce.sefa.pa.gov.br/index.php/desenvolvedor).
-  PA: ['appnfc.sefa.pa.gov.br'],
-  // http://www.sefaz.pb.gov.br/nfce (endereço único do QR, https://www.sefaz.pb.gov.br/announcements/14409-...).
+  // Comunicado da Sefaz-PB de 2024: desde 01/04/2024 o QR tem um único endereço, http://www.sefaz.pb.gov.br/nfce, e o antigo (receita.pb.gov.br)
+  // deixou de existir: https://www.sefaz.pb.gov.br/announcements/8996-sefaz-tem-novo-endereco-do-qr-code-da-nfc-e,
+  // https://inventti.com.br/?p=20336 e https://www.totvs.com/blog/fiscal-clientes/sefaz-pb-extincao-url-qr-code-nfc-e-antiga/.
   PB: ['www.sefaz.pb.gov.br'],
-  // http://nfce.sefaz.pe.gov.br/nfce/consulta (aviso da Sefaz-PE, https://www.sefaz.pe.gov.br/Servicos/Nota-Fiscal-de-Consumidor-Eletronica/).
-  PE: ['nfce.sefaz.pe.gov.br'],
-  // http://www.sefaz.pi.gov.br/nfce/qrcode (comunicado da Sefaz-PI, https://portal-admin.sefaz.pi.gov.br/noticias/contribuintes-devem-alterar-endereco-de-consulta-eletronico-nas-nfc-e/).
+  // Orientação da Sefaz-PI: QR versão 2.0 em http://www.sefaz.pi.gov.br/nfce/qrcode (https://netcpa.com.br/colunas/icmspi-contribuintes-devem-alterar-endereco-de-consulta-eletronico-nas-nfc-e/1971).
   PI: ['www.sefaz.pi.gov.br'],
-  // Consulta pública da NFC-e da Sefaz-RN, https://nfce.set.rn.gov.br/portalDFE/NFCe/ (a página http://www.set.rn.gov.br/nfce/consulta/ diz que o QR leva a ela).
-  RN: ['nfce.set.rn.gov.br'],
-  // https://www.nfce.sefin.ro.gov.br/docTecnica.jsp: http://www.nfce.sefin.ro.gov.br/consultanfce/consulta.jsp
+  // A Sefaz-RN trocou o domínio SET por SEFAZ e o antigo (nfce.set.rn.gov.br) deixou de existir (aviso de 18/05/2026 reproduzido em
+  // https://www.projetoacbr.com.br/forum/topic/92374-aten%C3%A7%C3%A3o-devs-sefaz-rn-link-do-qr-code-da-nfc-e-mudou-de-set-para-sefaz/):
+  // QR em https://nfce.sefaz.rn.gov.br/consultarNFCe.aspx?p=... (exemplo real no fórum) e consulta em nfce.sefaz.rn.gov.br/portalDFE/NFCe/ConsultaNFCe.aspx (https://infosimples.com/consultas/sefaz-rn-nfce-resumida/).
+  RN: ['nfce.sefaz.rn.gov.br'],
+  // Perguntas frequentes da Sefin-RO, https://www.sefin.ro.gov.br/portalsefin/downloads/PERGUNTAS-FREQUENTES-NFCE-FINAL.pdf: portal da NFC-e em http://www.nfce.sefin.ro.gov.br
+  // (consulta por chave ou QR); instrução normativa do QR em https://www.sefin.ro.gov.br/portalsefin/anexos/576.4566558137594IN15_022___QRcode.pdf.
   RO: ['www.nfce.sefin.ro.gov.br'],
-  // https://portalapp.sefaz.rr.gov.br/nfce/servlet/qrcode (consulta por QR Code da Sefaz-RR).
-  RR: ['portalapp.sefaz.rr.gov.br'],
-  // https://www.to.gov.br/sefaz/documentacao/4zw4v3wp9rrc: http://www.sefaz.to.gov.br/nfce/qrcode (v2.0); a v1.0 usava http://apps.sefaz.to.gov.br/portal-nfce/qrcodeNFCe.
-  TO: ['www.sefaz.to.gov.br', 'apps.sefaz.to.gov.br'],
-  // https://www.sefaz.al.gov.br/nfce/nfce-documentacao: http://nfce.sefaz.al.gov.br/QRCode/consultarNFCe.jsp
+  // Versão 2.0 do QR em http://www.sefaz.to.gov.br/nfce/qrcode (fórum do ACBr, https://www.projetoacbr.com.br/forum/tags/tocantins/); a versão 1.0, em apps.sefaz.to.gov.br, não é aceita.
+  TO: ['www.sefaz.to.gov.br'],
+  // Consulta da NFC-e em https://nfce.sefaz.al.gov.br/consultaNFCe.htm (https://infosimples.com/consultas/sefaz-al-nfce/) e QR em nfce.sefaz.al.gov.br/QRCode/consultarNFCe.jsp
+  // (fórum do ACBr, https://www.projetoacbr.com.br/forum/topic/56494-url-nfc-e-al/). Fonte secundária.
   AL: ['nfce.sefaz.al.gov.br'],
-  // https://portalnfce.sefaz.am.gov.br/desenvolvedor/documentacao-tecnica/: https://sistemas.sefaz.am.gov.br/nfceweb/consultarNFCe.jsp
+  // Portal do desenvolvedor da Sefaz-AM (https://portalnfce.sefaz.am.gov.br/desenvolvedor/documentacao-tecnica/) e fórum do ACBr
+  // (https://www.projetoacbr.com.br/forum/topic/40618-nfc-e-40-amazonas/): QR de produção em sistemas.sefaz.am.gov.br/nfceweb/consultarNFCe.jsp.
   AM: ['sistemas.sefaz.am.gov.br'],
 };
 
@@ -624,6 +649,20 @@ export function receiptDraft(facts: ReceiptFacts, today: IsoDate): ReceiptDraft 
 export const RECEIPT_DESCRIPTION_MAX = DESCRIPTION_MAX;
 
 // ---------------------------------------------------------------------------
+// Nota de exemplo (demonstração e e2e)
+// ---------------------------------------------------------------------------
+
+/**
+ * Endereço de QR de uma nota de exemplo FICTÍCIA e identificada, para a demonstração e o e2e (sem câmera): NFC-e do RJ do mês
+ * dado, CNPJ de exemplo 11.222.333/0001-81, série 999 e número 1. Só é usada quando a pessoa toca em "Usar nota de exemplo"; conta
+ * nova nunca recebe dado de exemplo. Passa por `readReceiptCode` como qualquer QR e, salva, aparece como nota já anotada se for lida de novo.
+ */
+export function exampleReceiptQr(month: IsoMonth): string {
+  const body = `33${month.slice(2, 4)}${month.slice(5, 7)}1122233300018165999000000001100000000`;
+  return `https://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode?p=${body}${accessKeyCheckDigit(body)}|2|1|1|${'0'.repeat(40)}`;
+}
+
+// ---------------------------------------------------------------------------
 // Textos
 // ---------------------------------------------------------------------------
 
@@ -659,6 +698,16 @@ export const NOTA_TEXT = {
   pdfReading: 'Lendo o PDF',
   viewOnSefaz: 'Ver a nota no site da Sefaz',
   openRecord: 'Abrir registro',
+  /** Folha do primeiro toque em "Escanear nota fiscal", antes de pedir a câmera. */
+  sheet: { camera: 'Usar a câmera', pdf: 'Escolher o PDF da nota', paste: 'Colar o link ou a chave' },
+  /** Anúncio para leitor de tela (iOS e região viva) quando a nota é lida. */
+  readAnnounce: 'Nota lida',
+  /** Dica depois de uns 10 segundos sem ler. */
+  torchHint: 'Não achou o código? Use a lanterna ou cole a chave.',
+  /** Para NF-e (modelo 55): compra em carnê ou crediário. */
+  installmentsHint: 'Comprou no carnê ou crediário? Anotar como parcelamento',
+  /** Nota de exemplo fictícia, só na demonstração e no e2e. */
+  example: { button: 'Usar nota de exemplo', note: 'Nota de exemplo fictícia, só para conhecer o recurso.' },
   chooseDay: 'Escolha o dia da compra',
   filled: 'Preenchemos o que a nota informa. Confira e toque em Salvar.',
   privacy: 'Guardamos só a chave de acesso da nota, que não tem dados pessoais. Não guardamos CPF nem o link.',

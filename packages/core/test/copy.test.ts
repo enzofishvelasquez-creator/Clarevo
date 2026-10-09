@@ -4,6 +4,19 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  NOTA_ERROR_TEXT,
+  NOTA_TEXT,
+  RECEIPT_ERROR_CODES,
+  accessKeyCheckDigit,
+  danfeFromText,
+  factsFromDanfe,
+  factsFromKey,
+  factsFromQr,
+  noteErrorText,
+  parseAccessKey,
+  parseNfceQr,
+  readReceiptCode,
+  receiptDraft,
   CARDS_TEXT,
   CARD_CHARGE_LABEL,
   CARD_ERROR_TEXT,
@@ -1003,6 +1016,81 @@ describe('textos de cartões (Ciclo E)', () => {
     const text = readFileSync(join(CORE_SRC, 'cards.ts'), 'utf8');
     expect(text).not.toMatch(FORBIDDEN);
     expect(text).not.toMatch(JUDGMENT);
+  });
+});
+
+/**
+ * Leitura de notas fiscais (Ciclo E, D-038): sem julgamento, sem alerta, sem produto; nenhum texto pede CPF (o aviso de
+ * privacidade diz que não guardamos) nem traz número longo (chave de acesso, cartão); os textos montados (resumo, descrição,
+ * nota de teste, mês futuro, nota já anotada) são gerados com várias notas e conferidos um a um, e também os arquivos-fonte.
+ */
+describe('textos de notas fiscais (Ciclo E)', () => {
+  /** Chave de 44 dígitos com o dígito verificador certo (CNPJ 11.222.333/0001-81, o exemplo público). */
+  function sampleKey(aamm: string, model: '55' | '65', uf = '33'): string {
+    const body = `${uf}${aamm}11222333000181${model}001000012345187654321`;
+    return body + String(accessKeyCheckDigit(body));
+  }
+
+  it('NOTA_TEXT, NOTA_ERROR_TEXT, rascunhos, nota já anotada e o arquivo-fonte', () => {
+    const today = '2026-10-09';
+    const texts: string[] = [
+      ...staticStrings(NOTA_TEXT),
+      ...staticStrings(NOTA_ERROR_TEXT),
+      NOTA_TEXT.alreadyNoted('2026-10-12', 'Mercado', 8_740),
+      NOTA_TEXT.alreadyNoted('2026-10-12', 'Compra em Loja Exemplo Ltda', 1),
+      NOTA_TEXT.alreadyNotedCard('2026-10-12', 'Mercado', 8_740, 'Nubank'),
+      NOTA_TEXT.summary('RJ', 'outubro de 2026'),
+      NOTA_TEXT.summary('SP', '12/10/2026'),
+      noteErrorText('qualquer_outro'),
+      ...RECEIPT_ERROR_CODES.map((code) => noteErrorText(code)),
+    ];
+    // Rascunhos de várias notas: do mês, de outro mês, de mês futuro, em contingência, de teste e do DANFE.
+    const base = 'https://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode?p=';
+    const qrs = [
+      `${base}${sampleKey('2610', '65')}|2|1|1|ABCDEF0123456789ABCDEF0123456789ABCDEF01`,
+      `${base}${sampleKey('2609', '65')}|2|1|08|87.40|0123456789ABCDEF0123456789ABCDEF01234567|1|ABCDEF0123456789ABCDEF0123456789ABCDEF01`,
+      `${base}${sampleKey('2611', '65')}|2|2|1|ABCDEF0123456789ABCDEF0123456789ABCDEF01`,
+      `${base}${sampleKey('2601', '65', '35')}|3|1`,
+    ];
+    for (const qr of qrs) {
+      const parsed = parseNfceQr(qr);
+      expect(parsed.ok, qr).toBe(true);
+      if (!parsed.ok) continue;
+      const draft = receiptDraft(factsFromQr(parsed.qr, qr), today);
+      texts.push(draft.description, draft.summary, ...(draft.testNote ? [draft.testNote] : []), ...(draft.futureNote ? [draft.futureNote] : []));
+    }
+    expect(texts.some((t) => t === NOTA_TEXT.testNote)).toBe(true);
+    expect(texts.some((t) => t === NOTA_TEXT.futureMonth)).toBe(true);
+    const keyParsed = readReceiptCode(sampleKey('2610', '55'));
+    expect(keyParsed.ok).toBe(true);
+    if (keyParsed.ok) texts.push(receiptDraft(factsFromKey(keyParsed.key), today).description);
+    const danfe = danfeFromText(
+      `RECEBEMOS DE LOJA EXEMPLO LTDA OS PRODUTOS E/OU SERVIÇOS CONSTANTES DA NOTA FISCAL ELETRÔNICA INDICADA AO LADO\nCHAVE DE ACESSO\n${sampleKey('2610', '55').replace(/(.{4})/g, '$1 ').trim()}\nDATA DA EMISSÃO 08/10/2026\nVALOR TOTAL DA NOTA 150,00`,
+    );
+    expect(danfe.ok).toBe(true);
+    if (danfe.ok) {
+      const draft = receiptDraft(factsFromDanfe(danfe.reading), today);
+      expect(draft.description).toBe('Compra em Loja Exemplo Ltda');
+      texts.push(draft.description, draft.summary);
+    }
+    expect(parseAccessKey(sampleKey('2610', '65')).ok).toBe(true);
+    expect(texts.length).toBeGreaterThan(40);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(NEUTRAL);
+      // Nunca chave, número de cartão nem código de segurança nos textos.
+      expect(text, text).not.toMatch(/\d{13,}/);
+      expect(text, text).not.toMatch(/\bcvv\b|c[oó]digo de verifica/i);
+    }
+    // Só o aviso de privacidade fala em CPF, e é para dizer que não guardamos.
+    expect(texts.filter((t) => /\bCPF\b/i.test(t))).toEqual([NOTA_TEXT.privacy]);
+    expect(NOTA_TEXT.privacy).toMatch(/Não guardamos CPF/);
+    for (const file of ['nota.ts', 'danfe.ts']) {
+      const source = readFileSync(join(CORE_SRC, file), 'utf8');
+      expect(source, file).not.toMatch(FORBIDDEN);
+      expect(source, file).not.toMatch(JUDGMENT);
+    }
   });
 });
 

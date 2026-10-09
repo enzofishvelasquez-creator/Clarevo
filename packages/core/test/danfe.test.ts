@@ -313,6 +313,38 @@ describe('DANFE em texto', () => {
     expect(r.issuedOn).toBe('2026-10-05');
   });
 
+  it('texto de extrator que cola o valor no rótulo (PDF do LibreOffice lido por unpdf)', () => {
+    // Saída real de um PDF gerado pelo LibreOffice: sem espaço entre o rótulo e o valor da mesma linha.
+    const glued = [
+      'RECEBEMOS DE LOJA EXEMPLO LTDA OS PRODUTOS E/OU SERVIÇOS CONSTANTES DA NOTA FISCAL ELETRÔNICA INDICADA AO LADO EMISSÃO: 05/10/2026 VALOR TOTAL: R$',
+      '150,00 DESTINATÁRIO: MARIA APARECIDA DOS SANTOS RUA DAS FLORES, 100 APTO 12',
+      'IDENTIFICAÇÃO DO EMITENTELOJA EXEMPLO LTDA',
+      'RUA DAS PALMEIRAS, 100 - CENTRO',
+      'DANFE',
+      'DOCUMENTO AUXILIAR DA',
+      'NOTA FISCAL ELETRÔNICA',
+      `CHAVE DE ACESSO${GROUPED.slice(0, -5)}`,
+      GROUPED.slice(-4),
+      'NATUREZA DA OPERAÇÃOVENDA DE MERCADORIA CNPJ12.345.678/0001-95',
+      `NOME / RAZÃO SOCIAL${RECIPIENT.name} CNPJ / CPF${RECIPIENT.cpf} DATA DA EMISSÃO05/10/2026`,
+      'VALOR TOTAL DOS PRODUTOS140,00 VALOR DO FRETE10,00 V. TOT. TRIB.12,30 VALOR TOTAL DA NOTA150,00',
+    ].join('\n');
+    const r = read(glued);
+    expect(r.key.key).toBe(KEY);
+    expect(r.issuedOn).toBe('2026-10-05');
+    expect(r.totalCents).toBe(15000);
+    expect(r.issuerName).toBe('Loja Exemplo Ltda');
+    expect(visible(r)).not.toContain(RECIPIENT.cpfDigits);
+    expect(visible(r)).not.toMatch(/MARIA|Maria|FLORES/);
+    // Sem o canhoto, cada campo sai do seu próprio rótulo.
+    const noCanhoto = glued.split('\n').slice(2).join('\n');
+    const n = read(noCanhoto);
+    expect(n.key.key).toBe(KEY);
+    expect(n.issuedOn).toBe('2026-10-05');
+    expect(n.totalCents).toBe(15000);
+    expect(n.issuerName).toBe('Loja Exemplo Ltda');
+  });
+
   it('chave de CNPJ alfanumérico', () => {
     const key = makeKey({ cnpj: '12ABC34501DE35' });
     const r = read(danfeCells({ key }));
