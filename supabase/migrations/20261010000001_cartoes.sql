@@ -7,7 +7,11 @@
 -- seguinte nascem e morrem dentro dessas funções; ninguém os cria à mão.
 -- Compra no cartão NUNCA entra em Pago: só o pagamento da fatura (pay_invoice) cria o gasto, na data do pagamento.
 -- Nunca se grava número completo do cartão, código de segurança ou validade: o cartão tem apelido e, se a pessoa quiser,
--- os 4 últimos dígitos. Nenhum CPF de nota fiscal: a chave de acesso (44 dígitos) não tem dado pessoal.
+-- os 4 últimos dígitos. Nenhum CPF de nota fiscal: a chave de acesso de uma NF-e de emitente pessoa física carrega o CPF
+-- dele, então o banco NUNCA guarda a chave: guarda só o resumo SHA-256 (64 caracteres hexadecimais minúsculos) da chave de
+-- 44 caracteres normalizada (maiúsculas), calculado no aparelho (packages/core, receiptKeyDigest). A nota repetida continua
+-- sendo detectada (mesmo resumo) e nenhum dado pessoal fica gravado. O banco confere só a forma do resumo; o dígito
+-- verificador e o CNPJ (numérico ou alfanumérico) são conferidos pelo core antes de gerar o resumo.
 --
 -- Fatura: identificada pelo mês de vencimento (primeiro dia do mês), como os bancos fazem.
 --   vencimento(M)  = dia de vencimento em M, limitado ao último dia do mês;
@@ -28,8 +32,10 @@
 -- C3. Um único gasto vivo por pagamento de fatura, ligado à conta do mesmo cartão e mês; a diferença entre a conta e o gasto
 --     existe como UM saldo anterior vivo na fatura seguinte, e só nesse caso.
 -- C4. O estorno automático de uma fatura seguinte = crédito (total negativo) da anterior.
--- C5. Fatura paga não muda: lançamentos novos, alterados ou excluídos numa fatura paga são recusados (fatura_paga).
--- C6. Nota fiscal: a chave de acesso é única por contexto entre gastos e compras no cartão vivos.
+-- C5. Fatura paga não muda: encargos e estornos novos, e lançamentos alterados ou excluídos numa fatura paga, são recusados
+--     (fatura_paga). Uma COMPRA nova (ou com data nova) cujo ciclo cairia numa fatura paga não é recusada: vai para a primeira
+--     fatura seguinte livre (clarevo_first_free_month), para que pagar a fatura aberta cedo não trave o cartão.
+-- C6. Nota fiscal: o resumo SHA-256 da chave de acesso é único por contexto entre gastos e compras no cartão vivos.
 -- Ordem de travas: chave → cartão → compra (parcelas por número) → contas das faturas (por mês) → registro.
 -- A atividade (gatilho de record_operations, 0005) é a última, como em toda escrita. Pagar fatura de outra pessoa exige
 -- "editar de outras pessoas" (a conta da fatura leva a autoria de quem criou o cartão).
@@ -55,8 +61,9 @@ create table public.cards (
   deleted_by uuid references public.persons (id),
   constraint cards_id_context_key unique (id, context_id),
   constraint cards_exclusao check ((deleted_at is null) = (deleted_by is null)),
-  -- O apelido não é lugar de número de cartão: 13 a 19 dígitos seguidos (ignorando espaço, ponto e hífen) são recusados.
-  constraint cards_apelido_sem_numero check (regexp_replace(nickname, '[ .-]', '', 'g') !~ '[0-9]{13,19}')
+  -- O apelido não é lugar de número de cartão: 13 a 19 dígitos (ignorando todo caractere que não seja dígito: espaço,
+  -- ponto, hífen, barra, vírgula, sublinhado...) são recusados.
+  constraint cards_apelido_sem_numero check (regexp_replace(nickname, '[^0-9]', '', 'g') !~ '[0-9]{13,19}')
 );
 create index cards_ctx on public.cards (context_id) where deleted_at is null;
 comment on table public.cards is
@@ -94,8 +101,9 @@ create table public.card_entries (
   source_month date check (source_month is null or extract(day from source_month) = 1),
   -- Saldo anterior: o gasto do pagamento parcial que o criou.
   payment_record_id uuid references public.financial_records (id) on delete cascade,
-  -- Chave de acesso da nota fiscal (44 dígitos), só na primeira parcela da compra.
-  receipt_key text check (receipt_key is null or receipt_key ~ '^[0-9]{44}$'),
+  -- Resumo SHA-256 (64 hexadecimais minúsculos) da chave de acesso da nota fiscal, só na primeira parcela da compra.
+  -- Nunca a chave: a de pessoa física carrega o CPF.
+  receipt_key text check (receipt_key is null or receipt_key ~ '^[0-9a-f]{64}$'),
   created_by uuid not null references public.persons (id),
   version integer not null default 1 check (version >= 1),
   created_at timestamptz not null default now(),
@@ -177,13 +185,13 @@ alter table public.financial_records
   add constraint financial_records_cartao check (
     (card_id is null) = (invoice_month is null)
     and (card_id is null or (commitment_id is not null and kind = 'despesa' and extract(day from invoice_month) = 1))),
-  add constraint financial_records_receipt_key check (receipt_key is null or (receipt_key ~ '^[0-9]{44}$' and kind = 'despesa' and card_id is null));
+  add constraint financial_records_receipt_key check (receipt_key is null or (receipt_key ~ '^[0-9a-f]{64}$' and kind = 'despesa' and card_id is null));
 create unique index financial_records_receipt_key on public.financial_records (context_id, receipt_key)
   where receipt_key is not null and deleted_at is null;
 comment on column public.financial_records.card_id is
   'Pagamento de fatura (com invoice_month e commitment_id): criado só por pay_invoice; origem "Pagamento de fatura".';
 comment on column public.financial_records.receipt_key is
-  'Chave de acesso da NF-e/NFC-e (44 dígitos, sem dado pessoal); única por contexto entre gastos e compras no cartão vivos.';
+  'Resumo SHA-256 (64 hexadecimais minúsculos) da chave de acesso da NF-e/NFC-e (a chave pode ter CPF; o resumo não a revela); único por contexto entre gastos e compras no cartão vivos.';
 
 -- ---------------------------------------------------------------------------
 -- Operações: lista completa vigente (26 ações das migrações anteriores) mais as 11 de cartão. Todas as de cartão apontam
@@ -326,19 +334,17 @@ as $$
                 'novembro', 'dezembro'])[extract(month from p_month)::int]
 $$;
 
--- Chave de acesso da NF-e/NFC-e: 44 dígitos e dígito verificador (módulo 11, pesos 2 a 9 da direita para a esquerda).
--- Resto 0 ou 1 dá dígito 0. Mesma regra de parseAccessKey no core.
+-- Chave da nota guardada: resumo SHA-256 em 64 hexadecimais minúsculos. O resumo é da chave de acesso de 44 caracteres em
+-- maiúsculas (NF-e ou NFC-e, com CNPJ numérico ou alfanumérico) e é calculado no aparelho: o banco não recebe a chave (que pode
+-- carregar o CPF do emitente pessoa física) e por isso confere só a forma. Dígito verificador, UF, mês, CNPJ e modelo são
+-- conferidos pelo core (parseAccessKey) antes de gerar o resumo.
 create or replace function public.clarevo_receipt_key_valid(p_key text)
 returns boolean
 language sql
 immutable
 set search_path = public
 as $$
-  select case when p_key ~ '^[0-9]{44}$' then
-           (select case when s.r in (0, 1) then 0 else 11 - s.r end
-              from (select sum(substr(p_key, i, 1)::int * (2 + (43 - i) % 8)) % 11 as r
-                      from generate_series(1, 43) i) s) = substr(p_key, 44, 1)::int
-         else false end
+  select coalesce(p_key ~ '^[0-9a-f]{64}$', false)
 $$;
 
 -- Mês seguinte (primeiro dia).
@@ -464,7 +470,7 @@ set search_path = public
 as $$
 begin
   if p_nickname is null or p_nickname = '' or char_length(p_nickname) > 30
-     or regexp_replace(p_nickname, '[ .-]', '', 'g') ~ '[0-9]{13,19}' then
+     or regexp_replace(p_nickname, '[^0-9]', '', 'g') ~ '[0-9]{13,19}' then
     raise exception 'apelido_invalido' using errcode = '22023';
   end if;
   if p_last_digits is not null and p_last_digits !~ '^[0-9]{4}$' then
@@ -699,6 +705,32 @@ as $$
                   where c.card_id = p_card_id and c.invoice_month = p_month and c.deleted_at is null and c.status = 'quitado')
 $$;
 
+-- Primeira fatura, a partir de p_from, em que as p_n parcelas seguidas não cruzam nenhuma fatura paga. Pagar a fatura aberta
+-- antes do fechamento é permitido; as compras que ainda cairiam nela (ou numa fatura paga adiantada) vão para a primeira
+-- fatura seguinte livre, em vez de serem recusadas: o dinheiro é conservado (a compra continua inteira em faturas a pagar) e a
+-- pessoa continua podendo pagar o que falta. Termina porque cada volta passa do último mês pago encontrado.
+create or replace function public.clarevo_first_free_month(p_card_id uuid, p_from date, p_n integer)
+returns date
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_m date := p_from;
+  v_paid date;
+begin
+  loop
+    select max(c.invoice_month) into v_paid from public.commitments c
+     where c.card_id = p_card_id and c.deleted_at is null and c.status = 'quitado'
+       and c.invoice_month >= v_m and c.invoice_month <= (v_m + make_interval(months => p_n - 1))::date;
+    exit when v_paid is null;
+    v_m := (v_paid + interval '1 month')::date;
+  end loop;
+  return v_m;
+end;
+$$;
+
 -- Chave da nota já anotada neste contexto (gasto ou compra no cartão vivos). A trava consultiva serializa a anotação.
 -- Detalhe: registro=<id do gasto> ou compra=<id da compra>.
 create or replace function public.clarevo_check_receipt_free(p_context_id uuid, p_key text)
@@ -729,8 +761,9 @@ $$;
 -- Leitura derivada: limite usado e fatura atual do cartão, faturas
 -- ---------------------------------------------------------------------------
 
--- Usado = lançamentos (parcelas, encargos e saldo anterior, menos estornos) de todas as faturas ainda não pagas, nunca
--- negativo. Fatura atual = a que recebe uma compra de hoje (mês, fechamento e vencimento).
+-- Usado = soma, por fatura ainda não paga, de max(0, total da fatura) (parcelas + encargos + saldo anterior - estornos). O
+-- crédito de uma fatura negativa é levado como estorno automático à seguinte, então somar com sinal contaria o crédito duas
+-- vezes. Fatura atual = a que recebe uma compra de hoje (mês, fechamento e vencimento).
 create or replace function public.clarevo_card_derived(p_card public.cards)
 returns table (used_cents bigint, current_month date, current_closing_on date, current_due_on date)
 language sql
@@ -738,12 +771,14 @@ stable
 security definer
 set search_path = public
 as $$
-  select greatest(0, coalesce((select sum(case when e.kind = 'estorno' then -e.amount_cents else e.amount_cents end)
-                                 from public.card_entries e
-                                where e.card_id = p_card.id and e.deleted_at is null
-                                  and not exists (select 1 from public.commitments m
-                                                   where m.card_id = e.card_id and m.invoice_month = e.invoice_month
-                                                     and m.deleted_at is null and m.status = 'quitado')), 0))::bigint,
+  select coalesce((select sum(greatest(0, t.total))
+                     from (select e.invoice_month, sum(case when e.kind = 'estorno' then -e.amount_cents else e.amount_cents end) as total
+                             from public.card_entries e
+                            where e.card_id = p_card.id and e.deleted_at is null
+                            group by e.invoice_month) t
+                    where not exists (select 1 from public.commitments m
+                                       where m.card_id = p_card.id and m.invoice_month = t.invoice_month
+                                         and m.deleted_at is null and m.status = 'quitado')), 0)::bigint,
          x.m,
          public.invoice_closing_on(p_card.closing_day, p_card.due_day, x.m),
          public.invoice_due_on(p_card.due_day, x.m)
@@ -755,12 +790,14 @@ $$;
 create view public.card_items with (security_barrier = true) as
 select c.id, c.context_id, c.nickname, c.last_digits, c.closing_day, c.due_day, c.limit_cents, c.status, c.created_by,
        c.version, c.created_at, c.updated_at,
-       greatest(0, coalesce((select sum(case when e.kind = 'estorno' then -e.amount_cents else e.amount_cents end)
-                               from public.card_entries e
-                              where e.card_id = c.id and e.deleted_at is null
-                                and not exists (select 1 from public.commitments m
-                                                 where m.card_id = e.card_id and m.invoice_month = e.invoice_month
-                                                   and m.deleted_at is null and m.status = 'quitado')), 0))::bigint as used_cents,
+       coalesce((select sum(greatest(0, t.total))
+                   from (select e.invoice_month, sum(case when e.kind = 'estorno' then -e.amount_cents else e.amount_cents end) as total
+                           from public.card_entries e
+                          where e.card_id = c.id and e.deleted_at is null
+                          group by e.invoice_month) t
+                  where not exists (select 1 from public.commitments m
+                                     where m.card_id = c.id and m.invoice_month = t.invoice_month
+                                       and m.deleted_at is null and m.status = 'quitado')), 0)::bigint as used_cents,
        x.m as current_month,
        public.invoice_closing_on(c.closing_day, c.due_day, x.m) as current_closing_on,
        public.invoice_due_on(c.due_day, x.m) as current_due_on
@@ -784,7 +821,9 @@ select b.card_id, b.context_id, b.month, b.closing_on, b.due_on,
        greatest(0, -b.total_cents)::bigint as credit_cents,
        b.entry_count,
        b.commitment_id, b.commitment_version,
-       coalesce(b.estimate, public.my_today() <= b.closing_on) as amount_is_estimate,
+       -- Marca "estimado" calculada na hora, com o fechamento e o dia de quem consulta: a gravada em commitments só é atualizada
+       -- por uma gravação de cartão ou por sync_series_occurrences e fica velha depois do dia do fechamento. Conta paga: falso.
+       (b.commitment_status is distinct from 'quitado' and public.my_today() <= b.closing_on) as amount_is_estimate,
        case when b.commitment_status = 'aberto' then b.commitment_amount_cents else 0::bigint end as to_pay_cents,
        b.paid_record_id, b.paid_cents, b.paid_on, b.paid_account_id,
        case when b.commitment_status = 'quitado' then b.commitment_amount_cents - b.paid_cents end as left_over_cents
@@ -799,7 +838,7 @@ select b.card_id, b.context_id, b.month, b.closing_on, b.due_on,
            coalesce(e.refunds_cents, 0)::bigint as refunds_cents,
            coalesce(e.entry_count, 0)::integer as entry_count,
            m.id as commitment_id, m.version as commitment_version, m.status::text as commitment_status,
-           m.amount_cents as commitment_amount_cents, m.amount_is_estimate as estimate,
+           m.amount_cents as commitment_amount_cents,
            r.id as paid_record_id, r.amount_cents as paid_cents, r.occurred_on as paid_on, r.account_id as paid_account_id
       from (select x.card_id, x.invoice_month from public.card_entries x where x.deleted_at is null
             union
@@ -838,6 +877,21 @@ select e.id, e.context_id, e.card_id,
    and public.context_permission(e.context_id, 'read');
 comment on view public.card_entry_items is
   'Lançamentos vivos dos cartões que quem consulta pode ler, com a compra como um lançamento (kind compra, valor total, parcelas).';
+
+-- Nota já anotada, para o aviso "Esta nota já foi anotada" logo depois de escanear (antes do Salvar): uma linha por gasto
+-- vivo ou compra viva no cartão (primeira parcela) que tem chave. receipt_key é o resumo SHA-256 da chave (nunca a chave).
+-- record_id preenchido = gasto; card_entry_id preenchido = compra no cartão (id da compra) e card_id o cartão. O app consulta
+-- com context_id e receipt_key (índices únicos parciais já existem) e abre o registro ou a compra. Só chama context_permission.
+create view public.receipt_items with (security_barrier = true) as
+select r.context_id, r.receipt_key, r.id as record_id, null::uuid as card_entry_id, null::uuid as card_id
+  from public.financial_records r
+ where r.receipt_key is not null and r.deleted_at is null and public.context_permission(r.context_id, 'read')
+union all
+select e.context_id, e.receipt_key, null::uuid, e.purchase_id, e.card_id
+  from public.card_entries e
+ where e.receipt_key is not null and e.deleted_at is null and public.context_permission(e.context_id, 'read');
+comment on view public.receipt_items is
+  'Notas fiscais já anotadas (gasto ou compra no cartão vivos) que quem consulta pode ler, pelo resumo da chave: ler antes de Salvar para avisar "Esta nota já foi anotada".';
 
 -- ---------------------------------------------------------------------------
 -- Resultados (JSON) das onze funções de cartão: {card, entry, entries, invoices, commitments, commitment, record}
@@ -1136,7 +1190,10 @@ end;
 $$;
 
 -- C4, no cartão inteiro: o estorno automático de cada fatura é o crédito (total negativo) da anterior, e só existe
--- enquanto houver, naquela fatura ou depois dela, um lançamento comum para recebê-lo.
+-- enquanto houver, naquela fatura ou depois dela, um lançamento comum para recebê-lo. Numa só passada sobre os lançamentos
+-- do cartão (agrupados por mês e ligados por mês, sem subconsulta correlacionada por mês): custa O(lançamentos), não
+-- O(meses x lançamentos), porque o gatilho de consistência roda uma vez por linha alterada (uma compra em 48 parcelas
+-- dispara 48 vezes).
 create or replace function public.clarevo_check_card_credit(p_card_id uuid)
 returns void
 language plpgsql
@@ -1146,18 +1203,19 @@ set search_path = public
 as $$
 begin
   if exists (
-    with live as (select e.invoice_month as m, e.kind, e.amount_cents,
-                         (e.kind = 'estorno' and e.source_month is not null) as auto
-                    from public.card_entries e where e.card_id = p_card_id and e.deleted_at is null),
-         tot as (select l.m, sum(case when l.kind = 'estorno' then -l.amount_cents else l.amount_cents end) as t
-                   from live l group by l.m),
-         lastm as (select max(l.m) as lm from live l where not l.auto),
-         months as (select l.m from live l union select (l.m + interval '1 month')::date from live l)
+    with tot as (select e.invoice_month as m,
+                        sum(case when e.kind = 'estorno' then -e.amount_cents else e.amount_cents end) as t,
+                        coalesce(sum(e.amount_cents) filter (where e.kind = 'estorno' and e.source_month is not null), 0) as a,
+                        bool_or(not (e.kind = 'estorno' and e.source_month is not null)) as regular
+                   from public.card_entries e where e.card_id = p_card_id and e.deleted_at is null
+                  group by e.invoice_month),
+         lastm as (select max(t.m) as lm from tot t where t.regular),
+         months as (select t.m from tot t union select (t.m + interval '1 month')::date from tot t)
     select 1 from months x
-     where coalesce((select sum(l.amount_cents) from live l where l.auto and l.m = x.m), 0)
-        <> case when x.m <= (select lm from lastm)
-                then greatest(0, -coalesce((select t.t from tot t where t.m = (x.m - interval '1 month')::date), 0))
-                else 0 end) then
+      left join tot cur on cur.m = x.m
+      left join tot prev on prev.m = (x.m - interval '1 month')::date
+     where coalesce(cur.a, 0)
+        <> case when x.m <= (select lm from lastm) then greatest(0, -coalesce(prev.t, 0)) else 0 end) then
     raise exception 'fatura_inconsistente' using errcode = '23514';
   end if;
 end;
@@ -1636,10 +1694,12 @@ $$;
 -- ---------------------------------------------------------------------------
 
 -- Compra no cartão: p_installments parcelas (1 a 48) a partir da fatura que contém a data da compra. Cartão arquivado
--- não recebe compra (cartao_arquivado). p_receipt_key: chave de acesso da nota (opcional, só na primeira parcela).
+-- não recebe compra (cartao_arquivado). p_receipt_key: resumo SHA-256 da chave de acesso da nota (opcional, só na primeira
+-- parcela). Fatura paga (por exemplo, paga antes do fechamento): a compra NÃO é recusada; ela vai para a primeira fatura
+-- seguinte em que nenhuma parcela cruza fatura paga (clarevo_first_free_month), e a conta dessa fatura cresce.
 -- Ordem: sessão; chave; repetição; trava (nao_encontrado, sem_permissao); cartao_arquivado; validação (valor_invalido,
 -- valor_acima_do_limite, descricao_obrigatoria, descricao_longa, categoria_invalida, parcelas_invalidas, data_invalida,
--- data_futura); chave da nota (chave_de_nota_invalida, nota_ja_anotada); limite_de_lancamentos; fatura_paga; escrita.
+-- data_futura); chave da nota (chave_de_nota_invalida, nota_ja_anotada); limite_de_lancamentos; escrita.
 create or replace function public.add_card_purchase(
   p_idempotency_key text,
   p_card_id uuid,
@@ -1704,12 +1764,8 @@ begin
     perform public.clarevo_check_receipt_free(v_card.context_id, v_receipt);
   end if;
   perform public.clarevo_check_entry_cap(v_card.id, p_installments);
-  v_m1 := public.invoice_month_for(v_card.closing_day, v_card.due_day, p_purchased_on);
-  for k in 0 .. p_installments - 1 loop
-    if public.clarevo_invoice_paid(v_card.id, (v_m1 + make_interval(months => k))::date) then
-      raise exception 'fatura_paga' using errcode = 'PT409';
-    end if;
-  end loop;
+  v_m1 := public.clarevo_first_free_month(v_card.id, public.invoice_month_for(v_card.closing_day, v_card.due_day, p_purchased_on),
+                                          p_installments);
 
   for k in 1 .. p_installments loop
     insert into public.card_entries (id, context_id, card_id, kind, invoice_month, amount_cents, description, category,
@@ -1734,7 +1790,8 @@ $$;
 --   compra (todas as parcelas): p_amount_cents = valor total; p_occurred_on = data da compra; p_description;
 --     p_category; p_installments. Sem mudar valor, data nem parcelas, só descrição e categoria mudam (também com
 --     parcelas em fatura paga). Com mudança, nenhuma parcela de hoje ou de depois pode estar em fatura paga (fatura_paga);
---     a primeira fatura só é recalculada se a data muda; mais parcelas ou menos parcelas ajustam o fim da compra.
+--     a primeira fatura só é recalculada se a data muda (e então vai para a primeira fatura livre, como em add_card_purchase);
+--     mais parcelas ou menos parcelas ajustam o fim da compra.
 --   encargo: p_amount_cents; p_charge_kind; p_invoice_month.
 --   estorno: p_amount_cents; p_description; p_category; p_invoice_month.
 -- Campo que não se aplica ao tipo, se vier preenchido: campo_nao_se_aplica. Saldo anterior e crédito levado:
@@ -1821,7 +1878,7 @@ begin
     v_change := p_amount_cents <> v_first.purchase_total_cents or v_n <> v_old_n or p_occurred_on <> v_first.purchased_on;
     if v_change then
       v_m1 := case when p_occurred_on = v_first.purchased_on then v_first.invoice_month
-                   else public.invoice_month_for(v_card.closing_day, v_card.due_day, p_occurred_on) end;
+                   else public.clarevo_first_free_month(v_card.id, public.invoice_month_for(v_card.closing_day, v_card.due_day, p_occurred_on), v_n) end;
       if exists (select 1 from public.card_entries x
                   where x.purchase_id = v_e.purchase_id and x.deleted_at is null
                     and public.clarevo_invoice_paid(x.card_id, x.invoice_month)) then
@@ -2099,8 +2156,10 @@ end;
 $$;
 
 -- Pagar a fatura: cria UM gasto (valor e data efetivamente pagos) e quita a conta da fatura, na mesma operação. Valor de
--- R$ 0,01 até o total da fatura; data até hoje e não antes de 1 ano. A fatura não precisa ter fechado (a pessoa pode pagar
--- antes; depois disso ela não recebe mais lançamentos). Pagamento parcial: a diferença vira o "saldo anterior" da fatura
+-- R$ 0,01 até o total da fatura; data até hoje e não antes do menor entre 1 ano atrás e o primeiro dia do período da fatura
+-- (o dia seguinte ao fechamento da fatura anterior), para que uma fatura antiga possa ser paga na data real. A fatura não
+-- precisa ter fechado (a pessoa pode pagar antes): as compras seguintes do ciclo vão para a primeira fatura seguinte livre
+-- (clarevo_first_free_month) e a fatura paga não recebe lançamentos (fatura_paga em encargo e estorno). Pagamento parcial: a diferença vira o "saldo anterior" da fatura
 -- seguinte (sem juros: os encargos entram quando a pessoa informar a fatura seguinte); a fatura seguinte não pode estar
 -- paga (fatura_seguinte_paga). p_expected_version é a versão da conta da fatura (commitment_version de invoice_items).
 -- p_account_id (opcional, depois da data): a conta de saída; sem ela, a conta ativa mais antiga do contexto. O gasto:
@@ -2108,8 +2167,8 @@ $$;
 -- da fatura, no core), ligado ao cartão e ao mês da fatura.
 -- Ordem: sessão; chave; repetição; trava do cartão (nao_encontrado; sem_permissao: cartão de outra pessoa exige "editar
 -- de outras pessoas"); mes_invalido; nao_encontrado (fatura sem conta); versao_desatualizada; compromisso_quitado;
--- valor_invalido; valor_acima_da_fatura; data_invalida (nula ou há mais de 1 ano); data_futura; conta_invalida;
--- fatura_seguinte_paga; escrita.
+-- valor_invalido; valor_acima_da_fatura; data_invalida (nula, ou antes do menor entre 1 ano atrás e o início do período
+-- da fatura); data_futura; conta_invalida; fatura_seguinte_paga; escrita.
 create or replace function public.pay_invoice(
   p_idempotency_key text,
   p_card_id uuid,
@@ -2183,7 +2242,9 @@ begin
   if p_paid_cents > v_c.amount_cents then
     raise exception 'valor_acima_da_fatura' using errcode = '22023';
   end if;
-  if p_paid_on is null or p_paid_on < (v_today - interval '1 year')::date then
+  if p_paid_on is null
+     or p_paid_on < least((v_today - interval '1 year')::date,
+                          (public.invoice_closing_on(v_card.closing_day, v_card.due_day, (p_month - interval '1 month')::date) + 1)) then
     raise exception 'data_invalida' using errcode = '22023';
   end if;
   if p_paid_on > v_today then
@@ -2969,7 +3030,9 @@ begin
     into v_fixed, v_annual, v_installment, v_debt, v_other, v_card, v_paid, v_open, v_estimated
     from (select c.status = 'quitado' as paid,
                  case when c.status = 'quitado' then r.amount_cents else c.amount_cents end as v,
-                 c.amount_is_estimate as estimate,
+                 -- Fatura aberta: a marca "estimado" vale até o dia do fechamento (calculada na hora, não a gravada).
+                 case when c.card_id is not null and c.status = 'aberto' then public.clarevo_today(auth.uid()) <= c.card_closing_on
+                      else c.amount_is_estimate end as estimate,
                  c.card_id is not null as is_card,
                  s.kind, s.nature
             from public.commitments c
@@ -3028,7 +3091,11 @@ create or replace view public.commitment_items with (security_invoker = true) as
 select c.id, c.context_id, c.description, c.amount_cents, c.currency, c.due_on, c.status, c.category,
        c.created_by, c.version, c.created_at, c.updated_at,
        r.id as paid_record_id, r.occurred_on as paid_on, r.amount_cents as paid_amount_cents, r.account_id as paid_account_id,
-       c.series_id, c.occurrence_number, c.series_override, c.amount_is_estimate,
+       c.series_id, c.occurrence_number, c.series_override,
+       -- Fatura de cartão em aberto: "estimado" até o dia do fechamento, calculado na hora (a marca gravada só é atualizada por
+       -- uma gravação de cartão ou por sync_series_occurrences e fica velha depois do fechamento). As outras contas: a gravada.
+       case when c.card_id is not null and c.status = 'aberto' then public.my_today() <= c.card_closing_on
+            else c.amount_is_estimate end as amount_is_estimate,
        s.kind as series_kind, s.nature as series_nature, s.installment_total as series_installment_total,
        s.parts_per_year as series_parts_per_year,
        c.card_id, c.invoice_month, c.card_closing_on
@@ -3036,7 +3103,7 @@ select c.id, c.context_id, c.description, c.amount_cents, c.currency, c.due_on, 
   left join public.financial_records r on r.commitment_id = c.id and r.deleted_at is null
   left join public.commitment_series s on s.id = c.series_id
  where c.deleted_at is null;
-comment on view public.commitment_items is 'Contas a pagar não excluídas com o gasto vivo que as quitou (paid_* nulos quando em aberto), a série e o cartão da fatura, quando houver.';
+comment on view public.commitment_items is 'Contas a pagar não excluídas com o gasto vivo que as quitou (paid_* nulos quando em aberto), a série e o cartão da fatura, quando houver. A marca amount_is_estimate da fatura aberta é calculada na hora.';
 
 -- ---------------------------------------------------------------------------
 -- Privilégios: bloco inteiro da 0007 (idempotente), com create_record de 9 argumentos e month_committed refeita, mais as

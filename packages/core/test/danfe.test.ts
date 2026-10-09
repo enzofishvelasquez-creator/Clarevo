@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { danfeFromText, factsFromDanfe, parseAccessKey, receiptDraft, type DanfeReading } from '../src';
+import { danfeFromText, factsFromDanfe, parseAccessKey, receiptDraft, receiptKeyValid, sha256Hex, type DanfeReading } from '../src';
 
 /** Mesma conta de outro jeito que a do código: pesos de 2 a 9 repetidos da direita para a esquerda, valor = código ASCII menos 48. */
 function dv11(chars: string): number {
@@ -353,6 +353,24 @@ describe('DANFE em texto', () => {
     expect(r.totalCents).toBe(15000);
   });
 
+  it('chave de CNPJ alfanumérico: o rascunho traz o resumo que o banco aceita; DANFE de emitente pessoa física não guarda o CPF', () => {
+    const alfa = makeKey({ cnpj: '12ABC34501DE35' });
+    const draft = receiptDraft(factsFromDanfe(read(danfeCells({ key: alfa }))), '2026-10-09');
+    expect(draft.receiptKey).toBe(sha256Hex(alfa));
+    expect(receiptKeyValid(draft.receiptKey)).toBe(true);
+    // Produtor rural (NF-e modelo 55 de pessoa física): "000" + CPF no lugar do CNPJ; o CPF não aparece em nada do rascunho.
+    const cpf = '52998224725';
+    const pf = makeKey({ cnpj: `000${cpf}` });
+    const r = read(danfeCells({ key: pf, issuer: 'SITIO BOA VISTA' }));
+    expect(r.key.cnpj).toBeNull();
+    const pfDraft = receiptDraft(factsFromDanfe(r), '2026-10-09');
+    expect(pfDraft.receiptKey).toBe(sha256Hex(pf));
+    expect(pfDraft.receiptKey).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.stringify(pfDraft)).not.toContain(cpf);
+    expect(JSON.stringify(pfDraft)).not.toContain(pf);
+    expect(pfDraft.description).toBe('Compra em Sitio Boa Vista');
+  });
+
   it('duas chaves: vale a que vem depois de "CHAVE DE ACESSO", não a da nota referenciada', () => {
     const referenced = makeKey({ number: 777 });
     const text = `INFORMAÇÕES COMPLEMENTARES NF-e referenciada ${referenced}\n${danfeCells({ canhoto: false })}`;
@@ -445,7 +463,7 @@ describe('DANFE em texto', () => {
     const r = read(danfeCells());
     const draft = receiptDraft(factsFromDanfe(r), '2026-10-09');
     expect(draft).toMatchObject({
-      receiptKey: KEY,
+      receiptKey: sha256Hex(KEY),
       description: 'Compra em Loja Exemplo Ltda',
       amountCents: 15000,
       occurredOn: '2026-10-05',
@@ -458,7 +476,10 @@ describe('DANFE em texto', () => {
     const noDate = read(`CHAVE DE ACESSO ${GROUPED} VALOR TOTAL DA NOTA 10,00`);
     expect(receiptDraft(factsFromDanfe(noDate), '2026-10-20').occurredOn).toBe('2026-10-20');
     expect(receiptDraft(factsFromDanfe(noDate), '2026-12-01').needsDay).toBe(true);
-    // A chave do resultado passa em parseAccessKey (é o que o banco guarda).
-    expect(parseAccessKey(draft.receiptKey).ok).toBe(true);
+    // O que o banco guarda é o resumo SHA-256 da chave (64 hexadecimais), nunca a chave.
+    expect(draft.receiptKey).toMatch(/^[0-9a-f]{64}$/);
+    expect(receiptKeyValid(draft.receiptKey)).toBe(true);
+    expect(JSON.stringify(draft)).not.toContain(KEY);
+    expect(parseAccessKey(KEY).ok).toBe(true);
   });
 });

@@ -8,7 +8,8 @@ import { findAccessKey, friendlyIssuerName } from './nota';
 /**
  * Leitura do DANFE da NF-e em PDF (Ciclo E, D-038, fase 2: compras online). O app extrai o texto do PDF no próprio aparelho
  * (biblioteca JS, sem servidor) e entrega o texto a `danfeFromText`, que acha:
- * - a chave de acesso (44 caracteres; o CNPJ do emitente e o mês da emissão vêm dela, com dígitos verificadores conferidos);
+ * - a chave de acesso (44 caracteres; o CNPJ do emitente e o mês da emissão vêm dela, com dígitos verificadores conferidos;
+ *   o registro guarda só o resumo SHA-256 dela, `AccessKeyInfo.digest`, nunca a chave, que em emitente pessoa física tem o CPF);
  * - a data de emissão e o "VALOR TOTAL DA NOTA";
  * - o nome do emitente ("RECEBEMOS DE <nome> OS PRODUTOS..." ou o bloco "IDENTIFICAÇÃO DO EMITENTE").
  *

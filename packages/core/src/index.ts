@@ -21,3 +21,4 @@ export * from './simulate';
 export * from './cards';
 export * from './nota';
 export * from './danfe';
+export * from './sha256';

@@ -21,6 +21,7 @@ import type {
   GoalStatus,
   IncomeReference,
   InvoiceItem,
+  ReceiptMatch,
   MonthOverview,
   NewGoalInput,
   OccurrenceMode,
@@ -371,6 +372,14 @@ export interface RecordsRepository {
   /** Lançamento vivo (a compra pelo id dela) ou null. Serve a "Esta nota já foi anotada" (nota_ja_anotada, detalhe compra=<id>). */
   getCardEntry(id: string): Promise<CardEntry | null>;
   /**
+   * Nota fiscal já anotada neste contexto (D-038), para o aviso "Esta nota já foi anotada" logo depois de escanear, antes de
+   * Salvar: procura o gasto vivo ou a compra viva no cartão que têm o resumo da chave (`ReceiptDraft.receiptKey`, 64
+   * hexadecimais minúsculos; receipt_items no banco). Devolve o gasto (`recordId`, abrir com getRecord) ou a compra
+   * (`cardEntryId`, abrir com getCardEntry, e `cardId`); null se a nota não foi anotada, se o resumo não tem a forma certa ou se
+   * quem consulta não lê o contexto (não revela a existência). Só leitura: não grava nem conta como anotação.
+   */
+  findReceipt(contextId: string, receiptKey: string): Promise<ReceiptMatch | null>;
+  /**
    * Lançamentos vivos do cartão: compras (uma por compra, com as parcelas calculadas por purchaseInstallments), encargos,
    * estornos (inclusive o automático) e saldos anteriores, por criação. Sem leitura: lista vazia.
    */
@@ -405,10 +414,12 @@ export interface RecordsRepository {
   deleteCard(key: string, id: string, expectedVersion: number): Promise<CardWrite>;
   /**
    * add_card_purchase: sem versão (como create_record). A 1ª parcela cai na fatura cujo período contém a data; as outras, nas
-   * seguintes. Ordem: repetição; nao_encontrado; sem_permissao; cartao_arquivado; CARD_PURCHASE_CODE_ORDER (valor_invalido,
-   * valor_acima_do_limite, descricao_obrigatoria, descricao_longa, categoria_invalida, parcelas_invalidas, data_invalida,
-   * data_futura); com receiptKey: chave_de_nota_invalida, nota_ja_anotada (detalhe "registro=<id>" ou "compra=<id>");
-   * limite_de_lancamentos; fatura_paga (alguma fatura das parcelas já paga). entry = a compra.
+   * seguintes. Fatura já paga (por exemplo, paga antes do fechamento) NÃO recusa a compra: ela vai para a primeira fatura
+   * seguinte em que nenhuma parcela cruza fatura paga (`purchaseFirstInvoiceMonth` com `paidInvoiceMonths`; o `invoiceMonth` da
+   * compra devolvida diz qual foi). Ordem: repetição; nao_encontrado; sem_permissao; cartao_arquivado; CARD_PURCHASE_CODE_ORDER
+   * (valor_invalido, valor_acima_do_limite, descricao_obrigatoria, descricao_longa, categoria_invalida, parcelas_invalidas,
+   * data_invalida, data_futura); com receiptKey (o resumo SHA-256 da chave, nunca a chave): chave_de_nota_invalida,
+   * nota_ja_anotada (detalhe "registro=<id>" ou "compra=<id>"); limite_de_lancamentos. entry = a compra.
    */
   addCardPurchase(key: string, cardId: string, input: CardPurchaseInput): Promise<CardWrite>;
   /**
@@ -438,8 +449,10 @@ export interface RecordsRepository {
    * pay_invoice: cria UM gasto "Fatura Nubank (outubro)" na data do pagamento e marca a conta da fatura como paga.
    * expectedVersion = versão da conta da fatura (Invoice.commitmentVersion). accountId: a conta de saída; ausente, a conta ativa
    * mais antiga do contexto. Ordem: repetição; nao_encontrado; sem_permissao; mes_invalido; nao_encontrado (a fatura não tem
-   * conta); versao_desatualizada; compromisso_quitado; valor_invalido; valor_acima_da_fatura; data_invalida (inválida ou há
-   * mais de 1 ano); data_futura; conta_invalida; fatura_seguinte_paga (pagamento parcial com a fatura seguinte já paga).
+   * conta); versao_desatualizada; compromisso_quitado; valor_invalido; valor_acima_da_fatura; data_invalida (inválida, ou
+   * antes do menor entre 1 ano atrás e o início do período da fatura, para pagar uma fatura antiga na data real); data_futura;
+   * conta_invalida; fatura_seguinte_paga (pagamento parcial com a fatura seguinte já paga). A fatura aberta pode ser paga antes
+   * do fechamento: as compras seguintes do ciclo vão para a primeira fatura seguinte livre.
    * Pagamento parcial: a diferença vira o lançamento "saldo anterior" na fatura do mês seguinte (entry). O gasto não tem categoria.
    */
   payInvoice(

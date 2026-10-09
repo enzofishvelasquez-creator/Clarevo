@@ -28,6 +28,7 @@ import type {
   OccurrenceMode,
   PaymentInput,
   PersonalSpace,
+  ReceiptMatch,
   RecordInput,
   RecordKind,
   ReturnDecision,
@@ -73,6 +74,7 @@ import {
   invoiceDueOn,
   invoiceItemOf,
   invoiceMonthOf,
+  invoicePeriod,
   invoiceRecordDescription,
   normalizeCardInput,
   normalizePurchaseInput,
@@ -1472,6 +1474,20 @@ export class MemoryRepository implements RecordsRepository {
     });
   }
 
+  /** Como a leitura de receipt_items: o gasto ou a compra vivos que têm o resumo da chave; sem leitura ou resumo malformado, null. */
+  async findReceipt(contextId: string, receiptKey: string) {
+    return this.read((): ReceiptMatch | null => {
+      if (!this.canRead(contextId) || !receiptKeyValid(receiptKey)) return null;
+      for (const r of this.records.values()) {
+        if (!r.deletedAt && r.contextId === contextId && r.receiptKey === receiptKey) return { recordId: r.id, cardEntryId: null, cardId: null };
+      }
+      for (const e of this.cardEntries.values()) {
+        if (!e.deletedAt && e.contextId === contextId && e.receiptKey === receiptKey) return { recordId: null, cardEntryId: e.id, cardId: e.cardId };
+      }
+      return null;
+    });
+  }
+
   async listCardEntries(cardId: string) {
     return this.read(() => {
       const c = this.cards.get(cardId);
@@ -1587,8 +1603,9 @@ export class MemoryRepository implements RecordsRepository {
 
   /**
    * Como add_card_purchase. Ordem: repetição; trava; cartao_arquivado; campos (cardPurchaseError); chave da nota
-   * (chave_de_nota_invalida, nota_ja_anotada); limite_de_lancamentos; fatura_paga; escrita (a fatura da 1ª parcela é a do período
-   * que contém a data, com os dias que o cartão tem hoje, e fica fixada).
+   * (chave_de_nota_invalida, nota_ja_anotada); limite_de_lancamentos; escrita (a fatura da 1ª parcela é a do período que contém
+   * a data, com os dias que o cartão tem hoje, e fica fixada; se ela, ou alguma fatura das parcelas, já está paga, a compra vai
+   * para a primeira fatura seguinte livre: pagar cedo não trava o cartão).
    */
   async addCardPurchase(key: string, cardId: string, input: CardPurchaseInput) {
     return this.write(() => {
@@ -1606,8 +1623,7 @@ export class MemoryRepository implements RecordsRepository {
         this.checkReceiptFree(card.contextId, norm.receiptKey);
       }
       this.checkEntryCap(cardId, norm.installments);
-      const first = purchaseFirstInvoiceMonth(card, norm.purchasedOn);
-      for (let k = 0; k < norm.installments; k++) if (this.invoicePaid(cardId, addMonths(first, k))) throw new RepoError('fatura_paga');
+      const first = purchaseFirstInvoiceMonth(card, norm.purchasedOn, norm.installments, this.paidMonths(cardId));
       const entry = this.newEntry(card, {
         kind: 'compra',
         description: norm.description,
@@ -1710,7 +1726,8 @@ export class MemoryRepository implements RecordsRepository {
         if (code) throw new RepoError(code);
         const change = norm.totalCents !== entry.amountCents || norm.installments !== entry.installments || norm.purchasedOn !== entry.purchasedOn;
         if (change) {
-          const first = norm.purchasedOn === entry.purchasedOn ? entry.invoiceMonth : purchaseFirstInvoiceMonth(card, norm.purchasedOn);
+          const first =
+            norm.purchasedOn === entry.purchasedOn ? entry.invoiceMonth : purchaseFirstInvoiceMonth(card, norm.purchasedOn, norm.installments, this.paidMonths(card.id));
           for (let k = 0; k < entry.installments; k++) if (this.invoicePaid(card.id, addMonths(entry.invoiceMonth, k))) throw new RepoError('fatura_paga');
           for (let k = 0; k < norm.installments; k++) if (this.invoicePaid(card.id, addMonths(first, k))) throw new RepoError('fatura_paga');
           if (norm.installments > entry.installments) this.checkEntryCap(card.id, norm.installments - entry.installments);
@@ -1781,7 +1798,8 @@ export class MemoryRepository implements RecordsRepository {
 
   /**
    * Como pay_invoice. Ordem: repetição; trava do cartão; mes_invalido; nao_encontrado (fatura sem conta); versão;
-   * compromisso_quitado; valor_invalido; valor_acima_da_fatura; data_invalida (inválida ou há mais de 1 ano); data_futura;
+   * compromisso_quitado; valor_invalido; valor_acima_da_fatura; data_invalida (inválida, ou antes do menor entre 1 ano atrás e o
+   * início do período da fatura); data_futura;
    * conta_invalida; fatura_seguinte_paga. Cria UM gasto sem categoria, ligado ao cartão e ao mês, na conta informada (sem ela, a
    * mais antiga do contexto) e, no pagamento parcial, o saldo anterior na fatura seguinte.
    */
@@ -1799,7 +1817,10 @@ export class MemoryRepository implements RecordsRepository {
       const today = this.opts.today();
       if (!Number.isSafeInteger(amountCents) || amountCents < 1) throw new RepoError('valor_invalido');
       if (amountCents > c.amountCents) throw new RepoError('valor_acima_da_fatura');
-      if (typeof paidOn !== 'string' || !isValidIsoDate(paidOn) || paidOn < addYearsClamped(today, -1)) throw new RepoError('data_invalida');
+      // Não antes do menor entre 1 ano atrás e o início do período da fatura (fatura antiga paga na data real).
+      const oneYearAgo = addYearsClamped(today, -1);
+      const periodStart = invoicePeriod(card, month).startOn;
+      if (typeof paidOn !== 'string' || !isValidIsoDate(paidOn) || paidOn < (periodStart < oneYearAgo ? periodStart : oneYearAgo)) throw new RepoError('data_invalida');
       if (paidOn > today) throw new RepoError('data_futura');
       const account = accountId
         ? this.space?.accounts.find((a) => a.id === accountId && a.contextId === card.contextId)
@@ -1952,6 +1973,13 @@ export class MemoryRepository implements RecordsRepository {
   /** Fatura paga ou paga em parte: a conta viva do cartão e mês está quitada (clarevo_invoice_paid). */
   private invoicePaid(cardId: string, month: IsoMonth): boolean {
     return this.invoiceCommitmentOf(cardId, month)?.status === 'quitado';
+  }
+
+  /** Meses das faturas pagas do cartão (para clarevo_first_free_month, em purchaseFirstInvoiceMonth). */
+  private paidMonths(cardId: string): IsoMonth[] {
+    return this.invoiceCommitments(cardId)
+      .filter((c) => c.status === 'quitado')
+      .map((c) => c.invoiceMonth!);
   }
 
   /** Faturas do cartão com os lançamentos e as contas vivas de agora (cards.ts, buildInvoices). */
@@ -2168,7 +2196,7 @@ export class MemoryRepository implements RecordsRepository {
         e.amountCents <= MAX_RECORD_CENTS &&
         isValidIsoMonth(e.invoiceMonth) &&
         (e.category === null || text(e.category, 40)) &&
-        (e.receiptKey === null || /^[0-9]{44}$/.test(e.receiptKey)) &&
+        (e.receiptKey === null || receiptKeyValid(e.receiptKey)) &&
         e.version >= 1;
       const origin = e.sourceMonth !== null && isValidIsoMonth(e.sourceMonth) && addMonths(e.sourceMonth, 1) === e.invoiceMonth;
       let kindOk: boolean;
@@ -2303,7 +2331,7 @@ export class MemoryRepository implements RecordsRepository {
     const add = (contextId: string, key: string | null) => {
       if (key === null) return;
       const k = `${contextId}|${key}`;
-      if (!/^[0-9]{44}$/.test(key) || seen.has(k)) throw new Error('nota_inconsistente');
+      if (!receiptKeyValid(key) || seen.has(k)) throw new Error('nota_inconsistente');
       seen.add(k);
     };
     for (const r of this.records.values()) {
@@ -2979,12 +3007,15 @@ export class MemoryRepository implements RecordsRepository {
   }
 
   private toCommitment(c: StoredCommitment): Commitment {
-    const { deletedAt: _deleted, seriesId, occurrenceNumber, seriesSkipped: _skipped, invoiceCardId, invoiceMonth, cardClosingOn: _closing, ...rest } = c;
+    const { deletedAt: _deleted, seriesId, occurrenceNumber, seriesSkipped: _skipped, invoiceCardId, invoiceMonth, cardClosingOn: closingOn, ...rest } = c;
     const r = this.livePayment(c.id);
     const s = seriesId ? this.seriesById.get(seriesId) : undefined;
     return {
       ...rest,
-      invoice: invoiceCardId && invoiceMonth ? { cardId: invoiceCardId, month: invoiceMonth } : null,
+      // Fatura de cartão em aberto: "estimado" calculado na hora, até o dia do fechamento (como commitment_items); a marca
+      // gravada só é atualizada por uma gravação de cartão ou por syncSeriesOccurrences e fica velha depois do fechamento.
+      amountIsEstimate: invoiceCardId && c.status === 'aberto' ? this.opts.today() <= closingOn! : c.amountIsEstimate,
+      invoice: invoiceCardId && invoiceMonth ? { cardId: invoiceCardId, month: invoiceMonth, closingOn: closingOn! } : null,
       series:
         s && occurrenceNumber !== null
           ? {

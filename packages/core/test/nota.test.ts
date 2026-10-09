@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
+  EXAMPLE_RECEIPT_HOST,
   NOTA_ERROR_TEXT,
   NOTA_TEXT,
   RECEIPT_ERROR_CODES,
@@ -20,7 +22,9 @@ import {
   parseNfceQr,
   readReceiptCode,
   receiptDraft,
+  receiptKeyDigest,
   receiptKeyValid,
+  sha256Hex,
   type AccessKeyInfo,
   type UfSigla,
 } from '../src';
@@ -82,6 +86,7 @@ function breakKey(key: string): string {
 
 const TODAY = '2026-10-09';
 const KEY = makeKey(); // NFC-e do RJ, outubro de 2026
+const nodeDigest = (key: string) => createHash('sha256').update(key, 'utf8').digest('hex');
 const SPACED = KEY.replace(/(.{4})/g, '$1 ').trim();
 
 describe('chave de acesso', () => {
@@ -108,6 +113,7 @@ describe('chave de acesso', () => {
     if (!r.ok) return;
     expect(r.info).toEqual({
       key: KEY,
+      digest: nodeDigest(KEY),
       uf: 'RJ',
       yearMonth: '2026-10',
       cnpj: '12345678000195',
@@ -135,15 +141,24 @@ describe('chave de acesso', () => {
     expect([...seen].sort()).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
   });
 
-  it('mesma regra do banco para chaves só com números (receiptKeyValid)', () => {
+  it('o banco guarda só o resumo SHA-256 da chave: receiptKeyValid confere os 64 hexadecimais, nunca a chave de 44 caracteres', () => {
     for (let n = 1; n <= 200; n++) {
       const k = makeKey({ number: n * 7, code: String(10000000 + n * 13) });
-      expect(receiptKeyValid(k)).toBe(true);
-      expect(parseAccessKey(k).ok).toBe(true);
-      const bad = breakKey(k);
-      expect(receiptKeyValid(bad)).toBe(false);
-      expect(parseAccessKey(bad).ok).toBe(false);
+      const digest = receiptKeyDigest(k);
+      expect(digest).toBe(nodeDigest(k));
+      expect(receiptKeyValid(digest!)).toBe(true);
+      // A chave inteira (numérica ou não) nunca é aceita como `receiptKey`.
+      expect(receiptKeyValid(k)).toBe(false);
+      expect(receiptKeyDigest(breakKey(k))).toBeNull();
     }
+    expect(receiptKeyValid('a'.repeat(64))).toBe(true);
+    for (const bad of ['', 'A'.repeat(64), 'a'.repeat(63), 'a'.repeat(65), `${'a'.repeat(63)}g`, ` ${'a'.repeat(63)}`, `${'a'.repeat(64)}\n`]) {
+      expect(receiptKeyValid(bad), JSON.stringify(bad)).toBe(false);
+    }
+    expect(receiptKeyValid(null as unknown as string)).toBe(false);
+    // Chave com espaços e minúsculas dá o mesmo resumo da chave normalizada.
+    expect(receiptKeyDigest(SPACED.toLowerCase())).toBe(nodeDigest(KEY));
+    expect(parseAccessKey(KEY).ok && (parseAccessKey(KEY) as { info: AccessKeyInfo }).info.digest).toBe(sha256Hex(KEY));
   });
 
   it('todas as 27 UFs do código IBGE', () => {
@@ -163,6 +178,29 @@ describe('chave de acesso', () => {
     expect(parseAccessKey(`  ${KEY.slice(0, 22)}\n${KEY.slice(22)}  `).ok).toBe(true);
     const alfa = makeKey({ cnpj: makeCnpj('12ABC34501DE') });
     expect(parseAccessKey(alfa.toLowerCase())).toEqual(parseAccessKey(alfa));
+  });
+
+  it('CNPJ alfanumérico: regra oficial (valor = ASCII menos 48; pesos 5 a 2 e 6 a 2), vetores calculados à parte', () => {
+    for (const cnpj of ['12ABC34501DE35', 'ABCDEFGH000195', 'Z9Y8X7W6V5U429', 'AAAAAAAA000191', '0A1B2C3D4E5F23', 'ZZZZZZZZZZZZ62', '11222333000181']) {
+      expect(cnpjValid(cnpj), cnpj).toBe(true);
+    }
+    // Dígito errado, letra minúscula, letra no lugar dos dígitos verificadores, tamanho errado.
+    for (const cnpj of ['12ABC34501DE36', 'ABCDEFGH000196', '12abc34501de35', '12ABC34501DEAB', '12ABC34501DE3', '12ABC34501DE355', '12ABC3450-DE35']) {
+      expect(cnpjValid(cnpj), cnpj).toBe(false);
+    }
+    // A chave do exemplo da auditoria, lida de ponta a ponta: escaneia, mostra o CNPJ e gera o resumo que o banco aceita.
+    const real = '35261012ABC34501DE35550010000001251000000035';
+    const read = readReceiptCode(real);
+    expect(read.ok && read.key.cnpjFormatted).toBe('12.ABC.345/01DE-35');
+    const draft = receiptDraft(factsFromKey((read as { key: AccessKeyInfo }).key), TODAY);
+    expect(draft.description).toBe('Compra (CNPJ 12.ABC.345/01DE-35)');
+    expect(draft.receiptKey).toBe(nodeDigest(real));
+    expect(receiptKeyValid(draft.receiptKey)).toBe(true);
+    expect(receiptKeyDigest(real.toLowerCase())).toBe(nodeDigest(real));
+    // O colado com grupos de 4 e a chave pelo link do QR dão o mesmo resumo.
+    expect(receiptKeyDigest(real.replace(/(.{4})/g, '$1 '))).toBe(nodeDigest(real));
+    const viaQr = readReceiptCode(`https://exemplo.test/qr?p=${real}|2|1|1|ABC`);
+    expect(viaQr.ok && viaQr.key.digest).toBe(nodeDigest(real));
   });
 
   it('chave com CNPJ alfanumérico (NT 2025.001): letras só nas 12 primeiras posições do CNPJ', () => {
@@ -214,13 +252,25 @@ describe('chave de acesso', () => {
     if (!r.ok) return;
     expect(r.info.cnpj).toBeNull();
     expect(r.info.cnpjFormatted).toBeNull();
-    // A chave inteira contém o CPF (é o que a pessoa leu da nota), mas nenhum outro campo o repete.
+    // A chave inteira contém o CPF (é o que a pessoa leu da nota; só em memória), mas nenhum outro campo o repete.
     const { key: _key, ...others } = r.info;
     expect(JSON.stringify(others)).not.toContain(cpf);
     const draft = receiptDraft(factsFromKey(r.info), TODAY);
     expect(draft.description).toBe('Compra');
     expect(draft.issuerCnpj).toBeNull();
-    expect(JSON.stringify({ ...draft, receiptKey: '' })).not.toContain(cpf);
+    // O que vai para o registro é o resumo da chave: serve para o aviso de nota repetida e não contém o CPF nem a chave.
+    expect(draft.receiptKey).toBe(nodeDigest(k));
+    expect(draft.receiptKey).toMatch(/^[0-9a-f]{64}$/);
+    expect(receiptKeyValid(draft.receiptKey)).toBe(true);
+    expect(JSON.stringify(draft)).not.toContain(cpf);
+    expect(JSON.stringify(draft)).not.toContain(k);
+    expect(receiptKeyValid(k)).toBe(false);
+    // O caso da auditoria (chave real de pessoa física lida de ponta a ponta).
+    const pf = readReceiptCode('33261000052998224725550010000001241000000026');
+    expect(pf.ok).toBe(true);
+    const pfDraft = receiptDraft(factsFromKey((pf as { key: AccessKeyInfo }).key), TODAY);
+    expect(pfDraft.receiptKey).toBe(nodeDigest('33261000052998224725550010000001241000000026'));
+    expect(JSON.stringify(pfDraft)).not.toContain('52998224725');
     // "000" + 11 dígitos que não são CPF válido continua sendo CNPJ inválido.
     expect(parseAccessKey(makeKey({ cnpj: '00052998224726' }))).toEqual({ ok: false, code: 'cnpj_invalido' });
   });
@@ -488,29 +538,98 @@ describe('página oficial da Sefaz', () => {
     }
     expect(SEFAZ_QR_HOSTS.RJ).toEqual(['consultadfe.fazenda.rj.gov.br']);
     expect(Object.keys(SEFAZ_QR_HOSTS).length).toBeGreaterThanOrEqual(19);
-    // Sem confirmação nesta conferência: sem botão (nenhum domínio, nem o que seria o provável).
+    // Sem confirmação nesta conferência: fora da lista. O botão vem da regra geral (domínio ".gov.br" coerente com a UF), não
+    // de um domínio anotado; um ".gov.br" sem a sigla da UF não serve.
     for (const uf of ['AC', 'AP', 'MA', 'SE', 'MT', 'PA', 'PE', 'RR'] as const) {
       expect(SEFAZ_QR_HOSTS[uf], uf).toBeUndefined();
       expect(officialQueryUrl(uf, 'https://exemplo.gov.br/q?p=A')).toBeNull();
+      expect(officialQueryUrl(uf, `https://sefaz.${uf.toLowerCase()}.gov.br/q?p=A`)).toBe(`https://sefaz.${uf.toLowerCase()}.gov.br/q?p=A`);
     }
-    expect(officialQueryUrl('MT', 'http://www.sefaz.mt.gov.br/nfce/consultanfce?p=A')).toBeNull();
-    expect(officialQueryUrl('RR', 'https://portalapp.sefaz.rr.gov.br/nfce/servlet/qrcode?p=A')).toBeNull();
+    expect(officialQueryUrl('MT', 'http://www.sefaz.mt.gov.br/nfce/consultanfce?p=A')).toBe('http://www.sefaz.mt.gov.br/nfce/consultanfce?p=A');
+    expect(officialQueryUrl('RR', 'https://portalapp.sefaz.rr.gov.br/nfce/servlet/qrcode?p=A')).toBe('https://portalapp.sefaz.rr.gov.br/nfce/servlet/qrcode?p=A');
   });
 
-  it('endereços que mudaram: vale o novo, o antigo (desativado) não', () => {
-    // PB: único endereço desde 01/04/2024.
+  it('regra de Enzo para os outros estados: qualquer ".gov.br" coerente com a UF da chave (a lista é a rota preferida)', () => {
+    // PE, PA, MT, MA ... não estão na lista e ganham o botão pelo próprio endereço do QR.
+    const pe = 'http://nfce.sefaz.pe.gov.br/nfce/consulta?p=26261000052998224725550010000001241000000026|2|1|1|ABC';
+    expect(officialQueryUrl('PE', pe)).toBe(pe);
+    expect(officialQueryUrl('PA', 'https://app.sefa.pa.gov.br/consulta?p=A')).toBe('https://app.sefa.pa.gov.br/consulta?p=A');
+    expect(officialQueryUrl('MA', 'https://sefaz.ma.gov.br/q?p=A')).toBe('https://sefaz.ma.gov.br/q?p=A');
+    // Domínio fictício, só para a regra: qualquer host .gov.br com a sigla como rótulo.
+    expect(officialQueryUrl('PE', 'https://qualquer.coisa.pe.gov.br/x/y?p=A#frag')).toBe('https://qualquer.coisa.pe.gov.br/x/y?p=A');
+    expect(officialQueryUrl('PE', 'https://PE.GOV.BR/x?p=A')).toBe('https://pe.gov.br/x?p=A');
+    expect(officialQueryUrl('DF', 'fazenda.df.gov.br/nfce/qrcode?p=A')).toBe('https://fazenda.df.gov.br/nfce/qrcode?p=A');
+    // Um estado da lista que muda de endereço não perde o botão até a próxima versão.
+    expect(officialQueryUrl('RN', 'https://novo-endereco.rn.gov.br/consultar?p=A')).toBe('https://novo-endereco.rn.gov.br/consultar?p=A');
+    expect(officialQueryUrl('SP', 'https://portal.fazenda.sp.gov.br/nfce?p=A')).not.toBeNull();
+    // A lista continua valendo, mesmo sem a sigla no domínio.
+    expect(officialQueryUrl('SC', 'https://sat.sef.sc.gov.br/nfce/consulta?p=A')).not.toBeNull();
+    // Não vale: domínio de outra UF, sem a sigla, que não termina em .gov.br, com a sigla só colada a outra palavra ou em outro lugar.
+    for (const url of [
+      'https://nfce.sefaz.pr.gov.br/q?p=A', // outra UF
+      'https://www.nfe.fazenda.gov.br/q?p=A', // federal, sem UF
+      'https://sefaz.gov.br/q?p=A',
+      'https://gov.br/q?p=A',
+      'https://sefaz.pe.com.br/q?p=A', // não é .gov.br
+      'https://sefaz.pe.gov.br.exemplo.com/q?p=A',
+      'https://exemplo.com/sefaz.pe.gov.br?p=A',
+      'https://sefazpe.gov.br/q?p=A', // sigla colada
+      'https://pe-sefaz.gov.br/q?p=A',
+      'https://sefaz.pe.gov.br:8443/q?p=A', // porta
+      'https://usuario@sefaz.pe.gov.br/q?p=A', // usuário
+      'https://sefaz..pe.gov.br/q?p=A', // rótulo vazio
+      'https://-sefaz.pe.gov.br/q?p=A',
+      'https://sefaz-.pe.gov.br/q?p=A',
+      'https://.pe.gov.br/q?p=A',
+      'ftp://sefaz.pe.gov.br/q?p=A',
+      'https://sefaz.pe.gov.br/q', // sem consulta
+      'https://sefaz.pe.gov.br/q?p=A B',
+    ]) {
+      expect(officialQueryUrl('PE', url), url).toBeNull();
+    }
+    // O RJ é o único com leitura automática: só o domínio confirmado, nenhum outro ".gov.br" do estado.
+    expect(officialQueryUrl('RJ', 'https://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode?p=A')).not.toBeNull();
+    expect(officialQueryUrl('RJ', 'https://www4.fazenda.rj.gov.br/consultaNFCe/QRCode?p=A')).toBeNull();
+    expect(officialQueryUrl('RJ', 'https://sefaz.rj.gov.br/qualquer?p=A')).toBeNull();
+    // De ponta a ponta: um QR de PE de domínio fictício dá o botão no rascunho.
+    const keyPe = makeKey({ uf: '26' });
+    const qrUrl = `https://consulta.fazenda.pe.gov.br/nfce?p=${keyPe}|2|1|1|ABC`;
+    const read = readReceiptCode(qrUrl);
+    if (!read.ok || !read.qr) throw new Error('QR de PE não lido');
+    expect(receiptDraft(factsFromQr(read.qr, qrUrl), TODAY).officialUrl).toBe(qrUrl);
+    // O mesmo QR de PE com o domínio de SP: sem botão.
+    const spUrl = `https://www.nfce.fazenda.sp.gov.br/qrcode?p=${keyPe}|2|1|1|ABC`;
+    const readSp = readReceiptCode(spUrl);
+    if (!readSp.ok || !readSp.qr) throw new Error('QR não lido');
+    expect(receiptDraft(factsFromQr(readSp.qr, spUrl), TODAY).officialUrl).toBeNull();
+    // Nota de teste (homologação) nunca oferece a página de produção.
+    const testUrl = `https://consulta.fazenda.pe.gov.br/nfce?p=${keyPe}|2|2|1|ABC`;
+    const readTest = readReceiptCode(testUrl);
+    if (!readTest.ok || !readTest.qr) throw new Error('QR de teste não lido');
+    const testDraft = receiptDraft(factsFromQr(readTest.qr, testUrl), TODAY);
+    expect(testDraft.officialUrl).toBeNull();
+    expect(testDraft.testNote).toBe(NOTA_TEXT.testNote);
+  });
+
+  it('endereços que mudaram: o novo está na lista; os antigos de outros estados passam pela regra geral, o do RJ não', () => {
+    // PB: único endereço desde 01/04/2024 (o antigo, receita.pb.gov.br, é um ".gov.br" da PB e a regra geral o aceita se vier no QR).
+    expect(SEFAZ_QR_HOSTS.PB).toEqual(['www.sefaz.pb.gov.br']);
     expect(officialQueryUrl('PB', 'http://www.sefaz.pb.gov.br/nfce?p=A|2|1')).toBe('http://www.sefaz.pb.gov.br/nfce?p=A|2|1');
-    expect(officialQueryUrl('PB', 'http://www.receita.pb.gov.br/nfce?p=A|2|1')).toBeNull();
+    expect(officialQueryUrl('PB', 'http://www.receita.pb.gov.br/nfce?p=A|2|1')).toBe('http://www.receita.pb.gov.br/nfce?p=A|2|1');
     // RN: domínio SET virou SEFAZ em 2026.
+    expect(SEFAZ_QR_HOSTS.RN).toEqual(['nfce.sefaz.rn.gov.br']);
     expect(officialQueryUrl('RN', 'https://nfce.sefaz.rn.gov.br/consultarNFCe.aspx?p=A|2|1')).not.toBeNull();
-    expect(officialQueryUrl('RN', 'https://nfce.set.rn.gov.br/portalDFE/NFCe/ConsultaNFCe.aspx?p=A')).toBeNull();
+    expect(officialQueryUrl('RN', 'https://nfce.set.rn.gov.br/portalDFE/NFCe/ConsultaNFCe.aspx?p=A')).not.toBeNull();
     // MG: portal SPED desde 2022.
+    expect(SEFAZ_QR_HOSTS.MG).toEqual(['portalsped.fazenda.mg.gov.br']);
     expect(officialQueryUrl('MG', 'https://portalsped.fazenda.mg.gov.br/portalnfce/sistema/qrcode.xhtml?p=A|2|1')).not.toBeNull();
-    expect(officialQueryUrl('MG', 'http://nfce.fazenda.mg.gov.br/portalnfce/sistema/qrcode.xhtml?p=A')).toBeNull();
+    expect(officialQueryUrl('MG', 'http://nfce.fazenda.mg.gov.br/portalnfce/sistema/qrcode.xhtml?p=A')).not.toBeNull();
     // GO: endereço novo (IT 2025.003).
     expect(officialQueryUrl('GO', 'https://nfeweb.sefaz.go.gov.br/nfeweb/sites/nfce/danfeNFCe?p=A|2|1')).not.toBeNull();
-    // TO: a versão 1.0 do QR, em apps, não vale.
-    expect(officialQueryUrl('TO', 'http://apps.sefaz.to.gov.br/portal-nfce/qrcodeNFCe?p=A')).toBeNull();
+    // TO: a versão 1.0 do QR, em apps.
+    expect(officialQueryUrl('TO', 'http://apps.sefaz.to.gov.br/portal-nfce/qrcodeNFCe?p=A')).not.toBeNull();
+    // RJ: o endereço antigo deixou de valer de propósito (só o confirmado).
+    expect(officialQueryUrl('RJ', 'https://www4.fazenda.rj.gov.br/consultaNFCe/QRCode?p=A')).toBeNull();
   });
 });
 
@@ -524,7 +643,7 @@ describe('rascunho do registro', () => {
   it('QR online do mês atual: data de hoje, valor e descrição com o CNPJ', () => {
     const d = receiptDraft(factsFromKey(info(KEY)), TODAY);
     expect(d).toMatchObject({
-      receiptKey: KEY,
+      receiptKey: nodeDigest(KEY),
       uf: 'RJ',
       model: '65',
       description: 'Compra (CNPJ 12.345.678/0001-95)',
@@ -539,6 +658,7 @@ describe('rascunho do registro', () => {
       testNote: null,
       futureNote: null,
     });
+    expect(d.receiptKey).not.toContain(KEY);
   });
 
   it('QR online de outro mês: pede o dia da compra', () => {
@@ -658,8 +778,12 @@ describe('textos', () => {
     expect(NOTA_TEXT.installmentsHint).toBe('Comprou no carnê ou crediário? Anotar como parcelamento');
   });
 
-  it('nota de exemplo: QR do RJ do mês, chave válida, fictícia e identificada; lida de novo vira a mesma chave', () => {
+  it('nota de exemplo: QR do RJ do mês, em ambiente de teste e domínio inexistente: nunca aponta para a Sefaz de verdade', () => {
     const qr = exampleReceiptQr('2026-10');
+    expect(qr).toMatch(new RegExp(`^https://${EXAMPLE_RECEIPT_HOST.replace(/\./g, '\\.')}/`));
+    expect(EXAMPLE_RECEIPT_HOST).toMatch(/\.invalid$/);
+    expect(qr).not.toMatch(/fazenda\.rj\.gov\.br|sefaz/i);
+    expect(qr).toMatch(/\|2\|2\|1\|/); // versão 2, tpAmb=2 (homologação)
     const read = readReceiptCode(qr);
     expect(read.ok && read.source).toBe('qr');
     if (!read.ok) return;
@@ -669,7 +793,8 @@ describe('textos', () => {
     expect(read.key.series).toBe(999);
     expect(read.key.cnpjFormatted).toBe('11.222.333/0001-81');
     expect(parseAccessKey(read.key.key).ok).toBe(true);
-    expect(officialQueryUrl('RJ', qr)).toBe(qr);
+    expect(read.qr?.environment).toBe('homologacao');
+    expect(officialQueryUrl('RJ', qr)).toBeNull();
     expect(readReceiptCode(qr)).toEqual(read);
     // Outros meses mudam só o mês da chave.
     const jan = readReceiptCode(exampleReceiptQr('2027-01'));
@@ -677,6 +802,10 @@ describe('textos', () => {
     const draft = receiptDraft(factsFromQr(read.qr!, qr), '2026-10-09');
     expect(draft.occurredOn).toBe('2026-10-09');
     expect(draft.amountCents).toBeNull();
+    // Sem botão da Sefaz e com o aviso de nota de teste; o resumo da chave é o que vai para o registro.
+    expect(draft.officialUrl).toBeNull();
+    expect(draft.testNote).toBe(NOTA_TEXT.testNote);
+    expect(draft.receiptKey).toBe(nodeDigest(read.key.key));
     expect(NOTA_TEXT.example.note).toMatch(/fictícia/);
   });
 });

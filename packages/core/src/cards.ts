@@ -46,12 +46,16 @@ import { calcLinkParams } from './calculators/links';
  *   do fechamento fica nessa fatura; só a compra DEPOIS do fechamento vai para a seguinte.
  * - Compra em n parcelas: o valor total dividido por n, com o resto de centavos na primeira; a parcela 1 cai na fatura
  *   cujo período contém a data da compra e as outras nas n - 1 faturas seguintes. A fatura da parcela 1 é fixada ao gravar.
+ * - Fatura paga antes do fechamento (permitido) não trava o cartão: a compra do mesmo ciclo vai para a primeira fatura
+ *   seguinte em que nenhuma parcela cruza fatura paga (`purchaseFirstInvoiceMonth` com as faturas pagas), a conta dessa fatura
+ *   cresce, o dinheiro é conservado e a pessoa continua podendo pagar o que falta. O aviso da compra mostra a fatura real.
  * - Total da fatura = parcelas + encargos + saldo anterior - estornos. Nunca negativo no pagamento: com total negativo, o
  *   crédito vira um estorno automático (gravado, com a fatura de origem) na fatura seguinte, mantido pelas funções de cartão.
  * - Situação: aberta (hoje até o dia do fechamento), fechada (depois do fechamento, sem pagamento), paga ou paga em parte.
  * - Compras nunca entram em Pago na data da compra: Pago recebe o pagamento da fatura, na data do pagamento (D-021).
  * - Pagamento parcial: a diferença vira o lançamento "saldo anterior" na fatura do mês seguinte, sem juros.
- * - Limite usado = soma dos totais das faturas ainda não pagas (abertas e fechadas, de todos os meses).
+ * - Limite usado = soma, por fatura ainda não paga (aberta ou fechada, de todos os meses), de max(0, total da fatura). O
+ *   crédito de uma fatura negativa é levado como estorno automático à seguinte; somar com sinal o contaria duas vezes.
  * - Nunca guarda número completo de cartão, código de segurança nem validade.
  */
 
@@ -166,9 +170,29 @@ export function purchaseInstallments(entry: Pick<CardEntry, 'id' | 'amountCents'
   }));
 }
 
-/** Fatura da 1ª parcela de uma compra feita na data (fixada ao gravar). */
-export function purchaseFirstInvoiceMonth(card: CardDays, purchasedOn: IsoDate): IsoMonth {
-  return invoiceMonthOf(card, purchasedOn);
+/**
+ * Fatura da 1ª parcela de uma compra feita na data (fixada ao gravar). Pagar a fatura antes do fechamento é permitido e não
+ * trava o cartão: com `paidMonths` (as faturas já pagas ou pagas em parte, `paidInvoiceMonths`), a compra vai para a primeira
+ * fatura, a partir da do período da data, em que nenhuma das `installments` parcelas seguidas cruza uma fatura paga (mesma regra
+ * de clarevo_first_free_month no banco). Sem faturas pagas, é a fatura cujo período contém a data.
+ */
+export function purchaseFirstInvoiceMonth(card: CardDays, purchasedOn: IsoDate, installments = 1, paidMonths: Iterable<IsoMonth> = []): IsoMonth {
+  let month = invoiceMonthOf(card, purchasedOn);
+  const paid = [...paidMonths].sort();
+  if (paid.length === 0) return month;
+  const count = Math.max(1, installments);
+  for (;;) {
+    const last = addMonths(month, count - 1);
+    let blocking: IsoMonth | null = null;
+    for (const p of paid) if (p >= month && p <= last) blocking = p;
+    if (blocking === null) return month;
+    month = addMonths(blocking, 1);
+  }
+}
+
+/** Meses das faturas já pagas ou pagas em parte (para `purchaseFirstInvoiceMonth`). */
+export function paidInvoiceMonths(invoices: readonly Pick<Invoice, 'month' | 'situation'>[]): IsoMonth[] {
+  return invoices.filter((i) => i.situation === 'paga' || i.situation === 'paga_em_parte').map((i) => i.month);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +212,7 @@ export type CardInputErrorCode = (typeof CARD_INPUT_CODE_ORDER)[number];
 export function cardInputError(input: CardInput): CardInputErrorCode | null {
   const name = input.name;
   if (typeof name !== 'string' || name !== name.trim() || charCount(name) < 1 || charCount(name) > CARD_NAME_MAX) return 'apelido_invalido';
-  // O apelido não é lugar de número de cartão: 13 a 19 dígitos seguidos (ignorando espaço, ponto e hífen) são recusados.
+  // O apelido não é lugar de número de cartão: 13 a 19 dígitos (ignorando tudo que não é dígito) são recusados.
   if (looksLikeCardNumber(name)) return 'apelido_invalido';
   if (input.lastDigits !== null && (typeof input.lastDigits !== 'string' || !/^\d{4}$/.test(input.lastDigits))) return 'final_invalido';
   if (!isInt(input.closingDay) || input.closingDay < 1 || input.closingDay > 31) return 'dia_de_fechamento_invalido';
@@ -199,9 +223,12 @@ export function cardInputError(input: CardInput): CardInputErrorCode | null {
   return null;
 }
 
-/** 13 a 19 dígitos seguidos, ignorando espaço, ponto e hífen: parece número de cartão (nunca guardado). */
+/**
+ * 13 a 19 dígitos no texto, ignorando todo caractere que não seja dígito (espaço, ponto, hífen, barra, vírgula, sublinhado,
+ * letras...): parece número de cartão (nunca guardado). Mesma regra de cards_apelido_sem_numero no banco.
+ */
 export function looksLikeCardNumber(text: string): boolean {
-  return /[0-9]{13,19}/.test(text.replace(/[ .-]/g, ''));
+  return /[0-9]{13,19}/.test(text.replace(/[^0-9]/g, ''));
 }
 
 /** Campos do cartão como o banco os grava: apelido e final aparados (final vazio vira nulo), ausentes viram nulos. */
@@ -305,27 +332,33 @@ export const INVOICE_PAYMENT_CODE_ORDER = ['valor_invalido', 'valor_acima_da_fat
 export type InvoicePaymentErrorCode = (typeof INVOICE_PAYMENT_CODE_ORDER)[number];
 
 /**
- * Valor de R$ 0,01 até o total da fatura; data até hoje e não antes de 1 ano (mesma data do ano anterior, limitada ao fim do
- * mês). Ordem de pay_invoice: valor_invalido, valor_acima_da_fatura, data_invalida (inválida ou há mais de 1 ano), data_futura.
+ * Valor de R$ 0,01 até o total da fatura; data até hoje e não antes do menor entre 1 ano atrás (mesma data do ano anterior,
+ * limitada ao fim do mês) e o primeiro dia do período da fatura (`periodStartOn`, o dia seguinte ao fechamento da fatura
+ * anterior), para que uma fatura antiga (compra de até 4 anos atrás) possa ser paga na data real. Sem `periodStartOn`, vale só
+ * 1 ano. Ordem de pay_invoice: valor_invalido, valor_acima_da_fatura, data_invalida (inválida ou antes do início da janela),
+ * data_futura.
  */
-export function invoicePaymentError(input: { amountCents: Cents; totalCents: Cents; paidOn: IsoDate }, today: IsoDate): InvoicePaymentErrorCode | null {
+export function invoicePaymentError(
+  input: { amountCents: Cents; totalCents: Cents; paidOn: IsoDate; periodStartOn?: IsoDate | null },
+  today: IsoDate,
+): InvoicePaymentErrorCode | null {
   if (!isInt(input.amountCents) || input.amountCents < 1) return 'valor_invalido';
   if (input.amountCents > input.totalCents) return 'valor_acima_da_fatura';
-  if (typeof input.paidOn !== 'string' || !isValidIsoDate(input.paidOn) || input.paidOn < addYearsClamped(today, -1)) return 'data_invalida';
+  const oneYearAgo = addYearsClamped(today, -1);
+  const earliest = input.periodStartOn && input.periodStartOn < oneYearAgo ? input.periodStartOn : oneYearAgo;
+  if (typeof input.paidOn !== 'string' || !isValidIsoDate(input.paidOn) || input.paidOn < earliest) return 'data_invalida';
   if (input.paidOn > today) return 'data_futura';
   return null;
 }
 
 /**
- * Chave de acesso da nota fiscal (NF-e ou NFC-e): 44 dígitos com o dígito verificador certo (módulo 11, pesos de 2 a 9 da
- * direita para a esquerda; resto 0 ou 1 dá dígito 0). Mesma regra de clarevo_receipt_key_valid.
+ * O que o registro guarda no lugar da chave de acesso da nota fiscal (D-038): o resumo SHA-256 da chave de 44 caracteres,
+ * em 64 hexadecimais MINÚSCULOS (`receiptKeyDigest` em nota.ts o calcula, depois de conferir dígito verificador, UF, mês, CNPJ
+ * numérico ou alfanumérico e modelo). Nunca a chave: a de NF-e de emitente pessoa física carrega o CPF dele. O banco confere só
+ * esta forma (clarevo_receipt_key_valid); a chave de 44 caracteres é recusada com chave_de_nota_invalida.
  */
-export function receiptKeyValid(key: string): boolean {
-  if (typeof key !== 'string' || !/^[0-9]{44}$/.test(key)) return false;
-  let sum = 0;
-  for (let i = 0; i < 43; i++) sum += Number(key[42 - i]) * (2 + (i % 8));
-  const r = sum % 11;
-  return (r === 0 || r === 1 ? 0 : 11 - r) === Number(key[43]);
+export function receiptKeyValid(digest: string): boolean {
+  return typeof digest === 'string' && /^[0-9a-f]{64}$/.test(digest);
 }
 
 /** Descrições e categoria como o banco as grava (aparadas; categoria vazia vira nula). */
@@ -431,7 +464,7 @@ export interface Invoice {
 /** O que buildInvoices usa do cartão. */
 export type InvoiceCard = Pick<Card, 'id' | 'closingDay' | 'dueDay'>;
 /** O que buildInvoices usa de cada conta de fatura (listInvoiceCommitments). */
-export type InvoiceCommitmentView = Pick<Commitment, 'id' | 'version' | 'status' | 'payment' | 'amountCents' | 'invoice'>;
+export type InvoiceCommitmentView = Pick<Commitment, 'id' | 'version' | 'status' | 'payment' | 'amountCents' | 'dueOn' | 'invoice'>;
 
 const LINE_ORDER: Record<InvoiceLineKind, number> = { saldo_anterior: 0, credito_anterior: 1, parcela: 2, encargo: 3, estorno: 4 };
 
@@ -537,8 +570,11 @@ function makeInvoice(
   const creditInCents = 0 - sum('credito_anterior');
   const rawCents = installmentsCents + chargesCents + balanceCents - refundsCents - creditInCents;
   const totalCents = Math.max(0, rawCents);
-  const closingOn = invoiceClosingOn(card, month);
-  const period = invoicePeriod(card, month);
+  // Com conta a pagar, o vencimento e o fechamento são os GRAVADOS nela (como invoice_items): numa fatura paga eles não mudam
+  // quando o cartão troca os dias. Sem conta (fatura sem total, futura), os do cartão de hoje.
+  const closingOn = commitment?.invoice ? commitment.invoice.closingOn : invoiceClosingOn(card, month);
+  const dueOn = commitment ? commitment.dueOn : invoiceDueOn(card, month);
+  const period = { startOn: invoicePeriod(card, month).startOn, endOn: closingOn };
   const payment = commitment && commitment.status === 'quitado' ? commitment.payment : null;
   const situation = invoiceSituation({ closingOn, today, totalCents, paidCents: payment ? payment.amountCents : null });
   const remainingCents = situation === 'paga_em_parte' ? totalCents - payment!.amountCents : 0;
@@ -553,7 +589,7 @@ function makeInvoice(
     cardId: card.id,
     month,
     closingOn,
-    dueOn: invoiceDueOn(card, month),
+    dueOn,
     periodStartOn: period.startOn,
     periodEndOn: period.endOn,
     lines,
@@ -891,12 +927,12 @@ export interface InvoicePaymentDraft {
 /** "Pagar fatura": total ou "Outro valor", e a data do pagamento. */
 export function validateInvoicePaymentDraft(
   draft: InvoicePaymentDraft,
-  invoice: Pick<Invoice, 'totalCents'>,
+  invoice: Pick<Invoice, 'totalCents'> & Partial<Pick<Invoice, 'periodStartOn'>>,
   today: IsoDate,
 ): { ok: true; amountCents: Cents; paidOn: IsoDate; partial: boolean } | { ok: false; errors: Partial<Record<'amountText' | 'dateText', string>>; code: InvoicePaymentErrorCode } {
   const amountCents = draft.mode === 'total' ? invoice.totalCents : (parseBRL(draft.amountText) ?? Number.NaN);
   const paidOn = parseDateBR(draft.dateText) ?? '';
-  const code = invoicePaymentError({ amountCents, totalCents: invoice.totalCents, paidOn }, today);
+  const code = invoicePaymentError({ amountCents, totalCents: invoice.totalCents, paidOn, periodStartOn: invoice.periodStartOn }, today);
   if (code) {
     const field = code === 'valor_invalido' || code === 'valor_acima_da_fatura' ? 'amountText' : 'dateText';
     return { ok: false, errors: { [field]: CARD_ERROR_TEXT[code] }, code };
@@ -1134,7 +1170,7 @@ export const CARD_ERROR_TEXT = {
   descricao_obrigatoria: 'Dê um nome para este lançamento.',
   valor_acima_do_limite: 'O valor máximo por lançamento é R$ 9.999.999,99.',
   parcelas_invalidas: 'Informe de 1 a 48 parcelas, com pelo menos R$ 0,01 em cada.',
-  data_invalida: 'Confira a data informada. Ela precisa ser de até 4 anos atrás para compras e de até 1 ano atrás para pagamentos.',
+  data_invalida: 'Confira a data informada. Compras podem ser de até 4 anos atrás. Pagamentos, de até 1 ano atrás ou, numa fatura mais antiga, a partir do começo do período dela.',
   data_futura: 'Use uma data até hoje. Aqui entram só compras e pagamentos já feitos.',
   tipo_de_encargo_invalido: 'Escolha o tipo do encargo.',
   mes_invalido: 'Escolha uma fatura entre quatro anos atrás e quatro anos à frente.',

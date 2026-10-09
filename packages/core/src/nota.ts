@@ -2,15 +2,19 @@ import type { IsoDate, IsoMonth } from './dates';
 import { formatDateBR, formatMonthYearBR, isValidIsoDate, monthOf } from './dates';
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS, formatBRL } from './money';
+import { sha256Hex } from './sha256';
 import { DESCRIPTION_MAX } from './validation';
 
 /**
  * Leitura de notas fiscais (Ciclo E, D-038, fase 1): QR da NFC-e, código de barras e chave de acesso da NF-e.
  *
  * Tudo roda no aparelho, sem servidor. Regras de privacidade (valem para nota.ts e danfe.ts):
- * - só a chave de acesso (44 caracteres, sem dados pessoais) é guardada pelo app, e só quando a pessoa toca em Salvar;
+ * - a chave de acesso (44 caracteres) NUNCA é guardada: a chave de uma NF-e de emitente pessoa física carrega o CPF dele
+ *   ("000" + CPF no lugar do CNPJ). O que o app guarda, só quando a pessoa toca em Salvar, é o resumo SHA-256 da chave
+ *   normalizada (64 hexadecimais minúsculos, `receiptKeyDigest`), que basta para avisar que a nota já foi anotada;
  * - o CPF ou CNPJ do destinatário que vem em alguns QR (parâmetro cDest, campo idDest) nunca é lido para fora destas funções;
- * - o CPF de emitente pessoa física (chave com "000" + CPF) também nunca sai: o resultado diz só que o emitente é pessoa física;
+ * - o CPF de emitente pessoa física também não aparece em nenhum resultado (`cnpj` e `cnpjFormatted` ficam null); a chave
+ *   inteira só existe em memória em `AccessKeyInfo.key`, para conferir e consultar, e não é gravada nem mostrada;
  * - o link inteiro do QR não é guardado: só o endereço oficial sanitizado (`officialQueryUrl`) vai para a tela, para abrir.
  *
  * Sem `URL`, `URLSearchParams`, `normalize`, lookbehind, grupos nomeados nem `\p{}`: o Hermes (iOS e Android) tem suporte parcial.
@@ -78,8 +82,13 @@ export type ReceiptErrorCode = (typeof RECEIPT_ERROR_CODES)[number];
 export type ReceiptModel = '55' | '65';
 
 export interface AccessKeyInfo {
-  /** A chave inteira (44 caracteres, maiúsculas). É o que o registro guarda em `receiptKey`. */
+  /**
+   * A chave inteira (44 caracteres, maiúsculas). Só em memória: NÃO é o que o registro guarda (a de pessoa física tem o CPF
+   * do emitente). O registro guarda `digest`.
+   */
   key: string;
+  /** Resumo SHA-256 da chave (64 hexadecimais minúsculos): o `receiptKey` do registro e da compra no cartão. Não revela o CPF. */
+  digest: string;
   uf: UfSigla;
   /** Mês da emissão (AAMM da chave). */
   yearMonth: IsoMonth;
@@ -95,6 +104,17 @@ export interface AccessKeyInfo {
 }
 
 export type AccessKeyResult = { ok: true; info: AccessKeyInfo } | { ok: false; code: ReceiptErrorCode };
+
+/**
+ * O que o app grava no lugar da chave (`receiptKey` de createRecord e addCardPurchase): o SHA-256 da chave normalizada
+ * (44 caracteres, maiúsculas), em 64 hexadecimais minúsculos. Aceita a chave com espaços e minúsculas; devolve null quando a
+ * chave não é válida (dígito verificador, UF, mês, CNPJ numérico ou alfanumérico, modelo). Mesmo resumo de
+ * `AccessKeyInfo.digest` e de `encode(sha256(chave), 'hex')` no banco.
+ */
+export function receiptKeyDigest(accessKey: string): string | null {
+  const parsed = parseAccessKey(accessKey);
+  return parsed.ok ? parsed.info.digest : null;
+}
 
 /** Forma da chave desde o CNPJ alfanumérico (NT 2025.001): 6 números, 12 letras ou números, 26 números. */
 const KEY_SHAPE = /^[0-9]{6}[0-9A-Z]{12}[0-9]{26}$/;
@@ -148,8 +168,8 @@ export function formatCnpj(cnpj: string): string {
 /**
  * Lê a chave de acesso da NF-e (modelo 55) ou da NFC-e (modelo 65): 44 caracteres, dígito verificador, UF (código IBGE), AAMM,
  * CNPJ do emitente (com os dígitos verificadores dele), modelo, série e número. Aceita espaços entre os grupos de 4 e minúsculas.
- * Ordem das conferências: forma, dígito verificador, UF, mês e ano, CNPJ, modelo. Mesma regra de clarevo_receipt_key_valid no
- * banco para chaves só com números.
+ * Ordem das conferências: forma, dígito verificador, UF, mês e ano, CNPJ, modelo. O banco não vê a chave (só o resumo dela,
+ * `digest`), então estas conferências são só do core.
  */
 export function parseAccessKey(input: string): AccessKeyResult {
   if (typeof input !== 'string') return { ok: false, code: 'chave_invalida' };
@@ -173,6 +193,7 @@ export function parseAccessKey(input: string): AccessKeyResult {
     ok: true,
     info: {
       key,
+      digest: sha256Hex(key),
       uf,
       yearMonth: `${year}-${key.slice(4, 6)}`,
       cnpj,
@@ -449,9 +470,12 @@ export function readReceiptCode(raw: string): ReceiptReading {
  * emite NFC-e (fórum do ACBr, base de conhecimento de fornecedores), anotada em cada linha. A lista de cada UF no portal nacional
  * da NFC-e (nfce.encat.org/desenvolvedor/qrcode) não pôde ser aberta nesta conferência (só havia busca); vale conferir lá.
  *
- * Fora da lista, por falta de confirmação nesta conferência: AC, AP, MA, SE, MT, PA, PE e RR. Para eles o botão "Ver a nota no
- * site da Sefaz" não aparece e todo o resto funciona. Para somar um estado: conferir no portal da Sefaz (ou em nota real) e
- * acrescentar aqui e no teste (conferência com notas reais é P-025).
+ * Fora da lista, por falta de confirmação nesta conferência: AC, AP, MA, SE, MT, PA, PE e RR. Para eles, e para qualquer
+ * estado que mude de endereço, vale a regra de Enzo (spec9 §5): o endereço vindo do próprio QR é aceito se o domínio termina em
+ * ".gov.br" e é coerente com a UF da chave (a sigla da UF é um dos rótulos, como em "nfce.sefaz.pe.gov.br"); a lista é a rota
+ * preferida e a regra vale quando o domínio não está nela (`officialQueryUrl`). O RJ só aceita o domínio confirmado. Para somar
+ * um estado à lista: conferir no portal da Sefaz (ou em nota real) e acrescentar aqui e no teste (conferência com notas reais
+ * é P-025).
  */
 export const SEFAZ_QR_HOSTS: Readonly<Partial<Record<UfSigla, readonly string[]>>> = {
   // https://portal.fazenda.rj.gov.br/dfe (atualizada em 14/04/2026) e https://ndd.tech/fiscal-blog/sefaz-rj-alteracao-na-url-do-qrcode-da-nfce-impacta-nas-operacoes-fiscais-das-empresas/:
@@ -514,20 +538,37 @@ export const SEFAZ_QR_HOSTS: Readonly<Partial<Record<UfSigla, readonly string[]>
   AM: ['sistemas.sefaz.am.gov.br'],
 };
 
+/** Um nome de domínio de verdade: rótulos de letras, números e hífen (sem hífen nas pontas), separados por ponto, sem rótulo vazio. */
+function validHost(host: string): boolean {
+  return host.length <= 253 && host.split('.').every((label) => /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(label));
+}
+
 /**
- * Endereço para "Ver a nota no site da Sefaz": o endereço do QR lido, só quando o domínio é um dos oficiais da UF da chave.
- * Devolve `esquema://domínio/caminho?consulta` (sem usuário, porta nem trecho "#"; domínio em minúsculas) ou null quando o domínio
- * não é conhecido, o endereço tem usuário, porta, espaço ou contra-barra, o esquema não é http nem https, ou não há consulta.
- * Sem esquema, usa https. Só chama o endereço quem toca no botão; nada é guardado.
+ * O domínio é de governo (termina em ".gov.br") e coerente com a UF da chave: algum rótulo dele é a sigla da UF, como em
+ * "fazenda.sp.gov.br", "sefaz.go.gov.br" ou "nfce.sefaz.pe.gov.br". Regra de Enzo (spec9 §5) para os estados fora da lista de
+ * `SEFAZ_QR_HOSTS`, que fica como a rota preferida; vale também quando um estado muda de endereço, até a lista ser atualizada.
+ */
+function govHostOfUf(host: string, uf: UfSigla): boolean {
+  if (!host.endsWith('.gov.br') || !validHost(host)) return false;
+  const labels = host.split('.');
+  return labels.slice(0, -2).includes(uf.toLowerCase());
+}
+
+/**
+ * Endereço para "Ver a nota no site da Sefaz": o endereço do QR lido, só quando o domínio é oficial da UF da chave. Dois
+ * caminhos: (1) o domínio está na lista `SEFAZ_QR_HOSTS` da UF; (2) para os outros estados, qualquer domínio ".gov.br" coerente
+ * com a UF da chave (a sigla da UF é um dos rótulos do domínio). O RJ só aceita o domínio confirmado (o endereço antigo
+ * deixou de valer de propósito). Devolve `esquema://domínio/caminho?consulta` (sem usuário, porta nem trecho "#"; domínio em
+ * minúsculas) ou null quando o domínio não serve, o endereço tem usuário, porta, espaço ou contra-barra, o esquema não é http
+ * nem https, ou não há consulta. Sem esquema, usa https. Só chama o endereço quem toca no botão; nada é guardado.
  */
 export function officialQueryUrl(uf: UfSigla, qrUrl: string | null | undefined): string | null {
   if (typeof qrUrl !== 'string') return null;
-  const hosts = SEFAZ_QR_HOSTS[uf];
-  if (!hosts) return null;
   const m = /^(?:(https?):\/\/)?([A-Za-z0-9.-]+)(\/[^\s?#\\]*)?(\?[^\s#\\]*)?(?:#\S*)?$/i.exec(qrUrl.trim());
   if (!m) return null;
   const host = m[2]!.toLowerCase();
-  if (!hosts.includes(host)) return null;
+  const listed = SEFAZ_QR_HOSTS[uf]?.includes(host) ?? false;
+  if (!listed && (uf === 'RJ' || !govHostOfUf(host, uf))) return null;
   const query = m[4] ?? '';
   if (query.length < 2) return null;
   return `${(m[1] ?? 'https').toLowerCase()}://${host}${m[3] ?? ''}${query}`;
@@ -557,7 +598,10 @@ export function factsFromKey(key: AccessKeyInfo): ReceiptFacts {
 }
 
 export interface ReceiptDraft {
-  /** Chave de acesso, para `receiptKey` do registro ou da compra no cartão. */
+  /**
+   * Resumo SHA-256 da chave de acesso (64 hexadecimais minúsculos), para `receiptKey` do registro ou da compra no cartão. Nunca
+   * a chave: a de pessoa física carrega o CPF do emitente.
+   */
   receiptKey: string;
   uf: UfSigla;
   model: ReceiptModel;
@@ -575,7 +619,7 @@ export interface ReceiptDraft {
   issuerName: string | null;
   /** "Nota fiscal do RJ, emitida em outubro de 2026" (ou "emitida em 12/10/2026" quando o dia é conhecido). */
   summary: string;
-  /** Endereço oficial da Sefaz, quando o QR veio de um domínio conhecido da UF. */
+  /** Endereço oficial da Sefaz, quando o QR veio de um domínio oficial da UF (lista ou ".gov.br" coerente com a UF). Nunca em nota de teste. */
   officialUrl: string | null;
   /** Texto quando a nota é de ambiente de teste (sem valor fiscal). */
   testNote: string | null;
@@ -628,7 +672,7 @@ export function receiptDraft(facts: ReceiptFacts, today: IsoDate): ReceiptDraft 
   const description = name !== '' ? fit(`Compra em ${name}`, DESCRIPTION_MAX) : key.cnpjFormatted ? `Compra (CNPJ ${key.cnpjFormatted})` : 'Compra';
   const when = known ? formatDateBR(known) : formatMonthYearBR(month);
   return {
-    receiptKey: key.key,
+    receiptKey: key.digest,
     uf: key.uf,
     model: key.model,
     description,
@@ -639,7 +683,8 @@ export function receiptDraft(facts: ReceiptFacts, today: IsoDate): ReceiptDraft 
     issuerCnpj: key.cnpjFormatted,
     issuerName: name !== '' ? name : null,
     summary: NOTA_TEXT.summary(key.uf, when),
-    officialUrl: officialQueryUrl(key.uf, facts.qrUrl),
+    // Nota de homologação (teste) não existe na página de produção da Sefaz: sem o botão.
+    officialUrl: facts.environment === 'homologacao' ? null : officialQueryUrl(key.uf, facts.qrUrl),
     testNote: facts.environment === 'homologacao' ? NOTA_TEXT.testNote : null,
     futureNote: month > todayMonth ? NOTA_TEXT.futureMonth : null,
   };
@@ -652,14 +697,20 @@ export const RECEIPT_DESCRIPTION_MAX = DESCRIPTION_MAX;
 // Nota de exemplo (demonstração e e2e)
 // ---------------------------------------------------------------------------
 
+/** Domínio reservado (RFC 2606, ".invalid" nunca existe) do QR de exemplo: a nota fictícia nunca aponta para a Sefaz de verdade. */
+export const EXAMPLE_RECEIPT_HOST = 'nota-de-exemplo.invalid';
+
 /**
  * Endereço de QR de uma nota de exemplo FICTÍCIA e identificada, para a demonstração e o e2e (sem câmera): NFC-e do RJ do mês
- * dado, CNPJ de exemplo 11.222.333/0001-81, série 999 e número 1. Só é usada quando a pessoa toca em "Usar nota de exemplo"; conta
- * nova nunca recebe dado de exemplo. Passa por `readReceiptCode` como qualquer QR e, salva, aparece como nota já anotada se for lida de novo.
+ * dado, CNPJ de exemplo 11.222.333/0001-81, série 999 e número 1, em AMBIENTE DE TESTE (homologação, tpAmb=2) e num domínio que
+ * não existe (`EXAMPLE_RECEIPT_HOST`). Por isso o rascunho mostra "Esta é uma nota de teste, sem valor fiscal." e nunca oferece
+ * "Ver a nota no site da Sefaz" (`officialUrl` null): a nota inventada não é aberta na Sefaz de verdade como se fosse de produção.
+ * Só é usada quando a pessoa toca em "Usar nota de exemplo"; conta nova nunca recebe dado de exemplo. Passa por `readReceiptCode`
+ * como qualquer QR e, salva, aparece como nota já anotada se for lida de novo.
  */
 export function exampleReceiptQr(month: IsoMonth): string {
   const body = `33${month.slice(2, 4)}${month.slice(5, 7)}1122233300018165999000000001100000000`;
-  return `https://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode?p=${body}${accessKeyCheckDigit(body)}|2|1|1|${'0'.repeat(40)}`;
+  return `https://${EXAMPLE_RECEIPT_HOST}/consultaNFCe/QRCode?p=${body}${accessKeyCheckDigit(body)}|2|2|1|${'0'.repeat(40)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -710,7 +761,7 @@ export const NOTA_TEXT = {
   example: { button: 'Usar nota de exemplo', note: 'Nota de exemplo fictícia, só para conhecer o recurso.' },
   chooseDay: 'Escolha o dia da compra',
   filled: 'Preenchemos o que a nota informa. Confira e toque em Salvar.',
-  privacy: 'Guardamos só a chave de acesso da nota, que não tem dados pessoais. Não guardamos CPF nem o link.',
+  privacy: 'Guardamos só um resumo da chave de acesso da nota, para avisar se ela for lida de novo. Não guardamos CPF, a chave nem o link.',
   testNote: 'Esta é uma nota de teste, sem valor fiscal.',
   futureMonth: 'Esta chave é de um mês que ainda não chegou. Confira os números.',
   summary: (uf: string, when: string): string => `Nota fiscal do ${uf}, emitida em ${when}`,

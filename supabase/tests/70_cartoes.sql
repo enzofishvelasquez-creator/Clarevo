@@ -10,7 +10,9 @@
 -- Diferença 2.100,00, Ainda a pagar 650,00 e renda comprometida 52,5% em outubro não mudam com o cartão nem com as compras.
 -- Pessoas FICTÍCIAS: Bia (sequência E e demonstração; titular da Família da Bia), Caio (Família, só leitura), Iris (Família,
 -- escreve sem "editar de outras pessoas"), Theo (Família, escreve e altera o que é dos outros), Rui (externo), Vera (RH da
--- empresa; Bia tem a licença) e Noel (conta nova; validação, limites, repetição, compras, crédito e nota). Valores em centavos.
+-- empresa; Bia tem a licença), Noel (conta nova; validação, limites, repetição, compras, crédito e nota) e Lia (conta nova;
+-- revisão da auditoria: pagar a fatura aberta sem travar o cartão, pagar fatura antiga, limite usado com crédito em cadeia,
+-- tempo perto do limite de lançamentos, apelido com separadores, leitura por chave da nota). Valores em centavos.
 \set ON_ERROR_STOP 1
 \set bia  '''00000000-0000-0000-0000-0000000000f1'''
 \set caio '''00000000-0000-0000-0000-0000000000f2'''
@@ -19,6 +21,7 @@
 \set rui  '''00000000-0000-0000-0000-0000000000f5'''
 \set vera '''00000000-0000-0000-0000-0000000000f6'''
 \set noel '''00000000-0000-0000-0000-0000000000f7'''
+\set lia  '''00000000-0000-0000-0000-0000000000f8'''
 
 begin;
 set local clarevo.today = '2026-10-07';
@@ -255,7 +258,7 @@ begin
 end $$;
 
 insert into ids values ('bia', :bia), ('caio', :caio), ('iris', :iris), ('theo', :theo), ('rui', :rui), ('vera', :vera),
-  ('noel', :noel);
+  ('noel', :noel), ('lia', :lia);
 insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
   (:bia,  'bia@exemplo.test',   now(), '{"display_name":"Bia"}'),
   (:caio, 'caio@exemplo.test',  now(), '{"display_name":"Caio"}'),
@@ -263,7 +266,8 @@ insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) value
   (:theo, 'theo@exemplo.test',  now(), '{"display_name":"Theo"}'),
   (:rui,  'rui@exemplo.test',   now(), '{"display_name":"Rui"}'),
   (:vera, 'vera@empresa.test',  now(), '{"display_name":"Vera"}'),
-  (:noel, 'noel@exemplo.test',  now(), '{"display_name":"Noel"}');
+  (:noel, 'noel@exemplo.test',  now(), '{"display_name":"Noel"}'),
+  (:lia,  'lia@exemplo.test',   now(), '{"display_name":"Lia"}');
 
 -- Espaços pessoais.
 set role authenticated;
@@ -272,7 +276,7 @@ declare
   p text;
   space jsonb;
 begin
-  foreach p in array array['bia', 'caio', 'iris', 'theo', 'rui', 'vera', 'noel'] loop
+  foreach p in array array['bia', 'caio', 'iris', 'theo', 'rui', 'vera', 'noel', 'lia'] loop
     perform pg_temp.as_(p);
     space := public.ensure_personal_space('Conta principal');
     insert into ids values (p || '_ctx', (space ->> 'context_id')::uuid), (p || '_acc', (space #>> '{account,id}')::uuid);
@@ -430,34 +434,33 @@ begin
     = 'janeiro,fevereiro,março,abril,maio,junho,julho,agosto,setembro,outubro,novembro,dezembro', 'meses em português';
 end $$;
 
--- Chave da nota: 44 dígitos e dígito verificador (módulo 11, pesos 2 a 9 da direita para a esquerda; resto 0 ou 1 dá 0).
+-- Chave da nota guardada: resumo SHA-256 da chave de acesso (64 hexadecimais minúsculos). A chave de 44 caracteres NUNCA é
+-- guardada (a de pessoa física carrega o CPF); o banco confere só a forma do resumo.
 do $$
 declare
   k text;
 begin
-  foreach k in array array['35080599999090910270550010000000010000000011', '33101234567800019065001000000123410000123454',
-                           '33260500000000000190650010000009871000000016', '33101112223300018165002000000004710000471014',
-                           '33109999999900012365001000000000110000000111',
-                           '33101234567800019065001000000123410000123470',   -- resto 0: dígito 0
-                           '33101234567800019065001000000123410000123560']   -- resto 1: dígito 0
+  foreach k in array array['ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+                           encode(sha256(convert_to('35080599999090910270550010000000010000000011', 'UTF8')), 'hex'),
+                           repeat('0', 64), repeat('f', 64), repeat('0123456789abcdef', 4)]
   loop
-    assert public.clarevo_receipt_key_valid(k), 'chave válida ' || k;
+    assert public.clarevo_receipt_key_valid(k), 'resumo válido ' || k;
   end loop;
-  foreach k in array array['33101234567800019065001000000123410000123455', '33101234567800019065001000000123410000123461',
-                           '3310123456780001906500100000012341000012345', '331012345678000190650010000001234100001234540',
-                           '3310123456780001906500100000012341000012345a', '33101234567800019065001000000123410000123 54',
-                           '', '00000000000000000000000000000000000000000001']
+  foreach k in array array['35080599999090910270550010000000010000000011',                          -- a chave inteira (44 dígitos) não é aceita
+                           '33260500000000000190650010000009871000000016',
+                           '35261012ABC34501DE35550010000001251000000035',                          -- nem com CNPJ alfanumérico
+                           '33261000052998224725550010000001241000000026',                          -- nem a de pessoa física (carrega CPF)
+                           repeat('A', 64), upper(encode(sha256('x'::bytea), 'hex')),               -- maiúsculas
+                           repeat('0', 63), repeat('0', 65), repeat('0', 63) || 'g', repeat('0', 63) || ' ', ' ' || repeat('0', 63),
+                           '', ' ', 'x']
   loop
-    assert not public.clarevo_receipt_key_valid(k), 'chave inválida "' || k || '"';
+    assert not public.clarevo_receipt_key_valid(k), 'resumo inválido "' || k || '"';
   end loop;
   assert not public.clarevo_receipt_key_valid(null), 'nula não é válida (quem chama trata a ausência)';
-  -- Dígito certo por construção: o mesmo cálculo, escrito de outro jeito, concorda em mil chaves.
-  assert not exists (
-    select 1 from (select lpad(g::text, 43, '3') as base from generate_series(1, 1000) g) b
-     where public.clarevo_receipt_key_valid(b.base || (
-       select case when r in (0, 1) then 0 else 11 - r end
-         from (select sum((substr(b.base, 44 - i, 1))::int * (2 + (i - 1) % 8)) % 11 as r from generate_series(1, 43) i) x)::text) is not true),
-    'dígito verificador calculado de outra forma concorda';
+  -- O mesmo resumo que o core calcula (vetores conhecidos; o teste do core confere os mesmos valores).
+  assert encode(sha256('abc'::bytea), 'hex') = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad', 'SHA-256 de "abc"';
+  assert encode(sha256(convert_to('35080599999090910270550010000000010000000011', 'UTF8')), 'hex')
+       = '7ad0f9e89a093ba3fbaa6099be31f117c550f8171ac4acda57d090fba35af79e', 'SHA-256 da chave de exemplo';
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -772,7 +775,7 @@ begin
   assert (select count(*) from public.card_entries where card_id = c) = 3, 'repetição não cria parcelas';
   perform pg_temp.expect_code(pg_temp.ap('cd-p-0030', c, '2026-10-07', 10000, 3, 'Sofá', 'Lazer'), 'chave_reutilizada', 'PT409');
   perform pg_temp.expect_code(pg_temp.ap('cd-p-0030', c, '2026-10-07', 10000, 2, 'Sofá', 'Moradia'), 'chave_reutilizada', 'PT409');
-  perform pg_temp.expect_code(pg_temp.ap('cd-p-0030', c, '2026-10-07', 10000, 3, 'Sofá', 'Moradia', '33101234567800019065001000000123410000123454'),
+  perform pg_temp.expect_code(pg_temp.ap('cd-p-0030', c, '2026-10-07', 10000, 3, 'Sofá', 'Moradia', '077c629d7c0482086b714ca21caca21da5d16f10fab42112559e4dce9222ded2'),
     'chave_reutilizada', 'PT409');
   perform pg_temp.expect_code(pg_temp.ach('cd-p-0030', c, '2026-11-01', 'juros', 10000), 'chave_reutilizada', 'PT409');
   perform pg_temp.check_links();
@@ -983,8 +986,16 @@ begin
 
   -- Passo 3: 12/11/2026. A fatura de novembro fechou em 03/11 e venceu em 10/11; a marca "estimado" é atualizada ao abrir o app.
   perform pg_temp.today('2026-11-12');
-  assert pg_temp.iv(c, '2026-11-01') = 'fechada 81040 conta81040v3e', 'fechada, mas a marca gravada ainda é a de antes';
+  -- A marca gravada fica velha até uma gravação de cartão ou sync_series_occurrences, mas as leituras (invoice_items,
+  -- commitment_items e month_committed) a calculam na hora: já firme depois do fechamento.
+  assert pg_temp.iv(c, '2026-11-01') = 'fechada 81040 conta81040v3', 'fechada: a leitura já mostra o valor firme';
+  assert pg_temp.cm(c, '2026-11-01') = '81040 2026-11-10 2026-11-03 aberto v3 estimado', 'a marca gravada ainda é a de antes';
+  assert not (select amount_is_estimate from public.commitment_items where id = pg_temp.cmid(c, '2026-11-01'))
+     and (select amount_is_estimate from public.commitment_items where id = pg_temp.cmid(c, '2026-12-01')), 'commitment_items: calculada na hora';
+  insert into snap values ('est_nov', (select estimated_open_cents::text from public.month_committed(pg_temp.id('bia_ctx'), '2026-11-01')));
   perform pg_temp.sync('bia_ctx');
+  assert (select v from snap where name = 'est_nov') = (select estimated_open_cents::text from public.month_committed(pg_temp.id('bia_ctx'), '2026-11-01')),
+    'month_committed: o estimado de novembro é o mesmo antes e depois de gravar a marca (já era calculado na hora)';
   assert pg_temp.cm(c, '2026-11-01') = '81040 2026-11-10 2026-11-03 aberto v4 firme', 'depois de abrir o app: valor firme, versão +1';
   assert pg_temp.cm(c, '2026-12-01') = '40000 2026-12-10 2026-12-03 aberto v1 estimado', 'dezembro ainda aberta: continua estimada';
   assert pg_temp.iv(c, '2026-11-01') = 'fechada 81040 conta81040v4' and pg_temp.iv(c, '2026-12-01') = 'aberta 40000 conta40000v1e', 'situação das faturas';
@@ -1154,7 +1165,14 @@ begin
     'pagamento total: paga, sem saldo anterior';
   assert (select request_hash from public.record_operations where idempotency_key = 'ce-b-0701')
        = md5(format('["pagar_fatura", "%s", "2026-11-01", %s, 78270, "2026-11-12", "%s"]', c, pg_temp.iv_ver(c, '2026-11-01') - 1, acc)), 'hash com a conta de saída';
-  perform pg_temp.expect_code(pg_temp.ap('ce-b-0702', c, '2026-10-20', 1000, 1, 'Fora de hora'), 'fatura_paga', 'PT409');
+  -- Compra do ciclo de uma fatura já paga: NÃO é recusada (pagar cedo não trava o cartão); vai para a primeira fatura livre
+  -- (dezembro) e a conta de dezembro cresce. A fatura paga continua intacta.
+  res := public.add_card_purchase('ce-b-0702', c, '2026-10-20', 1000, 1, 'Fora de hora');
+  assert res #>> '{entry,invoice_month}' = '2026-12-01' and pg_temp.cm(c, '2026-12-01') like '41000 % aberto %'
+     and pg_temp.iv(c, '2026-11-01') = 'paga 78270 conta0v' || pg_temp.iv_ver(c, '2026-11-01'), 'compra da fatura paga vai para dezembro';
+  perform pg_temp.check_links();
+  perform public.delete_card_entry('ce-b-0702x', (res #>> '{entry,id}')::uuid, 1);
+  assert pg_temp.cm(c, '2026-12-01') like '40000 % aberto %', 'e sai de dezembro ao excluir';
   perform pg_temp.expect_code(pg_temp.ach('ce-b-0703', c, '2026-11-01', 'multa', 100), 'fatura_paga', 'PT409');
   perform pg_temp.expect_code(pg_temp.arf('ce-b-0704', c, '2026-11-01', 100, 'Devolução'), 'fatura_paga', 'PT409');
   perform pg_temp.expect_code(pg_temp.de('ce-b-0705', (select id from public.card_entry_items where card_id = c and kind = 'encargo'), 1), 'fatura_paga', 'PT409');
@@ -1537,10 +1555,10 @@ declare
   acc uuid := pg_temp.id('noel_acc');
   bia uuid := pg_temp.id('bia_ctx');
   biacc uuid := pg_temp.id('bia_acc');
-  k1 text := '35080599999090910270550010000000010000000011';
-  k2 text := '33101234567800019065001000000123410000123454';
-  k3 text := '33260500000000000190650010000009871000000016';
-  k4 text := '33101112223300018165002000000004710000471014';
+  k1 text := '7ad0f9e89a093ba3fbaa6099be31f117c550f8171ac4acda57d090fba35af79e';
+  k2 text := '077c629d7c0482086b714ca21caca21da5d16f10fab42112559e4dce9222ded2';
+  k3 text := '2904729dae2e687811879a4343c29bb82be66b36778fca9a44ac9ce2070d58da';
+  k4 text := '6c5f063ae093566da0ce927a802757cfd1d5c7be5ddf4889b1728e848f131c87';
   card uuid := (select id from public.cards where context_id = pg_temp.id('noel_ctx') and nickname = 'Compras');
   r public.financial_records;
   r2 public.financial_records;
@@ -1562,7 +1580,7 @@ begin
   perform pg_temp.expect_code(format('select public.create_record(%L, %L, %L, ''despesa'', 100, ''2026-10-07'', ''Mercado'', null, %L)', 'cd-r-0012', ctx, acc, 'x'), 'chave_de_nota_invalida', '22023');
   perform pg_temp.expect_code(format('select public.create_record(%L, %L, %L, ''despesa'', 100, ''2026-10-07'', ''Mercado'', null, %L)', 'cd-r-0013', ctx, acc, '33101234567800019065001000000123410000123455'), 'chave_de_nota_invalida', '22023');
   perform pg_temp.expect_code(format('select public.create_record(%L, %L, %L, ''despesa'', 100, ''2026-10-07'', ''Mercado'', null, %L)', 'cd-r-0014', ctx, acc, '3310123456780001906500100000012341000012345'), 'chave_de_nota_invalida', '22023');
-  perform pg_temp.expect_code(format('select public.create_record(%L, %L, %L, ''despesa'', 100, ''2026-10-07'', ''Mercado'', null, %L)', 'cd-r-0015', ctx, acc, '331012345678000190650010000001234100001234540'), 'chave_de_nota_invalida', '22023');
+  perform pg_temp.expect_code(format('select public.create_record(%L, %L, %L, ''despesa'', 100, ''2026-10-07'', ''Mercado'', null, %L)', 'cd-r-0015', ctx, acc, '077c629d7c0482086b714ca21caca21da5d16f10fab42112559e4dce9222ded20'), 'chave_de_nota_invalida', '22023');
   perform pg_temp.expect_code(format('select public.create_record(%L, %L, %L, ''despesa'', 100, ''2026-10-07'', ''Mercado'', null, %L)', 'cd-r-0016', ctx, acc, '3310123456780001906500100000012341000012345a'), 'chave_de_nota_invalida', '22023');
   perform pg_temp.expect_code(format('select public.create_record(%L, %L, %L, ''receita'', 100, ''2026-10-07'', ''Venda'', null, %L)', 'cd-r-0017', ctx, acc, k2), 'chave_de_nota_invalida', '22023');
   -- A chave de uma compra no cartão também é validada.
@@ -1653,9 +1671,9 @@ reset role;
 insert into ids values ('k5_entry', gen_random_uuid());
 insert into public.financial_records (context_id, account_id, kind, amount_cents, currency, occurred_on, description, created_by, receipt_key)
   values (pg_temp.id('noel_ctx'), pg_temp.id('noel_acc'), 'despesa', 100, 'BRL', '2026-10-07', 'Direto', pg_temp.id('noel'),
-          '33109999999900012365001000000000110000000111');
+          '878e2ccaac8218bb7670035ddfaa1bda4413b2fcf4457469913e77133e24c69c');
 select pg_temp.expect_error(format($f$insert into public.financial_records (context_id, account_id, kind, amount_cents, currency, occurred_on, description, created_by, receipt_key)
-  values (%L, %L, 'despesa', 100, 'BRL', '2026-10-07', 'Direto 2', %L, '33109999999900012365001000000000110000000111')$f$,
+  values (%L, %L, 'despesa', 100, 'BRL', '2026-10-07', 'Direto 2', %L, '878e2ccaac8218bb7670035ddfaa1bda4413b2fcf4457469913e77133e24c69c')$f$,
   pg_temp.id('noel_ctx'), pg_temp.id('noel_acc'), pg_temp.id('noel')), '%financial_records_receipt_key%');
 -- Entre as duas tabelas, só o gatilho adiado pega (no fim da transação): uma fatura nova e consistente, com a nota que o gasto já tem.
 select pg_temp.expect_deferred(format($f$
@@ -1663,7 +1681,7 @@ select pg_temp.expect_deferred(format($f$
     values (%L, 'Fatura Compras', 100, '2027-06-12', %L, %L, '2027-06-01', '2027-06-05', false);
   insert into public.card_entries (id, context_id, card_id, kind, invoice_month, amount_cents, description, purchase_id, purchased_on,
       installment_number, installment_total, purchase_total_cents, receipt_key, created_by)
-    values (%L, %L, %L, 'parcela', '2027-06-01', 100, 'Direto', %L, '2026-10-07', 1, 1, 100, '33109999999900012365001000000000110000000111', %L)$f$,
+    values (%L, %L, %L, 'parcela', '2027-06-01', 100, 'Direto', %L, '2026-10-07', 1, 1, 100, '878e2ccaac8218bb7670035ddfaa1bda4413b2fcf4457469913e77133e24c69c', %L)$f$,
   pg_temp.id('noel_ctx'), pg_temp.id('noel'), pg_temp.id('noel_cp'), pg_temp.id('k5_entry'), pg_temp.id('noel_ctx'), pg_temp.id('noel_cp'),
   pg_temp.id('k5_entry'), pg_temp.id('noel')), 'nota_ja_anotada', '23505');
 -- Controle: a mesma fatura sem a nota repetida passa em todas as conferências do fim da transação.
@@ -1681,23 +1699,23 @@ rollback to savepoint controle;
 select pg_temp.expect_error(format($f$
   insert into public.card_entries (id, context_id, card_id, kind, invoice_month, amount_cents, description, purchase_id, purchased_on,
       installment_number, installment_total, purchase_total_cents, receipt_key, created_by)
-    values (%L, %L, %L, 'parcela', '2027-06-01', 100, 'A', %L, '2026-10-07', 1, 1, 100, '33260500000000000190650010000009871000000016', %L);
+    values (%L, %L, %L, 'parcela', '2027-06-01', 100, 'A', %L, '2026-10-07', 1, 1, 100, '2904729dae2e687811879a4343c29bb82be66b36778fca9a44ac9ce2070d58da', %L);
   insert into public.card_entries (id, context_id, card_id, kind, invoice_month, amount_cents, description, purchase_id, purchased_on,
       installment_number, installment_total, purchase_total_cents, receipt_key, created_by)
-    values (%L, %L, %L, 'parcela', '2027-07-01', 100, 'B', %L, '2026-10-07', 1, 1, 100, '33260500000000000190650010000009871000000016', %L)$f$,
+    values (%L, %L, %L, 'parcela', '2027-07-01', 100, 'B', %L, '2026-10-07', 1, 1, 100, '2904729dae2e687811879a4343c29bb82be66b36778fca9a44ac9ce2070d58da', %L)$f$,
   '40000000-0000-0000-0000-0000000000a1', pg_temp.id('noel_ctx'), pg_temp.id('noel_cp'), '40000000-0000-0000-0000-0000000000a1', pg_temp.id('noel'),
   '40000000-0000-0000-0000-0000000000a2', pg_temp.id('noel_ctx'), pg_temp.id('noel_cp'), '40000000-0000-0000-0000-0000000000a2', pg_temp.id('noel')),
   '%card_entries_receipt_key%');
 -- A chave não muda nunca (nem some), em gastos e em compras; formato; só em despesa comum.
-select pg_temp.expect_error(format($f$update public.financial_records set receipt_key = '33260500000000000190650010000009871000000016'
-  where receipt_key = '33109999999900012365001000000000110000000111' and context_id = %L$f$, pg_temp.id('noel_ctx')), 'campo_imutavel');
+select pg_temp.expect_error(format($f$update public.financial_records set receipt_key = '2904729dae2e687811879a4343c29bb82be66b36778fca9a44ac9ce2070d58da'
+  where receipt_key = '878e2ccaac8218bb7670035ddfaa1bda4413b2fcf4457469913e77133e24c69c' and context_id = %L$f$, pg_temp.id('noel_ctx')), 'campo_imutavel');
 select pg_temp.expect_error(format($f$update public.financial_records set receipt_key = null
-  where receipt_key = '33109999999900012365001000000000110000000111' and context_id = %L$f$, pg_temp.id('noel_ctx')), 'campo_imutavel');
+  where receipt_key = '878e2ccaac8218bb7670035ddfaa1bda4413b2fcf4457469913e77133e24c69c' and context_id = %L$f$, pg_temp.id('noel_ctx')), 'campo_imutavel');
 select pg_temp.expect_error(format($f$insert into public.financial_records (context_id, account_id, kind, amount_cents, currency, occurred_on, description, created_by, receipt_key)
   values (%L, %L, 'despesa', 100, 'BRL', '2026-10-07', 'Curta', %L, '123')$f$, pg_temp.id('noel_ctx'), pg_temp.id('noel_acc'), pg_temp.id('noel')),
   '%financial_records_receipt_key%');
 select pg_temp.expect_error(format($f$insert into public.financial_records (context_id, account_id, kind, amount_cents, currency, occurred_on, description, created_by, receipt_key)
-  values (%L, %L, 'receita', 100, 'BRL', '2026-10-07', 'Receita', %L, '33260500000000000190650010000009871000000016')$f$,
+  values (%L, %L, 'receita', 100, 'BRL', '2026-10-07', 'Receita', %L, '2904729dae2e687811879a4343c29bb82be66b36778fca9a44ac9ce2070d58da')$f$,
   pg_temp.id('noel_ctx'), pg_temp.id('noel_acc'), pg_temp.id('noel')), '%financial_records_receipt_key%');
 select pg_temp.expect_error(format($f$insert into public.card_entries (context_id, card_id, kind, invoice_month, amount_cents, description, purchase_id, purchased_on,
     installment_number, installment_total, purchase_total_cents, receipt_key, created_by)
@@ -1706,14 +1724,14 @@ select pg_temp.expect_error(format($f$insert into public.card_entries (context_i
 -- Chave só na primeira parcela.
 select pg_temp.expect_error(format($f$insert into public.card_entries (context_id, card_id, kind, invoice_month, amount_cents, description, purchase_id, purchased_on,
     installment_number, installment_total, purchase_total_cents, receipt_key, created_by)
-  values (%L, %L, 'parcela', '2027-06-01', 50, 'A', gen_random_uuid(), '2026-10-07', 2, 2, 100, '33260500000000000190650010000009871000000016', %L)$f$,
+  values (%L, %L, 'parcela', '2027-06-01', 50, 'A', gen_random_uuid(), '2026-10-07', 2, 2, 100, '2904729dae2e687811879a4343c29bb82be66b36778fca9a44ac9ce2070d58da', %L)$f$,
   pg_temp.id('noel_ctx'), pg_temp.id('noel_cp'), pg_temp.id('noel')), '%card_entries_forma%');
 -- Escrita direta da chave nos lançamentos que não são compra.
 select pg_temp.expect_error(format($f$insert into public.card_entries (context_id, card_id, kind, invoice_month, amount_cents, charge_kind, receipt_key, created_by)
-  values (%L, %L, 'encargo', '2027-06-01', 50, 'juros', '33260500000000000190650010000009871000000016', %L)$f$,
+  values (%L, %L, 'encargo', '2027-06-01', 50, 'juros', '2904729dae2e687811879a4343c29bb82be66b36778fca9a44ac9ce2070d58da', %L)$f$,
   pg_temp.id('noel_ctx'), pg_temp.id('noel_cp'), pg_temp.id('noel')), '%card_entries_forma%');
 select pg_temp.check_links();
-delete from public.financial_records where context_id = pg_temp.id('noel_ctx') and receipt_key = '33109999999900012365001000000000110000000111' and description = 'Direto';
+delete from public.financial_records where context_id = pg_temp.id('noel_ctx') and receipt_key = '878e2ccaac8218bb7670035ddfaa1bda4413b2fcf4457469913e77133e24c69c' and description = 'Direto';
 set role authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -2175,7 +2193,7 @@ begin
   perform pg_temp.expect_error(format('update public.card_entries set installment_number = 2 where id = %L', p), 'campo_imutavel');
   perform pg_temp.expect_error(format('update public.card_entries set source_month = ''2026-10-01'' where id = %L', sal), 'campo_imutavel');
   perform pg_temp.expect_error(format('update public.card_entries set payment_record_id = %L where id = %L', pg_temp.id('pgto1'), sal), 'campo_imutavel');
-  perform pg_temp.expect_error(format('update public.card_entries set receipt_key = %L where id = %L', '33260500000000000190650010000009871000000016', p), 'campo_imutavel');
+  perform pg_temp.expect_error(format('update public.card_entries set receipt_key = %L where id = %L', '2904729dae2e687811879a4343c29bb82be66b36778fca9a44ac9ce2070d58da', p), 'campo_imutavel');
   perform pg_temp.expect_error(format('update public.card_entries set created_by = %L where id = %L', pg_temp.id('bia'), ch), 'campo_imutavel');
   perform pg_temp.expect_error(format('update public.card_entries set created_at = now() - interval ''1 day'' where id = %L', ch), 'campo_imutavel');
   perform pg_temp.expect_error(format('update public.card_entries set amount_cents = 200 where id = %L', ch), 'campo_imutavel');
@@ -2260,7 +2278,7 @@ begin
   perform pg_temp.expect_error(format('update public.financial_records set invoice_month = ''2026-12-01'' where id = %L', pg_temp.id('g_record')), 'campo_imutavel');
   perform pg_temp.expect_error(format('update public.financial_records set card_id = %L where id = %L', pg_temp.id('g2_card'), pg_temp.id('g_record')), 'campo_imutavel');
   perform pg_temp.expect_error(format(rbase, 'card_id, invoice_month, commitment_id, receipt_key', ctx, acc, noel,
-    quote_literal(g) || ', ''2026-11-01'', ' || quote_literal(nov) || ', ''33260500000000000190650010000009871000000016'''), '%financial_records_receipt_key%');
+    quote_literal(g) || ', ''2026-11-01'', ' || quote_literal(nov) || ', ''2904729dae2e687811879a4343c29bb82be66b36778fca9a44ac9ce2070d58da'''), '%financial_records_receipt_key%');
 end $$;
 
 -- 11.4 Invariantes no fim da transação (cada caso desfeito no próprio bloco).
@@ -2353,6 +2371,306 @@ begin
   end loop;
 end $$;
 select pg_temp.check_links();
+
+-- ---------------------------------------------------------------------------
+-- 11b. Revisão da auditoria (Lia, conta nova, hoje 07/10/2026; cartões fecham dia 3 e vencem dia 10, salvo onde dito):
+--  a) pagar a fatura aberta antes do fechamento (total ou parcial) NÃO trava o cartão: as compras seguintes vão para a primeira
+--     fatura seguinte livre, o dinheiro é conservado e a pessoa continua podendo pagar o que falta;
+--  b) fatura antiga (compra de até 48 meses atrás) paga na data real; a janela de 1 ano continua para as recentes;
+--  c) limite usado com crédito em cadeia: soma por fatura não paga de max(0, total), igual ao core;
+--  d) apelido sem número de cartão com qualquer separador;
+--  e) tempo perto do limite de 5.000 lançamentos (gatilho de consistência por linha);
+--  f) leitura por chave da nota (receipt_items) e chave guardada só como resumo SHA-256 (nunca a chave, que pode ter CPF).
+-- ---------------------------------------------------------------------------
+reset role;
+select pg_temp.today('2026-10-07');
+set role authenticated;
+do $$
+declare
+  ctx uuid := pg_temp.id('lia_ctx');
+  acc uuid := pg_temp.id('lia_acc');
+  c uuid;
+  p uuid;
+  res jsonb;
+begin
+  perform pg_temp.as_('lia');
+
+  -- a) Cartão "Cedo". Compra de 20,00 em 01/10 (fatura de outubro, que fechou em 03/10 e vence em 10/10): paga em 07/10.
+  c := (public.create_card('li-a-0001', ctx, 'Cedo', null, 3, 10, null) #>> '{card,id}')::uuid;
+  insert into ids values ('lia_cedo', c);
+  perform public.add_card_purchase('li-a-0002', c, '2026-10-01', 2000, 1, 'Compra de outubro');
+  assert pg_temp.iv(c, '2026-10-01') = 'fechada 2000 conta2000v1', 'outubro fechada';
+  res := public.pay_invoice('li-a-0003', c, '2026-10-01', pg_temp.iv_ver(c, '2026-10-01'), 2000, '2026-10-07', acc);
+  assert res #>> '{invoices,0,status}' = 'paga', 'outubro paga';
+  -- Compra de 05/10 (depois do fechamento): novembro, ainda aberta (fecha em 03/11). Paga-se novembro ANTES do fechamento.
+  res := public.add_card_purchase('li-a-0004', c, '2026-10-05', 30000, 1, 'Mercado grande', 'Mercado');
+  assert res #>> '{entry,invoice_month}' = '2026-11-01' and pg_temp.iv(c, '2026-11-01') = 'aberta 30000 conta30000v1e', 'novembro aberta e estimada';
+  res := public.pay_invoice('li-a-0005', c, '2026-11-01', pg_temp.iv_ver(c, '2026-11-01'), 30000, '2026-10-07', acc);
+  assert res #>> '{invoices,0,status}' = 'paga' and pg_temp.iv(c, '2026-11-01') like 'paga 30000 conta0v%', 'novembro paga ainda aberta (antes do fechamento)';
+
+  -- O cartão NÃO trava: a compra de 07/10 cairia em novembro (paga) e vai para dezembro; novembro não muda.
+  res := public.add_card_purchase('li-a-0006', c, '2026-10-07', 7000, 1, 'Farmácia', 'Saúde');
+  assert res #>> '{entry,invoice_month}' = '2026-12-01' and pg_temp.cm(c, '2026-12-01') = '7000 2026-12-10 2026-12-03 aberto v1 estimado'
+     and pg_temp.iv(c, '2026-11-01') like 'paga 30000 conta0v%', 'compra de novembro (paga) vai para dezembro; a conta de dezembro nasce';
+  -- Em 3 vezes: dezembro, janeiro e fevereiro.
+  res := public.add_card_purchase('li-a-0007', c, '2026-10-07', 9000, 3, 'Tênis', 'Lazer');
+  assert res #>> '{entry,invoice_month}' = '2026-12-01'
+     and pg_temp.ivs(c) = '2026-10:2000 2026-11:30000 2026-12:10000 2027-01:3000 2027-02:3000', 'três parcelas a partir de dezembro';
+  -- O dinheiro é conservado (tudo o que foi anotado está nas faturas) e dá para pagar o que falta.
+  assert (select sum(total_cents) from public.invoice_items where card_id = c) = 2000 + 30000 + 7000 + 9000, 'soma das faturas = soma das compras';
+  assert (select count(*) from public.invoice_items where card_id = c and status in ('aberta', 'fechada') and commitment_id is not null) = 3
+     and (select count(*) from public.invoice_items where card_id = c and status = 'paga') = 2, 'três a pagar, duas pagas';
+  perform pg_temp.check_links();
+  perform pg_temp.views_agree();
+
+  -- Dezembro também é paga antes do fechamento; uma compra em 3 vezes do mesmo ciclo pula as faturas pagas (janeiro a março).
+  res := public.pay_invoice('li-a-0008', c, '2026-12-01', pg_temp.iv_ver(c, '2026-12-01'), 10000, '2026-10-07', acc);
+  res := public.add_card_purchase('li-a-0009', c, '2026-10-07', 6000, 3, 'Cadeira', 'Moradia');
+  assert res #>> '{entry,invoice_month}' = '2027-01-01'
+     and pg_temp.ivs(c) = '2026-10:2000 2026-11:30000 2026-12:10000 2027-01:5000 2027-02:5000 2027-03:2000',
+    'novembro e dezembro pagas: a compra começa em janeiro';
+  res := public.add_card_purchase('li-a-0010', c, '2026-10-07', 500, 1, 'Café');
+  assert res #>> '{entry,invoice_month}' = '2027-01-01', 'uma parcela: a primeira fatura livre';
+  -- Novembro volta a ficar em aberto (desfazer); dezembro continua paga. Uma parcela cabe em novembro; duas parcelas não
+  -- (dezembro está paga no meio) e começam em janeiro: nunca uma parcela dentro de fatura paga.
+  res := public.undo_invoice_payment('li-a-0011', c, '2026-11-01', pg_temp.iv_ver(c, '2026-11-01'));
+  res := public.add_card_purchase('li-a-0012', c, '2026-10-07', 400, 1, 'Pão');
+  assert res #>> '{entry,invoice_month}' = '2026-11-01' and pg_temp.cm(c, '2026-11-01') like '30400 % aberto %', 'uma parcela cabe em novembro (livre)';
+  res := public.add_card_purchase('li-a-0013', c, '2026-10-07', 800, 2, 'Livro');
+  assert res #>> '{entry,invoice_month}' = '2027-01-01', 'duas parcelas não cruzam dezembro (paga): começam em janeiro';
+  assert pg_temp.ivs(c) = '2026-10:2000 2026-11:30400 2026-12:10000 2027-01:5900 2027-02:5400 2027-03:2000', 'faturas depois das compras do ciclo';
+  assert (select sum(total_cents) from public.invoice_items where card_id = c) = 2000 + 30000 + 7000 + 9000 + 6000 + 500 + 400 + 800,
+    'o dinheiro continua conservado (total das faturas = total das compras)';
+  -- Mudar a data de uma compra para o ciclo de uma fatura paga (outubro) a deixa na primeira livre (novembro), sem recusa.
+  res := public.add_card_purchase('li-a-0014', c, '2026-10-07', 1000, 1, 'Mudar data');
+  p := (res #>> '{entry,id}')::uuid;
+  assert res #>> '{entry,invoice_month}' = '2026-11-01', 'nasce em novembro';
+  res := public.update_card_entry('li-a-0015', p, 1, 'compra', 1000, '2026-10-02', 'Mudar data', null, 1);
+  assert res #>> '{entry,invoice_month}' = '2026-11-01' and res #>> '{entry,purchased_on}' = '2026-10-02' and (res #>> '{entry,version}')::int = 2,
+    'data no ciclo de outubro (paga): a compra fica em novembro';
+  assert pg_temp.iv(c, '2026-10-01') like 'paga 2000 %' and pg_temp.cm(c, '2026-11-01') like '31400 % aberto %', 'outubro intacta; novembro com a compra';
+  -- Encargo e estorno escolhem a fatura (vêm da fatura do banco): fatura paga continua recusada.
+  perform pg_temp.expect_code(pg_temp.ach('li-a-0016', c, '2026-10-01', 'multa', 100), 'fatura_paga', 'PT409');
+  perform pg_temp.expect_code(pg_temp.arf('li-a-0017', c, '2026-12-01', 100, 'Devolução'), 'fatura_paga', 'PT409');
+  -- Desfazer o pagamento de dezembro e pagar de novo funciona (nada ficou preso).
+  res := public.undo_invoice_payment('li-a-0018', c, '2026-12-01', pg_temp.iv_ver(c, '2026-12-01'));
+  assert pg_temp.iv(c, '2026-12-01') like 'aberta 10000 conta10000v%', 'dezembro reaberta';
+  perform pg_temp.check_links();
+  perform pg_temp.views_agree();
+
+  -- Pagamento parcial antes do fechamento: o que sobra vai para dezembro como saldo anterior, e as compras seguintes também.
+  c := (public.create_card('li-a-0030', ctx, 'Parcial', null, 3, 10, null) #>> '{card,id}')::uuid;
+  perform public.add_card_purchase('li-a-0031', c, '2026-10-05', 30000, 1, 'Reforma');
+  res := public.pay_invoice('li-a-0032', c, '2026-11-01', pg_temp.iv_ver(c, '2026-11-01'), 20000, '2026-10-07', acc);
+  assert res #>> '{invoices,0,status}' = 'paga_em_parte' and res #>> '{entry,kind}' = 'saldo_anterior' and (res #>> '{entry,amount_cents}')::bigint = 10000,
+    'novembro paga em parte; 100,00 de saldo anterior em dezembro';
+  res := public.add_card_purchase('li-a-0033', c, '2026-10-07', 5000, 1, 'Depois do pagamento');
+  assert res #>> '{entry,invoice_month}' = '2026-12-01' and pg_temp.ivs(c) = '2026-11:30000 2026-12:15000', 'a compra vai para dezembro, junto do saldo';
+  assert (select sum(total_cents) from public.invoice_items where card_id = c and status in ('aberta', 'fechada')) + 20000 = 35000,
+    'o que falta pagar (150,00) mais o já pago (200,00) é o que se comprou (350,00)';
+  res := public.pay_invoice('li-a-0034', c, '2026-12-01', pg_temp.iv_ver(c, '2026-12-01'), 15000, '2026-10-07', acc);
+  assert res #>> '{invoices,0,status}' = 'paga' and (select sum(amount_cents) from public.financial_records
+          where context_id = ctx and card_id = c and deleted_at is null) = 35000, 'o resto pode ser pago; os dois pagamentos somam as compras';
+  perform pg_temp.check_links();
+
+  -- b) Fatura antiga: compra de 20/11/2024 em 3 vezes (faturas de dez/2024 a fev/2025, todas vencidas) paga na data real.
+  c := (public.create_card('li-b-0001', ctx, 'Antigo', null, 3, 10, null) #>> '{card,id}')::uuid;
+  perform public.add_card_purchase('li-b-0002', c, '2024-11-20', 9000, 3, 'Compra antiga');
+  assert pg_temp.ivs(c) = '2024-12:3000 2025-01:3000 2025-02:3000' and pg_temp.iv(c, '2024-12-01') = 'fechada 3000 conta3000v1', 'três faturas antigas';
+  -- Período da fatura de dez/2024: 04/11 a 03/12. Antes do início do período, não; no primeiro dia, sim.
+  perform pg_temp.expect_code(pg_temp.pi('li-b-0003', c, '2024-12-01', pg_temp.iv_ver(c, '2024-12-01'), 3000, '2024-11-03', acc), 'data_invalida', '22023');
+  res := public.pay_invoice('li-b-0004', c, '2024-12-01', pg_temp.iv_ver(c, '2024-12-01'), 3000, '2024-12-10', acc);
+  assert res #>> '{record,occurred_on}' = '2024-12-10' and res #>> '{invoices,0,status}' = 'paga', 'paga em 10/12/2024, a data real do vencimento';
+  perform pg_temp.expect_code(pg_temp.pi('li-b-0005', c, '2025-01-01', pg_temp.iv_ver(c, '2025-01-01'), 3000, '2024-12-03', acc), 'data_invalida', '22023');
+  res := public.pay_invoice('li-b-0006', c, '2025-01-01', pg_temp.iv_ver(c, '2025-01-01'), 3000, '2024-12-04', acc);
+  assert res #>> '{record,occurred_on}' = '2024-12-04', 'no primeiro dia do período';
+  perform pg_temp.expect_code(pg_temp.pi('li-b-0008', c, '2025-02-01', pg_temp.iv_ver(c, '2025-02-01'), 3000, '2026-10-08', acc), 'data_futura', '22023');
+  perform pg_temp.expect_code(pg_temp.pi('li-b-0009', c, '2025-02-01', pg_temp.iv_ver(c, '2025-02-01'), 3000, null, acc), 'data_invalida', '22023');
+  -- Fatura recente: a janela de 1 ano continua (07/10/2025 vale; 06/10/2025 não).
+  c := (public.create_card('li-b-0020', ctx, 'Janela', null, 3, 10, null) #>> '{card,id}')::uuid;
+  perform public.add_card_purchase('li-b-0021', c, '2026-10-05', 1000, 1, 'Recente');
+  perform pg_temp.expect_code(pg_temp.pi('li-b-0022', c, '2026-11-01', pg_temp.iv_ver(c, '2026-11-01'), 1000, '2025-10-06', acc), 'data_invalida', '22023');
+  res := public.pay_invoice('li-b-0023', c, '2026-11-01', pg_temp.iv_ver(c, '2026-11-01'), 1000, '2025-10-07', acc);
+  assert res #>> '{record,occurred_on}' = '2025-10-07', 'um ano atrás exato é aceito';
+  perform pg_temp.check_links();
+
+  -- c) Limite usado: 450,00 em 3 vezes e estorno de 400,00 em novembro (fecha dia 5, vence dia 12, hoje depois do fechamento).
+  c := (public.create_card('li-c-0001', ctx, 'Cadeia', null, 5, 12, 100000) #>> '{card,id}')::uuid;
+  perform public.add_card_purchase('li-c-0002', c, '2026-10-07', 45000, 3, 'Geladeira');
+  assert (public.add_card_refund('li-c-0003', c, '2026-11-01', 40000, 'Devolução') #>> '{card,used_cents}')::bigint = 5000
+     and pg_temp.ivs(c) = '2026-11:-25000 2026-12:-10000 2027-01:5000', 'crédito em cadeia: o único a pagar é janeiro (50,00)';
+  assert (select used_cents from public.card_items where id = c) = 5000, 'card_items.used_cents = soma de max(0, total) das faturas não pagas';
+  -- O caso da auditoria: 200,00 em novembro e 600,00 em 2 vezes, estorno de 600,00: novembro -100,00, dezembro 200,00.
+  c := (public.create_card('li-c-0010', ctx, 'Cadeia 2', null, 5, 12, null) #>> '{card,id}')::uuid;
+  perform public.add_card_purchase('li-c-0011', c, '2026-10-07', 20000, 1, 'Mercado');
+  perform public.add_card_purchase('li-c-0012', c, '2026-10-07', 60000, 2, 'Sofá');
+  perform public.add_card_refund('li-c-0013', c, '2026-11-01', 60000, 'Sofá devolvido');
+  assert pg_temp.ivs(c) = '2026-11:-10000 2026-12:20000' and (select used_cents from public.card_items where id = c) = 20000,
+    'novembro -100,00 levado a dezembro; limite usado 200,00 (e não 100,00)';
+  res := public.pay_invoice('li-c-0014', c, '2026-12-01', pg_temp.iv_ver(c, '2026-12-01'), 20000, '2026-10-07', acc);
+  assert (res #>> '{card,used_cents}')::bigint = 0 and (select used_cents from public.card_items where id = c) = 0, 'fatura paga sai do limite usado';
+  perform pg_temp.check_links();
+  perform pg_temp.views_agree();
+
+  -- d) Apelido sem número de cartão, com qualquer separador (13 a 19 dígitos em todo o apelido).
+  perform pg_temp.expect_code(pg_temp.cc('li-d-0001', ctx, '4111/1111/1111/1111', null, 3, 10, null), 'apelido_invalido', '22023');
+  perform pg_temp.expect_code(pg_temp.cc('li-d-0002', ctx, '4111_1111_1111_1111', null, 3, 10, null), 'apelido_invalido', '22023');
+  perform pg_temp.expect_code(pg_temp.cc('li-d-0003', ctx, '4111,1111,1111,1111', null, 3, 10, null), 'apelido_invalido', '22023');
+  perform pg_temp.expect_code(pg_temp.cc('li-d-0004', ctx, 'a4111b1111c1111d1111', null, 3, 10, null), 'apelido_invalido', '22023');
+  perform pg_temp.expect_code(pg_temp.cc('li-d-0005', ctx, '4111 1111 1111 111', null, 3, 10, null), 'apelido_invalido', '22023');
+  perform pg_temp.expect_code(pg_temp.cc('li-d-0006', ctx, '4111.1111-1111 1111', null, 3, 10, null), 'apelido_invalido', '22023');
+  perform pg_temp.expect_code(pg_temp.cc('li-d-0007', ctx, '41111111111111111111', null, 3, 10, null), 'apelido_invalido', '22023');
+  c := (public.create_card('li-d-0010', ctx, 'Loja 1234 / 2026', '1234', 3, 10, null) #>> '{card,id}')::uuid;   -- 8 dígitos: aceito
+  perform pg_temp.expect_code(pg_temp.uc('li-d-0011', c, 1, '4111/1111/1111/1111', null, 3, 10, null), 'apelido_invalido', '22023');
+  assert (select nickname from public.card_items where id = c) = 'Loja 1234 / 2026' and pg_temp.cardv(c) = 1, 'recusa não altera o cartão';
+end $$;
+reset role;
+-- Escrita direta (backend): a restrição da tabela também recusa o apelido com separadores.
+select pg_temp.expect_error(format($f$insert into public.cards (context_id, nickname, closing_day, due_day, created_by)
+  values (%L, '4111/1111/1111/1111', 3, 10, %L)$f$, pg_temp.id('lia_ctx'), pg_temp.id('lia')), '%cards_apelido_sem_numero%');
+select pg_temp.expect_error(format($f$insert into public.cards (context_id, nickname, closing_day, due_day, created_by)
+  values (%L, '4111,1111,1111,1111', 3, 10, %L)$f$, pg_temp.id('lia_ctx'), pg_temp.id('lia')), '%cards_apelido_sem_numero%');
+
+-- e) Tempo perto do limite de 5.000 lançamentos. O backend monta 100 compras de 48 parcelas (4.800 lançamentos) sem disparar os
+-- gatilhos (session_replication_role), como carga de dados; depois cada função de cartão roda com as conferências do fim da
+-- transação ligadas (set constraints all immediate) e o tempo é medido. O gatilho de consistência roda uma vez por linha
+-- alterada (uma compra em 48 parcelas dispara 48 vezes): cada disparo confere só os meses da linha e o crédito do cartão numa
+-- passada (O(lançamentos)), não uma subconsulta por mês.
+insert into ids values ('lia_cheio', gen_random_uuid());
+insert into public.cards (id, context_id, nickname, closing_day, due_day, created_by)
+  values (pg_temp.id('lia_cheio'), pg_temp.id('lia_ctx'), 'Cheio', 5, 12, pg_temp.id('lia'));
+set session_replication_role = replica;
+with pur as (select gen_random_uuid() as pid, g from generate_series(1, 100) g)
+insert into public.card_entries (id, context_id, card_id, kind, invoice_month, amount_cents, description, purchase_id, purchased_on,
+    installment_number, installment_total, purchase_total_cents, created_by)
+  select case when k = 1 then pur.pid else gen_random_uuid() end, pg_temp.id('lia_ctx'), pg_temp.id('lia_cheio'), 'parcela',
+         (date '2026-11-01' + make_interval(months => k - 1))::date, 100, 'Carga ' || pur.g, pur.pid, date '2026-10-07', k, 48, 4800,
+         pg_temp.id('lia')
+    from pur cross join generate_series(1, 48) k;
+set session_replication_role = origin;
+analyze public.card_entries;
+set role authenticated;
+do $$
+declare
+  c uuid := pg_temp.id('lia_cheio');
+  t0 timestamptz;
+  ms_add numeric;
+  ms_upd numeric;
+  ms_del numeric;
+  res jsonb;
+  p uuid;
+  limite constant numeric := 2000;   -- ms por operação (medido: de 100 a 300; antes da correção, de 4.000 a 6.000)
+begin
+  perform pg_temp.as_('lia');
+  assert (select count(*) from public.card_entries where card_id = c and deleted_at is null) = 4800, '4.800 lançamentos de carga';
+  t0 := clock_timestamp();
+  res := public.add_card_purchase('li-e-0001', c, '2026-10-07', 4800, 48, 'Última compra');
+  set constraints all immediate;
+  set constraints all deferred;
+  ms_add := extract(epoch from clock_timestamp() - t0) * 1000;
+  p := (res #>> '{entry,id}')::uuid;
+  assert (select count(*) from public.card_entries where card_id = c and deleted_at is null) = 4848, 'compra de 48 parcelas entrou';
+  assert ms_add < limite, format('add_card_purchase em 48 vezes perto do limite: %s ms (limite %s)', round(ms_add), limite);
+  t0 := clock_timestamp();
+  res := public.update_card('li-e-0002', c, pg_temp.cardv(c), 'Cheio', null, 5, 15, null);
+  set constraints all immediate;
+  set constraints all deferred;
+  ms_upd := extract(epoch from clock_timestamp() - t0) * 1000;
+  assert ms_upd < limite, format('update_card com 48 contas de fatura: %s ms (limite %s)', round(ms_upd), limite);
+  assert (select count(*) from public.commitments where card_id = c and deleted_at is null and due_on = (invoice_month + 14)) = 48, 'vencimento novo nas 48 contas';
+  t0 := clock_timestamp();
+  res := public.delete_card_entry('li-e-0003', p, 1);
+  set constraints all immediate;
+  set constraints all deferred;
+  ms_del := extract(epoch from clock_timestamp() - t0) * 1000;
+  assert ms_del < limite, format('delete_card_entry de compra em 48 vezes: %s ms (limite %s)', round(ms_del), limite);
+end $$;
+reset role;
+-- A carga de dados fica fora das conferências seguintes: apaga o cartão e tudo dele.
+delete from public.commitments where card_id = pg_temp.id('lia_cheio');
+delete from public.card_entries where card_id = pg_temp.id('lia_cheio');
+delete from public.cards where id = pg_temp.id('lia_cheio');
+select pg_temp.check_links();
+
+-- f) A chave da nota é guardada só como resumo SHA-256 e lida por receipt_items (para o aviso "Esta nota já foi anotada" logo
+-- depois de escanear). A chave de uma NF-e de pessoa física carrega o CPF do emitente ("000" + CPF) e a de CNPJ alfanumérico
+-- tem letras: o banco recebe o resumo de qualquer uma delas (calculado no aparelho) e nunca a chave.
+set role authenticated;
+do $$
+declare
+  ctx uuid := pg_temp.id('lia_ctx');
+  acc uuid := pg_temp.id('lia_acc');
+  bia uuid := pg_temp.id('bia_ctx');
+  biaacc uuid := pg_temp.id('bia_acc');
+  k_pf text := '33261000052998224725550010000001241000000026';          -- emitente pessoa física: CPF 529.982.247-25
+  k_alfa text := '35261012ABC34501DE35550010000001251000000035';        -- CNPJ alfanumérico 12.ABC.345/01DE-35
+  d_pf text := encode(sha256(convert_to(k_pf, 'UTF8')), 'hex');
+  d_alfa text := encode(sha256(convert_to(k_alfa, 'UTF8')), 'hex');
+  d_cartao text := encode(sha256(convert_to('33101112223300018165002000000004710000471014', 'UTF8')), 'hex');
+  r public.financial_records;
+  c uuid;
+  res jsonb;
+begin
+  perform pg_temp.as_('lia');
+  assert d_pf ~ '^[0-9a-f]{64}$' and d_alfa ~ '^[0-9a-f]{64}$' and d_pf <> d_alfa, 'resumos de 64 hexadecimais';
+  -- A chave inteira nunca é aceita (nem a de pessoa física, que tem CPF, nem a alfanumérica): só o resumo.
+  perform pg_temp.expect_code(format('select public.create_record(%L, %L, %L, ''despesa'', 100, ''2026-10-07'', ''Mercado'', null, %L)', 'li-f-0001', ctx, acc, k_pf),
+    'chave_de_nota_invalida', '22023');
+  perform pg_temp.expect_code(format('select public.create_record(%L, %L, %L, ''despesa'', 100, ''2026-10-07'', ''Mercado'', null, %L)', 'li-f-0002', ctx, acc, k_alfa),
+    'chave_de_nota_invalida', '22023');
+  perform pg_temp.expect_code(format('select public.create_record(%L, %L, %L, ''despesa'', 100, ''2026-10-07'', ''Mercado'', null, %L)', 'li-f-0003', ctx, acc, upper(d_pf)),
+    'chave_de_nota_invalida', '22023');
+  perform pg_temp.expect_code(format('select public.create_record(%L, %L, %L, ''despesa'', 100, ''2026-10-07'', ''Mercado'', null, %L)', 'li-f-0004', ctx, acc, substr(d_pf, 2)),
+    'chave_de_nota_invalida', '22023');
+  c := (public.create_card('li-f-0005', ctx, 'Notas', null, 5, 12, null) #>> '{card,id}')::uuid;
+  perform pg_temp.expect_code(pg_temp.ap('li-f-0006', c, '2026-10-07', 100, 1, 'x', null, k_pf), 'chave_de_nota_invalida', '22023');
+  assert (select count(*) from public.receipt_items where context_id = ctx) = 0, 'nada foi gravado';
+
+  -- Gasto com o resumo da chave de pessoa física e compra no cartão com o da chave alfanumérica: aceitos; nenhum CPF gravado.
+  r := public.create_record('li-f-0010', ctx, acc, 'despesa', 4500, '2026-10-06', 'Feira', 'Mercado', d_pf);
+  assert r.receipt_key = d_pf, 'resumo da chave de pessoa física guardado';
+  res := public.add_card_purchase('li-f-0011', c, '2026-10-07', 8000, 2, 'Loja com CNPJ novo', 'Lazer', d_alfa);
+  assert res #>> '{entry,receipt_key}' = d_alfa, 'resumo da chave com CNPJ alfanumérico guardado';
+  perform pg_temp.expect_code(format('select public.create_record(%L, %L, %L, ''despesa'', 100, ''2026-10-07'', ''Outra'', null, %L)', 'li-f-0012', ctx, acc, d_alfa),
+    'nota_ja_anotada', 'PT409', 'compra=' || (res #>> '{entry,id}'));
+  perform pg_temp.expect_code(pg_temp.ap('li-f-0013', c, '2026-10-07', 100, 1, 'Outra', null, d_pf), 'nota_ja_anotada', 'PT409', 'registro=' || r.id);
+
+  -- Leitura por chave (receipt_items): gasto, compra no cartão (primeira parcela), só de quem lê o contexto, só vivos.
+  assert (select array_agg(attname::text order by attnum) from pg_attribute where attrelid = 'public.receipt_items'::regclass and attnum > 0)
+       = array['context_id', 'receipt_key', 'record_id', 'card_entry_id', 'card_id'], 'colunas de receipt_items';
+  assert (select (record_id, card_entry_id, card_id) from public.receipt_items where context_id = ctx and receipt_key = d_pf)
+       is not distinct from (r.id, null::uuid, null::uuid),
+    'o gasto aparece pelo resumo da chave';
+  assert (select (record_id, card_entry_id, card_id) from public.receipt_items where context_id = ctx and receipt_key = d_alfa)
+       is not distinct from (null::uuid, (res #>> '{entry,id}')::uuid, c), 'a compra aparece com o id da compra e o cartão';
+  assert (select count(*) from public.receipt_items where context_id = ctx and receipt_key = d_cartao) = 0, 'chave nunca anotada: nada';
+  assert (select count(*) from public.receipt_items where receipt_key in (d_pf, d_alfa)) = 2 and not exists (
+    select 1 from public.receipt_items where receipt_key !~ '^[0-9a-f]{64}$'), 'só resumos';
+  perform pg_temp.as_('bia');
+  assert (select count(*) from public.receipt_items where receipt_key in (d_pf, d_alfa)) = 0, 'outra pessoa não vê as notas da Lia';
+  r := public.create_record('li-f-0020', bia, biaacc, 'despesa', 4500, '2026-10-06', 'Feira', null, d_pf);
+  assert (select count(*) from public.receipt_items where receipt_key = d_pf) = 1 and (select context_id from public.receipt_items where receipt_key = d_pf) = bia,
+    'cada contexto vê a sua';
+  perform pg_temp.as_('lia');
+  perform public.delete_card_entry('li-f-0021', (res #>> '{entry,id}')::uuid, 1);
+  assert (select count(*) from public.receipt_items where receipt_key = d_alfa) = 0, 'compra excluída: a chave volta a ficar livre';
+  perform public.delete_record('li-f-0022', (select record_id from public.receipt_items where context_id = ctx and receipt_key = d_pf), 1);
+  assert (select count(*) from public.receipt_items where context_id = ctx) = 0, 'gasto excluído: a chave volta a ficar livre';
+  perform pg_temp.check_links();
+end $$;
+reset role;
+do $$ begin
+  assert has_table_privilege('authenticated', 'public.receipt_items', 'select')
+     and not has_table_privilege('authenticated', 'public.receipt_items', 'insert, update, delete, truncate')
+     and not has_table_privilege('anon', 'public.receipt_items', 'select'), 'receipt_items: leitura para authenticated, nada para anon';
+  assert (select reloptions from pg_class where oid = 'public.receipt_items'::regclass) @> array['security_barrier=true'], 'receipt_items com security_barrier';
+  -- Nenhuma tabela guarda a chave inteira nem CPF de nota: toda chave guardada é um resumo de 64 hexadecimais.
+  assert not exists (select 1 from public.financial_records where receipt_key is not null and receipt_key !~ '^[0-9a-f]{64}$')
+     and not exists (select 1 from public.card_entries where receipt_key is not null and receipt_key !~ '^[0-9a-f]{64}$'), 'só resumos nas duas tabelas';
+end $$;
+set role anon;
+select pg_temp.expect_error($$select * from public.receipt_items$$, 'permission denied%');
+reset role;
 set role authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -2383,8 +2701,8 @@ do $$ begin
              'clarevo_check_receipt_free', 'clarevo_card_derived', 'clarevo_card_json', 'clarevo_invoice_json', 'clarevo_entry_json',
              'clarevo_card_result', 'clarevo_card_entry_result', 'clarevo_pay_result', 'clarevo_sync_card', 'clarevo_check_card_month',
              'clarevo_check_card_credit', 'clarevo_check_purchase', 'clarevo_check_invoice_payment', 'clarevo_check_card_consistency',
-             'clarevo_check_receipt_unique')
-             and not has_function_privilege('authenticated', p.oid, 'execute')) = 32, '32 auxiliares sem execute para authenticated';
+             'clarevo_check_receipt_unique', 'clarevo_first_free_month')
+             and not has_function_privilege('authenticated', p.oid, 'execute')) = 33, '33 auxiliares sem execute para authenticated';
   -- Nomes dos argumentos (chamada por nome no PostgREST) e retornos.
   assert pg_get_function_arguments('public.create_card(text, uuid, text, text, integer, integer, bigint)'::regprocedure)
        = 'p_idempotency_key text, p_context_id uuid, p_nickname text, p_last_digits text, p_closing_day integer, p_due_day integer, p_limit_cents bigint'

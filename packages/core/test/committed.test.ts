@@ -200,11 +200,11 @@ describe('percentual em milésimos e formato', () => {
     expect(committedGroupOf(bill(OCT + '-01', { series: ref('mensal') }))).toBe('fixos');
     expect(committedGroupOf(bill(OCT + '-01', { series: ref('anual') }))).toBe('anuais');
     expect(committedGroupOf(bill(OCT + '-01', { series: ref('parcelada', 'outro_parcelamento') }))).toBe('parcelamentos');
-    expect(committedGroupOf(bill(OCT + '-01', { invoice: { cardId: 'cartao-1', month: '2026-10' } }))).toBe('faturas');
-    expect(committedGroupOf(bill(OCT + '-01', { series: ref('parcelada', 'financiamento'), invoice: { cardId: 'cartao-1', month: '2026-10' } }))).toBe('faturas');
+    expect(committedGroupOf(bill(OCT + '-01', { invoice: { cardId: 'cartao-1', month: '2026-10', closingOn: '2026-10-03' } }))).toBe('faturas');
+    expect(committedGroupOf(bill(OCT + '-01', { series: ref('parcelada', 'financiamento'), invoice: { cardId: 'cartao-1', month: '2026-10', closingOn: '2026-10-03' } }))).toBe('faturas');
     expect(COMMITTED_GROUPS).toEqual(['fixos', 'anuais', 'parcelamentos', 'faturas', 'outras']);
     // Fatura de cartão nunca é dívida.
-    expect(isDebtCommitment(bill(OCT + '-01', { invoice: { cardId: 'cartao-1', month: '2026-10' } }))).toBe(false);
+    expect(isDebtCommitment(bill(OCT + '-01', { invoice: { cardId: 'cartao-1', month: '2026-10', closingOn: '2026-10-03' } }))).toBe(false);
     expect(isDebtCommitment(bill(OCT + '-01', { series: ref('parcelada', 'financiamento') }))).toBe(true);
     expect(isDebtCommitment(bill(OCT + '-01', { series: ref('parcelada', 'compra_parcelada') }))).toBe(true);
     expect(isDebtCommitment(bill(OCT + '-01', { series: ref('parcelada', 'outro_parcelamento') }))).toBe(false);

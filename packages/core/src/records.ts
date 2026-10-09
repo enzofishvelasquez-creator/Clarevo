@@ -45,7 +45,8 @@ export interface FinancialRecord {
    */
   invoice: InvoiceRef | null;
   /**
-   * Chave de acesso da nota fiscal (NF-e ou NFC-e, 44 dígitos com dígito verificador; D-038), sem nenhum dado pessoal. Única
+   * Resumo SHA-256 da chave de acesso da nota fiscal (64 hexadecimais minúsculos, calculado no aparelho por
+   * `receiptKeyDigest`; D-038). Nunca a chave de 44 caracteres: a de NF-e de emitente pessoa física carrega o CPF dele. Único
    * por contexto entre gastos e compras no cartão vivos. Só em despesa comum; null nos demais.
    */
   receiptKey: string | null;
@@ -84,10 +85,13 @@ export interface Commitment {
    */
   amountIsEstimate: boolean;
   /**
-   * Fatura de cartão (D-037): cartão e mês de vencimento. A conta muda só pelos lançamentos do cartão e é paga por
-   * pay_invoice (update_commitment, delete_commitment, pay_commitment e undo_commitment_payment recusam com conta_de_fatura).
+   * Fatura de cartão (D-037): cartão, mês de vencimento e o dia do fechamento gravado na conta (`card_closing_on`). A conta
+   * muda só pelos lançamentos do cartão e é paga por pay_invoice (update_commitment, delete_commitment, pay_commitment e
+   * undo_commitment_payment recusam com conta_de_fatura). Depois de paga, a conta não muda mais: o vencimento (`dueOn`) e o
+   * fechamento (`invoice.closingOn`) são os de quando foi paga, mesmo que o cartão troque os dias; a fatura mostrada
+   * (`buildInvoices`) usa os dois, como invoice_items.
    */
-  invoice: InvoiceRef | null;
+  invoice: CommitmentInvoiceRef | null;
   createdBy: string;
   version: number;
   createdAt: string;
@@ -98,6 +102,19 @@ export interface Commitment {
 export interface InvoiceRef {
   cardId: string;
   month: IsoMonth;
+}
+
+/**
+ * Nota fiscal já anotada (receipt_items): o gasto ou a compra no cartão vivos que têm o resumo da chave. Gasto: `recordId`
+ * (abrir com getRecord). Compra: `cardEntryId` (o id da compra, abrir com getCardEntry) e `cardId`.
+ */
+export type ReceiptMatch =
+  | { recordId: string; cardEntryId: null; cardId: null }
+  | { recordId: null; cardEntryId: string; cardId: string };
+
+/** A fatura na conta a pagar: também o dia do fechamento gravado (commitments.card_closing_on). */
+export interface CommitmentInvoiceRef extends InvoiceRef {
+  closingOn: IsoDate;
 }
 
 export interface CommitmentPayment {
@@ -148,7 +165,7 @@ export interface RecordInput {
   occurredOn: IsoDate;
   description: string;
   category: string | null;
-  /** Só ao criar uma despesa lida de uma nota fiscal (D-038): a chave de acesso. A edição ignora o campo. */
+  /** Só ao criar uma despesa lida de uma nota fiscal (D-038): o resumo SHA-256 da chave (`ReceiptDraft.receiptKey`), nunca a chave. A edição ignora o campo. */
   receiptKey?: string | null;
 }
 
@@ -502,7 +519,7 @@ export interface CardEntry {
   sourceMonth: IsoMonth | null;
   /** Só no saldo anterior: o gasto do pagamento parcial que o criou. */
   paymentRecordId: string | null;
-  /** Só na compra: chave de acesso da nota fiscal (D-038); única por contexto entre gastos e compras vivos. */
+  /** Só na compra: resumo SHA-256 da chave de acesso da nota fiscal (D-038); único por contexto entre gastos e compras vivos. */
   receiptKey: string | null;
   createdBy: string;
   version: number;
@@ -549,7 +566,7 @@ export interface CardPurchaseInput {
   purchasedOn: IsoDate;
   totalCents: Cents;
   installments: number;
-  /** Só ao criar (add_card_purchase), lida de uma nota fiscal (D-038): a chave de acesso. A edição ignora o campo. */
+  /** Só ao criar (add_card_purchase), lida de uma nota fiscal (D-038): o resumo SHA-256 da chave (`ReceiptDraft.receiptKey`), nunca a chave. A edição ignora o campo. */
   receiptKey?: string | null;
 }
 
