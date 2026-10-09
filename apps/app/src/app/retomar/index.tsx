@@ -17,6 +17,7 @@ import { Platform, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
 import { ContextPill, SubHeader } from '@/components/header';
+import { MoneyTxt } from '@/components/money-text';
 import { codeOf, isConflict, isUncertain, useReturnWriter } from '@/components/retorno-acoes';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Banner, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
@@ -99,7 +100,7 @@ export default function SeusUltimosMeses() {
           </View>
         ) : (
           <Animated.View entering={openIn} style={{ gap: space[4] }}>
-            <Txt>{returnOpeningText(review)}</Txt>
+            <MoneyTxt>{returnOpeningText(review)}</MoneyTxt>
             <Banner tone="info" icon={CalendarRange} live={false}>
               <Txt variant="label">{RETURN_TEXT.note}</Txt>
               <LinkButton
@@ -116,9 +117,9 @@ export default function SeusUltimosMeses() {
 
             {reviewCurrentText(review.current) ? (
               <Card style={{ gap: space[1] }}>
-                <Txt variant="label" style={tabular}>
-                  {reviewCurrentText(review.current)}
-                </Txt>
+                <MoneyTxt variant="label" style={tabular}>
+                  {reviewCurrentText(review.current)!}
+                </MoneyTxt>
               </Card>
             ) : null}
 
@@ -153,9 +154,9 @@ function MonthCard({ month }: { month: ReviewMonth }) {
         <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={2}>
           {card.title}
         </Txt>
-        <Txt variant="caption" color={colors.textSecondary} style={tabular}>
-          {card.received} · {card.paid}
-        </Txt>
+        <MoneyTxt variant="caption" color={colors.textSecondary} style={tabular}>
+          {`${card.received} · ${card.paid}`}
+        </MoneyTxt>
       </Card>
     );
   }
@@ -164,17 +165,17 @@ function MonthCard({ month }: { month: ReviewMonth }) {
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
         {card.title}
       </Txt>
-      <Txt variant="label" style={tabular}>
+      <MoneyTxt variant="label" style={tabular}>
         {card.received}
-      </Txt>
-      <Txt variant="label" style={tabular}>
+      </MoneyTxt>
+      <MoneyTxt variant="label" style={tabular}>
         {card.paid}
-      </Txt>
+      </MoneyTxt>
       <View style={styles.lines}>
         {card.lines.map((line) => (
-          <Txt key={line} variant="label" color={colors.textSecondary} style={tabular}>
+          <MoneyTxt key={line} variant="label" color={colors.textSecondary} style={tabular}>
             {line}
-          </Txt>
+          </MoneyTxt>
         ))}
       </View>
     </Card>

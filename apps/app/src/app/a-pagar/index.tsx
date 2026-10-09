@@ -29,6 +29,7 @@ import { useMoneyMask } from '@/components/committed-parts';
 import { AnnualGroupRow, CommitmentRow, type RowAction } from '@/components/commitment-row';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
+import { MoneyTxt } from '@/components/money-text';
 import { useReturnBand } from '@/components/retorno-faixa';
 import { EmptyState, ErrorState } from '@/components/states';
 import { TermHint } from '@/components/term-hint';
@@ -299,10 +300,10 @@ export default function ContasAPagarScreen() {
           ) : (
             <>
               <FitMoney cents={s.toPayCents} />
-              {caption?.includes ? <Txt variant="label">{caption.includes}</Txt> : null}
+              {caption?.includes ? <MoneyTxt variant="label">{caption.includes}</MoneyTxt> : null}
               {caption?.estimated ? (
                 <>
-                  <Txt variant="label">{caption.estimated}</Txt>
+                  <MoneyTxt variant="label">{caption.estimated}</MoneyTxt>
                   <TermHint term="Valor estimado" slug="estimativa" />
                 </>
               ) : null}
@@ -439,7 +440,7 @@ export default function ContasAPagarScreen() {
               },
             },
           ]}>
-          <Txt style={[{ fontFamily: fonts.bold }, tabular]}>{QUICK_PAY_TEXT.line(targetDraft.amountCents, targetDraft.paidOn)}</Txt>
+          <MoneyTxt style={[{ fontFamily: fonts.bold }, tabular]}>{QUICK_PAY_TEXT.line(targetDraft.amountCents, targetDraft.paidOn)}</MoneyTxt>
           <Txt color={colors.textSecondary}>
             Um gasto com esse valor entra em Pago de {formatMonthBR(monthOf(targetDraft.paidOn)).toLowerCase()}
             {personal && personal.accounts.length > 1 ? `, saindo da conta ${account.name}` : ''}, e a conta sai de Ainda a pagar.

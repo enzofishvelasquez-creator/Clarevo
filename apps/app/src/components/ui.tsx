@@ -26,7 +26,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { HIDDEN_MONEY, HIDDEN_MONEY_A11Y, maskMoneyLabel, useValuesHidden } from '@/lib/privacy';
+import { HIDDEN_MONEY, HIDDEN_MONEY_A11Y, maskMoneyLabel, maskMoneyText, spokenText, useValuesHidden } from '@/lib/privacy';
 import { yearA11y, yearA11yLabel } from '@/lib/years';
 import { colors, fonts, motion, radius, space, tabular, type } from '@/theme/tokens';
 
@@ -224,17 +224,21 @@ export function LinkButton({
 /**
  * Campo de texto com rótulo, dica e erro ligados ao campo (leitores de tela anunciam o erro).
  * `prefix` mostra um texto fixo à esquerda (ex.: "R$"); campos de senha ganham o botão "Mostrar senha".
+ * `moneyHint`: a dica traz um valor em reais de dados guardados ("A estimativa era R$ 180,00."); com "Ocultar valores"
+ * (lib/privacy.ts), aparece como "R$ ••••" e o leitor de tela diz "valor oculto". Limites fixos ("até R$ 9.999.999,99")
+ * não são dados da pessoa e ficam sem essa opção.
  */
 export const TextField = forwardRef<
   TextInput,
-  TextInputProps & { label: string; error?: string; hint?: string; large?: boolean; prefix?: string }
->(function TextField({ label, error, hint, large, prefix, style, onFocus, onBlur, secureTextEntry, ...props }, ref) {
+  TextInputProps & { label: string; error?: string; hint?: string; moneyHint?: boolean; large?: boolean; prefix?: string }
+>(function TextField({ label, error, hint, moneyHint, large, prefix, style, onFocus, onBlur, secureTextEntry, ...props }, ref) {
+  const hidden = useValuesHidden();
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const id = useId().replace(/:/g, '');
   const describedBy = error ? `${id}-erro` : hint ? `${id}-dica` : undefined;
   // Dica ou erro com um ano como "2026/2027": lidos "2026 a 2027" (spec 1.7).
-  const spokenHint = error ?? hint;
+  const spokenHint = error ?? (moneyHint && hint !== undefined ? maskMoneyLabel(hint, hidden) : hint);
   // Atributos ARIA que o React Native Web repassa ao campo na web.
   const aria = { 'aria-invalid': Boolean(error), 'aria-describedby': describedBy } as object;
   return (
@@ -278,8 +282,12 @@ export const TextField = forwardRef<
         ) : null}
       </View>
       {hint && !error ? (
-        <Txt variant="caption" color={colors.textSecondary} nativeID={`${id}-dica`} accessibilityLabel={yearA11yLabel(hint)}>
-          {hint}
+        <Txt
+          variant="caption"
+          color={colors.textSecondary}
+          nativeID={`${id}-dica`}
+          accessibilityLabel={moneyHint ? spokenText(hint, hidden) : yearA11yLabel(hint)}>
+          {moneyHint ? maskMoneyText(hint, hidden) : hint}
         </Txt>
       ) : null}
       {error ? (

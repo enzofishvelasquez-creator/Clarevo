@@ -1,6 +1,8 @@
 import { formatBRL, type Cents } from '@clarevo/core';
 import { useSyncExternalStore } from 'react';
 
+import { yearA11y } from '@/lib/years';
+
 /**
  * Ocultar valores (docs/08 §5 item 8): com valores ocultos, os valores em reais aparecem como "R$ ••••" e o leitor de
  * tela diz "valor oculto". O estado vale para a sessão do app: começa pela preferência "Ocultar valores ao abrir"
@@ -70,7 +72,20 @@ export function maskMoneyText(text: string, isHidden: boolean): string {
   return isHidden ? text.replace(MONEY_IN_TEXT, HIDDEN_MONEY) : text;
 }
 
-/** Nome acessível com os valores trocados por "valor oculto". */
+/**
+ * Nome acessível de um texto que pode ter valores em reais e anos como "2026/2027": os valores viram "valor oculto" (com
+ * valores ocultos) e o ano é lido "2026 a 2027". undefined quando o texto já se lê bem como está (o leitor de tela lê o
+ * próprio texto). Use no lugar de yearA11yLabel quando o texto mostrado também passa por maskMoneyText.
+ */
+export function spokenText(text: string, isHidden: boolean): string | undefined {
+  const spoken = yearA11y(maskMoneyLabel(text, isHidden));
+  return spoken === text ? undefined : spoken;
+}
+
+/**
+ * Nome acessível com os valores trocados por "valor oculto". Vários valores seguidos viram um só: "R$ 3.500,00 de
+ * R$ 22.500,00" é lido "valor oculto", não "valor oculto de valor oculto".
+ */
 export function maskMoneyLabel(text: string, isHidden: boolean): string {
-  return isHidden ? text.replace(MONEY_IN_TEXT, HIDDEN_MONEY_A11Y) : text;
+  return isHidden ? text.replace(MONEY_IN_TEXT, HIDDEN_MONEY_A11Y).replace(/valor oculto(?: (?:de|a|e) valor oculto)+/g, HIDDEN_MONEY_A11Y) : text;
 }

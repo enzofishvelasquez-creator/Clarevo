@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
+import { MoneyTxt } from '@/components/money-text';
 import { seriesStyles as styles, yearA11y, yearA11yLabel } from '@/components/series-parts';
 import { ErrorState } from '@/components/states';
 import { SumValues } from '@/components/sum-values';
@@ -220,6 +221,7 @@ export function YearInformForm({ series: s, number, contextId }: { series: Commi
               large
               autoFocus
               error={error ?? undefined}
+              moneyHint
               hint={
                 k > 1
                   ? 'Se as parcelas têm valores diferentes, informe o valor mais comum e ajuste as outras em cada conta.'
@@ -235,9 +237,9 @@ export function YearInformForm({ series: s, number, contextId }: { series: Commi
             />
             {/* Prévia que muda a cada tecla: sem região viva, para não ser anunciada de novo a cada dígito. */}
             <Banner tone="info" icon={Info} live={false}>
-              <Txt variant="label" accessibilityLabel={yearA11yLabel(plan.text)}>
+              <MoneyTxt variant="label" accessibilityLabel={yearA11yLabel(plan.text)}>
                 {plan.text}
-              </Txt>
+              </MoneyTxt>
             </Banner>
           </Card>
         )}
@@ -247,9 +249,9 @@ export function YearInformForm({ series: s, number, contextId }: { series: Commi
         <View style={styles.footerInner}>
           {banner ? (
             <Banner tone="erro" icon={AlertCircle}>
-              <Txt variant="label" color={colors.error}>
+              <MoneyTxt variant="label" color={colors.error}>
                 {banner}
-              </Txt>
+              </MoneyTxt>
             </Banner>
           ) : null}
           <View style={styles.footerRow}>

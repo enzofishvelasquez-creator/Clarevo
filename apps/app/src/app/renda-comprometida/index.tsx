@@ -23,6 +23,7 @@ import { CommitmentRow } from '@/components/commitment-row';
 import { FitText, GroupBar, Meter, MeterLegend, useMoneyMask } from '@/components/committed-parts';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
+import { MoneyTxt } from '@/components/money-text';
 import { monthChipLabel } from '@/components/series-parts';
 import { ErrorState } from '@/components/states';
 import { TermHint } from '@/components/term-hint';
@@ -174,7 +175,7 @@ function Highlight({ s, t }: { s: CommittedSummary; t: CommittedTexts }) {
       <View style={{ gap: space[1] }}>
         {t.highlight ? <FitText text={t.highlight} /> : null}
         <Txt color={colors.textSecondary}>{t.highlightCaption}</Txt>
-        {t.highlightAmounts ? <Txt style={[tabular, { fontFamily: fonts.bold }]}>{mask.text(t.highlightAmounts)}</Txt> : null}
+        {t.highlightAmounts ? <MoneyTxt style={[tabular, { fontFamily: fonts.bold }]}>{t.highlightAmounts}</MoneyTxt> : null}
       </View>
       {t.empty ? <Txt>{t.empty}</Txt> : null}
       {s.meter ? (
@@ -186,7 +187,7 @@ function Highlight({ s, t }: { s: CommittedSummary; t: CommittedTexts }) {
           label={t.meterA11y ? mask.label(t.meterA11y) : undefined}
         />
       ) : null}
-      {s.count > 0 ? <MeterLegend paid={mask.text(t.meterPaid)} open={mask.text(t.meterOpen)} /> : null}
+      {s.count > 0 ? <MeterLegend paid={t.meterPaid} open={t.meterOpen} /> : null}
       <TermHint term="Renda comprometida" slug="renda-comprometida" />
     </Card>
   );
@@ -208,12 +209,11 @@ function Composition({ s, t }: { s: CommittedSummary; t: CommittedTexts }) {
 }
 
 function GroupRow({ g, hasReference }: { g: CommittedGroupLine; hasReference: boolean }) {
-  const mask = useMoneyMask();
   return (
     <View style={styles.groupRow}>
-      <Txt variant="label" style={[tabular, { fontFamily: fonts.bold }]} accessibilityLabel={mask.label(g.a11yLabel)}>
-        {mask.text(g.line)}
-      </Txt>
+      <MoneyTxt variant="label" style={[tabular, { fontFamily: fonts.bold }]} accessibilityLabel={g.a11yLabel}>
+        {g.line}
+      </MoneyTxt>
       {hasReference ? <GroupBar permille={g.permille ?? 0} /> : null}
     </View>
   );
@@ -225,7 +225,6 @@ function GroupRow({ g, hasReference }: { g: CommittedGroupLine; hasReference: bo
  * regra. Sem renda de referência não há percentual, então também não há a marca de 30%.
  */
 function DebtBlock({ s, debt }: { s: CommittedSummary; debt: string }) {
-  const mask = useMoneyMask();
   const [shown, setShown] = useState(true);
   const [linkFailed, setLinkFailed] = useState(false);
   const hasReference = s.referenceCents !== null;
@@ -236,9 +235,9 @@ function DebtBlock({ s, debt }: { s: CommittedSummary; debt: string }) {
   };
   return (
     <View style={styles.debt}>
-      <Txt variant="label" style={[tabular, { fontFamily: fonts.bold }]}>
-        {mask.text(debt)}
-      </Txt>
+      <MoneyTxt variant="label" style={[tabular, { fontFamily: fonts.bold }]}>
+        {debt}
+      </MoneyTxt>
       {hasReference ? <GroupBar permille={s.debtPermille ?? 0} markPermille={shown ? DEBT_REFERENCE.permille : undefined} markLabel="30%" /> : null}
       {hasReference && shown ? (
         <View style={{ gap: space[1] }}>
@@ -281,25 +280,24 @@ function DebtBlock({ s, debt }: { s: CommittedSummary; debt: string }) {
  * meses anteriores (só no mês corrente, fora do percentual) e, acima da referência, a frase neutra no lugar do valor.
  */
 function Outside({ t }: { t: CommittedTexts }) {
-  const mask = useMoneyMask();
   if (!t.outside && !t.overReference && !t.estimated && !t.overdueBefore) return null;
   return (
     <Card style={{ gap: space[2] }}>
       {t.outside ? (
         <View style={{ gap: space[1] }}>
-          <Txt variant="title" style={tabular}>
-            {mask.text(t.outside)}
-          </Txt>
+          <MoneyTxt variant="title" style={tabular}>
+            {t.outside}
+          </MoneyTxt>
           <Txt variant="caption" color={colors.textSecondary}>
             {t.outsideNote}
           </Txt>
         </View>
       ) : null}
-      {t.overReference ? <Txt style={{ fontFamily: fonts.bold }}>{mask.text(t.overReference)}</Txt> : null}
-      {t.estimated ? <Txt>{mask.text(t.estimated)}</Txt> : null}
+      {t.overReference ? <MoneyTxt style={{ fontFamily: fonts.bold }}>{t.overReference}</MoneyTxt> : null}
+      {t.estimated ? <MoneyTxt>{t.estimated}</MoneyTxt> : null}
       {t.overdueBefore ? (
         <View style={{ gap: space[1] }}>
-          <Txt>{mask.text(t.overdueBefore)}</Txt>
+          <MoneyTxt>{t.overdueBefore}</MoneyTxt>
           <LinkButton label={COMMITTED_TEXT.seeOverdue} icon={ListChecks} style={styles.inlineLink} onPress={() => router.push('/a-pagar/vencidas')} />
         </View>
       ) : null}
@@ -309,11 +307,10 @@ function Outside({ t }: { t: CommittedTexts }) {
 
 /** Contas do ano ÷ 12 (P-019): só informativo, fora do percentual. */
 function AnnualShareCard({ s, t }: { s: CommittedSummary; t: CommittedTexts }) {
-  const mask = useMoneyMask();
   if (!t.annualShare) return null;
   return (
     <Card style={{ gap: space[1] }}>
-      <Txt style={tabular}>{mask.text(t.annualShare)}</Txt>
+      <MoneyTxt style={tabular}>{t.annualShare}</MoneyTxt>
       <Txt variant="caption" color={colors.textSecondary}>
         {t.annualShareNote}
         {s.annualShare?.estimated ? ` ${COMMITTED_TEXT.annualShareEstimated}` : ''}
@@ -328,7 +325,6 @@ function AnnualShareCard({ s, t }: { s: CommittedSummary; t: CommittedTexts }) {
  */
 function GoalLinesCard({ contextId, month }: { contextId: string | undefined; month: IsoMonth }) {
   const goals = useCommittedGoalLines(contextId, month);
-  const mask = useMoneyMask();
   if (goals.isPending) return null;
   if (goals.isError || !goals.data) {
     return (
@@ -342,9 +338,9 @@ function GoalLinesCard({ contextId, month }: { contextId: string | undefined; mo
   return (
     <Card style={{ gap: space[2] }}>
       <Title>Metas</Title>
-      <Txt style={tabular}>{mask.text(lines.saved)}</Txt>
-      {lines.planned ? <Txt style={tabular}>{mask.text(lines.planned)}</Txt> : null}
-      {lines.outsideAfterPlanned ? <Txt style={[tabular, { fontFamily: fonts.bold }]}>{mask.text(lines.outsideAfterPlanned)}</Txt> : null}
+      <MoneyTxt style={tabular}>{lines.saved}</MoneyTxt>
+      {lines.planned ? <MoneyTxt style={tabular}>{lines.planned}</MoneyTxt> : null}
+      {lines.outsideAfterPlanned ? <MoneyTxt style={[tabular, { fontFamily: fonts.bold }]}>{lines.outsideAfterPlanned}</MoneyTxt> : null}
       <Txt variant="caption" color={colors.textSecondary}>
         {lines.note}
       </Txt>
@@ -354,13 +350,12 @@ function GoalLinesCard({ contextId, month }: { contextId: string | undefined; mo
 
 /** Renda de referência vigente: valor e desde quando, Recebido do mês ao lado e "Alterar" ou, se varia, "Revisar". */
 function ReferenceCard({ s, t }: { s: CommittedSummary; t: CommittedTexts }) {
-  const mask = useMoneyMask();
   if (!t.reference) return null;
   return (
     <Card style={{ gap: space[2] }}>
       <Title>Renda de referência</Title>
-      <Txt style={[tabular, { fontFamily: fonts.bold }]}>{mask.text(t.reference)}</Txt>
-      {t.received ? <Txt color={colors.textSecondary}>{mask.text(t.received)}</Txt> : null}
+      <MoneyTxt style={[tabular, { fontFamily: fonts.bold }]}>{t.reference}</MoneyTxt>
+      {t.received ? <MoneyTxt color={colors.textSecondary}>{t.received}</MoneyTxt> : null}
       {t.review ? (
         <>
           <Txt>{t.review}</Txt>
@@ -398,7 +393,6 @@ function MonthBills({ s }: { s: CommittedSummary }) {
 /** Seis meses seguintes, sempre "Previsto", na mesma escala do medidor, e os marcos de "O que muda". */
 function Upcoming({ contextId, month }: { contextId: string | undefined; month: IsoMonth }) {
   const upcoming = useCommittedUpcoming(contextId, month);
-  const mask = useMoneyMask();
   const p = upcoming.data;
   return (
     <Card style={{ gap: space[2] }}>
@@ -417,9 +411,9 @@ function Upcoming({ contextId, month }: { contextId: string | undefined; month: 
           </Txt>
           {p.months.map((m) => (
             <View key={m.month} style={styles.groupRow}>
-              <Txt variant="label" style={[tabular, { fontFamily: fonts.bold }]} accessibilityLabel={mask.label(m.a11yLabel)}>
-                {mask.text(m.text)}
-              </Txt>
+              <MoneyTxt variant="label" style={[tabular, { fontFamily: fonts.bold }]} accessibilityLabel={m.a11yLabel}>
+                {m.text}
+              </MoneyTxt>
               {m.meter ? <Meter paidPermille={m.meter.paidPermille} openPermille={m.meter.openPermille} over={m.meter.over} height={8} /> : null}
             </View>
           ))}
@@ -429,9 +423,9 @@ function Upcoming({ contextId, month }: { contextId: string | undefined; month: 
                 {COMMITTED_TEXT.milestonesTitle}
               </Txt>
               {p.milestones.map((m) => (
-                <Txt key={`${m.kind}-${m.seriesId}-${m.month}`} variant="label" style={tabular}>
-                  {mask.text(m.text)}
-                </Txt>
+                <MoneyTxt key={`${m.kind}-${m.seriesId}-${m.month}`} variant="label" style={tabular}>
+                  {m.text}
+                </MoneyTxt>
               ))}
             </View>
           ) : null}

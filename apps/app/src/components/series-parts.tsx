@@ -1,9 +1,10 @@
-import { annualLastYearHint, formatBRL, formatMonthName, formatMonthYearBR, monthOf, type Cents, type IsoDate, type IsoMonth, type SeriesKind } from '@clarevo/core';
+import { annualLastYearHint, formatMonthName, formatMonthYearBR, monthOf, type Cents, type IsoDate, type IsoMonth, type SeriesKind } from '@clarevo/core';
 import { Check } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { spaceKeyPress, Txt } from '@/components/ui';
+import { maskMoneyText, moneyA11y, moneyText, spokenText, useValuesHidden } from '@/lib/privacy';
 import { yearA11y, yearA11yLabel } from '@/lib/years';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -60,10 +61,14 @@ export function monthChipLabel(month: IsoMonth, today: IsoDate): string {
   return month.slice(0, 4) === today.slice(0, 4) ? cap(formatMonthName(month)) : cap(formatMonthYearBR(month));
 }
 
-/** Valor estimado com o sinal "≈" na tela e "cerca de" no leitor de tela (nunca só o símbolo). */
-export function estimateText(cents: Cents, estimate: boolean): { text: string; a11y: string } {
-  const money = formatBRL(cents);
-  return estimate ? { text: `≈ ${money}`, a11y: `cerca de ${money}` } : { text: money, a11y: money };
+/**
+ * Valor estimado com o sinal "≈" na tela e "cerca de" no leitor de tela (nunca só o símbolo). Com valores ocultos
+ * (hidden, de useValuesHidden), "R$ ••••" na tela e "valor oculto" no leitor de tela.
+ */
+export function estimateText(cents: Cents, estimate: boolean, hidden = false): { text: string; a11y: string } {
+  const money = moneyText(cents, hidden);
+  const spoken = moneyA11y(cents, hidden);
+  return estimate ? { text: `≈ ${money}`, a11y: `cerca de ${spoken}` } : { text: money, a11y: spoken };
 }
 
 /** Mês de uma conta, para listas do detalhe: "Outubro" ou "Janeiro de 2027". */
@@ -98,27 +103,34 @@ export function ChoiceGroup({ label, hint, error, children }: { label: string; h
   );
 }
 
-/** Opção que se marca e desmarca (caixa de seleção), com texto de apoio. Alvo de 44 px e foco visível. */
+/**
+ * Opção que se marca e desmarca (caixa de seleção), com texto de apoio. Alvo de 44 px e foco visível. O rótulo e o
+ * apoio podem trazer valores em reais ("Venceu em 12/02/2027 · R$ 180,00"): com "Ocultar valores" (lib/privacy.ts),
+ * aparecem como "R$ ••••" e o leitor de tela diz "valor oculto".
+ */
 export function CheckOption({ label, hint, checked, onPress }: { label: string; hint?: string; checked: boolean; onPress: () => void }) {
+  const hidden = useValuesHidden();
+  const spokenLabel = spokenText(label, hidden);
+  const spokenHint = hint === undefined ? undefined : spokenText(hint, hidden);
   return (
     <Pressable
       accessibilityRole="checkbox"
       accessibilityState={{ checked }}
       aria-checked={checked}
-      accessibilityLabel={yearA11yLabel(label)}
-      accessibilityHint={hint === undefined ? undefined : yearA11y(hint)}
+      accessibilityLabel={spokenLabel}
+      accessibilityHint={hint === undefined ? undefined : yearA11y(spokenHint ?? hint)}
       onPress={onPress}
       {...spaceKeyPress(onPress)}
       style={(st) => [styles.check, (st as { focused?: boolean }).focused && styles.focusRing]}>
       <View style={[styles.box, checked && styles.boxChecked]}>{checked ? <Check size={16} color={colors.textOnBrand} strokeWidth={3} /> : null}</View>
       {/* Na web, o nome da caixa vem do texto (rótulo e dica): cada parte com "2026/2027" leva o nome falado. */}
       <View style={{ flex: 1, gap: 2 }}>
-        <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityLabel={yearA11yLabel(label)}>
-          {label}
+        <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityLabel={spokenLabel}>
+          {maskMoneyText(label, hidden)}
         </Txt>
         {hint ? (
-          <Txt variant="caption" color={colors.textSecondary} accessibilityLabel={yearA11yLabel(hint)}>
-            {hint}
+          <Txt variant="caption" color={colors.textSecondary} accessibilityLabel={spokenHint}>
+            {maskMoneyText(hint, hidden)}
           </Txt>
         ) : null}
       </View>

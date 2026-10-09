@@ -48,6 +48,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
+import { MoneyTxt } from '@/components/money-text';
 import { returnSession } from '@/components/retorno-acoes';
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt, styles as ui } from '@/components/ui';
@@ -367,9 +368,9 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       <Screen contentStyle={styles.body}>
         {noted ? (
           <Banner tone="sucesso" icon={Check}>
-            <Txt variant="label" color={colors.successText} style={{ fontFamily: fonts.bold }}>
+            <MoneyTxt variant="label" color={colors.successText} style={{ fontFamily: fonts.bold }}>
               {noted}
-            </Txt>
+            </MoneyTxt>
           </Banner>
         ) : null}
         {conflict ? (
@@ -377,9 +378,9 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             <Txt variant="label" color={colors.error}>
               {ERROR_TEXT.versao_desatualizada}
             </Txt>
-            <Txt variant="caption">
-              Versão atual: {conflict.description} · {formatBRL(conflict.amountCents)} · {formatDateBR(conflict.occurredOn)}
-            </Txt>
+            <MoneyTxt variant="caption">
+              {`Versão atual: ${conflict.description} · ${formatBRL(conflict.amountCents)} · ${formatDateBR(conflict.occurredOn)}`}
+            </MoneyTxt>
             <Txt variant="caption">Seu preenchimento foi mantido abaixo.</Txt>
             <Button label="Aplicar minhas alterações na versão atual" tone="soft" onPress={applyOverConflict} />
             <Button label="Descartar minhas alterações" tone="ghost" onPress={() => leave(goBack)} />

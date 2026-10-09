@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMoneyMask } from '@/components/committed-parts';
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
+import { MoneyTxt } from '@/components/money-text';
 import { ChoiceGroup, monthChipLabel, seriesStyles as styles } from '@/components/series-parts';
 import { ErrorState } from '@/components/states';
 import { TermHint } from '@/components/term-hint';
@@ -242,8 +243,13 @@ function ReferenceForm({ contextId }: { contextId: string }) {
           <>
             {chosen ? (
               <Card style={{ gap: space[3] }}>
-                <Txt>{mask.text(COMMITTED_TEXT.reference.suggestion(chosen.amountCents, chosen.months))}</Txt>
-                <Button label={mask.text(COMMITTED_TEXT.reference.useSuggestion(chosen.amountCents))} tone="soft" onPress={() => fillSuggestion(chosen.amountCents)} />
+                <MoneyTxt>{COMMITTED_TEXT.reference.suggestion(chosen.amountCents, chosen.months)}</MoneyTxt>
+                <Button
+                  label={mask.text(COMMITTED_TEXT.reference.useSuggestion(chosen.amountCents))}
+                  accessibilityLabel={mask.label(COMMITTED_TEXT.reference.useSuggestion(chosen.amountCents))}
+                  tone="soft"
+                  onPress={() => fillSuggestion(chosen.amountCents)}
+                />
               </Card>
             ) : null}
 

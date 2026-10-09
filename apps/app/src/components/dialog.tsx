@@ -2,11 +2,14 @@ import type { ReactNode } from 'react';
 import { Modal, StyleSheet, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
-import { yearA11yLabel } from '@/components/series-parts';
 import { Button, Txt } from '@/components/ui';
+import { maskMoneyText, spokenText, useValuesHidden } from '@/lib/privacy';
 import { colors, radius, space } from '@/theme/tokens';
 
-/** Diálogo de confirmação acessível. A ação segura vem primeiro. */
+/**
+ * Diálogo de confirmação acessível. A ação segura vem primeiro. O título pode trazer valores em reais ("Usar R$ 2.512,30
+ * a partir de 2028?"): com "Ocultar valores" (lib/privacy.ts), aparecem como "R$ ••••" e o leitor de tela diz "valor oculto".
+ */
 export function ConfirmDialog({
   visible,
   title,
@@ -29,14 +32,15 @@ export function ConfirmDialog({
   onConfirm: () => void;
 }) {
   const reduced = useReducedMotion();
+  const hidden = useValuesHidden();
   return (
     // Durante a ação (busy), nem Cancelar nem o voltar do sistema fecham o diálogo: a ação já começou.
     <Modal visible={visible} transparent animationType={reduced ? 'none' : 'fade'} onRequestClose={busy ? () => {} : onCancel}>
       <View style={styles.backdrop}>
         <View style={styles.box} accessibilityViewIsModal accessibilityRole="alert">
           {/* "2026/2027" no título é lido como "2026 a 2027". */}
-          <Txt variant="title" accessibilityRole="header" accessibilityLabel={yearA11yLabel(title)}>
-            {title}
+          <Txt variant="title" accessibilityRole="header" accessibilityLabel={spokenText(title, hidden)}>
+            {maskMoneyText(title, hidden)}
           </Txt>
           <View style={{ gap: space[2] }}>{children}</View>
           <View style={{ gap: space[2], marginTop: space[2] }}>

@@ -59,6 +59,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
+import { MoneyTxt } from '@/components/money-text';
 import { CheckOption, ChoiceGroup, joinList, lastYearHint, monthChipLabel, seriesStyles as styles, yearA11yLabel } from '@/components/series-parts';
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
@@ -689,9 +690,9 @@ export function SeriesEndForm({
             </Banner>
           ) : newTooLate ? null : effect ? (
             <Banner tone="info" icon={Info} live={false}>
-              <Txt variant="label" accessibilityLabel={yearA11yLabel(effect)}>
+              <MoneyTxt variant="label" accessibilityLabel={yearA11yLabel(effect)}>
                 {effect}
-              </Txt>
+              </MoneyTxt>
             </Banner>
           ) : null}
 
@@ -753,7 +754,7 @@ export function SeriesEndForm({
               {payPreview ? (
                 // Prévia que muda a cada tecla: sem região viva, para não ser anunciada de novo a cada dígito.
                 <Banner tone="info" icon={Info} live={false}>
-                  <Txt variant="label">{payPreview}</Txt>
+                  <MoneyTxt variant="label">{payPreview}</MoneyTxt>
                 </Banner>
               ) : null}
             </View>

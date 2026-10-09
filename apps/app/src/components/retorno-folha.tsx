@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { Modal, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
+import { MoneyTxt } from '@/components/money-text';
 import { PayRowError, codeOf, isUncertain, openRowFrom, useReturnWriter } from '@/components/retorno-acoes';
 import { ReturnRow } from '@/components/retorno-linha';
 import { yearA11yLabel } from '@/components/series-parts';
@@ -180,9 +181,9 @@ export function RegisterMonthSheet({
               <Txt variant="title" accessibilityRole="header">
                 {RETURN_TEXT.payTitle}
               </Txt>
-              <Txt style={[{ fontFamily: fonts.bold }, tabular]} accessibilityLabel={yearA11yLabel(body)}>
+              <MoneyTxt style={[{ fontFamily: fonts.bold }, tabular]} accessibilityLabel={yearA11yLabel(body)}>
                 {body}
-              </Txt>
+              </MoneyTxt>
               {personal && personal.accounts.length > 1 ? (
                 <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel={RETURN_TEXT.batchAccountLabel}>
                   {personal.accounts.map((a) => (
@@ -201,7 +202,7 @@ export function RegisterMonthSheet({
               <Txt variant="title" accessibilityRole="header">
                 {dialog.title}
               </Txt>
-              <Txt color={colors.textSecondary}>{dialog.body}</Txt>
+              <MoneyTxt color={colors.textSecondary}>{dialog.body}</MoneyTxt>
               <View style={{ gap: space[2], marginTop: space[2] }}>
                 <Button label={RETURN_TEXT.back} tone="soft" disabled={busy} onPress={() => setStep({ type: 'linha' })} />
                 <Button

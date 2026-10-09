@@ -42,6 +42,7 @@ import { SITUATION_LOOK } from '@/components/commitment-row';
 import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
+import { MoneyTxt } from '@/components/money-text';
 import { ErrorState } from '@/components/states';
 import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, FitMoney, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
@@ -563,9 +564,9 @@ export default function DetalheContaAPagar() {
                 busy={remove.isPending}
                 onCancel={() => setConfirming(null)}
                 onConfirm={doDelete}>
-                <Txt style={{ fontFamily: fonts.bold }}>
-                  {c.description} · {formatBRL(c.amountCents)} · vence em {formatDateBR(c.dueOn)} · Pessoal
-                </Txt>
+                <MoneyTxt style={{ fontFamily: fonts.bold }}>
+                  {`${c.description} · ${formatBRL(c.amountCents)} · vence em ${formatDateBR(c.dueOn)} · Pessoal`}
+                </MoneyTxt>
                 {ref ? (
                   <Txt color={colors.textSecondary}>
                     {annual
@@ -601,7 +602,7 @@ export default function DetalheContaAPagar() {
                   busy={skipping || skip.isPending}
                   onCancel={() => setConfirming(null)}
                   onConfirm={doSkip}>
-                  <Txt color={colors.textSecondary}>{yearPlan.text}</Txt>
+                  <MoneyTxt color={colors.textSecondary}>{yearPlan.text}</MoneyTxt>
                   <Txt color={colors.textSecondary}>Os valores deixam de contar em Ainda a pagar. Recebido, Pago e a diferença do mês não mudam.</Txt>
                 </ConfirmDialog>
               ) : null}
@@ -647,9 +648,9 @@ export default function DetalheContaAPagar() {
                   busy={undo.isPending}
                   onCancel={() => setConfirming(null)}
                   onConfirm={doUndo}>
-                  <Txt style={{ fontFamily: fonts.bold }}>
-                    {c.description} · {formatBRL(paid.amountCents)} pago em {formatDateBR(paid.paidOn)} · Pessoal
-                  </Txt>
+                  <MoneyTxt style={{ fontFamily: fonts.bold }}>
+                    {`${c.description} · ${formatBRL(paid.amountCents)} pago em ${formatDateBR(paid.paidOn)} · Pessoal`}
+                  </MoneyTxt>
                   <Txt color={colors.textSecondary}>
                     O gasto registrado será excluído e deixa de contar em Pago de {formatMonthBR(monthOf(paid.paidOn)).toLowerCase()}. A conta a
                     pagar volta para Ainda a pagar.
@@ -715,9 +716,9 @@ function Row({ label, value, last }: { label: string; value: string; last?: bool
       <Txt variant="label" color={colors.textSecondary}>
         {label}
       </Txt>
-      <Txt variant="label" style={{ fontFamily: fonts.bold, flexShrink: 1, textAlign: 'right' }}>
+      <MoneyTxt variant="label" style={{ fontFamily: fonts.bold, flexShrink: 1, textAlign: 'right' }}>
         {value}
-      </Txt>
+      </MoneyTxt>
     </View>
   );
 }

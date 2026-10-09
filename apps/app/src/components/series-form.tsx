@@ -55,6 +55,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
+import { MoneyTxt } from '@/components/money-text';
 import {
   ChoiceGroup,
   joinList,
@@ -965,20 +966,20 @@ export function SeriesForm({
             <Txt variant="label" style={{ fontFamily: fonts.bold }}>
               Como vai ficar
             </Txt>
-            <Txt variant="label" accessibilityLabel={yearA11yLabel(preview.text)}>
+            <MoneyTxt variant="label" accessibilityLabel={yearA11yLabel(preview.text)}>
               {preview.text}
-            </Txt>
+            </MoneyTxt>
             {preview.lines.map((line) => (
-              <Txt key={line} variant="caption" accessibilityLabel={yearA11yLabel(line)}>
+              <MoneyTxt key={line} variant="caption" accessibilityLabel={yearA11yLabel(line)}>
                 {line}
-              </Txt>
+              </MoneyTxt>
             ))}
           </Banner>
         ) : null}
 
         {conflicts?.texts.record ? (
           <Banner tone="info" icon={Info}>
-            <Txt variant="label">{conflicts.texts.record}</Txt>
+            <MoneyTxt variant="label">{conflicts.texts.record}</MoneyTxt>
             {conflicts.texts.startNext && canStartNext ? (
               <Button label={conflicts.texts.startNext} accessibilityLabel={yearA11yLabel(conflicts.texts.startNext)} tone="soft" onPress={startNext} />
             ) : null}
@@ -986,7 +987,7 @@ export function SeriesForm({
         ) : null}
         {showCommitmentConflict && conflicts && preview ? (
           <Banner tone="info" icon={Info}>
-            <Txt variant="label">{conflicts.texts.commitment}</Txt>
+            <MoneyTxt variant="label">{conflicts.texts.commitment ?? ''}</MoneyTxt>
             {conflicts.texts.startNext && canStartNext ? (
               <Button label={conflicts.texts.startNext} accessibilityLabel={yearA11yLabel(conflicts.texts.startNext)} tone="soft" onPress={startNext} />
             ) : null}
@@ -1000,7 +1001,7 @@ export function SeriesForm({
         ) : null}
         {conflicts?.texts.similar ? (
           <Banner tone="info" icon={Info}>
-            <Txt variant="label">{conflicts.texts.similar}</Txt>
+            <MoneyTxt variant="label">{conflicts.texts.similar}</MoneyTxt>
           </Banner>
         ) : null}
 

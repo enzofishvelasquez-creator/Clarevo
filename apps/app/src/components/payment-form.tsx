@@ -40,6 +40,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
+import { MoneyTxt } from '@/components/money-text';
 import { CheckOption, yearA11yLabel } from '@/components/series-parts';
 import { SumValues } from '@/components/sum-values';
 import { TermHint } from '@/components/term-hint';
@@ -395,9 +396,9 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
             <Txt variant="label" color={colors.error}>
               {COMMITMENT_ERROR_TEXT.versao_desatualizada}
             </Txt>
-            <Txt variant="caption">
-              Versão atual: {shown.description} · previsto {formatBRL(shown.amountCents)} · vence em {formatDateBR(shown.dueOn)}
-            </Txt>
+            <MoneyTxt variant="caption">
+              {`Versão atual: ${shown.description} · previsto ${formatBRL(shown.amountCents)} · vence em ${formatDateBR(shown.dueOn)}`}
+            </MoneyTxt>
             <Txt variant="caption">Seu preenchimento foi mantido abaixo.</Txt>
             <Button label="Confirmar pagamento na versão atual" tone="soft" onPress={() => submit()} />
           </Banner>
@@ -415,10 +416,11 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
           <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 16 }}>
             {shown.description}
           </Txt>
-          <Txt variant="caption" color={overdue ? colors.error : colors.textSecondary}>
-            {overdue ? 'Venceu em' : 'Vence em'} {formatDateBR(shown.dueOn)} ·{' '}
-            {shown.amountIsEstimate ? `estimado ≈ ${keepTogether(formatBRL(shown.amountCents))}` : `previsto ${keepTogether(formatBRL(shown.amountCents))}`}
-          </Txt>
+          <MoneyTxt variant="caption" color={overdue ? colors.error : colors.textSecondary}>
+            {`${overdue ? 'Venceu em' : 'Vence em'} ${formatDateBR(shown.dueOn)} · ${
+              shown.amountIsEstimate ? `estimado ≈ ${keepTogether(formatBRL(shown.amountCents))}` : `previsto ${keepTogether(formatBRL(shown.amountCents))}`
+            }`}
+          </MoneyTxt>
         </Card>
 
         <Card style={{ gap: space[4] }}>
@@ -438,9 +440,9 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
                 }}
               />
               {wholeYear && whole ? (
-                <Txt variant="caption" color={colors.textSecondary} style={{ paddingLeft: 24 + space[3] }} accessibilityLabel={yearA11yLabel(sumText(whole))}>
+                <MoneyTxt variant="caption" color={colors.textSecondary} style={{ paddingLeft: 24 + space[3] }} accessibilityLabel={yearA11yLabel(sumText(whole))}>
                   {sumText(whole)}
-                </Txt>
+                </MoneyTxt>
               ) : wholeYear ? (
                 <Txt variant="caption" color={colors.error} style={{ paddingLeft: 24 + space[3] }}>
                   {`Não foi possível carregar as parcelas de ${box.yearLabel}. Toque em Confirmar pagamento para tentar de novo ou desmarque a opção.`}
@@ -468,6 +470,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
             large
             autoFocus={c.amountIsEstimate}
             error={errors.amountText}
+            moneyHint
             hint={
               c.amountIsEstimate
                 ? `Digite o valor da conta. A estimativa era ${formatBRL(c.amountCents)}.`
@@ -540,16 +543,15 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
           {valid ? (
             // Prévia que muda a cada tecla: sem região viva, para não ser anunciada de novo a cada dígito.
             <Banner tone="info" icon={Info} live={false}>
-              <Txt variant="label">
-                Um gasto de {formatBRL(amount)} será registrado em Pago de {formatMonthBR(monthOf(paidOn)).toLowerCase()}, e esta conta a pagar
-                sai de Ainda a pagar.
-              </Txt>
+              <MoneyTxt variant="label">
+                {`Um gasto de ${formatBRL(amount)} será registrado em Pago de ${formatMonthBR(monthOf(paidOn)).toLowerCase()}, e esta conta a pagar sai de Ainda a pagar.`}
+              </MoneyTxt>
               {wholeYear && whole ? (
                 <Txt variant="label" accessibilityLabel={yearA11yLabel(afterText(whole))}>
                   {afterText(whole)}
                 </Txt>
               ) : amount !== shown.amountCents && !shown.amountIsEstimate ? (
-                <Txt variant="label">O valor pago é diferente do previsto ({formatBRL(shown.amountCents)}). Pago usa o valor pago.</Txt>
+                <MoneyTxt variant="label">{`O valor pago é diferente do previsto (${formatBRL(shown.amountCents)}). Pago usa o valor pago.`}</MoneyTxt>
               ) : null}
             </Banner>
           ) : null}

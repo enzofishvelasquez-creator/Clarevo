@@ -22,6 +22,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
+import { MoneyTxt } from '@/components/money-text';
 import { ErrorState } from '@/components/states';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { Banner, Button, Card, FitMoney, Screen, Skeleton, Txt } from '@/components/ui';
@@ -195,9 +196,7 @@ export default function DetalheRegistro() {
                 busy={remove.isPending}
                 onCancel={() => setConfirming(false)}
                 onConfirm={doDelete}>
-                <Txt style={{ fontFamily: fonts.bold }}>
-                  {r.description} · {formatBRL(r.amountCents)} · Pessoal
-                </Txt>
+                <MoneyTxt style={{ fontFamily: fonts.bold }}>{`${r.description} · ${formatBRL(r.amountCents)} · Pessoal`}</MoneyTxt>
                 <Txt color={colors.textSecondary}>O valor deixa de contar no resumo de {formatMonthBR(monthOf(r.occurredOn)).toLowerCase()}.</Txt>
                 {r.commitmentId ? <Txt color={colors.textSecondary}>A conta a pagar ligada a este gasto volta para Ainda a pagar.</Txt> : null}
               </ConfirmDialog>

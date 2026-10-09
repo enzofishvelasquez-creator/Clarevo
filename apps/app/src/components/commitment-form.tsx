@@ -40,6 +40,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
+import { MoneyTxt } from '@/components/money-text';
 import { SumValues } from '@/components/sum-values';
 import { ChoiceGroup, ofSeries, SERIES_NOUN } from '@/components/series-parts';
 import { TermHint } from '@/components/term-hint';
@@ -361,9 +362,9 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
             <Txt variant="label" color={colors.error}>
               {COMMITMENT_ERROR_TEXT.versao_desatualizada}
             </Txt>
-            <Txt variant="caption">
-              Versão atual: {conflict.description} · {formatBRL(conflict.amountCents)} · vence em {formatDateBR(conflict.dueOn)}
-            </Txt>
+            <MoneyTxt variant="caption">
+              {`Versão atual: ${conflict.description} · ${formatBRL(conflict.amountCents)} · vence em ${formatDateBR(conflict.dueOn)}`}
+            </MoneyTxt>
             <Txt variant="caption">Seu preenchimento foi mantido abaixo.</Txt>
             <Button label="Aplicar minhas alterações na versão atual" tone="soft" onPress={applyOverConflict} />
             <Button label="Descartar minhas alterações" tone="ghost" onPress={() => leave(goBack)} />
@@ -442,6 +443,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
             large
             autoFocus={informValue}
             error={errors.amountText}
+            moneyHint
             hint={
               informValue
                 ? `A estimativa era ${formatBRL(occurrence?.amountCents ?? 0)}.`

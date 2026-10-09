@@ -52,6 +52,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
+import { MoneyTxt } from '@/components/money-text';
 import { ChoiceGroup, monthChipLabel, seriesStyles as styles } from '@/components/series-parts';
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
@@ -593,7 +594,7 @@ export function SeriesEditForm({
         busy={busy}
         onCancel={() => setConfirm(null)}
         onConfirm={apply}>
-        <Txt>{confirm?.plan.text}</Txt>
+        <MoneyTxt>{confirm?.plan.text ?? ''}</MoneyTxt>
       </ConfirmDialog>
 
       <ConfirmDialog

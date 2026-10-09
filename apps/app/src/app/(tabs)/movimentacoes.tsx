@@ -21,6 +21,7 @@ import { AppHeader, ContextSwitch, MonthSwitcher } from '@/components/header';
 import { RecordRow } from '@/components/record-row';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, Chip, Money, Screen, Skeleton, Txt } from '@/components/ui';
+import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
 import { useCommitments, useMonthRecords, useSeriesList, useSpace, useView } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space } from '@/theme/tokens';
@@ -205,10 +206,11 @@ export default function MovimentacoesScreen() {
 
 /** Linha de atalho: ícone, nome, legenda curta e seta; nome acessível com a legenda ("Contas a pagar, R$ 650,00 em aberto neste mês, 1 vencida"). */
 function ShortcutRow({ icon: Icon, title, caption, open, last }: Shortcut & { last: boolean }) {
+  const hidden = useValuesHidden();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={shortcutA11yLabel(title, caption)}
+      accessibilityLabel={maskMoneyLabel(shortcutA11yLabel(title, caption), hidden)}
       onPress={open}
       style={(st) => [
         styles.shortcut,
@@ -224,7 +226,7 @@ function ShortcutRow({ icon: Icon, title, caption, open, last }: Shortcut & { la
           {title}
         </Txt>
         <Txt variant="caption" color={colors.textSecondary}>
-          {caption}
+          {maskMoneyText(caption, hidden)}
         </Txt>
       </View>
       <ChevronRight size={20} color={colors.textSecondary} aria-hidden />

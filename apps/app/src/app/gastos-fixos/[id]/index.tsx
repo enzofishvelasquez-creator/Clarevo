@@ -48,12 +48,14 @@ import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { RegisterMonthSheet } from '@/components/retorno-folha';
 import { ContextPill, SubHeader } from '@/components/header';
+import { MoneyTxt } from '@/components/money-text';
 import { estimateText, InstallmentBar, occurrenceMonthLabel, yearA11yLabel } from '@/components/series-parts';
 import { ErrorState } from '@/components/states';
 import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { explanationHref } from '@/lib/learn';
+import { moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
 import { useDeleteSeries, useSeries, useSeriesOccurrences, useSeriesOpenOccurrences, useSeriesOperationKey, useSpace } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
@@ -252,7 +254,7 @@ export default function DetalheGastoFixo() {
                 busy={deleting || remove.isPending}
                 onCancel={() => setConfirmDelete(false)}
                 onConfirm={doDelete}>
-                {deletePlan?.ok && deletePlan.text ? <Txt style={{ fontFamily: fonts.bold }}>{deletePlan.text}</Txt> : null}
+                {deletePlan?.ok && deletePlan.text ? <MoneyTxt style={{ fontFamily: fonts.bold }}>{deletePlan.text}</MoneyTxt> : null}
                 <Txt color={colors.textSecondary}>Prefere só parar de repetir? Use Encerrar.</Txt>
               </ConfirmDialog>
 
@@ -311,9 +313,9 @@ function Overview({ series: s, today }: { series: CommitmentSeries; today: IsoDa
         <Txt variant="label" color={colors.textSecondary}>
           {seriesCaption(s, today)}
         </Txt>
-        <Txt variant="title" style={tabular}>
+        <MoneyTxt variant="title" style={tabular}>
           {value}
-        </Txt>
+        </MoneyTxt>
         <CalcLink series={s} today={today} />
         {annual ? (
           <Txt variant="label" color={colors.textSecondary}>
@@ -342,9 +344,9 @@ function Overview({ series: s, today }: { series: CommitmentSeries; today: IsoDa
             Histórico de valores
           </Txt>
           {history.map((h) => (
-            <Txt key={`${h.term.fromNumber}`} variant="label" style={tabular}>
+            <MoneyTxt key={`${h.term.fromNumber}`} variant="label" style={tabular}>
               {h.text}
-            </Txt>
+            </MoneyTxt>
           ))}
         </Card>
       ) : null}
@@ -420,10 +422,9 @@ function Occurrences({
           <InstallmentBar paid={progress.paidBefore + progress.paidInApp} total={progress.total} />
           {progress.lastDueOn ? <Txt variant="label">Última parcela em {formatDateBR(progress.lastDueOn)}</Txt> : null}
           {progress.remainingCents !== null && progress.remaining ? (
-            <Txt variant="label" style={tabular}>
-              Soma das {parcelas(progress.remaining)} que faltam: {progress.approximate ? 'cerca de ' : ''}
-              {formatBRL(progress.remainingCents)}. Não é o valor para quitar.
-            </Txt>
+            <MoneyTxt variant="label" style={tabular}>
+              {`Soma das ${parcelas(progress.remaining)} que faltam: ${progress.approximate ? 'cerca de ' : ''}${formatBRL(progress.remainingCents)}. Não é o valor para quitar.`}
+            </MoneyTxt>
           ) : null}
           {DEBT_NATURES.includes(s.nature) ? (
             <View style={{ gap: space[1] }}>
@@ -531,11 +532,11 @@ function Occurrences({
 
       {suggestion && !ended ? (
         <Card style={{ gap: space[2] }}>
-          <Txt variant="label" style={tabular}>
+          <MoneyTxt variant="label" style={tabular}>
             {suggestion.count === 1
               ? `Valor da última conta paga: ${formatBRL(suggestion.amountCents)}.`
               : `Média das últimas ${suggestion.count} contas pagas: ${formatBRL(suggestion.amountCents)}.`}
-          </Txt>
+          </MoneyTxt>
           {applyFrom !== null ? (
             <Button
               label="Usar como novo valor de referência"
@@ -627,7 +628,8 @@ function Actions({
 
 /** Conta prevista: ainda não existe, não é tocável e não entra em total. */
 function ProjectedRow({ planned: p, last }: { planned: PlannedOccurrence; last: boolean }) {
-  const amount = estimateText(p.amountCents, p.amountIsEstimate);
+  const hidden = useValuesHidden();
+  const amount = estimateText(p.amountCents, p.amountIsEstimate, hidden);
   const label = `${p.description}, prevista, vence em ${formatDateBR(p.dueOn)}, ${amount.a11y}${p.amountIsEstimate ? ', valor estimado' : ''}`;
   return (
     <View style={[styles.row, !last && styles.divider]} accessible accessibilityLabel={label}>
@@ -650,14 +652,16 @@ function ProjectedRow({ planned: p, last }: { planned: PlannedOccurrence; last: 
 /** "Outubro · paga em 05/10/2026 · R$ 2.500,00" (parcelamento: com o número da parcela). Abre a conta. */
 function PaidRow({ commitment: c, today, last }: { commitment: Commitment; today: IsoDate; last: boolean }) {
   const month = occurrenceMonthLabel(c.dueOn, today);
+  const hidden = useValuesHidden();
   const number = c.series?.kind === 'parcelada' ? `Parcela ${c.series.number} · ` : '';
-  const amount = formatBRL(c.payment?.amountCents ?? c.amountCents);
+  const cents = c.payment?.amountCents ?? c.amountCents;
+  const amount = moneyText(cents, hidden);
   const paidOn = c.payment ? formatDateBR(c.payment.paidOn) : '';
   return (
     <Pressable
       onPress={() => router.push(`/a-pagar/${c.id}`)}
       accessibilityRole="button"
-      accessibilityLabel={`${number}${month}, paga em ${paidOn}, ${amount}`}
+      accessibilityLabel={`${number}${month}, paga em ${paidOn}, ${moneyA11y(cents, hidden)}`}
       accessibilityHint="Abre a conta a pagar"
       style={(st) => [
         styles.row,

@@ -1,8 +1,9 @@
-import { formatBRL, formatDateBR, type FinancialRecord } from '@clarevo/core';
+import { formatDateBR, type FinancialRecord } from '@clarevo/core';
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Money, Txt } from '@/components/ui';
+import { moneyA11y, useValuesHidden } from '@/lib/privacy';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
 export function kindLabel(r: Pick<FinancialRecord, 'kind'>) {
@@ -11,6 +12,7 @@ export function kindLabel(r: Pick<FinancialRecord, 'kind'>) {
 
 export function RecordRow({ record, onPress, last }: { record: FinancialRecord; onPress?: () => void; last?: boolean }) {
   const { width, fontScale } = useWindowDimensions();
+  const hidden = useValuesHidden();
   const stacked = width < 360 || fontScale > 1.3;
   const isIn = record.kind === 'receita';
   const Icon = isIn ? ArrowDownLeft : ArrowUpRight;
@@ -21,7 +23,7 @@ export function RecordRow({ record, onPress, last }: { record: FinancialRecord; 
       onPress={onPress}
       disabled={!onPress}
       accessibilityRole={onPress ? 'button' : undefined}
-      accessibilityLabel={`${record.description}, ${when}, ${formatBRL(record.amountCents)}`}
+      accessibilityLabel={`${record.description}, ${when}, ${moneyA11y(record.amountCents, hidden)}`}
       style={(s) => [
         styles.row,
         !last && styles.divider,

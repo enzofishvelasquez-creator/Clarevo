@@ -1,4 +1,4 @@
-import { COMMITTED_TEXT, ERROR_TEXT, committedLine, emptyMonthCaption, formatBRL, formatDateBR, formatMonthBR, monthOf, toPayCaption } from '@clarevo/core';
+import { COMMITTED_TEXT, ERROR_TEXT, committedLine, emptyMonthCaption, formatDateBR, formatMonthBR, monthOf, toPayCaption } from '@clarevo/core';
 import { router, useFocusEffect } from 'expo-router';
 import { AlertCircle, ArrowRight, CalendarClock, ChevronRight, Plus, ShieldCheck } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -9,6 +9,7 @@ import { Meter, useMoneyMask } from '@/components/committed-parts';
 import { FamilyNotLinked } from '@/components/family-state';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { AppHeader, ContextSwitch, MonthSwitcher } from '@/components/header';
+import { MoneyTxt } from '@/components/money-text';
 import { PrimeirosPassos } from '@/components/primeiros-passos';
 import { RecordRow } from '@/components/record-row';
 import { ReturnBand, useReturnBand } from '@/components/retorno-faixa';
@@ -17,6 +18,7 @@ import { Body, Button, Card, FitMoney, LinkButton, Money, Screen, Skeleton, Txt 
 import { totalChange, type TotalChange } from '@/lib/highlight';
 import { explanationHref } from '@/lib/learn';
 import { summaryTop } from '@/lib/nav';
+import { maskMoneyLabel, moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
 import { useCommitments, useCommittedSummary, useMonthRecords, useSpace, useView } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
@@ -25,6 +27,7 @@ export default function ResumoScreen() {
   const { today } = useSession();
   const { space: kind, month, currentMonth, monthDirection } = useView();
   const narrow = useWindowDimensions().width < 360;
+  const hidden = useValuesHidden();
   const [notice, setNotice] = useFlash();
   const personal = useSpace().data;
   const contextId = kind === 'pessoal' ? personal?.personalContextId : undefined;
@@ -92,7 +95,7 @@ export default function ResumoScreen() {
               <>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Diferença do mês, ${formatBRL(s.differenceCents)}`}
+                  accessibilityLabel={`Diferença do mês, ${moneyA11y(s.differenceCents, hidden)}`}
                   accessibilityHint="Mostra os registros que compõem o total"
                   onPress={() => router.push({ pathname: '/composicao', params: { tipo: 'diferenca' } })}
                   style={(st) => (st as { focused?: boolean }).focused && styles.focusOnBrand}>
@@ -211,6 +214,7 @@ export default function ResumoScreen() {
 function ToPayCard({ contextId }: { contextId: string | undefined }) {
   const { today } = useSession();
   const { month, currentMonth } = useView();
+  const hidden = useValuesHidden();
   const commitments = useCommitments(contextId, month);
   const s = commitments.summary;
   const isCurrent = month === currentMonth;
@@ -235,8 +239,8 @@ function ToPayCard({ contextId }: { contextId: string | undefined }) {
   const a11y = !s
     ? label
     : caption?.main
-      ? `${label}, ${formatBRL(s.toPayCents)}. ${caption.main}.${caption.overdue ? ` ${caption.overdue}.` : ''}${caption.includes ? ` ${caption.includes}` : ''}${caption.estimated ? ` ${caption.estimated}` : ''}`
-      : `${label}, ${formatBRL(s.toPayCents)}. ${zeroText}`;
+      ? `${label}, ${moneyA11y(s.toPayCents, hidden)}. ${caption.main}.${caption.overdue ? ` ${caption.overdue}.` : ''}${caption.includes ? ` ${maskMoneyLabel(caption.includes, hidden)}` : ''}${caption.estimated ? ` ${maskMoneyLabel(caption.estimated, hidden)}` : ''}`
+      : `${label}, ${moneyA11y(s.toPayCents, hidden)}. ${zeroText}`;
 
   return (
     <Card style={{ gap: space[2] }}>
@@ -276,9 +280,9 @@ function ToPayCard({ contextId }: { contextId: string | undefined }) {
                 </Txt>
               </View>
             ) : null}
-            {caption.includes ? <Txt variant="caption">{caption.includes}</Txt> : null}
+            {caption.includes ? <MoneyTxt variant="caption">{caption.includes}</MoneyTxt> : null}
             {/* Gastos fixos que mudam de valor (luz, água): parte do total é a referência, ainda estimada. */}
-            {caption.estimated ? <Txt variant="caption">{caption.estimated}</Txt> : null}
+            {caption.estimated ? <MoneyTxt variant="caption">{caption.estimated}</MoneyTxt> : null}
             <Txt variant="caption" color={colors.textSecondary}>
               Valores previstos, separados do que já foi pago.
             </Txt>
@@ -367,10 +371,11 @@ function TotalItem({
   alignEnd?: boolean;
   onPress: () => void;
 }) {
+  const hidden = useValuesHidden();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${label}, ${formatBRL(cents)}`}
+      accessibilityLabel={`${label}, ${moneyA11y(cents, hidden)}`}
       accessibilityHint="Abre a composição"
       onPress={onPress}
       style={(st) => [styles.splitItem, alignEnd && { alignItems: 'flex-end' }, (st as { focused?: boolean }).focused && styles.focusOnBrand]}>
@@ -384,9 +389,13 @@ function TotalItem({
             exiting={FadeOut.duration(motion.confirm).reduceMotion(ReduceMotion.System)}
             style={styles.changePill}
             accessibilityLiveRegion="polite"
-            accessibilityLabel={`${change > 0 ? 'Mais' : 'Menos'} ${formatBRL(Math.abs(change))} em ${label}`}>
-            <Txt variant="caption" color={colors.text} style={{ fontFamily: fonts.bold, fontSize: 12, lineHeight: 16 }}>
-              {change > 0 ? '+' : '−'} {formatBRL(Math.abs(change))}
+            accessibilityLabel={`${change > 0 ? 'Mais' : 'Menos'} ${moneyA11y(Math.abs(change), hidden)} em ${label}`}>
+            <Txt
+              variant="caption"
+              color={colors.text}
+              style={{ fontFamily: fonts.bold, fontSize: 12, lineHeight: 16 }}
+              accessibilityLabel={hidden ? `${change > 0 ? 'mais' : 'menos'} ${moneyA11y(Math.abs(change), hidden)}` : undefined}>
+              {change > 0 ? '+' : '−'} {moneyText(Math.abs(change), hidden)}
             </Txt>
           </Animated.View>
         ) : null}

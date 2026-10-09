@@ -1,7 +1,6 @@
 import {
   commitmentSituation,
   dueText,
-  formatBRL,
   formatMonthBR,
   monthOf,
   occurrenceLabel,
@@ -13,6 +12,7 @@ import { AlertCircle, CalendarClock, CalendarRange, Check, type LucideIcon } fro
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Txt } from '@/components/ui';
+import { maskMoneyLabel, maskMoneyText, moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
 /** Ícone e cores de cada situação. O texto da situação sempre acompanha o ícone (nunca só a cor). */
@@ -51,6 +51,7 @@ export function CommitmentRow({
   action?: RowAction;
 }) {
   const { width, fontScale } = useWindowDimensions();
+  const hidden = useValuesHidden();
   const stacked = width < 360 || fontScale > 1.3;
   const situation = commitmentSituation(c, today);
   const look = SITUATION_LOOK[situation];
@@ -63,19 +64,20 @@ export function CommitmentRow({
   const paidMonth = paid && monthOf(paid.paidOn) !== monthOf(c.dueOn) ? formatMonthBR(monthOf(paid.paidOn)).toLowerCase() : null;
   const seriesLabel = occurrenceLabel(c);
   const caption = [due, paidMonth ? `conta em Pago de ${paidMonth}` : null, seriesLabel, estimate ? 'estimado' : null].filter(Boolean).join(' · ');
-  const previsto = paid && paid.amountCents !== c.amountCents ? `Previsto ${formatBRL(c.amountCents)}` : null;
+  const showsPlanned = Boolean(paid && paid.amountCents !== c.amountCents);
+  const previsto = showsPlanned ? `Previsto ${moneyText(c.amountCents, hidden)}` : null;
   // A descrição e o vencimento abrem o nome acessível (as buscas por linha dependem desse começo).
   const label =
     `${c.description}, ${due.charAt(0).toLowerCase()}${due.slice(1)}, ` +
-    (estimate ? `cerca de ${formatBRL(cents)}, valor estimado` : formatBRL(cents)) +
+    (estimate ? `cerca de ${moneyA11y(cents, hidden)}, valor estimado` : moneyA11y(cents, hidden)) +
     (paidMonth ? `, conta em Pago de ${paidMonth}` : '') +
-    (previsto ? `, ${previsto.toLowerCase()}` : '') +
+    (showsPlanned ? `, previsto ${moneyA11y(c.amountCents, hidden)}`.toLowerCase() : '') +
     (c.series ? seriesA11y(c.series.kind, seriesLabel!) : '');
 
   const amount = (
     <View style={stacked ? undefined : styles.amountCol}>
       <Txt variant="label" style={[styles.amount, tabular]}>
-        {estimate ? `≈ ${formatBRL(cents)}` : formatBRL(cents)}
+        {estimate ? `≈ ${moneyText(cents, hidden)}` : moneyText(cents, hidden)}
       </Txt>
       {previsto ? (
         <Txt variant="caption" color={colors.textSecondary}>
@@ -160,11 +162,12 @@ function seriesA11y(kind: NonNullable<Commitment['series']>['kind'], label: stri
  */
 export function AnnualGroupRow({ group: g, onPress, last }: { group: AnnualGroup; onPress: () => void; last?: boolean }) {
   const { width, fontScale } = useWindowDimensions();
+  const hidden = useValuesHidden();
   const stacked = width < 360 || fontScale > 1.3;
   const amount = (
     <View style={stacked ? undefined : styles.amountCol}>
       <Txt variant="label" style={[styles.amount, tabular]}>
-        {g.approximate ? `≈ ${formatBRL(g.totalCents)}` : formatBRL(g.totalCents)}
+        {g.approximate ? `≈ ${moneyText(g.totalCents, hidden)}` : moneyText(g.totalCents, hidden)}
       </Txt>
     </View>
   );
@@ -172,7 +175,7 @@ export function AnnualGroupRow({ group: g, onPress, last }: { group: AnnualGroup
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={g.a11yLabel}
+      accessibilityLabel={maskMoneyLabel(g.a11yLabel, hidden)}
       accessibilityHint="Abre a conta do ano"
       style={(s) => [
         styles.row,
@@ -188,7 +191,7 @@ export function AnnualGroupRow({ group: g, onPress, last }: { group: AnnualGroup
           {g.title}
         </Txt>
         <Txt variant="caption" color={colors.textSecondary}>
-          {g.caption}
+          {maskMoneyText(g.caption, hidden)}
         </Txt>
         {stacked ? amount : null}
       </View>

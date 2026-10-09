@@ -34,6 +34,7 @@ import { ChoiceDialog } from '@/components/choice-dialog';
 import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
+import { MoneyTxt } from '@/components/money-text';
 import {
   PayRowError,
   codeOf,
@@ -540,9 +541,9 @@ export default function AtualizarMeses() {
     return (
       <Animated.View key={group.key} layout={rowLayout} style={[styles.group, !isLast && styles.divider]}>
         <View style={{ gap: space[2] }}>
-          <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} accessibilityRole="header" aria-level={3} accessibilityLabel={yearA11y(group.a11yLabel)}>
+          <MoneyTxt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} accessibilityRole="header" aria-level={3} accessibilityLabel={yearA11y(group.a11yLabel)}>
             {group.text}
-          </Txt>
+          </MoneyTxt>
           {groupActions(group).includes('nao_houve_ano') && open.length > 0 ? (
             <Button
               label={RETURN_TEXT.notHappenedYear(group.label)}
@@ -563,9 +564,9 @@ export default function AtualizarMeses() {
   const dialog = target && pending?.type === 'nao_houve' ? notHappenedDialog(target) : null;
   const resultBanner = result ? (
     <Banner tone={result.tone} icon={result.tone === 'erro' ? AlertCircle : Check}>
-      <Txt variant="label" color={result.tone === 'erro' ? colors.error : colors.successText} style={{ fontFamily: fonts.bold }} accessibilityLabel={yearA11yLabel(result.text)}>
+      <MoneyTxt variant="label" color={result.tone === 'erro' ? colors.error : colors.successText} style={{ fontFamily: fonts.bold }} accessibilityLabel={yearA11yLabel(result.text)}>
         {result.text}
-      </Txt>
+      </MoneyTxt>
     </Banner>
   ) : null;
   const accountChips =
@@ -652,12 +653,12 @@ export default function AtualizarMeses() {
                 </Txt>
                 {overview ? (
                   <>
-                    <Txt variant="label" style={tabular}>
+                    <MoneyTxt variant="label" style={tabular}>
                       {RETURN_TEXT.receiptsLine(overview)}
-                    </Txt>
-                    <Txt variant="label" style={tabular}>
+                    </MoneyTxt>
+                    <MoneyTxt variant="label" style={tabular}>
                       {RETURN_TEXT.expensesLine(overview)}
-                    </Txt>
+                    </MoneyTxt>
                   </>
                 ) : null}
                 <View style={styles.actions}>
@@ -730,9 +731,9 @@ export default function AtualizarMeses() {
               },
             },
           ]}>
-          <Txt style={[{ fontFamily: fonts.bold }, tabular]} accessibilityLabel={yearA11yLabel(RETURN_TEXT.payBody(rowShortName(target), target.amountCents, target.dueOn, account.name))}>
+          <MoneyTxt style={[{ fontFamily: fonts.bold }, tabular]} accessibilityLabel={yearA11yLabel(RETURN_TEXT.payBody(rowShortName(target), target.amountCents, target.dueOn, account.name))}>
             {RETURN_TEXT.payBody(rowShortName(target), target.amountCents, target.dueOn, account.name)}
-          </Txt>
+          </MoneyTxt>
           {accountChips}
         </ChoiceDialog>
       ) : null}
@@ -755,8 +756,8 @@ export default function AtualizarMeses() {
               }
             })
           }>
-          <Txt style={[{ fontFamily: fonts.bold }, tabular]}>{dialog.line}</Txt>
-          <Txt color={colors.textSecondary}>{dialog.body}</Txt>
+          <MoneyTxt style={[{ fontFamily: fonts.bold }, tabular]}>{dialog.line}</MoneyTxt>
+          <MoneyTxt color={colors.textSecondary}>{dialog.body}</MoneyTxt>
         </ConfirmDialog>
       ) : null}
 
@@ -788,9 +789,9 @@ export default function AtualizarMeses() {
               }
             })
           }>
-          <Txt color={colors.textSecondary} accessibilityLabel={yearA11yLabel(pending.plan.text)}>
+          <MoneyTxt color={colors.textSecondary} accessibilityLabel={yearA11yLabel(pending.plan.text)}>
             {pending.plan.text}
-          </Txt>
+          </MoneyTxt>
         </ConfirmDialog>
       ) : null}
 
@@ -804,9 +805,9 @@ export default function AtualizarMeses() {
           busy={busy}
           onCancel={() => setPending(null)}
           onConfirm={() => payBatch(pending.rows)}>
-          <Txt style={tabular} accessibilityLabel={yearA11yLabel(RETURN_TEXT.batchBody(pending.rows.map(view), accountChips ? null : account.name))}>
+          <MoneyTxt style={tabular} accessibilityLabel={yearA11yLabel(RETURN_TEXT.batchBody(pending.rows.map(view), accountChips ? null : account.name))}>
             {RETURN_TEXT.batchBody(pending.rows.map(view), accountChips ? null : account.name)}
-          </Txt>
+          </MoneyTxt>
           {accountChips}
         </ConfirmDialog>
       ) : null}

@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { Modal, StyleSheet, View } from 'react-native';
 
-import { yearA11yLabel } from '@/components/series-parts';
 import { Button, Txt } from '@/components/ui';
+import { maskMoneyText, spokenText, useValuesHidden } from '@/lib/privacy';
 import { colors, radius, space } from '@/theme/tokens';
 
 export interface DialogChoice {
@@ -16,6 +16,8 @@ export interface DialogChoice {
  * Mesmo desenho do ConfirmDialog; "Cancelar" fica por último e nunca grava nada.
  * Abre e fecha sem esmaecer: a maioria das escolhas leva a outra tela, e na web o foco volta a quem abriu o diálogo
  * só no fim da animação, o que tiraria o foco do campo da tela nova enquanto a pessoa digita.
+ * O título e as escolhas podem trazer valores em reais: com "Ocultar valores" (lib/privacy.ts), aparecem como "R$ ••••" e o
+ * leitor de tela diz "valor oculto".
  */
 export function ChoiceDialog({
   visible,
@@ -35,21 +37,22 @@ export function ChoiceDialog({
   busy?: boolean;
   onCancel: () => void;
 }) {
+  const hidden = useValuesHidden();
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onCancel}>
       <View style={styles.backdrop}>
         <View style={styles.box} accessibilityViewIsModal accessibilityRole="alert">
           {/* "2026/2027" no título e nas escolhas é lido como "2026 a 2027". */}
-          <Txt variant="title" accessibilityRole="header" accessibilityLabel={yearA11yLabel(title)}>
-            {title}
+          <Txt variant="title" accessibilityRole="header" accessibilityLabel={spokenText(title, hidden)}>
+            {maskMoneyText(title, hidden)}
           </Txt>
           {children ? <View style={{ gap: space[2] }}>{children}</View> : null}
           <View style={{ gap: space[2], marginTop: space[2] }}>
             {choices.map((c, i) => (
               <Button
                 key={c.label}
-                label={c.label}
-                accessibilityLabel={yearA11yLabel(c.label)}
+                label={maskMoneyText(c.label, hidden)}
+                accessibilityLabel={spokenText(c.label, hidden)}
                 tone={c.tone ?? 'soft'}
                 onPress={c.onPress}
                 busy={busy && i === 0}

@@ -32,10 +32,12 @@ import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-
 
 import { CommitmentRow } from '@/components/commitment-row';
 import { ConfirmDialog } from '@/components/dialog';
+import { MoneyTxt } from '@/components/money-text';
 import { RegisterMonthSheet } from '@/components/retorno-folha';
 import { yearA11y, yearA11yLabel } from '@/components/series-parts';
 import { TopicLink } from '@/components/topic-link';
 import { Button, Card, LinkButton, Txt } from '@/components/ui';
+import { maskMoneyText, spokenText, useValuesHidden } from '@/lib/privacy';
 import { useSeriesOperationKey, useSkipSeriesYear, useUpdateSeriesFrom } from '@/state/data';
 import { colors, fonts, motion, space, tabular } from '@/theme/tokens';
 
@@ -76,6 +78,7 @@ export function AnnualYears({
   /** Recusa do servidor: recarregar a série e as contas. */
   onRefused: () => void;
 }) {
+  const hidden = useValuesHidden();
   const k = s.partsPerYear ?? 1;
   const ended = seriesEnded(s, today);
   const list = mergeOccurrences(occurrences, open);
@@ -241,16 +244,16 @@ export function AnnualYears({
               : RETURN_TEXT.annualGapOld(label, y.missingParts);
           return (
             <Animated.View key={y.year.index} layout={rowLayout} style={[styles.year, i < years.length - 1 && styles.divider]}>
-              <Txt
+              <MoneyTxt
                 variant="label"
                 style={[{ fontFamily: fonts.bold, fontSize: 15 }, tabular]}
                 accessibilityLabel={yearA11y(y.texts.line).replace(/ · /g, ', ')}>
                 {y.texts.line}
-              </Txt>
+              </MoneyTxt>
               {y.texts.paidBefore ? (
-                <Txt variant="caption" color={colors.textSecondary} accessibilityLabel={yearA11yLabel(y.texts.paidBefore)}>
+                <MoneyTxt variant="caption" color={colors.textSecondary} accessibilityLabel={yearA11yLabel(y.texts.paidBefore)}>
                   {y.texts.paidBefore}
-                </Txt>
+                </MoneyTxt>
               ) : null}
               {y.texts.missing && gapRows.length > 0 ? (
                 <View style={{ gap: space[1] }}>
@@ -341,12 +344,12 @@ export function AnnualYears({
 
       {suggestion ? (
         <Card style={{ gap: space[2] }}>
-          <Txt variant="label" style={tabular} accessibilityLabel={yearA11yLabel(suggestion.text)}>
+          <MoneyTxt variant="label" style={tabular} accessibilityLabel={yearA11yLabel(suggestion.text)}>
             {suggestion.text}
-          </Txt>
+          </MoneyTxt>
           <Button
-            label={suggestion.action}
-            accessibilityLabel={yearA11yLabel(suggestion.action)}
+            label={maskMoneyText(suggestion.action, hidden)}
+            accessibilityLabel={spokenText(suggestion.action, hidden)}
             tone="soft"
             busy={busy && refConfirm !== null}
             busyLabel="Salvando…"
@@ -365,9 +368,9 @@ export function AnnualYears({
           busy={busy}
           onCancel={() => setConfirm(null)}
           onConfirm={doSkip}>
-          <Txt color={colors.textSecondary} accessibilityLabel={yearA11yLabel(confirm.plan.text)}>
+          <MoneyTxt color={colors.textSecondary} accessibilityLabel={yearA11yLabel(confirm.plan.text)}>
             {confirm.plan.text}
-          </Txt>
+          </MoneyTxt>
           <Txt color={colors.textSecondary}>
             {k > 1 ? 'Os valores deixam' : 'O valor deixa'} de contar em Ainda a pagar. Recebido, Pago e a diferença do mês não mudam.
           </Txt>
@@ -396,7 +399,7 @@ export function AnnualYears({
           busy={busy}
           onCancel={() => setRefConfirm(null)}
           onConfirm={applySuggestion}>
-          <Txt accessibilityLabel={yearA11yLabel(refConfirm.plan.text)}>{refConfirm.plan.text}</Txt>
+          <MoneyTxt accessibilityLabel={yearA11yLabel(refConfirm.plan.text)}>{refConfirm.plan.text}</MoneyTxt>
         </ConfirmDialog>
       ) : null}
     </>

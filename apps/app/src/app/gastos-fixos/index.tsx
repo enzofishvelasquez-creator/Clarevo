@@ -25,10 +25,12 @@ import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { openCalc } from '@/components/calc/open';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
+import { MoneyTxt } from '@/components/money-text';
 import { estimateText, SERIES_NOUN, yearA11y } from '@/components/series-parts';
 import { EmptyState, ErrorState } from '@/components/states';
 import { TopicLink } from '@/components/topic-link';
 import { Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
+import { useValuesHidden } from '@/lib/privacy';
 import { useSeriesList, useSpace } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
@@ -46,12 +48,12 @@ function currentNumber(s: CommitmentSeries, today: IsoDate): number {
  * Conta do ano: "≈ R$ 2.400,00 · todo ano em 20/01 · valor muda" ou "10 parcelas de ≈ R$ 180,00 · fevereiro a novembro,
  * dia 10 · valor muda"; com término, "termina em 2030".
  */
-function annualRowParts(s: CommitmentSeries, today: IsoDate): Part[] {
+function annualRowParts(s: CommitmentSeries, today: IsoDate, hidden: boolean): Part[] {
   const term = currentTerm(s, today);
   const variable = term.amountMode === 'variavel';
   const k = s.partsPerYear ?? 1;
   const n = currentNumber(s, today);
-  const amount = estimateText(term.amountCents, variable);
+  const amount = estimateText(term.amountCents, variable, hidden);
   const parts: Part[] = [];
   if (k === 1) {
     parts.push(amount);
@@ -74,7 +76,7 @@ function annualRowParts(s: CommitmentSeries, today: IsoDate): Part[] {
  * "Aluguel · R$ 2.500,00 · todo dia 5", "Luz · ≈ R$ 180,00 · todo dia 12 · valor muda",
  * "Financiamento do carro · Parcela 13 de 48 · R$ 850,00 · termina em outubro de 2029", "Escola · terminou em dezembro de 2026".
  */
-function seriesRowParts(s: CommitmentSeries, today: IsoDate): Part[] {
+function seriesRowParts(s: CommitmentSeries, today: IsoDate, hidden: boolean): Part[] {
   const end = seriesEndMonth(s);
   if (seriesEnded(s, today)) {
     if (s.kind === 'anual') {
@@ -85,7 +87,7 @@ function seriesRowParts(s: CommitmentSeries, today: IsoDate): Part[] {
     const t = end === null || s.lastNumber! < s.firstNumber ? 'encerrado antes da primeira conta' : `terminou em ${formatMonthYearBR(end)}`;
     return [part(t)];
   }
-  if (s.kind === 'anual') return annualRowParts(s, today);
+  if (s.kind === 'anual') return annualRowParts(s, today, hidden);
   const term = currentTerm(s, today);
   const variable = term.amountMode === 'variavel';
   const parts: Part[] = [];
@@ -95,7 +97,7 @@ function seriesRowParts(s: CommitmentSeries, today: IsoDate): Part[] {
     const label = `Parcela ${n} de ${s.installmentTotal}`;
     parts.push(part(label));
   }
-  parts.push(estimateText(term.amountCents, variable));
+  parts.push(estimateText(term.amountCents, variable, hidden));
   if (s.kind === 'mensal') parts.push(part(`todo dia ${term.dueDay}`));
   if (variable) parts.push(part('valor muda'));
   if (end !== null) parts.push(part(`termina em ${formatMonthYearBR(end)}`));
@@ -104,8 +106,9 @@ function seriesRowParts(s: CommitmentSeries, today: IsoDate): Part[] {
 
 function SeriesRow({ series: s, today, last }: { series: CommitmentSeries; today: IsoDate; last: boolean }) {
   const { width, fontScale } = useWindowDimensions();
+  const hidden = useValuesHidden();
   const stacked = width < 360 || fontScale > 1.3;
-  const parts = seriesRowParts(s, today);
+  const parts = seriesRowParts(s, today, hidden);
   const Icon = s.kind === 'parcelada' ? Layers : s.kind === 'anual' ? CalendarSync : Repeat;
   const name = currentTerm(s, today).description;
   const kindText = SERIES_NOUN[s.kind];
@@ -175,17 +178,18 @@ export default function GastosFixosScreen() {
         ) : list.isError ? null : (
           <>
             {monthlyActive.length > 0 ? (
-              <Txt variant="label" style={tabular}>
-                Por mês, se os valores não mudarem: {formatBRL(monthly.totalCents)}
-                {monthly.estimatedCents > 0 ? ` (inclui ${formatBRL(monthly.estimatedCents)} estimados)` : ''}.
-                {annualActive.length > 0 ? ' Contas do ano ficam fora desta soma.' : ''}
-              </Txt>
+              <MoneyTxt variant="label" style={tabular}>
+                {`Por mês, se os valores não mudarem: ${formatBRL(monthly.totalCents)}${
+                  monthly.estimatedCents > 0 ? ` (inclui ${formatBRL(monthly.estimatedCents)} estimados)` : ''
+                }.${annualActive.length > 0 ? ' Contas do ano ficam fora desta soma.' : ''}`}
+              </MoneyTxt>
             ) : null}
             {annualActive.length > 0 ? (
-              <Txt variant="label" style={tabular}>
-                Por ano, se os valores não mudarem: {formatBRL(yearly.totalCents)}
-                {yearly.estimatedCents > 0 ? ` (inclui ${formatBRL(yearly.estimatedCents)} estimados)` : ''}.
-              </Txt>
+              <MoneyTxt variant="label" style={tabular}>
+                {`Por ano, se os valores não mudarem: ${formatBRL(yearly.totalCents)}${
+                  yearly.estimatedCents > 0 ? ` (inclui ${formatBRL(yearly.estimatedCents)} estimados)` : ''
+                }.`}
+              </MoneyTxt>
             ) : null}
             {/* Com 2 ou mais contas no "Por mês": a calculadora de dividir as contas da casa, com esse total (nada é gravado). */}
             {monthlyActive.length >= 2 && monthly.totalCents > 0 && monthly.totalCents <= MAX_RECORD_CENTS ? (

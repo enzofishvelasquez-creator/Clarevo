@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Svg, { Defs, Path, Pattern, Rect } from 'react-native-svg';
 
+import { MoneyTxt } from '@/components/money-text';
 import { Txt } from '@/components/ui';
 import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
 import { colors, fonts, motion, space, tabular } from '@/theme/tokens';
@@ -134,21 +135,24 @@ function Swatch({ kind }: { kind: 'pago' | 'aberto' }) {
   );
 }
 
-/** Legenda do medidor: "Já pago · R$ 2.500,00" e "Em aberto · R$ 650,00", sempre em texto. */
+/**
+ * Legenda do medidor: "Já pago · R$ 2.500,00" e "Em aberto · R$ 650,00", sempre em texto. Os valores seguem "Ocultar
+ * valores" (A2): passe o texto do core como veio.
+ */
 export function MeterLegend({ paid, open }: { paid: string; open: string }) {
   return (
     <View style={styles.legend}>
       <View style={styles.legendItem}>
         <Swatch kind="pago" />
-        <Txt variant="label" style={[tabular, { flexShrink: 1 }]}>
+        <MoneyTxt variant="label" style={[tabular, { flexShrink: 1 }]}>
           {paid}
-        </Txt>
+        </MoneyTxt>
       </View>
       <View style={styles.legendItem}>
         <Swatch kind="aberto" />
-        <Txt variant="label" style={[tabular, { flexShrink: 1 }]}>
+        <MoneyTxt variant="label" style={[tabular, { flexShrink: 1 }]}>
           {open}
-        </Txt>
+        </MoneyTxt>
       </View>
     </View>
   );

@@ -14,9 +14,11 @@ import { Check, Info } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
+import { MoneyTxt } from '@/components/money-text';
 import type { RowOutcome } from '@/components/retorno-acoes';
 import { yearA11y, yearA11yLabel } from '@/components/series-parts';
 import { Banner, Button, LinkButton, spaceKeyPress, Txt } from '@/components/ui';
+import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 
 /** Linha resolvida troca o conteúdo em 240 ms e a altura em 280 ms (CL-V008), só depois da resposta do servidor. */
@@ -63,6 +65,7 @@ export function ReturnRow({
   inGroup?: boolean;
   last?: boolean;
 }) {
+  const hidden = useValuesHidden();
   const short = rowShortName(row);
   const text = reviewRowText(row);
   // reviewRowText começa pela descrição: a descrição fica em negrito e o resto abaixo.
@@ -82,13 +85,13 @@ export function ReturnRow({
             <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityLabel={yearA11yLabel(short)}>
               {short}
             </Txt>
-            <Txt variant="caption" color={colors.textSecondary} style={tabular}>
+            <MoneyTxt variant="caption" color={colors.textSecondary} style={tabular}>
               {outcome.type === 'paga' && outcome.commitment.payment
                 ? RETURN_TEXT.resolvedPaid(outcome.commitment.payment.paidOn, outcome.commitment.payment.amountCents)
                 : outcome.type === 'nao_houve'
                   ? RETURN_TEXT.resolvedNotHappened
                   : RETURN_TEXT.stillOpenDone}
-            </Txt>
+            </MoneyTxt>
             {outcome.type === 'paga' && onUndo ? (
               <LinkButton
                 label={RETURN_TEXT.undo}
@@ -108,7 +111,7 @@ export function ReturnRow({
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: Boolean(selected), disabled: busy }}
                 aria-checked={Boolean(selected)}
-                accessibilityLabel={yearA11y(RETURN_TEXT.selectA11y(short, row.amountCents))}
+                accessibilityLabel={yearA11y(maskMoneyLabel(RETURN_TEXT.selectA11y(short, row.amountCents), hidden))}
                 disabled={busy}
                 onPress={onToggle}
                 {...spaceKeyPress(() => onToggle?.())}
@@ -119,26 +122,26 @@ export function ReturnRow({
                 </View>
               </Pressable>
             ) : null}
-            <View style={[{ flex: 1, minWidth: 0, gap: 2 }, !canSelect && selectable && styles.alignWithBox]} accessible accessibilityLabel={yearA11y(reviewRowA11yLabel(row))}>
+            <View style={[{ flex: 1, minWidth: 0, gap: 2 }, !canSelect && selectable && styles.alignWithBox]} accessible accessibilityLabel={yearA11y(maskMoneyLabel(reviewRowA11yLabel(row), hidden))}>
               <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>
                 {row.description}
               </Txt>
               <Txt variant="caption" color={colors.textSecondary} style={tabular}>
-                {details}
+                {maskMoneyText(details, hidden)}
               </Txt>
             </View>
           </View>
 
           {loose ? (
             <Banner tone="info" icon={Info} live={false}>
-              <Txt variant="label">{RETURN_TEXT.looseExpense(loose)}</Txt>
+              <MoneyTxt variant="label">{RETURN_TEXT.looseExpense(loose)}</MoneyTxt>
             </Banner>
           ) : null}
 
           {note ? (
-            <Txt variant="label" color={closed ? colors.textSecondary : colors.error} accessibilityLiveRegion="polite" style={!closed && { fontFamily: fonts.bold }}>
+            <MoneyTxt variant="label" color={closed ? colors.textSecondary : colors.error} accessibilityLiveRegion="polite" style={!closed && { fontFamily: fonts.bold }}>
               {note}
-            </Txt>
+            </MoneyTxt>
           ) : null}
 
           {closed ? null : (

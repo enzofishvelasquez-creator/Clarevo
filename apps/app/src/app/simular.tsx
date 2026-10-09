@@ -101,10 +101,15 @@ export default function SimularScreen() {
   const submit = () => {
     const out = validateSimulationDraft(draft);
     if (!out.ok) {
+      // Só os erros de campos que estão na tela: sem modo, só "Escolha o que você quer saber." (os campos ainda nem apareceram).
+      const onScreen = new Set<SimulationField>(['mode', ...fields]);
+      const shown = (Object.keys(out.errors) as SimulationField[]).filter((f) => onScreen.has(f));
       setResult(null);
-      setErrors(out.errors);
-      const first = (Object.keys(out.errors) as SimulationField[]).find((f) => f !== 'mode');
-      if (!out.errors.mode && first) refs[first as TextFieldName].current?.focus();
+      setErrors(Object.fromEntries(shown.map((f) => [f, out.errors[f]])));
+      const first = shown.find((f): f is TextFieldName => f !== 'mode');
+      if (first && !shown.includes('mode')) refs[first].current?.focus();
+      // Sem campo para focar, o erro do modo é dito no iOS (no Android e na web, a região do erro já o anuncia).
+      else if (out.errors.mode) announceOnIOS(out.errors.mode, { queue: true });
       return;
     }
     setErrors({});

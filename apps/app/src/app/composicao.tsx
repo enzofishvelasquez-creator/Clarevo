@@ -6,9 +6,11 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { RecordRow } from '@/components/record-row';
 import { ContextPill, SubHeader } from '@/components/header';
+import { MoneyTxt } from '@/components/money-text';
 import { EmptyState, ErrorState } from '@/components/states';
 import { TopicLink } from '@/components/topic-link';
 import { Button, Card, FitMoney, Money, Screen, Skeleton, spaceKeyPress, Txt } from '@/components/ui';
+import { maskMoneyLabel, useValuesHidden } from '@/lib/privacy';
 import { useMonthRecords, useSpace, useView } from '@/state/data';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
@@ -147,6 +149,7 @@ function Segment({ value, onChange }: { value: Breakdown; onChange: (v: Breakdow
  * "Mercado, R$ 412,30, 23,4% do pago".
  */
 function CategoryCard({ shares, totalCents, action }: { shares: CategoryShare[]; totalCents: number; action: ReactNode }) {
+  const hidden = useValuesHidden();
   // Lista e item na web (o leitor de tela diz quantas categorias há); no app, cada barra é um elemento só.
   const listRole = Platform.OS === 'web' ? ({ role: 'list', 'aria-label': 'Pago por categoria' } as object) : {};
   const itemRole = Platform.OS === 'web' ? ({ role: 'listitem' } as object) : {};
@@ -161,14 +164,14 @@ function CategoryCard({ shares, totalCents, action }: { shares: CategoryShare[];
       ) : (
         <View style={{ gap: space[4] }} {...listRole}>
           {shares.map((sh) => (
-            <View key={sh.label} accessible accessibilityLabel={sh.a11yLabel} style={{ gap: space[2] }} {...itemRole}>
+            <View key={sh.label} accessible accessibilityLabel={maskMoneyLabel(sh.a11yLabel, hidden)} style={{ gap: space[2] }} {...itemRole}>
               <View style={styles.barHead}>
                 <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15, flexShrink: 1 }}>
                   {sh.label}
                 </Txt>
-                <Txt variant="label" style={[{ fontFamily: fonts.bold, fontSize: 15, flexShrink: 0 }, tabular]}>
-                  {formatBRL(sh.cents)} · {sh.percentText}
-                </Txt>
+                <MoneyTxt variant="label" style={[{ fontFamily: fonts.bold, fontSize: 15, flexShrink: 0 }, tabular]}>
+                  {`${formatBRL(sh.cents)} · ${sh.percentText}`}
+                </MoneyTxt>
               </View>
               <View style={styles.barTrack}>
                 <View style={[styles.barFill, { width: `${sh.tenths / 10}%` }, sh.tenths === 0 && styles.barMin]} />

@@ -32,11 +32,13 @@ import { ChoiceDialog } from '@/components/choice-dialog';
 import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
+import { MoneyTxt } from '@/components/money-text';
 import { CheckOption, yearA11y, yearA11yLabel } from '@/components/series-parts';
 import { EmptyState, ErrorState } from '@/components/states';
 import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Chip, Screen, Skeleton, Txt } from '@/components/ui';
 import { totalChange } from '@/lib/highlight';
+import { moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
 import { useCommitments, useDeleteCommitment, usePayCommitment, useSeriesList, useSkipSeriesYear, useSpace, useUpdateRecord } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, motion, space, tabular } from '@/theme/tokens';
@@ -350,9 +352,9 @@ export default function ContasVencidas() {
         : `Marcar as ${chosen.length} selecionadas como pagas no vencimento`;
   const resultBanner = result ? (
     <Banner tone={result.tone} icon={result.tone === 'erro' ? AlertCircle : Check}>
-      <Txt variant="label" color={result.tone === 'erro' ? colors.error : colors.successText} style={{ fontFamily: fonts.bold }}>
+      <MoneyTxt variant="label" color={result.tone === 'erro' ? colors.error : colors.successText} style={{ fontFamily: fonts.bold }}>
         {result.text}
-      </Txt>
+      </MoneyTxt>
     </Banner>
   ) : null;
   const hasFooter = commitments.isSuccess && fixed.length > 0;
@@ -524,9 +526,9 @@ export default function ContasVencidas() {
               },
             },
           ]}>
-          <Txt style={[{ fontFamily: fonts.bold }, tabular]}>
-            {formatBRL(target.amountCents)} em {formatDateBR(target.dueOn)}, da conta {account.name}.
-          </Txt>
+          <MoneyTxt style={[{ fontFamily: fonts.bold }, tabular]}>
+            {`${formatBRL(target.amountCents)} em ${formatDateBR(target.dueOn)}, da conta ${account.name}.`}
+          </MoneyTxt>
           <Txt color={colors.textSecondary}>
             Um gasto com esse valor entra em Pago de {formatMonthBR(monthOf(target.dueOn)).toLowerCase()}, e a conta sai de Ainda a pagar.
           </Txt>
@@ -546,13 +548,13 @@ export default function ContasVencidas() {
           busy={busy}
           onCancel={() => setPending(null)}
           onConfirm={() => doSkipYear(yearTarget)}>
-          <Txt style={[{ fontFamily: fonts.bold }, tabular]} accessibilityLabel={yearA11yLabel(yearTargetSummary.line)}>
+          <MoneyTxt style={[{ fontFamily: fonts.bold }, tabular]} accessibilityLabel={yearA11yLabel(yearTargetSummary.line)}>
             {yearTargetSummary.line}
-          </Txt>
+          </MoneyTxt>
           {yearTargetSummary.notDue ? <Txt color={colors.textSecondary}>{yearTargetSummary.notDue}</Txt> : null}
-          <Txt color={colors.textSecondary} accessibilityLabel={yearA11yLabel(yearTargetPlan.text)}>
+          <MoneyTxt color={colors.textSecondary} accessibilityLabel={yearA11yLabel(yearTargetPlan.text)}>
             {yearTargetPlan.text}
-          </Txt>
+          </MoneyTxt>
         </ConfirmDialog>
       ) : null}
 
@@ -569,9 +571,9 @@ export default function ContasVencidas() {
           busy={busy}
           onCancel={() => setPending(null)}
           onConfirm={() => doRemove(target)}>
-          <Txt style={{ fontFamily: fonts.bold }}>
-            {target.description} · {formatBRL(target.amountCents)} · venceu em {formatDateBR(target.dueOn)}
-          </Txt>
+          <MoneyTxt style={{ fontFamily: fonts.bold }}>
+            {`${target.description} · ${formatBRL(target.amountCents)} · venceu em ${formatDateBR(target.dueOn)}`}
+          </MoneyTxt>
           <Txt color={colors.textSecondary}>
             {target.series ? 'Ela sai de Contas a pagar e não volta a ser criada.' : 'Ela sai de Contas a pagar.'}
           </Txt>
@@ -588,9 +590,7 @@ export default function ContasVencidas() {
           busy={busy}
           onCancel={() => setPending(null)}
           onConfirm={payBatch}>
-          <Txt style={[{ fontFamily: fonts.bold }, tabular]}>
-            Total: {formatBRL(batchTotal)}, da conta {account.name}.
-          </Txt>
+          <MoneyTxt style={[{ fontFamily: fonts.bold }, tabular]}>{`Total: ${formatBRL(batchTotal)}, da conta ${account.name}.`}</MoneyTxt>
           <Txt color={colors.textSecondary}>
             Cada conta vira um gasto com o valor previsto, na data do vencimento, e entra em Pago do mês dessa data. Se uma falhar, as
             seguintes não são marcadas e as anteriores continuam pagas.
@@ -603,6 +603,7 @@ export default function ContasVencidas() {
 
 /** Descrição, "Venceu em 12/02/2027" e o valor. Valor fixo: caixa de seleção para o lote; estimado: "≈ R$ 180,00 · estimado". */
 function OverdueInfo({ commitment: c, checked, onToggle }: { commitment: Commitment; checked: boolean; onToggle: () => void }) {
+  const hidden = useValuesHidden();
   // Conta do ano: a parcela e o ano junto do vencimento ("Venceu em 10/02/2027 · Parcela 1 de 10 de 2027").
   const yearPart = c.series?.kind === 'anual' ? ` · ${occurrenceLabel(c)}` : '';
   const due = `Venceu em ${formatDateBR(c.dueOn)}${yearPart}`;
@@ -610,12 +611,15 @@ function OverdueInfo({ commitment: c, checked, onToggle }: { commitment: Commitm
     return <CheckOption label={c.description} hint={`${due} · ${formatBRL(c.amountCents)}`} checked={checked} onPress={onToggle} />;
   }
   return (
-    <View style={styles.estimate} accessible accessibilityLabel={`${c.description}, ${due.toLowerCase().replace(/ · /g, ', ').replace(/(\d{4})\/(\d{4})/, '$1 a $2')}, cerca de ${formatBRL(c.amountCents)}, valor estimado`}>
+    <View
+      style={styles.estimate}
+      accessible
+      accessibilityLabel={`${c.description}, ${due.toLowerCase().replace(/ · /g, ', ').replace(/(\d{4})\/(\d{4})/, '$1 a $2')}, cerca de ${moneyA11y(c.amountCents, hidden)}, valor estimado`}>
       <Txt variant="label" style={{ fontFamily: fonts.bold }}>
         {c.description}
       </Txt>
       <Txt variant="caption" color={colors.textSecondary} style={tabular}>
-        {due} · ≈ {formatBRL(c.amountCents)} · estimado
+        {due} · ≈ {moneyText(c.amountCents, hidden)} · estimado
       </Txt>
     </View>
   );

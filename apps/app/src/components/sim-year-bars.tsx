@@ -118,13 +118,13 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
 /** Tabela ano a ano: o mesmo conteúdo das barras, em texto. Um bloco por ano, com a frase completa para o leitor de tela. */
 function YearTable({ years }: { years: readonly SimulationYear[] }) {
   return (
-    <View style={{ gap: space[1] }} accessibilityRole="list">
+    <View style={{ gap: space[1] }} role="list">
       {years.map((y, i) => (
         <View
           key={y.year}
+          role="listitem"
           accessible
           focusable={false}
-          accessibilityRole="text"
           accessibilityLabel={T.yearA11y(y)}
           style={[styles.year, i < years.length - 1 && styles.yearDivider]}>
           <Txt variant="label" style={{ fontFamily: fonts.bold }}>

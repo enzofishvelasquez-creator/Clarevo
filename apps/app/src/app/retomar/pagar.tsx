@@ -38,6 +38,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
+import { MoneyTxt } from '@/components/money-text';
 import { PayRowError, codeOf, isConflict, isUncertain, openRowFrom, returnSession, useReturnWriter } from '@/components/retorno-acoes';
 import { ErrorState, LoadingState } from '@/components/states';
 import { SumValues } from '@/components/sum-values';
@@ -288,6 +289,7 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: Person
             large
             autoFocus={row.amountIsEstimate}
             error={errors.amountText}
+            moneyHint
             hint={row.amountIsEstimate ? RETURN_TEXT.estimateHint(row.amountCents) : 'Use o valor que saiu da conta, com juros ou desconto, se houver.'}
           />
           <SumValues target={refs.amountText} onUse={(t) => set('amountText', t)} />
@@ -346,9 +348,9 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: Person
           {valid ? (
             // Prévia que muda a cada tecla: sem região viva.
             <Banner tone="info" icon={Info} live={false}>
-              <Txt variant="label">
-                Um gasto de {formatBRL(amount)} será registrado em Pago de {formatMonthBR(monthOf(paidOn)).toLowerCase()}, da conta {account?.name}.
-              </Txt>
+              <MoneyTxt variant="label">
+                {`Um gasto de ${formatBRL(amount)} será registrado em Pago de ${formatMonthBR(monthOf(paidOn)).toLowerCase()}, da conta ${account?.name}.`}
+              </MoneyTxt>
             </Banner>
           ) : null}
         </Card>
