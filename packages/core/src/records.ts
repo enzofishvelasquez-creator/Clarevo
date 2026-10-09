@@ -217,6 +217,48 @@ export interface SeriesEditInput {
   dueDay: number;
 }
 
+/**
+ * Atividade da pessoa no contexto (D-030), mantida no banco a partir de record_operations: só datas, no fuso dela.
+ * Lida só pela própria pessoa.
+ */
+export interface ContextActivity {
+  /** Dia da última anotação (qualquer escrita pelas funções do banco, menos a decisão da revisão). */
+  lastWriteOn: IsoDate;
+  /** Última ausência longa: do último dia com anotação antes dela ao primeiro dia com anotação depois dela. */
+  absenceFromOn: IsoDate | null;
+  absenceUntilOn: IsoDate | null;
+}
+
+/** "Atualizar agora" concluído com alguma ação, ou "Seguir adiante" (e "Concluir" sem ação). */
+export type ReturnDecision = 'atualizou' | 'seguiu';
+
+/** Marca da revisão dos últimos meses (return_reviews). O mês revisado e o dia da decisão nunca recuam. */
+export interface ReturnReviewMark {
+  /** Último mês fechado coberto pela decisão. */
+  reviewedThrough: IsoMonth;
+  decision: ReturnDecision;
+  decidedOn: IsoDate;
+  version: number;
+}
+
+/** Atividade e marca da própria pessoa no contexto; null quando ainda não existem (conta nova: as duas). */
+export interface ReturnReviewState {
+  activity: ContextActivity | null;
+  mark: ReturnReviewMark | null;
+}
+
+/** Recebimentos e gastos anotados num mês (months_overview, mesmo critério de month_totals). */
+export interface MonthOverview {
+  month: IsoMonth;
+  receivedCount: number;
+  receivedCents: Cents;
+  paidCount: number;
+  paidCents: Cents;
+}
+
+/** create_series_occurrence: a conta do mês passado fica em aberto ou registrada como "não houve". */
+export type OccurrenceMode = 'aberta' | 'nao_houve';
+
 export const NO_CATEGORY_LABEL = 'Sem categoria';
 export const CATEGORIES: Record<RecordKind, readonly string[]> = {
   despesa: ['Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer'],
