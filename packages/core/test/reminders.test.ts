@@ -163,7 +163,8 @@ describe('Lembretes (D-025): plano de avisos', () => {
   });
 
   it('textos sem travessão, sem julgamento e sem a expressão proibida', () => {
-    const FORBIDDEN = /\b(recomendamos|recomendo|invista|aplique|atrasad[oa]|cuidado|estourou)\b|faz(er|endo)?\s+sentido|[–—]/i;
+    const FORBIDDEN =
+      /\b(recomendamos|recomendo|invista|aplique|atrasad[oa]s?|cuidado|ruim|cortes?|caixinha)\b|vale a pena|desperd[ií]cio|\bestour|saldo devedor|faz(er|endo)?\s+sentido|[\u2013\u2014]/i;
     const texts = [...Object.values(REMINDER_TEXT), reminderBody(1), reminderBody(2)];
     for (const t of texts) expect(t).not.toMatch(FORBIDDEN);
     expect(REMINDER_TEXT.web).toBe('Lembretes estão disponíveis no app para celular.');

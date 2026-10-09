@@ -8,7 +8,7 @@ import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTimin
 import { Logo } from '@/components/brand';
 import { yearA11yLabel } from '@/components/series-parts';
 import { DemoPill, TopInset, Txt } from '@/components/ui';
-import { setValuesHidden, useValuesHidden } from '@/lib/privacy';
+import { PRIVACY_TEXT, setValuesHidden, useValuesHidden } from '@/lib/privacy';
 import { canGoForward, useView, type SpaceKind } from '@/state/data';
 import { useSession } from '@/state/session';
 import { LOGOTYPE_HEIGHT, LOGOTYPE_WIDTH } from '@/theme/logo-paths';
@@ -44,7 +44,7 @@ function HideValuesButton() {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={hidden ? 'Mostrar valores' : 'Ocultar valores'}
+      accessibilityLabel={hidden ? PRIVACY_TEXT.showNow : PRIVACY_TEXT.hideNow}
       onPress={() => setValuesHidden(!hidden)}
       style={(s) => [styles.eye, (s as { focused?: boolean }).focused && focusOnBrand]}>
       {hidden ? <Eye size={24} color={colors.textOnBrand} /> : <EyeOff size={24} color={colors.textOnBrand} />}

@@ -63,7 +63,7 @@ export function moneyA11y(cents: Cents, isHidden: boolean): string {
 }
 
 /** Valores em reais dentro de uma frase já formatada ("−R$ 1.234,56", "R$ 30,00"). */
-const MONEY_IN_TEXT = /[−-]?\s?R\$[\s ]?\d{1,3}(?:\.\d{3})*,\d{2}/g;
+const MONEY_IN_TEXT = /[\u2212-]?R\$\s?\d{1,3}(?:\.\d{3})*,\d{2}/g;
 
 /** Frase mostrada com os valores trocados por "R$ ••••" (para telas que montam o texto com formatBRL). */
 export function maskMoneyText(text: string, isHidden: boolean): string {

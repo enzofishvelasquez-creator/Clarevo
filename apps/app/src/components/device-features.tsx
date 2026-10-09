@@ -88,14 +88,6 @@ function NativeFeatures() {
   useEffect(() => {
     runRef.current = run;
   });
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const schedule = useRef(() => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      timer.current = null;
-      runRef.current();
-    }, RESCHEDULE_DELAY_MS);
-  }).current;
 
   // Ao abrir, ao entrar e ao mudar a preferência ou o horário.
   useEffect(() => {
@@ -104,6 +96,14 @@ function NativeFeatures() {
 
   // Ao voltar para o app, depois de qualquer escrita concluída e da geração do dia dos gastos fixos.
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const schedule = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        runRef.current();
+      }, RESCHEDULE_DELAY_MS);
+    };
     const appState = AppState.addEventListener('change', (s) => s === 'active' && schedule());
     const mutations = qc.getMutationCache().subscribe((e) => {
       if (e.type === 'updated' && e.action.type === 'success') schedule();
@@ -115,9 +115,9 @@ function NativeFeatures() {
       appState.remove();
       mutations();
       queries();
-      if (timer.current) clearTimeout(timer.current);
+      if (timer) clearTimeout(timer);
     };
-  }, [qc, schedule]);
+  }, [qc]);
 
   // ---- Toque no aviso: Contas a pagar (Pessoal, mês atual) ------------------------------------
   const [pendingOpen, setPendingOpen] = useState(false);

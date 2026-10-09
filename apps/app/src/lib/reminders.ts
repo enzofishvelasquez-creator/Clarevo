@@ -83,12 +83,13 @@ export function queueReminders(job: ReminderJob) {
 }
 
 /**
- * Liga os lembretes depois do toque da pessoa: só então o sistema pede a permissão. Sem permissão, a preferência fica
- * desligada e a tela mostra o caminho para as configurações do aparelho.
+ * Liga os lembretes depois do toque da pessoa: só então o sistema pede a permissão. A escolha fica ligada mesmo sem a
+ * permissão; a tela mostra "Os avisos estão desativados nas configurações do aparelho." e, quando a pessoa libera os
+ * avisos e volta ao app, os lembretes são agendados sem outro toque.
  */
 export async function enableReminders(userId: string, persist: boolean): Promise<NotificationPermission> {
   const permission = await requestNotificationPermission();
-  if (permission.granted) updatePrefs(userId, { reminders: true }, persist);
+  updatePrefs(userId, { reminders: true }, persist);
   return permission;
 }
 
