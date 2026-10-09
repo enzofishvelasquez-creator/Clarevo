@@ -35,6 +35,19 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 140
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#2457F5"
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "O Clarevo usa o Face ID só para desbloquear o app, quando você liga essa opção em Conta."
+        }
       ]
     ],
     "experiments": {

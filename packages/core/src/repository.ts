@@ -5,6 +5,7 @@ import type {
   CommitmentInput,
   CommitmentSeries,
   FinancialRecord,
+  IncomeReference,
   MonthOverview,
   OccurrenceMode,
   PaymentInput,
@@ -32,6 +33,13 @@ export type CommitmentAction =
 
 /** Decisão da revisão dos últimos meses (decide_return_review); não conta como anotação (D-030). */
 export type ReturnReviewAction = 'decidir_revisao';
+
+/**
+ * Renda de referência (D-026, Ciclo B), gravada em record_operations com a referência em target_id:
+ * set_income_reference ('definir_renda_referencia') e delete_income_reference ('excluir_renda_referencia').
+ * Contam como anotação na atividade (D-030), como as demais escritas.
+ */
+export type IncomeReferenceAction = 'definir_renda_referencia' | 'excluir_renda_referencia';
 
 /** Resultado das escritas de conta a pagar: a conta no estado atual e, quando houver, o gasto envolvido. */
 export interface CommitmentWrite {
@@ -174,6 +182,33 @@ export interface RecordsRepository {
     reviewedThrough: IsoMonth,
     decision: ReturnDecision,
   ): Promise<ReturnReviewMark>;
+
+  // Renda de referência (D-026, Ciclo B). Para "Próximos meses", as contas por vencimento vêm de
+  // listCommitmentsDueBetween (mesma leitura de commitment_items).
+
+  /** Referências vivas do contexto, por mês de início crescente. Sem leitura: lista vazia (RLS). */
+  listIncomeReferences(contextId: string): Promise<IncomeReference[]>;
+  /**
+   * Cria (expectedVersion 0) ou altera (versão atual) a referência viva do mês fromMonth. Exige escrita no contexto.
+   * Ordem do banco: repetição; sem_permissao; mes_invalido; referencia_fora_do_intervalo (fora de mês atual − 24 a
+   * mês atual + 12); valor_invalido e valor_acima_do_limite; tipo_invalido (varies nulo); versao_desatualizada (versão
+   * nula ou negativa, 0 com referência viva no mês, maior que 0 sem referência viva ou com outra versão); autoria ou
+   * "editar de outras pessoas" (sem_permissao). Mesma chave e conteúdo: devolve o estado atual; outro conteúdo ou outra
+   * ação: chave_reutilizada.
+   */
+  setIncomeReference(
+    key: string,
+    contextId: string,
+    fromMonth: IsoMonth,
+    expectedVersion: number,
+    amountCents: Cents,
+    varies: boolean,
+  ): Promise<IncomeReference>;
+  /**
+   * Exclusão lógica com versão (a anterior volta a valer). Ordem: repetição; nao_encontrado (sem leitura ou já
+   * excluída); sem_permissao (sem escrita); versao_desatualizada; autoria. Devolve a referência excluída.
+   */
+  deleteIncomeReference(key: string, id: string, expectedVersion: number): Promise<IncomeReference>;
 }
 
 export type RepoErrorCode =
@@ -219,6 +254,7 @@ export type RepoErrorCode =
   | 'decisao_invalida'
   | 'mes_invalido'
   | 'periodo_invalido'
+  | 'referencia_fora_do_intervalo'
   | 'desconhecido';
 
 export class RepoError extends Error {

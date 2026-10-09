@@ -259,6 +259,25 @@ export interface MonthOverview {
 /** create_series_occurrence: a conta do mês passado fica em aberto ou registrada como "não houve". */
 export type OccurrenceMode = 'aberta' | 'nao_houve';
 
+/**
+ * Renda de referência mensal líquida (D-026(2)): informada pela pessoa, vale a partir de um mês (a mais recente com
+ * início até o mês mostrado). Só calcula percentuais: não confirma recebimento e nunca entra em Recebido.
+ * Gravada só por set_income_reference e delete_income_reference; no máximo uma viva por contexto e mês.
+ */
+export interface IncomeReference {
+  id: string;
+  contextId: string;
+  /** Primeiro mês em que vale (no banco, o dia 1 desse mês). */
+  fromMonth: IsoMonth;
+  amountCents: Cents;
+  /** "Minha renda varia": o app pede revisão quando a referência vigente é de um mês anterior. */
+  varies: boolean;
+  createdBy: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const NO_CATEGORY_LABEL = 'Sem categoria';
 export const CATEGORIES: Record<RecordKind, readonly string[]> = {
   despesa: ['Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer'],

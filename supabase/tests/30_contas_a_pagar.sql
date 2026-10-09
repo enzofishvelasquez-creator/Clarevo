@@ -614,15 +614,15 @@ end $$;
 
 -- 20. Privilégios: authenticated executa só as funções expostas; anon não executa nada; sem escrita direta.
 -- A lista inclui as funções de séries das migrações de gastos fixos e de contas do ano (testadas em 40 e 45) e as da
--- revisão dos últimos meses (testadas em 47).
+-- revisão dos últimos meses (testadas em 47) e as da renda comprometida (testadas em 50).
 reset role;
 do $$ begin
   assert (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
     = array['context_permission', 'create_commitment', 'create_record', 'create_series', 'create_series_occurrence',
-            'decide_return_review', 'delete_commitment', 'delete_record', 'delete_series', 'end_series', 'ensure_personal_space',
-            'inform_series_year', 'is_org_admin', 'month_to_pay', 'month_totals', 'months_overview',
-            'pay_commitment', 'skip_series_year', 'sync_series_occurrences', 'undo_commitment_payment', 'update_commitment', 'update_record',
+            'decide_return_review', 'delete_commitment', 'delete_income_reference', 'delete_record', 'delete_series', 'end_series', 'ensure_personal_space',
+            'inform_series_year', 'is_org_admin', 'month_committed', 'month_to_pay', 'month_totals', 'months_overview',
+            'pay_commitment', 'set_income_reference', 'skip_series_year', 'sync_series_occurrences', 'undo_commitment_payment', 'update_commitment', 'update_record',
             'update_series_from'],
     'authenticated executa só as funções expostas';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

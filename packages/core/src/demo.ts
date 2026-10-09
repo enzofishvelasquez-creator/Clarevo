@@ -10,6 +10,8 @@ import { newOperationKey } from './repository';
  * Contas do ano: IPVA (cota única, 20/01, desde 2027) e IPTU (10 parcelas de fevereiro a novembro, dia 10, desde 2027),
  * ambos com valor que muda. Em 07/10/2026 nenhuma conta delas existe (entram em novembro e dezembro de 2026), então
  * nenhum total de outubro, novembro ou dezembro de 2026 muda.
+ * Renda de referência (D-026): R$ 6.000,00 desde setembro de 2026, renda fixa. Renda comprometida de outubro: 52,5%
+ * (R$ 3.150,00); novembro: 63,8% (R$ 3.830,00). Recebido, Pago, Diferença e Ainda a pagar não mudam.
  */
 export const DEMO_TODAY = '2026-10-07';
 export const DEMO_EMAIL = 'demo@clarevo.app';
@@ -116,6 +118,9 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   await bill('Condomínio', 500, '2026-10-20', 'Moradia');
   await bill('Seguro do carro', 300, '2026-11-10', 'Transporte'); // só em "Próximos meses"
   await repo.syncSeriesOccurrences(ctx); // o app sincroniza ao abrir; aqui não cria nada
+  // Renda de referência (D-026): R$ 6.000,00 por mês desde setembro de 2026, renda fixa. Só calcula percentuais (52,5% em
+  // outubro, 63,8% em novembro); não entra em Recebido.
+  await repo.setIncomeReference(newOperationKey(), ctx, '2026-09', 0, 600_000, false);
 
   // A latência só passa a valer depois de semear, para a demonstração abrir rápido.
   repo.latencyMs = opts.latencyMs ?? 0;

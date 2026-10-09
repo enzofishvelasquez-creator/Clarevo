@@ -5,6 +5,14 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   ANNUAL_SERIES_ERROR_TEXT,
+  COMMITTED_TEXT,
+  INCOME_REFERENCE_ERROR_TEXT,
+  committedLine,
+  committedTexts,
+  paymentsForecast,
+  projectCommitted,
+  summarizeCommitted,
+  upcomingCommittedMonths,
   CALCULATORS,
   CALC_DISCLAIMER,
   CALC_ERROR_TEXT,
@@ -420,6 +428,112 @@ describe('textos das calculadoras e de "Achar tudo"', () => {
       expect(text).not.toMatch(FORBIDDEN);
       expect(text).not.toMatch(JUDGMENT);
     }
+  });
+});
+
+/**
+ * Renda comprometida (Ciclo B, spec2 §5 "Sem julgamento"): sem cor de alerta nem julgamento ("alto", "ruim", "cuidado",
+ * "estourou", "endividado", "atrasado"), sem "disponível" ou "sobra" (para não confundir com saldo). A previsão dos
+ * pagamentos do mês também nunca usa "Diferença".
+ */
+const NEUTRAL = /\balt[oa]s?\b|\bruim\b|cuidado|estour|endividad|atrasad|dispon[ií]vel|\bsobra|alerta|perig/i;
+
+/** Todas as strings fixas de um objeto de textos (funções ficam de fora: são chamadas à parte). */
+function staticStrings(o: unknown): string[] {
+  if (typeof o === 'string') return [o];
+  if (o && typeof o === 'object') return Object.values(o).flatMap(staticStrings);
+  return [];
+}
+
+describe('textos da renda comprometida (Ciclo B)', () => {
+  it('a lista neutra reprova o que deve e aceita os textos obrigatórios', () => {
+    for (const bad of ['Comprometimento alto', 'ruim', 'Cuidado', 'estourou', 'endividado', 'atrasado', 'disponível', 'sobra no mês'])
+      expect(NEUTRAL.test(bad)).toBe(true);
+    for (const ok of [COMMITTED_TEXT.outsideNote, COMMITTED_TEXT.debtReference, COMMITTED_TEXT.reference.intro, 'Alterar', 'Ocultar referência'])
+      expect(NEUTRAL.test(ok)).toBe(false);
+  });
+
+  it('COMMITTED_TEXT, INCOME_REFERENCE_ERROR_TEXT e os textos montados na demonstração', async () => {
+    const T = COMMITTED_TEXT;
+    const texts: string[] = [
+      ...staticStrings(T),
+      ...Object.values(INCOME_REFERENCE_ERROR_TEXT),
+      T.resumoTitle('2026-10'),
+      T.resumoA11y('2026-10', '52,5%', 315_000, 600_000),
+      T.resumoEmptyA11y('2026-10'),
+      T.emptyMonth('2026-10'),
+      T.highlightCaption('2026-10'),
+      T.highlightAmounts(315_000, 600_000),
+      T.meterPaid(250_000),
+      T.meterOpen(65_000),
+      T.meterA11y('52,5%', 250_000, 65_000),
+      T.groupLine('Gastos fixos', 250_000, '41,7%'),
+      T.groupLine('Gastos fixos', 250_000, null),
+      T.groupA11y('Gastos fixos', 250_000, '41,7%'),
+      T.groupA11y('Gastos fixos', 250_000, null),
+      T.debtLine(85_000, '14,2%'),
+      T.debtLine(85_000, null),
+      T.outside(285_000),
+      T.estimated(18_000),
+      T.overdueBefore(4_000, '2026-10'),
+      T.overReference(72_000),
+      T.annualShare(35_000),
+      T.referenceLine(600_000, '2026-09'),
+      T.received('2026-10', 600_000),
+      T.reviewHint('2026-09', '2026-10'),
+      T.reviewHint('2026-12', '2027-01'),
+      T.noReferenceLabel('2026-10'),
+      T.how('2026-10'),
+      T.reference.suggestion(600_000, ['2026-09']),
+      T.reference.suggestion(580_000, ['2026-07', '2026-08', '2026-09']),
+      T.reference.useSuggestion(600_000),
+      T.reference.deleteTitle('2026-10'),
+      T.reference.saved('2026-10'),
+      T.forecast('2026-10', 455_000),
+      T.forecastEstimated(18_000),
+    ];
+    const repo = await createDemoRepository();
+    const ctx = (await repo.getSpace())!.personalContextId;
+    const refs = await repo.listIncomeReferences(ctx);
+    const series = await repo.listSeries(ctx);
+    for (const month of ['2026-09', '2026-10', '2026-11']) {
+      const s = summarizeCommitted(await repo.listCommitments(ctx, month), ctx, month, DEMO_TODAY, refs, series);
+      const t = committedTexts(s, 600_000);
+      texts.push(
+        ...Object.values(committedLine(s)).filter((v): v is string => typeof v === 'string'),
+        ...staticStrings({ ...t, groups: null }),
+        ...t.groups.flatMap((g) => [g.label, g.line, g.a11yLabel, g.percentText ?? '']),
+      );
+      // Sem referência.
+      const bare = summarizeCommitted(await repo.listCommitments(ctx, month), ctx, month, DEMO_TODAY, []);
+      texts.push(...Object.values(committedLine(bare)).filter((v): v is string => typeof v === 'string'), ...staticStrings({ ...committedTexts(bare), groups: null }));
+    }
+    const months = upcomingCommittedMonths('2026-10');
+    const p = projectCommitted(series, await repo.listCommitmentsDueBetween(ctx, months[0]!, months[5]!), refs, months, DEMO_TODAY);
+    texts.push(...p.months.flatMap((m) => [m.text, m.a11yLabel]), ...p.milestones.map((m) => m.text));
+    expect(texts.length).toBeGreaterThan(150);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(NEUTRAL);
+    }
+  });
+
+  it('previsão dos pagamentos do mês: sem "Diferença", "disponível" nem "sobra"', async () => {
+    const repo = await createDemoRepository();
+    const ctx = (await repo.getSpace())!.personalContextId;
+    const paid = summarizeMonth(await repo.listRecords(ctx, '2026-10'), ctx, '2026-10').paidCents;
+    const f = paymentsForecast(paid, summarizeToPay(await repo.listCommitments(ctx, '2026-10'), ctx, '2026-10', DEMO_TODAY))!;
+    for (const text of [f.text, COMMITTED_TEXT.forecast('2026-11', 1), COMMITTED_TEXT.forecastEstimated(18_000)]) {
+      expect(text).not.toMatch(/diferen[cç]a|dispon[ií]vel|\bsobra/i);
+      expect(text).not.toMatch(FORBIDDEN);
+    }
+  });
+
+  it('arquivo-fonte committed.ts', () => {
+    const text = readFileSync(join(CORE_SRC, 'committed.ts'), 'utf8');
+    expect(text).not.toMatch(FORBIDDEN);
+    expect(text).not.toMatch(JUDGMENT);
   });
 });
 

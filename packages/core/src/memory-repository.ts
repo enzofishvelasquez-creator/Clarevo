@@ -9,6 +9,7 @@ import type {
   ContextActivity,
   FinancialAccount,
   FinancialRecord,
+  IncomeReference,
   OccurrenceMode,
   PaymentInput,
   PersonalSpace,
@@ -24,12 +25,14 @@ import type {
   AffectedRef,
   CommitmentAction,
   CommitmentWrite,
+  IncomeReferenceAction,
   RecordsRepository,
   ReturnReviewAction,
   SeriesAction,
   SeriesWrite,
 } from './repository';
 import { RepoError } from './repository';
+import { referenceMonthError } from './committed';
 import { PARTS_PER_YEAR_MAX } from './records';
 import { isLongAbsence, isReviewableMonth, monthsOverview as overviewOf } from './retorno';
 import {
@@ -50,13 +53,15 @@ import { dueDateBounds, seriesInputError, seriesTermError } from './validation';
 type RecordAction = 'criar' | 'editar' | 'excluir';
 
 interface Operation {
-  action: RecordAction | CommitmentAction | SeriesAction | ReturnReviewAction;
+  action: RecordAction | CommitmentAction | SeriesAction | ReturnReviewAction | IncomeReferenceAction;
   hash: string;
   contextId: string;
   recordId: string | null;
   commitmentId: string | null;
   /** Alvo genérico (target_id): a série nas ações de gasto fixo. */
   seriesId: string | null;
+  /** Alvo genérico (target_id): a renda de referência nas ações de renda de referência. */
+  referenceId: string | null;
 }
 
 type StoredRecord = FinancialRecord & { deletedAt?: string };
@@ -74,6 +79,8 @@ type StoredCommitment = Omit<Commitment, 'payment' | 'series'> & {
 type StoredSeries = Omit<CommitmentSeries, 'terms' | 'skippedNumbers' | 'paidCount' | 'openCount' | 'generating'> & { deletedAt?: string };
 /** Vigência: nunca editada; "esta e as próximas" marca as substituídas. */
 type StoredTerm = SeriesTerm & { id: string; seriesId: string; contextId: string; createdAt: string; supersededAt?: string };
+/** Renda de referência (income_references): exclusão lógica; no máximo uma viva por contexto e mês. */
+type StoredIncomeReference = IncomeReference & { deletedAt?: string; deletedBy?: string };
 
 const NATURES: readonly string[] = ['conta', 'financiamento', 'compra_parcelada', 'outro_parcelamento'];
 const SERIES_ACTIONS: readonly string[] = ['criar_serie', 'alterar_serie', 'encerrar_serie', 'excluir_serie', 'informar_ano', 'tirar_ano'];
@@ -107,6 +114,8 @@ export interface MemoryRepositoryOptions {
  * com S1 a S10.
  * Revisão dos últimos meses (D-030): toda operação gravada, menos a decisão da revisão, atualiza a atividade da pessoa no
  * contexto (como o gatilho clarevo_track_activity); a geração não grava operação e não mexe nela.
+ * Renda de referência (D-026): set_income_reference e delete_income_reference, com versão, exclusão lógica e no máximo
+ * uma viva por contexto e mês.
  * Usado na demonstração (acesso simulado) e nos testes.
  */
 export class MemoryRepository implements RecordsRepository {
@@ -119,6 +128,7 @@ export class MemoryRepository implements RecordsRepository {
   /** context_activity e return_reviews da pessoa (só ela usa este repositório), por contexto. */
   private activity = new Map<string, ContextActivity>();
   private reviews = new Map<string, ReturnReviewMark>();
+  private incomeRefs = new Map<string, StoredIncomeReference>();
   private seq = 0;
   /** Simula falha de rede: 'antes' (nada gravado) ou 'depois' (gravado, resposta perdida). */
   failNextWrite: 'antes' | 'depois' | null = null;
@@ -168,6 +178,7 @@ export class MemoryRepository implements RecordsRepository {
       operations: new Map(this.operations),
       activity: new Map(this.activity),
       reviews: new Map(this.reviews),
+      incomeRefs: new Map(this.incomeRefs),
     };
     let result: T;
     try {
@@ -183,6 +194,7 @@ export class MemoryRepository implements RecordsRepository {
         operations: this.operations,
         activity: this.activity,
         reviews: this.reviews,
+        incomeRefs: this.incomeRefs,
       } = saved);
       throw e;
     }
@@ -890,6 +902,78 @@ export class MemoryRepository implements RecordsRepository {
     });
   }
 
+  /** Como a leitura de income_references (RLS): vivas do contexto, por mês de início crescente; sem leitura, nada. */
+  async listIncomeReferences(contextId: string) {
+    return this.read(() =>
+      [...this.incomeRefs.values()]
+        .filter((r) => !r.deletedAt && r.contextId === contextId && this.canRead(r.contextId))
+        .sort((a, b) => a.fromMonth.localeCompare(b.fromMonth) || a.id.localeCompare(b.id))
+        .map(stripReference),
+    );
+  }
+
+  /**
+   * Como set_income_reference: versão 0 cria; maior que 0 altera a referência viva do mês (fromMonth não muda: para
+   * outro mês, exclua e crie). Ordem do banco: repetição, escrita no contexto, mês, faixa, valor, tipo, versão.
+   */
+  async setIncomeReference(key: string, contextId: string, fromMonth: IsoMonth, expectedVersion: number, amountCents: Cents, varies: boolean) {
+    return this.write(() => {
+      const payload = [contextId, fromMonth, expectedVersion, amountCents, varies];
+      const replayed = this.replay(key, 'definir_renda_referencia', payload);
+      if (replayed) return stripReference(this.incomeRefs.get(replayed.referenceId!)!);
+      if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      const monthError = referenceMonthError(fromMonth, this.opts.today());
+      if (monthError) throw new RepoError(monthError);
+      if (!Number.isSafeInteger(amountCents) || amountCents < 1) throw new RepoError('valor_invalido');
+      if (amountCents > MAX_RECORD_CENTS) throw new RepoError('valor_acima_do_limite');
+      if (typeof varies !== 'boolean') throw new RepoError('tipo_invalido');
+      if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0) throw new RepoError('versao_desatualizada');
+      const current = [...this.incomeRefs.values()].find((r) => !r.deletedAt && r.contextId === contextId && r.fromMonth === fromMonth);
+      if (expectedVersion !== (current?.version ?? 0)) throw new RepoError('versao_desatualizada');
+      const now = new Date().toISOString();
+      const next: StoredIncomeReference = current
+        ? { ...current, amountCents, varies, version: current.version + 1, updatedAt: now }
+        : {
+            id: this.id('ref'),
+            contextId,
+            fromMonth,
+            amountCents,
+            varies,
+            createdBy: this.opts.actorId,
+            version: 1,
+            createdAt: now,
+            updatedAt: now,
+          };
+      this.incomeRefs.set(next.id, next);
+      this.saveOperation(key, 'definir_renda_referencia', payload, { contextId, recordId: null, commitmentId: null, referenceId: next.id });
+      return stripReference(next);
+    });
+  }
+
+  /** Como delete_income_reference: exclusão lógica com versão; a referência anterior volta a valer. */
+  async deleteIncomeReference(key: string, id: string, expectedVersion: number) {
+    return this.write(() => {
+      const payload = [id, expectedVersion];
+      const replayed = this.replay(key, 'excluir_renda_referencia', payload);
+      if (replayed) return stripReference(this.incomeRefs.get(replayed.referenceId!)!);
+      const current = this.incomeRefs.get(id);
+      if (!current || current.deletedAt || !this.canRead(current.contextId)) throw new RepoError('nao_encontrado');
+      if (!this.canWrite(current.contextId)) throw new RepoError('sem_permissao');
+      if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
+      const now = new Date().toISOString();
+      const next: StoredIncomeReference = {
+        ...current,
+        version: current.version + 1,
+        updatedAt: now,
+        deletedAt: now,
+        deletedBy: this.opts.actorId,
+      };
+      this.incomeRefs.set(id, next);
+      this.saveOperation(key, 'excluir_renda_referencia', payload, { contextId: current.contextId, recordId: null, commitmentId: null, referenceId: id });
+      return stripReference(next);
+    });
+  }
+
   /**
    * Invariantes do vínculo (no banco: restrição adiada, FK composta e checagem de tipo).
    * I1: conta paga, não excluída, com exatamente 1 gasto vivo vinculado, ou em aberto com 0.
@@ -912,6 +996,30 @@ export class MemoryRepository implements RecordsRepository {
       }
     }
     this.checkSeriesInvariants();
+    this.checkReferenceInvariants();
+  }
+
+  /**
+   * Renda de referência (no banco: índice único das vivas e restrições de coluna): no máximo uma viva por contexto e
+   * mês; mês válido; valor de 1 a MAX_RECORD_CENTS; versão a partir de 1. Lança Error('referencia_inconsistente').
+   */
+  private checkReferenceInvariants() {
+    const live = new Set<string>();
+    for (const r of this.incomeRefs.values()) {
+      if (
+        !isValidIsoMonth(r.fromMonth) ||
+        !Number.isSafeInteger(r.amountCents) ||
+        r.amountCents < 1 ||
+        r.amountCents > MAX_RECORD_CENTS ||
+        r.version < 1
+      ) {
+        throw new Error('referencia_inconsistente');
+      }
+      if (r.deletedAt) continue;
+      const k = `${r.contextId}|${r.fromMonth}`;
+      if (live.has(k)) throw new Error('referencia_inconsistente');
+      live.add(k);
+    }
   }
 
   private checkSeriesInvariants() {
@@ -1005,6 +1113,7 @@ export class MemoryRepository implements RecordsRepository {
     /** Ausentes em instantâneos antigos (testes de S3 e S7): as guardas da revisão só comparam quando vêm. */
     activity?: Map<string, ContextActivity>;
     reviews?: Map<string, ReturnReviewMark>;
+    incomeRefs?: Map<string, StoredIncomeReference>;
   }) {
     const fail = () => {
       throw new Error('campo_imutavel');
@@ -1015,6 +1124,21 @@ export class MemoryRepository implements RecordsRepository {
       if (old && a.lastWriteOn < old.lastWriteOn) fail();
       if ((a.absenceFromOn === null) !== (a.absenceUntilOn === null)) fail();
       if (a.absenceFromOn !== null && !(a.absenceFromOn < a.absenceUntilOn! && a.absenceUntilOn! <= a.lastWriteOn)) fail();
+    }
+    // Renda de referência: contexto, mês, autoria e criação não mudam; excluída não volta; versão + 1 por escrita.
+    for (const [id, r] of this.incomeRefs) {
+      const old = before.incomeRefs?.get(id);
+      if (!old || old === r) continue;
+      if (
+        old.deletedAt ||
+        old.contextId !== r.contextId ||
+        old.fromMonth !== r.fromMonth ||
+        old.createdBy !== r.createdBy ||
+        old.createdAt !== r.createdAt ||
+        r.version !== old.version + 1
+      ) {
+        fail();
+      }
     }
     // Revisão: mês revisado e dia da decisão nunca recuam; versão + 1 por escrita.
     for (const [ctx, r] of this.reviews) {
@@ -1118,9 +1242,15 @@ export class MemoryRepository implements RecordsRepository {
     key: string,
     action: Operation['action'],
     payload: unknown[],
-    ids: Omit<Operation, 'action' | 'hash' | 'seriesId'> & { seriesId?: string },
+    ids: Omit<Operation, 'action' | 'hash' | 'seriesId' | 'referenceId'> & { seriesId?: string; referenceId?: string },
   ) {
-    this.operations.set(key, { action, hash: hash([action, ...payload]), ...ids, seriesId: ids.seriesId ?? null });
+    this.operations.set(key, {
+      action,
+      hash: hash([action, ...payload]),
+      ...ids,
+      seriesId: ids.seriesId ?? null,
+      referenceId: ids.referenceId ?? null,
+    });
     this.trackActivity(action, ids.contextId);
   }
 
@@ -1444,6 +1574,11 @@ function withRecord(w: CommitmentWrite): CommitmentWrite & { record: FinancialRe
 
 function hash(payload: unknown) {
   return JSON.stringify(payload);
+}
+
+function stripReference(r: StoredIncomeReference): IncomeReference {
+  const { deletedAt: _deleted, deletedBy: _by, ...rest } = r;
+  return rest;
 }
 
 function strip(r: StoredRecord): FinancialRecord {
