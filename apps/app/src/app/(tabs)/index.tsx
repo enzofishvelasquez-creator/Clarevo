@@ -1,4 +1,4 @@
-import { ERROR_TEXT, formatBRL, formatDateBR, formatMonthBR, monthOf, toPayCaption } from '@clarevo/core';
+import { ERROR_TEXT, emptyMonthCaption, formatBRL, formatDateBR, formatMonthBR, monthOf, toPayCaption } from '@clarevo/core';
 import { router, useFocusEffect } from 'expo-router';
 import { AlertCircle, ArrowRight, CalendarClock, Plus, ShieldCheck } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -10,6 +10,7 @@ import { FlashBanner, useFlash } from '@/components/flash';
 import { AppHeader, ContextSwitch, MonthSwitcher } from '@/components/header';
 import { PrimeirosPassos } from '@/components/primeiros-passos';
 import { RecordRow } from '@/components/record-row';
+import { ReturnBand, useReturnBand } from '@/components/retorno-faixa';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, FitMoney, LinkButton, Money, Screen, Skeleton, Txt } from '@/components/ui';
 import { totalChange, type TotalChange } from '@/lib/highlight';
@@ -22,12 +23,16 @@ export default function ResumoScreen() {
   const { today } = useSession();
   const { space: kind, month, currentMonth, monthDirection } = useView();
   const narrow = useWindowDimensions().width < 360;
-  const [notice] = useFlash();
+  const [notice, setNotice] = useFlash();
   const personal = useSpace().data;
   const contextId = kind === 'pessoal' ? personal?.personalContextId : undefined;
   const records = useMonthRecords(contextId, month);
   const s = records.summary;
   const monthName = formatMonthBR(month);
+  // "Nada anotado em junho." (e variações): só em meses fechados, como uma linha a mais no cabeçalho (D-030(6)).
+  const emptyCaption = s ? emptyMonthCaption(s, month, currentMonth) : null;
+  // Faixa "Seus últimos meses" (D-030): só no Pessoal e no mês atual, no lugar dos avisos temporários.
+  const band = useReturnBand(month === currentMonth ? contextId : undefined);
 
   // "Ver resumo do mês" volta a este Resumo, que continua na pilha: mostrar do topo, com os totais à vista.
   // Voltar com "Voltar" mantém a posição da rolagem.
@@ -101,6 +106,12 @@ export default function ResumoScreen() {
                     </Txt>
                   ) : null}
                 </Pressable>
+                {/* Fora da área tocável, para o leitor de tela ler a linha. Mês sem anotação não é mês sem gastos. */}
+                {emptyCaption ? (
+                  <Txt variant="caption" color={colors.textOnBrand} style={{ fontFamily: fonts.bold, marginTop: space[1] }}>
+                    {emptyCaption}
+                  </Txt>
+                ) : null}
                 <View style={styles.split}>
                   <TotalItem
                     label="Recebido"
@@ -123,8 +134,13 @@ export default function ResumoScreen() {
 
         <Body>
           <FlashBanner message={notice} />
-          {/* Aviso temporário de conta nova (só Pessoal, mês corrente): não muda a ordem dos blocos aprovados. */}
-          <PrimeirosPassos contextId={contextId} />
+          {/*
+            Avisos temporários (só Pessoal, mês corrente), um por vez, sem mudar a ordem dos blocos aprovados: a faixa
+            "Seus últimos meses" tem precedência; o card de Primeiros passos espera a revisão carregar e volta quando a
+            faixa some (conta nova nunca vê a faixa).
+          */}
+          {band.status === 'visivel' ? <ReturnBand band={band} onMovedOn={(text) => setNotice(text)} /> : null}
+          {band.status === 'oculta' ? <PrimeirosPassos contextId={contextId} /> : null}
 
           {kind === 'familia' ? (
             <FamilyNotLinked />

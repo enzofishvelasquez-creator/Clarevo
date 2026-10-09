@@ -27,7 +27,7 @@ SplashScreen.preventAutoHideAsync();
  * página recarregada). As telas de entrada, de confirmação e de nova senha ficam fora.
  */
 const ENTRY_PATH =
-  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|composicao|conta|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes|metas|aprender)\/?$/;
+  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|conta|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes|metas|aprender)\/?$/;
 
 /**
  * Endereço pedido ao abrir a versão web. Sem sessão (ou enquanto a sessão é conferida), as rotas protegidas levam à
@@ -213,6 +213,10 @@ function Navigation() {
           <Stack.Screen name="explicacao/[tema]" />
           <Stack.Screen name="calcular/index" />
           <Stack.Screen name="calcular/[slug]" />
+          {/* Seus últimos meses (D-030): resumo, passo a passo e registrar e pagar uma conta sem registro. */}
+          <Stack.Screen name="retomar/index" />
+          <Stack.Screen name="retomar/atualizar" />
+          <Stack.Screen name="retomar/pagar" />
         </Stack.Protected>
         <Stack.Screen name="carregando" />
         <Stack.Screen name="confirmado" />

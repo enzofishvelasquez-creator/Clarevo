@@ -1,7 +1,9 @@
 import {
   addMonths,
+  loadReturnReview,
   monthOf,
   newOperationKey,
+  returnWindow,
   summarizeMonth,
   summarizeToPay,
   type AffectedRef,
@@ -10,16 +12,21 @@ import {
   type CommitmentWrite,
   type FinancialRecord,
   type IsoMonth,
+  type OccurrenceMode,
   type PaymentInput,
   type RecordInput,
   type RecordKind,
+  type ReturnDecision,
+  type ReturnReview,
+  type ReturnReviewState,
   type SeriesAction,
   type SeriesEditInput,
   type SeriesInput,
   type SeriesWrite,
 } from '@clarevo/core';
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { createContext, use, useRef } from 'react';
+import { createContext, use, useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 
 import { useRepo, useSession } from '@/state/session';
 
@@ -67,6 +74,8 @@ export function useSeriesSync(contextId: string | undefined) {
         // Listas carregadas antes desta sincronização (por exemplo, na virada do dia) recarregam.
         qc.invalidateQueries({ queryKey: ['commitments'] });
         qc.invalidateQueries({ queryKey: ['series'] });
+        // Uma conta criada agora deixa de ser "sem conta registrada" na revisão dos últimos meses.
+        qc.invalidateQueries({ queryKey: ['returnReview'] });
       }
       const prev = qc.getQueryData<SeriesSyncResult>(queryKey);
       return prev ? { created: prev.created + r.created, createdOverdue: prev.createdOverdue + r.createdOverdue } : r;
@@ -141,6 +150,8 @@ function useInvalidate() {
     qc.invalidateQueries({ queryKey: ['commitment'] });
     // Reabrir a conta de um gasto fixo muda as contagens e a lista de contas da série.
     if (record.commitmentId) qc.invalidateQueries({ queryKey: ['series'] });
+    // Toda escrita muda a revisão dos últimos meses (atividade, recebimentos e gastos do mês).
+    qc.invalidateQueries({ queryKey: ['returnReview'] });
   };
 }
 
@@ -190,6 +201,7 @@ function useInvalidateCommitment() {
       qc.invalidateQueries({ queryKey: ['records'] });
       qc.invalidateQueries({ queryKey: ['record', w.record.id] });
     }
+    qc.invalidateQueries({ queryKey: ['returnReview'] });
   };
 }
 
@@ -322,6 +334,7 @@ function useInvalidateSeries() {
     qc.invalidateQueries({ queryKey: ['commitments'] });
     // Contas tiradas por encerrar ou excluir recarregam como não encontradas.
     qc.invalidateQueries({ queryKey: ['commitment'] });
+    qc.invalidateQueries({ queryKey: ['returnReview'] });
   };
 }
 
@@ -419,6 +432,7 @@ export function useSeriesOperationKey() {
         qc.invalidateQueries({ queryKey: ['series'] });
         qc.invalidateQueries({ queryKey: ['commitments'] });
         qc.invalidateQueries({ queryKey: ['commitment'] });
+        qc.invalidateQueries({ queryKey: ['returnReview'] });
         return { ...attempt, ...op };
       }
       return null;
@@ -434,6 +448,7 @@ export function useSeriesOperationKey() {
       pending.current = [...pending.current, { key, snapshot }];
       qc.invalidateQueries({ queryKey: ['series'] });
       qc.invalidateQueries({ queryKey: ['commitments'] });
+      qc.invalidateQueries({ queryKey: ['returnReview'] });
     },
     /** Gravação confirmada ou reconciliada: nada fica pendente e a próxima operação usa outra chave. */
     settled: () => {
@@ -445,6 +460,78 @@ export function useSeriesOperationKey() {
       current.current = newOperationKey();
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Seus últimos meses (D-030, Ciclo A4)
+// ---------------------------------------------------------------------------
+
+/** Atividade, marca e revisão montada (review null: nenhuma revisão ativa; review.isEmpty: nada a conferir). */
+export interface ReturnReviewData {
+  state: ReturnReviewState;
+  review: ReturnReview | null;
+}
+
+/**
+ * Revisão dos últimos meses do contexto, com a chave ['returnReview', ctx, hoje]. Só depois da sincronização do dia dar
+ * certo: sem ela, contas que a geração ainda vai criar apareceriam como "sem conta registrada". Se a sincronização ou a
+ * carga falham, falha inteira (sem faixa no Resumo; /retomar mostra ErrorState), nunca uma lista parcial.
+ * Toda escrita invalida ['returnReview']; ao voltar para o app (outro aparelho pode ter decidido), recarrega.
+ */
+export function useReturnReview(contextId: string | undefined) {
+  const repo = useRepo();
+  const qc = useQueryClient();
+  const { today } = useSession();
+  const sync = useSeriesSync(contextId);
+  const query = useQuery({
+    queryKey: ['returnReview', contextId, today],
+    queryFn: (): Promise<ReturnReviewData> => loadReturnReview(repo, contextId!, today),
+    enabled: Boolean(contextId) && synced(sync),
+  });
+  useEffect(() => {
+    if (!contextId) return;
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') qc.invalidateQueries({ queryKey: ['returnReview', contextId] });
+    });
+    return () => sub.remove();
+  }, [qc, contextId]);
+  return afterSync(sync, query);
+}
+
+/**
+ * Conta de um mês passado de uma série ("Já paguei", "Ainda não paguei" e "Não houve" de uma linha sem conta
+ * registrada). A versão da série não muda, mas a lista de contas dela muda: as mesmas invalidações das contas a pagar.
+ */
+export function useCreateSeriesOccurrence() {
+  const repo = useRepo();
+  const invalidate = useInvalidateCommitment();
+  return useMutation({
+    mutationFn: (v: { key: string; seriesId: string; seriesVersion: number; number: number; mode: OccurrenceMode }) =>
+      repo.createSeriesOccurrence(v.key, v.seriesId, v.seriesVersion, v.number, v.mode),
+    onSuccess: (w, v) => invalidate(w, v.mode === 'nao_houve'),
+  });
+}
+
+/**
+ * "Seguir adiante" e "Concluir": grava só a decisão. Confirmada pelo servidor, a revisão em cache passa a usar a marca
+ * nova (a faixa some na hora, com a animação de saída) e depois recarrega. Nada mais muda: a decisão não é anotação.
+ */
+export function useDecideReturnReview() {
+  const repo = useRepo();
+  const qc = useQueryClient();
+  const { today } = useSession();
+  return useMutation({
+    mutationFn: (v: { key: string; contextId: string; expectedVersion: number; reviewedThrough: IsoMonth; decision: ReturnDecision }) =>
+      repo.decideReturnReview(v.key, v.contextId, v.expectedVersion, v.reviewedThrough, v.decision),
+    onSuccess: (mark, v) => {
+      qc.setQueryData<ReturnReviewData>(['returnReview', v.contextId, today], (old) => {
+        if (!old) return old;
+        const state = { ...old.state, mark };
+        return { state, review: returnWindow(state, today) ? old.review : null };
+      });
+      qc.invalidateQueries({ queryKey: ['returnReview'] });
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------

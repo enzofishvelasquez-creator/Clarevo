@@ -1,3 +1,4 @@
+import { RETURN_TEXT } from '@clarevo/core';
 import { router } from 'expo-router';
 import { User } from 'lucide-react-native';
 import { View } from 'react-native';
@@ -39,6 +40,8 @@ export default function QuemVeScreen() {
         Gastos fixos e parcelamentos também são só seus. A empresa que oferece o benefício não vê nada disso, nem em números somados aos de
         outras pessoas. Contas do ano, como IPVA, IPTU e matrícula, seguem a mesma regra.
       </Txt>
+      {/* Revisão dos últimos meses (D-030(9)): só datas, lidas só pela própria pessoa. */}
+      <Txt color={colors.textSecondary}>{RETURN_TEXT.privacy}</Txt>
       <Button label="Entendi" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
     </Screen>
     </View>

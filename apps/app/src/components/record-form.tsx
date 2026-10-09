@@ -9,7 +9,10 @@ import {
   maskDateBR,
   FIELD_ORDER,
   NO_CATEGORY_LABEL,
+  RETURN_TEXT,
   centsToInput,
+  dayErrorText,
+  dayInMonthDate,
   fieldForErrorCode,
   formatBRL,
   formatDateBR,
@@ -19,35 +22,42 @@ import {
   monthOf,
   newOperationKey,
   parseDateBR,
+  seriesGapForExpense,
   validateRecordDraft,
   type DraftField,
   type FieldErrors,
   type FinancialRecord,
+  type IsoMonth,
   type PersonalSpace,
   type RecordDraft,
   type RecordInput,
   type RecordKind,
 } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
-import { router, useNavigation } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import * as Haptics from 'expo-haptics';
-import { AlertCircle, Info } from 'lucide-react-native';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View, type TextInput } from 'react-native';
+import { AlertCircle, Check, Info } from 'lucide-react-native';
+import { useEffect, useId, useRef, useState } from 'react';
+import { KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
+import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
+import { returnSession } from '@/components/retorno-acoes';
 import { SumValues } from '@/components/sum-values';
-import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
+import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt, styles as ui } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { totalChange } from '@/lib/highlight';
-import { useCommitments, useCreateRecord, useUpdateRecord } from '@/state/data';
+import { useCommitments, useCreateRecord, useReturnReview, useUpdateRecord } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
-import { colors, fonts, space } from '@/theme/tokens';
+import { colors, fonts, space, tabular } from '@/theme/tokens';
 
 type Mode = { type: 'novo'; kind: RecordKind } | { type: 'editar'; record: FinancialRecord };
+
+/** Mês fechado vindo da revisão dos últimos meses (?mes=AAAA-MM). */
+const ISO_MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 const COPY = {
   despesa: {
@@ -66,9 +76,19 @@ const COPY = {
   },
 } as const;
 
-/** Formulário único de criar e editar (CL C002, C003, C005). */
+/**
+ * Formulário único de criar e editar (CL C002, C003, C005).
+ * Modo "Dia" (D-030, revisão dos últimos meses): /registro/novo?tipo=…&mes=AAAA-MM&origem=retomar abre com um mês
+ * fechado já escolhido; o campo de data vira "Dia" ("/06/2026"), com "Usar outra data", e o rodapé ganha "Salvar e
+ * anotar outro" (limpa descrição, valor e categoria; mantém tipo, conta e mês) e "Salvar" (volta à revisão).
+ */
 export function RecordForm({ mode, space: personal }: { mode: Mode; space: PersonalSpace }) {
   const { today } = useSession();
+  const params = useLocalSearchParams<{ mes?: string; origem?: string }>();
+  /** Mês fechado do modo "Dia" (só ao criar); null no formulário comum. */
+  const dayMonth: IsoMonth | null =
+    mode.type === 'novo' && typeof params.mes === 'string' && ISO_MONTH.test(params.mes) && params.mes < monthOf(today) ? params.mes : null;
+  const fromReview = dayMonth !== null && params.origem === 'retomar';
   const repo = useRepo();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -80,8 +100,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   const copy = COPY[kind];
   const contextId = mode.type === 'novo' ? personal.personalContextId : mode.record.contextId;
 
-  const initial = useMemo<RecordDraft>(
-    () =>
+  const [initial, setInitial] = useState<RecordDraft>(() =>
       mode.type === 'novo'
         ? { accountId: personal.accounts[0]?.id ?? '', amountText: '', description: '', category: null, dateText: formatDateBR(today) }
         : {
@@ -91,8 +110,12 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             category: mode.record.category,
             dateText: formatDateBR(mode.record.occurredOn),
           },
-    [], // eslint-disable-line react-hooks/exhaustive-deps
   );
+  const [dayMode, setDayMode] = useState(dayMonth !== null);
+  const [dayText, setDayText] = useState('');
+  const [initialDay, setInitialDay] = useState('');
+  /** "Anotado: Salário, R$ 6.000,00 em 01/06/2026." depois de "Salvar e anotar outro". */
+  const [noted, setNoted] = useState<string | null>(null);
 
   const [draft, setDraft] = useState<RecordDraft>(initial);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -113,7 +136,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     accountId: useRef<TextInput>(null),
   } satisfies Record<DraftField, React.RefObject<TextInput | null>>;
 
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || (dayMode && dayText !== initialDay);
+  const day = dayMode && dayMonth ? dayInMonthDate(dayMonth, dayText) : null;
   const account = personal.accounts.find((a) => a.id === draft.accountId) ?? personal.accounts[0];
   const contextName = 'Pessoal';
 
@@ -138,6 +162,26 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   const focusFirst = (errs: FieldErrors) => {
     const first = FIELD_ORDER.find((f) => errs[f]);
     if (first) refs[first].current?.focus();
+  };
+
+  /** Modo "Dia": gravação confirmada. another: "Salvar e anotar outro" (o formulário fica, limpo); senão volta à revisão. */
+  const finishDay = (input: RecordInput, another: boolean) => {
+    if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    if (fromReview) returnSession.noteAction();
+    const text = RETURN_TEXT.noted(input);
+    if (!another) {
+      flash.set(text);
+      leave(goBack);
+      return;
+    }
+    const next: RecordDraft = { ...draft, description: '', amountText: '', category: null };
+    setInitial(next);
+    setDraft(next);
+    setInitialDay(dayText);
+    setErrors({});
+    setNoted(text);
+    opKey.current = newOperationKey();
+    refs.description.current?.focus();
   };
 
   const finish = (recordId: string, saved?: Pick<FinancialRecord, 'amountCents' | 'occurredOn'>) => {
@@ -180,6 +224,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       // Editar o gasto de uma conta a pagar muda a conta (versão e valor pago): o detalhe e a lista recarregam.
       qc.invalidateQueries({ queryKey: ['commitments'] });
       qc.invalidateQueries({ queryKey: ['commitment'] });
+      qc.invalidateQueries({ queryKey: ['returnReview'] });
       const current = await repo.getRecord(op.recordId);
       if (attempt.snapshot === snapshot || !current) {
         pending.current = [];
@@ -192,16 +237,21 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     return null;
   };
 
-  const submit = async (versionOverride?: number) => {
+  const submit = async (versionOverride?: number, another = false) => {
     if (busy) return; // envio repetido bloqueado enquanto o anterior não termina
-    const v = validateRecordDraft(draft, today);
-    if (!v.ok) {
-      setErrors(v.errors);
-      focusFirst(v.errors);
+    // Modo "Dia": o dia vira a data do mês fechado; erro do dia ("Informe o dia.", "Junho tem 30 dias.") no lugar da data.
+    const dayError = day && 'error' in day ? dayErrorText(day.error, dayMonth!) : null;
+    const effective = day ? { ...draft, dateText: 'date' in day ? formatDateBR(day.date) : '' } : draft;
+    const v = validateRecordDraft(effective, today);
+    if (!v.ok || dayError) {
+      const errs = { ...(v.ok ? {} : v.errors), ...(dayError ? { dateText: dayError } : {}) };
+      setErrors(errs);
+      focusFirst(errs);
       return;
     }
     setErrors({});
     setBanner(null);
+    setNoted(null);
     setBusy(true);
     const version = versionOverride ?? baseVersion;
     const snapshot = JSON.stringify([v.input, version]);
@@ -209,7 +259,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       if (pending.current.length > 0) {
         const saved = await reconcile(v.input, snapshot);
         if (saved) {
-          finish(saved.id, saved.amountCents !== undefined && saved.occurredOn ? { amountCents: saved.amountCents, occurredOn: saved.occurredOn } : undefined);
+          if (dayMode) finishDay(v.input, another);
+          else finish(saved.id, saved.amountCents !== undefined && saved.occurredOn ? { amountCents: saved.amountCents, occurredOn: saved.occurredOn } : undefined);
           return;
         }
         // Nada foi gravado: repetir com a mesma chave se o conteúdo é o mesmo da última tentativa.
@@ -220,7 +271,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       try {
         const saved = await send(key, v.input, version);
         pending.current = [];
-        finish(saved.id, saved);
+        if (dayMode) finishDay(v.input, another);
+        else finish(saved.id, saved);
       } catch (e) {
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
           opKey.current = newOperationKey();
@@ -270,7 +322,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     else goBack();
   };
 
-  const parsedDate = parseDateBR(draft.dateText);
+  const parsedDate = day ? ('date' in day ? day.date : null) : parseDateBR(draft.dateText);
   const movesMonth = mode.type === 'editar' && parsedDate && monthOf(parsedDate) !== monthOf(mode.record.occurredOn);
 
   // Aviso contra contar duas vezes (D-024): gasto com a descrição de uma conta de gasto fixo em aberto no mês da data.
@@ -289,6 +341,10 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     ? `${formatMonthName(monthOf(openSeriesBill.dueOn))}${openSeriesBill.dueOn.slice(0, 4) === today.slice(0, 4) ? '' : ` de ${openSeriesBill.dueOn.slice(0, 4)}`}`
     : '';
 
+  // Modo "Dia" a partir da revisão: gasto com a descrição de um gasto fixo sem conta registrada no mês (use Já paguei).
+  const returnReview = useReturnReview(fromReview && kind === 'despesa' ? contextId : undefined);
+  const gapRow = fromReview && dayMonth && returnReview.data?.review ? seriesGapForExpense(returnReview.data.review, dayMonth, draft.description) : null;
+
   const formatAmountOnBlur = () => {
     const cents = parseBRL(draft.amountText);
     if (cents !== null && cents > 0 && cents <= MAX_RECORD_CENTS) setDraft((d) => ({ ...d, amountText: centsToInput(cents) }));
@@ -302,6 +358,13 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
         right={<ContextPill label={`Salvando em ${contextName}`} />}
       />
       <Screen contentStyle={styles.body}>
+        {noted ? (
+          <Banner tone="sucesso" icon={Check}>
+            <Txt variant="label" color={colors.successText} style={{ fontFamily: fonts.bold }}>
+              {noted}
+            </Txt>
+          </Banner>
+        ) : null}
         {conflict ? (
           <Banner tone="erro" icon={AlertCircle}>
             <Txt variant="label" color={colors.error}>
@@ -357,6 +420,13 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             </Banner>
           ) : null}
 
+          {gapRow ? (
+            <Banner tone="info" icon={Info}>
+              <Txt variant="label">{RETURN_TEXT.dayGapHint(gapRow)}</Txt>
+              <LinkButton label={RETURN_TEXT.backToReview} style={styles.inlineLink} onPress={requestCancel} />
+            </Banner>
+          ) : null}
+
           <TextField
             ref={refs.amountText}
             label="Valor em reais"
@@ -372,28 +442,54 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
           />
           <SumValues target={refs.amountText} onUse={(t) => set('amountText', t)} />
 
-          <View style={{ gap: space[2] }}>
-            <TextField
-              ref={refs.dateText}
-              label={copy.dateLabel}
-              value={draft.dateText}
-              onChangeText={(t) => set('dateText', maskDateBR(t))}
-              placeholder="DD/MM/AAAA"
-              keyboardType="number-pad"
-              inputMode="numeric"
-              maxLength={10}
-              error={errors.dateText}
-              hint="Digite só os números. Só datas até hoje."
-            />
-            <View style={styles.chips}>
-              <Chip label="Hoje" selected={draft.dateText === formatDateBR(today)} onPress={() => set('dateText', formatDateBR(today))} />
-              <Chip
-                label="Ontem"
-                selected={draft.dateText === formatDateBR(addDays(today, -1))}
-                onPress={() => set('dateText', formatDateBR(addDays(today, -1)))}
+          {dayMode && dayMonth ? (
+            <View style={{ gap: space[2] }}>
+              <DayField
+                ref={refs.dateText}
+                month={dayMonth}
+                kind={kind}
+                value={dayText}
+                onChange={(t) => {
+                  setDayText(t);
+                  if (errors.dateText) setErrors((e) => ({ ...e, dateText: undefined }));
+                }}
+                error={errors.dateText}
+              />
+              <LinkButton
+                label={RETURN_TEXT.otherDate}
+                style={styles.inlineLink}
+                onPress={() => {
+                  // A data do dia já digitado (ou a de hoje) passa para o campo de data comum.
+                  if (day && 'date' in day) set('dateText', formatDateBR(day.date));
+                  setDayMode(false);
+                  setErrors((e) => ({ ...e, dateText: undefined }));
+                }}
               />
             </View>
-          </View>
+          ) : (
+            <View style={{ gap: space[2] }}>
+              <TextField
+                ref={refs.dateText}
+                label={copy.dateLabel}
+                value={draft.dateText}
+                onChangeText={(t) => set('dateText', maskDateBR(t))}
+                placeholder="DD/MM/AAAA"
+                keyboardType="number-pad"
+                inputMode="numeric"
+                maxLength={10}
+                error={errors.dateText}
+                hint="Digite só os números. Só datas até hoje."
+              />
+              <View style={styles.chips}>
+                <Chip label="Hoje" selected={draft.dateText === formatDateBR(today)} onPress={() => set('dateText', formatDateBR(today))} />
+                <Chip
+                  label="Ontem"
+                  selected={draft.dateText === formatDateBR(addDays(today, -1))}
+                  onPress={() => set('dateText', formatDateBR(addDays(today, -1)))}
+                />
+              </View>
+            </View>
+          )}
 
           {personal.accounts.length > 1 ? (
             <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel="Conta">
@@ -452,16 +548,36 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
               </Txt>
             </Banner>
           ) : null}
-          <View style={styles.footerRow}>
-            <Button label="Cancelar" tone="ghost" onPress={requestCancel} style={styles.cancel} />
-            <Button
-              label={banner && !conflict ? 'Tentar novamente' : copy.save}
-              busy={busy}
-              busyLabel="Salvando…"
-              onPress={() => submit()}
-              style={styles.save}
-            />
-          </View>
+          {dayMode ? (
+            // Modo "Dia": "Salvar e anotar outro" mantém o formulário (tipo, conta e mês); "Salvar" volta à revisão.
+            <View style={styles.footerRow}>
+              <Button
+                label={RETURN_TEXT.saveAndAnother}
+                tone="soft"
+                disabled={busy}
+                onPress={() => submit(undefined, true)}
+                style={styles.save}
+              />
+              <Button
+                label={banner && !conflict ? 'Tentar novamente' : RETURN_TEXT.save}
+                busy={busy}
+                busyLabel="Salvando…"
+                onPress={() => submit()}
+                style={styles.save}
+              />
+            </View>
+          ) : (
+            <View style={styles.footerRow}>
+              <Button label="Cancelar" tone="ghost" onPress={requestCancel} style={styles.cancel} />
+              <Button
+                label={banner && !conflict ? 'Tentar novamente' : copy.save}
+                busy={busy}
+                busyLabel="Salvando…"
+                onPress={() => submit()}
+                style={styles.save}
+              />
+            </View>
+          )}
         </View>
       </View>
 
@@ -482,8 +598,73 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   );
 }
 
+/**
+ * Campo "Dia" do modo "Dia": só o dia, com o mês fechado como sufixo ("/06/2026"), dica e erro ligados ao campo (o
+ * erro é anunciado ao aparecer, como nos campos de texto).
+ */
+function DayField({
+  ref,
+  month,
+  kind,
+  value,
+  onChange,
+  error,
+}: {
+  ref: React.Ref<TextInput>;
+  month: IsoMonth;
+  kind: RecordKind;
+  value: string;
+  onChange: (text: string) => void;
+  error?: string;
+}) {
+  const [focused, setFocused] = useState(false);
+  const id = useId().replace(/:/g, '');
+  const hint = RETURN_TEXT.dayHint(kind, month);
+  const aria = { 'aria-invalid': Boolean(error), 'aria-describedby': error ? `${id}-erro` : `${id}-dica` } as object;
+  return (
+    <View style={{ gap: space[2] }}>
+      <Txt variant="label" style={{ fontFamily: fonts.bold }}>
+        {RETURN_TEXT.dayLabel}
+      </Txt>
+      <View style={[ui.input, focused && ui.inputFocused, error ? ui.inputError : null]}>
+        <TextInput
+          ref={ref}
+          accessibilityLabel={`${RETURN_TEXT.dayLabel}, ${RETURN_TEXT.daySuffix(month)}`}
+          accessibilityHint={error ?? hint}
+          value={value}
+          onChangeText={(t) => onChange(t.replace(/\D/g, '').slice(0, 2))}
+          placeholder="DD"
+          placeholderTextColor={colors.placeholder}
+          keyboardType="number-pad"
+          inputMode="numeric"
+          maxLength={2}
+          {...aria}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          style={[ui.inputText, styles.dayInput]}
+        />
+        <Txt color={colors.textSecondary} style={tabular} accessibilityElementsHidden importantForAccessibility="no">
+          {RETURN_TEXT.daySuffix(month)}
+        </Txt>
+      </View>
+      {error ? (
+        <Animated.View entering={FadeIn.duration(150).reduceMotion(ReduceMotion.System)}>
+          <Txt variant="label" color={colors.error} accessibilityLiveRegion="polite" accessibilityRole="alert" nativeID={`${id}-erro`}>
+            {error}
+          </Txt>
+        </Animated.View>
+      ) : (
+        <Txt variant="caption" color={colors.textSecondary} nativeID={`${id}-dica`}>
+          {hint}
+        </Txt>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   body: { padding: space[5], gap: space[4], paddingBottom: space[6] },
+  dayInput: { flex: 0, width: 48, textAlign: 'right' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
   inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
   footer: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space[3], paddingHorizontal: space[5] },

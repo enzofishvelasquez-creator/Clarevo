@@ -1,6 +1,7 @@
 import {
   PARTS_PER_YEAR_MAX,
   RepoError,
+  addMonths,
   monthRange,
   type AffectedRef,
   type AmountMode,
@@ -10,14 +11,20 @@ import {
   type CommitmentInput,
   type CommitmentSeries,
   type CommitmentWrite,
+  type ContextActivity,
   type FinancialRecord,
   type IsoMonth,
+  type MonthOverview,
+  type OccurrenceMode,
   type PaymentInput,
   type PersonalSpace,
   type RecordInput,
   type RecordKind,
   type RecordsRepository,
   type RepoErrorCode,
+  type ReturnDecision,
+  type ReturnReviewMark,
+  type ReturnReviewState,
   type SeriesAction,
   type SeriesEditInput,
   type SeriesInput,
@@ -127,13 +134,42 @@ interface SeriesResult {
   changed: number;
 }
 
+/** Linha de context_activity (só datas, no fuso da pessoa; RLS: só a própria pessoa lê). */
+interface ContextActivityRow {
+  last_write_on: string;
+  absence_from_on: string | null;
+  absence_until_on: string | null;
+}
+
+/** Linha de return_reviews (e retorno jsonb de decide_return_review). reviewed_through: AAAA-MM-01. */
+interface ReturnReviewRow {
+  reviewed_through: string;
+  decision: ReturnDecision;
+  decided_on: string;
+  version: number;
+}
+
+/** Linha de months_overview: month AAAA-MM-01; centavos em bigint (número JSON). */
+interface MonthOverviewRow {
+  month: string;
+  received_count: number;
+  received_cents: number;
+  paid_count: number;
+  paid_cents: number;
+}
+
 const RECORD_ACTIONS = ['criar', 'editar', 'excluir'];
+/**
+ * 'criar_ocorrencia' (conta de mês passado de uma série, create_series_occurrence) é ação de conta a pagar: a conta
+ * fica em commitment_id. Embora tenha target_id (a série), nunca entra em SERIES_ACTIONS.
+ */
 const COMMITMENT_ACTIONS: CommitmentAction[] = [
   'criar_compromisso',
   'editar_compromisso',
   'excluir_compromisso',
   'pagar_compromisso',
   'desfazer_pagamento',
+  'criar_ocorrencia',
 ];
 const SERIES_ACTIONS: SeriesAction[] = ['criar_serie', 'alterar_serie', 'encerrar_serie', 'excluir_serie', 'informar_ano', 'tirar_ano'];
 
@@ -173,6 +209,13 @@ const KNOWN: RepoErrorCode[] = [
   'vencimento_fora_do_mes',
   'estimativa_invalida',
   'serie_inconsistente',
+  // Revisão dos últimos meses (D-030). Nenhum código acima termina com estes, nem estes com outro da lista.
+  'ocorrencia_existente',
+  'mes_fora_da_revisao',
+  'modo_invalido',
+  'decisao_invalida',
+  'mes_invalido',
+  'periodo_invalido',
 ];
 
 /**
@@ -305,6 +348,36 @@ function toSeries(s: SeriesRow): CommitmentSeries {
     version: s.version,
     createdAt: s.created_at,
     updatedAt: s.updated_at,
+  };
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const FIRST_DAY = /^\d{4}-\d{2}-01$/;
+
+/** Datas da atividade: o banco devolve AAAA-MM-DD; a ausência tem as duas pontas ou nenhuma (context_activity_ausencia). */
+function toActivity(a: ContextActivityRow): ContextActivity {
+  const dates = [a.last_write_on, a.absence_from_on, a.absence_until_on].filter((d): d is string => d !== null);
+  const consistent = dates.every((d) => ISO_DATE.test(d)) && (a.absence_from_on === null) === (a.absence_until_on === null);
+  if (!consistent) throw new RepoError('desconhecido', 'atividade_inconsistente');
+  return { lastWriteOn: a.last_write_on, absenceFromOn: a.absence_from_on, absenceUntilOn: a.absence_until_on };
+}
+
+/** Marca da revisão: o banco guarda o mês revisado como AAAA-MM-01; o core usa AAAA-MM. */
+function toReviewMark(r: ReturnReviewRow): ReturnReviewMark {
+  const consistent =
+    FIRST_DAY.test(r.reviewed_through) && ISO_DATE.test(r.decided_on) && (r.decision === 'atualizou' || r.decision === 'seguiu');
+  if (!consistent) throw new RepoError('desconhecido', 'revisao_inconsistente');
+  return { reviewedThrough: r.reviewed_through.slice(0, 7), decision: r.decision, decidedOn: r.decided_on, version: Number(r.version) };
+}
+
+function toMonthOverview(m: MonthOverviewRow): MonthOverview {
+  if (!FIRST_DAY.test(m.month)) throw new RepoError('desconhecido', 'periodo_inconsistente');
+  return {
+    month: m.month.slice(0, 7),
+    receivedCount: Number(m.received_count),
+    receivedCents: Number(m.received_cents),
+    paidCount: Number(m.paid_count),
+    paidCents: Number(m.paid_cents),
   };
 }
 
@@ -745,5 +818,108 @@ export class SupabaseRepository implements RecordsRepository {
     const result = data as { created: number; created_overdue: number } | null;
     if (!result) throw new RepoError('desconhecido');
     return { created: Number(result.created), createdOverdue: Number(result.created_overdue) };
+  }
+
+  // -------------------------------------------------------------------------
+  // Revisão dos últimos meses (D-030, Ciclo A4)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Atividade e marca da revisão da própria pessoa (RLS: person_id = auth.uid() e leitura no contexto). Sem linha, ou
+   * sem leitura no contexto: null. O filtro por pessoa é redundante com a RLS, de propósito.
+   */
+  async getReturnReviewState(contextId: string): Promise<ReturnReviewState> {
+    const [activity, review] = await Promise.all([
+      this.db
+        .from('context_activity')
+        .select('last_write_on, absence_from_on, absence_until_on')
+        .eq('context_id', contextId)
+        .eq('person_id', this.user.id)
+        .maybeSingle(),
+      this.db
+        .from('return_reviews')
+        .select('reviewed_through, decision, decided_on, version')
+        .eq('context_id', contextId)
+        .eq('person_id', this.user.id)
+        .maybeSingle(),
+    ]);
+    if (activity.error) throw repoError(activity.error);
+    if (review.error) throw repoError(review.error);
+    return {
+      activity: activity.data ? toActivity(activity.data as ContextActivityRow) : null,
+      mark: review.data ? toReviewMark(review.data as ReturnReviewRow) : null,
+    };
+  }
+
+  /** Um item por mês de from a to (até 12), com zeros em mês sem anotação; mesmo critério de month_totals. */
+  async monthsOverview(contextId: string, from: IsoMonth, to: IsoMonth): Promise<MonthOverview[]> {
+    const { data, error } = await this.db.rpc('months_overview', { p_context_id: contextId, p_from: `${from}-01`, p_to: `${to}-01` });
+    if (error) throw repoError(error);
+    return ((data ?? []) as MonthOverviewRow[]).map(toMonthOverview);
+  }
+
+  /**
+   * Contas vivas (abertas e pagas; a visão já tira as excluídas e as "não houve") com vencimento de from-01 até antes do
+   * dia 1 do mês seguinte a to, por vencimento, criação e id. Em páginas, como listCommitments.
+   */
+  async listCommitmentsDueBetween(contextId: string, from: IsoMonth, to: IsoMonth): Promise<Commitment[]> {
+    const start = `${from}-01`;
+    const endExclusive = `${addMonths(to, 1)}-01`;
+    const PAGE = 500;
+    const rows: CommitmentRow[] = [];
+    for (let offset = 0; ; offset += PAGE) {
+      const { data, error } = await this.db
+        .from('commitment_items')
+        .select('*')
+        .eq('context_id', contextId)
+        .gte('due_on', start)
+        .lt('due_on', endExclusive)
+        .order('due_on')
+        .order('created_at')
+        .order('id')
+        .range(offset, offset + PAGE - 1);
+      if (error) throw repoError(error);
+      rows.push(...(data as CommitmentRow[]));
+      if (data.length < PAGE) break;
+    }
+    return rows.map(toCommitment);
+  }
+
+  /**
+   * Conta do número n de uma série num dos 11 meses fechados anteriores ao atual: 'aberta' ou 'nao_houve' (gravada já
+   * excluída só neste mês). Mesmo retorno {commitment, record: null} das funções de conta a pagar. Reconciliação:
+   * findCommitmentOperation (criar_ocorrencia) ou repetir com a mesma chave e os mesmos argumentos.
+   */
+  createSeriesOccurrence(key: string, seriesId: string, expectedSeriesVersion: number, n: number, mode: OccurrenceMode) {
+    return this.callCommitment('create_series_occurrence', {
+      p_idempotency_key: key,
+      p_series_id: seriesId,
+      p_expected_version: expectedSeriesVersion,
+      p_number: n,
+      p_mode: mode,
+    });
+  }
+
+  /**
+   * Decisão da revisão (versão 0 = ainda não existe marca). Devolve a linha atual da marca; uma repetição com a mesma
+   * chave devolve a linha atual, que pode ter versão maior.
+   */
+  async decideReturnReview(
+    key: string,
+    contextId: string,
+    expectedVersion: number,
+    reviewedThrough: IsoMonth,
+    decision: ReturnDecision,
+  ): Promise<ReturnReviewMark> {
+    const { data, error } = await this.db.rpc('decide_return_review', {
+      p_idempotency_key: key,
+      p_context_id: contextId,
+      p_expected_version: expectedVersion,
+      p_reviewed_through: `${reviewedThrough}-01`,
+      p_decision: decision,
+    });
+    if (error) throw repoError(error);
+    if (!data) throw new RepoError('desconhecido');
+    return toReviewMark(data as ReturnReviewRow);
   }
 }

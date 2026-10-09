@@ -14,15 +14,26 @@ import {
   affectedByEnd,
   affectedByYear,
   annualYearSummary,
+  buildReturnReview,
+  emptyMonthCaption,
   groupAnnualLater,
+  installmentProgress,
+  lastClosedMonth,
+  loadReturnReview,
   lastNumberFromEndYear,
   mergeOccurrences,
   missingMonths,
   monthOf,
   monthRange,
+  monthsOverview,
   newOperationKey,
   occurrenceLabel,
   occurrencesToMaterialize,
+  returnBannerText,
+  returnWindow,
+  reviewDecision,
+  reviewExpectedVersion,
+  seriesGapsInRange,
   seriesInputError,
   seriesPreview,
   suggestedAnnualReference,
@@ -38,10 +49,14 @@ import {
   type FinancialRecord,
   type IsoDate,
   type IsoMonth,
+  type OccurrenceMode,
   type PaymentInput,
   type PlannedOccurrence,
   type RecordInput,
   type RecordKind,
+  type ReturnDecision,
+  type ReturnReview,
+  type ReviewRow,
   type SeriesEditInput,
   type SeriesInput,
   type SeriesKind,
@@ -1877,5 +1892,455 @@ describe('conversor de contas a pagar e gastos fixos', () => {
       p_amount_cents: 18990,
     });
     expect(calls[3]![1]).toEqual({ p_idempotency_key: 'chave-0006', p_series_id: 's1', p_number: 3, p_expected_affected: [{ id: 'c1', version: 1 }] });
+  });
+});
+
+describe('API real: Seus últimos meses (Ciclo A4, D-030)', () => {
+  // Ana, no fim desta suíte, volta a anotar só em 20/05/2033 (a última anotação dela aqui é de 2030): a montagem da
+  // sequência R (spec3 §2.3) com as datas sete anos à frente, mais Academia para "Não houve". Ana ainda tem os gastos
+  // fixos e as contas do ano dos ciclos anteriores, então as contagens da revisão são conferidas com o core (paridade)
+  // e os números da sequência R nas séries criadas aqui. Bruno é a pessoa de fora. Pessoas e contas fictícias.
+  const SETUP = '2033-05-20';
+  const R1 = '2033-10-07';
+  const OCT15 = '2033-10-15';
+  const NOV29 = '2033-11-29';
+  const at = (today: IsoDate) => repoFor(ANA, today);
+  const bruno = repoFor(BRUNO, R1);
+  let ctx = '';
+  let account = '';
+  let aluguel: CommitmentSeries;
+  let luz: CommitmentSeries;
+  let carro: CommitmentSeries;
+  let academia: CommitmentSeries;
+
+  const monthly = (description: string, reais: number, dueDay: number, amountMode: AmountMode = 'fixo', category = 'Moradia'): SeriesInput => ({
+    kind: 'mensal',
+    nature: 'conta',
+    description,
+    category,
+    amountCents: cents(reais),
+    amountMode,
+    dueDay,
+    firstDueMonth: '2033-05',
+    firstNumber: 1,
+    installmentTotal: null,
+    partsPerYear: null,
+    lastMonth: null,
+  });
+  const payment = (amountCents: Cents, paidOn: IsoDate, category: string | null = 'Moradia'): PaymentInput => ({ accountId: account, amountCents, paidOn, category });
+  const record = (today: IsoDate, kind: RecordKind, description: string, amountCents: Cents, occurredOn: IsoDate) =>
+    at(today).createRecord(newOperationKey(), ctx, kind, { accountId: account, amountCents, occurredOn, description, category: null });
+  /** Recebido, Pago e Diferença do mês pelo core sobre listRecords. */
+  const month = async (m: IsoMonth, today = R1) => {
+    const s = summarizeMonth(await at(today).listRecords(ctx, m), ctx, m);
+    return [s.receivedCents, s.paidCents, s.differenceCents];
+  };
+  /** months_overview pela API igual ao core (monthsOverview) sobre os registros de listRecords de cada mês. */
+  const overviewMatchesCore = async (from: IsoMonth, to: IsoMonth, today = R1) => {
+    const repo = at(today);
+    const records: FinancialRecord[] = [];
+    for (let m = from; m <= to; m = addMonths(m, 1)) records.push(...(await repo.listRecords(ctx, m)));
+    const api = await repo.monthsOverview(ctx, from, to);
+    expect(api).toEqual(monthsOverview(records, ctx, from, to));
+    return api;
+  };
+  /** listCommitmentsDueBetween igual às contas de listCommitments de cada mês com vencimento no próprio mês. */
+  const dueBetweenMatches = async (from: IsoMonth, to: IsoMonth, today = R1) => {
+    const repo = at(today);
+    const expected: Commitment[] = [];
+    for (let m = from; m <= to; m = addMonths(m, 1)) expected.push(...(await repo.listCommitments(ctx, m)).filter((c) => monthOf(c.dueOn) === m));
+    expected.sort((a, b) => a.dueOn.localeCompare(b.dueOn) || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+    const api = await repo.listCommitmentsDueBetween(ctx, from, to);
+    expect(api.map((c) => c.id)).toEqual(expected.map((c) => c.id));
+    expect(api).toEqual(expected);
+    return api;
+  };
+  const review = async (today: IsoDate) => {
+    const r = await loadReturnReview(at(today), ctx, today);
+    return r;
+  };
+  /** Linhas da revisão de uma série (todas as de meses fechados e do mês atual). */
+  const rowsOf = (rv: ReturnReview, s: CommitmentSeries) =>
+    [...rv.months.flatMap((m) => m.rows), ...rv.current.rows].filter((r) => r.series?.id === s.id);
+  const rowAt = (rv: ReturnReview, s: CommitmentSeries, n: number) => rowsOf(rv, s).find((r) => r.series!.number === n)!;
+  /** I1: conta paga se e somente se há gasto vivo vinculado, com o mesmo valor, data e conta. */
+  const checkPaid = async (c: Commitment, today = R1) => {
+    expect(c.status).toBe('quitado');
+    const r = (await at(today).getRecord(c.payment!.recordId))!;
+    expect([r.kind, r.commitmentId, r.amountCents, r.occurredOn, r.accountId]).toEqual([
+      'despesa',
+      c.id,
+      c.payment!.amountCents,
+      c.payment!.paidOn,
+      c.payment!.accountId,
+    ]);
+  };
+  /** "Já paguei" pela revisão: em aberto, paga; sem conta registrada, cria (K1) e paga (K2). */
+  const paid = async (row: ReviewRow, amountCents = row.amountCents, paidOn = row.dueOn) => {
+    const repo = at(R1);
+    const target = row.commitment ?? (await repo.createSeriesOccurrence(newOperationKey(), row.series!.id, row.seriesVersion!, row.series!.number, 'aberta')).commitment;
+    const w = await repo.payCommitment(newOperationKey(), target.id, target.version, payment(amountCents, paidOn, row.category));
+    await checkPaid(w.commitment);
+    return w.commitment;
+  };
+
+  beforeAll(async () => {
+    const space = (await at(SETUP).getSpace())!;
+    ctx = space.personalContextId;
+    account = space.accounts[0]!.id;
+  });
+
+  it('montagem em 20/05/2033: a primeira anotação depois de anos grava a ausência; gerar e ler não mexem na atividade', async () => {
+    const before = await at(SETUP).getReturnReviewState(ctx);
+    expect(before.mark).toBeNull();
+    const last = before.activity!.lastWriteOn;
+    expect(last < '2031-01-01').toBe(true);
+    // A revisão de quem não anota há anos começa no corte de 11 meses (sem nenhuma anotação nova ainda).
+    const window = returnWindow(before, SETUP)!;
+    expect([window.kind, window.anchor, window.fromMonth, window.toMonth, window.cutBefore]).toEqual(['ausencia', last, '2032-06', '2033-04', '2032-06']);
+    await checkedSync(ANA, ctx, SETUP);
+    expect(await at(SETUP).getReturnReviewState(ctx)).toEqual(before);
+
+    aluguel = (await at(SETUP).createSeries(newOperationKey(), ctx, monthly('Aluguel', 2500, 5))).series;
+    // Primeira anotação depois da ausência longa: de `last` a 20/05/2033.
+    expect((await at(SETUP).getReturnReviewState(ctx)).activity).toEqual({ lastWriteOn: SETUP, absenceFromOn: last, absenceUntilOn: SETUP });
+    luz = (await at(SETUP).createSeries(newOperationKey(), ctx, monthly('Luz', 180, 12, 'variavel'))).series;
+    const carroW = await at(SETUP).createSeries(newOperationKey(), ctx, {
+      kind: 'parcelada',
+      nature: 'financiamento',
+      description: 'Financiamento do carro',
+      category: 'Transporte',
+      amountCents: 85000,
+      amountMode: 'fixo',
+      dueDay: 10,
+      firstDueMonth: '2033-05',
+      firstNumber: 8,
+      installmentTotal: 48,
+      partsPerYear: null,
+      lastMonth: null,
+    });
+    carro = carroW.series;
+    academia = (await at(SETUP).createSeries(newOperationKey(), ctx, monthly('Academia', 120, 15, 'fixo', 'Saúde'))).series;
+    expect(carroW.occurrences.map((c) => [c.series!.number, c.dueOn])).toEqual([
+      [8, '2033-05-10'],
+      [9, '2033-06-10'],
+    ]);
+    const occ = async (s: CommitmentSeries, n: number) => byNumber(await at(SETUP).listSeriesOccurrences(s.id), n);
+    const pay = (c: Commitment, amountCents: Cents) => at(SETUP).payCommitment(newOperationKey(), c.id, c.version, payment(amountCents, c.dueOn));
+    await pay(await occ(aluguel, 1), 250000);
+    await pay(await occ(luz, 1), 16530);
+    await pay(await occ(carro, 8), 85000);
+    await pay(await occ(academia, 1), 12000);
+    await record(SETUP, 'receita', 'Salário', 600000, '2033-05-01');
+    await record(SETUP, 'despesa', 'Mercado', 125000, '2033-05-15');
+    expect(await month('2033-05', SETUP)).toEqual([600000, 488530, 111470]);
+    await overviewMatchesCore('2033-05', '2033-05', SETUP);
+    // Nenhuma anotação nova muda as pontas da ausência; ninguém além de Ana lê a atividade dela.
+    expect((await at(SETUP).getReturnReviewState(ctx)).activity).toEqual({ lastWriteOn: SETUP, absenceFromOn: last, absenceUntilOn: SETUP });
+    expect(await bruno.getReturnReviewState(ctx)).toEqual({ activity: null, mark: null });
+  });
+
+  it('R1 em 07/10/2033: revisão "ausência" de maio a setembro, igual ao core; lacunas de julho e agosto; progresso do carro', async () => {
+    await checkedSync(ANA, ctx, R1);
+    const { state, review: rv } = await review(R1);
+    expect(state.activity!.lastWriteOn).toBe(SETUP);
+    const w = rv!.window;
+    expect([w.kind, w.anchor, w.returnedOn, w.fromMonth, w.toMonth, w.currentMonth, w.cutBefore]).toEqual([
+      'ausencia',
+      SETUP,
+      null,
+      '2033-05',
+      '2033-09',
+      '2033-10',
+      null,
+    ]);
+    expect(returnBannerText(rv!)!.body).toMatch(/^Sua última anotação foi em 20\/05\/2033\. Desde então: /);
+    // Paridade: as três leituras da revisão pela API são as do core sobre as listas de sempre.
+    const overview = await overviewMatchesCore('2033-05', '2033-09');
+    const commitments = await dueBetweenMatches('2033-05', '2033-10');
+    const series = await at(R1).listSeries(ctx);
+    expect(rv).toEqual(buildReturnReview(w, overview, commitments, series, R1));
+    expect(overview.map((o) => [o.month, o.receivedCount, o.receivedCents, o.paidCount, o.paidCents])).toEqual([
+      ['2033-05', 1, 600000, 5, 488530],
+      ['2033-06', 0, 0, 0, 0],
+      ['2033-07', 0, 0, 0, 0],
+      ['2033-08', 0, 0, 0, 0],
+      ['2033-09', 0, 0, 0, 0],
+    ]);
+
+    // Séries da sequência R: junho e setembro em aberto, julho e agosto sem conta registrada, outubro com o Aluguel vencido.
+    const states = (s: CommitmentSeries) => rowsOf(rv!, s).map((r) => [r.series!.number, r.state, r.dueOn, r.amountCents, r.amountIsEstimate]);
+    expect(states(aluguel)).toEqual([
+      [2, 'aberta', '2033-06-05', 250000, false],
+      [3, 'sem_conta', '2033-07-05', 250000, false],
+      [4, 'sem_conta', '2033-08-05', 250000, false],
+      [5, 'aberta', '2033-09-05', 250000, false],
+      [6, 'aberta', '2033-10-05', 250000, false],
+    ]);
+    expect(states(luz)).toEqual([
+      [2, 'aberta', '2033-06-12', 18000, true],
+      [3, 'sem_conta', '2033-07-12', 18000, true],
+      [4, 'sem_conta', '2033-08-12', 18000, true],
+      [5, 'aberta', '2033-09-12', 18000, true],
+    ]);
+    expect(states(carro).map(([n, st, due]) => [n, st, due])).toEqual([
+      [9, 'aberta', '2033-06-10'],
+      [10, 'sem_conta', '2033-07-10'],
+      [11, 'sem_conta', '2033-08-10'],
+      [12, 'aberta', '2033-09-10'],
+    ]);
+    expect(rowAt(rv!, carro, 10).label).toBe('Parcela 10 de 48');
+    expect(rowAt(rv!, aluguel, 6).month).toBe('2033-10');
+    // seriesGapsInRange sobre listSeries e listCommitmentsDueBetween: as mesmas lacunas da revisão.
+    for (const s of [aluguel, luz, carro, academia]) {
+      const live = series.find((x) => x.id === s.id)!;
+      expect(seriesGapsInRange(live, commitments, '2033-05', '2033-09')).toEqual(rowsOf(rv!, s).filter((r) => r.state === 'sem_conta'));
+    }
+
+    // Carro: pagas antes 7, no Clarevo 1, sem conta registrada 2, faltam 38.
+    const c = (await at(R1).getSeries(carro.id))!;
+    const occ = await at(R1).listSeriesOccurrences(carro.id);
+    const open = await at(R1).listOpenSeriesOccurrences(carro.id);
+    const progress = installmentProgress(c, occ, open, R1);
+    expect([progress.paidBefore, progress.paidInApp, missingMonths(c, occ, R1).length, progress.remaining]).toEqual([7, 1, 2, 38]);
+    await checkedToPay(ANA, ctx, '2033-10', R1);
+  });
+
+  it('create_series_occurrence: cada lacuna é aceita, com a vigência do número; número que não é lacuna dá ocorrencia_existente', async () => {
+    const rv = (await review(R1)).review!;
+    const repo = at(R1);
+    // Academia: "Não houve" em julho e agosto grava os números 3 e 4 como excluídos só naquele mês.
+    for (const n of [3, 4]) {
+      const row = rowAt(rv, academia, n);
+      const w = await repo.createSeriesOccurrence(newOperationKey(), academia.id, row.seriesVersion!, n, 'nao_houve');
+      expect([w.commitment.series!.number, w.commitment.dueOn, w.commitment.status, w.record]).toEqual([n, row.dueOn, 'aberto', null]);
+    }
+    const ac = (await repo.getSeries(academia.id))!;
+    expect(ac.skippedNumbers).toEqual([3, 4]);
+    expect(ac.version).toBe(academia.version);
+    expect(seriesGapsInRange(ac, await repo.listCommitmentsDueBetween(ctx, '2033-05', '2033-10'), '2033-05', '2033-09')).toEqual([]);
+
+    // "Ainda não paguei" na Luz de agosto: a conta fica em aberto, com a vigência do número (estimada) e a autoria da série.
+    const luzAug = rowAt(rv, luz, 4);
+    const open = (await repo.createSeriesOccurrence(newOperationKey(), luz.id, luzAug.seriesVersion!, 4, 'aberta')).commitment;
+    expect([open.series!.number, open.dueOn, open.amountCents, open.amountIsEstimate, open.description, open.category, open.status, open.version, open.createdBy, open.payment]).toEqual([
+      4,
+      '2033-08-12',
+      18000,
+      true,
+      'Luz',
+      'Moradia',
+      'aberto',
+      1,
+      luz.createdBy,
+      null,
+    ]);
+
+    // Número que já tem conta (viva, paga, em aberto ou excluída só naquele mês): ocorrencia_existente, com chave nova.
+    expect(await err(repo.createSeriesOccurrence(newOperationKey(), academia.id, academia.version, 3, 'aberta'))).toBe('ocorrencia_existente');
+    expect(await err(repo.createSeriesOccurrence(newOperationKey(), luz.id, luz.version, 4, 'aberta'))).toBe('ocorrencia_existente');
+    expect(await err(repo.createSeriesOccurrence(newOperationKey(), aluguel.id, aluguel.version, 5, 'aberta'))).toBe('ocorrencia_existente');
+    expect(await err(repo.createSeriesOccurrence(newOperationKey(), aluguel.id, aluguel.version, 1, 'aberta'))).toBe('ocorrencia_existente');
+    // Mês atual e seguinte: mes_fora_da_revisao (antes de conferir se existe); antes do primeiro número: numero_fora_da_serie.
+    expect(await err(repo.createSeriesOccurrence(newOperationKey(), aluguel.id, aluguel.version, 6, 'aberta'))).toBe('mes_fora_da_revisao');
+    expect(await err(repo.createSeriesOccurrence(newOperationKey(), aluguel.id, aluguel.version, 7, 'aberta'))).toBe('mes_fora_da_revisao');
+    expect(await err(repo.createSeriesOccurrence(newOperationKey(), carro.id, carro.version, 7, 'aberta'))).toBe('numero_fora_da_serie');
+    expect(await err(repo.createSeriesOccurrence(newOperationKey(), aluguel.id, aluguel.version + 1, 3, 'aberta'))).toBe('versao_desatualizada');
+    expect(await err(repo.createSeriesOccurrence(newOperationKey(), aluguel.id, aluguel.version, 3, 'talvez' as OccurrenceMode))).toBe('modo_invalido');
+    // Outra pessoa: a série de Ana não existe para Bruno.
+    expect(await err(bruno.createSeriesOccurrence(newOperationKey(), aluguel.id, aluguel.version, 3, 'aberta'))).toBe('nao_encontrado');
+    expect(await err(bruno.monthsOverview(ctx, '2033-05', '2033-09'))).toBe('sem_permissao');
+    expect(await bruno.listCommitmentsDueBetween(ctx, '2033-05', '2033-10')).toEqual([]);
+    // Período inválido antes da permissão (como em month_totals).
+    expect(await err(repo.monthsOverview(ctx, '2032-09', '2033-09'))).toBe('periodo_invalido');
+    expect(await err(repo.monthsOverview(ctx, '2033-09', '2033-05'))).toBe('periodo_invalido');
+    expect(await err(bruno.monthsOverview(ctx, '2032-09', '2033-09'))).toBe('periodo_invalido');
+  });
+
+  it('reconciliação depois de falha de rede: findCommitmentOperation reconhece criar_ocorrencia; repetir a chave devolve a mesma conta', async () => {
+    const rv = (await review(R1)).review!;
+    const row = rowAt(rv, carro, 11);
+    expect(row.state).toBe('sem_conta');
+    const key = newOperationKey();
+    const lost = new SupabaseRepository(clientFor(ANA, R1, lostResponse), { id: ANA });
+    expect(await err(lost.createSeriesOccurrence(key, carro.id, row.seriesVersion!, 11, 'aberta'))).toBe('rede');
+    const repo = at(R1);
+    const op = (await repo.findCommitmentOperation(key))!;
+    expect([op.action, op.recordId]).toEqual(['criar_ocorrencia', null]);
+    expect(await repo.findSeriesOperation(key)).toBeNull();
+    expect(await repo.findOperation(key)).toBeNull();
+    const created = (await repo.getCommitment(op.commitmentId))!;
+    expect([created.series!.number, created.dueOn, created.amountCents, created.status]).toEqual([11, '2033-08-10', 85000, 'aberto']);
+    const again = await repo.createSeriesOccurrence(key, carro.id, row.seriesVersion!, 11, 'aberta');
+    expect(again.commitment).toEqual(created);
+    expect(await err(repo.createSeriesOccurrence(key, carro.id, row.seriesVersion!, 11, 'nao_houve'))).toBe('chave_reutilizada');
+    // Depois de pagar, a repetição devolve o estado atual (paga), sem criar outra conta; I1 vale.
+    const w = await repo.payCommitment(newOperationKey(), created.id, created.version, payment(85000, created.dueOn, 'Transporte'));
+    await checkPaid(w.commitment);
+    expect((await repo.createSeriesOccurrence(key, carro.id, row.seriesVersion!, 11, 'aberta')).commitment).toEqual(w.commitment);
+  });
+
+  it('R5 · Atualizar agora: mês a mês, como a tela; totais da sequência R e decisão "atualizou"', async () => {
+    let rv = (await review(R1)).review!;
+    // Junho: lote (Aluguel e carro em aberto), Luz 171,90 e Salário com "Dia" 1.
+    await paid(rowAt(rv, aluguel, 2));
+    await paid(rowAt(rv, carro, 9));
+    await paid(rowAt(rv, luz, 2), 17190);
+    await record(R1, 'receita', 'Salário', 600000, '2033-06-01');
+    // Julho: lote com criação, Luz 179,90 criada e paga, Salário.
+    await paid(rowAt(rv, aluguel, 3));
+    await paid(rowAt(rv, carro, 10));
+    await paid(rowAt(rv, luz, 3), 17990);
+    await record(R1, 'receita', 'Salário', 600000, '2033-07-01');
+    // Agosto: lote (carro já pago na reconciliação); Luz "Ainda não paguei" já registrada; recebimentos pulados.
+    await paid(rowAt(rv, aluguel, 4));
+    // Setembro e este mês.
+    await paid(rowAt(rv, aluguel, 5));
+    await paid(rowAt(rv, carro, 12));
+    await paid(rowAt(rv, luz, 5), 19420);
+    await record(R1, 'receita', 'Salário', 600000, '2033-09-01');
+    await paid(rowAt(rv, aluguel, 6));
+
+    expect(await month('2033-06')).toEqual([600000, 352190, 247810]);
+    expect(await month('2033-07')).toEqual([600000, 352990, 247010]);
+    expect(await month('2033-08')).toEqual([0, 335000, -335000]);
+    expect(await month('2033-09')).toEqual([600000, 354420, 245580]);
+    expect((await month('2033-10'))[1]).toBe(250000);
+    await overviewMatchesCore('2033-05', '2033-09');
+    await dueBetweenMatches('2033-05', '2033-10');
+    expect(emptyMonthCaption(summarizeMonth(await at(R1).listRecords(ctx, '2033-08'), ctx, '2033-08'), '2033-08', '2033-10')).toBe(
+      'Nenhum recebimento anotado em agosto.',
+    );
+
+    // Carro: pagas antes 7, no Clarevo 5, sem conta 0, faltam 36; parcela 13 em 10/10/2033; última em 10/09/2036.
+    const c = (await at(R1).getSeries(carro.id))!;
+    const occ = await at(R1).listSeriesOccurrences(carro.id);
+    const open = await at(R1).listOpenSeriesOccurrences(carro.id);
+    const progress = installmentProgress(c, occ, open, R1);
+    expect([c.paidCount, progress.paidBefore, progress.paidInApp, missingMonths(c, occ, R1).length, progress.remaining, progress.lastDueOn]).toEqual([
+      5,
+      7,
+      5,
+      0,
+      36,
+      '2036-09-10',
+    ]);
+    expect(byNumber(open, 13).dueOn).toBe('2033-10-10');
+
+    // Depois das ações, a revisão é "volta" (a primeira anotação depois da ausência foi hoje), com a mesma âncora.
+    const after = await review(R1);
+    rv = after.review!;
+    expect([rv.window.kind, rv.window.anchor, rv.window.returnedOn]).toEqual(['volta', SETUP, R1]);
+    expect(after.state.activity).toEqual({ lastWriteOn: R1, absenceFromOn: SETUP, absenceUntilOn: R1 });
+    // Das séries da sequência, continuam para conferir só contas em aberto (Luz de agosto e Academia de junho e
+    // setembro); nenhuma lacuna.
+    expect([aluguel, luz, carro, academia].flatMap((s) => rowsOf(rv, s)).map((r) => [r.description, r.state, r.dueOn])).toEqual([
+      ['Luz', 'aberta', '2033-08-12'],
+      ['Academia', 'aberta', '2033-06-15'],
+      ['Academia', 'aberta', '2033-09-15'],
+    ]);
+    await checkedToPay(ANA, ctx, '2033-10', R1);
+
+    // Concluir: decide 'atualizou' com o último mês fechado; a revisão some e a atividade não muda.
+    const key = newOperationKey();
+    const mark = await at(R1).decideReturnReview(key, ctx, reviewExpectedVersion(after.state), lastClosedMonth(R1), reviewDecision(true));
+    expect(mark).toEqual({ reviewedThrough: '2033-09', decision: 'atualizou', decidedOn: R1, version: 1 });
+    expect(await at(R1).getReturnReviewState(ctx)).toEqual({ activity: after.state.activity, mark });
+    expect((await review(R1)).review).toBeNull();
+    // Repetição devolve a marca atual; mesma chave com outro pedido é recusada.
+    expect(await at(R1).decideReturnReview(key, ctx, 0, '2033-09', 'atualizou')).toEqual(mark);
+    expect(await err(at(R1).decideReturnReview(key, ctx, 0, '2033-09', 'seguiu'))).toBe('chave_reutilizada');
+  });
+
+  it('R6 · decisão: versão, mês e decisão conferidos; o mês revisado nunca recua; só a própria pessoa decide e lê', async () => {
+    const repo = at(R1);
+    expect(await err(repo.decideReturnReview(newOperationKey(), ctx, 0, '2033-09', 'seguiu'))).toBe('versao_desatualizada');
+    expect(await err(repo.decideReturnReview(newOperationKey(), ctx, 1, '2033-10', 'seguiu'))).toBe('mes_invalido');
+    expect(await err(repo.decideReturnReview(newOperationKey(), ctx, 1, '2032-10', 'seguiu'))).toBe('mes_invalido');
+    expect(await err(repo.decideReturnReview(newOperationKey(), ctx, 1, '2033-09', 'talvez' as ReturnDecision))).toBe('decisao_invalida');
+    expect(await err(bruno.decideReturnReview(newOperationKey(), ctx, 1, '2033-09', 'seguiu'))).toBe('sem_permissao');
+    // Seguir com agosto: reviewed_through continua setembro; a versão sobe.
+    const mark = await repo.decideReturnReview(newOperationKey(), ctx, 1, '2033-08', 'seguiu');
+    expect(mark).toEqual({ reviewedThrough: '2033-09', decision: 'seguiu', decidedOn: R1, version: 2 });
+    expect((await repo.getReturnReviewState(ctx)).mark).toEqual(mark);
+    expect(await bruno.getReturnReviewState(ctx)).toEqual({ activity: null, mark: null });
+    // A marca de Bruno no próprio espaço é dele (começa na versão 0); a de Ana não aparece para ele.
+    const brunoCtx = (await bruno.getSpace())!.personalContextId;
+    expect((await bruno.getReturnReviewState(brunoCtx)).mark).toBeNull();
+  });
+
+  it('R3 e R4: nova anotação logo depois da decisão não traz a faixa; 45 dias depois, a revisão volta só com outubro', async () => {
+    await record(OCT15, 'despesa', 'Mercado', 30000, OCT15);
+    const r3 = await review(OCT15);
+    expect(r3.state.activity).toEqual({ lastWriteOn: OCT15, absenceFromOn: SETUP, absenceUntilOn: R1 });
+    expect(r3.review).toBeNull();
+    await checkedSync(ANA, ctx, NOV29);
+    const r4 = (await review(NOV29)).review!;
+    const w = r4.window;
+    expect([w.kind, w.anchor, w.fromMonth, w.toMonth, w.cutBefore]).toEqual(['ausencia', OCT15, '2033-10', '2033-10', null]);
+    expect(r4.months.map((m) => m.month)).toEqual(['2033-10']);
+    // Academia: os números excluídos só naquele mês nunca voltam, nem com a geração de novembro.
+    const academiaRows = await at(NOV29).listCommitmentsDueBetween(ctx, '2033-07', '2033-08');
+    expect(academiaRows.filter((c) => c.series?.id === academia.id)).toEqual([]);
+    expect((await at(NOV29).getSeries(academia.id))!.skippedNumbers).toEqual([3, 4]);
+  });
+});
+
+describe('conversor da revisão dos últimos meses', () => {
+  // Sem rede: os argumentos das funções do Ciclo A4 e a leitura das linhas (mês AAAA-MM-01 ↔ AAAA-MM).
+  const calls: [string, Record<string, unknown>][] = [];
+  const mark = { reviewed_through: '2026-09-01', decision: 'seguiu', decided_on: '2026-10-07', version: 1 };
+  const fake = (activity: object | null, review: object | null) => {
+    const db = {
+      from: (table: string) => {
+        const query = {
+          select: () => query,
+          eq: () => query,
+          maybeSingle: async () => ({ data: table === 'context_activity' ? activity : review, error: null }),
+        };
+        return query;
+      },
+      rpc: async (fn: string, args: Record<string, unknown>) => {
+        calls.push([fn, args]);
+        if (fn === 'months_overview') return { data: [{ month: '2026-05-01', received_count: 1, received_cents: 600000, paid_count: 4, paid_cents: 476530 }], error: null };
+        if (fn === 'decide_return_review') return { data: { person_id: 'p1', context_id: 'ctx', ...mark, created_at: 'x', updated_at: 'x' }, error: null };
+        return { data: null, error: { message: 'ocorrencia_existente', code: 'PT409' } };
+      },
+    };
+    return new SupabaseRepository(db as unknown as SupabaseClient, { id: 'p1' });
+  };
+  const failure = (p: Promise<unknown>) => p.then(() => null, (e: unknown) => (e instanceof RepoError ? [e.code, e.message] : String(e)));
+
+  it('atividade e marca: datas do banco, mês revisado como AAAA-MM; sem linha, null', async () => {
+    const activity = { last_write_on: '2026-10-07', absence_from_on: '2026-05-20', absence_until_on: '2026-10-07' };
+    expect(await fake(activity, mark).getReturnReviewState('ctx')).toEqual({
+      activity: { lastWriteOn: '2026-10-07', absenceFromOn: '2026-05-20', absenceUntilOn: '2026-10-07' },
+      mark: { reviewedThrough: '2026-09', decision: 'seguiu', decidedOn: '2026-10-07', version: 1 },
+    });
+    expect(await fake(null, null).getReturnReviewState('ctx')).toEqual({ activity: null, mark: null });
+    // Ausência com uma ponta só, mês revisado fora do dia 1 ou decisão desconhecida: recusados (nunca uma faixa errada).
+    expect(await failure(fake({ ...activity, absence_until_on: null }, null).getReturnReviewState('ctx'))).toEqual(['desconhecido', 'atividade_inconsistente']);
+    expect(await failure(fake(null, { ...mark, reviewed_through: '2026-09-15' }).getReturnReviewState('ctx'))).toEqual(['desconhecido', 'revisao_inconsistente']);
+    expect(await failure(fake(null, { ...mark, decision: 'talvez' }).getReturnReviewState('ctx'))).toEqual(['desconhecido', 'revisao_inconsistente']);
+  });
+
+  it('argumentos: meses como AAAA-MM-01; create_series_occurrence com os cinco parâmetros; códigos novos reconhecidos', async () => {
+    calls.length = 0;
+    const repo = fake(null, null);
+    expect(await repo.monthsOverview('ctx', '2026-05', '2026-09')).toEqual([
+      { month: '2026-05', receivedCount: 1, receivedCents: 600000, paidCount: 4, paidCents: 476530 },
+    ]);
+    expect(await repo.decideReturnReview('chave-0007', 'ctx', 0, '2026-09', 'seguiu')).toEqual({
+      reviewedThrough: '2026-09',
+      decision: 'seguiu',
+      decidedOn: '2026-10-07',
+      version: 1,
+    });
+    expect(await failure(repo.createSeriesOccurrence('chave-0008', 's1', 3, 7, 'nao_houve'))).toEqual(['ocorrencia_existente', 'ocorrencia_existente']);
+    expect(calls).toEqual([
+      ['months_overview', { p_context_id: 'ctx', p_from: '2026-05-01', p_to: '2026-09-01' }],
+      ['decide_return_review', { p_idempotency_key: 'chave-0007', p_context_id: 'ctx', p_expected_version: 0, p_reviewed_through: '2026-09-01', p_decision: 'seguiu' }],
+      ['create_series_occurrence', { p_idempotency_key: 'chave-0008', p_series_id: 's1', p_expected_version: 3, p_number: 7, p_mode: 'nao_houve' }],
+    ]);
   });
 });

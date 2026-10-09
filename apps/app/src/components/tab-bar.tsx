@@ -1,3 +1,4 @@
+import { LEARN_UI_TEXT } from '@clarevo/core';
 import type { TabListProps, TabTriggerSlotProps } from 'expo-router/ui';
 import { ArrowLeftRight, BookOpen, Flag, House, type LucideIcon } from 'lucide-react-native';
 import { forwardRef } from 'react';
@@ -7,12 +8,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Txt } from '@/components/ui';
 import { colors, fonts, radius } from '@/theme/tokens';
 
-/** Navegação: Resumo, Movimentações, Metas e Aprender. "Movimentos" é o rótulo compacto; o nome acessível é completo. */
+/**
+ * Navegação: Resumo, Movimentações, Metas e Aprender. "Movimentos" é o rótulo compacto; o nome acessível é completo.
+ * Aprender mantém o rótulo curto (quatro destinos do Primeiro Ciclo) e o nome acessível "Aprender e dúvidas", que
+ * contém o rótulo visível (D-031(1); WCAG 2.5.3).
+ */
 export const TABS: { name: string; href: '/' | '/movimentacoes' | '/metas' | '/aprender'; label: string; a11y: string; icon: LucideIcon }[] = [
   { name: 'index', href: '/', label: 'Resumo', a11y: 'Resumo', icon: House },
   { name: 'movimentacoes', href: '/movimentacoes', label: 'Movimentos', a11y: 'Movimentações', icon: ArrowLeftRight },
   { name: 'metas', href: '/metas', label: 'Metas', a11y: 'Metas', icon: Flag },
-  { name: 'aprender', href: '/aprender', label: 'Aprender', a11y: 'Aprender', icon: BookOpen },
+  { name: 'aprender', href: '/aprender', label: LEARN_UI_TEXT.tabLabel, a11y: LEARN_UI_TEXT.tabA11y, icon: BookOpen },
 ];
 
 type ButtonProps = TabTriggerSlotProps & { label: string; a11y: string; icon: LucideIcon };

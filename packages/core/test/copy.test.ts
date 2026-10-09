@@ -1,10 +1,16 @@
 /// <reference types="node" />
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   ANNUAL_SERIES_ERROR_TEXT,
+  LEARN_SECTIONS,
+  LEARN_UI_TEXT,
+  TOPICS,
+  learnUiTextSamples,
+  returnTextSamples,
+  type Topic,
   CALCULATORS,
   CALC_DISCLAIMER,
   CALC_ERROR_TEXT,
@@ -341,7 +347,8 @@ describe('textos das calculadoras e de "Achar tudo"', () => {
     expect(files.length).toBeGreaterThan(15);
     for (const slug of ['parcelado-ou-a-vista', 'quitar-antes', 'dividir-contas']) expect(files.some((f) => f.endsWith(`${slug}.ts`))).toBe(true);
     const bad = files.filter((f) => {
-      const text = readFileSync(f, 'utf8');
+      // Endereços de fontes (learn/topics) não são texto exibido: "cuidados-ao-investir" é parte de uma URL oficial.
+      const text = readFileSync(f, 'utf8').replace(/'https:\/\/[^'\s]+'/g, "''");
       return FORBIDDEN.test(text) || JUDGMENT.test(text);
     });
     expect(bad.map((f) => f.slice(CORE_SRC.length))).toEqual([]);
@@ -440,11 +447,14 @@ function sourceFiles(dir: string): string[] {
 }
 
 describe('textos do app', () => {
-  it('lib/topics.ts: títulos, subtítulos, parágrafos e hipóteses', () => {
-    const topics = readFileSync(join(APP_SRC, 'lib', 'topics.ts'), 'utf8');
-    // O arquivo certo, com os temas do Ciclo A: a conferência não passa por estar vazia.
-    for (const slug of ['gasto-fixo', 'estimativa', 'quitar-antes']) expect(topics).toContain(`slug: '${slug}'`);
-    expect(topics).not.toMatch(FORBIDDEN);
+  it('temas de Aprender: o catálogo do core (e lib/topics.ts enquanto existir)', () => {
+    // Os temas moraram em lib/topics.ts até o Ciclo A5; agora vêm do core (learn/topics) e passam também pelas listas
+    // de "textos de Aprender" abaixo. Enquanto lib/topics.ts existir (troca por lib/learn.ts), ele segue conferido.
+    const libTopics = join(APP_SRC, 'lib', 'topics.ts');
+    if (existsSync(libTopics)) expect(readFileSync(libTopics, 'utf8')).not.toMatch(FORBIDDEN);
+    // O catálogo certo, com os temas do Ciclo A: a conferência não passa por estar vazia.
+    for (const slug of ['gasto-fixo', 'estimativa', 'quitar-antes']) expect(TOPICS.map((t) => t.slug)).toContain(slug);
+    for (const t of TOPICS) for (const text of topicFieldTexts(t)) expect(text, `${t.slug}: ${text}`).not.toMatch(FORBIDDEN);
   });
 
   it('telas e componentes', () => {
@@ -452,5 +462,137 @@ describe('textos do app', () => {
     expect(files.length).toBeGreaterThan(30);
     const bad = files.filter((f) => FORBIDDEN.test(readFileSync(f, 'utf8'))).map((f) => f.slice(APP_SRC.length));
     expect(bad).toEqual([]);
+  });
+});
+
+/**
+ * Textos de Aprender (spec3 §3.6, R10, e §3.11): FORBIDDEN com a expressão vetada ampliada, LEARN_FORBIDDEN e as
+ * palavras de julgamento em todos os campos de todos os temas (inclusive rascunhos e palavras-chave), nas seções e
+ * em LEARN_UI_TEXT. Fontes ficam fora (o nome de uma instituição citada como fonte pode aparecer). Em sem-registro e
+ * voltei-depois, também as listas do retorno (cobrança e contagem de dias sem anotar).
+ */
+const FORBIDDEN_EXPANDED = /\bf(az|azer|azendo|a[cç]a|ar[aá]|ez|aria)\s+sentido/i;
+
+const LEARN_FORBIDDEN = new RegExp(
+  [
+    'poupan[cç]a',
+    'previd[eê]ncia',
+    'deb[eê]nture',
+    'fundos? (de|imobili)',
+    'cripto\\w*',
+    'bitcoin',
+    'consignado',
+    'portabilidade',
+    'endividad\\w*',
+    'estour\\w*',
+    '\\bruim\\b',
+    'vil[aã]o',
+    'culpa',
+    'usu[aá]ri[oa]s?',
+    'bem-vind[oa]s?',
+    'preocupad[oa]s?',
+    // Bancos, plataformas e empresas de dados de crédito.
+    'nubank',
+    'ita[uú]',
+    'bradesco',
+    'santander',
+    'banco do brasil',
+    'caixa econ[oô]mica',
+    'picpay',
+    'mercado pago',
+    '\\bxp\\b',
+    'btg',
+    '\\bc6\\b',
+    '\\binter\\b',
+    'serasa',
+    'boa vista',
+    '\\bquod\\b',
+    '\\bspc\\b',
+  ].join('|'),
+  'i',
+);
+
+/** Termos aceitos só em um tema (P-024): a referência da Serasa em renda comprometida (Ciclo B). */
+const LEARN_FORBIDDEN_EXCEPTIONS: Record<string, string[]> = { 'renda-comprometida': ['serasa'] };
+
+/** Listas do retorno (A4, spec3 §2.6, teste 8): cobrança e contagem de dias sem anotar. */
+const COLLECTION = /\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b/i;
+const ABSENCE = /aus[eê]nci|sem usar|\d+\s*dias?\b(?!\.$)|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i;
+
+/** Todos os campos de texto de um tema, menos as fontes. */
+function topicFieldTexts(t: Topic): string[] {
+  return [
+    t.title,
+    t.subtitle ?? '',
+    t.question ?? '',
+    t.short,
+    ...t.paragraphs,
+    t.example ?? '',
+    t.calculation ?? '',
+    t.hypotheses ?? '',
+    ...t.facts.map((f) => f.text),
+    ...t.keywords,
+    ...(t.aliases ?? []),
+    ...(t.pending ?? []),
+  ].filter((x) => x !== '');
+}
+
+function learnForbiddenMatch(text: string, slug: string | null): string | null {
+  const allowed = slug ? (LEARN_FORBIDDEN_EXCEPTIONS[slug] ?? []) : [];
+  const re = new RegExp(LEARN_FORBIDDEN.source, 'gi');
+  for (const m of text.matchAll(re)) if (!allowed.some((a) => m[0].toLowerCase().startsWith(a))) return m[0];
+  return null;
+}
+
+describe('textos de Aprender', () => {
+  it('as listas reprovam o que devem, inclusive variações montadas em tempo de execução, e aceitam os avisos', () => {
+    const verbs = ['faz', 'fazer', 'fazendo', 'faça', 'faca', 'fará', 'fara', 'fez', 'faria'];
+    for (const v of verbs) expect(FORBIDDEN_EXPANDED.test([v, 'sentido'].join(' ')), v).toBe(true);
+    expect(FORBIDDEN_EXPANDED.test(['faz', 'todo o', 'sentido'].join(' '))).toBe(false);
+    for (const bad of ['poupança', 'Previdência', 'fundo imobiliário', 'fundos de renda', 'criptomoedas', 'consignado', 'endividado', 'estourou', 'ruim', 'vilão', 'culpa', 'usuária', 'bem-vindo', 'preocupada', 'Nubank', 'Itaú', 'Caixa Econômica', 'XP', 'C6', 'Inter', 'Serasa', 'Boa Vista', 'SPC'])
+      expect(learnForbiddenMatch(bad, null), bad).not.toBeNull();
+    for (const ok of ['Fundo Garantidor de Créditos', 'superendividamento', 'interesse', 'internet', 'Lei Geral de Proteção de Dados', LEARN_UI_TEXT.footer, LEARN_UI_TEXT.disclaimer])
+      expect(learnForbiddenMatch(ok, null), ok).toBeNull();
+    expect(learnForbiddenMatch('referência da Serasa', 'renda-comprometida')).toBeNull();
+    expect(learnForbiddenMatch('referência da Serasa', 'score-credito')).toBe('Serasa');
+  });
+
+  it('todos os campos de todos os temas (sem as fontes)', () => {
+    const texts = TOPICS.flatMap((t) => topicFieldTexts(t).map((text) => ({ slug: t.slug, text })));
+    expect(texts.length).toBeGreaterThan(300);
+    const bad = texts.filter(
+      ({ slug, text }) => FORBIDDEN.test(text) || FORBIDDEN_EXPANDED.test(text) || JUDGMENT.test(text) || learnForbiddenMatch(text, slug) !== null,
+    );
+    expect(bad).toEqual([]);
+  });
+
+  it('seções e LEARN_UI_TEXT (strings e funções com entradas de exemplo)', () => {
+    const texts = [...learnUiTextSamples(), ...LEARN_SECTIONS.flatMap((s) => [s.title, s.description])];
+    expect(texts.length).toBeGreaterThan(45);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(FORBIDDEN_EXPANDED);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(learnForbiddenMatch(text, null), text).toBeNull();
+    }
+  });
+
+  it('sem-registro e voltei-depois: sem cobrança e sem contar dias sem anotar', () => {
+    for (const slug of ['sem-registro', 'voltei-depois'])
+      for (const text of topicFieldTexts(TOPICS.find((t) => t.slug === slug)!)) {
+        expect(text, text).not.toMatch(COLLECTION);
+        expect(text, text).not.toMatch(ABSENCE);
+      }
+  });
+
+  it('textos do retorno (A4): FORBIDDEN, cobrança e contagem de dias', () => {
+    const texts = returnTextSamples();
+    expect(texts.length).toBeGreaterThan(40);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(FORBIDDEN_EXPANDED);
+      expect(text, text).not.toMatch(COLLECTION);
+      expect(text, text).not.toMatch(ABSENCE);
+    }
   });
 });

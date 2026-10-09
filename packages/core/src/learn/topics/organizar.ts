@@ -26,7 +26,7 @@ export const ORGANIZAR_TOPICS: Topic[] = [
     keywords: ['despesa fixa', 'despesa variável', 'conta de luz', 'mercado', 'orçamento'],
     related: ['gasto-fixo', 'contas-do-ano', 'orcamento-50-30-20'],
     sources: [
-      BCB_CADERNO('Módulo 2, orçamento pessoal ou familiar: "Despesas fixas: são despesas que não variam ou variam muito pouco"'),
+      BCB_CADERNO('Módulo 2, orçamento pessoal ou familiar; despesas fixas são as que não variam ou variam muito pouco, como o aluguel e a prestação de um financiamento'),
       CVM_GUIA('Registrar as despesas que não são mensais, como impostos, seguros e matrículas'),
       CVM_RESERVAS('Reserva só para imprevistos, o que exclui gastos sazonais e previsíveis, como tributos e matrículas'),
       clarevo('D-024'),

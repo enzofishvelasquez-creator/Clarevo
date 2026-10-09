@@ -4,6 +4,7 @@ import {
   DEBT_NATURES,
   ERROR_TEXT,
   NO_CATEGORY_LABEL,
+  RETURN_TEXT,
   SERIES_ERROR_TEXT,
   SERIES_NATURE_LABEL,
   addMonths,
@@ -13,22 +14,25 @@ import {
   custoPorAnoLink,
   formatBRL,
   formatDateBR,
-  formatMonthBR,
   installmentProgress,
   isRepoError,
+  isReviewableMonth,
   mergeOccurrences,
   missingMonths,
   monthOf,
   projectSeries,
   quitarAntesLink,
+  rowShortName,
   seriesCaption,
   seriesEnded,
+  seriesGapsInRange,
   suggestedReference,
   termHistory,
   type Commitment,
   type CommitmentSeries,
   type IsoDate,
   type PlannedOccurrence,
+  type ReviewRow,
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -42,6 +46,7 @@ import { ChoiceDialog } from '@/components/choice-dialog';
 import { CommitmentRow } from '@/components/commitment-row';
 import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
+import { RegisterMonthSheet } from '@/components/retorno-folha';
 import { ContextPill, SubHeader } from '@/components/header';
 import { estimateText, InstallmentBar, occurrenceMonthLabel, yearA11yLabel } from '@/components/series-parts';
 import { ErrorState } from '@/components/states';
@@ -204,7 +209,16 @@ export default function DetalheGastoFixo() {
                   }}
                 />
               ) : (
-                <Occurrences series={s} occurrences={occurrences} open={openOcc.data} today={today} />
+                <Occurrences
+                  series={s}
+                  occurrences={occurrences}
+                  open={openOcc.data}
+                  today={today}
+                  onNotice={(text) => {
+                    setActionError(null);
+                    setNotice(text);
+                  }}
+                />
               )}
 
               <Txt variant="label" color={colors.textSecondary}>
@@ -361,6 +375,7 @@ function Occurrences({
   occurrences,
   open: allOpen,
   today,
+  onNotice,
 }: {
   series: CommitmentSeries;
   /** As 60 mais recentes (abertas e pagas), por número crescente. */
@@ -368,7 +383,11 @@ function Occurrences({
   /** Todas as em aberto, sem limite (useSeriesOpenOccurrences). */
   open: readonly Commitment[];
   today: IsoDate;
+  /** Resultado confirmado de "Registrar este mês". */
+  onNotice: (text: string) => void;
 }) {
+  /** Linha da revisão aberta na folha "Registrar este mês" (D-030). */
+  const [sheet, setSheet] = useState<ReviewRow | null>(null);
   const currentMonth = monthOf(today);
   const ended = seriesEnded(s, today);
   const open = occurrences.filter((c) => c.status === 'aberto');
@@ -393,6 +412,7 @@ function Occurrences({
           </Txt>
           <Txt variant="label" style={tabular}>
             Pagas antes do Clarevo: {progress.paidBefore} (informado por você) · Pagas no Clarevo: {progress.paidInApp}
+            {missing.length > 0 ? ` · ${RETURN_TEXT.progressGaps(missing.length)}` : ''}
             {progress.remaining !== null ? ` · ${progress.remaining === 1 ? 'Falta 1' : `Faltam ${progress.remaining}`}` : ''}
           </Txt>
           <InstallmentBar paid={progress.paidBefore + progress.paidInApp} total={progress.total} />
@@ -467,16 +487,42 @@ function Occurrences({
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
             Meses sem conta registrada
           </Txt>
-          {missing.map((m) => (
-            <Txt key={m.number} variant="label">
-              {formatMonthBR(m.month)}: sem conta registrada.
-            </Txt>
-          ))}
-          <Txt variant="label" color={colors.textSecondary}>
-            Se você pagou, anote o gasto em Anotar gasto.
-          </Txt>
-          <LinkButton label="Anotar gasto" style={styles.inlineLink} onPress={() => router.push('/registro/novo')} />
+          {/*
+            Nos 11 meses fechados anteriores ao atual, "Registrar este mês" (ou "esta parcela") abre a linha da revisão dos
+            últimos meses numa folha (D-030); meses mais antigos só podem ser anotados como gasto.
+          */}
+          {missing.map((m) => {
+            const row = isReviewableMonth(m.month, today) ? gapRowOf(s, occurrences, m) : null;
+            if (row) {
+              const label = s.kind === 'parcelada' ? RETURN_TEXT.registerInstallment : RETURN_TEXT.registerMonth;
+              return (
+                <View key={m.number} style={styles.gapRow}>
+                  <Txt variant="label">{RETURN_TEXT.seriesGap(m.month)}</Txt>
+                  <LinkButton label={label} accessibilityLabel={`${label}: ${rowShortName(row)}`} style={styles.inlineLink} onPress={() => setSheet(row)} />
+                </View>
+              );
+            }
+            return (
+              <Txt key={m.number} variant="label">
+                {m.month < monthOf(today) ? RETURN_TEXT.seriesGapOld(m.month) : RETURN_TEXT.seriesGap(m.month)}
+              </Txt>
+            );
+          })}
+          {missing.some((m) => m.month < monthOf(today) && !isReviewableMonth(m.month, today)) ? (
+            <LinkButton label="Anotar gasto" style={styles.inlineLink} onPress={() => router.push('/registro/novo')} />
+          ) : null}
         </Card>
+      ) : null}
+
+      {sheet ? (
+        <RegisterMonthSheet
+          row={sheet}
+          onClose={() => setSheet(null)}
+          onDone={(text) => {
+            setSheet(null);
+            onNotice(text);
+          }}
+        />
       ) : null}
 
       {suggestion && !ended ? (
@@ -498,6 +544,11 @@ function Occurrences({
       ) : null}
     </>
   );
+}
+
+/** Linha "sem conta registrada" do número, com a vigência dele (seriesGapsInRange no mês do número). */
+function gapRowOf(s: CommitmentSeries, occurrences: readonly Commitment[], m: { number: number; month: string }): ReviewRow | null {
+  return seriesGapsInRange(s, occurrences, m.month, m.month).find((r) => r.series?.number === m.number) ?? null;
 }
 
 function Actions({
@@ -638,5 +689,6 @@ const styles = StyleSheet.create({
   amount: { fontFamily: fonts.bold, fontSize: 15, flexShrink: 0 },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: space[4], paddingVertical: space[3], minHeight: 44, alignItems: 'center' },
   inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
+  gapRow: { gap: 2 },
   privacy: { flexDirection: 'row', alignSelf: 'center', alignItems: 'center', gap: space[2], minHeight: 44 },
 });
