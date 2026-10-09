@@ -4,6 +4,34 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  SIMULATE_DISCLAIMER,
+  SIMULATE_ERROR_TEXT,
+  SIMULATE_TEXT,
+  SIMULATION_FIELD_ORDER,
+  SIMULATION_MODES,
+  simulationErrorText,
+  simulationResultLines,
+  validateSimulationDraft,
+  GOALS_TEXT,
+  GOAL_ERROR_TEXT,
+  GOAL_MOVEMENT_KINDS,
+  GOAL_RESERVE_REFERENCE,
+  GOAL_STATUS_LABEL,
+  GOAL_TYPE_LABEL,
+  MOVEMENT_LABEL,
+  committedGoalLines,
+  essentialEstimateText,
+  goalCardCaption,
+  goalDetailTexts,
+  goalErrorText,
+  goalPlan,
+  goalPreview,
+  goalsMonthTexts,
+  movementLine,
+  reserveCardTexts,
+  validateGoalDraft,
+  validateGoalMovementDraft,
+  validateSavedValueDraft,
   ANNUAL_SERIES_ERROR_TEXT,
   COMMITTED_TEXT,
   INCOME_REFERENCE_ERROR_TEXT,
@@ -534,6 +562,225 @@ describe('textos da renda comprometida (Ciclo B)', () => {
     const text = readFileSync(join(CORE_SRC, 'committed.ts'), 'utf8');
     expect(text).not.toMatch(FORBIDDEN);
     expect(text).not.toMatch(JUDGMENT);
+  });
+});
+
+/**
+ * Metas e reserva (Ciclo C, spec2 §4.6 e §5): sem produto, banco, aplicação ou taxa; sem julgamento ("atrasado na meta",
+ * "ruim", "cuidado"), sem "disponível" ou "sobra" e sem celebração automática. O regex SAVINGS_HINT, que lê o texto
+ * digitado pela pessoa, fica fora da conferência do arquivo-fonte.
+ */
+const CELEBRATION = /parab[eé]ns|uhu|\bvoc[eê] conseguiu|arrasou|incr[ií]vel|sucesso|\bviva\b|[\u{1F389}\u{1F38A}\u{1F3C6}\u{1F973}]/iu;
+
+describe('textos de metas (Ciclo C)', () => {
+  it('a lista de celebração reprova o que deve e aceita os textos obrigatórios', () => {
+    for (const bad of ['Parabéns!', 'Você conseguiu', 'Meta incrível', '\u{1F389}']) expect(CELEBRATION.test(bad), bad).toBe(true);
+    for (const ok of [GOALS_TEXT.reachedBadge, GOALS_TEXT.detail.reachedBody, GOALS_TEXT.detail.concluded]) expect(CELEBRATION.test(ok), ok).toBe(false);
+  });
+
+  it('GOALS_TEXT, GOAL_ERROR_TEXT, rótulos e os textos montados na demonstração', async () => {
+    const T = GOALS_TEXT;
+    const texts: string[] = [
+      ...staticStrings(T),
+      ...staticStrings(GOAL_ERROR_TEXT),
+      ...staticStrings(GOAL_TYPE_LABEL),
+      ...staticStrings(GOAL_STATUS_LABEL),
+      ...staticStrings(MOVEMENT_LABEL),
+      GOAL_RESERVE_REFERENCE.text,
+      GOAL_RESERVE_REFERENCE.sourceText,
+      T.monthOutside('2026-10', 285_000),
+      T.monthCommitted('52,5%'),
+      T.monthSaved('2026-10', 50_000),
+      T.monthWithdrawn('2026-10', 20_000),
+      T.savedOfTarget(350_000, 2_250_000),
+      T.percent(15),
+      T.coverage(9, 350_000),
+      T.coverage(0, 100),
+      T.coverage(25, 1_000_000),
+      T.plannedShort(50_000),
+      T.progressA11y('Viagem de férias', 20, 120_000, 600_000),
+      T.cardDeadline('2027-07', 48_000),
+      T.cardDeadlinePassed('2026-09'),
+      T.cardPlanned(50_000, '2029-12'),
+      T.reserve.essentialsAverage(['2026-07', '2026-08', '2026-09'], ['Moradia', 'Mercado', 'Transporte']),
+      T.reserve.essentialsBills('2026-10', 315_000),
+      ...[1, 3, 6, 12, 24].map((n) => T.reserve.monthChip(n)),
+      T.reserve.result(2_250_000, 6, 375_000),
+      T.previewPlanned(50_000, '2029-12'),
+      T.previewDeadline('2027-07', 48_000),
+      T.detail.ofTarget(2_250_000, 20),
+      T.detail.missing(1_800_000),
+      T.detail.deadline('2027-12', 128_572),
+      T.detail.deadlinePassed('2026-09'),
+      T.detail.planned(100_000, '2028-04'),
+      T.detail.compositionInitial(300_000),
+      T.detail.compositionDeposits(150_000),
+      T.detail.compositionWithdrawals(0),
+      T.detail.compositionIncome(3_720),
+      T.detail.compositionDepreciation(1_000),
+      T.detail.deleteTitle('Viagem de férias'),
+      ...GOAL_MOVEMENT_KINDS.map((k) => T.movement.editTitle(k)),
+      T.update.preview('valorizacao', 3_720),
+      T.update.preview('desvalorizacao', 3_720),
+      T.update.button('valorizacao', 3_720),
+      T.update.button('desvalorizacao', 3_720),
+      T.negativeOn('2026-10-02', true),
+      T.negativeOn('2026-10-02', false),
+      ...[
+        'saldo_da_meta_insuficiente',
+        'data_futura',
+        'meta_arquivada',
+        'reserva_ja_existe',
+        'plano_invalido',
+        'saldo_inicial_invalido',
+        'observacao_longa',
+        'origem_invalida',
+        'alvo_invalido',
+        'desconhecido',
+      ].flatMap((code) =>
+        GOAL_MOVEMENT_KINDS.map((kind) => goalErrorText(code, { kind, negativeDay: '2026-10-02' })),
+      ),
+      ...GOAL_MOVEMENT_KINDS.flatMap((kind) => {
+        const line = movementLine({ kind, amountCents: 150_000, occurredOn: '2026-10-06' });
+        return [line.text, line.a11yLabel];
+      }),
+      essentialEstimateText({ source: 'media_gastos', amountCents: 375_000, months: ['2026-09'], byCategory: [{ category: 'Moradia', cents: 375_000 }], excludedAnnualCents: 240_000 }),
+      essentialEstimateText({ source: 'contas_do_mes', amountCents: 315_000, month: '2026-10' }),
+      essentialEstimateText({ source: 'informado', amountCents: null }),
+    ];
+    // Erros dos formulários.
+    const draft = validateGoalDraft(
+      {
+        goalType: 'emergencia',
+        name: '',
+        targetText: '',
+        essentialBaseText: 'x',
+        essentialMonthsText: '30',
+        essentialBaseSource: 'informado',
+        targetMonthText: '13/2026',
+        initialText: 'x',
+        plannedText: '0',
+      },
+      DEMO_TODAY,
+    );
+    if (!draft.ok) texts.push(...Object.values(draft.errors));
+    const goalDraftErrors = validateGoalDraft(
+      { goalType: 'objetivo', name: 'x'.repeat(41), targetText: '', essentialBaseText: '', essentialMonthsText: '', essentialBaseSource: 'informado', targetMonthText: '09/2026', initialText: '', plannedText: '' },
+      DEMO_TODAY,
+    );
+    if (!goalDraftErrors.ok) texts.push(...Object.values(goalDraftErrors.errors));
+    for (const kind of GOAL_MOVEMENT_KINDS) {
+      const m = validateGoalMovementDraft({ kind, amountText: '0', dateText: '08/10/2026', note: 'x'.repeat(81) }, DEMO_TODAY, { editing: true });
+      if (!m.ok) texts.push(...Object.values(m.errors));
+    }
+    for (const text of ['abc', '99.999.999,99']) {
+      const v = validateSavedValueDraft(text, 400_000);
+      if (!v.ok) texts.push(v.error);
+    }
+    // Demonstração: cards, plano, detalhe, histórico, "Seu mês" e as linhas da renda comprometida.
+    const repo = await createDemoRepository();
+    const ctx = (await repo.getSpace())!.personalContextId;
+    const goals = await repo.listGoals(ctx);
+    const month = await repo.listGoalMovementsInMonth(ctx, '2026-10');
+    const s = summarizeCommitted(await repo.listCommitments(ctx, '2026-10'), ctx, '2026-10', DEMO_TODAY, await repo.listIncomeReferences(ctx));
+    texts.push(...staticStrings(goalsMonthTexts(s, 50_000, '2026-10')), ...staticStrings(committedGoalLines(s, 50_000, 98_000)));
+    texts.push(...staticStrings(committedGoalLines(s, -20_000, 300_000)));
+    for (const g of goals) {
+      const movements = await repo.listGoalMovements(g.id);
+      const plan = goalPlan(g, month, DEMO_TODAY);
+      texts.push(goalCardCaption(plan) ?? '', ...staticStrings(reserveCardTexts(g)), ...staticStrings(goalDetailTexts(g, movements, DEMO_TODAY)));
+      texts.push(...movements.flatMap((m) => [movementLine(m).text, movementLine(m).a11yLabel]));
+      texts.push(goalPreview({ targetCents: g.targetCents, savedCents: g.savedCents, targetMonth: g.targetMonth, plannedMonthlyCents: g.plannedMonthlyCents }, DEMO_TODAY, month) ?? '');
+    }
+    expect(texts.length).toBeGreaterThan(200);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(NEUTRAL);
+      expect(text, text).not.toMatch(CELEBRATION);
+    }
+    // Nenhum texto de metas cita produto, banco ou taxa sugerida; "aplicação" só como lugar genérico do dinheiro.
+    for (const text of texts) expect(text, text).not.toMatch(/\b(tesouro|cdb|lci|lca|poupan[cç]a|selic|nubank|banco do brasil|caixa econ)/i);
+  });
+
+  it('arquivo-fonte goals.ts (fora a linha de SAVINGS_HINT)', () => {
+    const lines = readFileSync(join(CORE_SRC, 'goals.ts'), 'utf8').split('\n');
+    const checked = lines.filter((l) => !l.includes('SAVINGS_HINT = '));
+    expect(lines.length - checked.length).toBe(1);
+    const text = checked.join('\n');
+    expect(text).not.toMatch(FORBIDDEN);
+    expect(text).not.toMatch(JUDGMENT);
+    expect(text).not.toMatch(CELEBRATION);
+  });
+});
+
+/**
+ * Simulador (Ciclo D, spec2 §4.7 e §5, D-028): sem produto, banco, emissor, ranking ou taxa sugerida; todo resultado diz
+ * "na hipótese informada"; o aviso fixo passa pela lista. Textos montados com várias entradas (os três modos, taxas e
+ * inflações de borda), mensagens de todos os campos e o arquivo-fonte.
+ */
+describe('textos do simulador (Ciclo D)', () => {
+  it('SIMULATE_TEXT, SIMULATE_ERROR_TEXT, resultados, hipóteses, ano a ano e o arquivo-fonte', () => {
+    const T = SIMULATE_TEXT;
+    const texts: string[] = [
+      ...staticStrings(T),
+      ...staticStrings(SIMULATE_ERROR_TEXT),
+      SIMULATE_DISCLAIMER,
+      T.introSave(2_250_000, 14, 450_000),
+      T.introSave(2_250_000, 1, 0),
+      T.introTime(2_250_000, 0),
+      T.introTotal(50_000, 120, 0),
+      T.introTotal(0, 14, 450_000),
+      T.monthlyHighlight(118_452),
+      T.monthlyWithoutYield(128_572),
+      T.initialAlone(502_925, 14),
+      T.timeHighlight(100_000, 17, 18),
+      T.timeHighlight(100_000, 277, null),
+      T.totalHighlight(9_993_192, 120),
+      T.contributed(6_000_000),
+      T.earnings(3_993_192),
+      T.totalWithoutYield(6_000_000),
+      T.todayValue(450, 6_434_892),
+      ...SIMULATION_FIELD_ORDER.flatMap((field) => (['vazio', 'invalido', 'casas_demais', 'fora_da_faixa', 'zero', 'acima_do_limite', 'resultado_alto'] as const).map((code) => simulationErrorText(field, code))),
+    ];
+    const results: string[][] = [];
+    for (const mode of SIMULATION_MODES)
+      for (const rateText of ['0', '0,01', '10', '10,5', '30'])
+        for (const inflation of [null, '0', '4,5', '30'])
+          for (const [targetText, initialText, monthsText, monthlyText] of [
+            ['22.500,00', '4.500,00', '14', '1.000,00'],
+            ['22.500,00', '', '1', '0,01'],
+            ['9.999.999,99', '', '600', '1,00'],
+            ['4.500,00', '4.500,00', '12', '500,00'],
+            ['5.000,00', '4.500,00', '14', '0'],
+          ] as const) {
+            const out = validateSimulationDraft({ mode, targetText, initialText, monthsText, monthlyText, rateText, inflationOn: inflation !== null, inflationText: inflation ?? '' });
+            if (!out.ok) {
+              texts.push(...Object.values(out.errors));
+              continue;
+            }
+            const r = out.result;
+            const lines = simulationResultLines(r);
+            results.push(lines);
+            texts.push(...lines, ...r.hypotheses, r.disclaimer);
+            if (r.growth) texts.push(T.chartA11y(r.growth, r.months!), ...r.growth.byYear.flatMap((y) => [T.yearLabel(y), T.yearA11y(y)]));
+            // Todo resultado calculado diz "na hipótese informada"; só "você já tem o valor" fica sem conta.
+            if (!r.reached) expect(lines.join(' '), lines.join(' | ')).toMatch(/na hipótese informada/i);
+          }
+    expect(results.length).toBeGreaterThan(150);
+    expect(texts.length).toBeGreaterThan(2_000);
+    for (const text of new Set(texts)) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(NEUTRAL);
+      expect(text, text).not.toMatch(CELEBRATION);
+      // Sem produto, emissor, índice oficial automático ou taxa "de mercado".
+      expect(text, text).not.toMatch(/\b(tesouro|cdb|lci|lca|poupan[cç]a|selic|cdi|ipca|nubank|banco do brasil|caixa econ|rendimento m[eé]dio|de mercado|perfil de investidor)/i);
+    }
+    const source = readFileSync(join(CORE_SRC, 'simulate.ts'), 'utf8');
+    expect(source).not.toMatch(FORBIDDEN);
+    expect(source).not.toMatch(JUDGMENT);
+    expect(source).not.toMatch(CELEBRATION);
   });
 });
 

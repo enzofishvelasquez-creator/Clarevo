@@ -787,7 +787,59 @@ export const COMMITTED_TEXT = {
     `Se pagar tudo o que está em aberto, os pagamentos de ${formatMonthName(month)} chegam a ${formatBRL(cents)}.`,
   /** "Inclui R$ 180,00 estimados." */
   forecastEstimated: (cents: Cents) => `Inclui ${formatBRL(cents)} estimados.`,
+
+  // Metas (Ciclo C): linhas na tela /renda-comprometida, sempre fora do percentual.
+  /** "Guardado em metas em outubro: R$ 500,00" (aportes − resgates do mês) */
+  savedInGoals: (month: IsoMonth, cents: Cents) => `Guardado em metas em ${formatMonthName(month)}: ${formatBRL(cents)}`,
+  /** "Em outubro, os resgates de metas passaram os aportes em R$ 200,00." */
+  withdrawnFromGoals: (month: IsoMonth, cents: Cents) =>
+    `Em ${formatMonthName(month)}, os resgates de metas passaram os aportes em ${formatBRL(cents)}.`,
+  /** "Planejado para metas: R$ 980,00 por mês" */
+  plannedForGoals: (cents: Cents) => `Planejado para metas: ${formatBRL(cents)} por mês`,
+  /** "Fora dos compromissos depois do planejado: R$ 1.870,00" */
+  outsideAfterPlanned: (cents: Cents) => `Fora dos compromissos depois do planejado: ${formatBRL(cents)}`,
+  /** "As contas do mês e o planejado para metas passam a renda de referência em R$ 120,00." */
+  plannedOverReference: (cents: Cents) => `As contas do mês e o planejado para metas passam a renda de referência em ${formatBRL(cents)}.`,
+  goalsNote: 'Metas não entram no percentual: guardar não é conta a pagar.',
 } as const;
+
+/**
+ * Linhas das metas na tela de renda comprometida (Ciclo C, D-027(3)), fora do percentual: o guardado em metas no mês
+ * (aportes − resgates, savedInMonth), o planejado por mês das metas ativas (plannedForGoals) e o que fica fora dos
+ * compromissos depois do planejado (referência − comprometido − planejado). Nada disso muda committedCents,
+ * committedPermille nem outsideCents.
+ */
+export interface CommittedGoalLines {
+  savedInMonthCents: Cents;
+  plannedCents: Cents;
+  /** referência − comprometido − planejado (pode ser negativo); null sem referência ou sem planejado. */
+  outsideAfterPlannedCents: Cents | null;
+  /** "Guardado em metas em outubro: R$ 500,00" ou, com mais resgates que aportes, "Em outubro, os resgates ..." */
+  saved: string;
+  /** "Planejado para metas: R$ 980,00 por mês"; null sem planejado. */
+  planned: string | null;
+  /** "Fora dos compromissos depois do planejado: R$ 1.870,00" ou, abaixo de zero, "As contas do mês e o planejado ..." */
+  outsideAfterPlanned: string | null;
+  note: string;
+}
+
+/** s: summarizeCommitted do mês; savedInMonthCents: savedInMonth(listGoalMovementsInMonth); plannedCents: plannedForGoals(listGoals). */
+export function committedGoalLines(s: CommittedSummary, savedInMonthCents: Cents, plannedCents: Cents): CommittedGoalLines {
+  const after = s.outsideCents === null || plannedCents <= 0 ? null : s.outsideCents - plannedCents;
+  return {
+    savedInMonthCents,
+    plannedCents,
+    outsideAfterPlannedCents: after,
+    saved:
+      savedInMonthCents >= 0
+        ? COMMITTED_TEXT.savedInGoals(s.month, savedInMonthCents)
+        : COMMITTED_TEXT.withdrawnFromGoals(s.month, -savedInMonthCents),
+    planned: plannedCents > 0 ? COMMITTED_TEXT.plannedForGoals(plannedCents) : null,
+    outsideAfterPlanned:
+      after === null ? null : after >= 0 ? COMMITTED_TEXT.outsideAfterPlanned(after) : COMMITTED_TEXT.plannedOverReference(-after),
+    note: COMMITTED_TEXT.goalsNote,
+  };
+}
 
 /** Linha "Renda comprometida" no card "Ainda a pagar" do Resumo (depois do resumo tocável). */
 export type CommittedLine =

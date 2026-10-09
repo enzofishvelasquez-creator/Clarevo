@@ -1193,10 +1193,11 @@ begin
   assert (select array_agg(m[1] order by m[1] collate "C")
             from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
            where c.conname = 'record_operations_action_check')
-    = array['alterar_serie', 'criar', 'criar_compromisso', 'criar_ocorrencia', 'criar_serie', 'decidir_revisao',
+    = array['alterar_meta', 'alterar_movimento_meta', 'alterar_serie', 'criar', 'criar_compromisso', 'criar_meta', 'criar_ocorrencia', 'criar_serie', 'decidir_revisao',
             'definir_renda_referencia', 'desfazer_pagamento', 'editar', 'editar_compromisso', 'encerrar_serie', 'excluir',
-            'excluir_compromisso', 'excluir_renda_referencia', 'excluir_serie', 'informar_ano', 'pagar_compromisso', 'tirar_ano'],
-    'as 18 ações vigentes (com as 2 da renda comprometida, testadas em 50)';
+            'excluir_compromisso', 'excluir_meta', 'excluir_movimento_meta', 'excluir_renda_referencia', 'excluir_serie', 'informar_ano', 'pagar_compromisso',
+            'registrar_movimento_meta', 'situacao_meta', 'tirar_ano'],
+    'as 25 ações vigentes (com as 2 da renda comprometida, testadas em 50, e as 7 de metas, testadas em 60)';
   assert not exists (select 1 from public.record_operations
                       where (action = 'criar_ocorrencia' and (commitment_id is null or target_id is null or record_id is not null))
                          or (action = 'decidir_revisao' and (record_id is not null or commitment_id is not null or target_id is not null))),
@@ -1217,10 +1218,10 @@ end $$;
 do $$ begin
   assert (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
-    = array['context_permission', 'create_commitment', 'create_record', 'create_series', 'create_series_occurrence',
-            'decide_return_review', 'delete_commitment', 'delete_income_reference', 'delete_record', 'delete_series', 'end_series', 'ensure_personal_space',
+    = array['add_goal_movement', 'context_permission', 'create_commitment', 'create_goal', 'create_record', 'create_series', 'create_series_occurrence',
+            'decide_return_review', 'delete_commitment', 'delete_goal', 'delete_goal_movement', 'delete_income_reference', 'delete_record', 'delete_series', 'end_series', 'ensure_personal_space',
             'inform_series_year', 'is_org_admin', 'month_committed', 'month_to_pay', 'month_totals', 'months_overview',
-            'pay_commitment', 'set_income_reference', 'skip_series_year', 'sync_series_occurrences', 'undo_commitment_payment', 'update_commitment', 'update_record',
+            'pay_commitment', 'set_goal_status', 'set_income_reference', 'skip_series_year', 'sync_series_occurrences', 'undo_commitment_payment', 'update_commitment', 'update_goal', 'update_goal_movement', 'update_record',
             'update_series_from'],
     'authenticated executa só as funções expostas (3 novas)';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
