@@ -2105,6 +2105,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await shot('88_tema_taxa_mes_ano_fontes');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
   await layoutChecks('tema taxa ao mês 320px');
+  await p.locator('h1').filter({ hasText: /^Taxa ao mês e taxa ao ano$/ }).first().evaluate((e) => e.scrollIntoView({ block: 'start' }));
   await shot('88_tema_taxa_mes_ano_320px');
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   // Uma fonte abre o site numa janela nova; o app continua na explicação.
@@ -2610,6 +2611,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await body();
   ok('este mês: só a conta vencida antes de hoje (Aluguel de 05/10), sem recebimentos, e "Concluir"', (await stepTitle()) === 'Outubro de 2026 (este mês), Mês 4 de 4' &&
     t.includes('R$ 2.500,00 · venceu em 05/10/2026 · em aberto') && !t.includes('Recebimentos e gastos') && !t.includes('Luz') && (await visibleCount('button', 'Concluir')) === 1 && (await visibleCount('button', 'Concluir agora')) === 0, t.slice(0, 400));
+  ok('trocar de passo tira o aviso do passo anterior ("Anotado: Salário" de setembro)', !t.includes('Anotado: Salário'));
   await btn('Já paguei: Aluguel de outubro').click(); await waitText('Marcar como paga?');
   ok('"Já paguei" de valor fixo: confirmação com o valor, o vencimento e a conta', (await dialogText()).includes('Aluguel de outubro: R$ 2.500,00 em 05/10/2026, da conta Conta principal.') &&
     (await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Mudar valor ou data', exact: true }).count()) === 1);

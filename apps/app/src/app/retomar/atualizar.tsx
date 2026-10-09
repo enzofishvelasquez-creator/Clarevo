@@ -107,7 +107,7 @@ export default function AtualizarMeses() {
   const query = useReturnReview(ctx);
   const seriesList = useSeriesList(ctx);
   const writer = useReturnWriter();
-  const [notice] = useFlash();
+  const [notice, setNotice] = useFlash();
   const review = query.data?.review ?? null;
 
   const [session, setSession] = useState<Session | null>(null);
@@ -341,6 +341,8 @@ export default function AtualizarMeses() {
   const goTo = (i: number) => {
     setSelected([]);
     setResult(null);
+    // O aviso da tela anterior ("Anotado: ...") é do passo que ficou para trás.
+    setNotice(null);
     setIndex(i);
   };
 
