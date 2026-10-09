@@ -1,7 +1,8 @@
 /**
  * Roteiro de verificação do primeiro ciclo, do Ciclo A (gastos fixos e parcelamentos), do Ciclo A3 (contas do ano),
- * de "Primeiros passos" no Resumo, dos atalhos de Movimentações e do Ciclo A6 (achar tudo e calculadoras) na versão web,
- * em modo demonstração (acesso simulado).
+ * de "Primeiros passos" no Resumo, dos atalhos de Movimentações, do Ciclo A6 (achar tudo e calculadoras), do Ciclo A4
+ * (seus últimos meses, com o cenário fictício "retorno" da demonstração) e do Ciclo A5 (Aprender e dúvidas) na versão
+ * web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -197,6 +198,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await layoutChecks(prefix);
     ok(`${prefix}: sem o símbolo C`, (await symbolCount()) === 0);
   };
+  // Ciclo A4: faixa "Seus últimos meses" no Resumo e os títulos visíveis da tela (nível e texto), na ordem.
+  const bandShown = () => headingShown('Seus últimos meses');
+  const headingList = () => p.evaluate(() => [...document.querySelectorAll('[role=heading]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => `${e.getAttribute('aria-level')}:${e.textContent}`));
 
   // 1. Cadastro de uma conta nova (acesso simulado)
   await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
@@ -250,6 +254,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     return { card: top(h), anotar: top(a), level: h?.getAttribute('aria-level'), minStep: Math.round(Math.min(...steps.map((s) => s.getBoundingClientRect().height))) };
   });
   ok('primeiros passos: título de nível 2, antes de "Anotar gasto", passos com 56 px', ppOrder.card !== null && ppOrder.anotar !== null && ppOrder.card < ppOrder.anotar && ppOrder.level === '2' && ppOrder.minStep >= 56, JSON.stringify(ppOrder));
+  // Ciclo A4: conta nova (sem nenhuma anotação) nunca vê "Seus últimos meses"; os títulos do Resumo seguem na ordem.
+  ok('conta nova: sem a faixa "Seus últimos meses" e com os títulos do Resumo na ordem de sempre', !(await bandShown()) &&
+    JSON.stringify(await headingList()) === JSON.stringify(['2:Outubro de 2026', '2:Primeiros passos', '2:Pagamentos do mês']), JSON.stringify(await headingList()));
   await layoutChecks('primeiros passos 390px');
   await scrollTo('Primeiros passos');
   await shot('50_primeiros_passos');
@@ -380,6 +387,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await logoChecks('Resumo: logotipo "clarevo." no cabeçalho azul, sem o símbolo C');
   await shot('06_resumo_demo');
   ok('primeiros passos: fora da conta de demonstração com dados', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Agora não')) === 0 && !t.includes('Três passos para o Clarevo'));
+  // Ciclo A4: a demonstração padrão foi toda anotada em 07/10/2026 e não mostra a faixa; a ordem do Resumo não muda.
+  ok('demonstração padrão: sem a faixa "Seus últimos meses" e com os títulos do Resumo na ordem de sempre', !(await bandShown()) && !t.includes('Sua última anotação') &&
+    JSON.stringify(await headingList()) === JSON.stringify(['2:Outubro de 2026', '2:Pagamentos do mês']), JSON.stringify(await headingList()));
 
   const expectTotals = async (name, rec, pago, dif, aPagar = 'R$ 650,00') => {
     // Só a cópia visível: as outras abas e as telas da pilha continuam montadas, escondidas.
@@ -594,7 +604,16 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   await openToPay();
   // Revisar contas vencidas (Ciclo A): com duas ou mais vencidas, a seção mostra o atalho. Só conferência; nada é marcado aqui.
-  ok('vencidas: duas contas e o atalho "Revisar vencidas"', JSON.stringify(await sectionRows('Vencidas')) === JSON.stringify(['Revisar vencidas', 'Gás, venceu em 28/09/2026, R$ 40,00', 'Água, venceu em 05/10/2026, R$ 90,00']));
+  // Ciclo A5 (spec3 §3.7): no fim da seção, "Quanto custa pagar depois do vencimento?" leva ao tema de Aprender.
+  ok('vencidas: duas contas, o atalho "Revisar vencidas" e, no fim, "Quanto custa pagar depois do vencimento?"', JSON.stringify(await sectionRows('Vencidas')) === JSON.stringify(['Revisar vencidas', 'Gás, venceu em 28/09/2026, R$ 40,00', 'Água, venceu em 05/10/2026, R$ 90,00', 'Quanto custa pagar depois do vencimento?']),
+    JSON.stringify(await sectionRows('Vencidas')));
+  await btn('Quanto custa pagar depois do vencimento?').click(); await waitText('R$ 204,67');
+  ok('Vencidas: "Quanto custa pagar depois do vencimento?" abre "Multa e juros por atraso", com o exemplo de R$ 204,67', new URL(p.url()).pathname === '/explicacao/multa-juros-atraso' &&
+    (await p.locator('h1').filter({ hasText: /^Multa e juros por atraso$/ }).count()) === 1 && (await visibleCount('button', 'Voltar à tarefa')) === 1, p.url());
+  await scrollTo('Exemplo');
+  await shot('92_vencidas_multa_e_juros');
+  await btn('Voltar à tarefa').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
+  ok('"Voltar à tarefa" volta para Contas a pagar', new URL(p.url()).pathname === '/a-pagar', p.url());
   await btn('Revisar vencidas').click(); await waitText('Marque o que você já pagou e tire o que não houve.');
   await waitText('Venceu em 05/10/2026 · R$ 90,00');
   ok('revisar vencidas: cada linha com "Já paguei" e "Não houve"', (await body()).includes('Contas vencidas') &&
@@ -735,8 +754,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // "Por mês" continua R$ 3.530,00 (as contas do ano ficam fora) e "Por ano" soma R$ 4.200,00, todos estimados.
   const headings = await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
   ok('contas do ano: seção depois de Gastos fixos e Parcelamentos', JSON.stringify(headings) === JSON.stringify(['Gastos fixos', 'Parcelamentos', 'Contas do ano']), headings.join(' | '));
-  ok('contas do ano: IPVA e IPTU com rótulos em texto e "Nova conta do ano"',
-    JSON.stringify(await sectionRows('Contas do ano')) === JSON.stringify(['IPVA, cerca de R$ 2.400,00, todo ano em 20/01, valor muda, conta do ano', 'IPTU, 10 parcelas de cerca de R$ 180,00, fevereiro a novembro, dia 10, valor muda, conta do ano', 'Nova conta do ano']) &&
+  // Ciclo A5 (spec3 §3.7): o card termina com "Como se preparar para as contas do ano?", depois de "Nova conta do ano".
+  ok('contas do ano: IPVA e IPTU com rótulos em texto, "Nova conta do ano" e o link de Aprender',
+    JSON.stringify(await sectionRows('Contas do ano')) === JSON.stringify(['IPVA, cerca de R$ 2.400,00, todo ano em 20/01, valor muda, conta do ano', 'IPTU, 10 parcelas de cerca de R$ 180,00, fevereiro a novembro, dia 10, valor muda, conta do ano', 'Nova conta do ano', 'Como se preparar para as contas do ano?']) &&
       ['IPVA, IPTU, matrícula, material escolar e seguro anual. Entram em Contas a pagar dois meses antes de vencer.', '≈ R$ 2.400,00 · todo ano em 20/01 · valor muda', '10 parcelas de ≈ R$ 180,00 · fevereiro a novembro, dia 10 · valor muda'].every((x) => t.includes(x)),
     ((await sectionRows('Contas do ano')) ?? []).join(' | '));
   ok('contas do ano: "Por ano" com a parte estimada e "Por mês" continua R$ 3.530,00, sem elas',
@@ -1238,6 +1258,24 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Sair e entrar de novo na demonstração: as listas são lidas de novo e a geração do dia roda outra vez.
   // Nada do que foi tirado volta (Matrícula de 2026, parcelas do Seguro residencial e do Material escolar).
   await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
+  // Ciclo A5: "O que é isso?" ao lado de "Saldo inicial" abre o resumo no lugar; a explicação completa abre por cima e
+  // "Voltar à tarefa" volta para a Conta.
+  const saldoHint = p.getByRole('button', { name: 'O que é isso? Saldo inicial', exact: true }).filter({ visible: true }).first();
+  await saldoHint.waitFor({ timeout: 8000 }).catch(() => {});
+  ok('/conta: "O que é isso?" de "Saldo inicial", fechado, com alvo de 44 px', (await saldoHint.getAttribute('aria-expanded')) === 'false' && ((await saldoHint.boundingBox())?.height ?? 0) >= 43.5 &&
+    (await body()).includes('Saldo inicial: não informado.'));
+  await saldoHint.click(); await waitText('Ler explicação completa');
+  ok('/conta: o resumo abre no lugar, sem sair da tela', (await saldoHint.getAttribute('aria-expanded')) === 'true' && new URL(p.url()).pathname === '/conta');
+  await saldoHint.evaluate((e) => e.scrollIntoView({ block: 'center' }));
+  await shot('90_o_que_e_isso_saldo_inicial');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await layoutChecks('conta com "O que é isso?" aberto 320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  await btn('Ler explicação completa').click(); await waitText('Voltar à tarefa');
+  ok('"Ler explicação completa" abre "Diferença do mês e saldo da conta"', new URL(p.url()).pathname === '/explicacao/saldo' &&
+    (await p.locator('h1').filter({ hasText: /^Diferença do mês e saldo da conta$/ }).count()) === 1, p.url());
+  await btn('Voltar à tarefa').click(); await waitText('Acesso ao plano');
+  ok('"Voltar à tarefa" volta para a Conta, com o resumo ainda aberto', new URL(p.url()).pathname === '/conta' && (await saldoHint.getAttribute('aria-expanded')) === 'true', p.url());
   await btn('Sair deste aparelho').click(); await waitText('Seu dinheiro');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await expectTotals('depois de entrar de novo: outubro na base', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
@@ -1246,8 +1284,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('depois de uma nova geração, nada do que foi tirado ou pago de uma vez volta', ['Matrícula', 'Seguro residencial', 'Material escolar'].every((x) => !t.includes(x)) && t.includes('Seguro do carro'));
   await openSeriesList();
   t = await body();
+  // O card tem as 5 contas do ano, "Nova conta do ano" e, desde o Ciclo A5, o link "Como se preparar para as contas do ano?".
   ok('"Por ano" com as 5 contas do ano (IPVA, IPTU, Matrícula, Seguro residencial e Material escolar)', t.includes('Por ano, se os valores não mudarem: R$ 6.180,00 (inclui R$ 4.680,00 estimados).') &&
-    ((await sectionRows('Contas do ano')) ?? []).length === 6);
+    ((await sectionRows('Contas do ano')) ?? []).length === 7);
   await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
   await btn('Voltar').click(); await waitText('Diferença do mês');
 
@@ -1978,6 +2017,204 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Aprender › Calculadoras abre /calcular', new URL(p.url()).pathname === '/calcular' && (await h1Name()) === 'Calculadoras');
   await btn('Voltar').click(); await waitText('Diferença do mês e saldo da conta');
 
+  // Ciclo A5 · Aprender e dúvidas (D-031, D-032). Conteúdo educativo no aparelho: nada vai para a rede nem fica gravado.
+  // Topo da aba (spec5_notes §2): título, introdução, busca, card "Calculadoras", "Comece por aqui", atalhos e as seções.
+  const LEARN_SECTIONS = ['Usar o Clarevo', 'Organizar o mês', 'Juros e crédito', 'Dinheiro no tempo', 'Dúvidas frequentes'];
+  const learnH2 = () => p.evaluate(() => [...document.querySelectorAll('h2, [role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
+  // Linhas de tema visíveis (nome acessível "{título}. {subtítulo}. Leitura de N minuto(s)."), de cima para baixo.
+  const topicRows = () => p.evaluate(() => [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && / Leitura de \d+ minutos?\.$/.test(e.getAttribute('aria-label') || ''))
+    .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top).map((e) => e.getAttribute('aria-label')));
+  const learnSearch = () => p.getByLabel('Buscar um tema', { exact: true }).filter({ visible: true }).first();
+  const learnBackToTab = async () => { await btn('Voltar para Aprender').click(); await waitText('Comece por aqui'); };
+  await logoChecks('Aprender: logotipo "clarevo." no cabeçalho azul, sem o símbolo C');
+  t = await body();
+  const learnOrder = ['Buscar um tema', 'Calculadoras', 'Comece por aqui', 'Ir para', ...LEARN_SECTIONS].map((x) => t.indexOf(x));
+  ok('Aprender: título "Aprender e dúvidas", aba "Aprender" com o nome "Aprender e dúvidas" e a introdução', (await h1Name()) === 'Aprender e dúvidas' &&
+    (await p.getByRole('tab', { name: 'Aprender e dúvidas', exact: true }).filter({ visible: true }).count()) === 1 &&
+    (await p.getByRole('tab', { name: 'Aprender e dúvidas', exact: true }).filter({ visible: true }).first().innerText()).trim() === 'Aprender' &&
+    t.includes('Explicações curtas sobre contas, juros e o próprio Clarevo, com exemplos fictícios e fontes.'), await h1Name());
+  ok('Aprender: busca, card "Calculadoras", "Comece por aqui", "Ir para" e as cinco seções, nessa ordem', learnOrder.every((v, i, a) => v >= 0 && (i === 0 || v > a[i - 1])) &&
+    JSON.stringify(await learnH2()) === JSON.stringify(['Comece por aqui', ...LEARN_SECTIONS]), `${learnOrder.join(',')} ${JSON.stringify(await learnH2())}`);
+  ok('Aprender: "Comece por aqui" com Diferença do mês, Juros simples e compostos e Gasto fixo', JSON.stringify((await cardButtons('Comece por aqui')).slice(0, 3).map((x) => x.split('. ')[0])) ===
+    JSON.stringify(['Diferença do mês', 'Juros simples e juros compostos', 'Gasto fixo, conta a pagar e gasto anotado']), JSON.stringify(await cardButtons('Comece por aqui')));
+  ok('Aprender: linha de tema com título, subtítulo e tempo de leitura no nome; rascunhos fora da lista', (await visibleCount('button', 'Diferença do mês. Como um registro entra no mês. Leitura de 1 minuto.')) >= 1 &&
+    !t.includes('Orçamento e a referência 50-30-20') && !t.includes('Como apagar meus dados?') && t.includes('Conteúdo educativo e geral, com exemplos fictícios. O Clarevo não oferece crédito nem indica investimentos.'));
+  ok('Aprender: sem o desenho do símbolo C', (await symbolCount()) === 0);
+  await keepText();
+  await layoutChecks('aprender e dúvidas 390px');
+  await shot('86_aprender');
+  await p.getByRole('heading', { name: 'Usar o Clarevo', exact: true }).filter({ visible: true }).first().evaluate((e) => e.scrollIntoView({ block: 'start' }));
+  await shot('86_aprender_secoes');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await layoutChecks('aprender e dúvidas 320px');
+  await shot('86_aprender_320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  // Atalho de seção: rola até a seção (não filtra) e leva o foco ao título dela.
+  await btn('Ir para Dinheiro no tempo').click(); await p.waitForTimeout(900);
+  const timeTop = await p.evaluate(() => [...document.querySelectorAll('h2, [role=heading][aria-level="2"]')].find((e) => e.textContent === 'Dinheiro no tempo' && e.getBoundingClientRect().width > 0)?.getBoundingClientRect().top ?? null);
+  ok('"Ir para Dinheiro no tempo": a seção sobe para o topo e o foco vai para o título dela', timeTop !== null && timeTop >= 0 && timeTop < 200 &&
+    (await p.evaluate(() => (document.activeElement?.textContent || '').startsWith('Dinheiro no tempo'))) && (await body()).includes('Usar o Clarevo'), String(timeTop));
+
+  // Busca no aparelho: "juros" e "JÚROS" põem "Juros simples e juros compostos" primeiro; nenhuma requisição de rede.
+  const learnRequests = [];
+  const onLearnRequest = (r) => { if (!r.url().startsWith('data:')) learnRequests.push(r.url()); };
+  p.on('request', onLearnRequest);
+  await learnSearch().scrollIntoViewIfNeeded();
+  await learnSearch().pressSequentially('juros', { delay: 30 }); await waitText('temas para "juros"');
+  const jurosRows = await topicRows();
+  ok('busca "juros": "Juros simples e juros compostos" primeiro, com "temas para" e sem o card "Calculadoras" nem as seções', (jurosRows[0] ?? '').startsWith('Juros simples e juros compostos.') &&
+    jurosRows.some((r) => r.startsWith('Multa e juros por atraso.')) && jurosRows.some((r) => r.startsWith('Taxa ao mês e taxa ao ano.')) &&
+    (await visibleCount('button', /^Calculadoras\./)) === 0 && !(await body()).includes('Comece por aqui'), jurosRows.slice(0, 3).join(' | '));
+  await p.waitForTimeout(600);
+  const learnLive = await p.evaluate(() => [...document.querySelectorAll('[aria-live="polite"]')].map((e) => e.textContent).filter(Boolean));
+  ok('busca: a contagem é anunciada uma vez na região viva', learnLive.some((x) => /^\d+ temas para "juros"$/.test(x)), JSON.stringify(learnLive));
+  await keepText();
+  await layoutChecks('busca em aprender 390px');
+  await shot('87_aprender_busca');
+  await learnSearch().fill('JÚROS'); await p.waitForTimeout(200);
+  ok('busca "JÚROS": o mesmo primeiro resultado', ((await topicRows())[0] ?? '').startsWith('Juros simples e juros compostos.'));
+  await learnSearch().fill('zzzz'); await waitText('Nenhum tema encontrado');
+  ok('busca "zzzz": "Nenhum tema encontrado" e a sugestão', (await body()).includes('Tente outra palavra, como juros, fatura ou parcela.') && (await visibleCount('button', 'Ver todos os temas')) === 1);
+  await shot('87_aprender_busca_vazia');
+  await btn('Ver todos os temas').click(); await waitText('Comece por aqui');
+  ok('"Ver todos os temas" limpa a busca e volta a lista completa', (await learnSearch().inputValue()) === '' && (await visibleCount('button', /^Calculadoras\./)) === 1);
+  await learnSearch().fill('cartao'); await p.waitForTimeout(200);
+  await btn('Limpar busca').click(); await waitText('Comece por aqui');
+  ok('"Limpar busca" limpa o campo e devolve o foco a ele', (await learnSearch().inputValue()) === '' && (await learnSearch().evaluate((e) => e === document.activeElement)));
+  p.off('request', onLearnRequest);
+  const learnStored = await p.evaluate(() => { try { return JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }); } catch { return ''; } });
+  ok('busca: nenhuma requisição de rede e nada gravado no aparelho', learnRequests.length === 0 && !/juros|zzzz|cartao/i.test(learnStored), learnRequests.slice(0, 3).join(' | '));
+
+  // Tema "Taxa ao mês e taxa ao ano": exemplo, "Ver a conta", hipóteses, fontes com data, revisão e aviso.
+  await btn(/^Taxa ao mês e taxa ao ano\./).click(); await waitText('Voltar para Aprender');
+  await shot('88_tema_taxa_mes_ano');
+  t = await body();
+  const verConta = p.getByRole('button', { name: 'Ver a conta', exact: true }).filter({ visible: true }).first();
+  ok('tema: "26,82%", "Hipóteses do exemplo", "Ver a conta", "Fontes", consulta e "Revisado em"', ['26,82%', 'Hipóteses do exemplo', 'Fontes', 'Consultada em 09/10/2026', 'Revisado em 09/10/2026', 'Juros e crédito · 1 min de leitura',
+    'Conteúdo educativo e geral. Não é recomendação de produto financeiro nem oferta de crédito.'].every((x) => t.includes(x)) && (await verConta.getAttribute('aria-expanded')) === 'false' &&
+    (await p.locator('h1').filter({ hasText: /^Taxa ao mês e taxa ao ano$/ }).count()) === 1 && new URL(p.url()).pathname === '/explicacao/taxa-mes-ano', t.slice(0, 200));
+  await verConta.click(); await p.waitForTimeout(300);
+  ok('"Ver a conta" abre os passos no lugar', (await verConta.getAttribute('aria-expanded')) === 'true' && (await body()).length > t.length);
+  ok('tema: fontes com papel de link e "Fazer a conta com os seus números"', (await p.getByRole('link').filter({ visible: true }).count()) >= 1 && (await visibleCount('button', 'Fazer a conta com os seus números')) === 1);
+  ok('tema: sem o desenho do símbolo C', (await symbolCount()) === 0);
+  await keepText();
+  await layoutChecks('tema taxa ao mês 390px');
+  await scrollTo('Exemplo');
+  await shot('88_tema_taxa_mes_ano_conta');
+  await scrollTo('Fontes');
+  await shot('88_tema_taxa_mes_ano_fontes');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await layoutChecks('tema taxa ao mês 320px');
+  await shot('88_tema_taxa_mes_ano_320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  // Uma fonte abre o site numa janela nova; o app continua na explicação.
+  const sourceNav = [];
+  const onSourceNav = (r) => { if (r.isNavigationRequest() && !r.url().startsWith(`http://localhost:${PORT}`)) sourceNav.push(r.url()); };
+  ctx.on('request', onSourceNav);
+  const [popup] = await Promise.all([ctx.waitForEvent('page', { timeout: 8000 }).catch(() => null), p.getByRole('link').filter({ visible: true }).first().click()]);
+  await waitUntil(async () => sourceNav.length > 0 || (popup !== null && popup.url().startsWith('http')), 5000);
+  const sourceUrl = sourceNav[0] ?? (popup ? popup.url() : '');
+  const allowedSource = (url, slug) => { try { const h = new URL(url).hostname; return new URL(url).protocol === 'https:' && (['gov.br', 'leg.br', 'jus.br', 'def.br'].some((d) => h === d || h.endsWith(`.${d}`)) || (slug === 'fgc' && (h === 'fgc.org.br' || h.endsWith('.fgc.org.br')))); } catch { return false; } };
+  ok('fonte: abre outra janela com domínio oficial e o app continua na explicação', popup !== null && allowedSource(sourceUrl, 'taxa-mes-ano') && new URL(p.url()).pathname === '/explicacao/taxa-mes-ano', sourceUrl);
+  ctx.off('request', onSourceNav);
+  if (popup) await popup.close().catch(() => {});
+  // Relacionado troca a explicação no lugar; "Voltar para Aprender" volta direto para a aba.
+  await btn(/^Juros simples e juros compostos\./).click();
+  await waitUntil(async () => new URL(p.url()).pathname === '/explicacao/juros-simples-compostos');
+  ok('relacionado "Juros simples e juros compostos" abre', (await p.locator('h1').filter({ hasText: /^Juros simples e juros compostos$/ }).count()) === 1, p.url());
+  await learnBackToTab();
+  ok('"Voltar para Aprender" volta para a aba', new URL(p.url()).pathname === '/aprender', p.url());
+
+  // Dúvidas frequentes: a pergunta abre no lugar (aria-expanded), com o resumo e "Ler resposta completa".
+  const faq = p.getByRole('button', { name: 'A empresa que oferece o benefício vê meus gastos?', exact: true }).filter({ visible: true }).first();
+  await faq.scrollIntoViewIfNeeded();
+  ok('pergunta fechada: aria-expanded=false', (await faq.getAttribute('aria-expanded')) === 'false');
+  await faq.click();
+  const faqOpacity = await p.evaluate(() => {
+    const e = [...document.querySelectorAll('div[dir="auto"]')].find((x) => x.textContent.startsWith('Não. A empresa administra') && x.getBoundingClientRect().width > 0);
+    let o = e ? 1 : 0;
+    for (let n = e; n; n = n.parentElement) o *= Number(getComputedStyle(n).opacity);
+    return o;
+  });
+  await waitText('A empresa administra seu acesso ao plano');
+  ok('pergunta aberta: aria-expanded=true, o resumo e "Ler resposta completa"', (await faq.getAttribute('aria-expanded')) === 'true' && (await visibleCount('button', 'Ler resposta completa')) === 1);
+  if (process.env.REDUZIR_MOVIMENTO) ok('reduzir movimento: a resposta aparece já com opacidade 1', faqOpacity === 1, String(faqOpacity));
+  await faq.evaluate((e) => e.scrollIntoView({ block: 'start' }));
+  await shot('89_duvida_aberta');
+  await btn('Ler resposta completa').click(); await waitText('Voltar para Aprender');
+  ok('"Ler resposta completa" abre a resposta', new URL(p.url()).pathname === '/explicacao/empresa-ve' && (await p.locator('h1').filter({ hasText: /^A empresa que oferece o benefício vê meus gastos\?$/ }).count()) === 1, p.url());
+  await learnBackToTab();
+  await faq.click(); await waitGone('A empresa administra seu acesso ao plano');
+
+  // Todos os temas publicados, abertos pela aba (linhas das seções e "Ler resposta completa" das dúvidas), a 320 px:
+  // título como cabeçalho de nível 1, nenhum termo vetado nos textos exibidos (spec3 R10; as fontes ficam fora), fontes
+  // com papel de link, data de consulta e domínio permitido, sem rolagem lateral, alvos de 44 px e sem o símbolo C.
+  const LEARN_FORBIDDEN = new RegExp(['poupan[cç]a', 'previd[eê]ncia', 'deb[eê]nture', 'fundos? (de|imobili)', 'cripto\\w*', 'bitcoin', 'consignado', 'portabilidade', 'endividad\\w*', 'estour\\w*',
+    '\\bruim\\b', 'vil[aã]o', 'culpa', 'usu[aá]ri[oa]s?', 'bem-vind[oa]s?', 'preocupad[oa]s?', 'nubank', 'ita[uú]', 'bradesco', 'santander', 'banco do brasil', 'caixa econ[oô]mica', 'picpay',
+    'mercado pago', '\\bxp\\b', 'btg', '\\bc6\\b', '\\binter\\b', 'serasa', 'boa vista', '\\bquod\\b', '\\bspc\\b'].join('|'), 'i');
+  const VETOED = new RegExp(`\\bf(az|azer|azendo|a[cç]a|ar[aá]|ez|aria)\\s+${'sentido'}`, 'i');
+  const RETURN_WORDS = /\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b/i;
+  const pageProblems = () => p.evaluate(() => {
+    const shown = (e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0; };
+    const out = [];
+    if (document.documentElement.scrollWidth > window.innerWidth + 1) out.push('rolagem lateral');
+    for (const e of document.querySelectorAll('body *')) { const b = e.getBoundingClientRect(); if (b.width > 0 && b.height > 0 && (b.right > window.innerWidth + 0.5 || b.left < -0.5)) { out.push(`fora: ${(e.getAttribute('aria-label') || e.textContent || e.tagName).slice(0, 30)}`); break; } }
+    for (const e of document.querySelectorAll('[role=button],[role=link],[role=tab],[role=checkbox],button')) if (shown(e) && e.getBoundingClientRect().height < 43.5) out.push(`alvo: ${(e.getAttribute('aria-label') || e.textContent || '').slice(0, 30)}`);
+    for (const e of document.querySelectorAll('div[dir="auto"], span')) if (shown(e) && e.children.length === 0 && /R\$/.test(e.textContent || '') && e.scrollWidth > e.clientWidth + 1) out.push(`cortado: ${e.textContent}`);
+    return out;
+  });
+  const allowedSourceUrl = (url, slug) => { try { const u = new URL(url); const h = u.hostname; return u.protocol === 'https:' && (['gov.br', 'leg.br', 'jus.br', 'def.br'].some((d) => h === d || h.endsWith(`.${d}`)) || (slug === 'fgc' && (h === 'fgc.org.br' || h.endsWith('.fgc.org.br')))); } catch { return false; } };
+  // Os sites das fontes não abrem aqui: window.open só anota o endereço pedido (a abertura real foi conferida acima).
+  await p.evaluate(() => { window.__opened = []; window.__realOpen = window.open; window.open = (u) => { window.__opened.push(String(u)); return null; }; });
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  const learnSeen = new Map();
+  const learnIssues = { titulo: [], termos: [], fontes: [], layout: [] };
+  const checkTopicPage = async (expectTitle) => {
+    await waitText('Voltar para Aprender');
+    const slug = decodeURIComponent(new URL(p.url()).pathname.split('/')[2] ?? '');
+    const h1s = await p.evaluate(() => [...document.querySelectorAll('h1')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
+    // O cabeçalho da pilha também é de nível 1 ("Aprender"); o título do tema vem depois dele.
+    if (!(h1s.length === 2 && h1s[0] === 'Aprender' && expectTitle(h1s[1]))) learnIssues.titulo.push(`${slug}: ${JSON.stringify(h1s)}`);
+    const text = await body();
+    const shownText = text.split('\nFontes\n')[0] + '\n' + (text.split('Revisado em')[1] ?? '');
+    const bad = shownText.match(FORBIDDEN)?.[0] ?? shownText.match(VETOED)?.[0] ?? shownText.match(LEARN_FORBIDDEN)?.[0] ?? (['sem-registro', 'voltei-depois'].includes(slug) ? shownText.match(RETURN_WORDS)?.[0] : null);
+    if (bad || !text.includes('Revisado em')) learnIssues.termos.push(`${slug}: ${bad ?? 'sem "Revisado em"'}`);
+    const links = p.getByRole('link').filter({ visible: true });
+    const n = await links.count();
+    for (let i = 0; i < n; i++) {
+      const name = await links.nth(i).getAttribute('aria-label');
+      await links.nth(i).click();
+      const url = await p.evaluate(() => window.__opened[window.__opened.length - 1] ?? '');
+      if (!allowedSourceUrl(url, slug) || !(name ?? '').includes('Consultada em')) learnIssues.fontes.push(`${slug}: ${url} (${name})`);
+    }
+    const lp = await pageProblems();
+    if ((await symbolCount()) !== 0) lp.push('símbolo C');
+    if (lp.length) learnIssues.layout.push(`${slug}: ${lp.slice(0, 3).join(', ')}`);
+    learnSeen.set(slug, n);
+    await learnBackToTab();
+  };
+  const learnLabels = [...new Set(await topicRows())];
+  for (const label of learnLabels) {
+    await p.getByRole('button', { name: label, exact: true }).filter({ visible: true }).first().click();
+    await checkTopicPage((h) => label.startsWith(`${h}${/[?.!]$/.test(h) ? '' : '.'} `));
+  }
+  const faqNames = await p.evaluate(() => [...document.querySelectorAll('[role=button][aria-expanded]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label')));
+  for (const q of faqNames) {
+    const qb = p.getByRole('button', { name: q, exact: true }).filter({ visible: true }).first();
+    await qb.click(); await btn('Ler resposta completa').click();
+    await checkTopicPage((h) => h === q);
+    await qb.click(); await waitGone('Ler resposta completa');
+  }
+  await p.evaluate(() => { window.open = window.__realOpen; });
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  const externalTopics = [...learnSeen].filter(([, n]) => n > 0).map(([s]) => s);
+  ok('Aprender: 35 temas publicados abrem pela aba (28 nas seções e 7 dúvidas), cada um com o título como cabeçalho de nível 1', learnSeen.size === 35 && learnLabels.length === 28 && faqNames.length === 7 &&
+    learnIssues.titulo.length === 0, `${learnSeen.size} temas, ${learnLabels.length} linhas, ${faqNames.length} dúvidas ${learnIssues.titulo.slice(0, 3).join(' | ')}`);
+  ok('temas: nenhum termo vetado nem travessão longo nos textos exibidos', learnIssues.termos.length === 0, learnIssues.termos.slice(0, 3).join(' | '));
+  ok('temas: fontes com papel de link, data de consulta e domínio permitido (oficial; FGC só no tema do FGC)', externalTopics.length >= 20 && learnIssues.fontes.length === 0,
+    `${externalTopics.length} temas com fontes externas ${learnIssues.fontes.slice(0, 3).join(' | ')}`);
+  ok('temas a 320 px: sem rolagem lateral, nada cortado, alvos de 44 px e sem o símbolo C', learnIssues.layout.length === 0, learnIssues.layout.slice(0, 3).join(' | '));
+
   // Larguras 320 e 736: sem transbordamento horizontal, botões com 44 px
   for (const w of [320, 736]) {
     await p.setViewportSize({ width: w, height: 800 });
@@ -2129,6 +2366,327 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('calculadora desconhecida: "Esta calculadora não está disponível." com "Ver todas as calculadoras"', (await body()).includes('Esta calculadora não está disponível.') && (await visibleCount('button', 'Ver todas as calculadoras')) === 1);
   await btn('Ver todas as calculadoras').click(); await waitText('Decidir uma compra');
   ok('"Ver todas as calculadoras" abre a lista', new URL(p.url()).pathname === '/calcular' && (await h1Name()) === 'Calculadoras');
+
+  // Ciclo A5: endereço de tema desconhecido ou em rascunho mostra "Este conteúdo não está disponível."; um apelido
+  // (slug antigo) abre o tema novo. De volta à largura padrão (o bloco de larguras termina em 736 px).
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  for (const slug of ['nao-existe', 'orcamento-50-30-20', 'apagar-dados']) {
+    await viaEntry(`/explicacao/${slug}`, 'Este conteúdo não está disponível.');
+    t = await body();
+    ok(`/explicacao/${slug}: "Este conteúdo não está disponível." com "Ver temas de Aprender"`, t.includes('Este conteúdo não está disponível.') && (await visibleCount('button', 'Ver temas de Aprender')) === 1 &&
+      !t.includes('Orçamento e a referência 50-30-20') && !t.includes('Como apagar meus dados?'), t.slice(0, 200));
+  }
+  await shot('91_tema_indisponivel');
+  await btn('Ver temas de Aprender').click(); await waitText('Comece por aqui');
+  ok('"Ver temas de Aprender" abre a aba Aprender', new URL(p.url()).pathname === '/aprender' && (await h1Name()) === 'Aprender e dúvidas', p.url());
+  await viaEntry('/explicacao/reservas', 'Voltar à tarefa');
+  ok('/explicacao/reservas (apelido) abre "Reserva para imprevistos"', (await p.locator('h1').filter({ hasText: /^Reserva para imprevistos$/ }).count()) === 1, p.url());
+  // Ciclo A4 · Seus últimos meses (D-030), no cenário FICTÍCIO "retorno" da demonstração (?cenario=retorno): a
+  // montagem da sequência R anotada em 20/05/2026 (Aluguel, Luz estimada e Financiamento do carro desde maio, contas de
+  // maio pagas, Salário e Mercado) e aberta em 07/10/2026. Cada entrada recarrega a página e recomeça o cenário.
+  const enterReturnDemo = async () => {
+    await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Seu dinheiro');
+    await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+    await waitText('Sua última anotação foi em 20/05/2026.', 12000).catch(() => {});
+  };
+  // Bloco da faixa "Seus últimos meses" (do título aos botões); null se a faixa não aparece.
+  const bandText = () => p.evaluate(() => {
+    const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Seus últimos meses' && e.getBoundingClientRect().width > 0);
+    let box = h?.parentElement;
+    while (box && !box.querySelector('[role=button]')) box = box.parentElement;
+    return box ? box.innerText.replace(/ /g, ' ') : null;
+  });
+  // Cartão de um mês em /retomar: do título do mês até o título seguinte.
+  const monthCardText = (title) => p.evaluate((title) => {
+    const h = [...document.querySelectorAll('[role=heading][aria-level="2"]')].find((e) => e.textContent === title && e.getBoundingClientRect().width > 0);
+    return h ? h.parentElement.innerText.replace(/ /g, ' ') : null;
+  }, title);
+  // Passo de "Atualizar meses": título com o mês e "Mês i de n" (o elemento que recebe o foco ao trocar de passo).
+  const stepTitle = () => p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label'))[0] ?? null);
+  const focusedName = () => p.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? null);
+  // Nada em vermelho nas telas da revisão (vencidas sem cor de erro; a situação vai em texto).
+  const redTexts = () => p.evaluate(() => [...document.querySelectorAll('div[dir="auto"], span')].filter((e) => e.getBoundingClientRect().width > 0 && e.children.length === 0 && (e.textContent || '').trim() !== '' && getComputedStyle(e).color === 'rgb(180, 35, 24)').map((e) => e.textContent.slice(0, 40)));
+  // Texto das telas da revisão, para as listas de cobrança e de contagem de dias sem anotar (spec3 §2.6, teste 8).
+  const returnTexts = [];
+  const keepReturnText = async () => { const s = await body(); returnTexts.push(s); screenTexts.push(s); };
+  const bandOrder = () => p.evaluate(() => {
+    const top = (sel, text) => [...document.querySelectorAll(sel)].find((e) => e.textContent === text && e.getBoundingClientRect().width > 0)?.getBoundingClientRect().top ?? null;
+    return { faixa: top('[role=heading]', 'Seus últimos meses'), anotar: top('[role=button]', 'Anotar gasto'), pagamentos: top('[role=heading]', 'Pagamentos do mês') };
+  });
+  const BAND_BODY = 'Sua última anotação foi em 20/05/2026. Desde então: 4 meses com algo sem registro e 13 contas para conferir.';
+  const toPayIs = (value) => async () => (await p.getByRole('button', { name: new RegExp(`^Ainda a pagar neste mês, R\\$ ${value.replace(/\./g, '\\.')}`) }).filter({ visible: true }).count()) === 1;
+  const monthBack = async (title) => { await p.getByRole('button', { name: /Mês anterior/ }).filter({ visible: true }).first().click(); await waitText(title); };
+  const monthForward = async (title) => { await p.getByRole('button', { name: /Próximo mês/ }).filter({ visible: true }).first().click(); await waitText(title); };
+
+  // 2. Faixa no Resumo: sem valores, antes de "Anotar gasto", com a pílula "Demonstração".
+  await enterReturnDemo();
+  await waitText('4 meses com algo sem registro').catch(() => {});
+  let band = await bandText();
+  ok('retorno: faixa "Seus últimos meses" com a última anotação, 4 meses e 13 contas, e a nota', band !== null && band.includes(BAND_BODY) &&
+    band.includes('Atualizar é opcional. Nada é preenchido sem a sua confirmação.') && (await visibleCount('button', 'Ver resumo')) === 1 && (await visibleCount('button', 'Seguir adiante')) === 1, band ?? '');
+  ok('retorno: nenhum valor em reais na faixa', band !== null && !band.includes('R$'), band ?? '');
+  const bo = await bandOrder();
+  ok('retorno: a faixa fica no lugar dos avisos temporários, antes de "Anotar gasto", título de nível 2', bo.faixa !== null && bo.anotar !== null && bo.faixa < bo.anotar &&
+    JSON.stringify(await headingList()) === JSON.stringify(['2:Outubro de 2026', '2:Seus últimos meses', '2:Pagamentos do mês']), `${JSON.stringify(bo)} ${JSON.stringify(await headingList())}`);
+  ok('retorno: cenário fictício identificado com a pílula "Demonstração"', (await p.locator('[aria-label="Demonstração: acesso simulado e dados fictícios"]').filter({ visible: true }).count()) === 1);
+  ok('retorno: Ainda a pagar R$ 10.590,00 com "Inclui R$ 540,00 em valores estimados."', (await toPayIs('10.590,00')()) && (await body()).includes('Inclui R$ 540,00 em valores estimados.'));
+  await keepReturnText();
+  await layoutChecks('faixa seus últimos meses 390px');
+  await shot('72_seus_ultimos_meses');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await layoutChecks('faixa seus últimos meses 320px');
+  await shot('72_seus_ultimos_meses_320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  // Só no mês atual: em setembro, sem a faixa.
+  await monthBack('Setembro de 2026'); await p.waitForTimeout(500);
+  ok('retorno: a faixa só aparece no mês atual', !(await bandShown()));
+  await monthForward('Outubro de 2026'); await waitText('Seus últimos meses');
+  // Contas a pagar: com a faixa ativa, o aviso das contas criadas já vencidas leva ao resumo dos últimos meses.
+  await openToPay(); await waitText('O Clarevo criou');
+  const createdBox = await p.evaluate(() => {
+    const e = [...document.querySelectorAll('div[dir="auto"]')].find((x) => x.textContent.startsWith('O Clarevo criou') && x.getBoundingClientRect().width > 0);
+    let box = e?.parentElement;
+    while (box && !box.querySelector('[role=button]')) box = box.parentElement;
+    return box ? { text: e.textContent, buttons: [...box.querySelectorAll('[role=button]')].map((x) => x.getAttribute('aria-label') || x.textContent) } : null;
+  });
+  ok('retorno: em Contas a pagar, o aviso das contas criadas vencidas troca "Revisar vencidas" por "Ver resumo dos últimos meses"', createdBox !== null &&
+    createdBox.text === 'O Clarevo criou 4 contas de gastos fixos que já venceram. Confira se você já pagou.' && JSON.stringify(createdBox.buttons) === JSON.stringify(['Ver resumo dos últimos meses']), JSON.stringify(createdBox));
+  await btn('Ver resumo dos últimos meses').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos.');
+  ok('"Ver resumo dos últimos meses" abre /retomar', new URL(p.url()).pathname === '/retomar' && (await h1Name()) === 'Seus últimos meses', p.url());
+  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
+  await btn('Voltar').click(); await waitText('Seus últimos meses');
+
+  // 3. "Ver resumo": maio a setembro e "Outubro de 2026 (este mês)"; julho com as três contas sem conta registrada.
+  await btn('Ver resumo').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos.');
+  t = await body();
+  const retCards = await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
+  ok('/retomar: abertura com a última anotação e o período, e a nota', t.includes('Sua última anotação foi em 20/05/2026. Abaixo, o que está registrado de maio a setembro de 2026 e as contas vencidas deste mês.') &&
+    t.includes('Mês sem anotação não quer dizer mês sem gastos. Aqui aparece só o que está registrado no Clarevo.'), t.slice(0, 300));
+  ok('/retomar: cartões de maio a setembro e "Outubro de 2026 (este mês)"', JSON.stringify(retCards) === JSON.stringify(['Maio de 2026', 'Junho de 2026', 'Julho de 2026', 'Agosto de 2026', 'Setembro de 2026']) &&
+    t.includes('Outubro de 2026 (este mês) · 1 conta vencida em aberto: Aluguel, R$ 2.500,00, venceu em 05/10.'), retCards.join(' | '));
+  ok('/retomar: maio compacto, com o que foi anotado', (await monthCardText('Maio de 2026'))?.includes('Recebido: R$ 6.000,00 · 1 recebimento · Pago: R$ 4.765,30 · 4 gastos'), await monthCardText('Maio de 2026'));
+  const julyCard = await monthCardText('Julho de 2026');
+  ok('/retomar: julho com Aluguel, Luz e a parcela 10 de 48 sem conta registrada', julyCard !== null && julyCard.includes('Recebido: nenhum recebimento anotado') && julyCard.includes('Pago: nenhum gasto anotado') &&
+    julyCard.includes('Sem conta registrada: Aluguel · Financiamento do carro (parcela 10 de 48) · Luz'), julyCard ?? '');
+  ok('/retomar: junho com as 3 contas em aberto e a parte estimada', (await monthCardText('Junho de 2026'))?.includes('Contas em aberto: 3 · R$ 3.530,00 · inclui R$ 180,00 estimados'), await monthCardText('Junho de 2026'));
+  ok('/retomar: "Atualizar agora", "Seguir adiante" e o que "Seguir adiante" não faz', (await visibleCount('button', 'Atualizar agora')) === 1 && (await visibleCount('button', 'Seguir adiante')) === 1 &&
+    t.includes('Seguir adiante não apaga nem cria nada. Os meses continuam sem registro, e as contas em aberto continuam em Contas a pagar.'));
+  ok('/retomar: nada em vermelho', (await redTexts()).length === 0, (await redTexts()).join(' | '));
+  await keepReturnText();
+  await innerChecks('seus últimos meses 390px');
+  await shot('73_retomar', true);
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await innerChecks('seus últimos meses 320px');
+  await shot('73_retomar_320px', true);
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  // "Entenda" abre o tema "Mês sem registro" de Aprender; "Voltar à tarefa" volta à revisão.
+  await btn('Entenda o mês sem registro').click(); await waitText('Voltar à tarefa');
+  ok('/retomar: "Entenda" abre o tema "Mês sem registro"', new URL(p.url()).pathname === '/explicacao/sem-registro' && (await p.locator('h1').filter({ hasText: 'Mês sem registro' }).count()) === 1, p.url());
+  await btn('Voltar à tarefa').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos.');
+
+  // 4. "Atualizar agora", junho: lote de Aluguel e carro, Luz com o valor vazio (171,90) e Salário no modo "Dia".
+  await btn('Atualizar agora').click(); await waitText('Mês 1 de 5');
+  ok('atualizar: junho é o passo 1 de 5 (só os meses com algo a conferir, e este mês)', (await stepTitle()) === 'Junho de 2026, Mês 1 de 5', await stepTitle());
+  t = await body();
+  ok('atualizar: junho com as 3 contas em aberto e "Recebimentos: nenhum anotado"', ['Gastos fixos, parcelamentos e contas do ano', 'R$ 2.500,00 · venceu em 05/06/2026 · em aberto', 'Parcela 9 de 48 · R$ 850,00 · venceu em 10/06/2026 · em aberto',
+    'cerca de R$ 180,00 (estimado) · venceu em 12/06/2026 · em aberto', 'Recebimentos: nenhum anotado', 'Gastos: nenhum anotado'].every((x) => t.includes(x)), t.slice(0, 400));
+  const juneBoxes = await p.getByRole('checkbox').filter({ visible: true }).evaluateAll((es) => es.map((e) => `${e.getAttribute('aria-label')}=${e.getAttribute('aria-checked')}`));
+  ok('atualizar: caixas só nas contas de valor fixo, desmarcadas (a Luz estimada fica fora do lote)', JSON.stringify(juneBoxes) === JSON.stringify(['Selecionar Aluguel de junho, R$ 2.500,00=false', 'Selecionar Financiamento do carro de junho, R$ 850,00=false']), juneBoxes.join(' | '));
+  ok('atualizar: parcela sem "Não houve"; gasto fixo com "Já paguei" e "Não houve"', (await visibleCount('button', 'Não houve: Financiamento do carro de junho')) === 0 &&
+    (await visibleCount('button', 'Já paguei: Financiamento do carro de junho')) === 1 && (await visibleCount('button', 'Não houve: Aluguel de junho')) === 1 && (await visibleCount('button', 'Pular este mês')) === 1);
+  // Teclado: Shift+Tab do "Já paguei" leva à caixa, com foco visível de 3 px; Espaço marca; Tab volta ao botão.
+  await btn('Já paguei: Aluguel de junho').focus(); await p.keyboard.press('Shift+Tab');
+  const boxRing = await focusRing();
+  await p.keyboard.press(' '); await p.waitForTimeout(200);
+  const boxChecked = await p.getByRole('checkbox', { name: 'Selecionar Aluguel de junho, R$ 2.500,00' }).getAttribute('aria-checked');
+  await p.keyboard.press('Tab');
+  const paidRing = await focusRing();
+  ok('teclado: caixa e botão da linha com foco visível de 3 px; Espaço marca a caixa', boxRing === 'checkbox  3px solid' && boxChecked === 'true' && paidRing === 'button Já paguei 3px solid', `${boxRing} / ${boxChecked} / ${paidRing}`);
+  await p.getByRole('checkbox', { name: 'Selecionar Financiamento do carro de junho, R$ 850,00' }).click();
+  await waitText('Marcar as 2 selecionadas como pagas no vencimento');
+  await keepReturnText();
+  await innerChecks('atualizar junho 390px');
+  ok('atualizar: nada em vermelho', (await redTexts()).length === 0, (await redTexts()).join(' | '));
+  await shot('74_atualizar_junho');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await innerChecks('atualizar junho 320px');
+  await shot('74_atualizar_junho_320px', true);
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  await btn('Marcar as 2 selecionadas como pagas no vencimento').click(); await waitText('Marcar 2 contas como pagas?');
+  t = await dialogText();
+  ok('lote: diálogo com cada conta, o valor, o vencimento e a conta de saída', t.includes('Aluguel: R$ 2.500,00 em 05/06/2026. Financiamento do carro (parcela 9 de 48): R$ 850,00 em 10/06/2026. Saem da conta Conta principal.'), t);
+  await shot('75_lote_dialogo');
+  await confirmIn('Marcar como pagas'); await waitText('Paga em 10/06/2026 · R$ 850,00');
+  t = await body();
+  ok('lote: as 2 contas pagas no vencimento, com "Desfazer", e o rodapé passa a "Próximo mês"', t.includes('Paga em 05/06/2026 · R$ 2.500,00') && t.includes('2 contas marcadas como pagas') &&
+    (await visibleCount('button', 'Desfazer: Aluguel de junho')) === 1 && (await visibleCount('button', 'Próximo mês')) === 1 && (await visibleCount('button', 'Pular este mês')) === 0, t.slice(0, 500));
+  // Luz (valor que muda, em aberto): "Já paguei" abre o pagamento com o valor vazio e a data do vencimento.
+  await btn('Já paguei: Luz de junho').click(); await waitText('Digite o valor da conta. A estimativa era R$ 180,00.');
+  ok('Luz estimada: pagamento com o valor vazio, a dica da estimativa e a data do vencimento', (await field('Valor pago').inputValue()) === '' && (await field('Data do pagamento').inputValue()) === '12/06/2026');
+  await field('Valor pago').fill('171,90'); await btn('Confirmar pagamento').click();
+  await waitText('Mês 1 de 5'); await waitText('Paga em 12/06/2026 · R$ 171,90');
+  ok('Luz de junho paga com R$ 171,90, de volta ao passo', (await body()).includes('Paga em 12/06/2026 · R$ 171,90'));
+  // Recebimentos no modo "Dia": o mês já vem escolhido; só o dia.
+  await btn('Anotar recebimentos').click(); await waitText('Dia do recebimento em junho de 2026.');
+  ok('modo "Dia": campo "Dia" com "/06/2026", a dica e "Usar outra data"', (await p.getByLabel('Dia, /06/2026', { exact: true }).filter({ visible: true }).count()) === 1 &&
+    (await visibleCount('button', 'Usar outra data')) === 1 && (await visibleCount('button', 'Salvar e anotar outro')) === 1 && (await visibleCount('button', 'Salvar')) === 1);
+  await field('Descrição').fill('Salário'); await field('Valor em reais').fill('6000,00'); await field('Dia, /06/2026').fill('31');
+  await btn('Salvar').click(); await waitText('Junho tem 30 dias.');
+  ok('modo "Dia": 31 em junho dá "Junho tem 30 dias." e nada é salvo', (await field('Descrição').inputValue()) === 'Salário');
+  await field('Dia, /06/2026').fill('1');
+  await btn('Salvar e anotar outro').click(); await waitText('Anotado: Salário, R$ 6.000,00 em 01/06/2026.');
+  ok('"Salvar e anotar outro": anotado, com descrição e valor limpos e o dia mantido', (await field('Descrição').inputValue()) === '' && (await field('Valor em reais').inputValue()) === '' && (await field('Dia, /06/2026').inputValue()) === '1');
+  await keepReturnText();
+  await innerChecks('modo dia 390px');
+  await shot('76_modo_dia');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await innerChecks('modo dia 320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Mês 1 de 5'); await waitText('Recebimentos: R$ 6.000,00 · 1');
+  ok('o recebimento anotado aparece no passo de junho', (await body()).includes('Recebimentos: R$ 6.000,00 · 1'));
+  // "Voltar" sai sem gravar a decisão: o resumo mostra junho com o que foi anotado, e a revisão continua.
+  await btn('Voltar').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos.');
+  await waitUntil(async () => (await monthCardText('Junho de 2026'))?.includes('Recebido: R$ 6.000,00 · 1 recebimento'));
+  ok('/retomar: junho mostra "Recebido: R$ 6.000,00 · 1 recebimento" e os 3 gastos', (await monthCardText('Junho de 2026'))?.includes('Recebido: R$ 6.000,00 · 1 recebimento · Pago: R$ 3.521,90 · 3 gastos'), await monthCardText('Junho de 2026'));
+
+  // 5. Julho: lote que registra e paga Aluguel e a parcela 10; Luz 179,90 em "Registrar pagamento"; sem aviso de gasto solto.
+  await btn('Atualizar agora').click(); await waitText('Mês 1 de 4');
+  ok('atualizar de novo: junho resolvido sai dos passos e julho é o passo 1 de 4', (await stepTitle()) === 'Julho de 2026, Mês 1 de 4', await stepTitle());
+  t = await body();
+  ok('julho: as 3 contas sem conta registrada, com "Ainda não paguei"', ['R$ 2.500,00 · vencimento em 05/07/2026 · sem conta registrada', 'Parcela 10 de 48 · R$ 850,00 · vencimento em 10/07/2026 · sem conta registrada',
+    'cerca de R$ 180,00 (estimado) · vencimento em 12/07/2026 · sem conta registrada'].every((x) => t.includes(x)) && (await visibleCount('button', 'Ainda não paguei: Luz de julho')) === 1 &&
+    (await visibleCount('button', 'Não houve: Financiamento do carro de julho')) === 0, t.slice(0, 500));
+  ok('julho: sem aviso de gasto já anotado', !t.includes('Você já anotou o gasto'));
+  for (const name of ['Selecionar Aluguel de julho, R$ 2.500,00', 'Selecionar Financiamento do carro de julho, R$ 850,00']) await p.getByRole('checkbox', { name }).click();
+  await btn('Marcar as 2 selecionadas como pagas no vencimento').click(); await waitText('Marcar 2 contas como pagas?');
+  ok('lote de julho: registra e paga no vencimento', (await dialogText()).includes('Aluguel: R$ 2.500,00 em 05/07/2026. Financiamento do carro (parcela 10 de 48): R$ 850,00 em 10/07/2026.'));
+  await confirmIn('Marcar como pagas'); await waitText('Paga em 10/07/2026 · R$ 850,00');
+  ok('lote de julho: as 2 contas registradas e pagas', (await body()).includes('Paga em 05/07/2026 · R$ 2.500,00'));
+  await btn('Já paguei: Luz de julho').click(); await waitText('Registrar pagamento');
+  await waitText('A conta de julho será registrada e marcada como paga.');
+  t = await body();
+  ok('"Registrar pagamento": Luz de julho, valor vazio com a dica, data no vencimento', t.includes('Luz de julho') && t.includes('Digite o valor da conta. A estimativa era R$ 180,00.') &&
+    (await field('Valor pago').inputValue()) === '' && (await field('Data do pagamento').inputValue()) === '12/07/2026' && (await visibleCount('button', 'Salvar pagamento')) === 1);
+  await field('Valor pago').fill('179,90');
+  await keepReturnText();
+  await innerChecks('registrar pagamento 390px');
+  await shot('77_registrar_pagamento');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await innerChecks('registrar pagamento 320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  await btn('Salvar pagamento').click(); await waitText('Mês 1 de 4'); await waitText('Paga em 12/07/2026 · R$ 179,90');
+  ok('Luz de julho registrada e paga com R$ 179,90', (await body()).includes('Paga em 12/07/2026 · R$ 179,90'));
+  await btn('Anotar recebimentos').click(); await waitText('Dia do recebimento em julho de 2026.');
+  await field('Descrição').fill('Salário'); await field('Valor em reais').fill('6000,00'); await field('Dia, /07/2026').fill('1');
+  await btn('Salvar').click(); await waitText('Mês 1 de 4'); await waitText('Anotado: Salário, R$ 6.000,00 em 01/07/2026.');
+  await waitText('Recebimentos: R$ 6.000,00 · 1').catch(() => {});
+  ok('"Salvar" no modo "Dia" volta ao passo, com "Anotado" e o recebimento no mês', (await body()).includes('Recebimentos: R$ 6.000,00 · 1'));
+  // Pelo teclado: Enter em "Próximo mês" troca o passo e o foco vai para o título do mês.
+  await btn('Próximo mês').focus(); await p.keyboard.press('Enter'); await waitText('Mês 2 de 4');
+
+  // 6. Agosto: lote de Aluguel e da parcela 11; "Ainda não paguei" na Luz; recebimentos pulados.
+  await waitUntil(async () => (await focusedName()) === 'Agosto de 2026, Mês 2 de 4');
+  ok('agosto: passo 2 de 4, com o foco no título do mês', (await stepTitle()) === 'Agosto de 2026, Mês 2 de 4' && (await focusedName()) === 'Agosto de 2026, Mês 2 de 4', `${await stepTitle()} / foco: ${await focusedName()}`);
+  for (const name of ['Selecionar Aluguel de agosto, R$ 2.500,00', 'Selecionar Financiamento do carro de agosto, R$ 850,00']) await p.getByRole('checkbox', { name }).click();
+  await btn('Marcar as 2 selecionadas como pagas no vencimento').click(); await waitText('Marcar 2 contas como pagas?');
+  await confirmIn('Marcar como pagas'); await waitText('Paga em 10/08/2026 · R$ 850,00');
+  await btn('Ainda não paguei: Luz de agosto').click(); await waitText('Registrada em aberto. Ela aparece em Contas a pagar como vencida.');
+  ok('"Ainda não paguei": a Luz de agosto fica registrada em aberto, sem diálogo', (await body()).includes('Registrada em aberto. Ela aparece em Contas a pagar como vencida.'));
+  await keepReturnText();
+  await shot('78_atualizar_agosto');
+  await btn('Próximo mês').click(); await waitText('Mês 3 de 4');
+
+  // 7. Setembro (lote, Luz 194,20 e Salário) e este mês (Aluguel de outubro); "Concluir".
+  for (const name of ['Selecionar Aluguel de setembro, R$ 2.500,00', 'Selecionar Financiamento do carro de setembro, R$ 850,00']) await p.getByRole('checkbox', { name }).click();
+  await btn('Marcar as 2 selecionadas como pagas no vencimento').click(); await waitText('Marcar 2 contas como pagas?');
+  await confirmIn('Marcar como pagas'); await waitText('Paga em 10/09/2026 · R$ 850,00');
+  await btn('Já paguei: Luz de setembro').click(); await waitText('Digite o valor da conta. A estimativa era R$ 180,00.');
+  await field('Valor pago').fill('194,20'); await btn('Confirmar pagamento').click();
+  await waitText('Mês 3 de 4'); await waitText('Paga em 12/09/2026 · R$ 194,20');
+  await btn('Anotar recebimentos').click(); await waitText('Dia do recebimento em setembro de 2026.');
+  await field('Descrição').fill('Salário'); await field('Valor em reais').fill('6000,00'); await field('Dia, /09/2026').fill('1');
+  await btn('Salvar').click(); await waitText('Mês 3 de 4'); await waitText('Recebimentos: R$ 6.000,00 · 1');
+  await btn('Próximo mês').click(); await waitText('Mês 4 de 4');
+  t = await body();
+  ok('este mês: só a conta vencida antes de hoje (Aluguel de 05/10), sem recebimentos, e "Concluir"', (await stepTitle()) === 'Outubro de 2026 (este mês), Mês 4 de 4' &&
+    t.includes('R$ 2.500,00 · venceu em 05/10/2026 · em aberto') && !t.includes('Recebimentos e gastos') && !t.includes('Luz') && (await visibleCount('button', 'Concluir')) === 1 && (await visibleCount('button', 'Concluir agora')) === 0, t.slice(0, 400));
+  await btn('Já paguei: Aluguel de outubro').click(); await waitText('Marcar como paga?');
+  ok('"Já paguei" de valor fixo: confirmação com o valor, o vencimento e a conta', (await dialogText()).includes('Aluguel de outubro: R$ 2.500,00 em 05/10/2026, da conta Conta principal.') &&
+    (await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Mudar valor ou data', exact: true }).count()) === 1);
+  await confirmIn('Confirmar'); await waitText('Paga em 05/10/2026 · R$ 2.500,00');
+  await keepReturnText();
+  await shot('79_atualizar_este_mes');
+  await btn('Concluir').click(); await waitText('Meses atualizados. O que você pulou continua sem registro.');
+
+  // 8. Depois de concluir: a faixa sai; outubro, agosto e o carro mostram o que foi registrado.
+  await waitUntil(async () => !(await bandShown()));
+  ok('concluir: aviso de sucesso e a faixa sai', (await body()).includes('Meses atualizados. O que você pulou continua sem registro.') && !(await bandShown()) && new URL(p.url()).pathname === '/');
+  await waitUntil(toPayIs('1.210,00'), 8000);
+  ok('concluir: Ainda a pagar R$ 1.210,00 (R$ 1.030,00 de outubro e R$ 180,00 da Luz de agosto), com "Inclui R$ 360,00 em valores estimados."', (await toPayIs('1.210,00')()) && (await body()).includes('Inclui R$ 360,00 em valores estimados.'));
+  await expectTotals('outubro depois da revisão: Pago R$ 2.500,00 (Aluguel de 05/10)', 'R$ 0,00', 'R$ 2.500,00', '-R$ 2.500,00', 'R$ 1.210,00');
+  await keepReturnText();
+  await shot('80_resumo_meses_atualizados');
+  await monthBack('Setembro de 2026');
+  await expectTotals('setembro: 6.000,00 / 3.544,20 / 2.455,80', 'R$ 6.000,00', 'R$ 3.544,20', 'R$ 2.455,80', 'R$ 0,00');
+  await monthBack('Agosto de 2026'); await waitText('Nenhum recebimento anotado em agosto.');
+  await expectTotals('agosto: 0 / 3.350,00, com "Nenhum recebimento anotado em agosto."', 'R$ 0,00', 'R$ 3.350,00', '-R$ 3.350,00', 'R$ 180,00');
+  ok('agosto: "Nenhum recebimento anotado em agosto." no cabeçalho, sem o destaque "+ R$" de setembro', (await body()).includes('Nenhum recebimento anotado em agosto.') &&
+    (await p.locator('[aria-label^="Mais R$"], [aria-label^="Menos R$"]').filter({ visible: true }).count()) === 0);
+  await shot('81_resumo_agosto_sem_recebimento');
+  await monthBack('Julho de 2026');
+  await expectTotals('julho: 6.000,00 / 3.529,90 / 2.470,10', 'R$ 6.000,00', 'R$ 3.529,90', 'R$ 2.470,10', 'R$ 0,00');
+  await monthBack('Junho de 2026');
+  await expectTotals('junho: 6.000,00 / 3.521,90 / 2.478,10', 'R$ 6.000,00', 'R$ 3.521,90', 'R$ 2.478,10', 'R$ 0,00');
+  ok('junho e julho, com recebimento e gastos: sem a linha "Nada anotado"', !(await body()).includes('anotado em junho'));
+  for (const m of ['Julho de 2026', 'Agosto de 2026', 'Setembro de 2026', 'Outubro de 2026']) await monthForward(m);
+  await p.getByRole('tab', { name: 'Movimentações' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
+  await p.getByRole('button', { name: /^Gastos fixos e parcelamentos, / }).filter({ visible: true }).first().click(); await waitText('Por mês, se os valores não mudarem');
+  await openRow(/^Financiamento do carro, Parcela 13 de 48/); await waitText('Pagas antes do Clarevo');
+  t = await body();
+  ok('carro depois da revisão: "Pagas no Clarevo: 5" e "Faltam 36", sem meses sem conta registrada', t.includes('Pagas antes do Clarevo: 7 (informado por você) · Pagas no Clarevo: 5 · Faltam 36') &&
+    !t.includes('sem conta registrada') && t.includes('Última parcela em 10/09/2029'), (t.match(/Pagas antes[^\n]*/) ?? [''])[0]);
+  await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
+  await btn('Voltar').click(); await waitText('Registrar recebimento');
+  await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês');
+
+  // 9. De novo no cenário, "Seguir adiante" na faixa: só grava a decisão; nada é criado, pago ou excluído.
+  await enterReturnDemo();
+  await btn('Seguir adiante').click();
+  await waitText('Combinado. Os meses ficam como estão, e você pode anotar datas passadas quando quiser.');
+  await waitUntil(async () => !(await bandShown()));
+  ok('"Seguir adiante": aviso de sucesso e a faixa sai', !(await bandShown()) && (await body()).includes('Combinado. Os meses ficam como estão, e você pode anotar datas passadas quando quiser.'));
+  ok('"Seguir adiante": Ainda a pagar continua R$ 10.590,00', await toPayIs('10.590,00')());
+  ok('"Seguir adiante": o card de Primeiros passos não aparece na demonstração com dados', !(await headingShown('Primeiros passos')));
+  await keepReturnText();
+  await shot('82_seguir_adiante');
+  await openToPay(); await waitText('O Clarevo criou');
+  ok('depois de seguir adiante, o aviso das contas criadas volta a "Revisar vencidas"', (await visibleCount('button', 'Ver resumo dos últimos meses')) === 0 && (await visibleCount('button', 'Revisar vencidas')) === 2);
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  await monthBack('Setembro de 2026'); await monthBack('Agosto de 2026'); await monthBack('Julho de 2026'); await monthBack('Junho de 2026');
+  await waitText('Nada anotado em junho.');
+  ok('junho sem nenhuma anotação: "Nada anotado em junho."', (await body()).includes('Nada anotado em junho.'));
+  await shot('83_resumo_nada_anotado');
+  for (const m of ['Julho de 2026', 'Agosto de 2026', 'Setembro de 2026', 'Outubro de 2026']) await monthForward(m);
+  await p.getByRole('tab', { name: 'Movimentações' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
+  await p.getByRole('button', { name: /^Gastos fixos e parcelamentos, / }).filter({ visible: true }).first().click(); await waitText('Por mês, se os valores não mudarem');
+  await openRow(/^Financiamento do carro, Parcela/); await waitText('Meses sem conta registrada');
+  t = await body();
+  ok('carro depois de seguir adiante: julho e agosto sem conta registrada, "Registrar esta parcela" e "Sem conta registrada: 2"', t.includes('Julho de 2026: sem conta registrada.') && t.includes('Agosto de 2026: sem conta registrada.') &&
+    t.includes('Pagas no Clarevo: 1 · Sem conta registrada: 2 · Faltam 38') && (await visibleCount('button', 'Registrar esta parcela: Financiamento do carro de julho')) === 1, (t.match(/Pagas antes[^\n]*/) ?? [''])[0]);
+  await keepText();
+  await innerChecks('detalhe do parcelamento com meses sem conta 390px');
+  await scrollTo('Meses sem conta registrada');
+  await shot('84_parcelamento_sem_conta_registrada');
+  await btn('Por que este mês não tem conta?').click(); await waitText('Voltar à tarefa');
+  ok('"Por que este mês não tem conta?" abre "Mês sem registro"', new URL(p.url()).pathname === '/explicacao/sem-registro');
+  await btn('Voltar à tarefa').click(); await waitText('Meses sem conta registrada');
+  await btn('Registrar esta parcela: Financiamento do carro de julho').click(); await waitText('Financiamento do carro de julho');
+  ok('"Registrar esta parcela" abre a linha da revisão numa folha, com "Já paguei" e "Ainda não paguei"', (await visibleCount('button', 'Já paguei: Financiamento do carro de julho')) === 1 &&
+    (await visibleCount('button', 'Ainda não paguei: Financiamento do carro de julho')) === 1 && (await visibleCount('button', 'Não houve: Financiamento do carro de julho')) === 0);
+  await shot('85_registrar_esta_parcela');
+  await confirmIn('Voltar'); await waitGone('Ainda não paguei');
+  const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
+  ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);
   const forbidden = screenTexts.map((s) => s.match(FORBIDDEN)?.[0]).filter(Boolean);
   ok('contas do ano e calculadoras: nenhum termo proibido nem travessão longo nas telas novas', screenTexts.length > 0 && forbidden.length === 0, `${screenTexts.length} telas ${forbidden.join(' | ')}`);
   ok('sem erros de JavaScript no console', errors.length === 0, errors.slice(0,3).join(' | '));
