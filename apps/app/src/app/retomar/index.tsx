@@ -63,6 +63,15 @@ export default function SeusUltimosMeses() {
     }
   };
 
+  // A falha de "Seguir adiante" continua visível também quando a revisão recarregada já não existe.
+  const errorBanner = error ? (
+    <Banner tone="erro" icon={AlertCircle}>
+      <Txt variant="label" color={colors.error}>
+        {error}
+      </Txt>
+    </Banner>
+  ) : null;
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title={RETURN_TEXT.title} onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))} right={<ContextPill label="Pessoal" />} />
@@ -76,14 +85,18 @@ export default function SeusUltimosMeses() {
         ) : query.isError || !query.data ? (
           <ErrorState message={RETURN_TEXT.loadFailed} onRetry={() => query.refetch()} />
         ) : !review || review.isEmpty ? (
-          <Card>
-            <EmptyState
-              title={RETURN_TEXT.emptyTitle}
-              art="compromissos"
-              action={<Button label={RETURN_TEXT.backToSummary} tone="soft" onPress={toSummary} />}>
-              {RETURN_TEXT.emptyBody}
-            </EmptyState>
-          </Card>
+          <View style={{ gap: space[4] }}>
+            {errorBanner}
+            <Card>
+              <EmptyState
+                title={RETURN_TEXT.emptyTitle}
+                art="compromissos"
+                action={<Button label={RETURN_TEXT.backToSummary} tone="soft" onPress={toSummary} />}>
+                {/* "Já estão registrados" só com revisão ativa e vazia; sem revisão ativa, a linha neutra. */}
+                {review ? RETURN_TEXT.emptyBody : RETURN_TEXT.noActiveReview}
+              </EmptyState>
+            </Card>
+          </View>
         ) : (
           <Animated.View entering={openIn} style={{ gap: space[4] }}>
             <Txt>{returnOpeningText(review)}</Txt>
@@ -115,13 +128,7 @@ export default function SeusUltimosMeses() {
               </Txt>
             ) : null}
 
-            {error ? (
-              <Banner tone="erro" icon={AlertCircle}>
-                <Txt variant="label" color={colors.error}>
-                  {error}
-                </Txt>
-              </Banner>
-            ) : null}
+            {errorBanner}
 
             <View style={{ gap: space[3] }}>
               <Button label={RETURN_TEXT.updateNow} icon={ListChecks} disabled={busy} onPress={() => router.push('/retomar/atualizar')} />

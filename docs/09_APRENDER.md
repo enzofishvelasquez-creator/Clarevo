@@ -20,7 +20,7 @@
 | 3 | `saldo` | Diferença do mês e saldo da conta | Usar o Clarevo | tema | publicado | - | 1 min (67 palavras) | - | - |
 | 4 | `fatura` | Fatura sem contar duas vezes | Usar o Clarevo | tema | publicado | - | 1 min (62 palavras) | - | - |
 | 5 | `gasto-fixo` | Gasto fixo, conta a pagar e gasto anotado | Usar o Clarevo | tema | publicado | - | 1 min (65 palavras) | - | - |
-| 6 | `estimativa` | Contas que mudam de valor | Usar o Clarevo | tema | publicado | - | 1 min (45 palavras) | - | - |
+| 6 | `estimativa` | Contas que mudam de valor | Usar o Clarevo | tema | publicado | - | 1 min (85 palavras) | - | - |
 | 7 | `parcelamentos` | Parcelamentos no Clarevo | Usar o Clarevo | tema | publicado | - | 1 min (123 palavras) | - | - |
 | 8 | `sem-registro` | Mês sem registro | Usar o Clarevo | tema | publicado | - | 1 min (99 palavras) | - | - |
 | 9 | `gasto-fixo-variavel` | Gasto fixo e gasto variável | Organizar o mês | tema | publicado | 09/10/2027 | 1 min (193 palavras) | - | - |
@@ -36,7 +36,7 @@
 | 19 | `rotativo-cartao` | Rotativo do cartão e parcelamento da fatura | Juros e crédito | tema | publicado | 09/04/2027 | 2 min (283 palavras) | `custo-da-divida?modo=rotativo` | `cartao-rotativo` |
 | 20 | `cheque-especial` | Cheque especial | Juros e crédito | tema | publicado | 09/04/2027 | 1 min (137 palavras) | `custo-da-divida?modo=cheque_especial` | - |
 | 21 | `amortizacao-price-sac` | Amortização, Tabela Price e SAC | Juros e crédito | tema | publicado | 09/10/2027 | 2 min (201 palavras) | - | `juros-no-parcelamento` |
-| 22 | `quitar-antes` | Quitar antes do prazo | Juros e crédito | tema | publicado | 09/10/2027 | 2 min (243 palavras) | `quitar-antes` | - |
+| 22 | `quitar-antes` | Quitar antes do prazo | Juros e crédito | tema | publicado | 09/10/2027 | 2 min (247 palavras) | `quitar-antes` | - |
 | 23 | `multa-juros-atraso` | Multa e juros por atraso | Juros e crédito | tema | publicado | 09/10/2027 | 1 min (183 palavras) | `multa-e-juros` | `atraso` |
 | 24 | `score-credito` | Score de crédito | Juros e crédito | tema | publicado | 09/10/2027 | 1 min (187 palavras) | - | - |
 | 25 | `superendividamento` | Quando as dívidas não cabem na renda | Juros e crédito | tema | publicado | 09/10/2027 | 1 min (162 palavras) | - | - |
@@ -452,7 +452,8 @@ Em relação ao conteúdo checado da especificação de 08/10/2026 (Anexo A e te
 - `reserva-imprevistos`: "Como meta inicial, o mesmo portal sugere 1, 3 ou 6 meses" virou "Como exemplo de meta para começar, o mesmo portal cita 1, 3 ou 6 meses de despesas" (a CVM escreve "por exemplo").
 - `taxa-e-tarifa`: "Na conta corrente, pessoas físicas têm direito..." e "Quando uma conta atrasa, entram encargos..."; sem marca de conferência pendente.
 - `cheque-especial`: "juros pelos dias de uso" virou "juros sobre o valor usado pelo tempo em que a conta fica negativa, conforme o contrato" (subtítulo e resumo também).
-- `quitar-antes`: texto do Anexo A no lugar do anterior, com a exceção das linhas com recursos direcionados ou taxas administradas (crédito rural e Sistema Financeiro da Habitação, sem nome de banco, D-032(5)) e a frase de que o app mostra uma estimativa com a taxa digitada e que o valor oficial é o que a instituição informar; nunca "saldo devedor".
+- `estimativa`: exemplo fictício curto (contas de luz de R$ 165,30, R$ 180,00 e R$ 171,90, média de R$ 172,40), calculado por `learn/math.ts`, para a conta "(165,30 + 180,00 + 171,90) ÷ 3" chegar à tela; antes o tema tinha a conta e não tinha o exemplo, e "Ver a conta" não aparecia.
+- `quitar-antes`: texto do Anexo A no lugar do anterior, com a exceção das linhas com recursos direcionados ou taxas administradas (crédito rural e Sistema Financeiro da Habitação, sem nome de banco, D-032(5)) e a frase de que o app mostra uma estimativa com a taxa digitada e que o valor oficial é o que a instituição informar; nunca "saldo devedor". O corte da tarifa diz "a partir de 10 de dezembro de 2007", a data do trecho do STJ (fonte 4).
 - `multa-juros-atraso`: saiu a frase do aluguel (sem o número do acórdão do STJ); as hipóteses dizem que a fatura só tem o consumo de energia.
 - `score-credito`: "Mais de uma empresa calcula essa nota." e "a lei protege o segredo empresarial do cálculo" no lugar de frases sem trecho oficial; o exemplo fala em "12 contas pagas nos últimos 12 meses".
 - `selic`: "oito reuniões ordinárias por ano"; o parágrafo do spread foi reescrito pelo glossário do Banco Central, sem "as taxas de crédito costumam ficar bem acima da Selic".
@@ -467,6 +468,7 @@ Em relação ao conteúdo checado da especificação de 08/10/2026 (Anexo A e te
 |---|---|---|---|
 | 08/10/2026 | 21 temas do Anexo A da especificação | Conteúdo escrito e checado, com os exemplos recalculados em frações exatas | Trechos indexados das fontes, sem abrir as páginas |
 | 09/10/2026 | Catálogo inteiro (37 temas) | Primeira versão no app: 35 publicados e 2 rascunhos, `reviewedOn` 09/10/2026, os ajustes da seção 8 e os domínios da seção 3 | Busca na web, fato a fato, com o endereço e o trecho de cada fonte e a data 09/10/2026 (seção 4) |
+| 09/10/2026 | `quitar-antes`, `estimativa` | `quitar-antes`: o corte da tarifa passou de "desde dezembro de 2007" para "a partir de 10 de dezembro de 2007", a data do trecho do STJ (fonte 4); `estimativa`: exemplo e hipóteses (seção 8) | Trecho da fonte 4 de `quitar-antes` e a conta do exemplo recalculada em `learn/math.ts` (`npm test`) |
 
 ## 10. Como revisar um tema
 

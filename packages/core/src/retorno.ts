@@ -25,6 +25,7 @@ import type {
   ReturnReviewState,
   SeriesKind,
 } from './records';
+import type { AnnualYearSummary } from './series';
 import { annualYearLabelOf, numberAtOrAfter, numberAtOrBefore, occurrenceLabel, seriesMonthOf, termFor } from './series';
 import type { RecordsRepository } from './repository';
 import type { MonthSummary } from './summary';
@@ -206,6 +207,43 @@ export function seriesGapsInRange(
     });
   }
   return out;
+}
+
+/**
+ * Detalhe da conta do ano: as posições (1 a k) sem conta registrada de um ano, separadas entre as de meses que a revisão
+ * aceita (um dos 11 fechados anteriores ao atual, com "Registrar parcelas") e as mais antigas (só "Anotar gasto").
+ * `y`: annualYearSummary do ano.
+ */
+export function annualGapSplit(
+  s: Pick<CommitmentSeries, 'kind' | 'firstDueMonth' | 'firstNumber' | 'partsPerYear'>,
+  y: Pick<AnnualYearSummary, 'year' | 'missingParts'>,
+  today: IsoDate,
+): { reviewable: number[]; old: number[] } {
+  const reviewable: number[] = [];
+  const old: number[] = [];
+  for (const part of y.missingParts) {
+    const month = seriesMonthOf(s, y.year.firstNumber + part - 1);
+    (isReviewableMonth(month, today) ? reviewable : old).push(part);
+  }
+  return { reviewable, old };
+}
+
+/**
+ * Linhas da folha "Registrar parcelas" de um ano da conta do ano: as parcelas sem conta registrada em meses que a revisão
+ * aceita (annualGapSplit), com a vigência de cada número. `occurrences`: as contas vivas da série (abertas e pagas).
+ */
+export function annualGapRows(
+  s: CommitmentSeries,
+  occurrences: readonly Commitment[],
+  y: Pick<AnnualYearSummary, 'year' | 'missingParts'>,
+  today: IsoDate,
+): ReviewRow[] {
+  const { reviewable } = annualGapSplit(s, y, today);
+  if (reviewable.length === 0) return [];
+  const numbers = reviewable.map((part) => y.year.firstNumber + part - 1);
+  const wanted = new Set(numbers);
+  const months = numbers.map((n) => seriesMonthOf(s, n));
+  return seriesGapsInRange(s, occurrences, months[0]!, months[months.length - 1]!).filter((r) => wanted.has(r.series!.number));
 }
 
 function openRow(c: Commitment, seriesVersion: number | null): ReviewRow {
@@ -577,6 +615,13 @@ export function reviewDecision(acted: boolean): ReturnDecision {
 const capitalize = (text: string) => `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
 const money = (cents: Cents, estimate: boolean) => (estimate ? `cerca de ${formatBRL(cents)}` : formatBRL(cents));
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+/** Marca de valor estimado, junto de "cerca de" (D-024: valor de referência nunca aparece como valor da conta). */
+const STATE_ESTIMATE = 'estimado';
+/** Linha de conta do ano sem registro: "2027: parcelas 6 a 10 sem conta registrada." ou "2027: parcela 6 sem conta registrada." */
+const annualGapText = (label: string, parts: readonly number[]) =>
+  parts.length === 1 ? `${label}: parcela ${parts[0]} sem conta registrada.` : `${label}: parcelas ${partsText(parts)} sem conta registrada.`;
+/** Aviso dos meses fora dos 11 fechados (não podem ser registrados na revisão). */
+const OLD_MONTHS_HINT = 'Meses com mais de 1 ano não podem ser registrados aqui; se pagou, anote o gasto em Anotar gasto.';
 
 /** "a", "a e b", "a, b e c". */
 function joinList(items: readonly string[]): string {
@@ -683,7 +728,10 @@ export const RETURN_TEXT = {
   updateNow: 'Atualizar agora',
   moveOnHint: 'Seguir adiante não apaga nem cria nada. Os meses continuam sem registro, e as contas em aberto continuam em Contas a pagar.',
   emptyTitle: 'Nada para conferir',
+  /** Só com revisão ativa e nada a conferir. */
   emptyBody: 'Os meses desde a sua última anotação já estão registrados.',
+  /** Sem revisão ativa (decidida em outro aparelho, janela encerrada ou conflito): não afirma que os meses estão registrados. */
+  noActiveReview: 'Não há revisão dos últimos meses agora.',
   backToSummary: 'Voltar ao Resumo',
   loadFailed: 'Não foi possível carregar o resumo dos últimos meses.',
   retry: 'Tentar novamente',
@@ -696,7 +744,7 @@ export const RETURN_TEXT = {
   sectionRecords: 'Recebimentos e gastos',
   stateOpen: 'em aberto',
   stateGap: 'sem conta registrada',
-  stateEstimate: 'estimado',
+  stateEstimate: STATE_ESTIMATE,
   paidButton: 'Já paguei',
   notHappenedButton: 'Não houve',
   stillOpenButton: 'Ainda não paguei',
@@ -739,6 +787,9 @@ export const RETURN_TEXT = {
   payChange: 'Mudar valor ou data',
   confirm: 'Confirmar',
   /** "Não houve esta conta em julho?" */
+  /** Linha em negrito do diálogo "Não houve": "Aluguel · R$ 2.500,00" ou "Luz · cerca de R$ 180,00 (estimado)". */
+  rowAmountLine: (row: Pick<ReviewRow, 'description' | 'amountCents' | 'amountIsEstimate'>) =>
+    `${row.description} · ${money(row.amountCents, row.amountIsEstimate)}${row.amountIsEstimate ? ` (${STATE_ESTIMATE})` : ''}`,
   notHappenedGapTitle: (month: IsoMonth) => `Não houve esta conta em ${formatMonthName(month)}?`,
   /** "A conta de julho de Academia fica registrada como não houve e não volta a aparecer. Os outros meses não mudam." */
   notHappenedGapBody: (month: IsoMonth, description: string) =>
@@ -812,13 +863,18 @@ export const RETURN_TEXT = {
   seriesGap: (month: IsoMonth) => `${formatMonthBR(month)}: sem conta registrada.`,
   /** Mês fora dos 11 fechados. */
   seriesGapOld: (month: IsoMonth) =>
-    `${formatMonthBR(month)}: sem conta registrada. Meses com mais de 1 ano não podem ser registrados aqui; se pagou, anote o gasto em Anotar gasto.`,
+    `${formatMonthBR(month)}: sem conta registrada. ${OLD_MONTHS_HINT}`,
   /** Conta do ano com 2 ou mais parcelas: "2027: parcelas 6 a 10 sem conta registrada." */
-  annualGap: (label: string, parts: readonly number[]) =>
-    parts.length === 1 ? `${label}: parcela ${parts[0]} sem conta registrada.` : `${label}: parcelas ${partsText(parts)} sem conta registrada.`,
+  annualGap: annualGapText,
+  /** Parcelas de meses fora dos 11 fechados: "2025: parcelas 1 a 3 sem conta registrada. Meses com mais de 1 ano não podem …" */
+  annualGapOld: (label: string, parts: readonly number[]) => `${annualGapText(label, parts)} ${OLD_MONTHS_HINT}`,
   registerMonth: 'Registrar este mês',
   registerInstallment: 'Registrar esta parcela',
   registerParts: 'Registrar parcelas',
+  /** Nome acessível do link de um ano: "Registrar parcelas de 2027" (vários anos na mesma tela). */
+  registerPartsA11y: (label: string) => `Registrar parcelas de ${label}`,
+  /** Link para o tema sem-registro no detalhe da série. */
+  whyNoBill: 'Por que este mês não tem conta?',
   /** Progresso do parcelamento: "Sem conta registrada: 2" */
   progressGaps: (n: number) => `Sem conta registrada: ${n}`,
 
@@ -888,14 +944,22 @@ export interface ReviewMonthCard {
   title: string;
   received: string;
   paid: string;
-  /** Contas em aberto, sem conta registrada, grupos de conta do ano e outras vencidas; ou "Nenhuma conta para conferir." */
+  /**
+   * Contas em aberto, sem conta registrada (inclusive parcelas que o grupo de conta do ano de um mês anterior carrega),
+   * grupos de conta do ano e outras vencidas; "Nenhuma conta para conferir." só quando o mês não tem nenhuma linha.
+   */
   lines: string[];
-  /** Nada a conferir no mês (nem recebimentos e gastos faltando, nem contas): mostrar compacto. */
+  /** Nada a conferir no mês (nem recebimentos e gastos faltando, nem contas, nem parcelas de um grupo de um mês anterior): mostrar compacto. */
   compact: boolean;
 }
 
 export function reviewMonthCard(m: ReviewMonth): ReviewMonthCard {
-  const singles = m.items.flatMap((i) => (i.type === 'linha' ? [i.row] : []));
+  // Linhas de série do mês fora dos grupos de conta do ano mostrados neste mês. Incluem as que um grupo de um mês anterior
+  // carrega (o grupo fica no mês da primeira parcela e leva as dos meses seguintes): elas são contas do mês e aparecem aqui.
+  const grouped = new Set(m.items.flatMap((i) => (i.type === 'ano' ? i.group.rows.map((r) => r.key) : [])));
+  const shown = new Set(m.items.flatMap((i) => (i.type === 'linha' ? [i.row.key] : [])));
+  const singles = m.rows.filter((r) => r.series !== null && !grouped.has(r.key));
+  const carried = singles.filter((r) => !shown.has(r.key));
   const groups = m.items.flatMap((i) => (i.type === 'ano' ? [i.group] : []));
   const open = singles.filter((r) => r.state === 'aberta');
   const gaps = singles.filter((r) => r.state === 'sem_conta');
@@ -911,8 +975,9 @@ export function reviewMonthCard(m: ReviewMonth): ReviewMonthCard {
     title: RETURN_TEXT.monthTitle(m.month),
     received: RETURN_TEXT.received(m.overview),
     paid: RETURN_TEXT.paid(m.overview),
+    // "Nenhuma conta para conferir." só quando o mês não tem nenhuma linha (lines vazio implica m.rows vazio).
     lines: lines.length ? lines : [RETURN_TEXT.nothingToCheck],
-    compact: !m.toCheck,
+    compact: !m.toCheck && carried.length === 0,
   };
 }
 
@@ -950,13 +1015,20 @@ export function reviewRowA11yLabel(row: ReviewRow): string {
     .join(', ');
 }
 
-/** Corpo do diálogo "Não houve" de uma linha. */
-export function notHappenedDialog(row: ReviewRow): { title: string; body: string; confirm: string } {
+/** Corpo do diálogo "Não houve" de uma linha; `line` é a linha em negrito, com o valor estimado marcado. */
+export function notHappenedDialog(row: ReviewRow): { title: string; line: string; body: string; confirm: string } {
+  const line = RETURN_TEXT.rowAmountLine(row);
   if (row.state === 'sem_conta') {
-    return { title: RETURN_TEXT.notHappenedGapTitle(row.month), body: RETURN_TEXT.notHappenedGapBody(row.month, row.description), confirm: RETURN_TEXT.confirm };
+    return {
+      title: RETURN_TEXT.notHappenedGapTitle(row.month),
+      line,
+      body: RETURN_TEXT.notHappenedGapBody(row.month, row.description),
+      confirm: RETURN_TEXT.confirm,
+    };
   }
   return {
     title: RETURN_TEXT.notHappenedOpenTitle(row.month),
+    line,
     body: row.series ? RETURN_TEXT.notHappenedOpenSeriesBody : RETURN_TEXT.notHappenedOpenLooseBody,
     confirm: RETURN_TEXT.notHappenedOpenConfirm,
   };
@@ -1089,6 +1161,11 @@ export function returnTextSamples(): string[] {
     T.seriesGapOld('2025-07'),
     T.annualGap('2027', [6, 7, 8, 9, 10]),
     T.annualGap('2027', [6]),
+    T.annualGapOld('2025', [1, 2, 3]),
+    T.annualGapOld('2025', [4]),
+    T.registerPartsA11y('2027'),
+    T.rowAmountLine(luz),
+    T.rowAmountLine(carro),
     T.progressGaps(2),
     T.nothingNoted('2026-06'),
     T.noReceiptsNoted('2026-08'),

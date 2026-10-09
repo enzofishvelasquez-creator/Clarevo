@@ -2,7 +2,7 @@
 
 Atualizado em 09/10/2026. Prazos são estimativas de trabalho, não compromissos; dependem das decisões pendentes.
 
-Ordem a partir de 08/10/2026 (D-023, D-029, D-033 e D-034): o Ciclo A, o Ciclo A3 (contas do ano) e os Primeiros passos com os atalhos em Movimentações estão feitos. O Ciclo A6 ("Achar tudo" e calculadoras, D-035) está implementado e no roteiro web, com o teste manual em aberto. Os Ciclos A4 (seus últimos meses, D-030) e A5 (Aprender e dúvidas, D-031 e D-032) começaram em 09/10/2026 e estão implementados (o A4 no banco, no core e nas telas; o A5, sem mudança no banco, no core e nas telas), com os itens abertos de cada seção abaixo (entre eles, os passos do roteiro web). Seguem o A2 (lembretes) e depois B, C e D, todos antes do Ciclo 2 (família). Cada ciclo começa depois de o anterior passar em `npm test`, `npm run typecheck`, `npm run test:db`, `npm run test:api` e `npm run test:web`; A2 pode correr em paralelo, porque não mexe no banco.
+Ordem a partir de 08/10/2026 (D-023, D-029, D-033 e D-034): o Ciclo A, o Ciclo A3 (contas do ano) e os Primeiros passos com os atalhos em Movimentações estão feitos. O Ciclo A6 ("Achar tudo" e calculadoras, D-035) está implementado e no roteiro web, com o teste manual em aberto. Os Ciclos A4 (seus últimos meses, D-030) e A5 (Aprender e dúvidas, D-031 e D-032) começaram em 09/10/2026 e estão implementados (o A4 no banco, no core e nas telas; o A5, sem mudança no banco, no core e nas telas) e no roteiro web, com os itens abertos de cada seção abaixo (entre eles, o teste manual em aparelho). Seguem o A2 (lembretes) e depois B, C e D, todos antes do Ciclo 2 (família). Cada ciclo começa depois de o anterior passar em `npm test`, `npm run typecheck`, `npm run test:db`, `npm run test:api` e `npm run test:web`; A2 pode correr em paralelo, porque não mexe no banco.
 
 ## Primeiro ciclo (entregue em demonstração; falta ligar o Supabase)
 
@@ -71,26 +71,26 @@ Sem mudança no banco. Nas telas, os fluxos estão no roteiro web (`scripts/e2e-
 
 ## Ciclo A4: seus últimos meses (D-030)
 
-Rodados em 09/10/2026 durante o ciclo: `npm test` (23 arquivos, 390 testes), `npm run typecheck`, `npm run test:db` (10, 20, 30, 40, 45 e 47) e `npm run test:api` (60 testes). O roteiro web ainda não tem os passos do A4.
+Rodados em 09/10/2026, depois das correções da revisão: `npm test` (23 arquivos, 391 testes), `npm run typecheck`, `npm run test:db` (10, 20, 30, 40, 45 e 47), `npm run test:api` (60 testes), `npm run test:web` (1191 verificações) e `REDUZIR_MOVIMENTO=1 node scripts/e2e-web.js` (1192). Nas duas rodadas do roteiro web, os passos do A4 passam (telas 72 a 85 e 93 a 95); o que falta do ciclo está nos itens abertos abaixo.
 
 - [x] Banco: atividade por pessoa e contexto mantida por gatilho, decisão da revisão, `create_series_occurrence`, `decide_return_review` e `months_overview`, com carga inicial da atividade de quem já usava o app (migração `20261009000001_retorno.sql`), e testes de leitura só pela própria pessoa, permissões, guardas, privilégios e das sequências de aceite R e R7 (`supabase/tests/47_retorno.sql`)
-- [x] Core: ausência, período, contas sem registro, montagem da revisão, ações, lote, modo "Dia" e todos os textos (`retorno.ts`); `MemoryRepository` com o mesmo gatilho e as mesmas funções; cenário de demonstração "retorno", fictício e identificado, sem mudar a demonstração padrão (`retorno.test.ts`, 40 testes)
+- [x] Core: ausência, período, contas sem registro, montagem da revisão, ações, lote, modo "Dia" e todos os textos (`retorno.ts`); `MemoryRepository` com o mesmo gatilho e as mesmas funções; cenário de demonstração "retorno", fictício e identificado, sem mudar a demonstração padrão (`retorno.test.ts`, 41 testes)
 - [x] App ligado ao banco (`SupabaseRepository`), com testes pela API: revisão igual à do core, cada conta sem registro aceita, "Atualizar agora" com os totais da sequência R, reconciliação de `criar_ocorrencia` e decisão
 - [x] Faixa "Seus últimos meses" no Resumo, no lugar dos avisos temporários, só no Pessoal e no mês atual, sem valores; com ela, o card "Primeiros passos" espera
 - [x] `/retomar` (resumo mês a mês, "Atualizar agora" e "Seguir adiante"), `/retomar/atualizar` (passo a passo, "Já paguei", "Não houve", "Ainda não paguei", grupos por ano, lote "pagas no vencimento", "Desfazer", "Concluir") e `/retomar/pagar` (registrar e pagar uma conta sem registro, com "Salvar de novo")
 - [x] Formulário no modo "Dia" ("Junho tem 30 dias.", "Salvar e anotar outro", aviso de gasto fixo sem conta no mês)
 - [x] "Nada anotado em junho." no Resumo de meses fechados; "Registrar este mês" e "Registrar esta parcela" no detalhe de gasto fixo e de parcelamento, com "Sem conta registrada: N" no progresso; linha nova em "Quem vê estes dados?"; tema "Mês sem registro" em Aprender
-- [ ] Em Contas a pagar, com a faixa ativa, trocar "Revisar vencidas" da faixa de contas criadas vencidas por "Ver resumo dos últimos meses", que abre `/retomar`
-- [ ] No detalhe da conta do ano, "Registrar parcelas" no lugar do texto do A3 com "Anotar gasto" ("2027: parcelas 6 a 10 sem conta registrada.")
-- [ ] Demonstração: escolher o cenário "retorno" por `?cenario=retorno` (`lib/demo-auth.ts`), só no modo de demonstração
-- [ ] Roteiro web (`npm run test:web`) com os passos da `spec3` §2.10, também com movimento reduzido
+- [x] Em Contas a pagar, com a faixa ativa, "Ver resumo dos últimos meses" no lugar de "Revisar vencidas" na faixa de contas criadas vencidas, que abre `/retomar` (roteiro web)
+- [x] No detalhe da conta do ano, "Registrar parcelas" (uma folha com uma linha por parcela) no lugar do texto do A3 com "Anotar gasto" ("2027: parcelas 6 a 10 sem conta registrada."), só para os 11 meses fechados, e "Por que este mês não tem conta?"; pagar uma parcela que outro aparelho já registrou paga a que existe (roteiro web, telas 94 e 95)
+- [x] Demonstração: escolher o cenário "retorno" por `?cenario=retorno` (`lib/demo-auth.ts`), só no modo de demonstração
+- [x] Roteiro web (`npm run test:web` e `REDUZIR_MOVIMENTO=1 node scripts/e2e-web.js`, 1191 e 1192 verificações) com os passos da `spec3` §2.10 e as correções da revisão: modo "Dia" com o campo de 44 px e "Usar outra data" voltando ao passo, "/retomar" sem revisão ativa, "Registrar parcelas" na conta do ano, pagar uma conta que outro aparelho já registrou, aviso de gasto solto em conta do ano, "Não houve" com valor estimado e "Registrar esta parcela" pagando
 - [ ] **Você:** colar `supabase/migrations/20261009000001_retorno.sql` no SQL Editor do Supabase, depois da 0004 (`docs/05_SUPABASE.md`, passo 6)
 - [ ] Revisão dos textos por Enzo antes de publicar (tom sem cobrança)
 - [ ] Teste manual em iOS, Android e web, com leitor de tela na faixa, nas linhas e no lote, com movimento reduzido e em dois aparelhos (decidir num e conferir no outro)
 
 ## Ciclo A5: Aprender e dúvidas (D-031, D-032)
 
-Sem mudança no banco. Rodados em 09/10/2026 durante o ciclo: `npm test` (23 arquivos, 390 testes) e `npm run typecheck`. O roteiro web ainda não tem os passos do A5.
+Sem mudança no banco. Rodados em 09/10/2026, depois das correções da revisão: `npm test` (23 arquivos, 391 testes), `npm run typecheck`, `npm run test:db`, `npm run test:api` (60 testes), `npm run test:web` (1191 verificações) e `REDUZIR_MOVIMENTO=1 node scripts/e2e-web.js` (1192). Nas duas rodadas do roteiro web, os passos do A5 passam (telas 86 a 92 e 96).
 
 - [x] Core: módulo `learn` com os 37 temas (35 publicados e 2 rascunhos), seções, "Comece por aqui", busca, tempo de leitura, números dos exemplos, validação do catálogo e textos da interface (`learn-catalog.test.ts`, `learn-search.test.ts`, `learn-links.test.ts` e `copy.test.ts` ampliado)
 - [x] Conferência das fontes por busca na web em 09/10/2026, com o endereço, o trecho e a data de cada fato (`docs/09_APRENDER.md`); "Taxa, tarifa e encargo" publicado; "Orçamento e a referência 50-30-20" em rascunho
@@ -98,7 +98,7 @@ Sem mudança no banco. Rodados em 09/10/2026 durante o ciclo: `npm test` (23 arq
 - [x] Explicação ampliada: seção e tempo de leitura, exemplo, "Ver a conta", hipóteses, "No Clarevo", "Fazer a conta com os seus números", temas relacionados, fontes com link e data, "Revisado em", aviso educativo e "Voltar à tarefa" ou "Voltar para Aprender"; apelidos e "Este conteúdo não está disponível."
 - [x] "O que é isso?" (`TermHint`) e links contextuais nas telas da `spec3` §3.7; todos os links por `explanationHref`; `lib/topics.ts` removido
 - [x] Ilustrações por seção, sem o símbolo C, e o token `accentTint`
-- [ ] Roteiro web (`npm run test:web`) com os passos da `spec3` §3.13, ajustando as três conferências exatas que os links novos mudaram (seção Vencidas e seção Contas do ano em Gastos fixos)
+- [x] Roteiro web (`npm run test:web` e `REDUZIR_MOVIMENTO=1 node scripts/e2e-web.js`, 1191 e 1192 verificações) com os passos da `spec3` §3.13, já ajustado às três conferências exatas que os links novos mudaram (seção Vencidas e seção Contas do ano em Gastos fixos), com a região viva da busca e o "Ver a conta" de "Contas que mudam de valor"
 - [ ] Publicar "Orçamento e a referência 50-30-20" depois de conferir a divisão no próprio livro ou na editora (`docs/09_APRENDER.md`)
 - [ ] Publicar "Como apagar meus dados?" depois de P-023
 - [ ] Abrir as páginas oficiais quando a rede permitir e conferir as ressalvas listadas em `docs/09_APRENDER.md`

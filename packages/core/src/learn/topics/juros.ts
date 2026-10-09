@@ -419,7 +419,7 @@ export const JUROS_TOPICS: Topic[] = [
     paragraphs: [
       'O Código de Defesa do Consumidor (art. 52, § 2º) garante quitar uma dívida antes do prazo, no todo ou em parte, com redução proporcional dos juros e demais acréscimos.',
       'Em contratos de crédito de pessoas físicas com taxa prefixada, o valor para quitar é o valor presente das parcelas que faltam, calculado com a taxa de juros do próprio contrato (Resolução CMN nº 5.004/2022). Linhas com recursos direcionados ou taxas administradas, como o crédito rural e o financiamento pelo Sistema Financeiro da Habitação, podem seguir outra regra.',
-      'Bancos e financeiras não podem cobrar tarifa por quitar antes em contratos de pessoas físicas assinados desde dezembro de 2007 (Resolução CMN nº 3.516/2007). A oferta de crédito também precisa informar o direito de quitar antes sem custo extra (Código de Defesa do Consumidor, art. 54-B).',
+      'Bancos e financeiras não podem cobrar tarifa por quitar antes em contratos de pessoas físicas assinados a partir de 10 de dezembro de 2007 (Resolução CMN nº 3.516/2007). A oferta de crédito também precisa informar o direito de quitar antes sem custo extra (Código de Defesa do Consumidor, art. 54-B).',
       'Peça à instituição o valor atualizado para quitação; ele costuma ser menor que a soma das parcelas. Numa quitação parcial, as parcelas mais distantes são as que têm o maior desconto. Na calculadora do Clarevo, você vê uma estimativa com a taxa que digitar; o valor oficial é o que a instituição informar.',
     ],
     example:

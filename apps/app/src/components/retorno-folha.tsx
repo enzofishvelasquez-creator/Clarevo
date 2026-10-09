@@ -9,84 +9,121 @@ import {
 } from '@clarevo/core';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Modal, StyleSheet, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
 import { PayRowError, codeOf, isUncertain, openRowFrom, useReturnWriter } from '@/components/retorno-acoes';
 import { ReturnRow } from '@/components/retorno-linha';
 import { yearA11yLabel } from '@/components/series-parts';
 import { Button, Chip, Txt } from '@/components/ui';
+import { announceOnIOS } from '@/lib/a11y';
 import { useSpace } from '@/state/data';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
 type Step = { type: 'linha' } | { type: 'pagar' } | { type: 'nao_houve' };
 
+/** Espera para o anúncio no iOS: o VoiceOver volta ao detalhe depois de a folha fechar. */
+const ANNOUNCE_DELAY = 500;
+
 /**
- * "Registrar este mês" (ou "Registrar esta parcela") no detalhe do gasto fixo ou parcelamento: a mesma linha da revisão
- * dos últimos meses numa folha, com "Já paguei", "Não houve" (só gasto fixo mensal) e "Ainda não paguei". Valor que muda
- * abre o formulário de pagamento com o valor vazio. Só fecha com o resultado confirmado pelo servidor.
+ * "Registrar este mês" (ou "Registrar esta parcela" e "Registrar parcelas") no detalhe do gasto fixo, parcelamento ou
+ * conta do ano: a mesma linha da revisão dos últimos meses numa folha, com "Já paguei", "Não houve" (só gasto fixo
+ * mensal) e "Ainda não paguei". Com várias linhas (parcelas de um ano), cada uma tem as suas ações e a folha fecha ao
+ * confirmar uma; as que faltam continuam no detalhe. Valor que muda abre o formulário de pagamento com o valor vazio.
+ * Só fecha com o resultado confirmado pelo servidor, que também é anunciado no iOS.
  */
 export function RegisterMonthSheet({
-  row: initialRow,
+  rows,
+  title,
   onClose,
   onDone,
 }: {
-  row: ReviewRow;
+  /** Pelo menos uma linha "sem conta registrada" (seriesGapsInRange). */
+  rows: readonly ReviewRow[];
+  /** Título com várias linhas ("IPTU de 2026"); com uma só, o nome dela ("Aluguel de julho"). */
+  title?: string;
   onClose: () => void;
   /** Resultado confirmado (texto do anúncio). */
   onDone: (text: string) => void;
 }) {
   const reduced = useReducedMotion();
+  const { height } = useWindowDimensions();
   const personal = useSpace().data;
   const writer = useReturnWriter();
-  const [row, setRow] = useState(initialRow);
+  /** Dados atuais de cada linha (conta criada e pagamento que falhou), pela chave da linha recebida. */
+  const [current, setCurrent] = useState<Record<string, ReviewRow>>({});
+  const [activeKey, setActiveKey] = useState(rows[0]!.key);
   const [step, setStep] = useState<Step>({ type: 'linha' });
-  const [note, setNote] = useState<string | null>(null);
-  const [closed, setClosed] = useState(false);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [closedRows, setClosedRows] = useState<Record<string, true>>({});
   const [busy, setBusy] = useState(false);
   const [accountChoice, setAccountChoice] = useState<string | null>(null);
   const account = personal?.accounts.find((a) => a.id === accountChoice) ?? personal?.accounts[0] ?? null;
+  const view = (r: ReviewRow) => current[r.key] ?? r;
+  const several = rows.length > 1;
+  const active = rows.find((r) => r.key === activeKey) ?? rows[0]!;
+  const row = view(active);
   const short = rowShortName(row);
 
-  const failed = (e: unknown) => {
+  /** Falha de uma linha: abaixo dela e, no iOS (sem região viva), anunciada. */
+  const note = (key: string, text: string) => {
+    setNotes((cur) => ({ ...cur, [key]: text }));
+    announceOnIOS(text);
+  };
+
+  const failed = (key: string, e: unknown) => {
     setStep({ type: 'linha' });
     if (isUncertain(e)) {
-      setNote(RETURN_TEXT.saveFailed);
+      note(key, RETURN_TEXT.saveFailed);
       return;
     }
     // Recusa: o texto do código; conta já registrada ou série mudada em outro aparelho fecham a linha (a tela recarrega).
     const code = codeOf(e);
-    setNote(returnErrorText(code));
-    if (code === 'ocorrencia_existente' || code === 'mes_fora_da_revisao' || code === 'nao_encontrado') setClosed(true);
+    note(key, returnErrorText(code));
+    if (code === 'ocorrencia_existente' || code === 'mes_fora_da_revisao' || code === 'nao_encontrado') setClosedRows((cur) => ({ ...cur, [key]: true }));
   };
 
-  const act = async (fn: () => Promise<string>) => {
+  const act = async (target: ReviewRow, fn: () => Promise<string>) => {
     if (busy) return;
     setBusy(true);
-    setNote(null);
+    setNotes(({ [target.key]: _gone, ...rest }) => rest);
     try {
-      onDone(await fn());
+      const text = await fn();
+      // No iOS o resultado não tem região viva: é anunciado depois de a folha fechar.
+      announceOnIOS(text, { delay: ANNOUNCE_DELAY });
+      onDone(text);
     } catch (e) {
       if (e instanceof PayRowError) {
         if (e.created) {
-          setRow(openRowFrom(row, e.created));
+          const created = e.created;
+          setCurrent((cur) => ({ ...cur, [target.key]: openRowFrom(view(target), created) }));
           setStep({ type: 'linha' });
-          setNote(RETURN_TEXT.partialFailure(row.month));
+          note(target.key, RETURN_TEXT.partialFailure(target.month));
           return;
         }
-        failed(e.cause);
+        failed(target.key, e.cause);
         return;
       }
-      failed(e);
+      failed(target.key, e);
     } finally {
       setBusy(false);
     }
   };
 
-  const onAction = (action: ReviewAction) => {
+  /** Formulário de pagamento: conta já criada (falha parcial) ou registrar e pagar. */
+  const openForm = (target: ReviewRow) => {
+    const created = target.commitment ?? writer.createdFor(target.key);
+    onClose();
+    if (created) router.push({ pathname: '/a-pagar/[id]/pagar', params: { id: created.id, data: 'vencimento' } });
+    else if (target.series) router.push({ pathname: '/retomar/pagar', params: { serie: target.series.id, numero: String(target.series.number) } });
+  };
+
+  const onAction = (target: ReviewRow, action: ReviewAction) => {
+    const data = view(target);
+    setActiveKey(target.key);
     if (action === 'ja_paguei') {
-      if (row.amountIsEstimate) {
-        openForm();
+      if (data.amountIsEstimate) {
+        openForm(data);
         return;
       }
       setStep({ type: 'pagar' });
@@ -96,27 +133,31 @@ export function RegisterMonthSheet({
       setStep({ type: 'nao_houve' });
       return;
     }
-    act(async () => {
-      await writer.stillOpen(row);
-      return RETURN_TEXT.announceStillOpen(short);
+    act(target, async () => {
+      await writer.stillOpen(data);
+      return RETURN_TEXT.announceStillOpen(rowShortName(data));
     });
   };
 
-  /** Formulário de pagamento: conta já criada (falha parcial) ou registrar e pagar. */
-  const openForm = () => {
-    const created = row.commitment ?? writer.createdFor(row.key);
-    onClose();
-    if (created) router.push({ pathname: '/a-pagar/[id]/pagar', params: { id: created.id, data: 'vencimento' } });
-    else if (row.series) router.push({ pathname: '/retomar/pagar', params: { serie: row.series.id, numero: String(row.series.number) } });
-  };
-
   const pay = () =>
-    act(async () => {
+    act(active, async () => {
       const draft = rowPaymentDraft(row);
       await writer.payRow(row, { accountId: account!.id, amountCents: row.amountCents, paidOn: draft.paidOn, category: draft.category });
       return RETURN_TEXT.announcePaid(short);
     });
 
+  const lines = rows.map((r, i) => (
+    <ReturnRow
+      key={r.key}
+      row={view(r)}
+      outcome={null}
+      note={notes[r.key] ?? null}
+      closed={Boolean(closedRows[r.key])}
+      onAction={(a) => onAction(r, a)}
+      busy={busy}
+      last={i === rows.length - 1}
+    />
+  ));
   const dialog = notHappenedDialog(row);
   const body = account ? RETURN_TEXT.payBody(short, row.amountCents, row.dueOn, account.name) : '';
 
@@ -126,10 +167,10 @@ export function RegisterMonthSheet({
         <View style={styles.box} accessibilityViewIsModal>
           {step.type === 'linha' ? (
             <>
-              <Txt variant="title" accessibilityRole="header" accessibilityLabel={yearA11yLabel(short)}>
-                {short}
+              <Txt variant="title" accessibilityRole="header" accessibilityLabel={yearA11yLabel(several ? (title ?? short) : short)}>
+                {several ? (title ?? RETURN_TEXT.registerParts) : short}
               </Txt>
-              <ReturnRow row={row} outcome={null} note={note} closed={closed} onAction={onAction} busy={busy} last />
+              {several ? <ScrollView style={{ maxHeight: Math.round(height * 0.55) }}>{lines}</ScrollView> : lines}
               <Button label={RETURN_TEXT.back} tone="ghost" disabled={busy} onPress={onClose} />
             </>
           ) : step.type === 'pagar' ? (
@@ -149,7 +190,7 @@ export function RegisterMonthSheet({
               ) : null}
               <View style={{ gap: space[2], marginTop: space[2] }}>
                 <Button label={RETURN_TEXT.confirm} busy={busy} busyLabel="Aguarde…" disabled={!account} onPress={pay} />
-                <Button label={RETURN_TEXT.payChange} tone="soft" disabled={busy} onPress={openForm} />
+                <Button label={RETURN_TEXT.payChange} tone="soft" disabled={busy} onPress={() => openForm(row)} />
                 <Button label={RETURN_TEXT.back} tone="ghost" disabled={busy} onPress={() => setStep({ type: 'linha' })} />
               </View>
             </>
@@ -167,7 +208,7 @@ export function RegisterMonthSheet({
                   busy={busy}
                   busyLabel="Aguarde…"
                   onPress={() =>
-                    act(async () => {
+                    act(active, async () => {
                       await writer.notHappened(row);
                       return RETURN_TEXT.announceNotHappened(short);
                     })

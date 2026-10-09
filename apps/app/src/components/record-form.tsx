@@ -18,6 +18,7 @@ import {
   formatDateBR,
   formatMonthBR,
   formatMonthName,
+  formatMonthYearBR,
   isRepoError,
   monthOf,
   newOperationKey,
@@ -39,7 +40,7 @@ import { usePreventRemove } from 'expo-router/react-navigation';
 import * as Haptics from 'expo-haptics';
 import { AlertCircle, Check, Info } from 'lucide-react-native';
 import { useEffect, useId, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -260,7 +261,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       if (pending.current.length > 0) {
         const saved = await reconcile(v.input, snapshot);
         if (saved) {
-          if (dayMode) finishDay(v.input, another);
+          if (dayMode || fromReview) finishDay(v.input, another);
           else finish(saved.id, saved.amountCents !== undefined && saved.occurredOn ? { amountCents: saved.amountCents, occurredOn: saved.occurredOn } : undefined);
           return;
         }
@@ -272,7 +273,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       try {
         const saved = await send(key, v.input, version);
         pending.current = [];
-        if (dayMode) finishDay(v.input, another);
+        // Vindo da revisão, sempre volta a ela e anota a ação, também depois de "Usar outra data".
+        if (dayMode || fromReview) finishDay(v.input, another);
         else finish(saved.id, saved);
       } catch (e) {
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
@@ -344,7 +346,9 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
 
   // Modo "Dia" a partir da revisão: gasto com a descrição de um gasto fixo sem conta registrada no mês (use Já paguei).
   const returnReview = useReturnReview(fromReview && kind === 'despesa' ? contextId : undefined);
-  const gapRow = fromReview && dayMonth && returnReview.data?.review ? seriesGapForExpense(returnReview.data.review, dayMonth, draft.description) : null;
+  // O mês é o da data efetiva: depois de "Usar outra data", o da data digitada.
+  const gapMonth = parsedDate ? monthOf(parsedDate) : dayMonth;
+  const gapRow = fromReview && gapMonth && returnReview.data?.review ? seriesGapForExpense(returnReview.data.review, gapMonth, draft.description) : null;
 
   const formatAmountOnBlur = () => {
     const cents = parseBRL(draft.amountText);
@@ -446,7 +450,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
           {dayMode && dayMonth ? (
             <View style={{ gap: space[2] }}>
               <DayField
-                ref={refs.dateText}
+                inputRef={refs.dateText}
                 month={dayMonth}
                 kind={kind}
                 value={dayText}
@@ -604,14 +608,14 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
  * erro é anunciado ao aparecer, como nos campos de texto).
  */
 function DayField({
-  ref,
+  inputRef,
   month,
   kind,
   value,
   onChange,
   error,
 }: {
-  ref: React.Ref<TextInput>;
+  inputRef: React.RefObject<TextInput | null>;
   month: IsoMonth;
   kind: RecordKind;
   value: string;
@@ -627,10 +631,15 @@ function DayField({
       <Txt variant="label" style={{ fontFamily: fonts.bold }}>
         {RETURN_TEXT.dayLabel}
       </Txt>
-      <View style={[ui.input, focused && ui.inputFocused, error ? ui.inputError : null]}>
+      {/* A caixa toda leva o foco ao campo (o dia é só 1 ou 2 algarismos); sem papel próprio para o leitor de tela. */}
+      <Pressable
+        accessible={false}
+        tabIndex={-1}
+        onPress={() => inputRef.current?.focus()}
+        style={[ui.input, focused && ui.inputFocused, error ? ui.inputError : null]}>
         <TextInput
-          ref={ref}
-          accessibilityLabel={`${RETURN_TEXT.dayLabel}, ${RETURN_TEXT.daySuffix(month)}`}
+          ref={inputRef}
+          accessibilityLabel={`${RETURN_TEXT.dayLabel} de ${formatMonthYearBR(month)}`}
           accessibilityHint={error ?? hint}
           value={value}
           onChangeText={(t) => onChange(t.replace(/\D/g, '').slice(0, 2))}
@@ -647,7 +656,7 @@ function DayField({
         <Txt color={colors.textSecondary} style={tabular} accessibilityElementsHidden importantForAccessibility="no">
           {RETURN_TEXT.daySuffix(month)}
         </Txt>
-      </View>
+      </Pressable>
       {error ? (
         <Animated.View entering={FadeIn.duration(150).reduceMotion(ReduceMotion.System)}>
           <Txt variant="label" color={colors.error} accessibilityLiveRegion="polite" accessibilityRole="alert" nativeID={`${id}-erro`}>
@@ -665,9 +674,10 @@ function DayField({
 
 const styles = StyleSheet.create({
   body: { padding: space[5], gap: space[4], paddingBottom: space[6] },
-  // Só o dia (2 algarismos), alinhado à direita, colado ao sufixo "/06/2026".
+  // Só o dia (2 algarismos), alinhado à direita, colado ao sufixo "/06/2026"; alvo de pelo menos 44 px.
   dayInput: {
-    width: 40,
+    width: 44,
+    minWidth: 44,
     alignSelf: 'stretch',
     paddingVertical: space[3],
     fontFamily: fonts.medium,

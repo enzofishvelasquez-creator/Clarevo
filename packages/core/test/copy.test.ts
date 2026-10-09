@@ -7,6 +7,7 @@ import {
   ANNUAL_SERIES_ERROR_TEXT,
   LEARN_SECTIONS,
   LEARN_UI_TEXT,
+  RETURN_TEXT,
   TOPICS,
   learnUiTextSamples,
   returnTextSamples,
@@ -594,5 +595,17 @@ describe('textos de Aprender', () => {
       expect(text, text).not.toMatch(COLLECTION);
       expect(text, text).not.toMatch(ABSENCE);
     }
+    // Sem revisão ativa, valor estimado no diálogo "Não houve" e lacunas da conta do ano no detalhe: todos varridos.
+    for (const text of [
+      RETURN_TEXT.noActiveReview,
+      RETURN_TEXT.whyNoBill,
+      RETURN_TEXT.registerParts,
+      RETURN_TEXT.registerMonth,
+      RETURN_TEXT.annualGap('2027', [6, 7, 8, 9, 10]),
+      RETURN_TEXT.annualGapOld('2025', [1, 2, 3]),
+      RETURN_TEXT.registerPartsA11y('2027'),
+      RETURN_TEXT.rowAmountLine({ description: 'Luz', amountCents: 18_000, amountIsEstimate: true }),
+    ])
+      expect(texts, text).toContain(text);
   });
 });

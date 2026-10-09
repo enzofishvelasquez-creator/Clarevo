@@ -1,12 +1,16 @@
 import {
   ANNUAL_SERIES_ERROR_TEXT,
+  RETURN_TEXT,
   affectedByEditFrom,
   affectedByYear,
+  annualGapRows,
+  annualGapSplit,
   annualYearErrorText,
   annualYearRange,
   annualYearSummary,
   isRepoError,
   mergeOccurrences,
+  rowShortName,
   seriesEnded,
   seriesErrorText,
   suggestedAnnualReference,
@@ -16,6 +20,7 @@ import {
   type CommitmentSeries,
   type EditFromPlan,
   type IsoDate,
+  type ReviewRow,
   type YearPlan,
 } from '@clarevo/core';
 import { router } from 'expo-router';
@@ -26,7 +31,9 @@ import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-
 
 import { CommitmentRow } from '@/components/commitment-row';
 import { ConfirmDialog } from '@/components/dialog';
+import { RegisterMonthSheet } from '@/components/retorno-folha';
 import { yearA11y, yearA11yLabel } from '@/components/series-parts';
+import { TopicLink } from '@/components/topic-link';
 import { Button, Card, LinkButton, Txt } from '@/components/ui';
 import { useSeriesOperationKey, useSkipSeriesYear, useUpdateSeriesFrom } from '@/state/data';
 import { colors, fonts, motion, space, tabular } from '@/theme/tokens';
@@ -89,6 +96,8 @@ export function AnnualYears({
    */
   const [refConfirm, setRefConfirm] = useState<{ plan: EditFromPlanOk; suggestion: AnnualReferenceSuggestion; version: number } | null>(null);
   const [busy, setBusy] = useState(false);
+  /** "Registrar este mês" e "Registrar parcelas": as linhas sem conta registrada de um ano, numa folha (D-030). */
+  const [sheet, setSheet] = useState<{ rows: ReviewRow[]; title: string } | null>(null);
 
   const success = (text: string) => {
     // Confirmação tátil só depois da gravação confirmada.
@@ -217,6 +226,13 @@ export function AnnualYears({
           const remove = y.planned ? null : affectedByYear(list, s, n, 'tirar');
           const isOpen = expanded.includes(y.year.index);
           const label = y.year.label;
+          // Partes sem conta registrada: as dos 11 meses fechados podem ser registradas aqui (como na revisão dos últimos
+          // meses); as mais antigas só como gasto em Anotar gasto.
+          const { reviewable, old } = annualGapSplit(s, y, today);
+          const gapRows = annualGapRows(s, list, y, today);
+          const registerLabel = k === 1 ? RETURN_TEXT.registerMonth : RETURN_TEXT.registerParts;
+          const gapTitle = gapRows[0] ? `${gapRows[0].description} de ${label}` : label;
+          const gapText = k === 1 && gapRows[0] ? RETURN_TEXT.seriesGap(gapRows[0].month) : RETURN_TEXT.annualGap(label, reviewable);
           return (
             <Animated.View key={y.year.index} layout={rowLayout} style={[styles.year, i < years.length - 1 && styles.divider]}>
               <Txt
@@ -230,7 +246,29 @@ export function AnnualYears({
                   {y.texts.paidBefore}
                 </Txt>
               ) : null}
-              {y.texts.missing ? (
+              {y.texts.missing && gapRows.length > 0 ? (
+                <View style={{ gap: space[1] }}>
+                  <Txt variant="label" accessibilityLabel={yearA11yLabel(gapText)}>
+                    {gapText}
+                  </Txt>
+                  <LinkButton
+                    label={registerLabel}
+                    accessibilityLabel={k === 1 ? `${registerLabel}: ${rowShortName(gapRows[0]!)}` : RETURN_TEXT.registerPartsA11y(yearA11y(label))}
+                    style={styles.inlineLink}
+                    onPress={() => setSheet({ rows: gapRows, title: gapTitle })}
+                  />
+                  {old.length > 0 ? (
+                    <>
+                      <Txt variant="label" accessibilityLabel={yearA11yLabel(RETURN_TEXT.annualGapOld(label, old))}>
+                        {RETURN_TEXT.annualGapOld(label, old)}
+                      </Txt>
+                      <LinkButton label="Anotar gasto" style={styles.inlineLink} onPress={() => router.push('/registro/novo')} />
+                    </>
+                  ) : null}
+                  <TopicLink slug="sem-registro" label={RETURN_TEXT.whyNoBill} style={styles.inlineLink} />
+                </View>
+              ) : y.texts.missing ? (
+                // Todas as partes fora dos 11 meses fechados: o texto de antes, com "Anotar gasto".
                 <View style={{ gap: space[1] }}>
                   <Txt variant="label" accessibilityLabel={yearA11yLabel(y.texts.missing)}>
                     {y.texts.missing}
@@ -326,6 +364,18 @@ export function AnnualYears({
             {k > 1 ? 'Os valores deixam' : 'O valor deixa'} de contar em Ainda a pagar. Recebido, Pago e a diferença do mês não mudam.
           </Txt>
         </ConfirmDialog>
+      ) : null}
+
+      {sheet ? (
+        <RegisterMonthSheet
+          rows={sheet.rows}
+          title={sheet.title}
+          onClose={() => setSheet(null)}
+          onDone={(text) => {
+            setSheet(null);
+            onNotice(text);
+          }}
+        />
       ) : null}
 
       {refConfirm ? (

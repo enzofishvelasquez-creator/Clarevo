@@ -990,6 +990,13 @@ begin
   perform pg_temp.expect_error(format($f$select * from public.months_overview(%L, '2026-05-01', '2026-06-30')$f$, ctx), 'periodo_invalido');
   perform pg_temp.expect_error(format($f$select * from public.months_overview(%L, null, '2026-06-01')$f$, ctx), 'periodo_invalido');
   perform pg_temp.expect_error(format($f$select * from public.months_overview(%L, '2026-05-01', null)$f$, ctx), 'periodo_invalido');
+  -- Datas não finitas: recusadas (antes, 'infinity' nas duas pontas nunca terminava).
+  perform pg_temp.expect_error(format($f$select * from public.months_overview(%L, 'infinity', 'infinity')$f$, ctx), 'periodo_invalido');
+  perform pg_temp.expect_error(format($f$select * from public.months_overview(%L, '-infinity', '-infinity')$f$, ctx), 'periodo_invalido');
+  perform pg_temp.expect_error(format($f$select * from public.months_overview(%L, '-infinity', 'infinity')$f$, ctx), 'periodo_invalido');
+  perform pg_temp.expect_error(format($f$select * from public.months_overview(%L, '2026-05-01', 'infinity')$f$, ctx), 'periodo_invalido');
+  perform pg_temp.expect_error(format($f$select * from public.months_overview(%L, 'infinity', 'infinity')$f$, pg_temp.id('teo_ctx')),
+    'periodo_invalido');
   perform pg_temp.expect_error(format($f$select * from public.months_overview(%L, '2026-05-01', '2026-09-01')$f$, pg_temp.id('teo_ctx')),
     'sem_permissao');
   perform pg_temp.expect_error($f$select * from public.months_overview(null, '2026-05-01', '2026-09-01')$f$, 'sem_permissao');
@@ -1053,6 +1060,8 @@ do $$ begin
   perform pg_temp.expect_error(format($f$select public.create_series_occurrence('rt-f-0006', %L, 1, 4, 'aberta')$f$, pg_temp.id('internet')),
     'nao_encontrado');
   perform pg_temp.expect_error(format($f$select * from public.months_overview(%L, '2026-05-01', '2026-09-01')$f$, pg_temp.id('fam')),
+    'sem_permissao');
+  perform pg_temp.expect_error(format($f$select public.decide_return_review('rt-f-0007', %L, 0, '2026-09-01', 'seguiu')$f$, pg_temp.id('fam')),
     'sem_permissao');
   assert pg_temp.act('tito', 'fam') = '2026-10-07 - -', 'a linha continua (sai junto com a pessoa ou o contexto)';
 end $$;

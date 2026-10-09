@@ -2068,6 +2068,14 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.waitForTimeout(600);
   const learnLive = await p.evaluate(() => [...document.querySelectorAll('[aria-live="polite"]')].map((e) => e.textContent).filter(Boolean));
   ok('busca: a contagem é anunciada uma vez na região viva', learnLive.some((x) => /^\d+ temas para "juros"$/.test(x)), JSON.stringify(learnLive));
+  // A região viva fica numa caixa de 1 px recortada, nunca com opacidade 0 (o TalkBack ignora o que é transparente).
+  const liveBox = await p.evaluate(() => {
+    const e = [...document.querySelectorAll('[aria-live="polite"]')].find((x) => /^\d+ temas para "juros"$/.test(x.textContent));
+    if (!e) return null;
+    const box = e.parentElement; const r = box.getBoundingClientRect(); const cs = getComputedStyle(box);
+    return { w: r.width, h: r.height, overflow: cs.overflow, opacity: cs.opacity, own: getComputedStyle(e).opacity };
+  });
+  ok('busca: a região viva fica numa caixa de 1 px recortada e sem opacidade 0', liveBox !== null && liveBox.w === 1 && liveBox.h === 1 && liveBox.overflow === 'hidden' && liveBox.opacity === '1' && liveBox.own === '1', JSON.stringify(liveBox));
   await keepText();
   await layoutChecks('busca em aprender 390px');
   await shot('87_aprender_busca');
@@ -2125,6 +2133,21 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('relacionado "Juros simples e juros compostos" abre', (await p.locator('h1').filter({ hasText: /^Juros simples e juros compostos$/ }).count()) === 1, p.url());
   await learnBackToTab();
   ok('"Voltar para Aprender" volta para a aba', new URL(p.url()).pathname === '/aprender', p.url());
+
+  // Tema "Contas que mudam de valor": o exemplo e a conta escritos no catálogo chegam à tela, com "Ver a conta".
+  await btn(/^Contas que mudam de valor\./).click(); await waitText('Voltar para Aprender');
+  t = await body();
+  const verContaE = p.getByRole('button', { name: 'Ver a conta', exact: true }).filter({ visible: true });
+  ok('tema "Contas que mudam de valor": exemplo com média de R$ 172,40, "Hipóteses do exemplo" e um só "Ver a conta" fechado', new URL(p.url()).pathname === '/explicacao/estimativa' &&
+    (await p.locator('h1').filter({ hasText: /^Contas que mudam de valor$/ }).count()) === 1 && t.includes('a média é R$ 172,40') && t.includes('Hipóteses do exemplo') &&
+    (await verContaE.count()) === 1 && (await verContaE.first().getAttribute('aria-expanded')) === 'false', t.slice(0, 400));
+  await verContaE.first().click(); await p.waitForTimeout(300);
+  ok('tema "Contas que mudam de valor": "Ver a conta" mostra (165,30 + 180,00 + 171,90) ÷ 3 = 172,40', (await verContaE.first().getAttribute('aria-expanded')) === 'true' &&
+    (await body()).includes('(165,30 + 180,00 + 171,90) ÷ 3 = 172,40.'), (await body()).slice(0, 600));
+  await keepText();
+  await layoutChecks('tema contas que mudam de valor 390px');
+  await shot('96_tema_contas_que_mudam_de_valor');
+  await learnBackToTab();
 
   // Dúvidas frequentes: a pergunta abre no lugar (aria-expanded), com o resumo e "Ler resposta completa".
   const faq = p.getByRole('button', { name: 'A empresa que oferece o benefício vê meus gastos?', exact: true }).filter({ visible: true }).first();
@@ -2529,14 +2552,21 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Luz de junho paga com R$ 171,90, de volta ao passo', (await body()).includes('Paga em 12/06/2026 · R$ 171,90'));
   // Recebimentos no modo "Dia": o mês já vem escolhido; só o dia.
   await btn('Anotar recebimentos').click(); await waitText('Dia do recebimento em junho de 2026.');
-  ok('modo "Dia": campo "Dia" com "/06/2026", a dica e "Usar outra data"', (await p.getByLabel('Dia, /06/2026', { exact: true }).filter({ visible: true }).count()) === 1 &&
+  ok('modo "Dia": campo com o nome "Dia de junho de 2026" (sem "barra zero seis"), a dica e "Usar outra data"', (await p.getByLabel('Dia de junho de 2026', { exact: true }).filter({ visible: true }).count()) === 1 &&
+    (await p.getByLabel(/^Dia, /).filter({ visible: true }).count()) === 0 &&
     (await visibleCount('button', 'Usar outra data')) === 1 && (await visibleCount('button', 'Salvar e anotar outro')) === 1 && (await visibleCount('button', 'Salvar')) === 1);
-  await field('Descrição').fill('Salário'); await field('Valor em reais').fill('6000,00'); await field('Dia, /06/2026').fill('31');
+  // Alvo de toque: o campo tem pelo menos 44 px de largura e a caixa inteira (inclusive o sufixo "/06/2026") foca o campo.
+  const diaBox = await field('Dia de junho de 2026').evaluate((e) => { const i = e.getBoundingClientRect(); const c = e.parentElement.getBoundingClientRect(); return { inputW: i.width, boxW: c.width, boxH: c.height, x: c.x, y: c.y }; });
+  await p.evaluate(() => document.activeElement?.blur());
+  await p.mouse.click(diaBox.x + diaBox.boxW - 8, diaBox.y + diaBox.boxH / 2);
+  const diaFocus = await p.evaluate(() => document.activeElement?.getAttribute('aria-label'));
+  ok('modo "Dia": campo com pelo menos 44 px e a caixa inteira (até o fim da linha) foca o campo', diaBox.inputW >= 44 && diaBox.boxH >= 44 && diaFocus === 'Dia de junho de 2026', JSON.stringify({ ...diaBox, diaFocus }));
+  await field('Descrição').fill('Salário'); await field('Valor em reais').fill('6000,00'); await field('Dia de junho de 2026').fill('31');
   await btn('Salvar').click(); await waitText('Junho tem 30 dias.');
   ok('modo "Dia": 31 em junho dá "Junho tem 30 dias." e nada é salvo', (await field('Descrição').inputValue()) === 'Salário');
-  await field('Dia, /06/2026').fill('1');
+  await field('Dia de junho de 2026').fill('1');
   await btn('Salvar e anotar outro').click(); await waitText('Anotado: Salário, R$ 6.000,00 em 01/06/2026.');
-  ok('"Salvar e anotar outro": anotado, com descrição e valor limpos e o dia mantido', (await field('Descrição').inputValue()) === '' && (await field('Valor em reais').inputValue()) === '' && (await field('Dia, /06/2026').inputValue()) === '1');
+  ok('"Salvar e anotar outro": anotado, com descrição e valor limpos e o dia mantido', (await field('Descrição').inputValue()) === '' && (await field('Valor em reais').inputValue()) === '' && (await field('Dia de junho de 2026').inputValue()) === '1');
   await keepReturnText();
   await innerChecks('modo dia 390px');
   await shot('76_modo_dia');
@@ -2578,7 +2608,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Salvar pagamento').click(); await waitText('Mês 1 de 4'); await waitText('Paga em 12/07/2026 · R$ 179,90');
   ok('Luz de julho registrada e paga com R$ 179,90', (await body()).includes('Paga em 12/07/2026 · R$ 179,90'));
   await btn('Anotar recebimentos').click(); await waitText('Dia do recebimento em julho de 2026.');
-  await field('Descrição').fill('Salário'); await field('Valor em reais').fill('6000,00'); await field('Dia, /07/2026').fill('1');
+  await field('Descrição').fill('Salário'); await field('Valor em reais').fill('6000,00'); await field('Dia de julho de 2026').fill('1');
   await btn('Salvar').click(); await waitText('Mês 1 de 4'); await waitText('Anotado: Salário, R$ 6.000,00 em 01/07/2026.');
   await waitText('Recebimentos: R$ 6.000,00 · 1').catch(() => {});
   ok('"Salvar" no modo "Dia" volta ao passo, com "Anotado" e o recebimento no mês', (await body()).includes('Recebimentos: R$ 6.000,00 · 1'));
@@ -2605,7 +2635,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await field('Valor pago').fill('194,20'); await btn('Confirmar pagamento').click();
   await waitText('Mês 3 de 4'); await waitText('Paga em 12/09/2026 · R$ 194,20');
   await btn('Anotar recebimentos').click(); await waitText('Dia do recebimento em setembro de 2026.');
-  await field('Descrição').fill('Salário'); await field('Valor em reais').fill('6000,00'); await field('Dia, /09/2026').fill('1');
+  await field('Descrição').fill('Salário'); await field('Valor em reais').fill('6000,00'); await field('Dia de setembro de 2026').fill('1');
   await btn('Salvar').click(); await waitText('Mês 3 de 4'); await waitText('Recebimentos: R$ 6.000,00 · 1');
   await btn('Próximo mês').click(); await waitText('Mês 4 de 4');
   t = await body();
@@ -2687,6 +2717,156 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     (await visibleCount('button', 'Ainda não paguei: Financiamento do carro de julho')) === 1 && (await visibleCount('button', 'Não houve: Financiamento do carro de julho')) === 0);
   await shot('85_registrar_esta_parcela');
   await confirmIn('Voltar'); await waitGone('Ainda não paguei');
+  // 10. Correções da revisão dos últimos meses (A4), cada uma num cenário "retorno" novo.
+  // a) Modo "Dia" com "Usar outra data": salvar volta à revisão, anota a ação no passo e não abre o detalhe do registro.
+  await enterReturnDemo();
+  await btn('Ver resumo').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos.');
+  await btn('Atualizar agora').click(); await waitText('Mês 1 de 5');
+  ok('modo "Dia", outra data: antes de anotar, o rodapé do passo é "Pular este mês"', (await visibleCount('button', 'Pular este mês')) === 1 && (await visibleCount('button', 'Próximo mês')) === 0);
+  await btn('Anotar recebimentos').click(); await waitText('Dia do recebimento em junho de 2026.');
+  await field('Descrição').fill('Salário'); await field('Valor em reais').fill('6000,00');
+  await btn('Usar outra data').click();
+  await field('Data do recebimento').fill('15/06/2026');
+  await keepReturnText();
+  await btn('Salvar recebimento').click(); await waitText('Anotado: Salário, R$ 6.000,00 em 15/06/2026.');
+  await waitUntil(async () => (await visibleCount('button', 'Próximo mês')) === 1);
+  await waitText('Recebimentos: R$ 6.000,00 · 1').catch(() => {});
+  t = await body();
+  ok('modo "Dia", outra data: salvar volta ao passo de junho, com "Anotado" e o recebimento (não abre o detalhe do registro)', new URL(p.url()).pathname === '/retomar/atualizar' &&
+    (await stepTitle()) === 'Junho de 2026, Mês 1 de 5' && t.includes('Anotado: Salário, R$ 6.000,00 em 15/06/2026.') && t.includes('Recebimentos: R$ 6.000,00 · 1'), `${p.url()} ${t.slice(0, 200)}`);
+  ok('modo "Dia", outra data: a ação conta no passo (o rodapé passa de "Pular este mês" a "Próximo mês")', (await visibleCount('button', 'Próximo mês')) === 1 && (await visibleCount('button', 'Pular este mês')) === 0);
+  // "Não houve" numa conta de valor estimado: a linha do diálogo diz "cerca de" e "(estimado)", nunca o valor como se fosse exato.
+  await btn('Próximo mês').click(); await waitText('Mês 2 de 5');
+  await btn('Não houve: Luz de julho').click(); await waitText('Não houve esta conta em julho?');
+  t = await dialogText();
+  ok('"Não houve" na Luz estimada: o diálogo mostra "Luz · cerca de R$ 180,00 (estimado)"', t.includes('Luz · cerca de R$ 180,00 (estimado)') && !t.includes('Luz · R$ 180,00'), t);
+  await keepReturnText();
+  await confirmIn('Confirmar'); await waitText('Registrada como não houve: Luz de julho.');
+  ok('"Não houve" confirmado: resultado no rodapé do passo', (await body()).includes('Registrada como não houve: Luz de julho.'));
+
+  // b) /retomar sem revisão ativa (decidida em outro aparelho): nunca afirma que os meses estão registrados.
+  await enterReturnDemo();
+  await btn('Ver resumo').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos.');
+  const decidedElsewhere = await otherDevice(async (repo, ctx) => {
+    const st = await repo.getReturnReviewState(ctx);
+    try { await repo.decideReturnReview(crypto.randomUUID(), ctx, st.mark ? st.mark.version : 0, '2026-09', 'seguiu'); return 'ok'; } catch (e) { return String(e.code || e.message); }
+  });
+  await waitText('Nada para conferir');
+  t = await body();
+  ok('/retomar sem revisão ativa: "Não há revisão dos últimos meses agora." e "Voltar ao Resumo", sem dizer que os meses já estão registrados', decidedElsewhere === 'ok' &&
+    t.includes('Não há revisão dos últimos meses agora.') && !t.includes('já estão registrados') && (await visibleCount('button', 'Voltar ao Resumo')) === 1 &&
+    (await visibleCount('button', 'Atualizar agora')) === 0, `${decidedElsewhere} ${t.slice(0, 300)}`);
+  await keepReturnText();
+  await innerChecks('seus últimos meses sem revisão ativa 390px');
+  await shot('93_retomar_sem_revisao');
+  await btn('Voltar ao Resumo').click(); await waitText('Diferença do mês');
+  ok('"Voltar ao Resumo" volta ao Resumo, sem a faixa', new URL(p.url()).pathname === '/' && !(await bandShown()), p.url());
+
+  // c) Pagar uma conta que outro aparelho já registrou: paga a conta existente em vez de repetir o erro, e a linha é recarregada.
+  const toStep = async (skips) => {
+    await btn('Ver resumo').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos.');
+    await btn('Atualizar agora').click(); await waitText('Mês 1 de 5');
+    for (let i = 0; i < skips; i++) { await btn('Pular este mês').click(); await waitText(`Mês ${i + 2} de 5`); }
+  };
+  const createLuz = (number) => otherDevice(async (repo, ctx, number) => {
+    const luz = (await repo.listSeries(ctx)).find((s) => s.terms[0].description === 'Luz');
+    const w = await repo.createSeriesOccurrence(crypto.randomUUID(), luz.id, luz.version, number, 'aberta');
+    return { cid: w.commitment.id, due: w.commitment.dueOn };
+  }, number);
+  await enterReturnDemo(); await toStep(1);
+  ok('julho: Luz sem conta registrada', (await body()).includes('cerca de R$ 180,00 (estimado) · vencimento em 12/07/2026 · sem conta registrada'));
+  await btn('Já paguei: Luz de julho').click(); await waitText('Registrar pagamento');
+  const luzJulho = await createLuz(3);
+  await btn('Cancelar').click(); await waitText('Mês 2 de 5');
+  await waitUntil(async () => (await body()).includes('cerca de R$ 180,00 (estimado) · venceu em 12/07/2026 · em aberto'), 6000);
+  t = await body();
+  ok('conta criada em outro aparelho, "Cancelar" no pagamento: a linha da Luz é recarregada como conta em aberto', luzJulho.due === '2026-07-12' &&
+    t.includes('cerca de R$ 180,00 (estimado) · venceu em 12/07/2026 · em aberto') && !t.includes('vencimento em 12/07/2026 · sem conta registrada'), t.slice(0, 500));
+  await btn('Pular este mês').click(); await waitText('Mês 3 de 5');
+  await btn('Já paguei: Luz de agosto').click(); await waitText('Registrar pagamento');
+  await createLuz(4);
+  await field('Valor pago').fill('175,00'); await btn('Salvar pagamento').click();
+  await waitText('Mês 3 de 5'); await waitText('Paga em 12/08/2026 · R$ 175,00');
+  await keepReturnText();
+  t = await body();
+  ok('conta criada em outro aparelho, "Salvar pagamento": paga a conta que já existe, sem repetir "Esta conta já foi registrada"', t.includes('Paga em 12/08/2026 · R$ 175,00') &&
+    t.includes('Pagamento registrado: Luz de agosto.') && !t.includes('Esta conta já foi registrada') && new URL(p.url()).pathname === '/retomar/atualizar', t.slice(0, 400));
+
+  // d) Conta do ano nos 11 meses fechados: o detalhe oferece "Registrar parcelas" (a série sem conta registrada desde junho).
+  const makeAnnual = (withLooseJuly) => otherDevice(async (repo, ctx, withLooseJuly) => {
+    const o = repo.opts ?? repo.inner?.opts;
+    const back = o.today;
+    o.today = () => '2026-03-20';
+    const input = { kind: 'anual', nature: 'conta', description: 'Taxa do condomínio', category: 'Moradia', amountCents: 18000, amountMode: 'variavel', dueDay: 10, firstDueMonth: '2026-06', firstNumber: 1, installmentTotal: null, partsPerYear: 10, lastMonth: null };
+    let id;
+    try { id = (await repo.createSeries(crypto.randomUUID(), ctx, input)).series.id; } finally { o.today = back; await repo.syncSeriesOccurrences(ctx); }
+    if (withLooseJuly) {
+      const space = await repo.getSpace();
+      await repo.createRecord(crypto.randomUUID(), ctx, 'despesa', { accountId: space.accounts[0].id, amountCents: 17500, occurredOn: '2026-07-11', description: 'Taxa do condomínio', category: 'Moradia' });
+    }
+    return { id };
+  }, withLooseJuly);
+  await enterReturnDemo();
+  const annual = await makeAnnual(false);
+  await openToPay(); await waitText('O Clarevo criou').catch(() => {});
+  await p.getByRole('button', { name: /^Gastos fixos e parcelamentos, \d+ cadastrados/ }).filter({ visible: true }).first().click(); await waitText('Por mês, se os valores não mudarem');
+  await openRow(/^Taxa do condomínio/); await waitText('Ano a ano'); await waitText('2026/2027: parcelas 1 a 3 sem conta registrada.');
+  t = await body();
+  ok('conta do ano: "2026/2027: parcelas 1 a 3 sem conta registrada." com "Registrar parcelas" e "Por que este mês não tem conta?", sem o conselho de anotar gasto', !t.includes('Se você pagou') &&
+    (await visibleCount('button', 'Registrar parcelas de 2026 a 2027')) === 1 && (await visibleCount('button', 'Por que este mês não tem conta?')) === 1 && (await visibleCount('button', 'Anotar gasto')) === 0, t.slice(0, 600));
+  ok('conta do ano: nomes acessíveis sem "2026/2027" (leitores de tela ouvem "2026 a 2027")', (await slashNames()).length === 0, (await slashNames()).join(' | '));
+  await keepText();
+  await innerChecks('conta do ano com parcelas sem conta 390px');
+  await shot('94_conta_do_ano_registrar_parcelas');
+  await btn('Registrar parcelas de 2026 a 2027').click(); await waitText('Parcela 3 de 10 de 2026/2027');
+  const sheetBtns = await p.evaluate(() => [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label') || e.textContent).filter((x) => /^(Já paguei|Não houve|Ainda não paguei): /.test(x)));
+  ok('"Registrar parcelas": a folha tem as 3 parcelas (junho, julho e agosto), cada uma com "Já paguei", "Não houve" e "Ainda não paguei"', sheetBtns.length === 9 &&
+    ['junho', 'julho', 'agosto'].every((m) => ['Já paguei', 'Não houve', 'Ainda não paguei'].every((a) => sheetBtns.includes(`${a}: Taxa do condomínio de ${m}`))), sheetBtns.join(' | '));
+  ok('"Registrar parcelas": nomes acessíveis da folha sem "2026/2027"', (await slashNames()).length === 0, (await slashNames()).join(' | '));
+  await shot('95_folha_registrar_parcelas');
+  await btn('Ainda não paguei: Taxa do condomínio de junho').click(); await waitText('Registrada em aberto: Taxa do condomínio de junho.');
+  await waitText('2026/2027: parcelas 2 e 3 sem conta registrada.');
+  ok('"Ainda não paguei" na folha: a folha fecha, a parcela 1 fica em aberto e o detalhe segue com as parcelas 2 e 3', (await visibleCount('button', 'Já paguei: Taxa do condomínio de julho')) === 0 &&
+    (await body()).includes('2026/2027 · 10 parcelas · 8 em aberto · 2 sem conta registrada'), (await body()).slice(0, 400));
+  // Pagar a parcela de julho enquanto outro aparelho a registra: paga a que já existe e volta ao detalhe.
+  await btn('Registrar parcelas de 2026 a 2027').click(); await waitText('Parcela 2 de 10 de 2026/2027');
+  await btn('Já paguei: Taxa do condomínio de julho').click(); await waitText('Registrar pagamento');
+  await otherDevice(async (repo, ctx, id) => {
+    const s = await repo.getSeries(id);
+    await repo.createSeriesOccurrence(crypto.randomUUID(), id, s.version, 2, 'aberta');
+  }, annual.id);
+  await field('Valor pago').fill('175,00'); await btn('Salvar pagamento').click();
+  await waitText('Pagamento registrado: Taxa do condomínio de julho.');
+  await waitText('2026/2027: parcela 3 sem conta registrada.');
+  t = await body();
+  ok('conta do ano, parcela já registrada em outro aparelho: paga a conta existente e volta ao detalhe, com 1 paga e a parcela 3 sem conta', new URL(p.url()).pathname === `/gastos-fixos/${annual.id}` &&
+    t.includes('2026/2027 · 10 parcelas · 1 paga · 8 em aberto · 1 sem conta registrada') && !t.includes('Esta conta já foi registrada'), `${p.url()} ${t.slice(0, 500)}`);
+  await keepText();
+
+  // e) Aviso de gasto solto também nas linhas de meses posteriores dentro do grupo de uma conta do ano.
+  await enterReturnDemo();
+  await makeAnnual(true);
+  await btn('Ver resumo').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos.');
+  await btn('Atualizar agora').click(); await waitText('Mês 1 de 5');
+  await waitText('Você já anotou o gasto Taxa do condomínio em 11/07/2026 (R$ 175,00).').catch(() => {});
+  t = await body();
+  ok('grupo da conta do ano sob junho: a linha de julho avisa do gasto solto anotado em 11/07/2026', t.includes('Parcela 2 de 10 de 2026/2027') &&
+    t.includes('Você já anotou o gasto Taxa do condomínio em 11/07/2026 (R$ 175,00).'), t.slice(0, 700));
+  await keepReturnText();
+
+  // f) "Registrar esta parcela" no detalhe do parcelamento, depois de "Seguir adiante": a folha de uma linha paga e fecha.
+  await enterReturnDemo();
+  await btn('Seguir adiante').click(); await waitText('Combinado. Os meses ficam como estão');
+  await p.getByRole('tab', { name: 'Movimentações' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
+  await p.getByRole('button', { name: /^Gastos fixos e parcelamentos, / }).filter({ visible: true }).first().click(); await waitText('Por mês, se os valores não mudarem');
+  await openRow(/^Financiamento do carro, Parcela/); await waitText('Meses sem conta registrada');
+  await btn('Registrar esta parcela: Financiamento do carro de julho').click(); await waitText('Já paguei: Financiamento do carro de julho', 4000).catch(() => {});
+  await btn('Já paguei: Financiamento do carro de julho').click(); await waitText('Marcar como paga?');
+  await confirmIn('Confirmar'); await waitText('Pagamento registrado: Financiamento do carro de julho.');
+  await waitText('Pagas no Clarevo: 2 · Sem conta registrada: 1');
+  ok('"Registrar esta parcela" > "Já paguei": a folha fecha, com o aviso de pagamento e o detalhe atualizado (2 pagas, 1 sem conta)', (await visibleCount('button', 'Ainda não paguei: Financiamento do carro de julho')) === 0 &&
+    (await body()).includes('Pagas no Clarevo: 2 · Sem conta registrada: 1'));
+
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);
   const forbidden = screenTexts.map((s) => s.match(FORBIDDEN)?.[0]).filter(Boolean);

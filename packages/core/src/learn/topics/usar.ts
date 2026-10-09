@@ -138,7 +138,8 @@ export const USAR_TOPICS: Topic[] = [
       'Usamos o valor de referência que você informou, marcado como estimado, até você informar o valor de cada conta.',
       'Quando houver contas pagas, mostramos a média das últimas três como sugestão, e você decide se usa.',
     ],
-    example: null,
+    example:
+      'Se as três últimas contas de luz pagas foram de R$ 165,30, R$ 180,00 e R$ 171,90, a média é R$ 172,40. O Clarevo mostra esse valor como sugestão, e você decide se o usa como novo valor de referência.',
     calculation: '(165,30 + 180,00 + 171,90) ÷ 3 = 172,40.',
     hypotheses: 'Contas fictícias de R$ 165,30, R$ 180,00 e R$ 171,90: média de R$ 172,40.',
     facts: [],

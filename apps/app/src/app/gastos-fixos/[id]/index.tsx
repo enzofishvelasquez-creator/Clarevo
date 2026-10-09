@@ -514,13 +514,13 @@ function Occurrences({
           {missing.some((m) => m.month < monthOf(today) && !isReviewableMonth(m.month, today)) ? (
             <LinkButton label="Anotar gasto" style={styles.inlineLink} onPress={() => router.push('/registro/novo')} />
           ) : null}
-          <TopicLink slug="sem-registro" label="Por que este mês não tem conta?" style={styles.inlineLink} />
+          <TopicLink slug="sem-registro" label={RETURN_TEXT.whyNoBill} style={styles.inlineLink} />
         </Card>
       ) : null}
 
       {sheet ? (
         <RegisterMonthSheet
-          row={sheet}
+          rows={[sheet]}
           onClose={() => setSheet(null)}
           onDone={(text) => {
             setSheet(null);

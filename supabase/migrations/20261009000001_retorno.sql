@@ -419,7 +419,9 @@ set search_path = public
 as $$
 begin
   -- Sem auxiliares: com security invoker, authenticated não executa clarevo_months_between.
-  if p_from is null or p_to is null or extract(day from p_from) <> 1 or extract(day from p_to) <> 1
+  -- Datas não finitas ('infinity', '-infinity') são recusadas: extract(day ...) delas é nulo e a série de meses não terminaria.
+  if p_from is null or p_to is null or not isfinite(p_from) or not isfinite(p_to)
+     or extract(day from p_from) <> 1 or extract(day from p_to) <> 1
      or p_to < p_from or p_to > (p_from + interval '11 months')::date then
     raise exception 'periodo_invalido' using errcode = '22023';
   end if;

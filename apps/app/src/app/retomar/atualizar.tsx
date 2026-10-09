@@ -10,6 +10,7 @@ import {
   reviewStepTitle,
   rowPaymentDraft,
   rowShortName,
+  type FinancialRecord,
   type IsoMonth,
   type PaymentInput,
   type ReturnReview,
@@ -20,8 +21,8 @@ import {
   type ReviewStep,
   type YearPlan,
 } from '@clarevo/core';
-import { useQueryClient } from '@tanstack/react-query';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useQueries, useQueryClient } from '@tanstack/react-query';
+import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { AlertCircle, ArrowDownLeft, ArrowUpRight, Check, ListChecks } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -44,14 +45,18 @@ import {
   useReturnWriter,
   type RowOutcome,
 } from '@/components/retorno-acoes';
-import { ReturnRow, moneyText, rowLayout } from '@/components/retorno-linha';
+import { ReturnRow, rowLayout } from '@/components/retorno-linha';
 import { yearA11y, yearA11yLabel } from '@/components/series-parts';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Banner, Button, Card, Chip, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
+import { announceOnIOS } from '@/lib/a11y';
 import { flash } from '@/lib/flash';
-import { useMonthRecords, useReturnReview, useSeriesList, useSpace, type ReturnReviewData } from '@/state/data';
+import { useReturnReview, useSeriesList, useSpace, type ReturnReviewData } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, motion, space, tabular } from '@/theme/tokens';
+
+/** Espera para o anúncio no iOS: o diálogo de confirmação fecha e o VoiceOver volta à lista antes. */
+const ANNOUNCE_DELAY = 500;
 
 /** Troca de passo desliza com motion.context (200 ms), respeitando "reduzir movimento" (CL-V008). */
 const stepIn = FadeInRight.duration(motion.context).reduceMotion(ReduceMotion.System);
@@ -102,6 +107,7 @@ export default function AtualizarMeses() {
   const repo = useRepo();
   const qc = useQueryClient();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const personal = useSpace().data;
   const ctx = personal?.personalContextId;
   const query = useReturnReview(ctx);
@@ -144,7 +150,12 @@ export default function AtualizarMeses() {
   const steps = session?.steps ?? [];
   const step = steps[index] ?? null;
   const frozen = step && session ? session.frozen[step.month] : null;
-  const monthRecords = useMonthRecords(ctx, step?.month ?? today.slice(0, 7));
+  // Registros de cada mês das linhas do passo (o grupo de conta do ano traz linhas de meses seguintes), para o aviso de gasto solto.
+  const rowMonths = frozen ? [...new Set(stepRows(frozen).map((r) => r.month))] : [];
+  const monthQueries = useQueries({
+    queries: rowMonths.map((m) => ({ queryKey: ['records', ctx, m], queryFn: () => repo.listRecords(ctx!, m), enabled: Boolean(ctx) })),
+  });
+  const recordsOf = (month: IsoMonth): readonly FinancialRecord[] | undefined => monthQueries[rowMonths.indexOf(month)]?.data;
   const account = personal?.accounts.find((a) => a.id === accountChoice) ?? personal?.accounts[0] ?? null;
   const view = (r: ReviewRow) => rowData[r.key] ?? r;
   const last = index === steps.length - 1;
@@ -161,6 +172,15 @@ export default function AtualizarMeses() {
     markActed(step?.month ?? row.month);
   };
   const note = (row: ReviewRow, text: string) => setNotes((cur) => ({ ...cur, [row.key]: text }));
+  /** Falha de uma linha: aparece abaixo dela e, no iOS (sem região viva), é anunciada. */
+  const warn = (row: ReviewRow, text: string) => {
+    note(row, text);
+    announceOnIOS(text, { delay: ANNOUNCE_DELAY });
+  };
+  // Resultado do rodapé (conta paga, não houve, lote, falhas): no iOS o texto que aparece sozinho é anunciado uma vez.
+  useEffect(() => {
+    if (result) announceOnIOS(result.text, { delay: ANNOUNCE_DELAY });
+  }, [result]);
 
   /** Revisão recarregada do servidor (para "a lista foi atualizada"); null se não houver mais revisão ativa. */
   const freshReview = async (): Promise<ReturnReview | null> => {
@@ -173,8 +193,9 @@ export default function AtualizarMeses() {
    * Recusa porque algo mudou em outro aparelho: recarrega a linha e mostra o texto do código. Conta já paga em outro
    * aparelho aparece como paga; linha que saiu da revisão fica sem ações.
    */
-  const reloadRow = async (row: ReviewRow, e: unknown) => {
+  const reloadRow = async (row: ReviewRow, e: unknown, speak = true) => {
     const text = returnErrorText(codeOf(e));
+    const say = speak ? warn : note;
     try {
       const current = view(row);
       if (current.commitment && (isRepoCode(e, 'compromisso_quitado') || isRepoCode(e, 'versao_desatualizada'))) {
@@ -187,23 +208,23 @@ export default function AtualizarMeses() {
       const live = findLiveRow(await freshReview(), current);
       if (live) setRowData((cur) => ({ ...cur, [row.key]: live }));
       else setClosedRows((cur) => ({ ...cur, [row.key]: true }));
-      note(row, text);
+      say(row, text);
     } catch {
-      note(row, text);
+      say(row, text);
     }
   };
 
   /** Falha de uma ação de linha: rede (repetir é seguro), conflito (recarrega) ou recusa (texto do código). */
   const failed = async (row: ReviewRow, e: unknown) => {
     if (isUncertain(e)) {
-      note(row, RETURN_TEXT.saveFailed);
+      warn(row, RETURN_TEXT.saveFailed);
       return;
     }
     if (isConflict(e)) {
       await reloadRow(row, e);
       return;
     }
-    note(row, returnErrorText(codeOf(e)));
+    warn(row, returnErrorText(codeOf(e)));
   };
 
   const inputFor = (row: ReviewRow): PaymentInput => {
@@ -224,8 +245,8 @@ export default function AtualizarMeses() {
         // A conta foi registrada e o pagamento não: ela fica em aberto (estado verdadeiro); "Já paguei" de novo só paga.
         setRowData((cur) => ({ ...cur, [row.key]: openRowFrom(current, err.created!) }));
         markActed(step?.month ?? row.month);
-        note(row, RETURN_TEXT.partialFailure(row.month));
         if (!isUncertain(err.cause) && isConflict(err.cause)) await reloadRow(row, err.cause);
+        else warn(row, RETURN_TEXT.partialFailure(row.month));
         return false;
       }
       await failed(row, err.cause);
@@ -283,6 +304,48 @@ export default function AtualizarMeses() {
     router.push({ pathname: '/retomar/pagar', params: { serie: current.series.id, numero: String(current.series.number) } });
   };
 
+  /**
+   * Na volta de outra tela (pagamento, modo "Dia"), as linhas do passo sem resultado são conferidas na revisão
+   * recarregada: uma conta registrada ou paga em outro aparelho, ou pela tela de pagamento, deixa de ser "sem conta
+   * registrada" aqui, em vez de repetir uma ação que o servidor já recusou.
+   */
+  const refreshRows = async (resolvedNow: ReadonlySet<string>) => {
+    if (!frozen) return;
+    const stale = stepRows(frozen).filter((r) => !outcomes[r.key] && !closedRows[r.key] && !resolvedNow.has(r.key));
+    if (stale.length === 0) return;
+    try {
+      const fresh = await freshReview();
+      if (!fresh) return;
+      const changes: Record<string, ReviewRow> = {};
+      for (const r of stale) {
+        const cur = view(r);
+        const live = findLiveRow(fresh, cur);
+        if (!live) continue;
+        const same =
+          live.key === cur.key &&
+          live.state === cur.state &&
+          live.commitment?.id === cur.commitment?.id &&
+          live.commitment?.version === cur.commitment?.version;
+        if (!same) changes[r.key] = live;
+      }
+      if (Object.keys(changes).length > 0) setRowData((cur) => ({ ...cur, ...changes }));
+    } catch {
+      // Sem a revisão nova, as linhas ficam como estão: uma ação recusada recarrega a linha do mesmo jeito.
+    }
+  };
+  const latestRefresh = useRef(refreshRows);
+  useEffect(() => {
+    latestRefresh.current = refreshRows;
+  });
+  const leftScreen = useRef(false);
+  useEffect(
+    () =>
+      navigation.addListener('blur', () => {
+        leftScreen.current = true;
+      }),
+    [navigation],
+  );
+
   // Na volta das telas de pagamento e do modo "Dia": aplica o que foi confirmado lá (é uma ação do passo atual).
   const stepMonth = step?.month ?? null;
   useFocusEffect(
@@ -292,6 +355,10 @@ export default function AtualizarMeses() {
         setActed(true);
         if (stepMonth) setActedIn((cur) => ({ ...cur, [stepMonth]: true }));
       };
+      if (leftScreen.current) {
+        leftScreen.current = false;
+        latestRefresh.current(new Set(taken.outcomes.map(([rowKey]) => rowKey)));
+      }
       if (taken.acted || taken.outcomes.length > 0) actedHere();
       for (const [rowKey, outcome] of taken.outcomes) {
         setOutcomes((cur) => ({ ...cur, [rowKey]: outcome }));
@@ -427,7 +494,7 @@ export default function AtualizarMeses() {
             setRowData((cur) => ({ ...cur, [row.key]: openRowFrom(current, err.created!) }));
             markActed(step?.month ?? row.month);
             note(row, RETURN_TEXT.partialFailure(row.month));
-          } else if (!isUncertain(err.cause) && isConflict(err.cause)) await reloadRow(row, err.cause);
+          } else if (!isUncertain(err.cause) && isConflict(err.cause)) await reloadRow(row, err.cause, false);
           const conflict = isRepoCode(err.cause, 'versao_desatualizada') || isRepoCode(err.cause, 'ocorrencia_existente');
           setResult({ tone: 'erro', text: RETURN_TEXT.batchPartial(done, rows.length, rowShortName(row), conflict) });
           return;
@@ -445,7 +512,7 @@ export default function AtualizarMeses() {
       outcome={outcomes[row.key] ?? null}
       note={notes[row.key] ?? null}
       closed={Boolean(closedRows[row.key])}
-      monthRecords={monthRecords.data}
+      monthRecords={recordsOf(row.month)}
       selectable
       selected={selected.includes(row.key)}
       onToggle={() => setSelected((cur) => (cur.includes(row.key) ? cur.filter((k) => k !== row.key) : [...cur, row.key]))}
@@ -458,7 +525,7 @@ export default function AtualizarMeses() {
             setRowData((cur) => ({ ...cur, [row.key]: openRowFrom(view(row), reopened) }));
             setResult({ tone: 'sucesso', text: 'Pagamento desfeito' });
           } catch (e) {
-            note(row, isUncertain(e) ? RETURN_TEXT.saveFailed : returnErrorText(codeOf(e)));
+            warn(row, isUncertain(e) ? RETURN_TEXT.saveFailed : returnErrorText(codeOf(e)));
           }
         })
       }
@@ -687,9 +754,7 @@ export default function AtualizarMeses() {
               }
             })
           }>
-          <Txt style={[{ fontFamily: fonts.bold }, tabular]}>
-            {target.description} · {moneyText(target.amountCents)}
-          </Txt>
+          <Txt style={[{ fontFamily: fonts.bold }, tabular]}>{dialog.line}</Txt>
           <Txt color={colors.textSecondary}>{dialog.body}</Txt>
         </ConfirmDialog>
       ) : null}

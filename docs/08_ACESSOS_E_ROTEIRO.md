@@ -467,8 +467,8 @@ Situação em 09/10/2026, depois dos Ciclos A6 (D-035), A4 (D-030) e A5 (D-031 e
 | Conta, segurança, "Quem vê estes dados?" | Existe | Avatar, rodapés |
 | Metas | Tela de espera com o card "Enquanto isso, faça as contas" (Reserva, Juntar para um objetivo e Todas as calculadoras, A6) | Aba Metas |
 | Primeiros passos e "Organizar" em Movimentos | Existe (D-033); "Organizar" com 3 linhas, Calculadoras e legendas com valores (D-035(8)) | Card temporário no Resumo; Movimentos |
-| Seus últimos meses (A4) | Existe (D-030): faixa, resumo mês a mês, "Atualizar agora" e "Seguir adiante". Falta: o botão em Contas a pagar com a faixa ativa, "Registrar parcelas" na conta do ano, o cenário da demonstração pelo endereço, o roteiro web e o teste em aparelho (`docs/04`) | Faixa temporária no Resumo, `/retomar` |
-| Aprender e dúvidas: busca, 5 seções, 35 temas, "O que é isso?" (A5) | Existe (D-031 e D-032), com o card "Calculadoras" no topo e "Fazer a conta com os seus números" nos temas; catálogo e fontes em `docs/09_APRENDER.md`. Falta: o roteiro web e o teste em aparelho (`docs/04`) | Aba Aprender; "O que é isso?" nas telas |
+| Seus últimos meses (A4) | Existe (D-030): faixa, resumo mês a mês, "Atualizar agora" e "Seguir adiante", com "Ver resumo dos últimos meses" em Contas a pagar, "Registrar parcelas" na conta do ano e o cenário da demonstração pelo endereço, todos no roteiro web. Falta: o teste em aparelho (`docs/04`) | Faixa temporária no Resumo, `/retomar` |
+| Aprender e dúvidas: busca, 5 seções, 35 temas, "O que é isso?" (A5) | Existe (D-031 e D-032), com o card "Calculadoras" no topo e "Fazer a conta com os seus números" nos temas; catálogo e fontes em `docs/09_APRENDER.md`. Falta: o teste em aparelho (`docs/04`) | Aba Aprender; "O que é isso?" nas telas |
 | Lembretes de vencimento (A2) | Desenhado (`spec2` §1.3) | Conta › interruptor; aviso no celular |
 | Renda comprometida (B) | Desenhado (`spec2` §1.4) | Linha dentro do card "Ainda a pagar", `/renda-comprometida` |
 | Metas e reserva (C) | Desenhado (`spec2` §1.5) | Aba Metas, `/reserva`, `/meta/*` |

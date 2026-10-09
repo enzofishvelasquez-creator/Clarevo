@@ -81,9 +81,15 @@ export default function AprenderScreen() {
             <Txt color={colors.textSecondary}>{LEARN_UI_TEXT.intro}</Txt>
 
             <SearchField inputRef={inputRef} value={query} onChange={setQuery} onClear={clear} />
-            <Txt style={styles.liveRegion} accessibilityLiveRegion="polite" aria-live="polite">
-              {announced}
-            </Txt>
+            {/*
+              Região viva escondida só da vista: 1×1 px cortado, sem opacity 0 (no Android, o TalkBack ignora região com
+              alfa 0). No iOS o anúncio é de announceOnIOS, e o VoiceOver não precisa ler este texto de novo.
+            */}
+            <View style={styles.liveClip} accessibilityElementsHidden={Platform.OS === 'ios'}>
+              <Txt style={styles.liveText} accessibilityLiveRegion="polite" aria-live="polite">
+                {announced}
+              </Txt>
+            </View>
 
             {results !== null ? (
               <SearchResults query={query} results={results} onShowAll={clear} />
@@ -272,7 +278,8 @@ function SectionHeading({ section, headingRef }: { section: LearnSection; headin
 }
 
 const styles = StyleSheet.create({
-  liveRegion: { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 },
+  liveClip: { position: 'absolute', width: 1, height: 1, overflow: 'hidden' },
+  liveText: { width: 240 },
   search: { gap: space[2] },
   clear: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: -space[3], borderRadius: 22 },
   calc: {

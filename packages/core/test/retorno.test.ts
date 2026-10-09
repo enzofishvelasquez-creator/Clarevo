@@ -7,6 +7,9 @@ import {
   RETURN_NOTICE_DAYS,
   RETURN_TEXT,
   REVIEW_MAX_CLOSED_MONTHS,
+  annualGapRows,
+  annualGapSplit,
+  annualYearSummary,
   batchEligible,
   buildReturnReview,
   createDemoRepository,
@@ -416,6 +419,48 @@ describe('seriesGapsInRange', () => {
     expect(seriesGapsInRange(s, [], '2027-12', '2028-01')).toEqual([]);
   });
 
+  it('detalhe da conta do ano: parcelas dos 11 meses fechados com "Registrar parcelas", as mais antigas só com "Anotar gasto"', () => {
+    const s = iptuSerie();
+    const today = '2028-06-15';
+    // Sem conta nenhuma registrada: 2027 vai de fevereiro a novembro (n1 a n10). Os 11 meses fechados começam em julho de 2027.
+    const live14 = live(s, 14, '2028-05-10');
+    const y0 = annualYearSummary(s, [live14], [live14], 0, today);
+    expect(y0.missingParts).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(annualGapSplit(s, y0, today)).toEqual({ reviewable: [6, 7, 8, 9, 10], old: [1, 2, 3, 4, 5] });
+    expect(isReviewableMonth('2027-06', today)).toBe(false);
+    expect(isReviewableMonth('2027-07', today)).toBe(true);
+    const rows = annualGapRows(s, [live14], y0, today);
+    expect(rows.map((r) => [r.series!.number, r.month, r.state, r.label])).toEqual([
+      [6, '2027-07', 'sem_conta', 'Parcela 6 de 10 de 2027'],
+      [7, '2027-08', 'sem_conta', 'Parcela 7 de 10 de 2027'],
+      [8, '2027-09', 'sem_conta', 'Parcela 8 de 10 de 2027'],
+      [9, '2027-10', 'sem_conta', 'Parcela 9 de 10 de 2027'],
+      [10, '2027-11', 'sem_conta', 'Parcela 10 de 10 de 2027'],
+    ]);
+    // Os textos de cada grupo de parcelas do mesmo ano.
+    expect(RETURN_TEXT.annualGap(y0.year.label, [6, 7, 8, 9, 10])).toBe('2027: parcelas 6 a 10 sem conta registrada.');
+    expect(RETURN_TEXT.annualGapOld(y0.year.label, [1, 2, 3, 4, 5])).toContain('2027: parcelas 1 a 5 sem conta registrada. Meses com mais de 1 ano');
+    // Parcela já registrada (viva) ou tirada não entra; ano inteiramente fora da janela não tem linhas.
+    const withLive = annualYearSummary(s, [live14, live(s, 7, '2027-08-10')], [live14], 0, today);
+    expect(annualGapRows(s, [live14, live(s, 7, '2027-08-10')], withLive, today).map((r) => r.series!.number)).toEqual([6, 8, 9, 10]);
+    const skipped = { ...s, skippedNumbers: [8] };
+    const withSkip = annualYearSummary(skipped, [live14], [live14], 0, today);
+    expect(annualGapSplit(skipped, withSkip, today)).toEqual({ reviewable: [6, 7, 9, 10], old: [1, 2, 3, 4, 5] });
+    const early = annualYearSummary(s, [live14], [live14], 0, '2028-12-15');
+    expect(annualGapSplit(s, early, '2028-12-15')).toEqual({ reviewable: [], old: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] });
+    expect(annualGapRows(s, [live14], early, '2028-12-15')).toEqual([]);
+    // Conta do ano com uma parcela por ano: o mês único decide.
+    const ipva = serie(
+      { id: 'ipva', kind: 'anual', firstDueMonth: '2026-01', partsPerYear: 1 },
+      { description: 'IPVA', amountCents: 189_900, dueDay: 20 },
+    );
+    const ipvaY = annualYearSummary(ipva, [], [], 0, '2026-10-07');
+    expect(ipvaY.missingParts).toEqual([1]);
+    expect(annualGapSplit(ipva, ipvaY, '2026-10-07')).toEqual({ reviewable: [1], old: [] });
+    expect(annualGapRows(ipva, [], ipvaY, '2026-10-07').map((r) => [r.series!.number, r.month, r.label])).toEqual([[1, '2026-01', 'Conta do ano de 2026']]);
+    expect(annualGapSplit(ipva, ipvaY, '2027-03-07')).toEqual({ reviewable: [], old: [1] });
+  });
+
   it('número removido por encerramento e depois retomado aparece (MemoryRepository)', async () => {
     const h = await harness('2026-06-10');
     const { series, occurrences } = await h.series({ description: 'Academia', amountCents: 12_000, dueDay: 15, firstDueMonth: '2026-05' });
@@ -676,18 +721,44 @@ describe('rowActions, batchEligible, rowPaymentDraft e looseExpenseFor', () => {
     );
     expect(notHappenedDialog({ ...aluguel!, description: 'Academia' })).toEqual({
       title: 'Não houve esta conta em julho?',
+      line: 'Academia · R$ 2.500,00',
       body: 'A conta de julho de Academia fica registrada como não houve e não volta a aparecer. Os outros meses não mudam.',
       confirm: 'Confirmar',
     });
     expect(notHappenedDialog({ ...aluguel!, state: 'aberta', month: '2026-06' })).toEqual({
       title: 'Tirar a conta de junho?',
+      line: 'Aluguel · R$ 2.500,00',
       body: 'Ela sai de Contas a pagar e não volta a ser criada.',
       confirm: 'Tirar conta',
     });
+    // Valor estimado nunca aparece como valor da conta: "cerca de" e "(estimado)", na linha do diálogo e na folha.
+    expect(RETURN_TEXT.rowAmountLine(luz!)).toBe('Luz · cerca de R$ 180,00 (estimado)');
+    expect(notHappenedDialog(luz!).line).toBe('Luz · cerca de R$ 180,00 (estimado)');
+    expect(notHappenedDialog({ ...luz!, state: 'aberta', month: '2026-07' }).line).toBe('Luz · cerca de R$ 180,00 (estimado)');
+    expect(RETURN_TEXT.rowAmountLine(carro!)).toBe('Financiamento do carro · R$ 850,00');
+    expect(RETURN_TEXT.noActiveReview).toBe('Não há revisão dos últimos meses agora.');
+    expect(RETURN_TEXT.noActiveReview).not.toBe(RETURN_TEXT.emptyBody);
     expect(RETURN_TEXT.dayGapHint(aluguel!)).toBe('O gasto fixo Aluguel não tem conta registrada em julho. Para contar no gasto fixo, use Já paguei na revisão.');
     expect(RETURN_TEXT.estimateHint(18_000)).toBe('Digite o valor da conta. A estimativa era R$ 180,00.');
     expect(RETURN_TEXT.seriesGap('2026-07')).toBe('Julho de 2026: sem conta registrada.');
     expect(RETURN_TEXT.annualGap('2027', [6, 7, 8, 9, 10])).toBe('2027: parcelas 6 a 10 sem conta registrada.');
+    expect(RETURN_TEXT.annualGap('2027', [6])).toBe('2027: parcela 6 sem conta registrada.');
+    expect(RETURN_TEXT.annualGapOld('2025', [1, 2, 3])).toBe(
+      '2025: parcelas 1 a 3 sem conta registrada. Meses com mais de 1 ano não podem ser registrados aqui; se pagou, anote o gasto em Anotar gasto.',
+    );
+    expect(RETURN_TEXT.annualGapOld('2025', [4])).toBe(
+      '2025: parcela 4 sem conta registrada. Meses com mais de 1 ano não podem ser registrados aqui; se pagou, anote o gasto em Anotar gasto.',
+    );
+    expect(RETURN_TEXT.seriesGapOld('2025-07')).toBe(
+      'Julho de 2025: sem conta registrada. Meses com mais de 1 ano não podem ser registrados aqui; se pagou, anote o gasto em Anotar gasto.',
+    );
+    expect([RETURN_TEXT.registerMonth, RETURN_TEXT.registerInstallment, RETURN_TEXT.registerParts]).toEqual([
+      'Registrar este mês',
+      'Registrar esta parcela',
+      'Registrar parcelas',
+    ]);
+    expect(RETURN_TEXT.registerPartsA11y('2027')).toBe('Registrar parcelas de 2027');
+    expect(RETURN_TEXT.whyNoBill).toBe('Por que este mês não tem conta?');
   });
 
   it('códigos de erro e decisão ao concluir', () => {
@@ -1016,7 +1087,20 @@ describe('MemoryRepository: sequência R7 (contas do ano)', () => {
     // As linhas do grupo não se repetem nos meses seguintes.
     expect(monthOfReview(review, '2027-08').items).toEqual([]);
     expect(reviewMonthCard(monthOfReview(review, '2027-07')).lines).toEqual(['IPTU de 2027 · 5 parcelas sem conta registrada']);
-    expect(reviewMonthCard(monthOfReview(review, '2027-08')).lines).toEqual(['Nenhuma conta para conferir.']);
+    // Agosto tem a parcela 7, que o grupo de julho carrega: o cartão a mostra, nunca "Nenhuma conta para conferir.".
+    expect(monthOfReview(review, '2027-08').rows.map((x) => x.series!.number)).toEqual([7]);
+    expect(reviewMonthCard(monthOfReview(review, '2027-08'))).toMatchObject({
+      lines: ['Sem conta registrada: IPTU (parcela 7 de 10 de 2027)'],
+      compact: false,
+    });
+    expect(reviewMonthCard(monthOfReview(review, '2027-11')).lines).toEqual(['Sem conta registrada: IPTU (parcela 10 de 10 de 2027)']);
+    // Dezembro de 2027 e janeiro de 2028 não têm parcela: aí sim, nada a conferir.
+    expect(monthOfReview(review, '2027-12').rows).toEqual([]);
+    expect(reviewMonthCard(monthOfReview(review, '2027-12')).lines).toEqual(['Nenhuma conta para conferir.']);
+    for (const m of review.months) {
+      const lines = reviewMonthCard(m).lines;
+      expect(lines.includes(RETURN_TEXT.nothingToCheck), m.month).toBe(m.rows.length === 0);
+    }
     const may = monthOfReview(review, '2028-05');
     expect(may.items.map((i) => (i.type === 'linha' ? [i.row.series!.number, i.row.state] : null))).toEqual([[14, 'aberta']]);
     expect(review.current.rows.map((x) => [x.series!.number, x.dueOn])).toEqual([[15, '2028-06-10']]);
@@ -1081,6 +1165,13 @@ describe('MemoryRepository: sequência R7 (contas do ano)', () => {
     expect(group).toMatchObject({ state: 'aberta', text: 'IPTU de 2027 · 9 parcelas em aberto', number: 2, label: '2027' });
     expect(groupActions(group!)).toEqual(['nao_houve_ano']);
     expect(RETURN_TEXT.notHappenedYear(group!.label)).toBe('Não houve em 2027');
+    // O grupo fica em março; as parcelas dos meses seguintes aparecem nos cartões deles, em aberto.
+    expect(reviewMonthCard(monthOfReview(review, '2027-03')).lines).toEqual(['IPTU de 2027 · 9 parcelas em aberto']);
+    expect(reviewMonthCard(monthOfReview(review, '2027-04'))).toMatchObject({
+      lines: ['Contas em aberto: 1 · R$ 180,00 · inclui R$ 180,00 estimados'],
+      compact: false,
+    });
+    for (const m of review.months) expect(reviewMonthCard(m).lines.includes(RETURN_TEXT.nothingToCheck), m.month).toBe(m.rows.length === 0);
   });
 });
 

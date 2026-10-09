@@ -27,6 +27,7 @@ export type LearnProblemCode =
   | 'resumo'
   | 'paragrafos'
   | 'exemplo'
+  | 'calculo_sem_exemplo'
   | 'palavras_demais'
   | 'sem_fonte'
   | 'fonte_sem_data'
@@ -148,6 +149,8 @@ export function validateLearnCatalog(topics: readonly Topic[], opts: LearnValida
     if (t.short.trim() === '' || t.short.length > 220) push('resumo', t.slug, String(t.short.length));
     if (t.paragraphs.length < 1 || t.paragraphs.length > 5 || t.paragraphs.some((p) => p.trim() === '' || p.length > 450)) push('paragrafos', t.slug);
     if (t.example !== null && (t.example.trim() === '' || t.example.length > 450)) push('exemplo', t.slug);
+    // "Ver a conta" abre dentro do cartão Exemplo: conta sem exemplo nunca apareceria na tela.
+    if (t.calculation !== null && t.example === null) push('calculo_sem_exemplo', t.slug);
     const words = topicWordCount(t);
     if (words > TOPIC_MAX_WORDS) push('palavras_demais', t.slug, String(words));
     // Calculadora.

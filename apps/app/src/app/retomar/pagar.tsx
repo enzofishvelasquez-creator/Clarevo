@@ -20,9 +20,11 @@ import {
   seriesGapsInRange,
   seriesMonthOf,
   validatePaymentDraft,
+  type Commitment,
   type DraftField,
   type FieldErrors,
   type PaymentDraft,
+  type PaymentInput,
   type PersonalSpace,
   type ReviewRow,
 } from '@clarevo/core';
@@ -36,7 +38,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
-import { PayRowError, codeOf, isUncertain, returnSession, useReturnWriter } from '@/components/retorno-acoes';
+import { PayRowError, codeOf, isUncertain, openRowFrom, returnSession, useReturnWriter } from '@/components/retorno-acoes';
 import { ErrorState, LoadingState } from '@/components/states';
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
@@ -44,7 +46,7 @@ import { flash } from '@/lib/flash';
 import { explanationHref } from '@/lib/learn';
 import { totalChange } from '@/lib/highlight';
 import { useReturnReview, useSeries, useSpace } from '@/state/data';
-import { useSession } from '@/state/session';
+import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
 
 /**
@@ -97,10 +99,13 @@ function OutOfRange({ text }: { text: string }) {
 
 function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: PersonalSpace }) {
   const { today } = useSession();
+  const repo = useRepo();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const writer = useReturnWriter();
   const short = rowShortName(row);
+  /** Conta deste mês que já existia (criada em outro aparelho): as próximas tentativas pagam essa, sem registrar de novo. */
+  const existing = useRef<Commitment | null>(null);
 
   const initial = useMemo<PaymentDraft>(
     () => ({
@@ -147,6 +152,36 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: Person
     if (first) refs[first].current?.focus();
   };
 
+  /** A conta viva deste número da série no mês da linha, ou null (não existe, foi tirada ou a leitura falhou). */
+  const findLiveBill = async (): Promise<Commitment | null> => {
+    const ref = row.series;
+    if (!ref) return null;
+    try {
+      const bills = await repo.listCommitmentsDueBetween(personal.personalContextId, row.month, row.month);
+      return bills.find((c) => c.series?.id === ref.id && c.series.number === ref.number) ?? null;
+    } catch {
+      return null;
+    }
+  };
+
+  /**
+   * Registra e paga a conta da linha. Se ela já existe (ocorrencia_existente, criada em outro aparelho), paga a que está
+   * lá em vez de tentar registrar de novo; já paga lá, só a mostra como paga. alreadyPaid: ninguém pagou aqui.
+   */
+  const payLine = async (input: PaymentInput): Promise<{ paid: Commitment; alreadyPaid: boolean }> => {
+    try {
+      return { paid: await writer.payRow(existing.current ? openRowFrom(row, existing.current) : row, input), alreadyPaid: false };
+    } catch (e) {
+      const err = e instanceof PayRowError ? e : new PayRowError(e, null);
+      if (err.created || existing.current || isUncertain(err.cause) || codeOf(err.cause) !== 'ocorrencia_existente') throw err;
+      const live = await findLiveBill();
+      if (!live) throw err;
+      existing.current = live;
+      if (live.status === 'quitado') return { paid: live, alreadyPaid: true };
+      return { paid: await writer.payRow(openRowFrom(row, live), input), alreadyPaid: false };
+    }
+  };
+
   const submit = async () => {
     if (busy) return;
     const v = validatePaymentDraft(draft, today);
@@ -159,20 +194,23 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: Person
     setBanner(null);
     setBusy(true);
     try {
-      const paid = await writer.payRow(row, v.input);
-      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      if (paid.payment) totalChange.set({ total: 'pago', month: monthOf(paid.payment.paidOn), deltaCents: paid.payment.amountCents });
+      const { paid, alreadyPaid } = await payLine(v.input);
       returnSession.setOutcome(row.key, { type: 'paga', commitment: paid });
-      // Anunciado uma vez na tela de origem (revisão ou detalhe do gasto fixo).
-      flash.set(RETURN_TEXT.announcePaid(short));
+      if (!alreadyPaid) {
+        if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        if (paid.payment) totalChange.set({ total: 'pago', month: monthOf(paid.payment.paidOn), deltaCents: paid.payment.amountCents });
+        // Anunciado uma vez na tela de origem (revisão ou detalhe do gasto fixo).
+        flash.set(RETURN_TEXT.announcePaid(short));
+      }
       leave(goBack);
     } catch (e) {
       const err = e instanceof PayRowError ? e : new PayRowError(e, null);
-      const created = err.created ?? writer.createdFor(row.key);
+      const created = err.created ?? writer.createdFor(row.key) ?? existing.current;
       if (created) {
         // Conta registrada, pagamento não: ela já aparece em Contas a pagar; "Salvar de novo" repete só o pagamento.
         setPartial(true);
-        returnSession.noteAction();
+        // A revisão mostra a linha com a conta registrada em aberto, e não mais "sem conta registrada".
+        returnSession.setOutcome(row.key, { type: 'registrada', commitment: created });
         const field = !isUncertain(err.cause) ? fieldForErrorCode(codeOf(err.cause)) : null;
         if (field && PAYMENT_FIELD_ORDER.includes(field)) {
           const errs = { [field]: returnErrorText(codeOf(err.cause)) };

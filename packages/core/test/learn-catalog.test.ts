@@ -50,12 +50,6 @@ function referenceIds(): string[] {
   return [...ids];
 }
 
-/**
- * Decisões citadas pelo catálogo que entram em docs/00 no fim dos Ciclos A4 e A5 (spec5_notes §1 e §2): enquanto não
- * estiverem registradas, o teste aceita. Depois de registradas, valem como as demais; tirar daqui quando estiverem.
- */
-const AWAITING_REGISTRATION = ['D-030', 'D-031', 'D-032'];
-
 const TODAY = new Date().toISOString().slice(0, 10);
 
 const clone = (slug: TopicSlug): Topic => structuredClone(TOPICS.find((t) => t.slug === slug)!);
@@ -64,8 +58,10 @@ const withTopic = (t: Topic) => TOPICS.map((x) => (x.slug === t.slug ? t : x));
 
 describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
   it('R1 a R7, R9 e R12: validateLearnCatalog sem problemas, com as decisões de docs/00 e as referências', () => {
-    const decisions = [...registeredDecisions(), ...AWAITING_REGISTRATION];
-    expect(registeredDecisions().length).toBeGreaterThan(25);
+    const decisions = registeredDecisions();
+    expect(decisions.length).toBeGreaterThan(25);
+    // D-030, D-031 e D-032 já estão em docs/00: o catálogo cita só decisões registradas.
+    for (const id of ['D-030', 'D-031', 'D-032']) expect(decisions).toContain(id);
     const problems = validateLearnCatalog(TOPICS, { today: TODAY, decisionIds: decisions, referenceIds: referenceIds() });
     expect(problems).toEqual([]);
   });
@@ -191,8 +187,10 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
     };
     for (const [slug, old] of Object.entries(legacy)) {
       const t = topicBySlug(slug)!;
-      // Em diferenca, o parágrafo "Exemplo: ..." passou para o campo example, com o mesmo texto.
-      const paragraphs = t.example ? [...t.paragraphs, `Exemplo: ${t.example[0]!.toLowerCase()}${t.example.slice(1)}`] : t.paragraphs;
+      // Em diferenca, o parágrafo "Exemplo: ..." passou para o campo example, com o mesmo texto. Os demais ganharam
+      // (estimativa) ou já tinham o exemplo fora dos parágrafos.
+      const paragraphs =
+        slug === 'diferenca' && t.example ? [...t.paragraphs, `Exemplo: ${t.example[0]!.toLowerCase()}${t.example.slice(1)}`] : t.paragraphs;
       expect({ title: t.title, subtitle: t.subtitle, paragraphs, hypotheses: t.hypotheses }).toEqual(old);
     }
     // quitar-antes troca de texto (Anexo A, 14, com fontes conferidas) e mantém título e subtítulo.
@@ -200,6 +198,13 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
     expect([q.title, q.subtitle]).toEqual(['Quitar antes do prazo', 'O que a soma das parcelas não mostra']);
     expect(q.paragraphs.join(' ')).toContain('estimativa com a taxa que digitar; o valor oficial é o que a instituição informar');
     expect(q.paragraphs.join(' ')).not.toMatch(/saldo devedor/i);
+    // A vedação da tarifa começa na publicação da Resolução CMN nº 3.516/2007 (10/12/2007), não em 1º de dezembro.
+    expect(q.paragraphs[2]).toContain('assinados a partir de 10 de dezembro de 2007 (Resolução CMN nº 3.516/2007)');
+    expect(q.paragraphs.join(' ')).not.toContain('desde dezembro de 2007');
+    // estimativa: o exemplo traz a mesma conta que "Ver a conta" mostra.
+    const est = topicBySlug('estimativa')!;
+    expect(est.example).toContain('R$ 172,40');
+    expect(est.calculation).toBe('(165,30 + 180,00 + 171,90) ÷ 3 = 172,40.');
     expect(topicBySlug('contas-do-ano')!.paragraphs[4]).toBe(
       'No Clarevo, cadastre cada uma como conta do ano: o ano inteiro aparece em Contas a pagar dois meses antes do primeiro vencimento, e cada conta só entra em Ainda a pagar no mês em que vence.',
     );
@@ -303,6 +308,13 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
     const mark = clone('fgc');
     mark.paragraphs = [...mark.paragraphs, 'Trecho a confirmar [conferir].'];
     expectCode(withTopic(mark), 'marca_pendente', 'fgc');
+
+    // "Ver a conta" só aparece dentro do cartão Exemplo: calculation exige example.
+    const calcWithoutExample = clone('estimativa');
+    calcWithoutExample.example = null;
+    expectCode(withTopic(calcWithoutExample), 'calculo_sem_exemplo', 'estimativa');
+    expect(codes([...TOPICS])).not.toContain('calculo_sem_exemplo:estimativa');
+    expect(TOPICS.filter((t) => t.calculation !== null && t.example === null).map((t) => t.slug)).toEqual([]);
 
     const long = clone('selic');
     long.paragraphs = [...long.paragraphs, Array.from({ length: 150 }, () => 'palavra').join(' ')];

@@ -1,7 +1,6 @@
 import {
   RETURN_TEXT,
   batchEligible,
-  formatBRL,
   looseExpenseFor,
   reviewRowA11yLabel,
   reviewRowText,
@@ -182,9 +181,6 @@ export function ReturnRow({
     </Animated.View>
   );
 }
-
-/** "R$ 2.500,00" com o espaço não separável, para os textos dos diálogos. */
-export const moneyText = (cents: number) => formatBRL(cents).replace(' ', ' ');
 
 const styles = StyleSheet.create({
   row: { paddingVertical: space[3] },
