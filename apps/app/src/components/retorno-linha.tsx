@@ -153,7 +153,6 @@ export function ReturnRow({
               accessibilityLabel={yearA11y(`${CARDS_TEXT.openInvoice}: ${short}`)}
               tone="soft"
               disabled={busy}
-              style={styles.action}
               onPress={() => openCommitment(row.commitment!)}
             />
           ) : null}
