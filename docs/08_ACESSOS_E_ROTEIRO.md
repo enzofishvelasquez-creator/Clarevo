@@ -205,7 +205,7 @@ O ganho maior é de **descoberta**: as funções escondidas ganham nome visível
 ### 2.4 O que muda na estrutura aprovada
 
 - **Nada no Resumo nem nas quatro abas.** Os elementos que D-022 lista continuam iguais. As mudanças ficam em Movimentos, que não perde nada (o Primeiro ciclo, l. 48, pede "Registrar recebimento em Movimentações", e o botão continua), na tela provisória de Metas e em Aprender.
-- **O card lima do Resumo continua "Fatura sem contar duas vezes".** O CL C005 diz que esse card "pode orientar o conceito, mas não torna cartões uma função implementada", e a `spec3` §3.2 e D-031(5) mantêm o card. Não proponho trocar.
+- **O card lima do Resumo continua "Fatura sem contar duas vezes".** O CL C005 diz que esse card "pode orientar o conceito, mas não torna cartões uma função implementada", e a `spec3` §3.2 e D-031(5) mantêm o card. Não proponho trocar. Com o Ciclo E (D-037), os cartões são uma função implementada, e o card continua igual.
 - **Mudanças no Resumo que só entram com a sua aprovação** (decisão 4):
   - (a) Um link "Ver todas" ao lado de "Ainda a pagar neste mês", no mesmo padrão do "Ver todos" de "Pagamentos do mês". Hoje o card leva à lista, mas não há texto visível de ação. É uma mudança pequena num card aprovado.
   - (b) Uma fileira de 4 atalhos com nome (Recebimento, Contas a pagar, Gastos fixos, Calculadoras) abaixo de "Anotar gasto".
@@ -276,7 +276,7 @@ Recalculei em Python todos os exemplos abaixo, e eles batem com a `spec3` §3.11
 - **Cuidados:**
   - Não compara com rendimento, que fica no Ciclo D (só simulação, sem indicar produto; D-034(5)).
   - Cita a Lei 13.455/2017 só no tema.
-  - O botão "Anotar como parcelamento" aparece **só fora do cartão**, porque parcelas no cartão estão fora (D-023 e D-024). Com "Cartão de crédito", aparece o aviso de fatura que já existe.
+  - O botão "Anotar como parcelamento" aparece **só fora do cartão**, porque parcelas no cartão estão fora (D-023 e D-024). Com "Cartão de crédito", aparece o aviso de fatura que já existe. Desde o Ciclo E (D-037), a compra parcelada no cartão existe em Anotar gasto ("Em quantas vezes?"), e as parcelas caem nas faturas; esta calculadora continua sem o botão com cartão.
   - O botão abre `/gastos-fixos/novo?tipo=parcelada` preenchido. A rota já aceita `tipo`, `descricao`, `valor`, `categoria` e `dia`. O parâmetro `parcelas` hoje vale só para a conta do ano (1 a 12), então o número de parcelas do parcelamento (2 a 480) e o tipo do parcelamento entram como ampliação da rota, só no app.
 - **Onde aparece:**
   - em Calculadoras;
@@ -454,7 +454,7 @@ Recalculei em Python todos os exemplos abaixo, e eles batem com a `spec3` §3.11
 
 ## 4. O que já existe, o que está desenhado e o que falta
 
-Situação em 09/10/2026, depois dos Ciclos A6 (D-035), A4 (D-030), A5 (D-031 e D-032), A2 (D-025), B (D-026), C (D-027 e D-036) e D (D-028).
+Situação em 10/10/2026, depois dos Ciclos A6 (D-035), A4 (D-030), A5 (D-031 e D-032), A2 (D-025), B (D-026), C (D-027 e D-036), D (D-028) e E (D-037 e D-038).
 
 | Função | Situação | Onde fica ou ficaria |
 |---|---|---|
@@ -478,8 +478,9 @@ Situação em 09/10/2026, depois dos Ciclos A6 (D-035), A4 (D-030), A5 (D-031 e 
 | Busca de registros, orçamento por categoria | Falta, sem ciclo (o orçamento está no "núcleo proposto" das Instruções v2.1) | Movimentos; Metas ou Movimentos |
 | Ocultar valores e biometria | Existe (D-025). Falta: o teste em aparelho (`docs/04`) | Conta; olho no cabeçalho das abas quando couber |
 | Assinaturas, plano para sair das dívidas, revisão do mês, exportar dados, aviso de valor fora do habitual, "Parece um gasto fixo" | Falta (só sugestão em `spec2` §7) | Seção 5 |
-| Notas fiscais NFC-e por QR | Falta (depende de parecer jurídico; `docs/06` §4.2) | "Ler nota fiscal" em Anotar gasto |
-| Família, cartões, integração bancária, IA, crédito, painel de empresas | Fora do ciclo atual; a Família sem vínculo ganhou só o link "Enquanto isso, dividir as contas da casa" (fora do Resumo, A6) | Ciclos seguintes de `docs/04`, ou nunca (crédito) |
+| Notas fiscais (E) | Existe (D-038): "Escanear nota fiscal" em Anotar gasto, com câmera (QR da NFC-e e código de barras da NF-e), PDF do DANFE e "Colar o link ou a chave"; no RJ, a página da Sefaz-RJ preenche loja, valor e data no celular. Só o resumo SHA-256 da chave é guardado, nunca CPF. Sem parecer jurídico (D-034(5)). Falta: o aceite com notas reais (P-025), o teste em aparelho, compartilhar o PDF de outro app e a cobertura de outros estados (`docs/04`) | Primeiro item de Anotar gasto novo |
+| Cartões de crédito e faturas (E) | Existe (D-037): cartões, compra parcelada no cartão, fatura como conta a pagar, pagamento total ou parcial com saldo anterior, encargos e estornos, "Por categoria" e grupo "Faturas de cartão" na renda comprometida. Falta: o teste em aparelho e a interface na Família (`docs/04`) | Movimentos › "Organizar" › Cartões; "Como você pagou?" em Anotar gasto; `/cartoes` |
+| Família, integração bancária, IA, crédito, painel de empresas | Fora do ciclo atual; a Família sem vínculo ganhou só o link "Enquanto isso, dividir as contas da casa" (fora do Resumo, A6) | Ciclos seguintes de `docs/04`, ou nunca (crédito) |
 
 ## 5. Sugestões fundamentais com base em pesquisa
 
@@ -578,7 +579,7 @@ Ordem pelo valor para a pessoa e para a empresa que oferece o benefício. Valor:
     - [E] Direito de portabilidade da LGPD (art. 18); ajuda na declaração de IR.
     - Depende de: uma função de leitura que respeite as permissões do banco (RLS), com teste em `supabase/tests`.
     - Risco: arquivo com dado sensível fora do app.
-15. **Notas fiscais NFC-e, fase 1** (QR: loja, data e total).
+15. **Notas fiscais NFC-e, fase 1** (QR: loja, data e total). **Situação em 10/10/2026: implementado no Ciclo E (D-038), além da fase 1.** Câmera, PDF do DANFE e "Colar o link ou a chave" estão em Anotar gasto; a leitura automática da página oficial (loja, valor e data) vale no celular e só no RJ, e só foi testada com páginas sintéticas. O aceite com notas reais (P-025), o teste em aparelho e a cobertura de outros estados ficam abertos. A dependência "parecer jurídico" abaixo não vale mais (D-034(5)).
     - Valor: pessoa M, empresa M. Esforço: M/L.
     - [E] Um trabalho da UFGD mostra que os apps que leem a nota quase só usam a data e o total.
     - Depende de: parecer jurídico e câmera.
@@ -619,7 +620,7 @@ Ordem pelo valor para a pessoa e para a empresa que oferece o benefício. Valor:
 | 5 | **B** Renda comprometida, com a previsão dos pagamentos do mês em `/a-pagar` | M | Linha dentro do card "Ainda a pagar"; tela com medidor e próximos meses |
 | 6 | **C** Metas e reserva | L | Aba Metas completa; a calculadora da reserva passa a "Criar reserva" |
 | 7 | **D** Simulador, só simulação e sem indicar produto (D-028, D-034(5)) | S/M | "Juntar para um objetivo" ganha a taxa, a inflação e "Quanto posso ter" |
-| 8 | Seção 5, nesta ordem: busca de registros, orçamento por categoria, plano para sair das dívidas, assinaturas, "Seu mês", exportar, NFC-e e widget com valores ocultos | Varia | Uma entrega por vez |
+| 8 | Seção 5, nesta ordem: busca de registros, orçamento por categoria, plano para sair das dívidas, assinaturas, "Seu mês", exportar, NFC-e (feita no Ciclo E, D-038) e widget com valores ocultos | Varia | Uma entrega por vez |
 
 - **Ciclos seguintes:** o Ciclo 2 (Família) e os demais continuam como em `docs/04`. O conteúdo de época (item 13) pode sair antes, como texto para o RH.
 - **Resumo:** antes de qualquer mudança, o protótipo com 5 pessoas da seção 2.4. Ele pode correr junto do passo 1.

@@ -1,6 +1,6 @@
 # Arquitetura
 
-09/10/2026 · versão 0.9 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos, calculadoras, seus últimos meses, Aprender e dúvidas, lembretes, ocultar valores e biometria, renda comprometida, metas e reserva, plano de guardar e simulador)
+10/10/2026 · versão 0.10 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos, calculadoras, seus últimos meses, Aprender e dúvidas, lembretes, ocultar valores e biometria, renda comprometida, metas e reserva, plano de guardar, simulador, cartões e faturas e leitura de notas fiscais)
 
 ## Escolhas (aprovadas)
 
@@ -32,6 +32,8 @@ apps/app/src/
     reserva, meta/nova, meta/[id], meta/[id]/editar, meta/[id]/movimento  reserva para imprevistos, metas e movimentos
     guardar, guardar/minima  plano de guardar e reserva mínima
     simular  simulador (nada é gravado)
+    cartoes, cartoes/novo, cartoes/[id], cartoes/[id]/editar  cartões
+    cartoes/[id]/fatura/[mes], .../pagar, .../encargo, .../estorno, .../compra  fatura e seus lançamentos
   components/           interface (logo, campos, botões, formulários de registro, conta a pagar, pagamento, gasto fixo e conta do ano, "Ano a ano", "Somar valores", estados)
     retorno-*           faixa do Resumo, linha da revisão, ações e folha do detalhe da série
     term-hint, topic-link, learn-art, topic-example, faq-item  "O que é isso?", links e partes da explicação
@@ -39,9 +41,12 @@ apps/app/src/
     committed-parts     medidor da renda comprometida, barra por grupo e legenda
     goal-*, reserve-form, minimum-reserve, essentials-block, savings-card, savings-plan-form  metas, reserva, plano de guardar
     sim-result, sim-year-bars  resultado do simulador e barras por ano
+    card-form, card-parts, card-purchase-form, invoice-*  cartão, fatura, pagamento, encargo, estorno e edição da compra
+    receipt-scan, receipt-block  "Escanear nota fiscal": linha, folha, câmera, colar e o bloco "Nota lida"
     device-features, device-settings, setting-switch  lembretes, ocultar valores e biometria (Conta e layout)
   lib/                  autenticação (Supabase e demonstração), learn.ts (links e ações de Aprender), situação do card Primeiros passos (só no aparelho),
-                        reminders.ts, device.ts e device-prefs.ts (lembretes e preferências só do aparelho), privacy.ts (ocultar valores), essentials.ts
+                        reminders.ts, device.ts e device-prefs.ts (lembretes e preferências só do aparelho), privacy.ts (ocultar valores), essentials.ts,
+                        cards.ts (rotas e leituras de cartão), pdf-text.ts, receipt-read.ts, receipt-link.ts, sefaz-fetch.ts e note-prefs.ts (leitura de notas no aparelho)
   state/                sessão, dados (consultas e gravações), contexto e mês
   theme/                tokens de cor, tipografia, movimento e vetores do logo
 packages/core/          regras financeiras, validação, repositório em memória, testes
@@ -52,12 +57,14 @@ packages/core/          regras financeiras, validação, repositório em memóri
   src/goals.ts          metas, movimentos, reserva para imprevistos, gastos essenciais e textos
   src/savings.ts        plano de guardar: resposta, quando perguntar, etapas, reserva mínima e textos
   src/simulate.ts       simulador: contas com taxa, formulário, textos, criar meta e links
+  src/cards.ts          cartões: datas da fatura, parcelas, total, pagamento, saldo anterior, crédito, "Por categoria", validação e textos
+  src/nota.ts, danfe.ts, sefaz-page.ts, nota-flow.ts, sha256.ts  notas fiscais: QR e chave, DANFE, página da Sefaz-RJ, fluxo do formulário e resumo SHA-256
   src/calculators/      as 8 calculadoras, campos, textos e links de contexto
 supabase/
   migrations/           esquema, funções e permissões (0001 fundação, 0002 contas a pagar, 0003 gastos fixos, 0004 contas do ano, 0005 seus últimos meses,
-                        0006 renda comprometida, 0007 metas e plano de guardar)
+                        0006 renda comprometida, 0007 metas e plano de guardar, 0008 cartões e chave da nota fiscal)
   tests/                testes de isolamento, da sequência de aceite, de contas a pagar, de gastos fixos, de contas do ano, da revisão dos últimos meses,
-                        da renda comprometida (50), das metas (60) e do plano de guardar (65)
+                        da renda comprometida (50), das metas (60), do plano de guardar (65) e dos cartões (70)
 scripts/e2e-web.js      roteiro de verificação na versão web
 docs/                   decisões, regras, acessos, Supabase, roteiro, Aprender, marca, telas
 ```
@@ -81,6 +88,8 @@ pessoa ──< vínculo (permissões por ação) >── contexto (pessoal | fam
    │                                                                    ├──< conta a pagar (previsto) ── 0 ou 1 gasto vivo que a quitou (registro)
    │                                                                    ├──< renda de referência (a partir de um mês; nunca é Recebido)
    │                                                                    ├──< meta (reserva, oportunidade ou objetivo) ──< movimento (aporte, resgate, rendimento, valorização...)
+   │                                                                    ├──< cartão ──< lançamento (parcela, encargo, estorno, saldo anterior)
+   │                                                                    │       └── fatura (mês de vencimento) = 1 conta a pagar ── 0 ou 1 gasto vivo que a quitou
    │                                                                    └──< série (gasto fixo, parcelamento ou conta do ano) ──< vigência
    │                                                                                  └──< ocorrência = conta a pagar com número
    ├──< operação (chave de idempotência, ação, registro, conta a pagar ou série resultante) ── gatilho ──> atividade
@@ -149,6 +158,20 @@ pessoa ──< vínculo (permissões por ação) >── contexto (pessoal | fam
 - **No core e no app:** `savings.ts` decide quando perguntar (`shouldAskSavings`; a pergunta volta quando a renda de referência muda de valor depois de um "consigo"), monta o plano em etapas (`savingsPlan`: reserva de 1, 3 e 6 meses de gastos essenciais e depois as metas por prazo, sem rendimento), a reserva mínima a partir de R$ 100,00 e os passos pequenos. A resposta é lida por `getSavingsCheck` e gravada por `setSavingsAnswer`; o 4º passo de "Primeiros passos" usa `isSavingsStepDone`. "Usar este plano" são duas escritas em sequência, cada uma com a própria chave de operação: a resposta e a reserva (`create_goal` ou `update_goal`).
 
 **Simulador** (D-028) não muda o banco. `simulate.ts` calcula com a taxa digitada pela pessoa (0% a 30% ao ano, campo vazio por padrão): taxa mensal equivalente `(1 + a)^(1/12) - 1`, aportes no início de cada mês, ponto flutuante só no fator de juros (`log1p` e `expm1`) e centavos inteiros nas entradas e saídas, com arredondamento só no fim. A tela `/simular` valida o formulário no core, mostra o resultado só depois de tocar em "Simular", sempre com o resultado sem rendimento ao lado, as hipóteses e o aviso fixo. Nada é gravado, nem a taxa; "Criar meta com estes valores" abre `/meta/nova` preenchida, sem a taxa no endereço.
+
+**Cartões e faturas** (migração `20261010000001_cartoes.sql`, D-037) guardam o cartão, as compras com as parcelas e os lançamentos de cada fatura. A compra no cartão não é gasto realizado: só o pagamento da fatura chega a `financial_records`.
+
+- **Tabelas:** `cards` (apelido de 1 a 30 caracteres sem cara de número de cartão, `last_digits` de 4 dígitos ou nulo, dias de fechamento e vencimento de 1 a 31, `limit_cents`, situação `ativo` ou `arquivado`, autoria, versão e exclusão lógica) e `card_entries` (uma linha por parcela, `kind` `parcela`, `encargo`, `estorno` ou `saldo_anterior`, `invoice_month` sempre dia 1, `purchase_id` e `purchase_total_cents` na compra, `source_month` e `payment_record_id` nos lançamentos automáticos, `receipt_key` na parcela 1). `commitments` ganhou `card_id`, `invoice_month` e `card_closing_on` (a conta da fatura) e `financial_records` ganhou `card_id`, `invoice_month` e `receipt_key` (o gasto do pagamento da fatura e a chave da nota). Nunca há número completo, código de segurança nem validade.
+- **Funções:** `create_card`, `update_card`, `set_card_status`, `delete_card`, `add_card_purchase`, `update_card_entry`, `delete_card_entry`, `add_card_charge`, `add_card_refund`, `pay_invoice` e `undo_invoice_payment`, com chave de idempotência, hash em JSON e versão como as demais (a versão da fatura é a da conta dela). Todas devolvem o mesmo JSON, `{card, entry, entries, invoices, commitments, commitment, record}`. `create_record` ganhou `p_receipt_key` (opcional, no fim). Funções de data (`my_today`, `invoice_due_on`, `invoice_closing_on` e `invoice_month_for`) são puras e executáveis, porque as visões as chamam; com sessão, executam-se 49 funções, e as 35 auxiliares `clarevo_*` não são executáveis.
+- **Leitura:** as visões `card_items` (com `used_cents` e a fatura atual), `invoice_items` (uma linha por fatura que tem lançamento ou conta, com situação, totais por tipo e pagamento), `card_entry_items` (a compra como uma linha) e `receipt_items` (para o aviso "Esta nota já foi anotada"), todas `security_barrier` com o filtro de leitura do contexto explícito, sem leitura para `anon`. `commitment_items` ganhou as três colunas no fim e calcula `amount_is_estimate` das faturas abertas na hora (`my_today() <= card_closing_on`); `month_committed` ganhou `card_cents` e `card_permille` no fim.
+- **Invariantes** (conferidas no fim da transação, também para escrita direta): C1, a conta da fatura viva é igual ao total dos lançamentos vivos e toda fatura de total positivo tem conta; C2, as parcelas de uma compra são numeradas de 1 a n, somam o total, com o resto na primeira, uma por mês seguido, e a compra inteira é viva ou excluída; C3, um único gasto vivo por pagamento de fatura, ligado à conta do mesmo cartão e mês, e a diferença do pagamento parcial existe como um único saldo anterior na fatura seguinte; C4, o estorno automático da fatura seguinte é igual ao crédito da anterior; C5, fatura paga não muda (`fatura_paga`), salvo a regra de pagar cedo de D-037(6); C6, o resumo da chave da nota é único por contexto entre gastos e compras vivos. A conta da fatura é mantida por `clarevo_sync_card`, dentro de cada gravação de cartão; `update_commitment`, `delete_commitment`, `pay_commitment` e `undo_commitment_payment` a recusam com `conta_de_fatura`, e `update_record` e `delete_record` recusam o gasto do pagamento (`pagamento_de_fatura`). Ordem de travas: chave, cartão, compra (parcelas por número), contas das faturas (por mês), registro.
+- **Operações:** `record_operations` passou a 37 ações (as 11 novas apontam o cartão em `target_id`; as cinco de lançamento também levam o lançamento na coluna nova `entry_id`) e conta tudo como anotação para a atividade do A4. Perto do limite de 5.000 lançamentos, a conferência do crédito (C4) faz uma só passada sobre o cartão; medido com 4.800 parcelas, comprar em 48 parcelas leva cerca de 0,3 s.
+- **No core e no app:** `cards.ts` repete as datas, as parcelas, o total, o pagamento e o saldo anterior, o crédito levado adiante, o limite usado e a distribuição "Por categoria" (`buildInvoices`, `loadInvoices`, `distributeInvoicePayment`), e o `MemoryRepository` repete as 11 funções e a ordem das conferências. Os 19 métodos novos do repositório (`listCards`, `getCard`, `getCardEntry`, `findReceipt`, `listCardEntries`, `listInvoiceCommitments`, `listInvoiceItems`, as 11 escritas e `findCardOperation`) estão no `SupabaseRepository`. A demonstração tem o "Cartão Exemplo"; conta nova e o cenário "retorno" não têm cartão.
+
+**Leitura de notas fiscais** (D-038) roda no aparelho e grava só o resumo SHA-256 da chave de acesso, no mesmo campo `receipt_key` da migração 0008.
+
+- **Core:** `nota.ts` lê o QR da NFC-e (versões 2 e 3 e o formato antigo) e a chave de 44 caracteres (módulo 11, UF, mês, CNPJ numérico ou alfanumérico, modelo), valida o domínio oficial para "Ver a nota no site da Sefaz" (`officialQueryUrl`) e monta o rascunho (`receiptDraft`); `danfe.ts` extrai chave, data, total e emitente do texto do PDF e ignora o destinatário; `sefaz-page.ts` lê a página pública da Sefaz-RJ (loja, valor a pagar, emissão e quantidade de itens) com `fetch` injetado e tempo limite de 12 s, sem o bloco do consumidor; `nota-flow.ts` guarda as regras do formulário (folha de entradas, descrição sugerida, o que falta preencher, boleto); `sha256.ts` é SHA-256 em JavaScript puro, sem `crypto`, para rodar no Hermes. A chave de 44 caracteres (`AccessKeyInfo.key`) só existe em memória; só o `ReceiptDraft`, com o resumo, pode ser persistido.
+- **App:** `expo-camera` (QR e Code 128), `expo-document-picker` e `expo-file-system` (PDF) e `unpdf` 1.8.1 em `lib/pdf-text.ts`, com a guarda do `structuredClone` no nativo; `lib/sefaz-fetch.ts` só lê a página no celular (na web, o CORS bloqueia); `lib/receipt-link.ts` mantém o endereço oficial só em memória da sessão; `lib/note-prefs.ts` lembra no aparelho, por pessoa, a câmera já usada e a última descrição e categoria de até 50 lojas, pelo resumo SHA-256 do CNPJ. O banco nunca recebe o CNPJ, o link, o CPF nem o texto do PDF.
 
 **Lembretes, ocultar valores e biometria** (D-025) não mudam o banco e valem só no aparelho. `reminders.ts` (core) monta o plano (`reminderPlan`: um aviso por dia com conta em aberto vencendo no dia seguinte, no máximo 30, nunca com valor nem descrição); `lib/reminders.ts` cancela os agendamentos `clarevo-lembrete-*` e agenda o plano ao abrir o app, ao voltar para ele e depois de escritas, escutando o cache do TanStack Query a partir de `device-features.tsx`, montado no layout, sem mexer em `state/data.ts`. As preferências (lembretes e horário, oferta já mostrada, ocultar valores ao abrir, biometria ao abrir) ficam em `lib/device-prefs.ts`, por pessoa, no armazenamento do aparelho; na demonstração, só na memória. "Ocultar valores" é um estado de sessão em `lib/privacy.ts`: `Money`, `FitMoney` e `MoneyTxt` mostram "R$ ••••" e o nome acessível "valor oculto" para dados guardados (a política completa está no comentário do arquivo e em `privacy-app.test.ts`). Na web, `device.web.ts` não oferece lembretes nem biometria.
 

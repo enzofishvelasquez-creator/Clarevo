@@ -19,6 +19,13 @@
 
 ## 2. Escanear nota fiscal em "Anotar gasto"
 
+> **Situação em 10/10/2026: implementado no Ciclo E (D-038, `docs/00`).** A linha "Escanear nota fiscal" (56 px) é o primeiro item de Anotar gasto novo, com a folha de três opções, a câmera, o PDF do DANFE, "Colar o link ou a chave", o bloco "Nota lida", a nota já anotada, a descrição sem "Compra (CNPJ ...)", a leitura da página da Sefaz-RJ no celular e "Como você pagou?" logo depois do Valor. A pergunta de 2.4 foi respondida por Enzo ("Sim, ler a Sefaz-RJ já"). O que mudou em relação ao desenho abaixo:
+>
+> - A câmera não abre direto no primeiro toque: antes da permissão, uma folha oferece "Usar a câmera", "Escolher o PDF da nota" e "Colar o link ou a chave" (decisão de Enzo depois da auditoria); só depois de ler com a câmera uma vez o toque abre a câmera direto. Não há "Usar foto da galeria".
+> - "Ver a nota no site da Sefaz" abre no navegador do aparelho (na web, em outra aba), e não dentro do app com "Voltar ao gasto": não há webview instalado. O endereço não é guardado (leva a chave inteira), então o botão no detalhe do gasto só existe na sessão em que a nota foi lida.
+> - O banco guarda só o resumo SHA-256 da chave, não a chave (a chave de NF-e de pessoa física carrega o CPF do emitente). "Como da última vez nesta loja" fica só no aparelho, por resumo do CNPJ.
+> - Não foram feitos nesta entrega: o foco automático em Descrição continua como era, "Ler outra nota" no detalhe depois de salvar, o aviso de "conta já anotada" para toda conta em aberto (2.3), o atalho `?ler=nota` do ícone, a linha de Primeiros passos, o tema "Ler nota fiscal" e a busca de Aprender (2.5). A leitura da página da Sefaz só foi testada com páginas sintéticas (P-025).
+
 ### 2.1 Onde fica
 
 - **Primeiro item do formulário "Anotar gasto"**, acima da legenda "Gasto já pago · Conta principal". Hoje essa legenda fica perto de y 125, Descrição de 180 a 228 e Valor de 275 a 333 (`m360x640/08_anotar_gasto.png`).

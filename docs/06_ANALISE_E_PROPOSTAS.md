@@ -112,9 +112,9 @@ Exportar dados fica para quando houver o relatório mensal (não há botão sem 
   - Cada estado tem uma página de consulta diferente, que pode mudar; serviços pagos (ex.: Infosimples) são alternativa, com custo por consulta (não verificado).
   - Robôs em massa no servidor são desaconselhados (as Secretarias da Fazenda bloqueiam consumo automatizado); por isso a leitura acontece no aparelho, por ação da pessoa.
   - A página pode exibir o CPF da compra: não guardar esse dado.
-  - Precisa de parecer jurídico sobre a leitura das páginas públicas.
+  - Sem parecer jurídico (D-034(5): "Vamos apenas prestar informações já disponíveis"): a leitura é feita no aparelho, por ação da pessoa, só nos endereços oficiais (D-038).
   - Leitura de foto de cupom em papel com IA é alternativa para notas sem QR code, mas exige proposta própria e revisão antes de salvar (regra das instruções).
-- **Decisão:** aprovar a fase 1 como próximo diferencial e pedir o parecer jurídico.
+- **Decisão:** fase 1 (QR, chave, código de barras e PDF da nota) e leitura da página da Sefaz-RJ feitas no Ciclo E (D-038), começando pelo RJ, com cobertura nacional como objetivo.
 
 ### 4.3 Contas do banco, cartões, limites e faturas (Open Finance)
 
@@ -174,7 +174,7 @@ O Bíos usava movimento ambiente: arcos que "respiram", ondas e órbitas. No Cla
 1. Ciclo de acabamento de design (seção 3) e animações (seção 5).
 2. Contas a pagar: feito em 08/10/2026 (D-020, D-021); a recorrência veio com os gastos fixos (D-024) e o lembrete no dia anterior, com ocultar valores e biometria, em 09/10/2026 (D-025).
 3. Calculadoras 1, 2 e 3.
-4. Notas fiscais, fase 1 (QR code), após parecer jurídico.
+4. Notas fiscais, fase 1 (QR code, chave, código de barras e PDF): feita no Ciclo E (D-038).
 5. Login real com Supabase Pro e e-mail próprio, quando for abrir para pessoas de fora.
 6. Família (ciclo 2).
 7. Open Finance: decisão em dezembro de 2026.

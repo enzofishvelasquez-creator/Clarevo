@@ -1,8 +1,8 @@
 # Roteiro até o lançamento
 
-Atualizado em 09/10/2026. Prazos são estimativas de trabalho, não compromissos; dependem das decisões pendentes.
+Atualizado em 10/10/2026. Prazos são estimativas de trabalho, não compromissos; dependem das decisões pendentes.
 
-Ordem a partir de 08/10/2026 (D-023, D-029, D-033 e D-034): o Ciclo A, o Ciclo A3 (contas do ano) e os Primeiros passos com os atalhos em Movimentações estão feitos. O Ciclo A6 ("Achar tudo" e calculadoras, D-035) está implementado e no roteiro web, com o teste manual em aberto. Os Ciclos A4 (seus últimos meses, D-030) e A5 (Aprender e dúvidas, D-031 e D-032) estão implementados e no roteiro web, com os itens abertos de cada seção abaixo. Em 09/10/2026 foram implementados os Ciclos A2 (lembretes, ocultar valores e biometria, D-025), B (renda comprometida, D-026), C (metas e reserva, D-027, com o plano de guardar, D-036) e D (simulador, D-028), todos antes do Ciclo 2 (família). Neles, o que falta é o mesmo em todos: as migrações 0006 e 0007 precisam ser coladas no Supabase, e o teste em aparelho fica para depois de o app estar pronto. O roteiro web (`scripts/e2e-web.js`) já cobre as telas novas. Cada ciclo começa depois de o anterior passar em `npm test`, `npm run typecheck`, `npm run test:db`, `npm run test:api` e `npm run test:web`.
+Ordem a partir de 08/10/2026 (D-023, D-029, D-033 e D-034): o Ciclo A, o Ciclo A3 (contas do ano) e os Primeiros passos com os atalhos em Movimentações estão feitos. O Ciclo A6 ("Achar tudo" e calculadoras, D-035) está implementado e no roteiro web, com o teste manual em aberto. Os Ciclos A4 (seus últimos meses, D-030) e A5 (Aprender e dúvidas, D-031 e D-032) estão implementados e no roteiro web, com os itens abertos de cada seção abaixo. Em 09/10/2026 foram implementados os Ciclos A2 (lembretes, ocultar valores e biometria, D-025), B (renda comprometida, D-026), C (metas e reserva, D-027, com o plano de guardar, D-036) e D (simulador, D-028), todos antes do Ciclo 2 (família). Neles, o que falta é o mesmo em todos: o teste em aparelho, que fica para depois de o app estar pronto (as migrações 0006 e 0007 foram coladas e conferidas no Supabase em 10/10/2026). Em 10/10/2026 foi implementado também o Ciclo E (cartões de crédito e faturas, D-037, e leitura de notas fiscais, D-038), com a migração 0008 ainda por colar no Supabase. O roteiro web (`scripts/e2e-web.js`) já cobre as telas novas. Cada ciclo começa depois de o anterior passar em `npm test`, `npm run typecheck`, `npm run test:db`, `npm run test:api` e `npm run test:web`.
 
 ## Primeiro ciclo (entregue em demonstração; falta ligar o Supabase)
 
@@ -84,7 +84,7 @@ Rodados em 09/10/2026, depois das correções da revisão: `npm test` (23 arquiv
 - [x] No detalhe da conta do ano, "Registrar parcelas" (uma folha com uma linha por parcela) no lugar do texto do A3 com "Anotar gasto" ("2027: parcelas 6 a 10 sem conta registrada."), só para os 11 meses fechados, e "Por que este mês não tem conta?"; pagar uma parcela que outro aparelho já registrou paga a que existe (roteiro web, telas 94 e 95)
 - [x] Demonstração: escolher o cenário "retorno" por `?cenario=retorno` (`lib/demo-auth.ts`), só no modo de demonstração
 - [x] Roteiro web (`npm run test:web` e `REDUZIR_MOVIMENTO=1 node scripts/e2e-web.js`, 1191 e 1192 verificações) com os passos da `spec3` §2.10 e as correções da revisão: modo "Dia" com o campo de 44 px e "Usar outra data" voltando ao passo, "/retomar" sem revisão ativa, "Registrar parcelas" na conta do ano, pagar uma conta que outro aparelho já registrou, aviso de gasto solto em conta do ano, "Não houve" com valor estimado e "Registrar esta parcela" pagando
-- [ ] **Você:** colar `supabase/migrations/20261009000001_retorno.sql` no SQL Editor do Supabase, depois da 0004 (`docs/05_SUPABASE.md`, passo 6)
+- [x] **Você:** colar `supabase/migrations/20261009000001_retorno.sql` no SQL Editor do Supabase, depois da 0004 (`docs/05_SUPABASE.md`, passo 6; feito e conferido antes da publicação do Ciclo A4)
 - [ ] Revisão dos textos por Enzo antes de publicar (tom sem cobrança)
 - [ ] Teste manual em iOS, Android e web, com leitor de tela na faixa, nas linhas e no lote, com movimento reduzido e em dois aparelhos (decidir num e conferir no outro)
 
@@ -126,7 +126,7 @@ Sem mudança no banco. Última execução registrada pelas frentes de trabalho e
 - [x] App ligado ao banco (`SupabaseRepository`), com testes pela API: `month_committed` igual a `summarizeCommitted`, referências com versão e os códigos do core
 - [x] Telas: a linha "Renda comprometida" dentro do card "Ainda a pagar" do Resumo (estrutura inalterada), `/renda-comprometida` (medidor, grupos, "Fora dos compromissos", recebido, contas do mês, "Próximos meses", "O que muda", "Como calculamos", metas fora do percentual), `/renda-comprometida/referencia` (sugestão, mês de início, "Minha renda varia", excluir) e a previsão dos pagamentos do mês em Contas a pagar; falha de carga mostra erro, nunca 0%
 - [x] Temas "Renda comprometida e a referência de 30%" e "Quando a renda muda todo mês" em Aprender, com "O que é isso?" nas telas
-- [ ] **Você:** colar `supabase/migrations/20261009000002_renda_comprometida.sql` no SQL Editor do Supabase, depois da 0005 (`docs/05_SUPABASE.md`, passo 7)
+- [x] **Você:** colar `supabase/migrations/20261009000002_renda_comprometida.sql` no SQL Editor do Supabase, depois da 0005 (`docs/05_SUPABASE.md`, passo 7; feito e conferido em 10/10/2026, `docs/07_PUBLICACAO_WEB.md`)
 - [x] Roteiro web (`npm run test:web` e `REDUZIR_MOVIMENTO=1 node scripts/e2e-web.js`, 1494 e 1495 verificações, ambos passando em 10/10/2026): linha "Renda comprometida em outubro" dentro de "Ainda a pagar" e a ordem dos títulos do Resumo (Anotar gasto, Ainda a pagar neste mês, Pagamentos do mês, Fatura sem contar duas vezes, Quem vê estes dados?); `/renda-comprometida` com legenda, grupos e "Fora dos compromissos"; novembro com a linha de dívidas; referência de R$ 5.000,00 a partir de outubro (69,0%); excluir as referências; falha simulada sem 0%; rótulo acessível do medidor; previsão em Contas a pagar; nenhum termo proibido
 - [ ] Teste manual em iOS, Android e web, com e sem movimento reduzido e com leitor de tela (medidor, troca de mês e formulário da referência)
 
@@ -139,7 +139,7 @@ Mesmas execuções do Ciclo B. A migração é a `20261009000003_metas.sql`, que
 - [x] App ligado ao banco, com testes pela API (sequência de aceite C, `goal_items.saved_cents` igual a `goalSaved`, reconciliação de movimentos por `findGoalOperation`)
 - [x] Telas: aba Metas ("Seu mês", reserva, metas, acesso a "Calculadoras"), `/reserva`, `/meta/nova`, `/meta/[id]` com editar, aportes, resgates, rendimento e "Atualizar valor guardado", "Criar reserva" na calculadora de reserva, a dica "Dinheiro guardado não é gasto" no formulário de gasto, as metas em `/renda-comprometida` (fora do percentual) e a linha nova em "Quem vê estes dados?"
 - [x] Temas "O que muda ao registrar um aporte" e "Gastos essenciais" em Aprender
-- [ ] **Você:** colar `supabase/migrations/20261009000003_metas.sql` no SQL Editor do Supabase, depois da 0006 (`docs/05_SUPABASE.md`, passo 8)
+- [x] **Você:** colar `supabase/migrations/20261009000003_metas.sql` no SQL Editor do Supabase, depois da 0006 (`docs/05_SUPABASE.md`, passo 8; feito e conferido em 10/10/2026, `docs/07_PUBLICACAO_WEB.md`)
 - [x] Roteiro web (`npm run test:web` e `REDUZIR_MOVIMENTO=1 node scripts/e2e-web.js`, 1494 e 1495 verificações, ambos passando em 10/10/2026), já atualizado aos critérios que o ciclo mudou (reserva sem botão "Criar reserva", referência da reserva sem link, 40 temas publicados: 33 nas seções e 7 dúvidas), com: aba Metas da demonstração com o logotipo no cabeçalho (reserva 15% e "0,9 mês"; viagem 20% e R$ 480,00 por mês), calculadora com chips sem pré-seleção, aporte que anima a barra e não muda o Resumo, resgate retroativo recusado com a mensagem, movimento reduzido sem animação, aviso "Dinheiro guardado não é gasto", texto novo de "Quem vê estes dados?"
 - [ ] Teste manual em iOS, Android e web, com e sem movimento reduzido e com leitor de tela (barra de progresso, formulários de movimento e exclusão)
 - [ ] Opcional, sem ciclo: meta "Contas do ano" pré-preenchida com o valor do ano dividido por 12 (a recomendação de P-019 previa; não entrou)
@@ -166,17 +166,33 @@ Sem mudança no banco. Mesmas execuções do Ciclo B, mais `simulate.test.ts` (3
 - [ ] Teste manual em iOS, Android e web, com e sem movimento reduzido e com leitor de tela (anúncio do resultado e rolagem até ele, teclado numérico, tabela ano a ano)
 
 
+## Ciclo E: cartões de crédito e leitura de notas fiscais (D-037, D-038)
+
+Última execução registrada pelas frentes de trabalho em 10/10/2026, depois da junção do passo 3: `npm test` (37 arquivos, 803 testes), `npm run typecheck` (core e app sem erros), `npm run test:db` (OK, com `70_cartoes.sql`), `npm run test:api` (110 testes) e `npm run test:web` (1859 verificações; com `REDUZIR_MOVIMENTO=1`, 1860), esta última com os blocos "Ciclo E · Cartões" e "Ciclo E · Notas" (134 verificações).
+
+- [x] Banco: `cards`, `card_entries`, as visões `card_items`, `invoice_items`, `card_entry_items` e `receipt_items`, as 11 funções de cartão, a conta da fatura mantida na mesma transação, a chave da nota como resumo SHA-256, `conta_de_fatura` nas funções de contas a pagar e `pagamento_de_fatura` em `update_record` e `delete_record` (migração `20261010000001_cartoes.sql`), com testes de permissão, validação, sequência de aceite, invariantes C1 a C6, atividade, desempenho e privilégios (`supabase/tests/70_cartoes.sql`)
+- [x] Core: datas da fatura, parcelas com o resto na primeira, total, pagamento parcial e saldo anterior, pagar cedo, crédito levado adiante, limite usado, "Por categoria" com faturas, grupo "Faturas de cartão" na renda comprometida, validação na ordem do banco e textos (`cards.ts`); repositório em memória com as mesmas regras e demonstração com o "Cartão Exemplo", sem mudar os totais de outubro (`cards.test.ts`)
+- [x] Core: QR da NFC-e e chave (`nota.ts`), DANFE (`danfe.ts`), página da Sefaz-RJ (`sefaz-page.ts`), regras do formulário (`nota-flow.ts`) e SHA-256 em JavaScript puro (`sha256.ts`), conferidos em Hermes e em Node
+- [x] App ligado ao banco (`SupabaseRepository`), com testes pela API
+- [x] Telas de cartões: `/cartoes`, `/cartoes/novo`, `/cartoes/[id]`, `/cartoes/[id]/editar`, a fatura com pagar, encargo, estorno e editar compra, "Cartões" em Movimentações › Organizar, "Abrir fatura" em Contas a pagar, em Seus últimos meses e no detalhe do registro, grupo "Faturas de cartão" em `/renda-comprometida` e "Encargos do cartão" em "Por categoria"
+- [x] Anotar gasto: "Como você pagou?" depois do Valor, "Em quantas vezes?" até 48 e o aviso da fatura; a compra no cartão leva à fatura
+- [x] Anotar gasto: "Escanear nota fiscal" com câmera, PDF e colar, bloco "Nota lida", aviso de nota já anotada, descrição "Como da última vez nesta loja", leitura da página da Sefaz-RJ no celular e nota de exemplo só na demonstração
+- [x] Roteiro web com os passos do cartão e das notas; a câmera e a página real da Sefaz ficam de fora do roteiro, que lê o campo "Colar o link ou a chave", um PDF sintético e uma página sintética entregue por um gancho que só existe no roteiro
+- [ ] **Você:** colar `supabase/migrations/20261010000001_cartoes.sql` no SQL Editor do Supabase, depois da 0007, conferir com a consulta do passo 13 de `docs/05_SUPABASE.md` (11 funções, 2 tabelas e 1 visão) e recarregar o esquema (`docs/05_SUPABASE.md`, passo 9), antes de o Ciclo E entrar na `main`
+- [ ] **Você:** aceite com notas reais (P-025): de 5 a 10 cupons do RJ para a página da Sefaz e o formato dos QR, e DANFEs de compras online (Mercado Livre, Amazon) para `danfeFromText`
+- [ ] Teste em aparelho (iOS e Android): câmera, permissão, lanterna, vibração, seletor de arquivos, Hermes com `Intl` real, o tamanho do `unpdf` (cerca de 3,1 MB de bytecode) e o atraso de 450 ms do iOS entre a folha e a câmera
+- [ ] Compartilhar o PDF de outro app direto para o Clarevo (folha de compartilhamento), quando houver build das lojas
+- [ ] Aprender: trocar o parágrafo do tema `fatura` pelo de `CARDS_TEXT.topicParagraph` (hoje o tema ainda diz que cartões não estão disponíveis), escrever o tema "Ler nota fiscal" com fonte e levar "nota", "cupom" e "QR" à busca; incluir PDF.js (Apache-2.0) e `unpdf` (MIT) na tela de licenças
+- [ ] Fora da entrega do passo 3: atalho `?ler=nota` do ícone, linha da nota em Primeiros passos e o aviso de "conta já anotada" para toda conta em aberto (`docs/10` §2.3 e §2.5)
+- [ ] Revisão dos textos por Enzo antes de publicar (tom sem cobrança e sem julgamento)
+
 ## Próximos ciclos
 
-Os Ciclos A6, A4, A5, A2, B, C e D, que vinham primeiro (D-023 com a mudança de D-034), estão nas seções acima. Seguem a Família (Ciclo 2), os cartões e o benefício empresarial, abaixo.
+Os Ciclos A6, A4, A5, A2, B, C, D e E, que vinham primeiro (D-023 com a mudança de D-034), estão nas seções acima. Seguem a Família (Ciclo 2) e o benefício empresarial, abaixo.
 
 ## Ciclo 2: família
 
 Convite com permissões e validade, aceite, saída e revogação; "Quem vê estes dados?" com nomes e permissões reais; contas a pagar, gastos fixos e contas do ano na Família, depois de decidir P-012.
-
-## Ciclo 3: cartões
-
-Cartão e fatura sem contar duas vezes, com as parcelas de compras no cartão. A recorrência de contas a pagar foi para o Ciclo A, e lembretes e metas foram para os Ciclos A2 e C (D-023), já implementados.
 
 ## Ciclo 4: benefício empresarial e comercialização
 

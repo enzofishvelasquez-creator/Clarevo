@@ -498,6 +498,12 @@ Ressalvas e ajustes:
 
 Mudança em relação à especificação de 08/10/2026: ela previa "Taxa, tarifa e encargo" em rascunho e o 50-30-20 publicado. A Res. CMN 3.919/2010 foi conferida (o tema saiu publicado, com "Na conta corrente" e "Quando uma conta atrasa, entram encargos"), e o 50-30-20 ficou em rascunho. Com os cinco temas dos Ciclos B, C e D, o total passou a 40 publicados e 2 rascunhos. Antes de publicar `orcamento-50-30-20`, reescrever o parágrafo 1, que diz "o que sobra" (o Clarevo não usa "sobra" para o dinheiro que fica); como é rascunho, o texto não aparece em nenhuma tela.
 
+**Pendências do Ciclo E (D-037 e D-038).** Os cartões e a leitura de notas entraram no app em 10/10/2026, mas o conteúdo de Aprender ainda não acompanha:
+
+- O tema publicado `fatura` (Usar o Clarevo) ainda diz, no segundo parágrafo, "Cartões ainda não estão disponíveis no Clarevo. Este conteúdo explica o conceito para quando chegarem." O parágrafo novo está pronto em `CARDS_TEXT.topicParagraph` (`packages/core/src/cards.ts`): "Com o cartão cadastrado, as compras vão para a fatura e só contam em Pago quando a fatura é paga. Sem cartão cadastrado, anotar a fatura como conta a pagar continua valendo." Ao trocar, citar também D-037 nas fontes (hoje só D-020), atualizar a contagem de palavras da seção 2 e rodar `npm test`.
+- Não existe o tema "Ler nota fiscal" (o que é lido, o que nunca é guardado, com a fonte da Sefaz), nem a linha "A chave da nota fica no registro. O CPF nunca é guardado." em "Quem vê estes dados?", propostos em `docs/10` §2.5. O que o app guarda hoje é só o resumo SHA-256 da chave (D-038(5)), e o texto precisa dizer isso. Ao criar o tema, a fonte da Sefaz passa pela conferência da seção 3.
+- Não existe tema sobre o cartão em si (limite, fechamento e vencimento, com fonte); o cadastro do app explica só o que ele guarda.
+
 ## 6. Ressalvas para conferir quando as páginas abrirem
 
 Nenhuma muda o texto publicado hoje; todas estão também na seção 4, no tema.
