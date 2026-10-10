@@ -3257,6 +3257,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(300);
   ok('D endereço com valores inválidos: ignorados (campos vazios)', (await formValues()).length === 0, JSON.stringify(await formValues()));
 
+  const urlPath = () => new URL(p.url()).pathname;
   {
   // ==================================================================================================================
   // Ciclo E · Cartões de crédito (D-037). A demonstração tem o "Cartão Exemplo" (final 1234, fecha dia 3, vence dia 10, limite
@@ -3282,7 +3283,6 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const waitInvoice = async (hero) => { await waitText('Lançamentos'); await waitText(hero); await p.waitForTimeout(500); };
   const cardIdOf = (name) => otherDevice(async (repo, ctx, n) => (await repo.listCards(ctx)).find((c) => c.name === n)?.id ?? null, name);
   const countEntries = (cardId) => otherDevice(async (repo, ctx, id) => (await repo.listCardEntries(id)).length, cardId);
-  const urlPath = () => new URL(p.url()).pathname;
   // Total do cabeçalho azul da fatura: o valor logo depois do título, da situação e do apelido do cartão.
   const heroTotal = async () => (await body()).match(/Fatura de [^\n]+\n[^\n]+\n[^\n]+\n(R\$ [\d.]+,\d{2})/)?.[1] ?? null;
 
