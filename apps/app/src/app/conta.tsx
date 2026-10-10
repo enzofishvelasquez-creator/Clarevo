@@ -6,6 +6,7 @@ import { ScrollView, View } from 'react-native';
 import { ConfirmDialog } from '@/components/dialog';
 import { AccountsCard } from '@/components/accounts-card';
 import { PrivacyCard, RemindersCard } from '@/components/device-settings';
+import { FlashBanner, useFlash } from '@/components/flash';
 import { SubHeader } from '@/components/header';
 import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Screen, Txt } from '@/components/ui';
@@ -33,6 +34,8 @@ function Message({ msg }: { msg: Msg }) {
 export default function ContaScreen() {
   const { user, auth, signOut } = useSession();
   const personal = useSpace().data;
+  // Avisos das telas de contas ("Conta adicionada.", "Conta salva."): lidos uma única vez, quando esta tela abre.
+  const [notice] = useFlash();
   const [securityMsg, setSecurityMsg] = useState<Msg>(null);
   const [busy, setBusy] = useState<'senha' | 'sessoes' | null>(null);
   const [cooldown, setCooldown] = useState(0);
@@ -89,6 +92,7 @@ export default function ContaScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title="Conta" />
       <Screen scrollRef={scroll} contentStyle={{ padding: space[5], gap: space[4] }}>
+        <FlashBanner message={notice} />
         <Card style={{ gap: space[1] }}>
           <Txt variant="title">{user?.displayName}</Txt>
           <Txt color={colors.textSecondary}>{user?.email}</Txt>

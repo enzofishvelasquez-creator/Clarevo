@@ -22,10 +22,11 @@ Não consegui abrir a documentação do Supabase deste ambiente (acesso bloquead
 7. **Depois**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261009000002_renda_comprometida.sql` (renda comprometida, migração 0006) e clique em **Run**. Ela cria a tabela da renda de referência, as funções `set_income_reference`, `delete_income_reference` e `month_committed` e atualiza a lista de operações aceitas; não muda nenhum dado que já existe.
 8. **Depois**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261009000003_metas.sql` (metas e plano de guardar, migração 0007) e clique em **Run**. Ela cria as tabelas de metas, de movimentos e da resposta do plano de guardar, a visão `goal_items`, as oito funções novas e atualiza de novo a lista de operações aceitas (26 ações); não muda nenhum dado que já existe. Ela depende da 0006.
 9. **Depois**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261010000001_cartoes.sql` (cartões, faturas e chave da nota fiscal, migração 0008, Ciclo E) e clique em **Run**. Ela cria as tabelas `cards` e `card_entries`, as visões `card_items`, `invoice_items`, `card_entry_items` e `receipt_items`, as 11 funções de cartão (`create_card`, `update_card`, `set_card_status`, `delete_card`, `add_card_purchase`, `add_card_charge`, `add_card_refund`, `update_card_entry`, `delete_card_entry`, `pay_invoice` e `undo_invoice_payment`) e as colunas de ligação em `commitments` e `financial_records`, entre elas `receipt_key`, que guarda só o resumo SHA-256 da chave da nota. Também troca `create_record` (um parâmetro novo no fim, `p_receipt_key`, opcional) e `month_committed` (duas colunas no fim), recria `commitment_items` (três colunas no fim) e atualiza de novo a lista de operações aceitas (37 ações). Não muda nenhum dado que já existe. Ela depende da 0007.
-10. **Por último**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261010000002_orcamento.sql` (orçamento por categoria e limite pessoal de comprometimento, migração 0009, Ciclo F2) e clique em **Run**. Ela cria as tabelas `category_budgets` e `commitment_limits` (com a RLS de leitura e os gatilhos de proteção), o índice `card_entries_ctx_kind` (para o usado no mês), as funções `set_category_budget`, `delete_category_budget`, `set_commitment_limit`, `delete_commitment_limit` e `month_budget` e atualiza de novo a lista de operações aceitas (41 ações). Não muda nenhum dado que já existe e não toca nas tabelas de registros, contas a pagar, cartões ou metas. Ela depende da 0008. Depois dela, a conta nova continua sem orçamento nem limite.
-11. A ordem importa: cada arquivo altera tabelas e funções criadas pelos anteriores (a 0006 vem depois da 0005, a 0007 depois da 0006, a 0008 depois da 0007 e a 0009 depois da 0008). Cada arquivo roda uma única vez; se o projeto já tinha os primeiros, rode só os que faltam, na ordem dos nomes.
-12. Todos devem terminar sem erro. Se aparecer erro, me envie a mensagem.
-13. Para conferir as migrações novas, rode numa nova consulta:
+10. **Depois**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261010000002_orcamento.sql` (orçamento por categoria e limite pessoal de comprometimento, migração 0009, Ciclo F2) e clique em **Run**. Ela cria as tabelas `category_budgets` e `commitment_limits` (com a RLS de leitura e os gatilhos de proteção), o índice `card_entries_ctx_kind` (para o usado no mês), as funções `set_category_budget`, `delete_category_budget`, `set_commitment_limit`, `delete_commitment_limit` e `month_budget` e atualiza de novo a lista de operações aceitas (41 ações). Não muda nenhum dado que já existe e não toca nas tabelas de registros, contas a pagar, cartões ou metas. Ela depende da 0008. Depois dela, a conta nova continua sem orçamento nem limite.
+11. **Por último**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261010000003_contas.sql` (contas de origem do dinheiro, migração 0010, Ciclo G1) e clique em **Run**. Ela acrescenta a `financial_accounts` o tipo (`kind`: banco, dinheiro ou outra), a conta principal (`is_default`), a versão e a exclusão lógica, com índices que garantem uma só principal e nomes sem repetição por contexto, e dois gatilhos (`financial_accounts_default`, que marca a primeira conta ativa como principal, e `financial_accounts_guard`, que impede mudar o que só as funções mudam). Cria as funções `create_account`, `update_account`, `set_default_account`, `set_account_status` e `delete_account` (até 10 contas ativas por contexto; a conta que já tem lançamentos só se arquiva), a coluna opcional `account_id` em `goal_movements` (a origem do aporte e o destino do resgate, só informativa), recria `add_goal_movement`, `update_goal_movement`, `update_record` e a validação interna dos registros para aceitar a conta, e atualiza de novo a lista de operações aceitas (46 ações). As contas que já existem viram contas do tipo banco e a mais antiga de cada contexto vira a principal; nenhum lançamento, valor ou total muda. Ela depende da 0009. Depois dela, a conta nova continua com uma só conta, a "Conta principal", e nenhum dado de exemplo. O app publicado antes da 0010 segue funcionando (a troca do nome da conta direto na tabela continua permitida até a publicação deste ciclo).
+12. A ordem importa: cada arquivo altera tabelas e funções criadas pelos anteriores (a 0006 vem depois da 0005, a 0007 depois da 0006, a 0008 depois da 0007, a 0009 depois da 0008 e a 0010 depois da 0009). Cada arquivo roda uma única vez; se o projeto já tinha os primeiros, rode só os que faltam, na ordem dos nomes.
+13. Todos devem terminar sem erro. Se aparecer erro, me envie a mensagem.
+14. Para conferir as migrações novas, rode numa nova consulta:
 
    ```sql
    select (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -46,7 +47,7 @@ Não consegui abrir a documentação do Supabase deste ambiente (acesso bloquead
    ```
 
    O resultado esperado é `funcoes_0005 = 3`, `tabelas_0005 = 2`, `funcoes_0006 = 3`, `tabelas_0006 = 1`, `funcoes_0007 = 8`, `tabelas_0007 = 3` e `visoes_0007 = 1`.
-14. Para conferir a 0008, rode em outra consulta (só leitura):
+15. Para conferir a 0008, rode em outra consulta (só leitura):
 
    ```sql
    select (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -60,7 +61,7 @@ Não consegui abrir a documentação do Supabase deste ambiente (acesso bloquead
    ```
 
    O resultado esperado é `funcoes_0008 = 11`, `tabelas_0008 = 2` e `visoes_0008 = 1`. Essa consulta foi testada em 10/10/2026 num banco local descartável, montado com `supabase/tests/00_auth_shim.sql` e as oito migrações, e devolveu 11, 2 e 1.
-15. Para conferir a 0009, rode em outra consulta (só leitura):
+16. Para conferir a 0009, rode em outra consulta (só leitura):
 
    ```sql
    select (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -80,8 +81,32 @@ Não consegui abrir a documentação do Supabase deste ambiente (acesso bloquead
    ```
 
    O resultado esperado é `funcoes_0009 = 5`, `tabelas_0009 = 2`, `gatilhos_0009 = 2`, `regras_0009 = 2`, `acoes_0009 = 41`, `indice_0009 = 1` e `permissao_0009 = true`. Essa consulta foi testada em 10/10/2026 num banco local descartável, montado com `supabase/tests/00_auth_shim.sql` e as nove migrações (apagado depois), e devolveu 5, 2, 2, 2, 41, 1 e verdadeiro.
-16. Se o app mostrar erro ao abrir as contas a pagar, os gastos fixos, as contas do ano, as metas, os cartões, a renda comprometida, o orçamento ou o Resumo logo depois, a API ainda não leu o esquema novo: no SQL Editor, rode `notify pgrst, 'reload schema';`. Faça isso depois de colar a 0009, antes de abrir o app.
-17. O consultor de segurança do Supabase (**Advisors**) pode apontar a visão `series_items` como visão com os privilégios de quem a criou (a migração de contas do ano a recria com as mesmas opções). É intencional: ela precisa ler as contas excluídas só em um mês, filtra a permissão de leitura de forma explícita e usa `security_barrier` (ver `docs/01_ARQUITETURA.md`).
+17. Para conferir a 0010, rode em outra consulta (só leitura):
+
+   ```sql
+   select (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname in ('create_account', 'update_account', 'set_default_account', 'set_account_status',
+                  'delete_account')) as funcoes_0010,
+          (select count(*) from information_schema.columns
+            where table_schema = 'public' and table_name = 'financial_accounts'
+              and column_name in ('kind', 'is_default', 'version', 'updated_at', 'deleted_at', 'deleted_by')) as colunas_contas_0010,
+          (select count(*) from information_schema.columns
+            where table_schema = 'public' and table_name = 'goal_movements' and column_name = 'account_id') as coluna_metas_0010,
+          (select count(*) from pg_trigger
+            where tgname in ('financial_accounts_guard', 'financial_accounts_default') and not tgisinternal) as gatilhos_0010,
+          (select count(*) from pg_indexes
+            where schemaname = 'public' and indexname in ('financial_accounts_one_default', 'financial_accounts_name_live')) as indices_0010,
+          (select count(*) from pg_policies where schemaname = 'public' and tablename = 'financial_accounts') as regras_0010,
+          (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
+            where c.conname = 'record_operations_action_check') as acoes_0010,
+          (select count(*) from (select context_id from public.financial_accounts where deleted_at is null
+                                  group by context_id having count(*) filter (where is_default) <> 1) x) as contextos_sem_principal_0010,
+          has_function_privilege('authenticated', 'public.create_account(text, uuid, text, text)', 'execute') as permissao_0010;
+   ```
+
+   O resultado esperado é `funcoes_0010 = 5`, `colunas_contas_0010 = 6`, `coluna_metas_0010 = 1`, `gatilhos_0010 = 2`, `indices_0010 = 2`, `regras_0010 = 2`, `acoes_0010 = 46`, `contextos_sem_principal_0010 = 0` e `permissao_0010 = true`. Essa consulta foi testada em 10/10/2026 num banco local descartável, montado com `supabase/tests/00_auth_shim.sql` e as dez migrações (apagado depois), e devolveu 5, 6, 1, 2, 2, 2, 46, 0 e verdadeiro.
+18. Se o app mostrar erro ao abrir as contas a pagar, os gastos fixos, as contas do ano, as metas, os cartões, a renda comprometida, o orçamento, as contas de origem ou o Resumo logo depois, a API ainda não leu o esquema novo: no SQL Editor, rode `notify pgrst, 'reload schema';`. Faça isso depois de colar a 0010, antes de abrir o app.
+19. O consultor de segurança do Supabase (**Advisors**) pode apontar a visão `series_items` como visão com os privilégios de quem a criou (a migração de contas do ano a recria com as mesmas opções). É intencional: ela precisa ler as contas excluídas só em um mês, filtra a permissão de leitura de forma explícita e usa `security_barrier` (ver `docs/01_ARQUITETURA.md`).
 
 ## 3. Configurar o login
 

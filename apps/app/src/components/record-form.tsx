@@ -359,7 +359,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || (dayMode && dayText !== initialDay) || installmentsText !== '1' || note !== null;
   const day = dayMode && dayMonth ? dayInMonthDate(dayMonth, dayText) : null;
-  const account = personal.accounts.find((a) => a.id === draft.accountId) ?? personal.accounts[0];
+  const account = (allAccounts.data ?? personal.accounts).find((a) => a.id === draft.accountId) ?? personal.accounts[0];
   const contextName = 'Pessoal';
 
   // Sair com alterações não salvas pede confirmação (voltar, gesto, botão do sistema).

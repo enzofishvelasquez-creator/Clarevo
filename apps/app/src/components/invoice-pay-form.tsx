@@ -237,7 +237,7 @@ export function InvoicePayForm({ card, invoice, space: personal }: { card: CardD
           </Txt>
           {checked.ok && paidMonth ? (
             <MoneyTxt variant="label" style={[tabular, { fontFamily: fonts.bold }]}>
-              {`O pagamento de ${formatBRL(checked.amountCents)} entra em Pago de ${paidMonth}${account && personal.accounts.length > 1 ? `, saindo da conta ${account.name}` : ''}.`}
+              {`O pagamento de ${formatBRL(checked.amountCents)} entra em Pago de ${paidMonth}${account && personal.accounts.length > 1 ? `, ${ACCOUNTS_TEXT.leavingFrom(account.name)}` : ''}.`}
             </MoneyTxt>
           ) : null}
         </Card>

@@ -55,6 +55,7 @@ export const ACCOUNTS_TEXT = {
   into: 'Entrou em',
   to: 'Foi para',
   none: 'Sem conta',
+  notFound: 'Conta não encontrada',
   /** Filtro de Movimentações. */
   filterLabel: 'Conta',
   filterAll: 'Todas',
@@ -271,6 +272,13 @@ export function hasAccountChoice(accounts: readonly Pick<FinancialAccount, 'stat
 export function accountNameOf(accounts: readonly Pick<FinancialAccount, 'id' | 'name' | 'status'>[], id: string | null | undefined): string | null {
   if (!id) return null;
   return accounts.find((a) => a.id === id)?.name ?? null;
+}
+
+/** Nome da conta no detalhe de um registro ou de um pagamento: a arquivada leva "(arquivada)"; sem a conta, "Conta não encontrada". */
+export function accountDisplayName(accounts: readonly Pick<FinancialAccount, 'id' | 'name' | 'status'>[], id: string | null | undefined): string {
+  const a = id ? accounts.find((x) => x.id === id) : undefined;
+  if (!a) return ACCOUNTS_TEXT.notFound;
+  return a.status === 'arquivada' ? ACCOUNTS_TEXT.archivedName(a.name) : a.name;
 }
 
 /**

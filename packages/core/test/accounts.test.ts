@@ -455,6 +455,57 @@ describe('MemoryRepository: contas de origem (D-043)', () => {
     expect([totals.receivedCents, totals.paidCents]).toEqual([0, 0]);
   });
 
+  it('sequência de aceite (docs/02): os dez passos, com o Pago mudando só pelo gasto', async () => {
+    const { repo, ctx, principal } = await setup();
+    const totals = async () => {
+      const t = summarizeMonth(await repo.listRecords(ctx, '2026-10'), ctx, '2026-10');
+      return [t.receivedCents, t.paidCents];
+    };
+    // 1. Conta nova.
+    expect((await repo.listAccounts(ctx)).map((a) => [a.name, a.kind, a.status, a.isDefault, a.version])).toEqual([['Conta principal', 'banco', 'ativa', true, 1]]);
+    expect(await totals()).toEqual([0, 0]);
+    // 2. Criar a Carteira.
+    const cart = await repo.createAccount(key(), ctx, { name: 'Carteira', kind: 'dinheiro' });
+    expect(activeAccounts(await repo.listAccounts(ctx)).map((a) => [a.name, a.isDefault])).toEqual([['Conta principal', true], ['Carteira', false]]);
+    // 3. Mesmo nome com outra caixa.
+    await expectCode(repo.createAccount(key(), ctx, { name: 'carteira', kind: 'dinheiro' }), 'nome_da_conta_repetido');
+    // 4. Gasto de R$ 80,00 na Carteira.
+    const spent = await repo.createRecord(key(), ctx, 'despesa', { accountId: cart.id, amountCents: 8000, occurredOn: DEMO_TODAY, description: 'Feira', category: 'Mercado' });
+    expect(spent.accountId).toBe(cart.id);
+    expect(await totals()).toEqual([0, 8000]);
+    // 5. Excluir a Carteira.
+    await expectCode(repo.deleteAccount(key(), cart.id, cart.version), 'conta_com_lancamentos');
+    // 6. Arquivar a Carteira: o gasto mantém a conta.
+    const archived = await repo.setAccountStatus(key(), cart.id, cart.version, 'arquivada');
+    expect(archived.status).toBe('arquivada');
+    expect((await repo.listRecords(ctx, '2026-10')).find((r) => r.id === spent.id)!.accountId).toBe(cart.id);
+    // 7. Arquivar a principal sem escolher a nova: só resta ela ativa.
+    await expectCode(repo.setAccountStatus(key(), principal, 1, 'arquivada'), 'ultima_conta_ativa');
+    // 8. Reativar a Carteira e arquivar a principal escolhendo a Carteira.
+    const back = await repo.setAccountStatus(key(), cart.id, archived.version, 'ativa');
+    const k = key();
+    const swapped = await repo.setAccountStatus(k, principal, 1, 'arquivada', cart.id);
+    expect(swapped.status).toBe('arquivada');
+    const list = await repo.listAccounts(ctx);
+    expect(list.find((a) => a.id === cart.id)).toMatchObject({ isDefault: true, status: 'ativa' });
+    expect(list.find((a) => a.id === principal)).toMatchObject({ isDefault: false, status: 'arquivada' });
+    expect(back.status).toBe('ativa');
+    // 9. A mesma chave: nada muda.
+    expect(await repo.setAccountStatus(k, principal, 1, 'arquivada', cart.id)).toEqual(swapped);
+    expect(await repo.listAccounts(ctx)).toEqual(list);
+    // 10. Aporte com a conta e resgate sem conta: só os movimentos mudam.
+    const goal = await repo.createGoal(key(), ctx, {
+      goalType: 'objetivo', name: 'Viagem', targetCents: 500_000, targetMonth: null, plannedMonthlyCents: null,
+      essentialBaseCents: null, essentialMonths: null, essentialBaseSource: null, initialCents: 0, initialOn: null,
+    });
+    const gid = goal.goal.id;
+    const base = (amountCents: number, accountId: string | null) => ({ amountCents, occurredOn: DEMO_TODAY, note: null, accountId });
+    const dep = await repo.addGoalMovement(key(), gid, 'aporte', base(10_000, cart.id));
+    const out = await repo.addGoalMovement(key(), gid, 'resgate', base(3000, null));
+    expect([dep.movement!.accountId, out.movement!.accountId]).toEqual([cart.id, null]);
+    expect(await totals()).toEqual([0, 8000]);
+  });
+
   it('o cliente antigo (sem a conta) mantém o hash: a mesma chave com o mesmo conteúdo repete', async () => {
     const { repo, ctx } = await setup();
     const goal = await repo.createGoal(key(), ctx, {
