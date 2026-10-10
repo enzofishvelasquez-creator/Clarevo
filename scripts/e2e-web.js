@@ -1,8 +1,10 @@
 /**
  * Roteiro de verificação do primeiro ciclo, do Ciclo A (gastos fixos e parcelamentos), do Ciclo A3 (contas do ano),
  * de "Primeiros passos" no Resumo, dos atalhos de Movimentações, do Ciclo A6 (achar tudo e calculadoras), do Ciclo A4
- * (seus últimos meses, com o cenário fictício "retorno" da demonstração) e do Ciclo A5 (Aprender e dúvidas) na versão
- * web, em modo demonstração (acesso simulado).
+ * (seus últimos meses, com o cenário fictício "retorno" da demonstração), do Ciclo A5 (Aprender e dúvidas), do Ciclo A2
+ * (Conta na web e ocultar valores), do Ciclo B (renda comprometida e a previsão dos pagamentos), do Ciclo C (metas, reserva
+ * e plano de guardar) e do Ciclo D (simulador, com os aportes no início de cada mês) na versão web, em modo demonstração
+ * (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -238,19 +240,20 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     fixos: 'Cadastre seus gastos fixos. Aluguel, escola, luz, internet e parcelas, uma vez só.',
     recebido: 'Registre o que você recebeu este mês. Salário ou outra renda.',
     pago: 'Anote um gasto já pago. Mercado, farmácia ou transporte.',
+    guardar: 'Planejar quanto guardar. Diga se consegue guardar um valor por mês e veja um plano.',
   };
   const ppDone = (k) => PP[k].replace('. ', ', concluído. ');
   const ppRows = () => cardButtons('Primeiros passos');
   const ppIs = (rows) => async () => JSON.stringify(await ppRows()) === JSON.stringify([...rows, 'Agora não']);
   await waitText('Primeiros passos');
   t = await body();
-  ok('primeiros passos: conta nova vê os três passos, nenhum concluído, e "Agora não"', await ppIs([PP.fixos, PP.recebido, PP.pago])() &&
-    t.includes('Três passos para o Clarevo mostrar o seu mês de verdade.') && t.includes('R$ 0,00'), JSON.stringify(await ppRows()));
+  ok('primeiros passos: conta nova vê os quatro passos (o quarto é "Planejar quanto guardar"), nenhum concluído, e "Agora não"', await ppIs([PP.fixos, PP.recebido, PP.pago, PP.guardar])() &&
+    t.includes('Quatro passos para o Clarevo mostrar o seu mês de verdade.') && t.includes('R$ 0,00'), JSON.stringify(await ppRows()));
   const ppOrder = await p.evaluate(() => {
     const top = (e) => (e ? e.getBoundingClientRect().top : null);
     const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Primeiros passos' && e.getBoundingClientRect().width > 0);
     const a = [...document.querySelectorAll('[role=button]')].find((e) => e.textContent === 'Anotar gasto' && e.getBoundingClientRect().width > 0);
-    const steps = [...document.querySelectorAll('[role=button]')].filter((e) => /^(Cadastre|Registre|Anote um)/.test(e.getAttribute('aria-label') || '') && e.getBoundingClientRect().width > 0);
+    const steps = [...document.querySelectorAll('[role=button]')].filter((e) => /^(Cadastre|Registre|Anote um|Planejar)/.test(e.getAttribute('aria-label') || '') && e.getBoundingClientRect().width > 0);
     return { card: top(h), anotar: top(a), level: h?.getAttribute('aria-level'), minStep: Math.round(Math.min(...steps.map((s) => s.getBoundingClientRect().height))) };
   });
   ok('primeiros passos: título de nível 2, antes de "Anotar gasto", passos com 56 px', ppOrder.card !== null && ppOrder.anotar !== null && ppOrder.card < ppOrder.anotar && ppOrder.level === '2' && ppOrder.minStep >= 56, JSON.stringify(ppOrder));
@@ -284,16 +287,16 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await tab().first().click(); await waitText('Diferença do mês');
   };
   await tabsBack();
-  await waitUntil(ppIs([ppDone('fixos'), PP.recebido, PP.pago]), 8000);
-  ok('primeiros passos: gasto fixo cadastrado marca o passo 1 como concluído', await ppIs([ppDone('fixos'), PP.recebido, PP.pago])(), JSON.stringify(await ppRows()));
+  await waitUntil(ppIs([ppDone('fixos'), PP.recebido, PP.pago, PP.guardar]), 8000);
+  ok('primeiros passos: gasto fixo cadastrado marca o passo 1 como concluído', await ppIs([ppDone('fixos'), PP.recebido, PP.pago, PP.guardar])(), JSON.stringify(await ppRows()));
   // Passo 2 abre "Registrar recebimento".
   await btn(PP.recebido).click(); await waitText('Data do recebimento');
   ok('primeiros passos: o passo 2 abre o registro de recebimento', (await visibleCount('button', 'Salvar recebimento')) === 1);
   await field('Descrição').fill('Salário'); await field('Valor em reais').fill('3000');
   await btn('Salvar recebimento').click(); await waitText('Recebimento salvo');
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
-  await waitUntil(ppIs([ppDone('fixos'), ppDone('recebido'), PP.pago]), 8000);
-  ok('primeiros passos: recebimento do mês marca o passo 2; o passo 3 continua aberto', await ppIs([ppDone('fixos'), ppDone('recebido'), PP.pago])(), JSON.stringify(await ppRows()));
+  await waitUntil(ppIs([ppDone('fixos'), ppDone('recebido'), PP.pago, PP.guardar]), 8000);
+  ok('primeiros passos: recebimento do mês marca o passo 2; os passos 3 e 4 continuam abertos', await ppIs([ppDone('fixos'), ppDone('recebido'), PP.pago, PP.guardar])(), JSON.stringify(await ppRows()));
   await scrollTo('Primeiros passos');
   await shot('50_primeiros_passos_concluidos');
   // "Agora não": o card sai e o Resumo continua com "Anotar gasto".
@@ -310,6 +313,14 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
   await shot('05_conta');
   await shot('05b_conta_seguranca', true);
+  // Ciclo A2 (D-025): na web não há lembretes nem biometria (só no app para celular); "Ocultar valores ao abrir" existe
+  // também na web e é só deste aparelho.
+  t = await body();
+  const contaSwitches = await p.getByRole('switch').filter({ visible: true }).evaluateAll((els) => els.map((e) => [e.getAttribute('aria-label'), e.getAttribute('aria-checked')]));
+  ok('Conta na web: "Lembretes estão disponíveis no app para celular.", sem interruptor de lembretes nem de biometria', t.includes('Lembretes') && t.includes('Lembretes estão disponíveis no app para celular.') &&
+    !t.includes('Pedir biometria ao abrir') && !t.includes('Avisar') && JSON.stringify(contaSwitches) === JSON.stringify([['Ocultar valores ao abrir', 'false']]), JSON.stringify(contaSwitches));
+  ok('Conta: "Privacidade neste aparelho" com "Ocultar valores ao abrir" desligado por padrão e a legenda', t.includes('Privacidade neste aparelho') && t.includes('Ao abrir o app, os valores aparecem como R$ ••••. Vale só para este aparelho.'));
+  await keepText();
   await btn('Sair deste aparelho').click(); await waitText('Seu dinheiro');
   ok('sair volta para boas-vindas', (await body()).includes('Seu dinheiro'));
 
@@ -343,25 +354,65 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Simular abertura do link').click();
   await btn('Já confirmei meu e-mail').click(); await waitText('Sua primeira conta');
   await btn('Começar meu mês').click(); await waitText('Diferença do mês'); await waitText('Primeiros passos');
-  ok('segunda conta nova também começa com os três passos em aberto', await ppIs([PP.fixos, PP.recebido, PP.pago])(), JSON.stringify(await ppRows()));
+  ok('segunda conta nova também começa com os quatro passos em aberto', await ppIs([PP.fixos, PP.recebido, PP.pago, PP.guardar])(), JSON.stringify(await ppRows()));
   await btn(PP.pago).click(); await waitText('Será salvo em');
   ok('primeiros passos: o passo 3 abre "Anotar gasto"', (await visibleCount('button', 'Salvar gasto')) === 1);
   await field('Descrição').fill('Mercado'); await field('Valor em reais').fill('120');
   await btn('Salvar gasto').click(); await waitText('Gasto salvo');
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
-  await waitUntil(ppIs([PP.fixos, PP.recebido, ppDone('pago')]), 8000);
-  ok('primeiros passos: gasto pago no mês marca o passo 3', await ppIs([PP.fixos, PP.recebido, ppDone('pago')])(), JSON.stringify(await ppRows()));
+  await waitUntil(ppIs([PP.fixos, PP.recebido, ppDone('pago'), PP.guardar]), 8000);
+  ok('primeiros passos: gasto pago no mês marca o passo 3', await ppIs([PP.fixos, PP.recebido, ppDone('pago'), PP.guardar])(), JSON.stringify(await ppRows()));
   await btn(PP.recebido).click(); await waitText('Data do recebimento');
   await field('Descrição').fill('Salário'); await field('Valor em reais').fill('2800');
   await btn('Salvar recebimento').click(); await waitText('Recebimento salvo');
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
-  await waitUntil(ppIs([PP.fixos, ppDone('recebido'), ppDone('pago')]), 8000);
+  await waitUntil(ppIs([PP.fixos, ppDone('recebido'), ppDone('pago'), PP.guardar]), 8000);
   await btn(PP.fixos).click(); await waitText('Salvando em Pessoal');
   await field('Descrição').fill('Internet'); await field('Valor por mês').fill('100'); await field('Dia do vencimento').fill('20');
   await btn('Salvar gasto fixo').click(); await waitText('Gasto fixo salvo');
   await tabsBack();
+  // Ciclo C (D-036): o 4º passo, "Planejar quanto guardar", abre a aba Metas no card da pergunta. Com os três primeiros
+  // prontos, o card continua até a pessoa responder "consigo" ou "agora não".
+  await waitUntil(ppIs([ppDone('fixos'), ppDone('recebido'), ppDone('pago'), PP.guardar]), 8000);
+  ok('primeiros passos: com os três primeiros prontos, o card fica até o 4º passo ("Planejar quanto guardar")', await ppIs([ppDone('fixos'), ppDone('recebido'), ppDone('pago'), PP.guardar])(), JSON.stringify(await ppRows()));
+  await btn(PP.guardar).click(); await waitText('Você consegue guardar algum valor por mês?'); await p.waitForTimeout(500);
+  const askButtons = await cardButtons('Você consegue guardar algum valor por mês?');
+  ok('primeiros passos: o passo 4 abre a aba Metas no card da pergunta, com "Sim, consigo", "Agora não" e "Responder depois"', new URL(p.url()).pathname === '/metas' &&
+    JSON.stringify(askButtons) === JSON.stringify(['Sim, consigo', 'Agora não', 'Responder depois']), `${p.url()} ${JSON.stringify(askButtons)}`);
+  await logoChecks('Metas (conta nova): logotipo "clarevo." no cabeçalho azul, sem o símbolo C');
+  await shot('97_metas_pergunta_conta_nova');
+  // "Agora não": texto acolhedor e reserva mínima com valores a partir de R$ 100,00, nenhum pré-marcado. Nada é criado
+  // até a pessoa escolher e tocar em "Criar reserva mínima".
+  await btn('Agora não').click(); await waitText('Tudo bem. Muita gente começa com valores pequenos'); await p.waitForTimeout(400);
+  t = await body();
+  const minChips = await p.getByRole('radio').filter({ visible: true }).evaluateAll((els) => els.map((e) => [(e.getAttribute('aria-label') || e.textContent).replace(/\u00a0/g, ' '), e.getAttribute('aria-checked')]));
+  ok('"Agora não": texto acolhedor e a pergunta da reserva mínima', new URL(p.url()).pathname === '/guardar/minima' && t.includes('Tudo bem. Muita gente começa com valores pequenos, e qualquer valor guardado ajuda num imprevisto.') && t.includes('Quer começar uma reserva mínima?'), p.url());
+  ok('reserva mínima: chips R$ 100,00, 300,00, 500,00, 1.000,00 e "Outro valor" (e "1 mês dos seus gastos essenciais" com o que já dá para calcular: aqui, o gasto fixo de R$ 100,00), nenhum pré-marcado',
+    JSON.stringify(minChips.slice(0, 4).map((c) => c[0])) === JSON.stringify(['R$ 100,00', 'R$ 300,00', 'R$ 500,00', 'R$ 1.000,00']) && minChips.some((c) => c[0] === 'Outro valor') &&
+    minChips.every((c) => c[1] === 'false') && minChips.filter((c) => /gastos essenciais/.test(c[0])).length <= 1, JSON.stringify(minChips));
+  ok('reserva mínima: passos pequenos (R$ 10,00 por semana = R$ 43,33 por mês) e os dois links, sem dizer o que cortar', t.includes('Guardar R$ 10,00 por semana · R$ 43,33 por mês') && t.includes('Guardar quando entrar um valor extra') &&
+    (await visibleCount('button', 'Ver para onde foi o dinheiro')) === 1 && (await visibleCount('button', 'Ver renda comprometida')) === 1 && (await visibleCount('button', 'Me pergunte de novo no próximo mês')) === 1 && !FORBIDDEN.test(t));
+  await keepText();
+  await layoutChecks('reserva mínima 390px');
+  await shot('98_reserva_minima');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await layoutChecks('reserva mínima 320px');
+  await shot('98_reserva_minima_320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  await btn('Criar reserva mínima').click(); await p.waitForTimeout(300);
+  ok('reserva mínima: sem escolha, "Criar reserva mínima" pede para escolher', (await body()).includes('Escolha'), (await body()).split('\n').filter((l) => /Escolha/.test(l)).join(' | '));
+  await radio('Outro valor').click(); await field('Valor da reserva mínima').fill('50'); await btn('Criar reserva mínima').click(); await p.waitForTimeout(300);
+  ok('reserva mínima: "Outro valor" abaixo de R$ 100,00 é recusado', (await body()).includes('Informe um valor a partir de R$ 100,00, como 300,00.'));
+  const goalsBefore = await otherDevice(async (repo, ctx) => (await repo.listGoals(ctx)).length);
+  ok('reserva mínima: nada criado antes de escolher e criar', goalsBefore === 0, String(goalsBefore));
+  await radio('R$ 100,00').click(); await btn('Criar reserva mínima').click(); await waitText('Reserva mínima criada.'); await p.waitForTimeout(600);
+  t = await body();
+  ok('reserva mínima criada: Metas mostra "Reserva para imprevistos" com R$ 0,00 de R$ 100,00 (0%) e o convite à pergunta some', new URL(p.url()).pathname === '/metas' && t.includes('Reserva mínima criada.') &&
+    t.includes('R$ 0,00 de R$ 100,00') && !t.includes('Você consegue guardar algum valor por mês?'), t.slice(0, 300));
+  await shot('99_metas_reserva_minima');
+  await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês');
   await waitUntil(async () => !(await headingShown('Primeiros passos')), 8000);
-  ok('primeiros passos: com os três passos prontos, o card sai', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Anotar gasto')) === 1);
+  ok('primeiros passos: com os quatro passos prontos ("Agora não" conta como resposta), o card sai', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Anotar gasto')) === 1);
   await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
   await btn('Sair deste aparelho').click(); await waitText('Seu dinheiro');
   await btn('Entrar').click(); await waitText('Esqueci minha senha');
@@ -386,7 +437,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('base: sem valores estimados em outubro (a Luz estimada vence em novembro)', !t.includes('em valores estimados'));
   await logoChecks('Resumo: logotipo "clarevo." no cabeçalho azul, sem o símbolo C');
   await shot('06_resumo_demo');
-  ok('primeiros passos: fora da conta de demonstração com dados', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Agora não')) === 0 && !t.includes('Três passos para o Clarevo'));
+  ok('primeiros passos: fora da conta de demonstração com dados', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Agora não')) === 0 && !t.includes('Quatro passos para o Clarevo'));
   // Ciclo A4: a demonstração padrão foi toda anotada em 07/10/2026 e não mostra a faixa; a ordem do Resumo não muda.
   ok('demonstração padrão: sem a faixa "Seus últimos meses" e com os títulos do Resumo na ordem de sempre', !(await bandShown()) && !t.includes('Sua última anotação') &&
     JSON.stringify(await headingList()) === JSON.stringify(['2:Outubro de 2026', '2:Pagamentos do mês']), JSON.stringify(await headingList()));
@@ -1686,7 +1737,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('reserva: guardando 500,00 por mês, 36 meses', await shows('Guardando R$ 500,00 por mês, a reserva fica completa em 36 meses (3 anos).'));
   ok('reserva: referência com fonte, sem link nem número enquanto a página não for conferida', (await shows('Portal do Investidor, da CVM')) &&
     (await p.getByRole('link', { name: /Portal do Investidor/ }).count()) + (await p.getByRole('button', { name: /Portal do Investidor/ }).count()) === 0);
-  ok('reserva: nenhum botão de ação neste ciclo', (await visibleCount('button', /^(Criar reserva|Anotar)/)) === 0);
+  // Ciclo C: com o resultado válido, a calculadora oferece levar os números para a reserva (na demonstração, que já tem
+  // uma reserva, "Salvar na minha reserva"; numa conta sem reserva, "Criar reserva"). Nada é gravado ao digitar.
+  await waitUntil(async () => (await visibleCount('button', 'Salvar na minha reserva')) === 1, 4000);
+  ok('reserva: com o resultado, o botão "Salvar na minha reserva" (a demonstração já tem reserva) e nenhum "Anotar..."', (await visibleCount('button', 'Salvar na minha reserva')) === 1 && (await visibleCount('button', /^(Criar reserva|Anotar)/)) === 0);
   await calcShot('61_calc_reserva');
   await calcWidths('reserva', 'Reserva para imprevistos');
   await backToCalcList();
@@ -1698,6 +1752,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await radio('Em quanto tempo').click();
   await typeIn('Quanto vai guardar por mês', '1.000,00');
   ok('objetivo: guardando 1.000,00 por mês, 18 meses', await shows('Com estes números, guardando R$ 1.000,00 por mês, você chega lá em 18 meses (1 ano e 6 meses).'));
+  ok('objetivo: com o resultado, o link "Simular com rendimento" (Ciclo D)', (await visibleCount('button', 'Simular com rendimento')) === 1);
   await calcShot('62_calc_juntar_para_objetivo');
   await calcWidths('objetivo', 'Juntar para um objetivo');
   await backToCalcList();
@@ -1963,8 +2018,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Descartar alterações').click(); await waitText('Diferença do mês');
   ok('descartar não salva o rascunho', !(await body()).includes('Rascunho'));
 
-  // Metas, Aprender
-  await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Metas chegam em uma próxima versão');
+  // Metas (Ciclo C), Aprender. A demonstração tem a reserva para imprevistos (15%) e a meta "Viagem de férias" (20%), e já
+  // tem a resposta "consigo" com R$ 500,00 ao plano de guardar. Outubro continua na base nesta aba (as contas e os gastos
+  // de antes não mexem nas metas).
+  await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu plano de guardar'); await waitText('Planejado: R$ 500,00 por mês'); await p.waitForTimeout(400);
   await logoChecks('Metas: logotipo "clarevo." no cabeçalho azul, sem o símbolo C');
   const metasTitle = await p.evaluate(() => {
     const logo = [...document.querySelectorAll('[role=img][aria-label="Clarevo"]')].find((e) => e.getBoundingClientRect().width > 0);
@@ -1973,31 +2030,48 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   });
   ok('Metas: o título da aba fica abaixo do logotipo', metasTitle !== null && metasTitle >= 0, `distância=${metasTitle}`);
   await shot('16_metas');
-  // Ciclo A6: "Enquanto isso, faça as contas", com as 3 linhas que abrem telas que funcionam.
-  ok('Metas: card "Enquanto isso, faça as contas" com Reserva, Juntar e Todas as calculadoras', JSON.stringify(await cardButtons('Enquanto isso, faça as contas')) === JSON.stringify([
-    'Reserva para imprevistos. Quantos meses seus gastos essenciais cobrem', 'Juntar para um objetivo. Quanto guardar por mês ou em quanto tempo', 'Todas as calculadoras']), JSON.stringify(await cardButtons('Enquanto isso, faça as contas')));
-  await layoutChecks('metas com as calculadoras 390px');
-  await scrollTo('Enquanto isso, faça as contas');
+  t = await body();
+  const metasBars = await p.getByRole('progressbar').filter({ visible: true }).evaluateAll((els) => els.map((e) => [e.getAttribute('aria-label'), e.getAttribute('aria-valuenow'), e.getAttribute('aria-valuetext')]));
+  ok('Metas da demonstração: reserva 15% (R$ 3.500,00 de R$ 22.500,00, "Cobre 0,9 mês", planejado R$ 500,00 por mês) e a barra com valor e texto acessíveis', t.includes('R$ 3.500,00 de R$ 22.500,00') && t.includes('15%') &&
+    t.includes('Cobre 0,9 mês dos seus gastos essenciais') && t.includes('Planejado: R$ 500,00 por mês') &&
+    JSON.stringify(metasBars) === JSON.stringify([['Reserva para imprevistos: 15% da meta, R$ 3.500,00 de R$ 22.500,00.', '15', 'R$ 3.500,00 de R$ 22.500,00, 15%']]), JSON.stringify(metasBars));
+  ok('Metas da demonstração: "Viagem de férias" 20% (R$ 1.200,00 de R$ 6.000,00), até julho de 2027 com R$ 480,00 por mês', (await visibleCount('button', /^Viagem de férias: 20% da meta, R\$ 1\.200,00 de R\$ 6\.000,00\. Até julho de 2027 · R\$ 480,00 por mês para chegar lá\./)) === 1 &&
+    t.includes('R$ 1.200,00 de R$ 6.000,00') && t.includes('20%') && t.includes('Até julho de 2027 · R$ 480,00 por mês para chegar lá'));
+  ok('Metas da demonstração: plano de guardar com R$ 500,00 por mês e "Seu mês" com a renda comprometida e o guardado em outubro',
+    t.includes('Você planeja guardar R$ 500,00 por mês.') && t.includes('a terceira etapa (R$ 22.500,00, 6 meses dos seus gastos essenciais) chega em dezembro de 2029.') && t.includes('Guardado em outubro: R$ 500,00') &&
+    /\d+,\d% da renda de referência já tem destino\./.test(t) && (await visibleCount('button', 'Ver renda comprometida')) === 1 && (await visibleCount('button', 'Ver o plano')) === 1 && (await visibleCount('button', 'Mudar valor')) === 1);
+  ok('Metas: a pergunta "Você consegue guardar algum valor por mês?" não aparece depois da resposta "consigo"', !t.includes('Você consegue guardar algum valor por mês?') && (await visibleCount('button', 'Responder depois')) === 0);
+  ok('Metas: títulos na ordem (Seu plano de guardar, Seu mês, Reserva para imprevistos, Suas metas, Aprender)', JSON.stringify((await headingList()).filter((h) => h.startsWith('2:'))) ===
+    JSON.stringify(['2:Seu plano de guardar', '2:Seu mês', '2:Reserva para imprevistos', '2:Suas metas', '2:Aprender']), JSON.stringify(await headingList()));
+  await keepText();
+  // A aba mantém o acesso às calculadoras e ao simulador (linhas do mesmo card).
+  const calcRows = [
+    'Simular um plano. Quanto guardar por mês, em quanto tempo e quanto você pode ter, com hipóteses suas.',
+    'Calculadoras. Parcelado ou à vista, dívidas, reserva e outras contas',
+  ];
+  ok('Metas: "Simular um plano" e "Calculadoras" em linhas próprias, e o card "Enquanto isso, faça as contas" saiu', (await Promise.all(calcRows.map((n) => visibleCount('button', n)))).every((n) => n === 1) && !t.includes('Enquanto isso, faça as contas'));
+  await layoutChecks('metas 390px');
+  await scrollTo('Calculadoras');
   await shot('70_metas_calculadoras');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
-  await layoutChecks('metas com as calculadoras 320px');
+  await layoutChecks('metas 320px');
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   const fromGoals = async (row, title) => {
-    await p.getByRole('button', { name: new RegExp(`^${row}`) }).filter({ visible: true }).first().click();
+    await p.getByRole('button', { name: new RegExp(`^${row}\\.`) }).filter({ visible: true }).first().click();
     await waitUntil(async () => (await h1Name()) === title, 8000);
   };
-  await fromGoals('Reserva para imprevistos', 'Reserva para imprevistos');
-  await typeIn('Gastos essenciais por mês', '1.000,00'); await radio('3 meses').click();
-  ok('Metas › Reserva para imprevistos: a calculadora funciona (3 meses de 1.000,00 → R$ 3.000,00)', await shows('Com estes números, a reserva de 3 meses é de R$ 3.000,00.'));
-  await btn('Voltar').click(); await waitText('Enquanto isso, faça as contas');
-  await fromGoals('Juntar para um objetivo', 'Juntar para um objetivo');
-  await typeIn('Quanto quer juntar', '1.200,00'); await typeIn('Em quantos meses', '12');
-  ok('Metas › Juntar para um objetivo: a calculadora funciona (1.200,00 em 12 meses → R$ 100,00 por mês)', await shows('R$ 100,00 por mês'));
-  await btn('Voltar').click(); await waitText('Enquanto isso, faça as contas');
-  await fromGoals('Todas as calculadoras', 'Calculadoras');
+  await fromGoals('Calculadoras', 'Calculadoras');
   const calcNames = calcExpected.flatMap(([, items]) => items);
-  ok('Metas › Todas as calculadoras: a lista com as 8', calcNames.length === 8 && (await Promise.all(calcNames.map((n) => visibleCount('button', n)))).every((n) => n === 1));
-  await btn('Voltar').click(); await waitText('Enquanto isso, faça as contas');
+  ok('Metas › Calculadoras: a lista com as 8', calcNames.length === 8 && (await Promise.all(calcNames.map((n) => visibleCount('button', n)))).every((n) => n === 1));
+  await openCalc('Reserva para imprevistos');
+  await typeIn('Gastos essenciais por mês', '1.000,00'); await radio('3 meses').click();
+  ok('Metas › Calculadoras › Reserva para imprevistos: funciona (3 meses de 1.000,00 → R$ 3.000,00)', await shows('Com estes números, a reserva de 3 meses é de R$ 3.000,00.'));
+  await backToCalcList();
+  await openCalc('Juntar para um objetivo');
+  await typeIn('Quanto quer juntar', '1.200,00'); await typeIn('Em quantos meses', '12');
+  ok('Metas › Calculadoras › Juntar para um objetivo: funciona (1.200,00 em 12 meses → R$ 100,00 por mês)', await shows('R$ 100,00 por mês'));
+  await backToCalcList();
+  await btn('Voltar').click(); await waitText('Seu plano de guardar');
   await p.getByRole('tab', { name: 'Aprender' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês e saldo da conta');
   await shot('17_aprender');
   // Ciclo A6: card "Calculadoras" no topo de Aprender, antes dos temas.
@@ -2123,7 +2197,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const [popup] = await Promise.all([ctx.waitForEvent('page', { timeout: 8000 }).catch(() => null), p.getByRole('link').filter({ visible: true }).first().click()]);
   await waitUntil(async () => sourceNav.length > 0 || (popup !== null && popup.url().startsWith('http')), 5000);
   const sourceUrl = sourceNav[0] ?? (popup ? popup.url() : '');
-  const allowedSource = (url, slug) => { try { const h = new URL(url).hostname; return new URL(url).protocol === 'https:' && (['gov.br', 'leg.br', 'jus.br', 'def.br'].some((d) => h === d || h.endsWith(`.${d}`)) || (slug === 'fgc' && (h === 'fgc.org.br' || h.endsWith('.fgc.org.br')))); } catch { return false; } };
+  const allowedSource = (url, slug) => { try { const h = new URL(url).hostname; return new URL(url).protocol === 'https:' && (['gov.br', 'leg.br', 'jus.br', 'def.br'].some((d) => h === d || h.endsWith(`.${d}`)) || (slug === 'fgc' && (h === 'fgc.org.br' || h.endsWith('.fgc.org.br'))) || (slug === 'renda-comprometida' && (h === 'serasa.com.br' || h.endsWith('.serasa.com.br')))); } catch { return false; } };
   ok('fonte: abre outra janela com domínio oficial e o app continua na explicação', popup !== null && allowedSource(sourceUrl, 'taxa-mes-ano') && new URL(p.url()).pathname === '/explicacao/taxa-mes-ano', sourceUrl);
   ctx.off('request', onSourceNav);
   if (popup) await popup.close().catch(() => {});
@@ -2187,7 +2261,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     for (const e of document.querySelectorAll('div[dir="auto"], span')) if (shown(e) && e.children.length === 0 && /R\$/.test(e.textContent || '') && e.scrollWidth > e.clientWidth + 1) out.push(`cortado: ${e.textContent}`);
     return out;
   });
-  const allowedSourceUrl = (url, slug) => { try { const u = new URL(url); const h = u.hostname; return u.protocol === 'https:' && (['gov.br', 'leg.br', 'jus.br', 'def.br'].some((d) => h === d || h.endsWith(`.${d}`)) || (slug === 'fgc' && (h === 'fgc.org.br' || h.endsWith('.fgc.org.br')))); } catch { return false; } };
+  const allowedSourceUrl = (url, slug) => { try { const u = new URL(url); const h = u.hostname; return u.protocol === 'https:' && (['gov.br', 'leg.br', 'jus.br', 'def.br'].some((d) => h === d || h.endsWith(`.${d}`)) || (slug === 'fgc' && (h === 'fgc.org.br' || h.endsWith('.fgc.org.br'))) || (slug === 'renda-comprometida' && (h === 'serasa.com.br' || h.endsWith('.serasa.com.br')))); } catch { return false; } };
   // Os sites das fontes não abrem aqui: window.open só anota o endereço pedido (a abertura real foi conferida acima).
   await p.evaluate(() => { window.__opened = []; window.__realOpen = window.open; window.open = (u) => { window.__opened.push(String(u)); return null; }; });
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
@@ -2201,7 +2275,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     if (!(h1s.length === 2 && h1s[0] === 'Aprender' && expectTitle(h1s[1]))) learnIssues.titulo.push(`${slug}: ${JSON.stringify(h1s)}`);
     const text = await body();
     const shownText = text.split('\nFontes\n')[0] + '\n' + (text.split('Revisado em')[1] ?? '');
-    const bad = shownText.match(FORBIDDEN)?.[0] ?? shownText.match(VETOED)?.[0] ?? shownText.match(LEARN_FORBIDDEN)?.[0] ?? (['sem-registro', 'voltei-depois'].includes(slug) ? shownText.match(RETURN_WORDS)?.[0] : null);
+    // A referência de 30% da renda com parcelas de dívidas é de uma fonte privada identificada (P-024): a Serasa só pode aparecer em "renda-comprometida".
+    const learnChecked = slug === 'renda-comprometida' ? shownText.replace(/Serasa/g, '') : shownText;
+    const bad = shownText.match(FORBIDDEN)?.[0] ?? shownText.match(VETOED)?.[0] ?? learnChecked.match(LEARN_FORBIDDEN)?.[0] ?? (['sem-registro', 'voltei-depois'].includes(slug) ? shownText.match(RETURN_WORDS)?.[0] : null);
     if (bad || !text.includes('Revisado em')) learnIssues.termos.push(`${slug}: ${bad ?? 'sem "Revisado em"'}`);
     const links = p.getByRole('link').filter({ visible: true });
     const n = await links.count();
@@ -2232,10 +2308,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.evaluate(() => { window.open = window.__realOpen; });
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   const externalTopics = [...learnSeen].filter(([, n]) => n > 0).map(([s]) => s);
-  ok('Aprender: 35 temas publicados abrem pela aba (28 nas seções e 7 dúvidas), cada um com o título como cabeçalho de nível 1', learnSeen.size === 35 && learnLabels.length === 28 && faqNames.length === 7 &&
+  ok('Aprender: 40 temas publicados abrem pela aba (33 nas seções e 7 dúvidas), cada um com o título como cabeçalho de nível 1', learnSeen.size === 40 && learnLabels.length === 33 && faqNames.length === 7 &&
     learnIssues.titulo.length === 0, `${learnSeen.size} temas, ${learnLabels.length} linhas, ${faqNames.length} dúvidas ${learnIssues.titulo.slice(0, 3).join(' | ')}`);
   ok('temas: nenhum termo vetado nem travessão longo nos textos exibidos', learnIssues.termos.length === 0, learnIssues.termos.slice(0, 3).join(' | '));
-  ok('temas: fontes com papel de link, data de consulta e domínio permitido (oficial; FGC só no tema do FGC)', externalTopics.length >= 20 && learnIssues.fontes.length === 0,
+  ok('temas: fontes com papel de link, data de consulta e domínio permitido (oficial; FGC só no tema do FGC; Serasa só em renda-comprometida)', externalTopics.length >= 20 && learnIssues.fontes.length === 0,
     `${externalTopics.length} temas com fontes externas ${learnIssues.fontes.slice(0, 3).join(' | ')}`);
   ok('temas a 320 px: sem rolagem lateral, nada cortado, alvos de 44 px e sem o símbolo C', learnIssues.layout.length === 0, learnIssues.layout.slice(0, 3).join(' | '));
 
@@ -2405,6 +2481,696 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('"Ver temas de Aprender" abre a aba Aprender', new URL(p.url()).pathname === '/aprender' && (await h1Name()) === 'Aprender e dúvidas', p.url());
   await viaEntry('/explicacao/reservas', 'Voltar à tarefa');
   ok('/explicacao/reservas (apelido) abre "Reserva para imprevistos"', (await p.locator('h1').filter({ hasText: /^Reserva para imprevistos$/ }).count()) === 1, p.url());
+  // ==================================================================================================================
+  // Ciclo B · Renda comprometida (D-026, spec2 §2.3). Cada bloco parte de uma demonstração nova (hoje 07/10/2026; renda
+  // de referência de R$ 6.000,00 desde setembro). A linha do Resumo fica DENTRO do card "Ainda a pagar"; a tela mostra
+  // a composição, "Fora dos compromissos" (sem "sobra", "disponível" nem "saldo"), os próximos meses e, nas dívidas, a
+  // referência de mercado com a fonte. Falha de carga mostra erro, nunca 0%.
+  const freshDemo = async () => {
+    await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+    await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('R$ 2.100,00'); await p.waitForTimeout(400);
+  };
+  const rcRow = () => p.getByRole('button', { name: /^Renda comprometida em / }).filter({ visible: true }).first();
+  const rcLabel = (pct, spent, ref, month = 'outubro') => `Renda comprometida em ${month}: ${pct} da renda de referência. ${spent} de ${ref}. Abre os detalhes.`;
+  // Texto que a tela de renda comprometida nunca mostra (sem alerta, julgamento nem "saldo").
+  const NO_BALANCE = /\b(sobra|sobrou|sobras|dispon[ií]vel|saldo livre|alerta|cuidado|perigo|estour\w+|gastou demais|endividad\w+)\b/i;
+  const rcMonth = async (name) => { await radio(`Renda comprometida de ${name}`).click(); await waitText(`da sua renda de referência em ${name}`); await p.waitForTimeout(300); };
+
+  await freshDemo();
+  await waitText('Renda comprometida em outubro');
+  t = await body();
+  ok('B Resumo: linha "Renda comprometida em outubro" com 52,5% e o nome acessível completo', (await visibleCount('button', rcLabel('52,5%', 'R$ 3.150,00', 'R$ 6.000,00'))) === 1 && t.includes('52,5%'));
+  const rcInCard = await p.evaluate(() => {
+    const vis = (e) => e.getBoundingClientRect().width > 0;
+    const buttons = [...document.querySelectorAll('[role=button]')].filter(vis);
+    const row = buttons.find((e) => (e.getAttribute('aria-label') || '').startsWith('Renda comprometida em'));
+    const toPay = buttons.find((e) => (e.getAttribute('aria-label') || '').startsWith('Ainda a pagar neste mês'));
+    if (!row || !toPay) return null;
+    let box = row.parentElement;
+    while (box && !box.contains(toPay)) box = box.parentElement;
+    return {
+      heads: [...document.querySelectorAll('[role=heading]')].filter(vis).filter((h) => box.contains(h)).map((h) => h.textContent),
+      anotarGasto: buttons.some((e) => box.contains(e) && e.textContent === 'Anotar gasto'),
+      anotarConta: buttons.some((e) => box.contains(e) && e.textContent === 'Anotar conta a pagar'),
+    };
+  });
+  ok('B Resumo: a linha está dentro do card "Ainda a pagar" (sem card novo, sem título novo)', rcInCard !== null && rcInCard.heads.length === 0 && !rcInCard.anotarGasto && rcInCard.anotarConta, JSON.stringify(rcInCard));
+  const rcOrder = ['Anotar gasto', 'Ainda a pagar neste mês', 'Renda comprometida em outubro', 'Anotar conta a pagar', 'Pagamentos do mês', 'Fatura sem contar duas vezes', 'Quem vê estes dados?'].map((x) => t.indexOf(x));
+  ok('B Resumo: a ordem dos blocos não mudou (Anotar gasto, Ainda a pagar com a linha, Anotar conta a pagar, Pagamentos do mês, Fatura sem contar duas vezes, Quem vê estes dados?)', rcOrder.every((v, i) => v >= 0 && (i === 0 || v > rcOrder[i - 1])), JSON.stringify(rcOrder));
+  ok('B Resumo: títulos de sempre (Outubro de 2026 e Pagamentos do mês)', JSON.stringify(await headingList()) === JSON.stringify(['2:Outubro de 2026', '2:Pagamentos do mês']), JSON.stringify(await headingList()));
+  await layoutChecks('Resumo com renda comprometida 390px');
+  await shot('100_resumo_renda_comprometida');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await layoutChecks('Resumo com renda comprometida 320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+
+  // A tela de outubro: percentual, composição, fora dos compromissos, recebido, contas do mês, próximos meses e o critério.
+  await rcRow().click(); await waitText('da sua renda de referência em outubro de 2026'); await waitText('Dezembro de 2026 ·'); await p.waitForTimeout(400);
+  t = await body();
+  ok('B tela: título "Renda comprometida" e o destaque 52,5% (R$ 3.150,00 em contas de R$ 6.000,00)', (await h1Name()) === 'Renda comprometida' && t.includes('52,5%') && t.includes('R$ 3.150,00 em contas de R$ 6.000,00'), String(await h1Name()));
+  ok('B tela: legenda Já pago R$ 2.500,00 e Em aberto R$ 650,00', t.includes('Já pago · R$ 2.500,00') && t.includes('Em aberto · R$ 650,00'));
+  ok('B tela: composição (gastos fixos 41,7%, parcelamentos 0,0%, outras contas 10,8%)', t.includes('Gastos fixos · R$ 2.500,00 · 41,7%') && t.includes('Parcelamentos · R$ 0,00 · 0,0%') && t.includes('Outras contas a pagar · R$ 650,00 · 10,8%'));
+  ok('B tela: "Fora dos compromissos" R$ 2.850,00 com "Não é saldo: ainda precisa cobrir gastos do dia a dia."', t.includes('Fora dos compromissos: R$ 2.850,00') && t.includes('Não é saldo: ainda precisa cobrir gastos do dia a dia'));
+  ok('B tela: renda de referência (R$ 6.000,00 por mês, desde setembro de 2026) e recebido em outubro', t.includes('R$ 6.000,00 por mês, desde setembro de 2026') && t.includes('Recebido em outubro: R$ 6.000,00'));
+  ok('B tela: contas do mês (Aluguel, Internet, Condomínio)', t.includes('Contas do mês') && t.includes('Aluguel') && t.includes('Internet') && t.includes('Condomínio'));
+  ok('B tela: próximos meses (novembro R$ 3.830,00 63,8% e dezembro R$ 3.530,00 58,8%, "Previsto") e o marco de outubro de 2029', t.includes('Novembro de 2026 · R$ 3.830,00 · 63,8%') && t.includes('Dezembro de 2026 · R$ 3.530,00 · 58,8%') &&
+    t.includes('Previsto: contas já criadas e repetições programadas. Valores estimados podem mudar.') && t.includes('Outubro de 2029: última parcela de Financiamento do carro (R$ 850,00).'));
+  ok('B tela: "Como calculamos", "Como ler este número" e os links', t.includes('Somamos as contas a pagar com vencimento em outubro') && t.includes('Como ler este número') && t.includes('Gastos fixos e parcelamentos') && t.includes('Contas a pagar') && t.includes('Quem vê estes dados?'));
+  ok('B tela: nenhum termo de alerta, "sobra", "disponível" nem travessão longo', !NO_BALANCE.test(t) && !FORBIDDEN.test(t), (t.match(NO_BALANCE) ?? t.match(FORBIDDEN) ?? [''])[0]);
+  const rcMeter = await p.locator('[role=img]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')).filter(Boolean));
+  ok('B tela: o medidor tem um rótulo acessível com percentual, já pago e em aberto', rcMeter.includes('52,5% da renda de referência: já pago R$ 2.500,00, em aberto R$ 650,00.'), JSON.stringify(rcMeter.slice(0, 3)));
+  await keepText();
+  await innerChecks('renda comprometida 390px');
+  await shot('101_renda_comprometida_outubro', true);
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await innerChecks('renda comprometida 320px');
+  await shot('101_renda_comprometida_320px', true);
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+
+  // Novembro: 63,8%, dívidas (14,2%) com a referência de mercado e a fonte, "Ocultar referência" e os estimados.
+  await rcMonth('novembro de 2026');
+  t = await body();
+  ok('B novembro: 63,8% (R$ 3.830,00 em contas de R$ 6.000,00) e fora dos compromissos R$ 2.170,00', t.includes('63,8%') && t.includes('R$ 3.830,00 em contas de R$ 6.000,00') && t.includes('Fora dos compromissos: R$ 2.170,00') && t.includes('Não é saldo'));
+  ok('B novembro: dívidas R$ 850,00 (14,2%) com a referência da Serasa (até 30%), "não é uma regra para você" e a fonte com data', t.includes('Dívidas: R$ 850,00 · 14,2% da renda de referência.') &&
+    t.includes('Referência usada pela Serasa: até 30% da renda líquida com parcelas de dívidas. É uma referência geral, não uma regra para você.') && t.includes('Fonte: Serasa, página sobre comprometimento de renda, consultada em 09/10/2026.'));
+  ok('B novembro: "Inclui R$ 180,00 em valores estimados."', t.includes('Inclui R$ 180,00 em valores estimados.'));
+  ok('B novembro: a fonte da Serasa é um link (papel link)', (await p.getByRole('link', { name: /Serasa/ }).filter({ visible: true }).count()) >= 1);
+  await keepText();
+  await shot('102_renda_comprometida_novembro', true);
+  await btn('Ocultar referência').click(); await p.waitForTimeout(200);
+  ok('B novembro: "Ocultar referência" tira o texto da Serasa e oferece "Mostrar referência"', !(await body()).includes('Referência usada pela Serasa') && (await visibleCount('button', 'Mostrar referência')) === 1);
+  await btn('Mostrar referência').click(); await p.waitForTimeout(200);
+  ok('B novembro: "Mostrar referência" traz o texto de volta', (await body()).includes('Referência usada pela Serasa'));
+  await rcMonth('outubro de 2026');
+
+  // Referência: formulário com a sugestão (média de setembro), formata ao sair, salvar R$ 5.000,00 vira 63,0% e fora R$ 1.850,00.
+  await p.getByRole('button', { name: 'Alterar', exact: true }).filter({ visible: true }).first().click(); await waitText('Valor por mês');
+  const refInput = field('Valor por mês');
+  t = await body();
+  ok('B referência: textos do formulário (valor por mês, vale a partir de, renda fixa ou varia)', (await h1Name()) === 'Renda de referência' && t.includes('Quanto costuma cair na sua conta por mês, já com descontos.') && t.includes('Vale a partir de') &&
+    t.includes('Minha renda é fixa') && t.includes('Minha renda varia') && (await visibleCount('button', 'Salvar renda de referência')) === 1, String(await h1Name()));
+  ok('B referência: o campo vem preenchido com a referência em vigor (R$ 6.000,00)', (await refInput.inputValue()) === '6.000,00', await refInput.inputValue());
+  await waitText('a média foi');
+  t = await body();
+  ok('B referência: a sugestão (média de setembro, sem reembolsos) com "Usar R$ 6.000,00"', t.includes('Nos meses com recebimentos anotados, a média foi R$ 6.000,00 (setembro). Reembolsos ficam fora.') && (await visibleCount('button', 'Usar R$ 6.000,00')) === 1);
+  await keepText();
+  await innerChecks('renda de referência 390px');
+  await shot('103_renda_referencia');
+  await refInput.fill('5000'); await refInput.blur();
+  ok('B referência: o valor é formatado ao sair do campo (5.000,00)', (await refInput.inputValue()) === '5.000,00', await refInput.inputValue());
+  await btn('Salvar renda de referência').click(); await waitText('Renda de referência salva. Ela vale a partir de outubro.'); await waitText('63,0%');
+  t = await body();
+  ok('B salvar R$ 5.000,00 a partir de outubro: 63,0% e fora dos compromissos R$ 1.850,00', t.includes('63,0%') && t.includes('R$ 3.150,00 em contas de R$ 5.000,00') && t.includes('Fora dos compromissos: R$ 1.850,00'));
+  // Excluir a referência de outubro: pede confirmação e a de setembro volta a valer.
+  await p.getByRole('button', { name: 'Alterar', exact: true }).filter({ visible: true }).first().click(); await waitText('Valor por mês');
+  await btn('Excluir esta referência').click(); await waitText('Excluir a renda de referência de outubro?');
+  ok('B excluir a referência: o diálogo diz que a anterior volta a valer', (await dialogText()).includes('A referência anterior volta a valer. Sem nenhuma, mostramos só os valores em reais.'));
+  await shot('104_excluir_referencia');
+  await confirmIn('Excluir referência'); await waitText('Renda de referência excluída.'); await waitText('52,5%');
+  ok('B excluir a referência de outubro: volta a 52,5% (a de setembro)', (await body()).includes('52,5%') && (await body()).includes('R$ 6.000,00 por mês, desde setembro de 2026'));
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+
+  // Previsão dos pagamentos do mês: só em Contas a pagar, só no mês de hoje, sem "Diferença".
+  await openToPay(); await waitText('Se pagar tudo o que está em aberto'); await p.waitForTimeout(300);
+  t = await body();
+  ok('B contas a pagar: "Se pagar tudo o que está em aberto, os pagamentos de outubro chegam a R$ 4.550,00." (3.900,00 pagos + 650,00 em aberto)', t.includes('Se pagar tudo o que está em aberto, os pagamentos de outubro chegam a R$ 4.550,00.'));
+  ok('B contas a pagar: a previsão não fala em "Diferença", "disponível" nem "sobra"', !/Se pagar tudo[^\n]*(Diferença|dispon|sobra)/i.test(t) && !NO_BALANCE.test(t.split('Se pagar tudo')[1]?.split('\n')[0] ?? ''));
+  await keepText();
+  await layoutChecks('contas a pagar com a previsão 390px');
+  await shot('105_a_pagar_previsao');
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  ok('B Resumo: nunca mostra a previsão dos pagamentos do mês', !(await body()).includes('Se pagar tudo o que está em aberto'));
+  // Em outro mês, nada de previsão: setembro (mês passado) e, pelo mês seguinte, novembro.
+  await p.getByRole('button', { name: /Mês anterior/ }).filter({ visible: true }).first().click(); await waitText('Setembro de 2026'); await waitText('Renda comprometida em setembro'); await p.waitForTimeout(400);
+  t = await body();
+  ok('B Resumo em setembro (sem contas): "Renda comprometida em setembro" com 0,0% e "Nenhuma conta a pagar com vencimento em setembro."', t.includes('Renda comprometida em setembro') && t.includes('0,0%') && t.includes('Nenhuma conta a pagar com vencimento em setembro.') ||
+    (await visibleCount('button', /^Renda comprometida em setembro: 0,0%/)) === 1, t.slice(0, 200));
+  await shot('106_resumo_setembro_renda');
+  await rcRow().click(); await waitText('da sua renda de referência em setembro de 2026'); await p.waitForTimeout(300);
+  t = await body();
+  ok('B tela de setembro: sem contas ("Nenhuma conta a pagar com vencimento em setembro."), sem a lista "Contas do mês", e os chips de setembro e outubro', t.includes('Nenhuma conta a pagar com vencimento em setembro.') && !t.includes('Contas do mês') &&
+    (await radio('Renda comprometida de setembro de 2026').getAttribute('aria-checked')) === 'true' && (await radio('Renda comprometida de outubro de 2026').count()) === 1);
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  await p.getByRole('button', { name: /^Previsto para setembro de 2026/ }).filter({ visible: true }).first().click(); await waitUntil(async () => (await h1Name()) === 'Contas a pagar', 8000); await p.waitForTimeout(600);
+  ok('B contas a pagar de setembro: sem a previsão (só no mês de hoje)', !(await body()).includes('Se pagar tudo o que está em aberto'));
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  await p.getByRole('button', { name: /Próximo mês/ }).filter({ visible: true }).first().click(); await waitText('Outubro de 2026'); await p.waitForTimeout(400);
+
+  // Pagar a Internet com R$ 159,90: 52,7%; desfazer volta a 52,5%. Nada de "Pago" muda a conta de comprometido além do valor pago.
+  await openToPay(); await openRow(/^Internet, vence em 15\/10\/2026/); await waitText('Marcar como paga');
+  await btn('Marcar como paga').click(); await waitText('Confirmar pagamento');
+  await field('Valor pago').fill('159,90'); await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado');
+  await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
+  await waitUntil(async () => (await visibleCount('button', /^Renda comprometida em outubro: 52,7%/)) === 1, 6000);
+  ok('B pagar a Internet com R$ 159,90: a linha do Resumo vai a 52,7% (R$ 3.159,90 de R$ 6.000,00)', (await visibleCount('button', rcLabel('52,7%', 'R$ 3.159,90', 'R$ 6.000,00'))) === 1);
+  await rcRow().click(); await waitText('da sua renda de referência em outubro de 2026'); await p.waitForTimeout(300);
+  t = await body();
+  ok('B pagar a Internet: a tela mostra R$ 3.159,90, já pago R$ 2.659,90 e fora dos compromissos R$ 2.840,10', t.includes('52,7%') && t.includes('R$ 3.159,90 em contas de R$ 6.000,00') && t.includes('Já pago · R$ 2.659,90') && t.includes('Fora dos compromissos: R$ 2.840,10'));
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  await openToPay(); await openRow(/^Internet, paga em 07\/10\/2026/); await waitText('Desfazer pagamento');
+  await btn('Desfazer pagamento').click(); await waitText('Desfazer pagamento?'); await confirmIn('Desfazer pagamento'); await waitText('Pagamento desfeito');
+  await goResumo();
+  await waitUntil(async () => (await visibleCount('button', /^Renda comprometida em outubro: 52,5%/)) === 1, 6000);
+  ok('B desfazer o pagamento: volta a 52,5% (R$ 3.150,00)', (await visibleCount('button', rcLabel('52,5%', 'R$ 3.150,00', 'R$ 6.000,00'))) === 1);
+  // Conta avulsa de R$ 300,00 que vence em 28/10: 57,5%.
+  await btn('Anotar conta a pagar').click(); await waitText('Salvando em Pessoal');
+  await field('Descrição').fill('Conserto da geladeira'); await field('Valor em reais').fill('300'); await field('Data de vencimento').fill('28/10/2026');
+  await btn('Salvar conta a pagar').click(); await waitText('Conta a pagar salva');
+  await goResumo();
+  await waitUntil(async () => (await visibleCount('button', /^Renda comprometida em outubro: 57,5%/)) === 1, 6000);
+  ok('B anotar a conta avulsa "Conserto da geladeira" (R$ 300,00, 28/10): 57,5% (R$ 3.450,00)', (await visibleCount('button', rcLabel('57,5%', 'R$ 3.450,00', 'R$ 6.000,00'))) === 1);
+  // Referência de R$ 5.000,00 a partir de outubro: 69,0%; excluir volta a 57,5%; excluir a de setembro tira o percentual.
+  await rcRow().click(); await waitText('da sua renda de referência em outubro de 2026');
+  await p.getByRole('button', { name: 'Alterar', exact: true }).filter({ visible: true }).first().click(); await waitText('Valor por mês');
+  await field('Valor por mês').fill('5000'); await btn('Salvar renda de referência').click(); await waitText('Renda de referência salva. Ela vale a partir de outubro.'); await waitText('69,0%');
+  t = await body();
+  ok('B referência de R$ 5.000,00 a partir de outubro: 69,0% e fora dos compromissos R$ 1.550,00', t.includes('69,0%') && t.includes('Fora dos compromissos: R$ 1.550,00'));
+  await p.getByRole('button', { name: 'Alterar', exact: true }).filter({ visible: true }).first().click(); await waitText('Valor por mês');
+  await btn('Excluir esta referência').click(); await waitText('Excluir a renda de referência de outubro?'); await confirmIn('Excluir referência'); await waitText('Renda de referência excluída.'); await waitText('57,5%');
+  ok('B excluir a referência de outubro: volta a 57,5% (a de setembro)', (await body()).includes('57,5%'));
+  await p.getByRole('button', { name: 'Alterar', exact: true }).filter({ visible: true }).first().click(); await waitText('Valor por mês');
+  await radio('Vale a partir de setembro de 2026').click();
+  t = await body();
+  ok('B referência de setembro: o botão "Excluir esta referência" só aparece com referência no mês escolhido', (await visibleCount('button', 'Excluir esta referência')) === 1);
+  await btn('Excluir esta referência').click(); await waitText('Excluir a renda de referência de setembro?'); await confirmIn('Excluir referência'); await waitText('Renda de referência excluída.');
+  await waitText('Para ver quanto isso representa da sua renda, informe sua renda de referência.');
+  t = await body();
+  ok('B sem nenhuma referência: só valores em reais (R$ 3.450,00), sem percentual nem "Fora dos compromissos", com o convite "Informar renda de referência"', t.includes('Contas de outubro') && t.includes('R$ 3.450,00') && (await visibleCount('button', 'Informar renda de referência')) === 1 &&
+    !/\d,\d%/.test(t.split('Próximos meses')[0]) && !t.includes('Fora dos compromissos'));
+  ok('B sem nenhuma referência: composição só em reais', t.includes('Gastos fixos · R$ 2.500,00') && !/Gastos fixos · R\$ 2\.500,00 · \d/.test(t));
+  await shot('107_renda_sem_referencia', true);
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  t = await body();
+  ok('B Resumo sem referência: o convite "Veja quanto da sua renda já está comprometido" no lugar da linha', t.includes('Veja quanto da sua renda já está comprometido') && !t.includes('Renda comprometida em outubro'));
+  await shot('108_resumo_sem_referencia');
+
+  // Falha de carga: erro com "Tentar novamente", nunca 0%.
+  await p.evaluate(async () => {
+    const repo = await window.__e2e.repo();
+    repo.__orig = repo.listIncomeReferences;
+    repo.listIncomeReferences = () => Promise.reject(new Error('falha simulada'));
+    await window.__e2e.refresh();
+  });
+  await waitText('Não foi possível calcular a renda comprometida.');
+  t = await body();
+  ok('B falha de carga: erro com "Tentar novamente" no Resumo, sem 0,0% nem o convite', t.includes('Não foi possível calcular a renda comprometida.') && !t.includes('0,0%') && !t.includes('Veja quanto da sua renda'));
+  await shot('109_renda_falha');
+  await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.listIncomeReferences = repo.__orig; await window.__e2e.refresh(); });
+  await waitText('Veja quanto da sua renda já está comprometido');
+  ok('B falha de carga: depois que a leitura volta, o Resumo se recompõe', (await body()).includes('Veja quanto da sua renda já está comprometido'));
+
+  // ==================================================================================================================
+  // Ciclo A2 · Ocultar valores (D-025, docs/08 §5 item 8). "Ocultar valores ao abrir" fica em Conta (e vale já, nesta
+  // sessão); com valores ocultos, todo valor em reais de dados guardados vira "R$ ••••" e o leitor de tela diz "valor
+  // oculto", no texto e nos nomes acessíveis. O que a pessoa digita nem os limites fixos (R$ 1,00, R$ 100,00, R$ 9.999.999,99)
+  // entram. Só no aparelho: na demonstração nada é gravado. Na web não há lembretes nem biometria (conferido em Conta).
+  const ALLOWED_FIXED = /^R\$ (1,00|100,00|9\.999\.999,99)$/;
+  // Valores em reais ainda legíveis: no texto visível e em todos os nomes e valores acessíveis dos elementos visíveis.
+  const moneyLeaks = () => p.evaluate((allowed) => {
+    const re = /[−-]?R\$\s?\d{1,3}(?:\.\d{3})*,\d{2}/g;
+    const allow = new RegExp(allowed);
+    const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    const found = [];
+    const scan = (where, text) => { for (const m of (text || '').replace(/ /g, ' ').match(re) ?? []) if (!allow.test(m.replace(/^[−-]/, ''))) found.push(`${where}: ${m}`); };
+    scan('texto', document.body.innerText);
+    for (const e of document.querySelectorAll('[aria-label],[aria-valuetext],[aria-description],[title],input')) {
+      if (!vis(e)) continue;
+      for (const a of ['aria-label', 'aria-valuetext', 'aria-description', 'title']) scan(`${a} de ${e.tagName}`, e.getAttribute(a));
+    }
+    return found;
+  }, ALLOWED_FIXED.source);
+  const spokenHidden = () => p.evaluate(() => [...document.querySelectorAll('[aria-label],[aria-valuetext]')].filter((e) => e.getBoundingClientRect().width > 0 && /valor oculto/.test((e.getAttribute('aria-label') || '') + (e.getAttribute('aria-valuetext') || ''))).length);
+  const hiddenShows = async (name) => {
+    await p.waitForTimeout(300);
+    const leaks = await moneyLeaks();
+    const text = await body();
+    ok(`A2 valores ocultos, ${name}: nenhum valor em reais à vista (texto e nomes acessíveis)`, leaks.length === 0, leaks.slice(0, 4).join(' | '));
+    ok(`A2 valores ocultos, ${name}: "R$ ••••" na tela e "valor oculto" nos nomes acessíveis`, text.includes('R$ ••••') && (await spokenHidden()) > 0, `${text.includes('R$ ••••')} ${await spokenHidden()}`);
+  };
+  const openConta = async () => { await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho'); };
+  const hideSwitch = () => p.getByRole('switch', { name: 'Ocultar valores ao abrir' }).filter({ visible: true }).first();
+
+  await freshDemo();
+  t = await body();
+  ok('A2 antes de ocultar: o Resumo mostra os valores (R$ 6.000,00, R$ 3.900,00, R$ 2.100,00)', t.includes('R$ 6.000,00') && t.includes('R$ 3.900,00') && t.includes('R$ 2.100,00') && !t.includes('R$ ••••'));
+  await openConta();
+  ok('A2 Conta: "Ocultar valores ao abrir" desligado, sem biometria na web', (await hideSwitch().getAttribute('aria-checked')) === 'false' && (await visibleCount('switch', 'Pedir biometria ao abrir')) === 0);
+  await hideSwitch().click(); await p.waitForTimeout(300);
+  ok('A2 Conta: ligar "Ocultar valores ao abrir" marca o interruptor', (await hideSwitch().getAttribute('aria-checked')) === 'true');
+  ok('A2 Conta com valores ocultos: nenhum valor em reais à vista', (await moneyLeaks()).length === 0, (await moneyLeaks()).slice(0, 3).join(' | '));
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  await hiddenShows('Resumo');
+  t = await body();
+  ok('A2 Resumo oculto: percentuais e datas continuam (52,5%, "até 07/10")', t.includes('52,5%') && t.includes('até 07/10'));
+  const hiddenNames = await p.evaluate(() => [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label') || '').filter((l) => /valor oculto/.test(l)));
+  ok('A2 Resumo oculto: os botões de totais e a linha de renda comprometida dizem "valor oculto"', hiddenNames.some((l) => /^Ainda a pagar neste mês, valor oculto/.test(l)) && hiddenNames.some((l) => /^Renda comprometida em outubro: 52,5% da renda de referência\. valor oculto/.test(l)), JSON.stringify(hiddenNames.slice(0, 5)));
+  await shot('110_resumo_valores_ocultos');
+  await keepText();
+  // Movimentos (a lista), Contas a pagar e Renda comprometida.
+  await p.getByRole('tab', { name: 'Movimentações' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento'); await waitText('Aluguel');
+  await hiddenShows('Movimentos');
+  await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês');
+  await p.getByRole('button', { name: /^Ainda a pagar neste mês, valor oculto/ }).filter({ visible: true }).first().click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await waitText('Se pagar tudo o que está em aberto');
+  await hiddenShows('Contas a pagar');
+  ok('A2 Contas a pagar oculto: a previsão do mês também fica oculta', (await body()).includes('os pagamentos de outubro chegam a R$ ••••.'));
+  await shot('111_a_pagar_valores_ocultos');
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  await rcRow().click(); await waitText('da sua renda de referência em outubro de 2026'); await waitText('Dezembro de 2026 ·');
+  await hiddenShows('Renda comprometida');
+  t = await body();
+  ok('A2 Renda comprometida oculta: o percentual (52,5%) e a composição em % continuam; o medidor também fala "valor oculto"', t.includes('52,5%') && t.includes('41,7%') &&
+    (await p.locator('[role=img]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')).filter(Boolean))).some((l) => /^52,5% da renda de referência: já pago valor oculto, em aberto valor oculto\.$/.test(l)));
+  await shot('112_renda_valores_ocultos');
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu plano de guardar'); await waitText('Planejado: R$ ••••');
+  await hiddenShows('Metas');
+  const metasHiddenBars = await p.getByRole('progressbar').filter({ visible: true }).evaluateAll((els) => els.map((e) => [e.getAttribute('aria-label'), e.getAttribute('aria-valuenow'), e.getAttribute('aria-valuetext')]));
+  ok('A2 Metas ocultas: a barra da reserva mantém o percentual (15%) e diz "valor oculto"', metasHiddenBars.length === 1 && metasHiddenBars[0][1] === '15' && /valor oculto/.test(metasHiddenBars[0][0]) && !/R\$/.test(metasHiddenBars[0][0] + metasHiddenBars[0][2]), JSON.stringify(metasHiddenBars));
+  await shot('113_metas_valores_ocultos');
+  // O olho do cabeçalho: nas telas largas ele cabe ao lado do avatar; mostra e oculta na hora, só nesta sessão.
+  await p.setViewportSize({ width: 600, height: 900 }); await p.waitForTimeout(500);
+  await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês'); await p.waitForTimeout(300);
+  ok('A2 a 600 px: o olho "Mostrar valores" aparece no cabeçalho (valores ocultos)', (await visibleCount('button', 'Mostrar valores')) === 1 && (await visibleCount('button', 'Ocultar valores')) === 0);
+  await btn('Mostrar valores').click(); await p.waitForTimeout(400);
+  t = await body();
+  ok('A2 o olho "Mostrar valores" traz os valores de volta (R$ 6.000,00, R$ 650,00) e vira "Ocultar valores"', t.includes('R$ 6.000,00') && t.includes('R$ 650,00') && !t.includes('R$ ••••') && (await visibleCount('button', 'Ocultar valores')) === 1);
+  await btn('Ocultar valores').click(); await p.waitForTimeout(400);
+  await hiddenShows('Resumo (olho, 600 px)');
+  await btn('Mostrar valores').click(); await p.waitForTimeout(300);
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(400);
+  // De volta: o interruptor de Conta continua ligado (a preferência) e desligar mostra os valores.
+  await openConta();
+  await hideSwitch().click(); await p.waitForTimeout(300);
+  ok('A2 Conta: desligar "Ocultar valores ao abrir" mostra os valores de novo', (await hideSwitch().getAttribute('aria-checked')) === 'false');
+  await btn('Voltar').click(); await waitText('Diferença do mês'); await p.waitForTimeout(300);
+  t = await body();
+  ok('A2 de volta: o Resumo mostra R$ 6.000,00, R$ 3.900,00 e R$ 2.100,00, sem "R$ ••••"', t.includes('R$ 6.000,00') && t.includes('R$ 3.900,00') && t.includes('R$ 2.100,00') && !t.includes('R$ ••••') && (await moneyLeaks()).length > 0);
+
+  // ==================================================================================================================
+  // Ciclo C · Metas e reserva para imprevistos (D-027) e o plano de guardar (D-036). A demonstração tem a reserva (15%,
+  // R$ 3.500,00 de R$ 22.500,00) e "Viagem de férias" (20%, R$ 480,00 por mês), com a resposta "consigo" de R$ 500,00.
+  // Aportes, resgates e valorizações só mostram o que a pessoa registrou: nunca entram em Recebido nem em Pago.
+  const metasTab = async () => { await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu plano de guardar'); await p.waitForTimeout(400); };
+  const goalBars = () => p.getByRole('progressbar').filter({ visible: true }).evaluateAll((els) => els.map((e) => [e.getAttribute('aria-label'), e.getAttribute('aria-valuenow')]));
+  const goBackToMetas = async () => { for (let i = 0; i < 4 && (await visibleCount('tab', 'Metas')) === 0; i++) { await btn('Voltar').click(); await p.waitForTimeout(400); } await waitText('Seu plano de guardar'); };
+  await freshDemo();
+  await metasTab();
+  ok('C Metas: reserva 15% e "Viagem de férias" 20% com as barras acessíveis', JSON.stringify(await goalBars()) === JSON.stringify([['Reserva para imprevistos: 15% da meta, R$ 3.500,00 de R$ 22.500,00.', '15']]) &&
+    (await visibleCount('button', /^Viagem de férias: 20% da meta/)) === 1);
+  // Aporte de R$ 200,00 na reserva: o formulário avisa que guardar não é gasto; nada muda até o servidor confirmar.
+  await btn('Registrar aporte').click(); await waitText('Registre o dinheiro que você já separou'); await p.waitForTimeout(300);
+  t = await body();
+  ok('C aporte: "Salvando em Pessoal", "Guardar não é gasto" e "Aportes e resgates não entram em Pago nem em Recebido"', (await h1Name()) === 'Registrar aporte' && t.includes('Salvando em Pessoal') && t.includes('Guardar não é gasto: não anote este valor em Anotar gasto.') &&
+    t.includes('Aportes e resgates não entram em Pago nem em Recebido: o dinheiro continua seu, só mudou de lugar.') && (await field('Data').inputValue()) === '07/10/2026');
+  await keepText();
+  await innerChecks('aporte 390px');
+  await shot('114_aporte');
+  await btn('Registrar aporte').click(); await p.waitForTimeout(300);
+  ok('C aporte: sem valor, a mensagem de campo e nada gravado', (await body()).includes('Informe um valor') && (await otherDevice(async (repo, ctx) => (await repo.listGoals(ctx)).length)) === 2);
+  await field('Valor').fill('200'); await btn('Registrar aporte').click(); await waitText('Aporte registrado.'); await p.waitForTimeout(700);
+  t = await body();
+  ok('C aporte de R$ 200,00: reserva R$ 3.700,00 (16%) e "Guardado em outubro: R$ 700,00"', t.includes('R$ 3.700,00 de R$ 22.500,00') && t.includes('16%') && t.includes('Guardado em outubro: R$ 700,00') &&
+    JSON.stringify(await goalBars()) === JSON.stringify([['Reserva para imprevistos: 16% da meta, R$ 3.700,00 de R$ 22.500,00.', '16']]), JSON.stringify(await goalBars()));
+  await shot('115_metas_depois_do_aporte');
+  // O aporte não muda o Resumo: Recebido, Pago, Diferença e Ainda a pagar continuam iguais.
+  await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês');
+  await expectTotals('C o aporte não muda o Resumo: 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  ok('C o aporte não vira gasto nem recebimento: o Resumo continua com o mesmo percentual (52,5%)', (await visibleCount('button', /^Renda comprometida em outubro: 52,5%/)) === 1);
+  // A tela de renda comprometida: as linhas de Metas ficam fora do percentual.
+  await rcRow().click(); await waitText('da sua renda de referência em outubro de 2026'); await waitText('Metas não entram no percentual'); await p.waitForTimeout(300);
+  t = await body();
+  ok('C renda comprometida: linhas de Metas (guardado R$ 700,00, planejado R$ 980,00 por mês, fora depois do planejado R$ 1.870,00) fora do percentual (52,5%)',
+    t.includes('Guardado em metas em outubro: R$ 700,00') && t.includes('Planejado para metas: R$ 980,00 por mês') && t.includes('Fora dos compromissos depois do planejado: R$ 1.870,00') &&
+    t.includes('Metas não entram no percentual: guardar não é conta a pagar.') && t.includes('52,5%') && t.includes('Fora dos compromissos: R$ 2.850,00'));
+  await keepText();
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  // Detalhe da reserva, resgate retroativo recusado com a data e valor atualizado.
+  await metasTab(); await btn('Ver detalhes').click(); await waitText('Registrar resgate'); await p.waitForTimeout(400);
+  t = await body();
+  ok('C detalhe da reserva: R$ 3.700,00, "Faltam R$ 18.800,00", cobre 0,9 mês, composição (inicial R$ 3.000,00, aportes R$ 700,00, resgates R$ 0,00) e o aviso de que não entra em Pago nem em Recebido',
+    t.includes('R$ 3.700,00') && t.includes('de R$ 22.500,00 · 16%') && t.includes('Faltam R$ 18.800,00') && t.includes('Já guardado ao criar: R$ 3.000,00') && t.includes('Aportes: R$ 700,00') && t.includes('Resgates: R$ 0,00') &&
+    t.includes('Aportes e resgates não entram em Pago nem em Recebido: o dinheiro continua seu, só mudou de lugar.') && t.includes('07/10 · Aporte · + R$ 200,00'));
+  await shot('116_detalhe_reserva');
+  await btn('Registrar resgate').click(); await waitText('Resgate não é renda'); await p.waitForTimeout(300);
+  ok('C resgate: "Resgate não é renda: ele diminui o valor guardado e não entra em Recebido."', (await body()).includes('Resgate não é renda: ele diminui o valor guardado e não entra em Recebido. Se usou o dinheiro, anote o gasto normalmente.'));
+  await field('Valor').fill('3100'); await field('Data').fill('03/10/2026'); await btn('Registrar resgate').click(); await p.waitForTimeout(500);
+  t = await body();
+  ok('C resgate retroativo recusado: "o valor guardado ficaria negativo em 03/10/2026" (mesmo com R$ 3.700,00 guardados hoje), nada gravado', t.includes('Com este resgate, o valor guardado ficaria negativo em 03/10/2026. Confira o valor e a data.') && (await h1Name()) === 'Registrar resgate');
+  await shot('117_resgate_recusado');
+  await field('Data').fill('07/10/2026'); await field('Valor').fill('100'); await btn('Registrar resgate').click(); await waitText('Resgate registrado.'); await p.waitForTimeout(600);
+  t = await body();
+  ok('C resgate de R$ 100,00 hoje: guardado R$ 3.600,00 e "Resgates: R$ 100,00"', t.includes('R$ 3.600,00') && t.includes('Resgates: R$ 100,00'));
+  await btn('Atualizar valor guardado').click(); await waitText('Quanto há guardado hoje'); await p.waitForTimeout(300);
+  await field('Quanto há guardado hoje para esta meta, segundo o seu banco ou aplicação?').fill('3737,20'); await p.waitForTimeout(400);
+  t = await body();
+  ok('C atualizar valor guardado: a diferença (R$ 137,20) vira "Registrar valorização" e nunca vira aporte', (await visibleCount('button', /^Registrar valorização de/)) === 1 && t.includes('R$ 137,20'));
+  await keepText();
+  await shot('118_atualizar_valor');
+  await btn('Registrar valorização de R$ 137,20').click(); await waitText('Valorização registrada.'); await p.waitForTimeout(600);
+  t = await body();
+  ok('C valorização registrada: guardado R$ 3.737,20 e "Rendimentos e valorizações: R$ 137,20", aportes e resgates intactos', t.includes('R$ 3.737,20') && t.includes('Rendimentos e valorizações: R$ 137,20') && t.includes('Aportes: R$ 700,00') && t.includes('Resgates: R$ 100,00'));
+  await goBackToMetas();
+  await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês');
+  await expectTotals('C aporte, resgate e valorização não mudam o Resumo: 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+
+  // Plano de guardar: "Ver o plano" com as etapas; mudar para R$ 300,00 por mês e usar a etapa de 3 meses.
+  await metasTab(); await btn('Ver o plano').click(); await waitText('Etapas do plano'); await p.waitForTimeout(500);
+  t = await body();
+  ok('C plano de guardar: R$ 500,00 por mês, etapas de 1, 3 e 6 meses e "Viagem de férias", "Sem contar rendimentos" e a fonte da CVM', (await h1Name()) === 'Seu plano de guardar' && (await field('Quanto você consegue guardar por mês?').inputValue()) === '500,00' &&
+    t.includes('Fora dos compromissos em outubro: R$ 2.850,00. Não é saldo: ainda precisa cobrir gastos do dia a dia.') && t.includes('1 mês dos seus gastos essenciais') && t.includes('3 meses dos seus gastos essenciais') && t.includes('6 meses dos seus gastos essenciais') &&
+    t.includes('Viagem de férias') && t.includes('Sem contar rendimentos.') && t.includes('Fonte: CVM, Portal do Investidor'));
+  await keepText();
+  await innerChecks('plano de guardar 390px');
+  await shot('119_plano_de_guardar');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await innerChecks('plano de guardar 320px');
+  await shot('119_plano_de_guardar_320px', true);
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  await field('Quanto você consegue guardar por mês?').fill('300'); await p.waitForTimeout(400);
+  await radio('Etapa de 3 meses dos gastos essenciais').click(); await p.waitForTimeout(300);
+  t = await body();
+  ok('C plano com R$ 300,00 por mês: "a segunda etapa (R$ 11.250,00, 3 meses dos seus gastos essenciais) chega em dezembro de 2028." e o que a reserva passa a ter', t.includes('Com R$ 300,00 por mês, a segunda etapa (R$ 11.250,00, 3 meses dos seus gastos essenciais) chega em dezembro de 2028.') &&
+    t.includes('A Reserva para imprevistos passa a ter alvo de R$ 11.250,00 (3 meses dos seus gastos essenciais), com R$ 300,00 por mês planejados.') && t.includes('Depois, o mesmo valor pode ir para as suas metas.') && !NO_BALANCE.test(t));
+  await btn('Usar este plano').click(); await waitText('Plano salvo na sua reserva.'); await p.waitForTimeout(700);
+  t = await body();
+  ok('C usar o plano: Metas mostra "Você planeja guardar R$ 300,00 por mês." e a reserva com alvo de R$ 11.250,00 e R$ 300,00 por mês', new URL(p.url()).pathname === '/metas' && t.includes('Você planeja guardar R$ 300,00 por mês.') && t.includes('Planejado: R$ 300,00 por mês') && t.includes('de R$ 11.250,00'));
+  await shot('120_metas_plano_usado');
+  // "Mudar valor": um novo valor mantém o plano.
+  await btn('Mudar valor').click(); await waitText('Quanto você consegue guardar por mês?'); await p.waitForTimeout(300);
+  ok('C "Mudar valor" abre o plano com o valor atual (R$ 300,00)', (await field('Quanto você consegue guardar por mês?').inputValue()) === '300,00');
+  await btn('Cancelar').click(); await p.waitForTimeout(400); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
+  await waitText('Seu plano de guardar');
+
+  // Renda de referência mudou depois de "consigo": a pergunta volta, e "Manter o valor" grava de novo o mesmo valor.
+  await otherDevice(async (repo, ctx) => {
+    const refs = await repo.listIncomeReferences(ctx);
+    const last = refs[refs.length - 1];
+    await repo.setIncomeReference(`e2e-${Math.random()}`, ctx, last.fromMonth, last.version, last.amountCents + 50000, last.varies);
+  });
+  await waitText('Sua renda de referência mudou. Quer rever quanto guardar por mês?', 6000);
+  t = await body();
+  ok('C a renda de referência mudou: a pergunta "Sua renda de referência mudou. Quer rever quanto guardar por mês?" volta com "Manter o valor" e "Mudar valor" (sem "Responder depois")',
+    (await visibleCount('button', 'Manter o valor')) === 1 && (await visibleCount('button', 'Mudar valor')) === 1 && (await visibleCount('button', 'Responder depois')) === 0, t.slice(0, 300));
+  await shot('121_renda_de_referencia_mudou');
+  await btn('Manter o valor').click(); await waitText('Valor por mês mantido.'); await p.waitForTimeout(500);
+  // Na demonstração, "hoje" é 07/10/2026 e as horas das gravações vêm do relógio real: o dia da mudança da renda é depois do dia
+  // da resposta, então a pergunta continua na tela mesmo depois de "Manter o valor". O que se confere é a gravação.
+  const savingsNow = await otherDevice(async (repo, ctx) => { const c = await repo.getSavingsCheck(ctx); return c === null ? null : { answer: c.answer, monthlyCents: c.monthlyCents, version: c.version }; });
+  t = await body();
+  ok('C "Manter o valor": grava de novo "consigo" com o mesmo valor (R$ 300,00) e o plano continua', savingsNow !== null && savingsNow.answer === 'consigo' && savingsNow.monthlyCents === 30000 && savingsNow.version >= 3 && t.includes('Você planeja guardar R$ 300,00 por mês.'), JSON.stringify(savingsNow));
+
+  // Nova meta, editar, concluir, arquivar e excluir (uma meta de R$ 100,00 já alcançada).
+  await btn('Nova meta').click(); await waitText('Modelo de nome'); await p.waitForTimeout(300);
+  await btn('Criar meta').click(); await p.waitForTimeout(300);
+  ok('C nova meta: sem nome nem valor, as duas mensagens de campo', (await body()).includes('Dê um nome de 1 a 40 caracteres.') && /Informe (um|o) valor/.test(await body()), (await body()).split('\n').filter((l) => /nome|valor/i.test(l)).slice(0, 6).join(' | '));
+  await radio('Estudos').click(); await field('Valor da meta').fill('100'); await field('Quanto você já tem guardado para isso? (opcional)').fill('100'); await p.waitForTimeout(300);
+  ok('C nova meta: a prévia diz que a meta já está alcançada', (await body()).includes('Com o que você já tem guardado, a meta já está alcançada.'));
+  await btn('Criar meta').click(); await waitText('Meta criada.'); await p.waitForTimeout(500);
+  t = await body();
+  ok('C meta já alcançada: "Meta alcançada" com 100%, nunca 100% antes de alcançar, e o botão "Concluir meta"', t.includes('100%') && (await visibleCount('button', 'Concluir meta')) === 1);
+  await shot('122_meta_alcancada');
+  await btn('Concluir meta').click(); await waitText('Meta concluída.');
+  await btn('Mais ações').click(); await p.getByRole('alert').getByRole('button', { name: 'Excluir meta' }).last().click(); await p.waitForTimeout(300);
+  ok('C excluir meta: o diálogo avisa que os movimentos também saem', /movimentos/i.test(await dialogText()), (await dialogText()).slice(0, 200));
+  await p.getByRole('alert').getByRole('button', { name: 'Excluir meta' }).last().click(); await waitText('Meta excluída.'); await p.waitForTimeout(500);
+  ok('C meta excluída: some de Metas', !(await body()).includes('Estudos') && (await otherDevice(async (repo, ctx) => (await repo.listGoals(ctx)).length)) === 2);
+
+  // Conta nova: "Sim, consigo" cria a reserva pelo plano.
+  const newAcct = async (name, email) => {
+    await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+    await btn('Criar conta').click(); await waitText('Nome de apresentação');
+    await field('Nome de apresentação').fill(name); await field('E-mail').fill(email); await field('Senha').fill('senha1234');
+    await btn('Criar conta').click(); await waitText('Confira seu e-mail');
+    await btn('Simular abertura do link').click(); await btn('Já confirmei meu e-mail').click(); await waitText('Sua primeira conta');
+    await btn('Começar meu mês').click(); await waitText('Diferença do mês');
+  };
+  await newAcct('Cris Teste', 'cris@exemplo.com');
+  await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Você consegue guardar algum valor por mês?'); await p.waitForTimeout(400);
+  t = await body();
+  ok('C conta nova: Metas começa com a pergunta, sem metas, sem reserva e sem números de exemplo', t.includes('Sua resposta ajuda a montar um plano com os seus números. Ela fica só com você.') && t.includes('Nenhuma meta ainda') && t.includes('Calcular minha reserva') && t.includes('Guardado em outubro: R$ 0,00'));
+  ok('C conta nova: nenhuma meta nem reserva de exemplo', (await otherDevice(async (repo, ctx) => (await repo.listGoals(ctx)).length)) === 0 && !t.includes('Viagem de férias'));
+  await btn('Sim, consigo').click(); await waitText('Quanto você consegue guardar por mês?'); await p.waitForTimeout(500);
+  t = await body();
+  ok('C "Sim, consigo": campo de valor com a dica (R$ 1,00 a R$ 9.999.999,99), privacidade e o pedido dos gastos essenciais (conta nova, nada calculável)', (await h1Name()) === 'Seu plano de guardar' && t.includes('De R$ 1,00 a R$ 9.999.999,99.') && t.includes('Sua resposta e as datas de volta ficam só com você.') &&
+    t.includes('Informe quanto você gasta por mês com moradia, mercado, transporte, saúde e educação.'));
+  await field('Quanto você consegue guardar por mês?').fill('400'); await field('Gastos essenciais por mês').fill('2000'); await p.waitForTimeout(500);
+  t = await body();
+  ok('C "Sim, consigo" com R$ 400,00 e essenciais de R$ 2.000,00: a primeira etapa (R$ 2.000,00, 1 mês dos seus gastos essenciais) com o mês previsto',
+    /Com R\$ 400,00 por mês, a (primeira|segunda|terceira) etapa \(R\$ (2\.000,00, 1 mês|6\.000,00, 3 meses|12\.000,00, 6 meses) dos seus gastos essenciais\) chega em \S+ de 20\d\d\./.test(t) && t.includes('Etapas do plano'));
+  await shot('123_guardar_conta_nova');
+  await btn('Cancelar').click(); await waitText('Descartar'); await p.waitForTimeout(300);
+  ok('C sair do plano com o que foi digitado pede confirmação ("Continuar editando")', (await visibleCount('button', 'Continuar editando')) === 1);
+  await confirmIn('Continuar editando'); await p.waitForTimeout(300);
+  await radio('Etapa de 3 meses dos gastos essenciais').click();
+  await btn('Usar este plano').click(); await waitText('Plano salvo na sua reserva.'); await p.waitForTimeout(700);
+  t = await body();
+  ok('C "Usar este plano": a reserva nasce com alvo de R$ 6.000,00 (3 × R$ 2.000,00), R$ 0,00 guardado, R$ 400,00 por mês, e o card vira o plano', t.includes('R$ 0,00 de R$ 6.000,00') && t.includes('Planejado: R$ 400,00 por mês') && t.includes('Você planeja guardar R$ 400,00 por mês.') && !t.includes('Você consegue guardar algum valor por mês?'), t.slice(0, 400));
+  await shot('124_metas_reserva_pelo_plano');
+  await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
+  t = await body();
+  ok('C "Sim, consigo" conta como o 4º passo: o Resumo da conta nova mostra "Planejar quanto guardar" concluído', t.includes('Planejar quanto guardar') && (await visibleCount('button', /^Planejar quanto guardar, concluído\./)) === 1, t.slice(0, 300));
+
+  // Conta nova: a calculadora da reserva leva os números para "Criar reserva".
+  await newAcct('Davi Teste', 'davi@exemplo.com');
+  await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Você consegue guardar algum valor por mês?');
+  await p.getByRole('button', { name: /^Calculadoras\./ }).filter({ visible: true }).first().click(); await waitUntil(async () => (await h1Name()) === 'Calculadoras', 8000);
+  await openCalc('Reserva para imprevistos');
+  await typeIn('Gastos essenciais por mês', '3.750,00'); await radio('6 meses').click(); await typeIn('Quanto já tem guardado', '3.500,00'); await typeIn('Quanto guarda por mês', '500,00');
+  ok('C calculadora da reserva (conta sem reserva): 22.500,00 e o botão "Criar reserva"', (await shows('Com estes números, a reserva de 6 meses é de R$ 22.500,00.')) && (await visibleCount('button', 'Criar reserva')) === 1 && (await visibleCount('button', 'Salvar na minha reserva')) === 0);
+  await calcShot('125_calc_reserva_criar');
+  await btn('Criar reserva').click(); await waitText('Seus gastos essenciais por mês'); await p.waitForTimeout(500);
+  t = await body();
+  ok('C "Criar reserva" abre /reserva com os números da calculadora (3.750,00, 6 meses, 3.500,00 guardados e 500,00 por mês) e o valor da reserva', new URL(p.url()).pathname === '/reserva' && t.includes('Seus gastos essenciais por mês') && t.includes('R$ 3.750,00') &&
+    (await radio('6 meses').getAttribute('aria-checked')) === 'true' && t.includes('Valor da reserva: R$ 22.500,00 (6 × R$ 3.750,00)') && t.includes('A reserva para imprevistos é para emergências. Para aproveitar oportunidades, crie uma meta separada.') &&
+    t.includes('O Clarevo não guarda nem aplica dinheiro e não indica produtos, bancos ou aplicações.'), new URL(p.url()).pathname);
+  await keepText();
+  await innerChecks('reserva 390px');
+  await shot('126_reserva');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await innerChecks('reserva 320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  ok('C /reserva: ainda não criou nada (nada é gravado ao abrir)', (await otherDevice(async (repo, ctx) => (await repo.listGoals(ctx)).length)) === 0);
+  await btn('Criar reserva').click(); await waitText('Reserva criada.'); await p.waitForTimeout(700);
+  t = await body();
+  ok('C reserva criada pela calculadora: R$ 3.500,00 de R$ 22.500,00 (15%), cobre 0,9 mês dos gastos essenciais e planejado R$ 500,00 por mês', t.includes('R$ 3.500,00 de R$ 22.500,00') && t.includes('15%') && t.includes('Cobre 0,9 mês dos seus gastos essenciais') && t.includes('Planejado: R$ 500,00 por mês'), t.slice(0, 400));
+  await scrollTo('Reserva para imprevistos');
+  await shot('127_metas_reserva_criada');
+  // Dica de poupança no formulário de gasto: guardar não é gasto, com o atalho para Metas.
+  await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês');
+  await btn('Anotar gasto').click(); await waitText('Será salvo em'); await field('Descrição').fill('Aporte reserva'); await p.waitForTimeout(400);
+  t = await body();
+  ok('C Anotar gasto: ao digitar "Aporte reserva", a dica "Dinheiro guardado não é gasto" com o atalho para Metas', t.includes('Dinheiro guardado não é gasto') && (await visibleCount('button', /Ir para Metas|Registrar aporte/)) >= 1, t.split('\n').filter((l) => /guardado|Metas/.test(l)).join(' | '));
+  await keepText();
+  await shot('128_dica_poupanca_gasto');
+  await btn('Cancelar').click(); await p.waitForTimeout(400); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
+  await waitText('Diferença do mês');
+
+  // ==================================================================================================================
+  // Ciclo D · Simulador (D-028): só simulação, sem produto, banco nem taxa sugerida. A taxa é sempre digitada (campo vazio
+  // por padrão, sem exemplo), os aportes são no INÍCIO de cada mês (decisão de Enzo, 09/10/2026, como na Calculadora do
+  // Cidadão do Banco Central) e o resultado vem com o "sem rendimento" ao lado. Nada é gravado ao digitar nem ao simular;
+  // só "Criar meta com estes valores" abre o formulário de meta, que continua precisando de "Criar meta".
+  const SIM_DISCLAIMER = 'Simulação com as hipóteses que você informou. Não é promessa de rendimento nem recomendação de investimento.';
+  const SIM_INTRO = 'Faça contas com hipóteses suas. Nada aqui é gravado até você escolher criar uma meta.';
+  const inView = (text) => p.evaluate((x) => {
+    const els = [...document.querySelectorAll('div,span')].filter((e) => e.children.length === 0 && (e.textContent || '').includes(x));
+    return els.some((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.top >= 0 && r.bottom <= window.innerHeight; });
+  }, text);
+  const simRate = () => field('Taxa de rendimento ao ano (%)');
+  const simulate = async () => { await btn('Simular').click(); await p.waitForTimeout(250); };
+  const formValues = () => p.locator('input').evaluateAll((els) => els.filter((e) => e.getBoundingClientRect().width > 0).map((e) => `${e.getAttribute('aria-label')}=${e.value}`));
+  const goalCount = () => otherDevice(async (repo, ctx) => (await repo.listGoals(ctx)).length);
+
+  await freshDemo();
+  const simSnapBefore = await repoSnapshot();
+  const simStorageBefore = await storageNow();
+  const simWritesBefore = writes.length;
+  const simGoalsBefore = await goalCount();
+  await metasTab();
+  ok('D Metas: a linha "Simular um plano" com a legenda', (await visibleCount('button', 'Simular um plano. Quanto guardar por mês, em quanto tempo e quanto você pode ter, com hipóteses suas.')) === 1);
+  await p.getByRole('button', { name: /^Simular um plano\./ }).filter({ visible: true }).first().click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(500);
+  // Abertura a 360 x 640: o aviso fixo e a introdução ficam à vista sem rolar; as hipóteses estão na tela, com a taxa "a que você informar".
+  await p.setViewportSize({ width: 360, height: 640 }); await p.waitForTimeout(500);
+  ok('D abertura a 360 px: o aviso "Simulação com as hipóteses que você informou. Não é promessa de rendimento nem recomendação de investimento." e a introdução à vista, sem rolar', (await inView(SIM_DISCLAIMER)) === true && (await inView(SIM_INTRO)) === true);
+  await shot('129_simular_abertura_360px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(400);
+  t = await body();
+  ok('D abertura: título "Simular um plano", sem pílula de contexto, e nenhum campo antes de escolher o modo', (await h1Name()) === 'Simular um plano' && (await visibleCount('radio', 'Quanto guardar por mês')) === 1 && !t.includes('Quanto quer juntar'));
+  ok('D abertura: as hipóteses já visíveis, com aportes no início de cada mês e a taxa "a que você informar"', t.includes('Hipóteses') && t.includes('Aportes no início de cada mês, como na Calculadora do Cidadão do Banco Central.') &&
+    t.includes('Taxa de rendimento: a que você informar, constante no período.') && t.includes('Escolha o que quer saber, preencha os campos e toque em Simular.') && !t.includes('Criar meta com estes valores'));
+  await simulate();
+  ok('D "Simular" sem escolher o modo: só "Escolha o que você quer saber."', (await body()).includes('Escolha o que você quer saber.') && !(await body()).includes('Digite a taxa'));
+  await radio('Quanto guardar por mês').click(); await waitText('Quanto quer juntar'); await p.waitForTimeout(300);
+  t = await body();
+  ok('D modo "Quanto guardar por mês": campos de alvo, já tem, meses e taxa; sem o campo do aporte', t.includes('Quanto quer juntar') && t.includes('Quanto já tem (opcional)') && t.includes('Em quantos meses') && t.includes('Taxa de rendimento ao ano (%)') && !t.includes('Quanto vai guardar por mês'));
+  ok('D a taxa vem vazia, sem exemplo, e a dica diz que o Clarevo não sugere taxas, produtos nem instituições', (await simRate().inputValue()) === '' && ((await simRate().getAttribute('placeholder')) || '') === '' &&
+    t.includes('Você informa a taxa que quer testar. O Clarevo não sugere taxas, produtos nem instituições.'));
+  await simulate(); await waitText('Digite quanto quer juntar');
+  t = await body();
+  ok('D campos vazios: os três erros ("Digite quanto quer juntar, como 22.500,00.", meses e a taxa) e nenhum resultado com rendimento', t.includes('Digite quanto quer juntar, como 22.500,00.') && t.includes('Digite em quantos meses, de 1 a 600.') &&
+    t.includes('Digite a taxa ao ano que quer testar, de 0% a 30%.') && !t.includes('por mês na hipótese informada'));
+  ok('D o foco vai ao primeiro campo com erro', (await p.evaluate(() => document.activeElement && (document.activeElement.getAttribute('aria-label') || ''))) === 'Quanto quer juntar');
+  await shot('130_simular_erros');
+  await field('Quanto quer juntar').fill('22500'); await field('Quanto já tem (opcional)').fill('4500'); await field('Em quantos meses').fill('14');
+  // Sem taxa (campo vazio), só o aviso da taxa: nunca um resultado com rendimento, nem o "sem rendimento" apresentado como resultado.
+  await simulate();
+  t = await body();
+  ok('D taxa vazia: só o erro da taxa; nada de resultado com rendimento (nem R$ 1.175,15)', t.includes('Digite a taxa ao ano que quer testar, de 0% a 30%.') && !t.includes('por mês na hipótese informada') && !t.includes('R$ 1.175,15'));
+  await simRate().fill('30,01'); await simulate(); await waitText('Use uma taxa de 0% a 30% ao ano, com até 2 casas.');
+  ok('D taxa 30,01 recusada', true);
+  await simRate().fill('10'); await field('Quanto quer juntar').blur();
+  ok('D os valores em reais são formatados ao sair do campo (22.500,00 e 4.500,00)', (await field('Quanto quer juntar').inputValue()) === '22.500,00' && (await field('Quanto já tem (opcional)').inputValue()) === '4.500,00');
+  ok('D digitar a taxa atualiza a hipótese ao vivo: "Taxa de 10% ao ano (0,80% ao mês, taxa equivalente), constante no período."', (await body()).includes('Taxa de 10% ao ano (0,80% ao mês, taxa equivalente), constante no período.'));
+  await simulate(); await waitText('por mês na hipótese informada'); await p.waitForTimeout(400);
+  t = await body();
+  ok('D quanto guardar: "Para juntar R$ 22.500,00 em 14 meses, começando com R$ 4.500,00:" R$ 1.175,15 por mês na hipótese informada', t.includes('Para juntar R$ 22.500,00 em 14 meses, começando com R$ 4.500,00:') && t.includes('R$ 1.175,15 por mês na hipótese informada'));
+  ok('D quanto guardar: o "sem rendimento" ao lado (R$ 1.285,72 por mês) igual ao da calculadora', t.includes('Sem rendimento, seriam R$ 1.285,72 por mês.'));
+  ok('D resultado: ano a ano (Aportado e Rendimento na hipótese), "Ver tabela ano a ano" e "Criar meta com estes valores" com a dica de que a taxa não é gravada', t.includes('Ano a ano') && t.includes('Aportado') && t.includes('Rendimento na hipótese') && t.includes('Ver tabela ano a ano') && t.includes('Criar meta com estes valores') && t.includes('A taxa não é gravada'));
+  ok('D resultado: não há "Simular" nem aviso depois do resultado que prometa rendimento', !/garant|promet[ei]\w* (que|rendimento)/i.test(t.replace(SIM_DISCLAIMER, '')) && !FORBIDDEN.test(t));
+  await keepText();
+  const simTitles = (await headingList());
+  ok('D títulos: "Simular um plano" (1), "Resultado" (2) e "Hipóteses" (3)', simTitles.includes('1:Simular um plano') && simTitles.includes('2:Resultado') && simTitles.includes('3:Hipóteses'), JSON.stringify(simTitles));
+  ok('D a região viva do resultado tem o texto do resultado', (await liveText()).includes('R$ 1.175,15 por mês na hipótese informada'));
+  await calcHeader('simulador 390px', 'Simular um plano');
+  await layoutChecks('simulador 390px');
+  ok('simulador: sem o símbolo C', (await symbolCount()) === 0);
+  await calcShot('131_simular_resultado');
+  await btn('Ver tabela ano a ano').click(); await waitText('Ocultar tabela ano a ano'); await p.waitForTimeout(300);
+  t = await body();
+  ok('D tabela ano a ano: 2 anos, o segundo parcial (até o mês 14), com o total na hipótese', t.includes('Ano 1') && t.includes('Ano 2 (até o mês 14)') && t.includes('Total na hipótese'));
+  ok('D a tabela abre com aria-expanded e as linhas não são paradas de tabulação', (await p.getByRole('button', { name: 'Ocultar tabela ano a ano' }).filter({ visible: true }).first().getAttribute('aria-expanded')) === 'true' &&
+    (await p.evaluate(() => [...document.querySelectorAll('[tabindex="0"]')].filter((e) => /^Ano \d+:/.test(e.getAttribute('aria-label') || '')).length)) === 0);
+  await keepText();
+  await shot('132_simular_tabela');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await calcHeader('simulador 320px', 'Simular um plano');
+  await layoutChecks('simulador 320px');
+  await shot('132_simular_tabela_320px', true);
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  await btn('Ocultar tabela ano a ano').click();
+  // Mudar qualquer campo tira o resultado (nunca números velhos ao lado de campos novos).
+  await field('Em quantos meses').fill('15'); await p.waitForTimeout(250);
+  ok('D mudar um campo tira o resultado e deixa o texto de espera', !(await body()).includes('por mês na hipótese informada') && (await body()).includes('Escolha o que quer saber'));
+  await field('Em quantos meses').fill('14'); await simulate(); await waitText('por mês na hipótese informada');
+  // Criar meta: abre o formulário de meta preenchido, sem a taxa no endereço e sem gravar nada.
+  const goalsBeforeCreate = await goalCount();
+  await btn('Criar meta com estes valores').click(); await waitText('Modelo de nome'); await p.waitForTimeout(500);
+  const metaVals = await formValues();
+  ok('D "Criar meta com estes valores": /meta/nova com valor 22.500,00, prazo 11/2027, já guardado 4.500,00 e plano de 1.175,15; nome em branco', new URL(p.url()).pathname === '/meta/nova' &&
+    metaVals.some((v) => v === 'Valor da meta=22.500,00') && metaVals.some((v) => v.endsWith('=11/2027')) && metaVals.some((v) => v.endsWith('=4.500,00')) && metaVals.some((v) => v.endsWith('=1.175,15')) && metaVals.some((v) => /^Nome da meta=$/.test(v)), JSON.stringify(metaVals));
+  ok('D a taxa nunca vai para o endereço nem para a meta', !/taxa|rate|inflac|inflation/i.test(p.url()), p.url());
+  await shot('133_simular_criar_meta');
+  ok('D abrir o formulário de meta não grava nada (metas continuam em 2)', (await goalCount()) === goalsBeforeCreate && goalsBeforeCreate === 2);
+  await btn('Voltar').click(); await p.waitForTimeout(500);
+  if (await visibleCount('button', /Descartar|Sair/)) await p.getByRole('button', { name: /Descartar|Sair/ }).filter({ visible: true }).first().click().catch(() => {});
+  await p.waitForTimeout(400);
+  ok('D voltar leva ao simulador com tudo preenchido', (await body()).includes('Simular um plano') && (await field('Quanto quer juntar').inputValue()) === '22.500,00');
+
+  // Em quanto tempo: R$ 1.000,00 por mês chega em 17 meses com 10% ao ano; sem rendimento, 18.
+  await radio('Em quanto tempo').click(); await field('Quanto vai guardar por mês').fill('1000'); await simRate().fill('10'); await simulate(); await waitText('meses sem rendimento');
+  t = await body();
+  ok('D em quanto tempo: "Com R$ 1.000,00 por mês: 17 meses na hipótese informada; 18 meses sem rendimento."', t.includes('Para juntar R$ 22.500,00, começando com R$ 4.500,00:') && t.includes('Com R$ 1.000,00 por mês: 17 meses na hipótese informada; 18 meses sem rendimento.'));
+  await shot('134_simular_em_quanto_tempo');
+  await simRate().fill('0'); await simulate();
+  ok('D taxa 0: 18 meses nos dois e "Taxa de 0% ao ano: sem rendimento."', /18 meses na hipótese informada; 18 meses sem rendimento\./.test(await body()) && (await body()).includes('Taxa de 0% ao ano: sem rendimento.'));
+  await field('Quanto quer juntar').fill('9999999,99'); await field('Quanto vai guardar por mês').fill('0,01'); await simRate().fill('10'); await simulate();
+  t = await body();
+  ok('D meta que não chega em 50 anos: o texto, sem gráfico e sem "Criar meta com estes valores"', t.includes('a meta não é alcançada em 50 anos na hipótese informada') && !t.includes('Ano a ano') && !t.includes('Criar meta com estes valores'));
+  await field('Quanto quer juntar').fill('4500'); await field('Quanto vai guardar por mês').fill('1000'); await simulate();
+  t = await body();
+  ok('D já tem o valor: o texto, sem gráfico e sem "Criar meta com estes valores"', t.includes('você já tem o valor que quer juntar') && !t.includes('Ano a ano') && !t.includes('Criar meta com estes valores'));
+
+  // Quanto posso ter: R$ 1.000,00 por mês, 14 meses e R$ 4.500,00 iniciais viram R$ 19.896,17 (aportes no início de cada mês).
+  await radio('Quanto posso ter').click(); await field('Quanto já tem (opcional)').fill('4500'); await field('Em quantos meses').fill('14'); await field('Quanto vai guardar por mês').fill('1000'); await simRate().fill('10'); await simulate();
+  await waitText('Na hipótese informada'); await p.waitForTimeout(300);
+  t = await body();
+  ok('D quanto posso ter: R$ 19.896,17 em 14 meses (aportado R$ 18.500,00, rendimento R$ 1.396,17) e, sem rendimento, R$ 18.500,00', t.includes('Na hipótese informada: R$ 19.896,17 em 14 meses') && t.includes('Total aportado: R$ 18.500,00') && t.includes('Rendimento na hipótese: R$ 1.396,17') && t.includes('Sem rendimento, seriam R$ 18.500,00.'));
+  // 120 meses, R$ 500,00 por mês, 10% ao ano e inflação de 4,5%: R$ 100.728,79 (hoje, R$ 64.862,05).
+  await field('Quanto já tem (opcional)').fill(''); await field('Em quantos meses').fill('120'); await field('Quanto vai guardar por mês').fill('500');
+  ok('D inflação desligada: sem o campo "Inflação ao ano (%)"', (await p.getByLabel('Inflação ao ano (%)', { exact: true }).count()) === 0);
+  await p.getByRole('checkbox', { name: /Descontar inflação/ }).click(); await p.waitForTimeout(200);
+  ok('D inflação ligada: o campo vem vazio (nunca sugerido)', (await field('Inflação ao ano (%)').inputValue()) === '');
+  await simulate();
+  ok('D inflação ligada e vazia: erro "Digite a inflação ao ano que quer testar, de 0% a 30%."', (await body()).includes('Digite a inflação ao ano que quer testar, de 0% a 30%.'));
+  await field('Inflação ao ano (%)').fill('4,5'); await simulate(); await waitText('Em dinheiro de hoje'); await p.waitForTimeout(300);
+  t = await body();
+  ok('D quanto posso ter, 120 meses: R$ 100.728,79 na hipótese, R$ 60.000,00 aportados, R$ 40.728,79 de rendimento e R$ 64.862,05 em dinheiro de hoje (inflação de 4,5% ao ano)', t.includes('Na hipótese informada: R$ 100.728,79 em 120 meses') && t.includes('Total aportado: R$ 60.000,00') &&
+    t.includes('Rendimento na hipótese: R$ 40.728,79') && t.includes('Em dinheiro de hoje, com inflação de 4,5% ao ano: R$ 64.862,05') && t.includes('Sem rendimento, seriam R$ 60.000,00.') &&
+    t.includes('Inflação de 4,5% ao ano (0,37% ao mês, taxa equivalente), constante no período, só para o valor em dinheiro de hoje.'));
+  const simChart = await p.locator('[role="img"]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')).filter((l) => l && l.startsWith('Gráfico')));
+  ok('D o gráfico por ano tem um único rótulo acessível (R$ 60.000,00 aportados, total de R$ 100.728,79)', simChart.length === 1 && simChart[0].includes('R$ 60.000,00 aportados') && simChart[0].includes('total de R$ 100.728,79'), JSON.stringify(simChart));
+  await keepText();
+  await calcShot('135_simular_quanto_posso_ter');
+  await btn('Ver tabela ano a ano').click(); await waitText('Ocultar tabela ano a ano');
+  t = await body();
+  ok('D tabela de 10 anos com a coluna de dinheiro de hoje', t.includes('Ano 10') && !t.includes('Ano 11') && t.includes('Em dinheiro de hoje'));
+  await field('Quanto vai guardar por mês').fill('9999999,99'); await field('Em quantos meses').fill('600'); await simRate().fill('30'); await simulate();
+  ok('D resultado alto demais: "Com estes números, o resultado passa do que o simulador mostra."', (await body()).includes('Com estes números, o resultado passa do que o simulador mostra.'));
+  await field('Em quantos meses').fill('601'); await simRate().fill('abc'); await simulate();
+  t = await body();
+  ok('D prazo 601 e taxa "abc": "Use um prazo de 1 a 600 meses." e "Use uma taxa de 0% a 30% ao ano, com até 2 casas."', t.includes('Use um prazo de 1 a 600 meses.') && t.includes('Use uma taxa de 0% a 30% ao ano, com até 2 casas.'));
+  await simRate().fill('10'); await field('Em quantos meses').fill('120'); await field('Quanto vai guardar por mês').fill('500'); await simulate();
+  const simHints = await p.getByRole('button', { name: /^O que é isso\?/ }).filter({ visible: true }).evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+  ok('D "O que é isso?": taxa ao ano e ao mês, inflação, juros compostos e como ler uma simulação', ['Taxa ao ano e ao mês', 'Inflação', 'Juros compostos', 'Como ler uma simulação'].every((x) => simHints.some((h) => h && h.includes(x))), JSON.stringify(simHints));
+
+  // Nada gravado ao digitar nem ao simular: o repositório, o aparelho e a rede ficam iguais.
+  const simSnapAfter = await repoSnapshot();
+  ok('D nada gravado: repositório igual ao de antes do simulador, nada novo no aparelho, nenhuma requisição de escrita e as metas continuam em 2',
+    simSnapAfter === simSnapBefore && (await storageNow()) === simStorageBefore && writes.length === simWritesBefore && (await goalCount()) === 2, [snapshotDiff(simSnapBefore, simSnapAfter), ...writes.slice(simWritesBefore, simWritesBefore + 3)].filter(Boolean).join(' | '));
+
+  // As entradas: detalhe da meta, calculadora, Aprender, o tema "Como ler uma simulação" e o endereço direto.
+  await freshDemo();
+  await metasTab();
+  await p.getByRole('button', { name: /^Viagem de férias/ }).filter({ visible: true }).first().click(); await waitText('Mais ações'); await p.waitForTimeout(300);
+  ok('D detalhe da meta: o link "Simular com rendimento"', (await visibleCount('button', 'Simular com rendimento')) === 1);
+  await btn('Simular com rendimento').click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(300);
+  const fromGoal = await formValues();
+  ok('D do detalhe da meta: alvo R$ 6.000,00, já tem R$ 1.200,00, 10 meses e taxa vazia, no modo "Quanto guardar por mês"', fromGoal.includes('Quanto quer juntar=6.000,00') && fromGoal.includes('Quanto já tem (opcional)=1.200,00') && fromGoal.includes('Em quantos meses=10') &&
+    fromGoal.includes('Taxa de rendimento ao ano (%)=') && (await radio('Quanto guardar por mês').getAttribute('aria-checked')) === 'true' && !/taxa|rate/i.test(p.url()), JSON.stringify(fromGoal));
+  await simRate().fill('0'); await simulate(); await waitText('por mês na hipótese informada');
+  ok('D taxa 0 repete o plano da meta: R$ 480,00 por mês', (await body()).includes('R$ 480,00 por mês na hipótese informada') && (await body()).includes('Sem rendimento, seriam R$ 480,00 por mês.'));
+  await shot('136_simular_da_meta');
+  await btn('Voltar').click(); await waitText('Mais ações'); await btn('Voltar').click(); await waitText('Seu plano de guardar');
+  // Calculadora "Juntar para um objetivo": o link com os valores preenchidos (e sem link quando o objetivo já foi alcançado).
+  await p.getByRole('button', { name: /^Calculadoras\./ }).filter({ visible: true }).first().click(); await waitUntil(async () => (await h1Name()) === 'Calculadoras', 8000);
+  await openCalc('Juntar para um objetivo');
+  ok('D calculadora sem resultado: sem o link "Simular com rendimento"', (await visibleCount('button', 'Simular com rendimento')) === 0);
+  await typeIn('Quanto quer juntar', '22.500,00'); await typeIn('Quanto já tem', '4.500,00'); await radio('Em quanto tempo').click(); await typeIn('Quanto vai guardar por mês', '1.000,00');
+  await waitUntil(async () => (await visibleCount('button', 'Simular com rendimento')) === 1, 4000);
+  ok('D calculadora com resultado: o link "Simular com rendimento" (com 48 px de altura)', (await visibleCount('button', 'Simular com rendimento')) === 1 && (await btn('Simular com rendimento').boundingBox()).height >= 47.5);
+  await btn('Simular com rendimento').click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(300);
+  const fromCalc = await formValues();
+  ok('D da calculadora: alvo 22.500,00, já tem 4.500,00, aporte 1.000,00, taxa vazia e o modo "Em quanto tempo"', fromCalc.includes('Quanto quer juntar=22.500,00') && fromCalc.includes('Quanto já tem (opcional)=4.500,00') && fromCalc.includes('Quanto vai guardar por mês=1.000,00') &&
+    fromCalc.includes('Taxa de rendimento ao ano (%)=') && (await radio('Em quanto tempo').getAttribute('aria-checked')) === 'true', JSON.stringify(fromCalc));
+  await btn('Voltar').click(); await waitText('Quanto quer juntar');
+  await typeIn('Quanto já tem', '22.500,00'); await p.waitForTimeout(300);
+  ok('D calculadora com objetivo já alcançado: sem o link', (await visibleCount('button', 'Simular com rendimento')) === 0);
+  // Aprender: o atalho "Simular" no começo de "Dinheiro no tempo" e o tema com a ação "Simular um plano".
+  await freshDemo();
+  await p.getByRole('tab', { name: 'Aprender' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês e saldo da conta'); await p.waitForTimeout(300);
+  const timeSection = await p.evaluate(() => {
+    const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent.trim() === 'Dinheiro no tempo' && e.getBoundingClientRect().width > 0);
+    let el = h;
+    while (el && el.querySelectorAll('[role=button]').length < 2) el = el.parentElement;
+    return el ? [...el.querySelectorAll('[role=button]')].map((x) => x.getAttribute('aria-label')).slice(0, 3) : [];
+  });
+  ok('D Aprender: o atalho "Simular" abre "Dinheiro no tempo", antes dos temas', timeSection.length === 3 && /^Simular\. Quanto guardar por mês/.test(timeSection[0]) && !/^Simular/.test(timeSection[1]), JSON.stringify(timeSection));
+  await p.getByRole('button', { name: /^Simular\. Quanto guardar/ }).filter({ visible: true }).first().click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(300);
+  ok('D do atalho de Aprender: o simulador vazio (origem=aprender no endereço)', (await formValues()).every((x) => x.endsWith('=')) && p.url().includes('origem=aprender'), p.url());
+  await btn('Voltar').click(); await waitText('Diferença do mês e saldo da conta');
+  await p.getByRole('button', { name: /^Como ler uma simulação/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(600);
+  ok('D o tema "Como ler uma simulação" tem a ação "Simular um plano"', (await visibleCount('button', /Simular um plano/)) >= 1, p.url());
+  await p.getByRole('button', { name: /Simular um plano/ }).filter({ visible: true }).first().click(); await waitText('Faça contas com hipóteses suas');
+  ok('D a ação do tema abre /simular', new URL(p.url()).pathname === '/simular', p.url());
+  // Endereço direto (versão web instalada): valores do link; a taxa vinda do endereço nunca é lida; lixo é ignorado.
+  await p.goto(`http://localhost:${PORT}/simular?modo=em-quanto-tempo&alvo=2250000&inicial=450000&mensal=100000&taxa=10`); await waitText('Seu dinheiro');
+  await btn('Ver demonstração com dados fictícios').click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(300);
+  const direct = await formValues();
+  ok('D endereço direto: os valores do link (22.500,00 e 1.000,00) e a taxa do endereço não é lida', direct.includes('Quanto quer juntar=22.500,00') && direct.includes('Quanto vai guardar por mês=1.000,00') && direct.includes('Taxa de rendimento ao ano (%)='), JSON.stringify(direct));
+  await p.goto(`http://localhost:${PORT}/simular?modo=xyz&alvo=abc&meses=9999&inicial=-1`); await waitText('Seu dinheiro');
+  await btn('Ver demonstração com dados fictícios').click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(300);
+  ok('D endereço com valores inválidos: ignorados (campos vazios)', (await formValues()).length === 0, JSON.stringify(await formValues()));
+
   // Ciclo A4 · Seus últimos meses (D-030), no cenário FICTÍCIO "retorno" da demonstração (?cenario=retorno): a
   // montagem da sequência R anotada em 20/05/2026 (Aluguel, Luz estimada e Financiamento do carro desde maio, contas de
   // maio pagas, Salário e Mercado) e aberta em 07/10/2026. Cada entrada recarrega a página e recomeça o cenário.
