@@ -7,14 +7,14 @@ import {
   type GoalPlan,
 } from '@clarevo/core';
 import { router } from 'expo-router';
-import { ChevronDown, ChevronRight, ChevronUp, ShieldCheck, Target } from 'lucide-react-native';
-import { useState } from 'react';
+import { ChevronDown, ChevronRight, ChevronUp, PiggyBank, ShieldCheck, Target } from 'lucide-react-native';
+import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
 import { GoalProgress } from '@/components/goal-progress';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
-import { Button, Card, Txt, styles as ui } from '@/components/ui';
+import { Button, Card, LinkButton, Txt, styles as ui } from '@/components/ui';
 import { showsCoverage } from '@/lib/essentials';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 
@@ -22,8 +22,30 @@ import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
  * Card azul da reserva para imprevistos (spec2 §4.6): sem reserva, o convite para calcular; com reserva, "R$ 3.500,00 de
  * R$ 22.500,00", a barra lima, o percentual, a cobertura em meses de gastos essenciais (quando é verdade), o plano por mês e
  * "Registrar aporte" e "Ver detalhes". Texto claro sobre o azul; o lima é só da barra e do selo.
+ *
+ * `planSlot`: o plano de guardar dentro do card (D-039), em vez de um segundo card sobre o mesmo valor. `planLink`: a linha
+ * "Planejar quanto guardar" de quem respondeu "Agora não" (a pergunta só volta mais tarde, mas a porta fica aqui).
  */
-export function ReserveCard({ reserve, plan }: { reserve: Goal | null; plan: GoalPlan | null }) {
+export function ReserveCard({
+  reserve,
+  plan,
+  planSlot,
+  planLink,
+}: {
+  reserve: Goal | null;
+  plan: GoalPlan | null;
+  planSlot?: ReactNode;
+  planLink?: boolean;
+}) {
+  const planAction = planLink ? (
+    <LinkButton
+      label="Planejar quanto guardar"
+      icon={PiggyBank}
+      color={colors.textOnBrand}
+      style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
+      onPress={() => router.push('/guardar')}
+    />
+  ) : null;
   if (reserve === null || plan === null) {
     return (
       <View style={styles.blue}>
@@ -35,6 +57,7 @@ export function ReserveCard({ reserve, plan }: { reserve: Goal | null; plan: Goa
         </View>
         <Txt color={colors.textOnBrand}>{GOALS_TEXT.reserveEmpty}</Txt>
         <Button label={GOALS_TEXT.reserveCalculate} tone="soft" onPress={() => router.push('/reserva')} />
+        {planAction}
       </View>
     );
   }
@@ -81,6 +104,7 @@ export function ReserveCard({ reserve, plan }: { reserve: Goal | null; plan: Goa
           {t.planned}
         </MoneyTxt>
       ) : null}
+      {planSlot}
       <View style={styles.actions}>
         <Button
           label={GOALS_TEXT.addDeposit}
@@ -95,6 +119,7 @@ export function ReserveCard({ reserve, plan }: { reserve: Goal | null; plan: Goa
           onPress={() => router.push({ pathname: '/meta/[id]', params: { id: reserve.id } })}
         />
       </View>
+      {planAction}
     </View>
   );
 }

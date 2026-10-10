@@ -1,6 +1,6 @@
-import { CALC_UI_TEXT, SIMULATE_TEXT, type LearnSection, type LearnSectionId } from '@clarevo/core';
-import { router } from 'expo-router';
-import { ArrowRight, Calculator, ChartLine, Search, SearchX, X } from 'lucide-react-native';
+import { APP_SEARCH_TEXT, CALC_UI_TEXT, SIMULATE_TEXT, appScreenIsTab, searchAppScreens, type AppScreen, type LearnSection, type LearnSectionId } from '@clarevo/core';
+import { router, type Href } from 'expo-router';
+import { AppWindow, ArrowRight, Calculator, ChartLine, Search, SearchX, X } from 'lucide-react-native';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { AccessibilityInfo, Platform, Pressable, StyleSheet, TextInput, View, type ScrollView } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -19,6 +19,9 @@ import { colors, fonts, radius, space } from '@/theme/tokens';
 const ANNOUNCE_DELAY_MS = 400;
 
 const open = (t: Topic) => router.push(explanationHref(t.slug, 'aprender'));
+
+/** Abre a tela do app achada pela busca (aba: troca de aba; outra tela: empilha por cima). Nada é registrado. */
+const openAppScreen = (screen: AppScreen) => (appScreenIsTab(screen) ? router.navigate(screen.href as Href) : router.push(screen.href as Href));
 
 /**
  * Aprender e dúvidas (spec3 §3.2, com spec5_notes §2): introdução, busca, card "Calculadoras", card lima "Comece por
@@ -40,8 +43,19 @@ export default function AprenderScreen() {
   const reduced = useReducedMotion();
 
   const results = searchTopics(query);
+  // Grupo "No app" (A21): telas do app achadas por nome e sinônimos, calculadas no aparelho sobre um índice fixo.
+  const appResults = results === null ? [] : searchAppScreens(query);
   const countText =
-    results === null ? '' : results.length === 0 ? `${LEARN_UI_TEXT.noResultTitle}. ${LEARN_UI_TEXT.noResultBody}` : LEARN_UI_TEXT.resultCount(results.length, query);
+    results === null
+      ? ''
+      : results.length === 0 && appResults.length === 0
+        ? `${LEARN_UI_TEXT.noResultTitle}. ${LEARN_UI_TEXT.noResultBody}`
+        : [
+            results.length > 0 ? LEARN_UI_TEXT.resultCount(results.length, query) : null,
+            appResults.length > 0 ? APP_SEARCH_TEXT.countFor(appResults.length, query) : null,
+          ]
+            .filter(Boolean)
+            .join('. ');
 
   // A contagem é anunciada uma vez, quando a pessoa para de digitar (região viva educada; no iOS, anúncio na fila).
   useEffect(() => {
@@ -93,7 +107,7 @@ export default function AprenderScreen() {
             </View>
 
             {results !== null ? (
-              <SearchResults query={query} results={results} onShowAll={clear} />
+              <SearchResults query={query} results={results} appResults={appResults} onShowAll={clear} />
             ) : (
               <>
                 {/* Calculadoras no topo (D-034; spec5_notes §2): card branco, ícone azul, entre a busca e "Comece por aqui". */}
@@ -240,9 +254,12 @@ function SearchField({
   );
 }
 
-/** Resultados da busca: contagem e linhas de tema; sem resultado, a sugestão e "Ver todos os temas". Sem animação. */
-function SearchResults({ query, results, onShowAll }: { query: string; results: Topic[]; onShowAll: () => void }) {
-  if (results.length === 0) {
+/**
+ * Resultados da busca: o grupo "No app" primeiro (telas do app que fazem o que a pessoa procura), depois a contagem e as
+ * linhas de tema; sem nenhum dos dois, a sugestão e "Ver todos os temas". Sem animação.
+ */
+function SearchResults({ query, results, appResults, onShowAll }: { query: string; results: Topic[]; appResults: AppScreen[]; onShowAll: () => void }) {
+  if (results.length === 0 && appResults.length === 0) {
     return (
       <Card style={styles.empty}>
         <SearchX size={32} color={colors.brand} aria-hidden />
@@ -257,15 +274,38 @@ function SearchResults({ query, results, onShowAll }: { query: string; results: 
     );
   }
   return (
-    <View style={{ gap: space[2] }}>
-      <Txt variant="label" color={colors.textSecondary}>
-        {LEARN_UI_TEXT.resultCount(results.length, query)}
-      </Txt>
-      <Card style={{ paddingVertical: space[1] }}>
-        {results.map((t, i) => (
-          <TopicRow key={t.slug} topic={t} caption={t.subtitle ?? learnSection(t.section).title} last={i === results.length - 1} onPress={() => open(t)} />
-        ))}
-      </Card>
+    <View style={{ gap: space[4] }}>
+      {appResults.length > 0 ? (
+        <View style={{ gap: space[2] }}>
+          <Txt variant="title" accessibilityRole="header" aria-level={2}>
+            {APP_SEARCH_TEXT.groupTitle}
+          </Txt>
+          <Card style={{ paddingVertical: space[1] }}>
+            {appResults.map((screen, i) => (
+              <CalcNavRow
+                key={screen.id}
+                icon={AppWindow}
+                title={screen.title}
+                caption={screen.caption}
+                last={i === appResults.length - 1}
+                onPress={() => openAppScreen(screen)}
+              />
+            ))}
+          </Card>
+        </View>
+      ) : null}
+      {results.length > 0 ? (
+        <View style={{ gap: space[2] }}>
+          <Txt variant="label" color={colors.textSecondary}>
+            {LEARN_UI_TEXT.resultCount(results.length, query)}
+          </Txt>
+          <Card style={{ paddingVertical: space[1] }}>
+            {results.map((t, i) => (
+              <TopicRow key={t.slug} topic={t} caption={t.subtitle ?? learnSection(t.section).title} last={i === results.length - 1} onPress={() => open(t)} />
+            ))}
+          </Card>
+        </View>
+      ) : null}
     </View>
   );
 }

@@ -161,11 +161,21 @@ export function Button({
   tone = 'brand',
   busyLabel,
   busy,
+  compact,
   style,
   onPressIn,
   onPressOut,
   ...props
-}: PressableProps & { label: string; icon?: LucideIcon; tone?: ButtonTone; busy?: boolean; busyLabel?: string; style?: StyleProp<ViewStyle> }) {
+}: PressableProps & {
+  label: string;
+  icon?: LucideIcon;
+  tone?: ButtonTone;
+  busy?: boolean;
+  busyLabel?: string;
+  /** Botões lado a lado em telas estreitas: 48 px de altura e margens internas menores (o alvo continua com 44 px ou mais). */
+  compact?: boolean;
+  style?: StyleProp<ViewStyle>;
+}) {
   const t = TONES[tone];
   const disabled = props.disabled || busy;
   const press = usePressScale();
@@ -186,6 +196,7 @@ export function Button({
         }}
         style={(state) => [
           styles.button,
+          compact && styles.buttonCompact,
           // Ocupado mantém a cor (o texto muda para "Salvando…"); só desabilitado fica esmaecido.
           { backgroundColor: state.pressed ? t.bgPressed : t.bg, opacity: props.disabled && !busy ? 0.65 : 1 },
           tone === 'danger' && { borderWidth: 1, borderColor: colors.border },
@@ -204,19 +215,22 @@ export function LinkButton({
   label,
   color = colors.brand,
   icon: Icon,
+  trailing: Trailing,
   style,
   ...props
-}: PressableProps & { label: string; color?: string; icon?: LucideIcon; style?: StyleProp<ViewStyle> }) {
+}: PressableProps & { label: string; color?: string; icon?: LucideIcon; trailing?: LucideIcon; style?: StyleProp<ViewStyle> }) {
   return (
     <Pressable
       accessibilityRole="button"
       hitSlop={10}
       {...props}
-      style={(s) => [styles.link, Icon && styles.linkWithIcon, style, (s as { focused?: boolean }).focused && styles.focusRing]}>
+      style={(s) => [styles.link, (Icon || Trailing) && styles.linkWithIcon, style, (s as { focused?: boolean }).focused && styles.focusRing]}>
       {Icon ? <Icon size={18} color={color} strokeWidth={2.25} /> : null}
       <Txt variant="label" color={color} style={{ fontFamily: fonts.bold, fontSize: 16, flexShrink: 1 }}>
         {label}
       </Txt>
+      {/* Seta de "abre outra tela" (›): desenho, sem nome próprio. */}
+      {Trailing ? <Trailing size={18} color={color} strokeWidth={2.25} aria-hidden /> : null}
     </Pressable>
   );
 }
@@ -450,6 +464,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: space[5],
     paddingVertical: space[3],
   },
+  buttonCompact: { minHeight: 48, paddingHorizontal: space[3], paddingVertical: space[2] },
   buttonText: { fontFamily: fonts.bold, fontSize: 16, textAlign: 'center', flexShrink: 1 },
   link: { minHeight: 44, justifyContent: 'center', alignSelf: 'center', paddingHorizontal: space[2] },
   linkWithIcon: { flexDirection: 'row', alignItems: 'center', gap: space[2] },

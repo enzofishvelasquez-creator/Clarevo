@@ -1,5 +1,6 @@
 import {
   ERROR_TEXT,
+  PAYABLES_NAV_TEXT,
   QUICK_PAY_TEXT,
   RETURN_TEXT,
   formatMonthBR,
@@ -7,6 +8,8 @@ import {
   isRepoError,
   monthOf,
   newOperationKey,
+  payablesStartMonth,
+  payablesStep,
   quickPayAction,
   quickPayDraft,
   toPayCaption,
@@ -17,9 +20,9 @@ import {
   type PaymentInput,
 } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { AlertCircle, CalendarClock, Check, Info, ListChecks, Pencil, Plus, Repeat, ShieldCheck } from 'lucide-react-native';
+import { AlertCircle, Bell, CalendarClock, Check, ChevronLeft, ChevronRight, Info, ListChecks, Pencil, Plus, Repeat, ShieldCheck } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
@@ -151,10 +154,16 @@ function usePayOnce() {
   };
 }
 
-/** Contas a pagar do contexto Pessoal no mês em exibição, com a mesma origem do card do Resumo. */
+/**
+ * Contas a pagar do contexto Pessoal, com a mesma origem do card do Resumo. O mês é desta tela (seletor local, D-039): as
+ * entradas "de agora" (lembrete, atalho do ícone, aviso de vencidas) abrem no mês atual; os cards que mostram um mês levam
+ * esse mês no endereço (?mes=AAAA-MM). Trocar de mês aqui não muda o mês do Resumo nem de Movimentos.
+ */
 export default function ContasAPagarScreen() {
   const { today } = useSession();
-  const { month, currentMonth, setMonth } = useView();
+  const { currentMonth } = useView();
+  const params = useLocalSearchParams<{ mes?: string }>();
+  const [month, setMonth] = useState(() => payablesStartMonth(params.mes, currentMonth));
   const personal = useSpace().data;
   const ctx = personal?.personalContextId;
   const commitments = useCommitments(ctx, month);
@@ -193,7 +202,8 @@ export default function ContasAPagarScreen() {
     ? []
     : isCurrent
       ? [
-          { title: 'Vencidas', list: s.overdue, review: s.overdue.length >= 2, lateCost: true },
+          // "Revisar vencidas" já com 1 vencida: a revisão trata uma conta só e paga na data do vencimento (D-039).
+          { title: 'Vencidas', list: s.overdue, review: s.overdue.length >= 1, lateCost: true },
           { title: `A vencer em ${monthName.toLowerCase()}`, list: s.upcomingInMonth, quickPay: true },
           { title: 'Pagas', legend: 'Já contam em Pago, no mês da data do pagamento.', list: s.paidInMonth },
           {
@@ -288,9 +298,7 @@ export default function ContasAPagarScreen() {
         ) : null}
 
         <View style={{ gap: space[1] }}>
-          <Txt variant="caption" color={colors.textSecondary}>
-            Pessoal · {monthName}
-          </Txt>
+          <PayablesMonthPicker month={month} currentMonth={currentMonth} onChange={setMonth} />
           <Txt variant="label" color={colors.textSecondary}>
             {isCurrent ? 'Ainda a pagar neste mês' : `Previsto para ${monthName.toLowerCase()}`}
           </Txt>
@@ -411,6 +419,7 @@ export default function ContasAPagarScreen() {
           ))
         )}
 
+        <RemindersLink />
         <Txt variant="label" color={colors.textSecondary}>
           Já anotou o pagamento como gasto? Exclua a conta a pagar para ela não continuar em Ainda a pagar.
         </Txt>
@@ -449,6 +458,73 @@ export default function ContasAPagarScreen() {
         </ChoiceDialog>
       ) : null}
     </View>
+  );
+}
+
+/**
+ * Seletor de mês local, na mesma linha de "Pessoal · outubro de 2026" (poupa altura: o primeiro "Já paguei" continua à
+ * vista). Fora do mês atual, "Voltar para outubro de 2026". Vai de 24 meses atrás a 12 à frente (core: payablesStep).
+ */
+function PayablesMonthPicker({ month, currentMonth, onChange }: { month: IsoMonth; currentMonth: IsoMonth; onChange: (m: IsoMonth) => void }) {
+  const prev = payablesStep(month, currentMonth, -1);
+  const next = payablesStep(month, currentMonth, 1);
+  return (
+    <View style={{ gap: space[1] }}>
+      <View style={styles.monthRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={prev ? PAYABLES_NAV_TEXT.previous(prev) : 'Mês anterior'}
+          accessibilityState={{ disabled: !prev }}
+          disabled={!prev}
+          hitSlop={4}
+          onPress={() => prev && onChange(prev)}
+          style={(st) => [styles.monthBtn, !prev && { opacity: 0.35 }, prev && (st as { focused?: boolean }).focused && styles.focusRing]}>
+          <ChevronLeft size={22} color={colors.brand} />
+        </Pressable>
+        <Txt variant="caption" color={colors.textSecondary} style={{ flex: 1, textAlign: 'center' }} accessibilityLiveRegion="polite">
+          Pessoal · {formatMonthBR(month)}
+        </Txt>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={next ? PAYABLES_NAV_TEXT.next(next) : 'Próximo mês'}
+          accessibilityState={{ disabled: !next }}
+          disabled={!next}
+          hitSlop={4}
+          onPress={() => next && onChange(next)}
+          style={(st) => [styles.monthBtn, !next && { opacity: 0.35 }, next && (st as { focused?: boolean }).focused && styles.focusRing]}>
+          <ChevronRight size={22} color={colors.brand} />
+        </Pressable>
+      </View>
+      {month !== currentMonth ? (
+        <LinkButton label={PAYABLES_NAV_TEXT.backToCurrent(currentMonth)} style={styles.inlineLink} onPress={() => onChange(currentMonth)} />
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Lembretes onde a pessoa pensa em vencimento: leva a Conta, onde ficam o interruptor e o horário (D-025). Depois da lista, para
+ * não empurrar o primeiro "Já paguei".
+ */
+function RemindersLink() {
+  const t = PAYABLES_NAV_TEXT.reminders;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${t.title}. ${t.caption}`}
+      onPress={() => router.push('/conta')}
+      style={(st) => [styles.remindersLink, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && styles.focusRing]}>
+      <Bell size={20} color={colors.brand} strokeWidth={2.25} aria-hidden />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.bold, fontSize: 16 }}>
+          {t.title}
+        </Txt>
+        <Txt variant="caption" color={colors.textSecondary}>
+          {t.caption}
+        </Txt>
+      </View>
+      <ChevronRight size={20} color={colors.textSecondary} aria-hidden />
+    </Pressable>
   );
 }
 
@@ -508,6 +584,9 @@ function SeriesLink({ count }: { count: number | null }) {
 const styles = StyleSheet.create({
   privacy: { flexDirection: 'row', alignSelf: 'center', alignItems: 'center', gap: space[2], minHeight: 44 },
   inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
+  monthRow: { flexDirection: 'row', alignItems: 'center', gap: space[1], marginHorizontal: -space[2] },
+  monthBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  remindersLink: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 56, paddingHorizontal: space[4], paddingVertical: space[2], borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   seriesLink: { flexDirection: 'row', alignItems: 'center', alignSelf: 'center', gap: space[2], minHeight: 44, paddingHorizontal: space[2], borderRadius: radius.sm },
   focusRing: { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid', outlineOffset: 2 } as object,
 });

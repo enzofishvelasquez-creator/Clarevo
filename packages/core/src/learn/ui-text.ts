@@ -15,8 +15,8 @@ export const LEARN_UI_TEXT = {
   tabA11y: 'Aprender e dúvidas',
   title: 'Aprender e dúvidas',
   intro: 'Explicações curtas sobre contas, juros e o próprio Clarevo, com exemplos fictícios e fontes.',
-  searchLabel: 'Buscar um tema',
-  searchHint: 'Ex.: juros, fatura, parcela',
+  searchLabel: 'Buscar um tema ou uma função',
+  searchHint: 'Ex.: juros, boleto, IPVA',
   clearSearch: 'Limpar busca',
   /** "{n} temas para "{busca}"" · "1 tema para "{busca}"". */
   resultCount: (n: number, query: string) => `${n === 1 ? '1 tema' : `${n} temas`} para "${query.trim()}"`,
