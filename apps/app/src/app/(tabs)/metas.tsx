@@ -40,7 +40,7 @@ export default function MetasScreen() {
         <AppHeader title={GOALS_TEXT.tabTitle} />
         <Body>
           <FlashBanner message={notice} />
-          <SavingsCard contextId={contextId} card={savings} onNotice={setNotice} planInReserve={overview.isPending || Boolean(data?.reserve)} />
+          <SavingsCard contextId={contextId} card={savings} onNotice={setNotice} planInReserve={overview.isPending || Boolean(data)} />
 
           {personal.isError || overview.isError ? (
             <Card>

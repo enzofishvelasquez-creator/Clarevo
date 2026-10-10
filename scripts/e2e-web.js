@@ -3927,7 +3927,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const SEFAZ_KEY = accessKey('2610', '65', 5150, OTHER_CNPJ);
   const sefazHtml = (key) => `<html><head><script>var x='Valor a pagar R$ 1,00';</script></head><body><div id="u20" class="txtTopo">MERCADO EXEMPLO LTDA</div><div class="text">CNPJ: 45.723.174/0001-10</div><table id="tabResult"><tr id="Item + 1"><td>PRODUTO EXEMPLO</td></tr></table><div id="totalNota"><div><label>Qtd. total de itens:</label><span>1</span></div><div><label>Valor a pagar R$:</label><span>63,70</span></div></div><div id="infos"><ul><li><strong>Emissão: </strong>06/10/2026 10:15:00 - Via Consumidor</li></ul><h4>Consumidor</h4><ul><li>CPF: 123.456.789-09 Nome: FULANA DE TAL EXEMPLO</li></ul><h4>Chave de acesso</h4><span>${spacedKey(key)}</span></div></body></html>`;
   await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
-  await p.evaluate((html) => { window.__sefazCalls = []; window.__sefazMode = 'ok'; window.__sefazHtml = html; window.__clarevoSefazFetch = async (url) => { window.__sefazCalls.push(url); if (window.__sefazMode === 'erro') return { ok: false, status: 503, url, text: async () => '' }; return { ok: true, status: 200, url, text: async () => window.__sefazHtml }; }; }, sefazHtml(SEFAZ_KEY));
+  await p.evaluate((html) => { window.__sefazCalls = []; window.__sefazMode = 'ok'; window.__sefazHtml = html; window.__clarevoSefazFetch = async (url) => { window.__sefazCalls.push(url); if (window.__sefazMode === 'erro') return { ok: false, status: 503, url, text: async () => '' }; if (window.__sefazMode === 'semurl') return { ok: true, status: 200, text: async () => window.__sefazHtml }; return { ok: true, status: 200, url, text: async () => window.__sefazHtml }; }; }, sefazHtml(SEFAZ_KEY));
   await openPaste(); await field('Colar o link ou a chave da nota').fill(qrOnline(SEFAZ_KEY)); await btn('Ler a nota').click(); await waitText('Nota lida:'); await waitText('Loja, valor e data lidos da página da Sefaz.', 8000); await p.waitForTimeout(600); t = await body();
   const sefazCalls = await p.evaluate(() => window.__sefazCalls);
   ok('N página da Sefaz lida: "Nota lida: Mercado Exemplo Ltda · RJ · 06/10/2026", valor 63,70, data 06/10/2026 e a descrição com o nome da loja ("Nome da loja lido da nota"), com "Loja, valor e data lidos da página da Sefaz"',
@@ -3948,6 +3948,14 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Ler outra nota').click(); await waitText('Como você quer ler a nota?'); await btn('Colar o link ou a chave').click(); await waitText('Colar o link ou a chave da nota'); await p.waitForTimeout(300);
   await field('Colar o link ou a chave da nota').fill(qrOnline(SEFAZ_KEY)); await btn('Ler a nota').click(); await waitText('A página da Sefaz é de outra nota.', 8000); await p.waitForTimeout(500);
   ok('N página da Sefaz de outra nota (chave diferente): "A página da Sefaz é de outra nota. Confira o valor no cupom." e nada é aproveitado', (await body()).includes('A página da Sefaz é de outra nota. Confira o valor no cupom.') && (await field('Valor em reais').inputValue()) === '');
+  // A página só vale se mostra a chave lida ou o CNPJ do emitente; e a resposta precisa dizer de qual endereço veio.
+  const readAgain = async () => { await btn('Ler outra nota').click(); await waitText('Como você quer ler a nota?'); await btn('Colar o link ou a chave').click(); await waitText('Colar o link ou a chave da nota'); await p.waitForTimeout(300); await field('Colar o link ou a chave da nota').fill(qrOnline(SEFAZ_KEY)); await btn('Ler a nota').click(); await p.waitForTimeout(800); };
+  await p.evaluate(() => { window.__sefazMode = 'ok'; window.__sefazHtml = '<div class="txtTopo">LOJA FALSA</div><div>Valor a pagar R$: 9.999,99</div><div>Emissão: 06/10/2026</div>'; });
+  await readAgain(); await waitText('Não deu para ler a página da Sefaz.', 8000);
+  ok('N página que não mostra a chave nem o CNPJ do emitente: nada é aproveitado ("Não deu para ler a página da Sefaz."), valor e nome não vêm da página', (await field('Valor em reais').inputValue()) === '' && !(await body()).includes('LOJA FALSA') && !(await body()).includes('9.999,99'));
+  await p.evaluate((html) => { window.__sefazMode = 'semurl'; window.__sefazHtml = html; }, sefazHtml(SEFAZ_KEY));
+  await readAgain(); await waitText('Não deu para ler a página da Sefaz.', 8000);
+  ok('N resposta sem o endereço de onde veio (poderia ser de outro domínio): recusada, nada é aproveitado', (await field('Valor em reais').inputValue()) === '' && !(await body()).includes('Mercado Exemplo Ltda'));
   await p.evaluate(() => { delete window.__clarevoSefazFetch; });
   await leaveForm();
 
@@ -4606,26 +4614,36 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
     await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   };
-  const tabByName = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
+  // O nome acessível da aba "Movimentos" contém o rótulo visível (WCAG 2.5.3): "Movimentos: movimentações do mês".
+  const MOV_TAB = 'Movimentos: movimentações do mês';
+  const tabLabel = (name) => (name === 'Movimentações' ? MOV_TAB : name);
+  const tabByName = (name) => p.getByRole('tab', { name: tabLabel(name), exact: true }).filter({ visible: true }).first();
   // Estado da barra inferior: as quatro abas visíveis, onde terminam e qual está marcada.
   const barState = () => p.evaluate(() => {
-    const names = ['Resumo', 'Movimentações', 'Metas', 'Aprender e dúvidas'];
+    const names = ['Resumo', 'Movimentos: movimentações do mês', 'Metas', 'Aprender e dúvidas'];
     const tabs = [...document.querySelectorAll('[role=tab]')].filter((e) => names.includes(e.getAttribute('aria-label')) && e.getBoundingClientRect().width > 0);
     const rects = tabs.map((e) => e.getBoundingClientRect());
     return {
       n: tabs.length,
       selected: tabs.filter((e) => e.getAttribute('aria-selected') === 'true').map((e) => e.getAttribute('aria-label')),
       bottom: rects.length ? Math.round(Math.max(...rects.map((r) => r.bottom))) : 0,
+      top: rects.length ? Math.round(Math.min(...rects.map((r) => r.top))) : 0,
       minH: rects.length ? Math.round(Math.min(...rects.map((r) => r.height))) : 0,
       out: rects.filter((r) => r.left < -0.5 || r.right > window.innerWidth + 0.5).length,
       h: window.innerHeight,
       overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
     };
   });
+  // Telas pequenas medidas na altura de um celular simples: 360 × 640 e 320 × 640.
+  const SMALL_SCREENS = [[360, 640], [320, 640]];
+  const atSmall = async (fn) => {
+    for (const [w, h] of SMALL_SCREENS) { await p.setViewportSize({ width: w, height: h }); await p.waitForTimeout(450); await fn(w, h); }
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(350);
+  };
   const barOk = (s) => s.n === 4 && s.bottom <= s.h + 1 && s.bottom >= s.h - 40 && s.out === 0 && s.minH >= 44 && !s.overflow;
   const checkBar = (label, selected = null) => atWidths(async (w) => {
     const s = await barState();
-    ok(`${label} (${w}px): barra inferior à vista, com as 4 abas${selected ? ` e "${selected}" marcada` : ''}`, barOk(s) && (selected === null || (s.selected.length === 1 && s.selected[0] === selected)), JSON.stringify(s));
+    ok(`${label} (${w}px): barra inferior à vista, com as 4 abas${selected ? ` e "${selected}" marcada` : ''}`, barOk(s) && (selected === null || (s.selected.length === 1 && s.selected[0] === tabLabel(selected))), JSON.stringify(s));
   });
   const checkNoBar = (label) => atWidths(async (w) => { ok(`${label} (${w}px): formulário sem barra inferior`, (await barState()).n === 0); });
   // Posições (topo e base) de elementos visíveis por papel e texto exato ou por nome acessível.
@@ -4654,7 +4672,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     const anotar = top('[role=button]', (x) => x.textContent === 'Anotar gasto');
     const pago = top('[role=button]', (x) => (x.getAttribute('aria-label') || '').startsWith('Pago, '));
     const toPay = top('[role=button]', (x) => (x.getAttribute('aria-label') || '').startsWith('Ainda a pagar neste mês,'));
-    return { anotarTop: anotar && Math.round(anotar.top), anotarBottom: anotar && Math.round(anotar.bottom), pagoBottom: pago && Math.round(pago.bottom), toPayTop: toPay && Math.round(toPay.top), h: window.innerHeight };
+    const ver = top('[role=button]', (x) => x.getAttribute('aria-label') === 'Ver contas a pagar');
+    return { anotarTop: anotar && Math.round(anotar.top), anotarBottom: anotar && Math.round(anotar.bottom), pagoBottom: pago && Math.round(pago.bottom), toPayTop: toPay && Math.round(toPay.top), verContasH: ver && Math.round(ver.height), verContasW: ver && Math.round(ver.width), h: window.innerHeight };
   });
   await atWidths(async (w) => {
     const r = await resumoLayout(w);
@@ -4662,6 +4681,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
       r.anotarTop !== null && r.pagoBottom !== null && r.anotarTop - r.pagoBottom < 90 && r.anotarTop < r.toPayTop && r.anotarBottom <= r.h, JSON.stringify(r));
     ok(`nav Resumo (${w}px): "Ver contas ›" no card "Ainda a pagar" e "›" ao lado de Recebido e Pago`, (await visibleCount('button', 'Ver contas a pagar')) === 1 && (await body()).includes('Ver contas') &&
       (await p.locator('[aria-label^="Recebido, "] svg, [aria-label^="Pago, "] svg').evaluateAll((els) => els.filter((e) => e.getBoundingClientRect().width > 0).length)) >= 2, JSON.stringify(await resumoLayout(w)));
+    // "Ver contas ›" cabe numa linha só, também em 320 px (o link não quebra: altura de uma linha e largura do rótulo com a seta).
+    ok(`nav Resumo (${w}px): "Ver contas ›" numa linha só, sem quebrar`, r.verContasH !== null && r.verContasH <= 48 && r.verContasW >= 90, JSON.stringify(r));
     await layoutChecks(`nav Resumo ${w}px`);
     if (w === 390) await shot('170_resumo_navegacao');
     if (w === 320) await shot('170_resumo_navegacao_320px');
@@ -4677,7 +4698,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('nav Resumo: "›" ao lado de Pago abre os pagamentos (com "Por categoria")', urlPath() === '/composicao' && new URL(p.url()).searchParams.get('tipo') === 'pago' && (await visibleCount('radio', 'Por categoria')) === 1, p.url());
   await btn('Voltar').click(); await waitText('Diferença do mês');
   await btn('Ver contas a pagar').click(); await waitText('Ainda a pagar neste mês');
-  ok('nav Resumo: "Ver contas ›" abre as contas a pagar do mês do card', urlPath() === '/a-pagar' && (await body()).includes('Pessoal · Outubro de 2026'), p.url());
+  ok('nav Resumo: "Ver contas ›" abre as contas a pagar do mês do card, com o endereço limpo no mês atual (sem ?mes=)', urlPath() === '/a-pagar' && !p.url().includes('mes=') && (await body()).includes('Pessoal · Outubro de 2026'), p.url());
   await btn('Voltar').click(); await waitText('Diferença do mês');
 
   // O aviso da volta depois de semanas e o card de Primeiros passos vêm depois de "Anotar gasto", em 390 e 320 px.
@@ -4699,6 +4720,18 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // ---- 2. Barra inferior nas telas de consulta; só os formulários ficam sem ela ----
   await demoHome();
+  // Na abertura de uma tela de consulta a barra surge sobreposta ao fim da tela: as barras das abas e da consulta ocupam o mesmo
+  // lugar (nada de barra dupla nem salto), e o conteúdo da tela não encolhe. Conferido no meio da transição.
+  const barTopsNow = () => p.evaluate(() => [...document.querySelectorAll('[role=tab]')].filter((e) => ['Resumo', 'Movimentos: movimentações do mês', 'Metas', 'Aprender e dúvidas'].includes(e.getAttribute('aria-label')) && e.getBoundingClientRect().width > 0).map((e) => Math.round(e.getBoundingClientRect().top)));
+  const beforeBars = await barTopsNow();
+  await btn('Ver contas a pagar').click();
+  const midBars = await barTopsNow();
+  await waitText('Ainda a pagar neste mês'); await p.waitForTimeout(400);
+  const afterBars = await barTopsNow();
+  ok('nav barra: ao abrir uma tela de consulta, a barra fica no mesmo lugar (sem barra dupla nem salto), no meio e no fim da transição', beforeBars.length >= 4 && new Set([...beforeBars, ...midBars, ...afterBars]).size === 1, JSON.stringify({ beforeBars, midBars, afterBars }));
+  await btn('Voltar').click(); await waitText('Diferença do mês'); await p.waitForTimeout(300);
+  const movTab = await p.evaluate(() => { const e = [...document.querySelectorAll('[role=tab]')].find((x) => x.getBoundingClientRect().width > 0 && (x.textContent || '').trim() === 'Movimentos'); return e ? e.getAttribute('aria-label') : null; });
+  ok('nav barra: o nome acessível da aba "Movimentos" contém o rótulo visível ("Movimentos: movimentações do mês")', movTab === 'Movimentos: movimentações do mês', String(movTab));
   await tabByName('Movimentações').click(); await waitText('Registrar recebimento');
   await p.getByRole('button', { name: /^Calculadoras, / }).filter({ visible: true }).first().click(); await waitText('Decidir uma compra'); await p.waitForTimeout(400);
   await checkBar('nav barra: Calculadoras (o caso que sumia)', 'Movimentações');
@@ -4769,8 +4802,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // ---- 3. Contas a pagar: mês certo com seletor local, vencida em poucos toques, lembretes ----
   await demoHome();
   await p.getByRole('button', { name: /Mês anterior/ }).filter({ visible: true }).first().click(); await waitText('Setembro de 2026'); await p.waitForTimeout(600);
+  await atWidths(async (w) => { const r = await resumoLayout(w); ok(`nav Resumo em setembro (${w}px): "Ver contas ›" continua numa linha só, mesmo com o rótulo "Previsto para setembro de 2026"`, r.verContasH !== null && r.verContasH <= 48, JSON.stringify(r)); });
   await p.getByRole('button', { name: /^Previsto para setembro de 2026, R\$/ }).filter({ visible: true }).first().click(); await waitText('Previsto para setembro'); await p.waitForTimeout(400);
-  ok('nav Contas a pagar: o card do Resumo em setembro abre setembro, com o seletor de mês', urlPath() === '/a-pagar' && (await body()).includes('Pessoal · Setembro de 2026') && (await visibleCount('button', 'Voltar para outubro de 2026')) === 1 &&
+  ok('nav Contas a pagar: o card do Resumo em setembro abre setembro (?mes=2026-09), com o seletor de mês', urlPath() === '/a-pagar' && p.url().includes('mes=2026-09') && (await body()).includes('Pessoal · Setembro de 2026') && (await visibleCount('button', 'Voltar para outubro de 2026')) === 1 &&
     (await visibleCount('button', 'Mês anterior: agosto de 2026')) === 1 && (await visibleCount('button', 'Próximo mês: outubro de 2026')) === 1, p.url());
   await atWidths(async (w) => {
     await layoutChecks(`nav Contas a pagar em setembro ${w}px`);
@@ -4781,10 +4815,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('nav Contas a pagar: "Voltar para outubro de 2026" troca só a tela local e some no mês atual', (await body()).includes('Pessoal · Outubro de 2026') && (await visibleCount('button', 'Voltar para outubro de 2026')) === 0);
   await btn('Voltar').click(); await waitText('Diferença do mês');
   ok('nav Contas a pagar: trocar de mês ali não muda o mês do Resumo (continua em setembro)', await headingShown('Setembro de 2026'));
-  // Entrada "de agora" sem mês no endereço: abre no mês atual, mesmo com o Resumo em setembro.
+  // Renda comprometida (aberta do Resumo em setembro) > "Contas a pagar" leva o mês da tela, setembro.
   await p.getByRole('button', { name: /^Renda comprometida/ }).filter({ visible: true }).first().click(); await waitText('Contas do mês').catch(() => {}); await p.waitForTimeout(400);
-  await p.getByRole('button', { name: 'Contas a pagar', exact: true }).filter({ visible: true }).first().click(); await waitText('Ainda a pagar neste mês'); await p.waitForTimeout(300);
-  ok('nav Contas a pagar: entrada "de agora" (sem mês no endereço) abre em outubro, mesmo com o Resumo em setembro', urlPath() === '/a-pagar' && !p.url().includes('mes=') && (await body()).includes('Pessoal · Outubro de 2026'), p.url());
+  await p.getByRole('button', { name: 'Contas a pagar', exact: true }).filter({ visible: true }).first().click(); await waitText('Previsto para setembro'); await p.waitForTimeout(300);
+  ok('nav Contas a pagar: Renda comprometida > "Contas a pagar" leva o mês da tela (setembro, ?mes=2026-09)', urlPath() === '/a-pagar' && p.url().includes('mes=2026-09') && (await body()).includes('Pessoal · Setembro de 2026'), p.url());
   await goResumo();
   await p.getByRole('button', { name: /Próximo mês/ }).filter({ visible: true }).first().click(); await waitText('Outubro de 2026'); await p.waitForTimeout(400);
   // Seletor local: setembro, outubro, novembro; o Resumo não muda.
@@ -4795,16 +4829,25 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await body();
   ok('nav Contas a pagar: o seletor percorre os meses (setembro, outubro, novembro) e mostra "Previsto para novembro"', t.includes('Pessoal · Novembro de 2026') && t.includes('Previsto para novembro de 2026'));
   await btn('Voltar para outubro de 2026').click(); await waitText('Ainda a pagar neste mês'); await p.waitForTimeout(300);
+  // O primeiro "Já paguei" fica à vista, acima da barra inferior, também em 360 × 640 e 320 × 640 (sem rolar).
+  const firstPayBox = () => p.evaluate(() => {
+    const b = [...document.querySelectorAll('[role=button]')].find((e) => (e.getAttribute('aria-label') || '').startsWith('Já paguei ') && e.getBoundingClientRect().width > 0);
+    const r = b ? b.getBoundingClientRect() : null;
+    const tabs = [...document.querySelectorAll('[role=tab]')].filter((e) => e.getBoundingClientRect().width > 0);
+    return { top: r && Math.round(r.top), bottom: r && Math.round(r.bottom), barTop: tabs.length ? Math.round(Math.min(...tabs.map((e) => e.getBoundingClientRect().top))) : null, h: window.innerHeight };
+  });
   await atWidths(async (w) => {
-    const first = await p.evaluate(() => {
-      const b = [...document.querySelectorAll('[role=button]')].find((e) => (e.getAttribute('aria-label') || '').startsWith('Já paguei ') && e.getBoundingClientRect().width > 0);
-      return b ? Math.round(b.getBoundingClientRect().bottom) : null;
-    });
-    const bs = await barState();
-    // Em 320 px o parágrafo do topo ocupa mais linhas e o primeiro "Já paguei" pede uma rolagem curta (medido em 770 de 800).
-    ok(`nav Contas a pagar (${w}px): o primeiro "Já paguei" da lista fica ${w === 390 ? 'à vista, acima da barra, com o seletor de mês no lugar da linha "Pessoal"' : 'ao alcance (rolagem curta), dentro da tela'}`, first !== null && (w === 390 ? first <= bs.bottom - 56 : first <= bs.h), `${first} barra=${bs.bottom - 56}`);
+    const f = await firstPayBox();
+    ok(`nav Contas a pagar (${w}px): o primeiro "Já paguei" da lista fica à vista, acima da barra, com o seletor de mês no lugar da linha "Pessoal"`, f.bottom !== null && f.barTop !== null && f.bottom <= f.barTop, JSON.stringify(f));
     await layoutChecks(`nav Contas a pagar ${w}px`);
     if (w === 390) await shot('175_contas_a_pagar_outubro');
+  });
+  await atSmall(async (w, h) => {
+    await p.evaluate(() => window.scrollTo(0, 0)); await p.waitForTimeout(200);
+    const f = await firstPayBox();
+    ok(`nav Contas a pagar (${w}×${h}): o primeiro "Já paguei" aparece inteiro acima da barra inferior, sem rolar`, f.bottom !== null && f.barTop !== null && f.bottom <= f.barTop && f.top >= 0, JSON.stringify(f));
+    ok(`nav Contas a pagar (${w}×${h}): o parágrafo do critério e a previsão ficam depois das listas, não no topo`, f.bottom !== null && (await body()).includes('Contas em aberto com vencimento até o fim do mês') && (await body()).includes('Se pagar tudo o que está em aberto'));
+    if (w === 360) await shot('175_contas_a_pagar_360x640');
   });
 
   // Duas contas vencidas (Gás de 28/09 e Água de 05/10), anotadas em "outro aparelho"; a demonstração não tem vencidas.
@@ -4839,18 +4882,16 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await goResumo();
   ok('nav vencida: Ainda a pagar volta a R$ 650,00 depois de pagar Gás e Água (R$ 780,00 com elas)', (await p.getByRole('button', { name: /^Ainda a pagar neste mês, R\$ 650,00/ }).filter({ visible: true }).count()) === 1);
 
-  // Lembretes dentro de Contas a pagar.
+  // Lembretes: a linha "Lembretes de vencimento" só aparece no app de celular, fora da demonstração e com os lembretes
+  // desligados (na web e na demonstração ela não existe); os lembretes seguem em Conta.
   await openToPay(); await p.waitForTimeout(300);
   await atWidths(async (w) => {
     await scrollTo('Já anotou o pagamento como gasto? Exclua a conta a pagar para ela não continuar em Ainda a pagar.').catch(() => {});
-    ok(`nav lembretes (${w}px): link "Lembretes de vencimento" dentro de Contas a pagar, com 44 px ou mais`, (await p.evaluate(() => {
-      const b = [...document.querySelectorAll('[role=button]')].find((e) => (e.getAttribute('aria-label') || '').startsWith('Lembretes de vencimento.') && e.getBoundingClientRect().width > 0);
-      return b ? Math.round(b.getBoundingClientRect().height) : 0;
-    })) >= 44);
+    ok(`nav lembretes (${w}px): na web (e na demonstração) Contas a pagar não mostra a linha "Lembretes de vencimento", que só leva ao aviso quando ele pode ser ligado`, (await visibleCount('button', /^Lembretes de vencimento/)) === 0 && !(await body()).includes('Ligar em Conta.'));
     await layoutChecks(`nav lembretes ${w}px`);
   });
-  await p.getByRole('button', { name: /^Lembretes de vencimento\./ }).filter({ visible: true }).first().click(); await waitText('Lembretes estão disponíveis no app para celular.'); await p.waitForTimeout(300);
-  ok('nav lembretes: o link leva a Conta, onde ficam os lembretes', urlPath() === '/conta' && (await body()).includes('Lembretes'), p.url());
+  await goResumo(); await openConta();
+  ok('nav lembretes: em Conta ficam os lembretes (na web, o texto de que são do app para celular)', urlPath() === '/conta' && (await body()).includes('Lembretes estão disponíveis no app para celular.'), p.url());
   await keepText();
   await checkBar('nav barra: Conta', 'Resumo');
   await navBackTo('Resumo');
@@ -4879,17 +4920,18 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
       h: window.innerHeight,
     };
   });
-  for (const [w, h] of [[360, 640], [390, 844], [320, 800]]) {
+  for (const [w, h] of [[360, 640], [320, 640], [390, 844], [320, 800]]) {
     await p.setViewportSize({ width: w, height: h }); await p.waitForTimeout(500);
+    await p.evaluate(() => window.scrollTo(0, 0));
     const r = await askLayout();
-    // Em 360 × 640 o cabeçalho azul e a pergunta ocupam a tela: a pergunta inteira e o título da reserva ficam à vista, e o botão
-    // "Calcular minha reserva" pede uma rolagem curta; nas telas mais altas ele fica à vista acima da barra.
-    const fits = w >= 390 ? r.calcBottom !== null && r.calcBottom <= r.barTop : r.laterBottom !== null && r.laterBottom <= r.barTop && r.reserveTop !== null && r.reserveTop < r.barTop;
-    ok(`nav Metas conta nova (${w}×${h}): pergunta compacta (até 230 px), "Sim, consigo" e "Agora não" lado a lado, "Responder depois" abaixo, ${w >= 390 ? '"Calcular minha reserva" à vista acima da barra' : 'pergunta inteira e título da reserva à vista'}`,
-      r.askHeight !== null && r.askHeight <= 230 && r.sameRow === true && r.laterBelow === true && fits, JSON.stringify(r));
+    // Sem reserva, o texto do card tem uma ou duas linhas e "Calcular minha reserva" vem logo depois: o botão fica à vista, acima
+    // da barra, inclusive em 360 × 640 e 320 × 640 (sem rolar).
+    ok(`nav Metas conta nova (${w}×${h}): pergunta compacta (até 230 px), "Sim, consigo" e "Agora não" lado a lado, "Responder depois" abaixo e "Calcular minha reserva" à vista acima da barra`,
+      r.askHeight !== null && r.askHeight <= 230 && r.sameRow === true && r.laterBelow === true && r.calcBottom !== null && r.calcBottom <= r.barTop, JSON.stringify(r));
     await layoutChecks(`nav Metas conta nova ${w}px`);
     if (w === 390) await shot('177_metas_compacta');
-    if (w === 320) await shot('177_metas_compacta_320px');
+    if (w === 320 && h === 800) await shot('177_metas_compacta_320px');
+    if (w === 360) await shot('177_metas_compacta_360x640');
   }
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   await keepText();
@@ -4958,7 +5000,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('nav Aprender: os temas continuam nos resultados (juros) com a contagem de sempre', (await body()).includes('temas para "juros"'));
   await learnBox().fill('');
   ok('nav Aprender: a busca não registra nada (nenhuma requisição nem gravação, nada no aparelho)', (await storage()) === navStorageBefore && writes.length === navWritesBefore, `${writes.length - navWritesBefore} gravações`);
-  await goTab('Resumo');
+  await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await p.waitForTimeout(500);
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);

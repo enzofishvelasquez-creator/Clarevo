@@ -210,6 +210,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   const [pasteMessage, setPasteMessage] = useState<string | null>(null);
   const [pasteBoleto, setPasteBoleto] = useState(false);
   const [reading, setReading] = useState(false);
+  const readingRef = useRef(false);
+  const readSeq = useRef(0);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
   const [cameraOk, setCameraOk] = useState(false);
   const [cameraUsed, setCameraUsed] = useState(false);
@@ -337,6 +339,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   // ---------------------------------------------------------------------------------------------------------------------------
 
   const onScan = async () => {
+    if (readingRef.current) return;
     setScanMessage(null);
     if (cameraOk && cameraUsed) {
       setCameraOpen(true);
@@ -366,13 +369,20 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     setCameraOpen(false);
     setPasteOpen(false);
     setScanMessage(null);
+    // Número da leitura: "Desfazer leitura" (ou sair da tela) invalida a que está em andamento, e o resultado dela é ignorado.
+    const token = ++readSeq.current;
+    readingRef.current = true;
     setReading(true);
     try {
       const r = await pickAndReadNotePdf(today);
+      if (token !== readSeq.current) return;
       if (r.ok) await applyNote(r);
       else if (!r.cancelled) setScanMessage(r.message);
     } finally {
-      setReading(false);
+      if (token === readSeq.current) {
+        readingRef.current = false;
+        setReading(false);
+      }
     }
   };
 
@@ -432,7 +442,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     if (plan.amountText !== null) {
       if (!refine || mine(cur.amountText, prevFilled?.amountText)) next.amountText = plan.amountText;
     } else if (prevFilled && cur.amountText === prevFilled.amountText) next.amountText = '';
-    if (!refine || mine(cur.dateText, prevFilled?.dateText) || cur.dateText === formatDateBR(today)) next.dateText = plan.dateText;
+    // Complementação: só troca a data que a própria leitura preencheu (inclusive o "hoje" que ela supôs) ou que está vazia; uma data que a pessoa digitou, mesmo igual a hoje, fica.
+    if (!refine || mine(cur.dateText, prevFilled?.dateText)) next.dateText = plan.dateText;
     // Descrição e categoria: só onde a pessoa não digitou.
     // O que a loja já teve neste aparelho vale mais do que o nome lido da página (a leitura da página não troca a descrição repetida).
     if (!(refine && lastTime !== null)) {
@@ -504,6 +515,9 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   const undoNote = () => {
     const n = note;
     if (!n) return;
+    readSeq.current++;
+    readingRef.current = false;
+    setReading(false);
     setDraft((cur) => ({
       ...cur,
       description: cur.description === n.filled.description ? n.before.description : cur.description,
@@ -932,6 +946,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
                   if (url) openOfficialUrl(url).then((ok) => ok || setScanMessage(NOTA_FLOW_TEXT.openFailed));
                 }}
                 onReadAnother={onScan}
+                readAnotherDisabled={reading}
                 onUndo={undoNote}
                 onInstallments={installmentsFromNote}
               />

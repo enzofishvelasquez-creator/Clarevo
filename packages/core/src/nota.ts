@@ -83,9 +83,10 @@ export type ReceiptModel = '55' | '65';
 
 /**
  * Atenção (privacidade): `AccessKeyInfo` e o resultado de `readReceiptCode` guardam a chave de 44 caracteres, que numa nota de
- * pessoa física contém o CPF do emitente. Só existem em memória, para a tela de confirmação. O que pode ir para o banco, para
- * o rascunho mantido sem conexão e para qualquer armazenamento do aparelho é o `ReceiptDraft` (com `receiptKey`, o resumo
- * SHA-256), nunca a leitura, a chave nem `key`.
+ * pessoa física contém o CPF do emitente. Só existem em memória, para a tela de confirmação. O que pode ir para o banco é o
+ * `receiptKey` (o resumo SHA-256), nunca a leitura, a chave nem `key`. O `ReceiptDraft` INTEIRO também é só de memória e nunca
+ * deve ser persistido nem enviado: `officialUrl` leva a chave inteira no endereço (para abrir a página da Sefaz). Para gravar,
+ * copie apenas campos soltos do rascunho (descrição, valor, data, `receiptKey`).
  */
 export interface AccessKeyInfo {
   /**
@@ -190,9 +191,14 @@ export function parseAccessKey(input: string): AccessKeyResult {
   if (year < 2006 || month < 1 || month > 12) return { ok: false, code: 'data_invalida' };
   const cnpjText = key.slice(6, 20);
   let cnpj: string | null = null;
-  if (cnpjValid(cnpjText)) cnpj = cnpjText;
-  // Emitente pessoa física (produtor rural, por exemplo): "000" + CPF no lugar do CNPJ.
-  else if (!(cnpjText.startsWith('000') && cpfValid(cnpjText.slice(3)))) return { ok: false, code: 'cnpj_invalido' };
+  // Emitente pessoa física (produtor rural, por exemplo): "000" + CPF no lugar do CNPJ. Vale primeiro: cerca de 1,4% dos CPFs
+  // também passam na conta do CNPJ, e tratá-los como CNPJ mostraria o CPF do emitente na descrição e na tela. O custo aceito é
+  // não exibir um CNPJ real que comece por "000" e cujo resto seja um CPF válido (a descrição fica só "Compra").
+  const personalIssuer = cnpjText.startsWith('000') && cpfValid(cnpjText.slice(3));
+  if (!personalIssuer) {
+    if (!cnpjValid(cnpjText)) return { ok: false, code: 'cnpj_invalido' };
+    cnpj = cnpjText;
+  }
   const model = key.slice(20, 22);
   if (model !== '55' && model !== '65') return { ok: false, code: 'modelo_nao_suportado' };
   return {
@@ -588,8 +594,8 @@ function govHostOfUf(host: string, uf: UfSigla): boolean {
  * Endereço para "Ver a nota no site da Sefaz": o endereço do QR lido, só quando o domínio é oficial da UF da chave. Dois
  * caminhos: (1) o domínio está na lista `SEFAZ_QR_HOSTS` da UF; (2) para os outros estados, um domínio de órgão fiscal ".gov.br" coerente
  * com a UF da chave ("<Sefaz, Fazenda...>.<sigla da UF>.gov.br", ver `SEFAZ_HOST_LABELS`; prefeituras não valem). O RJ só aceita o domínio confirmado (o endereço antigo
- * deixou de valer de propósito). Devolve `esquema://domínio/caminho?consulta` (sem usuário, porta nem trecho "#"; domínio em
- * minúsculas) ou null quando o domínio não serve, o endereço tem usuário, porta, espaço ou contra-barra, o esquema não é http
+ * deixou de valer de propósito). Devolve `https://domínio/caminho?consulta` (sem usuário, porta nem trecho "#"; domínio em
+ * minúsculas; um endereço http do QR sobe para https) ou null quando o domínio não serve, o endereço tem usuário, porta, espaço ou contra-barra, o esquema não é http
  * nem https, ou não há consulta. Sem esquema, usa https. Só chama o endereço quem toca no botão; nada é guardado.
  */
 export function officialQueryUrl(uf: UfSigla, qrUrl: string | null | undefined): string | null {
@@ -601,7 +607,8 @@ export function officialQueryUrl(uf: UfSigla, qrUrl: string | null | undefined):
   if (!listed && (uf === 'RJ' || !govHostOfUf(host, uf))) return null;
   const query = m[4] ?? '';
   if (query.length < 2) return null;
-  return `${(m[1] ?? 'https').toLowerCase()}://${host}${m[3] ?? ''}${query}`;
+  // Sempre https: o QR de várias Sefaz ainda traz http, mas o endereço aceito é de domínio oficial, e a consulta não deve sair em claro.
+  return `https://${host}${m[3] ?? ''}${query}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -649,7 +656,11 @@ export interface ReceiptDraft {
   issuerName: string | null;
   /** "Nota fiscal do RJ, emitida em outubro de 2026" (ou "emitida em 12/10/2026" quando o dia é conhecido). */
   summary: string;
-  /** Endereço oficial da Sefaz, quando o QR veio de um domínio oficial da UF (lista ou ".gov.br" coerente com a UF). Nunca em nota de teste. */
+  /**
+   * Endereço oficial da Sefaz, quando o QR veio de um domínio oficial da UF (lista ou ".gov.br" coerente com a UF). Nunca em nota
+   * de teste. ATENÇÃO: leva a chave inteira (e, em nota de pessoa física, o CPF do emitente). Só em memória, para abrir ou ler a
+   * página; nunca persistir o rascunho nem este campo.
+   */
   officialUrl: string | null;
   /** Texto quando a nota é de ambiente de teste (sem valor fiscal). */
   testNote: string | null;

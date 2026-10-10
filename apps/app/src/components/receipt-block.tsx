@@ -26,6 +26,7 @@ export function NoteBlock({
   webLinkOnly,
   onOpenSefaz,
   onReadAnother,
+  readAnotherDisabled = false,
   onUndo,
   onInstallments,
 }: {
@@ -41,6 +42,8 @@ export function NoteBlock({
   webLinkOnly: boolean;
   onOpenSefaz: () => void;
   onReadAnother: () => void;
+  /** A leitura de um PDF está em andamento: "Ler outra nota" espera. */
+  readAnotherDisabled?: boolean;
   onUndo: () => void;
   onInstallments: () => void;
 }) {
@@ -62,7 +65,13 @@ export function NoteBlock({
       {draft.officialUrl ? <LinkButton label={NOTA_TEXT.viewOnSefaz} style={linkStyle} onPress={onOpenSefaz} /> : null}
       {draft.model === '55' ? <LinkButton label={NOTA_TEXT.installmentsHint} style={linkStyle} onPress={onInstallments} /> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space[5] }}>
-        <LinkButton label={NOTA_FLOW_TEXT.readAgain} style={linkStyle} onPress={onReadAnother} />
+        <LinkButton
+          label={NOTA_FLOW_TEXT.readAgain}
+          style={[linkStyle, readAnotherDisabled && { opacity: 0.45 }]}
+          disabled={readAnotherDisabled}
+          accessibilityState={{ disabled: readAnotherDisabled }}
+          onPress={onReadAnother}
+        />
         <LinkButton label={NOTA_FLOW_TEXT.undoRead} style={linkStyle} onPress={onUndo} />
       </View>
     </Banner>

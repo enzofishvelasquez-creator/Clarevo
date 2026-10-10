@@ -12,6 +12,9 @@ import {
   barModeFor,
   isPayablesMonth,
   normalizePath,
+  REMINDERS_SETTINGS_HREF,
+  payablesMonthParams,
+  showsRemindersLink,
   payablesStartMonth,
   payablesStep,
   searchAppScreens,
@@ -152,18 +155,29 @@ describe('Contas a pagar: mês de abertura e seletor local (D-039)', () => {
   });
 
   it('valor inválido ou fora do que o seletor oferece abre o mês atual', () => {
-    for (const bad of ['setembro', '2026-13', '2026-9', '2026-10-01', '1999-01', '2030-01']) expect(payablesStartMonth(bad, current), bad).toBe('2026-10');
+    for (const bad of ['setembro', '2026-13', '2026-9', '2026-10-01', '1999-12', '2030-01']) expect(payablesStartMonth(bad, current), bad).toBe('2026-10');
   });
 
-  it('o seletor vai de 24 meses atrás a 12 à frente e para nos limites', () => {
-    expect(PAYABLES_MONTH_RANGE).toEqual({ back: 24, forward: 12 });
+  it('os links que mostram um mês levam o mês, menos o atual (endereço limpo)', () => {
+    expect(payablesMonthParams('2026-09', current)).toEqual({ mes: '2026-09' });
+    expect(payablesMonthParams('2026-11', current)).toEqual({ mes: '2026-11' });
+    expect(payablesMonthParams('2026-10', current)).toEqual({});
+  });
+
+  it('o seletor volta sem limite (como o Resumo) e avança até 12 meses à frente', () => {
+    expect(PAYABLES_MONTH_RANGE).toEqual({ forward: 12 });
     expect(payablesStep('2026-10', current, -1)).toBe('2026-09');
     expect(payablesStep('2026-10', current, 1)).toBe('2026-11');
     expect(payablesStep('2026-12', current, 1)).toBe('2027-01');
     expect(payablesStep('2027-10', current, 1)).toBeNull();
-    expect(payablesStep('2024-10', current, -1)).toBeNull();
+    expect(payablesStep('2024-10', current, -1)).toBe('2024-09');
+    expect(payablesStep('2000-01', current, -1)).toBeNull();
     expect(isPayablesMonth('2024-10', current)).toBe(true);
-    expect(isPayablesMonth('2024-09', current)).toBe(false);
+    expect(isPayablesMonth('2024-09', current)).toBe(true);
+    expect(isPayablesMonth('2000-01', current)).toBe(true);
+    expect(isPayablesMonth('1999-12', current)).toBe(false);
+    // Um mês antigo do Resumo abre Contas a pagar nesse mês, não no atual.
+    expect(payablesStartMonth('2023-03', current)).toBe('2023-03');
     expect(isPayablesMonth(202610, current)).toBe(false);
   });
 });
@@ -229,5 +243,22 @@ describe('busca de Aprender: grupo "No app" (D-039)', () => {
     const before = JSON.stringify(APP_SCREENS);
     expect(ids('boleto')).toEqual(ids('boleto'));
     expect(JSON.stringify(APP_SCREENS)).toBe(before);
+  });
+});
+
+describe('Lembretes de vencimento em Contas a pagar (D-039)', () => {
+  const base = { deviceFeatures: true, demo: false, prefsLoaded: true, remindersOn: false, offerShown: false };
+
+  it('a linha aparece só no celular, fora da demonstração, com lembretes desligados e sem "Agora não"', () => {
+    expect(showsRemindersLink(base)).toBe(true);
+    expect(showsRemindersLink({ ...base, deviceFeatures: false })).toBe(false);
+    expect(showsRemindersLink({ ...base, demo: true })).toBe(false);
+    expect(showsRemindersLink({ ...base, prefsLoaded: false })).toBe(false);
+    expect(showsRemindersLink({ ...base, remindersOn: true })).toBe(false);
+    expect(showsRemindersLink({ ...base, offerShown: true })).toBe(false);
+  });
+
+  it('leva à seção de lembretes de Conta', () => {
+    expect(REMINDERS_SETTINGS_HREF).toBe('/conta?secao=lembretes');
   });
 });

@@ -107,3 +107,9 @@ export async function rememberStore(userId: string, storeId: string, memoryOfSto
   for (const id of ids.slice(MAX_STORES)) delete stores[id];
   save(userId, { ...current, stores }, persist);
 }
+
+/** Ao sair da conta (ou trocar de pessoa): esquece as memórias em RAM. O que foi gravado no aparelho vale só para a mesma pessoa. */
+export function clearNotePrefsMemory(): void {
+  memory.clear();
+  loading.clear();
+}

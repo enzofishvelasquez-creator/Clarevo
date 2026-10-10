@@ -6,6 +6,8 @@ import { AppState, Text, View } from 'react-native';
 
 import { pendingCredentials, type AuthService, type AuthState } from '@/lib/auth';
 import { DemoAuth } from '@/lib/demo-auth';
+import { clearNotePrefsMemory } from '@/lib/note-prefs';
+import { receiptLinks } from '@/lib/receipt-link';
 import { SupabaseAuth, supabaseConfigured } from '@/lib/supabase';
 
 /**
@@ -67,6 +69,12 @@ function useToday(mode: AuthService['mode']): IsoDate {
   return mode === 'demo' ? DEMO_TODAY : todayIn(deviceTimeZone(), new Date(now));
 }
 
+/** Nada da nota lida (endereços da Sefaz, memória das lojas) sobrevive à saída da conta nem passa para outra pessoa. */
+function clearReceiptMemory() {
+  receiptLinks.clear();
+  clearNotePrefsMemory();
+}
+
 function SessionProviderInner({ auth, children }: { auth: AuthService; children: ReactNode }) {
   const queryClient = useQueryClient();
   const [state, setState] = useState<AuthState>({ user: null, recovery: false });
@@ -85,7 +93,10 @@ function SessionProviderInner({ auth, children }: { auth: AuthService; children:
     const unsubscribe = auth.subscribe((s) => {
       setState((prev) => {
         // Outra pessoa ou sessão encerrada: nada do cache anterior pode aparecer.
-        if (prev.user?.id !== s.user?.id) queryClient.clear();
+        if (prev.user?.id !== s.user?.id) {
+          queryClient.clear();
+          clearReceiptMemory();
+        }
         return s;
       });
     });
@@ -110,6 +121,7 @@ function SessionProviderInner({ auth, children }: { auth: AuthService; children:
     pendingCredentials.clear();
     await auth.signOut(scope);
     queryClient.clear();
+    clearReceiptMemory();
   }, [queryClient, auth]);
 
   const repo = useMemo(() => (state.user ? auth.repositoryFor(state.user) : null), [state.user?.id]); // eslint-disable-line react-hooks/exhaustive-deps

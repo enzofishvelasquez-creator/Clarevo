@@ -47,16 +47,19 @@ export function ReserveCard({
     />
   ) : null;
   if (reserve === null || plan === null) {
+    // Sem reserva: o botão vem logo depois do título (à vista acima da barra em 360 × 640 e em 320 px), o texto curto depois dele.
     return (
-      <View style={styles.blue}>
+      <View style={[styles.blue, styles.blueEmpty]}>
         <View style={styles.blueHead}>
           <ShieldCheck size={22} color={colors.textOnBrand} strokeWidth={2.25} aria-hidden />
           <Txt variant="title" color={colors.textOnBrand} accessibilityRole="header" aria-level={2}>
             {GOALS_TEXT.reserveTitle}
           </Txt>
         </View>
-        <Txt color={colors.textOnBrand}>{GOALS_TEXT.reserveEmpty}</Txt>
         <Button label={GOALS_TEXT.reserveCalculate} tone="soft" onPress={() => router.push('/reserva')} />
+        <Txt color={colors.textOnBrand}>{GOALS_TEXT.reserveEmpty}</Txt>
+        {/* Quem respondeu "consigo" e ainda não tem reserva também vê o plano aqui, depois do botão (que fica à vista). */}
+        {planSlot}
         {planAction}
       </View>
     );
@@ -226,6 +229,7 @@ export function ClosedGoals({ goals }: { goals: readonly Goal[] }) {
 
 const styles = StyleSheet.create({
   blue: { backgroundColor: colors.brand, borderRadius: radius.lg, padding: space[5], gap: space[3] },
+  blueEmpty: { padding: space[4], gap: space[2] },
   blueHead: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   amounts: { fontFamily: fonts.extrabold, fontSize: 20, lineHeight: 28 },
   percentRow: { flexDirection: 'row', alignItems: 'center', gap: space[3] },

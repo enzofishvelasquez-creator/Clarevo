@@ -20,12 +20,23 @@ export const receiptLinks = {
   },
 };
 
-/** Abre o endereço oficial no navegador (web: nova aba sem referência). Devolve false se não deu para abrir. */
+/**
+ * Abre o endereço oficial no navegador (web: nova aba sem referência). Devolve false se não deu para abrir.
+ * Na web, `window.open(..., 'noopener')` sempre devolve null (não dá para saber se abriu), então abre-se por um link com
+ * `rel="noopener noreferrer"` e `target="_blank"`: sem mensagem de erro falsa. Se o navegador bloquear a aba, o botão continua ali.
+ */
 export async function openOfficialUrl(url: string): Promise<boolean> {
   try {
     if (Platform.OS === 'web') {
-      const opened = window.open(url, '_blank', 'noopener,noreferrer');
-      return opened !== undefined;
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      return true;
     }
     await Linking.openURL(url);
     return true;

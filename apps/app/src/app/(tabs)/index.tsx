@@ -1,4 +1,4 @@
-import { COMMITTED_TEXT, ERROR_TEXT, SUMMARY_NAV_TEXT, committedLine, emptyMonthCaption, formatDateBR, formatMonthBR, monthOf, toPayCaption } from '@clarevo/core';
+import { COMMITTED_TEXT, ERROR_TEXT, SUMMARY_NAV_TEXT, committedLine, emptyMonthCaption, formatDateBR, formatMonthBR, monthOf, payablesMonthParams, toPayCaption } from '@clarevo/core';
 import { router, useFocusEffect } from 'expo-router';
 import { AlertCircle, ArrowRight, CalendarClock, ChevronRight, Plus, ShieldCheck } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -248,8 +248,8 @@ function ToPayCard({ contextId }: { contextId: string | undefined }) {
 
   return (
     <Card style={{ gap: space[2] }}>
-      <View style={styles.cardHead}>
-        <Txt variant="label" color={colors.textSecondary}>
+      <View style={styles.toPayHead}>
+        <Txt variant="label" color={colors.textSecondary} style={{ flexShrink: 1 }}>
           {label}
         </Txt>
         {/* Mesmo padrão do "Ver todos" de "Pagamentos do mês": abre a lista do mês que o card mostra. */}
@@ -258,7 +258,7 @@ function ToPayCard({ contextId }: { contextId: string | undefined }) {
           accessibilityLabel={SUMMARY_NAV_TEXT.viewPayablesA11y}
           trailing={ChevronRight}
           style={styles.viewPayables}
-          onPress={() => router.push({ pathname: '/a-pagar', params: { mes: month } })}
+          onPress={() => router.push({ pathname: '/a-pagar', params: payablesMonthParams(month, currentMonth) })}
         />
       </View>
       {commitments.isPending ? (
@@ -270,7 +270,7 @@ function ToPayCard({ contextId }: { contextId: string | undefined }) {
           accessibilityRole="button"
           accessibilityLabel={a11y}
           accessibilityHint="Abre as contas a pagar"
-          onPress={() => router.push({ pathname: '/a-pagar', params: { mes: month } })}
+          onPress={() => router.push({ pathname: '/a-pagar', params: payablesMonthParams(month, currentMonth) })}
           style={(st) => [styles.toPayArea, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && styles.focusRing]}>
           <View style={{ flex: 1, gap: space[1] }}>
             <Money cents={s.toPayCents} />
@@ -435,7 +435,9 @@ const styles = StyleSheet.create({
   toPayArea: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3], minHeight: 44, borderRadius: radius.sm },
   overdueRow: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
   toPayLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
-  viewPayables: { paddingHorizontal: 0 },
+  // O link "Ver contas ›" fica numa linha só (até em 320 px); quem encolhe é o rótulo.
+  viewPayables: { paddingHorizontal: 0, flexShrink: 0 },
+  toPayHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space[2] },
   committed: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space[2], marginTop: space[1] },
   committedArea: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44, paddingVertical: space[1], borderRadius: radius.sm },
   committedHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', columnGap: space[2], flexWrap: 'wrap' },

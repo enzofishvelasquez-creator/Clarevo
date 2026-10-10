@@ -63,12 +63,42 @@ export const NOTA_FLOW_TEXT = {
   /** O link para a Sefaz não fica guardado (privacidade): só vale logo depois da leitura e do salvamento. */
   detailRow: 'Nota fiscal',
   detailRowValue: 'Anotada com a leitura da nota',
-  detailNoLink: 'Guardamos só um resumo da chave da nota, não o link. Para ver a nota no site da Sefaz, leia o QR de novo.',
+  detailNoLink: 'Guardamos só um resumo da chave da nota, não o link. O botão para ver a nota no site da Sefaz aparece logo depois de anotar uma nota lida pelo QR.',
   /** Dica de tela larga/computador. */
   webPdfFirst: 'No computador, o PDF da nota costuma ser o caminho mais fácil.',
   /** Mensagens de carregamento e falha do PDF e da câmera, em voz de aviso (sem alerta). */
   openFailed: 'Não foi possível abrir o endereço da Sefaz agora. Tente de novo mais tarde.',
 } as const;
+
+/** Tempo máximo da leitura de um PDF no aparelho (arquivo, texto e conferência). Passou disso, vale NOTA_TEXT.pdf.failed. */
+export const PDF_READ_TIMEOUT_MS = 25_000;
+
+/**
+ * Espera `work` por no máximo `ms`. Passou o tempo, devolve `'tempo'` e chama `onTimeout` (para destruir a tarefa em andamento);
+ * o resultado tardio de `work` é ignorado e uma falha tardia dele não vira erro solto. Nunca lança por causa de `work`: falha vira `'erro'`.
+ */
+export async function raceWithTimeout<T>(work: Promise<T>, ms: number, onTimeout?: () => void): Promise<{ value: T } | 'tempo' | 'erro'> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<'tempo'>((resolve) => {
+    timer = setTimeout(() => {
+      try {
+        onTimeout?.();
+      } catch {
+        // Destruir a tarefa é só um favor ao aparelho.
+      }
+      resolve('tempo');
+    }, ms);
+  });
+  const settled = work.then(
+    (value) => ({ value }),
+    () => 'erro' as const,
+  );
+  try {
+    return await Promise.race([settled, timeout]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Folha "Escanear nota fiscal"

@@ -1,8 +1,9 @@
 import { isRepoError } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Check, KeyRound, LogOut, MonitorSmartphone } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { ScrollView, View } from 'react-native';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { PrivacyCard, RemindersCard } from '@/components/device-settings';
@@ -43,6 +44,13 @@ export default function ContaScreen() {
   const [busy, setBusy] = useState<'nome' | 'senha' | 'sessoes' | null>(null);
   const [cooldown, setCooldown] = useState(0);
   const [confirmAll, setConfirmAll] = useState(false);
+  // ?secao=lembretes (vindo de Contas a pagar): rola até o card de lembretes.
+  const { secao } = useLocalSearchParams<{ secao?: string }>();
+  const scroll = useRef<ScrollView>(null);
+  const [remindersY, setRemindersY] = useState<number | null>(null);
+  useEffect(() => {
+    if (secao === 'lembretes' && remindersY !== null) scroll.current?.scrollTo({ y: Math.max(0, remindersY - space[4]), animated: false });
+  }, [secao, remindersY]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -108,7 +116,7 @@ export default function ContaScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title="Conta" />
-      <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
+      <Screen scrollRef={scroll} contentStyle={{ padding: space[5], gap: space[4] }}>
         <Card style={{ gap: space[1] }}>
           <Txt variant="title">{user?.displayName}</Txt>
           <Txt color={colors.textSecondary}>{user?.email}</Txt>
@@ -155,7 +163,9 @@ export default function ContaScreen() {
           <Button label="Encerrar sessão em todos os aparelhos" icon={MonitorSmartphone} tone="soft" onPress={() => setConfirmAll(true)} />
         </Card>
 
-        <RemindersCard />
+        <View onLayout={(e) => setRemindersY(e.nativeEvent.layout.y)}>
+          <RemindersCard />
+        </View>
         <PrivacyCard />
 
         <Card style={{ gap: space[2] }}>

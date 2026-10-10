@@ -83,15 +83,19 @@ export const BAR_TEXT = {
 // Contas a pagar: mês de abertura e seletor local
 // ---------------------------------------------------------------------------------------------------------------------
 
-/** Quantos meses o seletor de Contas a pagar volta e avança a partir do mês de hoje. */
-export const PAYABLES_MONTH_RANGE = { back: 24, forward: 12 } as const;
+/**
+ * Até quantos meses à frente o seletor de Contas a pagar avança a partir do mês de hoje. Para trás não há limite (como no
+ * Resumo): qualquer mês válido, a partir de `PAYABLES_FIRST_MONTH`, abre e o seletor volta quanto a pessoa quiser.
+ */
+export const PAYABLES_MONTH_RANGE = { forward: 12 } as const;
+export const PAYABLES_FIRST_MONTH: IsoMonth = '2000-01';
 
 /** Mês dentro do que o seletor oferece. */
 export function isPayablesMonth(month: unknown, currentMonth: IsoMonth): month is IsoMonth {
   return (
     typeof month === 'string' &&
     isValidIsoMonth(month) &&
-    month >= addMonths(currentMonth, -PAYABLES_MONTH_RANGE.back) &&
+    month >= PAYABLES_FIRST_MONTH &&
     month <= addMonths(currentMonth, PAYABLES_MONTH_RANGE.forward)
   );
 }
@@ -99,12 +103,32 @@ export function isPayablesMonth(month: unknown, currentMonth: IsoMonth): month i
 /**
  * Mês com que Contas a pagar abre. Entradas "de agora" (lembrete, atalho do ícone, aviso de vencidas, endereço salvo) não
  * levam mês e abrem no mês atual. Os cards que mostram um mês ("Previsto para setembro") levam esse mês no endereço.
- * Valor inválido, ou fora do que o seletor oferece, abre o mês atual.
+ * Valor inválido, ou fora do que o seletor oferece (qualquer mês válido até 12 meses à frente), abre o mês atual.
  */
 export function payablesStartMonth(param: string | string[] | undefined, currentMonth: IsoMonth): IsoMonth {
   const value = Array.isArray(param) ? param[0] : param;
   return isPayablesMonth(value, currentMonth) ? value : currentMonth;
 }
+
+/**
+ * Parâmetro de endereço para abrir Contas a pagar a partir de uma tela que mostra um mês: só leva `mes` quando o mês não é o
+ * atual (o mês atual é o padrão da tela, e o endereço fica limpo: `/a-pagar`).
+ */
+export function payablesMonthParams(month: IsoMonth, currentMonth: IsoMonth): { mes?: IsoMonth } {
+  return month === currentMonth ? {} : { mes: month };
+}
+
+/**
+ * A linha "Lembretes de vencimento" de Contas a pagar aparece só onde ela pode ajudar: no app de celular (a web não tem
+ * lembretes), fora da demonstração, com as preferências já lidas, com os lembretes desligados e sem a oferta depois do primeiro
+ * gasto fixo ter sido mostrada (quem respondeu "Agora não" não vê a linha de novo).
+ */
+export function showsRemindersLink(state: { deviceFeatures: boolean; demo: boolean; prefsLoaded: boolean; remindersOn: boolean; offerShown: boolean }): boolean {
+  return state.deviceFeatures && !state.demo && state.prefsLoaded && !state.remindersOn && !state.offerShown;
+}
+
+/** Endereço de Conta que rola até o card de lembretes. */
+export const REMINDERS_SETTINGS_HREF = '/conta?secao=lembretes';
 
 /** Mês vizinho no seletor local, ou null no limite (o botão fica desabilitado). */
 export function payablesStep(month: IsoMonth, currentMonth: IsoMonth, delta: 1 | -1): IsoMonth | null {
@@ -121,7 +145,7 @@ export const PAYABLES_NAV_TEXT = {
   /** Lembretes de vencimento: o interruptor e o horário ficam em Conta. */
   reminders: {
     title: 'Lembretes de vencimento',
-    caption: 'Um aviso no dia anterior. Ligar ou mudar o horário em Conta.',
+    caption: 'Um aviso no dia anterior ao vencimento. Ligar em Conta.',
   },
 } as const;
 

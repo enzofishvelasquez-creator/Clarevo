@@ -856,8 +856,7 @@ export const GOALS_TEXT = {
 
   // Card da reserva para imprevistos.
   reserveTitle: RESERVE_NAME,
-  reserveEmpty:
-    'Uma reserva ajuda a atravessar imprevistos, como um conserto ou uma queda de renda, sem recorrer a crédito. Calculamos um valor com base nos seus gastos essenciais, e você escolhe quantos meses quer cobrir.',
+  reserveEmpty: 'Cobre imprevistos sem recorrer a crédito. O valor sai dos seus gastos essenciais.',
   reserveCalculate: 'Calcular minha reserva',
   /** "R$ 3.500,00 de R$ 22.500,00" */
   savedOfTarget: (savedCents: Cents, targetCents: Cents) => `${formatBRL(savedCents)} de ${formatBRL(targetCents)}`,

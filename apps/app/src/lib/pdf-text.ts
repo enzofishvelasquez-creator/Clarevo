@@ -6,7 +6,8 @@
  * 1. guarda do `structuredClone`: o polyfill do Expo no nativo falha com o 2º argumento `null` (que o PDF.js passa) e a promessa
  *    nunca resolve. A guarda troca `null` por `undefined`. Na web o navegador já tem `structuredClone` correto e a guarda é inofensiva.
  * 2. juntar os itens de texto aqui (`getTextContent`), não com `extractText` (que cola o valor no rótulo da mesma linha);
- * 3. `getDocumentProxy` com `{ disableFontFace: true, verbosity: 0 }` e destruir a leitura no `finally`.
+ * 3. `getDocument` com `{ disableFontFace: true, verbosity: 0 }` (mesmos padrões do `getDocumentProxy`) e destruir a tarefa no `finally`
+ *    e no tempo limite (`PdfReadControl`).
  * No nativo o Metro não separa o código: o PDF.js (cerca de 1,7 MB de JavaScript) entra no pacote. Na web, o `import()` abaixo vira
  * um pedaço separado que só carrega quando a pessoa escolhe o PDF.
  */
@@ -32,20 +33,48 @@ export function hasPdfHeader(bytes: Uint8Array): boolean {
   return head.includes('%PDF-');
 }
 
-/** Texto das primeiras páginas do PDF, com os itens separados por espaço e quebra de linha onde o PDF a indica. Lança se o PDF não abre. */
-export async function pdfTextFromBytes(bytes: Uint8Array): Promise<string> {
+/** Controle da leitura em andamento: `abort()` destrói a tarefa do PDF.js (também a que ainda está abrindo) e para a leitura das páginas. */
+export interface PdfReadControl {
+  aborted: boolean;
+  task: { destroy(): Promise<void> } | null;
+  abort(): void;
+}
+
+export function newPdfReadControl(): PdfReadControl {
+  const control: PdfReadControl = {
+    aborted: false,
+    task: null,
+    abort() {
+      control.aborted = true;
+      control.task?.destroy().catch(() => {});
+    },
+  };
+  return control;
+}
+
+/**
+ * Texto das primeiras páginas do PDF, com os itens separados por espaço e quebra de linha onde o PDF a indica. Lança se o PDF não
+ * abre ou se a leitura foi abortada. A tarefa é criada aqui (`getDocument`) para ser destruída em qualquer saída: sucesso, falha
+ * ao abrir, falha numa página ou `control.abort()` (tempo limite).
+ */
+export async function pdfTextFromBytes(bytes: Uint8Array, control?: PdfReadControl): Promise<string> {
   installStructuredCloneGuard();
-  const { getDocumentProxy } = await import('unpdf');
-  const pdf = await getDocumentProxy(bytes, { disableFontFace: true, verbosity: 0 });
+  const { getResolvedPDFJS } = await import('unpdf');
+  const { getDocument } = await getResolvedPDFJS();
+  if (control?.aborted) throw new Error('leitura cancelada');
+  const task = getDocument({ data: bytes, useSystemFonts: true, disableFontFace: true, verbosity: 0 });
+  if (control) control.task = task;
   try {
+    const pdf = await task.promise;
     const parts: string[] = [];
     for (let n = 1; n <= Math.min(pdf.numPages, PDF_MAX_PAGES); n++) {
+      if (control?.aborted) throw new Error('leitura cancelada');
       const content = await (await pdf.getPage(n)).getTextContent();
       for (const item of content.items) if ('str' in item) parts.push(item.str, item.hasEOL ? '\n' : ' ');
       parts.push('\n');
     }
     return parts.join('');
   } finally {
-    await pdf.loadingTask.destroy();
+    await task.destroy().catch(() => {});
   }
 }
