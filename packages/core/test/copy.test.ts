@@ -385,7 +385,7 @@ function antesTexts(): string[] {
   const variants = [
     {},
     { primeiraEmUmMes: false },
-    { juntarPara: 'vista' as const, rendimento: '8' },
+    { entrada: '', rendimento: '8' },
     { rendimento: '12', guardar: '900,00' },
     { guardar: '1,00' },
     { renda: '8.000,00', comprometidoCents: 420_000 },

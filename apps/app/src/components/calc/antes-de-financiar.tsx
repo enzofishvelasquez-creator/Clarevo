@@ -5,7 +5,6 @@ import {
   calcErrorText,
   centsToInput,
   monthOf,
-  type AntesJuntarPara,
   type AntesResult,
   type CalcErrorCode,
   type CalcPrefill,
@@ -16,7 +15,6 @@ import { useMemo, useRef, useState } from 'react';
 import { View, type TextInput } from 'react-native';
 
 import {
-  CalcChoice,
   CalcField,
   CalcNote,
   CalcResult,
@@ -55,7 +53,6 @@ export function AntesDeFinanciarCalc({ prefill }: { prefill: CalcPrefill<'antes-
   const summary = useCommittedSummary(contextId, monthOf(today));
   const form = useCalcForm<Key>(() => ({ preco: '', entrada: '', parcelas: '', taxaMes: '', renda: '', guardar: '', rendimento: '' }));
   const [first, setFirst] = useState(ANTES_FIELDS.primeiraEmUmMes!.default === true);
-  const [juntarPara, setJuntarPara] = useState<AntesJuntarPara>(ANTES_FIELDS.juntarPara!.default as AntesJuntarPara);
   const entradaRef = useRef<TextInput>(null);
   // Aberta de um cadastro ou de algo que já existe: nada a anotar nem a criar de novo.
   const fromContext = useNoteHidden(prefill.origem);
@@ -79,12 +76,11 @@ export function AntesDeFinanciarCalc({ prefill }: { prefill: CalcPrefill<'antes-
           renda: rendaText,
           guardar: form.values.guardar,
           rendimento: form.values.rendimento,
-          juntarPara,
           comprometidoCents: committed,
         },
         today,
       ),
-    [form.values, first, rendaText, juntarPara, committed, today],
+    [form.values, first, rendaText, committed, today],
   );
   const errors: Partial<Record<string, CalcErrorCode>> = outcome.ok ? {} : outcome.errors;
   const result = outcome.ok ? outcome.result : null;
@@ -140,7 +136,9 @@ export function AntesDeFinanciarCalc({ prefill }: { prefill: CalcPrefill<'antes-
         <Txt variant="title" accessibilityRole="header" aria-level={2}>
           {ANTES_TEXT.alternativeTitle}
         </Txt>
-        <CalcChoice spec={fields.juntarPara!} value={juntarPara} onChange={(v) => setJuntarPara(v as AntesJuntarPara)} />
+        <Txt variant="caption" color={colors.textSecondary}>
+          {ANTES_TEXT.alternativeHint}
+        </Txt>
         <CalcField calc={calc} name="guardar" />
         <CalcField calc={calc} name="rendimento" />
       </Card>
@@ -165,7 +163,7 @@ export function AntesDeFinanciarCalc({ prefill }: { prefill: CalcPrefill<'antes-
                         tipo: result.noteParams!.tipo,
                         natureza: result.noteParams!.natureza,
                         parcelas: String(result.noteParams!.parcelas),
-                        valor: String(result.noteParams!.valor),
+                        ...(result.noteParams!.valor !== undefined ? { valor: String(result.noteParams!.valor) } : {}),
                       },
                     })
                   }

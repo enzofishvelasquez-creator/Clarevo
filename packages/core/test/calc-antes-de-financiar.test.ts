@@ -18,6 +18,7 @@ import {
   finalValueCents,
   financePaymentCents,
   isCalcSlug,
+  MAX_RECORD_CENTS,
   type AntesInput,
   type CalcErrorCode,
 } from '../src';
@@ -85,6 +86,24 @@ describe('10. Antes de financiar (D-044)', () => {
     expect(single.noteParams).toBeNull();
   });
 
+  it('1 parcela paga na compra: sem as linhas de impacto na renda nem do comprometido (e sem a referência de 30%)', () => {
+    const single = run({ parcelas: '1', primeiraEmUmMes: false, renda: '4.000,00', comprometidoCents: 100_000 });
+    expect(single.resultLines).toEqual([
+      'Com estes números, é 1 parcela de R$ 1.000,00.',
+      'Você paga tudo na compra.',
+      'Total pago: R$ 1.200,00 (entrada de R$ 200,00 mais 1 × R$ 1.000,00).',
+      'Sem juros: o total pago é igual ou menor que o preço à vista.',
+    ]);
+    expect(single.parcelaPermille).toBeNull();
+    expect(single.committedBeforePermille).toBeNull();
+    expect(single.committedAfterPermille).toBeNull();
+    expect(single.notes).toEqual([ANTES_ESTIMATE_TEXT]);
+    expect(single.hypotheses.some((h) => h.includes('renda líquida') || h.includes('comprometido é o do mês'))).toBe(false);
+    expect(run({ parcelas: '1', primeiraEmUmMes: false, comprometidoCents: 100_000 }).resultLines).toHaveLength(4);
+    // Uma parcela daqui a 1 mês ainda é um compromisso do mês seguinte: as linhas ficam.
+    expect(run({ parcelas: '1', renda: '4.000,00', comprometidoCents: 100_000 }).resultLines).toHaveLength(6);
+  });
+
   it('1 parcela daqui a 1 mês: o valor financiado mais 1 mês de juros', () => {
     const r = run({ parcelas: '1', taxaMes: '2' });
     expect(r.parcelaCents).toBe(102_000);
@@ -93,16 +112,40 @@ describe('10. Antes de financiar (D-044)', () => {
     expect(r.interestCents).toBe(2_000);
   });
 
-  it('taxa zero: parcela é o valor financiado dividido pelas parcelas, e o total não passa do preço (sem juros)', () => {
+  it('taxa zero: parcela é o valor financiado dividido pelas parcelas, a última absorve o arredondamento e nunca há juros', () => {
+    // 100.000 ÷ 12 = 8.333,33 → 8.333; 11 × 8.333 = 91.663 e a última, 8.337, fecha o preço.
     const r = run({ preco: '1.000,00', entrada: '', taxaMes: '0' });
     expect(r.parcelaCents).toBe(8_333);
-    expect(r.totalCents).toBe(99_996);
+    expect(r.lastParcelaCents).toBe(8_337);
+    expect(r.totalCents).toBe(100_000);
     expect(r.noInterest).toBe(true);
     expect(r.interestCents).toBe(0);
-    expect(r.resultLines[2]).toBe('Total pago: R$ 999,96 (12 × R$ 83,33).');
+    expect(r.resultLines[2]).toBe('Total pago: R$ 1.000,00 (11 × R$ 83,33 e uma última de R$ 83,37).');
     expect(r.resultLines[3]).toBe('Sem juros: o total pago é igual ou menor que o preço à vista.');
-    expect(r.hypotheses[1]).toBe('Sem juros informados: a parcela é o valor financiado dividido pelas parcelas, no centavo.');
+    expect(r.hypotheses[1]).toBe(
+      'Sem juros informados: a parcela é o valor financiado dividido pelas parcelas, no centavo, e a última (R$ 83,37) absorve a diferença do arredondamento.',
+    );
     expect(r.savingLines[1]).toMatch(/^Financiando: você usa o bem agora e não paga juros ao longo de 12 meses\./);
+    // Divisão exata: sem última diferente, o texto de sempre.
+    const exact = run({ preco: '1.200,00', entrada: '', taxaMes: '0' });
+    expect(exact.lastParcelaCents).toBe(exact.parcelaCents);
+    expect(exact.resultLines[2]).toBe('Total pago: R$ 1.200,00 (12 × R$ 100,00).');
+    expect(exact.hypotheses[1]).toBe('Sem juros informados: a parcela é o valor financiado dividido pelas parcelas, no centavo.');
+  });
+
+  it('taxa zero com a parcela arredondada para cima: a última fica menor e o juros continua zero (R$ 1,00 em 6 vezes)', () => {
+    // 100 ÷ 6 = 16,67 → 17; 5 × 17 = 85 e a última, 15. Antes, 6 × 17 = 102 mostrava R$ 0,02 de juros.
+    const r = run({ preco: '1,00', entrada: '', parcelas: '6', taxaMes: '0' });
+    expect([r.parcelaCents, r.lastParcelaCents, r.totalCents, r.interestCents, r.noInterest]).toEqual([17, 15, 100, 0, true]);
+    expect(r.resultLines[2]).toBe('Total pago: R$ 1,00 (5 × R$ 0,17 e uma última de R$ 0,15).');
+    expect(r.resultLines[3]).toBe('Sem juros: o total pago é igual ou menor que o preço à vista.');
+    // Com a primeira na compra e entrada, o mesmo.
+    const due = run({ preco: '1,00', entrada: '0,10', parcelas: '6', taxaMes: '0', primeiraEmUmMes: false });
+    expect(due.totalCents).toBe(100);
+    expect(due.interestCents).toBe(0);
+    // Menos centavos que parcelas: cada parcela tem 1 centavo, sem juros mesmo assim.
+    const tiny = run({ preco: '0,05', entrada: '', parcelas: '10', taxaMes: '0' });
+    expect([tiny.parcelaCents, tiny.lastParcelaCents, tiny.interestCents, tiny.noInterest]).toEqual([1, 1, 0, true]);
   });
 
   it('entrada igual ao preço: não há o que financiar', () => {
@@ -162,30 +205,31 @@ describe('10. Antes de financiar (D-044)', () => {
   });
 
   describe('juntar antes', () => {
-    it('padrão: guarda o valor da parcela; para dar mais entrada junta o valor financiado (12 meses, sem rendimento)', () => {
+    it('padrão: guarda o valor da parcela; junta o que falta para comprar à vista, o preço menos a entrada (12 meses, sem rendimento)', () => {
       // 100.000 ÷ 8.885 = 11,25 → 12 meses.
       const r = run();
-      expect(r.savingFor).toBe('entrada');
       expect(r.savingTargetCents).toBe(100_000);
       expect(r.savingMonthlyCents).toBe(8_885);
       expect(r.savingMonths).toBe(12);
       expect(r.savingLines).toEqual([
         'Guardando R$ 88,85 por mês, sem rendimento, você junta R$ 1.000,00 em 12 meses (1 ano).',
         'Financiando: você usa o bem agora e paga R$ 66,20 de juros ao longo de 12 meses.',
-        'Juntando: leva 12 meses para juntar o valor que seria financiado e não paga juros do financiamento.',
+        'Juntando: leva 12 meses para juntar o que falta para comprar à vista e não paga juros do financiamento.',
       ]);
+      expect(r.hypotheses).toContain('Juntar para comprar à vista: o valor a juntar é o que falta, o preço menos a entrada de R$ 200,00 que você já tem: R$ 1.000,00.');
       expect(r.hypotheses).toContain('O preço do bem pode mudar enquanto você junta.');
       expect(r.hypotheses).toContain('Sem rendimento: o valor guardado não cresce.');
       expect(r.hypotheses).toContain('Valor guardado por mês: o da parcela, a menos que você informe outro.');
     });
 
-    it('comprar à vista junta o preço inteiro (120.000 ÷ 8.885 = 13,5 → 14 meses)', () => {
-      const r = run({ juntarPara: 'vista' });
+    it('sem entrada, o que falta é o preço inteiro (120.000 ÷ 8.885 = 13,5 → 14 meses); não há mais escolha de "juntar para"', () => {
+      const r = run({ entrada: '' });
       expect(r.savingTargetCents).toBe(120_000);
       expect(r.savingMonths).toBe(14);
-      expect(r.savingLines[0]).toBe('Guardando R$ 88,85 por mês, sem rendimento, você junta R$ 1.200,00 em 14 meses (1 ano e 2 meses).');
-      expect(r.savingLines[2]).toBe('Juntando: leva 14 meses para comprar à vista e não paga juros do financiamento.');
+      expect(r.savingLines[0]).toBe('Guardando R$ 106,62 por mês, sem rendimento, você junta R$ 1.200,00 em 12 meses (1 ano).');
+      expect(r.savingLines[2]).toBe('Juntando: leva 12 meses para juntar o que falta para comprar à vista e não paga juros do financiamento.');
       expect(r.hypotheses).toContain('Juntar para comprar à vista: o valor a juntar é o preço inteiro, R$ 1.200,00.');
+      expect('juntarPara' in ANTES_FIELDS).toBe(false);
     });
 
     it('valor por mês informado e rendimento ao ano: R$ 90,00 com 12% ao ano juntam R$ 1.000,00 em 11 meses (sem rendimento, 12)', () => {
@@ -234,8 +278,8 @@ describe('10. Antes de financiar (D-044)', () => {
         [20, 24_000, 8_529, 6_348, 1_596],
       ]);
       expect(r.entryLines).toEqual([
-        'Mais 10% do preço de entrada (R$ 120,00): parcela de R$ 95,96 e juros de R$ 71,52 (R$ 7,92 a menos).',
-        'Mais 20% do preço de entrada (R$ 240,00): parcela de R$ 85,29 e juros de R$ 63,48 (R$ 15,96 a menos).',
+        'Com mais 10% do preço na entrada (R$ 120,00): parcela de R$ 95,96 e juros de R$ 71,52 (R$ 7,92 a menos).',
+        'Com mais 20% do preço na entrada (R$ 240,00): parcela de R$ 85,29 e juros de R$ 63,48 (R$ 15,96 a menos).',
       ]);
       expect(ANTES_EXTRA_ENTRY_PERCENTS).toEqual([10, 20]);
     });
@@ -250,9 +294,11 @@ describe('10. Antes de financiar (D-044)', () => {
       expect(one.biggerEntries.map((e) => e.percent)).toEqual([10]);
     });
 
-    it('sem juros a menos, não diz "a menos"', () => {
-      const r = run({ preco: '1.000,00', entrada: '', taxaMes: '0' });
+    it('sem juros a menos, não diz "a menos"; com taxa 0% os juros da entrada maior também são zero', () => {
+      const r = run({ preco: '1,00', entrada: '', parcelas: '7', taxaMes: '0' });
       expect(r.entryLines.every((l) => !l.includes('a menos'))).toBe(true);
+      expect(r.biggerEntries.map((e) => e.interestCents)).toEqual([0, 0]);
+      expect(r.entryLines[0]).toBe('Com mais 10% do preço na entrada (R$ 0,10): parcela de R$ 0,13 e juros de R$ 0,00.');
     });
   });
 
@@ -263,10 +309,19 @@ describe('10. Antes de financiar (D-044)', () => {
       expect(run({ parcelas: '480' }).noteParams?.parcelas).toBe(480);
     });
 
+    it('"Anotar como parcelamento" só leva o valor da parcela quando cabe no limite de um registro', () => {
+      // 9.999.999,99 em 2 parcelas a 99,99% ao mês: a parcela passa de R$ 9.999.999,99; o cadastro abre sem o valor.
+      const big = run({ preco: '9.999.999,99', entrada: '', parcelas: '2', taxaMes: '99,99' });
+      expect(big.parcelaCents).toBeGreaterThan(MAX_RECORD_CENTS);
+      expect(big.noteParams).toEqual({ tipo: 'parcelada', natureza: 'financiamento', parcelas: 2 });
+      expect('valor' in big.noteParams!).toBe(false);
+      const edge = run({ preco: '9.999.999,99', entrada: '', parcelas: '2', taxaMes: '0' });
+      expect(edge.noteParams?.valor).toBe(500_000_000);
+    });
+
     it('"Criar meta com este valor": objetivo com o valor a juntar, o prazo (mês de hoje + meses − 1) e o valor por mês', () => {
       const r = run({}, '2026-10-07');
       expect(r.goalParams).toEqual({ tipo: 'objetivo', valor: 100_000, prazo: '09/2027', mensal: 8_885 });
-      expect(run({ juntarPara: 'vista' }, '2026-10-07').goalParams).toEqual({ tipo: 'objetivo', valor: 120_000, prazo: '11/2027', mensal: 8_885 });
       expect(run().goalParams).toBeNull();
     });
   });
@@ -317,7 +372,6 @@ describe('10. Antes de financiar (D-044)', () => {
       expect(calcErrorText('antes-de-financiar', 'taxaMes', 'fora_da_faixa')).toBe('Use uma taxa de 0% a 99,99% ao mês.');
       expect(ANTES_FIELDS.taxaMes!.hint).toBe('Está na proposta do banco ou da loja. Use o CET ao mês, se tiver.');
       expect(ANTES_FIELDS.primeiraEmUmMes!.default).toBe(true);
-      expect(ANTES_FIELDS.juntarPara!.options!.map((o) => o.label)).toEqual(['Dar mais entrada', 'Comprar à vista']);
     });
 
     it('nenhuma taxa padrão: a taxa do financiamento e o rendimento nunca vêm de um link nem têm valor inicial', () => {
@@ -401,13 +455,12 @@ describe('conferência com o Python independente (fixtures/antes-de-financiar.py
     expect(savings.some((c) => c.months === null)).toBe(true);
     expect(savings.some((c) => c.rateBp > 0 && c.months !== null && c.months > 1)).toBe(true);
     for (const c of savings) {
-      // O preço é o alvo ("comprar à vista"); o valor por mês é o informado; o rendimento, o do caso.
+      // Sem entrada, o que falta para comprar à vista é o preço; o valor por mês é o informado; o rendimento, o do caso.
       const out = calcAntesDeFinanciar({
         preco: centsToInput(c.targetCents),
         entrada: '',
         parcelas: '12',
         taxaMes: '1',
-        juntarPara: 'vista',
         guardar: centsToInput(c.monthlyCents),
         rendimento: rateText(c.rateBp),
       });
