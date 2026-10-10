@@ -3,6 +3,7 @@ export * from './inputs';
 export type { CalcFieldKind, CalcFieldSpec, CalcOutcome, CalcTexts } from './common';
 export { RATE_DISPLAY_MAX } from './common';
 export * from './fields';
+export * from './antes-de-financiar';
 export * from './parcelado-ou-a-vista';
 export * from './custo-por-ano';
 export * from './custo-da-divida';

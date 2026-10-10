@@ -1,0 +1,4186 @@
+{
+"generator": "antes-de-financiar.py",
+"seed": 20261010,
+"cases": [
+{
+"kind": "price",
+"precoCents": 244583,
+"entradaCents": 0,
+"parcelas": 36,
+"taxaBp": 250,
+"primeiraEmUmMes": false,
+"parcelaCents": 10130,
+"totalCents": 364680,
+"interestCents": 120097
+},
+{
+"kind": "price",
+"precoCents": 186429636,
+"entradaCents": 52710354,
+"parcelas": 240,
+"taxaBp": 1500,
+"primeiraEmUmMes": true,
+"parcelaCents": 20057892,
+"totalCents": 4866604434,
+"interestCents": 4680174798
+},
+{
+"kind": "price",
+"precoCents": 25286,
+"entradaCents": 11308,
+"parcelas": 2,
+"taxaBp": 250,
+"primeiraEmUmMes": false,
+"parcelaCents": 7075,
+"totalCents": 25458,
+"interestCents": 172
+},
+{
+"kind": "price",
+"precoCents": 706031,
+"entradaCents": 238228,
+"parcelas": 480,
+"taxaBp": 0,
+"primeiraEmUmMes": true,
+"parcelaCents": 975,
+"totalCents": 706228,
+"interestCents": 197
+},
+{
+"kind": "price",
+"precoCents": 3017966,
+"entradaCents": 0,
+"parcelas": 48,
+"taxaBp": 100,
+"primeiraEmUmMes": true,
+"parcelaCents": 79475,
+"totalCents": 3814800,
+"interestCents": 796834
+},
+{
+"kind": "price",
+"precoCents": 54021524,
+"entradaCents": 28850369,
+"parcelas": 84,
+"taxaBp": 0,
+"primeiraEmUmMes": true,
+"parcelaCents": 299657,
+"totalCents": 54021557,
+"interestCents": 33
+},
+{
+"kind": "price",
+"precoCents": 568804969,
+"entradaCents": 0,
+"parcelas": 60,
+"taxaBp": 9999,
+"primeiraEmUmMes": true,
+"parcelaCents": 568748089,
+"totalCents": 34124885340,
+"interestCents": 33556080371
+},
+{
+"kind": "price",
+"precoCents": 25020174,
+"entradaCents": 13766247,
+"parcelas": 2,
+"taxaBp": 0,
+"primeiraEmUmMes": true,
+"parcelaCents": 5626964,
+"totalCents": 25020175,
+"interestCents": 1
+},
+{
+"kind": "price",
+"precoCents": 88939683,
+"entradaCents": 20328599,
+"parcelas": 1,
+"taxaBp": 221,
+"primeiraEmUmMes": true,
+"parcelaCents": 70127389,
+"totalCents": 90455988,
+"interestCents": 1516305
+},
+{
+"kind": "price",
+"precoCents": 121132088,
+"entradaCents": 24226417,
+"parcelas": 19,
+"taxaBp": 99,
+"primeiraEmUmMes": true,
+"parcelaCents": 5620142,
+"totalCents": 131009115,
+"interestCents": 9877027
+},
+{
+"kind": "price",
+"precoCents": 151550076,
+"entradaCents": 0,
+"parcelas": 1,
+"taxaBp": 9999,
+"primeiraEmUmMes": true,
+"parcelaCents": 303084997,
+"totalCents": 303084997,
+"interestCents": 151534921
+},
+{
+"kind": "price",
+"precoCents": 2448,
+"entradaCents": 0,
+"parcelas": 240,
+"taxaBp": 422,
+"primeiraEmUmMes": true,
+"parcelaCents": 103,
+"totalCents": 24720,
+"interestCents": 22272
+},
+{
+"kind": "price",
+"precoCents": 9870911,
+"entradaCents": 3809334,
+"parcelas": 48,
+"taxaBp": 9999,
+"primeiraEmUmMes": true,
+"parcelaCents": 6060971,
+"totalCents": 294735942,
+"interestCents": 284865031
+},
+{
+"kind": "price",
+"precoCents": 763976817,
+"entradaCents": 345973983,
+"parcelas": 480,
+"taxaBp": 250,
+"primeiraEmUmMes": false,
+"parcelaCents": 10195264,
+"totalCents": 5239700703,
+"interestCents": 4475723886
+},
+{
+"kind": "price",
+"precoCents": 1996227,
+"entradaCents": 0,
+"parcelas": 480,
+"taxaBp": 999,
+"primeiraEmUmMes": false,
+"parcelaCents": 181310,
+"totalCents": 87028800,
+"interestCents": 85032573
+},
+{
+"kind": "price",
+"precoCents": 3131,
+"entradaCents": 0,
+"parcelas": 120,
+"taxaBp": 100,
+"primeiraEmUmMes": false,
+"parcelaCents": 44,
+"totalCents": 5280,
+"interestCents": 2149
+},
+{
+"kind": "price",
+"precoCents": 79976196,
+"entradaCents": 28626133,
+"parcelas": 84,
+"taxaBp": 100,
+"primeiraEmUmMes": false,
+"parcelaCents": 897494,
+"totalCents": 104015629,
+"interestCents": 24039433
+},
+{
+"kind": "price",
+"precoCents": 14743767,
+"entradaCents": 2948753,
+"parcelas": 12,
+"taxaBp": 1500,
+"primeiraEmUmMes": true,
+"parcelaCents": 2175953,
+"totalCents": 29060189,
+"interestCents": 14316422
+},
+{
+"kind": "price",
+"precoCents": 3191,
+"entradaCents": 638,
+"parcelas": 60,
+"taxaBp": 95,
+"primeiraEmUmMes": true,
+"parcelaCents": 56,
+"totalCents": 3998,
+"interestCents": 807
+},
+{
+"kind": "price",
+"precoCents": 797509074,
+"entradaCents": 0,
+"parcelas": 120,
+"taxaBp": 9999,
+"primeiraEmUmMes": true,
+"parcelaCents": 797429323,
+"totalCents": 95691518760,
+"interestCents": 94894009686
+},
+{
+"kind": "price",
+"precoCents": 65888275,
+"entradaCents": 25707591,
+"parcelas": 2,
+"taxaBp": 86,
+"primeiraEmUmMes": false,
+"parcelaCents": 20176361,
+"totalCents": 66060313,
+"interestCents": 172038
+},
+{
+"kind": "price",
+"precoCents": 498195,
+"entradaCents": 0,
+"parcelas": 480,
+"taxaBp": 250,
+"primeiraEmUmMes": true,
+"parcelaCents": 12455,
+"totalCents": 5978400,
+"interestCents": 5480205
+},
+{
+"kind": "price",
+"precoCents": 117391540,
+"entradaCents": 0,
+"parcelas": 480,
+"taxaBp": 99,
+"primeiraEmUmMes": false,
+"parcelaCents": 1161045,
+"totalCents": 557301600,
+"interestCents": 439910060
+},
+{
+"kind": "price",
+"precoCents": 3495497,
+"entradaCents": 385417,
+"parcelas": 24,
+"taxaBp": 100,
+"primeiraEmUmMes": true,
+"parcelaCents": 146402,
+"totalCents": 3899065,
+"interestCents": 403568
+},
+{
+"kind": "price",
+"precoCents": 756406,
+"entradaCents": 315144,
+"parcelas": 120,
+"taxaBp": 428,
+"primeiraEmUmMes": true,
+"parcelaCents": 19010,
+"totalCents": 2596344,
+"interestCents": 1839938
+},
+{
+"kind": "price",
+"precoCents": 36003181,
+"entradaCents": 0,
+"parcelas": 12,
+"taxaBp": 199,
+"primeiraEmUmMes": true,
+"parcelaCents": 3402356,
+"totalCents": 40828272,
+"interestCents": 4825091
+},
+{
+"kind": "price",
+"precoCents": 3086370,
+"entradaCents": 826888,
+"parcelas": 240,
+"taxaBp": 9999,
+"primeiraEmUmMes": true,
+"parcelaCents": 2259256,
+"totalCents": 543048328,
+"interestCents": 539961958
+},
+{
+"kind": "price",
+"precoCents": 41782,
+"entradaCents": 0,
+"parcelas": 480,
+"taxaBp": 1500,
+"primeiraEmUmMes": false,
+"parcelaCents": 5450,
+"totalCents": 2616000,
+"interestCents": 2574218
+},
+{
+"kind": "price",
+"precoCents": 317930787,
+"entradaCents": 0,
+"parcelas": 226,
+"taxaBp": 1500,
+"primeiraEmUmMes": false,
+"parcelaCents": 41469233,
+"totalCents": 9372046658,
+"interestCents": 9054115871
+},
+{
+"kind": "price",
+"precoCents": 89643,
+"entradaCents": 0,
+"parcelas": 240,
+"taxaBp": 99,
+"primeiraEmUmMes": true,
+"parcelaCents": 980,
+"totalCents": 235200,
+"interestCents": 145557
+},
+{
+"kind": "price",
+"precoCents": 34019,
+"entradaCents": 6803,
+"parcelas": 48,
+"taxaBp": 99,
+"primeiraEmUmMes": true,
+"parcelaCents": 715,
+"totalCents": 41123,
+"interestCents": 7104
+},
+{
+"kind": "price",
+"precoCents": 175389,
+"entradaCents": 6238,
+"parcelas": 84,
+"taxaBp": 99,
+"primeiraEmUmMes": true,
+"parcelaCents": 2975,
+"totalCents": 256138,
+"interestCents": 80749
+},
+{
+"kind": "price",
+"precoCents": 3050,
+"entradaCents": 482,
+"parcelas": 60,
+"taxaBp": 0,
+"primeiraEmUmMes": true,
+"parcelaCents": 43,
+"totalCents": 3062,
+"interestCents": 12
+},
+{
+"kind": "price",
+"precoCents": 3923051,
+"entradaCents": 784610,
+"parcelas": 360,
+"taxaBp": 378,
+"primeiraEmUmMes": true,
+"parcelaCents": 118633,
+"totalCents": 43492490,
+"interestCents": 39569439
+},
+{
+"kind": "price",
+"precoCents": 4603,
+"entradaCents": 0,
+"parcelas": 201,
+"taxaBp": 1500,
+"primeiraEmUmMes": false,
+"parcelaCents": 600,
+"totalCents": 120600,
+"interestCents": 115997
+},
+{
+"kind": "price",
+"precoCents": 4194947,
+"entradaCents": 0,
+"parcelas": 84,
+"taxaBp": 0,
+"primeiraEmUmMes": true,
+"parcelaCents": 49940,
+"totalCents": 4194960,
+"interestCents": 13
+},
+{
+"kind": "price",
+"precoCents": 15135,
+"entradaCents": 1392,
+"parcelas": 2,
+"taxaBp": 9999,
+"primeiraEmUmMes": false,
+"parcelaCents": 9162,
+"totalCents": 19716,
+"interestCents": 4581
+},
+{
+"kind": "price",
+"precoCents": 381228,
+"entradaCents": 300680,
+"parcelas": 48,
+"taxaBp": 250,
+"primeiraEmUmMes": true,
+"parcelaCents": 2900,
+"totalCents": 439880,
+"interestCents": 58652
+},
+{
+"kind": "price",
+"precoCents": 134737806,
+"entradaCents": 15532113,
+"parcelas": 36,
+"taxaBp": 999,
+"primeiraEmUmMes": false,
+"parcelaCents": 11190209,
+"totalCents": 418379637,
+"interestCents": 283641831
+},
+{
+"kind": "price",
+"precoCents": 177663968,
+"entradaCents": 58950526,
+"parcelas": 240,
+"taxaBp": 8551,
+"primeiraEmUmMes": true,
+"parcelaCents": 101511864,
+"totalCents": 24421797886,
+"interestCents": 24244133918
+},
+{
+"kind": "price",
+"precoCents": 8622,
+"entradaCents": 7190,
+"parcelas": 360,
+"taxaBp": 95,
+"primeiraEmUmMes": false,
+"parcelaCents": 14,
+"totalCents": 12230,
+"interestCents": 3608
+},
+{
+"kind": "price",
+"precoCents": 9351,
+"entradaCents": 467,
+"parcelas": 2,
+"taxaBp": 100,
+"primeiraEmUmMes": false,
+"parcelaCents": 4464,
+"totalCents": 9395,
+"interestCents": 44
+},
+{
+"kind": "price",
+"precoCents": 20618,
+"entradaCents": 4123,
+"parcelas": 36,
+"taxaBp": 0,
+"primeiraEmUmMes": false,
+"parcelaCents": 458,
+"totalCents": 20611,
+"interestCents": 0
+},
+{
+"kind": "price",
+"precoCents": 4865648,
+"entradaCents": 0,
+"parcelas": 120,
+"taxaBp": 250,
+"primeiraEmUmMes": false,
+"parcelaCents": 125139,
+"totalCents": 15016680,
+"interestCents": 10151032
+},
+{
+"kind": "price",
+"precoCents": 801026544,
+"entradaCents": 0,
+"parcelas": 48,
+"taxaBp": 0,
+"primeiraEmUmMes": true,
+"parcelaCents": 16688053,
+"totalCents": 801026544,
+"interestCents": 0
+},
+{
+"kind": "price",
+"precoCents": 8596,
+"entradaCents": 0,
+"parcelas": 48,
+"taxaBp": 569,
+"primeiraEmUmMes": false,
+"parcelaCents": 498,
+"totalCents": 23904,
+"interestCents": 15308
+},
+{
+"kind": "price",
+"precoCents": 2457,
+"entradaCents": 2055,
+"parcelas": 12,
+"taxaBp": 99,
+"primeiraEmUmMes": true,
+"parcelaCents": 36,
+"totalCents": 2487,
+"interestCents": 30
+},
+{
+"kind": "price",
+"precoCents": 26238241,
+"entradaCents": 1363404,
+"parcelas": 120,
+"taxaBp": 1500,
+"primeiraEmUmMes": true,
+"parcelaCents": 3731226,
+"totalCents": 449110524,
+"interestCents": 422872283
+},
+{
+"kind": "price",
+"precoCents": 28987141,
+"entradaCents": 19816715,
+"parcelas": 60,
+"taxaBp": 394,
+"primeiraEmUmMes": true,
+"parcelaCents": 400753,
+"totalCents": 43861895,
+"interestCents": 14874754
+},
+{
+"kind": "price",
+"precoCents": 9777180,
+"entradaCents": 0,
+"parcelas": 120,
+"taxaBp": 99,
+"primeiraEmUmMes": true,
+"parcelaCents": 139597,
+"totalCents": 16751640,
+"interestCents": 6974460
+},
+{
+"kind": "price",
+"precoCents": 667292492,
+"entradaCents": 0,
+"parcelas": 48,
+"taxaBp": 999,
+"primeiraEmUmMes": false,
+"parcelaCents": 61241808,
+"totalCents": 2939606784,
+"interestCents": 2272314292
+},
+{
+"kind": "price",
+"precoCents": 94157,
+"entradaCents": 18831,
+"parcelas": 48,
+"taxaBp": 9999,
+"primeiraEmUmMes": true,
+"parcelaCents": 75318,
+"totalCents": 3634095,
+"interestCents": 3539938
+},
+{
+"kind": "price",
+"precoCents": 554062369,
+"entradaCents": 206744985,
+"parcelas": 120,
+"taxaBp": 0,
+"primeiraEmUmMes": true,
+"parcelaCents": 2894312,
+"totalCents": 554062425,
+"interestCents": 56
+},
+{
+"kind": "price",
+"precoCents": 499270,
+"entradaCents": 202377,
+"parcelas": 2,
+"taxaBp": 9999,
+"primeiraEmUmMes": true,
+"parcelaCents": 395831,
+"totalCents": 994039,
+"interestCents": 494769
+},
+{
+"kind": "price",
+"precoCents": 6812129,
+"entradaCents": 0,
+"parcelas": 12,
+"taxaBp": 100,
+"primeiraEmUmMes": true,
+"parcelaCents": 605249,
+"totalCents": 7262988,
+"interestCents": 450859
+},
+{
+"kind": "price",
+"precoCents": 54903942,
+"entradaCents": 15285751,
+"parcelas": 24,
+"taxaBp": 9999,
+"primeiraEmUmMes": true,
+"parcelaCents": 39614232,
+"totalCents": 966027319,
+"interestCents": 911123377
+},
+{
+"kind": "price",
+"precoCents": 28552628,
+"entradaCents": 0,
+"parcelas": 480,
+"taxaBp": 423,
+"primeiraEmUmMes": true,
+"parcelaCents": 1207776,
+"totalCents": 579732480,
+"interestCents": 551179852
+},
+{
+"kind": "price",
+"precoCents": 429841,
+"entradaCents": 85968,
+"parcelas": 120,
+"taxaBp": 250,
+"primeiraEmUmMes": false,
+"parcelaCents": 8844,
+"totalCents": 1147248,
+"interestCents": 717407
+},
+{
+"kind": "price",
+"precoCents": 853495752,
+"entradaCents": 245557888,
+"parcelas": 387,
+"taxaBp": 9999,
+"primeiraEmUmMes": true,
+"parcelaCents": 607877070,
+"totalCents": 235493983978,
+"interestCents": 234640488226
+},
+{
+"kind": "price",
+"precoCents": 475201,
+"entradaCents": 0,
+"parcelas": 36,
+"taxaBp": 9436,
+"primeiraEmUmMes": false,
+"parcelaCents": 230706,
+"totalCents": 8305416,
+"interestCents": 7830215
+},
+{
+"kind": "price",
+"precoCents": 5896,
+"entradaCents": 0,
+"parcelas": 36,
+"taxaBp": 999,
+"primeiraEmUmMes": true,
+"parcelaCents": 609,
+"totalCents": 21924,
+"interestCents": 16028
+},
+{
+"kind": "price",
+"precoCents": 465589,
+"entradaCents": 0,
+"parcelas": 24,
+"taxaBp": 250,
+"primeiraEmUmMes": false,
+"parcelaCents": 25397,
+"totalCents": 609528,
+"interestCents": 143939
+},
+{
+"kind": "price",
+"precoCents": 6765926,
+"entradaCents": 0,
+"parcelas": 84,
+"taxaBp": 0,
+"primeiraEmUmMes": true,
+"parcelaCents": 80547,
+"totalCents": 6765948,
+"interestCents": 22
+},
+{
+"kind": "price",
+"precoCents": 3449,
+"entradaCents": 0,
+"parcelas": 84,
+"taxaBp": 252,
+"primeiraEmUmMes": true,
+"parcelaCents": 99,
+"totalCents": 8316,
+"interestCents": 4867
+},
+{
+"kind": "price",
+"precoCents": 3008,
+"entradaCents": 538,
+"parcelas": 479,
+"taxaBp": 6834,
+"primeiraEmUmMes": true,
+"parcelaCents": 1688,
+"totalCents": 809090,
+"interestCents": 806082
+},
+{
+"kind": "price",
+"precoCents": 8933,
+"entradaCents": 2584,
+"parcelas": 480,
+"taxaBp": 1,
+"primeiraEmUmMes": true,
+"parcelaCents": 14,
+"totalCents": 9304,
+"interestCents": 371
+},
+{
+"kind": "price",
+"precoCents": 884068204,
+"entradaCents": 176813640,
+"parcelas": 230,
+"taxaBp": 382,
+"primeiraEmUmMes": true,
+"parcelaCents": 27021989,
+"totalCents": 6391871110,
+"interestCents": 5507802906
+},
+{
+"kind": "price",
+"precoCents": 77930,
+"entradaCents": 10282,
+"parcelas": 36,
+"taxaBp": 67,
+"primeiraEmUmMes": false,
+"parcelaCents": 2107,
+"totalCents": 86134,
+"interestCents": 8204
+},
+{
+"kind": "price",
+"precoCents": 223519,
+"entradaCents": 44703,
+"parcelas": 480,
+"taxaBp": 5478,
+"primeiraEmUmMes": false,
+"parcelaCents": 63287,
+"totalCents": 30422463,
+"interestCents": 30198944
+},
+{
+"kind": "price",
+"precoCents": 96208497,
+"entradaCents": 42909242,
+"parcelas": 480,
+"taxaBp": 0,
+"primeiraEmUmMes": false,
+"parcelaCents": 111040,
+"totalCents": 96208442,
+"interestCents": 0
+},
+{
+"kind": "price",
+"precoCents": 4982866,
+"entradaCents": 996573,
+"parcelas": 168,
+"taxaBp": 100,
+"primeiraEmUmMes": false,
+"parcelaCents": 48602,
+"totalCents": 9161709,
+"interestCents": 4178843
+},
+{
+"kind": "price",
+"precoCents": 2591340,
+"entradaCents": 2133795,
+"parcelas": 360,
+"taxaBp": 250,
+"primeiraEmUmMes": true,
+"parcelaCents": 11440,
+"totalCents": 6252195,
+"interestCents": 3660855
+},
+{
+"kind": "price",
+"precoCents": 162422248,
+"entradaCents": 59859914,
+"parcelas": 2,
+"taxaBp": 99,
+"primeiraEmUmMes": true,
+"parcelaCents": 52043943,
+"totalCents": 163947800,
+"interestCents": 1525552
+},
+{
+"kind": "price",
+"precoCents": 856531428,
+"entradaCents": 48526330,
+"parcelas": 240,
+"taxaBp": 99,
+"primeiraEmUmMes": true,
+"parcelaCents": 8829327,
+"totalCents": 2167564810,
+"interestCents": 1311033382
+},
+{
+"kind": "price",
+"precoCents": 227452,
+"entradaCents": 83115,
+"parcelas": 120,
+"taxaBp": 199,
+"primeiraEmUmMes": true,
+"parcelaCents": 3170,
+"totalCents": 463515,
+"interestCents": 236063
+},
+{
+"kind": "price",
+"precoCents": 8998,
+"entradaCents": 1799,
+"parcelas": 360,
+"taxaBp": 1,
+"primeiraEmUmMes": true,
+"parcelaCents": 20,
+"totalCents": 8999,
+"interestCents": 1
+},
+{
+"kind": "price",
+"precoCents": 95911,
+"entradaCents": 19182,
+"parcelas": 1,
+"taxaBp": 1500,
+"primeiraEmUmMes": true,
+"parcelaCents": 88238,
+"totalCents": 107420,
+"interestCents": 11509
+},
+{
+"kind": "price",
+"precoCents": 767223,
+"entradaCents": 153444,
+"parcelas": 2,
+"taxaBp": 232,
+"primeiraEmUmMes": true,
+"parcelaCents": 317610,
+"totalCents": 788664,
+"interestCents": 21441
+},
+{
+"kind": "price",
+"precoCents": 6482,
+"entradaCents": 2542,
+"parcelas": 60,
+"taxaBp": 0,
+"primeiraEmUmMes": true,
+"parcelaCents": 66,
+"totalCents": 6502,
+"interestCents": 20
+},
+{
+"kind": "price",
+"precoCents": 2150,
+"entradaCents": 1183,
+"parcelas": 2,
+"taxaBp": 0,
+"primeiraEmUmMes": true,
+"parcelaCents": 484,
+"totalCents": 2151,
+"interestCents": 1
+},
+{
+"kind": "price",
+"precoCents": 76902970,
+"entradaCents": 15380594,
+"parcelas": 2,
+"taxaBp": 2349,
+"primeiraEmUmMes": false,
+"parcelaCents": 33994354,
+"totalCents": 83369302,
+"interestCents": 6466332
+},
+{
+"kind": "price",
+"precoCents": 718013315,
+"entradaCents": 79419633,
+"parcelas": 12,
+"taxaBp": 99,
+"primeiraEmUmMes": true,
+"parcelaCents": 56702433,
+"totalCents": 759848829,
+"interestCents": 41835514
+},
+{
+"kind": "price",
+"precoCents": 3956,
+"entradaCents": 2632,
+"parcelas": 2,
+"taxaBp": 0,
+"primeiraEmUmMes": true,
+"parcelaCents": 662,
+"totalCents": 3956,
+"interestCents": 0
+},
+{
+"kind": "price",
+"precoCents": 285234863,
+"entradaCents": 77956419,
+"parcelas": 24,
+"taxaBp": 100,
+"primeiraEmUmMes": false,
+"parcelaCents": 9660709,
+"totalCents": 309813435,
+"interestCents": 24578572
+},
+{
+"kind": "price",
+"precoCents": 331961,
+"entradaCents": 0,
+"parcelas": 12,
+"taxaBp": 199,
+"primeiraEmUmMes": false,
+"parcelaCents": 30759,
+"totalCents": 369108,
+"interestCents": 37147
+},
+{
+"kind": "price",
+"precoCents": 259401537,
+"entradaCents": 0,
+"parcelas": 36,
+"taxaBp": 100,
+"primeiraEmUmMes": true,
+"parcelaCents": 8615843,
+"totalCents": 310170348,
+"interestCents": 50768811
+},
+{
+"kind": "price",
+"precoCents": 5680342,
+"entradaCents": 0,
+"parcelas": 84,
+"taxaBp": 551,
+"primeiraEmUmMes": true,
+"parcelaCents": 316484,
+"totalCents": 26584656,
+"interestCents": 20904314
+},
+{
+"kind": "price",
+"precoCents": 1720972,
+"entradaCents": 447336,
+"parcelas": 36,
+"taxaBp": 521,
+"primeiraEmUmMes": true,
+"parcelaCents": 79059,
+"totalCents": 3293460,
+"interestCents": 1572488
+},
+{
+"kind": "price",
+"precoCents": 82115537,
+"entradaCents": 0,
+"parcelas": 84,
+"taxaBp": 100,
+"primeiraEmUmMes": true,
+"parcelaCents": 1449564,
+"totalCents": 121763376,
+"interestCents": 39647839
+},
+{
+"kind": "price",
+"precoCents": 53959,
+"entradaCents": 10791,
+"parcelas": 36,
+"taxaBp": 9999,
+"primeiraEmUmMes": false,
+"parcelaCents": 21583,
+"totalCents": 787779,
+"interestCents": 733820
+},
+{
+"kind": "price",
+"precoCents": 2360,
+"entradaCents": 472,
+"parcelas": 37,
+"taxaBp": 7443,
+"primeiraEmUmMes": false,
+"parcelaCents": 806,
+"totalCents": 30294,
+"interestCents": 27934
+},
+{
+"kind": "price",
+"precoCents": 292033,
+"entradaCents": 2956,
+"parcelas": 48,
+"taxaBp": 0,
+"primeiraEmUmMes": false,
+"parcelaCents": 6022,
+"totalCents": 292012,
+"interestCents": 0
+},
+{
+"kind": "price",
+"precoCents": 277230039,
+"entradaCents": 0,
+"parcelas": 60,
+"taxaBp": 9999,
+"primeiraEmUmMes": false,
+"parcelaCents": 138608088,
+"totalCents": 8316485280,
+"interestCents": 8039255241
+},
+{
+"kind": "price",
+"precoCents": 6504,
+"entradaCents": 2470,
+"parcelas": 48,
+"taxaBp": 999,
+"primeiraEmUmMes": false,
+"parcelaCents": 370,
+"totalCents": 20230,
+"interestCents": 13726
+},
+{
+"kind": "price",
+"precoCents": 68250,
+"entradaCents": 31234,
+"parcelas": 120,
+"taxaBp": 999,
+"primeiraEmUmMes": true,
+"parcelaCents": 3698,
+"totalCents": 474994,
+"interestCents": 406744
+},
+{
+"kind": "price",
+"precoCents": 438019,
+"entradaCents": 0,
+"parcelas": 84,
+"taxaBp": 1500,
+"primeiraEmUmMes": false,
+"parcelaCents": 57133,
+"totalCents": 4799172,
+"interestCents": 4361153
+},
+{
+"kind": "price",
+"precoCents": 20354188,
+"entradaCents": 1436285,
+"parcelas": 48,
+"taxaBp": 250,
+"primeiraEmUmMes": true,
+"parcelaCents": 681158,
+"totalCents": 34131869,
+"interestCents": 13777681
+},
+{
+"kind": "price",
+"precoCents": 5611487,
+"entradaCents": 4731484,
+"parcelas": 36,
+"taxaBp": 1500,
+"primeiraEmUmMes": false,
+"parcelaCents": 115537,
+"totalCents": 8890816,
+"interestCents": 3279329
+},
+{
+"kind": "price",
+"precoCents": 926165849,
+"entradaCents": 317113726,
+"parcelas": 212,
+"taxaBp": 199,
+"primeiraEmUmMes": true,
+"parcelaCents": 12308941,
+"totalCents": 2926609218,
+"interestCents": 2000443369
+},
+{
+"kind": "price",
+"precoCents": 71783,
+"entradaCents": 0,
+"parcelas": 12,
+"taxaBp": 100,
+"primeiraEmUmMes": true,
+"parcelaCents": 6378,
+"totalCents": 76536,
+"interestCents": 4753
+},
+{
+"kind": "price",
+"precoCents": 394188377,
+"entradaCents": 115903619,
+"parcelas": 240,
+"taxaBp": 204,
+"primeiraEmUmMes": true,
+"parcelaCents": 5721949,
+"totalCents": 1489171379,
+"interestCents": 1094983002
+},
+{
+"kind": "price",
+"precoCents": 356282,
+"entradaCents": 71256,
+"parcelas": 48,
+"taxaBp": 0,
+"primeiraEmUmMes": true,
+"parcelaCents": 5938,
+"totalCents": 356280,
+"interestCents": 0
+},
+{
+"kind": "price",
+"precoCents": 84164,
+"entradaCents": 0,
+"parcelas": 322,
+"taxaBp": 1,
+"primeiraEmUmMes": true,
+"parcelaCents": 266,
+"totalCents": 85652,
+"interestCents": 1488
+},
+{
+"kind": "price",
+"precoCents": 44512440,
+"entradaCents": 21557724,
+"parcelas": 12,
+"taxaBp": 402,
+"primeiraEmUmMes": false,
+"parcelaCents": 2354080,
+"totalCents": 49806684,
+"interestCents": 5294244
+},
+{
+"kind": "price",
+"precoCents": 644612,
+"entradaCents": 195720,
+"parcelas": 36,
+"taxaBp": 9999,
+"primeiraEmUmMes": true,
+"parcelaCents": 448847,
+"totalCents": 16354212,
+"interestCents": 15709600
+},
+{
+"kind": "price",
+"precoCents": 5803,
+"entradaCents": 0,
+"parcelas": 60,
+"taxaBp": 100,
+"primeiraEmUmMes": true,
+"parcelaCents": 129,
+"totalCents": 7740,
+"interestCents": 1937
+},
+{
+"kind": "price",
+"precoCents": 92154,
+"entradaCents": 0,
+"parcelas": 2,
+"taxaBp": 99,
+"primeiraEmUmMes": true,
+"parcelaCents": 46762,
+"totalCents": 93524,
+"interestCents": 1370
+},
+{
+"kind": "price",
+"precoCents": 665148573,
+"entradaCents": 0,
+"parcelas": 120,
+"taxaBp": 100,
+"primeiraEmUmMes": false,
+"parcelaCents": 9448465,
+"totalCents": 1133815800,
+"interestCents": 468667227
+},
+{
+"kind": "price",
+"precoCents": 6044,
+"entradaCents": 0,
+"parcelas": 120,
+"taxaBp": 595,
+"primeiraEmUmMes": false,
+"parcelaCents": 340,
+"totalCents": 40800,
+"interestCents": 34756
+},
+{
+"kind": "price",
+"precoCents": 4384,
+"entradaCents": 1778,
+"parcelas": 2,
+"taxaBp": 100,
+"primeiraEmUmMes": true,
+"parcelaCents": 1323,
+"totalCents": 4424,
+"interestCents": 40
+},
+{
+"kind": "price",
+"precoCents": 31546269,
+"entradaCents": 5202451,
+"parcelas": 2,
+"taxaBp": 138,
+"primeiraEmUmMes": false,
+"parcelaCents": 13262172,
+"totalCents": 31726795,
+"interestCents": 180526
+},
+{
+"kind": "price",
+"precoCents": 10019212,
+"entradaCents": 8763078,
+"parcelas": 2,
+"taxaBp": 494,
+"primeiraEmUmMes": false,
+"parcelaCents": 643206,
+"totalCents": 10049490,
+"interestCents": 30278
+},
+{
+"kind": "price",
+"precoCents": 6648,
+"entradaCents": 2291,
+"parcelas": 480,
+"taxaBp": 1,
+"primeiraEmUmMes": true,
+"parcelaCents": 9,
+"totalCents": 6611,
+"interestCents": 0
+},
+{
+"kind": "price",
+"precoCents": 412348610,
+"entradaCents": 82469722,
+"parcelas": 84,
+"taxaBp": 9999,
+"primeiraEmUmMes": true,
+"parcelaCents": 329845900,
+"totalCents": 27789525322,
+"interestCents": 27377176712
+},
+{
+"kind": "price",
+"precoCents": 5172692,
+"entradaCents": 0,
+"parcelas": 480,
+"taxaBp": 99,
+"primeiraEmUmMes": true,
+"parcelaCents": 51666,
+"totalCents": 24799680,
+"interestCents": 19626988
+},
+{
+"kind": "price",
+"precoCents": 92056173,
+"entradaCents": 0,
+"parcelas": 298,
+"taxaBp": 99,
+"primeiraEmUmMes": true,
+"parcelaCents": 962457,
+"totalCents": 286812186,
+"interestCents": 194756013
+},
+{
+"kind": "price",
+"precoCents": 853,
+"entradaCents": 0,
+"parcelas": 334,
+"taxaBp": 1500,
+"primeiraEmUmMes": false,
+"parcelaCents": 111,
+"totalCents": 37074,
+"interestCents": 36221
+},
+{
+"kind": "price",
+"precoCents": 4821753,
+"entradaCents": 964350,
+"parcelas": 480,
+"taxaBp": 7021,
+"primeiraEmUmMes": true,
+"parcelaCents": 2708283,
+"totalCents": 1300940190,
+"interestCents": 1296118437
+},
+{
+"kind": "price",
+"precoCents": 7596345,
+"entradaCents": 0,
+"parcelas": 1,
+"taxaBp": 999,
+"primeiraEmUmMes": true,
+"parcelaCents": 8355220,
+"totalCents": 8355220,
+"interestCents": 758875
+},
+{
+"kind": "price",
+"precoCents": 5281074,
+"entradaCents": 3246745,
+"parcelas": 1,
+"taxaBp": 999,
+"primeiraEmUmMes": false,
+"parcelaCents": 2034329,
+"totalCents": 5281074,
+"interestCents": 0
+},
+{
+"kind": "price",
+"precoCents": 7024,
+"entradaCents": 0,
+"parcelas": 402,
+"taxaBp": 569,
+"primeiraEmUmMes": false,
+"parcelaCents": 378,
+"totalCents": 151956,
+"interestCents": 144932
+},
+{
+"kind": "price",
+"precoCents": 7617712,
+"entradaCents": 5206803,
+"parcelas": 90,
+"taxaBp": 1500,
+"primeiraEmUmMes": true,
+"parcelaCents": 361638,
+"totalCents": 37754223,
+"interestCents": 30136511
+},
+{
+"kind": "price",
+"precoCents": 4973708,
+"entradaCents": 994741,
+"parcelas": 240,
+"taxaBp": 250,
+"primeiraEmUmMes": true,
+"parcelaCents": 99740,
+"totalCents": 24932341,
+"interestCents": 19958633
+},
+{
+"kind": "price",
+"precoCents": 9992,
+"entradaCents": 0,
+"parcelas": 240,
+"taxaBp": 321,
+"primeiraEmUmMes": false,
+"parcelaCents": 311,
+"totalCents": 74640,
+"interestCents": 64648
+},
+{
+"kind": "price",
+"precoCents": 478,
+"entradaCents": 0,
+"parcelas": 137,
+"taxaBp": 250,
+"primeiraEmUmMes": false,
+"parcelaCents": 12,
+"totalCents": 1644,
+"interestCents": 1166
+},
+{
+"kind": "price",
+"precoCents": 279357952,
+"entradaCents": 0,
+"parcelas": 367,
+"taxaBp": 999,
+"primeiraEmUmMes": true,
+"parcelaCents": 27907859,
+"totalCents": 10242184253,
+"interestCents": 9962826301
+},
+{
+"kind": "price",
+"precoCents": 608711165,
+"entradaCents": 0,
+"parcelas": 12,
+"taxaBp": 9999,
+"primeiraEmUmMes": false,
+"parcelaCents": 304414729,
+"totalCents": 3652976748,
+"interestCents": 3044265583
+},
+{
+"kind": "price",
+"precoCents": 54039971,
+"entradaCents": 0,
+"parcelas": 12,
+"taxaBp": 999,
+"primeiraEmUmMes": false,
+"parcelaCents": 7207201,
+"totalCents": 86486412,
+"interestCents": 32446441
+},
+{
+"kind": "price",
+"precoCents": 84909868,
+"entradaCents": 3595310,
+"parcelas": 84,
+"taxaBp": 7795,
+"primeiraEmUmMes": true,
+"parcelaCents": 63384698,
+"totalCents": 5327909942,
+"interestCents": 5243000074
+},
+{
+"kind": "price",
+"precoCents": 955363,
+"entradaCents": 0,
+"parcelas": 240,
+"taxaBp": 999,
+"primeiraEmUmMes": true,
+"parcelaCents": 95441,
+"totalCents": 22905840,
+"interestCents": 21950477
+},
+{
+"kind": "price",
+"precoCents": 494635,
+"entradaCents": 98927,
+"parcelas": 36,
+"taxaBp": 199,
+"primeiraEmUmMes": true,
+"parcelaCents": 15500,
+"totalCents": 656927,
+"interestCents": 162292
+},
+{
+"kind": "price",
+"precoCents": 42221316,
+"entradaCents": 0,
+"parcelas": 240,
+"taxaBp": 100,
+"primeiraEmUmMes": false,
+"parcelaCents": 460290,
+"totalCents": 110469600,
+"interestCents": 68248284
+},
+{
+"kind": "price",
+"precoCents": 9304,
+"entradaCents": 3643,
+"parcelas": 36,
+"taxaBp": 999,
+"primeiraEmUmMes": true,
+"parcelaCents": 585,
+"totalCents": 24703,
+"interestCents": 15399
+},
+{
+"kind": "price",
+"precoCents": 82429,
+"entradaCents": 16485,
+"parcelas": 120,
+"taxaBp": 250,
+"primeiraEmUmMes": false,
+"parcelaCents": 1696,
+"totalCents": 220005,
+"interestCents": 137576
+},
+{
+"kind": "price",
+"precoCents": 7384131,
+"entradaCents": 4504371,
+"parcelas": 222,
+"taxaBp": 250,
+"primeiraEmUmMes": false,
+"parcelaCents": 70532,
+"totalCents": 20162475,
+"interestCents": 12778344
+},
+{
+"kind": "price",
+"precoCents": 337485,
+"entradaCents": 0,
+"parcelas": 2,
+"taxaBp": 100,
+"primeiraEmUmMes": false,
+"parcelaCents": 169582,
+"totalCents": 339164,
+"interestCents": 1679
+},
+{
+"kind": "price",
+"precoCents": 11507683,
+"entradaCents": 429716,
+"parcelas": 304,
+"taxaBp": 80,
+"primeiraEmUmMes": true,
+"parcelaCents": 97251,
+"totalCents": 29994020,
+"interestCents": 18486337
+},
+{
+"kind": "price",
+"precoCents": 1675,
+"entradaCents": 335,
+"parcelas": 12,
+"taxaBp": 0,
+"primeiraEmUmMes": false,
+"parcelaCents": 112,
+"totalCents": 1679,
+"interestCents": 4
+},
+{
+"kind": "price",
+"precoCents": 67090802,
+"entradaCents": 0,
+"parcelas": 48,
+"taxaBp": 0,
+"primeiraEmUmMes": false,
+"parcelaCents": 1397725,
+"totalCents": 67090800,
+"interestCents": 0
+},
+{
+"kind": "price",
+"precoCents": 943751728,
+"entradaCents": 0,
+"parcelas": 360,
+"taxaBp": 99,
+"primeiraEmUmMes": true,
+"parcelaCents": 9620463,
+"totalCents": 3463366680,
+"interestCents": 2519614952
+},
+{
+"kind": "price",
+"precoCents": 713454762,
+"entradaCents": 0,
+"parcelas": 24,
+"taxaBp": 999,
+"primeiraEmUmMes": true,
+"parcelaCents": 79347533,
+"totalCents": 1904340792,
+"interestCents": 1190886030
+},
+{
+"kind": "price",
+"precoCents": 19116939,
+"entradaCents": 6398727,
+"parcelas": 90,
+"taxaBp": 250,
+"primeiraEmUmMes": false,
+"parcelaCents": 347897,
+"totalCents": 37709457,
+"interestCents": 18592518
+},
+{
+"kind": "price",
+"precoCents": 85755619,
+"entradaCents": 29145293,
+"parcelas": 1,
+"taxaBp": 9999,
+"primeiraEmUmMes": false,
+"parcelaCents": 56610326,
+"totalCents": 85755619,
+"interestCents": 0
+},
+{
+"kind": "price",
+"precoCents": 395502,
+"entradaCents": 112410,
+"parcelas": 90,
+"taxaBp": 999,
+"primeiraEmUmMes": false,
+"parcelaCents": 25717,
+"totalCents": 2426940,
+"interestCents": 2031438
+},
+{
+"kind": "price",
+"precoCents": 8022,
+"entradaCents": 1604,
+"parcelas": 48,
+"taxaBp": 0,
+"primeiraEmUmMes": false,
+"parcelaCents": 134,
+"totalCents": 8036,
+"interestCents": 14
+},
+{
+"kind": "price",
+"precoCents": 18011698,
+"entradaCents": 0,
+"parcelas": 1,
+"taxaBp": 347,
+"primeiraEmUmMes": true,
+"parcelaCents": 18636704,
+"totalCents": 18636704,
+"interestCents": 625006
+},
+{
+"kind": "price",
+"precoCents": 74548,
+"entradaCents": 14909,
+"parcelas": 36,
+"taxaBp": 99,
+"primeiraEmUmMes": false,
+"parcelaCents": 1958,
+"totalCents": 85397,
+"interestCents": 10849
+},
+{
+"kind": "price",
+"precoCents": 82971,
+"entradaCents": 0,
+"parcelas": 12,
+"taxaBp": 9999,
+"primeiraEmUmMes": false,
+"parcelaCents": 41494,
+"totalCents": 497928,
+"interestCents": 414957
+},
+{
+"kind": "price",
+"precoCents": 7594117,
+"entradaCents": 0,
+"parcelas": 52,
+"taxaBp": 100,
+"primeiraEmUmMes": true,
+"parcelaCents": 188000,
+"totalCents": 9776000,
+"interestCents": 2181883
+},
+{
+"kind": "price",
+"precoCents": 266130,
+"entradaCents": 53226,
+"parcelas": 360,
+"taxaBp": 271,
+"primeiraEmUmMes": false,
+"parcelaCents": 5618,
+"totalCents": 2075706,
+"interestCents": 1809576
+},
+{
+"kind": "price",
+"precoCents": 2014848,
+"entradaCents": 0,
+"parcelas": 334,
+"taxaBp": 1,
+"primeiraEmUmMes": false,
+"parcelaCents": 6133,
+"totalCents": 2048422,
+"interestCents": 33574
+},
+{
+"kind": "price",
+"precoCents": 63668,
+"entradaCents": 12733,
+"parcelas": 84,
+"taxaBp": 6006,
+"primeiraEmUmMes": false,
+"parcelaCents": 19113,
+"totalCents": 1618225,
+"interestCents": 1554557
+},
+{
+"kind": "price",
+"precoCents": 6005912,
+"entradaCents": 1526400,
+"parcelas": 360,
+"taxaBp": 199,
+"primeiraEmUmMes": false,
+"parcelaCents": 87476,
+"totalCents": 33017760,
+"interestCents": 27011848
+},
+{
+"kind": "price",
+"precoCents": 639004,
+"entradaCents": 578113,
+"parcelas": 60,
+"taxaBp": 199,
+"primeiraEmUmMes": true,
+"parcelaCents": 1747,
+"totalCents": 682933,
+"interestCents": 43929
+},
+{
+"kind": "price",
+"precoCents": 715574275,
+"entradaCents": 0,
+"parcelas": 301,
+"taxaBp": 100,
+"primeiraEmUmMes": true,
+"parcelaCents": 7532632,
+"totalCents": 2267322232,
+"interestCents": 1551747957
+},
+{
+"kind": "price",
+"precoCents": 190296,
+"entradaCents": 85370,
+"parcelas": 24,
+"taxaBp": 1,
+"primeiraEmUmMes": true,
+"parcelaCents": 4377,
+"totalCents": 190418,
+"interestCents": 122
+},
+{
+"kind": "price",
+"precoCents": 562106,
+"entradaCents": 0,
+"parcelas": 360,
+"taxaBp": 1,
+"primeiraEmUmMes": false,
+"parcelaCents": 1590,
+"totalCents": 572400,
+"interestCents": 10294
+},
+{
+"kind": "price",
+"precoCents": 52914,
+"entradaCents": 10582,
+"parcelas": 24,
+"taxaBp": 99,
+"primeiraEmUmMes": false,
+"parcelaCents": 1971,
+"totalCents": 57886,
+"interestCents": 4972
+},
+{
+"kind": "price",
+"precoCents": 8948,
+"entradaCents": 4228,
+"parcelas": 84,
+"taxaBp": 100,
+"primeiraEmUmMes": false,
+"parcelaCents": 82,
+"totalCents": 11116,
+"interestCents": 2168
+},
+{
+"kind": "price",
+"precoCents": 7123,
+"entradaCents": 696,
+"parcelas": 36,
+"taxaBp": 483,
+"primeiraEmUmMes": true,
+"parcelaCents": 380,
+"totalCents": 14376,
+"interestCents": 7253
+},
+{
+"kind": "price",
+"precoCents": 26355851,
+"entradaCents": 5271170,
+"parcelas": 48,
+"taxaBp": 250,
+"primeiraEmUmMes": false,
+"parcelaCents": 740658,
+"totalCents": 40822754,
+"interestCents": 14466903
+},
+{
+"kind": "price",
+"precoCents": 753324,
+"entradaCents": 0,
+"parcelas": 36,
+"taxaBp": 99,
+"primeiraEmUmMes": false,
+"parcelaCents": 24733,
+"totalCents": 890388,
+"interestCents": 137064
+},
+{
+"kind": "price",
+"precoCents": 748424885,
+"entradaCents": 0,
+"parcelas": 36,
+"taxaBp": 7927,
+"primeiraEmUmMes": true,
+"parcelaCents": 593276407,
+"totalCents": 21357950652,
+"interestCents": 20609525767
+},
+{
+"kind": "price",
+"precoCents": 3268644,
+"entradaCents": 0,
+"parcelas": 48,
+"taxaBp": 999,
+"primeiraEmUmMes": false,
+"parcelaCents": 299985,
+"totalCents": 14399280,
+"interestCents": 11130636
+},
+{
+"kind": "price",
+"precoCents": 3460,
+"entradaCents": 0,
+"parcelas": 1,
+"taxaBp": 99,
+"primeiraEmUmMes": false,
+"parcelaCents": 3460,
+"totalCents": 3460,
+"interestCents": 0
+},
+{
+"kind": "price",
+"precoCents": 39030420,
+"entradaCents": 0,
+"parcelas": 360,
+"taxaBp": 2275,
+"primeiraEmUmMes": false,
+"parcelaCents": 7233744,
+"totalCents": 2604147840,
+"interestCents": 2565117420
+},
+{
+"kind": "price",
+"precoCents": 703526010,
+"entradaCents": 140705202,
+"parcelas": 360,
+"taxaBp": 999,
+"primeiraEmUmMes": true,
+"parcelaCents": 56225799,
+"totalCents": 20381992842,
+"interestCents": 19678466832
+},
+{
+"kind": "price",
+"precoCents": 557520203,
+"entradaCents": 111504040,
+"parcelas": 60,
+"taxaBp": 100,
+"primeiraEmUmMes": false,
+"parcelaCents": 9823152,
+"totalCents": 700893160,
+"interestCents": 143372957
+},
+{
+"kind": "price",
+"precoCents": 875262,
+"entradaCents": 361757,
+"parcelas": 84,
+"taxaBp": 99,
+"primeiraEmUmMes": true,
+"parcelaCents": 9032,
+"totalCents": 1120445,
+"interestCents": 245183
+},
+{
+"kind": "price",
+"precoCents": 53020443,
+"entradaCents": 40789931,
+"parcelas": 324,
+"taxaBp": 250,
+"primeiraEmUmMes": false,
+"parcelaCents": 298405,
+"totalCents": 137473151,
+"interestCents": 84452708
+},
+{
+"kind": "price",
+"precoCents": 482565,
+"entradaCents": 96513,
+"parcelas": 36,
+"taxaBp": 1,
+"primeiraEmUmMes": false,
+"parcelaCents": 10742,
+"totalCents": 483225,
+"interestCents": 660
+},
+{
+"kind": "price",
+"precoCents": 79244748,
+"entradaCents": 15270901,
+"parcelas": 1,
+"taxaBp": 1500,
+"primeiraEmUmMes": true,
+"parcelaCents": 73569924,
+"totalCents": 88840825,
+"interestCents": 9596077
+},
+{
+"kind": "price",
+"precoCents": 927707,
+"entradaCents": 218856,
+"parcelas": 12,
+"taxaBp": 7699,
+"primeiraEmUmMes": true,
+"parcelaCents": 546323,
+"totalCents": 6774732,
+"interestCents": 5847025
+},
+{
+"kind": "price",
+"precoCents": 36560,
+"entradaCents": 13240,
+"parcelas": 240,
+"taxaBp": 9999,
+"primeiraEmUmMes": true,
+"parcelaCents": 23318,
+"totalCents": 5609560,
+"interestCents": 5573000
+},
+{
+"kind": "price",
+"precoCents": 30667,
+"entradaCents": 0,
+"parcelas": 447,
+"taxaBp": 1500,
+"primeiraEmUmMes": false,
+"parcelaCents": 4000,
+"totalCents": 1788000,
+"interestCents": 1757333
+},
+{
+"kind": "price",
+"precoCents": 492488,
+"entradaCents": 454076,
+"parcelas": 360,
+"taxaBp": 33,
+"primeiraEmUmMes": true,
+"parcelaCents": 183,
+"totalCents": 519956,
+"interestCents": 27468
+},
+{
+"kind": "price",
+"precoCents": 6667865,
+"entradaCents": 0,
+"parcelas": 60,
+"taxaBp": 0,
+"primeiraEmUmMes": true,
+"parcelaCents": 111131,
+"totalCents": 6667860,
+"interestCents": 0
+},
+{
+"kind": "price",
+"precoCents": 6891,
+"entradaCents": 0,
+"parcelas": 279,
+"taxaBp": 215,
+"primeiraEmUmMes": true,
+"parcelaCents": 149,
+"totalCents": 41571,
+"interestCents": 34680
+},
+{
+"kind": "price",
+"precoCents": 62762,
+"entradaCents": 0,
+"parcelas": 24,
+"taxaBp": 250,
+"primeiraEmUmMes": true,
+"parcelaCents": 3509,
+"totalCents": 84216,
+"interestCents": 21454
+},
+{
+"kind": "price",
+"precoCents": 705605001,
+"entradaCents": 0,
+"parcelas": 240,
+"taxaBp": 1,
+"primeiraEmUmMes": false,
+"parcelaCents": 2975292,
+"totalCents": 714070080,
+"interestCents": 8465079
+},
+{
+"kind": "price",
+"precoCents": 60211734,
+"entradaCents": 12042346,
+"parcelas": 48,
+"taxaBp": 1,
+"primeiraEmUmMes": false,
+"parcelaCents": 1005889,
+"totalCents": 60325018,
+"interestCents": 113284
+},
+{
+"kind": "price",
+"precoCents": 3645827,
+"entradaCents": 1106250,
+"parcelas": 84,
+"taxaBp": 99,
+"primeiraEmUmMes": false,
+"parcelaCents": 44230,
+"totalCents": 4821570,
+"interestCents": 1175743
+},
+{
+"kind": "price",
+"precoCents": 75944103,
+"entradaCents": 0,
+"parcelas": 48,
+"taxaBp": 9999,
+"primeiraEmUmMes": false,
+"parcelaCents": 37970153,
+"totalCents": 1822567344,
+"interestCents": 1746623241
+},
+{
+"kind": "price",
+"precoCents": 5984,
+"entradaCents": 3691,
+"parcelas": 360,
+"taxaBp": 199,
+"primeiraEmUmMes": true,
+"parcelaCents": 46,
+"totalCents": 20251,
+"interestCents": 14267
+},
+{
+"kind": "price",
+"precoCents": 834037,
+"entradaCents": 314511,
+"parcelas": 240,
+"taxaBp": 9999,
+"primeiraEmUmMes": false,
+"parcelaCents": 259750,
+"totalCents": 62654511,
+"interestCents": 61820474
+},
+{
+"kind": "price",
+"precoCents": 62795,
+"entradaCents": 12559,
+"parcelas": 360,
+"taxaBp": 2059,
+"primeiraEmUmMes": false,
+"parcelaCents": 8577,
+"totalCents": 3100279,
+"interestCents": 3037484
+},
+{
+"kind": "price",
+"precoCents": 17059,
+"entradaCents": 3411,
+"parcelas": 240,
+"taxaBp": 250,
+"primeiraEmUmMes": false,
+"parcelaCents": 334,
+"totalCents": 83571,
+"interestCents": 66512
+},
+{
+"kind": "price",
+"precoCents": 723464790,
+"entradaCents": 144692958,
+"parcelas": 24,
+"taxaBp": 9999,
+"primeiraEmUmMes": true,
+"parcelaCents": 578713989,
+"totalCents": 14033828694,
+"interestCents": 13310363904
+},
+{
+"kind": "price",
+"precoCents": 40791782,
+"entradaCents": 0,
+"parcelas": 163,
+"taxaBp": 8649,
+"primeiraEmUmMes": false,
+"parcelaCents": 18918340,
+"totalCents": 3083689420,
+"interestCents": 3042897638
+},
+{
+"kind": "price",
+"precoCents": 205051132,
+"entradaCents": 0,
+"parcelas": 360,
+"taxaBp": 99,
+"primeiraEmUmMes": true,
+"parcelaCents": 2090260,
+"totalCents": 752493600,
+"interestCents": 547442468
+},
+{
+"kind": "price",
+"precoCents": 4914,
+"entradaCents": 982,
+"parcelas": 480,
+"taxaBp": 100,
+"primeiraEmUmMes": false,
+"parcelaCents": 39,
+"totalCents": 19702,
+"interestCents": 14788
+},
+{
+"kind": "price",
+"precoCents": 3955873,
+"entradaCents": 0,
+"parcelas": 60,
+"taxaBp": 9999,
+"primeiraEmUmMes": false,
+"parcelaCents": 1977838,
+"totalCents": 118670280,
+"interestCents": 114714407
+},
+{
+"kind": "price",
+"precoCents": 16711467,
+"entradaCents": 3342293,
+"parcelas": 84,
+"taxaBp": 1500,
+"primeiraEmUmMes": true,
+"parcelaCents": 2005392,
+"totalCents": 171795221,
+"interestCents": 155083754
+},
+{
+"kind": "price",
+"precoCents": 4679619,
+"entradaCents": 935923,
+"parcelas": 240,
+"taxaBp": 1,
+"primeiraEmUmMes": false,
+"parcelaCents": 15786,
+"totalCents": 4724563,
+"interestCents": 44944
+},
+{
+"kind": "price",
+"precoCents": 57643,
+"entradaCents": 0,
+"parcelas": 36,
+"taxaBp": 999,
+"primeiraEmUmMes": true,
+"parcelaCents": 5952,
+"totalCents": 214272,
+"interestCents": 156629
+},
+{
+"kind": "price",
+"precoCents": 67544,
+"entradaCents": 49928,
+"parcelas": 195,
+"taxaBp": 9999,
+"primeiraEmUmMes": true,
+"parcelaCents": 17614,
+"totalCents": 3484658,
+"interestCents": 3417114
+},
+{
+"kind": "price",
+"precoCents": 248008340,
+"entradaCents": 33068706,
+"parcelas": 188,
+"taxaBp": 0,
+"primeiraEmUmMes": false,
+"parcelaCents": 1143296,
+"totalCents": 248008354,
+"interestCents": 14
+},
+{
+"kind": "price",
+"precoCents": 631172,
+"entradaCents": 0,
+"parcelas": 480,
+"taxaBp": 999,
+"primeiraEmUmMes": true,
+"parcelaCents": 63054,
+"totalCents": 30265920,
+"interestCents": 29634748
+},
+{
+"kind": "price",
+"precoCents": 1583354,
+"entradaCents": 316670,
+"parcelas": 48,
+"taxaBp": 999,
+"primeiraEmUmMes": true,
+"parcelaCents": 127865,
+"totalCents": 6454190,
+"interestCents": 4870836
+},
+{
+"kind": "price",
+"precoCents": 499779123,
+"entradaCents": 0,
+"parcelas": 360,
+"taxaBp": 593,
+"primeiraEmUmMes": false,
+"parcelaCents": 27977817,
+"totalCents": 10072014120,
+"interestCents": 9572234997
+},
+{
+"kind": "price",
+"precoCents": 731043,
+"entradaCents": 0,
+"parcelas": 48,
+"taxaBp": 99,
+"primeiraEmUmMes": false,
+"parcelaCents": 19020,
+"totalCents": 912960,
+"interestCents": 181917
+},
+{
+"kind": "price",
+"precoCents": 4474,
+"entradaCents": 0,
+"parcelas": 84,
+"taxaBp": 250,
+"primeiraEmUmMes": false,
+"parcelaCents": 125,
+"totalCents": 10500,
+"interestCents": 6026
+},
+{
+"kind": "price",
+"precoCents": 4991,
+"entradaCents": 998,
+"parcelas": 24,
+"taxaBp": 1,
+"primeiraEmUmMes": true,
+"parcelaCents": 167,
+"totalCents": 5006,
+"interestCents": 15
+},
+{
+"kind": "price",
+"precoCents": 79224,
+"entradaCents": 0,
+"parcelas": 1,
+"taxaBp": 0,
+"primeiraEmUmMes": true,
+"parcelaCents": 79224,
+"totalCents": 79224,
+"interestCents": 0
+},
+{
+"kind": "price",
+"precoCents": 669283071,
+"entradaCents": 133856614,
+"parcelas": 84,
+"taxaBp": 1,
+"primeiraEmUmMes": false,
+"parcelaCents": 6400612,
+"totalCents": 671508022,
+"interestCents": 2224951
+},
+{
+"kind": "price",
+"precoCents": 632590,
+"entradaCents": 126518,
+"parcelas": 74,
+"taxaBp": 9999,
+"primeiraEmUmMes": true,
+"parcelaCents": 506021,
+"totalCents": 37572072,
+"interestCents": 36939482
+},
+{
+"kind": "price",
+"precoCents": 5543742,
+"entradaCents": 0,
+"parcelas": 24,
+"taxaBp": 1,
+"primeiraEmUmMes": true,
+"parcelaCents": 231278,
+"totalCents": 5550672,
+"interestCents": 6930
+},
+{
+"kind": "price",
+"precoCents": 8703,
+"entradaCents": 1740,
+"parcelas": 36,
+"taxaBp": 1500,
+"primeiraEmUmMes": true,
+"parcelaCents": 1051,
+"totalCents": 39576,
+"interestCents": 30873
+},
+{
+"kind": "price",
+"precoCents": 26646391,
+"entradaCents": 21756603,
+"parcelas": 84,
+"taxaBp": 199,
+"primeiraEmUmMes": true,
+"parcelaCents": 120289,
+"totalCents": 31860879,
+"interestCents": 5214488
+},
+{
+"kind": "price",
+"precoCents": 6035,
+"entradaCents": 3737,
+"parcelas": 24,
+"taxaBp": 0,
+"primeiraEmUmMes": false,
+"parcelaCents": 96,
+"totalCents": 6041,
+"interestCents": 6
+},
+{
+"kind": "price",
+"precoCents": 756829,
+"entradaCents": 474236,
+"parcelas": 36,
+"taxaBp": 9999,
+"primeiraEmUmMes": true,
+"parcelaCents": 282565,
+"totalCents": 10646576,
+"interestCents": 9889747
+},
+{
+"kind": "price",
+"precoCents": 457291,
+"entradaCents": 91458,
+"parcelas": 60,
+"taxaBp": 199,
+"primeiraEmUmMes": true,
+"parcelaCents": 10499,
+"totalCents": 721398,
+"interestCents": 264107
+},
+{
+"kind": "price",
+"precoCents": 906207395,
+"entradaCents": 46565805,
+"parcelas": 12,
+"taxaBp": 199,
+"primeiraEmUmMes": false,
+"parcelaCents": 79652366,
+"totalCents": 1002394197,
+"interestCents": 96186802
+},
+{
+"kind": "price",
+"precoCents": 810597467,
+"entradaCents": 230081886,
+"parcelas": 360,
+"taxaBp": 999,
+"primeiraEmUmMes": true,
+"parcelaCents": 57993507,
+"totalCents": 21107744406,
+"interestCents": 20297146939
+},
+{
+"kind": "price",
+"precoCents": 28023792,
+"entradaCents": 27477519,
+"parcelas": 308,
+"taxaBp": 5675,
+"primeiraEmUmMes": true,
+"parcelaCents": 310010,
+"totalCents": 122960599,
+"interestCents": 94936807
+},
+{
+"kind": "price",
+"precoCents": 5815207,
+"entradaCents": 0,
+"parcelas": 84,
+"taxaBp": 1,
+"primeiraEmUmMes": true,
+"parcelaCents": 69523,
+"totalCents": 5839932,
+"interestCents": 24725
+},
+{
+"kind": "price",
+"precoCents": 3817,
+"entradaCents": 0,
+"parcelas": 36,
+"taxaBp": 1500,
+"primeiraEmUmMes": false,
+"parcelaCents": 501,
+"totalCents": 18036,
+"interestCents": 14219
+},
+{
+"kind": "price",
+"precoCents": 28013028,
+"entradaCents": 21051298,
+"parcelas": 48,
+"taxaBp": 999,
+"primeiraEmUmMes": false,
+"parcelaCents": 638924,
+"totalCents": 51719650,
+"interestCents": 23706622
+},
+{
+"kind": "price",
+"precoCents": 679809282,
+"entradaCents": 0,
+"parcelas": 2,
+"taxaBp": 9999,
+"primeiraEmUmMes": false,
+"parcelaCents": 453198634,
+"totalCents": 906397268,
+"interestCents": 226587986
+},
+{
+"kind": "price",
+"precoCents": 707983846,
+"entradaCents": 141596769,
+"parcelas": 48,
+"taxaBp": 1500,
+"primeiraEmUmMes": false,
+"parcelaCents": 73966845,
+"totalCents": 3692005329,
+"interestCents": 2984021483
+},
+{
+"kind": "saving",
+"targetCents": 66131,
+"monthlyCents": 51780,
+"rateBp": 0,
+"months": 2,
+"finalCents": 103560
+},
+{
+"kind": "saving",
+"targetCents": 79229,
+"monthlyCents": 163,
+"rateBp": 1531,
+"months": 161,
+"finalCents": 79581
+},
+{
+"kind": "saving",
+"targetCents": 3430045,
+"monthlyCents": 4736,
+"rateBp": 50,
+"months": null,
+"finalCents": null
+},
+{
+"kind": "saving",
+"targetCents": 635234,
+"monthlyCents": 9217,
+"rateBp": 50,
+"months": 68,
+"finalCents": 635829
+},
+{
+"kind": "saving",
+"targetCents": 966977,
+"monthlyCents": 4462,
+"rateBp": 800,
+"months": 136,
+"finalCents": 971722
+},
+{
+"kind": "saving",
+"targetCents": 639242,
+"monthlyCents": 55809,
+"rateBp": 1000,
+"months": 11,
+"finalCents": 644065
+},
+{
+"kind": "saving",
+"targetCents": 159566,
+"monthlyCents": 449,
+"rateBp": 0,
+"months": 356,
+"finalCents": 159844
+},
+{
+"kind": "saving",
+"targetCents": 602866610,
+"monthlyCents": 1638375,
+"rateBp": 50,
+"months": 343,
+"finalCents": 604118337
+},
+{
+"kind": "saving",
+"targetCents": 47295,
+"monthlyCents": 55,
+"rateBp": 800,
+"months": 292,
+"finalCents": 47369
+},
+{
+"kind": "saving",
+"targetCents": 454614,
+"monthlyCents": 263687,
+"rateBp": 3000,
+"months": 2,
+"finalCents": 544988
+},
+{
+"kind": "saving",
+"targetCents": 6446103,
+"monthlyCents": 98709,
+"rateBp": 800,
+"months": 55,
+"finalCents": 6530653
+},
+{
+"kind": "saving",
+"targetCents": 555496,
+"monthlyCents": 5249,
+"rateBp": 50,
+"months": 104,
+"finalCents": 557982
+},
+{
+"kind": "saving",
+"targetCents": 7961389,
+"monthlyCents": 6271,
+"rateBp": 50,
+"months": null,
+"finalCents": null
+},
+{
+"kind": "saving",
+"targetCents": 84699823,
+"monthlyCents": 213088,
+"rateBp": 300,
+"months": 277,
+"finalCents": 84747823
+},
+{
+"kind": "saving",
+"targetCents": 43063,
+"monthlyCents": 685,
+"rateBp": 1268,
+"months": 49,
+"finalCents": 43470
+},
+{
+"kind": "saving",
+"targetCents": 754318,
+"monthlyCents": 4038,
+"rateBp": 3000,
+"months": 74,
+"finalCents": 754810
+},
+{
+"kind": "saving",
+"targetCents": 966715869,
+"monthlyCents": 609435,
+"rateBp": 0,
+"months": null,
+"finalCents": null
+},
+{
+"kind": "saving",
+"targetCents": 29727,
+"monthlyCents": 361,
+"rateBp": 1000,
+"months": 64,
+"finalCents": 30231
+},
+{
+"kind": "saving",
+"targetCents": 262459,
+"monthlyCents": 586,
+"rateBp": 391,
+"months": 278,
+"finalCents": 262892
+},
+{
+"kind": "saving",
+"targetCents": 72947,
+"monthlyCents": 10876,
+"rateBp": 800,
+"months": 7,
+"finalCents": 78116
+},
+{
+"kind": "saving",
+"targetCents": 206692811,
+"monthlyCents": 132551338,
+"rateBp": 0,
+"months": 2,
+"finalCents": 265102676
+},
+{
+"kind": "saving",
+"targetCents": 880749140,
+"monthlyCents": 545006,
+"rateBp": 50,
+"months": null,
+"finalCents": null
+},
+{
+"kind": "saving",
+"targetCents": 8086218,
+"monthlyCents": 12767,
+"rateBp": 352,
+"months": 361,
+"finalCents": 8121520
+},
+{
+"kind": "saving",
+"targetCents": 1323608,
+"monthlyCents": 548,
+"rateBp": 3000,
+"months": 182,
+"finalCents": 1329653
+},
+{
+"kind": "saving",
+"targetCents": 122636232,
+"monthlyCents": 7679723,
+"rateBp": 2987,
+"months": 14,
+"finalCents": 127083521
+},
+{
+"kind": "saving",
+"targetCents": 436013,
+"monthlyCents": 17860,
+"rateBp": 0,
+"months": 25,
+"finalCents": 446500
+},
+{
+"kind": "saving",
+"targetCents": 36757,
+"monthlyCents": 3395,
+"rateBp": 1268,
+"months": 11,
+"finalCents": 39661
+},
+{
+"kind": "saving",
+"targetCents": 3140143,
+"monthlyCents": 25395,
+"rateBp": 2904,
+"months": 61,
+"finalCents": 3206914
+},
+{
+"kind": "saving",
+"targetCents": 32987,
+"monthlyCents": 292,
+"rateBp": 800,
+"months": 85,
+"finalCents": 33108
+},
+{
+"kind": "saving",
+"targetCents": 8705496,
+"monthlyCents": 387011,
+"rateBp": 1000,
+"months": 21,
+"finalCents": 8879490
+},
+{
+"kind": "saving",
+"targetCents": 580437,
+"monthlyCents": 4958,
+"rateBp": 1268,
+"months": 78,
+"finalCents": 587359
+},
+{
+"kind": "saving",
+"targetCents": 461311,
+"monthlyCents": 902,
+"rateBp": 0,
+"months": 512,
+"finalCents": 461824
+},
+{
+"kind": "saving",
+"targetCents": 36590,
+"monthlyCents": 27275,
+"rateBp": 50,
+"months": 2,
+"finalCents": 54584
+},
+{
+"kind": "saving",
+"targetCents": 60307,
+"monthlyCents": 42757,
+"rateBp": 0,
+"months": 2,
+"finalCents": 85514
+},
+{
+"kind": "saving",
+"targetCents": 59295,
+"monthlyCents": 1931,
+"rateBp": 1398,
+"months": 27,
+"finalCents": 60955
+},
+{
+"kind": "saving",
+"targetCents": 441575620,
+"monthlyCents": 3721762,
+"rateBp": 50,
+"months": 116,
+"finalCents": 442392949
+},
+{
+"kind": "saving",
+"targetCents": 666011,
+"monthlyCents": 5415,
+"rateBp": 0,
+"months": 123,
+"finalCents": 666045
+},
+{
+"kind": "saving",
+"targetCents": 5112610,
+"monthlyCents": 22763,
+"rateBp": 1500,
+"months": 110,
+"finalCents": 5112725
+},
+{
+"kind": "saving",
+"targetCents": 41799,
+"monthlyCents": 89,
+"rateBp": 0,
+"months": 470,
+"finalCents": 41830
+},
+{
+"kind": "saving",
+"targetCents": 92756,
+"monthlyCents": 6,
+"rateBp": 1000,
+"months": null,
+"finalCents": null
+},
+{
+"kind": "saving",
+"targetCents": 608364009,
+"monthlyCents": 496800434,
+"rateBp": 1268,
+"months": 2,
+"finalCents": 1008551756
+},
+{
+"kind": "saving",
+"targetCents": 99293,
+"monthlyCents": 79941,
+"rateBp": 800,
+"months": 2,
+"finalCents": 161428
+},
+{
+"kind": "saving",
+"targetCents": 1582450,
+"monthlyCents": 1076753,
+"rateBp": 0,
+"months": 2,
+"finalCents": 2153506
+},
+{
+"kind": "saving",
+"targetCents": 318609,
+"monthlyCents": 145340,
+"rateBp": 0,
+"months": 3,
+"finalCents": 436020
+},
+{
+"kind": "saving",
+"targetCents": 5794449,
+"monthlyCents": 5526709,
+"rateBp": 729,
+"months": 2,
+"finalCents": 11151116
+},
+{
+"kind": "saving",
+"targetCents": 57142,
+"monthlyCents": 39504,
+"rateBp": 800,
+"months": 2,
+"finalCents": 79772
+},
+{
+"kind": "saving",
+"targetCents": 32400,
+"monthlyCents": 190,
+"rateBp": 1500,
+"months": 94,
+"finalCents": 32630
+},
+{
+"kind": "saving",
+"targetCents": 176209060,
+"monthlyCents": 1317084,
+"rateBp": 1000,
+"months": 91,
+"finalCents": 176497240
+},
+{
+"kind": "saving",
+"targetCents": 65935,
+"monthlyCents": 15190,
+"rateBp": 0,
+"months": 5,
+"finalCents": 75950
+},
+{
+"kind": "saving",
+"targetCents": 699430314,
+"monthlyCents": 191225974,
+"rateBp": 1348,
+"months": 4,
+"finalCents": 785377656
+},
+{
+"kind": "saving",
+"targetCents": 55897,
+"monthlyCents": 523,
+"rateBp": 1000,
+"months": 78,
+"finalCents": 56724
+},
+{
+"kind": "saving",
+"targetCents": 468718910,
+"monthlyCents": 467847810,
+"rateBp": 3000,
+"months": 1,
+"finalCents": 478189328
+},
+{
+"kind": "saving",
+"targetCents": 79735,
+"monthlyCents": 212,
+"rateBp": 1589,
+"months": 141,
+"finalCents": 80821
+},
+{
+"kind": "saving",
+"targetCents": 189115445,
+"monthlyCents": 6825741,
+"rateBp": 243,
+"months": 27,
+"finalCents": 189553295
+},
+{
+"kind": "saving",
+"targetCents": 70446,
+"monthlyCents": 6083,
+"rateBp": 3000,
+"months": 11,
+"finalCents": 76475
+},
+{
+"kind": "saving",
+"targetCents": 3993987,
+"monthlyCents": 7914,
+"rateBp": 50,
+"months": 459,
+"finalCents": 4002978
+},
+{
+"kind": "saving",
+"targetCents": 146284815,
+"monthlyCents": 6071663,
+"rateBp": 1079,
+"months": 22,
+"finalCents": 147575338
+},
+{
+"kind": "saving",
+"targetCents": 23140,
+"monthlyCents": 70,
+"rateBp": 50,
+"months": 310,
+"finalCents": 23164
+},
+{
+"kind": "saving",
+"targetCents": 22681336,
+"monthlyCents": 9419,
+"rateBp": 1000,
+"months": 378,
+"finalCents": 22777834
+},
+{
+"kind": "saving",
+"targetCents": 512681,
+"monthlyCents": 5068,
+"rateBp": 1500,
+"months": 67,
+"finalCents": 517427
+},
+{
+"kind": "saving",
+"targetCents": 53084,
+"monthlyCents": 13958,
+"rateBp": 3000,
+"months": 4,
+"finalCents": 58986
+},
+{
+"kind": "saving",
+"targetCents": 2238589,
+"monthlyCents": 1372574,
+"rateBp": 832,
+"months": 2,
+"finalCents": 2772724
+},
+{
+"kind": "saving",
+"targetCents": 650138810,
+"monthlyCents": 616335,
+"rateBp": 1000,
+"months": 282,
+"finalCents": 653753852
+},
+{
+"kind": "saving",
+"targetCents": 40483904,
+"monthlyCents": 55645,
+"rateBp": 300,
+"months": 417,
+"finalCents": 40557470
+},
+{
+"kind": "saving",
+"targetCents": 1282081,
+"monthlyCents": 4183,
+"rateBp": 300,
+"months": 229,
+"finalCents": 1288514
+},
+{
+"kind": "saving",
+"targetCents": 991812,
+"monthlyCents": 88277,
+"rateBp": 1268,
+"months": 11,
+"finalCents": 1031284
+},
+{
+"kind": "saving",
+"targetCents": 6608868,
+"monthlyCents": 6207456,
+"rateBp": 2005,
+"months": 2,
+"finalCents": 12702128
+},
+{
+"kind": "saving",
+"targetCents": 626603333,
+"monthlyCents": 142741,
+"rateBp": 1268,
+"months": 382,
+"finalCents": 630355496
+},
+{
+"kind": "saving",
+"targetCents": 5905335,
+"monthlyCents": 11473,
+"rateBp": 3000,
+"months": 115,
+"finalCents": 6025653
+},
+{
+"kind": "saving",
+"targetCents": 37600,
+"monthlyCents": 3638,
+"rateBp": 850,
+"months": 10,
+"finalCents": 37773
+},
+{
+"kind": "saving",
+"targetCents": 9769778,
+"monthlyCents": 18398,
+"rateBp": 1268,
+"months": 185,
+"finalCents": 9849325
+},
+{
+"kind": "saving",
+"targetCents": 680623502,
+"monthlyCents": 5640204,
+"rateBp": 300,
+"months": 106,
+"finalCents": 684015835
+},
+{
+"kind": "saving",
+"targetCents": 3094,
+"monthlyCents": 48,
+"rateBp": 0,
+"months": 65,
+"finalCents": 3120
+},
+{
+"kind": "saving",
+"targetCents": 947846,
+"monthlyCents": 639,
+"rateBp": 300,
+"months": null,
+"finalCents": null
+},
+{
+"kind": "saving",
+"targetCents": 5855,
+"monthlyCents": 10,
+"rateBp": 1268,
+"months": 193,
+"finalCents": 5880
+},
+{
+"kind": "saving",
+"targetCents": 968026261,
+"monthlyCents": 87049335,
+"rateBp": 1268,
+"months": 11,
+"finalCents": 1016942636
+},
+{
+"kind": "saving",
+"targetCents": 6289149,
+"monthlyCents": 77257,
+"rateBp": 800,
+"months": 66,
+"finalCents": 6368342
+},
+{
+"kind": "saving",
+"targetCents": 99682380,
+"monthlyCents": 8642477,
+"rateBp": 800,
+"months": 12,
+"finalCents": 108150976
+},
+{
+"kind": "saving",
+"targetCents": 9548170,
+"monthlyCents": 450210,
+"rateBp": 1500,
+"months": 19,
+"finalCents": 9630161
+},
+{
+"kind": "saving",
+"targetCents": 11289,
+"monthlyCents": 1107,
+"rateBp": 0,
+"months": 11,
+"finalCents": 12177
+},
+{
+"kind": "saving",
+"targetCents": 717612369,
+"monthlyCents": 718760,
+"rateBp": 0,
+"months": null,
+"finalCents": null
+},
+{
+"kind": "saving",
+"targetCents": 4029784,
+"monthlyCents": 2097530,
+"rateBp": 50,
+"months": 2,
+"finalCents": 4197676
+},
+{
+"kind": "saving",
+"targetCents": 29233,
+"monthlyCents": 491,
+"rateBp": 1000,
+"months": 49,
+"finalCents": 29528
+},
+{
+"kind": "saving",
+"targetCents": 7783642,
+"monthlyCents": 5339727,
+"rateBp": 800,
+"months": 2,
+"finalCents": 10782742
+},
+{
+"kind": "saving",
+"targetCents": 698449,
+"monthlyCents": 17683,
+"rateBp": 0,
+"months": 40,
+"finalCents": 707320
+},
+{
+"kind": "saving",
+"targetCents": 47983,
+"monthlyCents": 1590,
+"rateBp": 800,
+"months": 28,
+"finalCents": 48924
+},
+{
+"kind": "saving",
+"targetCents": 430121,
+"monthlyCents": 3844,
+"rateBp": 50,
+"months": 110,
+"finalCents": 432744
+},
+{
+"kind": "saving",
+"targetCents": 2594132,
+"monthlyCents": 136067,
+"rateBp": 1500,
+"months": 18,
+"finalCents": 2740755
+},
+{
+"kind": "saving",
+"targetCents": 97873,
+"monthlyCents": 318,
+"rateBp": 800,
+"months": 170,
+"finalCents": 98247
+},
+{
+"kind": "saving",
+"targetCents": 2239463,
+"monthlyCents": 6610,
+"rateBp": 50,
+"months": 317,
+"finalCents": 2240139
+},
+{
+"kind": "saving",
+"targetCents": 9057317,
+"monthlyCents": 782663,
+"rateBp": 3000,
+"months": 11,
+"finalCents": 9839582
+},
+{
+"kind": "saving",
+"targetCents": 834853,
+"monthlyCents": 46774,
+"rateBp": 50,
+"months": 18,
+"finalCents": 845264
+},
+{
+"kind": "saving",
+"targetCents": 2448635,
+"monthlyCents": 7065,
+"rateBp": 800,
+"months": 183,
+"finalCents": 2468637
+},
+{
+"kind": "saving",
+"targetCents": 82248,
+"monthlyCents": 6732,
+"rateBp": 2068,
+"months": 12,
+"finalCents": 89573
+},
+{
+"kind": "saving",
+"targetCents": 888718,
+"monthlyCents": 618367,
+"rateBp": 3000,
+"months": 2,
+"finalCents": 1278042
+},
+{
+"kind": "saving",
+"targetCents": 241218,
+"monthlyCents": 11242,
+"rateBp": 2176,
+"months": 19,
+"finalCents": 252698
+},
+{
+"kind": "saving",
+"targetCents": 7022172,
+"monthlyCents": 545752,
+"rateBp": 1268,
+"months": 13,
+"finalCents": 7611732
+},
+{
+"kind": "saving",
+"targetCents": 672503361,
+"monthlyCents": 3033077,
+"rateBp": 1490,
+"months": 110,
+"finalCents": 677953776
+},
+{
+"kind": "saving",
+"targetCents": 86919,
+"monthlyCents": 1000,
+"rateBp": 50,
+"months": 86,
+"finalCents": 87573
+},
+{
+"kind": "saving",
+"targetCents": 5878180,
+"monthlyCents": 2376257,
+"rateBp": 1500,
+"months": 3,
+"finalCents": 7297105
+},
+{
+"kind": "saving",
+"targetCents": 4424818,
+"monthlyCents": 315096,
+"rateBp": 1268,
+"months": 14,
+"finalCents": 4756903
+},
+{
+"kind": "saving",
+"targetCents": 973706,
+"monthlyCents": 40127,
+"rateBp": 50,
+"months": 25,
+"finalCents": 1008614
+},
+{
+"kind": "saving",
+"targetCents": 777915595,
+"monthlyCents": 19857690,
+"rateBp": 50,
+"months": 39,
+"finalCents": 780922953
+},
+{
+"kind": "saving",
+"targetCents": 26284,
+"monthlyCents": 796,
+"rateBp": 902,
+"months": 30,
+"finalCents": 26749
+},
+{
+"kind": "saving",
+"targetCents": 42033,
+"monthlyCents": 491,
+"rateBp": 312,
+"months": 78,
+"finalCents": 42444
+},
+{
+"kind": "saving",
+"targetCents": 2604998,
+"monthlyCents": 54072,
+"rateBp": 800,
+"months": 42,
+"finalCents": 2614672
+},
+{
+"kind": "saving",
+"targetCents": 105538476,
+"monthlyCents": 1194337,
+"rateBp": 50,
+"months": 87,
+"finalCents": 105830786
+},
+{
+"kind": "saving",
+"targetCents": 7615613,
+"monthlyCents": 109417,
+"rateBp": 1725,
+"months": 50,
+"finalCents": 7813463
+},
+{
+"kind": "saving",
+"targetCents": 877915,
+"monthlyCents": 692326,
+"rateBp": 1268,
+"months": 2,
+"finalCents": 1405487
+},
+{
+"kind": "saving",
+"targetCents": 1476710,
+"monthlyCents": 1580,
+"rateBp": 3000,
+"months": 140,
+"finalCents": 1486535
+},
+{
+"kind": "saving",
+"targetCents": 642711418,
+"monthlyCents": 794985,
+"rateBp": 0,
+"months": null,
+"finalCents": null
+},
+{
+"kind": "saving",
+"targetCents": 36596,
+"monthlyCents": 360,
+"rateBp": 3000,
+"months": 54,
+"finalCents": 37561
+},
+{
+"kind": "saving",
+"targetCents": 7327675,
+"monthlyCents": 538881,
+"rateBp": 1268,
+"months": 13,
+"finalCents": 7515901
+},
+{
+"kind": "saving",
+"targetCents": 322319851,
+"monthlyCents": 649366,
+"rateBp": 1268,
+"months": 179,
+"finalCents": 323691959
+},
+{
+"kind": "saving",
+"targetCents": 583008662,
+"monthlyCents": 1487834,
+"rateBp": 300,
+"months": 275,
+"finalCents": 585850635
+},
+{
+"kind": "saving",
+"targetCents": 23327273,
+"monthlyCents": 3159328,
+"rateBp": 1000,
+"months": 8,
+"finalCents": 26198647
+},
+{
+"kind": "saving",
+"targetCents": 3869768,
+"monthlyCents": 1456723,
+"rateBp": 0,
+"months": 3,
+"finalCents": 4370169
+},
+{
+"kind": "saving",
+"targetCents": 5515654,
+"monthlyCents": 153231,
+"rateBp": 3000,
+"months": 27,
+"finalCents": 5700636
+},
+{
+"kind": "saving",
+"targetCents": 260206,
+"monthlyCents": 11513,
+"rateBp": 0,
+"months": 23,
+"finalCents": 264799
+},
+{
+"kind": "saving",
+"targetCents": 346903,
+"monthlyCents": 312,
+"rateBp": 1268,
+"months": 250,
+"finalCents": 347534
+},
+{
+"kind": "saving",
+"targetCents": 9429,
+"monthlyCents": 5382,
+"rateBp": 300,
+"months": 2,
+"finalCents": 10803
+},
+{
+"kind": "saving",
+"targetCents": 75509,
+"monthlyCents": 12,
+"rateBp": 0,
+"months": null,
+"finalCents": null
+},
+{
+"kind": "saving",
+"targetCents": 2584518,
+"monthlyCents": 5705,
+"rateBp": 2782,
+"months": 114,
+"finalCents": 2619517
+},
+{
+"kind": "saving",
+"targetCents": 101094,
+"monthlyCents": 269,
+"rateBp": 800,
+"months": 191,
+"finalCents": 101157
+},
+{
+"kind": "saving",
+"targetCents": 824923,
+"monthlyCents": 1132,
+"rateBp": 1500,
+"months": 193,
+"finalCents": 827765
+},
+{
+"kind": "saving",
+"targetCents": 498467424,
+"monthlyCents": 280919332,
+"rateBp": 0,
+"months": 2,
+"finalCents": 561838664
+},
+{
+"kind": "saving",
+"targetCents": 967515501,
+"monthlyCents": 117180,
+"rateBp": 1500,
+"months": 393,
+"finalCents": 973951804
+},
+{
+"kind": "saving",
+"targetCents": 6454730,
+"monthlyCents": 63596,
+"rateBp": 0,
+"months": 102,
+"finalCents": 6486792
+},
+{
+"kind": "saving",
+"targetCents": 9866517,
+"monthlyCents": 546668,
+"rateBp": 0,
+"months": 19,
+"finalCents": 10386692
+},
+{
+"kind": "saving",
+"targetCents": 776625,
+"monthlyCents": 49507,
+"rateBp": 1476,
+"months": 15,
+"finalCents": 814988
+},
+{
+"kind": "saving",
+"targetCents": 241960092,
+"monthlyCents": 9055566,
+"rateBp": 3000,
+"months": 21,
+"finalCents": 243995784
+},
+{
+"kind": "saving",
+"targetCents": 1216206,
+"monthlyCents": 86350,
+"rateBp": 3000,
+"months": 13,
+"finalCents": 1312577
+},
+{
+"kind": "saving",
+"targetCents": 77942,
+"monthlyCents": 145,
+"rateBp": 1000,
+"months": 209,
+"finalCents": 78066
+},
+{
+"kind": "saving",
+"targetCents": 146780155,
+"monthlyCents": 63929,
+"rateBp": 1268,
+"months": 319,
+"finalCents": 147840392
+},
+{
+"kind": "saving",
+"targetCents": 8736929,
+"monthlyCents": 72483,
+"rateBp": 3000,
+"months": 59,
+"finalCents": 8823522
+},
+{
+"kind": "saving",
+"targetCents": 923526,
+"monthlyCents": 130742,
+"rateBp": 0,
+"months": 8,
+"finalCents": 1045936
+},
+{
+"kind": "saving",
+"targetCents": 74738,
+"monthlyCents": 7210,
+"rateBp": 0,
+"months": 11,
+"finalCents": 79310
+},
+{
+"kind": "saving",
+"targetCents": 797297,
+"monthlyCents": 2347,
+"rateBp": 1268,
+"months": 149,
+"finalCents": 806859
+},
+{
+"kind": "saving",
+"targetCents": 988455,
+"monthlyCents": 33641,
+"rateBp": 521,
+"months": 28,
+"finalCents": 1002150
+},
+{
+"kind": "saving",
+"targetCents": 1093148,
+"monthlyCents": 1081211,
+"rateBp": 300,
+"months": 2,
+"finalCents": 2170428
+},
+{
+"kind": "saving",
+"targetCents": 5123215,
+"monthlyCents": 2316,
+"rateBp": 2898,
+"months": 182,
+"finalCents": 5126922
+},
+{
+"kind": "saving",
+"targetCents": 90860,
+"monthlyCents": 1863,
+"rateBp": 1034,
+"months": 41,
+"finalCents": 91163
+},
+{
+"kind": "saving",
+"targetCents": 86245171,
+"monthlyCents": 41269661,
+"rateBp": 300,
+"months": 3,
+"finalCents": 124420680
+},
+{
+"kind": "saving",
+"targetCents": 672499,
+"monthlyCents": 377,
+"rateBp": 0,
+"months": null,
+"finalCents": null
+},
+{
+"kind": "saving",
+"targetCents": 1867723,
+"monthlyCents": 25494,
+"rateBp": 1500,
+"months": 53,
+"finalCents": 1879987
+},
+{
+"kind": "saving",
+"targetCents": 4533,
+"monthlyCents": 43,
+"rateBp": 1611,
+"months": 68,
+"finalCents": 4627
+},
+{
+"kind": "saving",
+"targetCents": 138935715,
+"monthlyCents": 9162616,
+"rateBp": 300,
+"months": 15,
+"finalCents": 140182399
+},
+{
+"kind": "saving",
+"targetCents": 4134279,
+"monthlyCents": 38565,
+"rateBp": 1268,
+"months": 73,
+"finalCents": 4157937
+},
+{
+"kind": "saving",
+"targetCents": 420874716,
+"monthlyCents": 215645188,
+"rateBp": 1268,
+"months": 2,
+"finalCents": 437780078
+},
+{
+"kind": "saving",
+"targetCents": 748,
+"monthlyCents": 64,
+"rateBp": 50,
+"months": 12,
+"finalCents": 770
+},
+{
+"kind": "saving",
+"targetCents": 268029289,
+"monthlyCents": 12764742,
+"rateBp": 2087,
+"months": 19,
+"finalCents": 285094285
+},
+{
+"kind": "saving",
+"targetCents": 4233481,
+"monthlyCents": 54532,
+"rateBp": 3000,
+"months": 46,
+"finalCents": 4372113
+},
+{
+"kind": "saving",
+"targetCents": 9261,
+"monthlyCents": 4,
+"rateBp": 300,
+"months": null,
+"finalCents": null
+},
+{
+"kind": "saving",
+"targetCents": 758938561,
+"monthlyCents": 11341707,
+"rateBp": 1195,
+"months": 52,
+"finalCents": 764298337
+},
+{
+"kind": "saving",
+"targetCents": 740959,
+"monthlyCents": 3450,
+"rateBp": 0,
+"months": 215,
+"finalCents": 741750
+},
+{
+"kind": "saving",
+"targetCents": 11885,
+"monthlyCents": 450,
+"rateBp": 0,
+"months": 27,
+"finalCents": 12150
+},
+{
+"kind": "saving",
+"targetCents": 299880012,
+"monthlyCents": 7184401,
+"rateBp": 1268,
+"months": 35,
+"finalCents": 302286527
+},
+{
+"kind": "saving",
+"targetCents": 804107558,
+"monthlyCents": 71875603,
+"rateBp": 300,
+"months": 12,
+"finalCents": 876459685
+},
+{
+"kind": "saving",
+"targetCents": 314848479,
+"monthlyCents": 821133,
+"rateBp": 50,
+"months": 356,
+"finalCents": 315122758
+},
+{
+"kind": "saving",
+"targetCents": 624478,
+"monthlyCents": 61559,
+"rateBp": 0,
+"months": 11,
+"finalCents": 677149
+},
+{
+"kind": "saving",
+"targetCents": 26027,
+"monthlyCents": 11257,
+"rateBp": 0,
+"months": 3,
+"finalCents": 33771
+},
+{
+"kind": "saving",
+"targetCents": 25731,
+"monthlyCents": 249,
+"rateBp": 50,
+"months": 102,
+"finalCents": 25949
+},
+{
+"kind": "saving",
+"targetCents": 617545,
+"monthlyCents": 2033,
+"rateBp": 3000,
+"months": 93,
+"finalCents": 624142
+},
+{
+"kind": "saving",
+"targetCents": 47275,
+"monthlyCents": 48,
+"rateBp": 0,
+"months": null,
+"finalCents": null
+},
+{
+"kind": "saving",
+"targetCents": 450391742,
+"monthlyCents": 348065491,
+"rateBp": 1514,
+"months": 2,
+"finalCents": 708519379
+},
+{
+"kind": "saving",
+"targetCents": 3007,
+"monthlyCents": 1948,
+"rateBp": 1779,
+"months": 2,
+"finalCents": 3976
+},
+{
+"kind": "saving",
+"targetCents": 673087103,
+"monthlyCents": 1516856,
+"rateBp": 300,
+"months": 300,
+"finalCents": 674376919
+},
+{
+"kind": "saving",
+"targetCents": 987465458,
+"monthlyCents": 287968760,
+"rateBp": 0,
+"months": 4,
+"finalCents": 1151875040
+},
+{
+"kind": "saving",
+"targetCents": 787724657,
+"monthlyCents": 3420370,
+"rateBp": 1000,
+"months": 131,
+"finalCents": 791442078
+},
+{
+"kind": "saving",
+"targetCents": 5124,
+"monthlyCents": 47,
+"rateBp": 1268,
+"months": 74,
+"finalCents": 5165
+},
+{
+"kind": "saving",
+"targetCents": 38023,
+"monthlyCents": 2789,
+"rateBp": 915,
+"months": 13,
+"finalCents": 38171
+},
+{
+"kind": "saving",
+"targetCents": 32923673,
+"monthlyCents": 117426,
+"rateBp": 50,
+"months": 266,
+"finalCents": 33034253
+},
+{
+"kind": "saving",
+"targetCents": 266992,
+"monthlyCents": 833,
+"rateBp": 50,
+"months": 301,
+"finalCents": 267147
+},
+{
+"kind": "saving",
+"targetCents": 76387,
+"monthlyCents": 56954,
+"rateBp": 1268,
+"months": 2,
+"finalCents": 115621
+},
+{
+"kind": "saving",
+"targetCents": 56036,
+"monthlyCents": 1726,
+"rateBp": 0,
+"months": 33,
+"finalCents": 56958
+},
+{
+"kind": "saving",
+"targetCents": 5431069,
+"monthlyCents": 1007267,
+"rateBp": 3000,
+"months": 6,
+"finalCents": 6528780
+},
+{
+"kind": "saving",
+"targetCents": 7826361,
+"monthlyCents": 86620,
+"rateBp": 800,
+"months": 72,
+"finalCents": 7951801
+},
+{
+"kind": "saving",
+"targetCents": 260200254,
+"monthlyCents": 41841699,
+"rateBp": 300,
+"months": 7,
+"finalCents": 295795590
+},
+{
+"kind": "saving",
+"targetCents": 9669929,
+"monthlyCents": 6909145,
+"rateBp": 50,
+"months": 2,
+"finalCents": 13826907
+},
+{
+"kind": "saving",
+"targetCents": 980307306,
+"monthlyCents": 88217402,
+"rateBp": 0,
+"months": 12,
+"finalCents": 1058608824
+},
+{
+"kind": "saving",
+"targetCents": 777085,
+"monthlyCents": 12263,
+"rateBp": 0,
+"months": 64,
+"finalCents": 784832
+},
+{
+"kind": "saving",
+"targetCents": 744806,
+"monthlyCents": 2268,
+"rateBp": 1707,
+"months": 127,
+"finalCents": 747673
+},
+{
+"kind": "saving",
+"targetCents": 656032384,
+"monthlyCents": 7530366,
+"rateBp": 1268,
+"months": 63,
+"finalCents": 662976728
+},
+{
+"kind": "saving",
+"targetCents": 6776953,
+"monthlyCents": 1420,
+"rateBp": 0,
+"months": null,
+"finalCents": null
+},
+{
+"kind": "saving",
+"targetCents": 75073,
+"monthlyCents": 176,
+"rateBp": 800,
+"months": 206,
+"finalCents": 75647
+},
+{
+"kind": "saving",
+"targetCents": 637498234,
+"monthlyCents": 6183521,
+"rateBp": 1133,
+"months": 73,
+"finalCents": 639683489
+},
+{
+"kind": "saving",
+"targetCents": 72245,
+"monthlyCents": 94,
+"rateBp": 0,
+"months": null,
+"finalCents": null
+},
+{
+"kind": "saving",
+"targetCents": 6484480,
+"monthlyCents": 50769,
+"rateBp": 1571,
+"months": 77,
+"finalCents": 6513154
+},
+{
+"kind": "saving",
+"targetCents": 72627,
+"monthlyCents": 463,
+"rateBp": 0,
+"months": 157,
+"finalCents": 72691
+},
+{
+"kind": "saving",
+"targetCents": 4235327,
+"monthlyCents": 80835,
+"rateBp": 50,
+"months": 52,
+"finalCents": 4250055
+},
+{
+"kind": "saving",
+"targetCents": 905573629,
+"monthlyCents": 53826182,
+"rateBp": 1189,
+"months": 16,
+"finalCents": 933422831
+},
+{
+"kind": "saving",
+"targetCents": 2209505,
+"monthlyCents": 2368,
+"rateBp": 1268,
+"months": 234,
+"finalCents": 2214348
+},
+{
+"kind": "saving",
+"targetCents": 952261,
+"monthlyCents": 5071,
+"rateBp": 800,
+"months": 123,
+"finalCents": 952555
+},
+{
+"kind": "saving",
+"targetCents": 712371379,
+"monthlyCents": 11385,
+"rateBp": 3000,
+"months": 330,
+"finalCents": 715272050
+},
+{
+"kind": "saving",
+"targetCents": 831960121,
+"monthlyCents": 3306849,
+"rateBp": 1939,
+"months": 105,
+"finalCents": 837946868
+},
+{
+"kind": "saving",
+"targetCents": 43275,
+"monthlyCents": 52,
+"rateBp": 800,
+"months": 288,
+"finalCents": 43445
+},
+{
+"kind": "saving",
+"targetCents": 803193917,
+"monthlyCents": 43591058,
+"rateBp": 50,
+"months": 19,
+"finalCents": 831681780
+},
+{
+"kind": "saving",
+"targetCents": 91961,
+"monthlyCents": 29,
+"rateBp": 1210,
+"months": 361,
+"finalCents": 92043
+},
+{
+"kind": "saving",
+"targetCents": 3704,
+"monthlyCents": 10,
+"rateBp": 0,
+"months": 371,
+"finalCents": 3710
+},
+{
+"kind": "saving",
+"targetCents": 23312,
+"monthlyCents": 6573,
+"rateBp": 1268,
+"months": 4,
+"finalCents": 26955
+},
+{
+"kind": "saving",
+"targetCents": 4782720,
+"monthlyCents": 8739,
+"rateBp": 1775,
+"months": 157,
+"finalCents": 4833633
+},
+{
+"kind": "saving",
+"targetCents": 59968,
+"monthlyCents": 14,
+"rateBp": 1500,
+"months": 337,
+"finalCents": 60032
+},
+{
+"kind": "saving",
+"targetCents": 985582,
+"monthlyCents": 755241,
+"rateBp": 0,
+"months": 2,
+"finalCents": 1510482
+},
+{
+"kind": "saving",
+"targetCents": 803561817,
+"monthlyCents": 2078189,
+"rateBp": 1500,
+"months": 147,
+"finalCents": 814905325
+},
+{
+"kind": "saving",
+"targetCents": 84940,
+"monthlyCents": 4891,
+"rateBp": 1911,
+"months": 16,
+"finalCents": 88775
+},
+{
+"kind": "saving",
+"targetCents": 7024991,
+"monthlyCents": 7429,
+"rateBp": 0,
+"months": null,
+"finalCents": null
+},
+{
+"kind": "saving",
+"targetCents": 797876026,
+"monthlyCents": 212298873,
+"rateBp": 1500,
+"months": 4,
+"finalCents": 874359196
+},
+{
+"kind": "saving",
+"targetCents": 344943,
+"monthlyCents": 11152,
+"rateBp": 595,
+"months": 29,
+"finalCents": 347920
+},
+{
+"kind": "saving",
+"targetCents": 62951,
+"monthlyCents": 627,
+"rateBp": 3000,
+"months": 53,
+"finalCents": 63378
+},
+{
+"kind": "saving",
+"targetCents": 5072772,
+"monthlyCents": 4498612,
+"rateBp": 800,
+"months": 2,
+"finalCents": 9084242
+},
+{
+"kind": "saving",
+"targetCents": 926478126,
+"monthlyCents": 1806116,
+"rateBp": 3000,
+"months": 115,
+"finalCents": 948577416
+},
+{
+"kind": "saving",
+"targetCents": 7429307,
+"monthlyCents": 56626,
+"rateBp": 300,
+"months": 114,
+"finalCents": 7462052
+},
+{
+"kind": "saving",
+"targetCents": 596388,
+"monthlyCents": 3533,
+"rateBp": 1061,
+"months": 105,
+"finalCents": 598073
+},
+{
+"kind": "saving",
+"targetCents": 716099,
+"monthlyCents": 258344,
+"rateBp": 882,
+"months": 3,
+"finalCents": 786040
+},
+{
+"kind": "saving",
+"targetCents": 102840566,
+"monthlyCents": 1520663,
+"rateBp": 1268,
+"months": 52,
+"finalCents": 104078647
+},
+{
+"kind": "saving",
+"targetCents": 22681,
+"monthlyCents": 389,
+"rateBp": 3000,
+"months": 38,
+"finalCents": 23297
+},
+{
+"kind": "saving",
+"targetCents": 24189,
+"monthlyCents": 21345,
+"rateBp": 0,
+"months": 2,
+"finalCents": 42690
+},
+{
+"kind": "saving",
+"targetCents": 7548158,
+"monthlyCents": 48213,
+"rateBp": 0,
+"months": 157,
+"finalCents": 7569441
+},
+{
+"kind": "saving",
+"targetCents": 7337189,
+"monthlyCents": 20629,
+"rateBp": 50,
+"months": 332,
+"finalCents": 7345390
+},
+{
+"kind": "saving",
+"targetCents": 77698,
+"monthlyCents": 3313,
+"rateBp": 1500,
+"months": 21,
+"finalCents": 79279
+}
+]
+}

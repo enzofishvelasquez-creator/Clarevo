@@ -2,6 +2,7 @@
 export type CalcGroup = 'compra' | 'dividas' | 'guardar';
 
 export type CalcSlug =
+  | 'antes-de-financiar'
   | 'parcelado-ou-a-vista'
   | 'custo-por-ano'
   | 'custo-da-divida'
@@ -26,6 +27,7 @@ export const CALC_GROUPS: readonly { id: CalcGroup; title: string }[] = [
 ];
 
 export const CALCULATORS: readonly CalcInfo[] = [
+  { slug: 'antes-de-financiar', title: 'Antes de financiar', subtitle: 'Parcela, juros e o que muda se juntar antes', group: 'compra' },
   { slug: 'parcelado-ou-a-vista', title: 'Parcelado ou à vista?', subtitle: 'Descubra os juros embutidos no parcelado', group: 'compra' },
   { slug: 'custo-por-ano', title: 'Quanto custa por ano?', subtitle: 'Assinaturas e gastos que se repetem', group: 'compra' },
   { slug: 'custo-da-divida', title: 'Quanto custa uma dívida?', subtitle: 'Rotativo, cheque especial ou empréstimo', group: 'dividas' },
@@ -110,6 +112,7 @@ export const CALC_UI_TEXT = {
     multa: 'Calcular multa e juros',
     quitar: 'Quanto economizo se quitar antes?',
     ordem: 'Em que ordem quitar? Fazer as contas',
+    financiar: 'Antes de financiar? Fazer as contas',
     custoAno: 'Quanto custa por ano?',
     dividir: 'Dividir estas contas',
     familia: 'Enquanto isso, dividir as contas da casa',

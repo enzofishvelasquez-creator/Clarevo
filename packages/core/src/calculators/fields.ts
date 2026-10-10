@@ -1,3 +1,4 @@
+import { ANTES_FIELDS } from './antes-de-financiar';
 import type { CalcSlug } from './catalog';
 import type { CalcFieldSpec } from './common';
 import { CUSTO_POR_ANO_FIELDS } from './custo-por-ano';
@@ -13,6 +14,7 @@ import { RESERVA_FIELDS } from './reserva';
 
 /** Campos de cada calculadora (rótulo, dica, tipo, faixa e mensagens), na ordem da tela. */
 export const CALC_FIELDS: Record<CalcSlug, Record<string, CalcFieldSpec>> = {
+  'antes-de-financiar': ANTES_FIELDS,
   'parcelado-ou-a-vista': PARCELADO_FIELDS,
   'custo-por-ano': CUSTO_POR_ANO_FIELDS,
   'custo-da-divida': DIVIDA_FIELDS,

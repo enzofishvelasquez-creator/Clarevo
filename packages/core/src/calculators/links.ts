@@ -6,6 +6,7 @@ import { DEBT_NATURES } from '../records';
 import { currentTerm, remainingInstallments } from '../series';
 import type { CalcSlug } from './catalog';
 import { isCalcSlug } from './catalog';
+import type { AntesInput } from './antes-de-financiar';
 import type { Frequencia, CustoPorAnoInput } from './custo-por-ano';
 import type { DividaInput, DividaTipo } from './custo-da-divida';
 import type { DividirInput, DividirModo } from './dividir-contas';
@@ -25,6 +26,7 @@ import type { ReservaInput } from './reserva';
  * frequencia, origem. calcLinkParams monta; calcPrefill lê e valida (ignora os inválidos, nunca lança).
  */
 export interface CalcInputMap {
+  'antes-de-financiar': AntesInput;
   'parcelado-ou-a-vista': ParceladoInput;
   'custo-por-ano': CustoPorAnoInput;
   'custo-da-divida': DividaInput;
@@ -38,6 +40,8 @@ export interface CalcInputMap {
 
 /** O que um link pode preencher, por calculadora (valores em centavos). */
 export interface CalcLinkValueMap {
+  /** Sem parâmetros: o comprometido e a renda de referência vêm da própria tela, e a taxa é sempre digitada. */
+  'antes-de-financiar': Record<never, never>;
   'parcelado-ou-a-vista': { modo?: ParceladoModo; avistaCents?: Cents; parcelaCents?: Cents; parcelas?: number };
   'custo-por-ano': { valorCents?: Cents; frequencia?: Frequencia };
   'custo-da-divida': { tipo?: DividaTipo; valorCents?: Cents; parcelas?: number };
@@ -110,6 +114,7 @@ export function calcLinkParams<S extends CalcSlug>(slug: S, values: CalcLinkValu
       put(out, 'dias', x.dias);
       break;
     }
+    case 'antes-de-financiar':
     case 'plano-dividas':
       break;
     case 'reserva':
@@ -183,7 +188,7 @@ function compact<T extends object>(obj: T): T {
  * - quitar-antes: parcela (ou valor), parcelas (→ restantes, 1 a 480), modo (tudo | ultimas), prazos (→ prazosEmDias;
  *   sem parcelas, restantes = quantidade de prazos; com quantidade diferente, os prazos são ignorados);
  * - multa-e-juros: valor, dias (1 a 3.650);
- * - plano-dividas: nenhum (as dívidas vêm dos parcelamentos da própria tela);
+ * - antes-de-financiar e plano-dividas: nenhum (os números vêm da própria tela e a taxa é sempre digitada);
  * - reserva: valor (→ essenciais);
  * - juntar-para-objetivo: total ou valor (→ alvo), modo (prazo | mensal);
  * - dividir-contas: total ou valor, modo (iguais | renda).
@@ -224,6 +229,7 @@ export function calcPrefill(slug: string, params: RouteParams): CalcPrefill<Calc
       case 'multa-e-juros':
         out = { valor: money(params, 'valor'), dias: count(params, 'dias', 1, 3_650) };
         break;
+      case 'antes-de-financiar':
       case 'plano-dividas':
         out = {};
         break;

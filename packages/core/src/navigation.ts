@@ -336,6 +336,13 @@ export const APP_SCREENS: readonly AppScreen[] = [
     keywords: ['calculadora', 'calculadoras', 'calcular', 'cálculo', 'fazer a conta', 'à vista', 'quitar', 'multa', 'dividir contas'],
   },
   {
+    id: 'antes-de-financiar',
+    title: 'Antes de financiar',
+    caption: 'Veja a parcela, os juros e quanto pesa na renda antes de comprar a prazo',
+    href: '/calcular/antes-de-financiar',
+    keywords: ['financiar', 'financiamento', 'financiado', 'poder de compra', 'entrada', 'à vista', 'comprar a prazo', 'parcela', 'prestação'],
+  },
+  {
     id: 'plano-dividas',
     title: 'Em que ordem quitar as dívidas?',
     caption: 'Compare duas ordens de pagamento para sair das dívidas',
