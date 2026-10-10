@@ -16,6 +16,7 @@ import {
   parseAccessKey,
   parseNfceQr,
   raceWithTimeout,
+  sefazPhoneHint,
   readReceiptCode,
   receiptDraft,
   scanOptionLabel,
@@ -23,9 +24,16 @@ import {
   storeMemoryFor,
   storeMemoryId,
   suggestDescription,
+  type PaymentForm,
 } from '../src';
 
 const TODAY = '2026-10-09';
+
+function parseNfceQrOk(url: string) {
+  const qr = parseNfceQr(url);
+  if (!qr.ok) throw new Error('qr');
+  return qr.qr;
+}
 
 function keyText(aamm: string, model: '55' | '65' = '65', uf = '33', cnpj = '11222333000181'): string {
   const body = `${uf}${aamm}${cnpj}${model}001000012345187654321`;
@@ -146,7 +154,7 @@ describe('o que a leitura preenche e o foco', () => {
 
   it('linha do bloco "Nota lida"', () => {
     const full = draftOf('2610', { totalCents: 8_740, issuedOn: '2026-10-06', issuerName: 'Mercado Exemplo Ltda' });
-    expect(noteReadLine(full.draft, '2026-10-06')).toBe('Nota lida: Mercado Exemplo Ltda · RJ · 06/10/2026');
+    expect(noteReadLine(full.draft, '2026-10-06')).toBe('Nota lida: Mercado Exemplo Ltda · RJ · R$ 87,40 · 06/10/2026');
     const bare = draftOf('2610');
     expect(noteReadLine(bare.draft, null)).toBe('Nota lida: CNPJ 11.222.333/0001-81 · RJ · outubro de 2026');
   });
@@ -223,6 +231,73 @@ describe('looksLikeBoleto', () => {
   });
 });
 
+describe('valor, loja, data e forma de pagamento na linha da nota (D-042)', () => {
+  const withPay = (payments: PaymentForm[], extra: Parameters<typeof draftOf>[1] = { totalCents: 8_740, issuedOn: '2026-10-06', issuerName: 'Mercado Exemplo' }) => {
+    const { facts } = draftOf('2610', extra);
+    return receiptDraft({ ...facts, payments }, TODAY);
+  };
+
+  it('"Nota lida: Mercado Exemplo · R$ 87,40 · 06/10/2026 · Pix" (com a UF depois da loja)', () => {
+    expect(noteReadLine(withPay(['pix']), '2026-10-06')).toBe('Nota lida: Mercado Exemplo · RJ · R$ 87,40 · 06/10/2026 · Pix');
+  });
+
+  it.each([
+    [['dinheiro'], 'Dinheiro'],
+    [['credito'], 'Cartão de crédito'],
+    [['debito'], 'Cartão de débito'],
+    [['vale'], 'Vale'],
+    [['outros'], 'Outra forma de pagamento'],
+    [['dinheiro', 'credito'], 'Pagamento em mais de uma forma'],
+  ] as [PaymentForm[], string][])('forma %j aparece como "%s"', (forms, label) => {
+    expect(noteReadLine(withPay(forms), '2026-10-06').endsWith(` · ${label}`)).toBe(true);
+  });
+
+  it('sem forma, sem valor ou sem data: a linha mostra só o que veio', () => {
+    expect(noteReadLine(withPay([]), '2026-10-06')).toBe('Nota lida: Mercado Exemplo · RJ · R$ 87,40 · 06/10/2026');
+    expect(noteReadLine(withPay(['pix'], { issuerName: 'Mercado Exemplo' }), null)).toBe('Nota lida: Mercado Exemplo · RJ · outubro de 2026 · Pix');
+    expect(noteReadLine(draftOf('2610').draft, null)).toBe('Nota lida: CNPJ 11.222.333/0001-81 · RJ · outubro de 2026');
+  });
+
+  it('o texto da linha nunca traz CPF nem a chave', () => {
+    const line = noteReadLine(withPay(['credito']), '2026-10-06');
+    expect(line).not.toMatch(/\d{11,}/);
+  });
+});
+
+describe('dica "No celular, o Clarevo lê o valor e a data na página da Sefaz."', () => {
+  const online = `https://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode?p=${keyText('2610')}|2|1|1|ABCDEF0123456789ABCDEF0123456789ABCDEF01`;
+  const contingency = `https://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode?p=${keyText('2610')}|2|1|08|87.40|0123456789ABCDEF0123456789ABCDEF01234567|1|ABCDEF0123456789ABCDEF0123456789ABCDEF01`;
+  const draftFrom = (url: string) => {
+    const qr = parseNfceQr(url);
+    if (!qr.ok) throw new Error('qr');
+    const facts = factsFromQr(qr.qr, url);
+    const draft = receiptDraft(facts, TODAY);
+    return { draft, issuedOn: noteIssuedOn(facts, draft, TODAY) };
+  };
+
+  it('na web, nota do RJ com QR online (sem valor nem dia): a dica aparece', () => {
+    const { draft, issuedOn } = draftFrom(online);
+    expect(sefazPhoneHint(draft, issuedOn, true)).toBe('No celular, o Clarevo lê o valor e a data na página da Sefaz.');
+  });
+
+  it('no celular (a leitura está disponível), não aparece', () => {
+    const { draft, issuedOn } = draftFrom(online);
+    expect(sefazPhoneHint(draft, issuedOn, false)).toBeNull();
+  });
+
+  it('QR em contingência (valor e dia no código): não aparece', () => {
+    const { draft, issuedOn } = draftFrom(contingency);
+    expect(sefazPhoneHint(draft, issuedOn, true)).toBeNull();
+  });
+
+  it('só chave (sem endereço oficial), nota de outro estado e NF-e: não aparece', () => {
+    expect(sefazPhoneHint(draftOf('2610').draft, null, true)).toBeNull();
+    const sp = receiptDraft(factsFromQr(parseNfceQrOk(`https://www.nfce.fazenda.sp.gov.br/qrcode?p=${keyText('2610', '65', '35')}|2|1|1|ABCDEF0123456789ABCDEF0123456789ABCDEF01`), 'https://www.nfce.fazenda.sp.gov.br/qrcode'), TODAY);
+    expect(sefazPhoneHint(sp, null, true)).toBeNull();
+    expect(sefazPhoneHint(draftOf('2610', { model: '55' }).draft, null, true)).toBeNull();
+  });
+});
+
 describe('integração com o QR', () => {
   it('QR do RJ em contingência traz valor e dia: nada falta', () => {
     const base = 'https://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode?p=';
@@ -233,7 +308,7 @@ describe('integração com o QR', () => {
     const facts = factsFromQr(qr.qr, url);
     const draft = receiptDraft(facts, TODAY);
     expect(noteFillPlan(draft)).toEqual({ amountText: '87,40', dateText: '08/10/2026', focus: null });
-    expect(noteReadLine(draft, noteIssuedOn(facts, draft, TODAY))).toBe('Nota lida: CNPJ 11.222.333/0001-81 · RJ · 08/10/2026');
+    expect(noteReadLine(draft, noteIssuedOn(facts, draft, TODAY))).toBe('Nota lida: CNPJ 11.222.333/0001-81 · RJ · R$ 87,40 · 08/10/2026');
   });
 });
 

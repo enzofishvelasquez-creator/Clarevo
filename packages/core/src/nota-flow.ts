@@ -2,9 +2,11 @@ import type { IsoDate, IsoMonth } from './dates';
 import { formatDateBR, formatMonthYearBR } from './dates';
 import type { AccessKeyInfo, ReceiptDraft, ReceiptFacts } from './nota';
 import { NOTA_TEXT } from './nota';
+import { paymentSummary } from './nota-pagamento';
+import { canReadSefazPage } from './sefaz-page';
 import { sha256Hex } from './sha256';
 import { CATEGORIES } from './records';
-import { centsToInput } from './money';
+import { centsToInput, formatBRL } from './money';
 import { DESCRIPTION_MAX } from './validation';
 
 /**
@@ -29,6 +31,9 @@ export const NOTA_FLOW_TEXT = {
   /** Antes de pedir a câmera pela primeira vez. */
   cameraIntro: 'O Clarevo usa a câmera só para ler o código da nota. Nenhuma foto é guardada.',
   cameraAim: 'Aponte para o QR code no rodapé do cupom. Compra on-line: o código de barras do DANFE.',
+  /** Depois de uns 5 segundos sem ler (D-042): chegar mais perto, até o QR ocupar a moldura. */
+  cameraCloser: 'Aproxime até o QR ocupar a moldura.',
+  cameraFrameA11y: 'Moldura para o código da nota',
   cameraStarting: 'Abrindo a câmera…',
   cameraUnavailable: 'Não conseguimos usar a câmera neste aparelho. Você pode escolher o PDF da nota ou colar o link ou a chave.',
   cameraDeniedHelp: 'Para usar a câmera, permita o acesso nos ajustes do aparelho. Você também pode escolher o PDF da nota ou colar o link ou a chave.',
@@ -55,6 +60,8 @@ export const NOTA_FLOW_TEXT = {
   otherMonth: (month: IsoMonth): string => `A nota é de ${formatMonthYearBR(month)}. A data escolhida é de outro mês.`,
   /** NF-e (modelo 55) sem dados da loja além do CNPJ. */
   cnpjOnly: 'O código traz o CNPJ da loja, não o nome. Digite o nome na descrição.',
+  /** Na web, nota do RJ com QR online: valor e data só vêm da página da Sefaz, que o celular lê. */
+  phoneReads: 'No celular, o Clarevo lê o valor e a data na página da Sefaz.',
   /** Boleto colado no lugar da chave. */
   boleto: 'Este é o código de um boleto. Para anotar uma conta que ainda vai vencer, use Anotar conta a pagar.',
   boletoAction: 'Anotar conta a pagar',
@@ -69,6 +76,14 @@ export const NOTA_FLOW_TEXT = {
   /** Mensagens de carregamento e falha do PDF e da câmera, em voz de aviso (sem alerta). */
   openFailed: 'Não foi possível abrir o endereço da Sefaz agora. Tente de novo mais tarde.',
 } as const;
+
+/**
+ * Câmera da leitura (D-042). Foco: o `expo-camera` 57.0.6 deixa o foco contínuo ligado quando `autofocus` não é passado (iOS) e
+ * é o padrão do CameraX (Android); `autofocus="on"` faz um foco só e o trava, e no Android mede o ponto do canto da tela, por isso
+ * não é usado. Não existe "toque para focar" nessa versão. O que o app faz: zoom inicial leve (10% do máximo do aparelho, para QR
+ * pequeno), moldura quadrada ao centro, dica de aproximar depois de 5 s e a da lanterna depois de 10 s. Nenhuma foto é guardada.
+ */
+export const NOTA_CAMERA = { zoom: 0.1, closerHintMs: 5_000, torchHintMs: 10_000 } as const;
 
 /** Tempo máximo da leitura de um PDF no aparelho (arquivo, texto e conferência). Passou disso, vale NOTA_TEXT.pdf.failed. */
 export const PDF_READ_TIMEOUT_MS = 25_000;
@@ -205,11 +220,25 @@ export function noteIssuedOn(facts: Pick<ReceiptFacts, 'issuedOn'>, draft: Pick<
   return d && d.slice(0, 7) === draft.month && d <= today ? d : null;
 }
 
-/** "Nota lida: Mercado Exemplo · RJ · 06/10/2026" ou "Nota lida: CNPJ 11.222.333/0001-81 · RJ · outubro de 2026". */
+/**
+ * "Nota lida: Mercado Exemplo · RJ · R$ 87,40 · 06/10/2026 · Pix" (D-042: loja, valor, data e forma de pagamento, quando a leitura
+ * os traz) ou "Nota lida: CNPJ 11.222.333/0001-81 · RJ · outubro de 2026" (só o que o código dá). A tela passa o texto por
+ * `MoneyTxt`, então o valor respeita "Ocultar valores".
+ */
 export function noteReadLine(draft: ReceiptDraft, issuedOn: IsoDate | null): string {
   const store = draft.issuerName ?? (draft.issuerCnpj ? `CNPJ ${draft.issuerCnpj}` : null);
   const when = issuedOn ? formatDateBR(issuedOn) : formatMonthYearBR(draft.month);
-  return `${NOTA_FLOW_TEXT.readTitle}: ${[store, draft.uf, when].filter(Boolean).join(' · ')}`;
+  const amount = draft.amountCents === null ? null : formatBRL(draft.amountCents);
+  return `${NOTA_FLOW_TEXT.readTitle}: ${[store, draft.uf, amount, when, paymentSummary(draft.payments)].filter(Boolean).join(' · ')}`;
+}
+
+/**
+ * Na web, a nota do RJ com QR online não traz valor nem data (a página da Sefaz só é lida no celular): o bloco diz onde a leitura
+ * completa acontece. Só quando falta o valor ou o dia, só para a nota que o celular leria, e só onde a leitura não está disponível.
+ */
+export function sefazPhoneHint(draft: ReceiptDraft, issuedOn: IsoDate | null, readUnavailable: boolean): string | null {
+  if (!readUnavailable || !canReadSefazPage(draft)) return null;
+  return draft.amountCents === null || issuedOn === null ? NOTA_FLOW_TEXT.phoneReads : null;
 }
 
 export interface NoteGaps {

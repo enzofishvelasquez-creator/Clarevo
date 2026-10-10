@@ -1,14 +1,14 @@
-import { CARDS_TEXT, ERROR_TEXT } from '@clarevo/core';
+import { CARDS_TEXT, ERROR_TEXT, cardInvoicesMonth, monthOf } from '@clarevo/core';
 import { router } from 'expo-router';
 import { Plus, ShieldCheck } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { CardTile } from '@/components/card-parts';
+import { CardMonthSummary, CardTile } from '@/components/card-parts';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Button, Card, Screen, Skeleton, Txt } from '@/components/ui';
-import { useCardsOverview, useSpace } from '@/state/data';
+import { useCardsOverview, useIncomeReferences, useSpace } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -22,6 +22,10 @@ export default function CartoesScreen() {
   const { today } = useSession();
   const personal = useSpace().data;
   const overview = useCardsOverview(personal?.personalContextId);
+  const refs = useIncomeReferences(personal?.personalContextId);
+  const month = monthOf(today);
+  // Faturas do mês (D-042): as de todos os cartões do contexto, ativos e arquivados, como a renda comprometida as conta.
+  const monthTotal = overview.data ? cardInvoicesMonth(overview.data.flatMap((o) => o.invoices), month, refs.data ?? []) : null;
   const [notice] = useFlash();
   const list = overview.data ?? [];
   const active = list.filter((o) => o.card.status === 'ativo');
@@ -32,6 +36,14 @@ export default function CartoesScreen() {
       <SubHeader title={T.title} right={<ContextPill label="Pessoal" />} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <FlashBanner message={notice} />
+        {monthTotal && list.length > 0 ? (
+          <CardMonthSummary
+            data={monthTotal}
+            incomeKnown={refs.isSuccess}
+            onSeeCommitted={() => router.push({ pathname: '/renda-comprometida', params: { mes: month } })}
+            onInformIncome={() => router.push({ pathname: '/renda-comprometida/referencia', params: { mes: month } })}
+          />
+        ) : null}
         <Txt color={colors.textSecondary}>{T.screens.listIntro}</Txt>
         <Button label={T.newCard} icon={Plus} onPress={() => router.push('/cartoes/novo')} />
 

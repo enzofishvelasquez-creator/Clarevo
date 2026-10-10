@@ -4,6 +4,8 @@ import type { Cents } from './money';
 import { MAX_RECORD_CENTS } from './money';
 import type { AccessKeyInfo, ReceiptDraft, ReceiptFacts } from './nota';
 import { findAccessKey, friendlyIssuerName, officialQueryUrl } from './nota';
+import type { PaymentForm } from './nota-pagamento';
+import { paymentFormsFromText } from './nota-pagamento';
 
 /**
  * Leitura da página pública da Sefaz (Ciclo E, D-038, decisão de Enzo de 09/10/2026: "Sim, ler a Sefaz-RJ já").
@@ -29,6 +31,8 @@ export interface SefazPageReading {
   issuedOn: IsoDate | null;
   /** Quantidade de itens da nota ("Qtd. total de itens"). */
   itemCount: number | null;
+  /** Forma de pagamento da tabela "Forma de pagamento" / "Valor pago" (D-042), sem valores nem troco; vazio quando a página não traz. */
+  payments: PaymentForm[];
 }
 
 export type SefazPageErrorCode =
@@ -292,9 +296,11 @@ export function parseSefazPage(html: string, key: AccessKeyInfo): SefazPageResul
   const itemRows = html.match(/<tr\b[^>]*\bid\s*=\s*["']Item\s*\+?\s*\d+["']/gi);
   const itemCount = items ? Number(items[1]) : itemRows ? itemRows.length : null;
   const issuerName = issuerFromPage(marker, lines);
+  // Só o trecho antes do bloco do consumidor: a forma de pagamento vem logo depois dos totais, e o resto da página não é lido para isso.
+  const payments = paymentFormsFromText(issuerLines(lines, marker).join('\n'));
 
   if (issuerName === null && totalCents === null && issuedOn === null) return { ok: false, code: 'pagina_nao_reconhecida' };
-  return { ok: true, reading: { issuerName, totalCents, issuedOn, itemCount: itemCount !== null && itemCount >= 1 ? itemCount : null } };
+  return { ok: true, reading: { issuerName, totalCents, issuedOn, itemCount: itemCount !== null && itemCount >= 1 ? itemCount : null, payments } };
 }
 
 /** Junta o que a página trouxe ao que o QR já dava (a página prevalece nos campos que ela traz). */
@@ -304,6 +310,7 @@ export function factsWithPage(facts: ReceiptFacts, reading: SefazPageReading): R
     issuedOn: reading.issuedOn ?? facts.issuedOn ?? null,
     totalCents: reading.totalCents ?? facts.totalCents ?? null,
     issuerName: reading.issuerName ?? facts.issuerName ?? null,
+    payments: reading.payments.length > 0 ? reading.payments : (facts.payments ?? null),
   };
 }
 

@@ -23,6 +23,21 @@ export interface PageOptions {
   discount?: string;
   items?: number;
   withCpf?: boolean;
+  /** Linhas da tabela "Forma de pagamento" (rótulo já em HTML e valor pago). Padrão: Cartão de Crédito com o valor a pagar. `false`: sem a tabela. */
+  payments?: { label: string; value: string }[] | false;
+  /** Linha "Troco R$" depois das formas. */
+  change?: string;
+}
+
+/** Tabela "Forma de pagamento" / "Valor pago" do leiaute padrão, com as formas pedidas e o troco. */
+function paymentRows(o: PageOptions): string {
+  if (o.payments === false) return '';
+  const rows = o.payments ?? [{ label: 'Cart&atilde;o de Cr&eacute;dito', value: o.total ?? '30,00' }];
+  return [
+    `   <div id="linhaTotal"><label>Forma de pagamento:</label><span class="totalNumb">Valor pago R$</span></div>`,
+    ...rows.map((r) => `   <div id="linhaTotal"><label>${r.label}</label><span class="totalNumb">${r.value}</span></div>`),
+    ...(o.change ? [`   <div id="linhaTotal"><label>Troco R$</label><span class="totalNumb">${o.change}</span></div>`] : []),
+  ].join('\n') + '\n';
 }
 
 /** Leiaute padrão: txtTopo, tabela #tabResult, #totalNota e "Informações gerais da Nota". */
@@ -58,9 +73,7 @@ ${rows}
    <div id="linhaTotal"><label>Valor total R$:</label><span class="totalNumb">${o.gross ?? o.total ?? '30,00'}</span></div>
    <div id="linhaTotal"><label>Descontos R$:</label><span class="totalNumb">${o.discount ?? '0,00'}</span></div>
    <div id="linhaTotal" class="linhaShade"><label>Valor a pagar R$:</label><span class="totalNumb txtMax">${o.total ?? '30,00'}</span></div>
-   <div id="linhaTotal"><label>Forma de pagamento:</label><span class="totalNumb">Valor pago R$</span></div>
-   <div id="linhaTotal"><label>Cart&atilde;o de Cr&eacute;dito</label><span class="totalNumb">${o.total ?? '30,00'}</span></div>
-  </div>
+${paymentRows(o)}  </div>
   <div id="infos">
    <h4>Informa&ccedil;&otilde;es gerais da Nota</h4>
    <ul><li><strong>EMISS&Atilde;O NORMAL</strong><br/><strong>N&uacute;mero: </strong>123456 <strong>S&eacute;rie: </strong>999 <strong>Emiss&atilde;o: </strong>${o.issued ?? '06/10/2026 14:32:10'} - Via Consumidor<br/><strong>Protocolo de Autoriza&ccedil;&atilde;o: </strong>133260000000001<br/><strong>Data de Autoriza&ccedil;&atilde;o: </strong>${o.issued ?? '06/10/2026 14:32:15'}</li></ul>
@@ -91,6 +104,19 @@ export function tablePage(o: { store: string; cnpj: string; key: string; issued:
 <div>Emiss&atilde;o: ${o.issued}</div>
 <div>Chave de acesso: ${spaced(o.key)}</div>
 <div>Consumidor n&atilde;o identificado</div>
+</body></html>`;
+}
+
+/** Variante com a forma de pagamento numa tabela (cabeçalho "Forma de pagamento" / "Valor pago", uma linha por forma e "Troco"). */
+export function paymentTablePage(o: { key: string; rows: { label: string; value: string }[]; change?: string; sameLine?: string }): string {
+  return `<html><body>
+<div id="u20" class="txtTopo">LOJA DA TABELA LTDA</div>
+<div class="text">CNPJ: 11.222.333/0001-81</div>
+<table id="totais"><tr><td>Valor a pagar R$</td><td>50,00</td></tr></table>
+${o.sameLine ? `<div>Forma de pagamento: ${o.sameLine}</div>` : `<table id="pagamento"><thead><tr><th>Forma de pagamento</th><th>Valor pago</th></tr></thead><tbody>${o.rows.map((r) => `<tr><td>${r.label}</td><td>${r.value}</td></tr>`).join('')}${o.change ? `<tr><td>Troco</td><td>${o.change}</td></tr>` : ''}</tbody></table>`}
+<div>Emiss&atilde;o: 06/10/2026 10:00:00</div>
+<div>Consumidor</div><div>CPF: ${CONSUMER_CPF}</div><div>Nome: PIX COMERCIO EXEMPLO</div>
+<div>Chave de acesso: ${spaced(o.key)}</div>
 </body></html>`;
 }
 

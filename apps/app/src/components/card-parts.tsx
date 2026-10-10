@@ -1,10 +1,12 @@
 import {
   CARDS_TEXT,
+  CARD_MONTH_TEXT,
   cardSummaryTexts,
   formatBRL,
   invoiceMonthLabel,
   invoiceTexts,
   type Card as CardData,
+  type CardInvoicesMonth,
   type CardSummary,
   type Invoice,
   type IsoDate,
@@ -15,7 +17,7 @@ import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { GoalProgress } from '@/components/goal-progress';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
-import { Money, Txt, styles as ui } from '@/components/ui';
+import { Card, FitMoney, LinkButton, Money, Txt, styles as ui } from '@/components/ui';
 import { cardHref, invoiceHref } from '@/lib/cards';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
@@ -149,7 +151,75 @@ export function InvoiceRow({ invoice, today, last }: { invoice: Invoice; today: 
   );
 }
 
+/**
+ * Faturas do mês no topo de Cartões (D-042): a soma das faturas que vencem no mês, quanto isso é da renda de referência, as
+ * próximas faturas (previstas) e a ligação com a renda comprometida. Neutro: sem cor de alerta. Os valores em reais seguem
+ * "Ocultar valores" (o percentual continua à vista, como na renda comprometida).
+ */
+export function CardMonthSummary({
+  data,
+  incomeKnown = true,
+  onSeeCommitted,
+  onInformIncome,
+}: {
+  data: CardInvoicesMonth;
+  /** A renda de referência não carregou: nem o percentual nem o convite para informá-la aparecem. */
+  incomeKnown?: boolean;
+  onSeeCommitted: () => void;
+  onInformIncome: () => void;
+}) {
+  return (
+    <Card style={styles.month}>
+      <Txt variant="title" accessibilityRole="header" aria-level={2} style={{ fontSize: 17, lineHeight: 24 }}>
+        {CARD_MONTH_TEXT.title(data.month)}
+      </Txt>
+      {data.invoiceCount === 0 ? (
+        <Txt color={colors.textSecondary}>{CARD_MONTH_TEXT.none(data.month)}</Txt>
+      ) : (
+        <>
+          <FitMoney cents={data.totalCents} maxSize={32} minSize={24} />
+          {!incomeKnown ? null : data.percentText ? (
+            <Txt variant="label" style={{ fontFamily: fonts.bold }}>
+              {CARD_MONTH_TEXT.percent(data.percentText)}
+            </Txt>
+          ) : (
+            <>
+              <Txt variant="label">{CARD_MONTH_TEXT.noReference}</Txt>
+              <LinkButton label={CARD_MONTH_TEXT.noReferenceLink} trailing={ChevronRight} style={styles.monthLink} onPress={onInformIncome} />
+            </>
+          )}
+          <Txt variant="caption" color={colors.textSecondary}>
+            {CARD_MONTH_TEXT.rule}
+          </Txt>
+          {data.hasOpenInvoice ? (
+            <Txt variant="caption" color={colors.textSecondary}>
+              {CARD_MONTH_TEXT.openNote}
+            </Txt>
+          ) : null}
+        </>
+      )}
+      {data.upcoming.length > 0 ? (
+        <MoneyTxt variant="label" style={tabular}>
+          {CARD_MONTH_TEXT.upcoming(data.upcoming)}
+        </MoneyTxt>
+      ) : null}
+      <Txt variant="caption" color={colors.textSecondary}>
+        {CARD_MONTH_TEXT.inCommitted}
+      </Txt>
+      <LinkButton
+        label={CARD_MONTH_TEXT.seeCommitted}
+        accessibilityLabel={CARD_MONTH_TEXT.seeCommittedA11y}
+        trailing={ChevronRight}
+        style={styles.monthLink}
+        onPress={onSeeCommitted}
+      />
+    </Card>
+  );
+}
+
 const styles = StyleSheet.create({
+  month: { gap: space[2] },
+  monthLink: { alignSelf: 'flex-start', paddingHorizontal: 0, minHeight: 44 },
   tile: { gap: space[2] },
   head: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   icon: { width: 40, height: 40, borderRadius: radius.sm, backgroundColor: colors.brandTint, alignItems: 'center', justifyContent: 'center' },

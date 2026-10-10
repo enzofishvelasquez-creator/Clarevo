@@ -4,6 +4,8 @@ import type { Cents } from './money';
 import { MAX_RECORD_CENTS, parseBRL } from './money';
 import type { AccessKeyInfo, ReceiptErrorCode, ReceiptFacts } from './nota';
 import { findAccessKey, friendlyIssuerName } from './nota';
+import type { PaymentForm } from './nota-pagamento';
+import { paymentFormsFromText } from './nota-pagamento';
 
 /**
  * Leitura do DANFE da NF-e em PDF (Ciclo E, D-038, fase 2: compras online). O app extrai o texto do PDF no próprio aparelho
@@ -31,6 +33,8 @@ export interface DanfeReading {
   totalCents: Cents | null;
   /** Razão social do emitente, como está no PDF (sem CPF); null quando não achou. */
   issuerName: string | null;
+  /** Forma de pagamento do bloco "FORMA DE PAGAMENTO" (ou `tPag`), quando o PDF o traz; vazio quando não traz (D-042). */
+  payments: PaymentForm[];
 }
 
 export type DanfeResult = { ok: true; reading: DanfeReading } | { ok: false; code: DanfeErrorCode };
@@ -268,11 +272,12 @@ export function danfeFromText(raw: string): DanfeResult {
       issuedOn: issuedOnFromText(text, key.yearMonth),
       totalCents: totalFromText(text),
       issuerName: issuerNameFromText(text),
+      payments: paymentFormsFromText(text, { withCodes: true }),
     },
   };
 }
 
 /** O que `receiptDraft` precisa a partir do DANFE lido. */
 export function factsFromDanfe(reading: DanfeReading): ReceiptFacts {
-  return { key: reading.key, issuedOn: reading.issuedOn, totalCents: reading.totalCents, issuerName: reading.issuerName };
+  return { key: reading.key, issuedOn: reading.issuedOn, totalCents: reading.totalCents, issuerName: reading.issuerName, payments: reading.payments };
 }

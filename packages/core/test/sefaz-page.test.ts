@@ -19,7 +19,7 @@ import {
   type AccessKeyInfo,
   type SefazFetch,
 } from '../src';
-import { CAPTCHA_PAGE, CONSUMER_CPF, CONSUMER_NAME, NOT_FOUND_PAGE, spaced, standardPage, tablePage } from './sefaz-html';
+import { CAPTCHA_PAGE, CONSUMER_CPF, CONSUMER_NAME, NOT_FOUND_PAGE, paymentTablePage, spaced, standardPage, tablePage } from './sefaz-html';
 
 /** Chave de NFC-e do RJ (CNPJ 11.222.333/0001-81), do mês AAMM. */
 function keyOf(aamm: string, number = '000012345', uf = '33'): { text: string; info: AccessKeyInfo } {
@@ -37,7 +37,7 @@ describe('parseSefazPage · leiaute padrão (HTML sintético)', () => {
   it('lê nome, valor a pagar, data de emissão e quantidade de itens', () => {
     const html = standardPage({ key: OUT.text, total: '87,40', gross: '90,00', discount: '2,60', items: 3, issued: '06/10/2026 14:32:10' });
     const r = parseSefazPage(html, OUT.info);
-    expect(r).toEqual({ ok: true, reading: { issuerName: 'Mercado Exemplo Ltda', totalCents: 8_740, issuedOn: '2026-10-06', itemCount: 3 } });
+    expect(r).toEqual({ ok: true, reading: { issuerName: 'Mercado Exemplo Ltda', totalCents: 8_740, issuedOn: '2026-10-06', itemCount: 3, payments: ['credito'] } });
   });
 
   it('valor a pagar prevalece sobre o valor total (desconto)', () => {
@@ -61,7 +61,7 @@ describe('parseSefazPage · leiaute padrão (HTML sintético)', () => {
     expect(json).not.toContain(CONSUMER_NAME);
     expect(json).not.toContain('FULANO');
     expect(json).not.toContain(OUT.text);
-    expect(Object.keys(r.ok ? r.reading : {}).sort()).toEqual(['issuedOn', 'issuerName', 'itemCount', 'totalCents']);
+    expect(Object.keys(r.ok ? r.reading : {}).sort()).toEqual(['issuedOn', 'issuerName', 'itemCount', 'payments', 'totalCents']);
   });
 
   it('o script e o estilo da página não entram na leitura (valor dentro do script é ignorado)', () => {
@@ -84,18 +84,18 @@ describe('parseSefazPage · outro leiaute (tabela, sem classe do cabeçalho, só
   it('lê o nome pela linha acima do CNPJ e o valor total', () => {
     const html = tablePage({ store: 'SUPERMERCADO BOA COMPRA S.A.', cnpj: '11.222.333/0001-81', key: OUT.text, issued: '06/10/2026', total: '154,32' });
     const r = parseSefazPage(html, OUT.info);
-    expect(r).toEqual({ ok: true, reading: { issuerName: 'Supermercado Boa Compra S.A.', totalCents: 15_432, issuedOn: '2026-10-06', itemCount: null } });
+    expect(r).toEqual({ ok: true, reading: { issuerName: 'Supermercado Boa Compra S.A.', totalCents: 15_432, issuedOn: '2026-10-06', itemCount: null, payments: [] } });
   });
 
   it('nome e CNPJ na mesma linha', () => {
     const html = `<div>FARMACIA EXEMPLO LTDA CNPJ: 11.222.333/0001-81</div><div>Valor a pagar R$ 23,90</div><div>Emissão: 05/10/2026 09:00</div>`;
     const r = parseSefazPage(html, OUT.info);
-    expect(r).toEqual({ ok: true, reading: { issuerName: 'Farmacia Exemplo Ltda', totalCents: 2_390, issuedOn: '2026-10-05', itemCount: null } });
+    expect(r).toEqual({ ok: true, reading: { issuerName: 'Farmacia Exemplo Ltda', totalCents: 2_390, issuedOn: '2026-10-05', itemCount: null, payments: [] } });
   });
 
   it('nome que já está em minúsculas fica como está; campos ausentes ficam null', () => {
     const r = parseSefazPage(`<div class="txtTopo">Casa do Pão</div><div>CNPJ: 11.222.333/0001-81</div><p>Emissão: 02/10/2026</p>`, OUT.info);
-    expect(r).toEqual({ ok: true, reading: { issuerName: 'Casa do Pão', totalCents: null, issuedOn: '2026-10-02', itemCount: null } });
+    expect(r).toEqual({ ok: true, reading: { issuerName: 'Casa do Pão', totalCents: null, issuedOn: '2026-10-02', itemCount: null, payments: [] } });
   });
 });
 
@@ -152,7 +152,7 @@ describe('factsWithPage e o rascunho', () => {
     const qr = parseNfceQr(OFFICIAL);
     if (!qr.ok) throw new Error('qr');
     const facts = factsFromQr(qr.qr, OFFICIAL);
-    const merged = factsWithPage(facts, { issuerName: null, totalCents: null, issuedOn: null, itemCount: null });
+    const merged = factsWithPage(facts, { issuerName: null, totalCents: null, issuedOn: null, itemCount: null, payments: [] });
     expect(merged.totalCents).toBeNull();
     expect(merged.issuedOn).toBeNull();
     expect(merged.issuerName).toBeNull();
@@ -204,7 +204,7 @@ describe('readSefazPage (fetch injetado)', () => {
   it('busca o endereço oficial sem credenciais e lê a página', async () => {
     const f = fetchOf(okHtml);
     const r = await readSefazPage(f, OFFICIAL, OUT.info);
-    expect(r).toEqual({ ok: true, reading: { issuerName: 'Mercado Exemplo Ltda', totalCents: 8_740, issuedOn: '2026-10-06', itemCount: 3 } });
+    expect(r).toEqual({ ok: true, reading: { issuerName: 'Mercado Exemplo Ltda', totalCents: 8_740, issuedOn: '2026-10-06', itemCount: 3, payments: ['credito'] } });
     expect(f).toHaveBeenCalledTimes(1);
     const [url, init] = (f as ReturnType<typeof vi.fn>).mock.calls[0] as [string, { method: string; credentials: string; headers: Record<string, string> }];
     expect(url).toBe(OFFICIAL);
@@ -293,7 +293,7 @@ describe('parseSefazPage · a página precisa ser desta nota', () => {
     if (!pf.ok) return;
     expect(pf.info.cnpj).toBeNull();
     const page = `<div class="txtTopo">Sítio Exemplo</div><div>Valor a pagar R$: 42,00</div><div>Chave de acesso: ${spaced(pf.info.key)}</div>`;
-    expect(parseSefazPage(page, pf.info)).toEqual({ ok: true, reading: { issuerName: 'Sítio Exemplo', totalCents: 4_200, issuedOn: null, itemCount: null } });
+    expect(parseSefazPage(page, pf.info)).toEqual({ ok: true, reading: { issuerName: 'Sítio Exemplo', totalCents: 4_200, issuedOn: null, itemCount: null, payments: [] } });
     expect(parseSefazPage(page.replace(/Chave de acesso:.*?</, '<'), pf.info)).toEqual({ ok: false, code: 'pagina_nao_reconhecida' });
   });
 
@@ -439,5 +439,115 @@ describe('readSefazPage · endereço e redirecionamentos', () => {
 describe('fixtures', () => {
   it('a chave aparece em grupos de 4 na página e continua sendo a da nota', () => {
     expect(spaced(OUT.text).split(' ')).toHaveLength(11);
+  });
+});
+
+describe('parseSefazPage · forma de pagamento (D-042)', () => {
+  const payments = (html: string) => {
+    const r = parseSefazPage(html, OUT.info);
+    if (!r.ok) throw new Error(r.code);
+    return r.reading.payments;
+  };
+  const FORMS: [string, string, string][] = [
+    ['Dinheiro', 'Dinheiro', 'dinheiro'],
+    ['Cart&atilde;o de Cr&eacute;dito', 'Cartão de Crédito', 'credito'],
+    ['Cart&atilde;o de D&eacute;bito', 'Cartão de Débito', 'debito'],
+    ['Pix', 'Pix', 'pix'],
+    ['PIX', 'PIX em maiúsculas', 'pix'],
+    ['Pagamento Instant&acirc;neo (PIX)', 'Pagamento Instantâneo (PIX)', 'pix'],
+    ['Vale Alimenta&ccedil;&atilde;o', 'Vale Alimentação', 'vale'],
+    ['Vale Refei&ccedil;&atilde;o', 'Vale Refeição', 'vale'],
+    ['Vale Presente', 'Vale Presente', 'vale'],
+    ['Outros', 'Outros', 'outros'],
+    ['Cr&eacute;dito Loja', 'Crédito Loja não é cartão', 'outros'],
+    ['Cheque', 'Cheque', 'outros'],
+  ];
+  it.each(FORMS)('layout padrão: %s (%s) vira %s', (label, _name, form) => {
+    expect(payments(standardPage({ key: OUT.text, total: '87,40', payments: [{ label, value: '87,40' }] }))).toEqual([form]);
+  });
+
+  it('a tabela padrão do leiaute (Cartão de Crédito, valor pago e troco zerado) vira cartão de crédito', () => {
+    expect(payments(standardPage({ key: OUT.text, total: '87,40', change: '0,00' }))).toEqual(['credito']);
+  });
+
+  it('dinheiro com troco: o troco não é forma de pagamento e o valor a pagar continua o da nota', () => {
+    const html = standardPage({ key: OUT.text, total: '87,40', payments: [{ label: 'Dinheiro', value: '100,00' }], change: '12,60' });
+    const r = parseSefazPage(html, OUT.info);
+    expect(r).toMatchObject({ ok: true, reading: { payments: ['dinheiro'], totalCents: 8_740 } });
+  });
+
+  it('mais de uma forma: todas, na ordem da página e sem repetir', () => {
+    const html = standardPage({
+      key: OUT.text,
+      total: '120,00',
+      payments: [
+        { label: 'Dinheiro', value: '20,00' },
+        { label: 'Cart&atilde;o de Cr&eacute;dito', value: '60,00' },
+        { label: 'Cart&atilde;o de Cr&eacute;dito', value: '40,00' },
+      ],
+      change: '0,00',
+    });
+    expect(payments(html)).toEqual(['dinheiro', 'credito']);
+  });
+
+  it('sem a tabela de pagamento: lista vazia, e o resto da leitura segue igual', () => {
+    const html = standardPage({ key: OUT.text, total: '87,40', payments: false });
+    expect(parseSefazPage(html, OUT.info)).toEqual({ ok: true, reading: { issuerName: 'Mercado Exemplo Ltda', totalCents: 8_740, issuedOn: '2026-10-06', itemCount: 3, payments: [] } });
+  });
+
+  it('o rótulo "Forma de pagamento" sem nenhuma forma conhecida logo depois: lista vazia', () => {
+    expect(payments(standardPage({ key: OUT.text, total: '87,40', payments: [{ label: 'Valor n&atilde;o informado', value: '87,40' }] }))).toEqual([]);
+  });
+
+  it('leiaute de tabela (cabeçalho, uma linha por forma e troco)', () => {
+    const rows = [{ label: 'Dinheiro', value: '60,00' }, { label: 'Pix', value: '0,00' }];
+    expect(payments(paymentTablePage({ key: OUT.text, rows, change: '10,00' }))).toEqual(['dinheiro', 'pix']);
+    expect(payments(paymentTablePage({ key: OUT.text, rows: [{ label: 'Cart&atilde;o de D&eacute;bito', value: '50,00' }] }))).toEqual(['debito']);
+  });
+
+  it('forma na mesma linha do rótulo ("Forma de pagamento: Dinheiro")', () => {
+    expect(payments(paymentTablePage({ key: OUT.text, rows: [], sameLine: 'Dinheiro' }))).toEqual(['dinheiro']);
+  });
+
+  it('maiúsculas, acentos e espaços diferentes não atrapalham', () => {
+    const html = `<div class="txtTopo">LOJA X</div><div>CNPJ: 11.222.333/0001-81</div><div>VALOR A PAGAR R$: 10,00</div><div>FORMA DE PAGAMENTO</div><div>CARTAO&nbsp;DE   CREDITO</div><div>10,00</div><div>Emissão: 06/10/2026</div>`;
+    expect(payments(html)).toEqual(['credito']);
+  });
+
+  it('só lê depois do rótulo: "Pix" no nome da loja ou num produto não vira forma de pagamento', () => {
+    const html = standardPage({ key: OUT.text, total: '87,40', store: 'PIX CAMISETAS LTDA', payments: false }).replace('PRODUTO EXEMPLO 1', 'CAMISETA PIX DINHEIRO');
+    expect(payments(html)).toEqual([]);
+  });
+
+  it('o bloco do consumidor nunca entra: nome parecido com forma de pagamento depois de "Consumidor" é ignorado', () => {
+    const html = paymentTablePage({ key: OUT.text, rows: [{ label: 'Pix', value: '50,00' }] });
+    // A página traz "Nome: PIX COMERCIO EXEMPLO" no bloco do consumidor e o CPF dele; só o Pix da tabela vale.
+    const r = parseSefazPage(html, OUT.info);
+    expect(r).toMatchObject({ ok: true, reading: { payments: ['pix'] } });
+    expect(JSON.stringify(r)).not.toContain(CONSUMER_CPF);
+    expect(JSON.stringify(r)).not.toContain('COMERCIO');
+    const consumerOnly = html.replace(/<table id="pagamento">.*?<\/table>/, '');
+    expect(payments(consumerOnly)).toEqual([]);
+  });
+
+  it('o resultado só tem as formas: nada de valor pago, troco nem dado do consumidor', () => {
+    const json = JSON.stringify(parseSefazPage(standardPage({ key: OUT.text, total: '87,40', payments: [{ label: 'Dinheiro', value: '100,00' }], change: '12,60' }), OUT.info));
+    expect(json).toContain('"payments":["dinheiro"]');
+    expect(json).not.toContain('12,60');
+    expect(json).not.toContain('100,00');
+    expect(json).not.toContain(CONSUMER_CPF);
+  });
+
+  it('factsWithPage leva a forma de pagamento da página ao rascunho; página sem forma deixa como estava', () => {
+    const qr = parseNfceQr(OFFICIAL);
+    if (!qr.ok) throw new Error('qr');
+    const facts = factsFromQr(qr.qr, OFFICIAL);
+    const read = parseSefazPage(standardPage({ key: OUT.text, total: '87,40', payments: [{ label: 'Pix', value: '87,40' }] }), OUT.info);
+    if (!read.ok) throw new Error(read.code);
+    const merged = factsWithPage(facts, read.reading);
+    expect(merged.payments).toEqual(['pix']);
+    expect(receiptDraft(merged, '2026-10-08').payments).toEqual(['pix']);
+    expect(factsWithPage(merged, { ...read.reading, payments: [] }).payments).toEqual(['pix']);
+    expect(receiptDraft(facts, '2026-10-08').payments).toEqual([]);
   });
 });

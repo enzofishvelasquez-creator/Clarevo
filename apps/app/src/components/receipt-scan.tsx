@@ -1,4 +1,5 @@
 import {
+  NOTA_CAMERA,
   NOTA_FLOW_TEXT,
   NOTA_TEXT,
   SEFAZ_TEXT,
@@ -159,9 +160,6 @@ export function PasteModal({
   );
 }
 
-/** Dica da lanterna depois de uns 10 segundos sem ler nada. */
-const HINT_AFTER_MS = 10_000;
-
 /**
  * Tela da câmera: QR (NFC-e) e código de barras Code 128 (chave da NF-e no DANFE). O boleto usa outro código de barras e nem
  * é lido. A permissão só é pedida aqui, depois da frase que explica o uso (nenhuma foto é guardada). Sem câmera ou com a permissão
@@ -184,7 +182,8 @@ export function CameraModal({
   const [permission, requestPermission] = useCameraPermissions();
   const [torch, setTorch] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [hint, setHint] = useState(false);
+  /** 0: nenhuma dica; 1: "Aproxime..." (5 s); 2: também a da lanterna (10 s). */
+  const [hint, setHint] = useState<0 | 1 | 2>(0);
   const [ready, setReady] = useState(false);
   const [mountError, setMountError] = useState(false);
   const last = useRef({ data: '', at: 0 });
@@ -196,11 +195,15 @@ export function CameraModal({
     last.current = { data: '', at: 0 };
     setTorch(false);
     setMessage(null);
-    setHint(false);
+    setHint(0);
     setReady(false);
     setMountError(false);
-    const timer = setTimeout(() => setHint(true), HINT_AFTER_MS);
-    return () => clearTimeout(timer);
+    const closer = setTimeout(() => setHint(1), NOTA_CAMERA.closerHintMs);
+    const torchHint = setTimeout(() => setHint(2), NOTA_CAMERA.torchHintMs);
+    return () => {
+      clearTimeout(closer);
+      clearTimeout(torchHint);
+    };
   }, [visible]);
 
   const handle = ({ data }: { data: string }) => {
@@ -242,12 +245,15 @@ export function CameraModal({
                   style={StyleSheet.absoluteFill}
                   facing="back"
                   enableTorch={torch}
+                  zoom={NOTA_CAMERA.zoom}
                   barcodeScannerSettings={{ barcodeTypes: ['qr', 'code128'] }}
                   onBarcodeScanned={handle}
                   onCameraReady={() => setReady(true)}
                   onMountError={() => setMountError(true)}
                 />
-                <View pointerEvents="none" style={styles.frame} />
+                <View style={styles.frameBox} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                  <View style={styles.frame} />
+                </View>
                 {!ready ? (
                   <View style={styles.starting} pointerEvents="none">
                     <ActivityIndicator color={colors.textOnBrand} />
@@ -260,7 +266,12 @@ export function CameraModal({
                   {message}
                 </Txt>
               ) : null}
-              {hint ? (
+              {hint >= 1 ? (
+                <Txt variant="label" color={colors.textSecondary} accessibilityLiveRegion="polite">
+                  {NOTA_FLOW_TEXT.cameraCloser}
+                </Txt>
+              ) : null}
+              {hint >= 2 ? (
                 <Txt variant="label" color={colors.textSecondary} accessibilityLiveRegion="polite">
                   {NOTA_TEXT.torchHint}
                 </Txt>
@@ -355,16 +366,9 @@ const styles = StyleSheet.create({
   box: { width: '100%', maxWidth: 420, backgroundColor: colors.surface, borderRadius: radius.lg, padding: space[6], gap: space[3] },
   cameraBody: { flex: 1, width: '100%', maxWidth: 560, alignSelf: 'center', padding: space[5], gap: space[4], justifyContent: 'space-between' },
   preview: { width: '100%', aspectRatio: 4 / 3, maxHeight: 360, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: '#0E1526' },
-  frame: {
-    position: 'absolute',
-    top: '18%',
-    left: '14%',
-    right: '14%',
-    bottom: '18%',
-    borderRadius: radius.md,
-    borderWidth: 3,
-    borderColor: colors.accent,
-  },
+  // Moldura quadrada ao centro (o QR é quadrado): o app não recorta a imagem, ela só guia a distância.
+  frameBox: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  frame: { height: '68%', aspectRatio: 1, borderRadius: radius.md, borderWidth: 3, borderColor: colors.accent },
   starting: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
   sefazRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },

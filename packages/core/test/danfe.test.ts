@@ -483,3 +483,85 @@ describe('DANFE em texto', () => {
     expect(parseAccessKey(KEY).ok).toBe(true);
   });
 });
+
+/** Bloco de pagamento de um DANFE (NT 2016/002 e DANFE de NFC-e em PDF), inserido antes do transportador. */
+function withPaymentBlock(block: string[], base = danfeCells()): string {
+  return base.replace('TRANSPORTADOR / VOLUMES TRANSPORTADOS', [...block, 'TRANSPORTADOR / VOLUMES TRANSPORTADOS'].join('\n'));
+}
+
+describe('DANFE em texto · forma de pagamento (D-042)', () => {
+  it('sem bloco de pagamento no texto: lista vazia ("se não houver, nada")', () => {
+    expect(read(danfeCells()).payments).toEqual([]);
+    expect(receiptDraft(factsFromDanfe(read(danfeCells())), '2026-10-09').payments).toEqual([]);
+  });
+
+  it('"FORMA DE PAGAMENTO" com o nome da forma, uma por linha', () => {
+    const cases: [string, string][] = [
+      ['Dinheiro', 'dinheiro'],
+      ['Cartão de Crédito', 'credito'],
+      ['Cartão de Débito', 'debito'],
+      ['Pix', 'pix'],
+      ['Pagamento Instantâneo (PIX)', 'pix'],
+      ['Vale Alimentação', 'vale'],
+      ['Boleto Bancário', 'outros'],
+      ['Outros', 'outros'],
+    ];
+    for (const [label, form] of cases) {
+      const r = read(withPaymentBlock(['PAGAMENTO', 'FORMA DE PAGAMENTO', 'VALOR', label, '150,00']));
+      expect(r.payments, label).toEqual([form]);
+    }
+  });
+
+  it('códigos tPag da NF-e: 01 dinheiro, 03 crédito, 04 débito, 17 Pix, 10 a 13 vales, 99 outros', () => {
+    const cases: [string, string][] = [
+      ['01', 'dinheiro'],
+      ['03', 'credito'],
+      ['04', 'debito'],
+      ['17', 'pix'],
+      ['10', 'vale'],
+      ['11', 'vale'],
+      ['12', 'vale'],
+      ['13', 'vale'],
+      ['99', 'outros'],
+    ];
+    for (const [code, form] of cases) {
+      expect(read(withPaymentBlock(['FORMA DE PAGAMENTO', 'tPag', code, '150,00'])).payments, code).toEqual([form]);
+      expect(read(withPaymentBlock([`Forma de pagamento: ${code} - texto qualquer`, '150,00'])).payments, code).toEqual([form]);
+      expect(read(withPaymentBlock([`tPag: ${code}`])).payments, `tPag: ${code}`).toEqual([form]);
+    }
+  });
+
+  it('código seguido do nome: as duas formas de escrever dão uma só forma', () => {
+    expect(read(withPaymentBlock(['FORMA DE PAGAMENTO', '03 - Cartão de Crédito', '150,00'])).payments).toEqual(['credito']);
+  });
+
+  it('"Sem pagamento" (90) não é forma', () => {
+    expect(read(withPaymentBlock(['FORMA DE PAGAMENTO', '90 - Sem pagamento', '0,00'])).payments).toEqual([]);
+  });
+
+  it('mais de uma forma: todas, na ordem do PDF; troco não conta', () => {
+    const r = read(withPaymentBlock(['FORMA DE PAGAMENTO VALOR PAGO', 'Dinheiro 100,00', 'Cartão de Débito 50,00', 'Troco 0,00', 'Pix']));
+    expect(r.payments).toEqual(['dinheiro', 'debito']);
+  });
+
+  it('PDF que escreve tudo numa linha só', () => {
+    const text = danfeCells().replace('TRANSPORTADOR / VOLUMES TRANSPORTADOS', 'FORMA DE PAGAMENTO VALOR PAGO Cartão de Crédito 150,00 TRANSPORTADOR / VOLUMES TRANSPORTADOS');
+    expect(read(text).payments).toEqual(['credito']);
+  });
+
+  it('só olha depois do rótulo: "Pix" ou "Dinheiro" em produto ou observação não vira forma', () => {
+    const text = danfeCells().replace('123 FONE DE OUVIDO', '123 CAMISETA PIX DINHEIRO CARTAO DE CREDITO').replace('Pedido 2000012345678', 'Pagamento via PIX combinado');
+    expect(read(text).payments).toEqual([]);
+  });
+
+  it('o destinatário nunca entra: nada do bloco do destinatário aparece no resultado da forma', () => {
+    const r = read(withPaymentBlock(['FORMA DE PAGAMENTO', 'Pix', '150,00']));
+    expect(r.payments).toEqual(['pix']);
+    expect(visible(r).toLowerCase()).not.toContain('maria');
+  });
+
+  it('a forma vai ao rascunho', () => {
+    const draft = receiptDraft(factsFromDanfe(read(withPaymentBlock(['FORMA DE PAGAMENTO', 'Cartão de Crédito', '150,00']))), '2026-10-09');
+    expect(draft.payments).toEqual(['credito']);
+  });
+});

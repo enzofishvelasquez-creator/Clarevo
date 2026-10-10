@@ -2,6 +2,8 @@ import type { IsoDate, IsoMonth } from './dates';
 import { formatDateBR, formatMonthYearBR, isValidIsoDate, monthOf } from './dates';
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS, formatBRL } from './money';
+import type { PaymentForm } from './nota-pagamento';
+import { uniquePaymentForms } from './nota-pagamento';
 import { sha256Hex } from './sha256';
 import { DESCRIPTION_MAX } from './validation';
 
@@ -622,6 +624,8 @@ export interface ReceiptFacts {
   totalCents?: Cents | null;
   issuerName?: string | null;
   environment?: 'producao' | 'homologacao' | null;
+  /** Forma de pagamento que a nota informa (página da Sefaz e DANFE; o QR não traz). Vazio ou ausente: a nota não diz. */
+  payments?: PaymentForm[] | null;
   /** Endereço lido do QR, só para calcular `officialUrl`. */
   qrUrl?: string | null;
 }
@@ -654,6 +658,8 @@ export interface ReceiptDraft {
   month: IsoMonth;
   issuerCnpj: string | null;
   issuerName: string | null;
+  /** Formas de pagamento que a nota informa, sem repetição (D-042); vazio quando a nota não diz. */
+  payments: PaymentForm[];
   /** "Nota fiscal do RJ, emitida em outubro de 2026" (ou "emitida em 12/10/2026" quando o dia é conhecido). */
   summary: string;
   /**
@@ -723,6 +729,7 @@ export function receiptDraft(facts: ReceiptFacts, today: IsoDate): ReceiptDraft 
     month,
     issuerCnpj: key.cnpjFormatted,
     issuerName: name !== '' ? name : null,
+    payments: uniquePaymentForms(facts.payments),
     summary: NOTA_TEXT.summary(key.uf, when),
     // Nota de homologação (teste) não existe na página de produção da Sefaz: sem o botão.
     officialUrl: facts.environment === 'homologacao' ? null : officialQueryUrl(key.uf, facts.qrUrl),
