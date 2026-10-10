@@ -4791,8 +4791,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await checkBar('nav barra: um cartão', 'Movimentações');
   await p.getByRole('button', { name: /^Fatura de novembro, / }).filter({ visible: true }).first().click(); await waitText('Lançamentos'); await p.waitForTimeout(400);
   await checkBar('nav barra: uma fatura', 'Movimentações');
-  await btn('Pagar fatura').click(); await waitText('Valor a pagar').catch(() => {}); await p.waitForTimeout(400);
-  await checkNoBar('nav barra: pagar fatura');
+  await btn('Informar encargos').click(); await waitText('Tipo do encargo'); await p.waitForTimeout(400);
+  await checkNoBar('nav barra: informar encargos (a fatura aberta não tem Pagar fatura)');
   await btn('Voltar').click(); await p.waitForTimeout(400);
   await navBackTo('Movimentações');
   // Registro: detalhe com barra; novo e editar sem barra.
