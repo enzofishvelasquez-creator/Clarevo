@@ -643,7 +643,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const FAT = (due, cents) => `Fatura Cartão Exemplo, vence em ${due}, cerca de R$ ${cents}, valor estimado`;
   const laterBase = ['Aluguel, vence em 05/11/2026, R$ 2.500,00, gasto fixo', 'Financiamento do carro, vence em 10/11/2026, R$ 850,00, parcela 13 de 48', 'Seguro do carro, vence em 10/11/2026, R$ 300,00', FAT('10/11/2026', '550,00'),
     'Luz, vence em 12/11/2026, cerca de R$ 180,00, valor estimado, gasto fixo', FAT('10/12/2026', '350,00'), FAT('10/01/2027', '350,00'), ...['10/02/2027', '10/03/2027', '10/04/2027', '10/05/2027', '10/06/2027', '10/07/2027', '10/08/2027'].map((d) => FAT(d, '150,00'))];
+  // Espera a lista completa (e não só a seção): as faturas do cartão chegam na mesma leitura, mas a tela pode estar num instante intermediário.
+  const laterBaseJson = JSON.stringify(laterBase);
+  await waitUntil(async () => JSON.stringify(await sectionRows('Próximos meses')) === laterBaseJson, 10000);
   const laterNow = await sectionRows('Próximos meses');
+  t = await body();
   ok('lista: próximos meses com Aluguel, parcela 13 de 48, Seguro, Luz estimada e as dez faturas do Cartão Exemplo', JSON.stringify(laterNow) === JSON.stringify(laterBase) && ['Vence em 05/11/2026 · Todo mês', 'Vence em 10/11/2026 · Parcela 13 de 48', 'Vence em 12/11/2026 · Todo mês · estimado', '≈ R$ 180,00'].every((x) => t.includes(x)), (laterNow ?? []).join(' | '));
   ok('lista: aluguel de outubro pago pelo gasto fixo, em Pagas', JSON.stringify(await sectionRows('Pagas')) === JSON.stringify(['Aluguel, paga em 05/10/2026, R$ 2.500,00, gasto fixo']) && t.includes('Paga em 05/10/2026 · Todo mês'));
   ok('lista: sem valores estimados no total de outubro', !t.includes('em valores estimados'));
@@ -818,14 +822,23 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar').click(); await waitText('Já contam em Pago, no mês da data do pagamento.');
   // "Próximos meses" continua com os gastos fixos de novembro: o Seguro sai dessa seção e entra em "Pagas".
   const isSeguro = (r) => r.startsWith('Seguro do carro');
-  await waitRows('Próximos meses', (rows) => rows !== null && !rows.some(isSeguro));
+  // Espera a tela inteira chegar ao estado final (a lista completa de "Próximos meses" sem o Seguro, o Seguro em "Pagas" e o total
+  // de sempre), não só o Seguro sair: as contas de fatura de cartão e as demais voltam da mesma leitura, mas a tela pode mostrar um
+  // instante intermediário enquanto as leituras do mês recarregam. Se o estado final não chegar, a conferência seguinte acusa.
+  const laterExpected = JSON.stringify(laterBase.filter((r) => !isSeguro(r)));
+  await waitUntil(async () => {
+    const later = await sectionRows('Próximos meses');
+    const paid = await sectionRows('Pagas');
+    return later !== null && JSON.stringify(later) === laterExpected && (paid ?? []).some((r) => /^Seguro do carro, paga em 07\/10\/2026/.test(r)) && (await body()).includes('R$ 650,00');
+  }, 10000);
   t = await body();
   const paidNow = (await sectionRows('Pagas')) ?? [];
   const laterPaid = await sectionRows('Próximos meses');
   ok('conta de novembro paga em outubro aparece em Pagas de outubro e sai de Próximos meses',
     (await p.getByRole('button', { name: /^Seguro do carro, paga em 07\/10\/2026, R\$ 300,00, conta em Pago de outubro de 2026/ }).filter({ visible: true }).count()) === 1 &&
       paidNow.some((r) => /^Seguro do carro, paga em 07\/10\/2026/.test(r)) && laterPaid !== null && !laterPaid.some(isSeguro) &&
-      JSON.stringify(laterPaid) === JSON.stringify(laterBase.filter((r) => !isSeguro(r))) && t.includes('R$ 650,00'), (laterPaid ?? []).join(' | '));
+      JSON.stringify(laterPaid) === laterExpected && t.includes('R$ 650,00'),
+    `Próximos meses: ${(laterPaid ?? []).join(' | ')} || Pagas: ${paidNow.join(' | ')}`);
   await btn('Voltar').click(); await waitText('Diferença do mês');
   await expectTotals('pagar Seguro em outubro → 4.200 / 1.800, a pagar 650', 'R$ 6.000,00', 'R$ 4.200,00', 'R$ 1.800,00', 'R$ 650,00');
   await openToPay();
@@ -835,7 +848,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
   await expectTotals('desfazer Seguro → base', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00');
   await openToPay(); await waitText('Próximos meses');
-  await waitRows('Pagas', (rows) => rows !== null && !rows.some(isSeguro));
+  await waitUntil(async () => JSON.stringify(await sectionRows('Próximos meses')) === laterBaseJson && !((await sectionRows('Pagas')) ?? []).some(isSeguro), 10000);
   ok('seguro volta para Próximos meses e sai de Pagas', (await p.getByRole('button', { name: /^Seguro do carro, vence em 10\/11\/2026/ }).filter({ visible: true }).count()) === 1 &&
     JSON.stringify(await sectionRows('Próximos meses')) === JSON.stringify(laterBase) && !((await sectionRows('Pagas')) ?? []).some(isSeguro));
   await btn('Voltar').click(); await waitText('Diferença do mês');
