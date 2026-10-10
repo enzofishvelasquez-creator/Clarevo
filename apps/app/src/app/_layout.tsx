@@ -10,11 +10,12 @@ import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { Platform } from 'react-native';
+import { Platform, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { DeviceFeatures } from '@/components/device-features';
+import { BrowseTabBar } from '@/components/tab-bar';
 import { afterLogin, restoreTarget, signOutIntent } from '@/lib/nav';
 import { SessionProvider, useSession } from '@/state/session';
 import { SpaceStatusContext, type SpaceStatus } from '@/state/space-status';
@@ -171,6 +172,7 @@ function Navigation() {
 
   return (
     <SpaceStatusContext value={{ status, retry: () => space.refetch() }}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Stack
         screenOptions={{
           headerShown: false,
@@ -250,6 +252,9 @@ function Navigation() {
           <Stack.Screen name="nova-senha" />
         </Stack.Protected>
       </Stack>
+      {/* Barra das telas de consulta (D-039): só com a conta pronta; formulários e telas de entrada ficam sem barra. */}
+      {status === 'pronto' && !inRecovery ? <BrowseTabBar /> : null}
+      </View>
       {/* Lembretes, ocultar valores e biometria ao abrir (A2). */}
       <DeviceFeatures />
     </SpaceStatusContext>

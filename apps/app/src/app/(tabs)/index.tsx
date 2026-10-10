@@ -1,4 +1,4 @@
-import { COMMITTED_TEXT, ERROR_TEXT, committedLine, emptyMonthCaption, formatDateBR, formatMonthBR, monthOf, toPayCaption } from '@clarevo/core';
+import { COMMITTED_TEXT, ERROR_TEXT, SUMMARY_NAV_TEXT, committedLine, emptyMonthCaption, formatDateBR, formatMonthBR, monthOf, toPayCaption } from '@clarevo/core';
 import { router, useFocusEffect } from 'expo-router';
 import { AlertCircle, ArrowRight, CalendarClock, ChevronRight, Plus, ShieldCheck } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -124,6 +124,7 @@ export default function ResumoScreen() {
                     label="Recebido"
                     cents={s.receivedCents}
                     change={shownChange?.total === 'recebido' ? shownChange.deltaCents : null}
+                    hint={SUMMARY_NAV_TEXT.receivedHint}
                     onPress={() => router.push({ pathname: '/composicao', params: { tipo: 'recebido' } })}
                   />
                   <TotalItem
@@ -131,6 +132,7 @@ export default function ResumoScreen() {
                     cents={s.paidCents}
                     alignEnd={!narrow}
                     change={shownChange?.total === 'pago' ? shownChange.deltaCents : null}
+                    hint={SUMMARY_NAV_TEXT.paidHint}
                     onPress={() => router.push({ pathname: '/composicao', params: { tipo: 'pago' } })}
                   />
                 </View>
@@ -140,12 +142,16 @@ export default function ResumoScreen() {
         </AppHeader>
 
         <Body>
-          <FlashBanner message={notice} />
           {/*
-            Avisos temporários (só Pessoal, mês corrente), um por vez, sem mudar a ordem dos blocos aprovados: a faixa
-            "Seus últimos meses" tem precedência; o card de Primeiros passos espera a revisão carregar e volta quando a
-            faixa some (conta nova nunca vê a faixa).
+            "Anotar gasto" sempre logo abaixo do cabeçalho azul (D-039), como na tela original aprovada, em qualquer estado.
+            Os avisos temporários (Primeiros passos, Seus últimos meses, confirmações) vêm depois dele, um por vez, sem mudar a
+            ordem dos blocos aprovados: a faixa "Seus últimos meses" tem precedência; o card de Primeiros passos espera a
+            revisão carregar e volta quando a faixa some (conta nova nunca vê a faixa).
           */}
+          {kind === 'familia' ? null : (
+            <Button label="Anotar gasto" icon={Plus} onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } })} />
+          )}
+          <FlashBanner message={notice} />
           {band.status === 'visivel' ? <ReturnBand band={band} onMovedOn={(text) => setNotice(text)} /> : null}
           {band.status === 'oculta' ? <PrimeirosPassos contextId={contextId} /> : null}
 
@@ -153,8 +159,6 @@ export default function ResumoScreen() {
             <FamilyNotLinked />
           ) : (
             <>
-              <Button label="Anotar gasto" icon={Plus} onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } })} />
-
               <ToPayCard contextId={contextId} />
 
               <Card>
@@ -244,9 +248,19 @@ function ToPayCard({ contextId }: { contextId: string | undefined }) {
 
   return (
     <Card style={{ gap: space[2] }}>
-      <Txt variant="label" color={colors.textSecondary}>
-        {label}
-      </Txt>
+      <View style={styles.cardHead}>
+        <Txt variant="label" color={colors.textSecondary}>
+          {label}
+        </Txt>
+        {/* Mesmo padrão do "Ver todos" de "Pagamentos do mês": abre a lista do mês que o card mostra. */}
+        <LinkButton
+          label={SUMMARY_NAV_TEXT.viewPayables}
+          accessibilityLabel={SUMMARY_NAV_TEXT.viewPayablesA11y}
+          trailing={ChevronRight}
+          style={styles.viewPayables}
+          onPress={() => router.push({ pathname: '/a-pagar', params: { mes: month } })}
+        />
+      </View>
       {commitments.isPending ? (
         <Skeleton width={140} height={28} />
       ) : commitments.isError || !s || !caption ? (
@@ -256,7 +270,7 @@ function ToPayCard({ contextId }: { contextId: string | undefined }) {
           accessibilityRole="button"
           accessibilityLabel={a11y}
           accessibilityHint="Abre as contas a pagar"
-          onPress={() => router.push('/a-pagar')}
+          onPress={() => router.push({ pathname: '/a-pagar', params: { mes: month } })}
           style={(st) => [styles.toPayArea, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && styles.focusRing]}>
           <View style={{ flex: 1, gap: space[1] }}>
             <Money cents={s.toPayCents} />
@@ -363,12 +377,14 @@ function TotalItem({
   cents,
   change,
   alignEnd,
+  hint,
   onPress,
 }: {
   label: string;
   cents: number;
   change: number | null;
   alignEnd?: boolean;
+  hint: string;
   onPress: () => void;
 }) {
   const hidden = useValuesHidden();
@@ -376,13 +392,15 @@ function TotalItem({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${label}, ${moneyA11y(cents, hidden)}`}
-      accessibilityHint="Abre a composição"
+      accessibilityHint={hint}
       onPress={onPress}
       style={(st) => [styles.splitItem, alignEnd && { alignItems: 'flex-end' }, (st as { focused?: boolean }).focused && styles.focusOnBrand]}>
       <View style={styles.totalLabelRow}>
         <Txt variant="caption" color={colors.textOnBrandSoft} style={{ fontFamily: fonts.bold }}>
           {label}
         </Txt>
+        {/* Seta de "abre outra tela": desenho, o nome acessível continua "Recebido, R$ ..." / "Pago, R$ ...". */}
+        <ChevronRight size={16} color={colors.textOnBrandSoft} strokeWidth={2.5} aria-hidden />
         {change !== null ? (
           <Animated.View
             entering={FadeIn.duration(motion.confirm).reduceMotion(ReduceMotion.System)}
@@ -417,6 +435,7 @@ const styles = StyleSheet.create({
   toPayArea: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3], minHeight: 44, borderRadius: radius.sm },
   overdueRow: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
   toPayLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
+  viewPayables: { paddingHorizontal: 0 },
   committed: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space[2], marginTop: space[1] },
   committedArea: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44, paddingVertical: space[1], borderRadius: radius.sm },
   committedHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', columnGap: space[2], flexWrap: 'wrap' },

@@ -55,7 +55,7 @@ const STEPS: Step[] = [
 const cardExit = FadeOut.duration(motion.confirm).reduceMotion(ReduceMotion.System);
 
 /**
- * "Primeiros passos" no Resumo, na área dos avisos temporários, antes de "Anotar gasto". Só no contexto Pessoal,
+ * "Primeiros passos" no Resumo, na área dos avisos temporários, depois de "Anotar gasto" (D-039). Só no contexto Pessoal,
  * no mês corrente, fora da conta de demonstração com dados e com tudo carregado: um passo só aparece concluído
  * quando a lista que o comprova carregou bem (nunca um sinal de concluído por engano). Some de vez, por pessoa,
  * quando os quatro passos ficam prontos ou depois de "Agora não" (lib/onboarding.ts). Conta nova continua vazia:

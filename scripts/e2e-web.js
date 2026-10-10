@@ -3,8 +3,9 @@
  * de "Primeiros passos" no Resumo, dos atalhos de Movimentações, do Ciclo A6 (achar tudo e calculadoras), do Ciclo A4
  * (seus últimos meses, com o cenário fictício "retorno" da demonstração), do Ciclo A5 (Aprender e dúvidas), do Ciclo A2
  * (Conta na web e ocultar valores), do Ciclo B (renda comprometida e a previsão dos pagamentos), do Ciclo C (metas, reserva
- * e plano de guardar) e do Ciclo D (simulador, com os aportes no início de cada mês) na versão web, em modo demonstração
- * (acesso simulado).
+ * e plano de guardar), do Ciclo D (simulador, com os aportes no início de cada mês) e da Navegação (D-039: "Anotar gasto" logo
+ * abaixo do cabeçalho, barra inferior nas telas de consulta, Contas a pagar no mês certo, Metas compacta e a busca "No app" de
+ * Aprender) na versão web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -234,7 +235,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('conta nova: lista de contas a pagar vazia com o botão de anotar', (await body()).includes('Anote contas que ainda vão vencer') && (await p.getByRole('button', { name: 'Anotar conta a pagar', exact: true }).filter({ visible: true }).count()) === 1);
   await btn('Voltar').click(); await waitText('Diferença do mês');
 
-  // Primeiros passos (conta nova): card no Resumo, depois dos avisos e antes de "Anotar gasto". Só leva às telas de
+  // Primeiros passos (conta nova): card no Resumo, depois de "Anotar gasto" (D-039). Só leva às telas de
   // cadastro; nenhum dado de exemplo. Cada passo é um botão com o nome inteiro (", concluído" quando pronto).
   const PP = {
     fixos: 'Cadastre seus gastos fixos. Aluguel, escola, luz, internet e parcelas, uma vez só.',
@@ -256,7 +257,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     const steps = [...document.querySelectorAll('[role=button]')].filter((e) => /^(Cadastre|Registre|Anote um|Planejar)/.test(e.getAttribute('aria-label') || '') && e.getBoundingClientRect().width > 0);
     return { card: top(h), anotar: top(a), level: h?.getAttribute('aria-level'), minStep: Math.round(Math.min(...steps.map((s) => s.getBoundingClientRect().height))) };
   });
-  ok('primeiros passos: título de nível 2, antes de "Anotar gasto", passos com 56 px', ppOrder.card !== null && ppOrder.anotar !== null && ppOrder.card < ppOrder.anotar && ppOrder.level === '2' && ppOrder.minStep >= 56, JSON.stringify(ppOrder));
+  ok('primeiros passos: título de nível 2, depois de "Anotar gasto" (D-039: o botão fica logo abaixo do cabeçalho), passos com 56 px', ppOrder.card !== null && ppOrder.anotar !== null && ppOrder.anotar < ppOrder.card && ppOrder.level === '2' && ppOrder.minStep >= 56, JSON.stringify(ppOrder));
   // Ciclo A4: conta nova (sem nenhuma anotação) nunca vê "Seus últimos meses"; os títulos do Resumo seguem na ordem.
   ok('conta nova: sem a faixa "Seus últimos meses" e com os títulos do Resumo na ordem de sempre', !(await bandShown()) &&
     JSON.stringify(await headingList()) === JSON.stringify(['2:Outubro de 2026', '2:Primeiros passos', '2:Pagamentos do mês']), JSON.stringify(await headingList()));
@@ -731,8 +732,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await shot('34_revisar_vencidas_320px', true);
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
-  await openRow(/^Internet, vence em 15\/10\/2026/); await waitText('Marcar como paga');
-  await btn('Marcar como paga').click(); await waitText('Confirmar pagamento');
+  await openRow(/^Internet, vence em 15\/10\/2026/); await waitText('Já paguei');
+  await btn('Já paguei').click(); await waitText('Confirmar pagamento');
   ok('pagamento sugere previsto, hoje e a conta', (await field('Valor pago').inputValue()) === '150,00' && (await field('Data do pagamento').inputValue()) === '07/10/2026' && (await body()).includes('Conta principal'));
   await field('Data do pagamento').fill('08/10/2026'); await btn('Confirmar pagamento').click(); await p.waitForTimeout(300);
   ok('pagamento com data futura recusado', (await body()).includes('Use uma data até hoje. A conta só é marcada como paga depois do pagamento.'));
@@ -774,8 +775,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await expectTotals('desfazer → a pagar 780', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 780,00');
 
   await openToPay();
-  await openRow(/^Internet, vence em 15\/10\/2026/); await waitText('Marcar como paga');
-  await btn('Marcar como paga').click(); await waitText('Confirmar pagamento');
+  await openRow(/^Internet, vence em 15\/10\/2026/); await waitText('Já paguei');
+  await btn('Já paguei').click(); await waitText('Confirmar pagamento');
   await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado');
   await btn('Adicionar a conta do próximo mês').click(); await waitText('Salvando em Pessoal');
   ok('conta do próximo mês preenchida', (await field('Descrição').inputValue()) === 'Internet' && (await field('Valor em reais').inputValue()) === '150,00' && (await field('Data de vencimento').inputValue()) === '15/11/2026');
@@ -810,8 +811,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Conta de novembro paga em outubro: o gasto conta em Pago de outubro e a conta aparece em "Pagas" de outubro.
   // Ainda a pagar não muda (ela estava em Próximos meses). Desfazer volta à base.
   await openToPay();
-  await openRow(/^Seguro do carro, vence em 10\/11\/2026/); await waitText('Marcar como paga');
-  await btn('Marcar como paga').click(); await waitText('Confirmar pagamento');
+  await openRow(/^Seguro do carro, vence em 10\/11\/2026/); await waitText('Já paguei');
+  await btn('Já paguei').click(); await waitText('Confirmar pagamento');
   await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado');
   ok('seguro pago em outubro: resumo afetado é Pago de outubro', (await body()).includes('Pago de outubro de 2026'));
   await btn('Voltar').click(); await waitText('Já contam em Pago, no mês da data do pagamento.');
@@ -934,10 +935,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // Pagar hoje a Escola de novembro: o gasto conta em Pago de outubro; desfazer volta à base.
   await openToPay();
-  await openRow(/^Escola, vence em 10\/11\/2026, R\$ 900,00, gasto fixo/); await waitText('Marcar como paga');
+  await openRow(/^Escola, vence em 10\/11\/2026, R\$ 900,00, gasto fixo/); await waitText('Já paguei');
   await waitText('Parte de: Escola · todo mês, dia 10').catch(() => {});
   ok('conta do gasto fixo: "Parte de" e "Ver gasto fixo"', (await body()).includes('Parte de: Escola · todo mês, dia 10') && (await visibleCount('button', 'Ver gasto fixo')) === 1);
-  await btn('Marcar como paga').click(); await waitText('Confirmar pagamento');
+  await btn('Já paguei').click(); await waitText('Confirmar pagamento');
   ok('pagar a Escola: valor previsto e hoje', (await field('Valor pago').inputValue()) === '900,00' && (await field('Data do pagamento').inputValue()) === '07/10/2026');
   await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado');
   ok('Escola paga: sem "Adicionar a conta do próximo mês" nem "Repetir todo mês"', (await visibleCount('button', 'Adicionar a conta do próximo mês')) === 0 && (await visibleCount('button', 'Repetir todo mês')) === 0 && (await visibleCount('button', 'Repetir todo ano')) === 0 && (await body()).includes('Pago de outubro de 2026'));
@@ -1255,12 +1256,12 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await keepText();
   await shot('45_tirar_parcelas_do_ano');
   await btn('Cancelar').click(); await p.waitForTimeout(300);
-  ok('cancelar não tira nada', (await visibleCount('button', 'Marcar como paga')) === 1 && (await body()).includes('R$ 114,00'));
+  ok('cancelar não tira nada', (await visibleCount('button', 'Já paguei')) === 1 && (await body()).includes('R$ 114,00'));
   await btn('Voltar').click(); await waitText('Esconder as parcelas');
 
   // "Paguei o ano todo de uma vez": a parcela 1 paga com R$ 433,20 e as outras 3 tiradas. Desfazer não traz as 3 de volta.
-  await openRow(partRow(1)); await waitText('Marcar como paga');
-  await btn('Marcar como paga').click(); await waitText('Confirmar pagamento');
+  await openRow(partRow(1)); await waitText('Já paguei');
+  await btn('Já paguei').click(); await waitText('Confirmar pagamento');
   const wholeBox = p.getByRole('checkbox', { name: /^Paguei o ano todo de uma vez \(cota única\)/ }).filter({ visible: true }).first();
   await wholeBox.waitFor({ timeout: 8000 }).catch(() => {});
   ok('pagamento da parcela: caixa "Paguei o ano todo de uma vez", desmarcada, com o aviso', (await wholeBox.count()) === 1 && (await wholeBox.getAttribute('aria-checked')) === 'false' &&
@@ -1502,7 +1503,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await confirmIn('Tirar parcelas');
   t = await firstBodyWith('saíram de Contas a pagar');
   ok('resultado incerto ao tirar as parcelas do ano: conferido na hora, a tela fecha com a faixa de sucesso', t.includes('6 parcelas de 2026/2027 saíram de Contas a pagar.') && !t.includes('Não foi possível tirar') &&
-    (await visibleCount('button', 'Marcar como paga')) === 0, t.slice(0, 300));
+    (await visibleCount('button', 'Já paguei')) === 0, t.slice(0, 300));
   await waitText('6 tiradas').catch(() => {});
   ok('a parcela tirada não fica na tela: o ano mostra as 6 tiradas', (await body()).includes('2026/2027 · 6 parcelas · 6 tiradas') && (await visibleCount('button', /^Curso de idiomas, vence em/)) === 0);
   await goResumo();
@@ -1521,8 +1522,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Salvar conta do ano').click(); await waitText('Conta do ano salva');
   await waitText('Ver as 2 parcelas');
   await btn('Ver as 2 parcelas').click(); await waitText('Esconder as parcelas');
-  await openRow(/^Taxa escolar, vence em 20\/10\/2026/); await waitText('Marcar como paga');
-  await btn('Marcar como paga').click(); await waitText('Confirmar pagamento');
+  await openRow(/^Taxa escolar, vence em 20\/10\/2026/); await waitText('Já paguei');
+  await btn('Já paguei').click(); await waitText('Confirmar pagamento');
   await field('Valor pago').fill('90,00');
   await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado');
   await btn('Ver conta do ano').click(); await waitText('Ano a ano');
@@ -1558,7 +1559,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await openRow(/^Taxa escolar, paga em 07\/10\/2026/); await waitText('Desfazer pagamento');
   await btn('Desfazer pagamento').click(); await waitText('Desfazer pagamento?');
   await confirmIn('Desfazer pagamento'); await waitText('Pagamento desfeito');
-  await btn('Marcar como paga').click(); await waitText('Confirmar pagamento');
+  await btn('Já paguei').click(); await waitText('Confirmar pagamento');
   const taxBox = p.getByRole('checkbox', { name: /^Paguei o ano todo de uma vez \(cota única\)/ }).filter({ visible: true }).first();
   await taxBox.waitFor({ timeout: 8000 }).catch(() => {});
   await taxBox.click(); await waitText('Soma das 2 parcelas de 2026 em aberto');
@@ -2091,8 +2092,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     t.includes('Você planeja guardar R$ 500,00 por mês.') && t.includes('a terceira etapa (R$ 22.500,00, 6 meses dos seus gastos essenciais) chega em dezembro de 2029.') && t.includes('Guardado em outubro: R$ 500,00') &&
     /\d+,\d% da renda de referência já tem destino\./.test(t) && (await visibleCount('button', 'Ver renda comprometida')) === 1 && (await visibleCount('button', 'Ver o plano')) === 1 && (await visibleCount('button', 'Mudar valor')) === 1);
   ok('Metas: a pergunta "Você consegue guardar algum valor por mês?" não aparece depois da resposta "consigo"', !t.includes('Você consegue guardar algum valor por mês?') && (await visibleCount('button', 'Responder depois')) === 0);
-  ok('Metas: títulos na ordem (Seu plano de guardar, Seu mês, Reserva para imprevistos, Suas metas, Aprender)', JSON.stringify((await headingList()).filter((h) => h.startsWith('2:'))) ===
-    JSON.stringify(['2:Seu plano de guardar', '2:Seu mês', '2:Reserva para imprevistos', '2:Suas metas', '2:Aprender']), JSON.stringify(await headingList()));
+  ok('Metas: títulos na ordem (Reserva para imprevistos com o plano dentro, Suas metas, Seu mês, Fazer as contas, Aprender; D-039)', JSON.stringify((await headingList()).filter((h) => h.startsWith('2:'))) ===
+    JSON.stringify(['2:Reserva para imprevistos', '2:Suas metas', '2:Seu mês', '2:Fazer as contas', '2:Aprender']) && (await headingList()).includes('3:Seu plano de guardar'), JSON.stringify(await headingList()));
   await keepText();
   // A aba mantém o acesso às calculadoras e ao simulador (linhas do mesmo card).
   const calcRows = [
@@ -2148,7 +2149,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Linhas de tema visíveis (nome acessível "{título}. {subtítulo}. Leitura de N minuto(s)."), de cima para baixo.
   const topicRows = () => p.evaluate(() => [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && / Leitura de \d+ minutos?\.$/.test(e.getAttribute('aria-label') || ''))
     .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top).map((e) => e.getAttribute('aria-label')));
-  const learnSearch = () => p.getByLabel('Buscar um tema', { exact: true }).filter({ visible: true }).first();
+  const learnSearch = () => p.getByLabel('Buscar um tema ou uma função', { exact: true }).filter({ visible: true }).first();
   const learnBackToTab = async () => { await btn('Voltar para Aprender').click(); await waitText('Comece por aqui'); };
   await logoChecks('Aprender: logotipo "clarevo." no cabeçalho azul, sem o símbolo C');
   t = await body();
@@ -2191,10 +2192,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     (await visibleCount('button', /^Calculadoras\./)) === 0 && !(await body()).includes('Comece por aqui'), jurosRows.slice(0, 3).join(' | '));
   await p.waitForTimeout(600);
   const learnLive = await p.evaluate(() => [...document.querySelectorAll('[aria-live="polite"]')].map((e) => e.textContent).filter(Boolean));
-  ok('busca: a contagem é anunciada uma vez na região viva', learnLive.some((x) => /^\d+ temas para "juros"$/.test(x)), JSON.stringify(learnLive));
+  ok('busca: a contagem é anunciada uma vez na região viva', learnLive.some((x) => /^\d+ temas para "juros"(\. \d+ telas? do app para "juros")?$/.test(x)), JSON.stringify(learnLive));
   // A região viva fica numa caixa de 1 px recortada, nunca com opacidade 0 (o TalkBack ignora o que é transparente).
   const liveBox = await p.evaluate(() => {
-    const e = [...document.querySelectorAll('[aria-live="polite"]')].find((x) => /^\d+ temas para "juros"$/.test(x.textContent));
+    const e = [...document.querySelectorAll('[aria-live="polite"]')].find((x) => /^\d+ temas para "juros"(\. \d+ telas? do app para "juros")?$/.test(x.textContent));
     if (!e) return null;
     const box = e.parentElement; const r = box.getBoundingClientRect(); const cs = getComputedStyle(box);
     return { w: r.width, h: r.height, overflow: cs.overflow, opacity: cs.opacity, own: getComputedStyle(e).opacity };
@@ -2379,11 +2380,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await shot(`24_contas_${w}px`, true);
     await headerChecks(`contas a pagar ${w}px`);
     // Telas novas: título inteiro (nenhum h1 cortado) e o contexto visível no cabeçalho.
-    await openRow(/^Internet, vence em 15\/10\/2026/); await waitText('Marcar como paga'); await p.waitForTimeout(300);
+    await openRow(/^Internet, vence em 15\/10\/2026/); await waitText('Já paguei'); await p.waitForTimeout(300);
     await headerChecks(`detalhe da conta ${w}px`);
     await layoutChecks(`detalhe da conta ${w}px`);
     if (w === 320) await shot('24_detalhe_conta_320px');
-    await btn('Marcar como paga').click(); await waitText('Confirmar pagamento'); await p.waitForTimeout(300);
+    await btn('Já paguei').click(); await waitText('Confirmar pagamento'); await p.waitForTimeout(300);
     await headerChecks(`marcar como paga ${w}px`);
     await layoutChecks(`marcar como paga ${w}px`);
     if (w === 320) await shot('24_marcar_como_paga_320px');
@@ -2667,8 +2668,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('button', { name: /Próximo mês/ }).filter({ visible: true }).first().click(); await waitText('Outubro de 2026'); await p.waitForTimeout(400);
 
   // Pagar a Internet com R$ 159,90: 52,7%; desfazer volta a 52,5%. Nada de "Pago" muda a conta de comprometido além do valor pago.
-  await openToPay(); await openRow(/^Internet, vence em 15\/10\/2026/); await waitText('Marcar como paga');
-  await btn('Marcar como paga').click(); await waitText('Confirmar pagamento');
+  await openToPay(); await openRow(/^Internet, vence em 15\/10\/2026/); await waitText('Já paguei');
+  await btn('Já paguei').click(); await waitText('Confirmar pagamento');
   await field('Valor pago').fill('159,90'); await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado');
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
   await waitUntil(async () => (await visibleCount('button', /^Renda comprometida em outubro: 52,7%/)) === 1, 6000);
@@ -2822,7 +2823,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Aportes, resgates e valorizações só mostram o que a pessoa registrou: nunca entram em Recebido nem em Pago.
   const metasTab = async () => { await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu plano de guardar'); await p.waitForTimeout(400); };
   const goalBars = () => p.getByRole('progressbar').filter({ visible: true }).evaluateAll((els) => els.map((e) => [e.getAttribute('aria-label'), e.getAttribute('aria-valuenow')]));
-  const goBackToMetas = async () => { for (let i = 0; i < 4 && (await visibleCount('tab', 'Metas')) === 0; i++) { await btn('Voltar').click(); await p.waitForTimeout(400); } await waitText('Seu plano de guardar'); };
+  // Com a barra inferior nas telas de consulta (D-039), a aba Metas está à mão também no detalhe da meta: um toque na aba.
+  const goBackToMetas = async () => {
+    for (let i = 0; i < 4 && (await visibleCount('tab', 'Metas')) === 0; i++) { await btn('Voltar').click(); await p.waitForTimeout(400); }
+    await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu plano de guardar'); await p.waitForTimeout(400);
+  };
   await freshDemo();
   await metasTab();
   ok('C Metas: reserva 15% e "Viagem de férias" 20% com as barras acessíveis', JSON.stringify(await goalBars()) === JSON.stringify([['Reserva para imprevistos: 15% da meta, R$ 3.500,00 de R$ 22.500,00.', '15']]) &&
@@ -2987,7 +2992,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await newAcct('Cris Teste', 'cris@exemplo.com');
   await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Você consegue guardar algum valor por mês?'); await p.waitForTimeout(400);
   t = await body();
-  ok('C conta nova: Metas começa com a pergunta, sem metas, sem reserva e sem números de exemplo', t.includes('Sua resposta ajuda a montar um plano com os seus números. Ela fica só com você.') && t.includes('Nenhuma meta ainda') && t.includes('Calcular minha reserva') && t.includes('Guardado em outubro: R$ 0,00'));
+  ok('C conta nova: Metas começa com a pergunta, sem metas, sem reserva e sem números de exemplo', t.includes('Só você vê esta resposta.') && t.includes('Nenhuma meta ainda') && t.includes('Calcular minha reserva') && t.includes('Guardado em outubro: R$ 0,00'));
   ok('C conta nova: nenhuma meta nem reserva de exemplo', (await otherDevice(async (repo, ctx) => (await repo.listGoals(ctx)).length)) === 0 && !t.includes('Viagem de férias'));
   await btn('Sim, consigo').click(); await waitText('Quanto você consegue guardar por mês?'); await p.waitForTimeout(500);
   t = await body();
@@ -3554,8 +3559,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     soonRows.some((r) => r.startsWith('Fatura Cartão verde, vence em ') && r.includes('09/10') && r.endsWith('R$ 80,00')) && ((await sectionRows('Próximos meses')) ?? []).some((r) => r.startsWith('Fatura Cartão Exemplo, vence em 10/11/2026')), JSON.stringify([dueRows, soonRows]));
   ok('E Contas a pagar: conta de fatura nunca mostra "Já paguei" (só as outras contas a vencer mostram)', (await visibleCount('button', /^Já paguei.*Fatura/)) === 0 && (await visibleCount('button', /^Já paguei/)) >= 2);
   await p.getByRole('button', { name: /^Fatura Cartão verde, vence em / }).filter({ visible: true }).first().click(); await waitInvoice('Fatura de outubro'); t = await body();
-  ok('E tocar na fatura de uma conta a pagar abre a fatura (fechada, vence em 09/10), com "Pagar fatura", e sem "Marcar como paga" nem "Editar conta" nem "Excluir conta"', /^\/cartoes\/[^/]+\/fatura\/2026-10$/.test(urlPath()) && t.includes('Fechada') && t.includes('R$ 80,00') && t.includes('Fechou em 01/10 · Vence em 09/10') &&
-    (await visibleCount('button', 'Pagar fatura')) === 1 && (await visibleCount('button', 'Marcar como paga')) === 0 && (await visibleCount('button', /^Excluir/)) === 0 && t.includes('Fatura fechada: o valor só muda se você informar encargos, estornos ou novos lançamentos.'), `${urlPath()} ${t.slice(0, 300)}`);
+  ok('E tocar na fatura de uma conta a pagar abre a fatura (fechada, vence em 09/10), com "Pagar fatura", e sem "Já paguei" nem "Editar conta" nem "Excluir conta"', /^\/cartoes\/[^/]+\/fatura\/2026-10$/.test(urlPath()) && t.includes('Fechada') && t.includes('R$ 80,00') && t.includes('Fechou em 01/10 · Vence em 09/10') &&
+    (await visibleCount('button', 'Pagar fatura')) === 1 && (await visibleCount('button', 'Já paguei')) === 0 && (await visibleCount('button', /^Excluir/)) === 0 && t.includes('Fatura fechada: o valor só muda se você informar encargos, estornos ou novos lançamentos.'), `${urlPath()} ${t.slice(0, 300)}`);
   await keepText();
   await shot('145_fatura_fechada');
   await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
@@ -3574,7 +3579,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const exemploIdDeep = await cardIdOf('Cartão Exemplo');
   await p.goto(`http://localhost:${PORT}/a-pagar/${invoiceCommitmentId}`); await waitText('Seu dinheiro');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Lançamentos', 12000).catch(() => {}); await p.waitForTimeout(600);
-  ok('E o endereço da conta de fatura (/a-pagar/<id>) abre a fatura (e não o detalhe da conta), sem "Marcar como paga"', urlPath() === `/cartoes/${exemploIdDeep}/fatura/2026-11` && (await h1Name()) === 'Fatura' && (await visibleCount('button', 'Marcar como paga')) === 0, urlPath());
+  ok('E o endereço da conta de fatura (/a-pagar/<id>) abre a fatura (e não o detalhe da conta), sem "Já paguei"', urlPath() === `/cartoes/${exemploIdDeep}/fatura/2026-11` && (await h1Name()) === 'Fatura' && (await visibleCount('button', 'Já paguei')) === 0, urlPath());
   await p.goto(`http://localhost:${PORT}/cartoes/${exemploIdDeep}/fatura/2026-12`); await waitText('Seu dinheiro');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Lançamentos', 12000).catch(() => {}); await p.waitForTimeout(600);
   ok('E o endereço direto da fatura (/cartoes/<id>/fatura/2026-12) abre a fatura de dezembro', urlPath() === `/cartoes/${exemploIdDeep}/fatura/2026-12` && (await body()).includes('Fatura de dezembro'), urlPath());
@@ -4086,7 +4091,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const monthBack = async (title) => { await p.getByRole('button', { name: /Mês anterior/ }).filter({ visible: true }).first().click(); await waitText(title); };
   const monthForward = async (title) => { await p.getByRole('button', { name: /Próximo mês/ }).filter({ visible: true }).first().click(); await waitText(title); };
 
-  // 2. Faixa no Resumo: sem valores, antes de "Anotar gasto", com a pílula "Demonstração".
+  // 2. Faixa no Resumo: sem valores, depois de "Anotar gasto" (D-039), com a pílula "Demonstração".
   await enterReturnDemo();
   await waitText('4 meses com algo sem registro').catch(() => {});
   let band = await bandText();
@@ -4094,7 +4099,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     band.includes('Atualizar é opcional. Nada é preenchido sem a sua confirmação.') && (await visibleCount('button', 'Ver resumo')) === 1 && (await visibleCount('button', 'Seguir adiante')) === 1, band ?? '');
   ok('retorno: nenhum valor em reais na faixa', band !== null && !band.includes('R$'), band ?? '');
   const bo = await bandOrder();
-  ok('retorno: a faixa fica no lugar dos avisos temporários, antes de "Anotar gasto", título de nível 2', bo.faixa !== null && bo.anotar !== null && bo.faixa < bo.anotar &&
+  ok('retorno: a faixa fica no lugar dos avisos temporários, depois de "Anotar gasto" (D-039), título de nível 2', bo.faixa !== null && bo.anotar !== null && bo.anotar < bo.faixa &&
     JSON.stringify(await headingList()) === JSON.stringify(['2:Outubro de 2026', '2:Seus últimos meses', '2:Pagamentos do mês']), `${JSON.stringify(bo)} ${JSON.stringify(await headingList())}`);
   ok('retorno: cenário fictício identificado com a pílula "Demonstração"', (await p.locator('[aria-label="Demonstração: acesso simulado e dados fictícios"]').filter({ visible: true }).count()) === 1);
   ok('retorno: Ainda a pagar R$ 10.590,00 com "Inclui R$ 540,00 em valores estimados."', (await toPayIs('10.590,00')()) && (await body()).includes('Inclui R$ 540,00 em valores estimados.'));
@@ -4583,6 +4588,377 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('falha parcial e "Cancelar": a Luz de julho volta como conta em aberto com "Já paguei", sem o resultado "Registrada em aberto", e o passo conta como ação ("Próximo mês")',
     new URL(p.url()).pathname === '/retomar/atualizar' && t.includes('cerca de R$ 180,00 (estimado) · venceu em 12/07/2026 · em aberto') && !t.includes('Registrada em aberto') &&
     (await visibleCount('button', 'Já paguei: Luz de julho')) === 1 && (await visibleCount('button', 'Próximo mês')) === 1 && (await visibleCount('button', 'Pular este mês')) === 0, t.slice(0, 500));
+
+  // ==================================================================================================================
+  // Navegação (D-039): "Anotar gasto" logo abaixo do cabeçalho; "Ver contas ›" e "›" em Recebido e Pago; barra inferior nas
+  // telas de consulta (e só nos formulários sem ela); Contas a pagar no mês certo, com seletor local; vencida em poucos
+  // toques; lembretes em Contas a pagar; Metas compacta; busca de Aprender com o grupo "No app". Cada item é conferido em 390
+  // e em 320 px de largura. Capturas novas: 160 em diante. Os totais de outubro da demonstração seguem 6.000 / 3.900 / 2.100 / 650.
+  // ==================================================================================================================
+  const NAV_WIDTHS = [[390, 844], [320, 800]];
+  // Roda a conferência em 390 e 320 px (volta para 390 no fim).
+  const atWidths = async (fn) => {
+    for (const [w, h] of NAV_WIDTHS) { await p.setViewportSize({ width: w, height: h }); await p.waitForTimeout(450); await fn(w); }
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(350);
+  };
+  const demoHome = async () => {
+    await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+    await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+    await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
+  };
+  const tabByName = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
+  // Estado da barra inferior: as quatro abas visíveis, onde terminam e qual está marcada.
+  const barState = () => p.evaluate(() => {
+    const names = ['Resumo', 'Movimentações', 'Metas', 'Aprender e dúvidas'];
+    const tabs = [...document.querySelectorAll('[role=tab]')].filter((e) => names.includes(e.getAttribute('aria-label')) && e.getBoundingClientRect().width > 0);
+    const rects = tabs.map((e) => e.getBoundingClientRect());
+    return {
+      n: tabs.length,
+      selected: tabs.filter((e) => e.getAttribute('aria-selected') === 'true').map((e) => e.getAttribute('aria-label')),
+      bottom: rects.length ? Math.round(Math.max(...rects.map((r) => r.bottom))) : 0,
+      minH: rects.length ? Math.round(Math.min(...rects.map((r) => r.height))) : 0,
+      out: rects.filter((r) => r.left < -0.5 || r.right > window.innerWidth + 0.5).length,
+      h: window.innerHeight,
+      overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+    };
+  });
+  const barOk = (s) => s.n === 4 && s.bottom <= s.h + 1 && s.bottom >= s.h - 40 && s.out === 0 && s.minH >= 44 && !s.overflow;
+  const checkBar = (label, selected = null) => atWidths(async (w) => {
+    const s = await barState();
+    ok(`${label} (${w}px): barra inferior à vista, com as 4 abas${selected ? ` e "${selected}" marcada` : ''}`, barOk(s) && (selected === null || (s.selected.length === 1 && s.selected[0] === selected)), JSON.stringify(s));
+  });
+  const checkNoBar = (label) => atWidths(async (w) => { ok(`${label} (${w}px): formulário sem barra inferior`, (await barState()).n === 0); });
+  // Posições (topo e base) de elementos visíveis por papel e texto exato ou por nome acessível.
+  const nodeBox = (role, text) => p.evaluate(({ role, text }) => {
+    const sel = role === 'heading' ? '[role=heading]' : '[role=button]';
+    const e = [...document.querySelectorAll(sel)].find((x) => (x.textContent === text || x.getAttribute('aria-label') === text) && x.getBoundingClientRect().width > 0);
+    if (!e) return null;
+    const b = e.getBoundingClientRect();
+    return { top: Math.round(b.top), bottom: Math.round(b.bottom), h: window.innerHeight };
+  }, { role, text });
+  const axDescription = async (namePrefix) => {
+    const { nodes } = await cdp.send('Accessibility.getFullAXTree');
+    const n = nodes.find((x) => !x.ignored && x.role?.value === 'button' && (x.name?.value ?? '').startsWith(namePrefix));
+    return n ? { name: n.name.value, description: n.description?.value ?? '' } : null;
+  };
+  const navBackTo = async (tabName) => { await tabByName(tabName).click(); await p.waitForTimeout(500); };
+
+  // ---- 1. Resumo: "Anotar gasto" logo abaixo do cabeçalho; "Ver contas ›"; "›" em Recebido e Pago ----
+  await demoHome();
+  t = await body();
+  ok('nav Resumo: totais de outubro da demonstração seguem Recebido 6.000, Pago 3.900, Diferença 2.100 e Ainda a pagar 650',
+    (await p.getByRole('button', { name: /^Recebido, R\$ 6\.000,00/ }).filter({ visible: true }).count()) === 1 && (await p.getByRole('button', { name: /^Pago, R\$ 3\.900,00/ }).filter({ visible: true }).count()) === 1 &&
+    (await p.getByRole('button', { name: /^Diferença do mês, R\$ 2\.100,00/ }).filter({ visible: true }).count()) === 1 && (await p.getByRole('button', { name: /^Ainda a pagar neste mês, R\$ 650,00/ }).filter({ visible: true }).count()) === 1);
+  const resumoLayout = (w) => p.evaluate(() => {
+    const top = (sel, pred) => { const e = [...document.querySelectorAll(sel)].find((x) => pred(x) && x.getBoundingClientRect().width > 0); return e ? e.getBoundingClientRect() : null; };
+    const anotar = top('[role=button]', (x) => x.textContent === 'Anotar gasto');
+    const pago = top('[role=button]', (x) => (x.getAttribute('aria-label') || '').startsWith('Pago, '));
+    const toPay = top('[role=button]', (x) => (x.getAttribute('aria-label') || '').startsWith('Ainda a pagar neste mês,'));
+    return { anotarTop: anotar && Math.round(anotar.top), anotarBottom: anotar && Math.round(anotar.bottom), pagoBottom: pago && Math.round(pago.bottom), toPayTop: toPay && Math.round(toPay.top), h: window.innerHeight };
+  });
+  await atWidths(async (w) => {
+    const r = await resumoLayout(w);
+    ok(`nav Resumo (${w}px): "Anotar gasto" logo abaixo do cabeçalho azul (menos de 90 px depois de Recebido e Pago), antes de "Ainda a pagar" e à vista sem rolar`,
+      r.anotarTop !== null && r.pagoBottom !== null && r.anotarTop - r.pagoBottom < 90 && r.anotarTop < r.toPayTop && r.anotarBottom <= r.h, JSON.stringify(r));
+    ok(`nav Resumo (${w}px): "Ver contas ›" no card "Ainda a pagar" e "›" ao lado de Recebido e Pago`, (await visibleCount('button', 'Ver contas a pagar')) === 1 && (await body()).includes('Ver contas') &&
+      (await p.locator('[aria-label^="Recebido, "] svg, [aria-label^="Pago, "] svg').evaluateAll((els) => els.filter((e) => e.getBoundingClientRect().width > 0).length)) >= 2, JSON.stringify(await resumoLayout(w)));
+    await layoutChecks(`nav Resumo ${w}px`);
+    if (w === 390) await shot('170_resumo_navegacao');
+    if (w === 320) await shot('170_resumo_navegacao_320px');
+  });
+  // As dicas ("Abre os recebimentos do mês") são do leitor de tela do celular (accessibilityHint); a web mantém só o nome.
+  const recName = await axDescription('Recebido, ');
+  const pagoName = await axDescription('Pago, ');
+  ok('nav Resumo: Recebido e Pago mantêm o nome acessível ("Recebido, R$ ..." e "Pago, R$ ...")', recName !== null && pagoName !== null && recName.name === 'Recebido, R$ 6.000,00' && pagoName.name === 'Pago, R$ 3.900,00', JSON.stringify([recName, pagoName]));
+  await p.getByRole('button', { name: /^Recebido, / }).filter({ visible: true }).first().click(); await waitText('Recebido');
+  ok('nav Resumo: "›" ao lado de Recebido abre a lista de recebimentos', urlPath() === '/composicao' && new URL(p.url()).searchParams.get('tipo') === 'recebido', p.url());
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  await p.getByRole('button', { name: /^Pago, / }).filter({ visible: true }).first().click(); await waitText('Por categoria');
+  ok('nav Resumo: "›" ao lado de Pago abre os pagamentos (com "Por categoria")', urlPath() === '/composicao' && new URL(p.url()).searchParams.get('tipo') === 'pago' && (await visibleCount('radio', 'Por categoria')) === 1, p.url());
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  await btn('Ver contas a pagar').click(); await waitText('Ainda a pagar neste mês');
+  ok('nav Resumo: "Ver contas ›" abre as contas a pagar do mês do card', urlPath() === '/a-pagar' && (await body()).includes('Pessoal · Outubro de 2026'), p.url());
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+
+  // O aviso da volta depois de semanas e o card de Primeiros passos vêm depois de "Anotar gasto", em 390 e 320 px.
+  await enterReturnDemo();
+  await atWidths(async (w) => {
+    const bo = await bandOrder();
+    const r = await resumoLayout(w);
+    ok(`nav Resumo (${w}px): na volta depois de semanas, "Anotar gasto" logo abaixo do cabeçalho e à vista; a faixa "Seus últimos meses" vem depois`, bo.faixa !== null && r.anotarTop !== null && r.anotarTop < bo.faixa && r.anotarBottom <= r.h && r.anotarTop - r.pagoBottom < 90, JSON.stringify({ bo, r }));
+    if (w === 390) await shot('171_resumo_volta_navegacao');
+  });
+  await newAcct('Davi Teste', 'davi@exemplo.com');
+  await waitText('Primeiros passos');
+  await atWidths(async (w) => {
+    const r = await resumoLayout(w);
+    const card = await nodeBox('heading', 'Primeiros passos');
+    ok(`nav Resumo (${w}px): conta nova com "Anotar gasto" logo abaixo do cabeçalho, à vista, e Primeiros passos depois dele`, r.anotarTop !== null && card !== null && r.anotarTop < card.top && r.anotarBottom <= r.h && r.anotarTop - r.pagoBottom < 90, JSON.stringify({ r, card }));
+    if (w === 390) await shot('171_resumo_conta_nova_navegacao');
+  });
+
+  // ---- 2. Barra inferior nas telas de consulta; só os formulários ficam sem ela ----
+  await demoHome();
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento');
+  await p.getByRole('button', { name: /^Calculadoras, / }).filter({ visible: true }).first().click(); await waitText('Decidir uma compra'); await p.waitForTimeout(400);
+  await checkBar('nav barra: Calculadoras (o caso que sumia)', 'Movimentações');
+  await shot('172_calculadoras_com_barra');
+  await p.getByRole('button', { name: /^Reserva para imprevistos\./ }).filter({ visible: true }).first().click(); await waitText('Gastos essenciais por mês'); await p.waitForTimeout(300);
+  await checkBar('nav barra: uma calculadora aberta', 'Movimentações');
+  await navBackTo('Metas');
+  ok('nav barra: tocar numa aba da barra volta à aba, sem telas empilhadas por baixo', urlPath() === '/metas' && (await visibleCount('button', 'Voltar')) === 0 && (await h1Name()) === 'Metas', p.url());
+  // Contas a pagar, detalhe e o formulário "Já paguei".
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento');
+  await p.getByRole('button', { name: /^Contas a pagar, / }).filter({ visible: true }).first().click(); await waitText('Ainda a pagar neste mês'); await p.waitForTimeout(400);
+  await checkBar('nav barra: Contas a pagar', 'Movimentações');
+  await openRow(/^Internet, vence em 15\/10\/2026/); await waitText('Já paguei'); await p.waitForTimeout(300);
+  await checkBar('nav barra: detalhe de uma conta a pagar', 'Movimentações');
+  await btn('Já paguei').click(); await waitText('Confirmar pagamento'); await p.waitForTimeout(300);
+  await checkNoBar('nav barra: pagar uma conta');
+  await btn('Voltar').click(); await waitText('Já paguei'); await btn('Voltar').click(); await waitText('Ainda a pagar neste mês');
+  await btn('Anotar conta a pagar').click(); await waitText('Com que frequência?'); await p.waitForTimeout(300);
+  await checkNoBar('nav barra: anotar conta a pagar');
+  await btn('Voltar').click(); await waitText('Ainda a pagar neste mês');
+  await p.getByRole('button', { name: /^Gastos fixos e parcelamentos/ }).filter({ visible: true }).first().click(); await waitText('Por mês, se os valores não mudarem'); await p.waitForTimeout(400);
+  await checkBar('nav barra: Gastos fixos e parcelamentos', 'Movimentações');
+  await openRow(/^Aluguel, /); await waitText('Aluguel'); await p.waitForTimeout(400);
+  await checkBar('nav barra: detalhe de um gasto fixo', 'Movimentações');
+  await navBackTo('Movimentações');
+  // Cartões, cartão, fatura e o pagamento da fatura.
+  await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitText('Cadastrar cartão'); await p.waitForTimeout(400);
+  await checkBar('nav barra: Cartões', 'Movimentações');
+  await p.getByRole('button', { name: /^Cartão Exemplo · final 1234\./ }).filter({ visible: true }).first().click(); await waitText('Fatura atual'); await p.waitForTimeout(400);
+  await checkBar('nav barra: um cartão', 'Movimentações');
+  await p.getByRole('button', { name: /^Fatura de novembro, / }).filter({ visible: true }).first().click(); await waitText('Lançamentos'); await p.waitForTimeout(400);
+  await checkBar('nav barra: uma fatura', 'Movimentações');
+  await btn('Pagar fatura').click(); await waitText('Valor a pagar').catch(() => {}); await p.waitForTimeout(400);
+  await checkNoBar('nav barra: pagar fatura');
+  await btn('Voltar').click(); await p.waitForTimeout(400);
+  await navBackTo('Movimentações');
+  // Registro: detalhe com barra; novo e editar sem barra.
+  await tabByName('Resumo').click(); await waitText('Diferença do mês');
+  await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(300);
+  await checkNoBar('nav barra: anotar gasto');
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  await p.getByRole('button', { name: /^Mercado, / }).filter({ visible: true }).first().click(); await waitText('Editar registro'); await p.waitForTimeout(400);
+  await checkBar('nav barra: detalhe de um gasto', 'Resumo');
+  await btn('Editar registro').click(); await waitText('Salvar alterações').catch(() => {}); await p.waitForTimeout(300);
+  await checkNoBar('nav barra: editar registro');
+  await btn('Voltar').click(); await p.waitForTimeout(300); await navBackTo('Resumo');
+  // Renda comprometida, Metas, meta, simulador e explicação.
+  await p.getByRole('button', { name: /renda de referência|Renda comprometida/ }).filter({ visible: true }).first().click(); await waitText('Metas não entram no percentual').catch(() => {}); await p.waitForTimeout(400);
+  await checkBar('nav barra: renda comprometida', 'Resumo');
+  await navBackTo('Metas'); await waitText('Reserva para imprevistos');
+  await btn('Ver detalhes').click(); await waitText('Registrar aporte'); await p.waitForTimeout(400);
+  await checkBar('nav barra: detalhe da reserva', 'Metas');
+  await btn('Registrar aporte').click(); await p.waitForTimeout(500);
+  await checkNoBar('nav barra: registrar aporte');
+  await btn('Voltar').click(); await p.waitForTimeout(300); await navBackTo('Metas');
+  await p.getByRole('button', { name: /^Simular um plano\./ }).filter({ visible: true }).first().click(); await waitText('O que você quer saber?'); await p.waitForTimeout(400);
+  await checkBar('nav barra: simulador', 'Metas');
+  await shot('173_simulador_com_barra');
+  await navBackTo('Metas');
+  await btn('Nova meta').click(); await waitText('Nome da meta').catch(() => {}); await p.waitForTimeout(400);
+  await checkNoBar('nav barra: nova meta');
+  await btn('Voltar').click(); await p.waitForTimeout(300); await navBackTo('Aprender e dúvidas');
+  await waitText('Comece por aqui');
+  await p.getByRole('button', { name: /Leitura de \d+ minutos?\./ }).filter({ visible: true }).first().click(); await waitText('Fontes'); await p.waitForTimeout(500);
+  ok('nav barra: a explicação de um tema abre em /explicacao', urlPath().startsWith('/explicacao/'), p.url());
+  await checkBar('nav barra: explicação de um tema', 'Aprender e dúvidas');
+
+  // ---- 3. Contas a pagar: mês certo com seletor local, vencida em poucos toques, lembretes ----
+  await demoHome();
+  await p.getByRole('button', { name: /Mês anterior/ }).filter({ visible: true }).first().click(); await waitText('Setembro de 2026'); await p.waitForTimeout(600);
+  await p.getByRole('button', { name: /^Previsto para setembro de 2026, R\$/ }).filter({ visible: true }).first().click(); await waitText('Previsto para setembro'); await p.waitForTimeout(400);
+  ok('nav Contas a pagar: o card do Resumo em setembro abre setembro, com o seletor de mês', urlPath() === '/a-pagar' && (await body()).includes('Pessoal · Setembro de 2026') && (await visibleCount('button', 'Voltar para outubro de 2026')) === 1 &&
+    (await visibleCount('button', 'Mês anterior: agosto de 2026')) === 1 && (await visibleCount('button', 'Próximo mês: outubro de 2026')) === 1, p.url());
+  await atWidths(async (w) => {
+    await layoutChecks(`nav Contas a pagar em setembro ${w}px`);
+    if (w === 390) await shot('174_contas_a_pagar_setembro');
+    if (w === 320) await shot('174_contas_a_pagar_setembro_320px');
+  });
+  await btn('Voltar para outubro de 2026').click(); await waitText('Ainda a pagar neste mês'); await p.waitForTimeout(400);
+  ok('nav Contas a pagar: "Voltar para outubro de 2026" troca só a tela local e some no mês atual', (await body()).includes('Pessoal · Outubro de 2026') && (await visibleCount('button', 'Voltar para outubro de 2026')) === 0);
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  ok('nav Contas a pagar: trocar de mês ali não muda o mês do Resumo (continua em setembro)', await headingShown('Setembro de 2026'));
+  // Entrada "de agora" sem mês no endereço: abre no mês atual, mesmo com o Resumo em setembro.
+  await p.getByRole('button', { name: /^Renda comprometida/ }).filter({ visible: true }).first().click(); await waitText('Contas do mês').catch(() => {}); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: 'Contas a pagar', exact: true }).filter({ visible: true }).first().click(); await waitText('Ainda a pagar neste mês'); await p.waitForTimeout(300);
+  ok('nav Contas a pagar: entrada "de agora" (sem mês no endereço) abre em outubro, mesmo com o Resumo em setembro', urlPath() === '/a-pagar' && !p.url().includes('mes=') && (await body()).includes('Pessoal · Outubro de 2026'), p.url());
+  await goResumo();
+  await p.getByRole('button', { name: /Próximo mês/ }).filter({ visible: true }).first().click(); await waitText('Outubro de 2026'); await p.waitForTimeout(400);
+  // Seletor local: setembro, outubro, novembro; o Resumo não muda.
+  await openToPay();
+  await btn('Mês anterior: setembro de 2026').click(); await waitText('Previsto para setembro');
+  await btn('Próximo mês: outubro de 2026').click(); await waitText('Ainda a pagar neste mês');
+  await btn('Próximo mês: novembro de 2026').click(); await waitText('Previsto para novembro'); await p.waitForTimeout(300);
+  t = await body();
+  ok('nav Contas a pagar: o seletor percorre os meses (setembro, outubro, novembro) e mostra "Previsto para novembro"', t.includes('Pessoal · Novembro de 2026') && t.includes('Previsto para novembro de 2026'));
+  await btn('Voltar para outubro de 2026').click(); await waitText('Ainda a pagar neste mês'); await p.waitForTimeout(300);
+  await atWidths(async (w) => {
+    const first = await p.evaluate(() => {
+      const b = [...document.querySelectorAll('[role=button]')].find((e) => (e.getAttribute('aria-label') || '').startsWith('Já paguei ') && e.getBoundingClientRect().width > 0);
+      return b ? Math.round(b.getBoundingClientRect().bottom) : null;
+    });
+    const bs = await barState();
+    // Em 320 px o parágrafo do topo ocupa mais linhas e o primeiro "Já paguei" pede uma rolagem curta (medido em 770 de 800).
+    ok(`nav Contas a pagar (${w}px): o primeiro "Já paguei" da lista fica ${w === 390 ? 'à vista, acima da barra, com o seletor de mês no lugar da linha "Pessoal"' : 'ao alcance (rolagem curta), dentro da tela'}`, first !== null && (w === 390 ? first <= bs.bottom - 56 : first <= bs.h), `${first} barra=${bs.bottom - 56}`);
+    await layoutChecks(`nav Contas a pagar ${w}px`);
+    if (w === 390) await shot('175_contas_a_pagar_outubro');
+  });
+
+  // Duas contas vencidas (Gás de 28/09 e Água de 05/10), anotadas em "outro aparelho"; a demonstração não tem vencidas.
+  await otherDevice(async (repo, ctx) => {
+    await repo.createCommitment('e2e-nav-gas', ctx, { description: 'Gás', amountCents: 4000, dueOn: '2026-09-28', category: null });
+    await repo.createCommitment('e2e-nav-agua', ctx, { description: 'Água', amountCents: 9000, dueOn: '2026-10-05', category: null });
+  });
+  await waitText('Gás, venceu em 28/09/2026').catch(() => {}); await p.waitForTimeout(500);
+  // Vencida: com 2 vencidas a revisão já existia; paga uma pelo detalhe ("Já paguei") e a outra pela revisão,
+  // que agora aparece também com 1 só vencida.
+  t = await body();
+  ok('nav vencida: duas vencidas (Gás e Água) e "Revisar vencidas" na seção', (await sectionRows('Vencidas'))?.[0] === 'Revisar vencidas' && (await sectionRows('Vencidas')).length === 4, JSON.stringify(await sectionRows('Vencidas')));
+  await openRow(/^Gás, venceu em 28\/09\/2026/); await waitText('Já paguei'); await p.waitForTimeout(300);
+  ok('nav vencida: o detalhe da conta tem "Já paguei" (e não "Marcar como paga")', (await visibleCount('button', 'Já paguei')) === 1 && (await visibleCount('button', 'Marcar como paga')) === 0);
+  await btn('Já paguei').click(); await waitText('Confirmar pagamento'); await p.waitForTimeout(300);
+  ok('nav vencida: "Já paguei" no detalhe abre o pagamento, com o mesmo nome da lista', (await body()).includes('Confirmar pagamento'));
+  await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado').catch(() => {}); await p.waitForTimeout(600);
+  await goResumo(); await openToPay(); await p.waitForTimeout(500);
+  const venc1 = await sectionRows('Vencidas');
+  ok('nav vencida: com 1 só vencida (Água), "Revisar vencidas" aparece na seção', venc1 !== null && venc1[0] === 'Revisar vencidas' && venc1.length === 3 && /^Água, venceu em 05\/10\/2026/.test(venc1[1]), JSON.stringify(venc1));
+  await atWidths(async (w) => { await layoutChecks(`nav vencida com 1 conta ${w}px`); });
+  let taps = 0;
+  const tap = async (click) => { taps += 1; await click(); };
+  await goResumo();
+  await tap(() => btn('Ver contas a pagar').click()); await waitText('Ainda a pagar neste mês');
+  await tap(() => btn('Revisar vencidas').click()); await waitText('Marque o que você já pagou e tire o que não houve.');
+  await tap(() => p.getByRole('button', { name: /^Já paguei Água/ }).filter({ visible: true }).first().click()); await waitText('Marcar Água');
+  await tap(() => confirmIn('Confirmar')); await waitText('marcada como paga').catch(() => {}); await p.waitForTimeout(500);
+  t = await body();
+  ok('nav vencida: uma vencida paga pela revisão em 3 toques até a confirmação (Ver contas, Revisar vencidas, Já paguei) e 1 para confirmar', taps === 4 && t.includes('Água') && (t.includes('marcada como paga') || t.includes('Nenhuma conta vencida')), `${taps} toques: ${t.slice(0, 200)}`);
+  await shot('176_vencida_revisao_uma_conta');
+  await goResumo();
+  ok('nav vencida: Ainda a pagar volta a R$ 650,00 depois de pagar Gás e Água (R$ 780,00 com elas)', (await p.getByRole('button', { name: /^Ainda a pagar neste mês, R\$ 650,00/ }).filter({ visible: true }).count()) === 1);
+
+  // Lembretes dentro de Contas a pagar.
+  await openToPay(); await p.waitForTimeout(300);
+  await atWidths(async (w) => {
+    await scrollTo('Já anotou o pagamento como gasto? Exclua a conta a pagar para ela não continuar em Ainda a pagar.').catch(() => {});
+    ok(`nav lembretes (${w}px): link "Lembretes de vencimento" dentro de Contas a pagar, com 44 px ou mais`, (await p.evaluate(() => {
+      const b = [...document.querySelectorAll('[role=button]')].find((e) => (e.getAttribute('aria-label') || '').startsWith('Lembretes de vencimento.') && e.getBoundingClientRect().width > 0);
+      return b ? Math.round(b.getBoundingClientRect().height) : 0;
+    })) >= 44);
+    await layoutChecks(`nav lembretes ${w}px`);
+  });
+  await p.getByRole('button', { name: /^Lembretes de vencimento\./ }).filter({ visible: true }).first().click(); await waitText('Lembretes estão disponíveis no app para celular.'); await p.waitForTimeout(300);
+  ok('nav lembretes: o link leva a Conta, onde ficam os lembretes', urlPath() === '/conta' && (await body()).includes('Lembretes'), p.url());
+  await keepText();
+  await checkBar('nav barra: Conta', 'Resumo');
+  await navBackTo('Resumo');
+
+  // ---- 4. Metas compacta: pergunta compacta, plano dentro do card da reserva, "Fazer as contas" ----
+  await newAcct('Eva Teste', 'eva@exemplo.com');
+  await tabByName('Metas').click(); await waitText('Você consegue guardar algum valor por mês?'); await p.waitForTimeout(500);
+  const askLayout = () => p.evaluate(() => {
+    const box = (sel, pred) => { const e = [...document.querySelectorAll(sel)].find((x) => pred(x) && x.getBoundingClientRect().width > 0); return e ? e.getBoundingClientRect() : null; };
+    const title = box('[role=heading]', (x) => x.textContent === 'Você consegue guardar algum valor por mês?');
+    const yes = box('[role=button]', (x) => x.textContent === 'Sim, consigo');
+    const no = box('[role=button]', (x) => x.textContent === 'Agora não');
+    const later = box('[role=button]', (x) => x.textContent === 'Responder depois');
+    const calc = box('[role=button]', (x) => x.textContent === 'Calcular minha reserva');
+    const reserve = box('[role=heading]', (x) => x.textContent === 'Reserva para imprevistos');
+    const tabs = [...document.querySelectorAll('[role=tab]')].filter((x) => x.getBoundingClientRect().width > 0 && ['Resumo', 'Metas'].includes(x.getAttribute('aria-label')));
+    const barTop = tabs.length ? Math.min(...tabs.map((x) => x.getBoundingClientRect().top)) : window.innerHeight;
+    return {
+      askHeight: title && later ? Math.round(later.bottom - title.top) : null,
+      sameRow: yes && no ? Math.abs(yes.top - no.top) < 2 && no.left > yes.right - 1 : null,
+      laterBelow: later && yes ? later.top > yes.bottom - 1 : null,
+      calcBottom: calc ? Math.round(calc.bottom) : null,
+      reserveTop: reserve ? Math.round(reserve.top) : null,
+      laterBottom: later ? Math.round(later.bottom) : null,
+      barTop: Math.round(barTop),
+      h: window.innerHeight,
+    };
+  });
+  for (const [w, h] of [[360, 640], [390, 844], [320, 800]]) {
+    await p.setViewportSize({ width: w, height: h }); await p.waitForTimeout(500);
+    const r = await askLayout();
+    // Em 360 × 640 o cabeçalho azul e a pergunta ocupam a tela: a pergunta inteira e o título da reserva ficam à vista, e o botão
+    // "Calcular minha reserva" pede uma rolagem curta; nas telas mais altas ele fica à vista acima da barra.
+    const fits = w >= 390 ? r.calcBottom !== null && r.calcBottom <= r.barTop : r.laterBottom !== null && r.laterBottom <= r.barTop && r.reserveTop !== null && r.reserveTop < r.barTop;
+    ok(`nav Metas conta nova (${w}×${h}): pergunta compacta (até 230 px), "Sim, consigo" e "Agora não" lado a lado, "Responder depois" abaixo, ${w >= 390 ? '"Calcular minha reserva" à vista acima da barra' : 'pergunta inteira e título da reserva à vista'}`,
+      r.askHeight !== null && r.askHeight <= 230 && r.sameRow === true && r.laterBelow === true && fits, JSON.stringify(r));
+    await layoutChecks(`nav Metas conta nova ${w}px`);
+    if (w === 390) await shot('177_metas_compacta');
+    if (w === 320) await shot('177_metas_compacta_320px');
+  }
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  await keepText();
+  await demoHome();
+  await tabByName('Metas').click(); await waitText('Reserva para imprevistos'); await waitText('Seu plano de guardar'); await p.waitForTimeout(500);
+  await atWidths(async (w) => {
+    const pos = await p.evaluate(() => {
+      const top = (sel, text) => [...document.querySelectorAll(sel)].find((e) => (e.textContent === text || e.getAttribute('aria-label') === text) && e.getBoundingClientRect().width > 0)?.getBoundingClientRect().top ?? null;
+      const doTheMath = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Fazer as contas' && e.getBoundingClientRect().width > 0);
+      const rows = doTheMath ? [...doTheMath.parentElement.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => (e.getAttribute('aria-label') || '').split('.')[0]) : null;
+      return {
+        question: top('[role=heading]', 'Você consegue guardar algum valor por mês?'),
+        reserve: top('[role=heading]', 'Reserva para imprevistos'), plan: top('[role=heading]', 'Seu plano de guardar'), deposit: top('[role=button]', 'Registrar aporte'),
+        goals: top('[role=heading]', 'Suas metas'), month: top('[role=heading]', 'Seu mês'), math: top('[role=heading]', 'Fazer as contas'), learn: top('[role=heading]', 'Aprender'), rows,
+        seePlan: top('[role=button]', 'Ver o plano'), change: top('[role=button]', 'Mudar valor'),
+      };
+    });
+    const o = [pos.reserve, pos.plan, pos.deposit, pos.goals, pos.month, pos.math, pos.learn];
+    ok(`nav Metas (${w}px): com a resposta "consigo", o plano fica dentro do card da reserva (sem segundo card) e a ordem é Reserva, Suas metas, Seu mês, Fazer as contas, Aprender`,
+      pos.question === null && o.every((x) => x !== null) && o.every((x, i) => i === 0 || x > o[i - 1]) && pos.seePlan > pos.plan && pos.seePlan < pos.deposit && pos.change > pos.plan && pos.change < pos.deposit, JSON.stringify(pos));
+    ok(`nav Metas (${w}px): "Fazer as contas" tem Simular um plano e Calculadoras`, JSON.stringify(pos.rows) === JSON.stringify(['Simular um plano', 'Calculadoras']), JSON.stringify(pos.rows));
+    await layoutChecks(`nav Metas demonstração ${w}px`);
+    if (w === 390) await shot('178_metas_plano_na_reserva');
+    if (w === 320) await shot('178_metas_plano_na_reserva_320px');
+  });
+  await p.getByRole('button', { name: /^Calculadoras\./ }).filter({ visible: true }).first().click(); await waitText('Decidir uma compra'); await p.waitForTimeout(300);
+  ok('nav Metas: "Fazer as contas" › Calculadoras abre a lista, com a barra à vista e Metas marcada', (await h1Name()) === 'Calculadoras' && barOk(await barState()) && (await barState()).selected[0] === 'Metas');
+  await navBackTo('Metas');
+  await keepText();
+
+  // ---- 5. Aprender: grupo "No app" na busca ----
+  await tabByName('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await p.waitForTimeout(400);
+  const learnBox = () => p.getByLabel('Buscar um tema ou uma função', { exact: true }).filter({ visible: true }).first();
+  const storage = () => p.evaluate(() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]));
+  const navStorageBefore = await storage();
+  const navWritesBefore = writes.length;
+  ok('nav Aprender: a busca tem o rótulo "Buscar um tema ou uma função" e a dica "Ex.: juros, boleto, IPVA"', (await learnBox().getAttribute('placeholder')) === 'Ex.: juros, boleto, IPVA');
+  const appSearch = [
+    ['nota fiscal', 'Escanear nota fiscal', () => urlPath() === '/registro/novo' && new URL(p.url()).searchParams.get('tipo') === 'despesa'],
+    ['boleto', 'Contas a pagar', () => urlPath() === '/a-pagar'],
+    ['lembrete', 'Lembretes de vencimento', () => urlPath() === '/conta'],
+    ['categoria', 'Pago por categoria', () => urlPath() === '/composicao' && new URL(p.url()).searchParams.get('tipo') === 'pago'],
+    ['simular', 'Simular um plano', () => urlPath() === '/simular'],
+    ['cartão', 'Cartões', () => urlPath() === '/cartoes'],
+  ];
+  for (const [query, title, opened] of appSearch) {
+    await learnBox().fill(query); await waitText('No app'); await p.waitForTimeout(500);
+    const group = await p.evaluate(() => {
+      const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'No app' && e.getBoundingClientRect().width > 0);
+      return h ? { level: h.getAttribute('aria-level'), top: Math.round(h.getBoundingClientRect().top) } : null;
+    });
+    ok(`nav Aprender: "${query}" mostra o grupo "No app" (título de nível 2) com "${title}"`, group !== null && group.level === '2' && (await p.getByRole('button', { name: new RegExp(`^${title.replace(/[?]/g, '\\?')}\\.`) }).filter({ visible: true }).count()) >= 1, JSON.stringify(group));
+    if (query === 'nota fiscal') await shot('179_aprender_no_app');
+    if (query === 'boleto') await atWidths(async (w) => { await layoutChecks(`nav Aprender No app ${w}px`); if (w === 320) await shot('179_aprender_no_app_320px'); });
+    await keepText();
+    await p.getByRole('button', { name: new RegExp(`^${title.replace(/[?]/g, '\\?')}\\.`) }).filter({ visible: true }).first().click(); await p.waitForTimeout(700);
+    ok(`nav Aprender: tocar em "${title}" abre a tela do app (${urlPath()})`, opened(), p.url());
+    if (query === 'categoria') ok('nav Aprender: "Pago por categoria" abre já em "Por categoria"', (await p.getByRole('radio', { name: 'Por categoria', exact: true }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'true');
+    if (query === 'nota fiscal') await btn('Voltar').click();
+    else await navBackTo('Aprender e dúvidas');
+    await waitText('Buscar um tema ou uma função'); await p.waitForTimeout(300);
+  }
+  await learnBox().fill('zzzzzz'); await waitText('Nenhum tema encontrado'); await p.waitForTimeout(300);
+  ok('nav Aprender: sem tema nem tela do app, a mensagem de sempre e sem o grupo "No app"', !(await headingShown('No app')) && (await body()).includes('Nenhum tema encontrado'));
+  await learnBox().fill('juros'); await waitText('temas para "juros"'); await p.waitForTimeout(300);
+  ok('nav Aprender: os temas continuam nos resultados (juros) com a contagem de sempre', (await body()).includes('temas para "juros"'));
+  await learnBox().fill('');
+  ok('nav Aprender: a busca não registra nada (nenhuma requisição nem gravação, nada no aparelho)', (await storage()) === navStorageBefore && writes.length === navWritesBefore, `${writes.length - navWritesBefore} gravações`);
+  await goTab('Resumo');
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);

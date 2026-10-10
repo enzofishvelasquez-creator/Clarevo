@@ -53,13 +53,14 @@ type Shortcut = { icon: LucideIcon; title: string; caption: string; open: () => 
  * do card "Ainda a pagar", D-021(5)), Cartões com a fatura atual e Calculadoras com a legenda fixa. Enquanto carrega ou com
  * erro, as linhas dinâmicas mostram a legenda fixa (nunca um "0" de uma falha). Nenhuma cor de alerta.
  */
-function organizeShortcuts(payables: string | null, series: string | null, cards: string): Shortcut[] {
+function organizeShortcuts(payables: string | null, series: string | null, cards: string, month: string): Shortcut[] {
   return [
     {
       icon: CalendarClock,
       title: ORGANIZE_TEXT.payables.title,
       caption: payables ?? ORGANIZE_TEXT.payables.fallback,
-      open: () => router.push('/a-pagar'),
+      // A legenda fala do mês em exibição; Contas a pagar abre nesse mesmo mês (seletor local, D-039).
+      open: () => router.push({ pathname: '/a-pagar', params: { mes: month } }),
     },
     {
       icon: Repeat,
@@ -99,6 +100,7 @@ export default function MovimentacoesScreen() {
     commitments.summary ? payablesCaptionFromSummary(commitments.summary, today) : null,
     seriesList.data ? seriesCaptionShort(seriesList.data) : null,
     cardsCaption(cardsOverview.data ?? null, today),
+    month,
   );
   const [filter, setFilter] = useState<Filter>('todos');
   const [notice] = useFlash();

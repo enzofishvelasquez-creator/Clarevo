@@ -530,7 +530,7 @@ export default function DetalheContaAPagar() {
                 </>
               ) : (
                 <>
-                  <Button label="Marcar como paga" icon={Check} onPress={() => router.push(`/a-pagar/${c.id}/pagar`)} />
+                  <Button label="Já paguei" icon={Check} onPress={() => router.push(`/a-pagar/${c.id}/pagar`)} />
                   {notice === 'Conta a pagar salva' ? (
                     <Button label="Anotar outra conta a pagar" icon={Plus} tone="soft" onPress={() => router.replace('/a-pagar/nova')} />
                   ) : null}

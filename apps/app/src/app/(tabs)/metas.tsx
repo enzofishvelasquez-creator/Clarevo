@@ -1,6 +1,6 @@
-import { CALC_UI_TEXT, COMMITTED_TEXT, ERROR_TEXT, GOALS_TEXT, goalsMonthTexts, monthOf, type Goal } from '@clarevo/core';
+import { CALC_UI_TEXT, COMMITTED_TEXT, ERROR_TEXT, GOALS_NAV_TEXT, GOALS_TEXT, goalsMonthTexts, monthOf, type Goal } from '@clarevo/core';
 import { router } from 'expo-router';
-import { Calculator, ChartLine, PiggyBank, Plus, ShieldCheck } from 'lucide-react-native';
+import { Calculator, ChartLine, Plus, ShieldCheck } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { CalcNavRow } from '@/components/calc/parts';
@@ -8,7 +8,7 @@ import { FlashBanner, useFlash } from '@/components/flash';
 import { ClosedGoals, GoalCard, ReserveCard } from '@/components/goal-cards';
 import { AppHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
-import { SavingsCard } from '@/components/savings-card';
+import { SavingsCard, SavingsPlanInReserve } from '@/components/savings-card';
 import { EmptyState, ErrorState } from '@/components/states';
 import { TopicRow } from '@/components/topic-link';
 import { Body, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
@@ -18,10 +18,10 @@ import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
 /**
- * Metas (Ciclo C, spec2 §4.6 e spec7). De cima para baixo: a pergunta "Você consegue guardar algum valor por mês?" (enquanto
- * não respondida ou quando chega a hora de perguntar de novo; depois, o resumo do plano), Seu mês, a reserva para
- * imprevistos, as metas, Simular e Calculadoras, Aprender, as concluídas e arquivadas (recolhidas), "Quem vê estes dados?" e o
- * rodapé. Metas são só do contexto Pessoal. Nada aqui grava sem o servidor confirmar; falha de carga é ErrorState, nunca
+ * Metas (Ciclo C, spec2 §4.6 e spec7; compacta em D-039). De cima para baixo: a pergunta compacta "Você consegue guardar algum
+ * valor por mês?" (enquanto não respondida ou quando chega a hora de perguntar de novo), a reserva para imprevistos (com o
+ * plano de guardar dentro do card, depois do "Sim"), as metas, Seu mês, "Fazer as contas" (Simular e Calculadoras), Aprender,
+ * as concluídas e arquivadas (recolhidas), "Quem vê estes dados?" e o rodapé. Metas são só do contexto Pessoal. Nada aqui grava sem o servidor confirmar; falha de carga é ErrorState, nunca
  * R$ 0,00 nem 0%.
  */
 export default function MetasScreen() {
@@ -40,7 +40,7 @@ export default function MetasScreen() {
         <AppHeader title={GOALS_TEXT.tabTitle} />
         <Body>
           <FlashBanner message={notice} />
-          <SavingsCard contextId={contextId} card={savings} onNotice={setNotice} />
+          <SavingsCard contextId={contextId} card={savings} onNotice={setNotice} planInReserve={overview.isPending || Boolean(data?.reserve)} />
 
           {personal.isError || overview.isError ? (
             <Card>
@@ -54,9 +54,14 @@ export default function MetasScreen() {
             </Card>
           ) : data ? (
             <>
-              <MonthCard overview={data} committed={committed} planLink={savings.data?.state.kind === 'oculto'} />
-              <ReserveCard reserve={data.reserve} plan={data.reserve ? data.plans[data.reserve.id]! : null} />
+              <ReserveCard
+                reserve={data.reserve}
+                plan={data.reserve ? data.plans[data.reserve.id]! : null}
+                planSlot={<SavingsPlanInReserve contextId={contextId} card={savings} />}
+                planLink={savings.data?.state.kind === 'oculto'}
+              />
               <GoalsSection active={data.active} plans={data.plans} />
+              <MonthCard overview={data} committed={committed} />
             </>
           ) : (
             <View style={{ gap: space[4] }} accessibilityRole="progressbar" accessibilityLabel="Carregando as metas">
@@ -69,16 +74,22 @@ export default function MetasScreen() {
             </View>
           )}
 
-          <Card style={{ paddingVertical: space[2] }}>
-            <CalcNavRow icon={ChartLine} title={GOALS_TEXT.simulateTitle} caption={GOALS_TEXT.simulateBody} onPress={() => router.push('/simular')} />
-            <CalcNavRow
-              icon={Calculator}
-              title={GOALS_TEXT.calculators}
-              caption={CALC_UI_TEXT.shortcutCaption}
-              onPress={() => router.push('/calcular')}
-              last
-            />
-          </Card>
+          {/* "Fazer as contas": só a conta, nada é gravado (D-028). */}
+          <View style={{ gap: space[2] }}>
+            <Txt variant="title" accessibilityRole="header" aria-level={2}>
+              {GOALS_NAV_TEXT.doTheMathTitle}
+            </Txt>
+            <Card style={{ paddingVertical: space[2] }}>
+              <CalcNavRow icon={ChartLine} title={GOALS_TEXT.simulateTitle} caption={GOALS_TEXT.simulateBody} onPress={() => router.push('/simular')} />
+              <CalcNavRow
+                icon={Calculator}
+                title={GOALS_TEXT.calculators}
+                caption={CALC_UI_TEXT.shortcutCaption}
+                onPress={() => router.push('/calcular')}
+                last
+              />
+            </Card>
+          </View>
 
           <LearnCard />
           {data ? <ClosedGoals goals={data.closed} /> : null}
@@ -103,15 +114,7 @@ export default function MetasScreen() {
  * (aportes menos resgates). O cálculo da renda comprometida carrega à parte: se falhar, o resto continua e a falha tem
  * "Tentar novamente"; nunca um valor ou um percentual de mentira.
  */
-function MonthCard({
-  overview,
-  committed,
-  planLink,
-}: {
-  overview: GoalsOverview;
-  committed: ReturnType<typeof useCommittedSummary>;
-  planLink: boolean;
-}) {
+function MonthCard({ overview, committed }: { overview: GoalsOverview; committed: ReturnType<typeof useCommittedSummary> }) {
   const summary = committed.data ?? null;
   const texts = goalsMonthTexts(summary, overview.savedInMonthCents, overview.month);
   const noReference = summary !== null && summary.referenceCents === null;
@@ -138,7 +141,6 @@ function MonthCard({
         <LinkButton label={COMMITTED_TEXT.noReferenceButton} style={styles.link} onPress={() => router.push('/renda-comprometida/referencia')} />
       ) : null}
       <LinkButton label={GOALS_TEXT.seeCommitted} style={styles.link} onPress={() => router.push('/renda-comprometida')} />
-      {planLink ? <LinkButton label="Planejar quanto guardar" icon={PiggyBank} style={styles.link} onPress={() => router.push('/guardar')} /> : null}
     </Card>
   );
 }

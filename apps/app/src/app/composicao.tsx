@@ -32,20 +32,21 @@ const BREAKDOWNS: { value: Breakdown; label: string }[] = [
 
 /** Composição de cada total, com o mesmo critério e a mesma origem do resumo (CL C004). */
 export default function ComposicaoScreen() {
-  const { tipo } = useLocalSearchParams<{ tipo?: string }>();
+  const { tipo, vista } = useLocalSearchParams<{ tipo?: string; vista?: string }>();
   // Endereço antigo de "Ainda a pagar": a lista agora é /a-pagar.
   if (tipo === 'apagar') return <Redirect href="/a-pagar" />;
-  return <Composicao kind={tipo && tipo in COPY ? (tipo as keyof typeof COPY) : 'pago'} />;
+  return <Composicao kind={tipo && tipo in COPY ? (tipo as keyof typeof COPY) : 'pago'} byCategory={vista === 'categoria'} />;
 }
 
-function Composicao({ kind }: { kind: keyof typeof COPY }) {
+function Composicao({ kind, byCategory: startByCategory }: { kind: keyof typeof COPY; byCategory: boolean }) {
   const copy = COPY[kind];
   const { month } = useView();
   const personal = useSpace().data;
   const records = useMonthRecords(personal?.personalContextId, month);
   const s = records.summary;
   // "Por categoria" só existe em Pago (spec4 §2.2); a escolha fica só nesta tela.
-  const [breakdown, setBreakdown] = useState<Breakdown>('registro');
+  // A busca de Aprender (grupo "No app") abre já em "Por categoria" (?vista=categoria).
+  const [breakdown, setBreakdown] = useState<Breakdown>(startByCategory ? 'categoria' : 'registro');
   const byCategory = kind === 'pago' && breakdown === 'categoria';
   // Pagamentos de fatura de cartão entram divididos pelas categorias das compras da fatura (D-037); a consulta só lê as faturas
   // dos cartões que aparecem no Pago do mês e só roda aqui (kind 'pago').

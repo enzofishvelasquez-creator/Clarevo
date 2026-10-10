@@ -170,6 +170,7 @@ import {
   toPayCaption,
   wholeYearPayment,
 } from '../src';
+import { APP_SCREENS, APP_SEARCH_TEXT, BAR_TEXT, GOALS_NAV_TEXT, PAYABLES_NAV_TEXT, SUMMARY_NAV_TEXT, searchAppScreens } from '../src';
 
 /**
  * Teste de textos (seção 5): sem indicação de produto financeiro, promessa de rendimento, travessões longos
@@ -1409,5 +1410,53 @@ describe('textos de Aprender', () => {
       RETURN_TEXT.rowAmountLine({ description: 'Luz', amountCents: 18_000, amountIsEstimate: true }),
     ])
       expect(texts, text).toContain(text);
+  });
+});
+
+/**
+ * Navegação (D-039): textos do seletor de Contas a pagar, do Resumo, de Metas compacta e do grupo "No app" da busca de
+ * Aprender, com o índice de telas inteiro (título, legenda e palavras de busca). Linguagem neutra de gênero, sem produto
+ * financeiro, sem travessões e sem a expressão proibida.
+ */
+describe('textos da navegação (D-039)', () => {
+  const GENDERED = /\b(o|a)s? usuári[oa]s?\b|\bobrigad[oa]s?\b/i;
+
+  it('textos fixos e montados', () => {
+    const texts: string[] = [
+      ...staticStrings(BAR_TEXT),
+      ...staticStrings(SUMMARY_NAV_TEXT),
+      ...staticStrings(GOALS_NAV_TEXT),
+      ...staticStrings(PAYABLES_NAV_TEXT),
+      ...staticStrings(APP_SEARCH_TEXT),
+      PAYABLES_NAV_TEXT.previous('2026-09'),
+      PAYABLES_NAV_TEXT.next('2026-11'),
+      PAYABLES_NAV_TEXT.backToCurrent('2026-10'),
+      APP_SEARCH_TEXT.countFor(1, 'boleto'),
+      APP_SEARCH_TEXT.countFor(3, ' cartão '),
+    ];
+    expect(texts.length).toBeGreaterThan(12);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(GENDERED);
+    }
+  });
+
+  it('o índice de telas do app inteiro', () => {
+    expect(APP_SCREENS.length).toBeGreaterThan(15);
+    for (const screen of APP_SCREENS) {
+      for (const text of [screen.title, screen.caption, ...screen.keywords]) {
+        expect(text, `${screen.id}: ${text}`).not.toMatch(FORBIDDEN);
+        expect(text, `${screen.id}: ${text}`).not.toMatch(GENDERED);
+      }
+      expect(screen.title, screen.id).not.toMatch(JUDGMENT);
+    }
+    // Palavras de busca em todas as formas: nenhuma busca comum devolve produto ou recomendação.
+    for (const query of ['nota fiscal', 'boleto', 'lembrete', 'categoria', 'simular', 'cartão']) expect(searchAppScreens(query).length, query).toBeGreaterThan(0);
+  });
+
+  it('arquivo-fonte navigation.ts', () => {
+    const text = readFileSync(join(CORE_SRC, 'navigation.ts'), 'utf8');
+    expect(text).not.toMatch(FORBIDDEN);
   });
 });
