@@ -276,6 +276,52 @@ describe('chave de acesso', () => {
     expect(parseAccessKey(makeKey({ cnpj: '00052998224726' }))).toEqual({ ok: false, code: 'cnpj_invalido' });
   });
 
+  it('emitente pessoa física cujo CPF também passa na conta do CNPJ continua sendo pessoa física (o CPF não aparece)', () => {
+    // 000 + CPF 35681128055: o CPF é válido e os 14 caracteres também fecham como CNPJ (cerca de 1,4% dos casos).
+    const k = '35261000000356811280550010000000011000000009';
+    expect(cnpjValid(k.slice(6, 20))).toBe(true);
+    const r = parseAccessKey(k);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.info.cnpj).toBeNull();
+    expect(r.info.cnpjFormatted).toBeNull();
+    const draft = receiptDraft(factsFromKey(r.info), TODAY);
+    expect(draft.description).toBe('Compra');
+    expect(draft.issuerCnpj).toBeNull();
+    const { key: _key, ...others } = r.info;
+    for (const out of [JSON.stringify(others), JSON.stringify(draft)]) {
+      expect(out).not.toContain('35681128055');
+      expect(out).not.toContain('356.811.280-55');
+      expect(out).not.toContain('000.356.811/2805-5');
+    }
+    // Varredura: nenhuma chave "000" + CPF válido mostra o CPF, passe ou não na conta do CNPJ.
+    const cpfWith = (base9: string): string => {
+      const dv = (len: number, digits: string): number => {
+        let sum = 0;
+        for (let i = 0; i < len; i++) sum += Number(digits[i]) * (len + 1 - i);
+        const rest = (sum * 10) % 11;
+        return rest === 10 ? 0 : rest;
+      };
+      const d1 = dv(9, base9);
+      return `${base9}${d1}${dv(10, base9 + d1)}`;
+    };
+    let alsoCnpj = 0;
+    for (let n = 0; n < 400; n++) {
+      const base9 = String(100000000 + n * 2237191).slice(0, 9).padStart(9, '1');
+      const cpf = cpfWith(base9);
+      if (/^(.)\1{10}$/.test(cpf)) continue;
+      const body = makeKey({ cnpj: `000${cpf}`, model: '55' });
+      const parsed = parseAccessKey(body);
+      expect(parsed.ok).toBe(true);
+      if (!parsed.ok) continue;
+      if (cnpjValid(`000${cpf}`)) alsoCnpj++;
+      expect(parsed.info.cnpj).toBeNull();
+      expect(parsed.info.cnpjFormatted).toBeNull();
+      expect(receiptDraft(factsFromKey(parsed.info), TODAY).description).toBe('Compra');
+    }
+    expect(alsoCnpj).toBeGreaterThan(0);
+  });
+
   it('findAccessKey: chave em grupos de 4, preferindo a que vem depois do rótulo', () => {
     const referenced = makeKey({ number: 999, model: '55' });
     const text = `NF-e referenciada ${referenced}\nCHAVE DE ACESSO\n${SPACED}\nOutro texto 123`;
@@ -484,9 +530,9 @@ describe('página oficial da Sefaz', () => {
     expect(officialQueryUrl('RJ', rj)).toBe(rj);
     expect(officialQueryUrl('RJ', `  ${rj}  `)).toBe(rj);
     expect(officialQueryUrl('RJ', rj.toUpperCase().replace('HTTPS://CONSULTADFE.FAZENDA.RJ.GOV.BR', 'https://ConsultaDFE.Fazenda.RJ.gov.br'))).toContain('https://consultadfe.fazenda.rj.gov.br/CONSULTANFCE/QRCODE?P=');
-    // Sem esquema, usa https; http é mantido; o trecho "#" cai.
+    // Sem esquema, usa https; http sobe para https; o trecho "#" cai.
     expect(officialQueryUrl('RJ', 'consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode?p=A|2|1')).toBe('https://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode?p=A|2|1');
-    expect(officialQueryUrl('RJ', 'http://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode?p=A#x')).toBe('http://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode?p=A');
+    expect(officialQueryUrl('RJ', 'http://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode?p=A#x')).toBe('https://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode?p=A');
   });
 
   it('recusa domínio de outro lugar, parecido, com usuário, porta, esquema estranho, sem consulta, de outra UF', () => {
@@ -546,14 +592,14 @@ describe('página oficial da Sefaz', () => {
       expect(officialQueryUrl(uf, 'https://exemplo.gov.br/q?p=A')).toBeNull();
       expect(officialQueryUrl(uf, `https://sefaz.${uf.toLowerCase()}.gov.br/q?p=A`)).toBe(`https://sefaz.${uf.toLowerCase()}.gov.br/q?p=A`);
     }
-    expect(officialQueryUrl('MT', 'http://www.sefaz.mt.gov.br/nfce/consultanfce?p=A')).toBe('http://www.sefaz.mt.gov.br/nfce/consultanfce?p=A');
+    expect(officialQueryUrl('MT', 'http://www.sefaz.mt.gov.br/nfce/consultanfce?p=A')).toBe('https://www.sefaz.mt.gov.br/nfce/consultanfce?p=A');
     expect(officialQueryUrl('RR', 'https://portalapp.sefaz.rr.gov.br/nfce/servlet/qrcode?p=A')).toBe('https://portalapp.sefaz.rr.gov.br/nfce/servlet/qrcode?p=A');
   });
 
   it('regra de Enzo para os outros estados: ".gov.br" de órgão fiscal da UF da chave (a lista é a rota preferida)', () => {
     // PE, PA, MT, MA ... não estão na lista e ganham o botão pelo próprio endereço do QR.
     const pe = 'http://nfce.sefaz.pe.gov.br/nfce/consulta?p=26261000052998224725550010000001241000000026|2|1|1|ABC';
-    expect(officialQueryUrl('PE', pe)).toBe(pe);
+    expect(officialQueryUrl('PE', pe)).toBe(pe.replace('http://', 'https://'));
     expect(officialQueryUrl('PA', 'https://app.sefa.pa.gov.br/consulta?p=A')).toBe('https://app.sefa.pa.gov.br/consulta?p=A');
     expect(officialQueryUrl('MA', 'https://sefaz.ma.gov.br/q?p=A')).toBe('https://sefaz.ma.gov.br/q?p=A');
     // Domínio fictício, só para a regra: "<rótulo da Sefaz ou Fazenda>.<sigla da UF>.gov.br", com subdomínios na frente.
@@ -638,8 +684,8 @@ describe('página oficial da Sefaz', () => {
   it('endereços que mudaram: o novo está na lista; os antigos de outros estados passam pela regra geral, o do RJ não', () => {
     // PB: único endereço desde 01/04/2024 (o antigo, receita.pb.gov.br, é um ".gov.br" da PB e a regra geral o aceita se vier no QR).
     expect(SEFAZ_QR_HOSTS.PB).toEqual(['www.sefaz.pb.gov.br']);
-    expect(officialQueryUrl('PB', 'http://www.sefaz.pb.gov.br/nfce?p=A|2|1')).toBe('http://www.sefaz.pb.gov.br/nfce?p=A|2|1');
-    expect(officialQueryUrl('PB', 'http://www.receita.pb.gov.br/nfce?p=A|2|1')).toBe('http://www.receita.pb.gov.br/nfce?p=A|2|1');
+    expect(officialQueryUrl('PB', 'http://www.sefaz.pb.gov.br/nfce?p=A|2|1')).toBe('https://www.sefaz.pb.gov.br/nfce?p=A|2|1');
+    expect(officialQueryUrl('PB', 'http://www.receita.pb.gov.br/nfce?p=A|2|1')).toBe('https://www.receita.pb.gov.br/nfce?p=A|2|1');
     // RN: domínio SET virou SEFAZ em 2026.
     expect(SEFAZ_QR_HOSTS.RN).toEqual(['nfce.sefaz.rn.gov.br']);
     expect(officialQueryUrl('RN', 'https://nfce.sefaz.rn.gov.br/consultarNFCe.aspx?p=A|2|1')).not.toBeNull();

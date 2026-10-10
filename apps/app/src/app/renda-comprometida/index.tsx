@@ -8,6 +8,7 @@ import {
   formatMonthYearBR,
   isValidIsoMonth,
   monthOf,
+  payablesMonthParams,
   type CommittedGroupLine,
   type CommittedSummary,
   type CommittedTexts,
@@ -131,7 +132,7 @@ function MonthBody({ contextId, month }: { contextId: string | undefined; month:
       <MonthBills s={s} />
       <Upcoming contextId={contextId} month={month} />
       <HowWeCalculate t={t} />
-      <Links />
+      <Links month={month} currentMonth={monthOf(today)} />
     </>
   );
 }
@@ -453,11 +454,12 @@ function HowWeCalculate({ t }: { t: CommittedTexts }) {
   );
 }
 
-function Links() {
+/** "Contas a pagar" abre no mês da tela (e no endereço limpo quando é o mês atual). */
+function Links({ month, currentMonth }: { month: IsoMonth; currentMonth: IsoMonth }) {
   return (
     <View style={{ gap: space[1], alignItems: 'center' }}>
       <LinkButton label={COMMITTED_TEXT.links.series} icon={Repeat} onPress={() => router.push('/gastos-fixos')} />
-      <LinkButton label={COMMITTED_TEXT.links.payables} icon={Wallet} onPress={() => router.push('/a-pagar')} />
+      <LinkButton label={COMMITTED_TEXT.links.payables} icon={Wallet} onPress={() => router.push({ pathname: '/a-pagar', params: payablesMonthParams(month, currentMonth) })} />
       <LinkButton label={COMMITTED_TEXT.links.whoSees} icon={ShieldCheck} color={colors.textSecondary} onPress={() => router.push('/quem-ve')} />
     </View>
   );

@@ -1,6 +1,7 @@
 import {
   ERROR_TEXT,
   PAYABLES_NAV_TEXT,
+  REMINDERS_SETTINGS_HREF,
   QUICK_PAY_TEXT,
   RETURN_TEXT,
   formatMonthBR,
@@ -12,6 +13,7 @@ import {
   payablesStep,
   quickPayAction,
   quickPayDraft,
+  showsRemindersLink,
   toPayCaption,
   type Commitment,
   type FinancialRecord,
@@ -20,10 +22,10 @@ import {
   type PaymentInput,
 } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, type Href } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { AlertCircle, Bell, CalendarClock, Check, ChevronLeft, ChevronRight, Info, ListChecks, Pencil, Plus, Repeat, ShieldCheck } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
@@ -40,6 +42,8 @@ import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, FitMoney, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
 import { openCommitment } from '@/lib/cards';
+import { DEVICE_FEATURES } from '@/lib/device';
+import { loadPrefs, useDevicePrefs } from '@/lib/device-prefs';
 import { totalChange } from '@/lib/highlight';
 import { explanationHref } from '@/lib/learn';
 import { useCommitments, usePayCommitment, usePaymentsForecast, useSeriesList, useSeriesSync, useSpace, useUpdateRecord, useView } from '@/state/data';
@@ -162,8 +166,17 @@ function usePayOnce() {
 export default function ContasAPagarScreen() {
   const { today } = useSession();
   const { currentMonth } = useView();
-  const params = useLocalSearchParams<{ mes?: string }>();
+  const params = useLocalSearchParams<{ mes?: string; abrir?: string }>();
   const [month, setMonth] = useState(() => payablesStartMonth(params.mes, currentMonth));
+  // Tela já aberta e nova entrada com mês (aviso de conta a vencer, cards): o mês do endereço manda. `abrir` muda a cada aviso,
+  // para o mesmo mês pedido outra vez também trazer a tela de volta ao mês atual.
+  const openedWith = useRef(`${params.mes ?? ''}|${params.abrir ?? ''}`);
+  useEffect(() => {
+    const stamp = `${params.mes ?? ''}|${params.abrir ?? ''}`;
+    if (stamp === openedWith.current) return;
+    openedWith.current = stamp;
+    setMonth(payablesStartMonth(params.mes, currentMonth));
+  }, [params.mes, params.abrir, currentMonth]);
   const personal = useSpace().data;
   const ctx = personal?.personalContextId;
   const commitments = useCommitments(ctx, month);
@@ -318,15 +331,7 @@ export default function ContasAPagarScreen() {
               ) : null}
             </>
           )}
-          <Txt color={colors.textSecondary}>
-            {isCurrent
-              ? 'Contas em aberto com vencimento até o fim do mês, inclusive as vencidas de meses anteriores. Ainda não saíram da conta e não entram em Pago nem na diferença do mês.'
-              : `Contas com vencimento em ${monthName.toLowerCase()} que continuam em aberto. Não entram em Pago nem na diferença do mês.`}
-          </Txt>
         </View>
-
-        {/* Previsão dos pagamentos do mês (docs/08 §5 item 7): só aqui e só no mês de hoje; nunca no Resumo. */}
-        {isCurrent && s ? <PaymentsForecastNote contextId={ctx} month={month} /> : null}
 
         <Button label="Anotar conta a pagar" icon={Plus} onPress={() => router.push('/a-pagar/nova')} />
         <SeriesLink count={seriesList.data?.length ?? null} />
@@ -419,7 +424,16 @@ export default function ContasAPagarScreen() {
           ))
         )}
 
+        {/* Previsão dos pagamentos do mês (docs/08 §5 item 7): só aqui e só no mês de hoje; nunca no Resumo. Depois das listas,
+            para o primeiro "Já paguei" ficar acima da barra em 360 × 640 e em 320 px (D-039, A8). */}
+        {isCurrent && s ? <PaymentsForecastNote contextId={ctx} month={month} /> : null}
         <RemindersLink />
+        {/* O critério do total fica aqui embaixo, para o primeiro "Já paguei" caber na primeira tela (D-039, A8). */}
+        <Txt variant="label" color={colors.textSecondary}>
+          {isCurrent
+            ? 'Contas em aberto com vencimento até o fim do mês, inclusive as vencidas de meses anteriores. Ainda não saíram da conta e não entram em Pago nem na diferença do mês.'
+            : `Contas com vencimento em ${monthName.toLowerCase()} que continuam em aberto. Não entram em Pago nem na diferença do mês.`}
+        </Txt>
         <Txt variant="label" color={colors.textSecondary}>
           Já anotou o pagamento como gasto? Exclua a conta a pagar para ela não continuar em Ainda a pagar.
         </Txt>
@@ -463,7 +477,7 @@ export default function ContasAPagarScreen() {
 
 /**
  * Seletor de mês local, na mesma linha de "Pessoal · outubro de 2026" (poupa altura: o primeiro "Já paguei" continua à
- * vista). Fora do mês atual, "Voltar para outubro de 2026". Vai de 24 meses atrás a 12 à frente (core: payablesStep).
+ * vista). Fora do mês atual, "Voltar para outubro de 2026". Volta sem limite e avança até 12 meses à frente (core: payablesStep).
  */
 function PayablesMonthPicker({ month, currentMonth, onChange }: { month: IsoMonth; currentMonth: IsoMonth; onChange: (m: IsoMonth) => void }) {
   const prev = payablesStep(month, currentMonth, -1);
@@ -503,16 +517,30 @@ function PayablesMonthPicker({ month, currentMonth, onChange }: { month: IsoMont
 }
 
 /**
- * Lembretes onde a pessoa pensa em vencimento: leva a Conta, onde ficam o interruptor e o horário (D-025). Depois da lista, para
- * não empurrar o primeiro "Já paguei".
+ * Lembretes onde a pessoa pensa em vencimento (D-025, D-039): leva ao card de lembretes de Conta, onde ficam o interruptor e o
+ * horário. Só aparece onde ajuda (`showsRemindersLink`): no app de celular, fora da demonstração, com os lembretes desligados e
+ * antes de a oferta depois do primeiro gasto fixo ser respondida. Depois da lista, para não empurrar o primeiro "Já paguei".
  */
 function RemindersLink() {
+  const { user, auth } = useSession();
+  const prefs = useDevicePrefs(user?.id);
+  const visible = showsRemindersLink({
+    deviceFeatures: DEVICE_FEATURES,
+    demo: auth.mode === 'demo',
+    prefsLoaded: prefs !== undefined,
+    remindersOn: prefs?.reminders ?? false,
+    offerShown: prefs?.reminderOffered ?? false,
+  });
+  useEffect(() => {
+    if (user?.id && DEVICE_FEATURES) loadPrefs(user.id, auth.mode !== 'demo');
+  }, [user?.id, auth.mode]);
+  if (!visible) return null;
   const t = PAYABLES_NAV_TEXT.reminders;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${t.title}. ${t.caption}`}
-      onPress={() => router.push('/conta')}
+      onPress={() => router.push(REMINDERS_SETTINGS_HREF as Href)}
       style={(st) => [styles.remindersLink, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && styles.focusRing]}>
       <Bell size={20} color={colors.brand} strokeWidth={2.25} aria-hidden />
       <View style={{ flex: 1, minWidth: 0 }}>

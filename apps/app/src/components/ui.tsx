@@ -26,6 +26,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useBrowseBarInset } from '@/lib/bar-inset';
 import { HIDDEN_MONEY, HIDDEN_MONEY_A11Y, maskMoneyLabel, maskMoneyText, spokenText, useValuesHidden } from '@/lib/privacy';
 import { yearA11y, yearA11yLabel } from '@/lib/years';
 import { colors, fonts, motion, radius, space, tabular, type } from '@/theme/tokens';
@@ -104,11 +105,17 @@ export function Screen({
   scrollRef?: Ref<ScrollView>;
 }) {
   const insets = useSafeAreaInsets();
+  // Barra das telas de consulta (sobreposta ao fim da tela): já inclui a área segura de baixo. Soma-se ao respiro de baixo que a
+  // tela já tem (o `padding` de `contentStyle` ou o padrão), por último, para nada ficar atrás da barra.
+  const barInset = useBrowseBarInset();
+  const own = StyleSheet.flatten(contentStyle) as ViewStyle | undefined;
+  const ownBottom = own?.paddingBottom ?? own?.paddingVertical ?? own?.padding;
+  const underBar = bottomInset && barInset > 0 ? { paddingBottom: barInset + (typeof ownBottom === 'number' ? ownBottom : space[10]) } : null;
   return (
     <ScrollView
       ref={scrollRef}
       style={styles.screen}
-      contentContainerStyle={[!wide && styles.screenContent, bottomInset && { paddingBottom: insets.bottom + space[10] }, contentStyle]}
+      contentContainerStyle={[!wide && styles.screenContent, bottomInset && { paddingBottom: insets.bottom + space[10] }, contentStyle, underBar]}
       keyboardShouldPersistTaps="handled">
       {children}
     </ScrollView>

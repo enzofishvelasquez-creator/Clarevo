@@ -1120,3 +1120,12 @@ describe('MemoryRepository: metas', () => {
     repo.checkInvariants();
   });
 });
+
+describe('Metas sem reserva (D-039): o botão "Calcular minha reserva" fica à vista em 360 × 640', () => {
+  it('o texto do card vazio tem uma ou duas linhas e o botão vem logo depois', () => {
+    // Em 360 px de largura cabem cerca de 38 caracteres por linha dentro do card azul: até cerca de 80 caracteres são duas linhas (o e2e mede o resultado).
+    expect(GOALS_TEXT.reserveEmpty.length).toBeLessThanOrEqual(90);
+    expect(GOALS_TEXT.reserveEmpty).toBe('Cobre imprevistos sem recorrer a crédito. O valor sai dos seus gastos essenciais.');
+    expect(GOALS_TEXT.reserveCalculate).toBe('Calcular minha reserva');
+  });
+});

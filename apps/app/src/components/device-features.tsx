@@ -127,7 +127,8 @@ function NativeFeatures() {
     setPendingOpen(false);
     setSpace('pessoal');
     setMonth(currentMonth);
-    if (pathname !== REMINDER_ROUTE) router.push(REMINDER_ROUTE as Href);
+    // Mês atual sempre, com um parâmetro de abertura novo: se Contas a pagar já está aberta em outro mês, a tela sincroniza.
+    router.navigate({ pathname: REMINDER_ROUTE, params: { mes: currentMonth, abrir: String(Date.now()) } } as Href);
   }, [pendingOpen, status, pathname, setSpace, setMonth, currentMonth]);
 
   // ---- Oferta depois do primeiro gasto fixo salvo -------------------------------------------

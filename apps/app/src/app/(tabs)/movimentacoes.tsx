@@ -5,10 +5,12 @@ import {
   formatDayHeader,
   formatMonthBR,
   payablesCaptionFromSummary,
+  payablesMonthParams,
   seriesCaptionShort,
   shortcutA11yLabel,
   sortNewestFirst,
   type FinancialRecord,
+  type IsoMonth,
 } from '@clarevo/core';
 import { router } from 'expo-router';
 import { Calculator, CalendarClock, ChevronRight, CreditCard, Minus, Plus, Repeat, type LucideIcon } from 'lucide-react-native';
@@ -53,14 +55,14 @@ type Shortcut = { icon: LucideIcon; title: string; caption: string; open: () => 
  * do card "Ainda a pagar", D-021(5)), Cartões com a fatura atual e Calculadoras com a legenda fixa. Enquanto carrega ou com
  * erro, as linhas dinâmicas mostram a legenda fixa (nunca um "0" de uma falha). Nenhuma cor de alerta.
  */
-function organizeShortcuts(payables: string | null, series: string | null, cards: string, month: string): Shortcut[] {
+function organizeShortcuts(payables: string | null, series: string | null, cards: string, month: IsoMonth, currentMonth: IsoMonth): Shortcut[] {
   return [
     {
       icon: CalendarClock,
       title: ORGANIZE_TEXT.payables.title,
       caption: payables ?? ORGANIZE_TEXT.payables.fallback,
       // A legenda fala do mês em exibição; Contas a pagar abre nesse mesmo mês (seletor local, D-039).
-      open: () => router.push({ pathname: '/a-pagar', params: { mes: month } }),
+      open: () => router.push({ pathname: '/a-pagar', params: payablesMonthParams(month, currentMonth) }),
     },
     {
       icon: Repeat,
@@ -88,7 +90,7 @@ const rowLayout = LinearTransition.duration(motion.detail).reduceMotion(ReduceMo
 
 export default function MovimentacoesScreen() {
   const { today } = useSession();
-  const { space: kind, month } = useView();
+  const { space: kind, month, currentMonth } = useView();
   const personal = useSpace().data;
   const contextId = kind === 'pessoal' ? personal?.personalContextId : undefined;
   const records = useMonthRecords(contextId, month);
@@ -101,6 +103,7 @@ export default function MovimentacoesScreen() {
     seriesList.data ? seriesCaptionShort(seriesList.data) : null,
     cardsCaption(cardsOverview.data ?? null, today),
     month,
+    currentMonth,
   );
   const [filter, setFilter] = useState<Filter>('todos');
   const [notice] = useFlash();

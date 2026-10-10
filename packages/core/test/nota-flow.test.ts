@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   NOTA_FLOW_TEXT,
   NOTA_TEXT,
+  PDF_READ_TIMEOUT_MS,
   accessKeyCheckDigit,
   dateOutsideNoteMonth,
   descriptionAfterCategory,
@@ -14,6 +15,7 @@ import {
   noteReadLine,
   parseAccessKey,
   parseNfceQr,
+  raceWithTimeout,
   readReceiptCode,
   receiptDraft,
   scanOptionLabel,
@@ -232,5 +234,46 @@ describe('integração com o QR', () => {
     const draft = receiptDraft(facts, TODAY);
     expect(noteFillPlan(draft)).toEqual({ amountText: '87,40', dateText: '08/10/2026', focus: null });
     expect(noteReadLine(draft, noteIssuedOn(facts, draft, TODAY))).toBe('Nota lida: CNPJ 11.222.333/0001-81 · RJ · 08/10/2026');
+  });
+});
+
+describe('leitura de PDF com tempo limite', () => {
+  it('o limite é de 25 segundos', () => {
+    expect(PDF_READ_TIMEOUT_MS).toBe(25_000);
+  });
+
+  it('devolve o resultado quando termina a tempo, a falha como "erro" e o atraso como "tempo" (chamando onTimeout uma vez)', async () => {
+    vi.useFakeTimers();
+    try {
+      expect(await raceWithTimeout(Promise.resolve(7), 1_000)).toEqual({ value: 7 });
+      expect(await raceWithTimeout(Promise.reject(new Error('x')), 1_000)).toBe('erro');
+      const onTimeout = vi.fn();
+      const never = new Promise<number>(() => {});
+      const pending = raceWithTimeout(never, PDF_READ_TIMEOUT_MS, onTimeout);
+      await vi.advanceTimersByTimeAsync(PDF_READ_TIMEOUT_MS - 1);
+      expect(onTimeout).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(2);
+      expect(await pending).toBe('tempo');
+      expect(onTimeout).toHaveBeenCalledTimes(1);
+      // Falha tardia do trabalho abandonado não vira erro solto.
+      let reject!: (e: Error) => void;
+      const late = new Promise<number>((_r, rej) => {
+        reject = rej;
+      });
+      const slow = raceWithTimeout(late, 100, () => {
+        throw new Error('destruir falhou');
+      });
+      await vi.advanceTimersByTimeAsync(150);
+      expect(await slow).toBe('tempo');
+      reject(new Error('tarde'));
+      await vi.advanceTimersByTimeAsync(10);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('o texto do detalhe sem link não manda "ler o QR de novo" (a nota pode ter vindo do PDF ou da chave)', () => {
+    expect(NOTA_FLOW_TEXT.detailNoLink).not.toMatch(/de novo/i);
+    expect(NOTA_FLOW_TEXT.detailNoLink).toContain('resumo da chave');
   });
 });

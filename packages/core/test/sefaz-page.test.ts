@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   EXAMPLE_RECEIPT_HOST,
+  SEFAZ_MAX_REDIRECTS,
+  SEFAZ_PAGE_MAX_CHARS,
   SEFAZ_READ_TIMEOUT_MS,
   SEFAZ_TEXT,
   accessKeyCheckDigit,
@@ -92,7 +94,7 @@ describe('parseSefazPage · outro leiaute (tabela, sem classe do cabeçalho, só
   });
 
   it('nome que já está em minúsculas fica como está; campos ausentes ficam null', () => {
-    const r = parseSefazPage(`<div class="txtTopo">Casa do Pão</div><p>Emissão: 02/10/2026</p>`, OUT.info);
+    const r = parseSefazPage(`<div class="txtTopo">Casa do Pão</div><div>CNPJ: 11.222.333/0001-81</div><p>Emissão: 02/10/2026</p>`, OUT.info);
     expect(r).toEqual({ ok: true, reading: { issuerName: 'Casa do Pão', totalCents: null, issuedOn: '2026-10-02', itemCount: null } });
   });
 });
@@ -103,7 +105,7 @@ describe('parseSefazPage · páginas que não servem', () => {
     expect(parseSefazPage('   \n ', OUT.info)).toEqual({ ok: false, code: 'pagina_vazia' });
     expect(parseSefazPage(undefined as unknown as string, OUT.info)).toEqual({ ok: false, code: 'pagina_vazia' });
     expect(parseSefazPage('<html><body><p>Olá</p></body></html>', OUT.info)).toEqual({ ok: false, code: 'pagina_nao_reconhecida' });
-    expect(parseSefazPage(`<p>${'x'.repeat(1_500_001)}</p>`, OUT.info)).toEqual({ ok: false, code: 'pagina_nao_reconhecida' });
+    expect(parseSefazPage(`<p>${'x'.repeat(SEFAZ_PAGE_MAX_CHARS + 1)}</p>`, OUT.info)).toEqual({ ok: false, code: 'pagina_nao_reconhecida' });
   });
 
   it('nota não encontrada e captcha', () => {
@@ -119,7 +121,7 @@ describe('parseSefazPage · páginas que não servem', () => {
   });
 
   it('valores absurdos são ignorados (zero e acima do limite do app)', () => {
-    const r = parseSefazPage(`<div class="txtTopo">LOJA X</div><div>Valor a pagar R$: 0,00</div><div>Valor total R$: 99.999.999.999,99</div>`, OUT.info);
+    const r = parseSefazPage(`<div class="txtTopo">LOJA X</div><div>CNPJ: 11.222.333/0001-81</div><div>Valor a pagar R$: 0,00</div><div>Valor total R$: 99.999.999.999,99</div>`, OUT.info);
     expect(r.ok && r.reading.totalCents).toBe(null);
   });
 });
@@ -233,7 +235,7 @@ describe('readSefazPage (fetch injetado)', () => {
       throw new TypeError('Network request failed');
     };
     expect(await readSefazPage(down, OFFICIAL, OUT.info)).toEqual({ ok: false, code: 'sem_conexao' });
-    const readFails: SefazFetch = async () => ({ ok: true, status: 200, text: async () => Promise.reject(new Error('corpo')) });
+    const readFails: SefazFetch = async () => ({ ok: true, status: 200, url: OFFICIAL, text: async () => Promise.reject(new Error('corpo')) });
     expect(await readSefazPage(readFails, OFFICIAL, OUT.info)).toEqual({ ok: false, code: 'sem_conexao' });
     const other = keyOf('2610', '000099999');
     expect(await readSefazPage(fetchOf(standardPage({ key: other.text })), OFFICIAL, OUT.info)).toEqual({ ok: false, code: 'nota_diferente' });
@@ -269,6 +271,140 @@ describe('readSefazPage (fetch injetado)', () => {
     expect(sefazReadErrorText('nota_diferente')).toBe(SEFAZ_TEXT.differentNote);
     expect(sefazReadErrorText('nota_nao_encontrada')).toBe(SEFAZ_TEXT.notFound);
     expect(SEFAZ_TEXT.failed).toBe('Não deu para ler a página da Sefaz. Confira o valor no cupom.');
+  });
+});
+
+describe('parseSefazPage · a página precisa ser desta nota', () => {
+  it('sem a chave lida nem o CNPJ do emitente na página, nada é aproveitado', () => {
+    const noProof = `<div class="txtTopo">LOJA QUALQUER</div><div>Valor a pagar R$: 9.999,99</div><div>Emissão: 06/10/2026</div>`;
+    expect(parseSefazPage(noProof, OUT.info)).toEqual({ ok: false, code: 'pagina_nao_reconhecida' });
+    // O CNPJ de quem comprou (depois de "Consumidor") não prova nada.
+    const consumerOnly = `<div>CONSUMIDOR</div><div>CNPJ: 11.222.333/0001-81</div><div>Nome: FULANO DE TAL</div><div>Valor a pagar R$: 10,00</div>`;
+    expect(parseSefazPage(consumerOnly, OUT.info)).toEqual({ ok: false, code: 'pagina_nao_reconhecida' });
+    const consumerCpf = `<div>Fulano da Silva Souza</div><div>CPF: ${CONSUMER_CPF}</div><div>Emissão: 06/10/2026</div><div>Valor a pagar R$: 10,00</div>`;
+    expect(parseSefazPage(consumerCpf, OUT.info)).toEqual({ ok: false, code: 'pagina_nao_reconhecida' });
+  });
+
+  it('basta a chave lida (nota de emitente pessoa física, sem CNPJ) ou o CNPJ do emitente', () => {
+    const withCnpj = `<div class="txtTopo">LOJA X</div><div>CNPJ: 11.222.333/0001-81</div><div>Valor a pagar R$: 10,00</div>`;
+    expect(parseSefazPage(withCnpj, OUT.info).ok).toBe(true);
+    const pf = parseAccessKey('35261000000356811280550010000000011000000009');
+    expect(pf.ok).toBe(true);
+    if (!pf.ok) return;
+    expect(pf.info.cnpj).toBeNull();
+    const page = `<div class="txtTopo">Sítio Exemplo</div><div>Valor a pagar R$: 42,00</div><div>Chave de acesso: ${spaced(pf.info.key)}</div>`;
+    expect(parseSefazPage(page, pf.info)).toEqual({ ok: true, reading: { issuerName: 'Sítio Exemplo', totalCents: 4_200, issuedOn: null, itemCount: null } });
+    expect(parseSefazPage(page.replace(/Chave de acesso:.*?</, '<'), pf.info)).toEqual({ ok: false, code: 'pagina_nao_reconhecida' });
+  });
+
+  it('o nome do emitente nunca vem do bloco do consumidor', () => {
+    const html = `<div>Consulta pública da NFC-e</div><div>Consumidor</div><div>MARIA DA SILVA EXEMPLO</div><div>CNPJ: 45.723.174/0001-10</div><div>Chave de acesso: ${spaced(OUT.text)}</div><div>Valor a pagar R$: 10,00</div>`;
+    const r = parseSefazPage(html, OUT.info);
+    expect(r.ok && r.reading.issuerName).toBeNull();
+    expect(JSON.stringify(r)).not.toContain('MARIA');
+    expect(JSON.stringify(r)).not.toContain('Maria');
+    // O texto "consumidor" dentro de uma linha do cabeçalho do documento não vira nome de loja.
+    const header = `<div>DANFE NFC-e - Documento Auxiliar da Nota Fiscal de Consumidor Eletrônica</div><div>PADARIA BOA ESPIGA LTDA</div><div>CNPJ: 11.222.333/0001-81</div><div>Valor a pagar R$: 8,00</div>`;
+    const h = parseSefazPage(header, OUT.info);
+    expect(h.ok && h.reading.issuerName).toBe('Padaria Boa Espiga Ltda');
+  });
+});
+
+describe('parseSefazPage · marcação hostil não trava a leitura', () => {
+  const hostile: [string, string][] = [
+    ['script sem fechamento repetido', '<script '.repeat(45_000)],
+    ['script aberto uma vez e lixo', '<script>' + 'x '.repeat(190_000)],
+    ['cabeçalho txtTopo repetido sem fechamento', '<div class="txtTopo">'.repeat(18_000)],
+    ['id u20 repetido sem fechamento', '<span id="u20">'.repeat(25_000)],
+    ['comentário sem fechamento', '<!-- '.repeat(70_000)],
+    ['abre-marca sem fechar', '<'.repeat(399_000)],
+    ['marca enorme sem ">"', '<div ' + 'a="b" '.repeat(60_000)],
+    ['rótulos de emissão repetidos', 'emissão '.repeat(49_000)],
+    ['dígitos soltos', '<p>' + '1 '.repeat(195_000) + '</p>'],
+    ['rótulos de valor repetidos', 'valor a pagar '.repeat(28_000)],
+    ['aspas e classe repetidas', '<div class="'.repeat(30_000)],
+    ['style e head sem fechamento', '<style><head><noscript>'.repeat(16_000)],
+  ];
+
+  it.each(hostile)('%s: termina rápido', (_name, html) => {
+    expect(html.length).toBeLessThanOrEqual(SEFAZ_PAGE_MAX_CHARS);
+    const started = performance.now();
+    const r = parseSefazPage(html, OUT.info);
+    const elapsed = performance.now() - started;
+    expect(r.ok).toBe(false);
+    expect(elapsed).toBeLessThan(1_000);
+  });
+
+  it('script e estilo grandes, mas fechados, são pulados; página com 150 itens lê rápido', () => {
+    const big = standardPage({ key: OUT.text, total: '1.500,00', items: 150 }).replace('</head>', `<script>var x = "${'a'.repeat(30_000)} Valor a pagar R$: 1,00";</script></head>`);
+    expect(big.length).toBeLessThan(SEFAZ_PAGE_MAX_CHARS);
+    const started = performance.now();
+    const r = parseSefazPage(big, OUT.info);
+    expect(performance.now() - started).toBeLessThan(1_000);
+    expect(r).toMatchObject({ ok: true, reading: { totalCents: 150_000, itemCount: 150, issuerName: 'Mercado Exemplo Ltda' } });
+  });
+
+  it('marcação sem fechamento trunca a leitura, sem aproveitar o que veio depois', () => {
+    const html = `<div class="txtTopo">LOJA X</div><div>CNPJ: 11.222.333/0001-81</div><script>var a = 1;` + `<div>Valor a pagar R$: 50,00</div>`;
+    const r = parseSefazPage(html, OUT.info);
+    expect(r.ok && r.reading.totalCents).toBeNull();
+  });
+});
+
+describe('readSefazPage · endereço e redirecionamentos', () => {
+  const okHtml = standardPage({ key: OUT.text, total: '87,40', issued: '06/10/2026 14:32:10' });
+  const headers = (location: string | null) => ({ get: (name: string) => (name.toLowerCase() === 'location' ? location : null) });
+
+  it('resposta sem o endereço de onde veio é recusada (a página poderia ser de outro domínio)', async () => {
+    const evil = '<div class="txtTopo">LOJA FALSA</div> Valor a pagar R$ 9.999,99';
+    const noUrl: SefazFetch = async () => ({ ok: true, status: 200, url: '', text: async () => evil });
+    expect(await readSefazPage(noUrl, OFFICIAL, OUT.info)).toEqual({ ok: false, code: 'resposta_invalida' });
+    const undef: SefazFetch = async () => ({ ok: true, status: 200, text: async () => okHtml });
+    expect(await readSefazPage(undef, OFFICIAL, OUT.info)).toEqual({ ok: false, code: 'resposta_invalida' });
+    const lookalike: SefazFetch = async () => ({ ok: true, status: 200, url: 'https://consultadfe.fazenda.rj.gov.br.evil.com/x', text: async () => okHtml });
+    expect(await readSefazPage(lookalike, OFFICIAL, OUT.info)).toEqual({ ok: false, code: 'resposta_invalida' });
+  });
+
+  it('pede com redirect manual e segue a Location do mesmo domínio, no máximo 2 saltos', async () => {
+    const calls: { url: string; redirect?: string }[] = [];
+    const hop: SefazFetch = async (url, init) => {
+      calls.push({ url, redirect: init.redirect });
+      if (calls.length === 1) return { ok: false, status: 302, headers: headers('/consultaNFCe/QRCode2?p=A'), text: async () => '' };
+      if (calls.length === 2) return { ok: false, status: 301, headers: headers('https://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode3?p=A'), text: async () => '' };
+      return { ok: true, status: 200, url, text: async () => okHtml };
+    };
+    const r = await readSefazPage(hop, OFFICIAL, OUT.info);
+    expect(r.ok).toBe(true);
+    expect(calls.map((c) => c.redirect)).toEqual(['manual', 'manual', 'manual']);
+    expect(calls[1]!.url).toBe('https://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode2?p=A');
+    expect(calls[2]!.url).toBe('https://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode3?p=A');
+    expect(SEFAZ_MAX_REDIRECTS).toBe(2);
+  });
+
+  it('terceiro salto, outro domínio, http, usuário, sem Location: recusa e não pede a outra página', async () => {
+    const loop: SefazFetch = vi.fn(async () => ({ ok: false, status: 302, headers: headers('/consultaNFCe/outra?p=A'), text: async () => '' }));
+    expect(await readSefazPage(loop, OFFICIAL, OUT.info)).toEqual({ ok: false, code: 'resposta_invalida' });
+    expect(loop).toHaveBeenCalledTimes(3);
+    for (const location of [
+      'https://phishing.example/x',
+      'https://consultadfe.fazenda.rj.gov.br.evil.com/x',
+      'https://consultadfe.fazenda.rj.gov.br@evil.com/x',
+      'http://consultadfe.fazenda.rj.gov.br/x?p=A',
+      '//evil.com/x',
+      'javascript:alert(1)',
+      '',
+    ]) {
+      const f: SefazFetch = vi.fn(async () => ({ ok: false, status: 302, headers: headers(location), text: async () => '' }));
+      expect(await readSefazPage(f, OFFICIAL, OUT.info), location).toEqual({ ok: false, code: 'resposta_invalida' });
+      expect(f).toHaveBeenCalledTimes(1);
+    }
+    const noLocation: SefazFetch = async () => ({ ok: false, status: 302, text: async () => '' });
+    expect(await readSefazPage(noLocation, OFFICIAL, OUT.info)).toEqual({ ok: false, code: 'resposta_invalida' });
+  });
+
+  it('corpo que nunca termina: tempo esgotado (a leitura inteira tem limite)', async () => {
+    const hang: SefazFetch = async () => ({ ok: true, status: 200, url: OFFICIAL, text: () => new Promise<string>(() => {}) });
+    expect(await readSefazPage(hang, OFFICIAL, OUT.info, { timeoutMs: 100 })).toEqual({ ok: false, code: 'tempo_esgotado' });
   });
 });
 

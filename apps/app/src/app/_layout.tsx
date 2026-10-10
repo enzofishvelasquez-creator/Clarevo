@@ -29,7 +29,7 @@ SplashScreen.preventAutoHideAsync();
  * página recarregada). As telas de entrada, de confirmação e de nova senha ficam fora.
  */
 const ENTRY_PATH =
-  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/referencia)?|cartoes(\/(novo|[^/]+(\/(editar|fatura\/\d{4}-\d{2}(\/(pagar|encargo|estorno))?))?))?|reserva|meta\/(nova|[^/]+(\/(editar|movimento))?)|guardar(\/minima)?|simular|conta|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes|metas|aprender)\/?$/;
+  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/referencia)?|cartoes(\/(novo|[^/]+(\/(editar|fatura\/\d{4}-\d{2}(\/(pagar|encargo|estorno|compra))?))?))?|reserva|meta\/(nova|[^/]+(\/(editar|movimento))?)|guardar(\/minima)?|simular|conta|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes|metas|aprender)\/?$/;
 
 /**
  * Endereço pedido ao abrir a versão web. Sem sessão (ou enquanto a sessão é conferida), as rotas protegidas levam à

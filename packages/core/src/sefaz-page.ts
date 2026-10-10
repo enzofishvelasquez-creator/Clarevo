@@ -39,8 +39,8 @@ export type SefazPageErrorCode =
 
 export type SefazPageResult = { ok: true; reading: SefazPageReading } | { ok: false; code: SefazPageErrorCode };
 
-/** Tamanho máximo do HTML lido (a consulta com muitos itens fica bem abaixo disso). */
-export const SEFAZ_PAGE_MAX_CHARS = 1_500_000;
+/** Tamanho máximo do HTML lido (a consulta com 100 itens fica em torno de 100 mil caracteres). */
+export const SEFAZ_PAGE_MAX_CHARS = 400_000;
 
 const ENTITIES: Record<string, string> = {
   nbsp: ' ',
@@ -90,18 +90,84 @@ function decodeEntities(text: string): string {
   });
 }
 
-/** Tira o HTML para texto em linhas: blocos viram quebra de linha, o resto das marcas some, as entidades são decodificadas. */
-function htmlToLines(html: string): string[] {
-  const text = html
-    .replace(/<!--[\s\S]*?-->/g, ' ')
-    .replace(/<(script|style|noscript|head)\b[\s\S]*?<\/\1\s*>/gi, ' ')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(div|p|tr|li|ul|ol|table|h[1-6]|label|section|header|footer|td|th)\s*>/gi, '\n')
-    .replace(/<[^>]*>/g, ' ');
+/** Onde procurar o fechamento de script, estilo e cabeçalho; sem fechamento nesse trecho, a leitura trunca ali (marcação hostil). */
+const CLOSE_WINDOW = 64_000;
+/** Quanto do início de uma marca é examinado atrás de classe ou id do cabeçalho do estabelecimento. */
+const TAG_INSPECT_CHARS = 500;
+/** Onde procurar o fechamento do elemento do cabeçalho do estabelecimento. */
+const MARKER_WINDOW = 2_000;
+const SKIPPED_TAGS = new Set(['script', 'style', 'noscript', 'head']);
+const BLOCK_CLOSING_TAGS = new Set(['div', 'p', 'tr', 'li', 'ul', 'ol', 'table', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'label', 'section', 'header', 'footer', 'td', 'th']);
+
+/** A marca (texto entre "<" e ">") é o cabeçalho do estabelecimento: classe txtTopo ou id u20 (leiaute padrão das consultas de NFC-e). */
+function isIssuerMarker(tag: string): boolean {
+  const head = tag.slice(0, TAG_INSPECT_CHARS).toLowerCase();
+  if (/\bid\s*=\s*["']u20["']/.test(head)) return true;
+  return head.indexOf('txttopo') >= 0 && /\bclass\s*=\s*["'][^"']*\btxttopo\b/.test(head);
+}
+
+/**
+ * Passa pelo HTML uma única vez, com `indexOf`, em tempo linear: blocos viram quebra de linha, o resto das marcas some, script,
+ * estilo, comentário e cabeçalho são pulados. Marcação sem fechamento (comentário, script, marca sem ">") trunca a leitura ali
+ * em vez de procurar o fechamento no resto da página. Também devolve o texto do elemento do estabelecimento (txtTopo ou u20).
+ */
+function scanHtml(html: string, wantMarker: boolean): { text: string; marker: string | null } {
+  const parts: string[] = [];
+  let marker: string | null = null;
+  let i = 0;
+  const n = html.length;
+  while (i < n) {
+    const lt = html.indexOf('<', i);
+    if (lt < 0) {
+      parts.push(html.slice(i));
+      break;
+    }
+    if (lt > i) parts.push(html.slice(i, lt));
+    if (html.startsWith('<!--', lt)) {
+      const close = html.indexOf('-->', lt + 4);
+      if (close < 0) break;
+      parts.push(' ');
+      i = close + 3;
+      continue;
+    }
+    const gt = html.indexOf('>', lt + 1);
+    if (gt < 0) break;
+    const tag = html.slice(lt + 1, Math.min(gt, lt + 1 + TAG_INSPECT_CHARS));
+    const named = /^(\/?)([A-Za-z][A-Za-z0-9]*)/.exec(tag);
+    const closing = named ? named[1] === '/' : false;
+    const name = named ? named[2]!.toLowerCase() : '';
+    i = gt + 1;
+    if (!closing && SKIPPED_TAGS.has(name) && html.charCodeAt(gt - 1) !== 47) {
+      const window = html.slice(i, i + CLOSE_WINDOW);
+      const close = new RegExp(`</${name}\\s*>`, 'i').exec(window);
+      if (!close) break;
+      parts.push(' ');
+      i += close.index + close[0].length;
+      continue;
+    }
+    if (wantMarker && marker === null && !closing && name !== '' && isIssuerMarker(tag)) {
+      const window = html.slice(i, i + MARKER_WINDOW);
+      const close = new RegExp(`</${name}\\s*>`, 'i').exec(window);
+      if (close) marker = scanHtml(window.slice(0, close.index), false).text;
+    }
+    if (name === 'br' && !closing) parts.push('\n');
+    else if (closing && BLOCK_CLOSING_TAGS.has(name)) parts.push('\n');
+    else parts.push(' ');
+  }
+  return { text: parts.join(''), marker };
+}
+
+function linesOf(text: string): string[] {
   return decodeEntities(text)
     .split(/\r?\n/)
     .map((line) => line.replace(/[\s ]+/g, ' ').trim())
     .filter((line) => line !== '');
+}
+
+/** Tira o HTML para texto em linhas e acha o cabeçalho do estabelecimento (primeira linha do elemento txtTopo ou u20). */
+function readHtml(html: string): { lines: string[]; marker: string | null } {
+  const { text, marker } = scanHtml(html, true);
+  return { lines: linesOf(text), marker: marker === null ? null : (linesOf(marker)[0] ?? null) };
 }
 
 /** "87,40" ou "1.250,90" em centavos; null se não for um valor de 0,01 até o limite do app. */
@@ -129,28 +195,34 @@ function valueAfter(text: string, label: RegExp): Cents | null {
 
 const CNPJ_TEXT = /\b([0-9A-Z]{2}\.[0-9A-Z]{3}\.[0-9A-Z]{3}\/[0-9A-Z]{4}-[0-9]{2})\b/;
 
-function issuerFromHtml(html: string, lines: string[]): string | null {
+/** As linhas do estabelecimento: tudo antes do bloco do consumidor (linha que começa por "Consumidor"). */
+function issuerLines(lines: string[]): string[] {
+  const at = lines.findIndex((line) => /^\W*consumidor\b/i.test(line));
+  return at < 0 ? lines : lines.slice(0, at);
+}
+
+function issuerFromPage(marker: string | null, lines: string[]): string | null {
   // 1) Cabeçalho do estabelecimento: classe txtTopo ou id u20 (leiaute padrão das consultas de NFC-e).
-  const byMarker = /<(\w+)\b[^>]*\b(?:class\s*=\s*["'][^"']*\btxtTopo\b[^"']*["']|id\s*=\s*["']u20["'])[^>]*>([\s\S]*?)<\/\1\s*>/i.exec(html);
-  const fromMarker = byMarker ? htmlToLines(byMarker[2]!)[0] : undefined;
-  const generic = /documento auxiliar|danfe|nfc-?e|nota fiscal|consulta p[úu]blica|secretaria de|sefaz|via consumidor/i;
-  const clean = (candidate: string | undefined): string | null => {
+  const generic = /documento auxiliar|danfe|nfc-?e|nota fiscal|consulta p[úu]blica|secretaria de|sefaz|via consumidor|consumidor/i;
+  const clean = (candidate: string | null | undefined): string | null => {
     if (!candidate) return null;
     const name = friendlyIssuerName(candidate.replace(/\bCNPJ\b.*$/i, '').replace(/[:|]\s*$/, '')).slice(0, 120).trim();
     if (name.length < 2 || !/[A-Za-zÀ-ÿ]/.test(name) || generic.test(name) || /^\d/.test(name)) return null;
     return name;
   };
-  const marked = clean(fromMarker);
+  const marked = clean(marker);
   if (marked) return marked;
-  // 2) A linha de cima do CNPJ do estabelecimento (ou o trecho antes de "CNPJ" na mesma linha).
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!;
+  // 2) A linha de cima do CNPJ do estabelecimento (ou o trecho antes de "CNPJ" na mesma linha). Só antes do bloco do consumidor:
+  //    o nome e o CNPJ de quem comprou nunca viram o nome da loja.
+  const above = issuerLines(lines);
+  for (let i = 0; i < above.length; i++) {
+    const line = above[i]!;
     if (!/\bCNPJ\b/i.test(line) && !CNPJ_TEXT.test(line)) continue;
     const before = line.replace(/\bCNPJ\b[\s\S]*$/i, '').trim();
     const same = clean(before);
     if (same) return same;
     for (let j = i - 1; j >= Math.max(0, i - 3); j--) {
-      const name = clean(lines[j]);
+      const name = clean(above[j]);
       if (name) return name;
     }
     return null;
@@ -176,18 +248,22 @@ function issuedOnFrom(text: string): IsoDate | null {
 export function parseSefazPage(html: string, key: AccessKeyInfo): SefazPageResult {
   if (typeof html !== 'string' || html.trim() === '') return { ok: false, code: 'pagina_vazia' };
   if (html.length > SEFAZ_PAGE_MAX_CHARS) return { ok: false, code: 'pagina_nao_reconhecida' };
-  const lines = htmlToLines(html);
+  const { lines, marker } = readHtml(html);
   const text = lines.join('\n');
 
   if (/nota\s+fiscal[^\n]{0,40}n[ãa]o\s+(?:foi\s+)?encontrada|n[ãa]o\s+foi\s+poss[ií]vel\s+(?:localizar|consultar)|chave\s+de\s+acesso\s+inv[áa]lida|nfc-?e\s+n[ãa]o\s+(?:foi\s+)?encontrada/i.test(text)) {
     return { ok: false, code: 'nota_nao_encontrada' };
   }
 
-  // A página é desta nota? Chave mostrada, CNPJ do estabelecimento e mês da emissão precisam bater com o que foi escaneado.
+  // A página é desta nota? Precisa mostrar a chave lida ou o CNPJ do emitente (e nenhum outro), e o mês da emissão tem de bater.
+  // Sem nenhum dos dois, não há como saber de quem é a página: 'pagina_nao_reconhecida', nada é aproveitado.
   const shown = findAccessKey(text);
   if (shown.ok && shown.info.digest !== key.digest) return { ok: false, code: 'nota_diferente' };
-  const cnpjShown = CNPJ_TEXT.exec(text.split(/\bconsumidor\b/i)[0]!);
+  const cnpjShown = key.cnpj ? CNPJ_TEXT.exec(issuerLines(lines).join('\n')) : null;
   if (key.cnpj && cnpjShown && cnpjShown[1]!.replace(/[^0-9A-Z]/g, '') !== key.cnpj) return { ok: false, code: 'nota_diferente' };
+  const sameKey = shown.ok && shown.info.digest === key.digest;
+  const sameCnpj = Boolean(key.cnpj && cnpjShown && cnpjShown[1]!.replace(/[^0-9A-Z]/g, '') === key.cnpj);
+  if (!sameKey && !sameCnpj) return { ok: false, code: 'pagina_nao_reconhecida' };
 
   const issuedOn = issuedOnFrom(text);
   if (issuedOn !== null && issuedOn.slice(0, 7) !== key.yearMonth) return { ok: false, code: 'nota_diferente' };
@@ -197,7 +273,7 @@ export function parseSefazPage(html: string, key: AccessKeyInfo): SefazPageResul
   const items = /qtd\.?\s*total\s+de\s+itens\s*:?\s*(\d{1,4})/i.exec(text);
   const itemRows = html.match(/<tr\b[^>]*\bid\s*=\s*["']Item\s*\+?\s*\d+["']/gi);
   const itemCount = items ? Number(items[1]) : itemRows ? itemRows.length : null;
-  const issuerName = issuerFromHtml(html, lines);
+  const issuerName = issuerFromPage(marker, lines);
 
   if (issuerName === null && totalCents === null && issuedOn === null) return { ok: false, code: 'pagina_nao_reconhecida' };
   return { ok: true, reading: { issuerName, totalCents, issuedOn, itemCount: itemCount !== null && itemCount >= 1 ? itemCount : null } };
@@ -232,18 +308,41 @@ export function canReadSefazPage(draft: Pick<ReceiptDraft, 'uf' | 'model' | 'off
 export type SefazReadErrorCode = SefazPageErrorCode | 'tempo_esgotado' | 'sem_conexao' | 'resposta_invalida' | 'endereco_invalido';
 export type SefazReadResult = { ok: true; reading: SefazPageReading } | { ok: false; code: SefazReadErrorCode };
 
-/** O pedaço de `fetch` que a leitura usa (injetado: o app passa o `fetch` do aparelho; os testes, um falso). */
+/**
+ * O pedaço de `fetch` que a leitura usa (injetado: o app passa o `fetch` do aparelho; os testes, um falso). Com `redirect: 'manual'`
+ * a resposta de redirecionamento chega com `status` 3xx e o cabeçalho `Location`, e quem chama decide se segue. Onde o `fetch`
+ * não separa o redirecionamento (React Native), `url` é o endereço final e a leitura confere o domínio dele.
+ */
 export type SefazFetch = (
   url: string,
-  init: { method: 'GET'; headers: Record<string, string>; signal?: AbortSignal; credentials?: 'omit' },
-) => Promise<{ ok: boolean; status: number; url?: string; text(): Promise<string> }>;
+  init: { method: 'GET'; headers: Record<string, string>; signal?: AbortSignal; credentials?: 'omit'; redirect?: 'manual' | 'follow' },
+) => Promise<{ ok: boolean; status: number; url?: string; headers?: { get(name: string): string | null }; text(): Promise<string> }>;
 
 export const SEFAZ_READ_TIMEOUT_MS = 12_000;
+/** Quantos redirecionamentos para o mesmo domínio a leitura segue. */
+export const SEFAZ_MAX_REDIRECTS = 2;
+
+/** O destino de um redirecionamento (cabeçalho Location), só se ficar no domínio oficial e em https; senão null. */
+function redirectTarget(location: string, from: string, host: string): string | null {
+  const loc = location.trim();
+  if (loc === '' || /[\s\\]/.test(loc)) return null;
+  let target: string;
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(loc)) target = loc;
+  else if (loc.startsWith('//')) target = `https:${loc}`;
+  else if (loc.startsWith('/')) target = `https://${host}${loc}`;
+  else {
+    const base = from.split('#')[0]!.split('?')[0]!;
+    target = `${base.slice(0, base.lastIndexOf('/') + 1)}${loc}`;
+  }
+  const m = /^https:\/\/([A-Za-z0-9.-]+)(?::443)?(?:[/?#]|$)/i.exec(target);
+  return m && m[1]!.toLowerCase() === host ? target.split('#')[0]! : null;
+}
 
 /**
  * Busca e lê a página oficial. Confere o endereço outra vez (só o domínio oficial da UF da chave e só o de leitura automática),
- * não segue para outro domínio, tem tempo limite e nunca lança: qualquer falha vira um código, e a tela cai para o preenchimento
- * manual ("Não deu para ler a página da Sefaz. Confira o valor no cupom."). Nada da página é guardado.
+ * segue no máximo 2 redirecionamentos e só para o mesmo domínio (nunca outro), exige que a resposta diga de qual endereço veio,
+ * tem tempo limite e nunca lança: qualquer falha vira um código, e a tela cai para o preenchimento manual ("Não deu para ler a
+ * página da Sefaz. Confira o valor no cupom."). Nada da página é guardado.
  */
 export async function readSefazPage(
   fetchImpl: SefazFetch,
@@ -268,12 +367,29 @@ export async function readSefazPage(
   });
   const work = (async (): Promise<SefazReadResult> => {
     try {
-      const res = await fetchImpl(url, { method: 'GET', headers: { Accept: 'text/html,application/xhtml+xml' }, signal: controller?.signal, credentials: 'omit' });
-      if (!res.ok) return { ok: false, code: 'resposta_invalida' };
-      // Redirecionamento para outro domínio: a página não é a da Sefaz do estado.
-      if (typeof res.url === 'string' && res.url !== '' && hostOfUrl(res.url) !== host) return { ok: false, code: 'resposta_invalida' };
-      const html = await res.text();
-      return parseSefazPage(html, key);
+      let current: string = url;
+      for (let hop = 0; hop <= SEFAZ_MAX_REDIRECTS; hop++) {
+        const res = await fetchImpl(current, {
+          method: 'GET',
+          headers: { Accept: 'text/html,application/xhtml+xml' },
+          signal: controller?.signal,
+          credentials: 'omit',
+          redirect: 'manual',
+        });
+        if (res.status >= 300 && res.status < 400) {
+          const location = res.headers?.get('location');
+          const next = typeof location === 'string' ? redirectTarget(location, current, host) : null;
+          if (next === null) return { ok: false, code: 'resposta_invalida' };
+          current = next;
+          continue;
+        }
+        if (!res.ok) return { ok: false, code: 'resposta_invalida' };
+        // Sem o endereço de onde a resposta veio, não há como saber se é a página da Sefaz do estado: recusa.
+        if (typeof res.url !== 'string' || res.url === '' || hostOfUrl(res.url) !== host) return { ok: false, code: 'resposta_invalida' };
+        const html = await res.text();
+        return parseSefazPage(html, key);
+      }
+      return { ok: false, code: 'resposta_invalida' };
     } catch {
       return { ok: false, code: 'sem_conexao' };
     }

@@ -7,16 +7,18 @@ import { Keyboard, Pressable, StyleSheet, useWindowDimensions, View, type Pressa
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Txt } from '@/components/ui';
+import { setBrowseBarInset } from '@/lib/bar-inset';
 import { colors, fonts, radius } from '@/theme/tokens';
 
 /**
- * Navegação: Resumo, Movimentações, Metas e Aprender. "Movimentos" é o rótulo compacto; o nome acessível é completo.
+ * Navegação: Resumo, Movimentações, Metas e Aprender. "Movimentos" é o rótulo compacto; o nome acessível o contém
+ * ("Movimentos: movimentações do mês"; WCAG 2.5.3, rótulo no nome).
  * Aprender mantém o rótulo curto (quatro destinos do Primeiro Ciclo) e o nome acessível "Aprender e dúvidas", que
  * contém o rótulo visível (D-031(1); WCAG 2.5.3).
  */
 export const TABS: { name: string; href: '/' | '/movimentacoes' | '/metas' | '/aprender'; label: string; a11y: string; icon: LucideIcon }[] = [
   { name: 'index', href: '/', label: 'Resumo', a11y: 'Resumo', icon: House },
-  { name: 'movimentacoes', href: '/movimentacoes', label: 'Movimentos', a11y: 'Movimentações', icon: ArrowLeftRight },
+  { name: 'movimentacoes', href: '/movimentacoes', label: 'Movimentos', a11y: 'Movimentos: movimentações do mês', icon: ArrowLeftRight },
   { name: 'metas', href: '/metas', label: 'Metas', a11y: 'Metas', icon: Flag },
   { name: 'aprender', href: '/aprender', label: LEARN_UI_TEXT.tabLabel, a11y: LEARN_UI_TEXT.tabA11y, icon: BookOpen },
 ];
@@ -103,10 +105,17 @@ export function BrowseTabBar() {
   const insets = useSafeAreaInsets();
   const keyboard = useKeyboardVisible();
   const origin = useLastTab();
-  if (barModeFor(pathname) !== 'consulta' || keyboard) return null;
+  const visible = barModeFor(pathname) === 'consulta' && !keyboard;
+  useEffect(() => {
+    if (!visible) setBrowseBarInset(0);
+  }, [visible]);
+  useEffect(() => () => setBrowseBarInset(0), []);
+  if (!visible) return null;
   const active = origin ?? topicTabFor(pathname);
+  // Sobreposta ao fim da tela (absoluta): a pilha de telas não encolhe quando a barra surge, então não há barra dupla nem salto
+  // na animação. A rolagem de cada tela reserva o espaço dela (lib/bar-inset).
   return (
-    <View style={[styles.barWrap, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+    <View style={[styles.barWrap, styles.overlay, { paddingBottom: Math.max(insets.bottom, 8) }]} onLayout={(e) => setBrowseBarInset(e.nativeEvent.layout.height)}>
       <View accessibilityRole="tablist" aria-label={BAR_TEXT.label} style={styles.bar}>
         {TABS.map((t) => (
           <TabFace key={t.name} focused={t.href === active} label={t.label} a11y={t.a11y} icon={t.icon} onPress={() => router.dismissTo(t.href)} />
@@ -129,6 +138,7 @@ export function TabBar({ children, ...props }: TabListProps) {
 }
 
 const styles = StyleSheet.create({
+  overlay: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   barWrap: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8 },
   bar: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 8, width: '100%', maxWidth: 560, alignSelf: 'center' },
   button: { flex: 1, minHeight: 56, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', gap: 4 },
