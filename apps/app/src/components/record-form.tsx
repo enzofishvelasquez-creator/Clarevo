@@ -1,10 +1,13 @@
 import {
+  CARDS_TEXT,
   CATEGORIES,
   DESCRIPTION_MAX,
   MAX_RECORD_CENTS,
   parseBRL,
   ERROR_TEXT,
   addDays,
+  cardErrorText,
+  cardTitle,
   charCount,
   maskDateBR,
   FIELD_ORDER,
@@ -16,6 +19,8 @@ import {
   dayInMonthDate,
   fieldForErrorCode,
   formatBRL,
+  installmentAmounts,
+  installmentsNotice,
   formatDateBR,
   formatMonthBR,
   formatMonthName,
@@ -24,11 +29,16 @@ import {
   looksLikeSavings,
   monthOf,
   newOperationKey,
+  paidInvoiceMonths,
   parseDateBR,
+  purchaseFirstInvoiceMonth,
+  purchaseNotice,
   seriesGapForExpense,
+  validateCardPurchaseDraft,
   validateRecordDraft,
   type DraftField,
   type FieldErrors,
+  type Card as CardData,
   type FinancialRecord,
   type IsoMonth,
   type PersonalSpace,
@@ -50,12 +60,16 @@ import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
 import { returnSession } from '@/components/retorno-acoes';
+import { ChoiceGroup } from '@/components/series-parts';
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt, styles as ui } from '@/components/ui';
+import { cardHref, invoiceHref } from '@/lib/cards';
+import { loadPrefs, updatePrefs, useDevicePrefs } from '@/lib/device-prefs';
 import { flash } from '@/lib/flash';
+import { guardedWrite } from '@/lib/guarded-write';
 import { totalChange } from '@/lib/highlight';
 import { explanationHref } from '@/lib/learn';
-import { useCommitments, useCreateRecord, useReturnReview, useUpdateRecord } from '@/state/data';
+import { useAddCardPurchase, useCardInvoices, useCardOperationKey, useCards, useCommitments, useCreateRecord, useReturnReview, useUpdateRecord } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
 
@@ -88,8 +102,8 @@ const COPY = {
  * anotar outro" (limpa descrição, valor e categoria; mantém tipo, conta e mês) e "Salvar" (volta à revisão).
  */
 export function RecordForm({ mode, space: personal }: { mode: Mode; space: PersonalSpace }) {
-  const { today } = useSession();
-  const params = useLocalSearchParams<{ mes?: string; origem?: string }>();
+  const { today, user, auth } = useSession();
+  const params = useLocalSearchParams<{ mes?: string; origem?: string; cartao?: string }>();
   /** Mês fechado do modo "Dia" (só ao criar); null no formulário comum. */
   const dayMonth: IsoMonth | null =
     mode.type === 'novo' && typeof params.mes === 'string' && ISO_MONTH.test(params.mes) && params.mes < monthOf(today) ? params.mes : null;
@@ -104,6 +118,29 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   const kind = mode.type === 'novo' ? mode.kind : mode.record.kind;
   const copy = COPY[kind];
   const contextId = mode.type === 'novo' ? personal.personalContextId : mode.record.contextId;
+
+  // Como você pagou? (D-037): só em gasto novo, fora do modo "Dia". Dinheiro, débito ou Pix é o jeito de sempre; cartão de
+  // crédito anota a compra na fatura (ela só entra em Pago quando a fatura for paga).
+  const cardMode = mode.type === 'novo' && kind === 'despesa' && dayMonth === null;
+  const cards = useCards(cardMode ? contextId : undefined);
+  const activeCards = (cards.data ?? []).filter((c) => c.status === 'ativo');
+  const userId = user?.id;
+  const persistPrefs = auth.mode !== 'demo';
+  const prefs = useDevicePrefs(userId);
+  const addPurchase = useAddCardPurchase();
+  const cardKeys = useCardOperationKey();
+  const [payWith, setPayWith] = useState<'dinheiro' | 'cartao'>('dinheiro');
+  const [chosenCardId, setChosenCardId] = useState<string | null>(null);
+  const [installmentsText, setInstallmentsText] = useState('1');
+  const [installmentsError, setInstallmentsError] = useState<string | undefined>();
+  const [cardError, setCardError] = useState<string | undefined>();
+  /** A pessoa já escolheu a forma de pagamento: a escolha lembrada só vale até aí. */
+  const paymentTouched = useRef(false);
+  /** Cartões ativos no momento de "Cadastrar cartão": o que aparecer depois vem escolhido ao voltar. */
+  const registering = useRef<string[] | null>(null);
+  const selectedCard: CardData | null =
+    payWith === 'cartao' ? (activeCards.find((c) => c.id === chosenCardId) ?? (activeCards.length === 1 ? activeCards[0]! : null)) : null;
+  const cardPurchase = cardMode && payWith === 'cartao';
 
   const [initial, setInitial] = useState<RecordDraft>(() =>
       mode.type === 'novo'
@@ -140,8 +177,38 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     dateText: useRef<TextInput>(null),
     accountId: useRef<TextInput>(null),
   } satisfies Record<DraftField, React.RefObject<TextInput | null>>;
+  const installmentsRef = useRef<TextInput>(null);
 
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || (dayMode && dayText !== initialDay);
+  useEffect(() => {
+    if (userId && cardMode) loadPrefs(userId, persistPrefs);
+  }, [userId, persistPrefs, cardMode]);
+
+  // Forma de pagamento: o cartão pedido pelo endereço (?cartao=) ou a última escolha deste aparelho, se ainda existir.
+  const wantedCard = typeof params.cartao === 'string' ? params.cartao : prefs?.lastPayment && prefs.lastPayment !== 'dinheiro' ? prefs.lastPayment : null;
+  const wantedActive = wantedCard !== null && activeCards.some((c) => c.id === wantedCard);
+  useEffect(() => {
+    if (!cardMode || paymentTouched.current || !cards.isSuccess) return;
+    if (wantedActive) {
+      setPayWith('cartao');
+      setChosenCardId(wantedCard);
+    }
+  }, [cardMode, cards.isSuccess, wantedActive, wantedCard]);
+
+  // Voltou de "Cadastrar cartão": o cartão novo já vem escolhido.
+  const activeIds = activeCards.map((c) => c.id).join(',');
+  useEffect(() => {
+    const before = registering.current;
+    if (!before) return;
+    const created = activeCards.find((c) => !before.includes(c.id));
+    if (created) {
+      registering.current = null;
+      paymentTouched.current = true;
+      setPayWith('cartao');
+      setChosenCardId(created.id);
+    }
+  }, [activeIds]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || (dayMode && dayText !== initialDay) || installmentsText !== '1';
   const day = dayMode && dayMonth ? dayInMonthDate(dayMonth, dayText) : null;
   const account = personal.accounts.find((a) => a.id === draft.accountId) ?? personal.accounts[0];
   const contextName = 'Pessoal';
@@ -200,6 +267,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       else totalChange.set({ total, month, deltaCents: saved.amountCents });
     }
     if (mode.type === 'novo') {
+      // Só quem tem cartão ativo tem o que lembrar: a escolha vale só neste aparelho.
+      if (cardMode && userId && activeCards.length > 0) updatePrefs(userId, { lastPayment: 'dinheiro' }, persistPrefs);
       flash.set(kind === 'despesa' ? 'Gasto salvo' : 'Recebimento salvo');
       leave(() => router.replace(`/registro/${recordId}`));
     } else {
@@ -242,8 +311,103 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     return null;
   };
 
+  /**
+   * Compra no cartão de crédito (D-037): vai para a fatura, não para Pago. Usa a chave de operação dos cartões (a mesma depois de
+   * uma falha de rede, e o banco reconhece a repetição); nada é anunciado antes de o servidor confirmar.
+   */
+  const submitCard = async () => {
+    if (busy) return;
+    const card = selectedCard;
+    if (!card) {
+      setCardError(CARDS_TEXT.expense.chooseCard);
+      return;
+    }
+    const v = validateCardPurchaseDraft(
+      { description: draft.description, amountText: draft.amountText, dateText: draft.dateText, category: draft.category, installmentsText },
+      today,
+    );
+    if (!v.ok) {
+      const errs: FieldErrors = {};
+      if (v.errors.description) errs.description = v.errors.description;
+      if (v.errors.amountText) errs.amountText = v.errors.amountText;
+      if (v.errors.dateText) errs.dateText = v.errors.dateText;
+      setErrors(errs);
+      setInstallmentsError(v.errors.installmentsText);
+      setCardError(undefined);
+      if (v.errors.installmentsText && !Object.keys(errs).length) installmentsRef.current?.focus();
+      else focusFirst(errs);
+      return;
+    }
+    setErrors({});
+    setInstallmentsError(undefined);
+    setCardError(undefined);
+    setBanner(null);
+    setBusy(true);
+    try {
+      const r = await guardedWrite(
+        cardKeys,
+        JSON.stringify([card.id, v.input]),
+        (key) => addPurchase.mutateAsync({ key, cardId: card.id, input: v.input }),
+        (s) => s.action === 'criar_compra_cartao' && s.cardId === card.id,
+      );
+      if (r.status === 'ok' || r.status === 'reconciled') {
+        // Confirmação tátil, aviso e lembrança da escolha só depois de o servidor confirmar.
+        if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        if (userId) updatePrefs(userId, { lastPayment: card.id }, persistPrefs);
+        let invoiceMonth: IsoMonth | null = r.status === 'ok' ? (r.value.entry?.invoiceMonth ?? null) : null;
+        if (r.status === 'reconciled' && r.saved.entryId) {
+          // A tentativa anterior foi gravada: a fatura real vem do lançamento.
+          try {
+            invoiceMonth = (await repo.getCardEntry(r.saved.entryId))?.invoiceMonth ?? null;
+          } catch {
+            invoiceMonth = null;
+          }
+        }
+        // A compra vai para a fatura: o aviso diz isso e que só conta em Pago quando a fatura for paga.
+        flash.set(invoiceMonth ? `${CARDS_TEXT.expense.savedFor(invoiceMonth, today)} ${CARDS_TEXT.screens.cardPurchaseNote}` : CARDS_TEXT.expense.saved);
+        leave(() => router.replace(invoiceMonth ? invoiceHref(card.id, invoiceMonth) : cardHref(card.id)));
+        return;
+      }
+      if (r.status === 'refused') {
+        const field: Partial<Record<string, 'description' | 'amountText' | 'dateText'>> = {
+          valor_invalido: 'amountText',
+          valor_acima_do_limite: 'amountText',
+          descricao_obrigatoria: 'description',
+          descricao_longa: 'description',
+          categoria_invalida: 'description',
+          data_invalida: 'dateText',
+          data_futura: 'dateText',
+        };
+        const f = field[r.code];
+        if (f) {
+          const errs: FieldErrors = { [f]: cardErrorText(r.code, { purchase: true }) };
+          setErrors(errs);
+          focusFirst(errs);
+          return;
+        }
+        if (r.code === 'parcelas_invalidas') {
+          setInstallmentsError(cardErrorText(r.code));
+          installmentsRef.current?.focus();
+          return;
+        }
+        if (r.code === 'cartao_arquivado' || r.code === 'nao_encontrado' || r.code === 'fatura_paga') qc.invalidateQueries({ queryKey: ['cards'] });
+        setBanner(cardErrorText(r.code, { purchase: true }));
+        return;
+      }
+      setBanner(ERROR_TEXT.salvar_falhou);
+    } catch {
+      setBanner(ERROR_TEXT.salvar_falhou);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submit = async (versionOverride?: number, another = false) => {
     if (busy) return; // envio repetido bloqueado enquanto o anterior não termina
+    if (cardPurchase) {
+      await submitCard();
+      return;
+    }
     // Modo "Dia": o dia vira a data do mês fechado; erro do dia ("Informe o dia.", "Junho tem 30 dias.") no lugar da data.
     const dayError = day && 'error' in day ? dayErrorText(day.error, dayMonth!) : null;
     const effective = day ? { ...draft, dateText: 'date' in day ? formatDateBR(day.date) : '' } : draft;
@@ -334,7 +498,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   // Aviso contra contar duas vezes (D-024): gasto com a descrição de uma conta de gasto fixo em aberto no mês da data.
   // Gasto que já é o pagamento de uma conta a pagar não precisa do aviso.
   const seriesCheckMonth =
-    kind === 'despesa' && !(mode.type === 'editar' && mode.record.commitmentId) && parsedDate ? monthOf(parsedDate) : null;
+    kind === 'despesa' && !cardPurchase && !(mode.type === 'editar' && mode.record.commitmentId) && parsedDate ? monthOf(parsedDate) : null;
   const monthBills = useCommitments(seriesCheckMonth ? contextId : undefined, seriesCheckMonth ?? monthOf(today));
   const typed = draft.description.trim().toLocaleLowerCase('pt-BR');
   const openSeriesBill =
@@ -352,6 +516,32 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   // O mês é o da data efetiva: depois de "Usar outra data", o da data digitada.
   const gapMonth = parsedDate ? monthOf(parsedDate) : dayMonth;
   const gapRow = fromReview && gapMonth && returnReview.data?.review ? seriesGapForExpense(returnReview.data.review, gapMonth, draft.description) : null;
+
+  // Compra no cartão: em qual fatura entra (a real, que pode ser a seguinte se a do ciclo já foi paga) e as parcelas.
+  const cardInvoices = useCardInvoices(cardPurchase ? selectedCard : null);
+  const installments = /^\d{1,3}$/.test(installmentsText.trim()) ? Number(installmentsText.trim()) : installmentsText.trim() === '' ? 1 : Number.NaN;
+  const purchaseAmount = parseBRL(draft.amountText);
+  let purchaseText: string | null = null;
+  let installmentsLine: string | null = null;
+  if (cardPurchase && selectedCard && cardInvoices.data && parsedDate && parsedDate <= today && Number.isInteger(installments) && installments >= 1 && installments <= 48) {
+    try {
+      const first = purchaseFirstInvoiceMonth(selectedCard, parsedDate, installments, paidInvoiceMonths(cardInvoices.data), today);
+      purchaseText = purchaseNotice(first, selectedCard.name, today);
+    } catch {
+      purchaseText = null;
+    }
+  }
+  if (cardPurchase && purchaseAmount !== null && purchaseAmount > 0 && purchaseAmount <= MAX_RECORD_CENTS && Number.isInteger(installments) && installments > 1 && installments <= 48) {
+    const first = installmentAmounts(purchaseAmount, installments)[0]!;
+    if (first >= 1) installmentsLine = installmentsNotice(installments, first);
+  }
+
+  const choosePayment = (next: 'dinheiro' | 'cartao') => {
+    paymentTouched.current = true;
+    setPayWith(next);
+    setCardError(undefined);
+    setBanner(null);
+  };
 
   const formatAmountOnBlur = () => {
     const cents = parseBRL(draft.amountText);
@@ -397,7 +587,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
 
         <Card style={{ gap: space[4] }}>
           <Txt variant="caption" color={colors.textSecondary}>
-            {copy.situation} · {account?.name}
+            {cardPurchase ? `${CARDS_TEXT.screens.purchaseSituation} · ${selectedCard ? cardTitle(selectedCard) : CARDS_TEXT.expense.credit}` : `${copy.situation} · ${account?.name}`}
           </Txt>
 
           <TextField
@@ -458,6 +648,86 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
           />
           <SumValues target={refs.amountText} onUse={(t) => set('amountText', t)} />
 
+          {cardMode ? (
+            <View style={{ gap: space[3] }}>
+              <ChoiceGroup label={CARDS_TEXT.screens.payHow}>
+                <Chip label={CARDS_TEXT.expense.cash} selected={payWith === 'dinheiro'} onPress={() => choosePayment('dinheiro')} />
+                <Chip label={CARDS_TEXT.expense.credit} selected={payWith === 'cartao'} onPress={() => choosePayment('cartao')} />
+              </ChoiceGroup>
+
+              {payWith === 'cartao' ? (
+                cards.isPending ? (
+                  <Txt variant="label" color={colors.textSecondary}>
+                    Carregando seus cartões…
+                  </Txt>
+                ) : cards.isError ? (
+                  <Banner tone="erro" icon={AlertCircle}>
+                    <Txt variant="label" color={colors.error}>
+                      {ERROR_TEXT.carregar_falhou}
+                    </Txt>
+                    <Button label="Tentar novamente" tone="soft" onPress={() => cards.refetch()} />
+                  </Banner>
+                ) : activeCards.length === 0 ? (
+                  <Banner tone="info" icon={Info} live={false}>
+                    <Txt variant="label">{CARDS_TEXT.screens.noCardsInline}</Txt>
+                    <Button
+                      label={CARDS_TEXT.expense.registerCard}
+                      tone="soft"
+                      onPress={() => {
+                        registering.current = activeCards.map((c) => c.id);
+                        router.push({ pathname: '/cartoes/novo', params: { origem: 'gasto' } });
+                      }}
+                    />
+                  </Banner>
+                ) : (
+                  <>
+                    {activeCards.length > 1 ? (
+                      <ChoiceGroup label={CARDS_TEXT.expense.chooseCard} error={cardError}>
+                        {activeCards.map((c) => (
+                          <Chip
+                            key={c.id}
+                            label={cardTitle(c)}
+                            selected={selectedCard?.id === c.id}
+                            onPress={() => {
+                              paymentTouched.current = true;
+                              setChosenCardId(c.id);
+                              setCardError(undefined);
+                            }}
+                          />
+                        ))}
+                      </ChoiceGroup>
+                    ) : null}
+                    <TextField
+                      ref={installmentsRef}
+                      label={CARDS_TEXT.expense.installments}
+                      value={installmentsText}
+                      onChangeText={(t) => {
+                        setInstallmentsText(t.replace(/\D/g, '').slice(0, 2));
+                        setInstallmentsError(undefined);
+                      }}
+                      keyboardType="number-pad"
+                      inputMode="numeric"
+                      maxLength={2}
+                      placeholder="1"
+                      hint={CARDS_TEXT.expense.installmentsHint}
+                      error={installmentsError}
+                    />
+                    {purchaseText || installmentsLine ? (
+                      <Banner tone="info" icon={Info} live={false}>
+                        {purchaseText ? <Txt variant="label">{purchaseText}</Txt> : null}
+                        {installmentsLine ? (
+                          <MoneyTxt variant="label" style={tabular}>
+                            {installmentsLine}
+                          </MoneyTxt>
+                        ) : null}
+                      </Banner>
+                    ) : null}
+                  </>
+                )
+              ) : null}
+            </View>
+          ) : null}
+
           {dayMode && dayMonth ? (
             <View style={{ gap: space[2] }}>
               <DayField
@@ -486,7 +756,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             <View style={{ gap: space[2] }}>
               <TextField
                 ref={refs.dateText}
-                label={copy.dateLabel}
+                label={cardPurchase ? CARDS_TEXT.screens.purchaseDateLabel : copy.dateLabel}
                 value={draft.dateText}
                 onChangeText={(t) => set('dateText', maskDateBR(t))}
                 placeholder="DD/MM/AAAA"
@@ -507,7 +777,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             </View>
           )}
 
-          {personal.accounts.length > 1 ? (
+          {personal.accounts.length > 1 && !cardPurchase ? (
             <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel="Conta">
               <Txt variant="label" style={{ fontFamily: fonts.bold }}>
                 Conta
@@ -546,9 +816,15 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             </Banner>
           ) : null}
 
-          <Txt variant="label" color={colors.textSecondary}>
-            Será salvo em <Txt variant="label" style={{ fontFamily: fonts.bold }}>{contextName}</Txt>, {account?.name}.
-          </Txt>
+          {cardPurchase ? (
+            <Txt variant="label" color={colors.textSecondary}>
+              Será salvo em <Txt variant="label" style={{ fontFamily: fonts.bold }}>{contextName}</Txt>, na fatura do cartão. {CARDS_TEXT.screens.cardPurchaseNote}
+            </Txt>
+          ) : (
+            <Txt variant="label" color={colors.textSecondary}>
+              Será salvo em <Txt variant="label" style={{ fontFamily: fonts.bold }}>{contextName}</Txt>, {account?.name}.
+            </Txt>
+          )}
         </Card>
 
         <LinkButton label="Como este registro entra no mês?" color={colors.textSecondary} onPress={() => router.push(explanationHref('diferenca'))} />
@@ -586,7 +862,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             <View style={styles.footerRow}>
               <Button label="Cancelar" tone="ghost" onPress={requestCancel} style={styles.cancel} />
               <Button
-                label={banner && !conflict ? 'Tentar novamente' : copy.save}
+                label={banner && !conflict ? 'Tentar novamente' : cardPurchase ? CARDS_TEXT.expense.save : copy.save}
                 busy={busy}
                 busyLabel="Salvando…"
                 onPress={() => submit()}

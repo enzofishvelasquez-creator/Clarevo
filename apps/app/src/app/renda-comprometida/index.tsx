@@ -29,6 +29,7 @@ import { ErrorState } from '@/components/states';
 import { TermHint } from '@/components/term-hint';
 import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Chip, LinkButton, Screen, Skeleton, Txt, styles as ui } from '@/components/ui';
+import { openCommitment } from '@/lib/cards';
 import { LEARN_UI_TEXT } from '@/lib/learn';
 import { HIDDEN_MONEY_A11Y } from '@/lib/privacy';
 import { useCommittedGoalLines, useCommittedSummary, useCommittedUpcoming, useMonthRecords, useSpace, useView } from '@/state/data';
@@ -205,6 +206,11 @@ function Composition({ s, t }: { s: CommittedSummary; t: CommittedTexts }) {
         <GroupRow key={g.group} g={g} hasReference={hasReference} />
       ))}
       {t.debt ? <DebtBlock s={s} debt={t.debt} /> : null}
+      {t.invoiceNote ? (
+        <Txt variant="caption" color={colors.textSecondary} style={{ paddingTop: space[2] }}>
+          {t.invoiceNote}
+        </Txt>
+      ) : null}
     </Card>
   );
 }
@@ -383,7 +389,7 @@ function MonthBills({ s }: { s: CommittedSummary }) {
             {COMMITTED_TEXT.groupLabel[g]}
           </Txt>
           {s.items[g].map((c, i, all) => (
-            <CommitmentRow key={c.id} commitment={c} today={today} last={i === all.length - 1} onPress={() => router.push(`/a-pagar/${c.id}`)} />
+            <CommitmentRow key={c.id} commitment={c} today={today} last={i === all.length - 1} onPress={() => openCommitment(c)} />
           ))}
         </View>
       ))}

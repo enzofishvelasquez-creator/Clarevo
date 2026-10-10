@@ -17,6 +17,11 @@ export interface DevicePrefs {
   reminderOffered: boolean;
   hideOnOpen: boolean;
   biometricLock: boolean;
+  /**
+   * Última forma de pagamento escolhida em Anotar gasto ("dinheiro" ou o identificador de um cartão), só para abrir o formulário
+   * já nela. Não é dado financeiro: nada vai para o servidor, e uma escolha que já não existe (cartão arquivado) é ignorada.
+   */
+  lastPayment: string | null;
 }
 
 export const DEFAULT_PREFS: DevicePrefs = {
@@ -25,6 +30,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   reminderOffered: false,
   hideOnOpen: false,
   biometricLock: false,
+  lastPayment: null,
 };
 
 const PREFIX = 'clarevo.aparelho.v1.';
@@ -45,6 +51,7 @@ function parse(raw: string | null | undefined): DevicePrefs {
       reminderOffered: v.reminderOffered === true,
       hideOnOpen: v.hideOnOpen === true,
       biometricLock: v.biometricLock === true,
+      lastPayment: typeof v.lastPayment === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(v.lastPayment) ? v.lastPayment : null,
     };
   } catch {
     return DEFAULT_PREFS;

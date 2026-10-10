@@ -581,6 +581,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const SC = {
     pagar: 'Contas a pagar, R$ 650,00 em aberto neste mês',
     fixos: 'Gastos fixos e parcelamentos, 5 cadastrados, com as contas do ano',
+    // D-037: a demonstração tem o "Cartão Exemplo"; a legenda traz a fatura atual (fecha dia 3, vence dia 10).
+    cartoes: 'Cartões, Cartão Exemplo, fatura de novembro R$ 550,00',
     calc: 'Calculadoras, Parcelado ou à vista, dívidas, reserva e outras contas',
   };
   await waitText('5 cadastrados, com as contas do ano').catch(() => {});
@@ -589,8 +591,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     const top = (sel, text) => [...document.querySelectorAll(sel)].find((e) => e.textContent === text && e.getBoundingClientRect().width > 0)?.getBoundingClientRect().top ?? null;
     return { anotar: top('[role=button]', 'Anotar gasto'), organizar: top('[role=heading]', 'Organizar'), totais: top('div[dir="auto"]', 'Pago em outubro') };
   });
-  ok('movimentações: "Organizar" com os três atalhos e as legendas de outubro, entre os botões e os totais do mês', JSON.stringify(await sectionRows('Organizar')) === JSON.stringify([SC.pagar, SC.fixos, SC.calc]) &&
-    ['R$ 650,00 em aberto neste mês', '5 cadastrados, com as contas do ano', 'Parcelado ou à vista, dívidas, reserva e outras contas'].every((x) => t.includes(x)) &&
+  ok('movimentações: "Organizar" com os quatro atalhos (Cartões entre os gastos fixos e as calculadoras) e as legendas de outubro, entre os botões e os totais do mês', JSON.stringify(await sectionRows('Organizar')) === JSON.stringify([SC.pagar, SC.fixos, SC.cartoes, SC.calc]) &&
+    ['R$ 650,00 em aberto neste mês', '5 cadastrados, com as contas do ano', 'Cartão Exemplo · fatura de novembro R$ 550,00', 'Parcelado ou à vista, dívidas, reserva e outras contas'].every((x) => t.includes(x)) &&
     scOrder.anotar !== null && scOrder.organizar !== null && scOrder.totais !== null && scOrder.anotar < scOrder.organizar && scOrder.organizar < scOrder.totais, `${JSON.stringify(await sectionRows('Organizar'))} ${JSON.stringify(scOrder)}`);
   await layoutChecks('movimentações com atalhos 390px');
   await scrollTo('Organizar');
@@ -635,9 +637,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await body();
   ok('lista: a vencer no mês e próximos meses fora do total', ['A vencer em outubro de 2026', 'Vence em 15/10/2026', 'Vence em 20/10/2026', 'Próximos meses', 'Seguro do carro', 'Não entram no total deste mês.'].every((x) => t.includes(x)));
   // Ciclo A: Aluguel, Luz e o financiamento são gastos fixos; Internet, Condomínio e Seguro continuam avulsas.
-  const laterBase = ['Aluguel, vence em 05/11/2026, R$ 2.500,00, gasto fixo', 'Financiamento do carro, vence em 10/11/2026, R$ 850,00, parcela 13 de 48', 'Seguro do carro, vence em 10/11/2026, R$ 300,00', 'Luz, vence em 12/11/2026, cerca de R$ 180,00, valor estimado, gasto fixo'];
+  // D-037: as dez faturas do "Cartão Exemplo" (novembro a agosto de 2027) são contas a pagar de "Próximos meses"; a de novembro vem
+  // depois do Seguro (também dia 10) e antes da Luz (dia 12); as outras nove vêm no fim, por vencimento.
+  const FAT = (due, cents) => `Fatura Cartão Exemplo, vence em ${due}, cerca de R$ ${cents}, valor estimado`;
+  const laterBase = ['Aluguel, vence em 05/11/2026, R$ 2.500,00, gasto fixo', 'Financiamento do carro, vence em 10/11/2026, R$ 850,00, parcela 13 de 48', 'Seguro do carro, vence em 10/11/2026, R$ 300,00', FAT('10/11/2026', '550,00'),
+    'Luz, vence em 12/11/2026, cerca de R$ 180,00, valor estimado, gasto fixo', FAT('10/12/2026', '350,00'), FAT('10/01/2027', '350,00'), ...['10/02/2027', '10/03/2027', '10/04/2027', '10/05/2027', '10/06/2027', '10/07/2027', '10/08/2027'].map((d) => FAT(d, '150,00'))];
   const laterNow = await sectionRows('Próximos meses');
-  ok('lista: próximos meses com Aluguel, parcela 13 de 48, Seguro e Luz estimada', JSON.stringify(laterNow) === JSON.stringify(laterBase) && ['Vence em 05/11/2026 · Todo mês', 'Vence em 10/11/2026 · Parcela 13 de 48', 'Vence em 12/11/2026 · Todo mês · estimado', '≈ R$ 180,00'].every((x) => t.includes(x)), (laterNow ?? []).join(' | '));
+  ok('lista: próximos meses com Aluguel, parcela 13 de 48, Seguro, Luz estimada e as dez faturas do Cartão Exemplo', JSON.stringify(laterNow) === JSON.stringify(laterBase) && ['Vence em 05/11/2026 · Todo mês', 'Vence em 10/11/2026 · Parcela 13 de 48', 'Vence em 12/11/2026 · Todo mês · estimado', '≈ R$ 180,00'].every((x) => t.includes(x)), (laterNow ?? []).join(' | '));
   ok('lista: aluguel de outubro pago pelo gasto fixo, em Pagas', JSON.stringify(await sectionRows('Pagas')) === JSON.stringify(['Aluguel, paga em 05/10/2026, R$ 2.500,00, gasto fixo']) && t.includes('Paga em 05/10/2026 · Todo mês'));
   ok('lista: sem valores estimados no total de outubro', !t.includes('em valores estimados'));
   // Ciclo A3: IPVA (20/01/2027) e IPTU (fevereiro a novembro de 2027) só entram dois meses antes do primeiro vencimento.
@@ -979,7 +985,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('valor igual ao estimado: deixa de ser estimada e fica alterada só neste mês', t.includes('Alterada só neste mês.') && !t.includes('Valor estimado') && (await visibleCount('button', 'Informar o valor da conta')) === 0);
   await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
   await waitRows('Próximos meses', (rows) => (rows ?? []).includes('Luz, vence em 12/11/2026, R$ 180,00, gasto fixo'));
-  ok('"estimado" some da Luz em Contas a pagar', ((await sectionRows('Próximos meses')) ?? []).includes('Luz, vence em 12/11/2026, R$ 180,00, gasto fixo') && !(await body()).includes('estimado'));
+  // Só as faturas do cartão continuam estimadas (a fatura aberta pode mudar com novas compras); a Luz deixa de ser.
+  ok('"estimado" some da Luz em Contas a pagar', ((await sectionRows('Próximos meses')) ?? []).includes('Luz, vence em 12/11/2026, R$ 180,00, gasto fixo') &&
+    ((await sectionRows('Próximos meses')) ?? []).filter((r) => r.includes('estimado')).every((r) => r.startsWith('Fatura Cartão Exemplo')));
   await openRow(/^Luz, vence em 12\/11\/2026/); await waitText('Excluir só a conta de novembro');
   await btn('Excluir só a conta de novembro').click(); await waitText('Excluir a conta de novembro?');
   ok('excluir só esta: o gasto fixo continua e a conta não volta', (await dialogText()).includes('O gasto fixo continua nos outros meses, e esta conta não volta a ser criada.'));
@@ -2575,7 +2583,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('B tela: "Fora dos compromissos" R$ 2.850,00 com "Não é saldo: ainda precisa cobrir gastos do dia a dia."', t.includes('Fora dos compromissos: R$ 2.850,00') && t.includes('Não é saldo: ainda precisa cobrir gastos do dia a dia'));
   ok('B tela: renda de referência (R$ 6.000,00 por mês, desde setembro de 2026) e recebido em outubro', t.includes('R$ 6.000,00 por mês, desde setembro de 2026') && t.includes('Recebido em outubro: R$ 6.000,00'));
   ok('B tela: contas do mês (Aluguel, Internet, Condomínio)', t.includes('Contas do mês') && t.includes('Aluguel') && t.includes('Internet') && t.includes('Condomínio'));
-  ok('B tela: próximos meses (novembro R$ 3.830,00 63,8% e dezembro R$ 3.530,00 58,8%, "Previsto") e o marco de outubro de 2029', t.includes('Novembro de 2026 · R$ 3.830,00 · 63,8%') && t.includes('Dezembro de 2026 · R$ 3.530,00 · 58,8%') &&
+  ok('B tela: próximos meses (novembro R$ 4.380,00 73,0% e dezembro R$ 3.880,00 64,7%, já com as faturas do cartão, "Previsto") e o marco de outubro de 2029', t.includes('Novembro de 2026 · R$ 4.380,00 · 73,0%') && t.includes('Dezembro de 2026 · R$ 3.880,00 · 64,7%') &&
     t.includes('Previsto: contas já criadas e repetições programadas. Valores estimados podem mudar.') && t.includes('Outubro de 2029: última parcela de Financiamento do carro (R$ 850,00).'));
   ok('B tela: "Como calculamos", "Como ler este número" e os links', t.includes('Somamos as contas a pagar com vencimento em outubro') && t.includes('Como ler este número') && t.includes('Gastos fixos e parcelamentos') && t.includes('Contas a pagar') && t.includes('Quem vê estes dados?'));
   ok('B tela: nenhum termo de alerta, "sobra", "disponível" nem travessão longo', !NO_BALANCE.test(t) && !FORBIDDEN.test(t), (t.match(NO_BALANCE) ?? t.match(FORBIDDEN) ?? [''])[0]);
@@ -2592,10 +2600,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Novembro: 63,8%, dívidas (14,2%) com a referência de mercado e a fonte, "Ocultar referência" e os estimados.
   await rcMonth('novembro de 2026');
   t = await body();
-  ok('B novembro: 63,8% (R$ 3.830,00 em contas de R$ 6.000,00) e fora dos compromissos R$ 2.170,00', t.includes('63,8%') && t.includes('R$ 3.830,00 em contas de R$ 6.000,00') && t.includes('Fora dos compromissos: R$ 2.170,00') && t.includes('Não é saldo'));
+  ok('B novembro: 73,0% (R$ 4.380,00 em contas de R$ 6.000,00, com R$ 550,00 de fatura de cartão) e fora dos compromissos R$ 1.620,00', t.includes('73,0%') && t.includes('R$ 4.380,00 em contas de R$ 6.000,00') && t.includes('Fora dos compromissos: R$ 1.620,00') && t.includes('Não é saldo'));
   ok('B novembro: dívidas R$ 850,00 (14,2%) com a referência da Serasa (até 30%), "não é uma regra para você" e a fonte com data', t.includes('Dívidas: R$ 850,00 · 14,2% da renda de referência.') &&
     t.includes('Referência usada pela Serasa: até 30% da renda líquida com parcelas de dívidas. É uma referência geral, não uma regra para você.') && t.includes('Fonte: Serasa, página sobre comprometimento de renda, consultada em 09/10/2026.'));
-  ok('B novembro: "Inclui R$ 180,00 em valores estimados."', t.includes('Inclui R$ 180,00 em valores estimados.'));
+  ok('B novembro: "Inclui R$ 730,00 em valores estimados." (a Luz de R$ 180,00 e a fatura aberta de R$ 550,00)', t.includes('Inclui R$ 730,00 em valores estimados.'));
   ok('B novembro: a fonte da Serasa é um link (papel link)', (await p.getByRole('link', { name: /Serasa/ }).filter({ visible: true }).count()) >= 1);
   await keepText();
   await shot('102_renda_comprometida_novembro', true);
@@ -3243,6 +3251,431 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.goto(`http://localhost:${PORT}/simular?modo=xyz&alvo=abc&meses=9999&inicial=-1`); await waitText('Seu dinheiro');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(300);
   ok('D endereço com valores inválidos: ignorados (campos vazios)', (await formValues()).length === 0, JSON.stringify(await formValues()));
+
+  {
+  // ==================================================================================================================
+  // Ciclo E · Cartões de crédito (D-037). A demonstração tem o "Cartão Exemplo" (final 1234, fecha dia 3, vence dia 10, limite
+  // R$ 5.000,00) com Tênis de corrida (R$ 600,00 em 3x), Notebook (R$ 1.500,00 em 10x) e Restaurante (R$ 200,00), todos de
+  // 05 e 06/10/2026: a primeira fatura vence em novembro (R$ 550,00) e o limite usado é R$ 2.300,00. Compra no cartão NUNCA
+  // entra em Pago: só o pagamento da fatura entra, na data do pagamento (D-021). Os totais de outubro continuam 6.000 / 3.900 /
+  // 2.100 e 650. Nenhum número de cartão, código de segurança nem validade existe em tela alguma. Hoje é 07/10/2026.
+  const goTab = async (name) => {
+    const tab = () => p.getByRole('tab', { name }).filter({ visible: true });
+    // A barra de abas pode demorar um instante (depois de criar a conta, por exemplo): espera antes de voltar telas.
+    for (let i = 0; i < 8; i++) { await tab().first().waitFor({ timeout: 1500 }).catch(() => {}); if ((await tab().count()) > 0) break; await btn('Voltar').click(); await p.waitForTimeout(400); }
+    await tab().first().click(); await p.waitForTimeout(500);
+  };
+  const cardTile = () => p.getByRole('button', { name: /^Cartão Exemplo · final 1234\./ }).filter({ visible: true }).first();
+  const openCardsList = async () => {
+    await goTab('Movimentações'); await waitText('Registrar recebimento');
+    await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitText('Cadastrar cartão'); await p.waitForTimeout(500);
+  };
+  const openCardPage = async () => { await openCardsList(); await cardTile().click(); await waitText('Fatura atual'); await p.waitForTimeout(400); };
+  const openInvoice = async (month = 'novembro') => {
+    await p.getByRole('button', { name: new RegExp(`^Fatura de ${month}, `) }).filter({ visible: true }).first().click(); await waitText('Lançamentos'); await p.waitForTimeout(500);
+  };
+  const waitInvoice = async (hero) => { await waitText('Lançamentos'); await waitText(hero); await p.waitForTimeout(500); };
+  const cardIdOf = (name) => otherDevice(async (repo, ctx, n) => (await repo.listCards(ctx)).find((c) => c.name === n)?.id ?? null, name);
+  const countEntries = (cardId) => otherDevice(async (repo, ctx, id) => (await repo.listCardEntries(id)).length, cardId);
+  const urlPath = () => new URL(p.url()).pathname;
+  // Total do cabeçalho azul da fatura: o valor logo depois do título, da situação e do apelido do cartão.
+  const heroTotal = async () => (await body()).match(/Fatura de [^\n]+\n[^\n]+\n[^\n]+\n(R\$ [\d.]+,\d{2})/)?.[1] ?? null;
+
+  await freshDemo();
+  await goTab('Movimentações');
+  await p.getByRole('button', { name: SC.cartoes, exact: true }).filter({ visible: true }).first().click(); await waitText('Cadastrar cartão'); await p.waitForTimeout(500);
+  t = await body();
+  ok('E Cartões: título, apelido, "final 1234", fatura de novembro aberta de R$ 550,00, fecha em 03/11, vence em 10/11 e o limite usado R$ 2.300,00 de R$ 5.000,00',
+    (await h1Name()) === 'Cartões' && ['Cartão Exemplo', 'final 1234', 'Fatura de novembro', 'R$ 550,00', 'Aberta · valor estimado', 'Fecha em 03/11 · Vence em 10/11', 'Limite usado: R$ 2.300,00 de R$ 5.000,00',
+      'O limite usado soma as parcelas das faturas que ainda não foram pagas.'].every((x) => t.includes(x)), t.slice(0, 500));
+  ok('E Cartões: o cartão é um botão só, com o nome acessível completo (apelido, final, fatura, fechamento, vencimento e limite)',
+    (await visibleCount('button', /^Cartão Exemplo · final 1234\. Fatura de novembro · R\$ 550,00 · Aberta\. Fecha em 03\/11\. Vence em 10\/11\. Limite usado: R\$ 2\.300,00 de R\$ 5\.000,00\.$/)) === 1 && (await visibleCount('button', 'Cadastrar cartão')) === 1);
+  ok('E Cartões: sem cor de alerta nem julgamento (sem "disponível", "estourou", "saldo")', !NO_BALANCE.test(t) && !/estourou|dispon[ií]vel|saldo/i.test(t));
+  await keepText();
+  await innerChecks('cartões 390px');
+  await shot('130_cartoes');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await innerChecks('cartões 320px');
+  await shot('130_cartoes_320px', true);
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+
+  // O cartão: faturas por mês (atual e próximas com as parcelas futuras), sem excluir enquanto há lançamentos.
+  await cardTile().click(); await waitText('Fatura atual'); await p.waitForTimeout(500);
+  t = await body();
+  const nextRows = (await sectionRows('Próximas faturas')) ?? [];
+  ok('E cartão: apelido, final, "Fecha no dia 3 · vence no dia 10", limite usado e a fatura atual (novembro, R$ 550,00)', (await h1Name()) === 'Cartão' && t.includes('Cartão Exemplo') && t.includes('final 1234') &&
+    t.includes('Fecha no dia 3 · vence no dia 10') && t.includes('Limite usado: R$ 2.300,00 de R$ 5.000,00') && JSON.stringify(await sectionRows('Fatura atual')) === JSON.stringify(['Fatura de novembro, aberta, R$ 550,00. Fecha em 03/11. Vence em 10/11.']),
+    JSON.stringify(await sectionRows('Fatura atual')));
+  ok('E cartão: próximas faturas de dezembro (R$ 350,00) a agosto de 2027 (R$ 150,00), com as parcelas futuras, e nenhuma fatura anterior', nextRows.length === 9 && nextRows[0] === 'Fatura de dezembro, aberta, R$ 350,00. Fecha em 03/12. Vence em 10/12.' &&
+    nextRows[1].startsWith('Fatura de janeiro de 2027, aberta, R$ 350,00') && nextRows[8].startsWith('Fatura de agosto de 2027, aberta, R$ 150,00') && !t.includes('Faturas anteriores') &&
+    t.includes('As parcelas das compras já anotadas entram nas faturas seguintes.') && t.includes('Ainda não começou'), JSON.stringify(nextRows));
+  ok('E cartão: com lançamentos, não oferece "Excluir cartão" e diz para arquivar; oferece editar, arquivar e anotar compra', (await visibleCount('button', 'Excluir cartão')) === 0 &&
+    t.includes('Um cartão com lançamentos não pode ser excluído. Arquive em vez de excluir.') && (await visibleCount('button', 'Editar cartão')) === 1 && (await visibleCount('button', 'Arquivar cartão')) === 1 && (await visibleCount('button', 'Anotar compra neste cartão')) === 1);
+  ok('E cartão: nenhum número de cartão, código de segurança nem validade em tela', !/\b\d{4} \d{4} \d{4}\b|\bcvv\b|validade/i.test(t));
+  await keepText();
+  await innerChecks('cartão 390px');
+  await shot('131_cartao');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await innerChecks('cartão 320px');
+  await shot('131_cartao_320px', true);
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+
+  // A fatura de novembro: lançamentos, total e as ações.
+  await openInvoice('novembro');
+  t = await body();
+  ok('E fatura de novembro: "Aberta", R$ 550,00 estimado, fecha em 03/11, vence em 10/11 e o período de 04/10 a 03/11', (await h1Name()) === 'Fatura' && ['Fatura de novembro', 'Aberta', 'Cartão Exemplo', 'R$ 550,00', 'Valor estimado: pode mudar com novas compras.',
+    'Fecha em 03/11 · Vence em 10/11', 'Período: 04/10 a 03/11'].every((x) => t.includes(x)), t.slice(0, 400));
+  ok('E fatura: lançamentos (Tênis "parcela 1 de 3", Notebook "parcela 1 de 10" e o Restaurante) e o total formado só por parcelas (R$ 550,00)',
+    (await visibleCount('button', 'Tênis de corrida · parcela 1 de 3 · R$ 200,00')) === 1 && (await visibleCount('button', 'Notebook · parcela 1 de 10 · R$ 150,00')) === 1 && (await visibleCount('button', 'Restaurante · R$ 200,00')) === 1 &&
+    t.includes('parcela 1 de 3 · compra em 05/10 · Lazer') && /Parcelas de compras\s+R\$ 550,00/.test(t) && /Total da fatura\s+R\$ 550,00/.test(t) && t.includes('Total = parcelas + encargos + saldo anterior - estornos'));
+  ok('E fatura: "Pagar fatura", "Informar encargos", "Registrar estorno" e a próxima fatura (dezembro); sem "Desfazer pagamento"', (await visibleCount('button', 'Pagar fatura')) === 1 && (await visibleCount('button', 'Informar encargos')) === 1 &&
+    (await visibleCount('button', 'Registrar estorno')) === 1 && (await visibleCount('button', 'Desfazer pagamento')) === 0 && (await visibleCount('button', 'Próxima fatura: dezembro')) === 1 && (await visibleCount('button', /^Fatura anterior/)) === 0);
+  await keepText();
+  await innerChecks('fatura 390px');
+  await shot('132_fatura');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await innerChecks('fatura 320px');
+  await shot('132_fatura_320px', true);
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+
+  // Anotar gasto: "Como você pagou?" logo depois do Valor. Dinheiro, débito ou Pix é o jeito de sempre (já marcado).
+  await goTab('Resumo'); await waitText('Diferença do mês');
+  await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
+  const payTops = await p.evaluate(() => {
+    const top = (text) => [...document.querySelectorAll('div[dir="auto"]')].find((e) => e.textContent === text && e.getBoundingClientRect().width > 0)?.getBoundingClientRect().top ?? null;
+    return { valor: top('Valor em reais'), como: top('Como você pagou?'), data: top('Data do pagamento') };
+  });
+  ok('E Anotar gasto: "Como você pagou?" vem logo depois do Valor (e antes da data), com "Dinheiro, débito ou Pix" marcado e "Cartão de crédito" desmarcado',
+    payTops.valor !== null && payTops.como !== null && payTops.data !== null && payTops.valor < payTops.como && payTops.como < payTops.data &&
+    (await radio('Dinheiro, débito ou Pix').getAttribute('aria-checked')) === 'true' && (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'false' && (await visibleCount('textbox', 'Em quantas vezes?')) === 0 && (await visibleCount('button', 'Salvar gasto')) === 1, JSON.stringify(payTops));
+  await radio('Cartão de crédito').click(); await p.waitForTimeout(400);
+  t = await body();
+  ok('E Anotar gasto com cartão: escolhe o único cartão, pede "Em quantas vezes?" (1 a 48), troca para "Data da compra" e o botão vira "Anotar compra no cartão"',
+    t.includes('Compra no cartão · Cartão Exemplo · final 1234') && (await field('Em quantas vezes?').inputValue()) === '1' && t.includes('De 1 a 48 parcelas.') && t.includes('Data da compra') && !t.includes('Data do pagamento') &&
+    (await visibleCount('button', 'Anotar compra no cartão')) === 1 && (await visibleCount('button', 'Salvar gasto')) === 0 && (await visibleCount('radiogroup', 'Conta')) === 0);
+  await field('Descrição').fill('Fone de ouvido'); await field('Valor em reais').fill('300'); await field('Em quantas vezes?').fill('49'); await p.waitForTimeout(300);
+  const exemploId = await cardIdOf('Cartão Exemplo');
+  const entriesBefore = await countEntries(exemploId);
+  await btn('Anotar compra no cartão').click(); await p.waitForTimeout(400);
+  ok('E compra no cartão com 49 parcelas: "Informe de 1 a 48 parcelas", nada gravado e o formulário continua', (await body()).includes('Informe de 1 a 48 parcelas, com pelo menos R$ 0,01 em cada.') && (await countEntries(exemploId)) === entriesBefore && urlPath() === '/registro/novo', urlPath());
+  await field('Em quantas vezes?').fill('3'); await p.waitForTimeout(500);
+  t = await body();
+  ok('E aviso da compra: "Esta compra entra na fatura de novembro do Cartão Exemplo e conta em Pago quando a fatura for paga." e "3 parcelas, a primeira de R$ 100,00"',
+    t.includes('Esta compra entra na fatura de novembro do Cartão Exemplo e conta em Pago quando a fatura for paga.') && t.includes('3 parcelas, a primeira de R$ 100,00. As outras 2 entram nas faturas seguintes.') &&
+    t.includes('Compra no cartão não entra em Pago agora: ela entra quando a fatura for paga.'), t.split('\n').filter((l) => /fatura/.test(l)).join(' | '));
+  await keepText();
+  await innerChecks('anotar compra no cartão 390px');
+  await shot('133_anotar_compra_no_cartao');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await layoutChecks('anotar compra no cartão 320px');
+  await shot('133_anotar_compra_no_cartao_320px', true);
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  await btn('Anotar compra no cartão').click(); await waitText('Compra anotada na fatura de novembro.'); await waitText('Lançamentos'); await p.waitForTimeout(600);
+  t = await body();
+  ok('E compra salva: abre a fatura de novembro (R$ 650,00) com o aviso de que vai para a fatura e só entra em Pago quando ela for paga, e a parcela 1 de 3 do Fone de ouvido',
+    /^\/cartoes\/[^/]+\/fatura\/2026-11$/.test(urlPath()) && t.includes('Compra anotada na fatura de novembro. Compra no cartão não entra em Pago agora: ela entra quando a fatura for paga.') && (await heroTotal()) === 'R$ 650,00' &&
+    (await visibleCount('button', 'Fone de ouvido · parcela 1 de 3 · R$ 100,00')) === 1 && (await countEntries(exemploId)) === entriesBefore + 1, `${urlPath()} ${await heroTotal()}`);
+  await shot('134_compra_na_fatura');
+  await goTab('Resumo'); await waitText('Diferença do mês');
+  await expectTotals('E compra no cartão não entra em Pago: o Resumo continua 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  // A última forma de pagamento fica lembrada só neste aparelho: o próximo Anotar gasto já abre no cartão.
+  await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(600);
+  ok('E Anotar gasto lembra a última forma de pagamento (cartão) neste aparelho: "Cartão de crédito" já marcado e a pergunta das parcelas à vista', (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'true' && (await visibleCount('textbox', 'Em quantas vezes?')) === 1);
+  await radio('Dinheiro, débito ou Pix').click(); await p.waitForTimeout(300);
+  ok('E de volta a "Dinheiro, débito ou Pix": o gasto de sempre (data do pagamento, conta, "Salvar gasto") e o botão do cartão some', (await visibleCount('button', 'Salvar gasto')) === 1 && (await visibleCount('textbox', 'Em quantas vezes?')) === 0 && (await body()).includes('Data do pagamento'));
+  await btn('Cancelar').click(); await p.waitForTimeout(300); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
+  await waitText('Diferença do mês');
+
+  // Dezembro com as parcelas futuras (R$ 450,00: Tênis, Notebook e Fone). Pagamento parcial antes do fechamento.
+  await openCardPage(); await openInvoice('novembro');
+  await btn('Próxima fatura: dezembro').click(); await waitInvoice('Fatura de dezembro'); t = await body();
+  ok('E fatura de dezembro: R$ 450,00 (parcela 2 do Tênis, do Notebook e do Fone) com o caminho para a fatura anterior', (await heroTotal()) === 'R$ 450,00' && (await visibleCount('button', 'Tênis de corrida · parcela 2 de 3 · R$ 200,00')) === 1 &&
+    (await visibleCount('button', 'Fone de ouvido · parcela 2 de 3 · R$ 100,00')) === 1 && (await visibleCount('button', 'Fatura anterior: novembro')) === 1, `${await heroTotal()}`);
+  await btn('Fatura anterior: novembro').click(); await waitInvoice('Fatura de novembro');
+  await btn('Pagar fatura').click(); await waitText('Confirmar pagamento'); await p.waitForTimeout(500);
+  t = await body();
+  ok('E Pagar fatura: total R$ 650,00, "Pagar o total" marcado, data de hoje com a janela "De 07/10/2025 até hoje." (começa 1 ano atrás) e "Outro valor" ainda sem campo',
+    (await h1Name()) === 'Pagar fatura' && t.includes('Total da fatura') && t.includes('R$ 650,00') && (await radio('Pagar o total').getAttribute('aria-checked')) === 'true' && (await field('Data do pagamento').inputValue()) === '07/10/2026' &&
+    t.includes('De 07/10/2025 até hoje.') && (await visibleCount('textbox', 'Valor pago')) === 0 && t.includes('O pagamento de R$ 650,00 entra em Pago de outubro.') && (await visibleCount('button', 'Confirmar pagamento')) === 1, t.slice(0, 500));
+  await keepText();
+  await innerChecks('pagar fatura 390px');
+  await shot('135_pagar_fatura');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await innerChecks('pagar fatura 320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  await field('Data do pagamento').fill('06/10/2025'); await btn('Confirmar pagamento').click(); await p.waitForTimeout(400);
+  ok('E pagar fatura com data antes da janela (06/10/2025): "Confira a data informada" e nada gravado', (await body()).includes('Confira a data informada.') && urlPath().endsWith('/pagar'));
+  await field('Data do pagamento').fill('08/10/2026'); await btn('Confirmar pagamento').click(); await p.waitForTimeout(400);
+  ok('E pagar fatura com data de amanhã: "Use uma data até hoje" e nada gravado', (await body()).includes('Use uma data até hoje.') && urlPath().endsWith('/pagar'));
+  await field('Data do pagamento').fill('07/10/2026'); await radio('Outro valor').click(); await field('Valor pago').fill('700'); await btn('Confirmar pagamento').click(); await p.waitForTimeout(400);
+  ok('E pagar fatura com valor acima do total: "O valor pago não pode passar do total da fatura." e nada gravado', (await body()).includes('O valor pago não pode passar do total da fatura.') && urlPath().endsWith('/pagar'));
+  await field('Valor pago').fill('250'); await p.waitForTimeout(500);
+  t = await body();
+  ok('E pagamento parcial de R$ 250,00: a prévia diz "Ficaram R$ 400,00 para a fatura de dezembro. Juros e encargos do banco entram quando você informar a fatura de dezembro." e oferece "Quanto custa pagar só uma parte?"',
+    t.includes('Ficaram R$ 400,00 para a fatura de dezembro. Juros e encargos do banco entram quando você informar a fatura de dezembro.') && (await visibleCount('button', 'Quanto custa pagar só uma parte?')) === 1 &&
+    t.includes('O pagamento de R$ 250,00 entra em Pago de outubro.'));
+  await keepText();
+  await shot('136_pagar_parcial');
+  await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado.'); await waitInvoice('Paga em parte'); t = await body();
+  ok('E fatura paga em parte: "Pago R$ 250,00 em 07/10/2026", o aviso do pagamento, o que ficou (R$ 400,00) com o caminho da calculadora e "Desfazer pagamento"; sem pagar de novo nem mudar lançamentos',
+    t.includes('Pagamento registrado. R$ 250,00 em Pago de outubro.') && t.includes('Pago R$ 250,00 em 07/10/2026') && t.includes('Ficaram R$ 400,00 para a fatura de dezembro.') && (await visibleCount('button', 'Quanto custa pagar só uma parte?')) === 1 &&
+    (await visibleCount('button', 'Desfazer pagamento')) === 1 && (await visibleCount('button', 'Pagar fatura')) === 0 && (await visibleCount('button', 'Informar encargos')) === 0 && (await visibleCount('button', 'Registrar estorno')) === 0 &&
+    (await visibleCount('button', 'Tênis de corrida · parcela 1 de 3 · R$ 200,00')) === 0 && t.includes('Fatura paga: para mudar os lançamentos, desfaça o pagamento.'), t.slice(0, 500));
+  await keepText();
+  await shot('137_fatura_paga_em_parte');
+  await goTab('Resumo'); await waitText('Diferença do mês');
+  await expectTotals('E pagar R$ 250,00 da fatura antes do vencimento: Pago 4.150 e diferença 1.850 (só o pagamento entra); recebido 6.000 e a pagar 650', 'R$ 6.000,00', 'R$ 4.150,00', 'R$ 1.850,00', 'R$ 650,00');
+  // Dezembro recebe o saldo anterior (R$ 400,00), sem juros: R$ 450,00 + R$ 400,00.
+  await openCardPage(); await p.getByRole('button', { name: /^Fatura de dezembro, / }).filter({ visible: true }).first().click(); await waitInvoice('Fatura de dezembro'); t = await body();
+  ok('E fatura de dezembro com o saldo anterior: R$ 850,00 (R$ 450,00 de parcelas + R$ 400,00 de saldo anterior, sem juros calculados pelo app)', (await heroTotal()) === 'R$ 850,00' && /Saldo anterior\s+R\$ 400,00/.test(t) && t.includes('Criado pelo pagamento parcial da fatura anterior.') &&
+    (await visibleCount('button', 'Saldo anterior · R$ 400,00')) === 0 && !/juros\s+R\$/i.test(t), `${await heroTotal()}`);
+  await shot('138_fatura_dezembro_saldo_anterior');
+  await btn('Fatura anterior: novembro').click(); await waitInvoice('Paga em parte');
+  await p.getByRole('button', { name: 'Quanto custa pagar só uma parte?' }).filter({ visible: true }).first().click(); await waitText('Tipo de dívida'); await p.waitForTimeout(500);
+  ok('E "Quanto custa pagar só uma parte?" abre a calculadora de dívida em modo rotativo com R$ 400,00 (e a taxa vazia)', urlPath() === '/calcular/custo-da-divida' && p.url().includes('modo=rotativo') && p.url().includes('valor=40000') &&
+    (await radio('Rotativo do cartão').getAttribute('aria-checked')) === 'true' && (await field('Valor da dívida').inputValue()) === '400,00' && (await field('Taxa de juros ao mês (%)').inputValue()) === '', p.url());
+  await btn('Voltar').click(); await waitInvoice('Paga em parte');
+  // O gasto do pagamento: "Fatura Cartão Exemplo (novembro)", origem "Pagamento de fatura", sem editar nem excluir.
+  await goTab('Movimentações'); await waitText('Registrar recebimento'); t = await body();
+  ok('E Movimentos: o pagamento aparece como "Fatura Cartão Exemplo (novembro)", "Pago · 07/10/2026 · Pagamento de fatura", R$ 250,00 (a compra no cartão não aparece)', t.includes('Fatura Cartão Exemplo (novembro)') && t.includes('Pago · 07/10/2026 · Pagamento de fatura') && !t.includes('Fone de ouvido'));
+  await p.getByRole('button', { name: /^Fatura Cartão Exemplo \(novembro\), Pago/ }).filter({ visible: true }).first().click(); await waitText('Abrir fatura'); await p.waitForTimeout(400); t = await body();
+  ok('E detalhe do pagamento de fatura: origem "Pagamento de fatura", "Abrir fatura" e nada de editar, excluir nem tornar gasto fixo (só se muda pela fatura)', t.includes('Pagamento de fatura') && (await visibleCount('button', 'Abrir fatura')) === 1 && (await visibleCount('button', 'Editar registro')) === 0 &&
+    (await visibleCount('button', 'Excluir registro')) === 0 && (await visibleCount('button', 'Tornar gasto fixo')) === 0 && t.includes('Este gasto é o pagamento de uma fatura. Para mudar ou desfazer o pagamento, abra a fatura.'));
+  await keepText();
+  await shot('139_registro_pagamento_de_fatura');
+  await btn('Abrir fatura').click(); await waitInvoice('Paga em parte');
+  // Desfazer: o gasto sai de Pago e o saldo anterior de dezembro também.
+  await btn('Desfazer pagamento').click(); await waitText('Desfazer o pagamento desta fatura?'); t = await dialogText();
+  ok('E desfazer o pagamento: o diálogo explica (o gasto é apagado, a fatura volta a ficar em aberto e o saldo anterior sai)', t.includes('O gasto do pagamento é apagado e a fatura volta a ficar em aberto. O saldo anterior criado na fatura seguinte também sai.'));
+  await confirmIn('Desfazer pagamento'); await waitText('Pagamento desfeito.'); await waitInvoice('Aberta'); t = await body();
+  ok('E pagamento desfeito: "Aberta" de novo, R$ 650,00, "Pagar fatura" e "Informar encargos" de volta', (await heroTotal()) === 'R$ 650,00' && (await visibleCount('button', 'Pagar fatura')) === 1 && (await visibleCount('button', 'Desfazer pagamento')) === 0 && !t.includes('Ficaram R$ 400,00'));
+  await goTab('Resumo'); await waitText('Diferença do mês');
+  await expectTotals('E desfazer o pagamento da fatura: o Resumo volta a 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  await openCardPage(); await p.getByRole('button', { name: /^Fatura de dezembro, / }).filter({ visible: true }).first().click(); await waitInvoice('Fatura de dezembro');
+  ok('E depois de desfazer: dezembro volta a R$ 450,00, sem saldo anterior', (await heroTotal()) === 'R$ 450,00' && !(await body()).includes('Saldo anterior'));
+
+  // Encargos e estorno (o app não calcula juros: a pessoa informa o que o banco cobrou).
+  await btn('Fatura anterior: novembro').click(); await waitInvoice('Aberta');
+  await btn('Informar encargos').click(); await waitText('Tipo do encargo'); await p.waitForTimeout(400); t = await body();
+  ok('E Informar encargos: tipos (juros, multa, IOF, anuidade, tarifa), a explicação de que o app não calcula juros e o valor', (await h1Name()) === 'Informar encargos' && ['Juros', 'Multa', 'IOF', 'Anuidade', 'Tarifa'].length === 5 &&
+    t.includes('Juros, multa, IOF, anuidade ou tarifa que o banco cobrou nesta fatura. O Clarevo não calcula juros sozinho.') && t.includes('Fatura de novembro · Cartão Exemplo') && (await visibleCount('radio', /^(Juros|Multa|IOF|Anuidade|Tarifa)$/)) === 5);
+  await keepText();
+  await innerChecks('informar encargos 390px');
+  await shot('140_informar_encargos');
+  await btn('Salvar encargo').click(); await p.waitForTimeout(400);
+  ok('E encargo sem tipo: "Escolha o tipo do encargo." e nada gravado', (await body()).includes('Escolha o tipo do encargo.') && (await countEntries(exemploId)) === entriesBefore + 1);
+  await radio('Anuidade').click(); await field('Valor do encargo').fill('30'); await btn('Salvar encargo').click(); await waitText('Encargo anotado na fatura.'); await waitInvoice('R$ 680,00'); t = await body();
+  ok('E encargo de anuidade de R$ 30,00: a fatura vai a R$ 680,00, com a linha "Anuidade" e "Encargos R$ 30,00" no total', (await heroTotal()) === 'R$ 680,00' && (await visibleCount('button', 'Anuidade · R$ 30,00')) === 1 && /Encargos\s+R\$ 30,00/.test(t));
+  await btn('Informar encargos').click(); await waitText('Tipo do encargo'); await radio('Juros').click(); await field('Valor do encargo').fill('12,50'); await btn('Salvar encargo').click(); await waitText('Encargo anotado na fatura.'); await waitInvoice('R$ 692,50');
+  await btn('Juros · R$ 12,50').click(); await waitText('Editar lançamento'); t = await dialogText();
+  ok('E tocar num encargo: "Editar lançamento" e "Excluir lançamento"', t.includes('Juros · R$ 12,50') && (await p.getByRole('alert').getByRole('button', { name: 'Editar lançamento' }).count()) === 1 && (await p.getByRole('alert').getByRole('button', { name: 'Excluir lançamento' }).count()) === 1);
+  await p.getByRole('alert').getByRole('button', { name: 'Editar lançamento' }).last().click(); await waitText('Tipo do encargo'); await p.waitForTimeout(400);
+  ok('E editar encargo: o formulário traz Juros e R$ 12,50', (await h1Name()) === 'Editar encargo' && (await radio('Juros').getAttribute('aria-checked')) === 'true' && (await field('Valor do encargo').inputValue()) === '12,50');
+  await field('Valor do encargo').fill('15'); await btn('Salvar encargo').click(); await waitText('Encargo atualizado.'); await waitInvoice('R$ 695,00');
+  ok('E encargo editado para R$ 15,00: a fatura vai a R$ 695,00', (await heroTotal()) === 'R$ 695,00' && (await visibleCount('button', 'Juros · R$ 15,00')) === 1);
+  await btn('Juros · R$ 15,00').click(); await waitText('Excluir lançamento'); await p.getByRole('alert').getByRole('button', { name: 'Excluir lançamento' }).last().click(); await waitText('Excluir este lançamento?');
+  await p.getByRole('alert').getByRole('button', { name: 'Excluir lançamento' }).last().click(); await waitText('Lançamento excluído.'); await waitInvoice('R$ 680,00');
+  ok('E encargo excluído: a fatura volta a R$ 680,00', (await heroTotal()) === 'R$ 680,00' && (await visibleCount('button', /^Juros/)) === 0);
+  await btn('Registrar estorno').click(); await waitText('Descrição do estorno'); await p.waitForTimeout(400); t = await body();
+  ok('E Registrar estorno: descrição, valor e a categoria que ele abate', (await h1Name()) === 'Registrar estorno' && t.includes('Estorno ou devolução de uma compra. O valor abate a categoria escolhida.') && t.includes('Categoria que o estorno abate') && (await visibleCount('radio', 'Lazer')) === 1);
+  await keepText();
+  await shot('141_registrar_estorno');
+  await btn('Salvar estorno').click(); await p.waitForTimeout(400);
+  ok('E estorno sem valor: a mensagem do valor junto do campo e nada gravado', /Informe (um|o) valor/.test(await body()) && (await countEntries(exemploId)) === entriesBefore + 2);
+  await field('Valor do estorno').fill('50'); await btn('Salvar estorno').click(); await p.waitForTimeout(400);
+  ok('E estorno sem descrição: "Dê um nome para este lançamento." e nada gravado', (await body()).includes('Dê um nome para este lançamento.') && (await countEntries(exemploId)) === entriesBefore + 2);
+  await field('Descrição do estorno').fill('Devolução do tênis'); await radio('Lazer').click(); await btn('Salvar estorno').click(); await waitText('Estorno registrado na fatura.'); await waitInvoice('R$ 630,00'); t = await body();
+  ok('E estorno de R$ 50,00 em Lazer: a fatura vai a R$ 630,00 (650 + 30 - 50), com a linha "Devolução do tênis · − R$ 50,00" e "Estornos − R$ 50,00"', (await heroTotal()) === 'R$ 630,00' &&
+    (await visibleCount('button', 'Devolução do tênis · − R$ 50,00')) === 1 && /Estornos\s+− R\$ 50,00/.test(t) && /Total da fatura\s+R\$ 630,00/.test(t));
+  await keepText();
+  await shot('142_fatura_com_encargo_e_estorno');
+  // Pagar o total antes do vencimento: o pagamento entra em Pago, dividido por categoria (com "Encargos do cartão").
+  await btn('Pagar fatura').click(); await waitText('Confirmar pagamento'); await btn('Confirmar pagamento').click(); await waitText('Fatura paga. R$ 630,00 em Pago de outubro.'); await waitInvoice('Paga');
+  t = await body();
+  ok('E pagamento total antecipado: "Paga", "Pago R$ 630,00 em 07/10/2026", e os lançamentos travados (sem editar enquanto a fatura estiver paga)', t.includes('Pago R$ 630,00 em 07/10/2026') && (await visibleCount('button', 'Anuidade · R$ 30,00')) === 0 && t.includes('Anuidade') &&
+    (await visibleCount('button', 'Desfazer pagamento')) === 1 && !t.includes('Ficaram'));
+  await goTab('Resumo'); await waitText('Diferença do mês');
+  await expectTotals('E fatura de R$ 630,00 paga em 07/10: Pago 4.530 e diferença 1.470; recebido 6.000 e a pagar 650', 'R$ 6.000,00', 'R$ 4.530,00', 'R$ 1.470,00', 'R$ 650,00');
+  await p.getByRole('button', { name: /^Pago, R\$/ }).filter({ visible: true }).first().click(); await waitText('Gastos pagos com data de pagamento neste mês.'); await p.waitForTimeout(400);
+  t = await body();
+  ok('E composição de Pago, "Por registro": o pagamento "Fatura Cartão Exemplo (novembro)" com a origem "Pagamento de fatura" (R$ 630,00)', t.includes('Fatura Cartão Exemplo (novembro)') && t.includes('Pago · 07/10/2026 · Pagamento de fatura') && t.includes('R$ 4.530,00'));
+  await radio('Por categoria').click(); await p.waitForTimeout(800); t = await body();
+  ok('E Por categoria: o pagamento da fatura é dividido pelas categorias das compras (Lazer R$ 350,00, Educação R$ 150,00, Sem categoria R$ 100,00) e os juros e anuidade em "Encargos do cartão" (R$ 30,00), somando Pago (R$ 4.530,00)',
+    ['Moradia', 'R$ 2.500,00', 'Mercado', 'R$ 1.400,00', 'Lazer', 'R$ 350,00', 'Educação', 'R$ 150,00', 'Sem categoria', 'R$ 100,00', 'Encargos do cartão', 'R$ 30,00', 'R$ 4.530,00'].every((x) => t.includes(x)) &&
+    t.includes('O pagamento de uma fatura entra dividido pelas categorias das compras dela. Juros, multa e outras cobranças do banco ficam em Encargos do cartão.'), t.slice(0, 700));
+  await keepText();
+  await innerChecks('por categoria com fatura 390px');
+  await shot('143_por_categoria_com_fatura');
+  const cats = await p.getByRole('listitem').filter({ visible: true }).evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') ?? '').filter(Boolean));
+  ok('E Por categoria: cada barra tem um nome acessível com valor e percentual ("Encargos do cartão, R$ 30,00, 0,7% do pago")', cats.length === 6 && cats.some((l) => /^Encargos do cartão, R\$ 30,00, \d+,\d% do pago/.test(l)) && cats.some((l) => /^Lazer, R\$ 350,00/.test(l)), JSON.stringify(cats));
+
+  // Renda comprometida: grupo "Faturas de cartão" fora de "Dívidas" (a linha de dívidas continua só com o financiamento).
+  await freshDemo();
+  await rcRow().click(); await waitText('da sua renda de referência em outubro de 2026'); await p.waitForTimeout(400); t = await body();
+  ok('E renda comprometida de outubro: continua 52,5% e não mostra "Faturas de cartão" (nenhuma fatura vence em outubro)', t.includes('52,5%') && !t.includes('Faturas de cartão'));
+  await rcMonth('novembro de 2026'); t = await body();
+  ok('E renda comprometida de novembro: 73,0%, o grupo "Faturas de cartão · R$ 550,00 · 9,2%" na composição, fora de "Dívidas" (R$ 850,00 · 14,2%), e a nota das faturas',
+    t.includes('73,0%') && t.includes('Faturas de cartão · R$ 550,00 · 9,2%') && t.includes('Dívidas: R$ 850,00 · 14,2% da renda de referência.') && t.includes('Compras no cartão entram pela fatura, no mês do vencimento dela. A linha de dívidas continua só com financiamento e compra parcelada.') &&
+    t.includes('Outras contas a pagar · R$ 300,00'), t.split('\n').filter((l) => /Faturas|Dívidas|Outras/.test(l)).join(' | '));
+  const rcOrder = await p.evaluate(() => {
+    const top = (text) => [...document.querySelectorAll('div[dir="auto"]')].find((e) => e.textContent.startsWith(text) && e.getBoundingClientRect().width > 0)?.getBoundingClientRect().top ?? null;
+    return { parcel: top('Parcelamentos'), faturas: top('Faturas de cartão ·'), outras: top('Outras contas a pagar'), dividas: top('Dívidas:') };
+  });
+  ok('E renda comprometida: "Faturas de cartão" entra entre "Parcelamentos" e "Outras contas a pagar", e as dívidas ficam abaixo, separadas', rcOrder.parcel !== null && rcOrder.faturas !== null && rcOrder.outras !== null && rcOrder.dividas !== null &&
+    rcOrder.parcel < rcOrder.faturas && rcOrder.faturas < rcOrder.outras && rcOrder.outras < rcOrder.dividas, JSON.stringify(rcOrder));
+  await keepText();
+  await innerChecks('renda comprometida com faturas 390px');
+  await shot('144_renda_comprometida_faturas');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await innerChecks('renda comprometida com faturas 320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  await scrollTo('Contas do mês');
+  await p.getByRole('button', { name: /^Fatura Cartão Exemplo, vence em 10\/11\/2026/ }).filter({ visible: true }).first().click(); await waitInvoice('Fatura de novembro');
+  ok('E conta de fatura em "Contas do mês" da renda comprometida abre a fatura (nunca o detalhe da conta a pagar)', /^\/cartoes\/[^/]+\/fatura\/2026-11$/.test(urlPath()) && (await h1Name()) === 'Fatura', urlPath());
+
+  // Contas a pagar: a fatura abre a fatura, sem "Já paguei", editar nem excluir. Faturas de outubro de outros cartões
+  // (uma a vencer e duas vencidas), criadas por "outro aparelho", mostram as ações certas.
+  await freshDemo();
+  await otherDevice(async (repo, ctx) => {
+    const k = () => `e2e-${Math.random()}`;
+    const mk = async (name, dueDay, description, category, cents) => {
+      const card = (await repo.createCard(k(), ctx, { name, lastDigits: null, closingDay: 1, dueDay, limitCents: null })).card;
+      await repo.addCardPurchase(k(), card.id, { description, category, purchasedOn: '2026-09-20', totalCents: cents, installments: 1 });
+    };
+    await mk('Cartão azul', 5, 'Mochila', 'Lazer', 12000);
+    await mk('Cartão roxo', 6, 'Livros', 'Educação', 6000);
+    await mk('Cartão verde', 9, 'Presente', 'Lazer', 8000);
+  });
+  await p.getByRole('button', { name: /^Ainda a pagar neste mês, R\$/ }).filter({ visible: true }).first().click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await waitText('Fatura Cartão verde'); await p.waitForTimeout(500);
+  t = await body();
+  const dueRows = (await sectionRows('Vencidas')) ?? [];
+  const soonRows = (await sectionRows('A vencer em outubro de 2026')) ?? [];
+  ok('E Contas a pagar: as faturas de outubro aparecem como contas (duas vencidas e uma a vencer), a de novembro em "Próximos meses"', dueRows.some((r) => r.startsWith('Fatura Cartão azul, venceu em 05/10/2026')) && dueRows.some((r) => r.startsWith('Fatura Cartão roxo, venceu em 06/10/2026')) &&
+    soonRows.some((r) => r.startsWith('Fatura Cartão verde, vence em ') && r.includes('09/10') && r.endsWith('R$ 80,00')) && ((await sectionRows('Próximos meses')) ?? []).some((r) => r.startsWith('Fatura Cartão Exemplo, vence em 10/11/2026')), JSON.stringify([dueRows, soonRows]));
+  ok('E Contas a pagar: conta de fatura nunca mostra "Já paguei" (só as outras contas a vencer mostram)', (await visibleCount('button', /^Já paguei.*Fatura/)) === 0 && (await visibleCount('button', /^Já paguei/)) >= 2);
+  await p.getByRole('button', { name: /^Fatura Cartão verde, vence em / }).filter({ visible: true }).first().click(); await waitInvoice('Fatura de outubro'); t = await body();
+  ok('E tocar na fatura de uma conta a pagar abre a fatura (fechada, vence em 09/10), com "Pagar fatura", e sem "Marcar como paga" nem "Editar conta" nem "Excluir conta"', /^\/cartoes\/[^/]+\/fatura\/2026-10$/.test(urlPath()) && t.includes('Fechada') && t.includes('R$ 80,00') && t.includes('Fechou em 01/10 · Vence em 09/10') &&
+    (await visibleCount('button', 'Pagar fatura')) === 1 && (await visibleCount('button', 'Marcar como paga')) === 0 && (await visibleCount('button', /^Excluir/)) === 0 && t.includes('Fatura fechada: o valor só muda se você informar encargos, estornos ou novos lançamentos.'), `${urlPath()} ${t.slice(0, 300)}`);
+  await keepText();
+  await shot('145_fatura_fechada');
+  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
+  await p.getByRole('button', { name: 'Revisar vencidas' }).filter({ visible: true }).first().click(); await waitText('Marque o que você já pagou e tire o que não houve.'); await p.waitForTimeout(500); t = await body();
+  ok('E Contas vencidas: as faturas têm "Abrir fatura" no lugar de "Já paguei" e "Não houve", sem caixa de seleção e fora do pagamento em lote',
+    (await visibleCount('button', 'Abrir fatura: Fatura Cartão azul de outubro')) === 1 && (await visibleCount('button', 'Abrir fatura: Fatura Cartão roxo de outubro')) === 1 && (await visibleCount('button', /^Já paguei Fatura/)) === 0 && (await visibleCount('button', /^Não houve Fatura/)) === 0 &&
+    (await visibleCount('checkbox', /Fatura Cartão/)) === 0 && t.includes('Fatura Cartão azul') && t.includes('Venceu em 05/10/2026'), t.slice(0, 500));
+  await keepText();
+  await shot('146_vencidas_com_faturas');
+  await btn('Abrir fatura: Fatura Cartão azul de outubro').click(); await waitInvoice('Fatura de outubro'); t = await body();
+  ok('E "Abrir fatura" nas vencidas leva à fatura do Cartão azul (R$ 120,00, venceu em 05/10)', /^\/cartoes\/[^/]+\/fatura\/2026-10$/.test(urlPath()) && t.includes('Cartão azul') && t.includes('R$ 120,00') && t.includes('Fechou em 01/10 · Venceu em 05/10'), `${urlPath()} ${t.slice(0, 200)}`);
+  // Endereço de conta de fatura (/a-pagar/<id>), como o de um lembrete, e endereço direto da fatura: depois de entrar, abrem a fatura
+  // (a demonstração é recriada com os mesmos identificadores).
+  await freshDemo();
+  const invoiceCommitmentId = await otherDevice(async (repo, ctx) => { const c = (await repo.listCards(ctx)).find((x) => x.name === 'Cartão Exemplo'); return (await repo.listInvoiceCommitments(c.id)).find((i) => i.invoice.month === '2026-11').id; });
+  const exemploIdDeep = await cardIdOf('Cartão Exemplo');
+  await p.goto(`http://localhost:${PORT}/a-pagar/${invoiceCommitmentId}`); await waitText('Seu dinheiro');
+  await btn('Ver demonstração com dados fictícios').click(); await waitText('Lançamentos', 12000).catch(() => {}); await p.waitForTimeout(600);
+  ok('E o endereço da conta de fatura (/a-pagar/<id>) abre a fatura (e não o detalhe da conta), sem "Marcar como paga"', urlPath() === `/cartoes/${exemploIdDeep}/fatura/2026-11` && (await h1Name()) === 'Fatura' && (await visibleCount('button', 'Marcar como paga')) === 0, urlPath());
+  await p.goto(`http://localhost:${PORT}/cartoes/${exemploIdDeep}/fatura/2026-12`); await waitText('Seu dinheiro');
+  await btn('Ver demonstração com dados fictícios').click(); await waitText('Lançamentos', 12000).catch(() => {}); await p.waitForTimeout(600);
+  ok('E o endereço direto da fatura (/cartoes/<id>/fatura/2026-12) abre a fatura de dezembro', urlPath() === `/cartoes/${exemploIdDeep}/fatura/2026-12` && (await body()).includes('Fatura de dezembro'), urlPath());
+
+  // Valores ocultos ("Ocultar valores"): nenhum valor das telas novas fica à vista, nem nos nomes acessíveis.
+  await freshDemo();
+  await openConta(); await hideSwitch().click(); await p.waitForTimeout(300); await btn('Voltar').click(); await waitText('Diferença do mês');
+  await goTab('Movimentações'); await waitText('Registrar recebimento'); await p.waitForTimeout(400);
+  await hiddenShows('Movimentos com Cartões');
+  ok('E valores ocultos: a linha "Cartões" diz "R$ ••••" na tela e "valor oculto" no nome acessível', (await visibleCount('button', 'Cartões, Cartão Exemplo, fatura de novembro valor oculto')) === 1 && (await body()).includes('Cartão Exemplo · fatura de novembro R$ ••••'), (await sectionRows('Organizar') ?? []).join(' | '));
+  await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitText('Cadastrar cartão'); await p.waitForTimeout(500);
+  await hiddenShows('lista de cartões');
+  ok('E valores ocultos: o cartão fala "valor oculto" (fatura e limite) e a barra do limite continua só desenho', (await visibleCount('button', /^Cartão Exemplo · final 1234\. Fatura de novembro · valor oculto · Aberta\. Fecha em 03\/11\. Vence em 10\/11\. Limite usado: valor oculto\.$/)) === 1 && (await body()).includes('Limite usado: R$ •••• de R$ ••••'));
+  await keepText();
+  await shot('147_cartoes_valores_ocultos');
+  await cardTile().click(); await waitText('Fatura atual'); await p.waitForTimeout(500);
+  await hiddenShows('cartão');
+  await openInvoice('novembro'); await hiddenShows('fatura');
+  ok('E valores ocultos na fatura: o total, as linhas e a composição ("Tênis de corrida · parcela 1 de 3 · valor oculto"), mas as parcelas e datas continuam', (await visibleCount('button', 'Tênis de corrida · parcela 1 de 3 · valor oculto')) === 1 && (await body()).includes('parcela 1 de 3 · compra em 05/10 · Lazer') && (await body()).includes('Fecha em 03/11 · Vence em 10/11'));
+  await shot('148_fatura_valores_ocultos');
+  await btn('Pagar fatura').click(); await waitText('Confirmar pagamento'); await radio('Outro valor').click(); await field('Valor pago').fill('250'); await p.waitForTimeout(500);
+  await hiddenShows('pagar fatura');
+  ok('E valores ocultos ao pagar em parte: o aviso do que fica e o resumo do pagamento aparecem como "R$ ••••"', (await body()).includes('Ficaram R$ •••• para a fatura de dezembro.') && (await body()).includes('O pagamento de R$ •••• entra em Pago de outubro.'));
+  await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado.'); await waitInvoice('Paga em parte');
+  await hiddenShows('fatura paga em parte');
+  ok('E valores ocultos depois de pagar: "Pagamento registrado. R$ •••• em Pago de outubro." e "Pago R$ •••• em 07/10/2026"', (await body()).includes('Pagamento registrado. R$ •••• em Pago de outubro.') && (await body()).includes('Pago R$ •••• em 07/10/2026'));
+  await goTab('Resumo'); await waitText('Diferença do mês');
+  await btn('Anotar gasto').click(); await waitText('Será salvo em'); await radio('Cartão de crédito').click(); await field('Descrição').fill('Livro'); await field('Valor em reais').fill('90'); await field('Em quantas vezes?').fill('3'); await p.waitForTimeout(500);
+  await hiddenShows('Anotar compra no cartão');
+  ok('E valores ocultos no aviso da compra parcelada: "3 parcelas, a primeira de R$ ••••"', (await body()).includes('3 parcelas, a primeira de R$ ••••.'));
+  await btn('Cancelar').click(); await p.waitForTimeout(300); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
+  await waitText('Diferença do mês');
+  await openConta(); await hideSwitch().click(); await p.waitForTimeout(300); await btn('Voltar').click(); await waitText('Diferença do mês');
+
+  // Conta nova: nenhum cartão de exemplo. "Cadastrar cartão" pelo Anotar gasto, a validação do formulário, editar, arquivar e excluir.
+  await newAcct('Eva Teste', 'eva@exemplo.com');
+  await goTab('Movimentações'); await waitText('Registrar recebimento'); t = await body();
+  ok('E conta nova: a linha "Cartões" convida a anotar compras na fatura e nenhum cartão de exemplo existe', (await visibleCount('button', 'Cartões, Nenhum cadastrado. Anote compras na fatura')) === 1 && !t.includes('Cartão Exemplo') && (await otherDevice(async (repo, ctx) => (await repo.listCards(ctx)).length)) === 0);
+  await goTab('Resumo'); await waitText('Diferença do mês');
+  await btn('Anotar gasto').click(); await waitText('Será salvo em'); await radio('Cartão de crédito').click(); await p.waitForTimeout(400); t = await body();
+  ok('E Anotar gasto sem cartão cadastrado: "Você ainda não cadastrou um cartão." com "Cadastrar cartão", sem pergunta de parcelas e sem salvar compra', t.includes('Você ainda não cadastrou um cartão.') && (await visibleCount('button', 'Cadastrar cartão')) === 1 && (await visibleCount('textbox', 'Em quantas vezes?')) === 0);
+  await field('Descrição').fill('Mercado do mês'); await field('Valor em reais').fill('90');
+  await btn('Cadastrar cartão').click(); await waitText('Apelido do cartão'); await p.waitForTimeout(500); t = await body();
+  ok('E Novo cartão (vindo de Anotar gasto): apelido, últimos 4 dígitos (opcional), dias, limite, a regra de privacidade e o aviso de que volta para anotar a compra', (await h1Name()) === 'Novo cartão' &&
+    ['Apelido do cartão', 'Por exemplo: Nubank ou Cartão do mercado', 'Últimos 4 dígitos (opcional)', 'Só os 4 últimos dígitos. Nunca o número completo, o código de segurança nem a validade.', 'Dia do fechamento', 'Compras depois desse dia entram na fatura seguinte.',
+      'Dia do vencimento', 'Se o mês for mais curto, usamos o último dia dele.', 'Limite (opcional)', 'Guardamos só o apelido e os 4 últimos dígitos. Nunca digite o número completo, o código de segurança nem a validade.', 'Depois de cadastrar, você volta para anotar a compra.'].every((x) => t.includes(x)), t.slice(0, 300));
+  await keepText();
+  await innerChecks('novo cartão 390px');
+  await shot('149_novo_cartao');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await innerChecks('novo cartão 320px');
+  await shot('149_novo_cartao_320px', true);
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  await btn('Salvar cartão').click(); await p.waitForTimeout(400); t = await body();
+  ok('E cartão sem nada: as mensagens de apelido e dos dois dias, junto dos campos, e nada gravado', t.includes('Dê um apelido de 1 a 30 caracteres, como Nubank.') && t.includes('Informe o dia do fechamento, de 1 a 31.') && t.includes('Informe o dia do vencimento, de 1 a 31.') &&
+    (await otherDevice(async (repo, ctx) => (await repo.listCards(ctx)).length)) === 0);
+  await field('Apelido do cartão').fill('4111 1111 1111 1111'); await field('Dia do fechamento').fill('3'); await field('Dia do vencimento').fill('10'); await btn('Salvar cartão').click(); await p.waitForTimeout(400);
+  ok('E apelido que parece número de cartão: recusado com "Não use o número do cartão no apelido. Use os 4 últimos dígitos no campo próprio." e nada gravado', (await body()).includes('Não use o número do cartão no apelido. Use os 4 últimos dígitos no campo próprio.') &&
+    (await otherDevice(async (repo, ctx) => (await repo.listCards(ctx)).length)) === 0);
+  await field('Apelido do cartão').fill('Nubank'); await field('Últimos 4 dígitos (opcional)').fill('4111111111111111'); await p.waitForTimeout(200);
+  ok('E campo de final: só 4 dígitos (o número completo digitado é cortado e nunca fica no formulário)', (await field('Últimos 4 dígitos (opcional)').inputValue()) === '4111');
+  await field('Últimos 4 dígitos (opcional)').fill('5678'); await field('Limite (opcional)').fill('5000');
+  await btn('Salvar cartão').click(); await waitText('Compra no cartão · Nubank · final 5678'); await waitText('Esta compra entra na fatura de novembro do Nubank', 12000).catch(() => {}); await p.waitForTimeout(300);
+  t = await body();
+  ok('E cartão salvo pelo Anotar gasto: volta ao formulário com o Nubank escolhido, a descrição e o valor mantidos, e o aviso da fatura (novembro: hoje é depois do fechamento do dia 3)', (await h1Name()) === 'Anotar gasto' && t.includes('Compra no cartão · Nubank · final 5678') && (await field('Descrição').inputValue()) === 'Mercado do mês' &&
+    t.includes('Esta compra entra na fatura de novembro do Nubank e conta em Pago quando a fatura for paga.') && (await otherDevice(async (repo, ctx) => (await repo.listCards(ctx)).length)) === 1, t.slice(0, 400));
+  await btn('Anotar compra no cartão').click(); await waitText('Compra anotada na fatura de novembro.'); await waitInvoice('Fatura de novembro'); t = await body();
+  ok('E primeira compra no cartão novo: a fatura de novembro do Nubank (R$ 90,00) e o Resumo da conta nova continua sem Pago', (await heroTotal()) === 'R$ 90,00' && t.includes('Nubank') && (await visibleCount('button', 'Mercado do mês · R$ 90,00')) === 1);
+  await goTab('Resumo'); await waitText('Diferença do mês'); t = await body();
+  ok('E conta nova: a compra no cartão não entra em Pago (continua R$ 0,00)', t.includes('R$ 0,00') && !t.includes('R$ 90,00'));
+  await openCardsList(); await p.getByRole('button', { name: /^Nubank · final 5678\./ }).filter({ visible: true }).first().click(); await waitText('Fatura atual'); await p.waitForTimeout(400); t = await body();
+  ok('E cartão novo com uma compra: o limite usado soma as parcelas não pagas (R$ 90,00 de R$ 5.000,00) e não oferece excluir', t.includes('Limite usado: R$ 90,00 de R$ 5.000,00') && (await visibleCount('button', 'Excluir cartão')) === 0 && t.includes('Fecha no dia 3 · vence no dia 10'));
+  await btn('Editar cartão').click(); await waitText('Apelido do cartão'); await p.waitForTimeout(400);
+  ok('E Editar cartão: traz o apelido, o final, os dias e o limite (R$ 5.000,00)', (await h1Name()) === 'Editar cartão' && (await field('Apelido do cartão').inputValue()) === 'Nubank' && (await field('Últimos 4 dígitos (opcional)').inputValue()) === '5678' &&
+    (await field('Dia do fechamento').inputValue()) === '3' && (await field('Dia do vencimento').inputValue()) === '10' && (await field('Limite (opcional)').inputValue()) === '5.000,00');
+  await field('Apelido do cartão').fill('Nubank roxo'); await field('Dia do fechamento').fill('20'); await btn('Salvar cartão').click(); await waitText('Cartão salvo.'); await p.waitForTimeout(500); t = await body();
+  ok('E cartão editado: "Cartão salvo.", o novo apelido e os dias (fecha 20, vence 10) valem; a compra já feita continua na fatura em que foi gravada', t.includes('Nubank roxo') && t.includes('Fecha no dia 20 · vence no dia 10') && (await otherDevice(async (repo, ctx) => (await repo.listCards(ctx))[0].name)) === 'Nubank roxo');
+  await btn('Arquivar cartão').click(); await waitText('Arquivar este cartão?'); t = await dialogText();
+  ok('E arquivar: o diálogo explica que o histórico fica e que dá para reativar', t.includes('Ele sai da escolha de compras novas. As faturas e o histórico continuam aqui, e você pode reativar quando quiser.'));
+  await confirmIn('Arquivar cartão'); await waitText('Cartão arquivado.'); await p.waitForTimeout(500); t = await body();
+  ok('E cartão arquivado: o selo "Arquivado", a faixa de aviso e "Reativar cartão" no lugar de arquivar; sem "Anotar compra neste cartão"', t.includes('Arquivado') && t.includes('Este cartão está arquivado. As faturas e o histórico continuam aqui.') && (await visibleCount('button', 'Reativar cartão')) === 1 &&
+    (await visibleCount('button', 'Arquivar cartão')) === 0 && (await visibleCount('button', 'Anotar compra neste cartão')) === 0);
+  await goTab('Resumo'); await waitText('Diferença do mês'); await btn('Anotar gasto').click(); await waitText('Será salvo em'); await radio('Cartão de crédito').click(); await p.waitForTimeout(400);
+  ok('E cartão arquivado não é oferecido em Anotar gasto: volta o convite "Você ainda não cadastrou um cartão."', (await body()).includes('Você ainda não cadastrou um cartão.'));
+  await btn('Cancelar').click(); await p.waitForTimeout(300); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
+  await waitText('Diferença do mês');
+  await openCardsList(); t = await body();
+  ok('E lista de cartões: o arquivado aparece em "Cartões arquivados"', t.includes('Cartões arquivados') && t.includes('Nubank roxo') && t.includes('Arquivado'));
+  await p.getByRole('button', { name: /^Nubank roxo · final 5678\./ }).filter({ visible: true }).first().click(); await waitText('Reativar cartão');
+  await btn('Reativar cartão').click(); await waitText('Cartão reativado.'); await p.waitForTimeout(400);
+  ok('E reativar cartão: "Cartão reativado." e "Arquivar cartão" de volta', (await visibleCount('button', 'Arquivar cartão')) === 1 && (await visibleCount('button', 'Reativar cartão')) === 0);
+  // Cartão sem lançamentos pode ser excluído.
+  await goTab('Movimentações'); await waitText('Registrar recebimento');
+  await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitText('Cadastrar cartão');
+  await btn('Cadastrar cartão').click(); await waitText('Apelido do cartão'); await field('Apelido do cartão').fill('Cartão do mercado'); await field('Dia do fechamento').fill('15'); await field('Dia do vencimento').fill('25');
+  await btn('Salvar cartão').click(); await waitText('Cartão salvo.'); await p.waitForTimeout(500); t = await body();
+  ok('E cartão sem compras: "Nenhuma compra neste cartão ainda.", "Limite usado: R$ 0,00" (sem limite informado) e "Excluir cartão" disponível', t.includes('Nenhuma compra neste cartão ainda.') && t.includes('Limite usado: R$ 0,00') && !t.includes('de R$') && (await visibleCount('button', 'Excluir cartão')) === 1);
+  await btn('Excluir cartão').click(); await waitText('Excluir este cartão?');
+  await p.getByRole('alert').getByRole('button', { name: 'Excluir cartão' }).last().click(); await waitText('Cartão excluído.'); await p.waitForTimeout(500); t = await body();
+  ok('E cartão excluído: "Cartão excluído." e sai da lista (o Nubank roxo continua)', !t.includes('Cartão do mercado') && t.includes('Nubank roxo') && (await otherDevice(async (repo, ctx) => (await repo.listCards(ctx)).length)) === 1);
+  }
 
   // Ciclo A4 · Seus últimos meses (D-030), no cenário FICTÍCIO "retorno" da demonstração (?cenario=retorno): a
   // montagem da sequência R anotada em 20/05/2026 (Aluguel, Luz estimada e Financiamento do carro desde maio, contas de

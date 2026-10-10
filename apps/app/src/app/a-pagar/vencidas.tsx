@@ -1,4 +1,5 @@
 import {
+  CARDS_TEXT,
   COMMITMENT_ERROR_TEXT,
   ERROR_TEXT,
   affectedByYear,
@@ -37,6 +38,7 @@ import { CheckOption, yearA11y, yearA11yLabel } from '@/components/series-parts'
 import { EmptyState, ErrorState } from '@/components/states';
 import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Chip, Screen, Skeleton, Txt } from '@/components/ui';
+import { openCommitment } from '@/lib/cards';
 import { totalChange } from '@/lib/highlight';
 import { moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
 import { useCommitments, useDeleteCommitment, usePayCommitment, useSeriesList, useSkipSeriesYear, useSpace, useUpdateRecord } from '@/state/data';
@@ -182,7 +184,8 @@ export default function ContasVencidas() {
   const skipKeys = useRef(new Map<string, { key: string; snapshot: string }>());
 
   const account = personal?.accounts.find((a) => a.id === accountChoice) ?? personal?.accounts[0] ?? null;
-  const fixed = overdue.filter((c) => !c.amountIsEstimate);
+  // Fatura de cartão (D-037) não entra no pagamento em lote: ela se paga na própria fatura.
+  const fixed = overdue.filter((c) => !c.amountIsEstimate && !c.invoice);
   // Seleções de contas que já saíram da lista (pagas ou tiradas) deixam de contar.
   const chosen = fixed.filter((c) => selected.includes(c.id));
   const toList = () => (router.canGoBack() ? router.back() : router.replace('/a-pagar'));
@@ -365,6 +368,17 @@ export default function ContasVencidas() {
   const renderRow = (c: Commitment, last: boolean, inGroup = false) => (
     <Animated.View key={c.id} exiting={rowExit} layout={rowLayout} style={[styles.row, inGroup && styles.inGroup, !last && styles.divider]}>
       <OverdueInfo commitment={c} checked={selected.includes(c.id)} onToggle={() => toggle(c.id)} />
+      {c.invoice ? (
+        <View style={styles.actions}>
+          <Button
+            label={CARDS_TEXT.openInvoice}
+            accessibilityLabel={`${CARDS_TEXT.openInvoice}: ${yearA11y(billName(c, today))}`}
+            tone="soft"
+            style={styles.action}
+            onPress={() => openCommitment(c)}
+          />
+        </View>
+      ) : (
       <View style={styles.actions}>
         <Button
           label="Já paguei"
@@ -387,6 +401,7 @@ export default function ContasVencidas() {
           onPress={() => setPending({ type: 'tirar', commitment: c })}
         />
       </View>
+      )}
     </Animated.View>
   );
 
@@ -607,6 +622,19 @@ function OverdueInfo({ commitment: c, checked, onToggle }: { commitment: Commitm
   // Conta do ano: a parcela e o ano junto do vencimento ("Venceu em 10/02/2027 · Parcela 1 de 10 de 2027").
   const yearPart = c.series?.kind === 'anual' ? ` · ${occurrenceLabel(c)}` : '';
   const due = `Venceu em ${formatDateBR(c.dueOn)}${yearPart}`;
+  // Fatura de cartão (D-037): sem caixa de seleção; o pagamento é na própria fatura.
+  if (c.invoice) {
+    return (
+      <View style={styles.estimate} accessible accessibilityLabel={`${c.description}, ${due.toLowerCase()}, ${moneyA11y(c.amountCents, hidden)}`}>
+        <Txt variant="label" style={{ fontFamily: fonts.bold }}>
+          {c.description}
+        </Txt>
+        <Txt variant="caption" color={colors.textSecondary} style={tabular}>
+          {due} · {moneyText(c.amountCents, hidden)}
+        </Txt>
+      </View>
+    );
+  }
   if (!c.amountIsEstimate) {
     return <CheckOption label={c.description} hint={`${due} · ${formatBRL(c.amountCents)}`} checked={checked} onPress={onToggle} />;
   }

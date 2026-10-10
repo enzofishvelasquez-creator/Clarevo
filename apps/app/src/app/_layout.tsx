@@ -28,7 +28,7 @@ SplashScreen.preventAutoHideAsync();
  * página recarregada). As telas de entrada, de confirmação e de nova senha ficam fora.
  */
 const ENTRY_PATH =
-  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/referencia)?|reserva|meta\/(nova|[^/]+(\/(editar|movimento))?)|guardar(\/minima)?|simular|conta|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes|metas|aprender)\/?$/;
+  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/referencia)?|cartoes(\/(novo|[^/]+(\/(editar|fatura\/\d{4}-\d{2}(\/(pagar|encargo|estorno))?))?))?|reserva|meta\/(nova|[^/]+(\/(editar|movimento))?)|guardar(\/minima)?|simular|conta|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes|metas|aprender)\/?$/;
 
 /**
  * Endereço pedido ao abrir a versão web. Sem sessão (ou enquanto a sessão é conferida), as rotas protegidas levam à
@@ -228,6 +228,15 @@ function Navigation() {
           <Stack.Screen name="guardar/minima" />
           {/* Simulador (D-028): só conta, nada é gravado. */}
           <Stack.Screen name="simular" />
+          {/* Cartões de crédito (D-037). /cartoes/novo é rota estática e tem precedência sobre /cartoes/[id]. */}
+          <Stack.Screen name="cartoes/index" />
+          <Stack.Screen name="cartoes/novo" />
+          <Stack.Screen name="cartoes/[id]/index" />
+          <Stack.Screen name="cartoes/[id]/editar" />
+          <Stack.Screen name="cartoes/[id]/fatura/[mes]/index" />
+          <Stack.Screen name="cartoes/[id]/fatura/[mes]/pagar" />
+          <Stack.Screen name="cartoes/[id]/fatura/[mes]/encargo" />
+          <Stack.Screen name="cartoes/[id]/fatura/[mes]/estorno" />
           {/* Seus últimos meses (D-030): resumo, passo a passo e registrar e pagar uma conta sem registro. */}
           <Stack.Screen name="retomar/index" />
           <Stack.Screen name="retomar/atualizar" />

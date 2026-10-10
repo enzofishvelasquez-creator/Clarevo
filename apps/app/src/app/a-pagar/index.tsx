@@ -36,6 +36,7 @@ import { TermHint } from '@/components/term-hint';
 import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, FitMoney, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
+import { openCommitment } from '@/lib/cards';
 import { totalChange } from '@/lib/highlight';
 import { explanationHref } from '@/lib/learn';
 import { useCommitments, usePayCommitment, usePaymentsForecast, useSeriesList, useSeriesSync, useSpace, useUpdateRecord, useView } from '@/state/data';
@@ -378,7 +379,7 @@ export default function ContasAPagarScreen() {
                             commitment={g.commitment}
                             today={today}
                             last={i === sec.grouped!.length - 1}
-                            onPress={() => router.push(`/a-pagar/${g.commitment.id}`)}
+                            onPress={() => openCommitment(g.commitment)}
                           />
                         </Animated.View>
                       ) : (
@@ -397,7 +398,7 @@ export default function ContasAPagarScreen() {
                           commitment={c}
                           today={today}
                           last={i === sec.list.length - 1}
-                          onPress={() => router.push(`/a-pagar/${c.id}`)}
+                          onPress={() => openCommitment(c)}
                           action={sec.quickPay ? actionFor(c) : undefined}
                         />
                       </Animated.View>

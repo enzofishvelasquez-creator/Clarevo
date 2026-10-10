@@ -30,7 +30,7 @@ import {
   type IsoMonth,
   type YearPlan,
 } from '@clarevo/core';
-import { router, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { AlertCircle, Calculator, CalendarSync, Check, Info, Pencil, Plus, Repeat, ShieldCheck, Trash2, Undo2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -46,6 +46,7 @@ import { MoneyTxt } from '@/components/money-text';
 import { ErrorState } from '@/components/states';
 import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, FitMoney, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
+import { invoiceHref } from '@/lib/cards';
 import { flash } from '@/lib/flash';
 import { openSummary } from '@/lib/nav';
 import { totalChange } from '@/lib/highlight';
@@ -337,6 +338,9 @@ export default function DetalheContaAPagar() {
   const estimateOpen = Boolean(c && !paid && c.amountIsEstimate);
   // Conta vencida em aberto: "Calcular multa e juros", com o valor e os dias depois do vencimento (D-034).
   const lateCalc = c ? multaLink(c, today) : null;
+
+  // Conta de fatura de cartão (D-037): abre a fatura; "Já paguei", editar e excluir não existem para ela.
+  if (c?.invoice) return <Redirect href={invoiceHref(c.invoice.cardId, c.invoice.month)} />;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

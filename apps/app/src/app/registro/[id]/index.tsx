@@ -1,4 +1,5 @@
 import {
+  CARDS_TEXT,
   CATEGORIES,
   ERROR_TEXT,
   NO_CATEGORY_LABEL,
@@ -28,6 +29,7 @@ import { FlashBanner, useFlash } from '@/components/flash';
 import { Banner, Button, Card, FitMoney, Screen, Skeleton, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { totalChange } from '@/lib/highlight';
+import { invoiceHref } from '@/lib/cards';
 import { openSummary } from '@/lib/nav';
 import { useDeleteRecord, useRecord, useSpace, useView } from '@/state/data';
 import { useSession } from '@/state/session';
@@ -140,7 +142,7 @@ export default function DetalheRegistro() {
                   <Row label="Conta" value={account?.name ?? 'Conta não encontrada'} />
                   <Row label="Data" value={formatDateBR(r.occurredOn)} />
                   <Row label="Categoria" value={r.category ?? NO_CATEGORY_LABEL} />
-                  {r.commitmentId ? <Row label="Origem" value="Conta a pagar" /> : null}
+                  {r.invoice ? <Row label="Origem" value={CARDS_TEXT.paymentOrigin} /> : r.commitmentId ? <Row label="Origem" value="Conta a pagar" /> : null}
                   <Row label="Resumo afetado" value={formatMonthBR(monthOf(r.occurredOn))} last />
                 </View>
                 <View style={styles.trail} accessible>
@@ -163,15 +165,25 @@ export default function DetalheRegistro() {
                   onPress={() => router.replace({ pathname: '/registro/novo', params: { tipo: r.kind } })}
                 />
               ) : null}
-              <Button label="Editar registro" icon={Pencil} onPress={() => router.push(`/registro/${r.id}/editar`)} />
+              {/* Pagamento de fatura (D-037): só se muda ou se desfaz pela fatura. */}
+              {r.invoice ? (
+                <>
+                  <Txt variant="label" color={colors.textSecondary}>
+                    {CARDS_TEXT.screens.paymentRecordNote}
+                  </Txt>
+                  <Button label={CARDS_TEXT.openInvoice} onPress={() => router.push(invoiceHref(r.invoice!.cardId, r.invoice!.month))} />
+                </>
+              ) : (
+                <Button label="Editar registro" icon={Pencil} onPress={() => router.push(`/registro/${r.id}/editar`)} />
+              )}
               {/* Gasto anotado sem conta a pagar: pode virar um gasto fixo, que começa no próximo vencimento. */}
-              {r.kind === 'despesa' && !r.commitmentId ? (
+              {r.kind === 'despesa' && !r.commitmentId && !r.invoice ? (
                 <Button label="Tornar gasto fixo" icon={Repeat} tone="soft" onPress={() => openAsSeries(r, today)} />
               ) : null}
-              {r.commitmentId ? (
+              {r.commitmentId && !r.invoice ? (
                 <Button label="Ver conta a pagar" tone="soft" onPress={() => router.push(`/a-pagar/${r.commitmentId}`)} />
               ) : null}
-              <Button label="Excluir registro" icon={Trash2} tone="danger" onPress={() => setConfirming(true)} />
+              {r.invoice ? null : <Button label="Excluir registro" icon={Trash2} tone="danger" onPress={() => setConfirming(true)} />}
               <Button
                 label="Ver resumo do mês"
                 tone="soft"

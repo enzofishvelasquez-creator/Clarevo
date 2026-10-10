@@ -92,7 +92,7 @@ export function CommitmentRow({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityHint="Abre a conta a pagar"
+      accessibilityHint={c.invoice ? 'Abre a fatura' : 'Abre a conta a pagar'}
       style={(s) => [
         styles.row,
         action ? styles.rowWithAction : !last && styles.divider,

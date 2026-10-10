@@ -1,5 +1,5 @@
 import { COMMITMENT_ERROR_TEXT, ERROR_TEXT, type Commitment } from '@clarevo/core';
-import { router, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 
@@ -7,6 +7,7 @@ import { CommitmentForm } from '@/components/commitment-form';
 import { SubHeader } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Card, Txt } from '@/components/ui';
+import { invoiceHref } from '@/lib/cards';
 import { useCommitment, useSpace } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
@@ -19,6 +20,7 @@ export default function EditarContaAPagar() {
   // Aberto o formulário, ele fica na tela: um conflito mostra o aviso ali, sem perder o preenchimento.
   const [opened, setOpened] = useState<Commitment | null>(null);
   if (!opened && c && c.status === 'aberto') setOpened(c);
+  if (c?.invoice) return <Redirect href={invoiceHref(c.invoice.cardId, c.invoice.month)} />;
 
   if (opened && personal) {
     return <CommitmentForm key={opened.id} mode={{ type: 'editar', commitment: opened, informValue: informar === '1' }} space={personal} />;

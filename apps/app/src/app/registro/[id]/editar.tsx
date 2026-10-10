@@ -1,10 +1,11 @@
 import { ERROR_TEXT } from '@clarevo/core';
-import { router, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 
 import { RecordForm } from '@/components/record-form';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Txt } from '@/components/ui';
+import { invoiceHref } from '@/lib/cards';
 import { useRecord, useSpace } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
@@ -23,5 +24,7 @@ export default function EditarRegistro() {
       </View>
     );
   }
+  // Pagamento de fatura (D-037): só a fatura muda o pagamento (desfazer e pagar de novo).
+  if (record.data.invoice) return <Redirect href={invoiceHref(record.data.invoice.cardId, record.data.invoice.month)} />;
   return <RecordForm key={record.data.id} mode={{ type: 'editar', record: record.data }} space={personal} />;
 }

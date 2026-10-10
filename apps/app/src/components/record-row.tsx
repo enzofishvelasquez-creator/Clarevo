@@ -1,4 +1,4 @@
-import { formatDateBR, type FinancialRecord } from '@clarevo/core';
+import { CARDS_TEXT, formatDateBR, type FinancialRecord } from '@clarevo/core';
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
@@ -17,7 +17,9 @@ export function RecordRow({ record, onPress, last }: { record: FinancialRecord; 
   const isIn = record.kind === 'receita';
   const Icon = isIn ? ArrowDownLeft : ArrowUpRight;
   // Gasto gerado ao marcar uma conta a pagar como paga: a origem aparece na legenda.
-  const when = `${kindLabel(record)} · ${formatDateBR(record.occurredOn)}${record.commitmentId ? ' · conta a pagar' : ''}`;
+  // Pagamento de fatura de cartão: a origem é a fatura (D-037), não uma conta a pagar comum.
+  const origin = record.invoice ? ` · ${CARDS_TEXT.paymentOrigin}` : record.commitmentId ? ' · conta a pagar' : '';
+  const when = `${kindLabel(record)} · ${formatDateBR(record.occurredOn)}${origin}`;
   return (
     <Pressable
       onPress={onPress}

@@ -1,4 +1,4 @@
-import { ERROR_TEXT, categoryBreakdown, formatBRL, formatMonthBR, type CategoryShare } from '@clarevo/core';
+import { CARDS_TEXT, ERROR_TEXT, formatBRL, formatMonthBR, type CategoryShare } from '@clarevo/core';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { Check, Minus, Plus } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
@@ -11,7 +11,7 @@ import { EmptyState, ErrorState } from '@/components/states';
 import { TopicLink } from '@/components/topic-link';
 import { Button, Card, FitMoney, Money, Screen, Skeleton, spaceKeyPress, Txt } from '@/components/ui';
 import { maskMoneyLabel, useValuesHidden } from '@/lib/privacy';
-import { useMonthRecords, useSpace, useView } from '@/state/data';
+import { useCategoryBreakdown, useMonthRecords, useSpace, useView } from '@/state/data';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
 const COPY = {
@@ -47,6 +47,10 @@ function Composicao({ kind }: { kind: keyof typeof COPY }) {
   // "Por categoria" só existe em Pago (spec4 §2.2); a escolha fica só nesta tela.
   const [breakdown, setBreakdown] = useState<Breakdown>('registro');
   const byCategory = kind === 'pago' && breakdown === 'categoria';
+  // Pagamentos de fatura de cartão entram divididos pelas categorias das compras da fatura (D-037); a consulta só lê as faturas
+  // dos cartões que aparecem no Pago do mês e só roda aqui (kind 'pago').
+  const categories = useCategoryBreakdown(kind === 'pago' ? personal?.personalContextId : undefined, month);
+  const hasInvoicePayment = Boolean(s?.composition.paid.some((r) => r.invoice));
 
   const sections = !s
     ? []
@@ -92,7 +96,17 @@ function Composicao({ kind }: { kind: keyof typeof COPY }) {
         {kind === 'pago' && s ? <Segment value={breakdown} onChange={setBreakdown} /> : null}
 
         {byCategory && s ? (
-          <CategoryCard shares={categoryBreakdown(s.composition.paid)} totalCents={s.paidCents} action={emptyAction('despesa')} />
+          categories.isPending ? (
+            <Card>
+              <Skeleton width="100%" height={120} />
+            </Card>
+          ) : categories.isError || !categories.data ? (
+            <Card>
+              <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => categories.refetch()} />
+            </Card>
+          ) : (
+            <CategoryCard shares={categories.data} totalCents={s.paidCents} action={emptyAction('despesa')} invoiceNote={hasInvoicePayment} />
+          )
         ) : (
           sections.map((sec) => (
             <Card key={sec.label}>
@@ -148,7 +162,7 @@ function Segment({ value, onChange }: { value: Breakdown; onChange: (v: Breakdow
  * é igual a Pago e os percentuais somam 100% (core: categoryBreakdown). Cada barra tem um nome acessível só:
  * "Mercado, R$ 412,30, 23,4% do pago".
  */
-function CategoryCard({ shares, totalCents, action }: { shares: CategoryShare[]; totalCents: number; action: ReactNode }) {
+function CategoryCard({ shares, totalCents, action, invoiceNote }: { shares: CategoryShare[]; totalCents: number; action: ReactNode; invoiceNote: boolean }) {
   const hidden = useValuesHidden();
   // Lista e item na web (o leitor de tela diz quantas categorias há); no app, cada barra é um elemento só.
   const listRole = Platform.OS === 'web' ? ({ role: 'list', 'aria-label': 'Pago por categoria' } as object) : {};
@@ -180,6 +194,11 @@ function CategoryCard({ shares, totalCents, action }: { shares: CategoryShare[];
           ))}
         </View>
       )}
+      {invoiceNote ? (
+        <Txt variant="caption" color={colors.textSecondary}>
+          {CARDS_TEXT.screens.categoryInvoiceNote}
+        </Txt>
+      ) : null}
     </Card>
   );
 }
