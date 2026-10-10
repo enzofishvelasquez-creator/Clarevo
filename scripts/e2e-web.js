@@ -5376,7 +5376,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const d42Spaced = (k) => k.replace(/(.{4})/g, '$1 ').trim();
   const D42_NFE = d42AccessKey('2610', '55', 4321);
   const d42ScanLine = () => p.getByRole('button', { name: /^Escanear nota fiscal\./ }).filter({ visible: true }).first();
-  const d42OpenScan = async () => { await d42ScanLine().click(); await waitText('Como você quer ler a nota?'); };
+  const d42OpenScan = async () => { if (await d42ScanLine().count()) await d42ScanLine().click(); else await btn('Ler outra nota').click(); await waitText('Como você quer ler a nota?'); };
   const d42OpenPaste = async () => { await d42OpenScan(); await btn('Colar o link ou a chave').click(); await waitText('Colar o link ou a chave da nota'); await p.waitForTimeout(300); };
   const d42Paste = async (text) => { await d42OpenPaste(); await field('Colar o link ou a chave da nota').fill(text); await btn('Ler a nota').click(); await waitText('Nota lida:'); await p.waitForTimeout(700); };
   const d42ToBlock = async () => { await p.getByText('Nota lida:', { exact: false }).filter({ visible: true }).first().evaluate((e) => e.scrollIntoView({ block: 'start' })); await p.waitForTimeout(300); };
