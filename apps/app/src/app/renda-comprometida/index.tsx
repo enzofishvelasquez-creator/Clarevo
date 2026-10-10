@@ -4,10 +4,14 @@ import {
   COMMITTED_TEXT,
   DEBT_REFERENCE,
   ERROR_TEXT,
+  LIMIT_TEXT,
   addMonths,
   committedTexts,
   formatMonthYearBR,
   isValidIsoMonth,
+  limitFor,
+  limitNotesFor,
+  limitStatus,
   monthOf,
   payablesMonthParams,
   type CommittedGroupLine,
@@ -35,7 +39,7 @@ import { Banner, Button, Card, Chip, LinkButton, Screen, Skeleton, Txt, styles a
 import { openCommitment } from '@/lib/cards';
 import { LEARN_UI_TEXT } from '@/lib/learn';
 import { HIDDEN_MONEY_A11Y } from '@/lib/privacy';
-import { useCommittedGoalLines, useCommittedSummary, useCommittedUpcoming, useMonthRecords, useSpace, useView } from '@/state/data';
+import { useCommitmentLimits, useCommittedGoalLines, useCommittedSummary, useCommittedUpcoming, useMonthRecords, useSpace, useView } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 
@@ -126,6 +130,7 @@ function MonthBody({ contextId, month }: { contextId: string | undefined; month:
   return (
     <>
       <Highlight s={s} t={t} />
+      <LimitCard contextId={contextId} s={s} />
       <Composition s={s} t={t} />
       <Outside t={t} />
       <AnnualShareCard s={s} t={t} />
@@ -194,6 +199,52 @@ function Highlight({ s, t }: { s: CommittedSummary; t: CommittedTexts }) {
       ) : null}
       {s.count > 0 ? <MeterLegend paid={t.meterPaid} open={t.meterOpen} /> : null}
       <TermHint term="Renda comprometida" slug="renda-comprometida" />
+    </Card>
+  );
+}
+
+/**
+ * "Seu limite" (D-041): o limite que a pessoa escolheu para a renda comprometida, de 10% a 100%, a partir de um mês. Só aparece com
+ * a renda de referência definida. Nunca vem preenchido nem sugerido: sem limite, o convite "Escolher meu limite". Com limite,
+ * "28,0% de 30% que você escolheu" e, a 5 pontos do limite ou depois dele, uma linha neutra com o mês ("Novembro passou 3,5 pontos
+ * do limite de 30% que você escolheu."). Sem cor de alerta. A referência de 30% das dívidas continua só na linha de dívidas.
+ */
+function LimitCard({ contextId, s }: { contextId: string | undefined; s: CommittedSummary }) {
+  const { today } = useSession();
+  const limits = useCommitmentLimits(contextId);
+  if (s.referenceCents === null) return null;
+  const open = () => router.push({ pathname: '/renda-comprometida/limite', params: { mes: s.month } });
+  if (limits.isPending) {
+    return (
+      <Card>
+        <Skeleton width="60%" height={20} />
+      </Card>
+    );
+  }
+  if (limits.isError || !limits.data) {
+    return (
+      <Card>
+        <ErrorState message={COMMITTED_TEXT.loadError} onRetry={() => limits.refetch()} />
+      </Card>
+    );
+  }
+  const limit = limitFor(limits.data, s.month);
+  const status = limit ? limitStatus(s.month, s.committedPermille, s.committedCents, limit.percent, today) : null;
+  return (
+    <Card style={{ gap: space[2] }}>
+      <Title>{LIMIT_TEXT.title}</Title>
+      {status ? (
+        <>
+          <Txt style={[tabular, { fontFamily: fonts.bold }]}>{status.line}</Txt>
+          {status.note ? <Txt>{status.note}</Txt> : null}
+          <LinkButton label={LIMIT_TEXT.change} style={styles.inlineLink} onPress={open} />
+        </>
+      ) : (
+        <>
+          <Txt color={colors.textSecondary}>{LIMIT_TEXT.none}</Txt>
+          <Button label={LIMIT_TEXT.choose} tone="soft" onPress={open} />
+        </>
+      )}
     </Card>
   );
 }
@@ -409,8 +460,12 @@ function MonthBills({ s }: { s: CommittedSummary }) {
 
 /** Seis meses seguintes, sempre "Previsto", na mesma escala do medidor, e os marcos de "O que muda". */
 function Upcoming({ contextId, month }: { contextId: string | undefined; month: IsoMonth }) {
+  const { today } = useSession();
   const upcoming = useCommittedUpcoming(contextId, month);
+  const limits = useCommitmentLimits(contextId);
   const p = upcoming.data;
+  // Meses previstos que passam do limite escolhido, com a mesma frase curta; sem limite (ou sem leitura dele), nenhuma marca.
+  const notes = p && limits.data ? limitNotesFor(p.months, limits.data, today) : {};
   return (
     <Card style={{ gap: space[2] }}>
       <Title>{COMMITTED_TEXT.upcomingTitle}</Title>
@@ -432,6 +487,11 @@ function Upcoming({ contextId, month }: { contextId: string | undefined; month: 
                 {m.text}
               </MoneyTxt>
               {m.meter ? <Meter paidPermille={m.meter.paidPermille} openPermille={m.meter.openPermille} over={m.meter.over} height={8} /> : null}
+              {notes[m.month] ? (
+                <Txt variant="caption" color={colors.textSecondary}>
+                  {notes[m.month]}
+                </Txt>
+              ) : null}
             </View>
           ))}
           {p.milestones.length > 0 ? (

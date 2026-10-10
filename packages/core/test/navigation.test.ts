@@ -61,6 +61,8 @@ describe('barra inferior (D-039)', () => {
       '/gastos-fixos',
       '/gastos-fixos/abc',
       '/renda-comprometida',
+      // Orçamento por categoria (D-041): a lista é de consulta; o formulário de uma categoria, não.
+      '/orcamento',
       '/meta/abc',
       '/simular',
       '/cartoes',
@@ -95,6 +97,9 @@ describe('barra inferior (D-039)', () => {
       '/guardar',
       '/guardar/minima',
       '/renda-comprometida/referencia',
+      '/renda-comprometida/limite',
+      '/orcamento/Mercado',
+      '/orcamento/Sa%C3%BAde',
       '/cartoes/novo',
       '/cartoes/abc/editar',
       '/cartoes/abc/fatura/2026-10/pagar',
@@ -123,11 +128,13 @@ describe('barra inferior (D-039)', () => {
   it('toda tela do app é classificada: o que se chama novo, editar ou pagar não tem barra, e o resto tem', () => {
     const routes = appRoutes();
     expect(routes.length).toBeGreaterThan(50);
-    const formName = /\/(novo|nova|editar|pagar|encargo|estorno|compra|encerrar|informar|movimento|atualizar|vencidas|referencia|minima|reserva|guardar)$/;
+    const formName = /\/(novo|nova|editar|pagar|encargo|estorno|compra|encerrar|informar|movimento|atualizar|vencidas|referencia|limite|minima|reserva|guardar)$/;
+    // O formulário do orçamento de uma categoria é a rota dinâmica /orcamento/[categoria].
+    const budgetForm = /^\/orcamento\/\[categoria\]$/;
     const entry = /^\/(boas-vindas|criar-conta|confirmar-email|entrar|recuperar-acesso|nova-senha|primeira-conta|carregando|confirmado)$/;
     for (const { pattern, sample } of routes) {
       const mode = barModeFor(sample);
-      if (entry.test(pattern) || formName.test(pattern)) expect(mode, pattern).toBe('formulario');
+      if (entry.test(pattern) || formName.test(pattern) || budgetForm.test(pattern)) expect(mode, pattern).toBe('formulario');
       else if ((TAB_ROUTES as readonly string[]).includes(pattern === '' ? '/' : pattern)) expect(mode, pattern).toBe('abas');
       else expect(mode, pattern).toBe('consulta');
     }
@@ -136,6 +143,7 @@ describe('barra inferior (D-039)', () => {
   it('aba do assunto: Contas a pagar é de Movimentos, Metas e simulador são de Metas, explicação é de Aprender', () => {
     expect(topicTabFor('/a-pagar')).toBe('/movimentacoes');
     expect(topicTabFor('/cartoes/abc')).toBe('/movimentacoes');
+    expect(topicTabFor('/orcamento')).toBe('/movimentacoes');
     expect(topicTabFor('/meta/abc')).toBe('/metas');
     expect(topicTabFor('/simular')).toBe('/metas');
     expect(topicTabFor('/explicacao/juros')).toBe('/aprender');
@@ -196,6 +204,12 @@ describe('busca de Aprender: grupo "No app" (D-039)', () => {
     expect(first('lembrete')).toBe('lembretes');
     expect(first('aviso')).toBe('lembretes');
     expect(first('categoria')).toBe('categoria');
+    // Orçamento por categoria (D-041): as palavras que a pessoa usa para procurar; "categoria" continua em "Pago por categoria".
+    for (const query of ['orçamento', 'orcamento', 'limite', 'gastar menos', 'quanto gastar', 'teto de gastos']) expect(ids(query), query).toContain('orcamento');
+    expect(first('orçamento')).toBe('orcamento');
+    expect(first('gastar menos')).toBe('orcamento');
+    expect(ids('limite')).toEqual(expect.arrayContaining(['orcamento', 'cartoes', 'renda-comprometida']));
+    expect(first('limite de renda')).toBe('renda-comprometida');
     expect(first('simular')).toBe('simular');
     expect(first('simulador')).toBe('simular');
     expect(first('cartão')).toBe('cartoes');

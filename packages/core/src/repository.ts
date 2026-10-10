@@ -1,3 +1,4 @@
+import type { CategoryBudget, CommitmentLimit, MonthBudgetRead } from './budget';
 import type { IsoDate, IsoMonth } from './dates';
 import type { Cents } from './money';
 import type {
@@ -59,6 +60,18 @@ export type ReturnReviewAction = 'decidir_revisao';
  * Contam como anotação na atividade (D-030), como as demais escritas.
  */
 export type IncomeReferenceAction = 'definir_renda_referencia' | 'excluir_renda_referencia';
+
+/**
+ * Orçamento por categoria e limite pessoal (D-041, Ciclo F), gravados em record_operations com a linha em target_id:
+ * set_category_budget ('definir_orcamento_categoria'), delete_category_budget ('excluir_orcamento_categoria'),
+ * set_commitment_limit ('definir_limite_comprometimento') e delete_commitment_limit ('excluir_limite_comprometimento').
+ * Contam como anotação na atividade (D-030), como as demais escritas.
+ */
+export type BudgetAction =
+  | 'definir_orcamento_categoria'
+  | 'excluir_orcamento_categoria'
+  | 'definir_limite_comprometimento'
+  | 'excluir_limite_comprometimento';
 
 /**
  * Resposta do plano de guardar (set_savings_answer, spec7), gravada em record_operations sem alvo. Como 'decidir_revisao',
@@ -300,6 +313,45 @@ export interface RecordsRepository {
    */
   deleteIncomeReference(key: string, id: string, expectedVersion: number): Promise<IncomeReference>;
 
+  // Orçamento por categoria e limite pessoal de comprometimento (D-041, Ciclo F). Regras em budget.ts, iguais às da migração 0009.
+
+  /** Linhas vivas do orçamento do contexto (todas as categorias e meses de início), por categoria e mês de início. Sem leitura: lista vazia. */
+  listCategoryBudgets(contextId: string): Promise<CategoryBudget[]>;
+  /**
+   * set_category_budget. Cria (expectedVersion 0) ou altera (versão atual) a linha viva da categoria no mês fromMonth; amountCents
+   * null encerra a vigência ("Tirar o orçamento a partir de"). Exige escrita no contexto. Ordem do banco: repetição; sem_permissao;
+   * mes_invalido; categoria_invalida (só as seis de despesa); versao_desatualizada (nula ou negativa também; 0 com linha viva no
+   * mês; maior que 0 sem linha ou com outra versão); autoria ou "editar de outras pessoas" (sem_permissao);
+   * vigencia_fora_do_intervalo (de mês atual − 24 a mês atual + 12); valor_invalido e valor_acima_do_limite (R$ 1,00 a
+   * R$ 9.999.999,99). Mesma chave e conteúdo: devolve o estado atual; outro conteúdo ou outra ação: chave_reutilizada.
+   */
+  setCategoryBudget(
+    key: string,
+    contextId: string,
+    category: string,
+    fromMonth: IsoMonth,
+    expectedVersion: number,
+    amountCents: Cents | null,
+  ): Promise<CategoryBudget>;
+  /** delete_category_budget: exclusão lógica com versão (a linha anterior volta a valer). Ordem: repetição; nao_encontrado; sem_permissao; versao_desatualizada; autoria. */
+  deleteCategoryBudget(key: string, id: string, expectedVersion: number): Promise<CategoryBudget>;
+  /**
+   * month_budget: o orçamento vigente e o usado no mês (competência) de cada uma das seis categorias, na ordem de
+   * BUDGET_CATEGORIES. Sem leitura no contexto: sem_permissao; mês que não é o dia 1: mes_invalido.
+   */
+  getMonthBudget(contextId: string, month: IsoMonth): Promise<MonthBudgetRead>;
+
+  /** Limites pessoais vivos do contexto, por mês de início crescente. Sem leitura: lista vazia. */
+  listCommitmentLimits(contextId: string): Promise<CommitmentLimit[]>;
+  /**
+   * set_commitment_limit. Cria (expectedVersion 0) ou altera (versão atual) o limite vivo do mês fromMonth. Ordem do banco:
+   * repetição; sem_permissao; mes_invalido; versao_desatualizada; autoria; vigencia_fora_do_intervalo; percentual_invalido
+   * (inteiro de 10 a 100). percent null grava a linha que encerra a vigência ("Tirar o limite a partir de {mês}").
+   */
+  setCommitmentLimit(key: string, contextId: string, fromMonth: IsoMonth, expectedVersion: number, percent: number | null): Promise<CommitmentLimit>;
+  /** delete_commitment_limit: exclusão lógica com versão (o limite anterior volta a valer; sem nenhum, nada). */
+  deleteCommitmentLimit(key: string, id: string, expectedVersion: number): Promise<CommitmentLimit>;
+
   // Metas e reservas (D-027, Ciclo C). Ordem das conferências e códigos em goals.ts (GOAL_*_CODE_ORDER).
 
   /** Metas vivas do contexto (todas as situações), por criação; com os totais de goal_items. Sem leitura: lista vazia. */
@@ -528,6 +580,8 @@ export type RepoErrorCode =
   | 'mes_invalido'
   | 'periodo_invalido'
   | 'referencia_fora_do_intervalo'
+  | 'vigencia_fora_do_intervalo'
+  | 'percentual_invalido'
   | 'reserva_ja_existe'
   | 'nome_da_meta_invalido'
   | 'alvo_acima_do_limite'

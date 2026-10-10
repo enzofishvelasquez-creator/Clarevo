@@ -552,6 +552,7 @@ Ordem pelo valor para a pessoa e para a empresa que oferece o benefício. Valor:
    - [E] As Instruções v2.1 põem "orçamento" no núcleo proposto. Mobills, Organizze e Simplifi têm.
    - Depende de: item 5 e B.
    - Risco: tom de julgamento ("estourou" é proibido).
+   - Situação: feito em 10/10/2026 (D-041, Ciclo F2), com a ordem proposta aprovada por Enzo ("sim"), a compra no cartão contada "No mês da compra" e o aviso "Só dentro do app". Orçamento mensal para as seis categorias de gasto, com vigência "a partir de" um mês, e `/orcamento` (consulta, com o usado no mês por competência: gastos, mais as parcelas do cartão no mês da compra, menos os estornos, sem os pagamentos de fatura); linha em Movimentos › Organizar e "de R$ 1.200,00 orçados" em Composição › Por categoria. Limite pessoal de 10% a 100% da renda de referência em Renda comprometida ("28,0% de 30% que você escolheu"), nunca preenchido. Aviso neutro na mensagem de sucesso ao chegar a 80% do orçamento, ao passar dele e ao cruzar o limite, sem notificação e sem as palavras vetadas. Migração 0009 (`20261010000002_orcamento.sql`), ainda por colar no Supabase. Falta: teste em aparelho e interface na Família (`docs/04`).
 10. **Plano para sair das dívidas, educativo.**
     - Lista as dívidas cadastradas, compara "maior taxa primeiro" com "menor dívida primeiro" usando as taxas digitadas e mostra o efeito de quitar antes.
     - Valor: pessoa A, empresa A. Esforço: M.

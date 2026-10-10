@@ -100,6 +100,7 @@ import { receiptLinks, openOfficialUrl } from '@/lib/receipt-link';
 import { readSefazOnDevice, sefazReadAvailable } from '@/lib/sefaz-fetch';
 import {
   useAddCardPurchase,
+  useBudgetWatch,
   useCardInvoices,
   useCardOperationKey,
   useCards,
@@ -108,6 +109,7 @@ import {
   useReceiptMatch,
   useReturnReview,
   useUpdateRecord,
+  withNotice,
 } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
@@ -179,6 +181,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   const create = useCreateRecord();
   const update = useUpdateRecord();
   const qc = useQueryClient();
+  // Aviso dentro do app (D-041): se o gasto fez a categoria chegar a 80% ou passar do orçamento do mês, a mensagem de sucesso ganha uma linha.
+  const budgetWatch = useBudgetWatch();
 
   const kind = mode.type === 'novo' ? mode.kind : mode.record.kind;
   const copy = COPY[kind];
@@ -648,7 +652,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     refs.description.current?.focus();
   };
 
-  const finish = (recordId: string, saved?: Pick<FinancialRecord, 'amountCents' | 'occurredOn'>) => {
+  const finish = (recordId: string, saved?: Pick<FinancialRecord, 'amountCents' | 'occurredOn'>, notice: string | null = null) => {
     // Confirmação tátil só depois da gravação confirmada.
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (saved) {
@@ -662,10 +666,10 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     if (mode.type === 'novo') {
       // Só quem tem cartão ativo tem o que lembrar: a escolha vale só neste aparelho.
       if (cardMode && userId && activeCards.length > 0) updatePrefs(userId, { lastPayment: 'dinheiro' }, persistPrefs);
-      flash.set(kind === 'despesa' ? 'Gasto salvo' : 'Recebimento salvo');
+      flash.set(withNotice(kind === 'despesa' ? 'Gasto salvo' : 'Recebimento salvo', notice));
       leave(() => router.replace(`/registro/${recordId}`));
     } else {
-      flash.set('Alterações salvas');
+      flash.set(withNotice('Alterações salvas', notice));
       leave(goBack);
     }
   };
@@ -751,6 +755,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     // Compra lida de uma nota: leva o resumo da chave (nunca a chave) para o aviso de nota repetida.
     const purchase = note ? { ...v.input, receiptKey: note.reading.draft.receiptKey } : v.input;
     try {
+      // O estado do orçamento da categoria no mês da compra, antes de gravar (a parcela 1 conta no mês da data da compra).
+      const budgetBefore = await budgetWatch.before(contextId, purchase.category, purchase.purchasedOn);
       const r = await guardedWrite(
         cardKeys,
         JSON.stringify([card.id, purchase]),
@@ -772,7 +778,11 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
           }
         }
         // A compra vai para a fatura: o aviso diz isso e que só conta em Pago quando a fatura for paga.
-        flash.set(invoiceMonth ? `${CARDS_TEXT.expense.savedFor(invoiceMonth, today)} ${CARDS_TEXT.screens.cardPurchaseNote}` : CARDS_TEXT.expense.saved);
+        // Só uma gravação confirmada agora compara o antes e o depois; uma tentativa reconciliada fica sem o aviso.
+        const budgetNotice = r.status === 'ok' ? await budgetWatch.after(budgetBefore) : null;
+        flash.set(
+          withNotice(invoiceMonth ? `${CARDS_TEXT.expense.savedFor(invoiceMonth, today)} ${CARDS_TEXT.screens.cardPurchaseNote}` : CARDS_TEXT.expense.saved, budgetNotice),
+        );
         leave(() => router.replace(invoiceMonth ? invoiceHref(card.id, invoiceMonth) : cardHref(card.id)));
         return;
       }
@@ -848,12 +858,14 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
         if (!last || last.snapshot !== snapshot) opKey.current = newOperationKey();
       }
       const key = opKey.current;
+      // O estado do orçamento da categoria no mês da data, antes de gravar (só gasto, fora do modo "Dia").
+      const budgetBefore = kind === 'despesa' && !dayMode && !fromReview ? await budgetWatch.before(contextId, v.input.category, v.input.occurredOn) : null;
       try {
         const saved = await send(key, input, version);
         pending.current = [];
         // Vindo da revisão, sempre volta a ela e anota a ação, também depois de "Usar outra data".
         if (dayMode || fromReview) finishDay(v.input, another);
-        else finish(saved.id, saved);
+        else finish(saved.id, saved, await budgetWatch.after(budgetBefore));
       } catch (e) {
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
           opKey.current = newOperationKey();

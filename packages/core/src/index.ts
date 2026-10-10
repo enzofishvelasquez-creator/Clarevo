@@ -28,3 +28,4 @@ export * from './sefaz-page';
 export * from './nota-pagamento';
 export * from './nota-flow';
 export * from './navigation';
+export * from './budget';

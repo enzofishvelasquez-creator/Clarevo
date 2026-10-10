@@ -1,4 +1,4 @@
-import { CARDS_TEXT, ERROR_TEXT, formatBRL, formatMonthBR, type CategoryShare } from '@clarevo/core';
+import { BUDGET_TEXT, CARDS_TEXT, ERROR_TEXT, formatBRL, formatMonthBR, payablesMonthParams, type CategoryShare } from '@clarevo/core';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { Check, Minus, Plus } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
@@ -9,9 +9,10 @@ import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
 import { EmptyState, ErrorState } from '@/components/states';
 import { TopicLink } from '@/components/topic-link';
-import { Button, Card, FitMoney, Money, Screen, Skeleton, spaceKeyPress, Txt } from '@/components/ui';
+import { Button, Card, FitMoney, LinkButton, Money, Screen, Skeleton, spaceKeyPress, Txt } from '@/components/ui';
 import { maskMoneyLabel, useValuesHidden } from '@/lib/privacy';
-import { useCategoryBreakdown, useMonthRecords, useSpace, useView } from '@/state/data';
+import { useSession } from '@/state/session';
+import { currentMonthOf, useCategoryBreakdown, useMonthBudget, useMonthRecords, useSpace, useView } from '@/state/data';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
 const COPY = {
@@ -41,6 +42,7 @@ export default function ComposicaoScreen() {
 function Composicao({ kind, byCategory: startByCategory }: { kind: keyof typeof COPY; byCategory: boolean }) {
   const copy = COPY[kind];
   const { month } = useView();
+  const { today } = useSession();
   const personal = useSpace().data;
   const records = useMonthRecords(personal?.personalContextId, month);
   const s = records.summary;
@@ -52,6 +54,10 @@ function Composicao({ kind, byCategory: startByCategory }: { kind: keyof typeof 
   // dos cartões que aparecem no Pago do mês e só roda aqui (kind 'pago').
   const categories = useCategoryBreakdown(kind === 'pago' ? personal?.personalContextId : undefined, month);
   const hasInvoicePayment = Boolean(s?.composition.paid.some((r) => r.invoice));
+  // Orçamento do mês (D-041): a linha "de R$ 1.200,00 orçados" só aparece na categoria que tem orçamento. Por categoria continua
+  // sendo do Pago; o orçamento é do usado no mês (competência). Sem a leitura do orçamento, a tela segue sem a linha.
+  const budget = useMonthBudget(kind === 'pago' ? personal?.personalContextId : undefined, month);
+  const budgets = new Map((budget.summary?.rows ?? []).map((r) => [r.category, r.budgetCents] as const));
 
   const sections = !s
     ? []
@@ -106,7 +112,15 @@ function Composicao({ kind, byCategory: startByCategory }: { kind: keyof typeof 
               <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => categories.refetch()} />
             </Card>
           ) : (
-            <CategoryCard shares={categories.data} totalCents={s.paidCents} action={emptyAction('despesa')} invoiceNote={hasInvoicePayment} />
+            <CategoryCard
+              shares={categories.data}
+              totalCents={s.paidCents}
+              action={emptyAction('despesa')}
+              invoiceNote={hasInvoicePayment}
+              budgets={budgets}
+              month={month}
+              currentMonth={currentMonthOf(today)}
+            />
           )
         ) : (
           sections.map((sec) => (
@@ -163,8 +177,25 @@ function Segment({ value, onChange }: { value: Breakdown; onChange: (v: Breakdow
  * é igual a Pago e os percentuais somam 100% (core: categoryBreakdown). Cada barra tem um nome acessível só:
  * "Mercado, R$ 412,30, 23,4% do pago".
  */
-function CategoryCard({ shares, totalCents, action, invoiceNote }: { shares: CategoryShare[]; totalCents: number; action: ReactNode; invoiceNote: boolean }) {
+function CategoryCard({
+  shares,
+  totalCents,
+  action,
+  invoiceNote,
+  budgets,
+  month,
+  currentMonth,
+}: {
+  shares: CategoryShare[];
+  totalCents: number;
+  action: ReactNode;
+  invoiceNote: boolean;
+  budgets: ReadonlyMap<string, number>;
+  month: string;
+  currentMonth: string;
+}) {
   const hidden = useValuesHidden();
+  const anyBudget = shares.some((sh) => budgets.has(sh.label));
   // Lista e item na web (o leitor de tela diz quantas categorias há); no app, cada barra é um elemento só.
   const listRole = Platform.OS === 'web' ? ({ role: 'list', 'aria-label': 'Pago por categoria' } as object) : {};
   const itemRole = Platform.OS === 'web' ? ({ role: 'listitem' } as object) : {};
@@ -179,7 +210,12 @@ function CategoryCard({ shares, totalCents, action, invoiceNote }: { shares: Cat
       ) : (
         <View style={{ gap: space[4] }} {...listRole}>
           {shares.map((sh) => (
-            <View key={sh.label} accessible accessibilityLabel={maskMoneyLabel(sh.a11yLabel, hidden)} style={{ gap: space[2] }} {...itemRole}>
+            <View
+              key={sh.label}
+              accessible
+              accessibilityLabel={maskMoneyLabel(budgets.has(sh.label) ? BUDGET_TEXT.budgetedA11y(sh.a11yLabel, budgets.get(sh.label)!) : sh.a11yLabel, hidden)}
+              style={{ gap: space[2] }}
+              {...itemRole}>
               <View style={styles.barHead}>
                 <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15, flexShrink: 1 }}>
                   {sh.label}
@@ -191,6 +227,11 @@ function CategoryCard({ shares, totalCents, action, invoiceNote }: { shares: Cat
               <View style={styles.barTrack}>
                 <View style={[styles.barFill, { width: `${sh.tenths / 10}%` }, sh.tenths === 0 && styles.barMin]} />
               </View>
+              {budgets.has(sh.label) ? (
+                <MoneyTxt variant="caption" color={colors.textSecondary} style={tabular}>
+                  {BUDGET_TEXT.budgeted(budgets.get(sh.label)!)}
+                </MoneyTxt>
+              ) : null}
             </View>
           ))}
         </View>
@@ -199,6 +240,18 @@ function CategoryCard({ shares, totalCents, action, invoiceNote }: { shares: Cat
         <Txt variant="caption" color={colors.textSecondary}>
           {CARDS_TEXT.screens.categoryInvoiceNote}
         </Txt>
+      ) : null}
+      {anyBudget ? (
+        <View style={{ gap: space[1] }}>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {BUDGET_TEXT.versusPaid}
+          </Txt>
+          <LinkButton
+            label={BUDGET_TEXT.seeBudget}
+            style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
+            onPress={() => router.push({ pathname: '/orcamento', params: payablesMonthParams(month, currentMonth) })}
+          />
+        </View>
       ) : null}
     </Card>
   );

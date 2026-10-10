@@ -1690,3 +1690,171 @@ describe('textos de "Antes de financiar" (D-044)', () => {
     expect(source).not.toMatch(/default:\s*['"]?\d/);
   });
 });
+
+import {
+  BUDGET_CATEGORIES,
+  BUDGET_ERROR_TEXT,
+  BUDGET_TEXT,
+  LIMIT_ERROR_TEXT,
+  LIMIT_TEXT,
+  budgetCaption,
+  budgetCrossing,
+  limitCrossing,
+  limitNotesFor,
+  limitStatus,
+  summarizeBudget,
+} from '../src';
+
+/**
+ * Orçamento por categoria e limite pessoal (D-041): sem cor que julgue nem julgamento. Além das palavras de D-035 e do Ciclo B,
+ * nenhum texto usa "estourou", "estouro", "excedeu", "gastou demais", "controle-se", "cuidado" ou "alerta". Linguagem neutra de
+ * gênero, em português do Brasil, sem travessões longos e sem a expressão proibida.
+ */
+describe('textos do orçamento e do limite (D-041)', () => {
+  const VETOED = /estour|\bexcedeu\b|\bexcedid|gastou demais|controle-se|\bcuidado|\balerta|perigo|\bculpa|\bgastão|\bgastona/i;
+  const GENDERED = /\b(o|a)s? usuári[oa]s?\b|\bobrigad[oa]s?\b|\bbem-vind[oa]s?\b|\bpreocupad[oa]s?\b|\bendividad[oa]s?\b|\bgastador/i;
+  const check = (texts: string[]) => {
+    expect(texts.length).toBeGreaterThan(0);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(NEUTRAL);
+      expect(text, text).not.toMatch(VETOED);
+      expect(text, text).not.toMatch(GENDERED);
+      expect(text, text).not.toMatch(/\bfaz(er|endo)?\s+sentido\b/i);
+    }
+  };
+
+  it('a lista reprova o que deve e aceita as frases do enunciado', () => {
+    for (const bad of ['Mercado estourou o orçamento', 'o orçamento foi excedido', 'Você excedeu', 'gastou demais', 'controle-se', 'Cuidado!', 'Alerta de gasto', 'Estouro do mês'])
+      expect(VETOED.test(bad) || NEUTRAL.test(bad), bad).toBe(true);
+    for (const ok of [
+      'Mercado chegou a 85% do orçamento de outubro.',
+      'Mercado passou do orçamento de outubro em R$ 12,30.',
+      'Novembro passou 3,5 pontos do limite de 30% que você escolheu.',
+      'Com esta conta, novembro chega a 32,0% da renda, acima do limite de 30% que você escolheu.',
+    ]) {
+      expect(VETOED.test(ok) || NEUTRAL.test(ok) || JUDGMENT.test(ok), ok).toBe(false);
+    }
+  });
+
+  it('BUDGET_TEXT, LIMIT_TEXT e as mensagens de erro', () => {
+    check([...staticStrings(BUDGET_TEXT), ...staticStrings(LIMIT_TEXT), ...Object.values(BUDGET_ERROR_TEXT), ...Object.values(LIMIT_ERROR_TEXT)]);
+  });
+
+  it('textos montados do orçamento e do formulário', () => {
+    const T = BUDGET_TEXT;
+    const texts: string[] = [
+      T.total(600_000, 310_000),
+      T.amounts(41_230, 120_000),
+      T.left(78_770),
+      T.over(1_230),
+      T.budgeted(120_000),
+      T.budgetedA11y('Mercado, R$ 412,30, 23,4% do pago', 120_000),
+      T.defineButton('Mercado'),
+      T.changeButton('Mercado'),
+      T.monthPick('2026-10'),
+      T.form.title('Educação'),
+      T.form.intro('Saúde'),
+      T.form.removeFrom('2026-11'),
+      T.form.removeTitle('Mercado', '2026-11'),
+      T.form.restore(100_000, '2026-09'),
+      T.form.restoreTitle(100_000, '2026-11'),
+      T.form.saved('Mercado', '2026-10'),
+      T.form.removed('Lazer', '2026-11'),
+      T.form.deleted('Moradia'),
+      T.form.historyRow('2026-10', 180_000),
+      T.form.historyRow('2026-11', null),
+      T.form.existing('2026-10'),
+      T.form.monthPrev('2026-09'),
+      T.form.monthNext('2026-11'),
+      ...[0, 79, 80, 85, 99, 100].map((p) => T.crossedNear('Mercado', p, 'outubro')),
+      T.crossedOver('Mercado', 'outubro', 1_230),
+      T.crossedOver('Lazer', 'dezembro de 2025', 1),
+      T.crossedOverHidden('Educação', 'outubro'),
+    ];
+    check(texts);
+  });
+
+  it('o resumo do mês e a legenda de Movimentos, em todos os níveis', () => {
+    const line = (category: string, budgetCents: number | null, usedCents: number) => ({
+      category,
+      budgetId: budgetCents === null ? null : 'x',
+      budgetVersion: budgetCents === null ? null : 1,
+      budgetFrom: budgetCents === null ? null : '2026-10',
+      budgetCents,
+      usedCents,
+    });
+    const texts: string[] = [];
+    for (const used of [0, 1, 7_999, 8_000, 9_999, 10_000, 10_001, 31_230, 1_000_000]) {
+      const s = summarizeBudget({ month: '2026-10', lines: BUDGET_CATEGORIES.map((c) => (c === 'Mercado' ? line(c, 10_000, used) : line(c, null, 5))) });
+      texts.push(budgetCaption(s), s.totalLine ?? '', ...s.rows.flatMap((r) => [r.amountLine, r.balanceLine, r.percentText, r.a11yLabel]));
+    }
+    texts.push(budgetCaption(summarizeBudget({ month: '2026-10', lines: BUDGET_CATEGORIES.map((c) => line(c, null, 0)) })));
+    check(texts.filter(Boolean));
+  });
+
+  it('o aviso dentro do app, em todos os cruzamentos, com e sem valores, em outro ano', () => {
+    const texts: string[] = [];
+    const l = (usedCents: number) => ({ category: 'Mercado', usedCents, budgetCents: 10_000 });
+    for (const before of [0, 5_000, 7_999, 8_500, 10_000, 12_000])
+      for (const after of [0, 7_999, 8_000, 9_999, 10_000, 10_001, 25_000])
+        for (const hide of [false, true]) {
+          for (const month of ['2026-10', '2025-12']) {
+            const text = budgetCrossing(l(before), l(after), month, DEMO_TODAY, hide);
+            if (text) texts.push(text);
+          }
+        }
+    expect(texts.length).toBeGreaterThan(10);
+    // Valores ocultos: nunca um valor em reais.
+    for (const t of texts.filter((x) => x.includes('R$'))) expect(t).toMatch(/em R\$ \d/);
+    expect(budgetCrossing(l(5_000), l(25_000), '2026-10', DEMO_TODAY, true)).not.toContain('R$');
+    check(texts);
+  });
+
+  it('as frases do limite pessoal, de 0% a 120% da renda, em dois anos e nos dois limites', () => {
+    const texts: string[] = [];
+    for (const percent of [10, 30, 60, 100])
+      for (let permille = 0; permille <= 1200; permille += 5)
+        for (const month of ['2026-10', '2027-01']) {
+          const s = limitStatus(month, permille, permille === 0 ? 0 : 100_000, percent, DEMO_TODAY);
+          if (s) texts.push(s.line, ...(s.note ? [s.note] : []));
+        }
+    expect(texts.length).toBeGreaterThan(500);
+    check(texts);
+    const months = [
+      { month: '2026-11', committedPermille: 730, committedCents: 438_000 },
+      { month: '2027-02', committedPermille: 1_200, committedCents: 720_000 },
+    ];
+    check(Object.values(limitNotesFor(months, [{ fromMonth: '2026-10', percent: 60 }], DEMO_TODAY)));
+    const crossed = limitCrossing([{ month: '2026-11', committedPermille: 280, committedCents: 1 }], [{ month: '2026-11', committedPermille: 320, committedCents: 1 }], [{ fromMonth: '2026-10', percent: 30 }], DEMO_TODAY);
+    expect(crossed).toBe('Com esta conta, novembro chega a 32,0% da renda, acima do limite de 30% que você escolheu.');
+    check([crossed!]);
+    const F = LIMIT_TEXT.form;
+    check([
+      F.removeFrom('2026-11'),
+      F.removeTitle('2026-11'),
+      F.restore(30, '2026-09'),
+      F.restoreTitle(30, '2026-11'),
+      F.saved(40, '2026-10'),
+      F.removed('2026-11'),
+      F.endedHere('2026-11'),
+      F.existing('2026-10'),
+    ]);
+  });
+
+  it('o índice de busca tem a tela do orçamento', () => {
+    const screen = APP_SCREENS.find((s) => s.id === 'orcamento')!;
+    expect(screen.href).toBe('/orcamento');
+    check([screen.title, screen.caption, ...screen.keywords]);
+    const renda = APP_SCREENS.find((s) => s.id === 'renda-comprometida')!;
+    check([renda.title, renda.caption, ...renda.keywords]);
+  });
+
+  it('arquivo-fonte budget.ts', () => {
+    const text = readFileSync(join(CORE_SRC, 'budget.ts'), 'utf8');
+    expect(text).not.toMatch(FORBIDDEN);
+    expect(text).not.toMatch(JUDGMENT);
+    expect(text).not.toMatch(VETOED);
+  });
+});

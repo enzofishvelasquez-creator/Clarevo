@@ -25,6 +25,10 @@ import { newOperationKey } from './repository';
  * em 10 vezes) e Restaurante (R$ 200,00 à vista). A primeira fatura vence em novembro de 2026 (R$ 550,00); compras no cartão
  * não entram em Pago. Limite usado: R$ 2.300,00 de R$ 5.000,00. Os totais de outubro (6.000 / 3.900 / 2.100 / 650) e a
  * renda comprometida de outubro (52,5%) não mudam; novembro passa a incluir a fatura (73,0%).
+ * Orçamento por categoria (D-041), a partir de outubro de 2026: Moradia R$ 2.500,00, Mercado R$ 1.800,00 e Lazer R$ 300,00.
+ * Usado em outubro (competência): Moradia R$ 2.500,00 (o aluguel pago), Mercado R$ 1.400,00 e Lazer R$ 400,00 (a 1ª parcela do
+ * tênis, R$ 200,00, e o restaurante, R$ 200,00; a compra no cartão conta no mês da compra). Limite pessoal de 60% a partir de
+ * outubro (outubro 52,5% de 60%; novembro passa 13,0 pontos). Nada disso muda os totais de outubro.
  */
 export const DEMO_TODAY = '2026-10-07';
 export const DEMO_EMAIL = 'demo@clarevo.app';
@@ -134,6 +138,13 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   // Renda de referência (D-026): R$ 6.000,00 por mês desde setembro de 2026, renda fixa. Só calcula percentuais (52,5% em
   // outubro, 63,8% em novembro); não entra em Recebido.
   await repo.setIncomeReference(newOperationKey(), ctx, '2026-09', 0, 600_000, false);
+  // Orçamento por categoria (D-041), a partir de outubro de 2026: Moradia R$ 2.500,00, Mercado R$ 1.800,00 e Lazer R$ 300,00.
+  // Só medem o usado no mês (competência); não mudam Recebido, Pago, Diferença, Ainda a pagar nem a renda comprometida.
+  await repo.setCategoryBudget(newOperationKey(), ctx, 'Moradia', '2026-10', 0, 250_000);
+  await repo.setCategoryBudget(newOperationKey(), ctx, 'Mercado', '2026-10', 0, 180_000);
+  await repo.setCategoryBudget(newOperationKey(), ctx, 'Lazer', '2026-10', 0, 30_000);
+  // Limite pessoal de comprometimento (D-041): 60% da renda de referência a partir de outubro de 2026. Outubro fica em 52,5%.
+  await repo.setCommitmentLimit(newOperationKey(), ctx, '2026-10', 0, 60);
   // Metas (D-027), pelas mesmas funções do cadastro. A reserva usa a média de setembro (Moradia e Mercado).
   const reserva = await repo.createGoal(newOperationKey(), ctx, {
     goalType: 'emergencia',

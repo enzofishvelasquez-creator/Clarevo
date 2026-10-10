@@ -74,7 +74,7 @@ import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { explanationHref } from '@/lib/learn';
-import { useCommitments, useCreateSeries, useMonthRecords, useSeriesList, useSeriesOperationKey, useUpdateSeriesFrom } from '@/state/data';
+import { useCommitments, useCreateSeries, useLimitWatch, useMonthRecords, useSeriesList, useSeriesOperationKey, useUpdateSeriesFrom, withNotice } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -182,6 +182,7 @@ export function SeriesForm({
   const navigation = useNavigation();
   const create = useCreateSeries();
   const updateFrom = useUpdateSeriesFrom();
+  const limitWatch = useLimitWatch();
   const keys = useSeriesOperationKey();
   const contextId = personal.personalContextId;
   const contextName = 'Pessoal';
@@ -417,10 +418,10 @@ export function SeriesForm({
     }
   };
 
-  const finish = (w: SeriesWrite, input: SeriesInput | null) => {
+  const finish = (w: SeriesWrite, input: SeriesInput | null, notice: string | null = null) => {
     // Confirmação tátil só depois da gravação confirmada.
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    flash.set(savedTextFor(w, input, today));
+    flash.set(withNotice(savedTextFor(w, input, today), notice));
     leave(() => router.replace(`/gastos-fixos/${w.series.id}`));
   };
 
@@ -513,11 +514,13 @@ export function SeriesForm({
         return;
       }
       const key = keys.keyFor(snapshot);
+      // Aviso do limite pessoal (D-041): o comprometido dos próximos meses antes de gravar, com a previsão das séries.
+      const limitBefore = await limitWatch.before(contextId);
       try {
         const saved = await create.mutateAsync({ key, contextId, input: v.input });
         keys.settled();
         setRetry(false);
-        finish(saved, v.input);
+        finish(saved, v.input, await limitWatch.after(limitBefore));
       } catch (e) {
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
           keys.refused();

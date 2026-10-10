@@ -1,4 +1,7 @@
 import {
+  BUDGET_CATEGORIES,
+  BUDGET_MAX_CENTS,
+  BUDGET_MIN_CENTS,
   ESSENTIAL_BASE_SOURCES,
   GOAL_MOVEMENT_KINDS,
   GOAL_NOTE_MAX,
@@ -26,10 +29,12 @@ import {
   type CardRefundInput,
   type CardStatus,
   type CardWrite,
+  type CategoryBudget,
   type Cents,
   type Commitment,
   type CommitmentAction,
   type CommitmentInput,
+  type CommitmentLimit,
   type CommitmentSeries,
   type CommitmentWrite,
   type ContextActivity,
@@ -47,6 +52,7 @@ import {
   type InvoicePaymentWrite,
   type IsoDate,
   type IsoMonth,
+  type MonthBudgetRead,
   type MonthOverview,
   type NewGoalInput,
   type OccurrenceMode,
@@ -220,6 +226,44 @@ interface IncomeReferenceRow {
   amount_changed_at: string | null;
 }
 
+/** Linha de category_budgets (e retorno de set/delete_category_budget, que traz também deleted_at e deleted_by). */
+interface CategoryBudgetRow {
+  id: string;
+  context_id: string;
+  category: string;
+  /** Sempre o dia 1 (AAAA-MM-01). */
+  from_month: string;
+  /** null: a linha que encerra a vigência ("Tirar o orçamento a partir de"). */
+  amount_cents: number | null;
+  created_by: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Linha de commitment_limits (e retorno de set/delete_commitment_limit). */
+interface CommitmentLimitRow {
+  id: string;
+  context_id: string;
+  from_month: string;
+  /** null: a linha que encerra a vigência ("Tirar o limite a partir de"). */
+  percent: number | null;
+  created_by: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Linha de month_budget: o orçamento vigente (nulos sem linha; budget_cents nulo se a vigente foi encerrada) e o usado no mês. */
+interface MonthBudgetRow {
+  category: string;
+  budget_id: string | null;
+  budget_version: number | null;
+  budget_from: string | null;
+  budget_cents: number | null;
+  used_cents: number;
+}
+
 /** Linha da visão goal_items (e a meta do retorno das funções de metas, que traz também deleted_at e deleted_by). */
 interface GoalRow {
   id: string;
@@ -359,6 +403,8 @@ interface CardResult {
   record: RecordRow | null;
 }
 
+const CATEGORY_BUDGET_COLUMNS = 'id, context_id, category, from_month, amount_cents, created_by, version, created_at, updated_at';
+const COMMITMENT_LIMIT_COLUMNS = 'id, context_id, from_month, percent, created_by, version, created_at, updated_at';
 const INCOME_REFERENCE_COLUMNS = 'id, context_id, from_month, amount_cents, varies, created_by, version, created_at, updated_at, amount_changed_at';
 const GOAL_MOVEMENT_COLUMNS = 'id, goal_id, context_id, kind, amount_cents, occurred_on, note, created_by, version, created_at, updated_at';
 const SAVINGS_CHECK_COLUMNS = 'context_id, answer, monthly_cents, answered_on, ask_again_on, version, created_at, updated_at';
@@ -448,6 +494,9 @@ const KNOWN: RepoErrorCode[] = [
   'periodo_invalido',
   // Renda de referência (D-026). Nenhum é sufixo de outro código da lista, nem tem outro como sufixo.
   'referencia_fora_do_intervalo',
+  // Orçamento por categoria e limite pessoal (D-041). Nenhum é sufixo de outro código da lista, nem tem outro como sufixo.
+  'vigencia_fora_do_intervalo',
+  'percentual_invalido',
   // Metas e reserva (D-027).
   'reserva_ja_existe',
   'nome_da_meta_invalido',
@@ -723,6 +772,79 @@ function toIncomeReference(r: IncomeReferenceRow): IncomeReference {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     amountChangedAt: r.amount_changed_at ?? null,
+  };
+}
+
+/** Orçamento de uma categoria: categoria entre as seis, mês no dia 1, valor nulo ou de R$ 1,00 a R$ 9.999.999,99 e versão a partir de 1. */
+function toCategoryBudget(r: CategoryBudgetRow): CategoryBudget {
+  const amountCents = wholeOrNull(r.amount_cents);
+  const version = whole(r.version);
+  const consistent =
+    BUDGET_CATEGORIES.includes(r.category) &&
+    FIRST_DAY.test(r.from_month) &&
+    (amountCents === null || (amountCents >= BUDGET_MIN_CENTS && amountCents <= BUDGET_MAX_CENTS)) &&
+    version >= 1;
+  if (!consistent) throw new RepoError('desconhecido', 'orcamento_inconsistente');
+  return {
+    id: r.id,
+    contextId: r.context_id,
+    category: r.category,
+    fromMonth: r.from_month.slice(0, 7),
+    amountCents,
+    createdBy: r.created_by,
+    version,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+/** Limite pessoal: mês no dia 1, percentual nulo ou inteiro de 10 a 100 e versão a partir de 1. */
+function toCommitmentLimit(r: CommitmentLimitRow): CommitmentLimit {
+  const percent = r.percent === null ? null : whole(r.percent);
+  const version = whole(r.version);
+  if (!FIRST_DAY.test(r.from_month) || (percent !== null && (percent < 10 || percent > 100)) || version < 1) throw new RepoError('desconhecido', 'limite_inconsistente');
+  return {
+    id: r.id,
+    contextId: r.context_id,
+    fromMonth: r.from_month.slice(0, 7),
+    percent,
+    createdBy: r.created_by,
+    version,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+/**
+ * month_budget: sempre as seis categorias, na ordem de BUDGET_CATEGORIES; orçamento (id, versão, mês e valor) e usado coerentes.
+ * Uma lista incompleta ou fora de ordem nunca aparece como um orçamento zerado.
+ */
+function toMonthBudget(month: IsoMonth, rows: readonly MonthBudgetRow[]): MonthBudgetRead {
+  if (rows.length !== BUDGET_CATEGORIES.length) throw new RepoError('desconhecido', 'orcamento_inconsistente');
+  return {
+    month,
+    lines: rows.map((r, i) => {
+      const budgetCents = wholeOrNull(r.budget_cents);
+      const budgetVersion = wholeOrNull(r.budget_version);
+      const usedCents = whole(r.used_cents);
+      const hasRow = r.budget_id !== null;
+      const consistent =
+        r.category === BUDGET_CATEGORIES[i] &&
+        usedCents >= 0 &&
+        hasRow === (r.budget_from !== null) &&
+        hasRow === (budgetVersion !== null) &&
+        (r.budget_from === null || FIRST_DAY.test(r.budget_from)) &&
+        (budgetCents === null || (hasRow && budgetCents >= BUDGET_MIN_CENTS && budgetCents <= BUDGET_MAX_CENTS));
+      if (!consistent) throw new RepoError('desconhecido', 'orcamento_inconsistente');
+      return {
+        category: r.category,
+        budgetId: r.budget_id,
+        budgetVersion,
+        budgetFrom: r.budget_from === null ? null : r.budget_from.slice(0, 7),
+        budgetCents,
+        usedCents,
+      };
+    }),
   };
 }
 
@@ -1564,6 +1686,100 @@ export class SupabaseRepository implements RecordsRepository {
       p_id: id,
       p_expected_version: expectedVersion,
     });
+  }
+
+  // -------------------------------------------------------------------------
+  // Orçamento por categoria e limite pessoal de comprometimento (D-041, Ciclo F2)
+  // -------------------------------------------------------------------------
+
+  /** Linhas vivas do orçamento do contexto (a RLS já tira as excluídas e o que a pessoa não lê), por categoria e mês de início. */
+  async listCategoryBudgets(contextId: string): Promise<CategoryBudget[]> {
+    const rows = await readAll<CategoryBudgetRow>((from, to) =>
+      this.db
+        .from('category_budgets')
+        .select(CATEGORY_BUDGET_COLUMNS)
+        .eq('context_id', contextId)
+        .is('deleted_at', null)
+        .order('from_month', { ascending: true })
+        .order('id')
+        .range(from, to),
+    );
+    // A ordem das categorias é a do app, não a alfabética do banco.
+    return rows
+      .map(toCategoryBudget)
+      .sort((a, b) => BUDGET_CATEGORIES.indexOf(a.category) - BUDGET_CATEGORIES.indexOf(b.category) || a.fromMonth.localeCompare(b.fromMonth) || a.id.localeCompare(b.id));
+  }
+
+  /** As funções de orçamento e de limite devolvem jsonb (a linha): sem .single(). */
+  private async callBudget(fn: string, args: Record<string, unknown>): Promise<CategoryBudget> {
+    const { data, error } = await this.db.rpc(fn, args);
+    if (error) throw repoError(error);
+    if (!data) throw new RepoError('desconhecido');
+    return toCategoryBudget(data as CategoryBudgetRow);
+  }
+
+  private async callLimit(fn: string, args: Record<string, unknown>): Promise<CommitmentLimit> {
+    const { data, error } = await this.db.rpc(fn, args);
+    if (error) throw repoError(error);
+    if (!data) throw new RepoError('desconhecido');
+    return toCommitmentLimit(data as CommitmentLimitRow);
+  }
+
+  /**
+   * Versão 0 cria a linha da categoria no mês; a versão atual altera. O mês vai como AAAA-MM-01; amountCents null grava a linha que
+   * encerra a vigência. Uma repetição com a mesma chave e o mesmo conteúdo devolve a linha atual (reconcilia um resultado incerto).
+   */
+  setCategoryBudget(key: string, contextId: string, category: string, fromMonth: IsoMonth, expectedVersion: number, amountCents: Cents | null) {
+    return this.callBudget('set_category_budget', {
+      p_idempotency_key: key,
+      p_context_id: contextId,
+      p_category: category,
+      p_from_month: `${fromMonth}-01`,
+      p_expected_version: expectedVersion,
+      p_amount_cents: amountCents,
+    });
+  }
+
+  /** Exclusão lógica: devolve a linha excluída (versão + 1). A anterior da categoria volta a valer. */
+  deleteCategoryBudget(key: string, id: string, expectedVersion: number) {
+    return this.callBudget('delete_category_budget', { p_idempotency_key: key, p_id: id, p_expected_version: expectedVersion });
+  }
+
+  /** month_budget: seis linhas (uma por categoria) com o orçamento vigente e o usado no mês (competência), calculado pelo banco. */
+  async getMonthBudget(contextId: string, month: IsoMonth): Promise<MonthBudgetRead> {
+    const { data, error } = await this.db.rpc('month_budget', { p_context_id: contextId, p_month: `${month}-01` });
+    if (error) throw repoError(error);
+    return toMonthBudget(month, (data ?? []) as MonthBudgetRow[]);
+  }
+
+  /** Limites vivos do contexto, por mês de início crescente (a RLS já tira os excluídos e o que a pessoa não lê). */
+  async listCommitmentLimits(contextId: string): Promise<CommitmentLimit[]> {
+    const rows = await readAll<CommitmentLimitRow>((from, to) =>
+      this.db
+        .from('commitment_limits')
+        .select(COMMITMENT_LIMIT_COLUMNS)
+        .eq('context_id', contextId)
+        .is('deleted_at', null)
+        .order('from_month', { ascending: true })
+        .order('id')
+        .range(from, to),
+    );
+    return rows.map(toCommitmentLimit);
+  }
+
+  /** percent null grava a linha que encerra a vigência ("Tirar o limite a partir de {mês}"). */
+  setCommitmentLimit(key: string, contextId: string, fromMonth: IsoMonth, expectedVersion: number, percent: number | null) {
+    return this.callLimit('set_commitment_limit', {
+      p_idempotency_key: key,
+      p_context_id: contextId,
+      p_from_month: `${fromMonth}-01`,
+      p_expected_version: expectedVersion,
+      p_percent: percent,
+    });
+  }
+
+  deleteCommitmentLimit(key: string, id: string, expectedVersion: number) {
+    return this.callLimit('delete_commitment_limit', { p_idempotency_key: key, p_id: id, p_expected_version: expectedVersion });
   }
 
   // -------------------------------------------------------------------------
