@@ -5,8 +5,13 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   NOTA_ERROR_TEXT,
+  ANNUAL_HELP_TEXT,
+  CARD_MONTH_TEXT,
   NOTA_FLOW_TEXT,
+  NOTA_PAYMENT_TEXT,
   NOTA_TEXT,
+  PAYMENT_FORMS,
+  PAYMENT_FORM_LABEL,
   SEFAZ_TEXT,
   noteGaps,
   noteReadLine,
@@ -1492,5 +1497,89 @@ describe('textos da navegação (D-039)', () => {
   it('arquivo-fonte navigation.ts', () => {
     const text = readFileSync(join(CORE_SRC, 'navigation.ts'), 'utf8');
     expect(text).not.toMatch(FORBIDDEN);
+  });
+});
+
+/**
+ * Ajustes de 10/10/2026 (D-042): forma de pagamento da nota, faturas do mês nos cartões e contas do ano explicadas. pt-BR, neutro
+ * quanto a gênero, sem travessões, sem a expressão vetada e sem tom de alerta nem julgamento.
+ */
+describe('textos dos ajustes de 10/10/2026 (D-042)', () => {
+  const GENDERED_D042 = /\bobrigad[oa]s?\b|\bbem-vind[oa]s?\b|\bo usu[áa]rio\b|\ba usu[áa]ria\b|\bcliente\b/i;
+  const ALERT_D042 = /aten[cç][aã]o|cuidado|alerta|perigo|urgente|erro grave|\batrasad|\bvencid[oa]s? h[aá]/i;
+
+  const check = (texts: string[]) => {
+    expect(texts.length).toBeGreaterThan(10);
+    for (const t of texts) {
+      expect(t, t).not.toMatch(FORBIDDEN);
+      expect(t, t).not.toMatch(JUDGMENT);
+      expect(t, t).not.toMatch(NEUTRAL);
+      expect(t, t).not.toMatch(GENDERED_D042);
+      expect(t, t).not.toMatch(ALERT_D042);
+      expect(t, t).not.toMatch(/\d{13,}/);
+    }
+  };
+
+  it('forma de pagamento da nota: rótulos, avisos e a linha "Nota lida" com cada forma', () => {
+    const texts = [
+      ...staticStrings(NOTA_PAYMENT_TEXT),
+      ...PAYMENT_FORMS.map((f) => PAYMENT_FORM_LABEL[f]),
+      ...PAYMENT_FORMS.map((f) => NOTA_PAYMENT_TEXT.fromNote(f)),
+      NOTA_FLOW_TEXT.phoneReads,
+      NOTA_FLOW_TEXT.cameraCloser,
+      NOTA_FLOW_TEXT.cameraAim,
+    ];
+    const body = '3326101122233300018165001000012345187654321';
+    const parsed = parseAccessKey(body + String(accessKeyCheckDigit(body)));
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) {
+      for (const payments of [[], ...PAYMENT_FORMS.map((f) => [f]), ['dinheiro', 'credito']] as const) {
+        const facts = { ...factsFromKey(parsed.info), issuerName: 'Mercado Exemplo', totalCents: 8_740, issuedOn: '2026-10-06', payments: [...payments] };
+        texts.push(noteReadLine(receiptDraft(facts, '2026-10-09'), '2026-10-06'));
+      }
+    }
+    check(texts);
+    // O pedido de Enzo, palavra por palavra.
+    expect(NOTA_PAYMENT_TEXT.creditNoCard).toBe('A nota diz cartão de crédito. Cadastre o cartão para anotar a compra na fatura.');
+    expect(NOTA_PAYMENT_TEXT.multiple).toBe('Pagamento em mais de uma forma');
+    expect(NOTA_FLOW_TEXT.cameraCloser).toBe('Aproxime até o QR ocupar a moldura.');
+    expect(NOTA_FLOW_TEXT.phoneReads).toBe('No celular, o Clarevo lê o valor e a data na página da Sefaz.');
+  });
+
+  it('faturas do mês nos cartões: título, regra, ligação com a renda comprometida e próximas faturas', () => {
+    const texts = [
+      ...staticStrings(CARD_MONTH_TEXT),
+      CARD_MONTH_TEXT.title('2026-10'),
+      CARD_MONTH_TEXT.title('2026-12'),
+      CARD_MONTH_TEXT.none('2026-10'),
+      CARD_MONTH_TEXT.percent('52,5%'),
+      CARD_MONTH_TEXT.percent('menos de 0,1%'),
+      CARD_MONTH_TEXT.upcoming([
+        { month: '2026-12', cents: 120_000 },
+        { month: '2027-01', cents: 90_000 },
+      ]),
+    ];
+    check(texts);
+    expect(CARD_MONTH_TEXT.percent('12,3%')).toBe('12,3% da sua renda de referência');
+    expect(CARD_MONTH_TEXT.noReference).toBe('Informe sua renda para ver quanto isso representa.');
+    expect(CARD_MONTH_TEXT.inCommitted).toBe('Já entra na sua renda comprometida, no grupo Faturas de cartão.');
+  });
+
+  it('contas do ano explicadas: cadastro, exemplos, lista, detalhe e informar o valor', () => {
+    const texts = [
+      ...staticStrings(ANNUAL_HELP_TEXT),
+      ANNUAL_HELP_TEXT.informOnlyYear('2027'),
+      ANNUAL_HELP_TEXT.informOnlyYear('2026/2027'),
+      ANNUAL_HELP_TEXT.informOnlyYear('2026 a 2027'),
+    ];
+    check(texts);
+  });
+
+  it('arquivos-fonte novos', () => {
+    for (const file of ['nota-pagamento.ts', 'cards-month.ts', 'annual-help.ts']) {
+      const source = readFileSync(join(CORE_SRC, file), 'utf8');
+      expect(source, file).not.toMatch(FORBIDDEN);
+      expect(source, file).not.toMatch(JUDGMENT);
+    }
   });
 });

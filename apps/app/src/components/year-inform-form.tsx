@@ -1,4 +1,5 @@
 import {
+  ANNUAL_HELP_TEXT,
   ANNUAL_SERIES_ERROR_TEXT,
   ERROR_TEXT,
   MAX_RECORD_CENTS,
@@ -202,6 +203,9 @@ export function YearInformForm({ series: s, number, contextId }: { series: Commi
           <Card style={{ gap: space[4] }}>
             <Txt accessibilityLabel={yearA11yLabel(`Use o valor do carnê ou do boleto de ${yearLabel}.`)}>
               Use o valor do carnê ou do boleto de {yearLabel}.
+            </Txt>
+            <Txt variant="label" color={colors.textSecondary} accessibilityLabel={yearA11yLabel(ANNUAL_HELP_TEXT.informOnlyYear(yearLabel))}>
+              {ANNUAL_HELP_TEXT.informOnlyYear(yearLabel)}
             </Txt>
             <TextField
               ref={amountRef}

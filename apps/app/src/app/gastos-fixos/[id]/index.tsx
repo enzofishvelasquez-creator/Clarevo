@@ -1,4 +1,5 @@
 import {
+  ANNUAL_HELP_TEXT,
   ANNUAL_SERIES_ERROR_TEXT,
   CALC_UI_TEXT,
   DEBT_NATURES,
@@ -318,9 +319,15 @@ function Overview({ series: s, today }: { series: CommitmentSeries; today: IsoDa
         </MoneyTxt>
         <CalcLink series={s} today={today} />
         {annual ? (
-          <Txt variant="label" color={colors.textSecondary}>
-            Cada ano entra em Contas a pagar dois meses antes do primeiro vencimento e só entra em Ainda a pagar no mês em que vence.
-          </Txt>
+          <>
+            <Txt variant="label" color={colors.textSecondary}>
+              Cada ano entra em Contas a pagar dois meses antes do primeiro vencimento e só entra em Ainda a pagar no mês em que vence.
+            </Txt>
+            <Txt variant="label" color={colors.textSecondary}>
+              {ANNUAL_HELP_TEXT.detailHowItWorks}
+            </Txt>
+            <TopicLink slug="contas-do-ano" label={ANNUAL_HELP_TEXT.whatIsThis} style={styles.inlineLink} />
+          </>
         ) : null}
         <View>
           <Row label="Contexto" value="Pessoal" />

@@ -870,7 +870,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Ciclo A5 (spec3 §3.7): o card termina com "Como se preparar para as contas do ano?", depois de "Nova conta do ano".
   ok('contas do ano: IPVA e IPTU com rótulos em texto, "Nova conta do ano" e o link de Aprender',
     JSON.stringify(await sectionRows('Contas do ano')) === JSON.stringify(['IPVA, cerca de R$ 2.400,00, todo ano em 20/01, valor muda, conta do ano', 'IPTU, 10 parcelas de cerca de R$ 180,00, fevereiro a novembro, dia 10, valor muda, conta do ano', 'Nova conta do ano', 'Como se preparar para as contas do ano?']) &&
-      ['IPVA, IPTU, matrícula, material escolar e seguro anual. Entram em Contas a pagar dois meses antes de vencer.', '≈ R$ 2.400,00 · todo ano em 20/01 · valor muda', '10 parcelas de ≈ R$ 180,00 · fevereiro a novembro, dia 10 · valor muda'].every((x) => t.includes(x)),
+      ['Contas que vêm uma vez por ano, como IPVA, IPTU, matrícula e seguro. Você cadastra uma vez; todo ano o Clarevo cria a conta do mês certo, dois meses antes de vencer.', '≈ R$ 2.400,00 · todo ano em 20/01 · valor muda', '10 parcelas de ≈ R$ 180,00 · fevereiro a novembro, dia 10 · valor muda'].every((x) => t.includes(x)),
     ((await sectionRows('Contas do ano')) ?? []).join(' | '));
   ok('contas do ano: "Por ano" com a parte estimada e "Por mês" continua R$ 3.530,00, sem elas',
     t.includes('Por ano, se os valores não mudarem: R$ 4.200,00 (inclui R$ 4.200,00 estimados).') && t.includes('Por mês, se os valores não mudarem: R$ 3.530,00 (inclui R$ 180,00 estimados). Contas do ano ficam fora desta soma.'));
@@ -3953,8 +3953,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
   const noteB = accessKey('2610', '65', 12346);
   await pasteNote(qrContingency(noteB, '06', '45.90')); t = await body();
-  ok('N QR com valor e dia: "Nota lida: CNPJ 11.222.333/0001-81 · RJ · 06/10/2026", valor 45,90 e data 06/10/2026, sem mensagem de falta e com o teclado fechado',
-    t.includes('Nota lida: CNPJ 11.222.333/0001-81 · RJ · 06/10/2026') && t.includes('Preenchemos o que a nota informa. Confira e toque em Salvar.') && (await field('Valor em reais').inputValue()) === '45,90' && (await field('Data do pagamento').inputValue()) === '06/10/2026' && !t.includes('não vem no código') &&
+  ok('N QR com valor e dia: "Nota lida: CNPJ 11.222.333/0001-81 · RJ · R$ 45,90 · 06/10/2026", valor 45,90 e data 06/10/2026, sem mensagem de falta e com o teclado fechado',
+    t.includes('Nota lida: CNPJ 11.222.333/0001-81 · RJ · R$ 45,90 · 06/10/2026') && t.includes('Preenchemos o que a nota informa. Confira e toque em Salvar.') && (await field('Valor em reais').inputValue()) === '45,90' && (await field('Data do pagamento').inputValue()) === '06/10/2026' && !t.includes('não vem no código') &&
     (await activeTag()) !== 'INPUT' && (await activeTag()) !== 'TEXTAREA', `${await activeTag()} ${t.slice(0, 300)}`);
   ok('N mesma loja (mesmo CNPJ) já anotada neste aparelho: descrição e categoria da última vez, com a legenda "Como da última vez nesta loja"',
     (await field('Descrição').inputValue()) === 'Mercado' && (await radio('Mercado').getAttribute('aria-checked')) === 'true' && t.includes('Como da última vez nesta loja'));
@@ -4003,8 +4003,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.evaluate((html) => { window.__sefazCalls = []; window.__sefazMode = 'ok'; window.__sefazHtml = html; window.__clarevoSefazFetch = async (url) => { window.__sefazCalls.push(url); if (window.__sefazMode === 'erro') return { ok: false, status: 503, url, text: async () => '' }; if (window.__sefazMode === 'semurl') return { ok: true, status: 200, text: async () => window.__sefazHtml }; return { ok: true, status: 200, url, text: async () => window.__sefazHtml }; }; }, sefazHtml(SEFAZ_KEY));
   await openPaste(); await field('Colar o link ou a chave da nota').fill(qrOnline(SEFAZ_KEY)); await btn('Ler a nota').click(); await waitText('Nota lida:'); await waitText('Loja, valor e data lidos da página da Sefaz.', 8000); await p.waitForTimeout(600); t = await body();
   const sefazCalls = await p.evaluate(() => window.__sefazCalls);
-  ok('N página da Sefaz lida: "Nota lida: Mercado Exemplo Ltda · RJ · 06/10/2026", valor 63,70, data 06/10/2026 e a descrição com o nome da loja ("Nome da loja lido da nota"), com "Loja, valor e data lidos da página da Sefaz"',
-    t.includes('Nota lida: Mercado Exemplo Ltda · RJ · 06/10/2026') && (await field('Valor em reais').inputValue()) === '63,70' && (await field('Data do pagamento').inputValue()) === '06/10/2026' && (await field('Descrição').inputValue()) === 'Mercado Exemplo Ltda' &&
+  ok('N página da Sefaz lida: "Nota lida: Mercado Exemplo Ltda · RJ · R$ 63,70 · 06/10/2026", valor 63,70, data 06/10/2026 e a descrição com o nome da loja ("Nome da loja lido da nota"), com "Loja, valor e data lidos da página da Sefaz"',
+    t.includes('Nota lida: Mercado Exemplo Ltda · RJ · R$ 63,70 · 06/10/2026') && (await field('Valor em reais').inputValue()) === '63,70' && (await field('Data do pagamento').inputValue()) === '06/10/2026' && (await field('Descrição').inputValue()) === 'Mercado Exemplo Ltda' &&
     t.includes('Nome da loja lido da nota') && t.includes('Loja, valor e data lidos da página da Sefaz. Confira antes de salvar.') && !t.includes('não vem no código') && t.includes('Preenchemos o que a nota informa.'), t.slice(0, 500));
   ok('N a leitura da página busca só o endereço oficial do QR (uma vez) e o app não mostra CPF nem nome do consumidor (a página os trazia)', sefazCalls.length === 1 && sefazCalls[0] === qrOnline(SEFAZ_KEY) && !/FULANA|123\.456\.789/.test(t) && !t.includes('Neste navegador, a página da Sefaz não pode ser lida'), JSON.stringify(sefazCalls));
   await keepText();
@@ -4045,8 +4045,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await openScan();
   const [chooser3] = await Promise.all([p.waitForEvent('filechooser'), btn('Escolher o PDF da nota').click()]);
   await chooser3.setFiles(pdfOk); await waitText('Nota lida:', 20000); await p.waitForTimeout(800); t = await body();
-  ok('N PDF do DANFE: "Nota lida: Loja Exemplo Ltda · RJ · 05/10/2026", valor 150,00, data 05/10/2026 e descrição com o nome da loja; teclado fechado (nada falta)',
-    t.includes('Nota lida: Loja Exemplo Ltda · RJ · 05/10/2026') && (await field('Valor em reais').inputValue()) === '150,00' && (await field('Data do pagamento').inputValue()) === '05/10/2026' && (await field('Descrição').inputValue()) === 'Loja Exemplo Ltda' &&
+  ok('N PDF do DANFE: "Nota lida: Loja Exemplo Ltda · RJ · R$ 150,00 · 05/10/2026", valor 150,00, data 05/10/2026 e descrição com o nome da loja; teclado fechado (nada falta)',
+    t.includes('Nota lida: Loja Exemplo Ltda · RJ · R$ 150,00 · 05/10/2026') && (await field('Valor em reais').inputValue()) === '150,00' && (await field('Data do pagamento').inputValue()) === '05/10/2026' && (await field('Descrição').inputValue()) === 'Loja Exemplo Ltda' &&
     t.includes('Nome da loja lido da nota') && (await activeTag()) !== 'INPUT', t.slice(0, 400));
   ok('N PDF do DANFE: nada do destinatário na tela (nome, CPF, endereço), nem a chave inteira, e a NF-e oferece o parcelamento',
     !/FULANA|123\.456\.789|DESTINATARIO|RUA DO/i.test(t) && !/\d{20,}/.test(t.replace(/[\s.]/g, '')) && (await visibleCount('button', 'Comprou no carnê ou crediário? Anotar como parcelamento')) === 1);

@@ -1,4 +1,5 @@
 import {
+  ANNUAL_HELP_TEXT,
   ANNUAL_SERIES_ERROR_TEXT,
   RETURN_TEXT,
   affectedByEditFrom,
@@ -215,6 +216,14 @@ export function AnnualYears({
         <Txt variant="title" accessibilityRole="header" aria-level={2}>
           Ano a ano
         </Txt>
+        {/* Como ler as palavras da lista (previsto, tirada) e o que "Informar o valor" muda. */}
+        <View style={{ gap: space[1] }}>
+          {ANNUAL_HELP_TEXT.yearByYearHelp.map((line) => (
+            <Txt key={line} variant="caption" color={colors.textSecondary}>
+              {line}
+            </Txt>
+          ))}
+        </View>
         {years.length === 0 ? (
           <Txt variant="label" color={colors.textSecondary}>
             Esta conta do ano foi encerrada antes da primeira conta.

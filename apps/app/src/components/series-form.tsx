@@ -1,4 +1,5 @@
 import {
+  ANNUAL_HELP_TEXT,
   CALC_UI_TEXT,
   CATEGORIES,
   DESCRIPTION_MAX,
@@ -69,6 +70,7 @@ import {
 } from '@/components/series-parts';
 import { SumValues } from '@/components/sum-values';
 import { TermHint } from '@/components/term-hint';
+import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { explanationHref } from '@/lib/learn';
@@ -663,9 +665,13 @@ export function SeriesForm({
         hint={
           variable
             ? anual
-              ? 'Use o valor do último ano. Ele aparece como estimado até você informar o valor do ano.'
+              ? `Use o valor do último ano. Ele aparece como estimado até você informar o valor do ano. ${annual.inParts ? ANNUAL_HELP_TEXT.amountExampleParts : ANNUAL_HELP_TEXT.amountExampleSingle}`
               : 'Use o valor de uma conta recente. Ele aparece como estimado até você informar o valor de cada conta.'
-            : undefined
+            : anual
+              ? annual.inParts
+                ? ANNUAL_HELP_TEXT.amountExampleParts
+                : ANNUAL_HELP_TEXT.amountExampleSingle
+              : undefined
         }
       />
       <SumValues target={refs.amountText} onUse={(t) => set('amountText', t)} />
@@ -686,7 +692,13 @@ export function SeriesForm({
       inputMode="numeric"
       maxLength={2}
       error={errors.dueDayText}
-      hint={day !== null && day >= 29 ? 'Nos meses mais curtos, vence no último dia do mês.' : 'De 1 a 31.'}
+      hint={
+        day !== null && day >= 29
+          ? 'Nos meses mais curtos, vence no último dia do mês.'
+          : anual
+            ? `De 1 a 31. ${ANNUAL_HELP_TEXT.dayExample}`
+            : 'De 1 a 31.'
+      }
     />
   );
 
@@ -724,7 +736,7 @@ export function SeriesForm({
   /** Todo ano: forma, parcelas, mês, dia, modo, valor, primeiro ano (ou próxima parcela) e término (seção 1.7). */
   const annualFields = (
     <>
-      <ChoiceGroup label="Como você paga?">
+      <ChoiceGroup label="Como você paga?" hint={ANNUAL_HELP_TEXT.howPaysHint}>
         <Chip label="Uma vez no ano (cota única)" selected={!annual.inParts} onPress={() => setAnnualField('inParts', false)} />
         <Chip label="Em parcelas no ano" selected={annual.inParts} onPress={() => setAnnualField('inParts', true)} />
       </ChoiceGroup>
@@ -750,6 +762,7 @@ export function SeriesForm({
 
       <ChoiceGroup
         label={annual.inParts ? 'Mês da primeira parcela' : 'Mês do vencimento'}
+        hint={annual.inParts ? ANNUAL_HELP_TEXT.monthHintParts : ANNUAL_HELP_TEXT.monthHintSingle}
         error={annual.month === null ? errors.firstMonthText : undefined}>
         {MONTH_SHORT.map((m, i) => (
           <Chip
@@ -766,7 +779,7 @@ export function SeriesForm({
 
       {dayField}
 
-      <ChoiceGroup label="O valor muda de um ano para outro?">
+      <ChoiceGroup label="O valor muda de um ano para outro?" hint={variable ? ANNUAL_HELP_TEXT.changesHint : ANNUAL_HELP_TEXT.sameHint}>
         <Chip label="Sim, muda todo ano (como IPVA e IPTU)" selected={variable} onPress={() => setMode('variavel')} />
         <Chip label="Não, é sempre o mesmo" selected={!variable} onPress={() => setMode('fixo')} />
       </ChoiceGroup>
@@ -777,7 +790,7 @@ export function SeriesForm({
       {startChoices ? (
         <>
           {yearChips.length > 0 ? (
-            <ChoiceGroup label="Primeiro ano" error={startedGroup ? undefined : startErrorShown}>
+            <ChoiceGroup label="Primeiro ano" hint={ANNUAL_HELP_TEXT.firstYearHint} error={startedGroup ? undefined : startErrorShown}>
               {yearChips.map((c) => (
                 <Chip
                   key={startKey(c)}
@@ -862,6 +875,13 @@ export function SeriesForm({
             <Chip label="Todo ano" selected={anual} onPress={() => setKind('anual')} />
             <Chip label="Parcelado" selected={parcelada} onPress={() => setKind('parcelada')} />
           </ChoiceGroup>
+
+          {anual ? (
+            <Banner tone="info" icon={Info} live={false}>
+              <Txt variant="label">{ANNUAL_HELP_TEXT.intro}</Txt>
+              <TopicLink slug="contas-do-ano" label={ANNUAL_HELP_TEXT.whatIsThis} style={styles.inlineLink} />
+            </Banner>
+          ) : null}
 
           {descriptionField}
 
@@ -1007,6 +1027,14 @@ export function SeriesForm({
 
         {anual ? (
           <>
+            <View style={{ gap: space[1] }}>
+              <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={2}>
+                {ANNUAL_HELP_TEXT.nextYearsTitle}
+              </Txt>
+              <Txt variant="label" color={colors.textSecondary}>
+                {ANNUAL_HELP_TEXT.nextYears}
+              </Txt>
+            </View>
             <Txt variant="label" color={colors.textSecondary}>
               Será salva em <Txt variant="label" style={{ fontFamily: fonts.bold }}>{contextName}</Txt>. Cada conta do ano vira uma conta a pagar,
               e só o que você marca como paga entra em Pago.

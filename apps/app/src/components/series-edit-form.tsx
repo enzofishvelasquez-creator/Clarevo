@@ -1,4 +1,5 @@
 import {
+  ANNUAL_HELP_TEXT,
   ANNUAL_SERIES_ERROR_TEXT,
   CATEGORIES,
   DESCRIPTION_MAX,
@@ -435,7 +436,7 @@ export function SeriesEditForm({
       <Screen contentStyle={{ padding: space[5], gap: space[4], paddingBottom: space[6] }}>
         <Txt color={colors.textSecondary}>
           {anual
-            ? 'As alterações valem a partir da conta escolhida. Contas pagas e contas cujo valor você informou ou alterou só naquele ano não mudam. O mês do vencimento não muda aqui.'
+            ? `As alterações valem a partir da conta escolhida. Contas pagas e contas cujo valor você informou ou alterou só naquele ano não mudam. O mês do vencimento não muda aqui. ${ANNUAL_HELP_TEXT.editVsInform}`
             : 'As alterações valem a partir do mês escolhido. Contas pagas e contas alteradas só no mês delas não mudam.'}
         </Txt>
         <Card style={{ gap: space[4] }}>

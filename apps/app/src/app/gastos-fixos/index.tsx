@@ -1,4 +1,5 @@
 import {
+  ANNUAL_HELP_TEXT,
   CALC_UI_TEXT,
   ERROR_TEXT,
   MAX_RECORD_CENTS,
@@ -241,7 +242,7 @@ export default function GastosFixosScreen() {
                 Contas do ano
               </Txt>
               <Txt variant="label" color={colors.textSecondary} style={{ paddingTop: space[1] }}>
-                IPVA, IPTU, matrícula, material escolar e seguro anual. Entram em Contas a pagar dois meses antes de vencer.
+                {ANNUAL_HELP_TEXT.listIntro}
               </Txt>
               {annualActive.map((s, i) => (
                 <SeriesRow key={s.id} series={s} today={today} last={i === annualActive.length - 1} />
