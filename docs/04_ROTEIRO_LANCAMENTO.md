@@ -225,7 +225,7 @@ Pedido de Adriana Velasquez, encaminhado por Enzo em 10/10/2026. Só no core e n
 - [x] Portas: primeira linha de "Decidir uma compra", link ao fim de Simular e da Renda comprometida e o grupo "No app" da busca (financiar, financiamento, poder de compra, entrada, à vista)
 - [x] Roteiro web: bloco "Antes de financiar (D-044)" em `scripts/e2e-web.js` (390 e 320 px, demonstração e conta nova, valores ocultos, nada gravado, links e busca); capturas 230 a 239 em `docs/telas`
 - [ ] Teste em aparelho (iOS e Android): teclado decimal nos campos, anúncio do resultado e a tela com 480 parcelas
-- [ ] **Você:** revisar as regras de detalhe de D-044 (em especial a leitura de "+10% e +20% de entrada", o valor que cada "Juntar para" junta e a frase do comprometido em reais quando não há renda) e os textos
+- [ ] **Você:** revisar as regras de detalhe de D-044 (em especial a leitura de "+10% e +20% de entrada", o alvo único de "Juntar antes" e a frase do comprometido em reais quando não há renda) e os textos
 
 ## Ajustes da revisão de Enzo, parte 1 (D-042), feito
 

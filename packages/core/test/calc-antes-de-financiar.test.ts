@@ -223,11 +223,11 @@ describe('10. Antes de financiar (D-044)', () => {
     });
 
     it('sem entrada, o que falta é o preço inteiro (120.000 ÷ 8.885 = 13,5 → 14 meses); não há mais escolha de "juntar para"', () => {
-      const r = run({ entrada: '' });
+      const r = run({ entrada: '', guardar: '88,85' });
       expect(r.savingTargetCents).toBe(120_000);
       expect(r.savingMonths).toBe(14);
-      expect(r.savingLines[0]).toBe('Guardando R$ 106,62 por mês, sem rendimento, você junta R$ 1.200,00 em 12 meses (1 ano).');
-      expect(r.savingLines[2]).toBe('Juntando: leva 12 meses para juntar o que falta para comprar à vista e não paga juros do financiamento.');
+      expect(r.savingLines[0]).toBe('Guardando R$ 88,85 por mês, sem rendimento, você junta R$ 1.200,00 em 14 meses (1 ano e 2 meses).');
+      expect(r.savingLines[2]).toBe('Juntando: leva 14 meses para juntar o que falta para comprar à vista e não paga juros do financiamento.');
       expect(r.hypotheses).toContain('Juntar para comprar à vista: o valor a juntar é o preço inteiro, R$ 1.200,00.');
       expect('juntarPara' in ANTES_FIELDS).toBe(false);
     });
@@ -420,6 +420,7 @@ describe('conferência com o Python independente (fixtures/antes-de-financiar.py
     taxaBp: number;
     primeiraEmUmMes: boolean;
     parcelaCents: number;
+    lastParcelaCents: number;
     totalCents: number;
     interestCents: number;
   };
@@ -445,7 +446,7 @@ describe('conferência com o Python independente (fixtures/antes-de-financiar.py
         expect(r.nothingToFinance, JSON.stringify(c)).toBe(true);
         continue;
       }
-      expect([r.parcelaCents, r.totalCents, r.interestCents], JSON.stringify(c)).toEqual([c.parcelaCents, c.totalCents, c.interestCents]);
+      expect([r.parcelaCents, r.lastParcelaCents, r.totalCents, r.interestCents], JSON.stringify(c)).toEqual([c.parcelaCents, c.lastParcelaCents, c.totalCents, c.interestCents]);
     }
   });
 

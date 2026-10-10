@@ -5838,7 +5838,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('D44 campos: preço, entrada (opcional), parcelas, taxa ao mês, "A primeira parcela vence em 1 mês?" (Sim marcado), renda e a alternativa de juntar antes',
     ['Preço à vista do bem', 'Entrada', 'Número de parcelas', 'Taxa de juros ao mês (%)', 'Sua renda líquida por mês', 'Quanto você conseguiria guardar por mês', 'Rendimento ao ano (%)'].every((x) => t.includes(x)) &&
     t.includes('A primeira parcela vence em 1 mês?') && t.includes('Não: a primeira parcela é paga na compra.') && (await radio('Sim').getAttribute('aria-checked')) === 'true' && (await radio('Não').getAttribute('aria-checked')) === 'false' &&
-    t.includes('Alternativa: juntar antes') && (await radio('Dar mais entrada').getAttribute('aria-checked')) === 'true' && (await radio('Comprar à vista').getAttribute('aria-checked')) === 'false');
+    t.includes('Alternativa: juntar antes') && (await visibleCount('radio', 'Dar mais entrada')) === 0 && (await visibleCount('radio', 'Comprar à vista')) === 0);
   ok('D44 a taxa e o rendimento nunca vêm preenchidos: taxa em branco, com "Está na proposta do banco ou da loja. Use o CET ao mês, se tiver."; rendimento em branco ("Em branco: sem rendimento.")',
     (await field('Taxa de juros ao mês (%)').inputValue()) === '' && (await field('Rendimento ao ano (%)').inputValue()) === '' && t.includes('Está na proposta do banco ou da loja. Use o CET ao mês, se tiver.') && t.includes('Em branco: sem rendimento.'));
   ok('D44 a renda de referência (R$ 6.000,00) entra sozinha no campo de renda, com a dica de que mudar aqui não altera a referência',
@@ -5869,12 +5869,12 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('D44 hipóteses visíveis: tabela Price com a primeira parcela em 1 mês, só a taxa informada, comprometido do mês atual e "O preço do bem pode mudar enquanto você junta."',
     t.includes('Hipóteses') && t.includes('Parcelas iguais (tabela Price), a primeira 1 mês depois da compra.') && t.includes('Só a taxa de juros informada, sem tarifas, seguros e IOF.') &&
     t.includes('O comprometido é o do mês atual, com as contas a pagar já criadas; os meses seguintes podem ser diferentes.') && t.includes('O preço do bem pode mudar enquanto você junta.'));
-  ok('D44 juntar antes (dar mais entrada, sem rendimento): guardando R$ 1.041,14 por mês, junta R$ 32.000,00 em 31 meses (2 anos e 7 meses), com a comparação neutra',
+  ok('D44 juntar antes (o que falta para comprar à vista, sem rendimento): guardando R$ 1.041,14 por mês, junta R$ 32.000,00 em 31 meses (2 anos e 7 meses), com a comparação neutra',
     t.includes('Guardando R$ 1.041,14 por mês, sem rendimento, você junta R$ 32.000,00 em 31 meses (2 anos e 7 meses).') &&
-    t.includes('Financiando: você usa o bem agora e paga R$ 17.974,72 de juros ao longo de 48 meses.') && t.includes('Juntando: leva 31 meses para juntar o valor que seria financiado e não paga juros do financiamento.'));
+    t.includes('Financiando: você usa o bem agora e paga R$ 17.974,72 de juros ao longo de 48 meses.') && t.includes('Juntando: leva 31 meses para juntar o que falta para comprar à vista e não paga juros do financiamento.'));
   ok('D44 entrada maior: mais 10% (R$ 4.000,00) e 20% (R$ 8.000,00) do preço, com a parcela, os juros e a diferença, e o atalho "Fazer a conta com outra entrada"',
-    t.includes('Com uma entrada maior') && t.includes('Mais 10% do preço de entrada (R$ 4.000,00): parcela de R$ 910,99 e juros de R$ 15.727,52 (R$ 2.247,20 a menos).') &&
-    t.includes('Mais 20% do preço de entrada (R$ 8.000,00): parcela de R$ 780,85 e juros de R$ 13.480,80 (R$ 4.493,92 a menos).') && (await visibleCount('button', 'Fazer a conta com outra entrada')) === 1);
+    t.includes('Com uma entrada maior') && t.includes('Com mais 10% do preço na entrada (R$ 4.000,00): parcela de R$ 910,99 e juros de R$ 15.727,52 (R$ 2.247,20 a menos).') &&
+    t.includes('Com mais 20% do preço na entrada (R$ 8.000,00): parcela de R$ 780,85 e juros de R$ 13.480,80 (R$ 4.493,92 a menos).') && (await visibleCount('button', 'Fazer a conta com outra entrada')) === 1);
   ok('D44 depois do resultado: "Anotar como parcelamento" e "Criar meta com este valor" (com a dica de que a taxa de rendimento não é gravada)',
     (await visibleCount('button', 'Anotar como parcelamento')) === 1 && (await visibleCount('button', 'Criar meta com este valor')) === 1 && t.includes('A meta recebe o valor, o prazo e o valor por mês. A taxa de rendimento não é gravada.'));
   ok('D44 os títulos: "Resultado", "Hipóteses", "Juntar antes" e "Com uma entrada maior" são títulos da tela', (await headingList()).filter((h) => /^[23]:(Resultado|Hipóteses|Juntar antes|Com uma entrada maior|Alternativa: juntar antes)$/.test(h)).length === 5, JSON.stringify(await headingList()));
@@ -5911,18 +5911,18 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     t.includes('Com estes números, são 48 parcelas de R$ 1.020,82.') && t.includes('Você paga por 48 meses (4 anos), a primeira na compra, até setembro de 2030.') && t.includes('Total pago: R$ 56.999,36 (entrada de R$ 8.000,00 mais 48 × R$ 1.020,82).') && t.includes('Juros: R$ 16.999,36.') &&
     t.includes('Parcelas iguais (tabela Price), a primeira paga na compra e as outras a cada mês.'));
   await radio('Sim').click(); await p.waitForTimeout(300);
-  await radio('Comprar à vista').click(); await d44Fill('Quanto você conseguiria guardar por mês', '1500'); await d44Fill('Rendimento ao ano (%)', '8');
+  await d44Fill('Quanto você conseguiria guardar por mês', '1500'); await d44Fill('Rendimento ao ano (%)', '8');
   t = await body();
-  ok('D44 comprar à vista, R$ 1.500,00 por mês e 8% ao ano: junta R$ 40.000,00 em 25 meses (2 anos e 1 mês); a hipótese diz o rendimento, os depósitos no início do mês e que o preço pode mudar',
-    t.includes('Guardando R$ 1.500,00 por mês, com rendimento de 8% ao ano, você junta R$ 40.000,00 em 25 meses (2 anos e 1 mês).') &&
-    t.includes('Juntando: leva 25 meses para comprar à vista e não paga juros do financiamento.') &&
+  ok('D44 juntar antes, R$ 1.500,00 por mês e 8% ao ano: junta R$ 32.000,00 em 20 meses (1 ano e 8 meses); a hipótese diz o rendimento, os depósitos no início do mês e que o preço pode mudar',
+    t.includes('Guardando R$ 1.500,00 por mês, com rendimento de 8% ao ano, você junta R$ 32.000,00 em 20 meses (1 ano e 8 meses).') &&
+    t.includes('Juntando: leva 20 meses para juntar o que falta para comprar à vista e não paga juros do financiamento.') &&
     t.includes('Rendimento de 8% ao ano (0,64% ao mês, taxa equivalente), informado por você, constante no período e sem imposto ou taxas.') &&
-    t.includes('Depósitos no início de cada mês, como na Calculadora do Cidadão do Banco Central; prazo em meses inteiros, para cima.') && t.includes('Juntar para comprar à vista: o valor a juntar é o preço inteiro, R$ 40.000,00.') && t.includes('O preço do bem pode mudar enquanto você junta.'));
+    t.includes('Depósitos no início de cada mês, como na Calculadora do Cidadão do Banco Central; prazo em meses inteiros, para cima.') && t.includes('Juntar para comprar à vista: o valor a juntar é o que falta, o preço menos a entrada de R$ 8.000,00 que você já tem: R$ 32.000,00.') && t.includes('O preço do bem pode mudar enquanto você junta.'));
   await d44Fill('Rendimento ao ano (%)', '31');
   t = await body();
   ok('D44 rendimento acima de 30%: erro no campo ("Use um rendimento de 0% a 30% ao ano, com até 2 casas.") e o texto de espera no resultado', t.includes('Use um rendimento de 0% a 30% ao ano, com até 2 casas.') && t.includes('Preencha os campos para ver o resultado.'));
   await d44Fill('Rendimento ao ano (%)', '');
-  await radio('Dar mais entrada').click(); await d44Fill('Quanto você conseguiria guardar por mês', '');
+  await d44Fill('Quanto você conseguiria guardar por mês', '');
   t = await body();
   ok('D44 rendimento e valor por mês em branco: volta a "sem rendimento" e ao valor da parcela (31 meses)', t.includes('Guardando R$ 1.041,14 por mês, sem rendimento, você junta R$ 32.000,00 em 31 meses (2 anos e 7 meses).'));
   await d44Fill('Entrada', '40000');
@@ -5950,7 +5950,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await d44Fill('Entrada', '12000');
   t = await body();
   ok('D44 com a entrada de R$ 12.000,00 a conta refaz tudo (financia R$ 28.000,00) e as linhas de entrada maior somam 10% e 20% do preço à entrada nova',
-    t.includes('Mais 10% do preço de entrada (R$ 4.000,00)') && t.includes('Mais 20% do preço de entrada (R$ 8.000,00)') && t.includes('junta R$ 28.000,00 em') && t.includes('entrada de R$ 12.000,00 mais 48 ×'));
+    t.includes('Com mais 10% do preço na entrada (R$ 4.000,00)') && t.includes('Com mais 20% do preço na entrada (R$ 8.000,00)') && t.includes('junta R$ 28.000,00 em') && t.includes('entrada de R$ 12.000,00 mais 48 ×'));
   await d44Fill('Entrada', '8000');
 
   // ---- 6. "Anotar como parcelamento" e "Criar meta com este valor": abrem o cadastro e a meta preenchidos, sem gravar nada ----
