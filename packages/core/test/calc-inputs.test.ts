@@ -83,7 +83,7 @@ describe('calculadoras: leitura dos campos', () => {
 });
 
 describe('calculadoras: catálogo e textos fixos', () => {
-  it('8 calculadoras em 3 grupos, na ordem da tela', () => {
+  it('9 calculadoras em 3 grupos, na ordem da tela', () => {
     expect(CALC_GROUPS.map((g) => g.title)).toEqual(['Decidir uma compra', 'Dívidas e atrasos', 'Guardar e dividir']);
     expect(CALC_SLUGS).toEqual([
       'parcelado-ou-a-vista',
@@ -91,17 +91,19 @@ describe('calculadoras: catálogo e textos fixos', () => {
       'custo-da-divida',
       'quitar-antes',
       'multa-e-juros',
+      'plano-dividas',
       'reserva',
       'juntar-para-objetivo',
       'dividir-contas',
     ]);
-    expect(CALC_GROUPS.map((g) => calculatorsInGroup(g.id).length)).toEqual([2, 3, 3]);
+    expect(CALC_GROUPS.map((g) => calculatorsInGroup(g.id).length)).toEqual([2, 4, 3]);
     expect(CALCULATORS.map((c) => c.title)).toEqual([
       'Parcelado ou à vista?',
       'Quanto custa por ano?',
       'Quanto custa uma dívida?',
       'Quitar antes ou adiantar parcelas',
       'Multa e juros por atraso',
+      'Em que ordem quitar as dívidas?',
       'Reserva para imprevistos',
       'Juntar para um objetivo',
       'Dividir as contas da casa',
@@ -118,7 +120,8 @@ describe('calculadoras: catálogo e textos fixos', () => {
     const labels = CALCULATORS.map((c) => calcRowA11yLabel(c.title, c.subtitle));
     expect(labels[0]).toBe('Parcelado ou à vista? Descubra os juros embutidos no parcelado');
     expect(labels[2]).toBe('Quanto custa uma dívida? Rotativo, cheque especial ou empréstimo');
-    expect(labels[5]).toBe('Reserva para imprevistos. Quantos meses seus gastos essenciais cobrem');
+    expect(labels[5]).toBe('Em que ordem quitar as dívidas? Duas ordens de pagamento, lado a lado');
+    expect(labels[6]).toBe('Reserva para imprevistos. Quantos meses seus gastos essenciais cobrem');
     for (const label of labels) expect(label).not.toMatch(/[?!.]\./);
     expect(calcRowA11yLabel('Todas as calculadoras')).toBe('Todas as calculadoras');
     expect(calcRowA11yLabel('Calculadoras', '')).toBe('Calculadoras');

@@ -1,5 +1,6 @@
 import {
   ESSENTIAL_LOOKBACK_MONTHS,
+  INSTALLMENT_NATURES,
   addMonths,
   annualCommitmentIds,
   categoryBreakdown,
@@ -13,6 +14,8 @@ import {
   loadInvoicesOfRecords,
   receiptKeyValid,
   reserveEssentialBaseCents,
+  seriesDebtDrafts,
+  seriesEnded,
   loadReturnReview,
   monthOf,
   newOperationKey,
@@ -81,6 +84,7 @@ import {
   type SavingsCardState,
   type SavingsCheck,
   type SeriesAction,
+  type SeriesDebtDraft,
   type SeriesEditInput,
   type SeriesInput,
   type SeriesWrite,
@@ -332,6 +336,37 @@ export function useSeriesList(contextId: string | undefined, enabled = true) {
     enabled: Boolean(contextId) && enabled && synced(sync),
   });
   return afterSync(sync, query);
+}
+
+/**
+ * Dívidas da calculadora "Em que ordem quitar as dívidas?" (D-040): os parcelamentos ativos com parcelas a vencer (financiamento,
+ * compra parcelada e outro parcelamento), com o valor da próxima parcela e quantas faltam. Só leitura: a calculadora nunca
+ * grava nem altera um parcelamento. As consultas são as mesmas do detalhe do parcelamento (mesmas chaves). Sem dado parcial:
+ * falha de uma consulta falha o conjunto.
+ */
+export function useSeriesDebts(contextId: string | undefined) {
+  const repo = useRepo();
+  const { today } = useSession();
+  const series = useSeriesList(contextId);
+  const eligible = useMemo(
+    () => (series.data ?? []).filter((s) => s.kind === 'parcelada' && INSTALLMENT_NATURES.includes(s.nature) && !seriesEnded(s, today)),
+    [series.data, today],
+  );
+  const occurrences = useQueries({
+    queries: eligible.map((s) => ({ queryKey: ['series', 'occurrences', s.id], queryFn: () => repo.listSeriesOccurrences(s.id) })),
+  });
+  const open = useQueries({
+    queries: eligible.map((s) => ({ queryKey: ['series', 'open', s.id], queryFn: () => repo.listOpenSeriesOccurrences(s.id) })),
+  });
+  const parts: QueryPart[] = [series, ...occurrences, ...open];
+  const ready = parts.every((p) => p.isSuccess);
+  const version = stamp([...occurrences, ...open]);
+  const value = useMemo(
+    (): SeriesDebtDraft[] | undefined =>
+      ready ? seriesDebtDrafts(eligible.map((s, i) => ({ series: s, occurrences: occurrences[i]!.data!, open: open[i]!.data! })), today) : undefined,
+    [ready, eligible, today, version], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  return combineParts<SeriesDebtDraft[]>(parts, value);
 }
 
 /** Um gasto fixo, depois da sincronização do dia do contexto (as contagens de contas dependem dela). */

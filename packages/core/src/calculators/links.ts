@@ -12,6 +12,7 @@ import type { DividirInput, DividirModo } from './dividir-contas';
 import type { ObjetivoInput, ObjetivoModo } from './juntar-para-objetivo';
 import type { MultaInput } from './multa-e-juros';
 import type { ParceladoInput, ParceladoModo } from './parcelado-ou-a-vista';
+import type { PlanoInput } from './plano-dividas';
 import { PARCELADO_RANGE } from './parcelado-ou-a-vista';
 import type { QuitarInput, QuitarModo } from './quitar-antes';
 import type { ReservaInput } from './reserva';
@@ -29,6 +30,7 @@ export interface CalcInputMap {
   'custo-da-divida': DividaInput;
   'quitar-antes': QuitarInput;
   'multa-e-juros': MultaInput;
+  'plano-dividas': PlanoInput;
   reserva: ReservaInput;
   'juntar-para-objetivo': ObjetivoInput;
   'dividir-contas': DividirInput;
@@ -41,6 +43,8 @@ export interface CalcLinkValueMap {
   'custo-da-divida': { tipo?: DividaTipo; valorCents?: Cents; parcelas?: number };
   'quitar-antes': { parcelaCents?: Cents; restantes?: number; modo?: QuitarModo; prazosEmDias?: readonly number[] };
   'multa-e-juros': { valorCents?: Cents; dias?: number };
+  /** Sem parâmetros: as dívidas vêm dos parcelamentos da própria tela, e a taxa é sempre digitada. */
+  'plano-dividas': Record<never, never>;
   reserva: { essenciaisCents?: Cents };
   'juntar-para-objetivo': { alvoCents?: Cents; modo?: ObjetivoModo };
   'dividir-contas': { totalCents?: Cents; modo?: DividirModo };
@@ -106,6 +110,8 @@ export function calcLinkParams<S extends CalcSlug>(slug: S, values: CalcLinkValu
       put(out, 'dias', x.dias);
       break;
     }
+    case 'plano-dividas':
+      break;
     case 'reserva':
       put(out, 'valor', (v as CalcLinkValueMap['reserva']).essenciaisCents);
       break;
@@ -177,6 +183,7 @@ function compact<T extends object>(obj: T): T {
  * - quitar-antes: parcela (ou valor), parcelas (→ restantes, 1 a 480), modo (tudo | ultimas), prazos (→ prazosEmDias;
  *   sem parcelas, restantes = quantidade de prazos; com quantidade diferente, os prazos são ignorados);
  * - multa-e-juros: valor, dias (1 a 3.650);
+ * - plano-dividas: nenhum (as dívidas vêm dos parcelamentos da própria tela);
  * - reserva: valor (→ essenciais);
  * - juntar-para-objetivo: total ou valor (→ alvo), modo (prazo | mensal);
  * - dividir-contas: total ou valor, modo (iguais | renda).
@@ -216,6 +223,9 @@ export function calcPrefill(slug: string, params: RouteParams): CalcPrefill<Calc
       }
       case 'multa-e-juros':
         out = { valor: money(params, 'valor'), dias: count(params, 'dias', 1, 3_650) };
+        break;
+      case 'plano-dividas':
+        out = {};
         break;
       case 'reserva':
         out = { essenciais: money(params, 'valor') };

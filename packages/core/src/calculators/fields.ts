@@ -7,6 +7,7 @@ import { CALC_ERROR_TEXT, type CalcErrorCode } from './inputs';
 import { OBJETIVO_FIELDS } from './juntar-para-objetivo';
 import { MULTA_FIELDS } from './multa-e-juros';
 import { COTA_UNICA_FIELDS, PARCELADO_FIELDS } from './parcelado-ou-a-vista';
+import { PLANO_FIELDS } from './plano-dividas';
 import { QUITAR_FIELDS } from './quitar-antes';
 import { RESERVA_FIELDS } from './reserva';
 
@@ -17,6 +18,7 @@ export const CALC_FIELDS: Record<CalcSlug, Record<string, CalcFieldSpec>> = {
   'custo-da-divida': DIVIDA_FIELDS,
   'quitar-antes': QUITAR_FIELDS,
   'multa-e-juros': MULTA_FIELDS,
+  'plano-dividas': PLANO_FIELDS,
   reserva: RESERVA_FIELDS,
   'juntar-para-objetivo': OBJETIVO_FIELDS,
   'dividir-contas': DIVIDIR_FIELDS,

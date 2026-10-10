@@ -7,6 +7,7 @@ export type CalcSlug =
   | 'custo-da-divida'
   | 'quitar-antes'
   | 'multa-e-juros'
+  | 'plano-dividas'
   | 'reserva'
   | 'juntar-para-objetivo'
   | 'dividir-contas';
@@ -30,6 +31,7 @@ export const CALCULATORS: readonly CalcInfo[] = [
   { slug: 'custo-da-divida', title: 'Quanto custa uma dívida?', subtitle: 'Rotativo, cheque especial ou empréstimo', group: 'dividas' },
   { slug: 'quitar-antes', title: 'Quitar antes ou adiantar parcelas', subtitle: 'Uma estimativa de quanto dos juros sai da conta', group: 'dividas' },
   { slug: 'multa-e-juros', title: 'Multa e juros por atraso', subtitle: 'Com os valores do boleto', group: 'dividas' },
+  { slug: 'plano-dividas', title: 'Em que ordem quitar as dívidas?', subtitle: 'Duas ordens de pagamento, lado a lado', group: 'dividas' },
   { slug: 'reserva', title: 'Reserva para imprevistos', subtitle: 'Quantos meses seus gastos essenciais cobrem', group: 'guardar' },
   { slug: 'juntar-para-objetivo', title: 'Juntar para um objetivo', subtitle: 'Quanto guardar por mês ou em quanto tempo', group: 'guardar' },
   { slug: 'dividir-contas', title: 'Dividir as contas da casa', subtitle: 'Partes iguais ou pela renda de cada pessoa', group: 'guardar' },
@@ -107,6 +109,7 @@ export const CALC_UI_TEXT = {
     cotaUnica: 'Cota única ou parcelado? Fazer a conta',
     multa: 'Calcular multa e juros',
     quitar: 'Quanto economizo se quitar antes?',
+    ordem: 'Em que ordem quitar? Fazer as contas',
     custoAno: 'Quanto custa por ano?',
     dividir: 'Dividir estas contas',
     familia: 'Enquanto isso, dividir as contas da casa',

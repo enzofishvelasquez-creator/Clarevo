@@ -8,6 +8,7 @@ import { DividirContasCalc } from '@/components/calc/dividir-contas';
 import { JuntarParaObjetivoCalc } from '@/components/calc/juntar-para-objetivo';
 import { MultaEJurosCalc } from '@/components/calc/multa-e-juros';
 import { ParceladoCalc } from '@/components/calc/parcelado-ou-a-vista';
+import { PlanoDividasCalc } from '@/components/calc/plano-dividas';
 import { QuitarAntesCalc } from '@/components/calc/quitar-antes';
 import { ReservaCalc } from '@/components/calc/reserva';
 import { SubHeader } from '@/components/header';
@@ -33,6 +34,8 @@ export default function CalculadoraScreen() {
       return <QuitarAntesCalc prefill={calcPrefill(slug, params)} />;
     case 'multa-e-juros':
       return <MultaEJurosCalc prefill={calcPrefill(slug, params)} />;
+    case 'plano-dividas':
+      return <PlanoDividasCalc />;
     case 'reserva':
       return <ReservaCalc prefill={calcPrefill(slug, params)} />;
     case 'juntar-para-objetivo':

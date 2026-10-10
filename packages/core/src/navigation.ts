@@ -336,6 +336,13 @@ export const APP_SCREENS: readonly AppScreen[] = [
     keywords: ['calculadora', 'calculadoras', 'calcular', 'cálculo', 'fazer a conta', 'à vista', 'quitar', 'multa', 'dividir contas'],
   },
   {
+    id: 'plano-dividas',
+    title: 'Em que ordem quitar as dívidas?',
+    caption: 'Compare duas ordens de pagamento para sair das dívidas',
+    href: '/calcular/plano-dividas',
+    keywords: ['dívida', 'dívidas', 'quitar', 'quitação', 'bola de neve', 'avalanche', 'sair das dívidas', 'ordem de pagamento', 'rotativo', 'cheque especial', 'financiamento'],
+  },
+  {
     id: 'ultimos-meses',
     title: 'Seus últimos meses',
     caption: 'Atualizar os meses em que você não anotou nada, sem cobrança',

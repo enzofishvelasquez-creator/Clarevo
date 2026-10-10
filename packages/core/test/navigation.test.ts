@@ -53,6 +53,7 @@ describe('barra inferior (D-039)', () => {
     for (const path of [
       '/calcular',
       '/calcular/reserva',
+      '/calcular/plano-dividas',
       '/calcular/parcelado-ou-a-vista',
       '/a-pagar',
       '/a-pagar/9c1f2f5e-3b0c-4d79-9a0e-5b0f6c1d2e3f',
@@ -204,6 +205,11 @@ describe('busca de Aprender: grupo "No app" (D-039)', () => {
     expect(first('esconder valores')).toBe('ocultar-valores');
     expect(first('voltei')).toBe('ultimos-meses');
     expect(first('calculadora')).toBe('calculadoras');
+    // Plano para quitar dívidas (D-040): as palavras que a pessoa usa para procurar.
+    for (const query of ['dívida', 'dívidas', 'quitar', 'bola de neve', 'avalanche', 'sair das dívidas']) expect(ids(query), query).toContain('plano-dividas');
+    expect(first('bola de neve')).toBe('plano-dividas');
+    expect(first('avalanche')).toBe('plano-dividas');
+    expect(first('dívida')).toBe('plano-dividas');
     expect(first('renda comprometida')).toBe('renda-comprometida');
     expect(ids('guardar')).toContain('metas');
   });
@@ -232,7 +238,9 @@ describe('busca de Aprender: grupo "No app" (D-039)', () => {
       expect(s.keywords.length, s.id).toBeGreaterThan(2);
       const path = normalizePath(s.href);
       expect(s.href.startsWith('/'), s.id).toBe(true);
-      expect(path === '/' || routes.includes(path), `${s.id}: ${path}`).toBe(true);
+      // Um endereço fixo (/calcular/plano-dividas) também é válido quando a rota é dinâmica (/calcular/[slug]).
+      const dynamic = routes.some((r) => r.includes('[') && new RegExp(`^${r.replace(/\[[^\]]+\]/g, '[^/]+')}$`).test(path));
+      expect(path === '/' || routes.includes(path) || dynamic, `${s.id}: ${path}`).toBe(true);
     }
     expect(appScreenIsTab({ href: '/metas' })).toBe(true);
     expect(appScreenIsTab({ href: '/a-pagar' })).toBe(false);

@@ -24,6 +24,7 @@ import { SubHeader } from '@/components/header';
 import { ChoiceGroup } from '@/components/series-parts';
 import { LinkButton, Screen, TextField, Txt, spaceKeyPress, styles as ui } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
+import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 
 /**
@@ -78,11 +79,19 @@ export function CalcDisclaimer() {
 }
 
 /** Caixa de aviso dentro do resultado (estimativa, teto do cheque especial, CET, boleto atualizado). */
-export function CalcNote({ children }: { children: ReactNode }) {
+export function CalcNote({ children, label }: { children: ReactNode; label?: string }) {
   return (
     <View style={styles.note}>
       <Info size={18} color={colors.brand} style={{ marginTop: 1 }} aria-hidden />
-      <View style={{ flex: 1, gap: space[1] }}>{typeof children === 'string' ? <Txt variant="label">{children}</Txt> : children}</View>
+      <View style={{ flex: 1, gap: space[1] }}>
+        {typeof children === 'string' ? (
+          <Txt variant="label" accessibilityLabel={label}>
+            {children}
+          </Txt>
+        ) : (
+          children
+        )}
+      </View>
     </View>
   );
 }
@@ -98,18 +107,22 @@ export function CalcResult({
   title = CALC_UI_TEXT.resultTitle,
   level = 2,
   waiting = CALC_UI_TEXT.waiting,
+  maskMoney = false,
   children,
 }: {
   texts: CalcTexts | null;
   title?: string;
   level?: 2 | 3;
   waiting?: string;
+  /** Com "Ocultar valores" ligado, os valores em reais do resultado aparecem como "R$ ••••" (só para o que vem de dados guardados). */
+  maskMoney?: boolean;
   children?: ReactNode;
 }) {
-  const [lead, ...rest] = texts?.resultLines ?? [];
+  const hidden = useValuesHidden() && maskMoney;
+  const [lead, ...rest] = (texts?.resultLines ?? []).map((l) => maskMoneyText(l, hidden));
   const shown = texts && lead !== undefined;
   // Anuncia o resultado inteiro: uma troca que mantém a primeira linha (como a taxa) também é dita.
-  const spoken = shown ? texts.resultLines.join(' ') : waiting;
+  const spoken = shown ? (texts.resultLines.map((l) => maskMoneyLabel(l, hidden)).join(' ')) : waiting;
   // O que já foi dito (ou estava na tela ao abrir): só uma troca é anunciada.
   const lastSpoken = useRef(spoken);
   useEffect(() => {
@@ -128,11 +141,13 @@ export function CalcResult({
       <View collapsable={false} style={{ gap: space[3] }} accessibilityLiveRegion="polite" aria-live="polite">
         {shown ? (
           <>
-            <Txt style={[styles.lead, tabular]}>{lead}</Txt>
+            <Txt style={[styles.lead, tabular]} accessibilityLabel={hidden ? maskMoneyLabel(texts.resultLines[0]!, true) : undefined}>
+              {lead}
+            </Txt>
             {rest.length > 0 ? (
               <View style={{ gap: space[1] }}>
                 {rest.map((line, i) => (
-                  <Txt key={`${i}-${line}`} style={tabular}>
+                  <Txt key={`${i}-${line}`} style={tabular} accessibilityLabel={hidden ? maskMoneyLabel(texts.resultLines[i + 1]!, true) : undefined}>
                     {line}
                   </Txt>
                 ))}
@@ -146,7 +161,9 @@ export function CalcResult({
       {texts && shown ? (
         <>
           {texts.notes.map((n, i) => (
-            <CalcNote key={`${i}-${n}`}>{n}</CalcNote>
+            <CalcNote key={`${i}-${n}`} label={hidden ? maskMoneyLabel(n, true) : undefined}>
+              {maskMoneyText(n, hidden)}
+            </CalcNote>
           ))}
           {texts.hypotheses.length > 0 ? (
             <View style={{ gap: space[1] }}>
@@ -261,6 +278,8 @@ export function CalcTextField({
   onChangeText,
   onBlur,
   error,
+  accessibilityLabel,
+  editable,
 }: {
   spec: CalcFieldSpec;
   label?: string;
@@ -269,6 +288,10 @@ export function CalcTextField({
   onChangeText: (text: string) => void;
   onBlur: () => void;
   error?: string;
+  /** Nome acessível mais longo que o rótulo visível (que continua no começo), para campos repetidos por dívida ou pessoa. */
+  accessibilityLabel?: string;
+  /** false: mostra o valor sem deixar editar (valores ocultos). */
+  editable?: boolean;
 }) {
   const money = spec.kind === 'dinheiro';
   const integer = spec.kind === 'inteiro';
@@ -287,6 +310,8 @@ export function CalcTextField({
       autoCorrect={false}
       autoComplete="off"
       error={error}
+      {...(accessibilityLabel !== undefined ? { accessibilityLabel } : {})}
+      {...(editable === false ? { editable: false } : {})}
     />
   );
 }

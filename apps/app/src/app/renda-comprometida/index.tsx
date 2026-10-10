@@ -1,4 +1,5 @@
 import {
+  CALC_UI_TEXT,
   COMMITTED_GROUPS,
   COMMITTED_TEXT,
   DEBT_REFERENCE,
@@ -15,11 +16,12 @@ import {
   type IsoMonth,
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ExternalLink, ListChecks, Repeat, ShieldCheck, Wallet } from 'lucide-react-native';
+import { ExternalLink, ListChecks, ListOrdered, Repeat, ShieldCheck, Wallet } from 'lucide-react-native';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInLeft, FadeInRight, ReduceMotion } from 'react-native-reanimated';
 
+import { openCalc } from '@/components/calc/open';
 import { CommitmentRow } from '@/components/commitment-row';
 import { FitText, GroupBar, Meter, MeterLegend, useMoneyMask } from '@/components/committed-parts';
 import { FlashBanner, useFlash } from '@/components/flash';
@@ -212,8 +214,15 @@ function Composition({ s, t }: { s: CommittedSummary; t: CommittedTexts }) {
           {t.invoiceNote}
         </Txt>
       ) : null}
+      {/* Com dívidas ou faturas de cartão no mês: o caminho para a conta da ordem de pagamento (só a conta, nada é gravado). */}
+      {t.debt || t.invoiceNote ? <OrderLink /> : null}
     </Card>
   );
+}
+
+/** "Em que ordem quitar? Fazer as contas": abre a calculadora (D-040), que lê os parcelamentos e não grava nada. */
+function OrderLink() {
+  return <LinkButton label={CALC_UI_TEXT.links.ordem} icon={ListOrdered} style={styles.inlineLink} onPress={() => openCalc('plano-dividas')} />;
 }
 
 function GroupRow({ g, hasReference }: { g: CommittedGroupLine; hasReference: boolean }) {

@@ -1,8 +1,9 @@
-import { CALC_UI_TEXT, COMMITTED_TEXT, ERROR_TEXT, GOALS_NAV_TEXT, GOALS_TEXT, goalsMonthTexts, monthOf, type Goal } from '@clarevo/core';
+import { CALC_UI_TEXT, COMMITTED_TEXT, calculatorBySlug, ERROR_TEXT, GOALS_NAV_TEXT, GOALS_TEXT, goalsMonthTexts, monthOf, type Goal } from '@clarevo/core';
 import { router } from 'expo-router';
-import { Calculator, ChartLine, Plus, ShieldCheck } from 'lucide-react-native';
+import { Calculator, ChartLine, ListOrdered, Plus, ShieldCheck } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { openCalc } from '@/components/calc/open';
 import { CalcNavRow } from '@/components/calc/parts';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ClosedGoals, GoalCard, ReserveCard } from '@/components/goal-cards';
@@ -81,6 +82,12 @@ export default function MetasScreen() {
             </Txt>
             <Card style={{ paddingVertical: space[2] }}>
               <CalcNavRow icon={ChartLine} title={GOALS_TEXT.simulateTitle} caption={GOALS_TEXT.simulateBody} onPress={() => router.push('/simular')} />
+              <CalcNavRow
+                icon={ListOrdered}
+                title={calculatorBySlug('plano-dividas')!.title}
+                caption={calculatorBySlug('plano-dividas')!.subtitle}
+                onPress={() => openCalc('plano-dividas')}
+              />
               <CalcNavRow
                 icon={Calculator}
                 title={GOALS_TEXT.calculators}

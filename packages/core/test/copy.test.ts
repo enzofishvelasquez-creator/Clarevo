@@ -127,6 +127,9 @@ import {
   calcJuntarParaObjetivo,
   calcRowA11yLabel,
   calcMultaEJuros,
+  calcPlanoDividas,
+  PLANO_ESTIMATE_TEXT,
+  PLANO_TEXT,
   calcParceladoOuAVista,
   calcQuitarAntes,
   calcReserva,
@@ -409,6 +412,23 @@ function calculatorResultTexts(): { all: string[]; multa: string[]; quitar: stri
   all.push(...outcomeTexts(calcDividirContas({ total: '100,00', modo: 'iguais', pessoas: [{}, { apelido: 'Ana' }, {}] })));
   all.push(...outcomeTexts(calcDividirContas({ total: '3.000,00', modo: 'renda', pessoas: [{ renda: '4.000,00' }, { renda: '6.000,00' }] })));
   all.push(...outcomeTexts(calcDividirContas({ total: '0,01', modo: 'renda', pessoas: [{ renda: '9.999.999,99' }, { renda: '9.999.999,99' }] })));
+  // Plano para quitar dívidas (D-040): resultado, sequências, diferenças, hipóteses e notas de várias combinações.
+  const planos = [
+    { extra: '200,00', dividas: [{ tipo: 'saldo' as const, saldo: '2.000,00', taxaSaldo: '2', pagamento: '60,00' }, { tipo: 'saldo' as const, saldo: '4.000,00', taxaSaldo: '5', pagamento: '300,00' }] },
+    { dividas: [{ tipo: 'parcelada' as const, parcela: '100,00', restantes: '3' }, { tipo: 'saldo' as const, saldo: '900,00', taxaSaldo: '5', pagamento: '200,00', apelido: 'Cartão azul' }] },
+    { dividas: [{ tipo: 'saldo' as const, saldo: '1.000,00', taxaSaldo: '8', pagamento: '50,00' }] },
+    { extra: '100,00', dividas: [{ tipo: 'parcelada' as const, parcela: '850,00', restantes: '36', taxaParcelada: '1,5' }] },
+    { dividas: [{ tipo: 'parcelada' as const, parcela: '850,00', restantes: '36', taxaParcelada: '1,5' }] },
+    { dividas: [{ tipo: 'saldo' as const, saldo: '100.000,00', taxaSaldo: '1', pagamento: '1.000,01' }] },
+    { dividas: [{ tipo: 'saldo' as const, saldo: '100.000,00', taxaSaldo: '1', pagamento: '1.000,01' }, { tipo: 'saldo' as const, saldo: '50.000,00', taxaSaldo: '1', pagamento: '500,01' }] },
+  ];
+  for (const today of [undefined, '2026-10-10'])
+    for (const input of planos) {
+      const out = calcPlanoDividas(input, today);
+      if (!out.ok) continue;
+      all.push(...outcomeTexts(out), ...out.result.differences);
+      for (const s of out.result.scenarios) all.push(s.title, s.summary, ...s.detailLines, ...s.sequenceLines);
+    }
   return { all: [...all, ...multa, ...quitar], multa, quitar };
 }
 
@@ -469,6 +489,13 @@ describe('textos das calculadoras e de "Achar tudo"', () => {
       MULTA_EXACT_TEXT,
       RESERVA_REFERENCIA.text,
       ...Object.values(RESERVA_TEXT),
+      PLANO_ESTIMATE_TEXT,
+      ...staticStrings(PLANO_TEXT),
+      PLANO_TEXT.removeDebtA11y('Cartão azul'),
+      PLANO_TEXT.debtTitle(0),
+      PLANO_TEXT.balanceStaysNote('Rotativo', 8_000),
+      PLANO_TEXT.savingsHint(30_000),
+      PLANO_TEXT.hypotheses.noRate('Dívida 1'),
       ...CALCULATORS.flatMap((c) => [c.title, c.subtitle, calcRowA11yLabel(c.title, c.subtitle)]),
       ...CALC_GROUPS.map((g) => g.title),
       ...Object.values(CALC_ERROR_TEXT),

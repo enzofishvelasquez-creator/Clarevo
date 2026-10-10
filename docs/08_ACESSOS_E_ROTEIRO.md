@@ -474,7 +474,7 @@ Situação em 10/10/2026, depois dos Ciclos A6 (D-035), A4 (D-030), A5 (D-031 e 
 | Lembretes de vencimento (A2) | Existe (D-025), só no aparelho: um aviso no dia anterior, sem valor nem descrição. Falta: o teste em aparelho, que Enzo fará com o app pronto (`docs/04`) | Conta › interruptor; aviso no celular |
 | Renda comprometida (B) | Existe (D-026), com renda de referência, "Próximos meses" e linha informativa das contas do ano. O roteiro web (`e2e-web.js`) cobre as telas. Falta: o teste em aparelho (`docs/04`) | Linha dentro do card "Ainda a pagar", `/renda-comprometida` |
 | Simulador (D) | Existe (D-028): `/simular` com três modos, taxa digitada, resultado sem rendimento ao lado, ano a ano e "Criar meta com estes valores"; "Simular com rendimento" na calculadora "Juntar para um objetivo". O roteiro web (`e2e-web.js`) cobre as telas. Falta: o teste em aparelho e a conferência com a Calculadora do Cidadão (`docs/04`) | `/simular`; Metas; detalhe da meta; calculadora; Aprender |
-| Calculadoras, "Somar valores", atalhos do ícone na web | Existe (A6, D-035): 8 calculadoras, "Somar valores" em todos os campos Valor, 4 atalhos no manifesto e volta à tela pedida depois de entrar. Falta: teste em aparelho e link da CVM na reserva (`docs/04`) | `/calcular`; campos Valor; manifesto |
+| Calculadoras, "Somar valores", atalhos do ícone na web | Existe (A6, D-035): 8 calculadoras (a 9ª, "Em que ordem quitar as dívidas?", é do Ciclo F1, D-040), "Somar valores" em todos os campos Valor, 4 atalhos no manifesto e volta à tela pedida depois de entrar. Falta: teste em aparelho e link da CVM na reserva (`docs/04`) | `/calcular`; campos Valor; manifesto |
 | "Já paguei" na lista e "Por categoria" | Existe (A6, D-035(5) e (6)) | `/a-pagar`; composição |
 | Previsão dos pagamentos do mês | Existe (D-026(10)) | Topo de `/a-pagar`, só no mês atual |
 | Busca de registros, orçamento por categoria | Falta, sem ciclo (o orçamento está no "núcleo proposto" das Instruções v2.1) | Movimentos; Metas ou Movimentos |
@@ -560,6 +560,7 @@ Ordem pelo valor para a pessoa e para a empresa que oferece o benefício. Valor:
     - [E] O YNAB tem um planejador de quitação.
     - Depende de: calculadoras 2 e 3, e B.
     - Riscos: não sugerir renegociação nem crédito (D-032(5)). Orientar a negociar com o credor só se o parecer permitir (decisão 5). Programas públicos mudam rápido: o Desenrola 2.0 perdeu a validade em 31/08/2026, e a MP 1.393/2026 cria outro.
+    - Situação: feito em 10/10/2026 (D-040, Ciclo F1), com a ordem proposta aprovada por Enzo ("sim"). É a nona calculadora, "Em que ordem quitar as dívidas?" (`/calcular/plano-dividas`), só no core e no app: lê os parcelamentos ativos sem alterar nada, compara "Maior taxa primeiro" com "Menor dívida primeiro" lado a lado, com "Sem valor a mais" como referência, e nunca diz qual ordem é a certa. Não sugere renegociação, crédito nem taxa; o programa público do Desenrola não aparece. Falta: teste em aparelho e o tema de Aprender que explique as duas ordens, com fonte (`docs/04`).
 11. **Assinaturas.**
     - Marcador nos gastos fixos, custo no ano (calculadora 8) e lembrete para revisar.
     - Valor: pessoa M, empresa M. Esforço: S, ou M se precisar de campo novo no banco.

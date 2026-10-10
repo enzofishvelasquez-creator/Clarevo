@@ -8,6 +8,7 @@ export * from './custo-por-ano';
 export * from './custo-da-divida';
 export * from './quitar-antes';
 export * from './multa-e-juros';
+export * from './plano-dividas';
 export * from './reserva';
 export * from './juntar-para-objetivo';
 export * from './dividir-contas';

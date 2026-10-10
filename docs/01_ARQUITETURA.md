@@ -1,6 +1,6 @@
 # Arquitetura
 
-10/10/2026 · versão 0.10 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos, calculadoras, seus últimos meses, Aprender e dúvidas, lembretes, ocultar valores e biometria, renda comprometida, metas e reserva, plano de guardar, simulador, cartões e faturas e leitura de notas fiscais)
+10/10/2026 · versão 0.11 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos, calculadoras, seus últimos meses, Aprender e dúvidas, lembretes, ocultar valores e biometria, renda comprometida, metas e reserva, plano de guardar, simulador, cartões e faturas, leitura de notas fiscais e plano para quitar dívidas)
 
 ## Escolhas (aprovadas)
 
@@ -26,7 +26,7 @@ apps/app/src/
     gastos-fixos, gastos-fixos/novo, gastos-fixos/[id], gastos-fixos/[id]/editar, gastos-fixos/[id]/encerrar,
     gastos-fixos/[id]/informar
     composicao, quem-ve, conta, explicacao/[tema]
-    calcular, calcular/[slug]  calculadoras (nada é gravado)
+    calcular, calcular/[slug]  calculadoras (nada é gravado); /calcular/plano-dividas é a 9ª (D-040)
     retomar, retomar/atualizar, retomar/pagar  seus últimos meses (revisão depois de ausência)
     renda-comprometida, renda-comprometida/referencia  renda comprometida e renda de referência
     reserva, meta/nova, meta/[id], meta/[id]/editar, meta/[id]/movimento  reserva para imprevistos, metas e movimentos
@@ -37,7 +37,7 @@ apps/app/src/
   components/           interface (logo, campos, botões, formulários de registro, conta a pagar, pagamento, gasto fixo e conta do ano, "Ano a ano", "Somar valores", estados)
     retorno-*           faixa do Resumo, linha da revisão, ações e folha do detalhe da série
     term-hint, topic-link, learn-art, topic-example, faq-item  "O que é isso?", links e partes da explicação
-    calc/               uma tela por calculadora e as partes comuns (campos, chips de 48 px, resultado anunciado)
+    calc/               uma tela por calculadora e as partes comuns (campos, chips de 48 px, resultado anunciado); plano-dividas.tsx lê os parcelamentos (`useSeriesDebts`, só leitura) e mascara com "Ocultar valores"
     committed-parts     medidor da renda comprometida, barra por grupo e legenda
     goal-*, reserve-form, minimum-reserve, essentials-block, savings-card, savings-plan-form  metas, reserva, plano de guardar
     sim-result, sim-year-bars  resultado do simulador e barras por ano
@@ -60,7 +60,7 @@ packages/core/          regras financeiras, validação, repositório em memóri
   src/simulate.ts       simulador: contas com taxa, formulário, textos, criar meta e links
   src/cards.ts          cartões: datas da fatura, parcelas, total, pagamento, saldo anterior, crédito, "Por categoria", validação e textos
   src/nota.ts, danfe.ts, sefaz-page.ts, nota-flow.ts, sha256.ts  notas fiscais: QR e chave, DANFE, página da Sefaz-RJ, fluxo do formulário e resumo SHA-256
-  src/calculators/      as 8 calculadoras, campos, textos e links de contexto
+  src/calculators/      as 9 calculadoras, campos, textos e links de contexto; plano-dividas.ts (D-040): conta mês a mês das duas ordens de quitar dívidas e a leitura dos parcelamentos (`seriesDebtDrafts`)
   src/navigation.ts     navegação (D-039): modo da barra inferior por endereço, mês de abertura e seletor de Contas a pagar, linha de lembretes e o índice "No app" da busca de Aprender
 supabase/
   migrations/           esquema, funções e permissões (0001 fundação, 0002 contas a pagar, 0003 gastos fixos, 0004 contas do ano, 0005 seus últimos meses,
