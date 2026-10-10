@@ -10,6 +10,8 @@ import type { LearnSource } from '../types';
  */
 export const REVIEWED_ON: IsoDate = '2026-10-09';
 export const CONSULTED_ON: IsoDate = '2026-10-09';
+/** Data de revisão dos temas que ganharam o texto dos cartões (D-037, 10/10/2026); as fontes externas seguem consultadas em 09/10. */
+export const CARDS_REVIEWED_ON: IsoDate = '2026-10-10';
 
 export const clarevo = (...refs: string[]): LearnSource => ({ kind: 'clarevo', refs });
 

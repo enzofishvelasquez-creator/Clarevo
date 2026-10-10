@@ -16,6 +16,7 @@ import {
   annualCommitmentIds,
   annualYearSummary,
   buildReturnReview,
+  cardErrorText,
   cardLimitUsed,
   categoryBreakdown,
   committedGoalLines,
@@ -53,6 +54,7 @@ import {
   occurrencesToMaterialize,
   organizeGoals,
   paidInvoiceMonths,
+  purchasePreview,
   paymentsForecast,
   plannedForGoals,
   projectCommitted,
@@ -3837,6 +3839,8 @@ describe('API real: cartões de crédito e notas fiscais (Ciclo E, D-037 e D-038
   const JAN = '2032-01';
   const AUG = '2032-08';
   const bruno = repoFor(BRUNO, T0);
+  // O dia seguinte ao fechamento de novembro (03/11): só então a fatura de novembro aceita o pagamento.
+  const late = repoFor(BRUNO, AFTER_CLOSING);
   const ana = repoFor(ANA, T0);
   let ctx = '';
   let account = '';
@@ -4069,19 +4073,25 @@ describe('API real: cartões de crédito e notas fiscais (Ciclo E, D-037 e D-038
   it('pagamento parcial: gasto em Pago, saldo anterior na fatura seguinte, Por categoria e desfazer', async () => {
     const nov = (await bruno.listInvoiceItems(card.id)).find((i) => i.month === NOV)!;
     expect(nov).toMatchObject({ status: 'aberta', totalCents: 53000, toPayCents: 53000, amountIsEstimate: true, paidRecordId: null });
+    // Em 07/10 a fatura de novembro ainda está aberta (fecha em 03/11): o banco recusa o pagamento, qualquer que seja o valor.
+    expect(await code(bruno.payInvoice(newOperationKey(), card.id, NOV, nov.commitmentVersion!, 30000, T0))).toEqual(['fatura_aberta', null]);
+    expect(await code(bruno.payInvoice(newOperationKey(), card.id, NOV, nov.commitmentVersion!, 0, T0))).toEqual(['fatura_aberta', null]);
+    expect(await code(bruno.payInvoice(newOperationKey(), card.id, DEC, 1, 100, T0))).toEqual(['versao_desatualizada', expect.stringMatching(/^versao_atual=\d+$/)]);
+    expect(await paidOfOctober()).toBe(0);
+    // Em 12/11 ela já fechou: o pagamento vale, e a data pode ser anterior ao fechamento (quem pagou antes informa o dia).
     const pay = (patch: Partial<{ version: number; cents: Cents; on: IsoDate; accountId: string | null }> = {}) =>
-      bruno.payInvoice(newOperationKey(), card.id, NOV, patch.version ?? nov.commitmentVersion!, patch.cents ?? 30000, patch.on ?? T0, patch.accountId ?? null);
+      late.payInvoice(newOperationKey(), card.id, NOV, patch.version ?? nov.commitmentVersion!, patch.cents ?? 30000, patch.on ?? T0, patch.accountId ?? null);
     expect(await code(pay({ cents: 0 }))).toEqual(['valor_invalido', null]);
     expect(await code(pay({ cents: 53001 }))).toEqual(['valor_acima_da_fatura', null]);
-    expect(await code(pay({ on: '2031-10-08' }))).toEqual(['data_futura', null]);
+    expect(await code(pay({ on: '2031-11-13' }))).toEqual(['data_futura', null]);
     expect(await code(pay({ on: '2020-01-01' }))).toEqual(['data_invalida', null]);
     expect(await code(pay({ version: nov.commitmentVersion! + 5 }))).toEqual(['versao_desatualizada', expect.stringMatching(/^versao_atual=\d+$/)]);
     expect(await code(pay({ accountId: randomUUID() }))).toEqual(['conta_invalida', null]);
-    expect(await code(bruno.payInvoice(newOperationKey(), card.id, '2031-03', 1, 100, T0))).toEqual(['nao_encontrado', null]);
+    expect(await code(late.payInvoice(newOperationKey(), card.id, '2031-03', 1, 100, T0))).toEqual(['nao_encontrado', null]);
     expect(await paidOfOctober()).toBe(0);
 
     const key = newOperationKey();
-    const paid = await bruno.payInvoice(key, card.id, NOV, nov.commitmentVersion!, 30000, T0, account);
+    const paid = await late.payInvoice(key, card.id, NOV, nov.commitmentVersion!, 30000, T0, account);
     expect(paid.record).toMatchObject({
       kind: 'despesa',
       amountCents: 30000,
@@ -4100,7 +4110,7 @@ describe('API real: cartões de crédito e notas fiscais (Ciclo E, D-037 e D-038
     expect(paid.invoices.find((i) => i.month === DEC)).toMatchObject({ totalCents: 58000, carriedInCents: 23000, status: 'aberta' });
     expect(paid.commitments.find((c) => c.invoice!.month === DEC)!.amountCents).toBe(58000);
     // Repetir a chave devolve o mesmo pagamento; a operação é achada pela chave.
-    expect((await bruno.payInvoice(key, card.id, NOV, nov.commitmentVersion!, 30000, T0, account)).record.id).toBe(paid.record.id);
+    expect((await late.payInvoice(key, card.id, NOV, nov.commitmentVersion!, 30000, T0, account)).record.id).toBe(paid.record.id);
     expect(await bruno.findCardOperation(key)).toEqual({ action: 'pagar_fatura', cardId: card.id, entryId: null, commitmentId: paid.commitment.id, recordId: paid.record.id });
     expect(await paidOfOctober()).toBe(30000);
     expect((await committedCard(DEC)).cardCents).toBe(58000);
@@ -4149,28 +4159,41 @@ describe('API real: cartões de crédito e notas fiscais (Ciclo E, D-037 e D-038
     await checkedToPay(BRUNO, ctx, DEC, T0);
   });
 
-  it('pagar a fatura aberta antes do fechamento desvia as compras novas; fatura fechada e paga recusa', async () => {
-    const lost = new SupabaseRepository(clientFor(BRUNO, T0, lostResponse), { id: BRUNO });
+  it('a fatura aberta não aceita pagamento; depois do fechamento paga com a data real; a compra de uma fatura paga é recusada', async () => {
+    const lost = new SupabaseRepository(clientFor(BRUNO, AFTER_CLOSING, lostResponse), { id: BRUNO });
     const nov = (await bruno.listInvoiceItems(card.id)).find((i) => i.month === NOV)!;
-    // A resposta se perde: o resultado é incerto, e a chave diz se gravou (e repetir não paga duas vezes).
+    // Em 07/10 (novembro fecha em 03/11) o pagamento é recusado e nada é gravado; dezembro, que ainda não começou, também.
+    expect(await code(bruno.payInvoice(newOperationKey(), card.id, NOV, nov.commitmentVersion!, 53000, T0))).toEqual(['fatura_aberta', null]);
+    const decItem = (await bruno.listInvoiceItems(card.id)).find((i) => i.month === DEC)!;
+    expect(await code(late.payInvoice(newOperationKey(), card.id, DEC, decItem.commitmentVersion!, 35000, T0))).toEqual(['fatura_aberta', null]);
+    expect(await paidOfOctober()).toBe(0);
+    expect(cardErrorText('fatura_aberta', { closingOn: nov.closingOn })).toBe(
+      'Esta fatura ainda está aberta. Registre o pagamento depois do fechamento, em 03/11/2031. Se você já pagou antes, use a data em que pagou.',
+    );
+    // Em 12/11 a resposta se perde: o resultado é incerto, e a chave diz se gravou (e repetir não paga duas vezes). A data do
+    // pagamento é anterior ao fechamento: o dia em que a pessoa pagou de fato.
     const key = newOperationKey();
     expect(await err(lost.payInvoice(key, card.id, NOV, nov.commitmentVersion!, 53000, T0))).toBe('rede');
     const op = await bruno.findCardOperation(key);
     expect(op).toMatchObject({ action: 'pagar_fatura', cardId: card.id, entryId: null });
-    const replay = await bruno.payInvoice(key, card.id, NOV, nov.commitmentVersion!, 53000, T0);
+    const replay = await late.payInvoice(key, card.id, NOV, nov.commitmentVersion!, 53000, T0);
     expect([replay.record.id, replay.commitment.id]).toEqual([op!.recordId, op!.commitmentId]);
     expect(await paidOfOctober()).toBe(53000);
     expect((await bruno.listInvoiceItems(card.id)).find((i) => i.month === NOV)).toMatchObject({ status: 'paga', paidCents: 53000, leftOverCents: 0 });
 
-    // Compra de hoje: a fatura natural (novembro) está aberta e paga, então vai para a primeira fatura livre (dezembro).
-    const faturas = await invoicesOf();
-    expect(purchaseFirstInvoiceMonth(card, T0, 1, paidInvoiceMonths(faturas), T0)).toBe(DEC);
-    expect(purchaseFirstInvoiceMonth(card, T0, 3, paidInvoiceMonths(faturas), T0)).toBe(DEC);
-    const mercado = await bruno.addCardPurchase(newOperationKey(), card.id, purchase('Mercado', 10000, T0, 1, 'Alimentação'));
-    expect(mercado.entry).toMatchObject({ invoiceMonth: DEC, purchasedOn: T0 });
+    // Sem desvio: a compra vai sempre para a fatura natural. A de 12/11 (depois do fechamento) é de dezembro; a de 07/10 é de
+    // novembro, que está paga, e é recusada (o banco já a cobrou ali).
+    const faturas = await invoicesOf(card, AFTER_CLOSING);
+    expect(purchaseFirstInvoiceMonth(card, AFTER_CLOSING)).toBe(DEC);
+    expect(purchaseFirstInvoiceMonth(card, T0)).toBe(NOV);
+    expect(purchasePreview(card, T0, 1, paidInvoiceMonths(faturas), AFTER_CLOSING)).toMatchObject({ blocked: true });
+    expect(purchasePreview(card, AFTER_CLOSING, 3, paidInvoiceMonths(faturas), AFTER_CLOSING)).toMatchObject({ blocked: false });
+    const mercado = await late.addCardPurchase(newOperationKey(), card.id, purchase('Mercado', 10000, AFTER_CLOSING, 1, 'Alimentação'));
+    expect(mercado.entry).toMatchObject({ invoiceMonth: DEC, purchasedOn: AFTER_CLOSING });
     expect(await totalsOf()).toContainEqual([DEC, 45000]);
     expect((await bruno.getCard(card.id))!.usedCents).toBe(cardLimitUsed(await invoicesOf()));
     expect(cardLimitUsed(await invoicesOf())).toBe(185000 + 10000 - 10000);
+    expect(await code(late.addCardPurchase(newOperationKey(), card.id, purchase('Esquecida de outubro', 5000, T0)))).toEqual(['fatura_paga', null]);
 
     // Fatura paga não aceita encargo, estorno nem mudança de valor, data ou parcelas; só descrição e categoria.
     expect(await code(bruno.addCardCharge(newOperationKey(), card.id, { chargeType: 'juros', amountCents: 100, invoiceMonth: NOV }))).toEqual(['fatura_paga', null]);
@@ -4182,7 +4205,6 @@ describe('API real: cartões de crédito e notas fiscais (Ciclo E, D-037 e D-038
     expect(tenis).toMatchObject({ description: 'Tênis de corrida azul', category: 'Vestuário', amountCents: 60000, invoiceMonth: NOV });
 
     // Depois do fechamento de novembro (12/11), uma compra de 20/10 pertence a ela: a fatura já foi paga, e nada é gravado.
-    const late = repoFor(BRUNO, AFTER_CLOSING);
     const before = (await bruno.listCardEntries(card.id)).length;
     expect(await code(late.addCardPurchase(newOperationKey(), card.id, purchase('Esquecida', 5000, '2031-10-20')))).toEqual(['fatura_paga', null]);
     expect((await bruno.listCardEntries(card.id)).length).toBe(before);
@@ -4191,7 +4213,7 @@ describe('API real: cartões de crédito e notas fiscais (Ciclo E, D-037 e D-038
     expect(lateItems.find((i) => i.month === NOV)).toMatchObject({ status: 'paga', amountIsEstimate: false });
     expect(lateItems.find((i) => i.month === DEC)).toMatchObject({ status: 'aberta', amountIsEstimate: true });
 
-    // Desfazer o pagamento antecipado reabre novembro; a compra desviada fica em dezembro até ser excluída.
+    // Desfazer o pagamento reabre novembro; a compra de dezembro fica até ser excluída.
     const undone = await bruno.undoInvoicePayment(newOperationKey(), card.id, NOV, replay.commitment.version);
     expect([undone.entry, undone.commitment.status]).toEqual([null, 'aberto']);
     expect(await paidOfOctober()).toBe(0);

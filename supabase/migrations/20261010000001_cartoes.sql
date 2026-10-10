@@ -1806,7 +1806,7 @@ $$;
 --   compra (todas as parcelas): p_amount_cents = valor total; p_occurred_on = data da compra; p_description;
 --     p_category; p_installments. Sem mudar valor, data nem parcelas, só descrição e categoria mudam (também com
 --     parcelas em fatura paga). Com mudança, nenhuma parcela de hoje ou de depois pode estar em fatura paga (fatura_paga);
---     a primeira fatura só é recalculada se a data muda (e então vai para a primeira fatura livre só se a fatura natural da data nova ainda está aberta, como em add_card_purchase; fechada e paga: fatura_paga);
+--     a primeira fatura só é recalculada se a data muda (e então é a fatura natural da data nova, como em add_card_purchase; se ela, ou uma parcela adiante, está paga: fatura_paga);
 --     mais parcelas ou menos parcelas ajustam o fim da compra.
 --   encargo: p_amount_cents; p_charge_kind; p_invoice_month.
 --   estorno: p_amount_cents; p_description; p_category; p_invoice_month.

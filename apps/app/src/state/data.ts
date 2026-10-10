@@ -979,7 +979,8 @@ export function useCommittedGoalLines(contextId: string | undefined, month: IsoM
 /**
  * Gastos essenciais por mês (essentialMonthly): os 6 meses fechados anteriores ao atual (as mesmas consultas de registros de
  * useMonthRecords), sem os gastos gerados por pagamento de conta do ano (as contas de cada série anual) e, sem meses com
- * gastos, as contas do mês atual. source 'informado' (amountCents null): a pessoa digita.
+ * gastos, as contas do mês atual. Os pagamentos de fatura de cartão entram divididos pelas categorias da fatura (as mesmas de
+ * "Por categoria"). source 'informado' (amountCents null): a pessoa digita.
  */
 export function useEssentialEstimate(contextId: string | undefined) {
   const repo = useRepo();
@@ -993,14 +994,17 @@ export function useEssentialEstimate(contextId: string | undefined) {
     queries: annual.map((s) => ({ queryKey: ['series', 'occurrences', s.id], queryFn: () => repo.listSeriesOccurrences(s.id), enabled: series.isSuccess })),
   });
   const commitments = useCommitments(contextId, current);
-  const parts: QueryPart[] = [...records, series, ...occurrences, commitments];
+  // Pagamentos de fatura de cartão entre os gastos: divididos pelas categorias da fatura, como em "Por categoria".
+  const allRecords = records.every((r) => r.isSuccess) ? records.flatMap((r) => r.data ?? []) : undefined;
+  const invoices = useInvoicesOfRecords(contextId, current, allRecords);
+  const parts: QueryPart[] = [...records, series, ...occurrences, commitments, invoices];
   const ready = parts.every((p) => p.isSuccess);
-  const version = `${stamp(records)}#${stamp(occurrences)}`;
+  const version = `${stamp(records)}#${stamp(occurrences)}#${invoices.dataUpdatedAt}`;
   const value = useMemo((): EssentialEstimate | undefined => {
     if (!ready || !contextId) return undefined;
     const committed = summarizeCommitted(commitments.data!, contextId, current, today, []).committedCents;
     const annualIds = annualCommitmentIds(occurrences.flatMap((o) => o.data ?? []));
-    return essentialMonthly(records.flatMap((r) => r.data ?? []), current, committed, annualIds);
+    return essentialMonthly(records.flatMap((r) => r.data ?? []), current, committed, annualIds, invoices.data ?? []);
   }, [ready, contextId, current, today, commitments.data, version]); // eslint-disable-line react-hooks/exhaustive-deps
   return combineParts<EssentialEstimate>(parts, value);
 }

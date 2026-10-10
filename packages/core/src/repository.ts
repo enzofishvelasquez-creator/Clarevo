@@ -413,12 +413,11 @@ export interface RecordsRepository {
    */
   deleteCard(key: string, id: string, expectedVersion: number): Promise<CardWrite>;
   /**
-   * add_card_purchase: sem versão (como create_record). A 1ª parcela cai na fatura cujo período contém a data; as outras, nas
-   * seguintes. Fatura natural ainda ABERTA e paga cedo NÃO recusa a compra: ela vai para a primeira fatura seguinte em que
-   * nenhuma parcela cruza fatura paga (`purchaseFirstInvoiceMonth` com `paidInvoiceMonths` e a data de hoje; o `invoiceMonth`
-   * da compra devolvida diz qual foi). Fatura natural já FECHADA e paga (ou com parcela adiante em fatura paga) recusa com
-   * fatura_paga (texto: `cardErrorText('fatura_paga', { purchase: true })`): a compra não vai para a fatura atual; quem foi
-   * cobrado depois registra um encargo ou ajuste na fatura atual. Ordem: repetição; nao_encontrado; sem_permissao; cartao_arquivado; CARD_PURCHASE_CODE_ORDER
+   * add_card_purchase: sem versão (como create_record). A 1ª parcela cai sempre na fatura natural, a cujo período a data
+   * pertence (`invoiceMonthOf`); as outras, nas seguintes. Se a fatura da 1ª parcela, ou de qualquer outra, já está paga, recusa
+   * com fatura_paga (texto: `cardErrorText('fatura_paga', { purchase: true })`; antes de enviar, `purchasePreview` mostra o
+   * mesmo texto): a compra não vai para outra fatura; quem foi cobrado depois registra um encargo ou ajuste na fatura atual.
+   * Ordem: repetição; nao_encontrado; sem_permissao; cartao_arquivado; CARD_PURCHASE_CODE_ORDER
    * (valor_invalido, valor_acima_do_limite, descricao_obrigatoria, descricao_longa, categoria_invalida, parcelas_invalidas,
    * data_invalida, data_futura); com receiptKey (o resumo SHA-256 da chave, nunca a chave): chave_de_nota_invalida,
    * nota_ja_anotada (detalhe "registro=<id>" ou "compra=<id>"); limite_de_lancamentos; fatura_paga. entry = a compra.
@@ -451,10 +450,12 @@ export interface RecordsRepository {
    * pay_invoice: cria UM gasto "Fatura Nubank (outubro)" na data do pagamento e marca a conta da fatura como paga.
    * expectedVersion = versão da conta da fatura (Invoice.commitmentVersion). accountId: a conta de saída; ausente, a conta ativa
    * mais antiga do contexto. Ordem: repetição; nao_encontrado; sem_permissao; mes_invalido; nao_encontrado (a fatura não tem
-   * conta); versao_desatualizada; compromisso_quitado; valor_invalido; valor_acima_da_fatura; data_invalida (inválida, ou
+   * conta); versao_desatualizada; compromisso_quitado; fatura_aberta (só se paga depois que a fatura fecha: hoje até o dia do
+   * fechamento, ou fatura futura, é recusado, sem gravar nada; o texto com a data é
+   * `cardErrorText('fatura_aberta', { closingOn })`); valor_invalido; valor_acima_da_fatura; data_invalida (inválida, ou
    * antes do menor entre 1 ano atrás e o início do período da fatura, para pagar uma fatura antiga na data real); data_futura;
-   * conta_invalida; fatura_seguinte_paga (pagamento parcial com a fatura seguinte já paga). A fatura aberta pode ser paga antes
-   * do fechamento: as compras seguintes do ciclo vão para a primeira fatura seguinte livre.
+   * conta_invalida; fatura_seguinte_paga (pagamento parcial com a fatura seguinte já paga). A data do pagamento pode ser
+   * anterior ao fechamento (quem pagou antes informa o dia em que pagou).
    * Pagamento parcial: a diferença vira o lançamento "saldo anterior" na fatura do mês seguinte (entry). O gasto não tem categoria.
    */
   payInvoice(
@@ -543,6 +544,7 @@ export type RepoErrorCode =
   | 'conta_de_fatura'
   | 'pagamento_de_fatura'
   | 'fatura_paga'
+  | 'fatura_aberta'
   | 'fatura_seguinte_paga'
   | 'valor_acima_da_fatura'
   | 'lancamento_automatico'

@@ -79,7 +79,6 @@ import {
   normalizeCardInput,
   normalizePurchaseInput,
   normalizeRefundInput,
-  purchaseFirstInvoiceMonth,
   purchaseInstallments,
   receiptKeyValid,
   type Invoice,
@@ -947,15 +946,6 @@ export class MemoryRepository implements RecordsRepository {
         created += r.created;
         createdOverdue += r.createdOverdue;
       }
-      // Faturas de cartão em aberto: o dia do fechamento passa sem gravação, então a marca "estimado" (hoje até o fechamento)
-      // é atualizada aqui, com versão + 1 (como sync_series_occurrences na migração 0008).
-      const today = this.opts.today();
-      const now = new Date().toISOString();
-      for (const c of [...this.commitments.values()]) {
-        if (c.contextId !== contextId || !c.invoiceCardId || c.deletedAt || c.status !== 'aberto' || c.cardClosingOn === null) continue;
-        const estimate = today <= c.cardClosingOn;
-        if (c.amountIsEstimate !== estimate) this.bumpCommitment(c.id, { amountIsEstimate: estimate }, now);
-      }
       return { created, createdOverdue };
     });
   }
@@ -1625,10 +1615,9 @@ export class MemoryRepository implements RecordsRepository {
 
   /**
    * Como add_card_purchase. Ordem: repetição; trava; cartao_arquivado; campos (cardPurchaseError); chave da nota
-   * (chave_de_nota_invalida, nota_ja_anotada); limite_de_lancamentos; fatura_paga; escrita (a fatura da 1ª parcela é a do
-   * período que contém a data, com os dias que o cartão tem hoje, e fica fixada; se ela ainda está ABERTA e foi paga cedo, ou
-   * alguma fatura das parcelas está paga, a compra vai para a primeira fatura seguinte livre: pagar cedo não trava o cartão.
-   * Se ela já FECHOU e está paga, a compra é recusada com fatura_paga).
+   * (chave_de_nota_invalida, nota_ja_anotada); limite_de_lancamentos; fatura_paga; escrita. A fatura da 1ª parcela é sempre a
+   * natural (a do período que contém a data, com os dias que o cartão tem hoje) e fica fixada; se ela, ou alguma fatura das
+   * parcelas, já está paga, a compra é recusada com fatura_paga (sem desvio para outra fatura).
    */
   async addCardPurchase(key: string, cardId: string, input: CardPurchaseInput) {
     return this.write(() => {
@@ -1646,8 +1635,8 @@ export class MemoryRepository implements RecordsRepository {
         this.checkReceiptFree(card.contextId, norm.receiptKey);
       }
       this.checkEntryCap(cardId, norm.installments);
-      const first = purchaseFirstInvoiceMonth(card, norm.purchasedOn, norm.installments, this.paidMonths(cardId), today);
-      // Fatura natural já fechada e paga (ou outra parcela em fatura paga): recusa, sem empurrar a compra para a fatura atual.
+      const first = invoiceMonthOf(card, norm.purchasedOn);
+      // Fatura natural paga (ou outra parcela em fatura paga): recusa, sem empurrar a compra para outra fatura.
       for (let k = 0; k < norm.installments; k++) if (this.invoicePaid(cardId, addMonths(first, k))) throw new RepoError('fatura_paga');
       const entry = this.newEntry(card, {
         kind: 'compra',
@@ -1751,8 +1740,7 @@ export class MemoryRepository implements RecordsRepository {
         if (code) throw new RepoError(code);
         const change = norm.totalCents !== entry.amountCents || norm.installments !== entry.installments || norm.purchasedOn !== entry.purchasedOn;
         if (change) {
-          const first =
-            norm.purchasedOn === entry.purchasedOn ? entry.invoiceMonth : purchaseFirstInvoiceMonth(card, norm.purchasedOn, norm.installments, this.paidMonths(card.id), today);
+          const first = norm.purchasedOn === entry.purchasedOn ? entry.invoiceMonth : invoiceMonthOf(card, norm.purchasedOn);
           for (let k = 0; k < entry.installments; k++) if (this.invoicePaid(card.id, addMonths(entry.invoiceMonth, k))) throw new RepoError('fatura_paga');
           for (let k = 0; k < norm.installments; k++) if (this.invoicePaid(card.id, addMonths(first, k))) throw new RepoError('fatura_paga');
           if (norm.installments > entry.installments) this.checkEntryCap(card.id, norm.installments - entry.installments);
@@ -1823,7 +1811,7 @@ export class MemoryRepository implements RecordsRepository {
 
   /**
    * Como pay_invoice. Ordem: repetição; trava do cartão; mes_invalido; nao_encontrado (fatura sem conta); versão;
-   * compromisso_quitado; valor_invalido; valor_acima_da_fatura; data_invalida (inválida, ou antes do menor entre 1 ano atrás e o
+   * compromisso_quitado; fatura_aberta (hoje até o fechamento: só se paga depois que a fatura fecha); valor_invalido; valor_acima_da_fatura; data_invalida (inválida, ou antes do menor entre 1 ano atrás e o
    * início do período da fatura); data_futura;
    * conta_invalida; fatura_seguinte_paga. Cria UM gasto sem categoria, ligado ao cartão e ao mês, na conta informada (sem ela, a
    * mais antiga do contexto) e, no pagamento parcial, o saldo anterior na fatura seguinte.
@@ -1840,6 +1828,8 @@ export class MemoryRepository implements RecordsRepository {
       if (c.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${c.version}`);
       if (c.status !== 'aberto') throw new RepoError('compromisso_quitado');
       const today = this.opts.today();
+      // Só se paga fatura fechada: aberta (hoje até o dia do fechamento gravado na conta) ou futura é recusada.
+      if (today <= c.cardClosingOn!) throw new RepoError('fatura_aberta');
       if (!Number.isSafeInteger(amountCents) || amountCents < 1) throw new RepoError('valor_invalido');
       if (amountCents > c.amountCents) throw new RepoError('valor_acima_da_fatura');
       // Não antes do menor entre 1 ano atrás e o início do período da fatura (fatura antiga paga na data real).
@@ -2000,13 +1990,6 @@ export class MemoryRepository implements RecordsRepository {
     return this.invoiceCommitmentOf(cardId, month)?.status === 'quitado';
   }
 
-  /** Meses das faturas pagas do cartão (para clarevo_first_free_month, em purchaseFirstInvoiceMonth). */
-  private paidMonths(cardId: string): IsoMonth[] {
-    return this.invoiceCommitments(cardId)
-      .filter((c) => c.status === 'quitado')
-      .map((c) => c.invoiceMonth!);
-  }
-
   /** Faturas do cartão com os lançamentos e as contas vivas de agora (cards.ts, buildInvoices). */
   private invoicesOf(card: StoredCard): Invoice[] {
     return buildInvoices(
@@ -2089,7 +2072,6 @@ export class MemoryRepository implements RecordsRepository {
             c.amountCents !== total ||
             c.dueOn !== dueOn ||
             c.description !== description ||
-            c.amountIsEstimate !== estimate ||
             c.cardClosingOn !== closingOn
           ) {
             this.bumpCommitment(c.id, { amountCents: total, dueOn, description, amountIsEstimate: estimate, cardClosingOn: closingOn }, now);

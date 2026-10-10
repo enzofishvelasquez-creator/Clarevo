@@ -11,6 +11,7 @@ import {
   cardErrorText,
   centsToInput,
   charCount,
+  formatBRL,
   formatDateBR,
   installmentAmounts,
   installmentsNotice,
@@ -41,7 +42,7 @@ import { guardedWrite } from '@/lib/guarded-write';
 import { openOfficialUrl, receiptLinks } from '@/lib/receipt-link';
 import { useCardOperationKey, useUpdateCardEntry } from '@/state/data';
 import { useSession } from '@/state/session';
-import { colors, space, tabular } from '@/theme/tokens';
+import { colors, fonts, space, tabular } from '@/theme/tokens';
 
 const S = CARDS_TEXT.screens;
 
@@ -51,8 +52,12 @@ type Field = 'description' | 'amountText' | 'dateText' | 'installmentsText';
  * Editar uma compra no cartão (D-037): descrição, valor total, data da compra, categoria e parcelas. Mudar valor, data ou parcelas
  * recalcula as parcelas e pode levar a compra a outras faturas (o banco refaz tudo na mesma operação). Usa `update_card_entry`
  * com a versão da compra; compra em fatura já paga é recusada pelo banco com o texto de sempre. Nenhum dado de cartão é pedido.
+ *
+ * `textOnly` (a compra tem parcela em fatura já paga): só a descrição e a categoria se alteram; valor, data e parcelas aparecem
+ * como estão, e o banco aceita a mudança porque nenhuma parcela se move. Depois de salvar, volta para a fatura em que a compra
+ * está agora (a data nova pode levá-la a outra fatura).
  */
-export function CardPurchaseForm({ card, month, entry }: { card: CardData; month: IsoMonth; entry: CardEntry }) {
+export function CardPurchaseForm({ card, month, entry, textOnly = false }: { card: CardData; month: IsoMonth; entry: CardEntry; textOnly?: boolean }) {
   const { today } = useSession();
   const qc = useQueryClient();
   const updateEntry = useUpdateCardEntry();
@@ -98,7 +103,8 @@ export function CardPurchaseForm({ card, month, entry }: { card: CardData; month
 
   async function submit() {
     if (busy) return;
-    const v = validateCardPurchaseDraft(draft, today);
+    // A data só é conferida contra o intervalo de 48 meses quando muda (como no banco): editar a descrição de uma compra antiga vale.
+    const v = validateCardPurchaseDraft(draft, today, draft.dateText !== initial.dateText);
     if (!v.ok) {
       setErrors(v.errors);
       setBanner(null);
@@ -121,8 +127,11 @@ export function CardPurchaseForm({ card, month, entry }: { card: CardData; month
       if (r.status === 'ok' || r.status === 'reconciled') {
         // Confirmação tátil e aviso só depois de o servidor confirmar.
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-        flash.set(S.purchaseUpdated);
-        guard.leave(goBack);
+        const recalculated = draft.amountText !== initial.amountText || draft.dateText !== initial.dateText || draft.installmentsText !== initial.installmentsText;
+        flash.set(recalculated ? S.purchaseUpdated : S.purchaseTextUpdated);
+        // A data nova pode levar a compra a outra fatura: volta para a fatura em que ela está agora (a de antes já não a mostra).
+        const moved = r.status === 'ok' && r.value.entry ? r.value.entry.invoiceMonth : null;
+        guard.leave(moved && moved !== month ? () => router.dismissTo(invoiceHref(card.id, moved)) : goBack);
         return;
       }
       if (r.status === 'refused') {
@@ -138,13 +147,14 @@ export function CardPurchaseForm({ card, month, entry }: { card: CardData; month
         };
         const f = field[r.code];
         if (f) {
-          const errs = { [f]: cardErrorText(r.code, { purchase: true }) };
+          const errs = { [f]: cardErrorText(r.code) };
           setErrors(errs);
           focusFirst(errs);
           return;
         }
         if (r.code === 'versao_desatualizada' || r.code === 'nao_encontrado' || r.code === 'fatura_paga') await qc.invalidateQueries({ queryKey: ['cards'] });
-        setBanner(cardErrorText(r.code, { purchase: true }));
+        // Editar não é anotar uma compra nova: o texto da fatura paga é o simples, "desfaça o pagamento da fatura".
+        setBanner(cardErrorText(r.code));
         return;
       }
       setBanner(ERROR_TEXT.salvar_falhou);
@@ -164,7 +174,7 @@ export function CardPurchaseForm({ card, month, entry }: { card: CardData; month
             {`Fatura de ${invoiceMonthLabel(month, today)} · ${card.name}`}
           </Txt>
           <Txt variant="label" color={colors.textSecondary}>
-            {S.purchaseEditNote}
+            {textOnly ? S.purchaseEditPaidNote : S.purchaseEditNote}
           </Txt>
           {entry.receiptKey ? (
             <Banner tone="info" live={false}>
@@ -191,59 +201,72 @@ export function CardPurchaseForm({ card, month, entry }: { card: CardData; month
             maxLength={DESCRIPTION_MAX}
             error={errors.description}
             hint={charCount(draft.description) >= 60 ? `${charCount(draft.description)} de ${DESCRIPTION_MAX} caracteres` : undefined}
-            returnKeyType="next"
+            returnKeyType={textOnly ? 'done' : 'next'}
             onSubmitEditing={() => refs.amountText.current?.focus()}
           />
-          <TextField
-            ref={refs.amountText}
-            label="Valor total da compra"
-            prefix="R$"
-            large
-            placeholder="0,00"
-            keyboardType="decimal-pad"
-            inputMode="decimal"
-            value={draft.amountText}
-            onChangeText={(t) => set('amountText', t)}
-            onBlur={() => set('amountText', formatMoneyText(draft.amountText))}
-            error={errors.amountText}
-          />
-          <View style={{ gap: space[2] }}>
-            <TextField
-              ref={refs.dateText}
-              label={S.purchaseDateLabel}
-              value={draft.dateText}
-              onChangeText={(t) => set('dateText', maskDateBR(t))}
-              placeholder="DD/MM/AAAA"
-              keyboardType="number-pad"
-              inputMode="numeric"
-              maxLength={10}
-              error={errors.dateText}
-              hint="Digite só os números. Só datas até hoje."
-            />
-            <View style={styles.chips}>
-              <Chip label="Hoje" selected={draft.dateText === formatDateBR(today)} onPress={() => set('dateText', formatDateBR(today))} />
-              <Chip label="Ontem" selected={draft.dateText === formatDateBR(addDays(today, -1))} onPress={() => set('dateText', formatDateBR(addDays(today, -1)))} />
+          {textOnly ? (
+            <View style={{ gap: space[1] }}>
+              <MoneyTxt style={[{ fontFamily: fonts.bold }, tabular]}>{`${formatBRL(entry.amountCents)}${entry.installments > 1 ? ` em ${entry.installments} vezes` : ''}`}</MoneyTxt>
+              {entry.purchasedOn ? (
+                <Txt variant="caption" color={colors.textSecondary}>
+                  {`${S.purchaseDateLabel}: ${formatDateBR(entry.purchasedOn)}`}
+                </Txt>
+              ) : null}
             </View>
-          </View>
-          <TextField
-            ref={refs.installmentsText}
-            label={CARDS_TEXT.expense.installments}
-            value={draft.installmentsText}
-            onChangeText={(t) => set('installmentsText', t.replace(/\D/g, '').slice(0, 2))}
-            keyboardType="number-pad"
-            inputMode="numeric"
-            maxLength={2}
-            placeholder="1"
-            hint={CARDS_TEXT.expense.installmentsHint}
-            error={errors.installmentsText}
-          />
-          {installmentsLine ? (
-            <Banner tone="info" live={false}>
-              <MoneyTxt variant="label" style={tabular}>
-                {installmentsLine}
-              </MoneyTxt>
-            </Banner>
-          ) : null}
+          ) : (
+            <>
+              <TextField
+                ref={refs.amountText}
+                label="Valor total da compra"
+                prefix="R$"
+                large
+                placeholder="0,00"
+                keyboardType="decimal-pad"
+                inputMode="decimal"
+                value={draft.amountText}
+                onChangeText={(t) => set('amountText', t)}
+                onBlur={() => set('amountText', formatMoneyText(draft.amountText))}
+                error={errors.amountText}
+              />
+              <View style={{ gap: space[2] }}>
+                <TextField
+                  ref={refs.dateText}
+                  label={S.purchaseDateLabel}
+                  value={draft.dateText}
+                  onChangeText={(t) => set('dateText', maskDateBR(t))}
+                  placeholder="DD/MM/AAAA"
+                  keyboardType="number-pad"
+                  inputMode="numeric"
+                  maxLength={10}
+                  error={errors.dateText}
+                  hint="Digite só os números. Só datas até hoje."
+                />
+                <View style={styles.chips}>
+                  <Chip label="Hoje" selected={draft.dateText === formatDateBR(today)} onPress={() => set('dateText', formatDateBR(today))} />
+                  <Chip label="Ontem" selected={draft.dateText === formatDateBR(addDays(today, -1))} onPress={() => set('dateText', formatDateBR(addDays(today, -1)))} />
+                </View>
+              </View>
+              <TextField
+                ref={refs.installmentsText}
+                label={CARDS_TEXT.expense.installments}
+                value={draft.installmentsText}
+                onChangeText={(t) => set('installmentsText', t.replace(/\D/g, '').slice(0, 2))}
+                keyboardType="number-pad"
+                inputMode="numeric"
+                maxLength={2}
+                placeholder="1"
+                hint={CARDS_TEXT.expense.installmentsHint}
+                error={errors.installmentsText}
+              />
+              {installmentsLine ? (
+                <Banner tone="info" live={false}>
+                  <MoneyTxt variant="label" style={tabular}>
+                    {installmentsLine}
+                  </MoneyTxt>
+                </Banner>
+              ) : null}
+            </>
+          )}
           <ChoiceGroup label="Categoria">
             <Chip label={NO_CATEGORY_LABEL} selected={draft.category === null} onPress={() => set('category', null)} />
             {CATEGORIES.despesa.map((c) => (

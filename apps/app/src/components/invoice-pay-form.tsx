@@ -49,7 +49,8 @@ const S = CARDS_TEXT.screens;
  * Pagar fatura (D-037): o total ou "Outro valor" e a data do pagamento, que vale de até 1 ano atrás (ou do começo do período da
  * fatura, se for mais antigo) até hoje. Uma só operação do banco cria o gasto do pagamento (entra em Pago no mês da data) e quita a
  * conta da fatura. Pagamento parcial: a diferença vira "Saldo anterior" na fatura seguinte, sem juros; o texto diz isso e leva a
- * "Quanto custa pagar só uma parte?". A fatura aberta pode ser paga antes do fechamento.
+ * "Quanto custa pagar só uma parte?". Só se paga fatura fechada (a aberta mostra quando poderá ser paga); a data do pagamento pode
+ * ser anterior ao fechamento, para quem pagou antes.
  */
 export function InvoicePayForm({ card, invoice, space: personal }: { card: CardData; invoice: Invoice; space: PersonalSpace }) {
   const { today } = useSession();
@@ -141,7 +142,9 @@ export function InvoicePayForm({ card, invoice, space: personal }: { card: CardD
           setBanner(r.code === 'compromisso_quitado' ? CARD_ERROR_TEXT.compromisso_quitado : CARD_ERROR_TEXT.versao_desatualizada);
           return;
         }
-        setBanner(cardErrorText(r.code));
+        // fatura_aberta: o texto traz o dia do fechamento; a fatura é recarregada para a tela deixar de oferecer o pagamento.
+        if (r.code === 'fatura_aberta') await qc.invalidateQueries({ queryKey: ['cards'] });
+        setBanner(cardErrorText(r.code, { closingOn: invoice.closingOn }));
         return;
       }
       setBanner(CARD_ERROR_TEXT.pagar_falhou ?? ERROR_TEXT.salvar_falhou);

@@ -1,3 +1,5 @@
+import type { Invoice } from './cards';
+import { recordShares } from './cards';
 import type { CommittedSummary } from './committed';
 import { COMMITTED_TEXT, formatPermille } from './committed';
 import type { IsoDate, IsoMonth } from './dates';
@@ -358,16 +360,21 @@ export type EssentialEstimate =
  * - records: listRecords dos 6 meses fechados anteriores ao mês atual (outros meses e recebimentos são ignorados);
  * - currentCommittedCents: renda comprometida do mês atual (summarizeCommitted(...).committedCents), para quando não há
  *   meses com gastos;
- * - annualIds: contas a pagar de contas do ano (annualCommitmentIds); os gastos gerados ao pagá-las não contam.
+ * - annualIds: contas a pagar de contas do ano (annualCommitmentIds); os gastos gerados ao pagá-las não contam;
+ * - invoices: as faturas dos gastos de pagamento de fatura de cartão (loadInvoicesOfRecords). Como em "Por categoria"
+ *   (categoryBreakdown), o pagamento de uma fatura é dividido pelas categorias dela (recordShares): o que foi comprado no cartão
+ *   em Moradia, Mercado, Transporte, Saúde e Educação conta como essencial, e os encargos do cartão não. Sem a fatura na lista,
+ *   o gasto fica na categoria dele (nenhuma, no pagamento de fatura).
  * Entre os 6 meses fechados, os até 3 mais recentes com algum gasto anotado (fora os de contas do ano):
  * roundDiv(Σ Pago em Moradia, Mercado, Transporte, Saúde e Educação, quantidade de meses). Média zero ou sem meses:
  * as contas do mês atual; sem elas: digitado.
  */
 export function essentialMonthly(
-  records: readonly Pick<FinancialRecord, 'kind' | 'amountCents' | 'occurredOn' | 'category' | 'commitmentId'>[],
+  records: readonly (Pick<FinancialRecord, 'kind' | 'amountCents' | 'occurredOn' | 'category' | 'commitmentId'> & { invoice?: FinancialRecord['invoice'] })[],
   currentMonth: IsoMonth,
   currentCommittedCents: Cents | null = null,
   annualIds: Iterable<string> = [],
+  invoices: readonly Pick<Invoice, 'cardId' | 'month' | 'mix'>[] = [],
 ): EssentialEstimate {
   const annual = new Set(annualIds);
   const closed = new Set(Array.from({ length: ESSENTIAL_LOOKBACK_MONTHS }, (_, i) => addMonths(currentMonth, -(i + 1))));
@@ -376,10 +383,16 @@ export function essentialMonthly(
   const counted = expenses.filter((r) => !isAnnual(r));
   const months = [...new Set(counted.map((r) => monthOf(r.occurredOn)))].sort().reverse().slice(0, ESSENTIAL_AVERAGE_MONTHS).sort();
   const used = new Set(months);
-  const inUsed = counted.filter((r) => used.has(monthOf(r.occurredOn)));
+  // Cada gasto vira uma ou mais partes (categoria e valor): o pagamento de fatura, uma por categoria da fatura.
+  const parts = counted
+    .filter((r) => used.has(monthOf(r.occurredOn)))
+    .flatMap((r) => {
+      const shares = recordShares({ invoice: r.invoice ?? null, amountCents: r.amountCents }, invoices);
+      return shares ? shares.map((x) => ({ category: x.charges ? null : x.category, cents: x.cents })) : [{ category: r.category, cents: r.amountCents }];
+    });
   const byCategory = ESSENTIAL_CATEGORIES.map((category) => ({
     category,
-    cents: inUsed.filter((r) => normalizeCategory(r.category) === normalizeCategory(category)).reduce((acc, r) => acc + r.amountCents, 0),
+    cents: parts.filter((x) => normalizeCategory(x.category) === normalizeCategory(category)).reduce((acc, x) => acc + x.cents, 0),
   })).filter((c) => c.cents > 0);
   const total = byCategory.reduce((acc, c) => acc + c.cents, 0);
   const amount = months.length > 0 ? roundDiv(total, months.length) : 0;

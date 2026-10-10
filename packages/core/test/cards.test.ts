@@ -21,8 +21,12 @@ import {
   categoryBreakdown,
   looksLikeCardNumber,
   normalizeCardInput,
+  currentInvoiceOf,
+  invoiceCanBePaid,
   paidInvoiceMonths,
+  purchaseBlockedByPaidInvoice,
   purchaseFirstInvoiceMonth,
+  purchasePreview,
   receiptKeyDigest,
   receiptKeyValid,
   invoiceItemOf,
@@ -484,17 +488,17 @@ describe('fatura: composição, total e situação', () => {
     expect(closesText('2026-11-03', f.clock.today)).toBe('Fecha hoje');
     f.clock.today = '2026-11-04';
     expect((await f.invoice(NOV)).situation).toBe('fechada');
-    // O dia do fechamento passa sem gravação: a leitura já calcula "estimado" na hora (falso), como a visão do banco; a marca
-    // gravada (versão 1) só é atualizada quando o app abre e sincroniza.
+    // O dia do fechamento passa sem gravação: a leitura já calcula "estimado" na hora (falso), como a visão do banco. A marca
+    // gravada fica velha e nada a lê; abrir o app (sincronizar) não mexe na conta da fatura nem na versão dela.
     bill = (await f.repo.listInvoiceCommitments(f.cardId))[0]!;
     expect([bill.amountIsEstimate, bill.amountCents, bill.status, bill.version]).toEqual([false, 20_000, 'aberto', 1]);
     expect((await f.repo.listInvoiceItems(f.cardId)).find((i) => i.month === NOV)).toMatchObject({ status: 'fechada', amountIsEstimate: false });
     expect((await f.repo.listCommitments(f.ctx, NOV)).find((c) => c.invoice)!.amountIsEstimate).toBe(false);
     await f.repo.syncSeriesOccurrences(f.ctx);
     bill = (await f.repo.listInvoiceCommitments(f.cardId))[0]!;
-    expect([bill.amountIsEstimate, bill.amountCents, bill.status, bill.version]).toEqual([false, 20_000, 'aberto', 2]);
+    expect([bill.amountIsEstimate, bill.amountCents, bill.status, bill.version]).toEqual([false, 20_000, 'aberto', 1]);
     await f.repo.syncSeriesOccurrences(f.ctx);
-    expect((await f.repo.listInvoiceCommitments(f.cardId))[0]!.version).toBe(2);
+    expect((await f.repo.listInvoiceCommitments(f.cardId))[0]!.version).toBe(1);
     // O valor muda com um novo lançamento mesmo depois do fechamento.
     await f.repo.addCardCharge(key(), f.cardId, { chargeType: 'anuidade', amountCents: 3_000, invoiceMonth: NOV });
     expect((await f.repo.listInvoiceCommitments(f.cardId))[0]!.amountCents).toBe(23_000);
@@ -1086,7 +1090,7 @@ describe('MemoryRepository: cartões com as regras do banco', () => {
     f.repo.checkInvariants();
   });
 
-  it('compra com data no período de uma fatura já FECHADA e paga é recusada (fatura_paga), sem ir para a fatura atual', async () => {
+  it('compra com data no período de uma fatura já paga é recusada (fatura_paga), sem desvio para outra fatura', async () => {
     const f = await fresh('2026-10-07');
     await f.purchase('Tênis', 40_000, '2026-10-05', 1, 'Lazer');
     f.clock.today = '2026-11-08';
@@ -1106,110 +1110,161 @@ describe('MemoryRepository: cartões com as regras do banco', () => {
     // Uma compra depois do fechamento vai para a fatura seguinte, que está aberta e não paga.
     const ok = await f.purchase('Depois do fechamento', 1_000, '2026-11-04', 1);
     expect(ok.entry!.invoiceMonth).toBe(DEC);
-    // Fatura natural fechada e NÃO paga (dezembro, hoje 04/12), com a parcela seguinte em fatura paga (janeiro, paga cedo): a compra
-    // em 2 vezes é recusada, sem desvio; em 1 vez ela fica em dezembro.
-    f.clock.today = '2026-12-04';
-    await f.purchase('Natural de janeiro', 500, '2026-12-04', 1);
-    const jan = await f.invoice('2027-01');
-    await f.repo.payInvoice(key(), f.cardId, '2027-01', jan.commitmentVersion!, 500, '2026-12-04');
-    await expectCode(f.purchase('Esquecida', 500, '2026-11-20', 2), 'fatura_paga');
-    expect((await f.purchase('Esquecida', 500, '2026-11-20', 1)).entry!.invoiceMonth).toBe(DEC);
+    // Fatura natural fechada e NÃO paga (outubro) com a parcela seguinte em fatura paga (novembro): a compra em 2 vezes é
+    // recusada, sem desvio; em 1 vez ela fica em outubro.
+    await expectCode(f.purchase('Esquecida', 500, '2026-09-20', 2), 'fatura_paga');
+    expect((await f.purchase('Esquecida', 500, '2026-09-20', 1)).entry!.invoiceMonth).toBe(OCT);
+    // Mudar a data para o ciclo de novembro (paga) também é recusado, e nada muda.
+    const moved = await f.purchase('Mudar data', 700, '2026-11-04', 1);
+    await expectCode(
+      f.repo.updateCardEntry(key(), moved.entry!.id, moved.entry!.version, {
+        kind: 'compra',
+        description: 'Mudar data',
+        category: null,
+        purchasedOn: '2026-11-02',
+        totalCents: 700,
+        installments: 1,
+      }),
+      'fatura_paga',
+    );
+    expect((await f.repo.listCardEntries(f.cardId)).find((e) => e.id === moved.entry!.id)).toMatchObject({ invoiceMonth: DEC, purchasedOn: '2026-11-04', version: 1 });
     f.repo.checkInvariants();
   });
 
-  it('pagar a fatura aberta antes do fechamento: as compras seguintes vão para a primeira fatura livre, o dinheiro é conservado e dá para pagar o resto', async () => {
+  it('a fatura só se paga depois do fechamento (fatura_aberta); a data pode ser anterior; as compras vão sempre para a fatura natural', async () => {
     const f = await fresh('2026-10-07');
     const totalOf = async () => (await f.invoices()).reduce((a, i) => a + i.rawCents, 0);
-    // Outubro (fechou em 03/10) paga em 07/10; novembro, aberta (fecha em 03/11), paga antes do fechamento.
+    // Outubro (fechou em 03/10) paga em 07/10; novembro, aberta (fecha em 03/11), não aceita pagamento.
     await f.purchase('Compra de outubro', 2_000, '2026-10-01');
     const oct = await f.invoice(OCT);
+    expect(invoiceCanBePaid(oct)).toBe(true);
     await f.repo.payInvoice(key(), f.cardId, OCT, oct.commitmentVersion!, 2_000, '2026-10-07');
     await f.purchase('Mercado', 30_000, '2026-10-05', 1, 'Mercado');
     let nov = await f.invoice(NOV);
     expect([nov.situation, nov.estimated, nov.totalCents]).toEqual(['aberta', true, 30_000]);
-    await f.repo.payInvoice(key(), f.cardId, NOV, nov.commitmentVersion!, 30_000, '2026-10-07');
-    nov = await f.invoice(NOV);
-    expect([nov.situation, nov.estimated, nov.totalCents]).toEqual(['paga', false, 30_000]);
-    // O cartão não trava: a compra de hoje (novembro, paga) vai para dezembro; 3 vezes, de dezembro a fevereiro.
-    const a = await f.purchase('Farmácia', 7_000, '2026-10-07', 1, 'Saúde');
-    expect(a.entry!.invoiceMonth).toBe(DEC);
-    const b = await f.purchase('Tênis', 9_000, '2026-10-07', 3, 'Lazer');
-    expect(b.entry!.invoiceMonth).toBe(DEC);
-    expect((await f.invoices()).map((i) => [i.month, i.totalCents])).toEqual([[OCT, 2_000], [NOV, 30_000], [DEC, 10_000], ['2027-01', 3_000], ['2027-02', 3_000]]);
+    expect(invoiceCanBePaid(nov)).toBe(false);
+    const before = await f.repo.listRecords(f.ctx, '2026-10');
+    await expectCode(f.repo.payInvoice(key(), f.cardId, NOV, nov.commitmentVersion!, 30_000, '2026-10-07'), 'fatura_aberta');
+    await expectCode(f.repo.payInvoice(key(), f.cardId, NOV, nov.commitmentVersion!, 10_000, '2026-10-07'), 'fatura_aberta');
+    // A recusa vem logo depois de versão e situação, antes de valor, data e conta; não grava nada.
+    await expectCode(f.repo.payInvoice(key(), f.cardId, NOV, nov.commitmentVersion!, 0, '2030-01-01', 'conta-inexistente'), 'fatura_aberta');
+    await expectCode(f.repo.payInvoice(key(), f.cardId, NOV, nov.commitmentVersion! + 1, 30_000, '2026-10-07'), 'versao_desatualizada');
+    expect(await f.repo.listRecords(f.ctx, '2026-10')).toEqual(before);
+    expect(await f.invoice(NOV)).toEqual(nov);
+    // Sem desvio: a compra de hoje cai na fatura natural (novembro), com ou sem parcelas.
+    expect((await f.purchase('Farmácia', 7_000, '2026-10-07', 1, 'Saúde')).entry!.invoiceMonth).toBe(NOV);
+    expect((await f.purchase('Tênis', 9_000, '2026-10-07', 3, 'Lazer')).entry!.invoiceMonth).toBe(NOV);
+    expect((await f.invoices()).map((i) => [i.month, i.totalCents])).toEqual([[OCT, 2_000], [NOV, 40_000], [DEC, 3_000], ['2027-01', 3_000]]);
     expect(await totalOf()).toBe(2_000 + 30_000 + 7_000 + 9_000);
     // Só os pagamentos entram em Pago (as compras no cartão não).
-    expect(await f.totals('2026-10')).toEqual([0, 32_000, -32_000]);
-    // Dezembro também é paga cedo: a compra em 3 vezes pula as duas faturas pagas e começa em janeiro; uma parcela também.
-    const dec = await f.invoice(DEC);
-    await f.repo.payInvoice(key(), f.cardId, DEC, dec.commitmentVersion!, 10_000, '2026-10-07');
-    expect((await f.purchase('Cadeira', 6_000, '2026-10-07', 3, 'Moradia')).entry!.invoiceMonth).toBe('2027-01');
-    expect((await f.purchase('Café', 500, '2026-10-07', 1)).entry!.invoiceMonth).toBe('2027-01');
-    // Novembro reabre (desfazer) com dezembro paga: uma parcela cabe em novembro; duas parcelas não cruzam dezembro.
+    expect(await f.totals('2026-10')).toEqual([0, 2_000, -2_000]);
+    // No dia do fechamento (03/11) a fatura ainda está aberta; no dia seguinte, fechada. A data do pagamento pode ser anterior ao
+    // fechamento (quem pagou antes informa o dia em que pagou).
+    f.clock.today = '2026-11-03';
     nov = await f.invoice(NOV);
-    await f.repo.undoInvoicePayment(key(), f.cardId, NOV, nov.commitmentVersion!);
-    expect((await f.purchase('Pão', 400, '2026-10-07', 1)).entry!.invoiceMonth).toBe(NOV);
-    expect((await f.purchase('Livro', 800, '2026-10-07', 2)).entry!.invoiceMonth).toBe('2027-01');
-    expect(await totalOf()).toBe(2_000 + 30_000 + 7_000 + 9_000 + 6_000 + 500 + 400 + 800);
-    // Mudar a data da compra para o ciclo de uma fatura FECHADA e paga (outubro) é recusado: não vai para a fatura atual.
-    const nova = await f.purchase('Mudar data', 1_000, '2026-10-07', 1);
-    const novaInput = { kind: 'compra' as const, description: 'Mudar data', category: null, totalCents: 1_000, installments: 1 };
-    await expectCode(f.repo.updateCardEntry(key(), nova.entry!.id, nova.entry!.version, { ...novaInput, purchasedOn: '2026-10-02' }), 'fatura_paga');
-    expect((await f.repo.listCardEntries(f.cardId)).find((e) => e.id === nova.entry!.id)).toMatchObject({ invoiceMonth: NOV, purchasedOn: '2026-10-07', version: 1 });
+    expect(invoiceCanBePaid(nov)).toBe(false);
+    await expectCode(f.repo.payInvoice(key(), f.cardId, NOV, nov.commitmentVersion!, 40_000, '2026-11-02'), 'fatura_aberta');
+    f.clock.today = '2026-11-04';
+    nov = await f.invoice(NOV);
+    expect(nov.situation).toBe('fechada');
+    expect(invoiceCanBePaid(nov)).toBe(true);
+    const paid = await f.repo.payInvoice(key(), f.cardId, NOV, nov.commitmentVersion!, 40_000, '2026-11-02');
+    expect(paid.record.occurredOn).toBe('2026-11-02');
+    nov = await f.invoice(NOV);
+    expect([nov.situation, nov.estimated, nov.totalCents]).toEqual(['paga', false, 40_000]);
+    expect(invoiceCanBePaid(nov)).toBe(false);
+    // A compra do ciclo de novembro (data até 03/11), agora numa fatura paga, é recusada; a de 04/11 vai para dezembro.
+    await expectCode(f.purchase('Esquecida de novembro', 1_000, '2026-11-02'), 'fatura_paga');
+    const cafe = await f.purchase('Café', 500, '2026-11-04');
+    expect(cafe.entry!.invoiceMonth).toBe(DEC);
+    // Mudar a data para o ciclo de outubro ou de novembro (pagas) é recusado.
+    const cafeInput = { kind: 'compra' as const, description: 'Café', category: null, totalCents: 500, installments: 1 };
+    await expectCode(f.repo.updateCardEntry(key(), cafe.entry!.id, cafe.entry!.version, { ...cafeInput, purchasedOn: '2026-10-02' }), 'fatura_paga');
+    await expectCode(f.repo.updateCardEntry(key(), cafe.entry!.id, cafe.entry!.version, { ...cafeInput, purchasedOn: '2026-11-02' }), 'fatura_paga');
+    expect((await f.repo.listCardEntries(f.cardId)).find((e) => e.id === cafe.entry!.id)).toMatchObject({ invoiceMonth: DEC, purchasedOn: '2026-11-04', version: 1 });
+    // Desfazer o pagamento reabre o ciclo (fechada, não paga): a compra com data nele volta a ser aceita.
+    await f.repo.undoInvoicePayment(key(), f.cardId, NOV, (await f.invoice(NOV)).commitmentVersion!);
+    expect((await f.purchase('Esquecida de novembro', 1_000, '2026-11-02')).entry!.invoiceMonth).toBe(NOV);
     f.repo.checkInvariants();
   });
 
-  it('pagamento parcial antes do fechamento: o que sobra e as compras seguintes vão para a fatura seguinte; o resto pode ser pago', async () => {
+  it('"Fatura atual" nunca é uma fatura paga: se o período de hoje cai num mês já pago, vale a primeira fatura seguinte sem pagamento', async () => {
     const f = await fresh('2026-10-07');
-    await f.purchase('Reforma', 30_000, '2026-10-05');
+    await f.purchase('Tênis', 40_000, '2026-10-05', 2, 'Lazer');
+    f.clock.today = '2026-11-04';
     const nov = await f.invoice(NOV);
-    const paid = await f.repo.payInvoice(key(), f.cardId, NOV, nov.commitmentVersion!, 20_000, '2026-10-07');
+    await f.repo.payInvoice(key(), f.cardId, NOV, nov.commitmentVersion!, 20_000, '2026-11-04');
+    const card = (await f.repo.getCard(f.cardId))!;
+    // Fecha dia 3: hoje (04/11) é da fatura de dezembro, aberta.
+    expect(summarizeCard(card, await f.invoices(), f.clock.today).current.month).toBe(DEC);
+    // Se a pessoa muda o fechamento para o dia 20, o período de hoje volta a ser o de novembro, que está paga: a atual é dezembro.
+    await f.repo.updateCard(key(), f.cardId, card.version, { ...NUBANK, closingDay: 20, dueDay: 25 });
+    const moved = (await f.repo.getCard(f.cardId))!;
+    expect(invoiceMonthOf(moved, f.clock.today)).toBe(NOV);
+    const invoices = await f.invoices();
+    expect(invoices.find((i) => i.month === NOV)!.situation).toBe('paga');
+    const summary = summarizeCard(moved, invoices, f.clock.today);
+    expect(summary.current.month).toBe(DEC);
+    expect(summary.current.situation).not.toMatch(/^paga/);
+    expect(currentInvoiceOf(moved, [], f.clock.today).month).toBe(NOV);
+    f.repo.checkInvariants();
+  });
+
+  it('pagamento parcial depois do fechamento: o que sobra e as compras seguintes vão para a fatura seguinte; o resto pode ser pago', async () => {
+    const f = await fresh('2026-11-04');
+    await f.purchase('Reforma', 30_000, '2026-10-05');
+    await f.purchase('Compra de setembro', 1_000, '2026-09-20');
+    const nov = await f.invoice(NOV);
+    const paid = await f.repo.payInvoice(key(), f.cardId, NOV, nov.commitmentVersion!, 20_000, '2026-11-04');
     expect(paid.entry).toMatchObject({ kind: 'saldo_anterior', amountCents: 10_000, invoiceMonth: DEC });
     expect((await f.invoice(NOV)).situation).toBe('paga_em_parte');
-    expect((await f.purchase('Depois do pagamento', 5_000, '2026-10-07')).entry!.invoiceMonth).toBe(DEC);
+    expect((await f.purchase('Depois do pagamento', 5_000, '2026-11-04')).entry!.invoiceMonth).toBe(DEC);
     const dec = await f.invoice(DEC);
     expect([dec.balanceCents, dec.installmentsCents, dec.totalCents]).toEqual([10_000, 5_000, 15_000]);
-    // Mudar a data para o ciclo aberto de novembro (paga em parte) também desvia para dezembro; uma compra de setembro (fatura de
-    // outubro, fechada e não paga) fica em outubro.
-    const sep = await f.purchase('Troca de data', 1_000, '2026-09-20');
-    expect(sep.entry!.invoiceMonth).toBe(OCT);
-    const moved = await f.repo.updateCardEntry(key(), sep.entry!.id, sep.entry!.version, {
-      kind: 'compra',
-      description: 'Troca de data',
-      category: null,
-      purchasedOn: '2026-10-06',
-      totalCents: 1_000,
-      installments: 1,
-    });
-    expect(moved.entry).toMatchObject({ invoiceMonth: DEC, purchasedOn: '2026-10-06', version: 2 });
+    // Parcela adiante em fatura paga: em 2 vezes a partir de setembro seriam outubro (fechada, não paga) e novembro (paga em parte).
+    await expectCode(f.purchase('Em duas vezes', 2_000, '2026-09-20', 2), 'fatura_paga');
+    // Mudar a data para o ciclo de novembro (paga em parte) é recusado; para o de outubro (fechada, não paga), aceito.
+    const sep = await f.purchase('Troca de data', 1_000, '2026-11-04');
+    expect(sep.entry!.invoiceMonth).toBe(DEC);
+    const input = { kind: 'compra' as const, description: 'Troca de data', category: null, totalCents: 1_000, installments: 1 };
+    await expectCode(f.repo.updateCardEntry(key(), sep.entry!.id, sep.entry!.version, { ...input, purchasedOn: '2026-10-06' }), 'fatura_paga');
+    const moved = await f.repo.updateCardEntry(key(), sep.entry!.id, sep.entry!.version, { ...input, purchasedOn: '2026-09-20' });
+    expect(moved.entry).toMatchObject({ invoiceMonth: OCT, purchasedOn: '2026-09-20', version: 2 });
     await f.repo.deleteCardEntry(key(), sep.entry!.id, 2);
+    // Dezembro fecha em 03/12: em 04/12 o resto pode ser pago, e os pagamentos somam as compras.
+    f.clock.today = '2026-12-04';
     const dec2 = await f.invoice(DEC);
     expect([dec2.balanceCents, dec2.installmentsCents, dec2.totalCents]).toEqual([10_000, 5_000, 15_000]);
-    await f.repo.payInvoice(key(), f.cardId, DEC, dec2.commitmentVersion!, 15_000, '2026-10-07');
-    const records = (await f.repo.listRecords(f.ctx, '2026-10')).filter((r) => r.invoice);
-    expect(records.reduce((a, r) => a + r.amountCents, 0)).toBe(35_000);
+    await f.repo.payInvoice(key(), f.cardId, DEC, dec2.commitmentVersion!, 15_000, '2026-12-04');
+    const oct = await f.invoice(OCT);
+    await f.repo.payInvoice(key(), f.cardId, OCT, oct.commitmentVersion!, 1_000, '2026-12-04');
+    const records = [...(await f.repo.listRecords(f.ctx, '2026-11')), ...(await f.repo.listRecords(f.ctx, '2026-12'))].filter((r) => r.invoice);
+    expect(records.reduce((a, r) => a + r.amountCents, 0)).toBe(36_000);
     f.repo.checkInvariants();
   });
 
-  it('purchaseFirstInvoiceMonth: primeira fatura livre, só quando a fatura natural ainda está aberta', () => {
-    const card = { closingDay: 3, dueDay: 10 };
+  it('purchaseFirstInvoiceMonth é sempre a fatura natural; purchaseBlockedByPaidInvoice e purchasePreview dizem quando o banco recusa', () => {
+    const card = { name: 'Nubank', closingDay: 3, dueDay: 10 };
     const T = '2026-10-07';
-    expect(purchaseFirstInvoiceMonth(card, '2026-10-05', 1, [], T)).toBe(NOV);
-    expect(purchaseFirstInvoiceMonth(card, '2026-10-05', 3, [], T)).toBe(NOV);
-    expect(purchaseFirstInvoiceMonth(card, '2026-10-05', 1, [NOV], T)).toBe(DEC);
-    expect(purchaseFirstInvoiceMonth(card, '2026-10-05', 3, [NOV, DEC], T)).toBe('2027-01');
-    // Uma parcela cabe antes de uma fatura paga adiante; duas não.
-    expect(purchaseFirstInvoiceMonth(card, '2026-10-05', 1, [DEC], T)).toBe(NOV);
-    expect(purchaseFirstInvoiceMonth(card, '2026-10-05', 2, [DEC], T)).toBe('2027-01');
-    expect(purchaseFirstInvoiceMonth(card, '2026-10-05', 48, ['2030-10'], T)).toBe('2030-11');
-    // Faturas pagas fora do alcance não mudam nada; ordem e repetição não importam.
-    expect(purchaseFirstInvoiceMonth(card, '2026-10-05', 2, ['2026-09', '2027-03'], T)).toBe(NOV);
-    expect(purchaseFirstInvoiceMonth(card, '2026-10-05', 2, new Set([DEC, NOV, NOV]), T)).toBe('2027-01');
-    // Fechamento: no dia 03/11 a fatura de novembro ainda está aberta (desvia); no dia 04/11 já fechou (não desvia).
-    expect(purchaseFirstInvoiceMonth(card, '2026-10-05', 1, [NOV], '2026-11-03')).toBe(DEC);
+    // Sem desvio: a fatura natural, com ou sem faturas pagas e qualquer que seja o dia de hoje.
+    expect(purchaseFirstInvoiceMonth(card, '2026-10-05')).toBe(NOV);
+    expect(purchaseFirstInvoiceMonth(card, '2026-10-05', 3, [NOV, DEC], T)).toBe(NOV);
     expect(purchaseFirstInvoiceMonth(card, '2026-10-05', 1, [NOV], '2026-11-04')).toBe(NOV);
-    // Fatura natural fechada: devolve a natural, mesmo paga (quem grava recusa com fatura_paga); nunca vai para a fatura atual.
-    expect(purchaseFirstInvoiceMonth(card, '2026-08-20', 1, ['2026-09', OCT, NOV], T)).toBe('2026-09');
-    expect(purchaseFirstInvoiceMonth(card, '2024-10-20', 1, ['2024-11', '2026-09', OCT], T)).toBe('2024-11');
+    expect(purchaseFirstInvoiceMonth(card, '2026-10-03')).toBe(OCT);
+    expect(purchaseFirstInvoiceMonth(card, '2024-10-20')).toBe('2024-11');
+    // A primeira parcela, ou qualquer outra, em fatura paga: recusada.
+    expect(purchaseBlockedByPaidInvoice(NOV, 1, [])).toBe(false);
+    expect(purchaseBlockedByPaidInvoice(NOV, 1, [NOV])).toBe(true);
+    expect(purchaseBlockedByPaidInvoice(NOV, 3, [DEC])).toBe(true);
+    expect(purchaseBlockedByPaidInvoice(NOV, 1, [DEC])).toBe(false);
+    expect(purchaseBlockedByPaidInvoice(NOV, 48, ['2030-10'])).toBe(true);
+    expect(purchaseBlockedByPaidInvoice(NOV, 2, ['2026-09', '2027-03'])).toBe(false);
+    expect(purchaseBlockedByPaidInvoice(NOV, 2, new Set([DEC, NOV, NOV]))).toBe(true);
+    // Prévia do formulário: a fatura, ou o motivo da recusa (o mesmo texto do banco).
+    expect(purchasePreview(card, '2026-10-05', 1, [], T)).toEqual({ text: purchaseNotice(NOV, 'Nubank', T), blocked: false });
+    expect(purchasePreview(card, '2026-10-05', 1, [NOV], T)).toEqual({ text: CARDS_TEXT.expense.paidInvoicePurchase, blocked: true });
+    expect(purchasePreview(card, '2026-10-05', 3, [DEC], T).blocked).toBe(true);
+    expect(purchasePreview(card, '2026-10-05', 1, [DEC], T).blocked).toBe(false);
     expect(paidInvoiceMonths([{ month: NOV, situation: 'paga' }, { month: DEC, situation: 'paga_em_parte' }, { month: '2027-01', situation: 'fechada' }, { month: '2027-02', situation: 'aberta' }])).toEqual([NOV, DEC]);
   });
 
@@ -1529,7 +1584,7 @@ describe('alinhamento com o banco', () => {
   it('fatura de outro ano que o do pagamento leva o ano no nome do gasto', async () => {
     const f = await fresh('2026-10-07');
     await f.purchase('Fone', 30_000, '2026-10-06', 3, 'Lazer'); // novembro, dezembro e janeiro
-    f.clock.today = '2026-12-20';
+    f.clock.today = '2027-01-04'; // janeiro fechou em 03/01; quem pagou antes informa o dia do pagamento (20/12)
     const jan = await f.invoice('2027-01');
     const paid = await f.repo.payInvoice(key(), f.cardId, '2027-01', jan.commitmentVersion!, 10_000, '2026-12-20');
     expect(paid.record.description).toBe('Fatura Nubank (janeiro de 2027)');
@@ -1710,8 +1765,9 @@ describe('revisão da auditoria', () => {
     expect((await g.invoices()).map((i) => [i.month, i.rawCents])).toEqual([[NOV, -10_000], [DEC, 20_000]]);
     expect((await g.repo.getCard(g.cardId))!.usedCents).toBe(20_000);
     // Fatura paga sai do uso do limite.
+    g.clock.today = '2026-12-06'; // dezembro fechou em 05/12
     const dec = await g.invoice(DEC);
-    const paid = await g.repo.payInvoice(key(), g.cardId, DEC, dec.commitmentVersion!, 20_000, '2026-10-07');
+    const paid = await g.repo.payInvoice(key(), g.cardId, DEC, dec.commitmentVersion!, 20_000, '2026-12-06');
     expect(paid.card.usedCents).toBe(0);
     g.repo.checkInvariants();
   });
@@ -1736,10 +1792,10 @@ describe('revisão da auditoria', () => {
     await expectCode(f.repo.payInvoice(key(), f.cardId, '2025-02', feb25.commitmentVersion!, 3_000, ''), 'data_invalida');
     // Fatura recente: a janela de 1 ano (07/10/2025 vale; 06/10/2025 não).
     const g = await fresh('2026-10-07');
-    await g.purchase('Recente', 1_000, '2026-10-05');
-    const nov = await g.invoice(NOV);
-    await expectCode(g.repo.payInvoice(key(), g.cardId, NOV, nov.commitmentVersion!, 1_000, '2025-10-06'), 'data_invalida');
-    expect((await g.repo.payInvoice(key(), g.cardId, NOV, nov.commitmentVersion!, 1_000, '2025-10-07')).record.occurredOn).toBe('2025-10-07');
+    await g.purchase('Recente', 1_000, '2026-09-20'); // fatura de outubro, fechada em 03/10
+    const oct = await g.invoice(OCT);
+    await expectCode(g.repo.payInvoice(key(), g.cardId, OCT, oct.commitmentVersion!, 1_000, '2025-10-06'), 'data_invalida');
+    expect((await g.repo.payInvoice(key(), g.cardId, OCT, oct.commitmentVersion!, 1_000, '2025-10-07')).record.occurredOn).toBe('2025-10-07');
     f.repo.checkInvariants();
     g.repo.checkInvariants();
   });

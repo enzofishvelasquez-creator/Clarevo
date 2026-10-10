@@ -935,6 +935,11 @@ describe('textos de cartões (Ciclo E)', () => {
     expect(CARDS_TEXT.paymentOrigin).toBe('Pagamento de fatura');
     expect(CARDS_TEXT.chargesCategory).toBe('Encargos do cartão');
     expect(invoiceRecordDescription('Nubank', '2026-10', '2026-10-20')).toBe('Fatura Nubank (outubro)');
+    expect(CARDS_TEXT.invoice.payAfterClosing('2026-11-03')).toBe(
+      'Esta fatura ainda está aberta. Registre o pagamento depois do fechamento, em 03/11/2026. Se você já pagou antes, use a data em que pagou.',
+    );
+    expect(cardErrorText('fatura_aberta', { closingOn: '2026-11-03' })).toBe(CARDS_TEXT.invoice.payAfterClosing('2026-11-03'));
+    expect(cardErrorText('fatura_aberta')).toBe(CARD_ERROR_TEXT.fatura_aberta);
     expect(CARDS_TEXT.topicParagraph).toMatch(/só contam em Pago quando a fatura é paga/);
     expect(CARDS_TEXT.topicParagraph).toMatch(/anotar a fatura como conta a pagar continua valendo/);
   });
@@ -974,6 +979,8 @@ describe('textos de cartões (Ciclo E)', () => {
     ];
     const codes = Object.keys(CARD_ERROR_TEXT);
     for (const code of codes) texts.push(cardErrorText(code));
+    // Fatura ainda aberta: o texto com a data do fechamento, o do erro e a dica nas telas.
+    texts.push(T.invoice.payAfterClosing('2026-11-03'), cardErrorText('fatura_aberta', { closingOn: '2026-11-03' }));
     // Demonstração: lista, fatura atual e linhas.
     const demo = await createDemoRepository();
     const ctx = (await demo.getSpace())!.personalContextId;
@@ -984,7 +991,7 @@ describe('textos de cartões (Ciclo E)', () => {
       texts.push(t.title, t.invoiceLine, t.closes, t.due, t.limit, t.a11yLabel, ...t.closed);
       for (const inv of invoices) {
         const it = invoiceTexts(inv, DEMO_TODAY);
-        texts.push(it.title, it.situation, it.total, it.closes, it.due, it.period, it.a11yLabel, ...(it.estimated ? [it.estimated] : []));
+        texts.push(it.title, it.situation, it.total, it.closes, it.due, it.period, it.a11yLabel, ...(it.estimated ? [it.estimated] : []), ...(it.payHint ? [it.payHint] : []));
         for (const l of inv.lines) texts.push(invoiceLineText(l));
       }
     }
@@ -1005,7 +1012,7 @@ describe('textos de cartões (Ciclo E)', () => {
         for (const l of inv.lines) texts.push(invoiceLineText(l));
       }
     }
-    clock.today = '2026-12-20';
+    clock.today = '2027-01-04'; // janeiro fechou em 03/01; o pagamento é informado com a data em que foi feito (20/12)
     // Novembro fica com crédito de R$ 470,00, que passa por dezembro (crédito de R$ 170,00) e chega a janeiro (R$ 130,00 a pagar).
     const jan = (await loadInvoices(repo, card, clock.today)).find((i) => i.month === '2027-01')!;
     expect(jan.totalCents).toBe(13_000);

@@ -6,6 +6,7 @@ import {
   cardErrorText,
   formatBRL,
   formatDayMonth,
+  invoiceCanBePaid,
   invoiceFor,
   invoiceLineText,
   invoiceMonthLabel,
@@ -82,7 +83,7 @@ export default function FaturaScreen() {
 
   function fail(code: string) {
     // Recusa por versão, exclusão ou pagamento em outro aparelho: recarrega e mostra o motivo.
-    if (code === 'versao_desatualizada' || code === 'nao_encontrado' || code === 'fatura_paga' || code === 'fatura_seguinte_paga') {
+    if (code === 'versao_desatualizada' || code === 'nao_encontrado' || code === 'fatura_paga' || code === 'fatura_aberta' || code === 'fatura_seguinte_paga') {
       card.refetch();
       invoices.refetch();
     }
@@ -144,10 +145,12 @@ export default function FaturaScreen() {
 
   const lineChoices = (l: InvoiceLine, inv: Invoice): DialogChoice[] => {
     const choices: DialogChoice[] = [];
-    // Compra no cartão: descrição, valor, data, categoria e parcelas (as parcelas são recalculadas).
+    const paidInvoice = inv.situation === 'paga' || inv.situation === 'paga_em_parte';
+    // Compra no cartão: descrição, valor, data, categoria e parcelas (as parcelas são recalculadas). Numa fatura paga, só a
+    // descrição e a categoria mudam (o banco recusa o resto), e a compra não é excluída aqui.
     if (l.kind === 'parcela' && c) {
       choices.push({
-        label: I.purchaseEdit,
+        label: paidInvoice ? I.purchaseEditPaid : I.purchaseEdit,
         onPress: () => {
           setLine(null);
           router.push({ pathname: '/cartoes/[id]/fatura/[mes]/compra', params: { id: c.id, mes: inv.month, lancamento: l.entryId! } });
@@ -166,7 +169,7 @@ export default function FaturaScreen() {
         },
       });
     }
-    choices.push({ label: I.entryDelete, onPress: () => setConfirmDelete(true) });
+    if (!paidInvoice) choices.push({ label: I.entryDelete, onPress: () => setConfirmDelete(true) });
     return choices;
   };
 
@@ -293,7 +296,8 @@ function InvoiceBody({
 }) {
   const t = invoiceTexts(invoice, today);
   const paid = invoice.situation === 'paga' || invoice.situation === 'paga_em_parte';
-  const canPay = !paid && invoice.commitmentVersion !== null && invoice.totalCents > 0;
+  // Só se paga fatura fechada; a aberta mostra quando poderá ser paga (t.payHint).
+  const canPay = invoiceCanBePaid(invoice);
   const canUndo = paid && invoice.commitmentVersion !== null;
   const calc = invoice.situation === 'paga_em_parte' ? partialPaymentCalcLink(invoice.remainingCents) : null;
   const sub = (m: string) => ({ pathname: '/cartoes/[id]/fatura/[mes]/pagar' as const, params: { id: cardId, mes: m } });
@@ -365,6 +369,11 @@ function InvoiceBody({
           </Card>
         ) : null}
 
+        {t.payHint ? (
+          <Txt variant="label" color={colors.textSecondary}>
+            {t.payHint}
+          </Txt>
+        ) : null}
         <View style={{ gap: space[3] }}>
           {canPay ? <Button label={I.payInvoice} icon={Wallet} disabled={busy} onPress={() => router.push(sub(invoice.month))} /> : null}
           {canUndo ? <Button label={I.undoPayment} icon={Undo2} tone="soft" disabled={busy} onPress={onUndo} /> : null}
@@ -419,7 +428,14 @@ function InvoiceBody({
             </Txt>
           ) : (
             invoice.lines.map((l, i) => (
-              <LineRow key={l.key} line={l} last={i === invoice.lines.length - 1} locked={paid} editable={editable(l)} onPress={() => onLine(l)} />
+              <LineRow
+                key={l.key}
+                line={l}
+                last={i === invoice.lines.length - 1}
+                locked={paid && l.kind !== 'parcela'}
+                editable={editable(l)}
+                onPress={() => onLine(l)}
+              />
             ))
           )}
         </Card>

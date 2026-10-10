@@ -1,4 +1,4 @@
-import { CARDS_TEXT, CARD_ERROR_TEXT, ERROR_TEXT, invoiceFor } from '@clarevo/core';
+import { CARDS_TEXT, CARD_ERROR_TEXT, ERROR_TEXT, invoiceCanBePaid, invoiceFor, paidInvoiceMonths, purchaseBlockedByPaidInvoice } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 
@@ -74,11 +74,12 @@ export function InvoicePayRoute() {
   }
   const invoice = invoiceFor(card.data, invoices.data, month, today);
   const paid = invoice.situation === 'paga' || invoice.situation === 'paga_em_parte';
-  if (paid || invoice.commitmentVersion === null || invoice.totalCents <= 0) {
+  // Só se paga fatura fechada: a aberta (ou futura) mostra quando poderá ser paga.
+  if (!invoiceCanBePaid(invoice)) {
     return (
       <Shell title={title}>
         <Blocked
-          text={paid ? CARD_ERROR_TEXT.compromisso_quitado : S.noPayable}
+          text={paid ? CARD_ERROR_TEXT.compromisso_quitado : invoice.situation === 'aberta' && invoice.commitmentVersion !== null ? CARDS_TEXT.invoice.payAfterClosing(invoice.closingOn) : S.noPayable}
           label={CARDS_TEXT.openInvoice}
           onPress={() => router.replace(invoiceHref(card.data!.id, month))}
         />
@@ -151,7 +152,6 @@ export function InvoiceEntryRoute({ kind }: { kind: EntryKind }) {
 export function CardPurchaseRoute() {
   const { id, mes, lancamento } = useLocalSearchParams<{ id: string; mes: string; lancamento?: string }>();
   const month = readInvoiceMonth(mes);
-  const { today } = useSession();
   const card = useCard(id);
   const invoices = useCardInvoices(card.data ?? null);
   const entry = useCardEntry(lancamento);
@@ -186,17 +186,12 @@ export function CardPurchaseRoute() {
       </Shell>
     );
   }
-  const invoice = invoiceFor(card.data, invoices.data, month, today);
-  if (invoice.situation === 'paga' || invoice.situation === 'paga_em_parte') {
-    return (
-      <Shell title={title}>
-        <Blocked text={CARD_ERROR_TEXT.fatura_paga} label={CARDS_TEXT.openInvoice} onPress={() => router.replace(invoiceHref(card.data!.id, month))} />
-      </Shell>
-    );
-  }
+  // Compra com parcela em fatura já paga (em qualquer das parcelas): só a descrição e a categoria mudam; o resto pede para
+  // desfazer o pagamento (o banco recusa com fatura_paga).
+  const paidParts = purchaseBlockedByPaidInvoice(found.invoiceMonth, found.installments, paidInvoiceMonths(invoices.data));
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <CardPurchaseForm card={card.data} month={month} entry={found} />
+      <CardPurchaseForm card={card.data} month={month} entry={found} textOnly={paidParts} />
     </View>
   );
 }

@@ -1,5 +1,6 @@
+import { CARDS_TEXT } from '../../cards';
 import type { Topic } from '../types';
-import { REVIEWED_ON, clarevo } from './common';
+import { CARDS_REVIEWED_ON, REVIEWED_ON, clarevo } from './common';
 
 /**
  * Seção "Usar o Clarevo": como cada número do app é calculado. Fontes: decisões do projeto (docs/00).
@@ -88,7 +89,7 @@ export const USAR_TOPICS: Topic[] = [
     short: 'Anote as compras do cartão ou o pagamento da fatura, nunca os dois: o mesmo consumo contaria duas vezes.',
     paragraphs: [
       'Uma compra de R$ 160 no cartão registra o consumo. Pagar a fatura quita essa obrigação e movimenta a conta. Contar esse pagamento como uma nova compra duplicaria o consumo. Juros e tarifas têm registros próprios.',
-      'Cartões ainda não estão disponíveis no Clarevo. Este conteúdo explica o conceito para quando chegarem.',
+      CARDS_TEXT.topicParagraph,
     ],
     example: null,
     calculation: null,
@@ -96,8 +97,8 @@ export const USAR_TOPICS: Topic[] = [
     facts: [],
     keywords: ['cartão de crédito', 'compra no cartão', 'pagamento da fatura', 'duplicado'],
     related: ['contei-duas-vezes', 'rotativo-cartao'],
-    sources: [clarevo('D-020')],
-    reviewedOn: REVIEWED_ON,
+    sources: [clarevo('D-020', 'D-037')],
+    reviewedOn: CARDS_REVIEWED_ON,
     reviewEveryMonths: null,
   },
   {

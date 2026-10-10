@@ -1,8 +1,10 @@
+import { CARDS_TEXT } from '../../cards';
 import type { Topic } from '../types';
 import {
   ANEEL_REN_1000,
   BCB_GLOSSARIO,
   CALC_CIDADAO_FINANCIAMENTO,
+  CARDS_REVIEWED_ON,
   DECRETO_6306_CAMARA,
   PROCON_GO_ROTATIVO,
   RES_4881,
@@ -267,7 +269,7 @@ export const JUROS_TOPICS: Topic[] = [
       'Se a fatura não é paga inteira no vencimento, o que falta vira crédito rotativo, com juros sobre esse saldo. Pelas regras do Conselho Monetário Nacional, o rotativo só pode durar até o vencimento da fatura seguinte; o saldo pode ir para outra forma de crédito, como o parcelamento da fatura, em condições mais vantajosas que as do rotativo (Resolução CMN nº 4.549/2017).',
       'Para dívidas que entraram no rotativo a partir de 3 de janeiro de 2024, a soma de juros e encargos (como multa, juros de mora e tarifas) do rotativo e do parcelamento da fatura não pode passar do valor original da dívida (Lei nº 14.690/2023 e Resolução CMN nº 5.112/2023). Assim, o total a pagar fica em até o dobro do valor que entrou no rotativo. O IOF fica fora desse limite.',
       'Quando o rotativo vira parcelamento, a conta do limite continua desde o início do rotativo, sem recomeçar. A fatura precisa mostrar o valor original e o total de juros e encargos de cada operação.',
-      'O Clarevo ainda não registra cartões. Este conteúdo explica o conceito.',
+      CARDS_TEXT.rotativoParagraph,
     ],
     example:
       'Numa fatura de R$ 1.000,00, você paga R$ 300,00 e R$ 700,00 vão para o rotativo. Com taxa fictícia de 14% ao mês, os juros do mês são R$ 98,00 e o saldo vai a R$ 798,00. Se esse saldo for parcelado em 24 vezes a 8% ao mês, as parcelas somariam R$ 1.818,96, com R$ 1.118,96 de juros desde o início. Pelo limite, juros e encargos param em R$ 700,00: sem IOF, quitar os R$ 700,00 que entraram no rotativo custa no máximo R$ 1.400,00.',
@@ -278,6 +280,7 @@ export const JUROS_TOPICS: Topic[] = [
     keywords: ['cartão de crédito', 'fatura', 'pagamento mínimo', 'parcelamento da fatura', 'teto de juros'],
     related: ['fatura', 'cheque-especial', 'juros-simples-compostos'],
     sources: [
+      clarevo('D-037'),
       planalto('Lei nº 14.690/2023', 'https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2023/lei/l14690.htm', 'art. 28, § 1º: juros e encargos financeiros limitados ao valor original da dívida'),
       cmn(
         'Resolução CMN nº 4.549/2017, texto consolidado com a Resolução CMN nº 5.112/2023',
@@ -296,7 +299,7 @@ export const JUROS_TOPICS: Topic[] = [
       ),
       PROCON_GO_ROTATIVO('IOF fora do cálculo; dívida de R$ 100 não pode passar de R$ 200 com juros e encargos'),
     ],
-    reviewedOn: REVIEWED_ON,
+    reviewedOn: CARDS_REVIEWED_ON,
     reviewEveryMonths: 6,
     aliases: ['cartao-rotativo'],
     calculator: { slug: 'custo-da-divida', params: { modo: 'rotativo' } },

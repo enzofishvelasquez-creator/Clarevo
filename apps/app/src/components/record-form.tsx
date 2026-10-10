@@ -42,8 +42,7 @@ import {
   noteIssuedOn,
   paidInvoiceMonths,
   parseDateBR,
-  purchaseFirstInvoiceMonth,
-  purchaseNotice,
+  purchasePreview,
   receiptDraft,
   sefazReadErrorText,
   seriesGapForExpense,
@@ -854,8 +853,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   let installmentsLine: string | null = null;
   if (cardPurchase && selectedCard && cardInvoices.data && parsedDate && parsedDate <= today && Number.isInteger(installments) && installments >= 1 && installments <= 48) {
     try {
-      const first = purchaseFirstInvoiceMonth(selectedCard, parsedDate, installments, paidInvoiceMonths(cardInvoices.data), today);
-      purchaseText = purchaseNotice(first, selectedCard.name, today);
+      // A fatura da compra é sempre a natural; se ela (ou uma parcela adiante) já está paga, o texto é o da recusa do banco.
+      purchaseText = purchasePreview(selectedCard, parsedDate, installments, paidInvoiceMonths(cardInvoices.data), today).text;
     } catch {
       purchaseText = null;
     }

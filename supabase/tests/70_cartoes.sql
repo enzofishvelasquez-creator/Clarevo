@@ -2778,8 +2778,8 @@ do $$ begin
              'clarevo_check_receipt_free', 'clarevo_card_derived', 'clarevo_card_json', 'clarevo_invoice_json', 'clarevo_entry_json',
              'clarevo_card_result', 'clarevo_card_entry_result', 'clarevo_pay_result', 'clarevo_sync_card', 'clarevo_check_card_month',
              'clarevo_check_card_credit', 'clarevo_check_purchase', 'clarevo_check_invoice_payment', 'clarevo_check_card_consistency',
-             'clarevo_check_receipt_unique', 'clarevo_first_free_month', 'clarevo_purchase_first_month', 'clarevo_looks_like_card_number')
-             and not has_function_privilege('authenticated', p.oid, 'execute')) = 35, '35 auxiliares sem execute para authenticated';
+             'clarevo_check_receipt_unique', 'clarevo_looks_like_card_number')
+             and not has_function_privilege('authenticated', p.oid, 'execute')) = 33, '33 auxiliares sem execute para authenticated';
   -- Nomes dos argumentos (chamada por nome no PostgREST) e retornos.
   assert pg_get_function_arguments('public.create_card(text, uuid, text, text, integer, integer, bigint)'::regprocedure)
        = 'p_idempotency_key text, p_context_id uuid, p_nickname text, p_last_digits text, p_closing_day integer, p_due_day integer, p_limit_cents bigint'
@@ -2909,6 +2909,10 @@ do $$ begin
      and to_regprocedure('public.delete_commitment(text, uuid, integer)') is not null
      and to_regprocedure('public.month_committed(uuid, date)') is not null and to_regprocedure('public.month_to_pay(uuid, date)') is not null
      and to_regprocedure('public.sync_series_occurrences(uuid)') is not null, 'demais assinaturas sem mudança';
+  -- Sem desvio de compra: as auxiliares que o faziam não existem mais (a compra vai sempre para a fatura natural).
+  assert not exists (select 1 from pg_proc where proname in ('clarevo_first_free_month', 'clarevo_purchase_first_month')), 'sem auxiliares de desvio';
+  -- sync_series_occurrences é a de antes das faturas: só gera as contas das séries, sem tocar nas contas de fatura.
+  assert pg_get_functiondef('public.sync_series_occurrences(uuid)'::regprocedure) not like '%card_closing_on%', 'sync_series_occurrences não mexe em faturas';
 end $$;
 
 -- anon: nenhuma função nem tabela de cartão.

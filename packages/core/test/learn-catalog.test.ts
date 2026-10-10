@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  CARDS_TEXT,
   ESSENTIAL_CATEGORIES,
   LEARN_SECTIONS,
   START_HERE,
@@ -76,8 +77,11 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
     // Na data do prazo de cheque-especial (6 meses), o aviso aparece; 31 dias antes, não.
     const due = reviewDueOn(TOPICS.find((t) => t.slug === 'cheque-especial')!)!;
     expect(due).toBe('2027-04-09');
-    expect(learnReviewWarnings(TOPICS, '2027-03-10').map((w) => w.slug)).toEqual(['iof-credito', 'rotativo-cartao', 'cheque-especial']);
+    expect(learnReviewWarnings(TOPICS, '2027-03-10').map((w) => w.slug)).toEqual(['iof-credito', 'cheque-especial']);
     expect(learnReviewWarnings(TOPICS, '2027-03-09')).toEqual([]);
+    // rotativo-cartao ganhou o texto dos cartões (D-037) e foi revisado em 10/10/2026: o prazo de 6 meses é 10/04/2027.
+    expect(reviewDueOn(TOPICS.find((t) => t.slug === 'rotativo-cartao')!)).toBe('2027-04-10');
+    expect(learnReviewWarnings(TOPICS, '2027-03-11').map((w) => w.slug)).toContain('rotativo-cartao');
   });
 
   it('os 42 slugs na ordem; TOPICS e TOPIC_SLUGS iguais', () => {
@@ -171,7 +175,8 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
         subtitle: 'Entenda o efeito no seu mês',
         paragraphs: [
           'Uma compra de R$ 160 no cartão registra o consumo. Pagar a fatura quita essa obrigação e movimenta a conta. Contar esse pagamento como uma nova compra duplicaria o consumo. Juros e tarifas têm registros próprios.',
-          'Cartões ainda não estão disponíveis no Clarevo. Este conteúdo explica o conceito para quando chegarem.',
+          // D-037: os cartões entraram no app, e o parágrafo "ainda não estão disponíveis" saiu.
+          'Com o cartão cadastrado, as compras vão para a fatura e só contam em Pago quando a fatura é paga. Sem cartão cadastrado, anotar a fatura como conta a pagar continua valendo.',
         ],
         hypotheses: 'Exemplo fictício: uma única compra à vista no cartão, sem parcelas, juros ou estornos.',
       },
@@ -217,6 +222,21 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
     expect(topicBySlug('contas-do-ano')!.paragraphs[4]).toBe(
       'No Clarevo, cadastre cada uma como conta do ano: o ano inteiro aparece em Contas a pagar dois meses antes do primeiro vencimento, e cada conta só entra em Ainda a pagar no mês em que vence.',
     );
+  });
+
+  it('cartões (D-037): fatura e rotativo-cartao falam dos cartões do app, citam D-037 e foram revisados em 10/10/2026', () => {
+    const fatura = topicBySlug('fatura')!;
+    const rotativo = topicBySlug('rotativo-cartao')!;
+    for (const t of [fatura, rotativo]) {
+      const text = [t.short, ...t.paragraphs].join(' ');
+      expect(text, t.slug).not.toMatch(/ainda não (estão disponíveis|registra)|para quando chegarem/);
+      expect(t.sources.flatMap((x) => (x.kind === 'clarevo' ? x.refs : [])), t.slug).toContain('D-037');
+      expect(t.reviewedOn, t.slug).toBe('2026-10-10');
+      expect(topicReadingMinutes(t), t.slug).toBeLessThanOrEqual(2);
+    }
+    expect(fatura.paragraphs[1]).toBe(CARDS_TEXT.topicParagraph);
+    expect(rotativo.paragraphs[3]).toBe(CARDS_TEXT.rotativoParagraph);
+    expect(fatura.sources).toEqual([{ kind: 'clarevo', refs: ['D-020', 'D-037'] }]);
   });
 
   it('R3 e R4: tempo de leitura calculado (200 palavras por minuto), no máximo 2 minutos', () => {

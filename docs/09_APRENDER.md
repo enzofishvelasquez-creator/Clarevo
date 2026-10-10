@@ -18,7 +18,7 @@
 | 1 | `diferenca` | Diferença do mês | Usar o Clarevo | tema | publicado | - | 1 min (70 palavras) | - | - |
 | 2 | `realizado-previsto` | Realizado e previsto | Usar o Clarevo | tema | publicado | - | 1 min (143 palavras) | - | - |
 | 3 | `saldo` | Diferença do mês e saldo da conta | Usar o Clarevo | tema | publicado | - | 1 min (67 palavras) | - | - |
-| 4 | `fatura` | Fatura sem contar duas vezes | Usar o Clarevo | tema | publicado | - | 1 min (62 palavras) | - | - |
+| 4 | `fatura` | Fatura sem contar duas vezes | Usar o Clarevo | tema | publicado | - | 1 min (79 palavras) | - | - |
 | 5 | `gasto-fixo` | Gasto fixo, conta a pagar e gasto anotado | Usar o Clarevo | tema | publicado | - | 1 min (65 palavras) | - | - |
 | 6 | `estimativa` | Contas que mudam de valor | Usar o Clarevo | tema | publicado | - | 1 min (85 palavras) | - | - |
 | 7 | `parcelamentos` | Parcelamentos no Clarevo | Usar o Clarevo | tema | publicado | - | 1 min (123 palavras) | - | - |
@@ -37,7 +37,7 @@
 | 20 | `cet` | CET, o Custo Efetivo Total | Juros e crédito | tema | publicado | 09/10/2027 | 1 min (174 palavras) | `custo-da-divida?modo=emprestimo` | - |
 | 21 | `iof-credito` | IOF no crédito | Juros e crédito | tema | publicado | 09/04/2027 | 1 min (132 palavras) | - | - |
 | 22 | `parcelado-ou-a-vista` | Parcelado, sem juros ou à vista | Juros e crédito | tema | publicado | 09/10/2027 | 2 min (241 palavras) | `parcelado-ou-a-vista` | - |
-| 23 | `rotativo-cartao` | Rotativo do cartão e parcelamento da fatura | Juros e crédito | tema | publicado | 09/04/2027 | 2 min (283 palavras) | `custo-da-divida?modo=rotativo` | `cartao-rotativo` |
+| 23 | `rotativo-cartao` | Rotativo do cartão e parcelamento da fatura | Juros e crédito | tema | publicado | 10/04/2027 | 2 min (312 palavras) | `custo-da-divida?modo=rotativo` | `cartao-rotativo` |
 | 24 | `cheque-especial` | Cheque especial | Juros e crédito | tema | publicado | 09/04/2027 | 1 min (137 palavras) | `custo-da-divida?modo=cheque_especial` | - |
 | 25 | `amortizacao-price-sac` | Amortização, Tabela Price e SAC | Juros e crédito | tema | publicado | 09/10/2027 | 2 min (201 palavras) | - | `juros-no-parcelamento` |
 | 26 | `quitar-antes` | Quitar antes do prazo | Juros e crédito | tema | publicado | 09/10/2027 | 2 min (247 palavras) | `quitar-antes` | - |
@@ -67,7 +67,7 @@ Temas que citam só decisões do Clarevo (sem revisão periódica; números só 
 | `diferenca` | Diferença do mês | Usar o Clarevo | D-005, D-011 |
 | `realizado-previsto` | Realizado e previsto | Usar o Clarevo | D-020, D-021 |
 | `saldo` | Diferença do mês e saldo da conta | Usar o Clarevo | D-011 |
-| `fatura` | Fatura sem contar duas vezes | Usar o Clarevo | D-020 |
+| `fatura` | Fatura sem contar duas vezes | Usar o Clarevo | D-020, D-037 |
 | `gasto-fixo` | Gasto fixo, conta a pagar e gasto anotado | Usar o Clarevo | D-024 |
 | `estimativa` | Contas que mudam de valor | Usar o Clarevo | D-024 |
 | `parcelamentos` | Parcelamentos no Clarevo | Usar o Clarevo | D-024 |
@@ -283,7 +283,7 @@ Ressalvas: nenhum fato citado ficou sem confirmação.
 
 ### `rotativo-cartao` · Rotativo do cartão e parcelamento da fatura (publicado)
 
-Calculadora: `/calcular/custo-da-divida?modo=rotativo`. Revisar até 09/04/2027 (6 meses).
+Calculadora: `/calcular/custo-da-divida?modo=rotativo`. Revisar até 10/04/2027 (6 meses; revisado em 10/10/2026 por causa do parágrafo dos cartões, D-037). Fonte do Clarevo: D-037.
 
 1. Oficial. Presidência da República: Lei nº 14.690/2023. <https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2023/lei/l14690.htm>. Trecho: art. 28, § 1º: juros e encargos financeiros limitados ao valor original da dívida. Consulta: 09/10/2026.
 2. Oficial. Conselho Monetário Nacional e Banco Central do Brasil: Resolução CMN nº 4.549/2017, texto consolidado com a Resolução CMN nº 5.112/2023. <https://normativos.bcb.gov.br/Lists/Normativos/Attachments/50330/Res_4549_v2_L.pdf>. Trecho: art. 1º (rotativo até o vencimento da fatura seguinte), art. 2º (parcelamento em condições mais vantajosas), art. 2º-A (encargos financeiros; parágrafo único, I e II: valor original e contagem desde o início do rotativo) e art. 2º-B (valor original e encargos na fatura). Consulta: 09/10/2026.
@@ -500,7 +500,7 @@ Mudança em relação à especificação de 08/10/2026: ela previa "Taxa, tarifa
 
 **Pendências do Ciclo E (D-037 e D-038).** Os cartões e a leitura de notas entraram no app em 10/10/2026, mas o conteúdo de Aprender ainda não acompanha:
 
-- O tema publicado `fatura` (Usar o Clarevo) ainda diz, no segundo parágrafo, "Cartões ainda não estão disponíveis no Clarevo. Este conteúdo explica o conceito para quando chegarem." O parágrafo novo está pronto em `CARDS_TEXT.topicParagraph` (`packages/core/src/cards.ts`): "Com o cartão cadastrado, as compras vão para a fatura e só contam em Pago quando a fatura é paga. Sem cartão cadastrado, anotar a fatura como conta a pagar continua valendo." Ao trocar, citar também D-037 nas fontes (hoje só D-020), atualizar a contagem de palavras da seção 2 e rodar `npm test`.
+- Feito em 10/10/2026: o tema `fatura` (Usar o Clarevo) trocou o segundo parágrafo ("Cartões ainda não estão disponíveis no Clarevo...") por `CARDS_TEXT.topicParagraph` (`packages/core/src/cards.ts`), cita D-037 nas fontes do Clarevo (D-020 e D-037) e passou a 79 palavras. O tema `rotativo-cartao` trocou "O Clarevo ainda não registra cartões. Este conteúdo explica o conceito." por `CARDS_TEXT.rotativoParagraph` (o que sobra de um pagamento parcial vira saldo anterior na fatura seguinte, sem juros, e o Clarevo não calcula juros sozinho), cita D-037 e passou a 312 palavras (2 min, abaixo do limite de 320). Os dois têm `reviewedOn` 10/10/2026; as fontes externas seguem consultadas em 09/10/2026, e o prazo de `rotativo-cartao` passou a 10/04/2027.
 - Não existe o tema "Ler nota fiscal" (o que é lido, o que nunca é guardado, com a fonte da Sefaz), nem a linha "A chave da nota fica no registro. O CPF nunca é guardado." em "Quem vê estes dados?", propostos em `docs/10` §2.5. O que o app guarda hoje é só o resumo SHA-256 da chave (D-038(5)), e o texto precisa dizer isso. Ao criar o tema, a fonte da Sefaz passa pela conferência da seção 3.
 - Não existe tema sobre o cartão em si (limite, fechamento e vencimento, com fonte); o cadastro do app explica só o que ele guarda.
 
@@ -527,7 +527,8 @@ Nenhuma muda o texto publicado hoje; todas estão também na seção 4, no tema.
 
 | Prazo | Temas | Aviso do teste a partir de |
 |---|---|---|
-| 09/04/2027 (6 meses) | `iof-credito`, `rotativo-cartao`, `cheque-especial` | 10/03/2027 |
+| 09/04/2027 (6 meses) | `iof-credito`, `cheque-especial` | 10/03/2027 |
+| 10/04/2027 (6 meses) | `rotativo-cartao` | 11/03/2027 |
 | 09/10/2027 (12 meses) | os demais temas com fonte externa, inclusive os 2 rascunhos | 09/09/2027 |
 | Sem prazo | temas que citam só decisões do Clarevo | |
 
@@ -561,6 +562,7 @@ Em relação ao conteúdo checado da especificação de 08/10/2026 (Anexo A e te
 | 09/10/2026 | Catálogo inteiro (37 temas) | Primeira versão no app: 35 publicados e 2 rascunhos, `reviewedOn` 09/10/2026, os ajustes da seção 8 e os domínios da seção 3 | Busca na web, fato a fato, com o endereço e o trecho de cada fonte e a data 09/10/2026 (seção 4) |
 | 09/10/2026 | `quitar-antes`, `estimativa` | `quitar-antes`: o corte da tarifa passou de "desde dezembro de 2007" para "a partir de 10 de dezembro de 2007", a data do trecho do STJ (fonte 4); `estimativa`: exemplo e hipóteses (seção 8) | Trecho da fonte 4 de `quitar-antes` e a conta do exemplo recalculada em `learn/math.ts` (`npm test`) |
 | 09/10/2026 | `renda-comprometida`, `renda-variavel`, `aporte`, `essenciais`, `simulacao` | Cinco temas novos, todos publicados (`reviewedOn` 09/10/2026, revisão a cada 12 meses): o catálogo passa a 42 temas, 40 publicados; decisões D-026, D-027 e D-028 citadas e registradas em `docs/00`; atalho "Simular" em Aprender e ações "No Clarevo" nas telas dos ciclos | Busca na web, fato a fato (CVM: duas frases do `aporte`; Banco Central: Estudo Especial nº 80, Séries 6 e 8, glossário e Caderno; Susep; IBGE; Calculadora do Cidadão), com as ressalvas da seção 4 e da seção 6 |
+| 10/10/2026 | `fatura`, `rotativo-cartao` | Os cartões entraram no app (D-037): o segundo parágrafo de `fatura` e o último de `rotativo-cartao` deixaram de dizer que não há cartões; as fontes do Clarevo ganharam D-037; `reviewedOn` 10/10/2026 (prazo de `rotativo-cartao`: 10/04/2027) | Texto do app conferido com D-037 e com os testes de `cards.test.ts`; nenhum fato externo novo, então as datas de consulta ficam em 09/10/2026 |
 
 ## 10. Como revisar um tema
 

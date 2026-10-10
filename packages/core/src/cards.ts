@@ -46,11 +46,11 @@ import { calcLinkParams } from './calculators/links';
  *   do fechamento fica nessa fatura; só a compra DEPOIS do fechamento vai para a seguinte.
  * - Compra em n parcelas: o valor total dividido por n, com o resto de centavos na primeira; a parcela 1 cai na fatura
  *   cujo período contém a data da compra e as outras nas n - 1 faturas seguintes. A fatura da parcela 1 é fixada ao gravar.
- * - Fatura paga antes do fechamento (permitido) não trava o cartão: a compra do mesmo ciclo, feita enquanto a fatura natural
- *   ainda está aberta, vai para a primeira fatura seguinte em que nenhuma parcela cruza fatura paga (`purchaseFirstInvoiceMonth`
- *   com as faturas pagas e a data de hoje), a conta dessa fatura cresce, o dinheiro é conservado e a pessoa continua podendo
- *   pagar o que falta. O aviso da compra mostra a fatura real. Se a fatura natural já FECHOU e está paga, a compra é recusada
- *   (fatura_paga): o banco já a cobrou ali, e empurrá-la para a fatura atual faria a pessoa pagar de novo.
+ * - A compra vai sempre para a fatura natural da data (a do período que a contém), sem desvio. Se ela, ou alguma parcela
+ *   adiante, já está paga, a compra é recusada (fatura_paga): o banco já a cobrou ali, e empurrá-la para outra fatura faria a
+ *   pessoa pagar de novo (`purchaseBlockedByPaidInvoice`). A fatura só se paga depois que FECHA (`invoiceCanBePaid`; antes
+ *   disso o banco recusa com fatura_aberta), e a data do pagamento continua livre na janela (pode ser anterior ao fechamento,
+ *   para quem pagou antes). Por isso uma fatura paga nunca é a que ainda recebe as compras de hoje.
  * - Total da fatura = parcelas + encargos + saldo anterior - estornos. Nunca negativo no pagamento: com total negativo, o
  *   crédito vira um estorno automático (gravado, com a fatura de origem) na fatura seguinte, mantido pelas funções de cartão.
  * - Situação: aberta (hoje até o dia do fechamento), fechada (depois do fechamento, sem pagamento), paga ou paga em parte.
@@ -173,34 +173,50 @@ export function purchaseInstallments(entry: Pick<CardEntry, 'id' | 'amountCents'
 }
 
 /**
- * Fatura da 1ª parcela de uma compra feita na data (fixada ao gravar). Pagar a fatura ANTES do fechamento é permitido e não
- * trava o cartão: quando a fatura natural (a do período que contém a data) ainda está aberta (`today` até o fechamento), a
- * compra vai, com `paidMonths` (as faturas já pagas ou pagas em parte, `paidInvoiceMonths`), para a primeira fatura, a partir
- * da natural, em que nenhuma das `installments` parcelas seguidas cruza uma fatura paga (mesma regra de
- * clarevo_purchase_first_month no banco). Sem faturas pagas, é a fatura cujo período contém a data.
- *
- * Fatura natural já FECHADA: devolve a própria fatura natural, sem desvio. Se ela (ou outra parcela) estiver paga, quem grava
- * recusa com `fatura_paga`: o banco já cobrou aquela compra na fatura fechada, e empurrá-la para a fatura atual faria a pessoa
- * pagar de novo. Quem cobrou depois registra um encargo ou ajuste na fatura atual.
+ * Fatura da 1ª parcela de uma compra feita na data (fixada ao gravar): sempre a fatura natural, a do período que contém a data
+ * (invoice_month_for no banco). Não há desvio para outra fatura: se ela, ou uma parcela adiante, está paga, quem grava recusa
+ * com `fatura_paga` (veja `purchaseBlockedByPaidInvoice`).
  */
-export function purchaseFirstInvoiceMonth(card: CardDays, purchasedOn: IsoDate, installments: number, paidMonths: Iterable<IsoMonth>, today: IsoDate): IsoMonth {
-  let month = invoiceMonthOf(card, purchasedOn);
-  if (today > invoiceClosingOn(card, month)) return month;
-  const paid = [...paidMonths].sort();
-  if (paid.length === 0) return month;
-  const count = Math.max(1, installments);
-  for (;;) {
-    const last = addMonths(month, count - 1);
-    let blocking: IsoMonth | null = null;
-    for (const p of paid) if (p >= month && p <= last) blocking = p;
-    if (blocking === null) return month;
-    month = addMonths(blocking, 1);
-  }
+export function purchaseFirstInvoiceMonth(card: CardDays, purchasedOn: IsoDate, ..._legacy: unknown[]): IsoMonth {
+  // Os parâmetros depois da data (parcelas, faturas pagas e hoje) eram da regra antiga de desvio e são ignorados.
+  return invoiceMonthOf(card, purchasedOn);
 }
 
-/** Meses das faturas já pagas ou pagas em parte (para `purchaseFirstInvoiceMonth`). */
+/** Meses das faturas já pagas ou pagas em parte (para `purchaseBlockedByPaidInvoice`). */
 export function paidInvoiceMonths(invoices: readonly Pick<Invoice, 'month' | 'situation'>[]): IsoMonth[] {
   return invoices.filter((i) => i.situation === 'paga' || i.situation === 'paga_em_parte').map((i) => i.month);
+}
+
+/** A compra cairia, na 1ª parcela ou em alguma outra, numa fatura já paga? (O banco recusa com `fatura_paga`.) */
+export function purchaseBlockedByPaidInvoice(firstMonth: IsoMonth, installments: number, paidMonths: Iterable<IsoMonth>): boolean {
+  const paid = new Set(paidMonths);
+  const count = Math.max(1, installments);
+  for (let k = 0; k < count; k++) if (paid.has(addMonths(firstMonth, k))) return true;
+  return false;
+}
+
+/**
+ * Aviso de Anotar gasto com um cartão: em qual fatura a compra entra ou, quando essa fatura (ou uma parcela adiante) já está
+ * paga, o motivo da recusa (o mesmo texto que o banco devolve com `fatura_paga`). `paidMonths`: `paidInvoiceMonths(faturas)`.
+ */
+export function purchasePreview(
+  card: CardDays & { name: string },
+  purchasedOn: IsoDate,
+  installments: number,
+  paidMonths: Iterable<IsoMonth>,
+  today: IsoDate,
+): { text: string; blocked: boolean } {
+  const first = invoiceMonthOf(card, purchasedOn);
+  if (purchaseBlockedByPaidInvoice(first, installments, paidMonths)) return { text: CARDS_TEXT.expense.paidInvoicePurchase, blocked: true };
+  return { text: purchaseNotice(first, card.name, today), blocked: false };
+}
+
+/**
+ * A fatura pode receber o pagamento? Só depois do fechamento (situação fechada), com conta a pagar e total maior que zero.
+ * Aberta (a atual) ou futura: o banco recusa com `fatura_aberta`; paga ou paga em parte: `compromisso_quitado`.
+ */
+export function invoiceCanBePaid(invoice: Pick<Invoice, 'situation' | 'commitmentId' | 'totalCents'>): boolean {
+  return invoice.situation === 'fechada' && invoice.commitmentId !== null && invoice.totalCents > 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -766,7 +782,7 @@ export function invoiceItemOf(i: Invoice): InvoiceItem {
 
 export interface CardSummary {
   card: Card;
-  /** Fatura que acumula as compras de hoje (o período contém hoje). */
+  /** Fatura que acumula as compras de hoje (o período contém hoje); nunca uma fatura paga (`currentInvoiceOf`). */
   current: Invoice;
   /** Faturas fechadas, ainda sem pagamento e com total maior que zero, da mais antiga à mais nova. */
   closedUnpaid: Invoice[];
@@ -775,11 +791,25 @@ export interface CardSummary {
   limitLeftCents: Cents | null;
 }
 
+/**
+ * A fatura atual: a do período que contém hoje. Nunca uma fatura paga: se a pessoa mudou os dias do cartão e o período de hoje
+ * cai num mês já pago, a atual é a primeira fatura seguinte ainda sem pagamento.
+ */
+export function currentInvoiceOf(card: InvoiceCard, invoices: readonly Invoice[], today: IsoDate): Invoice {
+  let month = invoiceMonthOf(card, today);
+  for (let guard = 0; guard < 120; guard++) {
+    const found = invoices.find((i) => i.month === month);
+    if (!found || (found.situation !== 'paga' && found.situation !== 'paga_em_parte')) break;
+    month = addMonths(month, 1);
+  }
+  return invoiceFor(card, invoices, month, today);
+}
+
 export function summarizeCard(card: Card, invoices: readonly Invoice[], today: IsoDate): CardSummary {
   const used = cardLimitUsed(invoices);
   return {
     card,
-    current: invoiceFor(card, invoices, invoiceMonthOf(card, today), today),
+    current: currentInvoiceOf(card, invoices, today),
     closedUnpaid: invoices.filter((i) => i.situation === 'fechada' && i.totalCents > 0),
     limitUsedCents: used,
     limitLeftCents: card.limitCents === null ? null : card.limitCents - used,
@@ -905,10 +935,14 @@ export interface CardPurchaseDraft {
   installmentsText: string;
 }
 
-/** Compra no cartão digitada em "Anotar gasto" (Forma de pagamento: Cartão de crédito). */
+/**
+ * Compra no cartão digitada em "Anotar gasto" (Forma de pagamento: Cartão de crédito). `checkRange` false (editar uma compra sem
+ * mudar a data): a data da compra não é conferida contra o intervalo de 48 meses, como no banco e em updateCardEntry.
+ */
 export function validateCardPurchaseDraft(
   draft: CardPurchaseDraft,
   today: IsoDate,
+  checkRange = true,
 ): { ok: true; input: CardPurchaseInput } | { ok: false; errors: CardPurchaseFieldErrors; code: CardPurchaseErrorCode } {
   const total = parseBRL(draft.amountText);
   const purchasedOn = parseDateBR(draft.dateText);
@@ -921,7 +955,7 @@ export function validateCardPurchaseDraft(
     totalCents: total ?? Number.NaN,
     installments,
   };
-  const code = cardPurchaseError(input, today);
+  const code = cardPurchaseError(input, today, checkRange);
   if (!code) return { ok: true, input };
   const errors: CardPurchaseFieldErrors = {};
   const field: Record<CardPurchaseErrorCode, CardPurchaseField> = {
@@ -1118,6 +1152,8 @@ export interface InvoiceTexts {
   partial: string | null;
   credit: string | null;
   empty: string | null;
+  /** Quando poderá ser paga ("Esta fatura ainda está aberta. Registre o pagamento depois do fechamento, em 03/11/2026. ..."); null se já fechou, está paga ou não tem conta */
+  payHint: string | null;
   a11yLabel: string;
 }
 
@@ -1141,6 +1177,7 @@ export function invoiceTexts(invoice: Invoice, today: IsoDate): InvoiceTexts {
     partial: invoice.situation === 'paga_em_parte' ? partialPaymentText(invoice.remainingCents, addMonths(invoice.month, 1), today) : null,
     credit: invoice.creditOutCents > 0 ? creditText(invoice.creditOutCents) : null,
     empty: invoice.lines.length === 0 ? CARDS_TEXT.invoiceEmpty : null,
+    payHint: invoice.situation === 'aberta' && invoice.commitmentId !== null && invoice.totalCents > 0 ? CARDS_TEXT.invoice.payAfterClosing(invoice.closingOn) : null,
     a11yLabel: `${title}, ${situation.toLowerCase()}, ${total}. ${closes}. ${due}.`,
   };
 }
@@ -1203,6 +1240,7 @@ export const CARD_ERROR_TEXT = {
   campo_nao_se_aplica: ERROR_TEXT.salvar_falhou,
   valor_acima_da_fatura: 'O valor pago não pode passar do total da fatura.',
   fatura_paga: 'Esta fatura já foi paga. Para mudar os lançamentos dela, desfaça o pagamento da fatura.',
+  fatura_aberta: 'Esta fatura ainda está aberta. Registre o pagamento depois do fechamento. Se você já pagou antes, use a data em que pagou.',
   fatura_seguinte_paga: 'A fatura do mês seguinte já foi paga. Desfaça o pagamento dela antes.',
   conta_de_fatura: 'Esta conta é a fatura de um cartão. Abra a fatura para alterar ou pagar.',
   pagamento_de_fatura: 'Este gasto é o pagamento de uma fatura: só a data e a conta de saída mudam aqui. Para o resto, abra a fatura e desfaça o pagamento.',
@@ -1217,13 +1255,15 @@ export const CARD_ERROR_TEXT = {
 
 /**
  * Texto do código; código desconhecido: falha genérica. Com o contexto, explica o motivo certo: `nickname` (apelido que parece
- * número de cartão) e `purchase` (compra de uma fatura já fechada e paga).
+ * número de cartão), `purchase` (compra de uma fatura já fechada e paga) e `closingOn` (o dia do fechamento da fatura ainda
+ * aberta, em fatura_aberta).
  */
-export function cardErrorText(code: string, context: { nickname?: string; purchase?: boolean } = {}): string {
+export function cardErrorText(code: string, context: { nickname?: string; purchase?: boolean; closingOn?: IsoDate } = {}): string {
   if (code === 'apelido_invalido' && typeof context.nickname === 'string' && looksLikeCardNumber(context.nickname)) {
     return CARDS_TEXT.form.nameHasNumber;
   }
   if (code === 'fatura_paga' && context.purchase) return CARDS_TEXT.expense.paidInvoicePurchase;
+  if (code === 'fatura_aberta' && context.closingOn) return CARDS_TEXT.invoice.payAfterClosing(context.closingOn);
   const texts: Record<string, string> = CARD_ERROR_TEXT;
   return code in texts ? texts[code]! : ERROR_TEXT.salvar_falhou;
 }
@@ -1299,6 +1339,9 @@ export const CARDS_TEXT = {
   // Fatura.
   invoice: {
     payInvoice: 'Pagar fatura',
+    /** Fatura ainda aberta (ou futura): quando poderá ser paga. */
+    payAfterClosing: (closingOn: IsoDate) =>
+      `Esta fatura ainda está aberta. Registre o pagamento depois do fechamento, em ${formatDateBR(closingOn)}. Se você já pagou antes, use a data em que pagou.`,
     payTotal: 'Pagar o total',
     payOther: 'Outro valor',
     payAmount: 'Valor pago',
@@ -1330,7 +1373,9 @@ export const CARDS_TEXT = {
     automaticEntry: 'Criado pelo pagamento parcial da fatura anterior.',
     derivedCredit: 'Calculado a partir do crédito da fatura anterior.',
     closedInvoiceNote: 'Fatura fechada: o valor só muda se você informar encargos, estornos ou novos lançamentos.',
-    paidInvoiceNote: 'Fatura paga: para mudar os lançamentos, desfaça o pagamento.',
+    paidInvoiceNote: 'Fatura paga: só a descrição e a categoria das compras mudam. Para mudar o resto, desfaça o pagamento.',
+    /** Compra com parcela em fatura paga: o menu da linha. */
+    purchaseEditPaid: 'Editar descrição e categoria',
     invoiceFormula: 'Total = parcelas + encargos + saldo anterior - estornos',
   },
   invoiceEmpty: 'Sem lançamentos nesta fatura.',
@@ -1346,6 +1391,9 @@ export const CARDS_TEXT = {
   // Aprender: parágrafo do tema "fatura" sobre o cadastro de cartões.
   topicParagraph:
     'Com o cartão cadastrado, as compras vão para a fatura e só contam em Pago quando a fatura é paga. Sem cartão cadastrado, anotar a fatura como conta a pagar continua valendo.',
+  /** Aprender: parágrafo do tema "rotativo-cartao" sobre o que o Clarevo faz com o que fica sem pagar numa fatura. */
+  rotativoParagraph:
+    'No Clarevo, se você paga só uma parte da fatura, o que ficou aparece como saldo anterior na fatura seguinte, sem juros. Os juros e encargos entram quando você informar a fatura do banco. O Clarevo não calcula juros sozinho.',
   /** Links das telas. */
   links: {
     calculator: 'Quanto custa pagar só uma parte?',
@@ -1393,6 +1441,11 @@ export const CARDS_TEXT = {
     purchaseEditTitle: 'Editar compra',
     purchaseSave: 'Salvar compra',
     purchaseUpdated: 'Compra alterada. As parcelas foram recalculadas.',
+    /** Só descrição e categoria mudaram (as parcelas ficam como estavam). */
+    purchaseTextUpdated: 'Compra alterada.',
+    /** Compra com parcela em fatura já paga: o formulário muda só a descrição e a categoria. */
+    purchaseEditPaidNote:
+      'Esta compra tem parcelas em uma fatura já paga. Aqui você muda só a descrição e a categoria. Para mudar valor, data ou parcelas, desfaça o pagamento da fatura.',
     purchaseEditNote: 'Mudar o valor, a data ou as parcelas recalcula as parcelas e pode mudar as faturas em que a compra aparece.',
     purchaseFromReceipt: 'Compra anotada com a leitura de uma nota fiscal.',
     noCardsInline: 'Você ainda não cadastrou um cartão.',

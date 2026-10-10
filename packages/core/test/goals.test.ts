@@ -32,6 +32,7 @@ import {
   goalsMonthTexts,
   isEssentialCategory,
   isRepoError,
+  loadInvoices,
   looksLikeSavings,
   monthReachedWithPlan,
   monthlyNeeded,
@@ -384,6 +385,41 @@ describe('gastos essenciais (D-027(6), P-017)', () => {
       excludedAnnualCents: 0,
     });
     expect(essentialEstimateText(e)).toBe('Média de setembro de 2026 em Moradia e Mercado. Lazer e gastos sem categoria não entram.');
+  });
+
+  it('pagamento de fatura de cartão conta pelas categorias da fatura (Moradia e Mercado entram; Lazer e encargos, não)', async () => {
+    const clock = { today: '2026-09-01' };
+    const repo = new MemoryRepository({ actorId: 'pessoa-essenciais', displayName: 'Pessoa', today: () => clock.today });
+    const ctx = (await repo.ensurePersonalSpace('Conta principal')).personalContextId;
+    const card = (await repo.createCard(key(), ctx, { name: 'Nubank', lastDigits: null, closingDay: 3, dueDay: 10, limitCents: null })).card;
+    const buy = (description: string, totalCents: number, category: string) =>
+      repo.addCardPurchase(key(), card.id, { description, category, purchasedOn: '2026-08-20', totalCents, installments: 1 });
+    await buy('Aluguel', 40_000, 'Moradia');
+    await buy('Feira', 30_000, 'Mercado');
+    await buy('Cinema', 10_000, 'Lazer');
+    await repo.addCardCharge(key(), card.id, { chargeType: 'juros', amountCents: 2_000, invoiceMonth: '2026-09' });
+    clock.today = '2026-09-04'; // setembro fechou em 03/09
+    const sep = (await loadInvoices(repo, card, clock.today)).find((i) => i.month === '2026-09')!;
+    await repo.payInvoice(key(), card.id, '2026-09', sep.commitmentVersion!, 82_000, '2026-09-04');
+    const records = await repo.listRecords(ctx, '2026-09');
+    expect(records.filter((r) => r.invoice)).toHaveLength(1);
+    // Sem as faturas, o gasto do pagamento não tem categoria: o mês tem gasto, mas nenhum essencial.
+    expect(essentialMonthly(records, OCT, null).source).toBe('informado');
+    // Com as faturas, o pagamento é dividido como em "Por categoria".
+    const invoices = await loadInvoices(repo, card, '2026-10-07');
+    expect(essentialMonthly(records, OCT, null, [], invoices)).toEqual({
+      source: 'media_gastos',
+      amountCents: 70_000,
+      months: ['2026-09'],
+      byCategory: [
+        { category: 'Moradia', cents: 40_000 },
+        { category: 'Mercado', cents: 30_000 },
+      ],
+      excludedAnnualCents: 0,
+    });
+    // Um gasto comum junto do pagamento soma na categoria dele.
+    const withCoffee = [...records, rec('2026-09-12', 5_000, 'Mercado')];
+    expect(essentialMonthly(withCoffee, OCT, null, [], invoices)).toMatchObject({ amountCents: 75_000 });
   });
 
   it('só as contas do mês e digitado', () => {

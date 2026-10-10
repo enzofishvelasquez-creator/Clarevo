@@ -234,8 +234,9 @@ function CardBody({
   const summary = invoices ? summarizeCard(card, invoices, today) : null;
   const limit = summary ? limitUsedText(summary.limitUsedCents, card.limitCents) : null;
   const limitPercent = summary && card.limitCents ? Math.min(100, Math.round((summary.limitUsedCents / card.limitCents) * 100)) : null;
-  const currentMonth = invoiceMonthOf(card, today);
+  // A fatura atual nunca é uma fatura paga (summarizeCard): as próximas e as anteriores se dividem por ela.
   const current = summary?.current ?? null;
+  const currentMonth = current?.month ?? invoiceMonthOf(card, today);
   const upcoming = (invoices ?? []).filter((i) => i.month > currentMonth && (i.lines.length > 0 || i.commitmentId));
   const previous = (invoices ?? []).filter((i) => i.month < currentMonth).reverse();
 
