@@ -9,7 +9,7 @@ Organização e educação financeira para pessoas e famílias, com fundação p
   <img src="docs/telas/10_detalhe_gasto_salvo.png" width="200" alt="Detalhe do registro">
 </p>
 
-Primeiro ciclo: 07/10/2026. Contas a pagar: 08/10/2026. Gastos fixos e parcelamentos: 08/10/2026. Contas do ano: 08/10/2026. Primeiros passos: 08/10/2026. Calculadoras: 09/10/2026. Seus últimos meses, Aprender e dúvidas, lembretes, ocultar valores e biometria, renda comprometida, metas e reserva, plano de guardar e simulador: 09/10/2026 (com itens em aberto em `docs/04`, entre eles o roteiro web das telas novas e o teste em aparelho). Sem Supabase configurado, o app roda em **demonstração** (acesso simulado e dados fictícios, com selo visível).
+Primeiro ciclo: 07/10/2026. Contas a pagar: 08/10/2026. Gastos fixos e parcelamentos: 08/10/2026. Contas do ano: 08/10/2026. Primeiros passos: 08/10/2026. Calculadoras: 09/10/2026. Seus últimos meses, Aprender e dúvidas, lembretes, ocultar valores e biometria, renda comprometida, metas e reserva, plano de guardar e simulador: 09/10/2026 (com itens em aberto em `docs/04`, entre eles o teste em aparelho; o roteiro web cobre as telas novas). Sem Supabase configurado, o app roda em **demonstração** (acesso simulado e dados fictícios, com selo visível).
 
 ## O que funciona
 

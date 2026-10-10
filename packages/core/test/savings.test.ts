@@ -18,11 +18,15 @@ import {
   goalInputError,
   goalPlan,
   isRepoError,
+  incomeChangedAfterAnswer,
+  isMinimumReserve,
   isSavingsStepDone,
   lastIncomeReferenceChange,
+  lastIncomeReferenceChangeAt,
   minimumReserveInput,
   minimumReserveOptions,
   newOperationKey,
+  reserveEssentialBaseCents,
   savingsAnswerError,
   savingsAskAgainOn,
   savingsAskReason,
@@ -227,7 +231,7 @@ describe('quando perguntar de novo (shouldAskSavings)', () => {
     expect(isSavingsStepDone(check('consigo', '2026-10-07', null, 100))).toBe(true);
   });
 
-  it('lastIncomeReferenceChange: só alteração ou novo valor, nunca a primeira referência', () => {
+  it('lastIncomeReferenceChange: só valor que mudou ou valor novo, nunca a primeira referência', () => {
     const ref = (over: Partial<IncomeReference>): IncomeReference => ({
       id: 'r',
       contextId: 'ctx',
@@ -238,12 +242,20 @@ describe('quando perguntar de novo (shouldAskSavings)', () => {
       version: 1,
       createdAt: '2026-09-02T12:00:00.000Z',
       updatedAt: '2026-09-02T12:00:00.000Z',
+      amountChangedAt: null,
       ...over,
     });
     expect(lastIncomeReferenceChange([])).toBeNull();
     expect(lastIncomeReferenceChange([ref({})])).toBeNull();
-    // Alterada (versão 2): o dia da alteração.
-    expect(lastIncomeReferenceChange([ref({ version: 2, updatedAt: '2026-10-05T12:00:00.000Z' })])).toBe('2026-10-05');
+    expect(lastIncomeReferenceChangeAt([])).toBeNull();
+    // Valor alterado (amountChangedAt): o dia e o instante da alteração.
+    const changed = ref({ version: 2, updatedAt: '2026-10-05T12:00:00.000Z', amountChangedAt: '2026-10-05T12:00:00.000Z' });
+    expect(lastIncomeReferenceChange([changed])).toBe('2026-10-05');
+    expect(lastIncomeReferenceChangeAt([changed])).toBe('2026-10-05T12:00:00.000Z');
+    // Versão acima de 1 sem o valor ter mudado (mesmo valor ou só "Minha renda varia"): não é mudança.
+    expect(lastIncomeReferenceChange([ref({ version: 2, varies: true, updatedAt: '2026-10-05T12:00:00.000Z' })])).toBeNull();
+    expect(lastIncomeReferenceChange([ref({ version: 5, updatedAt: '2026-10-05T12:00:00.000Z' })])).toBeNull();
+    expect(lastIncomeReferenceChangeAt([ref({ version: 5, updatedAt: '2026-10-05T12:00:00.000Z' })])).toBeNull();
     // Nova referência de mês posterior com outro valor: o dia em que foi criada; com o mesmo valor, nada.
     const second = ref({ id: 'r2', fromMonth: '2026-11', amountCents: 700_000, createdAt: '2026-10-08T01:00:00.000Z', updatedAt: '2026-10-08T01:00:00.000Z' });
     expect(lastIncomeReferenceChange([second, ref({})])).toBe('2026-10-08');
@@ -251,10 +263,81 @@ describe('quando perguntar de novo (shouldAskSavings)', () => {
     // No fuso da pessoa, 01:00 UTC ainda é o dia anterior.
     expect(lastIncomeReferenceChange([ref({}), second], 'America/Sao_Paulo')).toBe('2026-10-07');
     expect(lastIncomeReferenceChange([ref({}), second], 'Fuso/Inexistente')).toBe('2026-10-08');
-    // A mais recente entre várias.
-    expect(
-      lastIncomeReferenceChange([ref({ version: 3, updatedAt: '2026-10-20T12:00:00.000Z' }), { ...second, createdAt: '2026-10-08T12:00:00.000Z' }]),
-    ).toBe('2026-10-20');
+    // A mais recente entre várias, comparada por instante (não pela ordem de escrita).
+    const latest = ref({ version: 3, updatedAt: '2026-10-20T12:00:00.000Z', amountChangedAt: '2026-10-20T12:00:00.000Z' });
+    expect(lastIncomeReferenceChange([latest, { ...second, createdAt: '2026-10-08T12:00:00.000Z' }])).toBe('2026-10-20');
+    const sameDay = ref({ version: 2, amountChangedAt: '2026-10-08T15:30:00.000Z' });
+    expect(lastIncomeReferenceChangeAt([sameDay, { ...second, createdAt: '2026-10-08T12:00:00.000Z' }])).toBe('2026-10-08T15:30:00.000Z');
+  });
+
+  it('o instante decide: a mudança no mesmo dia da resposta, depois dela, faz a pergunta voltar', () => {
+    const c: SavingsCheck = { ...check('consigo', '2026-10-07', null, 50_000), updatedAt: '2026-10-07T12:00:00.000Z' };
+    // Antes ou no mesmo instante da resposta: nada. Depois, no mesmo dia: renda_mudou.
+    expect(savingsAskReason(c, '2026-10-07', '2026-10-07T11:59:59.000Z')).toBeNull();
+    expect(savingsAskReason(c, '2026-10-07', '2026-10-07T12:00:00.000Z')).toBeNull();
+    expect(savingsAskReason(c, '2026-10-07', '2026-10-07T12:00:01.000Z')).toBe('renda_mudou');
+    expect(savingsCardState(c, '2026-10-07', '2026-10-07T18:00:00.000Z')).toMatchObject({ kind: 'pergunta', reason: 'renda_mudou', monthlyCents: 50_000 });
+    expect(shouldAskSavings(c, '2026-10-08', '2026-10-06T23:00:00.000Z')).toBe(false);
+    expect(incomeChangedAfterAnswer(c, '2026-10-07T12:00:01.000Z')).toBe(true);
+    expect(incomeChangedAfterAnswer(c, '2026-10-07T11:00:00.000Z')).toBe(false);
+    expect(incomeChangedAfterAnswer(c, null)).toBe(false);
+    // Com o dia (AAAA-MM-DD), vale a regra antiga: só dia posterior ao da resposta.
+    expect(incomeChangedAfterAnswer(c, '2026-10-07')).toBe(false);
+    expect(incomeChangedAfterAnswer(c, '2026-10-08')).toBe(true);
+    // Responder de novo (instante posterior) faz a pergunta sumir.
+    const again: SavingsCheck = { ...c, updatedAt: '2026-10-07T20:00:00.000Z' };
+    expect(savingsAskReason(again, '2026-10-07', '2026-10-07T18:00:00.000Z')).toBeNull();
+    // 'depois' e 'agora_nao' seguem a data marcada, qualquer que seja a mudança.
+    expect(savingsAskReason(check('depois', '2026-10-07', '2026-10-14'), '2026-10-08', '2026-10-07T23:00:00.000Z')).toBeNull();
+  });
+
+  it('MemoryRepository: um relógio só (opts.today); repetir o valor ou trocar só "varia" não faz a pergunta voltar', async () => {
+    const { repo, ctx, clock } = await freshRepo('2026-10-07');
+    const first = await repo.setIncomeReference(key(), ctx, '2026-09', 0, 600_000, false);
+    expect(first.amountChangedAt).toBeNull();
+    expect(first.createdAt.startsWith('2026-10-07')).toBe(true);
+    const answered = await repo.setSavingsAnswer(key(), ctx, 0, 'consigo', 50_000);
+    expect(answered.updatedAt.startsWith('2026-10-07')).toBe(true);
+    // Mesmo valor, só "varia", salvar de novo: a versão sobe, o valor não mudou.
+    const varies = await repo.setIncomeReference(key(), ctx, '2026-09', 1, 600_000, true);
+    const same = await repo.setIncomeReference(key(), ctx, '2026-09', 2, 600_000, true);
+    expect(same).toMatchObject({ version: 3, amountChangedAt: null });
+    expect(varies.amountChangedAt).toBeNull();
+    clock.today = '2026-10-12';
+    expect(lastIncomeReferenceChangeAt(await repo.listIncomeReferences(ctx))).toBeNull();
+    expect(savingsCardState(answered, clock.today, lastIncomeReferenceChangeAt(await repo.listIncomeReferences(ctx)))).toEqual({ kind: 'plano', monthlyCents: 50_000 });
+    // Valor diferente, no mesmo dia da resposta mas depois dela: a pergunta volta.
+    const changed = await repo.setIncomeReference(key(), ctx, '2026-09', 3, 400_000, true);
+    expect(changed.amountChangedAt).toBe(changed.updatedAt);
+    expect(changed.createdAt).toBe(first.createdAt);
+    const at = lastIncomeReferenceChangeAt(await repo.listIncomeReferences(ctx));
+    expect(at).toBe(changed.amountChangedAt);
+    expect(savingsAskReason(answered, clock.today, at)).toBe('renda_mudou');
+    // "Manter o valor" é uma resposta nova: o instante dela passa o da mudança, no mesmo dia, e a pergunta some.
+    const kept = await repo.setSavingsAnswer(key(), ctx, 1, 'consigo', 50_000);
+    expect(savingsAskReason(kept, clock.today, at)).toBeNull();
+    expect(savingsCardState(kept, clock.today, at)).toEqual({ kind: 'plano', monthlyCents: 50_000 });
+    // Voltar ao valor anterior também é uma mudança, depois da última resposta.
+    const back = await repo.setIncomeReference(key(), ctx, '2026-09', 4, 600_000, true);
+    expect(savingsAskReason(kept, clock.today, lastIncomeReferenceChangeAt(await repo.listIncomeReferences(ctx)))).toBe('renda_mudou');
+    expect(back.amountChangedAt).toBe(back.updatedAt);
+    // Excluir a referência não conta como mudança do valor.
+    const afterDelete = await repo.deleteIncomeReference(key(), back.id, back.version);
+    expect(afterDelete.amountChangedAt).toBe(back.amountChangedAt);
+  });
+
+  it('demonstração: manter o valor depois de uma mudança no mesmo dia faz a pergunta sumir', async () => {
+    const { repo, ctx } = await demo();
+    const refs = await repo.listIncomeReferences(ctx);
+    expect(lastIncomeReferenceChangeAt(refs)).toBeNull();
+    const check0 = (await repo.getSavingsCheck(ctx))!;
+    const ref = refs[0]!;
+    const changed = await repo.setIncomeReference(key(), ctx, ref.fromMonth, ref.version, ref.amountCents + 100_000, ref.varies);
+    const at = lastIncomeReferenceChangeAt(await repo.listIncomeReferences(ctx));
+    expect(at).toBe(changed.amountChangedAt);
+    expect(savingsCardState(check0, DEMO_TODAY, at)).toMatchObject({ kind: 'pergunta', reason: 'renda_mudou' });
+    const kept = await repo.setSavingsAnswer(key(), ctx, check0.version, 'consigo', check0.monthlyCents);
+    expect(savingsCardState(kept, DEMO_TODAY, at)).toEqual({ kind: 'plano', monthlyCents: 50_000 });
   });
 });
 
@@ -549,7 +632,7 @@ describe('reserva mínima e passos pequenos ("Agora não")', () => {
     expect(validateMinimumReserveDraft('10.000.000,00')).toEqual({ ok: false, code: 'valor_acima_do_limite', error: SAVINGS_ERROR_TEXT.valor_acima_do_limite });
   });
 
-  it('"Criar reserva mínima": base = alvo, 1 mês, origem informada; o banco do core aceita', async () => {
+  it('"Criar reserva mínima": base = alvo, 1 mês, origem reserva_minima; o banco do core aceita', async () => {
     const input = minimumReserveInput(30_000);
     expect(input).toMatchObject({
       goalType: 'emergencia',
@@ -559,7 +642,7 @@ describe('reserva mínima e passos pequenos ("Agora não")', () => {
       plannedMonthlyCents: null,
       essentialBaseCents: 30_000,
       essentialMonths: 1,
-      essentialBaseSource: 'informado',
+      essentialBaseSource: 'reserva_minima',
       initialCents: null,
       initialOn: null,
     });
@@ -571,8 +654,41 @@ describe('reserva mínima e passos pequenos ("Agora não")', () => {
     expect(g).toMatchObject({ targetCents: 30_000, plannedMonthlyCents: 4_333, essentialMonths: 1, essentialBaseCents: 30_000, savedCents: 0 });
     // Na opção "1 mês dos seus gastos essenciais", a origem é a dos gastos essenciais.
     expect(minimumReserveInput(375_000, null, 'media_gastos').essentialBaseSource).toBe('media_gastos');
+    // A reserva mínima só existe com 1 mês (o banco recusa mais meses com esta origem).
+    expect(goalInputError({ ...minimumReserveInput(30_000), essentialMonths: 3, targetCents: 90_000 }, TODAY)).toBe('meses_invalidos');
+    expect(goalInputError({ ...minimumReserveInput(30_000), essentialMonths: 3, targetCents: null }, TODAY)).toBe('meses_invalidos');
+    expect(goalInputError({ ...minimumReserveInput(30_000), essentialMonths: 1 }, TODAY)).toBeNull();
+    expect(goalInputError({ ...minimumReserveInput(30_000), essentialMonths: 6, essentialBaseSource: 'informado', targetCents: 180_000 }, TODAY)).toBeNull();
+    expect(isMinimumReserve(g)).toBe(true);
+    expect(isMinimumReserve({ essentialBaseSource: 'informado' })).toBe(false);
+    expect(isMinimumReserve({ essentialBaseSource: null })).toBe(false);
+    await expectCode(repo.createGoal(key(), ctx, { ...minimumReserveInput(30_000), essentialMonths: 3, targetCents: 90_000 }), 'meses_invalidos');
     // Reserva existente: mantém nome e prazo.
     expect(minimumReserveInput(50_000, null, 'informado', { name: 'Minha reserva', targetMonth: '2027-12' })).toMatchObject({ name: 'Minha reserva', targetMonth: '2027-12' });
+  });
+
+  it('a reserva mínima nunca vira a base dos gastos essenciais (reserveEssentialBaseCents e "Usar este plano")', async () => {
+    const { repo, ctx } = await freshRepo();
+    const { goal: minimum } = await repo.createGoal(key(), ctx, minimumReserveInput(30_000, 5_000));
+    expect(minimum).toMatchObject({ essentialBaseCents: 30_000, essentialMonths: 1, essentialBaseSource: 'reserva_minima' });
+    expect(reserveEssentialBaseCents(minimum)).toBeNull();
+    expect(reserveEssentialBaseCents(null)).toBeNull();
+    expect(reserveEssentialBaseCents(undefined)).toBeNull();
+    expect(reserveEssentialBaseCents({ essentialBaseCents: null, essentialBaseSource: null })).toBeNull();
+    // Reserva com gastos essenciais (inclusive de 1 mês digitado) mantém a base.
+    expect(reserveEssentialBaseCents({ essentialBaseCents: 375_000, essentialBaseSource: 'media_gastos' })).toBe(375_000);
+    expect(reserveEssentialBaseCents({ essentialBaseCents: 300_000, essentialBaseSource: 'informado' })).toBe(300_000);
+    // A opção "1 mês dos seus gastos essenciais" guarda a origem deles: é base de verdade.
+    const real = minimumReserveInput(375_000, null, 'contas_do_mes');
+    expect(reserveEssentialBaseCents({ essentialBaseCents: real.essentialBaseCents!, essentialBaseSource: real.essentialBaseSource })).toBe(375_000);
+    // "Usar este plano" sobre uma reserva mínima grava a base nova como informada, nunca como reserva_minima.
+    const p = plan({ essentialCents: 375_000, monthlyCents: 20_000, goals: [{ ...goal({ name: 'x' }), ...minimum, savedCents: 0 } as PlanGoal] });
+    const input = savingsReserveInput(p, 'reserva_minima', { stageId: 'reserva-3', existing: minimum })!;
+    expect(input).toMatchObject({ essentialBaseCents: 375_000, essentialMonths: 3, targetCents: 1_125_000, essentialBaseSource: 'informado' });
+    expect(goalInputError(input, TODAY)).toBeNull();
+    const updated = await repo.updateGoal(key(), minimum.id, minimum.version, input);
+    expect(updated.goal).toMatchObject({ essentialBaseSource: 'informado', essentialMonths: 3, targetCents: 1_125_000 });
+    expect(savingsReserveInput(p, 'media_gastos', { stageId: 'reserva-3' })!.essentialBaseSource).toBe('media_gastos');
   });
 
   it('passo semanal: R$ 10,00 por semana são R$ 43,33 por mês (regra de "Quanto custa por ano?")', () => {

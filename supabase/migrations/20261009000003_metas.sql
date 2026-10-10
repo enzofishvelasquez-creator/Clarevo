@@ -45,7 +45,8 @@ create table public.goals (
   -- Só na reserva para imprevistos: gastos essenciais por mês confirmados, meses escolhidos e a origem da base.
   essential_base_cents bigint check (essential_base_cents is null or essential_base_cents between 1 and 999999999),
   essential_months smallint check (essential_months is null or essential_months between 1 and 24),
-  essential_base_source text check (essential_base_source in ('media_gastos', 'contas_do_mes', 'informado')),
+  -- 'reserva_minima': reserva mínima de "Agora não" (base = alvo, sempre 1 mês); nunca é base de gastos essenciais.
+  essential_base_source text check (essential_base_source in ('media_gastos', 'contas_do_mes', 'informado', 'reserva_minima')),
   status text not null default 'ativa' check (status in ('ativa', 'concluida', 'arquivada')),
   created_by uuid not null references public.persons (id),
   version integer not null default 1 check (version >= 1),
@@ -60,6 +61,7 @@ create table public.goals (
        and essential_base_source is not null and target_cents = essential_base_cents * essential_months)
     or (goal_type <> 'emergencia' and essential_base_cents is null and essential_months is null
        and essential_base_source is null)),
+  constraint goals_reserva_minima check (essential_base_source is distinct from 'reserva_minima' or essential_months = 1),
   constraint goals_exclusao check ((deleted_at is null) = (deleted_by is null))
 );
 -- G6: excluídas e arquivadas não bloqueiam uma reserva nova.
@@ -359,7 +361,7 @@ $$;
 
 -- Validação da meta (mesma ordem de validateGoalDraft no core). Devolve o alvo a gravar (na reserva, base × meses).
 -- p_check_month = false na edição quando o prazo não mudou (meta com prazo já passado continua editável).
--- Ordem: tipo; nome; alvo (reserva: base, meses, origem, base × meses no limite, alvo informado igual ao produto;
+-- Ordem: tipo; nome; alvo (reserva: base, meses, origem (reserva mínima só com 1 mês: meses_invalidos), base × meses no limite, alvo informado igual ao produto;
 -- outras: nenhum campo da reserva, valor, limite); prazo; plano por mês.
 create or replace function public.clarevo_validate_goal(
   p_actor uuid, p_goal_type text, p_name text, p_target_cents bigint, p_target_month date, p_planned_monthly_cents bigint,
@@ -388,8 +390,13 @@ begin
     if p_essential_months is null or p_essential_months not between 1 and 24 then
       raise exception 'meses_invalidos' using errcode = '22023';
     end if;
-    if p_essential_base_source is null or p_essential_base_source not in ('media_gastos', 'contas_do_mes', 'informado') then
+    if p_essential_base_source is null
+       or p_essential_base_source not in ('media_gastos', 'contas_do_mes', 'informado', 'reserva_minima') then
       raise exception 'origem_invalida' using errcode = '22023';
+    end if;
+    -- Reserva mínima é sempre de 1 mês (a base é o próprio alvo).
+    if p_essential_base_source = 'reserva_minima' and p_essential_months <> 1 then
+      raise exception 'meses_invalidos' using errcode = '22023';
     end if;
     -- Conferido antes do produto (sem estouro): base × meses <= limite <=> base <= limite div meses.
     if p_essential_base_cents > 999999999 / p_essential_months then

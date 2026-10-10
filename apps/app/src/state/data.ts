@@ -7,7 +7,8 @@ import {
   goalPlan,
   isRepoError,
   isSavingsStepDone,
-  lastIncomeReferenceChange,
+  lastIncomeReferenceChangeAt,
+  reserveEssentialBaseCents,
   loadReturnReview,
   monthOf,
   newOperationKey,
@@ -1093,8 +1094,8 @@ export function useSavingsStepDone(contextId: string | undefined) {
 /** O card da pergunta na aba Metas: a resposta, o dia da última mudança da renda de referência e o estado (savingsCardState). */
 export interface SavingsCardData {
   check: SavingsCheck | null;
-  /** Dia da última mudança da renda de referência para outro valor (lastIncomeReferenceChange), ou null. */
-  incomeChangedOn: IsoDate | null;
+  /** Instante da última mudança da renda de referência para outro valor (lastIncomeReferenceChangeAt), ou null. */
+  incomeChangedAt: string | null;
   state: SavingsCardState;
 }
 
@@ -1108,9 +1109,9 @@ export function useSavingsCard(contextId: string | undefined) {
   const value = useMemo((): SavingsCardData | undefined => {
     if (!ready) return undefined;
     const answer = check.data ?? null;
-    const incomeChangedOn = lastIncomeReferenceChange(refs.data!, space.data?.timeZone);
-    return { check: answer, incomeChangedOn, state: savingsCardState(answer, today, incomeChangedOn) };
-  }, [ready, check.data, refs.data, space.data?.timeZone, today]);
+    const incomeChangedAt = lastIncomeReferenceChangeAt(refs.data!);
+    return { check: answer, incomeChangedAt, state: savingsCardState(answer, today, incomeChangedAt) };
+  }, [ready, check.data, refs.data, today]);
   return combineParts<SavingsCardData>(parts, value);
 }
 
@@ -1138,7 +1139,7 @@ export function useSavingsPlanInputs(contextId: string | undefined) {
     const list = goals.data!;
     const reserve = organizeGoals(list).reserve;
     const est = estimate.data!;
-    return { goals: list, movements: movements.data!, estimate: est, suggestedEssentialCents: reserve?.essentialBaseCents ?? est.amountCents };
+    return { goals: list, movements: movements.data!, estimate: est, suggestedEssentialCents: reserveEssentialBaseCents(reserve) ?? est.amountCents };
   }, [ready, goals.data, movements.data, estimate.data]);
   return combineParts<SavingsPlanInputs>(parts, value);
 }

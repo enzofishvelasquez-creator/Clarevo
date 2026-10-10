@@ -214,8 +214,11 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
     try {
       const { initialCents: _initialCents, initialOn: _initialOn, ...rest } = v.input;
       const changes: GoalInput = rest;
-      const r = await guardedWrite(keys, JSON.stringify([goal?.id ?? null, goal?.version ?? 0, v.input]), (key) =>
-        goal ? update.mutateAsync({ key, id: goal.id, version: goal.version, input: changes }) : create.mutateAsync({ key, contextId, input: v.input }),
+      const r = await guardedWrite(
+        keys,
+        JSON.stringify([goal?.id ?? null, goal?.version ?? 0, v.input]),
+        (key) => (goal ? update.mutateAsync({ key, id: goal.id, version: goal.version, input: changes }) : create.mutateAsync({ key, contextId, input: v.input })),
+        (s) => (goal ? s.action === 'alterar_meta' && s.goalId === goal.id : s.action === 'criar_meta'),
       );
       if (r.status === 'ok') {
         flash.set(goal ? T.saved : T.created);

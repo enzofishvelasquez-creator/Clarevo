@@ -4,6 +4,7 @@ import type { IsoDate, IsoMonth } from './dates';
 import { addDays, addMonths, formatMonthYearBR, todayIn } from './dates';
 import {
   GOALS_TEXT,
+  MINIMUM_RESERVE_SOURCE,
   GOAL_DEADLINE_MAX_MONTHS,
   GOAL_ERROR_TEXT,
   GOAL_RESERVE_REFERENCE,
@@ -99,24 +100,37 @@ export type SavingsAskReason = 'primeira' | 'depois' | 'agora_nao' | 'renda_mudo
  * - Sem resposta: 'primeira'.
  * - 'depois' e 'agora_nao': só a partir do dia marcado (hoje >= askAgainOn); antes disso, nada, nem se a renda mudar.
  * - 'consigo': nunca por data; só quando a renda de referência mudou depois do dia da resposta ('renda_mudou').
- * incomeReferenceChangedAfter: dia (no fuso da pessoa) da alteração mais recente da renda de referência para outro
- * valor (lastIncomeReferenceChange), ou null. Mudar no mesmo dia da resposta não faz a pergunta voltar.
+ * incomeReferenceChangedAfter: a alteração mais recente da renda de referência para outro valor, ou null.
+ * - Instante (lastIncomeReferenceChangeAt): a pergunta volta quando a mudança é posterior ao instante da resposta
+ *   (check.updatedAt), inclusive no mesmo dia. É a forma que o app usa.
+ * - Dia AAAA-MM-DD (lastIncomeReferenceChange): volta só quando o dia é posterior ao dia da resposta.
  */
 export function savingsAskReason(
   check: SavingsCheck | null,
   today: IsoDate,
-  incomeReferenceChangedAfter: IsoDate | null = null,
+  incomeReferenceChangedAfter: IsoDate | string | null = null,
 ): SavingsAskReason | null {
   if (check === null) return 'primeira';
   if (check.answer === 'consigo') {
-    return incomeReferenceChangedAfter !== null && incomeReferenceChangedAfter > check.answeredOn ? 'renda_mudou' : null;
+    return incomeChangedAfterAnswer(check, incomeReferenceChangedAfter) ? 'renda_mudou' : null;
   }
   if (check.askAgainOn !== null && today < check.askAgainOn) return null;
   return check.answer === 'agora_nao' ? 'agora_nao' : 'depois';
 }
 
+/** A renda de referência mudou depois da resposta (a pergunta "renda_mudou" fica de pé)? Instante: depois de check.updatedAt; dia: depois de check.answeredOn. */
+export function incomeChangedAfterAnswer(check: SavingsCheck, changed: IsoDate | string | null): boolean {
+  if (changed === null) return false;
+  if (changed.length > 10) {
+    const changedMs = Date.parse(changed);
+    const answeredMs = Date.parse(check.updatedAt);
+    if (!Number.isNaN(changedMs) && !Number.isNaN(answeredMs)) return changedMs > answeredMs;
+  }
+  return changed.slice(0, 10) > check.answeredOn;
+}
+
 /** A pergunta "Você consegue guardar algum valor por mês?" deve aparecer agora? */
-export function shouldAskSavings(check: SavingsCheck | null, today: IsoDate, incomeReferenceChangedAfter: IsoDate | null = null): boolean {
+export function shouldAskSavings(check: SavingsCheck | null, today: IsoDate, incomeReferenceChangedAfter: IsoDate | string | null = null): boolean {
   return savingsAskReason(check, today, incomeReferenceChangedAfter) !== null;
 }
 
@@ -126,7 +140,11 @@ export type SavingsCardState =
   | { kind: 'plano'; monthlyCents: Cents }
   | { kind: 'oculto' };
 
-export function savingsCardState(check: SavingsCheck | null, today: IsoDate, incomeReferenceChangedAfter: IsoDate | null = null): SavingsCardState {
+export function savingsCardState(
+  check: SavingsCheck | null,
+  today: IsoDate,
+  incomeReferenceChangedAfter: IsoDate | string | null = null,
+): SavingsCardState {
   const reason = savingsAskReason(check, today, incomeReferenceChangedAfter);
   if (reason !== null) {
     const title =
@@ -143,39 +161,54 @@ export function isSavingsStepDone(check: SavingsCheck | null): boolean {
 }
 
 /**
- * Dia da última mudança da renda de referência para outro valor, ou null. Conta: uma referência alterada (versão acima
- * de 1, no dia da alteração) e uma referência nova, de mês posterior, com valor diferente da anterior (no dia em que foi
- * criada). A primeira referência da pessoa não é mudança. timeZone: fuso da pessoa para converter o instante em dia
- * (sem ele, o dia do instante em UTC).
+ * Instante da última mudança da renda de referência para outro valor, ou null. Conta: uma referência cujo valor foi
+ * alterado (amountChangedAt, só quando o valor mudou: repetir o mesmo valor ou trocar só "Minha renda varia" não conta) e
+ * uma referência nova, de mês posterior, com valor diferente da anterior (no instante em que foi criada). A primeira
+ * referência da pessoa não é mudança. Devolve o instante como está guardado.
  */
-export function lastIncomeReferenceChange(
-  references: readonly Pick<IncomeReference, 'fromMonth' | 'amountCents' | 'version' | 'createdAt' | 'updatedAt'>[],
-  timeZone?: string,
-): IsoDate | null {
-  const day = (instant: string): IsoDate => {
-    if (timeZone) {
-      try {
-        return todayIn(timeZone, new Date(instant));
-      } catch {
-        // Fuso ou instante inválido: cai no dia do instante.
-      }
-    }
-    return instant.slice(0, 10);
-  };
+export function lastIncomeReferenceChangeAt(
+  references: readonly Pick<IncomeReference, 'fromMonth' | 'amountCents' | 'createdAt' | 'amountChangedAt'>[],
+): string | null {
   const sorted = [...references].sort((a, b) => a.fromMonth.localeCompare(b.fromMonth));
-  let latest: IsoDate | null = null;
+  let latest: string | null = null;
+  let latestMs = Number.NEGATIVE_INFINITY;
   for (let i = 0; i < sorted.length; i += 1) {
     const r = sorted[i]!;
     const previous = sorted[i - 1];
     const instants: string[] = [];
-    if (r.version > 1) instants.push(r.updatedAt);
+    if (r.amountChangedAt) instants.push(r.amountChangedAt);
     if (previous && previous.amountCents !== r.amountCents) instants.push(r.createdAt);
     for (const instant of instants) {
-      const d = day(instant);
-      if (latest === null || d > latest) latest = d;
+      const ms = Date.parse(instant);
+      if (Number.isNaN(ms)) continue;
+      if (latest === null || ms > latestMs) {
+        latest = instant;
+        latestMs = ms;
+      }
     }
   }
   return latest;
+}
+
+/**
+ * Dia (no fuso da pessoa) da última mudança da renda de referência para outro valor (lastIncomeReferenceChangeAt), ou
+ * null. Só para mostrar ou comparar por dia; a pergunta de rever quanto guardar compara por instante. timeZone: fuso da
+ * pessoa para converter o instante em dia (sem ele, o dia do instante em UTC).
+ */
+export function lastIncomeReferenceChange(
+  references: readonly Pick<IncomeReference, 'fromMonth' | 'amountCents' | 'createdAt' | 'amountChangedAt'>[],
+  timeZone?: string,
+): IsoDate | null {
+  const instant = lastIncomeReferenceChangeAt(references);
+  if (instant === null) return null;
+  if (timeZone) {
+    try {
+      return todayIn(timeZone, new Date(instant));
+    } catch {
+      // Fuso ou instante inválido: cai no dia do instante.
+    }
+  }
+  return instant.slice(0, 10);
 }
 
 // ---------------------------------------------------------------------------
@@ -347,7 +380,8 @@ export function savingsReserveInput(
     plannedMonthlyCents: isAmount(plan.monthlyCents) ? plan.monthlyCents : null,
     essentialBaseCents: plan.essentialCents,
     essentialMonths: stage.months,
-    essentialBaseSource: source,
+    // A base agora são os gastos essenciais, não um valor mínimo.
+    essentialBaseSource: source === MINIMUM_RESERVE_SOURCE ? 'informado' : source,
     initialCents: null,
     initialOn: null,
   };
@@ -397,14 +431,14 @@ export function validateMinimumReserveDraft(
 
 /**
  * "Criar reserva mínima": reserva para imprevistos com o alvo escolhido. A reserva do Ciclo C exige base × meses; aqui a
- * base é o próprio alvo, com 1 mês. source: 'informado' (o valor foi escolhido pela pessoa) ou, na opção "1 mês dos
- * seus gastos essenciais", a origem dos gastos essenciais. plannedMonthlyCents: o valor por mês de um passo pequeno,
+ * base é o próprio alvo, com 1 mês. source: 'reserva_minima' (o valor foi escolhido pela pessoa; nunca serve de base de
+ * gastos essenciais) ou, na opção "1 mês dos seus gastos essenciais", a origem dos gastos essenciais. plannedMonthlyCents: o valor por mês de um passo pequeno,
  * quando a pessoa escolheu um; senão null.
  */
 export function minimumReserveInput(
   targetCents: Cents,
   plannedMonthlyCents: Cents | null = null,
-  source: EssentialBaseSource = 'informado',
+  source: EssentialBaseSource = MINIMUM_RESERVE_SOURCE,
   existing: Pick<Goal, 'name' | 'targetMonth'> | null = null,
 ): NewGoalInput {
   return {

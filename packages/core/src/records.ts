@@ -295,6 +295,11 @@ export interface IncomeReference {
   version: number;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Instante em que o valor mudou pela última vez, ou null se nunca mudou desde que foi criada. Só mudar o valor conta
+   * (repetir o mesmo valor ou trocar só "Minha renda varia" não muda).
+   */
+  amountChangedAt: string | null;
 }
 
 /**
@@ -313,8 +318,12 @@ export type GoalStatus = 'ativa' | 'concluida' | 'arquivada';
  * 'desvalorizacao' subtraem. "Atualizar valor guardado" registra a diferença como valorização ou desvalorização.
  */
 export type GoalMovementKind = 'saldo_inicial' | 'aporte' | 'resgate' | 'rendimento' | 'valorizacao' | 'desvalorizacao';
-/** De onde veio a base de gastos essenciais da reserva: média do Pago, contas do mês ou valor digitado. */
-export type EssentialBaseSource = 'media_gastos' | 'contas_do_mes' | 'informado';
+/**
+ * De onde veio a base de gastos essenciais da reserva: média do Pago, contas do mês ou valor digitado. 'reserva_minima':
+ * a reserva mínima de "Agora não" (base = alvo, sempre 1 mês); o valor é o alvo escolhido, nunca os gastos essenciais, e
+ * não pode servir de base para o plano nem para a cobertura.
+ */
+export type EssentialBaseSource = 'media_gastos' | 'contas_do_mes' | 'informado' | 'reserva_minima';
 
 /** Meta (goals) com os totais dos movimentos vivos (visão goal_items). Gravada só pelas funções de metas do banco. */
 export interface Goal {

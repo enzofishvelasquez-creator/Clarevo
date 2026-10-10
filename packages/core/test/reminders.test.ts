@@ -11,11 +11,13 @@ import {
   formatBRL,
   isReminderHour,
   isReminderId,
+  offerCaption,
   reminderBody,
   reminderHourA11y,
   reminderHourLabel,
   reminderPlan,
   type Commitment,
+  type ReminderHour,
 } from '../src';
 
 const CTX = 'ctx-pessoal';
@@ -162,10 +164,19 @@ describe('Lembretes (D-025): plano de avisos', () => {
     expect(isReminderId('outro-aviso')).toBe(false);
   });
 
+  it('oferta: o horário do texto é o guardado em Conta', () => {
+    expect(offerCaption(9)).toBe('O aviso chega às 9h, sem valores nem descrições na tela bloqueada. O horário pode ser mudado em Conta.');
+    expect(offerCaption(19)).toContain('às 19h');
+    expect(offerCaption(8)).toContain('às 8h');
+    expect(offerCaption()).toBe(offerCaption(DEFAULT_REMINDER_HOUR));
+    expect(offerCaption(7 as ReminderHour)).toBe(offerCaption(9));
+    for (const h of REMINDER_HOURS) expect(offerCaption(h)).toContain(`às ${reminderHourLabel(h)},`);
+  });
+
   it('textos sem travessão, sem julgamento e sem a expressão proibida', () => {
     const FORBIDDEN =
       /\b(recomendamos|recomendo|invista|aplique|atrasad[oa]s?|cuidado|ruim|cortes?|caixinha)\b|vale a pena|desperd[ií]cio|\bestour|saldo devedor|faz(er|endo)?\s+sentido|[\u2013\u2014]/i;
-    const texts = [...Object.values(REMINDER_TEXT), reminderBody(1), reminderBody(2)];
+    const texts = [...Object.values(REMINDER_TEXT), reminderBody(1), reminderBody(2), ...REMINDER_HOURS.map((h) => offerCaption(h))];
     for (const t of texts) expect(t).not.toMatch(FORBIDDEN);
     expect(REMINDER_TEXT.web).toBe('Lembretes estão disponíveis no app para celular.');
   });

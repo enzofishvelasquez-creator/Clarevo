@@ -190,6 +190,8 @@ interface IncomeReferenceRow {
   version: number;
   created_at: string;
   updated_at: string;
+  /** Instante em que o valor mudou pela última vez (null: nunca mudou desde que foi criada). */
+  amount_changed_at: string | null;
 }
 
 /** Linha da visão goal_items (e a meta do retorno das funções de metas, que traz também deleted_at e deleted_by). */
@@ -252,7 +254,7 @@ interface SavingsCheckRow {
   updated_at: string;
 }
 
-const INCOME_REFERENCE_COLUMNS = 'id, context_id, from_month, amount_cents, varies, created_by, version, created_at, updated_at';
+const INCOME_REFERENCE_COLUMNS = 'id, context_id, from_month, amount_cents, varies, created_by, version, created_at, updated_at, amount_changed_at';
 const GOAL_MOVEMENT_COLUMNS = 'id, goal_id, context_id, kind, amount_cents, occurred_on, note, created_by, version, created_at, updated_at';
 const SAVINGS_CHECK_COLUMNS = 'context_id, answer, monthly_cents, answered_on, ask_again_on, version, created_at, updated_at';
 
@@ -544,6 +546,7 @@ function toIncomeReference(r: IncomeReferenceRow): IncomeReference {
     version,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+    amountChangedAt: r.amount_changed_at ?? null,
   };
 }
 

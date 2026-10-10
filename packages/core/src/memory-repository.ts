@@ -52,6 +52,7 @@ import {
   GOAL_STATUSES,
   GOAL_TYPES,
   ESSENTIAL_BASE_SOURCES,
+  MINIMUM_RESERVE_SOURCE,
   RESERVE_MONTHS_MAX,
   RESERVE_MONTHS_MIN,
   firstNegativeDay,
@@ -967,6 +968,18 @@ export class MemoryRepository implements RecordsRepository {
     });
   }
 
+  /**
+   * Um relógio só para a renda de referência e para a resposta de guardar: o dia de opts.today() (a "data de hoje" do
+   * aparelho ou da demonstração), ao meio-dia UTC, e a cada chamada 1 ms depois da anterior. Assim a ordem entre a resposta
+   * e a mudança da renda vale também no mesmo dia e não depende do relógio real.
+   */
+  private lastStampMs = Number.NEGATIVE_INFINITY;
+  private stamp(): string {
+    const base = Date.parse(`${this.opts.today()}T12:00:00.000Z`);
+    this.lastStampMs = Math.max(Number.isNaN(base) ? Date.now() : base, this.lastStampMs + 1);
+    return new Date(this.lastStampMs).toISOString();
+  }
+
   /** Como a leitura de income_references (RLS): vivas do contexto, por mês de início crescente; sem leitura, nada. */
   async listIncomeReferences(contextId: string) {
     return this.read(() =>
@@ -995,9 +1008,17 @@ export class MemoryRepository implements RecordsRepository {
       if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0) throw new RepoError('versao_desatualizada');
       const current = [...this.incomeRefs.values()].find((r) => !r.deletedAt && r.contextId === contextId && r.fromMonth === fromMonth);
       if (expectedVersion !== (current?.version ?? 0)) throw new RepoError('versao_desatualizada');
-      const now = new Date().toISOString();
+      const now = this.stamp();
       const next: StoredIncomeReference = current
-        ? { ...current, amountCents, varies, version: current.version + 1, updatedAt: now }
+        ? {
+            ...current,
+            amountCents,
+            varies,
+            version: current.version + 1,
+            updatedAt: now,
+            // Só mudar o valor conta como mudança (como set_income_reference): repetir o valor ou trocar só "varia" não conta.
+            amountChangedAt: amountCents !== current.amountCents ? now : current.amountChangedAt,
+          }
         : {
             id: this.id('ref'),
             contextId,
@@ -1008,6 +1029,7 @@ export class MemoryRepository implements RecordsRepository {
             version: 1,
             createdAt: now,
             updatedAt: now,
+            amountChangedAt: null,
           };
       this.incomeRefs.set(next.id, next);
       this.saveOperation(key, 'definir_renda_referencia', payload, { contextId, recordId: null, commitmentId: null, referenceId: next.id });
@@ -1025,7 +1047,7 @@ export class MemoryRepository implements RecordsRepository {
       if (!current || current.deletedAt || !this.canRead(current.contextId)) throw new RepoError('nao_encontrado');
       if (!this.canWrite(current.contextId)) throw new RepoError('sem_permissao');
       if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
-      const now = new Date().toISOString();
+      const now = this.stamp();
       const next: StoredIncomeReference = {
         ...current,
         version: current.version + 1,
@@ -1319,7 +1341,7 @@ export class MemoryRepository implements RecordsRepository {
         throw new RepoError('versao_desatualizada', undefined, `versao_atual=${current?.version ?? 0}`);
       }
       const today = this.opts.today();
-      const now = new Date().toISOString();
+      const now = this.stamp();
       const next: SavingsCheck = {
         contextId,
         answer,
@@ -1434,6 +1456,7 @@ export class MemoryRepository implements RecordsRepository {
           g.essentialMonths! < RESERVE_MONTHS_MIN ||
           g.essentialMonths! > RESERVE_MONTHS_MAX ||
           !ESSENTIAL_BASE_SOURCES.includes(g.essentialBaseSource!) ||
+          (g.essentialBaseSource === MINIMUM_RESERVE_SOURCE && g.essentialMonths !== 1) ||
           g.targetCents !== g.essentialBaseCents! * g.essentialMonths!)
       ) {
         fail();

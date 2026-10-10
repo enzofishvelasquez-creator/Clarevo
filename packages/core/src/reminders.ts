@@ -29,7 +29,6 @@ export const REMINDER_TEXT = {
   caption: 'Um aviso no dia anterior ao vencimento. Sem valores nem descrições na tela bloqueada. Os lembretes ficam neste aparelho.',
   hourLabel: 'Horário do aviso',
   offerTitle: 'Quer receber um aviso no dia anterior ao vencimento?',
-  offerCaption: 'O aviso chega às 9h, sem valores nem descrições na tela bloqueada. O horário pode ser mudado em Conta.',
   offerAccept: 'Ativar lembretes',
   offerDecline: 'Agora não',
   denied: 'Os avisos estão desativados nas configurações do aparelho.',
@@ -47,6 +46,15 @@ export function isReminderHour(value: unknown): value is ReminderHour {
 /** "8h", "9h", "12h", "19h". */
 export function reminderHourLabel(hour: ReminderHour): string {
   return `${hour}h`;
+}
+
+/**
+ * Texto da oferta depois do primeiro gasto fixo: o horário é o guardado em Conta (padrão 9h), nunca fixo no texto.
+ * Hora fora da lista cai no horário padrão.
+ */
+export function offerCaption(hour: ReminderHour = DEFAULT_REMINDER_HOUR): string {
+  const h = isReminderHour(hour) ? hour : DEFAULT_REMINDER_HOUR;
+  return `O aviso chega às ${reminderHourLabel(h)}, sem valores nem descrições na tela bloqueada. O horário pode ser mudado em Conta.`;
 }
 
 /** Leitor de tela: "8 horas", "12 horas". */

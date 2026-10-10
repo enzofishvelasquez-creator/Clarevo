@@ -10,6 +10,8 @@ import {
   goalErrorText,
   organizeGoals,
   parseBRL,
+  reserveEssentialBaseCents,
+  savingsAskReason,
   savingsPlan,
   savingsPlanTexts,
   savingsReserveInput,
@@ -28,7 +30,7 @@ import { EssentialsBlock } from '@/components/essentials-block';
 import { FormFooter } from '@/components/form-footer';
 import { ContextPill, SubHeader } from '@/components/header';
 import { useLeaveGuard } from '@/components/leave-guard';
-import { MoneyTxt, useMoneyLabelMask, useMoneyMask } from '@/components/money-text';
+import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { ChoiceGroup } from '@/components/series-parts';
 import { TermHint } from '@/components/term-hint';
 import { Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
@@ -63,6 +65,7 @@ export function SavingsPlanForm({
   inputs,
   referenceText,
   focusAmount,
+  incomeChangedAt = null,
 }: {
   contextId: string;
   check: SavingsCheck | null;
@@ -70,10 +73,11 @@ export function SavingsPlanForm({
   /** "Fora dos compromissos em outubro: R$ 2.850,00. Não é saldo: ..." ou null (sem renda de referência ou sem o cálculo). */
   referenceText: string | null;
   focusAmount: boolean;
+  /** Instante da última mudança da renda de referência (useSavingsCard). Depois da resposta, a pergunta "renda mudou" está aberta. */
+  incomeChangedAt?: string | null;
 }) {
   const { today } = useSession();
   const qc = useQueryClient();
-  const mask = useMoneyMask();
   const setAnswer = useSetSavingsAnswer();
   const createGoal = useCreateGoal();
   const updateGoal = useUpdateGoal();
@@ -81,8 +85,9 @@ export function SavingsPlanForm({
   const goalKeys = useGoalOperationKey();
 
   const reserve = organizeGoals(inputs.goals).reserve;
-  const saved: SavedEssentials | null =
-    reserve && reserve.essentialBaseCents !== null && reserve.essentialBaseSource ? { cents: reserve.essentialBaseCents, source: reserve.essentialBaseSource } : null;
+  // A reserva mínima de "Agora não" guarda o próprio alvo como base de 1 mês: não é o gasto essencial da pessoa (reserveEssentialBaseCents).
+  const savedBase = reserveEssentialBaseCents(reserve);
+  const saved: SavedEssentials | null = reserve && savedBase !== null && reserve.essentialBaseSource ? { cents: savedBase, source: reserve.essentialBaseSource } : null;
 
   const initialAmount = check?.answer === 'consigo' && check.monthlyCents !== null ? centsToInput(check.monthlyCents) : '';
   const initialEssential = inputs.suggestedEssentialCents !== null ? centsToInput(inputs.suggestedEssentialCents) : '';
@@ -90,6 +95,7 @@ export function SavingsPlanForm({
   const [essentialText, setEssentialText] = useState(initialEssential);
   // Etapa escolhida: a da reserva que já existe (se tem 1, 3 ou 6 meses), para "Usar este plano" nunca diminuir o alvo sem a
   // pessoa escolher; sem reserva, o padrão do core (a primeira etapa ainda não alcançada).
+  const keepsOtherMonths = reserve !== null && reserve.essentialMonths !== null && !SAVINGS_STAGE_MONTHS.includes(reserve.essentialMonths);
   const initialStage = reserve && reserve.essentialMonths !== null && SAVINGS_STAGE_MONTHS.includes(reserve.essentialMonths) ? `reserva-${reserve.essentialMonths}` : null;
   const [stageId, setStageId] = useState<string | null>(initialStage);
   const [amountError, setAmountError] = useState<string | undefined>();
@@ -118,7 +124,9 @@ export function SavingsPlanForm({
   const texts = plan ? savingsPlanTexts(plan) : null;
   const source = essentialSourceFor(essentialCents, inputs.estimate, saved);
   const reserveInput = plan ? savingsReserveInput(plan, source, { existing: reserve }) : null;
-  const canUsePlan = reserveInput !== null;
+  // Reserva com outro prazo (12 meses, por exemplo): "Usar este plano" só aparece depois de a pessoa escolher uma etapa, para nunca diminuir o alvo sozinho.
+  const stageChosen = !keepsOtherMonths || stageId !== null;
+  const canUsePlan = reserveInput !== null && stageChosen;
   const reserveStages = plan ? plan.stages.filter((s) => s.kind === 'reserva') : [];
 
   // A frase do plano é anunciada uma vez, quando a pessoa para de digitar (no iOS não há região viva).
@@ -128,10 +136,11 @@ export function SavingsPlanForm({
     if (Platform.OS !== 'ios' || spoken === lastSpoken.current) return;
     const timer = setTimeout(() => {
       lastSpoken.current = spoken;
-      announceOnIOS(mask(spoken), { queue: true });
+      // announceOnIOS já troca os valores por "valor oculto"; mascarar antes deixaria só os pontos.
+      announceOnIOS(spoken, { queue: true });
     }, 600);
     return () => clearTimeout(timer);
-  }, [spoken, mask]);
+  }, [spoken]);
 
   function failFromResult(result: Exclude<WriteResult<unknown, object>, { status: 'ok' | 'reconciled' }>, scope: 'resposta' | 'reserva', prefix = '') {
     if (result.status === 'refused') {
@@ -165,7 +174,9 @@ export function SavingsPlanForm({
     setBusy(true);
     setError(null);
     try {
-      const sameAnswer = check?.answer === 'consigo' && check.monthlyCents === v.monthlyCents;
+      // Com a pergunta "renda mudou" aberta, manter o mesmo valor também grava, como "Manter o valor": a resposta passa a valer de hoje.
+      const incomeQuestionOpen = savingsAskReason(check, today, incomeChangedAt) === 'renda_mudou';
+      const sameAnswer = check?.answer === 'consigo' && check.monthlyCents === v.monthlyCents && !incomeQuestionOpen;
       let prefix = '';
       if (!sameAnswer) {
         const version = check?.version ?? 0;
@@ -279,7 +290,7 @@ export function SavingsPlanForm({
                     key={s.id}
                     label={GOALS_TEXT.reserve.monthChip(s.months!)}
                     accessibilityLabel={`Etapa de ${GOALS_TEXT.reserve.monthChip(s.months!)} dos gastos essenciais`}
-                    selected={plan.chosenStageId === s.id}
+                    selected={stageChosen && plan.chosenStageId === s.id}
                     onPress={() => setStageId(s.id)}
                   />
                 ))}

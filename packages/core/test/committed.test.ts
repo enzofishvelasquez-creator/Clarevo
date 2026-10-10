@@ -105,6 +105,7 @@ const income = (fromMonth: string, amountCents: number, over: Partial<IncomeRefe
   version: 1,
   createdAt: CREATED_AT,
   updatedAt: CREATED_AT,
+  amountChangedAt: null,
   ...over,
 });
 const receipt = (occurredOn: string, amountCents: number, category: string | null = 'Salário', kind: 'receita' | 'despesa' = 'receita'): FinancialRecord => {

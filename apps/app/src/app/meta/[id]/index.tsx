@@ -79,8 +79,11 @@ export default function MetaDetalhe() {
     setActionError(null);
     setNotice(null);
     try {
-      const r = await guardedWrite(keys, JSON.stringify(['situacao', g.id, g.version, status]), (key) =>
-        setStatus.mutateAsync({ key, id: g.id, version: g.version, status }),
+      const r = await guardedWrite(
+        keys,
+        JSON.stringify(['situacao', g.id, g.version, status]),
+        (key) => setStatus.mutateAsync({ key, id: g.id, version: g.version, status }),
+        (s) => s.action === 'situacao_meta' && s.goalId === g.id,
       );
       if (r.status === 'ok' || r.status === 'reconciled') {
         haptic();
@@ -97,7 +100,12 @@ export default function MetaDetalhe() {
     setBusy(true);
     setActionError(null);
     try {
-      const r = await guardedWrite(keys, JSON.stringify(['excluir', g.id, g.version]), (key) => remove.mutateAsync({ key, id: g.id, version: g.version }));
+      const r = await guardedWrite(
+        keys,
+        JSON.stringify(['excluir', g.id, g.version]),
+        (key) => remove.mutateAsync({ key, id: g.id, version: g.version }),
+        (s) => s.action === 'excluir_meta' && (s.goalId === '' || s.goalId === g.id),
+      );
       setConfirmDelete(false);
       if (r.status === 'ok' || r.status === 'reconciled') {
         haptic();

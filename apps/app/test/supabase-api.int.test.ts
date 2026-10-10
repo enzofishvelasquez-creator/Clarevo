@@ -2733,8 +2733,9 @@ describe('API real: renda comprometida (Ciclo B, D-026)', () => {
     const changed = await repo.setIncomeReference(newOperationKey(), ctx, SEP, 1, 650000, false);
     expect(await repo.setIncomeReference(key, ctx, SEP, 0, 600000, false)).toEqual(changed);
     // A alteração conta como mudança da renda de referência no dia em que foi feita (savings.lastIncomeReferenceChange).
-    expect(lastIncomeReferenceChange(await repo.listIncomeReferences(ctx))).toBe(changed.updatedAt.slice(0, 10));
-    expect(lastIncomeReferenceChange([{ ...changed, version: 1 }])).toBeNull();
+    expect(changed.amountChangedAt).not.toBeNull();
+    expect(lastIncomeReferenceChange(await repo.listIncomeReferences(ctx))).toBe(changed.amountChangedAt!.slice(0, 10));
+    expect(lastIncomeReferenceChange([{ ...changed, amountChangedAt: null }])).toBeNull();
 
     // A resposta se perde: o app não sabe o resultado. Repetir a mesma chave e o mesmo conteúdo devolve a referência criada.
     const lost = new SupabaseRepository(clientFor(BRUNO, T0, lostResponse), { id: BRUNO });
@@ -3485,7 +3486,7 @@ describe('API real: plano de guardar (D-036)', () => {
       targetCents: 30000,
       essentialBaseCents: 30000,
       essentialMonths: 1,
-      essentialBaseSource: 'informado',
+      essentialBaseSource: 'reserva_minima',
       plannedMonthlyCents: 4333,
       savedCents: 0,
       status: 'ativa',
@@ -3500,7 +3501,7 @@ describe('API real: plano de guardar (D-036)', () => {
 describe('conversor da renda de referência, das metas e do plano de guardar', () => {
   // Sem rede: os argumentos das funções, a leitura das linhas (mês AAAA-MM-01 ↔ AAAA-MM, bigint) e os códigos de erro.
   const calls: [string, Record<string, unknown>][] = [];
-  const ref = { id: 'r1', context_id: 'ctx', from_month: '2026-09-01', amount_cents: 600000, varies: false, created_by: 'p1', version: 1, created_at: 'a', updated_at: 'b' };
+  const ref = { id: 'r1', context_id: 'ctx', from_month: '2026-09-01', amount_cents: 600000, varies: false, created_by: 'p1', version: 1, created_at: 'a', updated_at: 'b', amount_changed_at: null };
   const goal = {
     id: 'g1',
     context_id: 'ctx',
@@ -3565,8 +3566,13 @@ describe('conversor da renda de referência, das metas e do plano de guardar', (
   it('renda de referência: AAAA-MM vira AAAA-MM-01 e volta; linha incoerente é recusada', async () => {
     calls.length = 0;
     const repo = fake({ set_income_reference: ref, delete_income_reference: { ...ref, version: 2, deleted_at: 'c', deleted_by: 'p1' } }, { income_references: { data: [ref] } });
-    const expected = { id: 'r1', contextId: 'ctx', fromMonth: '2026-09', amountCents: 600000, varies: false, createdBy: 'p1', version: 1, createdAt: 'a', updatedAt: 'b' };
+    const expected = { id: 'r1', contextId: 'ctx', fromMonth: '2026-09', amountCents: 600000, varies: false, createdBy: 'p1', version: 1, createdAt: 'a', updatedAt: 'b', amountChangedAt: null };
     expect(await repo.listIncomeReferences('ctx')).toEqual([expected]);
+    // O instante da última mudança do valor vem da coluna amount_changed_at.
+    const changedRow = { ...ref, version: 2, amount_changed_at: '2026-10-05T12:00:00.000Z' };
+    expect(await fake({}, { income_references: { data: [changedRow] } }).listIncomeReferences('ctx')).toEqual([
+      { ...expected, version: 2, amountChangedAt: '2026-10-05T12:00:00.000Z' },
+    ]);
     expect(await repo.setIncomeReference('chave-0001', 'ctx', '2026-09', 0, 600000, false)).toEqual(expected);
     expect(await repo.deleteIncomeReference('chave-0002', 'r1', 1)).toEqual({ ...expected, version: 2 });
     expect(calls).toEqual([

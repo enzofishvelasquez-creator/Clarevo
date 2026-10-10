@@ -522,6 +522,9 @@ describe('validação dos formulários de metas', () => {
     expect(code(reserveDraft({ essentialBaseText: '10.000.000,00', essentialMonthsText: '30' }))).toBe('meses_invalidos');
     expect(code(reserveDraft({ essentialBaseSource: 'chute' as 'informado' }))).toBe('origem_invalida');
     expect(code(reserveDraft({ essentialMonthsText: '25' }))).toBe('meses_invalidos');
+    // Reserva mínima: sempre 1 mês.
+    expect(code(reserveDraft({ essentialBaseSource: 'reserva_minima', essentialMonthsText: '3' }))).toBe('meses_invalidos');
+    expect(code(reserveDraft({ essentialBaseSource: 'reserva_minima', essentialMonthsText: '1' }))).toBeNull();
     expect(code(reserveDraft({ essentialMonthsText: '0' }))).toBe('meses_invalidos');
     expect(code(reserveDraft({ essentialBaseText: '5.000.000,00', essentialMonthsText: '2' }))).toBe('alvo_acima_do_limite');
     expect(code(reserveDraft({ essentialBaseText: '4.999.999,99', essentialMonthsText: '2' }))).toBeNull();

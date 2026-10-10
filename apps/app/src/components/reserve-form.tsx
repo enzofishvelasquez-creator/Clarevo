@@ -215,8 +215,11 @@ export function ReserveForm({
       const { initialCents: _initialCents, initialOn: _initialOn, ...rest } = v.input;
       const update_: GoalInput = rest;
       const snapshot = JSON.stringify([reserve?.id ?? null, reserve?.version ?? 0, v.input]);
-      const r = await guardedWrite(keys, snapshot, (key) =>
-        reserve ? update.mutateAsync({ key, id: reserve.id, version: reserve.version, input: update_ }) : create.mutateAsync({ key, contextId, input: v.input }),
+      const r = await guardedWrite(
+        keys,
+        snapshot,
+        (key) => (reserve ? update.mutateAsync({ key, id: reserve.id, version: reserve.version, input: update_ }) : create.mutateAsync({ key, contextId, input: v.input })),
+        (s) => (reserve ? s.action === 'alterar_meta' && s.goalId === reserve.id : s.action === 'criar_meta'),
       );
       if (r.status === 'ok' || r.status === 'reconciled') {
         flash.set(reserve ? R.saved : R.created);

@@ -6,7 +6,7 @@ import { ContextPill, SubHeader } from '@/components/header';
 import { SavingsPlanForm } from '@/components/savings-plan-form';
 import { ErrorState } from '@/components/states';
 import { Card, Screen, Skeleton } from '@/components/ui';
-import { useCommittedSummary, useSavingsCheck, useSavingsPlanInputs, useSpace } from '@/state/data';
+import { useCommittedSummary, useSavingsCard, useSavingsPlanInputs, useSpace } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -21,19 +21,20 @@ export default function GuardarScreen() {
   const { today } = useSession();
   const personal = useSpace();
   const contextId = personal.data?.personalContextId;
-  const check = useSavingsCheck(contextId);
+  const card = useSavingsCard(contextId);
   const inputs = useSavingsPlanInputs(contextId);
   const month = monthOf(today);
   const committed = useCommittedSummary(contextId, month);
 
-  const failed = personal.isError || check.isError || inputs.isError;
+  const failed = personal.isError || card.isError || inputs.isError;
 
-  if (contextId !== undefined && check.isSuccess && inputs.isSuccess) {
+  if (contextId !== undefined && card.isSuccess && inputs.isSuccess) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <SavingsPlanForm
           contextId={contextId}
-          check={check.data ?? null}
+          check={card.data.check}
+          incomeChangedAt={card.data.incomeChangedAt}
           inputs={inputs.data}
           referenceText={committed.data ? savingsReferenceText(committed.data, month) : null}
           focusAmount={editar === '1'}
@@ -51,7 +52,7 @@ export default function GuardarScreen() {
             message={ERROR_TEXT.carregar_falhou}
             onRetry={() => {
               personal.refetch();
-              check.refetch();
+              card.refetch();
               inputs.refetch();
             }}
           />

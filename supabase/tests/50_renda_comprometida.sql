@@ -344,8 +344,8 @@ begin
   r1 := public.set_income_reference('rc-n-0101', ctx, '2026-09-01', 0, 600000, false);
   sep := (r1 ->> 'id')::uuid;
   assert (select array_agg(k order by k) from jsonb_object_keys(r1) k)
-    = array['amount_cents', 'context_id', 'created_at', 'created_by', 'deleted_at', 'deleted_by', 'from_month', 'id', 'updated_at',
-            'varies', 'version'], 'retorno: a linha de income_references';
+    = array['amount_cents', 'amount_changed_at', 'context_id', 'created_at', 'created_by', 'deleted_at', 'deleted_by', 'from_month', 'id',
+            'updated_at', 'varies', 'version'], 'retorno: a linha de income_references';
   assert r1 ->> 'context_id' = ctx::text and r1 ->> 'from_month' = '2026-09-01' and (r1 ->> 'amount_cents')::bigint = 600000
      and not (r1 ->> 'varies')::boolean and r1 ->> 'created_by' = auth.uid()::text and (r1 ->> 'version')::int = 1
      and r1 -> 'deleted_at' = 'null'::jsonb and r1 -> 'deleted_by' = 'null'::jsonb, 'referência criada com versão 1';
@@ -944,7 +944,7 @@ do $$ begin
   assert (select array_agg(attname::text order by attnum) from pg_attribute
            where attrelid = 'public.income_references'::regclass and attnum > 0 and not attisdropped)
     = array['id', 'context_id', 'from_month', 'amount_cents', 'varies', 'created_by', 'version', 'created_at', 'updated_at',
-            'deleted_at', 'deleted_by'], 'colunas de income_references';
+            'amount_changed_at', 'deleted_at', 'deleted_by'], 'colunas de income_references';
   assert has_table_privilege('authenticated', 'public.income_references', 'select'), 'leitura (filtrada pela RLS)';
   assert not has_table_privilege('authenticated', 'public.income_references', 'insert, update, delete, truncate')
      and not has_any_column_privilege('authenticated', 'public.income_references', 'insert, update'), 'sem escrita direta';
@@ -963,6 +963,104 @@ do $$ begin
      and to_regprocedure('public.create_series_occurrence(text, uuid, integer, integer, text)') is not null
      and to_regprocedure('public.months_overview(uuid, date, date)') is not null, 'demais assinaturas sem mudança';
 end $$;
+-- ---------------------------------------------------------------------------
+-- 11. amount_changed_at: só mudar o valor marca o instante (repetir o valor ou trocar só "varia" não marca). A guarda grava
+-- o instante junto com o valor novo e recusa mudá-lo com o mesmo valor. Hugo (externo), contexto próprio; a transação tem um
+-- só now(), então o teste recua created_at e o instante guardado com a guarda desligada (só aqui, como superusuário).
+-- ---------------------------------------------------------------------------
+set role authenticated;
+do $$
+declare
+  ctx uuid := pg_temp.id('hugo_ctx');
+  r jsonb;
+  rid uuid;
+begin
+  perform pg_temp.as_('hugo');
+  r := public.set_income_reference('rc-ac-0001', ctx, '2026-09-01', 0, 600000, false);
+  rid := (r ->> 'id')::uuid;
+  assert r -> 'amount_changed_at' = 'null'::jsonb, 'criada: o valor nunca mudou';
+  -- Só "varia" muda: a versão sobe, o instante do valor não.
+  r := public.set_income_reference('rc-ac-0002', ctx, '2026-09-01', 1, 600000, true);
+  assert (r ->> 'version')::int = 2 and (r ->> 'varies')::boolean and r -> 'amount_changed_at' = 'null'::jsonb, 'só varia: sem marca';
+  -- Salvar de novo sem mudar nada.
+  r := public.set_income_reference('rc-ac-0003', ctx, '2026-09-01', 2, 600000, true);
+  assert (r ->> 'version')::int = 3 and r -> 'amount_changed_at' = 'null'::jsonb, 'mesmo valor e mesmo tipo: sem marca';
+  -- Valor novo: marca, no mesmo instante da alteração.
+  r := public.set_income_reference('rc-ac-0004', ctx, '2026-09-01', 3, 650000, true);
+  assert (r ->> 'version')::int = 4 and (r ->> 'amount_changed_at')::timestamptz = (r ->> 'updated_at')::timestamptz
+     and (r ->> 'amount_changed_at')::timestamptz = now(), 'valor novo: marca now()';
+  -- Referência nova de outro mês com valor diferente: sem marca própria (o app compara com a anterior pelo created_at).
+  r := public.set_income_reference('rc-ac-0005', ctx, '2026-10-01', 0, 700000, false);
+  assert r -> 'amount_changed_at' = 'null'::jsonb, 'referência nova: sem marca';
+end $$;
+reset role;
+
+-- Recua o instante guardado (guarda desligada só neste trecho) para separar "manter" de "marcar de novo".
+alter table public.income_references disable trigger income_references_guard;
+update public.income_references
+   set created_at = now() - interval '3 days', updated_at = now() - interval '2 days', amount_changed_at = now() - interval '2 days'
+ where context_id = pg_temp.id('hugo_ctx') and from_month = '2026-09-01';
+alter table public.income_references enable trigger income_references_guard;
+
+set role authenticated;
+do $$
+declare
+  ctx uuid := pg_temp.id('hugo_ctx');
+  r jsonb;
+  rid uuid := (select id from public.income_references where context_id = pg_temp.id('hugo_ctx') and from_month = '2026-09-01');
+  old_mark timestamptz := now() - interval '2 days';
+begin
+  perform pg_temp.as_('hugo');
+  -- Mesmo valor (com ou sem trocar "varia"): o instante antigo fica.
+  r := public.set_income_reference('rc-ac-0006', ctx, '2026-09-01', 4, 650000, false);
+  assert (r ->> 'version')::int = 5 and (r ->> 'amount_changed_at')::timestamptz = old_mark, 'só varia: o instante antigo fica';
+  r := public.set_income_reference('rc-ac-0007', ctx, '2026-09-01', 5, 650000, false);
+  assert (r ->> 'version')::int = 6 and (r ->> 'amount_changed_at')::timestamptz = old_mark, 'mesmo valor: o instante antigo fica';
+  -- Repetição devolve a linha atual, sem nova marca.
+  r := public.set_income_reference('rc-ac-0006', ctx, '2026-09-01', 4, 650000, false);
+  assert (r ->> 'amount_changed_at')::timestamptz = old_mark, 'repetição não marca';
+  -- Valor novo: marca de novo.
+  r := public.set_income_reference('rc-ac-0008', ctx, '2026-09-01', 6, 640000, false);
+  assert (r ->> 'version')::int = 7 and (r ->> 'amount_changed_at')::timestamptz = now()
+     and (r ->> 'amount_changed_at')::timestamptz > old_mark, 'valor novo marca de novo';
+  -- Voltar ao valor anterior também é mudança.
+  r := public.set_income_reference('rc-ac-0009', ctx, '2026-09-01', 7, 650000, false);
+  assert (r ->> 'amount_changed_at')::timestamptz = now() and (r ->> 'version')::int = 8, 'voltar ao valor anterior marca';
+  -- Excluir não mexe no instante do valor.
+  r := public.delete_income_reference('rc-ac-0010', rid, 8);
+  assert (r ->> 'amount_changed_at')::timestamptz = now() and r ->> 'deleted_at' is not null, 'exclusão mantém o instante do valor';
+end $$;
+reset role;
+
+do $$
+declare
+  rid uuid := (select id from public.income_references where context_id = pg_temp.id('hugo_ctx') and from_month = '2026-10-01');
+begin
+  -- Escrita direta do backend: o instante não muda com o mesmo valor...
+  perform pg_temp.expect_error(format($f$update public.income_references set amount_changed_at = now(), version = version + 1
+    where id = %L$f$, rid), 'campo_imutavel');
+  perform pg_temp.expect_error(format($f$update public.income_references set varies = true, amount_changed_at = now(), version = version + 1
+    where id = %L$f$, rid), 'campo_imutavel');
+  -- ... e com o valor novo a guarda grava o now() (o que a escrita pediu é ignorado).
+  begin
+    update public.income_references set amount_cents = 710000, amount_changed_at = null, version = version + 1 where id = rid;
+    assert (select amount_changed_at from public.income_references where id = rid) = now(), 'a guarda marca o valor novo';
+    raise exception 'desfazer';
+  exception when raise_exception then
+    assert sqlerrm = 'desfazer', sqlerrm;
+  end;
+  assert (select amount_changed_at from public.income_references where id = rid) is null, 'desfeito';
+  -- A marca nunca é anterior à criação.
+  alter table public.income_references disable trigger income_references_guard;
+  begin
+    update public.income_references set amount_changed_at = created_at - interval '1 second' where id = rid;
+    raise exception 'esperado erro';
+  exception when check_violation then
+    assert sqlerrm like '%income_references_mudanca%', sqlerrm;
+  end;
+  alter table public.income_references enable trigger income_references_guard;
+end $$;
+
 set role anon;
 select pg_temp.expect_error($$select public.set_income_reference('rc-anon-0001', gen_random_uuid(), '2026-09-01', 0, 1, false)$$, 'permission denied%');
 select pg_temp.expect_error($$select public.delete_income_reference('rc-anon-0002', gen_random_uuid(), 1)$$, 'permission denied%');

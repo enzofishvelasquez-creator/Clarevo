@@ -1,4 +1,4 @@
-import { REMINDER_ROUTE, REMINDER_TEXT, type PersonalSpace, type SeriesWrite } from '@clarevo/core';
+import { REMINDER_ROUTE, REMINDER_TEXT, offerCaption, type PersonalSpace, type SeriesWrite } from '@clarevo/core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, usePathname, type Href } from 'expo-router';
 import { LockKeyhole } from 'lucide-react-native';
@@ -243,7 +243,7 @@ function NativeFeatures() {
             openDeviceSettings();
           } else acceptOffer();
         }}>
-        <Txt color={colors.textSecondary}>{offer === 'negada' ? REMINDER_TEXT.denied : REMINDER_TEXT.offerCaption}</Txt>
+        <Txt color={colors.textSecondary}>{offer === 'negada' ? REMINDER_TEXT.denied : offerCaption(prefs?.reminderHour)}</Txt>
       </ConfirmDialog>
       {locked && userId ? <LockScreen message={unlockMsg} onUnlock={unlock} /> : null}
     </>

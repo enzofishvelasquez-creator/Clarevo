@@ -35,6 +35,7 @@ import { TermHint } from '@/components/term-hint';
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
+import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
 import { useAddGoalMovement, useDeleteGoalMovement, useGoalOperationKey, useUpdateGoalMovement } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
@@ -61,6 +62,7 @@ function titleOf(mode: MovementMode): string {
  */
 export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; movements: readonly GoalMovement[]; mode: MovementMode }) {
   const { today } = useSession();
+  const hidden = useValuesHidden();
   const qc = useQueryClient();
   const add = useAddGoalMovement();
   const edit = useUpdateGoalMovement();
@@ -147,8 +149,11 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
       setBusy(true);
       try {
         const input = { amountCents: change.amountCents, occurredOn: today, note: null };
-        const r = await guardedWrite(keys, JSON.stringify([goal.id, change.kind, input]), (key) =>
-          add.mutateAsync({ key, goalId: goal.id, kind: change.kind, input }),
+        const r = await guardedWrite(
+          keys,
+          JSON.stringify([goal.id, change.kind, input]),
+          (key) => add.mutateAsync({ key, goalId: goal.id, kind: change.kind, input }),
+          (s) => s.action === 'registrar_movimento_meta' && s.goalId === goal.id,
         );
         if (r.status === 'ok' || r.status === 'reconciled') return await done(M[change.kind].saved);
         if (r.status === 'refused') return fail(r.code, r.detail);
@@ -183,10 +188,14 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
     setBusy(true);
     try {
       const snapshot = JSON.stringify([goal.id, editing?.id ?? null, editing?.version ?? 0, kind, v.input]);
-      const r = await guardedWrite(keys, snapshot, (key) =>
-        editing && current
-          ? edit.mutateAsync({ key, movementId: editing.id, version: current.version, input: v.input })
-          : add.mutateAsync({ key, goalId: goal.id, kind, input: v.input }),
+      const r = await guardedWrite(
+        keys,
+        snapshot,
+        (key) =>
+          editing && current
+            ? edit.mutateAsync({ key, movementId: editing.id, version: current.version, input: v.input })
+            : add.mutateAsync({ key, goalId: goal.id, kind, input: v.input }),
+        (s) => (editing ? s.action === 'alterar_movimento_meta' && s.movementId === editing.id : s.action === 'registrar_movimento_meta' && s.goalId === goal.id),
       );
       if (r.status === 'ok' || r.status === 'reconciled') return await done(editing ? M.updated : M[kind === 'saldo_inicial' ? 'aporte' : kind].saved);
       if (r.status === 'refused') return fail(r.code, r.detail);
@@ -207,8 +216,11 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
     setBusy(true);
     setError(null);
     try {
-      const r = await guardedWrite(keys, JSON.stringify(['excluir', current.id, current.version]), (key) =>
-        remove.mutateAsync({ key, movementId: current.id, version: current.version }),
+      const r = await guardedWrite(
+        keys,
+        JSON.stringify(['excluir', current.id, current.version]),
+        (key) => remove.mutateAsync({ key, movementId: current.id, version: current.version }),
+        (s) => s.action === 'excluir_movimento_meta' && s.movementId === current.id,
       );
       setConfirmDelete(false);
       if (r.status === 'ok' || r.status === 'reconciled') return await done(M.deleted);
@@ -356,7 +368,9 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
       <FormFooter
         error={error}
         onCancel={guard.requestCancel}
-        submitLabel={submitLabel}
+        // A diferença revela o valor guardado: com valores ocultos, o botão mostra "R$ ••••" e o leitor diz "valor oculto".
+        submitLabel={maskMoneyText(submitLabel, hidden)}
+        submitAccessibilityLabel={hidden ? maskMoneyLabel(submitLabel, true) : undefined}
         busy={busy}
         disabled={archived || (editing !== null && current === null) || (saved !== null && saved.ok && saved.change === null)}
         onSubmit={submit}

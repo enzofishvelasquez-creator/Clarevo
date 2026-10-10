@@ -81,13 +81,17 @@ export function MinimumReserve({ contextId, check, inputs }: { contextId: string
       }
     }
     if (target === null) return;
-    // A opção "1 mês dos seus gastos essenciais" guarda a origem deles; os outros valores são informados pela pessoa.
-    const source = option.kind === 'essenciais' ? inputs.estimate.source : 'informado';
-    const input = minimumReserveInput(target, step?.monthlyCents ?? null, source);
+    // A opção "1 mês dos seus gastos essenciais" guarda a origem deles; os outros valores são a reserva mínima (origem reserva_minima).
+    const input = minimumReserveInput(target, step?.monthlyCents ?? null, option.kind === 'essenciais' ? inputs.estimate.source : undefined);
     setBusy(true);
     setError(null);
     try {
-      const r = await guardedWrite(goalKeys, JSON.stringify([contextId, input]), (key) => createGoal.mutateAsync({ key, contextId, input }));
+      const r = await guardedWrite(
+        goalKeys,
+        JSON.stringify([contextId, input]),
+        (key) => createGoal.mutateAsync({ key, contextId, input }),
+        (s) => s.action === 'criar_meta',
+      );
       if (r.status === 'ok' || r.status === 'reconciled') {
         flash.set(SAVINGS_TEXT.minimumCreated);
         guard.leave(() => (router.canGoBack() ? router.back() : router.replace('/metas')));

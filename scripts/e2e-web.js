@@ -410,6 +410,21 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('reserva mínima criada: Metas mostra "Reserva para imprevistos" com R$ 0,00 de R$ 100,00 (0%) e o convite à pergunta some', new URL(p.url()).pathname === '/metas' && t.includes('Reserva mínima criada.') &&
     t.includes('R$ 0,00 de R$ 100,00') && !t.includes('Você consegue guardar algum valor por mês?'), t.slice(0, 300));
   await shot('99_metas_reserva_minima');
+  // Reserva mínima e depois "consigo": a base da reserva mínima (R$ 100,00) não vira "gastos essenciais" do plano, e o plano em
+  // etapas troca a reserva de 1 mês por outra etapa sem recusa (a origem deixa de ser "reserva_minima").
+  ok('reserva mínima: Metas oferece "Planejar quanto guardar" (o plano ainda não foi respondido)', (await visibleCount('button', 'Planejar quanto guardar')) === 1);
+  await btn('Planejar quanto guardar').click(); await waitText('Quanto você consegue guardar por mês?'); await p.waitForTimeout(400);
+  await field('Quanto você consegue guardar por mês?').fill('300'); await p.waitForTimeout(500);
+  const minEssential = (await visibleCount('textbox', 'Gastos essenciais por mês')) === 1 ? await field('Gastos essenciais por mês').inputValue() : null;
+  ok('reserva mínima + "consigo": os R$ 100,00 da reserva mínima não aparecem como gastos essenciais informados', minEssential !== '100,00', String(minEssential));
+  if (minEssential !== null) await field('Gastos essenciais por mês').fill('2000');
+  await p.waitForTimeout(400);
+  await radio('Etapa de 3 meses dos gastos essenciais').click(); await p.waitForTimeout(300);
+  if ((await visibleCount('button', 'Usar este plano')) > 0) await btn('Usar este plano').click(); else await btn('Salvar valor por mês').click();
+  await waitUntil(async () => new URL(p.url()).pathname === '/metas', 8000); await p.waitForTimeout(700);
+  const minGoal = await otherDevice(async (repo, ctx) => { const g = (await repo.listGoals(ctx)).find((x) => x.goalType === 'emergencia'); return g ? { source: g.essentialBaseSource, months: g.essentialMonths, base: g.essentialBaseCents } : null; });
+  t = await body();
+  ok('reserva mínima + "consigo": o plano troca a reserva para 3 meses com a base informada (nunca "reserva_minima" com 3 meses)', minGoal !== null && minGoal.months === 3 && minGoal.source !== 'reserva_minima' && minGoal.base > 0 && t.includes('Você planeja guardar R$ 300,00 por mês.'), JSON.stringify(minGoal));
   await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês');
   await waitUntil(async () => !(await headingShown('Primeiros passos')), 8000);
   ok('primeiros passos: com os quatro passos prontos ("Agora não" conta como resposta), o card sai', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Anotar gasto')) === 1);
@@ -2829,6 +2844,21 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Registrar valorização de R$ 137,20').click(); await waitText('Valorização registrada.'); await p.waitForTimeout(600);
   t = await body();
   ok('C valorização registrada: guardado R$ 3.737,20 e "Rendimentos e valorizações: R$ 137,20", aportes e resgates intactos', t.includes('R$ 3.737,20') && t.includes('Rendimentos e valorizações: R$ 137,20') && t.includes('Aportes: R$ 700,00') && t.includes('Resgates: R$ 100,00'));
+  // Valores ocultos: o botão de "Atualizar valor guardado" não mostra a diferença e o leitor de tela diz "valor oculto".
+  await goBackToMetas();
+  await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Seu plano de guardar'); await p.waitForTimeout(300);
+  await btn('Ver detalhes').click(); await waitText('Registrar resgate'); await p.waitForTimeout(400);
+  await btn('Atualizar valor guardado').click(); await waitText('Quanto há guardado hoje'); await p.waitForTimeout(300);
+  await field('Quanto há guardado hoje para esta meta, segundo o seu banco ou aplicação?').fill('3800'); await p.waitForTimeout(400);
+  t = await body();
+  ok('C valores ocultos: "Registrar valorização de R$ ••••" na tela e "valor oculto" no nome acessível, sem a diferença (R$ 62,80)', (await visibleCount('button', 'Registrar valorização de valor oculto')) === 1 && t.includes('Registrar valorização de R$ ••••') && !t.includes('R$ 62,80'), t.split('\n').filter((l) => /valorização/.test(l)).join(' | '));
+  await btn('Cancelar').click(); await p.waitForTimeout(400); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
+  await p.waitForTimeout(300);
+  await goBackToMetas();
+  await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
+  ok('C valores ocultos desligados de novo em Conta', (await hideSwitch().getAttribute('aria-checked')) === 'false');
+  await btn('Voltar').click(); await waitText('Seu plano de guardar'); await p.waitForTimeout(300);
   await goBackToMetas();
   await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês');
   await expectTotals('C aporte, resgate e valorização não mudam o Resumo: 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
@@ -2873,11 +2903,26 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     (await visibleCount('button', 'Manter o valor')) === 1 && (await visibleCount('button', 'Mudar valor')) === 1 && (await visibleCount('button', 'Responder depois')) === 0, t.slice(0, 300));
   await shot('121_renda_de_referencia_mudou');
   await btn('Manter o valor').click(); await waitText('Valor por mês mantido.'); await p.waitForTimeout(500);
-  // Na demonstração, "hoje" é 07/10/2026 e as horas das gravações vêm do relógio real: o dia da mudança da renda é depois do dia
-  // da resposta, então a pergunta continua na tela mesmo depois de "Manter o valor". O que se confere é a gravação.
+  // A resposta nova vale a partir de agora (um relógio só): a pergunta some depois de "Manter o valor".
   const savingsNow = await otherDevice(async (repo, ctx) => { const c = await repo.getSavingsCheck(ctx); return c === null ? null : { answer: c.answer, monthlyCents: c.monthlyCents, version: c.version }; });
   t = await body();
   ok('C "Manter o valor": grava de novo "consigo" com o mesmo valor (R$ 300,00) e o plano continua', savingsNow !== null && savingsNow.answer === 'consigo' && savingsNow.monthlyCents === 30000 && savingsNow.version >= 3 && t.includes('Você planeja guardar R$ 300,00 por mês.'), JSON.stringify(savingsNow));
+  ok('C "Manter o valor": a pergunta "Sua renda de referência mudou" some e os botões também', !t.includes('Sua renda de referência mudou. Quer rever quanto guardar por mês?') && (await visibleCount('button', 'Manter o valor')) === 0, t.slice(0, 300));
+  // Nova mudança da renda: "Mudar valor" com o mesmo valor (R$ 300,00) também grava e a pergunta some.
+  await otherDevice(async (repo, ctx) => {
+    const refs = await repo.listIncomeReferences(ctx);
+    const last = refs[refs.length - 1];
+    await repo.setIncomeReference(`e2e-${Math.random()}`, ctx, last.fromMonth, last.version, last.amountCents - 50000, last.varies);
+  });
+  await waitText('Sua renda de referência mudou. Quer rever quanto guardar por mês?', 6000);
+  await btn('Mudar valor').click(); await waitText('Quanto você consegue guardar por mês?'); await p.waitForTimeout(400);
+  const versionBeforeChange = savingsNow === null ? 0 : savingsNow.version;
+  if ((await visibleCount('button', 'Usar este plano')) > 0) await btn('Usar este plano').click(); else await btn('Salvar valor por mês').click();
+  await waitUntil(async () => new URL(p.url()).pathname === '/metas', 8000); await p.waitForTimeout(700);
+  const savingsChanged = await otherDevice(async (repo, ctx) => { const c = await repo.getSavingsCheck(ctx); return c === null ? null : { answer: c.answer, monthlyCents: c.monthlyCents, version: c.version }; });
+  t = await body();
+  ok('C "Mudar valor" com o mesmo valor depois da renda mudar: grava uma versão nova e a pergunta some', savingsChanged !== null && savingsChanged.monthlyCents === 30000 && savingsChanged.version > versionBeforeChange &&
+    !t.includes('Sua renda de referência mudou. Quer rever quanto guardar por mês?') && (await visibleCount('button', 'Mudar valor')) === 1, JSON.stringify(savingsChanged));
 
   // Nova meta, editar, concluir, arquivar e excluir (uma meta de R$ 100,00 já alcançada).
   await btn('Nova meta').click(); await waitText('Modelo de nome'); await p.waitForTimeout(300);
@@ -3031,6 +3076,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const simTitles = (await headingList());
   ok('D títulos: "Simular um plano" (1), "Resultado" (2) e "Hipóteses" (3)', simTitles.includes('1:Simular um plano') && simTitles.includes('2:Resultado') && simTitles.includes('3:Hipóteses'), JSON.stringify(simTitles));
   ok('D a região viva do resultado tem o texto do resultado', (await liveText()).includes('R$ 1.175,15 por mês na hipótese informada'));
+  ok('D o aviso "Não é promessa de rendimento nem recomendação de investimento" fica dentro do cartão do resultado (região viva) e à vista', (await liveText()).includes(SIM_DISCLAIMER) && (await body()).split(SIM_DISCLAIMER).length - 1 >= 2);
   await calcHeader('simulador 390px', 'Simular um plano');
   await layoutChecks('simulador 390px');
   ok('simulador: sem o símbolo C', (await symbolCount()) === 0);

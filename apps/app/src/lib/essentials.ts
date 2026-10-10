@@ -1,4 +1,4 @@
-import type { Cents, EssentialBaseSource, EssentialEstimate } from '@clarevo/core';
+import { isMinimumReserve, type Cents, type EssentialBaseSource, type EssentialEstimate } from '@clarevo/core';
 
 /** Valor e origem dos gastos essenciais já gravados na reserva que a pessoa tem. */
 export interface SavedEssentials {
@@ -19,10 +19,10 @@ export function essentialSourceFor(cents: Cents | null, estimate: EssentialEstim
 }
 
 /**
- * Reserva mínima criada em "Agora não" (base = alvo, 1 mês, origem informada) e reserva de 1 mês com gastos essenciais
- * digitados têm a mesma forma no banco: nos dois casos "cobre X mês dos seus gastos essenciais" não seria verdade ou não
- * acrescentaria nada ao percentual. Nelas a cobertura não aparece.
+ * A reserva mínima de "Agora não" (origem 'reserva_minima') guarda o próprio alvo como base de 1 mês: "cobre X mês dos seus
+ * gastos essenciais" não seria verdade. Nela a cobertura não aparece. (Reserva de 1 mês com gastos essenciais digitados é
+ * 'informado' e mostra a cobertura.)
  */
-export function showsCoverage(goal: { essentialMonths: number | null; essentialBaseSource: EssentialBaseSource | null }): boolean {
-  return !(goal.essentialMonths === 1 && goal.essentialBaseSource === 'informado');
+export function showsCoverage(goal: { essentialBaseSource: EssentialBaseSource | null }): boolean {
+  return !isMinimumReserve(goal);
 }

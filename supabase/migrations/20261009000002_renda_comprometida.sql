@@ -37,10 +37,14 @@ create table public.income_references (
   version integer not null default 1 check (version >= 1),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  -- Instante em que o valor mudou pela última vez (nulo: nunca mudou desde a criação). Só mudar amount_cents marca;
+  -- repetir o valor ou trocar só "varies" não marca. Quem lê (savings.lastIncomeReferenceChange) usa este campo, não version.
+  amount_changed_at timestamptz,
   deleted_at timestamptz,
   deleted_by uuid references public.persons (id),
   constraint income_references_mes check (extract(day from from_month) = 1),
   constraint income_references_valor check (amount_cents between 1 and 999999999),
+  constraint income_references_mudanca check (amount_changed_at is null or amount_changed_at >= created_at),
   constraint income_references_exclusao check ((deleted_at is null) = (deleted_by is null))
 );
 -- B1: excluídas não bloqueiam uma referência nova no mesmo mês.
@@ -49,6 +53,8 @@ comment on table public.income_references is
   'Renda de referência mensal líquida informada pela pessoa, válida a partir de from_month até a próxima viva. '
   'Só denominador da renda comprometida: nunca entra em Recebido.';
 comment on column public.income_references.varies is '"Minha renda varia": o app pede revisão no começo de cada mês.';
+comment on column public.income_references.amount_changed_at is
+  'Instante da última mudança do valor (nulo se nunca mudou). Só mudar amount_cents marca; usado para perguntar de novo quanto guardar.';
 
 -- ---------------------------------------------------------------------------
 -- Operações: lista completa vigente (0002, 0003, 0004 e 0005) mais as duas ações novas, que apontam só para a
@@ -76,7 +82,8 @@ alter table public.record_operations add constraint record_operations_target_che
 
 -- ---------------------------------------------------------------------------
 -- Gatilho de proteção (B3): defesa adicional, só as duas funções gravam.
--- Podem mudar: amount_cents, varies, version (+1), updated_at, deleted_at e deleted_by.
+-- Podem mudar: amount_cents, varies, version (+1), updated_at, amount_changed_at (só junto com amount_cents: o gatilho
+-- grava now() quando o valor muda e recusa mudar o instante com o mesmo valor), deleted_at e deleted_by.
 -- ---------------------------------------------------------------------------
 create or replace function public.income_references_guard()
 returns trigger
@@ -87,6 +94,11 @@ begin
   if new.id <> old.id or new.context_id <> old.context_id or new.from_month <> old.from_month
      or new.created_by <> old.created_by or new.created_at <> old.created_at
      or old.deleted_at is not null or new.version <> old.version + 1 then
+    raise exception 'campo_imutavel' using errcode = '42501';
+  end if;
+  if new.amount_cents <> old.amount_cents then
+    new.amount_changed_at := now();
+  elsif new.amount_changed_at is distinct from old.amount_changed_at then
     raise exception 'campo_imutavel' using errcode = '42501';
   end if;
   new.updated_at := now();
@@ -189,7 +201,9 @@ begin
     returning * into v_ref;
   else
     update public.income_references
-       set amount_cents = p_amount_cents, varies = p_varies, version = version + 1
+       set amount_cents = p_amount_cents, varies = p_varies, version = version + 1,
+           -- Só mudar o valor marca o instante (a guarda também garante).
+           amount_changed_at = case when p_amount_cents <> amount_cents then now() else amount_changed_at end
      where id = v_ref.id
     returning * into v_ref;
   end if;

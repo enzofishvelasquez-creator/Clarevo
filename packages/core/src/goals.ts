@@ -59,7 +59,9 @@ import { ERROR_TEXT, charCount } from './validation';
 export const GOAL_TYPES: readonly GoalType[] = ['emergencia', 'oportunidade', 'objetivo'];
 export const GOAL_STATUSES: readonly GoalStatus[] = ['ativa', 'concluida', 'arquivada'];
 export const GOAL_MOVEMENT_KINDS: readonly GoalMovementKind[] = ['saldo_inicial', 'aporte', 'resgate', 'rendimento', 'valorizacao', 'desvalorizacao'];
-export const ESSENTIAL_BASE_SOURCES: readonly EssentialBaseSource[] = ['media_gastos', 'contas_do_mes', 'informado'];
+export const ESSENTIAL_BASE_SOURCES: readonly EssentialBaseSource[] = ['media_gastos', 'contas_do_mes', 'informado', 'reserva_minima'];
+/** Origem da reserva mínima ("Agora não"): base = alvo, sempre 1 mês. */
+export const MINIMUM_RESERVE_SOURCE: EssentialBaseSource = 'reserva_minima';
 /** Movimentos que a pessoa registra depois de criar a meta ('saldo_inicial' só ao criar). */
 export const GOAL_ADDABLE_KINDS: readonly GoalMovementKind[] = ['aporte', 'resgate', 'rendimento', 'valorizacao', 'desvalorizacao'];
 
@@ -389,6 +391,22 @@ export function essentialMonthly(
   return { source: 'informado', amountCents: null };
 }
 
+/** A reserva é a mínima de "Agora não" (origem 'reserva_minima')? */
+export function isMinimumReserve(goal: { essentialBaseSource: EssentialBaseSource | null }): boolean {
+  return goal.essentialBaseSource === MINIMUM_RESERVE_SOURCE;
+}
+
+/**
+ * Gastos essenciais por mês guardados na reserva, para pré-preencher o plano de guardar e a própria reserva; null quando
+ * não há base ou quando a reserva é a mínima (o valor dela é o alvo escolhido, nunca os gastos essenciais da pessoa).
+ */
+export function reserveEssentialBaseCents(
+  goal: { essentialBaseCents: Cents | null; essentialBaseSource: EssentialBaseSource | null } | null | undefined,
+): Cents | null {
+  if (!goal || goal.essentialBaseCents === null || goal.essentialBaseSource === null || isMinimumReserve(goal)) return null;
+  return goal.essentialBaseCents;
+}
+
 /** Alvo da reserva = essenciais × meses; null fora das faixas ou acima de R$ 9.999.999,99 (alvo_acima_do_limite). */
 export function emergencyTarget(essentialCents: Cents, months: number): Cents | null {
   if (!Number.isSafeInteger(essentialCents) || essentialCents < 1 || essentialCents > MAX_RECORD_CENTS) return null;
@@ -493,6 +511,8 @@ export function goalInputError(input: GoalInput, today: IsoDate, opts: { checkDe
     const months = input.essentialMonths;
     if (!isInt(months) || months < RESERVE_MONTHS_MIN || months > RESERVE_MONTHS_MAX) return 'meses_invalidos';
     if (!ESSENTIAL_BASE_SOURCES.includes(input.essentialBaseSource!)) return 'origem_invalida';
+    // Reserva mínima é sempre de 1 mês (a base é o próprio alvo).
+    if (input.essentialBaseSource === MINIMUM_RESERVE_SOURCE && months !== 1) return 'meses_invalidos';
     // Conferido antes do produto, como no banco: base × meses <= limite <=> base <= limite div meses.
     if (base! > Math.floor(MAX_RECORD_CENTS / months)) return 'alvo_acima_do_limite';
     if (input.targetCents !== null && input.targetCents !== undefined && input.targetCents !== base! * months) return 'alvo_invalido';
@@ -606,6 +626,7 @@ export function validateGoalDraft(
     const monthsOk = months !== null && months >= RESERVE_MONTHS_MIN && months <= RESERVE_MONTHS_MAX;
     if (!monthsOk) fail('meses_invalidos', 'essentialMonthsText', T.meses_invalidos);
     if (!ESSENTIAL_BASE_SOURCES.includes(draft.essentialBaseSource)) code ??= 'origem_invalida';
+    else if (draft.essentialBaseSource === MINIMUM_RESERVE_SOURCE && monthsOk && months !== 1) fail('meses_invalidos', 'essentialMonthsText', T.meses_invalidos);
     if (baseOk && base! > MAX_RECORD_CENTS) fail('alvo_acima_do_limite', 'essentialBaseText', T.valor_acima_do_limite);
     else if (baseOk && monthsOk) {
       target = emergencyTarget(base!, months!);

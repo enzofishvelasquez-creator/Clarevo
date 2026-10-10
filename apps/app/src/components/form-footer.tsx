@@ -16,6 +16,7 @@ export function FormFooter({
   onCancel,
   cancelLabel = 'Cancelar',
   submitLabel,
+  submitAccessibilityLabel,
   onSubmit,
   busy,
   disabled,
@@ -25,6 +26,8 @@ export function FormFooter({
   onCancel: () => void;
   cancelLabel?: string;
   submitLabel: string;
+  /** Nome acessível do botão principal quando difere do rótulo (valores ocultos: "valor oculto"). */
+  submitAccessibilityLabel?: string;
   onSubmit: () => void;
   busy?: boolean;
   disabled?: boolean;
@@ -44,7 +47,15 @@ export function FormFooter({
         {children}
         <View style={seriesStyles.footerRow}>
           <Button label={cancelLabel} tone="ghost" onPress={onCancel} style={seriesStyles.cancel} disabled={busy} />
-          <Button label={submitLabel} busy={busy} busyLabel="Salvando…" disabled={disabled} onPress={onSubmit} style={seriesStyles.save} />
+          <Button
+            label={submitLabel}
+            accessibilityLabel={busy ? undefined : submitAccessibilityLabel}
+            busy={busy}
+            busyLabel="Salvando…"
+            disabled={disabled}
+            onPress={onSubmit}
+            style={seriesStyles.save}
+          />
         </View>
       </View>
     </View>

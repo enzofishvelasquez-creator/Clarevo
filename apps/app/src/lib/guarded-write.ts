@@ -59,6 +59,8 @@ async function attempt<T, F extends object>(
         keys.settled();
         return { status: 'reconciled', saved };
       }
+      // Foi gravada outra ação (por exemplo, arquivar antes de excluir): a anterior está resolvida e esta é enviada com chave nova.
+      if (saved) keys.settled();
     } catch {
       // Não deu para conferir a tentativa anterior: ela continua guardada e é conferida de novo na próxima vez.
       return { status: 'uncertain' };

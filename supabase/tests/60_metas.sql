@@ -1495,6 +1495,68 @@ select pg_temp.expect_error(format('delete from public.goal_movements where goal
 reset role;
 
 -- ---------------------------------------------------------------------------
+-- 11b. Reserva mínima ("Agora não"): origem 'reserva_minima', base = alvo, sempre 1 mês. Nunca serve de base de gastos
+-- essenciais; o app e o core a reconhecem por esta origem (Rui, conta própria sem reserva).
+-- ---------------------------------------------------------------------------
+set role authenticated;
+do $$
+declare
+  ctx uuid := pg_temp.id('rui_ctx');
+  res jsonb;
+  rid uuid;
+begin
+  perform pg_temp.as_('rui');
+  -- Só com 1 mês (meses_invalidos), depois de conferir a origem.
+  perform pg_temp.expect_code(pg_temp.cg('mt-m-0001', ctx, 'emergencia', 'Reserva', null, null, null, 30000, 3, 'reserva_minima', null,
+    null), 'meses_invalidos', '22023');
+  perform pg_temp.expect_code(pg_temp.cg('mt-m-0002', ctx, 'emergencia', 'Reserva', null, null, null, 30000, 24, 'reserva_minima', null,
+    null), 'meses_invalidos', '22023');
+  perform pg_temp.expect_code(pg_temp.cg('mt-m-0003', ctx, 'emergencia', 'Reserva', null, null, null, 30000, 0, 'reserva_minima', null,
+    null), 'meses_invalidos', '22023');
+  perform pg_temp.expect_code(pg_temp.cg('mt-m-0004', ctx, 'emergencia', 'Reserva', null, null, null, 30000, 1, 'minima', null, null),
+    'origem_invalida', '22023');
+  -- Outros tipos não aceitam a origem.
+  perform pg_temp.expect_code(pg_temp.cg('mt-m-0005', ctx, 'objetivo', 'Curso', 30000, null, null, null, null, 'reserva_minima', null,
+    null), 'tipo_invalido', '22023');
+  assert (select count(*) from public.goals where context_id = ctx) = 0, 'recusas não gravam';
+
+  res := public.create_goal('mt-m-0010', ctx, 'emergencia', 'Reserva para imprevistos', null, null, 5000, 30000, 1, 'reserva_minima',
+    null, null);
+  rid := (res #>> '{goal,id}')::uuid;
+  assert res #>> '{goal,essential_base_source}' = 'reserva_minima' and (res #>> '{goal,essential_months}')::int = 1
+     and (res #>> '{goal,essential_base_cents}')::bigint = 30000 and (res #>> '{goal,target_cents}')::bigint = 30000
+     and (res #>> '{goal,planned_monthly_cents}')::bigint = 5000, 'reserva mínima criada: base = alvo, 1 mês';
+  assert (select essential_base_source from public.goal_items where id = rid) = 'reserva_minima', 'a visão traz a origem';
+  -- Repetição devolve a mesma reserva.
+  assert (public.create_goal('mt-m-0010', ctx, 'emergencia', 'Reserva para imprevistos', null, null, 5000, 30000, 1, 'reserva_minima',
+    null, null) #>> '{goal,id}')::uuid = rid, 'repetição';
+  -- Editar o alvo mantendo a origem e 1 mês; com mais meses, só com outra origem (os gastos essenciais passam a ser a base).
+  execute pg_temp.ug('mt-m-0011', rid, 1, 'emergencia', 'Reserva para imprevistos', null, null, 5000, 50000, 1, 'reserva_minima') into res;
+  assert (res #>> '{goal,target_cents}')::bigint = 50000 and res #>> '{goal,essential_base_source}' = 'reserva_minima', 'alvo editado';
+  perform pg_temp.expect_code(pg_temp.ug('mt-m-0012', rid, 2, 'emergencia', 'Reserva para imprevistos', null, null, 5000, 50000, 3,
+    'reserva_minima'), 'meses_invalidos', '22023');
+  execute pg_temp.ug('mt-m-0013', rid, 2, 'emergencia', 'Reserva para imprevistos', null, null, 5000, 375000, 3, 'informado') into res;
+  assert (res #>> '{goal,target_cents}')::bigint = 1125000 and res #>> '{goal,essential_base_source}' = 'informado', 'com gastos essenciais';
+end $$;
+reset role;
+do $$
+begin
+  -- Escrita direta do backend: a restrição vale também fora das funções.
+  perform pg_temp.expect_error(format($f$insert into public.goals (context_id, goal_type, name, target_cents, essential_base_cents,
+    essential_months, essential_base_source, created_by) values (%L, 'emergencia', 'Mínima 3', 3000, 1000, 3, 'reserva_minima', %L)$f$,
+    pg_temp.id('rui_ctx'), pg_temp.id('rui')), '%goals_reserva_minima%');
+  begin
+    insert into public.goals (context_id, goal_type, name, target_cents, essential_base_cents, essential_months, essential_base_source,
+                              status, created_by)
+    values (pg_temp.id('rui_ctx'), 'emergencia', 'Mínima arquivada', 1000, 1000, 1, 'reserva_minima', 'arquivada', pg_temp.id('rui'));
+    raise exception 'desfazer';
+  exception when raise_exception then
+    assert sqlerrm = 'desfazer', sqlerrm;
+  end;
+  perform pg_temp.check_links();
+end $$;
+
+-- ---------------------------------------------------------------------------
 -- 12. Privilégios e assinaturas (conferidos como superusuário).
 -- ---------------------------------------------------------------------------
 do $$ begin

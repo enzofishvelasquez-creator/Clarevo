@@ -36,6 +36,10 @@ export function SimResultCard({ result, hypotheses, today }: { result: Simulatio
                 {line}
               </Txt>
             ))}
+            {/* O aviso fica junto do resultado (a tela rola até aqui) e é dito com ele. */}
+            <Txt variant="caption" color={colors.textSecondary}>
+              {result.disclaimer}
+            </Txt>
           </>
         ) : (
           <Txt color={colors.textSecondary}>{T.waiting}</Txt>
@@ -91,5 +95,5 @@ export function SimResultCard({ result, hypotheses, today }: { result: Simulatio
 
 /** O que o leitor de tela diz quando o resultado aparece (iOS: announceOnIOS; Android e web: a região viva). */
 export function resultSpoken(result: SimulationResult): string {
-  return simulationResultLines(result).join(' ');
+  return [...simulationResultLines(result), result.disclaimer].join(' ');
 }

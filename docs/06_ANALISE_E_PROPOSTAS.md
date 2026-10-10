@@ -140,7 +140,7 @@ Exportar dados fica para quando houver o relatório mensal (não há botão sem 
 | Orçamento por categoria | Limite por categoria com aviso neutro ao se aproximar | Sem culpa nem julgamento |
 | Resumo da semana | Notificação curta: recebido, pago e o que vence | Cria hábito sem exigir abrir o app |
 | Família (ciclo 2) | Convite com permissões, quem vê o quê | Diferencial frente a apps só individuais |
-| Bloqueio do app | Biometria ou senha do aparelho ao abrir; botão para ocultar valores | Segurança visível. Feito em 09/10/2026 (D-025): "Ocultar valores ao abrir" e "Pedir biometria ao abrir" em Conta, só no aparelho; teste em aparelho em aberto |
+| Bloqueio do app | Biometria ou senha do aparelho ao abrir; botão para ocultar valores | Segurança visível. Feito em 09/10/2026 (D-025): "Ocultar valores ao abrir" em Conta (também na web) e "Pedir biometria ao abrir" (só no aparelho); teste em aparelho em aberto |
 | Verificação em duas etapas | Código de aplicativo autenticador no login | Disponível no Supabase (MFA) |
 | Exportar dados | Planilha ou PDF do mês | Confiança e portabilidade (LGPD) |
 | Relatório mensal | "Seu mês em 30 segundos" com 3 números e uma explicação | Valor percebido do plano |

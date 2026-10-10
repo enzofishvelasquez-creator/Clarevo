@@ -3,7 +3,7 @@ import { useState, type Ref } from 'react';
 import { StyleSheet, View, type TextInput } from 'react-native';
 
 import { formatMoneyText } from '@/components/calc/parts';
-import { MoneyTxt, useMoneyMask } from '@/components/money-text';
+import { MoneyTxt, useMoneyLabelMask, useMoneyMask } from '@/components/money-text';
 import { TermHint } from '@/components/term-hint';
 import { LinkButton, Money, TextField, Txt } from '@/components/ui';
 import type { SavedEssentials } from '@/lib/essentials';
@@ -32,6 +32,7 @@ export function EssentialsBlock({
 }) {
   const R = GOALS_TEXT.reserve;
   const mask = useMoneyMask();
+  const maskLabel = useMoneyLabelMask();
   const cents = parseBRL(text);
   const validCents = cents !== null && cents >= 1 && cents <= MAX_RECORD_CENTS ? cents : null;
   const [adjusting, setAdjusting] = useState(validCents === null);
@@ -72,7 +73,7 @@ export function EssentialsBlock({
             {suggestion !== null && validCents !== suggestion ? (
               <LinkButton
                 label={mask(`Usar a sugestão: R$ ${centsToInput(suggestion)}`)}
-                accessibilityLabel={mask(`Usar a sugestão: R$ ${centsToInput(suggestion)}`)}
+                accessibilityLabel={maskLabel(`Usar a sugestão: R$ ${centsToInput(suggestion)}`)}
                 style={styles.link}
                 onPress={() => {
                   onChangeText(centsToInput(suggestion));

@@ -465,11 +465,11 @@ function PaymentsForecastNote({ contextId, month }: { contextId: string | undefi
   if (!f) return null;
   return (
     <Banner tone="info" icon={CalendarClock} live={false}>
-      <Txt variant="label" style={tabular}>
+      <Txt variant="label" style={tabular} accessibilityLabel={mask.label(f.text)}>
         {mask.text(f.text)}
       </Txt>
       {f.estimatedText ? (
-        <Txt variant="caption" color={colors.textSecondary}>
+        <Txt variant="caption" color={colors.textSecondary} accessibilityLabel={mask.label(f.estimatedText)}>
           {mask.text(f.estimatedText)}
         </Txt>
       ) : null}
