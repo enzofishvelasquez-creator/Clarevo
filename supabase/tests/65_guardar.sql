@@ -468,7 +468,7 @@ end $$;
 
 -- ---------------------------------------------------------------------------
 -- 6. record_operations: responder_guardar não aponta para nada (o contexto já está em context_id), como decidir_revisao;
--- a lista vigente tem 26 ações; uma operação por escrita.
+-- a lista vigente tem 37 ações (26 e as 11 de cartões, testadas em 70); uma operação por escrita.
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -507,18 +507,21 @@ begin
     end if;
   end;
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-           where c.conname = 'record_operations_action_check') = 26, 'a lista vigente tem 26 ações';
+           where c.conname = 'record_operations_action_check') = 37, 'a lista vigente tem 37 ações (26 e as 11 de cartões, testadas em 70)';
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''responder_guardar''::text', 'g') m
            where c.conname = 'record_operations_action_check') = 1, 'responder_guardar na lista de ações';
   -- As 25 anteriores continuam aceitas pela restrição de ação (cada caso desfeito no próprio bloco).
   assert (select array_agg(m[1] order by m[1] collate "C")
             from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
            where c.conname = 'record_operations_action_check' and m[1] <> 'responder_guardar')
-    = array['alterar_meta', 'alterar_movimento_meta', 'alterar_serie', 'criar', 'criar_compromisso', 'criar_meta', 'criar_ocorrencia',
-            'criar_serie', 'decidir_revisao', 'definir_renda_referencia', 'desfazer_pagamento', 'editar', 'editar_compromisso',
-            'encerrar_serie', 'excluir', 'excluir_compromisso', 'excluir_meta', 'excluir_movimento_meta', 'excluir_renda_referencia',
-            'excluir_serie', 'informar_ano', 'pagar_compromisso', 'registrar_movimento_meta', 'situacao_meta', 'tirar_ano'],
-    'as 25 ações anteriores continuam';
+    = array['alterar_cartao', 'alterar_lancamento_cartao', 'alterar_meta', 'alterar_movimento_meta', 'alterar_serie', 'criar',
+            'criar_cartao', 'criar_compra_cartao', 'criar_compromisso', 'criar_encargo_cartao', 'criar_estorno_cartao',
+            'criar_meta', 'criar_ocorrencia', 'criar_serie', 'decidir_revisao', 'definir_renda_referencia', 'desfazer_pagamento',
+            'desfazer_pagamento_fatura', 'editar', 'editar_compromisso', 'encerrar_serie', 'excluir', 'excluir_cartao',
+            'excluir_compromisso', 'excluir_lancamento_cartao', 'excluir_meta', 'excluir_movimento_meta',
+            'excluir_renda_referencia', 'excluir_serie', 'informar_ano', 'pagar_compromisso', 'pagar_fatura',
+            'registrar_movimento_meta', 'situacao_cartao', 'situacao_meta', 'tirar_ano'],
+    'as ações anteriores continuam (as 25 de antes do guardar e as 11 de cartões, testadas em 70)';
   -- Cada resposta que gravou é uma operação sem alvo, no contexto certo, com o hash da chamada.
   assert not exists (select 1 from public.record_operations
                       where action = 'responder_guardar'

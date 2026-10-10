@@ -4,6 +4,41 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  NOTA_ERROR_TEXT,
+  NOTA_TEXT,
+  RECEIPT_ERROR_CODES,
+  accessKeyCheckDigit,
+  danfeFromText,
+  factsFromDanfe,
+  factsFromKey,
+  factsFromQr,
+  noteErrorText,
+  parseAccessKey,
+  parseNfceQr,
+  readReceiptCode,
+  receiptDraft,
+  CARDS_TEXT,
+  CARD_CHARGE_LABEL,
+  CARD_ERROR_TEXT,
+  CARD_STATUS_LABEL,
+  INVOICE_SITUATION_LABEL,
+  MemoryRepository,
+  cardErrorText,
+  cardSummaryTexts,
+  cardTitle,
+  closesText,
+  creditText,
+  dueTextOf,
+  installmentsNotice,
+  invoiceLineText,
+  invoiceMonthLabel,
+  invoiceRecordDescription,
+  invoiceTexts,
+  limitUsedText,
+  loadInvoices,
+  partialPaymentText,
+  purchaseNotice,
+  summarizeCard,
   SIMULATE_DISCLAIMER,
   SIMULATE_ERROR_TEXT,
   SIMULATE_TEXT,
@@ -866,6 +901,204 @@ describe('textos do plano de guardar (spec7)', () => {
     expect(text).not.toMatch(NEUTRAL);
     expect(text).not.toMatch(CELEBRATION);
     expect(text).not.toMatch(SAVINGS_EXTRA);
+  });
+});
+
+/**
+ * Cartões de crédito (Ciclo E, D-037): sem julgamento ("estourou", "gastou demais"), sem "disponível" nem alerta, sem número
+ * de cartão nem produto financeiro. O aviso da compra e o texto do pagamento parcial são conferidos palavra por palavra.
+ */
+describe('textos de cartões (Ciclo E)', () => {
+  it('o aviso da compra e o texto do pagamento parcial, como na especificação', () => {
+    expect(purchaseNotice('2026-11', 'Nubank', DEMO_TODAY)).toBe('Esta compra entra na fatura de novembro do Nubank e conta em Pago quando a fatura for paga.');
+    expect(partialPaymentText(30_000, '2026-12', DEMO_TODAY)).toBe(
+      'Ficaram R$ 300,00 para a fatura de dezembro. Juros e encargos do banco entram quando você informar a fatura de dezembro.',
+    );
+    expect(CARDS_TEXT.invoice.calcLink).toBe('Quanto custa pagar só uma parte?');
+    expect(CARDS_TEXT.expense.save).toBe('Anotar compra no cartão');
+    expect(CARDS_TEXT.expense.installments).toBe('Em quantas vezes?');
+    expect(CARDS_TEXT.expense.paymentMethod).toBe('Forma de pagamento');
+    expect(CARDS_TEXT.expense.credit).toBe('Cartão de crédito');
+    expect(CARDS_TEXT.expense.registerCard).toBe('Cadastrar cartão');
+    expect(CARDS_TEXT.invoice.payInvoice).toBe('Pagar fatura');
+    expect(CARDS_TEXT.invoice.payOther).toBe('Outro valor');
+    expect(CARDS_TEXT.invoice.addCharges).toBe('Informar encargos');
+    expect(CARDS_TEXT.invoice.addRefund).toBe('Registrar estorno');
+    expect(CARDS_TEXT.invoice.undoPayment).toBe('Desfazer pagamento');
+    expect(CARDS_TEXT.paymentOrigin).toBe('Pagamento de fatura');
+    expect(CARDS_TEXT.chargesCategory).toBe('Encargos do cartão');
+    expect(invoiceRecordDescription('Nubank', '2026-10', '2026-10-20')).toBe('Fatura Nubank (outubro)');
+    expect(CARDS_TEXT.topicParagraph).toMatch(/só contam em Pago quando a fatura é paga/);
+    expect(CARDS_TEXT.topicParagraph).toMatch(/anotar a fatura como conta a pagar continua valendo/);
+  });
+
+  it('CARDS_TEXT, CARD_ERROR_TEXT, rótulos e os textos montados (demonstração, pagamento parcial, crédito e fim de ano)', async () => {
+    const T = CARDS_TEXT;
+    const texts: string[] = [
+      ...staticStrings(T),
+      ...staticStrings(CARD_ERROR_TEXT),
+      ...staticStrings(INVOICE_SITUATION_LABEL),
+      ...staticStrings(CARD_STATUS_LABEL),
+      ...staticStrings(CARD_CHARGE_LABEL),
+      COMMITTED_TEXT.invoiceNote,
+      COMMITTED_TEXT.groupLabel.faturas,
+      T.expense.savedFor('2026-11', DEMO_TODAY),
+      T.expense.savedFor('2027-01', DEMO_TODAY),
+      T.recordLine('Nubank', '2026-10', '2026-10-20'),
+      T.recordLine('Nubank', '2027-01', '2026-12-20'),
+      purchaseNotice('2026-11', 'Nubank', DEMO_TODAY),
+      purchaseNotice('2027-01', 'Cartão do mercado', DEMO_TODAY),
+      installmentsNotice(10, 15_000),
+      partialPaymentText(30_000, '2027-01', '2026-12-20'),
+      creditText(3_000),
+      limitUsedText(230_000, 500_000),
+      limitUsedText(530_000, 500_000),
+      limitUsedText(0, null),
+      closesText('2026-11-03', '2026-11-03'),
+      closesText('2026-11-03', '2026-11-04'),
+      closesText('2026-11-03', '2026-10-07'),
+      dueTextOf('2026-11-10', '2026-11-10'),
+      dueTextOf('2026-11-10', '2026-11-11'),
+      dueTextOf('2026-11-10', '2026-10-07'),
+      cardTitle({ name: 'Nubank', lastDigits: '1234' }),
+      cardTitle({ name: 'Nubank', lastDigits: null }),
+      invoiceMonthLabel('2027-01', DEMO_TODAY),
+      ...(['juros', 'multa', 'iof', 'anuidade', 'tarifa'] as const).map((t) => CARD_CHARGE_LABEL[t]),
+    ];
+    const codes = Object.keys(CARD_ERROR_TEXT);
+    for (const code of codes) texts.push(cardErrorText(code));
+    // Demonstração: lista, fatura atual e linhas.
+    const demo = await createDemoRepository();
+    const ctx = (await demo.getSpace())!.personalContextId;
+    for (const card of await demo.listCards(ctx)) {
+      const invoices = await loadInvoices(demo, card, DEMO_TODAY);
+      const summary = summarizeCard(card, invoices, DEMO_TODAY);
+      const t = cardSummaryTexts(summary, DEMO_TODAY);
+      texts.push(t.title, t.invoiceLine, t.closes, t.due, t.limit, t.a11yLabel, ...t.closed);
+      for (const inv of invoices) {
+        const it = invoiceTexts(inv, DEMO_TODAY);
+        texts.push(it.title, it.situation, it.total, it.closes, it.due, it.period, it.a11yLabel, ...(it.estimated ? [it.estimated] : []));
+        for (const l of inv.lines) texts.push(invoiceLineText(l));
+      }
+    }
+    // Pagamento parcial, crédito levado, fatura fechada e paga, no fim do ano.
+    const clock = { today: '2026-10-07' };
+    const repo = new MemoryRepository({ actorId: 'pessoa-texto', displayName: 'Pessoa', today: () => clock.today });
+    const space = await repo.ensurePersonalSpace('Conta principal');
+    const card = (await repo.createCard(newOperationKey(), space.personalContextId, { name: 'Roxinho', lastDigits: '0042', closingDay: 3, dueDay: 10, limitCents: 100_000 })).card;
+    await repo.addCardPurchase(newOperationKey(), card.id, { description: 'Fone', category: 'Lazer', purchasedOn: '2026-10-05', totalCents: 90_000, installments: 3 });
+    await repo.addCardCharge(newOperationKey(), card.id, { chargeType: 'anuidade', amountCents: 3_000, invoiceMonth: '2026-11' });
+    await repo.addCardRefund(newOperationKey(), card.id, { description: 'Devolução do fone', category: 'Lazer', amountCents: 80_000, invoiceMonth: '2026-11' });
+    for (const day of ['2026-10-07', '2026-11-04']) {
+      clock.today = day;
+      const stateInvoices = await loadInvoices(repo, card, day);
+      for (const inv of stateInvoices) {
+        const it = invoiceTexts(inv, day);
+        texts.push(it.title, it.situation, it.total, it.closes, it.due, it.period, it.a11yLabel, ...(it.credit ? [it.credit] : []), ...(it.partial ? [it.partial] : []), ...(it.paid ? [it.paid] : []));
+        for (const l of inv.lines) texts.push(invoiceLineText(l));
+      }
+    }
+    clock.today = '2026-12-20';
+    // Novembro fica com crédito de R$ 470,00, que passa por dezembro (crédito de R$ 170,00) e chega a janeiro (R$ 130,00 a pagar).
+    const jan = (await loadInvoices(repo, card, clock.today)).find((i) => i.month === '2027-01')!;
+    expect(jan.totalCents).toBe(13_000);
+    const paid = await repo.payInvoice(newOperationKey(), card.id, '2027-01', jan.commitmentVersion!, 10_000, '2026-12-20');
+    const after = await loadInvoices(repo, card, clock.today);
+    for (const inv of after) {
+      const it = invoiceTexts(inv, clock.today);
+      texts.push(it.title, it.situation, it.total, it.a11yLabel, ...(it.partial ? [it.partial] : []), ...(it.paid ? [it.paid] : []));
+    }
+    texts.push(paid.record.description);
+    expect(texts.length).toBeGreaterThan(150);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(NEUTRAL);
+      // Nunca número de cartão, código de segurança nem validade nos textos.
+      expect(text, text).not.toMatch(/\b\d{13,19}\b/);
+      expect(text, text).not.toMatch(/\bcvv\b|c[oó]digo de verifica/i);
+    }
+  });
+
+  it('arquivo-fonte cards.ts', () => {
+    const text = readFileSync(join(CORE_SRC, 'cards.ts'), 'utf8');
+    expect(text).not.toMatch(FORBIDDEN);
+    expect(text).not.toMatch(JUDGMENT);
+  });
+});
+
+/**
+ * Leitura de notas fiscais (Ciclo E, D-038): sem julgamento, sem alerta, sem produto; nenhum texto pede CPF (o aviso de
+ * privacidade diz que não guardamos) nem traz número longo (chave de acesso, cartão); os textos montados (resumo, descrição,
+ * nota de teste, mês futuro, nota já anotada) são gerados com várias notas e conferidos um a um, e também os arquivos-fonte.
+ */
+describe('textos de notas fiscais (Ciclo E)', () => {
+  /** Chave de 44 dígitos com o dígito verificador certo (CNPJ 11.222.333/0001-81, o exemplo público). */
+  function sampleKey(aamm: string, model: '55' | '65', uf = '33'): string {
+    const body = `${uf}${aamm}11222333000181${model}001000012345187654321`;
+    return body + String(accessKeyCheckDigit(body));
+  }
+
+  it('NOTA_TEXT, NOTA_ERROR_TEXT, rascunhos, nota já anotada e o arquivo-fonte', () => {
+    const today = '2026-10-09';
+    const texts: string[] = [
+      ...staticStrings(NOTA_TEXT),
+      ...staticStrings(NOTA_ERROR_TEXT),
+      NOTA_TEXT.alreadyNoted('2026-10-12', 'Mercado', 8_740),
+      NOTA_TEXT.alreadyNoted('2026-10-12', 'Compra em Loja Exemplo Ltda', 1),
+      NOTA_TEXT.alreadyNotedCard('2026-10-12', 'Mercado', 8_740, 'Nubank'),
+      NOTA_TEXT.summary('RJ', 'outubro de 2026'),
+      NOTA_TEXT.summary('SP', '12/10/2026'),
+      noteErrorText('qualquer_outro'),
+      ...RECEIPT_ERROR_CODES.map((code) => noteErrorText(code)),
+    ];
+    // Rascunhos de várias notas: do mês, de outro mês, de mês futuro, em contingência, de teste e do DANFE.
+    const base = 'https://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode?p=';
+    const qrs = [
+      `${base}${sampleKey('2610', '65')}|2|1|1|ABCDEF0123456789ABCDEF0123456789ABCDEF01`,
+      `${base}${sampleKey('2609', '65')}|2|1|08|87.40|0123456789ABCDEF0123456789ABCDEF01234567|1|ABCDEF0123456789ABCDEF0123456789ABCDEF01`,
+      `${base}${sampleKey('2611', '65')}|2|2|1|ABCDEF0123456789ABCDEF0123456789ABCDEF01`,
+      `${base}${sampleKey('2601', '65', '35')}|3|1`,
+    ];
+    for (const qr of qrs) {
+      const parsed = parseNfceQr(qr);
+      expect(parsed.ok, qr).toBe(true);
+      if (!parsed.ok) continue;
+      const draft = receiptDraft(factsFromQr(parsed.qr, qr), today);
+      texts.push(draft.description, draft.summary, ...(draft.testNote ? [draft.testNote] : []), ...(draft.futureNote ? [draft.futureNote] : []));
+    }
+    expect(texts.some((t) => t === NOTA_TEXT.testNote)).toBe(true);
+    expect(texts.some((t) => t === NOTA_TEXT.futureMonth)).toBe(true);
+    const keyParsed = readReceiptCode(sampleKey('2610', '55'));
+    expect(keyParsed.ok).toBe(true);
+    if (keyParsed.ok) texts.push(receiptDraft(factsFromKey(keyParsed.key), today).description);
+    const danfe = danfeFromText(
+      `RECEBEMOS DE LOJA EXEMPLO LTDA OS PRODUTOS E/OU SERVIÇOS CONSTANTES DA NOTA FISCAL ELETRÔNICA INDICADA AO LADO\nCHAVE DE ACESSO\n${sampleKey('2610', '55').replace(/(.{4})/g, '$1 ').trim()}\nDATA DA EMISSÃO 08/10/2026\nVALOR TOTAL DA NOTA 150,00`,
+    );
+    expect(danfe.ok).toBe(true);
+    if (danfe.ok) {
+      const draft = receiptDraft(factsFromDanfe(danfe.reading), today);
+      expect(draft.description).toBe('Compra em Loja Exemplo Ltda');
+      texts.push(draft.description, draft.summary);
+    }
+    expect(parseAccessKey(sampleKey('2610', '65')).ok).toBe(true);
+    expect(texts.length).toBeGreaterThan(40);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(NEUTRAL);
+      // Nunca chave, número de cartão nem código de segurança nos textos.
+      expect(text, text).not.toMatch(/\d{13,}/);
+      expect(text, text).not.toMatch(/\bcvv\b|c[oó]digo de verifica/i);
+    }
+    // Só o aviso de privacidade fala em CPF, e é para dizer que não guardamos.
+    expect(texts.filter((t) => /\bCPF\b/i.test(t))).toEqual([NOTA_TEXT.privacy]);
+    expect(NOTA_TEXT.privacy).toMatch(/Não guardamos CPF/);
+    for (const file of ['nota.ts', 'danfe.ts']) {
+      const source = readFileSync(join(CORE_SRC, file), 'utf8');
+      expect(source, file).not.toMatch(FORBIDDEN);
+      expect(source, file).not.toMatch(JUDGMENT);
+    }
   });
 });
 

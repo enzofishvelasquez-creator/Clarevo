@@ -78,7 +78,7 @@ async function expectCode(p: Promise<unknown>, code: RepoErrorCode, detail?: str
 
 /** Demonstração sem as metas de exemplo: os gastos de setembro e a base de outubro (6.000 / 3.900 / 2.100 / 650). */
 async function baseRepo() {
-  const repo = await createDemoRepository();
+  const repo = await createDemoRepository({ cards: false });
   const ctx = (await repo.getSpace())!.personalContextId;
   for (const g of await repo.listGoals(ctx)) await repo.deleteGoal(key(), g.id, g.version);
   expect(await repo.listGoals(ctx)).toEqual([]);
@@ -368,7 +368,7 @@ describe('gastos essenciais (D-027(6), P-017)', () => {
   });
 
   it('demonstração: média de setembro, R$ 3.750,00', async () => {
-    const repo = await createDemoRepository();
+    const repo = await createDemoRepository({ cards: false });
     const ctx = (await repo.getSpace())!.personalContextId;
     const months = ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09'];
     const records = (await Promise.all(months.map((m) => repo.listRecords(ctx, m)))).flat();
@@ -700,7 +700,7 @@ describe('sequência de aceite C (MemoryRepository, hoje 07/10/2026)', () => {
 
 describe('demonstração do Ciclo C', () => {
   it('reserva 15% e 0,9 mês; viagem 20% e R$ 480,00 por mês; totais de outubro e renda comprometida iguais', async () => {
-    const repo = await createDemoRepository();
+    const repo = await createDemoRepository({ cards: false });
     const ctx = (await repo.getSpace())!.personalContextId;
     expect(await octoberTotals(repo, ctx)).toEqual(BASE_TOTALS);
     const goals = await repo.listGoals(ctx);
@@ -763,7 +763,7 @@ describe('demonstração do Ciclo C', () => {
   });
 
   it('linhas das metas: sem referência, sem plano, resgates maiores e planejado acima do que fica fora', async () => {
-    const repo = await createDemoRepository();
+    const repo = await createDemoRepository({ cards: false });
     const ctx = (await repo.getSpace())!.personalContextId;
     const list = await repo.listCommitments(ctx, OCT);
     const s = summarizeCommitted(list, ctx, OCT, DEMO_TODAY, await repo.listIncomeReferences(ctx));
@@ -1012,7 +1012,7 @@ describe('MemoryRepository: metas', () => {
   });
 
   it('nenhuma escrita de meta mexe em registros, contas a pagar, séries ou renda de referência (G3)', async () => {
-    const repo = await createDemoRepository();
+    const repo = await createDemoRepository({ cards: false });
     const ctx = (await repo.getSpace())!.personalContextId;
     const snapshot = async () =>
       JSON.stringify([

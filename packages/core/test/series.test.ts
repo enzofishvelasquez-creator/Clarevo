@@ -128,6 +128,7 @@ const occ = (s: CommitmentSeries, n: number, over: Partial<Commitment> = {}): Co
     payment: null,
     series: { id: s.id, number: n, kind: s.kind, nature: s.nature, installmentTotal: s.installmentTotal, partsPerYear: s.partsPerYear },
     seriesOverride: false,
+    invoice: null,
     amountIsEstimate: t.amountMode === 'variavel',
     createdBy: 'pessoa',
     version: 1,
@@ -483,6 +484,8 @@ describe('gastos fixos: regras puras', () => {
       description: 'ALUGUEL',
       category: 'Moradia',
       commitmentId: null,
+      invoice: null,
+      receiptKey: null,
       createdBy: 'pessoa',
       version: 1,
       createdAt: CREATED_AT,
@@ -538,6 +541,8 @@ describe('gastos fixos: regras puras', () => {
       description: 'Aluguel',
       category: 'Moradia',
       commitmentId: null,
+      invoice: null,
+      receiptKey: null,
       createdBy: 'pessoa',
       version: 1,
       createdAt: CREATED_AT,
@@ -1526,7 +1531,7 @@ describe('gastos fixos: MemoryRepository', () => {
 
 describe('demonstração do Ciclo A (com as contas do ano do A3)', () => {
   it('outubro 6.000 / 3.900 / 2.100 e R$ 650 a pagar; séries Aluguel, Luz, Financiamento do carro, IPVA e IPTU', async () => {
-    const repo = await createDemoRepository();
+    const repo = await createDemoRepository({ cards: false });
     const ctx = (await repo.getSpace())!.personalContextId;
     const oct = summarizeMonth(await repo.listRecords(ctx, OCT), ctx, OCT);
     expect([oct.receivedCents, oct.paidCents, oct.differenceCents]).toEqual([600000, 390000, 210000]);

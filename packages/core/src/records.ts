@@ -38,6 +38,18 @@ export interface FinancialRecord {
   category: string | null;
   /** Conta a pagar que este gasto quitou; null para registros comuns. Imutável. */
   commitmentId: string | null;
+  /**
+   * Fatura de cartão que este gasto pagou (pay_invoice): cartão e mês de vencimento da fatura; null nos outros registros.
+   * Imutável. Do gasto de um pagamento de fatura, update_record muda só a conta de saída e a data (valor, descrição e
+   * categoria vêm da fatura: pagamento_de_fatura) e delete_record nunca o exclui (o caminho é undo_invoice_payment).
+   */
+  invoice: InvoiceRef | null;
+  /**
+   * Resumo SHA-256 da chave de acesso da nota fiscal (64 hexadecimais minúsculos, calculado no aparelho por
+   * `receiptKeyDigest`; D-038). Nunca a chave de 44 caracteres: a de NF-e de emitente pessoa física carrega o CPF dele. Único
+   * por contexto entre gastos e compras no cartão vivos. Só em despesa comum; null nos demais.
+   */
+  receiptKey: string | null;
   createdBy: string;
   version: number;
   createdAt: string;
@@ -67,12 +79,42 @@ export interface Commitment {
    * a partir de outra conta não a muda.
    */
   seriesOverride: boolean;
-  /** Valor de referência de um gasto fixo que muda (luz, água) até a pessoa informar o valor da conta. */
+  /**
+   * Valor de referência de um gasto fixo que muda (luz, água) até a pessoa informar o valor da conta. Na conta de fatura
+   * de cartão, vale enquanto a fatura está aberta (hoje até o dia do fechamento).
+   */
   amountIsEstimate: boolean;
+  /**
+   * Fatura de cartão (D-037): cartão, mês de vencimento e o dia do fechamento gravado na conta (`card_closing_on`). A conta
+   * muda só pelos lançamentos do cartão e é paga por pay_invoice (update_commitment, delete_commitment, pay_commitment e
+   * undo_commitment_payment recusam com conta_de_fatura). Depois de paga, a conta não muda mais: o vencimento (`dueOn`) e o
+   * fechamento (`invoice.closingOn`) são os de quando foi paga, mesmo que o cartão troque os dias; a fatura mostrada
+   * (`buildInvoices`) usa os dois, como invoice_items.
+   */
+  invoice: CommitmentInvoiceRef | null;
   createdBy: string;
   version: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Fatura de um cartão, identificada pelo mês de vencimento ("fatura de novembro"). */
+export interface InvoiceRef {
+  cardId: string;
+  month: IsoMonth;
+}
+
+/**
+ * Nota fiscal já anotada (receipt_items): o gasto ou a compra no cartão vivos que têm o resumo da chave. Gasto: `recordId`
+ * (abrir com getRecord). Compra: `cardEntryId` (o id da compra, abrir com getCardEntry) e `cardId`.
+ */
+export type ReceiptMatch =
+  | { recordId: string; cardEntryId: null; cardId: null }
+  | { recordId: null; cardEntryId: string; cardId: string };
+
+/** A fatura na conta a pagar: também o dia do fechamento gravado (commitments.card_closing_on). */
+export interface CommitmentInvoiceRef extends InvoiceRef {
+  closingOn: IsoDate;
 }
 
 export interface CommitmentPayment {
@@ -123,6 +165,8 @@ export interface RecordInput {
   occurredOn: IsoDate;
   description: string;
   category: string | null;
+  /** Só ao criar uma despesa lida de uma nota fiscal (D-038): o resumo SHA-256 da chave (`ReceiptDraft.receiptKey`), nunca a chave. A edição ignora o campo. */
+  receiptKey?: string | null;
 }
 
 /** Gasto fixo (todo mês), parcelamento ou conta do ano (todo ano, D-029). */
@@ -403,6 +447,158 @@ export interface GoalMovementInput {
   occurredOn: IsoDate;
   note: string | null;
 }
+
+/** Cartão ativo aceita compras novas; arquivado só mostra o histórico e recebe pagamentos de fatura e lançamentos da fatura. */
+export type CardStatus = 'ativo' | 'arquivado';
+
+/**
+ * Cartão de crédito (D-037, Ciclo E), no contexto Pessoal. Nunca guarda número completo, código de segurança nem validade:
+ * só o apelido e, se a pessoa quiser, os 4 últimos dígitos. Gravado só pelas funções de cartões do banco.
+ */
+export interface Card {
+  id: string;
+  contextId: string;
+  /** 1 a 30 caracteres, sem espaços nas pontas e sem número de cartão (13 a 19 dígitos seguidos). */
+  name: string;
+  /** Exatamente 4 dígitos ("0123") ou null. Aparece como "final 1234". */
+  lastDigits: string | null;
+  /** 1 a 31, limitado ao último dia de cada mês. */
+  closingDay: number;
+  /** 1 a 31, limitado ao último dia de cada mês. */
+  dueDay: number;
+  /** R$ 1,00 a R$ 9.999.999,99, ou null. */
+  limitCents: Cents | null;
+  status: CardStatus;
+  createdBy: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  /** card_items.used_cents: limite usado (lançamentos das faturas ainda não pagas, nunca negativo). */
+  usedCents: Cents;
+  /** card_items.current_month, current_closing_on e current_due_on: a fatura que recebe uma compra de hoje. */
+  currentMonth: IsoMonth;
+  currentClosingOn: IsoDate;
+  currentDueOn: IsoDate;
+}
+
+/** Campos de create_card e update_card. */
+export interface CardInput {
+  name: string;
+  lastDigits: string | null;
+  closingDay: number;
+  dueDay: number;
+  limitCents: Cents | null;
+}
+
+/**
+ * Lançamentos do cartão: 'compra' (uma linha por compra, com as parcelas calculadas pelas regras do core), 'encargo'
+ * (juros, multa, IOF, anuidade ou tarifa informados a partir da fatura do banco), 'estorno' (crédito) e 'saldo_anterior'
+ * (criado só pelo pagamento parcial da fatura anterior, nunca pela pessoa).
+ */
+export type CardEntryKind = 'compra' | 'encargo' | 'estorno' | 'saldo_anterior';
+export type CardChargeType = 'juros' | 'multa' | 'iof' | 'anuidade' | 'tarifa';
+
+export interface CardEntry {
+  /** Compra: o id da compra (no banco, o da parcela 1, que as outras parcelas apontam como purchase_id). */
+  id: string;
+  contextId: string;
+  cardId: string;
+  kind: CardEntryKind;
+  /** compra e estorno manual: 1 a 80 caracteres; encargo, saldo anterior e estorno automático: null. */
+  description: string | null;
+  /** compra e estorno: uma das categorias do app ou null; encargo e saldo anterior: null. */
+  category: string | null;
+  /** Só no encargo. */
+  chargeType: CardChargeType | null;
+  /** Só na compra: data da compra (até hoje). */
+  purchasedOn: IsoDate | null;
+  /** Compra: valor total; os outros: valor positivo (o sinal vem do tipo; estorno abate). */
+  amountCents: Cents;
+  /** Compra: de 1 a 48 parcelas; os outros: 1. */
+  installments: number;
+  /**
+   * Compra: fatura da 1ª parcela (fixada ao gravar, não muda se o cartão mudar de dias); os outros: a fatura do
+   * lançamento. Mês do vencimento.
+   */
+  invoiceMonth: IsoMonth;
+  /**
+   * Saldo anterior e estorno automático (crédito levado): a fatura de origem, sempre o mês anterior à fatura do lançamento.
+   * null nos outros. O estorno com sourceMonth nasce e morre dentro das funções de cartão (lancamento_automatico).
+   */
+  sourceMonth: IsoMonth | null;
+  /** Só no saldo anterior: o gasto do pagamento parcial que o criou. */
+  paymentRecordId: string | null;
+  /** Só na compra: resumo SHA-256 da chave de acesso da nota fiscal (D-038); único por contexto entre gastos e compras vivos. */
+  receiptKey: string | null;
+  createdBy: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Uma fatura como a visão invoice_items a devolve (calculada, nunca gravada). Totais em centavos; total pode ser negativo. */
+export interface InvoiceItem {
+  cardId: string;
+  /** Mês do vencimento. */
+  month: IsoMonth;
+  closingOn: IsoDate;
+  dueOn: IsoDate;
+  status: 'aberta' | 'fechada' | 'paga' | 'paga_em_parte';
+  /** Parcelas + encargos + saldo anterior - estornos (inclusive o crédito levado). Negativo = crédito para a seguinte. */
+  totalCents: Cents;
+  purchasesCents: Cents;
+  chargesCents: Cents;
+  /** Saldo anterior (pagamento parcial da fatura anterior). */
+  carriedInCents: Cents;
+  /** Estornos, inclusive o estorno automático. */
+  refundsCents: Cents;
+  /** max(0, -total): o que é levado à fatura seguinte. */
+  creditCents: Cents;
+  entryCount: number;
+  commitmentId: string | null;
+  commitmentVersion: number | null;
+  amountIsEstimate: boolean;
+  /** Valor da conta em aberto; 0 quando paga ou sem conta. */
+  toPayCents: Cents;
+  paidRecordId: string | null;
+  paidCents: Cents | null;
+  paidOn: IsoDate | null;
+  paidAccountId: string | null;
+  /** Pagamento parcial: o que ficou para a fatura seguinte; null sem pagamento. */
+  leftOverCents: Cents | null;
+}
+
+/** add_card_purchase e update_card_entry (compra). */
+export interface CardPurchaseInput {
+  description: string;
+  category: string | null;
+  purchasedOn: IsoDate;
+  totalCents: Cents;
+  installments: number;
+  /** Só ao criar (add_card_purchase), lida de uma nota fiscal (D-038): o resumo SHA-256 da chave (`ReceiptDraft.receiptKey`), nunca a chave. A edição ignora o campo. */
+  receiptKey?: string | null;
+}
+
+/** add_card_charge e update_card_entry (encargo). */
+export interface CardChargeInput {
+  chargeType: CardChargeType;
+  amountCents: Cents;
+  invoiceMonth: IsoMonth;
+}
+
+/** add_card_refund e update_card_entry (estorno). */
+export interface CardRefundInput {
+  description: string;
+  category: string | null;
+  amountCents: Cents;
+  invoiceMonth: IsoMonth;
+}
+
+/** update_card_entry: o tipo precisa ser o do lançamento (tipo_invalido), e o saldo anterior não se altera. */
+export type CardEntryInput =
+  | ({ kind: 'compra' } & CardPurchaseInput)
+  | ({ kind: 'encargo' } & CardChargeInput)
+  | ({ kind: 'estorno' } & CardRefundInput);
 
 export const NO_CATEGORY_LABEL = 'Sem categoria';
 export const CATEGORIES: Record<RecordKind, readonly string[]> = {

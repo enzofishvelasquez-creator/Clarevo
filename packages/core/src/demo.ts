@@ -20,6 +20,11 @@ import { newOperationKey } from './repository';
  * Plano de guardar (spec7): resposta "consigo" com R$ 500,00 por mês em 07/10/2026 (sem data de volta), igual ao plano da
  * reserva. Com os gastos essenciais de R$ 3.750,00 e R$ 3.500,00 guardados na reserva, as etapas chegam em novembro de 2026
  * (1 mês), fevereiro de 2028 (3 meses) e dezembro de 2029 (6 meses).
+ * Cartões (D-037): "Cartão Exemplo" final 1234 (fechamento no dia 3, vencimento no dia 10, limite de R$ 5.000,00) com três
+ * compras de 05 e 06/10/2026, depois do fechamento de outubro: Tênis de corrida (R$ 600,00 em 3 vezes), Notebook (R$ 1.500,00
+ * em 10 vezes) e Restaurante (R$ 200,00 à vista). A primeira fatura vence em novembro de 2026 (R$ 550,00); compras no cartão
+ * não entram em Pago. Limite usado: R$ 2.300,00 de R$ 5.000,00. Os totais de outubro (6.000 / 3.900 / 2.100 / 650) e a
+ * renda comprometida de outubro (52,5%) não mudam; novembro passa a incluir a fatura (73,0%).
  */
 export const DEMO_TODAY = '2026-10-07';
 export const DEMO_EMAIL = 'demo@clarevo.app';
@@ -41,7 +46,7 @@ export function demoScenarioFrom(param: string | null | undefined): DemoScenario
   return (DEMO_SCENARIOS as readonly string[]).includes(value) ? (value as DemoScenario) : 'padrao';
 }
 
-export async function createDemoRepository(opts: { latencyMs?: number; scenario?: DemoScenario } = {}) {
+export async function createDemoRepository(opts: { latencyMs?: number; scenario?: DemoScenario; cards?: boolean } = {}) {
   if (opts.scenario === 'retorno') return createReturnDemoRepository(opts.latencyMs);
   const repo = new MemoryRepository({
     actorId: 'pessoa-demo',
@@ -158,6 +163,16 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   // Plano de guardar (spec7): a pessoa respondeu "consigo" com R$ 500,00 por mês, o mesmo plano da reserva. Só é lida pela
   // própria pessoa; não conta como anotação e não muda nenhum total.
   await repo.setSavingsAnswer(newOperationKey(), ctx, 0, 'consigo', 50_000);
+  // Cartões (D-037): o cartão fechou em 03/10, então as compras de 05 e 06/10 entram na fatura de novembro (vencimento 10/11).
+  // cards: false monta a demonstração dos ciclos anteriores (testes das bases A, B e C), sem o cartão e sem as faturas.
+  if (opts.cards !== false) {
+    const cartao = await repo.createCard(newOperationKey(), ctx, { name: 'Cartão Exemplo', lastDigits: '1234', closingDay: 3, dueDay: 10, limitCents: 500_000 });
+    const purchase = (description: string, category: string, purchasedOn: string, totalCents: number, installments: number) =>
+      repo.addCardPurchase(newOperationKey(), cartao.card.id, { description, category, purchasedOn, totalCents, installments });
+    await purchase('Tênis de corrida', 'Lazer', '2026-10-05', 60_000, 3);
+    await purchase('Notebook', 'Educação', '2026-10-05', 150_000, 10);
+    await purchase('Restaurante', 'Lazer', '2026-10-06', 20_000, 1);
+  }
 
   // A latência só passa a valer depois de semear, para a demonstração abrir rápido.
   repo.latencyMs = opts.latencyMs ?? 0;

@@ -38,6 +38,7 @@ function conta(dueOn: string, over: Partial<Commitment> = {}): Commitment {
     payment: null,
     series: null,
     seriesOverride: false,
+    invoice: null,
     amountIsEstimate: false,
     createdBy: 'pessoa-1',
     version: 1,
@@ -182,7 +183,7 @@ describe('Lembretes (D-025): plano de avisos', () => {
   });
 
   it('demonstração: contas em aberto de outubro e novembro viram avisos na véspera', async () => {
-    const repo = await createDemoRepository();
+    const repo = await createDemoRepository({ cards: false });
     const ctx = (await repo.getSpace())!.personalContextId;
     const list = await repo.listCommitments(ctx, '2026-10');
     const plan = reminderPlan(list, DEMO_TODAY, 9, REMINDER_LIMIT, { nowMinutes: 8 * 60, contextId: ctx });

@@ -1,6 +1,7 @@
 import type { IsoDate, IsoMonth } from './dates';
 import { monthOf, monthRange } from './dates';
 import type { Cents } from './money';
+import { CARD_CHARGES_CATEGORY, recordShares, type Invoice } from './cards';
 import { formatTenths } from './learn/format';
 import { sharesCents } from './learn/math';
 import { formatBRL } from './money';
@@ -138,12 +139,20 @@ export interface CategoryShare {
  * "Por categoria" na composição de Pago (spec4 §1.2): soma dos gastos por categoria, em ordem decrescente de valor
  * (empate: nome), com "Sem categoria" por último. Percentuais em décimos pelo maior resto, para somarem 1.000; a soma
  * dos centavos é igual a Pago. Recebimentos que vierem na lista ficam de fora.
+ *
+ * Pagamento de fatura de cartão (D-037): o gasto é dividido pelas categorias dos lançamentos da fatura paga, na proporção
+ * dos valores (maior resto, soma igual ao pago); os encargos ficam em "Encargos do cartão" e os estornos abatem a categoria
+ * deles. `invoices` traz as faturas desses gastos (loadInvoicesOfRecords); sem a fatura na lista, o gasto fica na categoria
+ * dele.
  */
-export function categoryBreakdown(paid: readonly FinancialRecord[]): CategoryShare[] {
+export function categoryBreakdown(paid: readonly FinancialRecord[], invoices: readonly Pick<Invoice, 'cardId' | 'month' | 'mix'>[] = []): CategoryShare[] {
   const byCategory = new Map<string | null, Cents>();
+  const add = (category: string | null, cents: Cents) => byCategory.set(category, (byCategory.get(category) ?? 0) + cents);
   for (const r of paid) {
     if (r.kind !== 'despesa') continue;
-    byCategory.set(r.category, (byCategory.get(r.category) ?? 0) + r.amountCents);
+    const shares = recordShares(r, invoices);
+    if (shares) for (const share of shares) add(share.charges ? CARD_CHARGES_CATEGORY : share.category, share.cents);
+    else add(r.category, r.amountCents);
   }
   const rows = [...byCategory.entries()]
     .map(([category, cents]) => ({ category, label: category ?? NO_CATEGORY_LABEL, cents }))

@@ -1248,11 +1248,16 @@ reset role;
 do $$ begin
   assert (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
-    = array['add_goal_movement', 'context_permission', 'create_commitment', 'create_goal', 'create_record', 'create_series', 'create_series_occurrence',
-            'decide_return_review', 'delete_commitment', 'delete_goal', 'delete_goal_movement', 'delete_income_reference', 'delete_record', 'delete_series', 'end_series', 'ensure_personal_space',
-            'inform_series_year', 'is_org_admin', 'month_committed', 'month_to_pay', 'month_totals', 'months_overview',
-            'pay_commitment', 'set_goal_status', 'set_income_reference', 'set_savings_answer', 'skip_series_year', 'sync_series_occurrences', 'undo_commitment_payment', 'update_commitment', 'update_goal', 'update_goal_movement', 'update_record',
-            'update_series_from'],
+    = array['add_card_charge', 'add_card_purchase', 'add_card_refund', 'add_goal_movement', 'context_permission', 'create_card',
+            'create_commitment', 'create_goal', 'create_record', 'create_series', 'create_series_occurrence',
+            'decide_return_review', 'delete_card', 'delete_card_entry', 'delete_commitment', 'delete_goal',
+            'delete_goal_movement', 'delete_income_reference', 'delete_record', 'delete_series', 'end_series',
+            'ensure_personal_space', 'inform_series_year', 'invoice_closing_on', 'invoice_due_on', 'invoice_month_for',
+            'is_org_admin', 'month_committed', 'month_to_pay', 'month_totals', 'months_overview', 'my_today',
+            'pay_commitment', 'pay_invoice', 'set_card_status', 'set_goal_status', 'set_income_reference',
+            'set_savings_answer', 'skip_series_year', 'sync_series_occurrences', 'undo_commitment_payment',
+            'undo_invoice_payment', 'update_card', 'update_card_entry', 'update_commitment', 'update_goal',
+            'update_goal_movement', 'update_record', 'update_series_from'],
     'authenticated executa só as funções expostas';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')), 'anon não executa nenhuma função';
@@ -1281,8 +1286,9 @@ do $$ begin
            where attrelid = 'public.commitment_items'::regclass and attnum > 0 and not attisdropped)
     = array['id', 'context_id', 'description', 'amount_cents', 'currency', 'due_on', 'status', 'category', 'created_by', 'version',
             'created_at', 'updated_at', 'paid_record_id', 'paid_on', 'paid_amount_cents', 'paid_account_id', 'series_id', 'occurrence_number',
-            'series_override', 'amount_is_estimate', 'series_kind', 'series_nature', 'series_installment_total', 'series_parts_per_year'],
-    'commitment_items: mesma lista, mais series_parts_per_year no fim';
+            'series_override', 'amount_is_estimate', 'series_kind', 'series_nature', 'series_installment_total', 'series_parts_per_year',
+            'card_id', 'invoice_month', 'card_closing_on'],
+    'commitment_items: mesma lista, mais series_parts_per_year e, da migração de cartões, card_id, invoice_month e card_closing_on no fim';
   assert (select array_agg(attname::text order by attnum) from pg_attribute
            where attrelid = 'public.series_items'::regclass and attnum > 0 and not attisdropped)
     = array['id', 'context_id', 'kind', 'nature', 'first_due_month', 'first_number', 'last_number', 'installment_total', 'currency',

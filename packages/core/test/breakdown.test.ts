@@ -14,6 +14,8 @@ const rec = (category: string | null, amountCents: number, kind: 'despesa' | 're
   description: 'x',
   category,
   commitmentId: null,
+  invoice: null,
+  receiptKey: null,
   createdBy: 'p',
   version: 1,
   createdAt: '2026-10-01T00:00:00Z',

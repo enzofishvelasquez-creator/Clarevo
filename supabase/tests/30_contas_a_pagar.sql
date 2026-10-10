@@ -620,11 +620,16 @@ reset role;
 do $$ begin
   assert (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
-    = array['add_goal_movement', 'context_permission', 'create_commitment', 'create_goal', 'create_record', 'create_series', 'create_series_occurrence',
-            'decide_return_review', 'delete_commitment', 'delete_goal', 'delete_goal_movement', 'delete_income_reference', 'delete_record', 'delete_series', 'end_series', 'ensure_personal_space',
-            'inform_series_year', 'is_org_admin', 'month_committed', 'month_to_pay', 'month_totals', 'months_overview',
-            'pay_commitment', 'set_goal_status', 'set_income_reference', 'set_savings_answer', 'skip_series_year', 'sync_series_occurrences', 'undo_commitment_payment', 'update_commitment', 'update_goal', 'update_goal_movement', 'update_record',
-            'update_series_from'],
+    = array['add_card_charge', 'add_card_purchase', 'add_card_refund', 'add_goal_movement', 'context_permission', 'create_card',
+            'create_commitment', 'create_goal', 'create_record', 'create_series', 'create_series_occurrence',
+            'decide_return_review', 'delete_card', 'delete_card_entry', 'delete_commitment', 'delete_goal',
+            'delete_goal_movement', 'delete_income_reference', 'delete_record', 'delete_series', 'end_series',
+            'ensure_personal_space', 'inform_series_year', 'invoice_closing_on', 'invoice_due_on', 'invoice_month_for',
+            'is_org_admin', 'month_committed', 'month_to_pay', 'month_totals', 'months_overview', 'my_today',
+            'pay_commitment', 'pay_invoice', 'set_card_status', 'set_goal_status', 'set_income_reference',
+            'set_savings_answer', 'skip_series_year', 'sync_series_occurrences', 'undo_commitment_payment',
+            'undo_invoice_payment', 'update_card', 'update_card_entry', 'update_commitment', 'update_goal',
+            'update_goal_movement', 'update_record', 'update_series_from'],
     'authenticated executa só as funções expostas';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')), 'anon não executa nenhuma função';
