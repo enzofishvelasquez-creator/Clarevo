@@ -2,7 +2,6 @@ import {
   GOALS_TEXT,
   MAX_RECORD_CENTS,
   SAVINGS_ERROR_TEXT,
-  SAVINGS_STAGE_MONTHS,
   SAVINGS_TEXT,
   GOAL_ERROR_TEXT,
   centsToInput,
@@ -35,7 +34,7 @@ import { ChoiceGroup } from '@/components/series-parts';
 import { TermHint } from '@/components/term-hint';
 import { Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
-import { essentialSourceFor, type SavedEssentials } from '@/lib/essentials';
+import { essentialSourceFor, savingsInitialStage, savingsNeedsStageChoice, type SavedEssentials } from '@/lib/essentials';
 import { flash } from '@/lib/flash';
 import { guardedWrite, type WriteResult } from '@/lib/guarded-write';
 import {
@@ -94,9 +93,10 @@ export function SavingsPlanForm({
   const [amountText, setAmountText] = useState(initialAmount);
   const [essentialText, setEssentialText] = useState(initialEssential);
   // Etapa escolhida: a da reserva que já existe (se tem 1, 3 ou 6 meses), para "Usar este plano" nunca diminuir o alvo sem a
-  // pessoa escolher; sem reserva, o padrão do core (a primeira etapa ainda não alcançada).
-  const keepsOtherMonths = reserve !== null && reserve.essentialMonths !== null && !SAVINGS_STAGE_MONTHS.includes(reserve.essentialMonths);
-  const initialStage = reserve && reserve.essentialMonths !== null && SAVINGS_STAGE_MONTHS.includes(reserve.essentialMonths) ? `reserva-${reserve.essentialMonths}` : null;
+  // pessoa escolher. Reserva mínima (1 mês, mas o alvo é o valor escolhido) e reserva de outro prazo não pré-marcam nada;
+  // sem reserva, o padrão do core (a primeira etapa ainda não alcançada).
+  const keepsOtherMonths = savingsNeedsStageChoice(reserve);
+  const initialStage = savingsInitialStage(reserve);
   const [stageId, setStageId] = useState<string | null>(initialStage);
   const [amountError, setAmountError] = useState<string | undefined>();
   const [essentialError, setEssentialError] = useState<string | undefined>();
@@ -124,7 +124,7 @@ export function SavingsPlanForm({
   const texts = plan ? savingsPlanTexts(plan) : null;
   const source = essentialSourceFor(essentialCents, inputs.estimate, saved);
   const reserveInput = plan ? savingsReserveInput(plan, source, { existing: reserve }) : null;
-  // Reserva com outro prazo (12 meses, por exemplo): "Usar este plano" só aparece depois de a pessoa escolher uma etapa, para nunca diminuir o alvo sozinho.
+  // Reserva mínima ou com outro prazo (12 meses, por exemplo): "Usar este plano" só aparece depois de a pessoa escolher uma etapa, para nunca diminuir o alvo sozinho.
   const stageChosen = !keepsOtherMonths || stageId !== null;
   const canUsePlan = reserveInput !== null && stageChosen;
   const reserveStages = plan ? plan.stages.filter((s) => s.kind === 'reserva') : [];

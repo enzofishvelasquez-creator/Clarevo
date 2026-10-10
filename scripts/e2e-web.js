@@ -410,6 +410,29 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('reserva mínima criada: Metas mostra "Reserva para imprevistos" com R$ 0,00 de R$ 100,00 (0%) e o convite à pergunta some', new URL(p.url()).pathname === '/metas' && t.includes('Reserva mínima criada.') &&
     t.includes('R$ 0,00 de R$ 100,00') && !t.includes('Você consegue guardar algum valor por mês?'), t.slice(0, 300));
   await shot('99_metas_reserva_minima');
+  // Editar a reserva mínima (R$ 100,00, 1 mês): os R$ 100,00 não viram "gastos essenciais salvos" no formulário e escolher 3 meses
+  // salva (antes, a origem "reserva_minima" ficava e a gravação era recusada com 3 meses). Depois, a reserva volta a ser a
+  // mínima para o restante do roteiro.
+  await btn('Ver detalhes').click(); await waitText('Mais ações'); await p.waitForTimeout(300);
+  await btn('Mais ações').click(); await p.getByRole('alert').getByRole('button', { name: 'Editar meta' }).last().click(); await waitText('Quantos meses você quer cobrir?'); await p.waitForTimeout(400);
+  ok('reserva mínima: Editar abre /reserva', new URL(p.url()).pathname === '/reserva', p.url());
+  ok('reserva mínima: Editar não trata os R$ 100,00 da reserva mínima como gastos essenciais salvos', !(await body()).includes('Valor salvo na sua reserva.'));
+  if ((await visibleCount('textbox', 'Gastos essenciais por mês')) === 0) await btn('Ajustar valor').click();
+  await field('Gastos essenciais por mês').fill('2000'); await p.waitForTimeout(300);
+  await radio('3 meses').click(); await p.waitForTimeout(300);
+  await btn('Salvar reserva').click(); await waitText('Reserva salva.'); await p.waitForTimeout(600);
+  const editedGoal = await otherDevice(async (repo, ctx) => { const g = (await repo.listGoals(ctx)).find((x) => x.goalType === 'emergencia'); return g ? { source: g.essentialBaseSource, months: g.essentialMonths, base: g.essentialBaseCents, target: g.targetCents } : null; });
+  ok('reserva mínima + Editar + 3 meses: salva (3 meses, base R$ 2.000,00 informada, alvo R$ 6.000,00)',
+    editedGoal !== null && editedGoal.months === 3 && editedGoal.source === 'informado' && editedGoal.base === 200000 && editedGoal.target === 600000, JSON.stringify(editedGoal));
+  await otherDevice(async (repo, ctx) => {
+    const g = (await repo.listGoals(ctx)).find((x) => x.goalType === 'emergencia');
+    await repo.updateGoal(`e2e-volta-minima-${Date.now()}`, g.id, g.version, { goalType: 'emergencia', name: g.name, targetCents: 10000, targetMonth: g.targetMonth, plannedMonthlyCents: g.plannedMonthlyCents, essentialBaseCents: 10000, essentialMonths: 1, essentialBaseSource: 'reserva_minima' });
+  });
+  await p.waitForTimeout(500);
+  const backToMin = await otherDevice(async (repo, ctx) => { const g = (await repo.listGoals(ctx)).find((x) => x.goalType === 'emergencia'); return g ? [g.essentialBaseSource, g.essentialMonths, g.targetCents] : null; });
+  ok('reserva mínima restaurada para o roteiro (R$ 100,00, 1 mês, reserva_minima)', JSON.stringify(backToMin) === JSON.stringify(['reserva_minima', 1, 10000]), JSON.stringify(backToMin));
+  for (let i = 0; i < 4 && new URL(p.url()).pathname !== '/metas'; i++) { await btn('Voltar').click(); await p.waitForTimeout(400); }
+  await waitText('Planejar quanto guardar'); await p.waitForTimeout(300);
   // Reserva mínima e depois "consigo": a base da reserva mínima (R$ 100,00) não vira "gastos essenciais" do plano, e o plano em
   // etapas troca a reserva de 1 mês por outra etapa sem recusa (a origem deixa de ser "reserva_minima").
   ok('reserva mínima: Metas oferece "Planejar quanto guardar" (o plano ainda não foi respondido)', (await visibleCount('button', 'Planejar quanto guardar')) === 1);
@@ -419,6 +442,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('reserva mínima + "consigo": os R$ 100,00 da reserva mínima não aparecem como gastos essenciais informados', minEssential !== '100,00', String(minEssential));
   if (minEssential !== null) await field('Gastos essenciais por mês').fill('2000');
   await p.waitForTimeout(400);
+  // Reserva mínima (1 mês): nenhuma etapa vem marcada e "Usar este plano" só aparece depois de a pessoa escolher (o alvo nunca diminui sozinho).
+  const stageChecked = await p.getByRole('radio').filter({ visible: true }).evaluateAll((els) => els.filter((e) => /^Etapa de /.test(e.getAttribute('aria-label') || '')).map((e) => e.getAttribute('aria-checked')));
+  ok('plano com reserva mínima: as três etapas aparecem e nenhuma vem marcada', stageChecked.length === 3 && stageChecked.every((c) => c === 'false'), JSON.stringify(stageChecked));
+  ok('plano com reserva mínima: sem escolher a etapa, não há "Usar este plano"', (await visibleCount('button', 'Usar este plano')) === 0);
   await radio('Etapa de 3 meses dos gastos essenciais').click(); await p.waitForTimeout(300);
   if ((await visibleCount('button', 'Usar este plano')) > 0) await btn('Usar este plano').click(); else await btn('Salvar valor por mês').click();
   await waitUntil(async () => new URL(p.url()).pathname === '/metas', 8000); await p.waitForTimeout(700);

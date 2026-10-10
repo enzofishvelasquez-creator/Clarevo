@@ -33,6 +33,7 @@ import { ErrorState } from '@/components/states';
 import { TermHint } from '@/components/term-hint';
 import { Banner, Body, Button, Card, FitMoney, LinkButton, Screen, Skeleton, Txt, styles as ui } from '@/components/ui';
 import { showsCoverage } from '@/lib/essentials';
+import { statusAttemptMatches } from '@/lib/goal-status-attempt';
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
 import { useDeleteGoal, useGoalDetail, useGoalOperationKey, useSetGoalStatus } from '@/state/data';
@@ -83,7 +84,7 @@ export default function MetaDetalhe() {
         keys,
         JSON.stringify(['situacao', g.id, g.version, status]),
         (key) => setStatus.mutateAsync({ key, id: g.id, version: g.version, status }),
-        (s) => s.action === 'situacao_meta' && s.goalId === g.id,
+        (s) => s.action === 'situacao_meta' && s.goalId === g.id && statusAttemptMatches(s.snapshot, status),
       );
       if (r.status === 'ok' || r.status === 'reconciled') {
         haptic();

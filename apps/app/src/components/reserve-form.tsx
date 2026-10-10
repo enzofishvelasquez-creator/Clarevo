@@ -16,6 +16,7 @@ import {
   maskMonthBR,
   negativeDayFromDetail,
   parseBRL,
+  reserveEssentialBaseCents,
   validateGoalDraft,
   type Cents,
   type EssentialEstimate,
@@ -114,14 +115,15 @@ export function ReserveForm({
   const keys = useGoalOperationKey();
   const R = GOALS_TEXT.reserve;
 
-  const saved: SavedEssentials | null =
-    reserve && reserve.essentialBaseCents !== null && reserve.essentialBaseSource ? { cents: reserve.essentialBaseCents, source: reserve.essentialBaseSource } : null;
+  // A reserva mínima de "Agora não" guarda o próprio alvo como base de 1 mês: não é gasto essencial (reserveEssentialBaseCents).
+  const savedBase = reserveEssentialBaseCents(reserve);
+  const saved: SavedEssentials | null = reserve && savedBase !== null && reserve.essentialBaseSource ? { cents: savedBase, source: reserve.essentialBaseSource } : null;
 
   // Preenchimento inicial: a reserva que existe, com o que a calculadora levou por cima; ou, ao criar, a sugestão e o que veio.
   const [initial] = useState(() => {
     const months = prefill.months ?? reserve?.essentialMonths ?? null;
     const pick: Pick = months === null ? null : RESERVE_MONTH_CHIPS.includes(months) ? months : 'outro';
-    const essential = prefill.essentialCents ?? reserve?.essentialBaseCents ?? estimate.amountCents;
+    const essential = prefill.essentialCents ?? savedBase ?? estimate.amountCents;
     return {
       essentialText: money(essential),
       pick,
@@ -160,8 +162,8 @@ export function ReserveForm({
   const guard = useLeaveGuard(dirty && !busy, '/metas');
 
   const essentialCents = parseBRL(essentialText);
-  const source = essentialSourceFor(essentialCents, estimate, saved);
   const monthsValue = pick === 'outro' ? monthsText : pick === null ? '' : String(pick);
+  const source = essentialSourceFor(essentialCents, estimate, saved, /^\d{1,3}$/.test(monthsValue) ? Number(monthsValue) : null);
 
   const draft: GoalDraft = {
     goalType: 'emergencia',
