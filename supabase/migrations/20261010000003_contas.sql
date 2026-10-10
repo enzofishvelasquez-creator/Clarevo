@@ -6,7 +6,7 @@
 --
 -- A conta de origem já existia: financial_accounts guarda a "Conta principal" criada por ensure_personal_space e
 -- financial_records.account_id, pay_commitment e pay_invoice já recebem a conta de saída. Esta migração só deixa a pessoa
--- cadastrar de onde sai o dinheiro (Itaú, Carteira...) e escolher uma em cada gasto, pagamento de conta, pagamento de fatura e
+-- cadastrar de onde sai o dinheiro (conta do banco, carteira...) e escolher uma em cada gasto, pagamento de conta, pagamento de fatura e
 -- aporte ou resgate de meta. Não existe saldo por conta (fica para P-018: transferências e saldo inicial): a conta é só a origem
 -- informada, e nada aqui entra em Recebido, Pago, Diferença, Ainda a pagar nem na renda comprometida.
 --
@@ -28,6 +28,11 @@
 -- A6. Conta excluída fica arquivada (nenhuma função de escrita de registro aceita conta que não é ativa) e some da leitura.
 -- A7. Aporte ou resgate de meta pode levar a conta (goal_movements.account_id, opcional, do mesmo contexto: FK composta); os
 --     outros tipos de movimento nunca levam conta. É só informativo: não cria gasto nem movimenta saldo (D-027(3), P-018).
+-- A8. Quem confere a conta de um lançamento (gasto, pagamento, fatura, aporte ou resgate) trava a linha dela com for share até o
+--     fim da transação; excluir, arquivar ou mudar a principal travam a linha com for update. Assim, uma exclusão ou um
+--     arquivamento que corre ao mesmo tempo espera, reconfere a situação da conta e dá conta_invalida (ou conta_com_lancamentos
+--     para quem exclui), e nunca sobra lançamento vivo numa conta excluída.
+-- A9. Sem conta informada, pay_invoice e pay_commitment usam a principal do contexto (não a mais antiga).
 -- Ordem de travas: chave -> trava consultiva do contexto (contas:<contexto>) -> linha da conta. A atividade (gatilho de
 -- record_operations, 0005) conta as cinco ações como anotação, como as demais escritas.
 
@@ -109,14 +114,17 @@ create trigger financial_accounts_guard
   before update on public.financial_accounts
   for each row execute function public.financial_accounts_guard();
 
--- Leitura: só as não excluídas. A renomeação direta (update (name), do app publicado) também só alcança as não excluídas.
+-- Leitura: só as não excluídas. A renomeação direta (update (name), do app publicado) também só alcança as não excluídas e, como
+-- as funções de contas, a conta de outra pessoa exige "editar de outras pessoas" (a autoria vale para a própria conta).
 drop policy accounts_read on public.financial_accounts;
 create policy accounts_read on public.financial_accounts for select to authenticated
   using (deleted_at is null and public.context_permission(context_id, 'read'));
 drop policy accounts_rename on public.financial_accounts;
 create policy accounts_rename on public.financial_accounts for update to authenticated
-  using (deleted_at is null and public.context_permission(context_id, 'write'))
-  with check (deleted_at is null and public.context_permission(context_id, 'write'));
+  using (deleted_at is null and public.context_permission(context_id, 'write')
+         and (created_by = auth.uid() or public.context_permission(context_id, 'edit_others')))
+  with check (deleted_at is null and public.context_permission(context_id, 'write')
+              and (created_by = auth.uid() or public.context_permission(context_id, 'edit_others')));
 
 -- ---------------------------------------------------------------------------
 -- Movimentos de meta: conta opcional (A7)
@@ -177,7 +185,8 @@ alter table public.record_operations add constraint record_operations_target_che
 -- ---------------------------------------------------------------------------
 -- Validação de registro: a conta de um registro que já existe continua valendo mesmo arquivada
 -- Mesmas regras da 0001; p_keep_account é a conta que o registro já tem (update_record), que pode estar arquivada. A assinatura
--- antiga (7 argumentos) sai: as funções que a chamam com 7 argumentos passam a usar esta, com o argumento novo em branco.
+-- antiga (7 argumentos) sai: as funções que a chamam com 7 argumentos passam a usar esta, com o argumento novo em branco. Passa de
+-- stable para volatile porque trava a linha da conta (for share, A8).
 -- ---------------------------------------------------------------------------
 drop function public.clarevo_validate_record(uuid, uuid, uuid, bigint, date, text, text);
 create or replace function public.clarevo_validate_record(
@@ -186,7 +195,7 @@ create or replace function public.clarevo_validate_record(
 )
 returns public.financial_accounts
 language plpgsql
-stable
+volatile
 security definer
 set search_path = public
 as $$
@@ -214,9 +223,12 @@ begin
   if p_occurred_on > public.clarevo_today(p_actor) then
     raise exception 'data_futura' using errcode = '22023';
   end if;
+  -- for share (A8): uma exclusão ou um arquivamento da conta que corre ao mesmo tempo espera esta transação; quem espera aqui
+  -- reconfere a linha depois da espera e dá conta_invalida.
   select * into v_account from public.financial_accounts
    where id = p_account_id and context_id = p_context_id and deleted_at is null
-     and (status = 'ativa' or id = p_keep_account);
+     and (status = 'ativa' or id = p_keep_account)
+   for share;
   if not found then
     raise exception 'conta_invalida' using errcode = '22023';
   end if;
@@ -312,6 +324,73 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
+-- Primeira entrada (0001) com a conta certa: a principal. Mesma assinatura, mesmas regras e mesmo retorno; mudança: a conta
+-- devolvida ignora as excluídas e põe a principal e as ativas antes das arquivadas (antes, a mais antiga, que podia estar
+-- arquivada ou excluída). Só cria a primeira conta se o contexto não tem nenhuma (o gatilho a torna principal).
+-- ---------------------------------------------------------------------------
+create or replace function public.ensure_personal_space(p_account_name text default 'Conta principal', p_time_zone text default null)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_user auth.users%rowtype;
+  v_name text;
+  v_ctx uuid;
+  v_account public.financial_accounts%rowtype;
+  v_account_name text := btrim(coalesce(p_account_name, ''));
+begin
+  if v_uid is null then
+    raise exception 'nao_autenticado' using errcode = '42501';
+  end if;
+  select * into v_user from auth.users where id = v_uid;
+  if not found or v_user.email_confirmed_at is null then
+    raise exception 'email_nao_confirmado' using errcode = '42501';
+  end if;
+
+  perform pg_advisory_xact_lock(hashtext('space:' || v_uid::text));
+
+  v_name := left(coalesce(nullif(btrim(v_user.raw_user_meta_data ->> 'display_name'), ''), split_part(v_user.email, '@', 1), 'Pessoa'), 80);
+  -- Fuso do aparelho no primeiro acesso (validado); sem ele, São Paulo.
+  insert into public.persons (id, display_name, time_zone)
+  values (v_uid, v_name,
+          coalesce((select name from pg_timezone_names where name = p_time_zone limit 1), 'America/Sao_Paulo'))
+  on conflict (id) do nothing;
+
+  select id into v_ctx from public.financial_contexts where owner_person_id = v_uid and kind = 'pessoal';
+  if v_ctx is null then
+    insert into public.financial_contexts (kind, name, owner_person_id) values ('pessoal', 'Pessoal', v_uid) returning id into v_ctx;
+    insert into public.context_memberships (context_id, person_id, role, can_read, can_write, can_edit_others)
+    values (v_ctx, v_uid, 'titular', true, true, true);
+  end if;
+
+  -- A conta que volta é a principal (ou, faltando, a ativa mais antiga): nunca uma arquivada nem uma excluída (A2 garante que há uma).
+  select * into v_account from public.financial_accounts
+   where context_id = v_ctx and deleted_at is null
+   order by is_default desc, (status = 'ativa') desc, created_at, id
+   limit 1;
+  if not found then
+    if char_length(v_account_name) not between 1 and 40 then
+      raise exception 'nome_da_conta_invalido' using errcode = '22023';
+    end if;
+    insert into public.financial_accounts (context_id, name, created_by)
+    values (v_ctx, v_account_name, v_uid)
+    returning * into v_account;
+  end if;
+
+  return jsonb_build_object(
+    'person_id', v_uid,
+    'display_name', (select display_name from public.persons where id = v_uid),
+    'context_id', v_ctx,
+    'account', jsonb_build_object('id', v_account.id, 'name', v_account.name, 'currency', v_account.currency)
+  );
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- Contas: validação, limite, nome repetido e trava
 -- ---------------------------------------------------------------------------
 
@@ -394,6 +473,28 @@ begin
     raise exception 'sem_permissao' using errcode = '42501';
   end if;
   return v_a;
+end;
+$$;
+
+-- Quem ganha ou perde a marca de principal precisa poder mexer na conta: a de outra pessoa exige "editar de outras pessoas"
+-- (sem_permissao). Quem chama já tem escrita no contexto (clarevo_lock_account).
+create or replace function public.clarevo_require_account_owner(p_account_id uuid)
+returns void
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_a public.financial_accounts%rowtype;
+begin
+  select * into v_a from public.financial_accounts where id = p_account_id;
+  if not found then
+    raise exception 'conta_invalida' using errcode = '22023';
+  end if;
+  if v_a.created_by <> auth.uid() and not public.context_permission(v_a.context_id, 'edit_others') then
+    raise exception 'sem_permissao' using errcode = '42501';
+  end if;
 end;
 $$;
 
@@ -521,8 +622,9 @@ $$;
 
 -- ---------------------------------------------------------------------------
 -- Tornar principal a conta (a versão é a dela; a principal anterior também sobe +1). Só conta ativa (conta_arquivada).
--- Já ser a principal é aceito e não muda nada (a versão não sobe).
--- Ordem: repetição; nao_encontrado; sem_permissao; versao_desatualizada; conta_arquivada.
+-- Já ser a principal é aceito e não muda nada (a versão não sobe). A conta que ganha e a que perde a marca precisam poder ser
+-- alteradas por quem chama: a de outra pessoa exige "editar de outras pessoas".
+-- Ordem: repetição; nao_encontrado; sem_permissao; versao_desatualizada; conta_arquivada; sem_permissao (a principal anterior).
 -- ---------------------------------------------------------------------------
 create or replace function public.set_default_account(
   p_idempotency_key text,
@@ -568,6 +670,10 @@ begin
   end if;
 
   if not v_a.is_default then
+    -- A principal anterior perde a marca: se é de outra pessoa, exige "editar de outras pessoas".
+    perform public.clarevo_require_account_owner(x.id)
+       from public.financial_accounts x
+      where x.context_id = v_a.context_id and x.is_default and x.deleted_at is null;
     update public.financial_accounts set is_default = false
      where context_id = v_a.context_id and is_default and deleted_at is null;
     update public.financial_accounts set is_default = true where id = v_a.id
@@ -586,8 +692,10 @@ $$;
 -- e não muda nada. Nunca se arquiva a última ativa (ultima_conta_ativa). Arquivar a principal exige escolher outra no mesmo ato
 -- (p_new_default_id, uma ativa do mesmo contexto; sem ela, conta_principal); p_new_default_id fora desse caso:
 -- campo_nao_se_aplica. Reativar respeita as 10 ativas (limite_de_contas).
+-- A conta que passa a ser a principal também precisa poder ser alterada por quem chama (sem_permissao: a de outra pessoa exige
+-- "editar de outras pessoas").
 -- Ordem: repetição; nao_encontrado; sem_permissao; versao_desatualizada; situacao_invalida; campo_nao_se_aplica;
--- ultima_conta_ativa; conta_principal; conta_invalida (a nova principal); limite_de_contas.
+-- ultima_conta_ativa; conta_principal; conta_invalida (a nova principal); sem_permissao (a nova principal); limite_de_contas.
 -- ---------------------------------------------------------------------------
 create or replace function public.set_account_status(
   p_idempotency_key text,
@@ -653,6 +761,7 @@ begin
             where x.id = p_new_default_id and x.context_id = v_a.context_id and x.deleted_at is null and x.status = 'ativa') then
         raise exception 'conta_invalida' using errcode = '22023';
       end if;
+      perform public.clarevo_require_account_owner(p_new_default_id);
       update public.financial_accounts set is_default = false, status = 'arquivada' where id = v_a.id
       returning * into v_a;
       update public.financial_accounts set is_default = true where id = p_new_default_id;
@@ -799,8 +908,11 @@ begin
     if p_kind not in ('aporte', 'resgate') then
       raise exception 'campo_nao_se_aplica' using errcode = '22023';
     end if;
-    if not exists (select 1 from public.financial_accounts a
-                    where a.id = p_account_id and a.context_id = v_g.context_id and a.deleted_at is null and a.status = 'ativa') then
+    -- for share (A8): a exclusão ou o arquivamento da conta que corre ao mesmo tempo espera, e quem espera aqui reconfere a linha.
+    perform 1 from public.financial_accounts a
+     where a.id = p_account_id and a.context_id = v_g.context_id and a.deleted_at is null and a.status = 'ativa'
+       for share;
+    if not found then
       raise exception 'conta_invalida' using errcode = '22023';
     end if;
   end if;
@@ -817,9 +929,12 @@ begin
 end;
 $$;
 
--- Valor, data, observação e conta (o tipo nunca muda). p_account_id nulo tira a conta. A conta só é conferida (ativa, do mesmo
--- contexto: conta_invalida) quando muda; manter a conta que o movimento já tem, mesmo arquivada, vale. Movimento que não é
--- aporte nem resgate: campo_nao_se_aplica com conta.
+-- Valor, data, observação e conta (o tipo nunca muda). p_account_id tem um valor padrão "manter" (o uuid de zeros): sem o
+-- argumento, a conta e o hash são os de antes (o app publicado, que chama por nome sem p_account_id, não perde a conta do
+-- movimento ao corrigir o valor); nulo, informado de propósito, tira a conta; um uuid troca ou mantém. A conta só é conferida
+-- (ativa, do mesmo contexto: conta_invalida) quando muda; manter a conta que o movimento já tem, mesmo arquivada, vale. Movimento
+-- que não é aporte nem resgate: campo_nao_se_aplica com conta. Hash: sem o argumento, o da 0007; com nulo, o mesmo mais [null];
+-- com uma conta, o mesmo mais a conta.
 drop function public.update_goal_movement(text, uuid, integer, bigint, date, text);
 create or replace function public.update_goal_movement(
   p_idempotency_key text,
@@ -828,7 +943,7 @@ create or replace function public.update_goal_movement(
   p_amount_cents bigint,
   p_occurred_on date,
   p_note text default null,
-  p_account_id uuid default null
+  p_account_id uuid default '00000000-0000-0000-0000-000000000000'
 )
 returns jsonb
 language plpgsql
@@ -839,9 +954,11 @@ as $$
 declare
   v_uid uuid := auth.uid();
   v_note text := nullif(public.clarevo_trim(p_note), '');
+  v_keep boolean := p_account_id is not distinct from '00000000-0000-0000-0000-000000000000'::uuid;
   v_hash text;
   v_op public.record_operations%rowtype;
   v_m public.goal_movements%rowtype;
+  v_account uuid;
 begin
   if v_uid is null then
     raise exception 'nao_autenticado' using errcode = '42501';
@@ -849,7 +966,7 @@ begin
   perform public.clarevo_check_key(p_idempotency_key);
   v_hash := md5((jsonb_build_array('alterar_movimento_meta', p_movement_id, p_expected_version, p_amount_cents, p_occurred_on,
                                    v_note)
-                 || case when p_account_id is null then '[]'::jsonb else jsonb_build_array(p_account_id) end)::text);
+                 || case when v_keep then '[]'::jsonb else jsonb_build_array(p_account_id) end)::text);
   perform pg_advisory_xact_lock(hashtext('op:' || v_uid::text || ':' || p_idempotency_key));
 
   select * into v_op from public.record_operations where actor_id = v_uid and idempotency_key = p_idempotency_key;
@@ -871,19 +988,25 @@ begin
     raise exception 'meta_arquivada' using errcode = 'PT409';
   end if;
   perform public.clarevo_validate_goal_movement(v_uid, p_amount_cents, p_occurred_on, v_note);
-  if p_account_id is not null then
+  -- A conta que fica: a do movimento (manter), nenhuma (nulo) ou a informada.
+  v_account := case when v_keep then v_m.account_id else p_account_id end;
+  if v_account is not null then
     if v_m.kind not in ('aporte', 'resgate') then
       raise exception 'campo_nao_se_aplica' using errcode = '22023';
     end if;
-    if p_account_id is distinct from v_m.account_id
-       and not exists (select 1 from public.financial_accounts a
-                        where a.id = p_account_id and a.context_id = v_m.context_id and a.deleted_at is null and a.status = 'ativa') then
-      raise exception 'conta_invalida' using errcode = '22023';
+    if v_account is distinct from v_m.account_id then
+      -- for share (A8), como em add_goal_movement.
+      perform 1 from public.financial_accounts a
+       where a.id = v_account and a.context_id = v_m.context_id and a.deleted_at is null and a.status = 'ativa'
+         for share;
+      if not found then
+        raise exception 'conta_invalida' using errcode = '22023';
+      end if;
     end if;
   end if;
 
   update public.goal_movements
-     set amount_cents = p_amount_cents, occurred_on = p_occurred_on, note = v_note, account_id = p_account_id, version = version + 1
+     set amount_cents = p_amount_cents, occurred_on = p_occurred_on, note = v_note, account_id = v_account, version = version + 1
    where id = v_m.id
   returning * into v_m;
   perform public.clarevo_require_goal_balance(v_m.goal_id);
@@ -892,6 +1015,224 @@ begin
   values (v_uid, p_idempotency_key, 'alterar_movimento_meta', v_m.context_id, v_hash, null, null, v_m.id);
 
   return public.clarevo_goal_result(v_m.goal_id, v_m.id);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Pagamentos com a conta de saída
+-- ---------------------------------------------------------------------------
+-- Pagar a conta (0008) com a conta de saída certa. Mesma assinatura, hash, repetição, ordem de erros e retorno. Mudanças: sem
+-- conta (nulo explícito; o argumento continua obrigatório, como no app publicado) vale a principal do contexto em vez de
+-- conta_invalida (A9), e a conta é travada com for share na conferência (A8).
+create or replace function public.pay_commitment(
+  p_idempotency_key text,
+  p_commitment_id uuid,
+  p_expected_version integer,
+  p_account_id uuid,
+  p_amount_cents bigint,
+  p_paid_on date,
+  p_category text default null
+)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_category text := nullif(public.clarevo_trim(p_category), '');
+  v_hash text;
+  v_op public.record_operations%rowtype;
+  v_c public.commitments%rowtype;
+  v_account_id uuid;
+  v_account public.financial_accounts%rowtype;
+  v_r public.financial_records%rowtype;
+begin
+  if v_uid is null then
+    raise exception 'nao_autenticado' using errcode = '42501';
+  end if;
+  perform public.clarevo_check_key(p_idempotency_key);
+  v_hash := md5(jsonb_build_array('pagar_compromisso', p_commitment_id, p_expected_version, p_account_id, p_amount_cents,
+                                  p_paid_on, v_category)::text);
+  perform pg_advisory_xact_lock(hashtext('op:' || v_uid::text || ':' || p_idempotency_key));
+
+  select * into v_op from public.record_operations where actor_id = v_uid and idempotency_key = p_idempotency_key;
+  if found then
+    if v_op.action <> 'pagar_compromisso' or v_op.request_hash <> v_hash then
+      raise exception 'chave_reutilizada' using errcode = 'PT409';
+    end if;
+    if not public.context_permission(v_op.context_id, 'read') then
+      raise exception 'nao_encontrado' using errcode = 'P0002';
+    end if;
+    return public.clarevo_commitment_result(v_op.commitment_id, v_op.record_id);
+  end if;
+
+  v_c := public.clarevo_lock_commitment(p_commitment_id);
+  -- Pagar a conta de uma fatura sem distribuir a diferença quebraria o saldo anterior: o caminho é pay_invoice.
+  if v_c.card_id is not null then
+    raise exception 'conta_de_fatura' using errcode = 'PT409';
+  end if;
+  if p_expected_version is distinct from v_c.version then
+    raise exception 'versao_desatualizada' using errcode = 'PT409', detail = 'versao_atual=' || v_c.version;
+  end if;
+  if v_c.status <> 'aberto' then
+    raise exception 'compromisso_quitado' using errcode = 'PT409';
+  end if;
+  -- Mesmas regras do gasto realizado: valor, categoria, data até hoje (data_futura), conta ativa do contexto.
+  -- Sem conta (nulo), vale a principal do contexto (A9); a validação trava a conta com for share (A8).
+  v_account_id := coalesce(p_account_id, (select a.id from public.financial_accounts a
+                                           where a.context_id = v_c.context_id and a.is_default and a.status = 'ativa' and a.deleted_at is null));
+  v_account := public.clarevo_validate_record(v_uid, v_c.context_id, v_account_id, p_amount_cents, p_paid_on, v_c.description, v_category);
+  if v_account.currency <> v_c.currency then
+    raise exception 'conta_invalida' using errcode = '22023';
+  end if;
+
+  insert into public.financial_records
+    (context_id, account_id, kind, amount_cents, currency, occurred_on, description, category, created_by, commitment_id)
+  values
+    (v_c.context_id, v_account.id, 'despesa', p_amount_cents, v_account.currency, p_paid_on, v_c.description, v_category, v_uid, v_c.id)
+  returning * into v_r;
+
+  update public.commitments set status = 'quitado', version = version + 1 where id = v_c.id;
+
+  insert into public.record_operations (actor_id, idempotency_key, action, context_id, request_hash, record_id, commitment_id)
+  values (v_uid, p_idempotency_key, 'pagar_compromisso', v_c.context_id, v_hash, v_r.id, v_c.id);
+
+  return public.clarevo_commitment_result(v_c.id, v_r.id);
+end;
+$$;
+
+-- Pagar a fatura (0008) com a conta de saída certa. Mesma assinatura, hash, repetição, ordem de erros e retorno. Mudanças: sem a
+-- conta, a principal do contexto (não a mais antiga, A9) e a conta é travada com for share na conferência (A8).
+create or replace function public.pay_invoice(
+  p_idempotency_key text,
+  p_card_id uuid,
+  p_month date,
+  p_expected_version integer,
+  p_paid_cents bigint,
+  p_paid_on date,
+  p_account_id uuid default null
+)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_args jsonb;
+  v_hash text;
+  v_op public.record_operations%rowtype;
+  v_card public.cards%rowtype;
+  v_c public.commitments%rowtype;
+  v_account public.financial_accounts%rowtype;
+  v_r public.financial_records%rowtype;
+  v_desc text;
+  v_next date;
+  v_left bigint;
+  v_today date;
+begin
+  if v_uid is null then
+    raise exception 'nao_autenticado' using errcode = '42501';
+  end if;
+  perform public.clarevo_check_key(p_idempotency_key);
+  v_args := jsonb_build_array('pagar_fatura', p_card_id, p_month, p_expected_version, p_paid_cents, p_paid_on);
+  if p_account_id is not null then
+    v_args := v_args || jsonb_build_array(p_account_id);
+  end if;
+  v_hash := md5(v_args::text);
+  perform pg_advisory_xact_lock(hashtext('op:' || v_uid::text || ':' || p_idempotency_key));
+
+  select * into v_op from public.record_operations where actor_id = v_uid and idempotency_key = p_idempotency_key;
+  if found then
+    if v_op.action <> 'pagar_fatura' or v_op.request_hash <> v_hash then
+      raise exception 'chave_reutilizada' using errcode = 'PT409';
+    end if;
+    if not public.context_permission(v_op.context_id, 'read') then
+      raise exception 'nao_encontrado' using errcode = 'P0002';
+    end if;
+    return public.clarevo_pay_result(v_op.target_id, p_month, v_op.commitment_id, v_op.record_id);
+  end if;
+
+  v_card := public.clarevo_lock_card(p_card_id, true);                                      -- trava 1: cartão
+  if p_month is null or extract(day from p_month) <> 1 then
+    raise exception 'mes_invalido' using errcode = '22023';
+  end if;
+  select * into v_c from public.commitments c
+   where c.card_id = v_card.id and c.invoice_month = p_month and c.deleted_at is null for update;   -- trava 2: conta
+  if v_c.id is null then
+    raise exception 'nao_encontrado' using errcode = 'P0002';
+  end if;
+  if p_expected_version is distinct from v_c.version then
+    raise exception 'versao_desatualizada' using errcode = 'PT409', detail = 'versao_atual=' || v_c.version;
+  end if;
+  if v_c.status <> 'aberto' then
+    raise exception 'compromisso_quitado' using errcode = 'PT409';
+  end if;
+  v_today := public.clarevo_today(v_uid);
+  if v_today <= v_c.card_closing_on then
+    raise exception 'fatura_aberta' using errcode = 'PT409';
+  end if;
+  if p_paid_cents is null or p_paid_cents < 1 then
+    raise exception 'valor_invalido' using errcode = '22023';
+  end if;
+  if p_paid_cents > v_c.amount_cents then
+    raise exception 'valor_acima_da_fatura' using errcode = '22023';
+  end if;
+  if p_paid_on is null
+     or p_paid_on < least((v_today - interval '1 year')::date,
+                          (public.invoice_closing_on(v_card.closing_day, v_card.due_day, (p_month - interval '1 month')::date) + 1)) then
+    raise exception 'data_invalida' using errcode = '22023';
+  end if;
+  if p_paid_on > v_today then
+    raise exception 'data_futura' using errcode = '22023';
+  end if;
+  -- Sem conta, a principal do contexto (A9, antes a mais antiga). for share (A8): a exclusão ou o arquivamento da conta que corre
+  -- ao mesmo tempo espera, e quem espera aqui reconfere a linha.
+  if p_account_id is null then
+    select * into v_account from public.financial_accounts a
+     where a.context_id = v_card.context_id and a.status = 'ativa' and a.deleted_at is null
+     order by a.is_default desc, a.created_at, a.id limit 1
+       for share;
+  else
+    select * into v_account from public.financial_accounts a
+     where a.id = p_account_id and a.context_id = v_card.context_id and a.status = 'ativa' and a.deleted_at is null
+       for share;
+  end if;
+  if v_account.id is null or v_account.currency <> v_c.currency then
+    raise exception 'conta_invalida' using errcode = '22023';
+  end if;
+  v_left := v_c.amount_cents - p_paid_cents;
+  v_next := public.clarevo_next_month(p_month);
+  if v_left > 0 and public.clarevo_invoice_paid(v_card.id, v_next) then
+    raise exception 'fatura_seguinte_paga' using errcode = 'PT409';
+  end if;
+  v_desc := 'Fatura ' || v_card.nickname || ' (' || public.clarevo_month_name(p_month)
+            || case when extract(year from p_month) <> extract(year from p_paid_on)
+                    then ' de ' || extract(year from p_month)::int else '' end || ')';
+
+  insert into public.financial_records
+    (context_id, account_id, kind, amount_cents, currency, occurred_on, description, category, created_by, commitment_id,
+     card_id, invoice_month)
+  values
+    (v_card.context_id, v_account.id, 'despesa', p_paid_cents, v_account.currency, p_paid_on, v_desc, null, v_uid, v_c.id,
+     v_card.id, p_month)
+  returning * into v_r;
+
+  update public.commitments set status = 'quitado', amount_is_estimate = false, version = version + 1 where id = v_c.id;
+
+  if v_left > 0 then
+    insert into public.card_entries (context_id, card_id, kind, invoice_month, amount_cents, source_month, payment_record_id, created_by)
+    values (v_card.context_id, v_card.id, 'saldo_anterior', v_next, v_left, p_month, v_r.id, v_uid);
+    perform public.clarevo_sync_card(v_card.id, p_month, v_next);
+  end if;
+
+  insert into public.record_operations (actor_id, idempotency_key, action, context_id, request_hash, record_id, commitment_id, target_id)
+  values (v_uid, p_idempotency_key, 'pagar_fatura', v_card.context_id, v_hash, v_r.id, v_c.id, v_card.id);
+
+  return public.clarevo_pay_result(v_card.id, p_month, v_c.id, v_r.id);
 end;
 $$;
 

@@ -726,13 +726,41 @@ begin
   rec := (r #>> '{record,id}')::uuid;
   r := to_jsonb(public.update_record('ct-g-0035', rec, 1, principal, 20000, '2026-10-07', 'Fatura Cartão Exemplo (outubro)', null));
   assert r ->> 'account_id' = principal::text, 'o pagamento da fatura troca de conta';
-  -- Sem a conta, o banco usa uma conta ativa do contexto (a mais antiga; aqui todas nasceram na mesma transação).
+  -- Sem a conta (A9): a principal do contexto, não a mais antiga. Aqui a principal é a Conta principal, a mais antiga também.
   v := (select commitment_version from public.invoice_items where card_id = card and month = '2026-10-01');
   perform public.undo_invoice_payment('ct-g-0036', card, '2026-10-01', v);
   v := (select commitment_version from public.invoice_items where card_id = card and month = '2026-10-01');
   r := public.pay_invoice('ct-g-0037', card, '2026-10-01', v, 20000, '2026-10-07');
-  assert exists (select 1 from public.financial_accounts a where a.id = (r #>> '{record,account_id}')::uuid and a.context_id = ctx and a.status = 'ativa'),
-    'sem a conta, uma conta ativa do contexto';
+  assert (r #>> '{record,account_id}')::uuid = principal, 'sem a conta, a principal do contexto';
+  -- Principal trocada para a Carteira (a mais nova): fatura e conta a pagar sem conta vão para ela, não para a mais antiga.
+  v := (select commitment_version from public.invoice_items where card_id = card and month = '2026-10-01');
+  perform public.undo_invoice_payment('ct-g-0038', card, '2026-10-01', v);
+  perform public.set_default_account('ct-g-0039', carteira, pg_temp.accver('hugo_cart2'));
+  v := (select commitment_version from public.invoice_items where card_id = card and month = '2026-10-01');
+  r := public.pay_invoice('ct-g-0040', card, '2026-10-01', v, 20000, '2026-10-07');
+  assert (r #>> '{record,account_id}')::uuid = carteira, 'sem a conta, a nova principal (e não a mais antiga)';
+  assert public.pay_invoice('ct-g-0040', card, '2026-10-01', v, 20000, '2026-10-07') = r, 'repetição devolve o estado gravado';
+  r := public.create_commitment('ct-g-0041', ctx, 4000, '2026-10-20', 'Água', 'Moradia');
+  c := (r #>> '{commitment,id}')::uuid;
+  r := public.pay_commitment('ct-g-0042', c, 1, null, 4000, '2026-10-07', 'Moradia');
+  assert (r #>> '{record,account_id}')::uuid = carteira, 'conta a pagar paga sem conta (nula): a principal do contexto';
+  assert (select request_hash from public.record_operations where idempotency_key = 'ct-g-0042')
+       = md5(format('["pagar_compromisso", "%s", 1, null, 4000, "2026-10-07", "Moradia"]', c)), 'o hash é o de sempre, com a conta nula';
+  assert public.pay_commitment('ct-g-0042', c, 1, null, 4000, '2026-10-07', 'Moradia') = r, 'repetição devolve o estado gravado';
+  -- Chamada por nome com a conta nula (cliente antigo) e a validação do valor continua antes da conta.
+  r := public.create_commitment('ct-g-0043', ctx, 5000, '2026-10-21', 'Gás', 'Moradia');
+  c := (r #>> '{commitment,id}')::uuid;
+  perform pg_temp.expect_code(format($f$select public.pay_commitment('ct-g-0044', %L, 1, null, 0, '2026-10-07', 'Moradia')$f$, c), 'valor_invalido', '22023');
+  -- Arquivar a Conta principal (que deixou de ser a principal) e voltar: ensure_personal_space devolve a principal, nunca a arquivada.
+  perform public.set_account_status('ct-g-0045', principal, pg_temp.accver('hugo_acc'), 'arquivada');
+  assert public.ensure_personal_space('Outra') #>> '{account,id}' = carteira::text, 'a primeira entrada devolve a principal, não a mais antiga arquivada';
+  assert public.ensure_personal_space('Outra') #>> '{account,name}' = (select name from public.financial_accounts where id = carteira), 'e o nome dela';
+  perform public.set_account_status('ct-g-0046', principal, pg_temp.accver('hugo_acc'), 'ativa');
+  assert public.ensure_personal_space('Outra') #>> '{account,id}' = carteira::text, 'com as duas ativas, a principal';
+  -- Sem principal ativa não há: a Conta principal volta a ser a principal, e o pagamento sem conta vai para ela.
+  perform public.set_default_account('ct-g-0047', principal, pg_temp.accver('hugo_acc'));
+  r := public.pay_commitment('ct-g-0048', c, 1, null, 5000, '2026-10-07', 'Moradia');
+  assert (r #>> '{record,account_id}')::uuid = principal, 'principal de volta: o pagamento sem conta vai para ela';
   perform pg_temp.check_links();
 end $$;
 reset role;
@@ -811,30 +839,52 @@ begin
   assert (select request_hash from public.record_operations where idempotency_key = 'ct-m-0031')
        = md5(format('["alterar_movimento_meta", "%s", 1, 2500, "2026-10-06", "Do salário", "%s"]', m2, principal)), 'hash com a conta';
   assert public.update_goal_movement('ct-m-0031', m2, 1, 2500, '2026-10-06', 'Do salário', principal) = r, 'repetição devolve o estado gravado';
-  -- Nula tira a conta; o hash sem conta é o da 0007.
+  -- Sem o argumento (o app publicado, que chama por nome): a conta é mantida e o hash é o da 0007. O uuid de zeros é o mesmo "manter".
   r := public.update_goal_movement('ct-m-0032', m2, 2, 2500, '2026-10-06', 'Do salário');
-  assert r #>> '{movement,account_id}' is null and (r #>> '{movement,version}')::int = 3, 'sem conta: a conta sai';
+  assert r #>> '{movement,account_id}' = principal::text and (r #>> '{movement,version}')::int = 3, 'sem o argumento: a conta é mantida';
   assert (select request_hash from public.record_operations where idempotency_key = 'ct-m-0032')
-       = md5(format('["alterar_movimento_meta", "%s", 2, 2500, "2026-10-06", "Do salário"]', m2)), 'hash da 0007 sem conta';
-  perform pg_temp.expect_code(pg_temp.gu('ct-m-0033', m2, 3, 2500, '2026-10-06', velha), 'conta_invalida', '22023');
-  perform pg_temp.expect_code(pg_temp.gu('ct-m-0034', m2, 3, 2500, '2026-10-06', pg_temp.id('gaia_cart')), 'conta_invalida', '22023');
+       = md5(format('["alterar_movimento_meta", "%s", 2, 2500, "2026-10-06", "Do salário"]', m2)), 'hash da 0007 sem o argumento';
+  assert public.update_goal_movement('ct-m-0032', m2, 2, 2500, '2026-10-06', 'Do salário') = r, 'repetição do cliente antigo';
+  r := public.update_goal_movement(p_idempotency_key => 'ct-m-0032a', p_movement_id => m2, p_expected_version => 3,
+                                   p_amount_cents => 2500, p_occurred_on => '2026-10-06', p_note => 'Do salário');
+  assert r #>> '{movement,account_id}' = principal::text and (r #>> '{movement,version}')::int = 4, 'por nome, sem p_account_id: a conta é mantida';
+  r := public.update_goal_movement('ct-m-0032b', m2, 4, 2500, '2026-10-06', 'Do salário', '00000000-0000-0000-0000-000000000000');
+  assert r #>> '{movement,account_id}' = principal::text and (r #>> '{movement,version}')::int = 5, 'o uuid de zeros também mantém';
+  assert (select request_hash from public.record_operations where idempotency_key = 'ct-m-0032b')
+       = md5(format('["alterar_movimento_meta", "%s", 4, 2500, "2026-10-06", "Do salário"]', m2)), 'mesmo hash de "manter"';
+  -- Nulo informado de propósito tira a conta; o hash leva o nulo e não se confunde com "manter".
+  r := public.update_goal_movement('ct-m-0032c', m2, 5, 2500, '2026-10-06', 'Do salário', null);
+  assert r #>> '{movement,account_id}' is null and (r #>> '{movement,version}')::int = 6, 'nulo informado: a conta sai';
+  assert (select request_hash from public.record_operations where idempotency_key = 'ct-m-0032c')
+       = md5(format('["alterar_movimento_meta", "%s", 5, 2500, "2026-10-06", "Do salário", null]', m2)), 'hash com o nulo';
+  assert public.update_goal_movement('ct-m-0032c', m2, 5, 2500, '2026-10-06', 'Do salário', null) = r, 'repetição do nulo';
+  perform pg_temp.expect_code(format($f$select public.update_goal_movement('ct-m-0032c', %L, 5, 2500, '2026-10-06', 'Do salário')$f$, m2),
+    'chave_reutilizada', 'PT409');
+  -- Sem conta no movimento, "manter" mantém sem conta.
+  r := public.update_goal_movement('ct-m-0032d', m2, 6, 2500, '2026-10-06', 'Do salário');
+  assert r #>> '{movement,account_id}' is null and (r #>> '{movement,version}')::int = 7, 'manter um movimento sem conta';
+  perform pg_temp.expect_code(pg_temp.gu('ct-m-0033', m2, 7, 2500, '2026-10-06', velha), 'conta_invalida', '22023');
+  perform pg_temp.expect_code(pg_temp.gu('ct-m-0034', m2, 7, 2500, '2026-10-06', pg_temp.id('gaia_cart')), 'conta_invalida', '22023');
   -- Movimento que não é aporte nem resgate não leva conta; o valor vem antes da conta.
   m4 := (public.add_goal_movement('ct-m-0035', g, 'rendimento', 300, '2026-10-07') #>> '{movement,id}')::uuid;
   perform pg_temp.expect_code(pg_temp.gu('ct-m-0036', m4, 1, 300, '2026-10-07', principal), 'campo_nao_se_aplica', '22023');
   perform pg_temp.expect_code(pg_temp.gu('ct-m-0037', m4, 1, 0, '2026-10-07', principal), 'valor_invalido', '22023');
   perform pg_temp.expect_code(pg_temp.gu('ct-m-0038', (select id from public.goal_movements where goal_id = g and kind = 'saldo_inicial'), 1, 100000,
     '2026-10-01', principal), 'campo_nao_se_aplica', '22023');
-  -- Manter a conta do movimento depois de arquivada vale (só a troca para uma arquivada é recusada).
-  perform public.update_goal_movement('ct-m-0039', m2, 3, 2500, '2026-10-06', 'Do salário', carteira);
+  -- Manter a conta do movimento depois de arquivada vale (só a troca para uma arquivada é recusada), também sem o argumento.
+  perform public.update_goal_movement('ct-m-0039', m2, 7, 2500, '2026-10-06', 'Do salário', carteira);
   perform public.set_account_status('ct-m-0040', carteira, pg_temp.accver('hugo_cart2'), 'arquivada');
-  r := public.update_goal_movement('ct-m-0041', m2, 4, 2600, '2026-10-06', 'Do salário', carteira);
+  r := public.update_goal_movement('ct-m-0041', m2, 8, 2600, '2026-10-06', 'Do salário', carteira);
   assert r #>> '{movement,account_id}' = carteira::text and (r #>> '{movement,amount_cents}')::bigint = 2600,
     'manter a conta arquivada do movimento vale';
-  r := public.update_goal_movement('ct-m-0042', m2, 5, 2600, '2026-10-06', 'Do salário', null);
+  r := public.update_goal_movement('ct-m-0041a', m2, 9, 2700, '2026-10-06', 'Do salário');
+  assert r #>> '{movement,account_id}' = carteira::text and (r #>> '{movement,amount_cents}')::bigint = 2700,
+    'e sem o argumento (cliente antigo) também, mesmo arquivada';
+  r := public.update_goal_movement('ct-m-0042', m2, 10, 2600, '2026-10-06', 'Do salário', null);
   assert r #>> '{movement,account_id}' is null, 'e tirar a conta também';
-  perform pg_temp.expect_code(pg_temp.gu('ct-m-0043', m2, 6, 2600, '2026-10-06', carteira), 'conta_invalida', '22023');
+  perform pg_temp.expect_code(pg_temp.gu('ct-m-0043', m2, 11, 2600, '2026-10-06', carteira), 'conta_invalida', '22023');
   perform public.set_account_status('ct-m-0044', carteira, pg_temp.accver('hugo_cart2'), 'ativa');
-  r := public.update_goal_movement('ct-m-0045', m2, 6, 2600, '2026-10-06', 'Do salário', carteira);
+  r := public.update_goal_movement('ct-m-0045', m2, 11, 2600, '2026-10-06', 'Do salário', carteira);
   assert r #>> '{movement,account_id}' = carteira::text, 'com a conta ativa de novo, a troca vale';
 
   -- Só informativo (A7): nenhum gasto, conta a pagar ou lançamento foi criado, e os totais do mês não mudaram.
@@ -842,7 +892,7 @@ begin
     'nenhum gasto, conta a pagar ou lançamento de cartão nasceu dos movimentos, e Recebido, Pago e Diferença não mudaram';
   perform pg_temp.check_links();
   -- Excluir o movimento: a conta fica livre dele.
-  perform public.delete_goal_movement('ct-m-0050', m2, 7);
+  perform public.delete_goal_movement('ct-m-0050', m2, 12);
   perform public.delete_goal_movement('ct-m-0051', m3, 1);
   assert not exists (select 1 from public.goal_movements where goal_id = g and account_id is not null and deleted_at is null), 'nenhum movimento vivo com conta';
   insert into ids values ('hugo_goal', g);
@@ -866,6 +916,7 @@ declare
   cv int;
   r jsonb;
   e uuid;
+  n int;
 begin
   -- Leitura: Davi, Elisa, Fábio e Ada veem as contas da Família; Gaia não.
   perform pg_temp.as_('davi');
@@ -898,26 +949,48 @@ begin
   perform pg_temp.expect_code(pg_temp.xa('ct-f-0024', casa, cv), 'sem_permissao', '42501');
   r := public.update_account('ct-f-0025', e, 1, 'Cartão de vale', 'outra');
   assert r ->> 'name' = 'Cartão de vale' and (r ->> 'version')::int = 2, 'a própria conta ela altera';
+  -- A marca de principal: tornar a própria conta principal tiraria a marca da conta da Ada, que Elisa não pode alterar.
+  perform pg_temp.expect_code(pg_temp.da('ct-f-0026', e, 2), 'sem_permissao', '42501');
+  assert pg_temp.acc('fam_acc') = 'Conta da casa|banco|ativa|principal|1' and pg_temp.acc('fam_elisa') like 'Cartão de vale|outra|ativa|-|2',
+    'a recusa não mudou nada';
+  -- Renomeação direta (update (name), do app publicado): só a própria conta (ou com "editar de outras pessoas"), como as funções.
+  update public.financial_accounts set name = 'Invasão da Elisa' where id = casa;
+  get diagnostics n = row_count;
+  assert n = 0, 'Elisa não renomeia direto a conta da Ada';
+  update public.financial_accounts set name = 'Vale da Elisa' where id = e;
+  get diagnostics n = row_count;
+  assert n = 1 and pg_temp.acc('fam_elisa') = 'Vale da Elisa|outra|ativa|-|3', 'a própria conta ela renomeia direto (versão +1)';
+  perform pg_temp.as_('fabio');
+  update public.financial_accounts set name = 'Cartão de vale' where id = e;
+  get diagnostics n = row_count;
+  assert n = 1 and pg_temp.acc('fam_elisa') = 'Cartão de vale|outra|ativa|-|4', 'Fábio renomeia direto a conta da Elisa';
+  perform pg_temp.as_('elisa');
   -- Fábio (altera o que é dos outros): renomeia a da Elisa e a da Ada, torna a de Elisa principal e a arquiva depois.
   perform pg_temp.as_('fabio');
-  r := public.update_account('ct-f-0030', e, 2, 'Vale-refeição', 'outra');
-  assert r ->> 'name' = 'Vale-refeição' and (r ->> 'version')::int = 3, 'Fábio altera a conta de Elisa';
-  r := public.set_default_account('ct-f-0031', e, 3);
+  r := public.update_account('ct-f-0030', e, 4, 'Vale-refeição', 'outra');
+  assert r ->> 'name' = 'Vale-refeição' and (r ->> 'version')::int = 5, 'Fábio altera a conta de Elisa';
+  r := public.set_default_account('ct-f-0031', e, 5);
   assert (r ->> 'is_default')::boolean and pg_temp.acc('fam_acc') = 'Conta da casa|banco|ativa|-|2', 'Fábio muda a principal da Família';
+  -- Agora a principal é a de Elisa: ela não pode arquivá-la passando a marca para a conta da Ada (nem tirar a da Ada de outra forma).
+  perform pg_temp.as_('elisa');
+  perform pg_temp.expect_code(pg_temp.sa('ct-f-0035', e, 6, 'arquivada', casa), 'sem_permissao', '42501');
+  assert pg_temp.acc('fam_elisa') like 'Vale-refeição|outra|ativa|principal|6' and pg_temp.acc('fam_acc') = 'Conta da casa|banco|ativa|-|2',
+    'a recusa não mudou nada';
+  perform pg_temp.as_('fabio');
   r := public.set_account_status('ct-f-0032', casa, 2, 'arquivada');
   assert r ->> 'status' = 'arquivada', 'Fábio arquiva a conta da Ada (não é a principal agora)';
   -- A única ativa (agora a de Elisa, também a principal) não se arquiva, com ou sem outra escolhida.
-  perform pg_temp.expect_code(pg_temp.sa('ct-f-0033', e, 4, 'arquivada', casa), 'ultima_conta_ativa', 'PT409');
-  perform pg_temp.expect_code(pg_temp.sa('ct-f-0034', e, 4, 'arquivada'), 'ultima_conta_ativa', 'PT409');
+  perform pg_temp.expect_code(pg_temp.sa('ct-f-0033', e, 6, 'arquivada', casa), 'ultima_conta_ativa', 'PT409');
+  perform pg_temp.expect_code(pg_temp.sa('ct-f-0034', e, 6, 'arquivada'), 'ultima_conta_ativa', 'PT409');
   r := public.set_account_status('ct-f-0036', casa, 3, 'ativa');
-  r := public.set_account_status('ct-f-0037', e, 4, 'arquivada', casa);
+  r := public.set_account_status('ct-f-0037', e, 6, 'arquivada', casa);
   assert pg_temp.acc('fam_acc') like 'Conta da casa|banco|ativa|principal|%' and (select count(*) from public.financial_accounts where context_id = fam and is_default) = 1,
     'arquivar a principal passa a principal para a outra, na Família';
-  r := public.delete_account('ct-f-0038', e, 5);
+  r := public.delete_account('ct-f-0038', e, 7);
   assert r ->> 'deleted_at' is not null, 'Fábio exclui a conta de Elisa (sem lançamentos)';
   -- Elisa já não encontra a que foi excluída; Ada lê a da casa.
   perform pg_temp.as_('elisa');
-  perform pg_temp.expect_code(pg_temp.ua('ct-f-0040', e, 6, 'Volta', 'outra'), 'nao_encontrado', 'P0002');
+  perform pg_temp.expect_code(pg_temp.ua('ct-f-0040', e, 8, 'Volta', 'outra'), 'nao_encontrado', 'P0002');
   perform pg_temp.as_('ada');
   assert (select count(*) from public.financial_accounts where context_id = fam) = 1, 'a Família volta a uma conta, a da casa';
   -- Revogar o vínculo: a repetição de uma criação anterior já não devolve a conta.
@@ -1161,6 +1234,7 @@ do $$ begin
      and not has_function_privilege('authenticated', 'public.clarevo_check_account_name(uuid, text, uuid)', 'execute')
      and not has_function_privilege('authenticated', 'public.clarevo_check_account_limit(uuid, uuid)', 'execute')
      and not has_function_privilege('authenticated', 'public.clarevo_lock_account(uuid)', 'execute')
+     and not has_function_privilege('authenticated', 'public.clarevo_require_account_owner(uuid)', 'execute')
      and not has_function_privilege('authenticated', 'public.clarevo_validate_record(uuid, uuid, uuid, bigint, date, text, text, uuid)', 'execute'),
     'gatilhos e funções de apoio sem execute';
   assert pg_get_function_arguments('public.create_account(text, uuid, text, text)'::regprocedure)
@@ -1176,8 +1250,8 @@ do $$ begin
      and pg_get_function_arguments('public.add_goal_movement(text, uuid, text, bigint, date, text, uuid)'::regprocedure)
        = 'p_idempotency_key text, p_goal_id uuid, p_kind text, p_amount_cents bigint, p_occurred_on date, p_note text DEFAULT NULL::text, p_account_id uuid DEFAULT NULL::uuid'
      and pg_get_function_arguments('public.update_goal_movement(text, uuid, integer, bigint, date, text, uuid)'::regprocedure)
-       = 'p_idempotency_key text, p_movement_id uuid, p_expected_version integer, p_amount_cents bigint, p_occurred_on date, p_note text DEFAULT NULL::text, p_account_id uuid DEFAULT NULL::uuid',
-    'assinaturas e nomes dos argumentos (chamada por nome no PostgREST)';
+       = 'p_idempotency_key text, p_movement_id uuid, p_expected_version integer, p_amount_cents bigint, p_occurred_on date, p_note text DEFAULT NULL::text, p_account_id uuid DEFAULT ''00000000-0000-0000-0000-000000000000''::uuid',
+    'assinaturas e nomes dos argumentos (chamada por nome no PostgREST); em update_goal_movement o padrão é "manter a conta"';
   assert (select bool_and(pg_get_function_result(p.oid) = 'jsonb' and p.prosecdef and p.provolatile = 'v')
             from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and p.proname in ('create_account', 'update_account', 'set_default_account', 'set_account_status', 'delete_account'))
@@ -1216,6 +1290,17 @@ do $$ begin
      and (select qual from pg_policies where tablename = 'financial_accounts' and policyname = 'accounts_rename') like '%deleted_at IS NULL%'
      and (select with_check from pg_policies where tablename = 'financial_accounts' and policyname = 'accounts_rename') like '%deleted_at IS NULL%',
     'duas políticas, as duas só para as contas não excluídas';
+  assert (select qual from pg_policies where tablename = 'financial_accounts' and policyname = 'accounts_rename') like '%created_by = auth.uid()%edit_others%'
+     and (select with_check from pg_policies where tablename = 'financial_accounts' and policyname = 'accounts_rename') like '%created_by = auth.uid()%edit_others%',
+    'a renomeação direta exige a autoria ou "editar de outras pessoas"';
+  assert (select provolatile from pg_proc where oid = 'public.clarevo_validate_record(uuid, uuid, uuid, bigint, date, text, text, uuid)'::regprocedure) = 'v'
+     and (select prosrc from pg_proc where oid = 'public.clarevo_validate_record(uuid, uuid, uuid, bigint, date, text, text, uuid)'::regprocedure) like '%for share%',
+    'a validação do registro é volátil e trava a conta com for share';
+  assert (select prosrc from pg_proc where oid = 'public.pay_invoice(text, uuid, date, integer, bigint, date, uuid)'::regprocedure) like '%a.is_default desc%'
+     and (select prosrc from pg_proc where oid = 'public.pay_invoice(text, uuid, date, integer, bigint, date, uuid)'::regprocedure) like '%for share%'
+     and (select prosrc from pg_proc where oid = 'public.add_goal_movement(text, uuid, text, bigint, date, text, uuid)'::regprocedure) like '%for share%'
+     and (select prosrc from pg_proc where oid = 'public.update_goal_movement(text, uuid, integer, bigint, date, text, uuid)'::regprocedure) like '%for share%',
+    'pagar fatura (principal primeiro) e os movimentos de meta travam a conta com for share';
   assert (select indexdef from pg_indexes where indexname = 'financial_accounts_one_default')
        = 'CREATE UNIQUE INDEX financial_accounts_one_default ON public.financial_accounts USING btree (context_id) WHERE is_default'
      and (select indexdef from pg_indexes where indexname = 'financial_accounts_name_live')
@@ -1233,6 +1318,99 @@ do $$ begin
      and exists (select 1 from pg_constraint where conname = 'goal_movements_conta' and contype = 'c'), 'vínculo e restrição do movimento';
   assert not has_table_privilege('authenticated', 'public.goal_movements', 'insert, update, delete, truncate')
      and not has_any_column_privilege('authenticated', 'public.goal_movements', 'insert, update'), 'goal_movements segue sem escrita direta';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 17. Caminho de atualização: as linhas de antes da 0010 (uma principal por contexto, tipo banco, versão 1) funcionam com as
+-- funções novas e com a renomeação direta do app publicado. Simulado em contextos novos, como superusuário: o estado anterior
+-- é refeito com os gatilhos desligados (só aqui), o comando de preenchimento da migração é repetido e os gatilhos voltam.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  a1 uuid; a2 uuid; b1 uuid; b2 uuid; c1 uuid;
+  iris uuid;
+  cp uuid;
+  cx uuid; cy uuid; cz uuid;
+  r jsonb;
+  n int;
+begin
+  insert into public.financial_contexts (kind, name, owner_person_id) values ('familia', 'Antes da 0010 X', pg_temp.id('ada')) returning id into cx;
+  insert into public.financial_contexts (kind, name, owner_person_id) values ('familia', 'Antes da 0010 Y', pg_temp.id('ada')) returning id into cy;
+  insert into public.financial_contexts (kind, name, owner_person_id) values ('familia', 'Antes da 0010 Z', pg_temp.id('ada')) returning id into cz;
+  insert into public.context_memberships (context_id, person_id, role, can_read, can_write, can_edit_others)
+    select c, pg_temp.id('ada'), 'titular'::public.membership_role, true, true, true from unnest(array[cx, cy, cz]) c;
+  alter table public.financial_accounts disable trigger financial_accounts_default;
+  alter table public.financial_accounts disable trigger financial_accounts_guard;
+  -- X: duas ativas; Y: a mais antiga arquivada e depois uma ativa; Z: uma só.
+  insert into public.financial_accounts (context_id, name, created_by, created_at) values (cx, 'Conta principal', pg_temp.id('ada'), now() - interval '3 days') returning id into a1;
+  insert into public.financial_accounts (context_id, name, created_by, created_at) values (cx, 'Segunda', pg_temp.id('ada'), now() - interval '2 days') returning id into a2;
+  insert into public.financial_accounts (context_id, name, status, created_by, created_at) values (cy, 'Velha', 'arquivada', pg_temp.id('ada'), now() - interval '3 days') returning id into b1;
+  insert into public.financial_accounts (context_id, name, created_by, created_at) values (cy, 'Conta principal', pg_temp.id('ada'), now() - interval '2 days') returning id into b2;
+  insert into public.financial_accounts (context_id, name, created_by) values (cz, 'Conta principal', pg_temp.id('ada')) returning id into c1;
+  -- Estado de antes da 0010: sem principal, tipo banco, versão 1.
+  update public.financial_accounts set is_default = false, kind = 'banco', version = 1, deleted_at = null, deleted_by = null
+   where id in (a1, a2, b1, b2, c1);
+  -- O mesmo comando de preenchimento da migração: a mais antiga das ativas de cada contexto vira a principal.
+  update public.financial_accounts a
+     set is_default = true
+   where a.status = 'ativa'
+     and a.id = (select x.id from public.financial_accounts x
+                  where x.context_id = a.context_id and x.status = 'ativa'
+                  order by x.created_at, x.id
+                  limit 1)
+     and a.context_id in (cx, cy, cz);
+  alter table public.financial_accounts enable trigger financial_accounts_default;
+  alter table public.financial_accounts enable trigger financial_accounts_guard;
+  assert (select array_agg(id order by id) from public.financial_accounts where is_default and context_id in (cx, cy, cz))
+       = (select array_agg(i order by i) from unnest(array[a1, b2, c1]) i), 'a mais antiga das ativas de cada contexto é a principal';
+  assert (select bool_and(kind = 'banco' and version = 1) from public.financial_accounts where context_id in (cx, cy, cz)), 'tipo banco, versão 1';
+  assert (select count(*) from public.financial_accounts where context_id in (cx, cy, cz) and is_default) = 3, 'uma principal por contexto';
+
+  -- O app novo e o publicado sobre essas linhas.
+  set role authenticated;
+  perform pg_temp.as_('ada');
+  assert (select count(*) from public.financial_accounts where context_id = cx) = 2, 'as duas contas de X são lidas';
+  update public.financial_accounts set name = 'Banco' where id = a1;           -- renomeação direta do app publicado
+  get diagnostics n = row_count;
+  assert n = 1 and (select version from public.financial_accounts where id = a1) = 2, 'a renomeação direta funciona e soma 1 à versão';
+  r := public.update_account('ct-u-0001', a1, 2, 'Banco do dia a dia', 'banco');
+  assert r ->> 'name' = 'Banco do dia a dia' and (r ->> 'version')::int = 3, 'update_account sobre a linha antiga';
+  r := public.update_account('ct-u-0002', a2, 1, 'Carteira', 'dinheiro');
+  assert r ->> 'kind' = 'dinheiro' and (r ->> 'version')::int = 2, 'a versão 1 da linha antiga vale';
+  perform public.create_record('ct-u-0003', cx, a2, 'despesa', 500, '2026-10-06', 'Padaria');
+  r := public.set_default_account('ct-u-0004', a2, 2);
+  assert (r ->> 'is_default')::boolean and (select version from public.financial_accounts where id = a1) = 4, 'trocar a principal; a anterior sobe +1';
+  r := public.set_account_status('ct-u-0005', a1, 4, 'arquivada');
+  assert r ->> 'status' = 'arquivada', 'arquivar a antiga principal (agora comum)';
+  perform pg_temp.expect_code(pg_temp.sa('ct-u-0006', a2, 3, 'arquivada'), 'ultima_conta_ativa', 'PT409');
+  perform pg_temp.expect_code(pg_temp.xa('ct-u-0007', a2, 3), 'conta_principal', 'PT409');
+  -- Y: a mais antiga estava arquivada; a ativa é a principal, e o nome da arquivada continua ocupado (ela não foi excluída).
+  perform pg_temp.expect_code(pg_temp.ca('ct-u-0008', cy, 'velha', 'outra'), 'nome_da_conta_repetido', 'PT409');
+  r := public.create_account('ct-u-0009', cy, 'Outra conta', 'outra');
+  assert not (r ->> 'is_default')::boolean and (select is_default from public.financial_accounts where id = b2), 'a principal de Y continua sendo a ativa antiga';
+  assert public.ensure_personal_space('Conta principal') is not null, 'a primeira entrada de Ada segue funcionando';
+  reset role;
+
+  -- A primeira entrada devolve a principal, mesmo com contas mais antigas arquivadas ou excluídas (Íris, pessoa nova).
+  iris := gen_random_uuid();
+  insert into ids values ('iris', iris);
+  insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values (iris, 'iris@exemplo.test', now(), '{"display_name":"Íris"}');
+  set role authenticated;
+  perform pg_temp.as_('iris');
+  r := public.ensure_personal_space('Conta principal');
+  reset role;
+  cp := (r #>> '{account,id}')::uuid;
+  insert into public.financial_accounts (context_id, name, status, created_by, created_at)
+    values ((r ->> 'context_id')::uuid, 'Antiga', 'arquivada', iris, now() - interval '5 days');
+  insert into public.financial_accounts (context_id, name, status, created_by, created_at, deleted_at, deleted_by)
+    values ((r ->> 'context_id')::uuid, 'Excluída', 'arquivada', iris, now() - interval '6 days', now(), iris);
+  assert (select name from public.financial_accounts where context_id = (r ->> 'context_id')::uuid order by created_at limit 1) = 'Excluída',
+    'a mais antiga é a excluída, depois a arquivada';
+  set role authenticated;
+  perform pg_temp.as_('iris');
+  assert public.ensure_personal_space('Outro nome') #>> '{account,id}' = cp::text, 'a primeira entrada devolve a principal, não a mais antiga';
+  assert (select count(*) from public.financial_accounts) = 2, 'e não cria conta (a excluída não é lida)';
+  reset role;
 end $$;
 
 -- Vínculos coerentes no fim de tudo.

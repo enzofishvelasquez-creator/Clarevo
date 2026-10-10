@@ -1082,7 +1082,7 @@ begin
      and pg_temp.cm(c, '2026-12-01') = '40000 2026-12-10 2026-12-03 aberto v1 estimado',
     'recusas não gravam';
 
-  -- Pagamento parcial: R$ 700,00 de R$ 782,70, em 12/11. A conta de saída é a conta ativa mais antiga do contexto.
+  -- Pagamento parcial: R$ 700,00 de R$ 782,70, em 12/11. A conta de saída é a conta principal do contexto (aqui também a mais antiga).
   res := public.pay_invoice('ce-b-0420', c, '2026-11-01', 5, 70000, '2026-11-12');
   insert into ids values ('pgto1', (res #>> '{record,id}')::uuid);
   assert res #>> '{record,description}' = 'Fatura Cartão Exemplo (novembro)' and (res #>> '{record,amount_cents}')::bigint = 70000
@@ -1824,7 +1824,7 @@ begin
   perform pg_temp.expect_code(pg_temp.pi('cd-f-0022', fc, '2026-11-01', 1, 100, '2026-10-07'), 'sem_permissao', '42501');
   perform pg_temp.expect_code(pg_temp.ui('cd-f-0023', fc, '2026-11-01', 1), 'sem_permissao', '42501');
   perform pg_temp.expect_code(pg_temp.uc('cd-f-0024', fc, 2, 'Caio', null, 5, 12, null), 'sem_permissao', '42501');
-  -- Theo paga a fatura (a conta de saída é a conta ativa mais antiga da Família); Iris não desfaz; Theo desfaz.
+  -- Theo paga a fatura (a conta de saída é a conta principal da Família, aqui também a mais antiga); Iris não desfaz; Theo desfaz.
   perform pg_temp.as_('theo');
   -- A fatura de novembro fecha em 05/11: Theo paga em 06/11 (fatura aberta é recusada; a Iris não chega a essa conferência).
   perform pg_temp.expect_code(pg_temp.pi('cd-f-0029', fc, '2026-11-01', pg_temp.iv_ver(fc, '2026-11-01'), 5000, '2026-10-07'), 'fatura_aberta', 'PT409');

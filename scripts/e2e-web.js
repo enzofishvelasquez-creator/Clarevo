@@ -1381,7 +1381,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const saldoHint = p.getByRole('button', { name: 'O que é isso? Saldo inicial', exact: true }).filter({ visible: true }).first();
   await saldoHint.waitFor({ timeout: 8000 }).catch(() => {});
   ok('/conta: "O que é isso?" de "Saldo inicial", fechado, com alvo de 44 px', (await saldoHint.getAttribute('aria-expanded')) === 'false' && ((await saldoHint.boundingBox())?.height ?? 0) >= 43.5 &&
-    (await body()).includes('Saldo inicial: não informado.'));
+    (await body()).includes('O Clarevo não calcula saldo por conta.'));
   await saldoHint.click(); await waitText('Ler explicação completa');
   ok('/conta: o resumo abre no lugar, sem sair da tela', (await saldoHint.getAttribute('aria-expanded')) === 'true' && new URL(p.url()).pathname === '/conta');
   await saldoHint.evaluate((e) => e.scrollIntoView({ block: 'center' }));
@@ -6525,8 +6525,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const g1Initial = await g1Rows();
   ok('G1 Conta: "Suas contas" lista a Conta principal (Conta bancária, Principal) e a Carteira (Dinheiro), nessa ordem',
     JSON.stringify(g1Initial) === JSON.stringify(['Conta principal, Conta bancária · Principal. Abrir a conta.', 'Carteira, Dinheiro. Abrir a conta.']), JSON.stringify(g1Initial));
-  ok('G1 Conta: o card diz que é só a origem (sem saldo) e mantém o aviso do saldo inicial; o antigo "Nome da conta" saiu',
-    t.includes('É só a origem informada: o Clarevo não guarda saldo nem movimenta dinheiro.') && t.includes('Saldo inicial: não informado. Sem ele, o Clarevo não calcula o saldo da conta.') &&
+  ok('G1 Conta: o card diz que é só a origem (sem saldo) e que o Clarevo não calcula saldo por conta; o antigo "Nome da conta" saiu',
+    t.includes('É só a origem informada: o Clarevo não guarda saldo nem movimenta dinheiro.') && t.includes('O Clarevo não calcula saldo por conta.') &&
     (await visibleCount('textbox', 'Nome da conta')) === 0 && (await visibleCount('button', 'Salvar nome')) === 0 && (await visibleCount('button', 'Adicionar conta')) === 1);
   ok('G1 Conta: a demonstração guarda a Carteira como dinheiro e o mercado pago nela (Mercado de setembro e de outubro)',
     (await g1Accounts()) === 'Conta principal|banco|ativa|principal;Carteira|dinheiro|ativa|-' && (await g1Records('Mercado')) === 'Mercado|Carteira|125000;Mercado|Carteira|140000', await g1Records('Mercado'));
@@ -6537,7 +6537,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await g1Keep();
   ok('G1 Nova conta: título, nome, tipo (Conta bancária marcada), a nota do saldo e o rodapé fixo',
     (await h1Name()) === 'Nova conta' && urlPath() === '/contas/nova' && (await visibleCount('textbox', 'Nome da conta')) === 1 && (await g1Checked('Conta bancária')) && (await visibleCount('radio', /^(Dinheiro|Outra)$/)) === 2 &&
-    t.includes('Por exemplo: Carteira ou Conta do banco.') && t.includes('Saldo inicial: não informado') && (await visibleCount('button', 'Adicionar conta')) === 1 && (await visibleCount('button', 'Excluir conta')) === 0);
+    t.includes('Por exemplo: Carteira ou Conta do banco.') && t.includes('O Clarevo não calcula saldo por conta.') && (await visibleCount('button', 'Adicionar conta')) === 1 && (await visibleCount('button', 'Excluir conta')) === 0);
   await atWidths(async (w) => { await innerChecks(`G1 Nova conta ${w}px`); if (w === 390) await shot('241_nova_conta'); });
   await g1Save('Adicionar conta');
   ok('G1 Nova conta sem nome: "Dê um nome de 1 a 40 caracteres para a conta." e nada gravado', (await body()).includes('Dê um nome de 1 a 40 caracteres para a conta.') && urlPath() === '/contas/nova' && (await g1Accounts()).split(';').length === 2);

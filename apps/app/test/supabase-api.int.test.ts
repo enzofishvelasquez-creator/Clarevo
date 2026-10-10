@@ -5398,6 +5398,12 @@ describe('API real: contas de origem do dinheiro (Ciclo G1, D-043)', () => {
     expect(archivedOld).toMatchObject({ status: 'arquivada', isDefault: false, version: old.version + 1 });
     expect((await ana.getSpace())!.accounts.map((a) => a.id)).not.toContain(old.id);
     expect((await ana.listAccounts(ctx)).map((a) => a.id)).toContain(old.id);
+    // A lista põe as ativas antes das arquivadas, com a principal no topo (e a arquivada por último).
+    const listedAll = await ana.listAccounts(ctx);
+    expect(listedAll.map((a) => a.status)).toEqual([...listedAll.map((a) => a.status)].sort((x, y) => (x === y ? 0 : x === 'ativa' ? -1 : 1)));
+    expect(listedAll[0]).toMatchObject({ id: principal, isDefault: true, status: 'ativa' });
+    expect(listedAll[listedAll.length - 1]).toMatchObject({ id: old.id, status: 'arquivada' });
+    expect(listedAll.filter((a) => a.status === 'ativa').map((a) => a.id)).toEqual((await ana.getSpace())!.accounts.map((a) => a.id));
     expect(await code(ana.createRecord(newOperationKey(), ctx, 'despesa', rec(old.id, 3)))).toEqual(['conta_invalida', null]);
     expect(await code(bruno.createRecord(newOperationKey(), ctx, 'despesa', rec(old.id, 3)))).toEqual(['sem_permissao', null]);
     // Editar mantendo a conta arquivada vale; trocar para outra arquivada, não.
@@ -5423,6 +5429,25 @@ describe('API real: contas de origem do dinheiro (Ciclo G1, D-043)', () => {
     // Totais do mês: a soma de todas as contas, sem separar por conta.
     const s = summarizeMonth(await ana.listRecords(ctx, OCT), ctx, OCT);
     expect([s.receivedCents, s.paidCents]).toEqual([600000, 9000 + 800 + 15000 + 20000]);
+    // Sem a conta (nula), a principal do contexto e não a mais antiga (A9): primeiro a Conta principal, depois a Carteira quando ela
+    // passa a principal; e a primeira entrada devolve a principal, mesmo com a mais antiga arquivada.
+    const water = await ana.createCommitment(newOperationKey(), ctx, { description: 'Água', amountCents: 5000, dueOn: '2036-10-16', category: 'Moradia' });
+    expect((await ana.payCommitment(newOperationKey(), water.commitment.id, 1, { accountId: null, amountCents: 5000, paidOn: T0, category: 'Moradia' })).record.accountId).toBe(principal);
+    const versionOf = async (id: string) => (await ana.listAccounts(ctx)).find((a) => a.id === id)!.version;
+    await ana.setDefaultAccount(newOperationKey(), wallet.id, await versionOf(wallet.id));
+    const gas = await ana.createCommitment(newOperationKey(), ctx, { description: 'Gás', amountCents: 6000, dueOn: '2036-10-17', category: 'Moradia' });
+    expect((await ana.payCommitment(newOperationKey(), gas.commitment.id, 1, { accountId: null, amountCents: 6000, paidOn: T0, category: 'Moradia' })).record.accountId).toBe(wallet.id);
+    const invoiceOf = async () => (await ana.listInvoiceItems(card.id)).find((i) => i.month === OCT)!.commitmentVersion!;
+    await ana.undoInvoicePayment(newOperationKey(), card.id, OCT, await invoiceOf());
+    expect((await ana.payInvoice(newOperationKey(), card.id, OCT, await invoiceOf(), 20000, T0)).record.accountId).toBe(wallet.id);
+    await ana.setAccountStatus(newOperationKey(), principal, await versionOf(principal), 'arquivada');
+    const eps = await clientFor(ANA, T0).rpc('ensure_personal_space', { p_account_name: 'Outro nome', p_time_zone: null });
+    expect(eps.error).toBeNull();
+    expect((eps.data as { account: { id: string } }).account.id).toBe(wallet.id);
+    await ana.setAccountStatus(newOperationKey(), principal, await versionOf(principal), 'ativa');
+    await ana.setDefaultAccount(newOperationKey(), principal, await versionOf(principal));
+    wallet = (await ana.listAccounts(ctx)).find((a) => a.id === wallet.id)!;
+    expect(wallet.isDefault).toBe(false);
     // Excluir: a conta com lançamentos pede para arquivar; a sem lançamentos sai.
     expect(await code(ana.deleteAccount(newOperationKey(), wallet.id, wallet.version))).toEqual(['conta_com_lancamentos', null]);
     // A conta antiga ficou sem lançamentos (o gasto dela passou para a Carteira): excluída, some da leitura e libera o nome.
@@ -5461,9 +5486,23 @@ describe('API real: contas de origem do dinheiro (Ciclo G1, D-043)', () => {
     // Alterar: trocar, tirar a conta (nulo) e manter a que o movimento já tem, mesmo arquivada.
     const swapped = await ana.updateGoalMovement(newOperationKey(), a.movement!.id, 1, move('aporte', principal));
     expect(swapped.movement).toMatchObject({ accountId: principal, version: 2 });
-    const cleared = await ana.updateGoalMovement(newOperationKey(), a.movement!.id, 2, move('aporte', null));
-    expect(cleared.movement!.accountId).toBeNull();
-    expect(await code(ana.updateGoalMovement(newOperationKey(), a.movement!.id, 3, move('aporte', archived.id)))).toEqual(['conta_invalida', null]);
+    // Cliente antigo corrigindo o valor (por nome, sem p_account_id): a conta do movimento é mantida, e não apagada.
+    const oldUpdate = await clientFor(ANA, T0).rpc('update_goal_movement', {
+      p_idempotency_key: newOperationKey(),
+      p_movement_id: a.movement!.id,
+      p_expected_version: 2,
+      p_amount_cents: 1100,
+      p_occurred_on: T0,
+      p_note: null,
+    });
+    expect(oldUpdate.error).toBeNull();
+    expect((oldUpdate.data as { movement: { account_id: string | null; version: number; amount_cents: number } }).movement).toMatchObject({ account_id: principal, version: 3, amount_cents: 1100 });
+    // O repositório novo, sem accountId no pedido, também mantém; com null informado, tira.
+    const keptByRepo = await ana.updateGoalMovement(newOperationKey(), a.movement!.id, 3, { amountCents: cents(10), occurredOn: T0, note: null });
+    expect(keptByRepo.movement).toMatchObject({ accountId: principal, version: 4 });
+    const cleared = await ana.updateGoalMovement(newOperationKey(), a.movement!.id, 4, move('aporte', null));
+    expect(cleared.movement).toMatchObject({ accountId: null, version: 5 });
+    expect(await code(ana.updateGoalMovement(newOperationKey(), a.movement!.id, 5, move('aporte', archived.id)))).toEqual(['conta_invalida', null]);
     const listed = await ana.listGoalMovements(gid);
     expect(listed.find((m) => m.id === r.movement!.id)!.accountId).toBe(principal);
     expect(listed.find((m) => m.id === a.movement!.id)!.accountId).toBeNull();
@@ -5601,7 +5640,14 @@ describe('conversor das contas de origem', () => {
     expect(await failure(fake({ add_goal_movement: { goal, movement: { ...movement, kind: 'rendimento' } } }).addGoalMovement('chave-0012', 'g1', 'rendimento', { amountCents: 1000, occurredOn: '2036-10-07', note: null }))).toEqual(['desconhecido', 'movimento_inconsistente', null]);
   });
 
-  it('a conta de aporte vai só quando informada; em alterar, nula tira a conta e ausente não manda nada', async () => {
+  it('listAccounts devolve as ativas antes das arquivadas, a principal no topo, qualquer que seja a ordem que o banco entregue', async () => {
+    const mk = (id: string, status: string, isDefault = false) => ({ ...row, id, name: id, status, is_default: isDefault });
+    const rows = [mk('arq1', 'arquivada'), mk('ativa2', 'ativa'), mk('arq2', 'arquivada'), mk('principal', 'ativa', true), mk('ativa3', 'ativa')];
+    const listed = await fake({}, { financial_accounts: rows }).listAccounts('ctx');
+    expect(listed.map((a) => a.id)).toEqual(['principal', 'ativa2', 'ativa3', 'arq1', 'arq2']);
+  });
+
+  it('a conta de aporte vai só quando informada; em alterar, nula tira a conta e ausente não manda nada (o banco mantém a conta)', async () => {
     calls.length = 0;
     const goal = { id: 'g1', context_id: 'ctx', goal_type: 'objetivo', name: 'Viagem', target_cents: 500000, target_month: null, planned_monthly_cents: null, essential_base_cents: null, essential_months: null, essential_base_source: null, status: 'ativa', created_by: 'p1', version: 1, created_at: 'a', updated_at: 'b', saved_cents: 0, initial_cents: 0, deposits_cents: 0, withdrawals_cents: 0, income_cents: 0, appreciation_cents: 0, depreciation_cents: 0, last_movement_on: null };
     const repo = fake({ add_goal_movement: { goal, movement: null }, update_goal_movement: { goal, movement: null } });

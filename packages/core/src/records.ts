@@ -179,6 +179,12 @@ export interface PaymentInput {
   category: string | null;
 }
 
+/**
+ * O que payCommitment aceita: um PaymentInput em que a conta pode ser nula, e então vale a conta principal do contexto (D-043;
+ * no banco, p_account_id nulo em pay_commitment). As telas sempre mandam a conta escolhida.
+ */
+export type PaymentRequest = Omit<PaymentInput, 'accountId'> & { accountId: string | null };
+
 /** Campos que a pessoa informa ao criar ou editar um registro. */
 export interface RecordInput {
   accountId: string;
@@ -473,8 +479,10 @@ export interface GoalMovementInput {
   occurredOn: IsoDate;
   note: string | null;
   /**
-   * Só em aporte e resgate (D-043): a conta ativa do mesmo contexto. Ausente ou null = sem conta; em update_goal_movement, null tira
-   * a conta que o movimento já tinha. Nos outros tipos, informar a conta é recusado (campo_nao_se_aplica).
+   * Só em aporte e resgate (D-043): a conta ativa do mesmo contexto. Em addGoalMovement, ausente ou null = sem conta. Em
+   * updateGoalMovement, ausente = manter a conta que o movimento já tem (o app publicado antes da 0010 não manda a conta e não a
+   * perde), null informado = tirar a conta, um id = trocar ou manter. Nos outros tipos, informar a conta é recusado
+   * (campo_nao_se_aplica).
    */
   accountId?: string | null;
 }

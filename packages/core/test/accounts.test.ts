@@ -21,6 +21,8 @@ import {
   defaultAccountOf,
   filterByAccount,
   hasAccountChoice,
+  pickerShowsChips,
+  pickerShownAccount,
   isRepoError,
   newOperationKey,
   normalizeAccountInput,
@@ -136,6 +138,26 @@ describe('regras puras das contas (D-043)', () => {
     expect(canAddActiveAccount([...full.slice(1), acc({ id: 'old', name: 'Velha', status: 'arquivada' })])).toBe(true);
   });
 
+  it('o seletor: chips quando há o que escolher; com uma conta só, o nome da conta escolhida como texto', () => {
+    const one = [list[0]!];
+    const two = [list[0]!, list[1]!];
+    // Uma conta, escolhida e sem "Sem conta": texto.
+    expect(pickerShowsChips(one, 'a')).toBe(false);
+    expect(pickerShownAccount(one, 'a')?.id).toBe('a');
+    // Com "Sem conta" (aporte e resgate) há o que escolher, mesmo com uma conta só e já escolhida (editar um aporte).
+    expect(pickerShowsChips(one, 'a', true)).toBe(true);
+    expect(pickerShowsChips(one, null, true)).toBe(true);
+    // Um valor que não é a primeira conta (a arquivada do registro, no fim da lista) mostra os chips.
+    expect(pickerShowsChips(one, 'outra')).toBe(true);
+    expect(pickerShowsChips(one, null)).toBe(true);
+    expect(pickerShowsChips(two, 'a')).toBe(true);
+    expect(pickerShowsChips([], null)).toBe(false);
+    // O texto mostra a conta escolhida, não a primeira.
+    expect(pickerShownAccount(two, 'b')?.id).toBe('b');
+    expect(pickerShownAccount(two, null)?.id).toBe('a');
+    expect(pickerShownAccount([], 'a')).toBeNull();
+  });
+
   it('o que impede arquivar ou excluir, olhando só a lista', () => {
     expect(accountBlock(list, list[1]!, 'archive')).toBeNull();
     expect(accountBlock(list, list[0]!, 'archive')).toBeNull(); // a principal arquiva escolhendo outra
@@ -191,6 +213,8 @@ describe('regras puras das contas (D-043)', () => {
     expect(ACCOUNTS_TEXT.rowCaption('outra', false, 'arquivada')).toBe('Outra · Arquivada');
     expect(ACCOUNTS_TEXT.single(ACCOUNTS_TEXT.out, 'Conta principal')).toBe('Saiu de: Conta principal');
     expect(ACCOUNTS_TEXT.leavingFrom('Carteira')).toBe('saindo da conta Carteira');
+    // Nenhum saldo por conta: o aviso não sugere que há saldo inicial a informar.
+    expect(ACCOUNTS_TEXT.balanceNote).toBe('O Clarevo não calcula saldo por conta.');
     expect(accountErrorText('conta_com_lancamentos')).toBe(ACCOUNT_ERROR_TEXT.conta_com_lancamentos);
     expect(accountErrorText('qualquer_coisa')).toBe(ACCOUNT_ERROR_TEXT.salvar_falhou);
   });
@@ -389,6 +413,23 @@ describe('MemoryRepository: contas de origem (D-043)', () => {
     const paidInvoice = await repo.payInvoice(key(), card.card.id, '2026-10', inv.commitmentVersion!, 20_000, DEMO_TODAY, cart.id);
     expect(paidInvoice.record.accountId).toBe(cart.id);
     expect(principal).toBeTruthy();
+    // Sem a conta, a principal do contexto (não a mais antiga): primeiro a Conta principal, depois a Carteira quando ela passa a principal.
+    const bill2 = await repo.createCommitment(key(), ctx, { description: 'Água', amountCents: 5000, dueOn: '2026-10-16', category: 'Moradia' });
+    const byDefault = await repo.payCommitment(key(), bill2.commitment.id, 1, { accountId: null, amountCents: 5000, paidOn: DEMO_TODAY, category: 'Moradia' });
+    expect(byDefault.record.accountId).toBe(principal);
+    await repo.undoInvoicePayment(key(), card.card.id, '2026-10', (await repo.listInvoiceItems(card.card.id)).find((i) => i.month === '2026-10')!.commitmentVersion!);
+    const afterUndo = (await repo.listInvoiceItems(card.card.id)).find((i) => i.month === '2026-10')!;
+    const first = await repo.payInvoice(key(), card.card.id, '2026-10', afterUndo.commitmentVersion!, 20_000, DEMO_TODAY);
+    expect(first.record.accountId).toBe(principal);
+    await repo.setDefaultAccount(key(), cart.id, cart.version);
+    await repo.undoInvoicePayment(key(), card.card.id, '2026-10', (await repo.listInvoiceItems(card.card.id)).find((i) => i.month === '2026-10')!.commitmentVersion!);
+    const again = await repo.payInvoice(key(), card.card.id, '2026-10', (await repo.listInvoiceItems(card.card.id)).find((i) => i.month === '2026-10')!.commitmentVersion!, 20_000, DEMO_TODAY);
+    expect(again.record.accountId).toBe(cart.id);
+    const bill3 = await repo.createCommitment(key(), ctx, { description: 'Gás', amountCents: 6000, dueOn: '2026-10-17', category: 'Moradia' });
+    const byNew = await repo.payCommitment(key(), bill3.commitment.id, 1, { accountId: null, amountCents: 6000, paidOn: DEMO_TODAY, category: 'Moradia' });
+    expect(byNew.record.accountId).toBe(cart.id);
+    // A primeira entrada devolve a principal primeiro.
+    expect((await repo.ensurePersonalSpace('Outro nome')).accounts[0]!.id).toBe(cart.id);
   });
 
   it('aporte e resgate de meta com a conta: só nesses tipos, conta ativa do contexto; a conta só informa', async () => {
@@ -437,17 +478,30 @@ describe('MemoryRepository: contas de origem (D-043)', () => {
     const m = a.movement!;
     const swapped = await repo.updateGoalMovement(key(), m.id, 1, base(principal));
     expect(swapped.movement).toMatchObject({ accountId: principal, version: 2 });
-    const cleared = await repo.updateGoalMovement(key(), m.id, 2, base(null));
+    // Sem a conta no pedido (o app publicado antes da 0010): a conta do movimento é mantida, e o hash é outro que o do nulo informado.
+    const kk = key();
+    const kept = await repo.updateGoalMovement(kk, m.id, 2, { amountCents: 1200, occurredOn: DEMO_TODAY, note: null });
+    expect(kept.movement).toMatchObject({ accountId: principal, amountCents: 1200, version: 3 });
+    expect(await repo.updateGoalMovement(kk, m.id, 2, { amountCents: 1200, occurredOn: DEMO_TODAY, note: null })).toEqual(kept);
+    await expectCode(repo.updateGoalMovement(kk, m.id, 2, { amountCents: 1200, occurredOn: DEMO_TODAY, note: null, accountId: null }), 'chave_reutilizada');
+    // Nulo informado tira a conta.
+    const cleared = await repo.updateGoalMovement(key(), m.id, 3, base(null));
     expect(cleared.movement!.accountId).toBeNull();
-    await expectCode(repo.updateGoalMovement(key(), m.id, 3, base(old.id)), 'conta_invalida');
+    // Sem conta no movimento, ausente continua sem conta.
+    const noneKept = await repo.updateGoalMovement(key(), m.id, 4, { amountCents: 1000, occurredOn: DEMO_TODAY, note: null });
+    expect(noneKept.movement).toMatchObject({ accountId: null, version: 5 });
+    await expectCode(repo.updateGoalMovement(key(), m.id, 5, base(old.id)), 'conta_invalida');
     const interest = await repo.addGoalMovement(key(), gid, 'rendimento', base());
     await expectCode(repo.updateGoalMovement(key(), interest.movement!.id, 1, base(principal)), 'campo_nao_se_aplica');
     await expectCode(repo.updateGoalMovement(key(), goal.movement!.id, 1, base(principal)), 'campo_nao_se_aplica');
     // Manter a conta que o movimento já tem vale mesmo depois de arquivada.
-    const keep = await repo.updateGoalMovement(key(), m.id, 3, base(cart.id));
+    const keep = await repo.updateGoalMovement(key(), m.id, 5, base(cart.id));
     await repo.setAccountStatus(key(), cart.id, 1, 'arquivada');
     const stillThere = await repo.updateGoalMovement(key(), m.id, keep.movement!.version, { ...base(cart.id), amountCents: 2000 });
     expect(stillThere.movement).toMatchObject({ accountId: cart.id, amountCents: 2000 });
+    // E sem a conta no pedido (cliente antigo) também, mesmo arquivada.
+    const stillOld = await repo.updateGoalMovement(key(), m.id, stillThere.movement!.version, { amountCents: 2100, occurredOn: DEMO_TODAY, note: null });
+    expect(stillOld.movement).toMatchObject({ accountId: cart.id, amountCents: 2100 });
     expect((await repo.listGoalMovements(gid)).filter((x) => x.accountId === cart.id)).toHaveLength(1);
     // Só informativo: nenhum gasto nasceu e os totais do mês são os de sempre.
     expect(await repo.listRecords(ctx, '2026-10')).toEqual(before);

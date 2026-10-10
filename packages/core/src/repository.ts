@@ -29,7 +29,7 @@ import type {
   MonthOverview,
   NewGoalInput,
   OccurrenceMode,
-  PaymentInput,
+  PaymentRequest,
   PersonalSpace,
   RecordInput,
   RecordKind,
@@ -248,8 +248,11 @@ export interface RecordsRepository {
   updateCommitment(key: string, id: string, expectedVersion: number, input: CommitmentInput): Promise<CommitmentWrite>;
   /** Numa ocorrência de série, exclui só este mês: o número nunca volta a ser criado. */
   deleteCommitment(key: string, id: string, expectedVersion: number): Promise<CommitmentWrite>;
-  /** Atômico: cria o gasto e quita a conta. record = gasto criado. */
-  payCommitment(key: string, id: string, expectedVersion: number, input: PaymentInput): Promise<CommitmentWrite & { record: FinancialRecord }>;
+  /**
+   * Atômico: cria o gasto e quita a conta. record = gasto criado. input.accountId nulo = a conta principal do contexto (D-043, A9);
+   * sem principal ativa, conta_invalida.
+   */
+  payCommitment(key: string, id: string, expectedVersion: number, input: PaymentRequest): Promise<CommitmentWrite & { record: FinancialRecord }>;
   /** Atômico: exclui o gasto e reabre a conta. record = gasto excluído. */
   undoCommitmentPayment(key: string, id: string, expectedVersion: number): Promise<CommitmentWrite & { record: FinancialRecord }>;
   /** Reconciliação de conta a pagar: a operação com esta chave já foi concluída? */
@@ -438,8 +441,8 @@ export interface RecordsRepository {
   /**
    * update_goal_movement: o tipo nunca muda (o 'saldo_inicial' também pode ser corrigido). Ordem: repetição;
    * nao_encontrado; sem_permissao (autoria, só no banco); versao_desatualizada; meta_arquivada; valor, data e
-   * observação; conta (input.accountId nulo tira a conta; só é conferida quando muda; manter a que o movimento já tem vale, mesmo
-   * arquivada); saldo_da_meta_insuficiente.
+   * observação; conta (input.accountId ausente mantém a conta do movimento; nulo informado tira a conta; só é conferida quando muda; manter a
+   * que o movimento já tem vale, mesmo arquivada); saldo_da_meta_insuficiente.
    */
   updateGoalMovement(key: string, movementId: string, expectedVersion: number, input: GoalMovementInput): Promise<GoalWrite>;
   /** delete_goal_movement. Ordem: repetição; nao_encontrado; sem_permissao; versao_desatualizada; meta_arquivada; saldo. */
@@ -547,8 +550,8 @@ export interface RecordsRepository {
   addCardRefund(key: string, cardId: string, input: CardRefundInput): Promise<CardWrite>;
   /**
    * pay_invoice: cria UM gasto "Fatura Nubank (outubro)" na data do pagamento e marca a conta da fatura como paga.
-   * expectedVersion = versão da conta da fatura (Invoice.commitmentVersion). accountId: a conta de saída; ausente, a conta ativa
-   * mais antiga do contexto. Ordem: repetição; nao_encontrado; sem_permissao; mes_invalido; nao_encontrado (a fatura não tem
+   * expectedVersion = versão da conta da fatura (Invoice.commitmentVersion). accountId: a conta de saída; ausente, a conta principal
+   * do contexto (D-043, A9). Ordem: repetição; nao_encontrado; sem_permissao; mes_invalido; nao_encontrado (a fatura não tem
    * conta); versao_desatualizada; compromisso_quitado; fatura_aberta (só se paga depois que a fatura fecha: hoje até o dia do
    * fechamento, ou fatura futura, é recusado, sem gravar nada; o texto com a data é
    * `cardErrorText('fatura_aberta', { closingOn })`); valor_invalido; valor_acima_da_fatura; data_invalida (inválida, ou

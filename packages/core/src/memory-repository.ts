@@ -28,7 +28,7 @@ import type {
   IncomeReference,
   NewGoalInput,
   OccurrenceMode,
-  PaymentInput,
+  PaymentRequest,
   PersonalSpace,
   ReceiptMatch,
   RecordInput,
@@ -829,7 +829,7 @@ export class MemoryRepository implements RecordsRepository {
     });
   }
 
-  async payCommitment(key: string, id: string, expectedVersion: number, input: PaymentInput) {
+  async payCommitment(key: string, id: string, expectedVersion: number, input: PaymentRequest) {
     return this.write(() => {
       const norm = normalizePayment(input);
       const payload = [id, expectedVersion, norm];
@@ -841,8 +841,11 @@ export class MemoryRepository implements RecordsRepository {
       if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
       if (current.status !== 'aberto') throw new RepoError('compromisso_quitado');
       // Mesmas regras do gasto realizado: valor, categoria, data até hoje e conta do contexto.
+      // Sem a conta (nula), a principal do contexto (A9); sem principal ativa, conta_invalida na validação.
+      const accountId =
+        norm.accountId ?? this.liveAccounts().find((a) => a.contextId === current.contextId && a.isDefault && a.status === 'ativa')?.id ?? '';
       const recordInput: RecordInput = {
-        accountId: norm.accountId,
+        accountId,
         amountCents: norm.amountCents,
         occurredOn: norm.paidOn,
         description: current.description,
@@ -1754,7 +1757,9 @@ export class MemoryRepository implements RecordsRepository {
   async updateGoalMovement(key: string, movementId: string, expectedVersion: number, input: GoalMovementInput) {
     return this.write(() => {
       const norm = normalizeMovementInput(input);
-      const payload = [movementId, expectedVersion, ...movementPayload(norm)];
+      // Conta ausente = manter a do movimento (o padrão do banco; o hash é o de antes da 0010); nula informada = tirar a conta.
+      const keepAccount = input.accountId === undefined;
+      const payload = [movementId, expectedVersion, norm.amountCents, norm.occurredOn, norm.note, ...(keepAccount ? [] : [norm.accountId])];
       const replayed = this.replay(key, 'alterar_movimento_meta', payload);
       if (replayed) return this.goalResult(replayed.goalId!, replayed.movementId);
       const { goal, movement } = this.liveMovement(movementId);
@@ -1762,10 +1767,11 @@ export class MemoryRepository implements RecordsRepository {
       if (goal.status === 'arquivada') throw new RepoError('meta_arquivada');
       const code = goalMovementError(movement.kind, norm, this.opts.today(), { allowInitial: true });
       if (code) throw new RepoError(code);
-      this.checkMovementAccount(goal.contextId, movement.kind, norm.accountId, movement.accountId);
+      const accountId = keepAccount ? movement.accountId : norm.accountId;
+      this.checkMovementAccount(goal.contextId, movement.kind, accountId, movement.accountId);
       this.checkGoalBalance(goal.id, { op: 'update', id: movementId, amountCents: norm.amountCents, occurredOn: norm.occurredOn });
       const now = new Date().toISOString();
-      this.goalMovements.set(movementId, { ...movement, ...norm, version: movement.version + 1, updatedAt: now });
+      this.goalMovements.set(movementId, { ...movement, ...norm, accountId, version: movement.version + 1, updatedAt: now });
       this.saveOperation(key, 'alterar_movimento_meta', payload, {
         contextId: goal.contextId,
         recordId: null,
@@ -2211,7 +2217,7 @@ export class MemoryRepository implements RecordsRepository {
    * compromisso_quitado; fatura_aberta (hoje até o fechamento: só se paga depois que a fatura fecha); valor_invalido; valor_acima_da_fatura; data_invalida (inválida, ou antes do menor entre 1 ano atrás e o
    * início do período da fatura); data_futura;
    * conta_invalida; fatura_seguinte_paga. Cria UM gasto sem categoria, ligado ao cartão e ao mês, na conta informada (sem ela, a
-   * mais antiga do contexto) e, no pagamento parcial, o saldo anterior na fatura seguinte.
+   * principal do contexto) e, no pagamento parcial, o saldo anterior na fatura seguinte.
    */
   async payInvoice(key: string, cardId: string, month: IsoMonth, expectedVersion: number, amountCents: Cents, paidOn: IsoDate, accountId: string | null = null) {
     return this.write(() => {
@@ -2234,9 +2240,10 @@ export class MemoryRepository implements RecordsRepository {
       const periodStart = invoicePeriod(card, month).startOn;
       if (typeof paidOn !== 'string' || !isValidIsoDate(paidOn) || paidOn < (periodStart < oneYearAgo ? periodStart : oneYearAgo)) throw new RepoError('data_invalida');
       if (paidOn > today) throw new RepoError('data_futura');
+      // Sem a conta, a principal do contexto (A9; antes, a mais antiga).
       const account = accountId
         ? this.liveAccounts().find((a) => a.id === accountId && a.contextId === card.contextId && a.status === 'ativa')
-        : this.liveAccounts().find((a) => a.contextId === card.contextId && a.status === 'ativa');
+        : activeAccounts(this.liveAccounts().filter((a) => a.contextId === card.contextId))[0];
       if (!account) throw new RepoError('conta_invalida');
       const left = c.amountCents - amountCents;
       const next = addMonths(month, 1);
@@ -3709,7 +3716,7 @@ function normalizeSeriesEdit(input: SeriesEditInput): SeriesEditInput {
   };
 }
 
-function normalizePayment(input: PaymentInput): PaymentInput {
+function normalizePayment(input: PaymentRequest): PaymentRequest {
   return { accountId: input.accountId, amountCents: input.amountCents, paidOn: input.paidOn, category: trimCategory(input.category) };
 }
 

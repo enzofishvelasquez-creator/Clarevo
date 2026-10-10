@@ -14,6 +14,7 @@ import {
   RepoError,
   SAVINGS_ANSWERS,
   SAVINGS_MIN_MONTHLY_CENTS,
+  activeAccounts,
   addMonths,
   monthRange,
   receiptKeyValid,
@@ -63,7 +64,7 @@ import {
   type MonthOverview,
   type NewGoalInput,
   type OccurrenceMode,
-  type PaymentInput,
+  type PaymentRequest,
   type PersonalSpace,
   type RecordInput,
   type RecordKind,
@@ -1222,13 +1223,16 @@ export class SupabaseRepository implements RecordsRepository {
         .from('financial_accounts')
         .select(ACCOUNT_COLUMNS)
         .eq('context_id', contextId)
-        .order('status', { ascending: true })
+        // 'ativa' vem depois de 'arquivada' na ordem do texto: descendente põe as ativas antes, a principal no topo.
+        .order('status', { ascending: false })
         .order('is_default', { ascending: false })
         .order('created_at')
         .order('id')
         .range(from, to),
     );
-    return rows.map(toAccount);
+    // A ordem final não depende do agrupamento do banco: ativas primeiro (a principal no topo), depois as arquivadas.
+    const all = rows.map(toAccount);
+    return [...activeAccounts(all), ...all.filter((a) => a.status === 'arquivada')];
   }
 
   /** As cinco funções devolvem a conta em jsonb (na repetição, a conta atual): sem .single(). */
@@ -1479,7 +1483,7 @@ export class SupabaseRepository implements RecordsRepository {
     });
   }
 
-  payCommitment(key: string, id: string, expectedVersion: number, input: PaymentInput) {
+  payCommitment(key: string, id: string, expectedVersion: number, input: PaymentRequest) {
     return this.callPayment('pay_commitment', {
       p_idempotency_key: key,
       p_commitment_id: id,
@@ -2049,7 +2053,8 @@ export class SupabaseRepository implements RecordsRepository {
       p_amount_cents: input.amountCents,
       p_occurred_on: input.occurredOn,
       p_note: input.note,
-      // Informada: troca ou mantém a conta. Nula: tira a conta (o banco repete o padrão nulo). Ausente: nada é enviado.
+      // Informada: troca ou mantém a conta. Nula: tira a conta. Ausente: nada é enviado e o banco mantém a conta do movimento
+      // (o padrão de p_account_id é "manter"; o banco anterior à 0010 não conhece o argumento).
       ...(input.accountId !== undefined ? { p_account_id: input.accountId } : {}),
     });
   }
@@ -2344,7 +2349,7 @@ export class SupabaseRepository implements RecordsRepository {
     });
   }
 
-  /** expectedVersion = versão da conta da fatura (InvoiceItem.commitmentVersion). Sem accountId, o banco usa a conta ativa mais antiga. */
+  /** expectedVersion = versão da conta da fatura (InvoiceItem.commitmentVersion). Sem accountId, o banco usa a conta principal do contexto. */
   payInvoice(
     key: string,
     cardId: string,

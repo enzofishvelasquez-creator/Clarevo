@@ -49,7 +49,7 @@ export const ACCOUNTS_TEXT = {
   add: 'Adicionar conta',
   manage: 'Gerenciar contas',
   limitNote: 'Você tem 10 contas ativas. Arquive uma para adicionar outra.',
-  balanceNote: 'Saldo inicial: não informado. Sem ele, o Clarevo não calcula o saldo da conta.',
+  balanceNote: 'O Clarevo não calcula saldo por conta.',
   /** Seletores. */
   out: 'Saiu de',
   into: 'Entrou em',
@@ -266,6 +266,21 @@ export function selectedAccount<A extends Pick<FinancialAccount, 'id' | 'status'
 /** O seletor só aparece como chips quando há mais de uma conta ativa; com uma só, o nome vai como texto. */
 export function hasAccountChoice(accounts: readonly Pick<FinancialAccount, 'status'>[]): boolean {
   return accounts.filter((a) => a.status === 'ativa').length > 1;
+}
+
+/**
+ * O seletor mostra chips (e não só o nome como texto) quando há o que escolher: mais de uma conta, a opção "Sem conta" (aporte e
+ * resgate), ou um valor que não é a primeira conta da lista (por exemplo a conta arquivada que o registro já tem). Só com uma
+ * conta, escolhida e sem "Sem conta", o seletor vira o texto "Saiu de: Conta principal". `accounts` é a lista do seletor.
+ */
+export function pickerShowsChips(accounts: readonly Pick<FinancialAccount, 'id'>[], value: string | null | undefined, allowNone = false): boolean {
+  const first = accounts[0];
+  return accounts.length > 1 || (first !== undefined && (allowNone || (value ?? null) !== first.id));
+}
+
+/** A conta que o seletor em texto mostra: a escolhida (`value`) e, na falta dela, a primeira da lista. */
+export function pickerShownAccount<A extends Pick<FinancialAccount, 'id'>>(accounts: readonly A[], value: string | null | undefined): A | null {
+  return accounts.find((a) => a.id === value) ?? accounts[0] ?? null;
 }
 
 /** Nome da conta pelo id (também a arquivada); null se não achar. */
