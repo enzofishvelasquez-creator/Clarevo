@@ -34,10 +34,9 @@ export const ANNUAL_HELP_TEXT = {
   intro:
     'Contas do ano são as que vêm uma vez por ano, como IPVA, IPTU, matrícula e seguro. Você cadastra uma vez; todo ano o Clarevo lembra e cria as contas do mês certo.',
   whatIsThis: 'O que é isso?',
-  whatIsThisA11y: 'O que são contas do ano? Abre uma explicação.',
 
   /** "Como você paga?": cota única e parcelado, com exemplo numérico. */
-  howPaysHint: `Cota única: o valor do ano sai de uma vez. Ex.: ${single.name} de ${formatBRL(single.cents)}, que vence em ${formatMonthName(single.month)}. Em parcelas: o valor do ano é dividido em vezes. Ex.: ${parts.name} de ${formatBRL(parts.totalCents)} em ${parts.parts} parcelas de ${formatBRL(annualPartsExample().partCents)}, de ${formatMonthName(parts.firstMonth)} a ${formatMonthName(annualPartsExample().lastMonth)}.`,
+  howPaysHint: `Cota única: o valor do ano sai de uma vez. Ex.: ${single.name} de ${formatBRL(single.cents)}, que vence em ${formatMonthName(single.month)}.\nEm parcelas: o valor do ano é dividido em vezes. Ex.: ${parts.name} de ${formatBRL(parts.totalCents)} em ${parts.parts} parcelas de ${formatBRL(annualPartsExample().partCents)}, de ${formatMonthName(parts.firstMonth)} a ${formatMonthName(annualPartsExample().lastMonth)}.`,
 
   /** Mês do vencimento (cota única) e mês da primeira parcela (parcelas). */
   monthHintSingle: `Em que mês a conta vence. Ex.: ${single.name} em ${formatMonthName(single.month)}.`,
@@ -72,7 +71,6 @@ export const ANNUAL_HELP_TEXT = {
     'Quando o valor de um ano mudar, use Informar o valor daquele ano, em Ano a ano. Só ele muda; os outros continuam com a referência.',
 
   /** "Ano a ano": legenda curta das palavras da lista. */
-  yearByYearTitle: 'Como ler',
   yearByYearHelp: [
     'Cada linha é um ano da conta. Previsto: o Clarevo ainda vai criar a conta, dois meses antes de vencer.',
     'Quando o carnê ou o boleto de um ano chegar com outro valor, toque em Informar o valor desse ano. Só ele muda.',

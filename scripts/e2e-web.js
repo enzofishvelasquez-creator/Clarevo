@@ -5520,7 +5520,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await d42AnnotarGasto();
   await d42Read(d42Keys.credito); t = await body();
   const d42Chosen = await p.getByRole('radiogroup', { name: 'Escolha o cartão' }).filter({ visible: true }).first().getByRole('radio').evaluateAll((es) => es.map((e) => `${e.textContent}=${e.getAttribute('aria-checked')}`));
-  ok('D42 com dois cartões: "Cartão de crédito" escolhido, "Escolha o cartão" com os dois e nenhum escolhido (a pessoa decide)', (await d42Checked('Cartão de crédito')) === 'true' && d42Chosen.length === 2 && d42Chosen.every((x) => x.endsWith('=false')), d42Chosen.join(' | '));
+  ok('D42 com dois cartões: "Cartão de crédito" escolhido e "Escolha o cartão" com os dois, o usado por último neste aparelho já escolhido (a memória de D-037)', (await d42Checked('Cartão de crédito')) === 'true' && d42Chosen.length === 2 &&
+    d42Chosen.filter((x) => x.endsWith('=true')).length === 1 && d42Chosen[0].startsWith('Cartão Exemplo') && d42Chosen[0].endsWith('=true'), d42Chosen.join(' | '));
   await keepText();
   await scrollTo('Como você pagou?');
   await shot('213_nota_credito_varios_cartoes');
@@ -5592,10 +5593,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('D42 Cartões: sem renda de referência o card não aparece com "Informe sua renda" aqui (a demonstração tem renda de R$ 6.000,00)', !t.includes('Informe sua renda para ver quanto isso representa.'));
   ok('D42 Cartões: neutro, sem cor de alerta nem julgamento (com percentual)', !D42_NO_ALERT.test(t));
   await keepText();
-  await shot('215_cartoes_faturas_do_mes');
+  await shot('216_cartoes_faturas_do_mes');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
   await innerChecks('D42 cartões faturas do mês 320px');
-  await shot('215_cartoes_faturas_do_mes_320px', true);
+  await shot('216_cartoes_faturas_do_mes_320px', true);
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   await innerChecks('D42 cartões faturas do mês 390px');
   // Mesmo número da renda comprometida: o grupo "Faturas de cartão" de outubro.
@@ -5625,7 +5626,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const d42Leaks = await moneyLeaks();
   ok('D42 Cartões com valores ocultos: total e próximas faturas em "R$ ••••", o percentual à vista e nenhum valor em reais legível', t.includes('R$ ••••') && t.includes('4,2% da sua renda de referência') && t.includes('Próximas faturas (previsto): novembro R$ ••••') &&
     !/R\$ \d/.test(t.split('Cartão Exemplo')[0]) && d42Leaks.length === 0, d42Leaks.slice(0, 3).join(' | ') + ' ' + t.slice(0, 300));
-  await shot('216_cartoes_faturas_do_mes_valores_ocultos');
+  await shot('217_cartoes_faturas_do_mes_valores_ocultos');
   await d42GoTab('Resumo'); await waitText('Diferença do mês');
   await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
   await btn('Voltar').click(); await waitText('Diferença do mês');
@@ -5639,11 +5640,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     t.includes('A nota diz cartão de crédito. Cadastre o cartão para anotar a compra na fatura.') && (await d42Checked('Cartão de crédito')) === 'true' && (await visibleCount('button', 'Cadastrar cartão')) === 1 && !t.includes('Você ainda não cadastrou um cartão.'), t.slice(0, 500));
   await keepText();
   await scrollTo('Como você pagou?');
-  await shot('217_nota_credito_sem_cartao');
+  await shot('218_nota_credito_sem_cartao');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
   await innerChecks('D42 nota de crédito sem cartão 320px');
   await scrollTo('Como você pagou?');
-  await shot('217_nota_credito_sem_cartao_320px');
+  await shot('218_nota_credito_sem_cartao_320px');
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   await btn('Cadastrar cartão').click(); await waitText('Guardamos só o apelido e os 4 últimos dígitos.'); await p.waitForTimeout(400);
   ok('D42 "Cadastrar cartão" abre o cadastro do cartão', d42Path() === '/cartoes/novo', d42Path());
@@ -5651,21 +5652,39 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.waitForTimeout(400);
   ok('D42 voltar do cadastro mantém a nota lida e a escolha do cartão de crédito', d42Path() === '/registro/novo' && (await body()).includes('Nota lida:') && (await d42Checked('Cartão de crédito')) === 'true', d42Path());
   await d42Leave();
+  // Dois cartões e nenhuma compra anterior neste aparelho: a nota escolhe "Cartão de crédito", e a pessoa escolhe o cartão.
+  await otherDevice(async (repo, ctx) => {
+    const k = () => `e2e-${Math.random()}`;
+    await repo.createCard(k(), ctx, { name: 'Cartão da Gabi', lastDigits: null, closingDay: 3, dueDay: 10, limitCents: null });
+    await repo.createCard(k(), ctx, { name: 'Cartão azul', lastDigits: null, closingDay: 20, dueDay: 25, limitCents: null });
+  });
+  await d42AnnotarGasto();
+  await d42Read(d42Keys.credito); t = await body();
+  const d42Gabi = await p.getByRole('radiogroup', { name: 'Escolha o cartão' }).filter({ visible: true }).first().getByRole('radio').evaluateAll((es) => es.map((e) => `${e.textContent}=${e.getAttribute('aria-checked')}`));
+  ok('D42 conta nova com dois cartões: "Cartão de crédito" escolhido, "Escolha o cartão" com os dois e nenhum escolhido (a pessoa decide)', (await d42Checked('Cartão de crédito')) === 'true' && d42Gabi.length === 2 && d42Gabi.every((x) => x.endsWith('=false')) &&
+    !t.includes('Cadastre o cartão'), d42Gabi.join(' | '));
+  await keepText();
+  await scrollTo('Como você pagou?');
+  await shot('219_nota_credito_dois_cartoes_sem_escolha');
+  await d42Leave();
   // Cartão com fatura em outubro, mas sem renda de referência: o convite no lugar do percentual.
   await otherDevice(async (repo, ctx) => {
     const k = () => `e2e-${Math.random()}`;
-    const card = (await repo.createCard(k(), ctx, { name: 'Cartão da Gabi', lastDigits: null, closingDay: 3, dueDay: 10, limitCents: null })).card;
+    const card = (await repo.listCards(ctx)).find((c) => c.name === 'Cartão da Gabi');
     await repo.addCardPurchase(k(), card.id, { description: 'Material', category: 'Educação', purchasedOn: '2026-09-15', totalCents: 12000, installments: 1 });
+    // O Cartão azul fecha dia 20: a compra de 25/09 está na fatura que vence em 25/10, ainda aberta.
+    const azul = (await repo.listCards(ctx)).find((c) => c.name === 'Cartão azul');
+    await repo.addCardPurchase(k(), azul.id, { description: 'Presente', category: 'Lazer', purchasedOn: '2026-09-25', totalCents: 8000, installments: 1 });
   });
   await d42GoTab('Movimentações'); await waitText('Registrar recebimento');
   await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitText('Faturas de outubro'); await p.waitForTimeout(600); t = await body();
-  ok('D42 Cartões sem renda de referência: R$ 120,00 e "Informe sua renda para ver quanto isso representa." com o link para a renda de referência, sem percentual',
-    t.includes('R$ 120,00') && t.includes('Informe sua renda para ver quanto isso representa.') && (await visibleCount('button', 'Informar minha renda de referência')) === 1 && !t.includes('da sua renda de referência'), t.slice(0, 400));
+  ok('D42 Cartões sem renda de referência: R$ 200,00 (dois cartões, um deles com fatura ainda aberta, dita) e "Informe sua renda para ver quanto isso representa." com o link para a renda de referência, sem percentual',
+    t.includes('R$ 200,00') && t.includes('Inclui fatura ainda aberta: o valor pode mudar com novas compras.') && t.includes('Informe sua renda para ver quanto isso representa.') && (await visibleCount('button', 'Informar minha renda de referência')) === 1 && !t.includes('da sua renda de referência'), t.slice(0, 400));
   await keepText();
-  await shot('218_cartoes_sem_renda_de_referencia');
+  await shot('220_cartoes_sem_renda_de_referencia');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
   await innerChecks('D42 cartões sem renda 320px');
-  await shot('218_cartoes_sem_renda_de_referencia_320px', true);
+  await shot('220_cartoes_sem_renda_de_referencia_320px', true);
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   await btn('Informar minha renda de referência').click(); await p.waitForTimeout(800);
   ok('D42 "Informar minha renda de referência" abre a renda de referência de outubro', d42Path() === '/renda-comprometida/referencia', d42Path());
@@ -5678,17 +5697,24 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     t.includes('Contas que vêm uma vez por ano, como IPVA, IPTU, matrícula e seguro. Você cadastra uma vez; todo ano o Clarevo cria a conta do mês certo, dois meses antes de vencer.'));
   await keepText();
   await scrollTo('Contas do ano');
-  await shot('219_contas_do_ano_lista');
+  await shot('221_contas_do_ano_lista');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
   await innerChecks('D42 contas do ano, lista 320px');
   await scrollTo('Contas do ano');
-  await shot('219_contas_do_ano_lista_320px');
+  await shot('221_contas_do_ano_lista_320px');
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
 
   await btn('Nova conta do ano').click(); await waitText('Como você paga?'); await p.waitForTimeout(500); t = await body();
   ok('D42 cadastro de conta do ano: a explicação curta no topo (uma vez por ano, cadastra uma vez, o Clarevo lembra e cria as contas do mês certo) e "O que é isso?"',
     t.includes('Contas do ano são as que vêm uma vez por ano, como IPVA, IPTU, matrícula e seguro. Você cadastra uma vez; todo ano o Clarevo lembra e cria as contas do mês certo.') && (await visibleCount('button', 'O que é isso?')) === 1 &&
     t.indexOf('Contas do ano são as que vêm') < t.indexOf('Descrição'), t.slice(0, 400));
+  await keepText();
+  await scrollTo('Com que frequência?');
+  await shot('222_conta_do_ano_cadastro_topo');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await scrollTo('Com que frequência?');
+  await shot('222_conta_do_ano_cadastro_topo_320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   ok('D42 cadastro de conta do ano: cota única e parcelado explicados com exemplo numérico (IPVA de R$ 2.400,00; IPTU de R$ 1.800,00 em 10 parcelas de R$ 180,00, de fevereiro a novembro)',
     t.includes('Cota única: o valor do ano sai de uma vez. Ex.: IPVA de R$ 2.400,00, que vence em janeiro.') && t.includes('Em parcelas: o valor do ano é dividido em vezes. Ex.: IPTU de R$ 1.800,00 em 10 parcelas de R$ 180,00, de fevereiro a novembro.'));
   ok('D42 cadastro de conta do ano: exemplos no mês, no dia e no valor (cota única)', t.includes('Em que mês a conta vence. Ex.: IPVA em janeiro.') && t.includes('De 1 a 31. Ex.: dia 20 para uma conta que vence em 20/01.') && t.includes('Ex.: IPVA de R$ 2.400,00.'));
@@ -5705,16 +5731,16 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('D42 cadastro em parcelas: "Primeiro ano" ganha a explicação de que o Clarevo cuida dos anos seguintes', (await body()).includes('O ano da primeira conta que o Clarevo vai criar. Dos anos seguintes ele cuida sozinho.'));
   await keepText();
   await scrollTo('Como você paga?');
-  await shot('220_conta_do_ano_cadastro_como_paga');
+  await shot('223_conta_do_ano_cadastro_como_paga');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
   await innerChecks('D42 cadastro de conta do ano 320px');
   await scrollTo('Como você paga?');
-  await shot('220_conta_do_ano_cadastro_como_paga_320px');
+  await shot('223_conta_do_ano_cadastro_como_paga_320px');
   await scrollTo('E nos próximos anos?');
-  await shot('221_conta_do_ano_cadastro_proximos_anos_320px');
+  await shot('224_conta_do_ano_cadastro_proximos_anos_320px');
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   await scrollTo('E nos próximos anos?');
-  await shot('221_conta_do_ano_cadastro_proximos_anos');
+  await shot('224_conta_do_ano_cadastro_proximos_anos');
   // "O que é isso?" abre o tema de Aprender que já existe (sem tema novo) e volta à tarefa.
   await p.evaluate(() => window.scrollTo(0, 0));
   await field('Descrição').fill('Matrícula');
@@ -5739,19 +5765,19 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('D42 "Ano a ano": o botão do ano em aberto é "Informar o valor de 2026"', (await visibleCount('button', 'Informar o valor de 2026')) === 1);
   await keepText();
   await scrollTo('Ano a ano');
-  await shot('222_conta_do_ano_detalhe');
+  await shot('225_conta_do_ano_detalhe');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
   await innerChecks('D42 detalhe da conta do ano 320px');
   await scrollTo('Ano a ano');
-  await shot('222_conta_do_ano_detalhe_320px');
+  await shot('225_conta_do_ano_detalhe_320px');
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   await btn('Informar o valor de 2026').click(); await waitText('Use o valor do carnê ou do boleto de 2026.'); await p.waitForTimeout(400); t = await body();
   ok('D42 "Informar o valor de 2026": diz que vale só para 2026 e que os outros anos continuam com a referência', t.includes('Isso vale só para 2026. Os outros anos continuam com a referência atual.'));
   await keepText();
-  await shot('223_conta_do_ano_informar_valor');
+  await shot('226_conta_do_ano_informar_valor');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
   await innerChecks('D42 informar o valor do ano 320px');
-  await shot('223_conta_do_ano_informar_valor_320px');
+  await shot('226_conta_do_ano_informar_valor_320px');
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   await btn('Cancelar').click(); await p.waitForTimeout(400); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
   await waitText('Ano a ano');

@@ -1106,7 +1106,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
                 <Chip label={CARDS_TEXT.expense.cash} selected={payWith === 'dinheiro'} onPress={() => choosePayment('dinheiro')} />
                 <Chip label={CARDS_TEXT.expense.credit} selected={payWith === 'cartao'} onPress={() => choosePayment('cartao')} />
               </ChoiceGroup>
-              {noteForm ? (
+              {noteForm && !(noteSaysCredit && cards.isSuccess && activeCards.length === 0) ? (
                 <Txt variant="caption" color={colors.textSecondary}>
                   {NOTA_PAYMENT_TEXT.fromNote(noteForm)}
                 </Txt>

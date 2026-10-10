@@ -18,7 +18,8 @@ import { paymentFormsFromText } from './nota-pagamento';
  * "Qtd. total de itens"), com o nome do estabelecimento no topo (classe txtTopo, id u20) ou na linha acima do CNPJ. Os testes usam HTML
  * sintético no leiaute padrão das consultas de NFC-e; o aceite com cupons reais do RJ continua pendente (P-025).
  *
- * Privacidade: o resultado só tem nome do estabelecimento, total, data de emissão e quantidade de itens. O bloco do consumidor
+ * Privacidade: o resultado só tem nome do estabelecimento, total, data de emissão, quantidade de itens e a forma de pagamento (D-042,
+ * só a forma, sem valor pago nem troco; `nota-pagamento.ts`). O bloco do consumidor
  * (CPF, nome) nunca é lido, e a página inteira é descartada depois da leitura. Sem `URL`, lookbehind, grupos nomeados nem `\p{}`.
  */
 

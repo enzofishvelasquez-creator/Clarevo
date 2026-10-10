@@ -14,6 +14,7 @@ import { paymentFormsFromText } from './nota-pagamento';
  *   o registro guarda só o resumo SHA-256 dela, `AccessKeyInfo.digest`, nunca a chave, que em emitente pessoa física tem o CPF);
  * - a data de emissão e o "VALOR TOTAL DA NOTA";
  * - o nome do emitente ("RECEBEMOS DE <nome> OS PRODUTOS..." ou o bloco "IDENTIFICAÇÃO DO EMITENTE").
+ * - a forma de pagamento (D-042), quando o PDF traz o bloco "FORMA DE PAGAMENTO" ou o `tPag`; sem ele, nada (`nota-pagamento.ts`).
  *
  * O destinatário (nome, CPF ou CNPJ, endereço), as linhas de produtos, o transportador e os dados adicionais são ignorados: o
  * resultado nem tem campo para eles. O texto também não é guardado.

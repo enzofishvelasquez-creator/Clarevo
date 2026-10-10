@@ -216,6 +216,18 @@ Enzo, em 10/10/2026: "sim" à ordem proposta (1. plano para sair das dívidas). 
 - [ ] Aprender: tema que explique "maior taxa primeiro" e "menor dívida primeiro" (bola de neve e avalanche), com fonte e data de revisão (a busca já leva "bola de neve" e "avalanche" à calculadora pelo grupo "No app")
 - [ ] **Você:** revisar as regras de detalhe de D-040 (em especial a referência "Sem valor a mais" sem bola de neve a dívida com saldo que não diminui ficar fora da comparação e as parcelas já vencidas ficarem fora do pré-preenchimento) e os textos
 
+## Ajustes da revisão de Enzo, parte 1 (D-042), feito
+
+Sem mudança no banco e sem pacote novo. Execução em 10/10/2026: `npm run typecheck` (core e app sem erros), `npm test` (todos os testes do core) e `npm run test:web` completo (2401 verificações OK, 142 delas do bloco "Ajustes de 10/10 (D-042)").
+
+- [x] Nota fiscal: forma de pagamento da página da Sefaz-RJ e do DANFE (`nota-pagamento.ts`), linha "Nota lida" com loja, valor, data e forma, "Como você pagou?" escolhido pela nota (crédito: cartão, com o aviso e "Cadastrar cartão" quando não há cartão; dinheiro, débito, Pix e vale: "Dinheiro, débito ou Pix"; mais de uma forma: nenhuma), dica da web "No celular, o Clarevo lê o valor e a data na página da Sefaz."
+- [x] Câmera: zoom inicial 0,1, moldura quadrada, dica "Aproxime até o QR ocupar a moldura." depois de 5 s (a da lanterna fica em 10 s). Sem `autofocus="on"` (travaria o foco) e sem "toque para focar" (não existe no `expo-camera` 57.0.6). Só exercitada em navegador com câmera de teste (capturas 227)
+- [x] Cartões: card "Faturas de outubro" no topo de `/cartoes` (`cards-month.ts`), com o percentual da renda de referência, as próximas faturas e o mesmo número do grupo "Faturas de cartão" da renda comprometida
+- [x] Contas do ano mais claras (`annual-help.ts`): explicação no topo do cadastro, "O que é isso?", cota única e parcelado com exemplo numérico, o que acontece nos próximos anos, legenda de "Ano a ano" e "Informar o valor"
+- [x] Capturas 210 a 227 em `docs/telas/` (390 e 320 px); as de 36 a 52, 94, 95, 130, 147, 156, 159 e 163 foram refeitas porque as telas mudaram
+- [ ] Fora daqui, para um ciclo próprio depois do orçamento por categoria: "origem do dinheiro nos pagamentos e nos aportes" como contas cadastradas (P-018)
+- [ ] **Você:** o aceite com cupons reais (P-025) agora inclui a tabela "Forma de pagamento" da página da Sefaz-RJ e o bloco do DANFE; e o teste da câmera (zoom e moldura) em aparelho real
+
 ## Próximos ciclos
 
 Os Ciclos A6, A4, A5, A2, B, C, D e E, que vinham primeiro (D-023 com a mudança de D-034), estão nas seções acima. Seguem a Família (Ciclo 2) e o benefício empresarial, abaixo.
