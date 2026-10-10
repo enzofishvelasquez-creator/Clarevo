@@ -1,6 +1,7 @@
 import {
   CARDS_TEXT,
   CATEGORIES,
+  DEMO_EMAIL,
   DESCRIPTION_MAX,
   MAX_RECORD_CENTS,
   parseBRL,
@@ -12,11 +13,18 @@ import {
   maskDateBR,
   FIELD_ORDER,
   GOALS_TEXT,
+  NOTA_FLOW_TEXT,
+  NOTA_TEXT,
   NO_CATEGORY_LABEL,
   RETURN_TEXT,
+  canReadSefazPage,
   centsToInput,
+  dateOutsideNoteMonth,
   dayErrorText,
   dayInMonthDate,
+  descriptionAfterCategory,
+  exampleReceiptQr,
+  factsWithPage,
   fieldForErrorCode,
   formatBRL,
   installmentAmounts,
@@ -29,20 +37,31 @@ import {
   looksLikeSavings,
   monthOf,
   newOperationKey,
+  noteErrorText,
+  noteFillPlan,
+  noteIssuedOn,
   paidInvoiceMonths,
   parseDateBR,
   purchaseFirstInvoiceMonth,
   purchaseNotice,
+  receiptDraft,
+  sefazReadErrorText,
   seriesGapForExpense,
+  storeMemoryFor,
+  storeMemoryId,
+  suggestDescription,
   validateCardPurchaseDraft,
   validateRecordDraft,
   type DraftField,
   type FieldErrors,
   type Card as CardData,
   type FinancialRecord,
+  type IsoDate,
   type IsoMonth,
   type PersonalSpace,
+  type ReceiptMatch,
   type RecordDraft,
+  type StoreMemory,
   type RecordInput,
   type RecordKind,
 } from '@clarevo/core';
@@ -52,28 +71,67 @@ import { usePreventRemove } from 'expo-router/react-navigation';
 import * as Haptics from 'expo-haptics';
 import { AlertCircle, Check, Info } from 'lucide-react-native';
 import { useEffect, useId, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
+import { NoteBlock, type SefazState } from '@/components/receipt-block';
+import { AlreadyNotedBanner, CameraModal, PasteModal, ScanLine, ScanSheet, cameraIsAvailable } from '@/components/receipt-scan';
 import { returnSession } from '@/components/retorno-acoes';
 import { ChoiceGroup } from '@/components/series-parts';
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt, styles as ui } from '@/components/ui';
+import { announceOnIOS } from '@/lib/a11y';
 import { cardHref, invoiceHref } from '@/lib/cards';
 import { loadPrefs, updatePrefs, useDevicePrefs } from '@/lib/device-prefs';
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
 import { totalChange } from '@/lib/highlight';
 import { explanationHref } from '@/lib/learn';
-import { useAddCardPurchase, useCardInvoices, useCardOperationKey, useCards, useCommitments, useCreateRecord, useReturnReview, useUpdateRecord } from '@/state/data';
+import { cameraWasUsed, markCameraUsed, rememberStore, storeMemoryOf } from '@/lib/note-prefs';
+import { pickAndReadNotePdf, readNoteCode, type NoteReading } from '@/lib/receipt-read';
+import { receiptLinks, openOfficialUrl } from '@/lib/receipt-link';
+import { readSefazOnDevice, sefazReadAvailable } from '@/lib/sefaz-fetch';
+import {
+  useAddCardPurchase,
+  useCardInvoices,
+  useCardOperationKey,
+  useCards,
+  useCommitments,
+  useCreateRecord,
+  useReceiptMatch,
+  useReturnReview,
+  useUpdateRecord,
+} from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
 
 type Mode = { type: 'novo'; kind: RecordKind } | { type: 'editar'; record: FinancialRecord };
+
+/** Valores dos campos que a leitura de uma nota preencheu (ou o que havia antes), para desfazer sem perder o que a pessoa digitou. */
+interface NoteFields {
+  description: string;
+  amountText: string;
+  dateText: string;
+  category: string | null;
+}
+
+/** A nota lida (só em memória): a leitura com a chave e o endereço, a data que a nota informa e o estado da página da Sefaz. */
+interface NoteState {
+  reading: Extract<NoteReading, { ok: true }>;
+  issuedOn: IsoDate | null;
+  filled: NoteFields;
+  before: NoteFields;
+  legend: string | null;
+  /** O que a mesma loja já teve neste aparelho (descrição e categoria), lido na leitura nova. */
+  lastTime: StoreMemory | null;
+  storeId: string | null;
+  sefaz: SefazState;
+  sefazMessage: string | null;
+}
 
 /** Mês fechado vindo da revisão dos últimos meses (?mes=AAAA-MM). */
 const ISO_MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -142,6 +200,24 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     payWith === 'cartao' ? (activeCards.find((c) => c.id === chosenCardId) ?? (activeCards.length === 1 ? activeCards[0]! : null)) : null;
   const cardPurchase = cardMode && payWith === 'cartao';
 
+  // Escanear nota fiscal (D-038): só em gasto novo, fora do modo "Dia" (mesma regra de "Como você pagou?").
+  const scanMode = cardMode;
+  const [note, setNote] = useState<NoteState | null>(null);
+  const noteRef = useRef<NoteState | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteMessage, setPasteMessage] = useState<string | null>(null);
+  const [pasteBoleto, setPasteBoleto] = useState(false);
+  const [reading, setReading] = useState(false);
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
+  const [cameraOk, setCameraOk] = useState(false);
+  const [cameraUsed, setCameraUsed] = useState(false);
+  /** Aviso de nota repetida vindo do banco (duas pessoas ou dois aparelhos ao mesmo tempo): mesma tela do aviso comum. */
+  const [forcedMatch, setForcedMatch] = useState<ReceiptMatch | null>(null);
+  const receiptMatch = useReceiptMatch(scanMode && note ? contextId : undefined, note?.reading.draft.receiptKey);
+  const match: ReceiptMatch | null = note ? (forcedMatch ?? receiptMatch.data ?? null) : null;
+
   const [initial, setInitial] = useState<RecordDraft>(() =>
       mode.type === 'novo'
         ? { accountId: personal.accounts[0]?.id ?? '', amountText: '', description: '', category: null, dateText: formatDateBR(today) }
@@ -160,6 +236,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   const [noted, setNoted] = useState<string | null>(null);
 
   const [draft, setDraft] = useState<RecordDraft>(initial);
+  const draftRef = useRef<RecordDraft>(draft);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [banner, setBanner] = useState<string | null>(null);
   const [conflict, setConflict] = useState<FinancialRecord | null>(null);
@@ -182,6 +259,23 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   useEffect(() => {
     if (userId && cardMode) loadPrefs(userId, persistPrefs);
   }, [userId, persistPrefs, cardMode]);
+
+  // As leituras assíncronas (página da Sefaz, memória da loja) trabalham com o preenchimento e a nota de agora.
+  useEffect(() => {
+    draftRef.current = draft;
+    noteRef.current = note;
+  });
+
+  // Câmera: existe? Já foi usada neste aparelho (então o toque abre a câmera direto)?
+  useEffect(() => {
+    if (!scanMode) return;
+    let alive = true;
+    cameraIsAvailable().then((ok) => alive && setCameraOk(ok));
+    if (userId) cameraWasUsed(userId, persistPrefs).then((used) => alive && setCameraUsed(used));
+    return () => {
+      alive = false;
+    };
+  }, [scanMode, userId, persistPrefs]);
 
   // Forma de pagamento: o cartão pedido pelo endereço (?cartao=) ou a última escolha deste aparelho, se ainda existir.
   const wantedCard = typeof params.cartao === 'string' ? params.cartao : prefs?.lastPayment && prefs.lastPayment !== 'dinheiro' ? prefs.lastPayment : null;
@@ -208,7 +302,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     }
   }, [activeIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || (dayMode && dayText !== initialDay) || installmentsText !== '1';
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || (dayMode && dayText !== initialDay) || installmentsText !== '1' || note !== null;
   const day = dayMode && dayMonth ? dayInMonthDate(dayMonth, dayText) : null;
   const account = personal.accounts.find((a) => a.id === draft.accountId) ?? personal.accounts[0];
   const contextName = 'Pessoal';
@@ -234,6 +328,229 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   const focusFirst = (errs: FieldErrors) => {
     const first = FIELD_ORDER.find((f) => errs[f]);
     if (first) refs[first].current?.focus();
+  };
+
+
+  // ---------------------------------------------------------------------------------------------------------------------------
+  // Escanear nota fiscal (D-038). A leitura só preenche o formulário; nada é gravado sem "Salvar". A chave de 44 caracteres e o
+  // endereço do QR ficam só em memória (state `note`); o registro leva apenas o resumo da chave.
+  // ---------------------------------------------------------------------------------------------------------------------------
+
+  const onScan = async () => {
+    setScanMessage(null);
+    if (cameraOk && cameraUsed) {
+      setCameraOpen(true);
+      return;
+    }
+    setSheetOpen(true);
+  };
+
+  /** iOS não apresenta uma tela (câmera, seletor de arquivos) enquanto o diálogo anterior ainda está saindo: espera um instante. */
+  const afterModal = (fn: () => void) => (Platform.OS === 'ios' ? setTimeout(fn, 450) : fn());
+
+  const chooseScan = (option: 'camera' | 'pdf' | 'colar') => {
+    setSheetOpen(false);
+    if (option === 'camera') afterModal(() => setCameraOpen(true));
+    else if (option === 'pdf') afterModal(choosePdf);
+    else afterModal(openPaste);
+  };
+
+  const openPaste = () => {
+    setCameraOpen(false);
+    setPasteMessage(null);
+    setPasteBoleto(false);
+    setPasteOpen(true);
+  };
+
+  const choosePdf = async () => {
+    setCameraOpen(false);
+    setPasteOpen(false);
+    setScanMessage(null);
+    setReading(true);
+    try {
+      const r = await pickAndReadNotePdf(today);
+      if (r.ok) await applyNote(r);
+      else if (!r.cancelled) setScanMessage(r.message);
+    } finally {
+      setReading(false);
+    }
+  };
+
+  /** Texto lido pela câmera: devolve o erro (a câmera continua procurando) ou null quando a nota foi aceita. */
+  const onCameraCode = (data: string): string | null => {
+    const r = readNoteCode(data, today);
+    if (r.ok) {
+      setCameraOpen(false);
+      if (userId) {
+        markCameraUsed(userId, persistPrefs);
+        setCameraUsed(true);
+      }
+      applyNote(r);
+      return null;
+    }
+    return r.boleto || r.message !== noteErrorText('codigo_nao_reconhecido') ? r.message : NOTA_FLOW_TEXT.notReceiptKeepLooking;
+  };
+
+  const submitPaste = (text: string) => {
+    const r = readNoteCode(text, today);
+    if (r.ok) {
+      setPasteOpen(false);
+      applyNote(r);
+      return;
+    }
+    setPasteMessage(r.message);
+    setPasteBoleto(r.boleto);
+  };
+
+  const readExample = () => {
+    const r = readNoteCode(exampleReceiptQr(monthOf(today)), today);
+    if (r.ok) {
+      setPasteOpen(false);
+      applyNote(r);
+    }
+  };
+
+  /**
+   * Coloca a nota no formulário. Nota nova substitui o que a leitura anterior preencheu (e o que a pessoa digitou no lugar fica);
+   * `refine` (a página da Sefaz chegou depois) só completa o que ainda está vazio ou como a leitura deixou.
+   */
+  const applyNote = async (r: Extract<NoteReading, { ok: true }>, refine = false) => {
+    const prev = noteRef.current;
+    const d = r.draft;
+    const issuedOn = noteIssuedOn(r.facts, d, today);
+    const plan = noteFillPlan(d);
+    const storeId = storeMemoryId(r.facts.key);
+    // A memória da loja é lida só na leitura nova; a complementação pela página da Sefaz mantém a que já valia.
+    const lastTime = refine ? (prev?.lastTime ?? null) : storeId && userId ? await storeMemoryOf(userId, storeId, persistPrefs) : null;
+    const sug = suggestDescription({ issuerName: d.issuerName, lastTime });
+    const prevFilled = prev?.filled ?? null;
+    const cur = draftRef.current;
+    const before: NoteFields = prev ? prev.before : { description: cur.description, amountText: cur.amountText, dateText: cur.dateText, category: cur.category };
+    // Valor e data: a nota prevalece numa leitura nova; numa complementação, só onde a pessoa não mexeu.
+    const mine = (value: string, auto: string | undefined) => value === '' || value === auto;
+    const next = { ...cur };
+    if (plan.amountText !== null) {
+      if (!refine || mine(cur.amountText, prevFilled?.amountText)) next.amountText = plan.amountText;
+    } else if (prevFilled && cur.amountText === prevFilled.amountText) next.amountText = '';
+    if (!refine || mine(cur.dateText, prevFilled?.dateText) || cur.dateText === formatDateBR(today)) next.dateText = plan.dateText;
+    // Descrição e categoria: só onde a pessoa não digitou.
+    // O que a loja já teve neste aparelho vale mais do que o nome lido da página (a leitura da página não troca a descrição repetida).
+    if (!(refine && lastTime !== null)) {
+      if (sug.description !== '' && (cur.description.trim() === '' || cur.description === prevFilled?.description)) next.description = sug.description;
+      else if (sug.description === '' && prevFilled && cur.description === prevFilled.description) next.description = '';
+    }
+    if (sug.category && (cur.category === null || cur.category === prevFilled?.category)) next.category = sug.category;
+    const filled: NoteFields = { description: next.description, amountText: next.amountText, dateText: next.dateText, category: next.category };
+    draftRef.current = next;
+    setDraft(next);
+    setErrors({});
+    setBanner(null);
+    setScanMessage(null);
+    if (!refine) setForcedMatch(null);
+
+    const sefazPossible = canReadSefazPage(d) && sefazReadAvailable();
+    const state: NoteState = {
+      reading: r,
+      issuedOn,
+      filled,
+      before,
+      legend: refine && lastTime !== null ? (prev?.legend ?? sug.legend) : sug.legend,
+      lastTime,
+      storeId,
+      sefaz: refine ? (prev?.sefaz ?? 'idle') : sefazPossible ? 'reading' : 'idle',
+      sefazMessage: null,
+    };
+    noteRef.current = state;
+    setNote(state);
+
+    if (!refine) {
+      // Anúncio "Nota lida" (iOS não tem região viva), vibração leve e foco no primeiro campo que falta.
+      announceOnIOS(NOTA_TEXT.readAnnounce, { delay: 250 });
+      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      setTimeout(() => {
+        if (plan.focus) refs[plan.focus].current?.focus();
+        else {
+          refs.description.current?.blur();
+          Keyboard.dismiss();
+        }
+      }, 300);
+      if (sefazPossible && d.officialUrl) readSefaz(r, d.officialUrl);
+    }
+  };
+
+  /** Lê a página da Sefaz-RJ no aparelho; qualquer falha deixa o preenchimento manual (nada é perdido). */
+  const readSefaz = async (r: Extract<NoteReading, { ok: true }>, url: string) => {
+    const digest = r.draft.receiptKey;
+    const result = await readSefazOnDevice(url, r.facts.key);
+    const current = noteRef.current;
+    if (!current || current.reading.draft.receiptKey !== digest) return;
+    if (!result.ok) {
+      const next = { ...current, sefaz: 'failed' as const, sefazMessage: sefazReadErrorText(result.code) };
+      noteRef.current = next;
+      setNote(next);
+      return;
+    }
+    const facts = factsWithPage(r.facts, result.reading);
+    const merged: Extract<NoteReading, { ok: true }> = { ok: true, source: r.source, facts, draft: receiptDraft(facts, today) };
+    await applyNote(merged, true);
+    const after = noteRef.current;
+    if (after && after.reading.draft.receiptKey === digest) {
+      const done = { ...after, sefaz: 'done' as const, sefazMessage: null };
+      noteRef.current = done;
+      setNote(done);
+    }
+  };
+
+  const undoNote = () => {
+    const n = note;
+    if (!n) return;
+    setDraft((cur) => ({
+      ...cur,
+      description: cur.description === n.filled.description ? n.before.description : cur.description,
+      amountText: cur.amountText === n.filled.amountText ? n.before.amountText : cur.amountText,
+      dateText: cur.dateText === n.filled.dateText ? n.before.dateText : cur.dateText,
+      category: cur.category === n.filled.category ? n.before.category : cur.category,
+    }));
+    setNote(null);
+    setForcedMatch(null);
+    setScanMessage(null);
+  };
+
+  const installmentsFromNote = () => {
+    const name = draft.description.trim() || note?.reading.draft.issuerName || '';
+    router.push({
+      pathname: '/gastos-fixos/novo',
+      params: {
+        tipo: 'parcelada',
+        natureza: 'compra_parcelada',
+        ...(name ? { descricao: name.slice(0, DESCRIPTION_MAX), origem: 'digitado' } : {}),
+        ...(draft.category && CATEGORIES.despesa.includes(draft.category) ? { categoria: draft.category } : {}),
+      },
+    });
+  };
+
+  /** Nota repetida recusada pelo banco: mesma tela do aviso ("Esta nota já foi anotada em ..."). */
+  const showDuplicate = async (detail: string | null | undefined) => {
+    const m = /^(registro|compra)=(.+)$/.exec(detail ?? '');
+    if (!m) return;
+    if (m[1] === 'registro') setForcedMatch({ recordId: m[2]!, cardEntryId: null, cardId: null });
+    else {
+      try {
+        const entry = await repo.getCardEntry(m[2]!);
+        if (entry) setForcedMatch({ recordId: null, cardEntryId: entry.id, cardId: entry.cardId });
+      } catch {
+        // O aviso comum (sem detalhe) já diz que a nota foi anotada.
+      }
+    }
+  };
+
+  /** Depois de gravar: o endereço oficial fica na memória da sessão (detalhe do gasto) e a loja é lembrada neste aparelho. */
+  const afterNoteSaved = () => {
+    const n = noteRef.current;
+    if (!n) return;
+    receiptLinks.remember(n.reading.draft.receiptKey, n.reading.draft.officialUrl);
+    const memory = storeMemoryFor(draft.description, draft.category);
+    if (userId && n.storeId && memory) rememberStore(userId, n.storeId, memory, persistPrefs);
   };
 
   /** Modo "Dia": gravação confirmada. another: "Salvar e anotar outro" (o formulário fica, limpo); senão volta à revisão. */
@@ -266,6 +583,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       else if (monthOf(mode.record.occurredOn) === month) totalChange.set({ total, month, deltaCents: saved.amountCents - mode.record.amountCents });
       else totalChange.set({ total, month, deltaCents: saved.amountCents });
     }
+    afterNoteSaved();
     if (mode.type === 'novo') {
       // Só quem tem cartão ativo tem o que lembrar: a escolha vale só neste aparelho.
       if (cardMode && userId && activeCards.length > 0) updatePrefs(userId, { lastPayment: 'dinheiro' }, persistPrefs);
@@ -343,17 +661,20 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     setCardError(undefined);
     setBanner(null);
     setBusy(true);
+    // Compra lida de uma nota: leva o resumo da chave (nunca a chave) para o aviso de nota repetida.
+    const purchase = note ? { ...v.input, receiptKey: note.reading.draft.receiptKey } : v.input;
     try {
       const r = await guardedWrite(
         cardKeys,
-        JSON.stringify([card.id, v.input]),
-        (key) => addPurchase.mutateAsync({ key, cardId: card.id, input: v.input }),
+        JSON.stringify([card.id, purchase]),
+        (key) => addPurchase.mutateAsync({ key, cardId: card.id, input: purchase }),
         (s) => s.action === 'criar_compra_cartao' && s.cardId === card.id,
       );
       if (r.status === 'ok' || r.status === 'reconciled') {
         // Confirmação tátil, aviso e lembrança da escolha só depois de o servidor confirmar.
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         if (userId) updatePrefs(userId, { lastPayment: card.id }, persistPrefs);
+        afterNoteSaved();
         let invoiceMonth: IsoMonth | null = r.status === 'ok' ? (r.value.entry?.invoiceMonth ?? null) : null;
         if (r.status === 'reconciled' && r.saved.entryId) {
           // A tentativa anterior foi gravada: a fatura real vem do lançamento.
@@ -391,7 +712,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
           return;
         }
         if (r.code === 'cartao_arquivado' || r.code === 'nao_encontrado' || r.code === 'fatura_paga') qc.invalidateQueries({ queryKey: ['cards'] });
-        setBanner(cardErrorText(r.code, { purchase: true }));
+        if (r.code === 'nota_ja_anotada') showDuplicate(r.detail);
+        setBanner(r.code === 'nota_ja_anotada' ? NOTA_FLOW_TEXT.alreadyNotedSave : cardErrorText(r.code, { purchase: true }));
         return;
       }
       setBanner(ERROR_TEXT.salvar_falhou);
@@ -423,10 +745,12 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     setNoted(null);
     setBusy(true);
     const version = versionOverride ?? baseVersion;
-    const snapshot = JSON.stringify([v.input, version]);
+    // Gasto lido de uma nota: leva o resumo da chave (nunca a chave) para o aviso de nota repetida.
+    const input: RecordInput = note && mode.type === 'novo' ? { ...v.input, receiptKey: note.reading.draft.receiptKey } : v.input;
+    const snapshot = JSON.stringify([input, version]);
     try {
       if (pending.current.length > 0) {
-        const saved = await reconcile(v.input, snapshot);
+        const saved = await reconcile(input, snapshot);
         if (saved) {
           if (dayMode || fromReview) finishDay(v.input, another);
           else finish(saved.id, saved.amountCents !== undefined && saved.occurredOn ? { amountCents: saved.amountCents, occurredOn: saved.occurredOn } : undefined);
@@ -438,7 +762,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       }
       const key = opKey.current;
       try {
-        const saved = await send(key, v.input, version);
+        const saved = await send(key, input, version);
         pending.current = [];
         // Vindo da revisão, sempre volta a ela e anota a ação, também depois de "Usar outra data".
         if (dayMode || fromReview) finishDay(v.input, another);
@@ -446,6 +770,11 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       } catch (e) {
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
           opKey.current = newOperationKey();
+          if (e.code === 'nota_ja_anotada') {
+            showDuplicate(e.detail);
+            setBanner(NOTA_FLOW_TEXT.alreadyNotedSave);
+            return;
+          }
           const field = fieldForErrorCode(e.code);
           if (field) {
             const errs = { [field]: ERROR_TEXT[e.code as keyof typeof ERROR_TEXT] };
@@ -586,6 +915,42 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
         ) : null}
 
         <Card style={{ gap: space[4] }}>
+          {/* Escanear nota fiscal: primeiro elemento do gasto novo. Depois da leitura, o bloco "Nota lida" ocupa o lugar da linha. */}
+          {scanMode ? (
+            note ? (
+              <NoteBlock
+                draft={note.reading.draft}
+                issuedOn={note.issuedOn}
+                amountEmpty={draft.amountText.trim() === ''}
+                dayEmpty={draft.dateText.trim() === ''}
+                descriptionEmpty={draft.description.trim() === ''}
+                sefaz={note.sefaz}
+                sefazMessage={note.sefazMessage}
+                webLinkOnly={!sefazReadAvailable()}
+                onOpenSefaz={() => {
+                  const url = note.reading.draft.officialUrl;
+                  if (url) openOfficialUrl(url).then((ok) => ok || setScanMessage(NOTA_FLOW_TEXT.openFailed));
+                }}
+                onReadAnother={onScan}
+                onUndo={undoNote}
+                onInstallments={installmentsFromNote}
+              />
+            ) : (
+              <ScanLine onPress={onScan} disabled={reading} />
+            )
+          ) : null}
+          {reading ? (
+            <Banner tone="info" icon={Info}>
+              <Txt variant="label">{NOTA_FLOW_TEXT.pdfWorking}</Txt>
+            </Banner>
+          ) : null}
+          {scanMessage ? (
+            <Banner tone="info" icon={Info}>
+              <Txt variant="label">{scanMessage}</Txt>
+            </Banner>
+          ) : null}
+          {match ? <AlreadyNotedBanner match={match} /> : null}
+
           <Txt variant="caption" color={colors.textSecondary}>
             {cardPurchase ? `${CARDS_TEXT.screens.purchaseSituation} · ${selectedCard ? cardTitle(selectedCard) : CARDS_TEXT.expense.credit}` : `${copy.situation} · ${account?.name}`}
           </Txt>
@@ -595,11 +960,17 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             label="Descrição"
             value={draft.description}
             onChangeText={(t) => set('description', t)}
-            placeholder={kind === 'despesa' ? 'Ex.: Café' : 'Ex.: Salário'}
+            placeholder={note ? NOTA_FLOW_TEXT.descriptionPlaceholder : kind === 'despesa' ? 'Ex.: Café' : 'Ex.: Salário'}
             maxLength={DESCRIPTION_MAX}
             autoFocus={mode.type === 'novo'}
             error={errors.description}
-            hint={charCount(draft.description) >= 60 ? `${charCount(draft.description)} de ${DESCRIPTION_MAX} caracteres` : undefined}
+            hint={
+              charCount(draft.description) >= 60
+                ? `${charCount(draft.description)} de ${DESCRIPTION_MAX} caracteres`
+                : note?.legend && draft.description === note.filled.description && draft.description !== ''
+                  ? note.legend
+                  : undefined
+            }
             returnKeyType="next"
             onSubmitEditing={() => refs.amountText.current?.focus()}
           />
@@ -802,10 +1173,25 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             <View style={styles.chips}>
               <Chip label={NO_CATEGORY_LABEL} selected={draft.category === null} onPress={() => set('category', null)} />
               {CATEGORIES[kind].map((c) => (
-                <Chip key={c} label={c} selected={draft.category === c} onPress={() => set('category', c)} />
+                <Chip
+                  key={c}
+                  label={c}
+                  selected={draft.category === c}
+                  onPress={() => {
+                    // Depois de ler uma nota sem o nome da loja, tocar numa categoria com a descrição vazia a preenche com o nome dela.
+                    if (note && kind === 'despesa') setDraft((d) => ({ ...d, category: c, description: descriptionAfterCategory(d.description, c) }));
+                    else set('category', c);
+                  }}
+                />
               ))}
             </View>
           </View>
+
+          {note && dateOutsideNoteMonth(parsedDate, note.reading.draft.month) ? (
+            <Txt variant="label" color={colors.textSecondary}>
+              {dateOutsideNoteMonth(parsedDate, note.reading.draft.month)}
+            </Txt>
+          ) : null}
 
           {movesMonth && parsedDate ? (
             <Banner tone="info" icon={Info}>
@@ -872,6 +1258,38 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
           )}
         </View>
       </View>
+
+      {scanMode ? (
+        <>
+          <ScanSheet visible={sheetOpen} cameraAvailable={cameraOk} showCameraIntro={!cameraUsed} onChoose={chooseScan} onClose={() => setSheetOpen(false)} />
+          <CameraModal
+            visible={cameraOpen}
+            onCode={onCameraCode}
+            onPdf={() => {
+              setCameraOpen(false);
+              afterModal(choosePdf);
+            }}
+            onPaste={() => {
+              setCameraOpen(false);
+              afterModal(openPaste);
+            }}
+            onClose={() => setCameraOpen(false)}
+          />
+          <PasteModal
+            visible={pasteOpen}
+            message={pasteMessage}
+            boleto={pasteBoleto}
+            demo={auth.mode === 'demo' && user?.email === DEMO_EMAIL}
+            onSubmit={submitPaste}
+            onExample={readExample}
+            onBoleto={() => {
+              setPasteOpen(false);
+              afterModal(() => router.push('/a-pagar/nova'));
+            }}
+            onClose={() => setPasteOpen(false)}
+          />
+        </>
+      ) : null}
 
       <ConfirmDialog
         visible={Boolean(confirmDiscard)}

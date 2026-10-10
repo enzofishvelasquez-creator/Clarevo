@@ -2,6 +2,8 @@ import {
   CARDS_TEXT,
   CATEGORIES,
   ERROR_TEXT,
+  NOTA_FLOW_TEXT,
+  NOTA_TEXT,
   NO_CATEGORY_LABEL,
   addMonths,
   deviceTimeZone,
@@ -30,6 +32,7 @@ import { Banner, Button, Card, FitMoney, Screen, Skeleton, Txt } from '@/compone
 import { flash } from '@/lib/flash';
 import { totalChange } from '@/lib/highlight';
 import { invoiceHref } from '@/lib/cards';
+import { openOfficialUrl, receiptLinks } from '@/lib/receipt-link';
 import { openSummary } from '@/lib/nav';
 import { useDeleteRecord, useRecord, useSpace, useView } from '@/state/data';
 import { useSession } from '@/state/session';
@@ -143,6 +146,7 @@ export default function DetalheRegistro() {
                   <Row label="Data" value={formatDateBR(r.occurredOn)} />
                   <Row label="Categoria" value={r.category ?? NO_CATEGORY_LABEL} />
                   {r.invoice ? <Row label="Origem" value={CARDS_TEXT.paymentOrigin} /> : r.commitmentId ? <Row label="Origem" value="Conta a pagar" /> : null}
+                  {r.receiptKey ? <Row label={NOTA_FLOW_TEXT.detailRow} value={NOTA_FLOW_TEXT.detailRowValue} /> : null}
                   <Row label="Resumo afetado" value={formatMonthBR(monthOf(r.occurredOn))} last />
                 </View>
                 <View style={styles.trail} accessible>
@@ -156,6 +160,24 @@ export default function DetalheRegistro() {
                   ) : null}
                 </View>
               </Card>
+
+              {/* Nota fiscal lida (D-038): o endereço da Sefaz só vale na sessão em que a nota foi lida; o registro guarda só o resumo da chave. */}
+              {r.receiptKey ? (
+                receiptLinks.get(r.receiptKey) ? (
+                  <Button
+                    label={NOTA_TEXT.viewOnSefaz}
+                    tone="soft"
+                    onPress={() => {
+                      const url = receiptLinks.get(r.receiptKey);
+                      if (url) openOfficialUrl(url).then((ok) => ok || setDeleteError(NOTA_FLOW_TEXT.openFailed));
+                    }}
+                  />
+                ) : (
+                  <Txt variant="caption" color={colors.textSecondary}>
+                    {NOTA_FLOW_TEXT.detailNoLink}
+                  </Txt>
+                )
+              ) : null}
 
               {notice === 'Gasto salvo' || notice === 'Recebimento salvo' ? (
                 <Button

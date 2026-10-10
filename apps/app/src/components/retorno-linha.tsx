@@ -1,4 +1,5 @@
 import {
+  CARDS_TEXT,
   RETURN_TEXT,
   batchEligible,
   looseExpenseFor,
@@ -18,6 +19,7 @@ import { MoneyTxt } from '@/components/money-text';
 import type { RowOutcome } from '@/components/retorno-acoes';
 import { yearA11y, yearA11yLabel } from '@/components/series-parts';
 import { Banner, Button, LinkButton, spaceKeyPress, Txt } from '@/components/ui';
+import { openCommitment } from '@/lib/cards';
 import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 
@@ -142,6 +144,18 @@ export function ReturnRow({
             <MoneyTxt variant="label" color={closed ? colors.textSecondary : colors.error} accessibilityLiveRegion="polite" style={!closed && { fontFamily: fonts.bold }}>
               {note}
             </MoneyTxt>
+          ) : null}
+
+          {/* Fatura de cartão: sem "Já paguei" nem "Não houve" (a fatura se paga pelo cartão); abre a fatura, como em Contas a pagar. */}
+          {!closed && row.commitment?.invoice ? (
+            <Button
+              label={CARDS_TEXT.openInvoice}
+              accessibilityLabel={yearA11y(`${CARDS_TEXT.openInvoice}: ${short}`)}
+              tone="soft"
+              disabled={busy}
+              style={styles.action}
+              onPress={() => openCommitment(row.commitment!)}
+            />
           ) : null}
 
           {closed ? null : (

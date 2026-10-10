@@ -3677,6 +3677,378 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('E cartão excluído: "Cartão excluído." e sai da lista (o Nubank roxo continua)', !t.includes('Cartão do mercado') && t.includes('Nubank roxo') && (await otherDevice(async (repo, ctx) => (await repo.listCards(ctx)).length)) === 1);
   }
 
+  {
+  // ==================================================================================================================
+  // Ciclo E · Notas (D-038, passo 3). "Escanear nota fiscal" é o primeiro elemento de Anotar gasto novo; a leitura só preenche
+  // o formulário (nada é gravado sem "Salvar gasto"); o registro leva só o resumo da chave. Sem câmera no roteiro: valem "Colar o link
+  // ou a chave", a nota de exemplo (fictícia, identificada, de teste) e o PDF por um arquivo sintético. A leitura da página da Sefaz-RJ
+  // só existe no celular (na web, só o link oficial) e o contêiner não alcança a Sefaz: o parser tem testes no core com HTML sintético.
+  // Hoje é 07/10/2026; a demonstração começa com Recebido 6.000 / Pago 3.900 / Diferença 2.100 / Ainda a pagar 650.
+  const goTabN = async (name) => {
+    const tab = () => p.getByRole('tab', { name }).filter({ visible: true });
+    for (let i = 0; i < 8; i++) { await tab().first().waitFor({ timeout: 1500 }).catch(() => {}); if ((await tab().count()) > 0) break; await btn('Voltar').click(); await p.waitForTimeout(400); }
+    await tab().first().click(); await p.waitForTimeout(500);
+  };
+  const waitInvoiceN = async (hero) => { await waitText('Lançamentos'); await waitText(hero); await p.waitForTimeout(500); };
+  const stepTitleN = () => p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label'))[0] ?? null);
+  const urlPathN = () => new URL(p.url()).pathname;
+  const activeLabel = () => p.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? null);
+  const activeTag = () => p.evaluate(() => document.activeElement?.tagName ?? null);
+  const dialogButtons = () => p.getByRole('alert').filter({ visible: true }).last().getByRole('button').evaluateAll((es) => es.map((e) => e.getAttribute('aria-label') || e.textContent));
+  const heroTotalN = async () => (await body()).match(/Fatura de [^\n]+\n[^\n]+\n[^\n]+\n(R\$ [\d.]+,\d{2})/)?.[1] ?? null;
+  const recordsOf = (month = '2026-10') => otherDevice(async (repo, ctx, m) => (await repo.listRecords(ctx, m)).map((r) => ({ id: r.id, d: r.description, c: r.amountCents, cat: r.category, on: r.occurredOn, key: r.receiptKey })), month);
+  // Chave de acesso e QR de NFC-e do RJ sintéticos (CNPJ 11.222.333/0001-81, o exemplo público). Dígito verificador por módulo 11.
+  const accessKey = (aamm, model, number, cnpj = '11222333000181') => {
+    const body43 = `33${aamm}${cnpj}${model}001${String(number).padStart(9, '0')}187654321`;
+    let sum = 0; for (let i = 0; i < 43; i++) sum += (body43.charCodeAt(42 - i) - 48) * (2 + (i % 8));
+    const r = sum % 11;
+    return body43 + String(r < 2 ? 0 : 11 - r);
+  };
+  const RJ = 'https://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode?p=';
+  const HASH = 'ABCDEF0123456789ABCDEF0123456789ABCDEF01';
+  const qrOnline = (key) => `${RJ}${key}|2|1|1|${HASH}`;
+  const qrContingency = (key, day, value) => `${RJ}${key}|2|1|${day}|${value}|0123456789ABCDEF0123456789ABCDEF01234567|1|${HASH}`;
+  const NOTE_AUG = accessKey('2608', '65', 777);
+  const NFE = accessKey('2610', '55', 4321);
+  const OTHER_CNPJ = '45723174000110';
+  const NFE_PDF_KEY = accessKey('2610', '55', 8899, OTHER_CNPJ);
+  const notesTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'clarevo-notas-'));
+  // PDF mínimo de texto (Helvetica, uma linha por Tj): só para o roteiro; o DANFE sintético traz destinatário fictício que não pode aparecer.
+  const makePdf = (lines) => {
+    const esc = (s) => s.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+    const content = `BT /F1 10 Tf 40 800 Td 14 TL\n${lines.map((l) => `(${esc(l)}) Tj T*`).join('\n')}\nET`;
+    const objs = [
+      '<< /Type /Catalog /Pages 2 0 R >>',
+      '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+      `<< /Length ${Buffer.byteLength(content, 'latin1')} >>\nstream\n${content}\nendstream`,
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+    ];
+    let out = '%PDF-1.4\n'; const offsets = [];
+    objs.forEach((o, i) => { offsets.push(Buffer.byteLength(out, 'latin1')); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
+    const xref = Buffer.byteLength(out, 'latin1');
+    out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+    return Buffer.from(out, 'latin1');
+  };
+  const spacedKey = (k) => k.replace(/(.{4})/g, '$1 ').trim();
+  const danfeLines = (key, issued, total) => [
+    'RECEBEMOS DE LOJA EXEMPLO LTDA OS PRODUTOS E/OU SERVIÇOS CONSTANTES DA NOTA FISCAL ELETRÔNICA INDICADA AO LADO',
+    'DANFE', 'Documento Auxiliar da Nota Fiscal Eletrônica',
+    'CHAVE DE ACESSO', spacedKey(key),
+    'DATA DA EMISSÃO', issued,
+    'DESTINATÁRIO / REMETENTE', 'NOME / RAZÃO SOCIAL', 'FULANA DE TAL EXEMPLO', 'CNPJ / CPF', '123.456.789-09', 'ENDEREÇO', 'RUA DO DESTINATARIO FICTICIA, 1',
+    'CÁLCULO DO IMPOSTO', 'VALOR TOTAL DA NOTA', total,
+  ];
+  const pdfOk = path.join(notesTmp, 'danfe-exemplo.pdf');
+  const pdfNoKey = path.join(notesTmp, 'sem-chave.pdf');
+  const notPdf = path.join(notesTmp, 'texto.pdf');
+  fs.writeFileSync(pdfOk, makePdf(danfeLines(NFE_PDF_KEY, '05/10/2026', '150,00')));
+  fs.writeFileSync(pdfNoKey, makePdf(['PEDIDO DE COMPRA', 'Obrigado pela compra', 'Valor total 150,00']));
+  fs.writeFileSync(notPdf, 'isto não é um PDF, só texto');
+  // Rede: nenhuma consulta à Sefaz sai do app na web (o link só abre quando a pessoa toca), e a nota de exemplo nunca chama a rede.
+  const netNotes = []; p.on('request', (r) => /fazenda\.rj\.gov\.br|nota-de-exemplo\.invalid/.test(r.url()) && netNotes.push(`${r.method()} ${r.url()}`));
+  await ctx.route('**://consultadfe.fazenda.rj.gov.br/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<html><body>Página da Sefaz simulada pelo roteiro.</body></html>' }));
+  const toBlock = async () => { await p.getByText('Nota lida:', { exact: false }).filter({ visible: true }).first().evaluate((e) => e.scrollIntoView({ block: 'start' })); await p.waitForTimeout(300); };
+  const scanLine = () => p.getByRole('button', { name: /^Escanear nota fiscal\./ }).filter({ visible: true }).first();
+  const openScan = async () => { await scanLine().click(); await waitText('Como você quer ler a nota?'); };
+  const openPaste = async () => { await openScan(); await btn('Colar o link ou a chave').click(); await waitText('Colar o link ou a chave da nota'); await p.waitForTimeout(300); };
+  const pasteNote = async (text) => { await openPaste(); await field('Colar o link ou a chave da nota').fill(text); await btn('Ler a nota').click(); await waitText('Nota lida:'); await p.waitForTimeout(700); };
+  const newExpense = async () => { await goTabN('Resumo'); await waitText('Diferença do mês'); await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(500); };
+  const leaveForm = async () => { await btn('Cancelar').click(); await p.waitForTimeout(300); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click(); await waitText('Diferença do mês'); };
+
+  await freshDemo();
+  await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
+  const tops = await p.evaluate(() => {
+    const line = [...document.querySelectorAll('[role=button]')].find((e) => (e.getAttribute('aria-label') || '').startsWith('Escanear nota fiscal') && e.getBoundingClientRect().width > 0);
+    const text = (s) => [...document.querySelectorAll('div[dir="auto"]')].find((e) => e.textContent.startsWith(s) && e.getBoundingClientRect().width > 0);
+    const situation = text('Gasto já pago');
+    return { line: line ? line.getBoundingClientRect().top : null, height: line ? Math.round(line.getBoundingClientRect().height) : null, situation: situation ? situation.getBoundingClientRect().top : null, label: line?.getAttribute('aria-label') };
+  });
+  ok('N Anotar gasto: "Escanear nota fiscal" é o primeiro elemento do formulário (acima da legenda "Gasto já pago"), com a linha de 56 px e a dica "Cupom do mercado ou PDF de compra on-line"',
+    tops.line !== null && tops.situation !== null && tops.line < tops.situation && tops.height >= 56 && tops.label === 'Escanear nota fiscal. Cupom do mercado ou PDF de compra on-line.' && (await body()).includes('Cupom do mercado ou PDF de compra on-line'), JSON.stringify(tops));
+  await keepText();
+  await innerChecks('anotar gasto com a linha de escanear 390px');
+  await shot('150_anotar_gasto_escanear');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await innerChecks('anotar gasto com a linha de escanear 320px');
+  await shot('150_anotar_gasto_escanear_320px', true);
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+
+  // A folha do primeiro toque: câmera só quando há câmera (o navegador do roteiro não tem), PDF e colar sempre; "Cancelar" não faz nada.
+  await openScan(); t = await dialogText(); const sheetButtons = await dialogButtons();
+  ok('N folha do primeiro toque: título, a frase de privacidade (só um resumo da chave, sem CPF nem link), "Escolher o PDF da nota" antes de "Colar o link ou a chave" (sem câmera no navegador do roteiro, o PDF vem primeiro) e "Cancelar"; "Usar a câmera" só aparece com câmera',
+    t.includes('Como você quer ler a nota?') && t.includes('Guardamos só um resumo da chave de acesso da nota, para avisar se ela for lida de novo. Não guardamos CPF, a chave nem o link.') && JSON.stringify(sheetButtons.filter((x) => x !== 'Usar a câmera')) === JSON.stringify(['Escolher o PDF da nota', 'Colar o link ou a chave', 'Cancelar']) && (sheetButtons.length === 3 || sheetButtons[0] === 'Usar a câmera'), JSON.stringify(sheetButtons));
+  await keepText();
+  await shot('151_folha_escanear');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await layoutChecks('folha de escanear 320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  await confirmIn('Cancelar'); await p.waitForTimeout(300);
+  ok('N "Cancelar" na folha fecha sem ler nada: a linha continua e o formulário está intacto', (await visibleCount('button', /^Escanear nota fiscal\./)) === 1 && !(await body()).includes('Nota lida'));
+
+  // Colar: códigos que não servem. O campo explica sem culpar.
+  await openPaste(); t = await body();
+  ok('N "Colar o link ou a chave": título, campo com dica, "Ler a nota"; na demonstração, "Usar nota de exemplo" com o aviso de que é fictícia', ['Colar o link ou a chave', 'Cole o link do QR da nota ou os 44 caracteres da chave de acesso.', 'Nota de exemplo fictícia, só para conhecer o recurso.'].every((x) => t.includes(x)) &&
+    (await visibleCount('button', 'Ler a nota')) === 1 && (await visibleCount('button', 'Usar nota de exemplo')) === 1);
+  await shot('152_colar_nota');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await layoutChecks('colar a nota 320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  await field('Colar o link ou a chave da nota').fill('abc'); await btn('Ler a nota').click(); await p.waitForTimeout(300); t = await body();
+  ok('N texto que não é de nota: "Não reconhecemos este código como de uma nota fiscal..." junto do campo, nada preenchido', t.includes('Não reconhecemos este código como de uma nota fiscal.') && !t.includes('Nota lida'));
+  await field('Colar o link ou a chave da nota').fill('3326 1011 2223 3300 0181 6500 1000 0123 4518 7654 3219'); await btn('Ler a nota').click(); await p.waitForTimeout(300);
+  ok('N chave com dígito errado: "A chave não confere. Confira os números ou escaneie de novo."', (await body()).includes('A chave não confere. Confira os números ou escaneie de novo.'));
+  // Boleto (Bradesco, 237, linha digitável e código de barras): outro tipo de código, não é chave de nota.
+  await field('Colar o link ou a chave da nota').fill('23791.23454 67890.123457 67890.123457 6 98760000012345'); await btn('Ler a nota').click(); await p.waitForTimeout(300); t = await body();
+  ok('N código de boleto colado: "Este é o código de um boleto. Para anotar uma conta que ainda vai vencer, use Anotar conta a pagar." com o botão que abre essa tela, e nada é lido nem guardado',
+    t.includes('Este é o código de um boleto. Para anotar uma conta que ainda vai vencer, use Anotar conta a pagar.') && (await visibleCount('button', 'Anotar conta a pagar')) >= 1 && !t.includes('Nota lida'));
+  await field('Colar o link ou a chave da nota').fill('23796987600000123451234567890123456789012345'); await btn('Ler a nota').click(); await p.waitForTimeout(300);
+  ok('N código de barras de boleto (44 dígitos que começam como o CE) também é reconhecido como boleto', (await body()).includes('Este é o código de um boleto.'));
+  await btn('Anotar conta a pagar').last().click(); await waitText('Anotar conta a pagar'); await p.waitForTimeout(500);
+  ok('N "Anotar conta a pagar" do aviso do boleto abre a tela de conta a pagar', urlPathN() === '/a-pagar/nova', urlPathN());
+  await btn('Cancelar').click(); await p.waitForTimeout(300); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
+  await p.waitForTimeout(300);
+  await waitText('Será salvo em');
+
+  // Nota de exemplo (demonstração): rascunho, bloco "Nota lida", foco no valor, mensagens do que falta e nenhuma chamada de rede.
+  await openPaste(); await btn('Usar nota de exemplo').click(); await waitText('Nota lida:'); await p.waitForTimeout(800);
+  t = await body();
+  ok('N nota de exemplo: bloco "Nota lida: CNPJ 11.222.333/0001-81 · RJ · outubro de 2026" no lugar da linha, a nota de teste e nada de "Preenchemos o que a nota informa" (falta o valor), sem "Ver a nota no site da Sefaz"',
+    t.includes('Nota lida: CNPJ 11.222.333/0001-81 · RJ · outubro de 2026') && !t.includes('Preenchemos o que a nota informa.') && t.includes('Esta é uma nota de teste, sem valor fiscal.') &&
+    (await visibleCount('button', /^Escanear nota fiscal\./)) === 0 && (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 0, t.slice(0, 500));
+  ok('N o que a nota não traz é dito com clareza: "O valor não vem no código desta nota. Digite o total impresso no cupom.", o dia de hoje usado e o CNPJ sem o nome',
+    t.includes('O valor não vem no código desta nota. Digite o total impresso no cupom.') && t.includes('O dia da compra não vem no código desta nota. Usamos o de hoje. Mude se foi outro dia.') && t.includes('O código traz o CNPJ da loja, não o nome. Digite o nome na descrição.'));
+  ok('N foco no primeiro campo que falta (Valor em reais), data de hoje e descrição vazia (nunca "Compra (CNPJ ...)")',
+    (await activeLabel()) === 'Valor em reais' && (await field('Data do pagamento').inputValue()) === '07/10/2026' && (await field('Descrição').inputValue()) === '' && !(await body()).includes('Compra (CNPJ') &&
+    (await field('Descrição').getAttribute('placeholder')) === 'Ex.: Mercado');
+  ok('N o bloco é uma região viva que anuncia "Nota lida" (leitores de tela), com "Ler outra nota" e "Desfazer leitura", e nenhum número longo (a chave) na tela',
+    (await p.getByRole('alert').filter({ hasText: 'Nota lida:' }).count()) >= 1 && (await visibleCount('button', 'Ler outra nota')) === 1 && (await visibleCount('button', 'Desfazer leitura')) === 1 && !/\d{20,}/.test(t.replace(/[\s.]/g, '')));
+  ok('N a nota de exemplo não chama a rede (nem a Sefaz, nem o domínio reservado dela)', netNotes.length === 0, netNotes.join(' | '));
+  await keepText();
+  await innerChecks('nota lida 390px');
+  await toBlock(); await shot('153_nota_lida');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await innerChecks('nota lida 320px');
+  await toBlock(); await shot('153_nota_lida_320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+
+  // Desfazer leitura: o formulário volta ao que era.
+  await field('Valor em reais').fill('12'); await p.waitForTimeout(200);
+  await btn('Desfazer leitura').click(); await p.waitForTimeout(400);
+  ok('N "Desfazer leitura": o bloco sai, a linha "Escanear nota fiscal" volta e o valor digitado pela pessoa é mantido', (await visibleCount('button', /^Escanear nota fiscal\./)) === 1 && !(await body()).includes('Nota lida:') && (await field('Valor em reais').inputValue()) === '12,00');
+  await field('Valor em reais').fill('');
+
+  // Tocar numa categoria com a descrição vazia, depois de ler uma nota sem o nome da loja, preenche a descrição com o nome dela.
+  await openPaste(); await btn('Usar nota de exemplo').click(); await waitText('Nota lida:'); await p.waitForTimeout(800);
+  await field('Valor em reais').fill('87,40'); await radio('Mercado').click(); await p.waitForTimeout(300);
+  ok('N categoria tocada com a descrição vazia preenche a descrição com o nome dela ("Mercado")', (await field('Descrição').inputValue()) === 'Mercado');
+  const before = await recordsOf();
+  await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(600); t = await body();
+  const saved = (await recordsOf()).filter((r) => r.d === 'Mercado' && r.c === 8740);
+  ok('N salvar a nota lida: gasto de R$ 87,40 em 07/10/2026, categoria Mercado, com a linha "Nota fiscal · Anotada com a leitura da nota"; o link da Sefaz não existe (nota de teste) e o detalhe explica que só o resumo da chave fica',
+    /^\/registro\/[^/]+$/.test(urlPathN()) && saved.length === 1 && saved[0].c === 8740 && saved[0].on === '2026-10-07' && saved[0].cat === 'Mercado' && t.includes('Nota fiscal') && t.includes('Anotada com a leitura da nota') &&
+    t.includes('Guardamos só um resumo da chave da nota, não o link.') && (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 0 && (await recordsOf()).length === before.length + 1, JSON.stringify(saved));
+  ok('N o registro leva só o resumo SHA-256 da chave (64 hexadecimais), nunca a chave de 44 dígitos', saved.length === 1 && /^[0-9a-f]{64}$/.test(saved[0].key ?? '') && !String(saved[0].key).includes('33261011'));
+  const savedId = saved[0].id;
+  await keepText();
+  await shot('154_nota_salva');
+  await btn('Editar registro').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
+  ok('N editar o gasto de uma nota: sem a linha "Escanear nota fiscal" (só em gasto novo)', (await visibleCount('button', /^Escanear nota fiscal\./)) === 0 && (await visibleCount('button', 'Salvar gasto')) === 1);
+  await btn('Cancelar').click(); await p.waitForTimeout(300); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
+  await goTabN('Resumo'); await waitText('Diferença do mês');
+  await expectTotals('N a nota salva entra em Pago como qualquer gasto: 6.000 / 3.987,40 / 2.012,60 e 650', 'R$ 6.000,00', 'R$ 3.987,40', 'R$ 2.012,60');
+
+  // Ler a mesma nota de novo: aviso de nota já anotada com o caminho para o registro; a gravação repetida é recusada.
+  await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
+  await openPaste(); await btn('Usar nota de exemplo').click(); await waitText('Nota lida:'); await waitText('Esta nota já foi anotada em', 8000); await p.waitForTimeout(500); t = await body();
+  ok('N mesma nota lida de novo: "Esta nota já foi anotada em 07/10/2026: Mercado, R$ 87,40." com "Abrir registro"', t.includes('Esta nota já foi anotada em 07/10/2026: Mercado, R$ 87,40.') && (await visibleCount('button', 'Abrir registro')) === 1);
+  await keepText();
+  await toBlock(); await shot('155_nota_ja_anotada');
+  await field('Valor em reais').fill('87,40'); await field('Descrição').fill('Mercado de novo'); await btn('Salvar gasto').click(); await p.waitForTimeout(800);
+  ok('N salvar a nota repetida é recusado ("Esta nota já está anotada...") e nada é gravado a mais', (await body()).includes('Esta nota já está anotada. Abra o registro para conferir ou leia outra nota.') && (await recordsOf()).length === before.length + 1 && urlPathN() === '/registro/novo', urlPathN());
+  await btn('Abrir registro').click(); await waitText('Anotada com a leitura da nota'); await p.waitForTimeout(400);
+  ok('N "Abrir registro" abre o gasto já anotado', urlPathN() === `/registro/${savedId}`, urlPathN());
+  await btn('Voltar').click(); await waitText('Será salvo em'); await leaveForm();
+
+  // QR oficial do RJ com valor e dia (contingência): preenche tudo, o teclado fica fechado, a memória da loja repete a descrição e a categoria
+  // e "Ver a nota no site da Sefaz" abre o endereço oficial (na web, só o link: a página não é lida).
+  await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
+  const noteB = accessKey('2610', '65', 12346);
+  await pasteNote(qrContingency(noteB, '06', '45.90')); t = await body();
+  ok('N QR com valor e dia: "Nota lida: CNPJ 11.222.333/0001-81 · RJ · 06/10/2026", valor 45,90 e data 06/10/2026, sem mensagem de falta e com o teclado fechado',
+    t.includes('Nota lida: CNPJ 11.222.333/0001-81 · RJ · 06/10/2026') && t.includes('Preenchemos o que a nota informa. Confira e toque em Salvar.') && (await field('Valor em reais').inputValue()) === '45,90' && (await field('Data do pagamento').inputValue()) === '06/10/2026' && !t.includes('não vem no código') &&
+    (await activeTag()) !== 'INPUT' && (await activeTag()) !== 'TEXTAREA', `${await activeTag()} ${t.slice(0, 300)}`);
+  ok('N mesma loja (mesmo CNPJ) já anotada neste aparelho: descrição e categoria da última vez, com a legenda "Como da última vez nesta loja"',
+    (await field('Descrição').inputValue()) === 'Mercado' && (await radio('Mercado').getAttribute('aria-checked')) === 'true' && t.includes('Como da última vez nesta loja'));
+  ok('N com o endereço oficial do RJ: "Ver a nota no site da Sefaz" no bloco e, na web, o aviso de que o Clarevo não lê a página (só o link)', (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 1 &&
+    t.includes('Neste navegador, a página da Sefaz não pode ser lida pelo Clarevo. Abra a nota no site da Sefaz e digite o total.') && !t.includes('Lendo a página da Sefaz'));
+  const [tab] = await Promise.all([ctx.waitForEvent('page'), btn('Ver a nota no site da Sefaz').click()]);
+  await tab.waitForURL(/consultadfe\.fazenda\.rj\.gov\.br/, { timeout: 8000 }).catch(() => {});
+  const tabUrl = tab.url(); await tab.close();
+  ok('N "Ver a nota no site da Sefaz" abre o endereço oficial do QR em outra aba (o app não busca a página na web)', tabUrl.startsWith('https://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode?p=') && netNotes.every((x) => x.startsWith('GET')) && !netNotes.some((x) => x.includes('nota-de-exemplo')), `${tabUrl} ${netNotes.join(' | ')}`);
+  await keepText();
+  await toBlock(); await shot('156_nota_com_link');
+  await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(600); t = await body();
+  ok('N gasto salvo logo depois da leitura: o detalhe tem "Ver a nota no site da Sefaz" (o endereço só vive na sessão; o registro guarda só o resumo da chave)', (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 1 && t.includes('Anotada com a leitura da nota') && !t.includes('Guardamos só um resumo da chave da nota, não o link.'));
+  await keepText();
+  await shot('157_nota_salva_com_link');
+
+  // NF-e (modelo 55): a chave sozinha, com o convite para anotar como parcelamento (carnê ou crediário).
+  await goTabN('Resumo'); await waitText('Diferença do mês'); await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
+  await pasteNote(NFE); t = await body();
+  ok('N chave de NF-e (modelo 55) colada: bloco da nota, valor em falta e "Comprou no carnê ou crediário? Anotar como parcelamento" (nunca para NFC-e)', t.includes('Nota lida:') && t.includes('O valor não vem no código desta nota.') && (await visibleCount('button', 'Comprou no carnê ou crediário? Anotar como parcelamento')) === 1 &&
+    (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 0);
+  await btn('Comprou no carnê ou crediário? Anotar como parcelamento').click(); await p.waitForTimeout(800);
+  ok('N "Anotar como parcelamento" abre o cadastro de parcelamento com a descrição da loja', urlPathN() === '/gastos-fixos/novo' && (await field('Descrição').inputValue()) === 'Mercado', `${urlPathN()} ${await field('Descrição').inputValue().catch(() => '')}`);
+  await shot('158_nota_como_parcelamento');
+  await btn('Cancelar').click().catch(() => {}); await p.waitForTimeout(300); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
+  await p.waitForTimeout(300);
+  ok('N voltar do parcelamento mantém o formulário com a nota lida', urlPathN() === '/registro/novo' && (await body()).includes('Nota lida:'), urlPathN());
+  await leaveForm();
+
+  // Nota de outro mês, só a chave: o dia precisa ser escolhido dentro do mês da nota (aviso leve se a data sai dele).
+  await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
+  await pasteNote(NOTE_AUG); t = await body();
+  ok('N chave de agosto: o dia fica em branco ("Escolha o dia em agosto de 2026"), o valor falta e o foco vai para o Valor',
+    t.includes('Nota lida: CNPJ 11.222.333/0001-81 · RJ · agosto de 2026') && t.includes('O dia da compra não vem no código desta nota. Escolha o dia em agosto de 2026.') && (await field('Data do pagamento').inputValue()) === '' && (await activeLabel()) === 'Valor em reais');
+  await field('Data do pagamento').fill('07102026'); await p.waitForTimeout(300);
+  ok('N data fora do mês da nota: aviso leve ("A nota é de agosto de 2026. A data escolhida é de outro mês."), sem bloquear', (await body()).includes('A nota é de agosto de 2026. A data escolhida é de outro mês.'));
+  await field('Data do pagamento').fill('15082026'); await p.waitForTimeout(300);
+  ok('N data dentro do mês da nota: o aviso some', !(await body()).includes('A data escolhida é de outro mês.') && (await field('Data do pagamento').inputValue()) === '15/08/2026');
+  await leaveForm();
+
+  // Leitura da página da Sefaz-RJ: no celular o app a busca no aparelho; aqui, um gancho do roteiro (globalThis.__clarevoSefazFetch) entrega uma
+  // página SINTÉTICA no lugar do fetch, para exercitar o caminho completo (a Sefaz real não é alcançável e o navegador bloquearia por CORS).
+  const SEFAZ_KEY = accessKey('2610', '65', 5150, OTHER_CNPJ);
+  const sefazHtml = (key) => `<html><head><script>var x='Valor a pagar R$ 1,00';</script></head><body><div id="u20" class="txtTopo">MERCADO EXEMPLO LTDA</div><div class="text">CNPJ: 45.723.174/0001-10</div><table id="tabResult"><tr id="Item + 1"><td>PRODUTO EXEMPLO</td></tr></table><div id="totalNota"><div><label>Qtd. total de itens:</label><span>1</span></div><div><label>Valor a pagar R$:</label><span>63,70</span></div></div><div id="infos"><ul><li><strong>Emissão: </strong>06/10/2026 10:15:00 - Via Consumidor</li></ul><h4>Consumidor</h4><ul><li>CPF: 123.456.789-09 Nome: FULANA DE TAL EXEMPLO</li></ul><h4>Chave de acesso</h4><span>${spacedKey(key)}</span></div></body></html>`;
+  await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
+  await p.evaluate((html) => { window.__sefazCalls = []; window.__sefazMode = 'ok'; window.__sefazHtml = html; window.__clarevoSefazFetch = async (url) => { window.__sefazCalls.push(url); if (window.__sefazMode === 'erro') return { ok: false, status: 503, url, text: async () => '' }; return { ok: true, status: 200, url, text: async () => window.__sefazHtml }; }; }, sefazHtml(SEFAZ_KEY));
+  await openPaste(); await field('Colar o link ou a chave da nota').fill(qrOnline(SEFAZ_KEY)); await btn('Ler a nota').click(); await waitText('Nota lida:'); await waitText('Loja, valor e data lidos da página da Sefaz.', 8000); await p.waitForTimeout(600); t = await body();
+  const sefazCalls = await p.evaluate(() => window.__sefazCalls);
+  ok('N página da Sefaz lida: "Nota lida: Mercado Exemplo Ltda · RJ · 06/10/2026", valor 63,70, data 06/10/2026 e a descrição com o nome da loja ("Nome da loja lido da nota"), com "Loja, valor e data lidos da página da Sefaz"',
+    t.includes('Nota lida: Mercado Exemplo Ltda · RJ · 06/10/2026') && (await field('Valor em reais').inputValue()) === '63,70' && (await field('Data do pagamento').inputValue()) === '06/10/2026' && (await field('Descrição').inputValue()) === 'Mercado Exemplo Ltda' &&
+    t.includes('Nome da loja lido da nota') && t.includes('Loja, valor e data lidos da página da Sefaz. Confira antes de salvar.') && !t.includes('não vem no código') && t.includes('Preenchemos o que a nota informa.'), t.slice(0, 500));
+  ok('N a leitura da página busca só o endereço oficial do QR (uma vez) e o app não mostra CPF nem nome do consumidor (a página os trazia)', sefazCalls.length === 1 && sefazCalls[0] === qrOnline(SEFAZ_KEY) && !/FULANA|123\.456\.789/.test(t) && !t.includes('Neste navegador, a página da Sefaz não pode ser lida'), JSON.stringify(sefazCalls));
+  await keepText();
+  await toBlock(); await shot('163_pagina_da_sefaz_lida');
+  // Ler outra nota substitui o que a leitura anterior preencheu; página que não abre cai no preenchimento manual, sem perder nada.
+  await p.evaluate(() => { window.__sefazMode = 'erro'; });
+  const SEFAZ_KEY2 = accessKey('2610', '65', 5151, OTHER_CNPJ);
+  await btn('Ler outra nota').click(); await waitText('Como você quer ler a nota?'); await btn('Colar o link ou a chave').click(); await waitText('Colar o link ou a chave da nota'); await p.waitForTimeout(300);
+  await field('Colar o link ou a chave da nota').fill(qrOnline(SEFAZ_KEY2)); await btn('Ler a nota').click(); await waitText('Não deu para ler a página da Sefaz.', 8000); await p.waitForTimeout(600); t = await body();
+  ok('N página da Sefaz que não abre: "Não deu para ler a página da Sefaz. Confira o valor no cupom.", o valor volta a faltar (a nota nova substitui a anterior) e o formulário segue manual',
+    t.includes('Não deu para ler a página da Sefaz. Confira o valor no cupom.') && t.includes('O valor não vem no código desta nota. Digite o total impresso no cupom.') && (await field('Valor em reais').inputValue()) === '' && (await field('Descrição').inputValue()) === '' &&
+    (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 1 && t.includes('Nota lida: CNPJ 45.723.174/0001-10 · RJ'), t.slice(0, 500));
+  await p.evaluate((html) => { window.__sefazMode = 'ok'; window.__sefazHtml = html; }, sefazHtml(accessKey('2610', '65', 9999, OTHER_CNPJ)));
+  await btn('Ler outra nota').click(); await waitText('Como você quer ler a nota?'); await btn('Colar o link ou a chave').click(); await waitText('Colar o link ou a chave da nota'); await p.waitForTimeout(300);
+  await field('Colar o link ou a chave da nota').fill(qrOnline(SEFAZ_KEY)); await btn('Ler a nota').click(); await waitText('A página da Sefaz é de outra nota.', 8000); await p.waitForTimeout(500);
+  ok('N página da Sefaz de outra nota (chave diferente): "A página da Sefaz é de outra nota. Confira o valor no cupom." e nada é aproveitado', (await body()).includes('A página da Sefaz é de outra nota. Confira o valor no cupom.') && (await field('Valor em reais').inputValue()) === '');
+  await p.evaluate(() => { delete window.__clarevoSefazFetch; });
+  await leaveForm();
+
+  // PDF do DANFE (compras on-line): escolhido pelo seletor de arquivos, lido no aparelho; destinatário nunca aparece.
+  await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
+  await openScan();
+  const [chooser] = await Promise.all([p.waitForEvent('filechooser'), btn('Escolher o PDF da nota').click()]);
+  await chooser.setFiles(notPdf); await waitText('Este arquivo não é um PDF.'); await p.waitForTimeout(300);
+  ok('N arquivo que não é PDF: "Este arquivo não é um PDF." e nada preenchido', (await body()).includes('Este arquivo não é um PDF.') && !(await body()).includes('Nota lida:'));
+  await openScan();
+  const [chooser2] = await Promise.all([p.waitForEvent('filechooser'), btn('Escolher o PDF da nota').click()]);
+  await chooser2.setFiles(pdfNoKey); await waitText('Não encontramos a chave de acesso neste PDF.', 15000); await p.waitForTimeout(300);
+  ok('N PDF sem a chave de acesso: "Não encontramos a chave de acesso neste PDF. Confira se é o PDF da nota fiscal (o DANFE)."', (await body()).includes('Não encontramos a chave de acesso neste PDF. Confira se é o PDF da nota fiscal (o DANFE).') && !(await body()).includes('Nota lida:'));
+  await openScan();
+  const [chooser3] = await Promise.all([p.waitForEvent('filechooser'), btn('Escolher o PDF da nota').click()]);
+  await chooser3.setFiles(pdfOk); await waitText('Nota lida:', 20000); await p.waitForTimeout(800); t = await body();
+  ok('N PDF do DANFE: "Nota lida: Loja Exemplo Ltda · RJ · 05/10/2026", valor 150,00, data 05/10/2026 e descrição com o nome da loja; teclado fechado (nada falta)',
+    t.includes('Nota lida: Loja Exemplo Ltda · RJ · 05/10/2026') && (await field('Valor em reais').inputValue()) === '150,00' && (await field('Data do pagamento').inputValue()) === '05/10/2026' && (await field('Descrição').inputValue()) === 'Loja Exemplo Ltda' &&
+    t.includes('Nome da loja lido da nota') && (await activeTag()) !== 'INPUT', t.slice(0, 400));
+  ok('N PDF do DANFE: nada do destinatário na tela (nome, CPF, endereço), nem a chave inteira, e a NF-e oferece o parcelamento',
+    !/FULANA|123\.456\.789|DESTINATARIO|RUA DO/i.test(t) && !/\d{20,}/.test(t.replace(/[\s.]/g, '')) && (await visibleCount('button', 'Comprou no carnê ou crediário? Anotar como parcelamento')) === 1);
+  await keepText();
+  await innerChecks('nota do PDF 390px');
+  await toBlock(); await shot('159_nota_pdf');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await innerChecks('nota do PDF 320px');
+  await toBlock(); await shot('159_nota_pdf_320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  // O PDF também vira compra no cartão: "Cartão de crédito" + a mesma nota.
+  await radio('Cartão de crédito').click(); await p.waitForTimeout(500);
+  const exemploId = await otherDevice(async (repo, ctx) => (await repo.listCards(ctx)).find((c) => c.name === 'Cartão Exemplo').id);
+  const entriesBeforeNote = await otherDevice(async (repo, ctx, id) => (await repo.listCardEntries(id)).length, exemploId);
+  await btn('Anotar compra no cartão').click(); await waitText('Lançamentos', 12000); await p.waitForTimeout(600); t = await body();
+  const noteEntries = await otherDevice(async (repo, ctx, id) => (await repo.listCardEntries(id)).map((e) => ({ id: e.id, d: e.description, c: e.amountCents, key: e.receiptKey, kind: e.kind })), exemploId);
+  const fromNote = noteEntries.find((e) => e.d === 'Loja Exemplo Ltda');
+  ok('N a nota do PDF vira compra no cartão: abre a fatura de novembro com a compra de R$ 150,00 e o resumo da chave no lançamento (nunca a chave)', /^\/cartoes\/[^/]+\/fatura\/2026-11$/.test(urlPathN()) && !!fromNote && fromNote.c === 15000 && /^[0-9a-f]{64}$/.test(fromNote.key ?? '') &&
+    noteEntries.length === entriesBeforeNote + 1 && (await visibleCount('button', 'Loja Exemplo Ltda · R$ 150,00')) === 1, `${urlPathN()} ${JSON.stringify(fromNote)}`);
+  await goTabN('Resumo'); await waitText('Diferença do mês');
+  await expectTotals('N compra no cartão vinda de nota não entra em Pago (continua 6.000 / 3.987,40 + 45,90 = 4.033,30)', 'R$ 6.000,00', 'R$ 4.033,30', 'R$ 1.966,70');
+  await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
+  await openScan();
+  const [chooser4] = await Promise.all([p.waitForEvent('filechooser'), btn('Escolher o PDF da nota').click()]);
+  await chooser4.setFiles(pdfOk); await waitText('Nota lida:', 20000); await waitText('Esta nota já foi anotada em', 8000); await p.waitForTimeout(500); t = await body();
+  ok('N a mesma nota (agora numa compra no cartão): "Esta nota já foi anotada em 05/10/2026 no cartão Cartão Exemplo: Loja Exemplo Ltda, R$ 150,00." com "Abrir registro"', t.includes('Esta nota já foi anotada em 05/10/2026 no cartão Cartão Exemplo: Loja Exemplo Ltda, R$ 150,00.') && (await visibleCount('button', 'Abrir registro')) === 1);
+  await btn('Abrir registro').click(); await waitText('Lançamentos', 12000); await p.waitForTimeout(500);
+  ok('N "Abrir registro" da compra no cartão abre a fatura em que ela está', /^\/cartoes\/[^/]+\/fatura\/2026-11$/.test(urlPathN()), urlPathN());
+
+  // B1 · Editar uma compra no cartão pela linha da fatura (descrição, valor, data, categoria e parcelas).
+  await btn('Loja Exemplo Ltda · R$ 150,00').click(); await p.waitForTimeout(400); const lineChoices = await dialogButtons();
+  ok('N linha da compra na fatura: o menu oferece "Editar compra" e "Excluir lançamento" (encargo e estorno seguem com "Editar lançamento")', lineChoices.includes('Editar compra') && lineChoices.includes('Excluir lançamento'), JSON.stringify(lineChoices));
+  await btn('Editar compra').click(); await waitText('Valor total da compra'); await p.waitForTimeout(500); t = await body();
+  ok('N Editar compra: título, fatura e cartão, descrição, valor total, data da compra, parcelas e categoria preenchidos; a compra da nota explica de onde veio', (await h1Name()) === 'Editar compra' && (await field('Descrição').inputValue()) === 'Loja Exemplo Ltda' &&
+    (await field('Valor total da compra').inputValue()) === '150,00' && (await field('Data da compra').inputValue()) === '05/10/2026' && (await field('Em quantas vezes?').inputValue()) === '1' && t.includes('Compra anotada com a leitura de uma nota fiscal.') &&
+    t.includes('Fatura de novembro · Cartão Exemplo'));
+  await keepText();
+  await innerChecks('editar compra 390px');
+  await shot('160_editar_compra');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await innerChecks('editar compra 320px');
+  await shot('160_editar_compra_320px', true);
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  await field('Valor total da compra').fill('0'); await btn('Salvar compra').click(); await p.waitForTimeout(400);
+  ok('N compra com valor zero: a mensagem do valor junto do campo e nada é gravado', (await body()).includes('Informe um valor maior que zero, como 80,00.'), (await body()).slice(0, 300));
+  await field('Valor total da compra').fill('300'); await field('Em quantas vezes?').fill('2'); await field('Descrição').fill('Loja Exemplo (2x)'); await radio('Lazer').click(); await p.waitForTimeout(400);
+  ok('N editar parcelas: o aviso mostra "2 parcelas, a primeira de R$ 150,00"', (await body()).includes('2 parcelas, a primeira de R$ 150,00. As outras 1 entram nas faturas seguintes.'));
+  await btn('Salvar compra').click(); await waitText('Compra alterada. As parcelas foram recalculadas.'); await waitText('Lançamentos'); await p.waitForTimeout(600);
+  const edited = (await otherDevice(async (repo, ctx, id) => (await repo.listCardEntries(id)).map((e) => ({ d: e.description, c: e.amountCents, n: e.installments, cat: e.category, key: e.receiptKey })), exemploId)).find((e) => e.d === 'Loja Exemplo (2x)');
+  ok('N compra editada: R$ 300,00 em 2 parcelas, categoria Lazer, a nota (resumo da chave) mantida; a fatura de novembro soma R$ 150,00 e volta com o aviso',
+    !!edited && edited.c === 30000 && edited.n === 2 && edited.cat === 'Lazer' && /^[0-9a-f]{64}$/.test(edited.key ?? '') && (await visibleCount('button', 'Loja Exemplo (2x) · parcela 1 de 2 · R$ 150,00')) === 1 && /^\/cartoes\/[^/]+\/fatura\/2026-11$/.test(urlPathN()), JSON.stringify(edited));
+  await shot('161_compra_editada');
+  await btn('Próxima fatura: dezembro').click(); await waitInvoiceN('Fatura de dezembro');
+  ok('N a segunda parcela cai na fatura de dezembro (R$ 350,00 + R$ 150,00 = R$ 500,00)', (await heroTotalN()) === 'R$ 500,00' && (await visibleCount('button', 'Loja Exemplo (2x) · parcela 2 de 2 · R$ 150,00')) === 1, `${await heroTotalN()}`);
+
+  // B2 · Seus últimos meses: a conta de fatura abre a fatura (como em Contas a pagar), sem "Já paguei" nem "Não houve".
+  await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Seu dinheiro');
+  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('Sua última anotação foi em 20/05/2026.', 12000).catch(() => {});
+  await otherDevice(async (repo, ctx) => {
+    const k = () => `e2e-${Math.random()}`;
+    const card = (await repo.createCard(k(), ctx, { name: 'Cartão azul', lastDigits: null, closingDay: 1, dueDay: 5, limitCents: null })).card;
+    await repo.addCardPurchase(k(), card.id, { description: 'Mochila', category: 'Lazer', purchasedOn: '2026-09-20', totalCents: 12000, installments: 1 });
+  });
+  await btn('Ver resumo').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos.'); await btn('Atualizar agora').click(); await waitText('Mês 1 de');
+  for (let i = 0; i < 8 && !/este mês/.test((await stepTitleN()) ?? ''); i++) {
+    if (await visibleCount('button', 'Próximo mês')) await btn('Próximo mês').click(); else await btn('Pular este mês').click();
+    await p.waitForTimeout(500);
+  }
+  await waitText('Abrir fatura: Fatura Cartão azul de outubro', 8000).catch(() => {}); t = await body();
+  ok('N Seus últimos meses (este mês): a fatura de cartão vencida tem "Abrir fatura" no lugar de "Já paguei" e "Não houve", e fica fora do lote',
+    (await visibleCount('button', 'Abrir fatura: Fatura Cartão azul de outubro')) === 1 && (await visibleCount('button', /^Já paguei: Fatura/)) === 0 && (await visibleCount('button', /^Não houve: Fatura/)) === 0 && (await visibleCount('checkbox', /Fatura Cartão/)) === 0 &&
+    t.includes('Fatura Cartão azul'), t.slice(0, 600));
+  await keepText();
+  await shot('162_ultimos_meses_com_fatura');
+  await btn('Abrir fatura: Fatura Cartão azul de outubro').click(); await waitText('Lançamentos', 12000); await p.waitForTimeout(500);
+  ok('N "Abrir fatura" em Seus últimos meses leva à fatura do Cartão azul (R$ 120,00, venceu em 05/10)', /^\/cartoes\/[^/]+\/fatura\/2026-10$/.test(urlPathN()) && (await body()).includes('Cartão azul') && (await body()).includes('R$ 120,00'), `${urlPathN()}`);
+
+  // Conta nova: nunca recebe nota de exemplo nem dado algum; o campo de colar não oferece "Usar nota de exemplo".
+  await newAcct('Eva Notas', 'eva.notas@exemplo.com');
+  await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
+  ok('N conta nova: a linha "Escanear nota fiscal" existe e nenhuma nota foi lida nem guardada antes de a pessoa tocar', (await visibleCount('button', /^Escanear nota fiscal\./)) === 1 && !(await body()).includes('Nota lida') && (await recordsOf()).length === 0);
+  await openPaste(); t = await body();
+  ok('N conta nova: o campo de colar não oferece "Usar nota de exemplo" (só a demonstração)', (await visibleCount('button', 'Usar nota de exemplo')) === 0 && !t.includes('Nota de exemplo fictícia'));
+  await field('Colar o link ou a chave da nota').fill(qrOnline(accessKey('2610', '65', 4545))); await btn('Ler a nota').click(); await waitText('Nota lida:'); await p.waitForTimeout(700);
+  ok('N conta nova: ler a nota preenche o formulário e não grava nada até "Salvar gasto" (nenhum registro criado)', (await recordsOf()).length === 0 && (await activeLabel()) === 'Valor em reais' && (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 1);
+  await leaveForm();
+  }
+
   // Ciclo A4 · Seus últimos meses (D-030), no cenário FICTÍCIO "retorno" da demonstração (?cenario=retorno): a
   // montagem da sequência R anotada em 20/05/2026 (Aluguel, Luz estimada e Financiamento do carro desde maio, contas de
   // maio pagas, Salário e Mercado) e aberta em 07/10/2026. Cada entrada recarrega a página e recomeça o cenário.

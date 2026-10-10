@@ -241,6 +241,8 @@ function Navigation() {
           <Stack.Screen name="retomar/index" />
           <Stack.Screen name="retomar/atualizar" />
           <Stack.Screen name="retomar/pagar" />
+          {/* Editar uma compra no cartão (D-037), pela linha da compra na fatura. */}
+          <Stack.Screen name="cartoes/[id]/fatura/[mes]/compra" />
         </Stack.Protected>
         <Stack.Screen name="carregando" />
         <Stack.Screen name="confirmado" />

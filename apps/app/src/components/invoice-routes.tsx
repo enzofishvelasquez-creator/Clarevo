@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 
 import { ContextPill, SubHeader } from '@/components/header';
+import { CardPurchaseForm } from '@/components/card-purchase-form';
 import { InvoiceEntryForm, type EntryKind } from '@/components/invoice-entry-form';
 import { InvoicePayForm } from '@/components/invoice-pay-form';
 import { ErrorState, LoadingState } from '@/components/states';
@@ -142,6 +143,60 @@ export function InvoiceEntryRoute({ kind }: { kind: EntryKind }) {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <InvoiceEntryForm kind={kind} card={card.data} month={month} entry={found} />
+    </View>
+  );
+}
+
+/** /cartoes/[id]/fatura/[mes]/compra?lancamento=<id>: editar uma compra no cartão (descrição, valor, data, categoria e parcelas). */
+export function CardPurchaseRoute() {
+  const { id, mes, lancamento } = useLocalSearchParams<{ id: string; mes: string; lancamento?: string }>();
+  const month = readInvoiceMonth(mes);
+  const { today } = useSession();
+  const card = useCard(id);
+  const invoices = useCardInvoices(card.data ?? null);
+  const entry = useCardEntry(lancamento);
+  const title = S.purchaseEditTitle;
+
+  if (card.isError || invoices.isError || entry.isError) {
+    return (
+      <Shell title={title}>
+        <ErrorState
+          message={ERROR_TEXT.carregar_falhou}
+          onRetry={() => {
+            card.refetch();
+            invoices.refetch();
+            entry.refetch();
+          }}
+        />
+      </Shell>
+    );
+  }
+  if (card.isPending || (card.data && invoices.isPending) || (lancamento && entry.isPending)) {
+    return (
+      <Shell title={title}>
+        <LoadingState />
+      </Shell>
+    );
+  }
+  const found = entry.data;
+  if (!card.data || !month || !invoices.data || !found || found.cardId !== card.data.id || found.kind !== 'compra') {
+    return (
+      <Shell title={title}>
+        <Blocked text={CARD_ERROR_TEXT.nao_encontrado} label="Ir para Cartões" onPress={() => router.replace('/cartoes')} />
+      </Shell>
+    );
+  }
+  const invoice = invoiceFor(card.data, invoices.data, month, today);
+  if (invoice.situation === 'paga' || invoice.situation === 'paga_em_parte') {
+    return (
+      <Shell title={title}>
+        <Blocked text={CARD_ERROR_TEXT.fatura_paga} label={CARDS_TEXT.openInvoice} onPress={() => router.replace(invoiceHref(card.data!.id, month))} />
+      </Shell>
+    );
+  }
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <CardPurchaseForm card={card.data} month={month} entry={found} />
     </View>
   );
 }

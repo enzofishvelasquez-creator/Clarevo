@@ -5,7 +5,13 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   NOTA_ERROR_TEXT,
+  NOTA_FLOW_TEXT,
   NOTA_TEXT,
+  SEFAZ_TEXT,
+  noteGaps,
+  noteReadLine,
+  sefazReadErrorText,
+  suggestDescription,
   RECEIPT_ERROR_CODES,
   accessKeyCheckDigit,
   danfeFromText,
@@ -1095,6 +1101,59 @@ describe('textos de notas fiscais (Ciclo E)', () => {
     expect(texts.filter((t) => /\bCPF\b/i.test(t))).toEqual([NOTA_TEXT.privacy]);
     expect(NOTA_TEXT.privacy).toMatch(/Não guardamos CPF/);
     for (const file of ['nota.ts', 'danfe.ts']) {
+      const source = readFileSync(join(CORE_SRC, file), 'utf8');
+      expect(source, file).not.toMatch(FORBIDDEN);
+      expect(source, file).not.toMatch(JUDGMENT);
+    }
+  });
+});
+
+/**
+ * Passo 3 do ciclo E (telas das notas): folha, câmera, bloco "Nota lida", mensagens do que a nota não traz, boleto e leitura da
+ * página da Sefaz. Sem julgamento, sem alerta, neutro quanto a gênero, sem travessões e sem a expressão vetada; nenhum texto
+ * pede CPF nem traz número longo.
+ */
+describe('textos das telas de notas fiscais (Ciclo E, passo 3)', () => {
+  it('NOTA_FLOW_TEXT, SEFAZ_TEXT, mensagens montadas e os arquivos-fonte', () => {
+    const texts: string[] = [
+      ...staticStrings(NOTA_FLOW_TEXT),
+      ...staticStrings(SEFAZ_TEXT),
+      NOTA_FLOW_TEXT.missingDay('2026-08'),
+      NOTA_FLOW_TEXT.otherMonth('2026-08'),
+      ...(['tempo_esgotado', 'sem_conexao', 'resposta_invalida', 'endereco_invalido', 'nota_diferente', 'nota_nao_encontrada', 'pagina_vazia', 'pagina_nao_reconhecida'] as const).map(sefazReadErrorText),
+    ];
+    const body = '3326101122233300018165001000012345187654321';
+    const text = body + String(accessKeyCheckDigit(body));
+    const parsed = parseAccessKey(text);
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) {
+      for (const [issuerName, totalCents, issuedOn] of [
+        [undefined, undefined, undefined],
+        ['Mercado Exemplo Ltda', 8_740, '2026-10-06'],
+      ] as const) {
+        const facts = { ...factsFromKey(parsed.info), ...(issuerName ? { issuerName } : {}), ...(totalCents ? { totalCents } : {}), ...(issuedOn ? { issuedOn } : {}) };
+        const draft = receiptDraft(facts, '2026-10-09');
+        texts.push(noteReadLine(draft, issuedOn ?? null));
+        const gaps = noteGaps(draft, issuedOn ?? null);
+        texts.push(...Object.values(gaps).filter((v): v is string => typeof v === 'string'));
+        const s = suggestDescription({ issuerName: draft.issuerName, lastTime: { description: 'Mercado do bairro', category: 'Mercado' } });
+        texts.push(...(s.legend ? [s.legend] : []), s.placeholder);
+      }
+    }
+    expect(texts.length).toBeGreaterThan(35);
+    for (const t of texts) {
+      expect(t, t).not.toMatch(FORBIDDEN);
+      expect(t, t).not.toMatch(JUDGMENT);
+      expect(t, t).not.toMatch(NEUTRAL);
+      expect(t, t).not.toMatch(/\d{13,}/);
+      expect(t, t).not.toMatch(/\bcvv\b|\bCPF\b|c[oó]digo de verifica/i);
+      // Neutro quanto a gênero: nada de "obrigado/a", "bem-vindo", "o usuário" nem tratamento no masculino genérico.
+      expect(t, t).not.toMatch(/\bobrigad[oa]\b|\bbem-vind[oa]\b|\bo usu[áa]rio\b|\ba usu[áa]ria\b|\bcliente\b/i);
+    }
+    // A privacidade da nota é dita em NOTA_TEXT.privacy (único texto que cita CPF).
+    expect(NOTA_TEXT.privacy).toMatch(/Não guardamos CPF/);
+    expect(NOTA_FLOW_TEXT.cameraIntro).toBe('O Clarevo usa a câmera só para ler o código da nota. Nenhuma foto é guardada.');
+    for (const file of ['sefaz-page.ts', 'nota-flow.ts']) {
       const source = readFileSync(join(CORE_SRC, file), 'utf8');
       expect(source, file).not.toMatch(FORBIDDEN);
       expect(source, file).not.toMatch(JUDGMENT);

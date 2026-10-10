@@ -44,6 +44,14 @@
         }
       ],
       [
+        "expo-camera",
+        {
+          "cameraPermission": "O Clarevo usa a câmera só para ler o código da nota fiscal. Nenhuma foto é guardada.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
         "expo-local-authentication",
         {
           "faceIDPermission": "O Clarevo usa o Face ID só para desbloquear o app, quando você liga essa opção em Conta."

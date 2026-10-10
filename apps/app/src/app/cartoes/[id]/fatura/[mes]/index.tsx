@@ -144,6 +144,16 @@ export default function FaturaScreen() {
 
   const lineChoices = (l: InvoiceLine, inv: Invoice): DialogChoice[] => {
     const choices: DialogChoice[] = [];
+    // Compra no cartão: descrição, valor, data, categoria e parcelas (as parcelas são recalculadas).
+    if (l.kind === 'parcela' && c) {
+      choices.push({
+        label: I.purchaseEdit,
+        onPress: () => {
+          setLine(null);
+          router.push({ pathname: '/cartoes/[id]/fatura/[mes]/compra', params: { id: c.id, mes: inv.month, lancamento: l.entryId! } });
+        },
+      });
+    }
     if ((l.kind === 'encargo' || l.kind === 'estorno') && c) {
       choices.push({
         label: I.entryEdit,
