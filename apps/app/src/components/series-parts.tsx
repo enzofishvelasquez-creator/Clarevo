@@ -80,7 +80,20 @@ export function occurrenceMonthLabel(dueOn: IsoDate, today: IsoDate): string {
  * Grupo de escolha (chips como rádio) com rótulo, dica e erro ligados ao grupo.
  * O erro é anunciado ao aparecer, como nos campos de texto.
  */
-export function ChoiceGroup({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: ReactNode }) {
+export function ChoiceGroup({
+  label,
+  hint,
+  error,
+  accessibilityLabel,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  error?: string;
+  /** Nome do grupo para o leitor de tela, quando é mais longo que o rótulo visível ("Tipo de dívida, Cartão azul"). */
+  accessibilityLabel?: string;
+  children: ReactNode;
+}) {
   return (
     <View style={{ gap: space[2] }}>
       <Txt variant="label" style={{ fontFamily: fonts.bold }}>
@@ -91,7 +104,7 @@ export function ChoiceGroup({ label, hint, error, children }: { label: string; h
           {hint}
         </Txt>
       ) : null}
-      <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel={yearA11y(label)}>
+      <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel={yearA11y(accessibilityLabel ?? label)}>
         {children}
       </View>
       {error ? (

@@ -340,8 +340,10 @@ export function useSeriesList(contextId: string | undefined, enabled = true) {
 
 /**
  * Dívidas da calculadora "Em que ordem quitar as dívidas?" (D-040): os parcelamentos ativos com parcelas a vencer (financiamento,
- * compra parcelada e outro parcelamento), com o valor da próxima parcela e quantas faltam. Só leitura: a calculadora nunca
- * grava nem altera um parcelamento. As consultas são as mesmas do detalhe do parcelamento (mesmas chaves). Sem dado parcial:
+ * compra parcelada e outro parcelamento), com o valor da próxima parcela e quantas faltam. Contam só as parcelas com
+ * vencimento de hoje em diante (seriesDebtDrafts): as já vencidas e em aberto ficam fora, e um parcelamento sem parcela a
+ * vencer também; o filtro por série encerrada abaixo só evita ler o que não teria parcela a vencer. Só leitura: a calculadora
+ * nunca grava nem altera um parcelamento. As consultas são as mesmas do detalhe do parcelamento (mesmas chaves). Sem dado parcial:
  * falha de uma consulta falha o conjunto.
  */
 export function useSeriesDebts(contextId: string | undefined) {

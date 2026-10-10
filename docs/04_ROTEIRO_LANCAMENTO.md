@@ -208,13 +208,13 @@ Sem mudança no banco. Regras no core (`packages/core/src/navigation.ts`, `navig
 
 Enzo, em 10/10/2026: "sim" à ordem proposta (1. plano para sair das dívidas). Só no core e no app, sem mudança no banco e sem pacote novo. Regras em `packages/core/src/calculators/plano-dividas.ts` e `docs/02`; tela em `apps/app/src/components/calc/plano-dividas.tsx`.
 
-- [x] Core: conta mês a mês das duas ordens e de "Sem valor a mais" em centavos inteiros (juros em BigInt), saldo inicial da parcelada pelo valor presente, bola de neve, desempates, limite de 600 meses, dívida com saldo que não diminui, leitura dos parcelamentos ativos e textos; testes em `calc-plano-dividas.test.ts` (casos conferidos à mão, valores conferidos em Python, conservação, taxa vazia, 10 dívidas, rollover, arredondamento e textos), com o catálogo, os campos, os links, a busca "No app" e o teste de textos ampliados
+- [x] Core: conta mês a mês das duas ordens e de "Sem valor a mais" em centavos inteiros (juros em BigInt), saldo inicial da parcelada pelo valor presente e a parcelada pela tabela do contrato (sem pagamento final enorme), bola de neve, desempates, limite de 600 meses, dívida com saldo que não diminui, leitura dos parcelamentos ativos e textos; testes em `calc-plano-dividas.test.ts` (casos conferidos à mão, valores conferidos em Python, conservação, taxa vazia, 10 dívidas, rollover, arredondamento e textos), com o catálogo, os campos, os links, a busca "No app" e o teste de textos ampliados
 - [x] Tela `/calcular/plano-dividas`: dívidas pré-preenchidas com os parcelamentos (só leitura), "Tirar da conta" e "Acrescentar dívida", valor a mais com a dica do plano de guardar, duas ordens lado a lado com a sequência de cada uma, valores ocultos e conta nova com a lista vazia
 - [x] Portas: linha na lista de Calculadoras (grupo "Dívidas e atrasos"), linha em "Fazer as contas" de Metas, link "Em que ordem quitar? Fazer as contas" na Renda comprometida e o grupo "No app" da busca (dívida, quitar, bola de neve, avalanche)
 - [x] Roteiro web: bloco "Ciclo F1 · Plano para quitar dívidas" em `scripts/e2e-web.js` (390 e 320 px, demonstração e conta nova, valores ocultos, nada gravado, links e busca); capturas 190 a 197 em `docs/telas`
 - [ ] Teste em aparelho (iOS e Android): teclado decimal nos campos, anúncio do resultado e a tela com 10 dívidas
 - [ ] Aprender: tema que explique "maior taxa primeiro" e "menor dívida primeiro" (bola de neve e avalanche), com fonte e data de revisão (a busca já leva "bola de neve" e "avalanche" à calculadora pelo grupo "No app")
-- [ ] **Você:** revisar as regras de detalhe de D-040 (em especial a referência "Sem valor a mais" sem bola de neve e a dívida com saldo que não diminui ficar fora da comparação) e os textos
+- [ ] **Você:** revisar as regras de detalhe de D-040 (em especial a referência "Sem valor a mais" sem bola de neve a dívida com saldo que não diminui ficar fora da comparação e as parcelas já vencidas ficarem fora do pré-preenchimento) e os textos
 
 ## Próximos ciclos
 

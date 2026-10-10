@@ -17,6 +17,9 @@ import {
   calcLinkParams,
   createDemoRepository,
   draftToInput,
+  installmentTable,
+  planoDebtStays,
+  presentValueCents,
   newOperationKey,
   planoDebtName,
   seriesDebtDrafts,
@@ -124,11 +127,11 @@ describe('9. Em que ordem quitar as dívidas? (D-040)', () => {
     expect(r.debts.map((d) => d.initialCents)).toEqual([2_351_158, 179_652, 150_000]);
     expect(r.initialSumCents).toBe(2_680_810);
     const base = scenario(r, 'sem_extra');
-    expect([base.months, base.totalPaidCents, base.interestCents]).toEqual([36, 3_459_391, 778_581]);
+    expect([base.months, base.totalPaidCents, base.interestCents]).toEqual([36, 3_459_389, 778_579]);
     expect(base.sequence.map((s) => [s.index, s.month])).toEqual([[2, 7], [1, 10], [0, 36]]);
     for (const id of ['maior_taxa', 'menor_divida']) {
       const s = scenario(r, id);
-      expect([s.months, s.totalPaidCents, s.interestCents, s.firstMonth]).toEqual([21, 3_162_746, 481_936, 4]);
+      expect([s.months, s.totalPaidCents, s.interestCents, s.firstMonth]).toEqual([21, 3_162_744, 481_934, 4]);
       expect(s.sequence.map((x) => [x.index, x.month])).toEqual([[2, 4], [1, 6], [0, 21]]);
       // Mês 1 é novembro de 2026: o mês 21 é julho de 2028.
       expect(s.endMonth).toBe('2028-07');
@@ -210,9 +213,9 @@ describe('9. Em que ordem quitar as dívidas? (D-040)', () => {
     expect(withExtra.differences).toEqual([]);
     const base = scenario(withExtra, 'sem_extra');
     const com = scenario(withExtra, 'com_extra');
-    // Referência em Python. O último pagamento acerta o centavo do arredondamento (R$ 30.600,01 em vez de R$ 30.600,00).
-    expect([base.months, base.totalPaidCents, base.interestCents]).toEqual([36, 3_060_001, 708_843]);
-    expect([com.months, com.totalPaidCents, com.interestCents]).toEqual([32, 2_960_739, 609_581]);
+    // Referência em Python (tabela do contrato): sem valor a mais paga exatamente as 36 parcelas, R$ 30.600,00.
+    expect([base.months, base.totalPaidCents, base.interestCents]).toEqual([36, 3_060_000, 708_842]);
+    expect([com.months, com.totalPaidCents, com.interestCents]).toEqual([32, 2_960_741, 609_583]);
     expect(withExtra.resultLines[0]).toMatch(/^Sem valor a mais: tudo termina em 36 meses/);
     expect(withExtra.resultLines[1]).toMatch(/^Com o valor a mais: tudo termina em /);
     expect(withExtra.resultLines.some((l) => /^Com o valor a mais: R\$ .* a menos de juros\.$/.test(l))).toBe(true);
@@ -250,13 +253,42 @@ describe('9. Em que ordem quitar as dívidas? (D-040)', () => {
     expect(none.notes).toHaveLength(2);
   });
 
+  it('planoDebtStays: vale com os três campos da própria dívida, mesmo com outros campos incompletos', () => {
+    expect(planoDebtStays(saldo('1.000,00', '8', '80,00'))).toBe(true);
+    expect(planoDebtStays(saldo('1.000,00', '8', '80,01'))).toBe(false);
+    expect(planoDebtStays(saldo('1.000,00', '8', '10,00', 'Rotativo'))).toBe(true);
+    // Campo da própria dívida faltando ou inválido: ainda não dá para dizer.
+    expect(planoDebtStays(saldo('1.000,00', '', '10,00'))).toBe(false);
+    expect(planoDebtStays(saldo('', '8', '10,00'))).toBe(false);
+    expect(planoDebtStays(saldo('1.000,00', '8', ''))).toBe(false);
+    expect(planoDebtStays(saldo('1.000,00', '0', '10,00'))).toBe(false);
+    expect(planoDebtStays(parcelada('10,00', '5', '8'))).toBe(false);
+    expect(planoDebtStays({ tipo: null })).toBe(false);
+    // O resultado do cálculo concorda, e o aviso não depende de o resto da tela estar completo.
+    const full = run({ dividas: [saldo('1.000,00', '8', '80,00'), parcelada('100,00', '5')] });
+    expect(full.debts.map((d) => d.excluded)).toEqual([true, false]);
+    const incompleta = { dividas: [saldo('1.000,00', '8', '80,00'), { tipo: 'parcelada' as const }], extra: 'abc' };
+    expect(errors(incompleta)).not.toBeNull();
+    expect(planoDebtStays(incompleta.dividas[0]!)).toBe(true);
+  });
+
+  it('legenda de "Sem valor a mais": só com 2 ou mais dívidas e nenhum valor a mais', () => {
+    const two = [saldo('1.000,00', '10', '600,00'), saldo('500,00', '5', '300,00')];
+    expect(scenario(run({ dividas: two }), 'sem_extra').caption).toBe('Cada dívida só com os pagamentos de sempre, sem passar nada adiante.');
+    expect(scenario(run({ dividas: two, extra: '0' }), 'sem_extra').caption).toBe(PLANO_TEXT.baselineCaption);
+    expect(scenario(run({ dividas: two, extra: '100,00' }), 'sem_extra').caption).toBeNull();
+    expect(scenario(run({ dividas: [two[0]!] }), 'sem_extra').caption).toBeNull();
+    for (const id of ['maior_taxa', 'menor_divida']) expect(scenario(run({ dividas: two }), id).caption).toBeNull();
+    expect(PLANO_TEXT.baselineCaption).toContain('sem passar nada adiante');
+  });
+
   it('as dívidas não terminam em 50 anos: 600 meses, sem número', () => {
     // R$ 100.000,00 a 1% pagando R$ 1.000,01: o saldo cai um centavo por mês.
     const r = run({ dividas: [saldo('100.000,00', '1', '1.000,01')] });
     const base = scenario(r, 'sem_extra');
     expect(PLANO_MAX_MONTHS).toBe(600);
     expect([base.months, base.endMonth, base.totalPaidCents, base.interestCents, base.sequence]).toEqual([null, null, null, null, []]);
-    expect(base.summary).toBe('Sem valor a mais: Com estes números, as dívidas não terminam em 50 anos.');
+    expect(base.summary).toBe('Sem valor a mais: com estes números, as dívidas não terminam em 50 anos.');
     expect(PLANO_TEXT.noEnd).toBe('Com estes números, as dívidas não terminam em 50 anos.');
     expect(r.resultLines.join(' ')).not.toMatch(/\d+ meses/);
     // Com valor a mais a dívida termina, e a ordem compara só o que termina.
@@ -352,6 +384,79 @@ describe('9. Em que ordem quitar as dívidas? (D-040)', () => {
     expect(none.debts[0]!.initialCents).toBe(3_060_000);
     expect(none.hypotheses).toContain('Dívida 1: sem juros informados, conta só as parcelas.');
     expect(scenario(none, 'sem_extra').interestCents).toBe(0);
+  });
+
+  it('parcelada pela tabela do contrato: sem balão, a dívida única paga a parcela todo mês e fecha no mês n', () => {
+    // Antes (saldo e juros arredondados a cada mês), 480 × R$ 850,00 a 5% pagava R$ 4.250,00 de uma vez no fim. Agora o saldo
+    // é o valor presente das parcelas que faltam: o total pago é n × parcela, exato, e a dívida fecha no mês n.
+    // Totais e saldos iniciais conferidos em Python (recorrência exata PV_k = (parcela + PV_k-1) ÷ (1 + i)).
+    const casos: [string, string, string, number, number][] = [
+      ['850,00', '480', '5', 1_700_000, 39_100_000],
+      ['99,99', '480', '2,5', 399_957, 4_399_563],
+      ['850,00', '360', '3', 2_833_266, 27_766_734],
+      ['850,00', '96', '15', 566_666, 7_593_334],
+      ['850,00', '240', '4', 2_124_826, 18_275_174],
+    ];
+    for (const [parcela, n, taxa, inicial, juros] of casos) {
+      const r = run({ dividas: [parcelada(parcela, n, taxa)] });
+      const base = scenario(r, 'sem_extra');
+      const cents = Number(parcela.replace(',', ''));
+      expect(r.debts[0]!.initialCents, `${n} × ${parcela} a ${taxa}%`).toBe(inicial);
+      expect([base.months, base.firstMonth], `${n} × ${parcela} a ${taxa}%`).toEqual([Number(n), Number(n)]);
+      expect(base.totalPaidCents, `${n} × ${parcela} a ${taxa}%`).toBe(cents * Number(n));
+      expect(base.interestCents, `${n} × ${parcela} a ${taxa}%`).toBe(juros);
+    }
+  });
+
+  it('a tabela do contrato: valor presente em forma fechada, igual a presentValueCents; o desvio dos juros é de cerca de 1 centavo por mês', () => {
+    for (const [parcela, bp, n] of [[85_000, 500, 480], [9_999, 250, 480], [85_000, 300, 360], [85_000, 1_500, 96], [100, 9_999, 40], [12_345, 1, 200]] as const) {
+      const table = installmentTable(parcela, bp, n);
+      expect(table).toHaveLength(n + 1);
+      expect(table[0]).toBe(0);
+      for (const k of [1, 2, 7, Math.floor(n / 2), n - 1, n]) {
+        expect(table[k], `${parcela} ${bp} k=${k}`).toBe(presentValueCents(parcela, bp, Array.from({ length: k }, (_, t) => t + 1)));
+      }
+      for (let k = 1; k <= n; k++) {
+        // Juros do mês pela tabela = saldo depois + parcela - saldo antes; fica a menos de 1,5 centavo dos juros do saldo.
+        expect(Math.abs(table[k - 1]! + parcela - table[k]! - (table[k]! * bp) / 10_000), `${parcela} ${bp} k=${k}`).toBeLessThan(1.5);
+      }
+    }
+    expect(installmentTable(1_000, 0, 3)).toEqual([0, 1_000, 2_000, 3_000]);
+  });
+
+  it('parcelada com valor a mais: o valor a mais rende a taxa do contrato e a dívida fecha quando cobre o que falta (conferido em Python)', () => {
+    // 480 × R$ 850,00 a 5% com R$ 100,00 a mais: fecha no mês 47, pagando R$ 43.838,00 (juros R$ 26.838,00).
+    const one = run({ extra: '100,00', dividas: [parcelada('850,00', '480', '5')] });
+    const com = scenario(one, 'com_extra');
+    expect([com.months, com.totalPaidCents, com.interestCents]).toEqual([47, 4_383_800, 2_683_800]);
+    expect(scenario(one, 'sem_extra').months).toBe(480);
+    // Duas parceladas (360 × R$ 850,00 a 3% e 60 × R$ 400,00 a 12%), R$ 150,00 a mais: a menor termina no mês 12 e a maior no 44.
+    const two = run({ extra: '150,00', dividas: [parcelada('850,00', '360', '3'), parcelada('400,00', '60', '12')] });
+    expect(two.debts.map((d) => d.initialCents)).toEqual([2_833_266, 332_962]);
+    expect(scenario(two, 'sem_extra').sequence.map((x) => [x.index, x.month])).toEqual([[1, 60], [0, 360]]);
+    expect(scenario(two, 'sem_extra').totalPaidCents).toBe(33_000_000);
+    for (const id of ['maior_taxa', 'menor_divida']) {
+      const s = scenario(two, id);
+      expect([s.months, s.totalPaidCents, s.interestCents]).toEqual([44, 6_027_898, 2_861_670]);
+      expect(s.sequence.map((x) => [x.index, x.month])).toEqual([[1, 12], [0, 44]]);
+      expect(s.totalPaidCents).toBe(two.initialSumCents + s.interestCents!);
+    }
+  });
+
+  it('sem balão em muitas parceladas: sem valor a mais, o total pago é sempre n × parcela', () => {
+    let seed = 777;
+    const next = (n: number) => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return Math.floor(seed / 16) % n;
+    };
+    for (let k = 0; k < 60; k++) {
+      const parcela = 100 + next(2_000_000);
+      const n = k % 3 === 0 ? 480 : 1 + next(480);
+      const bp = next(1_501);
+      const r = run({ dividas: [parcelada(`${Math.floor(parcela / 100)},${String(parcela % 100).padStart(2, '0')}`, String(n), `${Math.floor(bp / 100)},${String(bp % 100).padStart(2, '0')}`)] });
+      const base = scenario(r, 'sem_extra');
+      expect([base.months, base.totalPaidCents], `${parcela} × ${n} a ${bp / 100}%`).toEqual([n, parcela * n]);
+    }
   });
 
   it('nomes: apelido, "Dívida N" e a regra do número de cartão', () => {
@@ -544,6 +649,41 @@ describe('dívidas lidas dos parcelamentos', () => {
     // Parcelamento já encerrado (nenhuma parcela a vencer): fora.
     const ended = { ...car, series: { ...car.series, lastNumber: car.series.firstNumber - 1 } };
     expect(seriesDebtDrafts([ended], DEMO_TODAY)).toEqual([]);
+  });
+
+  it('parcelas vencidas em aberto ficam fora: contam só as que vencem de hoje em diante; sem nenhuma a vencer, o parcelamento fica fora', async () => {
+    // Hoje é 07/10/2026. "Vencida": 6 parcelas de 05/09 a 05/02; as de 05/09 e 05/10 já venceram e seguem em aberto.
+    // "Acabou": 2 parcelas, 05/09 e 05/10, as duas vencidas e em aberto (a série ainda não está encerrada pelo mês).
+    const repo = await createDemoRepository();
+    const ctx = (await repo.getSpace())!.personalContextId;
+    const parcelamento = (description: string, total: number): SeriesInput => ({
+      kind: 'parcelada',
+      nature: 'compra_parcelada',
+      description,
+      category: null,
+      amountCents: 12_000,
+      amountMode: 'fixo',
+      dueDay: 5,
+      firstDueMonth: '2026-09',
+      firstNumber: 1,
+      installmentTotal: total,
+      partsPerYear: null,
+      lastMonth: null,
+    });
+    await repo.createSeries(newOperationKey(), ctx, parcelamento('Vencida', 6));
+    await repo.createSeries(newOperationKey(), ctx, parcelamento('Acabou', 2));
+    const series = await repo.listSeries(ctx);
+    const items = await Promise.all(series.map(async (s) => ({ series: s, occurrences: await repo.listSeriesOccurrences(s.id), open: await repo.listOpenSeriesOccurrences(s.id) })));
+    const overdue = items.find((i) => i.series.id === series.find((s) => s.terms[0]?.description === 'Acabou')!.id)!;
+    expect(overdue.open.map((c) => c.dueOn)).toEqual(['2026-09-05', '2026-10-05']);
+    const drafts = seriesDebtDrafts(items, DEMO_TODAY);
+    expect(drafts.map((d) => [d.name, d.parcelaCents, d.restantes])).toEqual([
+      ['Financiamento do carro', 85_000, 36],
+      // 6 parcelas, 2 vencidas e em aberto: ficam as 4 que vencem de hoje em diante.
+      ['Vencida', 12_000, 4],
+    ]);
+    // As hipóteses dizem que as vencidas ficam fora.
+    expect(PLANO_TEXT.hypotheses.overdueOut).toBe('Dos seus parcelamentos, entram só as parcelas que vencem de hoje em diante; as já vencidas e em aberto ficam fora desta conta.');
   });
 
   it('o link da calculadora não leva nenhum campo (a taxa nunca vem no link)', () => {

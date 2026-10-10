@@ -1,7 +1,7 @@
 import { looksLikeCardNumber } from '../cards';
 import type { IsoDate, IsoMonth } from '../dates';
 import { addMonths, formatMonthYearBR, monthOf } from '../dates';
-import { presentValueCents, roundDivBig } from '../learn/math';
+import { roundDivBig } from '../learn/math';
 import { centsToInput, formatBRL, type Cents } from '../money';
 import type { Commitment, CommitmentSeries } from '../records';
 import { INSTALLMENT_NATURES } from '../records';
@@ -15,15 +15,20 @@ import { parseCount, parseMoney, parseOptionalMoney, parsePercentBp } from './in
  * digitada pela pessoa e as duas ordens aparecem lado a lado, sem dizer qual é a certa.
  *
  * A conta é mês a mês, com os pagamentos no fim de cada mês, a partir do mês seguinte:
- * - saldo inicial de uma dívida parcelada = valor presente das parcelas que faltam, Σ parcela ÷ (1 + i)^t, t = 1..n (sem
- *   taxa informada, a soma das parcelas); de uma dívida com saldo, o saldo informado;
- * - cada mês: juros = saldo × i (metade para cima, no centavo); pagamento de sempre = parcela (ou o pagamento informado),
- *   limitado a saldo + juros; na última parcela, o que faltar fecha a dívida (acerta os centavos do arredondamento);
+ * - dívida com saldo: saldo informado; cada mês, juros = saldo × i (metade para cima, no centavo) e pagamento = o informado,
+ *   limitado a saldo + juros;
+ * - dívida parcelada: segue a tabela do contrato. Saldo inicial = valor presente das parcelas que faltam, Σ parcela ÷
+ *   (1 + i)^t, t = 1..n (sem taxa informada, a soma das parcelas); depois de pagar k parcelas, o saldo da tabela é o valor
+ *   presente das n − k que restam, e a parcela paga é sempre a do contrato (a última também), sem pagamento final maior.
+ *   Os juros do mês são o que fecha a conta: saldo depois + pagamento − saldo antes. Cada saldo da tabela é arredondado uma
+ *   vez, a partir do valor exato, e por isso os juros de um mês diferem do exato em cerca de 1 centavo, sem efeito acumulado.
+ *   O valor a mais aplicado numa parcelada rende a taxa do contrato e abate o saldo da tabela; a dívida fecha quando ele
+ *   cobre o valor presente do que falta;
  * - com o valor a mais: o total do mês é o valor a mais mais todos os pagamentos de sempre; o que as dívidas abertas não
  *   usam (por já estarem quitadas) vai para a primeira dívida aberta da ordem, e o que sobrar ao quitá-la passa para a
  *   seguinte no mesmo mês (efeito bola de neve);
  * - referência: "Sem valor a mais" paga cada dívida só com os pagamentos de sempre, sem passar nada adiante.
- * Dinheiro em centavos inteiros; os juros do mês usam BigInt e roundDivBig, sem ponto flutuante.
+ * Dinheiro em centavos inteiros; juros e valores presentes usam BigInt e roundDivBig, sem ponto flutuante.
  */
 export type PlanoTipo = 'parcelada' | 'saldo';
 export type PlanoCampo = 'apelido' | 'tipo' | 'parcela' | 'restantes' | 'taxaParcelada' | 'saldo' | 'taxaSaldo' | 'pagamento';
@@ -75,11 +80,16 @@ export const PLANO_TEXT = {
   listHint: 'De 1 a 10 dívidas. Nada é gravado: tirar uma da conta não apaga nada.',
   prefilledNote: 'Preenchido com os seus parcelamentos em aberto. Informe a taxa ao mês de cada contrato; nada muda neles.',
   prefilledHidden: 'Valor oculto. Mostre os valores para editar.',
+  showValues: 'Mostrar valores',
+  showValuesA11y: (name: string) => `Mostrar valores para editar a parcela, ${name}`,
+  typeGroup: (name: string) => `Tipo de dívida, ${name}`,
   loadFailed: 'Não foi possível ler os seus parcelamentos agora. Você pode acrescentar as dívidas à mão.',
   loading: 'Lendo os seus parcelamentos',
   typeHint: 'Parcelada: financiamento, compra parcelada ou outro parcelamento. Saldo com juros: rotativo do cartão, cheque especial ou outra dívida com saldo.',
   /** Mostrado junto do campo "Quanto você paga por mês" e entre as notas do resultado. */
   balanceStays: 'Com este pagamento, o saldo não diminui.',
+  /** Legenda de "Sem valor a mais" quando há 2 ou mais dívidas e nenhum valor a mais: explica por que as ordens terminam antes. */
+  baselineCaption: 'Cada dívida só com os pagamentos de sempre, sem passar nada adiante.',
   balanceStaysNote: (name: string, interestCents: Cents) =>
     `${name} fica fora da comparação até o pagamento ser maior que os juros do primeiro mês (${formatBRL(interestCents)}).`,
   savingsHint: (cents: Cents) => `No seu plano de guardar você informou ${formatBRL(cents)} por mês.`,
@@ -106,7 +116,8 @@ export const PLANO_TEXT = {
     snowballNoExtra: 'As parcelas das dívidas já quitadas vão para a primeira dívida da ordem; o restante passa para a seguinte, no mesmo mês.',
     extraOnly: 'O valor a mais vai para a dívida todo mês, além do pagamento de sempre.',
     baseline: '"Sem valor a mais" paga cada dívida só com os pagamentos de sempre, sem passar nada adiante.',
-    presentValue: 'O saldo inicial de uma dívida parcelada é o valor presente das parcelas que faltam, pela taxa informada.',
+    presentValue: 'O saldo inicial de uma dívida parcelada é o valor presente das parcelas que faltam, pela taxa informada. A parcela segue a tabela do contrato e o valor a mais abate o saldo.',
+    overdueOut: 'Dos seus parcelamentos, entram só as parcelas que vencem de hoje em diante; as já vencidas e em aberto ficam fora desta conta.',
     noRate: (name: string) => `${name}: sem juros informados, conta só as parcelas.`,
   },
 } as const;
@@ -224,6 +235,8 @@ export interface PlanoScenario {
   detailLines: string[];
   /** "1. Cartão: termina em 5 meses (março de 2027)." */
   sequenceLines: string[];
+  /** Legenda junto ao título; só em "Sem valor a mais", com 2 ou mais dívidas e nenhum valor a mais. */
+  caption: string | null;
 }
 
 export interface PlanoResult extends CalcTexts {
@@ -242,8 +255,10 @@ interface SimDebt {
   initial: Cents;
   bp: number;
   minimum: Cents;
-  /** Parcelada: número de parcelas; a última fecha a dívida. */
+  /** Parcelada: número de parcelas que faltam; a dívida termina no mês `term`. */
   term: number | null;
+  /** Parcelada: `table[k]` = valor presente das k últimas parcelas (a tabela do contrato), de k = 0 a `term`. */
+  table: readonly Cents[] | null;
 }
 
 interface SimOutcome {
@@ -261,11 +276,41 @@ function monthInterest(balance: Cents, bp: number): Cents {
 }
 
 /**
+ * Tabela de uma dívida parcelada: `table[k]` = valor presente de k parcelas iguais, Σ parcela ÷ (1 + i)^t, t = 1..k, em
+ * forma fechada, parcela × B × ((B + bp)^k − B^k) ÷ (bp × (B + bp)^k) com B = 10.000, e arredondado uma só vez, metade para
+ * cima (é o mesmo número de presentValueCents, sem somar termo a termo). Sem taxa, k × parcela.
+ */
+export function installmentTable(parcela: Cents, bp: number, count: number): Cents[] {
+  const table: Cents[] = [0];
+  if (bp === 0) {
+    for (let k = 1; k <= count; k++) table.push(parcela * k);
+    return table;
+  }
+  const pay = BigInt(parcela);
+  const rate = BigInt(bp);
+  const q = BP + rate;
+  let qk = 1n;
+  let bk = 1n;
+  for (let k = 1; k <= count; k++) {
+    qk *= q;
+    bk *= BP;
+    table.push(Number(roundDivBig(pay * BP * (qk - bk), rate * qk)));
+  }
+  return table;
+}
+
+/**
  * Meses até quitar. `pool` null: cada dívida só com os pagamentos de sempre. Com `pool`: total do mês = valor a mais mais todos
  * os pagamentos de sempre; o que as dívidas abertas não usam segue a ordem (posições em `debts`).
+ *
+ * Dívida com saldo: juros = saldo × i; pagamento = o informado, limitado a saldo + juros. Dívida parcelada: o saldo é o da
+ * tabela do contrato menos o valor a mais já aplicado (que rende a mesma taxa); o pagamento do mês é a parcela, e os juros são
+ * o que fecha a conta (saldo depois + pagamento − saldo antes). No mês `term` a tabela chega a zero e a dívida termina.
  */
 function simulate(debts: readonly SimDebt[], pool: { order: readonly number[]; budget: Cents } | null): SimOutcome {
   const balance = debts.map((d) => d.initial);
+  /** Parcelada: valor a mais já aplicado, com a taxa do contrato. */
+  const applied = debts.map(() => 0);
   const closedAt = debts.map(() => 0);
   let totalPaid = 0;
   let interest = 0;
@@ -273,17 +318,26 @@ function simulate(debts: readonly SimDebt[], pool: { order: readonly number[]; b
     let used = 0;
     for (let i = 0; i < debts.length; i++) {
       const open = balance[i]!;
-      if (open > 0) {
-        const j = monthInterest(open, debts[i]!.bp);
+      if (open <= 0) continue;
+      const d = debts[i]!;
+      let pay: Cents;
+      if (d.table !== null) {
+        const grown = applied[i]! + monthInterest(applied[i]!, d.bp);
+        const gap = d.table[Math.max(0, d.term! - month)]! - grown;
+        const after = Math.max(0, gap);
+        pay = Math.min(d.minimum, Math.max(0, gap + d.minimum));
+        applied[i] = grown;
+        interest += after + pay - open;
+        balance[i] = after;
+      } else {
+        const j = monthInterest(open, d.bp);
         interest += j;
-        const d = debts[i]!;
         const owed = open + j;
-        const last = d.term !== null && month >= d.term;
-        const pay = last ? owed : Math.min(d.minimum, owed);
+        pay = Math.min(d.minimum, owed);
         balance[i] = owed - pay;
-        totalPaid += pay;
-        used += pay;
       }
+      totalPaid += pay;
+      used += pay;
     }
     if (pool) {
       let rest = Math.max(0, pool.budget - used);
@@ -293,6 +347,7 @@ function simulate(debts: readonly SimDebt[], pool: { order: readonly number[]; b
         if (open > 0) {
           const pay = Math.min(rest, open);
           balance[i] = open - pay;
+          applied[i] = applied[i]! + pay;
           rest -= pay;
           totalPaid += pay;
         }
@@ -304,11 +359,27 @@ function simulate(debts: readonly SimDebt[], pool: { order: readonly number[]; b
   return { months: null, totalPaid: 0, interest: 0, closedAt };
 }
 
+/**
+ * "Com este pagamento, o saldo não diminui.": dívida com saldo cujo pagamento não passa dos juros do primeiro mês. Vale com
+ * os três campos da própria dívida válidos, mesmo que outro campo (de outra dívida ou o valor a mais) esteja incompleto.
+ */
+export function planoDebtStays(d: PlanoDividaInput): boolean {
+  if (d.tipo !== 'saldo') return false;
+  const saldo = parseMoney(d.saldo ?? '');
+  const bp = parsePercentBp(d.taxaSaldo ?? '', PLANO_RATE_RANGE.saldo);
+  const pagamento = parseMoney(d.pagamento ?? '');
+  if (!saldo.ok || !bp.ok || !pagamento.ok) return false;
+  return pagamento.value <= monthInterest(saldo.value, bp.value);
+}
+
 /** Nome mostrado: o apelido sem espaços nas pontas ou "Dívida N". */
 export function planoDebtName(apelido: string | undefined, index: number): string {
   const nick = (apelido ?? '').trim();
   return nick !== '' ? nick : PLANO_TEXT.debtTitle(index);
 }
+
+/** Depois de dois-pontos a frase segue em minúscula: "Sem valor a mais: com estes números, ...". */
+const lowerFirst = (text: string): string => text.charAt(0).toLowerCase() + text.slice(1);
 
 const calendarMonth = (today: IsoDate | undefined, months: number): IsoMonth | null => (today === undefined ? null : addMonths(monthOf(today), months));
 
@@ -317,6 +388,7 @@ function buildScenario(
   sim: SimOutcome,
   included: readonly PlanoDebtInfo[],
   today: IsoDate | undefined,
+  caption: string | null = null,
 ): PlanoScenario {
   const title = PLANO_TEXT.scenario[id];
   if (sim.months === null) {
@@ -329,9 +401,10 @@ function buildScenario(
       totalPaidCents: null,
       interestCents: null,
       sequence: [],
-      summary: `${title}: ${PLANO_TEXT.noEnd}`,
+      summary: `${title}: ${lowerFirst(PLANO_TEXT.noEnd)}`,
       detailLines: [],
       sequenceLines: [],
+      caption,
     };
   }
   const sequence = included
@@ -351,6 +424,7 @@ function buildScenario(
     summary: `${title}: tudo termina em ${monthsDuration(sim.months)}${endMonth ? `, em ${formatMonthYearBR(endMonth)}` : ''}.`,
     detailLines: [`Total pago: ${formatBRL(sim.totalPaid)}`, `Juros estimados: ${formatBRL(interest)}`],
     sequenceLines: sequence.map((s, k) => `${k + 1}. ${s.name}: termina em ${monthsCount(s.month)}${s.calendar ? ` (${formatMonthYearBR(s.calendar)})` : ''}.`),
+    caption,
   };
 }
 
@@ -386,6 +460,8 @@ export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcom
   if (list.length > PLANO_MAX_DEBTS) return { ok: false, errors: { dividas: 'fora_da_faixa', ...r.errors } };
 
   const infos: PlanoDebtInfo[] = [];
+  /** Tabela do contrato de cada parcelada (por posição na lista). */
+  const tables = new Map<number, Cents[]>();
   list.forEach((d, i) => {
     const nick = (d.apelido ?? '').trim();
     if (charCount(nick) > PLANO_NAME_MAX) r.fail(`apelido.${i}`, 'longo');
@@ -398,7 +474,9 @@ export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcom
       const bp = rateText.trim() === '' ? null : r.read(`taxaParcelada.${i}`, parsePercentBp(rateText, PLANO_RATE_RANGE.parcelada));
       if (parcela === undefined || restantes === undefined || (rateText.trim() !== '' && bp === undefined)) return;
       const rate = bp ?? null;
-      const initial = presentValueCents(parcela, rate ?? 0, Array.from({ length: restantes }, (_, k) => k + 1));
+      const table = installmentTable(parcela, rate ?? 0, restantes);
+      tables.set(i, table);
+      const initial = table[restantes]!;
       infos.push({
         index: i,
         name,
@@ -406,7 +484,8 @@ export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcom
         initialCents: initial,
         rateBp: rate,
         minimumCents: parcela,
-        firstInterestCents: monthInterest(initial, rate ?? 0),
+        // Pela tabela: saldo depois da primeira parcela + parcela - saldo inicial.
+        firstInterestCents: Math.max(0, table[restantes - 1]! + parcela - initial),
         restantes,
         excluded: false,
       });
@@ -425,7 +504,7 @@ export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcom
         minimumCents: pagamento,
         restantes: null,
         firstInterestCents: firstInterest,
-        excluded: pagamento <= firstInterest,
+        excluded: planoDebtStays(d),
       });
     } else {
       r.fail(`tipo.${i}`, 'vazio');
@@ -435,7 +514,13 @@ export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcom
 
   const extraCents = extra ?? 0;
   const included = infos.filter((d) => !d.excluded);
-  const sim: SimDebt[] = included.map((d) => ({ initial: d.initialCents, bp: d.rateBp ?? 0, minimum: d.minimumCents, term: d.restantes }));
+  const sim: SimDebt[] = included.map((d) => ({
+    initial: d.initialCents,
+    bp: d.rateBp ?? 0,
+    minimum: d.minimumCents,
+    term: d.restantes,
+    table: tables.get(d.index) ?? null,
+  }));
   const initialSum = included.reduce((s, d) => s + d.initialCents, 0);
   const budget = extraCents + sim.reduce((s, d) => s + d.minimum, 0);
 
@@ -443,7 +528,8 @@ export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcom
   let diff: string[] = [];
   const lines: string[] = [];
   if (included.length > 0) {
-    const base = buildScenario('sem_extra', simulate(sim, null), included, today);
+    const baseCaption = included.length > 1 && extraCents === 0 ? PLANO_TEXT.baselineCaption : null;
+    const base = buildScenario('sem_extra', simulate(sim, null), included, today, baseCaption);
     scenarios.push(base);
     lines.push(base.summary);
     if (included.length === 1) {
@@ -516,9 +602,10 @@ export interface SeriesDebtDraft {
 }
 
 /**
- * Parcelamentos ativos com parcelas a vencer (financiamento, compra parcelada ou outro parcelamento; nunca gasto fixo nem
- * conta do ano), na ordem em que vieram, até 10. `occurrences` são as contas vivas da série e `open` as em aberto (mesmas
- * listas de "Quanto economizo se quitar antes?").
+ * Parcelamentos com parcelas a vencer (financiamento, compra parcelada ou outro parcelamento; nunca gasto fixo nem conta do
+ * ano), na ordem em que vieram, até 10. `occurrences` são as contas vivas da série e `open` as em aberto (mesmas listas de
+ * "Quanto economizo se quitar antes?"). Regra: contam só as parcelas com vencimento de hoje em diante; as já vencidas e em
+ * aberto ficam fora (a tela diz isso), e um parcelamento sem nenhuma parcela a vencer fica fora, esteja ou não encerrado.
  */
 export function seriesDebtDrafts(
   items: readonly { series: CommitmentSeries; occurrences: readonly Commitment[]; open: readonly Commitment[] }[],
@@ -528,7 +615,7 @@ export function seriesDebtDrafts(
   for (const { series: s, occurrences, open } of items) {
     if (out.length >= PLANO_MAX_DEBTS) break;
     if (s.kind !== 'parcelada' || !INSTALLMENT_NATURES.includes(s.nature)) continue;
-    const next = remainingInstallments(s, occurrences, open, today);
+    const next = remainingInstallments(s, occurrences, open, today)?.filter((x) => x.dueOn >= today);
     if (!next || next.length === 0 || next.length > 480) continue;
     const term = [...s.terms].reverse().find((t) => t.fromNumber <= next[0]!.number) ?? s.terms[0];
     const raw = [...(term?.description ?? '').trim()].slice(0, PLANO_NAME_MAX).join('').trim();

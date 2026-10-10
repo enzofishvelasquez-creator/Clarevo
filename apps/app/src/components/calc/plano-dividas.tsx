@@ -6,6 +6,7 @@ import {
   calcPlanoDividas,
   draftToInput,
   planoDebtName,
+  planoDebtStays,
   type CalcErrorCode,
   type PlanoCampo,
   type PlanoDividaInput,
@@ -13,14 +14,14 @@ import {
   type PlanoTipo,
 } from '@clarevo/core';
 import { CircleMinus, Plus } from 'lucide-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { CalcChip, CalcNote, CalcResult, CalcScreen, CalcTextField, calcInlineLink, formatMoneyText, showError, useCalcForm, type CalcForm } from '@/components/calc/parts';
 import { MoneyTxt } from '@/components/money-text';
 import { ChoiceGroup } from '@/components/series-parts';
 import { Button, Card, LinkButton, Skeleton, Txt } from '@/components/ui';
-import { useValuesHidden } from '@/lib/privacy';
+import { HIDDEN_MONEY_A11Y, setValuesHidden, useValuesHidden } from '@/lib/privacy';
 import { useSavingsCheck, useSeriesDebts, useSpace } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
@@ -34,6 +35,8 @@ import { colors, fonts, space } from '@/theme/tokens';
 interface Debt extends PlanoDividaInput {
   /** Estável: os campos não trocam de dono quando outra dívida sai da lista. */
   id: number;
+  /** A dívida veio de um parcelamento (lido, nunca alterado). */
+  fromSeries: boolean;
   /** A parcela veio de um parcelamento e ainda não foi mexida: com valores ocultos, fica mascarada. */
   parcelaFromSeries: boolean;
 }
@@ -41,32 +44,42 @@ interface Debt extends PlanoDividaInput {
 /** O campo já mostra o prefixo "R$": com valores ocultos, só os pontos ("R$ ••••" na tela). */
 const MASKED_VALUE = '••••';
 
-const blank = (id: number): Debt => ({ id, tipo: null, apelido: '', parcelaFromSeries: false });
+const blank = (id: number): Debt => ({ id, tipo: null, apelido: '', fromSeries: false, parcelaFromSeries: false });
 
 export function PlanoDividasCalc() {
   const { today } = useSession();
-  const contextId = useSpace().data?.personalContextId;
+  const spaceQuery = useSpace();
+  const contextId = spaceQuery.data?.personalContextId;
   const hidden = useValuesHidden();
   const form = useCalcForm<'extra'>(() => ({ extra: '' }));
   const [debts, setDebts] = useState<Debt[]>([]);
   const nextId = useRef(0);
-  const seeded = useRef(false);
+  const [seeded, setSeeded] = useState(false);
   const fromSeries = useSeriesDebts(contextId);
   const savings = useSavingsCheck(contextId);
 
-  // As dívidas dos parcelamentos entram uma vez, na frente do que a pessoa já tenha acrescentado.
+  // As dívidas dos parcelamentos entram uma vez, na frente do que a pessoa já tenha acrescentado (que nunca é descartado:
+  // se faltar lugar, é o pré-preenchimento que perde as últimas).
   useEffect(() => {
-    if (seeded.current || !fromSeries.data) return;
-    seeded.current = true;
-    const drafts: Debt[] = fromSeries.data.map((d) => ({ ...draftToInput(d), id: nextId.current++, parcelaFromSeries: true }));
-    if (drafts.length > 0) setDebts((list) => [...drafts, ...list].slice(0, PLANO_MAX_DEBTS));
-  }, [fromSeries.data]);
+    if (seeded || !fromSeries.data) return;
+    setSeeded(true);
+    const drafts: Debt[] = fromSeries.data.map((d) => ({ ...draftToInput(d), id: nextId.current++, fromSeries: true, parcelaFromSeries: true }));
+    if (drafts.length > 0) setDebts((list) => [...drafts.slice(0, Math.max(0, PLANO_MAX_DEBTS - list.length)), ...list]);
+  }, [fromSeries.data, seeded]);
 
-  const outcome = calcPlanoDividas({ dividas: debts.map(({ id: _id, parcelaFromSeries: _p, ...d }) => d), extra: form.values.extra }, today);
+  // A conta só roda de novo quando uma dívida, o valor a mais ou o dia mudam (não a cada render).
+  const outcome = useMemo(
+    () => calcPlanoDividas({ dividas: debts.map(({ id: _id, fromSeries: _s, parcelaFromSeries: _p, ...d }) => d), extra: form.values.extra }, today),
+    [debts, form.values.extra, today],
+  );
   const errors: Partial<Record<string, CalcErrorCode>> = outcome.ok ? {} : outcome.errors;
-  const result = outcome.ok ? outcome.result : null;
+  const anyFromSeries = debts.some((d) => d.fromSeries);
+  // Com dívidas lidas dos parcelamentos, as hipóteses dizem que as parcelas já vencidas e em aberto ficam fora.
+  const result = useMemo(
+    () => (outcome.ok ? (anyFromSeries ? { ...outcome.result, hypotheses: [...outcome.result.hypotheses, PLANO_TEXT.hypotheses.overdueOut] } : outcome.result) : null),
+    [outcome, anyFromSeries],
+  );
   const savedMonthly = savings.data?.answer === 'consigo' ? savings.data.monthlyCents : null;
-  const anyFromSeries = debts.some((d) => d.parcelaFromSeries);
 
   const update = (id: number, patch: Partial<Debt>) => setDebts((list) => list.map((d) => (d.id === id ? { ...d, ...patch } : d)));
   const add = () => {
@@ -75,7 +88,9 @@ export function PlanoDividasCalc() {
   };
   const remove = (id: number) => setDebts((list) => list.filter((d) => d.id !== id));
 
-  const loadingDebts = fromSeries.isPending && Boolean(contextId) && !seeded.current;
+  // Sem texto de lista vazia enquanto a conta e os parcelamentos ainda estão sendo lidos, nem no quadro entre a chegada dos
+  // parcelamentos e o pré-preenchimento (falha na leitura: a lista vazia aparece, com o aviso).
+  const loadingDebts = !seeded && (spaceQuery.isPending || (Boolean(contextId) && !fromSeries.isError));
   // O "vazio" de uma escolha só aparece quando ela é a única coisa que falta (antes disso, o resultado já diz para preencher).
   const entries = Object.entries(errors);
   const onlyTypesMissing = entries.length > 0 && entries.every(([k, c]) => k.startsWith('tipo.') && c === 'vazio');
@@ -109,7 +124,6 @@ export function PlanoDividasCalc() {
             errors={errors}
             form={form}
             showTypeError={onlyTypesMissing}
-            excluded={result?.debts.find((x) => x.index === i)?.excluded ?? false}
             first={i === 0}
             onChange={(patch) => update(d.id, patch)}
             onRemove={() => remove(d.id)}
@@ -164,7 +178,6 @@ function DebtCard({
   errors,
   form,
   showTypeError,
-  excluded,
   first,
   onChange,
   onRemove,
@@ -176,13 +189,15 @@ function DebtCard({
   form: CalcForm<'extra'>;
   /** Só falta escolher o tipo (em alguma dívida): é a hora de dizer qual. */
   showTypeError: boolean;
-  excluded: boolean;
   first: boolean;
   onChange: (patch: Partial<Debt>) => void;
   onRemove: () => void;
 }) {
   const name = planoDebtName(debt.apelido, index);
   const tipoSpec = PLANO_FIELDS.tipo!;
+  // O aviso depende só dos três campos desta dívida, não de o resto da tela estar completo.
+  const stays = planoDebtStays(debt);
+  const typeError = debt.tipo === null && showTypeError && errors[`tipo.${index}`] ? calcErrorText('plano-dividas', `tipo.${index}`, errors[`tipo.${index}`]!) : undefined;
 
   /** Campo de texto da dívida: nome acessível "Rótulo, nome da dívida"; erro conforme a regra comum das calculadoras. */
   const field = (campo: PlanoCampo & keyof PlanoDividaInput, label?: string, a11yLabel?: string) => {
@@ -192,7 +207,8 @@ function DebtCard({
     const code = errors[`${campo}.${index}`];
     const money = spec.kind === 'dinheiro';
     const masked = hidden && campo === 'parcela' && debt.parcelaFromSeries;
-    return (
+    const fieldName = a11yLabel ?? `${label ?? spec.label}, ${name}`;
+    const input = (
       <CalcTextField
         key={campo}
         spec={spec}
@@ -200,7 +216,7 @@ function DebtCard({
         hint={masked ? PLANO_TEXT.prefilledHidden : undefined}
         value={masked ? MASKED_VALUE : value}
         editable={!masked}
-        accessibilityLabel={a11yLabel ?? `${label ?? spec.label}, ${name}`}
+        accessibilityLabel={masked ? `${fieldName}, ${HIDDEN_MONEY_A11Y}` : fieldName}
         onChangeText={(t) => {
           onChange({ [campo]: t, ...(campo === 'parcela' ? { parcelaFromSeries: false } : {}) });
           form.touch(key);
@@ -215,6 +231,20 @@ function DebtCard({
         error={!masked && code && showError(code, spec, value, form.blurred(key), form.edited(key)) ? calcErrorText('plano-dividas', `${campo}.${index}`, code) : undefined}
       />
     );
+    if (!masked) return input;
+    // A parcela preenchida está mascarada e sem edição: o jeito de editar é mostrar os valores, aqui mesmo.
+    return (
+      <View key={campo} style={{ gap: space[1] }}>
+        {input}
+        <LinkButton
+          label={PLANO_TEXT.showValues}
+          accessibilityLabel={PLANO_TEXT.showValuesA11y(name)}
+          color={colors.textSecondary}
+          style={calcInlineLink}
+          onPress={() => setValuesHidden(false)}
+        />
+      </View>
+    );
   };
 
   return (
@@ -223,7 +253,7 @@ function DebtCard({
         {name}
       </Txt>
       {field('apelido', PLANO_FIELDS.apelido!.label, `Apelido da dívida ${index + 1}`)}
-      <ChoiceGroup label={tipoSpec.label} hint={first ? PLANO_TEXT.typeHint : undefined}>
+      <ChoiceGroup label={tipoSpec.label} accessibilityLabel={PLANO_TEXT.typeGroup(name)} hint={first ? PLANO_TEXT.typeHint : undefined} error={typeError}>
         {(tipoSpec.options ?? []).map((o) => (
           <CalcChip
             key={o.value}
@@ -234,11 +264,6 @@ function DebtCard({
           />
         ))}
       </ChoiceGroup>
-      {debt.tipo === null && showTypeError && errors[`tipo.${index}`] ? (
-        <Txt variant="label" color={colors.error}>
-          {calcErrorText('plano-dividas', `tipo.${index}`, errors[`tipo.${index}`]!)}
-        </Txt>
-      ) : null}
       {debt.tipo === 'parcelada' ? (
         <>
           {field('parcela')}
@@ -251,7 +276,7 @@ function DebtCard({
           {field('saldo')}
           {field('taxaSaldo')}
           {field('pagamento')}
-          {excluded ? <CalcNote>{PLANO_TEXT.balanceStays}</CalcNote> : null}
+          {stays ? <CalcNote>{PLANO_TEXT.balanceStays}</CalcNote> : null}
         </>
       ) : null}
       <LinkButton
@@ -278,6 +303,11 @@ function Details({ result }: { result: PlanoResult }) {
           <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={4}>
             {s.title}
           </Txt>
+          {s.caption ? (
+            <Txt variant="caption" color={colors.textSecondary}>
+              {s.caption}
+            </Txt>
+          ) : null}
           {s.months === null ? <Txt variant="label">{PLANO_TEXT.noEnd}</Txt> : null}
           {s.detailLines.map((line) => (
             <MoneyTxt key={line} variant="label">

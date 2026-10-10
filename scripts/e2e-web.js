@@ -5103,7 +5103,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   let f1Rows = await sectionRows('Fazer as contas');
   ok('F1 Metas: "Fazer as contas" tem Simular um plano, "Em que ordem quitar as dívidas?" e Calculadoras, nessa ordem',
     f1Rows !== null && f1Rows.length === 3 && /^Simular um plano\./.test(f1Rows[0]) && f1Rows[1] === 'Em que ordem quitar as dívidas? Duas ordens de pagamento, lado a lado' && /^Calculadoras\./.test(f1Rows[2]), JSON.stringify(f1Rows));
+  // O texto da lista vazia não pode piscar enquanto a conta e os parcelamentos são lidos: um observador registra se ele aparece.
+  await p.evaluate(() => {
+    window.__f1Flash = false;
+    new MutationObserver(() => { if (document.body.innerText.includes('Acrescente as dívidas que você quer comparar.')) window.__f1Flash = true; }).observe(document.body, { subtree: true, childList: true, characterData: true });
+  });
   await f1Open();
+  ok('F1 demonstração: o texto da lista vazia nunca aparece ao abrir (só a leitura e depois a dívida)', (await p.evaluate(() => window.__f1Flash)) === false);
   ok('F1 a tela abre em /calcular/plano-dividas com o título "Em que ordem quitar as dívidas?", o aviso das calculadoras no topo e a barra inferior com Metas marcada',
     urlPath() === '/calcular/plano-dividas' && (await h1Name()) === 'Em que ordem quitar as dívidas?' && (await body()).includes('Simulação com os valores e as taxas que você informou. Não é recomendação de produto financeiro nem oferta de crédito.') && barOk(await barState()) && (await barState()).selected[0] === 'Metas', p.url());
   await checkBar('F1 plano', 'Metas');
@@ -5117,6 +5123,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('F1 só uma dívida: não há ordem a comparar (nenhuma das duas ordens aparece)', !t.includes('Maior taxa primeiro') && !t.includes('Menor dívida primeiro'));
   ok('F1 o texto fixo da estimativa e as hipóteses visíveis',
     t.includes('Estimativa. O valor oficial de cada dívida é o que a instituição informar; peça o valor atualizado.') && t.includes('Taxas fixas, sem novas compras nem atrasos.') && t.includes('Sem IOF nem tarifas.') && t.includes('Pagamentos no fim de cada mês, a partir do mês seguinte.'));
+  ok('F1 com parcelamentos lidos, as hipóteses dizem que as parcelas já vencidas e em aberto ficam fora',
+    t.includes('Dos seus parcelamentos, entram só as parcelas que vencem de hoje em diante; as já vencidas e em aberto ficam fora desta conta.'));
   ok('F1 sem botão "Calcular": o resultado aparece enquanto a pessoa digita', (await visibleCount('button', /^Calcular/)) === 0);
   await atWidths(async (w) => {
     await layoutChecks(`F1 plano demonstração ${w}px`);
@@ -5130,12 +5138,12 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // ---- 2. Taxa e valor a mais: o resultado muda enquanto digita; a uma dívida, "Sem valor a mais" e "Com o valor a mais" ----
   await f1Fill(`Taxa de juros ao mês do contrato (%), ${F1_NAME}`, '1,5');
   t = await body();
-  ok('F1 com a taxa de 1,5%: saldo inicial pelo valor presente (R$ 23.511,58), total pago R$ 30.600,01 (o último pagamento acerta o centavo) e juros estimados R$ 7.088,43; some "sem juros informados"',
-    t.includes('Total pago: R$ 30.600,01') && t.includes('Juros estimados: R$ 7.088,43') && t.includes('O saldo inicial de uma dívida parcelada é o valor presente das parcelas que faltam, pela taxa informada.') && !t.includes('sem juros informados'), t.slice(-900));
+  ok('F1 com a taxa de 1,5%: saldo inicial pelo valor presente (R$ 23.511,58), total pago R$ 30.600,00 (as 36 parcelas, sem pagamento final maior) e juros estimados R$ 7.088,42; some "sem juros informados"',
+    t.includes('Total pago: R$ 30.600,00') && t.includes('Juros estimados: R$ 7.088,42') && t.includes('O saldo inicial de uma dívida parcelada é o valor presente das parcelas que faltam, pela taxa informada.') && !t.includes('sem juros informados'), t.slice(-900));
   await f1Fill('Quanto a mais você consegue pôr por mês nas dívidas?', '100,00');
   t = await body();
-  ok('F1 com R$ 100,00 a mais: "Com o valor a mais" termina em 32 meses (junho de 2029), R$ 992,62 a menos de juros e 4 meses antes',
-    t.includes('Com o valor a mais: tudo termina em 32 meses (2 anos e 8 meses), em junho de 2029.') && t.includes('Com o valor a mais: R$ 992,62 a menos de juros.') && t.includes('Com o valor a mais: tudo termina 4 meses antes.') &&
+  ok('F1 com R$ 100,00 a mais: "Com o valor a mais" termina em 32 meses (junho de 2029), R$ 992,59 a menos de juros e 4 meses antes',
+    t.includes('Com o valor a mais: tudo termina em 32 meses (2 anos e 8 meses), em junho de 2029.') && t.includes('Com o valor a mais: R$ 992,59 a menos de juros.') && t.includes('Com o valor a mais: tudo termina 4 meses antes.') &&
     !t.includes('Informe quanto a mais você consegue pôr por mês para ver o efeito.'), t.slice(-1200));
   await atWidths(async (w) => {
     await scrollTo('Resultado');
@@ -5150,6 +5158,12 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await body();
   ok('F1 uma dívida acrescentada: "Dívida 2" sem tipo, "Preencha os campos para ver o resultado." e o pedido do tipo (só falta ele)',
     t.includes('Dívida 2') && t.includes('Preencha os campos para ver o resultado.') && t.includes('Escolha o tipo da dívida.'), t.slice(-700));
+  ok('F1 o pedido do tipo é do grupo de escolha: grupo "Tipo de dívida, Dívida 2" e o erro anunciado como alerta dentro dele',
+    (await p.evaluate(() => {
+      const g = [...document.querySelectorAll('[role=radiogroup]')].find((e) => e.getAttribute('aria-label') === 'Tipo de dívida, Dívida 2' && e.getBoundingClientRect().width > 0);
+      const alert = g && g.parentElement ? [...g.parentElement.querySelectorAll('[role=alert]')].find((e) => e.textContent === 'Escolha o tipo da dívida.') : null;
+      return Boolean(g && alert);
+    })));
   await radio('Saldo com juros, Dívida 2').click(); await p.waitForTimeout(300);
   await f1Fill('Apelido da dívida 2', 'Cartão azul');
   ok('F1 o apelido vira o nome da dívida (título e nomes acessíveis dos campos)', (await headingShown('Cartão azul')) && (await visibleCount('textbox', 'Saldo hoje, Cartão azul')) === 1);
@@ -5157,12 +5171,12 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await f1Fill('Taxa de juros ao mês (%), Cartão azul', '1');
   await f1Fill('Quanto você paga por mês, Cartão azul', '300,00');
   t = await body();
-  ok('F1 duas dívidas: "Sem valor a mais" (36 meses, juros R$ 7.135,10), "Maior taxa primeiro" e "Menor dívida primeiro" (24 meses, outubro de 2028) lado a lado',
-    t.includes('Sem valor a mais: tudo termina em 36 meses (3 anos), em outubro de 2029.') && t.includes('Juros estimados: R$ 7.135,10') &&
+  ok('F1 duas dívidas: "Sem valor a mais" (36 meses, juros R$ 7.135,09), "Maior taxa primeiro" e "Menor dívida primeiro" (24 meses, outubro de 2028) lado a lado',
+    t.includes('Sem valor a mais: tudo termina em 36 meses (3 anos), em outubro de 2029.') && t.includes('Juros estimados: R$ 7.135,09') &&
     t.includes('Maior taxa primeiro: tudo termina em 24 meses (2 anos), em outubro de 2028.') && t.includes('Menor dívida primeiro: tudo termina em 24 meses (2 anos), em outubro de 2028.') &&
-    t.includes('Juros estimados: R$ 4.918,43') && t.includes('Juros estimados: R$ 4.925,13'), t.slice(-1800));
-  ok('F1 as diferenças em linguagem neutra: R$ 6,70 a menos de juros (Maior taxa primeiro), a primeira dívida termina 2 meses antes (Menor dívida primeiro) e o fim no mesmo mês',
-    t.includes('Maior taxa primeiro: R$ 6,70 a menos de juros.') && t.includes('Menor dívida primeiro: a primeira dívida termina 2 meses antes.') && t.includes('Tudo termina no mesmo mês nas duas ordens.'));
+    t.includes('Juros estimados: R$ 4.918,45') && t.includes('Juros estimados: R$ 4.925,13'), t.slice(-1800));
+  ok('F1 as diferenças em linguagem neutra: R$ 6,68 a menos de juros (Maior taxa primeiro), a primeira dívida termina 2 meses antes (Menor dívida primeiro) e o fim no mesmo mês',
+    t.includes('Maior taxa primeiro: R$ 6,68 a menos de juros.') && t.includes('Menor dívida primeiro: a primeira dívida termina 2 meses antes.') && t.includes('Tudo termina no mesmo mês nas duas ordens.'));
   ok('F1 a sequência de cada ordem, com o mês em que cada dívida termina',
     t.includes('1. Cartão azul: termina em 6 meses (abril de 2027).') && t.includes(`2. ${F1_NAME}: termina em 24 meses (outubro de 2028).`) && t.includes('1. Cartão azul: termina em 4 meses (fevereiro de 2027).') &&
     t.includes(`1. Cartão azul: termina em 6 meses (abril de 2027).`) && t.includes('Em que ordem cada dívida termina'));
@@ -5175,6 +5189,19 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     if (w === 390) await shot('192_plano_dividas_duas_ordens');
     if (w === 320) await shot('192_plano_dividas_duas_ordens_320px');
   });
+  await keepText();
+
+  // Sem valor a mais (campo vazio ou zero) e 2 ou mais dívidas: a legenda de "Sem valor a mais" explica por que as ordens terminam antes.
+  const F1_CAPTION = 'Cada dívida só com os pagamentos de sempre, sem passar nada adiante.';
+  ok('F1 com R$ 100,00 a mais, "Sem valor a mais" não leva a legenda', !(await body()).includes(F1_CAPTION));
+  await f1Fill('Quanto a mais você consegue pôr por mês nas dívidas?', '');
+  ok('F1 valor a mais vazio e duas dívidas: a legenda "sem passar nada adiante" aparece junto do título de "Sem valor a mais" (uma só vez)',
+    (await body()).split(F1_CAPTION).length === 2 && (await body()).includes('Maior taxa primeiro: tudo termina em'));
+  await f1Fill('Quanto a mais você consegue pôr por mês nas dívidas?', '0');
+  ok('F1 valor a mais zero e duas dívidas: a legenda continua', (await body()).split(F1_CAPTION).length === 2);
+  await atWidths(async (w) => { await scrollTo('Detalhes de cada ordem'); await layoutChecks(`F1 plano legenda ${w}px`); });
+  await f1Fill('Quanto a mais você consegue pôr por mês nas dívidas?', '100,00');
+  ok('F1 de volta aos R$ 100,00 a mais: a legenda some', !(await body()).includes(F1_CAPTION));
   await keepText();
 
   // ---- 4. Apelido que parece número de cartão e pagamento que não cobre os juros ----
@@ -5197,6 +5224,12 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     if (w === 320) await shot('193_plano_dividas_saldo_nao_diminui_320px');
   });
   await keepText();
+  // O aviso é da própria dívida: continua à vista mesmo com outro campo incompleto (aqui, as parcelas que faltam do financiamento).
+  await f1Fill(`Parcelas que faltam, ${F1_NAME}`, '');
+  t = await body();
+  ok('F1 outro campo incompleto: o resultado espera ("Preencha os campos...") e o aviso "Com este pagamento, o saldo não diminui." da dívida continua à vista',
+    t.includes('Preencha os campos para ver o resultado.') && t.includes('Com este pagamento, o saldo não diminui.') && !t.includes('fica fora da comparação'), t.slice(-700));
+  await f1Fill(`Parcelas que faltam, ${F1_NAME}`, '36');
   await f1Fill('Quanto você paga por mês, Cartão azul', '300,00');
   ok('F1 pagamento corrigido: o aviso some e as duas ordens voltam', !(await body()).includes('Com este pagamento, o saldo não diminui.') && (await body()).includes('Maior taxa primeiro: tudo termina em 24 meses'));
 
@@ -5257,9 +5290,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await f1Fill(`Taxa de juros ao mês do contrato (%), ${F1_NAME}`, '1,5');
   await f1Fill('Quanto a mais você consegue pôr por mês nas dívidas?', '100,00');
   t = await body();
-  const f1Parcela = field(`Valor da parcela, ${F1_NAME}`);
+  const f1Parcela = field(`Valor da parcela, ${F1_NAME}, valor oculto`);
   ok('F1 valores ocultos: a parcela preenchida mostra "R$ ••••" e não se edita; o que a pessoa digitou (taxa 1,5 e valor a mais 100,00) continua à vista',
     (await f1Parcela.inputValue()) === '••••', await f1Parcela.inputValue());
+  ok('F1 valores ocultos: o campo da parcela tem "valor oculto" no nome acessível e o link "Mostrar valores" ao lado',
+    (await visibleCount('textbox', `Valor da parcela, ${F1_NAME}, valor oculto`)) === 1 && (await visibleCount('button', `Mostrar valores para editar a parcela, ${F1_NAME}`)) === 1 && t.includes('Mostrar valores'));
   ok('F1 valores ocultos: o campo da parcela não se edita e a dica diz como editar', !(await f1Parcela.isEditable()) && t.includes('Valor oculto. Mostre os valores para editar.') && (await f1Value(`Taxa de juros ao mês do contrato (%), ${F1_NAME}`)) === '1,5' && (await f1Value('Quanto a mais você consegue pôr por mês nas dívidas?')) === '100,00');
   const f1Leaks = await moneyLeaks();
   ok('F1 valores ocultos: nenhum valor em reais à vista (texto e nomes acessíveis), com "R$ ••••" no resultado e "valor oculto" nos nomes', f1Leaks.length === 0 && t.includes('Com o valor a mais: R$ •••• a menos de juros.') && t.includes('Total pago: R$ ••••') && t.includes('No seu plano de guardar você informou R$ •••• por mês.') && (await spokenHidden()) > 0, `${f1Leaks.slice(0, 3).join(' | ')} ${t.includes('R$ ••••')}`);
@@ -5271,11 +5306,17 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     if (w === 320) await shot('194_plano_dividas_valores_ocultos_320px');
   });
   await keepText();
+  await btn(`Mostrar valores para editar a parcela, ${F1_NAME}`).click(); await p.waitForTimeout(400);
+  ok('F1 "Mostrar valores" na própria tela: a parcela volta a R$ 850,00 e pode ser editada, o link some e os valores do resultado voltam',
+    (await field(`Valor da parcela, ${F1_NAME}`).inputValue()) === '850,00' && (await field(`Valor da parcela, ${F1_NAME}`).isEditable()) && (await visibleCount('button', /^Mostrar valores para editar/)) === 0 &&
+    (await body()).includes('Total pago: R$ ') && !(await body()).includes('R$ ••••'));
   await goResumo();
-  await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
+  await openConta();
+  ok('F1 "Mostrar valores" vale só nesta sessão: a preferência "Ocultar valores ao abrir" de Conta continua ligada, e os valores seguem à mostra',
+    (await hideSwitch().getAttribute('aria-checked')) === 'true');
+  await hideSwitch().click(); await p.waitForTimeout(300);
   await btn('Voltar').click(); await waitText('Diferença do mês');
   await f1Open();
-  ok('F1 valores à mostra de novo: a parcela volta a R$ 850,00 e pode ser editada', (await field(`Valor da parcela, ${F1_NAME}`).inputValue()) === '850,00' && (await field(`Valor da parcela, ${F1_NAME}`).isEditable()));
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
 
   // ---- 8. Conta nova: lista vazia, nunca um exemplo ----
