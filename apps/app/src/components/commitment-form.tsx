@@ -47,7 +47,7 @@ import { TermHint } from '@/components/term-hint';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { explanationHref } from '@/lib/learn';
-import { useCreateCommitment, useUpdateCommitment } from '@/state/data';
+import { useCreateCommitment, useLimitWatch, useUpdateCommitment, withNotice } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -77,6 +77,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
   const navigation = useNavigation();
   const create = useCreateCommitment();
   const update = useUpdateCommitment();
+  const limitWatch = useLimitWatch();
   const qc = useQueryClient();
 
   const contextId = mode.type === 'nova' ? personal.personalContextId : mode.commitment.contextId;
@@ -149,14 +150,14 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
     if (first) refs[first].current?.focus();
   };
 
-  const finish = (id: string) => {
+  const finish = (id: string, notice: string | null = null) => {
     // Confirmação tátil só depois da gravação confirmada.
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (mode.type === 'nova') {
-      flash.set('Conta a pagar salva');
+      flash.set(withNotice('Conta a pagar salva', notice));
       leave(() => router.replace(`/a-pagar/${id}`));
     } else {
-      flash.set(informValue ? 'Valor da conta informado' : 'Alterações salvas');
+      flash.set(withNotice(informValue ? 'Valor da conta informado' : 'Alterações salvas', notice));
       leave(() => (router.canGoBack() ? router.back() : router.replace(`/a-pagar/${id}`)));
     }
   };
@@ -244,11 +245,13 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
         if (!last || last.snapshot !== snapshot) opKey.current = newOperationKey();
       }
       const key = opKey.current;
+      // Aviso do limite pessoal (D-041): o comprometido dos próximos meses antes de gravar, para ver se algum mês passou a ficar acima.
+      const limitBefore = await limitWatch.before(contextId);
       try {
         const saved = await send(key, input, version);
         pending.current = [];
         setRetry(false);
-        finish(saved.commitment.id);
+        finish(saved.commitment.id, await limitWatch.after(limitBefore));
       } catch (e) {
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
           opKey.current = newOperationKey();

@@ -40,7 +40,7 @@ import { invoiceHref } from '@/lib/cards';
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
 import { openOfficialUrl, receiptLinks } from '@/lib/receipt-link';
-import { useCardOperationKey, useUpdateCardEntry } from '@/state/data';
+import { useBudgetWatch, useCardOperationKey, useUpdateCardEntry, withNotice } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
 
@@ -61,6 +61,7 @@ export function CardPurchaseForm({ card, month, entry, textOnly = false }: { car
   const { today } = useSession();
   const qc = useQueryClient();
   const updateEntry = useUpdateCardEntry();
+  const budgetWatch = useBudgetWatch();
   const keys = useCardOperationKey();
 
   const [initial] = useState(() => ({
@@ -118,6 +119,8 @@ export function CardPurchaseForm({ card, month, entry, textOnly = false }: { car
     setBanner(null);
     setBusy(true);
     try {
+      // Aviso do orçamento (D-041): a parcela 1 da compra conta na categoria e no mês da data da compra (a nova, se mudou).
+      const budgetBefore = await budgetWatch.before(entry.contextId, input.category, input.purchasedOn);
       const r = await guardedWrite(
         keys,
         JSON.stringify([entry.id, entry.version, input]),
@@ -128,7 +131,8 @@ export function CardPurchaseForm({ card, month, entry, textOnly = false }: { car
         // Confirmação tátil e aviso só depois de o servidor confirmar.
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         const recalculated = draft.amountText !== initial.amountText || draft.dateText !== initial.dateText || draft.installmentsText !== initial.installmentsText;
-        flash.set(recalculated ? S.purchaseUpdated : S.purchaseTextUpdated);
+        const budgetNotice = r.status === 'ok' ? await budgetWatch.after(budgetBefore) : null;
+        flash.set(withNotice(recalculated ? S.purchaseUpdated : S.purchaseTextUpdated, budgetNotice));
         // A data nova pode levar a compra a outra fatura: volta para a fatura em que ela está agora (a de antes já não a mostra).
         const moved = r.status === 'ok' && r.value.entry ? r.value.entry.invoiceMonth : null;
         guard.leave(moved && moved !== month ? () => router.dismissTo(invoiceHref(card.id, moved)) : goBack);

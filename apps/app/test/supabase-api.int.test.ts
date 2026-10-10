@@ -7,6 +7,7 @@
 import { createHmac, randomUUID } from 'node:crypto';
 
 import {
+  BUDGET_CATEGORIES,
   RepoError,
   addMonths,
   affectedByDelete,
@@ -15,6 +16,8 @@ import {
   affectedByYear,
   annualCommitmentIds,
   annualYearSummary,
+  budgetCaption,
+  budgetCrossing,
   buildReturnReview,
   cardErrorText,
   cardLimitUsed,
@@ -22,6 +25,8 @@ import {
   committedGoalLines,
   coverageTenths,
   emergencyTarget,
+  limitFor,
+  limitStatus,
   emptyMonthCaption,
   exampleReceiptQr,
   essentialMonthly,
@@ -59,6 +64,7 @@ import {
   plannedForGoals,
   projectCommitted,
   purchaseFirstInvoiceMonth,
+  readMonthBudget,
   readReceiptCode,
   returnBannerText,
   returnWindow,
@@ -76,6 +82,7 @@ import {
   shouldAskSavings,
   suggestReference,
   suggestedAnnualReference,
+  summarizeBudget,
   summarizeCommitted,
   summarizeMonth,
   summarizeToPay,
@@ -88,9 +95,11 @@ import {
   type Card,
   type CardEntry,
   type CardInput,
+  type CategoryBudget,
   type Cents,
   type Commitment,
   type CommitmentInput,
+  type CommitmentLimit,
   type CommitmentSeries,
   type CommittedSummary,
   type FinancialRecord,
@@ -102,6 +111,7 @@ import {
   type IncomeReference,
   type IsoDate,
   type IsoMonth,
+  type MonthBudgetRead,
   type NewGoalInput,
   type OccurrenceMode,
   type PaymentInput,
@@ -4759,6 +4769,482 @@ describe('conversor dos cartões e das notas fiscais', () => {
     // Defeito de consistência (só escrita direta na tabela) vira erro genérico, sem valores.
     for (const c of ['fatura_inconsistente', 'compra_inconsistente']) {
       expect(await withDetails(c, 'Failing row contains (1, segredo)')).toEqual(['desconhecido', c, null]);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ciclo F2 · orçamento por categoria e limite pessoal de comprometimento (D-041)
+// ---------------------------------------------------------------------------
+
+describe('API real: orçamento por categoria e limite pessoal (Ciclo F2, D-041)', () => {
+  // Bruno repete a montagem quatro anos depois do bloco dos cartões (hoje 07/10/2035), num período em que nenhum bloco anterior
+  // gravou nada. Ana é a pessoa de fora. Cartão, gastos e pessoas FICTÍCIOS.
+  const T0 = '2035-10-07';
+  const AUG = '2035-08';
+  const SEP = '2035-09';
+  const OCT = '2035-10';
+  const NOV = '2035-11';
+  const DEC = '2035-12';
+  const JAN = '2036-01';
+  const MONTHS = [AUG, SEP, OCT, NOV, DEC, JAN];
+  const bruno = repoFor(BRUNO, T0);
+  const ana = repoFor(ANA, T0);
+  let ctx = '';
+  let account = '';
+  let card: Card;
+
+  const code = (p: Promise<unknown>) =>
+    p.then(
+      () => null,
+      (e: unknown) => (e instanceof RepoError ? [e.code, e.detail ?? null] : String(e)),
+    );
+  const record = (kind: RecordKind, description: string, reais: number, occurredOn: IsoDate, category: string | null, cents_?: number) =>
+    bruno.createRecord(newOperationKey(), ctx, kind, { accountId: account, amountCents: cents_ ?? cents(reais), occurredOn, description, category });
+  const setBudget = (category: string, month: IsoMonth, version: number, amountCents: Cents | null) =>
+    bruno.setCategoryBudget(newOperationKey(), ctx, category, month, version, amountCents);
+  const line = (read: MonthBudgetRead, category: string) => read.lines.find((l) => l.category === category)!;
+  const usedBy = async (month: IsoMonth) => Object.fromEntries((await bruno.getMonthBudget(ctx, month)).lines.map((l) => [l.category, l.usedCents]));
+
+  /**
+   * month_budget pela API é igual ao readMonthBudget do core sobre as leituras do app (linhas de orçamento, gastos dos meses da
+   * janela e lançamentos do cartão): campo a campo, inclusive o id e a versão da linha vigente.
+   */
+  const checked = async (month: IsoMonth) => {
+    const db = await bruno.getMonthBudget(ctx, month);
+    const records = (await Promise.all(MONTHS.map((m) => bruno.listRecords(ctx, m)))).flat();
+    const entries = card ? await bruno.listCardEntries(card.id) : [];
+    const core = readMonthBudget(month, await bruno.listCategoryBudgets(ctx), { records, entries });
+    expect(db).toEqual(core);
+    expect(db.lines.map((l) => l.category)).toEqual([...BUDGET_CATEGORIES]);
+    return db;
+  };
+  const checkedAll = async () => Object.fromEntries(await Promise.all(MONTHS.map(async (m) => [m, await checked(m)] as const)));
+
+  beforeAll(async () => {
+    const space = (await bruno.getSpace())!;
+    ctx = space.personalContextId;
+    account = space.accounts[0]!.id;
+  });
+
+  it('conta sem orçamento nem limite: seis categorias, sem orçamento e sem uso, igual ao core', async () => {
+    expect(await bruno.listCategoryBudgets(ctx)).toEqual([]);
+    expect(await bruno.listCommitmentLimits(ctx)).toEqual([]);
+    const read = await checked(OCT);
+    expect(read.lines).toEqual(BUDGET_CATEGORIES.map((category) => ({ category, budgetId: null, budgetVersion: null, budgetFrom: null, budgetCents: null, usedCents: 0 })));
+    const s = summarizeBudget(read);
+    expect([s.hasAny, s.totalLine, budgetCaption(s), s.without.length]).toEqual([false, null, 'Nenhum orçamento definido', 6]);
+  });
+
+  it('o usado do banco é o do core: gastos, parcelas pelo mês da compra, estornos e fatura paga fora', async () => {
+    await record('receita', 'Salário', 6000, '2035-10-01', 'Salário');
+    await record('despesa', 'Feira', 0, '2035-10-02', 'Mercado', 41230);
+    await record('despesa', 'Sem categoria', 50, '2035-10-02', null);
+    await record('receita', 'Reembolso do mercado', 500, '2035-10-03', 'Mercado');
+    await record('despesa', 'Pão', 10, '2035-09-30', 'Mercado');
+    card = (await bruno.createCard(newOperationKey(), ctx, { name: 'Cartão Exemplo', lastDigits: '1234', closingDay: 3, dueDay: 10, limitCents: 500000 })).card;
+    const buy = (description: string, category: string | null, purchasedOn: IsoDate, totalCents: Cents, installments: number) =>
+      bruno.addCardPurchase(newOperationKey(), card.id, { description, category, purchasedOn, totalCents, installments });
+    await buy('Geladeira', 'Mercado', '2035-09-30', 12000, 2);
+    await buy('Show', 'Lazer', '2035-10-05', 90000, 3);
+    await buy('Jogos', 'Lazer', '2035-10-05', 10001, 3);
+    await buy('Sem categoria no cartão', null, '2035-10-06', 5000, 1);
+    await bruno.addCardRefund(newOperationKey(), card.id, { description: 'Devolução', category: 'Lazer', amountCents: 4000, invoiceMonth: NOV });
+    await bruno.addCardCharge(newOperationKey(), card.id, { chargeType: 'juros', amountCents: 1500, invoiceMonth: NOV });
+    await bruno.addCardRefund(newOperationKey(), card.id, { description: 'Estorno grande', category: 'Lazer', amountCents: 50000, invoiceMonth: DEC });
+    const all = await checkedAll();
+    const used = (m: IsoMonth, c: string) => line(all[m]!, c).usedCents;
+    // Os mesmos números da montagem do teste do core e de 80_orcamento.sql.
+    expect([used(SEP, 'Mercado'), used(OCT, 'Mercado'), used(NOV, 'Mercado')]).toEqual([7000, 47230, 0]);
+    expect([used(OCT, 'Lazer'), used(NOV, 'Lazer'), used(DEC, 'Lazer'), used(JAN, 'Lazer')]).toEqual([33335, 29333, 0, 0]);
+    expect([used(AUG, 'Mercado'), used(OCT, 'Moradia'), used(OCT, 'Transporte')]).toEqual([0, 0, 0]);
+    // A compra no cartão nunca entra em Pago: só os gastos anotados.
+    expect(summarizeMonth(await bruno.listRecords(ctx, OCT), ctx, OCT).paidCents).toBe(46230);
+
+    // O pagamento da fatura de outubro (só depois do fechamento) cria um gasto, e ele nunca conta no orçamento.
+    const late = repoFor(BRUNO, '2035-10-20');
+    const invoice = (await late.listInvoiceItems(card.id)).find((i) => i.month === OCT)!;
+    const paid = await late.payInvoice(newOperationKey(), card.id, OCT, invoice.commitmentVersion!, invoice.totalCents, '2035-10-06');
+    expect(paid.record.invoice).toEqual({ cardId: card.id, month: OCT });
+    expect(summarizeMonth(await bruno.listRecords(ctx, OCT), ctx, OCT).paidCents).toBe(46230 + invoice.totalCents);
+    const after = await checked(OCT);
+    expect(line(after, 'Mercado').usedCents).toBe(47230);
+    expect(line(after, 'Lazer').usedCents).toBe(33335);
+  });
+
+  it('orçamento: criar, alterar com a versão, tirar a partir de um mês e excluir; sempre igual ao core', async () => {
+    const mercado = await setBudget('Mercado', SEP, 0, 100000);
+    expect(mercado).toMatchObject({ category: 'Mercado', fromMonth: SEP, amountCents: 100000, version: 1, createdBy: BRUNO, contextId: ctx });
+    const moradia = await setBudget('Moradia', OCT, 0, 250000);
+    const lazer = await setBudget('Lazer', OCT, 0, 30000);
+    // Lista na ordem das categorias do app (não a alfabética do banco).
+    expect((await bruno.listCategoryBudgets(ctx)).map((b) => b.category)).toEqual(['Moradia', 'Mercado', 'Lazer'].sort((a, b) => BUDGET_CATEGORIES.indexOf(a) - BUDGET_CATEGORIES.indexOf(b)));
+    let all = await checkedAll();
+    expect([line(all[AUG]!, 'Mercado').budgetCents, line(all[SEP]!, 'Mercado').budgetCents, line(all[OCT]!, 'Mercado').budgetCents]).toEqual([null, 100000, 100000]);
+    expect(line(all[OCT]!, 'Lazer')).toMatchObject({ budgetId: lazer.id, budgetVersion: 1, budgetFrom: OCT, budgetCents: 30000, usedCents: 33335 });
+    expect(line(all[SEP]!, 'Moradia')).toMatchObject({ budgetId: null, budgetCents: null });
+    const oct = summarizeBudget(all[OCT]!);
+    expect(oct.rows.map((r) => [r.category, r.amountLine, r.percentText])).toEqual([
+      ['Moradia', 'R$ 0,00 de R$ 2.500,00', '0,0%'],
+      ['Mercado', 'R$ 472,30 de R$ 1.000,00', '47,2%'],
+      ['Lazer', 'R$ 333,35 de R$ 300,00', '111,1%'],
+    ]);
+    expect(oct.totalLine).toBe('Orçado R$ 3.800,00 · Usado R$ 805,65');
+
+    // Um valor novo a partir de dezembro não reescreve meses anteriores; excluir devolve a linha anterior.
+    const dez = await setBudget('Mercado', DEC, 0, 150000);
+    all = await checkedAll();
+    expect([line(all[NOV]!, 'Mercado').budgetCents, line(all[DEC]!, 'Mercado').budgetCents]).toEqual([100000, 150000]);
+    const changed = await bruno.setCategoryBudget(newOperationKey(), ctx, 'Mercado', SEP, 1, 90000);
+    expect([changed.id, changed.version, changed.amountCents]).toEqual([mercado.id, 2, 90000]);
+    all = await checkedAll();
+    expect([line(all[OCT]!, 'Mercado').budgetCents, line(all[DEC]!, 'Mercado').budgetCents]).toEqual([90000, 150000]);
+    const gone = await bruno.deleteCategoryBudget(newOperationKey(), dez.id, 1);
+    expect(gone).toMatchObject({ id: dez.id, version: 2 });
+    all = await checkedAll();
+    expect(line(all[DEC]!, 'Mercado')).toMatchObject({ budgetId: mercado.id, budgetVersion: 2, budgetFrom: SEP, budgetCents: 90000 });
+
+    // "Tirar o orçamento a partir de novembro": linha sem valor; outubro continua como era.
+    const removed = await setBudget('Lazer', NOV, 0, null);
+    expect(removed).toMatchObject({ category: 'Lazer', fromMonth: NOV, amountCents: null, version: 1 });
+    all = await checkedAll();
+    expect(line(all[OCT]!, 'Lazer').budgetCents).toBe(30000);
+    expect(line(all[NOV]!, 'Lazer')).toMatchObject({ budgetId: removed.id, budgetFrom: NOV, budgetCents: null, usedCents: 29333 });
+    expect(summarizeBudget(all[NOV]!).without).toContain('Lazer');
+    // Voltar atrás: excluir a linha que encerra a vigência.
+    await bruno.deleteCategoryBudget(newOperationKey(), removed.id, 1);
+    all = await checkedAll();
+    expect(line(all[NOV]!, 'Lazer')).toMatchObject({ budgetId: lazer.id, budgetCents: 30000 });
+    // Excluída não bloqueia o mês: uma linha nova (versão 0) na mesma categoria e mês.
+    expect((await setBudget('Lazer', NOV, 0, 20000)).version).toBe(1);
+    expect(moradia.version).toBe(1);
+  });
+
+  it('validação também no banco, com o mesmo código e a mesma ordem do core; recusa não gasta a chave', async () => {
+    const key = newOperationKey();
+    // Hoje é 07/10/2035: de outubro de 2033 a outubro de 2036.
+    expect(await code(bruno.setCategoryBudget(key, ctx, 'Salário', OCT, 0, 100000))).toEqual(['categoria_invalida', null]);
+    expect(await code(bruno.setCategoryBudget(key, ctx, 'Sem categoria', OCT, 0, 100000))).toEqual(['categoria_invalida', null]);
+    expect(await code(bruno.setCategoryBudget(key, ctx, 'Compras', OCT, 0, 100000))).toEqual(['categoria_invalida', null]);
+    expect(await code(bruno.setCategoryBudget(key, ctx, 'Transporte', '2033-09', 0, 100000))).toEqual(['vigencia_fora_do_intervalo', null]);
+    expect(await code(bruno.setCategoryBudget(key, ctx, 'Transporte', '2036-11', 0, 100000))).toEqual(['vigencia_fora_do_intervalo', null]);
+    expect(await code(bruno.setCategoryBudget(key, ctx, 'Transporte', OCT, 0, 99))).toEqual(['valor_invalido', null]);
+    expect(await code(bruno.setCategoryBudget(key, ctx, 'Transporte', OCT, 0, 0))).toEqual(['valor_invalido', null]);
+    expect(await code(bruno.setCategoryBudget(key, ctx, 'Transporte', OCT, 0, 1_000_000_000))).toEqual(['valor_acima_do_limite', null]);
+    // Ordem: intervalo antes do valor; versão antes do intervalo.
+    expect(await code(bruno.setCategoryBudget(key, ctx, 'Transporte', '2036-11', 0, 0))).toEqual(['vigencia_fora_do_intervalo', null]);
+    expect(await code(bruno.setCategoryBudget(key, ctx, 'Transporte', '2036-11', 3, 0))).toEqual(['versao_desatualizada', 'versao_atual=0']);
+    expect(await code(bruno.setCategoryBudget(newOperationKey(), ctx, 'Lazer', OCT, 0, 30000))).toEqual(['versao_desatualizada', 'versao_atual=1']);
+    expect(await code(bruno.setCategoryBudget(newOperationKey(), ctx, 'Lazer', OCT, null as unknown as number, 30000))).toEqual(['versao_desatualizada', 'versao_atual=1']);
+    expect(await code(bruno.deleteCategoryBudget(newOperationKey(), randomUUID(), 1))).toEqual(['nao_encontrado', null]);
+    const lazer = (await bruno.listCategoryBudgets(ctx)).find((b) => b.category === 'Lazer' && b.fromMonth === OCT)!;
+    expect(await code(bruno.deleteCategoryBudget(newOperationKey(), lazer.id, 9))).toEqual(['versao_desatualizada', 'versao_atual=1']);
+    // Os dois limites do intervalo e os dois do valor são aceitos, e a mesma chave recusada antes ainda vale (nada foi gravado).
+    const low = await bruno.setCategoryBudget(key, ctx, 'Transporte', '2033-10', 0, 100);
+    const high = await setBudget('Transporte', '2036-10', 0, 999_999_999);
+    expect([low.amountCents, high.amountCents]).toEqual([100, 999_999_999]);
+    await bruno.deleteCategoryBudget(newOperationKey(), low.id, 1);
+    await bruno.deleteCategoryBudget(newOperationKey(), high.id, 1);
+    // Mês fora do dia 1 e mês de leitura inválido (o app sempre manda AAAA-MM-01; aqui direto).
+    const db = clientFor(BRUNO, T0);
+    const badDay = await db.rpc('set_category_budget', {
+      p_idempotency_key: newOperationKey(),
+      p_context_id: ctx,
+      p_category: 'Mercado',
+      p_from_month: '2035-10-15',
+      p_expected_version: 0,
+      p_amount_cents: 100,
+    });
+    expect(badDay.error?.message).toBe('mes_invalido');
+    expect((await db.rpc('month_budget', { p_context_id: ctx, p_month: '2035-10-15' })).error?.message).toBe('mes_invalido');
+    expect((await db.rpc('set_commitment_limit', { p_idempotency_key: newOperationKey(), p_context_id: ctx, p_from_month: '2035-10-15', p_expected_version: 0, p_percent: 40 })).error?.message).toBe('mes_invalido');
+  });
+
+  it('repetição, chave reutilizada e resultado incerto: repetir a mesma chave reconcilia, sem linha duplicada', async () => {
+    const key = newOperationKey();
+    const a = await bruno.setCategoryBudget(key, ctx, 'Saúde', OCT, 0, 40000);
+    expect(await bruno.setCategoryBudget(key, ctx, 'Saúde', OCT, 0, 40000)).toEqual(a);
+    // Outro conteúdo, outra ação ou chave de outra operação: chave_reutilizada.
+    expect(await code(bruno.setCategoryBudget(key, ctx, 'Saúde', OCT, 0, 40001))).toEqual(['chave_reutilizada', null]);
+    expect(await code(bruno.setCategoryBudget(key, ctx, 'Educação', OCT, 0, 40000))).toEqual(['chave_reutilizada', null]);
+    expect(await code(bruno.deleteCategoryBudget(key, a.id, 1))).toEqual(['chave_reutilizada', null]);
+    expect(await code(bruno.setCommitmentLimit(key, ctx, OCT, 0, 40))).toEqual(['chave_reutilizada', null]);
+    const recordKey = newOperationKey();
+    await bruno.createRecord(recordKey, ctx, 'despesa', { accountId: account, amountCents: 100, occurredOn: '2035-10-07', description: 'Café', category: null });
+    expect(await code(bruno.setCategoryBudget(recordKey, ctx, 'Saúde', OCT, 0, 40000))).toEqual(['chave_reutilizada', null]);
+    // Depois de alterada, a repetição da primeira chave devolve a linha atual (versão 2), sem gravar de novo.
+    const changed = await bruno.setCategoryBudget(newOperationKey(), ctx, 'Saúde', OCT, 1, 45000);
+    expect(await bruno.setCategoryBudget(key, ctx, 'Saúde', OCT, 0, 40000)).toEqual(changed);
+
+    // A resposta se perde: o app não sabe o resultado. Repetir a mesma chave e o mesmo conteúdo devolve a linha criada.
+    const lost = new SupabaseRepository(clientFor(BRUNO, T0, lostResponse), { id: BRUNO });
+    const lostKey = newOperationKey();
+    expect(await err(lost.setCategoryBudget(lostKey, ctx, 'Educação', OCT, 0, 70000))).toBe('rede');
+    const created = await bruno.setCategoryBudget(lostKey, ctx, 'Educação', OCT, 0, 70000);
+    expect((await bruno.listCategoryBudgets(ctx)).filter((b) => b.category === 'Educação')).toEqual([created]);
+    expect(created.version).toBe(1);
+    // A exclusão perdida também se reconcilia repetindo a chave: devolve a linha já excluída, sem erro.
+    const deleteKey = newOperationKey();
+    expect(await err(lost.deleteCategoryBudget(deleteKey, created.id, 1))).toBe('rede');
+    const deleted = await bruno.deleteCategoryBudget(deleteKey, created.id, 1);
+    expect([deleted.id, deleted.version]).toEqual([created.id, 2]);
+    await bruno.deleteCategoryBudget(newOperationKey(), changed.id, changed.version);
+    expect((await bruno.listCategoryBudgets(ctx)).map((b) => b.category)).not.toContain('Educação');
+    expect((await bruno.listCategoryBudgets(ctx)).map((b) => b.category)).not.toContain('Saúde');
+  });
+
+  it('limite pessoal: criar, alterar, excluir, validação e repetição', async () => {
+    const key = newOperationKey();
+    const a = await bruno.setCommitmentLimit(key, ctx, OCT, 0, 60);
+    expect(a).toMatchObject({ contextId: ctx, fromMonth: OCT, percent: 60, version: 1, createdBy: BRUNO });
+    expect(await bruno.setCommitmentLimit(key, ctx, OCT, 0, 60)).toEqual(a);
+    expect(await code(bruno.setCommitmentLimit(key, ctx, OCT, 0, 61))).toEqual(['chave_reutilizada', null]);
+    expect(await code(bruno.setCommitmentLimit(newOperationKey(), ctx, OCT, 0, 50))).toEqual(['versao_desatualizada', 'versao_atual=1']);
+    const v = (percent: number, month: IsoMonth = OCT, version = 1) => code(bruno.setCommitmentLimit(newOperationKey(), ctx, month, version, percent));
+    expect([await v(9), await v(101), await v(0), await v(-5)]).toEqual(Array(4).fill(['percentual_invalido', null]));
+    expect(await v(40, '2033-09', 0)).toEqual(['vigencia_fora_do_intervalo', null]);
+    expect(await v(40, '2036-11', 0)).toEqual(['vigencia_fora_do_intervalo', null]);
+    expect(await v(9, '2036-11', 0)).toEqual(['vigencia_fora_do_intervalo', null]);
+    const b = await bruno.setCommitmentLimit(newOperationKey(), ctx, DEC, 0, 40);
+    const rows = await bruno.listCommitmentLimits(ctx);
+    expect(rows.map((r) => [r.fromMonth, r.percent])).toEqual([[OCT, 60], [DEC, 40]]);
+    expect([limitFor(rows, NOV)?.percent, limitFor(rows, DEC)?.percent, limitFor(rows, SEP)]).toEqual([60, 40, null]);
+    const changed = await bruno.setCommitmentLimit(newOperationKey(), ctx, OCT, 1, 55);
+    expect([changed.id, changed.version, changed.percent]).toEqual([a.id, 2, 55]);
+    expect(await bruno.setCommitmentLimit(key, ctx, OCT, 0, 60)).toEqual(changed);
+    expect(await code(bruno.deleteCommitmentLimit(newOperationKey(), a.id, 1))).toEqual(['versao_desatualizada', 'versao_atual=2']);
+    expect(await code(bruno.deleteCommitmentLimit(newOperationKey(), randomUUID(), 1))).toEqual(['nao_encontrado', null]);
+    const lost = new SupabaseRepository(clientFor(BRUNO, T0, lostResponse), { id: BRUNO });
+    const deleteKey = newOperationKey();
+    expect(await err(lost.deleteCommitmentLimit(deleteKey, b.id, 1))).toBe('rede');
+    const gone = await bruno.deleteCommitmentLimit(deleteKey, b.id, 1);
+    expect([gone.id, gone.version]).toEqual([b.id, 2]);
+    expect((await bruno.listCommitmentLimits(ctx)).map((r) => r.percent)).toEqual([55]);
+    // O core lê o limite sobre a renda comprometida do banco; sem renda de referência, não há situação a mostrar.
+    const refs = await bruno.listIncomeReferences(ctx);
+    const c = summarizeCommitted(await bruno.listCommitments(ctx, OCT), ctx, OCT, T0, refs, []);
+    expect(refs.length > 0).toBe(c.committedPermille !== null);
+    expect(limitStatus(OCT, c.committedPermille, c.committedCents, 55, T0)?.line.endsWith(' de 55% que você escolheu') ?? null).toBe(c.committedPermille === null ? null : true);
+    expect(limitStatus(OCT, null, 0, 55, T0)).toBeNull();
+    await bruno.deleteCommitmentLimit(newOperationKey(), a.id, 2);
+    expect(await bruno.listCommitmentLimits(ctx)).toEqual([]);
+  });
+
+  it('aviso ao cruzar 80% e 100%: o banco devolve o antes e o depois, e o core monta a frase', async () => {
+    const budget = await setBudget('Transporte', OCT, 0, 100000);
+    const before = async () => line(await bruno.getMonthBudget(ctx, OCT), 'Transporte');
+    const crossing = async (hide: boolean, b: MonthBudgetRead['lines'][number]) =>
+      budgetCrossing(b, line(await bruno.getMonthBudget(ctx, OCT), 'Transporte'), OCT, T0, hide);
+    // Gasto de R$ 790,00: 79%, ainda abaixo de 80%.
+    let b = await before();
+    const g1 = await record('despesa', 'Combustível', 790, '2035-10-07', 'Transporte');
+    expect(await crossing(false, b)).toBeNull();
+    // Mais R$ 20,00: 81% (chegou a 80%).
+    b = await before();
+    await record('despesa', 'Estacionamento', 20, '2035-10-07', 'Transporte');
+    expect(await crossing(false, b)).toBe('Transporte chegou a 81% do orçamento de outubro.');
+    // Compra no cartão de R$ 400,00 em 2 vezes: a 1ª parcela, de R$ 200,00, passa em R$ 10,00 (conta no mês da compra).
+    b = await before();
+    await bruno.addCardPurchase(newOperationKey(), card.id, { description: 'Pneu', category: 'Transporte', purchasedOn: '2035-10-07', totalCents: 40000, installments: 2 });
+    expect(await crossing(false, b)).toBe('Transporte passou do orçamento de outubro em R$ 10,00.');
+    // O mesmo cruzamento, com os valores ocultos, sem o valor.
+    expect(await crossing(true, { ...b })).toBe('Transporte passou do orçamento de outubro.');
+    // Editar o gasto de R$ 790,00 para R$ 100,00 volta a ficar abaixo; editar de novo para cima cruza de novo.
+    const down = await bruno.updateRecord(newOperationKey(), g1.id, g1.version, { accountId: account, amountCents: 10000, occurredOn: '2035-10-07', description: 'Combustível', category: 'Transporte' });
+    b = await before();
+    expect(budgetCrossing(b, b, OCT, T0)).toBeNull();
+    await bruno.updateRecord(newOperationKey(), down.id, down.version, { accountId: account, amountCents: 90000, occurredOn: '2035-10-07', description: 'Combustível', category: 'Transporte' });
+    // A 2ª parcela do pneu cai em novembro: o aviso do mês de outubro não fala dele.
+    expect(line(await bruno.getMonthBudget(ctx, NOV), 'Transporte').usedCents).toBe(20000);
+    const after = await before();
+    expect(after.usedCents).toBe(90000 + 2000 + 20000);
+    expect(budget.version).toBe(1);
+  });
+
+  it('orçamento e limite não mexem em nenhum total: Recebido, Pago, Diferença, Ainda a pagar e renda comprometida ficam iguais', async () => {
+    const snapshot = async () => {
+      const rows = await Promise.all([OCT, NOV].map(async (m) => summarizeMonth(await bruno.listRecords(ctx, m), ctx, m)));
+      const toPay = await checkedToPay(BRUNO, ctx, OCT, T0);
+      const { data, error } = await clientFor(BRUNO, T0).rpc('month_committed', { p_context_id: ctx, p_month: `${OCT}-01` }).single();
+      expect(error).toBeNull();
+      return JSON.stringify([rows.map((r) => [r.receivedCents, r.paidCents, r.differenceCents]), toPay.toPayCents, data, await bruno.listCommitments(ctx, OCT)]);
+    };
+    const before = await snapshot();
+    const a = await setBudget('Educação', OCT, 0, 50000);
+    const l = await bruno.setCommitmentLimit(newOperationKey(), ctx, OCT, 0, 30);
+    await setBudget('Educação', NOV, 0, null);
+    expect(await snapshot()).toBe(before);
+    await bruno.deleteCategoryBudget(newOperationKey(), a.id, 1);
+    await bruno.deleteCommitmentLimit(newOperationKey(), l.id, 1);
+    expect(await snapshot()).toBe(before);
+  });
+
+  it('as quatro ações ficam em record_operations com a linha em target_id', async () => {
+    const db = clientFor(BRUNO, T0);
+    const { data, error } = await db
+      .from('record_operations')
+      .select('action, target_id, record_id, commitment_id')
+      .in('action', ['definir_orcamento_categoria', 'excluir_orcamento_categoria', 'definir_limite_comprometimento', 'excluir_limite_comprometimento']);
+    expect(error).toBeNull();
+    const actions = new Set((data ?? []).map((o) => o.action));
+    expect([...actions].sort()).toEqual(['definir_limite_comprometimento', 'definir_orcamento_categoria', 'excluir_limite_comprometimento', 'excluir_orcamento_categoria']);
+    expect((data ?? []).every((o) => o.target_id !== null && o.record_id === null && o.commitment_id === null)).toBe(true);
+  });
+
+  it('outra pessoa não lê nem altera orçamento e limite, nem consulta o usado; gravação direta é recusada', async () => {
+    const mine = (await bruno.listCategoryBudgets(ctx))[0]!;
+    const limit = await bruno.setCommitmentLimit(newOperationKey(), ctx, OCT, 0, 35);
+    expect(await ana.listCategoryBudgets(ctx)).toEqual([]);
+    expect(await ana.listCommitmentLimits(ctx)).toEqual([]);
+    expect(await err(ana.getMonthBudget(ctx, OCT))).toBe('sem_permissao');
+    expect(await err(ana.setCategoryBudget(newOperationKey(), ctx, 'Mercado', OCT, 0, 100))).toBe('sem_permissao');
+    expect(await err(ana.setCommitmentLimit(newOperationKey(), ctx, OCT, 0, 40))).toBe('sem_permissao');
+    expect(await err(ana.deleteCategoryBudget(newOperationKey(), mine.id, mine.version))).toBe('nao_encontrado');
+    expect(await err(ana.deleteCommitmentLimit(newOperationKey(), limit.id, limit.version))).toBe('nao_encontrado');
+    const mineDb = clientFor(BRUNO, T0);
+    expect((await mineDb.from('category_budgets').insert({ context_id: ctx, category: 'Mercado', from_month: '2035-07-01', amount_cents: 100, created_by: BRUNO })).error).not.toBeNull();
+    expect((await mineDb.from('category_budgets').update({ amount_cents: 1 }).eq('id', mine.id)).error).not.toBeNull();
+    expect((await mineDb.from('category_budgets').delete().eq('id', mine.id)).error).not.toBeNull();
+    expect((await mineDb.from('commitment_limits').insert({ context_id: ctx, from_month: '2035-07-01', percent: 40, created_by: BRUNO })).error).not.toBeNull();
+    expect((await mineDb.from('commitment_limits').update({ percent: 50 }).eq('id', limit.id)).error).not.toBeNull();
+    expect((await mineDb.from('commitment_limits').delete().eq('id', limit.id)).error).not.toBeNull();
+    for (const table of ['category_budgets', 'commitment_limits']) {
+      const anon = await clientFor(null).from(table).select('id');
+      expect(anon.error !== null || (anon.data ?? []).length === 0).toBe(true);
+    }
+    expect((await ana.getSpace()) && (await ana.listCategoryBudgets((await ana.getSpace())!.personalContextId))).toEqual([]);
+    await bruno.deleteCommitmentLimit(newOperationKey(), limit.id, limit.version);
+  });
+
+  it('limpeza: sem orçamento nem limite, e a conta volta a só os gastos', async () => {
+    for (const b of await bruno.listCategoryBudgets(ctx)) await bruno.deleteCategoryBudget(newOperationKey(), b.id, b.version);
+    for (const l of await bruno.listCommitmentLimits(ctx)) await bruno.deleteCommitmentLimit(newOperationKey(), l.id, l.version);
+    expect(await bruno.listCategoryBudgets(ctx)).toEqual([]);
+    expect(await bruno.listCommitmentLimits(ctx)).toEqual([]);
+    const read = await checked(OCT);
+    expect(read.lines.every((l) => l.budgetCents === null)).toBe(true);
+    expect(line(read, 'Mercado').usedCents).toBe(47230);
+    // Os lançamentos do cartão e o cartão saem para não deixar fatura nos meses de 2035.
+    for (const e of await bruno.listCardEntries(card.id)) await bruno.deleteCardEntry(newOperationKey(), e.id, e.version).catch(() => undefined);
+  });
+});
+
+describe('conversor do orçamento e do limite', () => {
+  // Sem rede: os argumentos de cada função, a leitura das linhas (AAAA-MM-01 ↔ AAAA-MM, bigint), a recusa de linha incoerente e
+  // os códigos de erro novos.
+  const calls: [string, Record<string, unknown>][] = [];
+  const budget = { id: 'b1', context_id: 'ctx', category: 'Mercado', from_month: '2026-10-01', amount_cents: 180000, created_by: 'p1', version: 1, created_at: 'a', updated_at: 'b' };
+  const limit = { id: 'l1', context_id: 'ctx', from_month: '2026-10-01', percent: 60, created_by: 'p1', version: 1, created_at: 'a', updated_at: 'b' };
+  const monthRows = (patch: Record<string, unknown> = {}) =>
+    BUDGET_CATEGORIES.map((category, i) => ({
+      category,
+      budget_id: i === 1 ? 'b1' : null,
+      budget_version: i === 1 ? 1 : null,
+      budget_from: i === 1 ? '2026-10-01' : null,
+      budget_cents: i === 1 ? 180000 : null,
+      used_cents: i === 1 ? 140000 : 0,
+      ...(i === 1 ? patch : {}),
+    }));
+  const query = (result: { data: unknown; error: unknown }) => {
+    const q: Record<string, unknown> = {};
+    for (const m of ['select', 'eq', 'is', 'order', 'range']) q[m] = () => q;
+    q.then = (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) => Promise.resolve(result).then(resolve, reject);
+    return q;
+  };
+  const fake = (rpc: Record<string, unknown>, tables: Record<string, unknown> = {}, error: unknown = null) => {
+    const db = {
+      from: (table: string) => query(error ? { data: null, error } : { data: tables[table] ?? null, error: null }),
+      rpc: async (fn: string, args: Record<string, unknown>) => {
+        calls.push([fn, args]);
+        return error ? { data: null, error } : { data: rpc[fn] ?? null, error: null };
+      },
+    };
+    return new SupabaseRepository(db as unknown as SupabaseClient, { id: 'p1' });
+  };
+  const failure = (p: Promise<unknown>) => p.then(() => null, (e: unknown) => (e instanceof RepoError ? [e.code, e.message, e.detail ?? null] : String(e)));
+  const expectedBudget = { id: 'b1', contextId: 'ctx', category: 'Mercado', fromMonth: '2026-10', amountCents: 180000, createdBy: 'p1', version: 1, createdAt: 'a', updatedAt: 'b' };
+
+  it('orçamento: AAAA-MM vira AAAA-MM-01 e volta; valor nulo encerra; linha incoerente é recusada', async () => {
+    calls.length = 0;
+    const repo = fake({ set_category_budget: budget, delete_category_budget: { ...budget, version: 2, deleted_at: 'c', deleted_by: 'p1' } }, { category_budgets: [budget] });
+    expect(await repo.listCategoryBudgets('ctx')).toEqual([expectedBudget]);
+    expect(await repo.setCategoryBudget('chave-0001', 'ctx', 'Mercado', '2026-10', 0, 180000)).toEqual(expectedBudget);
+    expect(await repo.deleteCategoryBudget('chave-0002', 'b1', 1)).toEqual({ ...expectedBudget, version: 2 });
+    await fake({ set_category_budget: { ...budget, amount_cents: null } }).setCategoryBudget('chave-0003', 'ctx', 'Mercado', '2026-11', 0, null);
+    expect(calls).toEqual([
+      ['set_category_budget', { p_idempotency_key: 'chave-0001', p_context_id: 'ctx', p_category: 'Mercado', p_from_month: '2026-10-01', p_expected_version: 0, p_amount_cents: 180000 }],
+      ['delete_category_budget', { p_idempotency_key: 'chave-0002', p_id: 'b1', p_expected_version: 1 }],
+      ['set_category_budget', { p_idempotency_key: 'chave-0003', p_context_id: 'ctx', p_category: 'Mercado', p_from_month: '2026-11-01', p_expected_version: 0, p_amount_cents: null }],
+    ]);
+    expect((await fake({ set_category_budget: { ...budget, amount_cents: null } }).setCategoryBudget('chave-0004', 'ctx', 'Mercado', '2026-10', 0, null)).amountCents).toBeNull();
+    for (const bad of [{ ...budget, category: 'Salário' }, { ...budget, from_month: '2026-10-15' }, { ...budget, amount_cents: 99 }, { ...budget, amount_cents: 1_000_000_000 }, { ...budget, version: 0 }, { ...budget, amount_cents: 1.5 }]) {
+      expect(await failure(fake({ set_category_budget: bad }).setCategoryBudget('chave-0005', 'ctx', 'Mercado', '2026-10', 0, 180000))).toEqual(['desconhecido', expect.stringMatching(/inconsistente$/), null]);
+    }
+    expect((await fake({ set_category_budget: { ...budget, amount_cents: '180000' } }).setCategoryBudget('chave-0006', 'ctx', 'Mercado', '2026-10', 0, 180000)).amountCents).toBe(180000);
+    expect(await failure(fake({}).setCategoryBudget('chave-0007', 'ctx', 'Mercado', '2026-10', 0, 100))).toEqual(['desconhecido', 'desconhecido', null]);
+    // Lista na ordem das categorias do app, mesmo se o banco devolve fora dela.
+    const lazer = { ...budget, id: 'b2', category: 'Lazer' };
+    const moradia = { ...budget, id: 'b3', category: 'Moradia' };
+    expect((await fake({}, { category_budgets: [lazer, budget, moradia] }).listCategoryBudgets('ctx')).map((b) => b.category)).toEqual(['Moradia', 'Mercado', 'Lazer']);
+  });
+
+  it('limite: argumentos, leitura e linha incoerente recusada', async () => {
+    calls.length = 0;
+    const expected = { id: 'l1', contextId: 'ctx', fromMonth: '2026-10', percent: 60, createdBy: 'p1', version: 1, createdAt: 'a', updatedAt: 'b' };
+    const repo = fake({ set_commitment_limit: limit, delete_commitment_limit: { ...limit, version: 2, deleted_at: 'c', deleted_by: 'p1' } }, { commitment_limits: [limit] });
+    expect(await repo.listCommitmentLimits('ctx')).toEqual([expected]);
+    expect(await repo.setCommitmentLimit('chave-0010', 'ctx', '2026-10', 0, 60)).toEqual(expected);
+    expect(await repo.deleteCommitmentLimit('chave-0011', 'l1', 1)).toEqual({ ...expected, version: 2 });
+    expect(calls).toEqual([
+      ['set_commitment_limit', { p_idempotency_key: 'chave-0010', p_context_id: 'ctx', p_from_month: '2026-10-01', p_expected_version: 0, p_percent: 60 }],
+      ['delete_commitment_limit', { p_idempotency_key: 'chave-0011', p_id: 'l1', p_expected_version: 1 }],
+    ]);
+    for (const bad of [{ ...limit, percent: 9 }, { ...limit, percent: 101 }, { ...limit, percent: 30.5 }, { ...limit, from_month: '2026-10-02' }, { ...limit, version: 0 }]) {
+      expect(await failure(fake({ set_commitment_limit: bad }).setCommitmentLimit('chave-0012', 'ctx', '2026-10', 0, 60))).toEqual(['desconhecido', expect.stringMatching(/inconsistente$|valor_inconsistente$/), null]);
+    }
+  });
+
+  it('month_budget: o mês vai como AAAA-MM-01 e as seis linhas voltam em ordem; lista incompleta ou incoerente é recusada', async () => {
+    calls.length = 0;
+    const repo = fake({ month_budget: monthRows() });
+    const read = await repo.getMonthBudget('ctx', '2026-10');
+    expect(calls).toEqual([['month_budget', { p_context_id: 'ctx', p_month: '2026-10-01' }]]);
+    expect(read.month).toBe('2026-10');
+    expect(read.lines.map((l) => l.category)).toEqual([...BUDGET_CATEGORIES]);
+    expect(read.lines[1]).toEqual({ category: 'Mercado', budgetId: 'b1', budgetVersion: 1, budgetFrom: '2026-10', budgetCents: 180000, usedCents: 140000 });
+    expect(read.lines[0]).toEqual({ category: 'Moradia', budgetId: null, budgetVersion: null, budgetFrom: null, budgetCents: null, usedCents: 0 });
+    // Orçamento encerrado: a linha vigente existe (id, versão e mês), mas sem valor.
+    expect((await fake({ month_budget: monthRows({ budget_cents: null }) }).getMonthBudget('ctx', '2026-11')).lines[1]).toMatchObject({ budgetId: 'b1', budgetFrom: '2026-10', budgetCents: null });
+    // bigint como texto é aceito.
+    expect((await fake({ month_budget: monthRows({ used_cents: '140000', budget_cents: '180000' }) }).getMonthBudget('ctx', '2026-10')).lines[1]).toMatchObject({ budgetCents: 180000, usedCents: 140000 });
+    const bad = (rows: unknown) => failure(fake({ month_budget: rows }).getMonthBudget('ctx', '2026-10'));
+    const incoherent = ['orcamento_inconsistente'];
+    expect(await bad(monthRows().slice(1))).toEqual(['desconhecido', incoherent[0], null]);
+    expect(await bad([...monthRows().reverse()])).toEqual(['desconhecido', incoherent[0], null]);
+    expect(await bad(monthRows({ used_cents: -1 }))).toEqual(['desconhecido', incoherent[0], null]);
+    expect(await bad(monthRows({ budget_from: null }))).toEqual(['desconhecido', incoherent[0], null]);
+    expect(await bad(monthRows({ budget_version: null }))).toEqual(['desconhecido', incoherent[0], null]);
+    expect(await bad(monthRows({ budget_from: '2026-10-15' }))).toEqual(['desconhecido', incoherent[0], null]);
+    expect(await bad(monthRows({ budget_cents: 50 }))).toEqual(['desconhecido', incoherent[0], null]);
+    expect(await bad(null)).toEqual(['desconhecido', incoherent[0], null]);
+  });
+
+  it('códigos de erro novos voltam com o próprio nome, sem detalhe além de versao_atual', async () => {
+    const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((m) => vi.spyOn(console, m).mockImplementation(() => undefined));
+    try {
+      for (const code of ['vigencia_fora_do_intervalo', 'percentual_invalido', 'categoria_invalida', 'mes_invalido', 'valor_invalido', 'valor_acima_do_limite'] as const) {
+        for (const message of [code, `ERROR: ${code}`]) {
+          const repo = fake({}, {}, { message, code: '22023', details: 'Key (id)=(0000)=(segredo) já existe. 12345678' });
+          expect(await failure(repo.setCategoryBudget('chave-4001', 'ctx', 'Mercado', '2026-10', 0, 100))).toEqual([code, code, null]);
+          expect(await failure(repo.setCommitmentLimit('chave-4002', 'ctx', '2026-10', 0, 40))).toEqual([code, code, null]);
+          expect(await failure(repo.getMonthBudget('ctx', '2026-10'))).toEqual([code, code, null]);
+        }
+      }
+      const stale = fake({}, {}, { message: 'versao_desatualizada', code: 'PT409', details: 'versao_atual=7' });
+      expect(await failure(stale.setCategoryBudget('chave-4003', 'ctx', 'Mercado', '2026-10', 0, 100))).toEqual(['versao_desatualizada', 'versao_desatualizada', 'versao_atual=7']);
+      for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+    } finally {
+      for (const spy of spies) spy.mockRestore();
     }
   });
 });

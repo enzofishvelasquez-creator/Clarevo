@@ -57,7 +57,7 @@ import { ChoiceGroup, monthChipLabel, seriesStyles as styles } from '@/component
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
-import { useSeries, useSeriesOccurrences, useSeriesOpenOccurrences, useSeriesOperationKey, useUpdateSeriesFrom } from '@/state/data';
+import { useLimitWatch, useSeries, useSeriesOccurrences, useSeriesOpenOccurrences, useSeriesOperationKey, useUpdateSeriesFrom, withNotice } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -144,6 +144,7 @@ export function SeriesEditForm({
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const update = useUpdateSeriesFrom();
+  const limitWatch = useLimitWatch();
   const keys = useSeriesOperationKey();
   const live = useSeries(opened.id, contextId);
   const occ = useSeriesOccurrences(opened.id, contextId);
@@ -332,9 +333,9 @@ export function SeriesEditForm({
     prepare(s, allOccurrences, k, v.input);
   };
 
-  const finish = (k: number) => {
+  const finish = (k: number, notice: string | null = null) => {
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    flash.set(`${noun} ${anual ? 'atualizada' : 'atualizado'} ${fromText(k)}.`);
+    flash.set(withNotice(`${noun} ${anual ? 'atualizada' : 'atualizado'} ${fromText(k)}.`, notice));
     leave(goBack);
   };
 
@@ -371,12 +372,14 @@ export function SeriesEditForm({
         }
       }
       const key = keys.keyFor(snapshot);
+      // Aviso do limite pessoal (D-041): o comprometido dos próximos meses antes de gravar, com a previsão das séries.
+      const limitBefore = await limitWatch.before(s.contextId);
       try {
         await update.mutateAsync({ key, id: s.id, version, fromNumber: k, affected: plan.affected, input });
         keys.settled();
         setRetry(false);
         setConfirm(null);
-        finish(k);
+        finish(k, await limitWatch.after(limitBefore));
       } catch (e) {
         setConfirm(null);
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {

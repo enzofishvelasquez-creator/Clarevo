@@ -39,8 +39,10 @@ const FORM_PATHS: readonly RegExp[] = [
   // Metas, reserva e plano de guardar.
   new RegExp(`^/meta/(nova|${ID}/(editar|movimento))$`),
   /^\/(reserva|guardar|guardar\/minima)$/,
-  // Renda de referência.
-  /^\/renda-comprometida\/referencia$/,
+  // Renda de referência e limite pessoal (D-041).
+  /^\/renda-comprometida\/(referencia|limite)$/,
+  // Orçamento de uma categoria (D-041): o formulário. A lista do orçamento (/orcamento) é de consulta e mostra a barra.
+  new RegExp(`^/orcamento/${ID}$`),
   // Cartões: cadastrar, editar e os formulários da fatura.
   new RegExp(`^/cartoes/(novo|${ID}/editar|${ID}/fatura/${MONTH}/(pagar|encargo|estorno|compra))$`),
   // Seus últimos meses: o passo a passo e o pagamento de uma conta sem registro.
@@ -63,7 +65,7 @@ export function barModeFor(pathname: string): BarMode {
 
 /** Abas que uma tela de consulta abre quando a pessoa não veio de nenhuma (endereço aberto direto): a do assunto. */
 const TAB_OF_TOPIC: readonly [RegExp, TabRoute][] = [
-  [/^\/(a-pagar|gastos-fixos|cartoes|registro)(\/|$)/, '/movimentacoes'],
+  [/^\/(a-pagar|gastos-fixos|cartoes|registro|orcamento)(\/|$)/, '/movimentacoes'],
   [/^\/(meta|reserva|guardar|simular|renda-comprometida)(\/|$)/, '/metas'],
   [/^\/explicacao(\/|$)/, '/aprender'],
 ];
@@ -308,6 +310,13 @@ export const APP_SCREENS: readonly AppScreen[] = [
     keywords: ['quem vê', 'privacidade', 'permissões', 'meus dados', 'compartilhar', 'acesso', 'família'],
   },
   {
+    id: 'orcamento',
+    title: 'Orçamento por categoria',
+    caption: 'Quanto usar por mês em cada categoria de gasto, mês a mês',
+    href: '/orcamento',
+    keywords: ['orçamento', 'orcamento', 'limite', 'limite de gastos', 'gastar menos', 'quanto gastar', 'teto de gastos', 'meta de gasto', 'mercado', 'lazer'],
+  },
+  {
     id: 'metas',
     title: 'Metas e reserva',
     caption: 'Metas, reserva para imprevistos e plano de guardar',
@@ -319,7 +328,7 @@ export const APP_SCREENS: readonly AppScreen[] = [
     title: 'Renda comprometida',
     caption: 'Quanto da sua renda de referência já tem destino',
     href: '/renda-comprometida',
-    keywords: ['renda comprometida', 'comprometimento', 'renda de referência', 'quanto da renda', 'fora dos compromissos'],
+    keywords: ['renda comprometida', 'comprometimento', 'renda de referência', 'quanto da renda', 'fora dos compromissos', 'meu limite', 'limite de renda', 'limite de comprometimento'],
   },
   {
     id: 'simular',

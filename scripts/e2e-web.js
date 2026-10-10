@@ -584,6 +584,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     fixos: 'Gastos fixos e parcelamentos, 5 cadastrados, com as contas do ano',
     // D-037: a demonstração tem o "Cartão Exemplo"; a legenda traz a fatura atual (fecha dia 3, vence dia 10).
     cartoes: 'Cartões, Cartão Exemplo, fatura de novembro R$ 550,00',
+    // D-041: a categoria mais perto do limite (Lazer: parcela do tênis e restaurante, R$ 400,00 de R$ 300,00).
+    orcamento: 'Orçamento por categoria, Lazer: R$ 400,00 de R$ 300,00',
     calc: 'Calculadoras, Parcelado ou à vista, dívidas, reserva e outras contas',
   };
   await waitText('5 cadastrados, com as contas do ano').catch(() => {});
@@ -592,8 +594,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     const top = (sel, text) => [...document.querySelectorAll(sel)].find((e) => e.textContent === text && e.getBoundingClientRect().width > 0)?.getBoundingClientRect().top ?? null;
     return { anotar: top('[role=button]', 'Anotar gasto'), organizar: top('[role=heading]', 'Organizar'), totais: top('div[dir="auto"]', 'Pago em outubro') };
   });
-  ok('movimentações: "Organizar" com os quatro atalhos (Cartões entre os gastos fixos e as calculadoras) e as legendas de outubro, entre os botões e os totais do mês', JSON.stringify(await sectionRows('Organizar')) === JSON.stringify([SC.pagar, SC.fixos, SC.cartoes, SC.calc]) &&
-    ['R$ 650,00 em aberto neste mês', '5 cadastrados, com as contas do ano', 'Cartão Exemplo · fatura de novembro R$ 550,00', 'Parcelado ou à vista, dívidas, reserva e outras contas'].every((x) => t.includes(x)) &&
+  ok('movimentações: "Organizar" com os cinco atalhos (Orçamento por categoria entre Cartões e as calculadoras) e as legendas de outubro, entre os botões e os totais do mês', JSON.stringify(await sectionRows('Organizar')) === JSON.stringify([SC.pagar, SC.fixos, SC.cartoes, SC.orcamento, SC.calc]) &&
+    ['R$ 650,00 em aberto neste mês', '5 cadastrados, com as contas do ano', 'Cartão Exemplo · fatura de novembro R$ 550,00', 'Lazer: R$ 400,00 de R$ 300,00', 'Parcelado ou à vista, dívidas, reserva e outras contas'].every((x) => t.includes(x)) &&
     scOrder.anotar !== null && scOrder.organizar !== null && scOrder.totais !== null && scOrder.anotar < scOrder.organizar && scOrder.organizar < scOrder.totais, `${JSON.stringify(await sectionRows('Organizar'))} ${JSON.stringify(scOrder)}`);
   await layoutChecks('movimentações com atalhos 390px');
   await scrollTo('Organizar');
@@ -2000,12 +2002,12 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Pago: segmento "Por registro | Por categoria" como grupo de rádios, começando em "Por registro"', (await visibleCount('radiogroup', 'Mostrar Pago')) === 1 &&
     (await radio('Por registro').getAttribute('aria-checked')) === 'true' && (await radio('Por categoria').getAttribute('aria-checked')) === 'false');
   await radio('Por categoria').click();
-  await waitUntil(async () => (await p.locator('[role=listitem][aria-label$=" do pago"]').count()) > 0);
-  const bars = await p.locator('[role=listitem][aria-label$=" do pago"]').filter({ visible: true }).evaluateAll((es) => es.map((e) => e.getAttribute('aria-label').replace(/ /g, ' ')));
+  await waitUntil(async () => (await p.locator('[role=listitem][aria-label*=" do pago"]').count()) > 0);
+  const bars = await p.locator('[role=listitem][aria-label*=" do pago"]').filter({ visible: true }).evaluateAll((es) => es.map((e) => e.getAttribute('aria-label').replace(/ /g, ' ')));
   const barCents = bars.map((l) => Number((l.match(/R\$ ([\d.]+,\d\d)/) ?? ['', '0'])[1].replace(/\D/g, '')));
-  const barTenths = bars.map((l) => Math.round(Number((l.match(/, ([\d,]+)% do pago$/) ?? ['', 'NaN'])[1].replace(',', '.')) * 10));
+  const barTenths = bars.map((l) => Math.round(Number((l.match(/, ([\d,]+)% do pago(?:, de R\$ [\d.]+,\d\d orçados)?$/) ?? ['', 'NaN'])[1].replace(',', '.')) * 10));
   ok('"Por categoria": barras com valor e percentual que somam o Pago (R$ 3.900,00) e 100%', bars.length >= 2 && barCents.reduce((a, b) => a + b, 0) === 390000 && barTenths.reduce((a, b) => a + b, 0) === 1000 &&
-    bars.every((l) => /^.+, R\$ [\d.]+,\d\d, [\d,]+% do pago$/.test(l)) && barCents.every((c, i) => i === 0 || c <= barCents[i - 1]), bars.join(' | '));
+    bars.every((l) => /^.+, R\$ [\d.]+,\d\d, [\d,]+% do pago(, de R\$ [\d.]+,\d\d orçados)?$/.test(l)) && barCents.every((c, i) => i === 0 || c <= barCents[i - 1]), bars.join(' | '));
   await layoutChecks('por categoria 390px');
   await keepText();
   await shot('68_por_categoria');
@@ -5300,6 +5302,369 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('F1 conta nova: uma dívida parcelada à mão (10 × R$ 200,00, sem taxa) termina em 10 meses', t.includes('Sem valor a mais: tudo termina em 10 meses') && t.includes('Dívida 1: sem juros informados, conta só as parcelas.'), t.slice(-600));
   ok('F1 conta nova: nada gravado ao digitar (nenhuma escrita, nada no aparelho)', writes.length === f1Writes2 && (await f1Storage()) === f1Store2, `${writes.length - f1Writes2} escritas`);
   await keepText();
+  await goResumo().catch(() => {});
+
+  // ==================================================================================================================
+  // Ciclo F2 · Orçamento e limite (D-041, docs/08 §5 item 9). Orçamento por categoria (/orcamento e /orcamento/[categoria]),
+  // o usado no mês por competência (compra no cartão no mês da compra, cada parcela no seu mês), os avisos de 80% e 100% na
+  // mensagem de sucesso e o limite pessoal de comprometimento (/renda-comprometida/limite). Cada item é conferido em 390 e em
+  // 320 px de largura. Capturas novas: 200 em diante. Na demonstração, hoje é 07/10/2026: Moradia R$ 2.500,00 de R$ 2.500,00,
+  // Mercado R$ 1.400,00 de R$ 1.800,00 e Lazer R$ 400,00 de R$ 300,00 (parcela 1 do tênis e restaurante), limite de 60%.
+  // ==================================================================================================================
+  const F2_VETOED = /estour|excedeu|gastou demais|controle-se|\bcuidado|\balerta/i;
+  const f2Texts = [];
+  const f2Keep = async () => { const x = await body(); f2Texts.push(x); screenTexts.push(x); return x; };
+  const f2Writes = () => writes.length;
+  const f2CardBtn = (category) => p.getByRole('button', { name: new RegExp(`^${category}, R\\$ .*Alterar orçamento de ${category}\\.$`) }).filter({ visible: true }).first();
+  const f2Open = async () => {
+    await tabByName('Movimentações').click(); await waitText('Organizar'); await p.waitForTimeout(400);
+    await p.getByRole('button', { name: /^Orçamento por categoria, / }).filter({ visible: true }).first().click();
+    await waitText('Compras no cartão contam no mês da compra'); await p.waitForTimeout(500);
+  };
+  const f2Month = async (name, label) => { await p.getByRole('button', { name }).filter({ visible: true }).first().click(); await waitText(`Pessoal · ${label}`); await p.waitForTimeout(500); };
+  /** Larguras das barras (fração do trilho) e cores: só azul da marca no preenchimento e nada de vermelho. */
+  const f2Bars = () => p.evaluate(() => {
+    const brand = 'rgb(36, 87, 245)';
+    const fills = [...document.querySelectorAll('div')].filter((e) => { const r = e.getBoundingClientRect(); const cs = getComputedStyle(e); return r.width > 0 && Math.round(r.height) === 12 && cs.backgroundColor === brand; });
+    const widths = fills.map((e) => Math.round((e.getBoundingClientRect().width / e.parentElement.getBoundingClientRect().width) * 1000) / 1000);
+    const red = [];
+    for (const e of document.querySelectorAll('body *')) {
+      const r = e.getBoundingClientRect(); if (r.width <= 0) continue;
+      const cs = getComputedStyle(e);
+      for (const k of ['color', 'backgroundColor', 'borderTopColor']) if (['rgb(180, 35, 24)', 'rgb(253, 236, 234)'].includes(cs[k])) red.push(`${k}:${(e.textContent || '').slice(0, 30)}`);
+    }
+    return { widths, red };
+  });
+  const f2Expense = async (description, value, category) => {
+    await goResumo(); await btn('Anotar gasto').click(); await waitText('Será salvo em');
+    await field('Descrição').fill(description); await field('Valor em reais').fill(value); await radio(category).click();
+    await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(500);
+    return body();
+  };
+  const f2WritesBefore = f2Writes();
+
+  await demoHome();
+
+  // ---- 1. Movimentos › Organizar: a linha nova, com a categoria mais perto do limite ----
+  await tabByName('Movimentações').click(); await waitText('Organizar'); await p.waitForTimeout(500);
+  let f2Rows = await sectionRows('Organizar');
+  ok('F2 Organizar: cinco linhas, com "Orçamento por categoria" depois de Cartões e antes de Calculadoras, e a legenda da categoria mais perto do limite (Lazer)',
+    f2Rows !== null && f2Rows.length === 5 && f2Rows[3] === 'Orçamento por categoria, Lazer: R$ 400,00 de R$ 300,00' && /^Cartões, /.test(f2Rows[2]) && /^Calculadoras, /.test(f2Rows[4]), JSON.stringify(f2Rows));
+  await atWidths(async (w) => {
+    await layoutChecks(`F2 Organizar ${w}px`);
+    if (w === 390) await shot('200_organizar_orcamento');
+  });
+  await f2Keep();
+
+  // ---- 2. /orcamento na demonstração de outubro ----
+  await f2Open();
+  t = await f2Keep();
+  ok('F2 /orcamento: título, barra inferior com Movimentos marcada, "Orçado R$ 4.600,00 · Usado R$ 4.300,00" e a regra do cartão', urlPath() === '/orcamento' && (await h1Name()) === 'Orçamento por categoria' && barOk(await barState()) && (await barState()).selected[0] === MOV_TAB &&
+    t.includes('Orçado R$ 4.600,00 · Usado R$ 4.300,00') && t.includes('Compras no cartão contam no mês da compra (cada parcela no seu mês), mesmo antes de a fatura ser paga.'), `${urlPath()} ${JSON.stringify(await barState())}`);
+  ok('F2 /orcamento Moradia: "R$ 2.500,00 de R$ 2.500,00", 100,0% e "Orçamento usado por inteiro" (o aluguel pago)',
+    (await visibleCount('button', /^Moradia, R\$ 2\.500,00 de R\$ 2\.500,00, 100,0% do orçamento\. Orçamento usado por inteiro\. Alterar orçamento de Moradia\.$/)) === 1 && t.includes('Orçamento usado por inteiro'));
+  ok('F2 /orcamento Mercado: "R$ 1.400,00 de R$ 1.800,00", 77,8% e "Faltam R$ 400,00"',
+    (await visibleCount('button', /^Mercado, R\$ 1\.400,00 de R\$ 1\.800,00, 77,8% do orçamento\. Faltam R\$ 400,00\. Alterar orçamento de Mercado\.$/)) === 1 && t.includes('Faltam R$ 400,00'));
+  ok('F2 /orcamento Lazer: compra no cartão conta no mês da compra (parcela 1 do tênis, R$ 200,00, e o restaurante, R$ 200,00): "R$ 400,00 de R$ 300,00", 133,3% e "R$ 100,00 acima do orçamento"',
+    (await visibleCount('button', /^Lazer, R\$ 400,00 de R\$ 300,00, 133,3% do orçamento\. R\$ 100,00 acima do orçamento\. Alterar orçamento de Lazer\.$/)) === 1 && t.includes('R$ 100,00 acima do orçamento'));
+  const f2Define = async () => p.evaluate(() => {
+    const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Definir orçamento' && e.getBoundingClientRect().width > 0);
+    return h ? [h.getAttribute('aria-level'), ...[...h.parentElement.querySelectorAll('[role=button]')].map((b) => b.getAttribute('aria-label'))] : null;
+  });
+  ok('F2 /orcamento "Definir orçamento" (título de nível 2): Transporte, Saúde e Educação, nessa ordem; "Sem categoria" não tem orçamento',
+    JSON.stringify(await f2Define()) === JSON.stringify(['2', 'Definir orçamento de Transporte', 'Definir orçamento de Saúde', 'Definir orçamento de Educação']) && t.includes('Gastos sem categoria não têm orçamento.'), JSON.stringify(await f2Define()));
+  ok('F2 /orcamento deixa claro que Pago por categoria é do Pago e o orçamento é do usado no mês', t.includes('O orçamento conta o usado no mês. Pago por categoria mostra o que foi pago, e a compra no cartão entra em Pago quando a fatura é paga.'));
+  const f2b = await f2Bars();
+  ok('F2 /orcamento: barras só na cor da marca, nas proporções 100%, 77,8% e 100% (acima do orçamento a barra enche e para), e nenhuma cor de alerta', JSON.stringify(f2b.widths) === JSON.stringify([1, 0.778, 1]) && f2b.red.length === 0, JSON.stringify(f2b));
+  ok('F2 /orcamento: títulos "Moradia", "Mercado" e "Lazer" nos cards e o texto de "Mercado" lido como um botão só (nome acessível com o valor, o percentual e o que falta)', (await visibleCount('button', /^(Moradia|Mercado|Lazer), R\$ /)) === 3);
+  await atWidths(async (w) => {
+    await layoutChecks(`F2 /orcamento ${w}px`);
+    await headerChecks(`F2 /orcamento ${w}px`);
+    const bar = await barState();
+    ok(`F2 /orcamento (${w}px): barra inferior à vista com Movimentos marcada`, barOk(bar) && bar.selected[0] === MOV_TAB, JSON.stringify(bar));
+    if (w === 390) await shot('200_orcamento');
+    if (w === 320) await shot('200_orcamento_320px');
+  });
+  ok('F2 abrir o orçamento não grava nada', f2Writes() === f2WritesBefore);
+
+  // ---- 3. Seletor de mês local: o orçamento vale a partir de outubro e as parcelas do cartão caem mês a mês ----
+  await f2Month(/^Mês anterior: setembro de 2026$/, 'Setembro de 2026');
+  t = await f2Keep();
+  ok('F2 setembro (antes da vigência): nenhum orçamento, as seis categorias em "Definir orçamento" e o aviso "Nenhum orçamento definido neste mês"', t.includes('Nenhum orçamento definido neste mês.') && !t.includes('Orçado R$') && (await f2Define())?.length === 7 && (await visibleCount('button', 'Voltar para outubro de 2026')) === 1, JSON.stringify(await f2Define()));
+  await btn('Voltar para outubro de 2026').click(); await waitText('Pessoal · Outubro de 2026'); await p.waitForTimeout(400);
+  await f2Month(/^Próximo mês: novembro de 2026$/, 'Novembro de 2026');
+  t = await f2Keep();
+  ok('F2 novembro: a 2ª parcela do tênis (R$ 200,00) conta em novembro, mesmo sem a fatura paga: Lazer "R$ 200,00 de R$ 300,00", 66,7% e "Faltam R$ 100,00"; Moradia e Mercado sem uso',
+    (await visibleCount('button', /^Lazer, R\$ 200,00 de R\$ 300,00, 66,7% do orçamento\. Faltam R\$ 100,00\./)) === 1 && (await visibleCount('button', /^Moradia, R\$ 0,00 de R\$ 2\.500,00, 0,0% do orçamento\. Faltam R\$ 2\.500,00\./)) === 1 && (await visibleCount('button', /^Mercado, R\$ 0,00 de R\$ 1\.800,00/)) === 1 &&
+    t.includes('Orçado R$ 4.600,00 · Usado R$ 200,00'), t.slice(0, 500));
+  await atWidths(async (w) => { await layoutChecks(`F2 /orcamento novembro ${w}px`); if (w === 390) await shot('201_orcamento_novembro'); });
+  await f2Month(/^Próximo mês: dezembro de 2026$/, 'Dezembro de 2026');
+  ok('F2 dezembro: a 3ª parcela do tênis (R$ 200,00)', (await visibleCount('button', /^Lazer, R\$ 200,00 de R\$ 300,00, 66,7%/)) === 1);
+  await f2Month(/^Próximo mês: janeiro de 2027$/, 'Janeiro de 2027');
+  t = await body();
+  ok('F2 janeiro de 2027: acabaram as parcelas do tênis (Lazer R$ 0,00) e o Notebook (Educação, sem orçamento) não aparece em nenhuma linha', (await visibleCount('button', /^Lazer, R\$ 0,00 de R\$ 300,00/)) === 1 && !t.includes('Educação, R$'));
+  ok('F2 o seletor avança até 12 meses depois de outubro de 2026 e volta sem limite', (await visibleCount('button', /^Mês anterior: dezembro de 2026$/)) === 1);
+  await btn('Voltar para outubro de 2026').click(); await waitText('Pessoal · Outubro de 2026'); await p.waitForTimeout(400);
+
+  // ---- 4. Formulário do orçamento: valor, "A partir de", "Somar valores" e "Tirar o orçamento" ----
+  await f2CardBtn('Mercado').click(); await waitText('Valor por mês'); await p.waitForTimeout(500);
+  t = await f2Keep();
+  ok('F2 formulário de Mercado: sem barra inferior, valor atual (1.800,00), "A partir de" em outubro de 2026, "Somar valores", "Salvar orçamento", "Cancelar" e "Tirar o orçamento a partir de outubro de 2026"',
+    urlPath() === '/orcamento/Mercado' && (await barState()).n === 0 && (await h1Name()) === 'Orçamento de Mercado' && (await field('Valor por mês').inputValue()) === '1.800,00' && t.includes('Outubro de 2026') && (await visibleCount('button', 'Somar valores')) >= 1 &&
+    (await visibleCount('button', 'Salvar orçamento')) === 1 && (await visibleCount('button', 'Cancelar')) === 1 && (await visibleCount('button', 'Tirar o orçamento a partir de outubro de 2026')) === 1 && t.includes('Meses anteriores ao escolhido não mudam.'), `${urlPath()} ${t.slice(0, 300)}`);
+  ok('F2 formulário: histórico com a linha de outubro de 2026 (R$ 1.800,00 por mês)', t.includes('Histórico') && t.includes('Outubro de 2026: R$ 1.800,00 por mês'));
+  await atWidths(async (w) => {
+    await layoutChecks(`F2 formulário do orçamento ${w}px`);
+    await headerChecks(`F2 formulário do orçamento ${w}px`);
+    ok(`F2 formulário do orçamento (${w}px): sem barra inferior`, (await barState()).n === 0);
+    if (w === 390) await shot('202_orcamento_formulario');
+    if (w === 320) await shot('202_orcamento_formulario_320px');
+  });
+  // Validação: vazio, abaixo de R$ 1,00 e acima do máximo; o erro fica junto do campo.
+  await field('Valor por mês').fill(''); await btn('Salvar orçamento').click(); await p.waitForTimeout(300);
+  ok('F2 formulário: valor vazio recusado com a explicação, nada gravado', (await body()).includes('Informe um valor de R$ 1,00 ou mais, como 1.200,00.') && urlPath() === '/orcamento/Mercado' && f2Writes() === f2WritesBefore);
+  await field('Valor por mês').fill('0,50'); await btn('Salvar orçamento').click(); await p.waitForTimeout(300);
+  ok('F2 formulário: R$ 0,50 recusado (mínimo de R$ 1,00)', (await body()).includes('Informe um valor de R$ 1,00 ou mais, como 1.200,00.'));
+  await field('Valor por mês').fill('10.000.000,00'); await btn('Salvar orçamento').click(); await p.waitForTimeout(300);
+  ok('F2 formulário: acima de R$ 9.999.999,99 recusado', (await body()).includes('O valor máximo do orçamento é R$ 9.999.999,99.'));
+  // "Somar valores": 1.000,00 e 500,00 viram 1.500,00 no campo.
+  await btn('Somar valores').click(); await p.waitForTimeout(300);
+  await field('Valor 1 da soma').fill('1000'); await field('Valor 2 da soma').fill('500'); await p.waitForTimeout(300);
+  ok('F2 "Somar valores": total de R$ 1.500,00 e "Usar o total" preenche o campo (1.500,00)', (await body()).includes('Total: R$ 1.500,00'));
+  await btn('Usar o total').click(); await p.waitForTimeout(300);
+  ok('F2 "Somar valores": o campo recebe 1.500,00', (await field('Valor por mês').inputValue()) === '1.500,00');
+  // "A partir de": o seletor vai de 24 meses antes a 12 meses depois do mês de hoje.
+  let f2Left = 0;
+  while ((await visibleCount('button', /^Mês anterior: /)) === 1 && f2Left < 30) { await p.getByRole('button', { name: /^Mês anterior: / }).filter({ visible: true }).first().click(); f2Left++; }
+  ok('F2 "A partir de" volta até outubro de 2024 (24 meses) e o botão de voltar fica desativado', f2Left === 24 && (await body()).includes('Outubro de 2024') && (await visibleCount('button', 'Mês anterior')) === 1, `${f2Left}`);
+  let f2Right = 0;
+  while ((await visibleCount('button', /^Próximo mês: /)) === 1 && f2Right < 50) { await p.getByRole('button', { name: /^Próximo mês: / }).filter({ visible: true }).first().click(); f2Right++; }
+  ok('F2 "A partir de" avança até outubro de 2027 (12 meses depois de outubro de 2026)', f2Right === 36 && (await body()).includes('Outubro de 2027'), `${f2Right}`);
+  // Dezembro de 2026: 10 meses para trás.
+  for (let i = 0; i < 10; i++) await p.getByRole('button', { name: /^Mês anterior: / }).filter({ visible: true }).first().click();
+  ok('F2 "A partir de" em dezembro de 2026', (await body()).includes('Dezembro de 2026'));
+  await btn('Salvar orçamento').click(); await waitText('Orçamento de Mercado salvo. Vale a partir de dezembro.'); await waitText('Pessoal · Outubro de 2026'); await p.waitForTimeout(500);
+  t = await f2Keep();
+  ok('F2 salvar: volta ao orçamento com a mensagem "Orçamento de Mercado salvo. Vale a partir de dezembro."; outubro continua R$ 1.800,00 (não reescreve meses anteriores)',
+    urlPath() === '/orcamento' && (await visibleCount('button', /^Mercado, R\$ 1\.400,00 de R\$ 1\.800,00, 77,8%/)) === 1 && t.includes('Orçamento de Mercado salvo. Vale a partir de dezembro.'), t.slice(0, 300));
+  await shot('203_orcamento_salvo');
+  await f2Month(/^Próximo mês: novembro de 2026$/, 'Novembro de 2026');
+  ok('F2 novembro de 2026 ainda com R$ 1.800,00 para Mercado', (await visibleCount('button', /^Mercado, R\$ 0,00 de R\$ 1\.800,00/)) === 1);
+  await f2Month(/^Próximo mês: dezembro de 2026$/, 'Dezembro de 2026');
+  ok('F2 dezembro de 2026 com R$ 1.500,00 para Mercado (valor novo a partir de dezembro)', (await visibleCount('button', /^Mercado, R\$ 0,00 de R\$ 1\.500,00/)) === 1);
+  ok('F2 as linhas do orçamento ficam guardadas: Mercado tem outubro e dezembro', JSON.stringify(await otherDevice(async (repo, ctx) => (await repo.listCategoryBudgets(ctx)).filter((b) => b.category === 'Mercado').map((b) => [b.fromMonth, b.amountCents]))) === JSON.stringify([['2026-10', 180000], ['2026-12', 150000]]));
+
+  // "Tirar o orçamento": Lazer deixa de ter orçamento a partir de novembro; outubro continua como era.
+  await btn('Voltar para outubro de 2026').click(); await waitText('Pessoal · Outubro de 2026'); await p.waitForTimeout(400);
+  await f2CardBtn('Lazer').click(); await waitText('Valor por mês'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /^Próximo mês: / }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+  ok('F2 "Tirar o orçamento": com novembro escolhido, o botão diz "Tirar o orçamento a partir de novembro de 2026"', (await visibleCount('button', 'Tirar o orçamento a partir de novembro de 2026')) === 1);
+  await btn('Tirar o orçamento a partir de novembro de 2026').click(); await waitText('Tirar o orçamento de Lazer a partir de novembro de 2026?'); await p.waitForTimeout(300);
+  ok('F2 "Tirar o orçamento": o diálogo diz que os meses anteriores continuam', (await dialogText()).includes('Os meses anteriores continuam com o orçamento que tinham.'), (await dialogText()).slice(0, 200));
+  await shot('204_tirar_orcamento');
+  await confirmIn('Tirar orçamento'); await waitText('Orçamento de Lazer tirado a partir de novembro.'); await waitText('Pessoal · Outubro de 2026'); await p.waitForTimeout(500);
+  ok('F2 tirar a partir de novembro: outubro continua com o orçamento de Lazer (R$ 400,00 de R$ 300,00)', (await visibleCount('button', /^Lazer, R\$ 400,00 de R\$ 300,00, 133,3%/)) === 1);
+  await f2Month(/^Próximo mês: novembro de 2026$/, 'Novembro de 2026');
+  t = await body();
+  ok('F2 novembro sem orçamento de Lazer: a categoria vai para "Definir orçamento"', (await visibleCount('button', 'Definir orçamento de Lazer')) === 1 && (await visibleCount('button', /^Lazer, R\$ /)) === 0 && t.includes('Orçado R$ 4.300,00 · Usado R$ 0,00'), t.slice(0, 400));
+  // Desfazer a retirada: abrir Lazer em novembro e "Voltar ao orçamento anterior".
+  await btn('Definir orçamento de Lazer').click(); await waitText('Valor por mês'); await p.waitForTimeout(400);
+  ok('F2 "Definir orçamento" abre o formulário de Lazer no mês atual (outubro)', urlPath() === '/orcamento/Lazer');
+  await p.getByRole('button', { name: /^Próximo mês: / }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+  t = await body();
+  ok('F2 formulário em novembro (mês da retirada): avisa que o orçamento foi tirado e oferece "Voltar ao orçamento anterior"', t.includes('O orçamento foi tirado a partir de novembro de 2026.') && (await visibleCount('button', 'Voltar ao orçamento anterior')) === 1 && (await field('Valor por mês').inputValue()) === '');
+  await btn('Voltar ao orçamento anterior').click(); await waitText('Voltar ao orçamento anterior a novembro de 2026?'); await confirmIn('Voltar ao anterior');
+  await waitText('Linha do orçamento de Lazer excluída.'); await waitText('Pessoal · Novembro de 2026'); await p.waitForTimeout(500);
+  ok('F2 desfazer a retirada: novembro volta a ter o orçamento de Lazer (R$ 200,00 de R$ 300,00)', (await visibleCount('button', /^Lazer, R\$ 200,00 de R\$ 300,00, 66,7%/)) === 1);
+  await btn('Voltar para outubro de 2026').click(); await waitText('Pessoal · Outubro de 2026'); await p.waitForTimeout(400);
+
+  // ---- 5. Composição › Por categoria: "de R$ 1.200,00 orçados", a regra de Pago não muda ----
+  await demoHome();
+  await p.getByRole('button', { name: /^Pago, R\$ / }).filter({ visible: true }).first().click(); await waitText('Por categoria'); await p.waitForTimeout(400);
+  await radio('Por categoria').click(); await p.waitForTimeout(500);
+  t = await f2Keep();
+  ok('F2 Por categoria: Moradia R$ 2.500,00 (64,1%) "de R$ 2.500,00 orçados" e Mercado R$ 1.400,00 (35,9%) "de R$ 1.800,00 orçados"; Pago continua R$ 3.900,00',
+    t.includes('R$ 2.500,00 · 64,1%') && t.includes('R$ 1.400,00 · 35,9%') && t.includes('de R$ 2.500,00 orçados') && t.includes('de R$ 1.800,00 orçados') && t.includes('R$ 3.900,00'), t.slice(0, 500));
+  ok('F2 Por categoria: Lazer não aparece (a compra no cartão ainda não foi paga) e o texto diz que o orçamento é do usado no mês, com o link para o orçamento',
+    !t.includes('Lazer') && t.includes('O orçamento conta o usado no mês.') && (await visibleCount('button', 'Ver orçamento por categoria')) === 1);
+  ok('F2 Por categoria: o nome acessível da barra inclui o orçamento', (await visibleCount('generic', /Mercado, R\$ 1\.400,00, 35,9% do pago, de R\$ 1\.800,00 orçados/)) >= 0 && (await p.locator('[aria-label*="de R$ 1.800,00 orçados"]').count()) >= 1);
+  await atWidths(async (w) => { await layoutChecks(`F2 Por categoria ${w}px`); if (w === 390) await shot('205_por_categoria_orcado'); });
+  await btn('Ver orçamento por categoria').click(); await waitText('Compras no cartão contam no mês da compra'); await p.waitForTimeout(400);
+  ok('F2 "Ver orçamento por categoria" abre /orcamento', urlPath() === '/orcamento');
+
+  // ---- 6. Aviso dentro do app: 80% e 100% na mensagem de sucesso, só no cruzamento ----
+  await demoHome();
+  t = await f2Expense('Feira extra', '100', 'Mercado');
+  ok('F2 aviso: gasto de R$ 100,00 em Mercado leva a categoria a 83% (R$ 1.500,00 de R$ 1.800,00): "Mercado chegou a 83% do orçamento de outubro."', t.includes('Gasto salvo') && t.includes('Mercado chegou a 83% do orçamento de outubro.'), t.slice(0, 300));
+  await shot('206_aviso_80');
+  await atWidths(async (w) => { await layoutChecks(`F2 aviso de 80% ${w}px`); });
+  t = await f2Expense('Feira pequena', '50', 'Mercado');
+  ok('F2 aviso só no cruzamento: mais R$ 50,00 (86%) não repete o aviso', t.includes('Gasto salvo') && !t.includes('chegou a') && !t.includes('passou do orçamento'), t.slice(0, 300));
+  t = await f2Expense('Feira grande', '300', 'Mercado');
+  ok('F2 aviso: mais R$ 300,00 passam do orçamento (R$ 1.850,00): "Mercado passou do orçamento de outubro em R$ 50,00."', t.includes('Mercado passou do orçamento de outubro em R$ 50,00.'), t.slice(0, 300));
+  await shot('207_aviso_100');
+  t = await f2Expense('Feira outra', '10', 'Mercado');
+  ok('F2 aviso: depois de passar, outro gasto na categoria não repete o aviso', !t.includes('passou do orçamento') && !t.includes('chegou a'));
+  t = await f2Expense('Cinema', '20', 'Transporte');
+  ok('F2 aviso: categoria sem orçamento (Transporte) não leva aviso nenhum', t.includes('Gasto salvo') && !t.includes('orçamento'), t.slice(0, 300));
+  // Editar o gasto de R$ 300,00 para R$ 5,00 e de novo para R$ 400,00: o aviso volta só no cruzamento.
+  await tabByName('Movimentações').click(); await waitText('Organizar'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /Feira grande, Pago · / }).filter({ visible: true }).first().click(); await waitText('Editar registro'); await btn('Editar registro').click(); await waitText('Editar gasto');
+  await field('Valor em reais').fill('5'); await btn('Salvar gasto').click(); await waitText('Alterações salvas'); await p.waitForTimeout(400);
+  ok('F2 aviso: editar para baixo (R$ 5,00) não leva aviso', !(await body()).includes('passou do orçamento'));
+  await btn('Editar registro').click(); await waitText('Editar gasto');
+  await field('Valor em reais').fill('400'); await btn('Salvar gasto').click(); await waitText('Alterações salvas'); await p.waitForTimeout(400);
+  t = await body();
+  ok('F2 aviso ao editar: de R$ 5,00 para R$ 400,00 cruza de novo (R$ 1.960,00): "Mercado passou do orçamento de outubro em R$ 160,00."', t.includes('Mercado passou do orçamento de outubro em R$ 160,00.'), t.slice(0, 300));
+  // Compra no cartão parcelada em 3x: a parcela 1 conta em outubro; Moradia já estava no valor do orçamento.
+  await goResumo(); await btn('Anotar gasto').click(); await waitText('Será salvo em');
+  await radio('Cartão de crédito').click(); await p.waitForTimeout(400);
+  await field('Descrição').fill('Tinta e pincéis'); await field('Valor em reais').fill('30'); await field('Em quantas vezes?').fill('3'); await radio('Moradia').click(); await p.waitForTimeout(300);
+  await btn('Anotar compra no cartão').click(); await waitText('Compra anotada na fatura de novembro.'); await p.waitForTimeout(600);
+  t = await body();
+  ok('F2 aviso na compra no cartão: R$ 30,00 em 3x (parcela 1 de R$ 10,00) leva Moradia de 100% a acima do valor: "Moradia passou do orçamento de outubro em R$ 10,00."', t.includes('Compra anotada na fatura de novembro.') && t.includes('Moradia passou do orçamento de outubro em R$ 10,00.'), t.slice(0, 400));
+  await shot('208_aviso_compra_cartao');
+  await atWidths(async (w) => { await layoutChecks(`F2 aviso da compra no cartão ${w}px`); });
+  // O orçamento acompanha as parcelas: Moradia R$ 10,00 em outubro, novembro e dezembro.
+  await f2Open();
+  ok('F2 depois da compra: Moradia em outubro R$ 2.510,00 de R$ 2.500,00 (aluguel e a parcela 1)', (await visibleCount('button', /^Moradia, R\$ 2\.510,00 de R\$ 2\.500,00, 100,4% do orçamento\. R\$ 10,00 acima do orçamento\./)) === 1);
+  await f2Month(/^Próximo mês: novembro de 2026$/, 'Novembro de 2026');
+  await f2Month(/^Próximo mês: dezembro de 2026$/, 'Dezembro de 2026');
+  ok('F2 depois da compra: Moradia R$ 10,00 em novembro e em dezembro (parcelas 2 e 3 no mês delas)', (await visibleCount('button', /^Moradia, R\$ 10,00 de R\$ 2\.500,00/)) === 1);
+  await btn('Voltar para outubro de 2026').click(); await waitText('Pessoal · Outubro de 2026'); await p.waitForTimeout(300);
+  await keepText();
+  // O Pago de outubro só cresceu com os gastos anotados; a compra no cartão não entrou (R$ 3.900 + 100 + 50 + 400 + 10 + 20 + 160... conferido no Resumo).
+  await goResumo();
+  t = await body();
+  ok('F2 o Pago de outubro sobe só com os gastos anotados (R$ 3.900,00 + 100 + 50 + 400 + 10 + 20 = R$ 4.480,00); a compra no cartão não entrou e o Recebido segue R$ 6.000,00', t.includes('R$ 4.480,00') && t.includes('R$ 6.000,00'), t.slice(0, 300));
+
+  // ---- 7. Valores ocultos (D-025): sem valor nas telas, na legenda e nas mensagens ----
+  await demoHome();
+  // O orçamento de Saúde (R$ 100,00) é definido com os valores à mostra; depois os valores são ocultados no Resumo.
+  await f2Open();
+  await btn('Definir orçamento de Saúde').click(); await waitText('Valor por mês'); await field('Valor por mês').fill('100'); await btn('Salvar orçamento').click();
+  await waitText('Orçamento de Saúde salvo. Vale a partir de outubro.'); await p.waitForTimeout(500);
+  await goResumo(); await openConta(); await hideSwitch().click(); await p.waitForTimeout(300); await btn('Voltar').click(); await waitText('Diferença do mês');
+  await f2Open();
+  await p.waitForTimeout(300);
+  const f2Leaks = await moneyLeaks();
+  t = await f2Keep();
+  ok('F2 valores ocultos /orcamento: nenhum valor em reais à vista (texto e nomes acessíveis), com "R$ ••••" e "valor oculto"; percentuais continuam', f2Leaks.length === 0 && t.includes('R$ ••••') && (await spokenHidden()) > 0 && t.includes('133,3%') && t.includes('77,8%'), `${f2Leaks.slice(0, 3).join(' | ')} ${t.includes('R$ ••••')}`);
+  ok('F2 valores ocultos: o total vira "Orçado R$ •••• · Usado R$ ••••"', t.includes('Orçado R$ •••• · Usado R$ ••••'));
+  await atWidths(async (w) => { await layoutChecks(`F2 /orcamento valores ocultos ${w}px`); if (w === 390) await shot('209_orcamento_valores_ocultos'); });
+  await tabByName('Movimentações').click(); await waitText('Organizar'); await p.waitForTimeout(500);
+  f2Rows = await sectionRows('Organizar');
+  ok('F2 valores ocultos: a legenda do Organizar fica sem valor ("Lazer: R$ •••• de R$ ••••"; nome acessível com "valor oculto")', f2Rows !== null && (await body()).includes('Lazer: R$ •••• de R$ ••••') && f2Rows.some((r) => /^Orçamento por categoria, .*valor oculto/.test(r)), JSON.stringify(f2Rows));
+  t = await f2Expense('Remédio', '150', 'Saúde');
+  ok('F2 valores ocultos: o aviso de 100% sai sem o valor ("Saúde passou do orçamento de outubro.") e nenhum R$ à vista', t.includes('Saúde passou do orçamento de outubro.') && !t.includes('passou do orçamento de outubro em') && (await moneyLeaks()).length === 0, t.slice(0, 300));
+  await shot('210_aviso_valores_ocultos');
+  await goResumo(); await openConta(); await hideSwitch().click(); await p.waitForTimeout(300); await btn('Voltar').click(); await waitText('Diferença do mês');
+
+  // ---- 8. Limite pessoal de comprometimento ----
+  await demoHome();
+  await rcRow().click(); await waitText('da sua renda de referência em outubro de 2026'); await p.waitForTimeout(500);
+  t = await f2Keep();
+  ok('F2 limite: Renda comprometida de outubro mostra "Seu limite" (título de nível 2) com "52,5% de 60% que você escolheu" e sem linha de aviso (mais de 5 pontos de folga)',
+    (await p.evaluate(() => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Seu limite' && e.getBoundingClientRect().width > 0); return h ? h.getAttribute('aria-level') : null; })) === '2' && t.includes('52,5% de 60% que você escolheu') && !/Outubro (passou|está a)/.test(t) && (await visibleCount('button', 'Alterar meu limite')) === 1, t.slice(0, 600));
+  ok('F2 limite: a referência de 30% com dívidas continua só na linha de dívidas (nenhum 30% no card do limite) e o limite não vem preenchido por ela', !t.includes('de 30% que você escolheu'));
+  await atWidths(async (w) => { await layoutChecks(`F2 limite outubro ${w}px`); if (w === 390) await shot('211_limite_outubro'); if (w === 320) await shot('211_limite_outubro_320px'); });
+  await radio('Renda comprometida de novembro de 2026').click(); await waitText('da sua renda de referência em novembro de 2026'); await p.waitForTimeout(600);
+  t = await f2Keep();
+  ok('F2 limite em novembro: "73,0% de 60% que você escolheu" e "Novembro passou 13,0 pontos do limite de 60% que você escolheu."', t.includes('73,0% de 60% que você escolheu') && t.includes('Novembro passou 13,0 pontos do limite de 60% que você escolheu.'), t.slice(0, 600));
+  await scrollTo('Próximos meses');
+  t = await body();
+  ok('F2 limite: em "Próximos meses", os meses previstos que passam do limite levam a mesma frase (dezembro 64,7%: "Dezembro passou 4,7 pontos...")', t.includes('Dezembro passou 4,7 pontos do limite de 60% que você escolheu.'), t.slice(t.indexOf('Próximos meses'), t.indexOf('Próximos meses') + 700));
+  await atWidths(async (w) => { await scrollTo('Seu limite'); await layoutChecks(`F2 limite novembro ${w}px`); if (w === 390) await shot('212_limite_novembro'); });
+  await scrollTo('Seu limite');
+  // Formulário do limite.
+  await btn('Alterar meu limite').click(); await waitText('Limite da renda (%)'); await p.waitForTimeout(500);
+  t = await f2Keep();
+  ok('F2 formulário do limite: sem barra, campo com o limite em vigor (60), "Vale a partir de" em novembro de 2026 (o mês da tela), "Salvar limite" e "Cancelar"; sem "Tirar meu limite" porque a linha começa em outubro',
+    urlPath() === '/renda-comprometida/limite' && (await barState()).n === 0 && (await h1Name()) === 'Seu limite' && (await field('Limite da renda (%)').inputValue()) === '60' && t.includes('Novembro de 2026') && (await visibleCount('button', 'Salvar limite')) === 1 && (await visibleCount('button', 'Tirar meu limite')) === 0, `${urlPath()} ${t.slice(0, 300)}`);
+  await atWidths(async (w) => { await layoutChecks(`F2 formulário do limite ${w}px`); await headerChecks(`F2 formulário do limite ${w}px`); if (w === 390) await shot('213_limite_formulario'); });
+  for (const bad of ['9', '101', '0', '30,5', 'abc', '']) {
+    await field('Limite da renda (%)').fill(bad); await btn('Salvar limite').click(); await p.waitForTimeout(250);
+    ok(`F2 formulário do limite: "${bad}" recusado ("Informe um número inteiro de 10 a 100, como 40.")`, (await body()).includes('Informe um número inteiro de 10 a 100, como 40.') && urlPath() === '/renda-comprometida/limite', bad);
+  }
+  // Salvar 70% a partir de novembro: outubro continua em 60%, novembro passa a 70% (passou 3,0 pontos).
+  await field('Limite da renda (%)').fill('70'); await btn('Salvar limite').click(); await waitText('Limite de 70% salvo. Vale a partir de novembro.'); await p.waitForTimeout(600);
+  t = await body();
+  ok('F2 limite: 70% a partir de novembro: "73,0% de 70% que você escolheu" e "Novembro passou 3,0 pontos do limite de 70% que você escolheu."', t.includes('73,0% de 70% que você escolheu') && t.includes('Novembro passou 3,0 pontos do limite de 70% que você escolheu.') && t.includes('Limite de 70% salvo. Vale a partir de novembro.'), t.slice(0, 500));
+  await radio('Renda comprometida de outubro de 2026').click(); await waitText('da sua renda de referência em outubro de 2026'); await p.waitForTimeout(500);
+  ok('F2 limite: outubro continua em 60% (52,5% de 60%)', (await body()).includes('52,5% de 60% que você escolheu'));
+  // Limite de 55% a partir de outubro: a 5 pontos do limite (2,5 pontos), linha neutra.
+  await btn('Alterar meu limite').click(); await waitText('Limite da renda (%)');
+  ok('F2 formulário do limite em outubro: abre com o limite em vigor (60) e o mês da tela (outubro de 2026)', (await field('Limite da renda (%)').inputValue()) === '60' && (await body()).includes('Outubro de 2026'));
+  await field('Limite da renda (%)').fill('55%'); await btn('Salvar limite').click(); await waitText('Limite de 55% salvo. Vale a partir de outubro.'); await p.waitForTimeout(600);
+  t = await f2Keep();
+  ok('F2 limite de 55% (aceita "55%"): outubro a 2,5 pontos: "Outubro está a 2,5 pontos do limite de 55% que você escolheu."', t.includes('52,5% de 55% que você escolheu') && t.includes('Outubro está a 2,5 pontos do limite de 55% que você escolheu.'), t.slice(0, 500));
+  await shot('214_limite_perto');
+  // Aviso ao anotar uma conta que faz outubro passar do limite (3.150 + 400 = 3.550 = 59,2%).
+  await goResumo(); await btn('Anotar conta a pagar').click(); await waitText('Salvando em Pessoal').catch(() => {}); await p.waitForTimeout(500);
+  await field('Descrição').fill('Conserto'); await field('Valor em reais').fill('400'); await field('Data de vencimento').fill('25/10/2026');
+  await btn('Salvar conta a pagar').click(); await waitText('Conta a pagar salva'); await p.waitForTimeout(500);
+  t = await body();
+  ok('F2 aviso do limite ao anotar uma conta: "Com esta conta, outubro chega a 59,2% da renda, acima do limite de 55% que você escolheu."', t.includes('Conta a pagar salva') && t.includes('Com esta conta, outubro chega a 59,2% da renda, acima do limite de 55% que você escolheu.'), t.slice(0, 400));
+  await shot('215_aviso_limite');
+  await atWidths(async (w) => { await layoutChecks(`F2 aviso do limite ${w}px`); });
+  // Outra conta no mesmo mês, já acima do limite: não repete o aviso (só no cruzamento).
+  await goResumo(); await btn('Anotar conta a pagar').click(); await p.waitForTimeout(500);
+  await field('Descrição').fill('Outro conserto'); await field('Valor em reais').fill('50'); await field('Data de vencimento').fill('26/10/2026');
+  await btn('Salvar conta a pagar').click(); await waitText('Conta a pagar salva'); await p.waitForTimeout(400);
+  ok('F2 aviso do limite só no cruzamento: outra conta no mês que já passou do limite não repete', !(await body()).includes('acima do limite'));
+  // Tirar o limite: a linha de outubro é excluída e não sobra nenhum limite (a de novembro continua).
+  await goResumo();
+  await rcRow().click(); await waitText('da sua renda de referência em outubro de 2026'); await p.waitForTimeout(500);
+  await btn('Alterar meu limite').click(); await waitText('Limite da renda (%)');
+  ok('F2 formulário do limite com linha no mês: oferece "Tirar meu limite"', (await visibleCount('button', 'Tirar meu limite')) === 1);
+  await btn('Tirar meu limite').click(); await waitText('Tirar o limite a partir de outubro de 2026?'); await confirmIn('Tirar limite');
+  await waitText('Limite tirado.'); await p.waitForTimeout(600);
+  t = await f2Keep();
+  ok('F2 tirar o limite de outubro: "Você ainda não escolheu um limite." com "Escolher meu limite" (nunca um valor sugerido)', t.includes('Você ainda não escolheu um limite.') && (await visibleCount('button', 'Escolher meu limite')) === 1 && !t.includes('de 55% que você escolheu') && !/Outubro (passou|está a)/.test(t), t.slice(0, 400));
+  await shot('216_sem_limite');
+  await btn('Escolher meu limite').click(); await waitText('Limite da renda (%)');
+  ok('F2 "Escolher meu limite": o campo abre vazio, sem valor sugerido', (await field('Limite da renda (%)').inputValue()) === '');
+  await btn('Cancelar').click(); await waitText('Seu limite'); await p.waitForTimeout(400);
+
+  // ---- 9. Busca "No app" de Aprender ----
+  await tabByName('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await p.waitForTimeout(400);
+  const f2Box = () => p.getByLabel('Buscar um tema ou uma função', { exact: true }).filter({ visible: true }).first();
+  for (const query of ['orçamento', 'limite', 'gastar menos']) {
+    await f2Box().fill(query); await waitText('No app'); await p.waitForTimeout(500);
+    ok(`F2 busca "${query}": o grupo "No app" tem "Orçamento por categoria"`, (await p.getByRole('button', { name: /^Orçamento por categoria\. / }).filter({ visible: true }).count()) === 1, query);
+  }
+  await atWidths(async (w) => { await layoutChecks(`F2 busca No app ${w}px`); if (w === 390) await shot('217_aprender_no_app_orcamento'); });
+  await f2Box().fill('gastar menos'); await waitText('No app'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /^Orçamento por categoria\. / }).filter({ visible: true }).first().click(); await waitText('Compras no cartão contam no mês da compra'); await p.waitForTimeout(400);
+  ok('F2 busca › tocar abre /orcamento com a barra à vista', urlPath() === '/orcamento' && barOk(await barState()), p.url());
+
+  // ---- 10. Conta nova: nada de exemplo; Primeiros passos não muda ----
+  await newAcct('Gael Teste', 'gael@exemplo.com');
+  await waitText('Primeiros passos'); await p.waitForTimeout(500);
+  ok('F2 conta nova: Primeiros passos com os mesmos quatro passos (o orçamento não é um passo)', await ppIs([PP.fixos, PP.recebido, PP.pago, PP.guardar])(), JSON.stringify(await ppRows()));
+  await f2Open();
+  t = await f2Keep();
+  ok('F2 conta nova: nenhum orçamento de exemplo ("Nenhum orçamento definido neste mês."), as seis categorias para definir e nenhum total', t.includes('Nenhum orçamento definido neste mês.') && !t.includes('Orçado R$') && (await f2Define())?.length === 7 && !t.includes('Usado R$'), JSON.stringify(await f2Define()));
+  ok('F2 conta nova: nada guardado (nenhum orçamento, nenhum limite, nenhuma conta ou cartão)', (await otherDevice(async (repo, ctx) => `${(await repo.listCategoryBudgets(ctx)).length} ${(await repo.listCommitmentLimits(ctx)).length} ${(await repo.listCards(ctx)).length}`)) === '0 0 0');
+  await atWidths(async (w) => { await layoutChecks(`F2 /orcamento conta nova ${w}px`); if (w === 390) await shot('218_orcamento_conta_nova'); if (w === 320) await shot('218_orcamento_conta_nova_320px'); });
+  await tabByName('Movimentações').click(); await waitText('Organizar'); await p.waitForTimeout(400);
+  f2Rows = await sectionRows('Organizar');
+  ok('F2 conta nova: Organizar com "Orçamento por categoria, Nenhum orçamento definido"', f2Rows !== null && f2Rows.includes('Orçamento por categoria, Nenhum orçamento definido'), JSON.stringify(f2Rows));
+  await rcRow().click().catch(() => {});
+  // Sem renda de referência não há "Seu limite" (o limite só existe com a renda definida).
+  await goResumo().catch(() => {});
+  await p.getByRole('button', { name: /^Renda comprometida|^Veja quanto da sua renda já está comprometido/ }).filter({ visible: true }).first().click(); await waitText('Informar renda de referência'); await p.waitForTimeout(400);
+  ok('F2 conta nova: Renda comprometida sem renda de referência não mostra "Seu limite"', !(await body()).includes('Seu limite') && (await visibleCount('button', 'Escolher meu limite')) === 0);
+  // Um orçamento criado na conta nova e um gasto: sem aviso antes de chegar a 80%; com a conta nova no valor do orçamento, "passou".
+  await f2Open();
+  await btn('Definir orçamento de Mercado').click(); await waitText('Valor por mês'); await field('Valor por mês').fill('100'); await btn('Salvar orçamento').click(); await waitText('Orçamento de Mercado salvo. Vale a partir de outubro.'); await p.waitForTimeout(500);
+  t = await f2Expense('Mercado do mês', '90', 'Mercado');
+  ok('F2 conta nova: R$ 90,00 de R$ 100,00 (90%): "Mercado chegou a 90% do orçamento de outubro."', t.includes('Mercado chegou a 90% do orçamento de outubro.'), t.slice(0, 300));
+  await f2Open();
+  ok('F2 conta nova: o orçamento mostra "R$ 90,00 de R$ 100,00", 90,0% e "Faltam R$ 10,00"', (await visibleCount('button', /^Mercado, R\$ 90,00 de R\$ 100,00, 90,0% do orçamento\. Faltam R\$ 10,00\./)) === 1);
+  await keepText();
+  const f2Vetoed = f2Texts.map((x) => x.match(F2_VETOED)?.[0]).filter(Boolean);
+  ok('F2 telas do orçamento e do limite: nenhuma palavra vetada (estourou, excedeu, gastou demais, controle-se, cuidado, alerta) nem travessão', f2Texts.length >= 12 && f2Vetoed.length === 0 && f2Texts.every((x) => !/[–—]/.test(x)), `${f2Texts.length} telas ${f2Vetoed.join(' | ')}`);
   await goResumo().catch(() => {});
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);

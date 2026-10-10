@@ -49,6 +49,7 @@ import { flash } from '@/lib/flash';
 import { explanationHref } from '@/lib/learn';
 import { totalChange } from '@/lib/highlight';
 import {
+  useBudgetWatch,
   usePayCommitment,
   useSeries,
   useSeriesOccurrences,
@@ -56,6 +57,7 @@ import {
   useSeriesOperationKey,
   useSkipSeriesYear,
   useUpdateRecord,
+  withNotice,
 } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
@@ -81,6 +83,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const pay = usePayCommitment();
+  const budgetWatch = useBudgetWatch();
   const updateRecord = useUpdateRecord();
   const skipYear = useSkipSeriesYear();
   const skipKeys = useSeriesOperationKey();
@@ -222,12 +225,12 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
   };
 
   /** Depois do pagamento confirmado: com a caixa marcada, tira as outras parcelas e mostra o texto certo. */
-  const afterPayment = async (saved: { amountCents: number; occurredOn: string } | undefined, plan: WholeYearPayment | null) => {
+  const afterPayment = async (saved: { amountCents: number; occurredOn: string } | undefined, plan: WholeYearPayment | null, notice: string | null = null) => {
     if (!plan) {
-      finish(saved);
+      finish(saved, withNotice('Pagamento registrado', notice));
       return;
     }
-    finish(saved, await skipOthers(plan));
+    finish(saved, withNotice(await skipOthers(plan), notice));
   };
 
   /**
@@ -323,11 +326,13 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
         if (!last || last.snapshot !== snapshot) opKey.current = newOperationKey();
       }
       const key = opKey.current;
+      // Aviso do orçamento (D-041): o gasto do pagamento conta na categoria e no mês da data do pagamento.
+      const budgetBefore = await budgetWatch.before(c.contextId, v.input.category, v.input.paidOn);
       try {
         const saved = await pay.mutateAsync({ key, id: c.id, version, input: v.input });
         pending.current = [];
         setRetry(false);
-        await afterPayment(saved.record, plan);
+        await afterPayment(saved.record, plan, await budgetWatch.after(budgetBefore));
       } catch (e) {
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
           opKey.current = newOperationKey();

@@ -1,4 +1,5 @@
 import {
+  BUDGET_TEXT,
   CARDS_TEXT,
   ERROR_TEXT,
   ORGANIZE_TEXT,
@@ -11,9 +12,11 @@ import {
   sortNewestFirst,
   type FinancialRecord,
   type IsoMonth,
+  budgetCaption,
+  type BudgetSummary,
 } from '@clarevo/core';
 import { router } from 'expo-router';
-import { Calculator, CalendarClock, ChevronRight, CreditCard, Minus, Plus, Repeat, type LucideIcon } from 'lucide-react-native';
+import { Calculator, CalendarClock, ChevronRight, CreditCard, Minus, Plus, Repeat, Target, type LucideIcon } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
@@ -26,7 +29,7 @@ import { RecordRow } from '@/components/record-row';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, Chip, Money, Screen, Skeleton, Txt } from '@/components/ui';
 import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
-import { useCardsOverview, useCommitments, useMonthRecords, useSeriesList, useSpace, useView } from '@/state/data';
+import { useCardsOverview, useCommitments, useMonthBudget, useMonthRecords, useSeriesList, useSpace, useView } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space } from '@/theme/tokens';
 
@@ -51,11 +54,19 @@ function groupByDay(list: FinancialRecord[]) {
 type Shortcut = { icon: LucideIcon; title: string; caption: string; open: () => void };
 
 /**
- * Bloco "Organizar" (D-033, D-034, D-037): Contas a pagar e Gastos fixos e parcelamentos com legendas do mês (a mesma origem
- * do card "Ainda a pagar", D-021(5)), Cartões com a fatura atual e Calculadoras com a legenda fixa. Enquanto carrega ou com
- * erro, as linhas dinâmicas mostram a legenda fixa (nunca um "0" de uma falha). Nenhuma cor de alerta.
+ * Bloco "Organizar" (D-033, D-034, D-037, D-041): Contas a pagar e Gastos fixos e parcelamentos com legendas do mês (a mesma origem
+ * do card "Ainda a pagar", D-021(5)), Cartões com a fatura atual, Orçamento por categoria com a categoria mais perto do limite
+ * ("Mercado: R$ 412,30 de R$ 1.200,00") e Calculadoras com a legenda fixa. Enquanto carrega ou com erro, as linhas dinâmicas
+ * mostram a legenda fixa (nunca um "0" de uma falha). Nenhuma cor de alerta.
  */
-function organizeShortcuts(payables: string | null, series: string | null, cards: string, month: IsoMonth, currentMonth: IsoMonth): Shortcut[] {
+function organizeShortcuts(
+  payables: string | null,
+  series: string | null,
+  cards: string,
+  budget: BudgetSummary | null,
+  month: IsoMonth,
+  currentMonth: IsoMonth,
+): Shortcut[] {
   return [
     {
       icon: CalendarClock,
@@ -75,6 +86,13 @@ function organizeShortcuts(payables: string | null, series: string | null, cards
       title: CARDS_TEXT.organizeRow,
       caption: cards,
       open: () => router.push('/cartoes'),
+    },
+    {
+      icon: Target,
+      title: BUDGET_TEXT.organize.title,
+      caption: budget ? budgetCaption(budget) : BUDGET_TEXT.organize.fallback,
+      // A legenda fala do mês em exibição; o Orçamento abre nesse mesmo mês (seletor local).
+      open: () => router.push({ pathname: '/orcamento', params: payablesMonthParams(month, currentMonth) }),
     },
     {
       icon: Calculator,
@@ -98,10 +116,12 @@ export default function MovimentacoesScreen() {
   const commitments = useCommitments(contextId, month);
   const seriesList = useSeriesList(contextId);
   const cardsOverview = useCardsOverview(contextId);
+  const budget = useMonthBudget(contextId, month);
   const shortcuts = organizeShortcuts(
     commitments.summary ? payablesCaptionFromSummary(commitments.summary, today) : null,
     seriesList.data ? seriesCaptionShort(seriesList.data) : null,
     cardsCaption(cardsOverview.data ?? null, today),
+    budget.summary,
     month,
     currentMonth,
   );

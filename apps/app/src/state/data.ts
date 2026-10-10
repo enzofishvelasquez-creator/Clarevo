@@ -3,6 +3,7 @@ import {
   INSTALLMENT_NATURES,
   addMonths,
   annualCommitmentIds,
+  budgetCrossing,
   categoryBreakdown,
   committedGoalLines,
   essentialMonthly,
@@ -10,6 +11,7 @@ import {
   isRepoError,
   isSavingsStepDone,
   lastIncomeReferenceChangeAt,
+  limitCrossing,
   loadInvoices,
   loadInvoicesOfRecords,
   receiptKeyValid,
@@ -27,6 +29,7 @@ import {
   savedInMonth,
   savingsCardState,
   suggestReference,
+  summarizeBudget,
   summarizeCard,
   summarizeCommitted,
   summarizeMonth,
@@ -44,10 +47,12 @@ import {
   type CardStatus,
   type CardSummary,
   type CardWrite,
+  type CategoryBudget,
   type CategoryShare,
   type Cents,
   type Commitment,
   type CommitmentInput,
+  type CommitmentLimit,
   type CommitmentWrite,
   type CommittedGoalLines,
   type CommittedProjection,
@@ -69,6 +74,8 @@ import {
   type Invoice,
   type IsoDate,
   type IsoMonth,
+  type LimitWatchMonth,
+  type MonthBudgetLine,
   type NewGoalInput,
   type OccurrenceMode,
   type PaymentInput,
@@ -93,6 +100,7 @@ import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient, ty
 import { createContext, use, useEffect, useMemo, useRef } from 'react';
 import { AppState } from 'react-native';
 
+import { valuesHidden } from '@/lib/privacy';
 import { useRepo, useSession } from '@/state/session';
 
 /** Lista, detalhe e totais leem a mesma origem: os registros do contexto no mês. */
@@ -905,6 +913,228 @@ export function useDeleteIncomeReference() {
 }
 
 // ---------------------------------------------------------------------------
+// Orçamento por categoria e limite pessoal de comprometimento (D-041, Ciclo F2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Chave do usado no mês: fica sob ['records'], de modo que toda escrita de gasto, pagamento e reconciliação que recarrega os
+ * registros recarrega também o orçamento (o usado vem dos gastos e dos lançamentos de cartão); as escritas de cartão a
+ * invalidam à parte. As linhas de orçamento (['budgetRows']) só mudam por set/delete_category_budget.
+ */
+const BUDGET_MONTH_KEY = ['records', 'budget'] as const;
+
+const refreshBudgets = (qc: QueryClient) => {
+  qc.invalidateQueries({ queryKey: ['budgetRows'] });
+  qc.invalidateQueries({ queryKey: BUDGET_MONTH_KEY });
+  qc.invalidateQueries({ queryKey: ['commitmentLimits'] });
+  qc.invalidateQueries({ queryKey: ['returnReview'] });
+};
+
+/** Orçamento e limite: sem busca de operação; repetir a mesma chave com o mesmo conteúdo reconcilia. */
+export function useBudgetOperationKey() {
+  return useOperationAttempts<Record<never, never>>(null, refreshBudgets);
+}
+
+/** Linhas vivas do orçamento do contexto (todas as categorias e meses de início), na ordem das categorias do app. */
+export function useCategoryBudgets(contextId: string | undefined) {
+  const repo = useRepo();
+  return useQuery({
+    queryKey: ['budgetRows', contextId],
+    queryFn: () => repo.listCategoryBudgets(contextId!),
+    enabled: Boolean(contextId),
+  });
+}
+
+/**
+ * O orçamento vigente e o usado no mês de cada categoria (month_budget, no banco; o MemoryRepository repete a regra) e o resumo
+ * pronto para a tela (summarizeBudget). Falha ou carregando: nunca um orçamento zerado.
+ */
+export function useMonthBudget(contextId: string | undefined, month: IsoMonth) {
+  const repo = useRepo();
+  const query = useQuery({
+    queryKey: [...BUDGET_MONTH_KEY, contextId, month],
+    queryFn: () => repo.getMonthBudget(contextId!, month),
+    enabled: Boolean(contextId),
+  });
+  const summary = useMemo(() => (query.data ? summarizeBudget(query.data) : null), [query.data]);
+  return { ...query, summary };
+}
+
+/** Depois de gravar uma linha do orçamento: a lista confirmada entra na hora e o usado do mês recarrega; conta como anotação. */
+function useInvalidateBudgets() {
+  const qc = useQueryClient();
+  return (row: CategoryBudget, deleted = false) => {
+    qc.setQueryData<CategoryBudget[]>(['budgetRows', row.contextId], (old) => {
+      if (!old) return old;
+      const others = old.filter((r) => r.id !== row.id);
+      return deleted ? others : [...others, row];
+    });
+    refreshBudgets(qc);
+  };
+}
+
+/** Salvar o orçamento de uma categoria num mês (versão 0 cria; a versão atual altera); amountCents null tira o orçamento a partir do mês. */
+export function useSetCategoryBudget() {
+  const repo = useRepo();
+  const invalidate = useInvalidateBudgets();
+  return useMutation({
+    mutationFn: (v: { key: string; contextId: string; category: string; fromMonth: IsoMonth; expectedVersion: number; amountCents: Cents | null }) =>
+      repo.setCategoryBudget(v.key, v.contextId, v.category, v.fromMonth, v.expectedVersion, v.amountCents),
+    onSuccess: (row) => invalidate(row),
+  });
+}
+
+/** Excluir uma linha do orçamento (a anterior da categoria volta a valer). */
+export function useDeleteCategoryBudget() {
+  const repo = useRepo();
+  const invalidate = useInvalidateBudgets();
+  return useMutation({
+    mutationFn: (v: { key: string; id: string; version: number }) => repo.deleteCategoryBudget(v.key, v.id, v.version),
+    onSuccess: (row) => invalidate(row, true),
+  });
+}
+
+/** Limites pessoais vivos do contexto, por mês de início crescente. */
+export function useCommitmentLimits(contextId: string | undefined) {
+  const repo = useRepo();
+  return useQuery({
+    queryKey: ['commitmentLimits', contextId],
+    queryFn: () => repo.listCommitmentLimits(contextId!),
+    enabled: Boolean(contextId),
+  });
+}
+
+function useInvalidateLimits() {
+  const qc = useQueryClient();
+  return (row: CommitmentLimit, deleted = false) => {
+    qc.setQueryData<CommitmentLimit[]>(['commitmentLimits', row.contextId], (old) => {
+      if (!old) return old;
+      const others = old.filter((r) => r.id !== row.id);
+      return deleted ? others : [...others, row].sort((a, b) => a.fromMonth.localeCompare(b.fromMonth) || a.id.localeCompare(b.id));
+    });
+    refreshBudgets(qc);
+  };
+}
+
+export function useSetCommitmentLimit() {
+  const repo = useRepo();
+  const invalidate = useInvalidateLimits();
+  return useMutation({
+    mutationFn: (v: { key: string; contextId: string; fromMonth: IsoMonth; expectedVersion: number; percent: number }) =>
+      repo.setCommitmentLimit(v.key, v.contextId, v.fromMonth, v.expectedVersion, v.percent),
+    onSuccess: (row) => invalidate(row),
+  });
+}
+
+export function useDeleteCommitmentLimit() {
+  const repo = useRepo();
+  const invalidate = useInvalidateLimits();
+  return useMutation({
+    mutationFn: (v: { key: string; id: string; version: number }) => repo.deleteCommitmentLimit(v.key, v.id, v.version),
+    onSuccess: (row) => invalidate(row, true),
+  });
+}
+
+/** O estado do orçamento de uma categoria e mês antes de uma escrita, para o aviso de cruzamento (null: nada a comparar). */
+export interface BudgetBefore {
+  contextId: string;
+  month: IsoMonth;
+  line: MonthBudgetLine;
+}
+
+/**
+ * Aviso dentro do app, sem notificação, depois de salvar um gasto ou uma compra no cartão (ou editar): se a categoria cruzou 80%
+ * ou 100% do orçamento do mês, a mensagem de sucesso ganha uma linha neutra (budgetCrossing). before() lê o estado antes de
+ * gravar e after() lê de novo e compara; qualquer falha de leitura apaga o aviso, nunca bloqueia o salvamento. Valores ocultos:
+ * a frase sai sem o valor.
+ */
+export function useBudgetWatch() {
+  const repo = useRepo();
+  const { today } = useSession();
+  return useMemo(
+    () => ({
+      /** category null (sem categoria), fora das seis ou data inválida: sem orçamento, nada a comparar. */
+      before: async (contextId: string, category: string | null, date: IsoDate): Promise<BudgetBefore | null> => {
+        if (category === null) return null;
+        try {
+          const month = monthOf(date);
+          const line = (await repo.getMonthBudget(contextId, month)).lines.find((l) => l.category === category);
+          return line && line.budgetCents !== null ? { contextId, month, line } : null;
+        } catch {
+          return null;
+        }
+      },
+      after: async (before: BudgetBefore | null): Promise<string | null> => {
+        if (!before) return null;
+        try {
+          const line = (await repo.getMonthBudget(before.contextId, before.month)).lines.find((l) => l.category === before.line.category);
+          return budgetCrossing(before.line, line ?? null, before.month, today, valuesHidden());
+        } catch {
+          return null;
+        }
+      },
+    }),
+    [repo, today],
+  );
+}
+
+/** Comprometido por mês antes de uma escrita (junto dos limites), para o aviso do limite pessoal. */
+export interface LimitBefore {
+  months: LimitWatchMonth[];
+}
+
+/**
+ * Aviso dentro do app, sem notificação, ao criar ou editar uma conta a pagar, gasto fixo ou parcelamento: se algum mês (do anterior
+ * ao atual até 6 meses à frente, com a previsão das séries) passou a ficar acima do limite pessoal, a mensagem de sucesso ganha
+ * a linha de limitCrossing. Sem renda de referência ou sem limite, nada é lido além das duas listas. Falha de leitura apaga o aviso.
+ */
+export function useLimitWatch() {
+  const repo = useRepo();
+  const { today } = useSession();
+  const read = async (contextId: string) => {
+    const [limits, refs] = await Promise.all([repo.listCommitmentLimits(contextId), repo.listIncomeReferences(contextId)]);
+    if (limits.length === 0 || refs.length === 0) return null;
+    const current = monthOf(today);
+    const months = Array.from({ length: 8 }, (_, i) => addMonths(current, i - 1));
+    const [series, due] = await Promise.all([repo.listSeries(contextId), repo.listCommitmentsDueBetween(contextId, months[0]!, months[months.length - 1]!)]);
+    const projection = projectCommitted(series, due, refs, months, today);
+    return {
+      limits,
+      months: projection.months.map((m): LimitWatchMonth => ({ month: m.month, committedPermille: m.committedPermille, committedCents: m.committedCents })),
+    };
+  };
+  return useMemo(
+    () => ({
+      before: async (contextId: string): Promise<(LimitBefore & { contextId: string }) | null> => {
+        try {
+          const r = await read(contextId);
+          return r ? { contextId, months: r.months } : null;
+        } catch {
+          return null;
+        }
+      },
+      after: async (before: (LimitBefore & { contextId: string }) | null): Promise<string | null> => {
+        if (!before) return null;
+        try {
+          const r = await read(before.contextId);
+          return r ? limitCrossing(before.months, r.months, r.limits, today) : null;
+        } catch {
+          return null;
+        }
+      },
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [repo, today],
+  );
+}
+
+/** Soma uma linha de aviso (D-041) à mensagem de sucesso, quando houver: cada aviso numa linha própria, depois da mensagem. */
+export function withNotice(text: string, ...notices: (string | null | undefined)[]): string {
+  const extra = notices.filter((n): n is string => Boolean(n));
+  return extra.length > 0 ? `${text}\n${extra.join('\n')}` : text;
+}
+
+// ---------------------------------------------------------------------------
 // Metas e reserva para imprevistos (D-027, Ciclo C)
 // ---------------------------------------------------------------------------
 
@@ -1391,6 +1621,8 @@ function useInvalidateCard() {
     qc.invalidateQueries({ queryKey: ['cards'] });
     qc.invalidateQueries({ queryKey: ['commitments'] });
     qc.invalidateQueries({ queryKey: ['commitment'] });
+    // Compra, estorno e exclusão de lançamento mudam o usado no mês do orçamento (a competência vem dos lançamentos).
+    qc.invalidateQueries({ queryKey: BUDGET_MONTH_KEY });
     if ('record' in w) {
       qc.invalidateQueries({ queryKey: ['records'] });
       qc.invalidateQueries({ queryKey: ['record', w.record.id] });
@@ -1512,6 +1744,7 @@ export function useUndoInvoicePayment() {
 
 const refreshCards = (qc: QueryClient) => {
   qc.invalidateQueries({ queryKey: ['cards'] });
+  qc.invalidateQueries({ queryKey: BUDGET_MONTH_KEY });
   qc.invalidateQueries({ queryKey: ['commitments'] });
   qc.invalidateQueries({ queryKey: ['commitment'] });
   // Uma tentativa incerta de pagar ou desfazer pode ter mexido no gasto.

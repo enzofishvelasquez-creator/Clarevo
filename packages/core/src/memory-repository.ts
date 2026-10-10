@@ -41,6 +41,7 @@ import type {
 } from './records';
 import type {
   AffectedRef,
+  BudgetAction,
   CardAction,
   CardWrite,
   CommitmentAction,
@@ -57,6 +58,17 @@ import type {
 } from './repository';
 import { RepoError } from './repository';
 import { referenceMonthError } from './committed';
+import {
+  BUDGET_CATEGORIES,
+  budgetAmountError,
+  budgetMonthError,
+  isBudgetCategory,
+  limitMonthError,
+  limitPercentError,
+  readMonthBudget,
+  type CategoryBudget,
+  type CommitmentLimit,
+} from './budget';
 import {
   CARDS_ACTIVE_MAX,
   CARD_CHARGE_TYPES,
@@ -123,7 +135,7 @@ import { dueDateBounds, seriesInputError, seriesTermError } from './validation';
 type RecordAction = 'criar' | 'editar' | 'excluir';
 
 interface Operation {
-  action: RecordAction | CommitmentAction | SeriesAction | ReturnReviewAction | IncomeReferenceAction | GoalAction | SavingsAction | CardAction;
+  action: RecordAction | CommitmentAction | SeriesAction | ReturnReviewAction | IncomeReferenceAction | BudgetAction | GoalAction | SavingsAction | CardAction;
   hash: string;
   contextId: string;
   recordId: string | null;
@@ -132,6 +144,8 @@ interface Operation {
   seriesId: string | null;
   /** Alvo genérico (target_id): a renda de referência nas ações de renda de referência. */
   referenceId: string | null;
+  /** Alvo genérico (target_id): a linha do orçamento por categoria ou do limite pessoal nas ações de orçamento e de limite. */
+  budgetId: string | null;
   /** Ações de metas: a meta e, nas ações de movimento, o movimento (target_id). */
   goalId: string | null;
   movementId: string | null;
@@ -162,6 +176,9 @@ type StoredSeries = Omit<CommitmentSeries, 'terms' | 'skippedNumbers' | 'paidCou
 type StoredTerm = SeriesTerm & { id: string; seriesId: string; contextId: string; createdAt: string; supersededAt?: string };
 /** Renda de referência (income_references): exclusão lógica; no máximo uma viva por contexto e mês. */
 type StoredIncomeReference = IncomeReference & { deletedAt?: string; deletedBy?: string };
+/** Linha do orçamento por categoria (category_budgets) e do limite pessoal (commitment_limits): exclusão lógica; no máximo uma viva por chave. */
+type StoredBudget = CategoryBudget & { deletedAt?: string; deletedBy?: string };
+type StoredLimit = CommitmentLimit & { deletedAt?: string; deletedBy?: string };
 /** Meta (goals) sem os totais de goal_items, que são calculados dos movimentos vivos. */
 type StoredGoal = Omit<
   Goal,
@@ -251,6 +268,8 @@ export class MemoryRepository implements RecordsRepository {
   private activity = new Map<string, ContextActivity>();
   private reviews = new Map<string, ReturnReviewMark>();
   private incomeRefs = new Map<string, StoredIncomeReference>();
+  private budgets = new Map<string, StoredBudget>();
+  private limits = new Map<string, StoredLimit>();
   private goals = new Map<string, StoredGoal>();
   private goalMovements = new Map<string, StoredGoalMovement>();
   /** savings_checks da pessoa (só ela usa este repositório), por contexto: uma resposta viva por contexto. */
@@ -307,6 +326,8 @@ export class MemoryRepository implements RecordsRepository {
       activity: new Map(this.activity),
       reviews: new Map(this.reviews),
       incomeRefs: new Map(this.incomeRefs),
+      budgets: new Map(this.budgets),
+      limits: new Map(this.limits),
       goals: new Map(this.goals),
       goalMovements: new Map(this.goalMovements),
       savingsChecks: new Map(this.savingsChecks),
@@ -328,6 +349,8 @@ export class MemoryRepository implements RecordsRepository {
         activity: this.activity,
         reviews: this.reviews,
         incomeRefs: this.incomeRefs,
+        budgets: this.budgets,
+        limits: this.limits,
         goals: this.goals,
         goalMovements: this.goalMovements,
         savingsChecks: this.savingsChecks,
@@ -1158,6 +1181,148 @@ export class MemoryRepository implements RecordsRepository {
       this.incomeRefs.set(id, next);
       this.saveOperation(key, 'excluir_renda_referencia', payload, { contextId: current.contextId, recordId: null, commitmentId: null, referenceId: id });
       return stripReference(next);
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Orçamento por categoria e limite pessoal (D-041): mesmas regras e mesma ordem das funções da migração 0009
+  // ---------------------------------------------------------------------------
+
+  /** Como a leitura de category_budgets (RLS): vivas do contexto, por categoria e mês de início; sem leitura, nada. */
+  async listCategoryBudgets(contextId: string) {
+    return this.read(() =>
+      [...this.budgets.values()]
+        .filter((b) => !b.deletedAt && b.contextId === contextId && this.canRead(b.contextId))
+        .sort(
+          (a, b) =>
+            BUDGET_CATEGORIES.indexOf(a.category) - BUDGET_CATEGORIES.indexOf(b.category) || a.fromMonth.localeCompare(b.fromMonth) || a.id.localeCompare(b.id),
+        )
+        .map(stripBudget),
+    );
+  }
+
+  /**
+   * Como set_category_budget. Ordem do banco: repetição; escrita no contexto; mês (dia 1) e categoria; versão; faixa do mês;
+   * valor (nulo encerra a vigência).
+   */
+  async setCategoryBudget(key: string, contextId: string, category: string, fromMonth: IsoMonth, expectedVersion: number, amountCents: Cents | null) {
+    return this.write(() => {
+      const payload = [contextId, category, fromMonth, expectedVersion, amountCents];
+      const replayed = this.replay(key, 'definir_orcamento_categoria', payload);
+      if (replayed) return stripBudget(this.budgets.get(replayed.budgetId!)!);
+      if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      if (typeof fromMonth !== 'string' || !isValidIsoMonth(fromMonth)) throw new RepoError('mes_invalido');
+      if (!isBudgetCategory(category)) throw new RepoError('categoria_invalida');
+      if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0) throw new RepoError('versao_desatualizada');
+      const current = [...this.budgets.values()].find((b) => !b.deletedAt && b.contextId === contextId && b.category === category && b.fromMonth === fromMonth);
+      if (expectedVersion !== (current?.version ?? 0)) throw new RepoError('versao_desatualizada');
+      const rangeError = budgetMonthError(fromMonth, this.opts.today());
+      if (rangeError) throw new RepoError(rangeError);
+      if (amountCents !== null && typeof amountCents !== 'number') throw new RepoError('valor_invalido');
+      const amountError = budgetAmountError(amountCents);
+      if (amountError) throw new RepoError(amountError);
+      const now = this.stamp();
+      const next: StoredBudget = current
+        ? { ...current, amountCents, version: current.version + 1, updatedAt: now }
+        : {
+            id: this.id('orc'),
+            contextId,
+            category,
+            fromMonth,
+            amountCents,
+            createdBy: this.opts.actorId,
+            version: 1,
+            createdAt: now,
+            updatedAt: now,
+          };
+      this.budgets.set(next.id, next);
+      this.saveOperation(key, 'definir_orcamento_categoria', payload, { contextId, recordId: null, commitmentId: null, budgetId: next.id });
+      return stripBudget(next);
+    });
+  }
+
+  /** Como delete_category_budget: exclusão lógica com versão; a linha anterior volta a valer. */
+  async deleteCategoryBudget(key: string, id: string, expectedVersion: number) {
+    return this.write(() => {
+      const payload = [id, expectedVersion];
+      const replayed = this.replay(key, 'excluir_orcamento_categoria', payload);
+      if (replayed) return stripBudget(this.budgets.get(replayed.budgetId!)!);
+      const current = this.budgets.get(id);
+      if (!current || current.deletedAt || !this.canRead(current.contextId)) throw new RepoError('nao_encontrado');
+      if (!this.canWrite(current.contextId)) throw new RepoError('sem_permissao');
+      if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
+      const now = this.stamp();
+      const next: StoredBudget = { ...current, version: current.version + 1, updatedAt: now, deletedAt: now, deletedBy: this.opts.actorId };
+      this.budgets.set(id, next);
+      this.saveOperation(key, 'excluir_orcamento_categoria', payload, { contextId: current.contextId, recordId: null, commitmentId: null, budgetId: id });
+      return stripBudget(next);
+    });
+  }
+
+  /**
+   * Como month_budget: o orçamento vigente e o usado no mês de cada categoria (budget.ts, categoryUsage). Mês fora do dia 1:
+   * mes_invalido; sem leitura: sem_permissao.
+   */
+  async getMonthBudget(contextId: string, month: IsoMonth) {
+    return this.read(() => {
+      if (typeof month !== 'string' || !isValidIsoMonth(month)) throw new RepoError('mes_invalido');
+      if (!this.canRead(contextId)) throw new RepoError('sem_permissao');
+      const budgets = [...this.budgets.values()].filter((b) => !b.deletedAt && b.contextId === contextId).map(stripBudget);
+      const records = [...this.records.values()].filter((r) => !r.deletedAt && r.contextId === contextId);
+      const entries = [...this.cardEntries.values()].filter((e) => !e.deletedAt && e.contextId === contextId);
+      return readMonthBudget(month, budgets, { records, entries });
+    });
+  }
+
+  /** Como a leitura de commitment_limits (RLS): vivos do contexto, por mês de início crescente; sem leitura, nada. */
+  async listCommitmentLimits(contextId: string) {
+    return this.read(() =>
+      [...this.limits.values()]
+        .filter((l) => !l.deletedAt && l.contextId === contextId && this.canRead(l.contextId))
+        .sort((a, b) => a.fromMonth.localeCompare(b.fromMonth) || a.id.localeCompare(b.id))
+        .map(stripLimit),
+    );
+  }
+
+  /** Como set_commitment_limit. Ordem do banco: repetição; escrita no contexto; mês (dia 1); versão; faixa do mês; percentual. */
+  async setCommitmentLimit(key: string, contextId: string, fromMonth: IsoMonth, expectedVersion: number, percent: number) {
+    return this.write(() => {
+      const payload = [contextId, fromMonth, expectedVersion, percent];
+      const replayed = this.replay(key, 'definir_limite_comprometimento', payload);
+      if (replayed) return stripLimit(this.limits.get(replayed.budgetId!)!);
+      if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      if (typeof fromMonth !== 'string' || !isValidIsoMonth(fromMonth)) throw new RepoError('mes_invalido');
+      if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0) throw new RepoError('versao_desatualizada');
+      const current = [...this.limits.values()].find((l) => !l.deletedAt && l.contextId === contextId && l.fromMonth === fromMonth);
+      if (expectedVersion !== (current?.version ?? 0)) throw new RepoError('versao_desatualizada');
+      const rangeError = limitMonthError(fromMonth, this.opts.today());
+      if (rangeError) throw new RepoError(rangeError);
+      if (limitPercentError(percent)) throw new RepoError('percentual_invalido');
+      const now = this.stamp();
+      const next: StoredLimit = current
+        ? { ...current, percent, version: current.version + 1, updatedAt: now }
+        : { id: this.id('lim'), contextId, fromMonth, percent, createdBy: this.opts.actorId, version: 1, createdAt: now, updatedAt: now };
+      this.limits.set(next.id, next);
+      this.saveOperation(key, 'definir_limite_comprometimento', payload, { contextId, recordId: null, commitmentId: null, budgetId: next.id });
+      return stripLimit(next);
+    });
+  }
+
+  /** Como delete_commitment_limit: exclusão lógica com versão; o limite anterior volta a valer. */
+  async deleteCommitmentLimit(key: string, id: string, expectedVersion: number) {
+    return this.write(() => {
+      const payload = [id, expectedVersion];
+      const replayed = this.replay(key, 'excluir_limite_comprometimento', payload);
+      if (replayed) return stripLimit(this.limits.get(replayed.budgetId!)!);
+      const current = this.limits.get(id);
+      if (!current || current.deletedAt || !this.canRead(current.contextId)) throw new RepoError('nao_encontrado');
+      if (!this.canWrite(current.contextId)) throw new RepoError('sem_permissao');
+      if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
+      const now = this.stamp();
+      const next: StoredLimit = { ...current, version: current.version + 1, updatedAt: now, deletedAt: now, deletedBy: this.opts.actorId };
+      this.limits.set(id, next);
+      this.saveOperation(key, 'excluir_limite_comprometimento', payload, { contextId: current.contextId, recordId: null, commitmentId: null, budgetId: id });
+      return stripLimit(next);
     });
   }
 
@@ -2518,6 +2683,7 @@ export class MemoryRepository implements RecordsRepository {
     }
     this.checkSeriesInvariants();
     this.checkReferenceInvariants();
+    this.checkBudgetInvariants();
     this.checkGoalInvariants();
     this.checkSavingsInvariants();
     this.checkCardInvariants();
@@ -2564,6 +2730,32 @@ export class MemoryRepository implements RecordsRepository {
       const k = `${r.contextId}|${r.fromMonth}`;
       if (live.has(k)) throw new Error('referencia_inconsistente');
       live.add(k);
+    }
+  }
+
+  /**
+   * Orçamento por categoria e limite pessoal (no banco: restrições de coluna e índices únicos das vivas): categoria entre as seis,
+   * mês válido, valor nulo ou de R$ 1,00 a MAX_RECORD_CENTS, percentual inteiro de 10 a 100, no máximo uma viva por chave e versão
+   * a partir de 1. Lança Error('orcamento_inconsistente').
+   */
+  private checkBudgetInvariants() {
+    const live = new Set<string>();
+    for (const b of this.budgets.values()) {
+      if (!isBudgetCategory(b.category) || !isValidIsoMonth(b.fromMonth) || (b.amountCents !== null && budgetAmountError(b.amountCents) !== null) || b.version < 1) {
+        throw new Error('orcamento_inconsistente');
+      }
+      if (b.deletedAt) continue;
+      const k = `${b.contextId}|${b.category}|${b.fromMonth}`;
+      if (live.has(k)) throw new Error('orcamento_inconsistente');
+      live.add(k);
+    }
+    const liveLimits = new Set<string>();
+    for (const l of this.limits.values()) {
+      if (!isValidIsoMonth(l.fromMonth) || limitPercentError(l.percent) !== null || l.version < 1) throw new Error('orcamento_inconsistente');
+      if (l.deletedAt) continue;
+      const k = `${l.contextId}|${l.fromMonth}`;
+      if (liveLimits.has(k)) throw new Error('orcamento_inconsistente');
+      liveLimits.add(k);
     }
   }
 
@@ -2659,6 +2851,8 @@ export class MemoryRepository implements RecordsRepository {
     activity?: Map<string, ContextActivity>;
     reviews?: Map<string, ReturnReviewMark>;
     incomeRefs?: Map<string, StoredIncomeReference>;
+    budgets?: Map<string, StoredBudget>;
+    limits?: Map<string, StoredLimit>;
     goals?: Map<string, StoredGoal>;
     goalMovements?: Map<string, StoredGoalMovement>;
     savingsChecks?: Map<string, SavingsCheck>;
@@ -2687,6 +2881,29 @@ export class MemoryRepository implements RecordsRepository {
         old.createdAt !== r.createdAt ||
         r.version !== old.version + 1
       ) {
+        fail();
+      }
+    }
+    // Orçamento e limite: contexto, categoria, mês, autoria e criação não mudam; excluída não volta; versão + 1 por escrita.
+    for (const [id, b] of this.budgets) {
+      const old = before.budgets?.get(id);
+      if (!old || old === b) continue;
+      if (
+        old.deletedAt ||
+        old.contextId !== b.contextId ||
+        old.category !== b.category ||
+        old.fromMonth !== b.fromMonth ||
+        old.createdBy !== b.createdBy ||
+        old.createdAt !== b.createdAt ||
+        b.version !== old.version + 1
+      ) {
+        fail();
+      }
+    }
+    for (const [id, l] of this.limits) {
+      const old = before.limits?.get(id);
+      if (!old || old === l) continue;
+      if (old.deletedAt || old.contextId !== l.contextId || old.fromMonth !== l.fromMonth || old.createdBy !== l.createdBy || old.createdAt !== l.createdAt || l.version !== old.version + 1) {
         fail();
       }
     }
@@ -2854,9 +3071,10 @@ export class MemoryRepository implements RecordsRepository {
     key: string,
     action: Operation['action'],
     payload: unknown[],
-    ids: Omit<Operation, 'action' | 'hash' | 'seriesId' | 'referenceId' | 'goalId' | 'movementId' | 'cardId' | 'entryId'> & {
+    ids: Omit<Operation, 'action' | 'hash' | 'seriesId' | 'referenceId' | 'budgetId' | 'goalId' | 'movementId' | 'cardId' | 'entryId'> & {
       seriesId?: string;
       referenceId?: string;
+      budgetId?: string;
       goalId?: string;
       movementId?: string | null;
       cardId?: string;
@@ -2869,6 +3087,7 @@ export class MemoryRepository implements RecordsRepository {
       ...ids,
       seriesId: ids.seriesId ?? null,
       referenceId: ids.referenceId ?? null,
+      budgetId: ids.budgetId ?? null,
       goalId: ids.goalId ?? null,
       movementId: ids.movementId ?? null,
       cardId: ids.cardId ?? null,
@@ -3303,6 +3522,16 @@ function stripEntry(e: StoredCardEntry): CardEntry {
 
 function stripMovement(m: StoredGoalMovement): GoalMovement {
   const { deletedAt: _deleted, deletedBy: _by, ...rest } = m;
+  return rest;
+}
+
+function stripBudget(b: StoredBudget): CategoryBudget {
+  const { deletedAt: _deleted, deletedBy: _by, ...rest } = b;
+  return rest;
+}
+
+function stripLimit(l: StoredLimit): CommitmentLimit {
+  const { deletedAt: _deleted, deletedBy: _by, ...rest } = l;
   return rest;
 }
 
