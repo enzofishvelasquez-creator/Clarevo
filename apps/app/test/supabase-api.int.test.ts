@@ -5000,11 +5000,12 @@ describe('API real: orçamento por categoria e limite pessoal (Ciclo F2, D-041)'
     expect(await bruno.setCommitmentLimit(key, ctx, OCT, 0, 60)).toEqual(a);
     expect(await code(bruno.setCommitmentLimit(key, ctx, OCT, 0, 61))).toEqual(['chave_reutilizada', null]);
     expect(await code(bruno.setCommitmentLimit(newOperationKey(), ctx, OCT, 0, 50))).toEqual(['versao_desatualizada', 'versao_atual=1']);
-    const v = (percent: number, month: IsoMonth = OCT, version = 1) => code(bruno.setCommitmentLimit(newOperationKey(), ctx, month, version, percent));
+    const v = (percent: number | null, month: IsoMonth = OCT, version = 1) => code(bruno.setCommitmentLimit(newOperationKey(), ctx, month, version, percent));
     expect([await v(9), await v(101), await v(0), await v(-5)]).toEqual(Array(4).fill(['percentual_invalido', null]));
     expect(await v(40, '2033-09', 0)).toEqual(['vigencia_fora_do_intervalo', null]);
     expect(await v(40, '2036-11', 0)).toEqual(['vigencia_fora_do_intervalo', null]);
     expect(await v(9, '2036-11', 0)).toEqual(['vigencia_fora_do_intervalo', null]);
+    expect(await v(null, '2036-11', 0)).toEqual(['vigencia_fora_do_intervalo', null]);
     const b = await bruno.setCommitmentLimit(newOperationKey(), ctx, DEC, 0, 40);
     const rows = await bruno.listCommitmentLimits(ctx);
     expect(rows.map((r) => [r.fromMonth, r.percent])).toEqual([[OCT, 60], [DEC, 40]]);
@@ -5019,6 +5020,16 @@ describe('API real: orçamento por categoria e limite pessoal (Ciclo F2, D-041)'
     expect(await err(lost.deleteCommitmentLimit(deleteKey, b.id, 1))).toBe('rede');
     const gone = await bruno.deleteCommitmentLimit(deleteKey, b.id, 1);
     expect([gone.id, gone.version]).toEqual([b.id, 2]);
+    expect((await bruno.listCommitmentLimits(ctx)).map((r) => r.percent)).toEqual([55]);
+    // "Tirar o limite a partir de dezembro": percentual nulo grava a linha que encerra a vigência (a leitura devolve null).
+    const endKey = newOperationKey();
+    const ended = await bruno.setCommitmentLimit(endKey, ctx, DEC, 0, null);
+    expect([ended.fromMonth, ended.percent, ended.version]).toEqual([DEC, null, 1]);
+    expect(await bruno.setCommitmentLimit(endKey, ctx, DEC, 0, null)).toEqual(ended);
+    const withEnd = await bruno.listCommitmentLimits(ctx);
+    expect(withEnd.map((r) => [r.fromMonth, r.percent])).toEqual([[OCT, 55], [DEC, null]]);
+    expect([limitFor(withEnd, NOV)?.percent, limitFor(withEnd, DEC)?.percent]).toEqual([55, null]);
+    expect((await bruno.deleteCommitmentLimit(newOperationKey(), ended.id, 1)).version).toBe(2);
     expect((await bruno.listCommitmentLimits(ctx)).map((r) => r.percent)).toEqual([55]);
     // O core lê o limite sobre a renda comprometida do banco; sem renda de referência, não há situação a mostrar.
     const refs = await bruno.listIncomeReferences(ctx);
@@ -5199,6 +5210,9 @@ describe('conversor do orçamento e do limite', () => {
       ['set_commitment_limit', { p_idempotency_key: 'chave-0010', p_context_id: 'ctx', p_from_month: '2026-10-01', p_expected_version: 0, p_percent: 60 }],
       ['delete_commitment_limit', { p_idempotency_key: 'chave-0011', p_id: 'l1', p_expected_version: 1 }],
     ]);
+    // Percentual nulo é a linha que encerra a vigência: aceito na leitura.
+    expect(await fake({ set_commitment_limit: { ...limit, percent: null } }).setCommitmentLimit('chave-0013', 'ctx', '2026-10', 0, null)).toEqual({ ...expected, percent: null });
+    expect(calls[calls.length - 1]).toEqual(['set_commitment_limit', { p_idempotency_key: 'chave-0013', p_context_id: 'ctx', p_from_month: '2026-10-01', p_expected_version: 0, p_percent: null }]);
     for (const bad of [{ ...limit, percent: 9 }, { ...limit, percent: 101 }, { ...limit, percent: 30.5 }, { ...limit, from_month: '2026-10-02' }, { ...limit, version: 0 }]) {
       expect(await failure(fake({ set_commitment_limit: bad }).setCommitmentLimit('chave-0012', 'ctx', '2026-10', 0, 60))).toEqual(['desconhecido', expect.stringMatching(/inconsistente$|valor_inconsistente$/), null]);
     }

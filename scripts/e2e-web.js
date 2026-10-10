@@ -5467,16 +5467,24 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await f2Month(/^Próximo mês: novembro de 2026$/, 'Novembro de 2026');
   t = await body();
   ok('F2 novembro sem orçamento de Lazer: a categoria vai para "Definir orçamento"', (await visibleCount('button', 'Definir orçamento de Lazer')) === 1 && (await visibleCount('button', /^Lazer, R\$ /)) === 0 && t.includes('Orçado R$ 4.300,00 · Usado R$ 0,00'), t.slice(0, 400));
-  // Desfazer a retirada: abrir Lazer em novembro e "Voltar ao orçamento anterior".
+  // Desfazer a retirada: abrir Lazer em novembro e "Voltar a R$ 300,00 por mês, valor de outubro de 2026".
   await btn('Definir orçamento de Lazer').click(); await waitText('Valor por mês'); await p.waitForTimeout(400);
   ok('F2 "Definir orçamento" abre o formulário de Lazer no mês atual (outubro)', urlPath() === '/orcamento/Lazer');
   await p.getByRole('button', { name: /^Próximo mês: / }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
   t = await body();
-  ok('F2 formulário em novembro (mês da retirada): avisa que o orçamento foi tirado e oferece "Voltar ao orçamento anterior"', t.includes('O orçamento foi tirado a partir de novembro de 2026.') && (await visibleCount('button', 'Voltar ao orçamento anterior')) === 1 && (await field('Valor por mês').inputValue()) === '');
-  await btn('Voltar ao orçamento anterior').click(); await waitText('Voltar ao orçamento anterior a novembro de 2026?'); await confirmIn('Voltar ao anterior');
+  ok('F2 formulário em novembro (mês da retirada): avisa que o orçamento foi tirado e oferece o botão que nomeia o valor ("Voltar a R$ 300,00 por mês, valor de outubro de 2026")', t.includes('O orçamento foi tirado a partir de novembro de 2026.') && (await visibleCount('button', 'Voltar a R$ 300,00 por mês, valor de outubro de 2026')) === 1 && (await visibleCount('button', 'Voltar ao orçamento anterior')) === 0 && (await field('Valor por mês').inputValue()) === '');
+  await btn('Voltar a R$ 300,00 por mês, valor de outubro de 2026').click(); await waitText('Voltar a R$ 300,00 por mês a partir de novembro de 2026?'); await confirmIn('Voltar ao valor anterior');
   await waitText('Linha do orçamento de Lazer excluída.'); await waitText('Pessoal · Novembro de 2026'); await p.waitForTimeout(500);
   ok('F2 desfazer a retirada: novembro volta a ter o orçamento de Lazer (R$ 200,00 de R$ 300,00)', (await visibleCount('button', /^Lazer, R\$ 200,00 de R\$ 300,00, 66,7%/)) === 1);
   await btn('Voltar para outubro de 2026').click(); await waitText('Pessoal · Outubro de 2026'); await p.waitForTimeout(400);
+  // "Tirar" na linha única do mês (nada antes dela): a linha é excluída, sem deixar uma linha sem valor no banco.
+  await btn('Definir orçamento de Transporte').click(); await waitText('Valor por mês'); await field('Valor por mês').fill('100'); await btn('Salvar orçamento').click();
+  await waitText('Orçamento de Transporte salvo. Vale a partir de outubro.'); await waitText('Pessoal · Outubro de 2026'); await p.waitForTimeout(500);
+  await f2CardBtn('Transporte').click(); await waitText('Valor por mês'); await p.waitForTimeout(400);
+  ok('F2 Transporte em outubro: sem linha antes, não há "Voltar a" e o botão é "Tirar o orçamento a partir de outubro de 2026"', (await visibleCount('button', 'Tirar o orçamento a partir de outubro de 2026')) === 1 && (await visibleCount('button', /^Voltar a /)) === 0);
+  await btn('Tirar o orçamento a partir de outubro de 2026').click(); await waitText('Tirar o orçamento de Transporte a partir de outubro de 2026?'); await confirmIn('Tirar orçamento');
+  await waitText('Orçamento de Transporte tirado a partir de outubro.'); await waitText('Pessoal · Outubro de 2026'); await p.waitForTimeout(500);
+  ok('F2 Transporte tirado sem nada antes: nenhuma linha fica guardada (a linha foi excluída, não gravada sem valor)', (await otherDevice(async (repo, ctx) => (await repo.listCategoryBudgets(ctx)).filter((b) => b.category === 'Transporte').length)) === 0 && (await visibleCount('button', 'Definir orçamento de Transporte')) === 1);
 
   // ---- 5. Composição › Por categoria: "de R$ 1.200,00 orçados", a regra de Pago não muda ----
   await demoHome();
@@ -5579,12 +5587,12 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Formulário do limite.
   await btn('Alterar meu limite').click(); await waitText('Limite da renda (%)'); await p.waitForTimeout(500);
   t = await f2Keep();
-  ok('F2 formulário do limite: sem barra, campo com o limite em vigor (60), "Vale a partir de" em novembro de 2026 (o mês da tela), "Salvar limite" e "Cancelar"; sem "Tirar meu limite" porque a linha começa em outubro',
-    urlPath() === '/renda-comprometida/limite' && (await barState()).n === 0 && (await h1Name()) === 'Seu limite' && (await field('Limite da renda (%)').inputValue()) === '60' && t.includes('Novembro de 2026') && (await visibleCount('button', 'Salvar limite')) === 1 && (await visibleCount('button', 'Tirar meu limite')) === 0, `${urlPath()} ${t.slice(0, 300)}`);
+  ok('F2 formulário do limite: sem barra, campo com o limite em vigor (60), "Vale a partir de" em novembro de 2026 (o mês da tela), "Salvar limite", "Cancelar" e "Tirar o limite a partir de novembro de 2026" (há limite em vigor, mesmo com a linha em outubro); placeholder "De 10 a 100", sem exemplo de valor',
+    urlPath() === '/renda-comprometida/limite' && (await barState()).n === 0 && (await h1Name()) === 'Seu limite' && (await field('Limite da renda (%)').inputValue()) === '60' && t.includes('Novembro de 2026') && (await visibleCount('button', 'Salvar limite')) === 1 && (await visibleCount('button', 'Tirar o limite a partir de novembro de 2026')) === 1 && (await visibleCount('button', 'Tirar meu limite')) === 0 && (await field('Limite da renda (%)').getAttribute('placeholder')) === 'De 10 a 100', `${urlPath()} ${t.slice(0, 300)}`);
   await atWidths(async (w) => { await layoutChecks(`F2 formulário do limite ${w}px`); await headerChecks(`F2 formulário do limite ${w}px`); if (w === 390) await shot('213_limite_formulario'); });
   for (const bad of ['9', '101', '0', '30,5', 'abc', '']) {
     await field('Limite da renda (%)').fill(bad); await btn('Salvar limite').click(); await p.waitForTimeout(250);
-    ok(`F2 formulário do limite: "${bad}" recusado ("Informe um número inteiro de 10 a 100, como 40.")`, (await body()).includes('Informe um número inteiro de 10 a 100, como 40.') && urlPath() === '/renda-comprometida/limite', bad);
+    ok(`F2 formulário do limite: "${bad}" recusado ("Informe um número inteiro de 10 a 100.", sem exemplo de valor)`, (await body()).includes('Informe um número inteiro de 10 a 100.') && !(await body()).includes('como 40') && urlPath() === '/renda-comprometida/limite', bad);
   }
   // Salvar 70% a partir de novembro: outubro continua em 60%, novembro passa a 70% (passou 3,0 pontos).
   await field('Limite da renda (%)').fill('70'); await btn('Salvar limite').click(); await waitText('Limite de 70% salvo. Vale a partir de novembro.'); await p.waitForTimeout(600);
@@ -5616,14 +5624,39 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await goResumo();
   await rcRow().click(); await waitText('da sua renda de referência em outubro de 2026'); await p.waitForTimeout(500);
   await btn('Alterar meu limite').click(); await waitText('Limite da renda (%)');
-  ok('F2 formulário do limite com linha no mês: oferece "Tirar meu limite"', (await visibleCount('button', 'Tirar meu limite')) === 1);
-  await btn('Tirar meu limite').click(); await waitText('Tirar o limite a partir de outubro de 2026?'); await confirmIn('Tirar limite');
-  await waitText('Limite tirado.'); await p.waitForTimeout(600);
+  ok('F2 formulário do limite com linha no mês: oferece "Tirar o limite a partir de outubro de 2026"', (await visibleCount('button', 'Tirar o limite a partir de outubro de 2026')) === 1);
+  await btn('Tirar o limite a partir de outubro de 2026').click(); await waitText('Tirar o limite a partir de outubro de 2026?'); await confirmIn('Tirar limite');
+  await waitText('Limite tirado a partir de outubro.'); await p.waitForTimeout(600);
   t = await f2Keep();
   ok('F2 tirar o limite de outubro: "Você ainda não escolheu um limite." com "Escolher meu limite" (nunca um valor sugerido)', t.includes('Você ainda não escolheu um limite.') && (await visibleCount('button', 'Escolher meu limite')) === 1 && !t.includes('de 55% que você escolheu') && !/Outubro (passou|está a)/.test(t), t.slice(0, 400));
   await shot('216_sem_limite');
   await btn('Escolher meu limite').click(); await waitText('Limite da renda (%)');
   ok('F2 "Escolher meu limite": o campo abre vazio, sem valor sugerido', (await field('Limite da renda (%)').inputValue()) === '');
+  // Limite novo em outubro (50%) e "Tirar o limite a partir de novembro": a linha de novembro (70%) vira uma linha sem percentual,
+  // que encerra a vigência; "Voltar a 50% da renda, limite de outubro de 2026" a exclui e o limite anterior volta a valer.
+  await field('Limite da renda (%)').fill('50'); await btn('Salvar limite').click(); await waitText('Limite de 50% salvo. Vale a partir de outubro.'); await p.waitForTimeout(500);
+  await radio('Renda comprometida de novembro de 2026').click(); await waitText('da sua renda de referência em novembro de 2026'); await p.waitForTimeout(500);
+  await btn('Alterar meu limite').click(); await waitText('Limite da renda (%)'); await p.waitForTimeout(400);
+  ok('F2 limite em novembro (linha de 70% com a de outubro antes): oferece "Tirar o limite a partir de novembro de 2026"', (await field('Limite da renda (%)').inputValue()) === '70' && (await visibleCount('button', 'Tirar o limite a partir de novembro de 2026')) === 1 && (await visibleCount('button', /^Voltar a /)) === 0);
+  await btn('Tirar o limite a partir de novembro de 2026').click(); await waitText('Tirar o limite a partir de novembro de 2026?'); await confirmIn('Tirar limite');
+  await waitText('Limite tirado a partir de novembro.'); await p.waitForTimeout(600);
+  t = await f2Keep();
+  ok('F2 limite tirado a partir de novembro: novembro volta a "Você ainda não escolheu um limite." (a linha encerra a vigência), sem frase de limite',
+    t.includes('Você ainda não escolheu um limite.') && !t.includes('que você escolheu.') && (await visibleCount('button', 'Escolher meu limite')) === 1, t.slice(0, 400));
+  await btn('Escolher meu limite').click(); await waitText('Limite da renda (%)'); await p.waitForTimeout(400);
+  t = await f2Keep();
+  ok('F2 formulário do limite no mês da retirada: avisa que o limite foi tirado e oferece "Voltar a 50% da renda, limite de outubro de 2026" (o campo abre vazio)',
+    t.includes('O limite foi tirado a partir de novembro de 2026.') && (await visibleCount('button', 'Voltar a 50% da renda, limite de outubro de 2026')) === 1 && (await field('Limite da renda (%)').inputValue()) === '' && (await visibleCount('button', /^Tirar o limite a partir de/)) === 0, t.slice(0, 400));
+  await btn('Voltar a 50% da renda, limite de outubro de 2026').click(); await waitText('Voltar a 50% da renda a partir de novembro de 2026?'); await confirmIn('Voltar ao limite anterior');
+  await waitText('Linha do limite excluída.'); await p.waitForTimeout(600);
+  ok('F2 voltar ao limite anterior: novembro volta a valer 50% (73,0% de 50%)', (await body()).includes('73,0% de 50% que você escolheu'));
+  // Limpeza: tirar o limite de outubro (linha única, sem nada antes: a linha é excluída).
+  await radio('Renda comprometida de outubro de 2026').click(); await waitText('da sua renda de referência em outubro de 2026'); await p.waitForTimeout(500);
+  await btn('Alterar meu limite').click(); await waitText('Limite da renda (%)');
+  await btn('Tirar o limite a partir de outubro de 2026').click(); await waitText('Tirar o limite a partir de outubro de 2026?'); await confirmIn('Tirar limite');
+  await waitText('Limite tirado a partir de outubro.'); await p.waitForTimeout(600);
+  ok('F2 sem nenhum limite outra vez (as duas linhas saíram)', (await body()).includes('Você ainda não escolheu um limite.') && JSON.stringify(await otherDevice(async (repo, ctx) => (await repo.listCommitmentLimits(ctx)).length)) === '0');
+  await btn('Escolher meu limite').click(); await waitText('Limite da renda (%)'); await p.waitForTimeout(300);
   await btn('Cancelar').click(); await waitText('Seu limite'); await p.waitForTimeout(400);
 
   // ---- 9. Busca "No app" de Aprender ----
@@ -5662,6 +5695,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('F2 conta nova: R$ 90,00 de R$ 100,00 (90%): "Mercado chegou a 90% do orçamento de outubro."', t.includes('Mercado chegou a 90% do orçamento de outubro.'), t.slice(0, 300));
   await f2Open();
   ok('F2 conta nova: o orçamento mostra "R$ 90,00 de R$ 100,00", 90,0% e "Faltam R$ 10,00"', (await visibleCount('button', /^Mercado, R\$ 90,00 de R\$ 100,00, 90,0% do orçamento\. Faltam R\$ 10,00\./)) === 1);
+  t = await f2Expense('Mercado completo', '10', 'Mercado');
+  ok('F2 conta nova: mais R$ 10,00 chegam exatamente ao orçamento (de 90% a 100%): "Mercado chegou a 100% do orçamento de outubro."', t.includes('Gasto salvo') && t.includes('Mercado chegou a 100% do orçamento de outubro.') && !t.includes('passou do orçamento'), t.slice(0, 300));
+  await f2Open();
+  ok('F2 conta nova: "R$ 100,00 de R$ 100,00" e "Orçamento usado por inteiro"', (await visibleCount('button', /^Mercado, R\$ 100,00 de R\$ 100,00, 100,0% do orçamento\. Orçamento usado por inteiro\./)) === 1);
   await keepText();
   const f2Vetoed = f2Texts.map((x) => x.match(F2_VETOED)?.[0]).filter(Boolean);
   ok('F2 telas do orçamento e do limite: nenhuma palavra vetada (estourou, excedeu, gastou demais, controle-se, cuidado, alerta) nem travessão', f2Texts.length >= 12 && f2Vetoed.length === 0 && f2Texts.every((x) => !/[–—]/.test(x)), `${f2Texts.length} telas ${f2Vetoed.join(' | ')}`);

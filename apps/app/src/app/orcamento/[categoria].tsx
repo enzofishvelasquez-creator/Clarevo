@@ -1,6 +1,5 @@
 import {
   BUDGET_ERROR_TEXT,
-  BUDGET_MIN_CENTS,
   BUDGET_TEXT,
   ERROR_TEXT,
   addMonths,
@@ -399,7 +398,7 @@ function BudgetForm({ contextId, category, startMonth }: { contextId: string; ca
 
       <ConfirmDialog
         visible={confirm === 'voltar' && beforeCents !== null}
-        title={mask(BUDGET_TEXT.form.restoreTitle(beforeCents ?? BUDGET_MIN_CENTS, month))}
+        title={mask(BUDGET_TEXT.form.restoreTitle(beforeCents ?? 0, month))}
         cancelLabel={BUDGET_TEXT.form.cancel}
         confirmLabel={BUDGET_TEXT.form.restoreConfirm}
         busy={working}

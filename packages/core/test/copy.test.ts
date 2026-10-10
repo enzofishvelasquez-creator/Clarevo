@@ -1562,7 +1562,8 @@ describe('textos do orçamento e do limite (D-041)', () => {
       T.form.intro('Saúde'),
       T.form.removeFrom('2026-11'),
       T.form.removeTitle('Mercado', '2026-11'),
-      T.form.restoreTitle('2026-11'),
+      T.form.restore(100_000, '2026-09'),
+      T.form.restoreTitle(100_000, '2026-11'),
       T.form.saved('Mercado', '2026-10'),
       T.form.removed('Lazer', '2026-11'),
       T.form.deleted('Moradia'),
@@ -1633,6 +1634,17 @@ describe('textos do orçamento e do limite (D-041)', () => {
     const crossed = limitCrossing([{ month: '2026-11', committedPermille: 280, committedCents: 1 }], [{ month: '2026-11', committedPermille: 320, committedCents: 1 }], [{ fromMonth: '2026-10', percent: 30 }], DEMO_TODAY);
     expect(crossed).toBe('Com esta conta, novembro chega a 32,0% da renda, acima do limite de 30% que você escolheu.');
     check([crossed!]);
+    const F = LIMIT_TEXT.form;
+    check([
+      F.removeFrom('2026-11'),
+      F.removeTitle('2026-11'),
+      F.restore(30, '2026-09'),
+      F.restoreTitle(30, '2026-11'),
+      F.saved(40, '2026-10'),
+      F.removed('2026-11'),
+      F.endedHere('2026-11'),
+      F.existing('2026-10'),
+    ]);
   });
 
   it('o índice de busca tem a tela do orçamento', () => {

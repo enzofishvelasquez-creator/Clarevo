@@ -153,7 +153,7 @@ function LimitForm({ contextId }: { contextId: string }) {
       setKeys.settled();
       attempt.current = null;
       setRetry(false);
-      done(LIMIT_TEXT.form.saved(saved.percent, saved.fromMonth));
+      done(LIMIT_TEXT.form.saved(v.percent, saved.fromMonth));
     } catch (e) {
       if (isRefusal(e) && isRepoError(e)) {
         setKeys.refused();

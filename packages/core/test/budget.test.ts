@@ -165,6 +165,18 @@ describe('orçamento vigente: "a partir de"', () => {
     expect(limitFor(rows, '2027-01')?.percent).toBe(60);
     expect(limitFor(rows, '2027-02')?.percent).toBe(50);
   });
+
+  it('limite pessoal: uma linha sem percentual encerra a vigência; um limite novo depois volta a valer', () => {
+    const rows = [
+      { fromMonth: '2026-10', percent: 60 as number | null },
+      { fromMonth: '2026-12', percent: null as number | null },
+      { fromMonth: '2027-03', percent: 50 as number | null },
+    ];
+    expect(limitFor(rows, '2026-11')?.percent).toBe(60);
+    expect(limitFor(rows, '2026-12')).toEqual({ fromMonth: '2026-12', percent: null });
+    expect(limitFor(rows, '2027-02')?.percent).toBeNull();
+    expect(limitFor(rows, '2027-03')?.percent).toBe(50);
+  });
 });
 
 describe('resumo do mês e textos', () => {
@@ -235,6 +247,21 @@ describe('aviso dentro do app ao cruzar 80% ou 100%', () => {
     expect(cross(95_999, 96_000)).toBe('Mercado chegou a 80% do orçamento de outubro.');
     // Exatamente o valor do orçamento ainda não passou.
     expect(cross(90_000, 120_000)).toBe('Mercado chegou a 100% do orçamento de outubro.');
+  });
+
+  it('chegar exatamente a 100% vindo de 80% a 99% também avisa; já estando em 100%, nada', () => {
+    expect(cross(102_000, 120_000)).toBe('Mercado chegou a 100% do orçamento de outubro.');
+    expect(cross(119_999, 120_000)).toBe('Mercado chegou a 100% do orçamento de outubro.');
+    expect(cross(96_000, 120_000)).toBe('Mercado chegou a 100% do orçamento de outubro.');
+    expect(cross(0, 120_000)).toBe('Mercado chegou a 100% do orçamento de outubro.');
+    expect(cross(120_000, 120_000)).toBeNull();
+    // Com valores ocultos o texto de "chegou a" não leva valor e é o mesmo.
+    expect(cross(102_000, 120_000, true)).toBe('Mercado chegou a 100% do orçamento de outubro.');
+    // Passar do valor continua sendo outra frase.
+    expect(cross(119_999, 120_001)).toBe('Mercado passou do orçamento de outubro em R$ 0,01.');
+    // Descendo de 100% ou ficando entre 80% e 99%: nada.
+    expect(cross(120_000, 110_000)).toBeNull();
+    expect(cross(100_000, 119_999)).toBeNull();
   });
 
   it('passou de 100%: com o valor, e sem ele quando os valores estão ocultos', () => {
@@ -351,6 +378,8 @@ describe('limite pessoal de comprometimento', () => {
   it('só com renda de referência e com limite escolhido; outro ano leva o ano', () => {
     expect(limitStatus('2026-11', null, 100, 30, T)).toBeNull();
     expect(limitStatus('2026-11', 300, 100, null, T)).toBeNull();
+    // Limite encerrado ("Tirar o limite a partir de"): sem situação, como sem limite.
+    expect(limitStatus('2026-12', 900, 100, limitFor([{ fromMonth: '2026-10', percent: 30 }, { fromMonth: '2026-12', percent: null }], '2026-12')?.percent ?? null, T)).toBeNull();
     expect(limitStatus('2027-01', 310, 100, 30, T)!.note).toBe('Janeiro de 2027 passou 1,0 ponto do limite de 30% que você escolheu.');
     expect(limitStatus('2026-11', 0, 0, 30, T)!.line).toBe('0,0% de 30% que você escolheu');
   });
@@ -368,6 +397,10 @@ describe('limite pessoal de comprometimento', () => {
     expect(limitCrossing([m('2026-11', null)], [m('2026-11', null)], limits, T)).toBeNull();
     expect(limitCrossing([m('2026-09', 100)], [m('2026-09', 900)], limits, T)).toBeNull();
     expect(limitCrossing([], [m('2026-11', 320)], limits, T)).toContain('novembro chega a 32,0%');
+    // Limite encerrado a partir de dezembro: dezembro não cruza nada.
+    const ended = [{ fromMonth: '2026-10', percent: 30 as number | null }, { fromMonth: '2026-12', percent: null as number | null }];
+    expect(limitCrossing([m('2026-12', 280)], [m('2026-12', 500)], ended, T)).toBeNull();
+    expect(limitCrossing([m('2026-11', 280)], [m('2026-11', 320)], ended, T)).toContain('novembro chega a 32,0%');
     // Vários meses: o primeiro que cruza.
     expect(limitCrossing([m('2026-11', 280), m('2026-12', 290)], [m('2026-12', 310), m('2026-11', 305)], limits, T)).toContain('novembro chega a 30,5%');
   });
@@ -382,6 +415,11 @@ describe('limite pessoal de comprometimento', () => {
       '2026-11': 'Novembro passou 13,0 pontos do limite de 60% que você escolheu.',
     });
     expect(limitNotesFor(months, [], DEMO_TODAY)).toEqual({});
+    // Limite encerrado a partir de dezembro: só novembro é marcado.
+    expect(limitNotesFor(months, [{ fromMonth: '2026-10', percent: 60 }, { fromMonth: '2026-12', percent: null }], DEMO_TODAY)).toEqual({
+      '2026-11': 'Novembro passou 13,0 pontos do limite de 60% que você escolheu.',
+    });
+    expect(limitNotesFor(months, [{ fromMonth: '2026-10', percent: null }], DEMO_TODAY)).toEqual({});
   });
 });
 
@@ -507,7 +545,7 @@ describe('MemoryRepository: orçamento e limite', () => {
 
   it('limite: validação, versão, exclusão e a anterior volta a valer', async () => {
     const { repo, ctx } = await setup();
-    const set = (m: string, v: number, p: number) => code(repo.setCommitmentLimit(key(), ctx, m, v, p));
+    const set = (m: string, v: number, p: number | null) => code(repo.setCommitmentLimit(key(), ctx, m, v, p));
     expect(await set('2026-13', 0, 40)).toBe('mes_invalido');
     expect(await set('2026-10', 4, 40)).toBe('versao_desatualizada');
     expect(await set('2024-09', 0, 40)).toBe('vigencia_fora_do_intervalo');
@@ -524,6 +562,26 @@ describe('MemoryRepository: orçamento e limite', () => {
     expect(limitFor(await repo.listCommitmentLimits(ctx), '2026-12')?.percent).toBe(60);
     expect(await code(repo.deleteCommitmentLimit(key(), b.id, 3))).toBe('nao_encontrado');
     expect(await repo.listCommitmentLimits(ctx)).toEqual([a]);
+  });
+
+  it('limite: percentual nulo grava a linha que encerra a vigência, sem reescrever os meses anteriores', async () => {
+    const { repo, ctx } = await setup();
+    const a = await repo.setCommitmentLimit(key(), ctx, '2026-10', 0, 60);
+    expect(await code(repo.setCommitmentLimit(key(), ctx, '2026-13', 0, null))).toBe('mes_invalido');
+    expect(await code(repo.setCommitmentLimit(key(), ctx, '2027-11', 0, null))).toBe('vigencia_fora_do_intervalo');
+    const k = key();
+    const ended = await repo.setCommitmentLimit(k, ctx, '2026-12', 0, null);
+    expect([ended.percent, ended.version]).toEqual([null, 1]);
+    expect(await repo.setCommitmentLimit(k, ctx, '2026-12', 0, null)).toEqual(ended);
+    const list = await repo.listCommitmentLimits(ctx);
+    expect(limitFor(list, '2026-11')?.percent).toBe(60);
+    expect(limitFor(list, '2026-12')?.percent).toBeNull();
+    // Um percentual volta a valer na mesma linha; excluir a linha sem percentual devolve o limite anterior.
+    const back = await repo.setCommitmentLimit(key(), ctx, '2026-12', 1, 40);
+    expect([back.id, back.version, back.percent]).toEqual([ended.id, 2, 40]);
+    await repo.setCommitmentLimit(key(), ctx, '2026-12', 2, null);
+    await repo.deleteCommitmentLimit(key(), ended.id, 3);
+    expect(limitFor(await repo.listCommitmentLimits(ctx), '2026-12')).toEqual(a);
   });
 });
 
@@ -582,6 +640,11 @@ describe('textos montados', () => {
     expect(BUDGET_TEXT.crossedOverHidden('Mercado', 'outubro')).toBe('Mercado passou do orçamento de outubro.');
     expect(BUDGET_TEXT.budgeted(120_000)).toBe('de R$ 1.200,00 orçados');
     expect(BUDGET_TEXT.form.removeFrom('2026-11')).toBe('Tirar o orçamento a partir de novembro de 2026');
+    expect(BUDGET_TEXT.form.restore(100_000, '2026-09')).toBe('Voltar a R$ 1.000,00 por mês, valor de setembro de 2026');
+    expect(LIMIT_TEXT.form.removeFrom('2026-11')).toBe('Tirar o limite a partir de novembro de 2026');
+    expect(LIMIT_TEXT.form.restore(30, '2026-09')).toBe('Voltar a 30% da renda, limite de setembro de 2026');
+    expect(LIMIT_TEXT.form.percentPlaceholder).toBe('De 10 a 100');
+    expect(LIMIT_ERROR_TEXT.percentual_invalido).toBe('Informe um número inteiro de 10 a 100.');
     expect(LIMIT_TEXT.crossed('novembro', '32,0%', 30)).toBe('Com esta conta, novembro chega a 32,0% da renda, acima do limite de 30% que você escolheu.');
   });
 });
