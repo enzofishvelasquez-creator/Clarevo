@@ -16,10 +16,13 @@ import {
   annualCommitmentIds,
   annualYearSummary,
   buildReturnReview,
+  cardLimitUsed,
+  categoryBreakdown,
   committedGoalLines,
   coverageTenths,
   emergencyTarget,
   emptyMonthCaption,
+  exampleReceiptQr,
   essentialMonthly,
   firstNegativeDay,
   formatPermille,
@@ -32,6 +35,8 @@ import {
   isSavingsStepDone,
   lastClosedMonth,
   lastIncomeReferenceChange,
+  loadInvoices,
+  loadInvoicesOfRecords,
   loadReturnReview,
   lastNumberFromEndYear,
   mergeOccurrences,
@@ -47,9 +52,12 @@ import {
   occurrenceLabel,
   occurrencesToMaterialize,
   organizeGoals,
+  paidInvoiceMonths,
   paymentsForecast,
   plannedForGoals,
   projectCommitted,
+  purchaseFirstInvoiceMonth,
+  readReceiptCode,
   returnBannerText,
   returnWindow,
   reviewDecision,
@@ -75,6 +83,9 @@ import {
   wholeYearPayment,
   type AffectedRef,
   type AmountMode,
+  type Card,
+  type CardEntry,
+  type CardInput,
   type Cents,
   type Commitment,
   type CommitmentInput,
@@ -3806,6 +3817,925 @@ describe('conversor da renda de referência, das metas e do plano de guardar', (
       for (const spy of spies) expect(spy).not.toHaveBeenCalled();
     } finally {
       for (const spy of spies) spy.mockRestore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ciclo E · cartões de crédito (D-037) e notas fiscais (D-038)
+// ---------------------------------------------------------------------------
+
+describe('API real: cartões de crédito e notas fiscais (Ciclo E, D-037 e D-038)', () => {
+  // Bruno repete a sequência de aceite cinco anos adiante (hoje 07/10/2031), num período em que nenhum bloco anterior gravou
+  // nada. Ana é a pessoa de fora. Cartões, notas e pessoas FICTÍCIOS; as notas vêm da nota de exemplo do core (homologação,
+  // domínio inexistente) e o app só manda o RESUMO da chave, nunca a chave de 44 caracteres.
+  const T0 = '2031-10-07';
+  const AFTER_CLOSING = '2031-11-12';
+  const OCT = '2031-10';
+  const NOV = '2031-11';
+  const DEC = '2031-12';
+  const JAN = '2032-01';
+  const AUG = '2032-08';
+  const bruno = repoFor(BRUNO, T0);
+  const ana = repoFor(ANA, T0);
+  let ctx = '';
+  let account = '';
+  let card: Card;
+  let tenis: CardEntry;
+  let notebook: CardEntry;
+  let restaurante: CardEntry;
+  let anuidade: CardEntry;
+  let estorno: CardEntry;
+
+  const nubank: CardInput = { name: 'Nubank', lastDigits: '1234', closingDay: 3, dueDay: 10, limitCents: 500000 };
+  const purchase = (description: string, totalCents: Cents, purchasedOn: IsoDate, installments = 1, category: string | null = 'Lazer') => ({
+    description,
+    category,
+    purchasedOn,
+    totalCents,
+    installments,
+  });
+  const invoicesOf = (c: Pick<Card, 'id' | 'closingDay' | 'dueDay'> = card, today: IsoDate = T0) => loadInvoices(repoFor(BRUNO, today), c, today);
+  const totalsOf = async (c: Card = card) => (await bruno.listInvoiceItems(c.id)).map((i) => [i.month, i.totalCents]);
+  const paidOfOctober = async () => summarizeMonth(await bruno.listRecords(ctx, OCT), ctx, OCT).paidCents;
+  const code = (p: Promise<unknown>) =>
+    p.then(
+      () => null,
+      (e: unknown) => (e instanceof RepoError ? [e.code, e.detail ?? null] : String(e)),
+    );
+  /** O resumo da nota de exemplo do mês, e a chave de 44 caracteres que NUNCA pode chegar ao banco. */
+  const note = (month: IsoMonth) => {
+    const r = readReceiptCode(exampleReceiptQr(month));
+    if (!r.ok) throw new Error('nota de exemplo inválida');
+    return { digest: r.key.digest, rawKey: r.key.key };
+  };
+
+  /** month_committed pela API é igual ao summarizeCommitted do core, inclusive o grupo "Faturas de cartão". */
+  const committedCard = async (month: IsoMonth) => {
+    const repo = repoFor(BRUNO, T0);
+    const s = summarizeCommitted(await repo.listCommitments(ctx, month), ctx, month, T0, await repo.listIncomeReferences(ctx), await repo.listSeries(ctx));
+    const { data, error } = await clientFor(BRUNO, T0).rpc('month_committed', { p_context_id: ctx, p_month: `${month}-01` }).single();
+    expect(error).toBeNull();
+    const r = data as CommittedRow & { card_cents: number; card_permille: number | null };
+    expect([Number(r.card_cents), r.card_permille === null ? null : Number(r.card_permille), Number(r.committed_cents), Number(r.other_cents)]).toEqual([
+      s.cardCents,
+      s.cardPermille,
+      s.committedCents,
+      s.otherCents,
+    ]);
+    return s;
+  };
+
+  beforeAll(async () => {
+    const space = (await bruno.getSpace())!;
+    ctx = space.personalContextId;
+    account = space.accounts[0]!.id;
+  });
+
+  it('cadastrar o cartão guarda só apelido e final; repetir a chave devolve o mesmo cartão', async () => {
+    expect(await bruno.listCards(ctx)).toEqual([]);
+    const key = newOperationKey();
+    const w = await bruno.createCard(key, ctx, nubank);
+    card = w.card;
+    expect(card).toMatchObject({
+      name: 'Nubank',
+      lastDigits: '1234',
+      closingDay: 3,
+      dueDay: 10,
+      limitCents: 500000,
+      status: 'ativo',
+      version: 1,
+      usedCents: 0,
+      // Hoje (07/10) já passou do fechamento de outubro: a compra de hoje cai na fatura que vence em novembro.
+      currentMonth: NOV,
+      currentClosingOn: '2031-11-03',
+      currentDueOn: '2031-11-10',
+    });
+    expect([w.entry, w.invoices, w.commitments]).toEqual([null, [], []]);
+    expect((await bruno.createCard(key, ctx, nubank)).card.id).toBe(card.id);
+    expect(await code(bruno.createCard(key, ctx, { ...nubank, closingDay: 4 }))).toEqual(['chave_reutilizada', null]);
+    expect(await bruno.findCardOperation(key)).toEqual({ action: 'criar_cartao', cardId: card.id, entryId: null, commitmentId: null, recordId: null });
+    expect(await bruno.findCardOperation(newOperationKey())).toBeNull();
+    expect(await bruno.listCards(ctx)).toEqual([card]);
+    expect(await bruno.getCard(card.id)).toEqual(card);
+    // A tabela nunca guarda mais que o apelido e os 4 últimos dígitos.
+    const row = await clientFor(BRUNO).from('cards').select('*').eq('id', card.id).single();
+    expect(Object.keys(row.data!).filter((k) => /number|numero|cvv|expir|validade|cpf/i.test(k))).toEqual([]);
+  });
+
+  it('validação do cartão também no banco, na ordem das conferências', async () => {
+    const make = (patch: Partial<CardInput>) => code(bruno.createCard(newOperationKey(), ctx, { ...nubank, ...patch }));
+    expect(await make({ name: '' })).toEqual(['apelido_invalido', null]);
+    expect(await make({ name: 'x'.repeat(31) })).toEqual(['apelido_invalido', null]);
+    // Número de cartão no apelido, com qualquer separador: o app nunca guarda.
+    expect(await make({ name: '4111 1111 1111 1111' })).toEqual(['apelido_invalido', null]);
+    expect(await make({ name: '4111-1111-1111-1111' })).toEqual(['apelido_invalido', null]);
+    expect(await make({ lastDigits: '12a4' })).toEqual(['final_invalido', null]);
+    expect(await make({ lastDigits: '12345' })).toEqual(['final_invalido', null]);
+    expect(await make({ closingDay: 0 })).toEqual(['dia_de_fechamento_invalido', null]);
+    expect(await make({ dueDay: 32 })).toEqual(['dia_de_vencimento_invalido', null]);
+    expect(await make({ limitCents: 50 })).toEqual(['limite_invalido', null]);
+    expect(await make({ limitCents: 1_000_000_000 })).toEqual(['limite_invalido', null]);
+    // Apelido com dígitos espalhados é aceito; sem final e sem limite também.
+    const free = await bruno.createCard(newOperationKey(), ctx, { name: 'Conta 0001 12345678-9', lastDigits: null, closingDay: 31, dueDay: 5, limitCents: null });
+    expect([free.card.name, free.card.lastDigits, free.card.limitCents]).toEqual(['Conta 0001 12345678-9', null, null]);
+    await bruno.deleteCard(newOperationKey(), free.card.id, free.card.version);
+    expect((await bruno.listCards(ctx)).map((c) => c.id)).toEqual([card.id]);
+  });
+
+  it('outra pessoa não vê o cartão, não lança nem cria cartão no contexto', async () => {
+    expect(await ana.getCard(card.id)).toBeNull();
+    expect(await ana.listCards(ctx)).toEqual([]);
+    expect(await ana.listCardEntries(card.id)).toEqual([]);
+    expect(await ana.listInvoiceItems(card.id)).toEqual([]);
+    expect(await ana.listInvoiceCommitments(card.id)).toEqual([]);
+    expect(await code(ana.addCardPurchase(newOperationKey(), card.id, purchase('Invasão', 100, T0)))).toEqual(['nao_encontrado', null]);
+    expect(await code(ana.updateCard(newOperationKey(), card.id, 1, nubank))).toEqual(['nao_encontrado', null]);
+    expect(await code(ana.deleteCard(newOperationKey(), card.id, 1))).toEqual(['nao_encontrado', null]);
+    expect(await code(ana.payInvoice(newOperationKey(), card.id, NOV, 1, 100, T0))).toEqual(['nao_encontrado', null]);
+    expect(await code(ana.createCard(newOperationKey(), ctx, nubank))).toEqual(['sem_permissao', null]);
+    expect(await ana.findCardOperation(newOperationKey())).toBeNull();
+    // Gravação direta nas tabelas de cartão é recusada.
+    const direct = await clientFor(BRUNO).from('cards').insert({ context_id: ctx, nickname: 'Direto', closing_day: 1, due_day: 2, created_by: BRUNO });
+    expect(direct.error).not.toBeNull();
+    expect((await clientFor(null).from('card_items').select('id')).data ?? []).toEqual([]);
+  });
+
+  it('compras parceladas viram faturas e contas a pagar; compra no cartão não entra em Pago', async () => {
+    const t = await bruno.addCardPurchase(newOperationKey(), card.id, purchase('Tênis de corrida', 60000, '2031-10-05', 3));
+    tenis = t.entry!;
+    expect(tenis).toMatchObject({ kind: 'compra', description: 'Tênis de corrida', category: 'Lazer', amountCents: 60000, installments: 3, invoiceMonth: NOV, purchasedOn: '2031-10-05', receiptKey: null, version: 1 });
+    expect(t.invoices.map((i) => [i.month, i.totalCents])).toEqual([[NOV, 20000], [DEC, 20000], [JAN, 20000]]);
+    expect(t.commitments.map((c) => [c.invoice!.month, c.amountCents])).toEqual([[NOV, 20000], [DEC, 20000], [JAN, 20000]]);
+    notebook = (await bruno.addCardPurchase(newOperationKey(), card.id, purchase('Notebook', 150000, '2031-10-05', 10, 'Educação'))).entry!;
+    restaurante = (await bruno.addCardPurchase(newOperationKey(), card.id, purchase('Restaurante', 20000, '2031-10-06'))).entry!;
+    expect(notebook.invoiceMonth).toBe(NOV);
+
+    // Novembro 550,00; dezembro e janeiro 350,00; de fevereiro a agosto 150,00 (as dez faturas do Notebook).
+    const expected = [[NOV, 55000], [DEC, 35000], [JAN, 35000], ...['2032-02', '2032-03', '2032-04', '2032-05', '2032-06', '2032-07', AUG].map((m) => [m, 15000])];
+    expect(await totalsOf()).toEqual(expected);
+    const invoices = await invoicesOf();
+    expect(invoices.map((i) => [i.month, i.totalCents])).toEqual(expected);
+    expect((await bruno.getCard(card.id))!.usedCents).toBe(230000);
+    expect(cardLimitUsed(invoices)).toBe(230000);
+    expect(await paidOfOctober()).toBe(0);
+    expect((await bruno.listCardEntries(card.id)).map((e) => e.id)).toEqual([tenis.id, notebook.id, restaurante.id]);
+    expect(await bruno.getCardEntry(notebook.id)).toEqual(notebook);
+
+    // A conta da fatura é uma conta a pagar comum, estimada até o fechamento, e o "Ainda a pagar" a conta uma vez.
+    // listCommitments traz também as abertas de outros meses: só a fatura que vence em novembro.
+    const nov = (await bruno.listCommitments(ctx, NOV)).filter((c) => c.invoice?.month === NOV);
+    expect(nov).toHaveLength(1);
+    expect(nov[0]).toMatchObject({
+      description: 'Fatura Nubank',
+      amountCents: 55000,
+      dueOn: '2031-11-10',
+      status: 'aberto',
+      amountIsEstimate: true,
+      category: null,
+      series: null,
+      invoice: { cardId: card.id, month: NOV, closingOn: '2031-11-03' },
+    });
+    expect((await bruno.listInvoiceCommitments(card.id)).map((c) => [c.invoice!.month, c.amountCents])).toEqual(expected);
+    const toPay = await checkedToPay(BRUNO, ctx, NOV, T0);
+    expect([toPay.dueInMonthCents, toPay.estimatedCents]).toEqual([55000, 55000]);
+    expect((await committedCard(NOV)).cardCents).toBe(55000);
+  });
+
+  it('compra recusada pelo banco: parcelas, data, valor, descrição e categoria', async () => {
+    const buy = (patch: Partial<ReturnType<typeof purchase>>) => code(bruno.addCardPurchase(newOperationKey(), card.id, { ...purchase('Teste', 1000, T0), ...patch }));
+    expect(await buy({ installments: 49 })).toEqual(['parcelas_invalidas', null]);
+    expect(await buy({ installments: 0 })).toEqual(['parcelas_invalidas', null]);
+    expect(await buy({ totalCents: 2, installments: 3 })).toEqual(['parcelas_invalidas', null]);
+    expect(await buy({ purchasedOn: '2031-10-08' })).toEqual(['data_futura', null]);
+    expect(await buy({ purchasedOn: '2027-09-30' })).toEqual(['data_invalida', null]);
+    expect(await buy({ totalCents: 0 })).toEqual(['valor_invalido', null]);
+    expect(await buy({ totalCents: 1_000_000_000 })).toEqual(['valor_acima_do_limite', null]);
+    expect(await buy({ description: '  ' })).toEqual(['descricao_obrigatoria', null]);
+    expect(await buy({ description: 'x'.repeat(81) })).toEqual(['descricao_longa', null]);
+    expect(await buy({ category: 'x'.repeat(41) })).toEqual(['categoria_invalida', null]);
+    expect(await bruno.listCardEntries(card.id)).toHaveLength(3);
+  });
+
+  it('encargo e estorno entram na fatura; editar e excluir respeitam versão e tipo', async () => {
+    anuidade = (await bruno.addCardCharge(newOperationKey(), card.id, { chargeType: 'anuidade', amountCents: 3000, invoiceMonth: NOV })).entry!;
+    expect(anuidade).toMatchObject({ kind: 'encargo', chargeType: 'anuidade', amountCents: 3000, invoiceMonth: NOV, description: null, category: null, purchasedOn: null, installments: 1 });
+    const r = await bruno.addCardRefund(newOperationKey(), card.id, { description: 'Devolução da loja', category: 'Lazer', amountCents: 5000, invoiceMonth: NOV });
+    estorno = r.entry!;
+    expect(estorno).toMatchObject({ kind: 'estorno', description: 'Devolução da loja', category: 'Lazer', amountCents: 5000, invoiceMonth: NOV, sourceMonth: null });
+    // 550,00 + 30,00 de anuidade - 50,00 de estorno.
+    expect(r.invoices.find((i) => i.month === NOV)).toMatchObject({ totalCents: 53000, purchasesCents: 55000, chargesCents: 3000, refundsCents: 5000, carriedInCents: 0, creditCents: 0 });
+    expect((await bruno.listCommitments(ctx, NOV)).find((c) => c.invoice?.month === NOV)!.amountCents).toBe(53000);
+    expect((await committedCard(NOV)).cardCents).toBe(53000);
+
+    const bad = (input: Parameters<typeof bruno.addCardCharge>[2]) => code(bruno.addCardCharge(newOperationKey(), card.id, input));
+    expect(await bad({ chargeType: 'taxa' as 'juros', amountCents: 100, invoiceMonth: NOV })).toEqual(['tipo_de_encargo_invalido', null]);
+    expect(await bad({ chargeType: 'juros', amountCents: 0, invoiceMonth: NOV })).toEqual(['valor_invalido', null]);
+    expect(await bad({ chargeType: 'juros', amountCents: 100, invoiceMonth: '2036-01' })).toEqual(['mes_invalido', null]);
+    expect(await code(bruno.addCardRefund(newOperationKey(), card.id, { description: '', category: null, amountCents: 100, invoiceMonth: NOV }))).toEqual(['descricao_obrigatoria', null]);
+
+    // Editar o encargo: valor novo inteiro, versão nova; a versão antiga não sobrescreve; tipo errado é recusado.
+    const edited = await bruno.updateCardEntry(newOperationKey(), anuidade.id, anuidade.version, { kind: 'encargo', chargeType: 'tarifa', amountCents: 3500, invoiceMonth: NOV });
+    expect(edited.entry).toMatchObject({ id: anuidade.id, chargeType: 'tarifa', amountCents: 3500, version: anuidade.version + 1 });
+    expect(edited.invoices.find((i) => i.month === NOV)!.totalCents).toBe(53500);
+    expect(await code(bruno.updateCardEntry(newOperationKey(), anuidade.id, anuidade.version, { kind: 'encargo', chargeType: 'anuidade', amountCents: 3000, invoiceMonth: NOV }))).toEqual(['versao_desatualizada', expect.stringMatching(/^versao_atual=\d+$/)]);
+    expect(await code(bruno.updateCardEntry(newOperationKey(), anuidade.id, edited.entry!.version, { kind: 'estorno', description: 'x', category: null, amountCents: 3500, invoiceMonth: NOV }))).toEqual(['tipo_invalido', null]);
+    const back = await bruno.updateCardEntry(newOperationKey(), anuidade.id, edited.entry!.version, { kind: 'encargo', chargeType: 'anuidade', amountCents: 3000, invoiceMonth: NOV });
+    anuidade = back.entry!;
+    expect(back.invoices.find((i) => i.month === NOV)!.totalCents).toBe(53000);
+
+    // Campo que o tipo não usa: o app nunca o manda, e o banco recusa se vier.
+    const raw = await clientFor(BRUNO, T0).rpc('update_card_entry', {
+      p_idempotency_key: newOperationKey(),
+      p_entry_id: anuidade.id,
+      p_expected_version: anuidade.version,
+      p_kind: 'encargo',
+      p_amount_cents: 3000,
+      p_occurred_on: null,
+      p_description: 'não se aplica',
+      p_category: null,
+      p_invoice_month: `${NOV}-01`,
+      p_charge_kind: 'anuidade',
+    });
+    expect(raw.error?.message).toBe('campo_nao_se_aplica');
+
+    // Compra: descrição e categoria mudam com valor, data e parcelas iguais; o total é sempre o novo inteiro.
+    const renamed = await bruno.updateCardEntry(newOperationKey(), restaurante.id, restaurante.version, { kind: 'compra', ...purchase('Restaurante japonês', 20000, '2031-10-06') });
+    restaurante = renamed.entry!;
+    expect(restaurante).toMatchObject({ description: 'Restaurante japonês', amountCents: 20000, version: 2 });
+    expect(await totalsOf()).toContainEqual([NOV, 53000]);
+  });
+
+  it('pagamento parcial: gasto em Pago, saldo anterior na fatura seguinte, Por categoria e desfazer', async () => {
+    const nov = (await bruno.listInvoiceItems(card.id)).find((i) => i.month === NOV)!;
+    expect(nov).toMatchObject({ status: 'aberta', totalCents: 53000, toPayCents: 53000, amountIsEstimate: true, paidRecordId: null });
+    const pay = (patch: Partial<{ version: number; cents: Cents; on: IsoDate; accountId: string | null }> = {}) =>
+      bruno.payInvoice(newOperationKey(), card.id, NOV, patch.version ?? nov.commitmentVersion!, patch.cents ?? 30000, patch.on ?? T0, patch.accountId ?? null);
+    expect(await code(pay({ cents: 0 }))).toEqual(['valor_invalido', null]);
+    expect(await code(pay({ cents: 53001 }))).toEqual(['valor_acima_da_fatura', null]);
+    expect(await code(pay({ on: '2031-10-08' }))).toEqual(['data_futura', null]);
+    expect(await code(pay({ on: '2020-01-01' }))).toEqual(['data_invalida', null]);
+    expect(await code(pay({ version: nov.commitmentVersion! + 5 }))).toEqual(['versao_desatualizada', expect.stringMatching(/^versao_atual=\d+$/)]);
+    expect(await code(pay({ accountId: randomUUID() }))).toEqual(['conta_invalida', null]);
+    expect(await code(bruno.payInvoice(newOperationKey(), card.id, '2031-03', 1, 100, T0))).toEqual(['nao_encontrado', null]);
+    expect(await paidOfOctober()).toBe(0);
+
+    const key = newOperationKey();
+    const paid = await bruno.payInvoice(key, card.id, NOV, nov.commitmentVersion!, 30000, T0, account);
+    expect(paid.record).toMatchObject({
+      kind: 'despesa',
+      amountCents: 30000,
+      occurredOn: T0,
+      description: 'Fatura Nubank (novembro)',
+      category: null,
+      accountId: account,
+      commitmentId: paid.commitment.id,
+      invoice: { cardId: card.id, month: NOV },
+      receiptKey: null,
+    });
+    expect(paid.commitment).toMatchObject({ status: 'quitado', payment: { recordId: paid.record.id, amountCents: 30000, paidOn: T0 }, invoice: { cardId: card.id, month: NOV } });
+    // 530,00 - 300,00: 230,00 viram o saldo anterior de dezembro, sem juros.
+    expect(paid.entry).toMatchObject({ kind: 'saldo_anterior', amountCents: 23000, invoiceMonth: DEC, sourceMonth: NOV, paymentRecordId: paid.record.id, description: null });
+    expect(paid.invoices.find((i) => i.month === NOV)).toMatchObject({ status: 'paga_em_parte', paidCents: 30000, paidOn: T0, paidRecordId: paid.record.id, leftOverCents: 23000, toPayCents: 0 });
+    expect(paid.invoices.find((i) => i.month === DEC)).toMatchObject({ totalCents: 58000, carriedInCents: 23000, status: 'aberta' });
+    expect(paid.commitments.find((c) => c.invoice!.month === DEC)!.amountCents).toBe(58000);
+    // Repetir a chave devolve o mesmo pagamento; a operação é achada pela chave.
+    expect((await bruno.payInvoice(key, card.id, NOV, nov.commitmentVersion!, 30000, T0, account)).record.id).toBe(paid.record.id);
+    expect(await bruno.findCardOperation(key)).toEqual({ action: 'pagar_fatura', cardId: card.id, entryId: null, commitmentId: paid.commitment.id, recordId: paid.record.id });
+    expect(await paidOfOctober()).toBe(30000);
+    expect((await committedCard(DEC)).cardCents).toBe(58000);
+
+    // Por categoria: o pagamento se divide pelas categorias da fatura; sem a fatura, cai em "Sem categoria".
+    const records = await bruno.listRecords(ctx, OCT);
+    const shares = categoryBreakdown(records, await loadInvoicesOfRecords(bruno, records, T0));
+    expect(shares.reduce((sum, r) => sum + r.cents, 0)).toBe(30000);
+    expect(shares.length).toBeGreaterThan(1);
+    expect(categoryBreakdown(records).map((r) => [r.category, r.cents])).toEqual([[null, 30000]]);
+    expect(await bruno.getRecord(paid.record.id)).toEqual(paid.record);
+
+    // O gasto de um pagamento de fatura só muda de conta e de data; a conta da fatura só muda pelo cartão.
+    expect(await code(bruno.deleteRecord(newOperationKey(), paid.record.id, paid.record.version))).toEqual(['pagamento_de_fatura', null]);
+    const same = { accountId: account, amountCents: 30000, occurredOn: T0, description: paid.record.description, category: null };
+    expect(await code(bruno.updateRecord(newOperationKey(), paid.record.id, paid.record.version, { ...same, amountCents: 29000 }))).toEqual(['pagamento_de_fatura', null]);
+    expect(await code(bruno.updateRecord(newOperationKey(), paid.record.id, paid.record.version, { ...same, description: 'Outra' }))).toEqual(['pagamento_de_fatura', null]);
+    const moved = await bruno.updateRecord(newOperationKey(), paid.record.id, paid.record.version, { ...same, occurredOn: '2031-10-06' });
+    expect([moved.occurredOn, moved.invoice]).toEqual(['2031-10-06', { cardId: card.id, month: NOV }]);
+    const novItem = (await bruno.listInvoiceItems(card.id)).find((i) => i.month === NOV)!;
+    expect([novItem.paidOn, novItem.status]).toEqual(['2031-10-06', 'paga_em_parte']);
+
+    // Conta de fatura: nenhuma função de conta a pagar a toca.
+    const dec = paid.commitments.find((c) => c.invoice!.month === DEC)!;
+    const novCommitment = (await bruno.getCommitment(paid.commitment.id))!;
+    const input: CommitmentInput = { amountCents: 1000, dueOn: dec.dueOn, description: 'Outra', category: null };
+    expect(await code(bruno.updateCommitment(newOperationKey(), dec.id, dec.version, input))).toEqual(['conta_de_fatura', null]);
+    expect(await code(bruno.deleteCommitment(newOperationKey(), dec.id, dec.version))).toEqual(['conta_de_fatura', null]);
+    expect(await code(bruno.payCommitment(newOperationKey(), dec.id, dec.version, { accountId: account, amountCents: dec.amountCents, paidOn: T0, category: null }))).toEqual(['conta_de_fatura', null]);
+    expect(await code(bruno.undoCommitmentPayment(newOperationKey(), novCommitment.id, novCommitment.version))).toEqual(['conta_de_fatura', null]);
+    expect(await code(pay({ version: novCommitment.version }))).toEqual(['compromisso_quitado', null]);
+
+    // Desfazer: apaga o gasto e o saldo anterior e reabre a conta.
+    expect(await code(bruno.undoInvoicePayment(newOperationKey(), card.id, NOV, novCommitment.version + 3))).toEqual(['versao_desatualizada', expect.stringMatching(/^versao_atual=\d+$/)]);
+    expect(await code(bruno.undoInvoicePayment(newOperationKey(), card.id, DEC, dec.version))).toEqual(['compromisso_aberto', null]);
+    const undone = await bruno.undoInvoicePayment(newOperationKey(), card.id, NOV, novCommitment.version);
+    expect(undone.record.id).toBe(paid.record.id);
+    expect(undone.commitment).toMatchObject({ status: 'aberto', payment: null, amountCents: 53000 });
+    expect(undone.entry).toMatchObject({ id: paid.entry!.id, kind: 'saldo_anterior' });
+    expect(undone.invoices.find((i) => i.month === NOV)).toMatchObject({ status: 'aberta', totalCents: 53000, paidRecordId: null });
+    expect(undone.invoices.find((i) => i.month === DEC)).toMatchObject({ totalCents: 35000, carriedInCents: 0 });
+    expect(await bruno.getRecord(paid.record.id)).toBeNull();
+    expect(await bruno.getCardEntry(paid.entry!.id)).toBeNull();
+    expect(await paidOfOctober()).toBe(0);
+    expect((await bruno.getCard(card.id))!.usedCents).toBe(230000 + 3000 - 5000);
+    await checkedToPay(BRUNO, ctx, DEC, T0);
+  });
+
+  it('pagar a fatura aberta antes do fechamento desvia as compras novas; fatura fechada e paga recusa', async () => {
+    const lost = new SupabaseRepository(clientFor(BRUNO, T0, lostResponse), { id: BRUNO });
+    const nov = (await bruno.listInvoiceItems(card.id)).find((i) => i.month === NOV)!;
+    // A resposta se perde: o resultado é incerto, e a chave diz se gravou (e repetir não paga duas vezes).
+    const key = newOperationKey();
+    expect(await err(lost.payInvoice(key, card.id, NOV, nov.commitmentVersion!, 53000, T0))).toBe('rede');
+    const op = await bruno.findCardOperation(key);
+    expect(op).toMatchObject({ action: 'pagar_fatura', cardId: card.id, entryId: null });
+    const replay = await bruno.payInvoice(key, card.id, NOV, nov.commitmentVersion!, 53000, T0);
+    expect([replay.record.id, replay.commitment.id]).toEqual([op!.recordId, op!.commitmentId]);
+    expect(await paidOfOctober()).toBe(53000);
+    expect((await bruno.listInvoiceItems(card.id)).find((i) => i.month === NOV)).toMatchObject({ status: 'paga', paidCents: 53000, leftOverCents: 0 });
+
+    // Compra de hoje: a fatura natural (novembro) está aberta e paga, então vai para a primeira fatura livre (dezembro).
+    const faturas = await invoicesOf();
+    expect(purchaseFirstInvoiceMonth(card, T0, 1, paidInvoiceMonths(faturas), T0)).toBe(DEC);
+    expect(purchaseFirstInvoiceMonth(card, T0, 3, paidInvoiceMonths(faturas), T0)).toBe(DEC);
+    const mercado = await bruno.addCardPurchase(newOperationKey(), card.id, purchase('Mercado', 10000, T0, 1, 'Alimentação'));
+    expect(mercado.entry).toMatchObject({ invoiceMonth: DEC, purchasedOn: T0 });
+    expect(await totalsOf()).toContainEqual([DEC, 45000]);
+    expect((await bruno.getCard(card.id))!.usedCents).toBe(cardLimitUsed(await invoicesOf()));
+    expect(cardLimitUsed(await invoicesOf())).toBe(185000 + 10000 - 10000);
+
+    // Fatura paga não aceita encargo, estorno nem mudança de valor, data ou parcelas; só descrição e categoria.
+    expect(await code(bruno.addCardCharge(newOperationKey(), card.id, { chargeType: 'juros', amountCents: 100, invoiceMonth: NOV }))).toEqual(['fatura_paga', null]);
+    expect(await code(bruno.addCardRefund(newOperationKey(), card.id, { description: 'x', category: null, amountCents: 100, invoiceMonth: NOV }))).toEqual(['fatura_paga', null]);
+    expect(await code(bruno.updateCardEntry(newOperationKey(), tenis.id, tenis.version, { kind: 'compra', ...purchase('Tênis de corrida', 61000, '2031-10-05', 3) }))).toEqual(['fatura_paga', null]);
+    expect(await code(bruno.deleteCardEntry(newOperationKey(), tenis.id, tenis.version))).toEqual(['fatura_paga', null]);
+    const relabel = await bruno.updateCardEntry(newOperationKey(), tenis.id, tenis.version, { kind: 'compra', ...purchase('Tênis de corrida azul', 60000, '2031-10-05', 3, 'Vestuário') });
+    tenis = relabel.entry!;
+    expect(tenis).toMatchObject({ description: 'Tênis de corrida azul', category: 'Vestuário', amountCents: 60000, invoiceMonth: NOV });
+
+    // Depois do fechamento de novembro (12/11), uma compra de 20/10 pertence a ela: a fatura já foi paga, e nada é gravado.
+    const late = repoFor(BRUNO, AFTER_CLOSING);
+    const before = (await bruno.listCardEntries(card.id)).length;
+    expect(await code(late.addCardPurchase(newOperationKey(), card.id, purchase('Esquecida', 5000, '2031-10-20')))).toEqual(['fatura_paga', null]);
+    expect((await bruno.listCardEntries(card.id)).length).toBe(before);
+    // Depois do fechamento a conta paga deixa de ser estimada; as seguintes ainda são.
+    const lateItems = await late.listInvoiceItems(card.id);
+    expect(lateItems.find((i) => i.month === NOV)).toMatchObject({ status: 'paga', amountIsEstimate: false });
+    expect(lateItems.find((i) => i.month === DEC)).toMatchObject({ status: 'aberta', amountIsEstimate: true });
+
+    // Desfazer o pagamento antecipado reabre novembro; a compra desviada fica em dezembro até ser excluída.
+    const undone = await bruno.undoInvoicePayment(newOperationKey(), card.id, NOV, replay.commitment.version);
+    expect([undone.entry, undone.commitment.status]).toEqual([null, 'aberto']);
+    expect(await paidOfOctober()).toBe(0);
+    const removed = await bruno.deleteCardEntry(newOperationKey(), mercado.entry!.id, mercado.entry!.version);
+    expect(removed.entry).toMatchObject({ id: mercado.entry!.id });
+    expect(await bruno.getCardEntry(mercado.entry!.id)).toBeNull();
+    expect(await totalsOf()).toContainEqual([DEC, 35000]);
+  });
+
+  it('crédito maior que a fatura é levado como estorno automático; o automático não se edita', async () => {
+    const w = await bruno.createCard(newOperationKey(), ctx, { name: 'Mercado', lastDigits: null, closingDay: 3, dueDay: 10, limitCents: null });
+    const other = w.card;
+    const geladeira = (await bruno.addCardPurchase(newOperationKey(), other.id, purchase('Geladeira', 45000, '2031-10-05', 3, 'Moradia'))).entry!;
+    const refund = await bruno.addCardRefund(newOperationKey(), other.id, { description: 'Devolução', category: 'Moradia', amountCents: 40000, invoiceMonth: NOV });
+    // 150,00 - 400,00 = -250,00 em novembro; levados a dezembro: 150,00 - 250,00 = -100,00; janeiro: 150,00 - 100,00 = 50,00.
+    expect(await totalsOf(other)).toEqual([[NOV, -25000], [DEC, -10000], [JAN, 5000]]);
+    const items = await bruno.listInvoiceItems(other.id);
+    expect(items.map((i) => [i.creditCents, i.commitmentId === null])).toEqual([[25000, true], [10000, true], [0, false]]);
+    expect((await bruno.listInvoiceCommitments(other.id)).map((c) => [c.invoice!.month, c.amountCents])).toEqual([[JAN, 5000]]);
+    expect((await bruno.getCard(other.id))!.usedCents).toBe(5000);
+    expect(cardLimitUsed(await invoicesOf(other))).toBe(5000);
+    const automatic = (await bruno.listCardEntries(other.id))
+      .filter((e) => e.kind === 'estorno' && e.description === null)
+      .sort((a, b) => a.invoiceMonth.localeCompare(b.invoiceMonth));
+    expect(automatic.map((e) => [e.invoiceMonth, e.sourceMonth, e.amountCents])).toEqual([[DEC, NOV, 25000], [JAN, DEC, 10000]]);
+    const auto = automatic[0]!;
+    expect(await code(bruno.updateCardEntry(newOperationKey(), auto.id, auto.version, { kind: 'estorno', description: 'x', category: null, amountCents: 1, invoiceMonth: DEC }))).toEqual(['lancamento_automatico', null]);
+    expect(await code(bruno.deleteCardEntry(newOperationKey(), auto.id, auto.version))).toEqual(['lancamento_automatico', null]);
+
+    // Sem conta a pagar, não há fatura para pagar.
+    expect(await code(bruno.payInvoice(newOperationKey(), other.id, NOV, 1, 100, T0))).toEqual(['nao_encontrado', null]);
+    // Arquivado não recebe compra, mas aceita encargo; reativar volta ao normal.
+    const archived = await bruno.setCardStatus(newOperationKey(), other.id, other.version, 'arquivado');
+    expect(archived.card).toMatchObject({ status: 'arquivado', version: other.version + 1 });
+    expect(await code(bruno.addCardPurchase(newOperationKey(), other.id, purchase('Nova', 100, T0)))).toEqual(['cartao_arquivado', null]);
+    const fee = await bruno.addCardCharge(newOperationKey(), other.id, { chargeType: 'iof', amountCents: 100, invoiceMonth: JAN });
+    expect(await code(bruno.setCardStatus(newOperationKey(), other.id, other.version, 'ativo'))).toEqual(['versao_desatualizada', expect.stringMatching(/^versao_atual=\d+$/)]);
+    expect(await code(bruno.setCardStatus(newOperationKey(), other.id, archived.card.version, 'suspenso' as 'ativo'))).toEqual(['situacao_invalida', null]);
+    const active = await bruno.setCardStatus(newOperationKey(), other.id, archived.card.version, 'ativo');
+    expect(active.card.status).toBe('ativo');
+
+    // Excluir: só sem lançamentos; as contas somem junto com os lançamentos.
+    expect(await code(bruno.deleteCard(newOperationKey(), other.id, active.card.version))).toEqual(['cartao_com_lancamentos', null]);
+    await bruno.deleteCardEntry(newOperationKey(), fee.entry!.id, fee.entry!.version);
+    await bruno.deleteCardEntry(newOperationKey(), refund.entry!.id, refund.entry!.version);
+    const last = await bruno.deleteCardEntry(newOperationKey(), geladeira.id, geladeira.version);
+    expect(last.invoices).toEqual([]);
+    expect(await bruno.listCardEntries(other.id)).toEqual([]);
+    expect(await bruno.listInvoiceCommitments(other.id)).toEqual([]);
+    expect(await code(bruno.deleteCard(newOperationKey(), other.id, active.card.version))).toBeNull();
+    expect(await bruno.getCard(other.id)).toBeNull();
+    expect((await bruno.listCards(ctx)).map((c) => c.id)).toEqual([card.id]);
+  });
+
+  it('nota fiscal: só o resumo da chave chega ao banco; nota repetida é achada antes de salvar', async () => {
+    const a = note('2031-10');
+    const b = note('2031-09');
+    expect(a.digest).toMatch(/^[0-9a-f]{64}$/);
+    expect(a.digest).not.toBe(b.digest);
+    expect(await bruno.findReceipt(ctx, a.digest)).toBeNull();
+    // Resumo malformado e chave inteira nem chegam ao banco.
+    expect(await bruno.findReceipt(ctx, 'abc')).toBeNull();
+    expect(await bruno.findReceipt(ctx, a.rawKey)).toBeNull();
+    expect(await bruno.findReceipt(ctx, a.digest.toUpperCase())).toBeNull();
+    // A chave inteira é recusada pelo banco, em gasto e em compra; receita não leva nota.
+    const expense = { accountId: account, amountCents: 8740, occurredOn: T0, description: 'Mercado', category: 'Alimentação' };
+    expect(await code(bruno.createRecord(newOperationKey(), ctx, 'despesa', { ...expense, receiptKey: a.rawKey }))).toEqual(['chave_de_nota_invalida', null]);
+    expect(await code(bruno.addCardPurchase(newOperationKey(), card.id, { ...purchase('Mercado', 8740, T0), receiptKey: a.rawKey }))).toEqual(['chave_de_nota_invalida', null]);
+    expect(await code(bruno.createRecord(newOperationKey(), ctx, 'receita', { ...expense, receiptKey: b.digest }))).toEqual(['chave_de_nota_invalida', null]);
+
+    // Gasto com nota.
+    const key = newOperationKey();
+    const record = await bruno.createRecord(key, ctx, 'despesa', { ...expense, receiptKey: b.digest });
+    expect(record).toMatchObject({ receiptKey: b.digest, invoice: null, commitmentId: null });
+    expect((await bruno.createRecord(key, ctx, 'despesa', { ...expense, receiptKey: b.digest })).id).toBe(record.id);
+    expect(await bruno.findReceipt(ctx, b.digest)).toEqual({ recordId: record.id, cardEntryId: null, cardId: null });
+    expect(await code(bruno.createRecord(newOperationKey(), ctx, 'despesa', { ...expense, receiptKey: b.digest }))).toEqual(['nota_ja_anotada', `registro=${record.id}`]);
+    expect(await code(bruno.addCardPurchase(newOperationKey(), card.id, { ...purchase('Mercado', 8740, T0), receiptKey: b.digest }))).toEqual(['nota_ja_anotada', `registro=${record.id}`]);
+    // A edição ignora a chave: continua a mesma e a nota continua achada.
+    const edited = await bruno.updateRecord(newOperationKey(), record.id, record.version, { ...expense, amountCents: 8800, receiptKey: a.digest });
+    expect([edited.amountCents, edited.receiptKey]).toEqual([8800, b.digest]);
+
+    // Compra no cartão com nota (na parcela 1).
+    const purchaseKey = newOperationKey();
+    const bought = await bruno.addCardPurchase(purchaseKey, card.id, { ...purchase('Farmácia', 9000, T0, 3, 'Saúde'), receiptKey: a.digest });
+    const entry = bought.entry!;
+    expect(entry).toMatchObject({ kind: 'compra', receiptKey: a.digest, installments: 3 });
+    expect((await bruno.addCardPurchase(purchaseKey, card.id, { ...purchase('Farmácia', 9000, T0, 3, 'Saúde'), receiptKey: a.digest })).entry!.id).toBe(entry.id);
+    expect(await bruno.findReceipt(ctx, a.digest)).toEqual({ recordId: null, cardEntryId: entry.id, cardId: card.id });
+    expect(await bruno.getCardEntry(entry.id)).toEqual(entry);
+    expect((await bruno.getCard(card.id))!.id).toBe(card.id);
+    expect(await code(bruno.createRecord(newOperationKey(), ctx, 'despesa', { ...expense, receiptKey: a.digest }))).toEqual(['nota_ja_anotada', `compra=${entry.id}`]);
+    expect(await code(bruno.addCardPurchase(newOperationKey(), card.id, { ...purchase('Outra vez', 100, T0), receiptKey: a.digest }))).toEqual(['nota_ja_anotada', `compra=${entry.id}`]);
+    // Editar a compra não mexe na nota.
+    const renamed = await bruno.updateCardEntry(newOperationKey(), entry.id, entry.version, { kind: 'compra', ...purchase('Farmácia do bairro', 9000, T0, 3, 'Saúde') });
+    expect(renamed.entry).toMatchObject({ description: 'Farmácia do bairro', receiptKey: a.digest });
+
+    // Quem não lê o contexto não descobre a nota; no banco só há resumos, nunca a chave.
+    expect(await ana.findReceipt(ctx, a.digest)).toBeNull();
+    expect(await ana.getCardEntry(entry.id)).toBeNull();
+    const stored = JSON.stringify([
+      (await clientFor(BRUNO).from('financial_records').select('*').eq('context_id', ctx)).data,
+      (await clientFor(BRUNO).from('card_entries').select('*').eq('card_id', card.id)).data,
+      (await clientFor(BRUNO).from('receipt_items').select('*').eq('context_id', ctx)).data,
+    ]);
+    expect(stored).toContain(a.digest);
+    expect(stored).not.toContain(a.rawKey);
+    expect(stored).not.toContain(a.rawKey.slice(6, 20));
+
+    // Excluir libera a nota para ser anotada de novo.
+    await bruno.deleteCardEntry(newOperationKey(), entry.id, renamed.entry!.version);
+    expect(await bruno.findReceipt(ctx, a.digest)).toBeNull();
+    const again = await bruno.createRecord(newOperationKey(), ctx, 'despesa', { ...expense, receiptKey: a.digest });
+    expect(await bruno.findReceipt(ctx, a.digest)).toEqual({ recordId: again.id, cardEntryId: null, cardId: null });
+    await bruno.deleteRecord(newOperationKey(), again.id, again.version);
+    await bruno.deleteRecord(newOperationKey(), record.id, edited.version);
+    expect(await bruno.findReceipt(ctx, b.digest)).toBeNull();
+  });
+
+  it('compra com a resposta perdida: a chave mostra se foi gravada e repetir não duplica', async () => {
+    const lost = new SupabaseRepository(clientFor(BRUNO, T0, lostResponse), { id: BRUNO });
+    const before = (await bruno.listCardEntries(card.id)).length;
+    const key = newOperationKey();
+    const input = purchase('Padaria', 1500, T0, 1, 'Alimentação');
+    expect(await err(lost.addCardPurchase(key, card.id, input))).toBe('rede');
+    const op = await bruno.findCardOperation(key);
+    expect(op).toMatchObject({ action: 'criar_compra_cartao', cardId: card.id, commitmentId: null, recordId: null });
+    expect(op!.entryId).not.toBeNull();
+    const replay = await bruno.addCardPurchase(key, card.id, input);
+    expect(replay.entry!.id).toBe(op!.entryId);
+    expect((await bruno.listCardEntries(card.id)).length).toBe(before + 1);
+    expect(await code(bruno.addCardPurchase(key, card.id, { ...input, totalCents: 1600 }))).toEqual(['chave_reutilizada', null]);
+    // Uma recusa não grava operação: a chave pode ser usada de novo.
+    const refusedKey = newOperationKey();
+    expect(await code(bruno.addCardPurchase(refusedKey, card.id, { ...input, totalCents: 0 }))).toEqual(['valor_invalido', null]);
+    expect(await bruno.findCardOperation(refusedKey)).toBeNull();
+    await bruno.deleteCardEntry(newOperationKey(), replay.entry!.id, replay.entry!.version);
+  });
+
+  it('limite de cartões ativos, exclusão do cartão e limpeza', async () => {
+    const extra: Card[] = [];
+    // Até 20 ativos por contexto (já há um).
+    for (let n = 1; n <= 19; n++) {
+      extra.push((await bruno.createCard(newOperationKey(), ctx, { name: `Lote ${n}`, lastDigits: null, closingDay: 5, dueDay: 12, limitCents: null })).card);
+    }
+    expect(await code(bruno.createCard(newOperationKey(), ctx, { name: 'Lote 20', lastDigits: null, closingDay: 5, dueDay: 12, limitCents: null }))).toEqual(['limite_de_cartoes', null]);
+    // Arquivar um libera a vaga, e reativar com 20 ativos é recusado.
+    const first = extra[0]!;
+    const archived = await bruno.setCardStatus(newOperationKey(), first.id, first.version, 'arquivado');
+    const slot = await bruno.createCard(newOperationKey(), ctx, { name: 'Lote 20', lastDigits: null, closingDay: 5, dueDay: 12, limitCents: null });
+    expect(await code(bruno.setCardStatus(newOperationKey(), first.id, archived.card.version, 'ativo'))).toEqual(['limite_de_cartoes', null]);
+    expect((await bruno.listCards(ctx)).map((c) => c.name)).toHaveLength(21);
+    for (const c of [...extra.slice(1), slot.card]) await bruno.deleteCard(newOperationKey(), c.id, c.version);
+    await bruno.deleteCard(newOperationKey(), first.id, archived.card.version);
+    expect((await bruno.listCards(ctx)).map((c) => c.id)).toEqual([card.id]);
+
+    // O Nubank: com lançamentos não se exclui; sem eles, sim, e as contas das faturas somem com os lançamentos.
+    const fresh = (await bruno.getCard(card.id))!;
+    expect(await code(bruno.deleteCard(newOperationKey(), card.id, fresh.version))).toEqual(['cartao_com_lancamentos', null]);
+    for (const e of await bruno.listCardEntries(card.id)) await bruno.deleteCardEntry(newOperationKey(), e.id, e.version);
+    expect(await bruno.listInvoiceItems(card.id)).toEqual([]);
+    expect(await bruno.listInvoiceCommitments(card.id)).toEqual([]);
+    const edited = await bruno.updateCard(newOperationKey(), card.id, fresh.version, { ...nubank, name: 'Nubank Ultravioleta', limitCents: 800000 });
+    expect(await code(bruno.updateCard(newOperationKey(), card.id, fresh.version, nubank))).toEqual(['versao_desatualizada', expect.stringMatching(/^versao_atual=\d+$/)]);
+    expect(edited.card).toMatchObject({ name: 'Nubank Ultravioleta', limitCents: 800000 });
+    const deleted = await bruno.deleteCard(newOperationKey(), card.id, edited.card.version);
+    expect(deleted.card.id).toBe(card.id);
+    expect(await bruno.getCard(card.id)).toBeNull();
+    expect(await bruno.listCards(ctx)).toEqual([]);
+    expect((await bruno.listCommitments(ctx, NOV)).filter((c) => c.invoice)).toEqual([]);
+  });
+});
+
+describe('conversor dos cartões e das notas fiscais', () => {
+  // Sem rede: os argumentos de cada função, a leitura das linhas (AAAA-MM-01 ↔ AAAA-MM, bigint), a recusa de linha incoerente
+  // e os códigos de erro novos.
+  const calls: [string, Record<string, unknown>][] = [];
+  const DIGEST = 'a'.repeat(64);
+  const cardRow = {
+    id: 'c1',
+    context_id: 'ctx',
+    nickname: 'Nubank',
+    last_digits: '1234',
+    closing_day: 3,
+    due_day: 10,
+    limit_cents: 500000,
+    status: 'ativo',
+    created_by: 'p1',
+    version: 1,
+    created_at: 'a',
+    updated_at: 'b',
+    used_cents: 230000,
+    current_month: '2026-11-01',
+    current_closing_on: '2026-11-03',
+    current_due_on: '2026-11-10',
+    deleted_at: null,
+    deleted_by: null,
+  };
+  const entryRow = {
+    id: 'e1',
+    context_id: 'ctx',
+    card_id: 'c1',
+    kind: 'compra',
+    description: 'Tênis',
+    category: 'Lazer',
+    charge_kind: null,
+    purchased_on: '2026-10-05',
+    amount_cents: 60000,
+    installments: 3,
+    invoice_month: '2026-11-01',
+    source_month: null,
+    payment_record_id: null,
+    receipt_key: DIGEST,
+    created_by: 'p1',
+    version: 1,
+    created_at: 'a',
+    updated_at: 'b',
+  };
+  const invoiceRow = {
+    card_id: 'c1',
+    context_id: 'ctx',
+    month: '2026-11-01',
+    closing_on: '2026-11-03',
+    due_on: '2026-11-10',
+    status: 'aberta',
+    total_cents: 20000,
+    purchases_cents: 20000,
+    charges_cents: 0,
+    carried_in_cents: 0,
+    refunds_cents: 0,
+    credit_cents: 0,
+    entry_count: 1,
+    commitment_id: 'm1',
+    commitment_version: 1,
+    amount_is_estimate: true,
+    to_pay_cents: 20000,
+    paid_record_id: null,
+    paid_cents: null,
+    paid_on: null,
+    paid_account_id: null,
+    left_over_cents: null,
+  };
+  const commitmentRow = {
+    id: 'm1',
+    context_id: 'ctx',
+    description: 'Fatura Nubank',
+    amount_cents: 20000,
+    currency: 'BRL',
+    due_on: '2026-11-10',
+    status: 'aberto',
+    category: null,
+    created_by: 'p1',
+    version: 1,
+    created_at: 'a',
+    updated_at: 'b',
+    paid_record_id: null,
+    paid_on: null,
+    paid_amount_cents: null,
+    paid_account_id: null,
+    series_id: null,
+    occurrence_number: null,
+    series_override: false,
+    amount_is_estimate: true,
+    series_kind: null,
+    series_nature: null,
+    series_installment_total: null,
+    series_parts_per_year: null,
+    card_id: 'c1',
+    invoice_month: '2026-11-01',
+    card_closing_on: '2026-11-03',
+  };
+  const recordRow = {
+    id: 'r1',
+    context_id: 'ctx',
+    account_id: 'a1',
+    kind: 'despesa',
+    status: 'realizado',
+    amount_cents: 20000,
+    currency: 'BRL',
+    occurred_on: '2026-10-07',
+    description: 'Fatura Nubank (novembro)',
+    category: null,
+    commitment_id: 'm1',
+    card_id: 'c1',
+    invoice_month: '2026-11-01',
+    receipt_key: null,
+    created_by: 'p1',
+    version: 1,
+    created_at: 'a',
+    updated_at: 'b',
+  };
+  const write = { card: cardRow, entry: entryRow, entries: [], invoices: [invoiceRow], commitments: [commitmentRow], commitment: null, record: null };
+  const payment = { ...write, entry: null, commitment: { ...commitmentRow, status: 'quitado', paid_record_id: 'r1', paid_on: '2026-10-07', paid_amount_cents: 20000, paid_account_id: 'a1' }, record: recordRow };
+
+  const query = (result: { data: unknown; error: unknown }) => {
+    const q: Record<string, unknown> = {};
+    for (const m of ['select', 'eq', 'in', 'is', 'gte', 'lt', 'order', 'range', 'limit']) q[m] = () => q;
+    q.maybeSingle = async () => ({ data: Array.isArray(result.data) ? (result.data[0] ?? null) : result.data, error: result.error });
+    q.then = (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) => Promise.resolve(result).then(resolve, reject);
+    return q;
+  };
+  const fake = (rpc: Record<string, unknown>, tables: Record<string, { data: unknown; error?: unknown }> = {}, error: unknown = null) => {
+    const db = {
+      from: (table: string) => query(error ? { data: null, error } : { data: tables[table]?.data ?? null, error: tables[table]?.error ?? null }),
+      // create_record devolve a linha e a chamada termina em .single(); as outras, jsonb sem .single().
+      rpc: (fn: string, args: Record<string, unknown>) => {
+        calls.push([fn, args]);
+        const result = error ? { data: null, error } : { data: rpc[fn] ?? null, error: null };
+        return Object.assign(Promise.resolve(result), { single: async () => result });
+      },
+    };
+    return new SupabaseRepository(db as unknown as SupabaseClient, { id: 'p1' });
+  };
+  const failure = (p: Promise<unknown>) => p.then(() => null, (e: unknown) => (e instanceof RepoError ? [e.code, e.message, e.detail ?? null] : String(e)));
+  const cardOut = {
+    id: 'c1',
+    contextId: 'ctx',
+    name: 'Nubank',
+    lastDigits: '1234',
+    closingDay: 3,
+    dueDay: 10,
+    limitCents: 500000,
+    status: 'ativo',
+    createdBy: 'p1',
+    version: 1,
+    createdAt: 'a',
+    updatedAt: 'b',
+    usedCents: 230000,
+    currentMonth: '2026-11',
+    currentClosingOn: '2026-11-03',
+    currentDueOn: '2026-11-10',
+  };
+  const entryOut = {
+    id: 'e1',
+    contextId: 'ctx',
+    cardId: 'c1',
+    kind: 'compra',
+    description: 'Tênis',
+    category: 'Lazer',
+    chargeType: null,
+    purchasedOn: '2026-10-05',
+    amountCents: 60000,
+    installments: 3,
+    invoiceMonth: '2026-11',
+    sourceMonth: null,
+    paymentRecordId: null,
+    receiptKey: DIGEST,
+    createdBy: 'p1',
+    version: 1,
+    createdAt: 'a',
+    updatedAt: 'b',
+  };
+
+  it('leitura: cartão, lançamento, fatura e conta de fatura (mês AAAA-MM-01 vira AAAA-MM, fechamento gravado)', async () => {
+    const repo = fake({}, { card_items: { data: [cardRow] }, card_entry_items: { data: [entryRow] }, invoice_items: { data: [invoiceRow] }, commitment_items: { data: [commitmentRow] } });
+    expect(await repo.listCards('ctx')).toEqual([cardOut]);
+    expect(await repo.getCard('c1')).toEqual(cardOut);
+    expect(await repo.getCardEntry('e1')).toEqual(entryOut);
+    expect(await repo.listCardEntries('c1')).toEqual([entryOut]);
+    const [invoice] = await repo.listInvoiceItems('c1');
+    expect(invoice).toMatchObject({ cardId: 'c1', month: '2026-11', closingOn: '2026-11-03', dueOn: '2026-11-10', status: 'aberta', totalCents: 20000, commitmentId: 'm1', commitmentVersion: 1, amountIsEstimate: true, paidCents: null, leftOverCents: null });
+    const [account] = await repo.listInvoiceCommitments('c1');
+    expect(account).toMatchObject({ id: 'm1', status: 'aberto', amountIsEstimate: true, series: null, invoice: { cardId: 'c1', month: '2026-11', closingOn: '2026-11-03' } });
+    expect(await fake({}, { card_items: { data: null } }).getCard('nada')).toBeNull();
+    // Conta e gasto comuns: sem fatura e sem nota.
+    const plain = await fake({}, { commitment_items: { data: [{ ...commitmentRow, card_id: null, invoice_month: null, card_closing_on: null, amount_is_estimate: false }] } }).getCommitment('m1');
+    expect(plain?.invoice).toBeNull();
+    const rec = await fake({}, { financial_records: { data: [{ ...recordRow, card_id: null, invoice_month: null, receipt_key: DIGEST }] } }).getRecord('r1');
+    expect([rec?.invoice, rec?.receiptKey]).toEqual([null, DIGEST]);
+  });
+
+  it('linhas incoerentes são recusadas: nunca mostrar um final, uma chave ou uma fatura errados', async () => {
+    const card = (patch: object) => failure(fake({}, { card_items: { data: [{ ...cardRow, ...patch }] } }).getCard('c1'));
+    for (const patch of [{ last_digits: '1234567890123456' }, { last_digits: '12' }, { status: 'suspenso' }, { closing_day: 0 }, { due_day: 32 }, { limit_cents: 0 }, { current_month: '2026-11-05' }]) {
+      expect(await card(patch)).toEqual(['desconhecido', expect.stringMatching(/inconsistente$/), null]);
+    }
+    const entry = (patch: object) => failure(fake({}, { card_entry_items: { data: [{ ...entryRow, ...patch }] } }).getCardEntry('e1'));
+    // A chave de 44 caracteres nunca é aceita no lugar do resumo.
+    for (const patch of [{ receipt_key: '3'.repeat(44) }, { receipt_key: 'A'.repeat(64) }, { kind: 'estorno', receipt_key: DIGEST }, { kind: 'rebate' }, { installments: 49 }, { kind: 'encargo', purchased_on: null, installments: 1, charge_kind: 'taxa', receipt_key: null }, { purchased_on: null }, { invoice_month: '2026-11-15' }]) {
+      expect(await entry(patch)).toEqual(['desconhecido', expect.stringMatching(/inconsistente$/), null]);
+    }
+    expect(await entry({ receipt_key: null })).toBeNull();
+    const invoice = (patch: object) => failure(fake({}, { invoice_items: { data: [{ ...invoiceRow, ...patch }] } }).listInvoiceItems('c1'));
+    for (const patch of [{ status: 'vencida' }, { commitment_version: null }, { status: 'paga' }, { paid_record_id: 'r1' }, { month: '2026-11-02' }]) {
+      expect(await invoice(patch)).toEqual(['desconhecido', expect.stringMatching(/inconsistente$/), null]);
+    }
+    const record = (patch: object) => failure(fake({}, { financial_records: { data: [{ ...recordRow, ...patch }] } }).getRecord('r1'));
+    for (const patch of [{ invoice_month: null }, { card_id: null }, { receipt_key: '3'.repeat(44) }]) {
+      expect(await record(patch)).toEqual(['desconhecido', expect.stringMatching(/inconsistente$/), null]);
+    }
+    const account = (patch: object) => failure(fake({}, { commitment_items: { data: [{ ...commitmentRow, ...patch }] } }).getCommitment('m1'));
+    for (const patch of [{ card_closing_on: null }, { invoice_month: null }, { series_id: 's1', occurrence_number: 1, series_kind: 'mensal', series_nature: 'fixo' }]) {
+      expect(await account(patch)).toEqual(['desconhecido', expect.stringMatching(/inconsistente$/), null]);
+    }
+  });
+
+  it('findReceipt: resumo malformado não consulta; gasto, compra e nada; linha incoerente é recusada', async () => {
+    const find = (rows: unknown[] | null, digest = DIGEST) => fake({}, { receipt_items: { data: rows } }).findReceipt('ctx', digest);
+    expect(await find([{ record_id: 'r1', card_entry_id: null, card_id: null }])).toEqual({ recordId: 'r1', cardEntryId: null, cardId: null });
+    expect(await find([{ record_id: null, card_entry_id: 'e1', card_id: 'c1' }])).toEqual({ recordId: null, cardEntryId: 'e1', cardId: 'c1' });
+    expect(await find([])).toBeNull();
+    expect(await find(null)).toBeNull();
+    expect(await find([{ record_id: 'r1', card_entry_id: null, card_id: null }], '3'.repeat(44))).toBeNull();
+    expect(await find([{ record_id: 'r1', card_entry_id: null, card_id: null }], 'A'.repeat(64))).toBeNull();
+    expect(await failure(find([{ record_id: 'r1', card_entry_id: 'e1', card_id: null }]))).toEqual(['desconhecido', 'nota_inconsistente', null]);
+    expect(await failure(find([{ record_id: 'r1', card_entry_id: null, card_id: null }, { record_id: 'r2', card_entry_id: null, card_id: null }]))).toEqual(['desconhecido', 'nota_inconsistente', null]);
+  });
+
+  it('argumentos de cada função de cartão; o resumo da nota e a conta de saída só vão quando existem', async () => {
+    calls.length = 0;
+    const repo = fake({
+      create_card: write,
+      update_card: write,
+      set_card_status: write,
+      delete_card: write,
+      add_card_purchase: write,
+      update_card_entry: write,
+      delete_card_entry: write,
+      add_card_charge: write,
+      add_card_refund: write,
+      pay_invoice: payment,
+      undo_invoice_payment: payment,
+      create_record: recordRow,
+    });
+    const input = { name: 'Nubank', lastDigits: '1234', closingDay: 3, dueDay: 10, limitCents: 500000 };
+    const base = { p_nickname: 'Nubank', p_last_digits: '1234', p_closing_day: 3, p_due_day: 10, p_limit_cents: 500000 };
+    expect(await repo.createCard('chave-5001', 'ctx', input)).toEqual({ card: cardOut, entry: entryOut, invoices: [expect.objectContaining({ month: '2026-11' })], commitments: [expect.objectContaining({ id: 'm1' })] });
+    await repo.updateCard('chave-5002', 'c1', 2, { ...input, lastDigits: null, limitCents: null });
+    await repo.setCardStatus('chave-5003', 'c1', 3, 'arquivado');
+    await repo.deleteCard('chave-5004', 'c1', 4);
+    const p = { description: 'Tênis', category: 'Lazer', purchasedOn: '2026-10-05', totalCents: 60000, installments: 3 };
+    await repo.addCardPurchase('chave-5005', 'c1', p);
+    await repo.addCardPurchase('chave-5006', 'c1', { ...p, receiptKey: DIGEST });
+    await repo.updateCardEntry('chave-5007', 'e1', 1, { kind: 'compra', ...p, receiptKey: DIGEST });
+    await repo.updateCardEntry('chave-5008', 'e2', 1, { kind: 'encargo', chargeType: 'juros', amountCents: 700, invoiceMonth: '2026-12' });
+    await repo.updateCardEntry('chave-5009', 'e3', 1, { kind: 'estorno', description: 'Devolução', category: null, amountCents: 900, invoiceMonth: '2026-12' });
+    await repo.deleteCardEntry('chave-5010', 'e1', 2);
+    await repo.addCardCharge('chave-5011', 'c1', { chargeType: 'anuidade', amountCents: 3000, invoiceMonth: '2026-11' });
+    await repo.addCardRefund('chave-5012', 'c1', { description: 'Devolução', category: 'Lazer', amountCents: 5000, invoiceMonth: '2026-11' });
+    const paid = await repo.payInvoice('chave-5013', 'c1', '2026-11', 1, 20000, '2026-10-07');
+    await repo.payInvoice('chave-5014', 'c1', '2026-11', 1, 20000, '2026-10-07', 'a1');
+    await repo.undoInvoicePayment('chave-5015', 'c1', '2026-11', 2);
+    await repo.createRecord('chave-5016', 'ctx', 'despesa', { accountId: 'a1', amountCents: 100, occurredOn: '2026-10-07', description: 'Mercado', category: null });
+    await repo.createRecord('chave-5017', 'ctx', 'despesa', { accountId: 'a1', amountCents: 100, occurredOn: '2026-10-07', description: 'Mercado', category: null, receiptKey: DIGEST });
+    expect(paid.record).toMatchObject({ invoice: { cardId: 'c1', month: '2026-11' }, commitmentId: 'm1', receiptKey: null });
+    expect(paid.commitment).toMatchObject({ status: 'quitado', payment: { recordId: 'r1', amountCents: 20000, paidOn: '2026-10-07', accountId: 'a1' } });
+    expect(paid.entry).toBeNull();
+    const k = (n: number) => ({ p_idempotency_key: `chave-${n}` });
+    const pur = { p_purchased_on: '2026-10-05', p_total_cents: 60000, p_installments: 3, p_description: 'Tênis', p_category: 'Lazer' };
+    const none = { p_installments: null, p_invoice_month: null, p_charge_kind: null };
+    expect(calls).toEqual([
+      ['create_card', { ...k(5001), p_context_id: 'ctx', ...base }],
+      ['update_card', { ...k(5002), p_card_id: 'c1', p_expected_version: 2, ...base, p_last_digits: null, p_limit_cents: null }],
+      ['set_card_status', { ...k(5003), p_card_id: 'c1', p_expected_version: 3, p_status: 'arquivado' }],
+      ['delete_card', { ...k(5004), p_card_id: 'c1', p_expected_version: 4 }],
+      ['add_card_purchase', { ...k(5005), p_card_id: 'c1', ...pur }],
+      ['add_card_purchase', { ...k(5006), p_card_id: 'c1', ...pur, p_receipt_key: DIGEST }],
+      // A chave da nota não muda depois de gravada: a edição nunca a manda.
+      ['update_card_entry', { ...k(5007), p_entry_id: 'e1', p_expected_version: 1, p_kind: 'compra', p_amount_cents: 60000, p_occurred_on: '2026-10-05', p_description: 'Tênis', p_category: 'Lazer', p_installments: 3, p_invoice_month: null, p_charge_kind: null }],
+      ['update_card_entry', { ...k(5008), p_entry_id: 'e2', p_expected_version: 1, p_kind: 'encargo', p_amount_cents: 700, p_occurred_on: null, p_description: null, p_category: null, ...none, p_invoice_month: '2026-12-01', p_charge_kind: 'juros' }],
+      ['update_card_entry', { ...k(5009), p_entry_id: 'e3', p_expected_version: 1, p_kind: 'estorno', p_amount_cents: 900, p_occurred_on: null, p_description: 'Devolução', p_category: null, ...none, p_invoice_month: '2026-12-01' }],
+      ['delete_card_entry', { ...k(5010), p_entry_id: 'e1', p_expected_version: 2 }],
+      ['add_card_charge', { ...k(5011), p_card_id: 'c1', p_invoice_month: '2026-11-01', p_charge_kind: 'anuidade', p_amount_cents: 3000 }],
+      ['add_card_refund', { ...k(5012), p_card_id: 'c1', p_invoice_month: '2026-11-01', p_amount_cents: 5000, p_description: 'Devolução', p_category: 'Lazer' }],
+      ['pay_invoice', { ...k(5013), p_card_id: 'c1', p_month: '2026-11-01', p_expected_version: 1, p_paid_cents: 20000, p_paid_on: '2026-10-07' }],
+      ['pay_invoice', { ...k(5014), p_card_id: 'c1', p_month: '2026-11-01', p_expected_version: 1, p_paid_cents: 20000, p_paid_on: '2026-10-07', p_account_id: 'a1' }],
+      ['undo_invoice_payment', { ...k(5015), p_card_id: 'c1', p_month: '2026-11-01', p_expected_version: 2 }],
+      ['create_record', { ...k(5016), p_context_id: 'ctx', p_account_id: 'a1', p_kind: 'despesa', p_amount_cents: 100, p_occurred_on: '2026-10-07', p_description: 'Mercado', p_category: null }],
+      ['create_record', { ...k(5017), p_context_id: 'ctx', p_account_id: 'a1', p_kind: 'despesa', p_amount_cents: 100, p_occurred_on: '2026-10-07', p_description: 'Mercado', p_category: null, p_receipt_key: DIGEST }],
+    ]);
+    // Sem cartão ou sem conta/gasto no retorno do pagamento, nunca um resultado inventado.
+    expect(await failure(fake({}).createCard('chave-5018', 'ctx', input))).toEqual(['desconhecido', 'desconhecido', null]);
+    expect(await failure(fake({ pay_invoice: { ...payment, record: null } }).payInvoice('chave-5019', 'c1', '2026-11', 1, 100, '2026-10-07'))).toEqual(['desconhecido', 'desconhecido', null]);
+    expect(await failure(fake({ undo_invoice_payment: { ...payment, commitment: null } }).undoInvoicePayment('chave-5020', 'c1', '2026-11', 1))).toEqual(['desconhecido', 'desconhecido', null]);
+  });
+
+  it('operação de cartão: ação, cartão, lançamento, conta e gasto', async () => {
+    const op = { action: 'pagar_fatura', target_id: 'c1', entry_id: null, commitment_id: 'm1', record_id: 'r1' };
+    expect(await fake({}, { record_operations: { data: [op] } }).findCardOperation('chave-6001')).toEqual({ action: 'pagar_fatura', cardId: 'c1', entryId: null, commitmentId: 'm1', recordId: 'r1' });
+    expect(await fake({}, { record_operations: { data: [{ ...op, action: 'criar_compra_cartao', entry_id: 'e1', commitment_id: null, record_id: null }] } }).findCardOperation('chave-6002')).toEqual({
+      action: 'criar_compra_cartao',
+      cardId: 'c1',
+      entryId: 'e1',
+      commitmentId: null,
+      recordId: null,
+    });
+    expect(await fake({}, { record_operations: { data: [] } }).findCardOperation('chave-6003')).toBeNull();
+    expect(await failure(fake({}, { record_operations: { data: [{ ...op, target_id: null }] } }).findCardOperation('chave-6004'))).toEqual(['desconhecido', 'operacao_inconsistente', null]);
+  });
+
+  it('códigos de erro de cartão e de nota: o nome vai adiante, o texto do banco não', async () => {
+    const codes = [
+      'conta_de_fatura',
+      'pagamento_de_fatura',
+      'fatura_paga',
+      'fatura_seguinte_paga',
+      'valor_acima_da_fatura',
+      'lancamento_automatico',
+      'campo_nao_se_aplica',
+      'apelido_invalido',
+      'final_invalido',
+      'dia_de_fechamento_invalido',
+      'dia_de_vencimento_invalido',
+      'limite_invalido',
+      'limite_de_cartoes',
+      'limite_de_lancamentos',
+      'cartao_arquivado',
+      'cartao_com_lancamentos',
+      'tipo_de_encargo_invalido',
+      'chave_de_nota_invalida',
+      'nota_ja_anotada',
+      // Já existentes e usados pelos cartões.
+      'compromisso_quitado',
+      'compromisso_aberto',
+      'mes_invalido',
+      'situacao_invalida',
+      'tipo_invalido',
+      'parcelas_invalidas',
+      'conta_invalida',
+      'valor_invalido',
+      'data_futura',
+      'data_invalida',
+      'versao_desatualizada',
+    ];
+    const input = { name: 'Nubank', lastDigits: null, closingDay: 3, dueDay: 10, limitCents: null };
+    for (const c of codes) {
+      for (const message of [c, `ERROR: ${c}`]) {
+        const repo = fake({}, {}, { message, code: 'PT409', details: 'Key (id)=(0000)=(segredo) já existe. 12345678' });
+        expect(await failure(repo.createCard('chave-7001', 'ctx', input))).toEqual([c, c, null]);
+        expect(await failure(repo.payInvoice('chave-7002', 'c1', '2026-11', 1, 100, '2026-10-07'))).toEqual([c, c, null]);
+        expect(await failure(repo.findReceipt('ctx', DIGEST))).toEqual([c, c, null]);
+      }
+    }
+    // O detalhe da nota repetida (gasto ou compra) segue adiante só com a forma certa.
+    const id = '3f2b8c1e-9d4a-4c55-8e7a-0b1c2d3e4f50';
+    const withDetails = (message: string, details: unknown) => failure(fake({}, {}, { message, code: 'PT409', details }).createCard('chave-7003', 'ctx', input));
+    expect(await withDetails('nota_ja_anotada', `registro=${id}`)).toEqual(['nota_ja_anotada', 'nota_ja_anotada', `registro=${id}`]);
+    expect(await withDetails('nota_ja_anotada', `compra=${id}`)).toEqual(['nota_ja_anotada', 'nota_ja_anotada', `compra=${id}`]);
+    expect(await withDetails('nota_ja_anotada', `compra=${id}; Key (receipt_key)=(${DIGEST})`)).toEqual(['nota_ja_anotada', 'nota_ja_anotada', null]);
+    expect(await withDetails('nota_ja_anotada', 'registro=abc')).toEqual(['nota_ja_anotada', 'nota_ja_anotada', null]);
+    expect(await withDetails('fatura_paga', `compra=${id}`)).toEqual(['fatura_paga', 'fatura_paga', null]);
+    // Defeito de consistência (só escrita direta na tabela) vira erro genérico, sem valores.
+    for (const c of ['fatura_inconsistente', 'compra_inconsistente']) {
+      expect(await withDetails(c, 'Failing row contains (1, segredo)')).toEqual(['desconhecido', c, null]);
     }
   });
 });

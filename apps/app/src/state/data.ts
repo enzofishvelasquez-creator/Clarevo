@@ -2,12 +2,16 @@ import {
   ESSENTIAL_LOOKBACK_MONTHS,
   addMonths,
   annualCommitmentIds,
+  categoryBreakdown,
   committedGoalLines,
   essentialMonthly,
   goalPlan,
   isRepoError,
   isSavingsStepDone,
   lastIncomeReferenceChangeAt,
+  loadInvoices,
+  loadInvoicesOfRecords,
+  receiptKeyValid,
   reserveEssentialBaseCents,
   loadReturnReview,
   monthOf,
@@ -20,11 +24,24 @@ import {
   savedInMonth,
   savingsCardState,
   suggestReference,
+  summarizeCard,
   summarizeCommitted,
   summarizeMonth,
   summarizeToPay,
   upcomingCommittedMonths,
   type AffectedRef,
+  type Card,
+  type CardAction,
+  type CardChargeInput,
+  type CardEntry,
+  type CardEntryInput,
+  type CardInput,
+  type CardPurchaseInput,
+  type CardRefundInput,
+  type CardStatus,
+  type CardSummary,
+  type CardWrite,
+  type CategoryShare,
   type Cents,
   type Commitment,
   type CommitmentInput,
@@ -44,12 +61,16 @@ import {
   type GoalStatus,
   type GoalWrite,
   type IncomeReference,
+  type InvoiceItem,
+  type InvoicePaymentWrite,
+  type Invoice,
   type IsoDate,
   type IsoMonth,
   type NewGoalInput,
   type OccurrenceMode,
   type PaymentInput,
   type PaymentsForecast,
+  type ReceiptMatch,
   type RecordInput,
   type RecordKind,
   type ReferenceSuggestion,
@@ -190,6 +211,8 @@ function useInvalidate() {
     qc.invalidateQueries({ queryKey: ['commitment'] });
     // Reabrir a conta de um gasto fixo muda as contagens e a lista de contas da série.
     if (record.commitmentId) qc.invalidateQueries({ queryKey: ['series'] });
+    // Pagamento de fatura (a conta, a data e a faturas mudam) e gasto com nota (o aviso "já anotada" muda): cartões recarregam.
+    if (record.invoice || record.receiptKey) qc.invalidateQueries({ queryKey: ['cards'] });
     // Toda escrita muda a revisão dos últimos meses (atividade, recebimentos e gastos do mês).
     qc.invalidateQueries({ queryKey: ['returnReview'] });
   };
@@ -1160,6 +1183,313 @@ export function useSetSavingsAnswer() {
       qc.invalidateQueries({ queryKey: ['savings'] });
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Cartões de crédito (D-037) e notas fiscais (D-038, Ciclo E)
+// ---------------------------------------------------------------------------
+
+/**
+ * Chaves de consulta: tudo de cartão fica sob ['cards', ...], então uma só invalidação de ['cards'] recarrega cartões, lançamentos,
+ * faturas, "Por categoria" com faturas e o aviso de nota já anotada. Contas de fatura são contas a pagar comuns (['commitments']).
+ */
+const cardKeys = {
+  list: (ctx: string | undefined) => ['cards', 'list', ctx] as const,
+  one: (id: string | undefined) => ['cards', 'one', id] as const,
+  entry: (id: string | undefined) => ['cards', 'entry', id] as const,
+  entries: (cardId: string | undefined) => ['cards', 'entries', cardId] as const,
+  invoiceItems: (cardId: string | undefined) => ['cards', 'invoiceItems', cardId] as const,
+  invoices: (cardId: string | undefined, today: IsoDate) => ['cards', 'invoices', cardId, today] as const,
+};
+
+/** Cartões vivos do contexto (ativos e arquivados), por criação, com limite usado e fatura atual (card_items). */
+export function useCards(contextId: string | undefined) {
+  const repo = useRepo();
+  return useQuery({ queryKey: cardKeys.list(contextId), queryFn: () => repo.listCards(contextId!), enabled: Boolean(contextId) });
+}
+
+/** Um cartão vivo; data null = excluído, inexistente ou sem leitura. */
+export function useCard(id: string | undefined) {
+  const repo = useRepo();
+  return useQuery({ queryKey: cardKeys.one(id), queryFn: () => repo.getCard(id!), enabled: Boolean(id) });
+}
+
+/** Um lançamento (a compra pelo id dela), por exemplo para abrir "compra=<id>" de nota_ja_anotada. */
+export function useCardEntry(id: string | undefined) {
+  const repo = useRepo();
+  return useQuery({ queryKey: cardKeys.entry(id), queryFn: () => repo.getCardEntry(id!), enabled: Boolean(id) });
+}
+
+/** Lançamentos vivos do cartão (a compra é uma linha com o valor total), por criação. */
+export function useCardEntries(cardId: string | undefined) {
+  const repo = useRepo();
+  return useQuery({ queryKey: cardKeys.entries(cardId), queryFn: () => repo.listCardEntries(cardId!), enabled: Boolean(cardId) });
+}
+
+/** Faturas do cartão como a visão invoice_items (totais sem as linhas), do mês mais antigo ao mais novo. */
+export function useInvoiceItems(cardId: string | undefined) {
+  const repo = useRepo();
+  return useQuery({ queryKey: cardKeys.invoiceItems(cardId), queryFn: () => repo.listInvoiceItems(cardId!), enabled: Boolean(cardId) });
+}
+
+/**
+ * Faturas montadas do cartão (loadInvoices: lançamentos + contas de fatura + hoje), com linhas por parcela, composição e
+ * situação. É a fonte de /cartoes/[id], da fatura, de purchaseFirstInvoiceMonth(…, paidInvoiceMonths(faturas), hoje) e de
+ * invoiceFor(card, faturas, mês, hoje). Depende de hoje (aberta, fechada), então a chave o traz.
+ */
+export function useCardInvoices(card: Pick<Card, 'id' | 'closingDay' | 'dueDay'> | null | undefined) {
+  const repo = useRepo();
+  const { today } = useSession();
+  return useQuery({
+    queryKey: cardKeys.invoices(card?.id, today),
+    queryFn: (): Promise<Invoice[]> => loadInvoices(repo, card!, today),
+    enabled: Boolean(card),
+  });
+}
+
+/** Um cartão com as faturas montadas e o resumo (fatura atual, fechadas sem pagamento, limite usado e restante). */
+export interface CardOverview {
+  card: Card;
+  invoices: Invoice[];
+  summary: CardSummary;
+}
+
+/**
+ * Todos os cartões do contexto com faturas e resumo (summarizeCard), para /cartoes e para o seletor de cartão do Anotar gasto.
+ * Sem dado parcial: falha ou carregando, nunca uma lista sem fatura.
+ */
+export function useCardsOverview(contextId: string | undefined) {
+  const repo = useRepo();
+  const { today } = useSession();
+  const cards = useCards(contextId);
+  const list = cards.data ?? [];
+  const invoices = useQueries({
+    queries: list.map((card) => ({
+      queryKey: cardKeys.invoices(card.id, today),
+      queryFn: (): Promise<Invoice[]> => loadInvoices(repo, card, today),
+      enabled: cards.isSuccess,
+    })),
+  });
+  const parts: QueryPart[] = [cards, ...invoices];
+  const ready = parts.every((p) => p.isSuccess);
+  const version = `${stamp([cards])}|${stamp(invoices)}`;
+  const value = useMemo(
+    (): CardOverview[] | undefined =>
+      ready ? list.map((card, i) => ({ card, invoices: invoices[i]!.data!, summary: summarizeCard(card, invoices[i]!.data!, today) })) : undefined,
+    [ready, today, version], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  return combineParts<CardOverview[]>(parts, value);
+}
+
+/**
+ * Faturas pagas pelos gastos de uma lista (loadInvoicesOfRecords), para "Por categoria". Sem pagamento de fatura na lista, não
+ * faz leitura nenhuma (data []). A chave traz só os cartões que aparecem e hoje.
+ */
+export function useInvoicesOfRecords(contextId: string | undefined, month: IsoMonth, records: readonly FinancialRecord[] | undefined) {
+  const repo = useRepo();
+  const { today } = useSession();
+  const cardIds = records ? [...new Set(records.flatMap((r) => (r.invoice ? [r.invoice.cardId] : [])))].sort().join(',') : '';
+  return useQuery({
+    queryKey: ['cards', 'ofRecords', contextId, month, today, cardIds],
+    queryFn: (): Promise<Invoice[]> => loadInvoicesOfRecords(repo, records!, today),
+    enabled: Boolean(contextId) && records !== undefined,
+  });
+}
+
+/**
+ * "Por categoria" do mês com os pagamentos de fatura divididos pelas categorias da fatura (categoryBreakdown(paid, faturas)).
+ * Pago do mês de useMonthRecords; sem dado parcial (nunca o gasto da fatura numa categoria só por falta de leitura).
+ */
+export function useCategoryBreakdown(contextId: string | undefined, month: IsoMonth) {
+  const records = useMonthRecords(contextId, month);
+  const paid = records.summary?.composition.paid;
+  const invoices = useInvoicesOfRecords(contextId, month, paid);
+  const parts: QueryPart[] = [records, invoices];
+  const value = useMemo(
+    (): CategoryShare[] | undefined => (paid && invoices.data ? categoryBreakdown(paid, invoices.data) : undefined),
+    [paid, invoices.data],
+  );
+  return combineParts<CategoryShare[]>(parts, value);
+}
+
+/**
+ * Nota fiscal já anotada (findReceipt): chame com o resumo da nota (ReceiptDraft.receiptKey, 64 hexadecimais), nunca a chave de
+ * 44 caracteres. digest null ou malformado: não consulta. data null = não anotada. A resposta não fica em cache (gcTime 0): o
+ * aviso vale para este momento, e o resumo não fica guardado na memória do app depois da tela.
+ */
+export function useReceiptMatch(contextId: string | undefined, digest: string | null | undefined) {
+  const repo = useRepo();
+  const valid = typeof digest === 'string' && receiptKeyValid(digest);
+  return useQuery({
+    queryKey: ['cards', 'receipt', contextId, valid ? digest : null],
+    queryFn: (): Promise<ReceiptMatch | null> => repo.findReceipt(contextId!, digest!),
+    enabled: Boolean(contextId) && valid,
+    staleTime: 0,
+    gcTime: 0,
+  });
+}
+
+/**
+ * Depois de gravar no cartão. Confirmados pelo servidor entram na hora: o cartão, o lançamento e todas as contas de fatura do
+ * cartão (detalhe da conta). Recarregam: cartões, lançamentos e faturas (['cards']), contas a pagar e o detalhe delas (a conta
+ * da fatura muda de valor, vencimento, estimado e some quando o total chega a zero), e, de onde deriva o resto, o Resumo
+ * (Ainda a pagar), a renda comprometida (grupo "Faturas de cartão") e "Ainda a pagar" nos próximos meses, que leem as contas.
+ * Pagar e desfazer também mexem no gasto: registros do mês (Recebido, Pago, Diferença) e "Por categoria". Toda escrita de cartão
+ * conta como anotação na revisão dos últimos meses.
+ * deletedCard: o cartão excluído recarrega como não encontrado. deletedEntry: o lançamento excluído, idem.
+ */
+function useInvalidateCard() {
+  const qc = useQueryClient();
+  return (w: CardWrite | InvoicePaymentWrite, opts: { deletedCard?: boolean; deletedEntry?: boolean } = {}) => {
+    if (opts.deletedCard) qc.invalidateQueries({ queryKey: cardKeys.one(w.card.id), refetchType: 'none' });
+    else qc.setQueryData(cardKeys.one(w.card.id), w.card);
+    if (w.entry) {
+      if (opts.deletedEntry) qc.invalidateQueries({ queryKey: cardKeys.entry(w.entry.id), refetchType: 'none' });
+      else qc.setQueryData(cardKeys.entry(w.entry.id), w.entry);
+    }
+    for (const c of w.commitments) qc.setQueryData(['commitment', c.id], c);
+    qc.invalidateQueries({ queryKey: ['cards'] });
+    qc.invalidateQueries({ queryKey: ['commitments'] });
+    qc.invalidateQueries({ queryKey: ['commitment'] });
+    if ('record' in w) {
+      qc.invalidateQueries({ queryKey: ['records'] });
+      qc.invalidateQueries({ queryKey: ['record', w.record.id] });
+    }
+    qc.invalidateQueries({ queryKey: ['returnReview'] });
+  };
+}
+
+export function useCreateCard() {
+  const repo = useRepo();
+  const invalidate = useInvalidateCard();
+  return useMutation({
+    mutationFn: (v: { key: string; contextId: string; input: CardInput }) => repo.createCard(v.key, v.contextId, v.input),
+    onSuccess: (w) => invalidate(w),
+  });
+}
+
+export function useUpdateCard() {
+  const repo = useRepo();
+  const invalidate = useInvalidateCard();
+  return useMutation({
+    mutationFn: (v: { key: string; id: string; version: number; input: CardInput }) => repo.updateCard(v.key, v.id, v.version, v.input),
+    onSuccess: (w) => invalidate(w),
+  });
+}
+
+/** Arquivar e reativar. */
+export function useSetCardStatus() {
+  const repo = useRepo();
+  const invalidate = useInvalidateCard();
+  return useMutation({
+    mutationFn: (v: { key: string; id: string; version: number; status: CardStatus }) => repo.setCardStatus(v.key, v.id, v.version, v.status),
+    onSuccess: (w) => invalidate(w),
+  });
+}
+
+/** Só cartão sem lançamentos vivos nem conta de fatura (cartao_com_lancamentos). */
+export function useDeleteCard() {
+  const repo = useRepo();
+  const invalidate = useInvalidateCard();
+  return useMutation({
+    mutationFn: (v: { key: string; id: string; version: number }) => repo.deleteCard(v.key, v.id, v.version),
+    onSuccess: (w) => invalidate(w, { deletedCard: true }),
+  });
+}
+
+/** Compra no cartão (com ou sem nota: input.receiptKey é o resumo). A fatura real fica em w.entry.invoiceMonth. */
+export function useAddCardPurchase() {
+  const repo = useRepo();
+  const invalidate = useInvalidateCard();
+  return useMutation({
+    mutationFn: (v: { key: string; cardId: string; input: CardPurchaseInput }) => repo.addCardPurchase(v.key, v.cardId, v.input),
+    onSuccess: (w) => invalidate(w),
+  });
+}
+
+/** Compra, encargo ou estorno manual (input.kind é o do lançamento). */
+export function useUpdateCardEntry() {
+  const repo = useRepo();
+  const invalidate = useInvalidateCard();
+  return useMutation({
+    mutationFn: (v: { key: string; entryId: string; version: number; input: CardEntryInput }) =>
+      repo.updateCardEntry(v.key, v.entryId, v.version, v.input),
+    onSuccess: (w) => invalidate(w),
+  });
+}
+
+export function useDeleteCardEntry() {
+  const repo = useRepo();
+  const invalidate = useInvalidateCard();
+  return useMutation({
+    mutationFn: (v: { key: string; entryId: string; version: number }) => repo.deleteCardEntry(v.key, v.entryId, v.version),
+    onSuccess: (w) => invalidate(w, { deletedEntry: true }),
+  });
+}
+
+/** Informar encargos (juros, multa, IOF, anuidade, tarifa) de uma fatura. */
+export function useAddCardCharge() {
+  const repo = useRepo();
+  const invalidate = useInvalidateCard();
+  return useMutation({
+    mutationFn: (v: { key: string; cardId: string; input: CardChargeInput }) => repo.addCardCharge(v.key, v.cardId, v.input),
+    onSuccess: (w) => invalidate(w),
+  });
+}
+
+export function useAddCardRefund() {
+  const repo = useRepo();
+  const invalidate = useInvalidateCard();
+  return useMutation({
+    mutationFn: (v: { key: string; cardId: string; input: CardRefundInput }) => repo.addCardRefund(v.key, v.cardId, v.input),
+    onSuccess: (w) => invalidate(w),
+  });
+}
+
+/**
+ * Pagar a fatura (total ou outro valor). version = InvoiceItem.commitmentVersion / Invoice.commitmentVersion. Cria o gasto do
+ * pagamento (entra em Pago), marca a conta da fatura e, no pagamento parcial, cria o saldo anterior na fatura seguinte (w.entry).
+ */
+export function usePayInvoice() {
+  const repo = useRepo();
+  const invalidate = useInvalidateCard();
+  return useMutation({
+    mutationFn: (v: { key: string; cardId: string; month: IsoMonth; version: number; amountCents: Cents; paidOn: IsoDate; accountId?: string | null }) =>
+      repo.payInvoice(v.key, v.cardId, v.month, v.version, v.amountCents, v.paidOn, v.accountId ?? null),
+    onSuccess: (w) => invalidate(w),
+  });
+}
+
+/** Desfazer o pagamento: apaga o gasto, reabre a conta e apaga o saldo anterior criado (w.entry, excluído). */
+export function useUndoInvoicePayment() {
+  const repo = useRepo();
+  const invalidate = useInvalidateCard();
+  return useMutation({
+    mutationFn: (v: { key: string; cardId: string; month: IsoMonth; version: number }) => repo.undoInvoicePayment(v.key, v.cardId, v.month, v.version),
+    onSuccess: (w) => invalidate(w, { deletedEntry: true }),
+  });
+}
+
+const refreshCards = (qc: QueryClient) => {
+  qc.invalidateQueries({ queryKey: ['cards'] });
+  qc.invalidateQueries({ queryKey: ['commitments'] });
+  qc.invalidateQueries({ queryKey: ['commitment'] });
+  // Uma tentativa incerta de pagar ou desfazer pode ter mexido no gasto.
+  qc.invalidateQueries({ queryKey: ['records'] });
+  qc.invalidateQueries({ queryKey: ['returnReview'] });
+};
+
+/**
+ * Chave de operação das escritas de cartão, guardada entre tentativas (mesmo padrão de useGoalOperationKey): findSaved confere
+ * com findCardOperation se uma tentativa incerta foi gravada (cardId, entryId nas ações de lançamento, commitmentId e recordId
+ * no pagamento).
+ */
+export function useCardOperationKey() {
+  const repo = useRepo();
+  return useOperationAttempts<{ action: CardAction; cardId: string; entryId: string | null; commitmentId: string | null; recordId: string | null }>(
+    (key) => repo.findCardOperation(key),
+    refreshCards,
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -11,8 +11,21 @@ import {
   SAVINGS_MIN_MONTHLY_CENTS,
   addMonths,
   monthRange,
+  receiptKeyValid,
   type AffectedRef,
   type AmountMode,
+  type Card,
+  type CardAction,
+  type CardChargeInput,
+  type CardChargeType,
+  type CardEntry,
+  type CardEntryInput,
+  type CardEntryKind,
+  type CardInput,
+  type CardPurchaseInput,
+  type CardRefundInput,
+  type CardStatus,
+  type CardWrite,
   type Cents,
   type Commitment,
   type CommitmentAction,
@@ -30,6 +43,9 @@ import {
   type GoalStatus,
   type GoalWrite,
   type IncomeReference,
+  type InvoiceItem,
+  type InvoicePaymentWrite,
+  type IsoDate,
   type IsoMonth,
   type MonthOverview,
   type NewGoalInput,
@@ -38,6 +54,7 @@ import {
   type PersonalSpace,
   type RecordInput,
   type RecordKind,
+  type ReceiptMatch,
   type RecordsRepository,
   type RepoErrorCode,
   type ReturnDecision,
@@ -70,6 +87,11 @@ interface RecordRow {
   description: string;
   category: string | null;
   commitment_id: string | null;
+  /** Pagamento de fatura (pay_invoice): cartão e mês de vencimento (AAAA-MM-01); nulos nos outros gastos. */
+  card_id: string | null;
+  invoice_month: string | null;
+  /** Resumo SHA-256 da chave da nota (64 hexadecimais minúsculos), nunca a chave. */
+  receipt_key: string | null;
   created_by: string;
   version: number;
   created_at: string;
@@ -104,6 +126,10 @@ interface CommitmentRow {
   series_installment_total: number | null;
   /** Só na conta do ano (1 = cota única); nulo nas outras. */
   series_parts_per_year: number | null;
+  /** Conta de fatura de cartão: cartão, mês de vencimento (AAAA-MM-01) e fechamento gravado; nulos nas outras contas. */
+  card_id: string | null;
+  invoice_month: string | null;
+  card_closing_on: string | null;
 }
 
 /** Retorno (jsonb) das funções de conta a pagar. record: gasto criado (pagar) ou excluído (desfazer). */
@@ -254,6 +280,85 @@ interface SavingsCheckRow {
   updated_at: string;
 }
 
+/** Linha da visão card_items (e o cartão do retorno das funções de cartão, que traz também deleted_at e deleted_by). */
+interface CardRow {
+  id: string;
+  context_id: string;
+  nickname: string;
+  last_digits: string | null;
+  closing_day: number;
+  due_day: number;
+  limit_cents: number | null;
+  status: CardStatus;
+  created_by: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  used_cents: number;
+  /** A fatura que recebe uma compra de hoje: mês de vencimento (AAAA-MM-01), fechamento e vencimento. */
+  current_month: string;
+  current_closing_on: string;
+  current_due_on: string;
+}
+
+/** Linha da visão card_entry_items (e o lançamento do retorno das funções de cartão). A compra é UMA linha, com o valor total. */
+interface CardEntryRow {
+  id: string;
+  context_id: string;
+  card_id: string;
+  kind: CardEntryKind;
+  description: string | null;
+  category: string | null;
+  charge_kind: CardChargeType | null;
+  purchased_on: string | null;
+  amount_cents: number;
+  installments: number;
+  invoice_month: string;
+  source_month: string | null;
+  payment_record_id: string | null;
+  receipt_key: string | null;
+  created_by: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Linha da visão invoice_items: uma por fatura que tem lançamento vivo ou conta viva. */
+interface InvoiceItemRow {
+  card_id: string;
+  context_id: string;
+  month: string;
+  closing_on: string;
+  due_on: string;
+  status: InvoiceItem['status'];
+  total_cents: number;
+  purchases_cents: number;
+  charges_cents: number;
+  carried_in_cents: number;
+  refunds_cents: number;
+  credit_cents: number;
+  entry_count: number;
+  commitment_id: string | null;
+  commitment_version: number | null;
+  amount_is_estimate: boolean;
+  to_pay_cents: number;
+  paid_record_id: string | null;
+  paid_cents: number | null;
+  paid_on: string | null;
+  paid_account_id: string | null;
+  left_over_cents: number | null;
+}
+
+/** Retorno (jsonb) das 11 funções de cartão. Só as chaves que o app usa; entries (linhas cruas das parcelas) fica de fora. */
+interface CardResult {
+  card: CardRow | null;
+  entry: CardEntryRow | null;
+  invoices: InvoiceItemRow[] | null;
+  commitments: CommitmentRow[] | null;
+  commitment: CommitmentRow | null;
+  record: RecordRow | null;
+}
+
 const INCOME_REFERENCE_COLUMNS = 'id, context_id, from_month, amount_cents, varies, created_by, version, created_at, updated_at, amount_changed_at';
 const GOAL_MOVEMENT_COLUMNS = 'id, goal_id, context_id, kind, amount_cents, occurred_on, note, created_by, version, created_at, updated_at';
 const SAVINGS_CHECK_COLUMNS = 'context_id, answer, monthly_cents, answered_on, ask_again_on, version, created_at, updated_at';
@@ -281,6 +386,20 @@ const GOAL_ACTIONS: GoalAction[] = [
   'registrar_movimento_meta',
   'alterar_movimento_meta',
   'excluir_movimento_meta',
+];
+/** Ações de cartão: o cartão em target_id; entry_id só nas cinco ações de lançamento. */
+const CARD_ACTIONS: CardAction[] = [
+  'criar_cartao',
+  'alterar_cartao',
+  'situacao_cartao',
+  'excluir_cartao',
+  'criar_compra_cartao',
+  'alterar_lancamento_cartao',
+  'excluir_lancamento_cartao',
+  'criar_encargo_cartao',
+  'criar_estorno_cartao',
+  'pagar_fatura',
+  'desfazer_pagamento_fatura',
 ];
 const GOAL_MOVEMENT_ACTIONS: readonly GoalAction[] = ['registrar_movimento_meta', 'alterar_movimento_meta', 'excluir_movimento_meta'];
 
@@ -345,16 +464,45 @@ const KNOWN: RepoErrorCode[] = [
   'saldo_da_meta_insuficiente',
   // Plano de guardar (D-036).
   'resposta_invalida',
+  // Cartões de crédito e notas fiscais (D-037 e D-038). Nenhum termina com outro código da lista (valor_acima_da_fatura,
+  // fatura_paga e fatura_seguinte_paga são diferentes até o fim; os "_invalido" têm prefixos próprios).
+  'conta_de_fatura',
+  'pagamento_de_fatura',
+  'fatura_paga',
+  'fatura_seguinte_paga',
+  'valor_acima_da_fatura',
+  'lancamento_automatico',
+  'campo_nao_se_aplica',
+  'apelido_invalido',
+  'final_invalido',
+  'dia_de_fechamento_invalido',
+  'dia_de_vencimento_invalido',
+  'limite_invalido',
+  'limite_de_cartoes',
+  'limite_de_lancamentos',
+  'cartao_arquivado',
+  'cartao_com_lancamentos',
+  'tipo_de_encargo_invalido',
+  'chave_de_nota_invalida',
+  'nota_ja_anotada',
 ];
 
 /**
- * Dos detalhes do banco, só dois seguem adiante, e só para montar uma mensagem para a pessoa: "dia=AAAA-MM-DD" (primeiro
- * dia em que o valor guardado ficaria negativo) e "versao_atual=N". Qualquer outro texto é descartado.
+ * Códigos que o banco só lança em escrita direta na tabela (23514), nunca pelas funções: defeito de consistência, não recusa.
+ * Viram 'desconhecido' com o nome como mensagem (sem valores), para a tela mostrar o erro genérico.
+ */
+const INCONSISTENCY_CODES = ['fatura_inconsistente', 'compra_inconsistente'];
+
+/**
+ * Dos detalhes do banco, só três seguem adiante, e só para montar uma mensagem ou abrir o registro: "dia=AAAA-MM-DD" (primeiro
+ * dia em que o valor guardado ficaria negativo), "versao_atual=N" e, em nota_ja_anotada, "registro=<id>" ou "compra=<id>".
+ * Qualquer outro texto é descartado.
  */
 function safeDetail(code: RepoErrorCode, details: string | null | undefined): string | undefined {
   if (typeof details !== 'string') return undefined;
   if (code === 'saldo_da_meta_insuficiente' && /^dia=\d{4}-\d{2}-\d{2}$/.test(details)) return details;
   if (code === 'versao_desatualizada' && /^versao_atual=\d{1,9}$/.test(details)) return details;
+  if (code === 'nota_ja_anotada' && /^(registro|compra)=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(details)) return details;
   return undefined;
 }
 
@@ -368,12 +516,26 @@ function repoError(e: { message?: string; code?: string; details?: string | null
   // O mais longo vence: 'modo_de_valor_invalido' termina com 'valor_invalido'.
   const known = KNOWN.filter((k) => msg === k || msg.endsWith(k)).sort((a, b) => b.length - a.length)[0];
   if (known) return new RepoError(known, undefined, safeDetail(known, e?.details));
+  const broken = INCONSISTENCY_CODES.find((k) => msg === k || msg.endsWith(k));
+  if (broken) return new RepoError('desconhecido', broken);
   if (e?.code === '42501') return new RepoError('sem_permissao');
   if (/fetch|network|Failed to fetch|timeout/i.test(msg) || !e?.code) return new RepoError('rede');
   return new RepoError('desconhecido', msg);
 }
 
+/** Mês do vencimento da fatura: o banco devolve o dia 1 (AAAA-MM-01); o core usa AAAA-MM. */
+function invoiceMonthOf(v: string | null | undefined): IsoMonth {
+  if (typeof v !== 'string' || !FIRST_DAY.test(v)) throw new RepoError('desconhecido', 'fatura_inconsistente');
+  return v.slice(0, 7);
+}
+
+/** Cartão e mês juntos ou nenhum dos dois; o resumo da nota, quando existe, tem a forma do banco (nunca a chave de 44 caracteres). */
 function toRecord(r: RecordRow): FinancialRecord {
+  const cardId = r.card_id ?? null;
+  const month = r.invoice_month ?? null;
+  const receiptKey = r.receipt_key ?? null;
+  if ((cardId === null) !== (month === null)) throw new RepoError('desconhecido', 'fatura_inconsistente');
+  if (receiptKey !== null && !receiptKeyValid(receiptKey)) throw new RepoError('desconhecido', 'nota_inconsistente');
   return {
     id: r.id,
     contextId: r.context_id,
@@ -386,6 +548,8 @@ function toRecord(r: RecordRow): FinancialRecord {
     description: r.description,
     category: r.category,
     commitmentId: r.commitment_id ?? null,
+    invoice: cardId !== null && month !== null ? { cardId, month: invoiceMonthOf(month) } : null,
+    receiptKey,
     createdBy: r.created_by,
     version: r.version,
     createdAt: r.created_at,
@@ -417,9 +581,17 @@ function toCommitment(c: CommitmentRow): Commitment {
   const inSeries = c.series_id != null;
   const seriesConsistent = inSeries
     ? c.occurrence_number != null && c.series_kind != null && c.series_nature != null
-    : c.occurrence_number == null && !c.series_override && !c.amount_is_estimate;
+    : // A conta de fatura aberta é "estimada" até o fechamento (amount_is_estimate), sem ser de série.
+      c.occurrence_number == null && !c.series_override && (c.card_id != null || !c.amount_is_estimate);
   if (!seriesConsistent) throw new RepoError('desconhecido', 'serie_inconsistente');
   const partsPerYear = inSeries ? partsPerYearOf(c.series_kind!, c.series_parts_per_year) : null;
+  // Conta de fatura: cartão, mês e fechamento juntos ou nenhum dos três, e nunca de série.
+  const cardId = c.card_id ?? null;
+  const closingOn = c.card_closing_on ?? null;
+  if ((cardId === null) !== (c.invoice_month == null) || (cardId === null) !== (closingOn === null)) {
+    throw new RepoError('desconhecido', 'fatura_inconsistente');
+  }
+  if (cardId !== null && (inSeries || !ISO_DATE.test(closingOn!))) throw new RepoError('desconhecido', 'fatura_inconsistente');
   return {
     id: c.id,
     contextId: c.context_id,
@@ -449,6 +621,7 @@ function toCommitment(c: CommitmentRow): Commitment {
       : null,
     seriesOverride: c.series_override === true,
     amountIsEstimate: c.amount_is_estimate === true,
+    invoice: cardId !== null ? { cardId, month: invoiceMonthOf(c.invoice_month), closingOn: closingOn! } : null,
     createdBy: c.created_by,
     version: c.version,
     createdAt: c.created_at,
@@ -657,6 +830,129 @@ function toSavingsCheck(r: SavingsCheckRow): SavingsCheck {
   };
 }
 
+const CARD_STATUSES: readonly CardStatus[] = ['ativo', 'arquivado'];
+const CARD_ENTRY_KINDS: readonly CardEntryKind[] = ['compra', 'encargo', 'estorno', 'saldo_anterior'];
+const CARD_CHARGE_TYPES: readonly CardChargeType[] = ['juros', 'multa', 'iof', 'anuidade', 'tarifa'];
+const INVOICE_STATUSES: readonly InvoiceItem['status'][] = ['aberta', 'fechada', 'paga', 'paga_em_parte'];
+
+/**
+ * Cartão (card_items). O banco só guarda o apelido e os 4 últimos dígitos: qualquer outra forma de final é recusada aqui
+ * (nunca mostrar nem repassar algo que pareça um número de cartão). O apelido do banco vira name.
+ */
+function toCard(c: CardRow): Card {
+  const closingDay = whole(c.closing_day);
+  const dueDay = whole(c.due_day);
+  const limit = wholeOrNull(c.limit_cents);
+  const consistent =
+    CARD_STATUSES.includes(c.status) &&
+    (c.last_digits === null || /^\d{4}$/.test(c.last_digits)) &&
+    closingDay >= 1 &&
+    closingDay <= 31 &&
+    dueDay >= 1 &&
+    dueDay <= 31 &&
+    (limit === null || limit >= 1) &&
+    ISO_DATE.test(c.current_closing_on) &&
+    ISO_DATE.test(c.current_due_on);
+  if (!consistent) throw new RepoError('desconhecido', 'cartao_inconsistente');
+  return {
+    id: c.id,
+    contextId: c.context_id,
+    name: c.nickname,
+    lastDigits: c.last_digits ?? null,
+    closingDay,
+    dueDay,
+    limitCents: limit,
+    status: c.status,
+    createdBy: c.created_by,
+    version: whole(c.version),
+    createdAt: c.created_at,
+    updatedAt: c.updated_at,
+    usedCents: whole(c.used_cents),
+    currentMonth: invoiceMonthOf(c.current_month),
+    currentClosingOn: c.current_closing_on,
+    currentDueOn: c.current_due_on,
+  };
+}
+
+/**
+ * Lançamento do cartão (card_entry_items). A compra é uma linha, com o valor total, as parcelas e a fatura da 1ª parcela;
+ * só a compra tem data de compra e só o encargo tem tipo. O resumo da chave da nota, quando existe, só vale na compra e tem a
+ * forma do banco.
+ */
+function toCardEntry(e: CardEntryRow): CardEntry {
+  const amountCents = whole(e.amount_cents);
+  const installments = whole(e.installments);
+  const purchase = e.kind === 'compra';
+  const receiptKey = e.receipt_key ?? null;
+  const consistent =
+    CARD_ENTRY_KINDS.includes(e.kind) &&
+    amountCents >= 1 &&
+    installments >= 1 &&
+    installments <= 48 &&
+    (purchase ? e.purchased_on != null && ISO_DATE.test(e.purchased_on) : e.purchased_on == null && installments === 1) &&
+    (e.kind === 'encargo' ? e.charge_kind != null && CARD_CHARGE_TYPES.includes(e.charge_kind) : e.charge_kind == null) &&
+    (receiptKey === null || (purchase && receiptKeyValid(receiptKey)));
+  if (!consistent) throw new RepoError('desconhecido', 'lancamento_inconsistente');
+  return {
+    id: e.id,
+    contextId: e.context_id,
+    cardId: e.card_id,
+    kind: e.kind,
+    description: e.description ?? null,
+    category: e.category ?? null,
+    chargeType: e.charge_kind ?? null,
+    purchasedOn: e.purchased_on ?? null,
+    amountCents,
+    installments,
+    invoiceMonth: invoiceMonthOf(e.invoice_month),
+    sourceMonth: e.source_month == null ? null : invoiceMonthOf(e.source_month),
+    paymentRecordId: e.payment_record_id ?? null,
+    receiptKey,
+    createdBy: e.created_by,
+    version: whole(e.version),
+    createdAt: e.created_at,
+    updatedAt: e.updated_at,
+  };
+}
+
+/** Fatura (invoice_items). Com conta, id e versão vêm juntos; sem conta (total <= 0), nada a pagar e nenhum pagamento. */
+function toInvoiceItem(i: InvoiceItemRow): InvoiceItem {
+  const commitmentVersion = wholeOrNull(i.commitment_version);
+  const toPayCents = whole(i.to_pay_cents);
+  const consistent =
+    INVOICE_STATUSES.includes(i.status) &&
+    ISO_DATE.test(i.closing_on) &&
+    ISO_DATE.test(i.due_on) &&
+    (i.commitment_id === null) === (commitmentVersion === null) &&
+    typeof i.amount_is_estimate === 'boolean' &&
+    toPayCents >= 0 &&
+    ((i.status === 'paga' || i.status === 'paga_em_parte') === (i.paid_record_id != null));
+  if (!consistent) throw new RepoError('desconhecido', 'fatura_inconsistente');
+  return {
+    cardId: i.card_id,
+    month: invoiceMonthOf(i.month),
+    closingOn: i.closing_on,
+    dueOn: i.due_on,
+    status: i.status,
+    totalCents: whole(i.total_cents),
+    purchasesCents: whole(i.purchases_cents),
+    chargesCents: whole(i.charges_cents),
+    carriedInCents: whole(i.carried_in_cents),
+    refundsCents: whole(i.refunds_cents),
+    creditCents: whole(i.credit_cents),
+    entryCount: whole(i.entry_count),
+    commitmentId: i.commitment_id ?? null,
+    commitmentVersion,
+    amountIsEstimate: i.amount_is_estimate,
+    toPayCents,
+    paidRecordId: i.paid_record_id ?? null,
+    paidCents: wholeOrNull(i.paid_cents),
+    paidOn: i.paid_on ?? null,
+    paidAccountId: i.paid_account_id ?? null,
+    leftOverCents: wholeOrNull(i.left_over_cents),
+  };
+}
+
 /** Páginas de 500 linhas até acabar: a API limita cada resposta, e uma lista incompleta não pode aparecer como confirmada. */
 async function readAll<T>(
   fetchPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message?: string; code?: string; details?: string | null } | null }>,
@@ -845,6 +1141,8 @@ export class SupabaseRepository implements RecordsRepository {
       p_occurred_on: input.occurredOn,
       p_description: input.description,
       p_category: input.category,
+      // Só despesa lida de uma nota (D-038): o resumo SHA-256, nunca a chave. Sem nota, o hash é o de antes.
+      ...(input.receiptKey != null ? { p_receipt_key: input.receiptKey } : {}),
     });
   }
 
@@ -1456,5 +1754,281 @@ export class SupabaseRepository implements RecordsRepository {
     if (error) throw repoError(error);
     if (!data) throw new RepoError('desconhecido');
     return toSavingsCheck(data as SavingsCheckRow);
+  }
+
+  // -------------------------------------------------------------------------
+  // Cartões de crédito (D-037, Ciclo E) e notas fiscais (D-038)
+  // -------------------------------------------------------------------------
+
+  /** Cartões vivos do contexto (ativos e arquivados), por criação, com o limite usado e a fatura atual (card_items). */
+  async listCards(contextId: string): Promise<Card[]> {
+    const rows = await readAll<CardRow>((from, to) =>
+      this.db.from('card_items').select('*').eq('context_id', contextId).order('created_at').order('id').range(from, to),
+    );
+    return rows.map(toCard);
+  }
+
+  async getCard(id: string): Promise<Card | null> {
+    const { data, error } = await this.db.from('card_items').select('*').eq('id', id).maybeSingle();
+    if (error) throw repoError(error);
+    return data ? toCard(data as CardRow) : null;
+  }
+
+  async getCardEntry(id: string): Promise<CardEntry | null> {
+    const { data, error } = await this.db.from('card_entry_items').select('*').eq('id', id).maybeSingle();
+    if (error) throw repoError(error);
+    return data ? toCardEntry(data as CardEntryRow) : null;
+  }
+
+  /**
+   * Nota já anotada (receipt_items): o gasto vivo ou a compra viva no cartão com este resumo da chave. Resumo sem a forma de
+   * 64 hexadecimais minúsculos nem chega ao banco (a chave de 44 caracteres, com o CPF de quem emitiu, nunca sai do aparelho).
+   * Quem não lê o contexto não vê nada: null. Só leitura.
+   */
+  async findReceipt(contextId: string, receiptKey: string): Promise<ReceiptMatch | null> {
+    if (!receiptKeyValid(receiptKey)) return null;
+    const { data, error } = await this.db
+      .from('receipt_items')
+      .select('record_id, card_entry_id, card_id')
+      .eq('context_id', contextId)
+      .eq('receipt_key', receiptKey)
+      .limit(2);
+    if (error) throw repoError(error);
+    const rows = (data ?? []) as { record_id: string | null; card_entry_id: string | null; card_id: string | null }[];
+    if (rows.length === 0) return null;
+    const row = rows[0]!;
+    if (rows.length > 1) throw new RepoError('desconhecido', 'nota_inconsistente');
+    if (row.record_id != null && row.card_entry_id == null && row.card_id == null) {
+      return { recordId: row.record_id, cardEntryId: null, cardId: null };
+    }
+    if (row.record_id == null && row.card_entry_id != null && row.card_id != null) {
+      return { recordId: null, cardEntryId: row.card_entry_id, cardId: row.card_id };
+    }
+    throw new RepoError('desconhecido', 'nota_inconsistente');
+  }
+
+  /** Lançamentos vivos do cartão (a compra é uma linha), por criação. Em páginas: até 5.000 por cartão. */
+  async listCardEntries(cardId: string): Promise<CardEntry[]> {
+    const rows = await readAll<CardEntryRow>((from, to) =>
+      this.db.from('card_entry_items').select('*').eq('card_id', cardId).order('created_at').order('id').range(from, to),
+    );
+    return rows.map(toCardEntry);
+  }
+
+  /** Contas de fatura vivas do cartão (abertas e pagas), por mês da fatura. Em páginas, como as demais listas. */
+  async listInvoiceCommitments(cardId: string): Promise<Commitment[]> {
+    const rows = await readAll<CommitmentRow>((from, to) =>
+      this.db.from('commitment_items').select('*').eq('card_id', cardId).order('invoice_month').order('id').range(from, to),
+    );
+    return rows.map(toCommitment);
+  }
+
+  /** Faturas do cartão (uma por mês com lançamento ou conta viva), do mês mais antigo ao mais novo. */
+  async listInvoiceItems(cardId: string): Promise<InvoiceItem[]> {
+    const rows = await readAll<InvoiceItemRow>((from, to) =>
+      this.db.from('invoice_items').select('*').eq('card_id', cardId).order('month').range(from, to),
+    );
+    return rows.map(toInvoiceItem);
+  }
+
+  /**
+   * As 11 funções de cartão devolvem jsonb {card, entry, entries, invoices, commitments, commitment, record}: sem .single().
+   * O cartão vem sempre, no estado atual (inclusive excluído). As parcelas cruas (entries) não são usadas.
+   */
+  private async callCard(fn: string, args: Record<string, unknown>): Promise<CardResult> {
+    const { data, error } = await this.db.rpc(fn, args);
+    if (error) throw repoError(error);
+    const result = data as CardResult | null;
+    if (!result?.card) throw new RepoError('desconhecido');
+    return result;
+  }
+
+  private cardWrite(r: CardResult): CardWrite {
+    return {
+      card: toCard(r.card!),
+      entry: r.entry ? toCardEntry(r.entry) : null,
+      invoices: (r.invoices ?? []).map(toInvoiceItem),
+      commitments: (r.commitments ?? []).map(toCommitment),
+    };
+  }
+
+  private async writeCard(fn: string, args: Record<string, unknown>): Promise<CardWrite> {
+    return this.cardWrite(await this.callCard(fn, args));
+  }
+
+  /** Pagar e desfazer sempre devolvem a conta da fatura e o gasto do pagamento (criado ou excluído). */
+  private async writeInvoicePayment(fn: string, args: Record<string, unknown>): Promise<InvoicePaymentWrite> {
+    const r = await this.callCard(fn, args);
+    if (!r.commitment || !r.record) throw new RepoError('desconhecido');
+    return { ...this.cardWrite(r), commitment: toCommitment(r.commitment), record: toRecord(r.record) };
+  }
+
+  createCard(key: string, contextId: string, input: CardInput) {
+    return this.writeCard('create_card', {
+      p_idempotency_key: key,
+      p_context_id: contextId,
+      p_nickname: input.name,
+      p_last_digits: input.lastDigits,
+      p_closing_day: input.closingDay,
+      p_due_day: input.dueDay,
+      p_limit_cents: input.limitCents,
+    });
+  }
+
+  updateCard(key: string, id: string, expectedVersion: number, input: CardInput) {
+    return this.writeCard('update_card', {
+      p_idempotency_key: key,
+      p_card_id: id,
+      p_expected_version: expectedVersion,
+      p_nickname: input.name,
+      p_last_digits: input.lastDigits,
+      p_closing_day: input.closingDay,
+      p_due_day: input.dueDay,
+      p_limit_cents: input.limitCents,
+    });
+  }
+
+  setCardStatus(key: string, id: string, expectedVersion: number, status: CardStatus) {
+    return this.writeCard('set_card_status', {
+      p_idempotency_key: key,
+      p_card_id: id,
+      p_expected_version: expectedVersion,
+      p_status: status,
+    });
+  }
+
+  deleteCard(key: string, id: string, expectedVersion: number) {
+    return this.writeCard('delete_card', { p_idempotency_key: key, p_card_id: id, p_expected_version: expectedVersion });
+  }
+
+  /** p_receipt_key (o resumo SHA-256, nunca a chave) só vai quando há nota: sem ela, o hash da operação é o de uma compra comum. */
+  addCardPurchase(key: string, cardId: string, input: CardPurchaseInput) {
+    return this.writeCard('add_card_purchase', {
+      p_idempotency_key: key,
+      p_card_id: cardId,
+      p_purchased_on: input.purchasedOn,
+      p_total_cents: input.totalCents,
+      p_installments: input.installments,
+      p_description: input.description,
+      p_category: input.category,
+      ...(input.receiptKey != null ? { p_receipt_key: input.receiptKey } : {}),
+    });
+  }
+
+  /**
+   * O valor é sempre o novo inteiro (compra: o total). Cada tipo manda só os campos que usa e deixa os outros nulos
+   * (campo_nao_se_aplica); a chave da nota não muda depois de gravada.
+   */
+  updateCardEntry(key: string, entryId: string, expectedVersion: number, input: CardEntryInput) {
+    const common = { p_idempotency_key: key, p_entry_id: entryId, p_expected_version: expectedVersion, p_kind: input.kind };
+    if (input.kind === 'compra') {
+      return this.writeCard('update_card_entry', {
+        ...common,
+        p_amount_cents: input.totalCents,
+        p_occurred_on: input.purchasedOn,
+        p_description: input.description,
+        p_category: input.category,
+        p_installments: input.installments,
+        p_invoice_month: null,
+        p_charge_kind: null,
+      });
+    }
+    if (input.kind === 'encargo') {
+      return this.writeCard('update_card_entry', {
+        ...common,
+        p_amount_cents: input.amountCents,
+        p_occurred_on: null,
+        p_description: null,
+        p_category: null,
+        p_installments: null,
+        p_invoice_month: `${input.invoiceMonth}-01`,
+        p_charge_kind: input.chargeType,
+      });
+    }
+    return this.writeCard('update_card_entry', {
+      ...common,
+      p_amount_cents: input.amountCents,
+      p_occurred_on: null,
+      p_description: input.description,
+      p_category: input.category,
+      p_installments: null,
+      p_invoice_month: `${input.invoiceMonth}-01`,
+      p_charge_kind: null,
+    });
+  }
+
+  deleteCardEntry(key: string, entryId: string, expectedVersion: number) {
+    return this.writeCard('delete_card_entry', { p_idempotency_key: key, p_entry_id: entryId, p_expected_version: expectedVersion });
+  }
+
+  addCardCharge(key: string, cardId: string, input: CardChargeInput) {
+    return this.writeCard('add_card_charge', {
+      p_idempotency_key: key,
+      p_card_id: cardId,
+      p_invoice_month: `${input.invoiceMonth}-01`,
+      p_charge_kind: input.chargeType,
+      p_amount_cents: input.amountCents,
+    });
+  }
+
+  addCardRefund(key: string, cardId: string, input: CardRefundInput) {
+    return this.writeCard('add_card_refund', {
+      p_idempotency_key: key,
+      p_card_id: cardId,
+      p_invoice_month: `${input.invoiceMonth}-01`,
+      p_amount_cents: input.amountCents,
+      p_description: input.description,
+      p_category: input.category,
+    });
+  }
+
+  /** expectedVersion = versão da conta da fatura (InvoiceItem.commitmentVersion). Sem accountId, o banco usa a conta ativa mais antiga. */
+  payInvoice(
+    key: string,
+    cardId: string,
+    month: IsoMonth,
+    expectedVersion: number,
+    amountCents: Cents,
+    paidOn: IsoDate,
+    accountId?: string | null,
+  ) {
+    return this.writeInvoicePayment('pay_invoice', {
+      p_idempotency_key: key,
+      p_card_id: cardId,
+      p_month: `${month}-01`,
+      p_expected_version: expectedVersion,
+      p_paid_cents: amountCents,
+      p_paid_on: paidOn,
+      ...(accountId != null ? { p_account_id: accountId } : {}),
+    });
+  }
+
+  undoInvoicePayment(key: string, cardId: string, month: IsoMonth, expectedVersion: number) {
+    return this.writeInvoicePayment('undo_invoice_payment', {
+      p_idempotency_key: key,
+      p_card_id: cardId,
+      p_month: `${month}-01`,
+      p_expected_version: expectedVersion,
+    });
+  }
+
+  /** Só operações de cartão: o cartão em target_id e, nas ações de lançamento, o lançamento em entry_id. */
+  async findCardOperation(key: string) {
+    const { data, error } = await this.db
+      .from('record_operations')
+      .select('action, target_id, entry_id, commitment_id, record_id')
+      .eq('idempotency_key', key)
+      .in('action', CARD_ACTIONS)
+      .maybeSingle();
+    if (error) throw repoError(error);
+    if (!data) return null;
+    if (!data.target_id) throw new RepoError('desconhecido', 'operacao_inconsistente');
+    return {
+      action: data.action as CardAction,
+      cardId: data.target_id as string,
+      entryId: (data.entry_id as string | null) ?? null,
+      commitmentId: (data.commitment_id as string | null) ?? null,
+      recordId: (data.record_id as string | null) ?? null,
+    };
   }
 }
