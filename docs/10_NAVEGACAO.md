@@ -2,6 +2,29 @@
 
 09/10/2026. Junta quatro análises independentes (mapa das telas com medidas, princípios de usabilidade, tarefas feitas por pessoas fictícias do público e comparação com outros apps de finanças). As medidas vêm da versão web de demonstração, em celular de 360 × 640 e de 390 × 844 (`nav_audit/m360x640/report.txt`, `m390x844/report.txt`, `measure.out`, capturas em `nav_audit/m360x640/` e `nav_audit/shots/`). Nada foi alterado no app.
 
+> **Situação em 10/10/2026: a navegação foi implementada e está registrada em D-039 (`docs/00`).** O texto abaixo é a proposta de 09/10/2026, mantida como registro; onde ele diz "hoje", leia a situação de antes da entrega. Enzo respondeu "Sim" a B1 e a B2 e pediu a barra inferior nas telas de consulta.
+>
+> **Entregue (D-039):**
+> - B1: "Anotar gasto" sempre logo abaixo do cabeçalho azul (y 408 a 460 em 390 × 844 e em 320 px), com a faixa "Seus últimos meses", o card "Primeiros passos" e as confirmações depois dele.
+> - B2: "Ver contas ›" no card "Ainda a pagar" e "›" ao lado de "Recebido" e "Pago".
+> - Barra inferior à vista em todas as telas de consulta, com a aba de origem marcada, sem barra dupla nem salto ao abrir.
+> - A5: Contas a pagar no mês certo, com seletor local (sem limite para trás e até 12 meses à frente) e as entradas "de agora" no mês atual.
+> - A6: "Revisar vencidas" já com 1 vencida e "Já paguei" no detalhe da conta.
+> - A7: a linha de lembretes em Contas a pagar, só no celular, fora da demonstração e com os lembretes desligados, que abre Conta no card de lembretes.
+> - A8: a previsão e o critério do total depois das listas, para o primeiro "Já paguei" ficar à vista.
+> - A12, só o nome acessível da aba: "Movimentos: movimentações do mês".
+> - A17: Metas compacta, com o plano de guardar dentro do card da reserva (com ou sem reserva) e o card "Fazer as contas". Do A18, só a linha "Planejar quanto guardar" no card da reserva para quem respondeu "Agora não".
+> - A21: a busca de Aprender ("Buscar um tema ou uma função") com o grupo "No app".
+> - A1, A2, A9 e A11 entraram com o Ciclo E (D-037 e D-038).
+>
+> **Em aberto:**
+> - A16, "Nova conta do ano" no topo da lista de Gastos fixos: não foi feito.
+> - A vencida se paga em 4 toques contando a confirmação. Para chegar a 3, "Já paguei" teria de ficar na própria linha da vencida, o que muda D-035(5) e depende de Enzo.
+> - Ficam sem barra, por terem rodapé fixo, `/reserva`, `/guardar`, `/guardar/minima`, `/retomar/atualizar`, `/retomar/pagar` e `/a-pagar/vencidas`; Enzo pode preferir a barra também nelas.
+> - Desvios menores a confirmar: o card "Seu mês" fica depois de "Suas metas"; a tela de pagamento mantém o título "Marcar como paga" enquanto o detalhe diz "Já paguei"; a previsão e a linha de lembretes ficam depois das listas, e não no topo; "Lembretes" e "Ocultar valores" na busca abrem Conta, e não a seção.
+> - Os demais itens das seções 4 e 5 (A3, A4, A10, A13 a A15, o resto de A18, A19, A20, A22 a A25 e B3 a B6) não foram tratados por D-039 e seguem como proposta. Antes de construir cada um, conferir no código se outro ciclo já o entregou.
+> - Testes em aparelho (iOS e Android) da barra, do teclado aberto e dos lembretes, que a versão web não exercita.
+
 ## 1. Resposta curta
 
 **Escanear nota fiscal.** O lugar certo é dentro de "Anotar gasto", como o primeiro botão do formulário. As cinco portas de gasto (Resumo, Movimentos, Primeiros passos, "Anotar outro gasto" e o atalho do ícone) já abrem esse mesmo formulário, então todas ganham o recurso sem nenhum botão novo no Resumo. Um ponto pede decisão de Enzo: na maioria dos cupons, o QR code traz só a loja (CNPJ) e o mês, sem valor e sem dia. Quem entrega "escaneou, preencheu" é a leitura da página oficial da Sefaz, que a especificação deixou para depois (seção 2.4).
@@ -24,7 +47,7 @@
 > - A câmera não abre direto no primeiro toque: antes da permissão, uma folha oferece "Usar a câmera", "Escolher o PDF da nota" e "Colar o link ou a chave" (decisão de Enzo depois da auditoria); só depois de ler com a câmera uma vez o toque abre a câmera direto. Não há "Usar foto da galeria".
 > - "Ver a nota no site da Sefaz" abre no navegador do aparelho (na web, em outra aba), e não dentro do app com "Voltar ao gasto": não há webview instalado. O endereço não é guardado (leva a chave inteira), então o botão no detalhe do gasto só existe na sessão em que a nota foi lida.
 > - O banco guarda só o resumo SHA-256 da chave, não a chave (a chave de NF-e de pessoa física carrega o CPF do emitente). "Como da última vez nesta loja" fica só no aparelho, por resumo do CNPJ.
-> - Não foram feitos nesta entrega: o foco automático em Descrição continua como era, "Ler outra nota" no detalhe depois de salvar, o aviso de "conta já anotada" para toda conta em aberto (2.3), o atalho `?ler=nota` do ícone, a linha de Primeiros passos, o tema "Ler nota fiscal" e a busca de Aprender (2.5). A leitura da página da Sefaz só foi testada com páginas sintéticas (P-025).
+> - Não foram feitos nesta entrega: o foco automático em Descrição continua como era, "Ler outra nota" no detalhe depois de salvar, o aviso de "conta já anotada" para toda conta em aberto (2.3), o atalho `?ler=nota` do ícone, a linha de Primeiros passos, e o tema "Ler nota fiscal". A busca de Aprender (2.5) entrou depois, com o grupo "No app" (D-039): "nota", "cupom", "QR" e "NFC-e" levam a "Escanear nota fiscal". A leitura da página da Sefaz só foi testada com páginas sintéticas (P-025).
 
 ### 2.1 Onde fica
 

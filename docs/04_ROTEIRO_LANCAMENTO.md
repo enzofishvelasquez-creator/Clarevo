@@ -2,7 +2,7 @@
 
 Atualizado em 10/10/2026. Prazos são estimativas de trabalho, não compromissos; dependem das decisões pendentes.
 
-Ordem a partir de 08/10/2026 (D-023, D-029, D-033 e D-034): o Ciclo A, o Ciclo A3 (contas do ano) e os Primeiros passos com os atalhos em Movimentações estão feitos. O Ciclo A6 ("Achar tudo" e calculadoras, D-035) está implementado e no roteiro web, com o teste manual em aberto. Os Ciclos A4 (seus últimos meses, D-030) e A5 (Aprender e dúvidas, D-031 e D-032) estão implementados e no roteiro web, com os itens abertos de cada seção abaixo. Em 09/10/2026 foram implementados os Ciclos A2 (lembretes, ocultar valores e biometria, D-025), B (renda comprometida, D-026), C (metas e reserva, D-027, com o plano de guardar, D-036) e D (simulador, D-028), todos antes do Ciclo 2 (família). Neles, o que falta é o mesmo em todos: o teste em aparelho, que fica para depois de o app estar pronto (as migrações 0006 e 0007 foram coladas e conferidas no Supabase em 10/10/2026). Em 10/10/2026 foi implementado também o Ciclo E (cartões de crédito e faturas, D-037, e leitura de notas fiscais, D-038), com a migração 0008 ainda por colar no Supabase. O roteiro web (`scripts/e2e-web.js`) já cobre as telas novas. Cada ciclo começa depois de o anterior passar em `npm test`, `npm run typecheck`, `npm run test:db`, `npm run test:api` e `npm run test:web`.
+Ordem a partir de 08/10/2026 (D-023, D-029, D-033 e D-034): o Ciclo A, o Ciclo A3 (contas do ano) e os Primeiros passos com os atalhos em Movimentações estão feitos. O Ciclo A6 ("Achar tudo" e calculadoras, D-035) está implementado e no roteiro web, com o teste manual em aberto. Os Ciclos A4 (seus últimos meses, D-030) e A5 (Aprender e dúvidas, D-031 e D-032) estão implementados e no roteiro web, com os itens abertos de cada seção abaixo. Em 09/10/2026 foram implementados os Ciclos A2 (lembretes, ocultar valores e biometria, D-025), B (renda comprometida, D-026), C (metas e reserva, D-027, com o plano de guardar, D-036) e D (simulador, D-028), todos antes do Ciclo 2 (família). Neles, o que falta é o mesmo em todos: o teste em aparelho, que fica para depois de o app estar pronto (as migrações 0006 e 0007 foram coladas e conferidas no Supabase em 10/10/2026). Em 10/10/2026 foi implementado também o Ciclo E (cartões de crédito e faturas, D-037, e leitura de notas fiscais, D-038), com a migração 0008 ainda por colar no Supabase. Também em 10/10/2026 entrou a navegação (D-039): "Anotar gasto" logo abaixo do cabeçalho do Resumo, a barra inferior nas telas de consulta, Contas a pagar no mês certo, Metas compacta e a busca "No app" de Aprender, na seção do Ciclo E abaixo. O roteiro web (`scripts/e2e-web.js`) já cobre as telas novas. Cada ciclo começa depois de o anterior passar em `npm test`, `npm run typecheck`, `npm run test:db`, `npm run test:api` e `npm run test:web`.
 
 ## Primeiro ciclo (entregue em demonstração; falta ligar o Supabase)
 
@@ -44,7 +44,7 @@ Ordem a partir de 08/10/2026 (D-023, D-029, D-033 e D-034): o Ciclo A, o Ciclo A
 
 ## Primeiros passos e atalhos em Movimentações (D-033), feito
 
-- [x] Card "Primeiros passos" no Resumo, antes de "Anotar gasto": três passos (gastos fixos, recebimento do mês e gasto já pago) com sinal de concluído e "Agora não"; só no Pessoal e no mês corrente, nunca na demonstração com dados; some de vez ao concluir ou dispensar
+- [x] Card "Primeiros passos" no Resumo, antes de "Anotar gasto" (desde D-039, depois dele): três passos (gastos fixos, recebimento do mês e gasto já pago) com sinal de concluído e "Agora não"; só no Pessoal e no mês corrente, nunca na demonstração com dados; some de vez ao concluir ou dispensar
 - [x] Bloco "Organizar" em Movimentações com "Contas a pagar" e "Gastos fixos e parcelamentos"
 - [x] Passos do card e do bloco "Organizar" no roteiro web (`npm run test:web`)
 - [ ] Teste manual em iOS, Android e web, com e sem movimento reduzido e com leitor de tela
@@ -76,7 +76,7 @@ Rodados em 09/10/2026, depois das correções da revisão: `npm test` (23 arquiv
 - [x] Banco: atividade por pessoa e contexto mantida por gatilho, decisão da revisão, `create_series_occurrence`, `decide_return_review` e `months_overview`, com carga inicial da atividade de quem já usava o app (migração `20261009000001_retorno.sql`), e testes de leitura só pela própria pessoa, permissões, guardas, privilégios e das sequências de aceite R e R7 (`supabase/tests/47_retorno.sql`)
 - [x] Core: ausência, período, contas sem registro, montagem da revisão, ações, lote, modo "Dia" e todos os textos (`retorno.ts`); `MemoryRepository` com o mesmo gatilho e as mesmas funções; cenário de demonstração "retorno", fictício e identificado, sem mudar a demonstração padrão (`retorno.test.ts`, 41 testes)
 - [x] App ligado ao banco (`SupabaseRepository`), com testes pela API: revisão igual à do core, cada conta sem registro aceita, "Atualizar agora" com os totais da sequência R, reconciliação de `criar_ocorrencia` e decisão
-- [x] Faixa "Seus últimos meses" no Resumo, no lugar dos avisos temporários, só no Pessoal e no mês atual, sem valores; com ela, o card "Primeiros passos" espera
+- [x] Faixa "Seus últimos meses" no Resumo, no lugar dos avisos temporários (desde D-039, depois de "Anotar gasto"), só no Pessoal e no mês atual, sem valores; com ela, o card "Primeiros passos" espera
 - [x] `/retomar` (resumo mês a mês, "Atualizar agora" e "Seguir adiante"), `/retomar/atualizar` (passo a passo, "Já paguei", "Não houve", "Ainda não paguei", grupos por ano, lote "pagas no vencimento", "Desfazer", "Concluir") e `/retomar/pagar` (registrar e pagar uma conta sem registro, com "Salvar de novo")
 - [x] Formulário no modo "Dia" ("Junho tem 30 dias.", "Salvar e anotar outro", aviso de gasto fixo sem conta no mês)
 - [x] "Nada anotado em junho." no Resumo de meses fechados; "Registrar este mês" e "Registrar esta parcela" no detalhe de gasto fixo e de parcelamento, com "Sem conta registrada: N" no progresso; linha nova em "Quem vê estes dados?"; tema "Mês sem registro" em Aprender
@@ -182,9 +182,27 @@ Sem mudança no banco. Mesmas execuções do Ciclo B, mais `simulate.test.ts` (3
 - [ ] **Você:** aceite com notas reais (P-025): de 5 a 10 cupons do RJ para a página da Sefaz e o formato dos QR, e DANFEs de compras online (Mercado Livre, Amazon) para `danfeFromText`
 - [ ] Teste em aparelho (iOS e Android): câmera, permissão, lanterna, vibração, seletor de arquivos, Hermes com `Intl` real, o tamanho do `unpdf` (cerca de 3,1 MB de bytecode) e o atraso de 450 ms do iOS entre a folha e a câmera
 - [ ] Compartilhar o PDF de outro app direto para o Clarevo (folha de compartilhamento), quando houver build das lojas
-- [ ] Aprender: trocar o parágrafo do tema `fatura` pelo de `CARDS_TEXT.topicParagraph` (hoje o tema ainda diz que cartões não estão disponíveis), escrever o tema "Ler nota fiscal" com fonte e levar "nota", "cupom" e "QR" à busca; incluir PDF.js (Apache-2.0) e `unpdf` (MIT) na tela de licenças
+- [x] Aprender: tema `fatura` com `CARDS_TEXT.topicParagraph` e `rotativo-cartao` com `CARDS_TEXT.rotativoParagraph` (10/10/2026, `docs/09_APRENDER.md`)
+- [ ] Aprender: escrever o tema "Ler nota fiscal" com fonte (a busca já leva "nota", "cupom" e "QR" a "Escanear nota fiscal" pelo grupo "No app", D-039); incluir PDF.js (Apache-2.0) e `unpdf` (MIT) na tela de licenças
 - [ ] Fora da entrega do passo 3: atalho `?ler=nota` do ícone, linha da nota em Primeiros passos e o aviso de "conta já anotada" para toda conta em aberto (`docs/10` §2.3 e §2.5)
 - [ ] Revisão dos textos por Enzo antes de publicar (tom sem cobrança e sem julgamento)
+
+### Navegação (D-039, `docs/10_NAVEGACAO.md`), junto do Ciclo E
+
+Sem mudança no banco. Regras no core (`packages/core/src/navigation.ts`, `navigation.test.ts`), barra em `apps/app/src/components/tab-bar.tsx` e `apps/app/src/lib/bar-inset.ts`.
+
+- [x] Resumo: "Anotar gasto" sempre logo abaixo do cabeçalho azul (y 408 a 460 em 390 × 844 e em 320 px), com a faixa "Seus últimos meses", o card "Primeiros passos" e as confirmações depois dele (Enzo: "Sim"; muda D-030(3) e D-033(1))
+- [x] Resumo: "Ver contas ›" no card "Ainda a pagar", numa linha só também em 320 px, e "›" ao lado de "Recebido" e "Pago" (Enzo: "Sim"; responde a D-034(4))
+- [x] Barra inferior à vista em toda tela de consulta (Calculadoras, Contas a pagar e o detalhe, Gastos fixos, Cartões e a fatura, detalhe do registro, composição, Renda comprometida, detalhe da reserva e da meta, Simular, explicação de um tema, Seus últimos meses, Conta), com a aba de origem marcada, sem barra dupla nem salto ao abrir e fora da frente do teclado; sem barra nos formulários e nas telas de passo a passo com rodapé fixo (`/reserva`, `/guardar`, `/guardar/minima`, `/retomar/atualizar`, `/retomar/pagar` e `/a-pagar/vencidas`)
+- [x] Contas a pagar: seletor de mês local (sem limite para trás, 12 meses à frente), entradas "de agora" no mês atual, cards com o mês no endereço, "Revisar vencidas" com 1 vencida, "Já paguei" no detalhe, previsão e critério do total depois das listas e a linha de lembretes (celular, fora da demonstração, lembretes desligados) que abre Conta no card de lembretes
+- [x] Metas compacta: pergunta de 186 px em 360 × 640, plano de guardar dentro do card da reserva (com ou sem reserva), "Calcular minha reserva" à vista acima da barra e o card "Fazer as contas"
+- [x] Aprender: "Buscar um tema ou uma função" e o grupo "No app" com 20 telas do app (`docs/09_APRENDER.md`); nome acessível da aba "Movimentos: movimentações do mês"
+- [x] Roteiro web: bloco "Navegação (D-039)" em `scripts/e2e-web.js`, conferido em 390 e 320 px de largura e, nos casos de altura curta, em 360 × 640 e 320 × 640
+- [ ] **Você:** decidir se a conta vencida passa a 3 toques contando a confirmação, com "Já paguei" na própria linha da vencida (muda D-035(5)); hoje são 4 toques (D-039(6))
+- [ ] **Você:** confirmar que `/reserva`, `/guardar`, `/guardar/minima`, `/retomar/atualizar`, `/retomar/pagar` e `/a-pagar/vencidas` ficam sem a barra (D-039(4)); confirmar o card "Seu mês" depois de "Suas metas" e o título "Marcar como paga" na tela de pagamento
+- [ ] "Nova conta do ano" no topo da lista de Gastos fixos (`docs/10` A16), não feito
+- [ ] Itens de `docs/10` que D-039 não trata (A3, A4, A10, A13 a A15, o resto de A18, A19, A20, A22 a A25 e B3 a B6): decidir a ordem e conferir no código o que o Ciclo E já entregou
+- [ ] Teste em aparelho (iOS e Android): barra sobreposta e a altura reservada na rolagem, barra escondida com o teclado aberto, lembretes ligados pela linha de Contas a pagar e a rolagem de Conta até o card
 
 ## Próximos ciclos
 

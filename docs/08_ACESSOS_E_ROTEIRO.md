@@ -4,6 +4,8 @@ Documento para Enzo, 08/10/2026. Nenhum arquivo do repositório foi alterado. Co
 
 Atualização de 09/10/2026: o Ciclo A6 entregou as calculadoras e o "Achar tudo" com as regras de D-035. A situação de cada função está na seção 4; o restante do texto é a proposta de 08/10/2026, mantida como registro.
 
+Atualização de 10/10/2026 (D-039, `docs/10_NAVEGACAO.md`): a navegação mudou depois desta proposta. "Anotar gasto" fica sempre logo abaixo do cabeçalho azul do Resumo, com os avisos temporários depois dele; o card "Ainda a pagar" ganhou "Ver contas ›", e "Recebido" e "Pago" ganharam "›" (a resposta à pergunta 4 da seção 7); a barra inferior com as quatro abas aparece em todas as telas de consulta, como Calculadoras e Contas a pagar, e só os formulários e os passos com rodapé fixo ficam sem ela. Onde este texto diz "o Resumo fica como foi aprovado", leia os blocos e a ordem de D-022, que não mudaram. Os desenhos de Movimentos, Metas e Aprender abaixo valem como foram implementados em D-035, com as mudanças de D-039 (Metas compacta, "Fazer as contas" e o grupo "No app" na busca de Aprender).
+
 Legenda: **[E]** evidência com fonte · **[O]** opinião minha · **[!]** dado frágil, a conferir.
 
 ## Resumo em 10 linhas
@@ -13,7 +15,7 @@ Legenda: **[E]** evidência com fonte · **[O]** opinião minha · **[!]** dado 
 3. Primeira leva: 7 calculadoras prontas para começar e 1 que depende de você ("Quitar antes"). São elas: parcelado ou à vista, quanto custa uma dívida, multa por atraso, reserva para imprevistos, juntar para um objetivo, dividir as contas da casa e quanto custa por ano.
 4. Todas usam os números que a pessoa digita e não gravam nada. Nenhuma indica banco, produto ou crédito.
 5. O Resumo fica exatamente como foi aprovado. Movimentos ganha o bloco "Organizar" (Contas a pagar, Gastos fixos e Calculadoras), e a aba Metas deixa de ser uma tela vazia.
-6. Pagar uma conta cai de 4 para 3 toques com o botão "Já paguei" na própria lista. A opção "Por categoria" mostra para onde foi o dinheiro.
+6. Pagar uma conta cai de 4 para 3 toques com o botão "Já paguei" na própria lista (conta a vencer; a conta vencida se paga pela revisão de vencidas em 4 toques, D-039(6)). A opção "Por categoria" mostra para onde foi o dinheiro.
 7. O que mais falta, por ordem de valor: lembretes, renda comprometida, metas e reserva, orçamento por categoria, ocultar valores, plano para sair das dívidas e exportar dados.
 8. A pesquisa mostra três coisas: só 14,3% das pessoas sabem calcular juros simples; 29,9% das famílias têm contas atrasadas; e lembretes funcionam, mas precisam juntar as contas para a pessoa não se descuidar de outras.
 9. Ordem sugerida: fechar as contas do ano, deixar tudo fácil de achar, entregar as calculadoras e depois seguir os ciclos já desenhados, com os lembretes em paralelo.
@@ -635,6 +637,8 @@ Ordem pelo valor para a pessoa e para a empresa que oferece o benefício. Valor:
 ## 7. Decisões que precisam do Enzo
 
 Respondidas em 08/10/2026 (D-034): 1, 2 e 3 aprovadas; 4 refeita de forma mais simples, com o Resumo como está até a resposta; 5, sem parecer jurídico: o app presta só informações públicas já disponíveis.
+
+A pergunta 4 foi respondida em 09/10/2026, com a auditoria de `docs/10`, e registrada em D-039(2): "Ver contas ›" no card "Ainda a pagar" e "›" em Recebido e Pago (Enzo: "Sim"). A fileira de atalhos e o botão "Mais" ficaram de fora.
 
 1. **Ordem:** posso fazer o "Achar tudo" e as calculadoras logo depois das contas do ano, antes de "Seus últimos meses"?
    - Isso muda a ordem combinada em D-023, mas não muda nenhuma tela aprovada.

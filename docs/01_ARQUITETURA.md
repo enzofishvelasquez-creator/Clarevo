@@ -44,9 +44,10 @@ apps/app/src/
     card-form, card-parts, card-purchase-form, invoice-*  cartão, fatura, pagamento, encargo, estorno e edição da compra
     receipt-scan, receipt-block  "Escanear nota fiscal": linha, folha, câmera, colar e o bloco "Nota lida"
     device-features, device-settings, setting-switch  lembretes, ocultar valores e biometria (Conta e layout)
+    tab-bar             barra das abas e barra das telas de consulta (D-039)
   lib/                  autenticação (Supabase e demonstração), learn.ts (links e ações de Aprender), situação do card Primeiros passos (só no aparelho),
                         reminders.ts, device.ts e device-prefs.ts (lembretes e preferências só do aparelho), privacy.ts (ocultar valores), essentials.ts,
-                        cards.ts (rotas e leituras de cartão), pdf-text.ts, receipt-read.ts, receipt-link.ts, sefaz-fetch.ts e note-prefs.ts (leitura de notas no aparelho)
+                        bar-inset.ts (altura da barra inferior das telas de consulta), cards.ts (rotas e leituras de cartão), pdf-text.ts, receipt-read.ts, receipt-link.ts, sefaz-fetch.ts e note-prefs.ts (leitura de notas no aparelho)
   state/                sessão, dados (consultas e gravações), contexto e mês
   theme/                tokens de cor, tipografia, movimento e vetores do logo
 packages/core/          regras financeiras, validação, repositório em memória, testes
@@ -60,6 +61,7 @@ packages/core/          regras financeiras, validação, repositório em memóri
   src/cards.ts          cartões: datas da fatura, parcelas, total, pagamento, saldo anterior, crédito, "Por categoria", validação e textos
   src/nota.ts, danfe.ts, sefaz-page.ts, nota-flow.ts, sha256.ts  notas fiscais: QR e chave, DANFE, página da Sefaz-RJ, fluxo do formulário e resumo SHA-256
   src/calculators/      as 8 calculadoras, campos, textos e links de contexto
+  src/navigation.ts     navegação (D-039): modo da barra inferior por endereço, mês de abertura e seletor de Contas a pagar, linha de lembretes e o índice "No app" da busca de Aprender
 supabase/
   migrations/           esquema, funções e permissões (0001 fundação, 0002 contas a pagar, 0003 gastos fixos, 0004 contas do ano, 0005 seus últimos meses,
                         0006 renda comprometida, 0007 metas e plano de guardar, 0008 cartões e chave da nota fiscal)
@@ -80,6 +82,14 @@ docs/                   decisões, regras, acessos, Supabase, roteiro, Aprender,
 - Na web, um endereço de tela do app aberto sem sessão (atalho do ícone, link salvo) fica só em memória e é retomado depois de entrar; parâmetros de links de e-mail (`token`, `code`, `type`, `error`) são descartados (D-035(10)).
 
 A navegação organiza a experiência; **quem protege os dados é o banco**.
+
+## Barra inferior e telas de consulta (D-039)
+
+- **Três modos, decididos no core** (`barModeFor` em `packages/core/src/navigation.ts`): *abas* (Resumo, Movimentos, Metas e Aprender, onde o layout das abas desenha a barra), *consulta* (qualquer outra tela que não seja formulário) e *formulário* (sem barra, porque a ação principal está no rodapé fixo).
+- **Consulta é o padrão.** Só os endereços de uma lista de formulários, de passos com rodapé fixo e de entrada ficam sem barra; uma tela nova nunca perde a barra por esquecimento. A lista (`FORM_PATHS`) e a justificativa de cada exceção estão em D-039(4).
+- **Como a barra é desenhada.** As telas de consulta são rotas fora do layout das abas; `BrowseTabBar`, no layout da raiz, mostra a barra sobreposta ao fim da tela (posição absoluta) e marca a aba de origem (a última aba em foco, ou a aba do assunto, `topicTabFor`). Cada rolagem soma a altura medida da barra (`lib/bar-inset.ts`), e a barra sai da frente quando o teclado abre. Tocar numa aba volta a ela e fecha as telas abertas por cima.
+- **Mês de Contas a pagar** (`payablesStartMonth`, `payablesStep`): a tela tem mês próprio; as entradas "de agora" abrem o mês atual, e os cards que mostram um mês levam `?mes=AAAA-MM` (omitido no mês atual, `payablesMonthParams`).
+- Nada disso lê ou grava dados da pessoa, e a busca "No app" de Aprender não registra buscas (`docs/09_APRENDER.md`).
 
 ## Modelo de dados
 
