@@ -4958,7 +4958,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('nav Aprender: os temas continuam nos resultados (juros) com a contagem de sempre', (await body()).includes('temas para "juros"'));
   await learnBox().fill('');
   ok('nav Aprender: a busca não registra nada (nenhuma requisição nem gravação, nada no aparelho)', (await storage()) === navStorageBefore && writes.length === navWritesBefore, `${writes.length - navWritesBefore} gravações`);
-  await goTab('Resumo');
+  await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await p.waitForTimeout(500);
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);
