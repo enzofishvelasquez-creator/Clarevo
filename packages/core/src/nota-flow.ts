@@ -33,7 +33,6 @@ export const NOTA_FLOW_TEXT = {
   cameraAim: 'Aponte para o QR code no rodapé do cupom. Compra on-line: o código de barras do DANFE.',
   /** Depois de uns 5 segundos sem ler (D-042): chegar mais perto, até o QR ocupar a moldura. */
   cameraCloser: 'Aproxime até o QR ocupar a moldura.',
-  cameraFrameA11y: 'Moldura para o código da nota',
   cameraStarting: 'Abrindo a câmera…',
   cameraUnavailable: 'Não conseguimos usar a câmera neste aparelho. Você pode escolher o PDF da nota ou colar o link ou a chave.',
   cameraDeniedHelp: 'Para usar a câmera, permita o acesso nos ajustes do aparelho. Você também pode escolher o PDF da nota ou colar o link ou a chave.',

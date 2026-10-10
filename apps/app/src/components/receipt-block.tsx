@@ -1,7 +1,8 @@
-import { NOTA_FLOW_TEXT, NOTA_TEXT, SEFAZ_TEXT, noteGaps, noteReadLine, type IsoDate, type ReceiptDraft } from '@clarevo/core';
+import { NOTA_FLOW_TEXT, NOTA_TEXT, SEFAZ_TEXT, noteGaps, noteReadLine, sefazPhoneHint, type IsoDate, type ReceiptDraft } from '@clarevo/core';
 import { QrCode } from 'lucide-react-native';
 import { View } from 'react-native';
 
+import { MoneyTxt } from '@/components/money-text';
 import { SefazStatus } from '@/components/receipt-scan';
 import { Banner, LinkButton, Txt } from '@/components/ui';
 import { colors, fonts, space } from '@/theme/tokens';
@@ -48,11 +49,13 @@ export function NoteBlock({
   onInstallments: () => void;
 }) {
   const gaps = noteGaps(draft, issuedOn);
+  const phoneHint = sefazPhoneHint(draft, issuedOn, webLinkOnly);
   return (
     <Banner tone="info" icon={QrCode}>
-      <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={2}>
+      {/* "Nota lida: Loja · RJ · R$ 87,40 · 06/10/2026 · Pix" (D-042): o valor segue "Ocultar valores". */}
+      <MoneyTxt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={2}>
         {noteReadLine(draft, issuedOn)}
-      </Txt>
+      </MoneyTxt>
       {!gaps.amount && !gaps.day ? <Txt variant="label">{NOTA_TEXT.filled}</Txt> : null}
       {draft.testNote ? <Txt variant="label">{draft.testNote}</Txt> : null}
       {draft.futureNote ? <Txt variant="label">{draft.futureNote}</Txt> : null}
@@ -62,6 +65,7 @@ export function NoteBlock({
       {gaps.dayAssumed ? <Txt variant="label">{gaps.dayAssumed}</Txt> : null}
       {descriptionEmpty && gaps.storeName ? <Txt variant="label">{gaps.storeName}</Txt> : null}
       {draft.officialUrl && webLinkOnly ? <Txt variant="caption" color={colors.textSecondary}>{SEFAZ_TEXT.webOnlyLink}</Txt> : null}
+      {phoneHint ? <Txt variant="caption" color={colors.textSecondary}>{phoneHint}</Txt> : null}
       {draft.officialUrl ? <LinkButton label={NOTA_TEXT.viewOnSefaz} style={linkStyle} onPress={onOpenSefaz} /> : null}
       {draft.model === '55' ? <LinkButton label={NOTA_TEXT.installmentsHint} style={linkStyle} onPress={onInstallments} /> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space[5] }}>

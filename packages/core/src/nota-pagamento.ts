@@ -195,12 +195,8 @@ export const NOTA_PAYMENT_TEXT = {
   multiple: 'Pagamento em mais de uma forma',
   /** A nota diz cartão de crédito e a pessoa ainda não cadastrou nenhum cartão. */
   creditNoCard: 'A nota diz cartão de crédito. Cadastre o cartão para anotar a compra na fatura.',
-  /** A nota diz cartão de crédito e há mais de um cartão: a pessoa escolhe. */
-  creditChooseCard: 'A nota diz cartão de crédito. Escolha o cartão.',
   /** Logo abaixo de "Como você pagou?" quando a nota escolheu. */
   fromNote: (form: PaymentForm): string => `A nota informa: ${PAYMENT_FORM_LABEL[form]}. Mude se você pagou de outro jeito.`,
-  /** Com mais de uma forma, a nota não escolhe. */
-  multipleChoose: 'A nota tem mais de uma forma de pagamento. Escolha como você pagou esta compra.',
 } as const;
 
 /** "Pix", "Cartão de crédito" ou "Pagamento em mais de uma forma"; null quando a nota não traz a forma. */

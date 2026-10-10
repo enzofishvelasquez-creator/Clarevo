@@ -14,6 +14,7 @@ import {
   FIELD_ORDER,
   GOALS_TEXT,
   NOTA_FLOW_TEXT,
+  NOTA_PAYMENT_TEXT,
   NOTA_TEXT,
   NO_CATEGORY_LABEL,
   RETURN_TEXT,
@@ -42,6 +43,7 @@ import {
   noteIssuedOn,
   paidInvoiceMonths,
   parseDateBR,
+  paymentChoiceFor,
   purchasePreview,
   receiptDraft,
   sefazReadErrorText,
@@ -57,6 +59,8 @@ import {
   type FinancialRecord,
   type IsoDate,
   type IsoMonth,
+  type PaymentChoice,
+  type PaymentForm,
   type PersonalSpace,
   type ReceiptMatch,
   type RecordDraft,
@@ -130,6 +134,10 @@ interface NoteState {
   storeId: string | null;
   sefaz: SefazState;
   sefazMessage: string | null;
+  /** "Como você pagou?" que a nota escolheu (D-042); null quando ela não escolheu (sem forma, mais de uma ou "outra forma"). */
+  paySet: PaymentChoice;
+  /** "Como você pagou?" antes de a primeira nota escolher, para "Desfazer leitura". */
+  payBefore: { payWith: 'dinheiro' | 'cartao'; chosenCardId: string | null };
 }
 
 /** Mês fechado vindo da revisão dos últimos meses (?mes=AAAA-MM). */
@@ -193,6 +201,10 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   const [cardError, setCardError] = useState<string | undefined>();
   /** A pessoa já escolheu a forma de pagamento: a escolha lembrada só vale até aí. */
   const paymentTouched = useRef(false);
+  /** A pessoa mexeu em "Como você pagou?" depois de a nota escolher: uma leitura nova da página da Sefaz não troca a escolha dela. */
+  const [payPicked, setPayPicked] = useState(false);
+  const payPickedRef = useRef(false);
+  const payRef = useRef<{ payWith: 'dinheiro' | 'cartao'; chosenCardId: string | null }>({ payWith: 'dinheiro', chosenCardId: null });
   /** Cartões ativos no momento de "Cadastrar cartão": o que aparecer depois vem escolhido ao voltar. */
   const registering = useRef<string[] | null>(null);
   const selectedCard: CardData | null =
@@ -275,6 +287,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   useEffect(() => {
     draftRef.current = draft;
     noteRef.current = note;
+    payPickedRef.current = payPicked;
+    payRef.current = { payWith, chosenCardId };
   });
 
   // Câmera: existe? Já foi usada neste aparelho (então o toque abre a câmera direto)?
@@ -470,6 +484,28 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     setScanMessage(null);
     if (!refine) setForcedMatch(null);
 
+    // Como você pagou? (D-042): a forma que a nota informa pré-seleciona; mais de uma forma, "outra forma" ou nenhuma, não. Uma leitura
+    // nova substitui a escolha da nota anterior; a página da Sefaz (refine) só escolhe se a nota ainda não escolheu e a pessoa não mexeu.
+    const choice: PaymentChoice = scanMode ? paymentChoiceFor(d.payments) : null;
+    const payBefore = prev?.payBefore ?? payRef.current;
+    let paySet: PaymentChoice = refine ? (prev?.paySet ?? null) : null;
+    if (!refine) {
+      payPickedRef.current = false;
+      setPayPicked(false);
+    }
+    if (choice && (!refine || (paySet === null && !payPickedRef.current))) {
+      paySet = choice;
+      paymentTouched.current = true;
+      payRef.current = { ...payRef.current, payWith: choice };
+      setPayWith(choice);
+      setCardError(undefined);
+    } else if (!refine && prev?.paySet && !payPickedRef.current && payRef.current.payWith === prev.paySet) {
+      // A nota nova não diz como foi pago: volta ao que havia antes da nota anterior.
+      payRef.current = payBefore;
+      setPayWith(payBefore.payWith);
+      setChosenCardId(payBefore.chosenCardId);
+    }
+
     const sefazPossible = canReadSefazPage(d) && sefazReadAvailable();
     const state: NoteState = {
       reading: r,
@@ -481,6 +517,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       storeId,
       sefaz: refine ? (prev?.sefaz ?? 'idle') : sefazPossible ? 'reading' : 'idle',
       sefazMessage: null,
+      paySet,
+      payBefore,
     };
     noteRef.current = state;
     setNote(state);
@@ -538,6 +576,14 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       dateText: cur.dateText === n.filled.dateText ? n.before.dateText : cur.dateText,
       category: cur.category === n.filled.category ? n.before.category : cur.category,
     }));
+    // "Como você pagou?": volta ao que havia antes da nota, se a pessoa não mexeu depois de a nota escolher.
+    if (n.paySet && !payPickedRef.current && payRef.current.payWith === n.paySet) {
+      payRef.current = n.payBefore;
+      setPayWith(n.payBefore.payWith);
+      setChosenCardId(n.payBefore.chosenCardId);
+    }
+    setPayPicked(false);
+    payPickedRef.current = false;
     setNote(null);
     setForcedMatch(null);
     setScanMessage(null);
@@ -892,8 +938,15 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     if (first >= 1) installmentsLine = installmentsNotice(installments, first);
   }
 
+  // A nota informa uma forma só e ela escolheu "Como você pagou?" (a pessoa ainda não mexeu): a legenda diz de onde veio a escolha.
+  const noteForm: PaymentForm | null =
+    note && note.paySet !== null && note.paySet === payWith && !payPicked && note.reading.draft.payments.length === 1 ? note.reading.draft.payments[0]! : null;
+  const noteSaysCredit = note !== null && paymentChoiceFor(note.reading.draft.payments) === 'cartao';
+
   const choosePayment = (next: 'dinheiro' | 'cartao') => {
     paymentTouched.current = true;
+    payPickedRef.current = true;
+    setPayPicked(true);
     setPayWith(next);
     setCardError(undefined);
     setBanner(null);
@@ -1053,6 +1106,11 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
                 <Chip label={CARDS_TEXT.expense.cash} selected={payWith === 'dinheiro'} onPress={() => choosePayment('dinheiro')} />
                 <Chip label={CARDS_TEXT.expense.credit} selected={payWith === 'cartao'} onPress={() => choosePayment('cartao')} />
               </ChoiceGroup>
+              {noteForm ? (
+                <Txt variant="caption" color={colors.textSecondary}>
+                  {NOTA_PAYMENT_TEXT.fromNote(noteForm)}
+                </Txt>
+              ) : null}
 
               {payWith === 'cartao' ? (
                 cards.isPending ? (
@@ -1068,7 +1126,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
                   </Banner>
                 ) : activeCards.length === 0 ? (
                   <Banner tone="info" icon={Info} live={false}>
-                    <Txt variant="label">{CARDS_TEXT.screens.noCardsInline}</Txt>
+                    <Txt variant="label">{noteSaysCredit ? NOTA_PAYMENT_TEXT.creditNoCard : CARDS_TEXT.screens.noCardsInline}</Txt>
                     <Button
                       label={CARDS_TEXT.expense.registerCard}
                       tone="soft"
@@ -1089,6 +1147,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
                             selected={selectedCard?.id === c.id}
                             onPress={() => {
                               paymentTouched.current = true;
+                              payPickedRef.current = true;
+                              setPayPicked(true);
                               setChosenCardId(c.id);
                               setCardError(undefined);
                             }}

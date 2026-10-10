@@ -5,6 +5,7 @@ export * from './validation';
 export * from './summary';
 export * from './commitments';
 export * from './series';
+export * from './annual-help';
 export * from './repository';
 export * from './memory-repository';
 export * from './demo';
