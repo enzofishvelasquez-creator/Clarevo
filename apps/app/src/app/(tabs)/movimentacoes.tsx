@@ -1,11 +1,15 @@
 import {
+  ACCOUNTS_TEXT,
   BUDGET_TEXT,
   CARDS_TEXT,
   ERROR_TEXT,
   ORGANIZE_TEXT,
+  accountFilterOptions,
+  filterByAccount,
   formatDayHeader,
   formatMonthBR,
   payablesCaptionFromSummary,
+  recordAccountName,
   payablesMonthParams,
   seriesCaptionShort,
   shortcutA11yLabel,
@@ -29,7 +33,7 @@ import { RecordRow } from '@/components/record-row';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, Chip, Money, Screen, Skeleton, Txt } from '@/components/ui';
 import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
-import { useCardsOverview, useCommitments, useMonthBudget, useMonthRecords, useSeriesList, useSpace, useView } from '@/state/data';
+import { useAccounts, useCardsOverview, useCommitments, useMonthBudget, useMonthRecords, useSeriesList, useSpace, useView } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space } from '@/theme/tokens';
 
@@ -126,9 +130,14 @@ export default function MovimentacoesScreen() {
     currentMonth,
   );
   const [filter, setFilter] = useState<Filter>('todos');
+  // Conta de origem (D-043): o filtro e o nome na linha só aparecem com 2 ou mais contas ativas.
+  const accounts = useAccounts(contextId);
+  const [accountFilter, setAccountFilter] = useState<string | null>(null);
+  const accountOptions = accounts.data && records.data ? accountFilterOptions(accounts.data, records.data) : [];
+  const accountId = accountOptions.some((o) => o.id === accountFilter) ? accountFilter : null;
   const [notice] = useFlash();
   const s = records.summary;
-  const list = records.data ? sortNewestFirst(records.data).filter((r) => filter === 'todos' || r.kind === filter) : [];
+  const list = records.data ? filterByAccount(sortNewestFirst(records.data), accountId).filter((r) => filter === 'todos' || r.kind === filter) : [];
   const groups = groupByDay(list);
 
   return (
@@ -194,6 +203,14 @@ export default function MovimentacoesScreen() {
                 ))}
               </View>
 
+              {accountOptions.length > 0 ? (
+                <View style={styles.filters} accessibilityRole="radiogroup" accessibilityLabel={ACCOUNTS_TEXT.filterLabel}>
+                  {accountOptions.map((o) => (
+                    <Chip key={o.id ?? 'todas'} label={o.label} selected={accountId === o.id} onPress={() => setAccountFilter(o.id)} />
+                  ))}
+                </View>
+              ) : null}
+
               <Card>
                 {records.isPending ? (
                   <View style={{ gap: space[3] }} accessibilityRole="progressbar" accessibilityLabel="Carregando movimentações">
@@ -208,13 +225,22 @@ export default function MovimentacoesScreen() {
                     title={`Nenhum registro em ${formatMonthBR(month).toLowerCase()}`}
                     // Filtro sem registros num mês que tem outros: a ação volta para todos.
                     action={
-                      filter !== 'todos' && (records.data?.length ?? 0) > 0 ? (
-                        <Button label="Mostrar todos" tone="soft" onPress={() => setFilter('todos')} />
+                      (filter !== 'todos' || accountId !== null) && (records.data?.length ?? 0) > 0 ? (
+                        <Button
+                          label="Mostrar todos"
+                          tone="soft"
+                          onPress={() => {
+                            setFilter('todos');
+                            setAccountFilter(null);
+                          }}
+                        />
                       ) : undefined
                     }>
-                    {filter === 'todos'
+                    {filter === 'todos' && accountId === null
                       ? 'Recebimentos e gastos já realizados aparecem aqui, do mais recente para o mais antigo.'
-                      : 'Nenhum registro deste tipo no mês.'}
+                      : accountId !== null
+                        ? 'Nenhum registro desta conta no mês.'
+                        : 'Nenhum registro deste tipo no mês.'}
                   </EmptyState>
                 ) : (
                   groups.map((g) => (
@@ -224,7 +250,12 @@ export default function MovimentacoesScreen() {
                       </Txt>
                       {g.items.map((r, i) => (
                         <Animated.View key={r.id} exiting={rowExit} layout={rowLayout}>
-                          <RecordRow record={r} last={i === g.items.length - 1} onPress={() => router.push(`/registro/${r.id}`)} />
+                          <RecordRow
+                            record={r}
+                            last={i === g.items.length - 1}
+                            accountName={accounts.data ? recordAccountName(accounts.data, r) : null}
+                            onPress={() => router.push(`/registro/${r.id}`)}
+                          />
                         </Animated.View>
                       ))}
                     </Animated.View>

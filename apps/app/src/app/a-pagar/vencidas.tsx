@@ -1,4 +1,5 @@
 import {
+  ACCOUNTS_TEXT,
   CARDS_TEXT,
   COMMITMENT_ERROR_TEXT,
   ERROR_TEXT,
@@ -14,6 +15,7 @@ import {
   monthOf,
   newOperationKey,
   occurrenceLabel,
+  selectedAccount,
   type AnnualGroup,
   type Commitment,
   type FinancialRecord,
@@ -29,6 +31,7 @@ import { Platform, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AccountPicker } from '@/components/account-picker';
 import { ChoiceDialog } from '@/components/choice-dialog';
 import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
@@ -40,6 +43,7 @@ import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Chip, Screen, Skeleton, Txt } from '@/components/ui';
 import { openCommitment } from '@/lib/cards';
 import { totalChange } from '@/lib/highlight';
+import { useLastAccount } from '@/lib/last-account';
 import { moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
 import { useCommitments, useDeleteCommitment, usePayCommitment, useSeriesList, useSkipSeriesYear, useSpace, useUpdateRecord } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
@@ -183,7 +187,8 @@ export default function ContasVencidas() {
    */
   const skipKeys = useRef(new Map<string, { key: string; snapshot: string }>());
 
-  const account = personal?.accounts.find((a) => a.id === accountChoice) ?? personal?.accounts[0] ?? null;
+  const lastAccount = useLastAccount();
+  const account = selectedAccount(personal?.accounts ?? [], accountChoice, lastAccount.last);
   // Fatura de cartão (D-037) não entra no pagamento em lote: ela se paga na própria fatura.
   const fixed = overdue.filter((c) => !c.amountIsEstimate && !c.invoice);
   // Seleções de contas que já saíram da lista (pagas ou tiradas) deixam de contar.
@@ -213,6 +218,7 @@ export default function ContasVencidas() {
     setResult(null);
     try {
       const record = await payOnce(c, inputFor(c));
+      lastAccount.remember(account.id);
       setPending(null);
       setSelected((cur) => cur.filter((x) => x !== c.id));
       if (record) showEffect([record]);
@@ -247,6 +253,7 @@ export default function ContasVencidas() {
           return;
         }
       }
+      lastAccount.remember(account.id);
       showEffect(paid);
       success(batch.length === 1 ? '1 conta marcada como paga.' : `${batch.length} contas marcadas como pagas.`);
     } finally {
@@ -434,17 +441,8 @@ export default function ContasVencidas() {
           </Card>
         ) : (
           <>
-            {personal && personal.accounts.length > 1 ? (
-              <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel="Conta de saída dos pagamentos">
-                <Txt variant="label" style={{ fontFamily: fonts.bold }}>
-                  Conta de saída dos pagamentos
-                </Txt>
-                <View style={styles.chips}>
-                  {personal.accounts.map((a) => (
-                    <Chip key={a.id} label={a.name} selected={account?.id === a.id} onPress={() => setAccountChoice(a.id)} />
-                  ))}
-                </View>
-              </View>
+            {personal ? (
+              <AccountPicker accounts={personal.accounts} value={account?.id ?? null} label={ACCOUNTS_TEXT.out} onChange={setAccountChoice} />
             ) : null}
 
             <Card>

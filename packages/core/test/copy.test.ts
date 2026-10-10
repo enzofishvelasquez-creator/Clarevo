@@ -4,6 +4,11 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  ACCOUNTS_TEXT,
+  ACCOUNT_ERROR_TEXT,
+  ACCOUNT_KIND_LABEL,
+  accountErrorText,
+  validateAccountDraft,
   NOTA_ERROR_TEXT,
   ANNUAL_HELP_TEXT,
   CARD_MONTH_TEXT,
@@ -1856,5 +1861,61 @@ describe('textos do orçamento e do limite (D-041)', () => {
     expect(text).not.toMatch(FORBIDDEN);
     expect(text).not.toMatch(JUDGMENT);
     expect(text).not.toMatch(VETOED);
+  });
+});
+
+describe('textos das contas de origem (D-043)', () => {
+  const GENDERED = /\b(o|a)s? usuári[oa]s?\b|\bobrigad[oa]s?\b|\bbem-vind[oa]s?\b|\bpreocupad[oa]s?\b|\bendividad[oa]s?\b|\bcadastrad[oa]\b|\bbem-vind/i;
+  const check = (texts: string[]) => {
+    expect(texts.length).toBeGreaterThan(0);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(GENDERED);
+      expect(text, text).not.toMatch(/\bfaz(er|endo)?\s+sentido\b/i);
+      // Nada de travessão longo ou curto (a lista FORBIDDEN já cobre; aqui também o hífen solto entre espaços).
+      expect(text, text).not.toMatch(/[\u2013\u2014]/);
+    }
+  };
+
+  it('ACCOUNTS_TEXT, ACCOUNT_ERROR_TEXT e os rótulos', () => {
+    check([...staticStrings(ACCOUNTS_TEXT), ...Object.values(ACCOUNT_ERROR_TEXT), ...Object.values(ACCOUNT_KIND_LABEL)]);
+  });
+
+  it('textos montados, em todas as combinações', () => {
+    const texts: string[] = [];
+    for (const kind of ['banco', 'dinheiro', 'outra'] as const)
+      for (const isDefault of [true, false])
+        for (const status of ['ativa', 'arquivada'] as const)
+          texts.push(ACCOUNTS_TEXT.rowCaption(kind, isDefault, status), ACCOUNTS_TEXT.rowA11y('Carteira', kind, isDefault, status));
+    for (const label of [ACCOUNTS_TEXT.out, ACCOUNTS_TEXT.into, ACCOUNTS_TEXT.to]) texts.push(ACCOUNTS_TEXT.single(label, 'Conta principal'));
+    texts.push(ACCOUNTS_TEXT.leavingFrom('Carteira'), ACCOUNTS_TEXT.archivedName('Antiga'), ACCOUNTS_TEXT.fromNote('Carteira'));
+    for (const code of Object.keys(ACCOUNT_ERROR_TEXT)) texts.push(accountErrorText(code));
+    texts.push(accountErrorText('desconhecido'));
+    for (const draft of [
+      { name: '', kind: null },
+      { name: 'x'.repeat(41), kind: 'banco' as const },
+      { name: 'Carteira', kind: null },
+    ]) {
+      const v = validateAccountDraft(draft, [{ id: 'a', name: 'Carteira' }]);
+      if (!v.ok) texts.push(...Object.values(v.errors));
+    }
+    const dup = validateAccountDraft({ name: 'carteira', kind: 'banco' }, [{ id: 'a', name: 'Carteira' }]);
+    if (!dup.ok) texts.push(...Object.values(dup.errors));
+    check(texts);
+  });
+
+  it('o aviso de que é só a origem informada: sem saldo, sem produto e sem recomendação', () => {
+    expect(ACCOUNTS_TEXT.intro).toContain('É só a origem informada');
+    expect(ACCOUNTS_TEXT.intro).toContain('não guarda saldo nem movimenta dinheiro');
+    // Nenhum banco, produto ou oferta nos textos: os exemplos são genéricos.
+    const all = [...staticStrings(ACCOUNTS_TEXT), ...Object.values(ACCOUNT_ERROR_TEXT)].join(' ');
+    expect(all).not.toMatch(/nubank|ita[uú]|bradesco|santander|caixa econ|picpay|mercado pago|\bxp\b|btg|\bc6\b|\binter\b|poupan[cç]a|investiment/i);
+  });
+
+  it('arquivo-fonte accounts.ts', () => {
+    const text = readFileSync(join(CORE_SRC, 'accounts.ts'), 'utf8');
+    expect(text).not.toMatch(FORBIDDEN);
+    expect(text).not.toMatch(JUDGMENT);
   });
 });

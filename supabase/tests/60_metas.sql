@@ -524,8 +524,8 @@ begin
             'initial_cents', 'last_movement_on', 'name', 'planned_monthly_cents', 'saved_cents', 'status', 'target_cents',
             'target_month', 'updated_at', 'version', 'withdrawals_cents'], 'goal: a linha de goals com as somas de goal_items';
   assert (select array_agg(k order by k) from jsonb_object_keys(r1 -> 'movement') k)
-    = array['amount_cents', 'context_id', 'created_at', 'created_by', 'deleted_at', 'deleted_by', 'goal_id', 'id', 'kind', 'note',
-            'occurred_on', 'updated_at', 'version'], 'movement: a linha de goal_movements';
+    = array['account_id', 'amount_cents', 'context_id', 'created_at', 'created_by', 'deleted_at', 'deleted_by', 'goal_id', 'id', 'kind',
+            'note', 'occurred_on', 'updated_at', 'version'], 'movement: a linha de goal_movements (com a conta opcional da 0010)';
   assert r1 #>> '{goal,name}' = 'Curso' and r1 #>> '{goal,goal_type}' = 'objetivo' and (r1 #>> '{goal,target_cents}')::bigint = 120000
      and r1 #>> '{goal,target_month}' = '2027-03-01' and (r1 #>> '{goal,planned_monthly_cents}')::bigint = 5000
      and r1 #> '{goal,essential_base_cents}' = 'null'::jsonb and r1 #>> '{goal,status}' = 'ativa'
@@ -1332,15 +1332,17 @@ begin
   assert (select array_agg(m[1] order by m[1] collate "C")
             from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
            where c.conname = 'record_operations_action_check')
-    = array['alterar_cartao', 'alterar_lancamento_cartao', 'alterar_meta', 'alterar_movimento_meta', 'alterar_serie', 'criar',
-            'criar_cartao', 'criar_compra_cartao', 'criar_compromisso', 'criar_encargo_cartao', 'criar_estorno_cartao',
-            'criar_meta', 'criar_ocorrencia', 'criar_serie', 'decidir_revisao', 'definir_limite_comprometimento',
-            'definir_orcamento_categoria', 'definir_renda_referencia', 'desfazer_pagamento', 'desfazer_pagamento_fatura',
-            'editar', 'editar_compromisso', 'encerrar_serie', 'excluir', 'excluir_cartao', 'excluir_compromisso',
-            'excluir_lancamento_cartao', 'excluir_limite_comprometimento', 'excluir_meta', 'excluir_movimento_meta',
-            'excluir_orcamento_categoria', 'excluir_renda_referencia', 'excluir_serie', 'informar_ano', 'pagar_compromisso',
-            'pagar_fatura', 'registrar_movimento_meta', 'responder_guardar', 'situacao_cartao', 'situacao_meta', 'tirar_ano'],
-    'as 41 ações vigentes (as 7 de metas, a de guardar, testada em 65, as 11 de cartões, testadas em 70, e as 4 de orçamento e limite, testadas em 80)';
+    = array['alterar_cartao', 'alterar_conta', 'alterar_lancamento_cartao', 'alterar_meta', 'alterar_movimento_meta',
+            'alterar_serie', 'conta_principal', 'criar', 'criar_cartao', 'criar_compra_cartao', 'criar_compromisso',
+            'criar_conta', 'criar_encargo_cartao', 'criar_estorno_cartao', 'criar_meta', 'criar_ocorrencia', 'criar_serie',
+            'decidir_revisao', 'definir_limite_comprometimento', 'definir_orcamento_categoria', 'definir_renda_referencia',
+            'desfazer_pagamento', 'desfazer_pagamento_fatura', 'editar', 'editar_compromisso', 'encerrar_serie', 'excluir',
+            'excluir_cartao', 'excluir_compromisso', 'excluir_conta', 'excluir_lancamento_cartao',
+            'excluir_limite_comprometimento', 'excluir_meta', 'excluir_movimento_meta', 'excluir_orcamento_categoria',
+            'excluir_renda_referencia', 'excluir_serie', 'informar_ano', 'pagar_compromisso', 'pagar_fatura',
+            'registrar_movimento_meta', 'responder_guardar', 'situacao_cartao', 'situacao_conta', 'situacao_meta',
+            'tirar_ano'],
+    'as 46 ações vigentes (as 7 de metas, a de guardar, testada em 65, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, e as 5 de contas, testadas em 85)';
   -- Toda operação de meta aponta para uma meta do mesmo contexto (a exclusão, para uma excluída); toda operação de
   -- movimento, para um movimento do mesmo contexto (a exclusão, para um excluído).
   assert not exists (select 1 from public.record_operations o
@@ -1566,15 +1568,16 @@ end $$;
 do $$ begin
   assert (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
-    = array['add_card_charge', 'add_card_purchase', 'add_card_refund', 'add_goal_movement', 'context_permission', 'create_card',
-            'create_commitment', 'create_goal', 'create_record', 'create_series', 'create_series_occurrence',
-            'decide_return_review', 'delete_card', 'delete_card_entry', 'delete_category_budget', 'delete_commitment',
-            'delete_commitment_limit', 'delete_goal', 'delete_goal_movement', 'delete_income_reference', 'delete_record',
-            'delete_series', 'end_series', 'ensure_personal_space', 'inform_series_year', 'invoice_closing_on', 'invoice_due_on',
-            'invoice_month_for', 'is_org_admin', 'month_budget', 'month_committed', 'month_to_pay', 'month_totals',
-            'months_overview', 'my_today', 'pay_commitment', 'pay_invoice', 'set_card_status', 'set_category_budget',
-            'set_commitment_limit', 'set_goal_status', 'set_income_reference', 'set_savings_answer', 'skip_series_year',
-            'sync_series_occurrences', 'undo_commitment_payment', 'undo_invoice_payment', 'update_card', 'update_card_entry',
+    = array['add_card_charge', 'add_card_purchase', 'add_card_refund', 'add_goal_movement', 'context_permission',
+            'create_account', 'create_card', 'create_commitment', 'create_goal', 'create_record', 'create_series',
+            'create_series_occurrence', 'decide_return_review', 'delete_account', 'delete_card', 'delete_card_entry',
+            'delete_category_budget', 'delete_commitment', 'delete_commitment_limit', 'delete_goal', 'delete_goal_movement',
+            'delete_income_reference', 'delete_record', 'delete_series', 'end_series', 'ensure_personal_space',
+            'inform_series_year', 'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'month_budget',
+            'month_committed', 'month_to_pay', 'month_totals', 'months_overview', 'my_today', 'pay_commitment', 'pay_invoice',
+            'set_account_status', 'set_card_status', 'set_category_budget', 'set_commitment_limit', 'set_default_account',
+            'set_goal_status', 'set_income_reference', 'set_savings_answer', 'skip_series_year', 'sync_series_occurrences',
+            'undo_commitment_payment', 'undo_invoice_payment', 'update_account', 'update_card', 'update_card_entry',
             'update_commitment', 'update_goal', 'update_goal_movement', 'update_record', 'update_series_from'],
     'authenticated executa só as funções expostas (7 novas)';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -1597,14 +1600,14 @@ do $$ begin
        = 'p_idempotency_key text, p_goal_id uuid, p_expected_version integer, p_status text'
      and pg_get_function_identity_arguments('public.delete_goal(text, uuid, integer)'::regprocedure)
        = 'p_idempotency_key text, p_goal_id uuid, p_expected_version integer'
-     and pg_get_function_identity_arguments('public.add_goal_movement(text, uuid, text, bigint, date, text)'::regprocedure)
-       = 'p_idempotency_key text, p_goal_id uuid, p_kind text, p_amount_cents bigint, p_occurred_on date, p_note text'
-     and pg_get_function_identity_arguments('public.update_goal_movement(text, uuid, integer, bigint, date, text)'::regprocedure)
-       = 'p_idempotency_key text, p_movement_id uuid, p_expected_version integer, p_amount_cents bigint, p_occurred_on date, p_note text'
+     and pg_get_function_identity_arguments('public.add_goal_movement(text, uuid, text, bigint, date, text, uuid)'::regprocedure)
+       = 'p_idempotency_key text, p_goal_id uuid, p_kind text, p_amount_cents bigint, p_occurred_on date, p_note text, p_account_id uuid'
+     and pg_get_function_identity_arguments('public.update_goal_movement(text, uuid, integer, bigint, date, text, uuid)'::regprocedure)
+       = 'p_idempotency_key text, p_movement_id uuid, p_expected_version integer, p_amount_cents bigint, p_occurred_on date, p_note text, p_account_id uuid'
      and pg_get_function_identity_arguments('public.delete_goal_movement(text, uuid, integer)'::regprocedure)
        = 'p_idempotency_key text, p_movement_id uuid, p_expected_version integer',
     'assinaturas e nomes dos argumentos (chamada por nome no PostgREST)';
-  assert (select array_agg(pg_get_function_arguments(p.oid) like '%p_note text DEFAULT NULL::text' order by p.proname)
+  assert (select array_agg(pg_get_function_arguments(p.oid) like '%p_note text DEFAULT NULL::text%' order by p.proname)
             from pg_proc p where p.proname in ('add_goal_movement', 'update_goal_movement')) = array[true, true], 'observação opcional';
   assert (select bool_and(pg_get_function_result(p.oid) = 'jsonb' and p.prosecdef and p.provolatile = 'v')
             from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -1622,7 +1625,7 @@ do $$ begin
   assert (select array_agg(attname::text order by attnum) from pg_attribute
            where attrelid = 'public.goal_movements'::regclass and attnum > 0 and not attisdropped)
     = array['id', 'goal_id', 'context_id', 'kind', 'amount_cents', 'occurred_on', 'note', 'created_by', 'version', 'created_at',
-            'updated_at', 'deleted_at', 'deleted_by'], 'colunas de goal_movements';
+            'updated_at', 'deleted_at', 'deleted_by', 'account_id'], 'colunas de goal_movements (a conta opcional é da 0010)';
   assert (select array_agg(attname::text || ':' || format_type(atttypid, atttypmod) order by attnum) from pg_attribute
            where attrelid = 'public.goal_items'::regclass and attnum > 0 and not attisdropped)
     = array['id:uuid', 'context_id:uuid', 'goal_type:text', 'name:text', 'target_cents:bigint', 'target_month:date',

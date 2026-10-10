@@ -43,6 +43,8 @@ const FORM_PATHS: readonly RegExp[] = [
   /^\/renda-comprometida\/(referencia|limite)$/,
   // Orçamento de uma categoria (D-041): o formulário. A lista do orçamento (/orcamento) é de consulta e mostra a barra.
   new RegExp(`^/orcamento/${ID}$`),
+  // Contas de origem do dinheiro (D-043): cadastrar e editar. A lista fica em Conta (consulta).
+  new RegExp(`^/contas/(nova|${ID}/editar)$`),
   // Cartões: cadastrar, editar e os formulários da fatura.
   new RegExp(`^/cartoes/(novo|${ID}/editar|${ID}/fatura/${MONTH}/(pagar|encargo|estorno|compra))$`),
   // Seus últimos meses: o passo a passo e o pagamento de uma conta sem registro.
@@ -301,6 +303,13 @@ export const APP_SCREENS: readonly AppScreen[] = [
     caption: 'Perfil, senha, lembretes, privacidade e sair',
     href: '/conta',
     keywords: ['conta', 'perfil', 'senha', 'alterar senha', 'sair', 'segurança', 'nome da conta', 'acesso ao plano'],
+  },
+  {
+    id: 'contas',
+    title: 'Suas contas',
+    caption: 'De onde sai o dinheiro dos gastos, pagamentos e aportes',
+    href: '/conta?secao=contas',
+    keywords: ['contas', 'suas contas', 'origem do dinheiro', 'saiu de', 'carteira', 'conta principal', 'adicionar conta', 'arquivar conta'],
   },
   {
     id: 'quem-ve',

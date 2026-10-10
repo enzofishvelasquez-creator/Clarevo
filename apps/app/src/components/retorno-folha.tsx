@@ -1,9 +1,11 @@
 import {
+  ACCOUNTS_TEXT,
   RETURN_TEXT,
   notHappenedDialog,
   returnErrorText,
   rowPaymentDraft,
   rowShortName,
+  selectedAccount,
   type ReviewAction,
   type ReviewRow,
 } from '@clarevo/core';
@@ -12,12 +14,14 @@ import { useState } from 'react';
 import { Modal, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
+import { AccountPicker } from '@/components/account-picker';
 import { MoneyTxt } from '@/components/money-text';
 import { PayRowError, codeOf, isUncertain, openRowFrom, useReturnWriter } from '@/components/retorno-acoes';
 import { ReturnRow } from '@/components/retorno-linha';
 import { yearA11yLabel } from '@/components/series-parts';
 import { Button, Chip, Txt } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
+import { useLastAccount } from '@/lib/last-account';
 import { useSpace } from '@/state/data';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
@@ -60,7 +64,8 @@ export function RegisterMonthSheet({
   const [closedRows, setClosedRows] = useState<Record<string, true>>({});
   const [busy, setBusy] = useState(false);
   const [accountChoice, setAccountChoice] = useState<string | null>(null);
-  const account = personal?.accounts.find((a) => a.id === accountChoice) ?? personal?.accounts[0] ?? null;
+  const lastAccount = useLastAccount();
+  const account = selectedAccount(personal?.accounts ?? [], accountChoice, lastAccount.last);
   const view = (r: ReviewRow) => current[r.key] ?? r;
   const several = rows.length > 1;
   const active = rows.find((r) => r.key === activeKey) ?? rows[0]!;
@@ -185,11 +190,7 @@ export function RegisterMonthSheet({
                 {body}
               </MoneyTxt>
               {personal && personal.accounts.length > 1 ? (
-                <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel={RETURN_TEXT.batchAccountLabel}>
-                  {personal.accounts.map((a) => (
-                    <Chip key={a.id} label={a.name} selected={account?.id === a.id} onPress={() => setAccountChoice(a.id)} />
-                  ))}
-                </View>
+                <AccountPicker accounts={personal.accounts} value={account?.id ?? null} label={ACCOUNTS_TEXT.out} onChange={setAccountChoice} hideManage />
               ) : null}
               <View style={{ gap: space[2], marginTop: space[2] }}>
                 <Button label={RETURN_TEXT.confirm} busy={busy} busyLabel="Aguarde…" disabled={!account} onPress={pay} />

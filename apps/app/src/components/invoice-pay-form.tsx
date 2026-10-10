@@ -1,4 +1,5 @@
 import {
+  ACCOUNTS_TEXT,
   CARDS_TEXT,
   CARD_ERROR_TEXT,
   ERROR_TEXT,
@@ -6,6 +7,7 @@ import {
   addMonths,
   addYearsClamped,
   cardErrorText,
+  chooseAccountId,
   formatBRL,
   formatDateBR,
   formatMonthName,
@@ -27,6 +29,7 @@ import { Info } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View, type TextInput } from 'react-native';
 
+import { AccountPicker } from '@/components/account-picker';
 import { formatMoneyText } from '@/components/calc/parts';
 import { FormFooter } from '@/components/form-footer';
 import { ContextPill, SubHeader } from '@/components/header';
@@ -38,6 +41,7 @@ import { invoiceHref } from '@/lib/cards';
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
 import { totalChange } from '@/lib/highlight';
+import { useLastAccount } from '@/lib/last-account';
 import { useCardOperationKey, usePayInvoice } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
@@ -54,6 +58,7 @@ const S = CARDS_TEXT.screens;
  */
 export function InvoicePayForm({ card, invoice, space: personal }: { card: CardData; invoice: Invoice; space: PersonalSpace }) {
   const { today } = useSession();
+  const lastAccount = useLastAccount();
   const qc = useQueryClient();
   const pay = usePayInvoice();
   const keys = useCardOperationKey();
@@ -63,7 +68,7 @@ export function InvoicePayForm({ card, invoice, space: personal }: { card: CardD
     mode: 'total',
     amountText: '',
     dateText: formatDateBR(today),
-    accountId: personal.accounts[0]?.id ?? '',
+    accountId: chooseAccountId(personal.accounts, lastAccount.last),
   }));
   const [draft, setDraft] = useState(initial);
   const [errors, setErrors] = useState<Partial<Record<'amountText' | 'dateText', string>>>({});
@@ -116,6 +121,7 @@ export function InvoicePayForm({ card, invoice, space: personal }: { card: CardD
       if (r.status === 'ok' || r.status === 'reconciled') {
         // Confirmação tátil, aviso e efeito em Pago só depois de o servidor confirmar.
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        lastAccount.remember(draft.accountId);
         if (r.status === 'ok') totalChange.set({ total: 'pago', month: monthOf(v.paidOn), deltaCents: v.amountCents });
         const text =
           r.status === 'ok'
@@ -224,13 +230,7 @@ export function InvoicePayForm({ card, invoice, space: personal }: { card: CardD
             </View>
           </View>
 
-          {personal.accounts.length > 1 ? (
-            <ChoiceGroup label={S.payAccount}>
-              {personal.accounts.map((a) => (
-                <Chip key={a.id} label={a.name} selected={draft.accountId === a.id} onPress={() => set('accountId', a.id)} />
-              ))}
-            </ChoiceGroup>
-          ) : null}
+          <AccountPicker accounts={personal.accounts} value={draft.accountId} label={ACCOUNTS_TEXT.out} onChange={(id) => set('accountId', id ?? '')} />
 
           <Txt variant="label" color={colors.textSecondary}>
             {S.payMonthNote}

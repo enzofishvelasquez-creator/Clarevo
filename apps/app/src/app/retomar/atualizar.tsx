@@ -1,4 +1,5 @@
 import {
+  ACCOUNTS_TEXT,
   RETURN_TEXT,
   batchEligible,
   groupActions,
@@ -10,6 +11,7 @@ import {
   reviewStepTitle,
   rowPaymentDraft,
   rowShortName,
+  selectedAccount,
   type FinancialRecord,
   type IsoMonth,
   type PaymentInput,
@@ -30,6 +32,7 @@ import { AccessibilityInfo, findNodeHandle, Platform, StyleSheet, View, type Scr
 import Animated, { FadeInRight, ReduceMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AccountPicker } from '@/components/account-picker';
 import { ChoiceDialog } from '@/components/choice-dialog';
 import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
@@ -52,6 +55,7 @@ import { EmptyState, ErrorState } from '@/components/states';
 import { Banner, Button, Card, Chip, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
 import { flash } from '@/lib/flash';
+import { useLastAccount } from '@/lib/last-account';
 import { useReturnReview, useSeriesList, useSpace, type ReturnReviewData } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, motion, space, tabular } from '@/theme/tokens';
@@ -157,7 +161,8 @@ export default function AtualizarMeses() {
     queries: rowMonths.map((m) => ({ queryKey: ['records', ctx, m], queryFn: () => repo.listRecords(ctx!, m), enabled: Boolean(ctx) })),
   });
   const recordsOf = (month: IsoMonth): readonly FinancialRecord[] | undefined => monthQueries[rowMonths.indexOf(month)]?.data;
-  const account = personal?.accounts.find((a) => a.id === accountChoice) ?? personal?.accounts[0] ?? null;
+  const lastAccount = useLastAccount();
+  const account = selectedAccount(personal?.accounts ?? [], accountChoice, lastAccount.last);
   const view = (r: ReviewRow) => rowData[r.key] ?? r;
   const last = index === steps.length - 1;
 
@@ -571,16 +576,7 @@ export default function AtualizarMeses() {
   ) : null;
   const accountChips =
     personal && personal.accounts.length > 1 ? (
-      <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel={RETURN_TEXT.batchAccountLabel}>
-        <Txt variant="label" style={{ fontFamily: fonts.bold }}>
-          {RETURN_TEXT.batchAccountLabel}
-        </Txt>
-        <View style={styles.chips}>
-          {personal.accounts.map((a) => (
-            <Chip key={a.id} label={a.name} selected={account?.id === a.id} onPress={() => setAccountChoice(a.id)} />
-          ))}
-        </View>
-      </View>
+      <AccountPicker accounts={personal.accounts} value={account?.id ?? null} label={ACCOUNTS_TEXT.out} onChange={setAccountChoice} hideManage />
     ) : null;
 
   const back = () => (router.canGoBack() ? router.back() : router.replace('/retomar'));

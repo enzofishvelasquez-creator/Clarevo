@@ -1,4 +1,5 @@
 import {
+  ACCOUNTS_TEXT,
   ANNUAL_MAX_YEARS,
   ANNUAL_SERIES_ERROR_TEXT,
   ERROR_TEXT,
@@ -11,6 +12,7 @@ import {
   affectedByEnd,
   annualYearOf,
   centsToInput,
+  chooseAccountId,
   currentTerm,
   fieldForErrorCode,
   firstMonthBounds,
@@ -57,6 +59,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, View, type TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AccountPicker } from '@/components/account-picker';
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
@@ -64,6 +67,7 @@ import { CheckOption, ChoiceGroup, joinList, lastYearHint, monthChipLabel, serie
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
+import { useLastAccount } from '@/lib/last-account';
 import { totalChange } from '@/lib/highlight';
 import {
   useEndSeries,
@@ -172,7 +176,8 @@ export function SeriesEndForm({
     return out;
   }, [occ.data, live.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const initialPay: PaymentDraft = { accountId: personal.accounts[0]?.id ?? '', amountText: '', dateText: formatDateBR(today), category: null };
+  const lastAccount = useLastAccount();
+  const initialPay: PaymentDraft = { accountId: chooseAccountId(personal.accounts, lastAccount.last), amountText: '', dateText: formatDateBR(today), category: null };
   const initial = useMemo(
     () => ({ choice: (resume ? (parcelada ? (total ?? null) : 'sem') : null) as EndChoice, otherText: '', payoff: false, pay: initialPay }),
     [], // eslint-disable-line react-hooks/exhaustive-deps
@@ -394,6 +399,7 @@ export function SeriesEndForm({
       const key = payKey.current;
       try {
         await pay.mutateAsync({ key, id: target.id, version: target.version, input: v.input });
+        lastAccount.remember(v.input.accountId);
         payPending.current = [];
         payKey.current = newOperationKey();
         setPaidDone({ number: target.series!.number, moved: false });
@@ -740,17 +746,13 @@ export function SeriesEndForm({
                   <Chip label="Ontem" selected={payDraft.dateText === formatDateBR(yesterday)} onPress={() => setPay('dateText', formatDateBR(yesterday))} />
                 </View>
               </View>
-              {personal.accounts.length > 1 ? (
-                <ChoiceGroup label="Conta" error={payErrors.accountId}>
-                  {personal.accounts.map((a) => (
-                    <Chip key={a.id} label={a.name} selected={payDraft.accountId === a.id} onPress={() => setPay('accountId', a.id)} />
-                  ))}
-                </ChoiceGroup>
-              ) : payErrors.accountId ? (
-                <Txt variant="label" color={colors.error}>
-                  {payErrors.accountId}
-                </Txt>
-              ) : null}
+              <AccountPicker
+                accounts={personal.accounts}
+                value={payDraft.accountId}
+                label={ACCOUNTS_TEXT.out}
+                error={payErrors.accountId}
+                onChange={(id) => setPay('accountId', id ?? '')}
+              />
               {payPreview ? (
                 // Prévia que muda a cada tecla: sem região viva, para não ser anunciada de novo a cada dígito.
                 <Banner tone="info" icon={Info} live={false}>

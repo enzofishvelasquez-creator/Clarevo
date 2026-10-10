@@ -1,11 +1,15 @@
 import {
+  ACCOUNTS_TEXT,
+  ERROR_TEXT,
   GOALS_TEXT,
   GOAL_ERROR_TEXT,
   GOAL_MOVEMENT_FIELD_ORDER,
   GOAL_NOTE_MAX,
   MOVEMENT_LABEL,
+  accountsForPicker,
   addDays,
   centsToInput,
+  chooseAccountId,
   firstNegativeDay,
   formatDateBR,
   goalErrorText,
@@ -25,6 +29,7 @@ import { Trash2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View, type TextInput } from 'react-native';
 
+import { AccountPicker } from '@/components/account-picker';
 import { formatMoneyText } from '@/components/calc/parts';
 import { ConfirmDialog } from '@/components/dialog';
 import { FormFooter } from '@/components/form-footer';
@@ -35,8 +40,9 @@ import { TermHint } from '@/components/term-hint';
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
+import { useLastAccount } from '@/lib/last-account';
 import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
-import { useAddGoalMovement, useDeleteGoalMovement, useGoalOperationKey, useUpdateGoalMovement } from '@/state/data';
+import { useAccounts, useAddGoalMovement, useDeleteGoalMovement, useGoalOperationKey, useSpace, useUpdateGoalMovement } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -68,22 +74,33 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
   const edit = useUpdateGoalMovement();
   const remove = useDeleteGoalMovement();
   const keys = useGoalOperationKey();
+  const lastAccount = useLastAccount();
+  const activeAccounts = useSpace().data?.accounts ?? [];
+  const allAccounts = useAccounts(goal.contextId);
   const editing = mode.type === 'editar' ? mode.movement : null;
   // O movimento em edição pode ter mudado (outro aparelho): sempre o da lista mais recente.
   const current = editing ? (movements.find((m) => m.id === editing.id) ?? null) : null;
   const kind: GoalMovementKind = editing ? editing.kind : mode.type === 'novo' ? mode.kind : 'valorizacao';
 
   const initial = (() => {
+    // A conta (D-043) só existe em aporte e resgate: o aporte novo abre na conta principal ou na última usada neste aparelho.
     if (editing) {
-      return { amountText: centsToInput(editing.amountCents), dateText: formatDateBR(editing.occurredOn), note: editing.note ?? '', savedText: '' };
+      return {
+        amountText: centsToInput(editing.amountCents),
+        dateText: formatDateBR(editing.occurredOn),
+        note: editing.note ?? '',
+        savedText: '',
+        accountId: editing.accountId,
+      };
     }
-    return { amountText: '', dateText: formatDateBR(today), note: '', savedText: '' };
+    return { amountText: '', dateText: formatDateBR(today), note: '', savedText: '', accountId: chooseAccountId(activeAccounts, lastAccount.last) || null };
   })();
   const [first] = useState(initial);
   const [amountText, setAmountText] = useState(first.amountText);
   const [dateText, setDateText] = useState(first.dateText);
   const [note, setNote] = useState(first.note);
   const [savedText, setSavedText] = useState(first.savedText);
+  const [accountId, setAccountId] = useState<string | null>(first.accountId);
   const [errors, setErrors] = useState<Partial<Record<GoalMovementField | 'savedText', string>>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -95,7 +112,7 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
     savedText: useRef<TextInput>(null),
   };
 
-  const dirty = amountText !== first.amountText || dateText !== first.dateText || note !== first.note || savedText !== first.savedText;
+  const dirty = amountText !== first.amountText || dateText !== first.dateText || note !== first.note || savedText !== first.savedText || accountId !== first.accountId;
   const guard = useLeaveGuard(dirty && !busy, `/meta/${goal.id}`);
   const archived = goal.status === 'arquivada';
 
@@ -104,6 +121,7 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
   };
 
   const draft: GoalMovementDraft = { kind, amountText, dateText, note };
+  const withAccount = mode.type !== 'atualizar' && (kind === 'aporte' || kind === 'resgate');
   const saved = mode.type === 'atualizar' ? validateSavedValueDraft(savedText, goal.savedCents) : null;
 
   /**
@@ -122,6 +140,10 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
     if (code === 'saldo_da_meta_insuficiente') {
       setErrors({ amountText: goalErrorText(code, { kind, negativeDay: negativeDayFromDetail(detail) }) });
       refs.amountText.current?.focus();
+      return;
+    }
+    if (code === 'conta_invalida' || code === 'campo_nao_se_aplica') {
+      setError(code === 'conta_invalida' ? ERROR_TEXT.conta_invalida : GOAL_ERROR_TEXT.salvar_falhou);
       return;
     }
     if (code === 'data_futura' || code === 'data_invalida') {
@@ -179,6 +201,8 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
         ? { op: 'update', id: editing.id, amountCents: v.input.amountCents, occurredOn: v.input.occurredOn }
         : { op: 'add', kind, amountCents: v.input.amountCents, occurredOn: v.input.occurredOn },
     );
+    // A conta (D-043) só vai em aporte e resgate; ao editar, nula tira a conta.
+    const input = withAccount ? { ...v.input, accountId } : v.input;
     if (negative !== null) {
       setErrors({ amountText: goalErrorText('saldo_da_meta_insuficiente', { kind, negativeDay: negative }) });
       refs.amountText.current?.focus();
@@ -187,17 +211,20 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
     setErrors({});
     setBusy(true);
     try {
-      const snapshot = JSON.stringify([goal.id, editing?.id ?? null, editing?.version ?? 0, kind, v.input]);
+      const snapshot = JSON.stringify([goal.id, editing?.id ?? null, editing?.version ?? 0, kind, input]);
       const r = await guardedWrite(
         keys,
         snapshot,
         (key) =>
           editing && current
-            ? edit.mutateAsync({ key, movementId: editing.id, version: current.version, input: v.input })
-            : add.mutateAsync({ key, goalId: goal.id, kind, input: v.input }),
+            ? edit.mutateAsync({ key, movementId: editing.id, version: current.version, input })
+            : add.mutateAsync({ key, goalId: goal.id, kind, input }),
         (s) => (editing ? s.action === 'alterar_movimento_meta' && s.movementId === editing.id : s.action === 'registrar_movimento_meta' && s.goalId === goal.id),
       );
-      if (r.status === 'ok' || r.status === 'reconciled') return await done(editing ? M.updated : M[kind === 'saldo_inicial' ? 'aporte' : kind].saved);
+      if (r.status === 'ok' || r.status === 'reconciled') {
+        if (withAccount) lastAccount.remember(accountId);
+        return await done(editing ? M.updated : M[kind === 'saldo_inicial' ? 'aporte' : kind].saved);
+      }
       if (r.status === 'refused') return fail(r.code, r.detail);
       setError(GOAL_ERROR_TEXT.salvar_falhou);
     } finally {
@@ -339,6 +366,15 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
                   />
                 </View>
               </View>
+              {withAccount ? (
+                <AccountPicker
+                  accounts={accountsForPicker(activeAccounts, allAccounts.data, editing?.accountId ?? null)}
+                  value={accountId}
+                  label={kind === 'resgate' ? ACCOUNTS_TEXT.to : ACCOUNTS_TEXT.out}
+                  allowNone={editing !== null}
+                  onChange={setAccountId}
+                />
+              ) : null}
               <TextField
                 ref={refs.note}
                 label={M.noteLabel}

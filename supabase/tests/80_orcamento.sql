@@ -714,7 +714,7 @@ end $$;
 reset role;
 
 -- ---------------------------------------------------------------------------
--- 8. record_operations: as quatro ações novas apontam só para a linha (target_id); a lista vigente tem 41 ações.
+-- 8. record_operations: as quatro ações novas apontam só para a linha (target_id); a lista vigente tem 46 ações.
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -746,17 +746,19 @@ begin
   assert (select array_agg(m[1] order by m[1] collate "C")
             from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
            where c.conname = 'record_operations_action_check')
-    = array['alterar_cartao', 'alterar_lancamento_cartao', 'alterar_meta', 'alterar_movimento_meta', 'alterar_serie', 'criar',
-            'criar_cartao', 'criar_compra_cartao', 'criar_compromisso', 'criar_encargo_cartao', 'criar_estorno_cartao',
-            'criar_meta', 'criar_ocorrencia', 'criar_serie', 'decidir_revisao', 'definir_limite_comprometimento',
-            'definir_orcamento_categoria', 'definir_renda_referencia', 'desfazer_pagamento', 'desfazer_pagamento_fatura', 'editar',
-            'editar_compromisso', 'encerrar_serie', 'excluir', 'excluir_cartao', 'excluir_compromisso', 'excluir_lancamento_cartao',
+    = array['alterar_cartao', 'alterar_conta', 'alterar_lancamento_cartao', 'alterar_meta', 'alterar_movimento_meta',
+            'alterar_serie', 'conta_principal', 'criar', 'criar_cartao', 'criar_compra_cartao', 'criar_compromisso',
+            'criar_conta', 'criar_encargo_cartao', 'criar_estorno_cartao', 'criar_meta', 'criar_ocorrencia', 'criar_serie',
+            'decidir_revisao', 'definir_limite_comprometimento', 'definir_orcamento_categoria', 'definir_renda_referencia',
+            'desfazer_pagamento', 'desfazer_pagamento_fatura', 'editar', 'editar_compromisso', 'encerrar_serie', 'excluir',
+            'excluir_cartao', 'excluir_compromisso', 'excluir_conta', 'excluir_lancamento_cartao',
             'excluir_limite_comprometimento', 'excluir_meta', 'excluir_movimento_meta', 'excluir_orcamento_categoria',
             'excluir_renda_referencia', 'excluir_serie', 'informar_ano', 'pagar_compromisso', 'pagar_fatura',
-            'registrar_movimento_meta', 'responder_guardar', 'situacao_cartao', 'situacao_meta', 'tirar_ano'],
-    'as 41 ações vigentes (com as 4 de orçamento e limite; as outras, testadas em 30 a 70)';
+            'registrar_movimento_meta', 'responder_guardar', 'situacao_cartao', 'situacao_conta', 'situacao_meta',
+            'tirar_ano'],
+    'as 46 ações vigentes (com as 4 de orçamento e limite e as 5 de contas, testadas em 85; as outras, testadas em 30 a 70)';
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-           where c.conname = 'record_operations_action_check') = 41, '41 ações';
+           where c.conname = 'record_operations_action_check') = 46, '46 ações';
   -- Toda operação nova aponta para uma linha do mesmo contexto; a exclusão, para uma linha excluída.
   assert not exists (select 1 from public.record_operations o
                       where o.action in ('definir_orcamento_categoria', 'excluir_orcamento_categoria')
@@ -905,17 +907,18 @@ reset role;
 do $$ begin
   assert (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
-    = array['add_card_charge', 'add_card_purchase', 'add_card_refund', 'add_goal_movement', 'context_permission', 'create_card',
-            'create_commitment', 'create_goal', 'create_record', 'create_series', 'create_series_occurrence',
-            'decide_return_review', 'delete_card', 'delete_card_entry', 'delete_category_budget', 'delete_commitment',
-            'delete_commitment_limit', 'delete_goal', 'delete_goal_movement', 'delete_income_reference', 'delete_record',
-            'delete_series', 'end_series', 'ensure_personal_space', 'inform_series_year', 'invoice_closing_on', 'invoice_due_on',
-            'invoice_month_for', 'is_org_admin', 'month_budget', 'month_committed', 'month_to_pay', 'month_totals', 'months_overview',
-            'my_today', 'pay_commitment', 'pay_invoice', 'set_card_status', 'set_category_budget', 'set_commitment_limit',
+    = array['add_card_charge', 'add_card_purchase', 'add_card_refund', 'add_goal_movement', 'context_permission',
+            'create_account', 'create_card', 'create_commitment', 'create_goal', 'create_record', 'create_series',
+            'create_series_occurrence', 'decide_return_review', 'delete_account', 'delete_card', 'delete_card_entry',
+            'delete_category_budget', 'delete_commitment', 'delete_commitment_limit', 'delete_goal', 'delete_goal_movement',
+            'delete_income_reference', 'delete_record', 'delete_series', 'end_series', 'ensure_personal_space',
+            'inform_series_year', 'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'month_budget',
+            'month_committed', 'month_to_pay', 'month_totals', 'months_overview', 'my_today', 'pay_commitment', 'pay_invoice',
+            'set_account_status', 'set_card_status', 'set_category_budget', 'set_commitment_limit', 'set_default_account',
             'set_goal_status', 'set_income_reference', 'set_savings_answer', 'skip_series_year', 'sync_series_occurrences',
-            'undo_commitment_payment', 'undo_invoice_payment', 'update_card', 'update_card_entry', 'update_commitment', 'update_goal',
-            'update_goal_movement', 'update_record', 'update_series_from'],
-    'authenticated executa só as 54 funções expostas (as 5 de orçamento e limite, testadas aqui)';
+            'undo_commitment_payment', 'undo_invoice_payment', 'update_account', 'update_card', 'update_card_entry',
+            'update_commitment', 'update_goal', 'update_goal_movement', 'update_record', 'update_series_from'],
+    'authenticated executa só as 59 funções expostas (as 5 de orçamento e limite, testadas aqui, e as 5 de contas, testadas em 85)';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')), 'anon não executa nenhuma função';
   assert not has_function_privilege('authenticated', 'public.category_budgets_guard()', 'execute')
