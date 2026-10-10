@@ -11,7 +11,7 @@
 -- Pessoas FICTÍCIAS: Bia (sequência E e demonstração; titular da Família da Bia), Caio (Família, só leitura), Iris (Família,
 -- escreve sem "editar de outras pessoas"), Theo (Família, escreve e altera o que é dos outros), Rui (externo), Vera (RH da
 -- empresa; Bia tem a licença), Noel (conta nova; validação, limites, repetição, compras, crédito e nota) e Lia (conta nova;
--- revisão da auditoria: pagar a fatura aberta sem travar o cartão, pagar fatura antiga, limite usado com crédito em cadeia,
+-- revisão da auditoria: pagar só depois do fechamento, compra sempre na fatura natural, pagar fatura antiga, limite usado com crédito em cadeia,
 -- tempo perto do limite de lançamentos, apelido com separadores, leitura por chave da nota). Valores em centavos.
 \set ON_ERROR_STOP 1
 \set bia  '''00000000-0000-0000-0000-0000000000f1'''
@@ -984,23 +984,25 @@ begin
            where card_id = c and invoice_month = '2026-11-01' and deleted_at is null group by category) x)
        = '{"Moradia": 40000, "Mercado": 32050, "Saúde": 8990}'::jsonb, 'composição de novembro';
 
-  -- Passo 3: 12/11/2026. A fatura de novembro fechou em 03/11 e venceu em 10/11; a marca "estimado" é atualizada ao abrir o app.
+  -- Passo 3: 12/11/2026. A fatura de novembro fechou em 03/11 e venceu em 10/11.
   perform pg_temp.today('2026-11-12');
-  -- A marca gravada fica velha até uma gravação de cartão ou sync_series_occurrences, mas as leituras (invoice_items,
-  -- commitment_items e month_committed) a calculam na hora: já firme depois do fechamento.
+  -- A marca gravada fica velha depois do fechamento (só uma gravação de cartão a refaz), mas nenhuma leitura a usa: invoice_items,
+  -- commitment_items e month_committed a calculam na hora, já firme depois do fechamento.
   assert pg_temp.iv(c, '2026-11-01') = 'fechada 81040 conta81040v3', 'fechada: a leitura já mostra o valor firme';
   assert pg_temp.cm(c, '2026-11-01') = '81040 2026-11-10 2026-11-03 aberto v3 estimado', 'a marca gravada ainda é a de antes';
   assert not (select amount_is_estimate from public.commitment_items where id = pg_temp.cmid(c, '2026-11-01'))
      and (select amount_is_estimate from public.commitment_items where id = pg_temp.cmid(c, '2026-12-01')), 'commitment_items: calculada na hora';
   insert into snap values ('est_nov', (select estimated_open_cents::text from public.month_committed(pg_temp.id('bia_ctx'), '2026-11-01')));
+  -- Abrir o app (sync_series_occurrences) não mexe nas contas das faturas: nem a marca nem a versão mudam (achado 5 da revisão).
   perform pg_temp.sync('bia_ctx');
   assert (select v from snap where name = 'est_nov') = (select estimated_open_cents::text from public.month_committed(pg_temp.id('bia_ctx'), '2026-11-01')),
-    'month_committed: o estimado de novembro é o mesmo antes e depois de gravar a marca (já era calculado na hora)';
-  assert pg_temp.cm(c, '2026-11-01') = '81040 2026-11-10 2026-11-03 aberto v4 firme', 'depois de abrir o app: valor firme, versão +1';
+    'month_committed: o estimado de novembro é o mesmo antes e depois de abrir o app (já era calculado na hora)';
+  assert pg_temp.cm(c, '2026-11-01') = '81040 2026-11-10 2026-11-03 aberto v3 estimado', 'depois de abrir o app: a conta da fatura não muda, nem a versão';
+  assert pg_temp.iv_ver(c, '2026-11-01') = 3, 'a versão da conta continua a que o app leu';
   assert pg_temp.cm(c, '2026-12-01') = '40000 2026-12-10 2026-12-03 aberto v1 estimado', 'dezembro ainda aberta: continua estimada';
-  assert pg_temp.iv(c, '2026-11-01') = 'fechada 81040 conta81040v4' and pg_temp.iv(c, '2026-12-01') = 'aberta 40000 conta40000v1e', 'situação das faturas';
+  assert pg_temp.iv(c, '2026-11-01') = 'fechada 81040 conta81040v3' and pg_temp.iv(c, '2026-12-01') = 'aberta 40000 conta40000v1e', 'situação das faturas';
   perform pg_temp.sync('bia_ctx');
-  assert pg_temp.cm(c, '2026-11-01') like '% v4 firme', 'abrir de novo não muda nada';
+  assert pg_temp.cm(c, '2026-11-01') like '% v3 estimado', 'abrir de novo não muda nada';
   assert (select (current_month, current_closing_on, current_due_on) from public.card_items where id = c) = ('2026-12-01'::date, '2026-12-03'::date, '2026-12-10'::date),
     'fatura atual em 12/11: a de dezembro';
   assert (select to_char(due_on, 'YYYY-MM-DD') from public.commitment_items where id = pg_temp.cmid(c, '2026-11-01')) = '2026-11-10'
@@ -1014,13 +1016,13 @@ begin
     'encargo no formato do app';
   assert (select request_hash from public.record_operations where idempotency_key = 'ce-b-0201')
        = md5(format('["criar_encargo_cartao", "%s", "2026-11-01", "juros", 1230]', c)), 'hash de criar_encargo_cartao';
-  assert pg_temp.cm(c, '2026-11-01') = '82270 2026-11-10 2026-11-03 aberto v5 firme', 'a conta acompanha o encargo';
+  assert pg_temp.cm(c, '2026-11-01') = '82270 2026-11-10 2026-11-03 aberto v4 firme', 'a conta acompanha o encargo';
   res := public.add_card_refund('ce-b-0202', c, '2026-11-01', 4000, 'Devolução da farmácia', 'Saúde');
   assert res #>> '{entry,kind}' = 'estorno' and res #>> '{entry,description}' = 'Devolução da farmácia' and res #>> '{entry,source_month}' is null
      and (res #>> '{entry,amount_cents}')::bigint = 4000, 'estorno no formato do app (valor positivo; o sinal vem do tipo)';
   assert (select request_hash from public.record_operations where idempotency_key = 'ce-b-0202')
        = md5(format('["criar_estorno_cartao", "%s", "2026-11-01", 4000, "Devolução da farmácia", "Saúde"]', c)), 'hash de criar_estorno_cartao';
-  assert pg_temp.cm(c, '2026-11-01') = '78270 2026-11-10 2026-11-03 aberto v6 firme' and pg_temp.iv(c, '2026-11-01') = 'fechada 78270 conta78270v6', 'total 782,70';
+  assert pg_temp.cm(c, '2026-11-01') = '78270 2026-11-10 2026-11-03 aberto v5 firme' and pg_temp.iv(c, '2026-11-01') = 'fechada 78270 conta78270v5', 'total 782,70';
   assert (select (purchases_cents, charges_cents, carried_in_cents, refunds_cents, credit_cents, entry_count) from public.invoice_items where card_id = c and month = '2026-11-01')
        = (81040::bigint, 1230::bigint, 0::bigint, 4000::bigint, 0::bigint, 5), 'composição da fatura';
   assert (select jsonb_object_agg(k, t) from (
@@ -1047,41 +1049,48 @@ begin
     perform pg_temp.expect_code(format('select public.pay_commitment(%L, %L, 1, %L, 40000, ''2026-11-12'')', 'ce-b-0308', did, acc), 'conta_de_fatura', 'PT409');
     -- Inexistente ou de quem não lê: nao_encontrado vem antes.
     perform pg_temp.expect_code(format('select public.pay_commitment(%L, %L, 1, %L, 40000, ''2026-11-12'')', 'ce-b-0309', gen_random_uuid(), acc), 'nao_encontrado', 'P0002');
-    assert pg_temp.cm(c, '2026-11-01') = '78270 2026-11-10 2026-11-03 aberto v6 firme' and (select count(*) from public.record_operations where idempotency_key like 'ce-b-03%') = 0,
+    assert pg_temp.cm(c, '2026-11-01') = '78270 2026-11-10 2026-11-03 aberto v5 firme' and (select count(*) from public.record_operations where idempotency_key like 'ce-b-03%') = 0,
       'recusas não mudam nada nem gravam operação';
   end;
 
   -- Passo 6: pagar. Validação na ordem: versão, situação, valor, valor acima da fatura, data inválida (mais de 1 ano), data
   -- futura, conta.
-  perform pg_temp.expect_stale(pg_temp.pi('ce-b-0401', c, '2026-11-01', 5, 70000, '2026-11-12'), 'versao_atual=6');
-  perform pg_temp.expect_stale(pg_temp.pi('ce-b-0402', c, '2026-11-01', null, 70000, '2026-11-12'), 'versao_atual=6');
-  perform pg_temp.expect_code(pg_temp.pi('ce-b-0403', c, '2026-11-01', 6, 0, '2026-11-12'), 'valor_invalido', '22023');
-  perform pg_temp.expect_code(pg_temp.pi('ce-b-0404', c, '2026-11-01', 6, null, '2026-11-12'), 'valor_invalido', '22023');
-  perform pg_temp.expect_code(pg_temp.pi('ce-b-0405', c, '2026-11-01', 6, -1, null), 'valor_invalido', '22023');
-  perform pg_temp.expect_code(pg_temp.pi('ce-b-0406', c, '2026-11-01', 6, 78271, null), 'valor_acima_da_fatura', '22023');
-  perform pg_temp.expect_code(pg_temp.pi('ce-b-0407', c, '2026-11-01', 6, 78271, '2026-11-12'), 'valor_acima_da_fatura', '22023');
-  perform pg_temp.expect_code(pg_temp.pi('ce-b-0408', c, '2026-11-01', 6, 70000, null), 'data_invalida', '22023');
-  perform pg_temp.expect_code(pg_temp.pi('ce-b-0409', c, '2026-11-01', 6, 70000, '2025-11-11'), 'data_invalida', '22023');
-  perform pg_temp.expect_code(pg_temp.pi('ce-b-0410', c, '2026-11-01', 6, 70000, '2026-11-13'), 'data_futura', '22023');
-  perform pg_temp.expect_code(pg_temp.pi('ce-b-0411', c, '2026-11-01', 6, 70000, '2026-11-12', gen_random_uuid()), 'conta_invalida', '22023');
-  perform pg_temp.expect_code(pg_temp.pi('ce-b-0412', c, '2026-11-01', 6, 70000, '2026-11-12', pg_temp.id('noel_acc')), 'conta_invalida', '22023');
-  perform pg_temp.expect_code(pg_temp.pi('ce-b-0413', c, '2026-11-15', 6, 70000, '2026-11-12'), 'mes_invalido', '22023');
-  perform pg_temp.expect_code(pg_temp.pi('ce-b-0414', c, null, 6, 70000, '2026-11-12'), 'mes_invalido', '22023');
-  perform pg_temp.expect_code(pg_temp.pi('ce-b-0415', c, '2026-10-01', 6, 70000, '2026-11-12'), 'nao_encontrado', 'P0002');   -- fatura sem conta
-  perform pg_temp.expect_code(pg_temp.pi('ce-b-0416', c, '2027-05-01', 6, 70000, '2026-11-12'), 'nao_encontrado', 'P0002');
-  perform pg_temp.expect_code(pg_temp.ui('ce-b-0417', c, '2026-11-01', 6), 'compromisso_aberto', 'PT409');
-  assert (select count(*) from public.record_operations where idempotency_key like 'ce-b-04%') = 0 and pg_temp.cm(c, '2026-11-01') like '78270 % v6 firme',
+  perform pg_temp.expect_stale(pg_temp.pi('ce-b-0401', c, '2026-11-01', 4, 70000, '2026-11-12'), 'versao_atual=5');
+  perform pg_temp.expect_stale(pg_temp.pi('ce-b-0402', c, '2026-11-01', null, 70000, '2026-11-12'), 'versao_atual=5');
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0403', c, '2026-11-01', 5, 0, '2026-11-12'), 'valor_invalido', '22023');
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0404', c, '2026-11-01', 5, null, '2026-11-12'), 'valor_invalido', '22023');
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0405', c, '2026-11-01', 5, -1, null), 'valor_invalido', '22023');
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0406', c, '2026-11-01', 5, 78271, null), 'valor_acima_da_fatura', '22023');
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0407', c, '2026-11-01', 5, 78271, '2026-11-12'), 'valor_acima_da_fatura', '22023');
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0408', c, '2026-11-01', 5, 70000, null), 'data_invalida', '22023');
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0409', c, '2026-11-01', 5, 70000, '2025-11-11'), 'data_invalida', '22023');
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0410', c, '2026-11-01', 5, 70000, '2026-11-13'), 'data_futura', '22023');
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0411', c, '2026-11-01', 5, 70000, '2026-11-12', gen_random_uuid()), 'conta_invalida', '22023');
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0412', c, '2026-11-01', 5, 70000, '2026-11-12', pg_temp.id('noel_acc')), 'conta_invalida', '22023');
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0413', c, '2026-11-15', 5, 70000, '2026-11-12'), 'mes_invalido', '22023');
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0414', c, null, 5, 70000, '2026-11-12'), 'mes_invalido', '22023');
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0415', c, '2026-10-01', 5, 70000, '2026-11-12'), 'nao_encontrado', 'P0002');   -- fatura sem conta
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0416', c, '2027-05-01', 5, 70000, '2026-11-12'), 'nao_encontrado', 'P0002');
+  perform pg_temp.expect_code(pg_temp.ui('ce-b-0417', c, '2026-11-01', 5), 'compromisso_aberto', 'PT409');
+  -- Fatura ainda aberta (dezembro fecha em 03/12): só se paga depois do fechamento. A recusa vem logo depois de versão e
+  -- situação e antes de valor, data e conta; nada é gravado.
+  perform pg_temp.expect_stale(pg_temp.pi('ce-b-0418', c, '2026-12-01', 9, 40000, '2026-11-12'), 'versao_atual=' || pg_temp.iv_ver(c, '2026-12-01'));
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0418', c, '2026-12-01', pg_temp.iv_ver(c, '2026-12-01'), 40000, '2026-11-12'), 'fatura_aberta', 'PT409');
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0419', c, '2026-12-01', pg_temp.iv_ver(c, '2026-12-01'), 0, null), 'fatura_aberta', 'PT409');
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0419', c, '2026-12-01', pg_temp.iv_ver(c, '2026-12-01'), 99999999, '2030-01-01', gen_random_uuid()), 'fatura_aberta', 'PT409');
+  assert (select count(*) from public.record_operations where idempotency_key like 'ce-b-04%') = 0 and pg_temp.cm(c, '2026-11-01') like '78270 % v5 firme'
+     and pg_temp.cm(c, '2026-12-01') = '40000 2026-12-10 2026-12-03 aberto v1 estimado',
     'recusas não gravam';
 
   -- Pagamento parcial: R$ 700,00 de R$ 782,70, em 12/11. A conta de saída é a conta ativa mais antiga do contexto.
-  res := public.pay_invoice('ce-b-0420', c, '2026-11-01', 6, 70000, '2026-11-12');
+  res := public.pay_invoice('ce-b-0420', c, '2026-11-01', 5, 70000, '2026-11-12');
   insert into ids values ('pgto1', (res #>> '{record,id}')::uuid);
   assert res #>> '{record,description}' = 'Fatura Cartão Exemplo (novembro)' and (res #>> '{record,amount_cents}')::bigint = 70000
      and res #>> '{record,occurred_on}' = '2026-11-12' and res #>> '{record,kind}' = 'despesa' and res #>> '{record,category}' is null
      and res #>> '{record,card_id}' = c::text and res #>> '{record,invoice_month}' = '2026-11-01' and res #>> '{record,account_id}' = acc::text
      and res #>> '{record,commitment_id}' = res #>> '{commitment,id}' and res #>> '{record,created_by}' = pg_temp.id('bia')::text
      and (res #>> '{record,version}')::int = 1 and res #>> '{record,receipt_key}' is null, 'um gasto "Fatura Cartão Exemplo (novembro)"';
-  assert res #>> '{commitment,status}' = 'quitado' and (res #>> '{commitment,amount_cents}')::bigint = 78270 and (res #>> '{commitment,version}')::int = 7
+  assert res #>> '{commitment,status}' = 'quitado' and (res #>> '{commitment,amount_cents}')::bigint = 78270 and (res #>> '{commitment,version}')::int = 6
      and res #> '{commitment,amount_is_estimate}' = 'false'::jsonb and res #>> '{commitment,paid_amount_cents}' = '70000'
      and res #>> '{commitment,paid_record_id}' = res #>> '{record,id}' and res #>> '{commitment,card_id}' = c::text, 'conta quitada; o previsto fica';
   assert res #>> '{entry,kind}' = 'saldo_anterior' and (res #>> '{entry,amount_cents}')::bigint = 8270 and res #>> '{entry,invoice_month}' = '2026-12-01'
@@ -1092,18 +1101,18 @@ begin
      and (res #>> '{invoices,0,to_pay_cents}')::bigint = 0 and res #>> '{invoices,1,status}' = 'aberta'
      and (res #>> '{invoices,1,total_cents}')::bigint = 48270 and (res #>> '{invoices,1,carried_in_cents}')::bigint = 8270, 'faturas no retorno';
   assert (select request_hash from public.record_operations where idempotency_key = 'ce-b-0420')
-       = md5(format('["pagar_fatura", "%s", "2026-11-01", 6, 70000, "2026-11-12"]', c)), 'hash de pagar_fatura (sem conta)';
+       = md5(format('["pagar_fatura", "%s", "2026-11-01", 5, 70000, "2026-11-12"]', c)), 'hash de pagar_fatura (sem conta)';
   assert (select (action, target_id, entry_id, record_id, commitment_id) is not distinct from ('pagar_fatura', c, null::uuid, (res #>> '{record,id}')::uuid, (res #>> '{commitment,id}')::uuid)
             from public.record_operations where idempotency_key = 'ce-b-0420'), 'operação: cartão, conta da fatura e gasto';
-  assert public.pay_invoice('ce-b-0420', c, '2026-11-01', 6, 70000, '2026-11-12') = res, 'repetição devolve o mesmo resultado';
+  assert public.pay_invoice('ce-b-0420', c, '2026-11-01', 5, 70000, '2026-11-12') = res, 'repetição devolve o mesmo resultado';
   assert (select count(*) from public.financial_records where card_id = c) = 1 and (select count(*) from public.card_entries where payment_record_id is not null) = 1,
     'repetição não grava de novo';
-  perform pg_temp.expect_code(pg_temp.pi('ce-b-0420', c, '2026-11-01', 6, 70001, '2026-11-12'), 'chave_reutilizada', 'PT409');
-  perform pg_temp.expect_code(pg_temp.pi('ce-b-0420', c, '2026-11-01', 6, 70000, '2026-11-12', acc), 'chave_reutilizada', 'PT409');
-  perform pg_temp.expect_code(pg_temp.pi('ce-b-0421', c, '2026-11-01', 7, 70000, '2026-11-12'), 'compromisso_quitado', 'PT409');
-  perform pg_temp.expect_stale(pg_temp.pi('ce-b-0422', c, '2026-11-01', 6, 70000, '2026-11-12'), 'versao_atual=7');
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0420', c, '2026-11-01', 5, 70001, '2026-11-12'), 'chave_reutilizada', 'PT409');
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0420', c, '2026-11-01', 5, 70000, '2026-11-12', acc), 'chave_reutilizada', 'PT409');
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0421', c, '2026-11-01', 6, 70000, '2026-11-12'), 'compromisso_quitado', 'PT409');
+  perform pg_temp.expect_stale(pg_temp.pi('ce-b-0422', c, '2026-11-01', 5, 70000, '2026-11-12'), 'versao_atual=6');
   assert pg_temp.cm(c, '2026-12-01') = '48270 2026-12-10 2026-12-03 aberto v2 estimado', 'dezembro: 400,00 + saldo anterior de 82,70';
-  assert pg_temp.iv(c, '2026-11-01') = 'paga_em_parte 78270 conta0v7' and pg_temp.iv(c, '2026-12-01') = 'aberta 48270 conta48270v2e', 'situação depois do pagamento';
+  assert pg_temp.iv(c, '2026-11-01') = 'paga_em_parte 78270 conta0v6' and pg_temp.iv(c, '2026-12-01') = 'aberta 48270 conta48270v2e', 'situação depois do pagamento';
   assert (pg_temp.totals('bia_ctx', '2026-11-01'))[2] = 70000 and (pg_temp.totals('bia_ctx', '2026-11-01'))[3] = -70000, 'Pago de novembro recebe o pagamento: 700,00';
   assert pg_temp.totals('bia_ctx', '2026-10-01') = '{600000,390000,210000}', 'outubro continua igual';
   assert (select count(*) from public.financial_records where card_id = c and occurred_on = '2026-11-12') = 1, 'um único gasto, na data do pagamento';
@@ -1129,7 +1138,7 @@ begin
     r := public.update_record('ce-b-0508', rid, 1, acc, 70000, '2026-11-11', 'Fatura Cartão Exemplo (novembro)', null);
     assert r.occurred_on = '2026-11-11' and r.version = 2 and r.card_id = c and r.invoice_month = '2026-11-01' and r.commitment_id = pg_temp.cmid(c, '2026-11-01'),
       'data corrigida; o vínculo com a fatura fica';
-    assert pg_temp.cm(c, '2026-11-01') like '78270 % quitado v8 firme', 'editar o gasto soma 1 à versão da conta (D-021(3))';
+    assert pg_temp.cm(c, '2026-11-01') like '78270 % quitado v7 firme', 'editar o gasto soma 1 à versão da conta (D-021(3))';
     assert (select count(*) from public.record_operations where idempotency_key between 'ce-b-0501' and 'ce-b-0507') = 0, 'recusas não gravam';
     perform pg_temp.check_links();
   end;
@@ -1191,8 +1200,15 @@ begin
   perform pg_temp.check_links();
   perform pg_temp.views_agree();
 
-  -- Passo 10: pagamento parcial de novo e a ordem de desfazer. Dezembro paga em seguida (fatura aberta pode ser paga): desfazer
+  -- Passo 10: pagamento parcial de novo e a ordem de desfazer. Dezembro paga em seguida (já fechada, em 04/12): desfazer
   -- novembro passa a ser recusado (fatura_seguinte_paga) até dezembro ser desfeita.
+  -- Dezembro só aceita pagamento depois de fechar (03/12): no próprio dia do fechamento ainda está aberta; no dia seguinte,
+  -- fechada. A data do pagamento pode ser anterior (quem pagou antes informa o dia em que pagou).
+  perform pg_temp.today('2026-12-03');
+  perform pg_temp.expect_code(pg_temp.pi('ce-b-0800', c, '2026-12-01', pg_temp.iv_ver(c, '2026-12-01'), 4000, '2026-11-12'), 'fatura_aberta', 'PT409');
+  assert pg_temp.iv(c, '2026-12-01') like 'aberta 40000 %', 'no dia do fechamento a fatura ainda está aberta';
+  perform pg_temp.today('2026-12-04');
+  assert pg_temp.iv(c, '2026-12-01') like 'fechada 40000 %', 'no dia seguinte, fechada';
   res := public.undo_invoice_payment('ce-b-0801', c, '2026-11-01', pg_temp.iv_ver(c, '2026-11-01'));
   res := public.pay_invoice('ce-b-0802', c, '2026-11-01', pg_temp.iv_ver(c, '2026-11-01'), 70000, '2026-11-12');
   assert pg_temp.cm(c, '2026-12-01') like '48270 %', 'saldo anterior de volta em dezembro';
@@ -1351,7 +1367,10 @@ begin
   insert into ids values ('noel_ck2', k);
   res := public.add_card_purchase('cd-c-0071', k, '2026-10-07', 60000, 2, 'Cama', 'Moradia');
   tv := (res #>> '{entry,id}')::uuid;
-  res := public.pay_invoice('cd-c-0072', k, '2026-12-01', pg_temp.iv_ver(k, '2026-12-01'), 30000, '2026-10-07');
+  -- Só se paga fatura fechada: dezembro fecha em 05/12, então o pagamento é em 06/12 (hoje volta a 07/10 no fim do bloco).
+  perform pg_temp.expect_code(pg_temp.pi('cd-c-0072', k, '2026-12-01', pg_temp.iv_ver(k, '2026-12-01'), 30000, '2026-10-07'), 'fatura_aberta', 'PT409');
+  perform pg_temp.today('2026-12-06');
+  res := public.pay_invoice('cd-c-0072', k, '2026-12-01', pg_temp.iv_ver(k, '2026-12-01'), 30000, '2026-12-06');
   assert res #>> '{invoices,0,status}' = 'paga', 'dezembro paga';
   perform pg_temp.expect_code(pg_temp.arf('cd-c-0073', k, '2026-11-01', 40000, 'Devolução grande'), 'fatura_seguinte_paga', 'PT409');
   assert pg_temp.ivs(k) = '2026-11:30000 2026-12:30000' and (select count(*) from public.card_entries where card_id = k) = 2
@@ -1365,7 +1384,7 @@ begin
   perform pg_temp.check_links();
 
   -- Saldo anterior: criado só pelo pagamento parcial; não se altera nem se exclui.
-  res := public.pay_invoice('cd-c-0080', k, '2026-11-01', pg_temp.iv_ver(k, '2026-11-01'), 6000, '2026-10-07');
+  res := public.pay_invoice('cd-c-0080', k, '2026-11-01', pg_temp.iv_ver(k, '2026-11-01'), 6000, '2026-12-06');
   auto := (res #>> '{entry,id}')::uuid;
   assert (res #>> '{entry,amount_cents}')::bigint = 4000 and pg_temp.cm(k, '2026-12-01') like '34000 %', 'saldo anterior de 40,00 em dezembro';
   perform pg_temp.expect_code(pg_temp.ue('cd-c-0081', auto, 1, 'saldo_anterior', 100, null, null, null), 'lancamento_automatico', 'PT409');
@@ -1380,6 +1399,7 @@ begin
   perform public.delete_card_entry('cd-c-0087', tv, 1);
   perform pg_temp.check_links();
   perform pg_temp.views_agree();
+  perform pg_temp.today('2026-10-07');
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -1517,7 +1537,9 @@ begin
   res := public.add_card_purchase('cd-e-0061', e, '2026-10-07', 1000, 1, 'Novo', null);
   assert res #>> '{entry,invoice_month}' = '2026-10-01', 'com fechamento no dia 10, a compra de 07/10 cai em outubro';
   -- Fatura paga não acompanha o cartão: os dias gravados na conta ficam.
-  res := public.pay_invoice('cd-e-0062', e, '2026-10-01', pg_temp.iv_ver(e, '2026-10-01'), 21000, '2026-10-07');
+  -- A fatura de outubro fecha em 10/10 (dia 10): paga-se em 11/10.
+  perform pg_temp.today('2026-10-11');
+  res := public.pay_invoice('cd-e-0062', e, '2026-10-01', pg_temp.iv_ver(e, '2026-10-01'), 21000, '2026-10-11');
   res := public.update_card('cd-e-0063', e, 2, 'Edições', null, 5, 12, null);
   assert pg_temp.cm(e, '2026-10-01') like '21000 2026-10-15 2026-10-10 quitado % firme' and pg_temp.cm(e, '2026-11-01') like '17500 2026-11-12 2026-11-05 aberto %'
      and (select description from public.commitments where id = pg_temp.cmid(e, '2026-10-01')) = 'Fatura Edições 2'
@@ -1527,6 +1549,7 @@ begin
   res := public.undo_invoice_payment('cd-e-0064', e, '2026-10-01', pg_temp.iv_ver(e, '2026-10-01'));
   assert pg_temp.cm(e, '2026-10-01') = '21000 2026-10-12 2026-10-05 aberto v' || (select version from public.commitments where id = pg_temp.cmid(e, '2026-10-01')) || ' firme',
     'reaberta, a conta segue os dias do cartão';
+  perform pg_temp.today('2026-10-07');
   perform public.delete_card_entry('cd-e-0065', (select id from public.card_entry_items where card_id = e and description = 'Novo'), 1);
   perform pg_temp.check_links();
 
@@ -1803,7 +1826,10 @@ begin
   perform pg_temp.expect_code(pg_temp.uc('cd-f-0024', fc, 2, 'Caio', null, 5, 12, null), 'sem_permissao', '42501');
   -- Theo paga a fatura (a conta de saída é a conta ativa mais antiga da Família); Iris não desfaz; Theo desfaz.
   perform pg_temp.as_('theo');
-  res := public.pay_invoice('cd-f-0030', fc, '2026-11-01', pg_temp.iv_ver(fc, '2026-11-01'), 5000, '2026-10-07');
+  -- A fatura de novembro fecha em 05/11: Theo paga em 06/11 (fatura aberta é recusada; a Iris não chega a essa conferência).
+  perform pg_temp.expect_code(pg_temp.pi('cd-f-0029', fc, '2026-11-01', pg_temp.iv_ver(fc, '2026-11-01'), 5000, '2026-10-07'), 'fatura_aberta', 'PT409');
+  perform pg_temp.today('2026-11-06');
+  res := public.pay_invoice('cd-f-0030', fc, '2026-11-01', pg_temp.iv_ver(fc, '2026-11-01'), 5000, '2026-11-06');
   rid := (res #>> '{record,id}')::uuid;
   assert res #>> '{record,account_id}' = famacc::text and res #>> '{record,created_by}' = pg_temp.id('theo')::text
      and res #>> '{record,description}' = 'Fatura Cartão da família (novembro)' and res #>> '{record,context_id}' = fam::text, 'pagamento na conta da Família';
@@ -1816,6 +1842,7 @@ begin
   perform pg_temp.expect_code(format('select public.delete_record(%L, %L, 1)', 'cd-f-0034', rid), 'pagamento_de_fatura', 'PT409');
   res := public.undo_invoice_payment('cd-f-0035', fc, '2026-11-01', pg_temp.iv_ver(fc, '2026-11-01'));
   assert res #>> '{record,deleted_by}' = pg_temp.id('theo')::text, 'Theo desfaz';
+  perform pg_temp.today('2026-10-07');
   -- A titular altera o encargo de Theo.
   perform pg_temp.as_('bia');
   res := public.update_card_entry('cd-f-0036', ch_theo, 1, 'encargo', 3500, null, null, null, null, '2026-11-01', 'anuidade');
@@ -2112,7 +2139,9 @@ begin
   insert into ids values ('g_card', g);
   insert into ids values ('g_purchase', (public.add_card_purchase('cd-g-0002', g, '2026-10-07', 20000, 2, 'Mesa', 'Moradia') #>> '{entry,id}')::uuid);
   insert into ids values ('g_charge', (public.add_card_charge('cd-g-0003', g, '2026-11-01', 'tarifa', 300) #>> '{entry,id}')::uuid);
-  res := public.pay_invoice('cd-g-0004', g, '2026-11-01', pg_temp.iv_ver(g, '2026-11-01'), 6000, '2026-10-07');
+  perform pg_temp.today('2026-11-06');   -- novembro fechou em 05/11
+  res := public.pay_invoice('cd-g-0004', g, '2026-11-01', pg_temp.iv_ver(g, '2026-11-01'), 6000, '2026-11-06');
+  perform pg_temp.today('2026-10-07');
   insert into ids values ('g_record', (res #>> '{record,id}')::uuid), ('g_saldo', (res #>> '{entry,id}')::uuid);
   assert pg_temp.ivs(g) = '2026-11:10300 2026-12:14300' and (res #>> '{entry,amount_cents}')::bigint = 4300, 'Guardas: novembro paga em parte; dezembro 143,00';
   g2 := (public.create_card('cd-g-0010', ctx, 'Guardas 2', null, 5, 12, null) #>> '{card,id}')::uuid;
@@ -2372,8 +2401,9 @@ select pg_temp.check_links();
 
 -- ---------------------------------------------------------------------------
 -- 11b. Revisão da auditoria (Lia, conta nova, hoje 07/10/2026; cartões fecham dia 3 e vencem dia 10, salvo onde dito):
---  a) pagar a fatura aberta antes do fechamento (total ou parcial) NÃO trava o cartão: as compras seguintes vão para a primeira
---     fatura seguinte livre, o dinheiro é conservado e a pessoa continua podendo pagar o que falta;
+--  a) a fatura só se paga depois que FECHA (fatura_aberta antes disso, sem gravar nada; a data do pagamento pode ser anterior ao
+--     fechamento); as compras vão sempre para a fatura natural, sem desvio: se ela, ou uma parcela adiante, já está paga,
+--     fatura_paga; fatura fechada e não paga recebe a compra do ciclo dela;
 --  b) fatura antiga (compra de até 48 meses atrás) paga na data real; a janela de 1 ano continua para as recentes;
 --  c) limite usado com crédito em cadeia: soma por fatura não paga de max(0, total), igual ao core;
 --  d) apelido sem número de cartão com qualquer separador;
@@ -2393,95 +2423,100 @@ declare
 begin
   perform pg_temp.as_('lia');
 
-  -- a) Cartão "Cedo". Compra de 20,00 em 01/10 (fatura de outubro, que fechou em 03/10 e vence em 10/10): paga em 07/10.
-  c := (public.create_card('li-a-0001', ctx, 'Cedo', null, 3, 10, null) #>> '{card,id}')::uuid;
-  insert into ids values ('lia_cedo', c);
+  -- a) Cartão "Fechamento". Compra de 20,00 em 01/10 (fatura de outubro, que fechou em 03/10 e vence em 10/10): paga em 07/10.
+  c := (public.create_card('li-a-0001', ctx, 'Fechamento', null, 3, 10, null) #>> '{card,id}')::uuid;
+  insert into ids values ('lia_fechamento', c);
   perform public.add_card_purchase('li-a-0002', c, '2026-10-01', 2000, 1, 'Compra de outubro');
   assert pg_temp.iv(c, '2026-10-01') = 'fechada 2000 conta2000v1', 'outubro fechada';
   res := public.pay_invoice('li-a-0003', c, '2026-10-01', pg_temp.iv_ver(c, '2026-10-01'), 2000, '2026-10-07', acc);
   assert res #>> '{invoices,0,status}' = 'paga', 'outubro paga';
-  -- Compra de 05/10 (depois do fechamento): novembro, ainda aberta (fecha em 03/11). Paga-se novembro ANTES do fechamento.
+  -- Compra de 05/10 (depois do fechamento): novembro, aberta (fecha em 03/11). Fatura aberta não se paga: a recusa vem sem
+  -- gravar nada, qualquer que seja o valor ou a data.
   res := public.add_card_purchase('li-a-0004', c, '2026-10-05', 30000, 1, 'Mercado grande', 'Mercado');
   assert res #>> '{entry,invoice_month}' = '2026-11-01' and pg_temp.iv(c, '2026-11-01') = 'aberta 30000 conta30000v1e', 'novembro aberta e estimada';
-  res := public.pay_invoice('li-a-0005', c, '2026-11-01', pg_temp.iv_ver(c, '2026-11-01'), 30000, '2026-10-07', acc);
-  assert res #>> '{invoices,0,status}' = 'paga' and pg_temp.iv(c, '2026-11-01') like 'paga 30000 conta0v%', 'novembro paga ainda aberta (antes do fechamento)';
+  perform pg_temp.expect_code(pg_temp.pi('li-a-0005', c, '2026-11-01', pg_temp.iv_ver(c, '2026-11-01'), 30000, '2026-10-07', acc), 'fatura_aberta', 'PT409');
+  perform pg_temp.expect_code(pg_temp.pi('li-a-0005', c, '2026-11-01', pg_temp.iv_ver(c, '2026-11-01'), 10000, '2026-10-07', acc), 'fatura_aberta', 'PT409');
+  assert pg_temp.iv(c, '2026-11-01') = 'aberta 30000 conta30000v1e' and not exists (select 1 from public.record_operations where idempotency_key = 'li-a-0005')
+     and (select count(*) from public.financial_records where card_id = c and deleted_at is null) = 1, 'a recusa não grava nada';
 
-  -- O cartão NÃO trava: a compra de 07/10 cairia em novembro (paga) e vai para dezembro; novembro não muda.
+  -- Sem desvio: as compras do ciclo vão sempre para a fatura natural (novembro), com ou sem parcelas.
   res := public.add_card_purchase('li-a-0006', c, '2026-10-07', 7000, 1, 'Farmácia', 'Saúde');
-  assert res #>> '{entry,invoice_month}' = '2026-12-01' and pg_temp.cm(c, '2026-12-01') = '7000 2026-12-10 2026-12-03 aberto v1 estimado'
-     and pg_temp.iv(c, '2026-11-01') like 'paga 30000 conta0v%', 'compra de novembro (paga) vai para dezembro; a conta de dezembro nasce';
-  -- Em 3 vezes: dezembro, janeiro e fevereiro.
+  assert res #>> '{entry,invoice_month}' = '2026-11-01' and pg_temp.cm(c, '2026-11-01') like '37000 2026-11-10 2026-11-03 aberto % estimado',
+    'compra de 07/10: fatura de novembro';
   res := public.add_card_purchase('li-a-0007', c, '2026-10-07', 9000, 3, 'Tênis', 'Lazer');
-  assert res #>> '{entry,invoice_month}' = '2026-12-01'
-     and pg_temp.ivs(c) = '2026-10:2000 2026-11:30000 2026-12:10000 2027-01:3000 2027-02:3000', 'três parcelas a partir de dezembro';
-  -- O dinheiro é conservado (tudo o que foi anotado está nas faturas) e dá para pagar o que falta.
+  assert res #>> '{entry,invoice_month}' = '2026-11-01'
+     and pg_temp.ivs(c) = '2026-10:2000 2026-11:40000 2026-12:3000 2027-01:3000', 'três parcelas a partir de novembro';
   assert (select sum(total_cents) from public.invoice_items where card_id = c) = 2000 + 30000 + 7000 + 9000, 'soma das faturas = soma das compras';
   assert (select count(*) from public.invoice_items where card_id = c and status in ('aberta', 'fechada') and commitment_id is not null) = 3
-     and (select count(*) from public.invoice_items where card_id = c and status = 'paga') = 2, 'três a pagar, duas pagas';
+     and (select count(*) from public.invoice_items where card_id = c and status = 'paga') = 1, 'três a pagar, uma paga';
   perform pg_temp.check_links();
   perform pg_temp.views_agree();
 
-  -- Dezembro também é paga antes do fechamento; uma compra em 3 vezes do mesmo ciclo pula as faturas pagas (janeiro a março).
-  res := public.pay_invoice('li-a-0008', c, '2026-12-01', pg_temp.iv_ver(c, '2026-12-01'), 10000, '2026-10-07', acc);
-  res := public.add_card_purchase('li-a-0009', c, '2026-10-07', 6000, 3, 'Cadeira', 'Moradia');
-  assert res #>> '{entry,invoice_month}' = '2027-01-01'
-     and pg_temp.ivs(c) = '2026-10:2000 2026-11:30000 2026-12:10000 2027-01:5000 2027-02:5000 2027-03:2000',
-    'novembro e dezembro pagas: a compra começa em janeiro';
-  res := public.add_card_purchase('li-a-0010', c, '2026-10-07', 500, 1, 'Café');
-  assert res #>> '{entry,invoice_month}' = '2027-01-01', 'uma parcela: a primeira fatura livre';
-  -- Novembro volta a ficar em aberto (desfazer); dezembro continua paga. Uma parcela cabe em novembro; duas parcelas não
-  -- (dezembro está paga no meio) e começam em janeiro: nunca uma parcela dentro de fatura paga.
-  res := public.undo_invoice_payment('li-a-0011', c, '2026-11-01', pg_temp.iv_ver(c, '2026-11-01'));
-  res := public.add_card_purchase('li-a-0012', c, '2026-10-07', 400, 1, 'Pão');
-  assert res #>> '{entry,invoice_month}' = '2026-11-01' and pg_temp.cm(c, '2026-11-01') like '30400 % aberto %', 'uma parcela cabe em novembro (livre)';
-  res := public.add_card_purchase('li-a-0013', c, '2026-10-07', 800, 2, 'Livro');
-  assert res #>> '{entry,invoice_month}' = '2027-01-01', 'duas parcelas não cruzam dezembro (paga): começam em janeiro';
-  assert pg_temp.ivs(c) = '2026-10:2000 2026-11:30400 2026-12:10000 2027-01:5900 2027-02:5400 2027-03:2000', 'faturas depois das compras do ciclo';
-  assert (select sum(total_cents) from public.invoice_items where card_id = c) = 2000 + 30000 + 7000 + 9000 + 6000 + 500 + 400 + 800,
-    'o dinheiro continua conservado (total das faturas = total das compras)';
-  -- Fatura natural FECHADA e paga (outubro, que fechou em 03/10 e foi paga): a compra com data nesse ciclo é recusada, na criação
-  -- e na mudança de data (fatura_paga). Não vai para a fatura atual: o banco já cobrou essa compra em outubro.
+  -- Novembro fecha em 03/11. Em 04/11 já se paga; a data do pagamento pode ser anterior ao fechamento (quem pagou antes
+  -- informa o dia em que pagou).
+  perform pg_temp.today('2026-11-04');
+  assert pg_temp.iv(c, '2026-11-01') like 'fechada 40000 %', 'novembro fechada';
+  res := public.pay_invoice('li-a-0008', c, '2026-11-01', pg_temp.iv_ver(c, '2026-11-01'), 40000, '2026-11-02', acc);
+  assert res #>> '{invoices,0,status}' = 'paga' and res #>> '{record,occurred_on}' = '2026-11-02' and pg_temp.iv(c, '2026-11-01') like 'paga 40000 conta0v%',
+    'novembro paga depois do fechamento, na data em que foi paga de fato';
+  -- Compra do ciclo de novembro (data até 03/11), agora numa fatura paga: recusada, na criação e na mudança de data. A de 04/11
+  -- é do ciclo de dezembro e entra normalmente.
+  perform pg_temp.expect_code(pg_temp.ap('li-a-0009', c, '2026-11-02', 1000, 1, 'Esquecida de novembro'), 'fatura_paga', 'PT409');
+  res := public.add_card_purchase('li-a-0010', c, '2026-11-04', 500, 1, 'Café');
+  p := (res #>> '{entry,id}')::uuid;
+  assert res #>> '{entry,invoice_month}' = '2026-12-01' and pg_temp.ivs(c) = '2026-10:2000 2026-11:40000 2026-12:3500 2027-01:3000', 'compra de 04/11: dezembro';
+  perform pg_temp.expect_code(pg_temp.ue('li-a-0011', p, 1, 'compra', 500, '2026-11-02', 'Café', null, 1), 'fatura_paga', 'PT409');
+  assert pg_temp.entv(p) = 1 and pg_temp.ivs(c) = '2026-10:2000 2026-11:40000 2026-12:3500 2027-01:3000', 'a mudança recusada não grava';
+  -- Fatura natural paga (outubro, paga em 07/10): compra com data nesse ciclo é recusada, na criação e na mudança de data.
   perform pg_temp.expect_code(pg_temp.ap('li-a-0014', c, '2026-10-02', 1000, 1, 'Esquecida'), 'fatura_paga', 'PT409');
   perform pg_temp.expect_code(pg_temp.ap('li-a-0014b', c, '2026-09-20', 1000, 1, 'Esquecida'), 'fatura_paga', 'PT409');
-  assert (select count(*) from public.record_operations where idempotency_key in ('li-a-0014', 'li-a-0014b')) = 0, 'recusas não gravam';
-  res := public.add_card_purchase('li-a-0015', c, '2026-10-07', 1000, 1, 'Mudar data');
-  p := (res #>> '{entry,id}')::uuid;
-  assert res #>> '{entry,invoice_month}' = '2026-11-01', 'nasce em novembro';
-  perform pg_temp.expect_code(pg_temp.ue('li-a-0015b', p, 1, 'compra', 1000, '2026-10-02', 'Mudar data', null, 1), 'fatura_paga', 'PT409');
-  assert pg_temp.entv(p) = 1 and pg_temp.iv(c, '2026-10-01') like 'paga 2000 %' and pg_temp.cm(c, '2026-11-01') like '31400 % aberto %',
-    'a mudança recusada não grava: outubro intacta; novembro com a compra';
+  perform pg_temp.expect_code(pg_temp.ue('li-a-0015b', p, 1, 'compra', 500, '2026-10-02', 'Café', null, 1), 'fatura_paga', 'PT409');
+  assert (select count(*) from public.record_operations where idempotency_key in ('li-a-0009', 'li-a-0011', 'li-a-0014', 'li-a-0014b', 'li-a-0015b')) = 0, 'recusas não gravam';
   -- Encargo e estorno escolhem a fatura (vêm da fatura do banco): fatura paga continua recusada.
   perform pg_temp.expect_code(pg_temp.ach('li-a-0016', c, '2026-10-01', 'multa', 100), 'fatura_paga', 'PT409');
-  perform pg_temp.expect_code(pg_temp.arf('li-a-0017', c, '2026-12-01', 100, 'Devolução'), 'fatura_paga', 'PT409');
-  -- Desfazer o pagamento de dezembro e pagar de novo funciona (nada ficou preso).
-  res := public.undo_invoice_payment('li-a-0018', c, '2026-12-01', pg_temp.iv_ver(c, '2026-12-01'));
-  assert pg_temp.iv(c, '2026-12-01') like 'aberta 10000 conta10000v%', 'dezembro reaberta';
+  perform pg_temp.expect_code(pg_temp.arf('li-a-0017', c, '2026-11-01', 100, 'Devolução'), 'fatura_paga', 'PT409');
+  -- Desfazer o pagamento de novembro reabre o ciclo (fechada, não paga): a compra com data nele volta a ser aceita.
+  res := public.undo_invoice_payment('li-a-0018', c, '2026-11-01', pg_temp.iv_ver(c, '2026-11-01'));
+  assert pg_temp.iv(c, '2026-11-01') like 'fechada 40000 conta40000v%', 'novembro reaberta';
+  res := public.add_card_purchase('li-a-0019', c, '2026-11-02', 1000, 1, 'Esquecida de novembro');
+  assert res #>> '{entry,invoice_month}' = '2026-11-01' and pg_temp.ivs(c) = '2026-10:2000 2026-11:41000 2026-12:3500 2027-01:3000',
+    'fatura natural fechada e não paga recebe a compra';
+  perform public.delete_card_entry('li-a-0019b', (res #>> '{entry,id}')::uuid, 1);
   perform pg_temp.check_links();
   perform pg_temp.views_agree();
 
-  -- Pagamento parcial antes do fechamento: o que sobra vai para dezembro como saldo anterior, e as compras seguintes também.
+  -- Pagamento parcial depois do fechamento: o que sobra vai para dezembro como saldo anterior. Outubro (fechada) segue sem pagar.
   c := (public.create_card('li-a-0030', ctx, 'Parcial', null, 3, 10, null) #>> '{card,id}')::uuid;
   perform public.add_card_purchase('li-a-0031', c, '2026-10-05', 30000, 1, 'Reforma');
-  res := public.pay_invoice('li-a-0032', c, '2026-11-01', pg_temp.iv_ver(c, '2026-11-01'), 20000, '2026-10-07', acc);
+  perform public.add_card_purchase('li-a-0031b', c, '2026-09-20', 1000, 1, 'Compra de setembro');
+  res := public.pay_invoice('li-a-0032', c, '2026-11-01', pg_temp.iv_ver(c, '2026-11-01'), 20000, '2026-11-04', acc);
   assert res #>> '{invoices,0,status}' = 'paga_em_parte' and res #>> '{entry,kind}' = 'saldo_anterior' and (res #>> '{entry,amount_cents}')::bigint = 10000,
     'novembro paga em parte; 100,00 de saldo anterior em dezembro';
-  res := public.add_card_purchase('li-a-0033', c, '2026-10-07', 5000, 1, 'Depois do pagamento');
-  assert res #>> '{entry,invoice_month}' = '2026-12-01' and pg_temp.ivs(c) = '2026-11:30000 2026-12:15000', 'a compra vai para dezembro, junto do saldo';
-  -- Mudar a data para o ciclo aberto de novembro (paga em parte) também desvia para dezembro; uma compra de setembro (fatura de
-  -- outubro, fechada e ainda a pagar) fica em outubro.
-  res := public.add_card_purchase('li-a-0033b', c, '2026-09-20', 1000, 1, 'Troca de data');
+  res := public.add_card_purchase('li-a-0033', c, '2026-11-04', 5000, 1, 'Depois do pagamento');
+  assert res #>> '{entry,invoice_month}' = '2026-12-01' and pg_temp.ivs(c) = '2026-10:1000 2026-11:30000 2026-12:15000', 'a compra vai para dezembro, junto do saldo';
+  -- Parcela adiante em fatura paga: 2 vezes a partir de setembro seriam outubro (fechada, não paga) e novembro (paga em parte).
+  perform pg_temp.expect_code(pg_temp.ap('li-a-0033a', c, '2026-09-20', 2000, 2, 'Em duas vezes'), 'fatura_paga', 'PT409');
+  assert not exists (select 1 from public.record_operations where idempotency_key = 'li-a-0033a')
+     and pg_temp.ivs(c) = '2026-10:1000 2026-11:30000 2026-12:15000', 'a recusa não grava';
+  -- Mudar a data para o ciclo de novembro (paga em parte) é recusado; para o de outubro (fechada, não paga), aceito.
+  res := public.add_card_purchase('li-a-0033b', c, '2026-11-04', 1000, 1, 'Troca de data');
   p := (res #>> '{entry,id}')::uuid;
-  assert res #>> '{entry,invoice_month}' = '2026-10-01', 'compra de setembro: fatura de outubro (fechada, não paga)';
-  res := public.update_card_entry('li-a-0033c', p, 1, 'compra', 1000, '2026-10-06', 'Troca de data', null, 1);
-  assert res #>> '{entry,invoice_month}' = '2026-12-01' and pg_temp.ivs(c) = '2026-11:30000 2026-12:16000',
-    'data no ciclo aberto de novembro (paga em parte): a compra vai para dezembro';
+  assert res #>> '{entry,invoice_month}' = '2026-12-01', 'compra de 04/11: dezembro';
+  perform pg_temp.expect_code(pg_temp.ue('li-a-0033c', p, 1, 'compra', 1000, '2026-10-06', 'Troca de data', null, 1), 'fatura_paga', 'PT409');
+  res := public.update_card_entry('li-a-0033e', p, 1, 'compra', 1000, '2026-09-20', 'Troca de data', null, 1);
+  assert res #>> '{entry,invoice_month}' = '2026-10-01' and pg_temp.ivs(c) = '2026-10:2000 2026-11:30000 2026-12:15000',
+    'data no ciclo de outubro (fechada, não paga): a compra vai para outubro';
   perform public.delete_card_entry('li-a-0033d', p, 2);
-  assert (select sum(total_cents) from public.invoice_items where card_id = c and status in ('aberta', 'fechada')) + 20000 = 35000,
-    'o que falta pagar (150,00) mais o já pago (200,00) é o que se comprou (350,00)';
-  res := public.pay_invoice('li-a-0034', c, '2026-12-01', pg_temp.iv_ver(c, '2026-12-01'), 15000, '2026-10-07', acc);
+  assert (select sum(total_cents) from public.invoice_items where card_id = c and status in ('aberta', 'fechada')) + 20000 = 36000,
+    'o que falta pagar (160,00) mais o já pago (200,00) é o que se comprou (360,00)';
+  -- Dezembro fecha em 03/12: em 04/12 o resto pode ser pago, e os pagamentos somam as compras.
+  perform pg_temp.today('2026-12-04');
+  res := public.pay_invoice('li-a-0034', c, '2026-12-01', pg_temp.iv_ver(c, '2026-12-01'), 15000, '2026-12-04', acc);
+  res := public.pay_invoice('li-a-0035', c, '2026-10-01', pg_temp.iv_ver(c, '2026-10-01'), 1000, '2026-12-04', acc);
   assert res #>> '{invoices,0,status}' = 'paga' and (select sum(amount_cents) from public.financial_records
-          where context_id = ctx and card_id = c and deleted_at is null) = 35000, 'o resto pode ser pago; os dois pagamentos somam as compras';
+          where context_id = ctx and card_id = c and deleted_at is null) = 36000, 'o resto pode ser pago; os pagamentos somam as compras';
   perform pg_temp.check_links();
+  perform pg_temp.today('2026-10-07');
 
   -- b) Fatura antiga: compra de 20/11/2024 em 3 vezes (faturas de dez/2024 a fev/2025, todas vencidas) paga na data real.
   c := (public.create_card('li-b-0001', ctx, 'Antigo', null, 3, 10, null) #>> '{card,id}')::uuid;
@@ -2498,9 +2533,9 @@ begin
   perform pg_temp.expect_code(pg_temp.pi('li-b-0009', c, '2025-02-01', pg_temp.iv_ver(c, '2025-02-01'), 3000, null, acc), 'data_invalida', '22023');
   -- Fatura recente: a janela de 1 ano continua (07/10/2025 vale; 06/10/2025 não).
   c := (public.create_card('li-b-0020', ctx, 'Janela', null, 3, 10, null) #>> '{card,id}')::uuid;
-  perform public.add_card_purchase('li-b-0021', c, '2026-10-05', 1000, 1, 'Recente');
-  perform pg_temp.expect_code(pg_temp.pi('li-b-0022', c, '2026-11-01', pg_temp.iv_ver(c, '2026-11-01'), 1000, '2025-10-06', acc), 'data_invalida', '22023');
-  res := public.pay_invoice('li-b-0023', c, '2026-11-01', pg_temp.iv_ver(c, '2026-11-01'), 1000, '2025-10-07', acc);
+  perform public.add_card_purchase('li-b-0021', c, '2026-09-20', 1000, 1, 'Recente');   -- fatura de outubro, fechada em 03/10
+  perform pg_temp.expect_code(pg_temp.pi('li-b-0022', c, '2026-10-01', pg_temp.iv_ver(c, '2026-10-01'), 1000, '2025-10-06', acc), 'data_invalida', '22023');
+  res := public.pay_invoice('li-b-0023', c, '2026-10-01', pg_temp.iv_ver(c, '2026-10-01'), 1000, '2025-10-07', acc);
   assert res #>> '{record,occurred_on}' = '2025-10-07', 'um ano atrás exato é aceito';
   perform pg_temp.check_links();
 
@@ -2517,8 +2552,10 @@ begin
   perform public.add_card_refund('li-c-0013', c, '2026-11-01', 60000, 'Sofá devolvido');
   assert pg_temp.ivs(c) = '2026-11:-10000 2026-12:20000' and (select used_cents from public.card_items where id = c) = 20000,
     'novembro -100,00 levado a dezembro; limite usado 200,00 (e não 100,00)';
-  res := public.pay_invoice('li-c-0014', c, '2026-12-01', pg_temp.iv_ver(c, '2026-12-01'), 20000, '2026-10-07', acc);
+  perform pg_temp.today('2026-12-06');   -- dezembro fechou em 05/12
+  res := public.pay_invoice('li-c-0014', c, '2026-12-01', pg_temp.iv_ver(c, '2026-12-01'), 20000, '2026-12-06', acc);
   assert (res #>> '{card,used_cents}')::bigint = 0 and (select used_cents from public.card_items where id = c) = 0, 'fatura paga sai do limite usado';
+  perform pg_temp.today('2026-10-07');
   perform pg_temp.check_links();
   perform pg_temp.views_agree();
 

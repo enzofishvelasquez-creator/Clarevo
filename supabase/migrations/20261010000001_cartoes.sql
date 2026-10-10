@@ -33,10 +33,10 @@
 --     existe como UM saldo anterior vivo na fatura seguinte, e só nesse caso.
 -- C4. O estorno automático de uma fatura seguinte = crédito (total negativo) da anterior.
 -- C5. Fatura paga não muda: encargos e estornos novos, e lançamentos alterados ou excluídos numa fatura paga, são recusados
---     (fatura_paga). Uma COMPRA nova (ou com data nova) cuja fatura natural ainda está ABERTA e foi paga cedo não é recusada: vai
---     para a primeira fatura seguinte livre (clarevo_purchase_first_month), para que pagar a fatura aberta cedo não trave o
---     cartão. Se a fatura natural já FECHOU e está paga (ou outra parcela cai em fatura paga), a compra é recusada (fatura_paga):
---     o banco já a cobrou ali, e ela não vai para a fatura atual.
+--     (fatura_paga). Uma compra nova (ou com data nova) vai sempre para a fatura natural da data (a do período que a contém):
+--     se ela, ou alguma parcela adiante, já está paga, a compra é recusada (fatura_paga), sem desvio para outra fatura. A
+--     fatura só é paga depois que FECHA (pay_invoice recusa com fatura_aberta enquanto hoje <= fechamento), então uma fatura
+--     paga nunca é a que ainda recebe as compras de hoje.
 -- C6. Nota fiscal: o resumo SHA-256 da chave de acesso é único por contexto entre gastos e compras no cartão vivos.
 -- Ordem de travas: chave → cartão → compra (parcelas por número) → contas das faturas (por mês) → registro.
 -- A atividade (gatilho de record_operations, 0005) é a última, como em toda escrita. Pagar fatura de outra pessoa exige
@@ -744,54 +744,6 @@ as $$
                   where c.card_id = p_card_id and c.invoice_month = p_month and c.deleted_at is null and c.status = 'quitado')
 $$;
 
--- Primeira fatura, a partir de p_from, em que as p_n parcelas seguidas não cruzam nenhuma fatura paga. Pagar a fatura aberta
--- antes do fechamento é permitido; as compras que ainda cairiam nela (ou numa fatura paga adiantada) vão para a primeira
--- fatura seguinte livre, em vez de serem recusadas: o dinheiro é conservado (a compra continua inteira em faturas a pagar) e a
--- pessoa continua podendo pagar o que falta. Termina porque cada volta passa do último mês pago encontrado.
-create or replace function public.clarevo_first_free_month(p_card_id uuid, p_from date, p_n integer)
-returns date
-language plpgsql
-stable
-security definer
-set search_path = public
-as $$
-declare
-  v_m date := p_from;
-  v_paid date;
-begin
-  loop
-    select max(c.invoice_month) into v_paid from public.commitments c
-     where c.card_id = p_card_id and c.deleted_at is null and c.status = 'quitado'
-       and c.invoice_month >= v_m and c.invoice_month <= (v_m + make_interval(months => p_n - 1))::date;
-    exit when v_paid is null;
-    v_m := (v_paid + interval '1 month')::date;
-  end loop;
-  return v_m;
-end;
-$$;
-
--- Fatura da 1ª parcela de uma compra com a data p_date. Só quando a fatura natural (a do período que contém a data) ainda
--- está ABERTA (hoje <= fechamento) o desvio para a primeira fatura livre vale: ali, uma fatura paga cedo não trava o cartão.
--- Fatura natural já FECHADA devolve a própria fatura natural (se ela, ou outra parcela, estiver paga, quem chama recusa com
--- fatura_paga: o banco já cobrou aquela compra na fatura fechada, e ela não pode ser empurrada para a fatura atual).
-create or replace function public.clarevo_purchase_first_month(p_card_id uuid, p_closing_day integer, p_due_day integer,
-                                                               p_date date, p_n integer)
-returns date
-language plpgsql
-stable
-security definer
-set search_path = public
-as $$
-declare
-  v_natural date := public.invoice_month_for(p_closing_day, p_due_day, p_date);
-begin
-  if public.my_today() <= public.invoice_closing_on(p_closing_day, p_due_day, v_natural) then
-    return public.clarevo_first_free_month(p_card_id, v_natural, p_n);
-  end if;
-  return v_natural;
-end;
-$$;
-
 -- Chave da nota já anotada neste contexto (gasto ou compra no cartão vivos). A trava consultiva serializa a anotação.
 -- Detalhe: registro=<id do gasto> ou compra=<id da compra>.
 create or replace function public.clarevo_check_receipt_free(p_context_id uuid, p_key text)
@@ -883,7 +835,7 @@ select b.card_id, b.context_id, b.month, b.closing_on, b.due_on,
        b.entry_count,
        b.commitment_id, b.commitment_version,
        -- Marca "estimado" calculada na hora, com o fechamento e o dia de quem consulta: a gravada em commitments só é atualizada
-       -- por uma gravação de cartão ou por sync_series_occurrences e fica velha depois do dia do fechamento. Conta paga: falso.
+       -- por uma gravação de cartão e fica velha depois do dia do fechamento (nenhuma leitura a usa). Conta paga: falso.
        (b.commitment_status is distinct from 'quitado' and public.my_today() <= b.closing_on) as amount_is_estimate,
        case when b.commitment_status = 'aberto' then b.commitment_amount_cents else 0::bigint end as to_pay_cents,
        b.paid_record_id, b.paid_cents, b.paid_on, b.paid_account_id,
@@ -1168,8 +1120,7 @@ begin
                                           amount_is_estimate, card_id, invoice_month, card_closing_on)
           values (v_card.context_id, v_desc, v_t, (select currency from public.financial_contexts where id = v_card.context_id),
                   v_due, 'aberto', v_card.created_by, v_est, p_card_id, v_m, v_closing);
-        elsif v_c.amount_cents <> v_t or v_c.due_on <> v_due or v_c.description <> v_desc
-              or v_c.amount_is_estimate <> v_est or v_c.card_closing_on <> v_closing then
+        elsif v_c.amount_cents <> v_t or v_c.due_on <> v_due or v_c.description <> v_desc or v_c.card_closing_on <> v_closing then
           update public.commitments
              set amount_cents = v_t, due_on = v_due, description = v_desc, amount_is_estimate = v_est,
                  card_closing_on = v_closing, version = version + 1
@@ -1754,11 +1705,10 @@ $$;
 -- (fatura_paga). O banco mantém a conta de cada fatura afetada na mesma transação (clarevo_sync_card).
 -- ---------------------------------------------------------------------------
 
--- Compra no cartão: p_installments parcelas (1 a 48) a partir da fatura que contém a data da compra. Cartão arquivado
--- não recebe compra (cartao_arquivado). p_receipt_key: resumo SHA-256 da chave de acesso da nota (opcional, só na primeira
--- parcela). Fatura natural ainda ABERTA e paga cedo: a compra NÃO é recusada; ela vai para a primeira fatura seguinte em que
--- nenhuma parcela cruza fatura paga (clarevo_purchase_first_month), e a conta dessa fatura cresce. Fatura natural já FECHADA e
--- paga (ou parcela adiante em fatura paga): fatura_paga, sem desvio.
+-- Compra no cartão: p_installments parcelas (1 a 48) a partir da fatura que contém a data da compra (invoice_month_for;
+-- sempre a fatura natural). Cartão arquivado não recebe compra (cartao_arquivado). p_receipt_key: resumo SHA-256 da chave de
+-- acesso da nota (opcional, só na primeira parcela). Se a fatura da primeira parcela, ou de qualquer parcela adiante, já está
+-- paga: fatura_paga, sem gravar nada (a compra não é empurrada para outra fatura).
 -- Ordem: sessão; chave; repetição; trava (nao_encontrado, sem_permissao); cartao_arquivado; validação (valor_invalido,
 -- valor_acima_do_limite, descricao_obrigatoria, descricao_longa, categoria_invalida, parcelas_invalidas, data_invalida,
 -- data_futura); chave da nota (chave_de_nota_invalida, nota_ja_anotada); limite_de_lancamentos; fatura_paga; escrita.
@@ -1826,7 +1776,7 @@ begin
     perform public.clarevo_check_receipt_free(v_card.context_id, v_receipt);
   end if;
   perform public.clarevo_check_entry_cap(v_card.id, p_installments);
-  v_m1 := public.clarevo_purchase_first_month(v_card.id, v_card.closing_day, v_card.due_day, p_purchased_on, p_installments);
+  v_m1 := public.invoice_month_for(v_card.closing_day, v_card.due_day, p_purchased_on);
   for k in 0 .. p_installments - 1 loop
     if public.clarevo_invoice_paid(v_card.id, (v_m1 + make_interval(months => k))::date) then
       raise exception 'fatura_paga' using errcode = 'PT409';
@@ -1944,7 +1894,7 @@ begin
     v_change := p_amount_cents <> v_first.purchase_total_cents or v_n <> v_old_n or p_occurred_on <> v_first.purchased_on;
     if v_change then
       v_m1 := case when p_occurred_on = v_first.purchased_on then v_first.invoice_month
-                   else public.clarevo_purchase_first_month(v_card.id, v_card.closing_day, v_card.due_day, p_occurred_on, v_n) end;
+                   else public.invoice_month_for(v_card.closing_day, v_card.due_day, p_occurred_on) end;
       if exists (select 1 from public.card_entries x
                   where x.purchase_id = v_e.purchase_id and x.deleted_at is null
                     and public.clarevo_invoice_paid(x.card_id, x.invoice_month)) then
@@ -2221,11 +2171,13 @@ begin
 end;
 $$;
 
--- Pagar a fatura: cria UM gasto (valor e data efetivamente pagos) e quita a conta da fatura, na mesma operação. Valor de
+-- Pagar a fatura: cria UM gasto (valor e data efetivamente pagos) e quita a conta da fatura, na mesma operação. Só depois que
+-- a fatura FECHA (hoje depois do fechamento gravado na conta): fatura aberta ou futura é recusada com fatura_aberta, sem
+-- gravar nada. A data do pagamento continua livre na janela (pode ser anterior ao fechamento, para quem pagou antes). Valor de
 -- R$ 0,01 até o total da fatura; data até hoje e não antes do menor entre 1 ano atrás e o primeiro dia do período da fatura
--- (o dia seguinte ao fechamento da fatura anterior), para que uma fatura antiga possa ser paga na data real. A fatura não
--- precisa ter fechado (a pessoa pode pagar antes): as compras seguintes do ciclo vão para a primeira fatura seguinte livre
--- (clarevo_purchase_first_month) e a fatura paga não recebe lançamentos (fatura_paga em encargo e estorno). Pagamento parcial: a diferença vira o "saldo anterior" da fatura
+-- (o dia seguinte ao fechamento da fatura anterior), para que uma fatura antiga possa ser paga na data real. Como só se paga
+-- fatura fechada, as compras novas nunca caem numa fatura paga pelo ciclo atual (a fatura paga não recebe lançamentos:
+-- fatura_paga em compra, encargo e estorno). Pagamento parcial: a diferença vira o "saldo anterior" da fatura
 -- seguinte (sem juros: os encargos entram quando a pessoa informar a fatura seguinte); a fatura seguinte não pode estar
 -- paga (fatura_seguinte_paga). p_expected_version é a versão da conta da fatura (commitment_version de invoice_items).
 -- p_account_id (opcional, depois da data): a conta de saída; sem ela, a conta ativa mais antiga do contexto. O gasto:
@@ -2233,7 +2185,7 @@ $$;
 -- da fatura, no core), ligado ao cartão e ao mês da fatura.
 -- Ordem: sessão; chave; repetição; trava do cartão (nao_encontrado; sem_permissao: cartão de outra pessoa exige "editar
 -- de outras pessoas"); mes_invalido; nao_encontrado (fatura sem conta); versao_desatualizada; compromisso_quitado;
--- valor_invalido; valor_acima_da_fatura; data_invalida (nula, ou antes do menor entre 1 ano atrás e o início do período
+-- fatura_aberta (PT409); valor_invalido; valor_acima_da_fatura; data_invalida (nula, ou antes do menor entre 1 ano atrás e o início do período
 -- da fatura); data_futura; conta_invalida; fatura_seguinte_paga; escrita.
 create or replace function public.pay_invoice(
   p_idempotency_key text,
@@ -2302,6 +2254,9 @@ begin
     raise exception 'compromisso_quitado' using errcode = 'PT409';
   end if;
   v_today := public.clarevo_today(v_uid);
+  if v_today <= v_c.card_closing_on then
+    raise exception 'fatura_aberta' using errcode = 'PT409';
+  end if;
   if p_paid_cents is null or p_paid_cents < 1 then
     raise exception 'valor_invalido' using errcode = '22023';
   end if;
@@ -2977,51 +2932,6 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- Geração das contas de série (0003) mais a marca "estimado" das faturas em aberto: o dia do fechamento passa sem
--- gravação, então quem abre o app a atualiza aqui (aberta até o dia do fechamento). Contas travadas por outra gravação
--- ficam para a próxima chamada (skip locked), sem esperar nem travar em ordem diferente.
--- ---------------------------------------------------------------------------
-create or replace function public.sync_series_occurrences(p_context_id uuid)
-returns jsonb
-language plpgsql
-volatile
-security definer
-set search_path = public
-as $$
-declare
-  v_uid uuid := auth.uid();
-  v_id uuid;
-  v_r jsonb;
-  v_created int := 0;
-  v_overdue int := 0;
-  v_today date;
-begin
-  if v_uid is null then
-    raise exception 'nao_autenticado' using errcode = '42501';
-  end if;
-  if not public.context_permission(p_context_id, 'read') then
-    raise exception 'sem_permissao' using errcode = '42501';
-  end if;
-  for v_id in select id from public.commitment_series
-               where context_id = p_context_id and deleted_at is null order by id loop
-    v_r := public.clarevo_materialize_series(v_id);
-    v_created := v_created + (v_r ->> 'created')::int;
-    v_overdue := v_overdue + (v_r ->> 'created_overdue')::int;
-  end loop;
-  v_today := public.clarevo_today(v_uid);
-  with t as (
-    select c.id from public.commitments c
-     where c.context_id = p_context_id and c.card_id is not null and c.deleted_at is null and c.status = 'aberto'
-       and c.amount_is_estimate <> (v_today <= c.card_closing_on)
-     order by c.id for update skip locked)
-  update public.commitments c
-     set amount_is_estimate = (v_today <= c.card_closing_on), version = c.version + 1
-    from t where c.id = t.id;
-  return jsonb_build_object('created', v_created, 'created_overdue', v_overdue);
-end;
-$$;
-
--- ---------------------------------------------------------------------------
 -- Renda comprometida (0006) com o grupo "Faturas de cartão": as contas de fatura saem de "outras contas" e formam o grupo
 -- novo (card_cents e card_permille, no fim). Fora de "Dívidas", que continua só com financiamento e compra parcelada. O
 -- total é fixos + contas do ano + parcelamentos + outras + faturas de cartão. Mesma regra e mesma ordem de conferência.
@@ -3159,7 +3069,7 @@ select c.id, c.context_id, c.description, c.amount_cents, c.currency, c.due_on, 
        r.id as paid_record_id, r.occurred_on as paid_on, r.amount_cents as paid_amount_cents, r.account_id as paid_account_id,
        c.series_id, c.occurrence_number, c.series_override,
        -- Fatura de cartão em aberto: "estimado" até o dia do fechamento, calculado na hora (a marca gravada só é atualizada por
-       -- uma gravação de cartão ou por sync_series_occurrences e fica velha depois do fechamento). As outras contas: a gravada.
+       -- uma gravação de cartão e fica velha depois do fechamento). As outras contas: a gravada.
        case when c.card_id is not null and c.status = 'aberto' then public.my_today() <= c.card_closing_on
             else c.amount_is_estimate end as amount_is_estimate,
        s.kind as series_kind, s.nature as series_nature, s.installment_total as series_installment_total,
