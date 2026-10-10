@@ -22,6 +22,11 @@ export interface DevicePrefs {
    * já nela. Não é dado financeiro: nada vai para o servidor, e uma escolha que já não existe (cartão arquivado) é ignorada.
    */
   lastPayment: string | null;
+  /**
+   * Última conta de origem escolhida (D-043: "Saiu de", "Entrou em", "Foi para"), só para abrir os formulários já nela. Não é dado
+   * financeiro: nada vai para o servidor, e uma escolha que já não existe ou foi arquivada é ignorada (chooseAccountId).
+   */
+  lastAccount: string | null;
 }
 
 export const DEFAULT_PREFS: DevicePrefs = {
@@ -31,6 +36,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   hideOnOpen: false,
   biometricLock: false,
   lastPayment: null,
+  lastAccount: null,
 };
 
 const PREFIX = 'clarevo.aparelho.v1.';
@@ -52,6 +58,7 @@ function parse(raw: string | null | undefined): DevicePrefs {
       hideOnOpen: v.hideOnOpen === true,
       biometricLock: v.biometricLock === true,
       lastPayment: typeof v.lastPayment === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(v.lastPayment) ? v.lastPayment : null,
+      lastAccount: typeof v.lastAccount === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(v.lastAccount) ? v.lastAccount : null,
     };
   } catch {
     return DEFAULT_PREFS;

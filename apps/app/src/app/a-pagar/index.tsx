@@ -1,4 +1,5 @@
 import {
+  ACCOUNTS_TEXT,
   ERROR_TEXT,
   PAYABLES_NAV_TEXT,
   REMINDERS_SETTINGS_HREF,
@@ -13,6 +14,7 @@ import {
   payablesStep,
   quickPayAction,
   quickPayDraft,
+  selectedAccount,
   showsRemindersLink,
   toPayCaption,
   type Commitment,
@@ -29,6 +31,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
+import { AccountPicker } from '@/components/account-picker';
 import { ChoiceDialog } from '@/components/choice-dialog';
 import { useMoneyMask } from '@/components/committed-parts';
 import { AnnualGroupRow, CommitmentRow, type RowAction } from '@/components/commitment-row';
@@ -44,6 +47,7 @@ import { announceOnIOS } from '@/lib/a11y';
 import { openCommitment } from '@/lib/cards';
 import { DEVICE_FEATURES } from '@/lib/device';
 import { loadPrefs, useDevicePrefs } from '@/lib/device-prefs';
+import { useLastAccount } from '@/lib/last-account';
 import { totalChange } from '@/lib/highlight';
 import { explanationHref } from '@/lib/learn';
 import { useCommitments, usePayCommitment, usePaymentsForecast, useSeriesList, useSeriesSync, useSpace, useUpdateRecord, useView } from '@/state/data';
@@ -188,8 +192,11 @@ export default function ContasAPagarScreen() {
   const [target, setTarget] = useState<Commitment | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ tone: 'sucesso' | 'erro'; text: string } | null>(null);
-  // Mesma conta de saída que o formulário de pagamento abre escolhida; "Mudar valor ou data" permite trocar.
-  const account = personal?.accounts[0] ?? null;
+  // Mesma conta de saída que o formulário de pagamento abre escolhida (a principal ou a última usada neste aparelho); o diálogo permite
+  // trocar quando há mais de uma conta ativa, e "Mudar valor ou data" abre o formulário completo.
+  const lastAccount = useLastAccount();
+  const [quickAccount, setQuickAccount] = useState<string | null>(null);
+  const account = selectedAccount(personal?.accounts ?? [], quickAccount, lastAccount.last);
   const s = commitments.summary;
   const monthName = formatMonthBR(month);
   const isCurrent = month === currentMonth;
@@ -274,6 +281,7 @@ export default function ContasAPagarScreen() {
     setResult(null);
     try {
       const record = await payOnce(c, { accountId: account.id, ...draft });
+      lastAccount.remember(account.id);
       setTarget(null);
       // Confirmação tátil e efeito em Pago no Resumo só depois da gravação confirmada.
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -467,8 +475,11 @@ export default function ContasAPagarScreen() {
           <MoneyTxt style={[{ fontFamily: fonts.bold }, tabular]}>{QUICK_PAY_TEXT.line(targetDraft.amountCents, targetDraft.paidOn)}</MoneyTxt>
           <Txt color={colors.textSecondary}>
             Um gasto com esse valor entra em Pago de {formatMonthBR(monthOf(targetDraft.paidOn)).toLowerCase()}
-            {personal && personal.accounts.length > 1 ? `, saindo da conta ${account.name}` : ''}, e a conta sai de Ainda a pagar.
+            {personal && personal.accounts.length > 1 ? `, ${ACCOUNTS_TEXT.leavingFrom(account.name)}` : ''}, e a conta sai de Ainda a pagar.
           </Txt>
+          {personal && personal.accounts.length > 1 ? (
+            <AccountPicker accounts={personal.accounts} value={account.id} label={ACCOUNTS_TEXT.out} onChange={setQuickAccount} hideManage />
+          ) : null}
         </ChoiceDialog>
       ) : null}
     </View>

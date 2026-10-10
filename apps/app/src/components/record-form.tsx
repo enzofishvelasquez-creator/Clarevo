@@ -1,4 +1,5 @@
 import {
+  ACCOUNTS_TEXT,
   CARDS_TEXT,
   CATEGORIES,
   DEMO_EMAIL,
@@ -19,7 +20,10 @@ import {
   NO_CATEGORY_LABEL,
   RETURN_TEXT,
   canReadSefazPage,
+  accountForPaymentForms,
+  accountsForPicker,
   centsToInput,
+  chooseAccountId,
   dateOutsideNoteMonth,
   dayErrorText,
   dayInMonthDate,
@@ -78,6 +82,7 @@ import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, Platform, Pressable,
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AccountPicker } from '@/components/account-picker';
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
@@ -99,6 +104,7 @@ import { pickAndReadNotePdf, readNoteCode, type NoteReading } from '@/lib/receip
 import { receiptLinks, openOfficialUrl } from '@/lib/receipt-link';
 import { readSefazOnDevice, sefazReadAvailable } from '@/lib/sefaz-fetch';
 import {
+  useAccounts,
   useAddCardPurchase,
   useBudgetWatch,
   useCardInvoices,
@@ -140,6 +146,10 @@ interface NoteState {
   paySet: PaymentChoice;
   /** "Como você pagou?" antes de a primeira nota escolher, para "Desfazer leitura". */
   payBefore: { payWith: 'dinheiro' | 'cartao'; chosenCardId: string | null };
+  /** Conta que a forma de pagamento da nota escolheu (D-043); null quando ela não escolheu. */
+  accountSet: string | null;
+  /** A conta antes de a primeira nota escolher, para "Desfazer leitura". */
+  accountBefore: string;
 }
 
 /** Mês fechado vindo da revisão dos últimos meses (?mes=AAAA-MM). */
@@ -205,6 +215,10 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   const [cardError, setCardError] = useState<string | undefined>();
   /** A pessoa já escolheu a forma de pagamento: a escolha lembrada só vale até aí. */
   const paymentTouched = useRef(false);
+  /** A pessoa já escolheu a conta (D-043): nem a última conta usada nem a conta da nota a trocam depois disso. */
+  const accountPickedRef = useRef(false);
+  const [accountPicked, setAccountPicked] = useState(false);
+  const allAccounts = useAccounts(contextId);
   /** A pessoa mexeu em "Como você pagou?" depois de a nota escolher: uma leitura nova da página da Sefaz não troca a escolha dela. */
   const [payPicked, setPayPicked] = useState(false);
   const payPickedRef = useRef(false);
@@ -247,7 +261,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
 
   const [initial, setInitial] = useState<RecordDraft>(() =>
       mode.type === 'novo'
-        ? { accountId: personal.accounts[0]?.id ?? '', amountText: '', description: '', category: null, dateText: formatDateBR(today) }
+        ? { accountId: chooseAccountId(personal.accounts), amountText: '', description: '', category: null, dateText: formatDateBR(today) }
         : {
             accountId: mode.record.accountId,
             amountText: centsToInput(mode.record.amountCents),
@@ -285,8 +299,19 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   const registerCardRef = useRef<View>(null);
 
   useEffect(() => {
-    if (userId && cardMode) loadPrefs(userId, persistPrefs);
-  }, [userId, persistPrefs, cardMode]);
+    if (userId && (cardMode || mode.type === 'novo')) loadPrefs(userId, persistPrefs);
+  }, [userId, persistPrefs, cardMode, mode.type]);
+
+  // Conta que vem marcada (D-043): a principal ou, se ainda existir e estiver ativa, a última usada neste aparelho. Só até a pessoa
+  // escolher; a conta de um registro que se edita nunca muda sozinha.
+  const lastAccount = prefs?.lastAccount ?? null;
+  useEffect(() => {
+    if (mode.type !== 'novo' || accountPickedRef.current || noteRef.current?.accountSet) return;
+    const wanted = chooseAccountId(personal.accounts, lastAccount);
+    if (!wanted || wanted === draftRef.current.accountId) return;
+    setInitial((i) => ({ ...i, accountId: wanted }));
+    setDraft((d) => ({ ...d, accountId: wanted }));
+  }, [lastAccount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // As leituras assíncronas (página da Sefaz, memória da loja) trabalham com o preenchimento e a nota de agora.
   useEffect(() => {
@@ -334,7 +359,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || (dayMode && dayText !== initialDay) || installmentsText !== '1' || note !== null;
   const day = dayMode && dayMonth ? dayInMonthDate(dayMonth, dayText) : null;
-  const account = personal.accounts.find((a) => a.id === draft.accountId) ?? personal.accounts[0];
+  const account = (allAccounts.data ?? personal.accounts).find((a) => a.id === draft.accountId) ?? personal.accounts[0];
   const contextName = 'Pessoal';
 
   // Sair com alterações não salvas pede confirmação (voltar, gesto, botão do sistema).
@@ -512,6 +537,22 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       setChosenCardId(payBefore.chosenCardId);
     }
 
+    // Conta (D-043): dinheiro escolhe a conta do tipo dinheiro, se houver uma só; Pix e débito, a principal se for banco. Uma leitura
+    // nova substitui a escolha da nota anterior; a página da Sefaz só escolhe se a nota ainda não escolheu; nada vale depois de a
+    // pessoa escolher a conta à mão.
+    const noteAccount = scanMode && choice === 'dinheiro' ? accountForPaymentForms(personal.accounts, d.payments) : null;
+    const accountBefore = prev?.accountBefore ?? draftRef.current.accountId;
+    let accountSet: string | null = refine ? (prev?.accountSet ?? null) : null;
+    if (noteAccount && !accountPickedRef.current && (!refine || accountSet === null)) {
+      accountSet = noteAccount;
+      draftRef.current = { ...draftRef.current, accountId: noteAccount };
+      setDraft(draftRef.current);
+    } else if (!refine && prev?.accountSet && !accountPickedRef.current && draftRef.current.accountId === prev.accountSet) {
+      // A nota nova não escolhe a conta: volta ao que havia antes da nota anterior.
+      draftRef.current = { ...draftRef.current, accountId: accountBefore };
+      setDraft(draftRef.current);
+    }
+
     const sefazPossible = canReadSefazPage(d) && sefazReadAvailable();
     const state: NoteState = {
       reading: r,
@@ -525,6 +566,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       sefazMessage: null,
       paySet,
       payBefore,
+      accountSet,
+      accountBefore,
     };
     noteRef.current = state;
     setNote(state);
@@ -588,6 +631,10 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       setPayWith(n.payBefore.payWith);
       setChosenCardId(n.payBefore.chosenCardId);
     }
+    // Conta: volta ao que havia antes da nota, se a pessoa não escolheu depois de a nota escolher.
+    if (n.accountSet && !accountPickedRef.current) {
+      setDraft((cur) => (cur.accountId === n.accountSet ? { ...cur, accountId: n.accountBefore } : cur));
+    }
     setPayPicked(false);
     payPickedRef.current = false;
     setNote(null);
@@ -635,6 +682,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   /** Modo "Dia": gravação confirmada. another: "Salvar e anotar outro" (o formulário fica, limpo); senão volta à revisão. */
   const finishDay = (input: RecordInput, another: boolean) => {
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    if (userId && input.accountId) updatePrefs(userId, { lastAccount: input.accountId }, persistPrefs);
     if (fromReview) returnSession.noteAction();
     const text = RETURN_TEXT.noted(input);
     if (!another) {
@@ -663,6 +711,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       else totalChange.set({ total, month, deltaCents: saved.amountCents });
     }
     afterNoteSaved();
+    // A última conta usada vale só neste aparelho (D-043): abre o próximo formulário já nela.
+    if (userId && !cardPurchase && draftRef.current.accountId) updatePrefs(userId, { lastAccount: draftRef.current.accountId }, persistPrefs);
     if (mode.type === 'novo') {
       // Só quem tem cartão ativo tem o que lembrar: a escolha vale só neste aparelho.
       if (cardMode && userId && activeCards.length > 0) updatePrefs(userId, { lastPayment: 'dinheiro' }, persistPrefs);
@@ -978,6 +1028,31 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     setBanner(null);
   };
 
+  // Conta de origem (D-043): "Saiu de" no gasto e "Entrou em" no recebimento. Ao editar, a conta que o registro já tem entra na lista
+  // mesmo arquivada. A conta que a nota escolheu leva uma legenda, até a pessoa escolher outra.
+  const pickerAccounts = accountsForPicker(personal.accounts, allAccounts.data, mode.type === 'editar' ? mode.record.accountId : null);
+  const accountFromNote = note !== null && note.accountSet !== null && note.accountSet === draft.accountId && !accountPicked;
+  const accountPicker = (
+    <View style={{ gap: space[1] }}>
+      <AccountPicker
+        accounts={pickerAccounts}
+        value={draft.accountId}
+        label={kind === 'despesa' ? ACCOUNTS_TEXT.out : ACCOUNTS_TEXT.into}
+        error={errors.accountId}
+        onChange={(id) => {
+          accountPickedRef.current = true;
+          setAccountPicked(true);
+          set('accountId', id ?? '');
+        }}
+      />
+      {accountFromNote ? (
+        <Txt variant="caption" color={colors.textSecondary}>
+          {ACCOUNTS_TEXT.fromNote(pickerAccounts.find((a) => a.id === draft.accountId)?.name ?? '')}
+        </Txt>
+      ) : null}
+    </View>
+  );
+
   const formatAmountOnBlur = () => {
     const cents = parseBRL(draft.amountText);
     if (cents !== null && cents > 0 && cents <= MAX_RECORD_CENTS) setDraft((d) => ({ ...d, amountText: centsToInput(cents) }));
@@ -1137,6 +1212,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
                   {NOTA_PAYMENT_TEXT.fromNote(noteForm)}
                 </Txt>
               ) : null}
+              {payWith === 'dinheiro' ? accountPicker : null}
 
               {payWith === 'cartao' ? (
                 cards.isPending ? (
@@ -1268,23 +1344,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             </View>
           )}
 
-          {personal.accounts.length > 1 && !cardPurchase ? (
-            <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel="Conta">
-              <Txt variant="label" style={{ fontFamily: fonts.bold }}>
-                Conta
-              </Txt>
-              <View style={styles.chips}>
-                {personal.accounts.map((a) => (
-                  <Chip key={a.id} label={a.name} selected={draft.accountId === a.id} onPress={() => set('accountId', a.id)} />
-                ))}
-              </View>
-              {errors.accountId ? (
-                <Txt variant="label" color={colors.error}>
-                  {errors.accountId}
-                </Txt>
-              ) : null}
-            </View>
-          ) : null}
+          {!cardMode && !cardPurchase ? accountPicker : null}
 
           <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel="Categoria">
             <Txt variant="label" style={{ fontFamily: fonts.bold }}>

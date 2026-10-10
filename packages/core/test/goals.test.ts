@@ -164,6 +164,7 @@ const mov = (kind: GoalMovementKind, amountCents: number, occurredOn: string, go
     amountCents,
     occurredOn,
     note: null,
+    accountId: null,
     createdBy: 'p',
     version: 1,
     createdAt: `2026-10-0${(mseq % 9) + 1}T00:00:00.000Z`,

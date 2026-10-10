@@ -456,7 +456,7 @@ Recalculei em Python todos os exemplos abaixo, e eles batem com a `spec3` §3.11
 
 ## 4. O que já existe, o que está desenhado e o que falta
 
-Situação em 10/10/2026, depois dos Ciclos A6 (D-035), A4 (D-030), A5 (D-031 e D-032), A2 (D-025), B (D-026), C (D-027 e D-036), D (D-028) e E (D-037 e D-038).
+Situação em 10/10/2026, depois dos Ciclos A6 (D-035), A4 (D-030), A5 (D-031 e D-032), A2 (D-025), B (D-026), C (D-027 e D-036), D (D-028) E (D-037 e D-038) e G1 (D-043).
 
 | Função | Situação | Onde fica ou ficaria |
 |---|---|---|
@@ -481,6 +481,7 @@ Situação em 10/10/2026, depois dos Ciclos A6 (D-035), A4 (D-030), A5 (D-031 e 
 | Ocultar valores e biometria | Existe (D-025). Falta: o teste em aparelho (`docs/04`) | Conta; olho no cabeçalho das abas quando couber |
 | Assinaturas, plano para sair das dívidas, revisão do mês, exportar dados, aviso de valor fora do habitual, "Parece um gasto fixo" | Falta (só sugestão em `spec2` §7) | Seção 5 |
 | Notas fiscais (E) | Existe (D-038): "Escanear nota fiscal" em Anotar gasto, com câmera (QR da NFC-e e código de barras da NF-e), PDF do DANFE e "Colar o link ou a chave"; no RJ, a página da Sefaz-RJ preenche loja, valor, data e forma de pagamento no celular, e a linha "Nota lida" mostra loja, valor, data e forma (D-042; "Como você pagou?" já vem escolhido, sem a forma, nenhuma escolha). Na web, a dica "No celular, o Clarevo lê o valor e a data na página da Sefaz." Só o resumo SHA-256 da chave é guardado, nunca CPF. Sem parecer jurídico (D-034(5)). Falta: o aceite com notas reais (P-025), o teste em aparelho, compartilhar o PDF de outro app e a cobertura de outros estados (`docs/04`) | Primeiro item de Anotar gasto novo |
+| Contas de origem do dinheiro (G1) | Existe (D-043): "Suas contas" em Conta e o seletor "Saiu de" / "Entrou em" / "Foi para" em gasto, recebimento, pagamento de conta, pagamento de fatura e aporte e resgate de meta; só a origem informada, sem saldo por conta (P-018). Falta: o teste em aparelho (`docs/04`) | Conta › "Suas contas"; formulários; filtro em Movimentos |
 | Cartões de crédito e faturas (E) | Existe (D-037): cartões, compra parcelada no cartão, fatura como conta a pagar, pagamento total ou parcial com saldo anterior, encargos e estornos, "Por categoria" e grupo "Faturas de cartão" na renda comprometida; desde D-042, o card "Faturas de outubro" no topo de `/cartoes`, com a soma das faturas do mês, quanto isso é da renda de referência e as próximas faturas. Falta: o teste em aparelho e a interface na Família (`docs/04`) | Movimentos › "Organizar" › Cartões; "Como você pagou?" em Anotar gasto; `/cartoes` |
 | Família, integração bancária, IA, crédito, painel de empresas | Fora do ciclo atual; a Família sem vínculo ganhou só o link "Enquanto isso, dividir as contas da casa" (fora do Resumo, A6) | Ciclos seguintes de `docs/04`, ou nunca (crédito) |
 
@@ -588,6 +589,13 @@ Ordem pelo valor para a pessoa e para a empresa que oferece o benefício. Valor:
     - [E] Um trabalho da UFGD mostra que os apps que leem a nota quase só usam a data e o total.
     - Depende de: parecer jurídico e câmera.
     - Riscos: as páginas das Secretarias da Fazenda mudam e variam por estado; não guardar o CPF.
+
+16. **Contas de origem do dinheiro** (pedido de Enzo em 10/10/2026: "Pedir pro Claude adicionar a origem do dinheiro nos pagamentos e nos aportes, informando a origem da conta"; resposta: "Contas cadastradas").
+    - A pessoa cadastra de onde sai o dinheiro (a conta do banco, a carteira) e escolhe uma em cada gasto, recebimento, pagamento de conta, pagamento de fatura e aporte ou resgate de meta; a primeira vem marcada.
+    - Valor: pessoa A, empresa B. Esforço: M (banco, core, repositórios e telas em formulários que já existiam).
+    - Depende de: cartões (E), metas (C) e nota fiscal (D-042), para a conta que a forma de pagamento indica.
+    - Riscos: virar saldo. É só a origem informada, sem saldo por conta, sem transferência e sem número de conta, agência ou cartão; saldo e transferências ficam em P-018. Nenhum nome de banco ou produto aparece nos textos.
+    - Situação: feito em 10/10/2026 (D-043, Ciclo G1, migração 0010), com a proposta do Claude ainda revisável por Enzo. "Suas contas" em Conta (nome, tipo, "Principal"; adicionar, editar, tornar principal, arquivar, reativar e excluir sem lançamentos), o seletor "Saiu de", "Entrou em" e "Foi para" nos formulários (com uma conta só, o texto "Saiu de: Conta principal"), a última conta usada só no aparelho, a conta nas linhas e no detalhe de Movimentações e o filtro por conta com duas ou mais contas ativas. A demonstração tem "Conta principal" e "Carteira"; conta nova só tem a "Conta principal". Em aberto: o teste com pessoas reais sobre o tamanho da lista (10 contas ativas é um palpite) e a pergunta de P-018.
 
 **Para a empresa que oferece o benefício** [O]:
 

@@ -25,6 +25,10 @@ import { newOperationKey } from './repository';
  * em 10 vezes) e Restaurante (R$ 200,00 à vista). A primeira fatura vence em novembro de 2026 (R$ 550,00); compras no cartão
  * não entram em Pago. Limite usado: R$ 2.300,00 de R$ 5.000,00. Os totais de outubro (6.000 / 3.900 / 2.100 / 650) e a
  * renda comprometida de outubro (52,5%) não mudam; novembro passa a incluir a fatura (73,0%).
+ * Contas de origem (D-043): "Conta principal" (banco, a principal) e "Carteira" (dinheiro). Os dois gastos de Mercado (R$ 1.250,00 em
+ * 12/09 e R$ 1.400,00 em 06/10) saíram da Carteira e o aporte de R$ 500,00 na reserva (06/10) saiu da Conta principal; o resto sai da
+ * Conta principal. A conta só informa a origem: os totais de outubro (6.000 / 3.900 / 2.100 / 650) e a renda comprometida (52,5%)
+ * não mudam. O cenário 'retorno' (montagem de maio) tem só a Conta principal. Conta nova: só a "Conta principal".
  * Orçamento por categoria (D-041), a partir de outubro de 2026: Moradia R$ 2.500,00, Mercado R$ 1.800,00 e Lazer R$ 300,00.
  * Usado em outubro (competência): Moradia R$ 2.500,00 (o aluguel pago), Mercado R$ 1.400,00 e Lazer R$ 400,00 (a 1ª parcela do
  * tênis, R$ 200,00, e o restaurante, R$ 200,00; a compra no cartão conta no mês da compra). Limite pessoal de 60% a partir de
@@ -61,14 +65,22 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   const space = await repo.ensurePersonalSpace('Conta principal');
   const ctx = space.personalContextId;
   const accountId = space.accounts[0]!.id;
-  const add = (kind: 'receita' | 'despesa', description: string, reais: number, occurredOn: string, category: string | null) =>
-    repo.createRecord(newOperationKey(), ctx, kind, { accountId, amountCents: reais * 100, occurredOn, description, category });
+  // Contas de origem (D-043): a Carteira é dinheiro; o mercado é pago nela.
+  const carteira = await repo.createAccount(newOperationKey(), ctx, { name: 'Carteira', kind: 'dinheiro' });
+  const add = (
+    kind: 'receita' | 'despesa',
+    description: string,
+    reais: number,
+    occurredOn: string,
+    category: string | null,
+    from: string = accountId,
+  ) => repo.createRecord(newOperationKey(), ctx, kind, { accountId: from, amountCents: reais * 100, occurredOn, description, category });
 
   await add('receita', 'Salário', 6000, '2026-09-01', 'Salário');
   await add('despesa', 'Aluguel', 2500, '2026-09-05', 'Moradia');
-  await add('despesa', 'Mercado', 1250, '2026-09-12', 'Mercado');
+  await add('despesa', 'Mercado', 1250, '2026-09-12', 'Mercado', carteira.id);
   await add('receita', 'Salário', 6000, '2026-10-01', 'Salário');
-  await add('despesa', 'Mercado', 1400, '2026-10-06', 'Mercado');
+  await add('despesa', 'Mercado', 1400, '2026-10-06', 'Mercado', carteira.id);
 
   // Gastos fixos e contas a pagar passam pelas mesmas regras do cadastro (sem semente direta).
   const fixed = (description: string, reais: number, dueDay: number, firstDueMonth: string, amountMode: 'fixo' | 'variavel', category: string) =>
@@ -158,7 +170,12 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
     initialCents: 300_000,
     initialOn: '2026-10-01',
   });
-  await repo.addGoalMovement(newOperationKey(), reserva.goal.id, 'aporte', { amountCents: 50_000, occurredOn: '2026-10-06', note: null });
+  await repo.addGoalMovement(newOperationKey(), reserva.goal.id, 'aporte', {
+    amountCents: 50_000,
+    occurredOn: '2026-10-06',
+    note: null,
+    accountId,
+  });
   await repo.createGoal(newOperationKey(), ctx, {
     goalType: 'objetivo',
     name: 'Viagem de férias',

@@ -1,6 +1,6 @@
 # Arquitetura
 
-10/10/2026 · versão 0.12 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos, calculadoras, seus últimos meses, Aprender e dúvidas, lembretes, ocultar valores e biometria, renda comprometida, metas e reserva, plano de guardar, simulador, cartões e faturas, leitura de notas fiscais, plano para quitar dívidas, "Antes de financiar" (D-044) e os ajustes de D-042: forma de pagamento da nota, faturas do mês nos cartões e contas do ano explicadas)
+10/10/2026 · versão 0.13 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos, calculadoras, seus últimos meses, Aprender e dúvidas, lembretes, ocultar valores e biometria, renda comprometida, metas e reserva, plano de guardar, simulador, cartões e faturas, leitura de notas fiscais, plano para quitar dívidas, "Antes de financiar" (D-044) os ajustes de D-042: forma de pagamento da nota, faturas do mês nos cartões e contas do ano explicadas, e as contas de origem do dinheiro, D-043)
 
 ## Escolhas (aprovadas)
 
@@ -26,6 +26,7 @@ apps/app/src/
     gastos-fixos, gastos-fixos/novo, gastos-fixos/[id], gastos-fixos/[id]/editar, gastos-fixos/[id]/encerrar,
     gastos-fixos/[id]/informar
     composicao, quem-ve, conta, explicacao/[tema]
+    contas/nova, contas/[id]/editar  contas de origem do dinheiro (D-043); a lista é o card "Suas contas" em /conta?secao=contas
     calcular, calcular/[slug]  calculadoras (nada é gravado); /calcular/plano-dividas é a 9ª (D-040) e /calcular/antes-de-financiar, a 10ª e a primeira da lista (D-044)
     retomar, retomar/atualizar, retomar/pagar  seus últimos meses (revisão depois de ausência)
     renda-comprometida, renda-comprometida/referencia  renda comprometida e renda de referência
@@ -44,10 +45,11 @@ apps/app/src/
     card-form, card-parts, card-purchase-form, invoice-*  cartão, fatura, pagamento, encargo, estorno e edição da compra
     receipt-scan, receipt-block  "Escanear nota fiscal": linha, folha, câmera, colar e o bloco "Nota lida"
     device-features, device-settings, setting-switch  lembretes, ocultar valores e biometria (Conta e layout)
+    account-picker, account-form, accounts-card  "Saiu de" / "Entrou em" / "Foi para" (chips, ou texto com uma conta só), formulário da conta e card "Suas contas" (D-043)
     tab-bar             barra das abas e barra das telas de consulta (D-039)
   lib/                  autenticação (Supabase e demonstração), learn.ts (links e ações de Aprender), situação do card Primeiros passos (só no aparelho),
                         reminders.ts, device.ts e device-prefs.ts (lembretes e preferências só do aparelho), privacy.ts (ocultar valores), essentials.ts,
-                        bar-inset.ts (altura da barra inferior das telas de consulta), cards.ts (rotas e leituras de cartão), pdf-text.ts, receipt-read.ts, receipt-link.ts, sefaz-fetch.ts e note-prefs.ts (leitura de notas no aparelho)
+                        bar-inset.ts (altura da barra inferior das telas de consulta), last-account.ts (última conta usada, só no aparelho), cards.ts (rotas e leituras de cartão), pdf-text.ts, receipt-read.ts, receipt-link.ts, sefaz-fetch.ts e note-prefs.ts (leitura de notas no aparelho)
   state/                sessão, dados (consultas e gravações), contexto e mês
   theme/                tokens de cor, tipografia, movimento e vetores do logo
 packages/core/          regras financeiras, validação, repositório em memória, testes
@@ -63,13 +65,15 @@ packages/core/          regras financeiras, validação, repositório em memóri
   src/nota-pagamento.ts forma de pagamento da nota (D-042): tabela da Sefaz, bloco do DANFE e `tPag`, pré-seleção de "Como você pagou?" e textos
   src/cards-month.ts   faturas do mês nos cartões e quanto isso é da renda de referência (D-042), igual ao grupo "Faturas de cartão" da renda comprometida
   src/annual-help.ts   textos e exemplos calculados que explicam as contas do ano (D-042)
+  src/accounts.ts      contas de origem do dinheiro (D-043): tipos, validação do formulário, escolha da conta que vem marcada, filtro por conta, conta da nota fiscal e textos
   src/calculators/      as 10 calculadoras, campos, textos e links de contexto; plano-dividas.ts (D-040): conta mês a mês das duas ordens de quitar dívidas e a leitura dos parcelamentos (`seriesDebtDrafts`); antes-de-financiar.ts (D-044): parcela Price (com a primeira em 1 mês ou na compra), juros, peso na renda, juntar antes (sobre `monthsForTarget` de `simulate.ts`) e entrada maior
   src/navigation.ts     navegação (D-039): modo da barra inferior por endereço, mês de abertura e seletor de Contas a pagar, linha de lembretes e o índice "No app" da busca de Aprender
 supabase/
   migrations/           esquema, funções e permissões (0001 fundação, 0002 contas a pagar, 0003 gastos fixos, 0004 contas do ano, 0005 seus últimos meses,
-                        0006 renda comprometida, 0007 metas e plano de guardar, 0008 cartões e chave da nota fiscal)
+                        0006 renda comprometida, 0007 metas e plano de guardar, 0008 cartões e chave da nota fiscal, 0009 orçamento e limite,
+                        0010 contas de origem do dinheiro)
   tests/                testes de isolamento, da sequência de aceite, de contas a pagar, de gastos fixos, de contas do ano, da revisão dos últimos meses,
-                        da renda comprometida (50), das metas (60), do plano de guardar (65) e dos cartões (70)
+                        da renda comprometida (50), das metas (60), do plano de guardar (65), dos cartões (70), do orçamento (80) e das contas de origem (85)
 scripts/e2e-web.js      roteiro de verificação na versão web
 docs/                   decisões, regras, acessos, Supabase, roteiro, Aprender, marca, telas
 ```
@@ -189,6 +193,15 @@ pessoa ──< vínculo (permissões por ação) >── contexto (pessoal | fam
 - **`month_budget(contexto, mês)`** repete no banco `readMonthBudget`: sempre as seis categorias, com a linha vigente (`budget_id`, `budget_version`, `budget_from`, `budget_cents`, nulos sem linha, e `budget_cents` nulo na linha que encerra) e `used_cents` por competência (gastos sem pagamento de fatura, parcelas de compras pelo mês da data da compra mais k - 1 meses e estornos informados no mês da fatura, nunca abaixo de zero). É `security definer` com filtros explícitos (contexto, exclusão, leitura), como `month_committed`, e confere `mes_invalido` antes de `sem_permissao`. O teste de banco e o de API comparam com o core mês a mês.
 - **Leitura e operações:** RLS de leitura das duas tabelas por permissão de leitura do contexto; sem escrita direta. `record_operations` passou a 41 ações (as quatro novas apontam a linha em `target_id`) e conta tudo como anotação para a atividade do A4.
 - **No core e no app:** `budget.ts` (tipos, `categoryUsage`, `readMonthBudget`, `summarizeBudget`, `budgetCrossing`, `limitStatus`, `limitCrossing`, validação dos formulários e todos os textos); o `MemoryRepository` repete as quatro funções e a leitura, o `SupabaseRepository` tem `listCategoryBudgets`, `setCategoryBudget`, `deleteCategoryBudget`, `getMonthBudget`, `listCommitmentLimits`, `setCommitmentLimit` e `deleteCommitmentLimit`. Telas: `/orcamento` (consulta, com a barra), `/orcamento/[categoria]` e `/renda-comprometida/limite` (formulários, sem barra). O aviso de cruzamento lê o estado antes e depois de gravar (`useBudgetWatch` e `useLimitWatch` em `state/data.ts`) e nunca bloqueia o salvamento: se a leitura falha, a mensagem sai sem a linha extra.
+
+**Contas de origem do dinheiro** (migração `20261010000003_contas.sql`, 0010, D-043) dizem de onde sai o dinheiro de um gasto, de um pagamento ou de um aporte. É só a origem informada: não existe saldo por conta, e nada disso entra em Recebido, Pago, Diferença, "Ainda a pagar" nem na renda comprometida.
+
+- **Tabela:** `financial_accounts` (que já existia) ganhou `kind` (`banco`, `dinheiro` ou `outra`, padrão `banco`), `is_default`, `version`, `updated_at`, `deleted_at` e `deleted_by`, mais `unique (id, context_id)` (para a chave composta de `goal_movements`). Dois índices únicos parciais (`financial_accounts_one_default`: uma principal por contexto; `financial_accounts_name_live`: nome sem repetição entre as contas vivas, sem diferenciar maiúsculas) e a restrição `financial_accounts_principal` (a principal é ativa e não excluída). A migração marca a conta mais antiga de cada contexto como principal e as demais como banco, sem mudar lançamentos.
+- **Gatilhos:** `financial_accounts_default` (antes de inserir: a primeira conta ativa do contexto vira a principal) e `financial_accounts_guard` (nome, tipo, principal, situação e exclusão só mudam pelas funções; qualquer alteração soma 1 à versão, o que mantém funcionando a troca de nome direta do app publicado, que fica com o `grant update (name)` até a publicação deste ciclo). As regras de leitura e de troca de nome passaram a exigir `deleted_at is null`.
+- **Funções:** `create_account(chave, contexto, nome, tipo)`, `update_account(chave, id, versão, nome, tipo)`, `set_default_account(chave, id, versão)`, `set_account_status(chave, id, versão, situação, nova_principal)` e `delete_account(chave, id, versão)`, com chave de idempotência por pessoa (trava de consultas por pessoa, repetição devolve o estado atual), hash em JSON, `chave_reutilizada`, `versao_desatualizada` com `versao_atual=N`, exclusão lógica e `security definer`. Uma trava de consultas por contexto (`contas:<contexto>`) serializa as cinco, para o limite de 10 contas ativas, a principal única e o nome sem repetição valerem mesmo com duas pessoas gravando juntas. Arquivar a principal exige `p_new_default_id` (outra conta ativa) no mesmo pedido; nunca se arquiva a última ativa; excluir só sem lançamentos (registros, pagamentos de conta, faturas pagas e movimentos de meta), senão `conta_com_lancamentos`.
+- **Onde a conta entra:** `financial_records.account_id` e as funções de pagamento (`pay_commitment`, `pay_invoice`) já existiam e agora recusam conta arquivada ou de outro contexto (`conta_invalida`); `create_record` e `update_record` também (a edição pode manter a conta que o registro já tem, mesmo arquivada: `clarevo_validate_record` ganhou o parâmetro `p_keep_account`, e `update_record` foi recriada). `goal_movements.account_id` é opcional, com chave composta `(account_id, context_id)` e restrição que só a aceita em aporte e resgate; `add_goal_movement` e `update_goal_movement` ganharam `p_account_id` (as assinaturas antigas foram trocadas; sem conta, o hash do pedido é o de antes; em `update_goal_movement` o padrão é manter a conta, o `null` informado a tira). `pay_commitment` (conta nula = principal), `pay_invoice` (sem conta, a principal) e `ensure_personal_space` (devolve a principal) foram recriadas, e `clarevo_validate_record` virou volátil e trava a conta com `for share`, como `add_goal_movement`, `update_goal_movement` e `pay_invoice`, para uma exclusão ou arquivamento simultâneo esperar e recusar.
+- **Leitura e operações:** sem visão nova. `getSpace` lê as contas ativas (a principal primeiro) e `listAccounts`, todas as não excluídas. `record_operations` passou a 46 ações (as cinco novas, `criar_conta`, `alterar_conta`, `conta_principal`, `situacao_conta` e `excluir_conta`, apontam a conta em `target_id`) e conta tudo como anotação para a atividade do A4.
+- **No core e no app:** `accounts.ts` (tipos, limites, `validateAccountDraft`, `chooseAccountId`, `selectedAccount`, `accountsForPicker`, `accountForPaymentForms`, `pickerShowsChips`, `recordAccountName`, `accountFilterOptions` e todos os textos, em `ACCOUNTS_TEXT`); o `MemoryRepository` repete as cinco funções, a validação das contas nos registros, nos pagamentos e nos movimentos e a ordem das conferências; o `SupabaseRepository` tem `listAccounts`, `createAccount`, `updateAccount`, `setDefaultAccount`, `setAccountStatus`, `deleteAccount` e `findAccountOperation` (a conferência de uma gravação sem resposta). `PersonalSpace.accounts` traz só as ativas. Nas telas, `AccountPicker` é o seletor de todos os formulários (com uma conta só, vira o texto "Saiu de: Conta principal"), `useLastAccount` guarda no aparelho a última conta usada (só vale se ainda estiver ativa) e as gravações das contas usam uma chave de idempotência por formulário, como as demais.
 
 **Leitura de notas fiscais** (D-038) roda no aparelho e grava só o resumo SHA-256 da chave de acesso, no mesmo campo `receipt_key` da migração 0008.
 

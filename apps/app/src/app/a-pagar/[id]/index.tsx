@@ -1,8 +1,10 @@
 import {
+  ACCOUNTS_TEXT,
   CALC_UI_TEXT,
   COMMITMENT_ERROR_TEXT,
   ERROR_TEXT,
   NO_CATEGORY_LABEL,
+  accountDisplayName,
   addMonths,
   affectedByYear,
   annualYearLabelOf,
@@ -51,6 +53,7 @@ import { flash } from '@/lib/flash';
 import { openSummary } from '@/lib/nav';
 import { totalChange } from '@/lib/highlight';
 import {
+  useAccounts,
   useCommitment,
   useCommitments,
   useDeleteCommitment,
@@ -97,6 +100,7 @@ export default function DetalheContaAPagar() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const commitment = useCommitment(id);
   const personal = useSpace().data;
+  const allAccounts = useAccounts(personal?.personalContextId);
   const view = useView();
   const { user, today } = useSession();
   const remove = useDeleteCommitment();
@@ -435,7 +439,7 @@ export default function DetalheContaAPagar() {
                     <>
                       <Row label="Valor previsto" value={formatBRL(c.amountCents)} />
                       <Row label="Data do pagamento" value={formatDateBR(paid.paidOn)} />
-                      <Row label="Conta" value={personal?.accounts.find((a) => a.id === paid.accountId)?.name ?? 'Conta não encontrada'} />
+                      <Row label={ACCOUNTS_TEXT.out} value={accountDisplayName(allAccounts.data ?? personal?.accounts ?? [], paid.accountId)} />
                     </>
                   ) : null}
                   <Row label="Resumo afetado" value={affected} last />

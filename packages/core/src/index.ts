@@ -29,3 +29,4 @@ export * from './nota-pagamento';
 export * from './nota-flow';
 export * from './navigation';
 export * from './budget';
+export * from './accounts';

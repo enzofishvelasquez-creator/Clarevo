@@ -1,4 +1,5 @@
 import {
+  ACCOUNTS_TEXT,
   CATEGORIES,
   COMMITMENT_ERROR_TEXT,
   MAX_RECORD_CENTS,
@@ -8,6 +9,7 @@ import {
   addDays,
   annualYearLabelOf,
   centsToInput,
+  chooseAccountId,
   fieldForErrorCode,
   formatBRL,
   formatDateBR,
@@ -38,6 +40,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View, type TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AccountPicker } from '@/components/account-picker';
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
@@ -48,6 +51,7 @@ import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '
 import { flash } from '@/lib/flash';
 import { explanationHref } from '@/lib/learn';
 import { totalChange } from '@/lib/highlight';
+import { useLastAccount } from '@/lib/last-account';
 import {
   useBudgetWatch,
   usePayCommitment,
@@ -79,6 +83,7 @@ const paymentText = (code: string) =>
  */
 export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { commitment: Commitment; space: PersonalSpace; paidOnDue?: boolean }) {
   const { today } = useSession();
+  const lastAccount = useLastAccount();
   const repo = useRepo();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -98,7 +103,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
 
   const initial = useMemo<PaymentDraft>(
     () => ({
-      accountId: personal.accounts[0]?.id ?? '',
+      accountId: chooseAccountId(personal.accounts, lastAccount.last),
       amountText: c.amountIsEstimate ? '' : centsToInput(c.amountCents),
       dateText: formatDateBR(paidOnDue && c.dueOn <= today ? c.dueOn : today),
       category: c.category,
@@ -188,6 +193,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
     // Confirmação tátil e efeito em Pago só depois da gravação confirmada.
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (saved) totalChange.set({ total: 'pago', month: monthOf(saved.occurredOn), deltaCents: saved.amountCents });
+    lastAccount.remember(draft.accountId);
     flash.set(text);
     leave(goBack);
   };
@@ -511,27 +517,13 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
             </View>
           </View>
 
-          {personal.accounts.length > 1 ? (
-            <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel="Conta">
-              <Txt variant="label" style={{ fontFamily: fonts.bold }}>
-                Conta
-              </Txt>
-              <View style={styles.chips}>
-                {personal.accounts.map((a) => (
-                  <Chip key={a.id} label={a.name} selected={draft.accountId === a.id} onPress={() => set('accountId', a.id)} />
-                ))}
-              </View>
-              {errors.accountId ? (
-                <Txt variant="label" color={colors.error}>
-                  {errors.accountId}
-                </Txt>
-              ) : null}
-            </View>
-          ) : errors.accountId ? (
-            <Txt variant="label" color={colors.error}>
-              {errors.accountId}
-            </Txt>
-          ) : null}
+          <AccountPicker
+            accounts={personal.accounts}
+            value={draft.accountId}
+            label={ACCOUNTS_TEXT.out}
+            error={errors.accountId}
+            onChange={(id) => set('accountId', id ?? '')}
+          />
 
           <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel="Categoria">
             <Txt variant="label" style={{ fontFamily: fonts.bold }}>

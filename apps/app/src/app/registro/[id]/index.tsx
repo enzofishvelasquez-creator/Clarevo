@@ -5,6 +5,8 @@ import {
   NOTA_FLOW_TEXT,
   NOTA_TEXT,
   NO_CATEGORY_LABEL,
+  ACCOUNTS_TEXT,
+  accountDisplayName,
   addMonths,
   deviceTimeZone,
   firstMonthBounds,
@@ -34,7 +36,7 @@ import { totalChange } from '@/lib/highlight';
 import { invoiceHref } from '@/lib/cards';
 import { openOfficialUrl, receiptLinks } from '@/lib/receipt-link';
 import { openSummary } from '@/lib/nav';
-import { useDeleteRecord, useRecord, useSpace, useView } from '@/state/data';
+import { useAccounts, useDeleteRecord, useRecord, useSpace, useView } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -76,7 +78,10 @@ export default function DetalheRegistro() {
   const toList = () => (router.canGoBack() ? router.back() : router.replace('/movimentacoes'));
 
   const r = record.data;
-  const account = personal?.accounts.find((a) => a.id === r?.accountId);
+  // Conta de origem (D-043): também a arquivada de um registro antigo ("Carteira (arquivada)").
+  const accounts = useAccounts(r?.contextId);
+  const accountList = accounts.data ?? personal?.accounts ?? [];
+  const accountName = accountDisplayName(accountList, r?.accountId);
 
   const doDelete = async () => {
     if (!r) return;
@@ -142,7 +147,10 @@ export default function DetalheRegistro() {
                 <FitMoney cents={r.amountCents} />
                 <View>
                   <Row label="Contexto" value="Pessoal" />
-                  <Row label="Conta" value={account?.name ?? 'Conta não encontrada'} />
+                  <Row
+                    label={r.kind === 'despesa' ? ACCOUNTS_TEXT.out : ACCOUNTS_TEXT.into}
+                    value={accountName}
+                  />
                   <Row label="Data" value={formatDateBR(r.occurredOn)} />
                   <Row label="Categoria" value={r.category ?? NO_CATEGORY_LABEL} />
                   {r.invoice ? <Row label="Origem" value={CARDS_TEXT.paymentOrigin} /> : r.commitmentId ? <Row label="Origem" value="Conta a pagar" /> : null}

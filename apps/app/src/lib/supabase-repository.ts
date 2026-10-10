@@ -1,4 +1,6 @@
 import {
+  ACCOUNT_KINDS,
+  ACCOUNT_NAME_MAX,
   BUDGET_CATEGORIES,
   BUDGET_MAX_CENTS,
   BUDGET_MIN_CENTS,
@@ -12,9 +14,14 @@ import {
   RepoError,
   SAVINGS_ANSWERS,
   SAVINGS_MIN_MONTHLY_CENTS,
+  activeAccounts,
   addMonths,
   monthRange,
   receiptKeyValid,
+  type AccountAction,
+  type AccountInput,
+  type AccountKind,
+  type AccountStatus,
   type AffectedRef,
   type AmountMode,
   type Card,
@@ -38,6 +45,7 @@ import {
   type CommitmentSeries,
   type CommitmentWrite,
   type ContextActivity,
+  type FinancialAccount,
   type FinancialRecord,
   type Goal,
   type GoalAction,
@@ -56,7 +64,7 @@ import {
   type MonthOverview,
   type NewGoalInput,
   type OccurrenceMode,
-  type PaymentInput,
+  type PaymentRequest,
   type PersonalSpace,
   type RecordInput,
   type RecordKind,
@@ -80,6 +88,23 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 // ---------------------------------------------------------------------------
 // Repositório: leitura filtrada pelo banco (RLS), escrita só por funções com idempotência e versão.
 // ---------------------------------------------------------------------------
+
+/** Linha de financial_accounts (e retorno jsonb das cinco funções de contas). */
+interface AccountRow {
+  id: string;
+  context_id: string;
+  name: string;
+  currency: string;
+  status: AccountStatus;
+  initial_balance_cents: number | null;
+  kind: AccountKind;
+  is_default: boolean;
+  version: number;
+}
+
+const ACCOUNT_COLUMNS = 'id, context_id, name, currency, status, initial_balance_cents, kind, is_default, version';
+/** Ações de contas: a conta em target_id. */
+const ACCOUNT_ACTIONS: AccountAction[] = ['criar_conta', 'alterar_conta', 'conta_principal', 'situacao_conta', 'excluir_conta'];
 
 interface RecordRow {
   id: string;
@@ -300,6 +325,8 @@ interface GoalMovementRow {
   amount_cents: number;
   occurred_on: string;
   note: string | null;
+  /** Origem do aporte ou destino do resgate (D-043); nulo nos outros tipos. */
+  account_id: string | null;
   created_by: string;
   version: number;
   created_at: string;
@@ -406,7 +433,7 @@ interface CardResult {
 const CATEGORY_BUDGET_COLUMNS = 'id, context_id, category, from_month, amount_cents, created_by, version, created_at, updated_at';
 const COMMITMENT_LIMIT_COLUMNS = 'id, context_id, from_month, percent, created_by, version, created_at, updated_at';
 const INCOME_REFERENCE_COLUMNS = 'id, context_id, from_month, amount_cents, varies, created_by, version, created_at, updated_at, amount_changed_at';
-const GOAL_MOVEMENT_COLUMNS = 'id, goal_id, context_id, kind, amount_cents, occurred_on, note, created_by, version, created_at, updated_at';
+const GOAL_MOVEMENT_COLUMNS = 'id, goal_id, context_id, kind, amount_cents, occurred_on, note, account_id, created_by, version, created_at, updated_at';
 const SAVINGS_CHECK_COLUMNS = 'context_id, answer, monthly_cents, answered_on, ask_again_on, version, created_at, updated_at';
 
 const RECORD_ACTIONS = ['criar', 'editar', 'excluir'];
@@ -465,6 +492,14 @@ const KNOWN: RepoErrorCode[] = [
   'conta_invalida',
   'categoria_invalida',
   'nome_da_conta_invalido',
+  // Contas de origem (D-043). Nenhum é sufixo de outro código da lista, nem tem outro como sufixo.
+  'tipo_da_conta_invalido',
+  'nome_da_conta_repetido',
+  'limite_de_contas',
+  'conta_principal',
+  'ultima_conta_ativa',
+  'conta_com_lancamentos',
+  'conta_arquivada',
   'vencimento_fora_do_intervalo',
   'compromisso_quitado',
   'compromisso_aberto',
@@ -903,6 +938,31 @@ function toGoal(g: GoalRow): Goal {
   };
 }
 
+/** Conta: tipo e situação da lista, nome de 1 a 40 caracteres e versão a partir de 1 (financial_accounts). */
+function toAccount(a: AccountRow): FinancialAccount {
+  const consistent =
+    ACCOUNT_KINDS.includes(a.kind) &&
+    (a.status === 'ativa' || a.status === 'arquivada') &&
+    typeof a.name === 'string' &&
+    [...a.name].length >= 1 &&
+    [...a.name].length <= ACCOUNT_NAME_MAX &&
+    Number.isInteger(Number(a.version)) &&
+    Number(a.version) >= 1 &&
+    (a.is_default !== true || a.status === 'ativa');
+  if (!consistent) throw new RepoError('desconhecido', 'conta_inconsistente');
+  return {
+    id: a.id,
+    contextId: a.context_id,
+    name: a.name,
+    currency: 'BRL',
+    initialBalanceCents: a.initial_balance_cents === null || a.initial_balance_cents === undefined ? null : Number(a.initial_balance_cents),
+    kind: a.kind,
+    status: a.status,
+    isDefault: a.is_default === true,
+    version: Number(a.version),
+  };
+}
+
 /** Movimento: tipo da lista, valor positivo (o sentido vem do tipo), data AAAA-MM-DD e observação de 1 a 80 caracteres. */
 function toGoalMovement(m: GoalMovementRow): GoalMovement {
   const amountCents = whole(m.amount_cents);
@@ -911,7 +971,9 @@ function toGoalMovement(m: GoalMovementRow): GoalMovement {
     amountCents >= 1 &&
     ISO_DATE.test(m.occurred_on) &&
     (m.note === null || (typeof m.note === 'string' && m.note.length >= 1 && m.note.length <= GOAL_NOTE_MAX));
-  if (!consistent) throw new RepoError('desconhecido', 'movimento_inconsistente');
+  // A conta só existe em aporte e resgate (goal_movements_conta).
+  const accountId = m.account_id ?? null;
+  if (!consistent || (accountId !== null && m.kind !== 'aporte' && m.kind !== 'resgate')) throw new RepoError('desconhecido', 'movimento_inconsistente');
   return {
     id: m.id,
     goalId: m.goal_id,
@@ -920,6 +982,7 @@ function toGoalMovement(m: GoalMovementRow): GoalMovement {
     amountCents,
     occurredOn: m.occurred_on,
     note: m.note,
+    accountId,
     createdBy: m.created_by,
     version: whole(m.version),
     createdAt: m.created_at,
@@ -1110,12 +1173,15 @@ export class SupabaseRepository implements RecordsRepository {
     if (person.error) throw repoError(person.error);
     if (ctx.error) throw repoError(ctx.error);
     if (!person.data || !ctx.data) return null;
+    // Só as contas ativas, a principal primeiro (os seletores e a conta que vem marcada). A RLS já esconde as excluídas.
     const accounts = await this.db
       .from('financial_accounts')
-      .select('id, context_id, name, currency, initial_balance_cents')
+      .select(ACCOUNT_COLUMNS)
       .eq('context_id', ctx.data.id)
       .eq('status', 'ativa')
-      .order('created_at');
+      .order('is_default', { ascending: false })
+      .order('created_at')
+      .order('id');
     if (accounts.error) throw repoError(accounts.error);
     if (accounts.data.length === 0) return null;
     return {
@@ -1123,13 +1189,7 @@ export class SupabaseRepository implements RecordsRepository {
       displayName: person.data.display_name,
       timeZone: person.data.time_zone,
       personalContextId: ctx.data.id,
-      accounts: accounts.data.map((a) => ({
-        id: a.id,
-        contextId: a.context_id,
-        name: a.name,
-        currency: 'BRL' as const,
-        initialBalanceCents: a.initial_balance_cents === null ? null : Number(a.initial_balance_cents),
-      })),
+      accounts: (accounts.data as AccountRow[]).map(toAccount),
     };
   }
 
@@ -1141,10 +1201,93 @@ export class SupabaseRepository implements RecordsRepository {
     return space;
   }
 
+  /** A renomeação direta (update (name)) que o app publicado antes da 0010 faz; o app novo usa updateAccount. */
   async renameAccount(accountId: string, name: string) {
     const { error, count } = await this.db.from('financial_accounts').update({ name: name.trim() }, { count: 'exact' }).eq('id', accountId);
-    if (error) throw error.code === '23514' ? new RepoError('nome_da_conta_invalido') : repoError(error);
+    if (error) {
+      if (error.code === '23514') throw new RepoError('nome_da_conta_invalido');
+      if (error.code === '23505') throw new RepoError('nome_da_conta_repetido');
+      throw repoError(error);
+    }
     if (count === 0) throw new RepoError('nao_encontrado');
+  }
+
+  // -------------------------------------------------------------------------
+  // Contas de origem do dinheiro (D-043): as cinco funções da migração 0010
+  // -------------------------------------------------------------------------
+
+  /** Contas não excluídas do contexto: ativas (a principal primeiro) e arquivadas (por criação). */
+  async listAccounts(contextId: string): Promise<FinancialAccount[]> {
+    const rows = await readAll<AccountRow>((from, to) =>
+      this.db
+        .from('financial_accounts')
+        .select(ACCOUNT_COLUMNS)
+        .eq('context_id', contextId)
+        // 'ativa' vem depois de 'arquivada' na ordem do texto: descendente põe as ativas antes, a principal no topo.
+        .order('status', { ascending: false })
+        .order('is_default', { ascending: false })
+        .order('created_at')
+        .order('id')
+        .range(from, to),
+    );
+    // A ordem final não depende do agrupamento do banco: ativas primeiro (a principal no topo), depois as arquivadas.
+    const all = rows.map(toAccount);
+    return [...activeAccounts(all), ...all.filter((a) => a.status === 'arquivada')];
+  }
+
+  /** As cinco funções devolvem a conta em jsonb (na repetição, a conta atual): sem .single(). */
+  private async callAccount(fn: string, args: Record<string, unknown>): Promise<FinancialAccount> {
+    const { data, error } = await this.db.rpc(fn, args);
+    if (error) throw repoError(error);
+    if (!data) throw new RepoError('desconhecido');
+    return toAccount(data as AccountRow);
+  }
+
+  createAccount(key: string, contextId: string, input: AccountInput) {
+    return this.callAccount('create_account', { p_idempotency_key: key, p_context_id: contextId, p_name: input.name, p_kind: input.kind });
+  }
+
+  updateAccount(key: string, id: string, expectedVersion: number, input: AccountInput) {
+    return this.callAccount('update_account', {
+      p_idempotency_key: key,
+      p_account_id: id,
+      p_expected_version: expectedVersion,
+      p_name: input.name,
+      p_kind: input.kind,
+    });
+  }
+
+  setDefaultAccount(key: string, id: string, expectedVersion: number) {
+    return this.callAccount('set_default_account', { p_idempotency_key: key, p_account_id: id, p_expected_version: expectedVersion });
+  }
+
+  setAccountStatus(key: string, id: string, expectedVersion: number, status: AccountStatus, newDefaultId: string | null = null) {
+    return this.callAccount('set_account_status', {
+      p_idempotency_key: key,
+      p_account_id: id,
+      p_expected_version: expectedVersion,
+      p_status: status,
+      p_new_default_id: newDefaultId,
+    });
+  }
+
+  deleteAccount(key: string, id: string, expectedVersion: number) {
+    return this.callAccount('delete_account', { p_idempotency_key: key, p_account_id: id, p_expected_version: expectedVersion });
+  }
+
+  /** Só operações de contas, da própria pessoa; a conta é o target_id. */
+  async findAccountOperation(key: string) {
+    const { data, error } = await this.db
+      .from('record_operations')
+      .select('action, target_id')
+      .eq('idempotency_key', key)
+      .in('action', ACCOUNT_ACTIONS)
+      .maybeSingle();
+    if (error) throw repoError(error);
+    if (!data) return null;
+    const target = data.target_id as string | null;
+    if (!target) throw new RepoError('desconhecido', 'operacao_inconsistente');
+    return { action: data.action as AccountAction, accountId: target };
   }
 
   /** Lê o mês inteiro em páginas: a API limita cada resposta, e um total incompleto não pode aparecer como confirmado. */
@@ -1340,7 +1483,7 @@ export class SupabaseRepository implements RecordsRepository {
     });
   }
 
-  payCommitment(key: string, id: string, expectedVersion: number, input: PaymentInput) {
+  payCommitment(key: string, id: string, expectedVersion: number, input: PaymentRequest) {
     return this.callPayment('pay_commitment', {
       p_idempotency_key: key,
       p_commitment_id: id,
@@ -1897,6 +2040,8 @@ export class SupabaseRepository implements RecordsRepository {
       p_amount_cents: input.amountCents,
       p_occurred_on: input.occurredOn,
       p_note: input.note,
+      // A conta de aporte e resgate (D-043) só vai quando informada: o banco anterior à 0010 não conhece o argumento.
+      ...(input.accountId ? { p_account_id: input.accountId } : {}),
     });
   }
 
@@ -1908,6 +2053,9 @@ export class SupabaseRepository implements RecordsRepository {
       p_amount_cents: input.amountCents,
       p_occurred_on: input.occurredOn,
       p_note: input.note,
+      // Informada: troca ou mantém a conta. Nula: tira a conta. Ausente: nada é enviado e o banco mantém a conta do movimento
+      // (o padrão de p_account_id é "manter"; o banco anterior à 0010 não conhece o argumento).
+      ...(input.accountId !== undefined ? { p_account_id: input.accountId } : {}),
     });
   }
 
@@ -2201,7 +2349,7 @@ export class SupabaseRepository implements RecordsRepository {
     });
   }
 
-  /** expectedVersion = versão da conta da fatura (InvoiceItem.commitmentVersion). Sem accountId, o banco usa a conta ativa mais antiga. */
+  /** expectedVersion = versão da conta da fatura (InvoiceItem.commitmentVersion). Sem accountId, o banco usa a conta principal do contexto. */
   payInvoice(
     key: string,
     cardId: string,

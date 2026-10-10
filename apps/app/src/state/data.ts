@@ -35,6 +35,9 @@ import {
   summarizeMonth,
   summarizeToPay,
   upcomingCommittedMonths,
+  type AccountAction,
+  type AccountInput,
+  type AccountStatus,
   type AffectedRef,
   type Card,
   type CardAction,
@@ -108,6 +111,15 @@ export function useSpace() {
   const repo = useRepo();
   const { user } = useSession();
   return useQuery({ queryKey: ['space', user?.id], queryFn: () => repo.getSpace() });
+}
+
+/**
+ * Contas não excluídas do contexto (D-043): ativas, a principal primeiro, e arquivadas. Os seletores usam as ativas de `useSpace`;
+ * esta lista serve à tela de contas e aos nomes (inclusive da arquivada, de um registro antigo).
+ */
+export function useAccounts(contextId: string | undefined) {
+  const repo = useRepo();
+  return useQuery({ queryKey: ['accounts', contextId], queryFn: () => repo.listAccounts(contextId!), enabled: Boolean(contextId) });
 }
 
 export function useMonthRecords(contextId: string | undefined, month: IsoMonth) {
@@ -1361,6 +1373,70 @@ export function useDeleteGoalMovement() {
   return useMutation({
     mutationFn: (v: { key: string; movementId: string; version: number }) => repo.deleteGoalMovement(v.key, v.movementId, v.version),
     onSuccess: (w) => invalidate(w),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Contas de origem do dinheiro (D-043, Ciclo G1)
+// ---------------------------------------------------------------------------
+
+/** Depois de gravar uma conta: a lista e o espaço (as contas ativas dos seletores) recarregam; conta como anotação. */
+const refreshAccounts = (qc: QueryClient) => {
+  qc.invalidateQueries({ queryKey: ['accounts'] });
+  qc.invalidateQueries({ queryKey: ['space'] });
+  qc.invalidateQueries({ queryKey: ['returnReview'] });
+};
+
+/** Contas: findSaved usa findAccountOperation (a conta é o alvo da operação). */
+export function useAccountOperationKey() {
+  const repo = useRepo();
+  return useOperationAttempts<{ action: AccountAction; accountId: string }>((key) => repo.findAccountOperation(key), refreshAccounts);
+}
+
+export function useCreateAccount() {
+  const repo = useRepo();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { key: string; contextId: string; input: AccountInput }) => repo.createAccount(v.key, v.contextId, v.input),
+    onSuccess: () => refreshAccounts(qc),
+  });
+}
+
+export function useUpdateAccount() {
+  const repo = useRepo();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { key: string; id: string; version: number; input: AccountInput }) => repo.updateAccount(v.key, v.id, v.version, v.input),
+    onSuccess: () => refreshAccounts(qc),
+  });
+}
+
+export function useSetDefaultAccount() {
+  const repo = useRepo();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { key: string; id: string; version: number }) => repo.setDefaultAccount(v.key, v.id, v.version),
+    onSuccess: () => refreshAccounts(qc),
+  });
+}
+
+/** Arquivar e reativar; ao arquivar a principal, newDefaultId é a conta que passa a ser a principal. */
+export function useSetAccountStatus() {
+  const repo = useRepo();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { key: string; id: string; version: number; status: AccountStatus; newDefaultId?: string | null }) =>
+      repo.setAccountStatus(v.key, v.id, v.version, v.status, v.newDefaultId ?? null),
+    onSuccess: () => refreshAccounts(qc),
+  });
+}
+
+export function useDeleteAccount() {
+  const repo = useRepo();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { key: string; id: string; version: number }) => repo.deleteAccount(v.key, v.id, v.version),
+    onSuccess: () => refreshAccounts(qc),
   });
 }
 

@@ -1,20 +1,19 @@
-import { isRepoError } from '@clarevo/core';
-import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Check, KeyRound, LogOut, MonitorSmartphone } from 'lucide-react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 
 import { ConfirmDialog } from '@/components/dialog';
+import { AccountsCard } from '@/components/accounts-card';
 import { PrivacyCard, RemindersCard } from '@/components/device-settings';
+import { FlashBanner, useFlash } from '@/components/flash';
 import { SubHeader } from '@/components/header';
-import { TermHint } from '@/components/term-hint';
 import { TopicLink } from '@/components/topic-link';
-import { Banner, Button, Card, Screen, TextField, Txt } from '@/components/ui';
+import { Banner, Button, Card, Screen, Txt } from '@/components/ui';
 import { AuthError, RESEND_INTERVAL_SECONDS } from '@/lib/auth';
 import { signOutIntent } from '@/lib/nav';
 import { useSpace } from '@/state/data';
-import { useRepo, useSession } from '@/state/session';
+import { useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
 type Msg = { tone: 'erro' | 'sucesso' | 'info'; text: string } | null;
@@ -31,55 +30,31 @@ function Message({ msg }: { msg: Msg }) {
   );
 }
 
-/** Conta: perfil, conta financeira, segurança, lembretes, privacidade neste aparelho e situação do acesso ao plano. */
+/** Conta: perfil, suas contas (origem do dinheiro, D-043), segurança, lembretes, privacidade neste aparelho e situação do acesso ao plano. */
 export default function ContaScreen() {
   const { user, auth, signOut } = useSession();
-  const repo = useRepo();
-  const qc = useQueryClient();
   const personal = useSpace().data;
-  const account = personal?.accounts[0];
-  const [name, setName] = useState(account?.name ?? '');
-  const [nameMsg, setNameMsg] = useState<Msg>(null);
+  // Avisos das telas de contas ("Conta adicionada.", "Conta salva."): lidos uma única vez, quando esta tela abre.
+  const [notice] = useFlash();
   const [securityMsg, setSecurityMsg] = useState<Msg>(null);
-  const [busy, setBusy] = useState<'nome' | 'senha' | 'sessoes' | null>(null);
+  const [busy, setBusy] = useState<'senha' | 'sessoes' | null>(null);
   const [cooldown, setCooldown] = useState(0);
   const [confirmAll, setConfirmAll] = useState(false);
-  // ?secao=lembretes (vindo de Contas a pagar): rola até o card de lembretes.
+  // ?secao=lembretes (vindo de Contas a pagar) ou ?secao=contas (o atalho "Gerenciar contas" dos seletores): rola até o card.
   const { secao } = useLocalSearchParams<{ secao?: string }>();
   const scroll = useRef<ScrollView>(null);
   const [remindersY, setRemindersY] = useState<number | null>(null);
+  const [accountsY, setAccountsY] = useState<number | null>(null);
   useEffect(() => {
-    if (secao === 'lembretes' && remindersY !== null) scroll.current?.scrollTo({ y: Math.max(0, remindersY - space[4]), animated: false });
-  }, [secao, remindersY]);
+    const y = secao === 'lembretes' ? remindersY : secao === 'contas' ? accountsY : null;
+    if (y !== null) scroll.current?.scrollTo({ y: Math.max(0, y - space[4]), animated: false });
+  }, [secao, remindersY, accountsY]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
     const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
     return () => clearTimeout(t);
   }, [cooldown]);
-
-  const saveName = async () => {
-    if (!account || busy) return;
-    const trimmed = name.trim();
-    if (trimmed.length < 1 || trimmed.length > 40) {
-      setNameMsg({ tone: 'erro', text: 'Dê um nome de 1 a 40 caracteres para a conta.' });
-      return;
-    }
-    setBusy('nome');
-    setNameMsg(null);
-    try {
-      await repo.renameAccount(account.id, trimmed);
-      await qc.invalidateQueries({ queryKey: ['space'] });
-      setNameMsg({ tone: 'sucesso', text: 'Nome da conta salvo.' });
-    } catch (e) {
-      setNameMsg({
-        tone: 'erro',
-        text: isRepoError(e, 'nome_da_conta_invalido') ? 'Dê um nome de 1 a 40 caracteres para a conta.' : 'Não foi possível salvar. Tente novamente.',
-      });
-    } finally {
-      setBusy(null);
-    }
-  };
 
   /** Alterar a senha pelo mesmo caminho seguro da recuperação: link no e-mail da conta. */
   const changePassword = async () => {
@@ -117,6 +92,7 @@ export default function ContaScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title="Conta" />
       <Screen scrollRef={scroll} contentStyle={{ padding: space[5], gap: space[4] }}>
+        <FlashBanner message={notice} />
         <Card style={{ gap: space[1] }}>
           <Txt variant="title">{user?.displayName}</Txt>
           <Txt color={colors.textSecondary}>{user?.email}</Txt>
@@ -130,18 +106,9 @@ export default function ContaScreen() {
           ) : null}
         </Card>
 
-        <Card style={{ gap: space[3] }}>
-          <Txt variant="title" accessibilityRole="header" aria-level={2}>
-            Conta financeira
-          </Txt>
-          <TextField label="Nome da conta" value={name} onChangeText={setName} maxLength={40} />
-          <Txt variant="caption" color={colors.textSecondary}>
-            Saldo inicial: não informado. Sem ele, o Clarevo não calcula o saldo da conta.
-          </Txt>
-          <TermHint term="Saldo inicial" slug="saldo" />
-          <Message msg={nameMsg} />
-          <Button label="Salvar nome" tone="soft" busy={busy === 'nome'} busyLabel="Salvando…" onPress={saveName} />
-        </Card>
+        <View onLayout={(e) => setAccountsY(e.nativeEvent.layout.y)}>
+          <AccountsCard contextId={personal?.personalContextId} />
+        </View>
 
         <Card style={{ gap: space[3] }}>
           <Txt variant="title" accessibilityRole="header" aria-level={2}>

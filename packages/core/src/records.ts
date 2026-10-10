@@ -4,13 +4,34 @@ import type { Cents } from './money';
 export type ContextKind = 'pessoal' | 'familia';
 export type RecordKind = 'receita' | 'despesa';
 
+/** Tipo da conta de origem do dinheiro (D-043): informativo; não existe saldo por conta (P-018). */
+export type AccountKind = 'banco' | 'dinheiro' | 'outra';
+/** Conta ativa aparece nos seletores; arquivada só mantém o histórico. Excluída (sem lançamentos) some da leitura. */
+export type AccountStatus = 'ativa' | 'arquivada';
+
+/**
+ * Conta de origem do dinheiro (D-043, Ciclo G1): de onde saiu um gasto, um pagamento de conta ou de fatura, ou um aporte em meta.
+ * Gravada só por create_account, update_account, set_default_account, set_account_status e delete_account.
+ */
 export interface FinancialAccount {
   id: string;
   contextId: string;
+  /** 1 a 40 caracteres, sem espaços nas pontas; único no contexto sem diferenciar maiúsculas de minúsculas. */
   name: string;
   currency: 'BRL';
   /** null = saldo inicial desconhecido (diferente de zero). */
   initialBalanceCents: Cents | null;
+  kind: AccountKind;
+  status: AccountStatus;
+  /** A conta principal do contexto: a que vem marcada nos seletores. Uma só, sempre ativa. */
+  isDefault: boolean;
+  version: number;
+}
+
+/** Campos que a pessoa informa ao cadastrar ou editar uma conta (create_account, update_account). */
+export interface AccountInput {
+  name: string;
+  kind: AccountKind;
 }
 
 /** Espaço da pessoa depois da primeira entrada confirmada. */
@@ -157,6 +178,12 @@ export interface PaymentInput {
   paidOn: IsoDate;
   category: string | null;
 }
+
+/**
+ * O que payCommitment aceita: um PaymentInput em que a conta pode ser nula, e então vale a conta principal do contexto (D-043;
+ * no banco, p_account_id nulo em pay_commitment). As telas sempre mandam a conta escolhida.
+ */
+export type PaymentRequest = Omit<PaymentInput, 'accountId'> & { accountId: string | null };
 
 /** Campos que a pessoa informa ao criar ou editar um registro. */
 export interface RecordInput {
@@ -415,6 +442,11 @@ export interface GoalMovement {
   occurredOn: IsoDate;
   /** Observação opcional, 1 a 80 caracteres (vazia vira null). */
   note: string | null;
+  /**
+   * Origem do aporte ou destino do resgate (D-043), opcional e só informativa: não cria gasto nem movimenta saldo. Sempre null
+   * nos outros tipos de movimento.
+   */
+  accountId: string | null;
   createdBy: string;
   version: number;
   createdAt: string;
@@ -446,6 +478,13 @@ export interface GoalMovementInput {
   amountCents: Cents;
   occurredOn: IsoDate;
   note: string | null;
+  /**
+   * Só em aporte e resgate (D-043): a conta ativa do mesmo contexto. Em addGoalMovement, ausente ou null = sem conta. Em
+   * updateGoalMovement, ausente = manter a conta que o movimento já tem (o app publicado antes da 0010 não manda a conta e não a
+   * perde), null informado = tirar a conta, um id = trocar ou manter. Nos outros tipos, informar a conta é recusado
+   * (campo_nao_se_aplica).
+   */
+  accountId?: string | null;
 }
 
 /** Cartão ativo aceita compras novas; arquivado só mostra o histórico e recebe pagamentos de fatura e lançamentos da fatura. */

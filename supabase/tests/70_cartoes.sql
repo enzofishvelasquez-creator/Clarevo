@@ -1082,7 +1082,7 @@ begin
      and pg_temp.cm(c, '2026-12-01') = '40000 2026-12-10 2026-12-03 aberto v1 estimado',
     'recusas não gravam';
 
-  -- Pagamento parcial: R$ 700,00 de R$ 782,70, em 12/11. A conta de saída é a conta ativa mais antiga do contexto.
+  -- Pagamento parcial: R$ 700,00 de R$ 782,70, em 12/11. A conta de saída é a conta principal do contexto (aqui também a mais antiga).
   res := public.pay_invoice('ce-b-0420', c, '2026-11-01', 5, 70000, '2026-11-12');
   insert into ids values ('pgto1', (res #>> '{record,id}')::uuid);
   assert res #>> '{record,description}' = 'Fatura Cartão Exemplo (novembro)' and (res #>> '{record,amount_cents}')::bigint = 70000
@@ -1824,7 +1824,7 @@ begin
   perform pg_temp.expect_code(pg_temp.pi('cd-f-0022', fc, '2026-11-01', 1, 100, '2026-10-07'), 'sem_permissao', '42501');
   perform pg_temp.expect_code(pg_temp.ui('cd-f-0023', fc, '2026-11-01', 1), 'sem_permissao', '42501');
   perform pg_temp.expect_code(pg_temp.uc('cd-f-0024', fc, 2, 'Caio', null, 5, 12, null), 'sem_permissao', '42501');
-  -- Theo paga a fatura (a conta de saída é a conta ativa mais antiga da Família); Iris não desfaz; Theo desfaz.
+  -- Theo paga a fatura (a conta de saída é a conta principal da Família, aqui também a mais antiga); Iris não desfaz; Theo desfaz.
   perform pg_temp.as_('theo');
   -- A fatura de novembro fecha em 05/11: Theo paga em 06/11 (fatura aberta é recusada; a Iris não chega a essa conferência).
   perform pg_temp.expect_code(pg_temp.pi('cd-f-0029', fc, '2026-11-01', pg_temp.iv_ver(fc, '2026-11-01'), 5000, '2026-10-07'), 'fatura_aberta', 'PT409');
@@ -1918,7 +1918,7 @@ reset role;
 
 -- ---------------------------------------------------------------------------
 -- 10. record_operations: as onze ações de cartão apontam para o cartão (target_id); as cinco de lançamento também para o
--- lançamento (entry_id); pagar e desfazer a fatura, também para a conta da fatura e o gasto; a lista vigente tem 41 ações (37 e as 4 de orçamento e limite, testadas em 80).
+-- lançamento (entry_id); pagar e desfazer a fatura, também para a conta da fatura e o gasto; a lista vigente tem 46 ações (37, as 4 de orçamento e limite, testadas em 80, e as 5 de contas, testadas em 85).
 -- Uma operação por escrita. Atividade (A4): toda ação de cartão é anotação de quem a fez no contexto.
 -- ---------------------------------------------------------------------------
 reset role;
@@ -1987,7 +1987,7 @@ begin
     = array['alterar_cartao', 'alterar_lancamento_cartao', 'criar_cartao', 'criar_compra_cartao', 'criar_encargo_cartao', 'criar_estorno_cartao',
             'desfazer_pagamento_fatura', 'excluir_cartao', 'excluir_lancamento_cartao', 'pagar_fatura', 'situacao_cartao'], 'as 11 ações de cartão';
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-           where c.conname = 'record_operations_action_check') = 41, 'a lista vigente tem 41 ações (37 e as 4 de orçamento e limite, testadas em 80)';
+           where c.conname = 'record_operations_action_check') = 46, 'a lista vigente tem 46 ações (37, as 4 de orçamento e limite, testadas em 80, e as 5 de contas, testadas em 85)';
 
   -- Cada operação aponta para um cartão do mesmo contexto; a de lançamento, para um lançamento do mesmo cartão; a de fatura, para
   -- a conta e o gasto daquele cartão.
@@ -2804,17 +2804,18 @@ reset role;
 do $$ begin
   assert (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
-    = array['add_card_charge', 'add_card_purchase', 'add_card_refund', 'add_goal_movement', 'context_permission', 'create_card',
-            'create_commitment', 'create_goal', 'create_record', 'create_series', 'create_series_occurrence',
-            'decide_return_review', 'delete_card', 'delete_card_entry', 'delete_category_budget', 'delete_commitment',
-            'delete_commitment_limit', 'delete_goal', 'delete_goal_movement', 'delete_income_reference', 'delete_record',
-            'delete_series', 'end_series', 'ensure_personal_space', 'inform_series_year', 'invoice_closing_on', 'invoice_due_on',
-            'invoice_month_for', 'is_org_admin', 'month_budget', 'month_committed', 'month_to_pay', 'month_totals',
-            'months_overview', 'my_today', 'pay_commitment', 'pay_invoice', 'set_card_status', 'set_category_budget',
-            'set_commitment_limit', 'set_goal_status', 'set_income_reference', 'set_savings_answer', 'skip_series_year',
-            'sync_series_occurrences', 'undo_commitment_payment', 'undo_invoice_payment', 'update_card', 'update_card_entry',
+    = array['add_card_charge', 'add_card_purchase', 'add_card_refund', 'add_goal_movement', 'context_permission',
+            'create_account', 'create_card', 'create_commitment', 'create_goal', 'create_record', 'create_series',
+            'create_series_occurrence', 'decide_return_review', 'delete_account', 'delete_card', 'delete_card_entry',
+            'delete_category_budget', 'delete_commitment', 'delete_commitment_limit', 'delete_goal', 'delete_goal_movement',
+            'delete_income_reference', 'delete_record', 'delete_series', 'end_series', 'ensure_personal_space',
+            'inform_series_year', 'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'month_budget',
+            'month_committed', 'month_to_pay', 'month_totals', 'months_overview', 'my_today', 'pay_commitment', 'pay_invoice',
+            'set_account_status', 'set_card_status', 'set_category_budget', 'set_commitment_limit', 'set_default_account',
+            'set_goal_status', 'set_income_reference', 'set_savings_answer', 'skip_series_year', 'sync_series_occurrences',
+            'undo_commitment_payment', 'undo_invoice_payment', 'update_account', 'update_card', 'update_card_entry',
             'update_commitment', 'update_goal', 'update_goal_movement', 'update_record', 'update_series_from'],
-    'authenticated executa só as 54 funções expostas (as 5 de orçamento e limite, testadas em 80, as 11 de cartão, as 4 de data e as de antes)';
+    'authenticated executa só as 59 funções expostas (as 5 de contas, testadas em 85, as 5 de orçamento e limite, testadas em 80, as 11 de cartão, as 4 de data e as de antes)';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')), 'anon não executa nenhuma função';
   -- Auxiliares, guardas e gatilhos de consistência: sem execute para authenticated.

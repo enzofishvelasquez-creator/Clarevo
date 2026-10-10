@@ -1,4 +1,5 @@
 import {
+  ACCOUNTS_TEXT,
   CATEGORIES,
   MAX_RECORD_CENTS,
   NO_CATEGORY_LABEL,
@@ -6,6 +7,7 @@ import {
   RETURN_TEXT,
   addDays,
   centsToInput,
+  chooseAccountId,
   fieldForErrorCode,
   formatBRL,
   formatDateBR,
@@ -36,6 +38,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View, type TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AccountPicker } from '@/components/account-picker';
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
@@ -44,6 +47,7 @@ import { ErrorState, LoadingState } from '@/components/states';
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
+import { useLastAccount } from '@/lib/last-account';
 import { explanationHref } from '@/lib/learn';
 import { totalChange } from '@/lib/highlight';
 import { useReturnReview, useSeries, useSpace } from '@/state/data';
@@ -104,13 +108,14 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: Person
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const writer = useReturnWriter();
+  const lastAccount = useLastAccount();
   const short = rowShortName(row);
   /** Conta deste mês que já existia (criada em outro aparelho): as próximas tentativas pagam essa, sem registrar de novo. */
   const existing = useRef<Commitment | null>(null);
 
   const initial = useMemo<PaymentDraft>(
     () => ({
-      accountId: personal.accounts[0]?.id ?? '',
+      accountId: chooseAccountId(personal.accounts, lastAccount.last),
       amountText: row.amountIsEstimate ? '' : centsToInput(row.amountCents),
       dateText: formatDateBR(row.dueOn <= today ? row.dueOn : today),
       category: row.category,
@@ -196,6 +201,7 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: Person
     setBusy(true);
     try {
       const { paid, alreadyPaid } = await payLine(v.input);
+      if (!alreadyPaid) lastAccount.remember(v.input.accountId);
       returnSession.setOutcome(row.key, { type: 'paga', commitment: paid });
       // O aviso aparece na tela de origem (revisão ou detalhe do gasto fixo), onde o FlashBanner o anuncia uma vez no iOS.
       if (alreadyPaid) {
@@ -315,23 +321,13 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: Person
             </View>
           </View>
 
-          {personal.accounts.length > 1 ? (
-            <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel="Conta">
-              <Txt variant="label" style={{ fontFamily: fonts.bold }}>
-                Conta
-              </Txt>
-              <View style={styles.chips}>
-                {personal.accounts.map((a) => (
-                  <Chip key={a.id} label={a.name} selected={draft.accountId === a.id} onPress={() => set('accountId', a.id)} />
-                ))}
-              </View>
-            </View>
-          ) : null}
-          {errors.accountId ? (
-            <Txt variant="label" color={colors.error}>
-              {errors.accountId}
-            </Txt>
-          ) : null}
+          <AccountPicker
+            accounts={personal.accounts}
+            value={draft.accountId}
+            label={ACCOUNTS_TEXT.out}
+            error={errors.accountId}
+            onChange={(id) => set('accountId', id ?? '')}
+          />
 
           <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel="Categoria">
             <Txt variant="label" style={{ fontFamily: fonts.bold }}>

@@ -2,6 +2,8 @@ import type { CategoryBudget, CommitmentLimit, MonthBudgetRead } from './budget'
 import type { IsoDate, IsoMonth } from './dates';
 import type { Cents } from './money';
 import type {
+  AccountInput,
+  AccountStatus,
   Card,
   CardChargeInput,
   CardEntry,
@@ -13,6 +15,7 @@ import type {
   Commitment,
   CommitmentInput,
   CommitmentSeries,
+  FinancialAccount,
   FinancialRecord,
   Goal,
   GoalInput,
@@ -26,7 +29,7 @@ import type {
   MonthOverview,
   NewGoalInput,
   OccurrenceMode,
-  PaymentInput,
+  PaymentRequest,
   PersonalSpace,
   RecordInput,
   RecordKind,
@@ -72,6 +75,13 @@ export type BudgetAction =
   | 'excluir_orcamento_categoria'
   | 'definir_limite_comprometimento'
   | 'excluir_limite_comprometimento';
+
+/**
+ * Contas de origem do dinheiro (D-043, Ciclo G1), gravadas em record_operations com a conta em target_id:
+ * create_account ('criar_conta'), update_account ('alterar_conta'), set_default_account ('conta_principal'), set_account_status
+ * ('situacao_conta') e delete_account ('excluir_conta'). Contam como anotação na atividade (D-030), como as demais escritas.
+ */
+export type AccountAction = 'criar_conta' | 'alterar_conta' | 'conta_principal' | 'situacao_conta' | 'excluir_conta';
 
 /**
  * Resposta do plano de guardar (set_savings_answer, spec7), gravada em record_operations sem alvo. Como 'decidir_revisao',
@@ -176,7 +186,41 @@ export interface RecordsRepository {
   getSpace(): Promise<PersonalSpace | null>;
   /** Cria (uma única vez) contexto pessoal e primeira conta. Idempotente. O fuso vem do aparelho. */
   ensurePersonalSpace(accountName: string, timeZone?: string): Promise<PersonalSpace>;
+  /**
+   * Renomeia a conta direto (o app publicado antes da 0010; o banco soma 1 à versão). Em tela nova, use updateAccount. Nome fora de
+   * 1 a 40 caracteres: nome_da_conta_invalido; nome de outra conta: nome_da_conta_repetido.
+   */
   renameAccount(accountId: string, name: string): Promise<void>;
+
+  // Contas de origem do dinheiro (D-043, Ciclo G1). Regras e textos em accounts.ts, iguais aos da migração 0010.
+  // PersonalSpace.accounts traz só as contas ativas, a principal primeiro (os seletores "Saiu de" e "Entrou em").
+
+  /** Contas não excluídas do contexto (ativas, a principal primeiro, e arquivadas, por criação), para a lista de contas e os nomes. Sem leitura: lista vazia. */
+  listAccounts(contextId: string): Promise<FinancialAccount[]>;
+  /**
+   * create_account. Exige escrita no contexto. A primeira conta de um contexto sem principal já nasce principal. Ordem: repetição;
+   * sem_permissao; nome_da_conta_invalido; tipo_da_conta_invalido; nome_da_conta_repetido; limite_de_contas (10 ativas).
+   */
+  createAccount(key: string, contextId: string, input: AccountInput): Promise<FinancialAccount>;
+  /** update_account: nome e tipo, em qualquer situação. Ordem: repetição; nao_encontrado; sem_permissao; versao_desatualizada; nome; tipo; nome_da_conta_repetido. */
+  updateAccount(key: string, id: string, expectedVersion: number, input: AccountInput): Promise<FinancialAccount>;
+  /** set_default_account: a conta passa a ser a principal (a anterior sobe +1); já ser a principal não muda nada. conta_arquivada se arquivada. */
+  setDefaultAccount(key: string, id: string, expectedVersion: number): Promise<FinancialAccount>;
+  /**
+   * set_account_status: arquivar e reativar (mesma situação não muda nada). Nunca a última ativa (ultima_conta_ativa); arquivar a principal
+   * exige newDefaultId, outra conta ativa (conta_principal sem ela; conta_invalida se não serve); newDefaultId fora disso:
+   * campo_nao_se_aplica; reativar respeita as 10 ativas (limite_de_contas). Ordem: repetição; nao_encontrado; sem_permissao;
+   * versao_desatualizada; situacao_invalida; campo_nao_se_aplica; ultima_conta_ativa; conta_principal; conta_invalida; limite_de_contas.
+   */
+  setAccountStatus(key: string, id: string, expectedVersion: number, status: AccountStatus, newDefaultId?: string | null): Promise<FinancialAccount>;
+  /**
+   * delete_account: exclusão lógica (a conta fica arquivada e some da leitura). Nunca a principal (conta_principal); só sem gastos nem
+   * movimentos de meta vivos (conta_com_lancamentos: arquive). Ordem: repetição; nao_encontrado; sem_permissao; versao_desatualizada;
+   * conta_principal; conta_com_lancamentos.
+   */
+  deleteAccount(key: string, id: string, expectedVersion: number): Promise<FinancialAccount>;
+  /** Reconciliação de contas: a operação com esta chave já foi concluída? */
+  findAccountOperation(key: string): Promise<{ action: AccountAction; accountId: string } | null>;
 
   listRecords(contextId: string, month: IsoMonth): Promise<FinancialRecord[]>;
   getRecord(id: string): Promise<FinancialRecord | null>;
@@ -204,8 +248,11 @@ export interface RecordsRepository {
   updateCommitment(key: string, id: string, expectedVersion: number, input: CommitmentInput): Promise<CommitmentWrite>;
   /** Numa ocorrência de série, exclui só este mês: o número nunca volta a ser criado. */
   deleteCommitment(key: string, id: string, expectedVersion: number): Promise<CommitmentWrite>;
-  /** Atômico: cria o gasto e quita a conta. record = gasto criado. */
-  payCommitment(key: string, id: string, expectedVersion: number, input: PaymentInput): Promise<CommitmentWrite & { record: FinancialRecord }>;
+  /**
+   * Atômico: cria o gasto e quita a conta. record = gasto criado. input.accountId nulo = a conta principal do contexto (D-043, A9);
+   * sem principal ativa, conta_invalida.
+   */
+  payCommitment(key: string, id: string, expectedVersion: number, input: PaymentRequest): Promise<CommitmentWrite & { record: FinancialRecord }>;
   /** Atômico: exclui o gasto e reabre a conta. record = gasto excluído. */
   undoCommitmentPayment(key: string, id: string, expectedVersion: number): Promise<CommitmentWrite & { record: FinancialRecord }>;
   /** Reconciliação de conta a pagar: a operação com esta chave já foi concluída? */
@@ -386,14 +433,16 @@ export interface RecordsRepository {
   /**
    * add_goal_movement: sem versão (como create_record); a versão da meta não sobe. Ordem: repetição; nao_encontrado;
    * sem_permissao; meta_arquivada; tipo_invalido ('saldo_inicial' só por createGoal); valor_invalido;
-   * valor_acima_do_limite; data_invalida; data_futura; observacao_longa; saldo_da_meta_insuficiente (o primeiro dia
+   * valor_acima_do_limite; data_invalida; data_futura; observacao_longa; conta (D-043: input.accountId só em aporte e resgate,
+   * campo_nao_se_aplica nos outros tipos; conta ativa do mesmo contexto, conta_invalida); saldo_da_meta_insuficiente (o primeiro dia
    * negativo em RepoError.detail, "dia=AAAA-MM-DD"; negativeDayFromDetail).
    */
   addGoalMovement(key: string, goalId: string, kind: GoalMovementKind, input: GoalMovementInput): Promise<GoalWrite>;
   /**
    * update_goal_movement: o tipo nunca muda (o 'saldo_inicial' também pode ser corrigido). Ordem: repetição;
    * nao_encontrado; sem_permissao (autoria, só no banco); versao_desatualizada; meta_arquivada; valor, data e
-   * observação; saldo_da_meta_insuficiente.
+   * observação; conta (input.accountId ausente mantém a conta do movimento; nulo informado tira a conta; só é conferida quando muda; manter a
+   * que o movimento já tem vale, mesmo arquivada); saldo_da_meta_insuficiente.
    */
   updateGoalMovement(key: string, movementId: string, expectedVersion: number, input: GoalMovementInput): Promise<GoalWrite>;
   /** delete_goal_movement. Ordem: repetição; nao_encontrado; sem_permissao; versao_desatualizada; meta_arquivada; saldo. */
@@ -501,8 +550,8 @@ export interface RecordsRepository {
   addCardRefund(key: string, cardId: string, input: CardRefundInput): Promise<CardWrite>;
   /**
    * pay_invoice: cria UM gasto "Fatura Nubank (outubro)" na data do pagamento e marca a conta da fatura como paga.
-   * expectedVersion = versão da conta da fatura (Invoice.commitmentVersion). accountId: a conta de saída; ausente, a conta ativa
-   * mais antiga do contexto. Ordem: repetição; nao_encontrado; sem_permissao; mes_invalido; nao_encontrado (a fatura não tem
+   * expectedVersion = versão da conta da fatura (Invoice.commitmentVersion). accountId: a conta de saída; ausente, a conta principal
+   * do contexto (D-043, A9). Ordem: repetição; nao_encontrado; sem_permissao; mes_invalido; nao_encontrado (a fatura não tem
    * conta); versao_desatualizada; compromisso_quitado; fatura_aberta (só se paga depois que a fatura fecha: hoje até o dia do
    * fechamento, ou fatura futura, é recusado, sem gravar nada; o texto com a data é
    * `cardErrorText('fatura_aberta', { closingOn })`); valor_invalido; valor_acima_da_fatura; data_invalida (inválida, ou
@@ -553,6 +602,13 @@ export type RepoErrorCode =
   | 'conta_invalida'
   | 'categoria_invalida'
   | 'nome_da_conta_invalido'
+  | 'tipo_da_conta_invalido'
+  | 'nome_da_conta_repetido'
+  | 'limite_de_contas'
+  | 'conta_principal'
+  | 'ultima_conta_ativa'
+  | 'conta_com_lancamentos'
+  | 'conta_arquivada'
   | 'vencimento_fora_do_intervalo'
   | 'compromisso_quitado'
   | 'compromisso_aberto'

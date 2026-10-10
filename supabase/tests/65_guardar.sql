@@ -468,7 +468,7 @@ end $$;
 
 -- ---------------------------------------------------------------------------
 -- 6. record_operations: responder_guardar não aponta para nada (o contexto já está em context_id), como decidir_revisao;
--- a lista vigente tem 41 ações (26, as 11 de cartões, testadas em 70, e as 4 de orçamento e limite, testadas em 80); uma operação por escrita.
+-- a lista vigente tem 46 ações (26, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, e as 5 de contas, testadas em 85); uma operação por escrita.
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -507,22 +507,23 @@ begin
     end if;
   end;
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-           where c.conname = 'record_operations_action_check') = 41, 'a lista vigente tem 41 ações (26, as 11 de cartões, testadas em 70, e as 4 de orçamento e limite, testadas em 80)';
+           where c.conname = 'record_operations_action_check') = 46, 'a lista vigente tem 46 ações (26, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, e as 5 de contas, testadas em 85)';
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''responder_guardar''::text', 'g') m
            where c.conname = 'record_operations_action_check') = 1, 'responder_guardar na lista de ações';
   -- As 25 anteriores continuam aceitas pela restrição de ação (cada caso desfeito no próprio bloco).
   assert (select array_agg(m[1] order by m[1] collate "C")
             from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
            where c.conname = 'record_operations_action_check' and m[1] <> 'responder_guardar')
-    = array['alterar_cartao', 'alterar_lancamento_cartao', 'alterar_meta', 'alterar_movimento_meta', 'alterar_serie', 'criar',
-            'criar_cartao', 'criar_compra_cartao', 'criar_compromisso', 'criar_encargo_cartao', 'criar_estorno_cartao',
-            'criar_meta', 'criar_ocorrencia', 'criar_serie', 'decidir_revisao', 'definir_limite_comprometimento',
-            'definir_orcamento_categoria', 'definir_renda_referencia', 'desfazer_pagamento', 'desfazer_pagamento_fatura',
-            'editar', 'editar_compromisso', 'encerrar_serie', 'excluir', 'excluir_cartao', 'excluir_compromisso',
-            'excluir_lancamento_cartao', 'excluir_limite_comprometimento', 'excluir_meta', 'excluir_movimento_meta',
-            'excluir_orcamento_categoria', 'excluir_renda_referencia', 'excluir_serie', 'informar_ano', 'pagar_compromisso',
-            'pagar_fatura', 'registrar_movimento_meta', 'situacao_cartao', 'situacao_meta', 'tirar_ano'],
-    'as ações anteriores continuam (as 25 de antes do guardar, as 11 de cartões, testadas em 70, e as 4 de orçamento e limite, testadas em 80)';
+    = array['alterar_cartao', 'alterar_conta', 'alterar_lancamento_cartao', 'alterar_meta', 'alterar_movimento_meta',
+            'alterar_serie', 'conta_principal', 'criar', 'criar_cartao', 'criar_compra_cartao', 'criar_compromisso',
+            'criar_conta', 'criar_encargo_cartao', 'criar_estorno_cartao', 'criar_meta', 'criar_ocorrencia', 'criar_serie',
+            'decidir_revisao', 'definir_limite_comprometimento', 'definir_orcamento_categoria', 'definir_renda_referencia',
+            'desfazer_pagamento', 'desfazer_pagamento_fatura', 'editar', 'editar_compromisso', 'encerrar_serie', 'excluir',
+            'excluir_cartao', 'excluir_compromisso', 'excluir_conta', 'excluir_lancamento_cartao',
+            'excluir_limite_comprometimento', 'excluir_meta', 'excluir_movimento_meta', 'excluir_orcamento_categoria',
+            'excluir_renda_referencia', 'excluir_serie', 'informar_ano', 'pagar_compromisso', 'pagar_fatura',
+            'registrar_movimento_meta', 'situacao_cartao', 'situacao_conta', 'situacao_meta', 'tirar_ano'],
+    'as ações anteriores continuam (as 25 de antes do guardar, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, e as 5 de contas, testadas em 85)';
   -- Cada resposta que gravou é uma operação sem alvo, no contexto certo, com o hash da chamada.
   assert not exists (select 1 from public.record_operations
                       where action = 'responder_guardar'
@@ -923,7 +924,7 @@ do $$ begin
   -- As assinaturas das migrações anteriores continuam.
   assert to_regprocedure('public.decide_return_review(text, uuid, integer, date, text)') is not null
      and to_regprocedure('public.create_goal(text, uuid, text, text, bigint, date, bigint, bigint, integer, text, bigint, date)') is not null
-     and to_regprocedure('public.add_goal_movement(text, uuid, text, bigint, date, text)') is not null, 'demais assinaturas sem mudança';
+     and to_regprocedure('public.add_goal_movement(text, uuid, text, bigint, date, text, uuid)') is not null, 'demais assinaturas sem mudança (a de aporte ganhou a conta opcional na 0010)';
 end $$;
 set role anon;
 select pg_temp.expect_error($$select public.set_savings_answer('gd-anon-001', gen_random_uuid(), 0, 'depois')$$, 'permission denied%');

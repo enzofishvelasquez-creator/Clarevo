@@ -3,6 +3,8 @@ import { addMonths, addYearsClamped, dateInMonth, isValidIsoDate, isValidIsoMont
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS } from './money';
 import type {
+  AccountInput,
+  AccountStatus,
   Card,
   CardChargeInput,
   CardEntry,
@@ -26,7 +28,7 @@ import type {
   IncomeReference,
   NewGoalInput,
   OccurrenceMode,
-  PaymentInput,
+  PaymentRequest,
   PersonalSpace,
   ReceiptMatch,
   RecordInput,
@@ -40,6 +42,7 @@ import type {
   SeriesTerm,
 } from './records';
 import type {
+  AccountAction,
   AffectedRef,
   BudgetAction,
   CardAction,
@@ -58,6 +61,7 @@ import type {
 } from './repository';
 import { RepoError } from './repository';
 import { referenceMonthError } from './committed';
+import { ACCOUNTS_ACTIVE_MAX, ACCOUNT_KINDS, ACCOUNT_NAME_MAX, accountInputError, accountNameTaken, activeAccounts, normalizeAccountInput } from './accounts';
 import {
   BUDGET_CATEGORIES,
   budgetAmountError,
@@ -135,7 +139,17 @@ import { dueDateBounds, seriesInputError, seriesTermError } from './validation';
 type RecordAction = 'criar' | 'editar' | 'excluir';
 
 interface Operation {
-  action: RecordAction | CommitmentAction | SeriesAction | ReturnReviewAction | IncomeReferenceAction | BudgetAction | GoalAction | SavingsAction | CardAction;
+  action:
+    | RecordAction
+    | CommitmentAction
+    | SeriesAction
+    | ReturnReviewAction
+    | IncomeReferenceAction
+    | BudgetAction
+    | GoalAction
+    | SavingsAction
+    | CardAction
+    | AccountAction;
   hash: string;
   contextId: string;
   recordId: string | null;
@@ -152,7 +166,12 @@ interface Operation {
   /** Ações de cartões: o cartão e, nas ações de lançamento, o lançamento (target_id e entry_id). */
   cardId: string | null;
   entryId: string | null;
+  /** Ações de contas: a conta (target_id). */
+  accountId: string | null;
 }
+
+/** Conta (financial_accounts): exclusão lógica (fica arquivada e some da leitura). */
+type StoredAccount = FinancialAccount & { createdBy: string; createdAt: string; deletedAt?: string; deletedBy?: string };
 
 type StoredRecord = FinancialRecord & { deletedAt?: string };
 /**
@@ -201,6 +220,7 @@ const GOAL_ACTIONS: readonly string[] = [
   'alterar_movimento_meta',
   'excluir_movimento_meta',
 ];
+const ACCOUNT_ACTIONS: readonly string[] = ['criar_conta', 'alterar_conta', 'conta_principal', 'situacao_conta', 'excluir_conta'];
 const CARD_ACTIONS: readonly string[] = [
   'criar_cartao',
   'alterar_cartao',
@@ -258,7 +278,9 @@ export interface MemoryRepositoryOptions {
  * Usado na demonstração (acesso simulado) e nos testes.
  */
 export class MemoryRepository implements RecordsRepository {
-  private space: PersonalSpace | null = null;
+  /** Pessoa e contexto; as contas (accounts) vêm de accountsById (ativas, a principal primeiro). */
+  private space: Omit<PersonalSpace, 'accounts'> | null = null;
+  private accountsById = new Map<string, StoredAccount>();
   private records = new Map<string, StoredRecord>();
   private commitments = new Map<string, StoredCommitment>();
   private seriesById = new Map<string, StoredSeries>();
@@ -333,6 +355,7 @@ export class MemoryRepository implements RecordsRepository {
       savingsChecks: new Map(this.savingsChecks),
       cards: new Map(this.cards),
       cardEntries: new Map(this.cardEntries),
+      accountsById: new Map(this.accountsById),
     };
     let result: T;
     try {
@@ -356,6 +379,7 @@ export class MemoryRepository implements RecordsRepository {
         savingsChecks: this.savingsChecks,
         cards: this.cards,
         cardEntries: this.cardEntries,
+        accountsById: this.accountsById,
       } = saved);
       throw e;
     }
@@ -364,35 +388,234 @@ export class MemoryRepository implements RecordsRepository {
   }
 
   async getSpace() {
-    return this.read(() => this.space);
+    return this.read(() => this.spaceView());
+  }
+
+  /** O espaço como o app lê: só as contas ativas (a principal primeiro), nunca as arquivadas nem as excluídas. */
+  private spaceView(): PersonalSpace | null {
+    if (!this.space) return null;
+    return { ...this.space, accounts: activeAccounts(this.liveAccounts().map(stripAccount)) };
+  }
+
+  /** Contas não excluídas por criação (ids com tamanho fixo: a ordem do texto é a de criação). */
+  private liveAccounts(): StoredAccount[] {
+    return [...this.accountsById.values()].filter((a) => !a.deletedAt).sort((a, b) => a.id.localeCompare(b.id));
   }
 
   async ensurePersonalSpace(accountName: string, timeZone?: string) {
     return this.write(() => {
-      if (this.space) return this.space;
+      if (this.space) return this.spaceView()!;
       const name = accountName.trim();
       if (name.length < 1 || name.length > 40) throw new RepoError('nome_da_conta_invalido');
       const contextId = this.id('ctx');
-      const account: FinancialAccount = { id: this.id('conta'), contextId, name, currency: 'BRL', initialBalanceCents: null };
+      const account: StoredAccount = {
+        id: this.id('conta'),
+        contextId,
+        name,
+        currency: 'BRL',
+        initialBalanceCents: null,
+        kind: 'banco',
+        status: 'ativa',
+        isDefault: true,
+        version: 1,
+        createdBy: this.opts.actorId,
+        createdAt: new Date().toISOString(),
+      };
+      this.accountsById.set(account.id, account);
       this.space = {
         personId: this.opts.actorId,
         displayName: this.opts.displayName,
         timeZone: timeZone ?? this.opts.timeZone ?? 'America/Sao_Paulo',
         personalContextId: contextId,
-        accounts: [account],
       };
-      return this.space;
+      return this.spaceView()!;
     });
   }
 
+  /** A renomeação direta do app publicado antes da 0010: soma 1 à versão, como o gatilho do banco, e recusa nome repetido. */
   async renameAccount(accountId: string, name: string) {
     return this.write(() => {
-      const acc = this.space?.accounts.find((a) => a.id === accountId);
-      if (!acc) throw new RepoError('nao_encontrado');
+      const acc = this.accountsById.get(accountId);
+      if (!acc || acc.deletedAt || !this.canRead(acc.contextId)) throw new RepoError('nao_encontrado');
       const trimmed = name.trim();
       if (trimmed.length < 1 || trimmed.length > 40) throw new RepoError('nome_da_conta_invalido');
-      acc.name = trimmed;
+      if (accountNameTaken(this.liveAccounts(), trimmed, accountId)) throw new RepoError('nome_da_conta_repetido');
+      this.accountsById.set(accountId, { ...acc, name: trimmed, version: acc.version + 1 });
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Contas de origem do dinheiro (D-043): as cinco funções da migração 0010
+  // ---------------------------------------------------------------------------
+
+  /** Como a leitura de financial_accounts (RLS: não excluídas, com leitura): ativas, a principal primeiro, depois as arquivadas. */
+  async listAccounts(contextId: string) {
+    return this.read(() => {
+      if (!this.canRead(contextId)) return [];
+      const all = this.liveAccounts().filter((a) => a.contextId === contextId).map(stripAccount);
+      return [...activeAccounts(all), ...all.filter((a) => a.status === 'arquivada')];
+    });
+  }
+
+  async findAccountOperation(key: string) {
+    return this.read(() => {
+      const op = this.operations.get(key);
+      return op && op.accountId && isAccountAction(op.action) ? { action: op.action, accountId: op.accountId } : null;
+    });
+  }
+
+  /**
+   * Como create_account. Ordem: repetição; sem_permissao; nome_da_conta_invalido; tipo_da_conta_invalido; nome_da_conta_repetido;
+   * limite_de_contas. Um contexto sem principal faz da conta nova a principal.
+   */
+  async createAccount(key: string, contextId: string, input: AccountInput) {
+    return this.write(() => {
+      const norm = normalizeAccountInput(input);
+      const payload = [contextId, norm.name, norm.kind];
+      const replayed = this.replayAccount(key, 'criar_conta', payload);
+      if (replayed) return replayed;
+      if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      const code = accountInputError(norm);
+      if (code) throw new RepoError(code);
+      this.checkAccountName(contextId, norm.name, null);
+      this.checkAccountLimit(contextId, null);
+      const live = this.liveAccounts().filter((a) => a.contextId === contextId);
+      const account: StoredAccount = {
+        id: this.id('conta'),
+        contextId,
+        name: norm.name,
+        currency: 'BRL',
+        initialBalanceCents: null,
+        kind: norm.kind,
+        status: 'ativa',
+        isDefault: !live.some((a) => a.isDefault),
+        version: 1,
+        createdBy: this.opts.actorId,
+        createdAt: new Date().toISOString(),
+      };
+      this.accountsById.set(account.id, account);
+      this.saveOperation(key, 'criar_conta', payload, { contextId, recordId: null, commitmentId: null, accountId: account.id });
+      return stripAccount(account);
+    });
+  }
+
+  /** Como update_account. Ordem: repetição; trava (nao_encontrado, sem_permissao); versão; nome; tipo; nome repetido. */
+  async updateAccount(key: string, id: string, expectedVersion: number, input: AccountInput) {
+    return this.write(() => {
+      const norm = normalizeAccountInput(input);
+      const payload = [id, expectedVersion, norm.name, norm.kind];
+      const replayed = this.replayAccount(key, 'alterar_conta', payload);
+      if (replayed) return replayed;
+      const acc = this.liveAccount(id);
+      if (acc.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${acc.version}`);
+      const code = accountInputError(norm);
+      if (code) throw new RepoError(code);
+      this.checkAccountName(acc.contextId, norm.name, id);
+      this.accountsById.set(id, { ...acc, name: norm.name, kind: norm.kind, version: acc.version + 1 });
+      this.saveOperation(key, 'alterar_conta', payload, { contextId: acc.contextId, recordId: null, commitmentId: null, accountId: id });
+      return stripAccount(this.accountsById.get(id)!);
+    });
+  }
+
+  /** Como set_default_account: a anterior sobe +1; já ser a principal não muda nada. Ordem: repetição; trava; versão; conta_arquivada. */
+  async setDefaultAccount(key: string, id: string, expectedVersion: number) {
+    return this.write(() => {
+      const payload = [id, expectedVersion];
+      const replayed = this.replayAccount(key, 'conta_principal', payload);
+      if (replayed) return replayed;
+      const acc = this.liveAccount(id);
+      if (acc.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${acc.version}`);
+      if (acc.status !== 'ativa') throw new RepoError('conta_arquivada');
+      if (!acc.isDefault) {
+        for (const other of this.liveAccounts()) {
+          if (other.contextId === acc.contextId && other.isDefault) this.accountsById.set(other.id, { ...other, isDefault: false, version: other.version + 1 });
+        }
+        this.accountsById.set(id, { ...acc, isDefault: true, version: acc.version + 1 });
+      }
+      this.saveOperation(key, 'conta_principal', payload, { contextId: acc.contextId, recordId: null, commitmentId: null, accountId: id });
+      return stripAccount(this.accountsById.get(id)!);
+    });
+  }
+
+  /**
+   * Como set_account_status. Ordem: repetição; trava; versão; situacao_invalida; campo_nao_se_aplica (newDefaultId fora de "arquivar
+   * a principal"); ultima_conta_ativa; conta_principal; conta_invalida (a nova principal); limite_de_contas (reativar).
+   */
+  async setAccountStatus(key: string, id: string, expectedVersion: number, status: AccountStatus, newDefaultId: string | null = null) {
+    return this.write(() => {
+      const payload = [id, expectedVersion, status, newDefaultId];
+      const replayed = this.replayAccount(key, 'situacao_conta', payload);
+      if (replayed) return replayed;
+      const acc = this.liveAccount(id);
+      if (acc.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${acc.version}`);
+      if (status !== 'ativa' && status !== 'arquivada') throw new RepoError('situacao_invalida');
+      const archiving = status === 'arquivada' && acc.status === 'ativa';
+      if (newDefaultId !== null && !(archiving && acc.isDefault)) throw new RepoError('campo_nao_se_aplica');
+      const now = this.liveAccounts().filter((a) => a.contextId === acc.contextId);
+      if (archiving) {
+        if (now.filter((a) => a.status === 'ativa').length <= 1) throw new RepoError('ultima_conta_ativa');
+        if (acc.isDefault) {
+          if (newDefaultId === null) throw new RepoError('conta_principal');
+          const next = now.find((a) => a.id === newDefaultId);
+          if (!next || next.id === id || next.status !== 'ativa') throw new RepoError('conta_invalida');
+          this.accountsById.set(id, { ...acc, isDefault: false, status: 'arquivada', version: acc.version + 1 });
+          this.accountsById.set(next.id, { ...next, isDefault: true, version: next.version + 1 });
+        } else {
+          this.accountsById.set(id, { ...acc, status: 'arquivada', version: acc.version + 1 });
+        }
+      } else if (status === 'ativa' && acc.status === 'arquivada') {
+        this.checkAccountLimit(acc.contextId, id);
+        this.accountsById.set(id, { ...acc, status: 'ativa', version: acc.version + 1 });
+      }
+      this.saveOperation(key, 'situacao_conta', payload, { contextId: acc.contextId, recordId: null, commitmentId: null, accountId: id });
+      return stripAccount(this.accountsById.get(id)!);
+    });
+  }
+
+  /** Como delete_account: exclusão lógica; a conta fica arquivada. Ordem: repetição; trava; versão; conta_principal; conta_com_lancamentos. */
+  async deleteAccount(key: string, id: string, expectedVersion: number) {
+    return this.write(() => {
+      const payload = [id, expectedVersion];
+      const replayed = this.replayAccount(key, 'excluir_conta', payload);
+      if (replayed) return replayed;
+      const acc = this.liveAccount(id);
+      if (acc.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${acc.version}`);
+      if (acc.isDefault) throw new RepoError('conta_principal');
+      if (
+        [...this.records.values()].some((r) => !r.deletedAt && r.accountId === id) ||
+        [...this.goalMovements.values()].some((m) => !m.deletedAt && m.accountId === id)
+      ) {
+        throw new RepoError('conta_com_lancamentos');
+      }
+      this.accountsById.set(id, { ...acc, status: 'arquivada', version: acc.version + 1, deletedAt: new Date().toISOString(), deletedBy: this.opts.actorId });
+      this.saveOperation(key, 'excluir_conta', payload, { contextId: acc.contextId, recordId: null, commitmentId: null, accountId: id });
+      return stripAccount(this.accountsById.get(id)!);
+    });
+  }
+
+  /** Como clarevo_lock_account: sem leitura ou excluída, não revela a existência; sem escrita, sem_permissao. */
+  private liveAccount(id: string): StoredAccount {
+    const a = this.accountsById.get(id);
+    if (!a || a.deletedAt || !this.canRead(a.contextId)) throw new RepoError('nao_encontrado');
+    if (!this.canWrite(a.contextId)) throw new RepoError('sem_permissao');
+    return a;
+  }
+
+  /** A4: nenhuma outra conta não excluída com o mesmo nome (sem diferenciar maiúsculas de minúsculas). */
+  private checkAccountName(contextId: string, name: string, exceptId: string | null) {
+    if (accountNameTaken(this.liveAccounts().filter((a) => a.contextId === contextId), name, exceptId)) throw new RepoError('nome_da_conta_repetido');
+  }
+
+  /** A3: até 10 contas ativas por contexto. */
+  private checkAccountLimit(contextId: string, exceptId: string | null) {
+    const active = this.liveAccounts().filter((a) => a.contextId === contextId && a.status === 'ativa' && a.id !== exceptId);
+    if (active.length >= ACCOUNTS_ACTIVE_MAX) throw new RepoError('limite_de_contas');
+  }
+
+  /** Devolve a conta atual (também a excluída), como o banco devolve a linha de target_id. */
+  private replayAccount(key: string, action: AccountAction, payload: unknown[]): FinancialAccount | null {
+    const op = this.replay(key, action, payload);
+    return op ? stripAccount(this.accountsById.get(op.accountId!)!) : null;
   }
 
   async listRecords(contextId: string, month: IsoMonth) {
@@ -463,7 +686,7 @@ export class MemoryRepository implements RecordsRepository {
       if (current.invoice && (norm.amountCents !== current.amountCents || norm.description !== current.description || norm.category !== current.category)) {
         throw new RepoError('pagamento_de_fatura');
       }
-      this.validate(current.contextId, norm);
+      this.validate(current.contextId, norm, current.accountId);
       const now = new Date().toISOString();
       const next = { ...current, ...norm, version: current.version + 1, updatedAt: now };
       this.records.set(id, next);
@@ -606,7 +829,7 @@ export class MemoryRepository implements RecordsRepository {
     });
   }
 
-  async payCommitment(key: string, id: string, expectedVersion: number, input: PaymentInput) {
+  async payCommitment(key: string, id: string, expectedVersion: number, input: PaymentRequest) {
     return this.write(() => {
       const norm = normalizePayment(input);
       const payload = [id, expectedVersion, norm];
@@ -618,8 +841,11 @@ export class MemoryRepository implements RecordsRepository {
       if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
       if (current.status !== 'aberto') throw new RepoError('compromisso_quitado');
       // Mesmas regras do gasto realizado: valor, categoria, data até hoje e conta do contexto.
+      // Sem a conta (nula), a principal do contexto (A9); sem principal ativa, conta_invalida na validação.
+      const accountId =
+        norm.accountId ?? this.liveAccounts().find((a) => a.contextId === current.contextId && a.isDefault && a.status === 'ativa')?.id ?? '';
       const recordInput: RecordInput = {
-        accountId: norm.accountId,
+        accountId,
         amountCents: norm.amountCents,
         occurredOn: norm.paidOn,
         description: current.description,
@@ -1503,13 +1729,14 @@ export class MemoryRepository implements RecordsRepository {
   async addGoalMovement(key: string, goalId: string, kind: GoalMovementKind, input: GoalMovementInput) {
     return this.write(() => {
       const norm = normalizeMovementInput(input);
-      const payload = [goalId, kind, norm.amountCents, norm.occurredOn, norm.note];
+      const payload = [goalId, kind, ...movementPayload(norm)];
       const replayed = this.replay(key, 'registrar_movimento_meta', payload);
       if (replayed) return this.goalResult(replayed.goalId!, replayed.movementId);
       const goal = this.liveGoal(goalId);
       if (goal.status === 'arquivada') throw new RepoError('meta_arquivada');
       const code = goalMovementError(kind, norm, this.opts.today());
       if (code) throw new RepoError(code);
+      this.checkMovementAccount(goal.contextId, kind, norm.accountId, null);
       this.checkGoalBalance(goalId, { op: 'add', kind, amountCents: norm.amountCents, occurredOn: norm.occurredOn });
       const m = this.newMovement(goal, kind, norm, new Date().toISOString());
       this.saveOperation(key, 'registrar_movimento_meta', payload, {
@@ -1530,7 +1757,9 @@ export class MemoryRepository implements RecordsRepository {
   async updateGoalMovement(key: string, movementId: string, expectedVersion: number, input: GoalMovementInput) {
     return this.write(() => {
       const norm = normalizeMovementInput(input);
-      const payload = [movementId, expectedVersion, norm.amountCents, norm.occurredOn, norm.note];
+      // Conta ausente = manter a do movimento (o padrão do banco; o hash é o de antes da 0010); nula informada = tirar a conta.
+      const keepAccount = input.accountId === undefined;
+      const payload = [movementId, expectedVersion, norm.amountCents, norm.occurredOn, norm.note, ...(keepAccount ? [] : [norm.accountId])];
       const replayed = this.replay(key, 'alterar_movimento_meta', payload);
       if (replayed) return this.goalResult(replayed.goalId!, replayed.movementId);
       const { goal, movement } = this.liveMovement(movementId);
@@ -1538,9 +1767,11 @@ export class MemoryRepository implements RecordsRepository {
       if (goal.status === 'arquivada') throw new RepoError('meta_arquivada');
       const code = goalMovementError(movement.kind, norm, this.opts.today(), { allowInitial: true });
       if (code) throw new RepoError(code);
+      const accountId = keepAccount ? movement.accountId : norm.accountId;
+      this.checkMovementAccount(goal.contextId, movement.kind, accountId, movement.accountId);
       this.checkGoalBalance(goal.id, { op: 'update', id: movementId, amountCents: norm.amountCents, occurredOn: norm.occurredOn });
       const now = new Date().toISOString();
-      this.goalMovements.set(movementId, { ...movement, ...norm, version: movement.version + 1, updatedAt: now });
+      this.goalMovements.set(movementId, { ...movement, ...norm, accountId, version: movement.version + 1, updatedAt: now });
       this.saveOperation(key, 'alterar_movimento_meta', payload, {
         contextId: goal.contextId,
         recordId: null,
@@ -1986,7 +2217,7 @@ export class MemoryRepository implements RecordsRepository {
    * compromisso_quitado; fatura_aberta (hoje até o fechamento: só se paga depois que a fatura fecha); valor_invalido; valor_acima_da_fatura; data_invalida (inválida, ou antes do menor entre 1 ano atrás e o
    * início do período da fatura); data_futura;
    * conta_invalida; fatura_seguinte_paga. Cria UM gasto sem categoria, ligado ao cartão e ao mês, na conta informada (sem ela, a
-   * mais antiga do contexto) e, no pagamento parcial, o saldo anterior na fatura seguinte.
+   * principal do contexto) e, no pagamento parcial, o saldo anterior na fatura seguinte.
    */
   async payInvoice(key: string, cardId: string, month: IsoMonth, expectedVersion: number, amountCents: Cents, paidOn: IsoDate, accountId: string | null = null) {
     return this.write(() => {
@@ -2009,9 +2240,10 @@ export class MemoryRepository implements RecordsRepository {
       const periodStart = invoicePeriod(card, month).startOn;
       if (typeof paidOn !== 'string' || !isValidIsoDate(paidOn) || paidOn < (periodStart < oneYearAgo ? periodStart : oneYearAgo)) throw new RepoError('data_invalida');
       if (paidOn > today) throw new RepoError('data_futura');
+      // Sem a conta, a principal do contexto (A9; antes, a mais antiga).
       const account = accountId
-        ? this.space?.accounts.find((a) => a.id === accountId && a.contextId === card.contextId)
-        : this.space?.accounts.find((a) => a.contextId === card.contextId);
+        ? this.liveAccounts().find((a) => a.id === accountId && a.contextId === card.contextId && a.status === 'ativa')
+        : activeAccounts(this.liveAccounts().filter((a) => a.contextId === card.contextId))[0];
       if (!account) throw new RepoError('conta_invalida');
       const left = c.amountCents - amountCents;
       const next = addMonths(month, 1);
@@ -2533,6 +2765,18 @@ export class MemoryRepository implements RecordsRepository {
     if (day) throw new RepoError('saldo_da_meta_insuficiente', undefined, `dia=${day}`);
   }
 
+  /**
+   * A conta de um aporte ou resgate (D-043), como no banco: só nesses tipos (campo_nao_se_aplica nos outros); ativa, não excluída
+   * e do mesmo contexto (conta_invalida), conferida só quando muda (keepAccountId é a que o movimento já tem).
+   */
+  private checkMovementAccount(contextId: string, kind: GoalMovementKind, accountId: string | null, keepAccountId: string | null) {
+    if (accountId === null) return;
+    if (kind !== 'aporte' && kind !== 'resgate') throw new RepoError('campo_nao_se_aplica');
+    if (accountId === keepAccountId) return;
+    const acc = this.accountsById.get(accountId);
+    if (!acc || acc.deletedAt || acc.contextId !== contextId || acc.status !== 'ativa') throw new RepoError('conta_invalida');
+  }
+
   private newMovement(goal: StoredGoal, kind: GoalMovementKind, input: GoalMovementInput, now: string): StoredGoalMovement {
     const m: StoredGoalMovement = {
       id: this.id('mov'),
@@ -2542,6 +2786,7 @@ export class MemoryRepository implements RecordsRepository {
       amountCents: input.amountCents,
       occurredOn: input.occurredOn,
       note: input.note,
+      accountId: input.accountId ?? null,
       createdBy: this.opts.actorId,
       version: 1,
       createdAt: now,
@@ -2686,9 +2931,51 @@ export class MemoryRepository implements RecordsRepository {
     this.checkBudgetInvariants();
     this.checkGoalInvariants();
     this.checkSavingsInvariants();
+    this.checkAccountInvariants();
     this.checkCardInvariants();
     this.checkInvoiceInvariants();
     this.checkReceiptInvariants();
+  }
+
+  /**
+   * Contas (D-043; no banco: restrições e índices de financial_accounts e a FK composta de goal_movements). A1: no máximo uma
+   * principal por contexto, ativa e não excluída; A2: com contas ativas, exatamente uma principal; A3: no máximo 10 ativas;
+   * A4: nome único entre as não excluídas; conta excluída fica arquivada; A7: a conta de um movimento de meta é do mesmo contexto
+   * e o movimento é aporte ou resgate. Lança Error('conta_inconsistente').
+   */
+  private checkAccountInvariants() {
+    const fail = (): never => {
+      throw new Error('conta_inconsistente');
+    };
+    const byContext = new Map<string, StoredAccount[]>();
+    for (const a of this.accountsById.values()) {
+      if (
+        !ACCOUNT_KINDS.includes(a.kind) ||
+        (a.status !== 'ativa' && a.status !== 'arquivada') ||
+        a.name !== a.name.trim() ||
+        [...a.name].length < 1 ||
+        [...a.name].length > ACCOUNT_NAME_MAX ||
+        !Number.isSafeInteger(a.version) ||
+        a.version < 1 ||
+        (a.isDefault && (a.status !== 'ativa' || a.deletedAt)) ||
+        (a.deletedAt && a.status !== 'arquivada')
+      ) {
+        fail();
+      }
+      if (a.deletedAt) continue;
+      byContext.set(a.contextId, [...(byContext.get(a.contextId) ?? []), a]);
+    }
+    for (const list of byContext.values()) {
+      const active = list.filter((a) => a.status === 'ativa');
+      if (list.filter((a) => a.isDefault).length > 1 || active.length > ACCOUNTS_ACTIVE_MAX) fail();
+      if (active.length > 0 && !active.some((a) => a.isDefault)) fail();
+      if (new Set(list.map((a) => a.name.toLowerCase())).size !== list.length) fail();
+    }
+    for (const m of this.goalMovements.values()) {
+      if (m.accountId === null) continue;
+      const a = this.accountsById.get(m.accountId);
+      if (!a || a.contextId !== m.contextId || (m.kind !== 'aporte' && m.kind !== 'resgate')) fail();
+    }
   }
 
   /**
@@ -3071,7 +3358,8 @@ export class MemoryRepository implements RecordsRepository {
     key: string,
     action: Operation['action'],
     payload: unknown[],
-    ids: Omit<Operation, 'action' | 'hash' | 'seriesId' | 'referenceId' | 'budgetId' | 'goalId' | 'movementId' | 'cardId' | 'entryId'> & {
+    ids: Omit<Operation, 'action' | 'hash' | 'seriesId' | 'referenceId' | 'budgetId' | 'goalId' | 'movementId' | 'cardId' | 'entryId' | 'accountId'> & {
+      accountId?: string;
       seriesId?: string;
       referenceId?: string;
       budgetId?: string;
@@ -3092,6 +3380,7 @@ export class MemoryRepository implements RecordsRepository {
       movementId: ids.movementId ?? null,
       cardId: ids.cardId ?? null,
       entryId: ids.entryId ?? null,
+      accountId: ids.accountId ?? null,
     });
     this.trackActivity(action, ids.contextId);
   }
@@ -3296,12 +3585,16 @@ export class MemoryRepository implements RecordsRepository {
     return this.canRead(contextId);
   }
 
-  private validate(contextId: string, input: RecordInput) {
+  /**
+   * Como clarevo_validate_record: a conta é ativa, não excluída e do contexto. keepAccountId é a conta que o registro já tem
+   * (update_record), que continua valendo mesmo arquivada.
+   */
+  private validate(contextId: string, input: RecordInput, keepAccountId: string | null = null) {
     validateCommon(input.amountCents, input.description, input.category);
     if (typeof input.occurredOn !== 'string' || !isValidIsoDate(input.occurredOn)) throw new RepoError('data_invalida');
     if (input.occurredOn > this.opts.today()) throw new RepoError('data_futura');
-    const acc = this.space?.accounts.find((a) => a.id === input.accountId);
-    if (!acc || acc.contextId !== contextId) throw new RepoError('conta_invalida');
+    const acc = this.accountsById.get(input.accountId);
+    if (!acc || acc.deletedAt || acc.contextId !== contextId || (acc.status !== 'ativa' && acc.id !== keepAccountId)) throw new RepoError('conta_invalida');
   }
 
   /** Mesma ordem de clarevo_validate_commitment no banco. */
@@ -3333,6 +3626,10 @@ function isSeriesAction(action: Operation['action']): action is SeriesAction {
 
 function isGoalAction(action: Operation['action']): action is GoalAction {
   return GOAL_ACTIONS.includes(action);
+}
+
+function isAccountAction(action: Operation['action']): action is AccountAction {
+  return ACCOUNT_ACTIONS.includes(action);
 }
 
 function isCardAction(action: Operation['action']): action is CardAction {
@@ -3419,7 +3716,7 @@ function normalizeSeriesEdit(input: SeriesEditInput): SeriesEditInput {
   };
 }
 
-function normalizePayment(input: PaymentInput): PaymentInput {
+function normalizePayment(input: PaymentRequest): PaymentRequest {
   return { accountId: input.accountId, amountCents: input.amountCents, paidOn: input.paidOn, category: trimCategory(input.category) };
 }
 
@@ -3452,8 +3749,13 @@ function goalPayload(g: GoalInput): unknown[] {
   return [g.goalType, g.name, g.targetCents, g.targetMonth, g.plannedMonthlyCents, g.essentialBaseCents, g.essentialMonths, g.essentialBaseSource];
 }
 
-function normalizeMovementInput(input: GoalMovementInput): GoalMovementInput {
-  return { amountCents: input.amountCents, occurredOn: input.occurredOn, note: normalizeGoalNote(input.note) };
+function normalizeMovementInput(input: GoalMovementInput): GoalMovementInput & { accountId: string | null } {
+  return { amountCents: input.amountCents, occurredOn: input.occurredOn, note: normalizeGoalNote(input.note), accountId: input.accountId ?? null };
+}
+
+/** Conteúdo do movimento na forma do hash: a conta só entra quando informada (sem ela, o hash é o de antes da 0010). */
+function movementPayload(norm: GoalMovementInput & { accountId: string | null }): unknown[] {
+  return norm.accountId === null ? [norm.amountCents, norm.occurredOn, norm.note] : [norm.amountCents, norm.occurredOn, norm.note, norm.accountId];
 }
 
 const byMovementDesc = (a: StoredGoalMovement, b: StoredGoalMovement) =>
@@ -3517,6 +3819,11 @@ function entryMonths(e: Pick<CardEntry, 'kind' | 'installments' | 'invoiceMonth'
 
 function stripEntry(e: StoredCardEntry): CardEntry {
   const { deletedAt: _deleted, deletedBy: _by, ...rest } = e;
+  return rest;
+}
+
+function stripAccount(a: StoredAccount): FinancialAccount {
+  const { createdBy: _by, createdAt: _at, deletedAt: _deleted, deletedBy: _deletedBy, ...rest } = a;
   return rest;
 }
 

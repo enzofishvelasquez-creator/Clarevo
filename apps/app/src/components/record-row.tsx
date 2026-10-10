@@ -10,7 +10,20 @@ export function kindLabel(r: Pick<FinancialRecord, 'kind'>) {
   return r.kind === 'despesa' ? 'Pago' : 'Recebido';
 }
 
-export function RecordRow({ record, onPress, last }: { record: FinancialRecord; onPress?: () => void; last?: boolean }) {
+/**
+ * Linha de registro. accountName (D-043): a conta de origem, só quando há mais de uma conta ativa ("Pago · 06/10/2026 · Carteira").
+ */
+export function RecordRow({
+  record,
+  onPress,
+  last,
+  accountName,
+}: {
+  record: FinancialRecord;
+  onPress?: () => void;
+  last?: boolean;
+  accountName?: string | null;
+}) {
   const { width, fontScale } = useWindowDimensions();
   const hidden = useValuesHidden();
   const stacked = width < 360 || fontScale > 1.3;
@@ -19,7 +32,7 @@ export function RecordRow({ record, onPress, last }: { record: FinancialRecord; 
   // Gasto gerado ao marcar uma conta a pagar como paga: a origem aparece na legenda.
   // Pagamento de fatura de cartão: a origem é a fatura (D-037), não uma conta a pagar comum.
   const origin = record.invoice ? ` · ${CARDS_TEXT.paymentOrigin}` : record.commitmentId ? ' · conta a pagar' : '';
-  const when = `${kindLabel(record)} · ${formatDateBR(record.occurredOn)}${origin}`;
+  const when = `${kindLabel(record)} · ${formatDateBR(record.occurredOn)}${origin}${accountName ? ` · ${accountName}` : ''}`;
   return (
     <Pressable
       onPress={onPress}

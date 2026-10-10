@@ -5,7 +5,8 @@
  * (Conta na web e ocultar valores), do Ciclo B (renda comprometida e a previsão dos pagamentos), do Ciclo C (metas, reserva
  * e plano de guardar), do Ciclo D (simulador, com os aportes no início de cada mês) e da Navegação (D-039: "Anotar gasto" logo
  * abaixo do cabeçalho, barra inferior nas telas de consulta, Contas a pagar no mês certo, Metas compacta e a busca "No app" de
- * Aprender) e de "Antes de financiar" (D-044) na versão web, em modo demonstração (acesso simulado).
+ * Aprender), de "Antes de financiar" (D-044) e do Ciclo G1 (contas de origem do dinheiro, D-043) na versão web, em modo
+ * demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -1380,7 +1381,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const saldoHint = p.getByRole('button', { name: 'O que é isso? Saldo inicial', exact: true }).filter({ visible: true }).first();
   await saldoHint.waitFor({ timeout: 8000 }).catch(() => {});
   ok('/conta: "O que é isso?" de "Saldo inicial", fechado, com alvo de 44 px', (await saldoHint.getAttribute('aria-expanded')) === 'false' && ((await saldoHint.boundingBox())?.height ?? 0) >= 43.5 &&
-    (await body()).includes('Saldo inicial: não informado.'));
+    (await body()).includes('O Clarevo não calcula saldo por conta.'));
   await saldoHint.click(); await waitText('Ler explicação completa');
   ok('/conta: o resumo abre no lugar, sem sair da tela', (await saldoHint.getAttribute('aria-expanded')) === 'true' && new URL(p.url()).pathname === '/conta');
   await saldoHint.evaluate((e) => e.scrollIntoView({ block: 'center' }));
@@ -3447,7 +3448,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await body();
   ok('E Pagar fatura: total R$ 400,00, "Pagar o total" marcado, data de hoje com a janela "De 07/10/2025 até hoje." (começa 1 ano atrás) e "Outro valor" ainda sem campo',
     (await h1Name()) === 'Pagar fatura' && t.includes('Total da fatura') && t.includes('R$ 400,00') && (await radio('Pagar o total').getAttribute('aria-checked')) === 'true' && (await field('Data do pagamento').inputValue()) === '07/10/2026' &&
-    t.includes('De 07/10/2025 até hoje.') && (await visibleCount('textbox', 'Valor pago')) === 0 && t.includes('O pagamento de R$ 400,00 entra em Pago de outubro.') && (await visibleCount('button', 'Confirmar pagamento')) === 1, t.slice(0, 500));
+    t.includes('De 07/10/2025 até hoje.') && (await visibleCount('textbox', 'Valor pago')) === 0 && t.includes('O pagamento de R$ 400,00 entra em Pago de outubro, saindo da conta Conta principal.') && (await visibleCount('button', 'Confirmar pagamento')) === 1, t.slice(0, 500));
   await keepText();
   await innerChecks('pagar fatura 390px');
   await shot('135_pagar_fatura');
@@ -3464,7 +3465,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await body();
   ok('E pagamento parcial de R$ 250,00: a prévia diz "Ficaram R$ 150,00 para a fatura de novembro. Juros e encargos do banco entram quando você informar a fatura de novembro." e oferece "Quanto custa pagar só uma parte?"',
     t.includes('Ficaram R$ 150,00 para a fatura de novembro. Juros e encargos do banco entram quando você informar a fatura de novembro.') && (await visibleCount('button', 'Quanto custa pagar só uma parte?')) === 1 &&
-    t.includes('O pagamento de R$ 250,00 entra em Pago de outubro.'));
+    t.includes('O pagamento de R$ 250,00 entra em Pago de outubro, saindo da conta Conta principal.'));
   await keepText();
   await shot('136_pagar_parcial');
   await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado.'); await waitInvoice('Paga em parte'); t = await body();
@@ -3677,7 +3678,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await openCardPage(); await openInvoice('outubro');
   await btn('Pagar fatura').click(); await waitText('Confirmar pagamento'); await radio('Outro valor').click(); await field('Valor pago').fill('250'); await p.waitForTimeout(500);
   await hiddenShows('pagar fatura');
-  ok('E valores ocultos ao pagar em parte: o aviso do que fica e o resumo do pagamento aparecem como "R$ ••••"', (await body()).includes('Ficaram R$ •••• para a fatura de novembro.') && (await body()).includes('O pagamento de R$ •••• entra em Pago de outubro.'));
+  ok('E valores ocultos ao pagar em parte: o aviso do que fica e o resumo do pagamento aparecem como "R$ ••••"', (await body()).includes('Ficaram R$ •••• para a fatura de novembro.') && (await body()).includes('O pagamento de R$ •••• entra em Pago de outubro, saindo da conta Conta principal.'));
   await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado.'); await waitInvoice('Paga em parte');
   await hiddenShows('fatura paga em parte');
   ok('E valores ocultos depois de pagar: "Pagamento registrado. R$ •••• em Pago de outubro." e "Pago R$ •••• em 07/10/2026"', (await body()).includes('Pagamento registrado. R$ •••• em Pago de outubro.') && (await body()).includes('Pago R$ •••• em 07/10/2026'));
@@ -6466,6 +6467,254 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await keepText();
   const f2Vetoed = f2Texts.map((x) => x.match(F2_VETOED)?.[0]).filter(Boolean);
   ok('F2 telas do orçamento e do limite: nenhuma palavra vetada (estourou, excedeu, gastou demais, controle-se, cuidado, alerta) nem travessão', f2Texts.length >= 12 && f2Vetoed.length === 0 && f2Texts.every((x) => !/[–—]/.test(x)), `${f2Texts.length} telas ${f2Vetoed.join(' | ')}`);
+  await goResumo().catch(() => {});
+
+  // ==================================================================================================================
+  // Ciclo G1 · Contas de origem do dinheiro (D-043, docs/08 §5 item 16). "Suas contas" em Conta (lista, nova conta, editar,
+  // principal, arquivar, reativar, excluir), o seletor "Saiu de" / "Entrou em" / "Foi para" em Anotar gasto, recebimento,
+  // editar registro, pagar conta, pagar fatura e aporte e resgate de meta, a conta nas linhas e no detalhe de Movimentos e o
+  // filtro por conta. A conta só informa a origem: não existe saldo por conta e os totais de outubro seguem 6.000 / 3.900 /
+  // 2.100 / 650. Cada tela é conferida em 390 e em 320 px. Capturas novas: 240 em diante. A demonstração tem "Conta principal"
+  // (banco) e "Carteira" (dinheiro), com o mercado pago na Carteira; conta nova tem só a "Conta principal".
+  // ==================================================================================================================
+  const g1Texts = [];
+  const g1Keep = async () => { const x = await body(); g1Texts.push(x); screenTexts.push(x); return x; };
+  const g1OpenCard = async () => {
+    await goResumo(); await tabByName('Movimentações').click(); await waitText('Registrar recebimento');
+    await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitText('Cadastrar cartão'); await p.waitForTimeout(500);
+    await p.getByRole('button', { name: /^Cartão Exemplo · final 1234\./ }).filter({ visible: true }).first().click(); await waitText('Fatura atual'); await p.waitForTimeout(400);
+  };
+  const g1OpenInvoice = async (month) => {
+    await p.getByRole('button', { name: new RegExp(`^Fatura de ${month}, `) }).filter({ visible: true }).first().click(); await waitText('Lançamentos'); await p.waitForTimeout(500);
+  };
+  const g1OpenConta = async () => {
+    await goResumo();
+    await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Suas contas'); await p.waitForTimeout(400);
+  };
+  const g1Rows = async () => ((await sectionRows('Suas contas')) ?? []).filter((x) => / Abrir a conta\.$/.test(x));
+  const g1Row = (name) => p.getByRole('button', { name: new RegExp(`^${name}, .*Abrir a conta\\.$`) }).filter({ visible: true }).first();
+  const g1Group = (name) => p.getByRole('radiogroup', { name, exact: true }).filter({ visible: true });
+  const g1Checked = async (name) => (await radio(name).count()) === 1 && (await radio(name).getAttribute('aria-checked')) === 'true';
+  const g1Records = (desc) => otherDevice(async (repo, ctx, d) => {
+    const space = await repo.getSpace();
+    const all = [];
+    for (const m of ['2026-09', '2026-10', '2026-11']) all.push(...(await repo.listRecords(ctx, m)));
+    const names = Object.fromEntries((await repo.listAccounts(ctx)).map((a) => [a.id, a.name]));
+    return all.filter((r) => r.description.startsWith(d)).map((r) => `${r.description}|${names[r.accountId]}|${r.amountCents}`).sort().join(';') || space.personalContextId.slice(0, 0);
+  }, desc);
+  const g1Accounts = () => otherDevice(async (repo, ctx) => (await repo.listAccounts(ctx)).map((a) => `${a.name}|${a.kind}|${a.status}|${a.isDefault ? 'principal' : '-'}`).join(';'));
+  const g1Save = async (label) => { await btn(label).click(); await p.waitForTimeout(400); };
+  const g1Totals = async () => {
+    const x = await otherDevice(async (repo, ctx) => {
+      const sum = (list, kind) => list.filter((r) => r.kind === kind).reduce((a, r) => a + r.amountCents, 0);
+      const list = await repo.listRecords(ctx, '2026-10');
+      const open = (await repo.listCommitments(ctx, '2026-10')).filter((c) => c.status === 'aberto' && c.dueOn.startsWith('2026-10')).reduce((a, c) => a + c.amountCents, 0);
+      return `${sum(list, 'receita')} ${sum(list, 'despesa')} ${open}`;
+    });
+    return x;
+  };
+  const g1WritesBefore = writes.length;
+
+  // ---- 1. Demonstração: Conta principal e Carteira; os totais de outubro não mudam ----
+  await demoHome();
+  t = await body();
+  ok('G1 demonstração: os totais de outubro seguem 6.000 / 3.900 / 2.100 e 650 com a Carteira',
+    t.includes('R$ 6.000,00') && t.includes('R$ 3.900,00') && t.includes('R$ 2.100,00') && t.includes('R$ 650,00') && (await g1Totals()) === '600000 390000 65000', await g1Totals());
+  await g1OpenConta();
+  t = await g1Keep();
+  const g1Initial = await g1Rows();
+  ok('G1 Conta: "Suas contas" lista a Conta principal (Conta bancária, Principal) e a Carteira (Dinheiro), nessa ordem',
+    JSON.stringify(g1Initial) === JSON.stringify(['Conta principal, Conta bancária · Principal. Abrir a conta.', 'Carteira, Dinheiro. Abrir a conta.']), JSON.stringify(g1Initial));
+  ok('G1 Conta: o card diz que é só a origem (sem saldo) e que o Clarevo não calcula saldo por conta; o antigo "Nome da conta" saiu',
+    t.includes('É só a origem informada: o Clarevo não guarda saldo nem movimenta dinheiro.') && t.includes('O Clarevo não calcula saldo por conta.') &&
+    (await visibleCount('textbox', 'Nome da conta')) === 0 && (await visibleCount('button', 'Salvar nome')) === 0 && (await visibleCount('button', 'Adicionar conta')) === 1);
+  ok('G1 Conta: a demonstração guarda a Carteira como dinheiro e o mercado pago nela (Mercado de setembro e de outubro)',
+    (await g1Accounts()) === 'Conta principal|banco|ativa|principal;Carteira|dinheiro|ativa|-' && (await g1Records('Mercado')) === 'Mercado|Carteira|125000;Mercado|Carteira|140000', await g1Records('Mercado'));
+  await atWidths(async (w) => { await layoutChecks(`G1 Conta (Suas contas) ${w}px`); if (w === 390) await shot('240_suas_contas'); if (w === 320) await shot('240_suas_contas_320px'); });
+
+  // ---- 2. Nova conta: validação, nome repetido e cadastro ----
+  await btn('Adicionar conta').click(); await waitText('Tipo da conta'); await p.waitForTimeout(400);
+  t = await g1Keep();
+  ok('G1 Nova conta: título, nome, tipo (Conta bancária marcada), a nota do saldo e o rodapé fixo',
+    (await h1Name()) === 'Nova conta' && urlPath() === '/contas/nova' && (await visibleCount('textbox', 'Nome da conta')) === 1 && (await g1Checked('Conta bancária')) && (await visibleCount('radio', /^(Dinheiro|Outra)$/)) === 2 &&
+    t.includes('Por exemplo: Carteira ou Conta do banco.') && t.includes('O Clarevo não calcula saldo por conta.') && (await visibleCount('button', 'Adicionar conta')) === 1 && (await visibleCount('button', 'Excluir conta')) === 0);
+  await atWidths(async (w) => { await innerChecks(`G1 Nova conta ${w}px`); if (w === 390) await shot('241_nova_conta'); });
+  await g1Save('Adicionar conta');
+  ok('G1 Nova conta sem nome: "Dê um nome de 1 a 40 caracteres para a conta." e nada gravado', (await body()).includes('Dê um nome de 1 a 40 caracteres para a conta.') && urlPath() === '/contas/nova' && (await g1Accounts()).split(';').length === 2);
+  await field('Nome da conta').fill('carteira'); await g1Save('Adicionar conta');
+  ok('G1 Nova conta com o nome de outra (sem diferenciar maiúsculas): "Você já tem uma conta com este nome. Use outro nome."', (await body()).includes('Você já tem uma conta com este nome. Use outro nome.') && urlPath() === '/contas/nova');
+  await field('Nome da conta').fill('Reserva da casa'); await radio('Outra').click(); await g1Save('Adicionar conta'); await waitText('Conta adicionada.'); await p.waitForTimeout(500);
+  const g1Added = await g1Rows();
+  ok('G1 Nova conta salva: aviso "Conta adicionada.", de volta a Conta com a terceira conta (Outra) e nenhuma principal nova',
+    urlPath() === '/conta' && g1Added.length === 3 && g1Added[2] === 'Reserva da casa, Outra. Abrir a conta.' && (await g1Accounts()) === 'Conta principal|banco|ativa|principal;Carteira|dinheiro|ativa|-;Reserva da casa|outra|ativa|-', JSON.stringify(g1Added));
+  await shot('242_conta_adicionada');
+
+  // ---- 3. Editar: renomear, tornar principal, arquivar a principal escolhendo outra, reativar, excluir ----
+  await g1Row('Reserva da casa').click(); await waitText('Situação'); await p.waitForTimeout(400);
+  t = await g1Keep();
+  ok('G1 Editar conta: título, nome e tipo preenchidos, a situação ("Outra") e as ações (Tornar principal, Arquivar conta, Excluir conta)',
+    (await h1Name()) === 'Editar conta' && (await field('Nome da conta').inputValue()) === 'Reserva da casa' && (await g1Checked('Outra')) && t.includes('Situação') &&
+    (await visibleCount('button', 'Tornar principal')) === 1 && (await visibleCount('button', 'Arquivar conta')) === 1 && (await visibleCount('button', 'Excluir conta')) === 1 && (await visibleCount('button', 'Reativar conta')) === 0, t.slice(0, 300));
+  await atWidths(async (w) => { await innerChecks(`G1 Editar conta ${w}px`); if (w === 390) await shot('243_editar_conta'); });
+  await field('Nome da conta').fill('Cofre'); await g1Save('Salvar conta'); await waitText('Conta salva.'); await p.waitForTimeout(400);
+  ok('G1 Editar: renomear para "Cofre" salva e volta a Conta com o aviso', urlPath() === '/conta' && (await g1Rows())[2] === 'Cofre, Outra. Abrir a conta.' && (await g1Accounts()).includes('Cofre|outra|ativa|-'));
+  await g1Row('Cofre').click(); await waitText('Situação'); await btn('Tornar principal').click(); await waitText('Conta principal atualizada.'); await p.waitForTimeout(500);
+  ok('G1 Tornar principal: aviso na própria tela, o botão some e a principal anterior deixa de ser principal',
+    (await visibleCount('button', 'Tornar principal')) === 0 && (await g1Accounts()) === 'Cofre|outra|ativa|principal;Conta principal|banco|ativa|-;Carteira|dinheiro|ativa|-'.replace('Cofre|outra|ativa|principal;Conta principal|banco|ativa|-;Carteira|dinheiro|ativa|-', (await g1Accounts())) && (await g1Accounts()).split(';').filter((x) => x.endsWith('|principal')).length === 1 && (await g1Accounts()).includes('Cofre|outra|ativa|principal'));
+  await btn('Arquivar conta').click(); await waitText('Qual será a conta principal?'); await p.waitForTimeout(400);
+  t = await dialogText();
+  ok('G1 Arquivar a principal: o diálogo pede a nova principal (uma escolha por conta ativa) e nada foi gravado',
+    t.includes('Escolha outra antes de arquivar esta.') && (await p.getByRole('button', { name: 'Tornar Conta principal a principal e arquivar' }).filter({ visible: true }).count()) === 1 &&
+    (await p.getByRole('button', { name: 'Tornar Carteira a principal e arquivar' }).filter({ visible: true }).count()) === 1 && (await g1Accounts()).includes('Cofre|outra|ativa|principal'));
+  await shot('244_arquivar_principal');
+  await p.getByRole('button', { name: 'Tornar Conta principal a principal e arquivar' }).filter({ visible: true }).first().click(); await waitText('Conta arquivada.'); await p.waitForTimeout(500);
+  ok('G1 Arquivar a principal escolhendo outra: o Cofre fica arquivado e a Conta principal volta a ser a principal',
+    (await g1Accounts()) === 'Conta principal|banco|ativa|principal;Carteira|dinheiro|ativa|-;Cofre|outra|arquivada|-' && (await visibleCount('button', 'Reativar conta')) === 1 && (await visibleCount('button', 'Arquivar conta')) === 0, await g1Accounts());
+  await btn('Reativar conta').click(); await waitText('Conta reativada.'); await p.waitForTimeout(500);
+  ok('G1 Reativar: o Cofre volta como conta ativa comum', (await g1Accounts()).includes('Cofre|outra|ativa|-'));
+  await btn('Excluir conta').click(); await waitText('Excluir esta conta?'); await p.waitForTimeout(300);
+  ok('G1 Excluir: o diálogo explica que só se exclui conta sem lançamentos', (await dialogText()).includes('Só é possível excluir uma conta sem lançamentos. Se ela já tem gastos ou aportes, arquive a conta: o histórico continua.'));
+  await confirmIn('Excluir conta'); await waitText('Conta excluída.'); await p.waitForTimeout(500);
+  ok('G1 Excluir conta sem lançamentos: aviso, de volta a Conta e só a Conta principal e a Carteira na lista',
+    urlPath() === '/conta' && JSON.stringify(await g1Rows()) === JSON.stringify(g1Initial) && (await g1Accounts()) === 'Conta principal|banco|ativa|principal;Carteira|dinheiro|ativa|-', JSON.stringify(await g1Rows()));
+  // A Carteira tem o mercado pago nela: excluir é recusado ("arquive"); a principal nunca se exclui nem se arquiva sozinha.
+  await g1Row('Carteira').click(); await waitText('Situação'); await btn('Excluir conta').click(); await waitText('Excluir esta conta?'); await confirmIn('Excluir conta'); await p.waitForTimeout(600);
+  t = await g1Keep();
+  ok('G1 Excluir a Carteira (com gastos): "Esta conta tem lançamentos. Arquive a conta em vez de excluir: o histórico continua." e nada muda',
+    t.includes('Esta conta tem lançamentos. Arquive a conta em vez de excluir: o histórico continua.') && (await g1Accounts()).includes('Carteira|dinheiro|ativa|-'));
+  await btn('Voltar').click(); await waitText('Suas contas'); await p.waitForTimeout(400);
+  await g1Row('Conta principal').click(); await waitText('Situação'); await p.waitForTimeout(300);
+  t = await body();
+  ok('G1 Conta principal: sem "Excluir conta" (a principal nunca se exclui), com a explicação, e "Tornar principal" não aparece',
+    (await visibleCount('button', 'Excluir conta')) === 0 && t.includes('A conta principal não pode ser excluída. Torne outra conta principal antes.') && (await visibleCount('button', 'Tornar principal')) === 0);
+  await btn('Voltar').click(); await waitText('Suas contas'); await p.waitForTimeout(300);
+
+  // ---- 4. Anotar gasto: "Saiu de" abaixo de "Dinheiro, débito ou Pix"; a primeira (principal) vem marcada ----
+  await goResumo(); await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
+  t = await g1Keep();
+  ok('G1 Anotar gasto: "Como você pagou?" ganha o grupo "Saiu de" com a Conta principal marcada e a Carteira, e o rodapé diz a conta',
+    (await g1Group('Saiu de').count()) === 1 && (await g1Checked('Conta principal')) && !(await g1Checked('Carteira')) && t.includes('Será salvo em Pessoal, Conta principal.') && (await visibleCount('button', 'Gerenciar contas')) === 1, t.slice(0, 400));
+  const g1Order = await p.evaluate(() => {
+    const y = (re) => [...document.querySelectorAll('[role=radiogroup],[role=radio]')].filter((e) => e.getBoundingClientRect().width > 0 && re.test(e.getAttribute('aria-label') || e.textContent || '')).map((e) => e.getBoundingClientRect().top)[0];
+    return { pay: y(/^Dinheiro, débito ou Pix$/), from: y(/^Saiu de$/), date: y(/^Data do pagamento$|^Hoje$/) };
+  });
+  ok('G1 Anotar gasto: "Saiu de" fica abaixo de "Dinheiro, débito ou Pix" (dentro de "Como você pagou?")', g1Order.pay !== undefined && g1Order.from !== undefined && g1Order.from > g1Order.pay, JSON.stringify(g1Order));
+  await atWidths(async (w) => { await layoutChecks(`G1 Anotar gasto ${w}px`); if (w === 390) await shot('245_anotar_gasto_saiu_de'); if (w === 320) await shot('245_anotar_gasto_saiu_de_320px'); });
+  await btn('Cartão de crédito').click().catch(() => radio('Cartão de crédito').click());
+  await p.waitForTimeout(500);
+  ok('G1 Anotar gasto com Cartão de crédito: sem "Saiu de" (a compra no cartão não sai de uma conta até a fatura ser paga)', (await g1Group('Saiu de').count()) === 0 && !(await body()).includes('Será salvo em Pessoal, Conta principal.'));
+  await radio('Dinheiro, débito ou Pix').click(); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: 'Gerenciar contas' }).filter({ visible: true }).first().click(); await waitText('Suas contas'); await p.waitForTimeout(500);
+  ok('G1 "Gerenciar contas" nos seletores leva a Suas contas em Conta', urlPath() === '/conta' && (await visibleCount('button', 'Adicionar conta')) === 1);
+  await btn('Voltar').click(); await waitText('Será salvo em'); await p.waitForTimeout(300);
+  await radio('Carteira').click(); await p.waitForTimeout(300);
+  ok('G1 Anotar gasto: escolher a Carteira troca a marca e o rodapé ("Será salvo em Pessoal, Carteira.")', (await g1Checked('Carteira')) && !(await g1Checked('Conta principal')) && (await body()).includes('Será salvo em Pessoal, Carteira.'));
+  await field('Descrição').fill('Padaria'); await field('Valor em reais').fill('12'); await radio('Mercado').click();
+  await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(500);
+  t = await g1Keep();
+  ok('G1 Detalhe do gasto: a linha "Saiu de" mostra a Carteira', t.includes('Saiu de') && t.includes('Carteira') && (await g1Records('Padaria')) === 'Padaria|Carteira|1200', await g1Records('Padaria'));
+  await shot('246_detalhe_saiu_de');
+  // A última conta usada vale só neste aparelho: o próximo formulário abre nela.
+  await goResumo(); await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
+  ok('G1 Anotar gasto de novo: abre na Carteira, a última conta usada neste aparelho', (await g1Checked('Carteira')) && (await body()).includes('Será salvo em Pessoal, Carteira.'));
+  await btn('Cancelar').click().catch(() => {}); await p.waitForTimeout(400);
+  await goResumo();
+
+  // ---- 5. Recebimento ("Entrou em") e editar o gasto trocando a conta ----
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(400);
+  await btn('Registrar recebimento').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
+  t = await g1Keep();
+  ok('G1 Registrar recebimento: o grupo se chama "Entrou em" e "Como você pagou?" não existe', (await g1Group('Entrou em').count()) === 1 && (await g1Group('Saiu de').count()) === 0 && !t.includes('Como você pagou?'));
+  await radio('Conta principal').click(); await field('Descrição').fill('Freela'); await field('Valor em reais').fill('200');
+  await btn('Salvar recebimento').click(); await waitText('Recebimento salvo'); await p.waitForTimeout(500);
+  t = await g1Keep();
+  ok('G1 Detalhe do recebimento: a linha "Entrou em" mostra a Conta principal', t.includes('Entrou em') && (await g1Records('Freela')) === 'Freela|Conta principal|20000', await g1Records('Freela'));
+  await goResumo(); await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /^Padaria, / }).filter({ visible: true }).first().click(); await waitText('Editar registro'); await btn('Editar registro').click(); await waitText('Salvar gasto'); await p.waitForTimeout(400);
+  ok('G1 Editar gasto: "Saiu de" abre na conta do registro (Carteira)', (await g1Group('Saiu de').count()) === 1 && (await g1Checked('Carteira')));
+  await radio('Conta principal').click(); await btn('Salvar gasto').click(); await waitText('Alterações salvas'); await p.waitForTimeout(500);
+  ok('G1 Editar gasto: trocar para a Conta principal grava a nova conta', (await g1Records('Padaria')) === 'Padaria|Conta principal|1200', await g1Records('Padaria'));
+
+  // ---- 6. Movimentos: a conta na linha e o filtro por conta (2 ou mais contas) ----
+  await goResumo(); await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(500);
+  t = await g1Keep();
+  ok('G1 Movimentos: a linha mostra a conta quando há mais de uma ("Pago · 06/10/2026 · Carteira" no mercado; "Pago · 05/10/2026 · conta a pagar · Conta principal" no aluguel)',
+    (await visibleCount('button', /^Mercado, Pago · 06\/10\/2026 · Carteira,/)) === 1 && (await visibleCount('button', /^Aluguel, Pago · 05\/10\/2026 · conta a pagar · Conta principal,/)) === 1, t.slice(0, 500));
+  ok('G1 Movimentos: o filtro por conta tem "Todas", "Conta principal" e "Carteira" (Todas marcada)',
+    (await g1Group('Conta').count()) === 1 && (await g1Checked('Todas')) && (await visibleCount('radio', 'Conta principal')) === 1 && (await visibleCount('radio', 'Carteira')) === 1);
+  await atWidths(async (w) => { await layoutChecks(`G1 Movimentos com filtro por conta ${w}px`); if (w === 390) await shot('247_movimentos_filtro_conta'); });
+  await radio('Carteira').click(); await p.waitForTimeout(500);
+  t = await body();
+  ok('G1 Movimentos filtrado pela Carteira: só os gastos dela (Mercado de outubro), sem o aluguel nem o salário',
+    (await visibleCount('button', /^Mercado, /)) === 1 && (await visibleCount('button', /^Aluguel, /)) === 0 && (await visibleCount('button', /^Salário, /)) === 0 && (await g1Checked('Carteira')) && t.includes('Pago em outubro'), t.slice(0, 400));
+  await radio('Todas').click(); await p.waitForTimeout(400);
+  ok('G1 Movimentos: "Todas" mostra tudo de novo', (await visibleCount('button', /^Aluguel, /)) === 1 && (await visibleCount('button', /^Mercado, /)) === 1);
+
+  // ---- 7. Pagamento de conta a pagar escolhendo a conta ----
+  await goResumo(); await openToPay();
+  await openRow(/^Internet, vence em 15\/10\/2026/); await waitText('Já paguei'); await btn('Já paguei').click(); await waitText('Confirmar pagamento'); await p.waitForTimeout(400);
+  t = await g1Keep();
+  ok('G1 Pagar conta: "Saiu de" abre na última conta usada (Conta principal, que acabou de receber o Padaria) e mostra a Carteira', (await g1Group('Saiu de').count()) === 1 && (await g1Checked('Conta principal')) && (await visibleCount('radio', 'Carteira')) === 1, t.slice(0, 300));
+  await atWidths(async (w) => { await layoutChecks(`G1 Pagar conta ${w}px`); if (w === 390) await shot('248_pagar_conta_saiu_de'); });
+  await radio('Carteira').click(); await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado'); await p.waitForTimeout(500);
+  t = await g1Keep();
+  ok('G1 Conta paga: o detalhe mostra "Saiu de" com a Carteira e o gasto do pagamento saiu da Carteira', t.includes('Saiu de') && t.includes('Carteira') && (await g1Records('Internet')) === 'Internet|Carteira|15000', await g1Records('Internet'));
+
+  // ---- 8. Pagamento de fatura escolhendo a conta (uma fatura fechada, criada por outro aparelho) ----
+  await otherDevice(async (repo, ctx) => {
+    const card = (await repo.listCards(ctx))[0];
+    await repo.addCardPurchase(crypto.randomUUID(), card.id, { description: 'Livro de setembro', category: 'Educação', purchasedOn: '2026-09-20', totalCents: 20000, installments: 1 });
+  });
+  await g1OpenCard(); await g1OpenInvoice('outubro'); await btn('Pagar fatura').click(); await waitText('Confirmar pagamento'); await p.waitForTimeout(400);
+  t = await g1Keep();
+  ok('G1 Pagar fatura: "Saiu de" com a conta marcada e a Carteira; o texto do mês diz de onde sai', (await g1Group('Saiu de').count()) === 1 && (await visibleCount('radio', 'Carteira')) === 1 && t.includes('saindo da conta'), t.slice(0, 400));
+  await atWidths(async (w) => { await layoutChecks(`G1 Pagar fatura ${w}px`); if (w === 390) await shot('249_pagar_fatura_saiu_de'); });
+  await radio('Carteira').click(); await p.waitForTimeout(300);
+  ok('G1 Pagar fatura: escolher a Carteira atualiza o texto ("saindo da conta Carteira")', (await body()).includes('saindo da conta Carteira'));
+  await btn('Confirmar pagamento').click(); await waitText('Fatura paga.'); await p.waitForTimeout(500);
+  ok('G1 Fatura paga: o gasto do pagamento saiu da Carteira', (await g1Records('Fatura Cartão Exemplo (outubro)')) === 'Fatura Cartão Exemplo (outubro)|Carteira|20000', await g1Records('Fatura'));
+
+  // ---- 9. Aporte e resgate de meta: "Saiu de" e "Foi para" (informativos) ----
+  await goResumo(); await tabByName('Metas').click(); await waitText('Reserva para imprevistos'); await p.waitForTimeout(500);
+  const g1Goal = await otherDevice(async (repo, ctx) => (await repo.listGoals(ctx)).find((g) => g.goalType === 'emergencia').id);
+  const g1Before = await otherDevice(async (repo, ctx, id) => (await repo.listGoalMovements(id)).length, g1Goal);
+  await btn('Registrar aporte').click(); await waitText('Registre o dinheiro que você já separou'); await p.waitForTimeout(400);
+  t = await g1Keep();
+  ok('G1 Aportar: "Saiu de" com a última conta usada (a Carteira, da fatura) e a Conta principal para escolher', (await g1Group('Saiu de').count()) === 1 && (await visibleCount('radio', 'Carteira')) === 1, t.slice(0, 300));
+  await atWidths(async (w) => { await layoutChecks(`G1 Aporte ${w}px`); if (w === 390) await shot('250_aporte_saiu_de'); });
+  await radio('Conta principal').click(); await field('Valor').fill('100'); await btn('Registrar aporte').click(); await waitText('Aporte registrado.'); await p.waitForTimeout(600);
+  const g1Aporte = await otherDevice(async (repo, ctx, id) => {
+    const names = Object.fromEntries((await repo.listAccounts(ctx)).map((a) => [a.id, a.name]));
+    return (await repo.listGoalMovements(id)).filter((m) => m.kind === 'aporte' && m.amountCents === 10000).map((m) => names[m.accountId] ?? 'sem conta').join(';');
+  }, g1Goal);
+  ok('G1 Aporte salvo na Conta principal (só informativo: nenhum gasto nasce e o Pago de outubro não muda)', g1Aporte === 'Conta principal' && (await otherDevice(async (repo, ctx, id) => (await repo.listGoalMovements(id)).length, g1Goal)) === g1Before + 1, g1Aporte);
+
+  // ---- 10. Conta nova: só a Conta principal, sem chips, sem filtro e sem conta na linha ----
+  await newAcct('Hélio Teste', 'helio@exemplo.com');
+  await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().waitFor({ timeout: 15000 }); await p.waitForTimeout(500);
+  await g1OpenConta();
+  t = await g1Keep();
+  ok('G1 conta nova: Suas contas tem só a "Conta principal" (Conta bancária, Principal); nenhuma conta de exemplo',
+    JSON.stringify(await g1Rows()) === JSON.stringify(['Conta principal, Conta bancária · Principal. Abrir a conta.']) && (await g1Accounts()) === 'Conta principal|banco|ativa|principal');
+  await shot('251_suas_contas_conta_nova');
+  await goResumo(); await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
+  t = await g1Keep();
+  ok('G1 conta nova: Anotar gasto mostra "Saiu de: Conta principal" como texto, sem chips, e o atalho "Gerenciar contas"',
+    t.includes('Saiu de: Conta principal') && (await g1Group('Saiu de').count()) === 0 && (await visibleCount('button', 'Gerenciar contas')) === 1 && t.includes('Será salvo em Pessoal, Conta principal.'));
+  await atWidths(async (w) => { await layoutChecks(`G1 conta nova Anotar gasto ${w}px`); if (w === 390) await shot('252_anotar_gasto_conta_unica'); });
+  await field('Descrição').fill('Café'); await field('Valor em reais').fill('8'); await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(500);
+  ok('G1 conta nova: o detalhe mostra "Saiu de" com a Conta principal', (await body()).includes('Conta principal') && (await g1Records('Café')) === 'Café|Conta principal|800');
+  await goResumo(); await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(500);
+  t = await body();
+  ok('G1 conta nova: Movimentos sem filtro por conta e sem a conta na linha ("Pago · 07/10/2026" sem o nome da conta)', (await g1Group('Conta').count()) === 0 && (await visibleCount('button', /^Café, Pago · 07\/10\/2026,/)) === 1 && !t.includes('· Conta principal'), t.slice(0, 300));
+  // Uma segunda conta na conta nova faz os chips, o filtro e a conta nas linhas aparecerem.
+  await otherDevice(async (repo, ctx) => { await repo.createAccount(crypto.randomUUID(), ctx, { name: 'Carteira', kind: 'dinheiro' }); });
+  await p.waitForTimeout(500);
+  ok('G1 nada de exemplo na conta nova: nenhuma conta além da criada agora e nenhum gasto na Carteira', (await g1Accounts()) === 'Conta principal|banco|ativa|principal;Carteira|dinheiro|ativa|-');
+
+  const g1Vetoed = g1Texts.map((x) => x.match(FORBIDDEN)?.[0]).filter(Boolean);
+  ok('G1 telas das contas: nenhum termo proibido, travessão, "fazer sentido" nem nome de banco ou produto', g1Texts.length >= 12 && g1Vetoed.length === 0 && g1Texts.every((x) => !/[–—]/.test(x) && !/nubank|ita[uú]\b|bradesco|santander|caixa econ|picpay|\bxp\b|btg|poupan[cç]a|investiment/i.test(x)), `${g1Texts.length} telas ${g1Vetoed.join(' | ')}`);
+  ok('G1 nenhuma escrita direta na rede: as contas gravam só pelas funções (nenhum PATCH, PUT ou DELETE de rede em contas)', !writes.slice(g1WritesBefore).some((w) => /financial_accounts/.test(w)));
   await goResumo().catch(() => {});
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
