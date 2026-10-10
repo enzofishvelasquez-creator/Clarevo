@@ -20,6 +20,8 @@ const MAX_STORES = 50;
 const EMPTY: NotePrefs = { cameraUsed: false, stores: {} };
 const memory = new Map<string, NotePrefs>();
 const loading = new Map<string, Promise<NotePrefs>>();
+/** Muda a cada `clearNotePrefsMemory`: uma leitura que começou antes da limpeza não guarda o resultado em memória. */
+let generation = 0;
 
 function parse(raw: string | null | undefined): NotePrefs {
   if (!raw) return { cameraUsed: false, stores: {} };
@@ -55,7 +57,8 @@ export function loadNotePrefs(userId: string, persist: boolean): Promise<NotePre
   const pending = loading.get(userId);
   if (pending) return pending;
   const key = PREFIX + userId;
-  const p = (async () => {
+  const startedIn = generation;
+  const run = async (): Promise<NotePrefs> => {
     let prefs: NotePrefs = { ...EMPTY, stores: {} };
     if (persist) {
       try {
@@ -64,11 +67,17 @@ export function loadNotePrefs(userId: string, persist: boolean): Promise<NotePre
         prefs = { ...EMPTY, stores: {} };
       }
     }
+    // A limpeza (sair da conta ou trocar de pessoa) vence a leitura em andamento: o resultado dela não vai para a memória.
+    if (startedIn !== generation) return prefs;
     const now = memory.get(userId) ?? prefs;
     memory.set(userId, now);
-    loading.delete(userId);
     return now;
-  })();
+  };
+  const p: Promise<NotePrefs> = run().then((prefs) => {
+    // Só tira a própria leitura: depois de uma limpeza, `loading` pode já ter a de uma leitura nova.
+    if (loading.get(userId) === p) loading.delete(userId);
+    return prefs;
+  });
   loading.set(userId, p);
   return p;
 }
@@ -110,6 +119,7 @@ export async function rememberStore(userId: string, storeId: string, memoryOfSto
 
 /** Ao sair da conta (ou trocar de pessoa): esquece as memórias em RAM. O que foi gravado no aparelho vale só para a mesma pessoa. */
 export function clearNotePrefsMemory(): void {
+  generation++;
   memory.clear();
   loading.clear();
 }

@@ -195,26 +195,44 @@ function valueAfter(text: string, label: RegExp): Cents | null {
 
 const CNPJ_TEXT = /\b([0-9A-Z]{2}\.[0-9A-Z]{3}\.[0-9A-Z]{3}\/[0-9A-Z]{4}-[0-9]{2})\b/;
 
-/** As linhas do estabelecimento: tudo antes do bloco do consumidor (linha que começa por "Consumidor"). */
-function issuerLines(lines: string[]): string[] {
-  const at = lines.findIndex((line) => /^\W*consumidor\b/i.test(line));
-  return at < 0 ? lines : lines.slice(0, at);
+/**
+ * Onde começa o bloco do consumidor: a primeira menção a "consumidor" ou "destinatário", em qualquer ponto da linha. O nome do
+ * documento ("Nota Fiscal de Consumidor Eletrônica") não conta, senão cortaria o cabeçalho antes do nome da loja.
+ */
+const CONSUMER_MARK = /\bconsumidor\b(?!\s+eletr[ôo]nica)|destinat[áa]rio/i;
+
+/**
+ * As linhas do estabelecimento: tudo antes do bloco do consumidor, cortando a linha em que ele começa no ponto da menção. A linha
+ * do cabeçalho txtTopo (`marker`) é o nome da loja e nunca marca o começo do bloco do consumidor.
+ */
+function issuerLines(lines: string[], marker: string | null): string[] {
+  const header = marker === null ? -1 : lines.indexOf(marker);
+  for (let i = 0; i < lines.length; i++) {
+    if (i === header) continue;
+    const m = CONSUMER_MARK.exec(lines[i]!);
+    if (!m) continue;
+    const head = lines[i]!.slice(0, m.index).trim();
+    return head === '' ? lines.slice(0, i) : [...lines.slice(0, i), head];
+  }
+  return lines;
 }
 
 function issuerFromPage(marker: string | null, lines: string[]): string | null {
   // 1) Cabeçalho do estabelecimento: classe txtTopo ou id u20 (leiaute padrão das consultas de NFC-e).
   const generic = /documento auxiliar|danfe|nfc-?e|nota fiscal|consulta p[úu]blica|secretaria de|sefaz|via consumidor|consumidor/i;
-  const clean = (candidate: string | null | undefined): string | null => {
+  // `generic` descarta títulos do documento; o nome que vem do cabeçalho txtTopo é o da loja e não passa por ele (uma loja pode se
+  // chamar "Mercado do Consumidor Ltda").
+  const clean = (candidate: string | null | undefined, applyGeneric = true): string | null => {
     if (!candidate) return null;
     const name = friendlyIssuerName(candidate.replace(/\bCNPJ\b.*$/i, '').replace(/[:|]\s*$/, '')).slice(0, 120).trim();
-    if (name.length < 2 || !/[A-Za-zÀ-ÿ]/.test(name) || generic.test(name) || /^\d/.test(name)) return null;
+    if (name.length < 2 || !/[A-Za-zÀ-ÿ]/.test(name) || (applyGeneric && generic.test(name)) || /^\d/.test(name)) return null;
     return name;
   };
-  const marked = clean(marker);
+  const marked = clean(marker, false);
   if (marked) return marked;
   // 2) A linha de cima do CNPJ do estabelecimento (ou o trecho antes de "CNPJ" na mesma linha). Só antes do bloco do consumidor:
   //    o nome e o CNPJ de quem comprou nunca viram o nome da loja.
-  const above = issuerLines(lines);
+  const above = issuerLines(lines, marker);
   for (let i = 0; i < above.length; i++) {
     const line = above[i]!;
     if (!/\bCNPJ\b/i.test(line) && !CNPJ_TEXT.test(line)) continue;
@@ -259,7 +277,7 @@ export function parseSefazPage(html: string, key: AccessKeyInfo): SefazPageResul
   // Sem nenhum dos dois, não há como saber de quem é a página: 'pagina_nao_reconhecida', nada é aproveitado.
   const shown = findAccessKey(text);
   if (shown.ok && shown.info.digest !== key.digest) return { ok: false, code: 'nota_diferente' };
-  const cnpjShown = key.cnpj ? CNPJ_TEXT.exec(issuerLines(lines).join('\n')) : null;
+  const cnpjShown = key.cnpj ? CNPJ_TEXT.exec(issuerLines(lines, marker).join('\n')) : null;
   if (key.cnpj && cnpjShown && cnpjShown[1]!.replace(/[^0-9A-Z]/g, '') !== key.cnpj) return { ok: false, code: 'nota_diferente' };
   const sameKey = shown.ok && shown.info.digest === key.digest;
   const sameCnpj = Boolean(key.cnpj && cnpjShown && cnpjShown[1]!.replace(/[^0-9A-Z]/g, '') === key.cnpj);
@@ -309,9 +327,11 @@ export type SefazReadErrorCode = SefazPageErrorCode | 'tempo_esgotado' | 'sem_co
 export type SefazReadResult = { ok: true; reading: SefazPageReading } | { ok: false; code: SefazReadErrorCode };
 
 /**
- * O pedaço de `fetch` que a leitura usa (injetado: o app passa o `fetch` do aparelho; os testes, um falso). Com `redirect: 'manual'`
- * a resposta de redirecionamento chega com `status` 3xx e o cabeçalho `Location`, e quem chama decide se segue. Onde o `fetch`
- * não separa o redirecionamento (React Native), `url` é o endereço final e a leitura confere o domínio dele.
+ * O pedaço de `fetch` que a leitura usa (injetado: o app passa o `fetch` de `expo/fetch` no celular, que respeita `redirect: 'manual'`;
+ * os testes, um falso). Com `redirect: 'manual'` a resposta de redirecionamento chega com `status` 3xx e o cabeçalho `Location`, e
+ * quem chama decide se segue. Um `fetch` que ignore `redirect` e siga sozinho (como o global do React Native pode fazer) continua
+ * seguro, porque as garantias não dependem dele: `url` é o endereço final e a leitura confere o domínio dele, e a página precisa ser
+ * da mesma nota (chave de acesso) para ser aceita.
  */
 export type SefazFetch = (
   url: string,

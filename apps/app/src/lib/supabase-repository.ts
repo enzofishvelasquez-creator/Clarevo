@@ -465,12 +465,14 @@ const KNOWN: RepoErrorCode[] = [
   // Plano de guardar (D-036).
   'resposta_invalida',
   // Cartões de crédito e notas fiscais (D-037 e D-038). Nenhum termina com outro código da lista (valor_acima_da_fatura,
-  // fatura_paga, fatura_aberta e fatura_seguinte_paga são diferentes até o fim; os "_invalido" têm prefixos próprios).
+  // fatura_paga, fatura_aberta e fatura_seguinte_paga são diferentes até o fim; os "_invalido" têm prefixos próprios), com uma
+  // exceção: dias_com_fatura_paga termina com fatura_paga, e o mais longo vence em repoError.
   'conta_de_fatura',
   'pagamento_de_fatura',
   'fatura_paga',
   'fatura_aberta',
   'fatura_seguinte_paga',
+  'dias_com_fatura_paga',
   'valor_acima_da_fatura',
   'lancamento_automatico',
   'campo_nao_se_aplica',

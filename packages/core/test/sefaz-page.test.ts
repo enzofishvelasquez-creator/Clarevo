@@ -308,6 +308,34 @@ describe('parseSefazPage · a página precisa ser desta nota', () => {
     const h = parseSefazPage(header, OUT.info);
     expect(h.ok && h.reading.issuerName).toBe('Padaria Boa Espiga Ltda');
   });
+
+  it('o bloco do consumidor ou do destinatário começa na primeira menção, em qualquer ponto da linha', () => {
+    // "Destinatário" no meio da linha: o nome que vem junto e o CNPJ de baixo ficam de fora.
+    const mid = `<div>Venda a Destinatário: MARIA DA SILVA EXEMPLO</div><div>CNPJ: 45.723.174/0001-10</div><div>Chave de acesso: ${spaced(OUT.text)}</div><div>Valor a pagar R$: 10,00</div>`;
+    const m = parseSefazPage(mid, OUT.info);
+    expect(m.ok && m.reading.issuerName).toBeNull();
+    expect(JSON.stringify(m)).not.toMatch(/maria/i);
+    const midConsumer = `<div>Dados do consumidor - MARIA DA SILVA EXEMPLO</div><div>CNPJ: 45.723.174/0001-10</div><div>Chave de acesso: ${spaced(OUT.text)}</div><div>Valor a pagar R$: 10,00</div>`;
+    const mc = parseSefazPage(midConsumer, OUT.info);
+    expect(mc.ok && mc.reading.issuerName).toBeNull();
+    expect(JSON.stringify(mc)).not.toMatch(/maria/i);
+    // O CNPJ de quem comprou, na mesma linha da menção, também não prova que a página é desta nota.
+    const consumerCnpj = `<div>Dados do consumidor - CNPJ: 11.222.333/0001-81</div><div>Valor a pagar R$: 10,00</div>`;
+    expect(parseSefazPage(consumerCnpj, OUT.info)).toEqual({ ok: false, code: 'pagina_nao_reconhecida' });
+    // O texto antes da menção ainda vale: o nome da loja na mesma linha do bloco do consumidor.
+    const before = `<div>PADARIA BOA ESPIGA LTDA CNPJ: 11.222.333/0001-81 Consumidor: não identificado</div><div>Valor a pagar R$: 8,00</div>`;
+    const b = parseSefazPage(before, OUT.info);
+    expect(b.ok && b.reading.issuerName).toBe('Padaria Boa Espiga Ltda');
+  });
+
+  it('o nome do cabeçalho txtTopo não passa pelo filtro de títulos: "Mercado do Consumidor Ltda" mantém o nome', () => {
+    const html = `<div class="txtTopo">MERCADO DO CONSUMIDOR LTDA</div><div>CNPJ: 11.222.333/0001-81</div><div>Valor a pagar R$: 8,00</div>`;
+    const r = parseSefazPage(html, OUT.info);
+    expect(r.ok && r.reading.issuerName).toBe('Mercado do Consumidor Ltda');
+    // Fora do cabeçalho, a menção abre o bloco do consumidor: o CNPJ de baixo não conta e a página não prova ser desta nota.
+    const noHeader = `<div>MERCADO DO CONSUMIDOR LTDA</div><div>CNPJ: 11.222.333/0001-81</div><div>Valor a pagar R$: 8,00</div>`;
+    expect(parseSefazPage(noHeader, OUT.info)).toEqual({ ok: false, code: 'pagina_nao_reconhecida' });
+  });
 });
 
 describe('parseSefazPage · marcação hostil não trava a leitura', () => {

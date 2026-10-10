@@ -1561,7 +1561,10 @@ export class MemoryRepository implements RecordsRepository {
     });
   }
 
-  /** Como update_card. Ordem: repetição; trava; versão; campos. As contas de fatura em aberto seguem o apelido e os dias novos. */
+  /**
+   * Como update_card. Ordem: repetição; trava; versão; campos; dias_com_fatura_paga (mudar os dias quando, com os dias novos,
+   * a fatura do período de hoje ou alguma depois dela já está paga). As contas de fatura em aberto seguem o apelido e os dias novos.
+   */
   async updateCard(key: string, id: string, expectedVersion: number, input: CardInput) {
     return this.write(() => {
       const norm = normalizeCardInput(input);
@@ -1572,6 +1575,10 @@ export class MemoryRepository implements RecordsRepository {
       if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${current.version}`);
       const code = cardInputError(norm);
       if (code) throw new RepoError(code);
+      if (norm.closingDay !== current.closingDay || norm.dueDay !== current.dueDay) {
+        const month = invoiceMonthOf(norm, this.opts.today());
+        if (this.invoiceCommitments(id).some((c) => c.status === 'quitado' && c.invoiceMonth! >= month)) throw new RepoError('dias_com_fatura_paga');
+      }
       this.cards.set(id, { ...current, ...norm, version: current.version + 1, updatedAt: new Date().toISOString() });
       this.syncInvoices(id);
       this.saveOperation(key, 'alterar_cartao', payload, { contextId: current.contextId, recordId: null, commitmentId: null, cardId: id });

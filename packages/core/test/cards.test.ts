@@ -1188,7 +1188,7 @@ describe('MemoryRepository: cartões com as regras do banco', () => {
     f.repo.checkInvariants();
   });
 
-  it('"Fatura atual" nunca é uma fatura paga: se o período de hoje cai num mês já pago, vale a primeira fatura seguinte sem pagamento', async () => {
+  it('mudar os dias do cartão com fatura paga no período de hoje ou depois é recusado (dias_com_fatura_paga); a "Fatura atual" nunca é paga', async () => {
     const f = await fresh('2026-10-07');
     await f.purchase('Tênis', 40_000, '2026-10-05', 2, 'Lazer');
     f.clock.today = '2026-11-04';
@@ -1197,16 +1197,24 @@ describe('MemoryRepository: cartões com as regras do banco', () => {
     const card = (await f.repo.getCard(f.cardId))!;
     // Fecha dia 3: hoje (04/11) é da fatura de dezembro, aberta.
     expect(summarizeCard(card, await f.invoices(), f.clock.today).current.month).toBe(DEC);
-    // Se a pessoa muda o fechamento para o dia 20, o período de hoje volta a ser o de novembro, que está paga: a atual é dezembro.
-    await f.repo.updateCard(key(), f.cardId, card.version, { ...NUBANK, closingDay: 20, dueDay: 25 });
+    // Fechamento no dia 20: o período de hoje seria o de novembro, que está paga. Recusado, sem gravar nada.
+    await expectCode(f.repo.updateCard(key(), f.cardId, card.version, { ...NUBANK, closingDay: 20, dueDay: 25 }), 'dias_com_fatura_paga');
+    expect(await f.repo.getCard(f.cardId)).toEqual(card);
+    expect(CARD_ERROR_TEXT.dias_com_fatura_paga).toBe(
+      'Há uma fatura paga neste período. Para mudar os dias de fechamento e vencimento, desfaça esse pagamento ou espere a próxima fatura.',
+    );
+    // Dias cujo período de hoje ainda é uma fatura sem pagamento (dezembro) passam, e a atual segue sendo a de dezembro.
+    await f.repo.updateCard(key(), f.cardId, card.version, { ...NUBANK, closingDay: 2, dueDay: 9 });
     const moved = (await f.repo.getCard(f.cardId))!;
-    expect(invoiceMonthOf(moved, f.clock.today)).toBe(NOV);
-    const invoices = await f.invoices();
-    expect(invoices.find((i) => i.month === NOV)!.situation).toBe('paga');
-    const summary = summarizeCard(moved, invoices, f.clock.today);
-    expect(summary.current.month).toBe(DEC);
-    expect(summary.current.situation).not.toMatch(/^paga/);
-    expect(currentInvoiceOf(moved, [], f.clock.today).month).toBe(NOV);
+    expect(invoiceMonthOf(moved, f.clock.today)).toBe(DEC);
+    expect(summarizeCard(moved, await f.invoices(), f.clock.today).current.month).toBe(DEC);
+    // Só apelido ou limite (sem mudar os dias) continuam livres com fatura paga.
+    await f.repo.updateCard(key(), f.cardId, moved.version, { ...NUBANK, name: 'Roxinho', closingDay: 2, dueDay: 9 });
+    // Desfeito o pagamento, mudar os dias volta a ser aceito.
+    await f.repo.undoInvoicePayment(key(), f.cardId, NOV, (await f.invoice(NOV)).commitmentVersion!);
+    const again = (await f.repo.getCard(f.cardId))!;
+    await f.repo.updateCard(key(), f.cardId, again.version, { ...NUBANK, closingDay: 20, dueDay: 25 });
+    expect(invoiceMonthOf((await f.repo.getCard(f.cardId))!, f.clock.today)).toBe(NOV);
     f.repo.checkInvariants();
   });
 
@@ -1661,6 +1669,7 @@ describe('textos de cartões', () => {
       'pagamento_de_fatura',
       'fatura_paga',
       'fatura_seguinte_paga',
+      'dias_com_fatura_paga',
       'valor_acima_da_fatura',
       'lancamento_automatico',
       'apelido_invalido',

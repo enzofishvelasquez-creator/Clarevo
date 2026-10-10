@@ -1238,8 +1238,9 @@ export function useInvoiceItems(cardId: string | undefined) {
 
 /**
  * Faturas montadas do cartão (loadInvoices: lançamentos + contas de fatura + hoje), com linhas por parcela, composição e
- * situação. É a fonte de /cartoes/[id], da fatura, de purchaseFirstInvoiceMonth(…, paidInvoiceMonths(faturas), hoje) e de
- * invoiceFor(card, faturas, mês, hoje). Depende de hoje (aberta, fechada), então a chave o traz.
+ * situação. É a fonte de /cartoes/[id], da fatura, de purchasePreview(card, data, parcelas, paidInvoiceMonths(faturas), hoje), que
+ * diz em qual fatura a compra entra ou se ela cairia numa fatura paga, e de invoiceFor(card, faturas, mês, hoje). Depende de hoje
+ * (aberta, fechada), então a chave o traz.
  */
 export function useCardInvoices(card: Pick<Card, 'id' | 'closingDay' | 'dueDay'> | null | undefined) {
   const repo = useRepo();

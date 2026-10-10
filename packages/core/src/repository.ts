@@ -398,7 +398,8 @@ export interface RecordsRepository {
   createCard(key: string, contextId: string, input: CardInput): Promise<CardWrite>;
   /**
    * update_card, em qualquer situação. Ordem: repetição; nao_encontrado; sem_permissao; versao_desatualizada;
-   * CARD_INPUT_CODE_ORDER. As contas de fatura em aberto passam a ter o novo apelido e vencimento (mesma transação); as
+   * CARD_INPUT_CODE_ORDER; dias_com_fatura_paga (mudar os dias quando, com os dias novos, a fatura do período de hoje ou
+   * alguma depois dela já está paga; nada é gravado). As contas de fatura em aberto passam a ter o novo apelido e vencimento (mesma transação); as
    * compras já feitas ficam nas faturas em que foram lançadas.
    */
   updateCard(key: string, id: string, expectedVersion: number, input: CardInput): Promise<CardWrite>;
@@ -546,6 +547,7 @@ export type RepoErrorCode =
   | 'fatura_paga'
   | 'fatura_aberta'
   | 'fatura_seguinte_paga'
+  | 'dias_com_fatura_paga'
   | 'valor_acima_da_fatura'
   | 'lancamento_automatico'
   | 'campo_nao_se_aplica'

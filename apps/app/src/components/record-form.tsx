@@ -211,6 +211,16 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   const [reading, setReading] = useState(false);
   const readingRef = useRef(false);
   const readSeq = useRef(0);
+  // Ao sair da tela, o número da leitura muda e `unmounted` passa a valer: o que a leitura em andamento ainda devolver é ignorado
+  // (nenhum setState depois de sair).
+  const unmounted = useRef(false);
+  useEffect(() => {
+    unmounted.current = false;
+    return () => {
+      unmounted.current = true;
+      readSeq.current++;
+    };
+  }, []);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
   const [cameraOk, setCameraOk] = useState(false);
   const [cameraUsed, setCameraUsed] = useState(false);
@@ -368,7 +378,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     setCameraOpen(false);
     setPasteOpen(false);
     setScanMessage(null);
-    // Número da leitura: "Desfazer leitura" (ou sair da tela) invalida a que está em andamento, e o resultado dela é ignorado.
+    // Número da leitura: "Desfazer leitura" ou sair da tela (a saída muda o número ao desmontar) invalida a que está em andamento, e o
+    // resultado dela é ignorado.
     const token = ++readSeq.current;
     readingRef.current = true;
     setReading(true);
@@ -431,6 +442,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     const storeId = storeMemoryId(r.facts.key);
     // A memória da loja é lida só na leitura nova; a complementação pela página da Sefaz mantém a que já valia.
     const lastTime = refine ? (prev?.lastTime ?? null) : storeId && userId ? await storeMemoryOf(userId, storeId, persistPrefs) : null;
+    if (unmounted.current) return;
     const sug = suggestDescription({ issuerName: d.issuerName, lastTime });
     const prevFilled = prev?.filled ?? null;
     const cur = draftRef.current;
@@ -492,6 +504,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   const readSefaz = async (r: Extract<NoteReading, { ok: true }>, url: string) => {
     const digest = r.draft.receiptKey;
     const result = await readSefazOnDevice(url, r.facts.key);
+    if (unmounted.current) return;
     const current = noteRef.current;
     if (!current || current.reading.draft.receiptKey !== digest) return;
     if (!result.ok) {
@@ -503,6 +516,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     const facts = factsWithPage(r.facts, result.reading);
     const merged: Extract<NoteReading, { ok: true }> = { ok: true, source: r.source, facts, draft: receiptDraft(facts, today) };
     await applyNote(merged, true);
+    if (unmounted.current) return;
     const after = noteRef.current;
     if (after && after.reading.draft.receiptKey === digest) {
       const done = { ...after, sefaz: 'done' as const, sefazMessage: null };

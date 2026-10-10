@@ -782,7 +782,7 @@ export function invoiceItemOf(i: Invoice): InvoiceItem {
 
 export interface CardSummary {
   card: Card;
-  /** Fatura que acumula as compras de hoje (o período contém hoje); nunca uma fatura paga (`currentInvoiceOf`). */
+  /** Fatura que acumula as compras de hoje (o período contém hoje); nunca uma fatura paga (veja `currentInvoiceOf`). */
   current: Invoice;
   /** Faturas fechadas, ainda sem pagamento e com total maior que zero, da mais antiga à mais nova. */
   closedUnpaid: Invoice[];
@@ -792,17 +792,11 @@ export interface CardSummary {
 }
 
 /**
- * A fatura atual: a do período que contém hoje. Nunca uma fatura paga: se a pessoa mudou os dias do cartão e o período de hoje
- * cai num mês já pago, a atual é a primeira fatura seguinte ainda sem pagamento.
+ * A fatura atual: a do período que contém hoje. Nunca é uma fatura paga: a fatura só é paga depois de fechar, e mudar os dias do
+ * cartão é recusado (`dias_com_fatura_paga`) quando, com os dias novos, o período de hoje ou um posterior já está pago.
  */
 export function currentInvoiceOf(card: InvoiceCard, invoices: readonly Invoice[], today: IsoDate): Invoice {
-  let month = invoiceMonthOf(card, today);
-  for (let guard = 0; guard < 120; guard++) {
-    const found = invoices.find((i) => i.month === month);
-    if (!found || (found.situation !== 'paga' && found.situation !== 'paga_em_parte')) break;
-    month = addMonths(month, 1);
-  }
-  return invoiceFor(card, invoices, month, today);
+  return invoiceFor(card, invoices, invoiceMonthOf(card, today), today);
 }
 
 export function summarizeCard(card: Card, invoices: readonly Invoice[], today: IsoDate): CardSummary {
@@ -1242,6 +1236,8 @@ export const CARD_ERROR_TEXT = {
   fatura_paga: 'Esta fatura já foi paga. Para mudar os lançamentos dela, desfaça o pagamento da fatura.',
   fatura_aberta: 'Esta fatura ainda está aberta. Registre o pagamento depois do fechamento. Se você já pagou antes, use a data em que pagou.',
   fatura_seguinte_paga: 'A fatura do mês seguinte já foi paga. Desfaça o pagamento dela antes.',
+  dias_com_fatura_paga:
+    'Há uma fatura paga neste período. Para mudar os dias de fechamento e vencimento, desfaça esse pagamento ou espere a próxima fatura.',
   conta_de_fatura: 'Esta conta é a fatura de um cartão. Abra a fatura para alterar ou pagar.',
   pagamento_de_fatura: 'Este gasto é o pagamento de uma fatura: só a data e a conta de saída mudam aqui. Para o resto, abra a fatura e desfaça o pagamento.',
   lancamento_automatico: 'O saldo anterior vem do pagamento parcial da fatura anterior. Para mudar, desfaça esse pagamento.',

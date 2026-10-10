@@ -35,8 +35,9 @@
 -- C5. Fatura paga não muda: encargos e estornos novos, e lançamentos alterados ou excluídos numa fatura paga, são recusados
 --     (fatura_paga). Uma compra nova (ou com data nova) vai sempre para a fatura natural da data (a do período que a contém):
 --     se ela, ou alguma parcela adiante, já está paga, a compra é recusada (fatura_paga), sem desvio para outra fatura. A
---     fatura só é paga depois que FECHA (pay_invoice recusa com fatura_aberta enquanto hoje <= fechamento), então uma fatura
---     paga nunca é a que ainda recebe as compras de hoje.
+--     fatura só é paga depois que FECHA (pay_invoice recusa com fatura_aberta enquanto hoje <= fechamento), e update_card
+--     recusa mudar os dias (dias_com_fatura_paga) quando, com os dias novos, a fatura do período de hoje ou alguma
+--     depois dela está paga, então uma fatura paga nunca é a que ainda recebe as compras de hoje.
 -- C6. Nota fiscal: o resumo SHA-256 da chave de acesso é único por contexto entre gastos e compras no cartão vivos.
 -- Ordem de travas: chave → cartão → compra (parcelas por número) → contas das faturas (por mês) → registro.
 -- A atividade (gatilho de record_operations, 0005) é a última, como em toda escrita. Pagar fatura de outra pessoa exige
@@ -1513,7 +1514,10 @@ end;
 $$;
 
 -- Altera apelido, final, dias e limite. As compras já feitas ficam nas faturas em que foram lançadas; as contas das faturas
--- em aberto seguem o apelido e os dias novos (vencimento e fechamento); as pagas não mudam.
+-- em aberto seguem o apelido e os dias novos (vencimento e fechamento); as pagas não mudam. Mudar os dias é recusado
+-- (dias_com_fatura_paga, PT409, sem gravar nada) quando, com os dias novos, a fatura do período de hoje ou alguma fatura
+-- depois dela já está paga: senão as compras de hoje cairiam numa fatura paga (fatura_paga) e a "fatura atual" seria outra.
+-- Ordem: sessão; chave; repetição; trava; versão; campos (clarevo_validate_card); dias_com_fatura_paga; escrita.
 create or replace function public.update_card(
   p_idempotency_key text,
   p_card_id uuid,
@@ -1539,6 +1543,7 @@ declare
   v_card public.cards%rowtype;
   v_from date;
   v_to date;
+  v_month date;
 begin
   if v_uid is null then
     raise exception 'nao_autenticado' using errcode = '42501';
@@ -1565,6 +1570,13 @@ begin
     raise exception 'versao_desatualizada' using errcode = 'PT409', detail = 'versao_atual=' || v_card.version;
   end if;
   perform public.clarevo_validate_card(v_nickname, v_digits, p_closing_day, p_due_day, p_limit_cents);
+  if p_closing_day <> v_card.closing_day or p_due_day <> v_card.due_day then
+    v_month := public.invoice_month_for(p_closing_day, p_due_day, public.clarevo_today(v_uid));
+    if exists (select 1 from public.commitments c
+                where c.card_id = v_card.id and c.invoice_month >= v_month and c.deleted_at is null and c.status = 'quitado') then
+      raise exception 'dias_com_fatura_paga' using errcode = 'PT409';
+    end if;
+  end if;
 
   update public.cards
      set nickname = v_nickname, last_digits = v_digits, closing_day = p_closing_day, due_day = p_due_day,

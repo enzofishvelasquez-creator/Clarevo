@@ -2581,6 +2581,53 @@ begin
   assert res #>> '{card,nickname}' = 'a4111b1111c1111d1111', 'dígitos separados por letras não são um número';
   res := public.update_card('li-d-0023', (res #>> '{card,id}')::uuid, 1, 'Cartão 2024/2025 nº 123456', null, 3, 10, null);
   assert res #>> '{card,nickname}' = 'Cartão 2024/2025 nº 123456', 'o mesmo na alteração';
+
+  -- g) Mudar os dias do cartão com fatura paga: recusado (dias_com_fatura_paga, PT409, sem gravar nada) quando, com os dias novos,
+  -- a fatura do período de hoje ou alguma depois dela já está paga; senão as compras de hoje cairiam numa fatura paga
+  -- (fatura_paga) enquanto a "fatura atual" seria outra. Cartão fecha dia 5 e vence dia 15; hoje 10/10; outubro (fechou em 05/10) paga.
+  perform pg_temp.today('2026-10-10');
+  c := (public.create_card('li-g-0001', ctx, 'Dias', null, 5, 15, null) #>> '{card,id}')::uuid;
+  perform public.add_card_purchase('li-g-0002', c, '2026-09-20', 5000, 1, 'Compra de setembro');
+  assert pg_temp.iv(c, '2026-10-01') like 'fechada 5000 %', 'outubro fechada';
+  perform public.pay_invoice('li-g-0003', c, '2026-10-01', pg_temp.iv_ver(c, '2026-10-01'), 5000, '2026-10-10', acc);
+  assert pg_temp.iv(c, '2026-10-01') like 'paga 5000 %', 'outubro paga';
+  res := public.add_card_purchase('li-g-0004', c, '2026-10-10', 1000, 1, 'Hoje');
+  assert res #>> '{entry,invoice_month}' = '2026-11-01', 'hoje cai em novembro com fechamento no dia 5';
+  -- Fechamento no dia 20 e vencimento no dia 30: o período de hoje seria o de outubro, que está paga.
+  perform pg_temp.expect_code(pg_temp.uc('li-g-0005', c, pg_temp.cardv(c), 'Dias', null, 20, 30, null), 'dias_com_fatura_paga', 'PT409');
+  perform pg_temp.expect_code(pg_temp.uc('li-g-0005b', c, pg_temp.cardv(c), 'Outro nome', null, 10, 30, null), 'dias_com_fatura_paga', 'PT409');
+  assert (select (closing_day::int, due_day::int, nickname::text) from public.card_items where id = c) = (5, 15, 'Dias'::text) and pg_temp.cardv(c) = 1
+     and not exists (select 1 from public.record_operations where idempotency_key in ('li-g-0005', 'li-g-0005b'))
+     and pg_temp.cm(c, '2026-10-01') like '5000 2026-10-15 2026-10-05 quitado %', 'a recusa não grava nada';
+  -- A validação dos campos vem antes; versão antes de tudo.
+  perform pg_temp.expect_code(pg_temp.uc('li-g-0006', c, pg_temp.cardv(c), 'Dias', null, 32, 30, null), 'dia_de_fechamento_invalido', '22023');
+  perform pg_temp.expect_stale(pg_temp.uc('li-g-0007', c, 9, 'Dias', null, 20, 30, null), 'versao_atual=1');
+  -- Dias cujo período de hoje é uma fatura sem pagamento passam (fechamento no dia 8: hoje é de novembro), assim como mudar só o
+  -- apelido ou o limite com os mesmos dias.
+  res := public.update_card('li-g-0008', c, 1, 'Dias 2', null, 5, 15, 100000);
+  assert res #>> '{card,nickname}' = 'Dias 2' and pg_temp.cardv(c) = 2, 'apelido e limite com os mesmos dias';
+  res := public.update_card('li-g-0009', c, 2, 'Dias 2', null, 8, 20, 100000);
+  assert (select (closing_day::int, due_day::int) from public.card_items where id = c) = (8, 20) and pg_temp.cardv(c) = 3, 'dias que deixam hoje em novembro';
+  perform pg_temp.expect_code(pg_temp.uc('li-g-0010', c, 3, 'Dias 2', null, 20, 30, null), 'dias_com_fatura_paga', 'PT409');
+  -- Em novembro (fecha em 08/11): com novembro paga, mudar para dias cujo período de hoje é o de novembro é recusado também.
+  perform pg_temp.today('2026-11-10');
+  perform public.pay_invoice('li-g-0011', c, '2026-11-01', pg_temp.iv_ver(c, '2026-11-01'), 1000, '2026-11-10', acc);
+  perform pg_temp.expect_code(pg_temp.uc('li-g-0012', c, 3, 'Dias 2', null, 25, 30, null), 'dias_com_fatura_paga', 'PT409');
+  -- Fechamento no dia 5: hoje (10/11) é da fatura de dezembro, depois da paga; passa, e volta aos dias anteriores também.
+  res := public.update_card('li-g-0013', c, 3, 'Dias 2', null, 5, 15, null);
+  assert pg_temp.cardv(c) = 4 and (select current_month from public.card_items where id = c) = '2026-12-01', 'hoje em dezembro: passa';
+  res := public.update_card('li-g-0014', c, 4, 'Dias 2', null, 8, 20, null);
+  assert pg_temp.cardv(c) = 5, 'e volta aos dias anteriores';
+  -- A fatura atual (dezembro) nunca é uma fatura paga. Desfeito o pagamento de novembro, os dias voltam a poder mudar.
+  assert (select current_month from public.card_items where id = c) = '2026-12-01'
+     and not exists (select 1 from public.invoice_items where card_id = c and month = '2026-12-01' and status in ('paga', 'paga_em_parte')),
+    'a fatura atual não é paga';
+  perform public.undo_invoice_payment('li-g-0015', c, '2026-11-01', pg_temp.iv_ver(c, '2026-11-01'));
+  res := public.update_card('li-g-0016', c, 5, 'Dias 2', null, 25, 30, null);
+  assert (select (closing_day::int, due_day::int) from public.card_items where id = c) = (25, 30), 'sem fatura paga no período de hoje, os dias mudam';
+  perform pg_temp.today('2026-10-07');
+  perform pg_temp.check_links();
+  perform pg_temp.views_agree();
 end $$;
 reset role;
 -- Escrita direta (backend): a restrição da tabela também recusa o apelido com separadores e aceita os dígitos espalhados.

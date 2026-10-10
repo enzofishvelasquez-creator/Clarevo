@@ -1,4 +1,5 @@
 import { readSefazPage, type AccessKeyInfo, type SefazFetch, type SefazReadResult } from '@clarevo/core';
+import { fetch as expoFetch } from 'expo/fetch';
 import { Platform } from 'react-native';
 
 /**
@@ -18,6 +19,13 @@ export function sefazReadAvailable(): boolean {
   return Platform.OS !== 'web' || testFetch() !== null;
 }
 
+/**
+ * O `fetch` global do React Native pode ignorar `redirect: 'manual'` e seguir os redirecionamentos por conta própria. Por isso, no
+ * celular a leitura usa o `fetch` de `expo/fetch` (Expo SDK 57), que repassa `redirect` ao código nativo: no Android o OkHttp passa a
+ * não seguir redirecionamentos e no iOS a URLSession devolve a resposta 3xx, com o cabeçalho Location, para o Clarevo conferir o
+ * domínio de cada salto (`readSefazPage`). Mesmo assim, as garantias que não dependem do `fetch` continuam valendo: o domínio da
+ * resposta final (`url`) precisa ser o oficial e a página precisa ser da mesma nota (chave de acesso).
+ */
 export function readSefazOnDevice(officialUrl: string, key: AccessKeyInfo): Promise<SefazReadResult> {
-  return readSefazPage(testFetch() ?? ((url, init) => fetch(url, init)), officialUrl, key);
+  return readSefazPage(testFetch() ?? ((url, init) => expoFetch(url, init)), officialUrl, key);
 }

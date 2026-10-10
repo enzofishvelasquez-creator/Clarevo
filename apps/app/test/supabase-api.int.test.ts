@@ -4710,6 +4710,7 @@ describe('conversor dos cartões e das notas fiscais', () => {
       'pagamento_de_fatura',
       'fatura_paga',
       'fatura_seguinte_paga',
+      'dias_com_fatura_paga',
       'valor_acima_da_fatura',
       'lancamento_automatico',
       'campo_nao_se_aplica',
