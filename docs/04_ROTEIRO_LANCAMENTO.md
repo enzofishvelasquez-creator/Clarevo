@@ -196,7 +196,7 @@ Sem mudança no banco. Regras no core (`packages/core/src/navigation.ts`, `navig
 - [x] Barra inferior à vista em toda tela de consulta (Calculadoras, Contas a pagar e o detalhe, Gastos fixos, Cartões e a fatura, detalhe do registro, composição, Renda comprometida, detalhe da reserva e da meta, Simular, explicação de um tema, Seus últimos meses, Conta), com a aba de origem marcada, sem barra dupla nem salto ao abrir e fora da frente do teclado; sem barra nos formulários e nas telas de passo a passo com rodapé fixo (`/reserva`, `/guardar`, `/guardar/minima`, `/retomar/atualizar`, `/retomar/pagar` e `/a-pagar/vencidas`)
 - [x] Contas a pagar: seletor de mês local (sem limite para trás, 12 meses à frente), entradas "de agora" no mês atual, cards com o mês no endereço, "Revisar vencidas" com 1 vencida, "Já paguei" no detalhe, previsão e critério do total depois das listas e a linha de lembretes (celular, fora da demonstração, lembretes desligados) que abre Conta no card de lembretes
 - [x] Metas compacta: pergunta de 186 px em 360 × 640, plano de guardar dentro do card da reserva (com ou sem reserva), "Calcular minha reserva" à vista acima da barra e o card "Fazer as contas"
-- [x] Aprender: "Buscar um tema ou uma função" e o grupo "No app" com 20 telas do app (21 com o plano para quitar dívidas, D-040) (`docs/09_APRENDER.md`); nome acessível da aba "Movimentos: movimentações do mês"
+- [x] Aprender: "Buscar um tema ou uma função" e o grupo "No app" com 20 telas do app (21 com o plano para quitar dívidas, D-040; 22 com "Antes de financiar", D-044) (`docs/09_APRENDER.md`); nome acessível da aba "Movimentos: movimentações do mês"
 - [x] Roteiro web: bloco "Navegação (D-039)" em `scripts/e2e-web.js`, conferido em 390 e 320 px de largura e, nos casos de altura curta, em 360 × 640 e 320 × 640
 - [ ] **Você:** decidir se a conta vencida passa a 3 toques contando a confirmação, com "Já paguei" na própria linha da vencida (muda D-035(5)); hoje são 4 toques (D-039(6))
 - [ ] **Você:** confirmar que `/reserva`, `/guardar`, `/guardar/minima`, `/retomar/atualizar`, `/retomar/pagar` e `/a-pagar/vencidas` ficam sem a barra (D-039(4)); confirmar o card "Seu mês" depois de "Suas metas" e o título "Marcar como paga" na tela de pagamento
@@ -215,6 +215,17 @@ Enzo, em 10/10/2026: "sim" à ordem proposta (1. plano para sair das dívidas). 
 - [ ] Teste em aparelho (iOS e Android): teclado decimal nos campos, anúncio do resultado e a tela com 10 dívidas
 - [ ] Aprender: tema que explique "maior taxa primeiro" e "menor dívida primeiro" (bola de neve e avalanche), com fonte e data de revisão (a busca já leva "bola de neve" e "avalanche" à calculadora pelo grupo "No app")
 - [ ] **Você:** revisar as regras de detalhe de D-040 (em especial a referência "Sem valor a mais" sem bola de neve a dívida com saldo que não diminui ficar fora da comparação e as parcelas já vencidas ficarem fora do pré-preenchimento) e os textos
+
+## Antes de financiar (D-044)
+
+Pedido de Adriana Velasquez, encaminhado por Enzo em 10/10/2026. Só no core e no app, sem mudança no banco e sem pacote novo. Regras em `packages/core/src/calculators/antes-de-financiar.ts` e `docs/02`; tela em `apps/app/src/components/calc/antes-de-financiar.tsx`.
+
+- [x] Core: parcela Price (primeira em 1 mês ou na compra), total pago, juros, peso na renda e comprometido do mês, juntar antes (aportes no início do mês, rendimento digitado) e entrada maior, em centavos inteiros; testes em `calc-antes-de-financiar.test.ts` (casos de mão e 440 casos conferidos em Python independente) e textos em `copy.test.ts`
+- [x] Tela `/calcular/antes-de-financiar`: renda de referência no campo de renda (editável, sem gravar), taxa e rendimento sempre digitados, "Juntar antes", "Com uma entrada maior", "Anotar como parcelamento", "Criar meta com este valor", valores ocultos e conta nova em branco
+- [x] Portas: primeira linha de "Decidir uma compra", link ao fim de Simular e da Renda comprometida e o grupo "No app" da busca (financiar, financiamento, poder de compra, entrada, à vista)
+- [x] Roteiro web: bloco "Antes de financiar (D-044)" em `scripts/e2e-web.js` (390 e 320 px, demonstração e conta nova, valores ocultos, nada gravado, links e busca); capturas 230 a 239 em `docs/telas`
+- [ ] Teste em aparelho (iOS e Android): teclado decimal nos campos, anúncio do resultado e a tela com 480 parcelas
+- [ ] **Você:** revisar as regras de detalhe de D-044 (em especial a leitura de "+10% e +20% de entrada", o valor que cada "Juntar para" junta e a frase do comprometido em reais quando não há renda) e os textos
 
 ## Ajustes da revisão de Enzo, parte 1 (D-042), feito
 

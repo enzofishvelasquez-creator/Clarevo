@@ -356,7 +356,7 @@ export function calcAntesDeFinanciar(input: AntesInput, today?: IsoDate): CalcOu
       );
     }
     notes.push(`${COMMITTED_TEXT.debtReference} ${COMMITTED_TEXT.debtReferenceSource}`);
-  } else if (committed !== null) {
+  } else if (committed !== null && committed > 0) {
     resultLines.push(`Seu comprometido do mês iria de ${brl(committed)} para ${brl(committed + parcela)} enquanto durar o financiamento.`);
   }
 
@@ -376,8 +376,9 @@ export function calcAntesDeFinanciar(input: AntesInput, today?: IsoDate): CalcOu
     savingLines.push(financing);
   } else {
     savingLines.push(`Guardando ${brl(monthly)} por mês, ${yieldText}, você junta ${brl(target)} em ${monthsDuration(months)}.`);
+    savingLines.push(financing);
     savingLines.push(
-      `${financing} Juntando: leva ${monthsCount(months)} para ${juntarPara === 'vista' ? 'comprar à vista' : 'juntar o valor que seria financiado'} e não paga juros do financiamento.`,
+      `Juntando: leva ${monthsCount(months)} para ${juntarPara === 'vista' ? 'comprar à vista' : 'juntar o valor que seria financiado'} e não paga juros do financiamento.`,
     );
   }
 

@@ -148,6 +148,12 @@ describe('10. Antes de financiar (D-044)', () => {
       expect(r.notes).toEqual([ANTES_ESTIMATE_TEXT]);
       const none = run();
       expect(none.resultLines).toHaveLength(4);
+      // Sem nada comprometido e sem renda, "de R$ 0,00 para a parcela" não diz nada além da parcela.
+      expect(run({ comprometidoCents: 0 }).resultLines).toHaveLength(4);
+      expect(run({ comprometidoCents: 0, renda: '4.000,00' }).resultLines.slice(4)).toEqual([
+        'A parcela seria 2,2% da sua renda.',
+        'Seu comprometido iria de 0,0% para 2,2% enquanto durar o financiamento.',
+      ]);
       // Com renda e sem o comprometido (ainda lendo, ou com falha): só o peso da parcela.
       const onlyIncome = run({ renda: '4.000,00', comprometidoCents: null });
       expect(onlyIncome.resultLines).toHaveLength(5);
@@ -165,7 +171,8 @@ describe('10. Antes de financiar (D-044)', () => {
       expect(r.savingMonths).toBe(12);
       expect(r.savingLines).toEqual([
         'Guardando R$ 88,85 por mês, sem rendimento, você junta R$ 1.000,00 em 12 meses (1 ano).',
-        'Financiando: você usa o bem agora e paga R$ 66,20 de juros ao longo de 12 meses. Juntando: leva 12 meses para juntar o valor que seria financiado e não paga juros do financiamento.',
+        'Financiando: você usa o bem agora e paga R$ 66,20 de juros ao longo de 12 meses.',
+        'Juntando: leva 12 meses para juntar o valor que seria financiado e não paga juros do financiamento.',
       ]);
       expect(r.hypotheses).toContain('O preço do bem pode mudar enquanto você junta.');
       expect(r.hypotheses).toContain('Sem rendimento: o valor guardado não cresce.');
@@ -177,7 +184,7 @@ describe('10. Antes de financiar (D-044)', () => {
       expect(r.savingTargetCents).toBe(120_000);
       expect(r.savingMonths).toBe(14);
       expect(r.savingLines[0]).toBe('Guardando R$ 88,85 por mês, sem rendimento, você junta R$ 1.200,00 em 14 meses (1 ano e 2 meses).');
-      expect(r.savingLines[1]).toContain('Juntando: leva 14 meses para comprar à vista e não paga juros do financiamento.');
+      expect(r.savingLines[2]).toBe('Juntando: leva 14 meses para comprar à vista e não paga juros do financiamento.');
       expect(r.hypotheses).toContain('Juntar para comprar à vista: o valor a juntar é o preço inteiro, R$ 1.200,00.');
     });
 

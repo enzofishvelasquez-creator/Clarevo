@@ -175,8 +175,8 @@ export function CalcResult({
                   <Txt variant="label" color={colors.textSecondary} aria-hidden accessibilityElementsHidden importantForAccessibility="no">
                     •
                   </Txt>
-                  <Txt variant="label" color={colors.textSecondary} style={{ flex: 1 }}>
-                    {h}
+                  <Txt variant="label" color={colors.textSecondary} style={{ flex: 1 }} accessibilityLabel={hidden ? maskMoneyLabel(h, true) : undefined}>
+                    {maskMoneyText(h, hidden)}
                   </Txt>
                 </View>
               ))}

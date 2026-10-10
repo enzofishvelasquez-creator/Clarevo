@@ -5,7 +5,7 @@
  * (Conta na web e ocultar valores), do Ciclo B (renda comprometida e a previsão dos pagamentos), do Ciclo C (metas, reserva
  * e plano de guardar), do Ciclo D (simulador, com os aportes no início de cada mês) e da Navegação (D-039: "Anotar gasto" logo
  * abaixo do cabeçalho, barra inferior nas telas de consulta, Contas a pagar no mês certo, Metas compacta e a busca "No app" de
- * Aprender) na versão web, em modo demonstração (acesso simulado).
+ * Aprender) e de "Antes de financiar" (D-044) na versão web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -5786,6 +5786,284 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('D42 editar a conta do ano: lembra que para o valor de um ano só se usa "Informar o valor", em Ano a ano', (await body()).includes('Para mudar o valor de um ano só, use Informar o valor, em Ano a ano. Aqui a mudança vale também para os anos seguintes.'));
   await keepText();
   await btn('Cancelar').click(); await p.waitForTimeout(400); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
+  await goResumo().catch(() => {});
+
+  // ==================================================================================================================
+  // Antes de financiar (D-044; pedido de Adriana Velasquez, encaminhado por Enzo em 10/10/2026). Calculadora educativa em
+  // /calcular/antes-de-financiar, no padrão de D-035: nada é gravado (nem no aparelho), a taxa do financiamento e o rendimento
+  // são sempre digitados, sem produto e sem dizer qual caminho escolher. Na demonstração, hoje é 07/10/2026, a renda de
+  // referência é R$ 6.000,00 e o comprometido de outubro é R$ 3.150,00 (52,5%). Cada tela é conferida em 390 e em 320 px.
+  // Capturas novas: 230 em diante (210 a 227 já existem; a especificação pedia 220).
+  // Conta: preço R$ 40.000,00, entrada R$ 8.000,00 (financia R$ 32.000,00), 48 parcelas a 1,99% ao mês, a primeira em 1 mês:
+  // parcela R$ 1.041,14, total R$ 57.974,72 e juros R$ 17.974,72 (conferidos à parte, em Python, com frações exatas).
+  // ==================================================================================================================
+  const D44_VETOED = /\b(melhor(es)?|pior(es)?|dever[ií]\w*|renegoci\w*|portabilidade|consignad\w*|cons[óo]rcio|vale a pena|saldo devedor|recomendamos|invista\w*|aplique em)\b/i;
+  const d44Fill = async (label, value) => { const f = field(label); await f.fill(value); await f.blur(); await p.waitForTimeout(200); };
+  const d44Open = async () => {
+    await tabByName('Metas').click(); await waitText('Fazer as contas'); await p.waitForTimeout(400);
+    await p.getByRole('button', { name: /^Calculadoras\./ }).filter({ visible: true }).first().click(); await waitText('Decidir uma compra'); await p.waitForTimeout(400);
+    await p.getByRole('button', { name: /^Antes de financiar\. / }).filter({ visible: true }).first().click(); await waitText('Preço à vista do bem'); await p.waitForTimeout(700);
+  };
+  const d44Series = () => otherDevice(async (repo, ctx) => JSON.stringify((await repo.listSeries(ctx)).map((s) => [s.id, s.version, s.openCount, s.paidCount])));
+  const d44Goals = () => otherDevice(async (repo, ctx) => JSON.stringify((await repo.listGoals(ctx)).map((g) => [g.id, g.version])));
+  const d44Small = () => p.evaluate(() => [...document.querySelectorAll('[role=button],[role=radio]')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.height < 47.5; }).map((e) => (e.getAttribute('aria-label') || e.textContent || '').slice(0, 40)));
+  const d44Texts = [];
+  const d44Keep = async () => { d44Texts.push(await body()); await keepText(); };
+  const d44Fill1 = async () => {
+    await d44Fill('Preço à vista do bem', '40000'); await d44Fill('Entrada', '8000'); await d44Fill('Número de parcelas', '48'); await d44Fill('Taxa de juros ao mês (%)', '1,99');
+  };
+
+  await demoHome();
+  const d44Writes = writes.length;
+  const d44Store = await storage();
+  const d44SeriesBefore = await d44Series();
+  const d44GoalsBefore = await d44Goals();
+
+  // ---- 1. Calculadoras: a nova linha abre o grupo "Decidir uma compra" ----
+  await tabByName('Metas').click(); await waitText('Fazer as contas'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /^Calculadoras\./ }).filter({ visible: true }).first().click(); await waitText('Decidir uma compra'); await p.waitForTimeout(400);
+  const d44Group = await sectionRows('Decidir uma compra');
+  ok('D44 Calculadoras: "Decidir uma compra" começa com "Antes de financiar", seguida de "Parcelado ou à vista?" e "Quanto custa por ano?"',
+    d44Group !== null && d44Group.length === 3 && d44Group[0] === 'Antes de financiar. Parcela, juros e o que muda se juntar antes' && /^Parcelado ou à vista\? /.test(d44Group[1]) && /^Quanto custa por ano\?\. |^Quanto custa por ano\? /.test(d44Group[2]), JSON.stringify(d44Group));
+  await atWidths(async (w) => { await layoutChecks(`D44 calculadoras ${w}px`); if (w === 390) await shot('236_calculadoras_com_antes_de_financiar'); });
+  await p.getByRole('button', { name: /^Antes de financiar\. / }).filter({ visible: true }).first().click(); await waitText('Preço à vista do bem'); await p.waitForTimeout(700);
+
+  // ---- 2. A tela abre vazia, com a renda de referência já no campo de renda e a taxa em branco ----
+  t = await body();
+  ok('D44 a tela abre em /calcular/antes-de-financiar com o título "Antes de financiar", o aviso das calculadoras no topo e a barra inferior com Metas marcada',
+    urlPath() === '/calcular/antes-de-financiar' && (await h1Name()) === 'Antes de financiar' && t.includes('Simulação com os valores e as taxas que você informou. Não é recomendação de produto financeiro nem oferta de crédito.') && barOk(await barState()) && (await barState()).selected[0] === 'Metas');
+  await checkBar('D44 antes de financiar', 'Metas');
+  ok('D44 campos: preço, entrada (opcional), parcelas, taxa ao mês, "A primeira parcela vence em 1 mês?" (Sim marcado), renda e a alternativa de juntar antes',
+    ['Preço à vista do bem', 'Entrada', 'Número de parcelas', 'Taxa de juros ao mês (%)', 'Sua renda líquida por mês', 'Quanto você conseguiria guardar por mês', 'Rendimento ao ano (%)'].every((x) => t.includes(x)) &&
+    t.includes('A primeira parcela vence em 1 mês?') && t.includes('Não: a primeira parcela é paga na compra.') && (await radio('Sim').getAttribute('aria-checked')) === 'true' && (await radio('Não').getAttribute('aria-checked')) === 'false' &&
+    t.includes('Alternativa: juntar antes') && (await radio('Dar mais entrada').getAttribute('aria-checked')) === 'true' && (await radio('Comprar à vista').getAttribute('aria-checked')) === 'false');
+  ok('D44 a taxa e o rendimento nunca vêm preenchidos: taxa em branco, com "Está na proposta do banco ou da loja. Use o CET ao mês, se tiver."; rendimento em branco ("Em branco: sem rendimento.")',
+    (await field('Taxa de juros ao mês (%)').inputValue()) === '' && (await field('Rendimento ao ano (%)').inputValue()) === '' && t.includes('Está na proposta do banco ou da loja. Use o CET ao mês, se tiver.') && t.includes('Em branco: sem rendimento.'));
+  ok('D44 a renda de referência (R$ 6.000,00) entra sozinha no campo de renda, com a dica de que mudar aqui não altera a referência',
+    (await field('Sua renda líquida por mês').inputValue()) === '6.000,00' && t.includes('Veio da sua renda de referência. Mudar aqui não altera a referência.'), await field('Sua renda líquida por mês').inputValue());
+  ok('D44 antes de preencher: "Preencha os campos para ver o resultado.", sem botão "Calcular" e sem os blocos do resultado', t.includes('Preencha os campos para ver o resultado.') && (await visibleCount('button', /^Calcular/)) === 0 &&
+    !t.includes('Com uma entrada maior') && (await visibleCount('button', 'Anotar como parcelamento')) === 0 && (await visibleCount('button', 'Criar meta com este valor')) === 0);
+  await atWidths(async (w) => {
+    await layoutChecks(`D44 antes de financiar vazio ${w}px`);
+    const small = await d44Small();
+    ok(`D44 vazio (${w}px): botões, chips e links da tela com alvo de 48 px`, small.filter((x) => !/^(Voltar|Resumo|Movimentos|Metas|Aprender)/.test(x)).length === 0, small.join(' | '));
+    if (w === 390) await shot('230_antes_de_financiar_vazio');
+    if (w === 320) await shot('230_antes_de_financiar_vazio_320px');
+  });
+  await d44Keep();
+
+  // ---- 3. O resultado: financiar, tempo, juros, peso na renda e o comprometido de 52,5% para 69,9% ----
+  await d44Fill1();
+  t = await body();
+  ok('D44 os campos de reais ganham a forma de moeda ao sair (40.000,00 e 8.000,00)', (await field('Preço à vista do bem').inputValue()) === '40.000,00' && (await field('Entrada').inputValue()) === '8.000,00');
+  ok('D44 financiar: 48 parcelas de R$ 1.041,14, por 48 meses (4 anos) até outubro de 2030, total R$ 57.974,72 (entrada de R$ 8.000,00 mais 48 × R$ 1.041,14) e juros de R$ 17.974,72',
+    t.includes('Com estes números, são 48 parcelas de R$ 1.041,14.') && t.includes('Você paga por 48 meses (4 anos), até outubro de 2030.') &&
+    t.includes('Total pago: R$ 57.974,72 (entrada de R$ 8.000,00 mais 48 × R$ 1.041,14).') && t.includes('Juros: R$ 17.974,72.'), t.slice(-1800));
+  ok('D44 peso na renda: a parcela seria 17,4% da renda e o comprometido de outubro iria de 52,5% para 69,9% enquanto durar o financiamento',
+    t.includes('A parcela seria 17,4% da sua renda.') && t.includes('Seu comprometido iria de 52,5% para 69,9% enquanto durar o financiamento.'));
+  ok('D44 a referência de 30% aparece só como referência, com a fonte e a data (como na tela da renda), e o aviso fixo da estimativa',
+    t.includes('Referência usada pela Serasa: até 30% da renda líquida com parcelas de dívidas. É uma referência geral, não uma regra para você.') &&
+    t.includes('Fonte: Serasa, página sobre comprometimento de renda, consultada em 09/10/2026.') && t.includes('Estimativa. As condições oficiais são as da proposta; peça o CET.'));
+  ok('D44 hipóteses visíveis: tabela Price com a primeira parcela em 1 mês, só a taxa informada, comprometido do mês atual e "O preço do bem pode mudar enquanto você junta."',
+    t.includes('Hipóteses') && t.includes('Parcelas iguais (tabela Price), a primeira 1 mês depois da compra.') && t.includes('Só a taxa de juros informada, sem tarifas, seguros e IOF.') &&
+    t.includes('O comprometido é o do mês atual, com as contas a pagar já criadas; os meses seguintes podem ser diferentes.') && t.includes('O preço do bem pode mudar enquanto você junta.'));
+  ok('D44 juntar antes (dar mais entrada, sem rendimento): guardando R$ 1.041,14 por mês, junta R$ 32.000,00 em 31 meses (2 anos e 7 meses), com a comparação neutra',
+    t.includes('Guardando R$ 1.041,14 por mês, sem rendimento, você junta R$ 32.000,00 em 31 meses (2 anos e 7 meses).') &&
+    t.includes('Financiando: você usa o bem agora e paga R$ 17.974,72 de juros ao longo de 48 meses.') && t.includes('Juntando: leva 31 meses para juntar o valor que seria financiado e não paga juros do financiamento.'));
+  ok('D44 entrada maior: mais 10% (R$ 4.000,00) e 20% (R$ 8.000,00) do preço, com a parcela, os juros e a diferença, e o atalho "Fazer a conta com outra entrada"',
+    t.includes('Com uma entrada maior') && t.includes('Mais 10% do preço de entrada (R$ 4.000,00): parcela de R$ 910,99 e juros de R$ 15.727,52 (R$ 2.247,20 a menos).') &&
+    t.includes('Mais 20% do preço de entrada (R$ 8.000,00): parcela de R$ 780,85 e juros de R$ 13.480,80 (R$ 4.493,92 a menos).') && (await visibleCount('button', 'Fazer a conta com outra entrada')) === 1);
+  ok('D44 depois do resultado: "Anotar como parcelamento" e "Criar meta com este valor" (com a dica de que a taxa de rendimento não é gravada)',
+    (await visibleCount('button', 'Anotar como parcelamento')) === 1 && (await visibleCount('button', 'Criar meta com este valor')) === 1 && t.includes('A meta recebe o valor, o prazo e o valor por mês. A taxa de rendimento não é gravada.'));
+  ok('D44 os títulos: "Resultado", "Hipóteses", "Juntar antes" e "Com uma entrada maior" são títulos da tela', (await headingList()).filter((h) => /^[23]:(Resultado|Hipóteses|Juntar antes|Com uma entrada maior|Alternativa: juntar antes)$/.test(h)).length === 5, JSON.stringify(await headingList()));
+  ok('D44 a região viva do resultado tem a parcela, o prazo, os juros e o peso na renda; a de "Juntar antes" tem o tempo e a comparação',
+    (await liveText()).includes('Com estes números, são 48 parcelas de R$ 1.041,14.') && (await liveText()).includes('A parcela seria 17,4% da sua renda.') && (await liveText()).includes('Guardando R$ 1.041,14 por mês'), (await liveText()).slice(0, 300));
+  ok('D44 nenhum texto de julgamento, de recomendação ou da lista vetada no resultado', !D44_VETOED.test(t) && !FORBIDDEN.test(t) && !JUDGMENT.test(t), (t.match(D44_VETOED) ?? t.match(FORBIDDEN) ?? t.match(JUDGMENT) ?? [''])[0]);
+  ok('D44 sem botão "Calcular": o resultado aparece enquanto a pessoa digita', (await visibleCount('button', /^Calcular/)) === 0);
+  await atWidths(async (w) => {
+    await layoutChecks(`D44 resultado ${w}px`);
+    const small = await d44Small();
+    ok(`D44 resultado (${w}px): botões, chips e links da tela com alvo de 48 px`, small.filter((x) => !/^(Voltar|Resumo|Movimentos|Metas|Aprender)/.test(x)).length === 0, small.join(' | '));
+    await scrollTo('Resultado');
+    if (w === 390) await shot('231_antes_de_financiar_resultado');
+    if (w === 320) await shot('231_antes_de_financiar_resultado_320px');
+    await scrollTo('Juntar antes');
+    if (w === 390) await shot('232_antes_de_financiar_juntar_antes');
+    if (w === 320) await shot('232_antes_de_financiar_juntar_antes_320px');
+  });
+  await d44Keep();
+
+  // ---- 4. A conta muda com a renda, com a primeira parcela na compra e com o que se junta ----
+  await d44Fill('Sua renda líquida por mês', '5000');
+  t = await body();
+  ok('D44 renda digitada aqui (R$ 5.000,00, sem gravar): 20,8% da renda, e o comprometido vai de 63,0% para 83,8%', t.includes('A parcela seria 20,8% da sua renda.') && t.includes('Seu comprometido iria de 63,0% para 83,8% enquanto durar o financiamento.') &&
+    t.includes('Percentuais sobre a renda líquida por mês que você informou aqui.') && !t.includes('Veio da sua renda de referência.'));
+  await d44Fill('Sua renda líquida por mês', '');
+  t = await body();
+  ok('D44 sem renda: só valores em reais ("Seu comprometido do mês iria de R$ 3.150,00 para R$ 4.191,14"), sem percentuais e sem a referência de 30%',
+    t.includes('Seu comprometido do mês iria de R$ 3.150,00 para R$ 4.191,14 enquanto durar o financiamento.') && !t.includes('A parcela seria') && !t.includes('Referência usada pela Serasa') && !t.includes('Veio da sua renda de referência.') && t.includes('Estimativa. As condições oficiais são as da proposta; peça o CET.'));
+  await d44Fill('Sua renda líquida por mês', '6000');
+  await radio('Não').click(); await p.waitForTimeout(300);
+  t = await body();
+  ok('D44 primeira parcela paga na compra: parcela de R$ 1.020,82, total R$ 56.999,36 (R$ 16.999,36 de juros), "a primeira na compra" e a hipótese correspondente',
+    t.includes('Com estes números, são 48 parcelas de R$ 1.020,82.') && t.includes('Você paga por 48 meses (4 anos), a primeira na compra, até setembro de 2030.') && t.includes('Total pago: R$ 56.999,36 (entrada de R$ 8.000,00 mais 48 × R$ 1.020,82).') && t.includes('Juros: R$ 16.999,36.') &&
+    t.includes('Parcelas iguais (tabela Price), a primeira paga na compra e as outras a cada mês.'));
+  await radio('Sim').click(); await p.waitForTimeout(300);
+  await radio('Comprar à vista').click(); await d44Fill('Quanto você conseguiria guardar por mês', '1500'); await d44Fill('Rendimento ao ano (%)', '8');
+  t = await body();
+  ok('D44 comprar à vista, R$ 1.500,00 por mês e 8% ao ano: junta R$ 40.000,00 em 25 meses (2 anos e 1 mês); a hipótese diz o rendimento, os depósitos no início do mês e que o preço pode mudar',
+    t.includes('Guardando R$ 1.500,00 por mês, com rendimento de 8% ao ano, você junta R$ 40.000,00 em 25 meses (2 anos e 1 mês).') &&
+    t.includes('Juntando: leva 25 meses para comprar à vista e não paga juros do financiamento.') &&
+    t.includes('Rendimento de 8% ao ano (0,64% ao mês, taxa equivalente), informado por você, constante no período e sem imposto ou taxas.') &&
+    t.includes('Depósitos no início de cada mês, como na Calculadora do Cidadão do Banco Central; prazo em meses inteiros, para cima.') && t.includes('Juntar para comprar à vista: o valor a juntar é o preço inteiro, R$ 40.000,00.') && t.includes('O preço do bem pode mudar enquanto você junta.'));
+  await d44Fill('Rendimento ao ano (%)', '31');
+  t = await body();
+  ok('D44 rendimento acima de 30%: erro no campo ("Use um rendimento de 0% a 30% ao ano, com até 2 casas.") e o texto de espera no resultado', t.includes('Use um rendimento de 0% a 30% ao ano, com até 2 casas.') && t.includes('Preencha os campos para ver o resultado.'));
+  await d44Fill('Rendimento ao ano (%)', '');
+  await radio('Dar mais entrada').click(); await d44Fill('Quanto você conseguiria guardar por mês', '');
+  t = await body();
+  ok('D44 rendimento e valor por mês em branco: volta a "sem rendimento" e ao valor da parcela (31 meses)', t.includes('Guardando R$ 1.041,14 por mês, sem rendimento, você junta R$ 32.000,00 em 31 meses (2 anos e 7 meses).'));
+  await d44Fill('Entrada', '40000');
+  t = await body();
+  ok('D44 entrada igual ao preço: "Com a entrada igual ao preço à vista, não há o que financiar.", sem juros, sem blocos de comparação e sem os botões',
+    t.includes('Com a entrada igual ao preço à vista, não há o que financiar.') && t.includes('Você paga R$ 40.000,00 na compra, sem juros.') && !t.includes('Com uma entrada maior') && !t.includes('Guardando R$') &&
+    (await visibleCount('button', 'Anotar como parcelamento')) === 0 && (await visibleCount('button', 'Criar meta com este valor')) === 0);
+  await d44Fill('Entrada', '40000,01');
+  t = await body();
+  ok('D44 entrada acima do preço: "A entrada não pode passar do preço à vista." (depois de sair do campo)', t.includes('A entrada não pode passar do preço à vista.') && t.includes('Preencha os campos para ver o resultado.'));
+  await d44Fill('Entrada', '8000');
+  await d44Fill('Número de parcelas', '481');
+  t = await body();
+  ok('D44 parcelas acima de 480: "Use de 1 a 480 parcelas."', t.includes('Use de 1 a 480 parcelas.'));
+  await d44Fill('Número de parcelas', '48');
+  await d44Fill('Taxa de juros ao mês (%)', '100');
+  t = await body();
+  ok('D44 taxa acima de 99,99%: "Use uma taxa de 0% a 99,99% ao mês."', t.includes('Use uma taxa de 0% a 99,99% ao mês.'));
+  await d44Fill('Taxa de juros ao mês (%)', '1,99');
+  ok('D44 voltando aos números do exemplo, o resultado volta (R$ 1.041,14)', await shows('Com estes números, são 48 parcelas de R$ 1.041,14.'));
+
+  // ---- 5. "Fazer a conta com outra entrada": leva o foco à entrada, sem mudar nada ----
+  await btn('Fazer a conta com outra entrada').click(); await p.waitForTimeout(400);
+  ok('D44 "Fazer a conta com outra entrada" leva o foco ao campo Entrada, que continua com R$ 8.000,00', (await p.evaluate(() => document.activeElement?.getAttribute('aria-label'))) === 'Entrada' && (await field('Entrada').inputValue()) === '8.000,00');
+  await d44Fill('Entrada', '12000');
+  t = await body();
+  ok('D44 com a entrada de R$ 12.000,00 a conta refaz tudo (financia R$ 28.000,00) e as linhas de entrada maior somam 10% e 20% do preço à entrada nova',
+    t.includes('Mais 10% do preço de entrada (R$ 4.000,00)') && t.includes('Mais 20% do preço de entrada (R$ 8.000,00)') && t.includes('junta R$ 28.000,00 em') && t.includes('entrada de R$ 12.000,00 mais 48 ×'));
+  await d44Fill('Entrada', '8000');
+
+  // ---- 6. "Anotar como parcelamento" e "Criar meta com este valor": abrem o cadastro e a meta preenchidos, sem gravar nada ----
+  await btn('Anotar como parcelamento').click(); await waitText('Total de parcelas'); await p.waitForTimeout(500);
+  ok('D44 "Anotar como parcelamento" abre o cadastro com Parcelado, a natureza "Financiamento ou empréstimo", a parcela de 1.041,14 e as 48 parcelas',
+    (await h1Name()) === 'Novo parcelamento' && (await radio('Parcelado').getAttribute('aria-checked')) === 'true' && (await field('Valor da parcela').inputValue()) === '1.041,14' && (await field('Total de parcelas').inputValue()) === '48' &&
+    (await p.getByRole('radio', { name: /^Financiamento ou empréstimo/ }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'true', `${await field('Total de parcelas').inputValue()}`);
+  ok('D44 abrir o cadastro não grava nada (nenhum parcelamento novo)', (await d44Series()) === d44SeriesBefore);
+  await btn('Cancelar').click(); await p.waitForTimeout(400);
+  if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
+  await waitUntil(async () => (await h1Name()) === 'Antes de financiar', 8000);
+  ok('D44 voltar do cadastro sem salvar devolve a calculadora com o resultado', await shows('Com estes números, são 48 parcelas de R$ 1.041,14.'));
+  await btn('Criar meta com este valor').click(); await waitText('Modelo de nome'); await p.waitForTimeout(500);
+  const d44Meta = await formValues();
+  ok('D44 "Criar meta com este valor" abre /meta/nova (objetivo) com valor 32.000,00, prazo 04/2029 (31 meses a partir de outubro de 2026) e plano de 1.041,14; nome em branco; nada de taxa no endereço',
+    urlPath() === '/meta/nova' && d44Meta.some((v) => v === 'Valor da meta=32.000,00') && d44Meta.some((v) => v.endsWith('=04/2029')) && d44Meta.some((v) => v.endsWith('=1.041,14')) && d44Meta.some((v) => /^Nome da meta=$/.test(v)) && !/taxa|rendimento|1,99/i.test(p.url()), `${JSON.stringify(d44Meta)} ${p.url()}`);
+  await shot('233_antes_de_financiar_criar_meta');
+  ok('D44 abrir o formulário de meta não grava nada', (await d44Goals()) === d44GoalsBefore);
+  await btn('Voltar').click(); await p.waitForTimeout(500);
+  if (await visibleCount('button', /Descartar|Sair/)) await p.getByRole('button', { name: /Descartar|Sair/ }).filter({ visible: true }).first().click().catch(() => {});
+  await waitUntil(async () => (await h1Name()) === 'Antes de financiar', 8000);
+  ok('D44 voltar da meta devolve a calculadora com o que foi digitado', (await field('Taxa de juros ao mês (%)').inputValue()) === '1,99' && (await field('Número de parcelas').inputValue()) === '48');
+  ok('D44 nada gravado até aqui: nenhuma requisição de escrita, nada no aparelho, nenhum parcelamento nem meta nova', writes.length === d44Writes && (await storage()) === d44Store && (await d44Series()) === d44SeriesBefore && (await d44Goals()) === d44GoalsBefore, `${writes.length - d44Writes} escritas`);
+
+  // ---- 7. Os caminhos até a calculadora: Simular, Renda comprometida e a busca "No app" ----
+  await demoHome();
+  await tabByName('Metas').click(); await waitText('Fazer as contas'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /^Simular um plano\./ }).filter({ visible: true }).first().click(); await waitText('Simular um plano'); await p.waitForTimeout(500);
+  ok('D44 Simular: o link "Antes de financiar? Fazer as contas" fica depois do resultado', (await visibleCount('button', 'Antes de financiar? Fazer as contas')) === 1);
+  await atWidths(async (w) => { await scrollTo('Antes de financiar? Fazer as contas'); await layoutChecks(`D44 simular ${w}px`); if (w === 390) await shot('234_simular_com_link_antes_de_financiar'); });
+  await btn('Antes de financiar? Fazer as contas').click(); await waitText('Preço à vista do bem'); await p.waitForTimeout(500);
+  ok('D44 Simular › link abre /calcular/antes-de-financiar com a renda de referência já no campo', urlPath() === '/calcular/antes-de-financiar' && (await field('Sua renda líquida por mês').inputValue()) === '6.000,00', p.url());
+  await demoHome();
+  await rcRow().click(); await waitText('da sua renda de referência em outubro de 2026'); await p.waitForTimeout(500);
+  ok('D44 Renda comprometida: o link "Antes de financiar? Fazer as contas" entre os links do fim da tela', (await visibleCount('button', 'Antes de financiar? Fazer as contas')) === 1);
+  await atWidths(async (w) => { await scrollTo('Quem vê estes dados?'); await layoutChecks(`D44 renda comprometida ${w}px`); if (w === 390) await shot('235_renda_comprometida_com_link_antes_de_financiar'); });
+  await btn('Antes de financiar? Fazer as contas').click(); await waitText('Preço à vista do bem'); await p.waitForTimeout(500);
+  ok('D44 Renda comprometida › link abre a calculadora, sem nada gravado', urlPath() === '/calcular/antes-de-financiar' && (await field('Sua renda líquida por mês').inputValue()) === '6.000,00');
+  await demoHome();
+  await tabByName('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await p.waitForTimeout(400);
+  const d44Box = () => p.getByLabel('Buscar um tema ou uma função', { exact: true }).filter({ visible: true }).first();
+  for (const query of ['financiar', 'financiamento', 'poder de compra', 'entrada', 'à vista']) {
+    await d44Box().fill(query); await waitText('No app'); await p.waitForTimeout(500);
+    const d44Group2 = await p.evaluate(() => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'No app' && e.getBoundingClientRect().width > 0); return h ? h.getAttribute('aria-level') : null; });
+    ok(`D44 busca "${query}": o grupo "No app" (nível 2) tem "Antes de financiar"`, d44Group2 === '2' && (await p.getByRole('button', { name: /^Antes de financiar\. Veja a parcela, os juros e quanto pesa na renda antes de comprar a prazo/ }).filter({ visible: true }).count()) === 1);
+    if (query === 'financiar') await atWidths(async (w) => { await layoutChecks(`D44 busca No app ${w}px`); if (w === 390) await shot('237_aprender_no_app_financiar'); });
+  }
+  await d44Box().fill('consórcio'); await p.waitForTimeout(500);
+  ok('D44 busca "consórcio": a calculadora não aparece (consórcio não é parte desta função)', (await p.getByRole('button', { name: /^Antes de financiar\. / }).filter({ visible: true }).count()) === 0);
+  await d44Box().fill('financiar'); await waitText('No app'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /^Antes de financiar\. Veja a parcela/ }).filter({ visible: true }).first().click(); await waitText('Preço à vista do bem'); await p.waitForTimeout(500);
+  ok('D44 busca › tocar abre /calcular/antes-de-financiar com a barra à vista', urlPath() === '/calcular/antes-de-financiar' && barOk(await barState()), p.url());
+  ok('D44 nada gravado nas navegações (links e busca): nenhuma requisição de escrita', writes.length === d44Writes, `${writes.length - d44Writes} escritas`);
+
+  // ---- 8. Valores ocultos (D-025): a renda que veio da referência e os valores do resultado ficam mascarados ----
+  await demoHome();
+  await openConta();
+  await hideSwitch().click(); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  await d44Open();
+  await d44Fill1();
+  t = await body();
+  const d44Renda = field('Sua renda líquida por mês, valor oculto');
+  ok('D44 valores ocultos: a renda da referência mostra "••••", não se edita e leva "valor oculto" no nome acessível; o que a pessoa digitou (taxa 1,99) continua à vista',
+    (await d44Renda.inputValue()) === '••••' && !(await d44Renda.isEditable()) && (await field('Taxa de juros ao mês (%)').inputValue()) === '1,99' && t.includes('Valor oculto. Mostre os valores para editar.'));
+  const d44Leaks = await moneyLeaks();
+  ok('D44 valores ocultos: nenhum valor em reais à vista (texto e nomes acessíveis); "R$ ••••" no resultado, nas linhas de juntar antes e de entrada maior; os percentuais e os meses continuam',
+    d44Leaks.length === 0 && t.includes('Com estes números, são 48 parcelas de R$ ••••.') && t.includes('A parcela seria 17,4% da sua renda.') && t.includes('Seu comprometido iria de 52,5% para 69,9% enquanto durar o financiamento.') &&
+    t.includes('Você paga por 48 meses (4 anos), até outubro de 2030.') && t.includes('em 31 meses (2 anos e 7 meses).') && (await spokenHidden()) > 0, `${d44Leaks.slice(0, 3).join(' | ')}`);
+  await atWidths(async (w) => {
+    await layoutChecks(`D44 valores ocultos ${w}px`);
+    await scrollTo('Sua renda líquida por mês');
+    if (w === 390) await shot('238_antes_de_financiar_valores_ocultos_renda');
+    if (w === 320) await shot('238_antes_de_financiar_valores_ocultos_renda_320px');
+    await scrollTo('Resultado');
+    if (w === 390) await shot('238_antes_de_financiar_valores_ocultos');
+    if (w === 320) await shot('238_antes_de_financiar_valores_ocultos_320px');
+  });
+  await d44Keep();
+  await btn('Mostrar valores para editar a renda').click(); await p.waitForTimeout(400);
+  ok('D44 "Mostrar valores" na própria tela: a renda volta a R$ 6.000,00, pode ser editada e o link some; os valores do resultado voltam',
+    (await field('Sua renda líquida por mês').inputValue()) === '6.000,00' && (await field('Sua renda líquida por mês').isEditable()) && (await visibleCount('button', 'Mostrar valores para editar a renda')) === 0 && (await body()).includes('são 48 parcelas de R$ 1.041,14.'));
+  await goResumo();
+  await openConta();
+  ok('D44 "Mostrar valores" vale só nesta sessão: a preferência "Ocultar valores ao abrir" continua ligada', (await hideSwitch().getAttribute('aria-checked')) === 'true');
+  await hideSwitch().click(); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+
+  // ---- 9. Conta nova: nada de exemplo, sem renda no campo e sem comprometido a comparar ----
+  await newAcct('Dora Teste', 'dora@exemplo.com');
+  const d44Writes2 = writes.length;
+  const d44Store2 = await storage();
+  await d44Open();
+  t = await body();
+  ok('D44 conta nova: o campo de renda abre em branco (sem renda de referência), a taxa em branco e o resultado pede o preenchimento; nenhum exemplo',
+    (await field('Sua renda líquida por mês').inputValue()) === '' && (await field('Taxa de juros ao mês (%)').inputValue()) === '' && !t.includes('Veio da sua renda de referência.') && t.includes('Preencha os campos para ver o resultado.') && !t.includes('R$ 1.041,14'));
+  await atWidths(async (w) => {
+    await layoutChecks(`D44 conta nova ${w}px`);
+    if (w === 390) await shot('239_antes_de_financiar_conta_nova');
+    if (w === 320) await shot('239_antes_de_financiar_conta_nova_320px');
+    await scrollTo('Sua renda líquida por mês');
+    if (w === 390) await shot('239_antes_de_financiar_conta_nova_renda');
+    if (w === 320) await shot('239_antes_de_financiar_conta_nova_renda_320px');
+  });
+  await d44Fill1();
+  t = await body();
+  ok('D44 conta nova: parcela, prazo e juros calculados; sem renda e sem nada comprometido, nenhuma linha de peso na renda (nem "de R$ 0,00 para")',
+    t.includes('Com estes números, são 48 parcelas de R$ 1.041,14.') && t.includes('Juros: R$ 17.974,72.') && !t.includes('A parcela seria') && !t.includes('Seu comprometido') && !t.includes('Referência usada pela Serasa'), t.slice(-900));
+  await d44Fill('Sua renda líquida por mês', '4500');
+  t = await body();
+  ok('D44 conta nova com a renda digitada (R$ 4.500,00): a parcela seria 23,1% e o comprometido iria de 0,0% para 23,1%', t.includes('A parcela seria 23,1% da sua renda.') && t.includes('Seu comprometido iria de 0,0% para 23,1% enquanto durar o financiamento.'), t.slice(-900));
+  ok('D44 conta nova: nada gravado ao digitar (nenhuma escrita, nada no aparelho, nenhum parcelamento)', writes.length === d44Writes2 && (await storage()) === d44Store2 && (await otherDevice(async (repo, ctx) => (await repo.listSeries(ctx)).length)) === 0, `${writes.length - d44Writes2} escritas`);
+  await d44Keep();
+  const d44Vetoed = d44Texts.map((s) => (s.match(D44_VETOED) ?? s.match(JUDGMENT) ?? [])[0]).filter(Boolean);
+  ok('D44 as telas da calculadora não usam nenhuma palavra vetada, de julgamento ou de recomendação (melhor, pior, deveria, vale a pena, invista, aplique em...)', d44Texts.length >= 3 && d44Vetoed.length === 0, d44Vetoed.join(' | '));
   await goResumo().catch(() => {});
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);

@@ -1,6 +1,6 @@
 # Arquitetura
 
-10/10/2026 · versão 0.12 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos, calculadoras, seus últimos meses, Aprender e dúvidas, lembretes, ocultar valores e biometria, renda comprometida, metas e reserva, plano de guardar, simulador, cartões e faturas, leitura de notas fiscais, plano para quitar dívidas e os ajustes de D-042: forma de pagamento da nota, faturas do mês nos cartões e contas do ano explicadas)
+10/10/2026 · versão 0.12 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos, calculadoras, seus últimos meses, Aprender e dúvidas, lembretes, ocultar valores e biometria, renda comprometida, metas e reserva, plano de guardar, simulador, cartões e faturas, leitura de notas fiscais, plano para quitar dívidas, "Antes de financiar" (D-044) e os ajustes de D-042: forma de pagamento da nota, faturas do mês nos cartões e contas do ano explicadas)
 
 ## Escolhas (aprovadas)
 
@@ -26,7 +26,7 @@ apps/app/src/
     gastos-fixos, gastos-fixos/novo, gastos-fixos/[id], gastos-fixos/[id]/editar, gastos-fixos/[id]/encerrar,
     gastos-fixos/[id]/informar
     composicao, quem-ve, conta, explicacao/[tema]
-    calcular, calcular/[slug]  calculadoras (nada é gravado); /calcular/plano-dividas é a 9ª (D-040)
+    calcular, calcular/[slug]  calculadoras (nada é gravado); /calcular/plano-dividas é a 9ª (D-040) e /calcular/antes-de-financiar, a 10ª e a primeira da lista (D-044)
     retomar, retomar/atualizar, retomar/pagar  seus últimos meses (revisão depois de ausência)
     renda-comprometida, renda-comprometida/referencia  renda comprometida e renda de referência
     reserva, meta/nova, meta/[id], meta/[id]/editar, meta/[id]/movimento  reserva para imprevistos, metas e movimentos
@@ -37,7 +37,7 @@ apps/app/src/
   components/           interface (logo, campos, botões, formulários de registro, conta a pagar, pagamento, gasto fixo e conta do ano, "Ano a ano", "Somar valores", estados)
     retorno-*           faixa do Resumo, linha da revisão, ações e folha do detalhe da série
     term-hint, topic-link, learn-art, topic-example, faq-item  "O que é isso?", links e partes da explicação
-    calc/               uma tela por calculadora e as partes comuns (campos, chips de 48 px, resultado anunciado); plano-dividas.tsx lê os parcelamentos (`useSeriesDebts`, só leitura) e mascara com "Ocultar valores"
+    calc/               uma tela por calculadora e as partes comuns (campos, chips de 48 px, resultado anunciado); plano-dividas.tsx lê os parcelamentos (`useSeriesDebts`, só leitura) e mascara com "Ocultar valores"; antes-de-financiar.tsx lê a renda de referência e o comprometido do mês (`useCommittedSummary`, só leitura)
     committed-parts     medidor da renda comprometida, barra por grupo e legenda
     goal-*, reserve-form, minimum-reserve, essentials-block, savings-card, savings-plan-form  metas, reserva, plano de guardar
     sim-result, sim-year-bars  resultado do simulador e barras por ano
@@ -63,7 +63,7 @@ packages/core/          regras financeiras, validação, repositório em memóri
   src/nota-pagamento.ts forma de pagamento da nota (D-042): tabela da Sefaz, bloco do DANFE e `tPag`, pré-seleção de "Como você pagou?" e textos
   src/cards-month.ts   faturas do mês nos cartões e quanto isso é da renda de referência (D-042), igual ao grupo "Faturas de cartão" da renda comprometida
   src/annual-help.ts   textos e exemplos calculados que explicam as contas do ano (D-042)
-  src/calculators/      as 9 calculadoras, campos, textos e links de contexto; plano-dividas.ts (D-040): conta mês a mês das duas ordens de quitar dívidas e a leitura dos parcelamentos (`seriesDebtDrafts`)
+  src/calculators/      as 10 calculadoras, campos, textos e links de contexto; plano-dividas.ts (D-040): conta mês a mês das duas ordens de quitar dívidas e a leitura dos parcelamentos (`seriesDebtDrafts`); antes-de-financiar.ts (D-044): parcela Price (com a primeira em 1 mês ou na compra), juros, peso na renda, juntar antes (sobre `monthsForTarget` de `simulate.ts`) e entrada maior
   src/navigation.ts     navegação (D-039): modo da barra inferior por endereço, mês de abertura e seletor de Contas a pagar, linha de lembretes e o índice "No app" da busca de Aprender
 supabase/
   migrations/           esquema, funções e permissões (0001 fundação, 0002 contas a pagar, 0003 gastos fixos, 0004 contas do ano, 0005 seus últimos meses,
