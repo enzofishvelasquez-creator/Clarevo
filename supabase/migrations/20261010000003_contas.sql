@@ -6,8 +6,8 @@
 --
 -- A conta de origem já existia: financial_accounts guarda a "Conta principal" criada por ensure_personal_space e
 -- financial_records.account_id, pay_commitment e pay_invoice já recebem a conta de saída. Esta migração só deixa a pessoa
--- cadastrar de onde sai o dinheiro (conta do banco, carteira...) e escolher uma em cada gasto, pagamento de conta, pagamento de fatura e
--- aporte ou resgate de meta. Não existe saldo por conta (fica para P-018: transferências e saldo inicial): a conta é só a origem
+-- cadastrar de onde sai o dinheiro (conta do banco, carteira...) e escolher uma em cada gasto, pagamento de conta, pagamento de
+-- fatura e aporte ou resgate de meta. Não existe saldo por conta (fica para P-018: transferências e saldo inicial): a conta é só a origem
 -- informada, e nada aqui entra em Recebido, Pago, Diferença, Ainda a pagar nem na renda comprometida.
 --
 -- Conta: nome de 1 a 40 caracteres (único no contexto, sem diferenciar maiúsculas de minúsculas, entre as não excluídas), tipo
@@ -33,6 +33,9 @@
 --     arquivamento que corre ao mesmo tempo espera, reconfere a situação da conta e dá conta_invalida (ou conta_com_lancamentos
 --     para quem exclui), e nunca sobra lançamento vivo numa conta excluída.
 -- A9. Sem conta informada, pay_invoice e pay_commitment usam a principal do contexto (não a mais antiga).
+-- A10. A conta de outra pessoa exige "editar de outras pessoas" para alterar, arquivar, excluir e também para ganhar ou perder a
+--     marca de principal (a pessoa que torna principal uma conta mexe também na que perde a marca); a renomeação direta do app
+--     publicado (update (name)) segue a mesma regra, na política accounts_rename.
 -- Ordem de travas: chave -> trava consultiva do contexto (contas:<contexto>) -> linha da conta. A atividade (gatilho de
 -- record_operations, 0005) conta as cinco ações como anotação, como as demais escritas.
 
