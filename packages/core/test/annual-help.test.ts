@@ -60,12 +60,29 @@ describe('contas do ano explicadas (D-042)', () => {
 
   it('o que acontece nos próximos anos fala de informar o valor, em Ano a ano, sem mudar os outros anos', () => {
     expect(ANNUAL_HELP_TEXT.changesHint).toContain('informe o valor em Ano a ano');
-    expect(ANNUAL_HELP_TEXT.changesHint).toContain('usa o valor do ano passado como estimativa');
+    expect(ANNUAL_HELP_TEXT.changesHint).toBe(
+      'Se muda, o Clarevo usa o valor que você cadastrou como estimativa. Quando o carnê ou o boleto do ano chegar, abra a conta do ano e informe o valor em Ano a ano.',
+    );
+    expect(ANNUAL_HELP_TEXT.changesHint).not.toContain('ano passado');
     expect(ANNUAL_HELP_TEXT.sameHint).toContain('repete o valor todo ano');
     expect(ANNUAL_HELP_TEXT.nextYears).toContain('dois meses antes do primeiro vencimento');
     expect(ANNUAL_HELP_TEXT.nextYears).toContain('só aquele ano muda');
     expect(ANNUAL_HELP_TEXT.informOnlyYear('2027')).toBe('Isso vale só para 2027. Os outros anos continuam com a referência atual.');
     expect(ANNUAL_HELP_TEXT.informOnlyYear('2026/2027')).toContain('2026/2027');
+  });
+
+  it('"o valor que você cadastrou" vale na regra: cada ano novo da série nasce com o valor cadastrado, não com o do ano anterior', () => {
+    const preview = seriesPreview(
+      {
+        kind: 'anual', nature: 'conta', description: 'IPVA', category: null, amountMode: 'variavel', amountCents: ANNUAL_EXAMPLE_SINGLE.cents,
+        dueDay: 20, firstDueMonth: ANNUAL_EXAMPLE_SINGLE.month, partsPerYear: 1, firstNumber: 1, installmentTotal: null, lastMonth: null,
+      },
+      '2026-10-10',
+    );
+    expect(preview.next.length).toBe(3);
+    expect(preview.next.map((o) => o.dueOn.slice(0, 4))).toEqual(['2027', '2028', '2029']);
+    for (const o of preview.next) expect(o.amountCents).toBe(ANNUAL_EXAMPLE_SINGLE.cents);
+    expect(ANNUAL_HELP_TEXT.changesHint).toContain('usa o valor que você cadastrou como estimativa');
   });
 
   it('a legenda de "Ano a ano" explica previsto, informar o valor e tirada', () => {

@@ -50,6 +50,22 @@ describe('forma de pagamento da nota (D-042)', () => {
     expect(uniquePaymentForms(['nada' as PaymentForm])).toEqual([]);
   });
 
+  it('códigos tPag só em linha inteira: nada de data cortada, parcelas, "Número" ou "10x"', () => {
+    const codes = { withCodes: true };
+    expect(paymentFormsFromText(`Forma de pagamento\n${'x'.repeat(244)}\n12/10/2026`, codes)).toEqual([]);
+    expect(paymentFormsFromText('Forma de pagamento\nDinheiro 50,00\n03 Número', codes)).toEqual(['dinheiro']);
+    expect(paymentFormsFromText('Forma de pagamento: À vista\nParcelas\n03', codes)).toEqual([]);
+    expect(paymentFormsFromText('Forma de pagamento: 10x no cartão de crédito', codes)).toEqual(['credito']);
+    expect(paymentFormsFromText('Forma de pagamento: 01/10/2026', codes)).toEqual([]);
+    expect(paymentFormsFromText('Forma de pagamento: 01,50', codes)).toEqual([]);
+    // Os casos certos continuam valendo.
+    expect(paymentFormsFromText('Forma de pagamento\n03\n150,00', codes)).toEqual(['credito']);
+    expect(paymentFormsFromText('tPag: 17\nvPag 10,00', codes)).toEqual(['pix']);
+    expect(paymentFormsFromText('Forma de pagamento: 03 - Cartão de Crédito\n150,00', codes)).toEqual(['credito']);
+    // Sem `withCodes` (página da Sefaz) nenhum código é lido.
+    expect(paymentFormsFromText('Forma de pagamento\n03\n150,00')).toEqual([]);
+  });
+
   it('pré-seleção de "Como você pagou?": crédito vira cartão; dinheiro, débito, Pix e vale viram "Dinheiro, débito ou Pix"', () => {
     expect(paymentChoiceFor(['credito'])).toBe('cartao');
     for (const f of ['dinheiro', 'debito', 'pix', 'vale'] as const) expect(paymentChoiceFor([f]), f).toBe('dinheiro');

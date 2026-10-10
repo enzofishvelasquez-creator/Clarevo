@@ -174,6 +174,8 @@ export function Button({
   onPressOut,
   ...props
 }: PressableProps & {
+  /** Para mover o foco até o botão (ex.: depois de um aviso que aponta para ele). Passa direto ao Pressable. */
+  ref?: Ref<View>;
   label: string;
   icon?: LucideIcon;
   tone?: ButtonTone;

@@ -1,9 +1,10 @@
 import { calcLinkParams, type CalcLinkValues, type CalcSlug } from '@clarevo/core';
 import { router } from 'expo-router';
-import { BadgePercent, CalendarRange, CalendarX2, ListOrdered, Percent, ShoppingBag, Target, Umbrella, Users, type LucideIcon } from 'lucide-react-native';
+import { BadgePercent, CalendarRange, CalendarX2, HandCoins, ListOrdered, Percent, ShoppingBag, Target, Umbrella, Users, type LucideIcon } from 'lucide-react-native';
 
 /** Ícone de cada calculadora na lista e nas portas (Metas). Só ilustra: o nome vem sempre escrito. */
 export const CALC_ICONS: Record<CalcSlug, LucideIcon> = {
+  'antes-de-financiar': HandCoins,
   'parcelado-ou-a-vista': ShoppingBag,
   'custo-por-ano': CalendarRange,
   'custo-da-divida': Percent,

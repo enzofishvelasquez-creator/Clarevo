@@ -182,8 +182,10 @@ export const ANTES_FIELDS: Record<AntesField, CalcFieldSpec> = {
 
 /** Textos fixos da tela. */
 export const ANTES_TEXT = {
+  alternativeTitle: 'Alternativa: juntar antes',
   savingTitle: 'Juntar antes',
   entryTitle: 'Com uma entrada maior',
+  noBiggerEntry: 'Com mais 10% do preço, a entrada já cobriria o preço inteiro.',
   otherEntry: 'Fazer a conta com outra entrada',
   noteInstallment: 'Anotar como parcelamento',
   createGoal: 'Criar meta com este valor',

@@ -16,7 +16,7 @@ import {
   type IsoMonth,
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ExternalLink, ListChecks, ListOrdered, Repeat, ShieldCheck, Wallet } from 'lucide-react-native';
+import { ExternalLink, HandCoins, ListChecks, ListOrdered, Repeat, ShieldCheck, Wallet } from 'lucide-react-native';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInLeft, FadeInRight, ReduceMotion } from 'react-native-reanimated';
@@ -467,6 +467,8 @@ function HowWeCalculate({ t }: { t: CommittedTexts }) {
 function Links({ month, currentMonth }: { month: IsoMonth; currentMonth: IsoMonth }) {
   return (
     <View style={{ gap: space[1], alignItems: 'center' }}>
+      {/* Antes de financiar (D-044): a conta da parcela, dos juros e do peso na renda; nada é gravado. */}
+      <LinkButton label={CALC_UI_TEXT.links.financiar} icon={HandCoins} onPress={() => openCalc('antes-de-financiar')} />
       <LinkButton label={COMMITTED_TEXT.links.series} icon={Repeat} onPress={() => router.push('/gastos-fixos')} />
       <LinkButton label={COMMITTED_TEXT.links.payables} icon={Wallet} onPress={() => router.push({ pathname: '/a-pagar', params: payablesMonthParams(month, currentMonth) })} />
       <LinkButton label={COMMITTED_TEXT.links.whoSees} icon={ShieldCheck} color={colors.textSecondary} onPress={() => router.push('/quem-ve')} />

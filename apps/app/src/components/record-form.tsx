@@ -74,7 +74,7 @@ import { usePreventRemove } from 'expo-router/react-navigation';
 import * as Haptics from 'expo-haptics';
 import { AlertCircle, Check, Info } from 'lucide-react-native';
 import { useEffect, useId, useRef, useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -278,6 +278,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     accountId: useRef<TextInput>(null),
   } satisfies Record<DraftField, React.RefObject<TextInput | null>>;
   const installmentsRef = useRef<TextInput>(null);
+  const registerCardRef = useRef<View>(null);
 
   useEffect(() => {
     if (userId && cardMode) loadPrefs(userId, persistPrefs);
@@ -487,7 +488,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     // Como você pagou? (D-042): a forma que a nota informa pré-seleciona; mais de uma forma, "outra forma" ou nenhuma, não. Uma leitura
     // nova substitui a escolha da nota anterior; a página da Sefaz (refine) só escolhe se a nota ainda não escolheu e a pessoa não mexeu.
     const choice: PaymentChoice = scanMode ? paymentChoiceFor(d.payments) : null;
-    const payBefore = prev?.payBefore ?? payRef.current;
+    // Leitura nova depois de a pessoa escolher à mão: "Desfazer leitura" devolve essa escolha, não a de antes da nota anterior.
+    const payBefore = !refine && payPickedRef.current ? payRef.current : (prev?.payBefore ?? payRef.current);
     let paySet: PaymentChoice = refine ? (prev?.paySet ?? null) : null;
     if (!refine) {
       payPickedRef.current = false;
@@ -710,6 +712,18 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     if (busy) return;
     const card = selectedCard;
     if (!card) {
+      if (cards.isSuccess && activeCards.length === 0) {
+        // Sem cartão cadastrado, o aviso do bloco "Cadastrar cartão" é onde a pessoa olha: a mensagem entra nele e o foco vai ao botão.
+        setCardError(NOTA_PAYMENT_TEXT.noCardToSave);
+        announceOnIOS(NOTA_PAYMENT_TEXT.noCardToSave);
+        setTimeout(() => {
+          const button = registerCardRef.current;
+          if (!button) return;
+          if (Platform.OS === 'web') (button as unknown as { focus?: () => void }).focus?.();
+          else AccessibilityInfo.sendAccessibilityEvent(button, 'focus');
+        }, 50);
+        return;
+      }
       setCardError(CARDS_TEXT.expense.chooseCard);
       return;
     }
@@ -1127,7 +1141,13 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
                 ) : activeCards.length === 0 ? (
                   <Banner tone="info" icon={Info} live={false}>
                     <Txt variant="label">{noteSaysCredit ? NOTA_PAYMENT_TEXT.creditNoCard : CARDS_TEXT.screens.noCardsInline}</Txt>
+                    {cardError ? (
+                      <Txt variant="label" color={colors.error} accessibilityRole="alert">
+                        {cardError}
+                      </Txt>
+                    ) : null}
                     <Button
+                      ref={registerCardRef}
                       label={CARDS_TEXT.expense.registerCard}
                       tone="soft"
                       onPress={() => {

@@ -2,6 +2,7 @@ import { CALC_UI_TEXT, calcPrefill, isCalcSlug } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 
+import { AntesDeFinanciarCalc } from '@/components/calc/antes-de-financiar';
 import { CustoDaDividaCalc } from '@/components/calc/custo-da-divida';
 import { CustoPorAnoCalc } from '@/components/calc/custo-por-ano';
 import { DividirContasCalc } from '@/components/calc/dividir-contas';
@@ -24,6 +25,8 @@ export default function CalculadoraScreen() {
   const slug = typeof params.slug === 'string' ? params.slug : '';
   if (!isCalcSlug(slug)) return <Unavailable />;
   switch (slug) {
+    case 'antes-de-financiar':
+      return <AntesDeFinanciarCalc prefill={calcPrefill(slug, params)} />;
     case 'parcelado-ou-a-vista':
       return <ParceladoCalc prefill={calcPrefill(slug, params)} />;
     case 'custo-por-ano':

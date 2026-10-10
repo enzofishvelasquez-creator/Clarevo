@@ -13,6 +13,7 @@ import {
   parseAccessKey,
   parseNfceQr,
   parseSefazPage,
+  paymentFormsFromText,
   readSefazPage,
   receiptDraft,
   sefazReadErrorText,
@@ -352,6 +353,8 @@ describe('parseSefazPage · marcação hostil não trava a leitura', () => {
     ['rótulos de valor repetidos', 'valor a pagar '.repeat(28_000)],
     ['aspas e classe repetidas', '<div class="'.repeat(30_000)],
     ['style e head sem fechamento', '<style><head><noscript>'.repeat(16_000)],
+    ['rótulo tPag repetido', 'tpag '.repeat(80_000)],
+    ['forma de pagamento e Pix repetidos', 'forma de pagamento pix '.repeat(17_000)],
   ];
 
   it.each(hostile)('%s: termina rápido', (_name, html) => {
@@ -361,6 +364,16 @@ describe('parseSefazPage · marcação hostil não trava a leitura', () => {
     const elapsed = performance.now() - started;
     expect(r.ok).toBe(false);
     expect(elapsed).toBeLessThan(1_000);
+  });
+
+  it('rótulos de forma de pagamento repetidos: a leitura da forma passa pelo texto uma vez só (menos de 50 ms)', () => {
+    const texts = ['tpag '.repeat(80_000), 'forma de pagamento pix '.repeat(17_000), 'Forma de pagamento\nPix\n'.repeat(15_000)];
+    for (const text of texts) {
+      const started = performance.now();
+      const forms = paymentFormsFromText(text);
+      expect(performance.now() - started).toBeLessThan(50);
+      expect(forms.length).toBeLessThanOrEqual(1);
+    }
   });
 
   it('script e estilo grandes, mas fechados, são pulados; página com 150 itens lê rápido', () => {

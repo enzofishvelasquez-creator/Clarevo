@@ -16,8 +16,8 @@ import {
 } from '@clarevo/core';
 import { router, useNavigation } from 'expo-router';
 import { Check, ChevronRight, Info, type LucideIcon } from 'lucide-react-native';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View, type TextInput } from 'react-native';
 import Animated, { ReduceMotion, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { SubHeader } from '@/components/header';
@@ -280,6 +280,7 @@ export function CalcTextField({
   error,
   accessibilityLabel,
   editable,
+  inputRef,
 }: {
   spec: CalcFieldSpec;
   label?: string;
@@ -292,12 +293,15 @@ export function CalcTextField({
   accessibilityLabel?: string;
   /** false: mostra o valor sem deixar editar (valores ocultos). */
   editable?: boolean;
+  /** Para levar o foco ao campo (por exemplo, "Fazer a conta com outra entrada"). */
+  inputRef?: Ref<TextInput>;
 }) {
   const money = spec.kind === 'dinheiro';
   const integer = spec.kind === 'inteiro';
   const free = spec.kind === 'texto';
   return (
     <TextField
+      ref={inputRef}
       label={label ?? spec.label}
       hint={hint ?? spec.hint}
       prefix={money ? 'R$' : undefined}
@@ -317,7 +321,19 @@ export function CalcTextField({
 }
 
 /** Campo ligado a uma chave da calculadora (rótulo, dica, faixa e mensagens de calcFields). */
-export function CalcField<K extends string>({ calc, name, label, hint }: { calc: CalcBinding<K>; name: K; label?: string; hint?: string }) {
+export function CalcField<K extends string>({
+  calc,
+  name,
+  label,
+  hint,
+  inputRef,
+}: {
+  calc: CalcBinding<K>;
+  name: K;
+  label?: string;
+  hint?: string;
+  inputRef?: Ref<TextInput>;
+}) {
   const spec = calcFields(calc.slug, calc.modo)[name]!;
   const value = calc.form.values[name];
   const code = calc.errors[name];
@@ -327,6 +343,7 @@ export function CalcField<K extends string>({ calc, name, label, hint }: { calc:
       spec={spec}
       label={label}
       hint={hint}
+      inputRef={inputRef}
       value={value}
       onChangeText={(t) => calc.form.set(name, t)}
       onBlur={() => {

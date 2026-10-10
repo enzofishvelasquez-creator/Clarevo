@@ -129,9 +129,13 @@ import {
   calcDividirContas,
   calcErrorText,
   calcFields,
+  calculatorBySlug,
   calcJuntarParaObjetivo,
   calcRowA11yLabel,
   calcMultaEJuros,
+  calcAntesDeFinanciar,
+  ANTES_ESTIMATE_TEXT,
+  ANTES_TEXT,
   calcPlanoDividas,
   PLANO_ESTIMATE_TEXT,
   PLANO_TEXT,
@@ -374,6 +378,38 @@ function outcomeTexts(out: CalcOutcome<CalcTexts & { parcelamento?: CalcOutcome<
   return [...r.resultLines, ...r.hypotheses, ...r.notes, ...nested];
 }
 
+/** Textos de "Antes de financiar" (D-044) com entradas comuns e de borda: resultado, juntar antes, entrada maior, hipóteses e avisos. */
+function antesTexts(): string[] {
+  const out: string[] = [];
+  const base = { preco: '50.000,00', entrada: '10.000,00', parcelas: '48', taxaMes: '1,99' };
+  const variants = [
+    {},
+    { primeiraEmUmMes: false },
+    { juntarPara: 'vista' as const, rendimento: '8' },
+    { rendimento: '12', guardar: '900,00' },
+    { guardar: '1,00' },
+    { renda: '8.000,00', comprometidoCents: 420_000 },
+    { renda: '1.000,00', comprometidoCents: 900_000 },
+    { renda: '9.999.999,99' },
+    { comprometidoCents: 420_000 },
+    { renda: '8.000,00', comprometidoCents: 0 },
+    { taxaMes: '0' },
+    { taxaMes: '0', preco: '1.000,00', entrada: '' },
+    { parcelas: '1' },
+    { parcelas: '1', primeiraEmUmMes: false },
+    { entrada: '50.000,00' },
+    { entrada: '49.000,00' },
+    { preco: '9.999.999,99', entrada: '', parcelas: '480', taxaMes: '99,99' },
+  ];
+  for (const today of [undefined, '2026-10-07'])
+    for (const v of variants) {
+      const res = calcAntesDeFinanciar({ ...base, ...v }, today);
+      if (!res.ok) continue;
+      out.push(...res.result.resultLines, ...res.result.hypotheses, ...res.result.notes, ...res.result.savingLines, ...res.result.entryLines);
+    }
+  return out;
+}
+
 /** Resultados de todas as calculadoras com entradas comuns e de borda. */
 function calculatorResultTexts(): { all: string[]; multa: string[]; quitar: string[] } {
   const all: string[] = [];
@@ -434,6 +470,7 @@ function calculatorResultTexts(): { all: string[]; multa: string[]; quitar: stri
       all.push(...outcomeTexts(out), ...out.result.differences);
       for (const s of out.result.scenarios) all.push(s.title, s.summary, ...s.detailLines, ...s.sequenceLines);
     }
+  all.push(...antesTexts());
   return { all: [...all, ...multa, ...quitar], multa, quitar };
 }
 
@@ -495,6 +532,8 @@ describe('textos das calculadoras e de "Achar tudo"', () => {
       RESERVA_REFERENCIA.text,
       ...Object.values(RESERVA_TEXT),
       PLANO_ESTIMATE_TEXT,
+      ANTES_ESTIMATE_TEXT,
+      ...Object.values(ANTES_TEXT),
       ...staticStrings(PLANO_TEXT),
       PLANO_TEXT.removeDebtA11y('Cartão azul'),
       PLANO_TEXT.debtTitle(0),
@@ -1581,5 +1620,73 @@ describe('textos dos ajustes de 10/10/2026 (D-042)', () => {
       expect(source, file).not.toMatch(FORBIDDEN);
       expect(source, file).not.toMatch(JUDGMENT);
     }
+  });
+});
+
+/**
+ * "Antes de financiar" (D-044): português do Brasil, linguagem neutra de gênero, sem travessões longos, sem a expressão
+ * vetada e sem as palavras que dizem o que a pessoa deve fazer ou qual caminho é o certo. Vale para o resultado, o juntar antes,
+ * a entrada maior, as hipóteses, os avisos, os rótulos, as dicas, as mensagens de erro e o próprio arquivo-fonte.
+ */
+const ANTES_VETOED =
+  /\b(melhor(es)?|pior(es)?|dever[ií]\w*|recomendamos|invista\w*|aplique em|renegoci\w*|portabilidade|consignad\w*|consórcio|vale a pena|ruim|cuidado|desperd\w*|cortes?|atrasad[oa]s?|estour\w*|caixinha|saldo devedor)\b|faz(er|endo)?\s+sentido|[–—]/i;
+const GENDERED = /\b(obrigad|bem-vind|sozinh|pront|cadastrad|conectad|convidad|atento|cansad|sozinh)[oa]s?\b|\(a\)|\(o\)|\bo\/a\b|\bvocê (é|está|ficou) \w+[oa]\b/i;
+
+describe('textos de "Antes de financiar" (D-044)', () => {
+  it('as listas reprovam o que deve e aceitam os avisos obrigatórios', () => {
+    const proibida = ['faz', 'sentido'].join(' ');
+    for (const bad of ['É a melhor opção', 'a pior', 'Você deveria juntar', 'recomendamos', 'Invista', 'aplique em', 'vale a pena', 'a — b', 'a – b', proibida, 'consórcio'])
+      expect(ANTES_VETOED.test(bad), bad).toBe(true);
+    for (const bad of ['Obrigado', 'bem-vinda', 'você está pronto', 'o(a) cliente']) expect(GENDERED.test(bad), bad).toBe(true);
+    for (const ok of [CALC_DISCLAIMER, ANTES_ESTIMATE_TEXT, 'Financiando: você usa o bem agora e paga R$ 1,00 de juros.', 'Seu comprometido iria de 52,5% para 66,7% enquanto durar o financiamento.']) {
+      expect(ANTES_VETOED.test(ok), ok).toBe(false);
+      expect(GENDERED.test(ok), ok).toBe(false);
+    }
+  });
+
+  it('resultado, juntar antes, entrada maior, hipóteses e avisos de várias combinações', () => {
+    const texts = antesTexts();
+    expect(texts.length).toBeGreaterThan(200);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(ANTES_VETOED);
+      expect(text, text).not.toMatch(GENDERED);
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(JUDGMENT);
+    }
+  });
+
+  it('rótulos, dicas, opções, mensagens de erro e textos fixos', () => {
+    const texts = [
+      ...Object.values(ANTES_TEXT),
+      ANTES_ESTIMATE_TEXT,
+      CALC_UI_TEXT.links.financiar,
+      calculatorBySlug('antes-de-financiar')!.title,
+      calculatorBySlug('antes-de-financiar')!.subtitle,
+      calcRowA11yLabel(calculatorBySlug('antes-de-financiar')!.title, calculatorBySlug('antes-de-financiar')!.subtitle),
+    ];
+    for (const [name, spec] of Object.entries(calcFields('antes-de-financiar'))) {
+      texts.push(spec.label, ...(spec.hint ? [spec.hint] : []), ...(spec.options ?? []).map((o) => o.label));
+      for (const code of Object.keys(CALC_ERROR_TEXT) as CalcErrorCode[]) texts.push(calcErrorText('antes-de-financiar', name, code));
+    }
+    expect(texts.length).toBeGreaterThan(40);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(ANTES_VETOED);
+      expect(text, text).not.toMatch(GENDERED);
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(NEUTRAL);
+    }
+  });
+
+  it('a busca "No app" e o arquivo-fonte do core também passam', () => {
+    const screen = APP_SCREENS.find((s) => s.id === 'antes-de-financiar')!;
+    for (const text of [screen.title, screen.caption, ...screen.keywords]) {
+      expect(text, text).not.toMatch(ANTES_VETOED);
+      expect(text, text).not.toMatch(FORBIDDEN);
+    }
+    const source = readFileSync(join(CORE_SRC, 'calculators', 'antes-de-financiar.ts'), 'utf8');
+    expect(source).not.toMatch(ANTES_VETOED);
+    expect(source).not.toMatch(FORBIDDEN);
+    // Nenhuma taxa padrão no código: a taxa do financiamento e o rendimento são sempre digitados.
+    expect(source).not.toMatch(/default:\s*['"]?\d/);
   });
 });

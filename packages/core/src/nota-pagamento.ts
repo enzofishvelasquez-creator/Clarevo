@@ -112,30 +112,49 @@ const WINDOW_CHARS = 260;
 
 const HEADER = /forma(?:s)?\s+de\s+pagamento|forma\s+pagamento|meio\s+de\s+pagamento|\btpag\b/gi;
 
-/** Formas na ordem em que aparecem num trecho já sem acento e em minúsculas. Os códigos `tPag` entram só quando `withCodes`. */
-function formsIn(windowText: string, withCodes: boolean): PaymentForm[] {
+/** Quantos rótulos "Forma de pagamento" a leitura segue (um cupom tem um; o limite protege de texto hostil repetido). */
+const MAX_HEADERS = 8;
+
+/**
+ * Formas na ordem em que aparecem num trecho já sem acento e em minúsculas. `codeText` (os códigos `tPag`) é o mesmo trecho sem a
+ * última linha, quando ela pode estar cortada, ou `null` quando os códigos não são lidos.
+ */
+function formsIn(windowText: string, codeText: string | null): PaymentForm[] {
   const hits: { at: number; form: PaymentForm | null }[] = [];
-  // Trechos já lidos: "Crédito Loja" vira "outros" e o "crédito" dentro dele não conta de novo como cartão.
-  const used: [number, number][] = [];
+  // Trechos já lidos: "Crédito Loja" vira "outros" e o "crédito" dentro dele não conta de novo como cartão. Uma marca por caractere
+  // deixa o teste de sobreposição linear no tamanho do trecho.
+  const used = new Uint8Array(windowText.length);
   for (const { form, re } of FORM_WORDS) {
     const g = new RegExp(re, 'g');
     let m: RegExpExecArray | null;
     while ((m = g.exec(windowText)) !== null) {
       const from = m.index;
-      const to = m.index + m[0].length;
-      if (used.some(([a, b]) => from < b && to > a)) continue;
-      used.push([from, to]);
+      const to = from + m[0].length;
+      let taken = false;
+      for (let i = from; i < to; i++) {
+        if (used[i] === 1) {
+          taken = true;
+          break;
+        }
+      }
+      if (taken) continue;
+      used.fill(1, from, to);
       hits.push({ at: from, form });
     }
   }
-  if (withCodes) {
-    // Código logo depois do rótulo ("tPag: 03", "Forma de pagamento 17").
-    const leading = /^[\s:=-]*(\d{2})(?![\d,.])/.exec(windowText);
+  if (codeText !== null) {
+    // Código logo depois do rótulo ("tPag: 03", "Forma de pagamento 17"). Não é código o que parece data, valor, número com
+    // barra ou ponto, nem "10x" (parcelas).
+    const leading = /^[\s:=-]*(\d{2})(?![\d,./x])/.exec(codeText);
     if (leading && leading[1]! in TPAG) hits.push({ at: leading.index, form: TPAG[leading[1]!] ?? null });
-    const codes = /(?:^|\n)\s*(\d{2})\s*(?=\n|$)|(?:^|\s)(\d{2})\s*-\s*(?=[a-z])/g;
+    // Código sozinho na linha (só se a linha termina em quebra de linha de verdade) ou "03 - Cartão de crédito".
+    const codes = /(?:^|\n)[ \t]*(\d{2})[ \t]*(?=\n)|(?:^|\s)(\d{2})\s*-\s*(?=[a-z])/g;
     let m: RegExpExecArray | null;
-    while ((m = codes.exec(windowText)) !== null) {
+    while ((m = codes.exec(codeText)) !== null) {
       const code = m[1] ?? m[2] ?? '';
+      // "Parcelas" ou "Quantidade" na linha de cima: o número é contagem, não código.
+      const before = codeText.slice(codeText.lastIndexOf('\n', m.index - 1) + 1, m.index);
+      if (m[1] !== undefined && /parcela|quantidade|\bqtd/.test(before)) continue;
       if (code in TPAG) hits.push({ at: m.index, form: TPAG[code] ?? null });
     }
   }
@@ -150,19 +169,32 @@ function formsIn(windowText: string, withCodes: boolean): PaymentForm[] {
  * `text` pode ter quebras de linha; a leitura é tolerante com maiúsculas, acentos, "Forma de pagamento: Dinheiro" na mesma linha ou
  * em linhas separadas, e com os códigos `tPag` quando `withCodes`. Vazio quando não há o rótulo ou nenhuma forma conhecida depois
  * dele. Sem o rótulo nada é lido: um "Pix" no meio do texto de outra seção (nome da loja, produto) nunca vira forma.
+ *
+ * Os códigos `tPag` só valem em linha inteira: quando o trecho foi cortado pelo limite de caracteres ou por uma palavra de parada
+ * ("Número", "Troco"), a última linha pode estar pela metade e não é lida como código ("12/10/2026" cortado em "12").
  */
 export function paymentFormsFromText(text: string, options: { withCodes?: boolean } = {}): PaymentForm[] {
   if (typeof text !== 'string' || text === '') return [];
   const p = plain(text);
+  const withCodes = options.withCodes === true;
   const out: PaymentForm[] = [];
   const re = new RegExp(HEADER.source, 'gi');
   let h: RegExpExecArray | null;
-  while ((h = re.exec(p)) !== null) {
+  let headers = 0;
+  while (headers < MAX_HEADERS && (h = re.exec(p)) !== null) {
+    headers++;
     const start = h.index + h[0].length;
     let windowText = p.slice(start, start + WINDOW_CHARS);
+    let cut = start + WINDOW_CHARS < p.length;
     const stop = STOP.exec(windowText);
-    if (stop) windowText = windowText.slice(0, stop.index);
-    for (const form of formsIn(windowText, options.withCodes === true)) if (!out.includes(form)) out.push(form);
+    if (stop) {
+      windowText = windowText.slice(0, stop.index);
+      cut = true;
+    }
+    // O próximo rótulo só é procurado depois do trecho já lido: cada caractere é lido uma vez.
+    re.lastIndex = start + windowText.length;
+    const codeText = withCodes ? (cut ? windowText.slice(0, windowText.lastIndexOf('\n') + 1) : windowText) : null;
+    for (const form of formsIn(windowText, codeText)) if (!out.includes(form)) out.push(form);
   }
   return out;
 }
@@ -195,6 +227,8 @@ export const NOTA_PAYMENT_TEXT = {
   multiple: 'Pagamento em mais de uma forma',
   /** A nota diz cartão de crédito e a pessoa ainda não cadastrou nenhum cartão. */
   creditNoCard: 'A nota diz cartão de crédito. Cadastre o cartão para anotar a compra na fatura.',
+  /** "Salvar compra" com cartão de crédito escolhido e nenhum cartão cadastrado. */
+  noCardToSave: 'Para anotar a compra no cartão de crédito, cadastre o cartão. Ou escolha Dinheiro, débito ou Pix.',
   /** Logo abaixo de "Como você pagou?" quando a nota escolheu. */
   fromNote: (form: PaymentForm): string => `A nota informa: ${PAYMENT_FORM_LABEL[form]}. Mude se você pagou de outro jeito.`,
 } as const;

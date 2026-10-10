@@ -1,4 +1,5 @@
 import {
+  CALC_UI_TEXT,
   SIMULATE_TEXT,
   SIMULATION_MODES,
   SIMULATION_MODE_FIELDS,
@@ -11,17 +12,18 @@ import {
   type SimulationResult,
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChartLine, Info } from 'lucide-react-native';
+import { ChartLine, HandCoins, Info } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Keyboard, KeyboardAvoidingView, Platform, StyleSheet, View, type ScrollView, type TextInput } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
+import { openCalc } from '@/components/calc/open';
 import { CalcChip, formatMoneyText } from '@/components/calc/parts';
 import { SubHeader } from '@/components/header';
 import { ChoiceGroup, CheckOption } from '@/components/series-parts';
 import { SimResultCard, resultSpoken } from '@/components/sim-result';
 import { TermHint } from '@/components/term-hint';
-import { Button, Card, Screen, TextField, Txt } from '@/components/ui';
+import { Button, Card, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
 import { useSession } from '@/state/session';
 import { colors, radius, space } from '@/theme/tokens';
@@ -209,6 +211,11 @@ export default function SimularScreen() {
 
         <View onLayout={(e) => (resultY.current = e.nativeEvent.layout.y)}>
           <SimResultCard result={result} hypotheses={result ? result.hypotheses : previewHypotheses(draft)} today={today} />
+        </View>
+
+        {/* Quem está pensando em comprar a prazo faz a conta do financiamento antes (D-044); só a conta, nada é gravado. */}
+        <View style={{ alignItems: 'center' }}>
+          <LinkButton label={CALC_UI_TEXT.links.financiar} icon={HandCoins} onPress={() => openCalc('antes-de-financiar')} />
         </View>
       </Screen>
     </KeyboardAvoidingView>

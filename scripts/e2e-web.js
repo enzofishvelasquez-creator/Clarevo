@@ -1609,7 +1609,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const DISCLAIMER = 'Simulação com os valores e as taxas que você informou. Não é recomendação de produto financeiro nem oferta de crédito.';
   const INTRO = 'Contas rápidas com os valores que você informa. Nada é gravado.';
   const CALC_LIST = [
-    ['Decidir uma compra', [['Parcelado ou à vista?', 'Descubra os juros embutidos no parcelado'], ['Quanto custa por ano?', 'Assinaturas e gastos que se repetem']]],
+    ['Decidir uma compra', [['Antes de financiar', 'Parcela, juros e o que muda se juntar antes'], ['Parcelado ou à vista?', 'Descubra os juros embutidos no parcelado'], ['Quanto custa por ano?', 'Assinaturas e gastos que se repetem']]],
     ['Dívidas e atrasos', [['Quanto custa uma dívida?', 'Rotativo, cheque especial ou empréstimo'], ['Quitar antes ou adiantar parcelas', 'Uma estimativa de quanto dos juros sai da conta'], ['Multa e juros por atraso', 'Com os valores do boleto'], ['Em que ordem quitar as dívidas?', 'Duas ordens de pagamento, lado a lado']]],
     ['Guardar e dividir', [['Reserva para imprevistos', 'Quantos meses seus gastos essenciais cobrem'], ['Juntar para um objetivo', 'Quanto guardar por mês ou em quanto tempo'], ['Dividir as contas da casa', 'Partes iguais ou pela renda de cada pessoa']]],
   ];
@@ -1694,7 +1694,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     return Object.keys(x).filter((k) => JSON.stringify(x[k]) !== JSON.stringify(y[k])).map((k) => `${k}: ${x[k].length} → ${y[k].length}`).join(' | ');
   };
 
-  // 1 e 2. Movimentos › Organizar › Calculadoras: 3 grupos, as 9 calculadoras (Ciclo F1: a 9ª é "Em que ordem quitar as dívidas?"), a abertura e o aviso.
+  // 1 e 2. Movimentos › Organizar › Calculadoras: 3 grupos, as 10 calculadoras (Ciclo F1: a 9ª é "Em que ordem quitar as dívidas?"; D-044: "Antes de financiar" abre o primeiro grupo), a abertura e o aviso.
   await p.getByRole('tab', { name: 'Movimentações' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
   await btn(SC.calc).click(); await waitText('Decidir uma compra');
   const writesBefore = writes.length;
@@ -1707,7 +1707,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   }));
   // Título e legenda no nome; sem ponto depois de um título que já termina em "?" (calcRowA11yLabel no core).
   const calcExpected = CALC_LIST.map(([g, items]) => [g, items.map(([a, b]) => `${a}${/[?.!]$/.test(a) ? '' : '.'} ${b}`)]);
-  ok('calculadoras: 3 grupos e as 9 calculadoras, na ordem, com título e subtítulo no nome', JSON.stringify(calcSections) === JSON.stringify(calcExpected), JSON.stringify(calcSections));
+  ok('calculadoras: 3 grupos e as 10 calculadoras, na ordem, com título e subtítulo no nome', JSON.stringify(calcSections) === JSON.stringify(calcExpected), JSON.stringify(calcSections));
   t = await body();
   ok('calculadoras: abertura e aviso fixo, sem pílula de contexto', t.includes(INTRO) && t.includes(DISCLAIMER) && (await p.locator('[aria-label^="Contexto:"]').filter({ visible: true }).count()) === 0);
   await calcHeader('calculadoras 390px', 'Calculadoras');
@@ -2126,7 +2126,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   };
   await fromGoals('Calculadoras', 'Calculadoras');
   const calcNames = calcExpected.flatMap(([, items]) => items);
-  ok('Metas › Calculadoras: a lista com as 9 (Ciclo F1)', calcNames.length === 9 && (await Promise.all(calcNames.map((n) => visibleCount('button', n)))).every((n) => n === 1));
+  ok('Metas › Calculadoras: a lista com as 10 (D-044)', calcNames.length === 10 && (await Promise.all(calcNames.map((n) => visibleCount('button', n)))).every((n) => n === 1));
   await openCalc('Reserva para imprevistos');
   await typeIn('Gastos essenciais por mês', '1.000,00'); await radio('3 meses').click();
   ok('Metas › Calculadoras › Reserva para imprevistos: funciona (3 meses de 1.000,00 → R$ 3.000,00)', await shows('Com estes números, a reserva de 3 meses é de R$ 3.000,00.'));
@@ -5719,7 +5719,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     t.includes('Cota única: o valor do ano sai de uma vez. Ex.: IPVA de R$ 2.400,00, que vence em janeiro.') && t.includes('Em parcelas: o valor do ano é dividido em vezes. Ex.: IPTU de R$ 1.800,00 em 10 parcelas de R$ 180,00, de fevereiro a novembro.'));
   ok('D42 cadastro de conta do ano: exemplos no mês, no dia e no valor (cota única)', t.includes('Em que mês a conta vence. Ex.: IPVA em janeiro.') && t.includes('De 1 a 31. Ex.: dia 20 para uma conta que vence em 20/01.') && t.includes('Ex.: IPVA de R$ 2.400,00.'));
   ok('D42 cadastro de conta do ano: o que acontece nos anos seguintes (valor que muda: estimativa e "Informar o valor"; valor igual: nada a fazer)',
-    t.includes('Se muda, o Clarevo usa o valor do ano passado como estimativa. Quando o carnê ou o boleto do ano chegar, abra a conta do ano e informe o valor em Ano a ano.') && t.includes('E nos próximos anos?') &&
+    t.includes('Se muda, o Clarevo usa o valor que você cadastrou como estimativa. Quando o carnê ou o boleto do ano chegar, abra a conta do ano e informe o valor em Ano a ano.') && t.includes('E nos próximos anos?') &&
     t.includes('Todo ano, o Clarevo cria as contas do ano dois meses antes do primeiro vencimento. Se o valor mudou, abra a conta do ano e use Informar o valor em Ano a ano: só aquele ano muda. Se o valor é sempre o mesmo, não precisa fazer nada.'));
   await radio('Não, é sempre o mesmo').click(); await p.waitForTimeout(300);
   ok('D42 "Não, é sempre o mesmo": a dica passa a dizer que o Clarevo repete o valor todo ano', (await body()).includes('Se é sempre o mesmo, o Clarevo repete o valor todo ano e você não precisa fazer nada.'));

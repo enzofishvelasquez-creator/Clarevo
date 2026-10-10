@@ -54,6 +54,7 @@ describe('barra inferior (D-039)', () => {
       '/calcular',
       '/calcular/reserva',
       '/calcular/plano-dividas',
+      '/calcular/antes-de-financiar',
       '/calcular/parcelado-ou-a-vista',
       '/a-pagar',
       '/a-pagar/9c1f2f5e-3b0c-4d79-9a0e-5b0f6c1d2e3f',
@@ -210,6 +211,11 @@ describe('busca de Aprender: grupo "No app" (D-039)', () => {
     expect(first('bola de neve')).toBe('plano-dividas');
     expect(first('avalanche')).toBe('plano-dividas');
     expect(first('dívida')).toBe('plano-dividas');
+    // Antes de financiar (D-044): as palavras que a pessoa usa; consórcio não faz parte.
+    for (const query of ['financiar', 'financiamento', 'poder de compra', 'entrada', 'à vista']) expect(ids(query), query).toContain('antes-de-financiar');
+    expect(first('financiar')).toBe('antes-de-financiar');
+    expect(first('poder de compra')).toBe('antes-de-financiar');
+    expect(ids('consórcio')).not.toContain('antes-de-financiar');
     expect(first('renda comprometida')).toBe('renda-comprometida');
     expect(ids('guardar')).toContain('metas');
   });

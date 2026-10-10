@@ -51,7 +51,7 @@ export const ANNUAL_HELP_TEXT = {
 
   /** "O valor muda de um ano para outro?" */
   changesHint:
-    'Se muda, o Clarevo usa o valor do ano passado como estimativa. Quando o carnê ou o boleto do ano chegar, abra a conta do ano e informe o valor em Ano a ano.',
+    'Se muda, o Clarevo usa o valor que você cadastrou como estimativa. Quando o carnê ou o boleto do ano chegar, abra a conta do ano e informe o valor em Ano a ano.',
   sameHint: 'Se é sempre o mesmo, o Clarevo repete o valor todo ano e você não precisa fazer nada.',
 
   /** "Primeiro ano" */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { danfeFromText, factsFromDanfe, parseAccessKey, receiptDraft, receiptKeyValid, sha256Hex, type DanfeReading } from '../src';
+import { danfeFromText, factsFromDanfe, parseAccessKey, paymentFormsFromText, receiptDraft, receiptKeyValid, sha256Hex, type DanfeReading } from '../src';
 
 /** Mesma conta de outro jeito que a do código: pesos de 2 a 9 repetidos da direita para a esquerda, valor = código ASCII menos 48. */
 function dv11(chars: string): number {
@@ -533,6 +533,28 @@ describe('DANFE em texto · forma de pagamento (D-042)', () => {
 
   it('código seguido do nome: as duas formas de escrever dão uma só forma', () => {
     expect(read(withPaymentBlock(['FORMA DE PAGAMENTO', '03 - Cartão de Crédito', '150,00'])).payments).toEqual(['credito']);
+  });
+
+  it('rótulos repetidos e hostis: a leitura com códigos tPag termina em menos de 50 ms', () => {
+    const texts = ['tpag '.repeat(80_000), 'forma de pagamento pix '.repeat(17_000), 'FORMA DE PAGAMENTO\n03\n'.repeat(15_000)];
+    for (const text of texts) {
+      const started = performance.now();
+      const forms = paymentFormsFromText(text, { withCodes: true });
+      expect(performance.now() - started).toBeLessThan(50);
+      expect(forms.length).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('número que não é código tPag não vira forma: data cortada, parcelas, "Número" e "10x"', () => {
+    // Janela cortada no meio de "12/10/2026" (260 caracteres depois do rótulo): "12" não é o código de vale.
+    const filler = 'x'.repeat(244);
+    const cut = `Forma de pagamento\n${filler}\n12/10/2026`;
+    expect(paymentFormsFromText(cut, { withCodes: true })).toEqual([]);
+    expect(paymentFormsFromText(`Forma de pagamento\n${'x'.repeat(250)}\n12`, { withCodes: true })).toEqual([]);
+    expect(read(withPaymentBlock(['FORMA DE PAGAMENTO', 'Dinheiro 50,00', '03 Número 1234', '150,00'])).payments).toEqual(['dinheiro']);
+    expect(read(withPaymentBlock(['Forma de pagamento: À vista', 'Parcelas', '03'])).payments).toEqual([]);
+    expect(read(withPaymentBlock(['Forma de pagamento: 10x no cartão de crédito', '150,00'])).payments).toEqual(['credito']);
+    expect(read(withPaymentBlock(['Forma de pagamento: 01/10/2026', '150,00'])).payments).toEqual([]);
   });
 
   it('"Sem pagamento" (90) não é forma', () => {

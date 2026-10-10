@@ -198,13 +198,18 @@ export function CameraModal({
     setHint(0);
     setReady(false);
     setMountError(false);
+  }, [visible]);
+
+  // As dicas contam a partir de a câmera estar pronta: o tempo de pedir a permissão e de abrir a câmera não entra na conta.
+  useEffect(() => {
+    if (!visible || !ready) return;
     const closer = setTimeout(() => setHint(1), NOTA_CAMERA.closerHintMs);
     const torchHint = setTimeout(() => setHint(2), NOTA_CAMERA.torchHintMs);
     return () => {
       clearTimeout(closer);
       clearTimeout(torchHint);
     };
-  }, [visible]);
+  }, [visible, ready]);
 
   const handle = ({ data }: { data: string }) => {
     if (done.current) return;
@@ -245,7 +250,7 @@ export function CameraModal({
                   style={StyleSheet.absoluteFill}
                   facing="back"
                   enableTorch={torch}
-                  zoom={NOTA_CAMERA.zoom}
+                  zoom={Platform.OS === 'ios' ? NOTA_CAMERA.zoom : 0}
                   barcodeScannerSettings={{ barcodeTypes: ['qr', 'code128'] }}
                   onBarcodeScanned={handle}
                   onCameraReady={() => setReady(true)}

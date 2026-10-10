@@ -79,8 +79,10 @@ export const NOTA_FLOW_TEXT = {
 /**
  * Câmera da leitura (D-042). Foco: o `expo-camera` 57.0.6 deixa o foco contínuo ligado quando `autofocus` não é passado (iOS) e
  * é o padrão do CameraX (Android); `autofocus="on"` faz um foco só e o trava, e no Android mede o ponto do canto da tela, por isso
- * não é usado. Não existe "toque para focar" nessa versão. O que o app faz: zoom inicial leve (10% do máximo do aparelho, para QR
- * pequeno), moldura quadrada ao centro, dica de aproximar depois de 5 s e a da lanterna depois de 10 s. Nenhuma foto é guardada.
+ * não é usado. Não existe "toque para focar" nessa versão. O que o app faz: zoom inicial leve só no iOS (`zoom` 0,1: lá o aumento é
+ * o zoom máximo do aparelho elevado a 0,1; no Android 0,1 viraria max(1, 0,1 × zoom máximo), que na maioria dos aparelhos não muda
+ * nada, então o Android abre sem zoom), moldura quadrada ao centro, dica de aproximar depois de 5 s e a da lanterna depois de 10 s, contados a partir de a câmera estar pronta.
+ * Nenhuma foto é guardada.
  */
 export const NOTA_CAMERA = { zoom: 0.1, closerHintMs: 5_000, torchHintMs: 10_000 } as const;
 
