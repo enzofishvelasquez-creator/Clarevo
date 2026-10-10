@@ -39,7 +39,9 @@ import { colors, fonts, space } from '@/theme/tokens';
 /**
  * Seu limite (D-041): quanto da renda de referência a pessoa quer comprometer por mês com contas, de 10% a 100% em pontos
  * inteiros, valendo a partir de um mês. Nunca vem preenchido: é escolha da pessoa (a referência de 30% com dívidas continua só
- * na linha de dívidas). Formulário, sem barra inferior. Escrita só por set_commitment_limit e delete_commitment_limit, com chave
+ * na linha de dívidas). "Tirar o limite a partir de {mês}" grava uma linha sem percentual, que encerra a vigência (ou, quando a
+ * linha do mês é a única com percentual até ali, exclui a linha); "Voltar a {percentual}" desfaz a retirada e só aparece quando a
+ * linha anterior tem percentual. Formulário, sem barra inferior. Escrita só por set_commitment_limit e delete_commitment_limit, com chave
  * de operação guardada entre tentativas. `?mes=AAAA-MM` escolhe o mês inicial (sem ele, o mês atual).
  */
 export default function LimiteScreen() {
@@ -84,8 +86,8 @@ function LimitForm({ contextId }: { contextId: string }) {
   const [banner, setBanner] = useState<string | null>(null);
   const [retry, setRetry] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [confirm, setConfirm] = useState<null | 'tirar' | 'voltar'>(null);
+  const [working, setWorking] = useState(false);
   const [leaveTo, setLeaveTo] = useState<null | (() => void)>(null);
   const [confirmDiscard, setConfirmDiscard] = useState<null | (() => void)>(null);
   const percentRef = useRef<TextInput>(null);
@@ -93,8 +95,12 @@ function LimitForm({ contextId }: { contextId: string }) {
 
   const list: CommitmentLimit[] | null = limits.data ?? null;
   const inEffect = list ? limitFor(list, month) : null;
+  /** A linha que começa exatamente neste mês: é ela que salvar altera (versão 0 se não existe). */
   const exact = list ? (list.find((l) => l.fromMonth === month) ?? null) : null;
-  const percentText = percentDraft ?? (inEffect ? String(inEffect.percent) : '');
+  /** A linha em vigor no mês anterior: é a que volta a valer se a deste mês sair. */
+  const before = list ? limitFor(list, addMonths(month, -1)) : null;
+  const beforePercent = before?.percent ?? null;
+  const percentText = percentDraft ?? (inEffect?.percent != null ? String(inEffect.percent) : '');
   const dirty = percentDraft !== null;
 
   usePreventRemove(dirty && !leaveTo, ({ data }) => {
@@ -165,19 +171,26 @@ function LimitForm({ contextId }: { contextId: string }) {
     }
   };
 
+  /**
+   * "Tirar o limite a partir de {mês}": uma linha sem percentual, que encerra a vigência. Quando a linha deste mês tem percentual e
+   * não há limite antes dela, basta excluí-la (o resultado é o mesmo, sem deixar uma linha sem percentual).
+   */
   const remove = async () => {
-    if (!exact || deleting) return;
-    setDeleting(true);
+    if (working) return;
+    setWorking(true);
     setBanner(null);
-    const snapshot = JSON.stringify([exact.id, exact.version]);
+    const dropRow = exact !== null && exact.percent !== null && beforePercent === null ? exact : null;
+    const expectedVersion = exact?.version ?? 0;
+    const snapshot = dropRow ? JSON.stringify([dropRow.id, dropRow.version]) : JSON.stringify([month, expectedVersion, null]);
     const key = delKeys.keyFor(snapshot);
     try {
-      await del.mutateAsync({ key, id: exact.id, version: exact.version });
+      if (dropRow) await del.mutateAsync({ key, id: dropRow.id, version: dropRow.version });
+      else await set.mutateAsync({ key, contextId, fromMonth: month, expectedVersion, percent: null });
       delKeys.settled();
-      setConfirmDelete(false);
-      done(LIMIT_TEXT.form.removed);
+      setConfirm(null);
+      done(LIMIT_TEXT.form.removed(month));
     } catch (e) {
-      setConfirmDelete(false);
+      setConfirm(null);
       if (isRefusal(e) && isRepoError(e)) {
         delKeys.refused();
         showRefusal(e.code);
@@ -186,7 +199,33 @@ function LimitForm({ contextId }: { contextId: string }) {
         setBanner(ERROR_TEXT.salvar_falhou);
       }
     } finally {
-      setDeleting(false);
+      setWorking(false);
+    }
+  };
+
+  /** Desfaz a retirada: exclui a linha sem percentual deste mês, e a anterior volta a valer. */
+  const restore = async () => {
+    if (!exact || working) return;
+    setWorking(true);
+    setBanner(null);
+    const snapshot = JSON.stringify([exact.id, exact.version]);
+    const key = delKeys.keyFor(snapshot);
+    try {
+      await del.mutateAsync({ key, id: exact.id, version: exact.version });
+      delKeys.settled();
+      setConfirm(null);
+      done(LIMIT_TEXT.form.deleted);
+    } catch (e) {
+      setConfirm(null);
+      if (isRefusal(e) && isRepoError(e)) {
+        delKeys.refused();
+        showRefusal(e.code);
+      } else {
+        delKeys.uncertain(key, snapshot);
+        setBanner(ERROR_TEXT.salvar_falhou);
+      }
+    } finally {
+      setWorking(false);
     }
   };
 
@@ -197,6 +236,8 @@ function LimitForm({ contextId }: { contextId: string }) {
 
   const prevMonth = month > bounds.min ? addMonths(month, -1) : null;
   const nextMonth = month < bounds.max ? addMonths(month, 1) : null;
+  const canRemove = inEffect !== null && inEffect.percent !== null;
+  const endedHere = exact !== null && exact.percent === null;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -223,7 +264,7 @@ function LimitForm({ contextId }: { contextId: string }) {
                   setPercentDraft(t.replace(/[^\d%\s]/g, ''));
                   setErrors((e) => ({ ...e, percentText: undefined }));
                 }}
-                placeholder="Ex.: 40"
+                placeholder={LIMIT_TEXT.form.percentPlaceholder}
                 keyboardType="number-pad"
                 inputMode="numeric"
                 maxLength={4}
@@ -266,11 +307,14 @@ function LimitForm({ contextId }: { contextId: string }) {
               </View>
               {exact ? (
                 <Txt variant="caption" color={colors.textSecondary}>
-                  {LIMIT_TEXT.form.existing(exact.fromMonth)}
+                  {endedHere ? LIMIT_TEXT.form.endedHere(exact.fromMonth) : LIMIT_TEXT.form.existing(exact.fromMonth)}
                 </Txt>
               ) : null}
             </Card>
-            {exact ? <Button label={LIMIT_TEXT.form.remove} tone="danger" onPress={() => setConfirmDelete(true)} /> : null}
+            {canRemove ? <Button label={LIMIT_TEXT.form.removeFrom(month)} tone="danger" onPress={() => setConfirm('tirar')} /> : null}
+            {endedHere && before && beforePercent !== null ? (
+              <Button label={LIMIT_TEXT.form.restore(beforePercent, before.fromMonth)} tone="soft" onPress={() => setConfirm('voltar')} />
+            ) : null}
           </>
         )}
       </Screen>
@@ -299,14 +343,25 @@ function LimitForm({ contextId }: { contextId: string }) {
       </View>
 
       <ConfirmDialog
-        visible={confirmDelete && Boolean(exact)}
-        title={LIMIT_TEXT.form.removeTitle(exact?.fromMonth ?? month)}
+        visible={confirm === 'tirar'}
+        title={LIMIT_TEXT.form.removeTitle(month)}
         cancelLabel={LIMIT_TEXT.form.cancel}
         confirmLabel={LIMIT_TEXT.form.removeConfirm}
-        busy={deleting}
-        onCancel={() => setConfirmDelete(false)}
+        busy={working}
+        onCancel={() => setConfirm(null)}
         onConfirm={() => remove()}>
         <Txt color={colors.textSecondary}>{LIMIT_TEXT.form.removeBody}</Txt>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        visible={confirm === 'voltar' && beforePercent !== null}
+        title={LIMIT_TEXT.form.restoreTitle(beforePercent ?? 0, month)}
+        cancelLabel={LIMIT_TEXT.form.cancel}
+        confirmLabel={LIMIT_TEXT.form.restoreConfirm}
+        busy={working}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => restore()}>
+        <Txt color={colors.textSecondary}>{LIMIT_TEXT.form.restoreBody}</Txt>
       </ConfirmDialog>
 
       <ConfirmDialog

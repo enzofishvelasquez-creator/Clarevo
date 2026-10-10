@@ -1,5 +1,6 @@
 import {
   BUDGET_ERROR_TEXT,
+  BUDGET_MIN_CENTS,
   BUDGET_TEXT,
   ERROR_TEXT,
   addMonths,
@@ -27,7 +28,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
-import { MoneyTxt } from '@/components/money-text';
+import { MoneyTxt, useMoneyMask } from '@/components/money-text';
 import { MonthStepper } from '@/components/month-stepper';
 import { seriesStyles as styles } from '@/components/series-parts';
 import { ErrorState } from '@/components/states';
@@ -41,8 +42,9 @@ import { colors, fonts, space } from '@/theme/tokens';
 
 /**
  * Orçamento de uma categoria (D-041): valor por mês, "A partir de" (este mês por padrão; meses passados até 24 meses atrás),
- * "Somar valores" e "Tirar o orçamento" (grava uma linha sem valor, que encerra a vigência a partir do mês escolhido). Meses
- * anteriores ao escolhido não mudam. Formulário, sem barra inferior. Escrita só por set_category_budget e delete_category_budget,
+ * "Somar valores" e "Tirar o orçamento" (grava uma linha sem valor, que encerra a vigência a partir do mês escolhido; quando a
+ * linha do mês é a única com valor até ali, exclui a linha). "Voltar a {valor}" desfaz a retirada e só aparece quando a linha
+ * anterior tem valor, que o botão nomeia. Meses anteriores ao escolhido não mudam. Formulário, sem barra inferior. Escrita só por set_category_budget e delete_category_budget,
  * com chave de operação guardada entre tentativas (repetir o mesmo conteúdo depois de falha de rede reconcilia).
  * `?mes=AAAA-MM` escolhe o mês inicial de "A partir de" (sem ele, o mês atual).
  */
@@ -89,6 +91,7 @@ function BudgetForm({ contextId, category, startMonth }: { contextId: string; ca
   const del = useDeleteCategoryBudget();
   const setKeys = useBudgetOperationKey();
   const delKeys = useBudgetOperationKey();
+  const mask = useMoneyMask();
 
   const currentMonth = monthOf(today);
   const bounds = budgetMonthBounds(today);
@@ -112,6 +115,9 @@ function BudgetForm({ contextId, category, startMonth }: { contextId: string; ca
   const inEffect = budgetRowFor(mine, category, month);
   /** A linha que começa exatamente neste mês: é ela que salvar altera (versão 0 se não existe). */
   const exact = mine.find((r) => r.fromMonth === month) ?? null;
+  /** A linha em vigor no mês anterior: é a que volta a valer se a deste mês sair. */
+  const before = budgetRowFor(mine, category, addMonths(month, -1));
+  const beforeCents = before?.amountCents ?? null;
   const amountText = amountDraft ?? (inEffect && inEffect.amountCents !== null ? centsToInput(inEffect.amountCents) : '');
   const dirty = amountDraft !== null;
 
@@ -187,16 +193,21 @@ function BudgetForm({ contextId, category, startMonth }: { contextId: string; ca
     }
   };
 
-  /** "Tirar o orçamento a partir de {mês}": uma linha sem valor, que encerra a vigência. */
+  /**
+   * "Tirar o orçamento a partir de {mês}": uma linha sem valor, que encerra a vigência. Quando a linha deste mês tem valor e não
+   * há orçamento antes dela, basta excluí-la (o resultado é o mesmo, sem deixar uma linha sem valor).
+   */
   const remove = async () => {
     if (working) return;
     setWorking(true);
     setBanner(null);
+    const dropRow = exact !== null && exact.amountCents !== null && beforeCents === null ? exact : null;
     const expectedVersion = exact?.version ?? 0;
-    const snapshot = JSON.stringify([category, month, expectedVersion, null]);
+    const snapshot = dropRow ? JSON.stringify([dropRow.id, dropRow.version]) : JSON.stringify([category, month, expectedVersion, null]);
     const key = delKeys.keyFor(snapshot);
     try {
-      await set.mutateAsync({ key, contextId, category, fromMonth: month, expectedVersion, amountCents: null });
+      if (dropRow) await del.mutateAsync({ key, id: dropRow.id, version: dropRow.version });
+      else await set.mutateAsync({ key, contextId, category, fromMonth: month, expectedVersion, amountCents: null });
       delKeys.settled();
       setConfirm(null);
       done(BUDGET_TEXT.form.removed(category, month));
@@ -345,7 +356,9 @@ function BudgetForm({ contextId, category, startMonth }: { contextId: string; ca
             ) : null}
 
             {canRemove ? <Button label={BUDGET_TEXT.form.removeFrom(month)} tone="danger" onPress={() => setConfirm('tirar')} /> : null}
-            {endedHere ? <Button label={BUDGET_TEXT.form.restore} tone="soft" onPress={() => setConfirm('voltar')} /> : null}
+            {endedHere && before && beforeCents !== null ? (
+              <Button label={mask(BUDGET_TEXT.form.restore(beforeCents, before.fromMonth))} tone="soft" onPress={() => setConfirm('voltar')} />
+            ) : null}
           </>
         )}
       </Screen>
@@ -385,8 +398,8 @@ function BudgetForm({ contextId, category, startMonth }: { contextId: string; ca
       </ConfirmDialog>
 
       <ConfirmDialog
-        visible={confirm === 'voltar'}
-        title={BUDGET_TEXT.form.restoreTitle(month)}
+        visible={confirm === 'voltar' && beforeCents !== null}
+        title={mask(BUDGET_TEXT.form.restoreTitle(beforeCents ?? BUDGET_MIN_CENTS, month))}
         cancelLabel={BUDGET_TEXT.form.cancel}
         confirmLabel={BUDGET_TEXT.form.restoreConfirm}
         busy={working}

@@ -246,7 +246,8 @@ interface CommitmentLimitRow {
   id: string;
   context_id: string;
   from_month: string;
-  percent: number;
+  /** null: a linha que encerra a vigência ("Tirar o limite a partir de"). */
+  percent: number | null;
   created_by: string;
   version: number;
   created_at: string;
@@ -797,11 +798,11 @@ function toCategoryBudget(r: CategoryBudgetRow): CategoryBudget {
   };
 }
 
-/** Limite pessoal: mês no dia 1, percentual inteiro de 10 a 100 e versão a partir de 1. */
+/** Limite pessoal: mês no dia 1, percentual nulo ou inteiro de 10 a 100 e versão a partir de 1. */
 function toCommitmentLimit(r: CommitmentLimitRow): CommitmentLimit {
-  const percent = whole(r.percent);
+  const percent = r.percent === null ? null : whole(r.percent);
   const version = whole(r.version);
-  if (!FIRST_DAY.test(r.from_month) || percent < 10 || percent > 100 || version < 1) throw new RepoError('desconhecido', 'limite_inconsistente');
+  if (!FIRST_DAY.test(r.from_month) || (percent !== null && (percent < 10 || percent > 100)) || version < 1) throw new RepoError('desconhecido', 'limite_inconsistente');
   return {
     id: r.id,
     contextId: r.context_id,
@@ -1766,7 +1767,8 @@ export class SupabaseRepository implements RecordsRepository {
     return rows.map(toCommitmentLimit);
   }
 
-  setCommitmentLimit(key: string, contextId: string, fromMonth: IsoMonth, expectedVersion: number, percent: number) {
+  /** percent null grava a linha que encerra a vigência ("Tirar o limite a partir de {mês}"). */
+  setCommitmentLimit(key: string, contextId: string, fromMonth: IsoMonth, expectedVersion: number, percent: number | null) {
     return this.callLimit('set_commitment_limit', {
       p_idempotency_key: key,
       p_context_id: contextId,

@@ -1284,8 +1284,8 @@ export class MemoryRepository implements RecordsRepository {
     );
   }
 
-  /** Como set_commitment_limit. Ordem do banco: repetição; escrita no contexto; mês (dia 1); versão; faixa do mês; percentual. */
-  async setCommitmentLimit(key: string, contextId: string, fromMonth: IsoMonth, expectedVersion: number, percent: number) {
+  /** Como set_commitment_limit. Ordem do banco: repetição; escrita no contexto; mês (dia 1); versão; faixa do mês; percentual (nulo encerra a vigência). */
+  async setCommitmentLimit(key: string, contextId: string, fromMonth: IsoMonth, expectedVersion: number, percent: number | null) {
     return this.write(() => {
       const payload = [contextId, fromMonth, expectedVersion, percent];
       const replayed = this.replay(key, 'definir_limite_comprometimento', payload);
@@ -2735,7 +2735,7 @@ export class MemoryRepository implements RecordsRepository {
 
   /**
    * Orçamento por categoria e limite pessoal (no banco: restrições de coluna e índices únicos das vivas): categoria entre as seis,
-   * mês válido, valor nulo ou de R$ 1,00 a MAX_RECORD_CENTS, percentual inteiro de 10 a 100, no máximo uma viva por chave e versão
+   * mês válido, valor nulo ou de R$ 1,00 a MAX_RECORD_CENTS, percentual nulo ou inteiro de 10 a 100, no máximo uma viva por chave e versão
    * a partir de 1. Lança Error('orcamento_inconsistente').
    */
   private checkBudgetInvariants() {

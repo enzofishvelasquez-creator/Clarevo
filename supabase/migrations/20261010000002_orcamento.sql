@@ -10,7 +10,8 @@
 -- mostrado. Uma linha sem valor (amount_cents nulo) encerra a vigência ("Tirar o orçamento a partir de novembro"); a linha
 -- nunca reescreve os meses anteriores a ela.
 -- Limite pessoal: percentual inteiro de 10 a 100 da renda de referência, com a mesma vigência; escolha da pessoa, nunca
--- preenchido por padrão.
+-- preenchido por padrão. Uma linha sem percentual (percent nulo) encerra a vigência ("Tirar o limite a partir de novembro"),
+-- como no orçamento.
 --
 -- Usado no mês M da categoria c (competência), como em budget.ts:
 --   gastos   = despesas vivas de c com data em M, menos os pagamentos de fatura (card_id nulo: a quitação de compras já contadas);
@@ -23,7 +24,7 @@
 -- Invariantes:
 -- D1. No máximo uma linha viva por (contexto, categoria, mês de início) no orçamento e por (contexto, mês de início) no limite.
 -- D2. from_month é sempre o 1º dia de um mês; categoria entre as seis de despesa; valor nulo ou de 100 a 999.999.999 centavos;
---     percentual de 10 a 100; exclusão com data e autoria juntas.
+--     percentual nulo (encerra a vigência) ou de 10 a 100; exclusão com data e autoria juntas.
 -- D3. Identidade, contexto, categoria, mês de início, autoria e criação nunca mudam; linha excluída não muda mais; versão +1 por
 --     escrita.
 -- D4. Orçamento e limite nunca entram em Recebido, Pago, Diferença, Ainda a pagar nem na renda comprometida: nenhuma função nova
@@ -65,7 +66,8 @@ create table public.commitment_limits (
   id uuid primary key default gen_random_uuid(),
   context_id uuid not null references public.financial_contexts (id) on delete cascade,
   from_month date not null,
-  percent smallint not null,
+  -- Nulo: encerra a vigência a partir de from_month (nenhum limite).
+  percent smallint,
   created_by uuid not null references public.persons (id),
   version integer not null default 1 check (version >= 1),
   created_at timestamptz not null default now(),
@@ -73,13 +75,18 @@ create table public.commitment_limits (
   deleted_at timestamptz,
   deleted_by uuid references public.persons (id),
   constraint commitment_limits_mes check (extract(day from from_month) = 1),
-  constraint commitment_limits_percentual check (percent between 10 and 100),
+  constraint commitment_limits_percentual check (percent is null or percent between 10 and 100),
   constraint commitment_limits_exclusao check ((deleted_at is null) = (deleted_by is null))
 );
 create unique index commitment_limits_one_live on public.commitment_limits (context_id, from_month) where deleted_at is null;
 comment on table public.commitment_limits is
-  'Limite pessoal de comprometimento da renda de referência (percentual inteiro de 10 a 100), válido a partir de from_month. '
-  'Escolha da pessoa: nunca vem preenchido.';
+  'Limite pessoal de comprometimento da renda de referência (percentual inteiro de 10 a 100), válido a partir de from_month '
+  'até a próxima linha viva. percent nulo encerra a vigência. Escolha da pessoa: nunca vem preenchido.';
+
+-- ---------------------------------------------------------------------------
+-- Índice para month_budget (o usado no mês lê as parcelas e os estornos do contexto): sem ele a leitura varre a tabela inteira.
+-- ---------------------------------------------------------------------------
+create index card_entries_ctx_kind on public.card_entries (context_id, kind, category) where deleted_at is null;
 
 -- ---------------------------------------------------------------------------
 -- Operações: lista completa vigente (37 ações das migrações anteriores) mais as 4 de orçamento e limite, que apontam só para a
@@ -342,7 +349,8 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Definir o limite pessoal de um mês (criar ou alterar) e excluir uma linha dele: mesma estrutura e mesma ordem das funções do
 -- orçamento, sem categoria. Validação depois da versão e da autoria: mês de início entre 24 meses antes e 12 meses depois do mês
--- de hoje (vigencia_fora_do_intervalo) e percentual inteiro de 10 a 100 (percentual_invalido).
+-- de hoje (vigencia_fora_do_intervalo) e percentual inteiro de 10 a 100 (percentual_invalido). p_percent nulo grava a linha que
+-- encerra a vigência ("Tirar o limite a partir de {mês}").
 -- ---------------------------------------------------------------------------
 create or replace function public.set_commitment_limit(
   p_idempotency_key text,
@@ -404,7 +412,7 @@ begin
   if p_from_month < (v_month - interval '24 months')::date or p_from_month > (v_month + interval '12 months')::date then
     raise exception 'vigencia_fora_do_intervalo' using errcode = '22023';
   end if;
-  if p_percent is null or p_percent < 10 or p_percent > 100 then
+  if p_percent is not null and (p_percent < 10 or p_percent > 100) then
     raise exception 'percentual_invalido' using errcode = '22023';
   end if;
 
@@ -521,23 +529,31 @@ begin
   end if;
   v_next := (p_month + interval '1 month')::date;
 
+  -- Gastos, parcelas e estornos de cada categoria, agregados uma vez só (uma leitura de financial_records e uma de card_entries,
+  -- esta pelo índice card_entries_ctx_kind), em vez de uma subconsulta por categoria.
   return query
+  with spent as (
+    select r.category as cat, sum(r.amount_cents)::bigint as cents
+      from public.financial_records r
+     where r.context_id = p_context_id and r.deleted_at is null and r.kind = 'despesa' and r.card_id is null
+       and r.occurred_on >= p_month and r.occurred_on < v_next
+     group by r.category
+  ), cards as (
+    select e.category as cat,
+           sum(case when e.kind = 'parcela' then e.amount_cents else -e.amount_cents end)::bigint as cents
+      from public.card_entries e
+     where e.context_id = p_context_id and e.deleted_at is null
+       and ((e.kind = 'parcela'
+             and (date_trunc('month', e.purchased_on::timestamp) + make_interval(months => e.installment_number - 1))::date = p_month)
+            or (e.kind = 'estorno' and e.source_month is null and e.invoice_month = p_month))
+     group by e.category
+  )
   select c.category,
          b.id, b.version, b.from_month, b.amount_cents,
-         greatest(0::bigint,
-                  coalesce((select sum(r.amount_cents) from public.financial_records r
-                             where r.context_id = p_context_id and r.deleted_at is null and r.kind = 'despesa'
-                               and r.card_id is null and r.category = c.category
-                               and r.occurred_on >= p_month and r.occurred_on < v_next), 0)::bigint
-                  + coalesce((select sum(e.amount_cents) from public.card_entries e
-                               where e.context_id = p_context_id and e.deleted_at is null and e.kind = 'parcela'
-                                 and e.category = c.category
-                                 and (date_trunc('month', e.purchased_on::timestamp) + make_interval(months => e.installment_number - 1))::date = p_month), 0)::bigint
-                  - coalesce((select sum(e.amount_cents) from public.card_entries e
-                               where e.context_id = p_context_id and e.deleted_at is null and e.kind = 'estorno'
-                                 and e.source_month is null and e.category = c.category and e.invoice_month = p_month), 0)::bigint
-         )::bigint
+         greatest(0::bigint, coalesce(s.cents, 0) + coalesce(k.cents, 0))::bigint
     from (values ('Moradia', 1), ('Mercado', 2), ('Transporte', 3), ('Saúde', 4), ('Educação', 5), ('Lazer', 6)) as c (category, ord)
+    left join spent s on s.cat = c.category
+    left join cards k on k.cat = c.category
     left join lateral (select x.* from public.category_budgets x
                         where x.context_id = p_context_id and x.category = c.category and x.deleted_at is null
                           and x.from_month <= p_month

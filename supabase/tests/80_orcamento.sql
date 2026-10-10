@@ -3,8 +3,8 @@
 -- competência, igual ao core: budget.ts), guardas, restrições de record_operations e privilégios.
 -- Sequência sobre a montagem FICTÍCIA da demonstração (Cris, hoje 07/10/2026): gastos anotados, uma conta paga, e um cartão
 -- (fecha dia 3, vence dia 10) com compras parceladas, estorno, encargo e o pagamento de uma fatura. Os números do usado são os
--- mesmos do teste do core ("o usado vem dos gastos e das compras no cartão do contexto, mês a mês"): Mercado R$ 60,00 em
--- setembro e R$ 472,30 em outubro; Lazer R$ 300,00 em outubro, R$ 260,00 em novembro e zero em dezembro (estorno maior que o gasto).
+-- mesmos do teste do core ("o usado vem dos gastos e das compras no cartão do contexto, mês a mês"): Mercado R$ 70,00 em
+-- setembro e R$ 472,30 em outubro; Lazer R$ 333,35 em outubro, R$ 293,33 em novembro e zero em dezembro (estorno maior que o gasto).
 -- Orçamento e limite nunca mudam Recebido, Pago, Diferença, Ainda a pagar nem a renda comprometida (D4).
 -- Pessoas FICTÍCIAS: Cris (sequência; titular da Família da Cris), Davi (Família, só leitura), Elisa (Família, escreve sem
 -- "editar de outras pessoas"), Fábio (Família, escreve e altera o que é dos outros), Gaia (externa), Heitor (RH da empresa; Cris
@@ -241,9 +241,11 @@ begin
   perform pg_temp.expect_error(format($f$select public.set_commitment_limit('or-n-0027', %L, '2026-10-01', 0, 9)$f$, ctx), 'percentual_invalido');
   perform pg_temp.expect_error(format($f$select public.set_commitment_limit('or-n-0028', %L, '2026-10-01', 0, 101)$f$, ctx), 'percentual_invalido');
   perform pg_temp.expect_error(format($f$select public.set_commitment_limit('or-n-0029', %L, '2026-10-01', 0, 0)$f$, ctx), 'percentual_invalido');
-  perform pg_temp.expect_error(format($f$select public.set_commitment_limit('or-n-0030', %L, '2026-10-01', 0, null)$f$, ctx), 'percentual_invalido');
   perform pg_temp.expect_error(format($f$select public.set_commitment_limit('or-n-0031', %L, '2027-11-01', 0, 9)$f$, ctx),
     'vigencia_fora_do_intervalo');
+  perform pg_temp.expect_error(format($f$select public.set_commitment_limit('or-n-0032', %L, '2027-11-01', 0, null)$f$, ctx),
+    'vigencia_fora_do_intervalo');
+  perform pg_temp.expect_error(format($f$select public.set_commitment_limit('or-n-0033', %L, '2026-10-15', 0, null)$f$, ctx), 'mes_invalido');
   assert (select count(*) from public.record_operations where idempotency_key like 'or-n-00%') = 0, 'recusas não gravam operação';
   assert (select count(*) from public.category_budgets) = 0 and (select count(*) from public.commitment_limits) = 0, 'recusas não gravam linha';
 
@@ -263,6 +265,16 @@ begin
   res := public.set_commitment_limit('or-n-0048', ctx, '2027-10-01', 0, 100);
   assert (res ->> 'percent')::int = 100 and res ->> 'from_month' = '2027-10-01', 'limite de 100%';
   perform public.delete_commitment_limit('or-n-0049', (res ->> 'id')::uuid, 1);
+  -- Percentual nulo grava a linha que encerra a vigência do limite ("Tirar o limite a partir de novembro").
+  res := public.set_commitment_limit('or-n-0057', ctx, '2026-11-01', 0, null);
+  assert res -> 'percent' = 'null'::jsonb and (res ->> 'version')::int = 1, 'percentual nulo grava a linha que encerra a vigência';
+  assert public.set_commitment_limit('or-n-0057', ctx, '2026-11-01', 0, null) = res, 'repetição da linha sem percentual';
+  perform pg_temp.expect_error(format($f$select public.set_commitment_limit('or-n-0057', %L, '2026-11-01', 0, 40)$f$, ctx), 'chave_reutilizada');
+  res := public.set_commitment_limit('or-n-0058', ctx, '2026-11-01', 1, 40);
+  assert res ->> 'percent' = '40' and (res ->> 'version')::int = 2, 'um percentual volta a valer na linha encerrada';
+  res := public.set_commitment_limit('or-n-0059', ctx, '2026-11-01', 2, null);
+  assert res -> 'percent' = 'null'::jsonb and (res ->> 'version')::int = 3, 'e a linha volta a encerrar';
+  perform public.delete_commitment_limit('or-n-0060', (res ->> 'id')::uuid, 3);
   assert (select count(*) from public.category_budgets) = 0 and (select count(*) from public.commitment_limits) = 0, 'limites desfeitos';
 
   -- O intervalo acompanha o hoje da pessoa (29/02/2028: de fevereiro de 2026 a fevereiro de 2029).
@@ -841,6 +853,22 @@ begin
   perform pg_temp.expect_error(format('update public.commitment_limits set percent = 50, version = version + 1 where id = %L', dlim), 'campo_imutavel');
   perform pg_temp.expect_error(format('update public.commitment_limits set percent = 9, version = version + 1 where id = %L', lim), '%commitment_limits_percentual%');
   perform pg_temp.expect_error(format('update public.commitment_limits set percent = 101, version = version + 1 where id = %L', lim), '%commitment_limits_percentual%');
+  -- Percentual nulo (a linha que encerra a vigência) passa pela guarda e pela restrição, na alteração e na inserção (desfeitas).
+  begin
+    update public.commitment_limits set percent = null, version = version + 1 where id = lim;
+    assert (select percent is null from public.commitment_limits where id = lim), 'a guarda aceita percentual nulo';
+    raise exception 'desfazer';
+  exception when raise_exception then
+    assert sqlerrm = 'desfazer', sqlerrm;
+  end;
+  begin
+    insert into public.commitment_limits (context_id, from_month, percent, created_by) values (ctx, '2026-07-01', null, pg_temp.id('cris'));
+    assert (select count(*) from public.commitment_limits where context_id = ctx and from_month = '2026-07-01' and percent is null) = 1,
+      'a restrição aceita percentual nulo';
+    raise exception 'desfazer';
+  exception when raise_exception then
+    assert sqlerrm = 'desfazer', sqlerrm;
+  end;
   perform pg_temp.expect_error(format($f$insert into public.commitment_limits (context_id, from_month, percent, created_by)
     values (%L, '2026-10-01', 40, %L)$f$, ctx, pg_temp.id('cris')), '%commitment_limits_one_live%');
   perform pg_temp.expect_error(format($f$insert into public.commitment_limits (context_id, from_month, percent, created_by)
@@ -932,6 +960,10 @@ do $$ begin
   assert exists (select 1 from pg_trigger where tgname = 'category_budgets_guard' and tgrelid = 'public.category_budgets'::regclass and not tgisinternal and tgenabled = 'O')
      and exists (select 1 from pg_trigger where tgname = 'commitment_limits_guard' and tgrelid = 'public.commitment_limits'::regclass and not tgisinternal and tgenabled = 'O'),
     'guardas ligadas';
+  -- O índice do usado no mês (item 3 da revisão do F2): parcial (só as vivas), pelo contexto, o tipo e a categoria.
+  assert (select indexdef from pg_indexes where schemaname = 'public' and tablename = 'card_entries' and indexname = 'card_entries_ctx_kind')
+    = 'CREATE INDEX card_entries_ctx_kind ON public.card_entries USING btree (context_id, kind, category) WHERE (deleted_at IS NULL)',
+    'índice card_entries_ctx_kind';
   -- As assinaturas das migrações anteriores continuam.
   assert to_regprocedure('public.set_income_reference(text, uuid, date, integer, bigint, boolean)') is not null
      and to_regprocedure('public.month_committed(uuid, date)') is not null

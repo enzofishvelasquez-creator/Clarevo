@@ -29,7 +29,8 @@ import { formatPermille } from './committed';
  *  metas e recebimentos nunca contam.
  *
  * Limite pessoal: de 10% a 100% da renda de referência, em pontos inteiros, com vigência "a partir de" um mês. É escolha da
- * pessoa e nunca vem preenchido. A referência de 30% com dívidas (D-026(5)) continua só na linha de dívidas.
+ * pessoa e nunca vem preenchido. Uma linha sem percentual (null) encerra a vigência ("Tirar o limite a partir de novembro"),
+ * como no orçamento. A referência de 30% com dívidas (D-026(5)) continua só na linha de dívidas.
  *
  * Sem cor que julgue, sem nota e sem julgamento: os textos são neutros (ver BUDGET_TEXT e LIMIT_TEXT e os testes de textos).
  */
@@ -83,14 +84,15 @@ export interface CategoryBudget {
 }
 
 /**
- * Limite pessoal de comprometimento a partir de um mês (commitment_limits): percentual inteiro da renda de referência.
- * Gravado só por set_commitment_limit e delete_commitment_limit; no máximo uma linha viva por contexto e mês de início.
+ * Limite pessoal de comprometimento a partir de um mês (commitment_limits): percentual inteiro da renda de referência. percent
+ * null: "Tirar o limite a partir de {mês}" (encerra a vigência, nenhum limite). Gravado só por set_commitment_limit e
+ * delete_commitment_limit; no máximo uma linha viva por contexto e mês de início.
  */
 export interface CommitmentLimit {
   id: string;
   contextId: string;
   fromMonth: IsoMonth;
-  percent: number;
+  percent: number | null;
   createdBy: string;
   version: number;
   createdAt: string;
@@ -104,7 +106,7 @@ export function budgetRowFor<T extends Pick<CategoryBudget, 'category' | 'fromMo
   return best;
 }
 
-/** Limite vigente no mês: a linha mais recente com início até o mês (ou null). */
+/** Linha do limite vigente no mês: a mais recente com início até o mês (pode ter percent null: limite encerrado), ou null. */
 export function limitFor<T extends Pick<CommitmentLimit, 'fromMonth'>>(rows: readonly T[], month: IsoMonth): T | null {
   let best: T | null = null;
   for (const r of rows) if (r.fromMonth <= month && (!best || r.fromMonth > best.fromMonth)) best = r;
@@ -314,7 +316,8 @@ function monthNameFor(month: IsoMonth, today: IsoDate): string {
 
 /**
  * Linha neutra para a mensagem de sucesso, só no cruzamento (antes < limiar <= depois): chegou a 80% (ou mais, até o valor do
- * orçamento) ou passou de 100%. "Mercado chegou a 85% do orçamento de outubro." / "Mercado passou do orçamento de outubro em
+ * orçamento), chegou a 100% (usado igual ao orçamento, vindo de menos) ou passou de 100%. "Mercado chegou a 85% do orçamento
+ * de outubro." / "Mercado chegou a 100% do orçamento de outubro." / "Mercado passou do orçamento de outubro em
  * R$ 12,30." Com valores ocultos, sem o valor: "Mercado passou do orçamento de outubro." before/after: a linha da categoria
  * antes e depois de gravar; sem orçamento depois, null.
  */
@@ -328,7 +331,9 @@ export function budgetCrossing(
   if (!after || after.budgetCents === null || !before || before.budgetCents === null) return null;
   const was = budgetLevel(before.usedCents, before.budgetCents);
   const now = budgetLevel(after.usedCents, after.budgetCents);
-  if (now <= was) return null;
+  // Chegar exatamente ao valor do orçamento, vindo de menos (inclusive de 80% a 99%), também avisa: "chegou a 100%".
+  const reachedFull = now === 1 && after.usedCents === after.budgetCents && before.usedCents < before.budgetCents;
+  if (now <= was && !reachedFull) return null;
   const name = monthNameFor(month, today);
   if (now === 2) {
     return hideValues
@@ -411,7 +416,7 @@ export function budgetCategoryFromParam(param: string | string[] | undefined): s
 
 export const LIMIT_ERROR_TEXT = {
   ...ERROR_TEXT,
-  percentual_invalido: 'Informe um número inteiro de 10 a 100, como 40.',
+  percentual_invalido: 'Informe um número inteiro de 10 a 100.',
   mes_invalido: 'Escolha um mês entre dois anos atrás e os próximos 12 meses.',
   vigencia_fora_do_intervalo: 'Escolha um mês entre dois anos atrás e os próximos 12 meses.',
   versao_desatualizada: 'O limite deste mês foi alterado em outro aparelho. Confira o valor atual antes de salvar.',
@@ -429,7 +434,9 @@ export function limitMonthError(month: unknown, today: IsoDate): 'mes_invalido' 
   return month < min || month > max ? 'vigencia_fora_do_intervalo' : null;
 }
 
+/** null aceito (tirar o limite: encerra a vigência); senão um número inteiro de 10 a 100. */
 export function limitPercentError(percent: unknown): 'percentual_invalido' | null {
+  if (percent === null) return null;
   return typeof percent === 'number' && Number.isInteger(percent) && percent >= LIMIT_MIN_PERCENT && percent <= LIMIT_MAX_PERCENT ? null : 'percentual_invalido';
 }
 
@@ -531,11 +538,12 @@ export function limitCrossing(
   const was = new Map(before.map((m) => [m.month, m]));
   for (const m of [...after].sort((a, b) => a.month.localeCompare(b.month))) {
     const limit = limitFor(limits, m.month);
-    if (!limit || m.committedPermille === null) continue;
-    const over = (permille: number) => permille > limit.percent * 10;
+    const percent = limit?.percent ?? null;
+    if (percent === null || m.committedPermille === null) continue;
+    const over = (permille: number) => permille > percent * 10;
     const prev = was.get(m.month);
     if (over(m.committedPermille) && !(prev && prev.committedPermille !== null && over(prev.committedPermille))) {
-      return LIMIT_TEXT.crossed(monthNameFor(m.month, today), formatPermille(m.committedPermille, m.committedCents), limit.percent);
+      return LIMIT_TEXT.crossed(monthNameFor(m.month, today), formatPermille(m.committedPermille, m.committedCents), percent);
     }
   }
   return null;
@@ -549,8 +557,7 @@ export function limitNotesFor(
 ): Record<IsoMonth, string> {
   const out: Record<IsoMonth, string> = {};
   for (const m of months) {
-    const limit = limitFor(limits, m.month);
-    const status = limit ? limitStatus(m.month, m.committedPermille, m.committedCents, limit.percent, today) : null;
+    const status = limitStatus(m.month, m.committedPermille, m.committedCents, limitFor(limits, m.month)?.percent ?? null, today);
     if (status?.kind === 'acima' && status.note) out[m.month] = status.note;
   }
   return out;
@@ -615,11 +622,14 @@ export const BUDGET_TEXT = {
     removeTitle: (category: string, month: IsoMonth) => `Tirar o orçamento de ${category} a partir de ${formatMonthYearBR(month)}?`,
     removeBody: 'Os meses anteriores continuam com o orçamento que tinham. Você pode definir outro quando quiser.',
     removeConfirm: 'Tirar orçamento',
-    /** Desfazer a retirada: exclui a linha sem valor do mês e a anterior volta a valer. */
-    restore: 'Voltar ao orçamento anterior',
-    restoreTitle: (month: IsoMonth) => `Voltar ao orçamento anterior a ${formatMonthYearBR(month)}?`,
+    /**
+     * Desfazer a retirada: exclui a linha sem valor do mês, e a anterior volta a valer. Só é oferecido quando a linha anterior
+     * tem valor, e o texto diz qual: "Voltar a R$ 1.000,00 por mês, valor de setembro de 2026".
+     */
+    restore: (cents: Cents, fromMonth: IsoMonth) => `Voltar a ${formatBRL(cents)} por mês, valor de ${formatMonthYearBR(fromMonth)}`,
+    restoreTitle: (cents: Cents, month: IsoMonth) => `Voltar a ${formatBRL(cents)} por mês a partir de ${formatMonthYearBR(month)}?`,
     restoreBody: 'Tiramos a linha que encerrava o orçamento neste mês. O valor anterior volta a valer.',
-    restoreConfirm: 'Voltar ao anterior',
+    restoreConfirm: 'Voltar ao valor anterior',
     /** "Orçamento de Mercado salvo. Vale a partir de outubro." */
     saved: (category: string, month: IsoMonth) => `Orçamento de ${category} salvo. Vale a partir de ${formatMonthName(month)}.`,
     /** "Orçamento de Mercado tirado a partir de novembro." */
@@ -666,17 +676,28 @@ export const LIMIT_TEXT = {
     title: 'Seu limite',
     percentLabel: 'Limite da renda (%)',
     percentHint: 'Um número inteiro de 10 a 100.',
+    percentPlaceholder: 'De 10 a 100',
     fromLabel: 'Vale a partir de',
     save: 'Salvar limite',
     cancel: 'Cancelar',
-    remove: 'Tirar meu limite',
-    /** "Tirar o limite de outubro?" */
+    /** "Tirar o limite a partir de novembro de 2026" */
+    removeFrom: (month: IsoMonth) => `Tirar o limite a partir de ${formatMonthYearBR(month)}`,
+    /** "Tirar o limite a partir de novembro de 2026?" */
     removeTitle: (month: IsoMonth) => `Tirar o limite a partir de ${formatMonthYearBR(month)}?`,
-    removeBody: 'O limite anterior volta a valer. Sem nenhum, a tela mostra só o percentual.',
+    removeBody: 'Os meses anteriores continuam com o limite que tinham. Você pode escolher outro quando quiser.',
     removeConfirm: 'Tirar limite',
+    /** Desfazer a retirada: só quando a linha anterior tem percentual, e o texto diz qual. */
+    restore: (percent: number, fromMonth: IsoMonth) => `Voltar a ${percent}% da renda, limite de ${formatMonthYearBR(fromMonth)}`,
+    restoreTitle: (percent: number, month: IsoMonth) => `Voltar a ${percent}% da renda a partir de ${formatMonthYearBR(month)}?`,
+    restoreBody: 'Tiramos a linha que encerrava o limite neste mês. O limite anterior volta a valer.',
+    restoreConfirm: 'Voltar ao limite anterior',
     /** "Limite de 40% salvo. Vale a partir de outubro." */
     saved: (percent: number, month: IsoMonth) => `Limite de ${percent}% salvo. Vale a partir de ${formatMonthName(month)}.`,
-    removed: 'Limite tirado.',
+    /** "Limite tirado a partir de novembro." */
+    removed: (month: IsoMonth) => `Limite tirado a partir de ${formatMonthName(month)}.`,
+    /** Exclusão da linha sem percentual (voltar ao anterior) ou de uma linha sem nada antes. */
+    deleted: 'Linha do limite excluída.',
+    endedHere: (month: IsoMonth) => `O limite foi tirado a partir de ${formatMonthYearBR(month)}. Ao salvar, um percentual volta a valer.`,
     existing: (month: IsoMonth) => `Já existe um limite a partir de ${formatMonthYearBR(month)}. Ao salvar, ele é alterado.`,
     monthPrev: (month: IsoMonth) => `Mês anterior: ${formatMonthYearBR(month)}`,
     monthNext: (month: IsoMonth) => `Próximo mês: ${formatMonthYearBR(month)}`,

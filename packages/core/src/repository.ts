@@ -346,9 +346,9 @@ export interface RecordsRepository {
   /**
    * set_commitment_limit. Cria (expectedVersion 0) ou altera (versão atual) o limite vivo do mês fromMonth. Ordem do banco:
    * repetição; sem_permissao; mes_invalido; versao_desatualizada; autoria; vigencia_fora_do_intervalo; percentual_invalido
-   * (inteiro de 10 a 100).
+   * (inteiro de 10 a 100). percent null grava a linha que encerra a vigência ("Tirar o limite a partir de {mês}").
    */
-  setCommitmentLimit(key: string, contextId: string, fromMonth: IsoMonth, expectedVersion: number, percent: number): Promise<CommitmentLimit>;
+  setCommitmentLimit(key: string, contextId: string, fromMonth: IsoMonth, expectedVersion: number, percent: number | null): Promise<CommitmentLimit>;
   /** delete_commitment_limit: exclusão lógica com versão (o limite anterior volta a valer; sem nenhum, nada). */
   deleteCommitmentLimit(key: string, id: string, expectedVersion: number): Promise<CommitmentLimit>;
 

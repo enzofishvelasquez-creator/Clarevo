@@ -1020,7 +1020,7 @@ export function useSetCommitmentLimit() {
   const repo = useRepo();
   const invalidate = useInvalidateLimits();
   return useMutation({
-    mutationFn: (v: { key: string; contextId: string; fromMonth: IsoMonth; expectedVersion: number; percent: number }) =>
+    mutationFn: (v: { key: string; contextId: string; fromMonth: IsoMonth; expectedVersion: number; percent: number | null }) =>
       repo.setCommitmentLimit(v.key, v.contextId, v.fromMonth, v.expectedVersion, v.percent),
     onSuccess: (row) => invalidate(row),
   });
