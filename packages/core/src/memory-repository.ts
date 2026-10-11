@@ -60,6 +60,8 @@ import type {
   SeriesWrite,
 } from './repository';
 import { RepoError } from './repository';
+import { SEARCH_LIMIT, compareNewestPurchase, compareNewestRecord, purchaseMatchesFilter, recordMatchesFilter } from './search';
+import type { RecordSearchFilter, SearchPage } from './search';
 import { referenceMonthError } from './committed';
 import { ACCOUNTS_ACTIVE_MAX, ACCOUNT_KINDS, ACCOUNT_NAME_MAX, accountInputError, accountNameTaken, activeAccounts, normalizeAccountInput } from './accounts';
 import {
@@ -622,6 +624,30 @@ export class MemoryRepository implements RecordsRepository {
     return this.read(() =>
       [...this.records.values()].filter((r) => !r.deletedAt && r.contextId === contextId && monthOf(r.occurredOn) === month).map(strip),
     );
+  }
+
+  /** Como a busca do banco: filtro de período, tipo, categoria, conta e valor; do mais recente ao mais antigo; até 1.000. */
+  async searchRecords(contextId: string, filter: RecordSearchFilter): Promise<SearchPage<FinancialRecord>> {
+    return this.read(() => {
+      if (!this.canRead(contextId)) return { items: [], truncated: false };
+      const found = [...this.records.values()]
+        .filter((r) => !r.deletedAt && r.contextId === contextId && recordMatchesFilter(r, filter))
+        .map(strip)
+        .sort(compareNewestRecord);
+      return { items: found.slice(0, SEARCH_LIMIT), truncated: found.length > SEARCH_LIMIT };
+    });
+  }
+
+  /** Compras vivas (uma linha por compra) que passam pelo filtro; nenhuma com recebimento ou conta de origem no filtro. */
+  async searchCardPurchases(contextId: string, filter: RecordSearchFilter): Promise<SearchPage<CardEntry>> {
+    return this.read(() => {
+      if (!this.canRead(contextId)) return { items: [], truncated: false };
+      const found = [...this.cardEntries.values()]
+        .filter((e) => !e.deletedAt && e.contextId === contextId && purchaseMatchesFilter(e, filter))
+        .map(stripEntry)
+        .sort(compareNewestPurchase);
+      return { items: found.slice(0, SEARCH_LIMIT), truncated: found.length > SEARCH_LIMIT };
+    });
   }
 
   async getRecord(id: string) {

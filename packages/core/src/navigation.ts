@@ -67,7 +67,7 @@ export function barModeFor(pathname: string): BarMode {
 
 /** Abas que uma tela de consulta abre quando a pessoa não veio de nenhuma (endereço aberto direto): a do assunto. */
 const TAB_OF_TOPIC: readonly [RegExp, TabRoute][] = [
-  [/^\/(a-pagar|gastos-fixos|cartoes|registro|orcamento)(\/|$)/, '/movimentacoes'],
+  [/^\/(a-pagar|gastos-fixos|cartoes|registro|orcamento|movimentacoes)(\/|$)/, '/movimentacoes'],
   [/^\/(meta|reserva|guardar|simular|renda-comprometida)(\/|$)/, '/metas'],
   [/^\/explicacao(\/|$)/, '/aprender'],
 ];
@@ -282,6 +282,13 @@ export const APP_SCREENS: readonly AppScreen[] = [
     caption: 'Registros do mês, contas a pagar e gastos fixos',
     href: '/movimentacoes',
     keywords: ['movimentos', 'movimentações', 'extrato', 'histórico', 'registros', 'lista de gastos', 'editar gasto', 'excluir gasto'],
+  },
+  {
+    id: 'buscar-movimentos',
+    title: 'Buscar em Movimentações',
+    caption: 'Achar um gasto ou recebimento em todos os meses e ver quanto deu no período',
+    href: '/movimentacoes/buscar',
+    keywords: ['buscar', 'busca', 'procurar', 'pesquisar', 'achar', 'encontrar', 'quanto paguei', 'quanto gastei', 'gasto antigo', 'registro antigo', 'luz'],
   },
   {
     id: 'lembretes',

@@ -10,10 +10,12 @@ import {
   GOAL_STATUSES,
   GOAL_TYPES,
   MAX_RECORD_CENTS,
+  NO_CATEGORY_LABEL,
   PARTS_PER_YEAR_MAX,
   RepoError,
   SAVINGS_ANSWERS,
   SAVINGS_MIN_MONTHLY_CENTS,
+  SEARCH_LIMIT,
   activeAccounts,
   addMonths,
   monthRange,
@@ -67,6 +69,7 @@ import {
   type PaymentRequest,
   type PersonalSpace,
   type RecordInput,
+  type RecordSearchFilter,
   type RecordKind,
   type ReceiptMatch,
   type RecordsRepository,
@@ -76,6 +79,7 @@ import {
   type ReturnReviewState,
   type SavingsAnswer,
   type SavingsCheck,
+  type SearchPage,
   type SeriesAction,
   type SeriesEditInput,
   type SeriesInput,
@@ -1156,6 +1160,40 @@ async function readAll<T>(
   return rows;
 }
 
+/**
+ * Até `limit` linhas, em páginas de 500 (a API limita cada resposta), pedindo uma a mais para saber se havia mais:
+ * `truncated` é verdadeiro só quando existe pelo menos uma linha além do limite.
+ */
+async function readUpTo<T>(
+  limit: number,
+  fetchPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message?: string; code?: string; details?: string | null } | null }>,
+): Promise<SearchPage<T>> {
+  const PAGE = 500;
+  const want = limit + 1;
+  const rows: T[] = [];
+  for (let from = 0; rows.length < want; from += PAGE) {
+    const to = Math.min(from + PAGE, want) - 1;
+    const { data, error } = await fetchPage(from, to);
+    if (error) throw repoError(error);
+    rows.push(...(data ?? []));
+    if ((data?.length ?? 0) < to - from + 1) break;
+  }
+  return { items: rows.slice(0, limit), truncated: rows.length > limit };
+}
+
+/** Filtros da busca (período, categoria, valor) sobre a coluna de data da tabela; `Sem categoria` pede a coluna nula. */
+function searchFilters<
+  Q extends { gte(column: string, value: unknown): Q; lte(column: string, value: unknown): Q; eq(column: string, value: unknown): Q; is(column: string, value: null): Q },
+>(query: Q, filter: RecordSearchFilter, dateColumn: string): Q {
+  let q = query;
+  if (filter.from !== null) q = q.gte(dateColumn, filter.from);
+  if (filter.to !== null) q = q.lte(dateColumn, filter.to);
+  if (filter.category !== null) q = filter.category === NO_CATEGORY_LABEL ? q.is('category', null) : q.eq('category', filter.category);
+  if (filter.minCents !== null) q = q.gte('amount_cents', filter.minCents);
+  if (filter.maxCents !== null) q = q.lte('amount_cents', filter.maxCents);
+  return q;
+}
+
 /** Só {id, version}: um campo a mais faria a conferência de conjunto do banco recusar a escrita. */
 const affectedJson = (list: readonly AffectedRef[]) => list.map((a) => ({ id: a.id, version: a.version }));
 
@@ -1310,6 +1348,37 @@ export class SupabaseRepository implements RecordsRepository {
       if (data.length < PAGE) break;
     }
     return rows.map(toRecord);
+  }
+
+  /**
+   * Buscar em Movimentações (D-045): período, tipo, categoria, conta e valor no servidor, do mais recente ao mais antigo, até 1.000
+   * linhas. O texto da descrição é filtrado no aparelho (sem diferenciar acentos). Só leitura, na mesma tabela que listRecords.
+   */
+  async searchRecords(contextId: string, filter: RecordSearchFilter): Promise<SearchPage<FinancialRecord>> {
+    const page = await readUpTo<RecordRow>(SEARCH_LIMIT, (from, to) => {
+      let q = searchFilters(this.db.from('financial_records').select('*').eq('context_id', contextId), filter, 'occurred_on');
+      if (filter.kind !== null) q = q.eq('kind', filter.kind);
+      if (filter.accountId !== null) q = q.eq('account_id', filter.accountId);
+      return q
+        .order('occurred_on', { ascending: false })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to);
+    });
+    return { items: page.items.map(toRecord), truncated: page.truncated };
+  }
+
+  /** Compras no cartão (uma linha por compra, valor total) pela data da compra; sem recebimento nem conta de origem no filtro. */
+  async searchCardPurchases(contextId: string, filter: RecordSearchFilter): Promise<SearchPage<CardEntry>> {
+    if (filter.kind === 'receita' || filter.accountId !== null) return { items: [], truncated: false };
+    const page = await readUpTo<CardEntryRow>(SEARCH_LIMIT, (from, to) =>
+      searchFilters(this.db.from('card_entry_items').select('*').eq('context_id', contextId).eq('kind', 'compra'), filter, 'purchased_on')
+        .order('purchased_on', { ascending: false })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to),
+    );
+    return { items: page.items.map(toCardEntry), truncated: page.truncated };
   }
 
   async getRecord(id: string) {

@@ -63,6 +63,8 @@ describe('barra inferior (D-039)', () => {
       '/renda-comprometida',
       // Orçamento por categoria (D-041): a lista é de consulta; o formulário de uma categoria, não.
       '/orcamento',
+      // Buscar em Movimentações (D-045): tela de consulta, com a barra.
+      '/movimentacoes/buscar',
       '/meta/abc',
       '/simular',
       '/cartoes',
@@ -144,6 +146,7 @@ describe('barra inferior (D-039)', () => {
     expect(topicTabFor('/a-pagar')).toBe('/movimentacoes');
     expect(topicTabFor('/cartoes/abc')).toBe('/movimentacoes');
     expect(topicTabFor('/orcamento')).toBe('/movimentacoes');
+    expect(topicTabFor('/movimentacoes/buscar')).toBe('/movimentacoes');
     expect(topicTabFor('/meta/abc')).toBe('/metas');
     expect(topicTabFor('/simular')).toBe('/metas');
     expect(topicTabFor('/explicacao/juros')).toBe('/aprender');
@@ -230,6 +233,13 @@ describe('busca de Aprender: grupo "No app" (D-039)', () => {
     expect(first('financiar')).toBe('antes-de-financiar');
     expect(first('poder de compra')).toBe('antes-de-financiar');
     expect(ids('consórcio')).not.toContain('antes-de-financiar');
+    // Buscar em Movimentações (D-045): as palavras que a pessoa usa para achar um gasto antigo.
+    for (const query of ['buscar', 'procurar', 'pesquisar', 'achar um gasto', 'quanto paguei', 'quanto gastei', 'gasto antigo', 'luz']) expect(ids(query), query).toContain('buscar-movimentos');
+    expect(first('buscar')).toBe('buscar-movimentos');
+    expect(first('procurar')).toBe('buscar-movimentos');
+    expect(first('quanto paguei')).toBe('buscar-movimentos');
+    expect(first('quanto gastei')).toBe('buscar-movimentos');
+    expect(first('quanto paguei de luz')).toBe('buscar-movimentos');
     expect(first('renda comprometida')).toBe('renda-comprometida');
     expect(ids('guardar')).toContain('metas');
   });

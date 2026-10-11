@@ -1,6 +1,6 @@
 # Arquitetura
 
-10/10/2026 · versão 0.13 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos, calculadoras, seus últimos meses, Aprender e dúvidas, lembretes, ocultar valores e biometria, renda comprometida, metas e reserva, plano de guardar, simulador, cartões e faturas, leitura de notas fiscais, plano para quitar dívidas, "Antes de financiar" (D-044) os ajustes de D-042: forma de pagamento da nota, faturas do mês nos cartões e contas do ano explicadas, e as contas de origem do dinheiro, D-043)
+10/10/2026 · versão 0.13 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos, calculadoras, seus últimos meses, Aprender e dúvidas, lembretes, ocultar valores e biometria, renda comprometida, metas e reserva, plano de guardar, simulador, cartões e faturas, leitura de notas fiscais, plano para quitar dívidas, "Antes de financiar" (D-044) os ajustes de D-042: forma de pagamento da nota, faturas do mês nos cartões e contas do ano explicadas, as contas de origem do dinheiro, D-043, e a busca em Movimentações, D-045)
 
 ## Escolhas (aprovadas)
 
@@ -26,6 +26,7 @@ apps/app/src/
     gastos-fixos, gastos-fixos/novo, gastos-fixos/[id], gastos-fixos/[id]/editar, gastos-fixos/[id]/encerrar,
     gastos-fixos/[id]/informar
     composicao, quem-ve, conta, explicacao/[tema]
+    movimentacoes/buscar  buscar em Movimentações (D-045): consulta, com a barra; nada é gravado
     contas/nova, contas/[id]/editar  contas de origem do dinheiro (D-043); a lista é o card "Suas contas" em /conta?secao=contas
     calcular, calcular/[slug]  calculadoras (nada é gravado); /calcular/plano-dividas é a 9ª (D-040) e /calcular/antes-de-financiar, a 10ª e a primeira da lista (D-044)
     retomar, retomar/atualizar, retomar/pagar  seus últimos meses (revisão depois de ausência)
@@ -67,6 +68,7 @@ packages/core/          regras financeiras, validação, repositório em memóri
   src/annual-help.ts   textos e exemplos calculados que explicam as contas do ano (D-042)
   src/accounts.ts      contas de origem do dinheiro (D-043): tipos, validação do formulário, escolha da conta que vem marcada, filtro por conta, conta da nota fiscal e textos
   src/calculators/      as 10 calculadoras, campos, textos e links de contexto; plano-dividas.ts (D-040): conta mês a mês das duas ordens de quitar dívidas e a leitura dos parcelamentos (`seriesDebtDrafts`); antes-de-financiar.ts (D-044): parcela Price (com a primeira em 1 mês ou na compra), juros, peso na renda, juntar antes (sobre `monthsForTarget` de `simulate.ts`) e entrada maior
+  src/search.ts         buscar em Movimentações (D-045): texto sem acento, período, filtro do servidor e a mesma regra no MemoryRepository, resumo e média por mês com gasto, agrupamento por mês, rascunho e textos
   src/navigation.ts     navegação (D-039): modo da barra inferior por endereço, mês de abertura e seletor de Contas a pagar, linha de lembretes e o índice "No app" da busca de Aprender
 supabase/
   migrations/           esquema, funções e permissões (0001 fundação, 0002 contas a pagar, 0003 gastos fixos, 0004 contas do ano, 0005 seus últimos meses,
@@ -202,6 +204,12 @@ pessoa ──< vínculo (permissões por ação) >── contexto (pessoal | fam
 - **Onde a conta entra:** `financial_records.account_id` e as funções de pagamento (`pay_commitment`, `pay_invoice`) já existiam e agora recusam conta arquivada ou de outro contexto (`conta_invalida`); `create_record` e `update_record` também (a edição pode manter a conta que o registro já tem, mesmo arquivada: `clarevo_validate_record` ganhou o parâmetro `p_keep_account`, e `update_record` foi recriada). `goal_movements.account_id` é opcional, com chave composta `(account_id, context_id)` e restrição que só a aceita em aporte e resgate; `add_goal_movement` e `update_goal_movement` ganharam `p_account_id` (as assinaturas antigas foram trocadas; sem conta, o hash do pedido é o de antes; em `update_goal_movement` o padrão é manter a conta, o `null` informado a tira). `pay_commitment` (conta nula = principal), `pay_invoice` (sem conta, a principal) e `ensure_personal_space` (devolve a principal) foram recriadas, e `clarevo_validate_record` virou volátil e trava a conta com `for share`, como `add_goal_movement`, `update_goal_movement` e `pay_invoice`, para uma exclusão ou arquivamento simultâneo esperar e recusar.
 - **Leitura e operações:** sem visão nova. `getSpace` lê as contas ativas (a principal primeiro) e `listAccounts`, todas as não excluídas. `record_operations` passou a 46 ações (as cinco novas, `criar_conta`, `alterar_conta`, `conta_principal`, `situacao_conta` e `excluir_conta`, apontam a conta em `target_id`) e conta tudo como anotação para a atividade do A4.
 - **No core e no app:** `accounts.ts` (tipos, limites, `validateAccountDraft`, `chooseAccountId`, `selectedAccount`, `accountsForPicker`, `accountForPaymentForms`, `pickerShowsChips`, `recordAccountName`, `accountFilterOptions` e todos os textos, em `ACCOUNTS_TEXT`); o `MemoryRepository` repete as cinco funções, a validação das contas nos registros, nos pagamentos e nos movimentos e a ordem das conferências; o `SupabaseRepository` tem `listAccounts`, `createAccount`, `updateAccount`, `setDefaultAccount`, `setAccountStatus`, `deleteAccount` e `findAccountOperation` (a conferência de uma gravação sem resposta). `PersonalSpace.accounts` traz só as ativas. Nas telas, `AccountPicker` é o seletor de todos os formulários (com uma conta só, vira o texto "Saiu de: Conta principal"), `useLastAccount` guarda no aparelho a última conta usada (só vale se ainda estiver ativa) e as gravações das contas usam uma chave de idempotência por formulário, como as demais.
+
+**Buscar em Movimentações** (D-045) não muda o banco: é leitura pura, com a RLS de sempre, e não grava nem registra buscas.
+
+- **Repositório:** `searchRecords(contextId, filtro)` (registros de `financial_records`) e `searchCardPurchases(contextId, filtro)` (compras de `card_entry_items`, uma linha por compra) filtram por período, tipo, categoria, conta e valor no servidor, do mais recente ao mais antigo (data, criação, id), em páginas de 500 e **até 1.000 linhas** (pede-se a 1.001ª para saber se havia mais: `truncated`). O texto não vai ao servidor. O `MemoryRepository` usa a mesma regra do core (`recordMatchesFilter`, `purchaseMatchesFilter`); o teste de API confere a regra contra o banco real.
+- **Core e app:** `search.ts` (normalização NFD sem marcas, `searchRange`, `searchFilterOf`, `searchResultRecords`, `summarizeSearch`, `groupByMonth`, `searchFromDraft` e `SEARCH_TEXT`), `useRecordSearch` em `state/data.ts` (a chave leva o filtro do servidor, nunca o texto, e começa por `records` e `cards`, então toda escrita recarrega a busca aberta), `components/search-parts.tsx` (o campo-botão "Buscar" e a linha da compra no cartão) e a tela `movimentacoes/buscar.tsx`, de consulta (`barModeFor`) e do assunto Movimentos (`topicTabFor`).
+- Uma função de leitura no banco seria melhor para muitos anos de registros; fica como evolução possível (D-045(5)).
 
 **Leitura de notas fiscais** (D-038) roda no aparelho e grava só o resumo SHA-256 da chave de acesso, no mesmo campo `receipt_key` da migração 0008.
 

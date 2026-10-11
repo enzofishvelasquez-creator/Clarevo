@@ -9,6 +9,7 @@ import {
   essentialMonthly,
   goalPlan,
   isRepoError,
+  includesCardPurchases,
   isSavingsStepDone,
   lastIncomeReferenceChangeAt,
   limitCrossing,
@@ -28,6 +29,7 @@ import {
   returnWindow,
   savedInMonth,
   savingsCardState,
+  searchFilterOf,
   suggestReference,
   summarizeBudget,
   summarizeCard,
@@ -93,6 +95,7 @@ import {
   type SavingsAnswer,
   type SavingsCardState,
   type SavingsCheck,
+  type SearchParams,
   type SeriesAction,
   type SeriesDebtDraft,
   type SeriesEditInput,
@@ -131,6 +134,31 @@ export function useMonthRecords(contextId: string | undefined, month: IsoMonth) 
   });
   const summary = query.data && contextId ? summarizeMonth(query.data, contextId, month) : null;
   return { ...query, summary };
+}
+
+/**
+ * Buscar em Movimentações (D-045). Dois pedidos só de leitura: os registros (gastos, recebimentos e pagamentos de conta e de
+ * fatura) e, quando a busca olha o cartão, as compras no cartão, cada um com até 1.000 linhas. A chave leva o filtro do servidor
+ * (período, tipo, categoria, conta e valor) e nunca o texto buscado, que é filtrado no aparelho e fica só na memória da tela.
+ * `params` nulo (valor digitado inválido) não consulta. As chaves começam por 'records' e 'cards', então toda escrita de
+ * registro, de pagamento ou de cartão recarrega a busca aberta.
+ */
+export function useRecordSearch(contextId: string | undefined, params: SearchParams | null) {
+  const repo = useRepo();
+  const { today } = useSession();
+  const filter = params ? searchFilterOf(params, today) : null;
+  const withCards = params !== null && includesCardPurchases(params);
+  const records = useQuery({
+    queryKey: ['records', 'search', contextId, filter],
+    queryFn: () => repo.searchRecords(contextId!, filter!),
+    enabled: Boolean(contextId) && filter !== null,
+  });
+  const purchases = useQuery({
+    queryKey: ['cards', 'search', contextId, filter],
+    queryFn: () => repo.searchCardPurchases(contextId!, filter!),
+    enabled: Boolean(contextId) && filter !== null && withCards,
+  });
+  return { records, purchases, withCards };
 }
 
 /** Resultado da sincronização do dia: contas de gastos fixos criadas e, entre elas, as já vencidas. */

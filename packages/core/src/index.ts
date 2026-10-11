@@ -30,3 +30,4 @@ export * from './nota-flow';
 export * from './navigation';
 export * from './budget';
 export * from './accounts';
+export * from './search';

@@ -41,6 +41,7 @@ import type {
   SeriesEditInput,
   SeriesInput,
 } from './records';
+import type { RecordSearchFilter, SearchPage } from './search';
 
 /**
  * Ações de conta a pagar gravadas em record_operations (mesmo espaço de chaves dos registros). 'criar_ocorrencia':
@@ -224,6 +225,22 @@ export interface RecordsRepository {
 
   listRecords(contextId: string, month: IsoMonth): Promise<FinancialRecord[]>;
   getRecord(id: string): Promise<FinancialRecord | null>;
+
+  // Buscar em Movimentações (D-045, Ciclo H1). Só leitura (a mesma que a RLS já permite): nada é gravado e o app não registra buscas.
+  // O texto da descrição não vai ao servidor: é filtrado no aparelho (search.ts), sem diferenciar maiúsculas nem acentos.
+
+  /**
+   * Registros vivos do contexto (gastos, recebimentos, pagamentos de conta e de fatura) que passam pelo filtro (período, tipo,
+   * categoria, conta e valor; regra em `recordMatchesFilter`), do mais recente ao mais antigo (data, criação, id), até
+   * `SEARCH_LIMIT` (1.000); `truncated` diz que havia mais. Sem leitura no contexto: nenhum item.
+   */
+  searchRecords(contextId: string, filter: RecordSearchFilter): Promise<SearchPage<FinancialRecord>>;
+  /**
+   * Compras no cartão vivas do contexto (uma por compra, com o valor total e as parcelas) que passam pelo filtro (data da compra,
+   * categoria e valor total; regra em `purchaseMatchesFilter`), da mais recente à mais antiga, até `SEARCH_LIMIT`. Só compras: não
+   * são gastos e nunca entram em Pago. Com recebimento ou conta de origem no filtro, nenhuma compra combina.
+   */
+  searchCardPurchases(contextId: string, filter: RecordSearchFilter): Promise<SearchPage<CardEntry>>;
 
   createRecord(key: string, contextId: string, kind: RecordKind, input: RecordInput): Promise<FinancialRecord>;
   /** Num gasto de conta a pagar, também soma 1 à versão da conta (o previsto não muda). */

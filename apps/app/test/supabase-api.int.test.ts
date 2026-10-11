@@ -8,7 +8,10 @@ import { createHmac, randomUUID } from 'node:crypto';
 
 import {
   BUDGET_CATEGORIES,
+  DEFAULT_SEARCH,
+  NO_CATEGORY_LABEL,
   RepoError,
+  SEARCH_LIMIT,
   addMonths,
   affectedByDelete,
   affectedByEditFrom,
@@ -22,6 +25,8 @@ import {
   cardErrorText,
   cardLimitUsed,
   categoryBreakdown,
+  compareNewestPurchase,
+  compareNewestRecord,
   committedGoalLines,
   coverageTenths,
   emergencyTarget,
@@ -64,8 +69,10 @@ import {
   plannedForGoals,
   projectCommitted,
   purchaseFirstInvoiceMonth,
+  purchaseMatchesFilter,
   readMonthBudget,
   readReceiptCode,
+  recordMatchesFilter,
   returnBannerText,
   returnWindow,
   reviewDecision,
@@ -76,6 +83,9 @@ import {
   savingsCardState,
   savingsPlan,
   savingsReserveInput,
+  searchFilterOf,
+  searchResultPurchases,
+  searchResultRecords,
   seriesGapsInRange,
   seriesInputError,
   seriesPreview,
@@ -85,6 +95,8 @@ import {
   summarizeBudget,
   summarizeCommitted,
   summarizeMonth,
+  summarizePurchases,
+  summarizeSearch,
   summarizeToPay,
   updateSavedValue,
   upcomingCommittedMonths,
@@ -119,12 +131,14 @@ import {
   type PaymentInput,
   type PlannedOccurrence,
   type RecordInput,
+  type RecordSearchFilter,
   type RecordKind,
   type ReturnDecision,
   type ReturnReview,
   type ReviewRow,
   type SavingsAnswer,
   type SavingsCheck,
+  type SearchParams,
   type SeriesEditInput,
   type SeriesInput,
   type SeriesKind,
@@ -5681,5 +5695,333 @@ describe('conversor das contas de origem', () => {
     } finally {
       for (const spy of spies) spy.mockRestore();
     }
+  });
+});
+
+describe('API real: buscar em Movimentações (Ciclo H1, D-045)', () => {
+  // Ana, em 07/10/2037, num período em que nenhum bloco anterior gravou nada. Bruno é a pessoa de fora. Gastos, contas, cartão e
+  // pessoas FICTÍCIOS. A busca só lê: o teste confere que nenhuma requisição de escrita sai nas buscas.
+  const T0 = '2037-10-07';
+  const YEAR: RecordSearchFilter = { from: '2037-01-01', to: '2037-12-31', kind: null, category: null, accountId: null, minCents: null, maxCents: null };
+  const methods: string[] = [];
+  const spy: typeof fetch = async (input, init) => {
+    methods.push((init?.method ?? 'GET').toUpperCase());
+    return fetch(input, init);
+  };
+  const ana = repoFor(ANA, T0);
+  const bruno = repoFor(BRUNO, T0);
+  const reader = new SupabaseRepository(clientFor(ANA, T0, spy), { id: ANA });
+  let ctx = '';
+  let principal = '';
+  let wallet = '';
+  let card: Card;
+
+  const params = (over: Partial<SearchParams> = {}): SearchParams => ({ ...DEFAULT_SEARCH, ...over });
+  const record = (kind: RecordKind, description: string, reais: number, occurredOn: IsoDate, category: string | null, accountId = principal) =>
+    ana.createRecord(newOperationKey(), ctx, kind, { accountId, amountCents: cents(reais), occurredOn, description, category });
+  const allOf2037 = async () => {
+    const rows: FinancialRecord[] = [];
+    for (let m = 1; m <= 12; m++) rows.push(...(await ana.listRecords(ctx, `2037-${String(m).padStart(2, '0')}`)));
+    return rows;
+  };
+  const line = (r: FinancialRecord) => `${r.occurredOn} ${r.description} ${r.amountCents}`;
+
+  beforeAll(async () => {
+    const space = (await ana.getSpace())!;
+    ctx = space.personalContextId;
+    principal = space.accounts[0]!.id;
+    wallet = (await ana.createAccount(newOperationKey(), ctx, { name: 'Carteira da busca', kind: 'dinheiro' })).id;
+    await record('despesa', 'Conta de luz', 140, '2037-08-10', 'Moradia');
+    await record('despesa', 'Conta de LUZ', 150, '2037-09-10', 'Moradia');
+    await record('despesa', 'Luz da casa (Enel)', 170.5, '2037-10-05', 'Moradia');
+    await record('despesa', 'Farmácia', 45.9, '2037-09-12', 'Saúde');
+    await record('despesa', 'Café', 8, '2037-10-02', null);
+    await record('despesa', 'Padaria', 12, '2037-10-03', 'Mercado', wallet);
+    await record('receita', 'Salário', 6000, '2037-10-01', 'Salário');
+    await record('receita', 'Freela de luz', 300, '2037-09-20', 'Renda extra');
+    // Uma conta a pagar paga: o gasto do pagamento entra na busca.
+    const bill = (await ana.createCommitment(newOperationKey(), ctx, { description: 'Internet da busca', amountCents: cents(99), dueOn: '2037-10-04', category: 'Moradia' })).commitment;
+    await ana.payCommitment(newOperationKey(), bill.id, bill.version, { accountId: principal, amountCents: cents(99), paidOn: '2037-10-04', category: 'Moradia' });
+    // Um cartão com duas compras; a fatura de outubro (fechada em 03/10) é paga em 06/10.
+    card = (await ana.createCard(newOperationKey(), ctx, { name: 'Cartão da busca', lastDigits: null, closingDay: 3, dueDay: 10, limitCents: null })).card;
+    await ana.addCardPurchase(newOperationKey(), card.id, { description: 'Tênis de corrida', category: 'Lazer', purchasedOn: '2037-09-20', totalCents: 60000, installments: 3 });
+    await ana.addCardPurchase(newOperationKey(), card.id, { description: 'Livro de luz', category: 'Educação', purchasedOn: '2037-08-02', totalCents: 5000, installments: 1 });
+    const october = (await ana.listInvoiceItems(card.id)).find((i) => i.month === '2037-10')!;
+    await ana.payInvoice(newOperationKey(), card.id, '2037-10', october.commitmentVersion!, october.totalCents, '2037-10-06', principal);
+  });
+
+  it('a busca do banco é a regra do core: cada filtro devolve o mesmo que recordMatchesFilter sobre os registros do ano, na mesma ordem', async () => {
+    const universe = await allOf2037();
+    expect(universe.length).toBe(10);
+    const filters: RecordSearchFilter[] = [
+      YEAR,
+      { ...YEAR, kind: 'despesa' },
+      { ...YEAR, kind: 'receita' },
+      { ...YEAR, category: 'Moradia' },
+      { ...YEAR, category: NO_CATEGORY_LABEL },
+      { ...YEAR, accountId: wallet },
+      { ...YEAR, accountId: principal, kind: 'despesa' },
+      { ...YEAR, minCents: cents(100), maxCents: cents(200) },
+      { ...YEAR, minCents: cents(170.5), maxCents: cents(170.5) },
+      { ...YEAR, from: '2037-09-10', to: '2037-10-02' },
+      { ...YEAR, from: '2037-10-05', to: null },
+      { ...YEAR, to: '2037-08-10' },
+      { ...YEAR, kind: 'despesa', category: 'Saúde', minCents: 1, maxCents: cents(50) },
+    ];
+    for (const filter of filters) {
+      const page = await reader.searchRecords(ctx, filter);
+      const expected = universe.filter((r) => recordMatchesFilter(r, filter)).sort(compareNewestRecord);
+      expect(page.items.map(line), JSON.stringify(filter)).toEqual(expected.map(line));
+      expect(page.truncated).toBe(false);
+    }
+    // Datas incluem os dois limites; o filtro com valor exato acha o gasto de R$ 170,50.
+    expect((await reader.searchRecords(ctx, { ...YEAR, minCents: cents(170.5), maxCents: cents(170.5) })).items.map((r) => r.description)).toEqual(['Luz da casa (Enel)']);
+    expect((await reader.searchRecords(ctx, { ...YEAR, from: '2037-10-05', to: '2037-10-05' })).items.map((r) => r.description)).toEqual(['Luz da casa (Enel)']);
+  });
+
+  it('"quanto paguei de luz?": o texto é filtrado no aparelho, sem acento nem maiúsculas, e a soma sai do core', async () => {
+    const page = await reader.searchRecords(ctx, searchFilterOf(params({ kind: 'despesa', period: 'ano' }), T0));
+    const luz = searchResultRecords(page.items, params({ text: 'LUZ', kind: 'despesa', period: 'ano' }), T0);
+    expect(luz.map(line)).toEqual(['2037-10-05 Luz da casa (Enel) 17050', '2037-09-10 Conta de LUZ 15000', '2037-08-10 Conta de luz 14000']);
+    const s = summarizeSearch(luz);
+    expect(s.paid).toEqual({ count: 3, cents: 46050, months: 3 });
+    expect(s.averagePaidCents).toBe(15350);
+    // Farmácia com acento achada sem acento.
+    expect(searchResultRecords(page.items, params({ text: 'farmacia', kind: 'despesa', period: 'ano' }), T0).map((r) => r.description)).toEqual(['Farmácia']);
+    // O recebimento "Freela de luz" não entra na busca de gastos.
+    expect(luz.some((r) => r.kind === 'receita')).toBe(false);
+  });
+
+  it('pagamento de conta e de fatura aparecem como gastos; a fatura é um gasto só, sem abrir as compras', async () => {
+    const page = await reader.searchRecords(ctx, { ...YEAR, kind: 'despesa' });
+    const bill = page.items.find((r) => r.description === 'Internet da busca')!;
+    expect(bill.commitmentId).not.toBeNull();
+    const invoice = page.items.filter((r) => r.invoice !== null);
+    expect(invoice).toHaveLength(1);
+    expect(invoice[0]!.invoice).toEqual({ cardId: card.id, month: '2037-10' });
+    expect(invoice[0]!.description).toBe('Fatura Cartão da busca (outubro)');
+    expect(invoice[0]!.amountCents).toBe(20000);
+    expect(page.items.some((r) => /tênis|livro/i.test(r.description))).toBe(false);
+  });
+
+  it('compras no cartão: uma linha por compra, valor total, parcelas e data da compra; fora dos gastos', async () => {
+    const page = await reader.searchCardPurchases(ctx, YEAR);
+    expect(page.truncated).toBe(false);
+    expect(page.items.map((e) => [e.purchasedOn, e.description, e.amountCents, e.installments])).toEqual([
+      ['2037-09-20', 'Tênis de corrida', 60000, 3],
+      ['2037-08-02', 'Livro de luz', 5000, 1],
+    ]);
+    const expected = page.items.filter((e) => purchaseMatchesFilter(e, YEAR)).sort(compareNewestPurchase);
+    expect(page.items.map((e) => e.id)).toEqual(expected.map((e) => e.id));
+    expect(summarizePurchases(page.items)).toEqual({ count: 2, totalCents: 65000 });
+    // Categoria, valor total e texto.
+    expect((await reader.searchCardPurchases(ctx, { ...YEAR, category: 'Lazer' })).items.map((e) => e.description)).toEqual(['Tênis de corrida']);
+    expect((await reader.searchCardPurchases(ctx, { ...YEAR, minCents: 50000 })).items.map((e) => e.description)).toEqual(['Tênis de corrida']);
+    expect((await reader.searchCardPurchases(ctx, { ...YEAR, from: '2037-09-01' })).items.map((e) => e.description)).toEqual(['Tênis de corrida']);
+    expect(searchResultPurchases(page.items, params({ text: 'LUZ', period: 'tudo' }), T0).map((e) => e.description)).toEqual(['Livro de luz']);
+    // A soma de Pago do mês é a de sempre: a compra no cartão não entra.
+    const october = summarizeMonth(await ana.listRecords(ctx, '2037-10'), ctx, '2037-10');
+    expect(october.composition.paid.map((r) => r.description)).not.toContain('Tênis de corrida');
+  });
+
+  it('recebimento ou conta de origem no filtro: nenhuma compra no cartão (e nem pergunta ao banco)', async () => {
+    const before = methods.length;
+    expect(await reader.searchCardPurchases(ctx, { ...YEAR, kind: 'receita' })).toEqual({ items: [], truncated: false });
+    expect(await reader.searchCardPurchases(ctx, { ...YEAR, accountId: principal })).toEqual({ items: [], truncated: false });
+    expect(methods.length).toBe(before);
+  });
+
+  it('só lê: nenhuma escrita sai nas buscas, e o app não deixa rastro no banco', async () => {
+    const operations = async () => (await clientFor(ANA, T0).from('record_operations').select('idempotency_key', { count: 'exact', head: true })).count;
+    const operationsBefore = await operations();
+    expect(operationsBefore).toBeGreaterThan(0);
+    const before = methods.length;
+    await reader.searchRecords(ctx, YEAR);
+    await reader.searchCardPurchases(ctx, YEAR);
+    const after = methods.slice(before);
+    expect(after.length).toBeGreaterThan(1);
+    expect(after.every((m) => m === 'GET')).toBe(true);
+    expect(await operations()).toBe(operationsBefore);
+  });
+
+  it('a pessoa de fora não lê nada deste contexto', async () => {
+    expect(await bruno.searchRecords(ctx, YEAR)).toEqual({ items: [], truncated: false });
+    expect(await bruno.searchCardPurchases(ctx, YEAR)).toEqual({ items: [], truncated: false });
+  });
+
+  it('registro excluído sai da busca', async () => {
+    const gone = await record('despesa', 'Registro que será excluído', 5, '2037-10-06', null);
+    expect((await reader.searchRecords(ctx, { ...YEAR, from: '2037-10-06', to: '2037-10-06' })).items.map((r) => r.id)).toContain(gone.id);
+    await ana.deleteRecord(newOperationKey(), gone.id, gone.version);
+    expect((await reader.searchRecords(ctx, { ...YEAR, from: '2037-10-06', to: '2037-10-06' })).items.map((r) => r.id)).not.toContain(gone.id);
+  });
+});
+
+describe('conversor da busca em Movimentações', () => {
+  // Sem rede: os filtros que chegam ao PostgREST, as páginas de 500 até o limite de 1.000 e o aviso de que havia mais.
+  const filter: RecordSearchFilter = { from: '2026-01-01', to: '2026-12-31', kind: 'despesa', category: 'Moradia', accountId: 'a1', minCents: 100, maxCents: 90000 };
+  const none: RecordSearchFilter = { from: null, to: null, kind: null, category: null, accountId: null, minCents: null, maxCents: null };
+  const recordRow = (i: number) => ({
+    id: `r${String(i).padStart(5, '0')}`,
+    context_id: 'ctx',
+    account_id: 'a1',
+    kind: 'despesa',
+    status: 'realizado',
+    amount_cents: 1000,
+    currency: 'BRL',
+    occurred_on: '2026-10-05',
+    description: 'Luz',
+    category: null,
+    commitment_id: null,
+    card_id: null,
+    invoice_month: null,
+    receipt_key: null,
+    created_by: 'p1',
+    version: 1,
+    created_at: '2026-10-05T10:00:00.000Z',
+    updated_at: '2026-10-05T10:00:00.000Z',
+  });
+  const purchaseRow = (i: number) => ({
+    id: `e${String(i).padStart(5, '0')}`,
+    context_id: 'ctx',
+    card_id: 'k1',
+    kind: 'compra',
+    description: 'Tênis',
+    category: 'Lazer',
+    charge_kind: null,
+    purchased_on: '2026-10-05',
+    amount_cents: 60000,
+    installments: 3,
+    invoice_month: '2026-11-01',
+    source_month: null,
+    payment_record_id: null,
+    receipt_key: null,
+    created_by: 'p1',
+    version: 1,
+    created_at: '2026-10-05T10:00:00.000Z',
+    updated_at: '2026-10-05T10:00:00.000Z',
+  });
+  /** Banco de mentira: guarda a ordem das chamadas de filtro, de ordenação e de página, e devolve `total` linhas. */
+  const fakeDb = (total: number, makeRow: (i: number) => unknown) => {
+    const log: unknown[][] = [];
+    const ranges: [number, number][] = [];
+    const tables: string[] = [];
+    const db = {
+      from: (table: string) => {
+        tables.push(table);
+        const q: Record<string, unknown> = {};
+        for (const m of ['select', 'eq', 'is', 'gte', 'lte', 'order']) q[m] = (...args: unknown[]) => (log.push([m, ...args]), q);
+        q.range = (from: number, to: number) => {
+          ranges.push([from, to]);
+          const page = { data: Array.from({ length: Math.max(0, Math.min(total, to + 1) - from) }, (_, k) => makeRow(from + k)), error: null };
+          return { then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) => Promise.resolve(page).then(resolve, reject) };
+        };
+        return q;
+      },
+    };
+    return { repo: new SupabaseRepository(db as unknown as SupabaseClient, { id: 'p1' }), log, ranges, tables };
+  };
+
+  it('registros: todos os filtros vão ao banco, do mais recente ao mais antigo, e o texto não vai', async () => {
+    const { repo, log, tables } = fakeDb(3, recordRow);
+    const page = await repo.searchRecords('ctx', filter);
+    expect(page.items).toHaveLength(3);
+    expect(tables).toEqual(['financial_records']);
+    expect(log).toEqual([
+      ['select', '*'],
+      ['eq', 'context_id', 'ctx'],
+      ['gte', 'occurred_on', '2026-01-01'],
+      ['lte', 'occurred_on', '2026-12-31'],
+      ['eq', 'category', 'Moradia'],
+      ['gte', 'amount_cents', 100],
+      ['lte', 'amount_cents', 90000],
+      ['eq', 'kind', 'despesa'],
+      ['eq', 'account_id', 'a1'],
+      ['order', 'occurred_on', { ascending: false }],
+      ['order', 'created_at', { ascending: false }],
+      ['order', 'id', { ascending: false }],
+    ]);
+  });
+
+  it('sem filtro só vai o contexto; "Sem categoria" pede a coluna nula', async () => {
+    const a = fakeDb(1, recordRow);
+    await a.repo.searchRecords('ctx', none);
+    expect(a.log.filter(([m]) => m !== 'order')).toEqual([['select', '*'], ['eq', 'context_id', 'ctx']]);
+    const b = fakeDb(1, recordRow);
+    await b.repo.searchRecords('ctx', { ...none, category: NO_CATEGORY_LABEL });
+    expect(b.log).toContainEqual(['is', 'category', null]);
+    expect(b.log.some(([m, c]) => m === 'eq' && c === 'category')).toBe(false);
+  });
+
+  it('o limite de 1.000: páginas de 500, uma linha a mais para saber se havia mais', async () => {
+    const big = fakeDb(1203, recordRow);
+    const page = await big.repo.searchRecords('ctx', none);
+    expect(big.ranges).toEqual([[0, 499], [500, 999], [1000, 1000]]);
+    expect(page.items).toHaveLength(SEARCH_LIMIT);
+    expect(page.truncated).toBe(true);
+    expect(page.items[0]!.id).toBe('r00000');
+    expect(page.items[SEARCH_LIMIT - 1]!.id).toBe('r00999');
+
+    // Exatamente 1.000: sem aviso.
+    const exact = fakeDb(1000, recordRow);
+    const full = await exact.repo.searchRecords('ctx', none);
+    expect(full.items).toHaveLength(1000);
+    expect(full.truncated).toBe(false);
+    expect(exact.ranges).toEqual([[0, 499], [500, 999], [1000, 1000]]);
+
+    // Uma página parcial acaba na primeira chamada.
+    const small = fakeDb(300, recordRow);
+    expect((await small.repo.searchRecords('ctx', none)).truncated).toBe(false);
+    expect(small.ranges).toEqual([[0, 499]]);
+    const empty = fakeDb(0, recordRow);
+    expect(await empty.repo.searchRecords('ctx', none)).toEqual({ items: [], truncated: false });
+  });
+
+  it('compras: só kind compra, pela data da compra; recebimento e conta de origem nem consultam', async () => {
+    const { repo, log, tables } = fakeDb(2, purchaseRow);
+    const page = await repo.searchCardPurchases('ctx', { ...filter, accountId: null });
+    expect(tables).toEqual(['card_entry_items']);
+    expect(page.items.map((e) => [e.purchasedOn, e.amountCents, e.installments, e.invoiceMonth])).toEqual([
+      ['2026-10-05', 60000, 3, '2026-11'],
+      ['2026-10-05', 60000, 3, '2026-11'],
+    ]);
+    expect(log).toEqual([
+      ['select', '*'],
+      ['eq', 'context_id', 'ctx'],
+      ['eq', 'kind', 'compra'],
+      ['gte', 'purchased_on', '2026-01-01'],
+      ['lte', 'purchased_on', '2026-12-31'],
+      ['eq', 'category', 'Moradia'],
+      ['gte', 'amount_cents', 100],
+      ['lte', 'amount_cents', 90000],
+      ['order', 'purchased_on', { ascending: false }],
+      ['order', 'created_at', { ascending: false }],
+      ['order', 'id', { ascending: false }],
+    ]);
+    const skipped = fakeDb(2, purchaseRow);
+    expect(await skipped.repo.searchCardPurchases('ctx', { ...none, kind: 'receita' })).toEqual({ items: [], truncated: false });
+    expect(await skipped.repo.searchCardPurchases('ctx', { ...none, accountId: 'a1' })).toEqual({ items: [], truncated: false });
+    expect(skipped.tables).toEqual([]);
+    const big = fakeDb(1100, purchaseRow);
+    const many = await big.repo.searchCardPurchases('ctx', none);
+    expect(many.items).toHaveLength(SEARCH_LIMIT);
+    expect(many.truncated).toBe(true);
+  });
+
+  it('linha incoerente é recusada, e um erro do banco vira o erro de sempre', async () => {
+    const bad = fakeDb(1, (i) => ({ ...recordRow(i), card_id: 'k1' }));
+    expect(await bad.repo.searchRecords('ctx', none).then(() => null, (e: unknown) => (e instanceof RepoError ? [e.code, e.message] : String(e)))).toEqual(['desconhecido', 'fatura_inconsistente']);
+    const badPurchase = fakeDb(1, (i) => ({ ...purchaseRow(i), installments: 0 }));
+    expect(await badPurchase.repo.searchCardPurchases('ctx', none).then(() => null, (e: unknown) => (e instanceof RepoError ? [e.code, e.message] : String(e)))).toEqual(['desconhecido', 'lancamento_inconsistente']);
+    const failing = {
+      from: () => {
+        const q: Record<string, unknown> = {};
+        for (const m of ['select', 'eq', 'is', 'gte', 'lte', 'order']) q[m] = () => q;
+        q.range = () => Promise.resolve({ data: null, error: { message: 'Failed to fetch' } });
+        return q;
+      },
+    };
+    const repo = new SupabaseRepository(failing as unknown as SupabaseClient, { id: 'p1' });
+    expect(await repo.searchRecords('ctx', none).then(() => null, (e: unknown) => (e instanceof RepoError ? e.code : String(e)))).toBe('rede');
   });
 });

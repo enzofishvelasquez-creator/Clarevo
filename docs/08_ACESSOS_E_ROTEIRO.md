@@ -456,7 +456,7 @@ Recalculei em Python todos os exemplos abaixo, e eles batem com a `spec3` §3.11
 
 ## 4. O que já existe, o que está desenhado e o que falta
 
-Situação em 10/10/2026, depois dos Ciclos A6 (D-035), A4 (D-030), A5 (D-031 e D-032), A2 (D-025), B (D-026), C (D-027 e D-036), D (D-028) E (D-037 e D-038) e G1 (D-043).
+Situação em 10/10/2026, depois dos Ciclos A6 (D-035), A4 (D-030), A5 (D-031 e D-032), A2 (D-025), B (D-026), C (D-027 e D-036), D (D-028) E (D-037 e D-038), G1 (D-043) e H1 (D-045).
 
 | Função | Situação | Onde fica ou ficaria |
 |---|---|---|
@@ -477,7 +477,8 @@ Situação em 10/10/2026, depois dos Ciclos A6 (D-035), A4 (D-030), A5 (D-031 e 
 | Calculadoras, "Somar valores", atalhos do ícone na web | Existe (A6, D-035): 8 calculadoras (a 9ª, "Em que ordem quitar as dívidas?", é do Ciclo F1, D-040, e a 10ª, "Antes de financiar", a primeira da lista, é de D-044), "Somar valores" em todos os campos Valor, 4 atalhos no manifesto e volta à tela pedida depois de entrar. Falta: teste em aparelho e link da CVM na reserva (`docs/04`) | `/calcular`; campos Valor; manifesto |
 | "Já paguei" na lista e "Por categoria" | Existe (A6, D-035(5) e (6)) | `/a-pagar`; composição |
 | Previsão dos pagamentos do mês | Existe (D-026(10)) | Topo de `/a-pagar`, só no mês atual |
-| Busca de registros, orçamento por categoria | Falta, sem ciclo (o orçamento está no "núcleo proposto" das Instruções v2.1) | Movimentos; Metas ou Movimentos |
+| Busca de registros (H1) | Existe (D-045): o campo "Buscar" no topo de Movimentos abre `/movimentacoes/buscar` (texto sem acento, tipo, período, categoria, conta e valor; resumo com a média por mês com gasto; compras no cartão à parte, fora da soma); também pelo grupo "No app" de Aprender. Falta: o teste em aparelho (`docs/04`) | Movimentos › "Buscar" |
+| Orçamento por categoria (F2) | Existe (D-041) | Movimentos › "Organizar"; `/orcamento` |
 | Ocultar valores e biometria | Existe (D-025). Falta: o teste em aparelho (`docs/04`) | Conta; olho no cabeçalho das abas quando couber |
 | Assinaturas, plano para sair das dívidas, revisão do mês, exportar dados, aviso de valor fora do habitual, "Parece um gasto fixo" | Falta (só sugestão em `spec2` §7) | Seção 5 |
 | Notas fiscais (E) | Existe (D-038): "Escanear nota fiscal" em Anotar gasto, com câmera (QR da NFC-e e código de barras da NF-e), PDF do DANFE e "Colar o link ou a chave"; no RJ, a página da Sefaz-RJ preenche loja, valor, data e forma de pagamento no celular, e a linha "Nota lida" mostra loja, valor, data e forma (D-042; "Como você pagou?" já vem escolhido, sem a forma, nenhuma escolha). Na web, a dica "No celular, o Clarevo lê o valor e a data na página da Sefaz." Só o resumo SHA-256 da chave é guardado, nunca CPF. Sem parecer jurídico (D-034(5)). Falta: o aceite com notas reais (P-025), o teste em aparelho, compartilhar o PDF de outro app e a cobertura de outros estados (`docs/04`) | Primeiro item de Anotar gasto novo |
@@ -526,6 +527,7 @@ Ordem pelo valor para a pessoa e para a empresa que oferece o benefício. Valor:
    - [E] Hoje não existe visão por categoria em nenhuma tela. Mobills e Organizze têm relatórios por categoria.
    - Depende de: nada para "Por categoria" (as categorias já estão nos registros); a busca pode pedir uma função de leitura no banco.
    - Riscos: as 6 categorias fixas limitam o detalhe; a busca em todos os meses pode pedir função nova no banco, com teste em `supabase/tests`.
+   - Situação: "Por categoria" feito (A6, D-035(6)). A busca em Movimentações, feita em 10/10/2026 (D-045), sem função nova no banco: o servidor filtra por período, tipo, categoria, conta e valor (até 1.000 linhas) e o texto é filtrado no aparelho, sem diferenciar acentos. Resumo com a soma e a média por mês com gasto; compras no cartão em grupo à parte, fora da soma. Falta o teste em aparelho; uma função de leitura no banco fica como evolução se houver muitos anos de registros.
 6. **Metas e reserva (C).**
    - Valor: pessoa A, empresa A. Esforço: L.
    - [E] 31% das pessoas não têm nenhuma reserva (Anbima, Raio X 2026).

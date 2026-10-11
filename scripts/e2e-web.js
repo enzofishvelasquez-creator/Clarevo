@@ -5,8 +5,8 @@
  * (Conta na web e ocultar valores), do Ciclo B (renda comprometida e a previsão dos pagamentos), do Ciclo C (metas, reserva
  * e plano de guardar), do Ciclo D (simulador, com os aportes no início de cada mês) e da Navegação (D-039: "Anotar gasto" logo
  * abaixo do cabeçalho, barra inferior nas telas de consulta, Contas a pagar no mês certo, Metas compacta e a busca "No app" de
- * Aprender), de "Antes de financiar" (D-044) e do Ciclo G1 (contas de origem do dinheiro, D-043) na versão web, em modo
- * demonstração (acesso simulado).
+ * Aprender), de "Antes de financiar" (D-044), do Ciclo G1 (contas de origem do dinheiro, D-043) e do Ciclo H1 (buscar em
+ * Movimentos, D-045) na versão web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -6715,6 +6715,304 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const g1Vetoed = g1Texts.map((x) => x.match(FORBIDDEN)?.[0]).filter(Boolean);
   ok('G1 telas das contas: nenhum termo proibido, travessão, "fazer sentido" nem nome de banco ou produto', g1Texts.length >= 12 && g1Vetoed.length === 0 && g1Texts.every((x) => !/[–—]/.test(x) && !/nubank|ita[uú]\b|bradesco|santander|caixa econ|picpay|\bxp\b|btg|poupan[cç]a|investiment/i.test(x)), `${g1Texts.length} telas ${g1Vetoed.join(' | ')}`);
   ok('G1 nenhuma escrita direta na rede: as contas gravam só pelas funções (nenhum PATCH, PUT ou DELETE de rede em contas)', !writes.slice(g1WritesBefore).some((w) => /financial_accounts/.test(w)));
+  await goResumo().catch(() => {});
+
+  // ==================================================================================================================
+  // Ciclo H1 · Buscar em Movimentos (D-045), docs/08 §5 item 5, segunda parte. O campo "Buscar" no topo de Movimentações abre
+  // /movimentacoes/buscar (consulta, com a barra); busca por texto (sem diferenciar maiúsculas e acentos), tipo, período, categoria,
+  // conta (D-043) e valor, em todos os meses. Resumo: "7 gastos · R$ 988,00 no período" e a média por mês com gasto. Compras no
+  // cartão ficam num grupo à parte e não somam em Pago. Valores ocultos respeitados. Nada é gravado nem registrado. Cada tela é
+  // conferida em 390 e em 320 px. Capturas novas: 260 em diante. Os dados extras (gastos de luz de maio a outubro, uma de março
+  // de 2024, Farmácia, Café, Padaria na Carteira, um recebimento e uma compra no cartão paga na fatura) vêm de "outro aparelho".
+  // ==================================================================================================================
+  const h1Texts = [];
+  const h1Keep = async () => { const x = await body(); h1Texts.push(x); screenTexts.push(x); return x; };
+  const h1Writes0 = writes.length;
+  const h1Group = (name) => p.getByRole('radiogroup', { name, exact: true }).filter({ visible: true });
+  const h1Pick = async (group, name) => { await h1Group(group).getByRole('radio', { name, exact: true }).click(); await p.waitForTimeout(600); };
+  const h1Checked = async (group, name) => (await h1Group(group).getByRole('radio', { name, exact: true }).getAttribute('aria-checked')) === 'true';
+  const h1Type = async (text) => { await field('O que você procura').fill(text); await p.waitForTimeout(600); };
+  const h1Labels = (re) => p.evaluate((src) => [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => (e.getAttribute('aria-label') || '').replace(/ /g, ' ')).filter((l) => new RegExp(src).test(l)), re.source);
+  const noMoney = (list) => list.map((l) => l.replace(/, R\$ [\d.,]+(\. Abre a fatura\.)?$/, '').replace(/, valor oculto(\. Abre a fatura\.)?$/, ''));
+  const h1Rows = async () => noMoney(await h1Labels(/, (Pago|Recebido) · \d{2}\/\d{2}\/\d{4}/));
+  const h1Purchases = async () => h1Labels(/, Compra · \d{2}\/\d{2}\/\d{4}/);
+  const h1Heads = async (level) => (await headingList()).filter((x) => x.startsWith(`${level}:`)).map((x) => x.slice(2));
+  const h1More = async () => { await p.getByRole('button', { name: /^Mais filtros/ }).filter({ visible: true }).first().click(); await waitText('Valor até'); await p.waitForTimeout(300); };
+  const h1Open = async () => {
+    await goResumo(); await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(400);
+    await p.getByRole('button', { name: /^Buscar\./ }).filter({ visible: true }).first().click(); await waitText('O que você procura'); await p.waitForTimeout(500);
+  };
+  const h1Clear = async () => { if ((await visibleCount('button', 'Limpar busca')) > 0) await btn('Limpar busca').click(); await p.waitForTimeout(500); };
+  const h1Storage = () => p.evaluate(() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]));
+  const luzRows = [
+    'Conta de luz, Pago · 05/10/2026 · Conta principal',
+    'Luz da varanda, Pago · 25/09/2026 · Conta principal',
+    'Conta de luz, Pago · 10/09/2026 · Conta principal',
+    'Freela de luz, Recebido · 20/08/2026 · Conta principal',
+    'Conta de luz, Pago · 10/08/2026 · Conta principal',
+    'Conta de luz, Pago · 10/07/2026 · Conta principal',
+    'Conta de luz, Pago · 10/06/2026 · Conta principal',
+    'Conta de luz, Pago · 10/05/2026 · Conta principal',
+  ];
+
+  // ---- 1. Dados: gastos antigos e uma compra no cartão paga na fatura (por "outro aparelho") ----
+  await demoHome();
+  await otherDevice(async (repo, ctx) => {
+    const space = await repo.getSpace();
+    const principal = space.accounts[0].id;
+    const carteira = space.accounts.find((a) => a.name === 'Carteira').id;
+    const add = (kind, description, reais, occurredOn, category, accountId = principal) =>
+      repo.createRecord(crypto.randomUUID(), ctx, kind, { accountId, amountCents: Math.round(reais * 100), occurredOn, description, category });
+    await add('despesa', 'Conta de luz', 150, '2026-05-10', 'Moradia');
+    await add('despesa', 'Conta de luz', 160.5, '2026-06-10', 'Moradia');
+    await add('despesa', 'Conta de luz', 170, '2026-07-10', 'Moradia');
+    await add('despesa', 'Conta de luz', 140.25, '2026-08-10', 'Moradia');
+    await add('despesa', 'Conta de luz', 155, '2026-09-10', 'Moradia');
+    await add('despesa', 'Luz da varanda', 30, '2026-09-25', 'Moradia');
+    await add('despesa', 'Conta de luz', 182.25, '2026-10-05', 'Moradia');
+    await add('despesa', 'Conta de luz', 99.9, '2024-03-05', 'Moradia');
+    await add('receita', 'Freela de luz', 300, '2026-08-20', 'Renda extra');
+    await add('despesa', 'Farmácia', 45.9, '2026-09-15', 'Saúde');
+    await add('despesa', 'Café', 8, '2026-10-02', null);
+    await add('despesa', 'Padaria', 12, '2026-10-03', 'Mercado', carteira);
+    // Uma compra de setembro no cartão (entra na fatura de outubro, fechada em 03/10) e o pagamento dessa fatura em 07/10.
+    const card = (await repo.listCards(ctx))[0];
+    await repo.addCardPurchase(crypto.randomUUID(), card.id, { description: 'Livro de luz', category: 'Educação', purchasedOn: '2026-09-20', totalCents: 20000, installments: 1 });
+    const invoice = (await repo.listInvoiceItems(card.id)).find((i) => i.month === '2026-10');
+    await repo.payInvoice(crypto.randomUUID(), card.id, '2026-10', invoice.commitmentVersion, invoice.totalCents, '2026-10-07', principal);
+  });
+  const h1Storage0 = await h1Storage();
+
+  // ---- 2. A entrada em Movimentações ----
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(600);
+  t = await h1Keep();
+  const h1EntryBox = await p.evaluate(() => {
+    const y = (re) => { const e = [...document.querySelectorAll('[role=button]')].find((x) => re.test(x.getAttribute('aria-label') || x.textContent || '') && x.getBoundingClientRect().width > 0); return e ? Math.round(e.getBoundingClientRect().top) : null; };
+    return { buscar: y(/^Buscar\./), anotar: y(/^Anotar gasto$/) };
+  });
+  ok('H1 Movimentações: o campo "Buscar" (lupa, "Gastos e recebimentos de todos os meses") é um botão e fica no topo, acima de "Anotar gasto"',
+    (await visibleCount('button', /^Buscar\. Abre a busca em todos os meses\.$/)) === 1 && t.includes('Gastos e recebimentos de todos os meses') && h1EntryBox.buscar !== null && h1EntryBox.anotar !== null && h1EntryBox.buscar < h1EntryBox.anotar, JSON.stringify(h1EntryBox));
+  await atWidths(async (w) => { await layoutChecks(`H1 Movimentações com o campo Buscar ${w}px`); if (w === 390) await shot('260_movimentos_buscar_entrada'); });
+  await p.getByRole('tab', { name: 'Ver dados de Família' }).filter({ visible: true }).first().click(); await waitText('Nenhuma família vinculada'); await p.waitForTimeout(400);
+  ok('H1 Movimentações em Família: sem o campo "Buscar" (a busca é do contexto Pessoal)', (await visibleCount('button', /^Buscar\./)) === 0);
+  await p.getByRole('tab', { name: 'Ver dados de Pessoal' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento'); await p.waitForTimeout(400);
+
+  // ---- 3. A tela: consulta com barra, campo, tipo e período (12 meses marcado), tudo à vista ----
+  await p.getByRole('button', { name: /^Buscar\./ }).filter({ visible: true }).first().click(); await waitText('O que você procura'); await p.waitForTimeout(600);
+  t = await h1Keep();
+  ok('H1 Buscar: título "Buscar", contexto Pessoal, a introdução que diz que nada é guardado, o campo com a dica e os grupos Tipo e Período',
+    (await h1Name()) === 'Buscar' && urlPath() === '/movimentacoes/buscar' && t.includes('Pessoal') && t.includes('Procure um gasto ou um recebimento em todos os meses. Nada do que você busca é guardado.') &&
+    t.includes('Por exemplo: luz, mercado ou farmácia. Não precisa de acento.') && (await visibleCount('searchbox', 'O que você procura')) === 1 && (await h1Group('Tipo').count()) === 1 && (await h1Group('Período').count()) === 1,
+    JSON.stringify([await h1Name(), urlPath(), t.includes('Pessoal'), t.includes('Procure um gasto ou um recebimento em todos os meses. Nada do que você busca é guardado.'), t.includes('Por exemplo: luz, mercado ou farmácia. Não precisa de acento.'), await visibleCount('searchbox', 'O que você procura'), await h1Group('Tipo').count(), await h1Group('Período').count()]));
+  ok('H1 Buscar: Tipo = Todos, Todos/Gastos/Recebimentos; Período = Últimos 12 meses entre seis opções',
+    (await h1Checked('Tipo', 'Todos')) && (await h1Group('Tipo').getByRole('radio').count()) === 3 && (await h1Checked('Período', 'Últimos 12 meses')) && (await h1Group('Período').getByRole('radio').count()) === 6 &&
+    JSON.stringify(await h1Group('Período').getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent))) === JSON.stringify(['Últimos 3 meses', 'Últimos 6 meses', 'Últimos 12 meses', 'Este ano', 'Ano passado', 'Tudo']));
+  await checkBar('H1 Buscar', 'Movimentações');
+  ok('H1 Buscar: "Limpar busca" só aparece depois de mudar algo', (await visibleCount('button', 'Limpar busca')) === 0);
+  // Sem texto, a busca já lista os registros dos últimos 12 meses (e as compras do cartão), do mais recente ao mais antigo.
+  ok('H1 Buscar sem texto: o resumo soma os 15 gastos dos 12 meses (R$ 8.903,90, média de R$ 1.483,98 por mês com gasto) e os 3 recebimentos (R$ 12.300,00)',
+    t.includes('15 gastos · R$ 8.903,90 no período') && t.includes('média de R$ 1.483,98 por mês com gasto') && t.includes('3 recebimentos · R$ 12.300,00 no período'), t.slice(0, 600));
+
+  // ---- 4. "Quanto paguei de luz?": texto sem diferenciar maiúsculas e acentos ----
+  await h1Type('LUZ');
+  t = await h1Keep();
+  ok('H1 "luz": 7 gastos (R$ 988,00), média de R$ 164,67 por mês com gasto (seis meses) e 1 recebimento (R$ 300,00)',
+    t.includes('7 gastos · R$ 988,00 no período') && t.includes('média de R$ 164,67 por mês com gasto') && t.includes('1 recebimento · R$ 300,00 no período'), t.slice(0, 600));
+  ok('H1 "luz": a lista agrupada por mês, do mais recente ao mais antigo, com Pago/Recebido, data e conta em cada linha',
+    JSON.stringify(await h1Rows()) === JSON.stringify(luzRows) && JSON.stringify((await h1Heads(2)).filter((x) => x !== 'Compras no cartão')) === JSON.stringify(['Outubro de 2026', 'Setembro de 2026', 'Agosto de 2026', 'Julho de 2026', 'Junho de 2026', 'Maio de 2026']), JSON.stringify(await h1Rows()));
+  ok('H1 "luz": a compra no cartão aparece num grupo à parte ("Compras no cartão", nível 2) com o total da compra e o aviso de que não soma em Pago',
+    (await h1Heads(2)).includes('Compras no cartão') && JSON.stringify(await h1Purchases()) === JSON.stringify(['Livro de luz, Compra · 20/09/2026 · Cartão Exemplo · à vista, R$ 200,00. Abre a fatura.']) &&
+    t.includes('1 compra · R$ 200,00 no total das compras') && t.includes('O dinheiro só sai quando a fatura é paga. Por isso estas compras não estão somadas em Pago') && t.includes('Os gastos acima não incluem as compras no cartão, listadas à parte.'), JSON.stringify(await h1Purchases()));
+  ok('H1 "luz": "Limpar busca" aparece e o texto tem "Limpar texto"', (await visibleCount('button', 'Limpar busca')) === 1 && (await visibleCount('button', 'Limpar texto')) === 1);
+  await atWidths(async (w) => { await innerChecks(`H1 Buscar "luz" ${w}px`); if (w === 390) await shot('261_buscar_luz'); if (w === 320) await shot('261_buscar_luz_320px'); });
+  await scrollTo('Compras no cartão'); await shot('262_buscar_compras_no_cartao');
+  await p.evaluate(() => window.scrollTo(0, 0));
+  // Acentos e maiúsculas: "farmacia" acha "Farmácia".
+  await h1Type('farmacia');
+  t = await body();
+  ok('H1 "farmacia" (sem acento) acha "Farmácia": 1 gasto de R$ 45,90, média de R$ 45,90, sem compras no cartão', JSON.stringify(await h1Rows()) === JSON.stringify(['Farmácia, Pago · 15/09/2026 · Conta principal']) &&
+    t.includes('1 gasto · R$ 45,90 no período') && t.includes('média de R$ 45,90 por mês com gasto') && !(await headingShown('Compras no cartão')));
+  await h1Type('  conta   DE luz ');
+  ok('H1 várias palavras, qualquer caixa e espaços a mais: "conta de luz" acha as seis contas de luz (sem "Luz da varanda" nem o recebimento)', (await h1Rows()).length === 6 && (await h1Rows()).every((r) => r.startsWith('Conta de luz')), JSON.stringify(await h1Rows()));
+  await h1Type('luz');
+
+  // ---- 5. Tipo e período ----
+  await h1Pick('Tipo', 'Gastos');
+  t = await body();
+  ok('H1 Tipo Gastos: sem o recebimento e sem a linha de recebimentos; as compras no cartão continuam', t.includes('7 gastos · R$ 988,00 no período') && !t.includes('1 recebimento') && (await h1Rows()).length === 7 && (await headingShown('Compras no cartão')));
+  await h1Pick('Tipo', 'Recebimentos');
+  t = await body();
+  ok('H1 Tipo Recebimentos: só o recebimento (R$ 300,00), sem média e sem o grupo de compras no cartão (compra não é recebimento)',
+    JSON.stringify(await h1Rows()) === JSON.stringify(['Freela de luz, Recebido · 20/08/2026 · Conta principal']) && t.includes('1 recebimento · R$ 300,00 no período') && !t.includes('por mês com gasto') && !(await headingShown('Compras no cartão')));
+  await h1Pick('Tipo', 'Todos');
+  await h1Pick('Período', 'Tudo');
+  t = await body();
+  ok('H1 Período Tudo: a conta de luz de março de 2024 entra (8 gastos, R$ 1.087,90, média de R$ 155,41 em sete meses)', t.includes('8 gastos · R$ 1.087,90 no período') && t.includes('média de R$ 155,41 por mês com gasto') && (await h1Heads(2)).includes('Março de 2024') && (await h1Rows()).length === 9);
+  await h1Pick('Período', 'Últimos 3 meses');
+  t = await body();
+  ok('H1 Últimos 3 meses (agosto a outubro): 4 gastos de luz (R$ 507,50, média de R$ 169,17) e o recebimento de agosto', t.includes('4 gastos · R$ 507,50 no período') && t.includes('média de R$ 169,17 por mês com gasto') && t.includes('1 recebimento · R$ 300,00 no período') && (await h1Rows()).length === 5);
+  await h1Pick('Período', 'Últimos 6 meses');
+  ok('H1 Últimos 6 meses (maio a outubro): os mesmos 7 gastos de luz', (await body()).includes('7 gastos · R$ 988,00 no período'));
+  await h1Pick('Período', 'Ano passado');
+  t = await h1Keep();
+  ok('H1 Ano passado: nada em 2025; "Nada encontrado", a explicação, sem soma e uma só "Limpar busca"', t.includes('Nada encontrado') && t.includes('Nenhum registro combina com esta busca. Mude o texto, o período ou os filtros.') && !t.includes('no período') && (await visibleCount('button', 'Limpar busca')) === 1,
+    JSON.stringify([t.includes('Nada encontrado'), t.includes('Nenhum registro combina com esta busca. Mude o texto, o período ou os filtros.'), t.includes('no período'), await visibleCount('button', 'Limpar busca')]) + t.slice(0, 700));
+  await atWidths(async (w) => { await innerChecks(`H1 Buscar sem resultado ${w}px`); if (w === 390) await shot('263_buscar_vazio'); });
+  await h1Pick('Período', 'Este ano');
+  ok('H1 Este ano: todos os 7 gastos de luz de 2026', (await body()).includes('7 gastos · R$ 988,00 no período'));
+  await h1Pick('Período', 'Últimos 12 meses');
+
+  // ---- 6. Mais filtros: categoria, conta e valor ----
+  ok('H1 "Mais filtros" fechado mostra só o nome', (await visibleCount('button', 'Mais filtros')) === 1 && (await visibleCount('textbox', 'Valor de')) === 0);
+  await h1More();
+  t = await h1Keep();
+  ok('H1 Mais filtros aberto: Categoria (Todas, as seis de gasto, as três de recebimento e Sem categoria), Conta (Todas, Conta principal, Carteira) e os dois valores com "R$"',
+    JSON.stringify(await h1Group('Categoria').getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent))) === JSON.stringify(['Todas', 'Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Salário', 'Renda extra', 'Reembolso', 'Sem categoria']) &&
+    JSON.stringify(await h1Group('Conta').getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent))) === JSON.stringify(['Todas', 'Conta principal', 'Carteira']) &&
+    (await visibleCount('textbox', 'Valor de')) === 1 && (await visibleCount('textbox', 'Valor até')) === 1 && (await visibleCount('button', 'Menos filtros')) === 1 && t.includes('Opcional. Deixe em branco para qualquer valor.'));
+  await atWidths(async (w) => { await innerChecks(`H1 Buscar com Mais filtros ${w}px`); if (w === 390) await shot('264_buscar_mais_filtros'); });
+  // Categoria: Moradia tira a compra do cartão (Educação) e fica com os 7 gastos de luz.
+  await h1Pick('Categoria', 'Moradia');
+  t = await body();
+  ok('H1 Categoria Moradia + "luz": os 7 gastos de luz, sem o recebimento (Renda extra) e sem a compra do cartão (Educação)', t.includes('7 gastos · R$ 988,00 no período') && !t.includes('1 recebimento') && !(await headingShown('Compras no cartão')));
+  await h1Pick('Categoria', 'Educação');
+  t = await body();
+  ok('H1 Categoria Educação + "luz": só a compra no cartão, e a soma de gastos diz que nenhum gasto combina', (await h1Rows()).length === 0 && (await h1Purchases()).length === 1 && t.includes('Nenhum gasto ou recebimento combina com esta busca.'));
+  await h1Pick('Tipo', 'Gastos'); await h1Pick('Período', 'Últimos 12 meses');
+  await h1Type('');
+  await h1Pick('Categoria', 'Sem categoria');
+  t = await h1Keep();
+  ok('H1 Sem categoria: o Café e o pagamento da fatura (um gasto só, "Pagamento de fatura"), R$ 208,00, e a explicação do pagamento de fatura',
+    JSON.stringify(await h1Rows()) === JSON.stringify(['Fatura Cartão Exemplo (outubro), Pago · 07/10/2026 · Pagamento de fatura · Conta principal', 'Café, Pago · 02/10/2026 · Conta principal']) &&
+    t.includes('2 gastos · R$ 208,00 no período') && t.includes('média de R$ 208,00 por mês com gasto') && t.includes('O pagamento de uma fatura aparece como um gasto só, na data do pagamento. As compras ficam em Compras no cartão.'), JSON.stringify(await h1Rows()));
+  await h1Pick('Categoria', 'Todas');
+  // Conta: a Carteira; compras no cartão não têm conta, e a tela diz isso.
+  await h1Pick('Conta', 'Carteira');
+  t = await h1Keep();
+  ok('H1 Conta Carteira: Mercado de outubro, a Padaria e o Mercado de setembro (3 gastos, R$ 2.662,00, média de R$ 1.331,00), sem compras no cartão e com o aviso',
+    JSON.stringify(await h1Rows()) === JSON.stringify(['Mercado, Pago · 06/10/2026 · Carteira', 'Padaria, Pago · 03/10/2026 · Carteira', 'Mercado, Pago · 12/09/2026 · Carteira']) &&
+    t.includes('3 gastos · R$ 2.662,00 no período') && t.includes('média de R$ 1.331,00 por mês com gasto') && !(await headingShown('Compras no cartão')) &&
+    t.includes('Compras no cartão não têm conta de origem: a conta vem do pagamento da fatura. Limpe o filtro de conta para vê-las.'), JSON.stringify(await h1Rows()));
+  await h1Pick('Conta', 'Todas');
+  // Valor.
+  await h1Type('luz');
+  await h1Pick('Tipo', 'Todos');
+  await field('Valor de').fill('100'); await field('Valor até').fill('200'); await p.waitForTimeout(1000);
+  t = await h1Keep();
+  ok('H1 Valor de R$ 100 até R$ 200: seis contas de luz (R$ 958,00; fica de fora a de R$ 30,00) e a compra de R$ 200,00 no cartão (o limite entra)',
+    t.includes('6 gastos · R$ 958,00 no período') && t.includes('média de R$ 159,67 por mês com gasto') && (await h1Purchases()).length === 1 && !(await h1Rows()).some((r) => r.startsWith('Luz da varanda')), t.slice(0, 500));
+  await field('Valor até').fill('199,99'); await p.waitForTimeout(1000);
+  ok('H1 Valor até R$ 199,99: a compra de R$ 200,00 sai do grupo do cartão', (await h1Purchases()).length === 0 && !(await headingShown('Compras no cartão')) && (await body()).includes('6 gastos · R$ 958,00 no período'));
+  await p.getByRole('button', { name: 'Menos filtros' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+  ok('H1 Mais filtros fechado com dois valores ligados diz quantos: "Mais filtros (2)", e os campos somem', (await visibleCount('button', 'Mais filtros (2)')) === 1 && (await visibleCount('textbox', 'Valor de')) === 0);
+  await p.getByRole('button', { name: 'Mais filtros (2)' }).filter({ visible: true }).first().click(); await waitText('Valor até'); await p.waitForTimeout(300);
+  await field('Valor de').fill('abc'); await p.waitForTimeout(1000);
+  t = await h1Keep();
+  ok('H1 Valor inválido: "Confira o valor informado, como 80,00." no campo e nenhuma busca com valor errado', t.includes('Confira o valor informado, como 80,00.') && !t.includes('no período') && (await h1Rows()).length === 0);
+  await field('Valor de').fill('500'); await field('Valor até').fill('20'); await p.waitForTimeout(1000);
+  t = await body();
+  ok('H1 Valor final menor que o inicial: "O valor final não pode ser menor que o inicial." e nada é listado', t.includes('O valor final não pode ser menor que o inicial.') && (await h1Rows()).length === 0);
+  await field('Valor de').fill(''); await field('Valor até').fill(''); await p.waitForTimeout(1000);
+  await p.getByRole('button', { name: 'Menos filtros' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+  ok('H1 Menos filtros: os campos de valor somem e o botão volta a "Mais filtros"', (await visibleCount('textbox', 'Valor de')) === 0 && (await visibleCount('button', 'Mais filtros')) === 1);
+
+  // ---- 7. Abrir uma linha: o detalhe do registro e a fatura da compra no cartão ----
+  await h1Pick('Período', 'Tudo');
+  await p.getByRole('button', { name: /^Conta de luz, Pago · 05\/10\/2026/ }).filter({ visible: true }).first().click(); await waitText('Editar registro'); await p.waitForTimeout(500);
+  ok('H1 Abrir uma linha: o detalhe do registro (/registro/...) com a barra de consulta', /^\/registro\/[^/]+$/.test(urlPath()) && (await body()).includes('Conta de luz'));
+  await btn('Voltar').click(); await waitText('O que você procura'); await p.waitForTimeout(500);
+  ok('H1 Voltar do detalhe: a busca continua como estava (texto "luz" e período Tudo)', (await field('O que você procura').inputValue()) === 'luz' && (await h1Checked('Período', 'Tudo')) && (await body()).includes('8 gastos · R$ 1.087,90 no período'));
+  await p.getByRole('button', { name: /^Livro de luz, Compra · 20\/09\/2026/ }).filter({ visible: true }).first().click(); await waitText('Lançamentos'); await p.waitForTimeout(500);
+  ok('H1 Abrir uma compra no cartão: a fatura de outubro do cartão (/cartoes/.../fatura/2026-10)', /^\/cartoes\/[^/]+\/fatura\/2026-10$/.test(urlPath()), p.url());
+  await btn('Voltar').click(); await waitText('O que você procura'); await p.waitForTimeout(400);
+  await btn('Limpar busca').click(); await p.waitForTimeout(600);
+  t = await body();
+  ok('H1 Limpar busca: texto vazio, Todos, 12 meses e sem filtros (volta ao resumo dos 12 meses)', (await field('O que você procura').inputValue()) === '' && (await h1Checked('Tipo', 'Todos')) && (await h1Checked('Período', 'Últimos 12 meses')) && (await visibleCount('button', 'Limpar busca')) === 0 && t.includes('15 gastos · R$ 8.903,90 no período'));
+
+  // ---- 8. Nada é gravado nem registrado ----
+  const h1Storage1 = await h1Storage();
+  ok('H1 a busca não grava nada no aparelho nem na rede: o armazenamento local não muda e nenhuma escrita sai', h1Storage1 === h1Storage0 && !/luz|farmacia|farmácia/i.test(h1Storage1) && writes.slice(h1Writes0).length === 0, `${writes.slice(h1Writes0).join(' | ')}`);
+
+  // ---- 9. Valores ocultos ----
+  await h1Type('luz');
+  await goResumo(); await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await p.getByRole('button', { name: /^Buscar\./ }).filter({ visible: true }).first().click(); await waitText('O que você procura'); await p.waitForTimeout(400);
+  await h1Type('luz');
+  t = await h1Keep();
+  await hiddenShows('Buscar');
+  ok('H1 valores ocultos: o resumo, a média e o grupo do cartão dizem "R$ ••••" e as linhas dizem "valor oculto", mas as contagens e as datas ficam',
+    t.includes('7 gastos · R$ •••• no período') && t.includes('média de R$ •••• por mês com gasto') && t.includes('1 compra · R$ •••• no total das compras') && (await h1Rows()).length === 8 && (await h1Rows())[0] === luzRows[0] &&
+    (await h1Labels(/, Pago · 05\/10\/2026 · Conta principal, valor oculto/)).length === 1 && (await h1Labels(/, Compra · 20\/09\/2026 · Cartão Exemplo · à vista, valor oculto\. Abre a fatura\./)).length === 1, t.slice(0, 400));
+  await atWidths(async (w) => { await layoutChecks(`H1 Buscar com valores ocultos ${w}px`); if (w === 390) await shot('265_buscar_valores_ocultos'); });
+  await goResumo(); await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+
+  // ---- 10. Passou de 1.000: as mais recentes, o aviso e "Mostrar mais" ----
+  await otherDevice(async (repo, ctx) => {
+    const space = await repo.getSpace();
+    const principal = space.accounts[0].id;
+    // A demonstração simula uma rede lenta; sem a espera, as 1.001 gravações levam um instante.
+    repo.latencyMs = 0;
+    for (let i = 0; i < 1001; i++) {
+      const day = String((i % 28) + 1).padStart(2, '0');
+      const month = String((i % 4) + 1).padStart(2, '0');
+      await repo.createRecord(crypto.randomUUID(), ctx, 'despesa', { accountId: principal, amountCents: 100 + i, occurredOn: `2026-${month}-${day}`, description: `Lote ${i}`, category: null });
+    }
+  });
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(500);
+  await p.getByRole('button', { name: /^Buscar\./ }).filter({ visible: true }).first().click(); await waitText('O que você procura'); await p.waitForTimeout(1500);
+  t = await h1Keep();
+  ok('H1 mais de 1.000 registros: "Mostrando os 1.000 mais recentes; refine a busca." e só 100 linhas de cada vez ("Mostrando 100 de 1000")',
+    t.includes('Mostrando os 1.000 mais recentes; refine a busca.') && t.includes('Mostrando 100 de 1000') && (await h1Rows()).length === 100 && (await visibleCount('button', 'Mostrar mais 100')) === 1, `${(await h1Rows()).length}`);
+  await btn('Mostrar mais 100').click(); await p.waitForTimeout(600);
+  ok('H1 "Mostrar mais 100": 200 linhas e "Mostrando 200 de 1000"', (await h1Rows()).length === 200 && (await body()).includes('Mostrando 200 de 1000'));
+  await scrollTo('Mostrando os 1.000 mais recentes; refine a busca.'); await shot('266_buscar_limite');
+  await h1Type('Lote 99');
+  t = await body();
+  ok('H1 com o limite atingido, o texto continua filtrando no aparelho (e o aviso segue, porque a busca olhou só as 1.000 mais recentes)', t.includes('Mostrando os 1.000 mais recentes; refine a busca.') && (await h1Rows()).length > 0 && (await h1Rows()).every((r) => /^Lote \d*99\d*, /.test(r)), JSON.stringify([t.includes('Mostrando os 1.000 mais recentes; refine a busca.'), (await h1Rows()).slice(0, 3)]) + t.slice(0, 500));
+  await h1Pick('Período', 'Ano passado'); await h1Type('');
+  t = await body();
+  ok('H1 refinar tira o aviso: o período "Ano passado" não tem registros e a tela volta ao normal', !t.includes('Mostrando os 1.000 mais recentes') && t.includes('Nada encontrado'));
+
+  // ---- 11. A busca "No app" de Aprender ----
+  await tabByName('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await p.waitForTimeout(400);
+  const h1Box = () => p.getByLabel('Buscar um tema ou uma função', { exact: true }).filter({ visible: true }).first();
+  for (const query of ['buscar', 'procurar', 'quanto paguei', 'quanto paguei de luz']) {
+    await h1Box().fill(query); await waitText('No app'); await p.waitForTimeout(500);
+    const h1Group2 = await p.evaluate(() => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'No app' && e.getBoundingClientRect().width > 0); return h ? h.getAttribute('aria-level') : null; });
+    ok(`H1 busca "${query}" em Aprender: o grupo "No app" (nível 2) tem "Buscar em Movimentações"`, h1Group2 === '2' && (await p.getByRole('button', { name: /^Buscar em Movimentações\. Achar um gasto ou recebimento em todos os meses e ver quanto deu no período/ }).filter({ visible: true }).count()) === 1, query);
+    if (query === 'quanto paguei') await atWidths(async (w) => { await layoutChecks(`H1 Aprender No app ${w}px`); if (w === 390) await shot('267_aprender_no_app_buscar'); });
+  }
+  await h1Box().fill('quanto paguei'); await waitText('No app'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /^Buscar em Movimentações\./ }).filter({ visible: true }).first().click(); await waitText('O que você procura'); await p.waitForTimeout(600);
+  ok('H1 tocar em "Buscar em Movimentações" em Aprender abre a busca, com a barra e Aprender marcada de origem', urlPath() === '/movimentacoes/buscar' && (await h1Name()) === 'Buscar');
+  await checkBar('H1 Buscar aberta por Aprender', 'Aprender e dúvidas');
+
+  // ---- 12. Conta nova: nada de exemplo, sem filtro de conta e sem compras no cartão ----
+  await newAcct('Ivo Teste', 'ivo@exemplo.com');
+  await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().waitFor({ timeout: 15000 }); await p.waitForTimeout(500);
+  await h1Open();
+  t = await h1Keep();
+  ok('H1 conta nova: a busca abre sem registros ("Nada encontrado"), sem soma e sem nenhum dado de exemplo', t.includes('Nada encontrado') && !t.includes('no período') && (await h1Rows()).length === 0 && (await h1Purchases()).length === 0 && !(await headingShown('Compras no cartão')));
+  await h1More();
+  ok('H1 conta nova: Mais filtros tem Categoria mas não tem Conta (uma conta só), e os dois valores', (await h1Group('Categoria').count()) === 1 && (await h1Group('Conta').count()) === 0 && (await visibleCount('textbox', 'Valor de')) === 1);
+  await atWidths(async (w) => { await innerChecks(`H1 Buscar conta nova ${w}px`); if (w === 390) await shot('268_buscar_conta_nova'); });
+  await h1Type('luz');
+  ok('H1 conta nova, com texto: continua sem resultado, com o botão "Limpar busca"', (await body()).includes('Nada encontrado') && (await visibleCount('button', 'Limpar busca')) === 1, JSON.stringify([(await body()).includes('Nada encontrado'), await visibleCount('button', 'Limpar busca')]) + (await body()).slice(0, 400));
+  await otherDevice(async (repo, ctx) => {
+    const space = await repo.getSpace();
+    await repo.createRecord(crypto.randomUUID(), ctx, 'despesa', { accountId: space.accounts[0].id, amountCents: 8000, occurredOn: '2026-09-15', description: 'Conta de luz', category: 'Moradia' });
+  });
+  await p.waitForTimeout(800);
+  t = await body();
+  ok('H1 conta nova: um gasto anotado depois aparece na busca aberta (a lista se atualiza)', t.includes('1 gasto · R$ 80,00 no período') && t.includes('média de R$ 80,00 por mês com gasto'), t.slice(0, 400));
+
+  const h1Vetoed = h1Texts.map((x) => x.match(FORBIDDEN)?.[0]).filter(Boolean);
+  ok('H1 telas da busca: nenhum termo proibido, travessão, "fazer sentido" nem palavra de julgamento sobre os gastos',
+    h1Texts.length >= 8 && h1Vetoed.length === 0 && h1Texts.every((x) => !/[–—]/.test(x) && !/\b(excessiv\w*|demais|gastou muito|desperd[ií]cio|cuidado|vale a pena|atrasad[oa]s?)\b/i.test(x)), `${h1Texts.length} telas ${h1Vetoed.join(' | ')}`);
+  ok('H1 nenhuma escrita direta na rede durante a busca (nenhum POST, PATCH, PUT ou DELETE)', writes.slice(h1Writes0).length === 0, writes.slice(h1Writes0).join(' | '));
   await goResumo().catch(() => {});
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);

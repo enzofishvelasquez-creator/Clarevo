@@ -188,6 +188,7 @@ import {
   wholeYearPayment,
 } from '../src';
 import { APP_SCREENS, APP_SEARCH_TEXT, BAR_TEXT, GOALS_NAV_TEXT, PAYABLES_NAV_TEXT, SUMMARY_NAV_TEXT, searchAppScreens } from '../src';
+import { DEFAULT_SEARCH_DRAFT, SEARCH_PAGE, SEARCH_PERIODS, SEARCH_TEXT, searchFromDraft } from '../src';
 
 /**
  * Teste de textos (seção 5): sem indicação de produto financeiro, promessa de rendimento, travessões longos
@@ -1917,5 +1918,70 @@ describe('textos das contas de origem (D-043)', () => {
     const text = readFileSync(join(CORE_SRC, 'accounts.ts'), 'utf8');
     expect(text).not.toMatch(FORBIDDEN);
     expect(text).not.toMatch(JUDGMENT);
+  });
+});
+
+describe('textos de Buscar em Movimentações (D-045)', () => {
+  const GENDERED = /\b(o|a)s? usuári[oa]s?\b|\bobrigad[oa]s?\b|\bbem-vind[oa]s?\b|\bpreocupad[oa]s?\b|\bendividad[oa]s?\b|\bcadastrad[oa]\b/i;
+  const check = (texts: string[]) => {
+    expect(texts.length).toBeGreaterThan(0);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(GENDERED);
+      expect(text, text).not.toMatch(/\bfaz(er|endo)?\s+sentido\b/i);
+      expect(text, text).not.toMatch(/[–—]/);
+      // Nenhum banco, produto ou oferta, e nenhuma palavra de julgamento sobre o gasto.
+      expect(text, text).not.toMatch(/nubank|ita[uú]\b|bradesco|santander|caixa econ|picpay|\bxp\b|btg|poupan[cç]a|investiment|\bexcessiv|\bdemais\b|\bgastou muito\b|\bcerto\b|\berrado\b/i);
+    }
+  };
+
+  it('SEARCH_TEXT inteiro (rótulos, avisos e mensagens fixas)', () => {
+    check(staticStrings(SEARCH_TEXT));
+  });
+
+  it('textos montados, em todas as combinações', () => {
+    const texts: string[] = [];
+    for (const n of [0, 1, 2, 12, 1000]) {
+      texts.push(SEARCH_TEXT.expenses(n, 193240), SEARCH_TEXT.incomes(n, 600000), SEARCH_TEXT.cardsSummary(n, 230000), SEARCH_TEXT.moreFilters(n));
+    }
+    texts.push(SEARCH_TEXT.average(16103), SEARCH_TEXT.shownOf(100, 250), SEARCH_TEXT.showMore(100));
+    for (const n of [1, 3, 48]) {
+      const caption = SEARCH_TEXT.purchaseCaption('2026-10-05', 'Cartão Exemplo', n);
+      texts.push(caption, SEARCH_TEXT.purchaseA11y('Notebook', caption, 'R$ 1.500,00'));
+    }
+    texts.push(SEARCH_TEXT.purchaseCaption('2026-10-05', null, 1));
+    for (const draft of [{ min: 'abc' }, { max: '1,234' }, { min: '50', max: '20' }]) {
+      const r = searchFromDraft({ ...DEFAULT_SEARCH_DRAFT, ...draft });
+      if (!r.ok) texts.push(...Object.values(r.errors));
+    }
+    check(texts);
+  });
+
+  it('o resumo diz o que a especificação pede e deixa claro que as compras no cartão não somam em Pago', () => {
+    expect(SEARCH_TEXT.expenses(12, 193240)).toBe('12 gastos · R$ 1.932,40 no período');
+    expect(SEARCH_TEXT.average(16103)).toBe('média de R$ 161,03 por mês com gasto');
+    expect(SEARCH_TEXT.truncated).toBe('Mostrando os 1.000 mais recentes; refine a busca.');
+    expect(SEARCH_TEXT.cardsNote).toContain('só sai quando a fatura é paga');
+    expect(SEARCH_TEXT.cardsNote).toContain('não estão somadas em Pago');
+    expect(SEARCH_TEXT.summaryCardsNote).toContain('não incluem as compras no cartão');
+    expect(SEARCH_TEXT.intro).toContain('Nada do que você busca é guardado');
+    expect(SEARCH_PAGE).toBe(100);
+  });
+
+  it('os rótulos de período e tipo cobrem tudo e são curtos', () => {
+    for (const p of SEARCH_PERIODS) expect(SEARCH_TEXT.periods[p].length, p).toBeGreaterThan(2);
+    expect(Object.keys(SEARCH_TEXT.kinds)).toEqual(['todos', 'despesa', 'receita']);
+    expect(SEARCH_TEXT.kinds.despesa).toBe('Gastos');
+    expect(SEARCH_TEXT.kinds.receita).toBe('Recebimentos');
+  });
+
+  it('a tela de busca no índice "No app" e os arquivos-fonte passam', () => {
+    const screen = APP_SCREENS.find((s) => s.id === 'buscar-movimentos')!;
+    expect(screen.href).toBe('/movimentacoes/buscar');
+    check([screen.title, screen.caption, ...screen.keywords]);
+    const source = readFileSync(join(CORE_SRC, 'search.ts'), 'utf8');
+    expect(source).not.toMatch(FORBIDDEN);
+    expect(source).not.toMatch(JUDGMENT);
   });
 });

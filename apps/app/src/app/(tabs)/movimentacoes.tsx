@@ -30,6 +30,7 @@ import { FamilyNotLinked } from '@/components/family-state';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { AppHeader, ContextSwitch, MonthSwitcher } from '@/components/header';
 import { RecordRow } from '@/components/record-row';
+import { SearchEntry } from '@/components/search-parts';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, Chip, Money, Screen, Skeleton, Txt } from '@/components/ui';
 import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
@@ -153,6 +154,9 @@ export default function MovimentacoesScreen() {
             <FamilyNotLinked splitLink />
           ) : (
             <>
+              {/* Buscar (D-045): campo no topo que abre a busca em todos os meses; nada é digitado aqui. */}
+              <SearchEntry onPress={() => router.push('/movimentacoes/buscar')} />
+
               <View style={styles.actions}>
                 <Button
                   label="Anotar gasto"

@@ -196,7 +196,7 @@ Sem mudança no banco. Regras no core (`packages/core/src/navigation.ts`, `navig
 - [x] Barra inferior à vista em toda tela de consulta (Calculadoras, Contas a pagar e o detalhe, Gastos fixos, Cartões e a fatura, detalhe do registro, composição, Renda comprometida, detalhe da reserva e da meta, Simular, explicação de um tema, Seus últimos meses, Conta), com a aba de origem marcada, sem barra dupla nem salto ao abrir e fora da frente do teclado; sem barra nos formulários e nas telas de passo a passo com rodapé fixo (`/reserva`, `/guardar`, `/guardar/minima`, `/retomar/atualizar`, `/retomar/pagar` e `/a-pagar/vencidas`)
 - [x] Contas a pagar: seletor de mês local (sem limite para trás, 12 meses à frente), entradas "de agora" no mês atual, cards com o mês no endereço, "Revisar vencidas" com 1 vencida, "Já paguei" no detalhe, previsão e critério do total depois das listas e a linha de lembretes (celular, fora da demonstração, lembretes desligados) que abre Conta no card de lembretes
 - [x] Metas compacta: pergunta de 186 px em 360 × 640, plano de guardar dentro do card da reserva (com ou sem reserva), "Calcular minha reserva" à vista acima da barra e o card "Fazer as contas"
-- [x] Aprender: "Buscar um tema ou uma função" e o grupo "No app" com 20 telas do app (21 com o plano para quitar dívidas, D-040; 22 com "Antes de financiar", D-044; 23 com "Suas contas", D-043) (`docs/09_APRENDER.md`); nome acessível da aba "Movimentos: movimentações do mês"
+- [x] Aprender: "Buscar um tema ou uma função" e o grupo "No app" com 20 telas do app (21 com o plano para quitar dívidas, D-040; 22 com "Antes de financiar", D-044; 23 com "Suas contas", D-043; 25 com "Orçamento por categoria", D-041, que a contagem anterior não incluía, e "Buscar em Movimentações", D-045) (`docs/09_APRENDER.md`); nome acessível da aba "Movimentos: movimentações do mês"
 - [x] Roteiro web: bloco "Navegação (D-039)" em `scripts/e2e-web.js`, conferido em 390 e 320 px de largura e, nos casos de altura curta, em 360 × 640 e 320 × 640
 - [ ] **Você:** decidir se a conta vencida passa a 3 toques contando a confirmação, com "Já paguei" na própria linha da vencida (muda D-035(5)); hoje são 4 toques (D-039(6))
 - [ ] **Você:** confirmar que `/reserva`, `/guardar`, `/guardar/minima`, `/retomar/atualizar`, `/retomar/pagar` e `/a-pagar/vencidas` ficam sem a barra (D-039(4)); confirmar o card "Seu mês" depois de "Suas metas" e o título "Marcar como paga" na tela de pagamento
@@ -226,6 +226,17 @@ Pedido de Adriana Velasquez, encaminhado por Enzo em 10/10/2026. Só no core e n
 - [x] Roteiro web: bloco "Antes de financiar (D-044)" em `scripts/e2e-web.js` (390 e 320 px, demonstração e conta nova, valores ocultos, nada gravado, links e busca); capturas 230 a 239 em `docs/telas`
 - [ ] Teste em aparelho (iOS e Android): teclado decimal nos campos, anúncio do resultado e a tela com 480 parcelas
 - [ ] **Você:** revisar as regras de detalhe de D-044 (em especial a leitura de "+10% e +20% de entrada", o alvo único de "Juntar antes" e a frase do comprometido em reais quando não há renda) e os textos
+
+## Buscar em Movimentações (D-045)
+
+Segunda parte do item 5 de `docs/08` §5, aprovada por Enzo com "sim" à ordem em 10/10/2026. Só no core e no app, sem migração e sem pacote novo. Regras em `packages/core/src/search.ts` e `docs/02`; tela em `apps/app/src/app/movimentacoes/buscar.tsx`.
+
+- [x] Core: texto sem acento, período, filtro do servidor, resumo com a média por mês com gasto, agrupamento por mês, rascunho dos valores e textos; testes em `search.test.ts`, `navigation.test.ts` e `copy.test.ts`
+- [x] Repositório: `searchRecords` e `searchCardPurchases` no `MemoryRepository` e no `SupabaseRepository` (páginas de 500, até 1.000 linhas, aviso do limite); testes de API em "API real: buscar em Movimentações" e "conversor da busca em Movimentações"
+- [x] Tela `/movimentacoes/buscar` (consulta, com a barra): campo, Tipo, Período, Mais filtros (categoria, conta, valor), resumo, lista por mês, "Compras no cartão" à parte, "Mostrar mais 100", valores ocultos, conta nova em branco; o campo "Buscar" no topo de Movimentações e o grupo "No app" de Aprender ("buscar", "procurar", "quanto paguei"; 25 telas)
+- [x] Roteiro web: bloco "Buscar em Movimentos (D-045)" em `scripts/e2e-web.js` (390 e 320 px, demonstração e conta nova, 1.001 registros, valores ocultos, nada gravado); capturas 260 a 268 em `docs/telas`
+- [ ] Teste em aparelho (iOS e Android): teclado de busca e decimal, anúncio do resumo e a rolagem com 1.000 linhas
+- [ ] **Você:** revisar as regras de detalhe de D-045 (os períodos, a média por mês com gasto, as compras no cartão fora da soma e as 100 linhas por vez) e os textos
 
 ## Ajustes da revisão de Enzo, parte 1 (D-042), feito
 
