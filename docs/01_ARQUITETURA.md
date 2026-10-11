@@ -1,6 +1,6 @@
 # Arquitetura
 
-11/10/2026 · versão 0.14 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos, calculadoras, seus últimos meses, Aprender e dúvidas, lembretes, ocultar valores e biometria, renda comprometida, metas e reserva, plano de guardar, simulador, cartões e faturas, leitura de notas fiscais, plano para quitar dívidas, "Antes de financiar" (D-044) os ajustes de D-042: forma de pagamento da nota, faturas do mês nos cartões e contas do ano explicadas, as contas de origem do dinheiro, D-043, a busca em Movimentações, D-045, e as assinaturas, D-046)
+11/10/2026 · versão 0.15 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos, calculadoras, seus últimos meses, Aprender e dúvidas, lembretes, ocultar valores e biometria, renda comprometida, metas e reserva, plano de guardar, simulador, cartões e faturas, leitura de notas fiscais, plano para quitar dívidas, "Antes de financiar" (D-044) os ajustes de D-042: forma de pagamento da nota, faturas do mês nos cartões e contas do ano explicadas, as contas de origem do dinheiro, D-043, a busca em Movimentações, D-045, as assinaturas, D-046, e a exportação dos dados, D-047)
 
 ## Escolhas (aprovadas)
 
@@ -27,6 +27,7 @@ apps/app/src/
     gastos-fixos/[id]/informar
     gastos-fixos/assinaturas  revisar assinaturas (D-046): consulta, com a barra; só grava a data da revisão
     composicao, quem-ve, conta, explicacao/[tema]
+    conta/exportar  exportar meus dados (D-047): consulta, com a barra; monta o CSV ou o resumo em PDF no aparelho, nada é gravado
     movimentacoes/buscar  buscar em Movimentações (D-045): consulta, com a barra; nada é gravado
     contas/nova, contas/[id]/editar  contas de origem do dinheiro (D-043); a lista é o card "Suas contas" em /conta?secao=contas
     calcular, calcular/[slug]  calculadoras (nada é gravado); /calcular/plano-dividas é a 9ª (D-040) e /calcular/antes-de-financiar, a 10ª e a primeira da lista (D-044)
@@ -51,6 +52,7 @@ apps/app/src/
     tab-bar             barra das abas e barra das telas de consulta (D-039)
   lib/                  autenticação (Supabase e demonstração), learn.ts (links e ações de Aprender), situação do card Primeiros passos (só no aparelho),
                         reminders.ts, device.ts e device-prefs.ts (lembretes e preferências só do aparelho), privacy.ts (ocultar valores), essentials.ts,
+                        export-share.ts e export-share.web.ts (entrega do arquivo exportado, D-047: celular com expo-print e expo-sharing, web com Blob e página de impressão), export-logo.ts (logotipo oficial em SVG para o PDF),
                         bar-inset.ts (altura da barra inferior das telas de consulta), last-account.ts (última conta usada, só no aparelho), subscription-reminder.ts ("Agora não" do aviso de assinaturas, 30 dias, só no aparelho), cards.ts (rotas e leituras de cartão), pdf-text.ts, receipt-read.ts, receipt-link.ts, sefaz-fetch.ts e note-prefs.ts (leitura de notas no aparelho)
   state/                sessão, dados (consultas e gravações), contexto e mês
   theme/                tokens de cor, tipografia, movimento e vetores do logo
@@ -70,6 +72,7 @@ packages/core/          regras financeiras, validação, repositório em memóri
   src/subscriptions.ts assinaturas (D-046): quais são, por mês e por ano, quando mostrar o lembrete (6 e 3 meses, "Agora não" por 30 dias) e os textos
   src/accounts.ts      contas de origem do dinheiro (D-043): tipos, validação do formulário, escolha da conta que vem marcada, filtro por conta, conta da nota fiscal e textos
   src/calculators/      as 10 calculadoras, campos, textos e links de contexto; plano-dividas.ts (D-040): conta mês a mês das duas ordens de quitar dívidas e a leitura dos parcelamentos (`seriesDebtDrafts`); antes-de-financiar.ts (D-044): parcela Price (com a primeira em 1 mês ou na compra), juros, peso na renda, juntar antes (sobre `monthsForTarget` de `simulate.ts`) e entrada maior
+  src/export.ts         exportar meus dados (D-047): períodos, linhas, CSV (BOM, ponto e vírgula, escape de fórmula), totais por mês iguais aos do Resumo, HTML do PDF, leitura com limite de 20.000 linhas e textos
   src/search.ts         buscar em Movimentações (D-045): texto sem acento, período, filtro do servidor e a mesma regra no MemoryRepository, resumo e média por mês com gasto, agrupamento por mês, rascunho e textos
   src/navigation.ts     navegação (D-039): modo da barra inferior por endereço, mês de abertura e seletor de Contas a pagar, linha de lembretes e o índice "No app" da busca de Aprender
 supabase/
@@ -219,6 +222,12 @@ pessoa ──< vínculo (permissões por ação) >── contexto (pessoal | fam
 - **Repositório:** `searchRecords(contextId, filtro)` (registros de `financial_records`) e `searchCardPurchases(contextId, filtro)` (compras de `card_entry_items`, uma linha por compra) filtram por período, tipo, categoria, conta e valor no servidor, do mais recente ao mais antigo (data, criação, id), em páginas de 500 e **até 1.000 linhas** (pede-se a 1.001ª para saber se havia mais: `truncated`). O texto vai como um `ILIKE` por palavra na descrição, mais largo que a conferência exata (`_` no lugar das letras que podem ter acento; o limite de 1.000 vale só para o que combina), e o aparelho confere o resto; as linhas repetidas entre as páginas (mesmo id) saem antes do corte. O `MemoryRepository` usa a mesma regra do core (`recordMatchesFilter`, `purchaseMatchesFilter`, `textSupersetMatches`); o teste de API confere a regra contra o banco real.
 - **Core e app:** `search.ts` (normalização NFD sem marcas, `searchTermPattern`, `searchRange`, `searchFilterOf`, `searchResultRecords`, `summarizeSearch`, `groupByMonth`, `searchFromDraft` e `SEARCH_TEXT`), `useRecordSearch` em `state/data.ts` (a chave leva o filtro do servidor, com as palavras do texto, só no cache em memória, que não é persistido, e começa por `records` e `cards`, então toda escrita recarrega a busca aberta), `components/search-parts.tsx` (o campo-botão "Buscar" e a linha da compra no cartão) e a tela `movimentacoes/buscar.tsx`, de consulta (`barModeFor`) e do assunto Movimentos (`topicTabFor`).
 - Uma função de leitura no banco seria melhor para muitos anos de registros; fica como evolução possível (D-045(5)).
+
+**Exportar meus dados** (D-047) não muda o banco: é leitura pura, com a RLS de sempre, e não grava nada. O app monta o arquivo no aparelho e não o guarda.
+
+- **Leitura:** `loadExportSource` (core) usa `searchRecords` e `searchCardPurchases` com o parâmetro opcional `limit` (20.000, em páginas de 500), mais `listAccounts`, `listCards`, `listCommitmentsDueBetween` e `getCommitment` (para dizer se o gasto veio de gasto fixo, parcelamento ou conta do ano) e, só no PDF, `loadInvoicesOfRecords` (para Por categoria sair como no Resumo). Passou do limite, a exportação pede um período menor.
+- **Montagem:** `buildExportFiles` devolve o CSV de lançamentos, o CSV de compras no cartão (só se houver) ou o HTML do PDF; as mesmas funções do Resumo (`summarizeMonth`, `categoryBreakdown`) dão os totais de cada mês.
+- **Entrega por plataforma:** `lib/export-share.ts` (celular) escreve o CSV no cache com `expo-file-system`, gera o PDF com `expo-print` (`printToFileAsync`), compartilha com `expo-sharing` e apaga a cópia; `lib/export-share.web.ts` baixa o CSV por Blob e abre uma página de impressão com o mesmo HTML. Os pacotes nativos ficam fora do site, como em `device.web.ts`.
 
 **Leitura de notas fiscais** (D-038) roda no aparelho e grava só o resumo SHA-256 da chave de acesso, no mesmo campo `receipt_key` da migração 0008.
 

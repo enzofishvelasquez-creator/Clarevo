@@ -5797,6 +5797,13 @@ describe('API real: buscar em Movimentações (Ciclo H1, D-045)', () => {
       expect(page.items.map(line), JSON.stringify(filter)).toEqual(expected.map(line));
       expect(page.truncated).toBe(false);
     }
+    // Exportar meus dados (D-047): o limite passado pela exportação corta no banco real e avisa que havia mais.
+    const two = await reader.searchRecords(ctx, YEAR, 2);
+    expect(two.items.map(line)).toEqual([...universe].sort(compareNewestRecord).slice(0, 2).map(line));
+    expect(two.truncated).toBe(true);
+    const wide = await reader.searchRecords(ctx, YEAR, 20_000);
+    expect([wide.items.length, wide.truncated]).toEqual([universe.length, false]);
+    expect((await reader.searchCardPurchases(ctx, YEAR, 1)).truncated).toBe(true);
     // O texto já vem filtrado do banco: "farmacia" (sem acento) acha "Farmácia", e a conferência exata do aparelho confirma.
     const farmacia = await reader.searchRecords(ctx, { ...YEAR, terms: searchTerms('farmacia') });
     expect(farmacia.items.map((r) => r.description)).toEqual(['Farmácia']);
@@ -6016,6 +6023,29 @@ describe('conversor da busca em Movimentações', () => {
     expect(small.ranges).toEqual([[0, 499]]);
     const empty = fakeDb(0, recordRow);
     expect(await empty.repo.searchRecords('ctx', none)).toEqual({ items: [], truncated: false });
+  });
+
+  it('exportar meus dados (D-047): o limite da leitura é um parâmetro (20.000), com as mesmas páginas de 500 e a linha a mais', async () => {
+    const many = fakeDb(1203, recordRow);
+    const page = await many.repo.searchRecords('ctx', none, 20_000);
+    expect(many.ranges).toEqual([[0, 499], [500, 999], [1000, 1499]]);
+    expect(page.items).toHaveLength(1203);
+    expect(page.truncated).toBe(false);
+    const cut = fakeDb(1203, recordRow);
+    const some = await cut.repo.searchRecords('ctx', none, 700);
+    expect(cut.ranges).toEqual([[0, 499], [500, 700]]);
+    expect(some.items).toHaveLength(700);
+    expect(some.truncated).toBe(true);
+    // Sem o parâmetro, a busca de Movimentações continua nas 1.000 mais recentes.
+    expect((await fakeDb(1203, recordRow).repo.searchRecords('ctx', none)).items).toHaveLength(SEARCH_LIMIT);
+    // Exatamente o limite: sem aviso; uma a mais: avisa. É o que a exportação usa para pedir um período menor.
+    const exact = fakeDb(20_000, recordRow);
+    const all = await exact.repo.searchRecords('ctx', none, 20_000);
+    expect([all.items.length, all.truncated]).toEqual([20_000, false]);
+    expect(exact.ranges.at(-1)).toEqual([20_000, 20_000]);
+    const over = fakeDb(20_001, recordRow);
+    const first = await over.repo.searchRecords('ctx', none, 20_000);
+    expect([first.items.length, first.truncated]).toEqual([20_000, true]);
   });
 
   it('linhas repetidas entre as páginas (mesmo id) saem antes do corte, na ordem em que chegaram', async () => {

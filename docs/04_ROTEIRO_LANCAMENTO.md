@@ -196,7 +196,7 @@ Sem mudança no banco. Regras no core (`packages/core/src/navigation.ts`, `navig
 - [x] Barra inferior à vista em toda tela de consulta (Calculadoras, Contas a pagar e o detalhe, Gastos fixos, Cartões e a fatura, detalhe do registro, composição, Renda comprometida, detalhe da reserva e da meta, Simular, explicação de um tema, Seus últimos meses, Conta), com a aba de origem marcada, sem barra dupla nem salto ao abrir e fora da frente do teclado; sem barra nos formulários e nas telas de passo a passo com rodapé fixo (`/reserva`, `/guardar`, `/guardar/minima`, `/retomar/atualizar`, `/retomar/pagar` e `/a-pagar/vencidas`)
 - [x] Contas a pagar: seletor de mês local (sem limite para trás, 12 meses à frente), entradas "de agora" no mês atual, cards com o mês no endereço, "Revisar vencidas" com 1 vencida, "Já paguei" no detalhe, previsão e critério do total depois das listas e a linha de lembretes (celular, fora da demonstração, lembretes desligados) que abre Conta no card de lembretes
 - [x] Metas compacta: pergunta de 186 px em 360 × 640, plano de guardar dentro do card da reserva (com ou sem reserva), "Calcular minha reserva" à vista acima da barra e o card "Fazer as contas"
-- [x] Aprender: "Buscar um tema ou uma função" e o grupo "No app" com 20 telas do app (21 com o plano para quitar dívidas, D-040; 22 com "Antes de financiar", D-044; 23 com "Suas contas", D-043; 25 com "Orçamento por categoria", D-041, que a contagem anterior não incluía, e "Buscar em Movimentações", D-045; 26 com "Revisar assinaturas", D-046) (`docs/09_APRENDER.md`); nome acessível da aba "Movimentos: movimentações do mês"
+- [x] Aprender: "Buscar um tema ou uma função" e o grupo "No app" com 20 telas do app (21 com o plano para quitar dívidas, D-040; 22 com "Antes de financiar", D-044; 23 com "Suas contas", D-043; 25 com "Orçamento por categoria", D-041, que a contagem anterior não incluía, e "Buscar em Movimentações", D-045; 26 com "Revisar assinaturas", D-046; 27 com "Exportar meus dados", D-047) (`docs/09_APRENDER.md`); nome acessível da aba "Movimentos: movimentações do mês"
 - [x] Roteiro web: bloco "Navegação (D-039)" em `scripts/e2e-web.js`, conferido em 390 e 320 px de largura e, nos casos de altura curta, em 360 × 640 e 320 × 640
 - [ ] **Você:** decidir se a conta vencida passa a 3 toques contando a confirmação, com "Já paguei" na própria linha da vencida (muda D-035(5)); hoje são 4 toques (D-039(6))
 - [ ] **Você:** confirmar que `/reserva`, `/guardar`, `/guardar/minima`, `/retomar/atualizar`, `/retomar/pagar` e `/a-pagar/vencidas` ficam sem a barra (D-039(4)); confirmar o card "Seu mês" depois de "Suas metas" e o título "Marcar como paga" na tela de pagamento
@@ -293,9 +293,20 @@ Enzo, em 10/10/2026: "sim", à ordem proposta para o item 11 (assinaturas). Banc
 - [ ] Teste em aparelho (iOS e Android): o interruptor com leitor de tela, "Continua" como botão alternado, os botões do aviso e o aviso aparecendo sem piscar
 - [ ] **Você:** revisar as regras de detalhe de D-046 (os 6 e os 3 meses do lembrete, a idade pelo dia do cadastro no Clarevo, os 30 dias de "Agora não", "Continua" que não é guardado, o texto que diz que encerrar aqui não encerra o serviço) e os textos
 
+## Ciclo H3: exportar meus dados (D-047, `docs/08` §5 item 14)
+
+Enzo, em 10/10/2026: "sim", à ordem da seção 5 de `docs/08`. Só no core e no app, **sem migração**, com dois pacotes nativos novos (`expo-print` `~57.0.2` e `expo-sharing` `~57.0.22`, as versões de `bundledNativeModules.json` do SDK 57). Regras em `packages/core/src/export.ts` e `docs/02`; tela em `apps/app/src/app/conta/exportar.tsx`.
+
+- [x] Core: `export.ts` (períodos, linhas, CSV com BOM, escape de fórmula, totais por mês iguais aos do Resumo, HTML do PDF, leitura com limite de 20.000 linhas, biometria antes de gerar e textos); testes em `export.test.ts`, `copy.test.ts` e `navigation.test.ts`
+- [x] Repositório: o parâmetro opcional `limit` de `searchRecords` e `searchCardPurchases` no `MemoryRepository` e no `SupabaseRepository` (a busca de Movimentações continua em 1.000); testes de API nos blocos "API real: buscar em Movimentações" e "conversor da busca em Movimentações"
+- [x] App: Conta › "Exportar meus dados" e `/conta/exportar` (consulta, com a barra): período, formato, "O que vai no arquivo", "Preparar arquivo", "Arquivo pronto" com um botão por arquivo; `export-share.ts` (celular: expo-file-system, expo-print e expo-sharing, com a cópia temporária apagada) e `export-share.web.ts` (Blob e página de impressão); o grupo "No app" de Aprender (27 telas)
+- [x] Roteiro web: bloco "Exportar meus dados (D-047)" em `scripts/e2e-web.js` (390 e 320 px, demonstração, valores ocultos e conta nova: o CSV baixado com cabeçalho, BOM, separador, um gasto, uma compra no cartão e o escape de fórmula; a página de impressão com os totais do Resumo; janela bloqueada; nada gravado, nem na rede nem no navegador); capturas 290 a 297 em `docs/telas`
+- [ ] Teste em aparelho (iOS e Android): o compartilhamento do CSV e do PDF, a impressão, o apagar da cópia temporária, a biometria antes de gerar e abrir o CSV no Excel e no Google Planilhas
+- [ ] **Você:** revisar as regras de detalhe de D-047 (a "Conta do ano" em Origem, as compras no cartão em segundo arquivo, o limite de 20.000 linhas, o PDF com meses vazios em uma linha e o texto sobre a LGPD) e os textos
+
 ## Próximos ciclos
 
-Os Ciclos A6, A4, A5, A2, B, C, D, E, F1, F2, G1 e H2, que vinham primeiro (D-023 com a mudança de D-034), estão nas seções acima. Seguem a Família (Ciclo 2) e o benefício empresarial, abaixo.
+Os Ciclos A6, A4, A5, A2, B, C, D, E, F1, F2, G1, H2 e H3, que vinham primeiro (D-023 com a mudança de D-034), estão nas seções acima. Seguem a Família (Ciclo 2) e o benefício empresarial, abaixo.
 
 ## Ciclo 2: família
 

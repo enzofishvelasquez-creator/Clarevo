@@ -451,6 +451,17 @@ describe('HTML do PDF (D-047)', () => {
     expect(html).toContain('Não é saldo da conta nem dinheiro disponível.');
   });
 
+  it('mês sem lançamento vira uma linha só e os meses com lançamento levam a tabela de totais', () => {
+    const html = exportReportHtml(buildExportReport(source));
+    const agosto = html.slice(html.indexOf('Agosto de 2026'), html.indexOf('Setembro de 2026'));
+    expect(agosto).toContain('Sem lançamentos neste mês.');
+    expect(agosto).not.toContain('<table');
+    const outubro = html.slice(html.indexOf('Outubro de 2026'));
+    expect(outubro).toContain('<table class="sum">');
+    // Soma do período: agosto vazio não muda nada.
+    expect(buildExportReport(source).totals).toEqual({ receivedCents: 600_000, paidCents: 290_000, differenceCents: 310_000 });
+  });
+
   it('escapa o texto da pessoa e não leva chave de nota, id nem autoria', () => {
     const html = exportReportHtml(buildExportReport(source));
     expect(html).not.toContain('<b>x</b>');

@@ -444,6 +444,7 @@ tr { break-inside: avoid; }
 .note { color: #4B5873; font-size: 10px; margin: 4px 0; }
 .empty { color: #4B5873; margin: 4px 0; }
 section.month { break-inside: auto; }
+@media screen { body { max-width: 820px; margin: 0 auto; padding: 16px; } }
 footer { margin-top: 18px; padding-top: 8px; border-top: 1px solid #E3E8F2; color: #4B5873; font-size: 10px; }
 `;
 
@@ -457,6 +458,8 @@ function summaryTable(received: Cents, paid: Cents, difference: Cents): string {
 function monthHtml(m: ExportMonth): string {
   const t = EXPORT_TEXT.pdf;
   const c = t.columns;
+  // Mês sem lançamento: uma linha só (os totais são zero e entram na soma do período), para o PDF não crescer com meses vazios.
+  if (m.rows.length === 0) return `<section class="month"><h2>${escapeHtml(formatMonthBR(m.month))}</h2><p class="empty">${t.noEntries}</p></section>`;
   const categories = m.categories.length
     ? `<h3>${t.byCategory}</h3><table><thead><tr><th>${c.category}</th><th class="num">${c.value}</th><th class="num">${c.share}</th></tr></thead><tbody>${m.categories
         .map((s) => `<tr><td>${escapeHtml(s.label)}</td><td class="num">${money(s.cents)}</td><td class="num">${escapeHtml(s.percentText)}</td></tr>`)

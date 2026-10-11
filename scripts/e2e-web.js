@@ -6,8 +6,8 @@
  * e plano de guardar), do Ciclo D (simulador, com os aportes no início de cada mês) e da Navegação (D-039: "Anotar gasto" logo
  * abaixo do cabeçalho, barra inferior nas telas de consulta, Contas a pagar no mês certo, Metas compacta e a busca "No app" de
  * Aprender), de "Antes de financiar" (D-044), do Ciclo G1 (contas de origem do dinheiro, D-043), do Ciclo H1 (buscar em
- * Movimentos, D-045) e do Ciclo H2 (assinaturas, D-046, com o cenário fictício "assinaturas" da demonstração) na versão web,
- * em modo demonstração (acesso simulado).
+ * Movimentos, D-045), do Ciclo H2 (assinaturas, D-046, com o cenário fictício "assinaturas" da demonstração) e do Ciclo H3
+ * (exportar meus dados em CSV e PDF, D-047) na versão web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -7325,6 +7325,212 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('H2 telas de assinaturas: nenhum termo proibido, travessão, expressão vetada, palavra de julgamento, "cancele" nem marca de serviço',
     h2Texts.length >= 12 && h2Vetoed.length === 0 && h2Judging.length === 0, `${h2Texts.length} telas ${h2Vetoed.join(' | ')} ${h2Judging.join(' | ')}`);
   ok('H2 nenhuma escrita direta na rede durante as assinaturas (nenhum POST, PATCH, PUT ou DELETE)', writes.slice(h2Writes0).length === 0, writes.slice(h2Writes0).join(' | '));
+  await goResumo().catch(() => {});
+
+  // ==================================================================================================================
+  // Ciclo H3 · Exportar meus dados (D-047), docs/08 §5 item 14. Conta › "Exportar meus dados" (/conta/exportar, tela de consulta)
+  // e a busca "No app" de Aprender. Período (padrão 12 meses) e formato (Planilha CSV ou Resumo em PDF); o arquivo é montado no
+  // aparelho com as leituras de sempre. Na web, o CSV baixa por Blob (lançamentos e, à parte, as compras no cartão) e o resumo abre
+  // uma página de impressão com o mesmo HTML. O arquivo sempre leva os valores, mesmo com "Ocultar valores" ligado. Nada é gravado
+  // (nem na rede, nem no armazenamento do navegador). Cada tela é conferida em 390 e em 320 px. Capturas novas: 290 em diante.
+  // ==================================================================================================================
+  const h3Texts = [];
+  const h3Keep = async () => { const x = await body(); h3Texts.push(x); screenTexts.push(x); return x; };
+  const h3Writes0 = writes.length;
+  const h3Storage = () => p.evaluate(() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]));
+  const h3OpenExport = async () => {
+    await goResumo(); await openConta();
+    await btn('Exportar meus dados. Abre a tela para gerar uma planilha ou um resumo em PDF.').click();
+    await waitText('O que vai no arquivo'); await p.waitForTimeout(400);
+  };
+  const h3Checked = async () => p.evaluate(() => [...document.querySelectorAll('[role=radio]')].filter((e) => e.getBoundingClientRect().width > 0 && e.getAttribute('aria-checked') === 'true').map((e) => e.textContent));
+  const h3Prepare = async () => { await btn('Preparar arquivo').click(); await p.getByText('Arquivo pronto', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 8000 }); await p.waitForTimeout(300); };
+  const h3Download = async (name) => {
+    const [download] = await Promise.all([p.waitForEvent('download'), btn(name).click()]);
+    const buf = fs.readFileSync(await download.path());
+    return { name: download.suggestedFilename(), buf, text: buf.toString('utf8') };
+  };
+  let h3Storage0 = null;
+
+  // ---- 1. A entrada em Conta ----
+  await demoHome();
+  h3Storage0 = await h3Storage();
+  await openConta();
+  t = await h3Keep();
+  ok('H3 Conta: o bloco "Exportar meus dados" (nível 2) com a legenda e o botão "Escolher período e formato", depois de Privacidade neste aparelho',
+    (await headingShown('Exportar meus dados')) && t.includes('Planilha (CSV) ou resumo em PDF dos seus gastos e recebimentos') && (await visibleCount('button', 'Exportar meus dados. Abre a tela para gerar uma planilha ou um resumo em PDF.')) === 1 &&
+    t.indexOf('Privacidade neste aparelho') < t.indexOf('Exportar meus dados') && t.indexOf('Exportar meus dados') < t.indexOf('Acesso ao plano'), t.slice(0, 900));
+  await atWidths(async (w) => { await layoutChecks(`H3 Conta com Exportar ${w}px`); if (w === 390) await shot('290_conta_exportar'); });
+  await btn('Exportar meus dados. Abre a tela para gerar uma planilha ou um resumo em PDF.').click(); await waitText('O que vai no arquivo'); await p.waitForTimeout(500);
+
+  // ---- 2. A tela: consulta com barra, período (12 meses) e formato (planilha) marcados, avisos à vista ----
+  t = await h3Keep();
+  ok('H3 a tela: título "Exportar meus dados" em /conta/exportar, contexto Pessoal e a introdução (montado neste aparelho, sem cópia no Clarevo)',
+    urlPath() === '/conta/exportar' && (await h1Name()) === 'Exportar meus dados' && t.includes('Pessoal') && t.includes('O arquivo é montado neste aparelho') && t.includes('O Clarevo não guarda cópia dele.'), t.slice(0, 500));
+  ok('H3 a portabilidade da LGPD (art. 18, V) só como referência, sem parecer jurídico', t.includes('art. 18, V, da LGPD') && t.includes('Esta tela não é parecer jurídico.'));
+  ok('H3 períodos: Este mês, Últimos 3, 6 e 12 meses, Este ano, Ano passado e Tudo; "Últimos 12 meses" marcado',
+    JSON.stringify(await p.evaluate(() => [...document.querySelectorAll('[role=radio]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent))) ===
+      JSON.stringify(['Este mês', 'Últimos 3 meses', 'Últimos 6 meses', 'Últimos 12 meses', 'Este ano', 'Ano passado', 'Tudo', 'Planilha (CSV)', 'Resumo em PDF']) &&
+    JSON.stringify(await h3Checked()) === JSON.stringify(['Últimos 12 meses', 'Planilha (CSV)']), JSON.stringify(await h3Checked()));
+  ok('H3 formato Planilha (CSV): explica as colunas, o segundo arquivo das compras no cartão e o que fica de fora (chave da nota, número do cartão, códigos internos)',
+    t.includes('Abre no Excel e no Google Planilhas') && t.includes('Data, Tipo, Descrição, Categoria, Valor (R$), Conta de origem e Origem') && t.includes('segundo arquivo') &&
+    t.includes('Ficam de fora a chave da nota fiscal, o número do cartão (só o final aparece) e os códigos internos do Clarevo.'));
+  ok('H3 o aviso dos valores: "O arquivo mostra os valores, mesmo com Ocultar valores ligado." e o de dados financeiros', t.includes('O arquivo mostra os valores, mesmo com Ocultar valores ligado.') && t.includes('O arquivo tem dados financeiros.'));
+  ok('H3 nenhum arquivo antes de pedir: sem "Arquivo pronto" e com o botão "Preparar arquivo"', !t.includes('Arquivo pronto') && (await visibleCount('button', 'Preparar arquivo')) === 1);
+  await checkBar('H3 Exportar meus dados');
+  await atWidths(async (w) => { await innerChecks(`H3 Exportar meus dados ${w}px`); if (w === 390) await shot('291_exportar_meus_dados'); if (w === 320) await shot('291_exportar_meus_dados_320px'); });
+
+  // ---- 3. Planilha dos últimos 12 meses: dois arquivos (lançamentos e compras no cartão) ----
+  await h3Prepare();
+  t = await h3Keep();
+  ok('H3 Arquivo pronto: "6 lançamentos e 3 compras no cartão", o período e dois botões de download; nada foi baixado ainda',
+    t.includes('6 lançamentos e 3 compras no cartão') && t.includes('Período: Últimos 12 meses') && t.includes('Cada botão baixa um arquivo.') &&
+    (await visibleCount('button', 'Baixar lançamentos (CSV)')) === 1 && (await visibleCount('button', 'Baixar compras no cartão (CSV)')) === 1, t.slice(0, 900));
+  await atWidths(async (w) => { await innerChecks(`H3 Arquivo pronto ${w}px`); await scrollTo('Arquivo pronto'); if (w === 390) await shot('292_exportar_arquivo_pronto'); if (w === 320) await shot('292_exportar_arquivo_pronto_320px'); });
+  const h3Lanc = await h3Download('Baixar lançamentos (CSV)');
+  const h3Lines = h3Lanc.text.split('\r\n');
+  ok('H3 CSV de lançamentos: nome clarevo-lancamentos-2026-10-07.csv e UTF-8 com BOM (EF BB BF)',
+    h3Lanc.name === 'clarevo-lancamentos-2026-10-07.csv' && h3Lanc.buf[0] === 0xef && h3Lanc.buf[1] === 0xbb && h3Lanc.buf[2] === 0xbf, `${h3Lanc.name} ${[...h3Lanc.buf.slice(0, 4)].join(',')}`);
+  ok('H3 CSV de lançamentos: cabeçalho separado por ponto e vírgula e uma linha por lançamento (6), terminando em CRLF',
+    h3Lines[0] === '﻿Data;Tipo;Descrição;Categoria;Valor (R$);Conta de origem;Origem' && h3Lines.length === 8 && h3Lines[7] === '', JSON.stringify(h3Lines.slice(0, 3)));
+  ok('H3 CSV de lançamentos: um gasto anotado em outra conta (Mercado, Carteira), valor com vírgula e data dd/mm/aaaa',
+    h3Lines.includes('06/10/2026;Gasto;Mercado;Mercado;1400,00;Carteira;Anotado'), h3Lines.join(' | '));
+  ok('H3 CSV de lançamentos: o gasto fixo pago (Aluguel) com a origem "Gasto fixo", e o recebimento como "Recebimento"',
+    h3Lines.includes('05/10/2026;Gasto;Aluguel;Moradia;2500,00;Conta principal;Gasto fixo') && h3Lines.includes('01/10/2026;Recebimento;Salário;Salário;6000,00;Conta principal;Anotado'));
+  ok('H3 CSV de lançamentos: sem sinal de menos, sem "R$" nem ponto de milhar nos valores, e sem as compras no cartão',
+    h3Lines.slice(1, 7).every((l) => /;\d+,\d{2};/.test(l)) && !h3Lanc.text.includes('Notebook'));
+  await waitText('Pronto. Confira o arquivo na pasta de downloads.').catch(() => {});
+  ok('H3 baixar não grava nada e a tela diz onde o arquivo ficou', (await body()).includes('Pronto. Confira o arquivo na pasta de downloads.'));
+  const h3Compras = await h3Download('Baixar compras no cartão (CSV)');
+  const h3PLines = h3Compras.text.split('\r\n');
+  ok('H3 CSV de compras no cartão: nome, BOM, cabeçalho e as 3 compras com apelido e final do cartão, valor total e parcelas',
+    h3Compras.name === 'clarevo-compras-no-cartao-2026-10-07.csv' && h3Compras.buf[0] === 0xef && h3PLines[0] === '﻿Data da compra;Cartão;Descrição;Categoria;Valor total (R$);Parcelas' && h3PLines.length === 5 &&
+    h3PLines.includes('05/10/2026;Cartão Exemplo (final 1234);Notebook;Educação;1500,00;10') && h3PLines.includes('05/10/2026;Cartão Exemplo (final 1234);Tênis de corrida;Lazer;600,00;3') &&
+    h3PLines.includes('06/10/2026;Cartão Exemplo (final 1234);Restaurante;Lazer;200,00;1'), h3PLines.join(' | '));
+  ok('H3 os CSV não levam id, chave de nota nem autoria', ![h3Lanc.text, h3Compras.text].some((x) => /pessoa-demo|[0-9a-f]{8}-[0-9a-f]{4}-|[0-9a-f]{64}/i.test(x)));
+
+  // ---- 4. Proteção contra fórmula: descrição começando com = ou + vira texto ----
+  await otherDevice(async (repo, ctx) => {
+    const space = await repo.getSpace();
+    const key = () => Math.random().toString(36).slice(2) + Date.now();
+    await repo.createRecord(key(), ctx, 'despesa', { accountId: space.accounts[0].id, amountCents: 1990, occurredOn: '2026-10-07', description: '=SOMA(1+1)', category: null });
+    await repo.createRecord(key(), ctx, 'despesa', { accountId: space.accounts[0].id, amountCents: 500, occurredOn: '2026-10-07', description: '+55 11 99999; "teste"', category: 'Lazer' });
+  });
+  await radio('Planilha (CSV)').click(); await p.waitForTimeout(300);
+  ok('H3 trocar o formato (ou o período) tira o arquivo pronto: é preciso preparar de novo', !(await body()).includes('Arquivo pronto'));
+  await h3Prepare();
+  const h3Esc = await h3Download('Baixar lançamentos (CSV)');
+  const h3EscLines = h3Esc.text.split('\r\n');
+  ok('H3 fórmula: "=SOMA(1+1)" sai como \'=SOMA(1+1) (texto), "Sem categoria" onde não há categoria', h3EscLines.includes("07/10/2026;Gasto;'=SOMA(1+1);Sem categoria;19,90;Conta principal;Anotado"), h3EscLines.join(' | '));
+  ok('H3 fórmula: "+55…" ganha o apóstrofo e, por ter ponto e vírgula e aspas, vai entre aspas com as aspas dobradas',
+    h3EscLines.includes('07/10/2026;Gasto;"\'+55 11 99999; ""teste""";Lazer;5,00;Conta principal;Anotado'), h3EscLines.join(' | '));
+  ok('H3 fórmula: nenhuma célula do arquivo começa com =, +, - ou @', h3EscLines.slice(1).filter(Boolean).every((l) => !/(^|;)[=+\-@]/.test(l.replace(/"[^"]*(""[^"]*)*"/g, 'x'))), h3EscLines.join(' | '));
+  const h3Compras2 = await h3Download('Baixar compras no cartão (CSV)');
+  ok('H3 as compras no cartão continuam as mesmas (3) depois dos novos gastos', h3Compras2.text.split('\r\n').length === 5);
+
+  // ---- 5. Outros períodos: Este mês, Ano passado (nada para exportar) ----
+  await radio('Este mês').click(); await p.waitForTimeout(300);
+  await h3Prepare();
+  t = await h3Keep();
+  ok('H3 Este mês: 5 lançamentos (os 3 de outubro e os 2 novos) e 3 compras no cartão', t.includes('5 lançamentos e 3 compras no cartão') && t.includes('Período: Este mês'), t.slice(0, 700));
+  const h3Mes = await h3Download('Baixar lançamentos (CSV)');
+  ok('H3 Este mês: só outubro de 2026 no arquivo', h3Mes.text.split('\r\n').slice(1).filter(Boolean).length === 5 && h3Mes.text.split('\r\n').slice(1).filter(Boolean).every((l) => l.slice(3, 10) === '10/2026'));
+  await radio('Ano passado').click(); await p.waitForTimeout(300);
+  await btn('Preparar arquivo').click(); await waitText('Nada para exportar'); await p.waitForTimeout(300);
+  t = await h3Keep();
+  ok('H3 Ano passado: "Nada para exportar. Não há gasto, recebimento nem compra no cartão neste período. Escolha outro período." e nenhum botão de arquivo',
+    t.includes('Nada para exportar. Não há gasto, recebimento nem compra no cartão neste período. Escolha outro período.') && !t.includes('Arquivo pronto') && (await visibleCount('button', /^(Baixar|Abrir para imprimir)/)) === 0, t.slice(0, 600));
+  await radio('Tudo').click(); await p.waitForTimeout(300);
+  await h3Prepare();
+  t = await h3Keep();
+  ok('H3 Tudo: lê todos os meses (8 lançamentos e 3 compras no cartão)', t.includes('8 lançamentos e 3 compras no cartão') && t.includes('Período: Tudo'), t.slice(0, 500));
+
+  // ---- 6. Resumo em PDF: a página de impressão com o mesmo HTML ----
+  await radio('Últimos 12 meses').click(); await radio('Resumo em PDF').click(); await p.waitForTimeout(300);
+  t = await h3Keep();
+  ok('H3 formato PDF: a dica e o conteúdo mudam (resumo de cada mês; compras no cartão à parte, fora de Pago)', t.includes('Um resumo de cada mês, com Recebido, Pago, Diferença e Por categoria') && t.includes('não entram em Pago'), t.slice(0, 900));
+  await h3Prepare();
+  t = await h3Keep();
+  ok('H3 PDF pronto: um botão só, "Abrir para imprimir ou salvar em PDF", sem botões de CSV',
+    (await visibleCount('button', 'Abrir para imprimir ou salvar em PDF')) === 1 && (await visibleCount('button', /^Baixar /)) === 0 && t.includes('8 lançamentos e 3 compras no cartão'), t.slice(0, 700));
+  await atWidths(async (w) => { await innerChecks(`H3 PDF pronto ${w}px`); await scrollTo('Arquivo pronto'); if (w === 390) await shot('293_exportar_pdf_pronto'); if (w === 320) await shot('293_exportar_pdf_pronto_320px'); });
+  await p.evaluate(() => {
+    const open = window.open.bind(window);
+    window.__h3Prints = 0;
+    window.open = (...a) => { const w = open(...a); if (w) w.print = () => { window.__h3Prints++; }; return w; };
+  });
+  const [h3Popup] = await Promise.all([p.waitForEvent('popup'), btn('Abrir para imprimir ou salvar em PDF').click()]);
+  await h3Popup.waitForLoadState('domcontentloaded'); await p.waitForTimeout(1200);
+  const h3Html = await h3Popup.content();
+  const h3Page = (await h3Popup.locator('body').innerText()).replace(/ /g, ' ');
+  ok('H3 página de impressão: o logotipo oficial "clarevo." (azul, ponto lima), "Resumo financeiro", a data de geração e o período',
+    (await h3Popup.evaluate(() => { const s = document.querySelector('.logo svg'); return s ? [...s.querySelectorAll('path, circle')].map((x) => (x.getAttribute('fill') || '').toUpperCase()).join(' ') : ''; })) === '#2457F5 #D4F05B' &&
+    h3Page.includes('Resumo financeiro') && h3Page.includes('Gerado em 07/10/2026') && h3Page.includes('Período: Últimos 12 meses (de novembro de 2025 a outubro de 2026)'), h3Page.slice(0, 400));
+  ok('H3 página de impressão: o mês de outubro de 2026 com Recebido, Pago e Diferença, Por categoria e a lista de lançamentos',
+    h3Page.includes('Outubro de 2026') && h3Page.includes('Por categoria') && h3Page.includes('Lançamentos') && h3Page.includes('Aluguel') && h3Page.includes('Moradia'), h3Page.slice(0, 1500));
+  ok('H3 página de impressão: as compras no cartão à parte, com a nota de que não entram em Pago', h3Page.includes('Compras no cartão') && h3Page.includes('Notebook') && h3Page.includes('3 compras · R$ 2.300,00 no total das compras') && h3Page.includes('não entram em Pago'));
+  ok('H3 a página pede a impressão uma vez (window.print) e o HTML é a página inteira, sem script', (await p.evaluate(() => window.__h3Prints)) === 1 && !/<script/i.test(h3Html) && h3Html.includes('<title>clarevo. Resumo financeiro de 07/10/2026</title>'), String(await p.evaluate(() => window.__h3Prints)));
+  await h3Popup.setViewportSize({ width: 794, height: 1000 });
+  await h3Popup.screenshot({ path: `${OUT}/294_pagina_de_impressao.png`, fullPage: false });
+  // Os totais do mês na página de impressão são os do Resumo (6.000 / 3.900 / 2.100 em outubro, sem os dois gastos novos).
+  const h3Oct = await h3Popup.evaluate(() => { const s = [...document.querySelectorAll('section.month')].find((x) => x.querySelector('h2')?.textContent === 'Outubro de 2026'); return s ? [...s.querySelectorAll('table.sum td')].map((x) => x.textContent.replace(/ /g, ' ')) : null; });
+  await h3Popup.close();
+  await p.bringToFront();
+  ok('H3 os totais de outubro na página de impressão incluem os dois gastos novos (R$ 6.000,00 / R$ 3.924,90 / R$ 2.075,10), como o Resumo', JSON.stringify(h3Oct) === JSON.stringify(['R$ 6.000,00', 'R$ 3.924,90', 'R$ 2.075,10']), JSON.stringify(h3Oct));
+  await goResumo();
+  await expectTotals('H3 o Resumo de outubro mostra os mesmos totais da página de impressão', 'R$ 6.000,00', 'R$ 3.924,90', 'R$ 2.075,10', 'R$ 650,00');
+  // Janela bloqueada: o aviso diz o que fazer.
+  await h3OpenExport();
+  await radio('Resumo em PDF').click(); await h3Prepare();
+  await p.evaluate(() => { window.open = () => null; });
+  await btn('Abrir para imprimir ou salvar em PDF').click(); await waitText('O navegador bloqueou a janela de impressão.'); await p.waitForTimeout(300);
+  ok('H3 janela de impressão bloqueada: "O navegador bloqueou a janela de impressão. Permita janelas para este site e tente de novo."', (await body()).includes('O navegador bloqueou a janela de impressão. Permita janelas para este site e tente de novo.'));
+
+  // ---- 7. Valores ocultos: o arquivo mostra os valores, com o aviso em destaque ----
+  await goResumo(); await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
+  await btn('Exportar meus dados. Abre a tela para gerar uma planilha ou um resumo em PDF.').click(); await waitText('O que vai no arquivo'); await p.waitForTimeout(400);
+  t = await h3Keep();
+  ok('H3 valores ocultos: o aviso "O arquivo mostra os valores, mesmo com Ocultar valores ligado." aparece em destaque e a tela não mostra nenhum valor em reais',
+    t.includes('O arquivo mostra os valores, mesmo com Ocultar valores ligado.') && (await moneyLeaks()).length === 0, (await moneyLeaks()).join(' | '));
+  await radio('Planilha (CSV)').click(); await h3Prepare();
+  const h3Hid = await h3Download('Baixar lançamentos (CSV)');
+  ok('H3 valores ocultos: o CSV baixado leva os valores (1400,00 e 2500,00), sem "••••"', h3Hid.text.includes(';1400,00;') && h3Hid.text.includes(';2500,00;') && !h3Hid.text.includes('••••'));
+  await atWidths(async (w) => { await innerChecks(`H3 Exportar com valores ocultos ${w}px`); if (w === 390) await shot('295_exportar_valores_ocultos'); });
+  await btn('Voltar').click(); await waitText('Privacidade neste aparelho');
+  await hideSwitch().click(); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+
+  // ---- 8. A busca "No app" de Aprender ----
+  await tabByName('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await p.waitForTimeout(400);
+  const h3Box = () => p.getByLabel('Buscar um tema ou uma função', { exact: true }).filter({ visible: true }).first();
+  for (const query of ['exportar', 'planilha', 'pdf', 'backup', 'baixar', 'csv']) {
+    await h3Box().fill(query); await waitText('No app'); await p.waitForTimeout(500);
+    const level = await p.evaluate(() => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'No app' && e.getBoundingClientRect().width > 0); return h ? h.getAttribute('aria-level') : null; });
+    ok(`H3 busca "${query}" em Aprender: o grupo "No app" (nível 2) tem "Exportar meus dados"`, level === '2' && (await p.getByRole('button', { name: /^Exportar meus dados\. Planilha \(CSV\) ou resumo em PDF/ }).filter({ visible: true }).count()) === 1, query);
+    if (query === 'planilha') await atWidths(async (w) => { await layoutChecks(`H3 Aprender No app ${w}px`); if (w === 390) await shot('296_aprender_no_app_exportar'); });
+  }
+  await h3Box().fill('exportar'); await waitText('No app'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /^Exportar meus dados\. / }).filter({ visible: true }).first().click(); await waitText('O que vai no arquivo'); await p.waitForTimeout(500);
+  ok('H3 tocar em "Exportar meus dados" em Aprender abre a tela, com a barra', urlPath() === '/conta/exportar' && (await h1Name()) === 'Exportar meus dados');
+  await checkBar('H3 Exportar aberta por Aprender');
+
+  // ---- 9. Conta nova: nada de exemplo, nada para exportar ----
+  await newAcct('Kauê Teste', 'kaue@exemplo.com');
+  await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().waitFor({ timeout: 15000 }); await p.waitForTimeout(500);
+  await h3OpenExport();
+  await radio('Tudo').click(); await btn('Preparar arquivo').click(); await waitText('Nada para exportar'); await p.waitForTimeout(400);
+  t = await h3Keep();
+  ok('H3 conta nova: "Nada para exportar", nenhum botão de arquivo e nenhum dado de exemplo', t.includes('Nada para exportar. Não há gasto, recebimento nem compra no cartão neste período.') && (await visibleCount('button', /^(Baixar|Abrir para imprimir)/)) === 0 && !t.includes('(exemplo)'));
+  await atWidths(async (w) => { await innerChecks(`H3 Exportar conta nova ${w}px`); if (w === 390) await shot('297_exportar_conta_nova'); });
+  await radio('Resumo em PDF').click(); await btn('Preparar arquivo').click(); await waitText('Nada para exportar'); await p.waitForTimeout(300);
+  ok('H3 conta nova: o resumo em PDF também diz "Nada para exportar" (nenhum PDF vazio)', (await visibleCount('button', 'Abrir para imprimir ou salvar em PDF')) === 0);
+
+  // ---- 10. Textos e escritas ----
+  const h3Vetoed = h3Texts.map((x) => x.match(FORBIDDEN)?.[0]).filter(Boolean);
+  const h3Judging = h3Texts.map((x) => x.match(/[–—]|\b(desperd[ií]cio|vale a pena|cortes?|cortar|cuidado|garantid[oa]|em conformidade)\b|\bbem-vind[oa]\b|\busuári[oa]s?\b/i)?.[0]).filter(Boolean);
+  ok('H3 telas de exportação: nenhum termo proibido, travessão, expressão vetada, palavra de julgamento nem promessa jurídica', h3Texts.length >= 10 && h3Vetoed.length === 0 && h3Judging.length === 0, `${h3Texts.length} telas ${h3Vetoed.join(' | ')} ${h3Judging.join(' | ')}`);
+  ok('H3 nenhuma escrita direta na rede durante a exportação (nenhum POST, PATCH, PUT ou DELETE)', writes.slice(h3Writes0).length === 0, writes.slice(h3Writes0).join(' | '));
+  ok('H3 nada é guardado no navegador (localStorage e sessionStorage iguais aos de antes: nem período, nem formato, nem arquivo)', (await h3Storage()) === h3Storage0, h3Storage0.slice(0, 200));
   await goResumo().catch(() => {});
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
