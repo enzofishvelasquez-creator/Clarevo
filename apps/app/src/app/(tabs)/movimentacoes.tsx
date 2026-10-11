@@ -3,6 +3,7 @@ import {
   BUDGET_TEXT,
   CARDS_TEXT,
   ERROR_TEXT,
+  IMPORT_TEXT,
   ORGANIZE_TEXT,
   accountFilterOptions,
   filterByAccount,
@@ -20,7 +21,7 @@ import {
   type BudgetSummary,
 } from '@clarevo/core';
 import { router } from 'expo-router';
-import { Calculator, CalendarClock, ChevronRight, CreditCard, Minus, Plus, Repeat, Target, type LucideIcon } from 'lucide-react-native';
+import { Calculator, CalendarClock, ChevronRight, CreditCard, FileUp, Minus, Plus, Repeat, Target, type LucideIcon } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
@@ -61,7 +62,7 @@ type Shortcut = { icon: LucideIcon; title: string; caption: string; open: () => 
 /**
  * Bloco "Organizar" (D-033, D-034, D-037, D-041): Contas a pagar e Gastos fixos e parcelamentos com legendas do mês (a mesma origem
  * do card "Ainda a pagar", D-021(5)), Cartões com a fatura atual, Orçamento por categoria com a categoria mais perto do limite
- * ("Mercado: R$ 412,30 de R$ 1.200,00") e Calculadoras com a legenda fixa. Enquanto carrega ou com erro, as linhas dinâmicas
+ * ("Mercado: R$ 412,30 de R$ 1.200,00"), Importar extrato ou fatura (D-048, legenda fixa) e Calculadoras com a legenda fixa. Enquanto carrega ou com erro, as linhas dinâmicas
  * mostram a legenda fixa (nunca um "0" de uma falha). Nenhuma cor de alerta.
  */
 function organizeShortcuts(
@@ -98,6 +99,12 @@ function organizeShortcuts(
       caption: budget ? budgetCaption(budget) : BUDGET_TEXT.organize.fallback,
       // A legenda fala do mês em exibição; o Orçamento abre nesse mesmo mês (seletor local).
       open: () => router.push({ pathname: '/orcamento', params: payablesMonthParams(month, currentMonth) }),
+    },
+    {
+      icon: FileUp,
+      title: IMPORT_TEXT.rowTitle,
+      caption: IMPORT_TEXT.rowCaption,
+      open: () => router.push('/importar'),
     },
     {
       icon: Calculator,

@@ -51,6 +51,7 @@ import type {
   CommitmentWrite,
   GoalAction,
   GoalWrite,
+  ImportAction,
   IncomeReferenceAction,
   InvoicePaymentWrite,
   RecordsRepository,
@@ -62,6 +63,8 @@ import type {
   SubscriptionReviewWrite,
 } from './repository';
 import { RepoError } from './repository';
+import type { ImportDestination, ImportItem, ImportResult } from './importar/tipos';
+import { IMPORT_BATCH } from './importar/tipos';
 import { SEARCH_LIMIT, compareNewestPurchase, compareNewestRecord, purchaseMatchesFilter, recordMatchesFilter } from './search';
 import type { RecordSearchFilter, SearchPage } from './search';
 import { referenceMonthError } from './committed';
@@ -155,7 +158,8 @@ interface Operation {
     | SavingsAction
     | CardAction
     | AccountAction
-    | SubscriptionReviewAction;
+    | SubscriptionReviewAction
+    | ImportAction;
   hash: string;
   contextId: string;
   recordId: string | null;
@@ -174,12 +178,14 @@ interface Operation {
   entryId: string | null;
   /** Ações de contas: a conta (target_id). */
   accountId: string | null;
+  /** Importação (import_result): quantas linhas viraram lançamento e quantas já existiam. Só em 'importar_extrato'. */
+  importResult: ImportResult | null;
 }
 
 /** Conta (financial_accounts): exclusão lógica (fica arquivada e some da leitura). */
 type StoredAccount = FinancialAccount & { createdBy: string; createdAt: string; deletedAt?: string; deletedBy?: string };
 
-type StoredRecord = FinancialRecord & { deletedAt?: string };
+type StoredRecord = FinancialRecord & { deletedAt?: string; importKey?: string };
 /**
  * Conta a pagar guardada sem o pagamento (lido do gasto vivo vinculado) e sem os dados da série (lidos pela junção).
  * seriesSkipped: excluída só neste mês; o número nunca volta a ser criado.
@@ -213,7 +219,7 @@ type StoredGoal = Omit<
 type StoredGoalMovement = GoalMovement & { deletedAt?: string; deletedBy?: string };
 /** Cartão (cards) sem o que é calculado (card_items: limite usado e fatura atual) e lançamento do cartão (card_entries): exclusão lógica. */
 type StoredCard = Omit<Card, 'usedCents' | 'currentMonth' | 'currentClosingOn' | 'currentDueOn'> & { deletedAt?: string; deletedBy?: string };
-type StoredCardEntry = CardEntry & { deletedAt?: string; deletedBy?: string };
+type StoredCardEntry = CardEntry & { deletedAt?: string; deletedBy?: string; importKey?: string };
 
 const NATURES: readonly string[] = ['conta', 'financiamento', 'compra_parcelada', 'outro_parcelamento'];
 const SERIES_ACTIONS: readonly string[] = [
@@ -2443,6 +2449,162 @@ export class MemoryRepository implements RecordsRepository {
     });
   }
 
+  // -------------------------------------------------------------------------
+  // Importar extrato ou fatura (D-048): import_records
+  // -------------------------------------------------------------------------
+
+  async findImportOperation(key: string) {
+    return this.read(() => {
+      const op = this.operations.get(key);
+      return op && op.action === 'importar_extrato' && op.importResult
+        ? { targetId: (op.accountId ?? op.cardId)!, result: op.importResult }
+        : null;
+    });
+  }
+
+  async findImportedKeys(contextId: string, keys: readonly string[]) {
+    return this.read(() => {
+      if (!this.canRead(contextId)) return [];
+      const wanted = new Set(keys);
+      const found = new Set<string>();
+      for (const r of this.records.values()) if (!r.deletedAt && r.contextId === contextId && r.importKey && wanted.has(r.importKey)) found.add(r.importKey);
+      for (const e of this.cardEntries.values()) if (!e.deletedAt && e.contextId === contextId && e.importKey && wanted.has(e.importKey)) found.add(e.importKey);
+      return [...found];
+    });
+  }
+
+  /** Como import_records (ordem de checagem em RecordsRepository.importRecords). Tudo ou nada: a recusa de um item desfaz o lote (write). */
+  async importRecords(key: string, contextId: string, destination: ImportDestination, targetId: string, items: readonly ImportItem[]) {
+    return this.write((): ImportResult => {
+      const list = Array.isArray(items) ? items : [];
+      const norm = list.map((it) => ({
+        importKey: it.importKey,
+        kind: it.kind,
+        amountCents: it.amountCents,
+        occurredOn: it.occurredOn,
+        description: typeof it.description === 'string' ? it.description.trim() : it.description,
+        category: trimCategory(it.category),
+      }));
+      const payload = [contextId, destination, targetId, norm];
+      const op = this.operations.get(key);
+      if (op) {
+        if (op.action !== 'importar_extrato' || op.hash !== hash(['importar_extrato', ...payload])) throw new RepoError('chave_reutilizada');
+        if (!this.canRead(op.contextId)) throw new RepoError('nao_encontrado');
+        return op.importResult!;
+      }
+      if (destination !== 'conta' && destination !== 'cartao') throw new RepoError('destino_invalido');
+      if (!Array.isArray(items) || items.length < 1 || items.length > IMPORT_BATCH) throw new RepoError('itens_invalidos');
+      if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      const today = this.opts.today();
+      let account: StoredAccount | undefined;
+      let card: StoredCard | undefined;
+      if (destination === 'conta') {
+        account = this.accountsById.get(targetId);
+        if (!account || account.deletedAt || account.contextId !== contextId || account.status !== 'ativa') throw new RepoError('conta_invalida');
+      } else {
+        card = this.liveCard(targetId);
+        if (card.contextId !== contextId) throw new RepoError('nao_encontrado');
+        if (card.status !== 'ativo') throw new RepoError('cartao_arquivado');
+      }
+      let live = card ? this.liveEntries(card.id).reduce((acc, e) => acc + e.installments, 0) : 0;
+      let created = 0;
+      let skipped = 0;
+      norm.forEach((it, index) => {
+        try {
+          if (typeof it !== 'object' || it === null) throw new RepoError('itens_invalidos');
+          if (typeof it.importKey !== 'string' || !/^[0-9a-f]{64}$/.test(it.importKey)) throw new RepoError('chave_de_importacao_invalida');
+          const exists =
+            destination === 'conta'
+              ? [...this.records.values()].some((r) => !r.deletedAt && r.contextId === contextId && r.importKey === it.importKey)
+              : [...this.cardEntries.values()].some((e) => !e.deletedAt && e.contextId === contextId && e.importKey === it.importKey);
+          if (exists) {
+            skipped += 1;
+            return;
+          }
+          const kinds = destination === 'conta' ? ['despesa', 'receita'] : ['compra', 'estorno'];
+          if (!kinds.includes(it.kind)) throw new RepoError('tipo_invalido');
+          const now = new Date().toISOString();
+          if (account) {
+            this.validate(contextId, { accountId: account.id, amountCents: it.amountCents, occurredOn: it.occurredOn, description: it.description, category: it.category });
+            const record: StoredRecord = {
+              id: this.id('reg'),
+              contextId,
+              accountId: account.id,
+              kind: it.kind as RecordKind,
+              status: 'realizado',
+              amountCents: it.amountCents,
+              currency: 'BRL',
+              occurredOn: it.occurredOn,
+              description: it.description,
+              category: it.category,
+              commitmentId: null,
+              invoice: null,
+              receiptKey: null,
+              createdBy: this.opts.actorId,
+              version: 1,
+              createdAt: now,
+              updatedAt: now,
+              importKey: it.importKey,
+            };
+            this.records.set(record.id, record);
+          } else {
+            const c = card!;
+            let month: IsoMonth;
+            if (it.kind === 'compra') {
+              const code = cardPurchaseError(
+                { purchasedOn: it.occurredOn, totalCents: it.amountCents, installments: 1, description: it.description, category: it.category },
+                today,
+                true,
+              );
+              if (code) throw new RepoError(code);
+              month = invoiceMonthOf(c, it.occurredOn);
+            } else {
+              // Estorno: valor, descrição e categoria; depois o dia (a fatura é a da data) e a faixa de 48 meses da fatura.
+              const text = cardRefundError({ amountCents: it.amountCents, description: it.description, category: it.category, invoiceMonth: monthOf(today) }, today, false);
+              if (text) throw new RepoError(text);
+              if (typeof it.occurredOn !== 'string' || !isValidIsoDate(it.occurredOn)) throw new RepoError('data_invalida');
+              if (it.occurredOn > today) throw new RepoError('data_futura');
+              month = invoiceMonthOf(c, it.occurredOn);
+              const range = cardRefundError({ amountCents: it.amountCents, description: it.description, category: it.category, invoiceMonth: month }, today, true);
+              if (range) throw new RepoError(range);
+            }
+            if (live + 1 > CARD_ENTRIES_MAX) throw new RepoError('limite_de_lancamentos');
+            if (this.invoicePaid(c.id, month)) throw new RepoError('fatura_paga');
+            const entry = this.newEntry(c, {
+              kind: it.kind as 'compra' | 'estorno',
+              description: it.description,
+              category: it.category,
+              chargeType: null,
+              purchasedOn: it.kind === 'compra' ? it.occurredOn : null,
+              amountCents: it.amountCents,
+              installments: 1,
+              invoiceMonth: month,
+              sourceMonth: null,
+              paymentRecordId: null,
+              receiptKey: null,
+            });
+            this.cardEntries.set(entry.id, { ...entry, importKey: it.importKey });
+            live += 1;
+          }
+          created += 1;
+        } catch (e) {
+          if (e instanceof RepoError) throw new RepoError(e.code, e.message === e.code ? undefined : e.message, `item=${index + 1}`);
+          throw e;
+        }
+      });
+      if (card && created > 0) this.syncInvoices(card.id);
+      const result: ImportResult = { created, skipped };
+      this.saveOperation(key, 'importar_extrato', payload, {
+        contextId,
+        recordId: null,
+        commitmentId: null,
+        ...(account ? { accountId: account.id } : { cardId: card!.id }),
+        importResult: result,
+      });
+      return result;
+    });
+  }
+
   /** Cartão vivo: sem leitura ou excluído, não revela a existência; sem escrita, sem_permissao. */
   private liveCard(id: string) {
     const c = this.cards.get(id);
@@ -3049,6 +3211,20 @@ export class MemoryRepository implements RecordsRepository {
     this.checkCardInvariants();
     this.checkInvoiceInvariants();
     this.checkReceiptInvariants();
+    this.checkImportInvariants();
+  }
+
+  /** Chave da importação (no banco: índices únicos parciais): no máximo uma linha viva por contexto e chave. Lança Error('importacao_inconsistente'). */
+  private checkImportInvariants() {
+    const seen = new Set<string>();
+    const add = (contextId: string, importKey: string | undefined, deletedAt: string | undefined) => {
+      if (!importKey || deletedAt) return;
+      const id = `${contextId}|${importKey}`;
+      if (seen.has(id)) throw new Error('importacao_inconsistente');
+      seen.add(id);
+    };
+    for (const r of this.records.values()) add(r.contextId, r.importKey, r.deletedAt);
+    for (const e of this.cardEntries.values()) add(e.contextId, e.importKey, e.deletedAt);
   }
 
   /**
@@ -3480,8 +3656,9 @@ export class MemoryRepository implements RecordsRepository {
     key: string,
     action: Operation['action'],
     payload: unknown[],
-    ids: Omit<Operation, 'action' | 'hash' | 'seriesId' | 'referenceId' | 'budgetId' | 'goalId' | 'movementId' | 'cardId' | 'entryId' | 'accountId'> & {
+    ids: Omit<Operation, 'action' | 'hash' | 'seriesId' | 'referenceId' | 'budgetId' | 'goalId' | 'movementId' | 'cardId' | 'entryId' | 'accountId' | 'importResult'> & {
       accountId?: string;
+      importResult?: ImportResult;
       seriesId?: string;
       referenceId?: string;
       budgetId?: string;
@@ -3503,6 +3680,7 @@ export class MemoryRepository implements RecordsRepository {
       cardId: ids.cardId ?? null,
       entryId: ids.entryId ?? null,
       accountId: ids.accountId ?? null,
+      importResult: ids.importResult ?? null,
     });
     this.trackActivity(action, ids.contextId);
   }
@@ -3940,7 +4118,7 @@ function entryMonths(e: Pick<CardEntry, 'kind' | 'installments' | 'invoiceMonth'
 }
 
 function stripEntry(e: StoredCardEntry): CardEntry {
-  const { deletedAt: _deleted, deletedBy: _by, ...rest } = e;
+  const { deletedAt: _deleted, deletedBy: _by, importKey: _import, ...rest } = e;
   return rest;
 }
 
@@ -3970,7 +4148,7 @@ function stripReference(r: StoredIncomeReference): IncomeReference {
 }
 
 function strip(r: StoredRecord): FinancialRecord {
-  const { deletedAt: _deleted, ...rest } = r;
+  const { deletedAt: _deleted, importKey: _import, ...rest } = r;
   return rest;
 }
 

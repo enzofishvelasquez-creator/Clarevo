@@ -58,6 +58,9 @@ import {
   type GoalMovementKind,
   type GoalStatus,
   type GoalWrite,
+  type ImportDestination,
+  type ImportItem,
+  type ImportResult,
   type IncomeReference,
   type InvoiceItem,
   type InvoicePaymentWrite,
@@ -597,6 +600,10 @@ const KNOWN: RepoErrorCode[] = [
   // Assinaturas (D-046). Nenhum é sufixo de outro código da lista, nem tem outro como sufixo.
   'marca_invalida',
   'assinatura_so_gasto_fixo',
+  // Importar extrato ou fatura (D-048). Nenhum é sufixo de outro código da lista, nem tem outro como sufixo.
+  'destino_invalido',
+  'itens_invalidos',
+  'chave_de_importacao_invalida',
 ];
 
 /**
@@ -606,8 +613,8 @@ const KNOWN: RepoErrorCode[] = [
 const INCONSISTENCY_CODES = ['fatura_inconsistente', 'compra_inconsistente'];
 
 /**
- * Dos detalhes do banco, só três seguem adiante, e só para montar uma mensagem ou abrir o registro: "dia=AAAA-MM-DD" (primeiro
- * dia em que o valor guardado ficaria negativo), "versao_atual=N" e, em nota_ja_anotada, "registro=<id>" ou "compra=<id>".
+ * Dos detalhes do banco, só quatro seguem adiante, e só para montar uma mensagem ou abrir o registro: "dia=AAAA-MM-DD" (primeiro
+ * dia em que o valor guardado ficaria negativo), "versao_atual=N" e, em nota_ja_anotada, "registro=<id>" ou "compra=<id>" e, ao importar, "item=N" (a posição do item recusado).
  * Qualquer outro texto é descartado.
  */
 function safeDetail(code: RepoErrorCode, details: string | null | undefined): string | undefined {
@@ -615,6 +622,8 @@ function safeDetail(code: RepoErrorCode, details: string | null | undefined): st
   if (code === 'saldo_da_meta_insuficiente' && /^dia=\d{4}-\d{2}-\d{2}$/.test(details)) return details;
   if (code === 'versao_desatualizada' && /^versao_atual=\d{1,9}$/.test(details)) return details;
   if (code === 'nota_ja_anotada' && /^(registro|compra)=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(details)) return details;
+  // Importar (D-048): a posição do item recusado no lote, de 1 a 500.
+  if (/^item=\d{1,3}$/.test(details)) return details;
   return undefined;
 }
 
@@ -2531,4 +2540,72 @@ export class SupabaseRepository implements RecordsRepository {
       recordId: (data.record_id as string | null) ?? null,
     };
   }
+
+  // -------------------------------------------------------------------------
+  // Importar extrato ou fatura (D-048): import_records (0012) e a visão import_items
+  // -------------------------------------------------------------------------
+
+  /**
+   * import_records devolve {created, skipped} em jsonb: sem .single(). O arquivo não chega aqui: só as linhas confirmadas, com o
+   * resumo SHA-256 de cada uma. Cada chamada leva de 1 a 500 itens (a tela divide); o app nunca manda um item além disso.
+   */
+  async importRecords(key: string, contextId: string, destination: ImportDestination, targetId: string, items: readonly ImportItem[]): Promise<ImportResult> {
+    const { data, error } = await this.db.rpc('import_records', {
+      p_idempotency_key: key,
+      p_context_id: contextId,
+      p_destination: destination,
+      p_target_id: targetId,
+      p_items: items.map((i) => ({
+        import_key: i.importKey,
+        kind: i.kind,
+        amount_cents: i.amountCents,
+        occurred_on: i.occurredOn,
+        description: i.description,
+        category: i.category,
+      })),
+    });
+    if (error) throw repoError(error);
+    return toImportResult(data);
+  }
+
+  /** Quais das chaves o contexto já tem em linhas importadas vivas. Em pedaços de 40 chaves (o endereço da consulta tem limite) e até 6 ao mesmo tempo. */
+  async findImportedKeys(contextId: string, keys: readonly string[]): Promise<string[]> {
+    const unique = [...new Set(keys)].filter((k) => /^[0-9a-f]{64}$/.test(k));
+    const chunks: string[][] = [];
+    for (let i = 0; i < unique.length; i += 40) chunks.push(unique.slice(i, i + 40));
+    const found = new Set<string>();
+    for (let i = 0; i < chunks.length; i += 6) {
+      const parts = await Promise.all(
+        chunks.slice(i, i + 6).map(async (chunk) => {
+          const { data, error } = await this.db.from('import_items').select('import_key').eq('context_id', contextId).in('import_key', chunk);
+          if (error) throw repoError(error);
+          return (data ?? []) as { import_key: string }[];
+        }),
+      );
+      for (const rows of parts) for (const r of rows) found.add(r.import_key);
+    }
+    return [...found];
+  }
+
+  /** Só operações de importação: o destino em target_id e o resultado em import_result. */
+  async findImportOperation(key: string) {
+    const { data, error } = await this.db
+      .from('record_operations')
+      .select('target_id, import_result')
+      .eq('idempotency_key', key)
+      .eq('action', 'importar_extrato')
+      .maybeSingle();
+    if (error) throw repoError(error);
+    if (!data) return null;
+    if (!data.target_id) throw new RepoError('desconhecido', 'operacao_inconsistente');
+    return { targetId: data.target_id as string, result: toImportResult(data.import_result) };
+  }
+}
+
+/** {created, skipped} de import_records: dois inteiros de 0 a 500; qualquer outra forma é defeito, não recusa. */
+function toImportResult(data: unknown): ImportResult {
+  const r = data as { created?: unknown; skipped?: unknown } | null;
+  const ok = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 500;
+  if (!r || !ok(r.created) || !ok(r.skipped)) throw new RepoError('desconhecido', 'importacao_inconsistente');
+  return { created: r.created, skipped: r.skipped };
 }

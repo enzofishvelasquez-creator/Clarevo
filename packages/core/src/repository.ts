@@ -41,6 +41,7 @@ import type {
   SeriesEditInput,
   SeriesInput,
 } from './records';
+import type { ImportDestination, ImportItem, ImportResult } from './importar/tipos';
 import type { RecordSearchFilter, SearchPage } from './search';
 
 /**
@@ -176,6 +177,12 @@ export type SeriesAction =
  * operação). Como 'decidir_revisao' e 'responder_guardar', não conta como anotação na atividade (D-030).
  */
 export type SubscriptionReviewAction = 'revisar_assinaturas';
+
+/**
+ * Importar extrato ou fatura (import_records, D-048), gravada em record_operations com a conta ou o cartão de destino em
+ * target_id e o resultado em import_result. Conta como anotação na atividade (D-030), como as demais escritas.
+ */
+export type ImportAction = 'importar_extrato';
 
 /** Resultado de markSubscriptionsReviewed: o dia gravado (hoje; na repetição, a data mais recente das assinaturas) e quantas mudaram. */
 export interface SubscriptionReviewWrite {
@@ -624,6 +631,26 @@ export interface RecordsRepository {
    * fatura_seguinte_paga (há saldo anterior e a fatura seguinte já foi paga).
    */
   undoInvoicePayment(key: string, cardId: string, month: IsoMonth, expectedVersion: number): Promise<InvoicePaymentWrite>;
+  // Importar extrato ou fatura (D-048, Ciclo I1). O arquivo é lido no aparelho (packages/core/src/importar); aqui chegam só as
+  // linhas confirmadas, em lotes de até 500, e o resumo SHA-256 de cada uma (importKey). Nada do arquivo é guardado.
+
+  /**
+   * import_records: cria em lote gastos e recebimentos de uma conta (destination 'conta', targetId = conta ativa) ou compras à vista e
+   * estornos de um cartão (destination 'cartao', targetId = cartão ativo), tudo ou nada, de 1 a 500 itens. Item cuja importKey já
+   * existe viva no contexto é pulado (sem validar). Os demais seguem as regras de createRecord (conta) ou de addCardPurchase com 1
+   * parcela e addCardRefund (cartão: o estorno cai na fatura da data); a recusa traz a posição do item (detalhe "item=N").
+   * Ordem: repetição (chave_reutilizada se o conteúdo muda); destino_invalido; itens_invalidos; sem_permissao; conta_invalida ou
+   * nao_encontrado e cartao_arquivado; por item: itens_invalidos, chave_de_importacao_invalida, pulo, tipo_invalido, valor_invalido,
+   * valor_acima_do_limite, descricao_obrigatoria, descricao_longa, categoria_invalida, data_invalida, data_futura (compra: também
+   * data_invalida além de 48 meses; estorno: mes_invalido), limite_de_lancamentos, fatura_paga. Gasto da conta entra em Pago na data
+   * dele (D-021); compra no cartão entra na fatura e só vira gasto no pagamento da fatura (D-037).
+   */
+  importRecords(key: string, contextId: string, destination: ImportDestination, targetId: string, items: readonly ImportItem[]): Promise<ImportResult>;
+  /** Quais das chaves dadas o contexto já tem em linhas importadas vivas (import_items): para a marca "Já anotado" antes de importar. */
+  findImportedKeys(contextId: string, keys: readonly string[]): Promise<string[]>;
+  /** Reconciliação da importação: a operação com esta chave já foi concluída? */
+  findImportOperation(key: string): Promise<{ targetId: string; result: ImportResult } | null>;
+
   /** Reconciliação de cartões: a operação com esta chave já foi concluída? entryId só nas ações de lançamento. */
   findCardOperation(key: string): Promise<{
     action: CardAction;
@@ -722,6 +749,9 @@ export type RepoErrorCode =
   | 'tipo_de_encargo_invalido'
   | 'chave_de_nota_invalida'
   | 'nota_ja_anotada'
+  | 'destino_invalido'
+  | 'itens_invalidos'
+  | 'chave_de_importacao_invalida'
   | 'marca_invalida'
   | 'assinatura_so_gasto_fixo'
   | 'desconhecido';

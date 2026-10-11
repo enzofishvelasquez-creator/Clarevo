@@ -1,11 +1,11 @@
-import { ACCOUNTS_TEXT, canAddActiveAccount, type AccountKind, type FinancialAccount } from '@clarevo/core';
+import { ACCOUNTS_TEXT, IMPORT_TEXT, canAddActiveAccount, type AccountKind, type FinancialAccount } from '@clarevo/core';
 import { router } from 'expo-router';
-import { ChevronRight, Coins, Landmark, Plus, Wallet, type LucideIcon } from 'lucide-react-native';
+import { ChevronRight, Coins, FileUp, Landmark, Plus, Wallet, type LucideIcon } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ErrorState, LoadingState } from '@/components/states';
 import { TermHint } from '@/components/term-hint';
-import { Button, Card, Txt } from '@/components/ui';
+import { Button, Card, LinkButton, Txt } from '@/components/ui';
 import { useAccounts } from '@/state/data';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -49,6 +49,14 @@ export function AccountsCard({ contextId }: { contextId: string | undefined }) {
               {ACCOUNTS_TEXT.limitNote}
             </Txt>
           )}
+          {/* Importar extrato (D-048): atalho para trazer os lançamentos de um arquivo do banco para uma destas contas. */}
+          <LinkButton
+            label={IMPORT_TEXT.accountsShortcut}
+            icon={FileUp}
+            accessibilityHint={IMPORT_TEXT.accountsShortcutHint}
+            style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
+            onPress={() => router.push('/importar')}
+          />
         </>
       )}
       <Txt variant="caption" color={colors.textSecondary}>

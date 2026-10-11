@@ -598,7 +598,7 @@ begin
            where c.conname = 'record_operations_action_check' and m[1] ~ 'assinatura')
     = array['marcar_assinatura', 'revisar_assinaturas'], 'as 2 ações de assinatura';
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-           where c.conname = 'record_operations_action_check') = 48, 'a lista vigente tem 48 ações (46 e as 2 de assinaturas)';
+           where c.conname = 'record_operations_action_check') = 49, 'a lista vigente tem 49 ações (46, as 2 de assinaturas e a importação, testada em 90)';
   assert exists (select 1 from pg_constraint c where c.conname = 'record_operations_target_check'
                   and pg_get_constraintdef(c.oid) like '%marcar_assinatura%' and pg_get_constraintdef(c.oid) like '%revisar_assinaturas%'
                   and pg_get_constraintdef(c.oid) like '%excluir_conta%'),

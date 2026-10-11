@@ -73,6 +73,8 @@ import {
   type GoalPlan,
   type GoalStatus,
   type GoalWrite,
+  type ImportDestination,
+  type ImportItem,
   type IncomeReference,
   type InvoiceItem,
   type InvoicePaymentWrite,
@@ -1874,6 +1876,21 @@ export function useUndoInvoicePayment() {
   return useMutation({
     mutationFn: (v: { key: string; cardId: string; month: IsoMonth; version: number }) => repo.undoInvoicePayment(v.key, v.cardId, v.month, v.version),
     onSuccess: (w) => invalidate(w, { deletedEntry: true }),
+  });
+}
+
+/**
+ * Importar extrato ou fatura (D-048): uma chamada de até 500 linhas por vez (a tela divide). Todo dado que a importação pode ter
+ * mexido é lido de novo: registros do mês, cartões e faturas, contas a pagar, orçamento e a revisão dos últimos meses. A chave de
+ * cada lote é guardada pela tela entre tentativas: repetir um lote já gravado devolve o mesmo resultado, sem duplicar.
+ */
+export function useImportRecords() {
+  const repo = useRepo();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { key: string; contextId: string; destination: ImportDestination; targetId: string; items: readonly ImportItem[] }) =>
+      repo.importRecords(v.key, v.contextId, v.destination, v.targetId, v.items),
+    onSuccess: () => refreshCards(qc),
   });
 }
 

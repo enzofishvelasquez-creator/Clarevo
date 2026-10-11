@@ -1,6 +1,6 @@
 # Regras financeiras do primeiro ciclo
 
-11/10/2026 · código em `packages/core` e no banco (`supabase/migrations`). As mesmas regras valem nos dois lugares. As calculadoras e o "Achar tudo" (Ciclo A6), o plano para quitar dívidas (Ciclo F1), "Antes de financiar" (D-044), o conteúdo de Aprender (Ciclo A5), o simulador (Ciclo D) e os lembretes, o ocultar valores e a biometria (Ciclo A2) ficam só no core e no app, sem gravar nada no banco. A revisão dos últimos meses (Ciclo A4), a renda comprometida (Ciclo B), as metas e o plano de guardar (Ciclo C), os cartões e as faturas (Ciclo E, D-037) e a chave das notas fiscais (D-038) as contas de origem do dinheiro (Ciclo G1, D-043) e as assinaturas (Ciclo H2, D-046) estão nos dois lugares; a busca em Movimentações (Ciclo H1, D-045) é só leitura, no core e no app; a leitura das notas (QR, chave, PDF e página da Sefaz-RJ) roda só no core e no app, no aparelho. Em "Onde é testado", "web" é o roteiro `scripts/e2e-web.js` (`npm run test:web`); as telas dos Ciclos A2, B, C, D e E também passam por ele (`docs/04`).
+11/10/2026 · código em `packages/core` e no banco (`supabase/migrations`). As mesmas regras valem nos dois lugares. As calculadoras e o "Achar tudo" (Ciclo A6), o plano para quitar dívidas (Ciclo F1), "Antes de financiar" (D-044), o conteúdo de Aprender (Ciclo A5), o simulador (Ciclo D) e os lembretes, o ocultar valores e a biometria (Ciclo A2) ficam só no core e no app, sem gravar nada no banco. A revisão dos últimos meses (Ciclo A4), a renda comprometida (Ciclo B), as metas e o plano de guardar (Ciclo C), os cartões e as faturas (Ciclo E, D-037) e a chave das notas fiscais (D-038) as contas de origem do dinheiro (Ciclo G1, D-043) e as assinaturas (Ciclo H2, D-046) e a importação de extrato e fatura (Ciclo I1, D-048) estão nos dois lugares; a busca em Movimentações (Ciclo H1, D-045) é só leitura, no core e no app; a leitura das notas (QR, chave, PDF e página da Sefaz-RJ) roda só no core e no app, no aparelho. Em "Onde é testado", "web" é o roteiro `scripts/e2e-web.js` (`npm run test:web`); as telas dos Ciclos A2, B, C, D e E também passam por ele (`docs/04`).
 
 ## Implementado e testado
 
@@ -366,6 +366,38 @@ Conta de teste, hoje 07/10/2026. Os totais de outubro são os mesmos em todos os
 | 10 | Retomar sem data para terminar | Volta às somas e à revisão |
 | 11 | Desmarcar | Sem marca, sem data de revisão e sem dia da marca; versão sobe 1 |
 | 12 | Hoje + 6 meses e 1 dia de uma revisão (ou 3 meses da marca, sem nenhuma revisão) | O lembrete aparece; "Agora não" o esconde por 30 dias |
+
+## Importar extrato e fatura (Ciclo I1, D-048)
+
+Regras em `packages/core/src/importar` (leitores, chave, "Já anotado", categorias e revisão), repetidas no banco pela função `import_records` (migração 0012); testes em `importar-leitores.test.ts`, `importar-revisao.test.ts`, `importar-repo.test.ts`, `copy.test.ts`, `navigation.test.ts`, `90_importar.sql`, na API e no roteiro web. Nada aqui muda a conta de Recebido, Pago, Diferença, "Ainda a pagar" nem a renda comprometida: os lançamentos criados são registros comuns.
+
+- **O que entra em Pago e Recebido.** A linha de um extrato de conta vira gasto (saída) ou recebimento (entrada) na data dela, na conta escolhida (D-021 e D-043). A linha de uma fatura de cartão vira compra à vista (1 parcela, a fatura natural da data) ou estorno (na fatura da data), e só o pagamento da fatura cria gasto, na data do pagamento (D-037): importar compras nunca muda Pago. "Ainda a pagar" cresce com a fatura do cartão, como com uma compra anotada à mão.
+- **Sinal.** OFX: `TRNAMT` negativo é saída e positivo é entrada, em extrato de conta e em fatura de cartão. Planilha: negativo é saída; com valor numa coluna só e sem coluna de tipo, o destino "cartão" lê o valor positivo como compra (o que o banco costuma mostrar numa fatura). Colunas de débito e crédito, ou de tipo, dão o sinal sozinhas. "Entradas e saídas estão trocadas" inverte tudo; a chave de cada linha não muda com a inversão.
+- **Valores e datas.** Valor em centavos inteiros, com vírgula ou ponto como decimal (detectado pelo arquivo), milhares, "R$", sinal à frente ou atrás e parênteses como negativo; mais de duas casas decimais e texto não são valor. Data dd/mm/aaaa, dd/mm/aa, dd-mm-aaaa, dd.mm.aaaa, aaaa-mm-dd ou aaaa/mm/dd, com hora opcional; data impossível não vale; o dia nunca passa pelo fuso do aparelho. OFX: os oito primeiros dígitos de `DTPOSTED`. Linha de valor zero, de saldo ou sem data ou valor legível fica de lado.
+- **Chave da linha** (`import_key`). SHA-256 de `imp1|<conta ou cartão>|f|<identificador>|<dia>|<valor em centavos com sinal>|<ordem>` quando o arquivo traz identificador (`FITID`), ou de `imp1|<conta ou cartão>|d|<dia>|<valor>|<descrição normalizada>|<ordem>` quando não traz. A ordem conta quantas linhas iguais vieram antes no mesmo arquivo. O identificador sozinho não basta: alguns bancos recomeçam a numeração a cada arquivo. A descrição editada na revisão não muda a chave. Única por contexto entre linhas vivas; o banco guarda só o resumo.
+- **"Já anotado".** (1) A chave já existe viva: a linha não pode ser marcada e o banco a pularia. (2) Existe registro do mesmo tipo e do mesmo valor, na mesma conta (ou compra do mesmo cartão), a até 3 dias, com descrição parecida (ao menos metade das palavras da menor em comum, sem as palavras comuns de banco, ou uma contida na outra); cada registro cobre uma linha só, a mais próxima no dia; a linha vem desmarcada e pode ser marcada. A linha cuja chave já existe ocupa o registro que a importou, para ele não marcar outra linha igual por semelhança.
+- **Marcas por palavra, desmarcadas.** No extrato da conta: "Parece pagamento de fatura" (pagamento, pagto, pgto ou liquidação com "fatura", ou "fatura" com "cartão", ou pagamento com "cartão de crédito") e "Parece transferência" (transferência com "própria", "mesma titularidade", "entre contas" ou "mesmo titular", ou essas expressões sozinhas). Na fatura do cartão, a linha de entrada com "pagamento", "pagto", "pgto" ou "obrigado" é o pagamento recebido: não entra; as outras entradas são estornos, desmarcados.
+- **Não entram.** Data futura; compra com mais de 48 meses (antes do primeiro dia do mês de 48 meses atrás) e estorno cuja fatura é mais antiga que isso; valor acima de R$ 9.999.999,99; linha que cai numa fatura já paga (`fatura_paga`); pagamento recebido numa fatura.
+- **Categoria sugerida.** A memória do aparelho (primeiras três palavras úteis da descrição, a categoria da última escolha, só se ainda serve ao tipo), depois regras por palavra inteira em português (saúde, educação, moradia, transporte, mercado e lazer nos gastos; salário, reembolso e renda extra nos recebimentos), sem marcas; senão, "Sem categoria". A memória guarda a última escolha de cada descrição, esquece a que ficou sem categoria e tem no máximo 300 entradas.
+- **Limites.** 5 MB, 5.000 linhas, 500 itens por chamada (a tela divide em lotes), 5.000 lançamentos vivos por cartão, 80 caracteres de descrição, 40 de categoria.
+- **Recusa e repetição.** `import_records` valida cada item na ordem de `create_record` e de `add_card_purchase`/`add_card_refund`, desfaz o lote inteiro na primeira recusa e devolve a posição do item (`item=N`); pular uma chave que já existe vem antes de validar. A mesma chave de operação com o mesmo conteúdo devolve o resultado gravado; com outro conteúdo, `chave_reutilizada`. Códigos novos: `destino_invalido`, `itens_invalidos` e `chave_de_importacao_invalida`.
+
+### Sequência de aceite da importação (reproduzida no core; cada passo também tem teste no banco e na API)
+
+Conta de teste, hoje 07/10/2026, cartão que fecha dia 3 e vence dia 10.
+
+| Passo | O que se faz | Resultado |
+|---|---|---|
+| 1 | Importar para a conta: gasto de R$ 45,90 (02/10), gasto de R$ 120,00 (03/10), recebimento de R$ 5.000,00 (05/10), gasto de R$ 35,00 (28/09) e gasto de R$ 9,99 (30/09) | 5 criados, 0 pulados; outubro: recebido R$ 5.000,00, pago R$ 165,90, diferença R$ 4.834,10; setembro: pago R$ 44,99; "Ainda a pagar" não muda |
+| 2 | Repetir a chamada, com a mesma chave | Mesmo resultado, nada gravado |
+| 3 | Mesma chave com menos itens | Recusado: `chave_reutilizada` |
+| 4 | Importar o mesmo arquivo com outra chave | 0 criados, 5 pulados |
+| 5 | Lote com um item de valor zero no 2º lugar | Recusado: `valor_invalido`, `item=2`; nada gravado |
+| 6 | Excluir um dos registros e importar de novo | 1 criado: a chave foi liberada |
+| 7 | Cartão: compras de R$ 200,00 (20/09), R$ 80,50 (03/10), R$ 159,90 (04/10) e R$ 30,00 (06/10) e estorno de R$ 40,00 (05/10) | 5 criados; fatura de outubro R$ 280,50 e de novembro R$ 149,90; Pago não muda; "Ainda a pagar" de outubro cresce R$ 280,50 |
+| 8 | Pagar a fatura de outubro e importar uma compra de 25/09 | Recusado: `fatura_paga`; nada gravado |
+| 9 | Compra de 48 meses atrás (primeiro dia do mês) e uma de um dia antes | A primeira entra; a segunda é `data_invalida`; estorno de 48 meses ou mais: `mes_invalido` |
+| 10 | 10 lotes de 500 compras e mais uma | As 5.000 entram; a seguinte é `limite_de_lancamentos` |
 
 ## Simulador (Ciclo D, D-028)
 

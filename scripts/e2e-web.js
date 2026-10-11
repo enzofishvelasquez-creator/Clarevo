@@ -588,6 +588,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     cartoes: 'Cartões, Cartão Exemplo, fatura de novembro R$ 550,00',
     // D-041: a categoria mais perto do limite (Lazer: parcela do tênis e restaurante, R$ 400,00 de R$ 300,00).
     orcamento: 'Orçamento por categoria, Lazer: R$ 400,00 de R$ 300,00',
+    // D-048: Importar extrato ou fatura, com a legenda fixa, entre o Orçamento e as calculadoras.
+    importar: 'Importar extrato ou fatura, Arquivo OFX ou planilha do banco',
     calc: 'Calculadoras, Parcelado ou à vista, dívidas, reserva e outras contas',
   };
   await waitText('7 cadastrados, com as contas do ano').catch(() => {});
@@ -596,8 +598,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     const top = (sel, text) => [...document.querySelectorAll(sel)].find((e) => e.textContent === text && e.getBoundingClientRect().width > 0)?.getBoundingClientRect().top ?? null;
     return { anotar: top('[role=button]', 'Anotar gasto'), organizar: top('[role=heading]', 'Organizar'), totais: top('div[dir="auto"]', 'Pago em outubro') };
   });
-  ok('movimentações: "Organizar" com os cinco atalhos (Orçamento por categoria entre Cartões e as calculadoras) e as legendas de outubro, entre os botões e os totais do mês', JSON.stringify(await sectionRows('Organizar')) === JSON.stringify([SC.pagar, SC.fixos, SC.cartoes, SC.orcamento, SC.calc]) &&
-    ['R$ 650,00 em aberto neste mês', '7 cadastrados, com as contas do ano', 'Cartão Exemplo · fatura de novembro R$ 550,00', 'Lazer: R$ 400,00 de R$ 300,00', 'Parcelado ou à vista, dívidas, reserva e outras contas'].every((x) => t.includes(x)) &&
+  ok('movimentações: "Organizar" com os seis atalhos (Orçamento por categoria e Importar extrato ou fatura entre Cartões e as calculadoras) e as legendas de outubro, entre os botões e os totais do mês', JSON.stringify(await sectionRows('Organizar')) === JSON.stringify([SC.pagar, SC.fixos, SC.cartoes, SC.orcamento, SC.importar, SC.calc]) &&
+    ['R$ 650,00 em aberto neste mês', '7 cadastrados, com as contas do ano', 'Cartão Exemplo · fatura de novembro R$ 550,00', 'Lazer: R$ 400,00 de R$ 300,00', 'Arquivo OFX ou planilha do banco', 'Parcelado ou à vista, dívidas, reserva e outras contas'].every((x) => t.includes(x)) &&
     scOrder.anotar !== null && scOrder.organizar !== null && scOrder.totais !== null && scOrder.anotar < scOrder.organizar && scOrder.organizar < scOrder.totais, `${JSON.stringify(await sectionRows('Organizar'))} ${JSON.stringify(scOrder)}`);
   await layoutChecks('movimentações com atalhos 390px');
   await scrollTo('Organizar');
@@ -6115,8 +6117,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // ---- 1. Movimentos › Organizar: a linha nova, com a categoria mais perto do limite ----
   await tabByName('Movimentações').click(); await waitText('Organizar'); await p.waitForTimeout(500);
   let f2Rows = await sectionRows('Organizar');
-  ok('F2 Organizar: cinco linhas, com "Orçamento por categoria" depois de Cartões e antes de Calculadoras, e a legenda da categoria mais perto do limite (Lazer)',
-    f2Rows !== null && f2Rows.length === 5 && f2Rows[3] === 'Orçamento por categoria, Lazer: R$ 400,00 de R$ 300,00' && /^Cartões, /.test(f2Rows[2]) && /^Calculadoras, /.test(f2Rows[4]), JSON.stringify(f2Rows));
+  ok('F2 Organizar: seis linhas, com "Orçamento por categoria" depois de Cartões e antes de "Importar extrato ou fatura" (D-048) e de Calculadoras, e a legenda da categoria mais perto do limite (Lazer)',
+    f2Rows !== null && f2Rows.length === 6 && f2Rows[3] === 'Orçamento por categoria, Lazer: R$ 400,00 de R$ 300,00' && /^Cartões, /.test(f2Rows[2]) && /^Importar extrato ou fatura, /.test(f2Rows[4]) && /^Calculadoras, /.test(f2Rows[5]), JSON.stringify(f2Rows));
   await atWidths(async (w) => {
     await layoutChecks(`F2 Organizar ${w}px`);
     if (w === 390) await shot('200_organizar_orcamento');
@@ -7325,6 +7327,262 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('H2 telas de assinaturas: nenhum termo proibido, travessão, expressão vetada, palavra de julgamento, "cancele" nem marca de serviço',
     h2Texts.length >= 12 && h2Vetoed.length === 0 && h2Judging.length === 0, `${h2Texts.length} telas ${h2Vetoed.join(' | ')} ${h2Judging.join(' | ')}`);
   ok('H2 nenhuma escrita direta na rede durante as assinaturas (nenhum POST, PATCH, PUT ou DELETE)', writes.slice(h2Writes0).length === 0, writes.slice(h2Writes0).join(' | '));
+  await goResumo().catch(() => {});
+
+  // ---- Importar extrato (D-048): arquivos OFX e planilhas CSV sintéticos (sem dados reais), lidos no aparelho ----
+  // Ciclo I1: Movimentos › Organizar, Conta › Contas de origem e a busca "No app" levam a /importar; o arquivo é lido no
+  // aparelho (nada dele é enviado nem guardado), o saldo do arquivo é ignorado, a pessoa escolhe a conta ou o cartão, revisa as
+  // linhas ("Já anotado", "Parece pagamento de fatura", "Parece transferência") e só as linhas confirmadas viram lançamentos.
+  const i1Dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clarevo-importar-'));
+  const i1File = (name, content, enc = 'utf8') => { const f = path.join(i1Dir, name); fs.writeFileSync(f, typeof content === 'string' ? Buffer.from(content, enc) : content); return f; };
+  const i1Ofx = i1File('extrato.ofx', [
+    'OFXHEADER:100', 'DATA:OFXSGML', 'VERSION:102', 'SECURITY:NONE', 'ENCODING:USASCII', 'CHARSET:1252', 'COMPRESSION:NONE', 'OLDFILEUID:NONE', 'NEWFILEUID:NONE', '',
+    '<OFX><SIGNONMSGSRSV1><SONRS><STATUS><CODE>0<SEVERITY>INFO</STATUS><DTSERVER>20261007120000[-3:BRT]<LANGUAGE>POR</SONRS></SIGNONMSGSRSV1>',
+    '<BANKMSGSRSV1><STMTTRNRS><TRNUID>1<STATUS><CODE>0<SEVERITY>INFO</STATUS><STMTRS><CURDEF>BRL<BANKACCTFROM><BANKID>0000<ACCTID>00000-0<ACCTTYPE>CHECKING</BANKACCTFROM>',
+    '<BANKTRANLIST><DTSTART>20261001<DTEND>20261007',
+    '<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20261002000000[-3:BRT]<TRNAMT>-45.90<FITID>IMP0001<MEMO>COMPRA PADARIA SÃO JOÃO</STMTTRN>',
+    '<STMTTRN><TRNTYPE>CREDIT<DTPOSTED>20261005000000[-3:BRT]<TRNAMT>5000.00<FITID>IMP0002<NAME>SALÁRIO<MEMO>EMPRESA EXEMPLO LTDA</STMTTRN>',
+    '<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20261006000000[-3:BRT]<TRNAMT>-1234.56<FITID>IMP0003<NAME>PAGAMENTO FATURA CARTÃO</STMTTRN>',
+    '<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20261006000000[-3:BRT]<TRNAMT>-500.00<FITID>IMP0004<NAME>TRANSFERÊNCIA ENTRE CONTAS</STMTTRN>',
+    '<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20261004000000[-3:BRT]<TRNAMT>-89.90<FITID>IMP0005<MEMO>FARMÁCIA CENTRAL</STMTTRN>',
+    '<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20261003000000[-3:BRT]<TRNAMT>-12.00<FITID>IMP0006<MEMO>COMPRA MERCADO DO BAIRRO</STMTTRN>',
+    '<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20261001000000[-3:BRT]<TRNAMT>-30.00<FITID>IMP0007<MEMO>TARIFA MANUTENCAO</STMTTRN>',
+    '</BANKTRANLIST><LEDGERBAL><BALAMT>1234.56<DTASOF>20261007000000</LEDGERBAL></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>', ''].join('\n'), 'latin1');
+  const i1Csv = i1File('extrato.csv', [
+    'Extrato da conta;;;', 'Período: 01/10/2026 a 07/10/2026;;;', ';;;', 'Data;Lançamento;Valor;Saldo',
+    '01/10/2026;PADARIA SAO JOAO 123;-15,50;1.000,00', '02/10/2026;SALDO DO DIA;0,00;1.000,00', '03/10/2026;"RESTAURANTE SABOR, CENTRO";-62,40;900,00',
+    '06/10/2026;REEMBOLSO DE VIAGEM;250,00;1.150,00', ''].join('\r\n'), 'latin1');
+  const i1Card = i1File('fatura.csv', [
+    'date,category,title,amount', '2026-10-04,restaurante,Cafeteria Central,18.50', '2026-10-05,mercado,Mercado do bairro,80.50', '2026-10-06,compras,Cinema Centro,59.90',
+    '2026-10-05,pagamento,Estorno cinema,-40.00', '2026-10-06,pagamento,Pagamento recebido,-150.00', ''].join('\n'));
+  const i1NoHeader = i1File('sem-cabecalho.csv', ['01/10/2026;PADARIA;-45,90;x', '02/10/2026;SALARIO;5000,00;y', ''].join('\n'));
+  const i1Pdf = i1File('lista.pdf', Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n'));
+  const i1Big = i1File('grande.csv', 'Data;Descrição;Valor\n' + '01/09/2026;Linha de teste com texto comprido para encher o arquivo;-1,00\n'.repeat(80000));
+  const i1Many = i1File('muitas.csv', 'Data;Descrição;Valor\n' + Array.from({ length: 5001 }, (_, i) => `01/09/2026;Linha ${i + 1};-1,00`).join('\n') + '\n');
+  const i1Lots = i1File('lote.csv', 'Data;Descrição;Valor\n' + Array.from({ length: 1200 }, (_, i) => `01/09/2026;Linha ${i + 1};-1,00`).join('\n') + '\n');
+  const i1Texts = [];
+  const i1Keep = async () => { const x = await body(); i1Texts.push(x); screenTexts.push(x); return x; };
+  const i1Writes0 = writes.length;
+  const i1Open = async () => { await tabByName('Movimentações').click(); await waitText('Organizar'); await p.waitForTimeout(400); await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(300); };
+  const i1Pick = async (file) => { const [chooser] = await Promise.all([p.waitForEvent('filechooser'), btn('Escolher o arquivo').click()]); await chooser.setFiles(file); };
+  const i1Review = async () => { await btn('Revisar as linhas').click(); await waitText('Marque o que vira lançamento', 12000); await p.waitForTimeout(400); };
+  const i1Boxes = () => p.getByRole('checkbox').filter({ visible: true }).evaluateAll((els) => els.filter((e) => (e.getAttribute('aria-label') || '').startsWith('Incluir:')).map((e) => [e.getAttribute('aria-label'), e.getAttribute('aria-checked'), e.getAttribute('aria-disabled')]));
+  const i1Box = (start) => p.getByRole('checkbox', { name: new RegExp(`^Incluir: ${start}`) }).filter({ visible: true }).first();
+  // Sair da revisão pelo "Voltar" do cabeçalho: com linhas por importar, pede confirmação.
+  const i1Leave = async () => { await btn('Voltar').click(); await waitText('Descartar o preenchimento?'); await confirmIn('Descartar alterações'); await waitText('Organizar'); await p.waitForTimeout(400); };
+  const i1Records = () => otherDevice(async (repo, ctx) => (await repo.listRecords(ctx, '2026-10')).map((r) => [r.kind, r.amountCents, r.occurredOn, r.description, r.category]).sort((a, b) => a[2].localeCompare(b[2]) || a[3].localeCompare(b[3])));
+
+  await demoHome();
+  await expectTotals('I1 demonstração: outubro segue 6.000 / 3.900 / 2.100 e 650 antes de importar', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  ok('I1 demonstração: a renda comprometida segue 52,5% antes de importar', (await body()).includes('52,5%'));
+  // Um gasto já anotado à mão: a linha parecida do arquivo vem como "Já anotado".
+  await otherDevice(async (repo, ctx) => {
+    const space = await repo.getSpace();
+    await repo.createRecord('i1-manual-0001', ctx, 'despesa', { accountId: space.accounts[0].id, amountCents: 1200, occurredOn: '2026-10-03', description: 'Mercado do bairro', category: 'Mercado' });
+  });
+  await p.waitForTimeout(500);
+
+  // ---- 1. A porta em Movimentos › Organizar, na busca "No app" e em Conta ----
+  await tabByName('Movimentações').click(); await waitText('Organizar'); await p.waitForTimeout(500);
+  const i1Rows = await sectionRows('Organizar');
+  ok('I1 Organizar: "Importar extrato ou fatura" com a legenda "Arquivo OFX ou planilha do banco" depois do Orçamento e antes das calculadoras', i1Rows !== null && i1Rows.length === 6 && i1Rows[4] === SC.importar && /^Calculadoras, /.test(i1Rows[5]), JSON.stringify(i1Rows));
+  await atWidths(async (w) => { await layoutChecks(`I1 Organizar com a linha de importar ${w}px`); if (w === 390) { await scrollTo('Organizar'); await shot('300_importar_organizar'); } if (w === 320) { await scrollTo('Organizar'); await shot('300_importar_organizar_320px'); } });
+  await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(400);
+  let t1 = await i1Keep();
+  ok('I1 a linha leva a "Importar extrato ou fatura", sem a barra inferior, com o contexto Pessoal e o aviso de que o arquivo é lido aqui e não é guardado', (await h1Name()) === 'Importar extrato ou fatura' && urlPath() === '/importar' && (await barState()).n === 0 &&
+    t1.includes('Importando em Pessoal') && t1.includes('Ele é lido aqui no aparelho e não é guardado.') && t1.includes('Até 5 MB e 5.000 linhas.') && (await visibleCount('button', 'Escolher o arquivo')) === 1, t1.slice(0, 400));
+  await atWidths(async (w) => { await innerChecks(`I1 escolher o arquivo ${w}px`); if (w === 390) await shot('301_importar_arquivo'); if (w === 320) await shot('301_importar_arquivo_320px'); });
+  await btn('Voltar').click(); await waitText('Organizar');
+  await tabByName('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await p.waitForTimeout(300);
+  for (const query of ['importar', 'extrato', 'ofx', 'banco', 'planilha']) {
+    await learnSearch().fill(query); await waitText('No app'); await p.waitForTimeout(400);
+    ok(`I1 busca "${query}" em Aprender: o grupo "No app" tem "Importar extrato ou fatura"`, (await p.getByRole('button', { name: /^Importar extrato ou fatura\. Arquivo OFX ou planilha do banco/ }).filter({ visible: true }).count()) === 1);
+  }
+  await learnSearch().fill('fatura'); await waitText('No app'); await p.waitForTimeout(400);
+  ok('I1 busca "fatura": Cartões continua em primeiro e a importação também aparece', (await p.getByRole('button', { name: /^Cartões\. / }).filter({ visible: true }).count()) === 1 && (await p.getByRole('button', { name: /^Importar extrato ou fatura\. / }).filter({ visible: true }).count()) === 1);
+  await learnSearch().fill('extrato'); await waitText('No app'); await p.waitForTimeout(300);
+  await p.getByRole('button', { name: /^Importar extrato ou fatura\. / }).filter({ visible: true }).first().click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(300);
+  ok('I1 tocar na busca "No app" abre a importação', urlPath() === '/importar' && (await h1Name()) === 'Importar extrato ou fatura');
+  await btn('Voltar').click(); await waitText('No app');
+  await openConta(); await waitText('Suas contas'); await p.waitForTimeout(300);
+  ok('I1 Conta › Suas contas tem o atalho "Importar extrato"', (await visibleCount('button', 'Importar extrato')) === 1);
+  await btn('Importar extrato').click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(300);
+  ok('I1 o atalho de Conta abre a importação', urlPath() === '/importar');
+  await btn('Voltar').click(); await waitText('Suas contas'); await btn('Voltar').click(); await waitText('No app');
+  await tabByName('Movimentações').click(); await waitText('Organizar');
+
+  // ---- 2. OFX do extrato da conta (SGML 1.x, Windows-1252) ----
+  await i1Open();
+  await i1Pick(i1Ofx); await waitText('Arquivo lido: extrato.ofx', 12000); await p.waitForTimeout(400);
+  t1 = await i1Keep();
+  ok('I1 OFX: "Arquivo lido", 7 linhas, o saldo do arquivo é ignorado e a conta já vem como destino (a principal marcada)', t1.includes('Arquivo lido: extrato.ofx') && t1.includes('7 linhas lidas') && t1.includes('O saldo que vem no arquivo é ignorado. O Clarevo não guarda saldo por conta.') &&
+    (await radio('Conta').getAttribute('aria-checked')) === 'true' && (await radio('Conta principal').getAttribute('aria-checked')) === 'true' && (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'false' && !t1.includes('R$ 1.234,56'));
+  await atWidths(async (w) => { await innerChecks(`I1 destino ${w}px`); if (w === 390) await shot('302_importar_destino'); if (w === 320) await shot('302_importar_destino_320px'); });
+  await radio('Carteira').click(); await radio('Conta principal').click();
+  await i1Review();
+  t1 = await i1Keep();
+  let boxes = await i1Boxes();
+  ok('I1 revisar: 7 linhas, 4 marcadas; acentos do Windows-1252 certos; NAME e MEMO juntos; categorias sugeridas por palavras', t1.includes('7 linhas · 4 marcadas') && t1.includes('COMPRA PADARIA SÃO JOÃO') && t1.includes('SALÁRIO EMPRESA EXEMPLO LTDA') && t1.includes('PAGAMENTO FATURA CARTÃO') &&
+    t1.includes('02/10/2026 · Saída · Mercado') && t1.includes('05/10/2026 · Entrada · Salário') && t1.includes('04/10/2026 · Saída · Saúde') && t1.includes('01/10/2026 · Saída · Sem categoria'), t1.slice(0, 500));
+  ok('I1 revisar: "Já anotado", "Parece pagamento de fatura" e "Parece transferência" vêm desmarcados, e o resto marcado', t1.includes('Já anotado') && t1.includes('Parece pagamento de fatura') && t1.includes('Parece transferência') &&
+    boxes.length === 7 && JSON.stringify(boxes.map((b) => b[1])) === JSON.stringify(['true', 'true', 'false', 'false', 'true', 'false', 'true']), JSON.stringify(boxes));
+  ok('I1 revisar: o nome de cada caixa diz a descrição, o valor e a data', boxes[0][0] === 'Incluir: COMPRA PADARIA SÃO JOÃO, R$ 45,90, 02/10/2026', String(boxes[0][0]));
+  ok('I1 revisar: o saldo do arquivo continua ignorado e nenhuma linha traz saldo', t1.includes('O saldo que vem no arquivo é ignorado.') && !t1.includes('1.234,56 ·') && (await visibleCount('button', 'Importar 4 lançamentos')) === 1);
+  await atWidths(async (w) => { await innerChecks(`I1 revisar ${w}px`); if (w === 390) await shot('303_importar_revisar'); if (w === 320) await shot('303_importar_revisar_320px'); });
+  // Selecionar tudo e limpar a seleção.
+  await btn('Selecionar tudo').click(); await p.waitForTimeout(300);
+  ok('I1 "Selecionar tudo" marca as 7 linhas e o botão vira "Limpar seleção"', (await body()).includes('7 linhas · 7 marcadas') && (await visibleCount('button', 'Limpar seleção')) === 1 && (await visibleCount('button', 'Importar 7 lançamentos')) === 1);
+  await btn('Limpar seleção').click(); await p.waitForTimeout(300);
+  ok('I1 "Limpar seleção" desmarca tudo e o botão de importar fica desligado', (await body()).includes('7 linhas · 0 marcadas') && (await p.getByRole('button', { name: 'Importar', exact: true }).filter({ visible: true }).first().getAttribute('aria-disabled')) === 'true');
+  for (const start of ['COMPRA PADARIA', 'SALÁRIO EMPRESA', 'FARMÁCIA CENTRAL', 'TARIFA MANUTENCAO']) await i1Box(start).click();
+  await p.waitForTimeout(300);
+  ok('I1 marcar de novo as quatro linhas: "4 marcadas" e "Importar 4 lançamentos"', (await body()).includes('7 linhas · 4 marcadas') && (await visibleCount('button', 'Importar 4 lançamentos')) === 1);
+  // Editar a categoria de uma linha (sem mudar a descrição) e a descrição de outra.
+  await btn('Editar: COMPRA PADARIA SÃO JOÃO').click(); await p.waitForTimeout(300);
+  await p.getByRole('radio', { name: 'Lazer', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(200);
+  await shot('304_importar_revisar_editando');
+  await btn('Pronto').click(); await p.waitForTimeout(200);
+  await btn('Editar: TARIFA MANUTENCAO').click(); await p.waitForTimeout(300);
+  await field('Descrição').fill(''); await p.waitForTimeout(300);
+  ok('I1 editar a descrição para vazio: o erro aparece na linha e o aviso no rodapé ao importar', (await body()).includes('Toda linha marcada precisa de uma descrição.'));
+  const i1Count0 = (await i1Records()).length;
+  await btn('Importar 4 lançamentos').click(); await p.waitForTimeout(400);
+  ok('I1 importar com uma descrição vazia não grava e mostra o erro junto do botão', (await body()).includes('Toda linha marcada precisa de uma descrição.') && (await i1Records()).length === i1Count0);
+  await field('Descrição').fill('Tarifa da conta'); await btn('Pronto').click(); await p.waitForTimeout(300);
+  t1 = await body();
+  ok('I1 depois de editar: a linha mostra a categoria escolhida, e a descrição nova', t1.includes('02/10/2026 · Saída · Lazer') && t1.includes('Tarifa da conta'));
+  const i1Before = (await i1Records()).length;
+  await btn('Importar 4 lançamentos').click(); await waitText('Importação concluída', 12000); await p.waitForTimeout(500);
+  t1 = await i1Keep();
+  ok('I1 importar: "4 lançamentos importados." com "Ver em Movimentos"; nada de saldo', t1.includes('4 lançamentos importados.') && (await visibleCount('button', 'Ver em Movimentos')) === 1 && (await visibleCount('button', 'Importar outro arquivo')) === 1 && !t1.includes('saldo por conta é'));
+  await atWidths(async (w) => { await innerChecks(`I1 concluído ${w}px`); if (w === 390) await shot('305_importar_concluido'); if (w === 320) await shot('305_importar_concluido_320px'); });
+  const i1After = await i1Records();
+  ok('I1 os quatro registros foram criados nos dias do extrato, com a descrição e a categoria da revisão (a memória só vem do aparelho)', i1After.length === i1Before + 4 &&
+    JSON.stringify(i1After.filter((r) => r[3] !== 'Mercado do bairro' && !['Mercado', 'Aluguel', 'Salário'].includes(r[3])).filter((r) => ['COMPRA PADARIA SÃO JOÃO', 'SALÁRIO EMPRESA EXEMPLO LTDA', 'FARMÁCIA CENTRAL', 'Tarifa da conta'].includes(r[3]))) === JSON.stringify([
+      ['despesa', 3000, '2026-10-01', 'Tarifa da conta', null], ['despesa', 4590, '2026-10-02', 'COMPRA PADARIA SÃO JOÃO', 'Lazer'], ['despesa', 8990, '2026-10-04', 'FARMÁCIA CENTRAL', 'Saúde'], ['receita', 500000, '2026-10-05', 'SALÁRIO EMPRESA EXEMPLO LTDA', 'Salário']]), JSON.stringify(i1After));
+  await btn('Ver em Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(600);
+  t1 = await body();
+  ok('I1 "Ver em Movimentos" abre o mês dos lançamentos com o aviso do resultado e os registros novos', t1.includes('4 lançamentos importados.') && t1.includes('Tarifa da conta') && t1.includes('FARMÁCIA CENTRAL') && t1.includes('Outubro'), t1.slice(0, 300));
+  await goResumo().catch(() => {});
+  await expectTotals('I1 Resumo depois de importar: gasto da conta entra em Pago no dia dele, o recebimento em Recebido, e Ainda a pagar não muda', 'R$ 11.000,00', 'R$ 4.077,80', 'R$ 6.922,20', 'R$ 650,00');
+
+  // ---- 3. O mesmo arquivo de novo: tudo "Já anotado", nada entra duas vezes ----
+  await i1Open(); await i1Pick(i1Ofx); await waitText('Arquivo lido: extrato.ofx', 12000); await i1Review();
+  t1 = await i1Keep(); boxes = await i1Boxes();
+  ok('I1 o mesmo arquivo de novo: as quatro linhas importadas vêm "Já anotado", sem caixa para marcar, e nada fica marcado', t1.includes('7 linhas · 0 marcadas') && (t1.match(/Já anotado/g) ?? []).length === 5 && (t1.match(/Esta linha já foi importada antes e não entra de novo\./g) ?? []).length === 4 &&
+    boxes.filter((b) => b[2] === 'true').length === 4 && (await p.getByRole('button', { name: 'Importar', exact: true }).filter({ visible: true }).first().getAttribute('aria-disabled')) === 'true', JSON.stringify(boxes.map((b) => [b[1], b[2]])));
+  await atWidths(async (w) => { await layoutChecks(`I1 revisar com tudo já anotado ${w}px`); if (w === 390) await shot('306_importar_ja_anotado'); });
+  ok('I1 o mesmo arquivo de novo: nenhum registro a mais foi criado', (await i1Records()).length === i1After.length);
+  // Valores ocultos: o valor de cada linha vira "R$ ••••" e o nome da caixa diz "valor oculto".
+  await i1Leave();
+  await openConta(); await hideSwitch().click(); await p.waitForTimeout(300); await btn('Voltar').click(); await waitText('Organizar');
+  await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await i1Pick(i1Ofx); await waitText('Arquivo lido: extrato.ofx', 12000); await i1Review();
+  await hiddenShows('Importar › A revisar');
+  boxes = await i1Boxes();
+  ok('I1 valores ocultos: o nome de cada caixa diz "valor oculto" e a descrição e a data seguem à vista', boxes[0][0] === 'Incluir: COMPRA PADARIA SÃO JOÃO, valor oculto, 02/10/2026' && (await body()).includes('COMPRA PADARIA SÃO JOÃO') && (await body()).includes('R$ ••••'), String(boxes[0][0]));
+  await atWidths(async (w) => { await layoutChecks(`I1 revisar com valores ocultos ${w}px`); if (w === 390) await shot('307_importar_valores_ocultos'); });
+  await i1Leave();
+  await openConta(); await hideSwitch().click(); await p.waitForTimeout(300); await btn('Voltar').click(); await waitText('Organizar');
+
+  // ---- 4. Planilha CSV do extrato: ponto e vírgula, decimal vírgula, cabeçalho depois de título, linha de saldo, memória do aparelho ----
+  await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await i1Pick(i1Csv); await waitText('Arquivo lido: extrato.csv', 12000); await p.waitForTimeout(300);
+  t1 = await i1Keep();
+  ok('I1 CSV: 3 linhas lidas, a linha de saldo fica de lado (dita na tela), o saldo é ignorado e nenhum destino vem escolhido', t1.includes('3 linhas lidas') && t1.includes('1 linha do arquivo foi deixada de lado (sem data ou valor, saldo ou valor zero).') && t1.includes('O saldo que vem no arquivo é ignorado.') &&
+    (await radio('Conta').getAttribute('aria-checked')) === 'false' && (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'false' && (await p.getByRole('button', { name: 'Revisar as linhas', exact: true }).filter({ visible: true }).first().getAttribute('aria-disabled')) === 'true');
+  await radio('Conta').click(); await p.waitForTimeout(300);
+  ok('I1 CSV: com a conta escolhida, "Conta de destino" mostra as contas ativas, a principal marcada', (await radio('Conta principal').getAttribute('aria-checked')) === 'true');
+  await i1Review();
+  t1 = await i1Keep();
+  ok('I1 CSV: valores com vírgula e milhares lidos; a memória do aparelho traz "Lazer" para a padaria (a regra diria Mercado); regras para o restante', t1.includes('3 linhas · 3 marcadas') && t1.includes('01/10/2026 · Saída · Lazer') && t1.includes('03/10/2026 · Saída · Lazer') && t1.includes('06/10/2026 · Entrada · Reembolso') &&
+    t1.includes('RESTAURANTE SABOR, CENTRO') && t1.includes('R$ 15,50') && t1.includes('R$ 62,40') && t1.includes('R$ 250,00'), t1.slice(0, 500));
+  await btn('Importar 3 lançamentos').click(); await waitText('Importação concluída', 12000);
+  ok('I1 CSV: "3 lançamentos importados."', (await body()).includes('3 lançamentos importados.'));
+  await btn('Ver em Movimentos').click(); await waitText('Registrar recebimento'); await goResumo().catch(() => {});
+  await expectTotals('I1 Resumo depois do CSV: R$ 11.250,00 recebidos, R$ 4.155,70 pagos, diferença R$ 7.094,30, e 650 a pagar', 'R$ 11.250,00', 'R$ 4.155,70', 'R$ 7.094,30', 'R$ 650,00');
+
+  // ---- 5. Fatura do cartão (planilha com a compra positiva): compras entram na fatura; estorno vem desmarcado; o pagamento da fatura não entra ----
+  await i1Open(); await i1Pick(i1Card); await waitText('Arquivo lido: fatura.csv', 12000);
+  await radio('Cartão de crédito').click(); await p.waitForTimeout(300);
+  t1 = await i1Keep();
+  ok('I1 cartão: o destino pede o cartão (o único, "Cartão Exemplo", já marcado) e explica que a compra só vira gasto quando a fatura é paga', t1.includes('Fatura: as compras entram na fatura e só viram gasto quando você paga a fatura.') && (await radio('Cartão Exemplo').getAttribute('aria-checked')) === 'true');
+  await atWidths(async (w) => { await innerChecks(`I1 destino cartão ${w}px`); if (w === 390) await shot('308_importar_destino_cartao'); });
+  await i1Review();
+  t1 = await i1Keep(); boxes = await i1Boxes();
+  ok('I1 cartão: três compras marcadas, o estorno desmarcado e o pagamento da fatura fora (sem caixa), e o aviso de que a compra não soma em Pago', t1.includes('5 linhas · 3 marcadas') && t1.includes('04/10/2026 · Compra · Lazer') && t1.includes('05/10/2026 · Compra · Mercado') && t1.includes('05/10/2026 · Estorno · Lazer') &&
+    t1.includes('Pagamento da fatura, não entra') && t1.includes('Compras no cartão entram na fatura e não somam em Pago até a fatura ser paga.') &&
+    JSON.stringify(boxes.map((b) => [b[1], b[2] === 'true'])) === JSON.stringify([['true', false], ['true', false], ['true', false], ['false', false], ['false', true]]), JSON.stringify(boxes));
+  await atWidths(async (w) => { await innerChecks(`I1 revisar cartão ${w}px`); if (w === 390) await shot('309_importar_revisar_cartao'); if (w === 320) await shot('309_importar_revisar_cartao_320px'); });
+  await btn('Importar 3 lançamentos').click(); await waitText('Importação concluída', 12000);
+  ok('I1 cartão: "3 lançamentos importados." com "Ver o cartão" e "Ver em Movimentos"', (await body()).includes('3 lançamentos importados.') && (await visibleCount('button', 'Ver o cartão')) === 1 && (await visibleCount('button', 'Ver em Movimentos')) === 1);
+  await btn('Ver o cartão').click(); await waitText('Cartão Exemplo'); await p.waitForTimeout(600);
+  t1 = await body();
+  ok('I1 cartão: a fatura de novembro soma as compras (R$ 550,00 + R$ 158,90 = R$ 708,90)', t1.includes('R$ 708,90'), t1.slice(0, 400));
+  await goResumo().catch(() => {});
+  await expectTotals('I1 Resumo depois da fatura: compras no cartão não entram em Pago (nada muda)', 'R$ 11.250,00', 'R$ 4.155,70', 'R$ 7.094,30', 'R$ 650,00');
+
+  // ---- 6. Planilha sem cabeçalho conhecido: escolher as colunas ----
+  await i1Open(); await i1Pick(i1NoHeader); await waitText('Quais colunas são quais?', 12000); await p.waitForTimeout(300);
+  t1 = await i1Keep();
+  ok('I1 sem cabeçalho: a tela de colunas, com a primeira linha lida como lançamento (a caixa "A primeira linha tem os nomes das colunas" desmarcada) e as colunas já chutadas', t1.includes('Não reconhecemos os nomes das colunas.') && t1.includes('01/10/2026 | PADARIA | -45,90 | x') &&
+    (await p.getByRole('checkbox', { name: 'A primeira linha tem os nomes das colunas' }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'false' &&
+    (await p.getByRole('radio', { name: /^Data, Coluna 1: 01\/10\/2026/ }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'true' && (await p.getByRole('radio', { name: /^Descrição, Coluna 2: PADARIA/ }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'true' &&
+    (await p.getByRole('radio', { name: /^Valor, Coluna 3: -45,90/ }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'true', t1.slice(0, 500));
+  await atWidths(async (w) => { await innerChecks(`I1 colunas ${w}px`); if (w === 390) await shot('310_importar_colunas'); if (w === 320) await shot('310_importar_colunas_320px'); });
+  await btn('Usar estas colunas').click(); await waitText('Arquivo lido: sem-cabecalho.csv', 8000);
+  ok('I1 sem cabeçalho: "Usar estas colunas" lê as duas linhas', (await body()).includes('2 linhas lidas'));
+  await btn('Escolher outro arquivo').click(); await waitText('Escolha o arquivo');
+
+  // ---- 7. Arquivos que não servem ----
+  const i1Bad = async (file, text, name) => {
+    await i1Pick(file); await waitText(text, 15000); await p.waitForTimeout(300);
+    const x = await i1Keep();
+    ok(`I1 ${name}: a mensagem aparece junto do botão e nada é lido`, x.includes(text) && (await visibleCount('button', 'Escolher o arquivo')) === 1 && (await visibleCount('button', 'Revisar as linhas')) === 0);
+  };
+  await i1Bad(i1Pdf, 'Não reconhecemos este arquivo. Use um OFX ou uma planilha CSV do banco.', 'PDF');
+  await atWidths(async (w) => { await innerChecks(`I1 arquivo que não serve ${w}px`); if (w === 390) await shot('311_importar_arquivo_invalido'); });
+  await i1Bad(i1Big, 'O arquivo passa de 5 MB. Peça ao banco um período menor.', 'arquivo maior que 5 MB');
+  await i1Bad(i1Many, 'O arquivo tem mais de 5.000 linhas. Peça ao banco um período menor.', 'arquivo com mais de 5.000 linhas');
+
+  // ---- 8. Um arquivo com 1.200 linhas: a lista mostra 100 por vez e a importação vai em três lotes ----
+  await i1Pick(i1Lots); await waitText('Arquivo lido: lote.csv', 15000);
+  await radio('Conta').click(); await i1Review();
+  t1 = await i1Keep();
+  ok('I1 1.200 linhas: "1.200 linhas · 1.200 marcadas", 100 caixas à vista e "Mostrar mais 100 (1.100 linhas restantes)"', t1.includes('1.200 linhas · 1.200 marcadas') && (await i1Boxes()).length === 100 && (await visibleCount('button', 'Mostrar mais 100 (1.100 linhas restantes)')) === 1 && (await visibleCount('button', 'Importar 1.200 lançamentos')) === 1);
+  await btn('Mostrar mais 100 (1.100 linhas restantes)').click(); await p.waitForTimeout(400);
+  ok('I1 "Mostrar mais" soma mais 100 linhas à lista', (await i1Boxes()).length === 200);
+  await btn('Importar 1.200 lançamentos').click(); await waitText('Importação concluída', 30000);
+  ok('I1 1.200 linhas: "1.200 lançamentos importados." (em lotes de 500)', (await body()).includes('1.200 lançamentos importados.'));
+  ok('I1 1.200 linhas: os gastos de setembro entraram um a um (R$ 1,00 cada)', (await otherDevice(async (repo, ctx) => (await repo.listRecords(ctx, '2026-09')).filter((r) => /^Linha \d+$/.test(r.description)).length)) === 1200);
+  await btn('Ver em Movimentos').click({ timeout: 90000 }); await waitText('Registrar recebimento', 90000); await goResumo().catch(() => {});
+  await p.getByRole('button', { name: /Próximo mês/ }).filter({ visible: true }).first().click(); await waitText('Outubro de 2026');
+  await expectTotals('I1 Resumo: outubro não muda com os gastos de setembro', 'R$ 11.250,00', 'R$ 4.155,70', 'R$ 7.094,30', 'R$ 650,00');
+
+  // ---- 9. Conta nova: nada de exemplo, sem cartão ----
+  await newAcct('Ivo Teste', 'ivo@exemplo.com');
+  await tabByName('Movimentações').click(); await waitText('Organizar'); await p.waitForTimeout(400);
+  ok('I1 conta nova: Movimentos sem registros de exemplo e com a linha "Importar extrato ou fatura"', (await visibleCount('button', SC.importar)) === 1 && (await body()).includes('Nenhum registro em outubro de 2026'));
+  await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await i1Pick(i1Ofx); await waitText('Arquivo lido: extrato.ofx', 12000);
+  await radio('Cartão de crédito').click(); await p.waitForTimeout(300);
+  t1 = await i1Keep();
+  ok('I1 conta nova: sem cartão, o destino diz "Você ainda não cadastrou nenhum cartão." e leva a cadastrar', t1.includes('Você ainda não cadastrou nenhum cartão.') && (await visibleCount('button', 'Cadastrar um cartão')) === 1 && (await p.getByRole('button', { name: 'Revisar as linhas', exact: true }).filter({ visible: true }).first().getAttribute('aria-disabled')) === 'true');
+  await atWidths(async (w) => { await layoutChecks(`I1 conta nova sem cartão ${w}px`); if (w === 390) await shot('312_importar_conta_nova_sem_cartao'); });
+  await radio('Conta').click(); await p.waitForTimeout(300);
+  ok('I1 conta nova: com uma conta só, o destino mostra o nome como texto', (await body()).includes('Conta de destino: Conta principal'));
+  await i1Review();
+  t1 = await i1Keep();
+  ok('I1 conta nova: a revisão não tem "Já anotado" por semelhança (nada anotado ainda), e a memória do aparelho é de outra pessoa (a padaria volta a "Mercado")', t1.includes('7 linhas · 5 marcadas') && t1.includes('02/10/2026 · Saída · Mercado') && !t1.includes('Já anotado'));
+  await btn('Importar 5 lançamentos').click();
+  await waitText('Importação concluída', 12000);
+  ok('I1 conta nova: "5 lançamentos importados."', (await body()).includes('5 lançamentos importados.'));
+  await btn('Ver em Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(500);
+  ok('I1 conta nova: os lançamentos importados aparecem em Movimentos', (await body()).includes('COMPRA PADARIA SÃO JOÃO') && (await body()).includes('SALÁRIO EMPRESA EXEMPLO LTDA'));
+
+  // ---- 10. Textos e escritas ----
+  const i1Vetoed = i1Texts.map((x) => x.match(FORBIDDEN)?.[0]).filter(Boolean);
+  const i1Brands = i1Texts.map((x) => x.match(/\b(nubank|ita[uú]|bradesco|santander|inter|c6|caixa|sicredi|sicoob|btg|neon|picpay|mercado pago|itaucard|visa|mastercard|hipercard|amex|serasa)\b/i)?.[0]).filter(Boolean);
+  const i1Dashes = i1Texts.map((x) => x.match(/[–—]/)?.[0]).filter(Boolean);
+  ok('I1 telas de importação: nenhum termo proibido, travessão, expressão vetada nem nome de banco ou de bandeira nos textos da interface', i1Texts.length >= 12 && i1Vetoed.length === 0 && i1Brands.length === 0 && i1Dashes.length === 0, `${i1Texts.length} telas ${i1Vetoed.join(' | ')} ${i1Brands.join(' | ')}`);
+  ok('I1 nenhuma escrita direta na rede durante a importação (a demonstração grava só em memória)', writes.slice(i1Writes0).length === 0, writes.slice(i1Writes0).join(' | '));
   await goResumo().catch(() => {});
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);

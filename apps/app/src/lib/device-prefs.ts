@@ -1,4 +1,4 @@
-import { DEFAULT_REMINDER_HOUR, isReminderHour, type ReminderHour } from '@clarevo/core';
+import { DEFAULT_REMINDER_HOUR, MEMORY_LIMIT, isReminderHour, type ImportMemory, type ReminderHour } from '@clarevo/core';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
@@ -32,6 +32,11 @@ export interface DevicePrefs {
    * aparelho; não é dado financeiro e nada vai para o servidor. Vazio ou inválido: o aviso não está escondido.
    */
   subscriptionSnoozedUntil: string | null;
+  /**
+   * Memória das categorias de "Importar extrato ou fatura" (D-048): palavras da descrição → categoria que a pessoa escolheu da última
+   * vez. Só neste aparelho, como a memória das notas fiscais; não é dado financeiro e nada vai para o servidor. No máximo 300 entradas.
+   */
+  importCategories: ImportMemory;
 }
 
 export const DEFAULT_PREFS: DevicePrefs = {
@@ -43,6 +48,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   lastPayment: null,
   lastAccount: null,
   subscriptionSnoozedUntil: null,
+  importCategories: {},
 };
 
 const PREFIX = 'clarevo.aparelho.v1.';
@@ -67,10 +73,21 @@ function parse(raw: string | null | undefined): DevicePrefs {
       lastAccount: typeof v.lastAccount === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(v.lastAccount) ? v.lastAccount : null,
       subscriptionSnoozedUntil:
         typeof v.subscriptionSnoozedUntil === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.subscriptionSnoozedUntil) ? v.subscriptionSnoozedUntil : null,
+      importCategories: parseMemory(v.importCategories),
     };
   } catch {
     return DEFAULT_PREFS;
   }
+}
+
+/** A memória de categorias guardada: só texto curto para texto curto, no máximo 300 entradas. */
+function parseMemory(value: unknown): ImportMemory {
+  const out: ImportMemory = {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return out;
+  for (const [k, c] of Object.entries(value as Record<string, unknown>).slice(0, MEMORY_LIMIT)) {
+    if (k.length > 0 && k.length <= 60 && typeof c === 'string' && c.length > 0 && c.length <= 40) out[k] = c;
+  }
+  return out;
 }
 
 function webStorage(): Storage | null {
