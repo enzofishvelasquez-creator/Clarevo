@@ -29,7 +29,7 @@ SplashScreen.preventAutoHideAsync();
  * página recarregada). As telas de entrada, de confirmação e de nova senha ficam fora.
  */
 const ENTRY_PATH =
-  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/referencia)?|contas\/(nova|[^/]+\/editar)|cartoes(\/(novo|[^/]+(\/(editar|fatura\/\d{4}-\d{2}(\/(pagar|encargo|estorno|compra))?))?))?|reserva|meta\/(nova|[^/]+(\/(editar|movimento))?)|guardar(\/minima)?|simular|conta|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes(\/buscar)?|metas|aprender)\/?$/;
+  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/referencia)?|contas\/(nova|[^/]+\/editar)|cartoes(\/(novo|[^/]+(\/(editar|fatura\/\d{4}-\d{2}(\/(pagar|encargo|estorno|compra))?))?))?|reserva|meta\/(nova|[^/]+(\/(editar|movimento))?)|guardar(\/minima)?|simular|conta(\/exportar)?|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes(\/buscar)?|metas|aprender)\/?$/;
 
 /**
  * Endereço pedido ao abrir a versão web. Sem sessão (ou enquanto a sessão é conferida), as rotas protegidas levam à
@@ -217,6 +217,8 @@ function Navigation() {
           <Stack.Screen name="composicao" />
           <Stack.Screen name="quem-ve" />
           <Stack.Screen name="conta" />
+          {/* Exportar meus dados (D-047): planilha (CSV) ou resumo em PDF, montado no aparelho. */}
+          <Stack.Screen name="conta/exportar" />
           {/* Contas de origem do dinheiro (D-043). /contas/nova é rota estática e tem precedência sobre /contas/[id]/editar. */}
           <Stack.Screen name="contas/nova" />
           <Stack.Screen name="contas/[id]/editar" />

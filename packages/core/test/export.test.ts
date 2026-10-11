@@ -22,6 +22,7 @@ import {
   csvCell,
   csvText,
   escapeHtml,
+  exportAfterAuth,
   exportCardLabel,
   exportFileName,
   exportFilterOf,
@@ -37,6 +38,7 @@ import {
   recordOriginOf,
   summarizeMonth,
   type CardEntry,
+  type Commitment,
   type ExportContext,
   type ExportSource,
   type FinancialRecord,
@@ -210,7 +212,7 @@ describe('CSV de lançamentos (D-047)', () => {
 
   it('a origem diz se o gasto veio de conta a pagar, gasto fixo, parcelamento, conta do ano ou fatura', () => {
     const series = (kind: 'mensal' | 'parcelada' | 'anual') => ({ series: { id: 's', number: 1, kind, nature: 'conta' as const, installmentTotal: null, partsPerYear: null } });
-    const commitments = new Map([
+    const commitments = new Map<string, Pick<Commitment, 'series'>>([
       ['avulsa', { series: null }],
       ['fixa', series('mensal')],
       ['parcela', series('parcelada')],
@@ -500,5 +502,14 @@ describe('HTML do PDF (D-047)', () => {
     expect(exportFileName('lancamentos', '2026-10-11')).toBe('clarevo-lancamentos-2026-10-11.csv');
     expect(exportFileName('compras', '2026-10-11')).toBe('clarevo-compras-no-cartao-2026-10-11.csv');
     expect(exportFileName('resumo', '2026-10-11')).toBe('clarevo-resumo-2026-10-11.pdf');
+  });
+});
+
+describe('biometria antes de gerar (D-047)', () => {
+  it('confirmar ou não ter biometria deixa seguir; cancelar ou falhar, não', () => {
+    expect(exportAfterAuth('ok')).toBe('seguir');
+    expect(exportAfterAuth('indisponivel')).toBe('seguir');
+    expect(exportAfterAuth('cancelado')).toBe('cancelado');
+    expect(exportAfterAuth('falhou')).toBe('falhou');
   });
 });

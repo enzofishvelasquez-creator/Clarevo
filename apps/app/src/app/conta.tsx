@@ -1,5 +1,6 @@
-import { AlertCircle, Check, KeyRound, LogOut, MonitorSmartphone } from 'lucide-react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { EXPORT_TEXT } from '@clarevo/core';
+import { AlertCircle, Check, FileDown, KeyRound, LogOut, MonitorSmartphone } from 'lucide-react-native';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 
@@ -134,6 +135,16 @@ export default function ContaScreen() {
           <RemindersCard />
         </View>
         <PrivacyCard />
+
+        <Card style={{ gap: space[3] }}>
+          <Txt variant="title" accessibilityRole="header" aria-level={2}>
+            {EXPORT_TEXT.entry}
+          </Txt>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {EXPORT_TEXT.entryHint}
+          </Txt>
+          <Button label={EXPORT_TEXT.entryButton} icon={FileDown} tone="soft" accessibilityLabel={EXPORT_TEXT.entryA11y} onPress={() => router.push('/conta/exportar')} />
+        </Card>
 
         <Card style={{ gap: space[2] }}>
           <Txt variant="title" accessibilityRole="header" aria-level={2}>

@@ -63,6 +63,7 @@ export const EXPORT_TEXT = {
   entry: 'Exportar meus dados',
   entryHint: 'Planilha (CSV) ou resumo em PDF dos seus gastos e recebimentos',
   entryA11y: 'Exportar meus dados. Abre a tela para gerar uma planilha ou um resumo em PDF.',
+  entryButton: 'Escolher período e formato',
   /** Tela. */
   title: 'Exportar meus dados',
   intro:
@@ -580,8 +581,16 @@ export function buildExportFiles(source: ExportSource, format: ExportFormat, opt
 }
 
 // ---------------------------------------------------------------------------
-// Leitura
+// Biometria e leitura
 // ---------------------------------------------------------------------------
+
+/**
+ * Com "Pedir biometria ao abrir" ligado (D-025), a exportação pede a biometria antes de gerar. Como na tela de desbloqueio, a
+ * confirmação do aparelho ou a falta de biometria e de senha cadastradas deixam seguir; a recusa ou o cancelamento, não.
+ */
+export function exportAfterAuth(result: 'ok' | 'cancelado' | 'indisponivel' | 'falhou'): 'seguir' | 'cancelado' | 'falhou' {
+  return result === 'ok' || result === 'indisponivel' ? 'seguir' : result === 'cancelado' ? 'cancelado' : 'falhou';
+}
 
 export type ExportLoad = { ok: true; source: ExportSource } | { ok: false; reason: 'muitas_linhas' };
 
