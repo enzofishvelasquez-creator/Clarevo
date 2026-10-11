@@ -27,6 +27,11 @@ export interface DevicePrefs {
    * financeiro: nada vai para o servidor, e uma escolha que já não existe ou foi arquivada é ignorada (chooseAccountId).
    */
   lastAccount: string | null;
+  /**
+   * "Agora não" no aviso de assinaturas (D-046): o dia (AAAA-MM-DD) até o qual o aviso fica escondido, hoje + 30 dias. Só neste
+   * aparelho; não é dado financeiro e nada vai para o servidor. Vazio ou inválido: o aviso não está escondido.
+   */
+  subscriptionSnoozedUntil: string | null;
 }
 
 export const DEFAULT_PREFS: DevicePrefs = {
@@ -37,6 +42,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   biometricLock: false,
   lastPayment: null,
   lastAccount: null,
+  subscriptionSnoozedUntil: null,
 };
 
 const PREFIX = 'clarevo.aparelho.v1.';
@@ -59,6 +65,8 @@ function parse(raw: string | null | undefined): DevicePrefs {
       biometricLock: v.biometricLock === true,
       lastPayment: typeof v.lastPayment === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(v.lastPayment) ? v.lastPayment : null,
       lastAccount: typeof v.lastAccount === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(v.lastAccount) ? v.lastAccount : null,
+      subscriptionSnoozedUntil:
+        typeof v.subscriptionSnoozedUntil === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.subscriptionSnoozedUntil) ? v.subscriptionSnoozedUntil : null,
     };
   } catch {
     return DEFAULT_PREFS;

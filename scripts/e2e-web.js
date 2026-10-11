@@ -5,8 +5,9 @@
  * (Conta na web e ocultar valores), do Ciclo B (renda comprometida e a previsão dos pagamentos), do Ciclo C (metas, reserva
  * e plano de guardar), do Ciclo D (simulador, com os aportes no início de cada mês) e da Navegação (D-039: "Anotar gasto" logo
  * abaixo do cabeçalho, barra inferior nas telas de consulta, Contas a pagar no mês certo, Metas compacta e a busca "No app" de
- * Aprender), de "Antes de financiar" (D-044), do Ciclo G1 (contas de origem do dinheiro, D-043) e do Ciclo H1 (buscar em
- * Movimentos, D-045) na versão web, em modo demonstração (acesso simulado).
+ * Aprender), de "Antes de financiar" (D-044), do Ciclo G1 (contas de origem do dinheiro, D-043), do Ciclo H1 (buscar em
+ * Movimentos, D-045) e do Ciclo H2 (assinaturas, D-046, com o cenário fictício "assinaturas" da demonstração) na versão web,
+ * em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -582,21 +583,21 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // As duas primeiras legendas vêm dos dados (a mesma origem do card "Ainda a pagar"); o nome acessível junta título e legenda.
   const SC = {
     pagar: 'Contas a pagar, R$ 650,00 em aberto neste mês',
-    fixos: 'Gastos fixos e parcelamentos, 5 cadastrados, com as contas do ano',
+    fixos: 'Gastos fixos e parcelamentos, 7 cadastrados, com as contas do ano',
     // D-037: a demonstração tem o "Cartão Exemplo"; a legenda traz a fatura atual (fecha dia 3, vence dia 10).
     cartoes: 'Cartões, Cartão Exemplo, fatura de novembro R$ 550,00',
     // D-041: a categoria mais perto do limite (Lazer: parcela do tênis e restaurante, R$ 400,00 de R$ 300,00).
     orcamento: 'Orçamento por categoria, Lazer: R$ 400,00 de R$ 300,00',
     calc: 'Calculadoras, Parcelado ou à vista, dívidas, reserva e outras contas',
   };
-  await waitText('5 cadastrados, com as contas do ano').catch(() => {});
+  await waitText('7 cadastrados, com as contas do ano').catch(() => {});
   t = await body();
   const scOrder = await p.evaluate(() => {
     const top = (sel, text) => [...document.querySelectorAll(sel)].find((e) => e.textContent === text && e.getBoundingClientRect().width > 0)?.getBoundingClientRect().top ?? null;
     return { anotar: top('[role=button]', 'Anotar gasto'), organizar: top('[role=heading]', 'Organizar'), totais: top('div[dir="auto"]', 'Pago em outubro') };
   });
   ok('movimentações: "Organizar" com os cinco atalhos (Orçamento por categoria entre Cartões e as calculadoras) e as legendas de outubro, entre os botões e os totais do mês', JSON.stringify(await sectionRows('Organizar')) === JSON.stringify([SC.pagar, SC.fixos, SC.cartoes, SC.orcamento, SC.calc]) &&
-    ['R$ 650,00 em aberto neste mês', '5 cadastrados, com as contas do ano', 'Cartão Exemplo · fatura de novembro R$ 550,00', 'Lazer: R$ 400,00 de R$ 300,00', 'Parcelado ou à vista, dívidas, reserva e outras contas'].every((x) => t.includes(x)) &&
+    ['R$ 650,00 em aberto neste mês', '7 cadastrados, com as contas do ano', 'Cartão Exemplo · fatura de novembro R$ 550,00', 'Lazer: R$ 400,00 de R$ 300,00', 'Parcelado ou à vista, dívidas, reserva e outras contas'].every((x) => t.includes(x)) &&
     scOrder.anotar !== null && scOrder.organizar !== null && scOrder.totais !== null && scOrder.anotar < scOrder.organizar && scOrder.organizar < scOrder.totais, `${JSON.stringify(await sectionRows('Organizar'))} ${JSON.stringify(scOrder)}`);
   await layoutChecks('movimentações com atalhos 390px');
   await scrollTo('Organizar');
@@ -657,8 +658,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Ciclo A3: IPVA (20/01/2027) e IPTU (fevereiro a novembro de 2027) só entram dois meses antes do primeiro vencimento.
   ok('contas do ano: IPVA e IPTU ainda fora de Contas a pagar em outubro', !t.includes('IPVA') && !t.includes('IPTU') && !t.includes('Contas do ano aparecem aqui'));
   // Aluguel, Luz, Financiamento do carro e as contas do ano IPVA e IPTU.
-  await waitText('5 cadastrados').catch(() => {});
-  ok('lista: link "Gastos fixos e parcelamentos" com a contagem', (await visibleCount('button', 'Gastos fixos e parcelamentos, 5 cadastrados')) === 1);
+  await waitText('7 cadastrados').catch(() => {});
+  ok('lista: link "Gastos fixos e parcelamentos" com a contagem', (await visibleCount('button', 'Gastos fixos e parcelamentos, 7 cadastrados')) === 1);
   await shot('19_contas_a_pagar');
 
   await btn('Anotar conta a pagar').click(); await waitText('Salvando em Pessoal');
@@ -857,26 +858,27 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar').click(); await waitText('Diferença do mês');
 
   // Ciclo A · gastos fixos e parcelamentos (D-023, D-024). Começa e termina com outubro na base: 6.000 / 3.900 / 2.100 e 650.
-  await openToPay(); await waitText('5 cadastrados');
-  await btn('Gastos fixos e parcelamentos, 5 cadastrados').click(); await waitText('Por mês, se os valores não mudarem');
+  await openToPay(); await waitText('7 cadastrados');
+  await btn('Gastos fixos e parcelamentos, 7 cadastrados').click(); await waitText('Por mês, se os valores não mudarem');
   t = await body();
-  ok('gastos fixos: soma por mês com a parte estimada', t.includes('Por mês, se os valores não mudarem: R$ 3.530,00 (inclui R$ 180,00 estimados).'));
+  ok('gastos fixos: soma por mês com a parte estimada', t.includes('Por mês, se os valores não mudarem: R$ 3.668,90 (inclui R$ 180,00 estimados).'));
   ok('gastos fixos: seções e linhas com rótulos em texto',
     JSON.stringify(await sectionRows('Gastos fixos')) === JSON.stringify(['Aluguel, R$ 2.500,00, todo dia 5, gasto fixo', 'Luz, cerca de R$ 180,00, todo dia 12, valor muda, gasto fixo']) &&
       JSON.stringify(await sectionRows('Parcelamentos')) === JSON.stringify(['Financiamento do carro, Parcela 13 de 48, R$ 850,00, termina em outubro de 2029, parcelamento']) &&
       ['R$ 2.500,00 · todo dia 5', '≈ R$ 180,00 · todo dia 12 · valor muda', 'Parcela 13 de 48 · R$ 850,00 · termina em outubro de 2029'].every((x) => t.includes(x)));
   await shot('25_gastos_fixos');
   // Ciclo A3: a demonstração já tem IPVA e IPTU em "Contas do ano" (seção entre Parcelamentos e Encerrados).
-  // "Por mês" continua R$ 3.530,00 (as contas do ano ficam fora) e "Por ano" soma R$ 4.200,00, todos estimados.
+  // "Por mês" continua R$ 3.668,90 (as contas do ano ficam fora) e "Por ano" soma R$ 4.200,00, todos estimados.
   const headings = await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
-  ok('contas do ano: seção depois de Gastos fixos e Parcelamentos', JSON.stringify(headings) === JSON.stringify(['Gastos fixos', 'Parcelamentos', 'Contas do ano']), headings.join(' | '));
+  // D-046: o grupo Assinaturas fica no topo, antes de Gastos fixos.
+  ok('contas do ano: seção depois de Gastos fixos e Parcelamentos (e o grupo Assinaturas no topo)', JSON.stringify(headings) === JSON.stringify(['Assinaturas', 'Gastos fixos', 'Parcelamentos', 'Contas do ano']), headings.join(' | '));
   // Ciclo A5 (spec3 §3.7): o card termina com "Como se preparar para as contas do ano?", depois de "Nova conta do ano".
   ok('contas do ano: IPVA e IPTU com rótulos em texto, "Nova conta do ano" e o link de Aprender',
     JSON.stringify(await sectionRows('Contas do ano')) === JSON.stringify(['IPVA, cerca de R$ 2.400,00, todo ano em 20/01, valor muda, conta do ano', 'IPTU, 10 parcelas de cerca de R$ 180,00, fevereiro a novembro, dia 10, valor muda, conta do ano', 'Nova conta do ano', 'Como se preparar para as contas do ano?']) &&
       ['Contas que vêm uma vez por ano, como IPVA, IPTU, matrícula e seguro. Você cadastra uma vez; todo ano o Clarevo cria a conta do mês certo, dois meses antes de vencer.', '≈ R$ 2.400,00 · todo ano em 20/01 · valor muda', '10 parcelas de ≈ R$ 180,00 · fevereiro a novembro, dia 10 · valor muda'].every((x) => t.includes(x)),
     ((await sectionRows('Contas do ano')) ?? []).join(' | '));
-  ok('contas do ano: "Por ano" com a parte estimada e "Por mês" continua R$ 3.530,00, sem elas',
-    t.includes('Por ano, se os valores não mudarem: R$ 4.200,00 (inclui R$ 4.200,00 estimados).') && t.includes('Por mês, se os valores não mudarem: R$ 3.530,00 (inclui R$ 180,00 estimados). Contas do ano ficam fora desta soma.'));
+  ok('contas do ano: "Por ano" com a parte estimada e "Por mês" continua R$ 3.668,90, sem elas',
+    t.includes('Por ano, se os valores não mudarem: R$ 4.200,00 (inclui R$ 4.200,00 estimados).') && t.includes('Por mês, se os valores não mudarem: R$ 3.668,90 (inclui R$ 180,00 estimados). Contas do ano ficam fora desta soma.'));
   await keepText();
   await scrollTo('Contas do ano');
   await shot('36_contas_do_ano');
@@ -1014,8 +1016,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Luz de novembro sai de Contas a pagar', !((await sectionRows('Próximos meses')) ?? ['Luz']).some((r) => r.startsWith('Luz')));
 
   // Encerrar a Escola em novembro e retomar sem data para terminar.
-  await waitText('6 cadastrados');
-  await btn('Gastos fixos e parcelamentos, 6 cadastrados').click(); await waitText('Por mês, se os valores não mudarem');
+  await waitText('8 cadastrados');
+  await btn('Gastos fixos e parcelamentos, 8 cadastrados').click(); await waitText('Por mês, se os valores não mudarem');
   await openRow(/^Escola, R\$ 900,00, todo dia 10, termina em dezembro de 2026, gasto fixo/); await waitText('Encerrar gasto fixo');
   await btn('Encerrar gasto fixo').click(); await waitText('Qual é a última conta?');
   await radio('Novembro').click(); await waitText('Nenhuma conta em aberto vai sair da lista.');
@@ -7019,6 +7021,310 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('H1 telas da busca: nenhum termo proibido, travessão, "fazer sentido" nem palavra de julgamento sobre os gastos',
     h1Texts.length >= 8 && h1Vetoed.length === 0 && h1Texts.every((x) => !/[–—]/.test(x) && !/\b(excessiv\w*|demais|gastou muito|desperd[ií]cio|cuidado|vale a pena|atrasad[oa]s?)\b/i.test(x)), `${h1Texts.length} telas ${h1Vetoed.join(' | ')}`);
   ok('H1 nenhuma escrita direta na rede durante a busca (nenhum POST, PATCH, PUT ou DELETE)', writes.slice(h1Writes0).length === 0, writes.slice(h1Writes0).join(' | '));
+  await goResumo().catch(() => {});
+
+  // ==================================================================================================================
+  // Ciclo H2 · Assinaturas (D-046), docs/08 §5 item 11. Um gasto fixo mensal marcado como assinatura ("É uma assinatura?",
+  // no cadastro e na edição) vai para o grupo "Assinaturas" no topo de Gastos fixos e parcelamentos, com o que custa por mês e
+  // por ano; "Revisar assinaturas" (/gastos-fixos/assinaturas) lista as ativas e só grava a data da revisão; o aviso "Faz tempo
+  // que você não revisa suas assinaturas." aparece dentro do app (cenário ?cenario=assinaturas) e some com "Revisei" ou "Agora
+  // não". Nada muda Recebido, Pago, Diferença, Ainda a pagar nem a renda comprometida. Cada tela é conferida em 390 e em 320 px.
+  // Capturas novas: 270 em diante.
+  // ==================================================================================================================
+  const h2Texts = [];
+  const h2Keep = async () => { const x = await body(); h2Texts.push(x); screenTexts.push(x); return x; };
+  const h2Writes0 = writes.length;
+  const h2Rows = async (title) => ((await sectionRows(title)) ?? null)?.map((r) => r.replace(/ /g, ' ')) ?? null;
+  const h2Switch = () => p.getByRole('switch', { name: 'É uma assinatura?' }).filter({ visible: true }).first();
+  const h2Checked = async () => (await h2Switch().getAttribute('aria-checked')) === 'true';
+  const h2Heads2 = () => p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
+  const h2OpenFixos = async () => {
+    await goResumo(); await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+    await p.getByRole('button', { name: /^Gastos fixos e parcelamentos, \d+ cadastrados/ }).filter({ visible: true }).first().click();
+    await waitText('Por mês, se os valores não mudarem'); await p.waitForTimeout(400);
+  };
+  const h2Series = () => otherDevice(async (repo, ctx) => (await repo.listSeries(ctx)).map((s) => [s.terms[0].description, s.subscription, s.subscriptionReviewedOn, s.version]));
+  const H2_GROUP = [
+    'Academia (exemplo), R$ 99,00 por mês, R$ 1.188,00 por ano, todo dia 5, assinatura',
+    'Quanto custa por ano? Academia (exemplo)',
+    'Streaming (exemplo), R$ 39,90 por mês, R$ 478,80 por ano, todo dia 10, assinatura',
+    'Quanto custa por ano? Streaming (exemplo)',
+    'Revisar assinaturas',
+  ];
+  const H2_TOTALS = 'R$ 138,90 por mês · R$ 1.666,80 por ano';
+  const h2Review = async () => {
+    await btn('Revisar assinaturas').click(); await waitText('Vale olhar de tempos em tempos'); await p.waitForTimeout(500);
+  };
+
+  // ---- 1. Gastos fixos da demonstração: o grupo "Assinaturas" no topo, antes de "Gastos fixos" ----
+  await demoHome();
+  await h2OpenFixos();
+  t = await h2Keep();
+  ok('H2 Gastos fixos: o grupo "Assinaturas" (nível 2) fica no topo, antes de Gastos fixos, Parcelamentos e Contas do ano',
+    JSON.stringify(await h2Heads2()) === JSON.stringify(['Assinaturas', 'Gastos fixos', 'Parcelamentos', 'Contas do ano']), JSON.stringify(await h2Heads2()));
+  ok('H2 Assinaturas: R$ 138,90 por mês e R$ 1.666,80 por ano (a soma das duas ativas, por ano = por mês × 12)', t.includes(H2_TOTALS), t.slice(0, 800));
+  ok('H2 Assinaturas: cada linha com o valor por mês e por ano, o dia e o link "Quanto custa por ano?"; a da maior para a menor; e "Revisar assinaturas"',
+    JSON.stringify(await h2Rows('Assinaturas')) === JSON.stringify(H2_GROUP) &&
+    t.includes('R$ 99,00 por mês · R$ 1.188,00 por ano · todo dia 5') && t.includes('R$ 39,90 por mês · R$ 478,80 por ano · todo dia 10'), JSON.stringify(await h2Rows('Assinaturas')));
+  ok('H2 as assinaturas não se repetem em "Gastos fixos" e continuam na soma "Por mês" (R$ 3.668,90)',
+    JSON.stringify(await h2Rows('Gastos fixos')) === JSON.stringify(['Aluguel, R$ 2.500,00, todo dia 5, gasto fixo', 'Luz, cerca de R$ 180,00, todo dia 12, valor muda, gasto fixo']) &&
+    t.includes('Por mês, se os valores não mudarem: R$ 3.668,90 (inclui R$ 180,00 estimados).'));
+  ok('H2 a demonstração não mostra o aviso de revisão (as assinaturas são de hoje)', !t.includes('Faz tempo que você não revisa suas assinaturas.') && (await visibleCount('button', 'Agora não')) === 0);
+  await atWidths(async (w) => { await innerChecks(`H2 Gastos fixos com Assinaturas ${w}px`); if (w === 390) await shot('270_gastos_fixos_assinaturas'); if (w === 320) await shot('270_gastos_fixos_assinaturas_320px'); });
+
+  // ---- 2. Nada muda nos totais de outubro nem na renda comprometida ----
+  await goResumo();
+  await expectTotals('H2 demonstração com assinaturas: outubro segue 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  ok('H2 a renda comprometida de outubro segue em 52,5%', (await visibleCount('button', /^Renda comprometida em outubro: 52,5%/)) === 1);
+
+  // ---- 3. "Quanto custa por ano?" na linha da assinatura ----
+  await h2OpenFixos();
+  await btn('Quanto custa por ano? Streaming (exemplo)').click(); await waitText('Com estes números'); await p.waitForTimeout(500);
+  t = await body();
+  ok('H2 "Quanto custa por ano?" da linha: a calculadora abre com R$ 39,90 por mês e mostra R$ 478,80 por ano (nada é gravado)',
+    urlPath() === '/calcular/custo-por-ano' && (await field('Valor').inputValue()) === '39,90' && (await radio('Por mês').getAttribute('aria-checked')) === 'true' &&
+    t.includes('Com estes números, o gasto soma R$ 478,80 por ano.') && t.includes('Por mês, fica em R$ 39,90.'), `${urlPath()} ${await field('Valor').inputValue()}`);
+  await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem'); await p.waitForTimeout(300);
+
+  // ---- 4. O detalhe do gasto fixo marcado ----
+  await btn('Streaming (exemplo), R$ 39,90 por mês, R$ 478,80 por ano, todo dia 10, assinatura').click(); await waitText('Histórico de valores'); await p.waitForTimeout(400);
+  t = await h2Keep();
+  ok('H2 detalhe da assinatura: "Assinatura · R$ 478,80 por ano" e "Você ainda não registrou uma revisão."', t.includes('Assinatura · R$ 478,80 por ano') && t.includes('Você ainda não registrou uma revisão.') && t.includes('R$ 39,90 por mês'));
+  await atWidths(async (w) => { await innerChecks(`H2 detalhe da assinatura ${w}px`); if (w === 390) await shot('271_detalhe_assinatura'); });
+  await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
+
+  // ---- 5. Revisar assinaturas ----
+  await h2Review();
+  t = await h2Keep();
+  ok('H2 Revisar assinaturas: tela de consulta com o título, a introdução neutra, o total e "Você ainda não registrou uma revisão."',
+    (await h1Name()) === 'Revisar assinaturas' && urlPath() === '/gastos-fixos/assinaturas' && t.includes('Vale olhar de tempos em tempos se cada uma ainda é usada.') &&
+    t.includes('2 assinaturas: R$ 138,90 por mês · R$ 1.666,80 por ano') && t.includes('Você ainda não registrou uma revisão.') && t.includes('Pessoal'), t.slice(0, 700));
+  ok('H2 Revisar assinaturas: cada uma com valor por mês e por ano, "Continua", "Encerrar a partir de…" e a calculadora; "Revisei minhas assinaturas" no fim',
+    t.includes('R$ 99,00 por mês · R$ 1.188,00 por ano · todo dia 5') && t.includes('R$ 39,90 por mês · R$ 478,80 por ano · todo dia 10') &&
+    (await visibleCount('button', /^Continua: /)) === 2 && (await visibleCount('button', /^Encerrar a partir de… /)) === 2 && (await visibleCount('button', /^Quanto custa por ano\? /)) === 2 &&
+    (await visibleCount('button', 'Revisei minhas assinaturas')) === 1 && t.includes('O Clarevo guarda só a data da revisão.'));
+  ok('H2 Revisar assinaturas: o aviso de que encerrar aqui só tira a assinatura do Clarevo', t.includes('Encerrar aqui só tira a assinatura do Clarevo a partir do mês escolhido.') && t.includes('é preciso encerrar também com quem oferece o serviço.'));
+  await checkBar('H2 Revisar assinaturas', 'Movimentações');
+  await atWidths(async (w) => { await innerChecks(`H2 Revisar assinaturas ${w}px`); if (w === 390) await shot('272_revisar_assinaturas'); if (w === 320) await shot('272_revisar_assinaturas_320px'); });
+  // "Continua" é só para acompanhar a lista: marca e desmarca, com contagem, e não grava nada.
+  const h2Keeps = () => p.getByRole('button', { name: /^Continua: / }).filter({ visible: true }).evaluateAll((els) => els.map((e) => e.getAttribute('aria-pressed')));
+  ok('H2 "Continua": começa sem marca, "0 de 2 marcadas como Continua"', JSON.stringify(await h2Keeps()) === JSON.stringify(['false', 'false']) && (await body()).includes('0 de 2 marcadas como Continua'));
+  await btn('Continua: Academia (exemplo)').click(); await p.waitForTimeout(300);
+  ok('H2 "Continua" na Academia: marcada, "1 de 2 marcadas como Continua"', JSON.stringify(await h2Keeps()) === JSON.stringify(['true', 'false']) && (await body()).includes('1 de 2 marcadas como Continua'));
+  await btn('Continua: Academia (exemplo)').click(); await p.waitForTimeout(300);
+  ok('H2 "Continua" de novo: desmarca', JSON.stringify(await h2Keeps()) === JSON.stringify(['false', 'false']));
+  await btn('Continua: Streaming (exemplo)').click(); await p.waitForTimeout(300);
+  ok('H2 "Continua" não grava nada: as séries seguem sem data de revisão e com a mesma versão', (await h2Series()).filter((s) => s[1]).every((s) => s[2] === null && s[3] === 2));
+  // "Revisei minhas assinaturas": só a data de hoje; versão e totais não mudam; a atividade não muda.
+  const h2Activity0 = await otherDevice(async (repo, ctx) => JSON.stringify((await repo.getReturnReviewState(ctx)).activity));
+  await btn('Revisei minhas assinaturas').click(); await waitText('Revisão registrada.'); await p.waitForTimeout(400);
+  t = await h2Keep();
+  const h2After = await h2Series();
+  ok('H2 "Revisei minhas assinaturas": "Revisão registrada." e "Última revisão: 07/10/2026."', t.includes('Revisão registrada.') && t.includes('Última revisão: 07/10/2026.'));
+  ok('H2 a revisão grava só a data de hoje nas duas assinaturas, sem subir a versão, e os gastos fixos comuns ficam sem data',
+    h2After.filter((s) => s[1]).length === 2 && h2After.filter((s) => s[1]).every((s) => s[2] === '2026-10-07' && s[3] === 2) && h2After.filter((s) => !s[1]).every((s) => s[2] === null && s[3] === 1), JSON.stringify(h2After));
+  ok('H2 revisar não conta como anotação: a atividade (última anotação) fica igual', (await otherDevice(async (repo, ctx) => JSON.stringify((await repo.getReturnReviewState(ctx)).activity))) === h2Activity0, h2Activity0);
+  await shot('273_revisao_registrada');
+  await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
+  await goResumo();
+  await expectTotals('H2 depois da revisão: outubro segue 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  await h2OpenFixos();
+  await btn('Streaming (exemplo), R$ 39,90 por mês, R$ 478,80 por ano, todo dia 10, assinatura').click(); await waitText('Histórico de valores');
+  await waitText('Última revisão: 07/10/2026.').catch(() => {});
+  ok('H2 o detalhe mostra a última revisão: 07/10/2026', (await body()).includes('Última revisão: 07/10/2026.'));
+  await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
+
+  // ---- 6. "Encerrar a partir de…" abre o fluxo de encerrar do gasto fixo ----
+  await h2Review();
+  await btn('Encerrar a partir de… Academia (exemplo)').click(); await waitText('Encerrar gasto fixo'); await p.waitForTimeout(500);
+  ok('H2 "Encerrar a partir de…": abre o fluxo existente de encerrar o gasto fixo (Academia)', /^\/gastos-fixos\/[^/]+\/encerrar$/.test(urlPath()) && (await body()).includes('Academia (exemplo)'), `${urlPath()}`);
+  await btn('Voltar').click(); await waitText('Vale olhar de tempos em tempos'); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
+
+  // ---- 7. O cadastro: "É uma assinatura?" só em "Todo mês" ----
+  await btn('Novo gasto fixo ou parcelamento').click(); await waitText('Salvando em Pessoal'); await p.waitForTimeout(400);
+  t = await h2Keep();
+  ok('H2 cadastro "Todo mês": o interruptor "É uma assinatura?" começa desligado, com a legenda "Streaming, aplicativo, academia, clube, plano de celular."',
+    (await visibleCount('switch', 'É uma assinatura?')) === 1 && !(await h2Checked()) && t.includes('Streaming, aplicativo, academia, clube, plano de celular.'), t.slice(0, 400));
+  await radio('Parcelado').click(); await p.waitForTimeout(300);
+  ok('H2 cadastro "Parcelado": sem o interruptor', (await visibleCount('switch', 'É uma assinatura?')) === 0);
+  await radio('Todo ano').click(); await p.waitForTimeout(300);
+  ok('H2 cadastro "Todo ano": sem o interruptor', (await visibleCount('switch', 'É uma assinatura?')) === 0);
+  await radio('Todo mês').click(); await p.waitForTimeout(300);
+  ok('H2 cadastro de volta a "Todo mês": o interruptor volta', (await visibleCount('switch', 'É uma assinatura?')) === 1);
+  await atWidths(async (w) => { await layoutChecks(`H2 cadastro com o interruptor ${w}px`); });
+  await field('Descrição').fill('Revista (exemplo)'); await field('Valor por mês').fill('19,90'); await field('Dia do vencimento').fill('8');
+  await h2Switch().click(); await p.waitForTimeout(300);
+  ok('H2 cadastro: o interruptor liga e o leitor de tela lê "marcado"', await h2Checked());
+  await h2Switch().scrollIntoViewIfNeeded(); await shot('274_cadastro_assinatura');
+  await btn('Salvar gasto fixo').click(); await waitText('Gasto fixo salvo'); await waitText('Marcado como assinatura.'); await p.waitForTimeout(500);
+  t = await h2Keep();
+  ok('H2 cadastro salvo: "Gasto fixo salvo..." e "Marcado como assinatura."; o detalhe mostra "Assinatura · R$ 238,80 por ano"',
+    t.includes('Gasto fixo salvo.') && t.includes('Marcado como assinatura.') && t.includes('Assinatura · R$ 238,80 por ano'), t.slice(0, 500));
+  await btn('Voltar').click().catch(() => {}); await p.waitForTimeout(500);
+  await waitText('Por mês, se os valores não mudarem');
+  t = await body();
+  ok('H2 o grupo passa a ter 3 assinaturas: R$ 158,80 por mês e R$ 1.905,60 por ano', t.includes('R$ 158,80 por mês · R$ 1.905,60 por ano') && (await h2Rows('Assinaturas'))?.length === 7, JSON.stringify(await h2Rows('Assinaturas')));
+  await scrollTo('Assinaturas'); await shot('275_assinaturas_tres');
+  // A conta da Revista (08/10) entra em Contas a pagar como qualquer gasto fixo: a assinatura em si não mudou nenhum total.
+  await goResumo();
+  await expectTotals('H2 a Revista (R$ 19,90, dia 8) criou a conta de outubro: Ainda a pagar sobe R$ 19,90 e o resto não muda', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 669,90');
+
+  // ---- 8. Editar: marcar e desmarcar só a marca (sem escolher o mês), Aluguel ----
+  await h2OpenFixos();
+  await btn('Aluguel, R$ 2.500,00, todo dia 5, gasto fixo').click(); await waitText('Histórico de valores'); await p.waitForTimeout(300);
+  ok('H2 detalhe de um gasto fixo comum: sem a linha "Assinatura"', !(await body()).includes('Assinatura ·'));
+  await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(400);
+  ok('H2 editar gasto fixo mensal: o interruptor está desligado e a legenda aparece', (await visibleCount('switch', 'É uma assinatura?')) === 1 && !(await h2Checked()) && (await body()).includes('Streaming, aplicativo, academia, clube, plano de celular.'));
+  await h2Switch().click(); await p.waitForTimeout(300);
+  await shot('276_editar_assinatura');
+  await btn('Salvar alterações').click(); await waitText('Marcado como assinatura.'); await p.waitForTimeout(500);
+  t = await h2Keep();
+  ok('H2 editar só a marca: salva direto, sem confirmar o mês, e volta ao detalhe com "Marcado como assinatura."; sem diálogo de "Aplicar"',
+    t.includes('Marcado como assinatura.') && t.includes('Assinatura · R$ 30.000,00 por ano') && (await p.getByRole('dialog').count()) === 0 && (await p.getByRole('alert').getByRole('button', { name: 'Aplicar' }).count()) === 0, t.slice(0, 500));
+  await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
+  ok('H2 o Aluguel passa ao grupo Assinaturas (4 assinaturas) e sai de "Gastos fixos"', (await h2Rows('Assinaturas'))?.some((r) => r.startsWith('Aluguel, R$ 2.500,00 por mês')) && !(await h2Rows('Gastos fixos'))?.some((r) => r.startsWith('Aluguel')));
+  await btn('Aluguel, R$ 2.500,00 por mês, R$ 30.000,00 por ano, todo dia 5, assinatura').click(); await waitText('Histórico de valores');
+  await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
+  ok('H2 editar o Aluguel marcado: o interruptor vem ligado', await h2Checked());
+  await h2Switch().click(); await p.waitForTimeout(200);
+  await btn('Salvar alterações').click(); await waitText('Assinatura desmarcada.'); await p.waitForTimeout(500);
+  ok('H2 desmarcar: "Assinatura desmarcada." e o detalhe sem a linha de assinatura', (await body()).includes('Assinatura desmarcada.') && !(await body()).includes('Assinatura · R$'));
+  // Marca e valor juntos: o diálogo "Aplicar a partir de..." vem primeiro, depois a marca.
+  await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
+  await h2Switch().click(); await field('Valor por mês').fill('2600,00'); await p.waitForTimeout(200);
+  await btn('Salvar alterações').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(400);
+  ok('H2 marca e valor juntos: o diálogo de aplicar a partir de um mês aparece (a marca vai depois)', (await p.getByRole('alert').getByRole('button', { name: 'Aplicar' }).count()) >= 1 || (await p.getByRole('dialog').count()) >= 1);
+  await confirmIn('Aplicar'); await waitText('Marcado como assinatura.'); await p.waitForTimeout(500);
+  t = await h2Keep();
+  ok('H2 marca e valor juntos: "Gasto fixo atualizado a partir de..." e "Marcado como assinatura."', /Gasto fixo atualizado a partir de [^\n]+\./.test(t) && t.includes('Marcado como assinatura.'), t.slice(0, 400));
+  await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
+  // Parcelamento e conta do ano: o formulário de edição não tem o interruptor.
+  await btn('Financiamento do carro, Parcela 13 de 48, R$ 850,00, termina em outubro de 2029, parcelamento').click(); await waitText('Progresso').catch(() => {}); await p.waitForTimeout(300);
+  await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
+  ok('H2 editar parcelamento: sem o interruptor "É uma assinatura?"', (await visibleCount('switch', 'É uma assinatura?')) === 0);
+  await btn('Cancelar').click(); await p.waitForTimeout(400);
+  await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
+
+  // ---- 9. A marca falha depois de salvar a série: o aviso diz o que foi salvo e o que não ----
+  await demoHome();
+  await h2OpenFixos();
+  await p.evaluate(async () => { const r = await window.__e2e.repo(); r.setSeriesSubscription = async () => { throw new Error('falha de teste'); }; });
+  await btn('Novo gasto fixo ou parcelamento').click(); await waitText('Salvando em Pessoal'); await p.waitForTimeout(400);
+  await field('Descrição').fill('Clube (exemplo)'); await field('Valor por mês').fill('45'); await field('Dia do vencimento').fill('20');
+  await h2Switch().click(); await p.waitForTimeout(200);
+  await btn('Salvar gasto fixo').click(); await waitText('Gasto fixo salvo'); await p.waitForTimeout(600);
+  t = await h2Keep();
+  ok('H2 a marca falha: "Gasto fixo salvo..." e "O gasto fixo foi salvo, mas a marca de assinatura não."; o detalhe sem a linha de assinatura',
+    t.includes('Gasto fixo salvo.') && t.includes('O gasto fixo foi salvo, mas a marca de assinatura não. Abra o gasto fixo, escolha Editar e tente de novo.') && !t.includes('Assinatura · R$') && !t.includes('Marcado como assinatura.'), t.slice(0, 500));
+  await shot('277_marca_falhou');
+  ok('H2 a marca falha: o gasto fixo existe e não é assinatura', JSON.stringify((await h2Series()).filter((s) => s[0] === 'Clube (exemplo)')) === JSON.stringify([['Clube (exemplo)', false, null, 1]]));
+  // Editar só a marca com a falha ainda ativa: o aviso de erro fica na tela, com "Tentar novamente".
+  await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
+  await h2Switch().click(); await btn('Salvar alterações').click(); await waitText('Não foi possível salvar'); await p.waitForTimeout(400);
+  ok('H2 editar só a marca com falha: o erro aparece junto do botão, que passa a "Tentar novamente", e nada é gravado', (await visibleCount('button', 'Tentar novamente')) === 1 && (await body()).includes('Não foi possível salvar') &&
+    JSON.stringify((await h2Series()).filter((s) => s[0] === 'Clube (exemplo)')) === JSON.stringify([['Clube (exemplo)', false, null, 1]]));
+  // A falha passa: tentar de novo grava.
+  await p.evaluate(async () => { const r = await window.__e2e.repo(); delete r.setSeriesSubscription; });
+  await btn('Tentar novamente').click(); await waitText('Marcado como assinatura.'); await p.waitForTimeout(500);
+  ok('H2 tentar de novo: a marca é gravada (a versão sobe uma vez)', JSON.stringify((await h2Series()).filter((s) => s[0] === 'Clube (exemplo)')) === JSON.stringify([['Clube (exemplo)', true, null, 2]]));
+  // Cancelar a edição com a marca mudada pede confirmação (alteração não salva).
+  await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
+  await h2Switch().click(); await p.waitForTimeout(200);
+  await btn('Cancelar').click(); await waitText('Descartar o preenchimento?');
+  ok('H2 sair da edição com a marca mudada e não salva pede confirmação', (await dialogText()).includes('Você tem alterações que ainda não foram salvas em Pessoal.'));
+  await confirmIn('Continuar editando'); await p.waitForTimeout(300);
+  await btn('Cancelar').click(); await waitText('Descartar o preenchimento?'); await confirmIn('Descartar alterações'); await p.waitForTimeout(500);
+
+  // ---- 10. O lembrete (cenário ?cenario=assinaturas: cadastradas em 30/06/2026 e nunca revisadas) ----
+  await p.goto(`http://localhost:${PORT}/?cenario=assinaturas`); await waitText('Seu dinheiro');
+  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+  await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
+  ok('H2 cenário "assinaturas": o Resumo tem os totais de outubro de sempre e nenhuma faixa de "Seus últimos meses"', !(await bandShown()));
+  await expectTotals('H2 cenário "assinaturas": outubro segue 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  await h2OpenFixos();
+  t = await h2Keep();
+  const h2ReminderTop = await p.evaluate(() => {
+    const top = (sel, text) => [...document.querySelectorAll(sel)].find((e) => (e.textContent || '').includes(text) && e.getBoundingClientRect().width > 0)?.getBoundingClientRect().top ?? null;
+    return { aviso: top('div[dir="auto"]', 'Faz tempo que você não revisa suas assinaturas.'), intro: top('div[dir="auto"]', 'Contas que se repetem.'), grupo: top('[role=heading]', 'Assinaturas') };
+  });
+  ok('H2 lembrete: "Faz tempo que você não revisa suas assinaturas." no topo de Gastos fixos, com "Revisar agora" e "Agora não", antes do texto da tela e do grupo',
+    t.includes('Faz tempo que você não revisa suas assinaturas.') && (await visibleCount('button', 'Revisar agora')) === 1 && (await visibleCount('button', 'Agora não')) === 1 &&
+    h2ReminderTop.aviso !== null && h2ReminderTop.intro !== null && h2ReminderTop.grupo !== null && h2ReminderTop.aviso < h2ReminderTop.intro && h2ReminderTop.intro < h2ReminderTop.grupo, JSON.stringify(h2ReminderTop));
+  await atWidths(async (w) => { await innerChecks(`H2 lembrete ${w}px`); if (w === 390) await shot('278_lembrete_assinaturas'); if (w === 320) await shot('278_lembrete_assinaturas_320px'); });
+  // "Agora não" esconde o aviso (30 dias, só neste aparelho) e ele não volta ao sair e voltar.
+  await btn('Agora não').click(); await p.waitForTimeout(500);
+  ok('H2 "Agora não": o aviso some', !(await body()).includes('Faz tempo que você não revisa suas assinaturas.') && (await visibleCount('button', 'Revisar agora')) === 0);
+  await goResumo(); await h2OpenFixos();
+  ok('H2 "Agora não": o aviso não volta ao sair e voltar para Gastos fixos', !(await body()).includes('Faz tempo que você não revisa suas assinaturas.'));
+  ok('H2 "Agora não" é só do aparelho: nenhuma escrita sai pela rede e a série não muda', writes.slice(h2Writes0).length === 0 && (await h2Series()).filter((s) => s[1]).every((s) => s[2] === null && s[3] === 2));
+  // Outra visita (a demonstração recomeça): "Revisar agora" leva à tela e "Revisei" faz o aviso sumir de vez.
+  await p.goto(`http://localhost:${PORT}/?cenario=assinaturas`); await waitText('Seu dinheiro');
+  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+  await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
+  await h2OpenFixos();
+  ok('H2 numa visita nova o aviso volta (na demonstração a escolha fica só em memória)', (await body()).includes('Faz tempo que você não revisa suas assinaturas.'));
+  await btn('Revisar agora').click(); await waitText('Vale olhar de tempos em tempos'); await p.waitForTimeout(400);
+  ok('H2 "Revisar agora" abre Revisar assinaturas', (await h1Name()) === 'Revisar assinaturas' && urlPath() === '/gastos-fixos/assinaturas' && (await body()).includes('Você ainda não registrou uma revisão.'));
+  await btn('Revisei minhas assinaturas').click(); await waitText('Revisão registrada.'); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem'); await p.waitForTimeout(500);
+  ok('H2 depois de "Revisei": o aviso não aparece mais', !(await body()).includes('Faz tempo que você não revisa suas assinaturas.') && (await visibleCount('button', 'Revisar agora')) === 0);
+  await goResumo(); await h2OpenFixos();
+  ok('H2 depois de "Revisei": o aviso continua fora ao sair e voltar', !(await body()).includes('Faz tempo que você não revisa suas assinaturas.'));
+
+  // ---- 11. Valores ocultos ----
+  await goResumo(); await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  await h2OpenFixos();
+  t = await body();
+  await hiddenShows('Gastos fixos com Assinaturas');
+  ok('H2 valores ocultos: o grupo diz "R$ •••• por mês · R$ •••• por ano" e as linhas, "valor oculto"; os nomes, as datas e o dia ficam',
+    t.includes('R$ •••• por mês · R$ •••• por ano') && t.includes('Academia (exemplo)') && t.includes('todo dia 5') &&
+    (await visibleCount('button', 'Academia (exemplo), valor oculto por mês, valor oculto por ano, todo dia 5, assinatura')) === 1, t.slice(0, 500));
+  await atWidths(async (w) => { await layoutChecks(`H2 Assinaturas com valores ocultos ${w}px`); if (w === 390) await shot('279_assinaturas_valores_ocultos'); });
+  await h2Review();
+  await hiddenShows('Revisar assinaturas');
+  ok('H2 valores ocultos em Revisar assinaturas: o total e as linhas sem valor; a contagem, os nomes e a data da revisão à vista',
+    (await body()).includes('2 assinaturas: R$ •••• por mês · R$ •••• por ano') && (await body()).includes('Última revisão: 07/10/2026.'));
+  await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
+  await goResumo(); await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+
+  // ---- 12. A busca "No app" de Aprender ----
+  await tabByName('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await p.waitForTimeout(400);
+  const h2Box = () => p.getByLabel('Buscar um tema ou uma função', { exact: true }).filter({ visible: true }).first();
+  for (const query of ['assinatura', 'assinaturas', 'streaming', 'academia', 'plano de celular', 'clube']) {
+    await h2Box().fill(query); await waitText('No app'); await p.waitForTimeout(500);
+    const level = await p.evaluate(() => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'No app' && e.getBoundingClientRect().width > 0); return h ? h.getAttribute('aria-level') : null; });
+    ok(`H2 busca "${query}" em Aprender: o grupo "No app" (nível 2) tem "Revisar assinaturas"`, level === '2' && (await p.getByRole('button', { name: /^Revisar assinaturas\. O que as assinaturas custam por mês e por ano/ }).filter({ visible: true }).count()) === 1, query);
+    if (query === 'streaming') await atWidths(async (w) => { await layoutChecks(`H2 Aprender No app ${w}px`); if (w === 390) await shot('280_aprender_no_app_assinaturas'); });
+  }
+  await h2Box().fill('assinaturas'); await waitText('No app'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /^Revisar assinaturas\. / }).filter({ visible: true }).first().click(); await waitText('Vale olhar de tempos em tempos'); await p.waitForTimeout(500);
+  ok('H2 tocar em "Revisar assinaturas" em Aprender abre a tela, com a barra e Aprender marcada de origem', urlPath() === '/gastos-fixos/assinaturas' && (await h1Name()) === 'Revisar assinaturas');
+  await checkBar('H2 Revisar assinaturas aberta por Aprender', 'Aprender e dúvidas');
+
+  // ---- 13. Conta nova: nada de exemplo, sem grupo, sem aviso ----
+  await newAcct('Jade Teste', 'jade@exemplo.com');
+  await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().waitFor({ timeout: 15000 }); await p.waitForTimeout(500);
+  await tabByName('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await p.waitForTimeout(300);
+  await p.getByLabel('Buscar um tema ou uma função', { exact: true }).filter({ visible: true }).first().fill('assinaturas'); await waitText('No app');
+  await p.getByRole('button', { name: /^Revisar assinaturas\. / }).filter({ visible: true }).first().click(); await waitText('Nenhuma assinatura ativa.'); await p.waitForTimeout(400);
+  t = await h2Keep();
+  ok('H2 conta nova: Revisar assinaturas diz que não há assinatura ativa, sem dado de exemplo, e leva a Gastos fixos',
+    t.includes('Nenhuma assinatura ativa. Marque um gasto fixo mensal como assinatura ao cadastrar ou editar.') && (await visibleCount('button', 'Ver gastos fixos')) === 1 && !t.includes('(exemplo)') && (await visibleCount('button', 'Revisei minhas assinaturas')) === 0, t.slice(0, 400));
+  await atWidths(async (w) => { await innerChecks(`H2 Revisar assinaturas conta nova ${w}px`); if (w === 390) await shot('281_revisar_assinaturas_conta_nova'); });
+  await btn('Ver gastos fixos').click(); await waitText('Nenhum gasto fixo ainda'); await p.waitForTimeout(400);
+  t = await h2Keep();
+  ok('H2 conta nova: Gastos fixos sem grupo "Assinaturas" e sem aviso', !(await headingShown('Assinaturas')) && !t.includes('Faz tempo que você não revisa suas assinaturas.') && !t.includes('(exemplo)'));
+  ok('H2 conta nova: nenhuma série e nenhuma assinatura de exemplo', (await h2Series()).length === 0);
+
+  // ---- 14. Textos e escritas ----
+  const h2Vetoed = h2Texts.map((x) => x.match(FORBIDDEN)?.[0]).filter(Boolean);
+  const h2Judging = h2Texts.map((x) => x.match(/[–—]|\b(desperd[ií]cio|vale a pena|cortes?|cortar|cancele|supérfluo|gastando demais|netflix|spotify|disney|amazon|globoplay|smart ?fit)\b/i)?.[0]).filter(Boolean);
+  ok('H2 telas de assinaturas: nenhum termo proibido, travessão, expressão vetada, palavra de julgamento, "cancele" nem marca de serviço',
+    h2Texts.length >= 12 && h2Vetoed.length === 0 && h2Judging.length === 0, `${h2Texts.length} telas ${h2Vetoed.join(' | ')} ${h2Judging.join(' | ')}`);
+  ok('H2 nenhuma escrita direta na rede durante as assinaturas (nenhum POST, PATCH, PUT ou DELETE)', writes.slice(h2Writes0).length === 0, writes.slice(h2Writes0).join(' | '));
   await goResumo().catch(() => {});
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);

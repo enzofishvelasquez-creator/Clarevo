@@ -1918,7 +1918,7 @@ reset role;
 
 -- ---------------------------------------------------------------------------
 -- 10. record_operations: as onze ações de cartão apontam para o cartão (target_id); as cinco de lançamento também para o
--- lançamento (entry_id); pagar e desfazer a fatura, também para a conta da fatura e o gasto; a lista vigente tem 46 ações (37, as 4 de orçamento e limite, testadas em 80, e as 5 de contas, testadas em 85).
+-- lançamento (entry_id); pagar e desfazer a fatura, também para a conta da fatura e o gasto; a lista vigente tem 48 ações (37, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, e as 2 de assinaturas, testadas em 88).
 -- Uma operação por escrita. Atividade (A4): toda ação de cartão é anotação de quem a fez no contexto.
 -- ---------------------------------------------------------------------------
 reset role;
@@ -1987,7 +1987,7 @@ begin
     = array['alterar_cartao', 'alterar_lancamento_cartao', 'criar_cartao', 'criar_compra_cartao', 'criar_encargo_cartao', 'criar_estorno_cartao',
             'desfazer_pagamento_fatura', 'excluir_cartao', 'excluir_lancamento_cartao', 'pagar_fatura', 'situacao_cartao'], 'as 11 ações de cartão';
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-           where c.conname = 'record_operations_action_check') = 46, 'a lista vigente tem 46 ações (37, as 4 de orçamento e limite, testadas em 80, e as 5 de contas, testadas em 85)';
+           where c.conname = 'record_operations_action_check') = 48, 'a lista vigente tem 48 ações (37, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, e as 2 de assinaturas, testadas em 88)';
 
   -- Cada operação aponta para um cartão do mesmo contexto; a de lançamento, para um lançamento do mesmo cartão; a de fatura, para
   -- a conta e o gasto daquele cartão.
@@ -2809,10 +2809,10 @@ do $$ begin
             'create_series_occurrence', 'decide_return_review', 'delete_account', 'delete_card', 'delete_card_entry',
             'delete_category_budget', 'delete_commitment', 'delete_commitment_limit', 'delete_goal', 'delete_goal_movement',
             'delete_income_reference', 'delete_record', 'delete_series', 'end_series', 'ensure_personal_space',
-            'inform_series_year', 'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'month_budget',
+            'inform_series_year', 'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'mark_subscriptions_reviewed', 'month_budget',
             'month_committed', 'month_to_pay', 'month_totals', 'months_overview', 'my_today', 'pay_commitment', 'pay_invoice',
             'set_account_status', 'set_card_status', 'set_category_budget', 'set_commitment_limit', 'set_default_account',
-            'set_goal_status', 'set_income_reference', 'set_savings_answer', 'skip_series_year', 'sync_series_occurrences',
+            'set_goal_status', 'set_income_reference', 'set_savings_answer', 'set_series_subscription', 'skip_series_year', 'sync_series_occurrences',
             'undo_commitment_payment', 'undo_invoice_payment', 'update_account', 'update_card', 'update_card_entry',
             'update_commitment', 'update_goal', 'update_goal_movement', 'update_record', 'update_series_from'],
     'authenticated executa só as 59 funções expostas (as 5 de contas, testadas em 85, as 5 de orçamento e limite, testadas em 80, as 11 de cartão, as 4 de data e as de antes)';

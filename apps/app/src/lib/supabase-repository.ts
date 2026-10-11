@@ -82,6 +82,7 @@ import {
   type SavingsCheck,
   type SearchPage,
   type SeriesAction,
+  type SubscriptionReviewWrite,
   type SeriesEditInput,
   type SeriesInput,
   type SeriesKind,
@@ -207,6 +208,12 @@ interface SeriesRow {
   generating: boolean;
   /** Só na conta do ano, de 1 (cota única) a 12; nulo nas outras. */
   parts_per_year: number | null;
+  /**
+   * Assinaturas (D-046, migração 0011): ausentes enquanto a 0011 não foi colada (o app novo com o banco antigo): valem falso e nulo,
+   * e nada quebra. subscription_reviewed_on: AAAA-MM-DD.
+   */
+  subscription?: boolean | null;
+  subscription_reviewed_on?: string | null;
 }
 
 /** Retorno (jsonb) das funções de série: ocorrências vivas por número crescente; changed conforme a função. */
@@ -454,7 +461,16 @@ const COMMITMENT_ACTIONS: CommitmentAction[] = [
   'desfazer_pagamento',
   'criar_ocorrencia',
 ];
-const SERIES_ACTIONS: SeriesAction[] = ['criar_serie', 'alterar_serie', 'encerrar_serie', 'excluir_serie', 'informar_ano', 'tirar_ano'];
+const SERIES_ACTIONS: SeriesAction[] = [
+  'criar_serie',
+  'alterar_serie',
+  'encerrar_serie',
+  'excluir_serie',
+  'informar_ano',
+  'tirar_ano',
+  // Assinaturas (D-046): o alvo (target_id) também é a série.
+  'marcar_assinatura',
+];
 /** Ações de metas: o alvo (target_id) é a meta nas quatro primeiras e o movimento nas três últimas. */
 const GOAL_ACTIONS: GoalAction[] = [
   'criar_meta',
@@ -577,6 +593,9 @@ const KNOWN: RepoErrorCode[] = [
   'tipo_de_encargo_invalido',
   'chave_de_nota_invalida',
   'nota_ja_anotada',
+  // Assinaturas (D-046). Nenhum é sufixo de outro código da lista, nem tem outro como sufixo.
+  'marca_invalida',
+  'assinatura_so_gasto_fixo',
 ];
 
 /**
@@ -749,6 +768,8 @@ function toSeries(s: SeriesRow): CommitmentSeries {
     paidCount: s.paid_count,
     openCount: s.open_count,
     generating: s.generating,
+    subscription: s.subscription === true,
+    subscriptionReviewedOn: s.subscription === true && typeof s.subscription_reviewed_on === 'string' ? s.subscription_reviewed_on.slice(0, 10) : null,
     createdBy: s.created_by,
     version: s.version,
     createdAt: s.created_at,
@@ -1754,6 +1775,28 @@ export class SupabaseRepository implements RecordsRepository {
       p_number: number,
       p_expected_affected: affectedJson(expectedAffected),
     });
+  }
+
+  /**
+   * Assinaturas (D-046, migração 0011). Marca ou desmarca o gasto fixo mensal; a série volta como nas outras escritas de série.
+   * Com o banco ainda sem a 0011, a função não existe e a chamada falha (desconhecido); o app trata como "a marca não foi salva".
+   */
+  setSeriesSubscription(key: string, id: string, expectedVersion: number, subscription: boolean) {
+    return this.callSeries('set_series_subscription', {
+      p_idempotency_key: key,
+      p_series_id: id,
+      p_expected_version: expectedVersion,
+      p_subscription: subscription,
+    });
+  }
+
+  /** "Revisei minhas assinaturas": retorno {reviewed_on, changed}. Não conta como anotação. */
+  async markSubscriptionsReviewed(key: string, contextId: string): Promise<SubscriptionReviewWrite> {
+    const { data, error } = await this.db.rpc('mark_subscriptions_reviewed', { p_idempotency_key: key, p_context_id: contextId });
+    if (error) throw repoError(error);
+    const r = data as { reviewed_on?: string | null; changed?: number } | null;
+    if (!r || typeof r.changed !== 'number') throw new RepoError('desconhecido');
+    return { reviewedOn: typeof r.reviewed_on === 'string' ? r.reviewed_on.slice(0, 10) : null, changed: r.changed };
   }
 
   /** Volátil: vai por POST (padrão do rpc). Leitura basta; a autoria das contas criadas é de quem criou a série. */

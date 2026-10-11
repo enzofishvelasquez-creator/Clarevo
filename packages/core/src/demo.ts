@@ -29,6 +29,11 @@ import { newOperationKey } from './repository';
  * 12/09 e R$ 1.400,00 em 06/10) saíram da Carteira e o aporte de R$ 500,00 na reserva (06/10) saiu da Conta principal; o resto sai da
  * Conta principal. A conta só informa a origem: os totais de outubro (6.000 / 3.900 / 2.100 / 650) e a renda comprometida (52,5%)
  * não mudam. O cenário 'retorno' (montagem de maio) tem só a Conta principal. Conta nova: só a "Conta principal".
+ * Assinaturas (D-046): "Streaming (exemplo)" (R$ 39,90, dia 10) e "Academia (exemplo)" (R$ 99,00, dia 5), gastos fixos mensais marcados como
+ * assinatura, nunca revisadas, com a primeira conta em junho de 2027 (o mais longe que o cadastro de 07/10/2026 e o de 30/06/2026, do
+ * cenário 'assinaturas', aceitam). Assim nenhuma conta delas existe nem entra na previsão dos próximos meses: os totais de outubro
+ * (6.000 / 3.900 / 2.100 / 650), a renda comprometida (52,5% em outubro, 63,8% em novembro...) e as contas a pagar não mudam. Contam
+ * em "Por mês, se os valores não mudarem" e no grupo Assinaturas: R$ 138,90 por mês e R$ 1.666,80 por ano.
  * Orçamento por categoria (D-041), a partir de outubro de 2026: Moradia R$ 2.500,00, Mercado R$ 1.800,00 e Lazer R$ 300,00.
  * Usado em outubro (competência): Moradia R$ 2.500,00 (o aluguel pago), Mercado R$ 1.400,00 e Lazer R$ 400,00 (a 1ª parcela do
  * tênis, R$ 200,00, e o restaurante, R$ 200,00; a compra no cartão conta no mês da compra). Limite pessoal de 60% a partir de
@@ -40,11 +45,15 @@ export const DEMO_EMAIL = 'demo@clarevo.app';
 /**
  * Cenários da demonstração (D-016), só no modo de demonstração e sempre com a pílula "Demonstração":
  * - 'padrao': a base de aceite de outubro de 2026 (tudo anotado em 07/10/2026, sem faixa de retorno);
- * - 'retorno': a montagem FICTÍCIA da sequência R do Ciclo A4 (D-030), anotada em 20/05/2026 e aberta em 07/10/2026.
- * Conta nova nunca recebe nenhum dos dois.
+ * - 'retorno': a montagem FICTÍCIA da sequência R do Ciclo A4 (D-030), anotada em 20/05/2026 e aberta em 07/10/2026;
+ * - 'assinaturas': a base de aceite, com as duas assinaturas de exemplo cadastradas em 30/06/2026 e nunca revisadas, o que faz o
+ *   lembrete "Faz tempo que você não revisa suas assinaturas" (D-046) aparecer em 07/10/2026. Os totais de outubro não mudam.
+ * Conta nova nunca recebe nenhum dos três.
  */
-export type DemoScenario = 'padrao' | 'retorno';
-export const DEMO_SCENARIOS: readonly DemoScenario[] = ['padrao', 'retorno'];
+export type DemoScenario = 'padrao' | 'retorno' | 'assinaturas';
+export const DEMO_SCENARIOS: readonly DemoScenario[] = ['padrao', 'retorno', 'assinaturas'];
+/** Dia em que as assinaturas de exemplo foram cadastradas no cenário 'assinaturas'. */
+export const DEMO_SUBSCRIPTIONS_SETUP_DAY = '2026-06-30';
 /** Dia da montagem do cenário 'retorno' (última anotação antes do tempo sem usar). */
 export const DEMO_RETURN_SETUP_DAY = '2026-05-20';
 
@@ -56,10 +65,12 @@ export function demoScenarioFrom(param: string | null | undefined): DemoScenario
 
 export async function createDemoRepository(opts: { latencyMs?: number; scenario?: DemoScenario; cards?: boolean } = {}) {
   if (opts.scenario === 'retorno') return createReturnDemoRepository(opts.latencyMs);
+  // O dia só muda, por um instante, para cadastrar as assinaturas de exemplo no cenário 'assinaturas'.
+  let today: string = DEMO_TODAY;
   const repo = new MemoryRepository({
     actorId: 'pessoa-demo',
     displayName: 'Maria Alves',
-    today: () => DEMO_TODAY,
+    today: () => today,
     latencyMs: 0,
   });
   const space = await repo.ensurePersonalSpace('Conta principal');
@@ -201,6 +212,34 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
     await purchase('Notebook', 'Educação', '2026-10-05', 150_000, 10);
     await purchase('Restaurante', 'Lazer', '2026-10-06', 20_000, 1);
   }
+
+  // Assinaturas (D-046): dois gastos fixos mensais FICTÍCIOS marcados como assinatura, com a primeira conta em junho de 2027. Nenhuma
+  // conta delas existe (a janela de geração vai até o mês seguinte) nem entra na previsão dos próximos meses, então nenhum total de
+  // outubro (6.000 / 3.900 / 2.100 / 650) nem a renda comprometida (52,5% em outubro) muda.
+  // No cenário 'assinaturas' elas foram cadastradas em 30/06/2026 (o dia volta a 07/10/2026 logo depois): nunca revisadas e com mais
+  // de 3 meses de cadastro. A atividade não recua (um dia antes do último com anotação não muda nada).
+  if (opts.scenario === 'assinaturas') today = DEMO_SUBSCRIPTIONS_SETUP_DAY;
+  for (const [description, cents, dueDay] of [
+    ['Streaming (exemplo)', 3990, 10],
+    ['Academia (exemplo)', 9900, 5],
+  ] as const) {
+    const w = await repo.createSeries(newOperationKey(), ctx, {
+      kind: 'mensal',
+      nature: 'conta',
+      description,
+      category: 'Lazer',
+      amountCents: cents,
+      amountMode: 'fixo',
+      dueDay,
+      firstDueMonth: '2027-06',
+      firstNumber: 1,
+      installmentTotal: null,
+      partsPerYear: null,
+      lastMonth: null,
+    });
+    await repo.setSeriesSubscription(newOperationKey(), w.series.id, w.series.version, true);
+  }
+  today = DEMO_TODAY;
 
   // A latência só passa a valer depois de semear, para a demonstração abrir rápido.
   repo.latencyMs = opts.latencyMs ?? 0;

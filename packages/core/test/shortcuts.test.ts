@@ -32,7 +32,7 @@ describe('Movimentos › Organizar: legendas', () => {
     // Dez dias depois, a Internet (15/10) está vencida.
     const later = summarizeToPay(await repo.listCommitments(ctx, '2026-10'), ctx, '2026-10', '2026-10-17');
     expect(payablesCaptionFromSummary(later, '2026-10-17')).toBe('R$ 650,00 em aberto neste mês · 1 vencida');
-    expect(seriesCaptionShort(await repo.listSeries(ctx))).toBe('5 cadastrados, com as contas do ano');
+    expect(seriesCaptionShort(await repo.listSeries(ctx))).toBe('7 cadastrados, com as contas do ano');
   });
 
   it('Gastos fixos e parcelamentos: nenhum, 1 e vários', () => {

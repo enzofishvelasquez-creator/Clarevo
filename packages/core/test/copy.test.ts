@@ -189,6 +189,7 @@ import {
 } from '../src';
 import { APP_SCREENS, APP_SEARCH_TEXT, BAR_TEXT, GOALS_NAV_TEXT, PAYABLES_NAV_TEXT, SUMMARY_NAV_TEXT, searchAppScreens } from '../src';
 import { DEFAULT_SEARCH_DRAFT, SEARCH_PAGE, SEARCH_PERIODS, SEARCH_TEXT, searchFromDraft } from '../src';
+import { SUBSCRIPTION_ERROR_TEXT, SUBSCRIPTION_TEXT, subscriptionCount, subscriptionErrorText } from '../src';
 
 /**
  * Teste de textos (seção 5): sem indicação de produto financeiro, promessa de rendimento, travessões longos
@@ -1985,5 +1986,91 @@ describe('textos de Buscar em Movimentações (D-045)', () => {
     const source = readFileSync(join(CORE_SRC, 'search.ts'), 'utf8');
     expect(source).not.toMatch(FORBIDDEN);
     expect(source).not.toMatch(JUDGMENT);
+  });
+});
+
+describe('textos das assinaturas (D-046)', () => {
+  const GENDERED = /\b(o|a)s? usuári[oa]s?\b|\bobrigad[oa]s?\b|\bbem-vind[oa]s?\b|\bpreocupad[oa]s?\b|\bendividad[oa]s?\b|\bcadastrad[oa]\b/i;
+  // Nenhuma marca de serviço, nenhum verbo de ordem sobre cancelar, nenhum julgamento sobre a assinatura.
+  const BRANDS =
+    /netflix|spotify|amazon|prime video|disney|globoplay|hbo|youtube|apple|google|deezer|paramount|smart ?fit|bluefit|duolingo|\bclaro\b|\bvivo\b|\btim\b|\boi\b|nubank|ita[uú]\b|bradesco|santander/i;
+  const ORDERS = /\bcancel(e|ar|amento)\b|\bcancele\b|\bdesperd[ií]c|\bcortes?\b|\bcortar\b|vale a pena|\bsupérfluo|\bgastando demais\b|\bdemais\b|\bexcessiv|\binútil\b|\bdeveria\b/i;
+  const check = (texts: string[]) => {
+    expect(texts.length).toBeGreaterThan(0);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(GENDERED);
+      expect(text, text).not.toMatch(BRANDS);
+      expect(text, text).not.toMatch(ORDERS);
+      expect(text, text).not.toMatch(/\bfaz(er|endo)?\s+sentido\b/i);
+      expect(text, text).not.toMatch(/[–—]/);
+    }
+  };
+  const functions = [
+    SUBSCRIPTION_TEXT.groupEstimated(9900),
+    SUBSCRIPTION_TEXT.totals(13890, 166680),
+    SUBSCRIPTION_TEXT.totals(100, 1200),
+    SUBSCRIPTION_TEXT.perYear(47880),
+    SUBSCRIPTION_TEXT.perMonth(3990),
+    SUBSCRIPTION_TEXT.detailYear(47880),
+    SUBSCRIPTION_TEXT.keepsCount(0, 1),
+    SUBSCRIPTION_TEXT.keepsCount(2, 3),
+    SUBSCRIPTION_TEXT.lastReview(null),
+    SUBSCRIPTION_TEXT.lastReview('2026-10-07'),
+    subscriptionCount(0),
+    subscriptionCount(1),
+    subscriptionCount(7),
+  ];
+
+  it('SUBSCRIPTION_TEXT inteiro (rótulos, avisos e mensagens fixas) e os textos montados', () => {
+    check([...staticStrings(SUBSCRIPTION_TEXT), ...functions]);
+  });
+
+  it('SUBSCRIPTION_ERROR_TEXT e o texto de cada código', () => {
+    check([...Object.values(SUBSCRIPTION_ERROR_TEXT), subscriptionErrorText('assinatura_so_gasto_fixo'), subscriptionErrorText('desconhecido')]);
+  });
+
+  it('a reprovação da lista pega o que ela deve', () => {
+    for (const bad of ['Cancele já', 'um corte de gastos', 'isso é um desperdício', 'não vale a pena', 'Netflix', 'Assinaturas — todas']) {
+      const caught = [FORBIDDEN, JUDGMENT, BRANDS, ORDERS].some((re) => re.test(bad));
+      expect(caught, bad).toBe(true);
+    }
+    // Os textos da própria tela passam, inclusive "Encerrar a partir de…" (encerrar não é cancelar) e "Continua".
+    for (const ok of ['Encerrar a partir de…', 'Continua', 'Revisar assinaturas', 'Vale olhar de tempos em tempos se cada uma ainda é usada.']) {
+      expect([FORBIDDEN, JUDGMENT, BRANDS, ORDERS].some((re) => re.test(ok)), ok).toBe(false);
+    }
+  });
+
+  it('o que a tela promete e o que ela não promete', () => {
+    expect(SUBSCRIPTION_TEXT.reviewIntro).toBe('Vale olhar de tempos em tempos se cada uma ainda é usada.');
+    expect(SUBSCRIPTION_TEXT.reviewNote).toContain('só tira a assinatura do Clarevo');
+    expect(SUBSCRIPTION_TEXT.reviewNote).toContain('encerrar também com quem oferece o serviço');
+    expect(SUBSCRIPTION_TEXT.reviewFooter).toBe('O Clarevo guarda só a data da revisão.');
+    expect(SUBSCRIPTION_TEXT.reminderLaterHint).toContain('só neste aparelho');
+    expect(SUBSCRIPTION_TEXT.keepsHint).toContain('não é guardado');
+  });
+
+  it('a tela no índice "No app" e o arquivo-fonte passam', () => {
+    const screen = APP_SCREENS.find((s) => s.id === 'assinaturas')!;
+    expect(screen.href).toBe('/gastos-fixos/assinaturas');
+    check([screen.title, screen.caption, ...screen.keywords]);
+    for (const q of ['assinatura', 'assinaturas', 'streaming', 'academia', 'plano de celular', 'clube']) {
+      expect(searchAppScreens(q).map((x) => x.id), q).toContain('assinaturas');
+    }
+    // "assinatura" achava Gastos fixos e parcelamentos (o índice de antes) e continua achando.
+    expect(searchAppScreens('assinatura').map((x) => x.id)).toContain('gastos-fixos');
+    const source = readFileSync(join(CORE_SRC, 'subscriptions.ts'), 'utf8');
+    expect(source).not.toMatch(FORBIDDEN);
+    expect(source).not.toMatch(JUDGMENT);
+    expect(source).not.toMatch(BRANDS);
+  });
+
+  it('a demonstração: as descrições de exemplo passam pela mesma lista', async () => {
+    const repo = await createDemoRepository();
+    const ctx = (await repo.getSpace())!.personalContextId;
+    const names = (await repo.listSeries(ctx)).filter((x) => x.subscription).map((x) => x.terms[0]!.description);
+    expect(names).toEqual(['Streaming (exemplo)', 'Academia (exemplo)']);
+    check(names);
   });
 });

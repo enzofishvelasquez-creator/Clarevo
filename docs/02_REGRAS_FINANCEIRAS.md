@@ -1,6 +1,6 @@
 # Regras financeiras do primeiro ciclo
 
-10/10/2026 · código em `packages/core` e no banco (`supabase/migrations`). As mesmas regras valem nos dois lugares. As calculadoras e o "Achar tudo" (Ciclo A6), o plano para quitar dívidas (Ciclo F1), "Antes de financiar" (D-044), o conteúdo de Aprender (Ciclo A5), o simulador (Ciclo D) e os lembretes, o ocultar valores e a biometria (Ciclo A2) ficam só no core e no app, sem gravar nada no banco. A revisão dos últimos meses (Ciclo A4), a renda comprometida (Ciclo B), as metas e o plano de guardar (Ciclo C), os cartões e as faturas (Ciclo E, D-037) e a chave das notas fiscais (D-038) e as contas de origem do dinheiro (Ciclo G1, D-043) estão nos dois lugares; a busca em Movimentações (Ciclo H1, D-045) é só leitura, no core e no app; a leitura das notas (QR, chave, PDF e página da Sefaz-RJ) roda só no core e no app, no aparelho. Em "Onde é testado", "web" é o roteiro `scripts/e2e-web.js` (`npm run test:web`); as telas dos Ciclos A2, B, C, D e E também passam por ele (`docs/04`).
+11/10/2026 · código em `packages/core` e no banco (`supabase/migrations`). As mesmas regras valem nos dois lugares. As calculadoras e o "Achar tudo" (Ciclo A6), o plano para quitar dívidas (Ciclo F1), "Antes de financiar" (D-044), o conteúdo de Aprender (Ciclo A5), o simulador (Ciclo D) e os lembretes, o ocultar valores e a biometria (Ciclo A2) ficam só no core e no app, sem gravar nada no banco. A revisão dos últimos meses (Ciclo A4), a renda comprometida (Ciclo B), as metas e o plano de guardar (Ciclo C), os cartões e as faturas (Ciclo E, D-037) e a chave das notas fiscais (D-038) as contas de origem do dinheiro (Ciclo G1, D-043) e as assinaturas (Ciclo H2, D-046) estão nos dois lugares; a busca em Movimentações (Ciclo H1, D-045) é só leitura, no core e no app; a leitura das notas (QR, chave, PDF e página da Sefaz-RJ) roda só no core e no app, no aparelho. Em "Onde é testado", "web" é o roteiro `scripts/e2e-web.js` (`npm run test:web`); as telas dos Ciclos A2, B, C, D e E também passam por ele (`docs/04`).
 
 ## Implementado e testado
 
@@ -336,6 +336,36 @@ Só leitura, no core e no app, sem mudança no banco: a busca usa a leitura que 
 - **Resumo.** Gastos: quantidade e soma (`R$ 1.932,40 no período`); **média por mês com gasto** = soma dos gastos ÷ meses diferentes que têm ao menos um gasto, em centavos, metade para cima (`roundDiv`); recebimentos: quantidade e soma, sem média. Exemplo: 12 gastos em 12 meses somando R$ 1.932,40 dão média de R$ 161,03 (193.240 ÷ 12 = 16.103,33). Seis meses com sete gastos de luz que somam R$ 988,00 dão R$ 164,67 (98.800 ÷ 6 = 16.466,67, que sobe).
 - **Grupos.** Os registros ficam agrupados por mês, do mais recente ao mais antigo; as compras no cartão, em "Compras no cartão", também por mês. A tela mostra 100 linhas de cada vez; a soma vale para todas as achadas.
 - **Onde é testado.** Core: `search.test.ts` (normalização, texto, o filtro mais largo do servidor, período, filtro, resumo e média, agrupamento, rascunho dos valores, MemoryRepository com 1.000 e 1.001 linhas, pagamento de fatura e compras) e `copy.test.ts`; API: o bloco "API real: buscar em Movimentações" confere cada filtro contra `recordMatchesFilter` sobre os registros do banco, a pessoa de fora, a exclusão e que só saem leituras, e "conversor da busca" confere os filtros enviados, as páginas de 500 e o limite; web: o bloco "Buscar em Movimentos (D-045)".
+
+## Assinaturas (Ciclo H2, D-046)
+
+Regras em `packages/core/src/subscriptions.ts`, repetidas no banco pelas funções `set_series_subscription` e `mark_subscriptions_reviewed` (migração 0011); testes em `subscriptions.test.ts`, `copy.test.ts`, `navigation.test.ts`, `88_assinaturas.sql`, na API e no roteiro web. A assinatura é um gasto fixo mensal marcado como tal. A marca só informa: **nada aqui muda** Recebido, Pago, Diferença, "Ainda a pagar" nem a renda comprometida, e o Clarevo não cancela nada junto a quem presta o serviço.
+
+- **Quem pode ser.** Só gasto fixo mensal (`kind = 'mensal'`); parcelamento e conta do ano nunca (`assinatura_so_gasto_fixo`, e a restrição `commitment_series_assinatura` no banco). Desmarcar apaga a data da revisão; marcar de novo começa sem data. Marcar o que já está marcado não muda nada nem sobe a versão da série; quando a marca muda, a versão sobe 1.
+- **Ativa.** Marcada, não excluída e não encerrada (a última conta é deste mês ou de um mês depois, ou não há término). Só as ativas entram nas somas, no grupo "Assinaturas", na revisão e no lembrete. Uma assinatura que ainda não começou (a primeira conta é de um mês futuro) é ativa.
+- **Por mês e por ano.** Por mês = soma do valor vigente de cada ativa (a vigência do mês de hoje, ou a da primeira conta antes de começar); por ano = por mês × 12 (a regra do "Quanto custa por ano?", D-035). Valor que muda entra pelo valor de referência e aparece com "≈"; a parte estimada vem dita. Cada linha mostra o próprio por mês e por ano. Exemplo: R$ 39,90 por mês dão R$ 478,80 por ano; R$ 39,90 e R$ 99,00 dão R$ 138,90 por mês e R$ 1.666,80 por ano.
+- **Revisão.** `mark_subscriptions_reviewed` grava o dia de hoje (no fuso de quem chama) nas ativas que quem chama pode alterar (as dele; as de outras pessoas, só com "editar de outras pessoas"); a data nunca recua (relógio para trás não muda nada); repetir no mesmo dia não muda nada; a versão da série não sobe. Sem assinatura ativa a chamada vale e muda 0. A atividade da revisão dos últimos meses (D-030) conta marcar como anotação e **não conta** revisar.
+- **Lembrete** (só dentro do app, sem notificação), com ao menos uma ativa: a última revisão é a data mais recente entre as ativas. Com revisão, o aviso aparece quando hoje é depois da última revisão mais 6 meses (revisada em 07/04/2026, aparece a partir de 08/10/2026); sem nenhuma revisão, quando hoje é a partir do dia do cadastro da assinatura mais antiga mais 3 meses (cadastrada em 07/07/2026, aparece em 07/10/2026). Meses civis, com o dia limitado ao fim do mês (31/07 mais 3 meses é 31/10; 30/11 mais 3 meses é 28/02). Uma revisão com data no futuro (relógio do aparelho para trás) não liga o aviso. "Agora não" esconde por 30 dias (o aviso volta no 30º dia), só neste aparelho; "Revisei minhas assinaturas" grava a data e o aviso some.
+- **Demonstração** (hoje 07/10/2026): "Streaming (exemplo)" (R$ 39,90, dia 10) e "Academia (exemplo)" (R$ 99,00, dia 5), com a primeira conta em junho de 2027: R$ 138,90 por mês e R$ 1.666,80 por ano; outubro segue em Recebido R$ 6.000,00, Pago R$ 3.900,00, Diferença R$ 2.100,00, Ainda a pagar R$ 650,00 e renda comprometida de 52,5%. Só "Por mês, se os valores não mudarem" passa de R$ 3.530,00 para R$ 3.668,90. Com `?cenario=assinaturas`, as duas foram cadastradas em 30/06/2026 e o lembrete aparece. Conta nova: nenhuma série, nenhuma assinatura.
+
+### Sequência de aceite das assinaturas (reproduzida no core; cada passo também tem teste no banco e na API)
+
+Conta de teste, hoje 07/10/2026. Os totais de outubro são os mesmos em todos os passos.
+
+| Passo | O que se faz | Resultado |
+|---|---|---|
+| 1 | Cadastrar "Streaming" (R$ 39,90, todo mês) sem a marca | Gasto fixo comum; nenhuma assinatura |
+| 2 | Marcar como assinatura | Aceito; versão 2; por mês R$ 39,90, por ano R$ 478,80 |
+| 3 | Marcar de novo, com a versão 2 | Nada muda; a versão continua 2 |
+| 4 | Marcar com a versão 1 | Recusado: `versao_desatualizada` (versão atual 2) |
+| 5 | Marcar um parcelamento ou uma conta do ano | Recusado: `assinatura_so_gasto_fixo` |
+| 6 | "Revisei minhas assinaturas" | Streaming com a revisão de 07/10/2026; versão 2; Pago e Ainda a pagar não mudam |
+| 7 | Revisar de novo no mesmo dia, ou com o relógio um dia antes | Nada muda; a data fica |
+| 8 | Revisar no dia seguinte | A data passa a 08/10/2026 |
+| 9 | Encerrar o Streaming sem nenhuma conta (último mês antes da primeira) | Sai das somas e da revisão; a marca continua |
+| 10 | Retomar sem data para terminar | Volta às somas e à revisão |
+| 11 | Desmarcar | Sem marca e sem data; versão sobe 1 |
+| 12 | Hoje + 6 meses e 1 dia de uma revisão (ou 3 meses sem nenhuma) | O lembrete aparece; "Agora não" o esconde por 30 dias |
 
 ## Simulador (Ciclo D, D-028)
 

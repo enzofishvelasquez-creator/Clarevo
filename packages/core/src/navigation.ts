@@ -249,6 +249,13 @@ export const APP_SCREENS: readonly AppScreen[] = [
     keywords: ['gasto fixo', 'fixo', 'parcelamento', 'parcela', 'aluguel', 'escola', 'financiamento', 'assinatura', 'mensalidade', 'carnê', 'crediário'],
   },
   {
+    id: 'assinaturas',
+    title: 'Revisar assinaturas',
+    caption: 'O que as assinaturas custam por mês e por ano, e um lugar para conferir cada uma',
+    href: '/gastos-fixos/assinaturas',
+    keywords: ['assinatura', 'assinaturas', 'streaming', 'academia', 'plano', 'plano de celular', 'clube', 'aplicativo', 'mensalidade', 'revisar assinaturas'],
+  },
+  {
     id: 'contas-do-ano',
     title: 'Contas do ano',
     caption: 'Contas que vencem uma vez por ano ou em poucas parcelas, como IPVA e IPTU',

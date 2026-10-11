@@ -162,7 +162,26 @@ export interface CommitmentWrite {
 }
 
 /** Ações de série gravadas em record_operations (alvo em target_id); 'informar_ano' e 'tirar_ano' só em contas do ano. */
-export type SeriesAction = 'criar_serie' | 'alterar_serie' | 'encerrar_serie' | 'excluir_serie' | 'informar_ano' | 'tirar_ano';
+export type SeriesAction =
+  | 'criar_serie'
+  | 'alterar_serie'
+  | 'encerrar_serie'
+  | 'excluir_serie'
+  | 'informar_ano'
+  | 'tirar_ano'
+  | 'marcar_assinatura';
+
+/**
+ * "Revisei minhas assinaturas" (mark_subscriptions_reviewed, D-046), gravada em record_operations sem alvo (o contexto está na
+ * operação). Como 'decidir_revisao' e 'responder_guardar', não conta como anotação na atividade (D-030).
+ */
+export type SubscriptionReviewAction = 'revisar_assinaturas';
+
+/** Resultado de markSubscriptionsReviewed: o dia gravado (hoje; na repetição, a data mais recente das assinaturas) e quantas mudaram. */
+export interface SubscriptionReviewWrite {
+  reviewedOn: IsoDate | null;
+  changed: number;
+}
 
 /** Conta afetada que a pessoa confirmou: se o conjunto mudar até gravar, a escrita é recusada. */
 export interface AffectedRef {
@@ -313,6 +332,19 @@ export interface RecordsRepository {
    * expectedAffected: affectedByYear(…, 'tirar'). changed = contas excluídas.
    */
   skipSeriesYear(key: string, seriesId: string, number: number, expectedAffected: AffectedRef[]): Promise<SeriesWrite>;
+  /**
+   * Assinaturas (D-046, migração 0011). Marca (true) ou desmarca (false) um gasto fixo mensal como assinatura. Desmarcar apaga a
+   * data da revisão. Marcar o que já está marcado, ou desmarcar o que não está, não muda nada nem sobe a versão (changed 0);
+   * quando muda, a versão sobe +1 e changed é 1. Parcelamento e conta do ano: assinatura_so_gasto_fixo. Ordem das recusas:
+   * nao_encontrado, sem_permissao, versao_desatualizada, marca_invalida, assinatura_so_gasto_fixo. Conta como anotação.
+   */
+  setSeriesSubscription(key: string, id: string, expectedVersion: number, subscription: boolean): Promise<SeriesWrite>;
+  /**
+   * "Revisei minhas assinaturas": grava o dia de hoje nas assinaturas ativas do contexto (não excluídas e não encerradas) que a
+   * pessoa pode alterar. A data nunca recua, repetir no mesmo dia não muda nada e a versão da série não muda. Sem assinatura
+   * ativa vale e muda 0. sem_permissao sem escrita no contexto. Não conta como anotação (a atividade não muda).
+   */
+  markSubscriptionsReviewed(key: string, contextId: string): Promise<SubscriptionReviewWrite>;
   /** Cria as contas da janela de geração. Idempotente, sem chave. */
   syncSeriesOccurrences(contextId: string): Promise<{ created: number; createdOverdue: number }>;
   /** Reconciliação de gasto fixo: a operação com esta chave já foi concluída? */
@@ -690,6 +722,8 @@ export type RepoErrorCode =
   | 'tipo_de_encargo_invalido'
   | 'chave_de_nota_invalida'
   | 'nota_ja_anotada'
+  | 'marca_invalida'
+  | 'assinatura_so_gasto_fixo'
   | 'desconhecido';
 
 export class RepoError extends Error {

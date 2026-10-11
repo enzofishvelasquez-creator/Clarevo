@@ -65,6 +65,8 @@ describe('barra inferior (D-039)', () => {
       '/orcamento',
       // Buscar em Movimentações (D-045): tela de consulta, com a barra.
       '/movimentacoes/buscar',
+      // Revisar assinaturas (D-046): tela de consulta, com a barra (a rota estática vem antes de gastos-fixos/[id]).
+      '/gastos-fixos/assinaturas',
       '/meta/abc',
       '/simular',
       '/cartoes',
@@ -147,6 +149,7 @@ describe('barra inferior (D-039)', () => {
     expect(topicTabFor('/cartoes/abc')).toBe('/movimentacoes');
     expect(topicTabFor('/orcamento')).toBe('/movimentacoes');
     expect(topicTabFor('/movimentacoes/buscar')).toBe('/movimentacoes');
+    expect(topicTabFor('/gastos-fixos/assinaturas')).toBe('/movimentacoes');
     expect(topicTabFor('/meta/abc')).toBe('/metas');
     expect(topicTabFor('/simular')).toBe('/metas');
     expect(topicTabFor('/explicacao/juros')).toBe('/aprender');
@@ -240,6 +243,13 @@ describe('busca de Aprender: grupo "No app" (D-039)', () => {
     expect(first('quanto paguei')).toBe('buscar-movimentos');
     expect(first('quanto gastei')).toBe('buscar-movimentos');
     expect(first('quanto paguei de luz')).toBe('buscar-movimentos');
+    // Assinaturas (D-046): as palavras que a pessoa usa; "Gastos fixos e parcelamentos" continua achado por "assinatura".
+    for (const query of ['assinatura', 'assinaturas', 'streaming', 'academia', 'plano de celular', 'clube', 'aplicativo', 'mensalidade']) expect(ids(query), query).toContain('assinaturas');
+    expect(first('assinaturas')).toBe('assinaturas');
+    expect(first('revisar assinaturas')).toBe('assinaturas');
+    expect(first('streaming')).toBe('assinaturas');
+    expect(first('academia')).toBe('assinaturas');
+    expect(ids('assinatura')).toContain('gastos-fixos');
     expect(first('renda comprometida')).toBe('renda-comprometida');
     expect(ids('guardar')).toContain('metas');
   });

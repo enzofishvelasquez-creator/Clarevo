@@ -91,6 +91,8 @@ const serie = (over: Partial<CommitmentSeries> = {}, termOver: Partial<SeriesTer
   paidCount: 0,
   openCount: 0,
   generating: true,
+  subscription: false,
+  subscriptionReviewedOn: null,
   createdBy: 'pessoa-1',
   version: 1,
   createdAt: CREATED_AT,

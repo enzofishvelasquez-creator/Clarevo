@@ -1253,10 +1253,10 @@ do $$ begin
             'create_series_occurrence', 'decide_return_review', 'delete_account', 'delete_card', 'delete_card_entry',
             'delete_category_budget', 'delete_commitment', 'delete_commitment_limit', 'delete_goal', 'delete_goal_movement',
             'delete_income_reference', 'delete_record', 'delete_series', 'end_series', 'ensure_personal_space',
-            'inform_series_year', 'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'month_budget',
+            'inform_series_year', 'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'mark_subscriptions_reviewed', 'month_budget',
             'month_committed', 'month_to_pay', 'month_totals', 'months_overview', 'my_today', 'pay_commitment', 'pay_invoice',
             'set_account_status', 'set_card_status', 'set_category_budget', 'set_commitment_limit', 'set_default_account',
-            'set_goal_status', 'set_income_reference', 'set_savings_answer', 'skip_series_year', 'sync_series_occurrences',
+            'set_goal_status', 'set_income_reference', 'set_savings_answer', 'set_series_subscription', 'skip_series_year', 'sync_series_occurrences',
             'undo_commitment_payment', 'undo_invoice_payment', 'update_account', 'update_card', 'update_card_entry',
             'update_commitment', 'update_goal', 'update_goal_movement', 'update_record', 'update_series_from'],
     'authenticated executa só as funções expostas';
@@ -1294,8 +1294,8 @@ do $$ begin
            where attrelid = 'public.series_items'::regclass and attnum > 0 and not attisdropped)
     = array['id', 'context_id', 'kind', 'nature', 'first_due_month', 'first_number', 'last_number', 'installment_total', 'currency',
             'created_by', 'version', 'created_at', 'updated_at', 'terms', 'skipped_numbers', 'paid_count', 'open_count', 'generating',
-            'parts_per_year'],
-    'series_items: mesma lista, mais parts_per_year depois de generating';
+            'parts_per_year', 'subscription', 'subscription_reviewed_on'],
+    'series_items: mesma lista, mais parts_per_year depois de generating e as duas colunas de assinatura da 0011 no fim';
   assert (select reloptions from pg_class where oid = 'public.series_items'::regclass) @> array['security_barrier=true']
      and not coalesce((select reloptions from pg_class where oid = 'public.series_items'::regclass) @> array['security_invoker=true'], false)
      and (select reloptions from pg_class where oid = 'public.commitment_items'::regclass) @> array['security_invoker=true'],

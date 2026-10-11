@@ -208,6 +208,8 @@ function Navigation() {
           <Stack.Screen name="a-pagar/[id]/pagar" />
           <Stack.Screen name="gastos-fixos/index" />
           <Stack.Screen name="gastos-fixos/novo" />
+          {/* Revisar assinaturas (D-046): rota estática, tem precedência sobre gastos-fixos/[id]. */}
+          <Stack.Screen name="gastos-fixos/assinaturas" />
           <Stack.Screen name="gastos-fixos/[id]/index" />
           <Stack.Screen name="gastos-fixos/[id]/editar" />
           <Stack.Screen name="gastos-fixos/[id]/encerrar" />

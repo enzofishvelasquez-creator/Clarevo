@@ -8,6 +8,7 @@ import {
   RETURN_TEXT,
   SERIES_ERROR_TEXT,
   SERIES_NATURE_LABEL,
+  SUBSCRIPTION_TEXT,
   addMonths,
   affectedByDelete,
   cotaUnicaLink,
@@ -27,6 +28,7 @@ import {
   seriesCaption,
   seriesEnded,
   seriesGapsInRange,
+  subscriptionYearlyCents,
   suggestedReference,
   termHistory,
   type Commitment,
@@ -317,6 +319,17 @@ function Overview({ series: s, today }: { series: CommitmentSeries; today: IsoDa
         <MoneyTxt variant="title" style={tabular}>
           {value}
         </MoneyTxt>
+        {/* Assinatura (D-046): quanto custa por ano e a data da última revisão. Só informa. */}
+        {s.subscription && s.kind === 'mensal' ? (
+          <View style={{ gap: 2 }}>
+            <MoneyTxt variant="label" style={[tabular, { fontFamily: fonts.bold }]}>
+              {SUBSCRIPTION_TEXT.detailYear(subscriptionYearlyCents(term.amountCents), variable)}
+            </MoneyTxt>
+            <Txt variant="caption" color={colors.textSecondary}>
+              {SUBSCRIPTION_TEXT.lastReview(s.subscriptionReviewedOn)}
+            </Txt>
+          </View>
+        ) : null}
         <CalcLink series={s} today={today} />
         {annual ? (
           <>

@@ -830,10 +830,10 @@ begin
             'desfazer_pagamento', 'desfazer_pagamento_fatura', 'editar', 'editar_compromisso', 'encerrar_serie', 'excluir',
             'excluir_cartao', 'excluir_compromisso', 'excluir_conta', 'excluir_lancamento_cartao',
             'excluir_limite_comprometimento', 'excluir_meta', 'excluir_movimento_meta', 'excluir_orcamento_categoria',
-            'excluir_renda_referencia', 'excluir_serie', 'informar_ano', 'pagar_compromisso', 'pagar_fatura',
-            'registrar_movimento_meta', 'responder_guardar', 'situacao_cartao', 'situacao_conta', 'situacao_meta',
+            'excluir_renda_referencia', 'excluir_serie', 'informar_ano', 'marcar_assinatura', 'pagar_compromisso', 'pagar_fatura',
+            'registrar_movimento_meta', 'responder_guardar', 'revisar_assinaturas', 'situacao_cartao', 'situacao_conta', 'situacao_meta',
             'tirar_ano'],
-    'as 46 ações vigentes (com as 7 de metas, testadas em 60, a de guardar, testada em 65, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, e as 5 de contas, testadas em 85)';
+    'as 48 ações vigentes (com as 7 de metas, testadas em 60, a de guardar, testada em 65, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, e as 2 de assinaturas, testadas em 88)';
   -- Toda operação nova aponta para uma referência do mesmo contexto; a exclusão, para uma referência excluída.
   assert not exists (select 1 from public.record_operations o
                       where o.action in ('definir_renda_referencia', 'excluir_renda_referencia')
@@ -923,10 +923,10 @@ do $$ begin
             'create_series_occurrence', 'decide_return_review', 'delete_account', 'delete_card', 'delete_card_entry',
             'delete_category_budget', 'delete_commitment', 'delete_commitment_limit', 'delete_goal', 'delete_goal_movement',
             'delete_income_reference', 'delete_record', 'delete_series', 'end_series', 'ensure_personal_space',
-            'inform_series_year', 'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'month_budget',
+            'inform_series_year', 'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'mark_subscriptions_reviewed', 'month_budget',
             'month_committed', 'month_to_pay', 'month_totals', 'months_overview', 'my_today', 'pay_commitment', 'pay_invoice',
             'set_account_status', 'set_card_status', 'set_category_budget', 'set_commitment_limit', 'set_default_account',
-            'set_goal_status', 'set_income_reference', 'set_savings_answer', 'skip_series_year', 'sync_series_occurrences',
+            'set_goal_status', 'set_income_reference', 'set_savings_answer', 'set_series_subscription', 'skip_series_year', 'sync_series_occurrences',
             'undo_commitment_payment', 'undo_invoice_payment', 'update_account', 'update_card', 'update_card_entry',
             'update_commitment', 'update_goal', 'update_goal_movement', 'update_record', 'update_series_from'],
     'authenticated executa só as funções expostas (3 novas)';

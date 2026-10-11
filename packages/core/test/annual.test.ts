@@ -94,6 +94,8 @@ const anual = (over: Partial<CommitmentSeries> = {}, termOver: Partial<SeriesTer
   paidCount: 0,
   openCount: 0,
   generating: true,
+  subscription: false,
+  subscriptionReviewedOn: null,
   createdBy: 'pessoa',
   version: 1,
   createdAt: CREATED_AT,
@@ -600,7 +602,8 @@ describe('contas do ano: totais, ano a ano, informar, tirar e sugestão', () => 
     const ctx = (await repo.getSpace())!.personalContextId;
     const list = await repo.listSeries(ctx);
     expect(seriesYearlyTotal(list, DEMO_TODAY)).toEqual({ totalCents: 420000, estimatedCents: 420000 });
-    expect(seriesMonthlyTotal(list, DEMO_TODAY)).toEqual({ totalCents: 353000, estimatedCents: 18000 });
+    // Aluguel, Luz, o financiamento e as duas assinaturas de exemplo (R$ 39,90 e R$ 99,00): 2.500 + 180 + 850 + 138,90.
+    expect(seriesMonthlyTotal(list, DEMO_TODAY)).toEqual({ totalCents: 366890, estimatedCents: 18000 });
     expect(seriesYearlyTotal([ipva({ lastNumber: 0 }), matricula()], DEMO_TODAY)).toEqual({ totalCents: 120000, estimatedCents: 0 });
     // Nenhuma conta da demonstração muda de outubro a dezembro de 2026.
     for (const month of ['2026-10', '2026-11', '2026-12']) {

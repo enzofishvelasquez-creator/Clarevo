@@ -92,6 +92,8 @@ const series = (over: Partial<CommitmentSeries> = {}): CommitmentSeries => ({
   paidCount: 0,
   openCount: 0,
   generating: true,
+  subscription: false,
+  subscriptionReviewedOn: null,
   createdBy: 'pessoa',
   version: 1,
   createdAt: CREATED_AT,
@@ -1559,10 +1561,13 @@ describe('demonstração do Ciclo A (com as contas do ano do A3)', () => {
       ['Financiamento do carro', 'Parcelamento · financiamento · parcelas 13 a 48'],
       ['IPVA', 'Todo ano em 20/01 · desde 2027'],
       ['IPTU', 'Todo ano, 10 parcelas de fevereiro a novembro, dia\u00a010 · desde 2027'],
+      // D-046: as duas assinaturas de exemplo, com a primeira conta em junho de 2027.
+      ['Streaming (exemplo)', 'Todo mês, dia\u00a010 · desde junho de 2027'],
+      ['Academia (exemplo)', 'Todo mês, dia\u00a05 · desde junho de 2027'],
     ]);
-    // Contas do ano ficam fora do "Por mês"; nenhuma conta delas existe em 07/10/2026.
-    expect(seriesMonthlyTotal(list, DEMO_TODAY)).toEqual({ totalCents: 353000, estimatedCents: 18000 });
-    expect(list.slice(3).map((s) => [s.openCount, s.paidCount])).toEqual([
+    // Contas do ano ficam fora do "Por mês"; nenhuma conta delas existe em 07/10/2026. As assinaturas de exemplo entram na soma.
+    expect(seriesMonthlyTotal(list, DEMO_TODAY)).toEqual({ totalCents: 366890, estimatedCents: 18000 });
+    expect(list.slice(3, 5).map((s) => [s.openCount, s.paidCount])).toEqual([
       [0, 0],
       [0, 0],
     ]);

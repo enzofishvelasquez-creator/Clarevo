@@ -250,6 +250,13 @@ export interface CommitmentSeries {
   openCount: number;
   /** Quem criou ainda pode anotar no contexto. */
   generating: boolean;
+  /**
+   * Assinatura (D-046, migração 0011): gasto fixo mensal marcado como assinatura. Sempre false em parcelamento e conta do ano.
+   * Só muda por setSeriesSubscription.
+   */
+  subscription: boolean;
+  /** Dia da última revisão das assinaturas (markSubscriptionsReviewed); null se nunca revisada. Só existe em assinatura. */
+  subscriptionReviewedOn: IsoDate | null;
   createdBy: string;
   version: number;
   createdAt: string;

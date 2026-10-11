@@ -8,6 +8,7 @@ import {
   NO_CATEGORY_LABEL,
   SERIES_ERROR_TEXT,
   SERIES_NATURE_LABEL,
+  SUBSCRIPTION_TEXT,
   affectedByEditFrom,
   annualYearOf,
   centsToInput,
@@ -25,6 +26,7 @@ import {
   maskMonthBR,
   mergeOccurrences,
   monthOf,
+  newOperationKey,
   numberAtOrAfter,
   numberOfMonth,
   parseBRL,
@@ -32,6 +34,7 @@ import {
   seriesErrorText,
   seriesMonthOf,
   seriesTermError,
+  subscriptionErrorText,
   termFor,
   type AmountMode,
   type Commitment,
@@ -55,10 +58,20 @@ import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
 import { ChoiceGroup, monthChipLabel, seriesStyles as styles } from '@/components/series-parts';
+import { SettingSwitch } from '@/components/setting-switch';
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
-import { useLimitWatch, useSeries, useSeriesOccurrences, useSeriesOpenOccurrences, useSeriesOperationKey, useUpdateSeriesFrom, withNotice } from '@/state/data';
+import {
+  useLimitWatch,
+  useSeries,
+  useSeriesOccurrences,
+  useSeriesOpenOccurrences,
+  useSeriesOperationKey,
+  useSetSeriesSubscription,
+  useUpdateSeriesFrom,
+  withNotice,
+} from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -145,6 +158,7 @@ export function SeriesEditForm({
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const update = useUpdateSeriesFrom();
+  const markSubscription = useSetSeriesSubscription();
   const limitWatch = useLimitWatch();
   const keys = useSeriesOperationKey();
   const live = useSeries(opened.id, contextId);
@@ -232,6 +246,11 @@ export function SeriesEditForm({
   const [confirm, setConfirm] = useState<Pending | null>(null);
   const [leaveTo, setLeaveTo] = useState<null | (() => void)>(null);
   const [confirmDiscard, setConfirmDiscard] = useState<null | (() => void)>(null);
+  /** Gasto fixo mensal: "É uma assinatura?" (D-046). Gravado por set_series_subscription, depois da alteração das vigências. */
+  const subscribable = s.kind === 'mensal';
+  const [subscription, setSubscription] = useState(opened.subscription);
+  /** Chave da gravação só da marca: a mesma em nova tentativa depois de falha de rede (o banco reconhece a repetição). */
+  const subscriptionKey = useRef(newOperationKey());
 
   // O tipo é um grupo de chips, sem campo para receber o foco.
   const refs = {
@@ -241,7 +260,9 @@ export function SeriesEditForm({
   } satisfies Partial<Record<EditField, React.RefObject<TextInput | null>>>;
   const otherRef = useRef<TextInput>(null);
 
-  const dirty = JSON.stringify({ draft, pick, otherText }) !== JSON.stringify(initial);
+  const termsDirty = JSON.stringify({ draft, pick, otherText }) !== JSON.stringify(initial);
+  const subscriptionDirty = subscribable && subscription !== opened.subscription;
+  const dirty = termsDirty || subscriptionDirty;
 
   usePreventRemove(dirty && !leaveTo, ({ data }) => {
     setConfirmDiscard(() => () => navigation.dispatch(data.action));
@@ -318,8 +339,56 @@ export function SeriesEditForm({
     return fresh ? { series: fresh, list: mergeOccurrences(list, open).reverse() } : null;
   };
 
+  /**
+   * Grava só a marca de assinatura (nenhum campo das vigências mudou). Recusa do servidor mostra o texto do motivo; falha de rede
+   * deixa tentar de novo com a mesma chave.
+   */
+  const saveSubscriptionOnly = async () => {
+    setBusy(true);
+    setBanner(null);
+    try {
+      await markSubscription.mutateAsync({ key: subscriptionKey.current, id: s.id, version: s.version, subscription });
+      subscriptionKey.current = newOperationKey();
+      setRetry(false);
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      flash.set(subscription ? SUBSCRIPTION_TEXT.savedAs : SUBSCRIPTION_TEXT.savedAsNot);
+      leave(goBack);
+    } catch (e) {
+      if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
+        subscriptionKey.current = newOperationKey();
+        setRetry(false);
+        setBanner(subscriptionErrorText(e.code));
+        if (e.code === 'versao_desatualizada') await reload().catch(() => null);
+      } else {
+        setRetry(true);
+        setBanner(SERIES_ERROR_TEXT.salvar_falhou);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * Depois de alterar as vigências: a marca de assinatura, em sequência, com a versão que a gravação devolveu. Se falhar, o gasto
+   * fixo continua atualizado e o aviso diz que a marca não foi salva. Devolve o aviso, ou null se a marca não mudou.
+   */
+  const markAfter = async (series: Pick<CommitmentSeries, 'id' | 'version' | 'subscription'>): Promise<string | null> => {
+    if (!subscribable || subscription === series.subscription) return null;
+    try {
+      await markSubscription.mutateAsync({ key: newOperationKey(), id: series.id, version: series.version, subscription });
+      return subscription ? SUBSCRIPTION_TEXT.savedAs : SUBSCRIPTION_TEXT.savedAsNot;
+    } catch {
+      return SUBSCRIPTION_TEXT.markFailed;
+    }
+  };
+
   const submit = () => {
     if (busy) return;
+    // Só a marca mudou: grava direto, sem escolher o mês nem confirmar (nenhuma conta muda).
+    if (subscriptionDirty && !termsDirty) {
+      saveSubscriptionOnly();
+      return;
+    }
     const v = validateEdit(draft, s.kind);
     if (!v.ok) {
       setErrors(v.errors);
@@ -355,7 +424,8 @@ export function SeriesEditForm({
           if (prev.k === k && JSON.stringify(prev.input) === JSON.stringify(input)) {
             setRetry(false);
             setConfirm(null);
-            finish(k);
+            const fresh = await repo.getSeries(s.id).catch(() => null);
+            finish(k, fresh ? await markAfter(fresh) : null);
             return;
           }
           // Outro preenchimento foi gravado antes da falha: recalcular com a versão atual e confirmar de novo.
@@ -376,11 +446,13 @@ export function SeriesEditForm({
       // Aviso do limite pessoal (D-041): o comprometido dos próximos meses antes de gravar, com a previsão das séries.
       const limitBefore = await limitWatch.before(s.contextId);
       try {
-        await update.mutateAsync({ key, id: s.id, version, fromNumber: k, affected: plan.affected, input });
+        const written = await update.mutateAsync({ key, id: s.id, version, fromNumber: k, affected: plan.affected, input });
         keys.settled();
         setRetry(false);
         setConfirm(null);
-        finish(k, await limitWatch.after(limitBefore));
+        const limitNotice = await limitWatch.after(limitBefore);
+        const markNotice = await markAfter(written.series);
+        finish(k, [limitNotice, markNotice].filter(Boolean).join('\n') || null);
       } catch (e) {
         setConfirm(null);
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
@@ -570,6 +642,11 @@ export function SeriesEditForm({
               <Chip key={c} label={c} selected={draft.category === c} onPress={() => set('category', c)} />
             ))}
           </ChoiceGroup>
+
+          {/* Assinatura (D-046): só gasto fixo mensal; vale para o gasto fixo inteiro, não só a partir do mês escolhido. */}
+          {subscribable ? (
+            <SettingSwitch label={SUBSCRIPTION_TEXT.switchLabel} caption={SUBSCRIPTION_TEXT.switchCaption} value={subscription} onChange={setSubscription} />
+          ) : null}
         </Card>
       </Screen>
 

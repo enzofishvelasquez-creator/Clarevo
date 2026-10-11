@@ -556,6 +556,35 @@ export function useSkipSeriesYear() {
   });
 }
 
+/**
+ * Assinaturas (D-046): marca ou desmarca um gasto fixo mensal. Mesmas invalidações das outras escritas de série (a marca conta
+ * como anotação, e a série volta com as contas).
+ */
+export function useSetSeriesSubscription() {
+  const repo = useRepo();
+  const invalidate = useInvalidateSeries();
+  return useMutation({
+    mutationFn: (v: { key: string; id: string; version: number; subscription: boolean }) =>
+      repo.setSeriesSubscription(v.key, v.id, v.version, v.subscription),
+    onSuccess: (w) => invalidate(w),
+  });
+}
+
+/**
+ * "Revisei minhas assinaturas" (D-046): grava só a data de hoje nas assinaturas ativas. Não conta como anotação, então a revisão dos
+ * últimos meses não recarrega; a lista de séries recarrega para o aviso sumir.
+ */
+export function useMarkSubscriptionsReviewed() {
+  const repo = useRepo();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { key: string; contextId: string }) => repo.markSubscriptionsReviewed(v.key, v.contextId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['series'] });
+    },
+  });
+}
+
 /** Tentativa de escrita de gasto fixo com resultado incerto (falha de rede). snapshot = conteúdo enviado. */
 export interface SeriesAttempt {
   key: string;

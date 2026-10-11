@@ -456,7 +456,7 @@ Recalculei em Python todos os exemplos abaixo, e eles batem com a `spec3` §3.11
 
 ## 4. O que já existe, o que está desenhado e o que falta
 
-Situação em 10/10/2026, depois dos Ciclos A6 (D-035), A4 (D-030), A5 (D-031 e D-032), A2 (D-025), B (D-026), C (D-027 e D-036), D (D-028) E (D-037 e D-038), G1 (D-043) e H1 (D-045).
+Situação em 11/10/2026, depois dos Ciclos A6 (D-035), A4 (D-030), A5 (D-031 e D-032), A2 (D-025), B (D-026), C (D-027 e D-036), D (D-028) E (D-037 e D-038), G1 (D-043), H1 (D-045) e H2 (D-046).
 
 | Função | Situação | Onde fica ou ficaria |
 |---|---|---|
@@ -480,7 +480,8 @@ Situação em 10/10/2026, depois dos Ciclos A6 (D-035), A4 (D-030), A5 (D-031 e 
 | Busca de registros (H1) | Existe (D-045): o campo "Buscar" no topo de Movimentos abre `/movimentacoes/buscar` (texto sem acento, tipo, período, categoria, conta e valor; resumo com a média por mês com gasto; compras no cartão à parte, fora da soma); também pelo grupo "No app" de Aprender. Falta: o teste em aparelho (`docs/04`) | Movimentos › "Buscar" |
 | Orçamento por categoria (F2) | Existe (D-041) | Movimentos › "Organizar"; `/orcamento` |
 | Ocultar valores e biometria | Existe (D-025). Falta: o teste em aparelho (`docs/04`) | Conta; olho no cabeçalho das abas quando couber |
-| Assinaturas, plano para sair das dívidas, revisão do mês, exportar dados, aviso de valor fora do habitual, "Parece um gasto fixo" | Falta (só sugestão em `spec2` §7) | Seção 5 |
+| Assinaturas (H2) | Existe (D-046): o interruptor "É uma assinatura?" no cadastro e na edição de gasto fixo mensal, o grupo "Assinaturas" no topo de Gastos fixos e parcelamentos (por mês, por ano e o link "Quanto custa por ano?" em cada linha), "Revisar assinaturas" (`/gastos-fixos/assinaturas`, só grava a data da revisão) e o aviso "Faz tempo que você não revisa suas assinaturas." dentro do app; também pelo grupo "No app" de Aprender. Falta: o teste em aparelho (`docs/04`) | Gastos fixos e parcelamentos; `/gastos-fixos/assinaturas` |
+| Revisão do mês, exportar dados, aviso de valor fora do habitual, "Parece um gasto fixo" | Falta (só sugestão em `spec2` §7) | Seção 5 |
 | Notas fiscais (E) | Existe (D-038): "Escanear nota fiscal" em Anotar gasto, com câmera (QR da NFC-e e código de barras da NF-e), PDF do DANFE e "Colar o link ou a chave"; no RJ, a página da Sefaz-RJ preenche loja, valor, data e forma de pagamento no celular, e a linha "Nota lida" mostra loja, valor, data e forma (D-042; "Como você pagou?" já vem escolhido, sem a forma, nenhuma escolha). Na web, a dica "No celular, o Clarevo lê o valor e a data na página da Sefaz." Só o resumo SHA-256 da chave é guardado, nunca CPF. Sem parecer jurídico (D-034(5)). Falta: o aceite com notas reais (P-025), o teste em aparelho, compartilhar o PDF de outro app e a cobertura de outros estados (`docs/04`) | Primeiro item de Anotar gasto novo |
 | Contas de origem do dinheiro (G1) | Existe (D-043): "Suas contas" em Conta e o seletor "Saiu de" / "Entrou em" / "Foi para" em gasto, recebimento, pagamento de conta, pagamento de fatura e aporte e resgate de meta; só a origem informada, sem saldo por conta (P-018). Falta: o teste em aparelho (`docs/04`) | Conta › "Suas contas"; formulários; filtro em Movimentos |
 | Cartões de crédito e faturas (E) | Existe (D-037): cartões, compra parcelada no cartão, fatura como conta a pagar, pagamento total ou parcial com saldo anterior, encargos e estornos, "Por categoria" e grupo "Faturas de cartão" na renda comprometida; desde D-042, o card "Faturas de outubro" no topo de `/cartoes`, com a soma das faturas do mês, quanto isso é da renda de referência e as próximas faturas. Falta: o teste em aparelho e a interface na Família (`docs/04`) | Movimentos › "Organizar" › Cartões; "Como você pagou?" em Anotar gasto; `/cartoes` |
@@ -570,6 +571,7 @@ Ordem pelo valor para a pessoa e para a empresa que oferece o benefício. Valor:
     - Valor: pessoa M, empresa M. Esforço: S, ou M se precisar de campo novo no banco.
     - [E] 46% pagam mais de R$ 100 por mês em assinaturas (Vindi, 2026, pela soma das faixas de R$ 101 a R$ 200 e de R$ 201 a R$ 500).
     - Risco: sem conexão bancária, a lista é manual.
+    - Situação: feito em 11/10/2026 (D-046, Ciclo H2, migração 0011), depois do "sim" de Enzo à ordem em 10/10/2026, com as regras de detalhe ainda revisáveis por ele. Campo novo no banco, como previsto (esforço M): `subscription` e `subscription_reviewed_on` na série, `set_series_subscription` e `mark_subscriptions_reviewed`, sem mudar nenhuma função de antes. O interruptor "É uma assinatura?" (só gasto fixo mensal) grava a marca depois de salvar a série; o grupo "Assinaturas" no topo de Gastos fixos soma "R$ 138,90 por mês · R$ 1.666,80 por ano" (por ano = por mês × 12) com o valor de cada linha e o link da calculadora "Quanto custa por ano?" (D-035); "Revisar assinaturas" lista as ativas com "Continua" (só para acompanhar, não é guardado) e "Encerrar a partir de…" (o fluxo de encerrar já existente), e "Revisei minhas assinaturas" grava a data de hoje; o lembrete dentro do app, sem notificação, aparece com a última revisão há mais de 6 meses (ou, sem nenhuma, a assinatura mais antiga com 3 meses ou mais de cadastro) e some com "Revisei" ou "Agora não" (30 dias, só no aparelho). Texto neutro, sem marcas e sem "cancele", "corte" nem "desperdício". A demonstração tem "Streaming (exemplo)" (R$ 39,90) e "Academia (exemplo)" (R$ 99,00) e o cenário `?cenario=assinaturas` mostra o lembrete; conta nova não tem nenhuma. Os totais de outubro (6.000 / 3.900 / 2.100 / 650) e os 52,5% não mudam. Falta: o teste em aparelho e a conferência de Enzo sobre os prazos do lembrete.
 12. **"Seu mês em 30 segundos" e resumo da semana.**
     - Valor: pessoa M, empresa M. Esforço: M.
     - [E] O Copilot tem revisão do mês e do ano; Karlan (2016) mostra o efeito de lembrar a meta.
@@ -640,7 +642,7 @@ Ordem pelo valor para a pessoa e para a empresa que oferece o benefício. Valor:
 - **Resumo:** antes de qualquer mudança, o protótipo com 5 pessoas da seção 2.4. Ele pode correr junto do passo 1.
 - **Verificações:**
   - Passos 1 e 2: não mexem no banco. Pedem `npm test`, `npm run typecheck` e `npm run test:web`, mais os vetores da `spec3` §3.11 no passo 2.
-  - Passos com banco (B, C, busca, orçamento e talvez assinaturas): pedem também `npm run test:db` e testes em `supabase/tests`.
+  - Passos com banco (B, C, busca, orçamento e assinaturas): pedem também `npm run test:db` e testes em `supabase/tests`.
   - Só vou informar as verificações realmente executadas.
 - **Arquivos que os passos 1 e 2 tocam:**
   - Telas que já existem: `(tabs)/movimentacoes.tsx`, `(tabs)/metas.tsx`, `(tabs)/aprender.tsx`, `_layout.tsx` (rotas novas), `a-pagar/index.tsx`, `a-pagar/[id]/index.tsx`, `composicao.tsx`, `gastos-fixos/index.tsx`, `gastos-fixos/[id]/index.tsx`, `gastos-fixos/novo.tsx`, `components/family-state.tsx`, os formulários com campo Valor e `public/manifest.webmanifest`.

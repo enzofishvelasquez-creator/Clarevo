@@ -3,8 +3,10 @@ import {
   CALC_UI_TEXT,
   ERROR_TEXT,
   MAX_RECORD_CENTS,
+  SUBSCRIPTION_TEXT,
   annualYearOf,
   currentTerm,
+  custoPorAnoLink,
   formatBRL,
   formatDayMonth,
   formatMonthName,
@@ -16,11 +18,15 @@ import {
   seriesEnded,
   seriesMonthlyTotal,
   seriesYearlyTotal,
+  subscriptionReminderVisible,
+  subscriptionRows,
+  subscriptionTotals,
   type CommitmentSeries,
   type IsoDate,
+  type SubscriptionRow as SubscriptionRowData,
 } from '@clarevo/core';
 import { router } from 'expo-router';
-import { CalendarSync, Layers, Plus, Repeat, ShieldCheck, Users } from 'lucide-react-native';
+import { Calculator, CalendarSync, ClipboardCheck, Info, Layers, Plus, Repeat, ShieldCheck, Users } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { openCalc } from '@/components/calc/open';
@@ -30,8 +36,9 @@ import { MoneyTxt } from '@/components/money-text';
 import { estimateText, SERIES_NOUN, yearA11y } from '@/components/series-parts';
 import { EmptyState, ErrorState } from '@/components/states';
 import { TopicLink } from '@/components/topic-link';
-import { Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
-import { useValuesHidden } from '@/lib/privacy';
+import { Banner, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
+import { moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
+import { useSubscriptionSnooze } from '@/lib/subscription-reminder';
 import { useSeriesList, useSpace } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
@@ -140,22 +147,114 @@ function SeriesRow({ series: s, today, last }: { series: CommitmentSeries; today
   );
 }
 
+/** "R$ 39,90 por mês · R$ 478,80 por ano": com valor que muda, o "≈" na tela e "cerca de" no leitor de tela. */
+function subscriptionLine(row: SubscriptionRowData, hidden: boolean): { text: string; a11y: string } {
+  const sign = row.estimated ? '≈ ' : '';
+  const spoken = row.estimated ? 'cerca de ' : '';
+  return {
+    text: `${sign}${moneyText(row.monthlyCents, hidden)} por mês · ${sign}${moneyText(row.yearlyCents, hidden)} por ano · todo dia ${row.dueDay}`,
+    a11y: `${spoken}${moneyA11y(row.monthlyCents, hidden)} por mês, ${spoken}${moneyA11y(row.yearlyCents, hidden)} por ano, todo dia ${row.dueDay}`,
+  };
+}
+
+/** Uma assinatura do grupo "Assinaturas": abre o gasto fixo; o link da calculadora fica na própria linha (D-035). */
+function SubscriptionLine({ row, series, today, last }: { row: SubscriptionRowData; series: CommitmentSeries | undefined; today: IsoDate; last: boolean }) {
+  const hidden = useValuesHidden();
+  const line = subscriptionLine(row, hidden);
+  const calc = series ? custoPorAnoLink(series, today) : null;
+  return (
+    <View style={[styles.subRow, !last && styles.divider]}>
+      <Pressable
+        onPress={() => router.push(`/gastos-fixos/${row.id}`)}
+        accessibilityRole="button"
+        accessibilityLabel={`${row.name}, ${line.a11y}, assinatura`}
+        accessibilityHint="Abre o gasto fixo"
+        style={(st) => [
+          styles.subMain,
+          st.pressed && { opacity: 0.7 },
+          (st as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid' },
+        ]}>
+        <View style={styles.icon}>
+          <Repeat size={18} color={colors.brand} />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>
+            {row.name}
+          </Txt>
+          <Txt variant="caption" color={colors.textSecondary} style={tabular}>
+            {line.text}
+          </Txt>
+        </View>
+      </Pressable>
+      {calc ? (
+        <LinkButton
+          label={CALC_UI_TEXT.links.custoAno}
+          accessibilityLabel={`${CALC_UI_TEXT.links.custoAno} ${row.name}`}
+          icon={Calculator}
+          style={styles.subCalc}
+          onPress={() => openCalc('custo-por-ano', calc)}
+        />
+      ) : null}
+    </View>
+  );
+}
+
 /**
- * Lista "Gastos fixos e parcelamentos" do contexto Pessoal: ativos por tipo (gastos fixos, parcelamentos e contas do
- * ano) e, por último, os encerrados.
+ * Grupo "Assinaturas" (D-046), no topo, só quando há alguma ativa: o que custam por mês e por ano (a soma dos valores vigentes; por
+ * ano = por mês × 12), uma linha por assinatura com o valor por ano, e o caminho para "Revisar assinaturas". Só informa: nada aqui
+ * muda Pago, Ainda a pagar nem a renda comprometida.
+ */
+function SubscriptionGroup({ list, today }: { list: readonly CommitmentSeries[]; today: IsoDate }) {
+  const rows = subscriptionRows(list, today);
+  if (rows.length === 0) return null;
+  const totals = subscriptionTotals(list, today);
+  const byId = new Map(list.map((s) => [s.id, s]));
+  return (
+    <Card>
+      <Txt variant="title" accessibilityRole="header" aria-level={2}>
+        {SUBSCRIPTION_TEXT.groupTitle}
+      </Txt>
+      <MoneyTxt variant="label" style={[tabular, { fontFamily: fonts.bold, paddingTop: space[1] }]}>
+        {SUBSCRIPTION_TEXT.totals(totals.monthlyCents, totals.yearlyCents)}
+      </MoneyTxt>
+      {totals.estimatedMonthlyCents > 0 ? (
+        <MoneyTxt variant="caption" color={colors.textSecondary} style={tabular}>
+          {SUBSCRIPTION_TEXT.groupEstimated(totals.estimatedMonthlyCents)}
+        </MoneyTxt>
+      ) : null}
+      {rows.map((row, i) => (
+        <SubscriptionLine key={row.id} row={row} series={byId.get(row.id)} today={today} last={i === rows.length - 1} />
+      ))}
+      <LinkButton
+        label={SUBSCRIPTION_TEXT.reviewLink}
+        icon={ClipboardCheck}
+        style={styles.inlineLink}
+        onPress={() => router.push('/gastos-fixos/assinaturas')}
+      />
+    </Card>
+  );
+}
+
+/**
+ * Lista "Gastos fixos e parcelamentos" do contexto Pessoal: assinaturas no topo (quando houver), ativos por tipo (gastos fixos,
+ * parcelamentos e contas do ano) e, por último, os encerrados.
  */
 export default function GastosFixosScreen() {
   const { today } = useSession();
   const personal = useSpace().data;
   const list = useSeriesList(personal?.personalContextId);
   const [notice] = useFlash();
+  const snooze = useSubscriptionSnooze();
 
   const all = list.data ?? [];
+  // Lembrete dentro do app (D-046), sem notificação: só depois de carregar a lista e de ler o aparelho, para não piscar.
+  const reminder = list.isSuccess && snooze.ready && subscriptionReminderVisible(all, today, snooze.snoozedUntil);
   const active = all.filter((s) => !seriesEnded(s, today));
   const monthlyActive = active.filter((s) => s.kind !== 'anual');
   const annualActive = active.filter((s) => s.kind === 'anual');
+  // Assinaturas (D-046) formam o próprio grupo, no topo, e não se repetem em "Gastos fixos".
   const sections = [
-    { title: 'Gastos fixos', items: active.filter((s) => s.kind === 'mensal') },
+    { title: 'Gastos fixos', items: active.filter((s) => s.kind === 'mensal' && !s.subscription) },
     { title: 'Parcelamentos', items: active.filter((s) => s.kind === 'parcelada') },
   ].filter((sec) => sec.items.length > 0);
   const ended = all.filter((s) => seriesEnded(s, today));
@@ -167,6 +266,23 @@ export default function GastosFixosScreen() {
       <SubHeader title="Gastos fixos e parcelamentos" right={<ContextPill label="Pessoal" />} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <FlashBanner message={notice} />
+        {reminder ? (
+          <Banner tone="info" icon={Info} live={false}>
+            <Txt variant="label" style={{ fontFamily: fonts.bold }}>
+              {SUBSCRIPTION_TEXT.reminderTitle}
+            </Txt>
+            <View style={styles.reminderActions}>
+              <Button label={SUBSCRIPTION_TEXT.reminderReview} tone="soft" compact onPress={() => router.push('/gastos-fixos/assinaturas')} />
+              <Button
+                label={SUBSCRIPTION_TEXT.reminderLater}
+                tone="ghost"
+                compact
+                accessibilityHint={SUBSCRIPTION_TEXT.reminderLaterHint}
+                onPress={snooze.snooze}
+              />
+            </View>
+          </Banner>
+        ) : null}
         <View style={{ gap: space[1] }}>
           <Txt color={colors.textSecondary}>
             Contas que se repetem. Cada mês vira uma conta a pagar, e só o que você marca como paga entra em Pago.
@@ -225,6 +341,8 @@ export default function GastosFixosScreen() {
           </Card>
         ) : (
           <>
+            <SubscriptionGroup list={all} today={today} />
+
             {sections.map((sec) => (
               <Card key={sec.title}>
                 <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -281,4 +399,8 @@ const styles = StyleSheet.create({
   icon: { width: 40, height: 40, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandTint },
   privacy: { flexDirection: 'row', alignSelf: 'center', alignItems: 'center', gap: space[2], minHeight: 44 },
   inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
+  subRow: { paddingVertical: space[2] },
+  subMain: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 56 },
+  subCalc: { alignSelf: 'flex-start', paddingLeft: 40 + space[3], minHeight: 44 },
+  reminderActions: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2], paddingTop: space[1] },
 });

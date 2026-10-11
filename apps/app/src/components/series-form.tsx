@@ -8,6 +8,7 @@ import {
   NO_CATEGORY_LABEL,
   SERIES_ERROR_TEXT,
   SERIES_NATURE_LABEL,
+  SUBSCRIPTION_TEXT,
   addMonths,
   affectedByEditFrom,
   annualStartChoices,
@@ -68,13 +69,24 @@ import {
   yearA11y,
   yearA11yLabel,
 } from '@/components/series-parts';
+import { SettingSwitch } from '@/components/setting-switch';
 import { SumValues } from '@/components/sum-values';
 import { TermHint } from '@/components/term-hint';
 import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { explanationHref } from '@/lib/learn';
-import { useCommitments, useCreateSeries, useLimitWatch, useMonthRecords, useSeriesList, useSeriesOperationKey, useUpdateSeriesFrom, withNotice } from '@/state/data';
+import {
+  useCommitments,
+  useCreateSeries,
+  useLimitWatch,
+  useMonthRecords,
+  useSeriesList,
+  useSeriesOperationKey,
+  useSetSeriesSubscription,
+  useUpdateSeriesFrom,
+  withNotice,
+} from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -182,6 +194,7 @@ export function SeriesForm({
   const navigation = useNavigation();
   const create = useCreateSeries();
   const updateFrom = useUpdateSeriesFrom();
+  const markSubscription = useSetSeriesSubscription();
   const limitWatch = useLimitWatch();
   const keys = useSeriesOperationKey();
   const contextId = personal.personalContextId;
@@ -220,7 +233,7 @@ export function SeriesForm({
       month: month !== null && month >= 1 && month <= 12 ? month : null,
       start: month !== null && year !== null ? { year, part: 1 } : 'auto',
     };
-    return { draft, monthPick, ending: false, annual };
+    return { draft, monthPick, ending: false, annual, subscription: false };
   };
   const initial = useMemo(() => initialFor(prefill ?? {}), []); // eslint-disable-line react-hooks/exhaustive-deps
   const blank = useMemo(() => (typed ? initialFor({}) : initial), []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -229,6 +242,8 @@ export function SeriesForm({
   const [monthPick, setMonthPick] = useState<MonthPick>(initial.monthPick);
   /** Todo mês e todo ano: "Termina em…" escolhido. */
   const [ending, setEnding] = useState(initial.ending);
+  /** Gasto fixo mensal: "É uma assinatura?" (D-046). Gravado por set_series_subscription depois de salvar a série. */
+  const [subscription, setSubscription] = useState(initial.subscription);
   /** Todo ano: "Em parcelas no ano", mês da 1ª parcela (1 a 12) e chip de início ("auto" = o padrão). */
   const [annual, setAnnual] = useState(initial.annual);
   /** A pessoa escolheu se o valor muda: trocar de frequência não muda mais o padrão. */
@@ -255,7 +270,9 @@ export function SeriesForm({
 
   const parcelada = draft.kind === 'parcelada';
   const anual = draft.kind === 'anual';
-  const dirty = JSON.stringify({ draft, monthPick, ending, annual }) !== JSON.stringify(blank);
+  const dirty = JSON.stringify({ draft, monthPick, ending, annual, subscription }) !== JSON.stringify(blank);
+  /** A marca só vale para gasto fixo mensal: ao trocar para parcelado ou anual, o interruptor some e a marca não é gravada. */
+  const wantsSubscription = subscription && draft.kind === 'mensal';
 
   // Sair com alterações não salvas pede confirmação (voltar, gesto, botão do sistema).
   usePreventRemove(dirty && !leaveTo, ({ data }) => {
@@ -426,6 +443,29 @@ export function SeriesForm({
   };
 
   /**
+   * Assinatura (D-046): depois de salvar a série, grava a marca em sequência (set_series_subscription, com a versão que a gravação
+   * devolveu). Se a marca falhar, a série continua salva: o aviso diz que a série foi salva e a marca não, e a pessoa pode tentar
+   * de novo em Editar. Devolve o aviso a juntar ao texto de "salvo".
+   */
+  const markIfWanted = async (w: SeriesWrite): Promise<{ write: SeriesWrite; notice: string | null }> => {
+    if (!wantsSubscription || w.series.kind !== 'mensal') return { write: w, notice: null };
+    // Já marcada (uma tentativa anterior chegou a gravar a marca): nada a fazer.
+    if (w.series.subscription) return { write: w, notice: SUBSCRIPTION_TEXT.savedAs };
+    try {
+      const marked = await markSubscription.mutateAsync({ key: newOperationKey(), id: w.series.id, version: w.series.version, subscription: true });
+      return { write: marked, notice: SUBSCRIPTION_TEXT.savedAs };
+    } catch {
+      return { write: w, notice: SUBSCRIPTION_TEXT.markFailed };
+    }
+  };
+
+  /** finish com a marca de assinatura, quando a pessoa pediu. */
+  const finishMarked = async (w: SeriesWrite, input: SeriesInput | null, notice: string | null = null) => {
+    const marked = await markIfWanted(w);
+    finish(marked.write, input, [notice, marked.notice].filter(Boolean).join('\n') || null);
+  };
+
+  /**
    * Resultado de rede incerto: antes de repetir, conferir se alguma tentativa anterior foi gravada.
    * Se foi e só mudaram descrição, valor, dia, categoria ou tipo, aplica o preenchimento atual como
    * "esta e as próximas" desde a primeira conta (nunca cria um segundo gasto fixo). Se mudou o período,
@@ -443,7 +483,7 @@ export function SeriesForm({
     const occurrences = [...list].reverse();
     if (saved.snapshot === snapshot) {
       keys.settled();
-      finish({ series, occurrences, changed: 0 }, input);
+      await finishMarked({ series, occurrences, changed: 0 }, input);
       return true;
     }
     // O período não muda por edição, e uma primeira conta já paga não muda mais: mostrar o que foi salvo,
@@ -468,7 +508,7 @@ export function SeriesForm({
       input: { nature, description, category, amountCents, amountMode, dueDay },
     });
     keys.settled();
-    finish(w, input);
+    await finishMarked(w, input);
     return true;
   };
 
@@ -520,7 +560,7 @@ export function SeriesForm({
         const saved = await create.mutateAsync({ key, contextId, input: v.input });
         keys.settled();
         setRetry(false);
-        finish(saved, v.input, await limitWatch.after(limitBefore));
+        await finishMarked(saved, v.input, await limitWatch.after(limitBefore));
       } catch (e) {
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
           keys.refused();
@@ -981,6 +1021,11 @@ export function SeriesForm({
               <Chip key={c} label={c} selected={draft.category === c} onPress={() => set('category', c)} />
             ))}
           </ChoiceGroup>
+
+          {/* Assinatura (D-046): só gasto fixo mensal. A marca é gravada logo depois de salvar. */}
+          {draft.kind === 'mensal' ? (
+            <SettingSwitch label={SUBSCRIPTION_TEXT.switchLabel} caption={SUBSCRIPTION_TEXT.switchCaption} value={subscription} onChange={setSubscription} />
+          ) : null}
         </Card>
 
         {preview ? (

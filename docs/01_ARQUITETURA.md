@@ -1,6 +1,6 @@
 # Arquitetura
 
-10/10/2026 · versão 0.13 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos, calculadoras, seus últimos meses, Aprender e dúvidas, lembretes, ocultar valores e biometria, renda comprometida, metas e reserva, plano de guardar, simulador, cartões e faturas, leitura de notas fiscais, plano para quitar dívidas, "Antes de financiar" (D-044) os ajustes de D-042: forma de pagamento da nota, faturas do mês nos cartões e contas do ano explicadas, as contas de origem do dinheiro, D-043, e a busca em Movimentações, D-045)
+11/10/2026 · versão 0.14 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos, calculadoras, seus últimos meses, Aprender e dúvidas, lembretes, ocultar valores e biometria, renda comprometida, metas e reserva, plano de guardar, simulador, cartões e faturas, leitura de notas fiscais, plano para quitar dívidas, "Antes de financiar" (D-044) os ajustes de D-042: forma de pagamento da nota, faturas do mês nos cartões e contas do ano explicadas, as contas de origem do dinheiro, D-043, a busca em Movimentações, D-045, e as assinaturas, D-046)
 
 ## Escolhas (aprovadas)
 
@@ -25,6 +25,7 @@ apps/app/src/
     a-pagar, a-pagar/nova, a-pagar/vencidas, a-pagar/[id], a-pagar/[id]/editar, a-pagar/[id]/pagar
     gastos-fixos, gastos-fixos/novo, gastos-fixos/[id], gastos-fixos/[id]/editar, gastos-fixos/[id]/encerrar,
     gastos-fixos/[id]/informar
+    gastos-fixos/assinaturas  revisar assinaturas (D-046): consulta, com a barra; só grava a data da revisão
     composicao, quem-ve, conta, explicacao/[tema]
     movimentacoes/buscar  buscar em Movimentações (D-045): consulta, com a barra; nada é gravado
     contas/nova, contas/[id]/editar  contas de origem do dinheiro (D-043); a lista é o card "Suas contas" em /conta?secao=contas
@@ -45,12 +46,12 @@ apps/app/src/
     sim-result, sim-year-bars  resultado do simulador e barras por ano
     card-form, card-parts, card-purchase-form, invoice-*  cartão, fatura, pagamento, encargo, estorno e edição da compra
     receipt-scan, receipt-block  "Escanear nota fiscal": linha, folha, câmera, colar e o bloco "Nota lida"
-    device-features, device-settings, setting-switch  lembretes, ocultar valores e biometria (Conta e layout)
+    device-features, device-settings, setting-switch  lembretes, ocultar valores e biometria (Conta e layout); o setting-switch também é o interruptor "É uma assinatura?" (D-046)
     account-picker, account-form, accounts-card  "Saiu de" / "Entrou em" / "Foi para" (chips, ou texto com uma conta só), formulário da conta e card "Suas contas" (D-043)
     tab-bar             barra das abas e barra das telas de consulta (D-039)
   lib/                  autenticação (Supabase e demonstração), learn.ts (links e ações de Aprender), situação do card Primeiros passos (só no aparelho),
                         reminders.ts, device.ts e device-prefs.ts (lembretes e preferências só do aparelho), privacy.ts (ocultar valores), essentials.ts,
-                        bar-inset.ts (altura da barra inferior das telas de consulta), last-account.ts (última conta usada, só no aparelho), cards.ts (rotas e leituras de cartão), pdf-text.ts, receipt-read.ts, receipt-link.ts, sefaz-fetch.ts e note-prefs.ts (leitura de notas no aparelho)
+                        bar-inset.ts (altura da barra inferior das telas de consulta), last-account.ts (última conta usada, só no aparelho), subscription-reminder.ts ("Agora não" do aviso de assinaturas, 30 dias, só no aparelho), cards.ts (rotas e leituras de cartão), pdf-text.ts, receipt-read.ts, receipt-link.ts, sefaz-fetch.ts e note-prefs.ts (leitura de notas no aparelho)
   state/                sessão, dados (consultas e gravações), contexto e mês
   theme/                tokens de cor, tipografia, movimento e vetores do logo
 packages/core/          regras financeiras, validação, repositório em memória, testes
@@ -66,6 +67,7 @@ packages/core/          regras financeiras, validação, repositório em memóri
   src/nota-pagamento.ts forma de pagamento da nota (D-042): tabela da Sefaz, bloco do DANFE e `tPag`, pré-seleção de "Como você pagou?" e textos
   src/cards-month.ts   faturas do mês nos cartões e quanto isso é da renda de referência (D-042), igual ao grupo "Faturas de cartão" da renda comprometida
   src/annual-help.ts   textos e exemplos calculados que explicam as contas do ano (D-042)
+  src/subscriptions.ts assinaturas (D-046): quais são, por mês e por ano, quando mostrar o lembrete (6 e 3 meses, "Agora não" por 30 dias) e os textos
   src/accounts.ts      contas de origem do dinheiro (D-043): tipos, validação do formulário, escolha da conta que vem marcada, filtro por conta, conta da nota fiscal e textos
   src/calculators/      as 10 calculadoras, campos, textos e links de contexto; plano-dividas.ts (D-040): conta mês a mês das duas ordens de quitar dívidas e a leitura dos parcelamentos (`seriesDebtDrafts`); antes-de-financiar.ts (D-044): parcela Price (com a primeira em 1 mês ou na compra), juros, peso na renda, juntar antes (sobre `monthsForTarget` de `simulate.ts`) e entrada maior
   src/search.ts         buscar em Movimentações (D-045): texto sem acento, período, filtro do servidor e a mesma regra no MemoryRepository, resumo e média por mês com gasto, agrupamento por mês, rascunho e textos
@@ -73,9 +75,9 @@ packages/core/          regras financeiras, validação, repositório em memóri
 supabase/
   migrations/           esquema, funções e permissões (0001 fundação, 0002 contas a pagar, 0003 gastos fixos, 0004 contas do ano, 0005 seus últimos meses,
                         0006 renda comprometida, 0007 metas e plano de guardar, 0008 cartões e chave da nota fiscal, 0009 orçamento e limite,
-                        0010 contas de origem do dinheiro)
+                        0010 contas de origem do dinheiro, 0011 assinaturas)
   tests/                testes de isolamento, da sequência de aceite, de contas a pagar, de gastos fixos, de contas do ano, da revisão dos últimos meses,
-                        da renda comprometida (50), das metas (60), do plano de guardar (65), dos cartões (70), do orçamento (80) e das contas de origem (85)
+                        da renda comprometida (50), das metas (60), do plano de guardar (65), dos cartões (70), do orçamento (80), das contas de origem (85) e das assinaturas (88)
 scripts/e2e-web.js      roteiro de verificação na versão web
 docs/                   decisões, regras, acessos, Supabase, roteiro, Aprender, marca, telas
 ```
@@ -195,6 +197,13 @@ pessoa ──< vínculo (permissões por ação) >── contexto (pessoal | fam
 - **`month_budget(contexto, mês)`** repete no banco `readMonthBudget`: sempre as seis categorias, com a linha vigente (`budget_id`, `budget_version`, `budget_from`, `budget_cents`, nulos sem linha, e `budget_cents` nulo na linha que encerra) e `used_cents` por competência (gastos sem pagamento de fatura, parcelas de compras pelo mês da data da compra mais k - 1 meses e estornos informados no mês da fatura, nunca abaixo de zero). É `security definer` com filtros explícitos (contexto, exclusão, leitura), como `month_committed`, e confere `mes_invalido` antes de `sem_permissao`. O teste de banco e o de API comparam com o core mês a mês.
 - **Leitura e operações:** RLS de leitura das duas tabelas por permissão de leitura do contexto; sem escrita direta. `record_operations` passou a 41 ações (as quatro novas apontam a linha em `target_id`) e conta tudo como anotação para a atividade do A4.
 - **No core e no app:** `budget.ts` (tipos, `categoryUsage`, `readMonthBudget`, `summarizeBudget`, `budgetCrossing`, `limitStatus`, `limitCrossing`, validação dos formulários e todos os textos); o `MemoryRepository` repete as quatro funções e a leitura, o `SupabaseRepository` tem `listCategoryBudgets`, `setCategoryBudget`, `deleteCategoryBudget`, `getMonthBudget`, `listCommitmentLimits`, `setCommitmentLimit` e `deleteCommitmentLimit`. Telas: `/orcamento` (consulta, com a barra), `/orcamento/[categoria]` e `/renda-comprometida/limite` (formulários, sem barra). O aviso de cruzamento lê o estado antes e depois de gravar (`useBudgetWatch` e `useLimitWatch` em `state/data.ts`) e nunca bloqueia o salvamento: se a leitura falha, a mensagem sai sem a linha extra.
+
+**Assinaturas** (migração `20261011000001_assinaturas.sql`, 0011, D-046) são gastos fixos mensais que a pessoa marca como assinatura, para somar o que custam por mês e por ano e lembrar de revisá-las. A marca só informa: nada disso entra em Recebido, Pago, Diferença, "Ainda a pagar" nem na renda comprometida.
+
+- **Colunas e visão:** `commitment_series.subscription boolean not null default false` e `subscription_reviewed_on date`, com a restrição `commitment_series_assinatura` (só `mensal` pode ser assinatura; a data só existe em assinatura). A visão `series_items` ganhou as duas colunas no fim (`create or replace view` aceita colunas novas só no fim); o app que ainda não conhece as colunas as ignora, e o app novo lê a série sem marca se o banco ainda não as tem.
+- **Funções:** `set_series_subscription(chave, série, versão esperada, marca)` (série lida e escrita por quem chama, e "editar de outras pessoas" para a de outra pessoa; marcar o que já está marcado não muda nada nem sobe a versão; desmarcar apaga a data da revisão) e `mark_subscriptions_reviewed(chave, contexto)` (grava a data de hoje nas assinaturas ativas, não excluídas e não encerradas, que quem chama pode alterar; a data nunca recua; não sobe a versão). As duas são `security definer`, com chave de idempotência por pessoa, hash em JSON e repetição que devolve o estado atual. **Nenhuma função existente mudou de assinatura**: `create_series` e `update_series_from` seguem iguais, e é o app novo que grava a marca logo depois de salvar a série.
+- **Operações e atividade:** `record_operations` passou a 48 ações (`marcar_assinatura`, com a série em `target_id`, e `revisar_assinaturas`, sem alvo, como `decidir_revisao` e `responder_guardar`). A atividade do A4 conta `marcar_assinatura` como anotação e não conta `revisar_assinaturas` (`clarevo_track_activity` foi recriada com a exceção).
+- **No core e no app:** `subscriptions.ts` (`isActiveSubscription`, `subscriptionRows`, `subscriptionTotals`, `subscriptionReminderDue`, `subscriptionSnoozeUntil` e `SUBSCRIPTION_TEXT`); o `MemoryRepository` repete as duas funções e o `SupabaseRepository` tem `setSeriesSubscription` e `markSubscriptionsReviewed`. `CommitmentSeries` ganhou `subscription` e `subscriptionReviewedOn`. O `MemoryRepository` passou a datar a criação da série pelo dia da pessoa (`opts.today`), não pelo relógio real, porque a idade da assinatura mais antiga decide o lembrete. Telas: o grupo "Assinaturas" e o aviso no topo de `/gastos-fixos`, o interruptor nos formulários de gasto fixo mensal e `/gastos-fixos/assinaturas`.
 
 **Contas de origem do dinheiro** (migração `20261010000003_contas.sql`, 0010, D-043) dizem de onde sai o dinheiro de um gasto, de um pagamento ou de um aporte. É só a origem informada: não existe saldo por conta, e nada disso entra em Recebido, Pago, Diferença, "Ainda a pagar" nem na renda comprometida.
 

@@ -58,6 +58,8 @@ import type {
   SavingsAction,
   SeriesAction,
   SeriesWrite,
+  SubscriptionReviewAction,
+  SubscriptionReviewWrite,
 } from './repository';
 import { RepoError } from './repository';
 import { SEARCH_LIMIT, compareNewestPurchase, compareNewestRecord, purchaseMatchesFilter, recordMatchesFilter } from './search';
@@ -133,6 +135,7 @@ import {
   editFromMaxNumber,
   occurrencesToMaterialize,
   seriesCountsTowardLimit,
+  seriesEnded,
   seriesMonthOf,
   termFor,
 } from './series';
@@ -151,7 +154,8 @@ interface Operation {
     | GoalAction
     | SavingsAction
     | CardAction
-    | AccountAction;
+    | AccountAction
+    | SubscriptionReviewAction;
   hash: string;
   contextId: string;
   recordId: string | null;
@@ -212,7 +216,15 @@ type StoredCard = Omit<Card, 'usedCents' | 'currentMonth' | 'currentClosingOn' |
 type StoredCardEntry = CardEntry & { deletedAt?: string; deletedBy?: string };
 
 const NATURES: readonly string[] = ['conta', 'financiamento', 'compra_parcelada', 'outro_parcelamento'];
-const SERIES_ACTIONS: readonly string[] = ['criar_serie', 'alterar_serie', 'encerrar_serie', 'excluir_serie', 'informar_ano', 'tirar_ano'];
+const SERIES_ACTIONS: readonly string[] = [
+  'criar_serie',
+  'alterar_serie',
+  'encerrar_serie',
+  'excluir_serie',
+  'informar_ano',
+  'tirar_ano',
+  'marcar_assinatura',
+];
 const GOAL_ACTIONS: readonly string[] = [
   'criar_meta',
   'alterar_meta',
@@ -277,6 +289,9 @@ export interface MemoryRepositoryOptions {
  * mesma transação de cada escrita do cartão; update_commitment, delete_commitment, pay_commitment e
  * undo_commitment_payment recusam essa conta (conta_de_fatura) e update_record e delete_record recusam o gasto de um
  * pagamento de fatura (pagamento_de_fatura). Compra no cartão nunca cria gasto: só o pagamento da fatura entra em Pago.
+ * Contas de origem (D-043): as cinco funções de contas. Assinaturas (D-046): set_series_subscription marca um gasto fixo mensal
+ * (versão, só gasto fixo mensal, desmarcar apaga a data da revisão) e mark_subscriptions_reviewed grava o dia de hoje nas
+ * assinaturas ativas, sem subir a versão e sem contar como anotação.
  * Usado na demonstração (acesso simulado) e nos testes.
  */
 export class MemoryRepository implements RecordsRepository {
@@ -1003,7 +1018,8 @@ export class MemoryRepository implements RecordsRepository {
         default:
           throw new RepoError('tipo_invalido');
       }
-      const now = new Date().toISOString();
+      // Instante deterministico do dia da pessoa (opts.today), nao o relogio real: a idade de uma assinatura depende dele.
+      const now = this.dayInstant();
       const series: StoredSeries = {
         id: this.id('serie'),
         contextId,
@@ -1015,6 +1031,8 @@ export class MemoryRepository implements RecordsRepository {
         installmentTotal: norm.kind === 'parcelada' ? norm.installmentTotal : null,
         partsPerYear: norm.kind === 'anual' ? norm.partsPerYear : null,
         currency: 'BRL',
+        subscription: false,
+        subscriptionReviewedOn: null,
         createdBy: this.opts.actorId,
         version: 1,
         createdAt: now,
@@ -1210,6 +1228,73 @@ export class MemoryRepository implements RecordsRepository {
   }
 
   /** Como sync_series_occurrences: leitura basta; a autoria e as regras são da série. Não grava operação. */
+  /**
+   * Como set_series_subscription (D-046): série lida e escrita por quem chama, versão, marca, tipo (só gasto fixo mensal).
+   * Marcar o que já está marcado não muda nada nem sobe a versão; quando muda, a versão sobe e a data da revisão é apagada.
+   */
+  async setSeriesSubscription(key: string, id: string, expectedVersion: number, subscription: boolean) {
+    return this.write(() => {
+      const payload = [id, expectedVersion, subscription];
+      const replay = this.replaySeries(key, 'marcar_assinatura', payload);
+      if (replay) return replay;
+      const s = this.liveSeries(id);
+      if (s.version !== expectedVersion) throw new RepoError('versao_desatualizada');
+      if (typeof subscription !== 'boolean') throw new RepoError('marca_invalida');
+      if (s.kind !== 'mensal') throw new RepoError('assinatura_so_gasto_fixo');
+      let changed = 0;
+      if (s.subscription !== subscription) {
+        this.seriesById.set(s.id, {
+          ...s,
+          subscription,
+          subscriptionReviewedOn: null,
+          version: s.version + 1,
+          updatedAt: new Date().toISOString(),
+        });
+        changed = 1;
+      }
+      this.saveOperation(key, 'marcar_assinatura', payload, { contextId: s.contextId, recordId: null, commitmentId: null, seriesId: s.id });
+      return this.seriesResult(s.id, changed);
+    });
+  }
+
+  /**
+   * Como mark_subscriptions_reviewed (D-046): escrita no contexto; só as assinaturas ativas (não excluídas, não encerradas) recebem
+   * o dia de hoje; a data nunca recua; a versão da série não muda; não conta como anotação. Sem assinatura ativa vale e muda 0.
+   */
+  async markSubscriptionsReviewed(key: string, contextId: string): Promise<SubscriptionReviewWrite> {
+    return this.write(() => {
+      const payload = [contextId];
+      const replayed = this.replay(key, 'revisar_assinaturas', payload);
+      if (replayed) return { reviewedOn: this.latestSubscriptionReview(replayed.contextId), changed: 0 };
+      if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      const today = this.opts.today();
+      let changed = 0;
+      for (const s of this.seriesById.values()) {
+        if (s.deletedAt || s.contextId !== contextId || !s.subscription || seriesEnded(s, today)) continue;
+        if (s.subscriptionReviewedOn !== null && s.subscriptionReviewedOn >= today) continue;
+        this.seriesById.set(s.id, { ...s, subscriptionReviewedOn: today, updatedAt: new Date().toISOString() });
+        changed += 1;
+      }
+      this.saveOperation(key, 'revisar_assinaturas', payload, { contextId, recordId: null, commitmentId: null });
+      return { reviewedOn: today, changed };
+    });
+  }
+
+  /** A data de revisão mais recente entre as assinaturas não excluídas do contexto (a resposta de uma repetição). */
+  private latestSubscriptionReview(contextId: string): IsoDate | null {
+    let latest: IsoDate | null = null;
+    for (const s of this.seriesById.values()) {
+      if (s.deletedAt || s.contextId !== contextId || !s.subscription || s.subscriptionReviewedOn === null) continue;
+      if (latest === null || s.subscriptionReviewedOn > latest) latest = s.subscriptionReviewedOn;
+    }
+    return latest;
+  }
+
+  /** Meio-dia UTC do dia de opts.today() mais o contador de ids em ms: igual a cada execução e crescente dentro do dia. */
+  private dayInstant(): string {
+    return new Date(Date.parse(`${this.opts.today()}T12:00:00.000Z`) + this.seq).toISOString();
+  }
+
   async syncSeriesOccurrences(contextId: string) {
     return this.write(() => {
       if (!this.canRead(contextId)) throw new RepoError('sem_permissao');
@@ -3118,6 +3203,8 @@ export class MemoryRepository implements RecordsRepository {
           shapeOk = false;
       }
       if (!shapeOk) fail();
+      // B1 e B2 (0011): só gasto fixo mensal é assinatura, e a data da revisão só existe em assinatura.
+      if ((s.subscription && s.kind !== 'mensal') || (s.subscriptionReviewedOn !== null && !s.subscription)) fail();
       // S5: vigência viva em firstNumber, nenhuma viva antes dele e no máximo uma viva por número.
       const live = [...this.terms.values()].filter((t) => t.seriesId === s.id && !t.supersededAt);
       if (!live.some((t) => t.fromNumber === s.firstNumber) || live.some((t) => t.fromNumber < s.firstNumber)) fail();
@@ -3412,12 +3499,12 @@ export class MemoryRepository implements RecordsRepository {
   }
 
   /**
-   * Como o gatilho clarevo_track_activity em record_operations: toda operação nova, menos decidir_revisao e
-   * responder_guardar, deixa o último dia com anotação >= hoje; se o intervalo desde o último for uma ausência longa,
+   * Como o gatilho clarevo_track_activity em record_operations: toda operação nova, menos decidir_revisao,
+   * responder_guardar e revisar_assinaturas, deixa o último dia com anotação >= hoje; se o intervalo desde o último for uma ausência longa,
    * ela passa a ser a última ausência. Mesmo dia ou relógio para trás: nada muda.
    */
   private trackActivity(action: Operation['action'], contextId: string) {
-    if (action === 'decidir_revisao' || action === 'responder_guardar') return;
+    if (action === 'decidir_revisao' || action === 'responder_guardar' || action === 'revisar_assinaturas') return;
     const day = this.opts.today();
     const a = this.activity.get(contextId);
     if (!a) {

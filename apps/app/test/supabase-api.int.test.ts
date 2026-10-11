@@ -9,9 +9,14 @@ import { createHmac, randomUUID } from 'node:crypto';
 import {
   BUDGET_CATEGORIES,
   DEFAULT_SEARCH,
+  MemoryRepository,
   NO_CATEGORY_LABEL,
   RepoError,
   SEARCH_LIMIT,
+  lastSubscriptionReview,
+  subscriptionReminderDue,
+  subscriptionRows,
+  subscriptionTotals,
   addMonths,
   affectedByDelete,
   affectedByEditFrom,
@@ -1878,6 +1883,8 @@ describe('conversor de contas a pagar e gastos fixos', () => {
     open_count: 1,
     generating: false,
     parts_per_year: null,
+    subscription: false,
+    subscription_reviewed_on: null,
   };
   /** IPTU de 10 parcelas por ano desde fevereiro de 2027, como a visão series_items e o objeto series das funções o devolvem. */
   const annualSeries = {
@@ -1910,6 +1917,8 @@ describe('conversor de contas a pagar e gastos fixos', () => {
       paidCount: 1,
       openCount: 1,
       generating: false,
+      subscription: false,
+      subscriptionReviewedOn: null,
       createdBy: 'p1',
       version: 2,
       createdAt: '2026-10-07T12:00:00Z',
@@ -6072,5 +6081,333 @@ describe('conversor da busca em Movimentações', () => {
     };
     const repo = new SupabaseRepository(failing as unknown as SupabaseClient, { id: 'p1' });
     expect(await repo.searchRecords('ctx', none).then(() => null, (e: unknown) => (e instanceof RepoError ? e.code : String(e)))).toBe('rede');
+  });
+});
+
+describe('API real: assinaturas (Ciclo H2, D-046)', () => {
+  // Ana, treze anos depois (hoje 07/10/2037), num período em que nenhum bloco anterior gravou nada; este é o último bloco da
+  // sequência. Bruno é a pessoa de fora. Gastos fixos FICTÍCIOS. A marca nunca muda Recebido, Pago, Diferença nem Ainda a pagar.
+  const T0 = '2037-10-07';
+  const ana = repoFor(ANA, T0);
+  const bruno = repoFor(BRUNO, T0);
+  let ctx = '';
+  const stream = { s: null as unknown as CommitmentSeries };
+  const gym = { s: null as unknown as CommitmentSeries };
+  const clube = { s: null as unknown as CommitmentSeries };
+  const rent = { s: null as unknown as CommitmentSeries };
+  const sofa = { s: null as unknown as CommitmentSeries };
+  const ipva = { s: null as unknown as CommitmentSeries };
+
+  const code = (p: Promise<unknown>) =>
+    p.then(
+      () => null,
+      (e: unknown) => (e instanceof RepoError ? [e.code, e.detail ?? null] : String(e)),
+    );
+  const monthly = (description: string, amountCents: number, firstDueMonth: IsoMonth = '2037-10', lastMonth: IsoMonth | null = null): SeriesInput => ({
+    kind: 'mensal',
+    nature: 'conta',
+    description,
+    category: 'Lazer',
+    amountCents,
+    amountMode: 'fixo',
+    dueDay: 10,
+    firstDueMonth,
+    firstNumber: 1,
+    installmentTotal: null,
+    partsPerYear: null,
+    lastMonth,
+  });
+  const mine = async (id: string) => (await ana.getSeries(id))!;
+  const flags = (x: CommitmentSeries) => [x.subscription, x.subscriptionReviewedOn, x.version].map(String).join('|');
+
+  beforeAll(async () => {
+    ctx = (await ana.getSpace())!.personalContextId;
+  });
+
+  it('a série nasce sem a marca e a visão devolve as duas colunas', async () => {
+    stream.s = (await ana.createSeries(newOperationKey(), ctx, monthly('Streaming', cents(39.9)))).series;
+    gym.s = (await ana.createSeries(newOperationKey(), ctx, monthly('Academia', cents(99), '2037-11'))).series;
+    clube.s = (await ana.createSeries(newOperationKey(), ctx, monthly('Clube', cents(45), '2037-09', '2037-09'))).series;
+    rent.s = (await ana.createSeries(newOperationKey(), ctx, monthly('Aluguel', cents(2500)))).series;
+    sofa.s = (
+      await ana.createSeries(newOperationKey(), ctx, {
+        ...monthly('Sofá', cents(200), '2037-11'),
+        kind: 'parcelada',
+        nature: 'compra_parcelada',
+        installmentTotal: 10,
+      })
+    ).series;
+    ipva.s = (await ana.createSeries(newOperationKey(), ctx, { ...monthly('IPVA', cents(2400), '2038-01'), kind: 'anual', partsPerYear: 1, amountMode: 'variavel' })).series;
+    for (const x of [stream.s, gym.s, clube.s, rent.s, sofa.s, ipva.s]) expect(flags(x)).toBe('false|null|1');
+    expect((await ana.listSeries(ctx)).every((x) => x.subscription === false && x.subscriptionReviewedOn === null)).toBe(true);
+    expect(await bruno.listSeries(ctx)).toEqual([]);
+  });
+
+  it('marca com a versão, repete a mesma chave e recusa outro conteúdo com ela', async () => {
+    const k = newOperationKey();
+    const w = await ana.setSeriesSubscription(k, stream.s.id, 1, true);
+    expect(w.changed).toBe(1);
+    expect(flags(w.series)).toBe('true|null|2');
+    expect(w.series.id).toBe(stream.s.id);
+    expect(w.occurrences.length).toBeGreaterThan(0);
+    stream.s = w.series;
+    expect(await mine(stream.s.id)).toEqual(w.series);
+    expect(await ana.findSeriesOperation(k)).toEqual({ action: 'marcar_assinatura', seriesId: stream.s.id });
+    expect(await bruno.findSeriesOperation(k)).toBeNull();
+    const replay = await ana.setSeriesSubscription(k, stream.s.id, 1, true);
+    expect(replay.changed).toBe(0);
+    expect(replay.series).toEqual(w.series);
+    expect(await code(ana.setSeriesSubscription(k, stream.s.id, 1, false))).toEqual(['chave_reutilizada', null]);
+    expect(await code(ana.setSeriesSubscription(k, stream.s.id, 2, true))).toEqual(['chave_reutilizada', null]);
+    expect(await code(ana.markSubscriptionsReviewed(k, ctx))).toEqual(['chave_reutilizada', null]);
+  });
+
+  it('versão velha traz a atual; marcar o que já está marcado não muda nada; só gasto fixo mensal; fora da pessoa não existe', async () => {
+    expect(await code(ana.setSeriesSubscription(newOperationKey(), stream.s.id, 1, true))).toEqual(['versao_desatualizada', 'versao_atual=2']);
+    const same = await ana.setSeriesSubscription(newOperationKey(), stream.s.id, 2, true);
+    expect(same.changed).toBe(0);
+    expect(flags(same.series)).toBe('true|null|2');
+    const nothing = await ana.setSeriesSubscription(newOperationKey(), rent.s.id, 1, false);
+    expect(nothing.changed).toBe(0);
+    expect(flags(nothing.series)).toBe('false|null|1');
+    expect(await code(ana.setSeriesSubscription(newOperationKey(), sofa.s.id, 1, true))).toEqual(['assinatura_so_gasto_fixo', null]);
+    expect(await code(ana.setSeriesSubscription(newOperationKey(), sofa.s.id, 1, false))).toEqual(['assinatura_so_gasto_fixo', null]);
+    expect(await code(ana.setSeriesSubscription(newOperationKey(), ipva.s.id, 1, true))).toEqual(['assinatura_so_gasto_fixo', null]);
+    expect(await code(ana.setSeriesSubscription(newOperationKey(), sofa.s.id, 9, true))).toEqual(['versao_desatualizada', 'versao_atual=1']);
+    expect(await code(ana.setSeriesSubscription(newOperationKey(), stream.s.id, 2, null as never))).toEqual(['marca_invalida', null]);
+    expect(await code(bruno.setSeriesSubscription(newOperationKey(), stream.s.id, 2, true))).toEqual(['nao_encontrado', null]);
+    expect(await code(ana.setSeriesSubscription(newOperationKey(), randomUUID(), 1, true))).toEqual(['nao_encontrado', null]);
+    // O app não traduz chave_invalida (a chave vem de newOperationKey, sempre válida): vira o erro genérico.
+    expect(await code(ana.setSeriesSubscription('curta', stream.s.id, 2, true))).toEqual(['desconhecido', null]);
+    // Nada disso mudou as séries.
+    expect(flags(await mine(sofa.s.id))).toBe('false|null|1');
+    expect(flags(await mine(ipva.s.id))).toBe('false|null|1');
+    expect(flags(await mine(stream.s.id))).toBe('true|null|2');
+  });
+
+  it('um resultado incerto se reconcilia: a resposta se perde, a marca foi gravada e a mesma chave devolve a série', async () => {
+    const flaky = new SupabaseRepository(clientFor(ANA, T0, lostResponse), { id: ANA });
+    const k = newOperationKey();
+    expect(await code(flaky.setSeriesSubscription(k, gym.s.id, 1, true))).toEqual(['rede', null]);
+    expect(await ana.findSeriesOperation(k)).toEqual({ action: 'marcar_assinatura', seriesId: gym.s.id });
+    expect(flags(await mine(gym.s.id))).toBe('true|null|2');
+    const again = await ana.setSeriesSubscription(k, gym.s.id, 1, true);
+    expect(again.changed).toBe(0);
+    expect(flags(again.series)).toBe('true|null|2');
+    gym.s = again.series;
+    const lostReview = newOperationKey();
+    expect(await code(flaky.markSubscriptionsReviewed(lostReview, ctx))).toEqual(['rede', null]);
+    // A revisão foi gravada: a mesma chave devolve a data mais recente, sem gravar de novo.
+    expect(await ana.markSubscriptionsReviewed(lostReview, ctx)).toEqual({ reviewedOn: T0, changed: 0 });
+    expect((await ana.listSeries(ctx)).filter((x) => x.subscriptionReviewedOn === T0).map((x) => x.id).sort()).toEqual([gym.s.id, stream.s.id].sort());
+  });
+
+  it('"Revisei minhas assinaturas": só as ativas recebem a data de hoje, a versão não sobe, a data nunca recua', async () => {
+    // Clube: marcada e encerrada (último mês em setembro de 2037) entra na lista, mas não na revisão.
+    clube.s = (await ana.setSeriesSubscription(newOperationKey(), clube.s.id, 1, true)).series;
+    expect(flags(clube.s)).toBe('true|null|2');
+    const before = JSON.stringify([await ana.listCommitments(ctx, '2037-10'), await ana.listRecords(ctx, '2037-10')]);
+    expect(await ana.markSubscriptionsReviewed(newOperationKey(), ctx)).toEqual({ reviewedOn: T0, changed: 0 });
+    expect(JSON.stringify([await ana.listCommitments(ctx, '2037-10'), await ana.listRecords(ctx, '2037-10')])).toBe(before);
+    const list = await ana.listSeries(ctx);
+    const by = (id: string) => list.find((x) => x.id === id)!;
+    expect(flags(by(stream.s.id))).toBe('true|2037-10-07|2');
+    expect(flags(by(gym.s.id))).toBe('true|2037-10-07|2');
+    expect(flags(by(clube.s.id))).toBe('true|null|2');
+    expect(flags(by(rent.s.id))).toBe('false|null|1');
+    // Relógio para trás: a data fica; no dia seguinte, muda de novo.
+    const back = repoFor(ANA, '2037-10-01');
+    expect(await back.markSubscriptionsReviewed(newOperationKey(), ctx)).toEqual({ reviewedOn: '2037-10-01', changed: 0 });
+    expect(by(stream.s.id).subscriptionReviewedOn).toBe(T0);
+    const next = repoFor(ANA, '2037-10-08');
+    expect(await next.markSubscriptionsReviewed(newOperationKey(), ctx)).toEqual({ reviewedOn: '2037-10-08', changed: 2 });
+    expect(flags((await ana.getSeries(stream.s.id))!)).toBe('true|2037-10-08|2');
+    expect(await code(bruno.markSubscriptionsReviewed(newOperationKey(), ctx))).toEqual(['sem_permissao', null]);
+    expect(await code(ana.markSubscriptionsReviewed('curta', ctx))).toEqual(['desconhecido', null]);
+  });
+
+  it('retomar a encerrada a traz para a revisão; desmarcar tira e apaga a data; marcar de novo começa sem data', async () => {
+    const resumed = await ana.endSeries(newOperationKey(), clube.s.id, 2, null, []);
+    expect(flags(resumed.series)).toBe('true|null|3');
+    const day = repoFor(ANA, '2037-10-09');
+    expect((await day.markSubscriptionsReviewed(newOperationKey(), ctx)).changed).toBe(3);
+    expect(flags((await ana.getSeries(clube.s.id))!)).toBe('true|2037-10-09|3');
+    const off = await ana.setSeriesSubscription(newOperationKey(), gym.s.id, 2, false);
+    expect(flags(off.series)).toBe('false|null|3');
+    const on = await ana.setSeriesSubscription(newOperationKey(), gym.s.id, 3, true);
+    expect(flags(on.series)).toBe('true|null|4');
+    gym.s = on.series;
+  });
+
+  it('a marca sobrevive a editar a partir de um mês e a encerrar; excluir devolve a série com a marca', async () => {
+    const open = (await ana.listOpenSeriesOccurrences(stream.s.id)).filter((c) => c.series!.number >= 2);
+    const edited = await ana.updateSeriesFrom(newOperationKey(), stream.s.id, 2, 2, open.map((c) => ({ id: c.id, version: c.version })), {
+      nature: 'conta',
+      description: 'Streaming',
+      category: 'Lazer',
+      amountCents: cents(44.9),
+      amountMode: 'fixo',
+      dueDay: 10,
+    });
+    expect(flags(edited.series)).toBe('true|2037-10-09|3');
+    stream.s = edited.series;
+    const all = await ana.listOpenSeriesOccurrences(rent.s.id);
+    const gone = await ana.deleteSeries(newOperationKey(), rent.s.id, 1, all.map((c) => ({ id: c.id, version: c.version })));
+    expect(gone.series.subscription).toBe(false);
+    expect(await ana.getSeries(rent.s.id)).toBeNull();
+  });
+
+  it('o core e o banco concordam: totais, lista, última revisão e lembrete sobre o que o banco devolveu', async () => {
+    const list = await ana.listSeries(ctx);
+    const rows = subscriptionRows(list, T0);
+    // Ativas: Streaming (R$ 44,90 desde novembro; R$ 39,90 em outubro), Academia (R$ 99,00) e Clube (R$ 45,00), retomado.
+    expect(rows.map((r) => [r.name, r.monthlyCents, r.yearlyCents])).toEqual([
+      ['Academia', cents(99), cents(99) * 12],
+      ['Clube', cents(45), cents(45) * 12],
+      ['Streaming', cents(39.9), cents(39.9) * 12],
+    ]);
+    expect(subscriptionTotals(list, T0)).toEqual({ count: 3, monthlyCents: cents(183.9), yearlyCents: cents(183.9) * 12, estimatedMonthlyCents: 0 });
+    expect(lastSubscriptionReview(list, T0)).toBe('2037-10-09');
+    expect(subscriptionReminderDue(list, '2038-04-09')).toBe(false);
+    expect(subscriptionReminderDue(list, '2038-04-10')).toBe(true);
+    // Sem as séries da pessoa de fora.
+    expect(subscriptionTotals(await bruno.listSeries(ctx), T0).count).toBe(0);
+  });
+
+  it('a mesma sequência no MemoryRepository e no banco dá a mesma marca, data, versão e changed', async () => {
+    type Repo = MemoryRepository | SupabaseRepository;
+    const run = async (c: string, at: (day: IsoDate) => Repo) => {
+      const out: unknown[] = [];
+      const mk = async (description: string, first: IsoMonth, last: IsoMonth | null = null) =>
+        (await at(T0).createSeries(newOperationKey(), c, monthly(description, 5000, first, last))).series;
+      const a = await mk('Revista', '2037-10');
+      const b = await mk('Aplicativo', '2037-11');
+      const e = await mk('Antiga', '2037-09', '2037-09');
+      const log = (w: { changed: number; series: CommitmentSeries }) => out.push([w.changed, flags(w.series)]);
+      log(await at(T0).setSeriesSubscription(newOperationKey(), a.id, 1, true));
+      log(await at(T0).setSeriesSubscription(newOperationKey(), a.id, 2, true));
+      log(await at(T0).setSeriesSubscription(newOperationKey(), b.id, 1, true));
+      log(await at(T0).setSeriesSubscription(newOperationKey(), e.id, 1, true));
+      out.push(await at(T0).markSubscriptionsReviewed(newOperationKey(), c));
+      out.push(await at(T0).markSubscriptionsReviewed(newOperationKey(), c));
+      out.push(await at('2037-10-08').markSubscriptionsReviewed(newOperationKey(), c));
+      log(await at('2037-10-08').setSeriesSubscription(newOperationKey(), a.id, 2, false));
+      log(await at('2037-10-08').setSeriesSubscription(newOperationKey(), a.id, 3, true));
+      out.push(
+        (await at(T0).listSeries(c))
+          .filter((x) => [a.id, b.id, e.id].includes(x.id))
+          .map((x) => [x.terms[0]!.description, flags(x)])
+          .sort(),
+      );
+      // O detalhe "versao_atual=N" só existe no banco; aqui só o código.
+      for (const x of [a, b]) out.push((await code(at(T0).setSeriesSubscription(newOperationKey(), x.id, 99, true)))?.[0]);
+      return out;
+    };
+    // Bruno tem o próprio contexto e nenhuma assinatura: a contagem de "changed" parte do zero, como na memória.
+    const brunoCtx = (await bruno.ensurePersonalSpace('Conta do Bruno')).personalContextId;
+    const db = await run(brunoCtx, (d) => repoFor(BRUNO, d));
+    let day: IsoDate = T0;
+    const mem = new MemoryRepository({ actorId: 'pessoa', displayName: 'Pessoa', today: () => day });
+    const memCtx = (await mem.ensurePersonalSpace('Conta principal')).personalContextId;
+    const memory = await run(memCtx, (d) => ((day = d), mem));
+    expect(memory).toEqual(db);
+    expect(db[0]).toEqual([1, 'true|null|2']);
+    expect(db[6]).toEqual({ reviewedOn: '2037-10-08', changed: 2 });
+  });
+});
+
+describe('conversor das assinaturas', () => {
+  // Sem rede: os argumentos das duas funções, a leitura das duas colunas (e a tolerância ao banco sem a 0011) e os códigos novos.
+  const calls: [string, Record<string, unknown>][] = [];
+  const term = { from_number: 1, description: 'Streaming', category: 'Lazer', amount_cents: 3990, amount_mode: 'fixo', due_day: 10 };
+  const seriesRow = {
+    id: 's1',
+    context_id: 'ctx',
+    kind: 'mensal',
+    nature: 'conta',
+    first_due_month: '2026-10-01',
+    first_number: 1,
+    last_number: null,
+    installment_total: null,
+    currency: 'BRL',
+    created_by: 'p1',
+    version: 2,
+    created_at: '2026-10-07T12:00:00Z',
+    updated_at: '2026-10-07T12:00:00Z',
+    terms: [term],
+    skipped_numbers: [],
+    paid_count: 0,
+    open_count: 1,
+    generating: true,
+    parts_per_year: null,
+    subscription: true,
+    subscription_reviewed_on: '2026-10-07',
+  };
+  const fake = (rpc: Record<string, unknown>, tables: Record<string, unknown> = {}, error: unknown = null) => {
+    const db = {
+      from: (table: string) => {
+        const q: Record<string, unknown> = {};
+        for (const m of ['select', 'eq', 'order', 'range', 'maybeSingle']) q[m] = () => q;
+        q.then = (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
+          Promise.resolve(error ? { data: null, error } : { data: tables[table] ?? null, error: null }).then(resolve, reject);
+        return q;
+      },
+      rpc: async (fn: string, args: Record<string, unknown>) => {
+        calls.push([fn, args]);
+        return error ? { data: null, error } : { data: rpc[fn] ?? null, error: null };
+      },
+    };
+    return new SupabaseRepository(db as unknown as SupabaseClient, { id: 'p1' });
+  };
+  const failure = (p: Promise<unknown>) => p.then(() => null, (e: unknown) => (e instanceof RepoError ? [e.code, e.message, e.detail ?? null] : String(e)));
+
+  it('argumentos das duas funções e leitura da série devolvida', async () => {
+    calls.length = 0;
+    const repo = fake({
+      set_series_subscription: { series: seriesRow, occurrences: [], changed: 1 },
+      mark_subscriptions_reviewed: { reviewed_on: '2026-10-07', changed: 2 },
+    });
+    const w = await repo.setSeriesSubscription('chave-0001', 's1', 1, true);
+    expect(w.changed).toBe(1);
+    expect(w.series).toMatchObject({ id: 's1', subscription: true, subscriptionReviewedOn: '2026-10-07', version: 2 });
+    expect(await repo.markSubscriptionsReviewed('chave-0002', 'ctx')).toEqual({ reviewedOn: '2026-10-07', changed: 2 });
+    expect(calls).toEqual([
+      ['set_series_subscription', { p_idempotency_key: 'chave-0001', p_series_id: 's1', p_expected_version: 1, p_subscription: true }],
+      ['mark_subscriptions_reviewed', { p_idempotency_key: 'chave-0002', p_context_id: 'ctx' }],
+    ]);
+  });
+
+  it('banco sem a 0011 ou linha antiga: sem as colunas, a série vale sem marca e sem data', async () => {
+    const { subscription: _s, subscription_reviewed_on: _d, ...old } = seriesRow;
+    const repo = fake({}, { series_items: [old] });
+    expect((await repo.listSeries('ctx'))[0]).toMatchObject({ subscription: false, subscriptionReviewedOn: null });
+    // A data sem a marca nunca aparece (a restrição do banco impede, e o app não confia).
+    const odd = fake({}, { series_items: [{ ...seriesRow, subscription: false, subscription_reviewed_on: '2026-10-07' }] });
+    expect((await odd.listSeries('ctx'))[0]).toMatchObject({ subscription: false, subscriptionReviewedOn: null });
+    const nulls = fake({}, { series_items: [{ ...seriesRow, subscription: null, subscription_reviewed_on: null }] });
+    expect((await nulls.listSeries('ctx'))[0]).toMatchObject({ subscription: false, subscriptionReviewedOn: null });
+  });
+
+  it('resposta da revisão incoerente é recusada; sem a função (banco antigo) vira erro desconhecido', async () => {
+    expect(await failure(fake({ mark_subscriptions_reviewed: { reviewed_on: '2026-10-07' } }).markSubscriptionsReviewed('chave-0003', 'ctx'))).toEqual(['desconhecido', 'desconhecido', null]);
+    expect(await failure(fake({}).markSubscriptionsReviewed('chave-0004', 'ctx'))).toEqual(['desconhecido', 'desconhecido', null]);
+    expect((await fake({ mark_subscriptions_reviewed: { reviewed_on: null, changed: 0 } }).markSubscriptionsReviewed('chave-0005', 'ctx')).reviewedOn).toBeNull();
+    expect(await failure(fake({}, {}, { message: 'Could not find the function public.set_series_subscription', code: 'PGRST202' }).setSeriesSubscription('chave-0006', 's1', 1, true))).toEqual([
+      'desconhecido',
+      'Could not find the function public.set_series_subscription',
+      null,
+    ]);
+  });
+
+  it('os códigos novos do banco viram os códigos do app', async () => {
+    for (const name of ['marca_invalida', 'assinatura_so_gasto_fixo', 'versao_desatualizada']) {
+      expect(await failure(fake({}, {}, { message: name, code: '22023' }).setSeriesSubscription('chave-0007', 's1', 1, true))).toEqual([name, name, null]);
+    }
+    expect(await failure(fake({}, {}, { message: 'versao_desatualizada', code: 'PT409', details: 'versao_atual=7' }).setSeriesSubscription('chave-0008', 's1', 1, true))).toEqual([
+      'versao_desatualizada',
+      'versao_desatualizada',
+      'versao_atual=7',
+    ]);
+    expect(await failure(fake({}, {}, { message: 'sem_permissao', code: '42501' }).markSubscriptionsReviewed('chave-0009', 'ctx'))).toEqual(['sem_permissao', 'sem_permissao', null]);
   });
 });
