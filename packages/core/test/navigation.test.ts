@@ -61,6 +61,8 @@ describe('barra inferior (D-039)', () => {
       '/gastos-fixos',
       '/gastos-fixos/abc',
       '/renda-comprometida',
+      // Exportar meus dados (D-047): tela de consulta, com a barra.
+      '/conta/exportar',
       // Orçamento por categoria (D-041): a lista é de consulta; o formulário de uma categoria, não.
       '/orcamento',
       // Buscar em Movimentações (D-045): tela de consulta, com a barra.
@@ -154,6 +156,7 @@ describe('barra inferior (D-039)', () => {
     expect(topicTabFor('/simular')).toBe('/metas');
     expect(topicTabFor('/explicacao/juros')).toBe('/aprender');
     expect(topicTabFor('/calcular')).toBe('/');
+    expect(topicTabFor('/conta/exportar')).toBe('/');
   });
 });
 
@@ -252,6 +255,10 @@ describe('busca de Aprender: grupo "No app" (D-039)', () => {
     expect(ids('assinatura')).toContain('gastos-fixos');
     expect(first('renda comprometida')).toBe('renda-comprometida');
     expect(ids('guardar')).toContain('metas');
+    // Exportar meus dados (D-047): as palavras que a pessoa usa; "meus dados" continua achando "Quem vê estes dados?".
+    for (const query of ['exportar', 'exportação', 'planilha', 'excel', 'csv', 'pdf', 'backup', 'baixar', 'baixar meus dados', 'relatório']) expect(ids(query), query).toContain('exportar');
+    for (const query of ['exportar', 'planilha', 'csv', 'excel', 'backup', 'baixar', 'exportar meus dados']) expect(first(query), query).toBe('exportar');
+    expect(ids('meus dados')).toEqual(expect.arrayContaining(['exportar', 'quem-ve']));
   });
 
   it('ignora acentos, maiúsculas e plural; todas as palavras precisam casar', () => {

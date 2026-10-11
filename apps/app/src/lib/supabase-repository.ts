@@ -1393,11 +1393,11 @@ export class SupabaseRepository implements RecordsRepository {
 
   /**
    * Buscar em Movimentações (D-045): período, tipo, categoria, conta e valor no servidor, do mais recente ao mais antigo, até 1.000
-   * linhas. O texto da descrição entra como filtro mais largo (ILIKE por palavra, `_` no lugar das letras que podem ter acento) e o
+   * linhas (ou `limit`, que a exportação de dados, D-047, eleva a 20.000). O texto da descrição entra como filtro mais largo (ILIKE por palavra, `_` no lugar das letras que podem ter acento) e o
    * aparelho confere o resto, sem diferenciar acentos. Só leitura, na mesma tabela que listRecords.
    */
-  async searchRecords(contextId: string, filter: RecordSearchFilter): Promise<SearchPage<FinancialRecord>> {
-    const page = await readUpTo<RecordRow>(SEARCH_LIMIT, (from, to) => {
+  async searchRecords(contextId: string, filter: RecordSearchFilter, limit: number = SEARCH_LIMIT): Promise<SearchPage<FinancialRecord>> {
+    const page = await readUpTo<RecordRow>(limit, (from, to) => {
       let q = searchFilters(this.db.from('financial_records').select('*').eq('context_id', contextId), filter, 'occurred_on');
       if (filter.kind !== null) q = q.eq('kind', filter.kind);
       if (filter.accountId !== null) q = q.eq('account_id', filter.accountId);
@@ -1411,9 +1411,9 @@ export class SupabaseRepository implements RecordsRepository {
   }
 
   /** Compras no cartão (uma linha por compra, valor total) pela data da compra; sem recebimento nem conta de origem no filtro. */
-  async searchCardPurchases(contextId: string, filter: RecordSearchFilter): Promise<SearchPage<CardEntry>> {
+  async searchCardPurchases(contextId: string, filter: RecordSearchFilter, limit: number = SEARCH_LIMIT): Promise<SearchPage<CardEntry>> {
     if (filter.kind === 'receita' || filter.accountId !== null) return { items: [], truncated: false };
-    const page = await readUpTo<CardEntryRow>(SEARCH_LIMIT, (from, to) =>
+    const page = await readUpTo<CardEntryRow>(limit, (from, to) =>
       searchFilters(this.db.from('card_entry_items').select('*').eq('context_id', contextId).eq('kind', 'compra'), filter, 'purchased_on')
         .order('purchased_on', { ascending: false })
         .order('created_at', { ascending: false })

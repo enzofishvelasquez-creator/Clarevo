@@ -251,15 +251,16 @@ export interface RecordsRepository {
   /**
    * Registros vivos do contexto (gastos, recebimentos, pagamentos de conta e de fatura) que passam pelo filtro (período, tipo,
    * categoria, conta e valor; regra em `recordMatchesFilter`), do mais recente ao mais antigo (data, criação, id), até
-   * `SEARCH_LIMIT` (1.000); `truncated` diz que havia mais. Sem leitura no contexto: nenhum item.
+   * `limit` (padrão `SEARCH_LIMIT`, 1.000; a exportação de dados, D-047, pede `EXPORT_MAX_ROWS`); `truncated` diz que havia mais.
+   * Sem leitura no contexto: nenhum item.
    */
-  searchRecords(contextId: string, filter: RecordSearchFilter): Promise<SearchPage<FinancialRecord>>;
+  searchRecords(contextId: string, filter: RecordSearchFilter, limit?: number): Promise<SearchPage<FinancialRecord>>;
   /**
    * Compras no cartão vivas do contexto (uma por compra, com o valor total e as parcelas) que passam pelo filtro (data da compra,
-   * categoria e valor total; regra em `purchaseMatchesFilter`), da mais recente à mais antiga, até `SEARCH_LIMIT`. Só compras: não
-   * são gastos e nunca entram em Pago. Com recebimento ou conta de origem no filtro, nenhuma compra combina.
+   * categoria e valor total; regra em `purchaseMatchesFilter`), da mais recente à mais antiga, até `limit` (padrão `SEARCH_LIMIT`). Só
+   * compras: não são gastos e nunca entram em Pago. Com recebimento ou conta de origem no filtro, nenhuma compra combina.
    */
-  searchCardPurchases(contextId: string, filter: RecordSearchFilter): Promise<SearchPage<CardEntry>>;
+  searchCardPurchases(contextId: string, filter: RecordSearchFilter, limit?: number): Promise<SearchPage<CardEntry>>;
 
   createRecord(key: string, contextId: string, kind: RecordKind, input: RecordInput): Promise<FinancialRecord>;
   /** Num gasto de conta a pagar, também soma 1 à versão da conta (o previsto não muda). */

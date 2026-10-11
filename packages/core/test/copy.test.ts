@@ -190,6 +190,7 @@ import {
 import { APP_SCREENS, APP_SEARCH_TEXT, BAR_TEXT, GOALS_NAV_TEXT, PAYABLES_NAV_TEXT, SUMMARY_NAV_TEXT, searchAppScreens } from '../src';
 import { DEFAULT_SEARCH_DRAFT, SEARCH_PAGE, SEARCH_PERIODS, SEARCH_TEXT, searchFromDraft } from '../src';
 import { SUBSCRIPTION_ERROR_TEXT, SUBSCRIPTION_TEXT, subscriptionCount, subscriptionErrorText } from '../src';
+import { EXPORT_FORMATS, EXPORT_PERIODS, EXPORT_TEXT, buildExportFiles, loadExportSource } from '../src';
 
 /**
  * Teste de textos (seção 5): sem indicação de produto financeiro, promessa de rendimento, travessões longos
@@ -2072,5 +2073,71 @@ describe('textos das assinaturas (D-046)', () => {
     const names = (await repo.listSeries(ctx)).filter((x) => x.subscription).map((x) => x.terms[0]!.description);
     expect(names).toEqual(['Streaming (exemplo)', 'Academia (exemplo)']);
     check(names);
+  });
+});
+
+describe('textos de Exportar meus dados (D-047)', () => {
+  const GENDERED = /\b(o|a)s? usuári[oa]s?\b|\bobrigad[oa]s?\b|\bbem-vind[oa]s?\b|\bpreocupad[oa]s?\b|\bendividad[oa]s?\b|\bcadastrad[oa]\b/i;
+  // Nenhum banco, produto ou oferta; a LGPD aparece só como referência, sem parecer jurídico nem promessa.
+  const BRAND_OR_PROMISE = /nubank|ita[uú]\b|bradesco|santander|caixa econ|picpay|\bxp\b|btg|poupan[cç]a|investiment|garantid|conforme a lei|em conformidade|certificad/i;
+  const check = (texts: string[]) => {
+    expect(texts.length).toBeGreaterThan(0);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(GENDERED);
+      expect(text, text).not.toMatch(BRAND_OR_PROMISE);
+      expect(text, text).not.toMatch(/\bfaz(er|endo)?\s+sentido\b/i);
+      expect(text, text).not.toMatch(/[–—]/);
+    }
+  };
+
+  it('EXPORT_TEXT inteiro (rótulos, avisos e mensagens fixas)', () => {
+    check(staticStrings(EXPORT_TEXT));
+  });
+
+  it('textos montados, em todas as combinações', () => {
+    const texts: string[] = [];
+    for (const [r, p] of [[0, 0], [1, 0], [2, 0], [1, 1], [124, 3], [20000, 1]] as const) texts.push(EXPORT_TEXT.readyCounts(r, p));
+    for (const file of ['lancamentos', 'compras', 'resumo'] as const) for (const native of [true, false]) texts.push(EXPORT_TEXT.fileButton(file, native));
+    texts.push(EXPORT_TEXT.readyPeriod(EXPORT_TEXT.periods['12m']), EXPORT_TEXT.pdf.docTitle('2026-10-11'), EXPORT_TEXT.pdf.generated('2026-10-11'));
+    texts.push(EXPORT_TEXT.pdf.period('Últimos 12 meses', 'de novembro de 2025 a outubro de 2026'), EXPORT_TEXT.pdf.purchasesTotal(1, 150_000), EXPORT_TEXT.pdf.purchasesTotal(3, 230_000));
+    for (const p of EXPORT_PERIODS) texts.push(EXPORT_TEXT.periods[p]);
+    for (const f of EXPORT_FORMATS) texts.push(EXPORT_TEXT.formats[f], EXPORT_TEXT.formatHints[f]);
+    check(texts);
+  });
+
+  it('os avisos que a especificação pede estão no texto', () => {
+    expect(EXPORT_TEXT.valuesNote).toBe('O arquivo mostra os valores, mesmo com Ocultar valores ligado.');
+    expect(EXPORT_TEXT.portability).toContain('art. 18, V, da LGPD');
+    expect(EXPORT_TEXT.portability).toContain('não é parecer jurídico');
+    expect(EXPORT_TEXT.intro).toContain('montado neste aparelho');
+    expect(EXPORT_TEXT.intro).toContain('não guarda cópia');
+    expect(EXPORT_TEXT.notIncluded).toContain('chave da nota fiscal');
+    expect(EXPORT_TEXT.notIncluded).toContain('só o final aparece');
+    expect(EXPORT_TEXT.contentCsv).toContain('segundo arquivo');
+    expect(EXPORT_TEXT.formats).toEqual({ csv: 'Planilha (CSV)', pdf: 'Resumo em PDF' });
+    expect(Object.values(EXPORT_TEXT.periods)).toEqual(['Este mês', 'Últimos 3 meses', 'Últimos 6 meses', 'Últimos 12 meses', 'Este ano', 'Ano passado', 'Tudo']);
+    expect(EXPORT_TEXT.tooMany).toContain('Escolha um período menor');
+  });
+
+  it('a tela no índice "No app", o arquivo-fonte e o HTML e os CSV da demonstração passam', async () => {
+    const screen = APP_SCREENS.find((s) => s.id === 'exportar')!;
+    expect(screen.href).toBe('/conta/exportar');
+    check([screen.title, screen.caption, ...screen.keywords]);
+    for (const q of ['exportar', 'planilha', 'pdf', 'backup', 'baixar']) expect(searchAppScreens(q).map((x) => x.id), q).toContain('exportar');
+    const source = readFileSync(join(CORE_SRC, 'export.ts'), 'utf8');
+    expect(source).not.toMatch(FORBIDDEN);
+    expect(source).not.toMatch(JUDGMENT);
+
+    const repo = await createDemoRepository();
+    const ctx = (await repo.getSpace())!.personalContextId;
+    const load = await loadExportSource(repo, ctx, '12m', DEMO_TODAY, { withInvoices: true });
+    if (!load.ok) throw new Error('esperava ok');
+    const pdf = buildExportFiles(load.source, 'pdf').files[0]!.content;
+    // O texto do PDF (sem a folha de estilo nem as marcas) segue as mesmas regras.
+    const plain = pdf.replace(/<style>[\s\S]*?<\/style>/g, ' ').replace(/<[^>]+>/g, ' ');
+    check(plain.split(/\s{2,}/).filter((t) => t.trim() !== ''));
+    for (const file of buildExportFiles(load.source, 'csv').files) expect(file.content).not.toMatch(/[–—]/);
   });
 });

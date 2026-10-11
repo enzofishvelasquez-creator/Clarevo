@@ -333,6 +333,13 @@ export const APP_SCREENS: readonly AppScreen[] = [
     keywords: ['quem vê', 'privacidade', 'permissões', 'meus dados', 'compartilhar', 'acesso', 'família'],
   },
   {
+    id: 'exportar',
+    title: 'Exportar meus dados',
+    caption: 'Planilha (CSV) ou resumo em PDF dos seus gastos e recebimentos',
+    href: '/conta/exportar',
+    keywords: ['exportar', 'exportação', 'planilha', 'excel', 'csv', 'pdf', 'backup', 'baixar', 'baixar meus dados', 'levar meus dados', 'relatório', 'cópia dos dados'],
+  },
+  {
     id: 'orcamento',
     title: 'Orçamento por categoria',
     caption: 'Quanto usar por mês em cada categoria de gasto, mês a mês',
