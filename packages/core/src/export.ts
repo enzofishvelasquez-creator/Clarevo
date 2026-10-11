@@ -105,7 +105,7 @@ export const EXPORT_TEXT = {
   readyTitle: 'Arquivo pronto',
   readyHint: {
     web: 'Cada botão baixa um arquivo. Ele fica na pasta de downloads do navegador, e o Clarevo não guarda cópia.',
-    native: 'Cada botão abre o compartilhamento do aparelho. O Clarevo apaga a cópia temporária depois.',
+    native: 'Cada botão abre o compartilhamento do aparelho. O Clarevo não guarda cópia: o arquivo temporário é apagado na próxima exportação ou quando esta tela é aberta.',
   },
   readyCounts: (records: number, purchases: number): string => {
     const r = records === 1 ? '1 lançamento' : `${records} lançamentos`;
@@ -121,7 +121,7 @@ export const EXPORT_TEXT = {
   },
   fileDone: {
     web: 'Pronto. Confira o arquivo na pasta de downloads.',
-    native: 'Pronto. A cópia temporária foi apagada.',
+    native: 'Pronto. O arquivo temporário é apagado na próxima exportação ou quando esta tela é aberta.',
   },
   pdfOpened: 'A página de impressão foi aberta. Escolha "Salvar como PDF" ou imprima.',
   shareFailed: 'Não foi possível compartilhar o arquivo. Tente novamente.',
@@ -130,7 +130,8 @@ export const EXPORT_TEXT = {
   newFile: 'Escolher outro período ou formato',
   /** PDF. */
   pdf: {
-    docTitle: (generatedOn: IsoDate): string => `clarevo. Resumo financeiro de ${formatDateBR(generatedOn)}`,
+    /** Título da página (vira o nome sugerido ao salvar ou imprimir): sem barras nem espaços, como o nome do arquivo. */
+    docTitle: (generatedOn: IsoDate): string => `clarevo-resumo-${generatedOn}`,
     heading: 'Resumo financeiro',
     period: (label: string, span: string): string => `Período: ${label} (${span})`,
     generated: (on: IsoDate): string => `Gerado em ${formatDateBR(on)}`,
@@ -169,13 +170,20 @@ export function exportFilterOf(period: ExportPeriod, today: IsoDate): RecordSear
 
 /**
  * Os meses do resumo, do mais antigo ao mais novo. O fim é o mês de hoje (ou o fim do período, se for antes); "Tudo" começa no
- * mês do registro mais antigo. Meses sem lançamento ficam na lista, como o Resumo mostra um mês vazio.
+ * mês do registro mais antigo ou da compra no cartão mais antiga, o que vier primeiro. Meses sem lançamento ficam na lista, como o
+ * Resumo mostra um mês vazio.
  */
-export function exportMonths(period: ExportPeriod, today: IsoDate, records: readonly Pick<FinancialRecord, 'occurredOn'>[]): IsoMonth[] {
+export function exportMonths(
+  period: ExportPeriod,
+  today: IsoDate,
+  records: readonly Pick<FinancialRecord, 'occurredOn'>[],
+  purchases: readonly Pick<CardEntry, 'kind' | 'purchasedOn'>[] = [],
+): IsoMonth[] {
   const { from, to } = exportRange(period, today);
   const recordMonths = records.map((r) => monthOf(r.occurredOn)).sort();
+  const purchaseMonths = purchases.flatMap((e) => (e.kind === 'compra' && e.purchasedOn !== null ? [monthOf(e.purchasedOn)] : [])).sort();
   const current = monthOf(today);
-  let start = from ? monthOf(from) : (recordMonths[0] ?? current);
+  let start = from ? monthOf(from) : ([recordMonths[0], purchaseMonths[0]].filter((m): m is IsoMonth => !!m).sort()[0] ?? current);
   let end = to && monthOf(to) < current ? monthOf(to) : current;
   const latest = recordMonths[recordMonths.length - 1];
   if (latest && latest > end) end = latest;
@@ -290,12 +298,15 @@ export const CSV_RECORD_HEADER: readonly string[] = ['Data', 'Tipo', 'Descriçã
 export const CSV_PURCHASE_HEADER: readonly string[] = ['Data da compra', 'Cartão', 'Descrição', 'Categoria', 'Valor total (R$)', 'Parcelas'];
 
 /**
- * Protege contra injeção de fórmula: texto que começa com =, +, -, @, tabulação ou retorno de linha ganha um apóstrofo na frente,
- * e a planilha o mostra como texto. Quebras de linha viram espaço (cada lançamento fica numa linha só).
+ * Protege contra injeção de fórmula: texto que começa com =, +, -, @, tabulação, retorno de linha ou quebra de linha, ou que tem
+ * só espaços (inclusive o espaço sem quebra) antes de um desses sinais, ganha um apóstrofo na frente, e a planilha o mostra como
+ * texto. A conferência vem antes de achatar as quebras de linha, para não perder o começo do texto. Depois, as quebras de linha
+ * viram espaço (cada lançamento fica numa linha só).
  */
 export function csvText(value: string): string {
+  const risky = /^[\s\u00a0]*[=+\-@]|^[\t\r\n]/.test(value);
   const flat = value.replace(/[\r\n]+/g, ' ');
-  return /^[=+\-@\t]/.test(flat) ? `'${flat}` : flat;
+  return risky ? `'${flat}` : flat;
 }
 
 /** Entre aspas quando há ponto e vírgula, aspas ou quebra de linha; as aspas internas dobram. */
@@ -384,7 +395,7 @@ export interface ExportReport {
  */
 export function buildExportReport(source: ExportSource): ExportReport {
   const ctx: ExportContext = { accounts: source.accounts, cards: source.cards, commitments: source.commitments };
-  const months = exportMonths(source.period, source.today, source.records);
+  const months = exportMonths(source.period, source.today, source.records, source.purchases);
   const rows = exportRows(source.records, ctx);
   const built: ExportMonth[] = months.map((month) => {
     const summary = summarizeMonth(source.records, source.contextId, month);

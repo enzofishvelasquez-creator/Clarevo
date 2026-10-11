@@ -22,7 +22,7 @@ import { Banner, Button, Card, Chip, Screen, Txt } from '@/components/ui';
 import { authenticate, DEVICE_FEATURES } from '@/lib/device';
 import { getPrefs, loadPrefs } from '@/lib/device-prefs';
 import { EXPORT_LOGO_SVG } from '@/lib/export-logo';
-import { deliverExportFile, EXPORT_NATIVE, type DeliverResult } from '@/lib/export-share';
+import { cleanupExportFiles, deliverExportFile, EXPORT_NATIVE, type DeliverResult } from '@/lib/export-share';
 import { useValuesHidden } from '@/lib/privacy';
 import { useSpace } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
@@ -54,6 +54,11 @@ export default function ExportarScreen() {
   const [delivering, setDelivering] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
+  // Ao abrir a tela, sai o que uma exportação anterior deixou no cache do aparelho (no Android a cópia fica até aqui).
+  useEffect(() => {
+    cleanupExportFiles();
+  }, []);
+
   // Preferências do aparelho (biometria) lidas ao abrir a tela.
   useEffect(() => {
     if (userId) loadPrefs(userId, persist);
@@ -75,6 +80,7 @@ export default function ExportarScreen() {
     setMsg(null);
     setReady(null);
     setDone(null);
+    cleanupExportFiles();
     try {
       const prefs = getPrefs(userId) ?? (await loadPrefs(userId, persist));
       if (prefs.biometricLock && DEVICE_FEATURES) {

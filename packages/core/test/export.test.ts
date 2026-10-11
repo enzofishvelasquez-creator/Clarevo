@@ -118,13 +118,18 @@ describe('CSV: células, valores e proteção contra fórmula (D-047)', () => {
     expect(csvAmount(-1250)).toBe('-12,50');
   });
 
-  it('texto que começa com =, +, -, @ ou tabulação ganha um apóstrofo; o resto fica como está', () => {
+  it('texto que começa com =, +, -, @, tabulação ou quebra de linha, ou tem só espaço antes do sinal, ganha um apóstrofo; o resto fica como está', () => {
     for (const bad of ['=SOMA(A1:A9)', '+55 11 99999', '-2+3', '@usuario', '\tabc', '=HYPERLINK("http://x")', '-']) expect(csvText(bad), bad).toBe(`'${bad}`);
-    for (const ok of ['Mercado', 'Pagamento = parcial', 'a-b', 'R$ 10', '1+1', ' =x', '']) expect(csvText(ok), ok).toBe(ok);
-    // Quebra de linha vira espaço: cada lançamento fica numa linha só. Retorno de linha no começo não protege nada além do espaço.
+    for (const ok of ['Mercado', 'Pagamento = parcial', 'a-b', 'R$ 10', '1+1', '']) expect(csvText(ok), ok).toBe(ok);
+    // Espaço antes do sinal não tira a proteção (o Excel ainda lê como fórmula), nem o espaço sem quebra.
+    for (const bad of [' =x', '  +1', '\u00a0@a', ' \t-1']) expect(csvText(bad), bad).toBe(`'${bad}`);
+    // A conferência é feita antes de achatar as quebras de linha; depois elas viram espaço (cada lançamento fica numa linha só).
     expect(csvText('linha 1\nlinha 2')).toBe('linha 1 linha 2');
-    expect(csvText('\r\n=1+1')).toBe(' =1+1');
+    expect(csvText('\r\n=1+1')).toBe("' =1+1");
+    expect(csvText('\n+1')).toBe("' +1");
+    expect(csvText('\r\nMercado')).toBe("' Mercado");
     expect(csvText('=1\r\n+2')).toBe("'=1 +2");
+    expect(csvText('ok\n=1')).toBe('ok =1');
   });
 
   it('entre aspas quando há ponto e vírgula, aspas ou quebra de linha; as aspas internas dobram', () => {
@@ -260,6 +265,14 @@ describe('período e meses (D-047)', () => {
     // "Tudo" começa no mês do registro mais antigo; sem registro, só o mês de hoje.
     expect(exportMonths('tudo', '2026-10-07', [{ occurredOn: '2025-08-20' }, { occurredOn: '2026-03-01' }])[0]).toBe('2025-08');
     expect(exportMonths('tudo', '2026-10-07', [])).toEqual(['2026-10']);
+    // A compra no cartão mais antiga também conta para o início de "Tudo" (só compras, ou compra antes do primeiro registro).
+    const buy = (purchasedOn: string | null, kind: 'compra' | 'estorno' = 'compra') => ({ kind, purchasedOn }) as const;
+    expect(exportMonths('tudo', '2026-10-07', [{ occurredOn: '2026-03-01' }], [buy('2026-01-15')])[0]).toBe('2026-01');
+    expect(exportMonths('tudo', '2026-10-07', [{ occurredOn: '2025-08-20' }], [buy('2026-01-15')])[0]).toBe('2025-08');
+    expect(exportMonths('tudo', '2026-10-07', [], [buy('2026-08-02'), buy('2026-09-02')])).toEqual(['2026-08', '2026-09', '2026-10']);
+    expect(exportMonths('tudo', '2026-10-07', [], [buy(null), buy('2024-01-01', 'estorno')])).toEqual(['2026-10']);
+    // Os outros períodos não mudam com as compras.
+    expect(exportMonths('3m', '2026-10-07', [], [buy('2025-01-15')])).toEqual(['2026-08', '2026-09', '2026-10']);
   });
 });
 
@@ -442,6 +455,8 @@ describe('HTML do PDF (D-047)', () => {
     expect(html).toContain('lang="pt-BR"');
     expect(html).toContain('clarevo<span class="dot">.</span>');
     expect(html).toContain('Gerado em 11/10/2026');
+    // O título da página vira o nome sugerido ao salvar: sem barras nem espaços, como o nome do arquivo.
+    expect(html).toContain('<title>clarevo-resumo-2026-10-11</title>');
     expect(html).toContain('Período: Últimos 3 meses (de agosto a outubro de 2026)');
     for (const label of ['Recebido', 'Pago', 'Diferença', 'Por categoria', 'Lançamentos', 'Outubro de 2026', 'Setembro de 2026', 'Agosto de 2026', 'No período']) expect(html).toContain(label);
     expect(html).toContain(formatBRL(600_000));

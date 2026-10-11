@@ -2113,6 +2113,11 @@ describe('textos de Exportar meus dados (D-047)', () => {
     expect(EXPORT_TEXT.portability).toContain('não é parecer jurídico');
     expect(EXPORT_TEXT.intro).toContain('montado neste aparelho');
     expect(EXPORT_TEXT.intro).toContain('não guarda cópia');
+    // No Android a cópia temporária fica até a próxima exportação ou até a tela abrir (o app de destino lê o arquivo depois).
+    expect(EXPORT_TEXT.readyHint.native).toContain('não guarda cópia');
+    expect(EXPORT_TEXT.readyHint.native).toContain('próxima exportação ou quando esta tela é aberta');
+    expect(EXPORT_TEXT.fileDone.native).toContain('próxima exportação ou quando esta tela é aberta');
+    expect(EXPORT_TEXT.fileDone.native).not.toContain('foi apagada');
     expect(EXPORT_TEXT.notIncluded).toContain('chave da nota fiscal');
     expect(EXPORT_TEXT.notIncluded).toContain('só o final aparece');
     expect(EXPORT_TEXT.contentCsv).toContain('segundo arquivo');

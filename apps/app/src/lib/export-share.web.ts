@@ -10,6 +10,9 @@ export type { DeliverResult };
 
 export const EXPORT_NATIVE = false;
 
+/** Na web não há cópia temporária: o CSV baixa por Blob e a página de impressão não grava nada. */
+export function cleanupExportFiles(): void {}
+
 export async function deliverExportFile(file: ExportFile, _dialogTitle: string): Promise<DeliverResult> {
   try {
     if (file.kind === 'csv') {
@@ -34,6 +37,7 @@ export async function deliverExportFile(file: ExportFile, _dialogTitle: string):
     const print = () => {
       if (printed) return;
       printed = true;
+      if (page.closed) return;
       page.focus();
       page.print();
     };

@@ -7469,7 +7469,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('H3 página de impressão: o mês de outubro de 2026 com Recebido, Pago e Diferença, Por categoria e a lista de lançamentos',
     h3Page.includes('Outubro de 2026') && h3Page.includes('Por categoria') && h3Page.includes('Lançamentos') && h3Page.includes('Aluguel') && h3Page.includes('Moradia'), h3Page.slice(0, 1500));
   ok('H3 página de impressão: as compras no cartão à parte, com a nota de que não entram em Pago', h3Page.includes('Compras no cartão') && h3Page.includes('Notebook') && h3Page.includes('3 compras · R$ 2.300,00 no total das compras') && h3Page.includes('não entram em Pago'));
-  ok('H3 a página pede a impressão uma vez (window.print) e o HTML é a página inteira, sem script', (await p.evaluate(() => window.__h3Prints)) === 1 && !/<script/i.test(h3Html) && h3Html.includes('<title>clarevo. Resumo financeiro de 07/10/2026</title>'), String(await p.evaluate(() => window.__h3Prints)));
+  ok('H3 a página pede a impressão uma vez (window.print) e o HTML é a página inteira, sem script', (await p.evaluate(() => window.__h3Prints)) === 1 && !/<script/i.test(h3Html) && h3Html.includes('<title>clarevo-resumo-2026-10-07</title>'), String(await p.evaluate(() => window.__h3Prints)));
   await h3Popup.setViewportSize({ width: 794, height: 1000 });
   await h3Popup.screenshot({ path: `${OUT}/294_pagina_de_impressao.png`, fullPage: false });
   // Os totais do mês na página de impressão são os do Resumo (6.000 / 3.900 / 2.100 em outubro, sem os dois gastos novos).
