@@ -1,5 +1,5 @@
 import type { IsoDate } from './dates';
-import { addDays, addMonthsToDate, formatDateBR } from './dates';
+import { addDays, addMonthsToDate, formatDateBR, todayIn } from './dates';
 import type { Cents } from './money';
 import { formatBRL } from './money';
 import type { CommitmentSeries } from './records';
@@ -21,7 +21,8 @@ import { ERROR_TEXT } from './validation';
  * - Por mês: soma do valor vigente de cada ativa (a vigência do mês de hoje, ou da primeira conta antes de começar); por ano: por
  *   mês × 12. Valor que muda (estimado) entra pelo valor de referência e a tela diz que é estimado.
  * - Lembrete: com ao menos uma assinatura ativa, aparece se a última revisão (a data mais recente entre as ativas) foi há mais de
- *   6 meses; sem nenhuma revisão, se a assinatura mais antiga foi cadastrada há 3 meses ou mais. "Agora não" esconde o aviso por
+ *   6 meses; sem nenhuma revisão, se a assinatura mais antiga foi marcada como assinatura há 3 meses ou mais (o dia da marca,
+ *   subscriptionSince, não o do cadastro da série: marcar um gasto fixo antigo não liga o aviso na hora). "Agora não" esconde o aviso por
  *   30 dias, só neste aparelho. "Revisei minhas assinaturas" grava a data no banco e o aviso some.
  */
 
@@ -107,7 +108,7 @@ export function subscriptionErrorText(code: string): string {
 /** O que as regras precisam de uma série. */
 export type SubscriptionSeries = Pick<
   CommitmentSeries,
-  'id' | 'kind' | 'firstDueMonth' | 'firstNumber' | 'lastNumber' | 'partsPerYear' | 'terms' | 'subscription' | 'subscriptionReviewedOn' | 'createdAt'
+  'id' | 'kind' | 'firstDueMonth' | 'firstNumber' | 'lastNumber' | 'partsPerYear' | 'terms' | 'subscription' | 'subscriptionReviewedOn' | 'subscriptionSince' | 'createdAt'
 >;
 
 /** Gasto fixo mensal marcado e não encerrado. */
@@ -182,9 +183,24 @@ export function subscriptionCount(n: number): string {
 // Lembrete
 // ---------------------------------------------------------------------------
 
-/** O dia civil em que a série foi cadastrada (a data do instante de criação). */
-export function createdDay(s: Pick<CommitmentSeries, 'createdAt'>): IsoDate {
+/**
+ * O dia civil em que a série foi cadastrada: a data do instante de criação no fuso da pessoa (o do espaço). Sem fuso, ou com fuso
+ * ou instante inválido, o dia do instante em UTC.
+ */
+export function createdDay(s: Pick<CommitmentSeries, 'createdAt'>, timeZone?: string): IsoDate {
+  if (timeZone) {
+    try {
+      return todayIn(timeZone, new Date(s.createdAt));
+    } catch {
+      // Fuso ou instante inválido: cai no dia do instante.
+    }
+  }
   return s.createdAt.slice(0, 10);
+}
+
+/** O dia em que a assinatura começou a contar para o lembrete: o da marca (subscriptionSince); só sem ele, o do cadastro. */
+export function subscriptionStartDay(s: Pick<CommitmentSeries, 'subscriptionSince' | 'createdAt'>, timeZone?: string): IsoDate {
+  return s.subscriptionSince ?? createdDay(s, timeZone);
 }
 
 /** A data mais recente de revisão entre as assinaturas ativas; null se nenhuma foi revisada. */
@@ -197,12 +213,12 @@ export function lastSubscriptionReview(list: readonly SubscriptionSeries[], toda
   return latest;
 }
 
-/** O dia do cadastro da assinatura ativa mais antiga; null sem assinatura ativa. */
-export function oldestSubscriptionDay(list: readonly SubscriptionSeries[], today: IsoDate): IsoDate | null {
+/** O dia da marca (ou, sem ele, do cadastro) da assinatura ativa mais antiga; null sem assinatura ativa. */
+export function oldestSubscriptionDay(list: readonly SubscriptionSeries[], today: IsoDate, timeZone?: string): IsoDate | null {
   let oldest: IsoDate | null = null;
   for (const s of list) {
     if (!isActiveSubscription(s, today)) continue;
-    const day = createdDay(s);
+    const day = subscriptionStartDay(s, timeZone);
     if (oldest === null || day < oldest) oldest = day;
   }
   return oldest;
@@ -210,11 +226,13 @@ export function oldestSubscriptionDay(list: readonly SubscriptionSeries[], today
 
 /**
  * O lembrete é devido? Com ao menos uma assinatura ativa: a última revisão foi há mais de 6 meses (hoje depois de revisão + 6
- * meses), ou nunca houve revisão e a assinatura mais antiga foi cadastrada há 3 meses ou mais (hoje a partir de cadastro + 3
- * meses). Meses civis, com o dia limitado ao fim do mês. Revisão no futuro (relógio do aparelho para trás) não faz o aviso aparecer.
+ * meses), ou nunca houve revisão e a assinatura mais antiga foi marcada há 3 meses ou mais (hoje a partir da marca + 3
+ * meses). A idade conta do dia da marca como assinatura (subscriptionSince), não do cadastro da série; timeZone (o do espaço) só
+ * serve ao último recurso, o dia do cadastro de quem não tem o dia da marca. Meses civis, com o dia limitado ao fim do mês.
+ * Revisão no futuro (relógio do aparelho para trás) não faz o aviso aparecer.
  */
-export function subscriptionReminderDue(list: readonly SubscriptionSeries[], today: IsoDate): boolean {
-  const oldest = oldestSubscriptionDay(list, today);
+export function subscriptionReminderDue(list: readonly SubscriptionSeries[], today: IsoDate, timeZone?: string): boolean {
+  const oldest = oldestSubscriptionDay(list, today, timeZone);
   if (oldest === null) return false;
   const last = lastSubscriptionReview(list, today);
   if (last !== null) return today > addMonthsToDate(last, SUBSCRIPTION_REVIEW_AFTER_MONTHS);
@@ -236,6 +254,7 @@ export function subscriptionReminderVisible(
   list: readonly SubscriptionSeries[],
   today: IsoDate,
   snoozedUntil: string | null | undefined,
+  timeZone?: string,
 ): boolean {
-  return subscriptionReminderDue(list, today) && !subscriptionSnoozed(snoozedUntil, today);
+  return subscriptionReminderDue(list, today, timeZone) && !subscriptionSnoozed(snoozedUntil, today);
 }

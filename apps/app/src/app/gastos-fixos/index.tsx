@@ -248,7 +248,7 @@ export default function GastosFixosScreen() {
 
   const all = list.data ?? [];
   // Lembrete dentro do app (D-046), sem notificação: só depois de carregar a lista e de ler o aparelho, para não piscar.
-  const reminder = list.isSuccess && snooze.ready && subscriptionReminderVisible(all, today, snooze.snoozedUntil);
+  const reminder = list.isSuccess && snooze.ready && subscriptionReminderVisible(all, today, snooze.snoozedUntil, personal?.timeZone);
   const active = all.filter((s) => !seriesEnded(s, today));
   const monthlyActive = active.filter((s) => s.kind !== 'anual');
   const annualActive = active.filter((s) => s.kind === 'anual');

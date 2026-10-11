@@ -16,6 +16,7 @@ import {
   lastSubscriptionReview,
   newOperationKey,
   oldestSubscriptionDay,
+  subscriptionStartDay,
   subscriptionCount,
   subscriptionErrorText,
   subscriptionReminderDue,
@@ -62,6 +63,7 @@ const sub = (over: Partial<SubscriptionSeries> & { amountCents?: number; mode?: 
     terms: [{ fromNumber: 1, description: name ?? 'Streaming', category: 'Lazer', amountCents: amountCents ?? 3990, amountMode: mode ?? 'fixo', dueDay: 10 }],
     subscription: true,
     subscriptionReviewedOn: null,
+    subscriptionSince: null,
     createdAt: '2026-10-01T12:00:00.000Z',
     ...rest,
   };
@@ -134,7 +136,9 @@ describe('assinaturas: quais são e quanto custam (D-046)', () => {
 });
 
 describe('assinaturas: quando mostrar o lembrete (D-046)', () => {
-  const at = (reviewedOn: string | null, createdAt = '2026-01-10T12:00:00.000Z') => sub({ subscriptionReviewedOn: reviewedOn, createdAt });
+  // since: o dia em que a série virou assinatura (subscriptionSince). O cadastro é antigo de propósito: quem manda é o dia da marca.
+  const at = (reviewedOn: string | null, since = '2026-01-10') =>
+    sub({ subscriptionReviewedOn: reviewedOn, subscriptionSince: since, createdAt: '2020-01-01T12:00:00.000Z' });
 
   it('as constantes são as da especificação', () => {
     expect(SUBSCRIPTION_REVIEW_AFTER_MONTHS).toBe(6);
@@ -142,20 +146,49 @@ describe('assinaturas: quando mostrar o lembrete (D-046)', () => {
     expect(SUBSCRIPTION_SNOOZE_DAYS).toBe(30);
   });
 
-  it('o dia do cadastro é a data do instante de criação', () => {
+  it('o dia do cadastro é a data do instante de criação, no fuso da pessoa quando ele é dado', () => {
     expect(createdDay({ createdAt: '2026-06-30T12:00:00.001Z' })).toBe('2026-06-30');
+    expect(createdDay({ createdAt: '2026-06-30T12:00:00.001Z' }, 'America/Sao_Paulo')).toBe('2026-06-30');
+    // 01h30 UTC de 08/07 ainda é 22h30 de 07/07 em São Paulo (UTC-3) e 21h30 em Rio Branco (UTC-5).
+    expect(createdDay({ createdAt: '2026-07-08T01:30:00.000Z' })).toBe('2026-07-08');
+    expect(createdDay({ createdAt: '2026-07-08T01:30:00.000Z' }, 'America/Sao_Paulo')).toBe('2026-07-07');
+    expect(createdDay({ createdAt: '2026-07-08T01:30:00.000Z' }, 'America/Rio_Branco')).toBe('2026-07-07');
+    // Para o outro lado (fuso à frente de UTC), o dia pode avançar.
+    expect(createdDay({ createdAt: '2026-07-07T22:30:00.000Z' }, 'Asia/Tokyo')).toBe('2026-07-08');
+    // Fuso inválido: o dia do instante em UTC.
+    expect(createdDay({ createdAt: '2026-07-08T01:30:00.000Z' }, 'Nao/Existe')).toBe('2026-07-08');
+  });
+
+  it('a idade conta do dia da marca como assinatura, não do cadastro da série', () => {
+    expect(subscriptionStartDay({ subscriptionSince: '2026-09-01', createdAt: '2020-01-01T12:00:00.000Z' })).toBe('2026-09-01');
+    expect(subscriptionStartDay({ subscriptionSince: null, createdAt: '2020-01-01T12:00:00.000Z' })).toBe('2020-01-01');
+    // Um gasto fixo cadastrado em 2020 e marcado hoje não liga o aviso na hora, nem em 2 meses; liga 3 meses depois da marca.
+    const old = sub({ createdAt: '2020-01-01T12:00:00.000Z', subscriptionSince: '2026-10-07' });
+    expect(subscriptionReminderDue([old], '2026-10-07')).toBe(false);
+    expect(subscriptionReminderDue([old], '2026-12-31')).toBe(false);
+    expect(subscriptionReminderDue([old], '2027-01-06')).toBe(false);
+    expect(subscriptionReminderDue([old], '2027-01-07')).toBe(true);
+    expect(oldestSubscriptionDay([old], '2026-10-07')).toBe('2026-10-07');
+    // Sem o dia da marca (null), cai no cadastro, no fuso da pessoa.
+    const legacy = sub({ createdAt: '2026-07-08T01:30:00.000Z', subscriptionSince: null });
+    expect(oldestSubscriptionDay([legacy], '2026-10-07')).toBe('2026-07-08');
+    expect(oldestSubscriptionDay([legacy], '2026-10-07', 'America/Sao_Paulo')).toBe('2026-07-07');
+    expect(subscriptionReminderDue([legacy], '2026-10-07')).toBe(false);
+    expect(subscriptionReminderDue([legacy], '2026-10-07', 'America/Sao_Paulo')).toBe(true);
+    expect(subscriptionReminderVisible([legacy], '2026-10-07', null, 'America/Sao_Paulo')).toBe(true);
+    expect(subscriptionReminderVisible([legacy], '2026-10-07', null)).toBe(false);
   });
 
   it('nunca revisada: aparece quando a assinatura mais antiga tem 3 meses ou mais', () => {
-    expect(subscriptionReminderDue([at(null, '2026-07-07T12:00:00.000Z')], '2026-10-07')).toBe(true); // exatamente 3 meses
-    expect(subscriptionReminderDue([at(null, '2026-07-08T12:00:00.000Z')], '2026-10-07')).toBe(false); // 2 meses e 29 dias
-    expect(subscriptionReminderDue([at(null, '2026-07-08T12:00:00.000Z')], '2026-10-08')).toBe(true);
+    expect(subscriptionReminderDue([at(null, '2026-07-07')], '2026-10-07')).toBe(true); // exatamente 3 meses
+    expect(subscriptionReminderDue([at(null, '2026-07-08')], '2026-10-07')).toBe(false); // 2 meses e 29 dias
+    expect(subscriptionReminderDue([at(null, '2026-07-08')], '2026-10-08')).toBe(true);
     // Cadastrada em 31/07: 3 meses depois é 31/10 (o dia limitado ao fim do mês, como no banco: 31/01 + 1 mês = 28/02).
-    expect(subscriptionReminderDue([at(null, '2026-07-31T12:00:00.000Z')], '2026-10-30')).toBe(false);
-    expect(subscriptionReminderDue([at(null, '2026-07-31T12:00:00.000Z')], '2026-10-31')).toBe(true);
-    expect(subscriptionReminderDue([at(null, '2026-11-30T12:00:00.000Z')], '2027-02-28')).toBe(true); // 30/11 + 3 meses = 28/02 (limitado)
+    expect(subscriptionReminderDue([at(null, '2026-07-31')], '2026-10-30')).toBe(false);
+    expect(subscriptionReminderDue([at(null, '2026-07-31')], '2026-10-31')).toBe(true);
+    expect(subscriptionReminderDue([at(null, '2026-11-30')], '2027-02-28')).toBe(true); // 30/11 + 3 meses = 28/02 (limitado)
     // Nova (de hoje): não incomoda.
-    expect(subscriptionReminderDue([at(null, '2026-10-07T12:00:00.000Z')], '2026-10-07')).toBe(false);
+    expect(subscriptionReminderDue([at(null, '2026-10-07')], '2026-10-07')).toBe(false);
   });
 
   it('já revisada: aparece só depois de mais de 6 meses da última revisão', () => {
@@ -164,25 +197,25 @@ describe('assinaturas: quando mostrar o lembrete (D-046)', () => {
     expect(subscriptionReminderDue([at('2026-04-08')], '2026-10-08')).toBe(false);
     expect(subscriptionReminderDue([at('2026-09-01')], '2026-10-07')).toBe(false);
     // Uma revisão recente vale mesmo que a assinatura seja antiga (o "3 meses" é só para quem nunca revisou).
-    expect(subscriptionReminderDue([at('2026-09-01', '2020-01-01T12:00:00.000Z')], '2026-10-07')).toBe(false);
+    expect(subscriptionReminderDue([at('2026-09-01', '2020-01-01')], '2026-10-07')).toBe(false);
     // Revisão no futuro (relógio do aparelho para trás): não aparece.
     expect(subscriptionReminderDue([at('2026-12-01')], '2026-10-07')).toBe(false);
   });
 
   it('com várias, vale a revisão mais recente; uma assinatura nova sem revisão não liga o aviso se outra foi revisada', () => {
-    const list = [at('2025-12-01', '2025-11-01T12:00:00.000Z'), { ...at('2026-08-15'), id: 'b' }, { ...at(null, '2026-09-01T12:00:00.000Z'), id: 'c' }];
+    const list = [at('2025-12-01', '2025-11-01'), { ...at('2026-08-15'), id: 'b' }, { ...at(null, '2026-09-01'), id: 'c' }];
     expect(lastSubscriptionReview(list, '2026-10-07')).toBe('2026-08-15');
     expect(subscriptionReminderDue(list, '2026-10-07')).toBe(false);
     // Se só a antiga foi revisada, vale a data dela.
-    expect(subscriptionReminderDue([at('2025-12-01'), { ...at(null, '2026-09-01T12:00:00.000Z'), id: 'c' }], '2026-10-07')).toBe(true);
-    expect(oldestSubscriptionDay([at(null, '2026-03-04T12:00:00.000Z'), { ...at(null, '2026-02-01T12:00:00.000Z'), id: 'z' }], '2026-10-07')).toBe('2026-02-01');
+    expect(subscriptionReminderDue([at('2025-12-01'), { ...at(null, '2026-09-01'), id: 'c' }], '2026-10-07')).toBe(true);
+    expect(oldestSubscriptionDay([at(null, '2026-03-04'), { ...at(null, '2026-02-01'), id: 'z' }], '2026-10-07')).toBe('2026-02-01');
   });
 
   it('sem assinatura ativa não há aviso; encerradas, desmarcadas e outros tipos não contam', () => {
     expect(subscriptionReminderDue([], DEMO_TODAY)).toBe(false);
-    expect(subscriptionReminderDue([at(null, '2020-01-01T12:00:00.000Z')].map((s) => ({ ...s, subscription: false })), DEMO_TODAY)).toBe(false);
-    expect(subscriptionReminderDue([{ ...at(null, '2020-01-01T12:00:00.000Z'), lastNumber: 0 }], DEMO_TODAY)).toBe(false);
-    expect(subscriptionReminderDue([{ ...at(null, '2020-01-01T12:00:00.000Z'), kind: 'parcelada' as const }], DEMO_TODAY)).toBe(false);
+    expect(subscriptionReminderDue([at(null, '2020-01-01')].map((s) => ({ ...s, subscription: false })), DEMO_TODAY)).toBe(false);
+    expect(subscriptionReminderDue([{ ...at(null, '2020-01-01'), lastNumber: 0 }], DEMO_TODAY)).toBe(false);
+    expect(subscriptionReminderDue([{ ...at(null, '2020-01-01'), kind: 'parcelada' as const }], DEMO_TODAY)).toBe(false);
     expect(lastSubscriptionReview([], DEMO_TODAY)).toBeNull();
     expect(oldestSubscriptionDay([], DEMO_TODAY)).toBeNull();
     // A revisão de uma encerrada não conta para a última revisão.
@@ -199,7 +232,7 @@ describe('assinaturas: quando mostrar o lembrete (D-046)', () => {
     expect(subscriptionSnoozed(undefined, '2026-10-07')).toBe(false);
     expect(subscriptionSnoozed('texto', '2026-10-07')).toBe(false);
     expect(subscriptionSnoozed('2026-11-6', '2026-10-07')).toBe(false);
-    const due = [at(null, '2026-03-01T12:00:00.000Z')];
+    const due = [at(null, '2026-03-01')];
     expect(subscriptionReminderVisible(due, '2026-10-07', null)).toBe(true);
     expect(subscriptionReminderVisible(due, '2026-10-07', '2026-11-06')).toBe(false);
     expect(subscriptionReminderVisible(due, '2026-11-06', '2026-11-06')).toBe(true);
@@ -267,10 +300,11 @@ async function seeded() {
 }
 
 describe('MemoryRepository: marcar e desmarcar assinatura (set_series_subscription)', () => {
-  it('a série nasce sem a marca e sem data de revisão', async () => {
+  it('a série nasce sem a marca e sem data de revisão nem dia da marca', async () => {
     const { stream } = await seeded();
     expect(stream.subscription).toBe(false);
     expect(stream.subscriptionReviewedOn).toBeNull();
+    expect(stream.subscriptionSince).toBeNull();
     expect(stream.version).toBe(1);
   });
 
@@ -279,7 +313,7 @@ describe('MemoryRepository: marcar e desmarcar assinatura (set_series_subscripti
     const k = key();
     const w = await repo.setSeriesSubscription(k, stream.id, 1, true);
     expect(w.changed).toBe(1);
-    expect(w.series).toMatchObject({ id: stream.id, subscription: true, subscriptionReviewedOn: null, version: 2 });
+    expect(w.series).toMatchObject({ id: stream.id, subscription: true, subscriptionReviewedOn: null, subscriptionSince: DEMO_TODAY, version: 2 });
     expect(w.occurrences.length).toBeGreaterThan(0);
     expect(await repo.findSeriesOperation(k)).toEqual({ action: 'marcar_assinatura', seriesId: stream.id });
     expect((await repo.getSeries(stream.id))!.subscription).toBe(true);
@@ -295,6 +329,35 @@ describe('MemoryRepository: marcar e desmarcar assinatura (set_series_subscripti
     const again = await repo.setSeriesSubscription(key(), stream.id, 2, true);
     expect(again.changed).toBe(0);
     expect(again.series).toMatchObject({ subscription: true, version: 2 });
+  });
+
+  it('marcar grava o dia de hoje da pessoa (não o do cadastro); marcar de novo mantém; desmarcar apaga; marcar outra vez começa de novo', async () => {
+    const today = { value: '2026-01-10' as IsoDate };
+    const { repo } = memory(today);
+    const ctx = (await repo.ensurePersonalSpace('Conta principal')).personalContextId;
+    const old = (await repo.createSeries(key(), ctx, monthly('Streaming', 3990, '2026-01'))).series;
+    expect(createdDay(old)).toBe('2026-01-10');
+    today.value = '2026-10-07';
+    const on = await repo.setSeriesSubscription(key(), old.id, 1, true);
+    expect(on.series.subscriptionSince).toBe('2026-10-07');
+    expect(on.series.createdAt.slice(0, 10)).toBe('2026-01-10');
+    // Marcar o que já está marcado, em outro dia: o dia da marca fica.
+    today.value = '2026-10-20';
+    const again = await repo.setSeriesSubscription(key(), old.id, 2, true);
+    expect([again.changed, again.series.subscriptionSince]).toEqual([0, '2026-10-07']);
+    // A revisão não mexe nele.
+    await repo.markSubscriptionsReviewed(key(), ctx);
+    expect(await repo.getSeries(old.id)).toMatchObject({ subscriptionReviewedOn: '2026-10-20', subscriptionSince: '2026-10-07' });
+    const off = await repo.setSeriesSubscription(key(), old.id, 2, false);
+    expect(off.series).toMatchObject({ subscription: false, subscriptionSince: null, subscriptionReviewedOn: null });
+    today.value = '2026-10-21';
+    const back = await repo.setSeriesSubscription(key(), old.id, 3, true);
+    expect(back.series).toMatchObject({ subscription: true, subscriptionSince: '2026-10-21' });
+    // O lembrete de quem nunca revisou conta da marca: o gasto fixo antigo recém-marcado não liga o aviso.
+    const list = await repo.listSeries(ctx);
+    expect(subscriptionReminderDue(list, '2026-10-21')).toBe(false);
+    expect(subscriptionReminderDue(list, '2027-01-20')).toBe(false);
+    expect(subscriptionReminderDue(list, '2027-01-21')).toBe(true);
   });
 
   it('a versão esperada precisa ser a atual', async () => {
@@ -359,9 +422,10 @@ describe('MemoryRepository: marcar e desmarcar assinatura (set_series_subscripti
     await repo.markSubscriptionsReviewed(key(), ctx);
     expect((await repo.getSeries(stream.id))!.subscriptionReviewedOn).toBe(DEMO_TODAY);
     const off = await repo.setSeriesSubscription(key(), stream.id, 2, false);
-    expect(off.series).toMatchObject({ subscription: false, subscriptionReviewedOn: null, version: 3 });
+    expect(off.series).toMatchObject({ subscription: false, subscriptionReviewedOn: null, subscriptionSince: null, version: 3 });
     const on = await repo.setSeriesSubscription(key(), stream.id, 3, true);
     expect(on.series).toMatchObject({ subscription: true, subscriptionReviewedOn: null, version: 4 });
+    expect(on.series.subscriptionSince).toBe(DEMO_TODAY);
   });
 
   it('a marca sobrevive a editar a partir de um mês, encerrar e retomar', async () => {
@@ -376,7 +440,7 @@ describe('MemoryRepository: marcar e desmarcar assinatura (set_series_subscripti
       open.map((c) => ({ id: c.id, version: c.version })),
       { nature: 'conta', description: 'Streaming', category: 'Lazer', amountCents: 4490, amountMode: 'fixo', dueDay: 10 },
     );
-    expect(edited.series).toMatchObject({ subscription: true, version: 3 });
+    expect(edited.series).toMatchObject({ subscription: true, subscriptionSince: DEMO_TODAY, version: 3 });
     const gone = (await repo.listOpenSeriesOccurrences(stream.id)).filter((c) => c.series!.number > 1);
     const ended = await repo.endSeries(
       key(),
@@ -387,7 +451,7 @@ describe('MemoryRepository: marcar e desmarcar assinatura (set_series_subscripti
     );
     expect(ended.series.subscription).toBe(true);
     const resumed = await repo.endSeries(key(), stream.id, 4, null, []);
-    expect(resumed.series).toMatchObject({ subscription: true, version: 5 });
+    expect(resumed.series).toMatchObject({ subscription: true, subscriptionSince: DEMO_TODAY, version: 5 });
   });
 
   it('não mexe em contas a pagar, registros nem totais do mês', async () => {
@@ -550,6 +614,7 @@ describe('assinaturas na demonstração e em conta nova (D-046)', () => {
     const list = await repo.listSeries(ctx);
     expect(subscriptionTotals(list, DEMO_TODAY)).toMatchObject({ count: 2, monthlyCents: 13890, yearlyCents: 166680 });
     expect(list.filter((s) => s.subscription).map((s) => createdDay(s))).toEqual(['2026-06-30', '2026-06-30']);
+    expect(list.filter((s) => s.subscription).map((s) => s.subscriptionSince)).toEqual(['2026-06-30', '2026-06-30']);
     expect(oldestSubscriptionDay(list, DEMO_TODAY)).toBe('2026-06-30');
     expect(lastSubscriptionReview(list, DEMO_TODAY)).toBeNull();
     expect(subscriptionReminderDue(list, DEMO_TODAY)).toBe(true);
@@ -582,6 +647,7 @@ describe('assinaturas na demonstração e em conta nova (D-046)', () => {
     const s: CommitmentSeries = (await repo.listSeries(ctx))[0]!;
     expect(typeof s.subscription).toBe('boolean');
     expect(s.subscriptionReviewedOn).toBeNull();
+    expect(s.subscriptionSince === null || /^\d{4}-\d{2}-\d{2}$/.test(s.subscriptionSince)).toBe(true);
     // A chave de operação de uma série qualquer reconhece 'marcar_assinatura' como ação de série.
     const k = key();
     await repo.setSeriesSubscription(k, (await repo.listSeries(ctx)).find((x) => x.kind === 'mensal' && !x.subscription)!.id, 1, true);

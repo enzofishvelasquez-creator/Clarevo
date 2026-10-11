@@ -17,6 +17,7 @@ import {
   formatBRL,
   formatDateBR,
   installmentProgress,
+  isActiveSubscription,
   isRepoError,
   isReviewableMonth,
   mergeOccurrences,
@@ -319,8 +320,8 @@ function Overview({ series: s, today }: { series: CommitmentSeries; today: IsoDa
         <MoneyTxt variant="title" style={tabular}>
           {value}
         </MoneyTxt>
-        {/* Assinatura (D-046): quanto custa por ano e a data da última revisão. Só informa. */}
-        {s.subscription && s.kind === 'mensal' ? (
+        {/* Assinatura (D-046): quanto custa por ano e a data da última revisão. Só informa, e só enquanto está ativa (não encerrada). */}
+        {isActiveSubscription(s, today) ? (
           <View style={{ gap: 2 }}>
             <MoneyTxt variant="label" style={[tabular, { fontFamily: fonts.bold }]}>
               {SUBSCRIPTION_TEXT.detailYear(subscriptionYearlyCents(term.amountCents), variable)}

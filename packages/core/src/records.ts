@@ -257,6 +257,12 @@ export interface CommitmentSeries {
   subscription: boolean;
   /** Dia da última revisão das assinaturas (markSubscriptionsReviewed); null se nunca revisada. Só existe em assinatura. */
   subscriptionReviewedOn: IsoDate | null;
+  /**
+   * Dia (no fuso da pessoa) em que a série foi marcada como assinatura (subscription_since): base do lembrete de primeira revisão,
+   * no lugar do cadastro da série (marcar um gasto fixo antigo não faz o aviso aparecer na hora). null fora de assinatura; o
+   * cadastro é o último recurso se a marca não tiver o dia.
+   */
+  subscriptionSince: IsoDate | null;
   createdBy: string;
   version: number;
   createdAt: string;

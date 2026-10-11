@@ -1033,6 +1033,7 @@ export class MemoryRepository implements RecordsRepository {
         currency: 'BRL',
         subscription: false,
         subscriptionReviewedOn: null,
+        subscriptionSince: null,
         createdBy: this.opts.actorId,
         version: 1,
         createdAt: now,
@@ -1227,10 +1228,10 @@ export class MemoryRepository implements RecordsRepository {
     return this.seriesResult(s.id, actual.length);
   }
 
-  /** Como sync_series_occurrences: leitura basta; a autoria e as regras são da série. Não grava operação. */
   /**
    * Como set_series_subscription (D-046): série lida e escrita por quem chama, versão, marca, tipo (só gasto fixo mensal).
    * Marcar o que já está marcado não muda nada nem sobe a versão; quando muda, a versão sobe e a data da revisão é apagada.
+   * Ao marcar, subscriptionSince recebe o dia de hoje da pessoa (opts.today); ao desmarcar, é apagado.
    */
   async setSeriesSubscription(key: string, id: string, expectedVersion: number, subscription: boolean) {
     return this.write(() => {
@@ -1247,6 +1248,7 @@ export class MemoryRepository implements RecordsRepository {
           ...s,
           subscription,
           subscriptionReviewedOn: null,
+          subscriptionSince: subscription ? (s.subscriptionSince ?? this.opts.today()) : null,
           version: s.version + 1,
           updatedAt: new Date().toISOString(),
         });
@@ -1295,6 +1297,7 @@ export class MemoryRepository implements RecordsRepository {
     return new Date(Date.parse(`${this.opts.today()}T12:00:00.000Z`) + this.seq).toISOString();
   }
 
+  /** Como sync_series_occurrences: leitura basta; a autoria e as regras são da série. Não grava operação. */
   async syncSeriesOccurrences(contextId: string) {
     return this.write(() => {
       if (!this.canRead(contextId)) throw new RepoError('sem_permissao');
@@ -3203,8 +3206,14 @@ export class MemoryRepository implements RecordsRepository {
           shapeOk = false;
       }
       if (!shapeOk) fail();
-      // B1 e B2 (0011): só gasto fixo mensal é assinatura, e a data da revisão só existe em assinatura.
-      if ((s.subscription && s.kind !== 'mensal') || (s.subscriptionReviewedOn !== null && !s.subscription)) fail();
+      // B1 e B2 (0011): só gasto fixo mensal é assinatura, e as datas (revisão e marca) só existem em assinatura.
+      if (
+        (s.subscription && s.kind !== 'mensal') ||
+        (s.subscriptionReviewedOn !== null && !s.subscription) ||
+        (s.subscriptionSince !== null && !s.subscription)
+      ) {
+        fail();
+      }
       // S5: vigência viva em firstNumber, nenhuma viva antes dele e no máximo uma viva por número.
       const live = [...this.terms.values()].filter((t) => t.seriesId === s.id && !t.supersededAt);
       if (!live.some((t) => t.fromNumber === s.firstNumber) || live.some((t) => t.fromNumber < s.firstNumber)) fail();

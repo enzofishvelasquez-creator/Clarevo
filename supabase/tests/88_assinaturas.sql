@@ -1,5 +1,5 @@
--- Assinaturas (D-046, Ciclo H2): a marca subscription e a data subscription_reviewed_on em commitment_series (e na visão
--- series_items), set_series_subscription, mark_subscriptions_reviewed, as duas ações novas de record_operations, a atividade
+-- Assinaturas (D-046, Ciclo H2): a marca subscription e as datas subscription_reviewed_on e subscription_since (o dia em que a
+-- marca foi posta, base do lembrete de primeira revisão) em commitment_series (e na visão series_items), set_series_subscription, mark_subscriptions_reviewed, as duas ações novas de record_operations, a atividade
 -- (marcar conta como anotação; revisar não conta), restrições e privilégios. As funções de série da 0003/0004 não mudam de
 -- assinatura: o app publicado antes da 0011 segue funcionando (seção 9).
 -- Sequência sobre pessoas FICTÍCIAS (hoje 07/10/2026): Lia (sequência; titular da Família da Lia), Davi (Família, só leitura),
@@ -74,6 +74,10 @@ create function pg_temp.sub(p_name text) returns text language sql as $$
   select format('%s|%s|%s', subscription::text, coalesce(subscription_reviewed_on::text, '-'), version)
     from public.series_items where id = pg_temp.id(p_name)
 $$;
+-- O dia em que a série virou assinatura (subscription_since), sem a RLS: '-' se nulo.
+create function pg_temp.since(p_name text) returns text language sql security definer set search_path = public, pg_temp as $$
+  select coalesce(subscription_since::text, '-') from public.commitment_series where id = pg_temp.id(p_name)
+$$;
 -- A mesma série sem a RLS (também a excluída).
 create function pg_temp.sub_raw(p_name text) returns text language sql security definer set search_path = public, pg_temp as $$
   select format('%s|%s|%s|%s', subscription::text, coalesce(subscription_reviewed_on::text, '-'), version,
@@ -143,7 +147,7 @@ insert into public.context_memberships (context_id, person_id, role, can_read, c
   select id, :fabio::uuid, 'membro'::public.membership_role, true, true, true from ids where name = 'fam';
 
 -- ---------------------------------------------------------------------------
--- 1. Conta nova e esquema: as duas colunas começam vazias (nenhuma assinatura de exemplo), a visão as devolve no fim e as
+-- 1. Conta nova e esquema: as colunas começam vazias (nenhuma assinatura de exemplo), a visão as devolve no fim e as
 -- restrições valem para quem escreve por fora das funções (B1, B2).
 -- ---------------------------------------------------------------------------
 set role authenticated;
@@ -153,13 +157,16 @@ begin
   assert (select count(*) from public.series_items) = 0, 'conta nova: nenhuma série, nenhuma assinatura';
   assert (select array_agg(column_name::text order by ordinal_position) from information_schema.columns
            where table_schema = 'public' and table_name = 'series_items' and ordinal_position > 18)
-       = array['parts_per_year', 'subscription', 'subscription_reviewed_on'], 'as duas colunas novas ficam no fim da visão';
+       = array['parts_per_year', 'subscription', 'subscription_reviewed_on', 'subscription_since'], 'as três colunas novas ficam no fim da visão';
   assert (select data_type || ',' || is_nullable || ',' || coalesce(column_default, '-') from information_schema.columns
            where table_schema = 'public' and table_name = 'commitment_series' and column_name = 'subscription')
        = 'boolean,NO,false', 'subscription: boolean, não nulo, padrão falso';
   assert (select data_type || ',' || is_nullable from information_schema.columns
            where table_schema = 'public' and table_name = 'commitment_series' and column_name = 'subscription_reviewed_on')
        = 'date,YES', 'subscription_reviewed_on: data, pode ser nula';
+  assert (select data_type || ',' || is_nullable from information_schema.columns
+           where table_schema = 'public' and table_name = 'commitment_series' and column_name = 'subscription_since')
+       = 'date,YES', 'subscription_since: data, pode ser nula';
 end $$;
 reset role;
 do $$
@@ -179,6 +186,11 @@ begin
   perform pg_temp.expect_error(
     format('update public.commitment_series set subscription = true, subscription_reviewed_on = %L where id = %L', '2026-10-07', s),
     '%commitment_series_assinatura%');
+  perform pg_temp.expect_error(format('update public.commitment_series set subscription_since = %L where id = %L', '2026-10-07', s),
+    '%commitment_series_assinatura%');
+  perform pg_temp.expect_error(
+    format('update public.commitment_series set subscription = true, subscription_since = %L where id = %L', '2026-10-07', s),
+    '%commitment_series_assinatura%');
   insert into public.commitment_series (context_id, kind, nature, first_due_month, first_number, parts_per_year, created_by)
     values (ctx, 'anual', 'conta', '2027-01-01', 1, 1, uid) returning id into s;
   insert into public.series_terms (series_id, context_id, from_number, description, amount_cents, amount_mode, due_day, created_by)
@@ -187,14 +199,17 @@ begin
   perform pg_temp.expect_error(
     format($f$insert into public.commitment_series (context_id, kind, nature, first_due_month, first_number, parts_per_year, subscription, created_by)
       values (%L, 'anual', 'conta', '2027-01-01', 1, 1, true, %L)$f$, ctx, uid), '%commitment_series_assinatura%');
-  -- Mensal: a marca e a data cabem; a data sem marca não.
-  insert into public.commitment_series (context_id, kind, nature, first_due_month, first_number, created_by, subscription, subscription_reviewed_on)
-    values (ctx, 'mensal', 'conta', '2026-11-01', 1, uid, true, '2026-10-01') returning id into s;
+  -- Mensal: a marca e as datas cabem; as datas sem marca não.
+  insert into public.commitment_series (context_id, kind, nature, first_due_month, first_number, created_by, subscription, subscription_reviewed_on, subscription_since)
+    values (ctx, 'mensal', 'conta', '2026-11-01', 1, uid, true, '2026-10-01', '2026-09-15') returning id into s;
   insert into public.series_terms (series_id, context_id, from_number, description, amount_cents, amount_mode, due_day, created_by)
     values (s, ctx, 1, 'Streaming', 3990, 'fixo', 10, uid);
   perform pg_temp.expect_error(format('update public.commitment_series set subscription = false where id = %L', s), '%commitment_series_assinatura%');
-  update public.commitment_series set subscription = false, subscription_reviewed_on = null where id = s;
-  assert (select not subscription and subscription_reviewed_on is null from public.commitment_series where id = s), 'desmarcar com a data limpa';
+  perform pg_temp.expect_error(format('update public.commitment_series set subscription = false, subscription_reviewed_on = null where id = %L', s),
+    '%commitment_series_assinatura%');
+  update public.commitment_series set subscription = false, subscription_reviewed_on = null, subscription_since = null where id = s;
+  assert (select not subscription and subscription_reviewed_on is null and subscription_since is null from public.commitment_series where id = s),
+    'desmarcar com as datas limpas';
   -- Limpeza das linhas de teste da seção.
   delete from public.series_terms where context_id = ctx;
   delete from public.commitment_series where context_id = ctx;
@@ -292,6 +307,10 @@ begin
     'as ocorrências vivas vêm junto, como nas outras funções de série';
   assert jsonb_array_length(res #> '{series,terms}') = 1 and res #>> '{series,terms,0,description}' = 'Streaming', 'a vigência não mudou';
   assert pg_temp.sub('hugo_stream') = 'true|-|2', 'a visão devolve a marca e a versão nova';
+  assert pg_temp.since('hugo_stream') = '2026-10-07' and res #>> '{series,subscription_since}' = '2026-10-07'
+     and (select subscription_since::text from public.series_items where id = s) = '2026-10-07',
+    'marcar grava o dia de hoje em subscription_since (resposta e visão), não o do cadastro da série';
+  assert pg_temp.since('hugo_sofa') = '-' and pg_temp.since('hugo_ipva') = '-', 'quem não é assinatura não tem subscription_since';
   assert (select count(*) from public.record_operations where idempotency_key = 'as-m-0001' and action = 'marcar_assinatura'
              and context_id = ctx and target_id = s and record_id is null and commitment_id is null and actor_id = pg_temp.id('hugo')
              and request_hash = md5(jsonb_build_array('marcar_assinatura', s, 1, true)::text)) = 1,
@@ -315,8 +334,11 @@ begin
   perform pg_temp.as_('hugo');
 
   -- Marcar o que já está marcado: nada muda, a versão fica, a operação é gravada.
+  perform pg_temp.today('2026-10-05');
   res := public.set_series_subscription('as-m-0002', s, 2, true);
+  perform pg_temp.today('2026-10-07');
   assert (res ->> 'changed')::int = 0 and (res #>> '{series,version}')::int = 2 and (res #>> '{series,subscription}')::boolean, 'já marcada: changed 0, versão 2';
+  assert pg_temp.since('hugo_stream') = '2026-10-07' and res #>> '{series,subscription_since}' = '2026-10-07', 'já marcada: o dia da marca fica';
   assert (select count(*) from public.record_operations where idempotency_key = 'as-m-0002' and action = 'marcar_assinatura' and target_id = s) = 1,
     'a operação do que não mudou também é gravada';
   perform pg_temp.expect_stale(pg_temp.mk('as-m-0003', s, 1, true), 'versao_atual=2');
@@ -329,10 +351,16 @@ begin
   assert not (res #>> '{series,subscription}')::boolean and res #>> '{series,subscription_reviewed_on}' is null
      and (res #>> '{series,version}')::int = 3 and (res ->> 'changed')::int = 1, 'desmarcada: sem data, versão 3';
   assert pg_temp.sub('hugo_stream') = 'false|-|3', 'a visão devolve a série comum';
+  assert pg_temp.since('hugo_stream') = '-' and res #>> '{series,subscription_since}' is null, 'desmarcar apaga subscription_since';
   res := public.set_series_subscription('as-m-0006', s, 3, false);
   assert (res ->> 'changed')::int = 0 and (res #>> '{series,version}')::int = 3, 'desmarcar o que não está marcado: nada muda';
+  assert pg_temp.since('hugo_stream') = '-', 'desmarcar o que não está marcado não cria o dia da marca';
+  perform pg_temp.today('2026-10-06');
   res := public.set_series_subscription('as-m-0007', s, 3, true);
+  perform pg_temp.today('2026-10-07');
   assert res #>> '{series,subscription_reviewed_on}' is null and (res #>> '{series,version}')::int = 4, 'marcar de novo: sem data, versão 4';
+  assert pg_temp.since('hugo_stream') = '2026-10-06' and res #>> '{series,subscription_since}' = '2026-10-06',
+    'marcar de novo começa um novo subscription_since (o dia da nova marca)';
   assert pg_temp.untouched() = before_, 'nada disso muda contas, registros nem vigências';
 end $$;
 reset role;
@@ -388,6 +416,8 @@ begin
   res := public.mark_subscriptions_reviewed('as-r-0030', ctx);
   assert res ->> 'reviewed_on' = '2026-10-07' and (res ->> 'changed')::int = 2, 'duas ativas receberam a data';
   assert pg_temp.sub('lia_stream') = 'true|2026-10-07|2' and pg_temp.sub('lia_gym') = 'true|2026-10-07|2', 'datas gravadas, versões iguais';
+  assert pg_temp.since('lia_stream') = '2026-10-07' and pg_temp.since('lia_gym') = '2026-10-07' and pg_temp.since('lia_aluguel') = '-',
+    'a revisão não mexe em subscription_since; gasto fixo comum não tem';
   assert pg_temp.sub('lia_clube') = 'true|-|2', 'a encerrada não recebe a data';
   assert pg_temp.sub_raw('lia_revista') = 'true|-|3|excluida', 'a excluída não recebe a data';
   assert pg_temp.sub('lia_aluguel') = 'false|-|1' and pg_temp.sub('lia_sofa') = 'false|-|1', 'gasto fixo comum e parcelamento não mudam';
@@ -512,13 +542,15 @@ begin
   perform pg_temp.as_('lia');
   perform pg_temp.expect_error(format('update public.commitment_series set subscription = true where id = %L', pg_temp.id('lia_aluguel')), 'permission denied%');
   perform pg_temp.expect_error(format('update public.commitment_series set subscription_reviewed_on = %L', '2026-10-07'), 'permission denied%');
+  perform pg_temp.expect_error(format('update public.commitment_series set subscription_since = %L', '2026-10-07'), 'permission denied%');
   perform pg_temp.expect_error(format('update public.series_items set subscription = true where id = %L', pg_temp.id('lia_aluguel')), 'permission denied%');
   perform pg_temp.expect_error(format($f$insert into public.commitment_series (context_id, kind, nature, first_due_month, created_by, subscription)
     values (%L, 'mensal', 'conta', '2026-11-01', %L, true)$f$, pg_temp.id('lia_ctx'), pg_temp.id('lia')), 'permission denied%');
   assert not has_any_column_privilege('authenticated', 'public.commitment_series', 'insert, update'), 'sem escrita direta em nenhuma coluna';
   assert not has_table_privilege('authenticated', 'public.series_items', 'insert, update, delete, truncate'), 'sem escrita pela visão';
   assert has_column_privilege('authenticated', 'public.commitment_series', 'subscription', 'select')
-     and has_column_privilege('authenticated', 'public.commitment_series', 'subscription_reviewed_on', 'select'), 'as colunas se leem';
+     and has_column_privilege('authenticated', 'public.commitment_series', 'subscription_reviewed_on', 'select')
+     and has_column_privilege('authenticated', 'public.commitment_series', 'subscription_since', 'select'), 'as colunas se leem';
   assert pg_temp.sub('lia_aluguel') = 'false|-|1', 'nada mudou';
 end $$;
 reset role;
@@ -661,20 +693,22 @@ begin
   perform pg_temp.as_('lia');
   perform pg_temp.today('2026-10-07');
   -- Editar a partir de novembro (a assinatura sobe de R$ 39,90 para R$ 44,90) mantém a marca e a data.
-  assert pg_temp.sub('lia_stream') = 'true|2026-10-10|2', 'antes de editar';
+  assert pg_temp.sub('lia_stream') = 'true|2026-10-10|2' and pg_temp.since('lia_stream') = '2026-10-07', 'antes de editar';
   open_ := (select coalesce(jsonb_agg(jsonb_build_object('id', id, 'version', version) order by occurrence_number), '[]'::jsonb)
               from public.commitments where series_id = s and deleted_at is null and status = 'aberto' and occurrence_number >= 2);
   res := public.update_series_from('as-c-0001', s, 2, 2, open_, 'conta', 'Streaming', null, 4490, 'fixo', 10);
   assert (res #>> '{series,subscription}')::boolean and res #>> '{series,subscription_reviewed_on}' = '2026-10-10'
-     and (res #>> '{series,version}')::int = 3, 'update_series_from mantém a marca e a data';
+     and (res #>> '{series,version}')::int = 3 and pg_temp.since('lia_stream') = '2026-10-07', 'update_series_from mantém a marca e as datas';
   -- Encerrar e retomar mantêm a marca; a encerrada deixa de contar na revisão e volta quando retomada.
   res := public.end_series('as-c-0002', s, 3, 1, pg_temp.open_refs('lia_stream', 1));
-  assert (res #>> '{series,subscription}')::boolean, 'end_series mantém a marca';
+  assert (res #>> '{series,subscription}')::boolean and pg_temp.since('lia_stream') = '2026-10-07', 'end_series mantém a marca e o dia dela';
   res := public.end_series('as-c-0003', s, 4, null, '[]');
-  assert (res #>> '{series,subscription}')::boolean and res #>> '{series,subscription_reviewed_on}' = '2026-10-10', 'retomar mantém a marca e a data';
+  assert (res #>> '{series,subscription}')::boolean and res #>> '{series,subscription_reviewed_on}' = '2026-10-10'
+     and pg_temp.since('lia_stream') = '2026-10-07', 'retomar mantém a marca e as datas';
   -- Uma série criada pela assinatura antiga de create_series (14 argumentos) nasce sem marca.
   res := public.create_series('as-c-0010', ctx, 'mensal', 'conta', 'Água', null, 6000, 'variavel', 8, '2026-11-01', 1, null, null, null);
-  assert not (res #>> '{series,subscription}')::boolean and res #>> '{series,subscription_reviewed_on}' is null, 'create_series: sem marca';
+  assert not (res #>> '{series,subscription}')::boolean and res #>> '{series,subscription_reviewed_on}' is null
+     and res #>> '{series,subscription_since}' is null, 'create_series: sem marca';
   -- Excluir a série marcada devolve a série excluída com a marca (a repetição lê a série excluída).
   open_ := pg_temp.open_refs('lia_stream');
   res := public.delete_series('as-c-0011', s, 5, open_);

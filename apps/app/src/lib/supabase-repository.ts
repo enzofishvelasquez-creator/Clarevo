@@ -210,10 +210,11 @@ interface SeriesRow {
   parts_per_year: number | null;
   /**
    * Assinaturas (D-046, migração 0011): ausentes enquanto a 0011 não foi colada (o app novo com o banco antigo): valem falso e nulo,
-   * e nada quebra. subscription_reviewed_on: AAAA-MM-DD.
+   * e nada quebra. subscription_reviewed_on e subscription_since: AAAA-MM-DD.
    */
   subscription?: boolean | null;
   subscription_reviewed_on?: string | null;
+  subscription_since?: string | null;
 }
 
 /** Retorno (jsonb) das funções de série: ocorrências vivas por número crescente; changed conforme a função. */
@@ -770,6 +771,7 @@ function toSeries(s: SeriesRow): CommitmentSeries {
     generating: s.generating,
     subscription: s.subscription === true,
     subscriptionReviewedOn: s.subscription === true && typeof s.subscription_reviewed_on === 'string' ? s.subscription_reviewed_on.slice(0, 10) : null,
+    subscriptionSince: s.subscription === true && typeof s.subscription_since === 'string' ? s.subscription_since.slice(0, 10) : null,
     createdBy: s.created_by,
     version: s.version,
     createdAt: s.created_at,

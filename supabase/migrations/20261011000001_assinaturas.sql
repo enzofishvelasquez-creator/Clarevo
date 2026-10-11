@@ -10,10 +10,13 @@
 --
 -- Invariantes:
 -- B1. Só gasto fixo mensal (kind = 'mensal') pode ser assinatura; parcelamento e conta do ano nunca são (restrição).
--- B2. A data da última revisão só existe em assinatura (restrição); tirar a marca apaga a data, e marcar de novo começa sem data.
+-- B2. A data da última revisão e o dia em que a marca foi posta (subscription_since) só existem em assinatura (restrição); tirar
+--     a marca apaga as duas datas, e marcar de novo começa sem revisão e com um novo subscription_since.
 -- B3. set_series_subscription: a série precisa ser lida e escrita por quem chama (e, se for de outra pessoa, "editar de outras
 --     pessoas"); a versão esperada precisa ser a atual; só gasto fixo mensal; marcar o que já está marcado (ou desmarcar o que não
---     está) não muda nada e não sobe a versão. Quando muda, a versão sobe +1.
+--     está) não muda nada e não sobe a versão. Quando muda, a versão sobe +1. Ao marcar, subscription_since recebe o dia de hoje
+--     no fuso de quem chama (clarevo_today); marcar o que já está marcado mantém o dia. O lembrete "nunca revisada, 3 meses" conta
+--     a partir dele, não do cadastro da série: marcar um gasto fixo antigo não faz o aviso aparecer na hora.
 -- B4. mark_subscriptions_reviewed grava a data de hoje (no fuso de quem chama) nas assinaturas ATIVAS do contexto (não excluídas e
 --     não encerradas) que quem chama pode alterar; a data nunca recua; repetir no mesmo dia não muda nada. Não muda a versão da
 --     série (como inform_series_year): é só uma data de conferência.
@@ -26,17 +29,21 @@
 -- ---------------------------------------------------------------------------
 alter table public.commitment_series
   add column subscription boolean not null default false,
-  add column subscription_reviewed_on date;
+  add column subscription_reviewed_on date,
+  add column subscription_since date;
 
 alter table public.commitment_series
   add constraint commitment_series_assinatura check (
     (not subscription or kind = 'mensal')
-    and (subscription_reviewed_on is null or subscription));
+    and (subscription_reviewed_on is null or subscription)
+    and (subscription_since is null or subscription));
 
 comment on column public.commitment_series.subscription is
   'Gasto fixo mensal marcado como assinatura (streaming, aplicativo, academia, clube, plano de celular). Só por set_series_subscription.';
 comment on column public.commitment_series.subscription_reviewed_on is
   'Dia da última revisão das assinaturas (mark_subscriptions_reviewed). Só em assinatura; nulo se nunca revisada.';
+comment on column public.commitment_series.subscription_since is
+  'Dia (no fuso de quem marcou) em que a série foi marcada como assinatura (set_series_subscription). Só em assinatura; base do lembrete de primeira revisão.';
 
 -- ---------------------------------------------------------------------------
 -- Operações: lista completa vigente (46 ações das migrações anteriores) mais as 2 de assinaturas. 'marcar_assinatura' aponta para
@@ -173,6 +180,7 @@ begin
     update public.commitment_series
        set subscription = p_subscription,
            subscription_reviewed_on = null,
+           subscription_since = case when p_subscription then coalesce(subscription_since, public.clarevo_today(v_uid)) else null end,
            version = version + 1
      where id = v_s.id;
     v_changed := 1;
@@ -262,7 +270,7 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- Visão das séries: as duas colunas novas no fim (create or replace só aceita colunas novas no fim).
+-- Visão das séries: as três colunas novas no fim (create or replace só aceita colunas novas no fim).
 -- ---------------------------------------------------------------------------
 create or replace view public.series_items with (security_barrier = true) as
 select s.id, s.context_id, s.kind, s.nature, s.first_due_month, s.first_number, s.last_number, s.installment_total,
@@ -280,13 +288,13 @@ select s.id, s.context_id, s.kind, s.nature, s.first_due_month, s.first_number, 
        exists (select 1 from public.context_memberships m where m.context_id = s.context_id and m.person_id = s.created_by
                  and m.revoked_at is null and m.can_read and m.can_write) as generating,
        s.parts_per_year,
-       s.subscription, s.subscription_reviewed_on
+       s.subscription, s.subscription_reviewed_on, s.subscription_since
   from public.commitment_series s
  where s.deleted_at is null and public.context_permission(s.context_id, 'read');
 comment on view public.series_items is 'Séries não excluídas que quem consulta pode ler, com vigências vivas, números pulados e contagens.';
 
 -- ---------------------------------------------------------------------------
--- Leitura (RLS) e privilégios. commitment_series continua sem insert, update ou delete diretos; a marca e a data só mudam pelas
+-- Leitura (RLS) e privilégios. commitment_series continua sem insert, update ou delete diretos; a marca e as datas só mudam pelas
 -- duas funções novas. Bloco inteiro da 0010 (idempotente), com as duas funções públicas novas no fim.
 -- ---------------------------------------------------------------------------
 revoke all on all tables in schema public from anon, authenticated;

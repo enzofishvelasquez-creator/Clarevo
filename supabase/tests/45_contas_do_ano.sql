@@ -1294,8 +1294,8 @@ do $$ begin
            where attrelid = 'public.series_items'::regclass and attnum > 0 and not attisdropped)
     = array['id', 'context_id', 'kind', 'nature', 'first_due_month', 'first_number', 'last_number', 'installment_total', 'currency',
             'created_by', 'version', 'created_at', 'updated_at', 'terms', 'skipped_numbers', 'paid_count', 'open_count', 'generating',
-            'parts_per_year', 'subscription', 'subscription_reviewed_on'],
-    'series_items: mesma lista, mais parts_per_year depois de generating e as duas colunas de assinatura da 0011 no fim';
+            'parts_per_year', 'subscription', 'subscription_reviewed_on', 'subscription_since'],
+    'series_items: mesma lista, mais parts_per_year depois de generating e as três colunas de assinatura da 0011 no fim';
   assert (select reloptions from pg_class where oid = 'public.series_items'::regclass) @> array['security_barrier=true']
      and not coalesce((select reloptions from pg_class where oid = 'public.series_items'::regclass) @> array['security_invoker=true'], false)
      and (select reloptions from pg_class where oid = 'public.commitment_items'::regclass) @> array['security_invoker=true'],

@@ -1885,6 +1885,7 @@ describe('conversor de contas a pagar e gastos fixos', () => {
     parts_per_year: null,
     subscription: false,
     subscription_reviewed_on: null,
+    subscription_since: null,
   };
   /** IPTU de 10 parcelas por ano desde fevereiro de 2027, como a visão series_items e o objeto series das funções o devolvem. */
   const annualSeries = {
@@ -1919,6 +1920,7 @@ describe('conversor de contas a pagar e gastos fixos', () => {
       generating: false,
       subscription: false,
       subscriptionReviewedOn: null,
+      subscriptionSince: null,
       createdBy: 'p1',
       version: 2,
       createdAt: '2026-10-07T12:00:00Z',
@@ -6119,12 +6121,14 @@ describe('API real: assinaturas (Ciclo H2, D-046)', () => {
   });
   const mine = async (id: string) => (await ana.getSeries(id))!;
   const flags = (x: CommitmentSeries) => [x.subscription, x.subscriptionReviewedOn, x.version].map(String).join('|');
+  /** O dia em que a série virou assinatura (subscription_since), como texto. */
+  const since = (x: CommitmentSeries) => String(x.subscriptionSince);
 
   beforeAll(async () => {
     ctx = (await ana.getSpace())!.personalContextId;
   });
 
-  it('a série nasce sem a marca e a visão devolve as duas colunas', async () => {
+  it('a série nasce sem a marca e a visão devolve as três colunas', async () => {
     stream.s = (await ana.createSeries(newOperationKey(), ctx, monthly('Streaming', cents(39.9)))).series;
     gym.s = (await ana.createSeries(newOperationKey(), ctx, monthly('Academia', cents(99), '2037-11'))).series;
     clube.s = (await ana.createSeries(newOperationKey(), ctx, monthly('Clube', cents(45), '2037-09', '2037-09'))).series;
@@ -6138,8 +6142,8 @@ describe('API real: assinaturas (Ciclo H2, D-046)', () => {
       })
     ).series;
     ipva.s = (await ana.createSeries(newOperationKey(), ctx, { ...monthly('IPVA', cents(2400), '2038-01'), kind: 'anual', partsPerYear: 1, amountMode: 'variavel' })).series;
-    for (const x of [stream.s, gym.s, clube.s, rent.s, sofa.s, ipva.s]) expect(flags(x)).toBe('false|null|1');
-    expect((await ana.listSeries(ctx)).every((x) => x.subscription === false && x.subscriptionReviewedOn === null)).toBe(true);
+    for (const x of [stream.s, gym.s, clube.s, rent.s, sofa.s, ipva.s]) expect([flags(x), since(x)]).toEqual(['false|null|1', 'null']);
+    expect((await ana.listSeries(ctx)).every((x) => x.subscription === false && x.subscriptionReviewedOn === null && x.subscriptionSince === null)).toBe(true);
     expect(await bruno.listSeries(ctx)).toEqual([]);
   });
 
@@ -6148,6 +6152,8 @@ describe('API real: assinaturas (Ciclo H2, D-046)', () => {
     const w = await ana.setSeriesSubscription(k, stream.s.id, 1, true);
     expect(w.changed).toBe(1);
     expect(flags(w.series)).toBe('true|null|2');
+    // O dia da marca é o de hoje da pessoa (T0), não o do cadastro da série.
+    expect(w.series.subscriptionSince).toBe(T0);
     expect(w.series.id).toBe(stream.s.id);
     expect(w.occurrences.length).toBeGreaterThan(0);
     stream.s = w.series;
@@ -6167,9 +6173,12 @@ describe('API real: assinaturas (Ciclo H2, D-046)', () => {
     const same = await ana.setSeriesSubscription(newOperationKey(), stream.s.id, 2, true);
     expect(same.changed).toBe(0);
     expect(flags(same.series)).toBe('true|null|2');
+    // Marcar de novo em outro dia não muda o dia da marca.
+    const later = await repoFor(ANA, '2037-10-20').setSeriesSubscription(newOperationKey(), stream.s.id, 2, true);
+    expect([later.changed, flags(later.series), since(later.series)]).toEqual([0, 'true|null|2', T0]);
     const nothing = await ana.setSeriesSubscription(newOperationKey(), rent.s.id, 1, false);
     expect(nothing.changed).toBe(0);
-    expect(flags(nothing.series)).toBe('false|null|1');
+    expect([flags(nothing.series), since(nothing.series)]).toEqual(['false|null|1', 'null']);
     expect(await code(ana.setSeriesSubscription(newOperationKey(), sofa.s.id, 1, true))).toEqual(['assinatura_so_gasto_fixo', null]);
     expect(await code(ana.setSeriesSubscription(newOperationKey(), sofa.s.id, 1, false))).toEqual(['assinatura_so_gasto_fixo', null]);
     expect(await code(ana.setSeriesSubscription(newOperationKey(), ipva.s.id, 1, true))).toEqual(['assinatura_so_gasto_fixo', null]);
@@ -6183,6 +6192,7 @@ describe('API real: assinaturas (Ciclo H2, D-046)', () => {
     expect(flags(await mine(sofa.s.id))).toBe('false|null|1');
     expect(flags(await mine(ipva.s.id))).toBe('false|null|1');
     expect(flags(await mine(stream.s.id))).toBe('true|null|2');
+    expect(since(await mine(stream.s.id))).toBe(T0);
   });
 
   it('um resultado incerto se reconcilia: a resposta se perde, a marca foi gravada e a mesma chave devolve a série', async () => {
@@ -6232,10 +6242,11 @@ describe('API real: assinaturas (Ciclo H2, D-046)', () => {
     const day = repoFor(ANA, '2037-10-09');
     expect((await day.markSubscriptionsReviewed(newOperationKey(), ctx)).changed).toBe(3);
     expect(flags((await ana.getSeries(clube.s.id))!)).toBe('true|2037-10-09|3');
+    expect(since((await ana.getSeries(gym.s.id))!)).toBe(T0);
     const off = await ana.setSeriesSubscription(newOperationKey(), gym.s.id, 2, false);
-    expect(flags(off.series)).toBe('false|null|3');
-    const on = await ana.setSeriesSubscription(newOperationKey(), gym.s.id, 3, true);
-    expect(flags(on.series)).toBe('true|null|4');
+    expect([flags(off.series), since(off.series)]).toEqual(['false|null|3', 'null']);
+    const on = await repoFor(ANA, '2037-10-21').setSeriesSubscription(newOperationKey(), gym.s.id, 3, true);
+    expect([flags(on.series), since(on.series)]).toEqual(['true|null|4', '2037-10-21']);
     gym.s = on.series;
   });
 
@@ -6250,6 +6261,7 @@ describe('API real: assinaturas (Ciclo H2, D-046)', () => {
       dueDay: 10,
     });
     expect(flags(edited.series)).toBe('true|2037-10-09|3');
+    expect(since(edited.series)).toBe(T0);
     stream.s = edited.series;
     const all = await ana.listOpenSeriesOccurrences(rent.s.id);
     const gone = await ana.deleteSeries(newOperationKey(), rent.s.id, 1, all.map((c) => ({ id: c.id, version: c.version })));
@@ -6283,7 +6295,7 @@ describe('API real: assinaturas (Ciclo H2, D-046)', () => {
       const a = await mk('Revista', '2037-10');
       const b = await mk('Aplicativo', '2037-11');
       const e = await mk('Antiga', '2037-09', '2037-09');
-      const log = (w: { changed: number; series: CommitmentSeries }) => out.push([w.changed, flags(w.series)]);
+      const log = (w: { changed: number; series: CommitmentSeries }) => out.push([w.changed, `${flags(w.series)}|${since(w.series)}`]);
       log(await at(T0).setSeriesSubscription(newOperationKey(), a.id, 1, true));
       log(await at(T0).setSeriesSubscription(newOperationKey(), a.id, 2, true));
       log(await at(T0).setSeriesSubscription(newOperationKey(), b.id, 1, true));
@@ -6296,7 +6308,7 @@ describe('API real: assinaturas (Ciclo H2, D-046)', () => {
       out.push(
         (await at(T0).listSeries(c))
           .filter((x) => [a.id, b.id, e.id].includes(x.id))
-          .map((x) => [x.terms[0]!.description, flags(x)])
+          .map((x) => [x.terms[0]!.description, `${flags(x)}|${since(x)}`])
           .sort(),
       );
       // O detalhe "versao_atual=N" só existe no banco; aqui só o código.
@@ -6311,7 +6323,7 @@ describe('API real: assinaturas (Ciclo H2, D-046)', () => {
     const memCtx = (await mem.ensurePersonalSpace('Conta principal')).personalContextId;
     const memory = await run(memCtx, (d) => ((day = d), mem));
     expect(memory).toEqual(db);
-    expect(db[0]).toEqual([1, 'true|null|2']);
+    expect(db[0]).toEqual([1, `true|null|2|${T0}`]);
     expect(db[6]).toEqual({ reviewedOn: '2037-10-08', changed: 2 });
   });
 });
@@ -6342,6 +6354,7 @@ describe('conversor das assinaturas', () => {
     parts_per_year: null,
     subscription: true,
     subscription_reviewed_on: '2026-10-07',
+    subscription_since: '2026-07-01',
   };
   const fake = (rpc: Record<string, unknown>, tables: Record<string, unknown> = {}, error: unknown = null) => {
     const db = {
@@ -6369,7 +6382,7 @@ describe('conversor das assinaturas', () => {
     });
     const w = await repo.setSeriesSubscription('chave-0001', 's1', 1, true);
     expect(w.changed).toBe(1);
-    expect(w.series).toMatchObject({ id: 's1', subscription: true, subscriptionReviewedOn: '2026-10-07', version: 2 });
+    expect(w.series).toMatchObject({ id: 's1', subscription: true, subscriptionReviewedOn: '2026-10-07', subscriptionSince: '2026-07-01', version: 2 });
     expect(await repo.markSubscriptionsReviewed('chave-0002', 'ctx')).toEqual({ reviewedOn: '2026-10-07', changed: 2 });
     expect(calls).toEqual([
       ['set_series_subscription', { p_idempotency_key: 'chave-0001', p_series_id: 's1', p_expected_version: 1, p_subscription: true }],
@@ -6378,14 +6391,17 @@ describe('conversor das assinaturas', () => {
   });
 
   it('banco sem a 0011 ou linha antiga: sem as colunas, a série vale sem marca e sem data', async () => {
-    const { subscription: _s, subscription_reviewed_on: _d, ...old } = seriesRow;
+    const { subscription: _s, subscription_reviewed_on: _d, subscription_since: _i, ...old } = seriesRow;
     const repo = fake({}, { series_items: [old] });
-    expect((await repo.listSeries('ctx'))[0]).toMatchObject({ subscription: false, subscriptionReviewedOn: null });
+    expect((await repo.listSeries('ctx'))[0]).toMatchObject({ subscription: false, subscriptionReviewedOn: null, subscriptionSince: null });
+    // Linha sem o dia da marca: a marca vale e o dia fica nulo (o lembrete cai no dia do cadastro).
+    const { subscription_since: _j, ...noSince } = seriesRow;
+    expect((await fake({}, { series_items: [noSince] }).listSeries('ctx'))[0]).toMatchObject({ subscription: true, subscriptionSince: null });
     // A data sem a marca nunca aparece (a restrição do banco impede, e o app não confia).
-    const odd = fake({}, { series_items: [{ ...seriesRow, subscription: false, subscription_reviewed_on: '2026-10-07' }] });
-    expect((await odd.listSeries('ctx'))[0]).toMatchObject({ subscription: false, subscriptionReviewedOn: null });
-    const nulls = fake({}, { series_items: [{ ...seriesRow, subscription: null, subscription_reviewed_on: null }] });
-    expect((await nulls.listSeries('ctx'))[0]).toMatchObject({ subscription: false, subscriptionReviewedOn: null });
+    const odd = fake({}, { series_items: [{ ...seriesRow, subscription: false, subscription_reviewed_on: '2026-10-07', subscription_since: '2026-07-01' }] });
+    expect((await odd.listSeries('ctx'))[0]).toMatchObject({ subscription: false, subscriptionReviewedOn: null, subscriptionSince: null });
+    const nulls = fake({}, { series_items: [{ ...seriesRow, subscription: null, subscription_reviewed_on: null, subscription_since: null }] });
+    expect((await nulls.listSeries('ctx'))[0]).toMatchObject({ subscription: false, subscriptionReviewedOn: null, subscriptionSince: null });
   });
 
   it('resposta da revisão incoerente é recusada; sem a função (banco antigo) vira erro desconhecido', async () => {

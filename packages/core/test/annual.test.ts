@@ -96,6 +96,7 @@ const anual = (over: Partial<CommitmentSeries> = {}, termOver: Partial<SeriesTer
   generating: true,
   subscription: false,
   subscriptionReviewedOn: null,
+  subscriptionSince: null,
   createdBy: 'pessoa',
   version: 1,
   createdAt: CREATED_AT,
