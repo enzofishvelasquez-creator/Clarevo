@@ -16,6 +16,7 @@ import {
   SAVINGS_ANSWERS,
   SAVINGS_MIN_MONTHLY_CENTS,
   SEARCH_LIMIT,
+  searchTermPattern,
   activeAccounts,
   addMonths,
   monthRange,
@@ -1162,28 +1163,42 @@ async function readAll<T>(
 
 /**
  * Até `limit` linhas, em páginas de 500 (a API limita cada resposta), pedindo uma a mais para saber se havia mais:
- * `truncated` é verdadeiro só quando existe pelo menos uma linha além do limite.
+ * `truncated` é verdadeiro só quando existe pelo menos uma linha além do limite. Páginas por posição podem repetir uma linha se
+ * algo mudar entre os pedidos: as repetidas (mesmo id) saem, mantendo a ordem em que chegaram.
  */
-async function readUpTo<T>(
+async function readUpTo<T extends { id: string }>(
   limit: number,
   fetchPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message?: string; code?: string; details?: string | null } | null }>,
 ): Promise<SearchPage<T>> {
   const PAGE = 500;
   const want = limit + 1;
   const rows: T[] = [];
-  for (let from = 0; rows.length < want; from += PAGE) {
-    const to = Math.min(from + PAGE, want) - 1;
-    const { data, error } = await fetchPage(from, to);
+  const seen = new Set<string>();
+  // `from` anda pelas linhas lidas (repetidas incluídas); cada pedido traz no máximo o que ainda falta.
+  for (let from = 0; rows.length < want; ) {
+    const size = Math.min(PAGE, want - rows.length);
+    const { data, error } = await fetchPage(from, from + size - 1);
     if (error) throw repoError(error);
-    rows.push(...(data ?? []));
-    if ((data?.length ?? 0) < to - from + 1) break;
+    for (const row of data ?? []) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      rows.push(row);
+    }
+    if ((data?.length ?? 0) < size) break;
+    from += size;
   }
   return { items: rows.slice(0, limit), truncated: rows.length > limit };
 }
 
-/** Filtros da busca (período, categoria, valor) sobre a coluna de data da tabela; `Sem categoria` pede a coluna nula. */
+/** Filtros da busca (período, categoria, valor e texto) sobre a coluna de data da tabela; `Sem categoria` pede a coluna nula. */
 function searchFilters<
-  Q extends { gte(column: string, value: unknown): Q; lte(column: string, value: unknown): Q; eq(column: string, value: unknown): Q; is(column: string, value: null): Q },
+  Q extends {
+    gte(column: string, value: unknown): Q;
+    lte(column: string, value: unknown): Q;
+    eq(column: string, value: unknown): Q;
+    is(column: string, value: null): Q;
+    ilike(column: string, pattern: string): Q;
+  },
 >(query: Q, filter: RecordSearchFilter, dateColumn: string): Q {
   let q = query;
   if (filter.from !== null) q = q.gte(dateColumn, filter.from);
@@ -1191,6 +1206,9 @@ function searchFilters<
   if (filter.category !== null) q = filter.category === NO_CATEGORY_LABEL ? q.is('category', null) : q.eq('category', filter.category);
   if (filter.minCents !== null) q = q.gte('amount_cents', filter.minCents);
   if (filter.maxCents !== null) q = q.lte('amount_cents', filter.maxCents);
+  // Texto: um ILIKE por palavra (todas precisam aparecer), mais largo que a conferência exata do aparelho; assim o limite de
+  // linhas vale só para o que combina. O texto vai na consulta e não é guardado em lugar nenhum.
+  for (const term of filter.terms) q = q.ilike('description', searchTermPattern(term));
   return q;
 }
 
@@ -1352,7 +1370,8 @@ export class SupabaseRepository implements RecordsRepository {
 
   /**
    * Buscar em Movimentações (D-045): período, tipo, categoria, conta e valor no servidor, do mais recente ao mais antigo, até 1.000
-   * linhas. O texto da descrição é filtrado no aparelho (sem diferenciar acentos). Só leitura, na mesma tabela que listRecords.
+   * linhas. O texto da descrição entra como filtro mais largo (ILIKE por palavra, `_` no lugar das letras que podem ter acento) e o
+   * aparelho confere o resto, sem diferenciar acentos. Só leitura, na mesma tabela que listRecords.
    */
   async searchRecords(contextId: string, filter: RecordSearchFilter): Promise<SearchPage<FinancialRecord>> {
     const page = await readUpTo<RecordRow>(SEARCH_LIMIT, (from, to) => {

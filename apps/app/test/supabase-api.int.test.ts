@@ -86,6 +86,7 @@ import {
   searchFilterOf,
   searchResultPurchases,
   searchResultRecords,
+  searchTerms,
   seriesGapsInRange,
   seriesInputError,
   seriesPreview,
@@ -5702,7 +5703,7 @@ describe('API real: buscar em Movimentações (Ciclo H1, D-045)', () => {
   // Ana, em 07/10/2037, num período em que nenhum bloco anterior gravou nada. Bruno é a pessoa de fora. Gastos, contas, cartão e
   // pessoas FICTÍCIOS. A busca só lê: o teste confere que nenhuma requisição de escrita sai nas buscas.
   const T0 = '2037-10-07';
-  const YEAR: RecordSearchFilter = { from: '2037-01-01', to: '2037-12-31', kind: null, category: null, accountId: null, minCents: null, maxCents: null };
+  const YEAR: RecordSearchFilter = { from: '2037-01-01', to: '2037-12-31', kind: null, category: null, accountId: null, minCents: null, maxCents: null, terms: [] };
   const methods: string[] = [];
   const spy: typeof fetch = async (input, init) => {
     methods.push((init?.method ?? 'GET').toUpperCase());
@@ -5767,6 +5768,17 @@ describe('API real: buscar em Movimentações (Ciclo H1, D-045)', () => {
       { ...YEAR, from: '2037-10-05', to: null },
       { ...YEAR, to: '2037-08-10' },
       { ...YEAR, kind: 'despesa', category: 'Saúde', minCents: 1, maxCents: cents(50) },
+      // Texto: o filtro mais largo do banco (ILIKE com _ nas letras que podem ter acento) é o mesmo do core, com e sem acento.
+      { ...YEAR, terms: searchTerms('farmacia') },
+      { ...YEAR, terms: searchTerms('FARMÁCIA') },
+      { ...YEAR, terms: searchTerms('cafe') },
+      { ...YEAR, terms: searchTerms('salario') },
+      { ...YEAR, terms: searchTerms('luz') },
+      { ...YEAR, terms: searchTerms('luz conta'), kind: 'despesa' },
+      { ...YEAR, terms: searchTerms('de   casa') },
+      { ...YEAR, terms: searchTerms('50%') },
+      { ...YEAR, terms: searchTerms('a_b') },
+      { ...YEAR, terms: searchTerms('l\\z') },
     ];
     for (const filter of filters) {
       const page = await reader.searchRecords(ctx, filter);
@@ -5774,20 +5786,32 @@ describe('API real: buscar em Movimentações (Ciclo H1, D-045)', () => {
       expect(page.items.map(line), JSON.stringify(filter)).toEqual(expected.map(line));
       expect(page.truncated).toBe(false);
     }
+    // O texto já vem filtrado do banco: "farmacia" (sem acento) acha "Farmácia", e a conferência exata do aparelho confirma.
+    const farmacia = await reader.searchRecords(ctx, { ...YEAR, terms: searchTerms('farmacia') });
+    expect(farmacia.items.map((r) => r.description)).toEqual(['Farmácia']);
+    expect((await reader.searchRecords(ctx, { ...YEAR, terms: searchTerms('CAFE') })).items.map((r) => r.description)).toEqual(['Café']);
+    expect((await reader.searchRecords(ctx, { ...YEAR, terms: searchTerms('%') })).items).toEqual([]);
+    expect((await reader.searchRecords(ctx, { ...YEAR, terms: searchTerms('_') })).items).toEqual([]);
     // Datas incluem os dois limites; o filtro com valor exato acha o gasto de R$ 170,50.
     expect((await reader.searchRecords(ctx, { ...YEAR, minCents: cents(170.5), maxCents: cents(170.5) })).items.map((r) => r.description)).toEqual(['Luz da casa (Enel)']);
     expect((await reader.searchRecords(ctx, { ...YEAR, from: '2037-10-05', to: '2037-10-05' })).items.map((r) => r.description)).toEqual(['Luz da casa (Enel)']);
   });
 
-  it('"quanto paguei de luz?": o texto é filtrado no aparelho, sem acento nem maiúsculas, e a soma sai do core', async () => {
-    const page = await reader.searchRecords(ctx, searchFilterOf(params({ kind: 'despesa', period: 'ano' }), T0));
+  it('"quanto paguei de luz?": o texto vai ao banco como filtro mais largo, o aparelho confere sem acento nem maiúsculas, e a soma sai do core', async () => {
+    const page = await reader.searchRecords(ctx, searchFilterOf(params({ text: 'LUZ', kind: 'despesa', period: 'ano' }), T0));
+    expect(page.items.every((r) => /l.z/i.test(r.description))).toBe(true);
+    expect(page.items.some((r) => r.description === 'Farmácia')).toBe(false);
     const luz = searchResultRecords(page.items, params({ text: 'LUZ', kind: 'despesa', period: 'ano' }), T0);
     expect(luz.map(line)).toEqual(['2037-10-05 Luz da casa (Enel) 17050', '2037-09-10 Conta de LUZ 15000', '2037-08-10 Conta de luz 14000']);
     const s = summarizeSearch(luz);
     expect(s.paid).toEqual({ count: 3, cents: 46050, months: 3 });
     expect(s.averagePaidCents).toBe(15350);
-    // Farmácia com acento achada sem acento.
-    expect(searchResultRecords(page.items, params({ text: 'farmacia', kind: 'despesa', period: 'ano' }), T0).map((r) => r.description)).toEqual(['Farmácia']);
+    // Farmácia com acento achada sem acento (e com acento, e em maiúsculas), pelo filtro do banco e pela conferência do aparelho.
+    for (const text of ['farmacia', 'farmácia', 'FARMACIA', 'Farmácia']) {
+      const p = params({ text, kind: 'despesa', period: 'ano' });
+      const found = await reader.searchRecords(ctx, searchFilterOf(p, T0));
+      expect(searchResultRecords(found.items, p, T0).map((r) => r.description), text).toEqual(['Farmácia']);
+    }
     // O recebimento "Freela de luz" não entra na busca de gastos.
     expect(luz.some((r) => r.kind === 'receita')).toBe(false);
   });
@@ -5819,6 +5843,9 @@ describe('API real: buscar em Movimentações (Ciclo H1, D-045)', () => {
     expect((await reader.searchCardPurchases(ctx, { ...YEAR, minCents: 50000 })).items.map((e) => e.description)).toEqual(['Tênis de corrida']);
     expect((await reader.searchCardPurchases(ctx, { ...YEAR, from: '2037-09-01' })).items.map((e) => e.description)).toEqual(['Tênis de corrida']);
     expect(searchResultPurchases(page.items, params({ text: 'LUZ', period: 'tudo' }), T0).map((e) => e.description)).toEqual(['Livro de luz']);
+    // O texto também vai ao banco nas compras: "tenis" (sem acento) acha "Tênis de corrida" e "luz" só o livro.
+    expect((await reader.searchCardPurchases(ctx, { ...YEAR, terms: searchTerms('tenis') })).items.map((e) => e.description)).toEqual(['Tênis de corrida']);
+    expect((await reader.searchCardPurchases(ctx, { ...YEAR, terms: searchTerms('LUZ') })).items.map((e) => e.description)).toEqual(['Livro de luz']);
     // A soma de Pago do mês é a de sempre: a compra no cartão não entra.
     const october = summarizeMonth(await ana.listRecords(ctx, '2037-10'), ctx, '2037-10');
     expect(october.composition.paid.map((r) => r.description)).not.toContain('Tênis de corrida');
@@ -5859,8 +5886,8 @@ describe('API real: buscar em Movimentações (Ciclo H1, D-045)', () => {
 
 describe('conversor da busca em Movimentações', () => {
   // Sem rede: os filtros que chegam ao PostgREST, as páginas de 500 até o limite de 1.000 e o aviso de que havia mais.
-  const filter: RecordSearchFilter = { from: '2026-01-01', to: '2026-12-31', kind: 'despesa', category: 'Moradia', accountId: 'a1', minCents: 100, maxCents: 90000 };
-  const none: RecordSearchFilter = { from: null, to: null, kind: null, category: null, accountId: null, minCents: null, maxCents: null };
+  const filter: RecordSearchFilter = { from: '2026-01-01', to: '2026-12-31', kind: 'despesa', category: 'Moradia', accountId: 'a1', minCents: 100, maxCents: 90000, terms: [] };
+  const none: RecordSearchFilter = { from: null, to: null, kind: null, category: null, accountId: null, minCents: null, maxCents: null, terms: [] };
   const recordRow = (i: number) => ({
     id: `r${String(i).padStart(5, '0')}`,
     context_id: 'ctx',
@@ -5910,7 +5937,7 @@ describe('conversor da busca em Movimentações', () => {
       from: (table: string) => {
         tables.push(table);
         const q: Record<string, unknown> = {};
-        for (const m of ['select', 'eq', 'is', 'gte', 'lte', 'order']) q[m] = (...args: unknown[]) => (log.push([m, ...args]), q);
+        for (const m of ['select', 'eq', 'is', 'gte', 'lte', 'ilike', 'order']) q[m] = (...args: unknown[]) => (log.push([m, ...args]), q);
         q.range = (from: number, to: number) => {
           ranges.push([from, to]);
           const page = { data: Array.from({ length: Math.max(0, Math.min(total, to + 1) - from) }, (_, k) => makeRow(from + k)), error: null };
@@ -5922,9 +5949,9 @@ describe('conversor da busca em Movimentações', () => {
     return { repo: new SupabaseRepository(db as unknown as SupabaseClient, { id: 'p1' }), log, ranges, tables };
   };
 
-  it('registros: todos os filtros vão ao banco, do mais recente ao mais antigo, e o texto não vai', async () => {
+  it('registros: todos os filtros vão ao banco, do mais recente ao mais antigo, e o texto vai como ILIKE por palavra', async () => {
     const { repo, log, tables } = fakeDb(3, recordRow);
-    const page = await repo.searchRecords('ctx', filter);
+    const page = await repo.searchRecords('ctx', { ...filter, terms: ['farmacia', '50%', 'a_b'] });
     expect(page.items).toHaveLength(3);
     expect(tables).toEqual(['financial_records']);
     expect(log).toEqual([
@@ -5935,6 +5962,9 @@ describe('conversor da busca em Movimentações', () => {
       ['eq', 'category', 'Moradia'],
       ['gte', 'amount_cents', 100],
       ['lte', 'amount_cents', 90000],
+      ['ilike', 'description', '%f_rm____%'],
+      ['ilike', 'description', '%50\\%%'],
+      ['ilike', 'description', '%_\\_b%'],
       ['eq', 'kind', 'despesa'],
       ['eq', 'account_id', 'a1'],
       ['order', 'occurred_on', { ascending: false }],
@@ -5977,6 +6007,25 @@ describe('conversor da busca em Movimentações', () => {
     expect(await empty.repo.searchRecords('ctx', none)).toEqual({ items: [], truncated: false });
   });
 
+  it('linhas repetidas entre as páginas (mesmo id) saem antes do corte, na ordem em que chegaram', async () => {
+    // A leitura por posição pode repetir uma linha se algo mudar entre os pedidos: aqui a segunda página começa repetindo as ids 498 e 499.
+    const total = 1100;
+    const rowAt = (i: number) => recordRow(i < 500 ? i : i - 2);
+    const dup = fakeDb(total, rowAt);
+    const page = await dup.repo.searchRecords('ctx', none);
+    const ids = page.items.map((r) => r.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids.slice(0, 3)).toEqual(['r00000', 'r00001', 'r00002']);
+    expect(ids.slice(496, 503)).toEqual(['r00496', 'r00497', 'r00498', 'r00499', 'r00500', 'r00501', 'r00502']);
+    expect(page.items).toHaveLength(SEARCH_LIMIT);
+    expect(page.truncated).toBe(true);
+    // Sem mais linhas além das repetidas: não avisa à toa.
+    const exact = fakeDb(1002, rowAt);
+    const full = await exact.repo.searchRecords('ctx', none);
+    expect(full.items).toHaveLength(1000);
+    expect(full.truncated).toBe(false);
+  });
+
   it('compras: só kind compra, pela data da compra; recebimento e conta de origem nem consultam', async () => {
     const { repo, log, tables } = fakeDb(2, purchaseRow);
     const page = await repo.searchCardPurchases('ctx', { ...filter, accountId: null });
@@ -6016,7 +6065,7 @@ describe('conversor da busca em Movimentações', () => {
     const failing = {
       from: () => {
         const q: Record<string, unknown> = {};
-        for (const m of ['select', 'eq', 'is', 'gte', 'lte', 'order']) q[m] = () => q;
+        for (const m of ['select', 'eq', 'is', 'gte', 'lte', 'ilike', 'order']) q[m] = () => q;
         q.range = () => Promise.resolve({ data: null, error: { message: 'Failed to fetch' } });
         return q;
       },

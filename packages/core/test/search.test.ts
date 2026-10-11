@@ -28,7 +28,9 @@ import {
   searchResultPurchases,
   searchResultRecords,
   searchSummaryLines,
+  searchTermPattern,
   searchTerms,
+  textSupersetMatches,
   summarizeMonth,
   summarizePurchases,
   summarizeSearch,
@@ -41,7 +43,7 @@ import {
   type SearchParams,
 } from '../src';
 
-const NONE: RecordSearchFilter = { from: null, to: null, kind: null, category: null, accountId: null, minCents: null, maxCents: null };
+const NONE: RecordSearchFilter = { from: null, to: null, kind: null, category: null, accountId: null, minCents: null, maxCents: null, terms: [] };
 
 function rec(over: Partial<FinancialRecord> & Pick<FinancialRecord, 'id' | 'occurredOn'>): FinancialRecord {
   return {
@@ -134,10 +136,43 @@ describe('período e filtro do servidor', () => {
     expect(DEFAULT_SEARCH.period).toBe('12m');
   });
 
-  it('o filtro do servidor leva período, tipo, categoria, conta e valor, mas não o texto', () => {
-    const f = searchFilterOf(params({ text: 'luz', kind: 'despesa', period: 'ano', category: 'Moradia', accountId: 'a1', minCents: 500, maxCents: 9000 }), '2026-10-07');
-    expect(f).toEqual({ from: '2026-01-01', to: '2026-12-31', kind: 'despesa', category: 'Moradia', accountId: 'a1', minCents: 500, maxCents: 9000 });
+  it('o filtro do servidor leva período, tipo, categoria, conta, valor e as palavras do texto (normalizadas)', () => {
+    const f = searchFilterOf(params({ text: 'Luz  FARMÁCIA', kind: 'despesa', period: 'ano', category: 'Moradia', accountId: 'a1', minCents: 500, maxCents: 9000 }), '2026-10-07');
+    expect(f).toEqual({ from: '2026-01-01', to: '2026-12-31', kind: 'despesa', category: 'Moradia', accountId: 'a1', minCents: 500, maxCents: 9000, terms: ['luz', 'farmacia'] });
     expect(searchFilterOf(DEFAULT_SEARCH, '2026-10-07')).toEqual({ ...NONE, from: '2025-11-01' });
+  });
+
+  it('o padrão do servidor troca as letras que podem ter acento por _ e escapa %, _ e \\', () => {
+    expect(searchTermPattern('luz')).toBe('%l_z%');
+    expect(searchTermPattern('farmacia')).toBe('%f_rm____%');
+    expect(searchTermPattern('conta')).toBe('%___t_%');
+    expect(searchTermPattern('xyz')).toBe('%xyz%');
+    expect(searchTermPattern('50%')).toBe('%50\\%%');
+    expect(searchTermPattern('a_b')).toBe('%_\\_b%');
+    expect(searchTermPattern('a\\b')).toBe('%_\\\\b%');
+    expect(searchTermPattern(searchTerms('AÇÃO')[0]!)).toBe('%____%');
+  });
+
+  it('o filtro mais largo aceita tudo o que a conferência exata aceita (com e sem acento, em qualquer caixa) e mais um pouco', () => {
+    const descriptions = ['Farmácia', 'FARMACIA', 'farmacia São João', 'Conta de luz', 'Açúcar', 'ACUCAR', 'Pão de queijo', 'Mercado', 'Ônibus', 'Café'];
+    const queries = ['farmacia', 'FARMÁCIA', 'acucar', 'açúcar', 'pao', 'pão', 'onibus', 'cafe', 'café', 'luz conta', 'sao joao', 'merc'];
+    for (const description of descriptions) {
+      for (const q of queries) {
+        if (textMatchesSearch(description, q)) expect(textSupersetMatches(description, searchTerms(q)), `${description} / ${q}`).toBe(true);
+      }
+    }
+    // Mais largo: o servidor deixa passar o que o aparelho ainda tira ("luz" também acha "lez"; o exato não).
+    expect(textSupersetMatches('Lez', ['luz'])).toBe(true);
+    expect(textMatchesSearch('Lez', 'luz')).toBe(false);
+    // Letras sem acento e símbolos literais continuam exatos no servidor.
+    expect(textSupersetMatches('Mercado', ['xyz'])).toBe(false);
+    expect(textSupersetMatches('Desconto de 50% hoje', ['50%'])).toBe(true);
+    expect(textSupersetMatches('Desconto de 505 hoje', ['50%'])).toBe(false);
+    expect(textSupersetMatches('a_b', ['a_b'])).toBe(true);
+    expect(textSupersetMatches('azb', ['a_b'])).toBe(false);
+    expect(textSupersetMatches('Sem descrição', [])).toBe(true);
+    expect(textSupersetMatches(null, ['luz'])).toBe(false);
+    expect(textSupersetMatches(null, [])).toBe(true);
   });
 
   it('o registro passa pelo filtro: datas incluem os limites, tipo, categoria, conta e valor', () => {
@@ -202,6 +237,30 @@ describe('resultado: texto, ordem, resumo e agrupamento', () => {
     const a = rec({ id: 'a', occurredOn: '2026-10-10', createdAt: '2026-10-10T08:00:00.000Z' });
     const b = rec({ id: 'b', occurredOn: '2026-10-10', createdAt: '2026-10-10T09:00:00.000Z' });
     expect(searchResultRecords([a, b], params(), '2026-10-07').map((r) => r.id)).toEqual(['b', 'a']);
+  });
+
+  it('empate de data: a ordem de criação vale como instante, mesmo com formatos diferentes de fuso', () => {
+    // Como texto, "T10:00:00Z" viria depois de "T10:00:00.500+00:00" (o "Z" vale mais que "."): a ordem certa é pelo instante.
+    const a = rec({ id: 'a', occurredOn: '2026-10-10', createdAt: '2026-10-10T10:00:00Z' });
+    const b = rec({ id: 'b', occurredOn: '2026-10-10', createdAt: '2026-10-10T10:00:00.500+00:00' });
+    const c = rec({ id: 'c', occurredOn: '2026-10-10', createdAt: '2026-10-10T07:30:00-03:00' });
+    // c é 10:30 em UTC, b é 10:00:00,5 e a é 10:00:00.
+    expect(searchResultRecords([a, b, c], params(), '2026-10-07').map((r) => r.id)).toEqual(['c', 'b', 'a']);
+    const p1 = purchase({ id: 'p1', purchasedOn: '2026-10-05', createdAt: '2026-10-05T10:00:00Z' });
+    const p2 = purchase({ id: 'p2', purchasedOn: '2026-10-05', createdAt: '2026-10-05T10:00:00.500+00:00' });
+    expect(searchResultPurchases([p1, p2], params(), '2026-10-07').map((e) => e.id)).toEqual(['p2', 'p1']);
+  });
+
+  it('quando a busca bateu no limite, as somas dizem que valem só para os 1.000 registros mais recentes', () => {
+    const s = summarizeSearch(searchResultRecords(records, params({ kind: 'todos' }), '2026-10-07'));
+    expect(searchSummaryLines(s, true)).toEqual([
+      '4 gastos · R$ 570,50 nos 1.000 registros mais recentes',
+      'média de R$ 190,17 por mês com gasto',
+      '1 recebimento · R$ 6.000,00 nos 1.000 registros mais recentes',
+    ]);
+    expect(searchSummaryLines(s, false)[0]).toBe('4 gastos · R$ 570,50 no período');
+    expect(SEARCH_TEXT.expenses(1, 100, true)).toBe('1 gasto · R$ 1,00 nos 1.000 registros mais recentes');
+    expect(SEARCH_TEXT.cardsSummary(2, 230000, true)).toBe('2 compras · R$ 2.300,00 no total das 1.000 compras mais recentes');
   });
 
   it('o resumo soma gastos e recebimentos e dá a média por mês com gasto (centavos, metade para cima)', () => {
@@ -463,6 +522,11 @@ describe('MemoryRepository: buscar (D-045)', () => {
     expect(page.truncated).toBe(true);
     expect(page.items.some((r) => r.id === first.id)).toBe(false);
     expect(page.items[0]!.occurredOn >= page.items[SEARCH_LIMIT - 1]!.occurredOn).toBe(true);
+    // O texto entra no filtro do servidor: o registro que ficou fora das 1.000 mais recentes aparece quando a busca o procura, sem aviso.
+    const byText = await repo.searchRecords(ctx, searchFilterOf(params({ period: 'tudo', text: 'MAIS ANTIGO' }), '2026-10-07'));
+    expect(byText.items.map((r) => r.id)).toEqual([first.id]);
+    expect(byText.truncated).toBe(false);
+    expect((await repo.searchRecords(ctx, searchFilterOf(params({ period: 'tudo', text: 'excluido' }), '2026-10-07'))).items).toEqual([]);
   }, 30000);
 
   it('a leitura de quem não é dono do contexto volta vazia, e a busca não grava nada', async () => {

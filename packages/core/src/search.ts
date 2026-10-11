@@ -10,9 +10,11 @@ import { CATEGORIES, NO_CATEGORY_LABEL } from './records';
  * Buscar em Movimentações (D-045, Ciclo H1; docs/08 §5 item 5). Responde "quanto paguei de luz?" e acha um lançamento antigo em
  * todos os meses. Regras puras: nada aqui grava, e o app não registra buscas (como Aprender).
  *
- * O servidor filtra por período, tipo, categoria, conta e valor e devolve até `SEARCH_LIMIT` linhas, das mais recentes; o texto da
- * descrição é filtrado no aparelho, sem diferenciar maiúsculas nem acentos (normalização NFD). Sem migração: a leitura é a mesma
- * que a RLS já permite. Compras no cartão ficam num grupo à parte e nunca entram na soma de Pago (só o pagamento da fatura é gasto).
+ * O servidor filtra por período, tipo, categoria, conta, valor e texto e devolve até `SEARCH_LIMIT` linhas, das mais recentes. O
+ * texto vai ao servidor como um filtro mais largo (ILIKE por palavra, com `_` no lugar de toda letra que pode ter acento), para o
+ * limite de linhas valer só para o que combina; a conferência exata, sem diferenciar maiúsculas nem acentos (normalização NFD),
+ * continua no aparelho. Sem migração: a leitura é a mesma que a RLS já permite. Compras no cartão ficam num grupo à parte e nunca
+ * entram na soma de Pago (só o pagamento da fatura é gasto).
  */
 
 /** Linhas que o servidor devolve por busca (registros e, em separado, compras no cartão). Passou disso, a busca avisa. */
@@ -54,7 +56,8 @@ export const DEFAULT_SEARCH: SearchParams = {
 
 /**
  * O que o servidor filtra (financial_records e card_entry_items). `from` e `to` incluem o dia; `category` igual a
- * `NO_CATEGORY_LABEL` pede os sem categoria; valores em centavos incluem os limites.
+ * `NO_CATEGORY_LABEL` pede os sem categoria; valores em centavos incluem os limites; `terms` são as palavras buscadas já
+ * normalizadas (`searchTerms`), cada uma virando um filtro mais largo na descrição (`searchTermPattern`).
  */
 export interface RecordSearchFilter {
   from: IsoDate | null;
@@ -64,6 +67,7 @@ export interface RecordSearchFilter {
   accountId: string | null;
   minCents: Cents | null;
   maxCents: Cents | null;
+  terms: readonly string[];
 }
 
 /** Resposta de uma busca no servidor: as mais recentes (até `SEARCH_LIMIT`) e se havia mais. */
@@ -75,6 +79,8 @@ export interface SearchPage<T> {
 // ---------------------------------------------------------------------------
 // Texto
 // ---------------------------------------------------------------------------
+
+const PARTIAL_RECORDS = 'nos 1.000 registros mais recentes';
 
 export const SEARCH_TEXT = {
   /** Entrada em Movimentações. */
@@ -117,11 +123,14 @@ export const SEARCH_TEXT = {
   emptyTitle: 'Nada encontrado',
   emptyBody: 'Nenhum registro combina com esta busca. Mude o texto, o período ou os filtros.',
   noRecords: 'Nenhum gasto ou recebimento combina com esta busca.',
-  truncated: 'Mostrando os 1.000 mais recentes; refine a busca.',
+  truncated: 'A busca olhou só os 1.000 registros mais recentes do período. Escolha um período menor ou use os filtros.',
   shownOf: (shown: number, total: number): string => `Mostrando ${shown} de ${total}`,
   showMore: (next: number): string => `Mostrar mais ${next}`,
-  expenses: (count: number, cents: Cents): string => `${count === 1 ? '1 gasto' : `${count} gastos`} · ${formatBRL(cents)} no período`,
-  incomes: (count: number, cents: Cents): string => `${count === 1 ? '1 recebimento' : `${count} recebimentos`} · ${formatBRL(cents)} no período`,
+  /** `partial`: a busca bateu no limite, então a soma vale só para os 1.000 registros mais recentes. */
+  expenses: (count: number, cents: Cents, partial = false): string =>
+    `${count === 1 ? '1 gasto' : `${count} gastos`} · ${formatBRL(cents)} ${partial ? PARTIAL_RECORDS : 'no período'}`,
+  incomes: (count: number, cents: Cents, partial = false): string =>
+    `${count === 1 ? '1 recebimento' : `${count} recebimentos`} · ${formatBRL(cents)} ${partial ? PARTIAL_RECORDS : 'no período'}`,
   average: (cents: Cents): string => `média de ${formatBRL(cents)} por mês com gasto`,
   /** Aviso sob o resumo quando há compras no cartão na busca: elas não entram na soma de gastos. */
   summaryCardsNote: 'Os gastos acima não incluem as compras no cartão, listadas à parte.',
@@ -130,7 +139,8 @@ export const SEARCH_TEXT = {
   /** Compras no cartão. */
   cardsTitle: 'Compras no cartão',
   cardsNote: 'O dinheiro só sai quando a fatura é paga. Por isso estas compras não estão somadas em Pago: o pagamento da fatura aparece na lista acima, uma vez só.',
-  cardsSummary: (count: number, cents: Cents): string => `${count === 1 ? '1 compra' : `${count} compras`} · ${formatBRL(cents)} no total das compras`,
+  cardsSummary: (count: number, cents: Cents, partial = false): string =>
+    `${count === 1 ? '1 compra' : `${count} compras`} · ${formatBRL(cents)} ${partial ? 'no total das 1.000 compras mais recentes' : 'no total das compras'}`,
   cardsHiddenByAccount: 'Compras no cartão não têm conta de origem: a conta vem do pagamento da fatura. Limpe o filtro de conta para vê-las.',
   cardsLoadFailed: 'Não foi possível carregar as compras no cartão. Tente novamente.',
   retry: 'Tentar de novo',
@@ -152,6 +162,39 @@ export function normalizeSearchText(text: string): string {
 export function searchTerms(query: string): string[] {
   const normalized = normalizeSearchText(query.slice(0, SEARCH_TEXT_MAX));
   return normalized === '' ? [] : normalized.split(' ');
+}
+
+/** Letras que podem ter acento em português (a, e, i, o, u, c, n), nas duas caixas: no filtro do servidor valem qualquer caractere. */
+const ACCENTABLE = /[aeioucn]/gi;
+
+/**
+ * O padrão ILIKE de uma palavra buscada (já normalizada): `%`, `_` e `\` literais ficam escapados e toda letra que pode ter acento
+ * vira `_`. É um conjunto mais largo que a conferência exata (NFD): nunca deixa de fora o que a conferência aceita, e o resto o
+ * aparelho tira. "farmacia" → "%f_rm____%".
+ */
+export function searchTermPattern(term: string): string {
+  const escaped = term.replace(/[\\%_]/g, (c) => `\\${c}`);
+  // Troca só as letras fora das barras de escape (a barra nunca é letra, então o escape não é tocado).
+  return `%${escaped.replace(ACCENTABLE, '_')}%`;
+}
+
+/** O filtro mais largo do servidor, repetido aqui para a memória: cada palavra aparece na descrição, com `_` valendo um caractere. */
+export function textSupersetMatches(description: string | null, terms: readonly string[]): boolean {
+  if (terms.length === 0) return true;
+  if (description === null) return false;
+  return terms.every((t) => ilikeRegex(searchTermPattern(t)).test(description));
+}
+
+function ilikeRegex(pattern: string): RegExp {
+  let source = '';
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i]!;
+    if (c === '\\') source += (pattern[++i] ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    else if (c === '%') source += '.*';
+    else if (c === '_') source += '.';
+    else source += c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+  return new RegExp(`^${source}$`, 'isu');
 }
 
 /** A descrição tem todas as palavras buscadas, em qualquer ordem e em qualquer parte? Sem texto buscado, tudo combina. */
@@ -185,7 +228,7 @@ export function searchRange(period: SearchPeriod, today: IsoDate): { from: IsoDa
   }
 }
 
-/** O que o servidor recebe para esta busca (o texto não vai: é filtrado no aparelho). */
+/** O que o servidor recebe para esta busca (as palavras do texto vão como filtro mais largo; a conferência exata é no aparelho). */
 export function searchFilterOf(params: SearchParams, today: IsoDate): RecordSearchFilter {
   const { from, to } = searchRange(params.period, today);
   return {
@@ -196,6 +239,7 @@ export function searchFilterOf(params: SearchParams, today: IsoDate): RecordSear
     accountId: params.accountId,
     minCents: params.minCents,
     maxCents: params.maxCents,
+    terms: searchTerms(params.text),
   };
 }
 
@@ -215,7 +259,8 @@ export function recordMatchesFilter(record: FinancialRecord, filter: RecordSearc
     (filter.kind === null || record.kind === filter.kind) &&
     categoryMatches(record.category, filter.category) &&
     (filter.accountId === null || record.accountId === filter.accountId) &&
-    amountMatches(record.amountCents, filter)
+    amountMatches(record.amountCents, filter) &&
+    textSupersetMatches(record.description, filter.terms)
   );
 }
 
@@ -231,7 +276,8 @@ export function purchaseMatchesFilter(entry: CardEntry, filter: RecordSearchFilt
     filter.accountId === null &&
     dateMatches(entry.purchasedOn, filter) &&
     categoryMatches(entry.category, filter.category) &&
-    amountMatches(entry.amountCents, filter)
+    amountMatches(entry.amountCents, filter) &&
+    textSupersetMatches(entry.description, filter.terms)
   );
 }
 
@@ -240,13 +286,19 @@ export function includesCardPurchases(params: Pick<SearchParams, 'kind' | 'accou
   return params.kind !== 'receita' && params.accountId === null;
 }
 
+/** Instantes de criação em ordem cronológica (formatos diferentes de ISO, como "Z" e "+00:00", não se comparam como texto). */
+function compareCreatedDesc(a: string, b: string): number {
+  const diff = Date.parse(b) - Date.parse(a);
+  return Number.isNaN(diff) ? 0 : diff;
+}
+
 /** Do mais recente ao mais antigo: data, depois criação, depois id. */
 export function compareNewestRecord(a: FinancialRecord, b: FinancialRecord): number {
-  return b.occurredOn.localeCompare(a.occurredOn) || b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id);
+  return b.occurredOn.localeCompare(a.occurredOn) || compareCreatedDesc(a.createdAt, b.createdAt) || b.id.localeCompare(a.id);
 }
 
 export function compareNewestPurchase(a: CardEntry, b: CardEntry): number {
-  return (b.purchasedOn ?? '').localeCompare(a.purchasedOn ?? '') || b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id);
+  return (b.purchasedOn ?? '').localeCompare(a.purchasedOn ?? '') || compareCreatedDesc(a.createdAt, b.createdAt) || b.id.localeCompare(a.id);
 }
 
 /** Resultado final no aparelho: o que o servidor devolveu, repassado pelo filtro, com o texto aplicado e do mais recente ao mais antigo. */
@@ -306,14 +358,14 @@ export function summarizePurchases(entries: readonly CardEntry[]): PurchasesSumm
   return { count: entries.length, totalCents: entries.reduce((acc, e) => acc + e.amountCents, 0) };
 }
 
-/** As linhas do resumo, na ordem em que aparecem: gastos, média, recebimentos. Vazio quando não há nada. */
-export function searchSummaryLines(summary: SearchSummary): string[] {
+/** As linhas do resumo, na ordem em que aparecem: gastos, média, recebimentos. Vazio quando não há nada. `partial`: a busca bateu no limite. */
+export function searchSummaryLines(summary: SearchSummary, partial = false): string[] {
   const lines: string[] = [];
   if (summary.paid.count > 0) {
-    lines.push(SEARCH_TEXT.expenses(summary.paid.count, summary.paid.cents));
+    lines.push(SEARCH_TEXT.expenses(summary.paid.count, summary.paid.cents, partial));
     if (summary.averagePaidCents !== null) lines.push(SEARCH_TEXT.average(summary.averagePaidCents));
   }
-  if (summary.received.count > 0) lines.push(SEARCH_TEXT.incomes(summary.received.count, summary.received.cents));
+  if (summary.received.count > 0) lines.push(SEARCH_TEXT.incomes(summary.received.count, summary.received.cents, partial));
   return lines;
 }
 

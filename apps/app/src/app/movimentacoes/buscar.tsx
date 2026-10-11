@@ -52,8 +52,9 @@ function useDebounced<V>(value: V, ms: number): V {
 
 /**
  * Buscar em Movimentações (D-045): gastos e recebimentos de todos os meses, por texto (sem diferenciar maiúsculas nem acentos),
- * tipo, período, categoria, conta e valor. O servidor filtra o que pode e devolve até 1.000 linhas; o texto é filtrado aqui, no
- * aparelho, e fica só na memória desta tela (nada é gravado nem registrado). Compras no cartão ficam num grupo à parte e não
+ * tipo, período, categoria, conta e valor. O servidor filtra (o texto, por um filtro mais largo) e devolve até 1.000 linhas; a conferência
+ * exata do texto é feita aqui, no aparelho. O texto fica só na memória desta tela e na chave do cache em memória (nada é gravado
+ * em armazenamento nem registrado). Compras no cartão ficam num grupo à parte e não
  * entram na soma de gastos: o dinheiro sai quando a fatura é paga, e o pagamento da fatura já está na lista.
  */
 export default function BuscarScreen() {
@@ -74,10 +75,12 @@ export default function BuscarScreen() {
     setPurchaseLimit(SEARCH_PAGE);
   };
 
-  // Os valores digitados só valem depois de um instante parado; o texto, o tipo e o período valem na hora.
+  // O texto e os valores digitados só valem depois de um instante parado (o texto vai ao servidor como filtro, então não consulta a
+  // cada tecla); o tipo e o período valem na hora.
+  const text = useDebounced(draft.text, 400);
   const min = useDebounced(draft.min, 400);
   const max = useDebounced(draft.max, 400);
-  const parsed = searchFromDraft({ ...draft, min, max });
+  const parsed = searchFromDraft({ ...draft, text, min, max });
   const params = parsed.ok ? parsed.params : null;
   const errors = parsed.ok ? {} : parsed.errors;
   const search = useRecordSearch(contextId, params);
@@ -91,12 +94,16 @@ export default function BuscarScreen() {
   const found = params && search.records.data ? searchResultRecords(search.records.data.items, params, today) : [];
   const summary = summarizeSearch(found);
   const purchases = params && search.withCards && search.purchases.data ? searchResultPurchases(search.purchases.data.items, params, today) : [];
-  const truncated = Boolean(search.records.data?.truncated || (search.withCards && search.purchases.data?.truncated));
+  const recordsTruncated = Boolean(search.records.data?.truncated);
+  const purchasesTruncated = Boolean(search.withCards && search.purchases.data?.truncated);
+  const truncated = recordsTruncated || purchasesTruncated;
   const cardNames = new Map((cards.data ?? []).map((c) => [c.id, c.name]));
-  const lines = searchSummaryLines(summary);
+  const lines = searchSummaryLines(summary, recordsTruncated);
   const purchasesPending = search.withCards && search.purchases.isPending;
+  const purchasesFailed = search.withCards && search.purchases.isError;
   const hiddenByAccount = params !== null && accountId !== null && draft.kind !== 'receita';
-  const nothing = found.length === 0 && purchases.length === 0 && !purchasesPending;
+  // Sem achados e sem erro nas compras no cartão: com a leitura das compras falha, a tela mostra o erro em vez de "Nada encontrado".
+  const nothing = found.length === 0 && purchases.length === 0 && !purchasesPending && !purchasesFailed;
 
   const shownRecords = found.slice(0, recordLimit);
   const shownPurchases = purchases.slice(0, purchaseLimit);
@@ -273,15 +280,15 @@ export default function BuscarScreen() {
               </Card>
             ) : null}
 
-            {search.withCards && search.purchases.isError ? (
+            {purchasesFailed ? (
               <ErrorState message={T.cardsLoadFailed} onRetry={() => search.purchases.refetch()} />
             ) : purchases.length > 0 ? (
               <Card style={{ gap: space[1] }}>
                 <Txt variant="title" accessibilityRole="header" aria-level={2}>
                   {T.cardsTitle}
                 </Txt>
-                <Txt variant="label" color={colors.textSecondary} accessibilityLabel={spokenText(cardsLine(purchases), hidden)}>
-                  {maskMoneyText(cardsLine(purchases), hidden)}
+                <Txt variant="label" color={colors.textSecondary} accessibilityLabel={spokenText(cardsLine(purchases, purchasesTruncated), hidden)}>
+                  {maskMoneyText(cardsLine(purchases, purchasesTruncated), hidden)}
                 </Txt>
                 <Txt variant="caption" color={colors.textSecondary} style={styles.note}>
                   {T.cardsNote}
@@ -314,9 +321,9 @@ export default function BuscarScreen() {
   );
 }
 
-const cardsLine = (purchases: Parameters<typeof summarizePurchases>[0]) => {
+const cardsLine = (purchases: Parameters<typeof summarizePurchases>[0], partial: boolean) => {
   const s = summarizePurchases(purchases);
-  return SEARCH_TEXT.cardsSummary(s.count, s.totalCents);
+  return SEARCH_TEXT.cardsSummary(s.count, s.totalCents, partial);
 };
 
 /** "Mostrando 100 de 250" e o botão para trazer mais 100. */

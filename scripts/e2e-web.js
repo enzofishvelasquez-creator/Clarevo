@@ -6731,7 +6731,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const h1Group = (name) => p.getByRole('radiogroup', { name, exact: true }).filter({ visible: true });
   const h1Pick = async (group, name) => { await h1Group(group).getByRole('radio', { name, exact: true }).click(); await p.waitForTimeout(600); };
   const h1Checked = async (group, name) => (await h1Group(group).getByRole('radio', { name, exact: true }).getAttribute('aria-checked')) === 'true';
-  const h1Type = async (text) => { await field('O que você procura').fill(text); await p.waitForTimeout(600); };
+  // O texto espera 400 ms parado antes de consultar o servidor (como os valores).
+  const h1Type = async (text) => { await field('O que você procura').fill(text); await p.waitForTimeout(1000); };
   const h1Labels = (re) => p.evaluate((src) => [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => (e.getAttribute('aria-label') || '').replace(/ /g, ' ')).filter((l) => new RegExp(src).test(l)), re.source);
   const noMoney = (list) => list.map((l) => l.replace(/, R\$ [\d.,]+(\. Abre a fatura\.)?$/, '').replace(/, valor oculto(\. Abre a fatura\.)?$/, ''));
   const h1Rows = async () => noMoney(await h1Labels(/, (Pago|Recebido) · \d{2}\/\d{2}\/\d{4}/));
@@ -6742,7 +6743,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await goResumo(); await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(400);
     await p.getByRole('button', { name: /^Buscar\./ }).filter({ visible: true }).first().click(); await waitText('O que você procura'); await p.waitForTimeout(500);
   };
-  const h1Clear = async () => { if ((await visibleCount('button', 'Limpar busca')) > 0) await btn('Limpar busca').click(); await p.waitForTimeout(500); };
+  const h1Clear = async () => { if ((await visibleCount('button', 'Limpar busca')) > 0) await btn('Limpar busca').click(); await p.waitForTimeout(1000); };
   const h1Storage = () => p.evaluate(() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]));
   const luzRows = [
     'Conta de luz, Pago · 05/10/2026 · Conta principal',
@@ -6925,7 +6926,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('button', { name: /^Livro de luz, Compra · 20\/09\/2026/ }).filter({ visible: true }).first().click(); await waitText('Lançamentos'); await p.waitForTimeout(500);
   ok('H1 Abrir uma compra no cartão: a fatura de outubro do cartão (/cartoes/.../fatura/2026-10)', /^\/cartoes\/[^/]+\/fatura\/2026-10$/.test(urlPath()), p.url());
   await btn('Voltar').click(); await waitText('O que você procura'); await p.waitForTimeout(400);
-  await btn('Limpar busca').click(); await p.waitForTimeout(600);
+  await btn('Limpar busca').click(); await p.waitForTimeout(1000);
   t = await body();
   ok('H1 Limpar busca: texto vazio, Todos, 12 meses e sem filtros (volta ao resumo dos 12 meses)', (await field('O que você procura').inputValue()) === '' && (await h1Checked('Tipo', 'Todos')) && (await h1Checked('Período', 'Últimos 12 meses')) && (await visibleCount('button', 'Limpar busca')) === 0 && t.includes('15 gastos · R$ 8.903,90 no período'));
 
@@ -6964,17 +6965,22 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(500);
   await p.getByRole('button', { name: /^Buscar\./ }).filter({ visible: true }).first().click(); await waitText('O que você procura'); await p.waitForTimeout(1500);
   t = await h1Keep();
-  ok('H1 mais de 1.000 registros: "Mostrando os 1.000 mais recentes; refine a busca." e só 100 linhas de cada vez ("Mostrando 100 de 1000")',
-    t.includes('Mostrando os 1.000 mais recentes; refine a busca.') && t.includes('Mostrando 100 de 1000') && (await h1Rows()).length === 100 && (await visibleCount('button', 'Mostrar mais 100')) === 1, `${(await h1Rows()).length}`);
+  ok('H1 mais de 1.000 registros: "A busca olhou só os 1.000 registros mais recentes do período. Escolha um período menor ou use os filtros." e só 100 linhas de cada vez ("Mostrando 100 de 1000")',
+    t.includes('A busca olhou só os 1.000 registros mais recentes do período. Escolha um período menor ou use os filtros.') && t.includes('Mostrando 100 de 1000') && (await h1Rows()).length === 100 && (await visibleCount('button', 'Mostrar mais 100')) === 1, `${(await h1Rows()).length}`);
+  ok('H1 mais de 1.000 registros: a soma diz que vale só para "nos 1.000 registros mais recentes", não "no período"',
+    /\d+ gastos? · R\$ [\d.,]+ nos 1\.000 registros mais recentes/.test(t) && !/ gastos? · R\$ [\d.,]+ no período/.test(t), t.slice(0, 500));
   await btn('Mostrar mais 100').click(); await p.waitForTimeout(600);
   ok('H1 "Mostrar mais 100": 200 linhas e "Mostrando 200 de 1000"', (await h1Rows()).length === 200 && (await body()).includes('Mostrando 200 de 1000'));
-  await scrollTo('Mostrando os 1.000 mais recentes; refine a busca.'); await shot('266_buscar_limite');
+  await scrollTo('A busca olhou só os 1.000 registros mais recentes do período. Escolha um período menor ou use os filtros.'); await shot('266_buscar_limite');
   await h1Type('Lote 99');
   t = await body();
-  ok('H1 com o limite atingido, o texto continua filtrando no aparelho (e o aviso segue, porque a busca olhou só as 1.000 mais recentes)', t.includes('Mostrando os 1.000 mais recentes; refine a busca.') && (await h1Rows()).length > 0 && (await h1Rows()).every((r) => /^Lote \d*99\d*, /.test(r)), JSON.stringify([t.includes('Mostrando os 1.000 mais recentes; refine a busca.'), (await h1Rows()).slice(0, 3)]) + t.slice(0, 500));
+  ok('H1 com o limite atingido, o texto vai ao servidor: só as linhas com "99" e sem o aviso, porque a busca com texto cabe nas 1.000', !t.includes('A busca olhou só os 1.000') && (await h1Rows()).length > 0 && (await h1Rows()).every((r) => /^Lote \d*99\d*, /.test(r)) && / no período/.test(t), JSON.stringify([t.includes('A busca olhou só os 1.000'), (await h1Rows()).slice(0, 3)]) + t.slice(0, 500));
+  await h1Type('lote 28');
+  t = await body();
+  ok('H1 o texto acha um dos mais antigos ("Lote 28", de 01/01), que a lista sem texto deixou fora das 1.000 mais recentes, em qualquer caixa', (await h1Rows()).some((r) => /^Lote 28, Pago · 01\/01\/2026/.test(r)) && !t.includes('A busca olhou só os 1.000'), JSON.stringify((await h1Rows()).slice(-3)) + t.slice(0, 300));
   await h1Pick('Período', 'Ano passado'); await h1Type('');
   t = await body();
-  ok('H1 refinar tira o aviso: o período "Ano passado" não tem registros e a tela volta ao normal', !t.includes('Mostrando os 1.000 mais recentes') && t.includes('Nada encontrado'));
+  ok('H1 refinar tira o aviso: o período "Ano passado" não tem registros e a tela volta ao normal', !t.includes('A busca olhou só os 1.000') && t.includes('Nada encontrado'));
 
   // ---- 11. A busca "No app" de Aprender ----
   await tabByName('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await p.waitForTimeout(400);

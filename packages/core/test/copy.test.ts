@@ -1944,6 +1944,7 @@ describe('textos de Buscar em Movimentações (D-045)', () => {
     const texts: string[] = [];
     for (const n of [0, 1, 2, 12, 1000]) {
       texts.push(SEARCH_TEXT.expenses(n, 193240), SEARCH_TEXT.incomes(n, 600000), SEARCH_TEXT.cardsSummary(n, 230000), SEARCH_TEXT.moreFilters(n));
+      texts.push(SEARCH_TEXT.expenses(n, 193240, true), SEARCH_TEXT.incomes(n, 600000, true), SEARCH_TEXT.cardsSummary(n, 230000, true));
     }
     texts.push(SEARCH_TEXT.average(16103), SEARCH_TEXT.shownOf(100, 250), SEARCH_TEXT.showMore(100));
     for (const n of [1, 3, 48]) {
@@ -1961,7 +1962,8 @@ describe('textos de Buscar em Movimentações (D-045)', () => {
   it('o resumo diz o que a especificação pede e deixa claro que as compras no cartão não somam em Pago', () => {
     expect(SEARCH_TEXT.expenses(12, 193240)).toBe('12 gastos · R$ 1.932,40 no período');
     expect(SEARCH_TEXT.average(16103)).toBe('média de R$ 161,03 por mês com gasto');
-    expect(SEARCH_TEXT.truncated).toBe('Mostrando os 1.000 mais recentes; refine a busca.');
+    expect(SEARCH_TEXT.expenses(12, 193240, true)).toBe('12 gastos · R$ 1.932,40 nos 1.000 registros mais recentes');
+    expect(SEARCH_TEXT.truncated).toBe('A busca olhou só os 1.000 registros mais recentes do período. Escolha um período menor ou use os filtros.');
     expect(SEARCH_TEXT.cardsNote).toContain('só sai quando a fatura é paga');
     expect(SEARCH_TEXT.cardsNote).toContain('não estão somadas em Pago');
     expect(SEARCH_TEXT.summaryCardsNote).toContain('não incluem as compras no cartão');

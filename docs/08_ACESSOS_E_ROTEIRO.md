@@ -527,7 +527,7 @@ Ordem pelo valor para a pessoa e para a empresa que oferece o benefício. Valor:
    - [E] Hoje não existe visão por categoria em nenhuma tela. Mobills e Organizze têm relatórios por categoria.
    - Depende de: nada para "Por categoria" (as categorias já estão nos registros); a busca pode pedir uma função de leitura no banco.
    - Riscos: as 6 categorias fixas limitam o detalhe; a busca em todos os meses pode pedir função nova no banco, com teste em `supabase/tests`.
-   - Situação: "Por categoria" feito (A6, D-035(6)). A busca em Movimentações, feita em 10/10/2026 (D-045), sem função nova no banco: o servidor filtra por período, tipo, categoria, conta e valor (até 1.000 linhas) e o texto é filtrado no aparelho, sem diferenciar acentos. Resumo com a soma e a média por mês com gasto; compras no cartão em grupo à parte, fora da soma. Falta o teste em aparelho; uma função de leitura no banco fica como evolução se houver muitos anos de registros.
+   - Situação: "Por categoria" feito (A6, D-035(6)). A busca em Movimentações, feita em 10/10/2026 (D-045), sem função nova no banco: o servidor filtra por período, tipo, categoria, conta e valor (até 1.000 linhas) e o texto vai ao servidor como filtro mais largo (ILIKE por palavra, `_` no lugar das letras que podem ter acento) e é conferido no aparelho, sem diferenciar acentos. Resumo com a soma e a média por mês com gasto; compras no cartão em grupo à parte, fora da soma. Falta o teste em aparelho; uma função de leitura no banco fica como evolução se houver muitos anos de registros.
 6. **Metas e reserva (C).**
    - Valor: pessoa A, empresa A. Esforço: L.
    - [E] 31% das pessoas não têm nenhuma reserva (Anbima, Raio X 2026).
