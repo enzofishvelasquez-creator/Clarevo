@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Como usar o Clarevo</title>
+<meta name="description" content="Manual de uso, com as funções, onde achar e como usar." />
+<style>
+  :root {
+    --azul: #2457F5; --lima: #D4F05B; --texto: #17223B; --secundario: #4B5873;
+    --fundo: #F6F8FC; --cartao: #FFFFFF; --linha: #E3E8F2; --realce: #EAF0FF; --link: #2457F5;
+  }
+  @media screen and (prefers-color-scheme: dark) {
+    :root { --texto: #ECF0FA; --secundario: #AAB5CE; --fundo: #0F1626; --cartao: #17223B; --linha: #2B3856; --realce: #1C2C57; --link: #8FB0FF; }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--fundo); color: var(--texto); font: 17px/1.55 Manrope, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--link); }
+  .pular { position: absolute; left: -999px; top: 0; background: var(--lima); color: #17223B; padding: 8px 12px; border-radius: 8px; }
+  .pular:focus { left: 8px; top: 8px; z-index: 5; }
+  main, .miolo { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+  .capa { background: var(--azul); color: #fff; border-radius: 0 0 28px 28px; padding: 48px 16px 40px; }
+  .capa .miolo { display: grid; gap: 20px; }
+  .logo { width: min(260px, 70vw); height: auto; display: block; }
+  .capa h1 { margin: 0; font-size: clamp(30px, 6vw, 46px); line-height: 1.12; font-weight: 800; }
+  .capa p { margin: 0; max-width: 56ch; color: #EEF2FF; font-size: 19px; }
+  .faixa-capa, .faixa-demo { background: var(--lima); color: #17223B; font-weight: 800; font-size: 13px; letter-spacing: .01em; }
+  .faixa-capa { display: inline-block; justify-self: start; padding: 6px 14px; border-radius: 999px; }
+  .intro { padding: 28px 0 8px; }
+  .intro p { margin: 0 0 12px; max-width: 70ch; }
+  .dica-impressao { color: var(--secundario); font-size: 15px; }
+  nav.sumario { padding: 8px 0 8px; }
+  nav.sumario h2, main > section > h2 { font-size: 26px; margin: 28px 0 8px; line-height: 1.2; }
+  .grupos-sumario { columns: 2 280px; column-gap: 32px; }
+  .grupo-sumario { break-inside: avoid; margin: 0 0 16px; }
+  .grupo-sumario h3 { margin: 0 0 4px; font-size: 17px; }
+  .grupo-sumario ul { margin: 0; padding-left: 20px; }
+  .grupo-sumario li { margin: 2px 0; }
+  .grupo-titulo { margin-top: 36px; padding-top: 8px; border-top: 3px solid var(--lima); }
+  .grupo-titulo p { margin: 0 0 8px; color: var(--secundario); }
+  .entrada { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 28px; align-items: start; background: var(--cartao); border: 1px solid var(--linha); border-radius: 20px; padding: 24px; margin: 20px 0; }
+  .entrada h3 { margin: 0 0 8px; font-size: 24px; line-height: 1.2; }
+  .entrada h4 { margin: 18px 0 4px; font-size: 14px; letter-spacing: .04em; text-transform: uppercase; color: var(--secundario); }
+  .entrada p { margin: 0 0 8px; }
+  .grupo { margin: 0 0 2px; font-size: 14px; font-weight: 700; color: var(--secundario); }
+  .onde { background: var(--realce); border-radius: 12px; padding: 10px 14px; color: var(--azul); }
+  @media screen and (prefers-color-scheme: dark) { .onde { color: var(--link); } }
+  .onde b { font-weight: 800; }
+  .sep { opacity: .7; }
+  .tambem-titulo { margin: 10px 0 2px !important; font-size: 14px; font-weight: 700; color: var(--secundario); }
+  .tambem { margin: 0 0 8px; padding: 0; list-style: none; display: grid; gap: 6px; }
+  .tambem li { border: 1px solid var(--linha); border-radius: 12px; padding: 6px 12px; font-size: 15px; }
+  .passos { margin: 0; padding: 0; list-style: none; counter-reset: passo; display: grid; gap: 10px; }
+  .passos li { counter-increment: passo; position: relative; padding-left: 40px; min-height: 28px; }
+  .passos li::before { content: counter(passo); position: absolute; left: 0; top: 0; width: 28px; height: 28px; border-radius: 50%; background: var(--realce); color: var(--azul); font-weight: 800; font-size: 14px; display: grid; place-items: center; }
+  @media screen and (prefers-color-scheme: dark) { .passos li::before { color: var(--link); } }
+  .rotulo { font-weight: 800; }
+  .linhas { margin: 0; padding-left: 20px; }
+  .linhas li { margin: 4px 0; }
+  figure.tela { margin: 0; border: 1px solid var(--linha); border-radius: 22px; overflow: hidden; background: #fff; }
+  figure.tela .faixa-demo { padding: 6px 10px; text-align: center; }
+  figure.tela img { display: block; width: 100%; height: auto; }
+  footer { max-width: 980px; margin: 32px auto 48px; padding: 0 16px; color: var(--secundario); font-size: 14px; }
+  @media (max-width: 760px) {
+    .entrada { grid-template-columns: 1fr; padding: 18px 16px; }
+    figure.tela { width: min(260px, 100%); justify-self: center; }
+  }
+  @page { size: A4; margin: 14mm 13mm 16mm; }
+  @media print {
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    :root { --texto: #17223B; --secundario: #3F4B66; --fundo: #FFFFFF; --cartao: #FFFFFF; --linha: #C9D1E2; --realce: #EAF0FF; --link: #17223B; }
+    body { font-size: 10.5pt; line-height: 1.45; background: #fff; color: #17223B; }
+    .pular, .dica-impressao { display: none; }
+    a { color: inherit; text-decoration: none; }
+    main, .miolo { max-width: none; padding: 0; }
+    .capa { min-height: 262mm; padding: 40mm 16mm 20mm; border-radius: 0; page-break-after: always; break-after: page; display: flex; align-items: flex-start; }
+    .capa h1 { font-size: 38pt; }
+    .capa p { font-size: 14pt; }
+    .logo { width: 70mm; }
+    .intro, nav.sumario { padding-top: 0; }
+    nav.sumario { break-after: page; page-break-after: always; }
+    nav.sumario h2, main > section > h2 { font-size: 18pt; }
+    .grupo-titulo { break-before: page; page-break-before: always; margin-top: 0; break-after: avoid; }
+    .entrada { break-inside: avoid; page-break-inside: avoid; grid-template-columns: minmax(0, 1fr) 47mm; gap: 7mm; padding: 4mm 5mm; margin: 4mm 0; border-radius: 4mm; }
+    .entrada h3 { font-size: 15pt; }
+    .entrada h4 { font-size: 8.5pt; margin-top: 4mm; }
+    .passos { gap: 2mm; }
+    .passos li { padding-left: 8.5mm; min-height: 6mm; }
+    .passos li::before { width: 6mm; height: 6mm; font-size: 8pt; }
+    .tambem li { font-size: 9.5pt; padding: 1mm 3mm; }
+    figure.tela { border-radius: 5mm; break-inside: avoid; }
+    figure.tela .faixa-demo { font-size: 8pt; padding: 1.2mm 2mm; }
+    footer { margin: 8mm 0 0; font-size: 9pt; }
+  }
+</style>
+</head>
+<body>
+<a class="pular" href="#sumario">Ir para o sumário</a>
+<header class="capa">
+  <div class="miolo">
+    <svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 7492 1500" role="img" aria-label="Clarevo"><path fill="#FFFFFF" d="M536 1500Q368 1500 248 1425Q128 1350 64 1221Q0 1092 0 930Q0 766 66 637Q133 508 254 434Q375 360 540 360Q731 360 860 456Q990 553 1026 720L754 792Q730 708 670 661Q611 614 536 614Q450 614 395 656Q340 697 314 768Q288 840 288 930Q288 1071 350 1158Q413 1246 536 1246Q628 1246 676 1204Q724 1162 748 1084L1026 1142Q980 1314 852 1407Q724 1500 536 1500ZM1166 1470V0H1438V1470ZM1958 1500Q1842 1500 1762 1456Q1681 1411 1640 1336Q1598 1262 1598 1172Q1598 1097 1621 1035Q1644 973 1696 926Q1747 878 1834 846Q1894 824 1977 807Q2060 790 2165 774Q2270 759 2396 740L2298 794Q2298 698 2252 653Q2206 608 2098 608Q2038 608 1973 637Q1908 666 1882 740L1636 662Q1677 528 1790 444Q1903 360 2098 360Q2241 360 2352 404Q2463 448 2520 556Q2552 616 2558 676Q2564 736 2564 810V1470H2326V1248L2360 1294Q2281 1403 2190 1452Q2098 1500 1958 1500ZM2016 1286Q2091 1286 2142 1260Q2194 1233 2224 1199Q2255 1165 2266 1142Q2287 1098 2290 1040Q2294 981 2294 942L2374 962Q2253 982 2178 996Q2103 1009 2057 1020Q2011 1031 1976 1044Q1936 1060 1912 1078Q1887 1097 1876 1119Q1864 1141 1864 1168Q1864 1205 1882 1232Q1901 1258 1935 1272Q1969 1286 2016 1286ZM2744 1470V390H2984V654L2958 620Q2979 564 3014 518Q3049 472 3100 442Q3139 418 3185 404Q3231 391 3280 388Q3329 384 3378 390V644Q3333 630 3274 634Q3214 639 3166 662Q3118 684 3085 720Q3052 757 3035 806Q3018 856 3018 918V1470ZM3990 1500Q3824 1500 3698 1428Q3571 1357 3500 1232Q3428 1106 3428 944Q3428 767 3498 636Q3568 505 3691 432Q3814 360 3974 360Q4144 360 4263 440Q4382 520 4439 665Q4496 810 4479 1006H4210V906Q4210 741 4158 668Q4105 596 3986 596Q3847 596 3782 680Q3716 765 3716 930Q3716 1081 3782 1164Q3847 1246 3974 1246Q4054 1246 4111 1211Q4168 1176 4198 1110L4470 1188Q4409 1336 4278 1418Q4146 1500 3990 1500ZM3632 1006V804H4348V1006ZM4916 1470 4524 390H4796L5052 1138L5308 390H5580L5188 1470ZM6166 1500Q6003 1500 5880 1427Q5757 1354 5688 1226Q5620 1097 5620 930Q5620 761 5690 632Q5760 504 5883 432Q6006 360 6166 360Q6329 360 6452 433Q6576 506 6645 634Q6714 763 6714 930Q6714 1098 6644 1226Q6575 1355 6452 1428Q6328 1500 6166 1500ZM6166 1246Q6297 1246 6362 1158Q6426 1069 6426 930Q6426 786 6360 700Q6295 614 6166 614Q6077 614 6020 654Q5963 694 5936 765Q5908 836 5908 930Q5908 1075 5974 1160Q6039 1246 6166 1246Z"/><circle cx="7243" cy="1135" r="248" fill="#D4F05B"/></svg>
+    <h1>Como usar o Clarevo</h1>
+    <p>Manual de uso, com as funções, onde achar e como usar.</p>
+    <span class="faixa-capa">Dados fictícios de demonstração</span>
+  </div>
+</header>
+<main>
+  <div class="intro">
+    <p>Este manual mostra, função por função, para que serve, onde fica e como usar. As telas são da demonstração do Clarevo, com dados fictícios. O mesmo texto está no app, em Aprender, em Como usar o Clarevo.</p>
+    <p class="dica-impressao">Para guardar em PDF, use Imprimir e escolha Salvar como PDF. O manual cabe em folhas A4.</p>
+  </div>
+  <nav class="sumario" id="sumario" aria-label="Sumário">
+    <h2>Sumário</h2>
+    <div class="grupos-sumario">
+        <div class="grupo-sumario">
+          <h3>Dia a dia</h3>
+          <ul><li><a href="#resumo">Resumo do mês</a></li><li><a href="#anotar-gasto">Anotar gasto e recebimento</a></li><li><a href="#nota-fiscal">Escanear nota fiscal</a></li><li><a href="#movimentos">Movimentos e Organizar</a></li><li><a href="#buscar">Buscar em Movimentos</a></li><li><a href="#importar-extrato">Importar extrato ou fatura</a></li><li><a href="#ultimos-meses">Seus últimos meses</a></li></ul>
+        </div>
+        <div class="grupo-sumario">
+          <h3>Contas e cartões</h3>
+          <ul><li><a href="#contas-a-pagar">Contas a pagar e Já paguei</a></li><li><a href="#vencidas">Contas vencidas</a></li><li><a href="#gastos-fixos">Gastos fixos e parcelamentos</a></li><li><a href="#contas-do-ano">Contas do ano</a></li><li><a href="#assinaturas">Assinaturas</a></li><li><a href="#cartoes">Cartões e faturas</a></li><li><a href="#contas-de-origem">Contas de origem</a></li></ul>
+        </div>
+        <div class="grupo-sumario">
+          <h3>Planejar</h3>
+          <ul><li><a href="#orcamento">Orçamento por categoria</a></li><li><a href="#renda-comprometida">Renda comprometida e limite pessoal</a></li><li><a href="#metas">Metas e reserva</a></li><li><a href="#plano-de-guardar">Plano de guardar</a></li><li><a href="#simulador">Simulador</a></li><li><a href="#calculadoras">Calculadoras</a></li><li><a href="#antes-de-financiar">Antes de financiar</a></li><li><a href="#plano-dividas">Plano para quitar dívidas</a></li></ul>
+        </div>
+        <div class="grupo-sumario">
+          <h3>Aprender e ajuda</h3>
+          <ul><li><a href="#aprender">Aprender</a></li><li><a href="#ajuda">Guia, ajuda no lugar e tour</a></li></ul>
+        </div>
+        <div class="grupo-sumario">
+          <h3>Conta e privacidade</h3>
+          <ul><li><a href="#lembretes">Lembretes de vencimento</a></li><li><a href="#ocultar-valores">Ocultar valores e biometria</a></li><li><a href="#exportar">Exportar meus dados</a></li><li><a href="#quem-ve">Quem vê estes dados</a></li></ul>
+        </div></div>
+  </nav>
+  
+      <section aria-labelledby="g-dia-a-dia">
+        <div class="grupo-titulo">
+          <h2 id="g-dia-a-dia">Dia a dia</h2>
+          <p>Resumo, anotações, notas fiscais, busca e importação.</p>
+        </div>
+        
+    <section class="entrada" id="resumo" aria-labelledby="t-resumo">
+      <div class="texto">
+        <p class="grupo">Dia a dia</p>
+        <h3 id="t-resumo">Resumo do mês</h3>
+        <h4>Para que serve</h4>
+        <p>Mostra, de uma vez, o que você recebeu, o que pagou e o que ainda vai vencer no mês.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Resumo</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>No topo, <b class="rotulo">&ldquo;Diferença do mês&rdquo;</b> é o que você recebeu menos o que já pagou. Toque em <b class="rotulo">&ldquo;Recebido&rdquo;</b> ou <b class="rotulo">&ldquo;Pago&rdquo;</b> para ver os registros de cada total.</li><li>Use as setas ao lado do nome do mês para ver outros meses.</li><li>Em <b class="rotulo">&ldquo;Ainda a pagar neste mês&rdquo;</b> fica o que ainda vai vencer. Toque em <b class="rotulo">&ldquo;Ver contas&rdquo;</b> para abrir Contas a pagar.</li><li><b class="rotulo">&ldquo;Pagamentos do mês&rdquo;</b> lista os últimos gastos, e <b class="rotulo">&ldquo;Ver todos&rdquo;</b> abre a lista completa, com a divisão por categoria.</li><li>Logo abaixo do cabeçalho fica o botão <b class="rotulo">&ldquo;Anotar gasto&rdquo;</b>.</li><li>Em conta nova, o card <b class="rotulo">&ldquo;Primeiros passos&rdquo;</b> leva aos primeiros cadastros.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/06_resumo_demo.png" alt="Tela de exemplo: Resumo do mês" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="anotar-gasto" aria-labelledby="t-anotar-gasto">
+      <div class="texto">
+        <p class="grupo">Dia a dia</p>
+        <h3 id="t-anotar-gasto">Anotar gasto e recebimento</h3>
+        <h4>Para que serve</h4>
+        <p>Registra um gasto que você já pagou ou um recebimento que já aconteceu, com valor, data e categoria.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Resumo</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Anotar gasto</b></p>
+        <p class="tambem-titulo">Também em</p><ul class="tambem"><li><b>Movimentos</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Anotar gasto</b></li><li><b>Movimentos</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Registrar recebimento</b></li></ul>
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Toque em <b class="rotulo">&ldquo;Anotar gasto&rdquo;</b>, logo abaixo do cabeçalho do Resumo, ou em <b class="rotulo">&ldquo;Registrar recebimento&rdquo;</b>, em Movimentos.</li><li>Digite a descrição e o <b class="rotulo">&ldquo;Valor em reais&rdquo;</b>.</li><li>Escolha a data (<b class="rotulo">&ldquo;Hoje&rdquo;</b>, <b class="rotulo">&ldquo;Ontem&rdquo;</b> ou outra) e a categoria.</li><li>Se pagou no cartão de crédito, escolha o cartão em <b class="rotulo">&ldquo;Como você pagou?&rdquo;</b>. Com mais de uma conta de origem, escolha de onde o dinheiro saiu em <b class="rotulo">&ldquo;Saiu de&rdquo;</b>.</li><li>Toque em <b class="rotulo">&ldquo;Salvar gasto&rdquo;</b> (ou <b class="rotulo">&ldquo;Salvar recebimento&rdquo;</b>). O valor entra no total do mês na hora.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/150_anotar_gasto_escanear.png" alt="Tela de exemplo: Anotar gasto e recebimento" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="nota-fiscal" aria-labelledby="t-nota-fiscal">
+      <div class="texto">
+        <p class="grupo">Dia a dia</p>
+        <h3 id="t-nota-fiscal">Escanear nota fiscal</h3>
+        <h4>Para que serve</h4>
+        <p>Preenche o gasto com os dados de uma nota fiscal, lendo o QR code, o PDF ou a chave de acesso.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Resumo</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Anotar gasto</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Escanear nota fiscal</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Abra <b class="rotulo">&ldquo;Anotar gasto&rdquo;</b> e toque em <b class="rotulo">&ldquo;Escanear nota fiscal&rdquo;</b>, a primeira linha da tela.</li><li>Escolha como ler a nota: <b class="rotulo">&ldquo;Usar a câmera&rdquo;</b>, <b class="rotulo">&ldquo;Escolher o PDF da nota&rdquo;</b> ou <b class="rotulo">&ldquo;Colar o link ou a chave&rdquo;</b>.</li><li>Aponte a câmera para o QR code do cupom ou para o código de barras da chave de acesso.</li><li>Confira o que foi preenchido, como valor, data e descrição, e mude o que precisar.</li><li>Toque em <b class="rotulo">&ldquo;Salvar gasto&rdquo;</b>. Só um resumo da chave é guardado, nunca o CPF, a chave inteira nem o link.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/153_nota_lida.png" alt="Tela de exemplo: Escanear nota fiscal" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="movimentos" aria-labelledby="t-movimentos">
+      <div class="texto">
+        <p class="grupo">Dia a dia</p>
+        <h3 id="t-movimentos">Movimentos e Organizar</h3>
+        <h4>Para que serve</h4>
+        <p>Lista os gastos e recebimentos do mês e reúne, em Organizar, os atalhos para contas a pagar, gastos fixos, cartões e orçamento.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Movimentos</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Veja os registros do mês, do mais recente para o mais antigo. Use as setas ao lado do nome do mês para mudar de mês.</li><li>Filtre por <b class="rotulo">&ldquo;Todos&rdquo;</b>, <b class="rotulo">&ldquo;Recebidos&rdquo;</b> ou <b class="rotulo">&ldquo;Pagos&rdquo;</b>.</li><li>Toque em um registro para ver o detalhe, editar ou excluir.</li><li>No card <b class="rotulo">&ldquo;Organizar&rdquo;</b>, abra <b class="rotulo">&ldquo;Contas a pagar&rdquo;</b>, <b class="rotulo">&ldquo;Gastos fixos e parcelamentos&rdquo;</b>, <b class="rotulo">&ldquo;Cartões&rdquo;</b>, <b class="rotulo">&ldquo;Orçamento por categoria&rdquo;</b>, <b class="rotulo">&ldquo;Importar extrato ou fatura&rdquo;</b> ou <b class="rotulo">&ldquo;Calculadoras&rdquo;</b>.</li><li>Com duas ou mais contas de origem, aparece o filtro <b class="rotulo">&ldquo;Conta&rdquo;</b> para ver só os registros de uma delas.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/260_movimentos_buscar_entrada.png" alt="Tela de exemplo: Movimentos e Organizar" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="buscar" aria-labelledby="t-buscar">
+      <div class="texto">
+        <p class="grupo">Dia a dia</p>
+        <h3 id="t-buscar">Buscar em Movimentos</h3>
+        <h4>Para que serve</h4>
+        <p>Acha um gasto ou recebimento em todos os meses e mostra quanto deu no período.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Movimentos</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Buscar</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Em Movimentos, toque no campo <b class="rotulo">&ldquo;Buscar&rdquo;</b>, no topo.</li><li>Digite o que procura, como <b class="rotulo">&ldquo;luz&rdquo;</b> ou <b class="rotulo">&ldquo;mercado&rdquo;</b>. Não precisa de acento.</li><li>Escolha o <b class="rotulo">&ldquo;Tipo&rdquo;</b> (Todos, Gastos ou Recebimentos) e o <b class="rotulo">&ldquo;Período&rdquo;</b>.</li><li>Toque em <b class="rotulo">&ldquo;Mais filtros&rdquo;</b> para limitar por categoria, conta ou valor.</li><li>Veja o total e a média do período e toque em uma linha para abrir o registro. Nada do que você busca é guardado.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/261_buscar_luz.png" alt="Tela de exemplo: Buscar em Movimentos" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="importar-extrato" aria-labelledby="t-importar-extrato">
+      <div class="texto">
+        <p class="grupo">Dia a dia</p>
+        <h3 id="t-importar-extrato">Importar extrato ou fatura</h3>
+        <h4>Para que serve</h4>
+        <p>Traz gastos, recebimentos e compras no cartão de um arquivo do banco (OFX ou planilha CSV), com revisão de cada linha antes de importar.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Movimentos</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Organizar</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Importar extrato ou fatura</b></p>
+        <p class="tambem-titulo">Também em</p><ul class="tambem"><li><b>Conta</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Suas contas</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Importar extrato</b></li></ul>
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Toque em <b class="rotulo">&ldquo;Escolher o arquivo&rdquo;</b> e escolha o arquivo OFX ou a planilha CSV que o banco gera. Ele é lido neste aparelho e não é guardado.</li><li>Diga para onde vão os lançamentos: <b class="rotulo">&ldquo;Conta&rdquo;</b> (extrato) ou <b class="rotulo">&ldquo;Cartão de crédito&rdquo;</b> (fatura), e escolha a conta ou o cartão.</li><li>Se o Clarevo não reconhecer as colunas, escolha qual é a data, a descrição e o valor e toque em <b class="rotulo">&ldquo;Usar estas colunas&rdquo;</b>.</li><li>Toque em <b class="rotulo">&ldquo;Revisar as linhas&rdquo;</b>. Marque o que vira lançamento e mude a descrição ou a categoria de uma linha, se quiser.</li><li>Linhas com <b class="rotulo">&ldquo;Já anotado&rdquo;</b>, <b class="rotulo">&ldquo;Parece parcela&rdquo;</b> ou <b class="rotulo">&ldquo;Parece pagamento de fatura&rdquo;</b> vêm desmarcadas, para nada entrar duas vezes.</li><li>Toque no botão de importar, que mostra quantos lançamentos entram. Compras no cartão só contam em Pago quando a fatura é paga.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/303_importar_revisar.png" alt="Tela de exemplo: Importar extrato ou fatura" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="ultimos-meses" aria-labelledby="t-ultimos-meses">
+      <div class="texto">
+        <p class="grupo">Dia a dia</p>
+        <h3 id="t-ultimos-meses">Seus últimos meses</h3>
+        <h4>Para que serve</h4>
+        <p>Ajuda a atualizar os meses em que você não anotou nada, sem cobrança. Atualizar é opcional.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Resumo</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Seus últimos meses</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Quando há meses sem anotação, o Resumo mostra a faixa <b class="rotulo">&ldquo;Seus últimos meses&rdquo;</b>. Ela some quando você decide.</li><li>Toque em <b class="rotulo">&ldquo;Ver resumo&rdquo;</b> para ver, mês a mês, o que está registrado e as contas para conferir.</li><li>Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.</li><li>Toque em <b class="rotulo">&ldquo;Atualizar agora&rdquo;</b> para passar pelos meses um a um. Em cada conta, use <b class="rotulo">&ldquo;Já paguei&rdquo;</b>, <b class="rotulo">&ldquo;Não houve&rdquo;</b> ou <b class="rotulo">&ldquo;Ainda não paguei&rdquo;</b>; nos meses, <b class="rotulo">&ldquo;Anotar recebimentos&rdquo;</b> ou <b class="rotulo">&ldquo;Anotar gastos&rdquo;</b>.</li><li>Para deixar como está, toque em <b class="rotulo">&ldquo;Seguir adiante&rdquo;</b>. Nada é criado, pago nem excluído.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/72_seus_ultimos_meses.png" alt="Tela de exemplo: Seus últimos meses" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+      </section>
+      <section aria-labelledby="g-contas-e-cartoes">
+        <div class="grupo-titulo">
+          <h2 id="g-contas-e-cartoes">Contas e cartões</h2>
+          <p>Contas a pagar, gastos fixos, assinaturas, cartões e contas de origem.</p>
+        </div>
+        
+    <section class="entrada" id="contas-a-pagar" aria-labelledby="t-contas-a-pagar">
+      <div class="texto">
+        <p class="grupo">Contas e cartões</p>
+        <h3 id="t-contas-a-pagar">Contas a pagar e Já paguei</h3>
+        <h4>Para que serve</h4>
+        <p>Reúne as contas que ainda vão vencer. Quando você paga, marca como paga e o valor passa a contar em Pago.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Movimentos</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Organizar</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Contas a pagar</b></p>
+        <p class="tambem-titulo">Também em</p><ul class="tambem"><li><b>Resumo</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Ainda a pagar neste mês</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Ver contas</b></li></ul>
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Toque em <b class="rotulo">&ldquo;Anotar conta a pagar&rdquo;</b> e preencha a descrição, o valor e o vencimento.</li><li>A lista separa <b class="rotulo">&ldquo;Vencidas&rdquo;</b>, <b class="rotulo">&ldquo;A vencer&rdquo;</b> e <b class="rotulo">&ldquo;Próximos meses&rdquo;</b>, com o total em <b class="rotulo">&ldquo;Ainda a pagar neste mês&rdquo;</b>.</li><li>Quando pagar, toque em <b class="rotulo">&ldquo;Já paguei&rdquo;</b> na linha da conta e confirme com <b class="rotulo">&ldquo;Confirmar pagamento&rdquo;</b>.</li><li>Para mudar o valor ou a data do pagamento, escolha <b class="rotulo">&ldquo;Mudar valor ou data&rdquo;</b>.</li><li>A conta paga passa a contar em <b class="rotulo">&ldquo;Pago&rdquo;</b>, no mês da data do pagamento.</li><li>Use as setas ao lado do nome do mês para ver as contas de outros meses.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/175_contas_a_pagar_outubro.png" alt="Tela de exemplo: Contas a pagar e Já paguei" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="vencidas" aria-labelledby="t-vencidas">
+      <div class="texto">
+        <p class="grupo">Contas e cartões</p>
+        <h3 id="t-vencidas">Contas vencidas</h3>
+        <h4>Para que serve</h4>
+        <p>Ajuda a conferir, de uma vez, as contas que passaram do vencimento e continuam em aberto.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Movimentos</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Organizar</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Contas a pagar</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Revisar vencidas</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Em Contas a pagar, abra a seção <b class="rotulo">&ldquo;Vencidas&rdquo;</b> e toque em <b class="rotulo">&ldquo;Revisar vencidas&rdquo;</b>.</li><li>Marque as contas que você já pagou.</li><li>Com mais de uma conta de origem, escolha de onde o dinheiro saiu em <b class="rotulo">&ldquo;Saiu de&rdquo;</b>.</li><li>Toque em <b class="rotulo">&ldquo;Marcar as selecionadas como pagas no vencimento&rdquo;</b> e confirme.</li><li>Se uma conta não houve, toque em <b class="rotulo">&ldquo;Não houve&rdquo;</b>: ela sai da lista e não volta.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/34_revisar_vencidas.png" alt="Tela de exemplo: Contas vencidas" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="gastos-fixos" aria-labelledby="t-gastos-fixos">
+      <div class="texto">
+        <p class="grupo">Contas e cartões</p>
+        <h3 id="t-gastos-fixos">Gastos fixos e parcelamentos</h3>
+        <h4>Para que serve</h4>
+        <p>Cadastra uma vez o que se repete todo mês, como aluguel e escola, ou o que você paga em parcelas. Cada mês vira uma conta a pagar.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Movimentos</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Organizar</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Gastos fixos e parcelamentos</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Toque em <b class="rotulo">&ldquo;Novo gasto fixo ou parcelamento&rdquo;</b>.</li><li>Em <b class="rotulo">&ldquo;Com que frequência?&rdquo;</b>, escolha <b class="rotulo">&ldquo;Todo mês&rdquo;</b> para um gasto fixo ou <b class="rotulo">&ldquo;Parcelado&rdquo;</b> para parcelas.</li><li>Informe a descrição, o valor e o dia do vencimento. Se o valor muda de um mês para outro, como luz e água, marque que ele muda: o valor do cadastro vira estimativa.</li><li>Toque em <b class="rotulo">&ldquo;Salvar gasto fixo&rdquo;</b> ou <b class="rotulo">&ldquo;Salvar parcelamento&rdquo;</b>.</li><li>Cada mês aparece em Contas a pagar. Só o que você marca como paga entra em Pago.</li><li>Para mudar o valor a partir de um mês ou terminar, abra o item e use <b class="rotulo">&ldquo;Mudar valor ou dia a partir de uma conta&rdquo;</b> ou <b class="rotulo">&ldquo;Encerrar gasto fixo&rdquo;</b>.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/270_gastos_fixos_assinaturas.png" alt="Tela de exemplo: Gastos fixos e parcelamentos" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="contas-do-ano" aria-labelledby="t-contas-do-ano">
+      <div class="texto">
+        <p class="grupo">Contas e cartões</p>
+        <h3 id="t-contas-do-ano">Contas do ano</h3>
+        <h4>Para que serve</h4>
+        <p>Para contas que vencem uma vez por ano ou em poucas parcelas, como IPVA e IPTU. O Clarevo cria a conta do mês certo, dois meses antes de vencer.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Movimentos</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Organizar</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Gastos fixos e parcelamentos</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Contas do ano</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Em <b class="rotulo">&ldquo;Contas do ano&rdquo;</b>, toque em <b class="rotulo">&ldquo;Nova conta do ano&rdquo;</b>.</li><li>Em <b class="rotulo">&ldquo;Como você paga?&rdquo;</b>, escolha <b class="rotulo">&ldquo;Uma vez no ano (cota única)&rdquo;</b> ou <b class="rotulo">&ldquo;Em parcelas no ano&rdquo;</b>.</li><li>Informe o mês do vencimento, o valor e, em <b class="rotulo">&ldquo;O valor muda de um ano para outro?&rdquo;</b>, se ele muda.</li><li>Toque em <b class="rotulo">&ldquo;Salvar conta do ano&rdquo;</b>. Nos anos seguintes, o Clarevo cria as contas automaticamente.</li><li>Quando chegar o carnê ou o boleto com outro valor, abra a conta do ano e use <b class="rotulo">&ldquo;Informar o valor de&rdquo;</b> e o ano, em <b class="rotulo">&ldquo;Ano a ano&rdquo;</b>. Só aquele ano muda.</li><li>Se um ano não houve, use <b class="rotulo">&ldquo;Não houve em&rdquo;</b> e o ano, ou <b class="rotulo">&ldquo;Tirar as parcelas de&rdquo;</b> e o ano <b class="rotulo">&ldquo;em aberto&rdquo;</b>.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/221_contas_do_ano_lista.png" alt="Tela de exemplo: Contas do ano" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="assinaturas" aria-labelledby="t-assinaturas">
+      <div class="texto">
+        <p class="grupo">Contas e cartões</p>
+        <h3 id="t-assinaturas">Assinaturas</h3>
+        <h4>Para que serve</h4>
+        <p>Mostra quanto as assinaturas custam por mês e por ano e dá um lugar para conferir, de tempos em tempos, se cada uma ainda é usada.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Movimentos</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Organizar</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Gastos fixos e parcelamentos</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Assinaturas</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Ao cadastrar ou editar um gasto fixo <b class="rotulo">&ldquo;Todo mês&rdquo;</b>, ligue <b class="rotulo">&ldquo;É uma assinatura?&rdquo;</b>.</li><li>Em Gastos fixos e parcelamentos, as assinaturas aparecem no grupo <b class="rotulo">&ldquo;Assinaturas&rdquo;</b>, com o total por mês e por ano.</li><li>Toque em <b class="rotulo">&ldquo;Revisar assinaturas&rdquo;</b> para ver cada uma e o custo por ano.</li><li>Se não usa mais uma assinatura, toque em <b class="rotulo">&ldquo;Encerrar a partir de…&rdquo;</b> e escolha o mês. Isso a tira só do Clarevo: para deixar de pagar, encerre também com quem oferece o serviço.</li><li>Toque em <b class="rotulo">&ldquo;Revisei minhas assinaturas&rdquo;</b> para registrar a data da revisão. O Clarevo guarda só essa data.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/272_revisar_assinaturas.png" alt="Tela de exemplo: Assinaturas" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="cartoes" aria-labelledby="t-cartoes">
+      <div class="texto">
+        <p class="grupo">Contas e cartões</p>
+        <h3 id="t-cartoes">Cartões e faturas</h3>
+        <h4>Para que serve</h4>
+        <p>Cadastra seus cartões de crédito para anotar as compras na fatura. A compra só entra em Pago quando você paga a fatura.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Movimentos</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Organizar</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Cartões</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Toque em <b class="rotulo">&ldquo;Cadastrar cartão&rdquo;</b>. Informe o apelido, os 4 últimos dígitos (opcional) e os dias de fechamento e de vencimento. Nunca digite o número completo, o código de segurança nem a validade.</li><li>Para anotar uma compra, abra <b class="rotulo">&ldquo;Anotar gasto&rdquo;</b>, escolha <b class="rotulo">&ldquo;Cartão de crédito&rdquo;</b> em <b class="rotulo">&ldquo;Como você pagou?&rdquo;</b> e depois o cartão.</li><li>Toque no cartão para ver a <b class="rotulo">&ldquo;Fatura atual&rdquo;</b>, as anteriores e as próximas.</li><li>Na fatura, use <b class="rotulo">&ldquo;Informar encargos&rdquo;</b> para juros, multa ou tarifa que o banco cobrou, e <b class="rotulo">&ldquo;Registrar estorno&rdquo;</b> para uma devolução.</li><li>Depois do fechamento, toque em <b class="rotulo">&ldquo;Pagar fatura&rdquo;</b> e informe o valor e a data. O pagamento vira um gasto só, na data em que você pagou.</li><li>Para desfazer um pagamento, use <b class="rotulo">&ldquo;Desfazer pagamento&rdquo;</b>.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/130_cartoes.png" alt="Tela de exemplo: Cartões e faturas" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="contas-de-origem" aria-labelledby="t-contas-de-origem">
+      <div class="texto">
+        <p class="grupo">Contas e cartões</p>
+        <h3 id="t-contas-de-origem">Contas de origem</h3>
+        <h4>Para que serve</h4>
+        <p>Cadastra de onde sai o dinheiro, como a conta do banco e a carteira, para escolher uma em cada gasto, pagamento e aporte. É só a origem: o Clarevo não guarda saldo.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Conta</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Suas contas</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Toque no círculo com as suas iniciais, no canto do cabeçalho, para abrir Conta.</li><li>Em <b class="rotulo">&ldquo;Suas contas&rdquo;</b>, toque em <b class="rotulo">&ldquo;Adicionar conta&rdquo;</b>, dê um nome e escolha o tipo: conta bancária, dinheiro ou outra.</li><li>Nos gastos, pagamentos e aportes, escolha a conta em <b class="rotulo">&ldquo;Saiu de&rdquo;</b>, <b class="rotulo">&ldquo;Entrou em&rdquo;</b> ou <b class="rotulo">&ldquo;Foi para&rdquo;</b>. A principal já vem marcada.</li><li>Toque em uma conta para renomear, usar <b class="rotulo">&ldquo;Tornar principal&rdquo;</b>, arquivar ou excluir.</li><li>O Clarevo não calcula saldo por conta. A conta mostra só de onde o dinheiro saiu.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/240_suas_contas.png" alt="Tela de exemplo: Contas de origem" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+      </section>
+      <section aria-labelledby="g-planejar">
+        <div class="grupo-titulo">
+          <h2 id="g-planejar">Planejar</h2>
+          <p>Orçamento, renda comprometida, metas, simulador e calculadoras.</p>
+        </div>
+        
+    <section class="entrada" id="orcamento" aria-labelledby="t-orcamento">
+      <div class="texto">
+        <p class="grupo">Planejar</p>
+        <h3 id="t-orcamento">Orçamento por categoria</h3>
+        <h4>Para que serve</h4>
+        <p>Define quanto você pretende usar por mês em cada categoria de gasto e mostra quanto já foi usado.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Movimentos</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Organizar</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Orçamento por categoria</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Em <b class="rotulo">&ldquo;Definir orçamento&rdquo;</b>, escolha uma categoria, como Mercado ou Lazer.</li><li>Informe o <b class="rotulo">&ldquo;Valor por mês&rdquo;</b> e <b class="rotulo">&ldquo;A partir de&rdquo;</b> qual mês ele vale. Os meses anteriores não mudam.</li><li>Toque em <b class="rotulo">&ldquo;Salvar orçamento&rdquo;</b>.</li><li>Em <b class="rotulo">&ldquo;Com orçamento&rdquo;</b>, cada categoria mostra o usado no mês, quanto falta e o percentual.</li><li>Compras no cartão contam no mês da compra, mesmo antes de a fatura ser paga.</li><li>Para mudar ou tirar um orçamento, toque na categoria e use <b class="rotulo">&ldquo;Tirar o orçamento&rdquo;</b>.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/200_orcamento.png" alt="Tela de exemplo: Orçamento por categoria" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="renda-comprometida" aria-labelledby="t-renda-comprometida">
+      <div class="texto">
+        <p class="grupo">Planejar</p>
+        <h3 id="t-renda-comprometida">Renda comprometida e limite pessoal</h3>
+        <h4>Para que serve</h4>
+        <p>Mostra quanto da sua renda de referência já tem destino em contas, parcelas e faturas, e deixa você escolher um limite seu.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Metas</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Seu mês</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Ver renda comprometida</b></p>
+        <p class="tambem-titulo">Também em</p><ul class="tambem"><li><b>Resumo</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Ainda a pagar neste mês</b></li></ul>
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Toque em <b class="rotulo">&ldquo;Informar renda de referência&rdquo;</b> e digite quanto costuma cair na sua conta por mês. Esse valor só calcula percentuais: ele não conta como recebido.</li><li>Veja o percentual da renda que já tem destino no mês, por grupo: gastos fixos, parcelamentos, contas do ano, faturas de cartão e outras contas.</li><li>Em <b class="rotulo">&ldquo;Próximos meses&rdquo;</b>, veja a previsão dos meses seguintes e, em <b class="rotulo">&ldquo;O que muda&rdquo;</b>, quando uma parcela termina.</li><li>Em <b class="rotulo">&ldquo;Seu limite&rdquo;</b>, toque em <b class="rotulo">&ldquo;Escolher meu limite&rdquo;</b> e informe até quantos por cento da renda você quer comprometer. A escolha é sua: o Clarevo não sugere um valor.</li><li>Se a renda mudar, toque em <b class="rotulo">&ldquo;Alterar&rdquo;</b> na renda de referência.</li><li>Metas e aportes não entram no percentual: guardar não é conta a pagar.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/101_renda_comprometida_outubro.png" alt="Tela de exemplo: Renda comprometida e limite pessoal" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="metas" aria-labelledby="t-metas">
+      <div class="texto">
+        <p class="grupo">Planejar</p>
+        <h3 id="t-metas">Metas e reserva</h3>
+        <h4>Para que serve</h4>
+        <p>Acompanha o que você está juntando para uma viagem, um curso ou imprevistos, mostrando só o que você registrou como guardado.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Metas</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Em <b class="rotulo">&ldquo;Reserva para imprevistos&rdquo;</b>, toque em <b class="rotulo">&ldquo;Calcular minha reserva&rdquo;</b> para ver quantos meses de gastos essenciais você quer cobrir.</li><li>Toque em <b class="rotulo">&ldquo;Nova meta&rdquo;</b>, dê um nome e informe o valor e, se quiser, o prazo.</li><li>Quando guardar dinheiro, abra a meta e use <b class="rotulo">&ldquo;Registrar aporte&rdquo;</b>. O valor guardado só anda com o que você registrar.</li><li>Para usar o dinheiro, use <b class="rotulo">&ldquo;Registrar resgate&rdquo;</b>. Resgate não entra como recebido.</li><li>Aportes e resgates não entram em Pago nem em Recebido: o dinheiro continua seu, só mudou de lugar.</li><li>Quando a meta chegar ao valor, use <b class="rotulo">&ldquo;Concluir meta&rdquo;</b>.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/16_metas.png" alt="Tela de exemplo: Metas e reserva" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="plano-de-guardar" aria-labelledby="t-plano-de-guardar">
+      <div class="texto">
+        <p class="grupo">Planejar</p>
+        <h3 id="t-plano-de-guardar">Plano de guardar</h3>
+        <h4>Para que serve</h4>
+        <p>Pergunta se você consegue guardar um valor por mês e monta um plano em etapas com os seus números, sem contar rendimento.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Metas</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Você consegue guardar algum valor por mês?</b></p>
+        <p class="tambem-titulo">Também em</p><ul class="tambem"><li><b>Resumo</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Primeiros passos</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Planejar quanto guardar</b></li></ul>
+        <h4>Como usar</h4>
+        <ol class="passos"><li>No topo de Metas, responda <b class="rotulo">&ldquo;Você consegue guardar algum valor por mês?&rdquo;</b> com <b class="rotulo">&ldquo;Sim, consigo&rdquo;</b>, <b class="rotulo">&ldquo;Agora não&rdquo;</b> ou <b class="rotulo">&ldquo;Responder depois&rdquo;</b>.</li><li>Com <b class="rotulo">&ldquo;Sim, consigo&rdquo;</b>, informe quanto por mês. O plano mostra etapas de 1, 3 e 6 meses de gastos essenciais e o mês previsto de cada uma.</li><li>Se o plano pedir, informe quanto você gasta por mês com o essencial: moradia, mercado, transporte, saúde e educação.</li><li>Toque em <b class="rotulo">&ldquo;Usar este plano&rdquo;</b> para criar ou atualizar a sua reserva com o valor por mês.</li><li>Com <b class="rotulo">&ldquo;Agora não&rdquo;</b>, você pode começar uma reserva mínima, a partir de R$ 100,00, ou ver passos pequenos. Nada é gravado até você escolher.</li><li>Só você vê a sua resposta, e a pergunta pode voltar mais tarde, sem cobrança.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/119_plano_de_guardar.png" alt="Tela de exemplo: Plano de guardar" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="simulador" aria-labelledby="t-simulador">
+      <div class="texto">
+        <p class="grupo">Planejar</p>
+        <h3 id="t-simulador">Simulador</h3>
+        <h4>Para que serve</h4>
+        <p>Faz contas com hipóteses suas: quanto guardar por mês, em quanto tempo ou quanto você pode ter. Nada é gravado.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Metas</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Fazer as contas</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Simular um plano</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Em <b class="rotulo">&ldquo;O que você quer saber?&rdquo;</b>, escolha <b class="rotulo">&ldquo;Quanto guardar por mês&rdquo;</b>, <b class="rotulo">&ldquo;Em quanto tempo&rdquo;</b> ou <b class="rotulo">&ldquo;Quanto posso ter&rdquo;</b>.</li><li>Preencha os campos. A taxa de rendimento é a que você quer testar: o Clarevo não sugere taxas.</li><li>Toque em <b class="rotulo">&ldquo;Simular&rdquo;</b> e veja o resultado, as hipóteses e a tabela <b class="rotulo">&ldquo;Ano a ano&rdquo;</b>.</li><li>Marque <b class="rotulo">&ldquo;Descontar inflação? (opcional)&rdquo;</b> para ver o valor em dinheiro de hoje.</li><li>Para guardar o resultado, toque em <b class="rotulo">&ldquo;Criar meta com estes valores&rdquo;</b>.</li><li>É uma simulação com as hipóteses que você informou, não uma promessa de rendimento.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/131_simular_resultado.png" alt="Tela de exemplo: Simulador" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="calculadoras" aria-labelledby="t-calculadoras">
+      <div class="texto">
+        <p class="grupo">Planejar</p>
+        <h3 id="t-calculadoras">Calculadoras</h3>
+        <h4>Para que serve</h4>
+        <p>Contas rápidas com os valores que você informa. Nada é gravado.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Movimentos</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Organizar</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Calculadoras</b></p>
+        <p class="tambem-titulo">Também em</p><ul class="tambem"><li><b>Metas</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Fazer as contas</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Calculadoras</b></li><li><b>Aprender</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Calculadoras</b></li></ul>
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Abra <b class="rotulo">&ldquo;Calculadoras&rdquo;</b> e escolha uma, organizadas em <b class="rotulo">&ldquo;Decidir uma compra&rdquo;</b>, <b class="rotulo">&ldquo;Dívidas e atrasos&rdquo;</b> e <b class="rotulo">&ldquo;Guardar e dividir&rdquo;</b>.</li><li>Digite os valores. O resultado aparece enquanto você digita, sem botão de calcular.</li><li>As taxas são sempre as que você digita: o Clarevo não traz taxa pronta.</li><li>Confira as <b class="rotulo">&ldquo;Hipóteses&rdquo;</b>, logo abaixo do resultado.</li><li>Algumas calculadoras oferecem <b class="rotulo">&ldquo;Anotar como parcelamento&rdquo;</b> ou <b class="rotulo">&ldquo;Anotar como gasto fixo&rdquo;</b>, para guardar o que você calculou.</li></ol>
+        <h4>Uma por uma</h4><ul class="linhas"><li><b>Antes de financiar</b>: Parcela, juros e o que muda se juntar antes</li><li><b>Parcelado ou à vista?</b>: Descubra os juros embutidos no parcelado</li><li><b>Quanto custa por ano?</b>: Assinaturas e gastos que se repetem</li><li><b>Quanto custa uma dívida?</b>: Rotativo, cheque especial ou empréstimo</li><li><b>Quitar antes ou adiantar parcelas</b>: Uma estimativa de quanto dos juros sai da conta</li><li><b>Multa e juros por atraso</b>: Com os valores do boleto</li><li><b>Em que ordem quitar as dívidas?</b>: Duas ordens de pagamento, lado a lado</li><li><b>Reserva para imprevistos</b>: Quantos meses seus gastos essenciais cobrem</li><li><b>Juntar para um objetivo</b>: Quanto guardar por mês ou em quanto tempo</li><li><b>Dividir as contas da casa</b>: Partes iguais ou pela renda de cada pessoa</li></ul>
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/236_calculadoras_com_antes_de_financiar.png" alt="Tela de exemplo: Calculadoras" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="antes-de-financiar" aria-labelledby="t-antes-de-financiar">
+      <div class="texto">
+        <p class="grupo">Planejar</p>
+        <h3 id="t-antes-de-financiar">Antes de financiar</h3>
+        <h4>Para que serve</h4>
+        <p>Mostra a parcela, os juros totais e quanto a parcela pesa na renda antes de você comprar a prazo, e compara com juntar antes.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Movimentos</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Organizar</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Calculadoras</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Antes de financiar</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Informe o <b class="rotulo">&ldquo;Preço à vista do bem&rdquo;</b> e a <b class="rotulo">&ldquo;Entrada&rdquo;</b>, se houver.</li><li>Digite o <b class="rotulo">&ldquo;Número de parcelas&rdquo;</b> e a <b class="rotulo">&ldquo;Taxa de juros ao mês (%)&rdquo;</b>, que está na proposta do banco ou da loja.</li><li>Em <b class="rotulo">&ldquo;A primeira parcela vence em 1 mês?&rdquo;</b>, escolha Sim ou Não.</li><li>Para ver quanto a parcela pesa, informe <b class="rotulo">&ldquo;Sua renda líquida por mês&rdquo;</b>. A renda de referência entra automaticamente, e mudar aqui não altera a referência.</li><li>Veja o total pago, os juros e a alternativa <b class="rotulo">&ldquo;Juntar antes&rdquo;</b>, com quanto tempo leva para juntar o valor.</li><li>É uma estimativa: as condições oficiais são as da proposta, e vale pedir o CET.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/231_antes_de_financiar_resultado.png" alt="Tela de exemplo: Antes de financiar" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="plano-dividas" aria-labelledby="t-plano-dividas">
+      <div class="texto">
+        <p class="grupo">Planejar</p>
+        <h3 id="t-plano-dividas">Plano para quitar dívidas</h3>
+        <h4>Para que serve</h4>
+        <p>Compara duas ordens de pagamento das suas dívidas, lado a lado, para você ver o efeito de cada uma. Nada é gravado.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Metas</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Fazer as contas</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Em que ordem quitar as dívidas?</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>A lista já vem com os seus parcelamentos em aberto. Para outras dívidas, toque em <b class="rotulo">&ldquo;Acrescentar dívida&rdquo;</b>, de 1 a 10.</li><li>Escolha o tipo: <b class="rotulo">&ldquo;Parcelada&rdquo;</b> ou <b class="rotulo">&ldquo;Saldo com juros&rdquo;</b>.</li><li>Preencha o valor da parcela, as parcelas que faltam e a taxa ao mês, ou o saldo de hoje, a taxa e quanto você paga por mês. As taxas são as do seu contrato.</li><li>Em <b class="rotulo">&ldquo;Quanto a mais você consegue pôr por mês nas dívidas?&rdquo;</b>, informe um valor extra, se houver.</li><li>Compare <b class="rotulo">&ldquo;Maior taxa primeiro&rdquo;</b> e <b class="rotulo">&ldquo;Menor dívida primeiro&rdquo;</b>: juros totais, mês em que cada dívida termina e os detalhes de cada ordem.</li><li>O Clarevo não diz qual ordem escolher e não oferece crédito.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/190_plano_dividas_demonstracao.png" alt="Tela de exemplo: Plano para quitar dívidas" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+      </section>
+      <section aria-labelledby="g-aprender-e-ajuda">
+        <div class="grupo-titulo">
+          <h2 id="g-aprender-e-ajuda">Aprender e ajuda</h2>
+          <p>Temas curtos, o guia, o botão ? e o tour.</p>
+        </div>
+        
+    <section class="entrada" id="aprender" aria-labelledby="t-aprender">
+      <div class="texto">
+        <p class="grupo">Aprender e ajuda</p>
+        <h3 id="t-aprender">Aprender</h3>
+        <h4>Para que serve</h4>
+        <p>Explicações curtas sobre contas, juros e o próprio Clarevo, com exemplos fictícios e fontes. Funciona no aparelho, sem registrar o que você lê nem o que busca.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Aprender</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Em <b class="rotulo">&ldquo;Comece por aqui&rdquo;</b>, leia os três temas para começar.</li><li>Use <b class="rotulo">&ldquo;Ir para&rdquo;</b> para pular a uma seção: <b class="rotulo">&ldquo;Usar o Clarevo&rdquo;</b>, <b class="rotulo">&ldquo;Organizar o mês&rdquo;</b>, <b class="rotulo">&ldquo;Juros e crédito&rdquo;</b>, <b class="rotulo">&ldquo;Dinheiro no tempo&rdquo;</b> ou <b class="rotulo">&ldquo;Dúvidas frequentes&rdquo;</b>.</li><li>Busque em <b class="rotulo">&ldquo;Buscar um tema ou uma função&rdquo;</b>. A busca acha temas, telas do app e passos do guia.</li><li>Abra um tema para ver o resumo, o exemplo com <b class="rotulo">&ldquo;Ver a conta&rdquo;</b>, as fontes e, quando houver, a ação em <b class="rotulo">&ldquo;No Clarevo&rdquo;</b>.</li><li>O Clarevo não registra quais temas você abre nem o que busca.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/320_aprender_como_usar.png" alt="Tela de exemplo: Aprender" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="ajuda" aria-labelledby="t-ajuda">
+      <div class="texto">
+        <p class="grupo">Aprender e ajuda</p>
+        <h3 id="t-ajuda">Guia, ajuda no lugar e tour</h3>
+        <h4>Para que serve</h4>
+        <p>Reúne o passo a passo de cada função. A ajuda também aparece no próprio lugar, com o botão ?, e num tour curto na primeira entrada.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Aprender</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Como usar o Clarevo</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Em Aprender, toque em <b class="rotulo">&ldquo;Como usar o Clarevo&rdquo;</b>.</li><li>Escolha uma função na lista, organizada em grupos. Cada uma mostra <b class="rotulo">&ldquo;Para que serve&rdquo;</b>, <b class="rotulo">&ldquo;Onde fica&rdquo;</b> e <b class="rotulo">&ldquo;Como usar&rdquo;</b>.</li><li>Toque em <b class="rotulo">&ldquo;Abrir&rdquo;</b> e o nome da tela para ir direto a ela.</li><li>Em algumas telas, o botão <b class="rotulo">&ldquo;?&rdquo;</b> no cabeçalho abre o <b class="rotulo">&ldquo;Como usar&rdquo;</b> daquela tela, com o atalho <b class="rotulo">&ldquo;Ver no guia&rdquo;</b>.</li><li>Para rever o tour de boas-vindas, toque em <b class="rotulo">&ldquo;Ver o tour de novo&rdquo;</b>, no topo do guia.</li><li>Nada do que você abre ou busca no guia é registrado.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/321_guia_lista.png" alt="Tela de exemplo: Guia, ajuda no lugar e tour" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+      </section>
+      <section aria-labelledby="g-conta-e-privacidade">
+        <div class="grupo-titulo">
+          <h2 id="g-conta-e-privacidade">Conta e privacidade</h2>
+          <p>Lembretes, ocultar valores, exportar e quem vê os dados.</p>
+        </div>
+        
+    <section class="entrada" id="lembretes" aria-labelledby="t-lembretes">
+      <div class="texto">
+        <p class="grupo">Conta e privacidade</p>
+        <h3 id="t-lembretes">Lembretes de vencimento</h3>
+        <h4>Para que serve</h4>
+        <p>Um aviso no dia anterior ao vencimento de cada conta a pagar. Funciona no app para celular.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Conta</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Lembretes</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>No app para celular, abra Conta e ligue <b class="rotulo">&ldquo;Lembretes de contas a pagar&rdquo;</b>.</li><li>Permita os avisos quando o aparelho pedir.</li><li>Escolha o <b class="rotulo">&ldquo;Horário do aviso&rdquo;</b>.</li><li>O aviso não mostra valores nem descrições na tela bloqueada e fica só neste aparelho.</li><li>Se o aparelho bloquear os avisos, use <b class="rotulo">&ldquo;Abrir configurações&rdquo;</b>.</li><li>Na versão para navegador, os lembretes não existem.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/329_conta_privacidade.png" alt="Tela de exemplo: Lembretes de vencimento" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="ocultar-valores" aria-labelledby="t-ocultar-valores">
+      <div class="texto">
+        <p class="grupo">Conta e privacidade</p>
+        <h3 id="t-ocultar-valores">Ocultar valores e biometria</h3>
+        <h4>Para que serve</h4>
+        <p>Esconde os valores em reais da tela e, no celular, pede biometria ao abrir o app. As escolhas valem só para este aparelho.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Conta</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Privacidade neste aparelho</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Toque no olho, no cabeçalho, para <b class="rotulo">&ldquo;Ocultar valores&rdquo;</b> ou <b class="rotulo">&ldquo;Mostrar valores&rdquo;</b> na hora. Os valores aparecem como R$ ••••.</li><li>Para abrir sempre com os valores ocultos, ligue <b class="rotulo">&ldquo;Ocultar valores ao abrir&rdquo;</b>, em Conta.</li><li>No celular com biometria configurada, ligue <b class="rotulo">&ldquo;Pedir biometria ao abrir&rdquo;</b>. Sair da conta nunca depende dela.</li><li>O arquivo de <b class="rotulo">&ldquo;Exportar meus dados&rdquo;</b> mostra os valores, mesmo com a ocultação ligada.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/110_resumo_valores_ocultos.png" alt="Tela de exemplo: Ocultar valores e biometria" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="exportar" aria-labelledby="t-exportar">
+      <div class="texto">
+        <p class="grupo">Conta e privacidade</p>
+        <h3 id="t-exportar">Exportar meus dados</h3>
+        <h4>Para que serve</h4>
+        <p>Leva seus gastos e recebimentos para uma planilha (CSV) ou para um resumo em PDF, montado neste aparelho.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Conta</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Exportar meus dados</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Em Conta, no card <b class="rotulo">&ldquo;Exportar meus dados&rdquo;</b>, toque em <b class="rotulo">&ldquo;Escolher período e formato&rdquo;</b>.</li><li>Escolha o <b class="rotulo">&ldquo;Período&rdquo;</b>, como <b class="rotulo">&ldquo;Este mês&rdquo;</b>, <b class="rotulo">&ldquo;Últimos 12 meses&rdquo;</b> ou <b class="rotulo">&ldquo;Tudo&rdquo;</b>.</li><li>Escolha o <b class="rotulo">&ldquo;Formato&rdquo;</b>: <b class="rotulo">&ldquo;Planilha (CSV)&rdquo;</b> ou <b class="rotulo">&ldquo;Resumo em PDF&rdquo;</b>.</li><li>Toque em <b class="rotulo">&ldquo;Preparar arquivo&rdquo;</b>. Com a biometria ligada, o aparelho pede a confirmação antes.</li><li>Em <b class="rotulo">&ldquo;Arquivo pronto&rdquo;</b>, baixe ou compartilhe o arquivo. O Clarevo não guarda cópia dele.</li><li>O arquivo tem dados financeiros: guarde e compartilhe só com quem você escolher.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/291_exportar_meus_dados.png" alt="Tela de exemplo: Exportar meus dados" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="quem-ve" aria-labelledby="t-quem-ve">
+      <div class="texto">
+        <p class="grupo">Conta e privacidade</p>
+        <h3 id="t-quem-ve">Quem vê estes dados</h3>
+        <h4>Para que serve</h4>
+        <p>Mostra quem tem acesso aos seus registros. Em Pessoal, só você. A empresa que oferece o plano não vê seus registros.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Resumo</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Quem vê estes dados?</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>No fim do Resumo, de Contas a pagar e de outras telas, toque em <b class="rotulo">&ldquo;Quem vê estes dados?&rdquo;</b>.</li><li>Veja o nome e a permissão de cada pessoa com acesso. Em Pessoal, só você vê, anota, edita e exclui.</li><li>A empresa que oferece o Clarevo como benefício administra só o seu acesso ao plano, não os seus registros.</li><li>Gastos fixos, renda de referência, metas, simulações e a revisão dos últimos meses também são só seus.</li><li>Para uma resposta mais completa, toque em <b class="rotulo">&ldquo;A empresa vê meus gastos?&rdquo;</b>.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/330_quem_ve.png" alt="Tela de exemplo: Quem vê estes dados" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+      </section>
+</main>
+<footer>Clarevo. Conteúdo educativo e geral, com dados fictícios de demonstração.</footer>
+</body>
+</html>

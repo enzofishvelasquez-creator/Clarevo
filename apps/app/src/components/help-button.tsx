@@ -46,7 +46,7 @@ function HelpSheet({ entry, onClose }: { entry: GuideEntry; onClose: () => void 
       onRequestClose={onClose}
       {...({ 'aria-label': HELP_TEXT.sheetLabel(entry.title) } as object)}>
       <View style={styles.backdrop}>
-        <View style={[styles.box, { maxHeight: Math.max(320, height - space[8]) }]} accessibilityViewIsModal>
+        <View style={[styles.box, { maxHeight: Math.max(320, Math.round(height * 0.86)) }]} accessibilityViewIsModal>
           <Txt variant="label" color={colors.textSecondary} style={{ fontFamily: fonts.bold }}>
             {HELP_TEXT.sheetSteps}
           </Txt>

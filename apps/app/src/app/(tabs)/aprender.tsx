@@ -25,9 +25,10 @@ const open = (t: Topic) => router.push(explanationHref(t.slug, 'aprender'));
 const openAppScreen = (screen: AppScreen) => (appScreenIsTab(screen) ? router.navigate(screen.href as Href) : router.push(screen.href as Href));
 
 /**
- * Aprender e dúvidas (spec3 §3.2, com spec5_notes §2): introdução, busca, card "Calculadoras", card lima "Comece por
- * aqui", atalhos de seção, as seções, Dúvidas frequentes e o rodapé. Com busca ativa, os resultados substituem tudo
- * do card "Calculadoras" para baixo.
+ * Aprender e dúvidas (spec3 §3.2, com spec5_notes §2): introdução, busca, card "Como usar o Clarevo" (o guia de uso, D-049),
+ * card "Calculadoras", card lima "Comece por aqui", atalhos de seção, as seções, Dúvidas frequentes e o rodapé. Com busca
+ * ativa, os resultados substituem tudo do card "Como usar o Clarevo" para baixo: o grupo "No app", o grupo "Como usar"
+ * (entradas do guia) e os temas.
  *
  * Privacidade (R11): o termo buscado fica só no estado desta tela, na memória; nada é gravado no aparelho nem
  * enviado, e a busca não faz requisição de rede.

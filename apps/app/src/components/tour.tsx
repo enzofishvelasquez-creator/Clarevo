@@ -47,7 +47,7 @@ export function TourDialog({ onClose }: { onClose: () => void }) {
       // Na web, o Modal vira role="dialog"; o nome vai nele.
       {...({ 'aria-label': TOUR_TEXT.dialogLabel } as object)}>
       <View style={styles.backdrop}>
-        <View style={[styles.box, { maxHeight: Math.max(280, height - space[8]) }]} accessibilityViewIsModal>
+        <View style={[styles.box, { maxHeight: Math.max(280, Math.round(height * 0.9)) }]} accessibilityViewIsModal>
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             <View style={styles.icon}>
               <Icon size={36} color={colors.text} strokeWidth={2.25} aria-hidden />
