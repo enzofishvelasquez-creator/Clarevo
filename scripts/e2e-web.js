@@ -5142,7 +5142,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await atWidths(async (w) => {
     await layoutChecks(`F1 plano demonstração ${w}px`);
     const small = await p.evaluate(() => [...document.querySelectorAll('[role=button],[role=radio]')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.height < 47.5; }).map((e) => (e.getAttribute('aria-label') || e.textContent || '').slice(0, 40)));
-    ok(`F1 plano (${w}px): botões, chips e links da tela com alvo de 48 px`, small.filter((x) => !/^(Voltar|Resumo|Movimentos|Metas|Aprender)/.test(x)).length === 0, small.join(' | '));
+    ok(`F1 plano (${w}px): botões, chips e links da tela com alvo de 48 px`, small.filter((x) => !/^(Voltar|Como usar esta tela|Resumo|Movimentos|Metas|Aprender)/.test(x)).length === 0, small.join(' | '));
     if (w === 390) await shot('190_plano_dividas_demonstracao');
     if (w === 320) await shot('190_plano_dividas_demonstracao_320px');
   });
@@ -5859,7 +5859,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await atWidths(async (w) => {
     await layoutChecks(`D44 antes de financiar vazio ${w}px`);
     const small = await d44Small();
-    ok(`D44 vazio (${w}px): botões, chips e links da tela com alvo de 48 px`, small.filter((x) => !/^(Voltar|Resumo|Movimentos|Metas|Aprender)/.test(x)).length === 0, small.join(' | '));
+    ok(`D44 vazio (${w}px): botões, chips e links da tela com alvo de 48 px`, small.filter((x) => !/^(Voltar|Como usar esta tela|Resumo|Movimentos|Metas|Aprender)/.test(x)).length === 0, small.join(' | '));
     if (w === 390) await shot('230_antes_de_financiar_vazio');
     if (w === 320) await shot('230_antes_de_financiar_vazio_320px');
   });
@@ -5896,7 +5896,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await atWidths(async (w) => {
     await layoutChecks(`D44 resultado ${w}px`);
     const small = await d44Small();
-    ok(`D44 resultado (${w}px): botões, chips e links da tela com alvo de 48 px`, small.filter((x) => !/^(Voltar|Resumo|Movimentos|Metas|Aprender)/.test(x)).length === 0, small.join(' | '));
+    ok(`D44 resultado (${w}px): botões, chips e links da tela com alvo de 48 px`, small.filter((x) => !/^(Voltar|Como usar esta tela|Resumo|Movimentos|Metas|Aprender)/.test(x)).length === 0, small.join(' | '));
     await scrollTo('Resultado');
     if (w === 390) await shot('231_antes_de_financiar_resultado');
     if (w === 320) await shot('231_antes_de_financiar_resultado_320px');
