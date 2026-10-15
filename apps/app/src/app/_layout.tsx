@@ -199,6 +199,8 @@ function Navigation() {
           <Stack.Screen name="registro/[id]/editar" />
           {/* Buscar em Movimentações (D-045): tela de consulta, com a barra inferior. */}
           <Stack.Screen name="movimentacoes/buscar" />
+          {/* Importar extrato ou fatura (D-048): escolher, revisar e importar, com rodapé fixo e sem barra. */}
+          <Stack.Screen name="importar/index" />
           <Stack.Screen name="a-pagar/index" />
           <Stack.Screen name="a-pagar/nova" />
           {/* Rota estática: tem precedência sobre a-pagar/[id]. */}

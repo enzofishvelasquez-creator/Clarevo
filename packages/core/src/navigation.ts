@@ -49,6 +49,8 @@ const FORM_PATHS: readonly RegExp[] = [
   new RegExp(`^/cartoes/(novo|${ID}/editar|${ID}/fatura/${MONTH}/(pagar|encargo|estorno|compra))$`),
   // Seus últimos meses: o passo a passo e o pagamento de uma conta sem registro.
   /^\/retomar\/(atualizar|pagar)$/,
+  // Importar extrato ou fatura (D-048): escolher o arquivo, o destino, revisar as linhas e importar, com rodapé fixo.
+  /^\/importar$/,
   // Entrada, cadastro, recuperação e carregamento.
   /^\/(boas-vindas|criar-conta|confirmar-email|entrar|recuperar-acesso|nova-senha|primeira-conta|carregando|confirmado)$/,
 ];
@@ -67,7 +69,7 @@ export function barModeFor(pathname: string): BarMode {
 
 /** Abas que uma tela de consulta abre quando a pessoa não veio de nenhuma (endereço aberto direto): a do assunto. */
 const TAB_OF_TOPIC: readonly [RegExp, TabRoute][] = [
-  [/^\/(a-pagar|gastos-fixos|cartoes|registro|orcamento|movimentacoes)(\/|$)/, '/movimentacoes'],
+  [/^\/(a-pagar|gastos-fixos|cartoes|registro|orcamento|movimentacoes|importar)(\/|$)/, '/movimentacoes'],
   [/^\/(meta|reserva|guardar|simular|renda-comprometida)(\/|$)/, '/metas'],
   [/^\/explicacao(\/|$)/, '/aprender'],
 ];
@@ -338,6 +340,13 @@ export const APP_SCREENS: readonly AppScreen[] = [
     caption: 'Planilha (CSV) ou resumo em PDF dos seus gastos e recebimentos',
     href: '/conta/exportar',
     keywords: ['exportar', 'exportação', 'planilha', 'excel', 'csv', 'pdf', 'backup', 'baixar', 'baixar meus dados', 'levar meus dados', 'relatório', 'cópia dos dados'],
+  },
+  {
+    id: 'importar-extrato',
+    title: 'Importar extrato ou fatura',
+    caption: 'Arquivo OFX ou planilha do banco, com revisão das linhas antes de importar',
+    href: '/importar',
+    keywords: ['importar', 'importação', 'extrato', 'ofx', 'banco', 'planilha', 'csv', 'arquivo do banco', 'trazer lançamentos', 'extrato do banco'],
   },
   {
     id: 'orcamento',

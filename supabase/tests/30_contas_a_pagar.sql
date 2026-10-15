@@ -625,7 +625,7 @@ do $$ begin
             'create_series_occurrence', 'decide_return_review', 'delete_account', 'delete_card', 'delete_card_entry',
             'delete_category_budget', 'delete_commitment', 'delete_commitment_limit', 'delete_goal', 'delete_goal_movement',
             'delete_income_reference', 'delete_record', 'delete_series', 'end_series', 'ensure_personal_space',
-            'inform_series_year', 'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'mark_subscriptions_reviewed', 'month_budget',
+            'import_records', 'inform_series_year', 'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'mark_subscriptions_reviewed', 'month_budget',
             'month_committed', 'month_to_pay', 'month_totals', 'months_overview', 'my_today', 'pay_commitment', 'pay_invoice',
             'set_account_status', 'set_card_status', 'set_category_budget', 'set_commitment_limit', 'set_default_account',
             'set_goal_status', 'set_income_reference', 'set_savings_answer', 'set_series_subscription', 'skip_series_year', 'sync_series_occurrences',

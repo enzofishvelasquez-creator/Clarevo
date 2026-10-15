@@ -191,6 +191,7 @@ import { APP_SCREENS, APP_SEARCH_TEXT, BAR_TEXT, GOALS_NAV_TEXT, PAYABLES_NAV_TE
 import { DEFAULT_SEARCH_DRAFT, SEARCH_PAGE, SEARCH_PERIODS, SEARCH_TEXT, searchFromDraft } from '../src';
 import { SUBSCRIPTION_ERROR_TEXT, SUBSCRIPTION_TEXT, subscriptionCount, subscriptionErrorText } from '../src';
 import { EXPORT_FORMATS, EXPORT_PERIODS, EXPORT_TEXT, buildExportFiles, loadExportSource } from '../src';
+import { IMPORT_ERROR_TEXT, IMPORT_SAVE_ERROR_TEXT, IMPORT_TEXT, failedItemIndex, importSaveErrorText, importedSummary, reviewLineA11y } from '../src';
 
 /**
  * Teste de textos (seção 5): sem indicação de produto financeiro, promessa de rendimento, travessões longos
@@ -2144,5 +2145,129 @@ describe('textos de Exportar meus dados (D-047)', () => {
     const plain = pdf.replace(/<style>[\s\S]*?<\/style>/g, ' ').replace(/<[^>]+>/g, ' ');
     check(plain.split(/\s{2,}/).filter((t) => t.trim() !== ''));
     for (const file of buildExportFiles(load.source, 'csv').files) expect(file.content).not.toMatch(/[–—]/);
+  });
+});
+
+describe('textos de importar extrato ou fatura (D-048)', () => {
+  const GENDERED = /\b(o|a)s? usuári[oa]s?\b|\bobrigad[oa]s?\b|\bbem-vind[oa]s?\b|\bpreocupad[oa]s?\b|\bendividad[oa]s?\b|\bcadastrad[oa]\b|\(a\)|\(o\)/i;
+  // Nenhuma marca de banco, de cartão ou de serviço na interface (as regras de categoria também não citam marca).
+  const BRANDS = new RegExp(
+    `(?<![\\p{L}\\d])(?:${[
+      'netflix', 'spotify', 'amazon', 'disney', 'globoplay', 'youtube', 'apple', 'google', 'nubank', 'itaú', 'itau', 'bradesco', 'santander',
+      'inter', 'c6', 'caixa econômica', 'banco do brasil', 'bb', 'sicredi', 'sicoob', 'btg', 'neon', 'picpay', 'mercado pago', 'mercado livre',
+      'ifood', 'uber', 'pix', 'visa', 'mastercard', 'elo', 'hipercard', 'amex', 'serasa', 'oi', 'vivo', 'tim', 'claro',
+    ].join('|')})(?![\\p{L}\\d])`,
+    'iu',
+  );
+  const check = (texts: string[]) => {
+    expect(texts.length).toBeGreaterThan(0);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(GENDERED);
+      expect(text, text).not.toMatch(BRANDS);
+      expect(text, text).not.toMatch(/\bfaz(er|endo)?\s+sentido\b/i);
+      expect(text, text).not.toMatch(/[–—]/);
+    }
+  };
+  const functions = [
+    IMPORT_TEXT.fileRead('extrato.ofx'),
+    IMPORT_TEXT.columnOption(1, ''),
+    IMPORT_TEXT.columnOption(2, '01/10/2026'),
+    IMPORT_TEXT.columnOption(3, 'Uma descrição bem comprida que passa do corte'),
+    IMPORT_TEXT.counts(1, 0),
+    IMPORT_TEXT.counts(23, 18),
+    IMPORT_TEXT.ignoredLines(1),
+    IMPORT_TEXT.ignoredLines(4),
+    IMPORT_TEXT.lineInclude('Padaria', 'R$ 45,90', '02/10/2026'),
+    IMPORT_TEXT.importButton(0),
+    IMPORT_TEXT.importButton(1),
+    IMPORT_TEXT.importButton(18),
+    IMPORT_TEXT.importing(500, 1200),
+    IMPORT_TEXT.partial(500, 1200),
+    IMPORT_TEXT.partial(1, 1),
+    importedSummary(18, 4),
+    importedSummary(1, 1),
+    importedSummary(18, 0),
+    importedSummary(0, 4),
+    importedSummary(0, 0),
+    importSaveErrorText('fatura_paga', { description: 'Padaria São João', amount: 'R$ 45,90', date: '02/10/2026' }),
+    importSaveErrorText('fatura_paga', { description: '', amount: 'R$ ••••', date: '02/10/2026' }),
+    importSaveErrorText('fatura_paga'),
+    importSaveErrorText('inexistente'),
+    reviewLineA11y('Padaria', 4590, '2026-10-02', 'Saída', 'Já anotado'),
+  ];
+
+  it('IMPORT_TEXT inteiro (rótulos, avisos e mensagens fixas) e os textos montados', () => {
+    check([...staticStrings(IMPORT_TEXT), ...functions]);
+  });
+
+  it('erros de leitura e de gravação, um por código', () => {
+    check([...Object.values(IMPORT_ERROR_TEXT), ...Object.values(IMPORT_SAVE_ERROR_TEXT)]);
+    expect(Object.keys(IMPORT_ERROR_TEXT).sort()).toEqual(
+      ['arquivo_grande', 'arquivo_vazio', 'csv_invalido', 'formato_desconhecido', 'linhas_demais', 'moeda_diferente', 'ofx_invalido', 'sem_lancamentos'].sort(),
+    );
+  });
+
+  it('a lista pega o que deve e aceita os textos da tela', () => {
+    for (const bad of ['Nubank', 'Importar do Itaú', 'Pix recebido', 'a \u2014 b', 'Cuidado', 'o usuário', 'Faça sentido'.replace('Faça', 'Faz').replace('Faz sentido', ['faz', 'sentido'].join(' '))]) {
+      const caught = [FORBIDDEN, JUDGMENT, GENDERED, BRANDS].some((re) => re.test(bad));
+      expect(caught, bad).toBe(true);
+    }
+    for (const ok of [IMPORT_TEXT.rowTitle, IMPORT_TEXT.rowCaption, IMPORT_TEXT.labels.ja_anotado, IMPORT_TEXT.labels.parcela, IMPORT_TEXT.labels.pagamento_fatura, IMPORT_TEXT.labels.transferencia]) {
+      expect([FORBIDDEN, JUDGMENT, GENDERED, BRANDS].some((re) => re.test(ok)), ok).toBe(false);
+    }
+  });
+
+  it('o que a tela promete e o que ela não promete', () => {
+    expect(IMPORT_TEXT.rowTitle).toBe('Importar extrato ou fatura');
+    expect(IMPORT_TEXT.rowCaption).toBe('Arquivo OFX ou planilha do banco');
+    expect(IMPORT_TEXT.labels.ja_anotado).toBe('Já anotado');
+    expect(IMPORT_TEXT.labels.pagamento_fatura).toBe('Parece pagamento de fatura');
+    expect(IMPORT_TEXT.labels.transferencia).toBe('Parece transferência');
+    expect(IMPORT_TEXT.labels.parcela).toBe('Parece parcela');
+    expect(IMPORT_TEXT.labelHints.parcela).toBe('Compra parcelada: anote uma vez em Anotar gasto, com o número de parcelas.');
+    expect(IMPORT_TEXT.reading).toBe('Lendo o arquivo…');
+    expect(importSaveErrorText('fatura_paga', { description: 'Padaria', amount: 'R$ 45,90', date: '02/10/2026' })).toBe(
+      `${IMPORT_SAVE_ERROR_TEXT.fatura_paga} Linha: Padaria, R$ 45,90, 02/10/2026.`,
+    );
+    expect(importSaveErrorText('fatura_paga')).toBe(IMPORT_SAVE_ERROR_TEXT.fatura_paga);
+    expect(failedItemIndex('item=3', 0)).toBe(2);
+    expect(failedItemIndex('item=1', 2)).toBe(1000);
+    expect(failedItemIndex('item=500', 1)).toBe(999);
+    expect(failedItemIndex('item=0', 0)).toBeNull();
+    expect(failedItemIndex('outro', 0)).toBeNull();
+    expect(failedItemIndex(undefined, 0)).toBeNull();
+    expect(IMPORT_TEXT.selectAll).toBe('Selecionar tudo');
+    expect(IMPORT_TEXT.seeInMovements).toBe('Ver em Movimentos');
+    expect(IMPORT_TEXT.balanceIgnored).toContain('saldo');
+    expect(IMPORT_TEXT.balanceIgnored).toContain('ignorado');
+    expect(IMPORT_TEXT.intro).toContain('não é guardado');
+    expect(IMPORT_TEXT.limits).toBe('Até 5 MB e 5.000 linhas.');
+    expect(IMPORT_TEXT.destinationAccount).toBe('Conta');
+    expect(IMPORT_TEXT.destinationCard).toBe('Cartão de crédito');
+    expect(IMPORT_TEXT.cardPurchaseNote).toContain('não somam em Pago');
+    expect(importedSummary(18, 4)).toBe('18 lançamentos importados, 4 já estavam anotados.');
+  });
+
+  it('a tela no índice "No app" acha por importar, extrato, ofx, banco, fatura e planilha; o pagamento da fatura continua em Cartões', () => {
+    const screen = APP_SCREENS.find((s) => s.id === 'importar-extrato')!;
+    expect(screen.href).toBe('/importar');
+    expect(screen.title).toBe(IMPORT_TEXT.rowTitle);
+    check([screen.title, screen.caption, ...screen.keywords]);
+    for (const q of ['importar', 'extrato', 'ofx', 'banco', 'fatura', 'planilha']) {
+      expect(searchAppScreens(q).map((x) => x.id), q).toContain('importar-extrato');
+    }
+    expect(searchAppScreens('fatura')[0]!.id).toBe('cartoes');
+  });
+
+  it('os arquivos-fonte novos passam', () => {
+    for (const name of ['importar/textos.ts', 'importar/categorias.ts', 'importar/revisao.ts', 'importar/dedupe.ts']) {
+      const source = readFileSync(join(CORE_SRC, name), 'utf8');
+      expect(source, name).not.toMatch(FORBIDDEN);
+      expect(source, name).not.toMatch(JUDGMENT);
+    }
+    // As regras de categoria não citam marca nenhuma.
+    expect(readFileSync(join(CORE_SRC, 'importar/categorias.ts'), 'utf8')).not.toMatch(BRANDS);
   });
 });

@@ -1918,7 +1918,7 @@ reset role;
 
 -- ---------------------------------------------------------------------------
 -- 10. record_operations: as onze ações de cartão apontam para o cartão (target_id); as cinco de lançamento também para o
--- lançamento (entry_id); pagar e desfazer a fatura, também para a conta da fatura e o gasto; a lista vigente tem 48 ações (37, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, e as 2 de assinaturas, testadas em 88).
+-- lançamento (entry_id); pagar e desfazer a fatura, também para a conta da fatura e o gasto; a lista vigente tem 49 ações (37, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, e a importação, testada em 90).
 -- Uma operação por escrita. Atividade (A4): toda ação de cartão é anotação de quem a fez no contexto.
 -- ---------------------------------------------------------------------------
 reset role;
@@ -1987,7 +1987,7 @@ begin
     = array['alterar_cartao', 'alterar_lancamento_cartao', 'criar_cartao', 'criar_compra_cartao', 'criar_encargo_cartao', 'criar_estorno_cartao',
             'desfazer_pagamento_fatura', 'excluir_cartao', 'excluir_lancamento_cartao', 'pagar_fatura', 'situacao_cartao'], 'as 11 ações de cartão';
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-           where c.conname = 'record_operations_action_check') = 48, 'a lista vigente tem 48 ações (37, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, e as 2 de assinaturas, testadas em 88)';
+           where c.conname = 'record_operations_action_check') = 49, 'a lista vigente tem 49 ações (37, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, e a importação, testada em 90)';
 
   -- Cada operação aponta para um cartão do mesmo contexto; a de lançamento, para um lançamento do mesmo cartão; a de fatura, para
   -- a conta e o gasto daquele cartão.
@@ -2809,7 +2809,7 @@ do $$ begin
             'create_series_occurrence', 'decide_return_review', 'delete_account', 'delete_card', 'delete_card_entry',
             'delete_category_budget', 'delete_commitment', 'delete_commitment_limit', 'delete_goal', 'delete_goal_movement',
             'delete_income_reference', 'delete_record', 'delete_series', 'end_series', 'ensure_personal_space',
-            'inform_series_year', 'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'mark_subscriptions_reviewed', 'month_budget',
+            'import_records', 'inform_series_year', 'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'mark_subscriptions_reviewed', 'month_budget',
             'month_committed', 'month_to_pay', 'month_totals', 'months_overview', 'my_today', 'pay_commitment', 'pay_invoice',
             'set_account_status', 'set_card_status', 'set_category_budget', 'set_commitment_limit', 'set_default_account',
             'set_goal_status', 'set_income_reference', 'set_savings_answer', 'set_series_subscription', 'skip_series_year', 'sync_series_occurrences',
@@ -2907,7 +2907,7 @@ do $$ begin
   assert (select array_agg(attname::text order by attnum) from pg_attribute where attrelid = 'public.card_entries'::regclass and attnum > 0 and not attisdropped)
     = array['id', 'context_id', 'card_id', 'kind', 'invoice_month', 'amount_cents', 'description', 'category', 'purchase_id', 'purchased_on',
             'installment_number', 'installment_total', 'purchase_total_cents', 'charge_kind', 'source_month', 'payment_record_id', 'receipt_key',
-            'created_by', 'version', 'created_at', 'updated_at', 'deleted_at', 'deleted_by'], 'colunas de card_entries';
+            'created_by', 'version', 'created_at', 'updated_at', 'deleted_at', 'deleted_by', 'import_key'], 'colunas de card_entries (a chave da importação, 0012, no fim)';
   assert (select array_agg(attname::text order by attnum) from pg_attribute where attrelid = 'public.card_items'::regclass and attnum > 0 and not attisdropped)
     = array['id', 'context_id', 'nickname', 'last_digits', 'closing_day', 'due_day', 'limit_cents', 'status', 'created_by', 'version', 'created_at',
             'updated_at', 'used_cents', 'current_month', 'current_closing_on', 'current_due_on'], 'colunas de card_items';
@@ -2935,8 +2935,8 @@ do $$ begin
             'amount_is_estimate', 'series_kind', 'series_nature', 'series_installment_total', 'series_parts_per_year', 'card_id', 'invoice_month',
             'card_closing_on'], 'commitment_items: a lista de antes, mais cartão, mês e fechamento no fim';
   assert (select array_agg(attname::text order by attnum) from pg_attribute where attrelid = 'public.record_operations'::regclass and attnum > 0 and not attisdropped)
-    = array['actor_id', 'idempotency_key', 'action', 'context_id', 'request_hash', 'record_id', 'created_at', 'commitment_id', 'target_id', 'entry_id'],
-    'record_operations ganhou entry_id';
+    = array['actor_id', 'idempotency_key', 'action', 'context_id', 'request_hash', 'record_id', 'created_at', 'commitment_id', 'target_id', 'entry_id', 'import_result'],
+    'record_operations ganhou entry_id (e import_result, da importação, 0012, no fim)';
 
   -- Chaves estrangeiras e gatilhos.
   assert (select confdeltype from pg_constraint where conname = 'cards_context_id_fkey') = 'c'

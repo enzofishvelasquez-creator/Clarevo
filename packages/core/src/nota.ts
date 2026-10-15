@@ -251,22 +251,37 @@ export function findAccessKey(text: string, after?: RegExp): KeySearch {
   }
   const found: { info: AccessKeyInfo; index: number }[] = [];
   let bestError: ReceiptErrorCode | null = null;
+  // Palavra só com letras e números, calculada uma vez por palavra (não a cada ponto de partida que passa por ela).
+  const alnum = tokens.map((t) => /^[0-9A-Za-z]+$/.test(t.text));
+  const readCache = new Map<string, AccessKeyResult>();
+  // Todas as palavras coladas, e onde cada uma começa: as palavras de a a b somam compact.slice(offsets[a], offsets[b + 1]).
+  const compact = tokens.map((t) => t.text).join('');
+  const offsets: number[] = [0];
+  for (const t of tokens) offsets.push(offsets[offsets.length - 1]! + t.text.length);
   for (const { i, skip } of starts) {
-    let joined = '';
-    for (let j = i; j < tokens.length && j < i + 44; j++) {
-      const t = j === i ? tokens[i]!.text.slice(skip) : tokens[j]!.text;
-      if (!/^[0-9A-Za-z]+$/.test(t)) break;
-      joined += t;
-      if (joined.length < 44) continue;
-      // Mais de 44 só vale quando o excesso é texto colado no fim da chave ("...3214NATUREZA"); número maior que a chave não é chave.
-      if (joined.length > 44 && !/[A-Za-z]/.test(joined[44]!)) break;
-      const upper = joined.slice(0, 44).toUpperCase();
-      if (KEY_SHAPE.test(upper)) {
-        const parsed = parseAccessKey(upper);
-        if (parsed.ok) found.push({ info: parsed.info, index: tokens[i]!.start + skip });
-        else if (bestError === null || (KEY_ERROR_RANK[parsed.code] ?? 0) > (KEY_ERROR_RANK[bestError] ?? 0)) bestError = parsed.code;
+    const first = tokens[i]!.text.slice(skip);
+    if (!/^[0-9A-Za-z]+$/.test(first)) continue;
+    // Junta palavras seguidas (no máximo 44) até somar 44 caracteres; uma palavra com outro símbolo interrompe.
+    let length = first.length;
+    let last = i;
+    while (length < 44 && last + 1 < tokens.length && last + 1 < i + 44 && alnum[last + 1]) {
+      last += 1;
+      length += tokens[last]!.text.length;
+    }
+    if (length < 44) continue;
+    const joined = last === i ? first : first + compact.slice(offsets[i + 1]!, offsets[last + 1]!);
+    // Mais de 44 só vale quando o excesso é texto colado no fim da chave ("...3214NATUREZA"); número maior que a chave não é chave.
+    if (joined.length > 44 && !/[A-Za-z]/.test(joined[44]!)) continue;
+    const upper = joined.slice(0, 44).toUpperCase();
+    if (KEY_SHAPE.test(upper)) {
+      // Um texto com o mesmo trecho repetido (muitos "1 1 1 ...") dá a mesma candidata vezes sem conta: a leitura é guardada.
+      let parsed = readCache.get(upper);
+      if (parsed === undefined) {
+        parsed = parseAccessKey(upper);
+        if (readCache.size < 256) readCache.set(upper, parsed);
       }
-      break;
+      if (parsed.ok) found.push({ info: parsed.info, index: tokens[i]!.start + skip });
+      else if (bestError === null || (KEY_ERROR_RANK[parsed.code] ?? 0) > (KEY_ERROR_RANK[bestError] ?? 0)) bestError = parsed.code;
     }
   }
   if (found.length > 0) {

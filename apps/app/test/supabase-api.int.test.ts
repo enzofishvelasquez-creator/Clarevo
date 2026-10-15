@@ -13,6 +13,8 @@ import {
   NO_CATEGORY_LABEL,
   RepoError,
   SEARCH_LIMIT,
+  buildReview,
+  importKey,
   lastSubscriptionReview,
   subscriptionReminderDue,
   subscriptionRows,
@@ -128,6 +130,8 @@ import {
   type GoalMovementInput,
   type GoalMovementKind,
   type GoalStatus,
+  type ImportItem,
+  type ImportParse,
   type IncomeReference,
   type IsoDate,
   type IsoMonth,
@@ -152,6 +156,7 @@ import {
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { loadImportContext } from '../src/lib/import-context';
 import { SupabaseRepository } from '../src/lib/supabase-repository';
 
 const API = process.env.CLAREVO_API_URL!;
@@ -6455,5 +6460,391 @@ describe('conversor das assinaturas', () => {
       'versao_atual=7',
     ]);
     expect(await failure(fake({}, {}, { message: 'sem_permissao', code: '42501' }).markSubscriptionsReviewed('chave-0009', 'ctx'))).toEqual(['sem_permissao', 'sem_permissao', null]);
+  });
+});
+
+describe('API real: importar extrato e fatura (Ciclo I1, D-048)', () => {
+  // Ana, mais um ano depois (hoje 07/10/2038), num período em que nenhum bloco anterior gravou nada; este é o último bloco da
+  // sequência. Bruno é a pessoa de fora. Linhas FICTÍCIAS. Cartão: fecha dia 3, vence dia 10.
+  const T0 = '2038-10-07';
+  const ana = repoFor(ANA, T0);
+  const bruno = repoFor(BRUNO, T0);
+  let ctx = '';
+  let account = '';
+  let card = '';
+  /** Chave de importação de teste (64 hexadecimais), como o aparelho a calcularia. */
+  const k = (name: string) => importKey('api-teste', { date: '2038-01-01', amountCents: 1, description: name, fitId: null }, 0);
+  const item = (name: string, kind: ImportItem['kind'], amountCents: number, occurredOn: IsoDate, description: string, category: string | null = null): ImportItem => ({
+    importKey: k(name),
+    kind,
+    amountCents,
+    occurredOn,
+    description,
+    category,
+  });
+  const code = (p: Promise<unknown>) =>
+    p.then(
+      () => null,
+      (e: unknown) => (e instanceof RepoError ? [e.code, e.detail ?? null] : String(e)),
+    );
+  const month = async (m: IsoMonth) => {
+    const s = summarizeMonth(await ana.listRecords(ctx, m), ctx, m);
+    return [s.receivedCents, s.paidCents, s.differenceCents];
+  };
+
+  beforeAll(async () => {
+    const space = (await ana.getSpace())!;
+    ctx = space.personalContextId;
+    account = space.accounts[0]!.id;
+    card = (await ana.createCard(newOperationKey(), ctx, { name: 'Cartão Importação', lastDigits: null, closingDay: 3, dueDay: 10, limitCents: null })).card.id;
+    await bruno.ensurePersonalSpace('Conta do Bruno');
+  });
+
+  it('conta: cria os registros nos dias deles; Pago e Recebido mudam, Ainda a pagar não; repetir a chave devolve o mesmo resultado', async () => {
+    const before = await checkedToPay(ANA, ctx, '2038-10', T0);
+    const totals = await month('2038-10');
+    expect(totals).toEqual([0, 0, 0]);
+    const items = [
+      item('conta-1', 'despesa', 4590, '2038-10-02', '  Padaria  Pão Quente ', 'Mercado'),
+      item('conta-2', 'despesa', 12000, '2038-10-03', 'Posto', 'Transporte'),
+      item('conta-3', 'receita', 500000, '2038-10-05', 'Salário', 'Salário'),
+      item('conta-4', 'despesa', 3500, '2038-09-28', 'Farmácia', null),
+    ];
+    const key = newOperationKey();
+    expect(await ana.importRecords(key, ctx, 'conta', account, items)).toEqual({ created: 4, skipped: 0 });
+    expect(await month('2038-10')).toEqual([500000, 16590, 483410]);
+    expect(await month('2038-09')).toEqual([0, 3500, -3500]);
+    const records = await ana.listRecords(ctx, '2038-10');
+    expect(records.map((r) => [r.kind, r.amountCents, r.occurredOn, r.description, r.category, r.accountId, r.version, r.commitmentId, r.receiptKey]).sort()).toEqual(
+      [
+        ['despesa', 12000, '2038-10-03', 'Posto', 'Transporte', account, 1, null, null],
+        ['despesa', 4590, '2038-10-02', 'Padaria  Pão Quente', 'Mercado', account, 1, null, null],
+        ['receita', 500000, '2038-10-05', 'Salário', 'Salário', account, 1, null, null],
+      ].sort(),
+    );
+    const after = await checkedToPay(ANA, ctx, '2038-10', T0);
+    expect([after.toPayCents, after.items.length]).toEqual([before.toPayCents, before.items.length]);
+    // Repetição: o mesmo resultado, sem registro novo; outro conteúdo com a mesma chave é recusado.
+    expect(await ana.importRecords(key, ctx, 'conta', account, items)).toEqual({ created: 4, skipped: 0 });
+    expect((await ana.listRecords(ctx, '2038-10')).length).toBe(3);
+    expect(await code(ana.importRecords(key, ctx, 'conta', account, items.slice(0, 2)))).toEqual(['chave_reutilizada', null]);
+    expect(await ana.findImportOperation(key)).toEqual({ targetId: account, result: { created: 4, skipped: 0 } });
+    expect(await ana.findImportOperation(newOperationKey())).toBeNull();
+    expect(await ana.findOperation(key)).toBeNull();
+  });
+
+  it('chaves já importadas viram "puladas"; editar mantém a chave, excluir a libera; findImportedKeys enxerga só as vivas e só do contexto', async () => {
+    const dup = [item('conta-1', 'despesa', 0, '2038-10-02', ''), item('conta-5', 'despesa', 300, '2038-10-06', 'Doce')];
+    expect(await ana.importRecords(newOperationKey(), ctx, 'conta', account, dup)).toEqual({ created: 1, skipped: 1 });
+    expect((await ana.findImportedKeys(ctx, [k('conta-1'), k('conta-5'), k('nunca')])).sort()).toEqual([k('conta-1'), k('conta-5')].sort());
+    expect(await bruno.findImportedKeys(ctx, [k('conta-1')])).toEqual([]);
+    expect(await ana.findImportedKeys(ctx, [])).toEqual([]);
+    const doce = (await ana.listRecords(ctx, '2038-10')).find((r) => r.description === 'Doce')!;
+    const edited = await ana.updateRecord(newOperationKey(), doce.id, doce.version, { accountId: account, amountCents: 350, occurredOn: '2038-10-06', description: 'Doce de leite', category: 'Mercado' });
+    expect(await ana.importRecords(newOperationKey(), ctx, 'conta', account, [dup[1]!])).toEqual({ created: 0, skipped: 1 });
+    await ana.deleteRecord(newOperationKey(), doce.id, edited.version);
+    expect(await ana.findImportedKeys(ctx, [k('conta-5')])).toEqual([]);
+    expect(await ana.importRecords(newOperationKey(), ctx, 'conta', account, [dup[1]!])).toEqual({ created: 1, skipped: 0 });
+    // Mais de 40 chaves de uma vez: a consulta é feita em pedaços e junta tudo.
+    const many = Array.from({ length: 130 }, (_, i) => k(`conta-${i % 2 === 0 ? 1 : 5}-x${i}`));
+    expect(await ana.findImportedKeys(ctx, [...many, k('conta-1'), k('conta-5')])).toHaveLength(2);
+  });
+
+  it('recusas: a posição do item vem no detalhe e nada do lote é gravado', async () => {
+    const good = item('erro-0', 'despesa', 100, '2038-10-01', 'Bom');
+    const bad = (patch: Partial<ImportItem>) => [good, { ...item('erro-1', 'despesa', 100, '2038-10-01', 'x'), ...patch }];
+    const run = (items: readonly ImportItem[], dest: 'conta' | 'cartao' = 'conta', target = account) => code(ana.importRecords(newOperationKey(), ctx, dest, target, items));
+    const before = (await ana.listRecords(ctx, '2038-10')).length;
+    expect(await run(bad({ amountCents: 0 }))).toEqual(['valor_invalido', 'item=2']);
+    expect(await run(bad({ amountCents: 1_000_000_000 }))).toEqual(['valor_acima_do_limite', 'item=2']);
+    expect(await run(bad({ description: '  ' }))).toEqual(['descricao_obrigatoria', 'item=2']);
+    expect(await run(bad({ description: 'x'.repeat(81) }))).toEqual(['descricao_longa', 'item=2']);
+    expect(await run(bad({ category: 'c'.repeat(41) }))).toEqual(['categoria_invalida', 'item=2']);
+    expect(await run(bad({ occurredOn: '2038-02-30' }))).toEqual(['data_invalida', 'item=2']);
+    expect(await run(bad({ occurredOn: '2038-10-08' }))).toEqual(['data_futura', 'item=2']);
+    expect(await run(bad({ kind: 'compra' }))).toEqual(['tipo_invalido', 'item=2']);
+    expect(await run(bad({ importKey: 'abc' }))).toEqual(['chave_de_importacao_invalida', 'item=2']);
+    expect(await run([])).toEqual(['itens_invalidos', null]);
+    expect(await run(Array.from({ length: 501 }, (_, i) => item(`muitos-${i}`, 'despesa', 1, '2038-10-01', 'x')))).toEqual(['itens_invalidos', null]);
+    expect(await run([good], 'conta', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc')).toEqual(['conta_invalida', null]);
+    expect(await run([good], 'cartao', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc')).toEqual(['nao_encontrado', null]);
+    expect(await run([good], 'banco' as 'conta')).toEqual(['destino_invalido', null]);
+    expect((await ana.listRecords(ctx, '2038-10')).length).toBe(before);
+    // Pessoa de fora: nem a conta nem o cartão de Ana são dela.
+    const outsider = (items: readonly ImportItem[], dest: 'conta' | 'cartao', target: string) => code(bruno.importRecords(newOperationKey(), ctx, dest, target, items));
+    expect(await outsider([good], 'conta', account)).toEqual(['sem_permissao', null]);
+    expect(await outsider([good], 'cartao', card)).toEqual(['sem_permissao', null]);
+  });
+
+  it('um lote de 500 linhas passa de uma vez', async () => {
+    const items = Array.from({ length: 500 }, (_, i) => item(`lote-${i}`, 'despesa', 100 + i, '2038-09-15', `Linha ${i}`));
+    expect(await ana.importRecords(newOperationKey(), ctx, 'conta', account, items)).toEqual({ created: 500, skipped: 0 });
+    expect((await month('2038-09'))[1]).toBe(3500 + items.reduce((n, i) => n + i.amountCents, 0));
+    expect(await ana.importRecords(newOperationKey(), ctx, 'conta', account, items)).toEqual({ created: 0, skipped: 500 });
+  });
+
+  it('cartão: compras na fatura da data e estorno na do estorno; nada entra em Pago; a fatura entra em Ainda a pagar; fatura paga recusa', async () => {
+    const before = await checkedToPay(ANA, ctx, '2038-10', T0);
+    const totals = await month('2038-10');
+    const items = [
+      item('cartao-1', 'compra', 20000, '2038-09-20', 'Livro', 'Educação'),
+      item('cartao-2', 'compra', 8050, '2038-10-03', 'Mercado do bairro', 'Mercado'),
+      item('cartao-3', 'compra', 15990, '2038-10-04', 'Cinema', 'Lazer'),
+      item('cartao-4', 'compra', 3000, '2038-10-06', ' Café ', null),
+      item('cartao-5', 'estorno', 4000, '2038-10-05', 'Devolução do cinema', 'Lazer'),
+    ];
+    const key = newOperationKey();
+    expect(await ana.importRecords(key, ctx, 'cartao', card, items)).toEqual({ created: 5, skipped: 0 });
+    expect(await ana.importRecords(key, ctx, 'cartao', card, items)).toEqual({ created: 5, skipped: 0 });
+    expect(await ana.findImportOperation(key)).toEqual({ targetId: card, result: { created: 5, skipped: 0 } });
+    expect(await ana.findCardOperation(key)).toBeNull();
+    expect(await month('2038-10')).toEqual(totals);
+    const entries = await ana.listCardEntries(card);
+    expect(entries.map((e) => [e.kind, e.amountCents, e.invoiceMonth, e.installments, e.purchasedOn, e.description, e.category]).sort()).toEqual(
+      [
+        ['compra', 20000, '2038-10', 1, '2038-09-20', 'Livro', 'Educação'],
+        ['compra', 8050, '2038-10', 1, '2038-10-03', 'Mercado do bairro', 'Mercado'],
+        ['compra', 15990, '2038-11', 1, '2038-10-04', 'Cinema', 'Lazer'],
+        ['compra', 3000, '2038-11', 1, '2038-10-06', 'Café', null],
+        ['estorno', 4000, '2038-11', 1, null, 'Devolução do cinema', 'Lazer'],
+      ].sort(),
+    );
+    expect((await ana.listInvoiceItems(card)).map((i) => [i.month, i.totalCents])).toEqual([
+      ['2038-10', 28050],
+      ['2038-11', 14990],
+    ]);
+    const after = await checkedToPay(ANA, ctx, '2038-10', T0);
+    expect(after.toPayCents - before.toPayCents).toBe(28050);
+    expect(after.items.length - before.items.length).toBe(1);
+    // Pagar a fatura de outubro (já fechada) e tentar importar uma linha que cai nela.
+    const oct = (await ana.listInvoiceItems(card)).find((i) => i.month === '2038-10')!;
+    await ana.payInvoice(newOperationKey(), card, '2038-10', oct.commitmentVersion!, 28050, T0);
+    expect(await code(ana.importRecords(newOperationKey(), ctx, 'cartao', card, [item('cartao-6', 'compra', 500, '2038-10-06', 'Pão'), item('cartao-7', 'compra', 700, '2038-09-25', 'Livro usado')]))).toEqual([
+      'fatura_paga',
+      'item=2',
+    ]);
+    expect(await ana.importRecords(newOperationKey(), ctx, 'cartao', card, [items[0]!, item('cartao-6', 'compra', 500, '2038-10-06', 'Pão')])).toEqual({ created: 1, skipped: 1 });
+    // O pagamento da fatura é o único gasto do cartão em Pago.
+    expect((await month('2038-10'))[1]).toBe(totals[1]! + 28050);
+    expect(await ana.findImportedKeys(ctx, [k('cartao-1'), k('cartao-5'), k('cartao-7')])).toHaveLength(2);
+  });
+
+  it('cartão: limites do dia, tipos e cartão arquivado', async () => {
+    const run = (it: ImportItem, target = card) => code(ana.importRecords(newOperationKey(), ctx, 'cartao', target, [it]));
+    expect(await run(item('lim-1', 'compra', 100, '2034-09-30', 'Antiga'))).toEqual(['data_invalida', 'item=1']);
+    expect(await run(item('lim-2', 'estorno', 100, '2034-06-15', 'Antigo'))).toEqual(['mes_invalido', 'item=1']);
+    expect(await run(item('lim-3', 'compra', 100, '2038-10-08', 'Futura'))).toEqual(['data_futura', 'item=1']);
+    expect(await run(item('lim-4', 'despesa', 100, '2038-10-06', 'Errado'))).toEqual(['tipo_invalido', 'item=1']);
+    expect(await run(item('lim-5', 'compra', 100, '2034-10-01', 'No limite'))).toBeNull();
+    const old = (await ana.createCard(newOperationKey(), ctx, { name: 'Cartão Arquivado', lastDigits: null, closingDay: 28, dueDay: 5, limitCents: null })).card;
+    await ana.setCardStatus(newOperationKey(), old.id, old.version, 'arquivado');
+    expect(await run(item('lim-6', 'compra', 100, '2038-10-06', 'Pão'), old.id)).toEqual(['cartao_arquivado', null]);
+  });
+
+  it('cartão: compra parcelada já anotada marca a parcela da fatura como "Já anotado", lida do banco; a outra parcela fica como "Parece parcela"', async () => {
+    const c2 = (await ana.createCard(newOperationKey(), ctx, { name: 'Cartão Parcelas', lastDigits: null, closingDay: 3, dueDay: 10, limitCents: null })).card;
+    // 10x de R$ 120,00 comprada em 15/07/2038: a 1ª parcela cai na fatura de agosto e a 3ª na de outubro.
+    await ana.addCardPurchase(newOperationKey(), c2.id, { description: 'Loja de móveis', category: 'Casa', purchasedOn: '2038-07-15', totalCents: 120000, installments: 10 });
+    const parseOf = (lines: [string, string, number][]): ImportParse => ({
+      source: 'csv',
+      statement: null,
+      lines: lines.map(([date, description, amountCents], i) => ({ ordinal: i + 1, date, description, amountCents, fitId: null })),
+      ignored: 0,
+      balanceIgnored: false,
+      cardPositive: true,
+    });
+    const parsed = parseOf([
+      ['2038-10-02', 'LOJA DE MOVEIS 03/10', 12000],
+      ['2038-07-15', 'LOJA DE MOVEIS 04/10', 12000],
+      ['2038-10-02', 'PAPELARIA CENTRAL 02/05', 5000],
+      ['2038-10-02', 'PADARIA SAO JOAO', 1800],
+    ]);
+    const data = await loadImportContext(ana, ctx, 'cartao', c2.id, parsed, c2);
+    const months = ['2038-08', '2038-09', '2038-10', '2038-11', '2038-12', '2039-01', '2039-02', '2039-03', '2039-04', '2039-05'];
+    expect(data.existing.filter((e) => e.installmentNumber !== undefined).map((e) => [e.installmentNumber, e.installmentCount, e.amountCents, e.invoiceMonth])).toEqual(
+      months.map((m, i) => [i + 1, 10, 12000, m]),
+    );
+    const review = buildReview({
+      parse: parsed,
+      destination: 'cartao',
+      targetId: c2.id,
+      today: T0,
+      invertSigns: false,
+      memory: {},
+      existing: data.existing,
+      importedKeys: data.importedKeys,
+      card: { days: c2, paidMonths: data.paidMonths },
+    });
+    // 04/10 com a data da compra original (fatura de agosto): bate pelo número da parcela.
+    expect(review.map((l) => [l.description, l.label, l.include])).toEqual([
+      ['LOJA DE MOVEIS 03/10', 'ja_anotado', false],
+      ['LOJA DE MOVEIS 04/10', 'ja_anotado', false],
+      ['PAPELARIA CENTRAL 02/05', 'parcela', false],
+      ['PADARIA SAO JOAO', null, true],
+    ]);
+  });
+
+  it('a resposta se perde: a importação foi gravada, e a chave encontra o resultado e repete sem duplicar', async () => {
+    const lossy = new SupabaseRepository(clientFor(ANA, T0, lostResponse), { id: ANA });
+    const key = newOperationKey();
+    const items = [item('rede-1', 'despesa', 111, '2038-10-06', 'Rede um'), item('rede-2', 'despesa', 222, '2038-10-06', 'Rede dois')];
+    expect(await code(lossy.importRecords(key, ctx, 'conta', account, items))).toEqual(['rede', null]);
+    expect(await ana.findImportOperation(key)).toEqual({ targetId: account, result: { created: 2, skipped: 0 } });
+    expect(await ana.importRecords(key, ctx, 'conta', account, items)).toEqual({ created: 2, skipped: 0 });
+    expect((await ana.listRecords(ctx, '2038-10')).filter((r) => r.description.startsWith('Rede ')).length).toBe(2);
+  });
+
+  it('a mesma sequência no MemoryRepository e no banco dá os mesmos resultados, erros e detalhes', async () => {
+    type Repo = MemoryRepository | SupabaseRepository;
+    const run = async (repo: Repo, c: string, acc: string, cd: string) => {
+      const out: unknown[] = [];
+      const go = async (dest: 'conta' | 'cartao', items: ImportItem[]) => {
+        const target = dest === 'conta' ? acc : cd;
+        try {
+          out.push(await repo.importRecords(newOperationKey(), c, dest, target, items));
+        } catch (e) {
+          out.push(e instanceof RepoError ? [e.code, e.detail ?? null] : String(e));
+        }
+      };
+      await go('conta', [item('par-1', 'despesa', 1000, '2038-10-01', 'Um', 'Mercado'), item('par-2', 'receita', 2000, '2038-10-02', 'Dois', 'Salário')]);
+      await go('conta', [item('par-1', 'despesa', 0, '2038-10-01', ''), item('par-3', 'despesa', 300, '2038-10-03', 'Três'), item('par-3', 'despesa', 300, '2038-10-03', 'Três')]);
+      await go('conta', [item('par-4', 'despesa', 300, '2038-10-03', 'Quatro'), item('par-5', 'despesa', 300, '2038-10-08', 'Futura')]);
+      await go('conta', [item('par-6', 'compra', 300, '2038-10-03', 'Tipo')]);
+      await go('cartao', [item('par-7', 'compra', 5000, '2038-09-25', 'Cartão um'), item('par-8', 'estorno', 1000, '2038-09-26', 'Estorno um'), item('par-7', 'compra', 5000, '2038-09-25', 'Cartão um')]);
+      await go('cartao', [item('par-9', 'compra', 100, '2034-09-30', 'Antiga')]);
+      await go('cartao', [item('par-10', 'estorno', 100, '2034-06-15', 'Antigo')]);
+      await go('cartao', [item('par-11', 'despesa', 100, '2038-10-01', 'Tipo')]);
+      await go('conta', []);
+      const records = (await repo.listRecords(c, '2038-10')).filter((r) => r.description.length > 0 && ['Um', 'Dois', 'Três', 'Quatro'].includes(r.description));
+      out.push(records.map((r) => [r.kind, r.amountCents, r.occurredOn, r.description, r.category]).sort());
+      out.push((await repo.listCardEntries(cd)).map((e) => [e.kind, e.amountCents, e.invoiceMonth, e.installments, e.description]).sort());
+      out.push((await repo.listInvoiceItems(cd)).map((i) => [i.month, i.totalCents, i.creditCents]));
+      return out;
+    };
+    const space = (await ana.ensurePersonalSpace('Conta principal'));
+    const acc2 = (await ana.createAccount(newOperationKey(), ctx, { name: 'Paridade', kind: 'banco' })).id;
+    const card2 = (await ana.createCard(newOperationKey(), ctx, { name: 'Cartão Paridade', lastDigits: null, closingDay: 3, dueDay: 10, limitCents: null })).card.id;
+    expect(space.personalContextId).toBe(ctx);
+    const db = await run(ana, ctx, acc2, card2);
+    const mem = new MemoryRepository({ actorId: 'pessoa', displayName: 'Pessoa', today: () => T0 });
+    const memSpace = await mem.ensurePersonalSpace('Conta principal');
+    const memAcc = (await mem.createAccount(newOperationKey(), memSpace.personalContextId, { name: 'Paridade', kind: 'banco' })).id;
+    const memCard = (await mem.createCard(newOperationKey(), memSpace.personalContextId, { name: 'Cartão Paridade', lastDigits: null, closingDay: 3, dueDay: 10, limitCents: null })).card.id;
+    const memory = await run(mem, memSpace.personalContextId, memAcc, memCard);
+    expect(memory).toEqual(db);
+    expect(db[0]).toEqual({ created: 2, skipped: 0 });
+    expect(db[1]).toEqual({ created: 1, skipped: 2 });
+    expect(db[2]).toEqual(['data_futura', 'item=2']);
+    expect(db[3]).toEqual(['tipo_invalido', 'item=1']);
+    expect(db[4]).toEqual({ created: 2, skipped: 1 });
+  });
+});
+
+describe('conversor da importação de extrato e fatura', () => {
+  // Sem rede: os argumentos da função, a leitura do resultado, a consulta em pedaços e os códigos novos do banco.
+  const calls: [string, Record<string, unknown>][] = [];
+  const queries: { table: string; in: string[] }[] = [];
+  const KEY_A = 'a'.repeat(64);
+  const KEY_B = 'b'.repeat(64);
+  const fake = (rpc: Record<string, unknown>, tables: Record<string, unknown> = {}, error: unknown = null) => {
+    const db = {
+      from: (table: string) => {
+        const query: { table: string; in: string[] } = { table, in: [] };
+        const q: Record<string, unknown> = {};
+        for (const m of ['select', 'eq', 'order', 'range', 'maybeSingle']) q[m] = () => q;
+        q.in = (_column: string, values: string[]) => {
+          query.in = values;
+          queries.push(query);
+          return q;
+        };
+        q.then = (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) => {
+          const rows = tables[table];
+          const data = Array.isArray(rows) && query.in.length > 0 ? (rows as { import_key: string }[]).filter((r) => query.in.includes(r.import_key)) : rows ?? null;
+          return Promise.resolve(error ? { data: null, error } : { data, error: null }).then(resolve, reject);
+        };
+        return q;
+      },
+      rpc: async (fn: string, args: Record<string, unknown>) => {
+        calls.push([fn, args]);
+        return error ? { data: null, error } : { data: rpc[fn] ?? null, error: null };
+      },
+    };
+    return new SupabaseRepository(db as unknown as SupabaseClient, { id: 'p1' });
+  };
+  const failure = (p: Promise<unknown>) => p.then(() => null, (e: unknown) => (e instanceof RepoError ? [e.code, e.message, e.detail ?? null] : String(e)));
+  const item: ImportItem = { importKey: KEY_A, kind: 'despesa', amountCents: 4590, occurredOn: '2026-10-02', description: 'Padaria', category: 'Mercado' };
+
+  it('os argumentos de import_records e a leitura do resultado', async () => {
+    calls.length = 0;
+    const repo = fake({ import_records: { created: 18, skipped: 4 } });
+    expect(await repo.importRecords('chave-0001', 'ctx', 'conta', 'acc', [item, { ...item, importKey: KEY_B, kind: 'receita', category: null }])).toEqual({ created: 18, skipped: 4 });
+    expect(calls).toEqual([
+      [
+        'import_records',
+        {
+          p_idempotency_key: 'chave-0001',
+          p_context_id: 'ctx',
+          p_destination: 'conta',
+          p_target_id: 'acc',
+          p_items: [
+            { import_key: KEY_A, kind: 'despesa', amount_cents: 4590, occurred_on: '2026-10-02', description: 'Padaria', category: 'Mercado' },
+            { import_key: KEY_B, kind: 'receita', amount_cents: 4590, occurred_on: '2026-10-02', description: 'Padaria', category: null },
+          ],
+        },
+      ],
+    ]);
+  });
+
+  it('resultado incoerente é defeito, não recusa; sem a função (banco antigo) vira erro desconhecido', async () => {
+    for (const bad of [null, {}, { created: 1 }, { created: -1, skipped: 0 }, { created: 1.5, skipped: 0 }, { created: 501, skipped: 0 }, { created: '1', skipped: 0 }]) {
+      expect(await failure(fake({ import_records: bad }).importRecords('chave-0002', 'ctx', 'conta', 'acc', [item])), JSON.stringify(bad)).toEqual([
+        'desconhecido',
+        'importacao_inconsistente',
+        null,
+      ]);
+    }
+    expect(await failure(fake({}, {}, { message: 'Could not find the function public.import_records', code: 'PGRST202' }).importRecords('chave-0003', 'ctx', 'conta', 'acc', [item]))).toEqual([
+      'desconhecido',
+      'Could not find the function public.import_records',
+      null,
+    ]);
+  });
+
+  it('os códigos novos e a posição do item vêm do banco; outros detalhes são descartados', async () => {
+    for (const name of ['destino_invalido', 'itens_invalidos', 'chave_de_importacao_invalida', 'fatura_paga', 'conta_invalida', 'limite_de_lancamentos', 'tipo_invalido']) {
+      expect(await failure(fake({}, {}, { message: name, code: '22023' }).importRecords('chave-0004', 'ctx', 'conta', 'acc', [item]))).toEqual([name, name, null]);
+    }
+    expect(await failure(fake({}, {}, { message: 'valor_invalido', code: '22023', details: 'item=12' }).importRecords('chave-0005', 'ctx', 'conta', 'acc', [item]))).toEqual([
+      'valor_invalido',
+      'valor_invalido',
+      'item=12',
+    ]);
+    expect(await failure(fake({}, {}, { message: 'valor_invalido', code: '22023', details: 'Failing row contains (Padaria, 4590)' }).importRecords('chave-0006', 'ctx', 'conta', 'acc', [item]))).toEqual([
+      'valor_invalido',
+      'valor_invalido',
+      null,
+    ]);
+    expect(await failure(fake({}, {}, { message: 'sem_permissao', code: '42501' }).importRecords('chave-0007', 'ctx', 'conta', 'acc', [item]))).toEqual(['sem_permissao', 'sem_permissao', null]);
+    expect(await failure(fake({}, {}, { message: 'Failed to fetch' }).importRecords('chave-0008', 'ctx', 'conta', 'acc', [item]))).toEqual(['rede', 'rede', null]);
+  });
+
+  it('findImportedKeys consulta import_items em pedaços de 40 chaves, sem repetir, e ignora o que não é chave', async () => {
+    queries.length = 0;
+    const keys = Array.from({ length: 95 }, (_, i) => i.toString(16).padStart(64, '0'));
+    const repo = fake({}, { import_items: [{ import_key: keys[3] }, { import_key: keys[90] }] });
+    const found = await repo.findImportedKeys('ctx', [...keys, ...keys.slice(0, 10), 'curta', '']);
+    expect(found.sort()).toEqual([keys[3], keys[90]].sort());
+    expect(queries.map((q) => q.in.length)).toEqual([40, 40, 15]);
+    expect(queries.every((q) => q.table === 'import_items')).toBe(true);
+    expect(await repo.findImportedKeys('ctx', [])).toEqual([]);
+    expect(await failure(fake({}, {}, { message: 'Failed to fetch' }).findImportedKeys('ctx', keys))).toEqual(['rede', 'rede', null]);
+  });
+
+  it('findImportOperation lê o destino e o resultado; resultado incoerente é defeito', async () => {
+    const op = { target_id: 'acc-1', import_result: { created: 3, skipped: 1 } };
+    expect(await fake({}, { record_operations: op }).findImportOperation('chave-0009')).toEqual({ targetId: 'acc-1', result: { created: 3, skipped: 1 } });
+    expect(await fake({}, { record_operations: null }).findImportOperation('chave-0010')).toBeNull();
+    expect(await failure(fake({}, { record_operations: { ...op, import_result: { created: 'x' } } }).findImportOperation('chave-0011'))).toEqual(['desconhecido', 'importacao_inconsistente', null]);
+    expect(await failure(fake({}, { record_operations: { ...op, target_id: null } }).findImportOperation('chave-0012'))).toEqual(['desconhecido', 'operacao_inconsistente', null]);
   });
 });
