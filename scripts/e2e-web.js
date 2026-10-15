@@ -7,7 +7,8 @@
  * abaixo do cabeçalho, barra inferior nas telas de consulta, Contas a pagar no mês certo, Metas compacta e a busca "No app" de
  * Aprender), de "Antes de financiar" (D-044), do Ciclo G1 (contas de origem do dinheiro, D-043), do Ciclo H1 (buscar em
  * Movimentos, D-045), do Ciclo H2 (assinaturas, D-046, com o cenário fictício "assinaturas" da demonstração) e do Ciclo H3
- * (exportar meus dados em CSV e PDF, D-047) na versão web, em modo demonstração (acesso simulado).
+ * (exportar meus dados em CSV e PDF, D-047), do Ciclo I1 (importar extrato e fatura, D-048) e do Tutorial (D-049: o guia em Aprender, o
+ * tour de boas-vindas, o botão "?" nas telas e as capturas do manual) na versão web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -40,6 +41,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // atalho acha a sessão e o QueryClient na árvore atual do React para gravar como outro aparelho faria (ou simular uma
   // falha de rede) e pedir às telas abertas que leiam de novo. Não muda nada no app.
   await ctx.addInitScript(() => {
+    // O tour de boas-vindas (D-049) fica desligado em todo carregamento da página: os blocos antigos criam contas novas o tempo todo e
+    // não esperam uma janela por cima do Resumo. O bloco "Tutorial (D-049)" liga o tour de propósito (window.__clarevoSemTour = false).
+    window.__clarevoSemTour = true;
     const find = () => {
       const root = document.getElementById('root');
       const key = root && Object.keys(root).find((k) => k.startsWith('__reactContainer$'));
@@ -2150,9 +2154,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     const top = (e) => e.getBoundingClientRect().top;
     const shown = [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && !/^Conta:/.test(e.getAttribute('aria-label') || ''));
     const main = shown.filter((e) => !e.closest('[role=tablist]')).sort((a, b) => top(a) - top(b));
-    return main[0] ? main[0].getAttribute('aria-label') || main[0].textContent : null;
+    return main.slice(0, 2).map((e) => e.getAttribute('aria-label') || e.textContent);
   });
-  ok('Aprender: card "Calculadoras" no topo', learnFirst === 'Calculadoras. Parcelado ou à vista, dívidas, reserva e outras contas com os seus números', learnFirst);
+  // D-049: o card "Como usar o Clarevo" vem primeiro; o card "Calculadoras" (A6) continua logo depois, antes dos temas.
+  ok('Aprender: card "Calculadoras" logo depois do card "Como usar o Clarevo", no topo', learnFirst[0] === 'Como usar o Clarevo. Onde fica cada função e como usar, passo a passo.' &&
+    learnFirst[1] === 'Calculadoras. Parcelado ou à vista, dívidas, reserva e outras contas com os seus números', JSON.stringify(learnFirst));
   await layoutChecks('aprender com as calculadoras 390px');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
   await layoutChecks('aprender com as calculadoras 320px');

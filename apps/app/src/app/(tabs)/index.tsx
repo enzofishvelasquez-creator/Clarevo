@@ -14,6 +14,7 @@ import { PrimeirosPassos } from '@/components/primeiros-passos';
 import { RecordRow } from '@/components/record-row';
 import { ReturnBand, useReturnBand } from '@/components/retorno-faixa';
 import { EmptyState, ErrorState } from '@/components/states';
+import { WelcomeTour } from '@/components/tour';
 import { Body, Button, Card, FitMoney, LinkButton, Money, Screen, Skeleton, Txt } from '@/components/ui';
 import { totalChange, type TotalChange } from '@/lib/highlight';
 import { explanationHref } from '@/lib/learn';
@@ -207,6 +208,8 @@ export default function ResumoScreen() {
           </Pressable>
         </Body>
       </Screen>
+      {/* Tour de boas-vindas (D-049(2)): um modal na primeira entrada, sem mudar a estrutura do Resumo. */}
+      <WelcomeTour personal={kind === 'pessoal'} contextId={contextId} />
     </View>
   );
 }

@@ -71,7 +71,7 @@ export function barModeFor(pathname: string): BarMode {
 const TAB_OF_TOPIC: readonly [RegExp, TabRoute][] = [
   [/^\/(a-pagar|gastos-fixos|cartoes|registro|orcamento|movimentacoes|importar)(\/|$)/, '/movimentacoes'],
   [/^\/(meta|reserva|guardar|simular|renda-comprometida)(\/|$)/, '/metas'],
-  [/^\/explicacao(\/|$)/, '/aprender'],
+  [/^\/(explicacao|aprender)(\/|$)/, '/aprender'],
 ];
 
 /** Aba do assunto da tela (Contas a pagar → Movimentos); Resumo quando o assunto não é de outra aba. */

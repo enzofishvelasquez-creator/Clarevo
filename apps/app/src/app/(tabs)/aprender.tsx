@@ -1,6 +1,6 @@
 import { APP_SEARCH_TEXT, CALC_UI_TEXT, SIMULATE_TEXT, appScreenIsTab, searchAppScreens, type AppScreen, type LearnSection, type LearnSectionId } from '@clarevo/core';
 import { router, type Href } from 'expo-router';
-import { AppWindow, ArrowRight, Calculator, ChartLine, Search, SearchX, X } from 'lucide-react-native';
+import { AppWindow, ArrowRight, BookOpenCheck, Calculator, ChartLine, Compass, Search, SearchX, X } from 'lucide-react-native';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { AccessibilityInfo, Platform, Pressable, StyleSheet, TextInput, View, type ScrollView } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -12,6 +12,7 @@ import { LearnArt } from '@/components/learn-art';
 import { TopicRow } from '@/components/topic-link';
 import { Body, Card, LinkButton, Screen, Txt, styles as ui } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
+import { GUIDE_TEXT, guideSummary, openGuideEntry, searchGuide, type GuideEntry } from '@/lib/guide';
 import { LEARN_ACTIONS, LEARN_UI_TEXT, START_HERE, explanationHref, learnSection, searchTopics, topicBySlug, topicsBySection, type Topic } from '@/lib/learn';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -45,14 +46,17 @@ export default function AprenderScreen() {
   const results = searchTopics(query);
   // Grupo "No app" (A21): telas do app achadas por nome e sinônimos, calculadas no aparelho sobre um índice fixo.
   const appResults = results === null ? [] : searchAppScreens(query);
+  // Grupo "Como usar" (D-049): as entradas do guia, achadas pelo título e pelas palavras de busca, também no aparelho.
+  const guideResults = results === null ? [] : searchGuide(query);
   const countText =
     results === null
       ? ''
-      : results.length === 0 && appResults.length === 0
+      : results.length === 0 && appResults.length === 0 && guideResults.length === 0
         ? `${LEARN_UI_TEXT.noResultTitle}. ${LEARN_UI_TEXT.noResultBody}`
         : [
             results.length > 0 ? LEARN_UI_TEXT.resultCount(results.length, query) : null,
             appResults.length > 0 ? APP_SEARCH_TEXT.countFor(appResults.length, query) : null,
+            guideResults.length > 0 ? GUIDE_TEXT.countFor(guideResults.length, query) : null,
           ]
             .filter(Boolean)
             .join('. ');
@@ -107,10 +111,28 @@ export default function AprenderScreen() {
             </View>
 
             {results !== null ? (
-              <SearchResults query={query} results={results} appResults={appResults} onShowAll={clear} />
+              <SearchResults query={query} results={results} appResults={appResults} guideResults={guideResults} onShowAll={clear} />
             ) : (
               <>
-                {/* Calculadoras no topo (D-034; spec5_notes §2): card branco, ícone azul, entre a busca e "Comece por aqui". */}
+                {/* Como usar o Clarevo (D-049): o guia de uso, no topo, antes das calculadoras. */}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={GUIDE_TEXT.cardA11y}
+                  onPress={() => router.push('/aprender/guia')}
+                  style={(s) => [styles.calc, s.pressed && { opacity: 0.85 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
+                  <View style={styles.calcIcon}>
+                    <Compass size={22} color={colors.brand} strokeWidth={2.25} aria-hidden />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Txt variant="label" style={{ fontFamily: fonts.extrabold, fontSize: 17 }}>
+                      {GUIDE_TEXT.cardTitle}
+                    </Txt>
+                    <Txt variant="caption">{GUIDE_TEXT.cardCaption}</Txt>
+                  </View>
+                  <ArrowRight size={20} color={colors.brand} aria-hidden />
+                </Pressable>
+
+                {/* Calculadoras no topo (D-034; spec5_notes §2): card branco, ícone azul, depois do guia e antes de "Comece por aqui". */}
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`${CALC_UI_TEXT.learnCardTitle}. ${CALC_UI_TEXT.learnCardCaption}`}
@@ -258,8 +280,20 @@ function SearchField({
  * Resultados da busca: o grupo "No app" primeiro (telas do app que fazem o que a pessoa procura), depois a contagem e as
  * linhas de tema; sem nenhum dos dois, a sugestão e "Ver todos os temas". Sem animação.
  */
-function SearchResults({ query, results, appResults, onShowAll }: { query: string; results: Topic[]; appResults: AppScreen[]; onShowAll: () => void }) {
-  if (results.length === 0 && appResults.length === 0) {
+function SearchResults({
+  query,
+  results,
+  appResults,
+  guideResults,
+  onShowAll,
+}: {
+  query: string;
+  results: Topic[];
+  appResults: AppScreen[];
+  guideResults: GuideEntry[];
+  onShowAll: () => void;
+}) {
+  if (results.length === 0 && appResults.length === 0 && guideResults.length === 0) {
     return (
       <Card style={styles.empty}>
         <SearchX size={32} color={colors.brand} aria-hidden />
@@ -289,6 +323,26 @@ function SearchResults({ query, results, appResults, onShowAll }: { query: strin
                 caption={screen.caption}
                 last={i === appResults.length - 1}
                 onPress={() => openAppScreen(screen)}
+              />
+            ))}
+          </Card>
+        </View>
+      ) : null}
+      {guideResults.length > 0 ? (
+        <View style={{ gap: space[2] }}>
+          <Txt variant="title" accessibilityRole="header" aria-level={2}>
+            {GUIDE_TEXT.searchGroupTitle}
+          </Txt>
+          <Card style={{ paddingVertical: space[1] }}>
+            {guideResults.map((entry, i) => (
+              <CalcNavRow
+                key={entry.id}
+                icon={BookOpenCheck}
+                title={entry.title}
+                caption={guideSummary(entry)}
+                accessibilityLabel={GUIDE_TEXT.searchRowA11y(entry.title, guideSummary(entry))}
+                last={i === guideResults.length - 1}
+                onPress={() => openGuideEntry(entry.id)}
               />
             ))}
           </Card>

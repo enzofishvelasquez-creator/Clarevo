@@ -154,6 +154,7 @@ export default function DetalheGastoFixo() {
         title={s?.kind === 'parcelada' ? 'Parcelamento' : s?.kind === 'anual' ? 'Conta do ano' : 'Gasto fixo'}
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/gastos-fixos'))}
         right={<ContextPill label="Pessoal" />}
+        help={s?.kind === 'anual' ? 'conta-do-ano' : undefined}
       />
       <Screen>
         <View style={styles.body}>

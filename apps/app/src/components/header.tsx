@@ -6,8 +6,10 @@ import { PixelRatio, Pressable, StyleSheet, useWindowDimensions, View } from 're
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { Logo } from '@/components/brand';
+import { HelpButton } from '@/components/help-button';
 import { yearA11yLabel } from '@/components/series-parts';
 import { DemoPill, TopInset, Txt } from '@/components/ui';
+import type { HelpScreen } from '@/lib/guide';
 import { PRIVACY_TEXT, setValuesHidden, useValuesHidden } from '@/lib/privacy';
 import { canGoForward, useView, type SpaceKind } from '@/state/data';
 import { useSession } from '@/state/session';
@@ -105,8 +107,9 @@ export function AppHeader({ title, children }: { title?: string; children?: Reac
  * voltar, título e, à direita, o contexto fixo ou outra informação. Quando não há espaço
  * para os dois lado a lado (telas estreitas, letra grande), o contexto desce para baixo do
  * título, alinhado a ele: nem o título nem o contexto são cortados.
+ * `help`: nas telas que têm entrada no guia (D-049(3)), o botão "?" (44 px) fica à direita e abre a folha "Como usar".
  */
-export function SubHeader({ title, onBack, right }: { title: string; onBack?: () => void; right?: ReactNode }) {
+export function SubHeader({ title, onBack, right, help }: { title: string; onBack?: () => void; right?: ReactNode; help?: HelpScreen }) {
   const back = onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/')));
   return (
     <View style={styles.subBand}>
@@ -132,6 +135,7 @@ export function SubHeader({ title, onBack, right }: { title: string; onBack?: ()
           </Txt>
           {right}
         </View>
+        {help ? <HelpButton screen={help} /> : null}
       </View>
     </View>
   );

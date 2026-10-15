@@ -37,6 +37,11 @@ export interface DevicePrefs {
    * vez. Só neste aparelho, como a memória das notas fiscais; não é dado financeiro e nada vai para o servidor. No máximo 300 entradas.
    */
   importCategories: ImportMemory;
+  /**
+   * O tour de boas-vindas (D-049) já foi visto ou pulado por esta pessoa neste aparelho. Só neste aparelho; não é dado financeiro e
+   * nada vai para o servidor. Uma pessoa em outro aparelho vê o tour de novo, uma vez; "Ver o tour de novo" no guia não muda isto.
+   */
+  tourSeen: boolean;
 }
 
 export const DEFAULT_PREFS: DevicePrefs = {
@@ -49,6 +54,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   lastAccount: null,
   subscriptionSnoozedUntil: null,
   importCategories: {},
+  tourSeen: false,
 };
 
 const PREFIX = 'clarevo.aparelho.v1.';
@@ -74,6 +80,7 @@ function parse(raw: string | null | undefined): DevicePrefs {
       subscriptionSnoozedUntil:
         typeof v.subscriptionSnoozedUntil === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.subscriptionSnoozedUntil) ? v.subscriptionSnoozedUntil : null,
       importCategories: parseMemory(v.importCategories),
+      tourSeen: v.tourSeen === true,
     };
   } catch {
     return DEFAULT_PREFS;

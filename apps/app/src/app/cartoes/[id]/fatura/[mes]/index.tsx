@@ -175,7 +175,7 @@ export default function FaturaScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SubHeader title={S.invoiceHeader} onBack={back} right={<ContextPill label="Pessoal" />} />
+      <SubHeader title={S.invoiceHeader} onBack={back} right={<ContextPill label="Pessoal" />} help="fatura" />
       <Screen wide>
         {card.isPending || (c && invoices.isPending) ? (
           <View style={[styles.hero, { gap: space[3] }]}>

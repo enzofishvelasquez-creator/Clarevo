@@ -891,7 +891,7 @@ export function SeriesForm({
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <SubHeader title={title} onBack={requestCancel} right={<ContextPill label={`Salvando em ${contextName}`} />} />
+      <SubHeader title={title} onBack={requestCancel} right={<ContextPill label={`Salvando em ${contextName}`} />} help={anual ? 'conta-do-ano' : undefined} />
       <Screen contentStyle={{ padding: space[5], gap: space[4], paddingBottom: space[6] }}>
         {prefill?.endedYear ? (
           <Banner tone="sucesso" icon={Check}>

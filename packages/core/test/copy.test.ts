@@ -192,6 +192,7 @@ import { DEFAULT_SEARCH_DRAFT, SEARCH_PAGE, SEARCH_PERIODS, SEARCH_TEXT, searchF
 import { SUBSCRIPTION_ERROR_TEXT, SUBSCRIPTION_TEXT, subscriptionCount, subscriptionErrorText } from '../src';
 import { EXPORT_FORMATS, EXPORT_PERIODS, EXPORT_TEXT, buildExportFiles, loadExportSource } from '../src';
 import { IMPORT_ERROR_TEXT, IMPORT_SAVE_ERROR_TEXT, IMPORT_TEXT, failedItemIndex, importSaveErrorText, importedSummary, reviewLineA11y } from '../src';
+import { GUIDE_ENTRIES, GUIDE_GROUPS, GUIDE_TEXT, HELP_TEXT, MANUAL_TEXT, TOUR_CARDS, TOUR_TEXT, guideSummary, guideWhere } from '../src';
 
 /**
  * Teste de textos (seção 5): sem indicação de produto financeiro, promessa de rendimento, travessões longos
@@ -2269,5 +2270,133 @@ describe('textos de importar extrato ou fatura (D-048)', () => {
     }
     // As regras de categoria não citam marca nenhuma.
     expect(readFileSync(join(CORE_SRC, 'importar/categorias.ts'), 'utf8')).not.toMatch(BRANDS);
+  });
+});
+
+describe('textos do guia, da ajuda no lugar, do tour e do manual (D-049)', () => {
+  // Nada de adjetivo ou substantivo que marque o gênero de quem lê: "você está pronto", "o usuário", "obrigado", "(a)".
+  const GENDERED = /\b(o|a)s? usuári[oa]s?\b|\bobrigad[oa]s?\b|\bbem-vind[oa]s?\b|\bsozinh[oa]s?\b|\bpreocupad[oa]s?\b|\bendividad[oa]s?\b|\bcliente\b|\(a\)|\(o\)|\bo\/a\b|\bvocê (é|está|ficou|estiver|fica) (pront|atent|cansad|convidad|conectad|cadastrad|sozinh|preocupad|satisfeit|segur|ciente)[oa]s?\b/i;
+  const BRANDS = new RegExp(
+    `(?<![\\p{L}\\d])(?:${[
+      'netflix', 'spotify', 'amazon', 'disney', 'globoplay', 'youtube', 'apple', 'google', 'nubank', 'itaú', 'itau', 'bradesco', 'santander',
+      'inter', 'c6', 'caixa econômica', 'banco do brasil', 'bb', 'sicredi', 'sicoob', 'btg', 'neon', 'picpay', 'mercado pago', 'mercado livre',
+      'ifood', 'uber', 'pix', 'visa', 'mastercard', 'elo', 'hipercard', 'amex', 'serasa', 'oi', 'vivo', 'tim', 'claro',
+    ].join('|')})(?![\\p{L}\\d])`,
+    'iu',
+  );
+  // Sem produto financeiro nem recomendação: o guia só mostra onde fica e como usar uma função.
+  const PRODUCTS = /poupan[cç]a|previd[eê]ncia|deb[eê]nture|fundos? (de|imobili)|cripto\w*|bitcoin|consignad\w*|portabilidade|cons[óo]rcio|\bcdb\b|\blci\b|\blca\b|tesouro|renda fixa|a[cç][õo]es da bolsa|\bmelhor(es)?\b|\bpior(es)?\b|dever[ií]a\w*|renegoci\w*/i;
+  // Português do Brasil: nenhum texto com palavra de interface em inglês, e cada frase tem as palavras de ligação do português.
+  const ENGLISH = /\b(the|and|with|your|click|tap|please|settings|button|home|screen|back)\b/i;
+  const PORTUGUESE = /\b(de|do|da|dos|das|para|em|que|com|você|o|a|os|as|um|uma|no|na|nos|nas|e|ou)\b/i;
+  const ALERT = /aten[cç][aã]o|cuidado|alerta|perigo|urgente|erro grave|\batrasad|\bvencid[oa]s? h[aá]|\bdispon[ií]vel|\bsobra\b|\balt[oa]s?\b|estour/i;
+
+  const check = (texts: string[]) => {
+    expect(texts.length).toBeGreaterThan(0);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(NEUTRAL);
+      expect(text, text).not.toMatch(GENDERED);
+      expect(text, text).not.toMatch(BRANDS);
+      expect(text, text).not.toMatch(PRODUCTS);
+      expect(text, text).not.toMatch(ALERT);
+      expect(text, text).not.toMatch(ENGLISH);
+      expect(text, text).not.toMatch(/\bfaz(er|endo)?\s+sentido\b/i);
+      expect(text, text).not.toMatch(/[–—]/);
+    }
+  };
+
+  const guideFunctions = [
+    GUIDE_TEXT.open('Cartões'),
+    GUIDE_TEXT.stepA11y(2, 'Toque em "Salvar gasto".'),
+    GUIDE_TEXT.whereA11y(['Movimentos', 'Organizar', 'Cartões']),
+    GUIDE_TEXT.rowA11y('Resumo do mês', 'Mostra o que você recebeu.'),
+    GUIDE_TEXT.rowA11y('Buscar em Movimentos?', 'Acha um gasto.'),
+    GUIDE_TEXT.searchRowA11y('Cartões e faturas', 'Cadastra seus cartões.'),
+    GUIDE_TEXT.countFor(1, 'boleto'),
+    GUIDE_TEXT.countFor(4, ' cartão '),
+    HELP_TEXT.sheetLabel('Cartões e faturas'),
+    TOUR_TEXT.progress(1, 5),
+    TOUR_TEXT.announce(2, 5, 'Anotar um gasto'),
+    MANUAL_TEXT.figureAlt('Cartões e faturas'),
+  ];
+
+  it('a lista pega o que deve e aceita os textos do guia', () => {
+    const proibida = ['faz', 'sentido'].join(' ');
+    for (const bad of ['Nubank', 'o usuário', 'Invista já', proibida, 'a \u2014 b', 'a \u2013 b', 'Cuidado', 'a melhor opção', 'Click here', 'Pix recebido', 'obrigado', 'Atenção aqui', 'Você está pronto', 'Você ficou atento']) {
+      const caught = [FORBIDDEN, JUDGMENT, NEUTRAL, GENDERED, BRANDS, PRODUCTS, ALERT, ENGLISH].some((re) => re.test(bad));
+      expect(caught, bad).toBe(true);
+    }
+    for (const ok of [GUIDE_TEXT.intro, HELP_TEXT.button, TOUR_TEXT.skip, TOUR_CARDS[0]!.body, 'Toque em "Anotar gasto", logo abaixo do cabeçalho do Resumo.']) {
+      expect([FORBIDDEN, JUDGMENT, NEUTRAL, GENDERED, BRANDS, PRODUCTS, ALERT, ENGLISH].some((re) => re.test(ok)), ok).toBe(false);
+    }
+  });
+
+  it('GUIDE_TEXT, HELP_TEXT, TOUR_TEXT e MANUAL_TEXT inteiros e os textos montados', () => {
+    check([...staticStrings(GUIDE_TEXT), ...staticStrings(HELP_TEXT), ...staticStrings(TOUR_TEXT), ...staticStrings(MANUAL_TEXT), ...guideFunctions]);
+    expect(GUIDE_TEXT.cardTitle).toBe('Como usar o Clarevo');
+    expect(GUIDE_TEXT.tourAgain).toBe('Ver o tour de novo');
+    expect(GUIDE_TEXT.purposeTitle).toBe('Para que serve');
+    expect(GUIDE_TEXT.whereTitle).toBe('Onde fica');
+    expect(GUIDE_TEXT.stepsTitle).toBe('Como usar');
+    expect(MANUAL_TEXT.demoBand).toBe('Dados fictícios de demonstração');
+    // O nome acessível do botão "?" e dos botões do tour.
+    expect(HELP_TEXT.button).toBe('Como usar esta tela');
+    expect(TOUR_TEXT.skip).toBe('Pular');
+  });
+
+  it('os cinco grupos e os cinco cartões do tour', () => {
+    check(GUIDE_GROUPS.flatMap((g) => [g.title, g.caption]));
+    check(TOUR_CARDS.flatMap((c) => [c.title, c.body]));
+    for (const c of TOUR_CARDS) {
+      expect(c.body, c.id).toMatch(/[.]$/);
+      expect(c.body, c.id).toMatch(PORTUGUESE);
+    }
+  });
+
+  it('cada entrada do catálogo: título, para que serve, onde fica, passos, palavras de busca e listas', () => {
+    const texts = GUIDE_ENTRIES.flatMap((e) => [
+      e.title,
+      e.purpose,
+      guideSummary(e),
+      guideWhere(e.where),
+      ...e.where,
+      ...(e.alsoWhere ?? []).flatMap((p) => [guideWhere(p), ...p]),
+      ...e.steps,
+      e.screenName,
+      GUIDE_TEXT.open(e.screenName),
+      ...e.keywords,
+      ...(e.lines ?? []).flatMap((l) => [l.title, l.caption]),
+    ]);
+    expect(texts.length).toBeGreaterThan(400);
+    check(texts);
+    for (const e of GUIDE_ENTRIES) {
+      expect(e.purpose, e.id).toMatch(/[.]$/);
+      expect(e.purpose, e.id).toMatch(PORTUGUESE);
+      for (const step of e.steps) {
+        // Cada passo é uma frase completa, começa em maiúscula (ou com o nome de uma tela entre aspas) e termina em ponto.
+        expect(step, `${e.id}: ${step}`).toMatch(/^[A-ZÁÉÍÓÚÂÊÔÃÕÇ"]/);
+        expect(step, `${e.id}: ${step}`).toMatch(/[.]$/);
+        expect(step, `${e.id}: ${step}`).toMatch(PORTUGUESE);
+      }
+    }
+  });
+
+  it('dinheiro e privacidade: o guia não traz o valor de ninguém nem dado pessoal, só os limites do próprio app', () => {
+    const all = GUIDE_ENTRIES.flatMap((e) => [e.purpose, ...e.steps]).join(' ');
+    // Os únicos valores em reais citados são os limites do app e o formato de exemplo dos valores ocultos.
+    const amounts = [...all.matchAll(/R\$ ?(?:\d{1,3}(?:\.\d{3})*,\d{2}|•+)/g)].map((m) => m[0]);
+    expect([...new Set(amounts)].sort()).toEqual(['R$ 100,00', 'R$ ••••'].sort());
+    expect(all).not.toMatch(/\d{3}\.\d{3}\.\d{3}-\d{2}/);
+    expect(all).not.toMatch(/@[a-z0-9-]+\.[a-z]/i);
+  });
+
+  it('os arquivos-fonte novos do guia passam', () => {
+    for (const name of ['guide/catalog.ts', 'guide/text.ts', 'guide/search.ts', 'guide/tour.ts', 'guide/types.ts']) {
+      const source = readFileSync(join(CORE_SRC, name), 'utf8');
+      expect(source, name).not.toMatch(FORBIDDEN);
+      expect(source, name).not.toMatch(JUDGMENT);
+    }
   });
 });

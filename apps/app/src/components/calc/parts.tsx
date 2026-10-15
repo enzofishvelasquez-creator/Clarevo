@@ -24,6 +24,7 @@ import { SubHeader } from '@/components/header';
 import { ChoiceGroup } from '@/components/series-parts';
 import { LinkButton, Screen, TextField, Txt, spaceKeyPress, styles as ui } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
+import type { HelpScreen } from '@/lib/guide';
 import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 
@@ -36,11 +37,16 @@ import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 /** Alvo de toque das calculadoras (docs/08 §3.1: 48 px). */
 export const CALC_TARGET = 48;
 
+/** O botão "?" (D-049(3)) só existe nas duas calculadoras com entrada própria no guia; as outras ficam em "Calculadoras". */
+function calcHelp(slug: CalcSlug): HelpScreen | undefined {
+  return slug === 'plano-dividas' ? 'plano-dividas' : slug === 'antes-de-financiar' ? 'antes-de-financiar' : undefined;
+}
+
 /** Tela de uma calculadora: título, aviso fixo no topo, conteúdo e o caminho para a lista. */
 export function CalcScreen({ slug, modo, children }: { slug: CalcSlug; modo?: string; children: ReactNode }) {
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <SubHeader title={calcTitle(slug, modo)} onBack={() => (router.canGoBack() ? router.back() : router.replace('/calcular'))} />
+      <SubHeader title={calcTitle(slug, modo)} onBack={() => (router.canGoBack() ? router.back() : router.replace('/calcular'))} help={calcHelp(slug)} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <CalcDisclaimer />
         {children}
@@ -444,17 +450,20 @@ export function CalcNavRow({
   caption,
   onPress,
   last,
+  accessibilityLabel,
 }: {
   icon: LucideIcon;
   title: string;
   caption?: string;
   onPress: () => void;
   last?: boolean;
+  /** Nome acessível próprio (deve conter o título visível); por padrão, "{título}. {legenda}". */
+  accessibilityLabel?: string;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={calcRowA11yLabel(title, caption)}
+      accessibilityLabel={accessibilityLabel ?? calcRowA11yLabel(title, caption)}
       onPress={onPress}
       style={(st) => [styles.row, !last && styles.divider, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && ui.focusRing]}>
       <View style={styles.rowIcon}>

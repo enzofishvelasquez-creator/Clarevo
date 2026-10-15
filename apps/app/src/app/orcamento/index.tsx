@@ -50,7 +50,7 @@ export default function OrcamentoScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SubHeader title={BUDGET_TEXT.title} right={<ContextPill label="Pessoal" />} />
+      <SubHeader title={BUDGET_TEXT.title} right={<ContextPill label="Pessoal" />} help="orcamento" />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <FlashBanner message={notice} />
         <View style={{ gap: space[1] }}>

@@ -186,7 +186,7 @@ export function AccountForm({ mode, contextId, accounts }: { mode: AccountFormMo
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <SubHeader title={account ? T.editTitle : T.newTitle} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" />} />
+      <SubHeader title={account ? T.editTitle : T.newTitle} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" />} help="contas-de-origem" />
       <Screen contentStyle={styles.body}>
         <Card style={{ gap: space[4] }}>
           <TextField

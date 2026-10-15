@@ -439,7 +439,7 @@ export function ImportFlow() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <SubHeader title={IMPORT_TEXT.screenTitle} onBack={guard.requestCancel} right={<ContextPill label="Importando em Pessoal" />} />
+      <SubHeader title={IMPORT_TEXT.screenTitle} onBack={guard.requestCancel} right={<ContextPill label="Importando em Pessoal" />} help="importar" />
       <Screen scrollRef={scroller} contentStyle={styles.body}>
         {step === 'arquivo' ? (
           <Card style={{ gap: space[4] }}>

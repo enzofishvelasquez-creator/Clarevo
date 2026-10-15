@@ -76,7 +76,7 @@ export default function RendaComprometidaScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SubHeader title={COMMITTED_TEXT.title} right={<ContextPill label="Pessoal" />} />
+      <SubHeader title={COMMITTED_TEXT.title} right={<ContextPill label="Pessoal" />} help="renda-comprometida" />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <FlashBanner message={notice} />
         <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Mês">
