@@ -193,6 +193,8 @@ import { SUBSCRIPTION_ERROR_TEXT, SUBSCRIPTION_TEXT, subscriptionCount, subscrip
 import { EXPORT_FORMATS, EXPORT_PERIODS, EXPORT_TEXT, buildExportFiles, loadExportSource } from '../src';
 import { IMPORT_ERROR_TEXT, IMPORT_SAVE_ERROR_TEXT, IMPORT_TEXT, failedItemIndex, importSaveErrorText, importedSummary, reviewLineA11y } from '../src';
 import { GUIDE_ENTRIES, GUIDE_GROUPS, GUIDE_TEXT, HELP_TEXT, MANUAL_TEXT, TOUR_CARDS, TOUR_TEXT, guideSummary, guideWhere } from '../src';
+import { COMPROVANTE_TEXT, comprovanteDraft, comprovanteErrorText, comprovanteGaps, comprovanteKindLabel, comprovanteKindPhrase, comprovanteMismatch, comprovanteReadLine, suggestComprovanteDescription } from '../src';
+import type { ComprovanteDirection, ComprovanteKind, ComprovanteReading } from '../src';
 
 /**
  * Teste de textos (seção 5): sem indicação de produto financeiro, promessa de rendimento, travessões longos
@@ -2397,6 +2399,96 @@ describe('textos do guia, da ajuda no lugar, do tour e do manual (D-049)', () =>
       const source = readFileSync(join(CORE_SRC, name), 'utf8');
       expect(source, name).not.toMatch(FORBIDDEN);
       expect(source, name).not.toMatch(JUDGMENT);
+    }
+  });
+});
+
+describe('textos do comprovante de Pix e de pagamento (D-051)', () => {
+  const GENDERED = /\b(o|a)s? usuári[oa]s?\b|\bobrigad[oa]s?\b|\bbem-vind[oa]s?\b|\bpreocupad[oa]s?\b|\bendividad[oa]s?\b|\bcadastrad[oa]\b|\(a\)|\(o\)/i;
+  // Nenhuma marca de banco, de cartão ou de serviço na interface. "Pix" é o nome do arranjo de pagamentos e é o assunto da tela.
+  const BRANDS = new RegExp(
+    `(?<![\\p{L}\\d])(?:${[
+      'netflix', 'spotify', 'amazon', 'disney', 'globoplay', 'youtube', 'apple', 'google', 'nubank', 'itaú', 'itau', 'bradesco', 'santander',
+      'inter', 'c6', 'caixa econômica', 'banco do brasil', 'bb', 'sicredi', 'sicoob', 'btg', 'neon', 'picpay', 'mercado pago', 'mercado livre',
+      'ifood', 'uber', 'visa', 'mastercard', 'elo', 'hipercard', 'amex', 'serasa', 'oi', 'vivo', 'tim', 'claro', 'whatsapp', 'pagseguro',
+    ].join('|')})(?![\\p{L}\\d])`,
+    'iu',
+  );
+  const check = (texts: string[]) => {
+    expect(texts.length).toBeGreaterThan(0);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(GENDERED);
+      expect(text, text).not.toMatch(BRANDS);
+      expect(text, text).not.toMatch(/\bfaz(er|endo)?\s+sentido\b/i);
+      expect(text, text).not.toMatch(/[–—]/);
+    }
+  };
+  const reading = (over: Partial<ComprovanteReading> = {}): ComprovanteReading => ({
+    kind: 'pix', direction: 'saida', directionGuessed: false, amountCents: 8500, occurredOn: '2026-10-05', time: '14:32', counterpart: 'Maria Souza', message: 'Almoço', ...over,
+  });
+  const KINDS: ComprovanteKind[] = ['pix', 'ted', 'boleto', 'debito', 'outro'];
+  const DIRECTIONS: (ComprovanteDirection | null)[] = ['saida', 'entrada', null];
+
+  it('COMPROVANTE_TEXT inteiro (opção, avisos, lacunas e erros) passa nas regras, sem número nem dado pessoal', () => {
+    const fixed = staticStrings(COMPROVANTE_TEXT);
+    check(fixed);
+    for (const text of fixed) expect(text, text).not.toMatch(/\d|@/);
+  });
+
+  it('textos montados, em todas as combinações de tipo e direção', () => {
+    const texts: string[] = [COMPROVANTE_TEXT.looksNoted('2026-10-05', 'Padaria', 8500), COMPROVANTE_TEXT.looksNoted('2026-10-05', 'Pix para Maria', 1)];
+    for (const kind of KINDS) {
+      for (const direction of DIRECTIONS) {
+        texts.push(comprovanteKindLabel(kind, direction), comprovanteKindPhrase(kind, direction));
+        const base = reading({ kind, direction });
+        for (const over of [{}, { amountCents: null }, { occurredOn: null, time: null }, { occurredOn: '2027-01-01' }, { counterpart: null, message: null }, { directionGuessed: true }] as const) {
+          const draft = comprovanteDraft({ ...base, ...over }, '2026-10-07');
+          texts.push(comprovanteReadLine(draft), ...Object.values(comprovanteGaps(draft)).filter((t): t is string => t !== null));
+          for (const screen of ['despesa', 'receita'] as const) {
+            const mismatch = comprovanteMismatch(draft, screen);
+            if (mismatch) texts.push(mismatch.text, mismatch.action);
+            const sug = suggestComprovanteDescription(draft, null, screen);
+            texts.push(sug.description, sug.placeholder, ...(sug.legend ? [sug.legend] : []));
+          }
+        }
+      }
+    }
+    for (const code of ['texto_vazio', 'nota_fiscal', 'nao_e_comprovante'] as const) texts.push(comprovanteErrorText(code));
+    check(texts.filter((t) => t !== ''));
+  });
+
+  it('o que a tela promete: lê no aparelho, não guarda o arquivo nem documento, chave Pix, conta ou códigos', () => {
+    for (const text of [COMPROVANTE_TEXT.sheetPrivacy, COMPROVANTE_TEXT.privacy]) {
+      expect(text).toContain('aqui no aparelho');
+      expect(text).toContain('não');
+      for (const word of ['CPF', 'CNPJ', 'chave Pix', 'conta', 'códigos']) expect(text, word).toContain(word);
+    }
+    expect(COMPROVANTE_TEXT.option).toBe('Ler comprovante de Pix ou pagamento (PDF)');
+    expect(COMPROVANTE_TEXT.lineHint).toBe('Comprovante em PDF, lido aqui no aparelho');
+    expect(COMPROVANTE_TEXT.filled).toBe('Preenchemos o que o comprovante informa. Confira e toque em Salvar.');
+    expect(COMPROVANTE_TEXT.looksNotedHint).toBe('Pode ser o mesmo lançamento. Se for outro, é só salvar.');
+    expect(COMPROVANTE_TEXT.looksNoted('2026-10-05', 'Padaria', 8500)).toBe('Parece já anotado em 05/10/2026: Padaria, R$ 85,00.');
+    expect(COMPROVANTE_TEXT.switchToIncome).toBe('Trocar para Registrar recebimento');
+    expect(COMPROVANTE_TEXT.switchToExpense).toBe('Trocar para Anotar gasto');
+    expect(COMPROVANTE_TEXT.errors.nota_fiscal).toContain('Escanear nota fiscal');
+    expect(COMPROVANTE_TEXT.errors.texto_vazio).toContain('foto');
+  });
+
+  it('cada mensagem de erro e de lacuna é uma frase completa, que termina em ponto e diz o que fazer', () => {
+    for (const text of [...Object.values(COMPROVANTE_TEXT.errors), ...Object.values(COMPROVANTE_TEXT.pdf), COMPROVANTE_TEXT.missingAmount, COMPROVANTE_TEXT.missingDay, COMPROVANTE_TEXT.futureDay, COMPROVANTE_TEXT.missingName, COMPROVANTE_TEXT.directionGuessed]) {
+      expect(text, text).toMatch(/^[A-ZÁÉÍÓÚÂÊÔÃÕÇ]/);
+      expect(text, text).toMatch(/[.]$/);
+    }
+  });
+
+  it('as regras novas do core não trazem marca de banco, termo de produto financeiro nem expressão vetada nos arquivos-fonte', () => {
+    for (const name of ['comprovante/tipos.ts', 'comprovante/texto.ts', 'comprovante/leitor.ts', 'comprovante/fluxo.ts', 'comprovante/index.ts']) {
+      const source = readFileSync(join(CORE_SRC, name), 'utf8');
+      expect(source, name).not.toMatch(FORBIDDEN);
+      expect(source, name).not.toMatch(JUDGMENT);
+      expect(source, name).not.toMatch(BRANDS);
     }
   });
 });

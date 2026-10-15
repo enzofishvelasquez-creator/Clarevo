@@ -116,4 +116,18 @@ Ainda existe: a Pluggy declara obter dados "via credenciais" em instituições f
 
 **Limites do primeiro corte.** Até 5 MB e 5.000 linhas por arquivo; 500 linhas por chamada ao banco (a tela divide); fatura já paga não recebe compra nem estorno; compra com mais de 48 meses e data futura não entram; cada linha da fatura vale uma compra à vista (compras parceladas aparecem parcela por parcela, como o banco as mostra).
 
-**Próximo passo da alternativa.** Item 2 da proposta aceita por Enzo: comprovante de Pix recebido por compartilhamento (entrega seguinte).
+**Item 2: comprovante de Pix e de pagamento em PDF (Ciclo I2, D-051).** Entregue. Para o que o arquivo de extrato não cobre (o Pix que acabou de acontecer, a TED, o boleto pago, a compra no débito), a pessoa baixa o comprovante em PDF no app do banco e o escolhe no Clarevo, em Anotar gasto (folha de "Escanear nota fiscal" › "Ler comprovante de Pix ou pagamento (PDF)") ou em Registrar recebimento (linha própria). O PDF é lido no aparelho (o mesmo caminho do DANFE), o leitor devolve só o tipo (Pix, TED, boleto, débito), a direção (saiu ou entrou), o valor, a data e a hora, o nome da outra ponta e a mensagem, e o formulário vem preenchido ("Pix para Maria Souza"), com "Como você pagou?" em "Dinheiro, débito ou Pix". Nada é gravado sem "Salvar".
+
+| Ponto do memorando | Comprovante em PDF |
+|---|---|
+| Consentimento regulatório e prazo | Não há: cada comprovante é um ato da pessoa, no momento em que o escolhe. |
+| Credenciais bancárias | Nunca passam pelo Clarevo: o PDF é baixado por ela no próprio app do banco. |
+| Servidor, webhooks e sincronização | Nenhum: a leitura roda no aparelho (`packages/core/src/comprovante`); só o registro que a pessoa salva vai para o banco do Clarevo, por `create_record`, como sempre. |
+| Duplicidades | Sem chave no registro (nem o ID da transação, nem um resumo dele): o aviso é por semelhança, "Parece já anotado em 05/10/2026: ...", quando há registro do mesmo tipo, valor e data a até 1 dia. Não bloqueia. Guardar o resumo do ID exigiria coluna e índice novos (migração), e esta entrega não faz migração. |
+| Desconectar e excluir | Não há conexão. O PDF e o texto não são guardados; o registro criado é comum (editar e excluir como sempre). |
+| LGPD | Minimização no leitor: CPF e CNPJ (inteiros ou mascarados), chave Pix, instituição, agência, conta, ID da transação, código de autenticação e protocolo são descartados; do nome, só o da outra ponta. A memória por nome fica só no aparelho, pelo resumo SHA-256 do nome normalizado. |
+| Limite do fornecedor por CPF | Não existe. |
+
+**O que perde.** Não é automático (um PDF por vez), não traz saldo e depende de o banco oferecer o comprovante em PDF com texto (foto de comprovante e PDF escaneado não são lidos). O leiaute de cada banco pode trazer rótulos que a leitura ainda não conhece: o aceite com comprovantes reais é P-026.
+
+**Próximo passo da alternativa.** Compartilhar o PDF direto do app do banco para o Clarevo ("Compartilhar com o Clarevo"), que exige a folha de compartilhamento nativa e espera o build das lojas (mesma pendência do PDF da nota, D-038(9)).

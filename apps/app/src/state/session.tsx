@@ -6,6 +6,7 @@ import { AppState, Text, View } from 'react-native';
 
 import { pendingCredentials, type AuthService, type AuthState } from '@/lib/auth';
 import { DemoAuth } from '@/lib/demo-auth';
+import { comprovanteHandoff } from '@/lib/comprovante-handoff';
 import { clearNotePrefsMemory } from '@/lib/note-prefs';
 import { receiptLinks } from '@/lib/receipt-link';
 import { SupabaseAuth, supabaseConfigured } from '@/lib/supabase';
@@ -69,9 +70,10 @@ function useToday(mode: AuthService['mode']): IsoDate {
   return mode === 'demo' ? DEMO_TODAY : todayIn(deviceTimeZone(), new Date(now));
 }
 
-/** Nada da nota lida (endereços da Sefaz, memória das lojas) sobrevive à saída da conta nem passa para outra pessoa. */
+/** Nada da nota lida (endereços da Sefaz, memória das lojas) nem do comprovante lido (D-051) sobrevive à saída da conta nem passa para outra pessoa. */
 function clearReceiptMemory() {
   receiptLinks.clear();
+  comprovanteHandoff.clear();
   clearNotePrefsMemory();
 }
 

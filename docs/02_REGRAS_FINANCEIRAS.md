@@ -1,6 +1,6 @@
 # Regras financeiras do primeiro ciclo
 
-11/10/2026 · código em `packages/core` e no banco (`supabase/migrations`). As mesmas regras valem nos dois lugares. As calculadoras e o "Achar tudo" (Ciclo A6), o plano para quitar dívidas (Ciclo F1), "Antes de financiar" (D-044), o conteúdo de Aprender (Ciclo A5), o simulador (Ciclo D) e os lembretes, o ocultar valores e a biometria (Ciclo A2) ficam só no core e no app, sem gravar nada no banco. A revisão dos últimos meses (Ciclo A4), a renda comprometida (Ciclo B), as metas e o plano de guardar (Ciclo C), os cartões e as faturas (Ciclo E, D-037) e a chave das notas fiscais (D-038) as contas de origem do dinheiro (Ciclo G1, D-043) e as assinaturas (Ciclo H2, D-046) e a importação de extrato e fatura (Ciclo I1, D-048) estão nos dois lugares; a busca em Movimentações (Ciclo H1, D-045) e a exportação dos dados (Ciclo H3, D-047) são só leitura, no core e no app; a leitura das notas (QR, chave, PDF e página da Sefaz-RJ) roda só no core e no app, no aparelho. Em "Onde é testado", "web" é o roteiro `scripts/e2e-web.js` (`npm run test:web`); as telas dos Ciclos A2, B, C, D e E também passam por ele (`docs/04`).
+11/10/2026 · código em `packages/core` e no banco (`supabase/migrations`). As mesmas regras valem nos dois lugares. As calculadoras e o "Achar tudo" (Ciclo A6), o plano para quitar dívidas (Ciclo F1), "Antes de financiar" (D-044), o conteúdo de Aprender (Ciclo A5), o simulador (Ciclo D) e os lembretes, o ocultar valores e a biometria (Ciclo A2) ficam só no core e no app, sem gravar nada no banco. A revisão dos últimos meses (Ciclo A4), a renda comprometida (Ciclo B), as metas e o plano de guardar (Ciclo C), os cartões e as faturas (Ciclo E, D-037) e a chave das notas fiscais (D-038) as contas de origem do dinheiro (Ciclo G1, D-043) e as assinaturas (Ciclo H2, D-046) e a importação de extrato e fatura (Ciclo I1, D-048) estão nos dois lugares; o comprovante de Pix e de pagamento (Ciclo I2, D-051) fica só no core e no app, sem gravar nada no banco; a busca em Movimentações (Ciclo H1, D-045) e a exportação dos dados (Ciclo H3, D-047) são só leitura, no core e no app; a leitura das notas (QR, chave, PDF e página da Sefaz-RJ) roda só no core e no app, no aparelho. Em "Onde é testado", "web" é o roteiro `scripts/e2e-web.js` (`npm run test:web`); as telas dos Ciclos A2, B, C, D e E também passam por ele (`docs/04`).
 
 ## Implementado e testado
 
@@ -413,6 +413,35 @@ Conta de teste, hoje 07/10/2026, cartão que fecha dia 3 e vence dia 10.
 | 9 | Compra de 48 meses atrás (primeiro dia do mês) e uma de um dia antes | A primeira entra; a segunda é `data_invalida`; estorno de 48 meses ou mais: `mes_invalido` |
 | 10 | 10 lotes de 500 compras e mais uma | As 5.000 entram; a seguinte é `limite_de_lancamentos` |
 
+## Comprovante de Pix e de pagamento (Ciclo I2, D-051)
+
+Regras em `packages/core/src/comprovante` (leitor, preenchimento, memória por nome e aviso de semelhança), só no core e no app: **não há regra nova no banco, nem função, nem coluna**. O registro que a pessoa salva é o de sempre (`create_record`, D-021), com a data do pagamento ou do recebimento, e conta em Pago (gasto) ou Recebido (recebimento) no dia dele; o comprovante não muda nenhuma conta do mês por si. Testes em `comprovante-leitor.test.ts`, `comprovante-fluxo.test.ts`, `nota-flow.test.ts`, `copy.test.ts` e no roteiro web.
+
+- **Tipo e direção.** Pix, TED, boleto pago e débito; sem pista, "pagamento" ou "recebimento". A direção decide o tipo do registro: saiu é gasto (despesa), entrou é recebimento (receita). Boleto e débito são sempre saída. O que o comprovante não diz (títulos neutros com "Origem" e "Destino") é resolvido pelo tipo da tela onde a pessoa está, e o bloco diz isso.
+- **Valor.** Em centavos inteiros, de 1 centavo a R$ 9.999.999,99 (o limite do registro). Vale o valor de rótulo mais específico: "Valor pago", "Valor total", "Valor cobrado" antes de "Valor" e de "Valor da transferência", e o "Valor do documento" do boleto só quando não há outro (os juros, a multa, o desconto, a tarifa e o saldo nunca valem). Número sem vírgula e sem "R$" (agência, data, hora, parte de um código) nunca é valor. Sem rótulo, só o único valor com "R$" do texto solto.
+- **Data e hora.** A data do pagamento ou da transferência, nunca a de vencimento, de agendamento nem a de emissão do próprio comprovante; data impossível não vale; data depois de hoje não preenche o campo ("Escolha o dia"), porque o app só aceita datas até hoje (D-021). A hora aparece só no bloco ("às 14:32") e não é gravada.
+- **Descrição.** A lembrada da última vez com o mesmo nome (categoria junto, só se for do tipo do registro), "Pix para {nome}" no gasto e "Pix de {nome}" no recebimento (TED, boleto, débito e pagamento têm a sua), a mensagem do comprovante ou em branco; no máximo 80 caracteres (o limite do app), cortados sem deixar meia palavra. A memória é só do aparelho: chave é o resumo SHA-256 de `pessoa:<despesa|receita>:<nome normalizado>` e valor é a descrição e a categoria que a pessoa salvou.
+- **"Parece já anotado".** Mesmo tipo, mesmo valor e data a até 1 dia da que está no campo (diferença em dias civis, também ao virar o mês e o ano); o registro de data mais próxima é o mostrado, e o primeiro no empate. Só avisa, nunca bloqueia: sem chave no banco, a semelhança é o único sinal. Entram todos os registros do tipo, inclusive os que pagam conta a pagar ou fatura.
+- **Privacidade.** O resultado do leitor tem só tipo, direção, valor, data, hora, nome da outra ponta e mensagem. CPF, CNPJ, chave Pix, instituição, agência, conta, ID da transação, código de autenticação, protocolo e número de cartão são descartados no leitor; o texto do PDF e o arquivo não são guardados.
+
+### Exemplos de leitura do comprovante (reproduzidos nos testes do core, com textos sintéticos)
+
+Hoje é 07/10/2026. "Tela" é o tipo do formulário onde a pessoa está (o padrão de direção, só usado quando o comprovante não diz).
+
+| Texto do comprovante (resumo) | Tela | O que o formulário recebe |
+|---|---|---|
+| "Pix enviado", "Valor R$ 85,00", "Destino › Nome MARIA SOUZA EXEMPLO", "05 OUT 2026 - 14:32:10", com CPF mascarado, instituição, chave Pix, "Origem" (a pessoa), agência, conta, ID da transação e autenticação | Anotar gasto | Gasto de R$ 85,00 em 05/10/2026, descrição "Pix para Maria Souza Exemplo"; nada do CPF, da chave, da agência, da conta nem dos códigos |
+| O mesmo, com título "Comprovante de transferência" (sem dizer a direção) | Anotar gasto | O mesmo gasto, com o aviso de que a direção veio da tela |
+| O mesmo, com título "Comprovante de transferência" | Registrar recebimento | Recebimento de R$ 85,00, descrição "Pix de Fulano de Tal Exemplo" (o nome de "Origem") |
+| "Pix recebido", "R$ 320,00", "Recebido de FULANO DE TAL EXEMPLO LTDA", "CNPJ 11.222.333/0001-81", "06/10/2026 09:05" | Anotar gasto | Nada é preenchido; aviso "Este comprovante é de um Pix recebido. Ele entra como recebimento, não como gasto." e "Trocar para Registrar recebimento" |
+| O mesmo | Registrar recebimento | Recebimento de R$ 320,00 em 06/10/2026, descrição "Pix de Fulano de Tal Exemplo Ltda" (o CNPJ nunca aparece) |
+| Boleto: "Valor do documento R$ 100,00", "Juros R$ 2,00", "Valor cobrado R$ 102,00", "Data de vencimento 01/10/2026", "Data do pagamento 05/10/2026" | Anotar gasto | Gasto de R$ 102,00 em 05/10/2026, descrição "Boleto para Empresa Exemplo de Energia S.A." |
+| "Pix enviado", "Data da transferência 04/10/2026", "Pago para ANA EXEMPLO", sem valor | Anotar gasto | Data 04/10/2026, valor em branco, foco no valor, "O valor não apareceu no comprovante. Digite o valor." |
+| "Pix enviado", "Valor R$ 45,00", sem data | Anotar gasto | Valor R$ 45,00, data em branco, foco na data, "A data não apareceu no comprovante. Escolha o dia." |
+| "Pix enviado" com data 08/10/2026 (depois de hoje) | Anotar gasto | Data em branco: "A data do comprovante ainda não chegou. Escolha o dia." |
+| Gasto de R$ 85,00 em 05/10/2026 já anotado; comprovante igual | Anotar gasto | "Parece já anotado em 05/10/2026: ..." com "Abrir registro"; com a data em 06/10 continua, em 07/10 ou com R$ 85,01 some; Salvar nunca é bloqueado |
+| PDF sem texto (foto), de nota fiscal, de pedido de compra, ou arquivo que não é PDF | qualquer | Uma mensagem para cada causa; nada preenchido |
+
 ## Simulador (Ciclo D, D-028)
 
 Regras em `packages/core/src/simulate.ts`; o banco não muda. Os vetores abaixo usam 10% ao ano (0,80% ao mês, taxa equivalente) e **aportes no início de cada mês**, a convenção da "Aplicação com depósitos regulares" da Calculadora do Cidadão, do Banco Central (n pagamentos iguais, realizados no início de cada período), por resposta "a" de Enzo em 09/10/2026. A especificação de 08/10/2026 usava o fim do mês (R$ 1.184,52, R$ 19.778,56, 17 meses, R$ 99.931,92 e R$ 64.348,92); a mudança multiplica a parte dos aportes por (1 + i). A página da metodologia foi vista só por trecho de resultado de busca, com a fórmula Sn = (1 + j) × [((1 + j)^n - 1) ÷ j] × p; a calculadora não foi aberta, e nenhum resultado dela foi comparado: os vetores abaixo são do próprio core. O fator de juros usa `log1p` e `expm1`, e o teste de precisão guarda casos conferidos contra uma referência de 80 dígitos (Python `Decimal`), feita fora do repositório.
@@ -474,6 +503,7 @@ Regras em `packages/core/src/learn`; nada é gravado nem enviado. O catálogo, a
 - Contas a receber previstas.
 - Cartões: juros e rotativo calculados e gravados, leitura da fatura do banco, parcelamento da fatura gravado (as calculadoras só simulam) e interface na Família (D-037(13)).
 - Notas fiscais: leitura da página da Sefaz de outros estados além do RJ, compartilhar o PDF de outro app para o Clarevo, itens da nota e uma área "Compras" (D-038). O aceite com notas reais é P-025.
+- Comprovantes de Pix e de pagamento: compartilhar o PDF direto do app do banco para o Clarevo, chave própria no registro para a duplicidade (hoje só o aviso por semelhança), leitura de foto (OCR) e o guia de uso citar o comprovante (D-051). O aceite com comprovantes reais é P-026.
 - Transferência entre contas próprias e empréstimos.
 - Receita fixa, variável e pontual com revisão mensal.
 - Saldo inicial informado como evento próprio (não é renda).

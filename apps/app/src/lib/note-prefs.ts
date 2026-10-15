@@ -6,39 +6,47 @@ import { Platform } from 'react-native';
  * Memórias das notas fiscais guardadas só neste aparelho, por pessoa (nada vai para o servidor):
  * - `cameraUsed`: a câmera já foi usada para ler uma nota, então o toque em "Escanear nota fiscal" abre a câmera direto;
  * - `stores`: descrição e categoria da última nota anotada de cada loja ("Como da última vez nesta loja"), pela chave
- *   `storeMemoryId` (resumo do CNPJ da loja). Guardam-se no máximo 50 lojas, das mais recentes.
- * Nunca guarda a chave de acesso, o link, CPF nem o CNPJ legível. Ler ou gravar pode falhar (navegação privada, armazenamento
+ *   `storeMemoryId` (resumo do CNPJ da loja). Guardam-se no máximo 50 lojas, das mais recentes;
+ * - `payees`: o mesmo para comprovantes de Pix e de pagamento (D-051, "Como da última vez com este nome"), pela chave
+ *   `counterpartMemoryId` (resumo SHA-256 do nome normalizado da outra ponta e do tipo do registro). Também até 50, das mais recentes.
+ * Nunca guarda a chave de acesso, o link, CPF nem o CNPJ legível, nem o nome da outra ponta como chave, nem chave Pix, conta ou códigos. Ler ou gravar pode falhar (navegação privada, armazenamento
  * cheio): vale a cópia em memória. Na demonstração fica só em memória (conta nova nunca herda a de outra).
  */
 interface NotePrefs {
   cameraUsed: boolean;
   stores: Record<string, StoreMemory & { at: number }>;
+  payees: Record<string, StoreMemory & { at: number }>;
 }
 
 const PREFIX = 'clarevo.notas.v1.';
 const MAX_STORES = 50;
-const EMPTY: NotePrefs = { cameraUsed: false, stores: {} };
+const EMPTY: NotePrefs = { cameraUsed: false, stores: {}, payees: {} };
 const memory = new Map<string, NotePrefs>();
 const loading = new Map<string, Promise<NotePrefs>>();
 /** Muda a cada `clearNotePrefsMemory`: uma leitura que começou antes da limpeza não guarda o resultado em memória. */
 let generation = 0;
 
-function parse(raw: string | null | undefined): NotePrefs {
-  if (!raw) return { cameraUsed: false, stores: {} };
-  try {
-    const v = JSON.parse(raw) as { cameraUsed?: unknown; stores?: unknown };
-    const stores: NotePrefs['stores'] = {};
-    if (v.stores && typeof v.stores === 'object') {
-      for (const [id, m] of Object.entries(v.stores as Record<string, unknown>)) {
-        const e = m as { description?: unknown; category?: unknown; at?: unknown };
-        if (/^[0-9a-f]{64}$/.test(id) && typeof e.description === 'string' && e.description !== '' && typeof e.at === 'number') {
-          stores[id] = { description: e.description.slice(0, 80), category: typeof e.category === 'string' ? e.category : null, at: e.at };
-        }
+/** Lembranças guardadas (por resumo de 64 hexadecimais): só as bem formadas entram. */
+function parseMemories(value: unknown): NotePrefs['stores'] {
+  const out: NotePrefs['stores'] = {};
+  if (value && typeof value === 'object') {
+    for (const [id, m] of Object.entries(value as Record<string, unknown>)) {
+      const e = m as { description?: unknown; category?: unknown; at?: unknown };
+      if (/^[0-9a-f]{64}$/.test(id) && typeof e.description === 'string' && e.description !== '' && typeof e.at === 'number') {
+        out[id] = { description: e.description.slice(0, 80), category: typeof e.category === 'string' ? e.category : null, at: e.at };
       }
     }
-    return { cameraUsed: v.cameraUsed === true, stores };
+  }
+  return out;
+}
+
+function parse(raw: string | null | undefined): NotePrefs {
+  if (!raw) return { cameraUsed: false, stores: {}, payees: {} };
+  try {
+    const v = JSON.parse(raw) as { cameraUsed?: unknown; stores?: unknown; payees?: unknown };
+    return { cameraUsed: v.cameraUsed === true, stores: parseMemories(v.stores), payees: parseMemories(v.payees) };
   } catch {
-    return { cameraUsed: false, stores: {} };
+    return { cameraUsed: false, stores: {}, payees: {} };
   }
 }
 
@@ -59,12 +67,12 @@ export function loadNotePrefs(userId: string, persist: boolean): Promise<NotePre
   const key = PREFIX + userId;
   const startedIn = generation;
   const run = async (): Promise<NotePrefs> => {
-    let prefs: NotePrefs = { ...EMPTY, stores: {} };
+    let prefs: NotePrefs = { ...EMPTY, stores: {}, payees: {} };
     if (persist) {
       try {
         prefs = parse(Platform.OS === 'web' ? webStorage()?.getItem(key) : await AsyncStorage.getItem(key));
       } catch {
-        prefs = { ...EMPTY, stores: {} };
+        prefs = { ...EMPTY, stores: {}, payees: {} };
       }
     }
     // A limpeza (sair da conta ou trocar de pessoa) vence a leitura em andamento: o resultado dela não vai para a memória.
@@ -115,6 +123,20 @@ export async function rememberStore(userId: string, storeId: string, memoryOfSto
   const ids = Object.keys(stores).sort((a, b) => stores[b]!.at - stores[a]!.at);
   for (const id of ids.slice(MAX_STORES)) delete stores[id];
   save(userId, { ...current, stores }, persist);
+}
+
+/** Descrição e categoria da última vez com esta pessoa ou empresa (comprovante de Pix, D-051), pela chave `counterpartMemoryId`. */
+export async function payeeMemoryOf(userId: string, payeeId: string, persist: boolean): Promise<StoreMemory | null> {
+  const found = (await loadNotePrefs(userId, persist)).payees[payeeId];
+  return found ? { description: found.description, category: found.category } : null;
+}
+
+export async function rememberPayee(userId: string, payeeId: string, memoryOfPayee: StoreMemory, persist: boolean): Promise<void> {
+  const current = await loadNotePrefs(userId, persist);
+  const payees = { ...current.payees, [payeeId]: { ...memoryOfPayee, at: Date.now() } };
+  const ids = Object.keys(payees).sort((a, b) => payees[b]!.at - payees[a]!.at);
+  for (const id of ids.slice(MAX_STORES)) delete payees[id];
+  save(userId, { ...current, payees }, persist);
 }
 
 /** Ao sair da conta (ou trocar de pessoa): esquece as memórias em RAM. O que foi gravado no aparelho vale só para a mesma pessoa. */

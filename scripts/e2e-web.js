@@ -7,8 +7,9 @@
  * abaixo do cabeçalho, barra inferior nas telas de consulta, Contas a pagar no mês certo, Metas compacta e a busca "No app" de
  * Aprender), de "Antes de financiar" (D-044), do Ciclo G1 (contas de origem do dinheiro, D-043), do Ciclo H1 (buscar em
  * Movimentos, D-045), do Ciclo H2 (assinaturas, D-046, com o cenário fictício "assinaturas" da demonstração) e do Ciclo H3
- * (exportar meus dados em CSV e PDF, D-047), do Ciclo I1 (importar extrato e fatura, D-048) e do Tutorial (D-049: o guia em Aprender, o
- * tour de boas-vindas, o botão "?" nas telas e as capturas do manual) na versão web, em modo demonstração (acesso simulado).
+ * (exportar meus dados em CSV e PDF, D-047), do Ciclo I1 (importar extrato e fatura, D-048), do Tutorial (D-049: o guia em Aprender, o
+ * tour de boas-vindas, o botão "?" nas telas e as capturas do manual) e do Ciclo I2 (comprovante de Pix e de pagamento em PDF,
+ * D-051) na versão web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -3867,8 +3868,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // A folha do primeiro toque: câmera só quando há câmera (o navegador do roteiro não tem), PDF e colar sempre; "Cancelar" não faz nada.
   await openScan(); t = await dialogText(); const sheetButtons = await dialogButtons();
-  ok('N folha do primeiro toque: título, a frase de privacidade (só um resumo da chave, sem CPF nem link), "Escolher o PDF da nota" antes de "Colar o link ou a chave" (sem câmera no navegador do roteiro, o PDF vem primeiro) e "Cancelar"; "Usar a câmera" só aparece com câmera',
-    t.includes('Como você quer ler a nota?') && t.includes('Guardamos só um resumo da chave de acesso da nota, para avisar se ela for lida de novo. Não guardamos CPF, a chave nem o link.') && JSON.stringify(sheetButtons.filter((x) => x !== 'Usar a câmera')) === JSON.stringify(['Escolher o PDF da nota', 'Colar o link ou a chave', 'Cancelar']) && (sheetButtons.length === 3 || sheetButtons[0] === 'Usar a câmera'), JSON.stringify(sheetButtons));
+  ok('N folha do primeiro toque: título, a frase de privacidade (só um resumo da chave, sem CPF nem link), "Escolher o PDF da nota" antes de "Colar o link ou a chave" (sem câmera no navegador do roteiro, o PDF vem primeiro), "Ler comprovante de Pix ou pagamento (PDF)" por último (D-051) e "Cancelar"; "Usar a câmera" só aparece com câmera',
+    t.includes('Como você quer ler a nota?') && t.includes('Guardamos só um resumo da chave de acesso da nota, para avisar se ela for lida de novo. Não guardamos CPF, a chave nem o link.') && JSON.stringify(sheetButtons.filter((x) => x !== 'Usar a câmera')) === JSON.stringify(['Escolher o PDF da nota', 'Colar o link ou a chave', 'Ler comprovante de Pix ou pagamento (PDF)', 'Cancelar']) && (sheetButtons.length === 4 || sheetButtons[0] === 'Usar a câmera'), JSON.stringify(sheetButtons));
   await keepText();
   await shot('151_folha_escanear');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
@@ -8252,6 +8253,335 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const j1Dashes = j1Texts.map((x) => x.match(/[–—]/)?.[0]).filter(Boolean);
   ok('Tutorial telas do guia, do tour e da ajuda: nenhum termo proibido, travessão, expressão vetada nem nome de banco ou de bandeira nos textos da interface', j1Texts.length >= 20 && j1Vetoed.length === 0 && j1Dashes.length === 0 && j1Brands.length === 0, `${j1Texts.length} telas ${j1Vetoed.join(' | ')} ${j1Brands.join(' | ')} ${j1Dashes.join(' | ')}`);
   ok('Tutorial: nenhuma escrita direta na rede (o tour, o guia e a ajuda não gravam; a demonstração e as contas novas ficam em memória)', writes.slice(j1Writes0).length === 0, writes.slice(j1Writes0).join(' | '));
+
+  // ==================================================================================================================
+  // Comprovante de Pix (D-051) · Ciclo I2, item 2 da alternativa sem custo à integração bancária (docs/11). Em Anotar gasto, a folha
+  // de "Escanear nota fiscal" ganha "Ler comprovante de Pix ou pagamento (PDF)"; em Registrar recebimento, uma linha própria. O PDF
+  // é lido no aparelho (nada sai dele), o leitor do core devolve só tipo, direção, valor, data e hora, o nome da outra ponta e a
+  // mensagem, e nada é gravado sem "Salvar". Os PDFs abaixo são sintéticos: nomes, documentos, chaves e códigos são inventados e
+  // nenhum deles pode aparecer na tela, nos nomes acessíveis nem no armazenamento do navegador. Hoje é 07/10/2026.
+  // ==================================================================================================================
+  const i2Writes0 = writes.length;
+  const i2Dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clarevo-comprovante-'));
+  const i2Texts = [];
+  const i2Keep = async () => { const x = await body(); i2Texts.push(x); screenTexts.push(x); return x; };
+  // PDF mínimo de texto (Helvetica, uma linha por Tj), como o dos blocos de nota fiscal.
+  const i2MakePdf = (lines) => {
+    const esc = (s) => s.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+    const content = `BT /F1 10 Tf 40 800 Td 14 TL\n${lines.map((l) => `(${esc(l)}) Tj T*`).join('\n')}\nET`;
+    const objs = [
+      '<< /Type /Catalog /Pages 2 0 R >>',
+      '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+      `<< /Length ${Buffer.byteLength(content, 'latin1')} >>\nstream\n${content}\nendstream`,
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+    ];
+    let out = '%PDF-1.4\n'; const offsets = [];
+    objs.forEach((o, i) => { offsets.push(Buffer.byteLength(out, 'latin1')); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
+    const xref = Buffer.byteLength(out, 'latin1');
+    out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+    return Buffer.from(out, 'latin1');
+  };
+  const i2File = (name, lines) => { const f = path.join(i2Dir, name); fs.writeFileSync(f, i2MakePdf(lines)); return f; };
+  // Dados do comprovante que NUNCA podem aparecer (todos fictícios): CPF inteiro e mascarado, CNPJ, chave Pix, agência, conta, ID da
+  // transação (E2E id) e código de autenticação.
+  const I2_SECRETS = ['529.982.247-25', '982.247', '52998224725', '456.789', '11.222.333/0001-81', '11222333', 'pessoa.exemplo', '7391', '84620-3', '84620', 'E00000000202610051432', 'S00000000001', '7F3A9C21B8D0'];
+  const I2_SENT = [
+    'Pix enviado', '05 OUT 2026 - 14:32:10', 'Valor', 'R$ 85,00', 'Tipo de transferência', 'Pix',
+    'Destino', 'Nome', 'MARIA SOUZA EXEMPLO', 'CPF/CNPJ', '529.982.247-25', 'Instituição', 'Banco Exemplo S.A.', 'Chave Pix', 'pessoa.exemplo@exemplo.com',
+    'Origem', 'Nome', 'FULANO DE TAL EXEMPLO', 'CPF', '***.456.789-**', 'Instituição', 'Banco Exemplo S.A.', 'Agência', '7391', 'Conta', '84620-3',
+    'ID da transação', 'E00000000202610051432S00000000001', 'Código de autenticação', '7F3A9C21B8D04E56A1F2C3D4E5B6A7C8', 'Descrição', 'Almoço de domingo',
+  ];
+  const i2Sent = i2File('pix-enviado.pdf', I2_SENT);
+  const i2Received = i2File('pix-recebido.pdf', [
+    'Pix recebido', 'Valor', 'R$ 320,00', 'Data e hora', '06/10/2026 09:05', 'Recebido de', 'FULANO DE TAL EXEMPLO LTDA', 'CNPJ', '11.222.333/0001-81',
+    'Chave Pix', 'pessoa.exemplo@exemplo.com', 'ID da transação', 'E00000000202610061005S00000000002',
+  ]);
+  // Título neutro, "Origem" e "Destino" juntos: o comprovante não diz se o dinheiro saiu ou entrou, vale o tipo da tela.
+  const i2Neutral = i2File('transferencia.pdf', I2_SENT.map((l, i) => (i === 0 ? 'Comprovante de transferência' : l)));
+  const i2NoAmount = i2File('sem-valor.pdf', ['Pix enviado', 'Data da transferência', '04/10/2026', 'Pago para', 'ANA EXEMPLO', 'Instituição', 'Banco Exemplo', 'Chave Pix', 'pessoa.exemplo@exemplo.com']);
+  const i2NoDate = i2File('sem-data.pdf', ['Pix enviado', 'Valor', 'R$ 45,00', 'Pago para', 'BEATRIZ EXEMPLO', 'Agência', '7391', 'Conta', '84620-3']);
+  const i2Boleto = i2File('boleto.pdf', [
+    'Comprovante de pagamento', 'Pagamento de boleto', 'Beneficiário', 'EMPRESA EXEMPLO DE ENERGIA S.A.', 'CNPJ do beneficiário', '11.222.333/0001-81',
+    'Pagador', 'FULANO DE TAL EXEMPLO', 'Valor do documento', 'R$ 100,00', 'Juros', 'R$ 2,00', 'Valor cobrado', 'R$ 102,00',
+    'Data de vencimento', '01/10/2026', 'Data do pagamento', '05/10/2026', 'Autenticação', '7F3A9C21B8D04E56A1F2C3D4E5B6A7C8',
+  ]);
+  const i2Photo = i2File('foto.pdf', []);
+  const i2Danfe = i2File('nota.pdf', ['DANFE', 'Documento Auxiliar da Nota Fiscal Eletrônica', 'CHAVE DE ACESSO', '3326 1011 2223 3300 0181 5500 1000 0043 2118 7654 3216', 'VALOR TOTAL DA NOTA', '150,00']);
+  const i2Order = i2File('pedido.pdf', ['PEDIDO DE COMPRA', 'Obrigado pela compra', 'Valor total 150,00', 'Entrega em até 5 dias úteis']);
+  const i2NotPdf = path.join(i2Dir, 'texto.pdf'); fs.writeFileSync(i2NotPdf, 'isto não é um PDF, só texto');
+  const I2_OPTION = 'Ler comprovante de Pix ou pagamento (PDF)';
+  const i2Line = () => p.getByRole('button', { name: /^Ler comprovante de Pix ou pagamento \(PDF\)\./ }).filter({ visible: true }).first();
+  const i2ScanLine = () => p.getByRole('button', { name: /^Escanear nota fiscal\./ }).filter({ visible: true }).first();
+  const i2Sheet = async () => { await i2ScanLine().click(); await waitText('Como você quer ler a nota?'); await p.waitForTimeout(300); };
+  const i2DialogButtons = () => p.getByRole('alert').filter({ visible: true }).last().getByRole('button').evaluateAll((es) => es.map((e) => e.getAttribute('aria-label') || e.textContent));
+  const i2Pick = async (opener, file) => { const [chooser] = await Promise.all([p.waitForEvent('filechooser'), opener.click()]); await chooser.setFiles(file); };
+  // Anotar gasto: pela folha de "Escanear nota fiscal". Registrar recebimento: pela linha própria.
+  const i2ReadExpense = async (file, wait = 'Comprovante lido:') => { await i2Sheet(); await i2Pick(btn(I2_OPTION), file); await waitText(wait, 20000); await p.waitForTimeout(800); };
+  const i2ReadIncome = async (file, wait = 'Comprovante lido:') => { await i2Pick(i2Line(), file); await waitText(wait, 20000); await p.waitForTimeout(800); };
+  const i2NewExpense = async () => { await goResumo(); await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(500); };
+  const i2NewIncome = async () => { await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await btn('Registrar recebimento').click(); await waitText('Data do recebimento'); await p.waitForTimeout(500); };
+  const i2Leave = async () => { await btn('Cancelar').click(); await p.waitForTimeout(300); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click(); await p.waitForTimeout(400); await goResumo(); };
+  const i2Records = () => otherDevice(async (repo, ctx) => (await repo.listRecords(ctx, '2026-10')).map((r) => ({ k: r.kind, c: r.amountCents, on: r.occurredOn, d: r.description, cat: r.category, key: r.receiptKey, id: r.id })).sort((a, b) => a.id.localeCompare(b.id)));
+  const i2ActiveTag = () => p.evaluate(() => document.activeElement?.tagName ?? null);
+  const i2Active = () => p.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? null);
+  const i2Values = async (dateLabel = 'Data do pagamento') => ({ desc: await field('Descrição').inputValue(), amount: await field('Valor em reais').inputValue(), date: await field(dateLabel).inputValue() });
+  // Tudo o que a pessoa (ou um leitor de tela) pode ver na página: texto, nomes acessíveis, dicas e o que está escrito nos campos.
+  const i2PageText = () => p.evaluate(() => {
+    const parts = [document.body.innerText];
+    for (const e of document.querySelectorAll('[aria-label],[aria-description],[placeholder],[title]')) parts.push(e.getAttribute('aria-label') || '', e.getAttribute('aria-description') || '', e.getAttribute('placeholder') || '', e.getAttribute('title') || '');
+    for (const e of document.querySelectorAll('input,textarea')) parts.push(e.value);
+    return parts.join('\n');
+  });
+  const i2Storage = () => p.evaluate(() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]));
+  const i2Leaks = async () => { const page = `${await i2PageText()}\n${await i2Storage()}`; return I2_SECRETS.filter((x) => page.includes(x)); };
+  const i2Shots = async (name, check = true) => {
+    if (check) await innerChecks(`${name} 390px`);
+    await shot(name);
+    await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+    if (check) await innerChecks(`${name} 320px`);
+    await shot(`${name}_320px`, true);
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  };
+  const i2Top = () => p.getByText('Comprovante lido:', { exact: false }).filter({ visible: true }).first().evaluate((e) => e.scrollIntoView({ block: 'start' })).then(() => p.waitForTimeout(300));
+
+  await demoHome();
+  await expectTotals('I2 demonstração: outubro segue 6.000 / 3.900 / 2.100 e 650 antes de ler comprovantes', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  ok('I2 demonstração: a renda comprometida segue 52,5% antes de ler comprovantes', (await body()).includes('52,5%'));
+  const i2Before = JSON.stringify(await i2Records());
+
+  // ---- 1. Anotar gasto: a folha ganha "Ler comprovante de Pix ou pagamento (PDF)" por último ----
+  await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
+  await i2Sheet();
+  let i2t = await dialogText(); const i2Buttons = await i2DialogButtons();
+  ok('I2 folha de "Escanear nota fiscal": "Ler comprovante de Pix ou pagamento (PDF)" vem por último, antes de "Cancelar", e a frase de privacidade do comprovante (lido aqui, nada guardado, sem CPF, CNPJ, chave Pix, conta nem códigos) aparece',
+    JSON.stringify(i2Buttons.filter((x) => x !== 'Usar a câmera')) === JSON.stringify(['Escolher o PDF da nota', 'Colar o link ou a chave', I2_OPTION, 'Cancelar']) &&
+    i2t.includes('Comprovante em PDF: lido aqui no aparelho e não guardado. Não guardamos CPF, CNPJ, chave Pix, conta nem códigos do comprovante.') &&
+    i2t.includes('Guardamos só um resumo da chave de acesso da nota'), JSON.stringify(i2Buttons));
+  await i2Keep();
+  await shot('350_comprovante_folha');
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
+  await shot('350_comprovante_folha_320px');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+
+  // ---- 2. Pix enviado: preenche valor, data, descrição e deixa "Como você pagou?" em Dinheiro, débito ou Pix; nada é gravado ----
+  await i2Pick(btn(I2_OPTION), i2Sent); await waitText('Comprovante lido:', 20000); await p.waitForTimeout(900);
+  i2t = await i2Keep();
+  let i2v = await i2Values();
+  ok('I2 Pix enviado: "Comprovante lido: Pix enviado · Maria Souza Exemplo · R$ 85,00 · 05/10/2026 às 14:32", valor 85,00, data 05/10/2026 e descrição "Pix para Maria Souza Exemplo" (com a legenda de onde veio)',
+    i2t.includes('Comprovante lido: Pix enviado · Maria Souza Exemplo · R$ 85,00 · 05/10/2026 às 14:32') && i2v.amount === '85,00' && i2v.date === '05/10/2026' && i2v.desc === 'Pix para Maria Souza Exemplo' && i2t.includes('Nome lido do comprovante'), JSON.stringify(i2v));
+  ok('I2 Pix enviado: a frase "Preenchemos o que o comprovante informa. Confira e toque em Salvar.", a mensagem do comprovante e a frase de privacidade; teclado fechado (nada falta)',
+    i2t.includes('Preenchemos o que o comprovante informa. Confira e toque em Salvar.') && i2t.includes('Mensagem do comprovante: Almoço de domingo') &&
+    i2t.includes('O PDF foi lido aqui no aparelho e não é guardado. Não guardamos CPF, CNPJ, chave Pix, conta nem códigos do comprovante.') && (await i2ActiveTag()) !== 'INPUT', i2t.slice(0, 500));
+  ok('I2 Pix enviado: "Como você pagou?" fica em "Dinheiro, débito ou Pix"', (await radio('Dinheiro, débito ou Pix').getAttribute('aria-checked')) === 'true' && (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'false');
+  ok('I2 Pix enviado: nenhum CPF (inteiro ou mascarado), CNPJ, chave Pix, agência, conta, ID da transação nem código de autenticação na tela, nos nomes acessíveis, nos campos nem no armazenamento',
+    (await i2Leaks()).length === 0, (await i2Leaks()).join(' | '));
+  ok('I2 Pix enviado: nada do lado de quem paga (nome de origem) na tela', !(await i2PageText()).includes('FULANO') && !(await i2PageText()).includes('Fulano de Tal'));
+  ok('I2 Pix enviado: nada é gravado antes de "Salvar gasto" (nenhum registro novo)', JSON.stringify(await i2Records()) === i2Before);
+  ok('I2 Pix enviado: o aviso "Parece já anotado" não aparece (nada igual foi anotado)', !(await body()).includes('Parece já anotado'));
+  await i2Top();
+  await i2Shots('351_comprovante_lido');
+
+  // ---- 3. Salvar: descrição e categoria que a pessoa escolheu; o registro não leva chave nem dado do comprovante ----
+  await field('Descrição').fill('Almoço de domingo'); await radio('Lazer').click(); await p.waitForTimeout(300);
+  await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(600);
+  const i2After = await i2Records();
+  const i2Saved = i2After.filter((r) => r.d === 'Almoço de domingo');
+  ok('I2 salvar: um registro novo de R$ 85,00 em 05/10/2026, "Almoço de domingo", Lazer, sem chave de nota, e nada do comprovante dentro dele',
+    i2After.length === JSON.parse(i2Before).length + 1 && i2Saved.length === 1 && i2Saved[0].c === 8500 && i2Saved[0].on === '2026-10-05' && i2Saved[0].cat === 'Lazer' && i2Saved[0].k === 'despesa' && i2Saved[0].key === null &&
+    I2_SECRETS.every((x) => !JSON.stringify(i2After).includes(x)), JSON.stringify(i2Saved));
+  await goResumo();
+  await expectTotals('I2 depois de salvar: Pago sobe R$ 85,00', 'R$ 6.000,00', 'R$ 3.985,00', 'R$ 2.015,00', 'R$ 650,00');
+
+  // ---- 4. A mesma pessoa de novo: "Como da última vez com este nome" e o aviso "Parece já anotado" (sem bloquear) ----
+  await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
+  await i2ReadExpense(i2Sent);
+  i2t = await i2Keep(); i2v = await i2Values();
+  ok('I2 memória por nome: a descrição e a categoria da última vez ("Almoço de domingo", Lazer), com a legenda "Como da última vez com este nome" (no lugar de "Nome lido do comprovante")',
+    i2v.desc === 'Almoço de domingo' && (await radio('Lazer').getAttribute('aria-checked')) === 'true' && i2t.includes('Como da última vez com este nome') && !i2t.includes('Nome lido do comprovante'), JSON.stringify(i2v));
+  ok('I2 "Parece já anotado em 05/10/2026: Almoço de domingo, R$ 85,00." com "Abrir registro" e a dica "Pode ser o mesmo lançamento. Se for outro, é só salvar."; o Salvar continua à mão',
+    i2t.includes('Parece já anotado em 05/10/2026: Almoço de domingo, R$ 85,00.') && i2t.includes('Pode ser o mesmo lançamento. Se for outro, é só salvar.') && (await visibleCount('button', 'Abrir registro')) === 1 &&
+    (await btn('Salvar gasto').getAttribute('aria-disabled')) !== 'true', i2t.slice(0, 500));
+  await i2Top();
+  await i2Shots('352_comprovante_ja_anotado');
+  // O aviso acompanha o que está nos campos: a até um dia vale, a dois dias ou com outro valor, não.
+  await field('Data do pagamento').fill('06/10/2026'); await p.waitForTimeout(500);
+  ok('I2 "Parece já anotado": a um dia de distância (06/10/2026) o aviso continua', (await body()).includes('Parece já anotado em 05/10/2026'));
+  await field('Data do pagamento').fill('07/10/2026'); await p.waitForTimeout(500);
+  ok('I2 "Parece já anotado": a dois dias de distância (07/10/2026) o aviso some', !(await body()).includes('Parece já anotado'));
+  await field('Data do pagamento').fill('05/10/2026'); await field('Valor em reais').fill('85,01'); await p.waitForTimeout(500);
+  ok('I2 "Parece já anotado": com outro valor (85,01) o aviso some', !(await body()).includes('Parece já anotado'));
+  await field('Valor em reais').fill('85,00'); await p.waitForTimeout(500);
+  ok('I2 "Parece já anotado": de volta ao mesmo valor e dia, o aviso volta', (await body()).includes('Parece já anotado em 05/10/2026: Almoço de domingo, R$ 85,00.'));
+  // "Abrir registro" abre o gasto anotado, e ao voltar o formulário segue como estava.
+  await btn('Abrir registro').click(); await waitUntil(() => /^\/registro\/[^/]+$/.test(urlPath()), 6000); await p.waitForTimeout(600);
+  ok('I2 "Abrir registro" leva ao registro que já existe', /^\/registro\/[^/]+$/.test(urlPath()) && (await body()).includes('Almoço de domingo') && (await body()).includes('R$ 85,00'), urlPath());
+  await btn('Voltar').click(); await waitText('Comprovante lido:'); await p.waitForTimeout(400);
+  ok('I2 ao voltar do registro, o formulário mantém a leitura e o preenchimento', (await i2Values()).amount === '85,00' && (await body()).includes('Comprovante lido: Pix enviado') && (await body()).includes('Parece já anotado'));
+  // O Salvar não é bloqueado: salvar de novo cria o segundo registro (a pessoa decide).
+  await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(500);
+  ok('I2 o aviso não bloqueia: salvar mesmo assim cria um segundo registro igual', (await i2Records()).filter((r) => r.d === 'Almoço de domingo').length === 2);
+  await goResumo();
+
+  // ---- 5. Desfazer leitura devolve o que havia antes ----
+  await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
+  await field('Descrição').fill('Café da manhã');
+  await i2ReadExpense(i2Boleto);
+  i2t = await i2Keep(); i2v = await i2Values();
+  ok('I2 boleto pago: "Comprovante lido: Boleto pago · Empresa Exemplo de Energia S.A. · R$ 102,00 · 05/10/2026" (o valor cobrado, não o do documento; a data do pagamento, não a do vencimento); o que a pessoa digitou na descrição fica',
+    i2t.includes('Comprovante lido: Boleto pago · Empresa Exemplo de Energia S.A. · R$ 102,00 · 05/10/2026') && i2v.amount === '102,00' && i2v.date === '05/10/2026' && i2v.desc === 'Café da manhã', i2t.slice(0, 400));
+  ok('I2 boleto pago: documento do beneficiário, autenticação e linha digitável fora da tela', (await i2Leaks()).length === 0 && !(await i2PageText()).includes('11.222.333'));
+  await btn('Desfazer leitura').click(); await p.waitForTimeout(500);
+  i2v = await i2Values();
+  ok('I2 "Desfazer leitura": o valor e a data voltam ao que havia (vazio e hoje), a descrição digitada continua e a linha de leitura volta',
+    i2v.amount === '' && i2v.date === '07/10/2026' && i2v.desc === 'Café da manhã' && !(await body()).includes('Comprovante lido:') && (await visibleCount('button', /^Escanear nota fiscal\./)) === 1);
+  await i2Leave();
+
+  // ---- 6. Pix recebido em Anotar gasto: avisa e oferece trocar para Registrar recebimento (nada é preenchido) ----
+  await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
+  await i2ReadExpense(i2Received);
+  i2t = await i2Keep(); i2v = await i2Values();
+  ok('I2 Pix recebido em Anotar gasto: "Comprovante lido: Pix recebido · Fulano de Tal Exemplo Ltda · R$ 320,00 · 06/10/2026 às 09:05" com o aviso "Este comprovante é de um Pix recebido. Ele entra como recebimento, não como gasto." e o botão "Trocar para Registrar recebimento"',
+    i2t.includes('Comprovante lido: Pix recebido · Fulano de Tal Exemplo Ltda · R$ 320,00 · 06/10/2026 às 09:05') && i2t.includes('Este comprovante é de um Pix recebido. Ele entra como recebimento, não como gasto.') &&
+    (await visibleCount('button', 'Trocar para Registrar recebimento')) === 1, i2t.slice(0, 500));
+  ok('I2 Pix recebido em Anotar gasto: nada é preenchido (valor e descrição em branco, data de hoje) e não há "Preenchemos o que o comprovante informa"',
+    i2v.amount === '' && i2v.desc === '' && i2v.date === '07/10/2026' && !i2t.includes('Preenchemos o que o comprovante informa'), JSON.stringify(i2v));
+  await i2Top();
+  await i2Shots('353_comprovante_outro_tipo');
+  await btn('Trocar para Registrar recebimento').click(); await waitText('Data do recebimento', 12000); await waitText('Comprovante lido:', 12000); await p.waitForTimeout(900);
+  i2t = await i2Keep(); i2v = await i2Values('Data do recebimento');
+  ok('I2 trocar: abre Registrar recebimento com o mesmo comprovante, sem pedir o PDF de novo: descrição "Pix de Fulano de Tal Exemplo Ltda", valor 320,00 e data 06/10/2026; sem o aviso de tipo trocado',
+    (await h1Name()) === 'Registrar recebimento' && i2v.desc === 'Pix de Fulano de Tal Exemplo Ltda' && i2v.amount === '320,00' && i2v.date === '06/10/2026' && !i2t.includes('Ele entra como') &&
+    i2t.includes('Preenchemos o que o comprovante informa. Confira e toque em Salvar.') && (await visibleCount('button', 'Salvar recebimento')) === 1, JSON.stringify(i2v));
+  ok('I2 trocar: nada do documento da empresa nem da chave na tela', (await i2Leaks()).length === 0);
+  await btn('Salvar recebimento').click(); await waitText('Recebimento salvo'); await p.waitForTimeout(600);
+  const i2Income = (await i2Records()).filter((r) => r.k === 'receita' && r.d === 'Pix de Fulano de Tal Exemplo Ltda');
+  ok('I2 trocar: o recebimento salvo tem R$ 320,00, 06/10/2026 e nenhuma chave de nota', i2Income.length === 1 && i2Income[0].c === 32000 && i2Income[0].on === '2026-10-06' && i2Income[0].key === null, JSON.stringify(i2Income));
+  await goResumo();
+  await expectTotals('I2 depois dos dois salvamentos e do recebimento: Recebido sobe R$ 320,00 e Pago, R$ 170,00', 'R$ 6.320,00', 'R$ 4.070,00', 'R$ 2.250,00', 'R$ 650,00');
+
+  // ---- 7. Registrar recebimento: a linha própria; um Pix enviado oferece a troca para Anotar gasto ----
+  await i2NewIncome();
+  const i2IncomeTops = await p.evaluate(() => {
+    const line = [...document.querySelectorAll('[role=button]')].find((e) => (e.getAttribute('aria-label') || '').startsWith('Ler comprovante de Pix ou pagamento') && e.getBoundingClientRect().width > 0);
+    const text = (s) => [...document.querySelectorAll('div[dir="auto"]')].find((e) => e.textContent.startsWith(s) && e.getBoundingClientRect().width > 0);
+    const situation = text('Recebimento já realizado');
+    return { line: line ? line.getBoundingClientRect().top : null, height: line ? Math.round(line.getBoundingClientRect().height) : null, situation: situation ? situation.getBoundingClientRect().top : null, label: line?.getAttribute('aria-label') };
+  });
+  ok('I2 Registrar recebimento: "Ler comprovante de Pix ou pagamento (PDF)" é o primeiro elemento (linha de 56 px, acima de "Recebimento já realizado"), com a dica "Comprovante em PDF, lido aqui no aparelho", e não há "Escanear nota fiscal"',
+    i2IncomeTops.line !== null && i2IncomeTops.situation !== null && i2IncomeTops.line < i2IncomeTops.situation && i2IncomeTops.height >= 56 &&
+    i2IncomeTops.label === 'Ler comprovante de Pix ou pagamento (PDF). Comprovante em PDF, lido aqui no aparelho.' && (await body()).includes('Comprovante em PDF, lido aqui no aparelho') && (await visibleCount('button', /^Escanear nota fiscal\./)) === 0, JSON.stringify(i2IncomeTops));
+  await i2Keep();
+  await i2Shots('355_comprovante_recebimento');
+  await i2ReadIncome(i2Sent);
+  i2t = await i2Keep(); i2v = await i2Values('Data do recebimento');
+  ok('I2 Pix enviado em Registrar recebimento: "Este comprovante é de um Pix enviado. Ele entra como gasto, não como recebimento." com "Trocar para Anotar gasto"; nada é preenchido',
+    i2t.includes('Comprovante lido: Pix enviado · Maria Souza Exemplo · R$ 85,00 · 05/10/2026 às 14:32') && i2t.includes('Este comprovante é de um Pix enviado. Ele entra como gasto, não como recebimento.') &&
+    (await visibleCount('button', 'Trocar para Anotar gasto')) === 1 && i2v.amount === '' && i2v.desc === '', JSON.stringify(i2v));
+  await btn('Trocar para Anotar gasto').click(); await waitText('Será salvo em', 12000); await waitText('Comprovante lido:', 12000); await p.waitForTimeout(900);
+  i2v = await i2Values(); await i2Keep();
+  ok('I2 trocar para Anotar gasto: o mesmo comprovante preenche o gasto (com a lembrança por nome da vez anterior, "Almoço de domingo", e a categoria Lazer)',
+    (await h1Name()) === 'Anotar gasto' && i2v.amount === '85,00' && i2v.date === '05/10/2026' && i2v.desc === 'Almoço de domingo' && (await radio('Lazer').getAttribute('aria-checked')) === 'true', JSON.stringify(i2v));
+  await i2Leave();
+
+  // ---- 8. Título neutro (Origem e Destino juntos): vale o tipo da tela, dito com clareza ----
+  await i2NewExpense();
+  await i2ReadExpense(i2Neutral);
+  i2t = await i2Keep(); i2v = await i2Values();
+  ok('I2 comprovante sem direção, em Anotar gasto: "Comprovante lido: Pix · Maria Souza Exemplo · ..." (sem afirmar "enviado"), o aviso "O comprovante não diz se o dinheiro saiu ou entrou. Usamos o tipo desta tela. Confira se está certo." e a descrição da última vez com este nome ("Almoço de domingo")',
+    i2t.includes('Comprovante lido: Pix · Maria Souza Exemplo · R$ 85,00 · 05/10/2026 às 14:32') && i2t.includes('O comprovante não diz se o dinheiro saiu ou entrou. Usamos o tipo desta tela. Confira se está certo.') && i2v.desc === 'Almoço de domingo', JSON.stringify(i2v));
+  ok('I2 comprovante sem direção: não oferece trocar de tela (a tela vale)', (await visibleCount('button', /^Trocar para /)) === 0);
+  await i2Leave();
+  await i2NewIncome();
+  await i2ReadIncome(i2Neutral);
+  i2t = await i2Keep(); i2v = await i2Values('Data do recebimento');
+  ok('I2 comprovante sem direção, em Registrar recebimento: o nome é o de quem enviou ("Fulano de Tal Exemplo") e a descrição, "Pix de Fulano de Tal Exemplo"',
+    i2t.includes('Comprovante lido: Pix · Fulano de Tal Exemplo · R$ 85,00 · 05/10/2026 às 14:32') && i2v.desc === 'Pix de Fulano de Tal Exemplo' && i2v.amount === '85,00' && i2v.date === '05/10/2026', JSON.stringify(i2v));
+  await i2Leave();
+
+  // ---- 9. O que o comprovante não traz: valor ou data em branco, com o foco no primeiro campo que falta ----
+  await i2NewExpense();
+  await i2ReadExpense(i2NoAmount);
+  i2t = await i2Keep(); i2v = await i2Values();
+  ok('I2 sem valor: "Comprovante lido: Pix enviado · Ana Exemplo · 04/10/2026", o aviso "O valor não apareceu no comprovante. Digite o valor.", valor em branco, data 04/10/2026 e o foco no Valor',
+    i2t.includes('Comprovante lido: Pix enviado · Ana Exemplo · 04/10/2026') && i2t.includes('O valor não apareceu no comprovante. Digite o valor.') && i2v.amount === '' && i2v.date === '04/10/2026' && i2v.desc === 'Pix para Ana Exemplo' && (await i2Active()) === 'Valor em reais', `${JSON.stringify(i2v)} ${await i2Active()}`);
+  await i2Top();
+  await i2Shots('354_comprovante_sem_valor');
+  await field('Valor em reais').fill('12,30'); await p.waitForTimeout(400);
+  ok('I2 sem valor: digitado o valor, o aviso some e o "Parece já anotado" não aparece (valor e data diferentes dos que existem)', !(await body()).includes('O valor não apareceu') && !(await body()).includes('Parece já anotado'));
+  await i2Leave();
+  await i2NewExpense();
+  await i2ReadExpense(i2NoDate);
+  i2t = await i2Keep(); i2v = await i2Values();
+  ok('I2 sem data: "Comprovante lido: Pix enviado · Beatriz Exemplo · R$ 45,00", o aviso "A data não apareceu no comprovante. Escolha o dia.", data em branco e o foco na data',
+    i2t.includes('Comprovante lido: Pix enviado · Beatriz Exemplo · R$ 45,00') && i2t.includes('A data não apareceu no comprovante. Escolha o dia.') && i2v.amount === '45,00' && i2v.date === '' && (await i2Active()) === 'Data do pagamento', `${JSON.stringify(i2v)} ${await i2Active()}`);
+  ok('I2 sem data: agência e conta do comprovante fora da tela', (await i2Leaks()).length === 0);
+  await btn('Salvar gasto').click(); await p.waitForTimeout(500);
+  ok('I2 sem data: salvar sem escolher o dia é recusado no campo da data (nada gravado)', (await body()).includes('Confira a data informada.'), (await body()).slice(0, 300));
+  await i2Leave();
+
+  // ---- 10. "Como você pagou?": Pix nunca é cartão de crédito; desfazer devolve a escolha ----
+  await i2NewExpense();
+  await radio('Cartão de crédito').click(); await p.waitForTimeout(400);
+  await i2ReadExpense(i2Sent);
+  ok('I2 com "Cartão de crédito" marcado, ler um Pix troca para "Dinheiro, débito ou Pix"', (await radio('Dinheiro, débito ou Pix').getAttribute('aria-checked')) === 'true' && (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'false');
+  await btn('Desfazer leitura').click(); await p.waitForTimeout(500);
+  ok('I2 "Desfazer leitura" devolve "Cartão de crédito"', (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'true');
+  await i2Keep();
+  await i2Leave();
+
+  // ---- 11. PDF que não serve: cada causa tem a sua mensagem e nada é preenchido ----
+  await i2NewExpense();
+  const i2Bad = async (file, message, label, viaSheet = true) => {
+    if (viaSheet) await i2Sheet();
+    await i2Pick(btn(I2_OPTION), file); await waitText(message, 20000); await p.waitForTimeout(400);
+    const x = await i2Keep(); const v = await i2Values();
+    ok(`I2 ${label}: "${message.slice(0, 60)}..." e nada preenchido`, x.includes(message) && !x.includes('Comprovante lido:') && v.amount === '' && v.desc === '', x.slice(0, 300));
+  };
+  await i2Bad(i2Photo, 'Não encontramos texto neste PDF. Ele pode ser uma foto do comprovante. Digite os dados à mão.', 'PDF sem texto (foto)');
+  await i2Shots('356_comprovante_erro', false);
+  await i2Bad(i2Danfe, 'Este PDF parece ser de uma nota fiscal, não de um comprovante. Para ler notas, use Escanear nota fiscal em Anotar gasto.', 'PDF de nota fiscal (DANFE)');
+  await i2Bad(i2Order, 'Não reconhecemos um comprovante neste PDF. Confira se é o comprovante de um Pix, de uma TED, de um boleto ou de um pagamento.', 'PDF que não é de comprovante');
+  await i2Bad(i2NotPdf, 'Este arquivo não é um PDF.', 'arquivo que não é PDF');
+  await i2Leave();
+
+  // ---- 12. Valores ocultos: o valor do bloco e o do aviso "Parece já anotado" aparecem como "R$ ••••" ----
+  await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+  await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
+  await i2ReadExpense(i2Sent);
+  i2t = await i2Keep();
+  ok('I2 valores ocultos: o bloco "Comprovante lido: Pix enviado · Maria Souza Exemplo · R$ •••• · 05/10/2026 às 14:32" e o aviso "Parece já anotado" não mostram o valor, e nenhum "R$ 85,00" fica à vista',
+    i2t.includes('Comprovante lido: Pix enviado · Maria Souza Exemplo · R$ •••• · 05/10/2026 às 14:32') && i2t.includes('Parece já anotado em 05/10/2026: Almoço de domingo, R$ ••••.') && !i2t.includes('R$ 85,00'), i2t.slice(0, 500));
+  ok('I2 valores ocultos: o nome acessível diz "valor oculto" no lugar do valor', (await p.getByRole('heading', { name: /valor oculto/ }).filter({ visible: true }).count()) >= 1);
+  await i2Leave();
+  await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+
+  // ---- 13. Conta nova: nada de exemplo; o comprovante vira o primeiro registro ----
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await btn('Criar conta').click(); await waitText('Nome de apresentação');
+  await field('Nome de apresentação').fill('Pat Comprovante'); await field('E-mail').fill('pat@exemplo.com'); await field('Senha').fill('senha1234');
+  await btn('Criar conta').click(); await waitText('Confira seu e-mail');
+  await btn('Simular abertura do link').click(); await btn('Já confirmei meu e-mail').click(); await waitText('Sua primeira conta');
+  await btn('Começar meu mês').click(); await waitText('Diferença do mês'); await p.waitForTimeout(600);
+  await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
+  await i2ReadExpense(i2Sent);
+  i2t = await i2Keep(); i2v = await i2Values();
+  ok('I2 conta nova: o comprovante preenche o formulário, sem "Parece já anotado" (nada de exemplo para comparar) e nada gravado', i2t.includes('Comprovante lido: Pix enviado · Maria Souza Exemplo') && i2v.desc === 'Pix para Maria Souza Exemplo' && !i2t.includes('Parece já anotado') && (await i2Records()).length === 0, JSON.stringify(i2v));
+  await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(600);
+  const i2New = await i2Records();
+  ok('I2 conta nova: o primeiro registro é o Pix de R$ 85,00 em 05/10/2026 e o armazenamento do navegador não guarda o nome nem dado do comprovante', i2New.length === 1 && i2New[0].c === 8500 && i2New[0].d === 'Pix para Maria Souza Exemplo' && i2New[0].key === null && (await i2Leaks()).length === 0 && !(await i2Storage()).includes('Maria'), JSON.stringify(i2New));
+  await goResumo().catch(() => {});
+
+  // ---- 14. Textos e escritas ----
+  const i2Vetoed = i2Texts.map((x) => x.match(FORBIDDEN)?.[0]).filter(Boolean);
+  const i2Brands = i2Texts.map((x) => x.match(/\b(nubank|ita[uú]|bradesco|santander|inter|c6|caixa|sicredi|sicoob|btg|neon|picpay|mercado pago|itaucard|visa|mastercard|hipercard|amex|serasa)\b/i)?.[0]).filter(Boolean);
+  const i2Dashes = i2Texts.map((x) => x.match(/[–—]/)?.[0]).filter(Boolean);
+  const i2Judging = i2Texts.map((x) => x.match(/\b(desperd[ií]cio|vale a pena|cuidado|garantid[oa]|em conformidade)\b|\bbem-vind[oa]\b|\busuári[oa]s?\b/i)?.[0]).filter(Boolean);
+  ok('I2 telas do comprovante: nenhum termo proibido, travessão, expressão vetada, palavra de julgamento nem nome de banco ou de bandeira nos textos da interface', i2Texts.length >= 20 && i2Vetoed.length === 0 && i2Brands.length === 0 && i2Dashes.length === 0 && i2Judging.length === 0, `${i2Texts.length} telas ${i2Vetoed.join(' | ')} ${i2Brands.join(' | ')} ${i2Judging.join(' | ')}`);
+  ok('I2 nenhum dado sigiloso dos comprovantes (CPF, CNPJ, chave Pix, agência, conta, ID da transação, autenticação) em nenhum texto de tela', i2Texts.every((x) => I2_SECRETS.every((s) => !x.includes(s))), I2_SECRETS.filter((s) => i2Texts.some((x) => x.includes(s))).join(' | '));
+  ok('I2 nenhuma escrita direta na rede durante a leitura dos comprovantes (a demonstração e as contas novas gravam só em memória)', writes.slice(i2Writes0).length === 0, writes.slice(i2Writes0).join(' | '));
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);

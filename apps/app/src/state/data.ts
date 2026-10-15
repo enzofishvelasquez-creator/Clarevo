@@ -1,6 +1,7 @@
 import {
   ESSENTIAL_LOOKBACK_MONTHS,
   INSTALLMENT_NATURES,
+  addDays,
   addMonths,
   annualCommitmentIds,
   budgetCrossing,
@@ -746,6 +747,17 @@ function combineParts<T>(parts: readonly QueryPart[], value: T | undefined): Syn
 
 /** Versão de um conjunto de consultas (instantes das últimas cargas): dependência estável para useMemo. */
 const stamp = (results: readonly { dataUpdatedAt: number }[]) => results.map((r) => r.dataUpdatedAt).join('|');
+
+/**
+ * Registros do contexto nos meses do dia anterior, do dia e do dia seguinte à data (a janela do aviso "Parece já anotado" do
+ * comprovante de Pix, D-051). As mesmas chaves de useMonthRecords: toda escrita de registro recarrega. Sem data ou sem contexto, não
+ * consulta e devolve lista vazia.
+ */
+export function useRecordsNear(contextId: string | undefined, date: IsoDate | null): FinancialRecord[] {
+  const months = date ? [...new Set([addDays(date, -1), date, addDays(date, 1)].map(monthOf))] : [];
+  const results = useRecordsOfMonths(contextId, months);
+  return results.flatMap((r) => r.data ?? []);
+}
 
 /** Registros de vários meses do contexto, com as mesmas chaves de useMonthRecords (invalidadas junto com ['records']). */
 function useRecordsOfMonths(contextId: string | undefined, months: readonly IsoMonth[]) {
