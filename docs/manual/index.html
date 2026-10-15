@@ -115,7 +115,7 @@
     <div class="grupos-sumario">
         <div class="grupo-sumario">
           <h3>Dia a dia</h3>
-          <ul><li><a href="#resumo">Resumo do mês</a></li><li><a href="#anotar-gasto">Anotar gasto e recebimento</a></li><li><a href="#nota-fiscal">Escanear nota fiscal</a></li><li><a href="#movimentos">Movimentos e Organizar</a></li><li><a href="#buscar">Buscar em Movimentos</a></li><li><a href="#importar-extrato">Importar extrato ou fatura</a></li><li><a href="#ultimos-meses">Seus últimos meses</a></li></ul>
+          <ul><li><a href="#resumo">Resumo do mês</a></li><li><a href="#seu-mes">Seu mês em 30 segundos</a></li><li><a href="#anotar-gasto">Anotar gasto e recebimento</a></li><li><a href="#nota-fiscal">Escanear nota fiscal</a></li><li><a href="#movimentos">Movimentos e Organizar</a></li><li><a href="#buscar">Buscar em Movimentos</a></li><li><a href="#importar-extrato">Importar extrato ou fatura</a></li><li><a href="#ultimos-meses">Seus últimos meses</a></li></ul>
         </div>
         <div class="grupo-sumario">
           <h3>Contas e cartões</h3>
@@ -157,6 +157,24 @@
       <figure class="tela">
         <div class="faixa-demo">Dados fictícios de demonstração</div>
         <img src="img/06_resumo_demo.png" alt="Tela de exemplo: Resumo do mês" width="780" height="1688" loading="lazy" />
+      </figure>
+    </section>
+    <section class="entrada" id="seu-mes" aria-labelledby="t-seu-mes">
+      <div class="texto">
+        <p class="grupo">Dia a dia</p>
+        <h3 id="t-seu-mes">Seu mês em 30 segundos</h3>
+        <h4>Para que serve</h4>
+        <p>Resume o mês em poucos cartões, lidos um por vez: o que entrou e saiu, para onde foi o dinheiro, o que ainda vence, o orçamento e as metas.</p>
+        <h4>Onde fica</h4>
+        <p class="onde"><b>Movimentos</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Seu mês em 30 segundos</b></p>
+        
+        <h4>Como usar</h4>
+        <ol class="passos"><li>Em Movimentos, logo abaixo de <b class="rotulo">&ldquo;Buscar&rdquo;</b>, toque em <b class="rotulo">&ldquo;Seu mês em 30 segundos&rdquo;</b>.</li><li>Leia um cartão por vez: toque em <b class="rotulo">&ldquo;Próximo&rdquo;</b> (ou deslize para o lado) e use <b class="rotulo">&ldquo;Anterior&rdquo;</b> para voltar. No último cartão, o botão é <b class="rotulo">&ldquo;Concluir&rdquo;</b>.</li><li><b class="rotulo">&ldquo;Entrou e saiu&rdquo;</b> mostra <b class="rotulo">&ldquo;Recebido&rdquo;</b>, <b class="rotulo">&ldquo;Pago&rdquo;</b> e <b class="rotulo">&ldquo;Diferença do mês&rdquo;</b>, que não é saldo da conta.</li><li><b class="rotulo">&ldquo;Para onde foi&rdquo;</b> traz as três maiores categorias de Pago e, quando o mês anterior tem pagamentos, a diferença para ele. É só um fato, sem nota.</li><li><b class="rotulo">&ldquo;O que ainda vence&rdquo;</b> mostra o total a pagar e as próximas contas. <b class="rotulo">&ldquo;Orçamento&rdquo;</b> e <b class="rotulo">&ldquo;Metas&rdquo;</b> só aparecem se você tem orçamento ou metas.</li><li>Use as setas ao lado do nome do mês para ver outro mês. Os valores seguem o que você escolheu em Ocultar valores.</li></ol>
+        
+      </div>
+      <figure class="tela">
+        <div class="faixa-demo">Dados fictícios de demonstração</div>
+        <img src="img/360_seu_mes_entrou_saiu.png" alt="Tela de exemplo: Seu mês em 30 segundos" width="780" height="1688" loading="lazy" />
       </figure>
     </section>
     <section class="entrada" id="anotar-gasto" aria-labelledby="t-anotar-gasto">
@@ -627,9 +645,9 @@
         <p>Esconde os valores em reais da tela e, no celular, pede biometria ao abrir o app. As escolhas valem só para este aparelho.</p>
         <h4>Onde fica</h4>
         <p class="onde"><b>Conta</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Privacidade neste aparelho</b></p>
-        
+        <p class="tambem-titulo">Também em</p><ul class="tambem"><li><b>Conta</b><span class="sep" aria-hidden="true"> &rsaquo; </span><b>Widget na tela inicial</b></li></ul>
         <h4>Como usar</h4>
-        <ol class="passos"><li>Toque no olho, no cabeçalho, para <b class="rotulo">&ldquo;Ocultar valores&rdquo;</b> ou <b class="rotulo">&ldquo;Mostrar valores&rdquo;</b> na hora. Os valores aparecem como R$ ••••.</li><li>Em telas estreitas, o olho não aparece. Ligue <b class="rotulo">&ldquo;Ocultar valores ao abrir&rdquo;</b>, em Conta: os valores ficam ocultos agora e sempre que você abrir o app.</li><li>No celular com biometria configurada, ligue <b class="rotulo">&ldquo;Pedir biometria ao abrir&rdquo;</b>. Sair da conta nunca depende dela.</li><li>O arquivo de <b class="rotulo">&ldquo;Exportar meus dados&rdquo;</b> mostra os valores, mesmo com a ocultação ligada.</li></ol>
+        <ol class="passos"><li>Toque no olho, no cabeçalho, para <b class="rotulo">&ldquo;Ocultar valores&rdquo;</b> ou <b class="rotulo">&ldquo;Mostrar valores&rdquo;</b> na hora. Os valores aparecem como R$ ••••.</li><li>Em telas estreitas, o olho não aparece. Ligue <b class="rotulo">&ldquo;Ocultar valores ao abrir&rdquo;</b>, em Conta: os valores ficam ocultos agora e sempre que você abrir o app.</li><li>No celular com biometria configurada, ligue <b class="rotulo">&ldquo;Pedir biometria ao abrir&rdquo;</b>. Sair da conta nunca depende dela.</li><li>O arquivo de <b class="rotulo">&ldquo;Exportar meus dados&rdquo;</b> mostra os valores, mesmo com a ocultação ligada.</li><li>Em Conta, <b class="rotulo">&ldquo;Widget na tela inicial&rdquo;</b> guarda se o widget mostra valores: <b class="rotulo">&ldquo;Mostrar valores no widget&rdquo;</b> começa desligado. O widget só existe quando o app estiver nas lojas.</li></ol>
         
       </div>
       <figure class="tela">
