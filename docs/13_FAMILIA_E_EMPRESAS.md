@@ -1,0 +1,59 @@
+# Família e painel de empresas: proposta para decisão
+
+Versão de 15/10/2026. Nada aqui foi construído. As prioridades seguem a ordem que Enzo definiu em 11/10/2026: bancos, família, empresas. Bancos foram resolvidos sem custo, com a importação de extrato e fatura (D-048) e a leitura de comprovantes de Pix (D-051). Este documento prepara os próximos dois ciclos.
+
+## O que já existe no banco
+
+- Contexto Família, vínculos com papel (titular ou membro) e três permissões: ler, anotar e editar de outras pessoas.
+- Todas as regras de gastos, recebimentos, contas a pagar, gastos fixos, contas do ano, metas, cartões, orçamento, contas de origem e importação já valem para a Família, com testes de permissão. Falta a tela e o convite.
+- Empresa: organização, quem administra, contrato de benefício com número de vagas e plano (individual ou familiar), licenças por e-mail e direito ao plano. A empresa não vê finanças, nem em números somados (regras 7, 14 e 49 de `03_ACESSO_E_PERMISSOES.md`).
+
+## Ciclo L: Família
+
+### Proposta
+
+1. **Criar a Família.** Na tela Família, "Criar Família" com um nome (por exemplo, "Casa"). Quem cria vira titular.
+2. **Convidar.** Titular gera um link de convite com papel escolhido: "anota e vê" ou "só vê". O link vale por 7 dias, serve uma única vez e pode ser cancelado. É enviado pelo próprio celular (WhatsApp, e-mail ou outro), sem custo de envio pelo Clarevo.
+3. **Aceitar.** Quem recebe abre o link, entra ou cria a conta e vê o nome da Família, quem convidou e o que poderá fazer, antes de aceitar. Aceitar nunca mostra nem copia o Pessoal de ninguém.
+4. **Alternar.** No topo do app, um seletor "Pessoal | Família" troca o contexto. Todas as telas atuais passam a funcionar na Família, com as regras de permissão do banco.
+5. **Sair e remover.** Membro sai quando quiser. Titular remove membro e muda o papel. O que a pessoa anotou continua na Família, porque é histórico da casa.
+6. **Gravação só por funções**, como o resto do app: `create_family`, `create_family_invite`, `cancel_family_invite`, `accept_family_invite`, `leave_family`, `remove_family_member`, `set_member_role`, com chave de idempotência, versão e testes em `supabase/tests`. O convite guarda só o resumo SHA-256 do código.
+
+### Perguntas para Enzo
+
+| Nº | Pergunta | Recomendação |
+|---|---|---|
+| L-1 | Família só para quem tem plano familiar pela empresa, ou para todas as pessoas durante o piloto? | Todas durante o piloto; a trava por plano entra junto com a cobrança |
+| L-2 | Quantas pessoas por Família? | Até 6, contando quem é titular |
+| L-3 | Uma pessoa pode estar em mais de uma Família? | Uma por vez neste ciclo |
+| L-4 | P-012: quem marca como paga uma conta criada por outra pessoa? | Quem anota na Família pode marcar como paga; alterar e excluir continuam só com quem criou ou com "editar de outras pessoas" |
+| L-5 | P-015: renda de referência por pessoa ou da casa? | Da casa, definida por quem anota |
+| L-6 | Quando alguém sai, o nome continua nos registros antigos? | Sim, como "ex-membro" mais o primeiro nome |
+| L-7 | Titular pode sair? | Só depois de passar a titularidade a outra pessoa adulta ou encerrar a Família |
+| L-8 | Convite pelo próprio celular (sem custo) ou e-mail enviado pelo Clarevo (exige provedor, P-008)? | Pelo próprio celular neste ciclo |
+
+## Ciclo M: painel de empresas
+
+### Proposta
+
+1. **Onde.** Só na web (`clarevo.pages.dev/empresa`), para quem administra o benefício (RH). O app de celular não muda para as pessoas.
+2. **Cadastro da empresa.** A equipe Clarevo cria a organização, o contrato (vagas, plano, início e fim) e a primeira pessoa administradora, por uma função restrita à equipe. Não há cadastro aberto nem cobrança neste ciclo.
+3. **O que o RH vê.** Vagas contratadas, convites enviados, licenças ativas e encerradas, datas. Nunca valores, categorias, metas, contas, cartões, Família, nem médias ou totais de finanças.
+4. **O que o RH faz.** Convidar por e-mail (um a um ou colando uma lista), reenviar, cancelar convite pendente e encerrar licença. A empresa não escolhe quem aceita nem ativa licença: a pessoa ativa ao aceitar.
+5. **Fim do benefício** (P-004): a pessoa mantém conta, histórico e Família; continua com acesso pleno por 30 dias e depois passa para o plano gratuito, com leitura do histórico.
+6. **Gravação só por funções** (`invite_licenses`, `cancel_license_invite`, `end_license`, `accept_license`), substituindo a escrita direta que hoje existe na tabela `licenses`, com testes de permissão.
+
+### Perguntas para Enzo
+
+| Nº | Pergunta | Recomendação |
+|---|---|---|
+| M-1 | O RH pode ver algum indicador somado e anônimo (por exemplo, "70% das pessoas usaram o app no mês")? | Só uso do app (licenças ativas e pessoas que entraram no mês), nunca finanças. Mudar isso exige rever a promessa "Quem vê estes dados?" e o contrato |
+| M-2 | Como o convite chega às pessoas? | Link de convite da empresa que o RH envia pelo canal interno (sem custo). E-mail pelo Clarevo depende de P-008 |
+| M-3 | Quem cria a empresa no sistema? | A equipe Clarevo, a partir do contrato assinado |
+| M-4 | Prazo de acesso depois do fim do benefício (P-004) | 30 dias de acesso pleno, depois plano gratuito com leitura |
+| M-5 | Contrato e LGPD: a empresa é só pagadora, e o Clarevo é controlador dos dados financeiros? | Sim; confirmar com advogado antes do primeiro contrato |
+| M-6 | Plano familiar pelo benefício: a Família inteira conta como 1 vaga? | Sim, 1 vaga por pessoa que recebe o benefício |
+
+## Fora destes ciclos
+
+Cobrança e preços (P-005), envio de e-mail pelo Clarevo (P-008), menores na Família (P-002, só 18+ no lançamento) e qualquer dado financeiro para a empresa.
