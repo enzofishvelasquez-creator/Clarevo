@@ -7361,9 +7361,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const i1CardNeg = i1File('fatura-negativa.csv', ['Data;Descrição;Valor', '04/10/2026;Restaurante;-45,90', '05/10/2026;Farmacia;-30,00', '06/10/2026;Pagamento recebido;500,00', ''].join('\n'));
   const i1CardPay = i1File('fatura-pagamento.csv', ['Data;Descrição;Valor', '04/10/2026;Restaurante;45,90', '05/10/2026;Farmacia;30,00', '06/10/2026;Padaria;12,00', '06/10/2026;Pagamento de fatura;500,00', ''].join('\n'));
   const i1Parc = i1File('fatura-parcelas.csv', ['Data;Descrição;Valor', '05/10/2026;LOJA DE MOVEIS 02/03;120,00', '06/10/2026;PAPELARIA CENTRAL 01/03;50,00', '06/10/2026;Cafe Central;8,00', '05/10/2026;Mercado do bairro;80,50', ''].join('\n'));
-  const i1TwoCols = i1File('debito-credito.csv', ['01/10/2026;PADARIA;45,90;;x', '02/10/2026;SALARIO;;5000,00;y', ''].join('\n'));
-  const i1Kind = i1File('com-tipo.csv', ['01/10/2026;PADARIA;45,90;D', '02/10/2026;SALARIO;5000,00;C', ''].join('\n'));
-  const i1NoSign = i1File('sem-sinal.csv', ['01/10/2026;PADARIA;45,90;x', '02/10/2026;SALARIO;5000,00;y', ''].join('\n'));
+  const i1TwoCols = i1File('debito-credito.csv', ['01/10/2026;PADARIA;33,30;;x', '02/10/2026;SALARIO;;4321,00;y', ''].join('\n'));
+  const i1Kind = i1File('com-tipo.csv', ['01/10/2026;PADARIA;33,30;D', '02/10/2026;SALARIO;4321,00;C', ''].join('\n'));
+  const i1NoSign = i1File('sem-sinal.csv', ['01/10/2026;PADARIA;33,30;x', '02/10/2026;SALARIO;4321,00;y', ''].join('\n'));
   const i1OfxTz = i1File('extrato-fuso.ofx', '<OFX><BANKMSGSRSV1><STMTRS><CURDEF>BRL<BANKTRANLIST><STMTTRN><DTPOSTED>20261005013000[0:GMT]<TRNAMT>-23.50<FITID>TZ1<MEMO>CINEMA NOITE</STMTTRN><STMTTRN><DTPOSTED>20261005<TRNAMT>-1.500<FITID>TZ2<MEMO>MILHAR AMBIGUO</STMTTRN></BANKTRANLIST></STMTRS></BANKMSGSRSV1></OFX>');
   const i1Pdf = i1File('lista.pdf', Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n'));
   const i1Big = i1File('grande.csv', 'Data;Descrição;Valor\n' + '01/09/2026;Linha de teste com texto comprido para encher o arquivo;-1,00\n'.repeat(80000));
@@ -7463,7 +7463,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const i1Before = (await i1Records()).length;
   await btn('Importar 4 lançamentos').click(); await waitText('Importação concluída', 12000); await p.waitForTimeout(500);
   t1 = await i1Keep();
-  ok('I1 importar: "4 lançamentos importados." com "Ver em Movimentos"; nada de saldo', t1.includes('4 lançamentos importados.') && (await visibleCount('button', 'Ver em Movimentos')) === 1 && (await visibleCount('button', 'Importar outro arquivo')) === 1 && !t1.includes('saldo por conta é'));
+  ok('I1 importar: "4 lançamentos importados, 1 já estava anotado." (o mercado deixado de fora) com "Ver em Movimentos"; nada de saldo', t1.includes('4 lançamentos importados, 1 já estava anotado.') && (await visibleCount('button', 'Ver em Movimentos')) === 1 && (await visibleCount('button', 'Importar outro arquivo')) === 1 && !t1.includes('saldo por conta é'));
   await atWidths(async (w) => { await innerChecks(`I1 concluído ${w}px`); if (w === 390) await shot('305_importar_concluido'); if (w === 320) await shot('305_importar_concluido_320px'); });
   const i1After = await i1Records();
   ok('I1 os quatro registros foram criados nos dias do extrato, com a descrição e a categoria da revisão (a memória só vem do aparelho)', i1After.length === i1Before + 4 &&
@@ -7471,7 +7471,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
       ['despesa', 3000, '2026-10-01', 'Tarifa da conta', null], ['despesa', 4590, '2026-10-02', 'COMPRA PADARIA SÃO JOÃO', 'Lazer'], ['despesa', 8990, '2026-10-04', 'FARMÁCIA CENTRAL', 'Saúde'], ['receita', 500000, '2026-10-05', 'SALÁRIO EMPRESA EXEMPLO LTDA', 'Salário']]), JSON.stringify(i1After));
   await btn('Ver em Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(600);
   t1 = await body();
-  ok('I1 "Ver em Movimentos" abre o mês dos lançamentos com o aviso do resultado e os registros novos', t1.includes('4 lançamentos importados.') && t1.includes('Tarifa da conta') && t1.includes('FARMÁCIA CENTRAL') && t1.includes('Outubro'), t1.slice(0, 300));
+  ok('I1 "Ver em Movimentos" abre o mês dos lançamentos com o aviso do resultado e os registros novos', t1.includes('4 lançamentos importados, 1 já estava anotado.') && t1.includes('Tarifa da conta') && t1.includes('FARMÁCIA CENTRAL') && t1.includes('Outubro'), t1.slice(0, 300));
   await goResumo().catch(() => {});
   await expectTotals('I1 Resumo depois de importar: gasto da conta entra em Pago no dia dele, o recebimento em Recebido, e Ainda a pagar não muda', 'R$ 11.000,00', 'R$ 4.077,80', 'R$ 6.922,20', 'R$ 650,00');
 
@@ -7585,8 +7585,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // ---- 6b. Colunas: débito e crédito separados, coluna de tipo, planilha sem sinal e valores ocultos ----
   await i1Pick(i1TwoCols); await waitText('Quais colunas são quais?', 12000); await p.waitForTimeout(300);
   await radio('Débito e crédito em colunas separadas').click(); await p.waitForTimeout(200);
-  await p.getByRole('radio', { name: /^Débito \(saída\), Coluna 3: 45,90/ }).filter({ visible: true }).first().click();
-  await p.getByRole('radio', { name: /^Crédito \(entrada\), Coluna 4: 5000,00/ }).filter({ visible: true }).first().click();
+  await p.getByRole('radio', { name: /^Débito \(saída\), Coluna 3: 33,30/ }).filter({ visible: true }).first().click();
+  await p.getByRole('radio', { name: /^Crédito \(entrada\), Coluna 4: 4321,00/ }).filter({ visible: true }).first().click();
   await atWidths(async (w) => { await innerChecks(`I1 colunas de débito e crédito ${w}px`); if (w === 390) await shot('314_importar_colunas_debito_credito'); });
   await btn('Usar estas colunas').click(); await waitText('Arquivo lido: debito-credito.csv', 8000);
   await radio('Conta').click(); await i1Review(); t1 = await i1Keep();
