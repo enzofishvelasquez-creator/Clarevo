@@ -88,11 +88,21 @@ describe('assinaturas: quais são e quanto custam (D-046)', () => {
     expect(isActiveSubscription(sub({ firstDueMonth: '2027-06' }), DEMO_TODAY)).toBe(true);
   });
 
-  it('por mês é o valor vigente e por ano é por mês × 12', () => {
+  it('por mês é o valor vigente e, sem término, por ano é por mês × 12', () => {
     expect(subscriptionYearlyCents(3990)).toBe(47880);
     expect(subscriptionYearlyCents(9900)).toBe(118800);
     const row = subscriptionRow(sub(), DEMO_TODAY);
-    expect(row).toEqual({ id: 's1', name: 'Streaming', monthlyCents: 3990, yearlyCents: 47880, estimated: false, dueDay: 10, reviewedOn: null });
+    expect(row).toEqual({
+      id: 's1',
+      name: 'Streaming',
+      monthlyCents: 3990,
+      yearlyCents: 47880,
+      yearMonths: 12,
+      yearEndsIn: null,
+      estimated: false,
+      dueDay: 10,
+      reviewedOn: null,
+    });
     expect(subscriptionRow(sub({ mode: 'variavel' }), DEMO_TODAY).estimated).toBe(true);
   });
 
@@ -122,8 +132,8 @@ describe('assinaturas: quais são e quanto custam (D-046)', () => {
 
   it('totais: soma dos valores vigentes das ativas, por ano × 12, e a parte estimada', () => {
     const list = [sub({ id: 'a', amountCents: 3990 }), sub({ id: 'b', name: 'Academia', amountCents: 9900, mode: 'variavel' }), sub({ id: 'c', subscription: false })];
-    expect(subscriptionTotals(list, DEMO_TODAY)).toEqual({ count: 2, monthlyCents: 13890, yearlyCents: 166680, estimatedMonthlyCents: 9900 });
-    expect(subscriptionTotals([], DEMO_TODAY)).toEqual({ count: 0, monthlyCents: 0, yearlyCents: 0, estimatedMonthlyCents: 0 });
+    expect(subscriptionTotals(list, DEMO_TODAY)).toEqual({ count: 2, monthlyCents: 13890, yearlyCents: 166680, estimatedMonthlyCents: 9900, endingCount: 0 });
+    expect(subscriptionTotals([], DEMO_TODAY)).toEqual({ count: 0, monthlyCents: 0, yearlyCents: 0, estimatedMonthlyCents: 0, endingCount: 0 });
     // Nenhuma ativa: zeros.
     expect(subscriptionTotals([sub({ subscription: false }), sub({ lastNumber: 0 })], DEMO_TODAY).count).toBe(0);
   });
@@ -588,7 +598,7 @@ describe('assinaturas na demonstração e em conta nova (D-046)', () => {
       ['Academia (exemplo)', 9900, 118800, false],
       ['Streaming (exemplo)', 3990, 47880, false],
     ]);
-    expect(subscriptionTotals(list, DEMO_TODAY)).toEqual({ count: 2, monthlyCents: 13890, yearlyCents: 166680, estimatedMonthlyCents: 0 });
+    expect(subscriptionTotals(list, DEMO_TODAY)).toEqual({ count: 2, monthlyCents: 13890, yearlyCents: 166680, estimatedMonthlyCents: 0, endingCount: 0 });
     // Só gastos fixos mensais viram assinatura: o resto da demonstração continua sem marca.
     expect(list.filter((s) => s.subscription).map((s) => s.kind)).toEqual(['mensal', 'mensal']);
     // Outubro: 6.000 / 3.900 / 2.100 e R$ 650 a pagar, como antes.

@@ -1,6 +1,6 @@
 # Clarevo · Resposta ao Relatório Técnico de Revisão v0.9
 
-15/10/2026. Avaliação item a item (CL-01 a CL-20 e casos T01 a T15) feita na versão atual do código, com sondas próprias no núcleo e num banco descartável (apagado depois). Verificações executadas nesta avaliação: `npm test` (1.352 testes), `npm run typecheck`, `npm run test:db` e `npm run test:api` (181 testes), todas aprovadas. Não foram feitos testes em aparelho nem no Supabase real. Nenhuma alteração foi feita no app por causa deste relatório até a aprovação das decisões abaixo.
+15/10/2026. Avaliação item a item (CL-01 a CL-20 e casos T01 a T15) feita na versão atual do código, com sondas próprias no núcleo e num banco descartável (apagado depois). Verificações executadas nesta avaliação: `npm test` (1.352 testes), `npm run typecheck`, `npm run test:db` e `npm run test:api` (181 testes), todas aprovadas. Não foram feitos testes em aparelho nem no Supabase real. Em 15/10/2026, depois desta avaliação, os itens 1 a 8 do plano (seção 2, os que não dependem de decisão) foram implementados (D-050, sem migração); o que depende de Enzo (seção 3) segue sem alteração no app. A evidência de cada item está na seção 2.
 
 ## 1. Resultado em uma página
 
@@ -18,17 +18,42 @@
 
 ## 2. Plano proposto (por prioridade)
 
-**P0, sem decisão (posso fazer já):**
-1. CL-02: dicionário de indicadores em `docs/02` (fórmula, período, origem, exclusões de cada número: Recebido, Pago, Diferença, Ainda a pagar, Renda comprometida, Usado do orçamento, Faturas, Guardado em metas) e um teste automatizado que acompanha uma compra de R$ 300,00 em 3x por todos os indicadores, mês a mês (T04).
-2. CL-01 texto: a mesma frase na tela do orçamento, no guia e no manual, descrevendo a regra que existe hoje, com teste que compara os três textos.
+**P0, sem decisão (feito em 15/10/2026, D-050):**
+1. **Feito.** CL-02: dicionário de indicadores em `docs/02` (fórmula, período, origem, exclusões de cada número: Recebido, Pago, Diferença, Ainda a pagar, Renda comprometida, Usado do orçamento, Faturas, Guardado em metas) e um teste automatizado que acompanha uma compra de R$ 300,00 em 3x por todos os indicadores, mês a mês (T04).
+   - O que mudou: `docs/02` ganhou "Quando cada valor conta" (a tabela (a) a (f) e o exemplo de 10/10) e "Dicionário de indicadores" (22 linhas, com fórmula, o que decide o mês, origem no core e no banco, o que não entra e se é confirmado ou estimado); a linha 148 deixou de dizer que "Por mês" é R$ 3.530,00 (R$ 3.668,90 desde D-046).
+   - Teste: `packages/core/test/consolidacao.test.ts` › "T04 e CL-02: compra de R$ 300,00 em 3x em 10/10/2026, indicador por indicador, mês a mês" (6 testes: "antes de pagar nada (10/10) ...", "pagando cada fatura no vencimento (10/11, 10/12 e 10/01) ...", "pagamento parcial de R$ 50,00 da fatura de dezembro ...", "alterar um lançamento muda só os indicadores dele ...", "conta paga com atraso ...", "o mesmo caminho nos textos ..."); no banco, `supabase/tests/95_consolidacao.sql` (`month_totals`, `month_to_pay`, `month_committed`, `month_budget`, `invoice_items`, `card_items` e `goal_movements`), com os mesmos números.
+   - Valores conferidos (core e banco, iguais): usado em Lazer R$ 100,00 / R$ 100,00 / R$ 100,00 / R$ 0,00; fatura R$ 0,00 / R$ 100,00 / R$ 100,00 / R$ 100,00; Ainda a pagar e renda comprometida (1,7%) R$ 0,00 / R$ 100,00 / R$ 100,00 / R$ 100,00; Pago pagando no vencimento R$ 0,00 / R$ 100,00 / R$ 100,00 / R$ 100,00 (10/11, 10/12 e 10/01); soma R$ 300,00 em todas as colunas; Recebido R$ 6.000,00 e Diferença só em outubro, sem mudar com a compra. Pagando R$ 50,00 da fatura de dezembro: Pago R$ 50,00, janeiro R$ 150,00 e renda comprometida R$ 100,00 / R$ 50,00 / R$ 150,00 (soma R$ 300,00).
+2. **Feito.** CL-01 texto: a mesma frase na tela do orçamento, no guia e no manual, descrevendo a regra que existe hoje, com teste que compara os três textos.
+   - Antes: tela "Compras no cartão contam no mês da compra (cada parcela no seu mês), mesmo antes de a fatura ser paga."; guia e manual "Compras no cartão contam no mês da compra, mesmo antes de a fatura ser paga."
+   - Depois, nos três (`BUDGET_TEXT.rule`) e em `docs/02`: "No orçamento, cada compra no cartão conta a partir do mês da compra: a 1ª parcela no mês da compra, a 2ª no mês seguinte, e assim por diante, mesmo antes de a fatura ser paga. Em Pago, ela só entra quando a fatura é paga. Gastos e contas pagas contam no mês da data do pagamento." A regra não mudou (parcela k no mês da compra + (k - 1); estorno sem mudança; as decisões 1 e 2 da seção 3 seguem pendentes). O manual foi regenerado com `npm run manual` (só o passo do orçamento mudou).
+   - Teste: `regressao-revisao.test.ts` › "CL-01: a regra do orçamento escrita uma vez só" (3 testes: a frase da tela é a do guia, a do manual e a de `docs/02`, palavra por palavra e sem as frases antigas; a frase diz a regra de hoje, conferida contra `categoryUsage` com a compra de R$ 300,00 em 3x; sem travessão nem expressão proibida); `budget.test.ts` › "textos montados › as frases do enunciado saem exatamente como escritas".
 
-**P1, sem decisão:**
-3. CL-08: renomear para "Contas do ano: R$ 4.200,00 por ano", separar o que ainda não começou ("Começam depois: ...") e calcular o custo no ano só pelos meses em que a série vale.
-4. CL-11: selo "Demonstração" também nos formulários e em Metas.
-5. CL-03 / CL-19: texto de resultado incerto ("Não deu para confirmar se salvou. Confira em Movimentos antes de anotar de novo.") e guardar a tentativa pendente para não duplicar ao voltar.
-6. CL-07: "Paga em parte" e "Vencida" iguais em todas as telas.
-7. CL-09: dizer no card da reserva "sem contar rendimentos", o mês do primeiro aporte considerado, o arredondamento para baixo e o que fica fora da base de gastos.
-8. CL-20: testes de regressão para cada falha acima; documento de reversão (como voltar a `main` a uma versão anterior).
+**P1, sem decisão (feito em 15/10/2026, D-050):**
+3. **Feito.** CL-08: renomear para "Contas do ano: R$ 4.200,00 por ano", separar o que ainda não começou ("Começam depois: ...") e calcular o custo no ano só pelos meses em que a série vale.
+   - Antes: "Por mês, se os valores não mudarem: R$ 3.668,90 (inclui R$ 180,00 estimados). Contas do ano ficam fora desta soma." e "Por ano, se os valores não mudarem: R$ 4.200,00 (inclui R$ 4.200,00 estimados)."; assinatura de R$ 39,90 que termina em dezembro de 2026, "R$ 478,80 por ano".
+   - Depois: "Gastos fixos, parcelamentos e assinaturas: R$ 3.668,90 por mês, se os valores não mudarem (inclui R$ 180,00 estimados)." e, à parte, "Já começaram: R$ 2.500,00. Começam depois: R$ 1.168,90 (4 itens, o primeiro em novembro de 2026)."; "Contas do ano (IPVA, IPTU e outras): R$ 4.200,00 por ano, se os valores não mudarem (valor estimado)." e "Começam depois: R$ 4.200,00 (2 itens, o primeiro em janeiro de 2027)."; a assinatura que termina em dezembro de 2026 mostra "R$ 119,70 até dezembro de 2026" (3 meses), e o total do grupo diz "No por ano, as assinaturas com término contam só os meses até o último." A demonstração segue em R$ 138,90 por mês e R$ 1.666,80 por ano, e o atalho "Dividir estas contas" recebe os mesmos R$ 3.668,90.
+   - Teste: `regressao-revisao.test.ts` › "CL-08: Gastos fixos, parcelamentos, assinaturas e contas do ano" (6 testes, entre eles "demonstração: a frase de cada soma diz o conjunto ...", "a parte que ainda não começou ...", "assinatura que termina antes de 12 meses: só os meses em que vale ...", "assinatura que ainda não começou conta 12 meses a partir do primeiro mês dela ...", "o total do grupo soma o por ano de cada uma ..." e "parcelamento curto entra uma vez no por mês e nunca é multiplicado ..."); `subscriptions.test.ts` › "por mês é o valor vigente e, sem término, por ano é por mês × 12" e "totais: soma dos valores vigentes das ativas ..."; roteiro web, "gastos fixos: soma por mês com a parte estimada, dizendo o conjunto, e o que ainda não começou à parte (CL-08)" e "contas do ano: ...".
+4. **Feito.** CL-11: selo "Demonstração" também nos formulários e em Metas.
+   - Antes: formulários e detalhes da demonstração mostravam "Salvando em Pessoal" e nenhuma palavra de demonstração; Metas não mostrava o contexto.
+   - Depois: pílula "Demonstração · Pessoal" (lima, como o selo das abas) em todo formulário e detalhe que tem contexto fixo (a mesma `ContextPill`, que também vale para "Importando em Pessoal"); a linha final de Anotar gasto e de Novo gasto fixo acrescenta "Fica só nesta demonstração, com dados fictícios."; Metas mostra o contexto ao lado do título ("Demonstração · Pessoal" na demonstração, "Pessoal" numa conta real); numa conta real nada disso aparece; `demoWithData` passou a exigir também o modo de demonstração.
+   - Teste: `regressao-revisao.test.ts` › "CL-11: demonstração visível nos formulários e em Metas" (3 testes: o texto da pílula na demonstração e fora dela; nenhuma tela escreve "Salvando em" fora de `ContextPill`; a linha final e o contexto de Metas); roteiro web, bloco 12b, "CL-11 demonstração: o formulário de gasto mostra ..." e, em 390 e 320 px, `headerChecks` com a pílula "Demonstração · Pessoal" e "CL-11 Metas: o cabeçalho mostra o contexto ...".
+5. **Feito.** CL-03 / CL-19: texto de resultado incerto ("Não deu para confirmar se salvou. Confira em Movimentos antes de anotar de novo.") e guardar a tentativa pendente para não duplicar ao voltar.
+   - Antes: "Não foi possível salvar. Seu preenchimento foi mantido. Tente novamente." também quando a gravação tinha acontecido; sair do formulário e anotar de novo gerava uma chave nova e duplicava.
+   - Depois: o texto novo em todo caminho de rede incerta (Movimentos para gasto, recebimento, conta a pagar, pagamento, gasto fixo, conta do ano e fatura; Metas, Cartões, Conta, Orçamento por categoria e Renda comprometida citam o próprio lugar); "Não foi possível salvar" fica só para a recusa do servidor. A tentativa pendente (chave e conteúdo) fica na memória do app (`PendingAttemptStore`), por pessoa e por formulário, nunca no aparelho; o mesmo conteúdo ao reabrir confere e conclui, outro conteúdo é outro registro e o anterior não é sobrescrito; some ao sair da conta. A importação já era segura (resumo SHA-256 por linha).
+   - Teste: `regressao-revisao.test.ts` › "CL-03 e CL-19: resultado incerto" (7 testes: o texto; "resposta perdida depois de gravar, sair do formulário e anotar de novo o mesmo gasto: um registro só (antes: dois)"; "outro conteúdo depois de sair do formulário é outro gasto ..."; isolamento por pessoa e por formulário; meta e conta a pagar com resposta perdida; o caminho sem queda); roteiro web, bloco 12b, "CL-03 resultado incerto ..." e "CL-03 e CL-19 sair do formulário e anotar de novo o mesmo gasto: a tela conclui e continua um registro só"; "H2 editar só a marca com falha ...".
+6. **Feito.** CL-07: "Paga em parte" e "Vencida" iguais em todas as telas.
+   - Antes: a conta da fatura paga em parte aparecia em Contas a pagar como "Paga em 08/11/2026" (tela da fatura: "Paga em parte"); a fatura fechada e não paga depois do vencimento aparecia como "Fechada" (só em Contas a pagar era "Vencida").
+   - Depois: "Paga em parte em 08/11/2026 · R$ 230,00 foram para a fatura de dezembro" na linha e no detalhe da conta; "Vencida" (calculada na leitura, sem gravar; no dia do vencimento ainda é "Fechada") na tela da fatura, na lista de cartões ("Fatura vencida de novembro: R$ 530,00. Venceu em 10/11") e no nome acessível. Nenhum número mudou: Pago de novembro R$ 300,00; dezembro com saldo anterior de R$ 230,00 e total de R$ 580,00; renda comprometida R$ 300,00 em novembro e R$ 580,00 em dezembro (soma R$ 880,00 = 530 + 350).
+   - Teste: `regressao-revisao.test.ts` › "CL-07: situação da fatura nas telas do cartão e em Contas a pagar" (4 testes: "fatura fechada e não paga depois do vencimento é Vencida ..."; "conta da fatura paga em parte: Paga em parte em Contas a pagar, igual à tela da fatura"; "fatura paga por inteiro continua Paga em 08/11/2026 ..."; as palavras iguais nas telas); `cards.test.ts` (pagamento parcial, sem mudança).
+7. **Feito.** CL-09: dizer no card da reserva "sem contar rendimentos", o mês do primeiro aporte considerado, o arredondamento para baixo e o que fica fora da base de gastos.
+   - Antes: "Planejado: R$ 500,00 por mês" (card); "Planejado: R$ 500,00 por mês · chega lá em dezembro de 2029" (meta); "Você planejou guardar R$ 500,00 por mês. Nesse ritmo, chega lá em dezembro de 2029." (detalhe); "Média de setembro de 2026 em Moradia e Mercado. Lazer e gastos sem categoria não entram." (base).
+   - Depois: "Planejado: R$ 500,00 por mês, sem contar rendimentos"; "Planejado: R$ 500,00 por mês · chega lá em dezembro de 2029, sem contar rendimentos"; "Você planejou guardar R$ 500,00 por mês. Contando a partir de novembro de 2026, sem rendimentos, chega lá em dezembro de 2029."; "Média do que foi pago em setembro de 2026 em Moradia e Mercado (1 mês com gastos anotados). Contas ainda não pagas, Lazer e gastos sem categoria não entram."; e, no card e no detalhe da reserva, "O percentual e os meses cobertos são arredondados para baixo." Os números de T10 não mudaram (R$ 3.500,00 de R$ 22.500,00, 15%, 0,9 mês, faltam R$ 19.000,00, dezembro de 2029).
+   - Teste: `regressao-revisao.test.ts` › "CL-09: explicações da reserva para imprevistos" (3 testes: textos da demonstração; "o mês de partida acompanha o aporte do mês ..."; a nota nas telas); `goals.test.ts` › "demonstração: média de setembro, R$ 3.750,00", "sequência de aceite C ... reserva, aporte, resgates e valorização ...", "demonstração do Ciclo C › reserva 15% e 0,9 mês ...".
+8. **Feito.** CL-20: testes de regressão para cada falha acima; documento de reversão (como voltar a `main` a uma versão anterior).
+   - O que mudou: um teste de regressão por falha corrigida (CL-01, CL-03 e CL-19, CL-07, CL-08, CL-09 e CL-11, nos blocos acima, com o antes e o depois de cada texto ou valor), `supabase/tests/95_consolidacao.sql` para a matriz no banco e o bloco 12b do roteiro web; `docs/07_PUBLICACAO_WEB.md` ganhou "Como voltar atrás" (identificar a versão no ar por commit e migração, voltar a implantação na Cloudflare, voltar a `main` com `git revert` sem reescrever o histórico, migrações só aditivas e o que fazer se uma falhar no meio); `docs/04` ganhou a tabela de rastreabilidade do que mudou.
+   - Ainda abertos em CL-20 (fora destes itens): integração contínua e monitoramento (decisão 9).
+
+**Verificações executadas depois das correções (15/10/2026):** `npm run typecheck` (core e app), `npm test` (54 arquivos, 1.385 testes, todos aprovados; antes eram 52 e 1.352), `npm run test:db` (15 arquivos, com o novo `95_consolidacao.sql`), `npm run test:api` (181 testes) e `npm run test:web` (4.117 verificações OK, com o bloco 12b novo). Não foram feitos testes em aparelho nem no Supabase real.
 
 **Dependem de decisão de Enzo (seção 3).**
 
@@ -380,14 +405,14 @@ Mudar a categoria move o valor sem duplicar (`80_orcamento.sql`, "mudar a catego
 | Item | Status | Prioridade sugerida | Precisa decisão? | Esforço |
 |---|---|---|---|---|
 | CL-01 | Necessita decisão de negócio (texto ambíguo; estorno não reconcilia o orçamento) | P0 | Sim: regra da parcela e do estorno | M (texto P; estorno ligado à compra G) |
-| CL-02 | Parcial (regras e testes existem; falta dicionário único e matriz de consolidação) | P0 | Não (depende de CL-01, CL-06 e CL-08) | M |
+| CL-02 | Feito em 15/10/2026 (D-050): dicionário em `docs/02` e matriz de consolidação no core e no banco | P0 | Não | M |
 | CL-03 | Já implementado no núcleo; parcial em testes de tela com queda de rede | P1 | Não | M |
 | CL-04 | Já implementado no escopo atual; pendências de LGPD | P0 (revisão jurídica e teste no Supabase real) | Sim: retenção (P-010) e revisão jurídica | M |
 | CL-05 | Já implementado; "não é saldo" fora do topo | P2 | Sim: texto no topo do Resumo (D-022) | P |
 | CL-06 | Já implementado; arredondamento dos grupos e proteção para renda 0 | P2 | Sim, leve: nota ou maior resto | P (nota) / M (maior resto) |
-| CL-07 | Parcial ("Vencida" e "Paga em parte" em Contas a pagar; estorno) | P1 | Sim, só o estorno (via CL-01) | P (rótulos) |
-| CL-08 | Falha confirmada de rótulo | P1 | Sim, leve: "Por mês" com séries futuras; assinatura com término | P |
-| CL-09 | Parcial (cálculo certo; faltam explicações) | P2 | Não | P |
+| CL-07 | Rótulos feitos em 15/10/2026 (D-050); estorno pendente (via CL-01) | P1 | Sim, só o estorno (via CL-01) | P (rótulos) |
+| CL-08 | Corrigido em 15/10/2026 (D-050): rótulos, "Começam depois" e por ano só pelos meses em que vale | P1 | Não (a decisão leve virou a opção a, com o que ainda não começa dito à parte) | P |
+| CL-09 | Corrigido em 15/10/2026 (D-050): explicações na reserva | P2 | Não | P |
 | CL-10 | Parcial (100% e 133,3% desenhados iguais; contas em aberto fora do usado sem aviso) | P1 | Sim: forma do excedente; 80% no card | P |
 
 ---
@@ -788,9 +813,9 @@ Faltam: notas reais e aparelho.
 
 | Item | Status | Prioridade sugerida | Precisa decisão? | Esforço |
 |---|---|---|---|---|
-| CL-03 | parcial (núcleo implementado; resultado incerto + saída do formulário) | P1 | Opcional (aviso de repetido) | P |
+| CL-03 | Texto e tentativa guardada feitos em 15/10/2026 (D-050); aviso de repetido segue opcional | P1 | Opcional (aviso de repetido) | P |
 | CL-04 | parcial (isolamento comprovado; exclusão e retenção ausentes) | P0 (exclusão e retenção antes de pessoas reais); P1 (teste de matriz) | Sim (jurídico) | M |
-| CL-11 | falha confirmada, parcial (selo ausente nos formulários) | P1 | Sim (Família) | P |
+| CL-11 | Selo nos formulários e contexto em Metas feitos em 15/10/2026 (D-050); Família pendente | P1 | Sim (Família) | P |
 | CL-12 | parcial (falta aparelho) | P1 | Não | M |
 | CL-13 | necessita decisão (teste com pessoas) | P1 | Sim | M |
 | CL-14 | parcial (notas reais e aparelho) | P1 | Insumo de Enzo (P-025) | M |
@@ -798,8 +823,8 @@ Faltam: notas reais e aparelho.
 | CL-16 | parcial; necessita decisão | P1 | Sim (jurídico) | M |
 | CL-17 | já implementado | P2 | Não | P |
 | CL-18 | parcial | P2 | Não | M |
-| CL-19 | parcial | P1 (texto do resultado incerto) | Não | P |
-| CL-20 | parcial; monitoramento necessita decisão | P2 | Sim (monitoramento) | M |
+| CL-19 | Texto do resultado incerto feito em 15/10/2026 (D-050) | P1 (texto do resultado incerto) | Não | P |
+| CL-20 | Testes de regressão e "Como voltar atrás" feitos em 15/10/2026 (D-050); integração contínua e monitoramento pendentes | P2 | Sim (monitoramento) | M |
 | T07 | já implementado | P2 (teste de toque duplo) | Não | P |
 | T08 | já implementado | P2 | Não | P |
 | T12 | já implementado | P1 (teste de matriz) | Não | P |

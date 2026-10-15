@@ -6313,7 +6313,7 @@ describe('API real: assinaturas (Ciclo H2, D-046)', () => {
       ['Clube', cents(45), cents(45) * 12],
       ['Streaming', cents(39.9), cents(39.9) * 12],
     ]);
-    expect(subscriptionTotals(list, T0)).toEqual({ count: 3, monthlyCents: cents(183.9), yearlyCents: cents(183.9) * 12, estimatedMonthlyCents: 0 });
+    expect(subscriptionTotals(list, T0)).toEqual({ count: 3, monthlyCents: cents(183.9), yearlyCents: cents(183.9) * 12, estimatedMonthlyCents: 0, endingCount: 0 });
     expect(lastSubscriptionReview(list, T0)).toBe('2037-10-09');
     expect(subscriptionReminderDue(list, '2038-04-09')).toBe(false);
     expect(subscriptionReminderDue(list, '2038-04-10')).toBe(true);

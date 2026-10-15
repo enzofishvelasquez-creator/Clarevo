@@ -6,6 +6,7 @@ import {
   DESCRIPTION_MAX,
   ERROR_TEXT,
   NO_CATEGORY_LABEL,
+  UNCERTAIN_TEXT,
   cardErrorText,
   centsToInput,
   invoiceMonthLabel,
@@ -52,7 +53,8 @@ export function InvoiceEntryForm({ kind, card, month, entry }: { kind: EntryKind
   const addCharge = useAddCardCharge();
   const addRefund = useAddCardRefund();
   const updateEntry = useUpdateCardEntry();
-  const keys = useCardOperationKey();
+  // Encargo ou estorno novo: a tentativa incerta fica na memória do app, para sair e voltar não duplicar (CL-03 e CL-19).
+  const keys = useCardOperationKey(entry ? undefined : `fatura-lancamento:${card.id}:${month}:${kind}`);
   const editing = entry ?? null;
   const charge = kind === 'encargo';
 
@@ -146,7 +148,7 @@ export function InvoiceEntryForm({ kind, card, month, entry }: { kind: EntryKind
         setBanner(cardErrorText(r.code));
         return;
       }
-      setBanner(ERROR_TEXT.salvar_falhou);
+      setBanner(UNCERTAIN_TEXT.cartoes);
     } finally {
       setBusy(false);
     }

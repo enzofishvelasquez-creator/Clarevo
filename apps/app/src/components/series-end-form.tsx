@@ -7,6 +7,7 @@ import {
   PAYMENT_FIELD_ORDER,
   SERIES_ERROR_TEXT,
   MAX_RECORD_CENTS,
+  UNCERTAIN_TEXT,
   addDays,
   addMonths,
   affectedByEnd,
@@ -430,12 +431,12 @@ export function SeriesEndForm({
         qc.invalidateQueries({ queryKey: ['series'] });
         qc.invalidateQueries({ queryKey: ['records'] });
         setRetry(true);
-        setBanner(PAYMENT_ERROR_TEXT.pagar_falhou);
+        setBanner(UNCERTAIN_TEXT.movimentos);
         return false;
       }
     } catch {
       setRetry(true);
-      setBanner(PAYMENT_ERROR_TEXT.pagar_falhou);
+      setBanner(UNCERTAIN_TEXT.movimentos);
       return false;
     }
   };
@@ -483,7 +484,7 @@ export function SeriesEndForm({
           saved = payPending.current.length > 0 ? await reconcilePay(chosenOcc, null, null) : null;
         } catch {
           setRetry(true);
-          setBanner(PAYMENT_ERROR_TEXT.pagar_falhou);
+          setBanner(UNCERTAIN_TEXT.movimentos);
           return;
         }
         if (saved?.moved) {
@@ -546,11 +547,11 @@ export function SeriesEndForm({
           }
           keys.uncertain(key, snapshot);
           setRetry(true);
-          setBanner(afterPayment ? PAYOFF_FAILED_END : texts.salvar_falhou);
+          setBanner(afterPayment ? PAYOFF_FAILED_END : UNCERTAIN_TEXT.movimentos);
         }
       } catch {
         setRetry(true);
-        setBanner(afterPayment ? PAYOFF_FAILED_END : texts.salvar_falhou);
+        setBanner(afterPayment ? PAYOFF_FAILED_END : UNCERTAIN_TEXT.movimentos);
       }
     } finally {
       setBusy(false);

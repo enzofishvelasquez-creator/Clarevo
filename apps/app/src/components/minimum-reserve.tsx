@@ -2,6 +2,7 @@ import {
   GOAL_ERROR_TEXT,
   SAVINGS_ERROR_TEXT,
   SAVINGS_TEXT,
+  UNCERTAIN_TEXT,
   formatBRL,
   goalErrorText,
   minimumReserveInput,
@@ -102,7 +103,7 @@ export function MinimumReserve({ contextId, check, inputs }: { contextId: string
         setError(goalErrorText(r.code));
         return;
       }
-      setError(GOAL_ERROR_TEXT.salvar_falhou);
+      setError(UNCERTAIN_TEXT.metas);
     } finally {
       setBusy(false);
     }
@@ -130,7 +131,7 @@ export function MinimumReserve({ contextId, check, inputs }: { contextId: string
         setError(savingsErrorText(r.code));
         return;
       }
-      setError(SAVINGS_ERROR_TEXT.salvar_falhou);
+      setError(UNCERTAIN_TEXT.metas);
     } finally {
       setAsking(false);
     }

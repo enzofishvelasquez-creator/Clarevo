@@ -4,6 +4,7 @@ import {
   SAVINGS_ERROR_TEXT,
   SAVINGS_TEXT,
   GOAL_ERROR_TEXT,
+  UNCERTAIN_TEXT,
   centsToInput,
   formatBRL,
   goalErrorText,
@@ -152,7 +153,7 @@ export function SavingsPlanForm({
       setError(`${prefix}${text}`);
       return;
     }
-    setError(`${prefix}${scope === 'resposta' ? SAVINGS_ERROR_TEXT.salvar_falhou : GOAL_ERROR_TEXT.salvar_falhou}`);
+    setError(`${prefix}${UNCERTAIN_TEXT.metas}`);
   }
 
   /** Grava a resposta "consigo" com o valor (se mudou) e, com `withReserve`, a reserva do plano. */

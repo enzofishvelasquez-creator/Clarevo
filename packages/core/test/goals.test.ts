@@ -385,7 +385,7 @@ describe('gastos essenciais (D-027(6), P-017)', () => {
       ],
       excludedAnnualCents: 0,
     });
-    expect(essentialEstimateText(e)).toBe('Média de setembro de 2026 em Moradia e Mercado. Lazer e gastos sem categoria não entram.');
+    expect(essentialEstimateText(e)).toBe('Média do que foi pago em setembro de 2026 em Moradia e Mercado (1 mês com gastos anotados). Contas ainda não pagas, Lazer e gastos sem categoria não entram.');
   });
 
   it('pagamento de fatura de cartão conta pelas categorias da fatura (Moradia e Mercado entram; Lazer e encargos, não)', async () => {
@@ -473,7 +473,7 @@ describe('gastos essenciais (D-027(6), P-017)', () => {
       excludedAnnualCents: 240_000,
     });
     expect(essentialEstimateText(e)).toBe(
-      'Média de junho, julho e setembro de 2026 em Mercado, Saúde e Educação. Lazer e gastos sem categoria não entram. Pagamentos de contas do ano, como IPVA e IPTU, também não entram.',
+      'Média do que foi pago em junho, julho e setembro de 2026 em Mercado, Saúde e Educação (3 meses com gastos anotados). Contas ainda não pagas, Lazer e gastos sem categoria não entram. Pagamentos de contas do ano, como IPVA e IPTU, também não entram.',
     );
     // Sem a lista de contas do ano, agosto e o IPVA entrariam.
     const without = essentialMonthly(records, OCT, 315_000);
@@ -481,7 +481,7 @@ describe('gastos essenciais (D-027(6), P-017)', () => {
     // Virada de ano: meses de dois anos no texto.
     const turn = essentialMonthly([rec('2026-12-05', 100_000, 'Moradia'), rec('2027-01-05', 100_001, 'Moradia')], '2027-02');
     expect(turn.amountCents).toBe(100_001); // 200.001 ÷ 2 = 100.000,5 → 100.001 (metade para cima)
-    expect(essentialEstimateText(turn)).toBe('Média de dezembro de 2026 e janeiro de 2027 em Moradia. Lazer e gastos sem categoria não entram.');
+    expect(essentialEstimateText(turn)).toBe('Média do que foi pago em dezembro de 2026 e janeiro de 2027 em Moradia (2 meses com gastos anotados). Contas ainda não pagas, Lazer e gastos sem categoria não entram.');
   });
 });
 
@@ -692,7 +692,7 @@ describe('sequência de aceite C (MemoryRepository, hoje 07/10/2026)', () => {
       ofTarget: 'de R$ 22.500,00 · 20%',
       missing: 'Faltam R$ 18.000,00',
       deadline: 'Até dezembro de 2027: R$ 1.285,72 por mês, sem contar rendimentos.',
-      planned: 'Você planejou guardar R$ 1.000,00 por mês. Nesse ritmo, chega lá em abril de 2028.',
+      planned: 'Você planejou guardar R$ 1.000,00 por mês. Contando a partir de novembro de 2026, sem rendimentos, chega lá em abril de 2028.',
       composition: ['Já guardado ao criar: R$ 3.000,00', 'Aportes: R$ 1.500,00', 'Resgates: R$ 0,00', 'Rendimentos e valorizações: R$ 0,00'],
       reached: null,
       coverage: 'Cobre 1,2 mês dos seus gastos essenciais',
@@ -755,13 +755,14 @@ describe('demonstração do Ciclo C', () => {
       amounts: 'R$ 3.500,00 de R$ 22.500,00',
       percent: '15%',
       coverage: 'Cobre 0,9 mês dos seus gastos essenciais',
-      planned: 'Planejado: R$ 500,00 por mês',
+      planned: 'Planejado: R$ 500,00 por mês, sem contar rendimentos',
+      rounding: 'O percentual e os meses cobertos são arredondados para baixo.',
       a11yLabel: 'Reserva para imprevistos: 15% da meta, R$ 3.500,00 de R$ 22.500,00.',
     });
     const rPlan = goalPlan(reserve!, month, DEMO_TODAY);
     expect(rPlan.firstProjectedMonth).toBe('2026-11');
     expect(rPlan.reachMonth).toBe('2029-12');
-    expect(goalCardCaption(rPlan)).toBe('Planejado: R$ 500,00 por mês · chega lá em dezembro de 2029');
+    expect(goalCardCaption(rPlan)).toBe('Planejado: R$ 500,00 por mês · chega lá em dezembro de 2029, sem contar rendimentos');
 
     // Viagem: 20%; sem aporte em outubro, P0 = outubro, n = 10 → R$ 480,00 por mês, chega em julho de 2027.
     const trip = active[0]!;

@@ -6,6 +6,7 @@ import {
   DESCRIPTION_MAX,
   MAX_RECORD_CENTS,
   NO_CATEGORY_LABEL,
+  UNCERTAIN_TEXT,
   addDays,
   annualYearLabelOf,
   centsToInput,
@@ -19,6 +20,8 @@ import {
   maskDateBR,
   monthOf,
   newOperationKey,
+  relevantAttempts,
+  settleSlot,
   parseBRL,
   parseDateBR,
   validateCommitmentDraft,
@@ -47,7 +50,7 @@ import { TermHint } from '@/components/term-hint';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { explanationHref } from '@/lib/learn';
-import { useCreateCommitment, useLimitWatch, useUpdateCommitment, withNotice } from '@/state/data';
+import { useAttemptSlot, useCreateCommitment, useLimitWatch, useUpdateCommitment, withNotice } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -115,9 +118,9 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
   const [leaveTo, setLeaveTo] = useState<null | (() => void)>(null);
   const [confirmDiscard, setConfirmDiscard] = useState<null | (() => void)>(null);
 
-  const opKey = useRef(newOperationKey());
-  /** Tentativas com resultado incerto (falha de rede), da mais antiga para a mais recente. */
-  const pending = useRef<{ key: string; snapshot: string }[]>([]);
+  // A chave do envio e as tentativas com resultado incerto, da mais antiga para a mais recente. Numa conta nova, ficam na memória do
+  // app (CL-03 e CL-19): sair do formulário e anotar de novo confere a tentativa anterior e reusa a chave.
+  const attempts = useAttemptSlot(mode.type === 'nova' ? 'conta-a-pagar:nova' : undefined);
   const refs = {
     description: useRef<TextInput>(null),
     amountText: useRef<TextInput>(null),
@@ -175,18 +178,18 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
    * falhar, a próxima tentativa reconcilia de novo em vez de repetir a criação.
    */
   const reconcile = async (input: CommitmentInput, snapshot: string): Promise<string | null> => {
-    for (const attempt of [...pending.current].reverse()) {
+    for (const attempt of [...relevantAttempts(attempts, snapshot)].reverse()) {
       const op = await repo.findCommitmentOperation(attempt.key);
       if (!op || (op.action !== 'criar_compromisso' && op.action !== 'editar_compromisso')) continue;
       qc.invalidateQueries({ queryKey: ['commitments'] });
       qc.invalidateQueries({ queryKey: ['commitment', op.commitmentId] });
       const current = await repo.getCommitment(op.commitmentId);
       if (attempt.snapshot === snapshot || !current) {
-        pending.current = [];
+        settleSlot(attempts);
         return op.commitmentId;
       }
       const saved = await update.mutateAsync({ key: newOperationKey(), id: current.id, version: current.version, input });
-      pending.current = [];
+      settleSlot(attempts);
       return saved.commitment.id;
     }
     return null;
@@ -233,7 +236,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
     const version = current?.version ?? 0;
     const snapshot = JSON.stringify([input, version]);
     try {
-      if (pending.current.length > 0) {
+      if (relevantAttempts(attempts, snapshot).length > 0) {
         const savedId = await reconcile(input, snapshot);
         if (savedId) {
           setRetry(false);
@@ -241,20 +244,20 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
           return;
         }
         // Nada foi gravado: repetir com a mesma chave se o conteúdo é o mesmo da última tentativa.
-        const last = pending.current[pending.current.length - 1];
-        if (!last || last.snapshot !== snapshot) opKey.current = newOperationKey();
+        const last = attempts.pending[attempts.pending.length - 1];
+        if (!last || last.snapshot !== snapshot) attempts.current = newOperationKey();
       }
-      const key = opKey.current;
+      const key = attempts.current;
       // Aviso do limite pessoal (D-041): o comprometido dos próximos meses antes de gravar, para ver se algum mês passou a ficar acima.
       const limitBefore = await limitWatch.before(contextId);
       try {
         const saved = await send(key, input, version);
-        pending.current = [];
+        settleSlot(attempts);
         setRetry(false);
         finish(saved.commitment.id, await limitWatch.after(limitBefore));
       } catch (e) {
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
-          opKey.current = newOperationKey();
+          attempts.current = newOperationKey();
           setRetry(false);
           const field = fieldForErrorCode(e.code);
           if (field && COMMITMENT_FIELD_ORDER.includes(field)) {
@@ -277,12 +280,12 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
           return;
         }
         // Falha de rede: a gravação pode ou não ter acontecido. Guardar a tentativa para reconciliar.
-        pending.current = [...pending.current, { key, snapshot }];
+        attempts.pending = [...attempts.pending, { key, snapshot }];
         // Se foi gravada, a lista e o Resumo que ficaram abertos recarregam e mostram a conta.
         qc.invalidateQueries({ queryKey: ['commitments'] });
         if (editingId) qc.invalidateQueries({ queryKey: ['commitment', editingId] });
         setRetry(true);
-        setBanner(COMMITMENT_ERROR_TEXT.salvar_falhou);
+        setBanner(UNCERTAIN_TEXT.movimentos);
       }
     } catch (e) {
       // Falhou a reconciliação: a tentativa pendente continua guardada e é conferida de novo na próxima vez.
@@ -291,7 +294,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
         setPaidElsewhere(true);
         return;
       }
-      setBanner(isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido' ? commitmentText(e.code) : COMMITMENT_ERROR_TEXT.salvar_falhou);
+      setBanner(isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido' ? commitmentText(e.code) : UNCERTAIN_TEXT.movimentos);
     } finally {
       setBusy(false);
     }

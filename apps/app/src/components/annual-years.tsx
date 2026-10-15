@@ -2,6 +2,7 @@ import {
   ANNUAL_HELP_TEXT,
   ANNUAL_SERIES_ERROR_TEXT,
   RETURN_TEXT,
+  UNCERTAIN_TEXT,
   affectedByEditFrom,
   affectedByYear,
   annualGapRows,
@@ -198,11 +199,11 @@ export function AnnualYears({
           return;
         }
         refKeys.uncertain(key, snapshot);
-        onError(ANNUAL_SERIES_ERROR_TEXT.salvar_falhou);
+        onError(UNCERTAIN_TEXT.movimentos);
       }
     } catch {
       setRefConfirm(null);
-      onError(ANNUAL_SERIES_ERROR_TEXT.salvar_falhou);
+      onError(UNCERTAIN_TEXT.movimentos);
     } finally {
       setBusy(false);
     }

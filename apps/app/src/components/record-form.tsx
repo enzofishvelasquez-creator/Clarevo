@@ -25,6 +25,8 @@ import {
   centsToInput,
   chooseAccountId,
   dateOutsideNoteMonth,
+  DEMO_TEXT,
+  UNCERTAIN_TEXT,
   dayErrorText,
   dayInMonthDate,
   descriptionAfterCategory,
@@ -45,6 +47,8 @@ import {
   noteErrorText,
   noteFillPlan,
   noteIssuedOn,
+  relevantAttempts,
+  settleSlot,
   paidInvoiceMonths,
   parseDateBR,
   paymentChoiceFor,
@@ -106,6 +110,7 @@ import { readSefazOnDevice, sefazReadAvailable } from '@/lib/sefaz-fetch';
 import {
   useAccounts,
   useAddCardPurchase,
+  useAttemptSlot,
   useBudgetWatch,
   useCardInvoices,
   useCardOperationKey,
@@ -207,7 +212,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   const persistPrefs = auth.mode !== 'demo';
   const prefs = useDevicePrefs(userId);
   const addPurchase = useAddCardPurchase();
-  const cardKeys = useCardOperationKey();
+  const cardKeys = useCardOperationKey(mode.type === 'novo' ? 'registro:compra-no-cartao' : undefined);
   const [payWith, setPayWith] = useState<'dinheiro' | 'cartao'>('dinheiro');
   const [chosenCardId, setChosenCardId] = useState<string | null>(null);
   const [installmentsText, setInstallmentsText] = useState('1');
@@ -286,9 +291,9 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   const [leaveTo, setLeaveTo] = useState<null | (() => void)>(null);
   const [confirmDiscard, setConfirmDiscard] = useState<null | (() => void)>(null);
 
-  const opKey = useRef(newOperationKey());
-  /** Tentativas com resultado incerto (falha de rede), da mais antiga para a mais recente. */
-  const pending = useRef<{ key: string; snapshot: string }[]>([]);
+  // A chave do envio e as tentativas com resultado incerto (falha de rede), da mais antiga para a mais recente. Num registro novo,
+  // ficam na memória do app (CL-03 e CL-19): sair do formulário e anotar de novo confere a tentativa anterior e reusa a chave.
+  const attempts = useAttemptSlot(mode.type === 'novo' ? `registro:novo:${kind}` : undefined);
   const refs = {
     description: useRef<TextInput>(null),
     amountText: useRef<TextInput>(null),
@@ -696,7 +701,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     setInitialDay(dayText);
     setErrors({});
     setNoted(text);
-    opKey.current = newOperationKey();
+    attempts.current = newOperationKey();
     refs.description.current?.focus();
   };
 
@@ -737,7 +742,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
    * falhar, a próxima tentativa reconcilia de novo em vez de repetir a criação.
    */
   const reconcile = async (input: RecordInput, snapshot: string): Promise<{ id: string } & Partial<FinancialRecord> | null> => {
-    for (const attempt of [...pending.current].reverse()) {
+    for (const attempt of [...relevantAttempts(attempts, snapshot)].reverse()) {
       const op = await repo.findOperation(attempt.key);
       if (!op) continue;
       qc.invalidateQueries({ queryKey: ['records'] });
@@ -748,11 +753,11 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       qc.invalidateQueries({ queryKey: ['returnReview'] });
       const current = await repo.getRecord(op.recordId);
       if (attempt.snapshot === snapshot || !current) {
-        pending.current = [];
+        settleSlot(attempts);
         return current ?? { id: op.recordId };
       }
       const saved = await update.mutateAsync({ key: newOperationKey(), id: current.id, version: current.version, input });
-      pending.current = [];
+      settleSlot(attempts);
       return saved;
     }
     return null;
@@ -863,9 +868,9 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
         setBanner(r.code === 'nota_ja_anotada' ? NOTA_FLOW_TEXT.alreadyNotedSave : cardErrorText(r.code, { purchase: true }));
         return;
       }
-      setBanner(ERROR_TEXT.salvar_falhou);
+      setBanner(UNCERTAIN_TEXT.cartoes);
     } catch {
-      setBanner(ERROR_TEXT.salvar_falhou);
+      setBanner(UNCERTAIN_TEXT.cartoes);
     } finally {
       setBusy(false);
     }
@@ -896,7 +901,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     const input: RecordInput = note && mode.type === 'novo' ? { ...v.input, receiptKey: note.reading.draft.receiptKey } : v.input;
     const snapshot = JSON.stringify([input, version]);
     try {
-      if (pending.current.length > 0) {
+      if (relevantAttempts(attempts, snapshot).length > 0) {
         const saved = await reconcile(input, snapshot);
         if (saved) {
           if (dayMode || fromReview) finishDay(v.input, another);
@@ -904,21 +909,21 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
           return;
         }
         // Nada foi gravado: repetir com a mesma chave se o conteúdo é o mesmo da última tentativa.
-        const last = pending.current[pending.current.length - 1];
-        if (!last || last.snapshot !== snapshot) opKey.current = newOperationKey();
+        const last = attempts.pending[attempts.pending.length - 1];
+        if (!last || last.snapshot !== snapshot) attempts.current = newOperationKey();
       }
-      const key = opKey.current;
+      const key = attempts.current;
       // O estado do orçamento da categoria no mês da data, antes de gravar (só gasto, fora do modo "Dia").
       const budgetBefore = kind === 'despesa' && !dayMode && !fromReview ? await budgetWatch.before(contextId, v.input.category, v.input.occurredOn) : null;
       try {
         const saved = await send(key, input, version);
-        pending.current = [];
+        settleSlot(attempts);
         // Vindo da revisão, sempre volta a ela e anota a ação, também depois de "Usar outra data".
         if (dayMode || fromReview) finishDay(v.input, another);
         else finish(saved.id, saved, await budgetWatch.after(budgetBefore));
       } catch (e) {
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
-          opKey.current = newOperationKey();
+          attempts.current = newOperationKey();
           if (e.code === 'nota_ja_anotada') {
             showDuplicate(e.detail);
             setBanner(NOTA_FLOW_TEXT.alreadyNotedSave);
@@ -948,11 +953,12 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
           return;
         }
         // Falha de rede: a gravação pode ou não ter acontecido. Guardar a tentativa para reconciliar.
-        pending.current = [...pending.current, { key, snapshot }];
-        setBanner(ERROR_TEXT.salvar_falhou);
+        attempts.pending = [...attempts.pending, { key, snapshot }];
+        setBanner(UNCERTAIN_TEXT.movimentos);
       }
     } catch {
-      setBanner(ERROR_TEXT.salvar_falhou);
+      // Não deu para conferir a tentativa anterior: ela continua guardada e é conferida de novo na próxima vez.
+      setBanner(UNCERTAIN_TEXT.movimentos);
     } finally {
       setBusy(false);
     }
@@ -1391,6 +1397,11 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
               Será salvo em <Txt variant="label" style={{ fontFamily: fonts.bold }}>{contextName}</Txt>, {account?.name}.
             </Txt>
           )}
+          {auth.mode === 'demo' ? (
+            <Txt variant="label" color={colors.textSecondary}>
+              {DEMO_TEXT.saveNote}
+            </Txt>
+          ) : null}
         </Card>
 
         <LinkButton label="Como este registro entra no mês?" color={colors.textSecondary} onPress={() => router.push(explanationHref('diferenca'))} />

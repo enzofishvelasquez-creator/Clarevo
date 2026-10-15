@@ -2,6 +2,7 @@ import {
   BUDGET_ERROR_TEXT,
   BUDGET_TEXT,
   ERROR_TEXT,
+  UNCERTAIN_TEXT,
   addMonths,
   budgetCategoryFromParam,
   budgetMonthBounds,
@@ -185,7 +186,7 @@ function BudgetForm({ contextId, category, startMonth }: { contextId: string; ca
         setKeys.uncertain(key, snapshot);
         attempt.current = { contentKey, expectedVersion };
         setRetry(true);
-        setBanner(ERROR_TEXT.salvar_falhou);
+        setBanner(UNCERTAIN_TEXT.orcamento);
       }
     } finally {
       setBusy(false);
@@ -217,7 +218,7 @@ function BudgetForm({ contextId, category, startMonth }: { contextId: string; ca
         showRefusal(e.code);
       } else {
         delKeys.uncertain(key, snapshot);
-        setBanner(ERROR_TEXT.salvar_falhou);
+        setBanner(UNCERTAIN_TEXT.orcamento);
       }
     } finally {
       setWorking(false);
@@ -243,7 +244,7 @@ function BudgetForm({ contextId, category, startMonth }: { contextId: string; ca
         showRefusal(e.code);
       } else {
         delKeys.uncertain(key, snapshot);
-        setBanner(ERROR_TEXT.salvar_falhou);
+        setBanner(UNCERTAIN_TEXT.orcamento);
       }
     } finally {
       setWorking(false);

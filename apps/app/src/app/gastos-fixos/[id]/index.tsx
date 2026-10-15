@@ -29,7 +29,7 @@ import {
   seriesCaption,
   seriesEnded,
   seriesGapsInRange,
-  subscriptionYearlyCents,
+  subscriptionRow,
   suggestedReference,
   termHistory,
   type Commitment,
@@ -300,6 +300,8 @@ function Overview({ series: s, today }: { series: CommitmentSeries; today: IsoDa
   const history = termHistory(s);
   const annual = s.kind === 'anual';
   const k = s.partsPerYear ?? 1;
+  // Assinatura ativa: o por ano conta só os meses em que ela vale nos próximos 12 (CL-08).
+  const subscription = isActiveSubscription(s, today) ? subscriptionRow(s, today) : null;
   // Conta do ano: "Valor muda: referência de R$ 180,00 por parcela (estimado) · cerca de R$ 1.800,00 por ano".
   const perYear = annual && k > 1 ? ` · ${variable ? 'cerca de ' : ''}${formatBRL(k * term.amountCents)} por ano` : '';
   const value = annual
@@ -322,10 +324,10 @@ function Overview({ series: s, today }: { series: CommitmentSeries; today: IsoDa
           {value}
         </MoneyTxt>
         {/* Assinatura (D-046): quanto custa por ano e a data da última revisão. Só informa, e só enquanto está ativa (não encerrada). */}
-        {isActiveSubscription(s, today) ? (
+        {subscription ? (
           <View style={{ gap: 2 }}>
             <MoneyTxt variant="label" style={[tabular, { fontFamily: fonts.bold }]}>
-              {SUBSCRIPTION_TEXT.detailYear(subscriptionYearlyCents(term.amountCents), variable)}
+              {SUBSCRIPTION_TEXT.detailYear(subscription.yearlyCents, variable, subscription.yearEndsIn)}
             </MoneyTxt>
             <Txt variant="caption" color={colors.textSecondary}>
               {SUBSCRIPTION_TEXT.lastReview(s.subscriptionReviewedOn)}

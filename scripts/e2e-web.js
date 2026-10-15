@@ -283,7 +283,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('primeiros passos: fora de Família', !(await headingShown('Primeiros passos')));
   await p.getByRole('tab', { name: 'Ver dados de Pessoal' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês'); await waitText('Primeiros passos');
   // Passo 1 abre o cadastro de gasto fixo; o passo fica concluído quando existe um gasto fixo.
-  await btn(PP.fixos).click(); await waitText('Salvando em Pessoal');
+  await btn(PP.fixos).click(); await waitText('Demonstração · Pessoal');
   ok('primeiros passos: o passo 1 abre "Novo gasto fixo", vazio, em "Todo mês"', (await h1Name()) === 'Novo gasto fixo' && (await radio('Todo mês').getAttribute('aria-checked')) === 'true' && (await field('Descrição').inputValue()) === '');
   await field('Descrição').fill('Aluguel'); await field('Valor por mês').fill('1500'); await field('Dia do vencimento').fill('10');
   await btn('Salvar gasto fixo').click(); await waitText('Gasto fixo salvo');
@@ -374,7 +374,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Salvar recebimento').click(); await waitText('Recebimento salvo');
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
   await waitUntil(ppIs([PP.fixos, ppDone('recebido'), ppDone('pago'), PP.guardar]), 8000);
-  await btn(PP.fixos).click(); await waitText('Salvando em Pessoal');
+  await btn(PP.fixos).click(); await waitText('Demonstração · Pessoal');
   await field('Descrição').fill('Internet'); await field('Valor por mês').fill('100'); await field('Dia do vencimento').fill('20');
   await btn('Salvar gasto fixo').click(); await waitText('Gasto fixo salvo');
   await tabsBack();
@@ -668,7 +668,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('lista: link "Gastos fixos e parcelamentos" com a contagem', (await visibleCount('button', 'Gastos fixos e parcelamentos, 7 cadastrados')) === 1);
   await shot('19_contas_a_pagar');
 
-  await btn('Anotar conta a pagar').click(); await waitText('Salvando em Pessoal');
+  await btn('Anotar conta a pagar').click(); await waitText('Demonstração · Pessoal');
   ok('anotar conta a pagar: "Com que frequência?" começa em "Só uma vez"', (await visibleCount('radiogroup', 'Com que frequência?')) === 1 && (await radio('Só uma vez').getAttribute('aria-checked')) === 'true' && (await radio('Todo mês').getAttribute('aria-checked')) === 'false' && (await radio('Todo ano').getAttribute('aria-checked')) === 'false' && (await radio('Parcelado').getAttribute('aria-checked')) === 'false');
   const kindChips = await p.getByRole('radiogroup', { name: 'Com que frequência?' }).filter({ visible: true }).first().getByRole('radio').evaluateAll((es) => es.map((e) => e.textContent));
   ok('anotar conta a pagar: chips "Só uma vez", "Todo mês", "Todo ano" e "Parcelado", nessa ordem', JSON.stringify(kindChips) === JSON.stringify(['Só uma vez', 'Todo mês', 'Todo ano', 'Parcelado']), kindChips.join(' | '));
@@ -680,7 +680,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('cancelar o gasto fixo com o que foi digitado pede "Descartar o preenchimento?"', (await dialogText()).includes('Você tem alterações que ainda não foram salvas em Pessoal.'));
   await btn('Descartar alterações').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
   ok('descartar volta para Contas a pagar sem salvar', !(await body()).includes('Academia'));
-  await btn('Anotar conta a pagar').click(); await waitText('Salvando em Pessoal');
+  await btn('Anotar conta a pagar').click(); await waitText('Demonstração · Pessoal');
   await btn('Salvar conta a pagar').click(); await p.waitForTimeout(300);
   t = await body();
   ok('conta a pagar vazia: mensagens exatas', t.includes('Dê um nome para esta conta a pagar.') && t.includes('Informe um valor maior que zero, como 80,00.'));
@@ -703,7 +703,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await body();
   ok('card: 3 contas e 1 vencida', t.includes('3 contas · próxima: Internet, 15/10') && t.includes('1 conta vencida'));
 
-  await btn('Anotar conta a pagar').click(); await waitText('Salvando em Pessoal');
+  await btn('Anotar conta a pagar').click(); await waitText('Demonstração · Pessoal');
   await field('Descrição').fill('Gás'); await field('Valor em reais').fill('40'); await field('Data de vencimento').fill('28/09/2026');
   await btn('Salvar conta a pagar').click(); await waitText('Conta a pagar salva');
   await goResumo();
@@ -792,7 +792,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await openRow(/^Internet, vence em 15\/10\/2026/); await waitText('Já paguei');
   await btn('Já paguei').click(); await waitText('Confirmar pagamento');
   await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado');
-  await btn('Adicionar a conta do próximo mês').click(); await waitText('Salvando em Pessoal');
+  await btn('Adicionar a conta do próximo mês').click(); await waitText('Demonstração · Pessoal');
   ok('conta do próximo mês preenchida', (await field('Descrição').inputValue()) === 'Internet' && (await field('Valor em reais').inputValue()) === '150,00' && (await field('Data de vencimento').inputValue()) === '15/11/2026');
   await btn('Salvar conta a pagar').click(); await waitText('Conta a pagar salva');
   ok('conta do próximo mês salva', (await body()).includes('Vence em 15/11/2026'));
@@ -867,7 +867,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await openToPay(); await waitText('7 cadastrados');
   await btn('Gastos fixos e parcelamentos, 7 cadastrados').click(); await waitText('Por mês, se os valores não mudarem');
   t = await body();
-  ok('gastos fixos: soma por mês com a parte estimada', t.includes('Por mês, se os valores não mudarem: R$ 3.668,90 (inclui R$ 180,00 estimados).'));
+  ok('gastos fixos: soma por mês com a parte estimada, dizendo o conjunto, e o que ainda não começou à parte (CL-08)',
+    t.includes('Gastos fixos, parcelamentos e assinaturas: R$ 3.668,90 por mês, se os valores não mudarem (inclui R$ 180,00 estimados).') &&
+    t.includes('Já começaram: R$ 2.500,00. Começam depois: R$ 1.168,90 (4 itens, o primeiro em novembro de 2026).') && !t.includes('Por mês, se os valores não mudarem'));
   ok('gastos fixos: seções e linhas com rótulos em texto',
     JSON.stringify(await sectionRows('Gastos fixos')) === JSON.stringify(['Aluguel, R$ 2.500,00, todo dia 5, gasto fixo', 'Luz, cerca de R$ 180,00, todo dia 12, valor muda, gasto fixo']) &&
       JSON.stringify(await sectionRows('Parcelamentos')) === JSON.stringify(['Financiamento do carro, Parcela 13 de 48, R$ 850,00, termina em outubro de 2029, parcelamento']) &&
@@ -883,8 +885,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     JSON.stringify(await sectionRows('Contas do ano')) === JSON.stringify(['IPVA, cerca de R$ 2.400,00, todo ano em 20/01, valor muda, conta do ano', 'IPTU, 10 parcelas de cerca de R$ 180,00, fevereiro a novembro, dia 10, valor muda, conta do ano', 'Nova conta do ano', 'Como se preparar para as contas do ano?']) &&
       ['Contas que vêm uma vez por ano, como IPVA, IPTU, matrícula e seguro. Você cadastra uma vez; todo ano o Clarevo cria a conta do mês certo, dois meses antes de vencer.', '≈ R$ 2.400,00 · todo ano em 20/01 · valor muda', '10 parcelas de ≈ R$ 180,00 · fevereiro a novembro, dia 10 · valor muda'].every((x) => t.includes(x)),
     ((await sectionRows('Contas do ano')) ?? []).join(' | '));
-  ok('contas do ano: "Por ano" com a parte estimada e "Por mês" continua R$ 3.668,90, sem elas',
-    t.includes('Por ano, se os valores não mudarem: R$ 4.200,00 (inclui R$ 4.200,00 estimados).') && t.includes('Por mês, se os valores não mudarem: R$ 3.668,90 (inclui R$ 180,00 estimados). Contas do ano ficam fora desta soma.'));
+  ok('contas do ano: "Contas do ano (IPVA, IPTU e outras)" com R$ 4.200,00 por ano, todo estimado, e o por mês continua R$ 3.668,90, sem elas (CL-08)',
+    t.includes('Contas do ano (IPVA, IPTU e outras): R$ 4.200,00 por ano, se os valores não mudarem (valor estimado).') &&
+    t.includes('Começam depois: R$ 4.200,00 (2 itens, o primeiro em janeiro de 2027).') &&
+    t.includes('Gastos fixos, parcelamentos e assinaturas: R$ 3.668,90 por mês, se os valores não mudarem (inclui R$ 180,00 estimados).'));
   await keepText();
   await scrollTo('Contas do ano');
   await shot('36_contas_do_ano');
@@ -920,7 +924,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
 
   // Novo gasto fixo "Escola": validação, teclado nos chips, prévia e faixa de sucesso.
-  await btn('Novo gasto fixo ou parcelamento').click(); await waitText('Salvando em Pessoal');
+  await btn('Novo gasto fixo ou parcelamento').click(); await waitText('Demonstração · Pessoal');
   await btn('Salvar gasto fixo').click(); await p.waitForTimeout(300);
   t = await body();
   ok('gasto fixo vazio: mensagens exatas e foco no primeiro erro', ['Dê um nome para este gasto fixo ou parcelamento.', 'Informe um valor maior que zero, como 80,00.', 'Informe um dia de 1 a 31.'].every((x) => t.includes(x)) &&
@@ -1137,7 +1141,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // "Todo ano" em Anotar conta a pagar leva descrição e valor para "Nova conta do ano".
   await openToPay();
-  await btn('Anotar conta a pagar').click(); await waitText('Salvando em Pessoal');
+  await btn('Anotar conta a pagar').click(); await waitText('Demonstração · Pessoal');
   await field('Descrição').fill('Matrícula'); await field('Valor em reais').fill('1200');
   await radio('Todo ano').click(); await waitText('Como você paga?');
   ok('"Todo ano" leva a "Nova conta do ano" sem perder descrição nem valor', (await p.locator('h1').filter({ visible: true }).first().textContent()) === 'Nova conta do ano' &&
@@ -1411,7 +1415,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await openSeriesList();
   t = await body();
   // O card tem as 5 contas do ano, "Nova conta do ano" e, desde o Ciclo A5, o link "Como se preparar para as contas do ano?".
-  ok('"Por ano" com as 5 contas do ano (IPVA, IPTU, Matrícula, Seguro residencial e Material escolar)', t.includes('Por ano, se os valores não mudarem: R$ 6.180,00 (inclui R$ 4.680,00 estimados).') &&
+  ok('"Por ano" com as 5 contas do ano (IPVA, IPTU, Matrícula, Seguro residencial e Material escolar)', t.includes('Contas do ano (IPVA, IPTU e outras): R$ 6.180,00 por ano, se os valores não mudarem (inclui R$ 4.680,00 estimados).') &&
     ((await sectionRows('Contas do ano')) ?? []).length === 7);
   await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
   await btn('Voltar').click(); await waitText('Diferença do mês');
@@ -1887,7 +1891,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // Lista de gastos fixos: "Dividir estas contas" com o "Por mês" da tela.
   await openToPay(); await openSeriesList();
-  const perMonth = ((await body()).match(/Por mês, se os valores não mudarem: R\$ ([\d.]+,\d\d)/) ?? [])[1];
+  const perMonth = ((await body()).match(/Gastos fixos, parcelamentos e assinaturas: R\$ ([\d.]+,\d\d) por mês/) ?? [])[1];
   await btn('Dividir estas contas').click(); await waitText('Total das contas');
   ok('gastos fixos: "Dividir estas contas" abre a calculadora com o "Por mês" da lista', perMonth !== undefined && (await h1Name()) === 'Dividir as contas da casa' && (await field('Total das contas').inputValue()) === perMonth,
     `${perMonth} / ${await field('Total das contas').inputValue()}`);
@@ -2087,7 +2091,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // Contexto fixo durante o preenchimento; descartar não salva nada
   await btn('Anotar gasto').click(); await waitText('Será salvo em');
-  ok('contexto visível e fixo no formulário', (await body()).includes('Salvando em Pessoal') && (await p.getByRole('tab', { name: 'Ver dados de Família' }).filter({ visible: true }).count()) === 0);
+  ok('contexto visível e fixo no formulário', (await body()).includes('Demonstração · Pessoal') && (await p.getByRole('tab', { name: 'Ver dados de Família' }).filter({ visible: true }).count()) === 0);
   await field('Descrição').fill('Rascunho');
   await btn('Cancelar').click(); await waitText('Descartar o preenchimento?');
   await btn('Descartar alterações').click(); await waitText('Diferença do mês');
@@ -2444,7 +2448,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     if (w === 320) await shot('35_editar_parcelamento_320px', true);
     await btn('Cancelar').click(); await waitText('Pagas antes do Clarevo');
     await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
-    await btn('Novo gasto fixo ou parcelamento').click(); await waitText('Salvando em Pessoal');
+    await btn('Novo gasto fixo ou parcelamento').click(); await waitText('Demonstração · Pessoal');
     await radio('Parcelado').click(); await waitText('Total de parcelas');
     await field('Descrição').fill('Geladeira'); await radio('Compra parcelada (boleto ou crediário)').click();
     await field('Valor da parcela').fill('850'); await field('Dia do vencimento').fill('10');
@@ -2710,7 +2714,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await waitUntil(async () => (await visibleCount('button', /^Renda comprometida em outubro: 52,5%/)) === 1, 6000);
   ok('B desfazer o pagamento: volta a 52,5% (R$ 3.150,00)', (await visibleCount('button', rcLabel('52,5%', 'R$ 3.150,00', 'R$ 6.000,00'))) === 1);
   // Conta avulsa de R$ 300,00 que vence em 28/10: 57,5%.
-  await btn('Anotar conta a pagar').click(); await waitText('Salvando em Pessoal');
+  await btn('Anotar conta a pagar').click(); await waitText('Demonstração · Pessoal');
   await field('Descrição').fill('Conserto da geladeira'); await field('Valor em reais').fill('300'); await field('Data de vencimento').fill('28/10/2026');
   await btn('Salvar conta a pagar').click(); await waitText('Conta a pagar salva');
   await goResumo();
@@ -2861,7 +2865,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Aporte de R$ 200,00 na reserva: o formulário avisa que guardar não é gasto; nada muda até o servidor confirmar.
   await btn('Registrar aporte').click(); await waitText('Registre o dinheiro que você já separou'); await p.waitForTimeout(300);
   t = await body();
-  ok('C aporte: "Salvando em Pessoal", "Guardar não é gasto" e "Aportes e resgates não entram em Pago nem em Recebido"', (await h1Name()) === 'Registrar aporte' && t.includes('Salvando em Pessoal') && t.includes('Guardar não é gasto: não anote este valor em Anotar gasto.') &&
+  ok('C aporte: "Demonstração · Pessoal", "Guardar não é gasto" e "Aportes e resgates não entram em Pago nem em Recebido"', (await h1Name()) === 'Registrar aporte' && t.includes('Demonstração · Pessoal') && t.includes('Guardar não é gasto: não anote este valor em Anotar gasto.') &&
     t.includes('Aportes e resgates não entram em Pago nem em Recebido: o dinheiro continua seu, só mudou de lugar.') && (await field('Data').inputValue()) === '07/10/2026');
   await keepText();
   await innerChecks('aporte 390px');
@@ -6094,7 +6098,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const f2Open = async () => {
     await tabByName('Movimentações').click(); await waitText('Organizar'); await p.waitForTimeout(400);
     await p.getByRole('button', { name: /^Orçamento por categoria, / }).filter({ visible: true }).first().click();
-    await waitText('Compras no cartão contam no mês da compra'); await p.waitForTimeout(500);
+    await waitText('No orçamento, cada compra no cartão conta a partir do mês da compra'); await p.waitForTimeout(500);
   };
   const f2Month = async (name, label) => { await p.getByRole('button', { name }).filter({ visible: true }).first().click(); await waitText(`Pessoal · ${label}`); await p.waitForTimeout(500); };
   /** Larguras das barras (fração do trilho) e cores: só azul da marca no preenchimento e nada de vermelho. */
@@ -6135,7 +6139,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await f2Open();
   t = await f2Keep();
   ok('F2 /orcamento: título, barra inferior com Movimentos marcada, "Orçado R$ 4.600,00 · Usado R$ 4.300,00" e a regra do cartão', urlPath() === '/orcamento' && (await h1Name()) === 'Orçamento por categoria' && barOk(await barState()) && (await barState()).selected[0] === MOV_TAB &&
-    t.includes('Orçado R$ 4.600,00 · Usado R$ 4.300,00') && t.includes('Compras no cartão contam no mês da compra (cada parcela no seu mês), mesmo antes de a fatura ser paga.'), `${urlPath()} ${JSON.stringify(await barState())}`);
+    t.includes('Orçado R$ 4.600,00 · Usado R$ 4.300,00') && t.includes('No orçamento, cada compra no cartão conta a partir do mês da compra: a 1ª parcela no mês da compra, a 2ª no mês seguinte, e assim por diante, mesmo antes de a fatura ser paga. Em Pago, ela só entra quando a fatura é paga. Gastos e contas pagas contam no mês da data do pagamento.'), `${urlPath()} ${JSON.stringify(await barState())}`);
   ok('F2 /orcamento Moradia: "R$ 2.500,00 de R$ 2.500,00", 100,0% e "Orçamento usado por inteiro" (o aluguel pago)',
     (await visibleCount('button', /^Moradia, R\$ 2\.500,00 de R\$ 2\.500,00, 100,0% do orçamento\. Orçamento usado por inteiro\. Alterar orçamento de Moradia\.$/)) === 1 && t.includes('Orçamento usado por inteiro'));
   ok('F2 /orcamento Mercado: "R$ 1.400,00 de R$ 1.800,00", 77,8% e "Faltam R$ 400,00"',
@@ -6272,7 +6276,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     !t.includes('Lazer') && t.includes('O orçamento conta o usado no mês.') && (await visibleCount('button', 'Ver orçamento por categoria')) === 1);
   ok('F2 Por categoria: o nome acessível da barra inclui o orçamento', (await visibleCount('generic', /Mercado, R\$ 1\.400,00, 35,9% do pago, de R\$ 1\.800,00 orçados/)) >= 0 && (await p.locator('[aria-label*="de R$ 1.800,00 orçados"]').count()) >= 1);
   await atWidths(async (w) => { await layoutChecks(`F2 Por categoria ${w}px`); if (w === 390) await shot('205_por_categoria_orcado'); });
-  await btn('Ver orçamento por categoria').click(); await waitText('Compras no cartão contam no mês da compra'); await p.waitForTimeout(400);
+  await btn('Ver orçamento por categoria').click(); await waitText('No orçamento, cada compra no cartão conta a partir do mês da compra'); await p.waitForTimeout(400);
   ok('F2 "Ver orçamento por categoria" abre /orcamento', urlPath() === '/orcamento');
 
   // ---- 6. Aviso dentro do app: 80% e 100% na mensagem de sucesso, só no cruzamento ----
@@ -6383,7 +6387,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('F2 limite de 55% (aceita "55%"): outubro a 2,5 pontos: "Outubro está a 2,5 pontos do limite de 55% que você escolheu."', t.includes('52,5% de 55% que você escolheu') && t.includes('Outubro está a 2,5 pontos do limite de 55% que você escolheu.'), t.slice(0, 500));
   await shot('214_limite_perto');
   // Aviso ao anotar uma conta que faz outubro passar do limite (3.150 + 400 = 3.550 = 59,2%).
-  await goResumo(); await btn('Anotar conta a pagar').click(); await waitText('Salvando em Pessoal').catch(() => {}); await p.waitForTimeout(500);
+  await goResumo(); await btn('Anotar conta a pagar').click(); await waitText('Demonstração · Pessoal').catch(() => {}); await p.waitForTimeout(500);
   await field('Descrição').fill('Conserto'); await field('Valor em reais').fill('400'); await field('Data de vencimento').fill('25/10/2026');
   await btn('Salvar conta a pagar').click(); await waitText('Conta a pagar salva'); await p.waitForTimeout(500);
   t = await body();
@@ -6443,7 +6447,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   }
   await atWidths(async (w) => { await layoutChecks(`F2 busca No app ${w}px`); if (w === 390) await shot('217_aprender_no_app_orcamento'); });
   await f2Box().fill('gastar menos'); await waitText('No app'); await p.waitForTimeout(400);
-  await p.getByRole('button', { name: /^Orçamento por categoria\. / }).filter({ visible: true }).first().click(); await waitText('Compras no cartão contam no mês da compra'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /^Orçamento por categoria\. / }).filter({ visible: true }).first().click(); await waitText('No orçamento, cada compra no cartão conta a partir do mês da compra'); await p.waitForTimeout(400);
   ok('F2 busca › tocar abre /orcamento com a barra à vista', urlPath() === '/orcamento' && barOk(await barState()), p.url());
 
   // ---- 10. Conta nova: nada de exemplo; Primeiros passos não muda ----
@@ -7076,7 +7080,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     t.includes('R$ 99,00 por mês · R$ 1.188,00 por ano · todo dia 5') && t.includes('R$ 39,90 por mês · R$ 478,80 por ano · todo dia 10'), JSON.stringify(await h2Rows('Assinaturas')));
   ok('H2 as assinaturas não se repetem em "Gastos fixos" e continuam na soma "Por mês" (R$ 3.668,90)',
     JSON.stringify(await h2Rows('Gastos fixos')) === JSON.stringify(['Aluguel, R$ 2.500,00, todo dia 5, gasto fixo', 'Luz, cerca de R$ 180,00, todo dia 12, valor muda, gasto fixo']) &&
-    t.includes('Por mês, se os valores não mudarem: R$ 3.668,90 (inclui R$ 180,00 estimados).'));
+    t.includes('Gastos fixos, parcelamentos e assinaturas: R$ 3.668,90 por mês, se os valores não mudarem (inclui R$ 180,00 estimados).'));
   ok('H2 a demonstração não mostra o aviso de revisão (as assinaturas são de hoje)', !t.includes('Faz tempo que você não revisa suas assinaturas.') && (await visibleCount('button', 'Agora não')) === 0);
   await atWidths(async (w) => { await innerChecks(`H2 Gastos fixos com Assinaturas ${w}px`); if (w === 390) await shot('270_gastos_fixos_assinaturas'); if (w === 320) await shot('270_gastos_fixos_assinaturas_320px'); });
 
@@ -7150,7 +7154,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
 
   // ---- 7. O cadastro: "É uma assinatura?" só em "Todo mês" ----
-  await btn('Novo gasto fixo ou parcelamento').click(); await waitText('Salvando em Pessoal'); await p.waitForTimeout(400);
+  await btn('Novo gasto fixo ou parcelamento').click(); await waitText('Demonstração · Pessoal'); await p.waitForTimeout(400);
   t = await h2Keep();
   ok('H2 cadastro "Todo mês": o interruptor "É uma assinatura?" começa desligado, com a legenda "Streaming, aplicativo, academia, clube, plano de celular."',
     (await visibleCount('switch', 'É uma assinatura?')) === 1 && !(await h2Checked()) && t.includes('Streaming, aplicativo, academia, clube, plano de celular.'), t.slice(0, 400));
@@ -7218,7 +7222,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await demoHome();
   await h2OpenFixos();
   await p.evaluate(async () => { const r = await window.__e2e.repo(); r.setSeriesSubscription = async () => { throw new Error('falha de teste'); }; });
-  await btn('Novo gasto fixo ou parcelamento').click(); await waitText('Salvando em Pessoal'); await p.waitForTimeout(400);
+  await btn('Novo gasto fixo ou parcelamento').click(); await waitText('Demonstração · Pessoal'); await p.waitForTimeout(400);
   await field('Descrição').fill('Clube (exemplo)'); await field('Valor por mês').fill('45'); await field('Dia do vencimento').fill('20');
   await h2Switch().click(); await p.waitForTimeout(200);
   await btn('Salvar gasto fixo').click(); await waitText('Gasto fixo salvo'); await p.waitForTimeout(600);
@@ -7229,8 +7233,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('H2 a marca falha: o gasto fixo existe e não é assinatura', JSON.stringify((await h2Series()).filter((s) => s[0] === 'Clube (exemplo)')) === JSON.stringify([['Clube (exemplo)', false, null, 1]]));
   // Editar só a marca com a falha ainda ativa: o aviso de erro fica na tela, com "Tentar novamente".
   await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
-  await h2Switch().click(); await btn('Salvar alterações').click(); await waitText('Não foi possível salvar'); await p.waitForTimeout(400);
-  ok('H2 editar só a marca com falha: o erro aparece junto do botão, que passa a "Tentar novamente", e nada é gravado', (await visibleCount('button', 'Tentar novamente')) === 1 && (await body()).includes('Não foi possível salvar') &&
+  await h2Switch().click(); await btn('Salvar alterações').click(); await waitText('Não deu para confirmar se salvou'); await p.waitForTimeout(400);
+  ok('H2 editar só a marca com falha: o erro aparece junto do botão ("Não deu para confirmar se salvou. Confira em Movimentos antes de anotar de novo."), que passa a "Tentar novamente", e nada é gravado', (await visibleCount('button', 'Tentar novamente')) === 1 && (await body()).includes('Não deu para confirmar se salvou. Confira em Movimentos antes de anotar de novo.') &&
     JSON.stringify((await h2Series()).filter((s) => s[0] === 'Clube (exemplo)')) === JSON.stringify([['Clube (exemplo)', false, null, 1]]));
   // A falha passa: tentar de novo grava.
   await p.evaluate(async () => { const r = await window.__e2e.repo(); delete r.setSeriesSubscription; });
@@ -7611,7 +7615,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(400);
   let t1 = await i1Keep();
   ok('I1 a linha leva a "Importar extrato ou fatura", sem a barra inferior, com o contexto Pessoal e o aviso de que o arquivo é lido aqui e não é guardado', (await h1Name()) === 'Importar extrato ou fatura' && urlPath() === '/importar' && (await barState()).n === 0 &&
-    t1.includes('Importando em Pessoal') && t1.includes('Ele é lido aqui no aparelho e não é guardado.') && t1.includes('Até 5 MB e 5.000 linhas.') && (await visibleCount('button', 'Escolher o arquivo')) === 1, t1.slice(0, 400));
+    t1.includes('Demonstração · Pessoal') && t1.includes('Ele é lido aqui no aparelho e não é guardado.') && t1.includes('Até 5 MB e 5.000 linhas.') && (await visibleCount('button', 'Escolher o arquivo')) === 1, t1.slice(0, 400));
   await atWidths(async (w) => { await innerChecks(`I1 escolher o arquivo ${w}px`); if (w === 390) await shot('301_importar_arquivo'); if (w === 320) await shot('301_importar_arquivo_320px'); });
   await btn('Voltar').click(); await waitText('Organizar');
   await tabByName('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await p.waitForTimeout(300);
@@ -8190,7 +8194,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await j1Help('Fatura', 'Cartões e faturas', 'Toque em "Cadastrar cartão"');
   // Orçamento por categoria
   await j1Tab('Movimentos: movimentações do mês').click(); await waitText('Registrar recebimento');
-  await j1Org('Orçamento por categoria').click(); await waitText('Compras no cartão contam no mês da compra');
+  await j1Org('Orçamento por categoria').click(); await waitText('No orçamento, cada compra no cartão conta a partir do mês da compra');
   await j1Help('Orçamento por categoria', 'Orçamento por categoria', 'Em "Definir orçamento", escolha uma categoria');
   await btn('Voltar').click(); await waitText('Registrar recebimento');
   // Importar extrato
@@ -8245,6 +8249,45 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await shot('330_quem_ve');
   await j1Keep();
   await btn('Entendi').click(); await waitText('Diferença do mês');
+
+  // ---- 12b. CL-11, CL-03 e CL-19 (docs/12): selo nos formulários e em Metas; resultado incerto, sair do formulário e anotar de novo ----
+  await goResumo();
+  await btn('Anotar gasto').click(); await waitText('Será salvo em');
+  t = await body();
+  ok('CL-11 demonstração: o formulário de gasto mostra "Demonstração · Pessoal" e a linha final avisa que fica só nesta demonstração',
+    t.includes('Demonstração · Pessoal') && !t.includes('Salvando em Pessoal') && t.includes('Será salvo em Pessoal, Conta principal.') && t.includes('Fica só nesta demonstração, com dados fictícios.'), t.slice(0, 300));
+  await atWidths(async (w) => {
+    await headerChecks(`CL-11 Anotar gasto na demonstração ${w}px`);
+    const pill = await p.locator('[aria-label="Contexto: Demonstração · Pessoal"]').filter({ visible: true }).count();
+    ok(`CL-11 Anotar gasto ${w}px: a pílula "Demonstração · Pessoal" está no cabeçalho`, pill === 1, String(pill));
+    if (w === 320) await shot('CL11_anotar_gasto_demonstracao_320px');
+  });
+  await btn('Cancelar').click(); await waitText('Diferença do mês');
+  await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu plano de guardar'); await p.waitForTimeout(400);
+  ok('CL-11 Metas: o cabeçalho mostra o contexto "Demonstração · Pessoal" e o selo da demonstração', (await p.locator('[aria-label="Contexto: Demonstração · Pessoal"]').filter({ visible: true }).count()) === 1 &&
+    (await p.locator('[aria-label^="Demonstração: acesso simulado"]').filter({ visible: true }).count()) === 1);
+  await atWidths(async (w) => { await layoutChecks(`CL-11 Metas ${w}px`); if (w === 320) await shot('CL11_metas_demonstracao_320px'); });
+  await goResumo();
+  // Resultado incerto (gravado, resposta perdida): o texto manda conferir; sair do formulário e anotar o mesmo gasto de novo não duplica.
+  const cl03Count = () => otherDevice(async (repo, contextId) => (await repo.listRecords(contextId, '2026-10')).filter((r) => r.description === 'Farmácia CL-03').length);
+  await btn('Anotar gasto').click(); await waitText('Será salvo em');
+  await field('Descrição').fill('Farmácia CL-03'); await field('Valor em reais').fill('80'); await p.getByRole('radio', { name: 'Saúde' }).filter({ visible: true }).first().click();
+  await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
+  await btn('Salvar gasto').click(); await waitText('Não deu para confirmar se salvou'); await p.waitForTimeout(400);
+  t = await body();
+  ok('CL-03 resultado incerto: "Não deu para confirmar se salvou. Confira em Movimentos antes de anotar de novo.", sem "Não foi possível salvar", e o preenchimento fica',
+    t.includes('Não deu para confirmar se salvou. Confira em Movimentos antes de anotar de novo.') && !t.includes('Não foi possível salvar') && (await field('Descrição').inputValue()) === 'Farmácia CL-03' && ['80', '80,00'].includes(await field('Valor em reais').inputValue()), t.slice(0, 300));
+  ok('CL-03 resultado incerto: a gravação aconteceu (um registro) apesar da resposta perdida', (await cl03Count()) === 1, String(await cl03Count()));
+  await shot('CL03_resultado_incerto');
+  await btn('Cancelar').click(); await p.waitForTimeout(300);
+  if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
+  await waitText('Diferença do mês');
+  // Sai do formulário, abre outro e anota o mesmo gasto: o app confere a tentativa anterior (guardada na memória do app) e não duplica.
+  await btn('Anotar gasto').click(); await waitText('Será salvo em');
+  await field('Descrição').fill('Farmácia CL-03'); await field('Valor em reais').fill('80'); await p.getByRole('radio', { name: 'Saúde' }).filter({ visible: true }).first().click();
+  await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(600);
+  ok('CL-03 e CL-19 sair do formulário e anotar de novo o mesmo gasto: a tela conclui e continua um registro só', (await cl03Count()) === 1, String(await cl03Count()));
+  await goResumo();
 
   // ---- 13. Textos e escritas ----
   const j1Vetoed = j1Texts.map((x) => x.match(FORBIDDEN)?.[0]).filter(Boolean);

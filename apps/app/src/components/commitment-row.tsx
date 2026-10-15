@@ -21,6 +21,8 @@ export const SITUATION_LOOK = {
   vence_hoje: { Icon: CalendarClock, fg: colors.brand, bg: colors.brandTint, label: 'Vence hoje' },
   vencida: { Icon: AlertCircle, fg: colors.error, bg: colors.errorTint, label: 'Vencida' },
   paga: { Icon: Check, fg: colors.successText, bg: colors.successTint, label: 'Paga' },
+  // A conta de uma fatura paga por menos que o total (CL-07): igual à tela da fatura ("Paga em parte").
+  paga_em_parte: { Icon: Check, fg: colors.successText, bg: colors.successTint, label: 'Paga em parte' },
 } as const;
 
 /** Ação rápida abaixo da linha, como "Já paguei" (nome acessível com a conta e o vencimento). */
@@ -56,7 +58,7 @@ export function CommitmentRow({
   const situation = commitmentSituation(c, today);
   const look = SITUATION_LOOK[situation];
   const due = dueText(c, today);
-  const paid = situation === 'paga' ? c.payment : null;
+  const paid = situation === 'paga' || situation === 'paga_em_parte' ? c.payment : null;
   const cents = paid ? paid.amountCents : c.amountCents;
   // O valor pago é sempre o real; só a conta em aberto pode estar estimada.
   const estimate = !paid && c.amountIsEstimate;
@@ -100,7 +102,7 @@ export function CommitmentRow({
         (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid' },
       ]}>
       <View style={[styles.icon, { backgroundColor: look.bg }]}>
-        <look.Icon size={18} color={situation === 'paga' ? colors.success : look.fg} />
+        <look.Icon size={18} color={situation === 'paga' || situation === 'paga_em_parte' ? colors.success : look.fg} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={2}>

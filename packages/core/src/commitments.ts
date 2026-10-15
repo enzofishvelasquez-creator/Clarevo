@@ -1,25 +1,50 @@
 import type { IsoDate } from './dates';
-import { addDays, addMonthsToDate, daysBetween, formatDateBR, formatDayMonth, formatMonthName } from './dates';
+import { addDays, addMonths, addMonthsToDate, daysBetween, formatDateBR, formatDayMonth, formatMonthName } from './dates';
 import { formatBRL } from './money';
 import type { Commitment, CommitmentInput } from './records';
 import type { ToPaySummary } from './summary';
 
-/** Situação derivada de uma conta a pagar. Nunca é gravada (D-021, regra 4). */
-export type CommitmentSituation = 'paga' | 'vencida' | 'vence_hoje' | 'a_vencer';
+/**
+ * Situação derivada de uma conta a pagar. Nunca é gravada (D-021, regra 4). `paga_em_parte` (CL-07) é só da conta de uma fatura de
+ * cartão paga por menos que o total: o resto foi para a fatura seguinte (D-037(6)), e a tela da fatura diz "Paga em parte".
+ */
+export type CommitmentSituation = 'paga' | 'paga_em_parte' | 'vencida' | 'vence_hoje' | 'a_vencer';
 
-/** Comparação de texto ISO, sem passar por Date local. Paga nunca é vencida, mesmo paga depois do vencimento. */
+/** Conta de fatura de cartão paga por menos que o total da fatura: o que sobrou vira "Saldo anterior" na fatura seguinte. */
+export function isPartialInvoicePayment(c: Pick<Commitment, 'invoice' | 'status' | 'payment' | 'amountCents'>): boolean {
+  return c.invoice !== null && c.status === 'quitado' && c.payment !== null && c.payment.amountCents < c.amountCents;
+}
+
+/**
+ * Comparação de texto ISO, sem passar por Date local. Paga nunca é vencida, mesmo paga depois do vencimento. A conta de uma fatura
+ * paga em parte é "paga em parte", igual à tela da fatura.
+ */
 export function commitmentSituation(c: Commitment, today: IsoDate): CommitmentSituation {
-  if (c.status === 'quitado') return 'paga';
+  if (c.status === 'quitado') return isPartialInvoicePayment(c) ? 'paga_em_parte' : 'paga';
   if (c.dueOn < today) return 'vencida';
   if (c.dueOn === today) return 'vence_hoje';
   return 'a_vencer';
 }
 
-/** Legenda da conta a pagar: "Vence amanhã", "Vence em 3 dias · 10/10", "Venceu em 05/10/2026", "Paga em 07/10/2026". */
+/** Mês por extenso no texto: "dezembro" e, em outro ano que o de hoje, "janeiro de 2027" (como invoiceMonthLabel, em cards.ts). */
+function monthLabelFor(month: string, today: IsoDate): string {
+  const name = formatMonthName(month);
+  return month.slice(0, 4) === today.slice(0, 4) ? name : `${name} de ${month.slice(0, 4)}`;
+}
+
+/**
+ * Legenda da conta a pagar: "Vence amanhã", "Vence em 3 dias · 10/10", "Venceu em 05/10/2026", "Paga em 07/10/2026" e, na conta de
+ * uma fatura paga em parte, "Paga em parte em 08/11/2026 · R$ 230,00 foram para a fatura de dezembro".
+ */
 export function dueText(c: Commitment, today: IsoDate): string {
   switch (commitmentSituation(c, today)) {
     case 'paga':
       return c.payment ? `Paga em ${formatDateBR(c.payment.paidOn)}` : 'Paga';
+    case 'paga_em_parte': {
+      const paid = c.payment!;
+      const next = addMonths(c.invoice!.month, 1);
+      return `Paga em parte em ${formatDateBR(paid.paidOn)} · ${formatBRL(c.amountCents - paid.amountCents)} foram para a fatura de ${monthLabelFor(next, today)}`;
+    }
     case 'vencida':
       return `Venceu em ${formatDateBR(c.dueOn)}`;
     case 'vence_hoje':

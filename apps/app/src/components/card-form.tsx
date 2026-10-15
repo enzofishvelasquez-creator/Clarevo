@@ -3,6 +3,7 @@ import {
   CARD_FIELD_ORDER,
   CARD_NAME_MAX,
   ERROR_TEXT,
+  UNCERTAIN_TEXT,
   cardErrorText,
   centsToInput,
   formatBRL,
@@ -53,7 +54,8 @@ export function CardForm({ mode, contextId }: { mode: CardFormMode; contextId: s
   const qc = useQueryClient();
   const create = useCreateCard();
   const update = useUpdateCard();
-  const keys = useCardOperationKey();
+  // Cartão novo: a tentativa incerta fica na memória do app, para sair e voltar não duplicar (CL-03 e CL-19).
+  const keys = useCardOperationKey(mode.type === 'editar' ? undefined : 'cartao:novo');
   const card = mode.type === 'editar' ? mode.card : null;
 
   const [initial] = useState<CardDraft>(() => ({
@@ -135,7 +137,7 @@ export function CardForm({ mode, contextId }: { mode: CardFormMode; contextId: s
         setError(cardErrorText(r.code));
         return;
       }
-      setError(ERROR_TEXT.salvar_falhou);
+      setError(UNCERTAIN_TEXT.cartoes);
     } finally {
       setBusy(false);
     }

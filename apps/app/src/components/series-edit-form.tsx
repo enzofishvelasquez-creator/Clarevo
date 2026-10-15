@@ -9,6 +9,7 @@ import {
   SERIES_ERROR_TEXT,
   SERIES_NATURE_LABEL,
   SUBSCRIPTION_TEXT,
+  UNCERTAIN_TEXT,
   affectedByEditFrom,
   annualYearOf,
   centsToInput,
@@ -361,7 +362,7 @@ export function SeriesEditForm({
         if (e.code === 'versao_desatualizada') await reload().catch(() => null);
       } else {
         setRetry(true);
-        setBanner(SERIES_ERROR_TEXT.salvar_falhou);
+        setBanner(UNCERTAIN_TEXT.movimentos);
       }
     } finally {
       setBusy(false);
@@ -477,12 +478,12 @@ export function SeriesEditForm({
         // Falha de rede: a alteração pode ou não ter sido gravada. Guardar a tentativa para reconciliar.
         keys.uncertain(key, snapshot);
         setRetry(true);
-        setBanner(SERIES_ERROR_TEXT.salvar_falhou);
+        setBanner(UNCERTAIN_TEXT.movimentos);
       }
     } catch (e) {
       setConfirm(null);
       setRetry(true);
-      setBanner(isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido' ? seriesErrorText(e.code, today, s.kind) : SERIES_ERROR_TEXT.salvar_falhou);
+      setBanner(isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido' ? seriesErrorText(e.code, today, s.kind) : UNCERTAIN_TEXT.movimentos);
     } finally {
       setBusy(false);
     }

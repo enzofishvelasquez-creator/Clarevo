@@ -29,7 +29,8 @@ import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
  * Orçamento por categoria (D-041): tela de consulta, com a barra inferior. Seletor de mês local (como Contas a pagar). Um card por
  * categoria com orçamento no mês: barra na cor da marca (nunca vermelho), "R$ 412,30 de R$ 1.200,00", "Faltam R$ 787,70" ou
  * "R$ 12,30 acima do orçamento" e o percentual com uma casa. As categorias sem orçamento ficam em "Definir orçamento". O usado
- * é por competência: compras no cartão contam no mês da compra, cada parcela no seu mês, mesmo antes de a fatura ser paga.
+ * é por competência: a 1ª parcela de uma compra no cartão conta no mês da compra e as seguintes nos meses depois, mesmo antes de a fatura
+ * ser paga; gastos e contas pagas contam no mês da data do pagamento (`BUDGET_TEXT.rule`, a mesma frase do guia e do manual).
  * `?mes=AAAA-MM` abre em outro mês (sem ele, o mês atual).
  */
 export default function OrcamentoScreen() {
@@ -66,7 +67,7 @@ export default function OrcamentoScreen() {
             <LinkButton label={PAYABLES_NAV_TEXT.backToCurrent(currentMonth)} style={styles.inlineLink} onPress={() => setMonth(currentMonth)} />
           ) : null}
         </View>
-        <Txt color={colors.textSecondary}>{BUDGET_TEXT.cardRule}</Txt>
+        <Txt color={colors.textSecondary}>{BUDGET_TEXT.rule}</Txt>
 
         {budget.isPending ? (
           <View style={{ gap: space[3] }} accessibilityRole="progressbar" accessibilityLabel="Carregando o orçamento">

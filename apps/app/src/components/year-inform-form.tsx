@@ -3,6 +3,7 @@ import {
   ANNUAL_SERIES_ERROR_TEXT,
   ERROR_TEXT,
   MAX_RECORD_CENTS,
+  UNCERTAIN_TEXT,
   affectedByYear,
   annualYearErrorText,
   centsToInput,
@@ -154,11 +155,11 @@ export function YearInformForm({ series: s, number, contextId }: { series: Commi
         // Falha de rede: a gravação pode ou não ter acontecido. Guardar a tentativa para reconciliar.
         keys.uncertain(key, snapshot);
         setRetry(true);
-        setBanner(ANNUAL_SERIES_ERROR_TEXT.salvar_falhou);
+        setBanner(UNCERTAIN_TEXT.movimentos);
       }
     } catch (e) {
       setRetry(true);
-      setBanner(isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido' ? annualYearErrorText(e.code, yearLabel) : ANNUAL_SERIES_ERROR_TEXT.salvar_falhou);
+      setBanner(isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido' ? annualYearErrorText(e.code, yearLabel) : UNCERTAIN_TEXT.movimentos);
     } finally {
       setBusy(false);
     }

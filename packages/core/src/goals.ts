@@ -877,8 +877,10 @@ export const GOALS_TEXT = {
   percent: pct,
   /** "Cobre 0,9 mês dos seus gastos essenciais" */
   coverage: (tenths: number, savedCents: Cents) => `Cobre ${formatCoverage(tenths, savedCents)} dos seus gastos essenciais`,
-  /** "Planejado: R$ 500,00 por mês" */
-  plannedShort: (cents: Cents) => `Planejado: ${formatBRL(cents)} por mês`,
+  /** "Planejado: R$ 500,00 por mês, sem contar rendimentos" */
+  plannedShort: (cents: Cents) => `Planejado: ${formatBRL(cents)} por mês, sem contar rendimentos`,
+  /** Sob o percentual e a cobertura da reserva (CL-09): os dois mostram só a parte inteira. */
+  roundingNote: 'O percentual e os meses cobertos são arredondados para baixo.',
   addDeposit: 'Registrar aporte',
   seeDetails: 'Ver detalhes',
   /** Barra: "Reserva para imprevistos: 15% da meta, R$ 3.500,00 de R$ 22.500,00." */
@@ -894,8 +896,8 @@ export const GOALS_TEXT = {
   cardDeadline: (month: IsoMonth, monthlyCents: Cents) => `Até ${formatMonthYearBR(month)} · ${formatBRL(monthlyCents)} por mês para chegar lá`,
   /** "Prazo: setembro de 2026" (o prazo chegou) */
   cardDeadlinePassed: (month: IsoMonth) => `Prazo: ${formatMonthYearBR(month)}`,
-  /** "Planejado: R$ 500,00 por mês · chega lá em dezembro de 2029" */
-  cardPlanned: (cents: Cents, month: IsoMonth) => `Planejado: ${formatBRL(cents)} por mês · chega lá em ${formatMonthYearBR(month)}`,
+  /** "Planejado: R$ 500,00 por mês · chega lá em dezembro de 2029, sem contar rendimentos" */
+  cardPlanned: (cents: Cents, month: IsoMonth) => `Planejado: ${formatBRL(cents)} por mês · chega lá em ${formatMonthYearBR(month)}, sem contar rendimentos`,
   reachedBadge: 'Meta alcançada',
   closedTitle: 'Concluídas e arquivadas',
 
@@ -915,9 +917,12 @@ export const GOALS_TEXT = {
   reserve: {
     title: RESERVE_NAME,
     essentialsTitle: 'Seus gastos essenciais por mês',
-    /** "Média de setembro de 2026 em Moradia e Mercado. Lazer e gastos sem categoria não entram." */
+    /**
+     * "Média do que foi pago em setembro de 2026 em Moradia e Mercado (1 mês com gastos anotados). Contas ainda não pagas, Lazer e
+     * gastos sem categoria não entram." Só entra o que foi pago (CL-09): conta em aberto e fatura não paga ficam fora.
+     */
     essentialsAverage: (months: readonly IsoMonth[], categories: readonly string[]) =>
-      `Média de ${monthsListText(months)} em ${listText(categories)}. Lazer e gastos sem categoria não entram.`,
+      `Média do que foi pago em ${monthsListText(months)} em ${listText(categories)} (${months.length === 1 ? '1 mês' : `${months.length} meses`} com gastos anotados). Contas ainda não pagas, Lazer e gastos sem categoria não entram.`,
     essentialsAnnualOut: 'Pagamentos de contas do ano, como IPVA e IPTU, também não entram.',
     /** "Começamos pelas contas de outubro: R$ 3.150,00. Some o que costuma gastar com mercado, transporte e saúde." */
     essentialsBills: (month: IsoMonth, cents: Cents) =>
@@ -984,9 +989,12 @@ export const GOALS_TEXT = {
     /** "O prazo de setembro de 2026 chegou. Para ver quanto guardar por mês, escolha um novo prazo em Editar meta." */
     deadlinePassed: (month: IsoMonth) =>
       `O prazo de ${formatMonthYearBR(month)} chegou. Para ver quanto guardar por mês, escolha um novo prazo em Editar meta.`,
-    /** "Você planejou guardar R$ 1.000,00 por mês. Nesse ritmo, chega lá em abril de 2028." */
-    planned: (plannedCents: Cents, month: IsoMonth) =>
-      `Você planejou guardar ${formatBRL(plannedCents)} por mês. Nesse ritmo, chega lá em ${formatMonthYearBR(month)}.`,
+    /**
+     * "Você planejou guardar R$ 500,00 por mês. Contando a partir de novembro de 2026, sem rendimentos, chega lá em dezembro de 2029."
+     * O mês de partida (P0) é o do primeiro aporte que ainda falta contar: o seguinte, se já houve aporte neste mês (CL-09).
+     */
+    planned: (plannedCents: Cents, month: IsoMonth, fromMonth: IsoMonth) =>
+      `Você planejou guardar ${formatBRL(plannedCents)} por mês. Contando a partir de ${formatMonthYearBR(fromMonth)}, sem rendimentos, chega lá em ${formatMonthYearBR(month)}.`,
     simulate: 'Simular com rendimento',
     compositionInitial: (cents: Cents) => `Já guardado ao criar: ${formatBRL(cents)}`,
     compositionDeposits: (cents: Cents) => `Aportes: ${formatBRL(cents)}`,
@@ -1154,6 +1162,8 @@ export interface ReserveCardTexts {
   percent: string;
   coverage: string | null;
   planned: string | null;
+  /** "O percentual e os meses cobertos são arredondados para baixo." (CL-09) */
+  rounding: string;
   a11yLabel: string;
 }
 
@@ -1165,6 +1175,7 @@ export function reserveCardTexts(goal: Goal): ReserveCardTexts {
     percent: GOALS_TEXT.percent(p.percent),
     coverage: tenths === null ? null : GOALS_TEXT.coverage(tenths, goal.savedCents),
     planned: goal.plannedMonthlyCents === null ? null : GOALS_TEXT.plannedShort(goal.plannedMonthlyCents),
+    rounding: GOALS_TEXT.roundingNote,
     a11yLabel: GOALS_TEXT.progressA11y(goal.name, p.percent, goal.savedCents, goal.targetCents),
   };
 }
@@ -1179,6 +1190,8 @@ export interface GoalDetailTexts {
   composition: string[];
   reached: { badge: string; body: string } | null;
   coverage: string | null;
+  /** Só na reserva: "O percentual e os meses cobertos são arredondados para baixo." (CL-09) */
+  rounding: string | null;
 }
 
 export function goalDetailTexts(goal: Goal, movements: readonly GoalMovement[], today: IsoDate): GoalDetailTexts {
@@ -1196,7 +1209,8 @@ export function goalDetailTexts(goal: Goal, movements: readonly GoalMovement[], 
         : plan.deadline.monthlyCents === null
           ? D.deadlinePassed(plan.deadline.month)
           : D.deadline(plan.deadline.month, plan.deadline.monthlyCents),
-    planned: plan.plannedMonthlyCents !== null && plan.reachMonth !== null ? D.planned(plan.plannedMonthlyCents, plan.reachMonth) : null,
+    planned:
+      plan.plannedMonthlyCents !== null && plan.reachMonth !== null ? D.planned(plan.plannedMonthlyCents, plan.reachMonth, plan.firstProjectedMonth) : null,
     composition: [
       D.compositionInitial(c.initialCents),
       D.compositionDeposits(c.depositsCents),
@@ -1206,6 +1220,7 @@ export function goalDetailTexts(goal: Goal, movements: readonly GoalMovement[], 
     ],
     reached: plan.progress.reached ? { badge: D.reachedBadge, body: D.reachedBody } : null,
     coverage: tenths === null ? null : GOALS_TEXT.coverage(tenths, goal.savedCents),
+    rounding: goal.goalType === 'emergencia' ? GOALS_TEXT.roundingNote : null,
   };
 }
 

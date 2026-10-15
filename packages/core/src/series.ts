@@ -174,6 +174,11 @@ export function seriesEndMonth(s: SeriesShape & Pick<CommitmentSeries, 'lastNumb
   return s.lastNumber === null ? null : seriesMonthOf(s, s.lastNumber);
 }
 
+/** Mês da primeira conta da série (na conta do ano, o da parcela `firstNumber`). */
+export function seriesStartMonth(s: SeriesShape): IsoMonth {
+  return seriesMonthOf(s, s.firstNumber);
+}
+
 /** Encerrada: sem nenhuma conta ou com a última conta antes do mês atual. */
 export function seriesEnded(s: SeriesShape & Pick<CommitmentSeries, 'lastNumber'>, today: IsoDate): boolean {
   if (s.lastNumber === null) return false;
@@ -848,6 +853,90 @@ export function seriesYearlyTotal(list: readonly SeriesRange[], today: IsoDate):
     if (t.amountMode === 'variavel') estimatedCents += year;
   }
   return { totalCents, estimatedCents };
+}
+
+/** A parte das somas "Por mês" ou "Por ano" que vem de séries que ainda não começaram (CL-08). */
+export interface SeriesLaterPart {
+  /** Quantas séries ainda não começaram. */
+  count: number;
+  /** O que elas somam, pelo mesmo cálculo da soma ("Por mês": o valor vigente; "Por ano": parcelas por ano × o valor vigente). */
+  totalCents: Cents;
+  /** Parte de `totalCents` com valor estimado. */
+  estimatedCents: Cents;
+  /** Mês da primeira conta da que começa antes; null sem nenhuma. */
+  firstMonth: IsoMonth | null;
+}
+
+/**
+ * Séries não encerradas cuja primeira conta é depois do mês de hoje: ainda não têm conta no mês. `annual` escolhe o grupo: contas do
+ * ano (verdadeiro) ou gastos fixos e parcelamentos (falso). Mesma conta de seriesMonthlyTotal e seriesYearlyTotal, só do que ainda
+ * não começou; o total da soma continua incluindo essas séries, e o texto mostra a parte separada.
+ */
+export function seriesStartingLater(list: readonly SeriesRange[], today: IsoDate, annual: boolean): SeriesLaterPart {
+  const now = monthOf(today);
+  let count = 0;
+  let totalCents = 0;
+  let estimatedCents = 0;
+  let firstMonth: IsoMonth | null = null;
+  for (const s of list) {
+    if ((s.kind === 'anual') !== annual || seriesEnded(s, today)) continue;
+    const start = seriesStartMonth(s);
+    if (start <= now) continue;
+    const t = currentTerm(s, today);
+    const cents = annual ? partsOf(s) * t.amountCents : t.amountCents;
+    count += 1;
+    totalCents += cents;
+    if (t.amountMode === 'variavel') estimatedCents += cents;
+    if (firstMonth === null || start < firstMonth) firstMonth = start;
+  }
+  return { count, totalCents, estimatedCents, firstMonth };
+}
+
+/** Textos das somas de Gastos fixos e parcelamentos (CL-08): cada frase diz o conjunto que soma. */
+export const SERIES_TOTALS_TEXT = {
+  /** Fim da frase: nada, "(valor estimado)" quando tudo é estimado, ou "(inclui R$ 180,00 estimados)". */
+  estimated: (totalCents: Cents, estimatedCents: Cents): string =>
+    estimatedCents <= 0 ? '' : estimatedCents >= totalCents ? ' (valor estimado)' : ` (inclui ${formatBRL(estimatedCents)} estimados)`,
+  /** "Gastos fixos, parcelamentos e assinaturas: R$ 3.668,90 por mês, se os valores não mudarem (inclui R$ 180,00 estimados)." */
+  monthly: (totalCents: Cents, estimatedCents: Cents): string =>
+    `Gastos fixos, parcelamentos e assinaturas: ${formatBRL(totalCents)} por mês, se os valores não mudarem${SERIES_TOTALS_TEXT.estimated(totalCents, estimatedCents)}.`,
+  /** "Contas do ano (IPVA, IPTU e outras): R$ 4.200,00 por ano, se os valores não mudarem (valor estimado)." */
+  yearly: (totalCents: Cents, estimatedCents: Cents): string =>
+    `Contas do ano (IPVA, IPTU e outras): ${formatBRL(totalCents)} por ano, se os valores não mudarem${SERIES_TOTALS_TEXT.estimated(totalCents, estimatedCents)}.`,
+  /** "Já começaram: R$ 2.500,00. Começam depois: R$ 1.168,90 (4 itens, o primeiro em novembro de 2026)." */
+  later: (totalCents: Cents, later: SeriesLaterPart): string => {
+    const started = totalCents - later.totalCents;
+    const when = later.firstMonth === null ? '' : formatMonthYearBR(later.firstMonth);
+    const what = later.count === 1 ? `1 item, em ${when}` : `${later.count} itens, o primeiro em ${when}`;
+    return `${started > 0 ? `Já começaram: ${formatBRL(started)}. ` : ''}Começam depois: ${formatBRL(later.totalCents)} (${what}).`;
+  },
+} as const;
+
+export interface SeriesTotalsTexts {
+  /** Gastos fixos, parcelamentos e assinaturas; null sem nenhum ativo. */
+  monthly: string | null;
+  /** O que dessa soma ainda não começou; null quando tudo já começou. */
+  monthlyLater: string | null;
+  /** Contas do ano; null sem nenhuma ativa. */
+  yearly: string | null;
+  yearlyLater: string | null;
+}
+
+/** As frases das somas de Gastos fixos e parcelamentos para o dia de hoje, a partir de todas as séries do contexto. */
+export function seriesTotalsTexts(list: readonly SeriesRange[], today: IsoDate): SeriesTotalsTexts {
+  const active = list.filter((s) => !seriesEnded(s, today));
+  const hasMonthly = active.some((s) => s.kind !== 'anual');
+  const hasAnnual = active.some((s) => s.kind === 'anual');
+  const monthly = seriesMonthlyTotal(list, today);
+  const yearly = seriesYearlyTotal(list, today);
+  const monthlyLater = seriesStartingLater(list, today, false);
+  const yearlyLater = seriesStartingLater(list, today, true);
+  return {
+    monthly: hasMonthly ? SERIES_TOTALS_TEXT.monthly(monthly.totalCents, monthly.estimatedCents) : null,
+    monthlyLater: hasMonthly && monthlyLater.count > 0 ? SERIES_TOTALS_TEXT.later(monthly.totalCents, monthlyLater) : null,
+    yearly: hasAnnual ? SERIES_TOTALS_TEXT.yearly(yearly.totalCents, yearly.estimatedCents) : null,
+    yearlyLater: hasAnnual && yearlyLater.count > 0 ? SERIES_TOTALS_TEXT.later(yearly.totalCents, yearlyLater) : null,
+  };
 }
 
 /** Série virtual de um cadastro ainda não salvo (mesmos números de create_series). */

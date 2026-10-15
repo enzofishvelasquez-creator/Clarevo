@@ -8,6 +8,7 @@ import {
   committedGoalLines,
   essentialMonthly,
   goalPlan,
+  isRefusal,
   isRepoError,
   includesCardPurchases,
   isSavingsStepDone,
@@ -21,8 +22,12 @@ import {
   seriesEnded,
   loadReturnReview,
   monthOf,
+  newAttemptSlot,
   newOperationKey,
   organizeGoals,
+  slotKeys,
+  type AttemptSlot,
+  type OperationAttempt,
   paymentsForecast,
   plannedForGoals,
   projectCommitted,
@@ -108,6 +113,7 @@ import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient, ty
 import { createContext, use, useEffect, useMemo, useRef } from 'react';
 import { AppState } from 'react-native';
 
+import { pendingAttempts } from '@/lib/pending-attempts';
 import { valuesHidden } from '@/lib/privacy';
 import { useRepo, useSession } from '@/state/session';
 
@@ -588,9 +594,18 @@ export function useMarkSubscriptionsReviewed() {
 }
 
 /** Tentativa de escrita de gasto fixo com resultado incerto (falha de rede). snapshot = conteúdo enviado. */
-export interface SeriesAttempt {
-  key: string;
-  snapshot: string;
+export type SeriesAttempt = OperationAttempt;
+
+/**
+ * O espaço de tentativas de um formulário (CL-03 e CL-19). Com `scope`, fica na memória do app, por pessoa: sair do formulário e
+ * anotar de novo continua conferindo a tentativa anterior e reusando a chave, sem duplicar (as tentativas de uma visita anterior só
+ * valem para o mesmo conteúdo; ver `pending.ts` no core). Sem `scope`, vale só enquanto o formulário está aberto.
+ */
+export function useAttemptSlot(scope?: string): AttemptSlot {
+  const { user } = useSession();
+  const slot = useRef<AttemptSlot | null>(null);
+  if (slot.current === null) slot.current = scope ? pendingAttempts.adopt(user?.id ?? '', scope) : newAttemptSlot();
+  return slot.current;
 }
 
 /**
@@ -598,50 +613,18 @@ export interface SeriesAttempt {
  * - o mesmo conteúdo depois de uma falha de rede vai com a mesma chave, e o banco reconhece a repetição;
  * - antes de repetir, findSaved confere com findSeriesOperation se alguma tentativa anterior foi gravada;
  * - as tentativas só são esquecidas depois de uma gravação confirmada ou reconciliada (settled).
+ * `scope`: formulário que cria (novo gasto fixo), para a tentativa sobreviver a sair e voltar (useAttemptSlot).
  */
-export function useSeriesOperationKey() {
+export function useSeriesOperationKey(scope?: string) {
   const repo = useRepo();
   const qc = useQueryClient();
-  const current = useRef(newOperationKey());
-  const pending = useRef<SeriesAttempt[]>([]);
-  return {
-    hasPending: () => pending.current.length > 0,
-    /** A tentativa incerta mais recente que foi gravada, com a ação e a série; null se nenhuma foi. */
-    findSaved: async (): Promise<(SeriesAttempt & { action: SeriesAction; seriesId: string }) | null> => {
-      for (const attempt of [...pending.current].reverse()) {
-        const op = await repo.findSeriesOperation(attempt.key);
-        if (!op) continue;
-        qc.invalidateQueries({ queryKey: ['series'] });
-        qc.invalidateQueries({ queryKey: ['commitments'] });
-        qc.invalidateQueries({ queryKey: ['commitment'] });
-        qc.invalidateQueries({ queryKey: ['returnReview'] });
-        return { ...attempt, ...op };
-      }
-      return null;
-    },
-    /** Chave do envio: a da última tentativa incerta, se o conteúdo é o mesmo; senão, uma nova. */
-    keyFor: (snapshot: string) => {
-      const last = pending.current[pending.current.length - 1];
-      if (last && last.snapshot !== snapshot) current.current = newOperationKey();
-      return current.current;
-    },
-    /** Falha de rede: a gravação pode ou não ter acontecido. */
-    uncertain: (key: string, snapshot: string) => {
-      pending.current = [...pending.current, { key, snapshot }];
-      qc.invalidateQueries({ queryKey: ['series'] });
-      qc.invalidateQueries({ queryKey: ['commitments'] });
-      qc.invalidateQueries({ queryKey: ['returnReview'] });
-    },
-    /** Gravação confirmada ou reconciliada: nada fica pendente e a próxima operação usa outra chave. */
-    settled: () => {
-      pending.current = [];
-      current.current = newOperationKey();
-    },
-    /** Recusa do servidor: nada foi gravado com esta chave; a próxima tentativa usa outra. */
-    refused: () => {
-      current.current = newOperationKey();
-    },
-  };
+  const slot = useAttemptSlot(scope);
+  return slotKeys<{ action: SeriesAction; seriesId: string }>(slot, (key) => repo.findSeriesOperation(key), () => {
+    qc.invalidateQueries({ queryKey: ['series'] });
+    qc.invalidateQueries({ queryKey: ['commitments'] });
+    qc.invalidateQueries({ queryKey: ['commitment'] });
+    qc.invalidateQueries({ queryKey: ['returnReview'] });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -759,16 +742,8 @@ function useRecordsOfMonths(contextId: string | undefined, months: readonly IsoM
 // Chaves de operação (padrão de useSeriesOperationKey, para renda de referência, metas e plano de guardar)
 // ---------------------------------------------------------------------------
 
-/** Tentativa de escrita com resultado incerto (falha de rede). snapshot = conteúdo enviado. */
-export type OperationAttempt = SeriesAttempt;
-
-/**
- * O servidor respondeu e recusou a escrita (nada foi gravado com a chave: use refused()). Falha de rede ou erro desconhecido,
- * não: o resultado é incerto (use uncertain()). Mesma regra das telas de gasto fixo e de conta a pagar.
- */
-export function isRefusal(e: unknown): boolean {
-  return isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido';
-}
+/** O servidor respondeu e recusou a escrita (nada foi gravado com a chave: use refused())? Falha de rede ou erro desconhecido, não. */
+export { isRefusal };
 
 /**
  * Chave de operação guardada entre tentativas:
@@ -778,45 +753,12 @@ export function isRefusal(e: unknown): boolean {
  * - as tentativas só são esquecidas depois de uma gravação confirmada ou reconciliada (settled).
  * Renda de referência e resposta do plano de guardar não têm busca de operação: a reconciliação é repetir a mesma chave com o
  * mesmo conteúdo (findSaved devolve sempre null).
+ * `scope`: formulário que cria algo; a tentativa fica na memória do app e sobrevive a sair do formulário e voltar (useAttemptSlot).
  */
-function useOperationAttempts<F extends object>(find: ((key: string) => Promise<F | null>) | null, refresh: (qc: QueryClient) => void) {
+function useOperationAttempts<F extends object>(find: ((key: string) => Promise<F | null>) | null, refresh: (qc: QueryClient) => void, scope?: string) {
   const qc = useQueryClient();
-  const current = useRef(newOperationKey());
-  const pending = useRef<OperationAttempt[]>([]);
-  return {
-    hasPending: () => pending.current.length > 0,
-    /** A tentativa incerta mais recente que foi gravada, com os dados da operação; null se nenhuma foi (ou sem busca). */
-    findSaved: async (): Promise<(OperationAttempt & F) | null> => {
-      if (!find) return null;
-      for (const attempt of [...pending.current].reverse()) {
-        const op = await find(attempt.key);
-        if (!op) continue;
-        refresh(qc);
-        return { ...attempt, ...op };
-      }
-      return null;
-    },
-    /** Chave do envio: a da última tentativa incerta, se o conteúdo é o mesmo; senão, uma nova. */
-    keyFor: (snapshot: string) => {
-      const last = pending.current[pending.current.length - 1];
-      if (last && last.snapshot !== snapshot) current.current = newOperationKey();
-      return current.current;
-    },
-    /** Falha de rede: a gravação pode ou não ter acontecido. */
-    uncertain: (key: string, snapshot: string) => {
-      pending.current = [...pending.current, { key, snapshot }];
-      refresh(qc);
-    },
-    /** Gravação confirmada ou reconciliada: nada fica pendente e a próxima operação usa outra chave. */
-    settled: () => {
-      pending.current = [];
-      current.current = newOperationKey();
-    },
-    /** Recusa do servidor: nada foi gravado com esta chave; a próxima tentativa usa outra. */
-    refused: () => {
-      current.current = newOperationKey();
-    },
-  };
+  const slot = useAttemptSlot(scope);
+  return slotKeys<F>(slot, find, () => refresh(qc));
 }
 
 const refreshGoals = (qc: QueryClient) => {
@@ -832,9 +774,9 @@ const refreshSavings = (qc: QueryClient) => {
 };
 
 /** Metas: findSaved usa findGoalOperation (goalId vazio quando a meta ou o movimento já não é legível; ver o repositório). */
-export function useGoalOperationKey() {
+export function useGoalOperationKey(scope?: string) {
   const repo = useRepo();
-  return useOperationAttempts<{ action: GoalAction; goalId: string; movementId: string | null }>((key) => repo.findGoalOperation(key), refreshGoals);
+  return useOperationAttempts<{ action: GoalAction; goalId: string; movementId: string | null }>((key) => repo.findGoalOperation(key), refreshGoals, scope);
 }
 
 /** Renda de referência: sem busca de operação; repetir a mesma chave com o mesmo conteúdo reconcilia. */
@@ -1447,9 +1389,9 @@ const refreshAccounts = (qc: QueryClient) => {
 };
 
 /** Contas: findSaved usa findAccountOperation (a conta é o alvo da operação). */
-export function useAccountOperationKey() {
+export function useAccountOperationKey(scope?: string) {
   const repo = useRepo();
-  return useOperationAttempts<{ action: AccountAction; accountId: string }>((key) => repo.findAccountOperation(key), refreshAccounts);
+  return useOperationAttempts<{ action: AccountAction; accountId: string }>((key) => repo.findAccountOperation(key), refreshAccounts, scope);
 }
 
 export function useCreateAccount() {
@@ -1909,11 +1851,12 @@ const refreshCards = (qc: QueryClient) => {
  * com findCardOperation se uma tentativa incerta foi gravada (cardId, entryId nas ações de lançamento, commitmentId e recordId
  * no pagamento).
  */
-export function useCardOperationKey() {
+export function useCardOperationKey(scope?: string) {
   const repo = useRepo();
   return useOperationAttempts<{ action: CardAction; cardId: string; entryId: string | null; commitmentId: string | null; recordId: string | null }>(
     (key) => repo.findCardOperation(key),
     refreshCards,
+    scope,
   );
 }
 

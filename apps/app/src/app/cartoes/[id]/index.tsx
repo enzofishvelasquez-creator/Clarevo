@@ -2,6 +2,7 @@ import {
   CARDS_TEXT,
   CARD_ERROR_TEXT,
   ERROR_TEXT,
+  UNCERTAIN_TEXT,
   cardErrorText,
   invoiceMonthOf,
   limitUsedText,
@@ -97,7 +98,7 @@ export default function CartaoDetalhe() {
         haptic();
         setNotice(text);
       } else if (r.status === 'refused') fail(r.code);
-      else setActionError(ERROR_TEXT.salvar_falhou);
+      else setActionError(UNCERTAIN_TEXT.cartoes);
     } finally {
       setBusy(false);
     }
@@ -120,7 +121,7 @@ export default function CartaoDetalhe() {
         flash.set(F.deleted);
         router.dismissTo('/cartoes');
       } else if (r.status === 'refused') fail(r.code);
-      else setActionError(ERROR_TEXT.salvar_falhou);
+      else setActionError(UNCERTAIN_TEXT.cartoes);
     } finally {
       setBusy(false);
     }

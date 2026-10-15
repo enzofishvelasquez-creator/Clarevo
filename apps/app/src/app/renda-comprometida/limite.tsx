@@ -3,6 +3,7 @@ import {
   ERROR_TEXT,
   LIMIT_ERROR_TEXT,
   LIMIT_TEXT,
+  UNCERTAIN_TEXT,
   addMonths,
   formatMonthBR,
   formatMonthYearBR,
@@ -164,7 +165,7 @@ function LimitForm({ contextId }: { contextId: string }) {
         setKeys.uncertain(key, snapshot);
         attempt.current = { contentKey, expectedVersion };
         setRetry(true);
-        setBanner(ERROR_TEXT.salvar_falhou);
+        setBanner(UNCERTAIN_TEXT.renda);
       }
     } finally {
       setBusy(false);
@@ -196,7 +197,7 @@ function LimitForm({ contextId }: { contextId: string }) {
         showRefusal(e.code);
       } else {
         delKeys.uncertain(key, snapshot);
-        setBanner(ERROR_TEXT.salvar_falhou);
+        setBanner(UNCERTAIN_TEXT.renda);
       }
     } finally {
       setWorking(false);
@@ -222,7 +223,7 @@ function LimitForm({ contextId }: { contextId: string }) {
         showRefusal(e.code);
       } else {
         delKeys.uncertain(key, snapshot);
-        setBanner(ERROR_TEXT.salvar_falhou);
+        setBanner(UNCERTAIN_TEXT.renda);
       }
     } finally {
       setWorking(false);

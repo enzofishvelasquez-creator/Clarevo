@@ -66,7 +66,8 @@ const cardExit = FadeOut.duration(motion.confirm).reduceMotion(ReduceMotion.Syst
 export function PrimeirosPassos({ contextId }: { contextId: string | undefined }) {
   const { user, auth } = useSession();
   const { space: kind, month, currentMonth } = useView();
-  const demoWithData = user?.email === DEMO_EMAIL;
+  // Só a demonstração tem dados de exemplo: uma conta real com este e-mail continua vendo o card (CL-11).
+  const demoWithData = auth.mode === 'demo' && user?.email === DEMO_EMAIL;
   const firstSteps = useFirstSteps(demoWithData ? undefined : user?.id, auth.mode !== 'demo');
   const eligible = kind === 'pessoal' && month === currentMonth && firstSteps.status === 'aberto';
   // Nenhuma consulta depois que o card fechou. Enquanto ele está aberto, os registros do mês são os mesmos do Resumo

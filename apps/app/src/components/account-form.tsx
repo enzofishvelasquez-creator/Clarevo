@@ -5,6 +5,7 @@ import {
   ACCOUNT_KIND_LABEL,
   ACCOUNT_NAME_MAX,
   ERROR_TEXT,
+  UNCERTAIN_TEXT,
   accountBlock,
   accountErrorText,
   activeAccounts,
@@ -58,7 +59,8 @@ export function AccountForm({ mode, contextId, accounts }: { mode: AccountFormMo
   const makeDefault = useSetDefaultAccount();
   const setStatus = useSetAccountStatus();
   const remove = useDeleteAccount();
-  const keys = useAccountOperationKey();
+  // Conta nova: a tentativa incerta fica na memória do app, para sair e voltar não duplicar (CL-03 e CL-19).
+  const keys = useAccountOperationKey(mode.type === 'editar' ? undefined : 'conta:nova');
   const account = mode.type === 'editar' ? mode.account : null;
 
   const [initial] = useState<AccountDraft>(() => ({ name: account?.name ?? '', kind: account?.kind ?? 'banco' }));
@@ -134,7 +136,7 @@ export function AccountForm({ mode, contextId, accounts }: { mode: AccountFormMo
         setError(accountErrorText(r.code));
         return;
       }
-      setError(ERROR_TEXT.salvar_falhou);
+      setError(UNCERTAIN_TEXT.conta);
     } finally {
       setBusy(false);
     }
@@ -174,7 +176,7 @@ export function AccountForm({ mode, contextId, accounts }: { mode: AccountFormMo
         setActionError(accountErrorText(r.code));
         return;
       }
-      setActionError(ERROR_TEXT.salvar_falhou);
+      setActionError(UNCERTAIN_TEXT.conta);
     } finally {
       setBusy(false);
     }

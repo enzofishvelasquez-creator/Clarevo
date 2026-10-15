@@ -5,6 +5,7 @@ import {
   MAX_RECORD_CENTS,
   NO_CATEGORY_LABEL,
   PAYMENT_ERROR_TEXT,
+  UNCERTAIN_TEXT,
   PAYMENT_FIELD_ORDER,
   addDays,
   annualYearLabelOf,
@@ -19,6 +20,8 @@ import {
   mergeOccurrences,
   monthOf,
   newOperationKey,
+  relevantAttempts,
+  settleSlot,
   parseBRL,
   parseDateBR,
   validatePaymentDraft,
@@ -53,6 +56,7 @@ import { explanationHref } from '@/lib/learn';
 import { totalChange } from '@/lib/highlight';
 import { useLastAccount } from '@/lib/last-account';
 import {
+  useAttemptSlot,
   useBudgetWatch,
   usePayCommitment,
   useSeries,
@@ -128,9 +132,9 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
   const [leaveTo, setLeaveTo] = useState<null | (() => void)>(null);
   const [confirmDiscard, setConfirmDiscard] = useState<null | (() => void)>(null);
 
-  const opKey = useRef(newOperationKey());
-  /** Tentativas com resultado incerto (falha de rede), da mais antiga para a mais recente. */
-  const pending = useRef<{ key: string; snapshot: string }[]>([]);
+  // A chave do envio e as tentativas com resultado incerto, da mais antiga para a mais recente. Ficam na memória do app, por conta
+  // (CL-03 e CL-19): sair do formulário e abrir de novo confere a tentativa anterior e reusa a chave.
+  const attempts = useAttemptSlot(`pagamento:${c.id}`);
   const refs = {
     description: useRef<TextInput>(null),
     amountText: useRef<TextInput>(null),
@@ -247,7 +251,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
    * a próxima tentativa reconcilia de novo em vez de repetir o pagamento.
    */
   const reconcile = async (input: PaymentInput, snapshot: string): Promise<{ amountCents: number; occurredOn: string } | true | null> => {
-    for (const attempt of [...pending.current].reverse()) {
+    for (const attempt of [...relevantAttempts(attempts, snapshot)].reverse()) {
       const op = await repo.findCommitmentOperation(attempt.key);
       if (!op || op.action !== 'pagar_compromisso' || !op.recordId) continue;
       qc.invalidateQueries({ queryKey: ['commitments'] });
@@ -255,7 +259,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
       qc.invalidateQueries({ queryKey: ['records'] });
       const expense = await repo.getRecord(op.recordId);
       if (!expense || attempt.snapshot === snapshot) {
-        pending.current = [];
+        settleSlot(attempts);
         return expense ?? true;
       }
       // O useInvalidate dos registros já recarrega as contas a pagar.
@@ -265,7 +269,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
         version: expense.version,
         input: { accountId: input.accountId, amountCents: input.amountCents, occurredOn: input.paidOn, description: expense.description, category: input.category },
       });
-      pending.current = [];
+      settleSlot(attempts);
       return saved;
     }
     return null;
@@ -320,7 +324,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
     const version = baseVersion;
     const snapshot = JSON.stringify([v.input, version]);
     try {
-      if (pending.current.length > 0) {
+      if (relevantAttempts(attempts, snapshot).length > 0) {
         const saved = await reconcile(v.input, snapshot);
         if (saved) {
           setRetry(false);
@@ -328,20 +332,20 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
           return;
         }
         // Nada foi gravado: repetir com a mesma chave se o conteúdo é o mesmo da última tentativa.
-        const last = pending.current[pending.current.length - 1];
-        if (!last || last.snapshot !== snapshot) opKey.current = newOperationKey();
+        const last = attempts.pending[attempts.pending.length - 1];
+        if (!last || last.snapshot !== snapshot) attempts.current = newOperationKey();
       }
-      const key = opKey.current;
+      const key = attempts.current;
       // Aviso do orçamento (D-041): o gasto do pagamento conta na categoria e no mês da data do pagamento.
       const budgetBefore = await budgetWatch.before(c.contextId, v.input.category, v.input.paidOn);
       try {
         const saved = await pay.mutateAsync({ key, id: c.id, version, input: v.input });
-        pending.current = [];
+        settleSlot(attempts);
         setRetry(false);
         await afterPayment(saved.record, plan, await budgetWatch.after(budgetBefore));
       } catch (e) {
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
-          opKey.current = newOperationKey();
+          attempts.current = newOperationKey();
           setRetry(false);
           const field = fieldForErrorCode(e.code);
           if (field && PAYMENT_FIELD_ORDER.includes(field)) {
@@ -358,18 +362,18 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
           return;
         }
         // Falha de rede: o pagamento pode ou não ter sido gravado. Guardar a tentativa para reconciliar.
-        pending.current = [...pending.current, { key, snapshot }];
+        attempts.pending = [...attempts.pending, { key, snapshot }];
         // Se foi gravado, o detalhe, a lista e o Resumo que ficaram abertos recarregam e mostram a conta paga.
         qc.invalidateQueries({ queryKey: ['commitments'] });
         qc.invalidateQueries({ queryKey: ['commitment', c.id] });
         qc.invalidateQueries({ queryKey: ['records'] });
         setRetry(true);
-        setBanner(PAYMENT_ERROR_TEXT.pagar_falhou);
+        setBanner(UNCERTAIN_TEXT.movimentos);
       }
     } catch (e) {
       // Falhou a reconciliação: a tentativa pendente continua guardada e é conferida de novo na próxima vez.
       setRetry(true);
-      setBanner(isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido' ? paymentText(e.code) : PAYMENT_ERROR_TEXT.pagar_falhou);
+      setBanner(isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido' ? paymentText(e.code) : UNCERTAIN_TEXT.movimentos);
     } finally {
       setBusy(false);
     }

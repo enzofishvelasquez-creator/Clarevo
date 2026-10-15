@@ -6,6 +6,7 @@ import {
   GOAL_MOVEMENT_FIELD_ORDER,
   GOAL_NOTE_MAX,
   MOVEMENT_LABEL,
+  UNCERTAIN_TEXT,
   accountsForPicker,
   addDays,
   centsToInput,
@@ -73,7 +74,8 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
   const add = useAddGoalMovement();
   const edit = useUpdateGoalMovement();
   const remove = useDeleteGoalMovement();
-  const keys = useGoalOperationKey();
+  // Aporte, resgate e rendimento novos: a tentativa incerta fica na memória do app, para sair e voltar não duplicar (CL-03 e CL-19).
+  const keys = useGoalOperationKey(mode.type === 'editar' || mode.type === 'atualizar' ? undefined : `meta-movimento:${goal.id}:${mode.kind}`);
   const lastAccount = useLastAccount();
   const activeAccounts = useSpace().data?.accounts ?? [];
   const allAccounts = useAccounts(goal.contextId);
@@ -179,7 +181,7 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
         );
         if (r.status === 'ok' || r.status === 'reconciled') return await done(M[change.kind].saved);
         if (r.status === 'refused') return fail(r.code, r.detail);
-        setError(GOAL_ERROR_TEXT.salvar_falhou);
+        setError(UNCERTAIN_TEXT.metas);
       } finally {
         setBusy(false);
       }
@@ -226,7 +228,7 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
         return await done(editing ? M.updated : M[kind === 'saldo_inicial' ? 'aporte' : kind].saved);
       }
       if (r.status === 'refused') return fail(r.code, r.detail);
-      setError(GOAL_ERROR_TEXT.salvar_falhou);
+      setError(UNCERTAIN_TEXT.metas);
     } finally {
       setBusy(false);
     }
@@ -252,7 +254,7 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
       setConfirmDelete(false);
       if (r.status === 'ok' || r.status === 'reconciled') return await done(M.deleted);
       if (r.status === 'refused') return fail(r.code, r.detail);
-      setError(GOAL_ERROR_TEXT.salvar_falhou);
+      setError(UNCERTAIN_TEXT.metas);
     } finally {
       setBusy(false);
     }

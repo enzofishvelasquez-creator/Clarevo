@@ -4,6 +4,7 @@ import {
   GOAL_ERROR_TEXT,
   GOAL_STATUS_LABEL,
   GOAL_TYPE_LABEL,
+  UNCERTAIN_TEXT,
   goalDetailTexts,
   goalErrorText,
   goalPlan,
@@ -90,7 +91,7 @@ export default function MetaDetalhe() {
         haptic();
         setNotice(text);
       } else if (r.status === 'refused') fail(r.code);
-      else setActionError(GOAL_ERROR_TEXT.salvar_falhou);
+      else setActionError(UNCERTAIN_TEXT.metas);
     } finally {
       setBusy(false);
     }
@@ -113,7 +114,7 @@ export default function MetaDetalhe() {
         flash.set(D.deleted);
         router.dismissTo('/metas');
       } else if (r.status === 'refused') fail(r.code);
-      else setActionError(GOAL_ERROR_TEXT.salvar_falhou);
+      else setActionError(UNCERTAIN_TEXT.metas);
     } finally {
       setBusy(false);
     }
@@ -248,7 +249,7 @@ function GoalBody({
   const coverage = reserve && showsCoverage(goal) ? t.coverage : null;
   // "Simular com rendimento": só enquanto falta guardar (o simulador começa do guardado e do prazo da meta).
   const simulate = reached ? null : simulateLinkParams(simulateValuesFromGoal(plan));
-  const planLines = [t.deadline, t.planned, coverage].filter((x): x is string => Boolean(x));
+  const planLines = [t.deadline, t.planned, coverage, reserve ? t.rounding : null].filter((x): x is string => Boolean(x));
   const a11yBar = GOALS_TEXT.progressA11y(goal.name, plan.progress.percent, goal.savedCents, goal.targetCents);
   const a11yValue = `${GOALS_TEXT.savedOfTarget(goal.savedCents, goal.targetCents)}, ${GOALS_TEXT.percent(plan.progress.percent)}`;
 

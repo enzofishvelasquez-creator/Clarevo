@@ -567,11 +567,23 @@ export function limitNotesFor(
 // Textos
 // ---------------------------------------------------------------------------
 
+const BUDGET_CARD_RULE =
+  'No orçamento, cada compra no cartão conta a partir do mês da compra: a 1ª parcela no mês da compra, a 2ª no mês seguinte, e assim por diante, mesmo antes de a fatura ser paga. Em Pago, ela só entra quando a fatura é paga.';
+const BUDGET_PAID_RULE = 'Gastos e contas pagas contam no mês da data do pagamento.';
+
 /** Textos do orçamento por categoria. Neutros: sem cor que julgue, sem julgamento. */
 export const BUDGET_TEXT = {
   title: 'Orçamento por categoria',
   intro: 'Defina quanto você pretende usar por mês em cada categoria de gasto.',
-  cardRule: 'Compras no cartão contam no mês da compra (cada parcela no seu mês), mesmo antes de a fatura ser paga.',
+  /**
+   * A regra de hoje (CL-01): a mesma na tela do orçamento, no guia e no manual (teste em `regressao-revisao.test.ts`). A parcela k
+   * conta no mês da compra mais (k - 1); a compra não cai inteira no mês dela, e o pagamento da fatura não conta de novo.
+   */
+  cardRule: BUDGET_CARD_RULE,
+  /** Gastos comuns e contas pagas: pela data do pagamento (o gasto da conta paga leva a categoria dela). */
+  paidRule: BUDGET_PAID_RULE,
+  /** As duas frases juntas, como aparecem na tela do orçamento, no passo do guia e no manual. */
+  rule: `${BUDGET_CARD_RULE} ${BUDGET_PAID_RULE}`,
   /** Orçamento é do usado no mês; Pago por categoria é do que foi pago. */
   versusPaid: 'O orçamento conta o usado no mês. Pago por categoria mostra o que foi pago, e a compra no cartão entra em Pago quando a fatura é paga.',
   retry: 'Tentar novamente',

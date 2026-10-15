@@ -3,6 +3,7 @@ import {
   CARDS_TEXT,
   CARD_ERROR_TEXT,
   ERROR_TEXT,
+  UNCERTAIN_TEXT,
   addDays,
   addMonths,
   addYearsClamped,
@@ -61,7 +62,8 @@ export function InvoicePayForm({ card, invoice, space: personal }: { card: CardD
   const lastAccount = useLastAccount();
   const qc = useQueryClient();
   const pay = usePayInvoice();
-  const keys = useCardOperationKey();
+  // O pagamento desta fatura: a tentativa incerta fica na memória do app, para sair e voltar não duplicar (CL-03 e CL-19).
+  const keys = useCardOperationKey(`fatura-pagar:${card.id}:${invoice.month}`);
   const t = invoiceTexts(invoice, today);
 
   const [initial] = useState<InvoicePaymentDraft & { accountId: string }>(() => ({
@@ -153,7 +155,7 @@ export function InvoicePayForm({ card, invoice, space: personal }: { card: CardD
         setBanner(cardErrorText(r.code, { closingOn: invoice.closingOn }));
         return;
       }
-      setBanner(CARD_ERROR_TEXT.pagar_falhou ?? ERROR_TEXT.salvar_falhou);
+      setBanner(UNCERTAIN_TEXT.cartoes);
     } finally {
       setBusy(false);
     }

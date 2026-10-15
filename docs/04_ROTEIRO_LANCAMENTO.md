@@ -1,6 +1,6 @@
 # Roteiro até o lançamento
 
-Atualizado em 15/10/2026. Prazos são estimativas de trabalho, não compromissos; dependem das decisões pendentes.
+Atualizado em 15/10/2026 (correções da revisão v0.9 na seção D-050, abaixo). Prazos são estimativas de trabalho, não compromissos; dependem das decisões pendentes.
 
 Ordem a partir de 08/10/2026 (D-023, D-029, D-033 e D-034): o Ciclo A, o Ciclo A3 (contas do ano) e os Primeiros passos com os atalhos em Movimentações estão feitos. O Ciclo A6 ("Achar tudo" e calculadoras, D-035) está implementado e no roteiro web, com o teste manual em aberto. Os Ciclos A4 (seus últimos meses, D-030) e A5 (Aprender e dúvidas, D-031 e D-032) estão implementados e no roteiro web, com os itens abertos de cada seção abaixo. Em 09/10/2026 foram implementados os Ciclos A2 (lembretes, ocultar valores e biometria, D-025), B (renda comprometida, D-026), C (metas e reserva, D-027, com o plano de guardar, D-036) e D (simulador, D-028), todos antes do Ciclo 2 (família). Neles, o que falta é o mesmo em todos: o teste em aparelho, que fica para depois de o app estar pronto (as migrações 0006 e 0007 foram coladas e conferidas no Supabase em 10/10/2026). Em 10/10/2026 foi implementado também o Ciclo E (cartões de crédito e faturas, D-037, e leitura de notas fiscais, D-038), com a migração 0008 ainda por colar no Supabase. Também em 10/10/2026 entrou a navegação (D-039): "Anotar gasto" logo abaixo do cabeçalho do Resumo, a barra inferior nas telas de consulta, Contas a pagar no mês certo, Metas compacta e a busca "No app" de Aprender, na seção do Ciclo E abaixo. Ainda em 10/10/2026 entrou o Ciclo F1, o plano para quitar dívidas (D-040), seção própria abaixo, e o Ciclo F2, o orçamento por categoria e o limite pessoal (D-041), com a migração 0009 colada e conferida no Supabase em 10/10/2026, e o Ciclo G1, as contas de origem do dinheiro (D-043), seção própria abaixo, com a migração 0010 colada e conferida no Supabase em 11/10/2026. Em 11/10/2026 entrou o Ciclo H2, as assinaturas (D-046), seção própria abaixo, com a migração 0011 ainda por colar no Supabase. O roteiro web (`scripts/e2e-web.js`) já cobre as telas novas. Cada ciclo começa depois de o anterior passar em `npm test`, `npm run typecheck`, `npm run test:db`, `npm run test:api` e `npm run test:web`.
 
@@ -329,6 +329,33 @@ Enzo, em 11/10/2026: "Algo importante, que eu quero, é um tutorial de uso do ap
 - [x] Rodados em 15/10/2026 no Ciclo J1: `npm test` (52 arquivos, 1352 testes), `npm run typecheck` e `npm run test:web` (4096 verificações); sem mudança no banco, `test:db` e `test:api` não se aplicam
 - [ ] Teste em aparelho (iOS e Android): o tour com VoiceOver e TalkBack (foco, leitura do cartão e do anúncio de troca), a folha "?" e o guia com letra grande, e o tour na primeira abertura depois de atualizar o app
 - [ ] **Você:** revisar os textos do guia, a ordem dos grupos, os cinco cartões do tour (inclusive aparecer uma vez também para quem já usa o app) e o manual (`docs/manual/index.html`, que o orquestrador publica como página)
+
+## Correções da revisão v0.9, itens 1 a 8 do plano (D-050), feito
+
+Sem migração, sem função nova no banco e sem pacote novo. Origem: `docs/12_RESPOSTA_REVISAO_V09.md` (seção 2). Nenhuma regra de cálculo mudou; os totais de outubro da demonstração seguem em 6.000 / 3.900 / 2.100 / 650 e 52,5%. Ficam de fora, por dependerem de Enzo, os itens da seção 3 de `docs/12` (regra da parcela e do estorno no orçamento, barra acima de 100%, Família, privacidade, teste com pessoas e monitoramento).
+
+- [x] **CL-02.** Dicionário de indicadores e "Quando cada valor conta" em `docs/02`; a compra de R$ 300,00 em 3x (10/10) segue por todos os indicadores, mês a mês: `packages/core/test/consolidacao.test.ts` (core) e `supabase/tests/95_consolidacao.sql` (banco).
+- [x] **CL-01, texto.** Uma frase só (`BUDGET_TEXT.rule`) na tela do orçamento, no guia e no manual (regenerado com `npm run manual`), igual à de `docs/02`; teste de comparação em `regressao-revisao.test.ts`.
+- [x] **CL-08.** "Gastos fixos, parcelamentos e assinaturas: ... por mês" e "Contas do ano (IPVA, IPTU e outras): ... por ano"; "Começam depois: ..." à parte; por ano de assinatura só pelos meses em que vale ("R$ 119,70 até dezembro de 2026").
+- [x] **CL-11.** "Demonstração · Pessoal" nos formulários e detalhes, linha "Fica só nesta demonstração, com dados fictícios." em Anotar gasto e Novo gasto fixo, e o contexto no cabeçalho de Metas.
+- [x] **CL-03 e CL-19.** "Não deu para confirmar se salvou. Confira em Movimentos antes de anotar de novo." e a tentativa pendente guardada na memória do app (`PendingAttemptStore`): sair do formulário e anotar de novo não duplica.
+- [x] **CL-07.** "Vencida" na fatura fechada e não paga depois do vencimento; "Paga em parte" também na conta da fatura em Contas a pagar.
+- [x] **CL-09.** Reserva: "sem contar rendimentos", mês de partida do plano, arredondamento para baixo e base de gastos (só o que foi pago, número de meses).
+- [x] **CL-20.** Teste de regressão por falha corrigida (`regressao-revisao.test.ts`), bloco de CL-03, CL-11 e CL-19 no roteiro web e "Como voltar atrás" em `docs/07`.
+- [ ] Teste manual em aparelho (texto ampliado nas pílulas novas e leitor de tela nos textos de resultado incerto).
+- Verificações de 15/10/2026, depois das correções: `npm run typecheck`, `npm test` (1.385 testes em 54 arquivos; eram 1.352 em 52), `npm run test:db` (15 arquivos, com `95_consolidacao.sql`), `npm run test:api` (181 testes) e `npm run test:web` (4.117 verificações OK; eram 3.588 em 11/10/2026).
+
+Rastreabilidade do que mudou (caso → onde é testado):
+
+| Caso | Teste |
+|---|---|
+| CL-01 / T04 | `regressao-revisao.test.ts` › "CL-01: a regra do orçamento escrita uma vez só"; `consolidacao.test.ts`; `95_consolidacao.sql`; `budget.test.ts` › "textos montados" |
+| CL-02 | `consolidacao.test.ts` (6 testes); `95_consolidacao.sql` |
+| CL-03 / CL-19 / T07 | `regressao-revisao.test.ts` › "CL-03 e CL-19: resultado incerto"; roteiro web, bloco "12b" (resultado incerto, sair do formulário e anotar de novo) |
+| CL-07 / T05 | `regressao-revisao.test.ts` › "CL-07: situação da fatura nas telas do cartão e em Contas a pagar"; `cards.test.ts` |
+| CL-08 / T09 | `regressao-revisao.test.ts` › "CL-08: Gastos fixos, parcelamentos, assinaturas e contas do ano"; `subscriptions.test.ts`; roteiro web, blocos de Gastos fixos e H2 |
+| CL-09 / T10 | `regressao-revisao.test.ts` › "CL-09: explicações da reserva para imprevistos"; `goals.test.ts` |
+| CL-11 / T13 | `regressao-revisao.test.ts` › "CL-11: demonstração visível nos formulários e em Metas"; roteiro web, bloco "12b" (390 e 320 px) |
 
 ## Próximos ciclos
 

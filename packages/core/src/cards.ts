@@ -478,6 +478,11 @@ export interface Invoice {
   /** Crédito levado para a fatura seguinte (total negativo): vira o estorno automático dela. */
   creditOutCents: Cents;
   situation: InvoiceSituation;
+  /**
+   * Vencida (CL-07), calculada na leitura como nas contas (D-021(4)): fechada, sem pagamento, com total a pagar e vencimento antes
+   * de hoje. Não é gravada e não muda `situation` (que é a do banco): a fatura continua "fechada" e pode ser paga.
+   */
+  overdue: boolean;
   /** Aberta: o valor pode mudar com novas compras. */
   estimated: boolean;
   /** O período da fatura ainda não começou. */
@@ -639,6 +644,7 @@ function makeInvoice(
     totalCents,
     creditOutCents: Math.max(0, -rawCents),
     situation,
+    overdue: situation === 'fechada' && totalCents > 0 && dueOn < today,
     estimated: situation === 'aberta',
     isFuture: period.startOn > today,
     commitmentId: commitment ? commitment.id : null,
@@ -1079,6 +1085,17 @@ export const INVOICE_SITUATION_LABEL: Readonly<Record<InvoiceSituation, string>>
   paga_em_parte: 'Paga em parte',
 };
 
+/** "Vencida": a fatura fechada, sem pagamento, depois do vencimento (CL-07). Igual ao rótulo das contas a pagar. */
+export const INVOICE_OVERDUE_LABEL = 'Vencida';
+
+/**
+ * O rótulo da situação da fatura, o mesmo em todas as telas (CL-07): Aberta, Fechada, Vencida, Paga ou Paga em parte. A conta a
+ * pagar da fatura usa as mesmas palavras ("Vencida", "Paga em parte"; ver commitmentSituation).
+ */
+export function invoiceSituationLabel(invoice: Pick<Invoice, 'situation' | 'overdue'>): string {
+  return invoice.overdue ? INVOICE_OVERDUE_LABEL : INVOICE_SITUATION_LABEL[invoice.situation];
+}
+
 export const CARD_STATUS_LABEL: Readonly<Record<CardStatus, string>> = { ativo: 'Ativo', arquivado: 'Arquivado' };
 
 /** "Fecha hoje", "Fechou em 03/10" ou "Fecha em 03/11". */
@@ -1130,7 +1147,7 @@ export function invoiceLineText(line: InvoiceLine): string {
 export interface InvoiceTexts {
   /** "Fatura de novembro" */
   title: string;
-  /** "Aberta", "Fechada", "Paga" ou "Paga em parte" */
+  /** "Aberta", "Fechada", "Vencida", "Paga" ou "Paga em parte" */
   situation: string;
   /** "R$ 550,00" (aberta: com "estimado" à parte) */
   total: string;
@@ -1153,7 +1170,7 @@ export interface InvoiceTexts {
 
 export function invoiceTexts(invoice: Invoice, today: IsoDate): InvoiceTexts {
   const month = invoiceMonthLabel(invoice.month, today);
-  const situation = INVOICE_SITUATION_LABEL[invoice.situation];
+  const situation = invoiceSituationLabel(invoice);
   const title = `Fatura de ${month}`;
   const total = formatBRL(invoice.totalCents);
   const closes = closesText(invoice.closingOn, today);
@@ -1184,7 +1201,7 @@ export interface CardSummaryTexts {
   closes: string;
   due: string;
   limit: string;
-  /** "Fatura fechada de outubro: R$ 300,00. Vence em 10/10" por fatura fechada sem pagamento */
+  /** "Fatura fechada de outubro: R$ 300,00. Vence em 10/10" por fatura fechada sem pagamento ("Fatura vencida de outubro..." depois do vencimento) */
   closed: string[];
   archived: string | null;
   a11yLabel: string;
@@ -1195,7 +1212,7 @@ export function cardSummaryTexts(s: CardSummary, today: IsoDate): CardSummaryTex
   const title = cardTitle(s.card);
   const limit = limitUsedText(s.limitUsedCents, s.card.limitCents);
   const invoiceLine = `${t.title} · ${t.total} · ${t.situation}`;
-  const closed = s.closedUnpaid.map((i) => `Fatura fechada de ${invoiceMonthLabel(i.month, today)}: ${formatBRL(i.totalCents)}. ${dueTextOf(i.dueOn, today)}`);
+  const closed = s.closedUnpaid.map((i) => `Fatura ${i.overdue ? 'vencida' : 'fechada'} de ${invoiceMonthLabel(i.month, today)}: ${formatBRL(i.totalCents)}. ${dueTextOf(i.dueOn, today)}`);
   return {
     title,
     invoiceLine,

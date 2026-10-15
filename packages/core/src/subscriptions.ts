@@ -1,9 +1,9 @@
-import type { IsoDate } from './dates';
-import { addDays, addMonthsToDate, formatDateBR, todayIn } from './dates';
+import type { IsoDate, IsoMonth } from './dates';
+import { addDays, addMonthsToDate, formatDateBR, formatMonthYearBR, monthOf, monthsBetween, todayIn } from './dates';
 import type { Cents } from './money';
 import { formatBRL } from './money';
 import type { CommitmentSeries } from './records';
-import { currentTerm, seriesEnded } from './series';
+import { currentTerm, seriesEnded, seriesEndMonth, seriesStartMonth } from './series';
 import { ERROR_TEXT } from './validation';
 
 /**
@@ -19,7 +19,10 @@ import { ERROR_TEXT } from './validation';
  * - Só gasto fixo mensal (kind 'mensal') pode ser assinatura; parcelamento e conta do ano nunca.
  * - Ativa: marcada e não encerrada (seriesEnded). Só as ativas entram nas somas e na revisão.
  * - Por mês: soma do valor vigente de cada ativa (a vigência do mês de hoje, ou da primeira conta antes de começar); por ano: por
- *   mês × 12. Valor que muda (estimado) entra pelo valor de referência e a tela diz que é estimado.
+ *   mês × os meses em que a assinatura vale dentro de 12 meses (CL-08): sem término, ou com término a 12 meses ou mais, são 12; com
+ *   término antes, só os meses até o último (R$ 39,90 até dezembro, com hoje em outubro: 3 × R$ 39,90 = R$ 119,70, "até dezembro de
+ *   2026" em vez de "por ano"). Os 12 meses contam do mês de hoje ou do primeiro mês da assinatura, o que vier depois. Valor que
+ *   muda (estimado) entra pelo valor de referência e a tela diz que é estimado.
  * - Lembrete: com ao menos uma assinatura ativa, aparece se a última revisão (a data mais recente entre as ativas) foi há mais de
  *   6 meses; sem nenhuma revisão, se a assinatura mais antiga foi marcada como assinatura há 3 meses ou mais (o dia da marca,
  *   subscriptionSince, não o do cadastro da série: marcar um gasto fixo antigo não liga o aviso na hora). "Agora não" esconde o aviso por
@@ -50,11 +53,18 @@ export const SUBSCRIPTION_TEXT = {
   totals: (monthlyCents: Cents, yearlyCents: Cents): string => `${formatBRL(monthlyCents)} por mês · ${formatBRL(yearlyCents)} por ano`,
   /** "R$ 478,80 por ano". */
   perYear: (yearlyCents: Cents): string => `${formatBRL(yearlyCents)} por ano`,
+  /** Com término antes de 12 meses: "R$ 119,70 até dezembro de 2026" (só os meses em que a assinatura vale). */
+  untilMonth: (cents: Cents, lastMonth: IsoMonth): string => `${formatBRL(cents)} até ${formatMonthYearBR(lastMonth)}`,
+  /** Fim do "por ano": "por ano" ou "até dezembro de 2026" (o valor vem antes, mascarável). */
+  yearSuffix: (lastMonth: IsoMonth | null): string => (lastMonth === null ? 'por ano' : `até ${formatMonthYearBR(lastMonth)}`),
+  /** Nota do grupo quando alguma assinatura termina antes de 12 meses. */
+  endingNote: 'No por ano, as assinaturas com término contam só os meses até o último.',
   perMonth: (monthlyCents: Cents): string => `${formatBRL(monthlyCents)} por mês`,
   reviewLink: 'Revisar assinaturas',
   /** Detalhe do gasto fixo marcado. */
   detailBadge: 'Assinatura',
-  detailYear: (yearlyCents: Cents, estimated = false): string => `Assinatura · ${estimated ? 'cerca de ' : ''}${formatBRL(yearlyCents)} por ano`,
+  detailYear: (yearlyCents: Cents, estimated = false, lastMonth: IsoMonth | null = null): string =>
+    `Assinatura · ${estimated ? 'cerca de ' : ''}${formatBRL(yearlyCents)} ${SUBSCRIPTION_TEXT.yearSuffix(lastMonth)}`,
   /** Tela "Revisar assinaturas". */
   reviewTitle: 'Revisar assinaturas',
   reviewIntro: 'Vale olhar de tempos em tempos se cada uma ainda é usada.',
@@ -116,9 +126,27 @@ export function isActiveSubscription(s: SubscriptionSeries, today: IsoDate): boo
   return s.kind === 'mensal' && s.subscription && !seriesEnded(s, today);
 }
 
-/** Por ano = por mês × 12 (o valor vigente se repetir). */
+/** Por ano com o valor vigente se repetindo, sem término: por mês × 12. Com término, use subscriptionYear. */
 export function subscriptionYearlyCents(monthlyCents: Cents): Cents {
   return monthlyCents * SUBSCRIPTION_MONTHS_PER_YEAR;
+}
+
+/**
+ * Os meses em que a assinatura vale dentro de 12 meses (CL-08), a partir do mês de hoje ou do primeiro mês da assinatura, o que
+ * vier depois. Sem término, ou com o último mês a 12 meses ou mais, são 12 e `lastMonth` é null ("por ano"); com término antes,
+ * são só os meses até o último e `lastMonth` é ele ("até dezembro de 2026").
+ */
+export function subscriptionYear(
+  s: Pick<CommitmentSeries, 'kind' | 'firstDueMonth' | 'firstNumber' | 'lastNumber' | 'partsPerYear'>,
+  today: IsoDate,
+): { months: number; lastMonth: IsoMonth | null } {
+  const now = monthOf(today);
+  const first = seriesStartMonth(s);
+  const start = first > now ? first : now;
+  const end = seriesEndMonth(s);
+  if (end === null) return { months: SUBSCRIPTION_MONTHS_PER_YEAR, lastMonth: null };
+  const months = Math.max(0, monthsBetween(start, end) + 1);
+  return months >= SUBSCRIPTION_MONTHS_PER_YEAR ? { months: SUBSCRIPTION_MONTHS_PER_YEAR, lastMonth: null } : { months, lastMonth: end };
 }
 
 /** Uma assinatura ativa, pronta para a lista. */
@@ -126,7 +154,12 @@ export interface SubscriptionRow {
   id: string;
   name: string;
   monthlyCents: Cents;
+  /** Por mês × os meses em que vale nos próximos 12 (12 sem término ou com término distante). */
   yearlyCents: Cents;
+  /** Meses de `yearlyCents` (1 a 12). */
+  yearMonths: number;
+  /** Último mês, quando a assinatura termina antes de 12 meses ("até dezembro de 2026"); null nos demais ("por ano"). */
+  yearEndsIn: IsoMonth | null;
   /** Valor que muda de um mês para outro: o valor é o de referência. */
   estimated: boolean;
   dueDay: number;
@@ -135,11 +168,14 @@ export interface SubscriptionRow {
 
 export function subscriptionRow(s: SubscriptionSeries, today: IsoDate): SubscriptionRow {
   const term = currentTerm(s, today);
+  const year = subscriptionYear(s, today);
   return {
     id: s.id,
     name: term.description,
     monthlyCents: term.amountCents,
-    yearlyCents: subscriptionYearlyCents(term.amountCents),
+    yearlyCents: term.amountCents * year.months,
+    yearMonths: year.months,
+    yearEndsIn: year.lastMonth,
     estimated: term.amountMode === 'variavel',
     dueDay: term.dueDay,
     reviewedOn: s.subscriptionReviewedOn,
@@ -157,21 +193,28 @@ export function subscriptionRows(list: readonly SubscriptionSeries[], today: Iso
 export interface SubscriptionTotals {
   count: number;
   monthlyCents: Cents;
+  /** Soma do por ano de cada uma (cada assinatura conta só os meses em que vale, até 12). */
   yearlyCents: Cents;
   /** Parte do por mês que vem de valores de referência (valor que muda). */
   estimatedMonthlyCents: Cents;
+  /** Quantas terminam antes de 12 meses (o por ano delas é menor que por mês × 12). */
+  endingCount: number;
 }
 
-/** Quanto as assinaturas ativas custam: por mês, a soma dos valores vigentes; por ano, por mês × 12. */
+/** Quanto as assinaturas ativas custam: por mês, a soma dos valores vigentes; por ano, a soma do por ano de cada uma. */
 export function subscriptionTotals(list: readonly SubscriptionSeries[], today: IsoDate): SubscriptionTotals {
   let monthlyCents = 0;
+  let yearlyCents = 0;
   let estimatedMonthlyCents = 0;
+  let endingCount = 0;
   const rows = subscriptionRows(list, today);
   for (const r of rows) {
     monthlyCents += r.monthlyCents;
+    yearlyCents += r.yearlyCents;
+    if (r.yearEndsIn !== null) endingCount += 1;
     if (r.estimated) estimatedMonthlyCents += r.monthlyCents;
   }
-  return { count: rows.length, monthlyCents, yearlyCents: subscriptionYearlyCents(monthlyCents), estimatedMonthlyCents };
+  return { count: rows.length, monthlyCents, yearlyCents, estimatedMonthlyCents, endingCount };
 }
 
 /** "2 assinaturas" / "1 assinatura". */

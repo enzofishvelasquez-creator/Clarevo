@@ -2,6 +2,7 @@ import {
   COMMITTED_TEXT,
   ERROR_TEXT,
   INCOME_REFERENCE_ERROR_TEXT,
+  UNCERTAIN_TEXT,
   centsToInput,
   formatBRL,
   formatMonthYearBR,
@@ -181,7 +182,7 @@ function ReferenceForm({ contextId }: { contextId: string }) {
         setKeys.uncertain(key, snapshot);
         attempt.current = { contentKey, expectedVersion };
         setRetry(true);
-        setBanner(ERROR_TEXT.salvar_falhou);
+        setBanner(UNCERTAIN_TEXT.renda);
       }
     } finally {
       setBusy(false);
@@ -206,7 +207,7 @@ function ReferenceForm({ contextId }: { contextId: string }) {
         showRefusal(e.code);
       } else {
         delKeys.uncertain(key, snapshot);
-        setBanner(ERROR_TEXT.salvar_falhou);
+        setBanner(UNCERTAIN_TEXT.renda);
       }
     } finally {
       setDeleting(false);

@@ -364,7 +364,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Informe o ${q(BUDGET_TEXT.form.amountLabel)} e ${q(BUDGET_TEXT.form.fromLabel)} qual mês ele vale. Os meses anteriores não mudam.`,
       `Toque em ${q(BUDGET_TEXT.form.save)}.`,
       `Em ${q(BUDGET_TEXT.withBudgetTitle)}, cada categoria mostra o usado no mês, quanto falta e o percentual.`,
-      'Compras no cartão contam no mês da compra, mesmo antes de a fatura ser paga.',
+      BUDGET_TEXT.rule,
       `Para mudar ou tirar um orçamento, toque na categoria e use ${q(BUDGET_TEXT.form.remove)}.`,
     ],
     screenName: BUDGET_TEXT.title,

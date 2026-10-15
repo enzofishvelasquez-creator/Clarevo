@@ -2,6 +2,7 @@ import {
   ANNUAL_HELP_TEXT,
   CALC_UI_TEXT,
   CATEGORIES,
+  DEMO_TEXT,
   DESCRIPTION_MAX,
   INSTALLMENT_NATURES,
   MAX_RECORD_CENTS,
@@ -9,6 +10,7 @@ import {
   SERIES_ERROR_TEXT,
   SERIES_NATURE_LABEL,
   SUBSCRIPTION_TEXT,
+  UNCERTAIN_TEXT,
   addMonths,
   affectedByEditFrom,
   annualStartChoices,
@@ -188,7 +190,7 @@ export function SeriesForm({
   typed?: boolean;
   space: PersonalSpace;
 }) {
-  const { today } = useSession();
+  const { today, auth } = useSession();
   const repo = useRepo();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -196,7 +198,8 @@ export function SeriesForm({
   const updateFrom = useUpdateSeriesFrom();
   const markSubscription = useSetSeriesSubscription();
   const limitWatch = useLimitWatch();
-  const keys = useSeriesOperationKey();
+  // Tentativa incerta na memória do app (CL-03 e CL-19): sair do formulário e cadastrar de novo confere a anterior e reusa a chave.
+  const keys = useSeriesOperationKey('gasto-fixo:novo');
   const contextId = personal.personalContextId;
   const contextName = 'Pessoal';
   const currentMonth = monthOf(today);
@@ -472,7 +475,7 @@ export function SeriesForm({
    * abre o que foi salvo para a pessoa conferir. Devolve true se havia algo gravado.
    */
   const reconcile = async (input: SeriesInput, snapshot: string): Promise<boolean> => {
-    const saved = await keys.findSaved();
+    const saved = await keys.findSaved(snapshot);
     if (!saved || saved.action !== 'criar_serie') return false;
     const [series, list] = await Promise.all([repo.getSeries(saved.seriesId), repo.listSeriesOccurrences(saved.seriesId)]);
     if (!series) {
@@ -549,7 +552,7 @@ export function SeriesForm({
     setBusy(true);
     const snapshot = JSON.stringify(v.input);
     try {
-      if (keys.hasPending() && (await reconcile(v.input, snapshot))) {
+      if (keys.hasPending(snapshot) && (await reconcile(v.input, snapshot))) {
         setRetry(false);
         return;
       }
@@ -578,14 +581,12 @@ export function SeriesForm({
         // Falha de rede: a gravação pode ou não ter acontecido. Guardar a tentativa para reconciliar.
         keys.uncertain(key, snapshot);
         setRetry(true);
-        setBanner(SERIES_ERROR_TEXT.salvar_falhou);
+        setBanner(UNCERTAIN_TEXT.movimentos);
       }
     } catch (e) {
       // Falhou a reconciliação: a tentativa pendente continua guardada e é conferida de novo na próxima vez.
       setRetry(true);
-      setBanner(
-        isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido' ? seriesErrorText(e.code, today, draft.kind) : SERIES_ERROR_TEXT.salvar_falhou,
-      );
+      setBanner(isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido' ? seriesErrorText(e.code, today, draft.kind) : UNCERTAIN_TEXT.movimentos);
     } finally {
       setBusy(false);
     }
@@ -1099,6 +1100,11 @@ export function SeriesForm({
               Será salvo em <Txt variant="label" style={{ fontFamily: fonts.bold }}>{contextName}</Txt>. Cada mês vira uma conta a pagar, e só o
               que você marca como paga entra em Pago.
             </Txt>
+            {auth.mode === 'demo' ? (
+              <Txt variant="label" color={colors.textSecondary}>
+                {DEMO_TEXT.saveNote}
+              </Txt>
+            ) : null}
             <LinkButton
               label="Gasto fixo, conta a pagar e gasto anotado"
               color={colors.textSecondary}

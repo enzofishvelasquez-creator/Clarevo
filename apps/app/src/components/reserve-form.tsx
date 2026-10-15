@@ -8,6 +8,7 @@ import {
   RESERVE_MONTHS_MIN,
   RESERVE_MONTH_CHIPS,
   RESERVE_NAME,
+  UNCERTAIN_TEXT,
   centsToInput,
   emergencyTarget,
   formatMonthInputBR,
@@ -112,7 +113,8 @@ export function ReserveForm({
   const qc = useQueryClient();
   const create = useCreateGoal();
   const update = useUpdateGoal();
-  const keys = useGoalOperationKey();
+  // Reserva nova: a tentativa incerta fica na memória do app, para sair e voltar não duplicar (CL-03 e CL-19).
+  const keys = useGoalOperationKey(reserve ? undefined : 'reserva:nova');
   const R = GOALS_TEXT.reserve;
 
   // A reserva mínima de "Agora não" guarda o próprio alvo como base de 1 mês: não é gasto essencial (reserveEssentialBaseCents).
@@ -233,7 +235,7 @@ export function ReserveForm({
         setError(goalErrorText(r.code, { negativeDay: negativeDayFromDetail(r.detail) }));
         return;
       }
-      setError(GOAL_ERROR_TEXT.salvar_falhou);
+      setError(UNCERTAIN_TEXT.metas);
     } finally {
       setBusy(false);
     }

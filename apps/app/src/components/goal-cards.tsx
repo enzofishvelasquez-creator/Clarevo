@@ -102,6 +102,9 @@ export function ReserveCard({
           {coverage}
         </MoneyTxt>
       ) : null}
+      <Txt variant="caption" color={colors.textOnBrandSoft}>
+        {t.rounding}
+      </Txt>
       {t.planned ? (
         <MoneyTxt variant="label" color={colors.textOnBrandSoft}>
           {t.planned}

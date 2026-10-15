@@ -5,6 +5,7 @@ import {
   GOAL_NAME_MAX,
   GOAL_TEMPLATES,
   MAX_RECORD_CENTS,
+  UNCERTAIN_TEXT,
   centsToInput,
   charCount,
   formatBRL,
@@ -111,7 +112,8 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
   const qc = useQueryClient();
   const create = useCreateGoal();
   const update = useUpdateGoal();
-  const keys = useGoalOperationKey();
+  // Meta nova: a tentativa incerta fica na memória do app, para sair e voltar não duplicar (CL-03 e CL-19).
+  const keys = useGoalOperationKey(mode.type === 'editar' ? undefined : 'meta:nova');
   const goal = mode.type === 'editar' ? mode.goal : null;
   const T = GOALS_TEXT.form;
 
@@ -250,7 +252,7 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
         setError(goalErrorText(r.code));
         return;
       }
-      setError(GOAL_ERROR_TEXT.salvar_falhou);
+      setError(UNCERTAIN_TEXT.metas);
     } finally {
       setBusy(false);
     }

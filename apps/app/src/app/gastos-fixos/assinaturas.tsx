@@ -31,13 +31,14 @@ import { useMarkSubscriptionsReviewed, useSeriesList, useSpace } from '@/state/d
 import { useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
 
-/** "R$ 39,90 por mês · R$ 478,80 por ano": com valor que muda, o "≈" na tela e "cerca de" no leitor de tela. */
+/** "R$ 39,90 por mês · R$ 478,80 por ano" (ou "até dezembro de 2026" com término antes de 12 meses): com valor que muda, o "≈" na tela e "cerca de" no leitor de tela. */
 function amounts(row: SubscriptionRow, hidden: boolean): { text: string; a11y: string } {
   const sign = row.estimated ? '≈ ' : '';
   const spoken = row.estimated ? 'cerca de ' : '';
+  const year = SUBSCRIPTION_TEXT.yearSuffix(row.yearEndsIn);
   return {
-    text: `${sign}${moneyText(row.monthlyCents, hidden)} por mês · ${sign}${moneyText(row.yearlyCents, hidden)} por ano`,
-    a11y: `${spoken}${moneyA11y(row.monthlyCents, hidden)} por mês, ${spoken}${moneyA11y(row.yearlyCents, hidden)} por ano`,
+    text: `${sign}${moneyText(row.monthlyCents, hidden)} por mês · ${sign}${moneyText(row.yearlyCents, hidden)} ${year}`,
+    a11y: `${spoken}${moneyA11y(row.monthlyCents, hidden)} por mês, ${spoken}${moneyA11y(row.yearlyCents, hidden)} ${year}`,
   };
 }
 
@@ -188,6 +189,11 @@ export default function RevisarAssinaturas() {
                 <MoneyTxt variant="caption" color={colors.textSecondary} style={tabular}>
                   {SUBSCRIPTION_TEXT.groupEstimated(totals.estimatedMonthlyCents)}
                 </MoneyTxt>
+              ) : null}
+              {totals.endingCount > 0 ? (
+                <Txt variant="caption" color={colors.textSecondary}>
+                  {SUBSCRIPTION_TEXT.endingNote}
+                </Txt>
               ) : null}
               <Txt variant="caption" color={colors.textSecondary}>
                 {SUBSCRIPTION_TEXT.lastReview(lastReview)}

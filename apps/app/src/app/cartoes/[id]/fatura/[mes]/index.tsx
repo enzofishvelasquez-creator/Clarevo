@@ -2,6 +2,7 @@ import {
   CARDS_TEXT,
   CARD_ERROR_TEXT,
   ERROR_TEXT,
+  UNCERTAIN_TEXT,
   addMonths,
   cardErrorText,
   formatBRL,
@@ -87,7 +88,7 @@ export default function FaturaScreen() {
       card.refetch();
       invoices.refetch();
     }
-    setActionError(code === 'desconhecido' || code === 'rede' ? ERROR_TEXT.salvar_falhou : cardErrorText(code));
+    setActionError(code === 'desconhecido' || code === 'rede' ? UNCERTAIN_TEXT.cartoes : cardErrorText(code));
   }
 
   async function doUndo(inv: Invoice) {
@@ -135,7 +136,7 @@ export default function FaturaScreen() {
         haptic();
         setNotice(I.entryDeleted);
       } else if (r.status === 'refused') fail(r.code);
-      else setActionError(ERROR_TEXT.salvar_falhou);
+      else setActionError(UNCERTAIN_TEXT.cartoes);
     } finally {
       setBusy(false);
     }

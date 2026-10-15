@@ -28,6 +28,24 @@ export const ERROR_TEXT = {
 
 export type ErrorCode = keyof typeof ERROR_TEXT;
 
+/**
+ * Resultado incerto (CL-03 e CL-19): a conexão caiu depois de enviar e o app não sabe se gravou. Diferente de "Não foi possível
+ * salvar", que é para quando o servidor recusou e nada foi gravado. O texto manda conferir onde o registro apareceria antes de
+ * anotar de novo; o preenchimento fica no formulário e salvar outra vez, com o mesmo conteúdo, confere antes e não duplica
+ * (`guardedWrite` e `PendingAttemptStore`, em `pending.ts`). Uma frase por lugar onde a pessoa confere.
+ */
+export const UNCERTAIN_TEXT = {
+  /** Gasto, recebimento, conta a pagar, pagamento, gasto fixo, conta do ano e fatura. */
+  movimentos: 'Não deu para confirmar se salvou. Confira em Movimentos antes de anotar de novo.',
+  metas: 'Não deu para confirmar se salvou. Confira em Metas antes de tentar de novo.',
+  cartoes: 'Não deu para confirmar se salvou. Confira em Cartões antes de tentar de novo.',
+  conta: 'Não deu para confirmar se salvou. Confira em Conta antes de tentar de novo.',
+  orcamento: 'Não deu para confirmar se salvou. Confira em Orçamento por categoria antes de tentar de novo.',
+  renda: 'Não deu para confirmar se salvou. Confira em Renda comprometida antes de tentar de novo.',
+} as const;
+
+export type UncertainArea = keyof typeof UNCERTAIN_TEXT;
+
 /** Textos de conta a pagar. ERROR_TEXT continua fixo para registros; aqui só o que muda ou é novo. */
 export const COMMITMENT_ERROR_TEXT = {
   ...ERROR_TEXT,

@@ -7,6 +7,7 @@ import {
   NOTA_FLOW_TEXT,
   NOTA_TEXT,
   NO_CATEGORY_LABEL,
+  UNCERTAIN_TEXT,
   addDays,
   cardErrorText,
   centsToInput,
@@ -161,7 +162,7 @@ export function CardPurchaseForm({ card, month, entry, textOnly = false }: { car
         setBanner(cardErrorText(r.code));
         return;
       }
-      setBanner(ERROR_TEXT.salvar_falhou);
+      setBanner(UNCERTAIN_TEXT.cartoes);
     } finally {
       setBusy(false);
     }

@@ -17,7 +17,7 @@ import {
   seriesEndMonth,
   seriesEnded,
   seriesMonthlyTotal,
-  seriesYearlyTotal,
+  seriesTotalsTexts,
   subscriptionReminderVisible,
   subscriptionRows,
   subscriptionTotals,
@@ -147,13 +147,17 @@ function SeriesRow({ series: s, today, last }: { series: CommitmentSeries; today
   );
 }
 
-/** "R$ 39,90 por mês · R$ 478,80 por ano": com valor que muda, o "≈" na tela e "cerca de" no leitor de tela. */
+/**
+ * "R$ 39,90 por mês · R$ 478,80 por ano": com valor que muda, o "≈" na tela e "cerca de" no leitor de tela. Com término antes de 12
+ * meses, só os meses até o último: "R$ 39,90 por mês · R$ 119,70 até dezembro de 2026" (CL-08).
+ */
 function subscriptionLine(row: SubscriptionRowData, hidden: boolean): { text: string; a11y: string } {
   const sign = row.estimated ? '≈ ' : '';
   const spoken = row.estimated ? 'cerca de ' : '';
+  const year = SUBSCRIPTION_TEXT.yearSuffix(row.yearEndsIn);
   return {
-    text: `${sign}${moneyText(row.monthlyCents, hidden)} por mês · ${sign}${moneyText(row.yearlyCents, hidden)} por ano · todo dia ${row.dueDay}`,
-    a11y: `${spoken}${moneyA11y(row.monthlyCents, hidden)} por mês, ${spoken}${moneyA11y(row.yearlyCents, hidden)} por ano, todo dia ${row.dueDay}`,
+    text: `${sign}${moneyText(row.monthlyCents, hidden)} por mês · ${sign}${moneyText(row.yearlyCents, hidden)} ${year} · todo dia ${row.dueDay}`,
+    a11y: `${spoken}${moneyA11y(row.monthlyCents, hidden)} por mês, ${spoken}${moneyA11y(row.yearlyCents, hidden)} ${year}, todo dia ${row.dueDay}`,
   };
 }
 
@@ -222,6 +226,11 @@ function SubscriptionGroup({ list, today }: { list: readonly CommitmentSeries[];
           {SUBSCRIPTION_TEXT.groupEstimated(totals.estimatedMonthlyCents)}
         </MoneyTxt>
       ) : null}
+      {totals.endingCount > 0 ? (
+        <Txt variant="caption" color={colors.textSecondary}>
+          {SUBSCRIPTION_TEXT.endingNote}
+        </Txt>
+      ) : null}
       {rows.map((row, i) => (
         <SubscriptionLine key={row.id} row={row} series={byId.get(row.id)} today={today} last={i === rows.length - 1} />
       ))}
@@ -259,7 +268,7 @@ export default function GastosFixosScreen() {
   ].filter((sec) => sec.items.length > 0);
   const ended = all.filter((s) => seriesEnded(s, today));
   const monthly = seriesMonthlyTotal(all, today);
-  const yearly = seriesYearlyTotal(all, today);
+  const totalsTexts = seriesTotalsTexts(all, today);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -294,19 +303,29 @@ export default function GastosFixosScreen() {
           <Skeleton width="80%" height={20} />
         ) : list.isError ? null : (
           <>
-            {monthlyActive.length > 0 ? (
-              <MoneyTxt variant="label" style={tabular}>
-                {`Por mês, se os valores não mudarem: ${formatBRL(monthly.totalCents)}${
-                  monthly.estimatedCents > 0 ? ` (inclui ${formatBRL(monthly.estimatedCents)} estimados)` : ''
-                }.${annualActive.length > 0 ? ' Contas do ano ficam fora desta soma.' : ''}`}
-              </MoneyTxt>
+            {totalsTexts.monthly ? (
+              <View style={{ gap: space[1] }}>
+                <MoneyTxt variant="label" style={tabular}>
+                  {totalsTexts.monthly}
+                </MoneyTxt>
+                {totalsTexts.monthlyLater ? (
+                  <MoneyTxt variant="caption" color={colors.textSecondary} style={tabular}>
+                    {totalsTexts.monthlyLater}
+                  </MoneyTxt>
+                ) : null}
+              </View>
             ) : null}
-            {annualActive.length > 0 ? (
-              <MoneyTxt variant="label" style={tabular}>
-                {`Por ano, se os valores não mudarem: ${formatBRL(yearly.totalCents)}${
-                  yearly.estimatedCents > 0 ? ` (inclui ${formatBRL(yearly.estimatedCents)} estimados)` : ''
-                }.`}
-              </MoneyTxt>
+            {totalsTexts.yearly ? (
+              <View style={{ gap: space[1] }}>
+                <MoneyTxt variant="label" style={tabular}>
+                  {totalsTexts.yearly}
+                </MoneyTxt>
+                {totalsTexts.yearlyLater ? (
+                  <MoneyTxt variant="caption" color={colors.textSecondary} style={tabular}>
+                    {totalsTexts.yearlyLater}
+                  </MoneyTxt>
+                ) : null}
+              </View>
             ) : null}
             {/* Com 2 ou mais contas no "Por mês": a calculadora de dividir as contas da casa, com esse total (nada é gravado). */}
             {monthlyActive.length >= 2 && monthly.totalCents > 0 && monthly.totalCents <= MAX_RECORD_CENTS ? (

@@ -1,4 +1,4 @@
-import { GOALS_NAV_TEXT, SAVINGS_ERROR_TEXT, SAVINGS_STAGE_MONTHS, SAVINGS_TEXT, organizeGoals, savingsErrorText, savingsPlan, savingsPlanTexts, type Cents, type SavingsAnswer } from '@clarevo/core';
+import { UNCERTAIN_TEXT, GOALS_NAV_TEXT, SAVINGS_ERROR_TEXT, SAVINGS_STAGE_MONTHS, SAVINGS_TEXT, organizeGoals, savingsErrorText, savingsPlan, savingsPlanTexts, type Cents, type SavingsAnswer } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { CircleAlert, PiggyBank } from 'lucide-react-native';
@@ -70,7 +70,7 @@ export function SavingsCard({
       setError(savingsErrorText(result.code));
       return;
     }
-    setError(SAVINGS_ERROR_TEXT.salvar_falhou);
+    setError(UNCERTAIN_TEXT.metas);
   }
 
   if (card.isPending) {

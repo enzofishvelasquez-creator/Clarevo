@@ -634,7 +634,11 @@ describe('a demonstração (fictícia): orçamento de outubro e limite de 60%', 
 
 describe('textos montados', () => {
   it('as frases do enunciado saem exatamente como escritas', () => {
-    expect(BUDGET_TEXT.cardRule).toBe('Compras no cartão contam no mês da compra (cada parcela no seu mês), mesmo antes de a fatura ser paga.');
+    expect(BUDGET_TEXT.cardRule).toBe(
+      'No orçamento, cada compra no cartão conta a partir do mês da compra: a 1ª parcela no mês da compra, a 2ª no mês seguinte, e assim por diante, mesmo antes de a fatura ser paga. Em Pago, ela só entra quando a fatura é paga.',
+    );
+    expect(BUDGET_TEXT.paidRule).toBe('Gastos e contas pagas contam no mês da data do pagamento.');
+    expect(BUDGET_TEXT.rule).toBe(`${BUDGET_TEXT.cardRule} ${BUDGET_TEXT.paidRule}`);
     expect(BUDGET_TEXT.crossedNear('Mercado', 85, 'outubro')).toBe('Mercado chegou a 85% do orçamento de outubro.');
     expect(BUDGET_TEXT.crossedOver('Mercado', 'outubro', 1_230)).toBe('Mercado passou do orçamento de outubro em R$ 12,30.');
     expect(BUDGET_TEXT.crossedOverHidden('Mercado', 'outubro')).toBe('Mercado passou do orçamento de outubro.');

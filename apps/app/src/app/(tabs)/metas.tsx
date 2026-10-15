@@ -38,7 +38,7 @@ export default function MetasScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Screen wide>
-        <AppHeader title={GOALS_TEXT.tabTitle} />
+        <AppHeader title={GOALS_TEXT.tabTitle} context="Pessoal" />
         <Body>
           <FlashBanner message={notice} />
           <SavingsCard contextId={contextId} card={savings} onNotice={setNotice} planInReserve={overview.isPending || Boolean(data)} />

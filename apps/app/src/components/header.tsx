@@ -1,4 +1,4 @@
-import { addMonths, formatMonthBR } from '@clarevo/core';
+import { addMonths, contextPillText, formatMonthBR } from '@clarevo/core';
 import { router } from 'expo-router';
 import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, Users } from 'lucide-react-native';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -85,16 +85,19 @@ function BrandRow() {
  * Cabeçalho das abas: faixa azul de ponta a ponta, conteúdo limitado a 560 px,
  * com logo e avatar em todas as abas (padrão único). `title` aparece abaixo do logo.
  */
-export function AppHeader({ title, children }: { title?: string; children?: ReactNode }) {
+export function AppHeader({ title, context, children }: { title?: string; context?: string; children?: ReactNode }) {
   return (
     <View style={styles.band}>
       <TopInset color={colors.brand} />
       <View style={styles.inner}>
         <BrandRow />
         {title ? (
-          <Txt variant="title" color={colors.textOnBrand} style={styles.title} accessibilityRole="header" aria-level={1}>
-            {title}
-          </Txt>
+          <View style={styles.titleRow}>
+            <Txt variant="title" color={colors.textOnBrand} style={[styles.title, context ? { marginBottom: 0 } : null]} accessibilityRole="header" aria-level={1}>
+              {title}
+            </Txt>
+            {context ? <ContextPill label={context} /> : null}
+          </View>
         ) : null}
         {children}
       </View>
@@ -141,12 +144,18 @@ export function SubHeader({ title, onBack, right, help }: { title: string; onBac
   );
 }
 
-/** Contexto fixo durante o preenchimento ou na leitura de um registro. */
+/**
+ * Contexto fixo durante o preenchimento ou na leitura de um registro. Na demonstração (CL-11), a pílula vira "Demonstração · Pessoal",
+ * no lima do selo das abas, para nenhum formulário nem detalhe parecer uma conta real.
+ */
 export function ContextPill({ label }: { label: string }) {
+  const { auth } = useSession();
+  const demo = auth.mode === 'demo';
+  const text = contextPillText(label, demo);
   return (
-    <View style={styles.pill} accessible accessibilityLabel={`Contexto: ${label}`}>
-      <Txt variant="caption" color={colors.brand} style={{ fontFamily: fonts.bold }}>
-        {label}
+    <View style={[styles.pill, demo && styles.pillDemo]} accessible accessibilityLabel={`Contexto: ${text}`}>
+      <Txt variant="caption" color={demo ? colors.text : colors.brand} style={{ fontFamily: fonts.bold }}>
+        {text}
       </Txt>
     </View>
   );
@@ -241,6 +250,7 @@ const styles = StyleSheet.create({
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space[5], gap: space[3] },
   topRight: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   title: { fontSize: 24, lineHeight: 32, marginBottom: space[4] },
+  titleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[3], rowGap: space[1], marginBottom: space[4] },
   avatar: { minWidth: 44, height: 44, paddingHorizontal: 4, borderRadius: 22, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   eye: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   subBand: { backgroundColor: colors.brand },
@@ -250,6 +260,7 @@ const styles = StyleSheet.create({
   // O título ocupa a largura natural: se não couber numa linha ao lado do contexto, o contexto passa para baixo.
   subTitle: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 },
   pill: { backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: space[1], marginRight: space[3] },
+  pillDemo: { backgroundColor: colors.accent },
   track: { flexDirection: 'row', backgroundColor: colors.brandDeep, borderRadius: radius.md, padding: 4 },
   indicator: { position: 'absolute', left: 4, top: 4, bottom: 4, borderRadius: 13, backgroundColor: colors.surface },
   option: { flex: 1, minHeight: 48, borderRadius: 13, flexDirection: 'row', gap: space[2], alignItems: 'center', justifyContent: 'center' },
