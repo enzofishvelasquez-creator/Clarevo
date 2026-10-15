@@ -7,4 +7,5 @@ export * from './arquivo';
 export * from './dedupe';
 export * from './categorias';
 export * from './revisao';
+export * from './execucao';
 export * from './textos';

@@ -1,4 +1,4 @@
-import { daysBetween, type IsoDate } from '../dates';
+import { daysBetween, type IsoDate, type IsoMonth } from '../dates';
 import { sha256Hex } from '../sha256';
 import type { ParsedLine } from './tipos';
 
@@ -83,33 +83,69 @@ export function importKey(targetId: string, line: Pick<ParsedLine, 'date' | 'amo
   return sha256Hex(base);
 }
 
+/** Parcela que aparece na descrição de uma linha de fatura ("LOJA 03/10" é a parcela 3 de 10). */
+export interface InstallmentMark {
+  number: number;
+  count: number;
+}
+
+/**
+ * Parcela escrita na descrição: "03/10", "3/10", "PARC 03/10". Uma data com ano ("03/10/2026") não conta, nem número maior que o
+ * total ou total fora de 2 a 48 parcelas (o limite do app). null quando não há parcela.
+ */
+export function installmentMark(description: string): InstallmentMark | null {
+  const re = /(?:^|[^\d/])(\d{1,2})\/(\d{1,2})(?![\d/])/g;
+  for (let m = re.exec(description); m !== null; m = re.exec(description)) {
+    const number = Number(m[1]);
+    const count = Number(m[2]);
+    if (count >= 2 && count <= 48 && number >= 1 && number <= count) return { number, count };
+  }
+  return null;
+}
+
 /** Um registro que já existe na conta (gasto ou recebimento) ou no cartão (compra ou estorno), para a marca "Já anotado". */
 export interface ExistingEntry {
   date: IsoDate;
-  /** Positivo; o tipo diz se saiu ou entrou. */
+  /** Positivo; o tipo diz se saiu ou entrou. Numa parcela de compra do cartão, o valor da parcela. */
   amountCents: number;
   description: string;
   kind: 'despesa' | 'receita' | 'compra' | 'estorno';
+  /** Parcela de uma compra parcelada do cartão: a fatura (mês do vencimento) em que ela cai e qual parcela é. */
+  invoiceMonth?: IsoMonth;
+  installmentNumber?: number;
+  installmentCount?: number;
 }
 
 export const DUPLICATE_WINDOW_DAYS = 3;
 
+/** Uma linha do arquivo para comparar com o que já existe. */
+export interface LookalikeLine {
+  date: IsoDate;
+  amountCents: number;
+  description: string;
+  kind: ExistingEntry['kind'];
+  /** Cartão: fatura em que a linha cai e a parcela escrita na descrição, quando houver. */
+  invoiceMonth?: IsoMonth;
+  installment?: InstallmentMark | null;
+}
+
 /**
  * Quais linhas parecem já anotadas: existe um registro do mesmo tipo e do mesmo valor, com dia a até 3 dias de diferença e
  * descrição parecida. Cada registro existente cobre uma linha só (duas compras iguais no mesmo dia, com um registro, marcam uma),
- * a mais próxima no dia primeiro.
+ * a mais próxima no dia primeiro. Linha com parcela na descrição ("LOJA 03/10") também bate com a parcela de uma compra parcelada
+ * já anotada quando é a mesma parcela do mesmo total, ou quando cai na fatura dessa parcela, mesmo com o dia da compra original.
  */
-export function findLookalikes(
-  lines: readonly { date: IsoDate; amountCents: number; description: string; kind: ExistingEntry['kind'] }[],
-  existing: readonly ExistingEntry[],
-): boolean[] {
+export function findLookalikes(lines: readonly LookalikeLine[], existing: readonly ExistingEntry[]): boolean[] {
   const pairs: { line: number; entry: number; gap: number }[] = [];
   lines.forEach((l, i) => {
     existing.forEach((e, j) => {
       if (e.kind !== l.kind || e.amountCents !== l.amountCents) return;
       const gap = Math.abs(daysBetween(e.date, l.date));
-      if (gap > DUPLICATE_WINDOW_DAYS || !similarDescriptions(e.description, l.description)) return;
-      pairs.push({ line: i, entry: j, gap });
+      const mark = l.installment ?? null;
+      const sameInstallment = mark !== null && e.installmentCount === mark.count && e.installmentNumber === mark.number;
+      const sameInvoice = mark !== null && e.invoiceMonth !== undefined && e.invoiceMonth === l.invoiceMonth;
+      if ((gap > DUPLICATE_WINDOW_DAYS && !sameInstallment && !sameInvoice) || !similarDescriptions(e.description, l.description)) return;
+      pairs.push({ line: i, entry: j, gap: sameInstallment || sameInvoice ? Math.min(gap, DUPLICATE_WINDOW_DAYS) : gap });
     });
   });
   pairs.sort((a, b) => a.gap - b.gap || a.line - b.line || a.entry - b.entry);

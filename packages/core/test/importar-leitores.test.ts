@@ -19,6 +19,8 @@ import {
   parseCsvBytes,
   parseCsvText,
   parseFileDate,
+  parseOfxAmount,
+  ofxDate,
   parseOfxBytes,
   parseOfxText,
   readCsvTable,
@@ -190,7 +192,7 @@ NEWFILEUID:NONE
 <STMTTRN>
 <TRNTYPE>DEBIT
 <DTPOSTED>20261006
-<TRNAMT>-1.234,56
+<TRNAMT>-1234.56
 <FITID>EX20261006001
 <NAME>PAGAMENTO FATURA CARTÃO
 </STMTTRN>
@@ -317,6 +319,68 @@ describe('importar: OFX', () => {
     expect(r.ok && r.parse.lines).toEqual([{ ordinal: 1, date: '2026-10-04', description: 'Cafe', amountCents: -350, fitId: null }]);
   });
 
+  it('TRNAMT: leitor próprio, sem milhar; mais de duas casas, mais de um separador ou letras recusam a linha', () => {
+    const cases: [string, number | null][] = [
+      ['-45.90', -4590],
+      ['-45,90', -4590],
+      ['+5000.00', 500000],
+      ['5000', 500000],
+      ['-1500', -150000],
+      ['-1500.5', -150050],
+      ['.50', 50],
+      ['0.00', 0],
+      ['-1.500', null],
+      ['1,500', null],
+      ['-1.234,56', null],
+      ['1,234.56', null],
+      ['1.2.3', null],
+      ['12.', null],
+      ['', null],
+      ['-', null],
+      ['R$ 10.00', null],
+      ['10.00-', null],
+    ];
+    for (const [text, expected] of cases) expect(parseOfxAmount(text), text).toBe(expected);
+    expect(parseOfxAmount('99999999999999.00')).toBeGreaterThan(999_999_999);
+    // A linha com "-1.500" fica de fora (contada), não vira R$ 1.500,00.
+    const r = parseOfxText(
+      '<OFX><BANKMSGSRSV1><STMTRS><BANKTRANLIST><STMTTRN><DTPOSTED>20261004<TRNAMT>-1.500<NAME>A</STMTTRN><STMTTRN><DTPOSTED>20261004<TRNAMT>-1500.00<NAME>B</STMTTRN></BANKTRANLIST></STMTRS></BANKMSGSRSV1></OFX>',
+    );
+    expect(r.ok && [r.parse.ignored, r.parse.lines.map((l) => [l.description, l.amountCents])]).toEqual([1, [['B', -150000]]]);
+  });
+
+  it('DTPOSTED com fuso: converte hora e fuso para o dia no fuso da pessoa; data sem hora vale como escrita', () => {
+    // Sem fuso, só data ou hora zerada: o dia escrito.
+    expect(ofxDate('20261004')).toBe('2026-10-04');
+    expect(ofxDate('20261004120000')).toBe('2026-10-04');
+    expect(ofxDate('20261004000000[0:GMT]')).toBe('2026-10-04');
+    expect(ofxDate('20261004000000[-3:BRT]')).toBe('2026-10-04');
+    // Mesmo fuso da pessoa (São Paulo, -3): o mesmo dia.
+    expect(ofxDate('20261004233000[-3:BRT]')).toBe('2026-10-04');
+    // GMT: 01h30 do dia 5 em GMT é 22h30 do dia 4 em São Paulo.
+    expect(ofxDate('20261005013000[0:GMT]')).toBe('2026-10-04');
+    expect(ofxDate('20261005120000[0:GMT]')).toBe('2026-10-05');
+    // Fuso com fração e fuso positivo; hora com decimais de segundo.
+    expect(ofxDate('20261005003000.000[5.5:IST]')).toBe('2026-10-04');
+    expect(ofxDate('20261004230000[+9:JST]')).toBe('2026-10-04');
+    expect(ofxDate('20261004230000[-8:PST]')).toBe('2026-10-05');
+    // O fuso da pessoa vem do espaço: Rio Branco (-5) vê o dia anterior.
+    expect(ofxDate('20261005013000[0:GMT]', 'America/Rio_Branco')).toBe('2026-10-04');
+    expect(ofxDate('20261005053000[0:GMT]', 'America/Rio_Branco')).toBe('2026-10-05');
+    expect(ofxDate('20261005053000[0:GMT]', 'Fuso/Inexistente')).toBe('2026-10-05');
+    // Data impossível, lixo e fuso fora do possível.
+    expect(ofxDate('20261305')).toBeNull();
+    expect(ofxDate('sem')).toBeNull();
+    expect(ofxDate(undefined)).toBeNull();
+    expect(ofxDate('20261005013000[99:XXX]')).toBe('2026-10-05');
+    const r = parseOfxText('<OFX><BANKMSGSRSV1><STMTRS><BANKTRANLIST><STMTTRN><DTPOSTED>20261005013000[0:GMT]<TRNAMT>-3.50<NAME>Cafe</STMTTRN></BANKTRANLIST></STMTRS></BANKMSGSRSV1></OFX>');
+    expect(r.ok && r.parse.lines[0]!.date).toBe('2026-10-04');
+    const rio = parseOfxText('<OFX><BANKMSGSRSV1><STMTRS><BANKTRANLIST><STMTTRN><DTPOSTED>20261005053000[0:GMT]<TRNAMT>-3.50<NAME>Cafe</STMTTRN></BANKTRANLIST></STMTRS></BANKMSGSRSV1></OFX>', 'America/Rio_Branco');
+    expect(rio.ok && rio.parse.lines[0]!.date).toBe('2026-10-05');
+    const viaFile = readImportFile(utf8('<OFX><BANKMSGSRSV1><STMTRS><BANKTRANLIST><STMTTRN><DTPOSTED>20261005013000[0:GMT]<TRNAMT>-3.50<NAME>Cafe</STMTTRN></BANKTRANLIST></STMTRS></BANKMSGSRSV1></OFX>'), 'a.ofx', 'America/Rio_Branco');
+    expect(viaFile.kind === 'ok' && viaFile.parse.lines[0]!.date).toBe('2026-10-04');
+  });
+
   it('erros: não é OFX, sem lançamentos, outra moeda, linhas demais', () => {
     expect(looksLikeOfx(OFX_SGML_ACCOUNT)).toBe(true);
     expect(looksLikeOfx(OFX_XML_CARD)).toBe(true);
@@ -354,7 +418,8 @@ describe('importar: CSV', () => {
     expect(r.table.delimiter).toBe(';');
     expect(r.parse.source).toBe('csv');
     expect(r.parse.statement).toBeNull();
-    expect(r.parse.cardPositive).toBe(true);
+    // Dois valores negativos e um positivo: o sinal já é o do app, a revisão não inverte numa fatura.
+    expect(r.parse.cardPositive).toBe(false);
     expect(r.parse.ignored).toBe(1);
     expect(r.parse.lines.map((l) => [l.date, l.description, l.amountCents])).toEqual([
       ['2026-10-01', 'PADARIA SÃO JOÃO', -4590],
@@ -480,6 +545,60 @@ describe('importar: CSV', () => {
     const r = parseCsvText('Data;Descrição;Valor\n01/10/2026;Saldo anterior;100,00\n02/10/2026;Zero;0,00\nsem data;X;1,00\n03/10/2026;Total;5,00\n04/10/2026;Real;-3,00\n');
     expect(r.kind === 'ok' && r.parse.ignored).toBe(4);
     expect(r.kind === 'ok' && r.parse.lines.map((l) => l.description)).toEqual(['Real']);
+  });
+});
+
+describe('importar: CSV de fatura com sinais e linhas de saldo', () => {
+  it('fatura com as compras negativas (maioria negativa) não é invertida, e o pagamento recebido positivo fica de fora', () => {
+    const r = parseCsvText('Data;Descrição;Valor\n01/10/2026;Restaurante;-45,90\n02/10/2026;Farmacia;-30,00\n03/10/2026;Pagamento recebido;500,00\n');
+    expect(r.kind).toBe('ok');
+    if (r.kind !== 'ok') return;
+    expect(r.parse.cardPositive).toBe(false);
+    expect(r.parse.lines.map((l) => l.amountCents)).toEqual([-4590, -3000, 50000]);
+  });
+
+  it('fatura com as compras positivas (maioria positiva) é invertida no cartão; empate não inverte', () => {
+    const pos = parseCsvText('Data;Descrição;Valor\n01/10/2026;Restaurante;45,90\n02/10/2026;Farmacia;30,00\n03/10/2026;Pagamento recebido;-500,00\n');
+    expect(pos.kind === 'ok' && pos.parse.cardPositive).toBe(true);
+    const tie = parseCsvText('Data;Descrição;Valor\n01/10/2026;Restaurante;45,90\n03/10/2026;Pagamento recebido;-500,00\n');
+    expect(tie.kind === 'ok' && tie.parse.cardPositive).toBe(false);
+    const withKind = parseCsvText('Data;Descrição;Valor;Tipo\n01/10/2026;Restaurante;45,90;Débito\n02/10/2026;Farmacia;30,00;Débito\n');
+    expect(withKind.kind === 'ok' && withKind.parse.cardPositive).toBe(false);
+  });
+
+  it('linha de saldo ou total sai só quando não tem data válida ou a descrição é exatamente saldo ou total; "Total Express" fica', () => {
+    const text = [
+      'Data;Descrição;Valor',
+      '01/10/2026;Saldo anterior;100,00',
+      '01/10/2026;SALDO DO DIA;100,00',
+      '02/10/2026;Saldo;100,00',
+      '02/10/2026;Total;5,00',
+      'Saldo final;Total do período;7,00',
+      '03/10/2026;Total Express;-25,00',
+      '04/10/2026;Saldo de FGTS;-12,00',
+      '05/10/2026;Compra Total Frutas;-8,00',
+      '',
+    ].join('\n');
+    const r = parseCsvText(text);
+    expect(r.kind).toBe('ok');
+    if (r.kind !== 'ok') return;
+    expect(r.parse.ignored).toBe(5);
+    expect(r.parse.lines.map((l) => l.description)).toEqual(['Total Express', 'Saldo de FGTS', 'Compra Total Frutas']);
+  });
+
+  it('mapeamento manual com débito e crédito separados e com coluna de tipo', () => {
+    const table = readCsvTable('01/10/2026;Padaria;45,90;;x\n02/10/2026;Salário;;5000,00;y\n');
+    const two = applyMapping(table, { firstRow: 0, columns: { date: 0, description: 1, amount: -1, debit: 2, credit: 3, kind: -1 } });
+    expect('error' in two).toBe(false);
+    if ('error' in two) return;
+    expect(two.cardPositive).toBe(false);
+    expect(two.lines.map((l) => l.amountCents)).toEqual([-4590, 500000]);
+    const kinds = readCsvTable('01/10/2026;Padaria;45,90;D\n02/10/2026;Salário;5000,00;C\n');
+    const withKind = applyMapping(kinds, { firstRow: 0, columns: { date: 0, description: 1, amount: 2, debit: -1, credit: -1, kind: 3 } });
+    expect('error' in withKind).toBe(false);
+    if ('error' in withKind) return;
+    expect(withKind.cardPositive).toBe(false);
+    expect(withKind.lines.map((l) => l.amountCents)).toEqual([-4590, 500000]);
   });
 });
 

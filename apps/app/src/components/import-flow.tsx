@@ -1,11 +1,18 @@
 import {
+  EMPTY_TALLY,
   IMPORT_ERROR_TEXT,
   IMPORT_TEXT,
   allSelected,
   applyMapping,
+  attemptProgress,
+  attemptSnapshot,
+  bankAttempt,
   buildReview,
   chunkItems,
+  failedItemIndex,
+  formatDateBR,
   importSaveErrorText,
+  importSummaryOf,
   importedSummary,
   includedLines,
   lineProblem,
@@ -17,7 +24,9 @@ import {
   toImportItems,
   updateLine,
   type CsvTable,
+  type ImportAttempt,
   type ImportDestination,
+  type ImportTally,
   type ImportParse,
   type ImportResult,
   type ReviewLine,
@@ -26,12 +35,12 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { CircleAlert, FileUp, ShieldCheck } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 
 import { AccountPicker } from '@/components/account-picker';
 import { FormFooter } from '@/components/form-footer';
 import { ContextPill, SubHeader } from '@/components/header';
-import { ColumnChoice, ReviewRow, guessColumns } from '@/components/import-parts';
+import { ColumnChoice, ReviewRow, guessColumns, maskCell } from '@/components/import-parts';
 import { useLeaveGuard } from '@/components/leave-guard';
 import { MoneyTxt } from '@/components/money-text';
 import { CheckOption, ChoiceGroup } from '@/components/series-parts';
@@ -39,6 +48,7 @@ import { Banner, Button, Card, Chip, LinkButton, Screen, Txt } from '@/component
 import { getPrefs, updatePrefs } from '@/lib/device-prefs';
 import { flash } from '@/lib/flash';
 import { latestMonthOf, loadImportContext, type ImportContext } from '@/lib/import-context';
+import { moneyText, useValuesHidden } from '@/lib/privacy';
 import { pickImportFile, type PickedImport } from '@/lib/import-file';
 import { isRefusal, useCards, useImportRecords, useSpace, useView } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
@@ -49,11 +59,18 @@ type Step = 'arquivo' | 'colunas' | 'destino' | 'revisar' | 'pronto';
 /** Quantas linhas a lista mostra de cada vez (um arquivo pode ter até 5.000). */
 const PAGE = 100;
 
-/** O mapeamento de colunas que a pessoa escolhe, em índices a partir de zero. */
+/**
+ * O mapeamento de colunas que a pessoa escolhe, em índices a partir de zero. `two`: débito e crédito em colunas separadas (em vez
+ * de uma coluna de valor); `kind`: coluna de tipo (D ou C), ou -1 quando não há.
+ */
 interface Mapping {
   date: number;
   description: number;
   amount: number;
+  debit: number;
+  credit: number;
+  kind: number;
+  two: boolean;
   header: boolean;
 }
 
@@ -67,6 +84,8 @@ export function ImportFlow() {
   const { today, user, auth } = useSession();
   const { setMonth, currentMonth } = useView();
   const personal = useSpace();
+  const hidden = useValuesHidden();
+  const timeZone = personal.data?.timeZone;
   const contextId = personal.data?.personalContextId;
   const accounts = personal.data?.accounts ?? [];
   const cards = useCards(contextId);
@@ -79,6 +98,8 @@ export function ImportFlow() {
   const [table, setTable] = useState<CsvTable | null>(null);
   const [mapping, setMapping] = useState<Mapping | null>(null);
   const [mappingError, setMappingError] = useState<string | null>(null);
+  /** A planilha escolhida não tem sinal nem tipo: a pessoa precisa confirmar que as linhas serão lidas todas como entrada (ou compra). */
+  const [noSignAsk, setNoSignAsk] = useState(false);
   const [reading, setReading] = useState(false);
   const [readError, setReadError] = useState<string | null>(null);
   const [destination, setDestination] = useState<ImportDestination | null>(null);
@@ -95,11 +116,15 @@ export function ImportFlow() {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
-  /** Lotes já gravados nesta tentativa (por posição) e a chave do conjunto: repetir com o mesmo conteúdo repete as mesmas chaves. */
-  const attempt = useRef<{ snapshot: string; base: string; results: ImportResult[] } | null>(null);
-  /** Linhas gravadas por tentativas anteriores que depois foram refeitas (recusa no meio): somam no resumo final. */
-  const carried = useRef<ImportResult>({ created: 0, skipped: 0 });
-
+  /** A tentativa em curso: lotes já gravados (por posição) e a chave do conjunto; repetir com o mesmo conteúdo repete as mesmas chaves. */
+  const attempt = useRef<ImportAttempt | null>(null);
+  /** O que tentativas anteriores já gravaram e que depois foram refeitas (recusa no meio, ou linhas mudadas): soma no resumo final. */
+  const tally = useRef<ImportTally>(EMPTY_TALLY);
+  /** Rolagem até a linha que o banco recusou: a posição do cartão da lista e a de cada linha, medidas ao desenhar. */
+  const scroller = useRef<ScrollView>(null);
+  const listY = useRef(0);
+  const rowY = useRef<Map<string, number>>(new Map());
+  const pendingScroll = useRef<string | null>(null);
   const target = destination === 'conta' ? accountId : cardId;
   const activeCards = (cards.data ?? []).filter((c) => c.status === 'ativo');
   const reviewing = step === 'revisar' && !result;
@@ -128,14 +153,21 @@ export function ImportFlow() {
       // Planilha sem cabeçalho: se a primeira linha já tem uma data, ela é um lançamento, não os nomes das colunas.
       const header = !(r.table.rows[0] ?? []).some((cell) => parseFileDate(cell) !== null);
       const guess = guessColumns(r.table, header ? 1 : 0);
-      setMapping({ date: guess.date, description: guess.description, amount: guess.amount, header });
+      setMapping({ date: guess.date, description: guess.description, amount: guess.amount, debit: -1, credit: -1, kind: -1, two: false, header });
       setMappingError(null);
+      setNoSignAsk(false);
       setStep('colunas');
       return;
     }
     setParse(r.parse);
     setTable(r.table);
     startDestination(r.parse);
+  }
+
+  function changeMapping(next: Mapping) {
+    setMapping(next);
+    setNoSignAsk(false);
+    setMappingError(null);
   }
 
   function startDestination(p: ImportParse) {
@@ -149,7 +181,7 @@ export function ImportFlow() {
     setReadError(null);
     setReading(true);
     try {
-      const picked = await pickImportFile();
+      const picked = await pickImportFile(timeZone);
       if (!picked.cancelled) accept(picked);
     } finally {
       setReading(false);
@@ -159,18 +191,29 @@ export function ImportFlow() {
   // ---- 2. Colunas -----------------------------------------------------------------------------------------------------------
   function applyColumns() {
     if (!table || !mapping) return;
-    if (new Set([mapping.date, mapping.description, mapping.amount]).size < 3) {
+    const chosen = mapping.two ? [mapping.date, mapping.description, mapping.debit, mapping.credit] : [mapping.date, mapping.description, mapping.amount];
+    const kindClash = !mapping.two && mapping.kind >= 0 && chosen.includes(mapping.kind);
+    if (new Set(chosen).size < chosen.length || chosen.some((c) => c < 0) || kindClash) {
       setMappingError(IMPORT_TEXT.columnsNeedAll);
       return;
     }
     const out = applyMapping(table, {
       firstRow: mapping.header ? 1 : 0,
-      columns: { date: mapping.date, description: mapping.description, amount: mapping.amount, debit: -1, credit: -1, kind: -1 },
+      columns: mapping.two
+        ? { date: mapping.date, description: mapping.description, amount: -1, debit: mapping.debit, credit: mapping.credit, kind: -1 }
+        : { date: mapping.date, description: mapping.description, amount: mapping.amount, debit: -1, credit: -1, kind: mapping.kind },
     });
     if ('error' in out) {
       setMappingError(IMPORT_ERROR_TEXT[out.error]);
       return;
     }
+    // Sem sinal e sem tipo, todas as linhas têm o mesmo sentido: pede a confirmação antes de seguir.
+    if (!mapping.two && !noSignAsk && out.lines.every((l) => l.amountCents > 0)) {
+      setNoSignAsk(true);
+      setMappingError(null);
+      return;
+    }
+    setNoSignAsk(false);
     setMappingError(null);
     setParse(out);
     startDestination(out);
@@ -251,6 +294,29 @@ export function ImportFlow() {
   );
 
   // ---- 4. Importar ----------------------------------------------------------------------------------------------------------
+  /** Rola até a linha pedida, se já foi desenhada (senão, quando ela aparecer). */
+  const scrollToPending = useCallback(() => {
+    const id = pendingScroll.current;
+    const y = id ? rowY.current.get(id) : undefined;
+    if (id === null || y === undefined) return;
+    pendingScroll.current = null;
+    scroller.current?.scrollTo({ y: Math.max(0, listY.current + y - space[4]), animated: false });
+  }, []);
+  const onListLayout = useCallback(
+    (y: number) => {
+      listY.current = y;
+      scrollToPending();
+    },
+    [scrollToPending],
+  );
+  const onRowLayout = useCallback(
+    (id: string, y: number) => {
+      rowY.current.set(id, y);
+      if (pendingScroll.current === id) scrollToPending();
+    },
+    [scrollToPending],
+  );
+
   async function runImport() {
     if (saving || !contextId || !destination || !target) return;
     const chosen = includedLines(lines);
@@ -268,8 +334,23 @@ export function ImportFlow() {
     }
     const items = toImportItems(lines);
     const chunks = chunkItems(items);
-    const snapshot = JSON.stringify([destination, target, items.map((i) => [i.importKey, i.description, i.category, i.amountCents, i.occurredOn, i.kind])]);
-    if (!attempt.current || attempt.current.snapshot !== snapshot) attempt.current = { snapshot, base: newOperationKey(), results: [] };
+    const snapshot = attemptSnapshot(destination, target, items);
+    const total = items.length;
+    if (attempt.current && attempt.current.snapshot !== snapshot) {
+      if (attempt.current.results.length > 0) {
+        // A pessoa mudou as linhas depois de uma falha de rede no meio: os lotes que já entraram ficam contados (a chave dos novos
+        // lotes é outra) e a revisão é refeita, para as linhas que já entraram não irem de novo.
+        const gone = attempt.current;
+        const progress = attemptProgress(gone);
+        tally.current = bankAttempt(tally.current, gone);
+        attempt.current = null;
+        setSaveError(IMPORT_TEXT.partial(progress.sent, progress.total));
+        await prepare(lines);
+        return;
+      }
+      attempt.current = null;
+    }
+    if (!attempt.current) attempt.current = { snapshot, base: newOperationKey(), results: [], chunks };
     const current = attempt.current;
     setSaveError(null);
     setSaving(true);
@@ -282,40 +363,48 @@ export function ImportFlow() {
       }
     } catch (e) {
       const done = current.results.length;
+      const sentCount = attemptProgress(current).sent;
       if (isRefusal(e)) {
         const err = e as { code: string; detail?: string };
+        // A linha que o banco recusou (item=N dentro do lote): o texto a cita e a tela abre a edição dela.
+        const at = failedItemIndex(err.detail, done);
+        const refused = at === null ? undefined : chosen[at];
+        const shownLine = refused
+          ? { description: refused.description.trim(), amount: moneyText(refused.amountCents, hidden), date: formatDateBR(refused.date) }
+          : undefined;
+        setSaveError(`${importSaveErrorText(err.code, shownLine)}${done > 0 ? ` ${IMPORT_TEXT.partial(sentCount, total)}` : ''}`);
         // O que já entrou fica (com a chave de cada linha); o lote recusado não foi gravado. Refaz a revisão com o que mudou.
-        setSaveError(
-          `${importSaveErrorText(err.code, err.detail)}${done > 0 ? ` ${IMPORT_TEXT.partial(chunks.slice(0, done).reduce((n, c) => n + c.length, 0), items.length)}` : ''}`,
-        );
         if (done > 0) {
-          carried.current = {
-            created: carried.current.created + current.results.reduce((n, r) => n + r.created, 0),
-            skipped: carried.current.skipped + current.results.reduce((n, r) => n + r.skipped, 0),
-          };
+          tally.current = bankAttempt(tally.current, current);
           attempt.current = null;
           await prepare(lines);
         }
+        if (refused) {
+          const position = lines.findIndex((l) => l.id === refused.id);
+          setShown((n) => Math.max(n, position + 1));
+          setEditing(refused.id);
+          pendingScroll.current = refused.id;
+          scrollToPending();
+        }
       } else {
-        setSaveError(done > 0 ? IMPORT_TEXT.partial(chunks.slice(0, done).reduce((n, c) => n + c.length, 0), items.length) : importSaveErrorText('rede'));
+        setSaveError(done > 0 ? IMPORT_TEXT.partial(sentCount, total) : importSaveErrorText('rede'));
       }
       return;
     } finally {
       setSaving(false);
       setProgress(null);
     }
-    const total = {
-      created: carried.current.created + current.results.reduce((n, r) => n + r.created, 0),
-      skipped: carried.current.skipped + current.results.reduce((n, r) => n + r.skipped, 0),
-    };
+    // O resumo soma o que o banco criou e pulou (chave repetida) com as linhas "Já anotado" que ficaram de fora da seleção.
+    const summary = importSummaryOf(tally.current, current, lines);
     attempt.current = null;
-    carried.current = { created: 0, skipped: 0 };
+    tally.current = EMPTY_TALLY;
+    rowY.current = new Map();
     if (user) {
       updatePrefs(user.id, { importCategories: rememberCategories(memory(), chosen.map((l) => ({ description: l.description.trim(), category: l.category }))) }, persist);
     }
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     setMonth(latestMonthOf(chosen.map((l) => l.date), currentMonth));
-    setResult(total);
+    setResult(summary);
     setStep('pronto');
   }
 
@@ -335,7 +424,8 @@ export function ImportFlow() {
     setReadError(null);
     setInvert(false);
     attempt.current = null;
-    carried.current = { created: 0, skipped: 0 };
+    tally.current = EMPTY_TALLY;
+    setNoSignAsk(false);
   }
 
   function seeMovements() {
@@ -343,13 +433,14 @@ export function ImportFlow() {
     router.replace('/movimentacoes');
   }
 
+  const sample = mapping?.header ? 1 : 0;
   const counts = reviewCounts(lines);
   const visible = lines.slice(0, shown);
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <SubHeader title={IMPORT_TEXT.screenTitle} onBack={guard.requestCancel} right={<ContextPill label="Importando em Pessoal" />} />
-      <Screen contentStyle={styles.body}>
+      <Screen scrollRef={scroller} contentStyle={styles.body}>
         {step === 'arquivo' ? (
           <Card style={{ gap: space[4] }}>
             <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -380,30 +471,49 @@ export function ImportFlow() {
               <Txt variant="label">{IMPORT_TEXT.columnsPreview}</Txt>
               {table.rows.slice(0, 4).map((r, i) => (
                 <Txt key={i} variant="caption" color={colors.textSecondary} numberOfLines={2}>
-                  {r.slice(0, 6).join(' | ')}
+                  {r.slice(0, 6).map((cell) => maskCell(cell, hidden)).join(' | ')}
                 </Txt>
               ))}
             </View>
-            <CheckOption
-              label={IMPORT_TEXT.firstRowHeader}
-              checked={mapping.header}
-              onPress={() => setMapping({ ...mapping, header: !mapping.header })}
-            />
-            <ColumnChoice label={IMPORT_TEXT.columnDate} table={table} sampleRow={mapping.header ? 1 : 0} value={mapping.date} onChange={(c) => setMapping({ ...mapping, date: c })} />
-            <ColumnChoice
-              label={IMPORT_TEXT.columnDescription}
-              table={table}
-              sampleRow={mapping.header ? 1 : 0}
-              value={mapping.description}
-              onChange={(c) => setMapping({ ...mapping, description: c })}
-            />
-            <ColumnChoice label={IMPORT_TEXT.columnAmount} table={table} sampleRow={mapping.header ? 1 : 0} value={mapping.amount} onChange={(c) => setMapping({ ...mapping, amount: c })} />
+            <CheckOption label={IMPORT_TEXT.firstRowHeader} checked={mapping.header} onPress={() => changeMapping({ ...mapping, header: !mapping.header })} />
+            <ColumnChoice label={IMPORT_TEXT.columnDate} table={table} sampleRow={sample} value={mapping.date} onChange={(c) => changeMapping({ ...mapping, date: c })} />
+            <ColumnChoice label={IMPORT_TEXT.columnDescription} table={table} sampleRow={sample} value={mapping.description} onChange={(c) => changeMapping({ ...mapping, description: c })} />
+            <ChoiceGroup label={IMPORT_TEXT.columnsAmountTitle}>
+              <Chip label={IMPORT_TEXT.columnsAmountOne} selected={!mapping.two} onPress={() => changeMapping({ ...mapping, two: false })} />
+              <Chip label={IMPORT_TEXT.columnsAmountTwo} selected={mapping.two} onPress={() => changeMapping({ ...mapping, two: true })} />
+            </ChoiceGroup>
+            {mapping.two ? (
+              <>
+                <ColumnChoice label={IMPORT_TEXT.columnDebit} table={table} sampleRow={sample} value={mapping.debit} onChange={(c) => changeMapping({ ...mapping, debit: c })} />
+                <ColumnChoice label={IMPORT_TEXT.columnCredit} table={table} sampleRow={sample} value={mapping.credit} onChange={(c) => changeMapping({ ...mapping, credit: c })} />
+              </>
+            ) : (
+              <>
+                <ColumnChoice label={IMPORT_TEXT.columnAmount} table={table} sampleRow={sample} value={mapping.amount} onChange={(c) => changeMapping({ ...mapping, amount: c })} />
+                <ColumnChoice
+                  label={IMPORT_TEXT.columnKind}
+                  hint={IMPORT_TEXT.columnKindHint}
+                  noneLabel={IMPORT_TEXT.columnKindNone}
+                  table={table}
+                  sampleRow={sample}
+                  value={mapping.kind}
+                  onChange={(c) => changeMapping({ ...mapping, kind: c })}
+                />
+              </>
+            )}
+            {noSignAsk ? (
+              <Banner tone="info" icon={CircleAlert}>
+                <Txt variant="label" accessibilityRole="alert">
+                  {IMPORT_TEXT.columnsNoSign}
+                </Txt>
+              </Banner>
+            ) : null}
             {mappingError ? (
               <Txt variant="label" color={colors.error} accessibilityRole="alert">
                 {mappingError}
               </Txt>
             ) : null}
-            <Button label={IMPORT_TEXT.columnsApply} onPress={applyColumns} />
+            <Button label={noSignAsk ? IMPORT_TEXT.columnsNoSignConfirm : IMPORT_TEXT.columnsApply} onPress={applyColumns} />
             <LinkButton label={IMPORT_TEXT.pickFileOther} onPress={again} />
           </Card>
         ) : null}
@@ -522,14 +632,18 @@ export function ImportFlow() {
                 onPress={() => setLines((all) => setAll(all, !allSelected(all)))}
               />
             </Card>
+            <View onLayout={(e: LayoutChangeEvent) => onListLayout(e.nativeEvent.layout.y)}>
             <Card style={{ paddingVertical: space[2] }}>
               {visible.map((l, i) => (
-                <ReviewRow key={l.id} line={l} editing={editing === l.id} last={i === visible.length - 1} onToggle={toggle} onEdit={setEditing} onChange={change} />
+                <View key={l.id} onLayout={(e) => onRowLayout(l.id, e.nativeEvent.layout.y)}>
+                  <ReviewRow line={l} editing={editing === l.id} last={i === visible.length - 1} onToggle={toggle} onEdit={setEditing} onChange={change} />
+                </View>
               ))}
               {shown < lines.length ? (
                 <Button label={IMPORT_TEXT.showMore(Math.min(PAGE, lines.length - shown), lines.length - shown)} tone="ghost" onPress={() => setShown((n) => n + PAGE)} />
               ) : null}
             </Card>
+            </View>
           </>
         ) : null}
 

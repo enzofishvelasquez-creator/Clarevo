@@ -1,6 +1,6 @@
 import { parseCsvText, type CsvTable } from './csv';
 import { decodeImportBytes } from './decode';
-import { looksLikeOfx, parseOfxText } from './ofx';
+import { looksLikeOfx, OFX_DEFAULT_TIME_ZONE, parseOfxText } from './ofx';
 import { IMPORT_MAX_BYTES, type ImportErrorCode, type ImportParse } from './tipos';
 
 /**
@@ -25,14 +25,15 @@ function looksBinary(bytes: Uint8Array): boolean {
   return !utf16 && zeros > 0;
 }
 
-export function readImportFile(bytes: Uint8Array, _name = ''): ImportRead {
+/** `timeZone`: o fuso do espaço, para converter a hora de um OFX que informa o fuso (padrão São Paulo). */
+export function readImportFile(bytes: Uint8Array, _name = '', timeZone: string = OFX_DEFAULT_TIME_ZONE): ImportRead {
   if (bytes.length === 0) return { kind: 'erro', code: 'arquivo_vazio' };
   if (bytes.length > IMPORT_MAX_BYTES) return { kind: 'erro', code: 'arquivo_grande' };
   if (looksBinary(bytes)) return { kind: 'erro', code: 'formato_desconhecido' };
   const { text } = decodeImportBytes(bytes);
   if (text.trim() === '') return { kind: 'erro', code: 'arquivo_vazio' };
   if (looksLikeOfx(text)) {
-    const r = parseOfxText(text);
+    const r = parseOfxText(text, timeZone);
     return r.ok ? { kind: 'ok', parse: r.parse, table: null } : { kind: 'erro', code: r.code };
   }
   const csv = parseCsvText(text);

@@ -1,6 +1,8 @@
 import {
+  addMonths,
   existingMonths,
   importKeys,
+  installmentAmounts,
   type Card,
   type ExistingEntry,
   type ImportDestination,
@@ -44,7 +46,23 @@ export async function loadImportContext(
   const [entries, invoices] = await Promise.all([repo.listCardEntries(targetId), card ? repo.listInvoiceItems(card.id) : Promise.resolve([])]);
   const existing: ExistingEntry[] = [];
   for (const e of entries) {
-    if (e.kind === 'compra' && e.purchasedOn) existing.push({ date: e.purchasedOn, amountCents: e.amountCents, description: e.description ?? '', kind: 'compra' });
+    if (e.kind !== 'compra' || !e.purchasedOn) continue;
+    const description = e.description ?? '';
+    existing.push({ date: e.purchasedOn, amountCents: e.amountCents, description, kind: 'compra' });
+    // Compra parcelada: a fatura traz o valor de cada parcela ("LOJA 03/10"), na fatura em que ela cai.
+    if (e.installments > 1) {
+      installmentAmounts(e.amountCents, e.installments).forEach((amountCents, i) =>
+        existing.push({
+          date: e.purchasedOn!,
+          amountCents,
+          description,
+          kind: 'compra',
+          invoiceMonth: addMonths(e.invoiceMonth, i),
+          installmentNumber: i + 1,
+          installmentCount: e.installments,
+        }),
+      );
+    }
   }
   const paidMonths = new Set(invoices.filter((i) => i.status === 'paga' || i.status === 'paga_em_parte').map((i) => i.month));
   return { existing, importedKeys, paidMonths };

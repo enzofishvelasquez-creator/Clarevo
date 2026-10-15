@@ -190,7 +190,7 @@ import {
 import { APP_SCREENS, APP_SEARCH_TEXT, BAR_TEXT, GOALS_NAV_TEXT, PAYABLES_NAV_TEXT, SUMMARY_NAV_TEXT, searchAppScreens } from '../src';
 import { DEFAULT_SEARCH_DRAFT, SEARCH_PAGE, SEARCH_PERIODS, SEARCH_TEXT, searchFromDraft } from '../src';
 import { SUBSCRIPTION_ERROR_TEXT, SUBSCRIPTION_TEXT, subscriptionCount, subscriptionErrorText } from '../src';
-import { IMPORT_ERROR_TEXT, IMPORT_SAVE_ERROR_TEXT, IMPORT_TEXT, importSaveErrorText, importedSummary, reviewLineA11y } from '../src';
+import { IMPORT_ERROR_TEXT, IMPORT_SAVE_ERROR_TEXT, IMPORT_TEXT, failedItemIndex, importSaveErrorText, importedSummary, reviewLineA11y } from '../src';
 
 /**
  * Teste de textos (seção 5): sem indicação de produto financeiro, promessa de rendimento, travessões longos
@@ -2119,7 +2119,9 @@ describe('textos de importar extrato ou fatura (D-048)', () => {
     importedSummary(18, 0),
     importedSummary(0, 4),
     importedSummary(0, 0),
-    importSaveErrorText('fatura_paga', 'item=3'),
+    importSaveErrorText('fatura_paga', { description: 'Padaria São João', amount: 'R$ 45,90', date: '02/10/2026' }),
+    importSaveErrorText('fatura_paga', { description: '', amount: 'R$ ••••', date: '02/10/2026' }),
+    importSaveErrorText('fatura_paga'),
     importSaveErrorText('inexistente'),
     reviewLineA11y('Padaria', 4590, '2026-10-02', 'Saída', 'Já anotado'),
   ];
@@ -2140,7 +2142,7 @@ describe('textos de importar extrato ou fatura (D-048)', () => {
       const caught = [FORBIDDEN, JUDGMENT, GENDERED, BRANDS].some((re) => re.test(bad));
       expect(caught, bad).toBe(true);
     }
-    for (const ok of [IMPORT_TEXT.rowTitle, IMPORT_TEXT.rowCaption, IMPORT_TEXT.labels.ja_anotado, IMPORT_TEXT.labels.pagamento_fatura, IMPORT_TEXT.labels.transferencia]) {
+    for (const ok of [IMPORT_TEXT.rowTitle, IMPORT_TEXT.rowCaption, IMPORT_TEXT.labels.ja_anotado, IMPORT_TEXT.labels.parcela, IMPORT_TEXT.labels.pagamento_fatura, IMPORT_TEXT.labels.transferencia]) {
       expect([FORBIDDEN, JUDGMENT, GENDERED, BRANDS].some((re) => re.test(ok)), ok).toBe(false);
     }
   });
@@ -2151,6 +2153,19 @@ describe('textos de importar extrato ou fatura (D-048)', () => {
     expect(IMPORT_TEXT.labels.ja_anotado).toBe('Já anotado');
     expect(IMPORT_TEXT.labels.pagamento_fatura).toBe('Parece pagamento de fatura');
     expect(IMPORT_TEXT.labels.transferencia).toBe('Parece transferência');
+    expect(IMPORT_TEXT.labels.parcela).toBe('Parece parcela');
+    expect(IMPORT_TEXT.labelHints.parcela).toBe('Compra parcelada: anote uma vez em Anotar gasto, com o número de parcelas.');
+    expect(IMPORT_TEXT.reading).toBe('Lendo o arquivo…');
+    expect(importSaveErrorText('fatura_paga', { description: 'Padaria', amount: 'R$ 45,90', date: '02/10/2026' })).toBe(
+      `${IMPORT_SAVE_ERROR_TEXT.fatura_paga} Linha: Padaria, R$ 45,90, 02/10/2026.`,
+    );
+    expect(importSaveErrorText('fatura_paga')).toBe(IMPORT_SAVE_ERROR_TEXT.fatura_paga);
+    expect(failedItemIndex('item=3', 0)).toBe(2);
+    expect(failedItemIndex('item=1', 2)).toBe(1000);
+    expect(failedItemIndex('item=500', 1)).toBe(999);
+    expect(failedItemIndex('item=0', 0)).toBeNull();
+    expect(failedItemIndex('outro', 0)).toBeNull();
+    expect(failedItemIndex(undefined, 0)).toBeNull();
     expect(IMPORT_TEXT.selectAll).toBe('Selecionar tudo');
     expect(IMPORT_TEXT.seeInMovements).toBe('Ver em Movimentos');
     expect(IMPORT_TEXT.balanceIgnored).toContain('saldo');

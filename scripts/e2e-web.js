@@ -7356,6 +7356,15 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     'date,category,title,amount', '2026-10-04,restaurante,Cafeteria Central,18.50', '2026-10-05,mercado,Mercado do bairro,80.50', '2026-10-06,compras,Cinema Centro,59.90',
     '2026-10-05,pagamento,Estorno cinema,-40.00', '2026-10-06,pagamento,Pagamento recebido,-150.00', ''].join('\n'));
   const i1NoHeader = i1File('sem-cabecalho.csv', ['01/10/2026;PADARIA;-45,90;x', '02/10/2026;SALARIO;5000,00;y', ''].join('\n'));
+  // Revisão I1: fatura com as compras negativas (o pagamento recebido é o valor positivo); fatura positiva com uma linha de
+  // pagamento entre as compras; fatura com parcelas; colunas de débito e crédito; coluna de tipo; planilha sem sinal; OFX com fuso.
+  const i1CardNeg = i1File('fatura-negativa.csv', ['Data;Descrição;Valor', '04/10/2026;Restaurante;-45,90', '05/10/2026;Farmacia;-30,00', '06/10/2026;Pagamento recebido;500,00', ''].join('\n'));
+  const i1CardPay = i1File('fatura-pagamento.csv', ['Data;Descrição;Valor', '04/10/2026;Restaurante;45,90', '05/10/2026;Farmacia;30,00', '06/10/2026;Padaria;12,00', '06/10/2026;Pagamento de fatura;500,00', ''].join('\n'));
+  const i1Parc = i1File('fatura-parcelas.csv', ['Data;Descrição;Valor', '05/10/2026;LOJA DE MOVEIS 02/03;120,00', '06/10/2026;PAPELARIA CENTRAL 01/03;50,00', '06/10/2026;Cafe Central;8,00', '05/10/2026;Mercado do bairro;80,50', ''].join('\n'));
+  const i1TwoCols = i1File('debito-credito.csv', ['01/10/2026;PADARIA;45,90;;x', '02/10/2026;SALARIO;;5000,00;y', ''].join('\n'));
+  const i1Kind = i1File('com-tipo.csv', ['01/10/2026;PADARIA;45,90;D', '02/10/2026;SALARIO;5000,00;C', ''].join('\n'));
+  const i1NoSign = i1File('sem-sinal.csv', ['01/10/2026;PADARIA;45,90;x', '02/10/2026;SALARIO;5000,00;y', ''].join('\n'));
+  const i1OfxTz = i1File('extrato-fuso.ofx', '<OFX><BANKMSGSRSV1><STMTRS><CURDEF>BRL<BANKTRANLIST><STMTTRN><DTPOSTED>20261005013000[0:GMT]<TRNAMT>-23.50<FITID>TZ1<MEMO>CINEMA NOITE</STMTTRN><STMTTRN><DTPOSTED>20261005<TRNAMT>-1.500<FITID>TZ2<MEMO>MILHAR AMBIGUO</STMTTRN></BANKTRANLIST></STMTRS></BANKMSGSRSV1></OFX>');
   const i1Pdf = i1File('lista.pdf', Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n'));
   const i1Big = i1File('grande.csv', 'Data;Descrição;Valor\n' + '01/09/2026;Linha de teste com texto comprido para encher o arquivo;-1,00\n'.repeat(80000));
   const i1Many = i1File('muitas.csv', 'Data;Descrição;Valor\n' + Array.from({ length: 5001 }, (_, i) => `01/09/2026;Linha ${i + 1};-1,00`).join('\n') + '\n');
@@ -7520,6 +7529,47 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await goResumo().catch(() => {});
   await expectTotals('I1 Resumo depois da fatura: compras no cartão não entram em Pago (nada muda)', 'R$ 11.250,00', 'R$ 4.155,70', 'R$ 7.094,30', 'R$ 650,00');
 
+  // ---- 5b. Revisão da fatura: sinais, pagamento entre as compras, parcelas e o resumo com "já estavam anotados" ----
+  // Compras negativas e "Pagamento recebido" positivo: nada é invertido; as compras entram e o pagamento fica de fora.
+  await i1Open(); await i1Pick(i1CardNeg); await waitText('Arquivo lido: fatura-negativa.csv', 12000);
+  await radio('Cartão de crédito').click(); await p.waitForTimeout(300); await i1Review();
+  t1 = await i1Keep(); boxes = await i1Boxes();
+  ok('I1 fatura com as compras negativas: as duas compras vêm marcadas e o "Pagamento recebido" positivo fica de fora (não vira compra)', t1.includes('3 linhas · 2 marcadas') && t1.includes('04/10/2026 · Compra') && t1.includes('Pagamento da fatura, não entra') &&
+    JSON.stringify(boxes.map((b) => [b[1], b[2] === 'true'])) === JSON.stringify([['true', false], ['true', false], ['false', true]]), JSON.stringify(boxes));
+  await i1Leave();
+  // Compras positivas com uma linha de pagamento entre elas: a palavra a denuncia, desmarcada mas podendo ser marcada.
+  await i1Open(); await i1Pick(i1CardPay); await waitText('Arquivo lido: fatura-pagamento.csv', 12000);
+  await radio('Cartão de crédito').click(); await p.waitForTimeout(300); await i1Review();
+  t1 = await i1Keep(); boxes = await i1Boxes();
+  ok('I1 fatura com uma linha de pagamento entre as compras: "Parece pagamento de fatura", desmarcada e com caixa para marcar', t1.includes('4 linhas · 3 marcadas') && t1.includes('Parece pagamento de fatura') && t1.includes('O pagamento da fatura já é registrado em Pagar fatura.') &&
+    JSON.stringify(boxes.map((b) => [b[1], b[2] === 'true'])) === JSON.stringify([['true', false], ['true', false], ['true', false], ['false', false]]), JSON.stringify(boxes));
+  await i1Leave();
+  // Compra parcelada já anotada: 3 parcelas de R$ 120,00 (a 1ª na fatura de novembro).
+  await otherDevice(async (repo, ctx) => {
+    const card = (await repo.listCards(ctx))[0];
+    await repo.addCardPurchase('i1-parcelada-0001', card.id, { description: 'Loja de móveis', category: 'Lazer', purchasedOn: '2026-10-05', totalCents: 36000, installments: 3 });
+  });
+  await p.waitForTimeout(500);
+  await i1Open(); await i1Pick(i1Parc); await waitText('Arquivo lido: fatura-parcelas.csv', 12000);
+  await radio('Cartão de crédito').click(); await p.waitForTimeout(300); await i1Review();
+  t1 = await i1Keep(); boxes = await i1Boxes();
+  ok('I1 fatura com parcelas: a parcela da compra já anotada vem "Já anotado", a outra "Parece parcela" com a explicação, e só o café fica marcado',
+    t1.includes('4 linhas · 1 marcada') && (t1.match(/Já anotado/g) ?? []).length === 2 && t1.includes('Parece parcela') && t1.includes('Compra parcelada: anote uma vez em Anotar gasto, com o número de parcelas.') &&
+    JSON.stringify(boxes.map((b) => [b[1], b[2] === 'true'])) === JSON.stringify([['false', false], ['false', false], ['true', false], ['false', true]]), JSON.stringify(boxes));
+  await atWidths(async (w) => { await layoutChecks(`I1 revisar fatura com parcelas ${w}px`); if (w === 390) await shot('313_importar_parcelas'); });
+  // O resumo diz quantas linhas já estavam anotadas (a parcela por semelhança e o mercado pela chave) e quantas foram importadas.
+  await btn('Importar 1 lançamento').click(); await waitText('Importação concluída', 12000);
+  ok('I1 resumo da fatura: "1 lançamento importado, 2 já estavam anotados."', (await body()).includes('1 lançamento importado, 2 já estavam anotados.'), (await body()).slice(0, 300));
+  await btn('Importar outro arquivo').click(); await waitText('Escolha o arquivo');
+  await btn('Voltar').click(); await waitText('Organizar'); await p.waitForTimeout(300);
+  // OFX com fuso e TRNAMT ambíguo: 01h30 GMT do dia 5 é dia 4 em São Paulo; "-1.500" (três casas) deixa a linha de fora.
+  await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await i1Pick(i1OfxTz); await waitText('Arquivo lido: extrato-fuso.ofx', 12000);
+  t1 = await i1Keep();
+  ok('I1 OFX com fuso: 1 linha lida e 1 deixada de lado ("-1.500" não vira R$ 1.500,00)', t1.includes('1 linha lida') && t1.includes('1 linha do arquivo foi deixada de lado'), t1.slice(0, 300));
+  await i1Review(); t1 = await i1Keep();
+  ok('I1 OFX com fuso: a data da linha é 04/10/2026 (o dia no fuso do espaço), não 05/10', t1.includes('04/10/2026 · Saída') && !t1.includes('05/10/2026 · Saída') && !t1.includes('MILHAR AMBIGUO'), t1.slice(0, 300));
+  await i1Leave();
+
   // ---- 6. Planilha sem cabeçalho conhecido: escolher as colunas ----
   await i1Open(); await i1Pick(i1NoHeader); await waitText('Quais colunas são quais?', 12000); await p.waitForTimeout(300);
   t1 = await i1Keep();
@@ -7531,6 +7581,41 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Usar estas colunas').click(); await waitText('Arquivo lido: sem-cabecalho.csv', 8000);
   ok('I1 sem cabeçalho: "Usar estas colunas" lê as duas linhas', (await body()).includes('2 linhas lidas'));
   await btn('Escolher outro arquivo').click(); await waitText('Escolha o arquivo');
+
+  // ---- 6b. Colunas: débito e crédito separados, coluna de tipo, planilha sem sinal e valores ocultos ----
+  await i1Pick(i1TwoCols); await waitText('Quais colunas são quais?', 12000); await p.waitForTimeout(300);
+  await radio('Débito e crédito em colunas separadas').click(); await p.waitForTimeout(200);
+  await p.getByRole('radio', { name: /^Débito \(saída\), Coluna 3: 45,90/ }).filter({ visible: true }).first().click();
+  await p.getByRole('radio', { name: /^Crédito \(entrada\), Coluna 4: 5000,00/ }).filter({ visible: true }).first().click();
+  await atWidths(async (w) => { await innerChecks(`I1 colunas de débito e crédito ${w}px`); if (w === 390) await shot('314_importar_colunas_debito_credito'); });
+  await btn('Usar estas colunas').click(); await waitText('Arquivo lido: debito-credito.csv', 8000);
+  await radio('Conta').click(); await i1Review(); t1 = await i1Keep();
+  ok('I1 débito e crédito em colunas separadas: a coluna de débito é saída e a de crédito é entrada', t1.includes('2 linhas · 2 marcadas') && t1.includes('01/10/2026 · Saída') && t1.includes('02/10/2026 · Entrada'), t1.slice(0, 300));
+  await i1Leave();
+  await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await i1Pick(i1Kind); await waitText('Quais colunas são quais?', 12000); await p.waitForTimeout(300);
+  await p.getByRole('radio', { name: /^Tipo da linha \(D ou C\), Coluna 4: D/ }).filter({ visible: true }).first().click();
+  await btn('Usar estas colunas').click(); await waitText('Arquivo lido: com-tipo.csv', 8000);
+  await radio('Conta').click(); await i1Review(); t1 = await i1Keep();
+  ok('I1 coluna de tipo (D ou C): D é saída e C é entrada, sem sinal nos valores', t1.includes('01/10/2026 · Saída') && t1.includes('02/10/2026 · Entrada'), t1.slice(0, 300));
+  await i1Leave();
+  await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await i1Pick(i1NoSign); await waitText('Quais colunas são quais?', 12000); await p.waitForTimeout(300);
+  await btn('Usar estas colunas').click(); await waitText('Nenhum valor tem sinal nem coluna de tipo.', 8000);
+  t1 = await i1Keep();
+  ok('I1 planilha sem sinal nem tipo: avisa que todas as linhas serão lidas como entrada e pede a confirmação antes de seguir', t1.includes('Quais colunas são quais?') && (await visibleCount('button', 'Entendi, usar assim')) === 1 && !t1.includes('Arquivo lido: sem-sinal.csv'), t1.slice(0, 300));
+  await atWidths(async (w) => { await innerChecks(`I1 colunas sem sinal ${w}px`); if (w === 390) await shot('315_importar_colunas_sem_sinal'); });
+  await btn('Entendi, usar assim').click(); await waitText('Arquivo lido: sem-sinal.csv', 8000);
+  await radio('Conta').click(); await i1Review(); t1 = await i1Keep();
+  ok('I1 planilha sem sinal, depois de confirmar: as duas linhas são entradas (a caixa "Entradas e saídas estão trocadas" conserta)', t1.includes('01/10/2026 · Entrada') && t1.includes('02/10/2026 · Entrada'), t1.slice(0, 300));
+  await i1Leave();
+  // Valores ocultos: a prévia e as opções de coluna não mostram os valores da planilha.
+  await openConta(); await hideSwitch().click(); await p.waitForTimeout(300); await btn('Voltar').click(); await waitText('Organizar');
+  await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await i1Pick(i1NoHeader); await waitText('Quais colunas são quais?', 12000); await p.waitForTimeout(300);
+  t1 = await body();
+  ok('I1 valores ocultos nas colunas: a prévia e as opções de coluna não mostram "-45,90" nem "5000,00"', !t1.includes('45,90') && !t1.includes('5000,00') && t1.includes('R$ ••••') && t1.includes('PADARIA') &&
+    (await p.getByRole('radio', { name: /45,90|5000,00/ }).filter({ visible: true }).count()) === 0 && (await p.getByRole('radio', { name: /^Valor, Coluna 3: R\$ ••••/ }).filter({ visible: true }).count()) === 1, t1.slice(0, 400));
+  await btn('Voltar').click(); await waitText('Organizar');
+  await openConta(); await hideSwitch().click(); await p.waitForTimeout(300); await btn('Voltar').click(); await waitText('Organizar');
+  await btn(SC.importar).click(); await waitText('Escolha o arquivo');
 
   // ---- 7. Arquivos que não servem ----
   const i1Bad = async (file, text, name) => {

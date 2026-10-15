@@ -13,6 +13,7 @@ import {
   NO_CATEGORY_LABEL,
   RepoError,
   SEARCH_LIMIT,
+  buildReview,
   importKey,
   lastSubscriptionReview,
   subscriptionReminderDue,
@@ -130,6 +131,7 @@ import {
   type GoalMovementKind,
   type GoalStatus,
   type ImportItem,
+  type ImportParse,
   type IncomeReference,
   type IsoDate,
   type IsoMonth,
@@ -154,6 +156,7 @@ import {
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { loadImportContext } from '../src/lib/import-context';
 import { SupabaseRepository } from '../src/lib/supabase-repository';
 
 const API = process.env.CLAREVO_API_URL!;
@@ -6606,6 +6609,49 @@ describe('API real: importar extrato e fatura (Ciclo I1, D-048)', () => {
     const old = (await ana.createCard(newOperationKey(), ctx, { name: 'Cartão Arquivado', lastDigits: null, closingDay: 28, dueDay: 5, limitCents: null })).card;
     await ana.setCardStatus(newOperationKey(), old.id, old.version, 'arquivado');
     expect(await run(item('lim-6', 'compra', 100, '2038-10-06', 'Pão'), old.id)).toEqual(['cartao_arquivado', null]);
+  });
+
+  it('cartão: compra parcelada já anotada marca a parcela da fatura como "Já anotado", lida do banco; a outra parcela fica como "Parece parcela"', async () => {
+    const c2 = (await ana.createCard(newOperationKey(), ctx, { name: 'Cartão Parcelas', lastDigits: null, closingDay: 3, dueDay: 10, limitCents: null })).card;
+    // 10x de R$ 120,00 comprada em 15/07/2038: a 1ª parcela cai na fatura de agosto e a 3ª na de outubro.
+    await ana.addCardPurchase(newOperationKey(), c2.id, { description: 'Loja de móveis', category: 'Casa', purchasedOn: '2038-07-15', totalCents: 120000, installments: 10 });
+    const parseOf = (lines: [string, string, number][]): ImportParse => ({
+      source: 'csv',
+      statement: null,
+      lines: lines.map(([date, description, amountCents], i) => ({ ordinal: i + 1, date, description, amountCents, fitId: null })),
+      ignored: 0,
+      balanceIgnored: false,
+      cardPositive: true,
+    });
+    const parsed = parseOf([
+      ['2038-10-02', 'LOJA DE MOVEIS 03/10', 12000],
+      ['2038-07-15', 'LOJA DE MOVEIS 04/10', 12000],
+      ['2038-10-02', 'PAPELARIA CENTRAL 02/05', 5000],
+      ['2038-10-02', 'PADARIA SAO JOAO', 1800],
+    ]);
+    const data = await loadImportContext(ana, ctx, 'cartao', c2.id, parsed, c2);
+    const months = ['2038-08', '2038-09', '2038-10', '2038-11', '2038-12', '2039-01', '2039-02', '2039-03', '2039-04', '2039-05'];
+    expect(data.existing.filter((e) => e.installmentNumber !== undefined).map((e) => [e.installmentNumber, e.installmentCount, e.amountCents, e.invoiceMonth])).toEqual(
+      months.map((m, i) => [i + 1, 10, 12000, m]),
+    );
+    const review = buildReview({
+      parse: parsed,
+      destination: 'cartao',
+      targetId: c2.id,
+      today: T0,
+      invertSigns: false,
+      memory: {},
+      existing: data.existing,
+      importedKeys: data.importedKeys,
+      card: { days: c2, paidMonths: data.paidMonths },
+    });
+    // 04/10 com a data da compra original (fatura de agosto): bate pelo número da parcela.
+    expect(review.map((l) => [l.description, l.label, l.include])).toEqual([
+      ['LOJA DE MOVEIS 03/10', 'ja_anotado', false],
+      ['LOJA DE MOVEIS 04/10', 'ja_anotado', false],
+      ['PAPELARIA CENTRAL 02/05', 'parcela', false],
+      ['PADARIA SAO JOAO', null, true],
+    ]);
   });
 
   it('a resposta se perde: a importação foi gravada, e a chave encontra o resultado e repete sem duplicar', async () => {

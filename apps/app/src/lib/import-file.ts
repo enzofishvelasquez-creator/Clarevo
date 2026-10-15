@@ -5,7 +5,8 @@ import { Platform } from 'react-native';
 /**
  * Escolher e ler o arquivo de "Importar extrato ou fatura" (D-048), no aparelho. O arquivo (OFX ou planilha CSV) vai do seletor
  * para a memória, é lido pelo core e descartado: nada dele é enviado nem guardado, e a cópia que o seletor faz no cache do app
- * (só no celular) é apagada ao fim. O tamanho é conferido ANTES de ler os bytes (5 MB).
+ * (só no celular) é apagada ao fim. O tamanho é conferido ANTES de ler os bytes (5 MB). `timeZone`: o fuso do espaço, para a data de
+ * um OFX que informa a hora e o fuso.
  */
 export type PickedImport = { cancelled: true } | { cancelled: false; name: string; read: ImportRead };
 
@@ -39,7 +40,7 @@ async function deleteCachedCopy(asset: DocumentPicker.DocumentPickerAsset): Prom
 }
 
 /** Abre o seletor de arquivos e lê o escolhido. Cancelar não é erro. */
-export async function pickImportFile(): Promise<PickedImport> {
+export async function pickImportFile(timeZone?: string): Promise<PickedImport> {
   let picked: DocumentPicker.DocumentPickerResult;
   try {
     // Qualquer tipo: o OFX não tem um tipo comum e o sistema esconderia o arquivo; o conteúdo é que diz o que ele é.
@@ -52,7 +53,9 @@ export async function pickImportFile(): Promise<PickedImport> {
   try {
     if (typeof asset.size === 'number' && asset.size > IMPORT_MAX_BYTES) return { cancelled: false, name: asset.name, read: { kind: 'erro', code: 'arquivo_grande' } };
     const bytes = await bytesOf(asset);
-    return { cancelled: false, name: asset.name, read: readImportFile(bytes, asset.name) };
+    // A leitura é síncrona e pode levar um tempo num arquivo grande: cede a vez antes, para a tela mostrar "Lendo o arquivo…".
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    return { cancelled: false, name: asset.name, read: readImportFile(bytes, asset.name, timeZone) };
   } catch (e) {
     return { cancelled: false, name: asset.name, read: { kind: 'erro', code: e instanceof TooBigError ? 'arquivo_grande' : 'csv_invalido' } };
   } finally {

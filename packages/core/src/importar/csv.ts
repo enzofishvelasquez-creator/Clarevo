@@ -8,8 +8,8 @@ import { cleanDescription, parseAmountCents, parseFileDate } from './valores';
  * da data (dd/mm/aaaa ou aaaa-mm-dd), e acha as colunas pelo nome do cabeçalho (data, descrição, valor ou débito e crédito). Se não
  * reconhecer o cabeçalho, devolve a tabela para a pessoa escolher as colunas. O saldo do arquivo nunca é lido.
  * Sinal: no extrato da conta, negativo = saiu e positivo = entrou. Na fatura do cartão, o banco costuma mostrar a compra como valor
- * positivo; por isso, com destino "cartão", a revisão inverte o sinal de uma planilha de valor único (`cardPositive`). A tela deixa
- * inverter de novo.
+ * positivo; por isso, com destino "cartão", a revisão inverte o sinal de uma planilha de valor único em que a maioria dos valores é
+ * positiva (`cardPositive`). A tela deixa inverter de novo.
  */
 
 export type CsvDelimiter = ';' | ',' | '\t';
@@ -179,6 +179,9 @@ export function detectDecimal(cells: string[], delimiter: CsvDelimiter): '.' | '
   return delimiter === ',' ? '.' : ',';
 }
 
+/** Descrições que são linha de saldo ou de total do banco (e não um lançamento); "Total Express" é uma loja e fica. */
+const BALANCE_ROW = new Set(['saldo', 'saldo anterior', 'saldo do dia', 'total']);
+
 function kindSign(value: string): -1 | 1 | 0 {
   const k = headerKey(value);
   if (/^(d|deb|debito|debitos|saida|despesa|compra)\b/.test(k)) return -1;
@@ -188,8 +191,9 @@ function kindSign(value: string): -1 | 1 | 0 {
 
 /**
  * Lê as linhas de dados com o mapeamento. Linhas sem data ou sem valor legível, de saldo ou com valor zero são contadas em
- * `ignored`. O sinal fica como está no arquivo (negativo = saiu); `cardPositive` avisa que o valor vem numa coluna só e sem tipo,
- * então numa fatura de cartão a compra é o valor positivo (o destino "cartão" inverte o sinal na revisão).
+ * `ignored`. O sinal fica como está no arquivo (negativo = saiu); `cardPositive` avisa que o valor vem numa coluna só, sem tipo e
+ * com a maioria dos valores positiva: numa fatura de cartão a compra é o valor positivo (o destino "cartão" inverte o sinal na
+ * revisão). Se a maioria é negativa, a fatura já usa o sinal do app e nada é invertido.
  */
 export function applyMapping(table: CsvTable, mapping: CsvMapping): ImportParse | { error: ImportErrorCode } {
   const { columns: c } = mapping;
@@ -216,7 +220,7 @@ export function applyMapping(table: CsvTable, mapping: CsvMapping): ImportParse 
       const credit = parseAmountCents(row[c.credit] ?? '', decimal);
       cents = debit === null && credit === null ? null : Math.abs(credit ?? 0) - Math.abs(debit ?? 0);
     }
-    if (date === null || cents === null || cents === 0 || /^(saldo|total)\b/.test(headerKey(description))) {
+    if (date === null || cents === null || cents === 0 || BALANCE_ROW.has(headerKey(description))) {
       ignored += 1;
       continue;
     }
@@ -224,6 +228,9 @@ export function applyMapping(table: CsvTable, mapping: CsvMapping): ImportParse 
     if (lines.length > IMPORT_MAX_LINES) return { error: 'linhas_demais' };
   }
   if (lines.length === 0) return { error: 'sem_lancamentos' };
+  // Fatura com o valor positivo na compra é a que o banco mostra assim; se a maioria vem negativa, o sinal já é o do app.
+  const positives = lines.filter((l) => l.amountCents > 0).length;
+  const negatives = lines.length - positives;
   const header = table.rows[mapping.firstRow - 1] ?? [];
   return {
     source: 'csv',
@@ -231,7 +238,7 @@ export function applyMapping(table: CsvTable, mapping: CsvMapping): ImportParse 
     lines,
     ignored,
     balanceIgnored: header.some((h) => /\bsaldo\b/.test(headerKey(h))),
-    cardPositive: c.amount >= 0 && !byKind,
+    cardPositive: c.amount >= 0 && !byKind && positives > negatives,
   };
 }
 

@@ -14,6 +14,14 @@ import {
   findLookalikes,
   importKey,
   importedSummary,
+  installmentMark,
+  EMPTY_TALLY,
+  alreadyNotedLeftOut,
+  attemptProgress,
+  attemptSnapshot,
+  bankAttempt,
+  importSummaryOf,
+  parseCsvText,
   includedLines,
   kindOf,
   lineProblem,
@@ -32,6 +40,9 @@ import {
   suggestCategory,
   toImportItems,
   updateLine,
+  type ExistingEntry,
+  type ImportAttempt,
+  type ImportItem,
   type ImportParse,
   type ParsedLine,
   type ReviewInput,
@@ -470,6 +481,210 @@ describe('importar: a revisão do cartão', () => {
       ['compra', 15990, '2026-10-04', 'Lazer'],
       ['estorno', 4000, '2026-10-05', 'Lazer'],
     ]);
+  });
+});
+
+describe('importar: fatura em planilha com sinais diferentes', () => {
+  const read = (text: string) => {
+    const r = parseCsvText(text);
+    if (r.kind !== 'ok') throw new Error('planilha não lida');
+    return r.parse;
+  };
+
+  it('compras negativas e "Pagamento recebido" positivo: as compras entram e o pagamento fica de fora, sem inverter', () => {
+    const p = read('Data;Descrição;Valor\n01/10/2026;Restaurante;-45,90\n02/10/2026;Farmacia;-30,00\n03/10/2026;Pagamento recebido;500,00\n');
+    expect(p.cardPositive).toBe(false);
+    const review = buildReview(cardInput(p));
+    expect(review.map((l) => [l.description, l.kind, l.amountCents, l.label, l.importable, l.include])).toEqual([
+      ['Restaurante', 'compra', 4590, null, true, true],
+      ['Farmacia', 'compra', 3000, null, true, true],
+      ['Pagamento recebido', 'pagamento', 50000, 'pagamento_recebido', false, false],
+    ]);
+  });
+
+  it('compras positivas e pagamento negativo continuam do jeito antigo (invertidas)', () => {
+    const p = read('Data;Descrição;Valor\n01/10/2026;Restaurante;45,90\n02/10/2026;Farmacia;30,00\n03/10/2026;Pagamento recebido;-500,00\n');
+    expect(p.cardPositive).toBe(true);
+    expect(buildReview(cardInput(p)).map((l) => [l.kind, l.label])).toEqual([
+      ['compra', null],
+      ['compra', null],
+      ['pagamento', 'pagamento_recebido'],
+    ]);
+  });
+
+  it('linha de pagamento que o arquivo trouxe como compra (sinal trocado) vem desmarcada como "Parece pagamento de fatura", mas pode ser marcada', () => {
+    // Maioria positiva (invertida), mas o pagamento também veio positivo: vira compra, e a palavra o denuncia.
+    const p = parse(
+      [line(1, '2026-10-01', 'Restaurante', 4590), line(2, '2026-10-02', 'Farmacia', 3000), line(3, '2026-10-03', 'Pagamento de fatura', 50000), line(4, '2026-10-03', 'Obrigado pelo pagamento', 20000)],
+      { source: 'csv', cardPositive: true },
+    );
+    const review = buildReview(cardInput(p));
+    expect(review.map((l) => [l.kind, l.label, l.importable, l.include])).toEqual([
+      ['compra', null, true, true],
+      ['compra', null, true, true],
+      ['compra', 'pagamento_fatura', true, false],
+      ['compra', 'pagamento_fatura', true, false],
+    ]);
+    expect(setAll(review, true).map((l) => l.include)).toEqual([true, true, true, true]);
+  });
+
+  it('compras comuns não ganham a marca de pagamento', () => {
+    const p = parse([line(1, '2026-10-01', 'Padaria', 4590), line(2, '2026-10-02', 'Papelaria Central', 3000)], { source: 'csv', cardPositive: true });
+    expect(buildReview(cardInput(p)).map((l) => l.label)).toEqual([null, null]);
+  });
+});
+
+describe('importar: parcelas na fatura', () => {
+  it('reconhece "03/10" como parcela e não uma data com ano, número maior que o total ou total fora de 2 a 48', () => {
+    const cases: [string, [number, number] | null][] = [
+      ['LOJA 03/10', [3, 10]],
+      ['LOJA 3/10', [3, 10]],
+      ['PARC 03/10 LOJA', [3, 10]],
+      ['LOJA PARC03/10', [3, 10]],
+      ['LOJA 03/10/2026', null],
+      ['LOJA 03/10/26', null],
+      ['COMPRA 12/05', null],
+      ['LOJA 01/01', null],
+      ['LOJA 2/60', null],
+      ['LOJA 10/10', [10, 10]],
+      ['2026/10 LOJA', null],
+      ['LOJA 123/10', null],
+      ['PADARIA', null],
+      ['LOJA 15/10/2026 03/12', [3, 12]],
+    ];
+    for (const [text, expected] of cases) expect(installmentMark(text), text).toEqual(expected ? { number: expected[0], count: expected[1] } : null);
+  });
+
+  it('fatura com parcela: "Parece parcela", desmarcada mas podendo ser marcada', () => {
+    const p = parse([line(1, '2026-10-02', 'LOJA 03/10', 12000), line(2, '2026-10-02', 'Padaria', 4590), line(3, '2026-10-03', 'Loja 15/10/2026', 500)], { source: 'csv', cardPositive: true });
+    const review = buildReview(cardInput(p));
+    expect(review.map((l) => [l.label, l.importable, l.include])).toEqual([
+      ['parcela', true, false],
+      [null, true, true],
+      [null, true, true],
+    ]);
+    expect(setAll(review, true)[0]!.include).toBe(true);
+  });
+
+  it('no extrato da conta a marca de parcela não aparece (a data na descrição é comum)', () => {
+    const p = parse([line(1, '2026-10-02', 'COMPRA DEBITO LOJA 03/10', -12000)]);
+    expect(buildReview(input(p))[0]!.label).toBeNull();
+  });
+
+  // Cartão fecha dia 3 e vence dia 10: 04/10 em diante cai na fatura de novembro.
+  const installmentEntries = (total: number, count: number, purchasedOn: string, firstInvoice: string, description: string): ExistingEntry[] => {
+    const each = Math.floor(total / count);
+    const rest = total - each * count;
+    const out: ExistingEntry[] = [{ date: purchasedOn, amountCents: total, description, kind: 'compra' }];
+    for (let k = 0; k < count; k++) {
+      const [y, m] = firstInvoice.split('-').map(Number) as [number, number];
+      const index = y * 12 + (m - 1) + k;
+      const month = `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}`;
+      out.push({ date: purchasedOn, amountCents: k === 0 ? each + rest : each, description, kind: 'compra', invoiceMonth: month, installmentNumber: k + 1, installmentCount: count });
+    }
+    return out;
+  };
+
+  const labelOf = (description: string, date: string, existing: ExistingEntry[], cents = 12000) =>
+    buildReview(cardInput(parse([line(1, date, description, cents)], { source: 'csv', cardPositive: true }), [], { existing }))[0]!.label;
+
+  it('compra parcelada já anotada: a parcela da fatura vem como "Já anotado" com a data original, a data da cobrança ou só pela fatura', () => {
+    // 10x de R$ 120,00 (total R$ 1.200,00) comprada em 15/07, 1ª parcela na fatura de agosto: a parcela 3 cai na de outubro.
+    const existing = installmentEntries(120000, 10, '2026-07-15', '2026-08', 'Loja de móveis');
+    // Mesma parcela com a data da compra original (fatura antiga), e com a data da cobrança.
+    expect(labelOf('LOJA DE MOVEIS 03/10', '2026-07-15', existing)).toBe('ja_anotado');
+    expect(labelOf('LOJA DE MOVEIS 03/10', '2026-10-02', existing)).toBe('ja_anotado');
+    // Outro total de parcelas no texto, mas cai na fatura de outubro com o mesmo valor e a mesma loja: é a mesma parcela.
+    expect(labelOf('LOJA DE MOVEIS 03/12', '2026-10-02', existing)).toBe('ja_anotado');
+    // A parcela 4 (fatura de novembro) é a seguinte: com a data original, bate pelo número.
+    expect(labelOf('LOJA DE MOVEIS 04/10', '2026-07-15', existing)).toBe('ja_anotado');
+    // A 1ª parcela traz o centavo que sobra do total.
+    const odd = installmentEntries(10000, 3, '2026-09-20', '2026-10', 'Tênis');
+    expect(labelOf('TENIS 01/03', '2026-10-02', odd, 3334)).toBe('ja_anotado');
+    expect(labelOf('TENIS 02/03', '2026-09-20', odd, 3333)).toBe('ja_anotado');
+  });
+
+  it('cada parcela anotada cobre uma linha só; a outra linha igual fica como "Parece parcela"', () => {
+    const existing = installmentEntries(120000, 10, '2026-07-15', '2026-08', 'Loja de móveis');
+    const p = parse([line(1, '2026-10-02', 'LOJA DE MOVEIS 03/10', 12000), line(2, '2026-10-02', 'LOJA DE MOVEIS 03/10', 12000)], { source: 'csv', cardPositive: true });
+    expect(buildReview(cardInput(p, [], { existing })).map((l) => [l.label, l.include])).toEqual([
+      ['ja_anotado', false],
+      ['parcela', false],
+    ]);
+  });
+
+  it('parcela de outra loja, de outro valor ou de outra compra não é marcada como já anotada', () => {
+    const existing = installmentEntries(120000, 10, '2026-07-15', '2026-08', 'Loja de móveis');
+    expect(labelOf('PAPELARIA CENTRAL 03/10', '2026-10-02', existing)).toBe('parcela');
+    expect(labelOf('LOJA DE MOVEIS 03/10', '2026-10-02', existing, 12500)).toBe('parcela');
+    // Sem parcela escrita, só vale o dia da compra: a fatura de outubro não basta (poderia ser outra compra do mesmo valor).
+    expect(labelOf('LOJA DE MOVEIS', '2026-10-02', existing)).toBeNull();
+    // Compra de 6 parcelas de R$ 120,00 em outra época: "03/10" de outra compra, em outra fatura, não bate.
+    const other = installmentEntries(72000, 6, '2026-02-10', '2026-03', 'Loja de móveis');
+    expect(labelOf('LOJA DE MOVEIS 03/10', '2026-10-02', other)).toBe('parcela');
+  });
+});
+
+describe('importar: resumo com as linhas "Já anotado" que ficaram de fora', () => {
+  it('conta só as de fora, e não as que lotes anteriores já gravaram', () => {
+    const p = parse([line(1, '2026-10-02', 'Padaria', -4590, 'a'), line(2, '2026-10-03', 'Mercado', -1200, 'b'), line(3, '2026-10-04', 'Farmácia', -8990, 'c')]);
+    const review = buildReview(input(p, { existing: [{ date: '2026-10-03', amountCents: 1200, description: 'Mercado', kind: 'despesa' }] }));
+    expect(review.map((l) => [l.label, l.include])).toEqual([[null, true], ['ja_anotado', false], [null, true]]);
+    expect(alreadyNotedLeftOut(review)).toBe(1);
+    // Marcar a linha parecida a faz entrar de novo: ela não é mais "deixada de fora".
+    expect(alreadyNotedLeftOut(setAll(review, true).map((l) => (l.label === 'ja_anotado' ? { ...l, include: true } : l)))).toBe(0);
+    // Refeita a revisão depois de lotes gravados, as linhas enviadas viram "Já anotado" por chave e já foram contadas pelo banco.
+    const rebuilt = buildReview(input(p, { importedKeys: new Set([review[0]!.key, review[2]!.key]), existing: [{ date: '2026-10-03', amountCents: 1200, description: 'Mercado', kind: 'despesa' }] }));
+    expect(alreadyNotedLeftOut(rebuilt)).toBe(3);
+    expect(alreadyNotedLeftOut(rebuilt, new Set([review[0]!.key, review[2]!.key]))).toBe(1);
+  });
+});
+
+describe('importar: a conta da importação em lotes', () => {
+  const many = Array.from({ length: 1200 }, (_, i) => line(i + 1, '2026-09-01', `Linha ${i + 1}`, -100, `f${i}`));
+  const attemptFor = (items: ImportItem[], results: { created: number; skipped: number }[]): ImportAttempt => ({
+    snapshot: attemptSnapshot('conta', ACC, items),
+    base: 'base',
+    results,
+    chunks: chunkItems(items),
+  });
+
+  it('sem falha: o resumo é o que o banco criou e pulou, mais as linhas "Já anotado" de fora', () => {
+    const p = parse([line(1, '2026-10-02', 'Padaria', -4590, 'a'), line(2, '2026-10-03', 'Mercado', -1200, 'b'), line(3, '2026-10-04', 'Farmácia', -8990, 'c'), line(4, '2026-10-05', 'Luz', -9000, 'd')]);
+    const existing: ExistingEntry[] = [{ date: '2026-10-03', amountCents: 1200, description: 'Mercado', kind: 'despesa' }];
+    const lines = buildReview(input(p, { existing, importedKeys: new Set([buildReview(input(p))[3]!.key]) }));
+    expect(lines.map((l) => [l.label, l.include])).toEqual([[null, true], ['ja_anotado', false], [null, true], ['ja_anotado', false]]);
+    const attempt = attemptFor(toImportItems(lines), [{ created: 2, skipped: 0 }]);
+    expect(importSummaryOf(EMPTY_TALLY, attempt, lines)).toEqual({ created: 2, skipped: 2 });
+    // O banco pulou uma chave que apareceu entre a revisão e o envio: soma às de fora.
+    expect(importSummaryOf(EMPTY_TALLY, attemptFor(toImportItems(lines), [{ created: 1, skipped: 1 }]), lines)).toEqual({ created: 1, skipped: 3 });
+    expect(importedSummary(2, 2)).toBe('2 lançamentos importados, 2 já estavam anotados.');
+  });
+
+  it('falha de rede depois de um lote e linhas mudadas: o lote gravado fica contado e não conta de novo como "Já anotado"', () => {
+    const lines = buildReview(input(parse(many)));
+    expect(lines.every((l) => l.include)).toBe(true);
+    const first = attemptFor(toImportItems(lines), [{ created: 500, skipped: 0 }]);
+    expect(attemptProgress(first)).toEqual({ sent: 500, total: 1200 });
+    // A pessoa mudou uma descrição: a tentativa é abandonada, mas o lote gravado fica no total.
+    const banked = bankAttempt(EMPTY_TALLY, first);
+    expect(banked.created).toBe(500);
+    expect(banked.sentKeys.size).toBe(500);
+    // A revisão refeita: as 500 linhas enviadas já são "Já anotado" por chave; as outras 700 seguem marcadas.
+    const sentKeys = new Set(toImportItems(lines).slice(0, 500).map((i) => i.importKey));
+    const rebuilt = buildReview(input(parse(many), { importedKeys: sentKeys }));
+    expect(rebuilt.filter((l) => l.include)).toHaveLength(700);
+    const next = attemptFor(toImportItems(rebuilt), [{ created: 500, skipped: 0 }, { created: 200, skipped: 0 }]);
+    expect(importSummaryOf(banked, next, rebuilt)).toEqual({ created: 1200, skipped: 0 });
+  });
+
+  it('o mesmo conteúdo dá o mesmo resumo da tentativa; conteúdo diferente, outro', () => {
+    const items = toImportItems(buildReview(input(parse(many.slice(0, 3)))));
+    expect(attemptSnapshot('conta', ACC, items)).toBe(attemptSnapshot('conta', ACC, [...items]));
+    expect(attemptSnapshot('conta', ACC, items)).not.toBe(attemptSnapshot('conta', ACC, items.slice(1)));
+    expect(attemptSnapshot('conta', ACC, items)).not.toBe(attemptSnapshot('cartao', ACC, items));
+    expect(attemptSnapshot('conta', ACC, items)).not.toBe(attemptSnapshot('conta', 'outra', items));
+    expect(attemptSnapshot('conta', ACC, items)).not.toBe(attemptSnapshot('conta', ACC, [{ ...items[0]!, description: 'Outra' }, ...items.slice(1)]));
   });
 });
 

@@ -1,7 +1,9 @@
+import { todayIn } from '../dates';
+import { MAX_RECORD_CENTS } from '../money';
 import { decodeImportBytes } from './decode';
 import type { ImportFileResult, ParsedLine } from './tipos';
 import { IMPORT_MAX_LINES } from './tipos';
-import { cleanDescription, parseAmountCents, parseFileDate } from './valores';
+import { cleanDescription, parseFileDate } from './valores';
 
 /**
  * Leitor de OFX (Open Financial Exchange) para extrato de conta (BANKMSGSRSV1) e fatura de cartão (CREDITCARDMSGSRSV1), nas duas
@@ -50,14 +52,49 @@ export function ofxDescription(name: string | undefined, memo: string | undefine
   return cleanDescription(`${n} ${m}`);
 }
 
-/** Dia de DTPOSTED: os oito primeiros dígitos (AAAAMMDD); hora e fuso depois são ignorados. */
-export function ofxDate(value: string | undefined): string | null {
-  const m = /^\s*(\d{4})(\d{2})(\d{2})/.exec(value ?? '');
-  return m ? parseFileDate(`${m[1]}-${m[2]}-${m[3]}`) : null;
+/** Fuso usado para converter a data de um OFX que informa o fuso, quando a tela não passa o do espaço. */
+export const OFX_DEFAULT_TIME_ZONE = 'America/Sao_Paulo';
+
+/**
+ * Dia de DTPOSTED. Sem fuso, ou com a hora zerada (data sem hora, como os bancos mandam "20261002000000[0:GMT]"), vale o dia
+ * escrito. Com hora e fuso ("20261002013000[0:GMT]", "[-3:BRT]"), o instante é convertido para o dia no fuso da pessoa
+ * (`timeZone`, o do espaço; São Paulo se faltar), para uma compra da noite não cair no dia seguinte.
+ */
+export function ofxDate(value: string | undefined, timeZone: string = OFX_DEFAULT_TIME_ZONE): string | null {
+  const m = /^\s*(\d{4})(\d{2})(\d{2})(?:(\d{2})(\d{2})(\d{2})?(?:\.\d+)?)?\s*(?:\[\s*([+-]?\d{1,2}(?:\.\d+)?)\s*(?::[^\]]*)?\])?/.exec(value ?? '');
+  if (!m) return null;
+  const day = parseFileDate(`${m[1]}-${m[2]}-${m[3]}`);
+  if (day === null || m[4] === undefined || m[7] === undefined) return day;
+  const [hh, mm, ss] = [Number(m[4]), Number(m[5]), Number(m[6] ?? '0')];
+  if (hh > 23 || mm > 59 || ss > 59 || (hh === 0 && mm === 0 && ss === 0)) return day;
+  const offsetHours = Number(m[7]);
+  if (!Number.isFinite(offsetHours) || Math.abs(offsetHours) > 14) return day;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const instant = Date.UTC(y, mo - 1, d, hh, mm, ss) - Math.round(offsetHours * 3600) * 1000;
+  try {
+    return todayIn(timeZone, new Date(instant));
+  } catch {
+    return day;
+  }
+}
+
+/**
+ * Valor de TRNAMT em centavos, com sinal. Leitor próprio (o OFX não usa separador de milhar): sinal opcional, dígitos e no máximo
+ * um separador decimal, "." ou ",". Mais de duas casas ("-1.500", "1,500"), mais de um separador ou outro caractere → null (a
+ * linha fica de fora, em vez de virar R$ 1.500,00 ou R$ 1,50 por engano). Passa de 13 dígitos → acima do limite do app.
+ */
+export function parseOfxAmount(raw: string): number | null {
+  const m = /^([+-])?(\d*)(?:[.,](\d{1,2}))?$/.exec(raw.trim());
+  if (!m || (m[2] === '' && m[3] === undefined)) return null;
+  const whole = (m[2] ?? '').replace(/^0+(?=\d)/, '') || '0';
+  const negative = m[1] === '-';
+  if (whole.length > 13) return (negative ? -1 : 1) * (MAX_RECORD_CENTS + 1);
+  const cents = Number(whole) * 100 + Number((m[3] ?? '').padEnd(2, '0') || '0');
+  return negative ? -cents : cents;
 }
 
 /** Lê o texto de um OFX. Erros: ofx_invalido (nenhum extrato), moeda_diferente, linhas_demais, sem_lancamentos. */
-export function parseOfxText(text: string): ImportFileResult {
+export function parseOfxText(text: string, timeZone: string = OFX_DEFAULT_TIME_ZONE): ImportFileResult {
   const start = text.search(/<OFX[\s>]/i);
   if (start < 0) return { ok: false, code: 'ofx_invalido' };
   const body = text.slice(start);
@@ -128,8 +165,8 @@ export function parseOfxText(text: string): ImportFileResult {
   const lines: ParsedLine[] = [];
   let ignored = 0;
   for (const r of raws) {
-    const date = ofxDate(r.posted);
-    const cents = r.amount === undefined ? null : parseAmountCents(decodeEntities(r.amount));
+    const date = ofxDate(r.posted, timeZone);
+    const cents = r.amount === undefined ? null : parseOfxAmount(decodeEntities(r.amount));
     if (date === null || cents === null || cents === 0) {
       ignored += 1;
       continue;
@@ -156,6 +193,6 @@ function cleanFitId(value: string): string {
 }
 
 /** Lê os bytes de um OFX (UTF-8 ou Windows-1252). */
-export function parseOfxBytes(bytes: Uint8Array): ImportFileResult {
-  return parseOfxText(decodeImportBytes(bytes).text);
+export function parseOfxBytes(bytes: Uint8Array, timeZone: string = OFX_DEFAULT_TIME_ZONE): ImportFileResult {
+  return parseOfxText(decodeImportBytes(bytes).text, timeZone);
 }

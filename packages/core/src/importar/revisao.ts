@@ -4,7 +4,7 @@ import { CATEGORIES } from '../records';
 import { DESCRIPTION_MAX } from '../validation';
 import { invoiceMonthOf, type CardDays } from '../cards';
 import { suggestCategory, type ImportMemory } from './categorias';
-import { DUPLICATE_WINDOW_DAYS, findLookalikes, importKeys, normalizeDescription, type ExistingEntry } from './dedupe';
+import { DUPLICATE_WINDOW_DAYS, findLookalikes, importKeys, installmentMark, normalizeDescription, type ExistingEntry } from './dedupe';
 import { IMPORT_BATCH, type ImportDestination, type ImportItem, type ImportParse } from './tipos';
 import { cleanDescription } from './valores';
 
@@ -22,6 +22,7 @@ export type ReviewKind = 'despesa' | 'receita' | 'compra' | 'estorno' | 'pagamen
  */
 export type ReviewLabel =
   | 'ja_anotado'
+  | 'parcela'
   | 'pagamento_fatura'
   | 'transferencia'
   | 'pagamento_recebido'
@@ -124,7 +125,16 @@ export function buildReview(input: ReviewInput): ReviewLine[] {
   });
   // "Já anotado" por semelhança. As linhas cuja chave já existe também entram na conta: cada uma ocupa o registro que a importou,
   // para ele não marcar, por semelhança, outra linha igual que ainda não foi importada.
-  const candidates = partial.map((p) => ({ date: p.l.date, amountCents: p.amount, description: p.l.description, kind: p.kind as ExistingEntry['kind'] }));
+  const candidates = partial.map((p) => ({
+    date: p.l.date,
+    amountCents: p.amount,
+    description: p.l.description,
+    kind: p.kind as ExistingEntry['kind'],
+    // Fatura com parcela na descrição ("LOJA 03/10"): compara com as parcelas das compras parceladas já anotadas.
+    ...(destination === 'cartao' && p.kind === 'compra' && input.card
+      ? { invoiceMonth: invoiceMonthOf(input.card.days, p.l.date), installment: installmentMark(p.l.description) }
+      : {}),
+  }));
   const similar = findLookalikes(
     candidates.map((c, i) => (partial[i]!.kind === 'pagamento' ? { ...c, amountCents: -1 } : c)),
     input.existing,
@@ -152,6 +162,12 @@ export function buildReview(input: ReviewInput): ReviewLine[] {
     if (amount > MAX_RECORD_CENTS && importable) block('valor_alto');
     if (keyExists && importable) block('ja_anotado');
     if (label === null && similar[i]) label = 'ja_anotado';
+    if (label === null && destination === 'cartao' && kind === 'compra') {
+      // Compra parcelada: anotar uma vez em Anotar gasto, com o número de parcelas, não parcela por parcela da fatura. E uma
+      // linha de "pagamento" que o arquivo trouxe como compra (planilha com o sinal trocado) é o pagamento da fatura.
+      if (installmentMark(l.description)) label = 'parcela';
+      else if (looksLikeCardPaymentLine(l.description)) label = 'pagamento_fatura';
+    }
     if (label === null && destination === 'conta') {
       if (looksLikeInvoicePayment(l.description)) label = 'pagamento_fatura';
       else if (looksLikeOwnTransfer(l.description)) label = 'transferencia';
@@ -247,4 +263,13 @@ export function reviewCounts(lines: readonly ReviewLine[]): { total: number; inc
     included: includedLines(lines).length,
     alreadyNoted: lines.filter((l) => l.label === 'ja_anotado').length,
   };
+}
+
+/**
+ * Quantas linhas "Já anotado" ficaram de fora da importação (não marcadas): entram no resumo final como "já estavam anotados".
+ * `sentKeys`: chaves das linhas que lotes já gravados nesta importação enviaram; elas viram "Já anotado" quando a revisão é
+ * refeita depois de uma recusa, mas já foram contadas como criadas (ou puladas) pelo banco, então não contam de novo.
+ */
+export function alreadyNotedLeftOut(lines: readonly ReviewLine[], sentKeys: ReadonlySet<string> = new Set()): number {
+  return lines.filter((l) => l.label === 'ja_anotado' && !l.include && !sentKeys.has(l.key)).length;
 }

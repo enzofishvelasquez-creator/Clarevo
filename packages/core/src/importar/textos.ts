@@ -1,6 +1,6 @@
 import { formatDateBR } from '../dates';
 import { formatBRL } from '../money';
-import { IMPORT_MAX_LINES, type ImportErrorCode } from './tipos';
+import { IMPORT_BATCH, IMPORT_MAX_LINES, type ImportErrorCode } from './tipos';
 import type { ReviewLabel } from './revisao';
 
 /**
@@ -24,7 +24,7 @@ export const IMPORT_TEXT = {
   pickTitle: 'Escolha o arquivo',
   pickFile: 'Escolher o arquivo',
   pickFileOther: 'Escolher outro arquivo',
-  reading: 'Lendo o arquivo aqui no aparelho…',
+  reading: 'Lendo o arquivo…',
   fileRead: (name: string) => `Arquivo lido: ${name}`,
   linesRead: (n: number) => `${num(n)} ${plural(n, 'linha lida', 'linhas lidas')}`,
   balanceIgnored: 'O saldo que vem no arquivo é ignorado. O Clarevo não guarda saldo por conta.',
@@ -52,7 +52,18 @@ export const IMPORT_TEXT = {
   firstRowHeader: 'A primeira linha tem os nomes das colunas',
   columnsPreview: 'Como o arquivo começa',
   columnsApply: 'Usar estas colunas',
-  columnsNeedAll: 'Escolha uma coluna diferente para data, descrição e valor.',
+  columnsNeedAll: 'Escolha uma coluna diferente para cada campo.',
+  columnsAmountTitle: 'Como o valor aparece?',
+  columnsAmountOne: 'Uma coluna de valor',
+  columnsAmountTwo: 'Débito e crédito em colunas separadas',
+  columnDebit: 'Débito (saída)',
+  columnCredit: 'Crédito (entrada)',
+  columnKind: 'Tipo da linha (D ou C)',
+  columnKindHint: 'Use se os valores vêm sem sinal e outra coluna diz se é débito ou crédito.',
+  columnKindNone: 'Sem coluna de tipo',
+  columnsNoSign: 'Nenhum valor tem sinal nem coluna de tipo. Num extrato de conta, todas as linhas serão lidas como entrada; numa fatura de cartão, como compra. Confira a escolha antes de seguir.',
+  columnsNoSignConfirm: 'Entendi, usar assim',
+  columnsMoreHint: 'Role a lista para ver todas as colunas.',
   /** A revisar. */
   reviewTitle: 'A revisar',
   reviewIntro: 'Marque o que vira lançamento. Você pode mudar a descrição e a categoria de cada linha.',
@@ -79,6 +90,7 @@ export const IMPORT_TEXT = {
   /** Marcas. */
   labels: {
     ja_anotado: 'Já anotado',
+    parcela: 'Parece parcela',
     pagamento_fatura: 'Parece pagamento de fatura',
     transferencia: 'Parece transferência',
     pagamento_recebido: 'Pagamento da fatura, não entra',
@@ -89,6 +101,7 @@ export const IMPORT_TEXT = {
   } satisfies Record<ReviewLabel, string>,
   labelHints: {
     ja_anotado: 'Parece igual a um lançamento que já existe. Vem desmarcado.',
+    parcela: 'Compra parcelada: anote uma vez em Anotar gasto, com o número de parcelas.',
     pagamento_fatura: 'O pagamento da fatura já é registrado em Pagar fatura. Vem desmarcado.',
     transferencia: 'Transferência entre as suas contas não é gasto. Vem desmarcada.',
   } satisfies Partial<Record<ReviewLabel, string>>,
@@ -165,11 +178,20 @@ export const IMPORT_SAVE_ERROR_TEXT: Record<string, string> = {
   desconhecido: 'Não foi possível importar agora. Tente de novo.',
 };
 
-/** Texto do erro de importação; com a posição da linha ("item=3"), diz qual é. */
-export function importSaveErrorText(code: string, detail?: string): string {
-  const base = IMPORT_SAVE_ERROR_TEXT[code] ?? IMPORT_SAVE_ERROR_TEXT.desconhecido!;
+/**
+ * Posição, na lista de itens enviados (de 0 em diante), da linha que o banco recusou: `detail` é "item=N" (N de 1 em diante, dentro
+ * do lote) e `batchIndex` é o lote (de 0 em diante, de IMPORT_BATCH itens). null quando o detalhe não traz posição.
+ */
+export function failedItemIndex(detail: string | undefined, batchIndex: number): number | null {
   const at = /^item=(\d{1,4})$/.exec(detail ?? '');
-  return at ? `${base} (Linha ${at[1]} do lote.)` : base;
+  const n = at ? Number(at[1]) : 0;
+  return n >= 1 ? batchIndex * IMPORT_BATCH + n - 1 : null;
+}
+
+/** Texto do erro de importação; com a linha recusada (descrição, valor e data já formatados), diz qual é. */
+export function importSaveErrorText(code: string, line?: { description: string; amount: string; date: string }): string {
+  const base = IMPORT_SAVE_ERROR_TEXT[code] ?? IMPORT_SAVE_ERROR_TEXT.desconhecido!;
+  return line ? `${base} Linha: ${line.description || IMPORT_TEXT.noDescription}, ${line.amount}, ${line.date}.` : base;
 }
 
 /** Nome acessível de uma linha da revisão. */

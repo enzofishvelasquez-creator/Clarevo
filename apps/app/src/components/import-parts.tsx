@@ -12,11 +12,11 @@ import {
 } from '@clarevo/core';
 import { Check } from 'lucide-react-native';
 import { memo } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ChoiceGroup, CheckOption } from '@/components/series-parts';
 import { Chip, LinkButton, Money, TextField, Txt, spaceKeyPress } from '@/components/ui';
-import { maskMoneyText, moneyA11y, useValuesHidden } from '@/lib/privacy';
+import { HIDDEN_MONEY, maskMoneyText, moneyA11y, useValuesHidden } from '@/lib/privacy';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
 /** Rótulo do tipo de cada linha no destino. */
@@ -161,7 +161,19 @@ export function guessColumns(table: CsvTable, firstRow: number): CsvColumns {
   return { date: Math.max(0, date), description: Math.max(0, description), amount: Math.max(0, amount), debit: -1, credit: -1, kind: -1 };
 }
 
-/** Escolha de uma coluna da planilha entre as primeiras 12, com um exemplo do conteúdo. */
+/**
+ * Texto de uma célula da planilha para mostrar. Com "Ocultar valores", a célula que é um valor ("-45,90", "1.234,56") ou traz um
+ * valor em reais vira "R$ ••••": a prévia e as opções de coluna não podem mostrar o que a pessoa escondeu.
+ */
+export function maskCell(text: string, hidden: boolean): string {
+  if (!hidden) return text;
+  return parseAmountCents(text) !== null ? HIDDEN_MONEY : maskMoneyText(text, true);
+}
+
+/**
+ * Escolha de uma coluna da planilha, com um exemplo do conteúdo. Mostra todas as colunas (a lista rola quando são muitas).
+ * `noneLabel`: acrescenta a opção "sem coluna" (valor -1), para campos opcionais.
+ */
 export function ColumnChoice({
   label,
   table,
@@ -169,6 +181,8 @@ export function ColumnChoice({
   value,
   onChange,
   error,
+  hint,
+  noneLabel,
 }: {
   label: string;
   table: CsvTable;
@@ -176,15 +190,33 @@ export function ColumnChoice({
   value: number;
   onChange: (column: number) => void;
   error?: string;
+  hint?: string;
+  noneLabel?: string;
 }) {
-  const width = Math.min(12, Math.max(1, ...table.rows.slice(0, 30).map((r) => r.length)));
-  return (
-    <ChoiceGroup label={label} error={error}>
+  const hidden = useValuesHidden();
+  const width = Math.max(1, ...table.rows.slice(0, 30).map((r) => r.length));
+  const scrolls = width > 8;
+  const chips = (
+    <>
+      {noneLabel ? <Chip label={noneLabel} accessibilityLabel={`${label}, ${noneLabel}`} selected={value < 0} onPress={() => onChange(-1)} /> : null}
       {Array.from({ length: width }, (_, c) => {
-        const text = IMPORT_TEXT.columnOption(c + 1, table.rows[sampleRow]?.[c] ?? '');
-        // O nome inclui o campo ("Valor, Coluna 3: -45,90"): as três escolhas listam as mesmas colunas.
+        // O exemplo é a primeira célula com conteúdo entre as primeiras linhas (débito e crédito costumam ficar em branco um do outro).
+        const sample = table.rows.slice(sampleRow, sampleRow + 5).map((r) => r[c] ?? '').find((cell) => cell !== '') ?? '';
+        const text = IMPORT_TEXT.columnOption(c + 1, maskCell(sample, hidden));
+        // O nome inclui o campo ("Valor, Coluna 3: -45,90"): as escolhas listam as mesmas colunas.
         return <Chip key={c} label={text} accessibilityLabel={`${label}, ${text}`} selected={value === c} onPress={() => onChange(c)} />;
       })}
+    </>
+  );
+  return (
+    <ChoiceGroup label={label} error={error} hint={hint ?? (scrolls ? IMPORT_TEXT.columnsMoreHint : undefined)}>
+      {scrolls ? (
+        <ScrollView style={styles.columnsScroll} contentContainerStyle={styles.columnsContent} nestedScrollEnabled>
+          {chips}
+        </ScrollView>
+      ) : (
+        chips
+      )}
     </ChoiceGroup>
   );
 }
@@ -214,6 +246,8 @@ const styles = StyleSheet.create({
   badge: { alignSelf: 'flex-start', borderRadius: radius.pill, paddingHorizontal: space[2], paddingVertical: 2 },
   badgeSoft: { backgroundColor: colors.accent },
   badgeOff: { backgroundColor: colors.border },
+  columnsScroll: { width: '100%', maxHeight: 190 },
+  columnsContent: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
   editor: { gap: space[3], paddingLeft: 44 + space[1] },
   link: { alignSelf: 'flex-start', paddingHorizontal: 0, marginLeft: 44 + space[1] },
   focusRing: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.brand, outlineOffset: 2 },
