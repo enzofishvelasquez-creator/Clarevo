@@ -3,6 +3,7 @@ import { formatDateBR, formatMonthYearBR } from './dates';
 import type { AccessKeyInfo, ReceiptDraft, ReceiptFacts } from './nota';
 import { NOTA_TEXT } from './nota';
 import { paymentSummary } from './nota-pagamento';
+import { COMPROVANTE_TEXT } from './comprovante/fluxo';
 import { canReadSefazPage } from './sefaz-page';
 import { sha256Hex } from './sha256';
 import { CATEGORIES } from './records';
@@ -120,17 +121,19 @@ export async function raceWithTimeout<T>(work: Promise<T>, ms: number, onTimeout
 // Folha "Escanear nota fiscal"
 // ---------------------------------------------------------------------------
 
-export type ScanOption = 'camera' | 'pdf' | 'colar';
+export type ScanOption = 'camera' | 'pdf' | 'colar' | 'comprovante';
 
 /**
  * Opções da folha do primeiro toque, na ordem. Com câmera: câmera, PDF, colar. Sem câmera (computador, aparelho sem câmera):
- * o PDF vem primeiro, porque o e-mail com o DANFE costuma estar no próprio computador.
+ * o PDF vem primeiro, porque o e-mail com o DANFE costuma estar no próprio computador. Por último, "Ler comprovante de Pix ou
+ * pagamento (PDF)" (D-051): não é leitura de nota, e não leva a câmera nem a chave.
  */
 export function scanSheetOptions(cameraAvailable: boolean): ScanOption[] {
-  return cameraAvailable ? ['camera', 'pdf', 'colar'] : ['pdf', 'colar'];
+  return cameraAvailable ? ['camera', 'pdf', 'colar', 'comprovante'] : ['pdf', 'colar', 'comprovante'];
 }
 
 export function scanOptionLabel(option: ScanOption): string {
+  if (option === 'comprovante') return COMPROVANTE_TEXT.option;
   return NOTA_TEXT.sheet[option === 'colar' ? 'paste' : option];
 }
 

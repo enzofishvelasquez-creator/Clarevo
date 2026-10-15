@@ -1,6 +1,7 @@
 import {
   ESSENTIAL_LOOKBACK_MONTHS,
   INSTALLMENT_NATURES,
+  addDays,
   addMonths,
   annualCommitmentIds,
   budgetCrossing,
@@ -619,12 +620,18 @@ export function useSeriesOperationKey(scope?: string) {
   const repo = useRepo();
   const qc = useQueryClient();
   const slot = useAttemptSlot(scope);
-  return slotKeys<{ action: SeriesAction; seriesId: string }>(slot, (key) => repo.findSeriesOperation(key), () => {
-    qc.invalidateQueries({ queryKey: ['series'] });
-    qc.invalidateQueries({ queryKey: ['commitments'] });
-    qc.invalidateQueries({ queryKey: ['commitment'] });
-    qc.invalidateQueries({ queryKey: ['returnReview'] });
-  });
+  return slotKeys<{ action: SeriesAction; seriesId: string }>(
+    slot,
+    (key) => repo.findSeriesOperation(key),
+    () => {
+      qc.invalidateQueries({ queryKey: ['series'] });
+      qc.invalidateQueries({ queryKey: ['commitments'] });
+      qc.invalidateQueries({ queryKey: ['commitment'] });
+      qc.invalidateQueries({ queryKey: ['returnReview'] });
+    },
+    // Excluído nunca conta como salvo: um gasto fixo criado e excluído depois não é "o que foi salvo".
+    async (found) => found.action !== 'criar_serie' || (await repo.getSeries(found.seriesId)) !== null,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -730,6 +737,17 @@ function combineParts<T>(parts: readonly QueryPart[], value: T | undefined): Syn
 /** Versão de um conjunto de consultas (instantes das últimas cargas): dependência estável para useMemo. */
 const stamp = (results: readonly { dataUpdatedAt: number }[]) => results.map((r) => r.dataUpdatedAt).join('|');
 
+/**
+ * Registros do contexto nos meses do dia anterior, do dia e do dia seguinte à data (a janela do aviso "Parece já anotado" do
+ * comprovante de Pix, D-051). As mesmas chaves de useMonthRecords: toda escrita de registro recarrega. Sem data ou sem contexto, não
+ * consulta e devolve lista vazia.
+ */
+export function useRecordsNear(contextId: string | undefined, date: IsoDate | null): FinancialRecord[] {
+  const months = date ? [...new Set([addDays(date, -1), date, addDays(date, 1)].map(monthOf))] : [];
+  const results = useRecordsOfMonths(contextId, months);
+  return results.flatMap((r) => r.data ?? []);
+}
+
 /** Registros de vários meses do contexto, com as mesmas chaves de useMonthRecords (invalidadas junto com ['records']). */
 function useRecordsOfMonths(contextId: string | undefined, months: readonly IsoMonth[]) {
   const repo = useRepo();
@@ -755,10 +773,16 @@ export { isRefusal };
  * mesmo conteúdo (findSaved devolve sempre null).
  * `scope`: formulário que cria algo; a tentativa fica na memória do app e sobrevive a sair do formulário e voltar (useAttemptSlot).
  */
-function useOperationAttempts<F extends object>(find: ((key: string) => Promise<F | null>) | null, refresh: (qc: QueryClient) => void, scope?: string) {
+function useOperationAttempts<F extends object>(
+  find: ((key: string) => Promise<F | null>) | null,
+  refresh: (qc: QueryClient) => void,
+  scope?: string,
+  /** O que a operação gravou ainda existe? Excluído nunca conta como salvo (só para as ações que criam). */
+  alive?: (found: F) => Promise<boolean>,
+) {
   const qc = useQueryClient();
   const slot = useAttemptSlot(scope);
-  return slotKeys<F>(slot, find, () => refresh(qc));
+  return slotKeys<F>(slot, find, () => refresh(qc), alive);
 }
 
 const refreshGoals = (qc: QueryClient) => {
@@ -776,7 +800,19 @@ const refreshSavings = (qc: QueryClient) => {
 /** Metas: findSaved usa findGoalOperation (goalId vazio quando a meta ou o movimento já não é legível; ver o repositório). */
 export function useGoalOperationKey(scope?: string) {
   const repo = useRepo();
-  return useOperationAttempts<{ action: GoalAction; goalId: string; movementId: string | null }>((key) => repo.findGoalOperation(key), refreshGoals, scope);
+  return useOperationAttempts<{ action: GoalAction; goalId: string; movementId: string | null }>(
+    (key) => repo.findGoalOperation(key),
+    refreshGoals,
+    scope,
+    async (found) => {
+      // A meta criada e excluída depois não conta; o aporte ou resgate excluído (ou de meta excluída) volta com goalId vazio.
+      if (found.action === 'criar_meta') return (await repo.getGoal(found.goalId)) !== null;
+      if (found.action === 'registrar_movimento_meta') {
+        return found.goalId !== '' && (await repo.listGoalMovements(found.goalId)).some((m) => m.id === found.movementId);
+      }
+      return true;
+    },
+  );
 }
 
 /** Renda de referência: sem busca de operação; repetir a mesma chave com o mesmo conteúdo reconcilia. */
@@ -1391,7 +1427,17 @@ const refreshAccounts = (qc: QueryClient) => {
 /** Contas: findSaved usa findAccountOperation (a conta é o alvo da operação). */
 export function useAccountOperationKey(scope?: string) {
   const repo = useRepo();
-  return useOperationAttempts<{ action: AccountAction; accountId: string }>((key) => repo.findAccountOperation(key), refreshAccounts, scope);
+  return useOperationAttempts<{ action: AccountAction; accountId: string }>(
+    (key) => repo.findAccountOperation(key),
+    refreshAccounts,
+    scope,
+    async (found) => {
+      if (found.action !== 'criar_conta') return true;
+      const space = await repo.getSpace();
+      if (!space) return false;
+      return (await repo.listAccounts(space.personalContextId)).some((a) => a.id === found.accountId);
+    },
+  );
 }
 
 export function useCreateAccount() {
@@ -1857,6 +1903,21 @@ export function useCardOperationKey(scope?: string) {
     (key) => repo.findCardOperation(key),
     refreshCards,
     scope,
+    async (found) => {
+      // Excluído nunca conta como salvo: o cartão, a compra, o encargo ou o estorno excluídos, e o pagamento de fatura desfeito.
+      switch (found.action) {
+        case 'criar_cartao':
+          return (await repo.getCard(found.cardId)) !== null;
+        case 'criar_compra_cartao':
+        case 'criar_encargo_cartao':
+        case 'criar_estorno_cartao':
+          return found.entryId === null || (await repo.getCardEntry(found.entryId)) !== null;
+        case 'pagar_fatura':
+          return found.recordId === null || (await repo.getRecord(found.recordId)) !== null;
+        default:
+          return true;
+      }
+    },
   );
 }
 

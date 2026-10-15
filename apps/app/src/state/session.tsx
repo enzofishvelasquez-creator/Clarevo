@@ -6,6 +6,7 @@ import { AppState, Text, View } from 'react-native';
 
 import { pendingCredentials, type AuthService, type AuthState } from '@/lib/auth';
 import { DemoAuth } from '@/lib/demo-auth';
+import { comprovanteHandoff } from '@/lib/comprovante-handoff';
 import { clearNotePrefsMemory } from '@/lib/note-prefs';
 import { pendingAttempts } from '@/lib/pending-attempts';
 import { receiptLinks } from '@/lib/receipt-link';
@@ -71,11 +72,12 @@ function useToday(mode: AuthService['mode']): IsoDate {
 }
 
 /**
- * Nada da nota lida (endereços da Sefaz, memória das lojas) nem das tentativas de escrita com resultado incerto (CL-03 e CL-19)
- * sobrevive à saída da conta nem passa para outra pessoa.
+ * Nada da nota lida (endereços da Sefaz, memória das lojas), do comprovante lido (D-051) nem das tentativas de escrita com
+ * resultado incerto (CL-03 e CL-19) sobrevive à saída da conta nem passa para outra pessoa.
  */
 function clearReceiptMemory() {
   receiptLinks.clear();
+  comprovanteHandoff.clear();
   clearNotePrefsMemory();
   pendingAttempts.clear();
 }

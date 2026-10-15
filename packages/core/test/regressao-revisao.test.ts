@@ -1,18 +1,21 @@
 /// <reference types="node" />
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   BUDGET_TEXT,
+  CARRIED_ATTEMPT_MAX_AGE_MS,
   DEMO_TEXT,
   DEMO_TODAY,
   GOALS_TEXT,
   GUIDE_ENTRIES,
   MemoryRepository,
   PendingAttemptStore,
+  SAVED_BEFORE_TEXT,
   SERIES_TOTALS_TEXT,
   SUBSCRIPTION_TEXT,
   UNCERTAIN_TEXT,
+  attemptExpired,
   buildInvoices,
   cardSummaryTexts,
   categoryUsage,
@@ -20,6 +23,7 @@ import {
   committedTexts,
   contextPillText,
   createDemoRepository,
+  dropAttempts,
   dueText,
   essentialEstimateText,
   essentialMonthly,
@@ -30,10 +34,17 @@ import {
   invoiceSituationLabel,
   invoiceTexts,
   isPartialInvoicePayment,
+  isRepoError,
+  keyForSend,
   loadInvoices,
   newAttemptSlot,
   newOperationKey,
+  recordUncertain,
+  refuseKey,
+  relevantAttempts,
+  repeatAfterSaved,
   reserveCardTexts,
+  savedBeforeText,
   seriesMonthlyTotal,
   seriesStartingLater,
   seriesTotalsTexts,
@@ -42,10 +53,14 @@ import {
   subscriptionRow,
   subscriptionTotals,
   subscriptionYear,
+  subscriptionYearAmount,
   summarizeCommitted,
   summarizeMonth,
+  type AttemptSlot,
+  type CommitmentInput,
   type CommitmentSeries,
   type IsoDate,
+  type PendingAttempt,
   type SubscriptionSeries,
 } from '../src';
 
@@ -167,6 +182,7 @@ describe('CL-08: Gastos fixos, parcelamentos, assinaturas e contas do ano', () =
     lastNumber: null,
     partsPerYear: null,
     terms: [{ fromNumber: 1, description: 'Streaming', category: 'Lazer', amountCents: 3_990, amountMode: 'fixo', dueDay: 10 }],
+    skippedNumbers: [],
     subscription: true,
     subscriptionReviewedOn: null,
     subscriptionSince: null,
@@ -201,6 +217,42 @@ describe('CL-08: Gastos fixos, parcelamentos, assinaturas e contas do ano', () =
     const curta = assinatura({ firstDueMonth: '2027-06', lastNumber: 3 });
     expect(subscriptionYear(curta, DEMO_TODAY)).toEqual({ months: 3, lastMonth: '2027-08' });
     expect(subscriptionRow(curta, DEMO_TODAY).yearlyCents).toBe(11_970);
+  });
+
+  it('por ano soma o valor vigente de cada mês: aumento agendado entra a partir do mês dele e mês excluído não entra (antes: valor de hoje × meses)', () => {
+    const termo = (fromNumber: number, amountCents: number) => ({ fromNumber, description: 'Streaming', category: 'Lazer', amountCents, amountMode: 'fixo' as const, dueDay: 5 });
+    // Começou em outubro de 2026 (n = 1) a R$ 39,90; a partir do número 3 (dezembro) passa a R$ 44,90. Hoje 07/10/2026.
+    const aumento = assinatura({ firstDueMonth: '2026-10', terms: [termo(1, 3_990), termo(3, 4_490)] });
+    const row = subscriptionRow(aumento, DEMO_TODAY);
+    // Por mês: o valor vigente de hoje. Por ano: 2 meses a R$ 39,90 e 10 a R$ 44,90 (antes: 12 × R$ 39,90 = R$ 478,80).
+    expect([row.monthlyCents, row.yearlyCents, row.yearMonths]).toEqual([3_990, 2 * 3_990 + 10 * 4_490, 12]);
+    expect(row.yearlyCents).toBe(52_880);
+    expect(subscriptionYearAmount(aumento, DEMO_TODAY)).toEqual({ cents: 52_880, months: 12 });
+    // A mesma regra em novembro: a janela é de novembro de 2026 a outubro de 2027 (1 × R$ 39,90 + 11 × R$ 44,90).
+    expect(subscriptionRow(aumento, '2026-11-10').yearlyCents).toBe(3_990 + 11 * 4_490);
+    // Com o aumento já em vigor, o por mês e o por ano são o mesmo valor de sempre.
+    expect(subscriptionRow(aumento, '2027-01-10').monthlyCents).toBe(4_490);
+    expect(subscriptionRow(aumento, '2027-01-10').yearlyCents).toBe(12 * 4_490);
+    // Aumento agendado e término antes de 12 meses: só os meses até o último, cada um pelo valor do seu mês (nov: 39,90; dez e jan: 44,90).
+    const curto = assinatura({ firstDueMonth: '2026-10', lastNumber: 4, terms: [termo(1, 3_990), termo(3, 4_490)] });
+    expect(subscriptionRow(curto, DEMO_TODAY)).toMatchObject({ yearlyCents: 2 * 3_990 + 2 * 4_490, yearMonths: 4, yearEndsIn: '2027-01' });
+    // Aumento depois da janela: não entra.
+    const longe = assinatura({ firstDueMonth: '2026-10', terms: [termo(1, 3_990), termo(14, 9_990)] });
+    expect(subscriptionRow(longe, DEMO_TODAY).yearlyCents).toBe(12 * 3_990);
+    // Mês excluído da série (novembro, número 2): fica de fora da soma e dos meses (antes: 12 × R$ 39,90).
+    const excluido = assinatura({ firstDueMonth: '2026-10', skippedNumbers: [2] });
+    expect(subscriptionRow(excluido, DEMO_TODAY)).toMatchObject({ monthlyCents: 3_990, yearlyCents: 11 * 3_990, yearMonths: 11 });
+    // Mês excluído no passado (antes da janela) não muda nada.
+    const passado = assinatura({ firstDueMonth: '2026-06', skippedNumbers: [2] });
+    expect(subscriptionRow(passado, DEMO_TODAY).yearlyCents).toBe(12 * 3_990);
+    // Aumento e mês excluído juntos: dezembro excluído (n = 3) pula o primeiro mês do novo valor.
+    const juntos = assinatura({ firstDueMonth: '2026-10', skippedNumbers: [3], terms: [termo(1, 3_990), termo(3, 4_490)] });
+    expect(subscriptionRow(juntos, DEMO_TODAY).yearlyCents).toBe(2 * 3_990 + 9 * 4_490);
+    // Assinatura que ainda não começou: a janela é a dos 12 primeiros meses dela, com o aumento no lugar certo (junho de 2027 = n 1).
+    const futura = assinatura({ firstDueMonth: '2027-06', terms: [termo(1, 3_990), termo(13, 4_490)], skippedNumbers: [4] });
+    expect(subscriptionRow(futura, DEMO_TODAY).yearlyCents).toBe(11 * 3_990);
+    // Os totais somam o por ano de cada uma, já com a regra de cada mês.
+    expect(subscriptionTotals([aumento, excluido], DEMO_TODAY)).toMatchObject({ count: 2, monthlyCents: 7_980, yearlyCents: 52_880 + 11 * 3_990 });
   });
 
   it('o total do grupo soma o por ano de cada uma e diz quantas terminam antes (a demonstração continua em R$ 1.666,80)', async () => {
@@ -341,12 +393,15 @@ describe('CL-03 e CL-19: resultado incerto', () => {
     expect((await guardedWrite(visita1, snapshot, send)).status).toBe('uncertain');
     expect(await repo.listRecords(ctx, OCT)).toHaveLength(1); // gravou, mas a resposta se perdeu
     expect(store.count('pessoa-teste')).toBe(1);
-    // A pessoa sai do formulário, reabre e anota o mesmo gasto: confere antes de enviar e mostra como concluído.
+    // A pessoa sai do formulário, reabre e anota o mesmo gasto: confere antes de enviar, e NÃO conclui sozinha (pode ser outro igual de
+    // verdade): devolve 'saved_before', sem enviar nada e com a tentativa ainda guardada. "Ver o gasto salvo" resolve a tentativa.
     const visita2 = slotKeys(store.adopt('pessoa-teste', 'registro:novo:despesa'), find);
     expect(visita2.hasPending(snapshot)).toBe(true);
     const r2 = await guardedWrite(visita2, snapshot, send);
-    expect(r2.status).toBe('reconciled');
+    expect(r2.status).toBe('saved_before');
     expect(await repo.listRecords(ctx, OCT)).toHaveLength(1);
+    expect(store.count('pessoa-teste')).toBe(1);
+    visita2.settled();
     expect(store.count('pessoa-teste')).toBe(0);
     // Salvar uma terceira vez, depois de resolvido, é uma anotação nova (outra chave): o app não bloqueia gastos iguais de verdade.
     const visita3 = slotKeys(store.adopt('pessoa-teste', 'registro:novo:despesa'), find);
@@ -398,7 +453,7 @@ describe('CL-03 e CL-19: resultado incerto', () => {
     repo.failNextWrite = 'depois';
     expect((await guardedWrite(slotKeys(store.adopt('pessoa-teste', 'meta:nova'), find), snapshot, (k) => repo.createGoal(k, ctx, input))).status).toBe('uncertain');
     const r = await guardedWrite(slotKeys(store.adopt('pessoa-teste', 'meta:nova'), find), snapshot, (k) => repo.createGoal(k, ctx, input), (s) => s.action === 'criar_meta');
-    expect(r.status).toBe('reconciled');
+    expect(r.status).toBe('saved_before');
     expect(await repo.listGoals(ctx)).toHaveLength(1);
   });
 
@@ -411,7 +466,7 @@ describe('CL-03 e CL-19: resultado incerto', () => {
     repo.failNextWrite = 'depois';
     await guardedWrite(slotKeys(store.adopt('pessoa-teste', 'conta-a-pagar:nova'), find), snapshot, (k) => repo.createCommitment(k, ctx, input));
     const r = await guardedWrite(slotKeys(store.adopt('pessoa-teste', 'conta-a-pagar:nova'), find), snapshot, (k) => repo.createCommitment(k, ctx, input), (s) => s.action === 'criar_compromisso');
-    expect(r.status).toBe('reconciled');
+    expect(r.status).toBe('saved_before');
     expect(await repo.listCommitments(ctx, OCT)).toHaveLength(1);
   });
 
@@ -443,6 +498,388 @@ describe('CL-03 e CL-19: resultado incerto', () => {
     expect(slot.current).not.toBe(first);
     expect(slot.pending).toEqual([]);
     expect(key()).not.toBe(key());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CL-03 e CL-19, segunda rodada (revisão do D-050): chave nova com outro conteúdo, "Anotar outro igual?",
+// o que foi excluído e a validade das tentativas de visitas anteriores
+// ---------------------------------------------------------------------------
+
+describe('CL-03 e CL-19, segunda rodada: outro conteúdo, entrada idêntica legítima, excluído e validade', () => {
+  const OCT = '2026-10';
+  const PESSOA = 'pessoa-teste';
+  const MINUTO = 60_000;
+  const despesa = { amountCents: 8_000, occurredOn: '2026-10-07', description: 'Farmácia', category: 'Saúde' };
+
+  async function conta() {
+    const repo = new MemoryRepository({ actorId: PESSOA, displayName: 'Pessoa de teste', today: () => DEMO_TODAY });
+    const space = await repo.ensurePersonalSpace('Conta principal');
+    return { repo, ctx: space.personalContextId, accountId: space.accounts[0]!.id };
+  }
+
+  /**
+   * O caminho próprio dos formulários de gasto (record-form), conta a pagar (commitment-form) e pagamento (payment-form): a mesma
+   * sequência de chamadas dos três, que não passam por `guardedWrite`. Confere as tentativas, pergunta quando a achada é de uma
+   * visita anterior, esquece a que foi excluída e envia com `keyForSend`. Um teste de código-fonte logo abaixo garante que os
+   * formulários chamam as mesmas funções, na mesma ordem.
+   */
+  interface Ops {
+    find: (key: string) => Promise<{ id: string } | null>;
+    alive: (id: string) => Promise<boolean>;
+    send: (key: string) => Promise<{ id: string }>;
+  }
+  type Outcome = { status: 'saved'; id: string; created: boolean } | { status: 'asked'; id: string; attempt: PendingAttempt } | { status: 'uncertain' } | { status: 'refused'; code: string };
+  async function ownPath(slot: AttemptSlot, snapshot: string, ops: Ops): Promise<Outcome> {
+    if (relevantAttempts(slot, snapshot).length > 0) {
+      for (const attempt of [...relevantAttempts(slot, snapshot)].reverse()) {
+        const op = await ops.find(attempt.key);
+        if (!op) continue;
+        if (!(await ops.alive(op.id))) {
+          dropAttempts(slot, (a) => a.key === attempt.key);
+          continue;
+        }
+        if (attempt.carried) return { status: 'asked', id: op.id, attempt };
+        if (attempt.snapshot === snapshot) {
+          settleSlot(slot);
+          return { status: 'saved', id: op.id, created: false };
+        }
+      }
+    }
+    const k = keyForSend(slot, snapshot);
+    try {
+      const saved = await ops.send(k);
+      settleSlot(slot);
+      return { status: 'saved', id: saved.id, created: true };
+    } catch (e) {
+      if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
+        refuseKey(slot);
+        return { status: 'refused', code: e.code };
+      }
+      recordUncertain(slot, k, snapshot);
+      return { status: 'uncertain' };
+    }
+  }
+
+  /** Os três formulários que cuidam das próprias chaves, cada um com as operações do repositório que ele usa. */
+  async function formularios() {
+    const { repo, ctx, accountId } = await conta();
+    const pagar = await repo.createCommitment(key(), ctx, { description: 'Condomínio', amountCents: 50_000, dueOn: '2026-10-20', category: 'Moradia' });
+    const gasto = (over: Partial<typeof despesa> = {}): Ops & { snapshot: string } => {
+      const input = { ...despesa, ...over, accountId };
+      return {
+        snapshot: JSON.stringify([input, 0]),
+        find: (k) => repo.findOperation(k).then((op) => (op ? { id: op.recordId } : null)),
+        alive: async (id) => (await repo.getRecord(id)) !== null,
+        send: (k) => repo.createRecord(k, ctx, 'despesa', input),
+      };
+    };
+    const conta_ = (over: Partial<CommitmentInput> = {}): Ops & { snapshot: string } => {
+      const input = { description: 'Internet', amountCents: 15_000, dueOn: '2026-10-15', category: 'Moradia', ...over };
+      return {
+        snapshot: JSON.stringify([input, 0]),
+        find: (k) => repo.findCommitmentOperation(k).then((op) => (op && op.action === 'criar_compromisso' ? { id: op.commitmentId } : null)),
+        alive: async (id) => (await repo.getCommitment(id)) !== null,
+        send: (k) => repo.createCommitment(k, ctx, input).then((w) => ({ id: w.commitment.id })),
+      };
+    };
+    const pagamento = (amountCents: number): Ops & { snapshot: string } => {
+      const input = { accountId, amountCents, paidOn: '2026-10-07', category: 'Moradia' };
+      return {
+        snapshot: JSON.stringify([input, pagar.commitment.version]),
+        find: (k) => repo.findCommitmentOperation(k).then((op) => (op && op.action === 'pagar_compromisso' && op.recordId ? { id: op.recordId } : null)),
+        alive: async (id) => (await repo.getRecord(id)) !== null,
+        send: (k) => repo.payCommitment(k, pagar.commitment.id, pagar.commitment.version, input).then((w) => ({ id: w.record.id })),
+      };
+    };
+    return { repo, ctx, accountId, pagar, gasto, conta_, pagamento };
+  }
+
+  it('achado 1: outro conteúdo numa visita nova envia com chave nova, nos formulários de caminho próprio (antes: chave_reutilizada)', async () => {
+    const f = await formularios();
+    const store = new PendingAttemptStore();
+    const casos = [
+      { escopo: 'registro:novo:despesa', a: f.gasto(), b: f.gasto({ amountCents: 2_500, description: 'Lanche' }), total: async () => (await f.repo.listRecords(f.ctx, OCT)).length },
+      {
+        escopo: 'conta-a-pagar:nova',
+        a: f.conta_(),
+        b: f.conta_({ description: 'Luz', amountCents: 9_000 }),
+        total: async () => (await f.repo.listCommitments(f.ctx, OCT)).filter((c) => c.description !== 'Condomínio').length,
+      },
+    ];
+    for (const caso of casos) {
+      // Visita 1: o envio gravou, mas a resposta se perdeu (resultado incerto).
+      const visita1 = store.adopt(PESSOA, caso.escopo);
+      const chaveAntiga = visita1.current;
+      f.repo.failNextWrite = 'depois';
+      expect((await ownPath(visita1, caso.a.snapshot, caso.a)).status, caso.escopo).toBe('uncertain');
+      expect(await caso.total(), caso.escopo).toBe(1);
+      // Antes: o formulário reenviava a chave antiga com outro conteúdo, e o banco recusava.
+      await expect(caso.b.send(chaveAntiga), caso.escopo).rejects.toMatchObject({ code: 'chave_reutilizada' });
+      // Visita 2, com outro conteúdo: chave nova e grava (a tentativa antiga não vale para este conteúdo; uma gravação confirmada resolve as pendentes).
+      const visita2 = store.adopt(PESSOA, caso.escopo);
+      expect(relevantAttempts(visita2, caso.b.snapshot), caso.escopo).toEqual([]);
+      const r = await ownPath(visita2, caso.b.snapshot, caso.b);
+      expect(r.status, caso.escopo).toBe('saved');
+      expect(await caso.total(), caso.escopo).toBe(2);
+    }
+    f.repo.checkInvariants();
+  });
+
+  it('achado 1, pagamento: outro valor numa visita nova não volta como chave_reutilizada; a recusa é a da regra da conta', async () => {
+    const f = await formularios();
+    const store = new PendingAttemptStore();
+    const escopo = `pagamento:${f.pagar.commitment.id}`;
+    const visita1 = store.adopt(PESSOA, escopo);
+    const a = f.pagamento(50_000);
+    const b = f.pagamento(45_000);
+    f.repo.failNextWrite = 'depois';
+    expect((await ownPath(visita1, a.snapshot, a)).status).toBe('uncertain');
+    // O pagamento foi gravado: pagar de novo com outro valor, na visita seguinte, é recusado pela regra da conta (a versão mudou ou já
+    // está paga; a tela recarrega e mostra que a conta foi paga em outro lugar), não pela chave.
+    const visita2 = store.adopt(PESSOA, escopo);
+    const r = await ownPath(visita2, b.snapshot, b);
+    expect(r).toMatchObject({ status: 'refused' });
+    if (r.status !== 'refused') throw new Error('esperava a recusa');
+    expect(['versao_desatualizada', 'compromisso_quitado']).toContain(r.code);
+    expect(r.code).not.toBe('chave_reutilizada');
+    f.repo.checkInvariants();
+  });
+
+  it('achado 2: tentativa de visita anterior achada gravada não conclui sozinha; "Ver o gasto salvo" resolve e "Anotar outro igual" grava outro com chave nova', async () => {
+    const f = await formularios();
+    const store = new PendingAttemptStore();
+    const a = f.gasto();
+    const visita1 = store.adopt(PESSOA, 'registro:novo:despesa');
+    f.repo.failNextWrite = 'depois';
+    await ownPath(visita1, a.snapshot, a);
+    expect((await f.repo.listRecords(f.ctx, OCT)).length).toBe(1);
+
+    // Visita 2, mesmo conteúdo: pergunta, sem enviar nada e sem esquecer a tentativa.
+    const visita2 = store.adopt(PESSOA, 'registro:novo:despesa');
+    const pergunta = await ownPath(visita2, a.snapshot, a);
+    expect(pergunta.status).toBe('asked');
+    if (pergunta.status !== 'asked') throw new Error('esperava a pergunta');
+    expect((await f.repo.listRecords(f.ctx, OCT)).length).toBe(1);
+    expect(store.count(PESSOA)).toBe(1);
+    // A pergunta aponta para o registro antigo (é o que "Ver o gasto salvo" abre).
+    expect((await f.repo.getRecord(pergunta.id))?.description).toBe('Farmácia');
+
+    // "Anotar outro igual": esquece a tentativa e envia com chave nova. Dois gastos iguais, e nada pendente.
+    const chaveDaPergunta = pergunta.attempt.key;
+    repeatAfterSaved(visita2, pergunta.attempt);
+    expect(visita2.current).not.toBe(chaveDaPergunta);
+    const outro = await ownPath(visita2, a.snapshot, a);
+    expect(outro).toMatchObject({ status: 'saved', created: true });
+    const lista = await f.repo.listRecords(f.ctx, OCT);
+    expect(lista.map((r) => r.description)).toEqual(['Farmácia', 'Farmácia']);
+    expect(new Set(lista.map((r) => r.id)).size).toBe(2);
+    expect(store.count(PESSOA)).toBe(0);
+
+    // "Ver o gasto salvo": a tentativa é resolvida (nada pendente) e nada foi enviado.
+    const visita3 = store.adopt(PESSOA, 'registro:novo:despesa');
+    f.repo.failNextWrite = 'depois';
+    const b = f.gasto({ amountCents: 1_900, description: 'Café' });
+    await ownPath(visita3, b.snapshot, b);
+    const visita4 = store.adopt(PESSOA, 'registro:novo:despesa');
+    const pergunta2 = await ownPath(visita4, b.snapshot, b);
+    expect(pergunta2.status).toBe('asked');
+    settleSlot(visita4);
+    expect(store.count(PESSOA)).toBe(0);
+    expect((await f.repo.listRecords(f.ctx, OCT)).length).toBe(3);
+    f.repo.checkInvariants();
+  });
+
+  it('achado 2, nos outros formulários (guardedWrite): "saved_before" não envia nem esquece; "release" e enviar de novo grava outro igual', async () => {
+    const { repo, ctx } = await conta();
+    const store = new PendingAttemptStore();
+    const input = { description: 'Internet', amountCents: 15_000, dueOn: '2026-10-15', category: 'Moradia' };
+    const find = (k: string) => repo.findCommitmentOperation(k);
+    const snapshot = JSON.stringify([input, 0]);
+    const send = (k: string) => repo.createCommitment(k, ctx, input);
+    const aceita = (s: { action: string }) => s.action === 'criar_compromisso';
+    const abrir = () => slotKeys(store.adopt(PESSOA, 'conta-a-pagar:nova'), find);
+
+    repo.failNextWrite = 'depois';
+    expect((await guardedWrite(abrir(), snapshot, send, aceita)).status).toBe('uncertain');
+    const visita2 = abrir();
+    const r = await guardedWrite(visita2, snapshot, send, aceita);
+    expect(r.status).toBe('saved_before');
+    if (r.status !== 'saved_before') throw new Error('esperava saved_before');
+    expect(r.saved.carried).toBe(true);
+    expect(r.saved.snapshot).toBe(snapshot);
+    expect(r.saved.commitmentId).toBeTruthy();
+    expect((await repo.listCommitments(ctx, OCT)).length).toBe(1);
+    expect(store.count(PESSOA)).toBe(1);
+    // Chamar de novo, sem escolher, repete a pergunta (nada mudou).
+    expect((await guardedWrite(visita2, snapshot, send, aceita)).status).toBe('saved_before');
+    // "Anotar outra igual": release e enviar de novo.
+    visita2.release(r.saved);
+    expect(visita2.hasPending(snapshot)).toBe(false);
+    expect((await guardedWrite(visita2, snapshot, send, aceita)).status).toBe('ok');
+    expect((await repo.listCommitments(ctx, OCT)).length).toBe(2);
+    expect(store.count(PESSOA)).toBe(0);
+    repo.checkInvariants();
+  });
+
+  it('a tentativa da MESMA visita continua concluindo sozinha: salvar de novo depois de "Não deu para confirmar" mostra como concluído', async () => {
+    const { repo, ctx, accountId } = await conta();
+    const slot = newAttemptSlot();
+    const keys = slotKeys(slot, (k) => repo.findOperation(k));
+    const input = { ...despesa, accountId };
+    const snapshot = JSON.stringify([input, 0]);
+    repo.failNextWrite = 'depois';
+    expect((await guardedWrite(keys, snapshot, (k) => repo.createRecord(k, ctx, 'despesa', input))).status).toBe('uncertain');
+    expect((await guardedWrite(keys, snapshot, (k) => repo.createRecord(k, ctx, 'despesa', input))).status).toBe('reconciled');
+    expect((await repo.listRecords(ctx, OCT)).length).toBe(1);
+    expect(slot.pending).toEqual([]);
+  });
+
+  it('achado 2: o que foi excluído depois nunca conta como salvo (antes: "Gasto salvo" apontando para um registro que não existe)', async () => {
+    const f = await formularios();
+    const store = new PendingAttemptStore();
+    const a = f.gasto();
+    const visita1 = store.adopt(PESSOA, 'registro:novo:despesa');
+    f.repo.failNextWrite = 'depois';
+    await ownPath(visita1, a.snapshot, a);
+    const [gravado] = await f.repo.listRecords(f.ctx, OCT);
+    await f.repo.deleteRecord(key(), gravado!.id, gravado!.version);
+    expect(await f.repo.listRecords(f.ctx, OCT)).toHaveLength(0);
+
+    // Visita 2, mesmo conteúdo: o registro foi excluído, então não há o que mostrar. Grava um novo, com chave nova.
+    const visita2 = store.adopt(PESSOA, 'registro:novo:despesa');
+    const r = await ownPath(visita2, a.snapshot, a);
+    expect(r).toMatchObject({ status: 'saved', created: true });
+    if (r.status !== 'saved') throw new Error('esperava gravar');
+    expect(r.id).not.toBe(gravado!.id);
+    expect((await f.repo.listRecords(f.ctx, OCT)).map((x) => x.id)).toEqual([r.id]);
+
+    // O mesmo no caminho do guardedWrite, com a função "alive" que os formulários passam (o app: getRecord, getGoal, getCard...).
+    const { repo, ctx, accountId } = await conta();
+    const input = { ...despesa, accountId };
+    const snapshot = JSON.stringify([input, 0]);
+    const send = (k: string) => repo.createRecord(k, ctx, 'despesa', input);
+    const mem = new PendingAttemptStore();
+    const abrir = (comAlive: boolean) =>
+      slotKeys(mem.adopt(PESSOA, 'registro:novo:despesa'), (k) => repo.findOperation(k), undefined, comAlive ? async (op) => (await repo.getRecord(op.recordId)) !== null : undefined);
+    repo.failNextWrite = 'depois';
+    await guardedWrite(abrir(true), snapshot, send);
+    const [salvo] = await repo.listRecords(ctx, OCT);
+    await repo.deleteRecord(key(), salvo!.id, salvo!.version);
+    // Sem a conferência de "existe": aponta para o registro excluído (o defeito).
+    expect((await guardedWrite(abrir(false), snapshot, send)).status).toBe('saved_before');
+    // Com a conferência: a tentativa é esquecida e o envio grava um registro novo.
+    const depois = await guardedWrite(abrir(true), snapshot, send);
+    expect(depois.status).toBe('ok');
+    expect((await repo.listRecords(ctx, OCT)).length).toBe(1);
+    expect(mem.count(PESSOA)).toBe(0);
+    repo.checkInvariants();
+  });
+
+  it('a tentativa de visita anterior vale 30 minutos: depois disso o mesmo conteúdo é uma anotação nova (antes: nunca vencia)', async () => {
+    const f = await formularios();
+    const a = f.gasto();
+    const t0 = 1_800_000_000_000;
+    for (const [minutos, vale] of [[29, true], [30, true], [31, false]] as const) {
+      const store = new PendingAttemptStore();
+      const visita1 = store.adopt(PESSOA, 'registro:novo:despesa', t0);
+      const chave = visita1.current;
+      recordUncertain(visita1, chave, a.snapshot, t0);
+      // Visita 2, 'minutos' depois.
+      const visita2 = store.adopt(PESSOA, 'registro:novo:despesa', t0 + minutos * MINUTO);
+      expect(visita2.pending.length, `${minutos} min`).toBe(vale ? 1 : 0);
+      expect(relevantAttempts(visita2, a.snapshot).length, `${minutos} min`).toBe(vale ? 1 : 0);
+      // Vencida: a chave também gira (reenviá-la devolveria o registro antigo, em silêncio).
+      if (!vale) expect(visita2.current, `${minutos} min`).not.toBe(chave);
+      else expect(visita2.current).toBe(chave);
+    }
+    // Vencida, com a gravação de verdade: o mesmo gasto vira outro registro, sem pergunta.
+    const store = new PendingAttemptStore();
+    const visita1 = store.adopt(PESSOA, 'registro:novo:despesa', t0);
+    f.repo.failNextWrite = 'depois';
+    const k1 = visita1.current;
+    expect((await ownPath(visita1, a.snapshot, a)).status).toBe('uncertain');
+    visita1.pending[0]!.at = t0;
+    const tarde = store.adopt(PESSOA, 'registro:novo:despesa', t0 + 45 * MINUTO);
+    expect(tarde.current).not.toBe(k1);
+    expect(await ownPath(tarde, a.snapshot, a)).toMatchObject({ status: 'saved', created: true });
+    expect((await f.repo.listRecords(f.ctx, OCT)).length).toBe(2);
+    // Sem horário guardado (tentativa antiga de outra versão): não expira por engano.
+    expect(attemptExpired({ key: 'k', snapshot: 's' }, t0 + 999 * MINUTO)).toBe(false);
+    expect(CARRIED_ATTEMPT_MAX_AGE_MS).toBe(30 * MINUTO);
+  });
+
+  it('keyForSend: mesma chave para o mesmo conteúdo, chave nova para outro, também quando a última tentativa é de uma visita anterior', () => {
+    const slot = newAttemptSlot();
+    const k1 = slot.current;
+    expect(keyForSend(slot, 'A')).toBe(k1); // sem tentativa: a chave de sempre
+    recordUncertain(slot, k1, 'A');
+    expect(keyForSend(slot, 'A')).toBe(k1); // mesmo conteúdo: repete
+    const k2 = keyForSend(slot, 'B'); // outro conteúdo: nova
+    expect(k2).not.toBe(k1);
+    expect(slot.current).toBe(k2);
+    // Tentativa carregada: relevantAttempts a ignora para outro conteúdo, mas a chave antiga ainda não pode voltar.
+    const store = new PendingAttemptStore();
+    const visita1 = store.adopt('ana', 'registro:novo:despesa');
+    recordUncertain(visita1, visita1.current, 'A');
+    const antiga = visita1.current;
+    const visita2 = store.adopt('ana', 'registro:novo:despesa');
+    expect(relevantAttempts(visita2, 'B')).toEqual([]);
+    expect(keyForSend(visita2, 'B')).not.toBe(antiga);
+  });
+
+  it('os formulários chamam as mesmas funções, na mesma ordem (o caminho próprio do gasto, da conta a pagar e do pagamento)', () => {
+    for (const file of ['record-form', 'commitment-form', 'payment-form']) {
+      const src = read(`apps/app/src/components/${file}.tsx`);
+      expect(src, file).toContain('keyForSend(attempts, snapshot)');
+      expect(src, file).toContain('recordUncertain(attempts, key, snapshot)');
+      expect(src, file).toContain('refuseKey(attempts)');
+      expect(src, file).toContain('dropAttempts(attempts');
+      expect(src, file).toContain('if (attempt.carried) return');
+      // A rotação da chave não fica mais presa ao "tem tentativa relevante" (o defeito do achado 1).
+      expect(src, file).not.toMatch(/last\.snapshot !== snapshot\) attempts\.current/);
+      expect(src, file).not.toContain('attempts.pending = [...attempts.pending');
+      // A ordem: conferir, perguntar quando a achada é de visita anterior, depois a chave do envio.
+      expect(src.indexOf('relevantAttempts(attempts, snapshot).length > 0'), file).toBeLessThan(src.indexOf('keyForSend(attempts, snapshot)'));
+    }
+  });
+
+  it('todo formulário que guarda a tentativa fora da tela mostra "já tinha sido salvo" (e nenhum outro finge que não existe)', () => {
+    const dir = (path: string) => readdirSync(`${ROOT}${path}`).map((n) => `${path}/${n}`);
+    const arquivos = [...dir('apps/app/src/components'), ...dir('apps/app/src/app/cartoes/[id]')].filter((f) => /\.tsx$/.test(f));
+    const comEscopo = arquivos.filter((f) => /use(AttemptSlot|\w*OperationKey)\(\s*(`|'|mode\.type|entry \?|reserve \?)/.test(read(f)));
+    // Os formulários da lista (D-050): gasto e compra no cartão, conta a pagar, pagamento, gasto fixo, meta, reserva, aporte, cartão, conta, fatura e lançamento.
+    for (const file of [
+      'record-form', 'commitment-form', 'payment-form', 'series-form', 'goal-form', 'reserve-form', 'goal-movement-form', 'card-form', 'account-form', 'invoice-pay-form', 'invoice-entry-form',
+    ]) {
+      expect(comEscopo, file).toContain(`apps/app/src/components/${file}.tsx`);
+    }
+    for (const f of comEscopo) {
+      const src = read(f);
+      expect(src, f).toContain('useSavedBefore');
+      expect(src, f).toContain('.banner}');
+    }
+    // Quem usa guardedWrite com tentativa carregada trata o status novo; o restante (sem escopo) nunca o recebe.
+    for (const f of comEscopo.filter((x) => read(x).includes('guardedWrite('))) expect(read(f), f).toContain("'saved_before'");
+    expect(read('apps/app/src/components/series-form.tsx')).toContain('saved.carried');
+  });
+
+  it('textos de "já tinha sido salvo": uma pergunta por formulário, no gênero certo, sem travessão nem a expressão proibida', () => {
+    expect(SAVED_BEFORE_TEXT.gasto).toEqual({ message: 'Este gasto já tinha sido salvo. Anotar outro igual?', another: 'Anotar outro igual', view: 'Ver o gasto salvo' });
+    expect(savedBeforeText('recebimento').message).toBe('Este recebimento já tinha sido salvo. Anotar outro igual?');
+    expect(savedBeforeText('compra').message).toBe('Esta compra já tinha sido salva. Anotar outra igual?');
+    // Onde um segundo igual não é possível, não há pergunta nem "outro igual".
+    expect(savedBeforeText('pagamento').another).toBeNull();
+    expect(savedBeforeText('reserva').another).toBeNull();
+    for (const [kind, t] of Object.entries(SAVED_BEFORE_TEXT)) {
+      for (const text of [t.message, t.view, ...(t.another ? [t.another] : [])]) {
+        expect(text, kind).not.toMatch(FORBIDDEN);
+        expect(text, kind).toMatch(/^[A-ZÁÉÍÓÚÂÊÔÃÕÇ]/);
+      }
+      expect(t.message, kind).toMatch(/já tinha sido (salv|registrad)/);
+      if (t.another) expect(t.message, kind).toMatch(/\?$/);
+      else expect(t.message, kind).toMatch(/\.$/);
+    }
   });
 });
 

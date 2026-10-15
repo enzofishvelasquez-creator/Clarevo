@@ -6308,12 +6308,20 @@ describe('API real: assinaturas (Ciclo H2, D-046)', () => {
     const list = await ana.listSeries(ctx);
     const rows = subscriptionRows(list, T0);
     // Ativas: Streaming (R$ 44,90 desde novembro; R$ 39,90 em outubro), Academia (R$ 99,00) e Clube (R$ 45,00), retomado.
+    // O por ano soma o valor de cada mês da janela (revisão do D-050): o Streaming é 1 mês a R$ 39,90 e 11 a R$ 44,90, não 12 × R$ 39,90.
+    const streamingYear = cents(39.9) + cents(44.9) * 11;
     expect(rows.map((r) => [r.name, r.monthlyCents, r.yearlyCents])).toEqual([
       ['Academia', cents(99), cents(99) * 12],
       ['Clube', cents(45), cents(45) * 12],
-      ['Streaming', cents(39.9), cents(39.9) * 12],
+      ['Streaming', cents(39.9), streamingYear],
     ]);
-    expect(subscriptionTotals(list, T0)).toEqual({ count: 3, monthlyCents: cents(183.9), yearlyCents: cents(183.9) * 12, estimatedMonthlyCents: 0, endingCount: 0 });
+    expect(subscriptionTotals(list, T0)).toEqual({
+      count: 3,
+      monthlyCents: cents(183.9),
+      yearlyCents: cents(99) * 12 + cents(45) * 12 + streamingYear,
+      estimatedMonthlyCents: 0,
+      endingCount: 0,
+    });
     expect(lastSubscriptionReview(list, T0)).toBe('2037-10-09');
     expect(subscriptionReminderDue(list, '2038-04-09')).toBe(false);
     expect(subscriptionReminderDue(list, '2038-04-10')).toBe(true);

@@ -6,6 +6,7 @@ import { PLANO_FIELDS, PLANO_TEXT } from '../calculators/plano-dividas';
 import { CARDS_TEXT } from '../cards';
 import { QUICK_PAY_TEXT } from '../commitments';
 import { COMMITTED_TEXT } from '../committed';
+import { COMPROVANTE_TEXT } from '../comprovante/fluxo';
 import { EXPORT_TEXT } from '../export';
 import { GOALS_TEXT } from '../goals';
 import { IMPORT_TEXT } from '../importar/textos';
@@ -107,11 +108,12 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Escolha como ler a nota: ${list([NOTA_TEXT.sheet.camera, NOTA_TEXT.sheet.pdf, NOTA_TEXT.sheet.paste], 'ou')}.`,
       'Aponte a câmera para o QR code do cupom ou para o código de barras da chave de acesso.',
       'Confira o que foi preenchido, como valor, data e descrição, e mude o que precisar.',
+      `Para ler o PDF do comprovante de um Pix, de uma TED, de um boleto ou de uma compra no débito, escolha ${q(COMPROVANTE_TEXT.option)} na mesma folha. Em Registrar recebimento, a linha tem o mesmo nome. O PDF é lido no aparelho e não é guardado.`,
       `Toque em ${q('Salvar gasto')}. Só um resumo da chave é guardado, nunca o CPF, a chave inteira nem o link.`,
     ],
     screenName: 'Anotar gasto',
     href: '/registro/novo?tipo=despesa',
-    keywords: ['nota', 'fiscal', 'cupom', 'qr', 'qr code', 'nfc-e', 'nf-e', 'danfe', 'escanear', 'câmera', 'chave de acesso', 'recibo'],
+    keywords: ['nota', 'fiscal', 'cupom', 'qr', 'qr code', 'nfc-e', 'nf-e', 'danfe', 'escanear', 'câmera', 'chave de acesso', 'recibo', 'comprovante', 'pix', 'ted', 'boleto'],
     routes: [],
     screenshot: '153_nota_lida.png',
   },

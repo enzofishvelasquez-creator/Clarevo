@@ -19,8 +19,13 @@ import {
   isRepoError,
   maskDateBR,
   monthOf,
+  dropAttempts,
+  keyForSend,
   newOperationKey,
+  recordUncertain,
+  refuseKey,
   relevantAttempts,
+  repeatAfterSaved,
   settleSlot,
   parseBRL,
   parseDateBR,
@@ -30,6 +35,7 @@ import {
   type CommitmentInput,
   type DraftField,
   type FieldErrors,
+  type PendingAttempt,
   type PersonalSpace,
 } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
@@ -44,6 +50,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
+import { useSavedBefore } from '@/components/saved-before';
 import { SumValues } from '@/components/sum-values';
 import { ChoiceGroup, ofSeries, SERIES_NOUN } from '@/components/series-parts';
 import { TermHint } from '@/components/term-hint';
@@ -143,6 +150,25 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
   const leave = (fn: () => void) => setLeaveTo(() => fn);
   const goBack = () => (router.canGoBack() ? router.back() : router.replace(editingId ? `/a-pagar/${editingId}` : '/a-pagar'));
 
+  // "Esta conta a pagar já tinha sido salva. Anotar outra igual?" (CL-03 e CL-19): uma tentativa de visita anterior achada gravada não
+  // conclui sozinha. O aviso sai da tela quando o preenchimento muda.
+  const watchKey = JSON.stringify(draft);
+  const savedBefore = useSavedBefore<{ id: string; attempt: PendingAttempt }>(
+    'conta-a-pagar',
+    watchKey,
+    {
+      onView: (saved) => {
+        settleSlot(attempts);
+        leave(() => router.replace(`/a-pagar/${saved.id}`));
+      },
+      onAnother: (saved) => {
+        repeatAfterSaved(attempts, saved.attempt);
+        submit();
+      },
+    },
+    busy,
+  );
+
   const set = <K extends keyof CommitmentDraft>(k: K, v: CommitmentDraft[K]) => {
     setDraft((d) => ({ ...d, [k]: v }));
     if (k in errors) setErrors((e) => ({ ...e, [k]: undefined }));
@@ -172,25 +198,33 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
 
   /**
    * Resultado de rede incerto: antes de repetir, conferir se alguma tentativa anterior foi gravada.
-   * Se foi e o preenchimento mudou depois da falha, aplica o preenchimento atual como edição
-   * dessa mesma conta a pagar (nunca cria uma segunda). Devolve o ID, ou null se nada foi gravado.
-   * As tentativas só são esquecidas depois que a leitura e a edição de acompanhamento dão certo: se uma delas
-   * falhar, a próxima tentativa reconcilia de novo em vez de repetir a criação.
+   * - Gravada e excluída depois: não conta como salva (a tentativa é esquecida e o envio segue com chave nova).
+   * - Gravada em uma visita anterior ao formulário: não conclui sozinha, porque pode ser outra conta igual de verdade. Devolve `asked`
+   *   e o formulário pergunta ("Esta conta a pagar já tinha sido salva. Anotar outra igual?").
+   * - Gravada nesta visita: se o preenchimento mudou depois da falha, aplica o preenchimento atual como edição dessa mesma conta a
+   *   pagar (nunca cria uma segunda).
+   * Devolve o ID, ou null se nada foi gravado. As tentativas só são esquecidas depois que a leitura e a edição de acompanhamento dão
+   * certo: se uma delas falhar, a próxima tentativa reconcilia de novo em vez de repetir a criação.
    */
-  const reconcile = async (input: CommitmentInput, snapshot: string): Promise<string | null> => {
+  const reconcile = async (input: CommitmentInput, snapshot: string): Promise<{ id: string; asked: PendingAttempt | null } | null> => {
     for (const attempt of [...relevantAttempts(attempts, snapshot)].reverse()) {
       const op = await repo.findCommitmentOperation(attempt.key);
       if (!op || (op.action !== 'criar_compromisso' && op.action !== 'editar_compromisso')) continue;
       qc.invalidateQueries({ queryKey: ['commitments'] });
       qc.invalidateQueries({ queryKey: ['commitment', op.commitmentId] });
       const current = await repo.getCommitment(op.commitmentId);
-      if (attempt.snapshot === snapshot || !current) {
+      if (!current) {
+        dropAttempts(attempts, (a) => a.key === attempt.key);
+        continue;
+      }
+      if (attempt.carried) return { id: op.commitmentId, asked: attempt };
+      if (attempt.snapshot === snapshot) {
         settleSlot(attempts);
-        return op.commitmentId;
+        return { id: op.commitmentId, asked: null };
       }
       const saved = await update.mutateAsync({ key: newOperationKey(), id: current.id, version: current.version, input });
       settleSlot(attempts);
-      return saved.commitment.id;
+      return { id: saved.commitment.id, asked: null };
     }
     return null;
   };
@@ -237,17 +271,22 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
     const snapshot = JSON.stringify([input, version]);
     try {
       if (relevantAttempts(attempts, snapshot).length > 0) {
-        const savedId = await reconcile(input, snapshot);
-        if (savedId) {
+        const found = await reconcile(input, snapshot);
+        if (found?.asked) {
+          // Uma tentativa de visita anterior foi gravada: a pessoa escolhe entre ver a conta e anotar outra igual.
           setRetry(false);
-          finish(savedId);
+          savedBefore.show({ id: found.id, attempt: found.asked }, watchKey);
           return;
         }
-        // Nada foi gravado: repetir com a mesma chave se o conteúdo é o mesmo da última tentativa.
-        const last = attempts.pending[attempts.pending.length - 1];
-        if (!last || last.snapshot !== snapshot) attempts.current = newOperationKey();
+        if (found) {
+          setRetry(false);
+          finish(found.id);
+          return;
+        }
       }
-      const key = attempts.current;
+      // Repete a chave se o conteúdo é o mesmo da última tentativa; com outro conteúdo, sempre uma chave nova (mesmo se a última
+      // tentativa for de uma visita anterior, que não conta como relevante: a chave antiga voltaria como chave_reutilizada).
+      const key = keyForSend(attempts, snapshot);
       // Aviso do limite pessoal (D-041): o comprometido dos próximos meses antes de gravar, para ver se algum mês passou a ficar acima.
       const limitBefore = await limitWatch.before(contextId);
       try {
@@ -257,7 +296,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
         finish(saved.commitment.id, await limitWatch.after(limitBefore));
       } catch (e) {
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
-          attempts.current = newOperationKey();
+          refuseKey(attempts);
           setRetry(false);
           const field = fieldForErrorCode(e.code);
           if (field && COMMITMENT_FIELD_ORDER.includes(field)) {
@@ -280,7 +319,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
           return;
         }
         // Falha de rede: a gravação pode ou não ter acontecido. Guardar a tentativa para reconciliar.
-        attempts.pending = [...attempts.pending, { key, snapshot }];
+        recordUncertain(attempts, key, snapshot);
         // Se foi gravada, a lista e o Resumo que ficaram abertos recarregam e mostram a conta.
         qc.invalidateQueries({ queryKey: ['commitments'] });
         if (editingId) qc.invalidateQueries({ queryKey: ['commitment', editingId] });
@@ -530,6 +569,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
       {/* Rodapé fixo: a ação principal fica sempre visível, acima do teclado. */}
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space[3]) }]}>
         <View style={styles.footerInner}>
+          {savedBefore.banner}
           {banner ? (
             <Banner tone="erro" icon={AlertCircle}>
               <Txt variant="label" color={colors.error}>

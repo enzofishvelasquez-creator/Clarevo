@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   APP_SCREENS,
   CALCULATORS,
+  COMPROVANTE_TEXT,
   GUIDE_ENTRIES,
   GUIDE_GROUPS,
   GUIDE_SEARCH_LIMIT,
@@ -192,6 +193,19 @@ describe('catálogo do guia (D-049)', () => {
     expect(importar.steps.join(' ')).toContain('"Escolher o arquivo"');
     expect(importar.steps.join(' ')).toContain('"Revisar as linhas"');
     expect(importar.alsoWhere?.map(guideWhere)).toContain('Conta › Suas contas › Importar extrato');
+  });
+
+  it('"Escanear nota fiscal" cita o comprovante de Pix e de pagamento em um passo (D-051), com o nome real da opção, e a busca acha por "pix", "ted" e "boleto"', () => {
+    const nota = guideEntry('nota-fiscal')!;
+    const step = nota.steps.find((x) => x.includes(COMPROVANTE_TEXT.option));
+    expect(step).toBeDefined();
+    expect(step).toContain('"Ler comprovante de Pix ou pagamento (PDF)"');
+    expect(step).toContain('Registrar recebimento');
+    expect(step).toContain('não é guardado');
+    // O passo entra antes de "Salvar gasto", que continua sendo o último.
+    expect(nota.steps.indexOf(step!)).toBe(nota.steps.length - 2);
+    expect(nota.steps[nota.steps.length - 1]).toContain('"Salvar gasto"');
+    for (const word of ['pix', 'ted', 'boleto', 'comprovante']) expect(searchGuide(word).map((e) => e.id), word).toContain('nota-fiscal');
   });
 
   it('as calculadoras aparecem cada uma em uma linha, a partir do catálogo de calculadoras', () => {

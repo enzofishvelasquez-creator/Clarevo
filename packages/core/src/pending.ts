@@ -11,10 +11,21 @@ import { isRepoError, newOperationKey, type RepoError } from './repository';
  * pessoa e ao recarregar a página.
  *
  * Regra de segurança: uma tentativa que sobrou de uma visita anterior ao formulário (`carried`) só vale para o MESMO conteúdo. Com
- * outro conteúdo, a pessoa está anotando outra coisa: a tentativa antiga não é conferida nem aproveitada, e o registro novo nunca
- * troca nem sobrescreve o que foi gravado antes. Dentro da mesma visita, o comportamento de sempre continua: depois de uma falha, o
- * preenchimento mudado vira edição do que foi gravado.
+ * outro conteúdo, a pessoa está anotando outra coisa: a tentativa antiga não é conferida nem aproveitada, o registro novo nunca
+ * troca nem sobrescreve o que foi gravado antes, e o envio usa SEMPRE uma chave nova (`keyForSend`; a chave antiga voltaria como
+ * `chave_reutilizada`). Dentro da mesma visita, o comportamento de sempre continua: depois de uma falha, o preenchimento mudado vira
+ * edição do que foi gravado.
+ *
+ * Entrada idêntica legítima: uma tentativa de visita anterior, conferida e achada gravada, NÃO conclui sozinha. A pessoa pode ter
+ * querido anotar outro igual (dois cafés de R$ 8,00 no mesmo dia), então o formulário pergunta ("Este gasto já tinha sido salvo.
+ * Anotar outro igual?"): "outro igual" esquece a tentativa e envia com chave nova; "Ver o gasto salvo" resolve a tentativa e abre o
+ * que foi gravado. A tentativa de visita anterior vale por 30 minutos (`CARRIED_ATTEMPT_MAX_AGE_MS`); depois, sai da memória e o
+ * mesmo conteúdo é uma anotação nova. E o que foi excluído depois nunca conta como salvo: a conferência esquece a tentativa e o
+ * envio segue com chave nova.
  */
+
+/** Quanto tempo uma tentativa deixada por uma visita anterior continua valendo: 30 minutos depois de ficar incerta. */
+export const CARRIED_ATTEMPT_MAX_AGE_MS = 30 * 60 * 1000;
 
 /** Uma tentativa com resultado incerto: a chave enviada e o conteúdo (texto estável) que ela levava. */
 export interface PendingAttempt {
@@ -22,6 +33,8 @@ export interface PendingAttempt {
   snapshot: string;
   /** Sobrou de uma visita anterior ao formulário. */
   carried?: boolean;
+  /** Quando ficou incerta (milissegundos desde 1970); a validade das tentativas de visitas anteriores conta daqui. */
+  at?: number;
 }
 
 /** O que um formulário guarda entre tentativas: a chave do próximo envio e as tentativas incertas, da mais antiga para a mais recente. */
@@ -43,6 +56,49 @@ export function settleSlot(slot: AttemptSlot): void {
   slot.current = newOperationKey();
 }
 
+/** Guarda uma tentativa com resultado incerto (falha de rede depois de enviar). */
+export function recordUncertain(slot: AttemptSlot, key: string, snapshot: string, now: number = Date.now()): void {
+  slot.pending = [...slot.pending, { key, snapshot, at: now }];
+}
+
+/**
+ * A chave do próximo envio. Reusa a da última tentativa incerta quando o conteúdo é o mesmo (o banco reconhece a repetição); com
+ * outro conteúdo, SEMPRE uma chave nova, mesmo que a última tentativa seja de uma visita anterior e por isso não conte como
+ * relevante. Girar a chave só dentro do "tem tentativa relevante" reenviava a chave antiga com conteúdo diferente, e o banco
+ * recusava com `chave_reutilizada`. Todo formulário que cuida das próprias chaves chama esta função.
+ */
+export function keyForSend(slot: AttemptSlot, snapshot: string): string {
+  const last = slot.pending[slot.pending.length - 1];
+  if (last && last.snapshot !== snapshot) slot.current = newOperationKey();
+  return slot.current;
+}
+
+/** O servidor recusou (nada foi gravado com a chave): a próxima tentativa usa outra. */
+export function refuseKey(slot: AttemptSlot): void {
+  slot.current = newOperationKey();
+}
+
+/**
+ * Esquece tentativas que já não valem (a conferência mostrou que o que elas gravaram foi excluído, ou a pessoa escolheu anotar
+ * outro igual). Se a chave do próximo envio era de uma delas, gira: reenviá-la devolveria o resultado antigo, em silêncio.
+ */
+export function dropAttempts(slot: AttemptSlot, match: (attempt: PendingAttempt) => boolean): void {
+  const dropped = slot.pending.filter(match);
+  if (dropped.length === 0) return;
+  slot.pending = slot.pending.filter((a) => !match(a));
+  if (dropped.some((a) => a.key === slot.current) && !slot.pending.some((a) => a.key === slot.current)) slot.current = newOperationKey();
+}
+
+/** "Anotar outro igual": esquece a tentativa achada gravada (e as outras do mesmo conteúdo); o envio seguinte leva chave nova. */
+export function repeatAfterSaved(slot: AttemptSlot, saved: { snapshot: string }): void {
+  dropAttempts(slot, (a) => a.snapshot === saved.snapshot);
+}
+
+/** A tentativa de uma visita anterior já passou da validade? Sem horário guardado, não expira. */
+export function attemptExpired(attempt: PendingAttempt, now: number = Date.now()): boolean {
+  return attempt.at !== undefined && now - attempt.at > CARRIED_ATTEMPT_MAX_AGE_MS;
+}
+
 /**
  * As tentativas que valem para este envio: todas, se não há conteúdo para comparar ou se são da mesma visita; as de visitas
  * anteriores, só quando o conteúdo é igual ao que está sendo enviado.
@@ -60,16 +116,17 @@ export class PendingAttemptStore {
   }
 
   /**
-   * Abre uma visita ao formulário: devolve o espaço guardado (ou um novo) e marca como `carried` o que já havia nele. Chame uma vez
-   * por abertura do formulário, não a cada desenho da tela.
+   * Abre uma visita ao formulário: devolve o espaço guardado (ou um novo), esquece o que passou da validade (30 minutos) e marca como
+   * `carried` o que sobrou. Chame uma vez por abertura do formulário, não a cada desenho da tela.
    */
-  adopt(personId: string, scope: string): AttemptSlot {
+  adopt(personId: string, scope: string, now: number = Date.now()): AttemptSlot {
     const id = this.id(personId, scope);
     let slot = this.slots.get(id);
     if (!slot) {
       slot = newAttemptSlot();
       this.slots.set(id, slot);
     }
+    dropAttempts(slot, (a) => attemptExpired(a, now));
     for (const a of slot.pending) a.carried = true;
     return slot;
   }
@@ -113,6 +170,8 @@ export function isRefusal(e: unknown): boolean {
 export interface OperationAttempt {
   key: string;
   snapshot: string;
+  /** Sobrou de uma visita anterior ao formulário (a pessoa decide se é o mesmo ou outro igual). */
+  carried?: boolean;
 }
 
 export interface OperationKeys<F extends object> {
@@ -122,11 +181,18 @@ export interface OperationKeys<F extends object> {
   uncertain: (key: string, snapshot: string) => void;
   settled: () => void;
   refused: () => void;
+  /** "Anotar outro igual": esquece a tentativa achada gravada; o envio seguinte leva chave nova. */
+  release: (saved: OperationAttempt) => void;
 }
 
 export type WriteResult<T, F extends object> =
   | { status: 'ok'; value: T }
   | { status: 'reconciled'; saved: OperationAttempt & F }
+  /**
+   * Uma tentativa de visita anterior foi achada gravada. Não conclui sozinha: a pessoa escolhe entre ver o que foi salvo
+   * (`keys.settled()` e abrir) e anotar outro igual (`keys.release(saved)` e enviar de novo). Nada foi enviado.
+   */
+  | { status: 'saved_before'; saved: OperationAttempt & F }
   | { status: 'refused'; code: string; detail: string | null }
   | { status: 'uncertain' };
 
@@ -144,6 +210,11 @@ export function slotKeys<F extends object>(
   slot: AttemptSlot,
   find: ((key: string) => Promise<F | null>) | null,
   refresh: () => void = () => {},
+  /**
+   * O que a operação gravou ainda existe? Excluído nunca conta como salvo: a tentativa é esquecida e o envio segue com chave nova.
+   * Sem esta função, tudo o que a busca da operação achar conta.
+   */
+  alive?: (found: F) => Promise<boolean>,
 ): OperationKeys<F> {
   return {
     hasPending: (snapshot) => relevantAttempts(slot, snapshot).length > 0,
@@ -152,28 +223,29 @@ export function slotKeys<F extends object>(
       for (const attempt of [...relevantAttempts(slot, snapshot)].reverse()) {
         const op = await find(attempt.key);
         if (!op) continue;
+        if (alive && !(await alive(op))) {
+          // Gravou e foi excluído depois: não há o que mostrar como salvo.
+          dropAttempts(slot, (a) => a.key === attempt.key);
+          refresh();
+          continue;
+        }
         refresh();
         return { ...attempt, ...op };
       }
       return null;
     },
     /** Chave do envio: a da última tentativa incerta, se o conteúdo é o mesmo; senão, uma nova. */
-    keyFor: (snapshot) => {
-      const last = slot.pending[slot.pending.length - 1];
-      if (last && last.snapshot !== snapshot) slot.current = newOperationKey();
-      return slot.current;
-    },
+    keyFor: (snapshot) => keyForSend(slot, snapshot),
     /** Falha de rede: a gravação pode ou não ter acontecido. */
     uncertain: (key, snapshot) => {
-      slot.pending = [...slot.pending, { key, snapshot }];
+      recordUncertain(slot, key, snapshot);
       refresh();
     },
     /** Gravação confirmada ou reconciliada: nada fica pendente e a próxima operação usa outra chave. */
     settled: () => settleSlot(slot),
     /** Recusa do servidor: nada foi gravado com esta chave; a próxima tentativa usa outra. */
-    refused: () => {
-      slot.current = newOperationKey();
-    },
+    refused: () => refuseKey(slot),
+    release: (saved) => repeatAfterSaved(slot, saved),
   };
 }
 
@@ -204,6 +276,8 @@ async function attempt<T, F extends object>(
     try {
       const saved = await keys.findSaved(snapshot);
       if (saved && (!accept || accept(saved))) {
+        // De uma visita anterior: pode ser outro igual de verdade. Quem chama pergunta; nada é enviado nem esquecido ainda.
+        if (saved.carried) return { status: 'saved_before', saved };
         keys.settled();
         return { status: 'reconciled', saved };
       }

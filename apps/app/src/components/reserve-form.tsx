@@ -41,6 +41,7 @@ import { FormFooter } from '@/components/form-footer';
 import { ContextPill, SubHeader } from '@/components/header';
 import { useLeaveGuard } from '@/components/leave-guard';
 import { MoneyTxt } from '@/components/money-text';
+import { useSavedBefore } from '@/components/saved-before';
 import { ChoiceGroup } from '@/components/series-parts';
 import { TermHint } from '@/components/term-hint';
 import { Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
@@ -180,6 +181,26 @@ export function ReserveForm({
   };
   const checked = validateGoalDraft(draft, today, { mode: reserve ? 'editar' : 'criar', originalTargetMonth: reserve?.targetMonth ?? null });
 
+  // "Esta reserva já tinha sido salva." (CL-03 e CL-19): uma tentativa de visita anterior achada gravada não conclui sozinha. Só pode haver
+  // uma reserva para imprevistos, então aqui só há "Ver a reserva salva". O aviso sai da tela quando o preenchimento muda.
+  const watchKey = JSON.stringify(draft);
+  const savedBefore = useSavedBefore<{ key: string; snapshot: string; goalId: string }>(
+    'reserva',
+    watchKey,
+    {
+      onView: (saved) => {
+        keys.settled();
+        flash.set(R.created);
+        guard.leave(() => router.replace(`/meta/${saved.goalId}`));
+      },
+      onAnother: (saved) => {
+        keys.release(saved);
+        submit();
+      },
+    },
+    busy,
+  );
+
   // Valor da reserva e prévia ao vivo (nada de erro enquanto a pessoa ainda digita: o erro vem ao salvar).
   const months = pick === null ? null : pick === 'outro' ? (/^\s*\d{1,3}\s*$/.test(monthsText) ? Number(monthsText) : null) : pick;
   const target =
@@ -225,6 +246,11 @@ export function ReserveForm({
         (key) => (reserve ? update.mutateAsync({ key, id: reserve.id, version: reserve.version, input: update_ }) : create.mutateAsync({ key, contextId, input: v.input })),
         (s) => (reserve ? s.action === 'alterar_meta' && s.goalId === reserve.id : s.action === 'criar_meta'),
       );
+      if (r.status === 'saved_before') {
+        // Uma reserva de visita anterior foi gravada: a pessoa vê a reserva salva.
+        savedBefore.show(r.saved, watchKey);
+        return;
+      }
       if (r.status === 'ok' || r.status === 'reconciled') {
         flash.set(reserve ? R.saved : R.created);
         guard.leave(() => (reserve ? (router.canGoBack() ? router.back() : router.replace('/metas')) : router.dismissTo('/metas')));
@@ -245,6 +271,7 @@ export function ReserveForm({
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <SubHeader title={R.title} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" />} />
       <Screen contentStyle={styles.body}>
+        {savedBefore.banner}
         <Card style={{ gap: space[4] }}>
           <EssentialsBlock
             estimate={estimate}

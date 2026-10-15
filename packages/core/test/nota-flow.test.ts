@@ -168,10 +168,15 @@ describe('o que a leitura preenche e o foco', () => {
 });
 
 describe('folha "Escanear nota fiscal"', () => {
-  it('com câmera: câmera, PDF, colar; sem câmera: o PDF vem primeiro', () => {
-    expect(scanSheetOptions(true)).toEqual(['camera', 'pdf', 'colar']);
-    expect(scanSheetOptions(false)).toEqual(['pdf', 'colar']);
-    expect(scanSheetOptions(true).map(scanOptionLabel)).toEqual(['Usar a câmera', 'Escolher o PDF da nota', 'Colar o link ou a chave']);
+  it('com câmera: câmera, PDF, colar; sem câmera: o PDF vem primeiro; por último, o comprovante de Pix (D-051)', () => {
+    expect(scanSheetOptions(true)).toEqual(['camera', 'pdf', 'colar', 'comprovante']);
+    expect(scanSheetOptions(false)).toEqual(['pdf', 'colar', 'comprovante']);
+    expect(scanSheetOptions(true).map(scanOptionLabel)).toEqual([
+      'Usar a câmera',
+      'Escolher o PDF da nota',
+      'Colar o link ou a chave',
+      'Ler comprovante de Pix ou pagamento (PDF)',
+    ]);
     expect(NOTA_TEXT.sheet.camera).toBe('Usar a câmera');
   });
 });

@@ -19,7 +19,11 @@ import {
   maskDateBR,
   mergeOccurrences,
   monthOf,
+  dropAttempts,
+  keyForSend,
   newOperationKey,
+  recordUncertain,
+  refuseKey,
   relevantAttempts,
   settleSlot,
   parseBRL,
@@ -31,6 +35,7 @@ import {
   type FieldErrors,
   type PaymentDraft,
   type PaymentInput,
+  type PendingAttempt,
   type PersonalSpace,
   type WholeYearPayment,
 } from '@clarevo/core';
@@ -47,6 +52,7 @@ import { AccountPicker } from '@/components/account-picker';
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
+import { useSavedBefore } from '@/components/saved-before';
 import { CheckOption, yearA11yLabel } from '@/components/series-parts';
 import { SumValues } from '@/components/sum-values';
 import { TermHint } from '@/components/term-hint';
@@ -183,6 +189,23 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
   const leave = (fn: () => void) => setLeaveTo(() => fn);
   const goBack = () => (router.canGoBack() ? router.back() : router.replace(`/a-pagar/${c.id}`));
 
+  // "Este pagamento já tinha sido registrado. A conta já está paga." (CL-03 e CL-19): uma tentativa de visita anterior achada gravada não
+  // conclui sozinha. Uma conta não é paga duas vezes, então só há "Ver a conta paga". O aviso sai da tela quando o preenchimento muda.
+  const watchKey = JSON.stringify([draft, wholeYear]);
+  const savedBefore = useSavedBefore<{ plan: WholeYearPayment | null }>(
+    'pagamento',
+    watchKey,
+    {
+      onView: (saved) => {
+        settleSlot(attempts);
+        // Com "Paguei o ano todo", o segundo passo (tirar as outras parcelas) segue como se o pagamento tivesse acabado de ser confirmado.
+        afterPayment(undefined, saved.plan);
+      },
+      onAnother: () => {},
+    },
+    busy,
+  );
+
   const set = <K extends keyof PaymentDraft>(k: K, v: PaymentDraft[K]) => {
     setDraft((d) => ({ ...d, [k]: v }));
     if (k in errors) setErrors((e) => ({ ...e, [k]: undefined }));
@@ -245,12 +268,15 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
 
   /**
    * Resultado de rede incerto: antes de repetir, conferir se alguma tentativa anterior foi gravada.
-   * Se foi e o preenchimento mudou, aplica o preenchimento atual como edição do gasto gerado.
-   * Nunca há um segundo pagamento. Devolve o gasto (ou só true, se ele já não existe), ou null se nada foi gravado.
-   * As tentativas só são esquecidas depois que a leitura e a edição do gasto dão certo: se uma delas falhar,
-   * a próxima tentativa reconcilia de novo em vez de repetir o pagamento.
+   * - O gasto do pagamento foi excluído depois (pagamento desfeito): não conta como salvo. A tentativa é esquecida e o envio segue
+   *   com chave nova.
+   * - Gravada em uma visita anterior ao formulário: não conclui sozinha. Devolve `asked`, e o formulário avisa que a conta já está
+   *   paga (uma conta não é paga duas vezes, então aqui não há "outro igual").
+   * - Gravada nesta visita: se o preenchimento mudou, aplica o preenchimento atual como edição do gasto gerado.
+   * Nunca há um segundo pagamento. Devolve o gasto, ou null se nada foi gravado. As tentativas só são esquecidas depois que a leitura
+   * e a edição do gasto dão certo: se uma delas falhar, a próxima tentativa reconcilia de novo em vez de repetir o pagamento.
    */
-  const reconcile = async (input: PaymentInput, snapshot: string): Promise<{ amountCents: number; occurredOn: string } | true | null> => {
+  const reconcile = async (input: PaymentInput, snapshot: string): Promise<{ saved: { amountCents: number; occurredOn: string }; asked: PendingAttempt | null } | null> => {
     for (const attempt of [...relevantAttempts(attempts, snapshot)].reverse()) {
       const op = await repo.findCommitmentOperation(attempt.key);
       if (!op || op.action !== 'pagar_compromisso' || !op.recordId) continue;
@@ -258,9 +284,14 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
       qc.invalidateQueries({ queryKey: ['commitment', op.commitmentId] });
       qc.invalidateQueries({ queryKey: ['records'] });
       const expense = await repo.getRecord(op.recordId);
-      if (!expense || attempt.snapshot === snapshot) {
+      if (!expense) {
+        dropAttempts(attempts, (a) => a.key === attempt.key);
+        continue;
+      }
+      if (attempt.carried) return { saved: expense, asked: attempt };
+      if (attempt.snapshot === snapshot) {
         settleSlot(attempts);
-        return expense ?? true;
+        return { saved: expense, asked: null };
       }
       // O useInvalidate dos registros já recarrega as contas a pagar.
       const saved = await updateRecord.mutateAsync({
@@ -270,7 +301,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
         input: { accountId: input.accountId, amountCents: input.amountCents, occurredOn: input.paidOn, description: expense.description, category: input.category },
       });
       settleSlot(attempts);
-      return saved;
+      return { saved, asked: null };
     }
     return null;
   };
@@ -325,17 +356,22 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
     const snapshot = JSON.stringify([v.input, version]);
     try {
       if (relevantAttempts(attempts, snapshot).length > 0) {
-        const saved = await reconcile(v.input, snapshot);
-        if (saved) {
+        const found = await reconcile(v.input, snapshot);
+        if (found?.asked) {
+          // Uma tentativa de visita anterior foi gravada: a conta já está paga. A pessoa escolhe ver a conta.
           setRetry(false);
-          await afterPayment(saved === true ? undefined : saved, plan);
+          savedBefore.show({ plan }, watchKey);
           return;
         }
-        // Nada foi gravado: repetir com a mesma chave se o conteúdo é o mesmo da última tentativa.
-        const last = attempts.pending[attempts.pending.length - 1];
-        if (!last || last.snapshot !== snapshot) attempts.current = newOperationKey();
+        if (found) {
+          setRetry(false);
+          await afterPayment(found.saved, plan);
+          return;
+        }
       }
-      const key = attempts.current;
+      // Repete a chave se o conteúdo é o mesmo da última tentativa; com outro conteúdo, sempre uma chave nova (mesmo se a última
+      // tentativa for de uma visita anterior, que não conta como relevante: a chave antiga voltaria como chave_reutilizada).
+      const key = keyForSend(attempts, snapshot);
       // Aviso do orçamento (D-041): o gasto do pagamento conta na categoria e no mês da data do pagamento.
       const budgetBefore = await budgetWatch.before(c.contextId, v.input.category, v.input.paidOn);
       try {
@@ -345,7 +381,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
         await afterPayment(saved.record, plan, await budgetWatch.after(budgetBefore));
       } catch (e) {
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
-          attempts.current = newOperationKey();
+          refuseKey(attempts);
           setRetry(false);
           const field = fieldForErrorCode(e.code);
           if (field && PAYMENT_FIELD_ORDER.includes(field)) {
@@ -362,7 +398,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
           return;
         }
         // Falha de rede: o pagamento pode ou não ter sido gravado. Guardar a tentativa para reconciliar.
-        attempts.pending = [...attempts.pending, { key, snapshot }];
+        recordUncertain(attempts, key, snapshot);
         // Se foi gravado, o detalhe, a lista e o Resumo que ficaram abertos recarregam e mostram a conta paga.
         qc.invalidateQueries({ queryKey: ['commitments'] });
         qc.invalidateQueries({ queryKey: ['commitment', c.id] });
@@ -568,6 +604,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
       {/* Rodapé fixo: a ação principal fica sempre visível, acima do teclado. */}
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space[3]) }]}>
         <View style={styles.footerInner}>
+          {savedBefore.banner}
           {banner ? (
             <Banner tone="erro" icon={AlertCircle}>
               <Txt variant="label" color={colors.error}>

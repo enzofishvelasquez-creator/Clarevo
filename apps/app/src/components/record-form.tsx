@@ -2,6 +2,7 @@ import {
   ACCOUNTS_TEXT,
   CARDS_TEXT,
   CATEGORIES,
+  COMPROVANTE_TEXT,
   DEMO_EMAIL,
   DESCRIPTION_MAX,
   MAX_RECORD_CENTS,
@@ -24,6 +25,11 @@ import {
   accountsForPicker,
   centsToInput,
   chooseAccountId,
+  comprovanteDraft,
+  comprovanteFillPlan,
+  comprovanteMemoryFor,
+  comprovanteMismatch,
+  counterpartMemoryId,
   dateOutsideNoteMonth,
   DEMO_TEXT,
   UNCERTAIN_TEXT,
@@ -33,6 +39,7 @@ import {
   exampleReceiptQr,
   factsWithPage,
   fieldForErrorCode,
+  findLookalikeRecord,
   formatBRL,
   installmentAmounts,
   installmentsNotice,
@@ -43,11 +50,16 @@ import {
   isRepoError,
   looksLikeSavings,
   monthOf,
+  keyForSend,
   newOperationKey,
   noteErrorText,
   noteFillPlan,
   noteIssuedOn,
+  dropAttempts,
+  recordUncertain,
+  refuseKey,
   relevantAttempts,
+  repeatAfterSaved,
   settleSlot,
   paidInvoiceMonths,
   parseDateBR,
@@ -58,9 +70,12 @@ import {
   seriesGapForExpense,
   storeMemoryFor,
   storeMemoryId,
+  suggestComprovanteDescription,
   suggestDescription,
   validateCardPurchaseDraft,
   validateRecordDraft,
+  type ComprovanteDraft,
+  type ComprovanteReading,
   type DraftField,
   type FieldErrors,
   type Card as CardData,
@@ -69,6 +84,7 @@ import {
   type IsoMonth,
   type PaymentChoice,
   type PaymentForm,
+  type PendingAttempt,
   type PersonalSpace,
   type ReceiptMatch,
   type RecordDraft,
@@ -90,10 +106,11 @@ import { AccountPicker } from '@/components/account-picker';
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
-import { NoteBlock, type SefazState } from '@/components/receipt-block';
+import { LookalikeBanner, NoteBlock, ProofBlock, type SefazState } from '@/components/receipt-block';
 import { AlreadyNotedBanner, CameraModal, PasteModal, ScanLine, ScanSheet, cameraIsAvailable } from '@/components/receipt-scan';
 import { returnSession } from '@/components/retorno-acoes';
 import { ChoiceGroup } from '@/components/series-parts';
+import { useSavedBefore } from '@/components/saved-before';
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt, styles as ui } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
@@ -103,7 +120,9 @@ import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
 import { totalChange } from '@/lib/highlight';
 import { explanationHref } from '@/lib/learn';
-import { cameraWasUsed, markCameraUsed, rememberStore, storeMemoryOf } from '@/lib/note-prefs';
+import { cameraWasUsed, markCameraUsed, payeeMemoryOf, rememberPayee, rememberStore, storeMemoryOf } from '@/lib/note-prefs';
+import { comprovanteHandoff } from '@/lib/comprovante-handoff';
+import { pickAndReadComprovantePdf } from '@/lib/comprovante-read';
 import { pickAndReadNotePdf, readNoteCode, type NoteReading } from '@/lib/receipt-read';
 import { receiptLinks, openOfficialUrl } from '@/lib/receipt-link';
 import { readSefazOnDevice, sefazReadAvailable } from '@/lib/sefaz-fetch';
@@ -118,6 +137,7 @@ import {
   useCommitments,
   useCreateRecord,
   useReceiptMatch,
+  useRecordsNear,
   useReturnReview,
   useUpdateRecord,
   withNotice,
@@ -155,6 +175,24 @@ interface NoteState {
   accountSet: string | null;
   /** A conta antes de a primeira nota escolher, para "Desfazer leitura". */
   accountBefore: string;
+}
+
+/**
+ * O comprovante de Pix ou de pagamento lido (D-051), só em memória: o que ele disse (já sem documento, chave nem códigos), o que a
+ * leitura preencheu e o que havia antes (para "Desfazer leitura"), a lembrança por nome e, quando a leitura trocou "Como você pagou?"
+ * (Pix nunca é cartão de crédito), o que havia antes. `mismatch`: o comprovante é do outro tipo e nada foi preenchido.
+ */
+interface ProofState {
+  reading: ComprovanteReading;
+  draft: ComprovanteDraft;
+  mismatch: { text: string; action: string } | null;
+  filled: NoteFields;
+  before: NoteFields;
+  legend: string | null;
+  placeholder: string;
+  payeeId: string | null;
+  payBefore: { payWith: 'dinheiro' | 'cartao'; chosenCardId: string | null };
+  paySet: boolean;
 }
 
 /** Mês fechado vindo da revisão dos últimos meses (?mes=AAAA-MM). */
@@ -236,8 +274,15 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
 
   // Escanear nota fiscal (D-038): só em gasto novo, fora do modo "Dia" (mesma regra de "Como você pagou?").
   const scanMode = cardMode;
+  // Ler comprovante de Pix ou de pagamento (D-051): em gasto novo (pela folha de "Escanear nota fiscal") e em recebimento novo (pela
+  // linha própria), também fora do modo "Dia".
+  const proofMode = mode.type === 'novo' && dayMonth === null;
   const [note, setNote] = useState<NoteState | null>(null);
   const noteRef = useRef<NoteState | null>(null);
+  const [proof, setProof] = useState<ProofState | null>(null);
+  const proofRef = useRef<ProofState | null>(null);
+  /** Qual leitura de PDF está em andamento (decide o texto "Lendo ... aqui no aparelho"). */
+  const [readingWhat, setReadingWhat] = useState<'nota' | 'comprovante'>('nota');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
@@ -322,6 +367,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   useEffect(() => {
     draftRef.current = draft;
     noteRef.current = note;
+    proofRef.current = proof;
     payPickedRef.current = payPicked;
     payRef.current = { payWith, chosenCardId };
   });
@@ -362,7 +408,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     }
   }, [activeIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || (dayMode && dayText !== initialDay) || installmentsText !== '1' || note !== null;
+  const dirty =
+    JSON.stringify(draft) !== JSON.stringify(initial) || (dayMode && dayText !== initialDay) || installmentsText !== '1' || note !== null || proof !== null;
   const day = dayMode && dayMonth ? dayInMonthDate(dayMonth, dayText) : null;
   const account = (allAccounts.data ?? personal.accounts).find((a) => a.id === draft.accountId) ?? personal.accounts[0];
   const contextName = 'Pessoal';
@@ -379,6 +426,52 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   const leave = (fn: () => void) => setLeaveTo(() => fn);
   // Aberto por atalho ou endereço recarregado, o formulário pode ser a única tela da pilha: volta ao registro ou ao Resumo.
   const goBack = () => (router.canGoBack() ? router.back() : router.replace(mode.type === 'editar' ? `/registro/${mode.record.id}` : '/'));
+
+  // "Este gasto já tinha sido salvo. Anotar outro igual?" (CL-03 e CL-19): uma tentativa de visita anterior achada gravada não conclui
+  // sozinha. O aviso sai da tela quando o preenchimento muda, porque já não fala do que está nos campos.
+  const watchKey = JSON.stringify([draft, dayText, installmentsText, payWith, chosenCardId]);
+  const savedBeforeRecord = useSavedBefore<{ id: string; attempt: PendingAttempt; another: boolean }>(
+    kind === 'despesa' ? 'gasto' : 'recebimento',
+    watchKey,
+    {
+      onView: (saved) => {
+        settleSlot(attempts);
+        leave(() => router.replace(`/registro/${saved.id}`));
+      },
+      onAnother: (saved) => {
+        repeatAfterSaved(attempts, saved.attempt);
+        submit(undefined, saved.another);
+      },
+    },
+    busy,
+  );
+  /** Abre a fatura da compra já gravada (a fatura real vem do lançamento) ou, sem ela, o cartão. */
+  const openSavedPurchase = async (cardId: string, entryId: string | null) => {
+    let invoiceMonth: IsoMonth | null = null;
+    if (entryId) {
+      try {
+        invoiceMonth = (await repo.getCardEntry(entryId))?.invoiceMonth ?? null;
+      } catch {
+        invoiceMonth = null;
+      }
+    }
+    leave(() => router.replace(invoiceMonth ? invoiceHref(cardId, invoiceMonth) : cardHref(cardId)));
+  };
+  const savedBeforeCard = useSavedBefore<{ key: string; snapshot: string; cardId: string; entryId: string | null }>(
+    'compra',
+    watchKey,
+    {
+      onView: (saved) => {
+        cardKeys.settled();
+        openSavedPurchase(saved.cardId, saved.entryId);
+      },
+      onAnother: (saved) => {
+        cardKeys.release(saved);
+        submitCard();
+      },
+    },
+    busy,
+  );
 
   const set = <K extends keyof RecordDraft>(k: K, v: RecordDraft[K]) => {
     setDraft((d) => ({ ...d, [k]: v }));
@@ -409,10 +502,11 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   /** iOS não apresenta uma tela (câmera, seletor de arquivos) enquanto o diálogo anterior ainda está saindo: espera um instante. */
   const afterModal = (fn: () => void) => (Platform.OS === 'ios' ? setTimeout(fn, 450) : fn());
 
-  const chooseScan = (option: 'camera' | 'pdf' | 'colar') => {
+  const chooseScan = (option: 'camera' | 'pdf' | 'colar' | 'comprovante') => {
     setSheetOpen(false);
     if (option === 'camera') afterModal(() => setCameraOpen(true));
     else if (option === 'pdf') afterModal(choosePdf);
+    else if (option === 'comprovante') afterModal(chooseProofPdf);
     else afterModal(openPaste);
   };
 
@@ -431,11 +525,38 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     // resultado dela é ignorado.
     const token = ++readSeq.current;
     readingRef.current = true;
+    setReadingWhat('nota');
     setReading(true);
     try {
       const r = await pickAndReadNotePdf(today);
       if (token !== readSeq.current) return;
       if (r.ok) await applyNote(r);
+      else if (!r.cancelled) setScanMessage(r.message);
+    } finally {
+      if (token === readSeq.current) {
+        readingRef.current = false;
+        setReading(false);
+      }
+    }
+  };
+
+  /**
+   * Comprovante de Pix ou de pagamento em PDF (D-051): abre o seletor de arquivos e lê o escolhido no aparelho. A direção da tela
+   * (gasto: o dinheiro saiu; recebimento: entrou) só vale quando o comprovante não diz.
+   */
+  const chooseProofPdf = async () => {
+    if (readingRef.current) return;
+    setCameraOpen(false);
+    setPasteOpen(false);
+    setScanMessage(null);
+    const token = ++readSeq.current;
+    readingRef.current = true;
+    setReadingWhat('comprovante');
+    setReading(true);
+    try {
+      const r = await pickAndReadComprovantePdf(kind === 'despesa' ? 'saida' : 'entrada');
+      if (token !== readSeq.current) return;
+      if (r.ok) await applyProof(r.reading);
       else if (!r.cancelled) setScanMessage(r.message);
     } finally {
       if (token === readSeq.current) {
@@ -485,6 +606,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
    */
   const applyNote = async (r: Extract<NoteReading, { ok: true }>, refine = false) => {
     const prev = noteRef.current;
+    // Um comprovante lido antes sai de cena: o que ele preencheu é substituído como se fosse de uma nota anterior.
+    const prevProof = refine ? null : proofRef.current;
     const d = r.draft;
     const issuedOn = noteIssuedOn(r.facts, d, today);
     const plan = noteFillPlan(d);
@@ -493,9 +616,13 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     const lastTime = refine ? (prev?.lastTime ?? null) : storeId && userId ? await storeMemoryOf(userId, storeId, persistPrefs) : null;
     if (unmounted.current) return;
     const sug = suggestDescription({ issuerName: d.issuerName, lastTime });
-    const prevFilled = prev?.filled ?? null;
+    const prevFilled = prev?.filled ?? prevProof?.filled ?? null;
     const cur = draftRef.current;
-    const before: NoteFields = prev ? prev.before : { description: cur.description, amountText: cur.amountText, dateText: cur.dateText, category: cur.category };
+    const before: NoteFields = prev
+      ? prev.before
+      : prevProof
+        ? prevProof.before
+        : { description: cur.description, amountText: cur.amountText, dateText: cur.dateText, category: cur.category };
     // Valor e data: a nota prevalece numa leitura nova; numa complementação, só onde a pessoa não mexeu.
     const mine = (value: string, auto: string | undefined) => value === '' || value === auto;
     const next = { ...cur };
@@ -523,7 +650,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     // nova substitui a escolha da nota anterior; a página da Sefaz (refine) só escolhe se a nota ainda não escolheu e a pessoa não mexeu.
     const choice: PaymentChoice = scanMode ? paymentChoiceFor(d.payments) : null;
     // Leitura nova depois de a pessoa escolher à mão: "Desfazer leitura" devolve essa escolha, não a de antes da nota anterior.
-    const payBefore = !refine && payPickedRef.current ? payRef.current : (prev?.payBefore ?? payRef.current);
+    const payBefore = !refine && payPickedRef.current ? payRef.current : (prev?.payBefore ?? prevProof?.payBefore ?? payRef.current);
     let paySet: PaymentChoice = refine ? (prev?.paySet ?? null) : null;
     if (!refine) {
       payPickedRef.current = false;
@@ -576,6 +703,10 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     };
     noteRef.current = state;
     setNote(state);
+    if (prevProof) {
+      proofRef.current = null;
+      setProof(null);
+    }
 
     if (!refine) {
       // Anúncio "Nota lida" (iOS não tem região viva), vibração leve e foco no primeiro campo que falta.
@@ -647,6 +778,145 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     setScanMessage(null);
   };
 
+  /**
+   * Coloca o comprovante no formulário (D-051). Nada é gravado sem "Salvar". Um comprovante novo substitui o que a leitura anterior
+   * (de comprovante ou de nota) preencheu, e o que a pessoa digitou no lugar fica. Comprovante do outro tipo (um Pix recebido em
+   * Anotar gasto, um Pix enviado em Registrar recebimento) não preenche nada: o bloco avisa e oferece a troca.
+   */
+  const applyProof = async (reading: ComprovanteReading) => {
+    const prevProof = proofRef.current;
+    const prevNote = noteRef.current;
+    const d = comprovanteDraft(reading, today);
+    const mismatch = comprovanteMismatch(d, kind);
+    const payeeId = counterpartMemoryId(d.counterpart, kind);
+    const lastTime = !mismatch && payeeId && userId ? await payeeMemoryOf(userId, payeeId, persistPrefs) : null;
+    if (unmounted.current) return;
+    const sug = suggestComprovanteDescription(d, lastTime, kind);
+    const cur = draftRef.current;
+    const prevFilled = prevProof?.filled ?? prevNote?.filled ?? null;
+    const before: NoteFields = prevProof?.before ?? prevNote?.before ?? { description: cur.description, amountText: cur.amountText, dateText: cur.dateText, category: cur.category };
+    let next = { ...cur };
+    if (mismatch) {
+      // Nada novo é preenchido, e o que uma leitura anterior preencheu volta ao que havia antes (se a pessoa não mexeu).
+      if (prevFilled) {
+        if (cur.description === prevFilled.description) next.description = before.description;
+        if (cur.amountText === prevFilled.amountText) next.amountText = before.amountText;
+        if (cur.dateText === prevFilled.dateText) next.dateText = before.dateText;
+        if (cur.category === prevFilled.category) next.category = before.category;
+      }
+    } else {
+      const plan = comprovanteFillPlan(d, sug.description);
+      // Valor e data: o comprovante novo prevalece; sem valor ou sem data nele, o campo da leitura anterior esvazia.
+      if (plan.amountText !== null) next.amountText = plan.amountText;
+      else if (prevFilled && cur.amountText === prevFilled.amountText) next.amountText = '';
+      next.dateText = plan.dateText;
+      // Descrição e categoria: só onde a pessoa não digitou.
+      if (sug.description !== '' && (cur.description.trim() === '' || cur.description === prevFilled?.description)) next.description = sug.description;
+      else if (sug.description === '' && prevFilled && cur.description === prevFilled.description) next.description = '';
+      if (sug.category && (cur.category === null || cur.category === prevFilled?.category)) next.category = sug.category;
+    }
+    // Uma nota lida antes sai de cena: a conta que ela escolheu volta, se a pessoa não escolheu outra.
+    if (prevNote?.accountSet && !accountPickedRef.current && next.accountId === prevNote.accountSet) next = { ...next, accountId: prevNote.accountBefore };
+    const filled: NoteFields = { description: next.description, amountText: next.amountText, dateText: next.dateText, category: next.category };
+    draftRef.current = next;
+    setDraft(next);
+    setErrors({});
+    setBanner(null);
+    setScanMessage(null);
+    setForcedMatch(null);
+
+    // "Como você pagou?": Pix e débito são "Dinheiro, débito ou Pix", nunca cartão de crédito (a pessoa pode mudar depois).
+    // Uma escolha feita à mão antes desta leitura vale como o "antes"; só a feita depois dela impede o "Desfazer leitura" de devolver.
+    const manual = payPickedRef.current;
+    const payBefore = manual ? payRef.current : (prevProof?.payBefore ?? prevNote?.payBefore ?? payRef.current);
+    let paySet = manual ? false : (prevProof?.paySet ?? false);
+    if (!mismatch) {
+      payPickedRef.current = false;
+      setPayPicked(false);
+    }
+    if (!mismatch && cardMode && payRef.current.payWith === 'cartao') {
+      paySet = true;
+      paymentTouched.current = true;
+      payRef.current = { ...payRef.current, payWith: 'dinheiro' };
+      setPayWith('dinheiro');
+      setCardError(undefined);
+    }
+    // A leitura anterior de uma nota pode ter escolhido a forma: a escolha dela deixa de valer com o comprovante.
+    if (prevNote) {
+      noteRef.current = null;
+      setNote(null);
+    }
+
+    const state: ProofState = {
+      reading,
+      draft: d,
+      mismatch: mismatch ? { text: mismatch.text, action: mismatch.action } : null,
+      filled,
+      before,
+      legend: sug.legend,
+      placeholder: sug.placeholder,
+      payeeId,
+      payBefore,
+      paySet,
+    };
+    proofRef.current = state;
+    setProof(state);
+
+    // Anúncio "Comprovante lido" (iOS não tem região viva), vibração leve e foco no primeiro campo que falta.
+    announceOnIOS(COMPROVANTE_TEXT.readAnnounce, { delay: 250 });
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    if (!mismatch) {
+      const plan = comprovanteFillPlan(d, next.description);
+      setTimeout(() => {
+        if (plan.focus) refs[plan.focus].current?.focus();
+        else {
+          refs.description.current?.blur();
+          Keyboard.dismiss();
+        }
+      }, 300);
+    }
+  };
+
+  const undoProof = () => {
+    const p = proofRef.current;
+    if (!p) return;
+    readSeq.current++;
+    readingRef.current = false;
+    setReading(false);
+    setDraft((cur) => ({
+      ...cur,
+      description: cur.description === p.filled.description ? p.before.description : cur.description,
+      amountText: cur.amountText === p.filled.amountText ? p.before.amountText : cur.amountText,
+      dateText: cur.dateText === p.filled.dateText ? p.before.dateText : cur.dateText,
+      category: cur.category === p.filled.category ? p.before.category : cur.category,
+    }));
+    // "Como você pagou?": volta ao que havia antes, se o comprovante o trocou e a pessoa não escolheu depois.
+    if (p.paySet && !payPickedRef.current && payRef.current.payWith === 'dinheiro') {
+      payRef.current = p.payBefore;
+      setPayWith(p.payBefore.payWith);
+      setChosenCardId(p.payBefore.chosenCardId);
+    }
+    proofRef.current = null;
+    setProof(null);
+    setScanMessage(null);
+  };
+
+  /** "Trocar para Registrar recebimento" (ou "Anotar gasto"): abre o outro formulário com o mesmo comprovante, sem pedir o PDF de novo. */
+  const switchKind = () => {
+    const p = proofRef.current;
+    if (!p) return;
+    comprovanteHandoff.set(p.reading);
+    const other: RecordKind = kind === 'despesa' ? 'receita' : 'despesa';
+    leave(() => router.replace({ pathname: '/registro/novo', params: { tipo: other } }));
+  };
+
+  // O comprovante que veio da troca de tipo entra assim que o formulário abre (uma vez só).
+  useEffect(() => {
+    if (!proofMode) return;
+    const handed = comprovanteHandoff.take();
+    if (handed) applyProof(handed);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const installmentsFromNote = () => {
     const name = draft.description.trim() || note?.reading.draft.issuerName || '';
     router.push({
@@ -678,10 +948,17 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
   /** Depois de gravar: o endereço oficial fica na memória da sessão (detalhe do gasto) e a loja é lembrada neste aparelho. */
   const afterNoteSaved = () => {
     const n = noteRef.current;
-    if (!n) return;
-    receiptLinks.remember(n.reading.draft.receiptKey, n.reading.draft.officialUrl);
-    const memory = storeMemoryFor(draft.description, draft.category);
-    if (userId && n.storeId && memory) rememberStore(userId, n.storeId, memory, persistPrefs);
+    if (n) {
+      receiptLinks.remember(n.reading.draft.receiptKey, n.reading.draft.officialUrl);
+      const memory = storeMemoryFor(draft.description, draft.category);
+      if (userId && n.storeId && memory) rememberStore(userId, n.storeId, memory, persistPrefs);
+    }
+    // Comprovante de Pix (D-051): a pessoa ou empresa é lembrada neste aparelho pelo resumo do nome (nunca o nome como chave).
+    const p = proofRef.current;
+    if (p && !p.mismatch && userId && p.payeeId) {
+      const memory = comprovanteMemoryFor(draft.description, draft.category, kind);
+      if (memory) rememberPayee(userId, p.payeeId, memory, persistPrefs);
+    }
   };
 
   /** Modo "Dia": gravação confirmada. another: "Salvar e anotar outro" (o formulário fica, limpo); senão volta à revisão. */
@@ -736,12 +1013,18 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
 
   /**
    * Resultado de rede incerto: antes de repetir, conferir se alguma tentativa anterior foi gravada.
-   * Se foi, e o preenchimento mudou depois da falha, aplica o preenchimento atual como edição
-   * desse mesmo registro (nunca cria um segundo). Devolve o ID do registro, ou null se nada foi gravado.
-   * As tentativas só são esquecidas depois que a leitura e a edição de acompanhamento dão certo: se uma delas
-   * falhar, a próxima tentativa reconcilia de novo em vez de repetir a criação.
+   * - Gravada e excluída depois: não conta como salva. A tentativa é esquecida e o envio segue com chave nova.
+   * - Gravada em uma visita anterior ao formulário (`carried`): não conclui sozinha, porque pode ser outro gasto igual de verdade.
+   *   Devolve `asked`, e o formulário pergunta ("Este gasto já tinha sido salvo. Anotar outro igual?").
+   * - Gravada nesta visita: se o preenchimento mudou depois da falha, aplica o preenchimento atual como edição desse mesmo registro
+   *   (nunca cria um segundo).
+   * Devolve null se nada foi gravado. As tentativas só são esquecidas depois que a leitura e a edição de acompanhamento dão certo: se
+   * uma delas falhar, a próxima tentativa reconcilia de novo em vez de repetir a criação.
    */
-  const reconcile = async (input: RecordInput, snapshot: string): Promise<{ id: string } & Partial<FinancialRecord> | null> => {
+  const reconcile = async (
+    input: RecordInput,
+    snapshot: string,
+  ): Promise<{ record: { id: string } & Partial<FinancialRecord>; asked: PendingAttempt | null } | null> => {
     for (const attempt of [...relevantAttempts(attempts, snapshot)].reverse()) {
       const op = await repo.findOperation(attempt.key);
       if (!op) continue;
@@ -752,13 +1035,18 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
       qc.invalidateQueries({ queryKey: ['commitment'] });
       qc.invalidateQueries({ queryKey: ['returnReview'] });
       const current = await repo.getRecord(op.recordId);
-      if (attempt.snapshot === snapshot || !current) {
+      if (!current) {
+        dropAttempts(attempts, (a) => a.key === attempt.key);
+        continue;
+      }
+      if (attempt.carried) return { record: current, asked: attempt };
+      if (attempt.snapshot === snapshot) {
         settleSlot(attempts);
-        return current ?? { id: op.recordId };
+        return { record: current, asked: null };
       }
       const saved = await update.mutateAsync({ key: newOperationKey(), id: current.id, version: current.version, input });
       settleSlot(attempts);
-      return saved;
+      return { record: saved, asked: null };
     }
     return null;
   };
@@ -818,6 +1106,11 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
         (key) => addPurchase.mutateAsync({ key, cardId: card.id, input: purchase }),
         (s) => s.action === 'criar_compra_cartao' && s.cardId === card.id,
       );
+      if (r.status === 'saved_before') {
+        // Uma compra de visita anterior foi gravada: a pessoa escolhe entre ver a compra e anotar outra igual.
+        savedBeforeCard.show(r.saved, watchKey);
+        return;
+      }
       if (r.status === 'ok' || r.status === 'reconciled') {
         // Confirmação tátil, aviso e lembrança da escolha só depois de o servidor confirmar.
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -902,17 +1195,22 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     const snapshot = JSON.stringify([input, version]);
     try {
       if (relevantAttempts(attempts, snapshot).length > 0) {
-        const saved = await reconcile(input, snapshot);
-        if (saved) {
+        const found = await reconcile(input, snapshot);
+        if (found?.asked) {
+          // Uma tentativa de visita anterior foi gravada: a pessoa escolhe entre ver o gasto e anotar outro igual.
+          savedBeforeRecord.show({ id: found.record.id, attempt: found.asked, another }, watchKey);
+          return;
+        }
+        if (found) {
+          const saved = found.record;
           if (dayMode || fromReview) finishDay(v.input, another);
           else finish(saved.id, saved.amountCents !== undefined && saved.occurredOn ? { amountCents: saved.amountCents, occurredOn: saved.occurredOn } : undefined);
           return;
         }
-        // Nada foi gravado: repetir com a mesma chave se o conteúdo é o mesmo da última tentativa.
-        const last = attempts.pending[attempts.pending.length - 1];
-        if (!last || last.snapshot !== snapshot) attempts.current = newOperationKey();
       }
-      const key = attempts.current;
+      // Repete a chave se o conteúdo é o mesmo da última tentativa; com outro conteúdo, sempre uma chave nova (mesmo se a última
+      // tentativa for de uma visita anterior, que não conta como relevante: a chave antiga voltaria como chave_reutilizada).
+      const key = keyForSend(attempts, snapshot);
       // O estado do orçamento da categoria no mês da data, antes de gravar (só gasto, fora do modo "Dia").
       const budgetBefore = kind === 'despesa' && !dayMode && !fromReview ? await budgetWatch.before(contextId, v.input.category, v.input.occurredOn) : null;
       try {
@@ -923,7 +1221,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
         else finish(saved.id, saved, await budgetWatch.after(budgetBefore));
       } catch (e) {
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
-          attempts.current = newOperationKey();
+          refuseKey(attempts);
           if (e.code === 'nota_ja_anotada') {
             showDuplicate(e.detail);
             setBanner(NOTA_FLOW_TEXT.alreadyNotedSave);
@@ -953,7 +1251,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
           return;
         }
         // Falha de rede: a gravação pode ou não ter acontecido. Guardar a tentativa para reconciliar.
-        attempts.pending = [...attempts.pending, { key, snapshot }];
+        recordUncertain(attempts, key, snapshot);
         setBanner(UNCERTAIN_TEXT.movimentos);
       }
     } catch {
@@ -978,6 +1276,12 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
 
   const parsedDate = day ? ('date' in day ? day.date : null) : parseDateBR(draft.dateText);
   const movesMonth = mode.type === 'editar' && parsedDate && monthOf(parsedDate) !== monthOf(mode.record.occurredOn);
+
+  // "Parece já anotado" (D-051): o comprovante não deixa chave no registro, então a duplicidade só se avisa por semelhança (mesmo tipo,
+  // mesmo valor e data a até um dia de um registro que já existe). Vale para o que está nos campos agora, e nunca bloqueia o Salvar.
+  const proofChecks = proof !== null && proof.mismatch === null;
+  const nearRecords = useRecordsNear(proofChecks ? contextId : undefined, proofChecks ? parsedDate : null);
+  const lookalike = proofChecks ? findLookalikeRecord(nearRecords, { kind, amountCents: parseBRL(draft.amountText), date: parsedDate }) : null;
 
   // Aviso contra contar duas vezes (D-024): gasto com a descrição de uma conta de gasto fixo em aberto no mês da data.
   // Gasto que já é o pagamento de uma conta a pagar não precisa do aviso.
@@ -1079,6 +1383,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             </MoneyTxt>
           </Banner>
         ) : null}
+        {savedBeforeRecord.banner}
+        {savedBeforeCard.banner}
         {conflict ? (
           <Banner tone="erro" icon={AlertCircle}>
             <Txt variant="label" color={colors.error}>
@@ -1103,7 +1409,19 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
 
         <Card style={{ gap: space[4] }}>
           {/* Escanear nota fiscal: primeiro elemento do gasto novo. Depois da leitura, o bloco "Nota lida" ocupa o lugar da linha. */}
-          {scanMode ? (
+          {proofMode && proof ? (
+            <ProofBlock
+              draft={proof.draft}
+              mismatch={proof.mismatch}
+              amountEmpty={draft.amountText.trim() === ''}
+              dayEmpty={draft.dateText.trim() === ''}
+              descriptionEmpty={draft.description.trim() === ''}
+              onSwitch={switchKind}
+              onReadAnother={chooseProofPdf}
+              readAnotherDisabled={reading}
+              onUndo={undoProof}
+            />
+          ) : scanMode ? (
             note ? (
               <NoteBlock
                 draft={note.reading.draft}
@@ -1126,10 +1444,12 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             ) : (
               <ScanLine onPress={onScan} disabled={reading} />
             )
+          ) : proofMode ? (
+            <ScanLine variant="comprovante" onPress={chooseProofPdf} disabled={reading} />
           ) : null}
           {reading ? (
             <Banner tone="info" icon={Info}>
-              <Txt variant="label">{NOTA_FLOW_TEXT.pdfWorking}</Txt>
+              <Txt variant="label">{readingWhat === 'comprovante' ? COMPROVANTE_TEXT.working : NOTA_FLOW_TEXT.pdfWorking}</Txt>
             </Banner>
           ) : null}
           {scanMessage ? (
@@ -1138,6 +1458,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             </Banner>
           ) : null}
           {match ? <AlreadyNotedBanner match={match} /> : null}
+          {lookalike ? <LookalikeBanner record={lookalike} onOpen={() => router.push(`/registro/${lookalike.id}`)} /> : null}
 
           <Txt variant="caption" color={colors.textSecondary}>
             {cardPurchase ? `${CARDS_TEXT.screens.purchaseSituation} · ${selectedCard ? cardTitle(selectedCard) : CARDS_TEXT.expense.credit}` : `${copy.situation} · ${account?.name}`}
@@ -1148,15 +1469,15 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             label="Descrição"
             value={draft.description}
             onChangeText={(t) => set('description', t)}
-            placeholder={note ? NOTA_FLOW_TEXT.descriptionPlaceholder : kind === 'despesa' ? 'Ex.: Café' : 'Ex.: Salário'}
+            placeholder={proof ? proof.placeholder : note ? NOTA_FLOW_TEXT.descriptionPlaceholder : kind === 'despesa' ? 'Ex.: Café' : 'Ex.: Salário'}
             maxLength={DESCRIPTION_MAX}
             autoFocus={mode.type === 'novo'}
             error={errors.description}
             hint={
               charCount(draft.description) >= 60
                 ? `${charCount(draft.description)} de ${DESCRIPTION_MAX} caracteres`
-                : note?.legend && draft.description === note.filled.description && draft.description !== ''
-                  ? note.legend
+                : (proof ?? note)?.legend && draft.description === (proof ?? note)!.filled.description && draft.description !== ''
+                  ? (proof ?? note)!.legend!
                   : undefined
             }
             returnKeyType="next"
@@ -1365,7 +1686,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
                   selected={draft.category === c}
                   onPress={() => {
                     // Depois de ler uma nota sem o nome da loja, tocar numa categoria com a descrição vazia a preenche com o nome dela.
-                    if (note && kind === 'despesa') setDraft((d) => ({ ...d, category: c, description: descriptionAfterCategory(d.description, c) }));
+                    if ((note && kind === 'despesa') || proof) setDraft((d) => ({ ...d, category: c, description: descriptionAfterCategory(d.description, c) }));
                     else set('category', c);
                   }}
                 />
@@ -1463,6 +1784,10 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
             onPaste={() => {
               setCameraOpen(false);
               afterModal(openPaste);
+            }}
+            onProof={() => {
+              setCameraOpen(false);
+              afterModal(chooseProofPdf);
             }}
             onClose={() => setCameraOpen(false)}
           />

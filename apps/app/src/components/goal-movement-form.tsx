@@ -37,6 +37,7 @@ import { FormFooter } from '@/components/form-footer';
 import { ContextPill, SubHeader } from '@/components/header';
 import { useLeaveGuard } from '@/components/leave-guard';
 import { MoneyTxt } from '@/components/money-text';
+import { useSavedBefore } from '@/components/saved-before';
 import { TermHint } from '@/components/term-hint';
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
@@ -123,6 +124,25 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
   };
 
   const draft: GoalMovementDraft = { kind, amountText, dateText, note };
+
+  // "Este aporte já tinha sido salvo. Anotar outro igual?" (CL-03 e CL-19): uma tentativa de visita anterior achada gravada não conclui
+  // sozinha. O aviso sai da tela quando o preenchimento muda.
+  const watchKey = JSON.stringify([draft, accountId]);
+  const savedBefore = useSavedBefore<{ key: string; snapshot: string }>(
+    kind === 'resgate' ? 'resgate' : kind === 'rendimento' ? 'rendimento' : 'aporte',
+    watchKey,
+    {
+      onView: () => {
+        keys.settled();
+        guard.leave(() => (router.canGoBack() ? router.back() : router.replace(`/meta/${goal.id}`)));
+      },
+      onAnother: (saved) => {
+        keys.release(saved);
+        submit();
+      },
+    },
+    busy,
+  );
   const withAccount = mode.type !== 'atualizar' && (kind === 'aporte' || kind === 'resgate');
   const saved = mode.type === 'atualizar' ? validateSavedValueDraft(savedText, goal.savedCents) : null;
 
@@ -223,6 +243,11 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
             : add.mutateAsync({ key, goalId: goal.id, kind, input }),
         (s) => (editing ? s.action === 'alterar_movimento_meta' && s.movementId === editing.id : s.action === 'registrar_movimento_meta' && s.goalId === goal.id),
       );
+      if (r.status === 'saved_before') {
+        // Um movimento de visita anterior foi gravado: a pessoa escolhe entre ver a meta e anotar outro igual.
+        savedBefore.show(r.saved, watchKey);
+        return;
+      }
       if (r.status === 'ok' || r.status === 'reconciled') {
         if (withAccount) lastAccount.remember(accountId);
         return await done(editing ? M.updated : M[kind === 'saldo_inicial' ? 'aporte' : kind].saved);
@@ -273,6 +298,7 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <SubHeader title={titleOf(mode)} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" />} />
       <Screen contentStyle={styles.body}>
+        {savedBefore.banner}
         {archived ? (
           <Banner tone="info">
             <Txt variant="label">{GOAL_ERROR_TEXT.meta_arquivada}</Txt>

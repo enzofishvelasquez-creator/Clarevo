@@ -25,6 +25,7 @@ import { FormFooter } from '@/components/form-footer';
 import { ContextPill, SubHeader } from '@/components/header';
 import { useLeaveGuard } from '@/components/leave-guard';
 import { MoneyTxt } from '@/components/money-text';
+import { useSavedBefore } from '@/components/saved-before';
 import { Banner, Button, Card, Screen, TextField, Txt } from '@/components/ui';
 import { cardHref } from '@/lib/cards';
 import { flash } from '@/lib/flash';
@@ -86,6 +87,25 @@ export function CardForm({ mode, contextId }: { mode: CardFormMode; contextId: s
     if (errors[k as CardField]) setErrors((e) => ({ ...e, [k]: undefined }));
   };
 
+  // "Este cartão já tinha sido salvo. Cadastrar outro igual?" (CL-03 e CL-19): uma tentativa de visita anterior achada gravada não conclui
+  // sozinha. O aviso sai da tela quando o preenchimento muda.
+  const watchKey = JSON.stringify(draft);
+  const savedBefore = useSavedBefore<{ key: string; snapshot: string; cardId: string }>(
+    'cartao',
+    watchKey,
+    {
+      onView: (saved) => {
+        keys.settled();
+        guard.leave(() => router.replace(cardHref(saved.cardId)));
+      },
+      onAnother: (saved) => {
+        keys.release(saved);
+        submit();
+      },
+    },
+    busy,
+  );
+
   async function submit() {
     if (busy) return;
     const v = validateCardDraft(draft);
@@ -110,6 +130,11 @@ export function CardForm({ mode, contextId }: { mode: CardFormMode; contextId: s
             : create.mutateAsync({ key, contextId, input: v.input }),
         (s) => (card ? s.action === 'alterar_cartao' && s.cardId === card.id : s.action === 'criar_cartao'),
       );
+      if (r.status === 'saved_before') {
+        // Um cartão de visita anterior foi gravado: a pessoa escolhe entre ver o cartão e cadastrar outro igual.
+        savedBefore.show(r.saved, watchKey);
+        return;
+      }
       if (r.status === 'ok' || r.status === 'reconciled') {
         // Confirmação tátil e aviso só depois de o servidor confirmar.
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -147,6 +172,7 @@ export function CardForm({ mode, contextId }: { mode: CardFormMode; contextId: s
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <SubHeader title={card ? T.editTitle : T.newTitle} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" />} />
       <Screen contentStyle={styles.body}>
+        {savedBefore.banner}
         {conflict && card ? (
           <Banner tone="erro" icon={CircleAlert}>
             <Txt variant="label" color={colors.error}>

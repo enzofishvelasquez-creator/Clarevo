@@ -92,6 +92,14 @@ async function indicadores(m: Montagem, month: IsoMonth) {
 type Indicadores = Awaited<ReturnType<typeof indicadores>>;
 
 const todos = async (m: Montagem) => Object.fromEntries(await Promise.all(MONTHS.map(async (month) => [month, await indicadores(m, month)] as const))) as Record<IsoMonth, Indicadores>;
+/**
+ * Uma linha com todos os indicadores do mês, em texto, na ordem de `pg_temp.mes` em `supabase/tests/95_consolidacao.sql`: recebido
+ * pago diferença aPagar comprometido comprometidoFaturas percentual(milésimos) usadoLazer fatura limiteUsado guardado. Os mesmos
+ * textos nos dois testes provam que o core e o banco chegam aos mesmos números.
+ */
+const linha = (i: Indicadores): string =>
+  [i.recebido, i.pago, i.diferenca, i.aPagar, i.comprometido, i.comprometidoFaturas, i.percentual ?? '-', i.usadoLazer, i.fatura, i.limiteUsado, i.guardado].join(' ');
+const linhas = (t: Record<IsoMonth, Indicadores>): string[] => MONTHS.map((month) => linha(t[month]!));
 const coluna = (t: Record<IsoMonth, Indicadores>, campo: keyof Indicadores) => MONTHS.map((month) => t[month]![campo]);
 const soma = (t: Record<IsoMonth, Indicadores>, campo: keyof Indicadores) => MONTHS.reduce((acc, month) => acc + (t[month]![campo] ?? 0), 0);
 
@@ -207,12 +215,19 @@ describe('T04 e CL-02: compra de R$ 300,00 em 3x em 10/10/2026, indicador por in
     expect(coluna(t, 'comprometido')).toEqual([0, 10_000, 5_000, 15_000]);
     expect(soma(t, 'comprometido')).toBe(30_000);
     expect(coluna(t, 'aPagar')).toEqual([0, 0, 0, 15_000]);
+    // Limite: R$ 300,00 de compra menos R$ 100,00 e R$ 50,00 pagos; o saldo anterior de R$ 50,00 segue ocupando o limite (R$ 150,00 usados,
+    // R$ 4.850,00 restantes de R$ 5.000,00).
+    expect(coluna(t, 'limiteUsado')).toEqual([15_000, 15_000, 15_000, 15_000]);
+    expect(500_000 - t[JAN]!.limiteUsado).toBe(485_000);
     // O orçamento não muda: o saldo anterior não é compra, e o pagamento da fatura não conta.
     expect(coluna(t, 'usadoLazer')).toEqual([10_000, 10_000, 10_000, 0]);
     expect(soma(t, 'usadoLazer')).toBe(30_000);
     // Pagando o resto em janeiro (R$ 150,00), o total pago fecha em R$ 300,00.
     await pagar(JAN, '2027-01-10', 15_000);
-    expect(soma(await todos(m), 'pago')).toBe(30_000);
+    const depois = await todos(m);
+    expect(soma(depois, 'pago')).toBe(30_000);
+    expect(soma(depois, 'aPagar')).toBe(0);
+    expect(coluna(depois, 'limiteUsado')).toEqual([0, 0, 0, 0]);
     m.repo.checkInvariants();
   });
 
@@ -253,6 +268,49 @@ describe('T04 e CL-02: compra de R$ 300,00 em 3x em 10/10/2026, indicador por in
     expect(coluna(t, 'recebido')).toEqual(coluna(antesEdicao, 'recebido'));
     expect(coluna(t, 'guardado')).toEqual(coluna(antesEdicao, 'guardado'));
     expect(mudou(antesEdicao, t).some((x) => /\.(pago|recebido|diferenca|guardado)$/.test(x))).toBe(false);
+    m.repo.checkInvariants();
+  });
+
+  it('os mesmos números do banco (supabase/tests/95_consolidacao.sql, cenário 6): aporte, encargo e edição da compra, mês a mês, em texto', async () => {
+    const m = await montagem();
+    const compra = await comprar(m);
+    expect(linhas(await todos(m))).toEqual([
+      '600000 0 600000 0 0 0 0 10000 0 30000 0',
+      '0 0 0 10000 10000 10000 17 10000 10000 30000 0',
+      '0 0 0 10000 10000 10000 17 10000 10000 30000 0',
+      '0 0 0 10000 10000 10000 17 0 10000 30000 0',
+    ]);
+    // Aporte de R$ 100,00: só o guardado de outubro.
+    await m.repo.addGoalMovement(key(), m.goalId, 'aporte', { amountCents: 10_000, occurredOn: '2026-10-10', note: null });
+    expect(linhas(await todos(m))).toEqual([
+      '600000 0 600000 0 0 0 0 10000 0 30000 10000',
+      '0 0 0 10000 10000 10000 17 10000 10000 30000 0',
+      '0 0 0 10000 10000 10000 17 10000 10000 30000 0',
+      '0 0 0 10000 10000 10000 17 0 10000 30000 0',
+    ]);
+    // Encargo de R$ 12,00 na fatura de novembro: fatura, Ainda a pagar, comprometido (R$ 122,00 de R$ 6.000,00 = 1,9%) e limite usado.
+    await m.repo.addCardCharge(key(), m.cardId, { chargeType: 'juros', amountCents: 1_200, invoiceMonth: NOV });
+    expect(linhas(await todos(m))).toEqual([
+      '600000 0 600000 0 0 0 0 10000 0 31200 10000',
+      '0 0 0 11200 11200 11200 19 10000 11200 31200 0',
+      '0 0 0 10000 10000 10000 17 10000 10000 31200 0',
+      '0 0 0 10000 10000 10000 17 0 10000 31200 0',
+    ]);
+    // A compra editada para R$ 330,00 em 3x.
+    await m.repo.updateCardEntry(key(), compra.entry!.id, compra.entry!.version, {
+      kind: 'compra',
+      description: 'Show',
+      category: 'Lazer',
+      purchasedOn: '2026-10-10',
+      totalCents: 33_000,
+      installments: 3,
+    });
+    expect(linhas(await todos(m))).toEqual([
+      '600000 0 600000 0 0 0 0 11000 0 34200 10000',
+      '0 0 0 12200 12200 12200 20 11000 12200 34200 0',
+      '0 0 0 11000 11000 11000 18 11000 11000 34200 0',
+      '0 0 0 11000 11000 11000 18 0 11000 34200 0',
+    ]);
     m.repo.checkInvariants();
   });
 

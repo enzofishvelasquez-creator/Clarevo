@@ -28,6 +28,7 @@ import { formatMoneyText } from '@/components/calc/parts';
 import { FormFooter } from '@/components/form-footer';
 import { ContextPill, SubHeader } from '@/components/header';
 import { useLeaveGuard } from '@/components/leave-guard';
+import { useSavedBefore } from '@/components/saved-before';
 import { ChoiceGroup } from '@/components/series-parts';
 import { Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { invoiceHref } from '@/lib/cards';
@@ -80,6 +81,25 @@ export function InvoiceEntryForm({ kind, card, month, entry }: { kind: EntryKind
   const goBack = () => (router.canGoBack() ? router.back() : router.replace(invoiceHref(card.id, month)));
   const invoiceName = `Fatura de ${invoiceMonthLabel(month, today)}`;
 
+  // "Este lançamento já tinha sido salvo. Anotar outro igual?" (CL-03 e CL-19): uma tentativa de visita anterior achada gravada não conclui
+  // sozinha. O aviso sai da tela quando o preenchimento muda.
+  const watchKey = JSON.stringify(draft);
+  const savedBefore = useSavedBefore<{ key: string; snapshot: string }>(
+    'fatura-lancamento',
+    watchKey,
+    {
+      onView: () => {
+        keys.settled();
+        guard.leave(goBack);
+      },
+      onAnother: (saved) => {
+        keys.release(saved);
+        submit();
+      },
+    },
+    busy,
+  );
+
   async function submit() {
     if (busy) return;
     let input: CardEntryInput;
@@ -120,6 +140,11 @@ export function InvoiceEntryForm({ kind, card, month, entry }: { kind: EntryKind
             ? s.action === 'alterar_lancamento_cartao' && s.entryId === editing.id
             : s.action === (charge ? 'criar_encargo_cartao' : 'criar_estorno_cartao') && s.cardId === card.id,
       );
+      if (r.status === 'saved_before') {
+        // Um lançamento de visita anterior foi gravado: a pessoa escolhe entre ver a fatura e anotar outro igual.
+        savedBefore.show(r.saved, watchKey);
+        return;
+      }
       if (r.status === 'ok' || r.status === 'reconciled') {
         // Confirmação tátil e aviso só depois de o servidor confirmar.
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -161,6 +186,7 @@ export function InvoiceEntryForm({ kind, card, month, entry }: { kind: EntryKind
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <SubHeader title={title} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" />} />
       <Screen contentStyle={styles.body}>
+        {savedBefore.banner}
         <Card style={{ gap: space[4] }}>
           <Txt variant="caption" color={colors.textSecondary}>
             {invoiceName} · {card.name}

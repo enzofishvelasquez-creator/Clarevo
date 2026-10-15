@@ -1,10 +1,24 @@
-import { NOTA_FLOW_TEXT, NOTA_TEXT, SEFAZ_TEXT, noteGaps, noteReadLine, sefazPhoneHint, type IsoDate, type ReceiptDraft } from '@clarevo/core';
-import { QrCode } from 'lucide-react-native';
+import {
+  COMPROVANTE_TEXT,
+  NOTA_FLOW_TEXT,
+  NOTA_TEXT,
+  SEFAZ_TEXT,
+  comprovanteGaps,
+  comprovanteReadLine,
+  noteGaps,
+  noteReadLine,
+  sefazPhoneHint,
+  type ComprovanteDraft,
+  type IsoDate,
+  type LookalikeRecord,
+  type ReceiptDraft,
+} from '@clarevo/core';
+import { FileText, Info, QrCode } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { MoneyTxt } from '@/components/money-text';
 import { SefazStatus } from '@/components/receipt-scan';
-import { Banner, LinkButton, Txt } from '@/components/ui';
+import { Banner, Button, LinkButton, Txt } from '@/components/ui';
 import { colors, fonts, space } from '@/theme/tokens';
 
 export type SefazState = 'idle' | 'reading' | 'done' | 'failed';
@@ -83,3 +97,92 @@ export function NoteBlock({
 }
 
 const linkStyle = { alignSelf: 'flex-start', paddingHorizontal: 0 } as const;
+
+/**
+ * O bloco "Comprovante lido" (D-051) que ocupa o lugar da linha de leitura depois de ler o PDF de um comprovante de Pix ou de
+ * pagamento: "Comprovante lido: Pix enviado · Maria Souza · R$ 85,00 · 05/10/2026 às 14:32", o que o comprovante não trouxe (valor,
+ * dia, nome), a mensagem que a pessoa escreveu nele, a frase de privacidade, "Ler outro comprovante" e "Desfazer leitura". Quando o
+ * comprovante é do outro lado (um Pix recebido em Anotar gasto, um Pix enviado em Registrar recebimento), nada foi preenchido: o
+ * bloco avisa e oferece a troca. Região viva: a leitura é anunciada. Nada foi salvo.
+ */
+export function ProofBlock({
+  draft,
+  mismatch,
+  amountEmpty,
+  dayEmpty,
+  descriptionEmpty,
+  onSwitch,
+  onReadAnother,
+  readAnotherDisabled = false,
+  onUndo,
+}: {
+  draft: ComprovanteDraft;
+  /** O comprovante é do outro lado: a frase, o botão de trocar e o tipo para onde vai. */
+  mismatch: { text: string; action: string } | null;
+  amountEmpty: boolean;
+  dayEmpty: boolean;
+  descriptionEmpty: boolean;
+  onSwitch: () => void;
+  onReadAnother: () => void;
+  readAnotherDisabled?: boolean;
+  onUndo: () => void;
+}) {
+  const gaps = comprovanteGaps(draft);
+  return (
+    <Banner tone="info" icon={FileText}>
+      <MoneyTxt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={2}>
+        {comprovanteReadLine(draft)}
+      </MoneyTxt>
+      {mismatch ? (
+        <>
+          <Txt variant="label">{mismatch.text}</Txt>
+          <Button label={mismatch.action} onPress={onSwitch} />
+        </>
+      ) : (
+        <>
+          {!gaps.amount && !gaps.day ? <Txt variant="label">{COMPROVANTE_TEXT.filled}</Txt> : null}
+          {gaps.guessed ? <Txt variant="label">{gaps.guessed}</Txt> : null}
+          {amountEmpty && gaps.amount ? <Txt variant="label">{gaps.amount}</Txt> : null}
+          {dayEmpty && gaps.day ? <Txt variant="label">{gaps.day}</Txt> : null}
+          {descriptionEmpty && gaps.name ? <Txt variant="label">{gaps.name}</Txt> : null}
+          {draft.message ? (
+            <Txt variant="caption" color={colors.textSecondary}>
+              {`${COMPROVANTE_TEXT.messageLabel}: ${draft.message}`}
+            </Txt>
+          ) : null}
+        </>
+      )}
+      <Txt variant="caption" color={colors.textSecondary}>
+        {COMPROVANTE_TEXT.privacy}
+      </Txt>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space[5] }}>
+        <LinkButton
+          label={COMPROVANTE_TEXT.readAgain}
+          style={[linkStyle, readAnotherDisabled && { opacity: 0.45 }]}
+          disabled={readAnotherDisabled}
+          accessibilityState={{ disabled: readAnotherDisabled }}
+          onPress={onReadAnother}
+        />
+        <LinkButton label={COMPROVANTE_TEXT.undoRead} style={linkStyle} onPress={onUndo} />
+      </View>
+    </Banner>
+  );
+}
+
+/**
+ * "Parece já anotado em 05/10/2026: Padaria, R$ 85,00." com "Abrir registro" (D-051). Aviso por semelhança (mesmo valor e data a até
+ * um dia de um registro do mesmo tipo): não bloqueia o salvamento. Os valores seguem "Ocultar valores".
+ */
+export function LookalikeBanner({ record, onOpen }: { record: LookalikeRecord; onOpen: () => void }) {
+  return (
+    <Banner tone="info" icon={Info}>
+      <MoneyTxt variant="label" style={{ fontFamily: fonts.bold }}>
+        {COMPROVANTE_TEXT.looksNoted(record.occurredOn, record.description, record.amountCents)}
+      </MoneyTxt>
+      <Txt variant="caption" color={colors.textSecondary}>
+        {COMPROVANTE_TEXT.looksNotedHint}
+      </Txt>
+      <LinkButton label={NOTA_TEXT.openRecord} style={linkStyle} onPress={onOpen} />
+    </Banner>
+  );
+}

@@ -71,6 +71,7 @@ import {
   yearA11y,
   yearA11yLabel,
 } from '@/components/series-parts';
+import { useSavedBefore } from '@/components/saved-before';
 import { SettingSwitch } from '@/components/setting-switch';
 import { SumValues } from '@/components/sum-values';
 import { TermHint } from '@/components/term-hint';
@@ -477,6 +478,11 @@ export function SeriesForm({
   const reconcile = async (input: SeriesInput, snapshot: string): Promise<boolean> => {
     const saved = await keys.findSaved(snapshot);
     if (!saved || saved.action !== 'criar_serie') return false;
+    if (saved.carried) {
+      // Uma tentativa de visita anterior foi gravada (e ainda existe): a pessoa escolhe entre ver o que foi salvo e criar outro igual.
+      savedBefore.show(saved, watchKey);
+      return true;
+    }
     const [series, list] = await Promise.all([repo.getSeries(saved.seriesId), repo.listSeriesOccurrences(saved.seriesId)]);
     if (!series) {
       keys.settled();
@@ -530,6 +536,25 @@ export function SeriesForm({
     }
     return errs;
   };
+
+  // "Este gasto fixo já tinha sido salvo. Criar outro igual?" (CL-03 e CL-19): uma tentativa de visita anterior achada gravada não conclui
+  // sozinha. O aviso sai da tela quando o preenchimento muda.
+  const watchKey = JSON.stringify(effective);
+  const savedBefore = useSavedBefore<{ key: string; snapshot: string; seriesId: string }>(
+    parcelada ? 'parcelamento' : anual ? 'conta-do-ano' : 'gasto-fixo',
+    watchKey,
+    {
+      onView: (saved) => {
+        keys.settled();
+        leave(() => router.replace(`/gastos-fixos/${saved.seriesId}`));
+      },
+      onAnother: (saved) => {
+        keys.release(saved);
+        submit();
+      },
+    },
+    busy,
+  );
 
   const submit = async () => {
     if (busy) return; // envio repetido bloqueado enquanto o anterior não termina
@@ -1117,6 +1142,7 @@ export function SeriesForm({
       {/* Rodapé fixo: a ação principal fica sempre visível, acima do teclado. */}
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space[3]) }]}>
         <View style={styles.footerInner}>
+          {savedBefore.banner}
           {banner ? (
             <Banner tone="erro" icon={AlertCircle}>
               <Txt variant="label" color={colors.error}>

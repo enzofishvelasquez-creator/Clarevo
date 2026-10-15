@@ -1,4 +1,5 @@
 import {
+  COMPROVANTE_TEXT,
   NOTA_CAMERA,
   NOTA_FLOW_TEXT,
   NOTA_TEXT,
@@ -10,7 +11,7 @@ import {
 } from '@clarevo/core';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router } from 'expo-router';
-import { ChevronRight, Flashlight, FlashlightOff, Info, QrCode } from 'lucide-react-native';
+import { ChevronRight, FileText, Flashlight, FlashlightOff, Info, QrCode } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 
@@ -28,22 +29,27 @@ import { colors, fonts, radius, space } from '@/theme/tokens';
  * `receipt-block.tsx`. Nada é gravado aqui: a leitura só preenche o formulário.
  */
 
-/** A linha de 56 px (azul claro) que abre a folha ou a câmera. */
-export function ScanLine({ onPress, disabled }: { onPress: () => void; disabled?: boolean }) {
+/**
+ * A linha de 56 px (azul claro) que abre a folha ou a câmera. `variant="comprovante"` (D-051) é a linha de Registrar recebimento:
+ * "Ler comprovante de Pix ou pagamento (PDF)", que vai direto ao seletor de arquivos.
+ */
+export function ScanLine({ onPress, disabled, variant = 'nota' }: { onPress: () => void; disabled?: boolean; variant?: 'nota' | 'comprovante' }) {
+  const proof = variant === 'comprovante';
+  const Icon = proof ? FileText : QrCode;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={NOTA_FLOW_TEXT.scanLineA11y}
+      accessibilityLabel={proof ? COMPROVANTE_TEXT.lineA11y : NOTA_FLOW_TEXT.scanLineA11y}
       disabled={disabled}
       onPress={onPress}
       style={(s) => [styles.scanLine, (s as { focused?: boolean }).focused && ui.focusRing, s.pressed && { backgroundColor: '#DCE6FF' }]}>
-      <QrCode size={24} color={colors.brand} strokeWidth={2.25} />
+      <Icon size={24} color={colors.brand} strokeWidth={2.25} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.bold }}>
-          {NOTA_TEXT.scanButton}
+          {proof ? COMPROVANTE_TEXT.option : NOTA_TEXT.scanButton}
         </Txt>
         <Txt variant="caption" color={colors.textSecondary}>
-          {NOTA_FLOW_TEXT.scanLineHint}
+          {proof ? COMPROVANTE_TEXT.lineHint : NOTA_FLOW_TEXT.scanLineHint}
         </Txt>
       </View>
       <ChevronRight size={20} color={colors.brand} aria-hidden />
@@ -79,6 +85,9 @@ export function ScanSheet({
       ) : null}
       <Txt variant="caption" color={colors.textSecondary}>
         {NOTA_TEXT.privacy}
+      </Txt>
+      <Txt variant="caption" color={colors.textSecondary}>
+        {COMPROVANTE_TEXT.sheetPrivacy}
       </Txt>
       {!cameraAvailable && Platform.OS === 'web' ? (
         <Txt variant="label" color={colors.textSecondary}>
@@ -171,12 +180,15 @@ export function CameraModal({
   onCode,
   onPdf,
   onPaste,
+  onProof,
   onClose,
 }: {
   visible: boolean;
   onCode: (data: string) => string | null;
   onPdf: () => void;
   onPaste: () => void;
+  /** "Ler comprovante de Pix ou pagamento (PDF)" (D-051): quem já usou a câmera abre direto nela, então a opção também mora aqui. */
+  onProof: () => void;
   onClose: () => void;
 }) {
   const [permission, requestPermission] = useCameraPermissions();
@@ -293,6 +305,7 @@ export function CameraModal({
           <View style={{ gap: space[2] }}>
             <Button label={NOTA_TEXT.sheet.pdf} tone="soft" onPress={onPdf} />
             <Button label={NOTA_TEXT.sheet.paste} tone="soft" onPress={onPaste} />
+            <Button label={COMPROVANTE_TEXT.option} tone="soft" onPress={onProof} />
             <Button label={NOTA_FLOW_TEXT.back} tone="ghost" onPress={onClose} />
           </View>
         </View>

@@ -34,6 +34,7 @@ import { FormFooter } from '@/components/form-footer';
 import { ContextPill, SubHeader } from '@/components/header';
 import { useLeaveGuard } from '@/components/leave-guard';
 import { MoneyTxt } from '@/components/money-text';
+import { useSavedBefore } from '@/components/saved-before';
 import { ChoiceGroup } from '@/components/series-parts';
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
@@ -195,6 +196,25 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
         )
       : null;
 
+  // "Esta meta já tinha sido salva. Criar outra igual?" (CL-03 e CL-19): uma tentativa de visita anterior achada gravada não conclui
+  // sozinha. O aviso sai da tela quando o preenchimento muda.
+  const watchKey = JSON.stringify(draft);
+  const savedBefore = useSavedBefore<{ key: string; snapshot: string; goalId: string }>(
+    'meta',
+    watchKey,
+    {
+      onView: (saved) => {
+        keys.settled();
+        guard.leave(() => router.replace(`/meta/${saved.goalId}`));
+      },
+      onAnother: (saved) => {
+        keys.release(saved);
+        submit();
+      },
+    },
+    busy,
+  );
+
   const clear = (field: GoalField) => {
     if (errors[field]) setErrors((e) => ({ ...e, [field]: undefined }));
   };
@@ -226,6 +246,11 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
         flash.set(goal ? T.saved : T.created);
         const id = r.value.goal.id;
         guard.leave(() => (goal ? (router.canGoBack() ? router.back() : router.replace(`/meta/${id}`)) : router.replace(`/meta/${id}`)));
+        return;
+      }
+      if (r.status === 'saved_before') {
+        // Uma meta de visita anterior foi gravada: a pessoa escolhe entre ver a meta e criar outra igual.
+        savedBefore.show(r.saved, watchKey);
         return;
       }
       if (r.status === 'reconciled') {
@@ -264,6 +289,7 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <SubHeader title={goal ? T.editTitle : T.newTitle} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" />} />
       <Screen contentStyle={styles.body}>
+        {savedBefore.banner}
         {conflict && goal ? (
           <Banner tone="erro" icon={CircleAlert}>
             <Txt variant="label" color={colors.error}>

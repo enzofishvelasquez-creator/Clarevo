@@ -27,6 +27,7 @@ import { ConfirmDialog } from '@/components/dialog';
 import { FormFooter } from '@/components/form-footer';
 import { ContextPill, SubHeader } from '@/components/header';
 import { useLeaveGuard } from '@/components/leave-guard';
+import { useSavedBefore } from '@/components/saved-before';
 import { ChoiceGroup } from '@/components/series-parts';
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
@@ -93,6 +94,25 @@ export function AccountForm({ mode, contextId, accounts }: { mode: AccountFormMo
     }
   };
 
+  // "Esta conta já tinha sido salva. Cadastrar outra igual?" (CL-03 e CL-19): uma tentativa de visita anterior achada gravada não conclui
+  // sozinha. O aviso sai da tela quando o preenchimento muda.
+  const watchKey = JSON.stringify(draft);
+  const savedBefore = useSavedBefore<{ key: string; snapshot: string }>(
+    'conta',
+    watchKey,
+    {
+      onView: () => {
+        keys.settled();
+        guard.leave(() => (router.canGoBack() ? router.back() : router.replace(BACK)));
+      },
+      onAnother: (saved) => {
+        keys.release(saved);
+        submit();
+      },
+    },
+    busy,
+  );
+
   async function submit() {
     if (busy) return;
     const v = validateAccountDraft(draft, accounts, account?.id);
@@ -121,6 +141,11 @@ export function AccountForm({ mode, contextId, accounts }: { mode: AccountFormMo
             : create.mutateAsync({ key, contextId, input: v.input }),
         (s) => (account ? s.action === 'alterar_conta' && s.accountId === account.id : s.action === 'criar_conta'),
       );
+      if (r.status === 'saved_before') {
+        // Uma conta de visita anterior foi gravada: a pessoa escolhe entre ver as contas e cadastrar outra igual.
+        savedBefore.show(r.saved, watchKey);
+        return;
+      }
       if (r.status === 'ok' || r.status === 'reconciled') return done(account ? T.saved : T.created);
       if (r.status === 'refused') {
         if (r.code === 'versao_desatualizada' || r.code === 'nao_encontrado') qc.invalidateQueries({ queryKey: ['accounts'] });
@@ -190,6 +215,7 @@ export function AccountForm({ mode, contextId, accounts }: { mode: AccountFormMo
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <SubHeader title={account ? T.editTitle : T.newTitle} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" />} help="contas-de-origem" />
       <Screen contentStyle={styles.body}>
+        {savedBefore.banner}
         <Card style={{ gap: space[4] }}>
           <TextField
             ref={nameRef}

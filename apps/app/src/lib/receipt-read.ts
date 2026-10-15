@@ -43,9 +43,9 @@ export function readNoteCode(raw: string, today: IsoDate): NoteReading {
 }
 
 /** O arquivo passa do limite: confere o tamanho ANTES de ler os bytes para a memória. */
-class PdfTooBigError extends Error {}
+export class PdfTooBigError extends Error {}
 
-async function bytesOf(asset: DocumentPicker.DocumentPickerAsset): Promise<Uint8Array> {
+export async function bytesOf(asset: DocumentPicker.DocumentPickerAsset): Promise<Uint8Array> {
   if (Platform.OS === 'web') {
     if (!asset.file) throw new Error('sem arquivo');
     if (asset.file.size > PDF_MAX_BYTES) throw new PdfTooBigError();
@@ -57,8 +57,11 @@ async function bytesOf(asset: DocumentPicker.DocumentPickerAsset): Promise<Uint8
   return new Uint8Array(await file.arrayBuffer());
 }
 
-/** Apaga a cópia do PDF que o seletor fez no cache do app (tem CPF, nome e endereço de quem comprou). Só no nativo; nunca lança. */
-async function deleteCachedCopy(asset: DocumentPicker.DocumentPickerAsset): Promise<void> {
+/**
+ * Apaga a cópia do PDF que o seletor fez no cache do app (de uma nota, tem CPF, nome e endereço de quem comprou; de um comprovante,
+ * documento, chave Pix e conta). Só no nativo; nunca lança.
+ */
+export async function deleteCachedCopy(asset: DocumentPicker.DocumentPickerAsset): Promise<void> {
   if (Platform.OS === 'web') return;
   try {
     const { File, Paths } = await import('expo-file-system');
@@ -70,6 +73,40 @@ async function deleteCachedCopy(asset: DocumentPicker.DocumentPickerAsset): Prom
   } catch {
     // O sistema limpa o cache quando precisa; a cópia só fica até lá.
   }
+}
+
+export type PdfTextRead = { ok: true; text: string } | { ok: false; reason: 'grande' | 'nao_pdf' | 'falhou' };
+
+/**
+ * Bytes de um PDF (já escolhido) até o texto: confere tamanho, cabeçalho "%PDF-" e extrai o texto. A leitura inteira (arquivo e
+ * texto) tem tempo limite (`PDF_READ_TIMEOUT_MS`): passou dele, destrói a tarefa do PDF e devolve `falhou`. É o mesmo caminho da nota
+ * fiscal e do comprovante de Pix (D-051): quem chama escolhe as mensagens. `extract` e `timeoutMs` existem para a leitura ser testável.
+ */
+export async function readPdfText(
+  read: () => Promise<Uint8Array>,
+  size: number | undefined,
+  options: { timeoutMs?: number; extract?: (bytes: Uint8Array, control: PdfReadControl) => Promise<string> } = {},
+): Promise<PdfTextRead> {
+  if (typeof size === 'number' && size > PDF_MAX_BYTES) return { ok: false, reason: 'grande' };
+  const control = newPdfReadControl();
+  const extract = options.extract ?? pdfTextFromBytes;
+  const work = (async (): Promise<PdfTextRead> => {
+    const bytes = await read();
+    if (bytes.length > PDF_MAX_BYTES) return { ok: false, reason: 'grande' };
+    if (!hasPdfHeader(bytes)) return { ok: false, reason: 'nao_pdf' };
+    return { ok: true, text: await extract(bytes, control) };
+  })();
+  const raced = await raceWithTimeout(work, options.timeoutMs ?? PDF_READ_TIMEOUT_MS, () => control.abort());
+  if (raced === 'tempo') return { ok: false, reason: 'falhou' };
+  if (raced === 'erro') {
+    // A causa só importa para o tamanho; o resto cai na mensagem geral.
+    const cause = await work.then(
+      () => null,
+      (e: unknown) => e,
+    );
+    return { ok: false, reason: cause instanceof PdfTooBigError ? 'grande' : 'falhou' };
+  }
+  return raced.value;
 }
 
 /**
@@ -84,27 +121,9 @@ export async function readNotePdfBytes(
   options: { timeoutMs?: number; extract?: (bytes: Uint8Array, control: PdfReadControl) => Promise<string> } = {},
 ): Promise<NoteReading> {
   const fail = (message: string): NoteReading => ({ ok: false, message, boleto: false });
-  if (typeof size === 'number' && size > PDF_MAX_BYTES) return fail(NOTA_TEXT.pdf.tooBig);
-  const control = newPdfReadControl();
-  const extract = options.extract ?? pdfTextFromBytes;
-  const work = (async (): Promise<string | NoteReading> => {
-    const bytes = await read();
-    if (bytes.length > PDF_MAX_BYTES) return fail(NOTA_TEXT.pdf.tooBig);
-    if (!hasPdfHeader(bytes)) return fail(NOTA_TEXT.pdf.notPdf);
-    return extract(bytes, control);
-  })();
-  const raced = await raceWithTimeout(work, options.timeoutMs ?? PDF_READ_TIMEOUT_MS, () => control.abort());
-  if (raced === 'tempo') return fail(NOTA_TEXT.pdf.failed);
-  if (raced === 'erro') {
-    // A causa só importa para o tamanho; o resto cai na mensagem geral.
-    const cause = await work.then(
-      () => null,
-      (e: unknown) => e,
-    );
-    return fail(cause instanceof PdfTooBigError ? NOTA_TEXT.pdf.tooBig : NOTA_TEXT.pdf.failed);
-  }
-  if (typeof raced.value !== 'string') return raced.value;
-  const danfe = danfeFromText(raced.value);
+  const text = await readPdfText(read, size, options);
+  if (!text.ok) return fail(text.reason === 'grande' ? NOTA_TEXT.pdf.tooBig : text.reason === 'nao_pdf' ? NOTA_TEXT.pdf.notPdf : NOTA_TEXT.pdf.failed);
+  const danfe = danfeFromText(text.text);
   if (!danfe.ok) {
     if (danfe.code === 'texto_vazio') return fail(NOTA_TEXT.pdf.noText);
     if (danfe.code === 'chave_nao_encontrada') return fail(NOTA_TEXT.pdf.noKey);

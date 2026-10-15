@@ -36,6 +36,7 @@ import { FormFooter } from '@/components/form-footer';
 import { ContextPill, SubHeader } from '@/components/header';
 import { useLeaveGuard } from '@/components/leave-guard';
 import { MoneyTxt } from '@/components/money-text';
+import { useSavedBefore } from '@/components/saved-before';
 import { ChoiceGroup } from '@/components/series-parts';
 import { Banner, Card, Chip, LinkButton, Money, Screen, TextField, Txt } from '@/components/ui';
 import { invoiceHref } from '@/lib/cards';
@@ -98,6 +99,25 @@ export function InvoicePayForm({ card, invoice, space: personal }: { card: CardD
 
   const goBack = () => (router.canGoBack() ? router.back() : router.replace(invoiceHref(card.id, invoice.month)));
 
+  // "Este pagamento da fatura já tinha sido registrado. Registrar outro igual?" (CL-03 e CL-19): uma tentativa de visita anterior achada
+  // gravada não conclui sozinha (um segundo pagamento igual é possível, em parte). O aviso sai da tela quando o preenchimento muda.
+  const watchKey = JSON.stringify(draft);
+  const savedBefore = useSavedBefore<{ key: string; snapshot: string }>(
+    'fatura-pagamento',
+    watchKey,
+    {
+      onView: () => {
+        keys.settled();
+        guard.leave(goBack);
+      },
+      onAnother: (saved) => {
+        keys.release(saved);
+        submit();
+      },
+    },
+    busy,
+  );
+
   async function submit() {
     if (busy || invoice.commitmentVersion === null) return;
     const v = validateInvoicePaymentDraft(draft, invoice, today);
@@ -120,6 +140,11 @@ export function InvoicePayForm({ card, invoice, space: personal }: { card: CardD
           pay.mutateAsync({ key, cardId: card.id, month: invoice.month, version, amountCents: v.amountCents, paidOn: v.paidOn, accountId: draft.accountId || null }),
         (s) => s.action === 'pagar_fatura' && s.cardId === card.id,
       );
+      if (r.status === 'saved_before') {
+        // Um pagamento de visita anterior foi gravado: a pessoa escolhe entre ver a fatura e registrar outro igual.
+        savedBefore.show(r.saved, watchKey);
+        return;
+      }
       if (r.status === 'ok' || r.status === 'reconciled') {
         // Confirmação tátil, aviso e efeito em Pago só depois de o servidor confirmar.
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -165,6 +190,7 @@ export function InvoicePayForm({ card, invoice, space: personal }: { card: CardD
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <SubHeader title={S.payTitle} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" />} />
       <Screen contentStyle={styles.body}>
+        {savedBefore.banner}
         <Card style={{ gap: space[1] }}>
           <Txt variant="caption" color={colors.textSecondary}>
             {t.title} · {card.name}

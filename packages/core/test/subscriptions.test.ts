@@ -61,6 +61,7 @@ const sub = (over: Partial<SubscriptionSeries> & { amountCents?: number; mode?: 
     lastNumber: null,
     partsPerYear: null,
     terms: [{ fromNumber: 1, description: name ?? 'Streaming', category: 'Lazer', amountCents: amountCents ?? 3990, amountMode: mode ?? 'fixo', dueDay: 10 }],
+    skippedNumbers: [],
     subscription: true,
     subscriptionReviewedOn: null,
     subscriptionSince: null,
