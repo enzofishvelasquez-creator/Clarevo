@@ -1,6 +1,6 @@
 # Arquitetura
 
-11/10/2026 · versão 0.16 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos, calculadoras, seus últimos meses, Aprender e dúvidas, lembretes, ocultar valores e biometria, renda comprometida, metas e reserva, plano de guardar, simulador, cartões e faturas, leitura de notas fiscais, plano para quitar dívidas, "Antes de financiar" (D-044) os ajustes de D-042: forma de pagamento da nota, faturas do mês nos cartões e contas do ano explicadas, as contas de origem do dinheiro, D-043, a busca em Movimentações, D-045, as assinaturas, D-046, a exportação dos dados, D-047, e importar extrato e fatura, D-048)
+15/10/2026 · versão 0.17 (primeiro ciclo, contas a pagar, gastos fixos, contas do ano, primeiros passos, calculadoras, seus últimos meses, Aprender e dúvidas, lembretes, ocultar valores e biometria, renda comprometida, metas e reserva, plano de guardar, simulador, cartões e faturas, leitura de notas fiscais, plano para quitar dívidas, "Antes de financiar" (D-044) os ajustes de D-042: forma de pagamento da nota, faturas do mês nos cartões e contas do ano explicadas, as contas de origem do dinheiro, D-043, a busca em Movimentações, D-045, as assinaturas, D-046, a exportação dos dados, D-047, importar extrato e fatura, D-048, e o tutorial de uso, D-049)
 
 ## Escolhas (aprovadas)
 
@@ -32,6 +32,7 @@ apps/app/src/
     importar              importar extrato ou fatura (D-048): arquivo, colunas, destino, revisão e resultado num fluxo só, sem a barra e com rodapé fixo; só grava as linhas confirmadas, por `import_records`
     contas/nova, contas/[id]/editar  contas de origem do dinheiro (D-043); a lista é o card "Suas contas" em /conta?secao=contas
     calcular, calcular/[slug]  calculadoras (nada é gravado); /calcular/plano-dividas é a 9ª (D-040) e /calcular/antes-de-financiar, a 10ª e a primeira da lista (D-044)
+    aprender/guia, aprender/guia/[id]  como usar o Clarevo (D-049): a lista por grupos e uma entrada; consulta, com a barra; nada é gravado
     retomar, retomar/atualizar, retomar/pagar  seus últimos meses (revisão depois de ausência)
     renda-comprometida, renda-comprometida/referencia  renda comprometida e renda de referência
     reserva, meta/nova, meta/[id], meta/[id]/editar, meta/[id]/movimento  reserva para imprevistos, metas e movimentos
@@ -52,7 +53,8 @@ apps/app/src/
     import-flow, import-parts  importar extrato ou fatura (D-048): o fluxo e a linha da revisão (caixa, valor, tipo, categoria, marca e "Editar")
     account-picker, account-form, accounts-card  "Saiu de" / "Entrou em" / "Foi para" (chips, ou texto com uma conta só), formulário da conta e card "Suas contas" (D-043)
     tab-bar             barra das abas e barra das telas de consulta (D-039)
-  lib/                  autenticação (Supabase e demonstração), learn.ts (links e ações de Aprender), situação do card Primeiros passos (só no aparelho),
+    tour, help-button   tutorial (D-049): o tour de cinco cartões (modal, uma vez por pessoa em cada aparelho) e o botão "?" do cabeçalho com a folha "Como usar"
+  lib/                  autenticação (Supabase e demonstração), learn.ts (links e ações de Aprender), guide.ts (o guia e o tour: reexporta o core, abre entradas e telas, e a marca que desliga o tour no roteiro), situação do card Primeiros passos (só no aparelho),
                         reminders.ts, device.ts e device-prefs.ts (lembretes e preferências só do aparelho), privacy.ts (ocultar valores), essentials.ts,
                         export-share.ts e export-share.web.ts (entrega do arquivo exportado, D-047: celular com expo-print e expo-sharing, web com Blob e página de impressão), export-logo.ts (logotipo oficial em SVG para o PDF),
                         bar-inset.ts (altura da barra inferior das telas de consulta), last-account.ts (última conta usada, só no aparelho), subscription-reminder.ts ("Agora não" do aviso de assinaturas, 30 dias, só no aparelho), import-file.ts (escolher e ler o arquivo no aparelho e apagar a cópia do cache) e import-context.ts (o que o banco já tem para a marca "Já anotado"), cards.ts (rotas e leituras de cartão), pdf-text.ts, receipt-read.ts, receipt-link.ts, sefaz-fetch.ts e note-prefs.ts (leitura de notas no aparelho)
@@ -77,6 +79,7 @@ packages/core/          regras financeiras, validação, repositório em memóri
   src/export.ts         exportar meus dados (D-047): períodos, linhas, CSV (BOM, ponto e vírgula, escape de fórmula), totais por mês iguais aos do Resumo, HTML do PDF, leitura com limite de 20.000 linhas e textos
   src/search.ts         buscar em Movimentações (D-045): texto sem acento, período, filtro do servidor e a mesma regra no MemoryRepository, resumo e média por mês com gasto, agrupamento por mês, rascunho e textos
   src/importar/         importar extrato e fatura (D-048): `decode.ts` (UTF-8, UTF-16 e Windows-1252 sem `TextDecoder`), `ofx.ts` (SGML e XML), `csv.ts` (separador, decimal, cabeçalho e colunas), `valores.ts` (valor e data), `dedupe.ts` (a chave `import_key` e "Já anotado"), `categorias.ts` (memória do aparelho e regras por palavra), `revisao.ts` (as linhas da revisão e os itens para o banco), `execucao.ts` (a conta dos lotes e o resumo final), `arquivo.ts` e `textos.ts`
+  src/guide/            tutorial de uso (D-049): `catalog.ts` (as 28 entradas em 5 grupos, com para que serve, onde fica, como usar, tela e palavras de busca), `text.ts` (guia, "?", tour de 5 cartões e manual), `search.ts` (grupo "Como usar" da busca de Aprender) e `tour.ts` (`shouldShowTour`: quando o tour pode abrir)
   src/navigation.ts     navegação (D-039): modo da barra inferior por endereço, mês de abertura e seletor de Contas a pagar, linha de lembretes e o índice "No app" da busca de Aprender
 supabase/
   migrations/           esquema, funções e permissões (0001 fundação, 0002 contas a pagar, 0003 gastos fixos, 0004 contas do ano, 0005 seus últimos meses,
@@ -85,7 +88,8 @@ supabase/
   tests/                testes de isolamento, da sequência de aceite, de contas a pagar, de gastos fixos, de contas do ano, da revisão dos últimos meses,
                         da renda comprometida (50), das metas (60), do plano de guardar (65), dos cartões (70), do orçamento (80), das contas de origem (85), das assinaturas (88) e da importação (90)
 scripts/e2e-web.js      roteiro de verificação na versão web
-docs/                   decisões, regras, acessos, Supabase, roteiro, Aprender, marca, telas
+scripts/gerar-manual.js manual para compartilhar (D-049): gera docs/manual/index.html a partir do catálogo do guia
+docs/                   decisões, regras, acessos, Supabase, roteiro, Aprender, marca, telas, manual
 ```
 
 ## Navegação protegida
@@ -252,6 +256,12 @@ pessoa ──< vínculo (permissões por ação) >── contexto (pessoal | fam
 
 - **Core (`src/learn/`):** `types.ts` (seções, os 42 slugs e o formato do tema, das fontes e dos fatos de norma), `sections.ts` (as cinco seções e "Comece por aqui"), `topics/` (o conteúdo, um arquivo por seção), `reading.ts` (palavras e tempo de leitura), `search.ts` (busca no aparelho), `examples.ts` (os números esperados de cada exemplo, calculados por `math.ts`), `validate.ts` (validação do catálogo: tamanhos, fontes, domínios, prazos de revisão, números conferidos e hipóteses), `ui-text.ts` (`LEARN_UI_TEXT`) e `math.ts` e `format.ts`, do A6. O catálogo, as fontes e o registro de revisões estão em `docs/09_APRENDER.md`.
 - **App:** `lib/learn.ts` reexporta o core e define `explanationHref(slug, origem)`, que a rota `/explicacao/[tema]` recebe com `origem` (`tarefa` ou `aprender`); com `typedRoutes`, o `typecheck` recusa um slug ou uma rota que não existem. Ali ficam também as ações "No Clarevo" e o link de cada tema para a calculadora. `lib/topics.ts` foi removido: nenhum `/explicacao/` é escrito à mão fora de `lib/learn.ts` (conferido por `learn-links.test.ts`). `TermHint` e `TopicLink` não desenham nada para tema em rascunho. A busca fica só na memória da aba; nada é gravado nem enviado.
+
+**Tutorial de uso** (D-049) não muda o banco: o catálogo é texto fixo no app, e nada do que a pessoa abre, busca ou vê no tour é registrado.
+
+- **Core (`src/guide/`):** `GUIDE_ENTRIES` (uma entrada por função, com `routes` que apontam para arquivos de `apps/app/src/app`), `GUIDE_GROUPS`, `GUIDE_TEXT`, `HELP_TEXT`, `TOUR_CARDS`, `TOUR_TEXT` e `MANUAL_TEXT`; `searchGuide` (título 8 e palavras de busca 6, mesma normalização de `searchWords`) e `shouldShowTour`. `guide.test.ts` confere que toda rota existe, que nenhuma entrada fica sem passos, que cada nome de "Onde fica" e cada botão entre aspas existe nos textos das telas, que toda tela de consulta ou aba tem entrada (ou está numa lista explícita de exceções) e que cada captura do manual existe em `docs/telas` com 780 px de largura.
+- **App:** `app/aprender/guia/index.tsx` e `[id].tsx` (telas de consulta; `ENTRY_PATH` em `_layout.tsx` aceita o endereço direto); o card em `(tabs)/aprender.tsx` e o grupo "Como usar" da busca; `components/tour.tsx` (`TourDialog` e `WelcomeTour`, montado no Resumo; a preferência `tourSeen` fica em `lib/device-prefs.ts`) e `components/help-button.tsx` (`HelpButton`, usado por `SubHeader` quando recebe `help`).
+- **Manual:** `scripts/gerar-manual.js` lê o mesmo catálogo (transpila o TypeScript do core na hora, sem pacote novo) e escreve `docs/manual/index.html` e `docs/manual/img/`; as capturas vêm de `scripts/e2e-web.js`.
 
 ## Como executar
 

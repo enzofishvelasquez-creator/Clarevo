@@ -30,6 +30,7 @@ Primeiro ciclo: 07/10/2026. Contas a pagar: 08/10/2026. Gastos fixos e parcelame
 - Plano de guardar: o Clarevo pergunta se você consegue guardar algum valor por mês; com "sim", monta etapas (reserva de 1, 3 e 6 meses e suas metas) e o mês previsto; com "agora não", sugere começar uma reserva mínima, a partir de R$ 100,00, sem julgamento. A resposta fica só com você.
 - Simulador: quanto guardar por mês, em quanto tempo e quanto posso ter, com a taxa que você digita (campo vazio por padrão), o resultado sem rendimento sempre ao lado e as hipóteses à vista; só simulação, sem indicar produto, banco nem taxa, e nada é gravado.
 - Aprender e dúvidas: busca, cinco seções e 40 temas curtos (juros, taxas, CET, IOF, cartão, cheque especial, inflação, Selic, FGC, contas do ano, reserva, renda comprometida, aporte, gastos essenciais, como ler uma simulação e o próprio app), com fonte e "Revisado em" em todos, fonte oficial com data de consulta sempre que existe e, nos temas com números, exemplo fictício com a conta aberta e, quando há calculadora correspondente, "Fazer a conta com os seus números"; "O que é isso?" ao lado dos termos nas telas; sem indicar produto e sem registrar o que a pessoa lê ou busca.
+- Tutorial de uso: Aprender › "Como usar o Clarevo" (guia com 28 funções: para que serve, onde fica e como usar), tour de 5 cartões na primeira entrada (sempre pulável), botão "?" em algumas telas e um manual para compartilhar (`docs/manual/index.html`, gerado por `npm run manual`, que roda `scripts/gerar-manual.js`).
 - Rascunho preservado, aviso antes de descartar, estados de carregamento, erro e vazio.
 - Banco com permissões por pessoa, contexto e ação; empresa não vê finanças.
 
@@ -69,3 +70,4 @@ npm run test:web   # fluxos completos na versão web (Playwright)
 10. [Calculadoras, acessos rápidos e o que falta construir (08/10/2026)](docs/08_ACESSOS_E_ROTEIRO.md)
 11. [Aprender e dúvidas: catálogo, fontes e revisões](docs/09_APRENDER.md)
 12. [Referências recebidas](docs/referencias/)
+13. [Manual de uso para compartilhar (gerado do guia do app)](docs/manual/index.html)
