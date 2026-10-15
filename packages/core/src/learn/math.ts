@@ -297,3 +297,77 @@ export function monthsToReach(targetCents: Cents, monthlyCents: Cents): number {
   const t = BigInt(targetCents);
   return toNumber((t + m - 1n) / m);
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Conteúdo de época (Ciclo K2, D-053): 13º salário, férias e pagamento do Imposto de Renda em quotas. Só as contas dos
+// exemplos de Aprender; o app não calcula descontos de INSS nem de Imposto de Renda.
+// ---------------------------------------------------------------------------------------------------------------------
+
+/**
+ * Primeira parcela do 13º salário: metade do salário do mês anterior (Lei 4.749/1965, art. 2º), metade para cima.
+ * thirteenthFirstCents(300.000) = 150.000.
+ */
+export function thirteenthFirstCents(monthlySalaryCents: Cents): Cents {
+  return toNumber(roundDivBig(int(monthlySalaryCents, 'salário'), 2n));
+}
+
+/**
+ * 13º salário proporcional: 1/12 da remuneração por mês de serviço (Lei 4.090/1962, art. 1º, § 1º), de 0 a 12 meses,
+ * dividido só no fim e arredondado metade para cima. thirteenthCents(300.000, 7) = 175.000; com 12 meses, o salário inteiro.
+ */
+export function thirteenthCents(monthlyCents: Cents, months: number): Cents {
+  const m = int(months, 'meses');
+  if (m > 12n) throw new RangeError(`meses inválidos: ${months}`);
+  return toNumber(roundDivBig(int(monthlyCents, 'remuneração') * m, 12n));
+}
+
+/**
+ * Meses que contam para o 13º: o mês em que a pessoa trabalhou 15 dias ou mais conta inteiro, e o de 14 dias ou menos não
+ * conta (Lei 4.090/1962, art. 1º, § 2º). Recebe os dias trabalhados em cada mês (de 0 a 31).
+ * thirteenthMonthsCount([31, 28, 31, 30, 31, 30, 14]) = 6.
+ */
+export function thirteenthMonthsCount(workedDays: readonly number[]): number {
+  return workedDays.filter((d) => {
+    if (int(d, 'dias') > 31n) throw new RangeError(`dias inválidos: ${d}`);
+    return d >= 15;
+  }).length;
+}
+
+/**
+ * Férias com o terço constitucional (Constituição, art. 7º, XVII): a remuneração dos dias de férias (salário ÷ 30 × dias)
+ * mais um terço dela, cada parte arredondada metade para cima. De 1 a 30 dias.
+ * vacationPayCents(300.000) = { baseCents: 300.000, thirdCents: 100.000, totalCents: 400.000 }.
+ */
+export function vacationPayCents(monthlySalaryCents: Cents, days = 30): { baseCents: Cents; thirdCents: Cents; totalCents: Cents } {
+  const d = int(days, 'dias', 1);
+  if (d > 30n) throw new RangeError(`dias inválidos: ${days}`);
+  const baseCents = toNumber(roundDivBig(int(monthlySalaryCents, 'salário') * d, 30n));
+  const thirdCents = toNumber(roundDivBig(BigInt(baseCents), 3n));
+  return { baseCents, thirdCents, totalCents: baseCents + thirdCents };
+}
+
+/** Pagamento do Imposto de Renda em quotas: até 8, nenhuma abaixo de R$ 50,00, e imposto abaixo de R$ 100,00 numa só vez. */
+export const INCOME_TAX_MAX_QUOTAS = 8;
+export const INCOME_TAX_MIN_QUOTA_CENTS = 5_000;
+export const INCOME_TAX_SINGLE_PAYMENT_BELOW_CENTS = 10_000;
+
+/**
+ * Maior número de quotas em que o imposto a pagar pode ser dividido: 0 sem imposto, 1 abaixo de R$ 100,00 e, a partir daí,
+ * o menor entre 8 e o imposto ÷ R$ 50,00 (para baixo). incomeTaxMaxQuotas(120.000) = 8; incomeTaxMaxQuotas(32.000) = 6.
+ */
+export function incomeTaxMaxQuotas(taxCents: Cents): number {
+  const tax = int(taxCents, 'imposto');
+  if (tax === 0n) return 0;
+  if (tax < BigInt(INCOME_TAX_SINGLE_PAYMENT_BELOW_CENTS)) return 1;
+  return Math.min(INCOME_TAX_MAX_QUOTAS, Number(tax / BigInt(INCOME_TAX_MIN_QUOTA_CENTS)));
+}
+
+/**
+ * Quotas iguais do imposto a pagar, sem os juros das quotas depois da primeira; os centavos que sobram vão para as
+ * primeiras quotas. Mais quotas que o permitido: RangeError. incomeTaxQuotas(120.000, 8) = oito quotas de 15.000.
+ */
+export function incomeTaxQuotas(taxCents: Cents, quotas: number): Cents[] {
+  const n = int(quotas, 'quotas', 1);
+  if (Number(n) > incomeTaxMaxQuotas(taxCents)) throw new RangeError(`quotas demais para o imposto: ${quotas}`);
+  return sharesCents(taxCents, Array.from({ length: Number(n) }, () => 1));
+}

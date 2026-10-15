@@ -8,3 +8,4 @@ export * from './search';
 export * from './examples';
 export * from './validate';
 export * from './ui-text';
+export * from './epoca';

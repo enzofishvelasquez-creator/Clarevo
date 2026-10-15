@@ -2671,3 +2671,88 @@ describe('textos do widget e de "Seu mês em 30 segundos" (D-052)', () => {
     }
   });
 });
+
+import { SEASONAL_CALENDAR, SEASONAL_TEXT, seasonalCard, seasonalTextSamples } from '../src';
+
+/**
+ * Conteúdo de época (Ciclo K2, D-053): o card "Neste mês" e os quatro temas novos (13º salário, férias, volta às aulas e Imposto
+ * de Renda), em português do Brasil, neutros quanto a gênero, sem travessões longos, sem a expressão proibida, sem palavra de
+ * julgamento nem de alarme, sem produto financeiro, oferta de crédito, nome de banco ou marca, e sem exclamação.
+ */
+describe('textos de conteúdo de época (D-053)', () => {
+  const EPOCA = ['decimo-terceiro', 'ferias', 'volta-as-aulas', 'imposto-de-renda'];
+  const GENDERED = /\b(o|a)s? usuári[oa]s?\b|\bobrigad[oa]s?\b|\bbem-vind[oa]s?\b|\bpreocupad[oa]s?\b|\bendividad[oa]s?\b|\bempregad[oa]s?\b|\btrabalhador(a|es|as)?\b|\bcontribuint[ea]s? (que )?(el[ea]|ele)\b|\bsolteir[oa]s?\b|\bcasad[oa]s?\b|\bmãe\b|\bpai\b/i;
+  const ALARM = /\b(cuidado|alerta|perigo|urgente|corra|aproveite|imperd[ií]vel|não perca|perca|irrespons[aá]vel|descuid\w*|péssim\w*|ótim\w*|melhor opção|vale a pena)\b|!/i;
+  const PRODUCTS = /empr[eé]stimo|financiamento|consignado|investimento|invista|aplica[cç][aã]o|poupan[cç]a|previd[eê]ncia|tesouro|\bcdb\b|\blci\b|\blca\b|cart[aã]o de cr[eé]dito|cr[eé]dito pessoal|antecip\w+ (do )?13/i;
+  const BRANDS = /\b(nubank|ita[uú]|bradesco|santander|c6|sicredi|sicoob|btg|neon|picpay|mercado pago|visa|mastercard|hipercard|amex|serasa|xp)\b/i;
+
+  /** Todo o texto de um tema de época: campos exibidos, palavras de busca e as fontes (título, trecho e instituição). */
+  const everything = (slug: string): string[] => {
+    const t = TOPICS.find((x) => x.slug === slug)!;
+    const sources = t.sources.flatMap((s) => (s.kind === 'clarevo' ? [] : s.kind === 'obra' ? [s.title] : [s.publisher, s.title, s.locator ?? '']));
+    return [...topicFieldTexts(t), ...sources].filter((x) => x !== '');
+  };
+
+  const check = (texts: string[]) => {
+    expect(texts.length).toBeGreaterThan(0);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(FORBIDDEN_EXPANDED);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(ALARM);
+      expect(text, text).not.toMatch(GENDERED);
+      expect(text, text).not.toMatch(BRANDS);
+      expect(learnForbiddenMatch(text, null), text).toBeNull();
+    }
+  };
+
+  it('as listas reprovam o que devem e aceitam o texto de época', () => {
+    for (const bad of ['Cuidado com o prazo', 'Não perca', 'Aproveite!', 'Peça um empréstimo', 'O trabalhador recebe', 'a empregada', 'investimento']) {
+      expect(ALARM.test(bad) || GENDERED.test(bad) || PRODUCTS.test(bad), bad).toBe(true);
+    }
+    for (const ok of ['Quem trabalha com carteira assinada recebe o 13º salário em duas parcelas.', 'Confira a data oficial do ano no site da Receita.', 'O Clarevo não calcula nem entrega a declaração.']) {
+      expect(ALARM.test(ok) || GENDERED.test(ok) || PRODUCTS.test(ok), ok).toBe(false);
+    }
+  });
+
+  it('o card "Neste mês" e as calculadoras ligadas, em todos os meses', () => {
+    const texts = [...seasonalTextSamples(), SEASONAL_TEXT.title, ...SEASONAL_CALENDAR.map((m) => SEASONAL_TEXT.caption(String(m.month)))];
+    expect(texts.length).toBeGreaterThan(15);
+    check(texts);
+    // O título e a legenda não contam nem julgam: "Neste mês" e "Temas para outubro".
+    expect(SEASONAL_TEXT.title).toBe('Neste mês');
+    expect(SEASONAL_TEXT.caption('outubro')).toBe('Temas para outubro');
+  });
+
+  it('as linhas do card: título, subtítulo e legenda de cada tema e calculadora de cada mês', () => {
+    for (const m of SEASONAL_CALENDAR) {
+      const card = seasonalCard(`2026-${String(m.month).padStart(2, '0')}-10`);
+      if (!card) continue;
+      check(card.topics.flatMap((t) => [t.title, t.subtitle ?? '', t.short]).filter((x) => x !== ''));
+      if (card.calculators.length > 0) check(card.calculators.flatMap((c) => [c.title, c.caption]));
+    }
+  });
+
+  it.each(EPOCA)('tema %s: campos, palavras de busca e fontes passam nas regras', (slug) => {
+    check(everything(slug));
+    // Nenhum produto financeiro nem oferta de crédito nos textos exibidos.
+    for (const text of topicFieldTexts(TOPICS.find((t) => t.slug === slug)!)) expect(text, text).not.toMatch(PRODUCTS);
+  });
+
+  it('o arquivo do calendário e o dos temas passam pelas regras de texto', () => {
+    for (const file of [join('learn', 'epoca.ts'), join('learn', 'topics', 'epoca.ts')]) {
+      const source = readFileSync(join(CORE_SRC, file), 'utf8');
+      expect(source, file).not.toMatch(FORBIDDEN);
+      expect(source, file).not.toMatch(FORBIDDEN_EXPANDED);
+      expect(source, file).not.toMatch(/[–—]/);
+    }
+  });
+
+  it('o 13º, as férias e o Imposto de Renda dizem o que o Clarevo não faz: não calcula desconto nem entrega a declaração', () => {
+    const decimo = topicFieldTexts(TOPICS.find((t) => t.slug === 'decimo-terceiro')!).join(' ');
+    expect(decimo).toContain('O Clarevo não calcula os descontos');
+    const ir = topicFieldTexts(TOPICS.find((t) => t.slug === 'imposto-de-renda')!).join(' ');
+    expect(ir).toContain('O Clarevo não calcula nem entrega a declaração');
+    expect(ir).toContain('Confira a data oficial do ano no site da Receita');
+  });
+});

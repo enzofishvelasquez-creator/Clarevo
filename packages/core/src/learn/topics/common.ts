@@ -13,6 +13,13 @@ export const CONSULTED_ON: IsoDate = '2026-10-09';
 /** Data de revisão dos temas que ganharam o texto dos cartões (D-037, 10/10/2026); as fontes externas seguem consultadas em 09/10. */
 export const CARDS_REVIEWED_ON: IsoDate = '2026-10-10';
 
+/**
+ * Conteúdo de época (Ciclo K2, D-053): os quatro temas novos foram escritos e conferidos em 15/10/2026, pelo mesmo método
+ * (trecho de resultado de busca da própria fonte, porque os sites oficiais não abrem a partir do ambiente de trabalho).
+ */
+export const EPOCA_REVIEWED_ON: IsoDate = '2026-10-15';
+export const EPOCA_CONSULTED_ON: IsoDate = '2026-10-15';
+
 export const clarevo = (...refs: string[]): LearnSource => ({ kind: 'clarevo', refs });
 
 export const oficial = (publisher: string, title: string, url: string, locator: string | null = null): LearnSource => ({
@@ -22,6 +29,16 @@ export const oficial = (publisher: string, title: string, url: string, locator: 
   url,
   locator,
   consultedOn: CONSULTED_ON,
+});
+
+/** Fonte oficial de um tema de época (D-053), consultada em 15/10/2026. */
+export const oficialEpoca = (publisher: string, title: string, url: string, locator: string | null = null): LearnSource => ({
+  kind: 'oficial',
+  publisher,
+  title,
+  url,
+  locator,
+  consultedOn: EPOCA_CONSULTED_ON,
 });
 
 export const mercado = (publisher: string, title: string, url: string, locator: string | null = null): LearnSource => ({

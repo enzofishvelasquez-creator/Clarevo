@@ -1,6 +1,6 @@
 import { APP_SEARCH_TEXT, CALC_UI_TEXT, SIMULATE_TEXT, appScreenIsTab, searchAppScreens, type AppScreen, type LearnSection, type LearnSectionId } from '@clarevo/core';
 import { router, type Href } from 'expo-router';
-import { AppWindow, ArrowRight, BookOpenCheck, Calculator, ChartLine, Compass, Search, SearchX, X } from 'lucide-react-native';
+import { AppWindow, ArrowRight, BookOpenCheck, Calculator, CalendarDays, ChartLine, Compass, Search, SearchX, X } from 'lucide-react-native';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { AccessibilityInfo, Platform, Pressable, StyleSheet, TextInput, View, type ScrollView } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -13,7 +13,22 @@ import { TopicRow } from '@/components/topic-link';
 import { Body, Card, LinkButton, Screen, Txt, styles as ui } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
 import { GUIDE_TEXT, guideSummary, openGuideEntry, searchGuide, type GuideEntry } from '@/lib/guide';
-import { LEARN_ACTIONS, LEARN_UI_TEXT, START_HERE, explanationHref, learnSection, searchTopics, topicBySlug, topicsBySection, type Topic } from '@/lib/learn';
+import {
+  LEARN_ACTIONS,
+  LEARN_UI_TEXT,
+  SEASONAL_TEXT,
+  START_HERE,
+  calculatorHref,
+  explanationHref,
+  learnSection,
+  searchTopics,
+  seasonalCard,
+  topicBySlug,
+  topicsBySection,
+  type SeasonalCard,
+  type Topic,
+} from '@/lib/learn';
+import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
 /** Quanto esperar depois da última tecla para anunciar a contagem de resultados (spec3 §3.9). */
@@ -26,9 +41,9 @@ const openAppScreen = (screen: AppScreen) => (appScreenIsTab(screen) ? router.na
 
 /**
  * Aprender e dúvidas (spec3 §3.2, com spec5_notes §2): introdução, busca, card "Como usar o Clarevo" (o guia de uso, D-049),
- * card "Calculadoras", card lima "Comece por aqui", atalhos de seção, as seções, Dúvidas frequentes e o rodapé. Com busca
- * ativa, os resultados substituem tudo do card "Como usar o Clarevo" para baixo: o grupo "No app", o grupo "Como usar"
- * (entradas do guia) e os temas.
+ * card "Calculadoras", card "Neste mês" (os temas de época do mês de hoje, D-053; o card some nos meses sem tema), card lima
+ * "Comece por aqui", atalhos de seção, as seções, Dúvidas frequentes e o rodapé. Com busca ativa, os resultados substituem
+ * tudo do card "Como usar o Clarevo" para baixo: o grupo "No app", o grupo "Como usar" (entradas do guia) e os temas.
  *
  * Privacidade (R11): o termo buscado fica só no estado desta tela, na memória; nada é gravado no aparelho nem
  * enviado, e a busca não faz requisição de rede.
@@ -43,6 +58,9 @@ export default function AprenderScreen() {
   const sectionY = useRef<Partial<Record<LearnSectionId, number>>>({});
   const headings = useRef<Partial<Record<LearnSectionId, View | null>>>({});
   const reduced = useReducedMotion();
+  // Temas de época (D-053): só o mês de hoje decide; nada é guardado nem enviado.
+  const { today } = useSession();
+  const season = seasonalCard(today);
 
   const results = searchTopics(query);
   // Grupo "No app" (A21): telas do app achadas por nome e sinônimos, calculadas no aparelho sobre um índice fixo.
@@ -151,6 +169,9 @@ export default function AprenderScreen() {
                   <ArrowRight size={20} color={colors.brand} aria-hidden />
                 </Pressable>
 
+                {/* Neste mês (D-053): os temas de época do mês de hoje, entre "Calculadoras" e "Comece por aqui". Sem notificação. */}
+                {season ? <SeasonCardView card={season} /> : null}
+
                 {startHere.length > 0 ? (
                   <View style={styles.startHere}>
                     <Txt variant="title" accessibilityRole="header" aria-level={2} style={{ fontFamily: fonts.extrabold }}>
@@ -222,6 +243,45 @@ export default function AprenderScreen() {
         </View>
       </Screen>
     </View>
+  );
+}
+
+/**
+ * Card "Neste mês" (D-053): título de nível 2 com a legenda "Temas para outubro", uma linha para cada tema do mês (as mesmas
+ * linhas das seções, com o tempo de leitura) e, quando um tema liga uma calculadora, a linha dela ("Cota única ou parcelado?").
+ */
+function SeasonCardView({ card }: { card: SeasonalCard }) {
+  return (
+    <Card style={{ gap: space[2] }}>
+      <View style={styles.sectionHead}>
+        <View style={styles.calcIcon}>
+          <CalendarDays size={22} color={colors.brand} strokeWidth={2.25} aria-hidden />
+        </View>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <Txt variant="title" accessibilityRole="header" aria-level={2}>
+            {SEASONAL_TEXT.title}
+          </Txt>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {SEASONAL_TEXT.caption(card.monthName)}
+          </Txt>
+        </View>
+      </View>
+      <View>
+        {card.topics.map((t, i) => (
+          <TopicRow key={t.slug} topic={t} last={i === card.topics.length - 1 && card.calculators.length === 0} onPress={() => open(t)} />
+        ))}
+        {card.calculators.map((c, i) => (
+          <CalcNavRow
+            key={`${c.slug}-${c.params.modo ?? ''}`}
+            icon={Calculator}
+            title={c.title}
+            caption={c.caption}
+            last={i === card.calculators.length - 1}
+            onPress={() => router.push(calculatorHref(c))}
+          />
+        ))}
+      </View>
+    </Card>
   );
 }
 

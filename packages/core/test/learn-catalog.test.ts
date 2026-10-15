@@ -84,12 +84,12 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
     expect(learnReviewWarnings(TOPICS, '2027-03-11').map((w) => w.slug)).toContain('rotativo-cartao');
   });
 
-  it('os 42 slugs na ordem; TOPICS e TOPIC_SLUGS iguais', () => {
-    expect(TOPIC_SLUGS.length).toBe(42);
+  it('os 46 slugs na ordem; TOPICS e TOPIC_SLUGS iguais', () => {
+    expect(TOPIC_SLUGS.length).toBe(46);
     expect(TOPICS.map((t) => t.slug)).toEqual([...TOPIC_SLUGS]);
   });
 
-  it('seção, tipo e status de cada tema: 40 publicados e 2 rascunhos', () => {
+  it('seção, tipo e status de cada tema: 44 publicados e 2 rascunhos', () => {
     const table: Record<TopicSlug, string> = {
       diferenca: 'usar tema publicado',
       'realizado-previsto': 'usar tema publicado',
@@ -107,6 +107,10 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
       'renda-variavel': 'organizar tema publicado',
       aporte: 'organizar tema publicado',
       essenciais: 'organizar tema publicado',
+      'decimo-terceiro': 'organizar tema publicado',
+      ferias: 'organizar tema publicado',
+      'volta-as-aulas': 'organizar tema publicado',
+      'imposto-de-renda': 'organizar tema publicado',
       'juros-simples-compostos': 'juros tema publicado',
       'taxa-mes-ano': 'juros tema publicado',
       'taxa-e-tarifa': 'juros tema publicado',
@@ -135,7 +139,7 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
       'o-que-o-clarevo-nao-faz': 'duvidas pergunta publicado',
     };
     expect(Object.fromEntries(TOPICS.map((t) => [t.slug, `${t.section} ${t.kind} ${t.status}`]))).toEqual(table);
-    expect(publishedTopics().length).toBe(40);
+    expect(publishedTopics().length).toBe(44);
     // Rascunho diz o que falta conferir.
     for (const t of TOPICS.filter((x) => x.status === 'rascunho')) expect(t.pending!.length).toBeGreaterThan(0);
   });
@@ -250,11 +254,12 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
     }
   });
 
-  it('R5: toda fonte externa de tema publicado tem endereço permitido e data de consulta 09/10/2026', () => {
+  it('R5: toda fonte externa de tema publicado tem endereço permitido e data de consulta 09/10/2026 (os quatro de época, 15/10/2026)', () => {
+    const epoca: readonly string[] = ['decimo-terceiro', 'ferias', 'volta-as-aulas', 'imposto-de-renda'];
     for (const t of publishedTopics())
       for (const s of t.sources) {
         if (s.kind === 'clarevo') continue;
-        expect(s.consultedOn, `${t.slug}: ${s.title}`).toBe('2026-10-09');
+        expect(s.consultedOn, `${t.slug}: ${s.title}`).toBe(epoca.includes(t.slug) ? '2026-10-15' : '2026-10-09');
         if (s.kind !== 'obra') expect(isAllowedSourceUrl(s.url, s.kind, t.slug), s.url).toBe(true);
       }
     expect(isAllowedSourceUrl('https://www.planalto.gov.br/ccivil_03/leis/l8078compilado.htm', 'oficial', 'cet')).toBe(true);
@@ -527,6 +532,10 @@ describe('temas dos Ciclos B, C e D (renda comprometida, renda que muda, aporte,
       'renda-variavel',
       'aporte',
       'essenciais',
+      'decimo-terceiro',
+      'ferias',
+      'volta-as-aulas',
+      'imposto-de-renda',
     ]);
     expect(topicsBySection()[3]!.topics.map((x) => x.slug)).toEqual(['inflacao-ipca', 'selic', 'liquidez-risco-retorno', 'fgc', 'simulacao']);
   });
@@ -562,7 +571,7 @@ describe('consulta ao catálogo', () => {
   it('seções na ordem da tela, com os temas publicados; Comece por aqui publicado', () => {
     const sections = topicsBySection();
     expect(sections.map((s) => s.section.title)).toEqual(['Usar o Clarevo', 'Organizar o mês', 'Juros e crédito', 'Dinheiro no tempo', 'Dúvidas frequentes']);
-    expect(sections.map((s) => s.topics.length)).toEqual([8, 7, 13, 5, 7]);
+    expect(sections.map((s) => s.topics.length)).toEqual([8, 11, 13, 5, 7]);
     expect(LEARN_SECTIONS.length).toBe(5);
     expect([...START_HERE]).toEqual(['diferenca', 'juros-simples-compostos', 'gasto-fixo']);
     for (const slug of START_HERE) expect(isTopicPublished(slug)).toBe(true);
@@ -580,6 +589,8 @@ describe('consulta ao catálogo', () => {
       cet: 'custo-da-divida?modo=emprestimo',
       'reserva-imprevistos': 'reserva',
       'contas-do-ano': 'parcelado-ou-a-vista?modo=cota-unica',
+      // D-053: o tema de férias liga a calculadora de juntar para um objetivo.
+      ferias: 'juntar-para-objetivo',
     };
     const actual: Partial<Record<TopicSlug, string>> = {};
     for (const t of TOPICS) {

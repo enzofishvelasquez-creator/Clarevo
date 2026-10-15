@@ -9,7 +9,8 @@
  * Movimentos, D-045), do Ciclo H2 (assinaturas, D-046, com o cenário fictício "assinaturas" da demonstração) e do Ciclo H3
  * (exportar meus dados em CSV e PDF, D-047), do Ciclo I1 (importar extrato e fatura, D-048), do Tutorial (D-049: o guia em Aprender, o
  * tour de boas-vindas, o botão "?" nas telas e as capturas do manual) e do Ciclo I2 (comprovante de Pix e de pagamento em PDF,
- * D-051) e do Ciclo K1 (Seu mês em 30 segundos e o interruptor do widget em Conta, D-052) na versão web, em modo demonstração (acesso simulado).
+ * D-051), do Ciclo K1 (Seu mês em 30 segundos e o interruptor do widget em Conta, D-052) e do Ciclo K2 (conteúdo de época: o card "Neste mês" em
+ * Aprender e os temas de 13º salário, férias, volta às aulas e Imposto de Renda, D-053) na versão web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -2184,13 +2185,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const learnBackToTab = async () => { await btn('Voltar para Aprender').click(); await waitText('Comece por aqui'); };
   await logoChecks('Aprender: logotipo "clarevo." no cabeçalho azul, sem o símbolo C');
   t = await body();
-  const learnOrder = ['Buscar um tema', 'Calculadoras', 'Comece por aqui', 'Ir para', ...LEARN_SECTIONS].map((x) => t.indexOf(x));
+  const learnOrder = ['Buscar um tema', 'Calculadoras', 'Neste mês', 'Comece por aqui', 'Ir para', ...LEARN_SECTIONS].map((x) => t.indexOf(x));
   ok('Aprender: título "Aprender e dúvidas", aba "Aprender" com o nome "Aprender e dúvidas" e a introdução', (await h1Name()) === 'Aprender e dúvidas' &&
     (await p.getByRole('tab', { name: 'Aprender e dúvidas', exact: true }).filter({ visible: true }).count()) === 1 &&
     (await p.getByRole('tab', { name: 'Aprender e dúvidas', exact: true }).filter({ visible: true }).first().innerText()).trim() === 'Aprender' &&
     t.includes('Explicações curtas sobre contas, juros e o próprio Clarevo, com exemplos fictícios e fontes.'), await h1Name());
-  ok('Aprender: busca, card "Calculadoras", "Comece por aqui", "Ir para" e as cinco seções, nessa ordem', learnOrder.every((v, i, a) => v >= 0 && (i === 0 || v > a[i - 1])) &&
-    JSON.stringify(await learnH2()) === JSON.stringify(['Comece por aqui', ...LEARN_SECTIONS]), `${learnOrder.join(',')} ${JSON.stringify(await learnH2())}`);
+  ok('Aprender: busca, card "Calculadoras", card "Neste mês" (D-053), "Comece por aqui", "Ir para" e as cinco seções, nessa ordem', learnOrder.every((v, i, a) => v >= 0 && (i === 0 || v > a[i - 1])) &&
+    JSON.stringify(await learnH2()) === JSON.stringify(['Neste mês', 'Comece por aqui', ...LEARN_SECTIONS]), `${learnOrder.join(',')} ${JSON.stringify(await learnH2())}`);
   ok('Aprender: "Comece por aqui" com Diferença do mês, Juros simples e compostos e Gasto fixo', JSON.stringify((await cardButtons('Comece por aqui')).slice(0, 3).map((x) => x.split('. ')[0])) ===
     JSON.stringify(['Diferença do mês', 'Juros simples e juros compostos', 'Gasto fixo, conta a pagar e gasto anotado']), JSON.stringify(await cardButtons('Comece por aqui')));
   ok('Aprender: linha de tema com título, subtítulo e tempo de leitura no nome; rascunhos fora da lista', (await visibleCount('button', 'Diferença do mês. Como um registro entra no mês. Leitura de 1 minuto.')) >= 1 &&
@@ -2390,7 +2391,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.evaluate(() => { window.open = window.__realOpen; });
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   const externalTopics = [...learnSeen].filter(([, n]) => n > 0).map(([s]) => s);
-  ok('Aprender: 40 temas publicados abrem pela aba (33 nas seções e 7 dúvidas), cada um com o título como cabeçalho de nível 1', learnSeen.size === 40 && learnLabels.length === 33 && faqNames.length === 7 &&
+  ok('Aprender: 44 temas publicados abrem pela aba (37 nas seções, com os quatro de época, e 7 dúvidas), cada um com o título como cabeçalho de nível 1', learnSeen.size === 44 && learnLabels.length === 37 && faqNames.length === 7 &&
     learnIssues.titulo.length === 0, `${learnSeen.size} temas, ${learnLabels.length} linhas, ${faqNames.length} dúvidas ${learnIssues.titulo.slice(0, 3).join(' | ')}`);
   ok('temas: nenhum termo vetado nem travessão longo nos textos exibidos', learnIssues.termos.length === 0, learnIssues.termos.slice(0, 3).join(' | '));
   ok('temas: fontes com papel de link, data de consulta e domínio permitido (oficial; FGC só no tema do FGC; Serasa só em renda-comprometida)', externalTopics.length >= 20 && learnIssues.fontes.length === 0,
@@ -8038,7 +8039,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const j1H2 = await p.evaluate(() => [...document.querySelectorAll('h2, [role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
   ok('Tutorial Aprender: o card "Como usar o Clarevo" é o primeiro botão, e o card "Calculadoras" vem logo depois', j1First[0] === 'Como usar o Clarevo. Onde fica cada função e como usar, passo a passo.' &&
     j1First[1] === 'Calculadoras. Parcelado ou à vista, dívidas, reserva e outras contas com os seus números', JSON.stringify(j1First));
-  ok('Tutorial Aprender: o card não é título (os títulos de Aprender seguem os mesmos)', JSON.stringify(j1H2) === JSON.stringify(['Comece por aqui', 'Usar o Clarevo', 'Organizar o mês', 'Juros e crédito', 'Dinheiro no tempo', 'Dúvidas frequentes']), JSON.stringify(j1H2));
+  ok('Tutorial Aprender: o card não é título (os títulos de Aprender seguem os mesmos, com "Neste mês" do conteúdo de época, D-053)', JSON.stringify(j1H2) === JSON.stringify(['Neste mês', 'Comece por aqui', 'Usar o Clarevo', 'Organizar o mês', 'Juros e crédito', 'Dinheiro no tempo', 'Dúvidas frequentes']), JSON.stringify(j1H2));
   await j1Keep();
   await j1Widths(async (w) => { await layoutChecks(`tutorial aprender com o guia ${w}px`); await shot(w === 390 ? '320_aprender_como_usar' : '320_aprender_como_usar_320px'); });
 
@@ -9095,6 +9096,229 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const k1Brands = k1Texts.map((x) => x.match(/\b(nubank|ita[uú]|bradesco|santander|c6|sicredi|sicoob|btg|neon|picpay|mercado pago|visa|mastercard|hipercard|amex|serasa)\b/i)?.[0]).filter(Boolean);
   ok('K1 telas do Seu mês, do widget e das entradas: nenhum termo proibido, travessão, expressão vetada, palavra de julgamento nem nome de banco ou de bandeira nos textos da interface', k1Texts.length >= 20 && k1Vetoed.length === 0 && k1Dashes.length === 0 && k1Judging.length === 0 && k1Brands.length === 0, `${k1Texts.length} telas ${k1Vetoed.join(' | ')} ${k1Judging.join(' | ')} ${k1Brands.join(' | ')}`);
   ok('K1 nenhuma escrita direta na rede (o Seu mês e o interruptor do widget só leem e guardam no aparelho; a demonstração e as contas novas ficam em memória)', writes.slice(k1Writes0).length === 0, writes.slice(k1Writes0).join(' | '));
+
+  // ==================================================================================================================
+  // Conteúdo de época (D-053) · Ciclo K2 (docs/08 §5 item 13; Enzo: "sim" à ordem). Aqui, na versão web: (1) em Aprender, o card
+  // "Neste mês" (título de nível 2, legenda "Temas para outubro") entre "Calculadoras" e "Comece por aqui", com os temas do mês de
+  // hoje (07/10/2026: 13º salário e Contas que chegam uma vez por ano) e a calculadora "Cota única ou parcelado?"; (2) os quatro
+  // temas novos (13º salário, férias, volta às aulas e Declaração do Imposto de Renda): exemplos, "Ver a conta", fontes com data de
+  // consulta de 15/10/2026, "Revisado em", a calculadora de férias e os relacionados; (3) a busca troca o card pelos resultados e
+  // o card volta ao limpar; (4) o guia (D-049) ganhou o passo; (5) conta nova vê o mesmo card (conteúdo público, nada de exemplo da
+  // pessoa); (6) nada é gravado, nada vai para a rede e nenhuma notificação é pedida. Só leitura. Capturas 380 a 388. Hoje é
+  // 07/10/2026 (a versão web usa sempre a data da demonstração); os outros meses e o card que some em agosto e setembro são
+  // conferidos em packages/core/test/learn-epoca.test.ts.
+  // ==================================================================================================================
+  const k2Writes0 = writes.length;
+  const k2Texts = [];
+  // Textos guardados: a tela inteira (termos proibidos e travessões) e o que é do conteúdo de época (julgamento, produto e gênero); na lista de
+  // Aprender, só o card "Neste mês", porque o resto da lista são os outros temas do catálogo, conferidos no bloco de Aprender.
+  const k2Own = [];
+  const k2Keep = async (list = false) => {
+    const x = await body(); k2Texts.push(x); screenTexts.push(x);
+    k2Own.push(list ? x.slice(Math.max(0, x.indexOf('Neste mês')), x.indexOf('Comece por aqui') < 0 ? undefined : x.indexOf('Comece por aqui')) : x);
+    return x;
+  };
+  const k2Path = () => new URL(p.url()).pathname;
+  const k2Store = () => p.evaluate(() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]));
+  const k2Notification = () => p.evaluate(() => (typeof Notification === 'undefined' ? 'indisponível' : Notification.permission));
+  const k2Tab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
+  const k2Plain = async () => (await body()).replace(/\s+/g, ' ');
+  const k2Requests = [];
+  const k2OnRequest = (r) => { if (!r.url().startsWith('data:') && !r.url().startsWith(`http://localhost:${PORT}`)) k2Requests.push(r.url()); };
+  p.on('request', k2OnRequest);
+  // Os três tamanhos de tela: confere a largura e os alvos de toque e captura em 390, 360 e 320 px (ou só nos pedidos).
+  const k2Shots = async (name, sizes = [390, 360, 320], scroll = null) => {
+    for (const [w, h, suffix] of [[390, 844, ''], [360, 740, '_360px'], [320, 800, '_320px']]) {
+      if (!sizes.includes(w)) continue;
+      await p.setViewportSize({ width: w, height: h }); await p.waitForTimeout(450);
+      if (scroll) await scroll();
+      await layoutChecks(`${name} ${w}px`);
+      await shot(`${name}${suffix}`);
+    }
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  };
+  // Os sites das fontes não abrem aqui: window.open só anota o endereço pedido (como no bloco de Aprender).
+  const k2StubOpen = () => p.evaluate(() => { window.__opened = []; window.__realOpen = window.__realOpen ?? window.open; window.open = (u) => { window.__opened.push(String(u)); return null; }; });
+  // Cada fonte da página aberta: papel de link, "Consultada em 15/10/2026" no nome e endereço oficial permitido.
+  const k2Sources = async (slug) => {
+    const links = p.getByRole('link').filter({ visible: true });
+    const n = await links.count();
+    const bad = [];
+    for (let i = 0; i < n; i++) {
+      const name = await links.nth(i).getAttribute('aria-label');
+      await links.nth(i).click();
+      const url = await p.evaluate(() => window.__opened[window.__opened.length - 1] ?? '');
+      if (!allowedSourceUrl(url, slug) || !(name ?? '').includes('Consultada em 15/10/2026')) bad.push(`${url} (${name})`);
+    }
+    return { n, bad };
+  };
+  const k2H1s = () => p.evaluate(() => [...document.querySelectorAll('h1')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
+  const k2Row13 = '13º salário. Duas parcelas, o proporcional e os descontos. Leitura de 2 minutos.';
+  const k2RowContas = 'Contas que chegam uma vez por ano. IPVA, IPTU, matrícula e material escolar. Leitura de 2 minutos.';
+  const k2RowCalc = 'Cota única ou parcelado? Descubra os juros embutidos no parcelamento da conta do ano';
+  const k2RowFerias = 'Férias: pagamento, um terço e abono. O que a lei prevê para quem tem carteira assinada. Leitura de 2 minutos.';
+  const k2RowVolta = 'Volta às aulas: mensalidade e material. O que a lei diz sobre a anuidade e a lista de material. Leitura de 2 minutos.';
+  const k2RowIR = 'Declaração do Imposto de Renda. Prazo, informe de rendimentos e pagamento em quotas. Leitura de 2 minutos.';
+
+  // ---- 1. Demonstração (07/10/2026): o card "Neste mês" entre "Calculadoras" e "Comece por aqui" ----
+  await j1Demo();
+  const k2Store0 = await k2Store();
+  const k2Notification0 = await k2Notification();
+  await k2Tab('Aprender e dúvidas').click(); await waitText('Neste mês'); await p.waitForTimeout(400);
+  t = await k2Keep(true);
+  const k2Order = ['Como usar o Clarevo', 'Calculadoras', 'Neste mês', 'Comece por aqui', 'Ir para', ...LEARN_SECTIONS].map((x) => t.indexOf(x));
+  ok('K2 Aprender: o card "Neste mês" vem depois de "Como usar o Clarevo" e de "Calculadoras" e antes de "Comece por aqui", dos atalhos e das seções', k2Order.every((v, i, a) => v >= 0 && (i === 0 || v > a[i - 1])), k2Order.join(','));
+  ok('K2 Aprender: "Neste mês" é título de nível 2, e os títulos de Aprender são os de sempre mais ele', JSON.stringify(await learnH2()) === JSON.stringify(['Neste mês', 'Comece por aqui', ...LEARN_SECTIONS]), JSON.stringify(await learnH2()));
+  ok('K2 Aprender (outubro): a legenda diz "Temas para outubro"', t.includes('Neste mês\nTemas para outubro'), t.slice(t.indexOf('Neste mês') - 20, t.indexOf('Neste mês') + 120));
+  const k2Rows = await cardButtons('Neste mês');
+  ok('K2 Aprender (outubro): o card tem 13º salário, Contas que chegam uma vez por ano e a calculadora "Cota única ou parcelado?", cada linha com o nome acessível completo', JSON.stringify(k2Rows) === JSON.stringify([k2Row13, k2RowContas, k2RowCalc]), JSON.stringify(k2Rows));
+  ok('K2 Aprender: sem símbolo C, sem nada anotado pela pessoa (só conteúdo público) e o rodapé educativo segue', (await symbolCount()) === 0 && t.includes('Conteúdo educativo e geral, com exemplos fictícios. O Clarevo não oferece crédito nem indica investimentos.'));
+  await k2Shots('380_aprender_neste_mes', [390, 360, 320], () => scrollTo('Calculadoras'));
+  await k2Tab('Aprender e dúvidas').click(); await p.waitForTimeout(300);
+
+  // ---- 2. O 13º salário, aberto pelo card: exemplo, "Ver a conta", fontes e "Voltar para Aprender" ----
+  await scrollTo('Neste mês');
+  await p.getByRole('button', { name: k2Row13, exact: true }).filter({ visible: true }).first().click(); await waitText('Voltar para Aprender'); await p.waitForTimeout(400);
+  await k2StubOpen();
+  t = await k2Keep();
+  let k2 = await k2Plain();
+  ok('K2 13º salário: título de nível 1 "13º salário" (depois do "Aprender" do cabeçalho), "Organizar o mês · 2 min de leitura" e o subtítulo', JSON.stringify(await k2H1s()) === JSON.stringify(['Aprender', '13º salário']) &&
+    t.includes('Organizar o mês · 2 min de leitura') && t.includes('Duas parcelas, o proporcional e os descontos'), JSON.stringify(await k2H1s()));
+  ok('K2 13º salário: os prazos da lei (entre fevereiro e 30 de novembro; até 20 de dezembro), o proporcional (1/12 por mês, 15 dias ou mais) e os descontos só na segunda parcela', k2.includes('entre fevereiro e 30 de novembro') && k2.includes('até 20 de dezembro') &&
+    k2.includes('1/12 da remuneração por mês de serviço') && k2.includes('uma fração de 15 dias ou mais conta como mês inteiro') && k2.includes('A primeira parcela sai sem desconto. Na segunda entram o INSS e o Imposto de Renda.') &&
+    k2.includes('Confira os prazos do ano no site do Ministério do Trabalho e Emprego') && k2.includes('O Clarevo não calcula os descontos'), k2.slice(0, 300));
+  ok('K2 13º salário: o exemplo com R$ 3.000,00, R$ 1.500,00, R$ 250,00 e R$ 1.750,00 (7 meses) e as hipóteses fictícias', k2.includes('R$ 3.000,00') && k2.includes('a primeira parcela é de R$ 1.500,00 e a segunda, de R$ 1.500,00 antes dos descontos') &&
+    k2.includes('o proporcional é de R$ 250,00 por mês, ou R$ 1.750,00 no total') && k2.includes('Hipóteses do exemplo') && k2.includes('Exemplo fictício: salário fixo de R$ 3.000,00'), k2.slice(k2.indexOf('Exemplo') - 10, k2.indexOf('Exemplo') + 300));
+  await btn('Ver a conta').click(); await waitText('250,00 × 7 = 1.750,00'); t = await k2Keep();
+  ok('K2 13º salário: "Ver a conta" mostra os quatro passos, até 250,00 × 7 = 1.750,00', ['3.000,00 ÷ 2 = 1.500,00', '3.000,00 − 1.500,00 = 1.500,00', '3.000,00 ÷ 12 = 250,00', '250,00 × 7 = 1.750,00'].every((x) => t.includes(x)));
+  ok('K2 13º salário: sem a seção "No Clarevo" (nenhuma calculadora nem tela ligada)', !t.includes('No Clarevo') && !t.includes('Fazer a conta com os seus números'));
+  ok('K2 13º salário: "Temas relacionados" com Férias, Declaração do Imposto de Renda e Contas que chegam uma vez por ano, nessa ordem', JSON.stringify((await cardButtons('Temas relacionados')).map((x) => x.split('. ')[0])) ===
+    JSON.stringify(['Férias: pagamento, um terço e abono', 'Declaração do Imposto de Renda', 'Contas que chegam uma vez por ano']), JSON.stringify(await cardButtons('Temas relacionados')));
+  ok('K2 13º salário: "Revisado em 15/10/2026" e cada fonte com "Consultada em 15/10/2026"', t.includes('Revisado em 15/10/2026') && (t.match(/Consultada em 15\/10\/2026/g) ?? []).length === 6 && t.includes('Clarevo: D-011, D-053'));
+  const k2Src13 = await k2Sources('decimo-terceiro');
+  ok('K2 13º salário: seis fontes oficiais com papel de link, "Consultada em 15/10/2026" e domínio permitido (Ministério do Trabalho, Planalto, INSS e Receita)', k2Src13.n === 6 && k2Src13.bad.length === 0, `${k2Src13.n} ${k2Src13.bad.join(' | ')}`);
+  await k2Shots('381_epoca_decimo_terceiro', [390, 360, 320], () => scrollTo('13º salário'));
+  await scrollTo('Fontes'); await shot('382_epoca_decimo_terceiro_fontes');
+  // Relacionado troca a explicação no lugar: Férias, e "Voltar para Aprender" ainda leva à aba.
+  await p.getByRole('button', { name: k2RowFerias, exact: true }).filter({ visible: true }).first().click(); await waitText('Fazer a conta com os seus números'); await p.waitForTimeout(400);
+  await k2StubOpen();
+  t = await k2Keep(); k2 = await k2Plain();
+  ok('K2 Férias: título de nível 1 "Férias: pagamento, um terço e abono" e o subtítulo da lei', JSON.stringify(await k2H1s()) === JSON.stringify(['Aprender', 'Férias: pagamento, um terço e abono']) && t.includes('O que a lei prevê para quem tem carteira assinada'), JSON.stringify(await k2H1s()));
+  ok('K2 Férias: 30 dias, um terço, pagamento até dois dias antes, abono até 15 dias antes do fim do período aquisitivo, até três períodos (um de 14 dias) e o 13º junto com as férias', k2.includes('São 30 dias corridos para quem não faltou mais de cinco vezes sem justificativa') &&
+    k2.includes('com pelo menos um terço a mais que o salário normal') && k2.includes('O pagamento das férias deve ser feito até dois dias antes do início') && k2.includes('até 15 dias antes do fim do período aquisitivo') &&
+    k2.includes('até três períodos, e um deles precisa ter pelo menos 14 dias corridos') && k2.includes('se a pessoa pedir em janeiro'), k2.slice(0, 300));
+  ok('K2 Férias: o exemplo R$ 3.000,00 mais R$ 1.000,00 é R$ 4.000,00 antes dos descontos, com a conta e as hipóteses', k2.includes('R$ 3.000,00 mais R$ 1.000,00, ou seja, R$ 4.000,00 antes dos descontos') && k2.includes('Exemplo fictício: salário fixo, 30 dias de férias'));
+  ok('K2 Férias: "No Clarevo" com "Fazer a conta com os seus números", ligado a "Juntar para um objetivo"', t.includes('No Clarevo') && (await visibleCount('button', 'Fazer a conta com os seus números')) === 1);
+  const k2SrcFerias = await k2Sources('ferias');
+  ok('K2 Férias: quatro fontes oficiais com "Consultada em 15/10/2026" e domínio permitido', k2SrcFerias.n === 4 && k2SrcFerias.bad.length === 0, `${k2SrcFerias.n} ${k2SrcFerias.bad.join(' | ')}`);
+  await k2Shots('383_epoca_ferias', [390, 320], () => scrollTo('Férias: pagamento, um terço e abono'));
+  await btn('Fazer a conta com os seus números').click(); await waitText('Simulação com os valores e as taxas que você informou.'); await p.waitForTimeout(400);
+  ok('K2 Férias: a calculadora "Juntar para um objetivo" abre (/calcular/juntar-para-objetivo)', k2Path() === '/calcular/juntar-para-objetivo' && (await h1Name()) === 'Juntar para um objetivo', `${k2Path()} ${await h1Name()}`);
+  await btn('Voltar').click(); await waitText('Voltar para Aprender');
+  await btn('Voltar para Aprender').click(); await waitText('Neste mês'); await p.waitForTimeout(300);
+  ok('K2 Férias: "Voltar para Aprender" leva à aba, com o card "Neste mês"', k2Path() === '/aprender' && (await learnH2()).includes('Neste mês'), k2Path());
+
+  // ---- 3. Os outros dois temas novos, abertos pelas linhas de "Organizar o mês" ----
+  await p.getByRole('button', { name: k2RowVolta, exact: true }).filter({ visible: true }).first().click(); await waitText('Voltar para Aprender'); await p.waitForTimeout(400);
+  await k2StubOpen();
+  t = await k2Keep(); k2 = await k2Plain();
+  ok('K2 Volta às aulas: título de nível 1 e a lei da anuidade (12 parcelas iguais, 45 dias antes do fim da matrícula), os itens de uso coletivo (Lei 12.886/2013) e os Procons', JSON.stringify(await k2H1s()) === JSON.stringify(['Aprender', 'Volta às aulas: mensalidade e material']) &&
+    k2.includes('é dividido em 12 parcelas mensais iguais, ou em 6, no caso de semestralidade') && k2.includes('pelo menos 45 dias antes do fim do prazo de matrícula') && k2.includes('Itens de uso coletivo, como material de limpeza e de escritório, não podem entrar na lista') &&
+    k2.includes('Lei 12.886/2013') && k2.includes('Segundo os Procons, a escola também não escolhe a marca nem o local de compra'), k2.slice(0, 300));
+  ok('K2 Volta às aulas: o exemplo R$ 14.400,00 em 12 parcelas de R$ 1.200,00 e, com R$ 600,00 de material, R$ 1.800,00', k2.includes('anuidade de R$ 14.400,00 em 12 parcelas iguais, cada parcela é de R$ 1.200,00') && k2.includes('lista de material custar R$ 600,00') && k2.includes('as saídas desse mês somam R$ 1.800,00'));
+  const k2SrcVolta = await k2Sources('volta-as-aulas');
+  ok('K2 Volta às aulas: quatro fontes (Câmara dos Deputados, Procon de Mato Grosso e Prefeitura de Sinop) com "Consultada em 15/10/2026" e domínio permitido', k2SrcVolta.n === 4 && k2SrcVolta.bad.length === 0, `${k2SrcVolta.n} ${k2SrcVolta.bad.join(' | ')}`);
+  await k2Shots('384_epoca_volta_as_aulas', [390, 320], () => scrollTo('Volta às aulas: mensalidade e material'));
+  await btn('Voltar para Aprender').click(); await waitText('Neste mês'); await p.waitForTimeout(300);
+  await p.getByRole('button', { name: k2RowIR, exact: true }).filter({ visible: true }).first().click(); await waitText('Voltar para Aprender'); await p.waitForTimeout(400);
+  await k2StubOpen();
+  t = await k2Keep(); k2 = await k2Plain();
+  ok('K2 Imposto de Renda: título de nível 1 e o prazo de 2026 dito como fato do ano, com "Confira a data oficial do ano no site da Receita" e sem data do ano seguinte', JSON.stringify(await k2H1s()) === JSON.stringify(['Aprender', 'Declaração do Imposto de Renda']) &&
+    k2.includes('em 2026, o prazo foi de 23 de março a 29 de maio') && k2.includes('Confira a data oficial do ano no site da Receita') && !/2027|2028/.test(k2.split('Fontes')[0]), k2.slice(0, 300));
+  ok('K2 Imposto de Renda: a multa (1% ao mês ou fração, mínimo de R$ 165,74 e máximo de 20%) e as quotas (até 8, nenhuma menor que R$ 50,00, imposto abaixo de R$ 100,00 de uma vez)', k2.includes('Quem precisa declarar e entrega depois do prazo paga multa de 1% ao mês ou fração de atraso sobre o imposto devido, com mínimo de R$ 165,74 e máximo de 20% do imposto') &&
+    k2.includes('dividido em até 8 quotas mensais, e nenhuma quota pode ser menor que R$ 50,00') && k2.includes('Imposto menor que R$ 100,00 é pago de uma só vez') && k2.includes('A primeira quota, paga no prazo, não tem juros'));
+  ok('K2 Imposto de Renda: o exemplo R$ 1.200,00 em 8 quotas de R$ 150,00 e o aviso de que o Clarevo não calcula nem entrega a declaração', k2.includes('Com imposto a pagar de R$ 1.200,00, a quota única é de R$ 1.200,00. Em 8 quotas, cada uma é de R$ 150,00') && k2.includes('O Clarevo não calcula nem entrega a declaração'));
+  const k2SrcIR = await k2Sources('imposto-de-renda');
+  ok('K2 Imposto de Renda: seis fontes oficiais (Receita Federal e Planalto) com "Consultada em 15/10/2026" e domínio permitido', k2SrcIR.n === 6 && k2SrcIR.bad.length === 0, `${k2SrcIR.n} ${k2SrcIR.bad.join(' | ')}`);
+  await btn('Ver a conta').click(); await waitText('24 quotas possíveis, limitadas a 8'); t = await k2Keep();
+  ok('K2 Imposto de Renda: "Ver a conta" mostra 1.200,00 ÷ 8 = 150,00 e o limite de 8 quotas', t.includes('1.200,00 ÷ 8 = 150,00') && t.includes('1.200,00 ÷ 50,00 = 24 quotas possíveis, limitadas a 8'));
+  await k2Shots('385_epoca_imposto_de_renda', [390, 320], () => scrollTo('Declaração do Imposto de Renda'));
+  await btn('Voltar para Aprender').click(); await waitText('Neste mês'); await p.waitForTimeout(300);
+
+  // ---- 4. As outras duas linhas do card: Contas que chegam uma vez por ano e a calculadora "Cota única ou parcelado?" ----
+  await scrollTo('Neste mês');
+  await p.getByRole('button', { name: k2RowContas, exact: true }).filter({ visible: true }).first().click(); await waitText('Voltar para Aprender'); await p.waitForTimeout(300);
+  ok('K2 card: a linha "Contas que chegam uma vez por ano" abre a explicação (/explicacao/contas-do-ano) com "Voltar para Aprender"', k2Path() === '/explicacao/contas-do-ano' && JSON.stringify(await k2H1s()) === JSON.stringify(['Aprender', 'Contas que chegam uma vez por ano']), k2Path());
+  await btn('Voltar para Aprender').click(); await waitText('Neste mês'); await p.waitForTimeout(300);
+  await scrollTo('Neste mês');
+  await p.getByRole('button', { name: k2RowCalc, exact: true }).filter({ visible: true }).first().click(); await waitText('Simulação com os valores e as taxas que você informou.'); await p.waitForTimeout(500);
+  t = await k2Keep();
+  ok('K2 card: a calculadora abre em /calcular/parcelado-ou-a-vista?modo=cota-unica com o título "Cota única ou parcelado?"', k2Path() === '/calcular/parcelado-ou-a-vista' && new URL(p.url()).searchParams.get('modo') === 'cota-unica' && (await h1Name()) === 'Cota única ou parcelado?', `${p.url()} ${await h1Name()}`);
+  await shot('386_epoca_calculadora_cota_unica');
+  await btn('Voltar').click(); await waitText('Neste mês'); await p.waitForTimeout(300);
+  ok('K2 card: "Voltar" da calculadora devolve a aba Aprender com o card', k2Path() === '/aprender' && (await learnH2()).includes('Neste mês'), k2Path());
+
+  // ---- 5. Busca: os resultados substituem o card, e o card volta ao limpar ----
+  const k2Box = () => p.getByLabel('Buscar um tema ou uma função', { exact: true }).filter({ visible: true }).first();
+  await k2Box().scrollIntoViewIfNeeded();
+  await k2Box().fill('férias'); await waitText('para "férias"'); await p.waitForTimeout(500);
+  let k2Found = await topicRows();
+  ok('K2 busca "férias": o primeiro resultado é "Férias: pagamento, um terço e abono" e o card "Neste mês" some', k2Found[0] === k2RowFerias && !(await learnH2()).includes('Neste mês') && !(await body()).includes('Comece por aqui'), JSON.stringify(k2Found.slice(0, 3)));
+  await shot('387_aprender_busca_ferias');
+  for (const [query, first] of [['13º', k2Row13], ['décimo terceiro', k2Row13], ['imposto de renda', k2RowIR], ['volta às aulas', k2RowVolta], ['abono pecuniário', k2RowFerias]]) {
+    await k2Box().fill(query); await waitText(`para "${query}"`); await p.waitForTimeout(350);
+    k2Found = await topicRows();
+    ok(`K2 busca "${query}": o primeiro resultado é o tema de época certo`, k2Found[0] === first, JSON.stringify(k2Found.slice(0, 3)));
+  }
+  await k2Box().fill('matrícula'); await waitText('para "matrícula"'); await p.waitForTimeout(350);
+  k2Found = await topicRows();
+  ok('K2 busca "matrícula": acha Contas que chegam uma vez por ano e Volta às aulas', k2Found.includes(k2RowContas) && k2Found.includes(k2RowVolta), JSON.stringify(k2Found.slice(0, 4)));
+  await k2Box().fill(''); await waitText('Neste mês'); await p.waitForTimeout(400);
+  ok('K2 busca: ao limpar, o card "Neste mês" volta com as mesmas três linhas', JSON.stringify(await cardButtons('Neste mês')) === JSON.stringify([k2Row13, k2RowContas, k2RowCalc]), JSON.stringify(await cardButtons('Neste mês')));
+
+  // ---- 6. O guia (D-049): a entrada "Aprender" ganhou o passo ----
+  await p.getByRole('button', { name: 'Como usar o Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
+  await p.getByRole('button', { name: /^Aprender\. Explicações curtas sobre contas, juros e o próprio Clarevo/ }).filter({ visible: true }).first().click(); await waitText('Para que serve'); await p.waitForTimeout(400);
+  t = await k2Keep();
+  ok('K2 guia: a entrada "Aprender" tem o passo "Neste mês" (13º salário, volta às aulas, Imposto de Renda e férias, e o card que some nos meses sem tema) e seis passos', k2Path() === '/aprender/guia/aprender' &&
+    t.includes('Em "Neste mês", veja os temas do mês: 13º salário e contas do começo do ano no fim do ano, volta às aulas no começo, Imposto de Renda de fevereiro a maio e férias em junho e julho. O card some nos meses sem tema.') &&
+    (await p.locator('[aria-label^="Passo "]').filter({ visible: true }).count()) === 6, `${k2Path()} ${t.slice(0, 200)}`);
+  await shot('388_guia_aprender_neste_mes');
+  await btn('Voltar').click(); await waitText('Ver o tour de novo');
+  await btn('Voltar').click(); await waitText('Neste mês');
+
+  // ---- 7. Conta nova: o mesmo card (conteúdo público; nada de exemplo da pessoa) ----
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await btn('Criar conta').click(); await waitText('Nome de apresentação');
+  await field('Nome de apresentação').fill('Kai Época'); await field('E-mail').fill('kai.epoca@exemplo.com'); await field('Senha').fill('senha1234');
+  await btn('Criar conta').click(); await waitText('Confira seu e-mail');
+  await btn('Simular abertura do link').click(); await btn('Já confirmei meu e-mail').click(); await waitText('Sua primeira conta');
+  await btn('Começar meu mês').click(); await waitText('Diferença do mês'); await p.waitForTimeout(600);
+  await k2Tab('Aprender e dúvidas').click(); await waitText('Neste mês'); await p.waitForTimeout(400);
+  t = await k2Keep(true);
+  ok('K2 conta nova: Aprender mostra o mesmo card "Neste mês", "Temas para outubro" e as três linhas, sem valor da pessoa', JSON.stringify(await cardButtons('Neste mês')) === JSON.stringify([k2Row13, k2RowContas, k2RowCalc]) && t.includes('Temas para outubro') && !/R\$ \d/.test(t), JSON.stringify(await cardButtons('Neste mês')));
+  await k2Tab('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
+  ok('K2 conta nova: o Resumo segue como era (sem "Neste mês")', !(await body()).includes('Neste mês'));
+
+  // ---- 8. Demonstração de novo: o Resumo e os totais não mudam; nada gravado, nada na rede, nenhuma notificação ----
+  await j1Demo();
+  ok('K2 Resumo da demonstração: os títulos e os blocos são os de antes (D-022), sem "Neste mês"', JSON.stringify(await headingList()) === k1ResumoHeadings && !(await body()).includes('Neste mês'), JSON.stringify(await headingList()));
+  await expectTotals('K2 demonstração: outubro segue 6.000 / 3.900 / 2.100 e 650 depois do conteúdo de época', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  p.off('request', k2OnRequest);
+  ok('K2 nenhuma requisição para fora do servidor local (o card e os temas vêm do aparelho)', k2Requests.length === 0, k2Requests.slice(0, 3).join(' | '));
+  ok('K2 nada foi guardado no aparelho (localStorage e sessionStorage iguais) e nenhuma notificação foi pedida', (await k2Store()) === (await p.evaluate(() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]))) && (await k2Notification()) === k2Notification0 && k2Notification0 !== 'granted', `${k2Notification0}`);
+  ok('K2 o armazenamento do aparelho segue como no começo do bloco (a demonstração recarregada não guarda nada de Aprender)', (await k2Store()) === k2Store0, `${await k2Store()} | ${k2Store0}`);
+
+  // ---- 9. Textos e escritas ----
+  const k2Shown = k2Own.map((x) => x.split('\nFontes\n')[0] + '\n' + (x.split('Revisado em')[1] ?? ''));
+  const k2Vetoed = k2Texts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(VETOED)?.[0]).filter(Boolean);
+  const k2Dashes = k2Texts.map((x) => x.match(/[–—]/)?.[0]).filter(Boolean);
+  const k2Learn = k2Shown.map((x) => x.match(LEARN_FORBIDDEN)?.[0]).filter(Boolean);
+  const k2Judging = k2Shown.map((x) => x.match(/\b(gast\w+ demais|estour\w*|cuidado|desperd[ií]cio|vale a pena|aproveite|corra|urgente|alerta|perigo|parab[eé]ns|incr[ií]vel)\b|\busuári[oa]s?\b|\bbem-vind[oa]\b|\b(o|a)s? (empregad[oa]|trabalhador)\w*/i)?.[0]).filter(Boolean);
+  const k2Products = k2Shown.map((x) => x.match(/empr[eé]stimo|financiamento|consignado|investimento|cart[aã]o de cr[eé]dito|cr[eé]dito pessoal|\bcdb\b|tesouro/i)?.[0]).filter(Boolean);
+  ok('K2 telas do conteúdo de época (Aprender, os quatro temas, o guia): nenhum termo proibido, travessão, expressão vetada, palavra de julgamento, produto financeiro nem nome de banco ou de bandeira nos textos da interface (as fontes ficam fora, menos o travessão)',
+    k2Texts.length >= 8 && k2Vetoed.length === 0 && k2Dashes.length === 0 && k2Learn.length === 0 && k2Judging.length === 0 && k2Products.length === 0, `${k2Texts.length} telas ${k2Vetoed.join(' | ')} ${k2Learn.join(' | ')} ${k2Judging.join(' | ')} ${k2Products.join(' | ')}`);
+  ok('K2 nenhuma escrita direta na rede (o card e os temas só leem; a demonstração e as contas novas ficam em memória)', writes.slice(k2Writes0).length === 0, writes.slice(k2Writes0).join(' | '));
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);

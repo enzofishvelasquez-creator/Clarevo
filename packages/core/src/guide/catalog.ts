@@ -11,7 +11,7 @@ import { EXPORT_TEXT } from '../export';
 import { GOALS_TEXT } from '../goals';
 import { IMPORT_TEXT } from '../importar/textos';
 import { LEARN_SECTIONS } from '../learn/sections';
-import { LEARN_UI_TEXT } from '../learn/ui-text';
+import { LEARN_UI_TEXT, SEASONAL_TEXT } from '../learn/ui-text';
 import { GOALS_NAV_TEXT, REMINDERS_SETTINGS_HREF, SUMMARY_NAV_TEXT } from '../navigation';
 import { NOTA_TEXT } from '../nota';
 import { REMINDER_TEXT } from '../reminders';
@@ -560,6 +560,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     where: [TAB.aprender],
     steps: [
       `Em ${q(LEARN_UI_TEXT.startHere)}, leia os três temas para começar.`,
+      `Em ${q(SEASONAL_TEXT.title)}, veja os temas do mês: 13º salário e contas do começo do ano no fim do ano, volta às aulas no começo, Imposto de Renda de fevereiro a maio e férias em junho e julho. O card some nos meses sem tema.`,
       `Use ${q(LEARN_UI_TEXT.goTo)} para pular a uma seção: ${list(
         LEARN_SECTIONS.map((s) => s.title),
         'ou',

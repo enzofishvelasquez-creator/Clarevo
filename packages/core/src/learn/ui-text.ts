@@ -69,6 +69,13 @@ export const LEARN_UI_TEXT = {
   readFull: 'Ler explicação completa',
 } as const;
 
+/** Textos do card "Neste mês" de Aprender (D-053); o calendário e o card ficam em `learn/epoca.ts`. */
+export const SEASONAL_TEXT = {
+  title: 'Neste mês',
+  /** "Temas para outubro". */
+  caption: (monthName: string) => `Temas para ${monthName}`,
+} as const;
+
 /** Todos os textos de LEARN_UI_TEXT e das seções, com as funções chamadas com entradas de exemplo (teste de textos). */
 export function learnUiTextSamples(): string[] {
   const t = LEARN_UI_TEXT;

@@ -13,6 +13,7 @@ import {
   equivalentAnnualRate,
   equivalentMonthlyBp,
   impliedMonthlyRate,
+  incomeTaxQuotas,
   installmentCents,
   iofCents,
   lateChargesCents,
@@ -24,6 +25,9 @@ import {
   sacTotals,
   sharesCents,
   simpleTotalCents,
+  thirteenthCents,
+  thirteenthFirstCents,
+  vacationPayCents,
 } from './math';
 import type { TopicSlug } from './types';
 
@@ -187,6 +191,27 @@ export const EXAMPLE_NUMBERS: Partial<Record<TopicSlug, () => ExampleNumbers>> =
     const g = simulateGrowth({ initial: 0, monthly: 50_000, months: 120, rateBp: 1_000, inflationBp: 450 });
     // 10.072.879, 6.000.000, 4.072.879 e 6.486.205
     return { money: [50_000, g.finalCents, g.contributedCents, g.earningsCents, g.todayValueCents!], bp: [1_000, equivalentMonthlyBp(1_000), 450], tenths: [] };
+  },
+  // Ciclo K2 (D-053), conteúdo de época. Os percentuais e os limites de norma (multa do Imposto de Renda, quotas) ficam nos
+  // `facts` do tema, com a fonte.
+  'decimo-terceiro': () => {
+    const salary = 300_000;
+    const first = thirteenthFirstCents(salary); // 150.000
+    const monthly = roundDiv(salary, 12); // 25.000
+    // R$ 3.000,00 em 7 meses: 175.000.
+    return { money: [salary, first, salary - first, monthly, thirteenthCents(salary, 7)], bp: [] };
+  },
+  ferias: () => {
+    const pay = vacationPayCents(300_000); // 300.000 + 100.000 = 400.000
+    return { money: [300_000, pay.thirdCents, pay.totalCents], bp: [] };
+  },
+  'volta-as-aulas': () => {
+    const parcel = monthlyShareCents(1_440_000, 12); // 120.000
+    return { money: [1_440_000, parcel, 60_000, parcel + 60_000], bp: [] };
+  },
+  'imposto-de-renda': () => {
+    const quotas = incomeTaxQuotas(120_000, 8); // oito de 15.000
+    return { money: [120_000, quotas[0]!], bp: [] };
   },
 };
 

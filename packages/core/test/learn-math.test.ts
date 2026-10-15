@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   IOF_DAILY_PPM,
   IOF_FIXED_PPM,
+  INCOME_TAX_MAX_QUOTAS,
+  INCOME_TAX_MIN_QUOTA_CENTS,
+  INCOME_TAX_SINGLE_PAYMENT_BELOW_CENTS,
   IOF_MAX_DAYS,
   averageCents,
   compoundTotalBig,
@@ -15,6 +18,8 @@ import {
   formatRate,
   formatTenths,
   impliedMonthlyRate,
+  incomeTaxMaxQuotas,
+  incomeTaxQuotas,
   installmentCents,
   iofCents,
   lateChargesCents,
@@ -27,6 +32,10 @@ import {
   sacTotals,
   sharesCents,
   simpleTotalCents,
+  thirteenthCents,
+  thirteenthFirstCents,
+  thirteenthMonthsCount,
+  vacationPayCents,
 } from '../src';
 
 /** 1, 2, …, n. */
@@ -337,5 +346,78 @@ describe('learn/format', () => {
     expect(formatTenths(1_000)).toBe('100%');
     expect(formatInteger(1_234_567)).toBe('1.234.567');
     expect(formatInteger(999)).toBe('999');
+  });
+});
+
+/** Conteúdo de época (D-053): as contas dos exemplos de 13º salário, férias e pagamento do Imposto de Renda em quotas. */
+describe('learn/math: conteúdo de época (D-053)', () => {
+  it('13º proporcional: salário de R$ 3.000,00 e 7 meses = R$ 1.750,00; com 12 meses, o salário inteiro; com 0, nada', () => {
+    expect(thirteenthCents(300_000, 7)).toBe(175_000);
+    expect(thirteenthCents(300_000, 12)).toBe(300_000);
+    expect(thirteenthCents(300_000, 1)).toBe(25_000);
+    expect(thirteenthCents(300_000, 0)).toBe(0);
+    // Divide só no fim: R$ 1.000,00 em 5 meses = 416,666... → R$ 416,67 (metade para cima), não 5 × R$ 83,33.
+    expect(thirteenthCents(100_000, 5)).toBe(41_667);
+    expect(thirteenthCents(100_000, 7)).toBe(58_333);
+    expect(() => thirteenthCents(300_000, 13)).toThrow(RangeError);
+    expect(() => thirteenthCents(300_000, -1)).toThrow(RangeError);
+    expect(() => thirteenthCents(300_000, 1.5)).toThrow(RangeError);
+    expect(() => thirteenthCents(-1, 3)).toThrow(RangeError);
+  });
+
+  it('primeira parcela do 13º: metade do salário do mês anterior, metade para cima; a segunda fecha o valor do ano', () => {
+    expect(thirteenthFirstCents(300_000)).toBe(150_000);
+    expect(300_000 - thirteenthFirstCents(300_000)).toBe(150_000);
+    expect(thirteenthFirstCents(300_001)).toBe(150_001);
+    expect(thirteenthFirstCents(0)).toBe(0);
+    expect(() => thirteenthFirstCents(-1)).toThrow(RangeError);
+  });
+
+  it('meses do 13º: 15 dias ou mais contam o mês inteiro, 14 dias ou menos não contam', () => {
+    expect(thirteenthMonthsCount([31, 28, 31, 30, 31, 30, 14])).toBe(6);
+    expect(thirteenthMonthsCount([31, 28, 31, 30, 31, 30, 15])).toBe(7);
+    expect(thirteenthMonthsCount([])).toBe(0);
+    expect(thirteenthMonthsCount([0, 14, 14])).toBe(0);
+    expect(() => thirteenthMonthsCount([32])).toThrow(RangeError);
+    expect(() => thirteenthMonthsCount([-1])).toThrow(RangeError);
+  });
+
+  it('férias: salário de R$ 3.000,00 e 30 dias = R$ 3.000,00 mais R$ 1.000,00 = R$ 4.000,00', () => {
+    expect(vacationPayCents(300_000)).toEqual({ baseCents: 300_000, thirdCents: 100_000, totalCents: 400_000 });
+    // 20 dias: 2.000,00 mais 666,67 (metade para cima).
+    expect(vacationPayCents(300_000, 20)).toEqual({ baseCents: 200_000, thirdCents: 66_667, totalCents: 266_667 });
+    expect(vacationPayCents(300_000, 10)).toEqual({ baseCents: 100_000, thirdCents: 33_333, totalCents: 133_333 });
+    expect(vacationPayCents(0).totalCents).toBe(0);
+    expect(() => vacationPayCents(300_000, 31)).toThrow(RangeError);
+    expect(() => vacationPayCents(300_000, 0)).toThrow(RangeError);
+    expect(() => vacationPayCents(-1)).toThrow(RangeError);
+  });
+
+  it('Imposto de Renda em quotas: até 8, nenhuma abaixo de R$ 50,00, imposto abaixo de R$ 100,00 numa só vez', () => {
+    expect([INCOME_TAX_MAX_QUOTAS, INCOME_TAX_MIN_QUOTA_CENTS, INCOME_TAX_SINGLE_PAYMENT_BELOW_CENTS]).toEqual([8, 5_000, 10_000]);
+    expect(incomeTaxMaxQuotas(0)).toBe(0);
+    expect(incomeTaxMaxQuotas(9_999)).toBe(1);
+    expect(incomeTaxMaxQuotas(10_000)).toBe(2);
+    expect(incomeTaxMaxQuotas(14_999)).toBe(2);
+    expect(incomeTaxMaxQuotas(32_000)).toBe(6);
+    expect(incomeTaxMaxQuotas(40_000)).toBe(8);
+    expect(incomeTaxMaxQuotas(120_000)).toBe(8);
+    expect(incomeTaxMaxQuotas(100_000_000)).toBe(8);
+  });
+
+  it('quotas iguais: R$ 1.200,00 em 8 = oito de R$ 150,00; os centavos que sobram vão para as primeiras; a soma fecha', () => {
+    expect(incomeTaxQuotas(120_000, 8)).toEqual(Array(8).fill(15_000));
+    expect(incomeTaxQuotas(120_000, 1)).toEqual([120_000]);
+    expect(incomeTaxQuotas(10_001, 2)).toEqual([5_001, 5_000]);
+    const q = incomeTaxQuotas(32_001, 6);
+    expect(q.reduce((a, b) => a + b, 0)).toBe(32_001);
+    expect(q).toEqual([5_334, 5_334, 5_334, 5_333, 5_333, 5_333]);
+    expect(Math.min(...q)).toBeGreaterThanOrEqual(INCOME_TAX_MIN_QUOTA_CENTS);
+    // Mais quotas que o permitido, imposto abaixo de R$ 100,00 em duas quotas e quotas zero ou fracionadas: recusados.
+    expect(() => incomeTaxQuotas(120_000, 9)).toThrow(RangeError);
+    expect(() => incomeTaxQuotas(9_999, 2)).toThrow(RangeError);
+    expect(() => incomeTaxQuotas(32_000, 7)).toThrow(RangeError);
+    expect(() => incomeTaxQuotas(120_000, 0)).toThrow(RangeError);
+    expect(() => incomeTaxQuotas(120_000, 2.5)).toThrow(RangeError);
   });
 });

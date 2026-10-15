@@ -2,13 +2,22 @@ import { LEARN_SECTIONS } from '../sections';
 import type { LearnSection, Topic, TopicCalculatorLink, TopicSlug } from '../types';
 import { TOPIC_SLUGS } from '../types';
 import { DUVIDAS_TOPICS } from './duvidas';
+import { EPOCA_TOPICS } from './epoca';
 import { JUROS_TOPICS } from './juros';
 import { ORGANIZAR_TOPICS } from './organizar';
 import { TEMPO_TOPICS } from './tempo';
 import { USAR_TOPICS } from './usar';
 
 /** Catálogo completo (publicados e rascunhos), na ordem de TOPIC_SLUGS. */
-export const TOPICS: readonly Topic[] = [...USAR_TOPICS, ...ORGANIZAR_TOPICS, ...JUROS_TOPICS, ...TEMPO_TOPICS, ...DUVIDAS_TOPICS];
+export const TOPICS: readonly Topic[] = [
+  ...USAR_TOPICS,
+  ...ORGANIZAR_TOPICS,
+  // Temas de época (D-053): também da seção "Organizar o mês", logo depois dos outros dessa seção.
+  ...EPOCA_TOPICS,
+  ...JUROS_TOPICS,
+  ...TEMPO_TOPICS,
+  ...DUVIDAS_TOPICS,
+];
 
 const BY_SLUG = new Map<string, Topic>(TOPICS.map((t) => [t.slug, t]));
 const BY_ALIAS = new Map<string, Topic>(TOPICS.flatMap((t) => (t.aliases ?? []).map((a) => [a, t] as const)));
