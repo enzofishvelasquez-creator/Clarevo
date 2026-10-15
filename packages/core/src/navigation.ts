@@ -69,7 +69,7 @@ export function barModeFor(pathname: string): BarMode {
 
 /** Abas que uma tela de consulta abre quando a pessoa não veio de nenhuma (endereço aberto direto): a do assunto. */
 const TAB_OF_TOPIC: readonly [RegExp, TabRoute][] = [
-  [/^\/(a-pagar|gastos-fixos|cartoes|registro|orcamento|movimentacoes|importar)(\/|$)/, '/movimentacoes'],
+  [/^\/(a-pagar|gastos-fixos|cartoes|registro|orcamento|movimentacoes|importar|seu-mes)(\/|$)/, '/movimentacoes'],
   [/^\/(meta|reserva|guardar|simular|renda-comprometida)(\/|$)/, '/metas'],
   [/^\/(explicacao|aprender)(\/|$)/, '/aprender'],
 ];
@@ -298,6 +298,14 @@ export const APP_SCREENS: readonly AppScreen[] = [
     caption: 'Achar um gasto ou recebimento em todos os meses e ver quanto deu no período',
     href: '/movimentacoes/buscar',
     keywords: ['buscar', 'busca', 'procurar', 'pesquisar', 'achar', 'encontrar', 'quanto paguei', 'quanto gastei', 'gasto antigo', 'registro antigo', 'luz'],
+  },
+  {
+    // O título e a legenda são os de SEU_MES_TEXT (seu-mes.ts), conferidos por teste: o arquivo do Seu mês importa este.
+    id: 'seu-mes',
+    title: 'Seu mês em 30 segundos',
+    caption: 'Poucas telas curtas com o que entrou, saiu, vence e foi guardado no mês',
+    href: '/seu-mes',
+    keywords: ['seu mês', 'mês em 30 segundos', '30 segundos', 'revisão do mês', 'balanço do mês', 'o que entrou', 'o que saiu', 'resumo rápido', 'visão do mês'],
   },
   {
     id: 'lembretes',

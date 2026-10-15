@@ -196,6 +196,7 @@ import { GUIDE_ENTRIES, GUIDE_GROUPS, GUIDE_TEXT, HELP_TEXT, MANUAL_TEXT, TOUR_C
 import { COMPROVANTE_TEXT, comprovanteDraft, comprovanteErrorText, comprovanteGaps, comprovanteKindLabel, comprovanteKindPhrase, comprovanteMismatch, comprovanteReadLine, suggestComprovanteDescription } from '../src';
 import type { ComprovanteDirection, ComprovanteKind, ComprovanteReading } from '../src';
 import { SAVED_BEFORE_TEXT } from '../src';
+import { SEU_MES_TEXT, WIDGET_TEXT, buildSeuMes, buildWidgetContent, loadInvoicesOfRecords, seuMesRowA11y, plannedForGoals, savedInMonth, type SeuMesInput } from '../src';
 
 /**
  * Teste de textos (seção 5): sem indicação de produto financeiro, promessa de rendimento, travessões longos
@@ -2522,6 +2523,151 @@ describe('textos de "já tinha sido salvo" (revisão do D-050, CL-03 e CL-19)', 
         expect(t.message, kind).toMatch(/\.$/);
       }
       expect(t.view, kind).toMatch(/^Ver /);
+    }
+  });
+});
+
+describe('textos do widget e de "Seu mês em 30 segundos" (D-052)', () => {
+  const GENDERED = /\b(o|a)s? usuári[oa]s?\b|\bobrigad[oa]s?\b|\bbem-vind[oa]s?\b|\bpreocupad[oa]s?\b|\bendividad[oa]s?\b|\bcadastrad[oa]\b|\(a\)|\(o\)|\bo\/a\b|\bvocê (é|está|ficou) \w+[oa]\b/i;
+  // Sem julgamento nem celebração: o mês é um fato, nunca uma nota. "Alto" e "acima" só no sentido de fato ("acima do orçamento" é do orçamento).
+  const VETOED = /\bdemais\b|\balt[oa]s?\b|\bruim\b|cuidado|estour|gastou|gastão|gastona|exagero|\bculpa|\bperigo|\balerta|\bdeveria\b|\bprecisa(m)? (gastar|cortar)|\bcort(ar|e)\b|\bsupérfluo|parab[eé]ns|\bvoc[eê] conseguiu|incr[ií]vel|arrasou|\bvale a pena\b|\bsaldo disponível\b/i;
+  const BRANDS = /\b(nubank|ita[uú]|bradesco|santander|c6|sicredi|sicoob|btg|neon|picpay|mercado pago|visa|mastercard|hipercard|amex|serasa)\b/i;
+  const check = (texts: string[]) => {
+    expect(texts.length).toBeGreaterThan(0);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(FORBIDDEN_EXPANDED);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(VETOED);
+      expect(text, text).not.toMatch(GENDERED);
+      expect(text, text).not.toMatch(BRANDS);
+      expect(text, text).not.toMatch(/[–—]/);
+    }
+  };
+
+  /** Os cartões de outubro, de setembro e de um mês vazio, mais variações montadas à mão. */
+  async function sampleTexts(): Promise<string[]> {
+    return (await sampleParts()).texts;
+  }
+
+  async function sampleParts(): Promise<{ texts: string[]; details: string[] }> {
+    const repo = await createDemoRepository();
+    const ctx = (await repo.getSpace())!.personalContextId;
+    const goals = await repo.listGoals(ctx);
+    const inputOf = async (month: string, today = DEMO_TODAY): Promise<SeuMesInput> => {
+      const [y, m] = month.split('-').map(Number);
+      const previous = m === 1 ? `${y! - 1}-12` : `${y}-${String(m! - 1).padStart(2, '0')}`;
+      const read = async (mo: string) => {
+        const summary = summarizeMonth(await repo.listRecords(ctx, mo), ctx, mo);
+        return { summary, breakdown: categoryBreakdown(summary.composition.paid, await loadInvoicesOfRecords(repo, summary.composition.paid, today)) };
+      };
+      const cur = await read(month);
+      return {
+        month,
+        today,
+        summary: cur.summary,
+        breakdown: cur.breakdown,
+        previousBreakdown: (await read(previous)).breakdown,
+        toPay: summarizeToPay(await repo.listCommitments(ctx, month), ctx, month, today),
+        budget: summarizeBudget(await repo.getMonthBudget(ctx, month)),
+        goals: { count: goals.length, savedInMonthCents: savedInMonth(await repo.listGoalMovementsInMonth(ctx, month), month), plannedCents: plannedForGoals(goals) },
+      };
+    };
+    const views = [
+      buildSeuMes(await inputOf('2026-10')),
+      buildSeuMes(await inputOf('2026-09')),
+      buildSeuMes(await inputOf('2026-01')),
+    ];
+    const october = await inputOf('2026-10');
+    views.push(
+      buildSeuMes({ ...october, summary: { ...october.summary, receivedCents: 100_000, paidCents: 130_000, differenceCents: -30_000 } }),
+      buildSeuMes({ ...october, goals: { count: 1, savedInMonthCents: -20_000, plannedCents: 0 } }),
+      buildSeuMes({ ...october, budget: { ...october.budget!, rows: october.budget!.rows.map((r) => ({ ...r, level: 0 as const })) } }),
+      buildSeuMes({ ...october, month: '2027-01', today: '2027-01-10' }),
+    );
+    const texts: string[] = [];
+    const details: string[] = [];
+    for (const view of views) {
+      if (view.empty) texts.push(view.empty.title, view.empty.body, view.empty.action.label);
+      for (const card of view.cards) {
+        texts.push(card.title, ...(card.intro ? [card.intro] : []), ...card.notes, ...(card.action ? [card.action.label] : []));
+        for (const row of card.rows) {
+          texts.push(row.label, ...(row.value ? [row.value] : []), ...row.details, seuMesRowA11y(row));
+          details.push(...row.details);
+        }
+      }
+    }
+    return { texts, details };
+  }
+
+  it('SEU_MES_TEXT e WIDGET_TEXT inteiros (as frases fixas) passam nas regras', () => {
+    check(staticStrings(SEU_MES_TEXT));
+    check(staticStrings(WIDGET_TEXT));
+  });
+
+  it('as frases montadas de Seu mês, em todos os cartões e estados, passam nas regras', async () => {
+    const texts = await sampleTexts();
+    expect(texts.length).toBeGreaterThan(80);
+    check([
+      ...texts,
+      SEU_MES_TEXT.progress(2, 5),
+      SEU_MES_TEXT.announce(2, 5, 'Para onde foi'),
+      SEU_MES_TEXT.cards.leftOpen('2026-09', '2026-10'),
+      SEU_MES_TEXT.cards.leftOpen('2025-12', '2026-01'),
+      SEU_MES_TEXT.where.more(15_000, 'setembro'),
+      SEU_MES_TEXT.where.less(8_000, 'dezembro de 2025'),
+      SEU_MES_TEXT.where.same('setembro'),
+      SEU_MES_TEXT.where.none('setembro'),
+      SEU_MES_TEXT.where.others(1),
+      SEU_MES_TEXT.where.others(4),
+      SEU_MES_TEXT.due.overdue(1),
+      SEU_MES_TEXT.due.overdue(3),
+      SEU_MES_TEXT.due.more(1),
+      SEU_MES_TEXT.due.more(4),
+      SEU_MES_TEXT.budget.more(1),
+      SEU_MES_TEXT.budget.more(3),
+      SEU_MES_TEXT.goals.saved('2026-10', '2026-10'),
+      SEU_MES_TEXT.goals.withdrawn('2025-12', '2026-01'),
+      SEU_MES_TEXT.entered.nothingYet('2026-10'),
+      SEU_MES_TEXT.entered.nothingNoted('2026-09'),
+      SEU_MES_TEXT.empty.titleCurrent('2026-10'),
+      SEU_MES_TEXT.empty.titlePast('2026-09'),
+    ]);
+  });
+
+  it('a comparação com o mês anterior é só um fato: "a mais", "a menos", "igual" ou "nada pago", sem julgar', async () => {
+    const texts = (await sampleParts()).details.filter((t) => /que em |Igual a |Nada pago/.test(t));
+    expect(texts.length).toBeGreaterThan(2);
+    for (const text of texts) expect(text, text).toMatch(/^(R\$ [\d.]+,\d{2} a (mais|menos) que em|Igual a|Nada pago nesta categoria em) [a-zç]+( de \d{4})?$/);
+    expect(SEU_MES_TEXT.where.more(15_000, 'setembro')).toBe('R$ 150,00 a mais que em setembro');
+  });
+
+  it('o conteúdo do widget, em todos os estados, com e sem valores, passa nas regras', async () => {
+    const repo = await createDemoRepository();
+    const ctx = (await repo.getSpace())!.personalContextId;
+    const toPay = summarizeToPay(await repo.listCommitments(ctx, '2026-10'), ctx, '2026-10', DEMO_TODAY);
+    const empty = summarizeToPay([], ctx, '2026-10', DEMO_TODAY);
+    const texts: string[] = [];
+    for (const showValues of [true, false]) {
+      for (const demo of [true, false]) {
+        for (const [signedIn, list] of [[true, toPay], [true, empty], [true, null], [false, toPay]] as const) {
+          const { small, medium } = buildWidgetContent({ today: DEMO_TODAY, signedIn, demo, showValues, toPay: list });
+          texts.push(small.label, small.a11y, medium.a11y, ...[medium.title, medium.value, medium.message, medium.overdue, medium.badge, medium.next?.line].filter((t): t is string => t !== null && t !== undefined));
+        }
+      }
+    }
+    check(texts);
+    // O estado vazio e o sem sessão têm as frases pedidas.
+    expect(texts).toContain('Nada em aberto neste mês');
+    expect(texts).toContain('Entre no Clarevo para ver');
+  });
+
+  it('os arquivos-fonte novos do core passam pelas regras de texto', () => {
+    for (const name of ['widget.ts', 'seu-mes.ts']) {
+      const source = readFileSync(join(CORE_SRC, name), 'utf8');
+      expect(source, name).not.toMatch(FORBIDDEN);
+      expect(source, name).not.toMatch(JUDGMENT);
+      expect(source, name).not.toMatch(BRANDS);
     }
   });
 });

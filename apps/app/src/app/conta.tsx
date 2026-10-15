@@ -6,7 +6,7 @@ import { ScrollView, View } from 'react-native';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { AccountsCard } from '@/components/accounts-card';
-import { PrivacyCard, RemindersCard } from '@/components/device-settings';
+import { PrivacyCard, RemindersCard, WidgetCard } from '@/components/device-settings';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { SubHeader } from '@/components/header';
 import { TopicLink } from '@/components/topic-link';
@@ -135,6 +135,7 @@ export default function ContaScreen() {
           <RemindersCard />
         </View>
         <PrivacyCard />
+        <WidgetCard />
 
         <Card style={{ gap: space[3] }}>
           <Txt variant="title" accessibilityRole="header" aria-level={2}>

@@ -18,9 +18,11 @@ import { REMINDER_TEXT } from '../reminders';
 import { RETURN_TEXT } from '../retorno';
 import { SAVINGS_TEXT } from '../savings';
 import { SEARCH_TEXT } from '../search';
+import { SEU_MES_TEXT } from '../seu-mes';
 import { ORGANIZE_TEXT } from '../shortcuts';
 import { SIMULATE_TEXT } from '../simulate';
 import { SUBSCRIPTION_TEXT } from '../subscriptions';
+import { WIDGET_TEXT } from '../widget';
 import { GUIDE_GROUPS, GUIDE_TEXT, HELP_TEXT } from './text';
 import type { GuideEntry, GuideGroup, GuideGroupId, GuideLine, HelpScreen } from './types';
 
@@ -73,6 +75,26 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     keywords: ['resumo', 'mês', 'diferença', 'recebido', 'pago', 'ainda a pagar', 'início', 'tela inicial', 'totais', 'primeiros passos'],
     routes: ['/', '/composicao'],
     screenshot: '06_resumo_demo.png',
+  },
+  {
+    id: 'seu-mes',
+    group: 'dia-a-dia',
+    title: SEU_MES_TEXT.title,
+    purpose: 'Resume o mês em poucos cartões, lidos um por vez: o que entrou e saiu, para onde foi o dinheiro, o que ainda vence, o orçamento e as metas.',
+    where: [TAB.movimentos, SEU_MES_TEXT.title],
+    steps: [
+      `Em Movimentos, logo abaixo de ${q(SEARCH_TEXT.entry)}, toque em ${q(SEU_MES_TEXT.title)}.`,
+      `Leia um cartão por vez: toque em ${q(SEU_MES_TEXT.next)} (ou deslize para o lado) e use ${q(SEU_MES_TEXT.previous)} para voltar. No último cartão, o botão é ${q(SEU_MES_TEXT.finish)}.`,
+      `${q(SEU_MES_TEXT.cards.enteredAndLeft)} mostra ${q(SEU_MES_TEXT.entered.received)}, ${q(SEU_MES_TEXT.entered.paid)} e ${q(SEU_MES_TEXT.entered.difference)}, que não é saldo da conta.`,
+      `${q(SEU_MES_TEXT.cards.whereItWent)} traz as três maiores categorias de Pago e, quando o mês anterior tem pagamentos, a diferença para ele. É só um fato, sem nota.`,
+      `${q(SEU_MES_TEXT.cards.stillDue)} mostra o total a pagar e as próximas contas. ${q(SEU_MES_TEXT.cards.budget)} e ${q(SEU_MES_TEXT.cards.goals)} só aparecem se você tem orçamento ou metas.`,
+      'Use as setas ao lado do nome do mês para ver outro mês. Os valores seguem o que você escolheu em Ocultar valores.',
+    ],
+    screenName: SEU_MES_TEXT.title,
+    href: '/seu-mes',
+    keywords: ['seu mês', 'mês em 30 segundos', '30 segundos', 'revisão do mês', 'balanço do mês', 'o que entrou', 'o que saiu', 'resumo rápido', 'visão do mês'],
+    routes: ['/seu-mes'],
+    screenshot: '360_seu_mes_entrou_saiu.png',
   },
   {
     id: 'anotar-gasto',
@@ -600,11 +622,13 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     title: 'Ocultar valores e biometria',
     purpose: 'Esconde os valores em reais da tela e, no celular, pede biometria ao abrir o app. As escolhas valem só para este aparelho.',
     where: [ACCOUNT_SCREEN, PRIVACY_SECTION],
+    alsoWhere: [[ACCOUNT_SCREEN, WIDGET_TEXT.section]],
     steps: [
       `Toque no olho, no cabeçalho, para ${q('Ocultar valores')} ou ${q('Mostrar valores')} na hora. Os valores aparecem como R$ ••••.`,
       `Em telas estreitas, o olho não aparece. Ligue ${q('Ocultar valores ao abrir')}, em Conta: os valores ficam ocultos agora e sempre que você abrir o app.`,
       `No celular com biometria configurada, ligue ${q('Pedir biometria ao abrir')}. Sair da conta nunca depende dela.`,
       `O arquivo de ${q(EXPORT_TEXT.entry)} mostra os valores, mesmo com a ocultação ligada.`,
+      `Em Conta, ${q(WIDGET_TEXT.section)} guarda se o widget mostra valores: ${q(WIDGET_TEXT.showValues)} começa desligado. O widget só existe quando o app estiver nas lojas.`,
     ],
     screenName: ACCOUNT_SCREEN,
     href: '/conta',

@@ -13,6 +13,7 @@ import {
   recordAccountName,
   payablesMonthParams,
   seriesCaptionShort,
+  seuMesParams,
   shortcutA11yLabel,
   sortNewestFirst,
   type FinancialRecord,
@@ -32,6 +33,7 @@ import { FlashBanner, useFlash } from '@/components/flash';
 import { AppHeader, ContextSwitch, MonthSwitcher } from '@/components/header';
 import { RecordRow } from '@/components/record-row';
 import { SearchEntry } from '@/components/search-parts';
+import { SeuMesEntry } from '@/components/seu-mes-parts';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, Chip, Money, Screen, Skeleton, Txt } from '@/components/ui';
 import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
@@ -163,6 +165,9 @@ export default function MovimentacoesScreen() {
             <>
               {/* Buscar (D-045): campo no topo que abre a busca em todos os meses; nada é digitado aqui. */}
               <SearchEntry onPress={() => router.push('/movimentacoes/buscar')} />
+
+              {/* Seu mês em 30 segundos (D-052): logo abaixo de Buscar; abre no mês em exibição. */}
+              <SeuMesEntry onPress={() => router.push({ pathname: '/seu-mes', params: seuMesParams(month, currentMonth) })} />
 
               <View style={styles.actions}>
                 <Button

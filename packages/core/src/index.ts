@@ -39,3 +39,5 @@ export * from './export';
 export * from './importar';
 export * from './guide';
 export * from './comprovante';
+export * from './widget';
+export * from './seu-mes';

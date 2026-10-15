@@ -1,4 +1,4 @@
-import { DEFAULT_REMINDER_HOUR, MEMORY_LIMIT, isReminderHour, type ImportMemory, type ReminderHour } from '@clarevo/core';
+import { DEFAULT_REMINDER_HOUR, DEFAULT_WIDGET_SHOW_VALUES, MEMORY_LIMIT, isReminderHour, type ImportMemory, type ReminderHour } from '@clarevo/core';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
@@ -42,6 +42,12 @@ export interface DevicePrefs {
    * nada vai para o servidor. Uma pessoa em outro aparelho vê o tour de novo, uma vez; "Ver o tour de novo" no guia não muda isto.
    */
   tourSeen: boolean;
+  /**
+   * "Mostrar valores no widget" (D-052): desligada de início. O widget nativo só existe com o app nas lojas; até lá a escolha fica
+   * guardada aqui, só neste aparelho (não é dado financeiro e nada vai para o servidor), e é a que o app lerá ao montar o conteúdo do
+   * widget (`buildWidgetSnapshot`, no core). Separada de "Ocultar valores ao abrir": uma não muda a outra.
+   */
+  widgetShowValues: boolean;
 }
 
 export const DEFAULT_PREFS: DevicePrefs = {
@@ -55,6 +61,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   subscriptionSnoozedUntil: null,
   importCategories: {},
   tourSeen: false,
+  widgetShowValues: DEFAULT_WIDGET_SHOW_VALUES,
 };
 
 const PREFIX = 'clarevo.aparelho.v1.';
@@ -81,6 +88,7 @@ function parse(raw: string | null | undefined): DevicePrefs {
         typeof v.subscriptionSnoozedUntil === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.subscriptionSnoozedUntil) ? v.subscriptionSnoozedUntil : null,
       importCategories: parseMemory(v.importCategories),
       tourSeen: v.tourSeen === true,
+      widgetShowValues: v.widgetShowValues === true,
     };
   } catch {
     return DEFAULT_PREFS;

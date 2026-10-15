@@ -115,6 +115,7 @@ describe('catálogo do guia (D-049)', () => {
     // As funcionalidades do spec, mais Exportar, Importar e Buscar (D-045, D-047 e D-048).
     for (const id of [
       'resumo',
+      'seu-mes',
       'anotar-gasto',
       'nota-fiscal',
       'movimentos',
@@ -206,6 +207,26 @@ describe('catálogo do guia (D-049)', () => {
     expect(nota.steps.indexOf(step!)).toBe(nota.steps.length - 2);
     expect(nota.steps[nota.steps.length - 1]).toContain('"Salvar gasto"');
     for (const word of ['pix', 'ted', 'boleto', 'comprovante']) expect(searchGuide(word).map((e) => e.id), word).toContain('nota-fiscal');
+  });
+
+  it('"Seu mês em 30 segundos" (D-052) tem entrada em Dia a dia, logo depois do Resumo, com o caminho e os botões reais e a busca acha por "seu mês" e "30 segundos"', () => {
+    const entry = guideEntry('seu-mes')!;
+    expect(entry.group).toBe('dia-a-dia');
+    expect(GUIDE_ENTRIES.map((e) => e.id).slice(0, 2)).toEqual(['resumo', 'seu-mes']);
+    expect(entry.title).toBe('Seu mês em 30 segundos');
+    expect(entry.href).toBe('/seu-mes');
+    expect(entry.routes).toEqual(['/seu-mes']);
+    expect(guideWhere(entry.where)).toBe('Movimentos › Seu mês em 30 segundos');
+    const steps = entry.steps.join(' ');
+    for (const name of ['"Buscar"', '"Próximo"', '"Anterior"', '"Concluir"', '"Entrou e saiu"', '"Para onde foi"', '"O que ainda vence"', '"Orçamento"', '"Metas"', '"Diferença do mês"']) {
+      expect(steps, name).toContain(name);
+    }
+    for (const query of ['seu mês', '30 segundos', 'revisão do mês']) expect(searchGuide(query).map((e) => e.id), query).toContain('seu-mes');
+    // A palavra "cartão" continua levando só a Cartões e faturas: o guia do mês não a usa como palavra de busca.
+    expect(searchGuide('cartão').map((e) => e.id)).toEqual(['cartoes']);
+    // A entrada de Ocultar valores cita o widget de Conta (D-052).
+    expect(guideEntry('ocultar-valores')!.alsoWhere?.map(guideWhere)).toContain('Conta › Widget na tela inicial');
+    expect(guideEntry('ocultar-valores')!.steps.join(' ')).toContain('"Mostrar valores no widget"');
   });
 
   it('as calculadoras aparecem cada uma em uma linha, a partir do catálogo de calculadoras', () => {

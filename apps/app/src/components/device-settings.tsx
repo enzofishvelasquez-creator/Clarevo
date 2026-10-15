@@ -1,4 +1,4 @@
-import { REMINDER_HOURS, REMINDER_TEXT, reminderHourA11y, reminderHourLabel } from '@clarevo/core';
+import { REMINDER_HOURS, REMINDER_TEXT, WIDGET_TEXT, reminderHourA11y, reminderHourLabel } from '@clarevo/core';
 import { BellOff, Settings } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { AppState, View } from 'react-native';
@@ -11,7 +11,7 @@ import { loadPrefs, updatePrefs, useDevicePrefs } from '@/lib/device-prefs';
 import { PRIVACY_TEXT, setValuesHidden } from '@/lib/privacy';
 import { disableReminders, enableReminders, getNotificationPermission } from '@/lib/reminders';
 import { useSession } from '@/state/session';
-import { colors, space } from '@/theme/tokens';
+import { colors, fonts, space } from '@/theme/tokens';
 
 function useDeviceSettings() {
   const { user, auth } = useSession();
@@ -171,6 +171,29 @@ export function PrivacyCard() {
           <Txt variant="label">{msg}</Txt>
         </Banner>
       ) : null}
+    </Card>
+  );
+}
+
+/**
+ * Conta › "Widget na tela inicial" (D-052): o widget nativo só existe com o app nas lojas ("Disponível quando o app estiver nas
+ * lojas"), mas a escolha de mostrar ou não os valores nele já fica guardada, só neste aparelho. Desligada de início: o widget mostra
+ * R$ •••• no lugar dos valores. Não depende de "Ocultar valores ao abrir" e não muda nada no app.
+ */
+export function WidgetCard() {
+  const { userId, persist, prefs } = useDeviceSettings();
+  if (!prefs || !userId) return null;
+  return (
+    <Card style={{ gap: space[3] }}>
+      <SectionTitle>{WIDGET_TEXT.section}</SectionTitle>
+      <Txt style={{ fontFamily: fonts.bold }}>{WIDGET_TEXT.availability}</Txt>
+      <Txt color={colors.textSecondary}>{WIDGET_TEXT.explain}</Txt>
+      <SettingSwitch
+        label={WIDGET_TEXT.showValues}
+        caption={WIDGET_TEXT.showValuesCaption}
+        value={prefs.widgetShowValues}
+        onChange={(v) => updatePrefs(userId, { widgetShowValues: v }, persist)}
+      />
     </Card>
   );
 }

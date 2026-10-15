@@ -5,6 +5,7 @@ import {
   addMonths,
   annualCommitmentIds,
   budgetCrossing,
+  buildSeuMes,
   categoryBreakdown,
   committedGoalLines,
   essentialMonthly,
@@ -85,6 +86,7 @@ import {
   type InvoiceItem,
   type InvoicePaymentWrite,
   type Invoice,
+  type SeuMesView,
   type IsoDate,
   type IsoMonth,
   type LimitWatchMonth,
@@ -1323,6 +1325,40 @@ export function useEssentialEstimate(contextId: string | undefined) {
     return essentialMonthly(records.flatMap((r) => r.data ?? []), current, committed, annualIds, invoices.data ?? []);
   }, [ready, contextId, current, today, commitments.data, version]); // eslint-disable-line react-hooks/exhaustive-deps
   return combineParts<EssentialEstimate>(parts, value);
+}
+
+/**
+ * "Seu mês em 30 segundos" (D-052): os cartões do mês, montados no core (`buildSeuMes`) com as leituras que o Resumo, Contas a pagar, o
+ * orçamento e as metas já fazem (as mesmas chaves: toda escrita recarrega). O mês anterior entra só para a comparação em "Para onde
+ * foi". Sem dado parcial: uma falha de qualquer leitura falha tudo, nunca um cartão com zero no lugar do valor.
+ */
+export function useSeuMes(contextId: string | undefined, month: IsoMonth) {
+  const { today } = useSession();
+  const records = useMonthRecords(contextId, month);
+  const breakdown = useCategoryBreakdown(contextId, month);
+  const previous = useCategoryBreakdown(contextId, addMonths(month, -1));
+  const commitments = useCommitments(contextId, month);
+  const budget = useMonthBudget(contextId, month);
+  const goals = useGoals(contextId);
+  const movements = useGoalMovementsInMonth(contextId, month);
+  const parts: QueryPart[] = [records, breakdown, previous, commitments, budget, goals, movements];
+  const ready = parts.every((p) => p.isSuccess);
+  const summary = records.summary;
+  const toPay = commitments.summary;
+  const value = useMemo((): SeuMesView | undefined => {
+    if (!ready || !summary || !toPay || !breakdown.data || !previous.data || !goals.data || !movements.data) return undefined;
+    return buildSeuMes({
+      month,
+      today,
+      summary,
+      breakdown: breakdown.data,
+      previousBreakdown: previous.data,
+      toPay,
+      budget: budget.summary,
+      goals: { count: goals.data.length, savedInMonthCents: savedInMonth(movements.data, month), plannedCents: plannedForGoals(goals.data) },
+    });
+  }, [ready, month, today, summary, toPay, breakdown.data, previous.data, budget.summary, goals.data, movements.data]);
+  return combineParts<SeuMesView>(parts, value);
 }
 
 /** Depois de gravar uma meta ou um movimento: a meta confirmada entra na hora; listas e movimentos recarregam; conta como anotação. */
