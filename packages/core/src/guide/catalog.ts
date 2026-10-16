@@ -6,6 +6,7 @@ import { PLANO_FIELDS, PLANO_TEXT } from '../calculators/plano-dividas';
 import { CARDS_TEXT } from '../cards';
 import { QUICK_PAY_TEXT } from '../commitments';
 import { COMMITTED_TEXT } from '../committed';
+import { BENEFIT_TEXT, COMPANY_TEXT } from '../company';
 import { COMPROVANTE_TEXT } from '../comprovante/fluxo';
 import { EXPORT_TEXT } from '../export';
 import { FAMILY_TEXT, INVITE_TEXT } from '../family';
@@ -677,6 +678,46 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     keywords: ['família', 'familia', 'casa', 'convidar', 'convite', 'link de convite', 'pessoas', 'membros', 'titular', 'dividir contas da casa', 'anotar junto', 'compartilhar contas'],
     routes: ['/familia'],
     screenshot: '400_familia_criar.png',
+  },
+  {
+    id: 'painel-da-empresa',
+    group: 'conta-e-privacidade',
+    title: 'Painel da empresa',
+    purpose: 'Para quem administra o benefício de uma empresa: convida pessoas por link, acompanha as licenças e vê números de uso. Só na web, e a empresa nunca vê os registros de ninguém.',
+    where: [ACCOUNT_SCREEN, COMPANY_TEXT.accountTitle],
+    steps: [
+      `Na web, em Conta, no card ${q(COMPANY_TEXT.accountTitle)}, toque em ${q(COMPANY_TEXT.accountOpen)}. O card só aparece para quem administra uma empresa.`,
+      `Em ${q(COMPANY_TEXT.contractTitle)}, confira o plano, as vagas e o fim. Cada convite pendente e cada licença ativa ocupa uma vaga.`,
+      `Em ${q(COMPANY_TEXT.inviteTitle)}, cole os e-mails, um por linha ou separados por vírgula, confira a lista e confirme. Cada pessoa recebe um link de uso único.`,
+      `Em ${q(COMPANY_TEXT.linksTitle)}, use ${q(COMPANY_TEXT.copyAll)} ou ${q(COMPANY_TEXT.download)} e envie cada link pelo canal interno da empresa. O Clarevo não envia e-mail, e os links aparecem só nessa hora.`,
+      `Em ${q(COMPANY_TEXT.licensesTitle)}, filtre pela situação e use ${list([COMPANY_TEXT.renew, COMPANY_TEXT.cancelInvite, COMPANY_TEXT.end], 'ou')}. Quem tem a licença encerrada mantém conta, histórico e Família, com 30 dias de acesso pleno.`,
+      `Em ${q(COMPANY_TEXT.usageTitle)}, veja só números, sem dizer quem entrou. Em ${q(COMPANY_TEXT.promoTitle)}, copie textos prontos para divulgar o benefício.`,
+    ],
+    screenName: COMPANY_TEXT.title,
+    href: '/empresa',
+    keywords: ['empresa', 'rh', 'recursos humanos', 'benefício', 'beneficio', 'licença', 'licenças', 'convidar pessoas', 'vagas', 'contrato', 'painel', 'uso do app', 'textos para divulgar'],
+    routes: ['/empresa'],
+    screenshot: '421_empresa_painel.png',
+  },
+  {
+    id: 'beneficio-da-empresa',
+    group: 'conta-e-privacidade',
+    title: 'Benefício pela empresa',
+    purpose: 'Mostra se a sua empresa oferece o Clarevo como benefício e deixa aceitar o convite por link. A empresa administra só o seu acesso ao plano, nunca os seus registros.',
+    where: [ACCOUNT_SCREEN, BENEFIT_TEXT.accountTitle],
+    steps: [
+      `Abra o link de convite que o RH enviou. Sem sessão, toque em ${q(BENEFIT_TEXT.enter)} ou ${q(BENEFIT_TEXT.createAccount)} com o e-mail do convite; depois você volta ao convite.`,
+      `Confira o nome da empresa e o plano e toque em ${q(BENEFIT_TEXT.accept)}. O link serve uma vez e só com o e-mail do convite.`,
+      `Sem o link aberto, em Conta, no card ${q(BENEFIT_TEXT.accountTitle)}, toque em ${q(BENEFIT_TEXT.haveInvite)}, cole o link e toque em ${q(BENEFIT_TEXT.pasteSubmit)}.`,
+      `Depois de aceitar, o card mostra a empresa, o plano e desde quando vale. Em ${q('Acesso ao plano')}, a situação aparece como ${q(BENEFIT_TEXT.planCardSituation)}.`,
+      'Se a licença for encerrada, você fica com a conta, o histórico e a Família. O acesso pleno continua por 30 dias, e o card diz até quando.',
+      `Para saber o que a empresa vê, toque em ${q('Quem vê estes dados?')}. Ela não vê seus registros, contas, metas, cartões nem a sua Família.`,
+    ],
+    screenName: ACCOUNT_SCREEN,
+    href: '/conta',
+    keywords: ['benefício', 'beneficio', 'empresa', 'convite da empresa', 'link do rh', 'licença', 'plano da empresa', 'aceitar convite', 'tenho um convite'],
+    routes: ['/beneficio/[codigo]'],
+    screenshot: '433_conta_beneficio_ativo.png',
   },
   {
     id: 'quem-ve',

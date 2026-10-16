@@ -68,6 +68,9 @@ import { IMPORT_BATCH } from './importar/tipos';
 import type { FamilyAction, FamilyInvite, FamilyInviteWrite, FamilyInvitePreview, FamilyJoin, FamilyOverview, InviteRole } from './family';
 import { isFamilyAction } from './family';
 import { MemoryFamilyHub } from './memory-family';
+import type { Benefit, BenefitPreview, CompanyAction, CompanyOverview, CompanyUsage, License, LicenseInviteWrite, LicenseRenewWrite } from './company';
+import { isCompanyAction } from './company';
+import { MemoryCompanyHub } from './memory-company';
 import { SEARCH_LIMIT, compareNewestPurchase, compareNewestRecord, purchaseMatchesFilter, recordMatchesFilter } from './search';
 import type { RecordSearchFilter, SearchPage } from './search';
 import { referenceMonthError } from './committed';
@@ -163,7 +166,8 @@ interface Operation {
     | AccountAction
     | SubscriptionReviewAction
     | ImportAction
-    | FamilyAction;
+    | FamilyAction
+    | CompanyAction;
   hash: string;
   contextId: string;
   recordId: string | null;
@@ -284,6 +288,14 @@ export interface MemoryRepositoryOptions {
    * repositório tem o próprio, só com a pessoa dele. O que cada pessoa anota na Família fica no repositório dela.
    */
   family?: MemoryFamilyHub;
+  /**
+   * Empresas (D-056): organizações, contratos, licenças e direitos ao plano. Repositórios de pessoas diferentes que compartilham o
+   * mesmo hub compartilham a administração do benefício. Sem hub, o repositório tem o próprio, sem nenhuma empresa (conta nova
+   * nunca recebe empresa de exemplo).
+   */
+  company?: MemoryCompanyHub;
+  /** E-mail da conta, para o convite da empresa conferir o e-mail de quem aceita. Padrão: `<pessoa>@memoria.test`. */
+  email?: string;
 }
 
 /**
@@ -340,11 +352,14 @@ export class MemoryRepository implements RecordsRepository {
 
   /** Família: compartilhada entre repositórios quando o hub vem das opções. */
   private readonly hub: MemoryFamilyHub;
+  /** Empresas: compartilhada entre repositórios quando o hub vem das opções. */
+  private readonly company: MemoryCompanyHub;
 
   constructor(private readonly opts: MemoryRepositoryOptions) {
     this.latencyMs = opts.latencyMs ?? 0;
     // Sem hub próprio, o relógio da Família é o dia da pessoa (ao meio-dia), para os convites vencerem junto com o "hoje" dos testes.
     this.hub = opts.family ?? new MemoryFamilyHub({ now: () => Date.parse(`${opts.today()}T12:00:00.000Z`) });
+    this.company = opts.company ?? new MemoryCompanyHub({ now: () => Date.parse(`${opts.today()}T12:00:00.000Z`), today: opts.today });
   }
 
   /** Ids com tamanho fixo: a ordem do texto é a ordem de criação (desempate das listas). */
@@ -468,6 +483,7 @@ export class MemoryRepository implements RecordsRepository {
         personalContextId: contextId,
       };
       this.hub.register(this.opts.actorId, this.opts.displayName, contextId);
+      this.company.register(this.opts.actorId, this.opts.email ?? `${this.opts.actorId}@memoria.test`, this.opts.displayName, this.space.timeZone);
       return this.spaceView()!;
     });
   }
@@ -3711,7 +3727,7 @@ export class MemoryRepository implements RecordsRepository {
    * ela passa a ser a última ausência. Mesmo dia ou relógio para trás: nada muda.
    */
   private trackActivity(action: Operation['action'], contextId: string) {
-    if (action === 'decidir_revisao' || action === 'responder_guardar' || action === 'revisar_assinaturas' || isFamilyAction(action)) return;
+    if (action === 'decidir_revisao' || action === 'responder_guardar' || action === 'revisar_assinaturas' || isFamilyAction(action) || isCompanyAction(action)) return;
     const day = this.opts.today();
     const a = this.activity.get(contextId);
     if (!a) {
@@ -4072,6 +4088,98 @@ export class MemoryRepository implements RecordsRepository {
       this.hub.end(this.opts.actorId, key, contextId, this.ownPersonal);
       this.familyDone(key, 'encerrar_familia', contextId);
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Empresas (D-056): as sete funções da migração 0014, sobre o hub compartilhado
+  // ---------------------------------------------------------------------------
+
+  /** Uma chave já usada por outra operação da pessoa (fora da empresa) é chave_reutilizada: o espaço de chaves é um só. */
+  private companyKey(key: string) {
+    const prev = this.operations.get(key);
+    if (prev && !isCompanyAction(prev.action)) throw new RepoError('chave_reutilizada');
+  }
+
+  /** Marca a chave como usada, uma vez (a repetição não grava de novo). Não tem contexto financeiro nem conta como anotação. */
+  private companyDone(key: string, action: CompanyAction) {
+    if (this.operations.has(key)) return;
+    this.operations.set(key, {
+      action,
+      hash: '',
+      contextId: '',
+      recordId: null,
+      commitmentId: null,
+      seriesId: null,
+      referenceId: null,
+      budgetId: null,
+      goalId: null,
+      movementId: null,
+      cardId: null,
+      entryId: null,
+      accountId: null,
+      importResult: null,
+    });
+  }
+
+  async listAdministeredCompanies(): Promise<CompanyOverview[]> {
+    return this.read(() => this.company.listAdministered(this.opts.actorId));
+  }
+
+  async getCompanyUsage(organizationId: string): Promise<CompanyUsage> {
+    return this.read(() => this.company.usage(this.opts.actorId, organizationId));
+  }
+
+  async inviteLicenses(key: string, contractId: string, emails: readonly string[]): Promise<LicenseInviteWrite> {
+    return this.write(() => {
+      this.companyKey(key);
+      const r = this.company.invite(this.opts.actorId, key, contractId, emails);
+      this.companyDone(key, 'convidar_licencas');
+      return r;
+    });
+  }
+
+  async renewLicenseInvite(key: string, licenseId: string): Promise<LicenseRenewWrite> {
+    return this.write(() => {
+      this.companyKey(key);
+      const r = this.company.renew(this.opts.actorId, key, licenseId);
+      this.companyDone(key, 'renovar_convite_licenca');
+      return r;
+    });
+  }
+
+  async cancelLicenseInvite(key: string, licenseId: string): Promise<License> {
+    return this.write(() => {
+      this.companyKey(key);
+      const r = this.company.cancel(this.opts.actorId, key, licenseId);
+      this.companyDone(key, 'cancelar_convite_licenca');
+      return r;
+    });
+  }
+
+  async endLicense(key: string, licenseId: string): Promise<License> {
+    return this.write(() => {
+      this.companyKey(key);
+      const r = this.company.end(this.opts.actorId, key, licenseId);
+      this.companyDone(key, 'encerrar_licenca');
+      return r;
+    });
+  }
+
+  async previewLicenseInvite(code: string): Promise<BenefitPreview> {
+    return this.read(() => this.company.preview(this.opts.actorId, code));
+  }
+
+  async acceptLicense(key: string, code: string): Promise<Benefit> {
+    return this.write(() => {
+      this.companyKey(key);
+      const r = this.company.accept(this.opts.actorId, key, code);
+      this.companyDone(key, 'aceitar_licenca');
+      return r;
+    });
+  }
+
+  async getMyBenefit(): Promise<Benefit | null> {
+    return this.read(() => this.company.myBenefit(this.opts.actorId));
   }
 }
 

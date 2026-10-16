@@ -1918,7 +1918,7 @@ reset role;
 
 -- ---------------------------------------------------------------------------
 -- 10. record_operations: as onze ações de cartão apontam para o cartão (target_id); as cinco de lançamento também para o
--- lançamento (entry_id); pagar e desfazer a fatura, também para a conta da fatura e o gasto; a lista vigente tem 58 ações (37, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, e as 9 da Família, testadas em 95_familia).
+-- lançamento (entry_id); pagar e desfazer a fatura, também para a conta da fatura e o gasto; a lista vigente tem 63 ações (37, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas).
 -- Uma operação por escrita. Atividade (A4): toda ação de cartão é anotação de quem a fez no contexto.
 -- ---------------------------------------------------------------------------
 reset role;
@@ -1987,7 +1987,7 @@ begin
     = array['alterar_cartao', 'alterar_lancamento_cartao', 'criar_cartao', 'criar_compra_cartao', 'criar_encargo_cartao', 'criar_estorno_cartao',
             'desfazer_pagamento_fatura', 'excluir_cartao', 'excluir_lancamento_cartao', 'pagar_fatura', 'situacao_cartao'], 'as 11 ações de cartão';
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-           where c.conname = 'record_operations_action_check') = 58, 'a lista vigente tem 58 ações (37, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, e as 9 da Família, testadas em 95_familia)';
+           where c.conname = 'record_operations_action_check') = 63, 'a lista vigente tem 63 ações (37, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas)';
 
   -- Cada operação aponta para um cartão do mesmo contexto; a de lançamento, para um lançamento do mesmo cartão; a de fatura, para
   -- a conta e o gasto daquele cartão.
@@ -2804,21 +2804,23 @@ reset role;
 do $$ begin
   assert (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
-    = array['accept_family_invite', 'add_card_charge', 'add_card_purchase', 'add_card_refund', 'add_goal_movement',
-            'cancel_family_invite', 'context_permission', 'create_account', 'create_card', 'create_commitment', 'create_family',
-            'create_family_invite', 'create_goal', 'create_record', 'create_series', 'create_series_occurrence',
-            'decide_return_review', 'delete_account', 'delete_card', 'delete_card_entry', 'delete_category_budget',
-            'delete_commitment', 'delete_commitment_limit', 'delete_goal', 'delete_goal_movement', 'delete_income_reference',
-            'delete_record', 'delete_series', 'end_family', 'end_series', 'ensure_personal_space', 'import_records',
-            'inform_series_year', 'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'leave_family',
-            'mark_subscriptions_reviewed', 'month_budget', 'month_committed', 'month_to_pay', 'month_totals', 'months_overview',
-            'my_today', 'pay_commitment', 'pay_invoice', 'preview_family_invite', 'remove_family_member', 'set_account_status',
-            'set_card_status', 'set_category_budget', 'set_commitment_limit', 'set_default_account', 'set_goal_status',
-            'set_income_reference', 'set_member_role', 'set_savings_answer', 'set_series_subscription', 'skip_series_year',
-            'sync_series_occurrences', 'transfer_family_ownership', 'undo_commitment_payment', 'undo_invoice_payment',
-            'update_account', 'update_card', 'update_card_entry', 'update_commitment', 'update_goal', 'update_goal_movement',
-            'update_record', 'update_series_from'],
-    'authenticated executa só as 59 funções expostas (as 5 de contas, testadas em 85, as 5 de orçamento e limite, testadas em 80, as 11 de cartão, as 4 de data e as de antes)';
+    = array['accept_family_invite', 'accept_license', 'add_card_charge', 'add_card_purchase', 'add_card_refund',
+            'add_goal_movement', 'cancel_family_invite', 'cancel_license_invite', 'context_permission', 'create_account',
+            'create_card', 'create_commitment', 'create_family', 'create_family_invite', 'create_goal', 'create_record',
+            'create_series', 'create_series_occurrence', 'decide_return_review', 'delete_account', 'delete_card',
+            'delete_card_entry', 'delete_category_budget', 'delete_commitment', 'delete_commitment_limit', 'delete_goal',
+            'delete_goal_movement', 'delete_income_reference', 'delete_record', 'delete_series', 'end_family', 'end_license',
+            'end_series', 'ensure_personal_space', 'import_records', 'inform_series_year', 'invite_licenses',
+            'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'leave_family',
+            'mark_subscriptions_reviewed', 'month_budget', 'month_committed', 'month_to_pay', 'month_totals',
+            'months_overview', 'my_today', 'organization_usage', 'pay_commitment', 'pay_invoice', 'preview_family_invite',
+            'preview_license_invite', 'remove_family_member', 'renew_license_invite', 'set_account_status', 'set_card_status',
+            'set_category_budget', 'set_commitment_limit', 'set_default_account', 'set_goal_status', 'set_income_reference',
+            'set_member_role', 'set_savings_answer', 'set_series_subscription', 'skip_series_year', 'sync_series_occurrences',
+            'transfer_family_ownership', 'undo_commitment_payment', 'undo_invoice_payment', 'update_account', 'update_card',
+            'update_card_entry', 'update_commitment', 'update_goal', 'update_goal_movement', 'update_record',
+            'update_series_from'],
+    'authenticated executa só as 79 funções expostas (as 5 de contas, testadas em 85, as 5 de orçamento e limite, testadas em 80, as 11 de cartão, as 4 de data e as de antes)';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')), 'anon não executa nenhuma função';
   -- Auxiliares, guardas e gatilhos de consistência: sem execute para authenticated.
@@ -2938,8 +2940,8 @@ do $$ begin
             'amount_is_estimate', 'series_kind', 'series_nature', 'series_installment_total', 'series_parts_per_year', 'card_id', 'invoice_month',
             'card_closing_on'], 'commitment_items: a lista de antes, mais cartão, mês e fechamento no fim';
   assert (select array_agg(attname::text order by attnum) from pg_attribute where attrelid = 'public.record_operations'::regclass and attnum > 0 and not attisdropped)
-    = array['actor_id', 'idempotency_key', 'action', 'context_id', 'request_hash', 'record_id', 'created_at', 'commitment_id', 'target_id', 'entry_id', 'import_result'],
-    'record_operations ganhou entry_id (e import_result, da importação, 0012, no fim)';
+    = array['actor_id', 'idempotency_key', 'action', 'context_id', 'request_hash', 'record_id', 'created_at', 'commitment_id', 'target_id', 'entry_id', 'import_result', 'license_result'],
+    'record_operations ganhou entry_id (e import_result, da importação, 0012, e license_result, das licenças, 0014, no fim)';
 
   -- Chaves estrangeiras e gatilhos.
   assert (select confdeltype from pg_constraint where conname = 'cards_context_id_fkey') = 'c'

@@ -22,3 +22,27 @@ export const pendingInvite = {
     pending = null;
   },
 };
+
+/**
+ * Convite da empresa pendente (D-056): igual ao da Família, para quem abre o link do RH sem estar na conta. O código fica só na
+ * memória do app, é retomado quando o espaço da pessoa está pronto e sai da memória ao sair da conta.
+ */
+let pendingBenefitCode: string | null = null;
+
+export const pendingBenefit = {
+  set(code: string) {
+    pendingBenefitCode = code;
+  },
+  /** Devolve o código guardado uma única vez. */
+  take(): string | null {
+    const code = pendingBenefitCode;
+    pendingBenefitCode = null;
+    return code;
+  },
+  has(): boolean {
+    return pendingBenefitCode !== null;
+  },
+  clear() {
+    pendingBenefitCode = null;
+  },
+};

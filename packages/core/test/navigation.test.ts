@@ -82,6 +82,8 @@ describe('barra inferior (D-039)', () => {
       '/retomar',
       // Família (D-055): a tela da Família é de consulta, com a barra.
       '/familia',
+      // Painel da empresa (D-056): só na web, tela de consulta, com a barra.
+      '/empresa',
     ])
       expect(barModeFor(path), path).toBe('consulta');
   });
@@ -122,6 +124,8 @@ describe('barra inferior (D-039)', () => {
       '/familia/nova',
       '/familia/convidar',
       '/convite/0123456789abcdef0123456789abcdef',
+      // Convite da empresa (D-056): abre pelo link do RH, antes e depois de entrar, sem barra.
+      '/beneficio/0123456789abcdef0123456789abcdef',
       '/entrar',
       '/boas-vindas',
       '/criar-conta',
@@ -145,7 +149,7 @@ describe('barra inferior (D-039)', () => {
     const formName = /\/(novo|nova|editar|pagar|encargo|estorno|compra|encerrar|informar|movimento|atualizar|vencidas|referencia|limite|minima|reserva|guardar|importar|convidar)$/;
     // O formulário do orçamento de uma categoria é a rota dinâmica /orcamento/[categoria].
     const budgetForm = /^\/orcamento\/\[categoria\]$/;
-    const entry = /^\/(boas-vindas|criar-conta|confirmar-email|entrar|recuperar-acesso|nova-senha|primeira-conta|carregando|confirmado|convite\/\[codigo\])$/;
+    const entry = /^\/(boas-vindas|criar-conta|confirmar-email|entrar|recuperar-acesso|nova-senha|primeira-conta|carregando|confirmado|convite\/\[codigo\]|beneficio\/\[codigo\])$/;
     for (const { pattern, sample } of routes) {
       const mode = barModeFor(sample);
       if (entry.test(pattern) || formName.test(pattern) || budgetForm.test(pattern)) expect(mode, pattern).toBe('formulario');

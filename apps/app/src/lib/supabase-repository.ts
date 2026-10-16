@@ -23,6 +23,7 @@ import {
   activeAccounts,
   addMonths,
   normalizeInviteCode,
+  normalizeLicenseCode,
   monthRange,
   receiptKeyValid,
   type AccountAction,
@@ -31,6 +32,10 @@ import {
   type AccountStatus,
   type AffectedRef,
   type AmountMode,
+  type Benefit,
+  type BenefitContract,
+  type BenefitPlan,
+  type BenefitPreview,
   type Card,
   type CardAction,
   type CardChargeInput,
@@ -51,6 +56,8 @@ import {
   type CommitmentLimit,
   type CommitmentSeries,
   type CommitmentWrite,
+  type CompanyOverview,
+  type CompanyUsage,
   type ContextActivity,
   type FamilyInvite,
   type FamilyInviteWrite,
@@ -78,6 +85,11 @@ import {
   type InvoicePaymentWrite,
   type IsoDate,
   type IsoMonth,
+  type License,
+  type LicenseInviteResult,
+  type LicenseInviteWrite,
+  type LicenseRenewWrite,
+  type LicenseStatus,
   type MonthBudgetRead,
   type MonthOverview,
   type NewGoalInput,
@@ -627,6 +639,13 @@ const KNOWN: RepoErrorCode[] = [
   'nao_sobre_si',
   'contexto_invalido',
   'familia_com_membros',
+  // Empresas (D-056). Nenhum é sufixo de outro código da lista, nem tem outro como sufixo.
+  'email_invalido',
+  'contrato_nao_vigente',
+  'vagas_insuficientes',
+  'licenca_nao_convidada',
+  'licenca_nao_ativa',
+  'ja_tem_licenca',
 ];
 
 /**
@@ -645,8 +664,10 @@ function safeDetail(code: RepoErrorCode, details: string | null | undefined): st
   if (code === 'saldo_da_meta_insuficiente' && /^dia=\d{4}-\d{2}-\d{2}$/.test(details)) return details;
   if (code === 'versao_desatualizada' && /^versao_atual=\d{1,9}$/.test(details)) return details;
   if (code === 'nota_ja_anotada' && /^(registro|compra)=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(details)) return details;
-  // Importar (D-048): a posição do item recusado no lote, de 1 a 500.
+  // Importar (D-048) e convidar pela empresa (D-056): a posição do item recusado no lote, de 1 a 500.
   if (/^item=\d{1,3}$/.test(details)) return details;
+  // Convidar pela empresa: quantas vagas livres sobram.
+  if (code === 'vagas_insuficientes' && /^disponiveis=\d{1,7}$/.test(details)) return details;
   return undefined;
 }
 
@@ -2742,6 +2763,242 @@ export class SupabaseRepository implements RecordsRepository {
     const { error } = await this.db.rpc('end_family', { p_context: contextId, p_key: key });
     if (error) throw repoError(error);
   }
+
+  // -------------------------------------------------------------------------
+  // Empresas (D-056): as sete funções da migração 0014, a visão my_benefit e as tabelas que o RH lê (organizations,
+  // benefit_contracts e licenses, sem o resumo do código nem a pessoa)
+  // -------------------------------------------------------------------------
+
+  /**
+   * As organizações que a pessoa administra (a RLS só deixa o RH ler a própria), com os contratos e as licenças deles. As licenças
+   * vêm só das colunas liberadas e só dos contratos da organização: a licença que a própria pessoa recebe de outra empresa fica de fora.
+   */
+  async listAdministeredCompanies(): Promise<CompanyOverview[]> {
+    const orgs = await this.db.from('organizations').select('id, name').order('name').order('id');
+    if (orgs.error) throw repoError(orgs.error);
+    const organizations = (orgs.data ?? []) as { id: string; name: string }[];
+    if (organizations.length === 0) return [];
+    const ids = organizations.map((o) => o.id);
+    const contractRows = await readAll<ContractRow>((from, to) =>
+      this.db
+        .from('benefit_contracts')
+        .select('id, organization_id, seats, plan, starts_on, ends_on')
+        .in('organization_id', ids)
+        .order('starts_on')
+        .order('id')
+        .range(from, to),
+    );
+    const contracts = contractRows.map(toContract);
+    const contractIds = contracts.map((c) => c.id);
+    const licenseRows =
+      contractIds.length === 0
+        ? []
+        : await readAll<LicenseRow>((from, to) =>
+            this.db.from('licenses').select(LICENSE_COLUMNS).in('contract_id', contractIds).order('created_at').order('id').range(from, to),
+          );
+    const licenses = licenseRows.map(toLicense);
+    return organizations.map((o) => {
+      const own = contracts.filter((c) => c.organizationId === o.id);
+      const ownIds = new Set(own.map((c) => c.id));
+      return { organization: { id: o.id, name: o.name }, contracts: own, licenses: licenses.filter((l) => ownIds.has(l.contractId)), demo: false };
+    });
+  }
+
+  async getCompanyUsage(organizationId: string): Promise<CompanyUsage> {
+    const { data, error } = await this.db.rpc('organization_usage', { p_org: organizationId });
+    if (error) throw repoError(error);
+    return toUsage(data);
+  }
+
+  async inviteLicenses(key: string, contractId: string, emails: readonly string[]): Promise<LicenseInviteWrite> {
+    const { data, error } = await this.db.rpc('invite_licenses', { p_contract: contractId, p_emails: [...emails], p_key: key });
+    if (error) throw repoError(error);
+    const r = data as { contract_id?: unknown; results?: unknown; seats?: unknown; in_use?: unknown } | null;
+    if (!r || typeof r.contract_id !== 'string' || !Array.isArray(r.results) || typeof r.seats !== 'number' || typeof r.in_use !== 'number') {
+      throw new RepoError('desconhecido', 'convite_inconsistente');
+    }
+    const results = (r.results as { email?: unknown; outcome?: unknown; code?: unknown; license?: unknown }[]).map((x): LicenseInviteResult => {
+      const code = x.code === null || x.code === undefined ? null : normalizeLicenseCode(x.code);
+      if (typeof x.email !== 'string' || (x.outcome !== 'convidada' && x.outcome !== 'ja_convidado') || (x.code != null && code === null) || (x.outcome === 'ja_convidado' && code !== null)) {
+        throw new RepoError('desconhecido', 'convite_inconsistente');
+      }
+      return { email: x.email, outcome: x.outcome, code, license: toLicense(x.license as LicenseRow) };
+    });
+    return { contractId: r.contract_id, results, seats: r.seats, inUse: r.in_use };
+  }
+
+  async renewLicenseInvite(key: string, licenseId: string): Promise<LicenseRenewWrite> {
+    const { data, error } = await this.db.rpc('renew_license_invite', { p_license: licenseId, p_key: key });
+    if (error) throw repoError(error);
+    const r = data as { license?: unknown; code?: unknown } | null;
+    const code = r?.code === null || r?.code === undefined ? null : normalizeLicenseCode(r.code);
+    if (!r || (r.code != null && code === null)) throw new RepoError('desconhecido', 'convite_inconsistente');
+    return { license: toLicense(r.license as LicenseRow), code };
+  }
+
+  async cancelLicenseInvite(key: string, licenseId: string): Promise<License> {
+    const { data, error } = await this.db.rpc('cancel_license_invite', { p_license: licenseId, p_key: key });
+    if (error) throw repoError(error);
+    return toLicense((data as { license?: unknown } | null)?.license as LicenseRow);
+  }
+
+  async endLicense(key: string, licenseId: string): Promise<License> {
+    const { data, error } = await this.db.rpc('end_license', { p_license: licenseId, p_key: key });
+    if (error) throw repoError(error);
+    return toLicense((data as { license?: unknown } | null)?.license as LicenseRow);
+  }
+
+  async previewLicenseInvite(code: string): Promise<BenefitPreview> {
+    const normalized = normalizeLicenseCode(code);
+    // Código fora do formato: a mesma resposta do banco para qualquer convite que não vale, sem ir à rede.
+    if (normalized === null) throw new RepoError('convite_invalido');
+    const { data, error } = await this.db.rpc('preview_license_invite', { p_code: normalized });
+    if (error) throw repoError(error);
+    const r = data as { organization_name?: unknown; plan?: unknown } | null;
+    if (!r || typeof r.organization_name !== 'string' || !isBenefitPlanValue(r.plan)) throw new RepoError('desconhecido', 'convite_inconsistente');
+    return { organizationName: r.organization_name, plan: r.plan };
+  }
+
+  async acceptLicense(key: string, code: string): Promise<Benefit> {
+    const normalized = normalizeLicenseCode(code);
+    if (normalized === null) throw new RepoError('convite_invalido');
+    const { data, error } = await this.db.rpc('accept_license', { p_code: normalized, p_key: key });
+    if (error) throw repoError(error);
+    return toBenefit(data as Record<string, unknown> | null);
+  }
+
+  /** O benefício da própria pessoa (visão my_benefit): a licença ativa, ou a encerrada mais recente; null se nunca teve. */
+  async getMyBenefit(): Promise<Benefit | null> {
+    const { data, error } = await this.db
+      .from('my_benefit')
+      .select('license_id, organization_name, plan, status, activated_at, ended_at, access_until, contract_ends_on')
+      .order('activated_at', { ascending: false })
+      .order('license_id');
+    if (error) throw repoError(error);
+    const rows = (data ?? []) as Record<string, unknown>[];
+    if (rows.length === 0) return null;
+    const benefits = rows.map(toBenefit);
+    return benefits.find((b) => b.status === 'ativa') ?? benefits[0]!;
+  }
+}
+
+/** Colunas de licenses que a empresa e a própria pessoa podem ler (o resumo do código e a pessoa nunca são lidos). */
+const LICENSE_COLUMNS = 'id, contract_id, invited_email, status, invited_at, created_at, activated_at, ended_at, cancelled_at';
+
+interface LicenseRow {
+  id: string;
+  contract_id: string;
+  invited_email: string;
+  status: string;
+  invited_at: string;
+  created_at: string;
+  activated_at: string | null;
+  ended_at: string | null;
+  cancelled_at: string | null;
+}
+
+interface ContractRow {
+  id: string;
+  organization_id: string;
+  seats: number;
+  plan: string;
+  starts_on: string;
+  ends_on: string | null;
+}
+
+const isBenefitPlanValue = (v: unknown): v is BenefitPlan => v === 'individual' || v === 'familiar';
+const isLicenseStatusValue = (v: unknown): v is LicenseStatus => v === 'convidada' || v === 'ativa' || v === 'encerrada';
+
+/** Licença: situação conhecida e datas coerentes; qualquer outra forma é defeito, não recusa. */
+function toLicense(r: LicenseRow | null | undefined): License {
+  if (
+    !r ||
+    typeof r.id !== 'string' ||
+    typeof r.contract_id !== 'string' ||
+    typeof r.invited_email !== 'string' ||
+    !isLicenseStatusValue(r.status) ||
+    typeof r.invited_at !== 'string' ||
+    typeof r.created_at !== 'string' ||
+    (r.status === 'ativa') !== (r.activated_at !== null && r.ended_at === null && r.cancelled_at === null) ||
+    (r.status === 'convidada' && (r.activated_at !== null || r.ended_at !== null || r.cancelled_at !== null))
+  ) {
+    throw new RepoError('desconhecido', 'licenca_inconsistente');
+  }
+  return {
+    id: r.id,
+    contractId: r.contract_id,
+    email: r.invited_email,
+    status: r.status,
+    invitedAt: r.invited_at,
+    createdAt: r.created_at,
+    activatedAt: r.activated_at ?? null,
+    endedAt: r.ended_at ?? null,
+    cancelledAt: r.cancelled_at ?? null,
+  };
+}
+
+function toContract(r: ContractRow): BenefitContract {
+  if (!r || typeof r.id !== 'string' || typeof r.organization_id !== 'string' || !isBenefitPlanValue(r.plan) || !Number.isInteger(r.seats) || r.seats < 1) {
+    throw new RepoError('desconhecido', 'contrato_inconsistente');
+  }
+  return { id: r.id, organizationId: r.organization_id, seats: r.seats, plan: r.plan, startsOn: r.starts_on, endsOn: r.ends_on ?? null };
+}
+
+/** {license_id, organization_name, plan, status, activated_at, ended_at, access_until, contract_ends_on} de accept_license e de my_benefit. */
+function toBenefit(r: Record<string, unknown> | null | undefined): Benefit {
+  if (
+    !r ||
+    typeof r.license_id !== 'string' ||
+    typeof r.organization_name !== 'string' ||
+    !isBenefitPlanValue(r.plan) ||
+    (r.status !== 'ativa' && r.status !== 'encerrada') ||
+    typeof r.activated_at !== 'string' ||
+    (r.status === 'ativa') !== (r.ended_at === null || r.ended_at === undefined)
+  ) {
+    throw new RepoError('desconhecido', 'beneficio_inconsistente');
+  }
+  return {
+    licenseId: r.license_id,
+    organizationName: r.organization_name,
+    plan: r.plan,
+    status: r.status,
+    activatedAt: r.activated_at,
+    endedAt: typeof r.ended_at === 'string' ? r.ended_at : null,
+    accessUntil: typeof r.access_until === 'string' ? r.access_until : null,
+    contractEndsOn: typeof r.contract_ends_on === 'string' ? r.contract_ends_on : null,
+  };
+}
+
+/** Quatro contagens inteiras e o mês; joinedThisMonth nulo só quando o uso não é visível. */
+function toUsage(data: unknown): CompanyUsage {
+  const r = data as Record<string, unknown> | null;
+  const int = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0;
+  if (
+    !r ||
+    typeof r.organization_id !== 'string' ||
+    typeof r.month !== 'string' ||
+    !int(r.seats) ||
+    !int(r.invited) ||
+    !int(r.active) ||
+    !int(r.ended) ||
+    !int(r.usage_minimum) ||
+    typeof r.usage_visible !== 'boolean' ||
+    (r.usage_visible ? !int(r.joined_this_month) : r.joined_this_month !== null) ||
+    r.usage_visible !== r.active >= r.usage_minimum
+  ) {
+    throw new RepoError('desconhecido', 'uso_inconsistente');
+  }
+  return {
+    organizationId: r.organization_id,
+    month: r.month,
+    seats: r.seats,
+    invited: r.invited,
+    active: r.active,
+    ended: r.ended,
+    joinedThisMonth: r.usage_visible ? (r.joined_this_month as number) : null,
+    usageVisible: r.usage_visible,
+    usageMinimum: r.usage_minimum,
+  };
 }
 
 /** Linha de family_member_items. */

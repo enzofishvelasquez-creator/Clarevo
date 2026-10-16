@@ -5,6 +5,7 @@ create table if not exists auth.users (
   id uuid primary key,
   email text,
   email_confirmed_at timestamptz,
+  last_sign_in_at timestamptz,
   raw_user_meta_data jsonb not null default '{}'
 );
 -- Mesma leitura do Supabase: claim individual ou o JSON completo de claims (PostgREST).

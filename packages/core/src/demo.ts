@@ -1,3 +1,4 @@
+import { MemoryCompanyHub } from './memory-company';
 import { MemoryRepository } from './memory-repository';
 import { newOperationKey } from './repository';
 
@@ -63,6 +64,18 @@ export function demoScenarioFrom(param: string | null | undefined): DemoScenario
   return (DEMO_SCENARIOS as readonly string[]).includes(value) ? (value as DemoScenario) : 'padrao';
 }
 
+/**
+ * A empresa da demonstração (D-056): "Empresa Exemplo (demonstração)", FICTÍCIA e identificada, com licenças de pessoas fictícias
+ * e números de uso fictícios, administrada pela conta de demonstração. Mora só neste hub, na memória do aparelho: o painel da
+ * demonstração não grava nada fora dele e não toca o banco. Conta nova nunca recebe empresa de exemplo (o hub de uma conta nova
+ * começa vazio). Vagas: 40; em uso: 18 (12 ativas e 6 convites); 3 encerradas e 1 convite cancelado; 9 das 12 ativas entraram em outubro.
+ */
+export function createDemoCompanyHub(adminPersonId: string = 'pessoa-demo'): MemoryCompanyHub {
+  const hub = new MemoryCompanyHub({ now: () => Date.parse(`${DEMO_TODAY}T12:00:00.000Z`), today: () => DEMO_TODAY });
+  hub.seedDemo(adminPersonId);
+  return hub;
+}
+
 export async function createDemoRepository(opts: { latencyMs?: number; scenario?: DemoScenario; cards?: boolean } = {}) {
   if (opts.scenario === 'retorno') return createReturnDemoRepository(opts.latencyMs);
   // O dia só muda, por um instante, para cadastrar as assinaturas de exemplo no cenário 'assinaturas'.
@@ -70,8 +83,10 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   const repo = new MemoryRepository({
     actorId: 'pessoa-demo',
     displayName: 'Maria Alves',
+    email: DEMO_EMAIL,
     today: () => today,
     latencyMs: 0,
+    company: createDemoCompanyHub(),
   });
   const space = await repo.ensurePersonalSpace('Conta principal');
   const ctx = space.personalContextId;
@@ -260,8 +275,10 @@ async function createReturnDemoRepository(latencyMs?: number) {
   const repo = new MemoryRepository({
     actorId: 'pessoa-demo',
     displayName: 'Maria Alves',
+    email: DEMO_EMAIL,
     today: () => today,
     latencyMs: 0,
+    company: createDemoCompanyHub(),
   });
   const space = await repo.ensurePersonalSpace('Conta principal');
   const ctx = space.personalContextId;

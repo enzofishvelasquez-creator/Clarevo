@@ -1,4 +1,4 @@
-import { FAMILY_ROLE_HELP, FAMILY_TEXT, GOALS_TEXT, RETURN_TEXT, SAVINGS_TEXT } from '@clarevo/core';
+import { BENEFIT_TEXT, FAMILY_ROLE_HELP, FAMILY_TEXT, GOALS_TEXT, RETURN_TEXT, SAVINGS_TEXT } from '@clarevo/core';
 import { router } from 'expo-router';
 import { User } from 'lucide-react-native';
 import { View } from 'react-native';
@@ -61,6 +61,8 @@ export default function QuemVeScreen() {
         Se uma empresa oferecer o Clarevo como benefício, ela administra seu acesso ao plano. Seus registros financeiros têm permissões
         próprias e não ficam visíveis para a empresa.
       </Txt>
+      {/* O que a empresa vê (D-056): licenças e, com 5 pessoas ativas ou mais, quantas entraram no mês; nunca finanças. */}
+      <Txt color={colors.textSecondary}>{BENEFIT_TEXT.whoSees}</Txt>
       {kind === 'pessoal' ? (
         <>
           {family ? <Txt color={colors.textSecondary}>{FAMILY_TEXT.privacy}</Txt> : null}

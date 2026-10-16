@@ -55,6 +55,8 @@ const FORM_PATHS: readonly RegExp[] = [
   /^\/familia\/(nova|convidar)$/,
   // Convite para a Família: abre antes de entrar e depois de entrar, como as telas de entrada, sem barra.
   new RegExp(`^/convite/${ID}$`),
+  // Convite da empresa (D-056): o mesmo caminho do convite da Família, aberto pelo link do RH, sem barra.
+  new RegExp(`^/beneficio/${ID}$`),
   // Entrada, cadastro, recuperação e carregamento.
   /^\/(boas-vindas|criar-conta|confirmar-email|entrar|recuperar-acesso|nova-senha|primeira-conta|carregando|confirmado)$/,
 ];

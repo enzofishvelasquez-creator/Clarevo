@@ -229,6 +229,34 @@ describe('catálogo do guia (D-049)', () => {
     expect(guideEntry('ocultar-valores')!.steps.join(' ')).toContain('"Mostrar valores no widget"');
   });
 
+  it('o painel da empresa e o benefício pela empresa (D-056) têm entrada, com o lugar e os nomes reais das telas', () => {
+    const painel = guideEntry('painel-da-empresa')!;
+    expect(painel.group).toBe('conta-e-privacidade');
+    expect(painel.href).toBe('/empresa');
+    expect(painel.routes).toEqual(['/empresa']);
+    expect(guideWhere(painel.where)).toBe('Conta › Painel da empresa');
+    expect(painel.purpose).toContain('Só na web');
+    const passos = painel.steps.join(' ');
+    for (const name of ['"Abrir painel da empresa"', '"Contrato"', '"Convidar pessoas"', '"Links para enviar"', '"Copiar todos"', '"Baixar lista"', '"Licenças"', '"Reenviar convite"', '"Cancelar convite"', '"Encerrar licença"', '"Uso do app"', '"Textos para divulgar"']) {
+      expect(passos, name).toContain(name);
+    }
+    expect(passos).toContain('30 dias');
+    expect(painel.screenshot).toBe('421_empresa_painel.png');
+    const beneficio = guideEntry('beneficio-da-empresa')!;
+    expect(beneficio.href).toBe('/conta');
+    expect(beneficio.routes).toEqual(['/beneficio/[codigo]']);
+    expect(guideWhere(beneficio.where)).toBe('Conta › Benefício pela empresa');
+    const passosBeneficio = beneficio.steps.join(' ');
+    for (const name of ['"Entrar"', '"Criar conta"', '"Aceitar benefício"', '"Tenho um convite da empresa"', '"Ver convite"', '"Acesso ao plano"', '"Quem vê estes dados?"']) {
+      expect(passosBeneficio, name).toContain(name);
+    }
+    for (const query of ['empresa', 'rh', 'licença']) expect(searchGuide(query).map((e) => e.id), query).toContain('painel-da-empresa');
+    for (const query of ['benefício', 'convite da empresa']) expect(searchGuide(query).map((e) => e.id), query).toContain('beneficio-da-empresa');
+    // O guia não promete o que o painel não faz: nada de e-mail enviado pelo Clarevo nem de finanças vistas pela empresa.
+    expect(passos).toContain('O Clarevo não envia e-mail');
+    expect(passosBeneficio).toContain('Ela não vê seus registros');
+  });
+
   it('as calculadoras aparecem cada uma em uma linha, a partir do catálogo de calculadoras', () => {
     const calc = guideEntry('calculadoras')!;
     expect(calc.lines?.map((l) => l.title)).toEqual(CALCULATORS.map((c) => c.title));

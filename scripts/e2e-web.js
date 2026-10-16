@@ -13,7 +13,8 @@
  * Aprender e os temas de 13º salário, férias, volta às aulas e Imposto de Renda, D-053), das decisões de 16/10/2026 (D-054: o estorno no
  * orçamento, o excedente acima de 100% e o aviso de 80% dispensável, a legenda do Resumo, os percentuais dos grupos da renda comprometida,
  * a legenda do widget com valores ocultos e o card "Neste mês" em Metas) e do Ciclo L (Família, D-055: criar, convidar por link, aceitar,
- * papéis, sair e encerrar, com a Família simulada na memória) na versão web, em modo demonstração (acesso simulado).
+ * papéis, sair e encerrar, com a Família simulada na memória) e do Ciclo M (Empresas, D-056: o painel do RH só na web, o convite da empresa por
+ * link, a licença, o uso do app e a demonstração com a "Empresa Exemplo", com a empresa simulada na memória) na versão web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -75,6 +76,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
         return session.user.email === 'demo@clarevo.app' ? await session.auth.demoRepo : session.repo;
       },
       refresh: () => find().client.invalidateQueries(),
+      // As empresas simuladas (D-056): a equipe Clarevo cadastra a empresa pelo SQL Editor; aqui o roteiro faz o mesmo no hub da memória.
+      company: () => find().session.auth.companyHub,
     };
   });
   const p = await ctx.newPage();
@@ -8046,17 +8049,17 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await j1Keep();
   await j1Widths(async (w) => { await layoutChecks(`tutorial aprender com o guia ${w}px`); await shot(w === 390 ? '320_aprender_como_usar' : '320_aprender_como_usar_320px'); });
 
-  // ---- 7. A lista do guia: cinco grupos, trinta entradas (28 do D-049, "Seu mês em 30 segundos", D-052, e "Família", D-055) ----
+  // ---- 7. A lista do guia: cinco grupos, trinta e duas entradas (28 do D-049, "Seu mês em 30 segundos", D-052, "Família", D-055, "Painel da empresa" e "Benefício pela empresa", D-056) ----
   await p.getByRole('button', { name: 'Como usar o Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
   const j1Groups = () => p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((h) => h.getBoundingClientRect().width > 0).map((h) => ({
     title: h.textContent, rows: [...h.parentElement.parentElement.querySelectorAll('[role=button]')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.getAttribute('aria-label') || b.textContent) })));
   const j1G = await j1Groups();
   ok('Tutorial guia: /aprender/guia com o título "Como usar o Clarevo", a barra inferior (Aprender marcada) e o botão "Ver o tour de novo"', j1Path() === '/aprender/guia' && (await h1Name()) === 'Como usar o Clarevo' &&
     (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1 && (await visibleCount('button', 'Ver o tour de novo')) === 1);
-  ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 8, 7, 8, 2 e 5 entradas (Dia a dia ganhou "Seu mês em 30 segundos" e Conta e privacidade ganhou "Família")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
-    JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([8, 7, 8, 2, 5]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
+  ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 8, 7, 8, 2 e 7 entradas (Dia a dia ganhou "Seu mês em 30 segundos" e Conta e privacidade ganhou "Família", "Painel da empresa" e "Benefício pela empresa")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
+    JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([8, 7, 8, 2, 7]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
   const j1Rows = j1G.flatMap((g) => g.rows);
-  ok('Tutorial guia: cada linha tem o nome acessível "{título}. {para que serve}" (as funções novas: Buscar, Exportar e Importar)', j1Rows.length === 30 &&
+  ok('Tutorial guia: cada linha tem o nome acessível "{título}. {para que serve}" (as funções novas: Buscar, Exportar e Importar)', j1Rows.length === 32 &&
     j1Rows.includes('Buscar em Movimentos. Acha um gasto ou recebimento em todos os meses e mostra quanto deu no período.') &&
     j1Rows.includes('Exportar meus dados. Leva seus gastos e recebimentos para uma planilha (CSV) ou para um resumo em PDF, montado neste aparelho.') &&
     j1Rows.some((r) => r.startsWith('Importar extrato ou fatura. Traz gastos, recebimentos e compras no cartão de um arquivo do banco')) &&
@@ -10060,6 +10063,326 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const famBad = famTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(bem-vind[oa]|convidad[oa]s?|cadastrad[oa]s?|usuári[oa]s?)\b/i)?.[0]).filter(Boolean);
   ok('Família: nenhum termo proibido, travessão longo, expressão vetada nem palavra com gênero nas telas novas', famTexts.length >= 10 && famBad.length === 0, `${famTexts.length} telas ${famBad.join(' | ')}`);
   ok('Família: nenhuma escrita direta na rede (a Família do roteiro é simulada na memória)', writes.length === famWrites0, writes.slice(famWrites0).join(' | '));
+
+  // =====================================================================================================================
+  // Empresas (D-056): o painel do RH (só na web), o convite da empresa por link, a licença, o uso do app e a demonstração. O roteiro web
+  // só usa a memória (acesso simulado): as contas simuladas compartilham uma empresa simulada (organização, contrato, licenças e
+  // direitos), que a equipe Clarevo cadastra no banco de verdade pelo SQL Editor e aqui o roteiro cadastra no hub da memória
+  // (window.__e2e.company). O banco de verdade é coberto por supabase/tests/97_empresas.sql e pelos testes de API. A conta de
+  // demonstração com dados fictícios administra a "Empresa Exemplo (demonstração)", fictícia e só na memória dela.
+  // =====================================================================================================================
+  const empSizes = [[390, 844, ''], [360, 740, '_360px'], [320, 800, '_320px']];
+  // Capturas numeradas a partir de 420, em 390, 360 e 320 px (o painel também em 1280 px), com as conferências de largura e de alvos de toque.
+  const empShots = async (name, { scroll = null, wide = false } = {}) => {
+    for (const [w, h, suffix] of empSizes) {
+      await p.setViewportSize({ width: w, height: h }); await p.waitForTimeout(450);
+      if (scroll) await scroll();
+      await layoutChecks(`${name} ${w}px`);
+      await shot(`${name}${suffix}`);
+    }
+    if (wide) {
+      await p.setViewportSize({ width: 1280, height: 900 }); await p.waitForTimeout(450);
+      if (scroll) await scroll();
+      await layoutChecks(`${name} 1280px`);
+      await shot(`${name}_1280px`);
+    }
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  };
+  // Rola até o título (nível 2) de um card, para a captura mostrar o card.
+  const empScroll = (title) => async () => {
+    await p.evaluate((title) => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === title && e.getBoundingClientRect().width > 0); if (h) h.scrollIntoView({ block: 'start' }); }, title);
+    await p.waitForTimeout(250);
+  };
+  const empTexts = [];
+  const empKeep = async () => { empTexts.push(await body()); await keepText(); };
+  const empWrites0 = writes.length;
+  // Linha "rótulo: valor" do contrato e do uso (o nome acessível junta os dois).
+  const empRow = (label) => p.evaluate((label) => { const e = [...document.querySelectorAll('[aria-label]')].find((x) => x.getAttribute('aria-label').startsWith(`${label}: `) && x.getBoundingClientRect().width > 0); return e ? e.getAttribute('aria-label').slice(label.length + 2) : null; }, label);
+  // O link (do painel) de um e-mail, e só o código dele.
+  const empLinkOf = (email) => p.evaluate((email) => { const e = [...document.querySelectorAll('[aria-label]')].find((x) => x.getAttribute('aria-label').startsWith(`Link de ${email}: `) && x.getBoundingClientRect().width > 0); return e ? e.getAttribute('aria-label').slice(`Link de ${email}: `.length) : null; }, email);
+  const empStubClipboard = () => p.evaluate(() => { window.__copied = []; Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (x) => { window.__copied.push(x); } }, configurable: true }); });
+  const empGoPanel = async () => { await famConta(); await btn('Abrir painel da empresa').click(); await waitText('Contrato'); await p.waitForTimeout(500); };
+  const empChip = (name) => radio(name);
+  // O texto do card cujo título (nível 2) é este.
+  const empCardText = (title) => p.evaluate((title) => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === title && e.getBoundingClientRect().width > 0); return h?.parentElement?.textContent ?? ''; }, title);
+  const empPush = (pathname) => p.evaluate((path) => { history.pushState({}, '', path); window.dispatchEvent(new PopStateEvent('popstate')); }, pathname);
+
+  // ---- 1. Demonstração (investidor): Conta, o painel da "Empresa Exemplo (demonstração)", fictícia e identificada ----
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+  await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
+  await empStubClipboard();
+  await famConta(); await waitText('Abrir painel da empresa'); await waitText('Na demonstração não há benefício de exemplo.');
+  t = await body();
+  ok('Empresas, demonstração: Conta tem o card "Painel da empresa" (só na web) com a explicação e o botão "Abrir painel da empresa"', (await headingShown('Painel da empresa')) &&
+    t.includes('Convide pessoas para o benefício, acompanhe as licenças e veja como o app está sendo usado.') && (await visibleCount('button', 'Abrir painel da empresa')) === 1, t.slice(0, 300));
+  ok('Empresas, demonstração: "Benefício pela empresa" diz que não há benefício de exemplo e não oferece colar convite', (await headingShown('Benefício pela empresa')) &&
+    t.includes('Na demonstração não há benefício de exemplo. Para receber o convite de uma empresa, entre com uma conta sua.') && !t.includes('Tenho um convite da empresa'));
+  await empKeep();
+  await empShots('420_conta_painel_empresa', { scroll: empScroll('Painel da empresa') });
+  await btn('Abrir painel da empresa').click(); await waitText('Empresa Exemplo (demonstração)'); await p.waitForTimeout(600);
+  t = await body();
+  ok('Painel da demonstração: título, aviso de dados fictícios e o nome "Empresa Exemplo (demonstração)", com a barra de abas (tela de consulta)', (await famH1()) === 'Painel da empresa' &&
+    t.includes('Demonstração: empresa e pessoas fictícias. Nada é gravado fora deste aparelho.') && (await headingShown('Empresa Exemplo (demonstração)')) && (await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).count()) === 1, t.slice(0, 300));
+  ok('Painel: Contrato com plano Individual, 40 vagas, 18 em uso, 22 livres, início 01/03/2026, sem data de fim e "Em vigor"',
+    (await headingShown('Contrato')) && (await empRow('Plano')) === 'Individual' && (await empRow('Vagas')) === '40' && (await empRow('Em uso')) === '18 de 40 vagas em uso' && (await empRow('Livres')) === '22' &&
+    (await empRow('Início')) === '01/03/2026' && (await empRow('Fim')) === 'Sem data de fim' && (await empRow('Situação')) === 'Em vigor');
+  ok('Painel: as seções na ordem (Contrato, Convidar pessoas, Licenças, Uso do app, Textos para divulgar)', await (async () => {
+    const hs = await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
+    const order = ['Contrato', 'Convidar pessoas', 'Licenças', 'Uso do app', 'Textos para divulgar'].map((h) => hs.indexOf(h));
+    return order.every((i, n) => i >= 0 && (n === 0 || i > order[n - 1]));
+  })());
+  ok('Painel: Uso do app com os números fictícios (40 vagas, 6 convites, 12 ativas, 3 encerradas, 9 entraram em outubro) e a explicação de privacidade',
+    (await empRow('Vagas contratadas')) === '40' && (await empRow('Convites pendentes')) === '6' && (await empRow('Licenças ativas')) === '12' && (await empRow('Licenças encerradas')) === '3' &&
+    (await empRow('Pessoas que entraram em outubro')) === '9' && t.includes('A empresa não vê valores, categorias, metas, contas, cartões nem a Família de ninguém, nem somados.'), `${await empRow('Pessoas que entraram em outubro')}`);
+  ok('Painel: Textos para divulgar (4 fixos mais "Neste mês: outubro"), cada um com "Copiar texto"; nenhum leva e-mail nem valor',
+    (await headingShown('Textos para divulgar')) && ['Anúncio do benefício', 'Como entrar', 'Lembrete para quem ainda não entrou', 'O que a empresa vê', 'Neste mês: outubro'].every((x) => t.includes(x)) &&
+    (await visibleCount('button', /^Copiar o texto /)) === 5 && t.includes('Em outubro, o Clarevo tem conteúdo sobre 13º salário e'), t.slice(-900));
+  await empKeep();
+  await empShots('421_empresa_painel', { wide: true });
+  // Licenças: 22 (12 ativas, 6 com convite, 3 encerradas e 1 convite cancelado), com filtro por situação.
+  ok('Painel: Licenças com o filtro Todas (22), Convidadas (6), Ativas (12) e Encerradas (4)', (await empChip('Todas, 22').count()) === 1 && (await empChip('Convidadas, 6').count()) === 1 && (await empChip('Ativas, 12').count()) === 1 && (await empChip('Encerradas, 4').count()) === 1 &&
+    (await empChip('Todas, 22').getAttribute('aria-checked')) === 'true');
+  await empChip('Encerradas, 4').click(); await p.waitForTimeout(300);
+  t = await body();
+  ok('Painel: filtro Encerradas mostra as 3 encerradas com a data e o convite cancelado, sem botões de ação', (t.match(/Encerrada em \d\d\/\d\d\/2026/g) ?? []).length === 3 && t.includes('Convite cancelado em 25/09/2026') &&
+    (await visibleCount('button', /^Reenviar o convite/)) === 0 && (await visibleCount('button', /^Encerrar a licença/)) === 0, t.slice(-700));
+  await empChip('Convidadas, 6').click(); await p.waitForTimeout(300);
+  t = await body();
+  ok('Painel: filtro Convidadas mostra 6 convites com a data e "Reenviar convite" e "Cancelar convite" em cada um', (t.match(/Convite enviado em \d\d\/\d\d\/2026/g) ?? []).length === 6 && (await visibleCount('button', /^Reenviar o convite de /)) === 6 && (await visibleCount('button', /^Cancelar o convite de /)) === 6);
+  await empChip('Ativas, 12').click(); await p.waitForTimeout(300);
+  t = await body();
+  ok('Painel: filtro Ativas mostra 12 licenças com "Ativa desde" e "Encerrar licença"', (t.match(/Ativa desde \d\d\/\d\d\/2026/g) ?? []).length === 12 && (await visibleCount('button', /^Encerrar a licença de /)) === 12 && t.includes('pessoa.01@empresa-exemplo.example'));
+  await empShots('424_empresa_licencas', { scroll: empScroll('Licenças') });
+
+  // ---- 2. Convidar pessoas: a conferência (válidos, repetidos, já convidados e inválidos) e a confirmação ----
+  await empScroll('Convidar pessoas')();
+  ok('Convidar: o botão começa em "Convidar 0 pessoas", desligado, com a dica de colar os e-mails', (await btn('Convidar 0 pessoas').isDisabled()) && (await body()).includes('Cole os e-mails para ver a conferência.'));
+  await field('E-mails').fill('nova.pessoa@empresa-exemplo.example\nNOVA.PESSOA@empresa-exemplo.example\npessoa.01@empresa-exemplo.example\nisto-nao-e-email');
+  await p.waitForTimeout(300);
+  t = await body();
+  ok('Convidar: a conferência separa 1 válido, 1 repetido na lista, 1 já convidado e 1 item inválido (que aparece), e o botão fica desligado',
+    t.includes('1 e-mail válido para convidar') && t.includes('1 e-mail repetido na lista (conta uma vez)') && t.includes('1 e-mail já convidado (não ocupa outra vaga)') && t.includes('1 item que não parece um e-mail') && t.includes('isto-nao-e-email') &&
+    t.includes('Sobram 22 vagas') && t.includes('Corrija ou retire os itens que não parecem um e-mail para continuar.') && (await btn('Convidar 1 pessoa').isDisabled()), t.slice(-900));
+  await empKeep();
+  await empShots('422_empresa_convidar_conferencia', { scroll: empScroll('Convidar pessoas') });
+  await field('E-mails').fill('nova.pessoa@empresa-exemplo.example, NOVA.PESSOA@empresa-exemplo.example; pessoa.01@empresa-exemplo.example');
+  await p.waitForTimeout(300);
+  ok('Convidar: vírgula e ponto e vírgula também separam; sem item inválido o botão "Convidar 1 pessoa" liga', !(await btn('Convidar 1 pessoa').isDisabled()) && !(await body()).includes('Corrija ou retire'));
+  await btn('Convidar 1 pessoa').click(); await waitText('1 convite criado.'); await p.waitForTimeout(500);
+  t = await body();
+  const empLink1 = await empLinkOf('nova.pessoa@empresa-exemplo.example');
+  ok('Convidar: "1 convite criado.", a lista esvazia e os links aparecem (endereço do app mais /beneficio/ e 32 caracteres), só agora', t.includes('1 convite criado.') && (await field('E-mails').inputValue()) === '' &&
+    (await headingShown('Links para enviar')) && empLink1 !== null && new RegExp(`^http://localhost:${PORT}/beneficio/[0-9a-f]{32}$`).test(empLink1) && t.includes('Os links aparecem só agora'), `${empLink1}`);
+  ok('Convidar: os contadores sobem (22 vagas viram 21 livres; Todas 23 e Convidadas 7)', (await empRow('Livres')) === '21' && (await empChip('Todas, 23').count()) === 1 && (await empChip('Convidadas, 7').count()) === 1, `${await empRow('Livres')}`);
+  await btn('Copiar todos').click(); await waitText('Lista copiada.'); await p.waitForTimeout(200);
+  ok('"Copiar todos": uma linha por pessoa, com o e-mail e o link, e o aviso "Lista copiada."', (await p.evaluate(() => window.__copied.at(-1))) === `nova.pessoa@empresa-exemplo.example: ${empLink1}`);
+  const [empDl] = await Promise.all([p.waitForEvent('download'), btn('Baixar lista').click()]);
+  const empCsv = fs.readFileSync(await empDl.path()).toString('utf8');
+  ok('"Baixar lista": CSV com BOM, cabeçalho "E-mail;Link", uma linha por pessoa e o nome do arquivo com a data', empDl.suggestedFilename() === 'clarevo-convites-2026-10-07.csv' && empCsv === `﻿E-mail;Link\r\nnova.pessoa@empresa-exemplo.example;${empLink1}\r\n`, `${empDl.suggestedFilename()} ${JSON.stringify(empCsv)}`);
+  await btn('Copiar o link de nova.pessoa@empresa-exemplo.example').click(); await waitText('Link copiado.'); await p.waitForTimeout(200);
+  ok('"Copiar link" de uma pessoa copia só o link', (await p.evaluate(() => window.__copied.at(-1))) === empLink1);
+  await empKeep();
+  await empShots('423_empresa_links', { scroll: empScroll('Links para enviar') });
+
+  // ---- 3. Reenviar, cancelar e encerrar ----
+  await empChip('Convidadas, 7').click(); await p.waitForTimeout(300);
+  await btn('Reenviar o convite de convite.01@empresa-exemplo.example').click(); await waitText('Novo link gerado. O link anterior deixou de valer.'); await p.waitForTimeout(400);
+  const empLink2 = await empLinkOf('convite.01@empresa-exemplo.example');
+  ok('Reenviar: aviso de que o link anterior deixou de valer e o link novo entra nos "Links para enviar" (junto com o da outra pessoa)', empLink2 !== null && new RegExp(`/beneficio/[0-9a-f]{32}$`).test(empLink2) && empLink2 !== empLink1 &&
+    (await empLinkOf('nova.pessoa@empresa-exemplo.example')) === empLink1);
+  await btn('Cancelar o convite de convite.02@empresa-exemplo.example').click(); await waitText('Cancelar o convite?'); await p.waitForTimeout(300);
+  t = await dialogText();
+  ok('Cancelar convite: o diálogo diz que o link deixa de funcionar, que a vaga volta e que dá para convidar o mesmo e-mail de novo', t.includes('convite.02@empresa-exemplo.example') && t.includes('O link deixa de funcionar e a vaga volta. Você pode convidar o mesmo e-mail de novo depois.'), t);
+  await confirmIn('Cancelar convite'); await waitText('Convite cancelado.'); await p.waitForTimeout(500);
+  ok('Cancelar convite: aviso, a vaga volta (Livres 22), Convidadas 6 e Encerradas 5 (a linha fica, como convite cancelado)', (await empRow('Livres')) === '22' && (await empChip('Convidadas, 6').count()) === 1 && (await empChip('Encerradas, 5').count()) === 1, `${await empRow('Livres')}`);
+  await empChip('Ativas, 12').click(); await p.waitForTimeout(300);
+  await btn('Encerrar a licença de pessoa.12@empresa-exemplo.example').click(); await waitText('Encerrar a licença?'); await p.waitForTimeout(300);
+  t = await dialogText();
+  ok('Encerrar licença: o diálogo explica os 30 dias de acesso pleno, o plano gratuito com leitura do histórico e que nada é apagado', t.includes('pessoa.12@empresa-exemplo.example') && t.includes('A pessoa continua com a conta, o histórico e a Família dela: nada é apagado.') &&
+    t.includes('O acesso pleno segue por 30 dias e depois ela passa para o plano gratuito, com leitura do histórico.') && t.includes('Para voltar a ter o benefício, será preciso convidar de novo.'), t);
+  await empShots('425_empresa_encerrar');
+  await confirmIn('Encerrar licença'); await waitText('Licença encerrada.'); await p.waitForTimeout(500);
+  ok('Encerrar licença: aviso, Ativas 11 e Encerradas 6; as linhas das ativas seguem com "Encerrar licença"', (await empChip('Ativas, 11').count()) === 1 && (await empChip('Encerradas, 6').count()) === 1 && (await visibleCount('button', /^Encerrar a licença de /)) === 11);
+  ok('Uso do app depois das ações: 6 convites, 11 ativas, 4 encerradas (o convite cancelado não conta) e 9 entraram em outubro', (await empRow('Convites pendentes')) === '6' && (await empRow('Licenças ativas')) === '11' && (await empRow('Licenças encerradas')) === '4' && (await empRow('Pessoas que entraram em outubro')) === '9',
+    `${await empRow('Convites pendentes')} ${await empRow('Licenças ativas')} ${await empRow('Licenças encerradas')}`);
+  await empKeep();
+  await empShots('426_empresa_uso', { scroll: empScroll('Uso do app') });
+  await empShots('427_empresa_textos', { scroll: empScroll('Textos para divulgar') });
+  await btn('Copiar o texto Anúncio do benefício').click(); await waitText('Texto copiado.'); await p.waitForTimeout(200);
+  ok('"Copiar texto": copia o texto pronto, sem e-mail nem número de ninguém', await (async () => { const c = await p.evaluate(() => window.__copied.at(-1)); return c.startsWith('Chegou um benefício para ajudar a organizar o dinheiro do mês: o Clarevo.') && !/@|R\$\s?\d/.test(c); })());
+  ok('Painel da demonstração: nenhuma escrita na rede (a empresa de exemplo vive só na memória)', writes.length === empWrites0, writes.slice(empWrites0).join(' | '));
+  // A demonstração de novo: nada do que foi feito fica (cada visita refaz a empresa de exemplo) e os totais não mudam.
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+  await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
+  ok('Demonstração de novo: os totais de outubro seguem 6.000 / 3.900 / 2.100 e o Resumo não ganhou nada da empresa', (await body()).includes('R$ 6.000,00') && (await body()).includes('R$ 3.900,00') && (await body()).includes('R$ 2.100,00') && !(await body()).includes('Empresa Exemplo'));
+  await empGoPanel();
+  ok('Demonstração de novo: a empresa de exemplo volta como era (22 licenças, nenhum convite do roteiro anterior)', (await empChip('Todas, 22').count()) === 1 && !(await body()).includes('nova.pessoa@'));
+
+  // ---- 4. Conta nova de RH (Rita): sem empresa, sem painel; depois que a equipe cadastra a empresa, o painel aparece ----
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await empStubClipboard();
+  await famCreateAccount('Rita Prado', 'rita.empresa@exemplo.com');
+  await famConta(); await waitText('Tenho um convite da empresa'); await p.waitForTimeout(300);
+  t = await body();
+  ok('Conta nova: sem empresa, não há "Painel da empresa"; "Benefício pela empresa" oferece "Tenho um convite da empresa" (nada de exemplo)', (await visibleCount('button', 'Abrir painel da empresa')) === 0 && !(await headingShown('Painel da empresa')) &&
+    (await headingShown('Benefício pela empresa')) && t.includes('Se a sua empresa oferece o Clarevo como benefício, cole aqui o link do convite para ver os detalhes e aceitar.') && t.includes('Tenho um convite da empresa') && !t.includes('Empresa Exemplo'), t.slice(0, 400));
+  await empKeep();
+  await empShots('429_conta_convite_empresa', { scroll: empScroll('Benefício pela empresa') });
+  // A equipe Clarevo cadastra a empresa (no banco de verdade, pelo SQL Editor; aqui, no hub da memória).
+  const empOrg = await p.evaluate(() => window.__e2e.company().staffCreateOrganization({ name: 'Empresa Alfa', seats: 6, plan: 'individual', startsOn: '2026-10-01', endsOn: null, adminEmail: 'RITA.empresa@exemplo.com' }));
+  ok('A equipe cadastra a empresa: organização, contrato e a primeira pessoa administradora (a Rita, que já tem conta)', typeof empOrg.organizationId === 'string' && empOrg.adminPersonId.length > 0);
+  const empNoAccount = await p.evaluate(() => { try { window.__e2e.company().staffCreateOrganization({ name: 'Empresa Beta', seats: 3, plan: 'familiar', startsOn: '2026-10-01', endsOn: null, adminEmail: 'ninguem@exemplo.com' }); return null; } catch (e) { return `${e.code}|${e.hint}`; } });
+  ok('A equipe: administrador sem conta é recusado com erro claro e dica (nada é criado)', empNoAccount !== null && empNoAccount.startsWith('administrador_sem_conta|') && empNoAccount.includes('criar a conta no app'), `${empNoAccount}`);
+  await p.evaluate(() => window.__e2e.refresh()); await p.waitForTimeout(500);
+  await empGoPanel();
+  t = await body();
+  ok('Painel de uma empresa real (da memória): "Empresa Alfa", sem aviso de demonstração, 6 vagas, 0 em uso, sem fim; sem licenças ainda', (await headingShown('Empresa Alfa')) && !t.includes('Demonstração: empresa e pessoas fictícias') && (await empRow('Vagas')) === '6' && (await empRow('Em uso')) === '0 de 6 vagas em uso' &&
+    (await empRow('Fim')) === 'Sem data de fim' && t.includes('Nenhuma licença ainda. Convide pessoas acima.'), t.slice(0, 400));
+  ok('Uso do app com 0 pessoas ativas: os números de licenças aparecem e o de uso do mês diz "Aparece a partir de 5 pessoas ativas."', (await empRow('Pessoas que entraram em outubro')) === 'Aparece a partir de 5 pessoas ativas.' && (await empRow('Licenças ativas')) === '0');
+  await field('E-mails').fill('bia.empresa@exemplo.com\ncaio.empresa@exemplo.com\nduda.empresa@exemplo.com');
+  await btn('Convidar 3 pessoas').click(); await waitText('3 convites criados.'); await p.waitForTimeout(500);
+  const empBia = await empLinkOf('bia.empresa@exemplo.com');
+  const empCaio = await empLinkOf('caio.empresa@exemplo.com');
+  const empDuda = await empLinkOf('duda.empresa@exemplo.com');
+  ok('Convidar 3: três links diferentes, um por pessoa, e as vagas (3 em uso)', [empBia, empCaio, empDuda].every((x) => x !== null && /\/beneficio\/[0-9a-f]{32}$/.test(x)) && new Set([empBia, empCaio, empDuda]).size === 3 && (await empRow('Em uso')) === '3 de 6 vagas em uso');
+  // Reenviar o da Duda e depois cancelar: o link velho e o novo deixam de existir na tela, e a vaga volta.
+  await btn('Reenviar o convite de duda.empresa@exemplo.com').click(); await waitText('Novo link gerado.'); await p.waitForTimeout(400);
+  const empDuda2 = await empLinkOf('duda.empresa@exemplo.com');
+  ok('Reenviar a Duda: outro link', empDuda2 !== null && empDuda2 !== empDuda);
+  await btn('Cancelar o convite de duda.empresa@exemplo.com').click(); await waitText('Cancelar o convite?'); await confirmIn('Cancelar convite'); await waitText('Convite cancelado.'); await p.waitForTimeout(500);
+  ok('Cancelar a Duda: some dos links para enviar, a vaga volta (2 em uso) e a linha fica como "Convite cancelado"', (await empLinkOf('duda.empresa@exemplo.com')) === null && (await empRow('Em uso')) === '2 de 6 vagas em uso' && (await body()).includes('Convite cancelado em 07/10/2026'));
+
+  // ---- 5. Bia recebe o link da empresa: cola em "Tenho um convite da empresa", vê a prévia e aceita ----
+  await famSignOut();
+  await famCreateAccount('Bia Souza', 'bia.empresa@exemplo.com');
+  await otherDevice(async (repo, ctx) => { const sp = await repo.getSpace(); await repo.createRecord('empresa-bia-0001', ctx, 'despesa', { accountId: sp.accounts[0].id, amountCents: 25000, occurredOn: '2026-10-05', description: 'Mercado da Bia', category: null }); });
+  await famConta(); await waitText('Tenho um convite da empresa'); await p.waitForTimeout(300);
+  ok('Bia (sem ser RH): Conta não mostra "Painel da empresa"', (await visibleCount('button', 'Abrir painel da empresa')) === 0 && !(await headingShown('Painel da empresa')));
+  await field('Link do convite da empresa').fill('isto não é um convite');
+  await btn('Ver convite').click(); await waitText('Não encontramos um convite da empresa neste texto.');
+  ok('Tenho um convite da empresa: um texto sem link é recusado junto ao campo, sem sair de Conta', (await body()).includes('Não encontramos um convite da empresa neste texto. Confira o link que você recebeu.') && (await famH1()) === 'Conta');
+  await field('Link do convite da empresa').fill(empCaio);
+  await btn('Ver convite').click(); await waitText('Convite indisponível'); await p.waitForTimeout(400);
+  t = await body();
+  ok('O link da Caio na conta da Bia (outro e-mail): "Convite indisponível", a mesma mensagem de qualquer convite que não vale, sem nome de empresa', (await famH1()) === 'Benefício da empresa' &&
+    t.includes('Este convite não está disponível. Se o link é seu, entre com o e-mail que a empresa usou no convite ou peça um novo link ao RH.') && !t.includes('Empresa Alfa'), t.slice(0, 300));
+  await empKeep();
+  await empShots('431_beneficio_indisponivel');
+  await btn('Ir para o início').click(); await waitText('Diferença do mês');
+  await famConta(); await waitText('Tenho um convite da empresa');
+  await field('Link do convite da empresa').fill(`Oi! Aqui está o seu benefício: ${empBia}`);
+  await btn('Ver convite').click(); await waitText('Aceitar benefício'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Convite da empresa: a prévia mostra só o nome da empresa e o plano, e a promessa de privacidade; sem barra de abas', (await famH1()) === 'Benefício da empresa' && t.includes('Convite de Empresa Alfa') && t.includes('Plano individual') &&
+    t.includes('A empresa administra só o seu acesso ao plano e não vê seus registros, contas, metas, cartões nem a sua Família.') && (await visibleCount('button', 'Aceitar benefício')) === 1 && (await visibleCount('button', 'Agora não')) === 1 &&
+    (await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).count()) === 0, t.slice(0, 400));
+  ok('Convite da empresa: a prévia não mostra o código, o e-mail da Bia nem vagas', !t.includes(empBia.split('/').pop()) && !t.includes('bia.empresa@exemplo.com') && !/vagas|licen/i.test(t.replace('Plano individual', '')));
+  await empKeep();
+  await empShots('430_beneficio_previa');
+  await btn('Agora não').click(); await waitText('Diferença do mês');
+  await famConta(); await waitText('Tenho um convite da empresa');
+  ok('"Agora não" volta ao início e não aceita nada (Conta segue sem benefício)', (await body()).includes('Tenho um convite da empresa') && !(await body()).includes('Benefício ativo'));
+  await field('Link do convite da empresa').fill(empBia); await btn('Ver convite').click(); await waitText('Aceitar benefício');
+  await btn('Aceitar benefício').click(); await waitText('Benefício ativado: Empresa Alfa.'); await p.waitForTimeout(600);
+  t = await body();
+  ok('Aceitar: abre Conta com o aviso "Benefício ativado: Empresa Alfa." e o card (empresa, plano, desde quando, "Benefício ativo")', famPath() === '/conta' && t.includes('Benefício ativado: Empresa Alfa.') && (await empRow('Empresa')) === 'Empresa Alfa' && (await empRow('Plano')) === 'Individual' &&
+    (await empRow('Desde')) === '07/10/2026' && (await empRow('Situação')) === 'Benefício ativo', `${famPath()} ${t.slice(0, 300)}`);
+  ok('Aceitar: o card "Acesso ao plano" passa a dizer "Benefício pela empresa", e "Tenho um convite da empresa" some', (await empCardText('Acesso ao plano')).includes('Situação') && (await empCardText('Acesso ao plano')).includes('Benefício pela empresa') && !t.includes('Tenho um convite da empresa'));
+  await empKeep();
+  await empShots('433_conta_beneficio_ativo', { scroll: empScroll('Benefício pela empresa') });
+  // O link usado não vale de novo.
+  await famGoResumo();
+  // Quem vê estes dados?: a explicação do que a empresa vê.
+  await p.getByRole('button', { name: 'Quem vê estes dados?' }).filter({ visible: true }).first().click(); await waitText('Entendi'); await p.waitForTimeout(400);
+  t = await body();
+  ok('Quem vê estes dados?: explica o que a empresa vê (e-mails que convidou, situação e datas; uso do mês só com 5 pessoas ativas) e o que nunca vê', t.includes('A empresa que oferece o benefício vê os e-mails que ela mesma convidou, a situação de cada licença (convite enviado, ativa ou encerrada) e as datas.') &&
+    t.includes('Com 5 pessoas ativas ou mais, vê também quantas entraram no app no mês, sem dizer quem.') && t.includes('A empresa não vê valores, categorias, metas, contas, cartões nem a Família de ninguém, nem somados.') && t.includes('Se uma empresa oferecer o Clarevo como benefício'), t.slice(0, 600));
+  await empKeep();
+  await empShots('435_quem_ve_empresa');
+  await btn('Entendi').click(); await waitText('Diferença do mês');
+
+  // ---- 6. Caio abre o link sem ter conta: entra pela criação da conta e volta ao convite ----
+  await famSignOut();
+  await empPush(new URL(empCaio).pathname);
+  await waitText('Você recebeu um convite da sua empresa para usar o Clarevo como benefício.'); await p.waitForTimeout(400);
+  t = await body();
+  ok('Convite da empresa sem conta: explica, oferece "Criar conta" e "Entrar", e nada do convite (empresa, plano) aparece antes de entrar', famPath() === new URL(empCaio).pathname && (await famH1()) === 'Benefício da empresa' &&
+    t.includes('Entre ou crie sua conta com o e-mail do convite para ver os detalhes e aceitar. Depois você volta para este convite.') && (await visibleCount('button', 'Criar conta')) === 1 && (await visibleCount('button', 'Entrar')) === 1 && !t.includes('Empresa Alfa') && !t.includes('Plano individual'), `${famPath()} ${t.slice(0, 300)}`);
+  await empKeep();
+  await empShots('432_beneficio_sem_conta');
+  await btn('Criar conta').click(); await waitText('Nome de apresentação');
+  await field('Nome de apresentação').fill('Caio Reis'); await field('E-mail').fill('caio.empresa@exemplo.com'); await field('Senha').fill('senha1234');
+  await btn('Criar conta').click(); await waitText('Confira seu e-mail');
+  await btn('Simular abertura do link').click(); await btn('Já confirmei meu e-mail').click();
+  await waitUntil(async () => (await famH1()) === 'Sua primeira conta', 8000);
+  await btn('Começar meu mês').click(); await waitText('Aceitar benefício'); await p.waitForTimeout(500);
+  ok('Convite da empresa sem conta: depois de criar a conta, volta ao convite e mostra a prévia da Empresa Alfa', famPath() === new URL(empCaio).pathname && (await body()).includes('Convite de Empresa Alfa'), `${famPath()}`);
+  await btn('Aceitar benefício').click(); await waitText('Benefício ativado: Empresa Alfa.'); await p.waitForTimeout(500);
+  ok('Caio: aceitou e a Conta mostra o benefício ativo', (await empRow('Empresa')) === 'Empresa Alfa' && (await empRow('Situação')) === 'Benefício ativo');
+
+  // ---- 7. Rita de volta: duas ativas, uma cancelada; o uso do mês só aparece com 5 pessoas ativas ----
+  await famSignOut();
+  await famSignIn('rita.empresa@exemplo.com');
+  await empGoPanel();
+  t = await body();
+  ok('Painel da Rita: Bia e Caio ativas desde 07/10/2026, a Duda com convite cancelado; Todas 3, Convidadas 0, Ativas 2, Encerradas 1', (t.match(/Ativa desde 07\/10\/2026/g) ?? []).length === 2 && t.includes('duda.empresa@exemplo.com') && t.includes('Convite cancelado em 07/10/2026') &&
+    (await empChip('Todas, 3').count()) === 1 && (await empChip('Convidadas, 0').count()) === 1 && (await empChip('Ativas, 2').count()) === 1 && (await empChip('Encerradas, 1').count()) === 1, t.slice(-700));
+  ok('Uso com 2 pessoas ativas: o número do mês segue escondido', (await empRow('Licenças ativas')) === '2' && (await empRow('Pessoas que entraram em outubro')) === 'Aparece a partir de 5 pessoas ativas.');
+  await field('E-mails').fill('edu.empresa@exemplo.com\nfabi.empresa@exemplo.com\ngui.empresa@exemplo.com');
+  await btn('Convidar 3 pessoas').click(); await waitText('3 convites criados.'); await p.waitForTimeout(500);
+  const empPeople = [];
+  for (const n of ['edu', 'fabi', 'gui']) empPeople.push({ email: `${n}.empresa@exemplo.com`, code: (await empLinkOf(`${n}.empresa@exemplo.com`)).split('/').pop() });
+  // Outro aparelho: as três pessoas aceitam (cada uma com a conta dela); o último acesso de cada uma vem do hub.
+  await p.evaluate(({ people }) => {
+    const hub = window.__e2e.company();
+    people.forEach((x, i) => {
+      const id = `pessoa-${x.email.split('.')[0]}`;
+      hub.register(id, x.email, x.email.split('.')[0]);
+      hub.accept(id, `empresa-aceite-${i}-xxxx`, x.code);
+    });
+    hub.recordSignIn('pessoa-edu', '2026-09-30T12:00:00.000Z');
+    hub.recordSignIn('pessoa-fabi', '2026-10-06T12:00:00.000Z');
+    return window.__e2e.refresh();
+  }, { people: empPeople });
+  await p.waitForTimeout(800);
+  t = await body();
+  ok('Com 5 pessoas ativas o uso do mês aparece: entraram em outubro Bia, Caio e Fabi (3); o da Edu foi em setembro e a Gui ainda não entrou', (await empRow('Licenças ativas')) === '5' && (await empRow('Convites pendentes')) === '0' && (await empRow('Pessoas que entraram em outubro')) === '3' && (await empRow('Em uso')) === '5 de 6 vagas em uso', `${await empRow('Pessoas que entraram em outubro')}`);
+  ok('O número não diz quem entrou: nenhuma linha do uso tem nome nem e-mail', !(await p.evaluate(() => [...document.querySelectorAll('[aria-label^="Pessoas que entraram"]')].some((e) => /@/.test(e.textContent)))));
+  // Vagas: 5 de 6 usadas; duas pessoas novas não cabem, uma cabe.
+  await field('E-mails').fill('hugo.empresa@exemplo.com\nivo.empresa@exemplo.com');
+  await p.waitForTimeout(300);
+  t = await body();
+  ok('Sem vagas para todas: "Sobra 1 vaga", o aviso de que há mais pessoas novas do que vagas livres, e o botão "Convidar 2 pessoas" desligado', t.includes('Sobra 1 vaga') && t.includes('A lista tem mais pessoas novas do que vagas livres.') && (await btn('Convidar 2 pessoas').isDisabled()), t.slice(-600));
+  await field('E-mails').fill('hugo.empresa@exemplo.com');
+  await p.waitForTimeout(300);
+  ok('Com uma pessoa nova cabe na última vaga: "Convidar 1 pessoa" ligado', !(await btn('Convidar 1 pessoa').isDisabled()));
+  await field('E-mails').fill('');
+  // Encerrar a licença da Bia: sai de 5 para 4 pessoas ativas e o número do mês some de novo.
+  await empChip('Ativas, 5').click(); await p.waitForTimeout(300);
+  await btn('Encerrar a licença de bia.empresa@exemplo.com').click(); await waitText('Encerrar a licença?'); await confirmIn('Encerrar licença'); await waitText('Licença encerrada.'); await p.waitForTimeout(600);
+  ok('Encerrada a licença da Bia: 4 ativas, 1 encerrada e o número do mês volta a "Aparece a partir de 5 pessoas ativas."', (await empRow('Licenças ativas')) === '4' && (await empRow('Licenças encerradas')) === '1' && (await empRow('Pessoas que entraram em outubro')) === 'Aparece a partir de 5 pessoas ativas.');
+  await empKeep();
+
+  // ---- 8. Bia depois do fim do benefício: conta, histórico e acesso pleno por 30 dias ----
+  await famSignOut();
+  await famSignIn('bia.empresa@exemplo.com');
+  await famConta(); await waitText('Benefício encerrado em'); await p.waitForTimeout(300);
+  t = await body();
+  ok('Bia com a licença encerrada: o card diz "Benefício encerrado em 07/10/2026", o acesso pleno até 06/11/2026 e que a conta, o histórico e a Família continuam com ela', (await empRow('Situação')) === 'Benefício encerrado em 07/10/2026' && t.includes('Acesso pleno até 06/11/2026') &&
+    t.includes('Sua conta, seu histórico e a sua Família continuam com você.') && (await empRow('Empresa')) === 'Empresa Alfa', t.slice(0, 500));
+  ok('Bia com a licença encerrada: "Acesso ao plano" volta a "Plano pessoal"', (await empCardText('Acesso ao plano')).includes('Plano pessoal'));
+  await empKeep();
+  await empShots('434_conta_beneficio_encerrado', { scroll: empScroll('Benefício pela empresa') });
+  await famGoResumo();
+  ok('Bia com a licença encerrada: o histórico continua (o gasto de R$ 250,00 de 05/10 segue no Resumo) e ela continua anotando', (await body()).includes('R$ 250,00') && (await visibleCount('button', 'Anotar gasto')) === 1);
+  await famSignOut();
+
+  // ---- 9. Textos e escritas ----
+  const empBad = empTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(bem-vind[oa]|cadastrad[oa]s?|usuári[oa]s?|colaborador(a|es|as)?|funcionári[oa]s?|administrador(a|es|as)?)\b/i)?.[0]).filter(Boolean);
+  ok('Empresas: nenhum termo proibido, travessão longo, expressão vetada nem palavra com gênero nas telas novas', empTexts.length >= 12 && empBad.length === 0, `${empTexts.length} telas ${empBad.join(' | ')}`);
+  ok('Empresas: nenhuma escrita direta na rede (as empresas do roteiro são simuladas na memória)', writes.length === empWrites0, writes.slice(empWrites0).join(' | '));
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);

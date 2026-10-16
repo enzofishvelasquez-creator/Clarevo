@@ -279,13 +279,17 @@ select pg_temp.expect_error(format($$select public.sync_series_occurrences(%L)$$
 select pg_temp.expect_error(format($$select public.pay_commitment('chave-car-c002', %L, 1, %L, 15000, '2026-10-07')$$,
   (select id from ids where name = 'ana_internet'), (select id from ids where name = 'ana_conta')), 'nao_encontrado');
 select pg_temp.expect_error(format($$select * from public.month_totals(%L, '2026-10-01')$$, (select id from ids where name = 'ana_ctx')), 'sem_permissao');
--- Empresa convida por e-mail, mas não escolhe beneficiário nem ativa a licença.
+-- Empresa convida por e-mail (só pela função invite_licenses, D-056), mas não escolhe beneficiário nem ativa a licença; a escrita
+-- direta em licenças é recusada (as funções são testadas em 97_empresas).
 select pg_temp.expect_error($$insert into public.licenses (contract_id, invited_email, person_id)
   values ('20000000-0000-0000-0000-000000000001', 'davi@exemplo.test', '00000000-0000-0000-0000-00000000000d')$$, 'permission denied%');
-insert into public.licenses (contract_id, invited_email) values ('20000000-0000-0000-0000-000000000001', 'novo@exemplo.test');
-do $$ begin assert (select status from public.licenses where invited_email = 'novo@exemplo.test') = 'convidada', 'convite nasce como convidada'; end $$;
-select pg_temp.expect_error($$update public.licenses set status = 'ativa' where invited_email = 'novo@exemplo.test'$$, '%licenses_check%');
+select pg_temp.expect_error($$insert into public.licenses (contract_id, invited_email) values ('20000000-0000-0000-0000-000000000001', 'novo@exemplo.test')$$,
+  'permission denied%');
+select pg_temp.expect_error($$update public.licenses set status = 'ativa' where invited_email = 'ana@exemplo.test'$$, 'permission denied%');
 select pg_temp.expect_error($$update public.licenses set person_id = '00000000-0000-0000-0000-00000000000d'$$, 'permission denied%');
+select pg_temp.expect_error($$delete from public.licenses$$, 'permission denied%');
+select public.invite_licenses('20000000-0000-0000-0000-000000000001', array['novo@exemplo.test'], 'chave-car-l001');
+do $$ begin assert (select status from public.licenses where invited_email = 'novo@exemplo.test') = 'convidada', 'convite nasce como convidada'; end $$;
 
 -- 5. Davi (externo) e sem sessão: nada de ninguém.
 select set_config('request.jwt.claim.sub', :davi, true);
@@ -348,7 +352,7 @@ select pg_temp.expect_error(format($$select public.create_series('chave-bru-s006
 
 -- 7. Fim do benefício não apaga conta, histórico ou família.
 reset role;
-update public.licenses set status = 'encerrada', ended_at = now();
+update public.licenses set status = 'encerrada', ended_at = now() where status = 'ativa';
 update public.plan_entitlements set valid_until = now();
 set role authenticated;
 select set_config('request.jwt.claim.sub', :ana, true);

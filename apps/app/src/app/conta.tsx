@@ -1,11 +1,12 @@
-import { EXPORT_TEXT, FAMILY_ROLE_LABEL, FAMILY_TEXT } from '@clarevo/core';
-import { AlertCircle, Check, FileDown, KeyRound, LogOut, MonitorSmartphone, Users } from 'lucide-react-native';
+import { BENEFIT_TEXT, COMPANY_TEXT, EXPORT_TEXT, FAMILY_ROLE_LABEL, FAMILY_TEXT } from '@clarevo/core';
+import { AlertCircle, Building2, Check, FileDown, KeyRound, LogOut, MonitorSmartphone, Users } from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Platform, ScrollView, View } from 'react-native';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { AccountsCard } from '@/components/accounts-card';
+import { BenefitCard } from '@/components/benefit-card';
 import { PrivacyCard, RemindersCard, WidgetCard } from '@/components/device-settings';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { SubHeader } from '@/components/header';
@@ -13,6 +14,7 @@ import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Screen, Txt } from '@/components/ui';
 import { AuthError, RESEND_INTERVAL_SECONDS } from '@/lib/auth';
 import { signOutIntent } from '@/lib/nav';
+import { useCompanies, useMyBenefit } from '@/state/company';
 import { useWork } from '@/state/data';
 import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
@@ -37,6 +39,8 @@ export default function ContaScreen() {
   const { user, auth, signOut } = useSession();
   const personal = useWork().data;
   const family = useFamily();
+  const companies = useCompanies();
+  const benefit = useMyBenefit();
   // Avisos das telas de contas ("Conta adicionada.", "Conta salva."): lidos uma única vez, quando esta tela abre.
   const [notice] = useFlash();
   const [securityMsg, setSecurityMsg] = useState<Msg>(null);
@@ -126,6 +130,19 @@ export default function ContaScreen() {
           />
         </Card>
 
+        {/* Painel da empresa (D-056): só na web e só para quem administra uma organização; no celular nada aparece. */}
+        {Platform.OS === 'web' && (companies.data?.length ?? 0) > 0 ? (
+          <Card style={{ gap: space[3] }}>
+            <Txt variant="title" accessibilityRole="header" aria-level={2}>
+              {COMPANY_TEXT.accountTitle}
+            </Txt>
+            <Txt variant="caption" color={colors.textSecondary}>
+              {COMPANY_TEXT.accountHint}
+            </Txt>
+            <Button label={COMPANY_TEXT.accountOpen} icon={Building2} tone="soft" onPress={() => router.push('/empresa')} />
+          </Card>
+        ) : null}
+
         <View onLayout={(e) => setAccountsY(e.nativeEvent.layout.y)}>
           <AccountsCard contextId={personal?.contextId} canWrite={personal?.canWrite ?? true} />
         </View>
@@ -166,6 +183,9 @@ export default function ContaScreen() {
           <Button label={EXPORT_TEXT.entryButton} icon={FileDown} tone="soft" accessibilityLabel={EXPORT_TEXT.entryA11y} onPress={() => router.push('/conta/exportar')} />
         </Card>
 
+        {/* Benefício pela empresa (D-056): o que a empresa oferece, ou onde colar o link do convite. */}
+        <BenefitCard />
+
         <Card style={{ gap: space[2] }}>
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
             Acesso ao plano
@@ -175,7 +195,7 @@ export default function ContaScreen() {
               Situação
             </Txt>
             <Txt variant="label" style={{ fontFamily: fonts.bold }}>
-              Plano pessoal
+              {benefit.data?.status === 'ativa' ? BENEFIT_TEXT.planCardSituation : 'Plano pessoal'}
             </Txt>
           </View>
           <Txt variant="caption" color={colors.textSecondary}>

@@ -41,6 +41,7 @@ import type {
   SeriesEditInput,
   SeriesInput,
 } from './records';
+import type { Benefit, BenefitPreview, CompanyOverview, CompanyUsage, License, LicenseInviteWrite, LicenseRenewWrite } from './company';
 import type { FamilyInvite, FamilyInviteWrite, FamilyInvitePreview, FamilyJoin, FamilyOverview, InviteRole } from './family';
 import type { ImportDestination, ImportItem, ImportResult } from './importar/tipos';
 import type { RecordSearchFilter, SearchPage } from './search';
@@ -703,6 +704,44 @@ export interface RecordsRepository {
   transferFamilyOwnership(key: string, contextId: string, personId: string): Promise<void>;
   /** end_family. Só o titular e só sem outra pessoa ativa (familia_com_membros). Os dados ficam guardados, sem leitura por ninguém. */
   endFamily(key: string, contextId: string): Promise<void>;
+
+  // Empresas (D-056, Ciclo M). Regras e textos em company.ts, iguais aos da migração 0014 (as sete funções, a visão my_benefit e a
+  // leitura de licenças do RH). Toda escrita leva uma chave de idempotência (o mesmo espaço das outras operações da pessoa): repetir
+  // a mesma chave devolve o mesmo resultado; outro conteúdo com a mesma chave é chave_reutilizada. Nenhuma conta como anotação na
+  // atividade (D-030). A empresa nunca lê finanças: nada aqui toca registros, contas, metas, cartões nem a Família. No
+  // MemoryRepository, organizações, licenças e direitos são compartilhados entre repositórios por um MemoryCompanyHub.
+
+  /**
+   * As organizações que a pessoa administra, com os contratos e as licenças de cada uma (sem a pessoa que aceitou nem o resumo do
+   * código). Quem não administra nenhuma recebe uma lista vazia.
+   */
+  listAdministeredCompanies(): Promise<CompanyOverview[]>;
+  /** organization_usage: só quem administra (nao_encontrado). Com menos de 5 pessoas ativas, joinedThisMonth é nulo. */
+  getCompanyUsage(organizationId: string): Promise<CompanyUsage>;
+  /**
+   * invite_licenses. Só quem administra o contrato. Normaliza os e-mails e tira os repetidos. Ordem: repetição; nao_encontrado;
+   * itens_invalidos (de 1 a 500); email_invalido (detalhe item=N); contrato_nao_vigente; vagas_insuficientes (detalhe disponiveis=N).
+   * Tudo ou nada. E-mail que já tem licença aberta volta como ja_convidado, sem novo código; os códigos aparecem uma única vez.
+   */
+  inviteLicenses(key: string, contractId: string, emails: readonly string[]): Promise<LicenseInviteWrite>;
+  /** renew_license_invite. Só licença convidada (licenca_nao_convidada), contrato em vigor. O link anterior deixa de valer. */
+  renewLicenseInvite(key: string, licenseId: string): Promise<LicenseRenewWrite>;
+  /** cancel_license_invite. Só convite (licenca_nao_convidada); a linha fica encerrada com cancelledAt e a vaga volta. */
+  cancelLicenseInvite(key: string, licenseId: string): Promise<License>;
+  /** end_license. Só licença ativa (licenca_nao_ativa); o acesso pleno vale mais 30 dias e nada é apagado. */
+  endLicense(key: string, licenseId: string): Promise<License>;
+  /**
+   * preview_license_invite (só leitura): o nome da organização e o plano. Convite malformado, que não existe, usado, cancelado,
+   * trocado por um link novo, de contrato fora da vigência ou de outro e-mail: sempre convite_invalido, sem revelar qual caso.
+   */
+  previewLicenseInvite(code: string): Promise<BenefitPreview>;
+  /**
+   * accept_license. Ordem: repetição; sem_permissao (sem espaço pessoal); convite_invalido; ja_tem_licenca (uma ativa por pessoa).
+   * Uso único. Cria o direito ao plano de origem benefício. Nunca dá à empresa acesso a nada da pessoa.
+   */
+  acceptLicense(key: string, code: string): Promise<Benefit>;
+  /** O benefício que a própria pessoa recebe (my_benefit): a licença ativa, ou a encerrada mais recente; null se nunca teve. */
+  getMyBenefit(): Promise<Benefit | null>;
 }
 
 export type RepoErrorCode =
@@ -808,6 +847,12 @@ export type RepoErrorCode =
   | 'nao_sobre_si'
   | 'contexto_invalido'
   | 'familia_com_membros'
+  | 'email_invalido'
+  | 'contrato_nao_vigente'
+  | 'vagas_insuficientes'
+  | 'licenca_nao_convidada'
+  | 'licenca_nao_ativa'
+  | 'ja_tem_licenca'
   | 'desconhecido';
 
 export class RepoError extends Error {
@@ -816,7 +861,8 @@ export class RepoError extends Error {
     message?: string,
     /**
      * Detalhe do banco, quando houver (saldo_da_meta_insuficiente: o primeiro dia negativo, AAAA-MM-DD; versao_desatualizada:
-     * "versao_atual=N"; nota_ja_anotada: "registro=<id>" ou "compra=<id>").
+     * "versao_atual=N"; nota_ja_anotada: "registro=<id>" ou "compra=<id>"; vagas_insuficientes: "disponiveis=N"; email_invalido:
+     * "item=N").
      */
     readonly detail?: string,
   ) {

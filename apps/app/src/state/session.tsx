@@ -7,7 +7,7 @@ import { AppState, Text, View } from 'react-native';
 import { pendingCredentials, type AuthService, type AuthState } from '@/lib/auth';
 import { DemoAuth } from '@/lib/demo-auth';
 import { comprovanteHandoff } from '@/lib/comprovante-handoff';
-import { pendingInvite } from '@/lib/invite-target';
+import { pendingBenefit, pendingInvite } from '@/lib/invite-target';
 import { clearNotePrefsMemory } from '@/lib/note-prefs';
 import { pendingAttempts } from '@/lib/pending-attempts';
 import { receiptLinks } from '@/lib/receipt-link';
@@ -129,6 +129,7 @@ function SessionProviderInner({ auth, children }: { auth: AuthService; children:
     pendingCredentials.clear();
     // O convite que esperava a entrada não passa para outra pessoa (D-055).
     pendingInvite.clear();
+    pendingBenefit.clear();
     await auth.signOut(scope);
     queryClient.clear();
     clearReceiptMemory();

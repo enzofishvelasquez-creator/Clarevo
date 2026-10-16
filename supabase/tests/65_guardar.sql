@@ -468,7 +468,7 @@ end $$;
 
 -- ---------------------------------------------------------------------------
 -- 6. record_operations: responder_guardar não aponta para nada (o contexto já está em context_id), como decidir_revisao;
--- a lista vigente tem 58 ações (26, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, e as 9 da Família, testadas em 95_familia); uma operação por escrita.
+-- a lista vigente tem 63 ações (26, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas); uma operação por escrita.
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -507,26 +507,27 @@ begin
     end if;
   end;
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-           where c.conname = 'record_operations_action_check') = 58, 'a lista vigente tem 58 ações (26, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, e as 9 da Família, testadas em 95_familia)';
+           where c.conname = 'record_operations_action_check') = 63, 'a lista vigente tem 63 ações (26, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas)';
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''responder_guardar''::text', 'g') m
            where c.conname = 'record_operations_action_check') = 1, 'responder_guardar na lista de ações';
   -- As 25 anteriores continuam aceitas pela restrição de ação (cada caso desfeito no próprio bloco).
   assert (select array_agg(m[1] order by m[1] collate "C")
             from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
            where c.conname = 'record_operations_action_check' and m[1] <> 'responder_guardar')
-    = array['aceitar_convite_familia', 'alterar_cartao', 'alterar_conta', 'alterar_lancamento_cartao', 'alterar_meta',
-            'alterar_movimento_meta', 'alterar_papel_familia', 'alterar_serie', 'cancelar_convite_familia', 'conta_principal',
-            'criar', 'criar_cartao', 'criar_compra_cartao', 'criar_compromisso', 'criar_conta', 'criar_convite_familia',
-            'criar_encargo_cartao', 'criar_estorno_cartao', 'criar_familia', 'criar_meta', 'criar_ocorrencia', 'criar_serie',
-            'decidir_revisao', 'definir_limite_comprometimento', 'definir_orcamento_categoria', 'definir_renda_referencia',
-            'desfazer_pagamento', 'desfazer_pagamento_fatura', 'editar', 'editar_compromisso', 'encerrar_familia',
-            'encerrar_serie', 'excluir', 'excluir_cartao', 'excluir_compromisso', 'excluir_conta', 'excluir_lancamento_cartao',
-            'excluir_limite_comprometimento', 'excluir_meta', 'excluir_movimento_meta', 'excluir_orcamento_categoria',
-            'excluir_renda_referencia', 'excluir_serie', 'importar_extrato', 'informar_ano', 'marcar_assinatura',
-            'pagar_compromisso', 'pagar_fatura', 'registrar_movimento_meta', 'remover_membro_familia', 'revisar_assinaturas',
-            'sair_familia', 'situacao_cartao', 'situacao_conta', 'situacao_meta', 'tirar_ano',
-            'transferir_titularidade_familia'],
-    'as ações anteriores continuam (as 25 de antes do guardar, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, e as 9 da Família, testadas em 95_familia)';
+    = array['aceitar_convite_familia', 'aceitar_licenca', 'alterar_cartao', 'alterar_conta', 'alterar_lancamento_cartao',
+            'alterar_meta', 'alterar_movimento_meta', 'alterar_papel_familia', 'alterar_serie', 'cancelar_convite_familia',
+            'cancelar_convite_licenca', 'conta_principal', 'convidar_licencas', 'criar', 'criar_cartao',
+            'criar_compra_cartao', 'criar_compromisso', 'criar_conta', 'criar_convite_familia', 'criar_encargo_cartao',
+            'criar_estorno_cartao', 'criar_familia', 'criar_meta', 'criar_ocorrencia', 'criar_serie', 'decidir_revisao',
+            'definir_limite_comprometimento', 'definir_orcamento_categoria', 'definir_renda_referencia', 'desfazer_pagamento',
+            'desfazer_pagamento_fatura', 'editar', 'editar_compromisso', 'encerrar_familia', 'encerrar_licenca',
+            'encerrar_serie', 'excluir', 'excluir_cartao', 'excluir_compromisso', 'excluir_conta',
+            'excluir_lancamento_cartao', 'excluir_limite_comprometimento', 'excluir_meta', 'excluir_movimento_meta',
+            'excluir_orcamento_categoria', 'excluir_renda_referencia', 'excluir_serie', 'importar_extrato', 'informar_ano',
+            'marcar_assinatura', 'pagar_compromisso', 'pagar_fatura', 'registrar_movimento_meta', 'remover_membro_familia',
+            'renovar_convite_licenca', 'revisar_assinaturas', 'sair_familia', 'situacao_cartao', 'situacao_conta',
+            'situacao_meta', 'tirar_ano', 'transferir_titularidade_familia'],
+    'as ações anteriores continuam (as 25 de antes do guardar, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas)';
   -- Cada resposta que gravou é uma operação sem alvo, no contexto certo, com o hash da chamada.
   assert not exists (select 1 from public.record_operations
                       where action = 'responder_guardar'

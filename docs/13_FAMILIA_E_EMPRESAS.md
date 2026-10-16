@@ -1,6 +1,6 @@
 # Família e painel de empresas: proposta para decisão
 
-Versão de 15/10/2026, atualizada em 16/10/2026: o **Ciclo L (Família) foi implementado** depois das respostas de Enzo (D-055; o que foi feito e onde está em `docs/00`, `docs/03` e `docs/05`); o Ciclo M (painel de empresas, D-056) segue como proposta. As prioridades seguem a ordem que Enzo definiu em 11/10/2026: bancos, família, empresas. Bancos foram resolvidos sem custo, com a importação de extrato e fatura (D-048) e a leitura de comprovantes de Pix (D-051). Este documento prepara os próximos dois ciclos.
+Versão de 15/10/2026, atualizada em 16/10/2026: o **Ciclo L (Família) foi implementado** depois das respostas de Enzo (D-055; o que foi feito e onde está em `docs/00`, `docs/03` e `docs/05`); o **Ciclo M (painel de empresas) também foi implementado** depois das respostas de Enzo (D-056; o que foi feito e onde está em `docs/00`, `docs/03`, `docs/04` e `docs/05`). As prioridades seguem a ordem que Enzo definiu em 11/10/2026: bancos, família, empresas. Bancos foram resolvidos sem custo, com a importação de extrato e fatura (D-048) e a leitura de comprovantes de Pix (D-051). Este documento prepara os próximos dois ciclos.
 
 ## O que já existe no banco
 
@@ -33,6 +33,8 @@ Versão de 15/10/2026, atualizada em 16/10/2026: o **Ciclo L (Família) foi impl
 | L-8 | Convite pelo próprio celular (sem custo) ou e-mail enviado pelo Clarevo (exige provedor, P-008)? | Pelo próprio celular neste ciclo |
 
 ## Ciclo M: painel de empresas
+
+**Feito em 16/10/2026 (D-056).** Enzo aceitou as recomendações M-1 a M-6; o banco (migração 0014), o core, o app (web) e os testes entraram juntos. Em resumo: o painel só existe na web (`/empresa`, em Conta › Painel da empresa); o RH vê vagas, convites, licenças e, a partir de 5 pessoas ativas, quantas entraram no mês, nunca finanças; o convite é um link de uso único que o RH envia pelo canal interno; as quatro funções `clarevo_staff_*` só rodam no SQL Editor; a licença só é gravada por `invite_licenses`, `renew_license_invite`, `cancel_license_invite`, `end_license` e `accept_license`; o fim do benefício dá 30 dias de acesso pleno e nada é apagado. As decisões de detalhe que não estavam em M-1 a M-6 são proposta do Claude, revisáveis por Enzo (`docs/00`, D-056 (5)).
 
 ### Proposta
 

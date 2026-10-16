@@ -1,6 +1,7 @@
 import {
   DEMO_EMAIL,
   DEMO_TODAY,
+  MemoryCompanyHub,
   MemoryFamilyHub,
   MemoryRepository,
   createDemoRepository,
@@ -48,6 +49,13 @@ export class DemoAuth implements AuthService {
    * Família de exemplo nem membros simulados. Nada disto sai da memória do app.
    */
   private readonly familyHub = new MemoryFamilyHub({ now: () => Date.parse(`${DEMO_TODAY}T12:00:00.000Z`) });
+  /**
+   * As empresas simuladas (D-056): as contas criadas aqui compartilham um só hub, com o dia fixo da demonstração, que começa vazio
+   * (conta nova nunca recebe empresa de exemplo). A equipe Clarevo cadastra a empresa pelo SQL Editor no banco de verdade; aqui o
+   * roteiro de teste faz o mesmo por `companyHub.staffCreateOrganization`. A conta de demonstração com dados fictícios fica fora:
+   * ela tem a própria "Empresa Exemplo (demonstração)", num hub só dela. Nada disto sai da memória do app.
+   */
+  readonly companyHub = new MemoryCompanyHub({ now: () => Date.parse(`${DEMO_TODAY}T12:00:00.000Z`), today: () => DEMO_TODAY });
 
   constructor() {
     this.accounts.set(DEMO_EMAIL, {
@@ -98,6 +106,8 @@ export class DemoAuth implements AuthService {
     const acc = this.accounts.get(email.trim().toLowerCase());
     if (!acc || acc.password !== password) throw new AuthError('credenciais_invalidas');
     if (!acc.user.emailConfirmed) throw new AuthError('email_nao_confirmado');
+    // O último acesso (auth.users.last_sign_in_at) que o uso do app, para a empresa, conta no mês.
+    this.companyHub.recordSignIn(acc.user.id);
     this.emit({ user: { ...acc.user }, recovery: false });
   }
 
@@ -148,6 +158,8 @@ export class DemoAuth implements AuthService {
       today: () => DEMO_TODAY,
       latencyMs: 300,
       family: this.familyHub,
+      company: this.companyHub,
+      email: user.email,
     });
     return acc.repo;
   }

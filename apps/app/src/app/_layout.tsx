@@ -225,6 +225,8 @@ function Navigation() {
           <Stack.Screen name="familia/index" />
           <Stack.Screen name="familia/nova" />
           <Stack.Screen name="familia/convidar" />
+          {/* Painel da empresa (D-056): só na web, para quem administra o benefício; a tela de consulta tem a barra inferior. */}
+          <Stack.Screen name="empresa/index" />
           {/* Exportar meus dados (D-047): planilha (CSV) ou resumo em PDF, montado no aparelho. */}
           <Stack.Screen name="conta/exportar" />
           {/* Contas de origem do dinheiro (D-043). /contas/nova é rota estática e tem precedência sobre /contas/[id]/editar. */}
@@ -270,6 +272,8 @@ function Navigation() {
         <Stack.Screen name="confirmado" />
         {/* Convite para a Família (D-055): aberto pelo link, com ou sem conta; a tela decide o que mostrar. */}
         <Stack.Screen name="convite/[codigo]" />
+        {/* Convite da empresa (D-056): o mesmo caminho do convite da Família, aberto pelo link do RH, com ou sem conta. */}
+        <Stack.Screen name="beneficio/[codigo]" />
         <Stack.Protected guard={signedOut || inRecovery}>
           <Stack.Screen name="nova-senha" />
         </Stack.Protected>
