@@ -24,6 +24,8 @@
 > - Desvios menores a confirmar: o card "Seu mês" fica depois de "Suas metas"; a tela de pagamento mantém o título "Marcar como paga" enquanto o detalhe diz "Já paguei"; a previsão e a linha de lembretes ficam depois das listas, e não no topo; "Lembretes" e "Ocultar valores" na busca abrem Conta, e não a seção.
 > - Os demais itens das seções 4 e 5 (A3, A4, A10, A13 a A15, o resto de A18, A19, A20, A22 a A25 e B3 a B6) não foram tratados por D-039 e seguem como proposta. Antes de construir cada um, conferir no código se outro ciclo já o entregou.
 > - Testes em aparelho (iOS e Android) da barra, do teclado aberto e dos lembretes, que a versão web não exercita.
+>
+> **Acrescentado em 16/10/2026 (D-057, Evolução):** a tela `/evolucao` é de consulta, com a barra inferior e Movimentos como aba do assunto (`TAB_OF_TOPIC` em `navigation.ts`, como as outras telas de Movimentos). A entrada é a linha "Evolução" em Movimentações, logo abaixo de "Seu mês em 30 segundos" e acima de "Anotar gasto" (fora do bloco "Organizar", que segue com as seis linhas), e a busca "No app" de Aprender (`APP_SCREENS`, id `evolucao`) abre a tela com a aba de Aprender marcada, como as demais. Aberta pelo endereço direto, depois de entrar, fica por cima do Resumo (`ENTRY_PATH` em `_layout.tsx`). "Ver lançamentos" e "Ver Pago por categoria" definem o mês em exibição do app e abrem a composição (`/composicao?tipo=pago` ou `tipo=recebido`, e `&vista=categoria`), como o Seu mês faz.
 
 ## 1. Resposta curta
 

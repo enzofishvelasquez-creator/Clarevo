@@ -13,8 +13,10 @@
  * Aprender e os temas de 13º salário, férias, volta às aulas e Imposto de Renda, D-053), das decisões de 16/10/2026 (D-054: o estorno no
  * orçamento, o excedente acima de 100% e o aviso de 80% dispensável, a legenda do Resumo, os percentuais dos grupos da renda comprometida,
  * a legenda do widget com valores ocultos e o card "Neste mês" em Metas) e do Ciclo L (Família, D-055: criar, convidar por link, aceitar,
- * papéis, sair e encerrar, com a Família simulada na memória) e do Ciclo M (Empresas, D-056: o painel do RH só na web, o convite da empresa por
- * link, a licença, o uso do app e a demonstração com a "Empresa Exemplo", com a empresa simulada na memória) na versão web, em modo demonstração (acesso simulado).
+ * papéis, sair e encerrar, com a Família simulada na memória), do Ciclo M (Empresas, D-056: o painel do RH só na web, o convite da empresa por
+ * link, a licença, o uso do app e a demonstração com a "Empresa Exemplo", com a empresa simulada na memória) e da Evolução (D-057: Recebido
+ * e Pago mês a mês, média, mediana e total, meses tirados da comparação só na memória, e o cenário fictício "evolucao") na versão web, em modo
+ * demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -8049,17 +8051,17 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await j1Keep();
   await j1Widths(async (w) => { await layoutChecks(`tutorial aprender com o guia ${w}px`); await shot(w === 390 ? '320_aprender_como_usar' : '320_aprender_como_usar_320px'); });
 
-  // ---- 7. A lista do guia: cinco grupos, trinta e duas entradas (28 do D-049, "Seu mês em 30 segundos", D-052, "Família", D-055, "Painel da empresa" e "Benefício pela empresa", D-056) ----
+  // ---- 7. A lista do guia: cinco grupos, trinta e três entradas (28 do D-049, "Seu mês em 30 segundos", D-052, "Evolução", D-057, "Família", D-055, "Painel da empresa" e "Benefício pela empresa", D-056) ----
   await p.getByRole('button', { name: 'Como usar o Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
   const j1Groups = () => p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((h) => h.getBoundingClientRect().width > 0).map((h) => ({
     title: h.textContent, rows: [...h.parentElement.parentElement.querySelectorAll('[role=button]')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.getAttribute('aria-label') || b.textContent) })));
   const j1G = await j1Groups();
   ok('Tutorial guia: /aprender/guia com o título "Como usar o Clarevo", a barra inferior (Aprender marcada) e o botão "Ver o tour de novo"', j1Path() === '/aprender/guia' && (await h1Name()) === 'Como usar o Clarevo' &&
     (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1 && (await visibleCount('button', 'Ver o tour de novo')) === 1);
-  ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 8, 7, 8, 2 e 7 entradas (Dia a dia ganhou "Seu mês em 30 segundos" e Conta e privacidade ganhou "Família", "Painel da empresa" e "Benefício pela empresa")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
-    JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([8, 7, 8, 2, 7]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
+  ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 9, 7, 8, 2 e 7 entradas (Dia a dia ganhou "Seu mês em 30 segundos" e "Evolução" e Conta e privacidade ganhou "Família", "Painel da empresa" e "Benefício pela empresa")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
+    JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([9, 7, 8, 2, 7]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
   const j1Rows = j1G.flatMap((g) => g.rows);
-  ok('Tutorial guia: cada linha tem o nome acessível "{título}. {para que serve}" (as funções novas: Buscar, Exportar e Importar)', j1Rows.length === 32 &&
+  ok('Tutorial guia: cada linha tem o nome acessível "{título}. {para que serve}" (as funções novas: Buscar, Exportar e Importar)', j1Rows.length === 33 &&
     j1Rows.includes('Buscar em Movimentos. Acha um gasto ou recebimento em todos os meses e mostra quanto deu no período.') &&
     j1Rows.includes('Exportar meus dados. Leva seus gastos e recebimentos para uma planilha (CSV) ou para um resumo em PDF, montado neste aparelho.') &&
     j1Rows.some((r) => r.startsWith('Importar extrato ou fatura. Traz gastos, recebimentos e compras no cartão de um arquivo do banco')) &&
@@ -10384,6 +10386,522 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const empBad = empTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(bem-vind[oa]|cadastrad[oa]s?|usuári[oa]s?|colaborador(a|es|as)?|funcionári[oa]s?|administrador(a|es|as)?)\b/i)?.[0]).filter(Boolean);
   ok('Empresas: nenhum termo proibido, travessão longo, expressão vetada nem palavra com gênero nas telas novas', empTexts.length >= 12 && empBad.length === 0, `${empTexts.length} telas ${empBad.join(' | ')}`);
   ok('Empresas: nenhuma escrita direta na rede (as empresas do roteiro são simuladas na memória)', writes.length === empWrites0, writes.slice(empWrites0).join(' | '));
+
+  // =====================================================================================================================
+  // Evolução (D-057, fase 1b): a tela /evolucao, aberta de Movimentos, com Recebido ou Pago mês a mês em um gráfico de linha, média,
+  // mediana, total dos meses exibidos e o painel do mês escolhido, onde a pessoa tira um mês da comparação sem apagar nem mudar nenhum
+  // lançamento. Tudo na memória: nada é gravado nem enviado. Aqui, na versão web: (1) a linha em Movimentos, a demonstração padrão
+  // (maio a outubro de 2026: setembro 3.750, outubro 3.900 em andamento), T01, T08, T09, T26 e as entradas; (2) o cenário fictício
+  // "?cenario=evolucao" (janeiro a junho de 2026: 3.200, 3.400, 3.300, 7.800, 3.450 e 3.600, com o "Reparo do carro" de R$ 4.400,00 em
+  // abril): T02 a T07, T10, T13, T14, a tabela, os nomes acessíveis (T23) e valores ocultos; (3) erro e carregamento (T24); (4) conta
+  // nova, Família e troca de pessoa (T19). Capturas a partir de 440, em 390, 360 e 320 px. Hoje é 07/10/2026.
+  // =====================================================================================================================
+  const evSizes = [[390, 844, ''], [360, 740, '_360px'], [320, 800, '_320px']];
+  const evWrites0 = writes.length;
+  const evTexts = [];
+  const evKeep = async () => { const x = await body(); evTexts.push(x); screenTexts.push(x); return x; };
+  const evPath = () => new URL(p.url()).pathname;
+  // Rola até o título (nível 2) de um card, para a captura mostrar o card.
+  const evScroll = (title) => async () => {
+    await p.evaluate((title) => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === title && e.getBoundingClientRect().width > 0); if (h) h.scrollIntoView({ block: 'start' }); }, title);
+    await p.waitForTimeout(250);
+  };
+  const evScrollBtn = (name) => async () => {
+    await p.getByRole('button', { name, exact: true }).filter({ visible: true }).first().evaluate((e) => e.scrollIntoView({ block: 'start' }));
+    await p.waitForTimeout(250);
+  };
+  const evTop = async () => { await p.evaluate(() => { for (const e of document.querySelectorAll('div')) if (e.scrollTop > 0) e.scrollTop = 0; }); await p.waitForTimeout(200); };
+  // Capturas em 390, 360 e 320 px, com as conferências de largura, de alvos de toque e de cabeçalho em cada uma (tab: tela das abas).
+  const evShots = async (name, { scroll = null, tab = false } = {}) => {
+    for (const [w, h, suffix] of evSizes) {
+      await p.setViewportSize({ width: w, height: h }); await p.waitForTimeout(450);
+      if (scroll) await scroll(); else await evTop();
+      if (tab) await layoutChecks(`${name} ${w}px`); else await innerChecks(`${name} ${w}px`);
+      await shot(`${name}${suffix}`);
+    }
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  };
+  const evEnter = async (scenario) => {
+    await p.goto(`http://localhost:${PORT}/${scenario ? `?cenario=${scenario}` : ''}`); await waitText('Seu dinheiro');
+    await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+    await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
+  };
+  const evRow = () => p.getByRole('button', { name: 'Evolução. Recebido e pago mês a mês, com média e mediana.', exact: true }).filter({ visible: true }).first();
+  const evOpen = async () => {
+    await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+    await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  };
+  // Os botões do gráfico: um por mês, com o nome que o leitor de tela diz.
+  const evNames = () => p.evaluate(() => [...document.querySelectorAll('[role=group][aria-label^="Meses do gráfico"] button')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label').replace(/ /g, ' ')));
+  const evPressed = () => p.evaluate(() => [...document.querySelectorAll('[role=group][aria-label^="Meses do gráfico"] button[aria-pressed="true"]')].map((e) => e.getAttribute('aria-label').replace(/ /g, ' ')));
+  const evMonth = (month) => p.getByRole('button', { name: new RegExp(`^${month} de 2026`) }).filter({ visible: true }).first();
+  const evPick = async (month) => { await evMonth(month).click(); await p.waitForTimeout(450); };
+  const evSwitch = () => p.getByRole('switch', { name: 'Mostrar este mês na comparação', exact: true }).filter({ visible: true }).first();
+  // Tira (on false) ou põe (on true) um mês na comparação, pelo painel dele.
+  const evSet = async (month, on) => {
+    await evPick(month);
+    if ((await evSwitch().getAttribute('aria-checked')) !== String(on)) { await evSwitch().click(); await p.waitForTimeout(350); }
+  };
+  const evRestoreCount = () => visibleCount('button', 'Restaurar todos');
+  // O desenho de um mês: "cheio" (na comparação), "vazio" (fora), "escolhido", "escolhido_vazio", "traco" (sem registros) e o ícone do eixo.
+  const evMark = (month) => p.evaluate((month) => {
+    const btn = [...document.querySelectorAll('[role=group][aria-label^="Meses do gráfico"] button')].find((e) => (e.getAttribute('aria-label') || '').startsWith(month));
+    const svg = [...document.querySelectorAll('svg')].find((s) => s.getBoundingClientRect().height > 100 && s.getBoundingClientRect().width > 0 && s.querySelector('line'));
+    if (!btn || !svg) return null;
+    const sr = svg.getBoundingClientRect(); const br = btn.getBoundingClientRect();
+    const cx = br.left + br.width / 2 - sr.left;
+    const near = (x) => Math.abs(x - cx) < br.width / 2 - 1;
+    const circles = [...svg.querySelectorAll('circle')].filter((c) => near(Number(c.getAttribute('cx')))).map((c) => `${c.getAttribute('fill')}|${c.getAttribute('stroke')}|${c.getAttribute('r')}`);
+    const lines = [...svg.querySelectorAll('line')].filter((l) => l.getAttribute('stroke') !== '#7D8AA6' && l.getAttribute('stroke') !== '#E3E8F2' && near((Number(l.getAttribute('x1')) + Number(l.getAttribute('x2'))) / 2)).map((l) => l.getAttribute('stroke'));
+    let kind = 'nenhum';
+    if (circles.includes('#D4F05B|#17223B|10')) kind = circles.length > 1 ? 'escolhido_vazio' : lines.length > 0 ? 'escolhido_traco' : 'escolhido';
+    else if (circles.includes('#2457F5|#FFFFFF|7')) kind = 'cheio';
+    else if (circles.includes('#FFFFFF|#2457F5|7')) kind = 'vazio';
+    else if (lines.includes('#4B5873')) kind = 'traco';
+    const own = [...svg.querySelectorAll('circle')].find((c) => near(Number(c.getAttribute('cx'))));
+    return { kind, cx: Math.round(cx * 10) / 10, cy: own ? Math.round(Number(own.getAttribute('cy')) * 10) / 10 : null, icon: btn.querySelector('svg') !== null };
+  }, month);
+  // Os trechos de linha: os x de cada um. Nenhum trecho atravessa um mês fora da comparação.
+  const evRuns = () => p.evaluate(() => {
+    const svg = [...document.querySelectorAll('svg')].find((s) => s.getBoundingClientRect().height > 100 && s.getBoundingClientRect().width > 0 && s.querySelector('line'));
+    return svg ? [...svg.querySelectorAll('path')].filter((e) => e.getAttribute('stroke') === '#2457F5').map((e) => (e.getAttribute('d').match(/-?\d+(\.\d+)?/g) || []).map(Number).filter((_, i) => i % 2 === 0)) : [];
+  });
+  const evCrosses = async (month) => {
+    const mark = await evMark(month);
+    const runs = await evRuns();
+    return runs.some((xs) => Math.min(...xs) < mark.cx && Math.max(...xs) > mark.cx);
+  };
+  const evLive = () => p.evaluate(() => [...document.querySelectorAll('[aria-live="polite"]')].map((e) => e.textContent.replace(/ /g, ' ')).filter(Boolean));
+  const evH2s = () => p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((h) => h.getBoundingClientRect().width > 0).map((h) => h.textContent));
+  const evStore = () => p.evaluate(() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]));
+  const evMoney = (n) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  // ---- 1. Demonstração padrão: o Resumo não muda, e a linha "Evolução" fica em Movimentos, logo abaixo de "Seu mês em 30 segundos" ----
+  await evEnter();
+  await expectTotals('Evolução, demonstração: outubro segue 6.000 / 3.900 / 2.100 e 650 antes da tela', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  const evResumoHeadings = JSON.stringify(await headingList());
+  ok('Evolução Resumo: a estrutura de D-022 não ganhou a Evolução (a linha mora em Movimentos)', !(await body()).includes('Evolução'));
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(500);
+  const evTops = await p.evaluate(() => {
+    const top = (re) => { const e = [...document.querySelectorAll('[role=button]')].find((x) => x.getBoundingClientRect().width > 0 && re.test(x.getAttribute('aria-label') || x.textContent || '')); return e ? Math.round(e.getBoundingClientRect().top) : null; };
+    return { buscar: top(/^Buscar\./), seuMes: top(/^Seu mês em 30 segundos\./), evolucao: top(/^Evolução\./), anotar: top(/^Anotar gasto$/) };
+  });
+  t = await evKeep();
+  ok('Evolução Movimentos: a linha "Evolução" vem logo abaixo de "Seu mês em 30 segundos" e acima de "Anotar gasto", com a legenda e o nome acessível', (await visibleCount('button', 'Evolução. Recebido e pago mês a mês, com média e mediana.')) === 1 &&
+    t.includes('Recebido e pago mês a mês, com média e mediana') && evTops.buscar < evTops.seuMes && evTops.seuMes < evTops.evolucao && evTops.evolucao < evTops.anotar, JSON.stringify(evTops));
+  const evOrganizar = await sectionRows('Organizar');
+  ok('Evolução Movimentos: a linha não entra em "Organizar" (o bloco segue com as seis linhas de sempre)', evOrganizar.length === 6 && !evOrganizar.some((r) => r.includes('Evolução')), JSON.stringify(evOrganizar));
+  await evShots('440_evolucao_movimentos', { tab: true });
+
+  // ---- 2. Carregando: o esqueleto, sem nenhum valor, e a tela completa depois ----
+  await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.__orig = repo.monthsOverview; repo.monthsOverview = (...a) => new Promise((r) => setTimeout(r, 10000)).then(() => repo.__orig.apply(repo, a)); });
+  await evRow().click();
+  await p.getByRole('progressbar', { name: 'Carregando a evolução' }).first().waitFor({ timeout: 4000 });
+  t = await body();
+  ok('Evolução carregando: o esqueleto "Carregando a evolução", com o título, os seletores e nenhum valor nem gráfico', (await visibleCount('progressbar', 'Carregando a evolução')) === 1 && (await h1Name()) === 'Evolução' && t.includes('Valores registrados, pela data do pagamento') && !/R\$ \d/.test(t) && (await evNames()).length === 0, t.slice(0, 200));
+  await evShots('451_evolucao_carregando');
+  await waitText('Pago por mês', 20000); await p.waitForTimeout(500);
+  await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.monthsOverview = repo.__orig; });
+  ok('Evolução carregando: com a resposta, o esqueleto sai e o gráfico aparece', (await visibleCount('progressbar', 'Carregando a evolução')) === 0 && (await evNames()).length === 6);
+
+  // ---- 3. T01: seis meses, Pago, sem filtros; o mês em andamento e os meses sem registros à vista e fora da conta ----
+  t = await evKeep();
+  let names = await evNames();
+  ok('Evolução T01: a tela abre em /evolucao, de consulta, com a barra (Movimentos marcada), o título "Evolução" (h1) e o subtítulo "Valores registrados, pela data do pagamento"', evPath() === '/evolucao' && (await h1Name()) === 'Evolução' &&
+    (await p.getByRole('tab', { name: MOV_TAB, selected: true }).filter({ visible: true }).count()) === 1 && t.includes('Valores registrados, pela data do pagamento') && t.includes('Demonstração · Pessoal'), `${evPath()} ${await h1Name()}`);
+  ok('Evolução T01: "Pago" e "6 meses" marcados por padrão, com "Recebido", "3 meses" e "12 meses" ao lado', (await radio('Pago').getAttribute('aria-checked')) === 'true' && (await radio('6 meses').getAttribute('aria-checked')) === 'true' &&
+    (await radio('Recebido').getAttribute('aria-checked')) === 'false' && (await radio('3 meses').getAttribute('aria-checked')) === 'false' && (await radio('12 meses').getAttribute('aria-checked')) === 'false');
+  ok('Evolução T01: seis pontos, de maio a outubro de 2026, cada um um botão com mês, valor, estado e se está na comparação (T23)', names.length === 6 &&
+    JSON.stringify(names) === JSON.stringify([
+      'Maio de 2026, sem registros, fora da comparação',
+      'Junho de 2026, sem registros, fora da comparação',
+      'Julho de 2026, sem registros, fora da comparação',
+      'Agosto de 2026, sem registros, fora da comparação',
+      'Setembro de 2026, R$ 3.750,00, na comparação',
+      'Outubro de 2026, R$ 3.900,00, mês em andamento, fora da comparação',
+    ]), JSON.stringify(names));
+  ok('Evolução T01: período "Meses: de maio a outubro de 2026", "Maior valor do gráfico: R$ 3.900,00" e nenhum aviso de comparação personalizada', t.includes('Meses: de maio a outubro de 2026') && t.includes('Maior valor do gráfico: R$ 3.900,00') &&
+    !t.includes('Comparação personalizada') && (await evRestoreCount()) === 0);
+  ok('Evolução T01: o mês mais recente com lançamentos (outubro, em andamento) abre no painel, com os mesmos R$ 3.900,00 do Resumo e as mesmas categorias do Seu mês (Moradia 64,1% e Mercado 35,9%)', (await evPressed()).join('') === 'Outubro de 2026, R$ 3.900,00, mês em andamento, fora da comparação' &&
+    t.includes('Outubro de 2026\nPago\nR$ 3.900,00\nMês em andamento') && t.includes('Moradia\n64,1% do pago') && t.includes('R$ 2.500,00') && t.includes('Mercado\n35,9% do pago') && t.includes('R$ 1.400,00'), t.slice(300, 900));
+  ok('Evolução T01: o mês em andamento não tem variação nem interruptor, e a frase diz por quê', t.includes('Variação não disponível: o mês ainda está em andamento.') && t.includes('Este mês fica fora da comparação até terminar.') && (await visibleCount('switch', 'Mostrar este mês na comparação')) === 0);
+  ok('Evolução um único mês na comparação (setembro): média e mediana de R$ 3.750,00, "1 de 1 mês", e a frase que explica; total de R$ 7.650,00', t.includes('Média dos meses na comparação\nR$ 3.750,00\n1 de 1 mês') && t.includes('Mediana dos meses na comparação\nR$ 3.750,00\n1 de 1 mês') &&
+    t.includes('Só um mês na comparação: a média e a mediana são o valor dele.') && t.includes('Total dos meses exibidos\nR$ 7.650,00'));
+  ok('Evolução T10: meses sem registros ficam no eixo, com um traço na linha de base e o ícone do eixo, e nunca viram um ponto em R$ 0,00', (await evMark('Maio')).kind === 'traco' && (await evMark('Maio')).icon && (await evMark('Setembro')).kind === 'cheio' && !(await evMark('Setembro')).icon && (await evMark('Outubro')).kind === 'escolhido_vazio', JSON.stringify([await evMark('Maio'), await evMark('Setembro'), await evMark('Outubro')]));
+  ok('Evolução legenda: "Na comparação", "Mês em andamento", "Sem registros" e "Mês escolhido", em texto', t.includes('Na comparação') && t.includes('Mês em andamento') && t.includes('Sem registros') && t.includes('Mês escolhido'));
+  await evShots('441_evolucao_demonstracao_6_meses');
+
+  // ---- 4. T09 e T08 na demonstração padrão: o único mês fora (nunca média zero) e "Restaurar todos" ----
+  await evPick('Setembro');
+  t = await evKeep();
+  ok('Evolução setembro: painel com R$ 3.750,00, "Com registros", variação "não disponível" (nenhum outro mês antes na comparação), o interruptor ligado e o link "Ver lançamentos"', t.includes('Setembro de 2026\nPago\nR$ 3.750,00\nCom registros') &&
+    t.includes('Variação não disponível: não há outro mês na comparação antes deste.') && (await evSwitch().getAttribute('aria-checked')) === 'true' && (await visibleCount('button', 'Ver lançamentos')) === 1 && (await evMark('Setembro')).kind === 'escolhido');
+  await evSwitch().click(); await p.waitForTimeout(500);
+  t = await evKeep();
+  ok('Evolução T08: com o único mês fora, "Escolha ao menos um mês para comparar" e "Restaurar todos", sem média nem mediana e sem nenhum R$ 0,00', t.includes('Escolha ao menos um mês para comparar') && t.includes('Todos os meses estão fora da comparação, então não há média nem mediana.') &&
+    !t.includes('Média dos meses na comparação') && !t.includes('Mediana dos meses na comparação') && !t.includes('R$ 0,00') && (await evRestoreCount()) === 2 && t.includes('Total dos meses exibidos\nR$ 7.650,00') &&
+    t.includes('Comparação personalizada: 1 de 1 mês fora da comparação'), t.slice(900, 1500));
+  ok('Evolução T08: o anúncio ao leitor de tela diz "Nenhum mês na comparação."', (await evLive()).includes('Nenhum mês na comparação.'), JSON.stringify(await evLive()));
+  await evShots('445_evolucao_todos_fora', { scroll: evScroll('Escolha ao menos um mês para comparar') });
+  await p.getByRole('button', { name: 'Restaurar todos', exact: true }).filter({ visible: true }).last().click(); await p.waitForTimeout(500);
+  t = await body();
+  ok('Evolução T08: "Restaurar todos" devolve o mês e a média (R$ 3.750,00); o aviso some', t.includes('Média dos meses na comparação\nR$ 3.750,00\n1 de 1 mês') && !t.includes('Comparação personalizada') && (await evRestoreCount()) === 0 && (await evMark('Setembro')).kind === 'escolhido');
+
+  // ---- 5. Os links: "Ver lançamentos" e "Ver Pago por categoria" abrem a Composição no mês do painel ----
+  await evPick('Outubro');
+  await btn('Ver lançamentos').click(); await waitText('Pessoal · Outubro de 2026'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Evolução "Ver lançamentos" (outubro): abre a composição de Pago de outubro, com os R$ 3.900,00', evPath() === '/composicao' && new URL(p.url()).searchParams.get('tipo') === 'pago' && t.includes('Pessoal · Outubro de 2026') && t.includes('R$ 3.900,00'), p.url());
+  await btn('Voltar').click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(400);
+  await evPick('Setembro');
+  await btn('Ver Pago por categoria').click(); await waitText('Pessoal · Setembro de 2026'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Evolução "Ver Pago por categoria" (setembro): define o mês de setembro e abre "Por categoria", com R$ 3.750,00', evPath() === '/composicao' && new URL(p.url()).searchParams.get('vista') === 'categoria' && t.includes('Pessoal · Setembro de 2026') && t.includes('R$ 3.750,00'), p.url());
+  await btn('Voltar').click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(400);
+  ok('Evolução: ao voltar da composição, a tela continua com o mês e a seleção de antes', (await evPressed()).join('').startsWith('Setembro de 2026'));
+
+  // ---- 6. T26: uma anotação nova em Movimentos muda o gráfico, sem recriar nada ----
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await btn('Anotar gasto').click(); await waitText('Será salvo em');
+  await field('Descrição').fill('Café da tarde'); await field('Valor em reais').fill('100'); await field('Data do pagamento').fill('06/10/2026');
+  await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(500);
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  names = await evNames();
+  t = await body();
+  ok('Evolução T26: depois de anotar um gasto de R$ 100,00 em Movimentos, outubro passa a R$ 4.000,00 (3.900 + 100), sem nenhuma recarga, e o total dos meses exibidos a R$ 7.750,00', names[5] === 'Outubro de 2026, R$ 4.000,00, mês em andamento, fora da comparação' && t.includes('Total dos meses exibidos\nR$ 7.750,00'), JSON.stringify(names));
+  await btn('Voltar').click(); await waitText('Registrar recebimento');
+
+  // ---- 7. Aprender: a busca "No app" e a entrada do guia ----
+  await j1Tab('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await p.waitForTimeout(300);
+  const evBox = () => p.getByLabel('Buscar um tema ou uma função', { exact: true }).filter({ visible: true }).first();
+  for (const query of ['evolução', 'mediana', 'gráfico']) {
+    await evBox().fill(query); await waitText('No app'); await p.waitForTimeout(500);
+    ok(`Evolução busca "${query}" em Aprender: "No app" tem "Evolução" e "Como usar" tem a entrada do guia`, (await visibleCount('button', /^Evolução\. Recebido e pago mês a mês, com média e mediana, e os meses que você tira da comparação/)) === 1 &&
+      (await visibleCount('button', /^Como usar Evolução\. Mostra o Recebido ou o Pago/)) === 1, query);
+  }
+  await evBox().fill('evolução'); await waitText('No app'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /^Evolução\. Recebido e pago mês a mês/ }).filter({ visible: true }).first().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(500);
+  ok('Evolução busca: a linha "No app" abre /evolucao, com a aba de Aprender marcada (a de onde a pessoa veio)', evPath() === '/evolucao' && (await h1Name()) === 'Evolução' && (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1, evPath());
+  await btn('Voltar').click(); await waitText('Buscar um tema ou uma função'); await evBox().fill('');
+  await p.getByRole('button', { name: 'Como usar o Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
+  await p.getByRole('button', { name: /^Evolução\. Mostra o Recebido ou o Pago/ }).filter({ visible: true }).first().click(); await waitText('Para que serve'); await p.waitForTimeout(400);
+  t = await evKeep();
+  ok('Evolução guia: a entrada "Evolução" (/aprender/guia/evolucao) tem as três seções, "Movimentos › Evolução", seis passos e o botão "Abrir Evolução"', evPath() === '/aprender/guia/evolucao' && (await h1Name()) === 'Evolução' &&
+    JSON.stringify(await evH2s()) === JSON.stringify(['Para que serve', 'Onde fica', 'Como usar']) && t.includes('Movimentos › Evolução') && (await p.locator('[aria-label^="Passo "]').filter({ visible: true }).count()) === 6 &&
+    (await visibleCount('button', 'Abrir Evolução')) === 1 && t.includes('"Mostrar este mês na comparação"') && t.includes('"Restaurar todos"'), `${evPath()} ${JSON.stringify(await evH2s())}`);
+  await btn('Abrir Evolução').click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(500);
+  ok('Evolução guia: "Abrir Evolução" abre a tela (/evolucao)', evPath() === '/evolucao' && (await h1Name()) === 'Evolução');
+  await btn('Voltar').click(); await waitText('Para que serve');
+  await btn('Voltar').click(); await waitText('Ver o tour de novo');
+
+  // ---- 8. O endereço direto: /evolucao aberto direto, depois de entrar, abre a tela ----
+  await p.goto(`http://localhost:${PORT}/evolucao`); await waitText('Seu dinheiro');
+  await btn('Ver demonstração com dados fictícios').click(); await waitText('Valores registrados, pela data do pagamento', 12000); await p.waitForTimeout(700);
+  ok('Evolução endereço: /evolucao aberto direto, depois de entrar, mostra a tela, de consulta, por cima do Resumo (com a barra inferior e o botão "Voltar")', evPath() === '/evolucao' && (await h1Name()) === 'Evolução' && (await evNames()).length === 6 &&
+    (await p.getByRole('tab').filter({ visible: true }).count()) === 4 && (await visibleCount('button', 'Voltar')) === 1, p.url());
+
+  // ---- 9. O cenário fictício "evolucao": janeiro a junho de 2026 (EF §6) ----
+  await evEnter('evolucao');
+  await evOpen();
+  const evStore0 = await evStore();
+  names = await evNames();
+  t = await evKeep();
+  ok('Evolução cenário (6 meses, de maio a outubro): maio R$ 3.450,00 e junho R$ 3.600,00 na comparação, julho a outubro sem registros; média R$ 3.525,00 e mediana R$ 3.525,00, "2 de 2 meses"', names.length === 6 &&
+    names[0] === 'Maio de 2026, R$ 3.450,00, na comparação' && names[1] === 'Junho de 2026, R$ 3.600,00, na comparação' && names.slice(2).every((n) => n.endsWith('sem registros, fora da comparação')) &&
+    t.includes('Média dos meses na comparação\nR$ 3.525,00\n2 de 2 meses') && t.includes('Mediana dos meses na comparação\nR$ 3.525,00\n2 de 2 meses') && t.includes('Total dos meses exibidos\nR$ 7.050,00'), JSON.stringify(names));
+  await radio('12 meses').click(); await p.waitForTimeout(700);
+  names = await evNames();
+  t = await evKeep();
+  ok('Evolução T10: com 12 meses, novembro e dezembro de 2025 e julho a outubro de 2026 ficam no eixo "sem registros", fora da comparação, e nunca viram R$ 0,00', names.length === 12 && names[0] === 'Novembro de 2025, sem registros, fora da comparação' &&
+    names[1] === 'Dezembro de 2025, sem registros, fora da comparação' && names.slice(8).every((n) => n.endsWith('sem registros, fora da comparação')) && !t.includes('R$ 0,00'), JSON.stringify(names));
+  ok('Evolução T01/T05: os seis meses de janeiro a junho com os valores de referência (3.200, 3.400, 3.300, 7.800, 3.450 e 3.600), todos na comparação', [2, 3, 4, 5, 6, 7].every((i) => names[i].endsWith('na comparação')) &&
+    names[2] === 'Janeiro de 2026, R$ 3.200,00, na comparação' && names[3] === 'Fevereiro de 2026, R$ 3.400,00, na comparação' && names[4] === 'Março de 2026, R$ 3.300,00, na comparação' &&
+    names[5] === 'Abril de 2026, R$ 7.800,00, na comparação' && names[6] === 'Maio de 2026, R$ 3.450,00, na comparação' && names[7] === 'Junho de 2026, R$ 3.600,00, na comparação', JSON.stringify(names.slice(2, 8)));
+  ok('Evolução T05: histórico completo, média R$ 4.125,00, mediana R$ 3.425,00, "6 de 6 meses", total R$ 24.750,00, sem aviso nem "Restaurar todos"', t.includes('Média dos meses na comparação\nR$ 4.125,00\n6 de 6 meses') &&
+    t.includes('Mediana dos meses na comparação\nR$ 3.425,00\n6 de 6 meses') && t.includes('Total dos meses exibidos\nR$ 24.750,00') && !t.includes('Comparação personalizada') && (await evRestoreCount()) === 0);
+  await evShots('442_evolucao_cenario_12_meses');
+
+  // ---- 10. O painel de abril, T02, T04 e T06: tirar abril da comparação ----
+  await evPick('Abril');
+  t = await evKeep();
+  const evAprilBefore = await evMark('Abril');
+  ok('Evolução painel de abril (tela B): "Abril de 2026" (nível 2), Pago R$ 7.800,00 com centavos, "Com registros", "De março para abril: R$ 4.500,00 a mais" e "136,4% a mais que março"', (await evH2s()).includes('Abril de 2026') && t.includes('Abril de 2026\nPago\nR$ 7.800,00\nCom registros') &&
+    t.includes('De março para abril: R$ 4.500,00 a mais') && t.includes('136,4% a mais que março') && !t.includes('Abril ficou fora'), t.slice(900, 1500));
+  ok('Evolução painel de abril: as 3 maiores categorias do mês (Transporte R$ 4.700,00, Moradia R$ 2.000,00 e Mercado R$ 880,00), com o percentual do pago', t.includes('Maiores categorias do mês') && t.includes('Transporte\n60,3% do pago') && t.includes('R$ 4.700,00') &&
+    t.includes('Moradia\n25,6% do pago') && t.includes('R$ 2.000,00') && t.includes('Mercado\n11,3% do pago') && t.includes('R$ 880,00') && !t.includes('Lazer\n'), t.slice(900, 1700));
+  ok('Evolução painel de abril: o interruptor "Mostrar este mês na comparação" ligado, com "Tirar da comparação não apaga nem muda nenhum lançamento.", e "Ver lançamentos"', (await evSwitch().getAttribute('aria-checked')) === 'true' &&
+    t.includes('Tirar da comparação não apaga nem muda nenhum lançamento.') && (await visibleCount('button', 'Ver lançamentos')) === 1 && (await visibleCount('button', 'Ver Pago por categoria')) === 1 && evAprilBefore.kind === 'escolhido');
+  await evShots('444_evolucao_painel_abril', { scroll: evScroll('Abril de 2026') });
+  const evLinesBefore = JSON.stringify(await evRuns());
+  await evSwitch().click(); await p.waitForTimeout(500);
+  await evPick('Junho');
+  t = await evKeep();
+  names = await evNames();
+  const evAprilOut = await evMark('Abril');
+  ok('Evolução T02: abril fora da comparação vira ponto vazio, com o ícone no eixo, no mesmo lugar, e o botão diz "Abril de 2026, R$ 7.800,00, fora da comparação" (T23)', evAprilOut.kind === 'vazio' && evAprilOut.icon && evAprilOut.cx === evAprilBefore.cx && evAprilOut.cy === evAprilBefore.cy &&
+    names[5] === 'Abril de 2026, R$ 7.800,00, fora da comparação', JSON.stringify([evAprilBefore, evAprilOut, names[5]]));
+  ok('Evolução T02: a linha é interrompida nos dois lados de abril (nenhum trecho atravessa o mês fora) e março e maio seguem na comparação', !(await evCrosses('Abril')) && (await evMark('Março')).kind === 'cheio' && (await evMark('Maio')).kind === 'cheio' && JSON.stringify(await evRuns()) !== evLinesBefore, JSON.stringify(await evRuns()));
+  ok('Evolução T04: sem abril, média R$ 3.390,00, mediana R$ 3.400,00, "5 de 6 meses"', t.includes('Média dos meses na comparação\nR$ 3.390,00\n5 de 6 meses') && t.includes('Mediana dos meses na comparação\nR$ 3.400,00\n5 de 6 meses'));
+  ok('Evolução T06: o total dos meses exibidos segue R$ 24.750,00 com abril fora', t.includes('Total dos meses exibidos\nR$ 24.750,00') && !t.includes('R$ 24.750,00\nR$ 24.750,00'));
+  ok('Evolução tela C: aviso fixo "Comparação personalizada: 1 de 6 meses fora da comparação", "Fora da comparação: abril. Vale só para Pago." e "Restaurar todos"', t.includes('Comparação personalizada: 1 de 6 meses fora da comparação') && t.includes('Fora da comparação: abril. Vale só para Pago.') && (await evRestoreCount()) === 1 &&
+    (await headingShown('Comparação personalizada: 1 de 6 meses fora da comparação')));
+  ok('Evolução legenda: a legenda ganha "Fora da comparação" (o ponto vazio e o ícone), e o leitor de tela ouve a nova média e mediana ("Média R$ 3.390,00, mediana R$ 3.400,00, 5 de 6 meses.")', (await p.getByText('Fora da comparação', { exact: true }).filter({ visible: true }).count()) >= 1 && (await evLive()).includes('Média R$ 3.390,00, mediana R$ 3.400,00, 5 de 6 meses.'), JSON.stringify(await evLive()));
+  await evShots('443_evolucao_abril_fora');
+  await evShots('446_evolucao_comparacao_personalizada', { scroll: evScroll('Comparação personalizada: 1 de 6 meses fora da comparação') });
+  // T02: o histórico fica intacto. Abril segue com os R$ 7.800,00 e o "Reparo do carro" em Pago do mês.
+  await evPick('Abril');
+  await btn('Ver lançamentos').click(); await waitText('Pessoal · Abril de 2026'); await p.waitForTimeout(600);
+  t = await body();
+  ok('Evolução T02: com abril fora da comparação, "Ver lançamentos" mostra Pago de abril intacto: R$ 7.800,00 e o "Reparo do carro" de R$ 4.400,00', evPath() === '/composicao' && t.includes('R$ 7.800,00') && t.includes('Reparo do carro') && t.includes('R$ 4.400,00'), t.slice(0, 300));
+  await btn('Voltar').click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(400);
+  ok('Evolução: o mês escolhido e a seleção seguem ao voltar da composição (abril ainda fora)', (await evPressed()).join('').startsWith('Abril de 2026, R$ 7.800,00, fora da comparação') && (await evRestoreCount()) === 1);
+
+  // ---- 11. T14: março para maio com abril fora, com as duas datas ----
+  await evPick('Maio');
+  t = await evKeep();
+  ok('Evolução T14: com abril fora, maio diz "De março para maio: R$ 150,00 a mais", "4,5% a mais que março" e "Abril ficou fora da comparação.", nunca "mês a mês"', t.includes('De março para maio: R$ 150,00 a mais') && t.includes('4,5% a mais que março') && t.includes('Abril ficou fora da comparação.') &&
+    !/De março para maio[^\n]*mês a mês/.test(t) && !t.includes('De abril para maio'), t.slice(900, 1500));
+  await evShots('447_evolucao_variacao_com_mes_fora', { scroll: evScroll('Maio de 2026') });
+  await evPick('Abril');
+  t = await body();
+  ok('Evolução T14: o próprio abril (fora) mostra a variação contra o mês anterior que está na comparação ("De março para abril"), sem "Abril ficou fora"', t.includes('De março para abril: R$ 4.500,00 a mais') && !t.includes('Abril ficou fora da comparação.') && (await evSwitch().getAttribute('aria-checked')) === 'false');
+
+  // ---- 12. T03: reativar abril devolve o valor, a posição e a média ----
+  await evSwitch().click(); await p.waitForTimeout(500);
+  await evPick('Junho');
+  t = await evKeep();
+  const evAprilBack = await evMark('Abril');
+  ok('Evolução T03: reativar abril devolve o ponto cheio no mesmo lugar, a linha inteira e a média (R$ 4.125,00, mediana R$ 3.425,00, "6 de 6 meses"); o aviso e "Restaurar todos" somem', evAprilBack.kind === 'cheio' && evAprilBack.cx === evAprilBefore.cx && evAprilBack.cy === evAprilBefore.cy && JSON.stringify(await evRuns()) === evLinesBefore &&
+    t.includes('Média dos meses na comparação\nR$ 4.125,00\n6 de 6 meses') && t.includes('Mediana dos meses na comparação\nR$ 3.425,00\n6 de 6 meses') && !t.includes('Comparação personalizada') && (await evRestoreCount()) === 0, JSON.stringify([evAprilBefore, evAprilBack]));
+
+  // ---- 13. T07: vários meses fora, não consecutivos ----
+  await evSet('Fevereiro', false); await evSet('Abril', false); await evSet('Junho', false);
+  names = await evNames();
+  t = await evKeep();
+  ok('Evolução T07: fevereiro, abril e junho fora: média R$ 3.316,67, mediana R$ 3.300,00, "3 de 6 meses", e o total segue R$ 24.750,00', t.includes('Média dos meses na comparação\nR$ 3.316,67\n3 de 6 meses') && t.includes('Mediana dos meses na comparação\nR$ 3.300,00\n3 de 6 meses') && t.includes('Total dos meses exibidos\nR$ 24.750,00'));
+  ok('Evolução T07: o aviso diz "3 de 6 meses fora da comparação" e nomeia os três; o eixo continua com os 12 meses nos lugares de origem, sem renumerar', t.includes('Comparação personalizada: 3 de 6 meses fora da comparação') && t.includes('Fora da comparação: fevereiro, abril e junho. Vale só para Pago.') &&
+    names.length === 12 && names[3] === 'Fevereiro de 2026, R$ 3.400,00, fora da comparação' && names[5] === 'Abril de 2026, R$ 7.800,00, fora da comparação' && names[7] === 'Junho de 2026, R$ 3.600,00, fora da comparação' &&
+    names[2] === 'Janeiro de 2026, R$ 3.200,00, na comparação' && names[4] === 'Março de 2026, R$ 3.300,00, na comparação' && names[6] === 'Maio de 2026, R$ 3.450,00, na comparação', JSON.stringify(names));
+  ok('Evolução T07: sem dois meses vizinhos na comparação, não há trecho de linha, só os pontos (janeiro, março e maio cheios; fevereiro, abril e junho vazios)', (await evRuns()).length === 0 && (await evMark('Janeiro')).kind === 'cheio' && (await evMark('Março')).kind === 'cheio' && (await evMark('Maio')).kind === 'cheio' &&
+    (await evMark('Fevereiro')).kind === 'vazio' && (await evMark('Abril')).kind === 'vazio' && (await evMark('Junho')).kind === 'escolhido_vazio', JSON.stringify(await evRuns()));
+  await evShots('448_evolucao_varios_meses_fora');
+  // Tabela equivalente, com os meses fora rotulados.
+  await p.getByRole('button', { name: 'Ver valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(500);
+  t = await evKeep();
+  const evRows = await p.evaluate(() => [...document.querySelectorAll('[role=listitem]')].filter((e) => e.getBoundingClientRect().width > 0 && /de (2025|2026), /.test(e.getAttribute('aria-label') || '')).map((e) => (e.getAttribute('aria-label') || '').replace(/ /g, ' ')));
+  ok('Evolução tabela "Ver valores mês a mês": uma linha por mês (12), com mês, valor, estado e "Na comparação?" ("Sim" ou "Fora da comparação"), e "Sem valor" nos meses sem registros', evRows.length === 12 &&
+    evRows[2] === 'Janeiro de 2026, R$ 3.200,00, Com registros, Na comparação? Sim' && evRows[3] === 'Fevereiro de 2026, R$ 3.400,00, Com registros, Na comparação? Fora da comparação' && evRows[0] === 'Novembro de 2025, Sem valor, Sem registros, Na comparação? Fora da comparação' &&
+    t.includes('Na comparação?\nFora da comparação') && t.includes('Sem valor') && (await visibleCount('button', 'Esconder valores mês a mês')) === 1 && t.includes('O total dos meses exibidos não depende do que está na comparação.'), JSON.stringify(evRows.slice(0, 4)));
+  await evShots('449_evolucao_tabela', { scroll: evScrollBtn('Esconder valores mês a mês') });
+  await p.getByRole('button', { name: 'Esconder valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
+  ok('Evolução tabela: "Esconder valores mês a mês" fecha a tabela', (await visibleCount('button', 'Ver valores mês a mês')) === 1 && (await p.locator('[role=listitem]').filter({ visible: true }).count()) === 0);
+
+  // ---- 14. T08 e T09 no cenário: todos fora, depois um só mês ----
+  await evSet('Janeiro', false); await evSet('Março', false); await evSet('Maio', false);
+  t = await evKeep();
+  ok('Evolução T08: com os seis meses fora, "Escolha ao menos um mês para comparar", "Restaurar todos" (no aviso e no card), sem média, sem mediana e sem R$ 0,00; o total segue R$ 24.750,00', t.includes('Escolha ao menos um mês para comparar') && t.includes('Comparação personalizada: 6 de 6 meses fora da comparação') &&
+    !t.includes('Média dos meses na comparação') && !t.includes('Mediana dos meses na comparação') && !t.includes('R$ 0,00') && (await evRestoreCount()) === 2 && t.includes('Total dos meses exibidos\nR$ 24.750,00'));
+  await p.getByRole('button', { name: 'Restaurar todos', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(500);
+  t = await body();
+  ok('Evolução T05: "Restaurar todos" devolve os seis meses de uma vez: média R$ 4.125,00, mediana R$ 3.425,00, "6 de 6 meses"; o aviso some', t.includes('Média dos meses na comparação\nR$ 4.125,00\n6 de 6 meses') && t.includes('Mediana dos meses na comparação\nR$ 3.425,00\n6 de 6 meses') && !t.includes('Comparação personalizada') && (await evRestoreCount()) === 0);
+  for (const m of ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Junho']) await evSet(m, false);
+  await evPick('Maio');
+  t = await evKeep();
+  ok('Evolução T09: só maio na comparação: média e mediana de R$ 3.450,00, "1 de 6 meses", a frase que explica e a variação "não disponível"', t.includes('Média dos meses na comparação\nR$ 3.450,00\n1 de 6 meses') && t.includes('Mediana dos meses na comparação\nR$ 3.450,00\n1 de 6 meses') &&
+    t.includes('Só um mês na comparação: a média e a mediana são o valor dele.') && t.includes('Variação não disponível: não há outro mês na comparação antes deste.'));
+  await evShots('450_evolucao_um_mes_na_comparacao');
+  await p.getByRole('button', { name: 'Restaurar todos', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(500);
+
+  // ---- 15. T13: Recebido e Pago têm cada um a sua seleção; mês sem registros em Recebido (março) ----
+  await evSet('Abril', false);
+  await radio('Recebido').click(); await p.waitForTimeout(700);
+  names = await evNames();
+  t = await evKeep();
+  ok('Evolução T13: ao trocar para Recebido, a seleção de Pago não vem junto (abril de Recebido está na comparação, sem aviso nem "Restaurar todos")', names[5] === 'Abril de 2026, R$ 5.200,00, na comparação' && !t.includes('Comparação personalizada') && (await evRestoreCount()) === 0 && (await radio('Recebido').getAttribute('aria-checked')) === 'true');
+  ok('Evolução Recebido: março sem recebimento anotado fica "sem registros", e as contas usam os 5 meses com recebimento (média R$ 5.060,00, mediana R$ 5.000,00, "5 de 5 meses"), com total de R$ 25.300,00', names[4] === 'Março de 2026, sem registros, fora da comparação' &&
+    t.includes('Média dos meses na comparação\nR$ 5.060,00\n5 de 5 meses') && t.includes('Mediana dos meses na comparação\nR$ 5.000,00\n5 de 5 meses') && t.includes('Total dos meses exibidos\nR$ 25.300,00') && t.includes('Recebido por mês'), JSON.stringify(names.slice(2, 8)));
+  await evPick('Março');
+  t = await evKeep();
+  ok('Evolução T10: março em Recebido: "Sem registros: mês sem anotação não quer dizer mês sem recebimentos", sem valor, sem R$ 0,00, sem interruptor, sem variação e sem "Ver lançamentos" nem categorias', t.includes('Março de 2026\nRecebido\nSem registros\nSem registros: mês sem anotação não quer dizer mês sem recebimentos') &&
+    t.includes('Este mês fica fora da comparação porque não tem registros.') && t.includes('Variação não disponível: mês sem registros.') && !t.includes('R$ 0,00') && (await visibleCount('switch', 'Mostrar este mês na comparação')) === 0 &&
+    (await visibleCount('button', 'Ver lançamentos')) === 0 && !t.includes('Maiores categorias do mês') && (await evMark('Março')).kind === 'escolhido_traco', t.slice(700, 1300));
+  await evShots('452_evolucao_recebido_sem_registros', { scroll: evScroll('Março de 2026') });
+  await evPick('Abril');
+  t = await body();
+  ok('Evolução Recebido, abril: "Recebido" R$ 5.200,00, variação "De fevereiro para abril: R$ 200,00 a mais" com "4% a mais que fevereiro" e "Março está sem registros.", sem categorias (só o link "Ver lançamentos")', t.includes('Abril de 2026\nRecebido\nR$ 5.200,00') &&
+    t.includes('De fevereiro para abril: R$ 200,00 a mais') && t.includes('4% a mais que fevereiro') && t.includes('Março está sem registros.') && !t.includes('Maiores categorias do mês') && (await visibleCount('button', 'Ver lançamentos')) === 1 && (await visibleCount('button', 'Ver Pago por categoria')) === 0);
+  await btn('Ver lançamentos').click(); await waitText('Pessoal · Abril de 2026'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Evolução Recebido: "Ver lançamentos" abre a composição de Recebido de abril (R$ 5.200,00)', evPath() === '/composicao' && new URL(p.url()).searchParams.get('tipo') === 'recebido' && t.includes('R$ 5.200,00') && t.includes('Salário'), p.url());
+  await btn('Voltar').click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(400);
+  await evSet('Fevereiro', false);
+  t = await body();
+  ok('Evolução T13: em Recebido, fevereiro fora dá média R$ 5.075,00, mediana R$ 5.050,00, "4 de 5 meses" e o aviso "1 de 5 meses ... Vale só para Recebido."', t.includes('Média dos meses na comparação\nR$ 5.075,00\n4 de 5 meses') && t.includes('Mediana dos meses na comparação\nR$ 5.050,00\n4 de 5 meses') &&
+    t.includes('Comparação personalizada: 1 de 5 meses fora da comparação') && t.includes('Fora da comparação: fevereiro. Vale só para Recebido.'));
+  await radio('Pago').click(); await p.waitForTimeout(700);
+  names = await evNames();
+  t = await body();
+  ok('Evolução T13: de volta a Pago, abril continua fora e fevereiro continua dentro (cada valor guarda a própria seleção)', names[5] === 'Abril de 2026, R$ 7.800,00, fora da comparação' && names[3] === 'Fevereiro de 2026, R$ 3.400,00, na comparação' && t.includes('Comparação personalizada: 1 de 6 meses fora da comparação') && t.includes('Fora da comparação: abril. Vale só para Pago.'));
+  // Os meses fora valem para a seleção, e não para a janela: 3 meses não mostra abril, e 12 meses traz abril fora de volta.
+  await radio('3 meses').click(); await p.waitForTimeout(600);
+  names = await evNames();
+  t = await body();
+  ok('Evolução janela de 3 meses (agosto a outubro, sem nenhum registro no cenário): "Sem registros nestes meses" e o convite a escolher mais meses, sem gráfico e sem aviso (abril não está na janela)', names.length === 0 && t.includes('Sem registros nestes meses') &&
+    t.includes('Se há anotações mais antigas, escolha 6 ou 12 meses.') && !t.includes('Comparação personalizada') && !/R\$ \d/.test(t), t.slice(0, 300));
+  await evShots('457_evolucao_janela_sem_registros');
+  await radio('12 meses').click(); await p.waitForTimeout(600);
+  ok('Evolução janela de 12 meses: abril segue fora da comparação (a seleção é guardada por valor mostrado, não por janela)', (await evNames())[5] === 'Abril de 2026, R$ 7.800,00, fora da comparação' && (await body()).includes('Comparação personalizada: 1 de 6 meses fora da comparação'));
+  ok('Evolução sem gravar: tirar e restaurar meses não escreve nada no aparelho (nem no armazenamento do navegador)', (await evStore()) === evStore0, await evStore());
+
+  // ---- 16. Teclado e leitor de tela (T23): botões com nome, pontos escondidos, seleção anunciada ----
+  await evMonth('Maio').focus(); await p.keyboard.press('Enter'); await p.waitForTimeout(400);
+  ok('Evolução teclado: Enter em "Maio de 2026" escolhe o mês (aria-pressed) e abre o painel de maio', (await evPressed()).join('').startsWith('Maio de 2026, R$ 3.450,00') && (await evH2s()).includes('Maio de 2026'));
+  await p.keyboard.press('Tab'); await p.keyboard.press('Space'); await p.waitForTimeout(400);
+  ok('Evolução teclado: Tab e Espaço escolhem o mês seguinte (junho)', (await evPressed()).join('').startsWith('Junho de 2026'));
+  const evA11y = await p.evaluate(() => {
+    const vis = (e) => e.getBoundingClientRect().width > 0;
+    const group = [...document.querySelectorAll('[role=group][aria-label^="Meses do gráfico"]')].filter(vis);
+    const buttons = group.flatMap((g) => [...g.querySelectorAll('button')]).filter(vis);
+    const svg = [...document.querySelectorAll('svg')].find((s) => s.getBoundingClientRect().height > 100 && s.querySelector('line'));
+    const radios = [...document.querySelectorAll('[role=radiogroup]')].filter(vis).map((g) => g.getAttribute('aria-label'));
+    const headings = [...document.querySelectorAll('[role=heading]')].filter(vis).map((h) => `${h.getAttribute('aria-level')}:${h.textContent}`);
+    return { groups: group.length, buttons: buttons.length, unnamed: buttons.filter((b) => !(b.getAttribute('aria-label') || '').trim()).length, small: buttons.filter((b) => b.getBoundingClientRect().height < 44).length,
+      pressed: buttons.filter((b) => b.getAttribute('aria-pressed') === 'true').length, svgHidden: svg ? svg.getAttribute('aria-hidden') === 'true' : false, radios, headings };
+  });
+  ok('Evolução leitor de tela: um grupo "Meses do gráfico" com 12 botões, todos com nome, todos com 44 px ou mais de altura, um só pressionado, o desenho escondido e os seletores em grupos nomeados', evA11y.groups === 1 && evA11y.buttons === 12 && evA11y.unnamed === 0 && evA11y.small === 0 && evA11y.pressed === 1 && evA11y.svgHidden &&
+    evA11y.radios.includes('Valor mostrado') && evA11y.radios.includes('Meses mostrados'), JSON.stringify(evA11y));
+  ok('Evolução leitor de tela: títulos em ordem (h1 "Evolução", h2 "Recebido/Pago por mês" e o mês do painel, h2 da seção de comparação)', evA11y.headings[0] === '1:Evolução' && evA11y.headings.includes('2:Pago por mês') && evA11y.headings.includes('2:Junho de 2026'), JSON.stringify(evA11y.headings));
+  const evWidthsOk = await p.evaluate(() => { const bs = [...document.querySelectorAll('[role=group][aria-label^="Meses do gráfico"] button')].filter((b) => b.getBoundingClientRect().width > 0); return bs.map((b) => Math.round(b.getBoundingClientRect().width)); });
+  ok('Evolução alvos de toque: com 12 meses, cada mês é uma coluna inteira com 22 px ou mais de largura, sem sobrepor a vizinha (a tabela é o caminho com alvo largo)', evWidthsOk.length === 12 && evWidthsOk.every((w) => w >= 22), JSON.stringify(evWidthsOk));
+  await radio('6 meses').click(); await p.waitForTimeout(500);
+  const evWidths6 = await p.evaluate(() => [...document.querySelectorAll('[role=group][aria-label^="Meses do gráfico"] button')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => Math.round(b.getBoundingClientRect().width)));
+  ok('Evolução alvos de toque: com 6 meses, cada coluna tem 44 px ou mais de largura e de altura em 390 px', evWidths6.length === 6 && evWidths6.every((w) => w >= 44), JSON.stringify(evWidths6));
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(500);
+  const evWidths320 = await p.evaluate(() => [...document.querySelectorAll('[role=group][aria-label^="Meses do gráfico"] button')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => Math.round(b.getBoundingClientRect().width)));
+  ok('Evolução alvos de toque: com 6 meses em 320 px, cada coluna tem 44 px ou mais de largura', evWidths320.length === 6 && evWidths320.every((w) => w >= 44), JSON.stringify(evWidths320));
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(400);
+  await radio('12 meses').click(); await p.waitForTimeout(400);
+
+  // ---- 17. Valores ocultos: pontos sem valor no leitor de tela, eixo sem números, tabela e cartões em R$ •••• ----
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento');
+  await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  await radio('12 meses').click(); await p.waitForTimeout(500);
+  await evPick('Abril');
+  await hiddenShows('Evolução');
+  names = await evNames();
+  t = await evKeep();
+  ok('Evolução valores ocultos: os pontos dizem "valor oculto" ao leitor de tela ("Abril de 2026, valor oculto, fora da comparação"), sem número nenhum', names[5] === 'Abril de 2026, valor oculto, fora da comparação' && names[2] === 'Janeiro de 2026, valor oculto, na comparação' && names[0] === 'Novembro de 2025, sem registros, fora da comparação' && !names.some((n) => /R\$|\d,\d{2}/.test(n)), JSON.stringify(names.slice(0, 7)));
+  ok('Evolução valores ocultos: o eixo sem números ("Maior valor do gráfico" some), a média, a mediana, o total e o valor do painel em R$ ••••; os percentuais e os meses seguem à vista', !t.includes('Maior valor do gráfico') && t.includes('Média dos meses na comparação\nR$ ••••\n5 de 6 meses') && t.includes('Mediana dos meses na comparação\nR$ ••••') &&
+    t.includes('Total dos meses exibidos\nR$ ••••') && t.includes('Abril de 2026\nPago\nR$ ••••') && t.includes('136,4% a mais que março') && t.includes('De março para abril: R$ •••• a mais') && t.includes('Transporte\n60,3% do pago'), t.slice(900, 1500));
+  await evShots('453_evolucao_valores_ocultos');
+  await p.getByRole('button', { name: 'Ver valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
+  await hiddenShows('Evolução, tabela');
+  t = await body();
+  ok('Evolução valores ocultos: a tabela mostra R$ •••• nos meses com registros e "Sem valor" nos outros', t.includes('Sem valor') && t.includes('R$ ••••') && !/R\$ \d/.test(t));
+  // O próximo bloco começa de novo, com os valores à mostra (a demonstração é refeita).
+
+  // ---- 18. Erro e recuperação (T24): sem dado parcial, "Tentar de novo" e nada de outra conta ----
+  await evEnter('evolucao');
+  await evOpen();
+  await radio('12 meses').click(); await p.waitForTimeout(500);
+  await evSet('Abril', false);
+  await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.__orig = repo.monthsOverview; repo.monthsOverview = () => Promise.reject(new Error('falha simulada')); await window.__e2e.refresh(); });
+  await waitText('Não foi possível carregar a evolução.', 15000); await p.waitForTimeout(400);
+  t = await evKeep();
+  ok('Evolução T24 erro: "Não foi possível carregar a evolução." com "Tentar de novo", sem gráfico, sem média, sem total e sem nenhum valor em reais (nem o que já estava carregado)', t.includes('Não foi possível carregar a evolução.') && (await visibleCount('button', 'Tentar de novo')) === 1 && (await evNames()).length === 0 &&
+    !t.includes('Média dos meses na comparação') && !t.includes('Total dos meses exibidos') && !/R\$ \d/.test(t) && !t.includes('Comparação personalizada') && (await h1Name()) === 'Evolução', t.slice(0, 300));
+  ok('Evolução T24 erro: o título, os seletores e a barra continuam; o erro é anunciado como alerta', (await radio('Pago').getAttribute('aria-checked')) === 'true' && (await p.getByRole('alert').filter({ hasText: 'Não foi possível carregar a evolução.' }).count()) >= 1 && (await p.getByRole('tab', { name: MOV_TAB, selected: true }).filter({ visible: true }).count()) === 1);
+  await evShots('454_evolucao_erro');
+  await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.monthsOverview = repo.__orig; });
+  await btn('Tentar de novo').click(); await waitText('Pago por mês', 12000); await p.waitForTimeout(600);
+  names = await evNames();
+  t = await body();
+  ok('Evolução T24 recuperação: "Tentar de novo" traz os dados de volta, e a seleção de abril continua fora', names.length === 12 && names[5] === 'Abril de 2026, R$ 7.800,00, fora da comparação' && t.includes('Comparação personalizada: 1 de 6 meses fora da comparação'));
+
+  // ---- 19. Conta nova (T19): nada de exemplo, e a seleção de outra pessoa nunca passa ----
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await famCreateAccount('Eva Lima', 'eva.evolucao@exemplo.com');
+  await evOpen();
+  t = await evKeep();
+  ok('Evolução conta nova: "Sem registros nestes meses", a frase de mês sem anotação, o botão "Anotar gasto" e nenhum gráfico, nenhuma média e nenhum valor de exemplo', t.includes('Sem registros nestes meses') && t.includes('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.') &&
+    (await visibleCount('button', 'Anotar gasto')) === 1 && (await evNames()).length === 0 && !/R\$ \d/.test(t) && !t.includes('Média dos meses'), t.slice(0, 300));
+  await evShots('455_evolucao_conta_nova');
+  await radio('Recebido').click(); await p.waitForTimeout(500);
+  t = await body();
+  ok('Evolução conta nova, Recebido: "Sem registros nestes meses", "mês sem recebimentos" e o botão "Registrar recebimento"', t.includes('Sem registros nestes meses') && t.includes('mês sem recebimentos') && (await visibleCount('button', 'Registrar recebimento')) === 1);
+  await radio('Pago').click(); await p.waitForTimeout(400);
+  // Um gasto em setembro (mês fechado) e outro em outubro (em andamento).
+  await btn('Anotar gasto').click(); await waitText('Será salvo em');
+  await field('Descrição').fill('Mercado de setembro'); await field('Valor em reais').fill('300'); await field('Data do pagamento').fill('15/09/2026');
+  await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(500);
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  names = await evNames();
+  t = await evKeep();
+  ok('Evolução conta nova com um gasto de setembro: setembro R$ 300,00 na comparação, outubro sem registros, "1 de 1 mês" e total de R$ 300,00', names[4] === 'Setembro de 2026, R$ 300,00, na comparação' && names[5] === 'Outubro de 2026, sem registros, fora da comparação' &&
+    t.includes('Média dos meses na comparação\nR$ 300,00\n1 de 1 mês') && t.includes('Total dos meses exibidos\nR$ 300,00'), JSON.stringify(names));
+  await btn('Voltar').click(); await waitText('Registrar recebimento');
+  await btn('Anotar gasto').click(); await waitText('Será salvo em');
+  await field('Descrição').fill('Café'); await field('Valor em reais').fill('100'); await field('Data do pagamento').fill('06/10/2026');
+  await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(500);
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  names = await evNames();
+  ok('Evolução conta nova: depois de outro gasto, outubro aparece como mês em andamento (R$ 100,00), fora das contas, e o total soma os dois (R$ 400,00)', names[5] === 'Outubro de 2026, R$ 100,00, mês em andamento, fora da comparação' && (await body()).includes('Total dos meses exibidos\nR$ 400,00'), JSON.stringify(names.slice(4)));
+  // Setembro fora da comparação: todos fora.
+  await evSet('Setembro', false);
+  t = await body();
+  ok('Evolução conta nova: setembro fora deixa o mês em andamento sozinho; "Escolha ao menos um mês para comparar" e "Restaurar todos"', t.includes('Escolha ao menos um mês para comparar') && (await evRestoreCount()) === 2 && !t.includes('Média dos meses na comparação'));
+
+  // ---- 20. Família: os dados da Família, e a troca de contexto esquece a seleção ----
+  await famGoFamilia();
+  await btn('Criar Família').click(); await waitText('Nome da Família'); await field('Nome da Família').fill('Casa Reis');
+  await btn('Criar Família').click(); await waitText('Família criada.'); await p.waitForTimeout(400);
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await famTab('Ver dados de Família').click(); await p.waitForTimeout(500);
+  await btn('Anotar gasto').click(); await waitText('Será salvo em Família');
+  await field('Descrição').fill('Mercado da casa'); await field('Valor em reais').fill('250'); await field('Data do pagamento').fill('06/10/2026');
+  await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(500);
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  names = await evNames();
+  t = await evKeep();
+  ok('Evolução na Família: a pílula diz "Demonstração · Família" e os valores são os da Família (outubro R$ 250,00 em andamento), sem o setembro nem o gasto do Pessoal', t.includes('Demonstração · Família') && names.length === 6 && names[5] === 'Outubro de 2026, R$ 250,00, mês em andamento, fora da comparação' &&
+    names[4] === 'Setembro de 2026, sem registros, fora da comparação' && !t.includes('R$ 300,00') && !t.includes('Comparação personalizada'), JSON.stringify(names.slice(4)));
+  await evShots('456_evolucao_familia');
+  await btn('Voltar').click(); await waitText('Registrar recebimento');
+  await famTab('Ver dados de Pessoal').click(); await p.waitForTimeout(500);
+  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  names = await evNames();
+  t = await body();
+  ok('Evolução ao voltar ao Pessoal: os dados são os do Pessoal de novo (setembro R$ 300,00), e o setembro que estava fora da comparação voltou, porque trocar de contexto esquece a seleção', names[4] === 'Setembro de 2026, R$ 300,00, na comparação' && !t.includes('Comparação personalizada') &&
+    t.includes('Média dos meses na comparação\nR$ 300,00\n1 de 1 mês') && !t.includes('R$ 250,00'), JSON.stringify(names.slice(4)));
+
+  // ---- 21. Sair da conta e trocar de pessoa: a seleção nunca sobrevive ----
+  await evSet('Setembro', false);
+  ok('Evolução antes de sair: setembro fora da comparação em Pessoal', (await body()).includes('Comparação personalizada: 1 de 1 mês fora da comparação'));
+  await famSignOut();
+  await famCreateAccount('Noa Reis', 'noa.evolucao@exemplo.com');
+  await evOpen();
+  t = await evKeep();
+  ok('Evolução troca de pessoa (T19): outra pessoa na mesma aba vê só a conta dela: "Sem registros nestes meses", nenhum gráfico, nenhum aviso e nenhum valor da pessoa anterior', t.includes('Sem registros nestes meses') && !t.includes('Comparação personalizada') && !/R\$ \d/.test(t) && (await evNames()).length === 0);
+  await famSignOut();
+  await famSignIn('eva.evolucao@exemplo.com');
+  await evOpen();
+  names = await evNames();
+  t = await body();
+  ok('Evolução sair e entrar de novo: os dados da pessoa voltam (setembro R$ 300,00), e a seleção de antes (setembro fora) foi esquecida: nada fica guardado', names[4] === 'Setembro de 2026, R$ 300,00, na comparação' && !t.includes('Comparação personalizada') && (await evRestoreCount()) === 0);
+  await famSignOut();
+
+  // ---- 22. A demonstração de novo, o Resumo e os totais não mudam; textos e escritas ----
+  await evEnter();
+  await expectTotals('Evolução, demonstração: outubro segue 6.000 / 3.900 / 2.100 e 650 depois da tela', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  ok('Evolução Resumo: os títulos e os blocos são os mesmos de antes da Evolução (D-022)', JSON.stringify(await headingList()) === evResumoHeadings && !(await body()).includes('Evolução'), JSON.stringify(await headingList()));
+  const evBad = evTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(demais|alt[oa]s?|baix[oa]s?|gastou|aumentou|diminuiu|despencou|disparou|cuidado|estour\w*|exagero|usuári[oa]s?|bem-vind[oa]s?)\b/i)?.[0]).filter(Boolean);
+  ok('Evolução: nenhum termo proibido, travessão longo, expressão vetada, palavra de julgamento nem palavra com gênero nas telas novas', evTexts.length >= 15 && evBad.length === 0, `${evTexts.length} telas ${evBad.join(' | ')}`);
+  ok('Evolução: nenhuma escrita direta na rede (a tela só lê, e tirar ou restaurar meses fica na memória do app)', writes.length === evWrites0, writes.slice(evWrites0).join(' | '));
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);

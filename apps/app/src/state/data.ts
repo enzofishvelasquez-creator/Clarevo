@@ -286,6 +286,21 @@ export function useRecordSearch(contextId: string | undefined, params: SearchPar
   return { records, purchases, withCards };
 }
 
+/**
+ * Recebido e Pago por mês, de `from` a `to` (até 12 meses), para a tela Evolução (D-057): `months_overview`, a mesma soma de
+ * `month_totals` do Resumo, com a contagem de lançamentos e o mês sem lançamento com valor 0 e contagem 0. O banco confere a
+ * permissão (na Família, a mesma de ler os registros) e recusa sem leitura: isso é erro, nunca "sem registros". A chave começa por
+ * 'records': toda escrita de registro, pagamento, fatura ou importação recarrega a tela aberta (T26).
+ */
+export function useMonthsOverview(contextId: string | undefined, from: IsoMonth, to: IsoMonth) {
+  const repo = useRepo();
+  return useQuery({
+    queryKey: ['records', 'overview', contextId, from, to],
+    queryFn: () => repo.monthsOverview(contextId!, from, to),
+    enabled: Boolean(contextId),
+  });
+}
+
 /** Resultado da sincronização do dia: contas de gastos fixos criadas e, entre elas, as já vencidas. */
 export interface SeriesSyncResult {
   created: number;

@@ -75,7 +75,7 @@ export function barModeFor(pathname: string): BarMode {
 
 /** Abas que uma tela de consulta abre quando a pessoa não veio de nenhuma (endereço aberto direto): a do assunto. */
 const TAB_OF_TOPIC: readonly [RegExp, TabRoute][] = [
-  [/^\/(a-pagar|gastos-fixos|cartoes|registro|orcamento|movimentacoes|importar|seu-mes)(\/|$)/, '/movimentacoes'],
+  [/^\/(a-pagar|gastos-fixos|cartoes|registro|orcamento|movimentacoes|importar|seu-mes|evolucao)(\/|$)/, '/movimentacoes'],
   [/^\/(meta|reserva|guardar|simular|renda-comprometida)(\/|$)/, '/metas'],
   [/^\/(explicacao|aprender)(\/|$)/, '/aprender'],
 ];
@@ -321,6 +321,14 @@ export const APP_SCREENS: readonly AppScreen[] = [
     caption: 'Poucas telas curtas com o que entrou, saiu, vence e foi guardado no mês',
     href: '/seu-mes',
     keywords: ['seu mês', 'mês em 30 segundos', '30 segundos', 'revisão do mês', 'balanço do mês', 'o que entrou', 'o que saiu', 'resumo rápido', 'visão do mês'],
+  },
+  {
+    // O título e a legenda são os de EVOLUTION_TEXT (evolucao-tela.ts), conferidos por teste: o arquivo da Evolução importa este.
+    id: 'evolucao',
+    title: 'Evolução',
+    caption: 'Recebido e pago mês a mês, com média e mediana, e os meses que você tira da comparação',
+    href: '/evolucao',
+    keywords: ['evolução', 'evolucao', 'gráfico', 'grafico', 'mês a mês', 'comparar meses', 'comparação', 'média', 'mediana', 'variação', 'tirar mês da comparação', 'linha do tempo'],
   },
   {
     id: 'lembretes',

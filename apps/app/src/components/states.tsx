@@ -104,13 +104,24 @@ export function LoadingState({ label = 'Carregando…', color = colors.brand }: 
 }
 
 /** Falha de consulta: nunca exibida como zero. */
-export function ErrorState({ message, onRetry, onBrand }: { message: string; onRetry: () => void; onBrand?: boolean }) {
+export function ErrorState({
+  message,
+  onRetry,
+  onBrand,
+  retryLabel = 'Tentar novamente',
+}: {
+  message: string;
+  onRetry: () => void;
+  onBrand?: boolean;
+  /** O texto do botão ("Tentar novamente" na maioria das telas). */
+  retryLabel?: string;
+}) {
   return (
     <View style={[styles.error, onBrand && { backgroundColor: colors.surface }]} accessibilityRole="alert">
       <Txt variant="label" color={colors.error}>
         {message}
       </Txt>
-      <Button label="Tentar novamente" icon={RotateCcw} tone="soft" onPress={onRetry} />
+      <Button label={retryLabel} icon={RotateCcw} tone="soft" onPress={onRetry} />
     </View>
   );
 }

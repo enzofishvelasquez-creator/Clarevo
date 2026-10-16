@@ -32,6 +32,7 @@ import { FlashBanner, useFlash } from '@/components/flash';
 import { AppHeader, ContextSwitch, MonthSwitcher } from '@/components/header';
 import { RecordRow } from '@/components/record-row';
 import { SearchEntry } from '@/components/search-parts';
+import { EvolutionEntry } from '@/components/evolucao-parts';
 import { SeuMesEntry } from '@/components/seu-mes-parts';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, Chip, Money, Screen, Skeleton, Txt } from '@/components/ui';
@@ -164,6 +165,9 @@ export default function MovimentacoesScreen() {
 
               {/* Seu mês em 30 segundos (D-052): logo abaixo de Buscar; abre no mês em exibição. */}
               <SeuMesEntry onPress={() => router.push({ pathname: '/seu-mes', params: seuMesParams(month, currentMonth) })} />
+
+              {/* Evolução (D-057): logo abaixo de "Seu mês em 30 segundos"; sempre abre na janela de 6 meses até o mês atual. */}
+              <EvolutionEntry onPress={() => router.push('/evolucao')} />
 
               {canWrite ? (
                 <View style={styles.actions}>

@@ -1,6 +1,6 @@
 # Regras financeiras do primeiro ciclo
 
-15/10/2026 · código em `packages/core` e no banco (`supabase/migrations`). As mesmas regras valem nos dois lugares. As calculadoras e o "Achar tudo" (Ciclo A6), o plano para quitar dívidas (Ciclo F1), "Antes de financiar" (D-044), o conteúdo de Aprender (Ciclo A5), o simulador (Ciclo D) e os lembretes, o ocultar valores e a biometria (Ciclo A2) ficam só no core e no app, sem gravar nada no banco. A revisão dos últimos meses (Ciclo A4), a renda comprometida (Ciclo B), as metas e o plano de guardar (Ciclo C), os cartões e as faturas (Ciclo E, D-037) e a chave das notas fiscais (D-038) as contas de origem do dinheiro (Ciclo G1, D-043) e as assinaturas (Ciclo H2, D-046) e a importação de extrato e fatura (Ciclo I1, D-048) estão nos dois lugares; o comprovante de Pix e de pagamento (Ciclo I2, D-051) fica só no core e no app, sem gravar nada no banco; a busca em Movimentações (Ciclo H1, D-045), a exportação dos dados (Ciclo H3, D-047) e o "Seu mês em 30 segundos" com o núcleo do widget (Ciclo K1, D-052) são só leitura, no core e no app; a leitura das notas (QR, chave, PDF e página da Sefaz-RJ) roda só no core e no app, no aparelho. Em "Onde é testado", "web" é o roteiro `scripts/e2e-web.js` (`npm run test:web`); as telas dos Ciclos A2, B, C, D e E também passam por ele (`docs/04`).
+15/10/2026 · código em `packages/core` e no banco (`supabase/migrations`). As mesmas regras valem nos dois lugares. As calculadoras e o "Achar tudo" (Ciclo A6), o plano para quitar dívidas (Ciclo F1), "Antes de financiar" (D-044), o conteúdo de Aprender (Ciclo A5), o simulador (Ciclo D) e os lembretes, o ocultar valores e a biometria (Ciclo A2) ficam só no core e no app, sem gravar nada no banco. A revisão dos últimos meses (Ciclo A4), a renda comprometida (Ciclo B), as metas e o plano de guardar (Ciclo C), os cartões e as faturas (Ciclo E, D-037) e a chave das notas fiscais (D-038) as contas de origem do dinheiro (Ciclo G1, D-043) e as assinaturas (Ciclo H2, D-046) e a importação de extrato e fatura (Ciclo I1, D-048) estão nos dois lugares; o comprovante de Pix e de pagamento (Ciclo I2, D-051) fica só no core e no app, sem gravar nada no banco; a busca em Movimentações (Ciclo H1, D-045), a exportação dos dados (Ciclo H3, D-047) e o "Seu mês em 30 segundos" com o núcleo do widget (Ciclo K1, D-052) e a Evolução (Ciclo O, D-057) são só leitura, no core e no app; a leitura das notas (QR, chave, PDF e página da Sefaz-RJ) roda só no core e no app, no aparelho. Em "Onde é testado", "web" é o roteiro `scripts/e2e-web.js` (`npm run test:web`); as telas dos Ciclos A2, B, C, D e E também passam por ele (`docs/04`).
 
 ## Implementado e testado
 
@@ -523,6 +523,34 @@ Regras em `packages/core/src/seu-mes.ts` e `widget.ts`, só no core e no app: **
 - **Valores ocultos.** Cada valor em reais passa por `MoneyTxt` ("R$ ••••" e "valor oculto"); percentuais e datas seguem à vista.
 
 **Widget.** `buildWidgetContent` usa o mesmo `summarizeToPay` do card "Ainda a pagar" do Resumo: o total é o do mês de hoje com as vencidas de meses anteriores, e a próxima conta é a primeira em aberto que vence hoje ou depois (`nextDue`). Na demonstração, "Ainda a pagar em outubro" R$ 650,00 e "Internet · 15/10 · R$ 150,00"; com a preferência desligada (o padrão), "R$ ••••" no total e, na próxima conta, só "Próxima conta · em 8 dias" (D-054, P-027: sem o nome, sem o valor, sem a data e sem dizer se é estimado, como o lembrete de vencimento, que nunca diz o nome; o prazo é "hoje", "amanhã" ou "em N dias"), e nenhum nome nem número no que o app guarda para o widget ler nem no texto alternativo ("Próxima conta, vence em 8 dias."). Vazio: "Nada em aberto neste mês". Sem sessão: "Entre no Clarevo para ver", sem nenhum dado da leitura.
+
+## Evolução (Ciclo O, D-057)
+
+Regras em `packages/core/src/evolucao.ts` (as contas, fase 1a) e `evolucao-tela.ts` (o que a tela mostra e os textos, fase 1b), só no core e no app: **não há regra financeira nova, nem função, nem coluna no banco**. A tela lê `months_overview` (a mesma soma de `month_totals`, a do Resumo) e só faz contas sobre ela. Dinheiro em centavos inteiros, somas em bigint e metade para cima. Os exemplos usam o caso de referência da especificação (janeiro a junho de 2026) no cenário `?cenario=evolucao`.
+
+| Regra de exibição | Como | Onde é testado |
+|---|---|---|
+| Base | Recebido e Pago pela data do pagamento ("Valores registrados, pela data do pagamento"); fatura paga uma vez, compra no cartão nunca; só lançamento realizado | core: `evolucao.test.ts`, `retorno.test.ts`; web |
+| Estado de cada mês | Com registros (ao menos um lançamento na métrica), Sem registros (contagem 0: "mês sem anotação não quer dizer mês sem gastos", nunca R$ 0,00 nem ponto em zero) e Mês em andamento (o mês atual com lançamentos) | core: `evolucao.test.ts`, `evolucao-tela.test.ts`; web |
+| Na comparação | Só o mês fechado com registros que a pessoa não tirou. O mês em andamento, o mês sem registros e o mês tirado ficam à vista no eixo e fora da média e da mediana (D04) | core: `evolucao-tela.test.ts`; web |
+| Média e mediana | Média exata dos meses na comparação (soma em bigint, metade para cima); mediana do valor do meio ou, com n par, a média dos dois do meio (metade para cima). Cada uma com "n de N meses" (N: meses fechados com registros). Com n = 0 não há média nem mediana, nunca zero: "Escolha ao menos um mês para comparar" e "Restaurar todos"; com um mês só, média e mediana são o valor dele | core; web |
+| Total dos meses exibidos | Soma de todos os pontos da janela, tirados ou não, em andamento ou sem registros: nunca muda com a seleção (EF-09) | core; web |
+| Variação | Do mês anterior que está na comparação até o mês escolhido, sempre com as duas datas ("De março para abril: R$ 4.500,00 a mais"). Com mês tirado ou sem registros no meio, diz "De março para maio" e "Abril ficou fora da comparação."; nunca "mês a mês". Percentual só com base maior que zero ("136,4% a mais que março"); sem outro mês antes, "não disponível"; mês em andamento e mês sem registros não têm variação | core; web |
+| Gráfico | Linha em azul, pontos grandes; ponto vazio e ícone no eixo para o mês fora; linha interrompida nos dois lados do mês fora; um traço na base para o mês sem registros; lima com contorno para o mês escolhido. A escala parte do zero e não muda com a seleção. Cada mês é um botão com o nome "Abril de 2026, R$ 7.800,00, fora da comparação", e "Ver valores mês a mês" mostra a mesma informação em texto | web |
+| Seleção | Os meses tirados valem só na memória, por pessoa, por contexto e por valor mostrado (Recebido e Pago separados); somem ao sair da conta, ao trocar de pessoa ou de contexto e ao recarregar. Não grava nada e não muda nenhum lançamento | core: `EvolutionSelectionStore`; web |
+| Valores ocultos | Pontos sem valor no leitor de tela ("valor oculto"), eixo sem números ("Maior valor do gráfico" some) e "R$ ••••" nos cartões, no painel e na tabela; percentuais e meses seguem à vista | web |
+
+Vetores, Pago (centavos entre parênteses): 3.200, 3.400, 3.300, 7.800, 3.450 e 3.600.
+
+| Seleção | Média | Mediana | n de N | Total dos meses exibidos |
+|---|---:|---:|---|---:|
+| Todos | R$ 4.125,00 (412.500) | R$ 3.425,00 (342.500) | 6 de 6 meses | R$ 24.750,00 |
+| Sem abril | R$ 3.390,00 (339.000) | R$ 3.400,00 (340.000) | 5 de 6 meses | R$ 24.750,00 |
+| Sem fevereiro, abril e junho | R$ 3.316,67 (331.667, de 331.666,67) | R$ 3.300,00 | 3 de 6 meses | R$ 24.750,00 |
+| Só maio | R$ 3.450,00 | R$ 3.450,00 | 1 de 6 meses | R$ 24.750,00 |
+| Nenhum | nunca R$ 0,00: "Escolha ao menos um mês para comparar" | | 0 de 6 meses | R$ 24.750,00 |
+
+Abril menos março: R$ 4.500,00 (136,4%); o "Reparo do carro" de R$ 4.400,00 explica quase tudo, e as demais categorias somam R$ 100,00 a mais. Com abril fora, maio contra março: R$ 150,00 (4,5%). Recebido (5.000, 5.000, março sem recebimento, 5.200, 5.000 e 5.100): média R$ 5.060,00, mediana R$ 5.000,00, "5 de 5 meses" e total R$ 25.300,00; sem fevereiro, R$ 5.075,00 e R$ 5.050,00. Na demonstração padrão (maio a outubro de 2026), setembro (R$ 3.750,00) é o único mês na comparação, e outubro (R$ 3.900,00, o mesmo Pago do Resumo) está em andamento: total R$ 7.650,00.
 
 ## Simulador (Ciclo D, D-028)
 

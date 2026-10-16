@@ -8,6 +8,7 @@ import { QUICK_PAY_TEXT } from '../commitments';
 import { COMMITTED_TEXT } from '../committed';
 import { BENEFIT_TEXT, COMPANY_TEXT } from '../company';
 import { COMPROVANTE_TEXT } from '../comprovante/fluxo';
+import { EVOLUTION_TEXT, EVOLUTION_WINDOWS } from '../evolucao-tela';
 import { EXPORT_TEXT } from '../export';
 import { FAMILY_TEXT, INVITE_TEXT } from '../family';
 import { GOALS_TEXT } from '../goals';
@@ -97,6 +98,26 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     keywords: ['seu mês', 'mês em 30 segundos', '30 segundos', 'revisão do mês', 'balanço do mês', 'o que entrou', 'o que saiu', 'resumo rápido', 'visão do mês'],
     routes: ['/seu-mes'],
     screenshot: '360_seu_mes_entrou_saiu.png',
+  },
+  {
+    id: 'evolucao',
+    group: 'dia-a-dia',
+    title: EVOLUTION_TEXT.title,
+    purpose: 'Mostra o Recebido ou o Pago de cada mês em um gráfico de linha, com média e mediana, e deixa tirar um mês da comparação sem mexer em nenhum lançamento.',
+    where: [TAB.movimentos, EVOLUTION_TEXT.title],
+    steps: [
+      `Em Movimentos, logo abaixo de ${q(SEU_MES_TEXT.title)}, toque em ${q(EVOLUTION_TEXT.title)}.`,
+      `Escolha ${q(EVOLUTION_TEXT.metrics.recebido)} ou ${q(EVOLUTION_TEXT.metrics.pago)} e ${list(EVOLUTION_WINDOWS.map((n) => EVOLUTION_TEXT.windowLabel[n]), 'ou')}. O gráfico tem um ponto por mês, pela data do pagamento.`,
+      'Toque em um mês para ver o valor exato, a variação com o mês anterior na comparação e as 3 maiores categorias de Pago.',
+      `Para tirar um mês da comparação, desligue ${q(EVOLUTION_TEXT.panel.switchLabel)}. Isso não apaga nem muda lançamento, e ${q(EVOLUTION_TEXT.custom.restore)} traz os meses de volta.`,
+      `${q(EVOLUTION_TEXT.stats.average)} e ${q(EVOLUTION_TEXT.stats.median)} usam só os meses da comparação. ${q(EVOLUTION_TEXT.stats.total)} soma todos e não muda.`,
+      `${q(EVOLUTION_TEXT.table.show)} abre os mesmos valores em texto. O mês em andamento e os meses sem registros ficam à vista, fora das contas. A seleção vale só enquanto o app está aberto.`,
+    ],
+    screenName: EVOLUTION_TEXT.title,
+    href: '/evolucao',
+    keywords: ['evolução', 'evolucao', 'gráfico', 'mês a mês', 'comparar meses', 'comparação', 'média', 'mediana', 'variação', 'tirar mês da comparação', 'linha do tempo'],
+    routes: ['/evolucao'],
+    screenshot: '443_evolucao_abril_fora.png',
   },
   {
     id: 'anotar-gasto',

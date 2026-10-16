@@ -116,6 +116,7 @@ describe('catálogo do guia (D-049)', () => {
     for (const id of [
       'resumo',
       'seu-mes',
+      'evolucao',
       'anotar-gasto',
       'nota-fiscal',
       'movimentos',
@@ -227,6 +228,26 @@ describe('catálogo do guia (D-049)', () => {
     // A entrada de Ocultar valores cita o widget de Conta (D-052).
     expect(guideEntry('ocultar-valores')!.alsoWhere?.map(guideWhere)).toContain('Conta › Widget na tela inicial');
     expect(guideEntry('ocultar-valores')!.steps.join(' ')).toContain('"Mostrar valores no widget"');
+  });
+
+  it('"Evolução" (D-057) tem entrada em Dia a dia, logo depois de "Seu mês em 30 segundos", com o caminho e os botões reais, e a busca acha por "evolução", "mediana" e "gráfico"', () => {
+    const entry = guideEntry('evolucao')!;
+    expect(entry.group).toBe('dia-a-dia');
+    expect(GUIDE_ENTRIES.map((e) => e.id).slice(0, 3)).toEqual(['resumo', 'seu-mes', 'evolucao']);
+    expect(entry.title).toBe('Evolução');
+    expect(entry.href).toBe('/evolucao');
+    expect(entry.routes).toEqual(['/evolucao']);
+    expect(guideWhere(entry.where)).toBe('Movimentos › Evolução');
+    expect(entry.screenshot).toBe('443_evolucao_abril_fora.png');
+    const steps = entry.steps.join(' ');
+    for (const name of ['"Seu mês em 30 segundos"', '"Evolução"', '"Recebido"', '"Pago"', '"3 meses"', '"6 meses"', '"12 meses"', '"Mostrar este mês na comparação"', '"Restaurar todos"', '"Média dos meses na comparação"', '"Mediana dos meses na comparação"', '"Total dos meses exibidos"', '"Ver valores mês a mês"']) {
+      expect(steps, name).toContain(name);
+    }
+    expect(steps).toContain('não apaga nem muda lançamento');
+    expect(steps).toContain('só enquanto o app está aberto');
+    for (const query of ['evolução', 'mediana', 'gráfico', 'comparar meses']) expect(searchGuide(query).map((e) => e.id), query).toContain('evolucao');
+    // A palavra "cartão" continua levando só a Cartões e faturas.
+    expect(searchGuide('cartão').map((e) => e.id)).toEqual(['cartoes']);
   });
 
   it('o painel da empresa e o benefício pela empresa (D-056) têm entrada, com o lugar e os nomes reais das telas', () => {

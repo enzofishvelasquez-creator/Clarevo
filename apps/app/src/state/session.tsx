@@ -7,6 +7,7 @@ import { AppState, Text, View } from 'react-native';
 import { pendingCredentials, type AuthService, type AuthState } from '@/lib/auth';
 import { DemoAuth } from '@/lib/demo-auth';
 import { comprovanteHandoff } from '@/lib/comprovante-handoff';
+import { evolutionSelection } from '@/lib/evolution-memory';
 import { pendingBenefit, pendingInvite } from '@/lib/invite-target';
 import { clearNotePrefsMemory } from '@/lib/note-prefs';
 import { pendingAttempts } from '@/lib/pending-attempts';
@@ -73,14 +74,16 @@ function useToday(mode: AuthService['mode']): IsoDate {
 }
 
 /**
- * Nada da nota lida (endereços da Sefaz, memória das lojas), do comprovante lido (D-051) nem das tentativas de escrita com
- * resultado incerto (CL-03 e CL-19) sobrevive à saída da conta nem passa para outra pessoa.
+ * Nada da nota lida (endereços da Sefaz, memória das lojas), do comprovante lido (D-051), das tentativas de escrita com
+ * resultado incerto (CL-03 e CL-19) nem dos meses tirados da comparação em Evolução (D-057) sobrevive à saída da conta nem passa
+ * para outra pessoa.
  */
 function clearReceiptMemory() {
   receiptLinks.clear();
   comprovanteHandoff.clear();
   clearNotePrefsMemory();
   pendingAttempts.clear();
+  evolutionSelection.clear();
 }
 
 function SessionProviderInner({ auth, children }: { auth: AuthService; children: ReactNode }) {

@@ -2891,3 +2891,145 @@ describe('textos das decisões de 16/10/2026 (D-054)', () => {
     check(texts);
   });
 });
+
+import {
+  EVOLUTION_TEXT,
+  EVOLUTION_WINDOWS,
+  buildEvolutionView,
+  evolutionAnnouncement,
+  evolutionFetchRange,
+  evolutionPanel,
+  evolutionVariation,
+  type EvolutionMetric,
+  type MonthOverview as EvolutionOverviewRow,
+} from '../src';
+
+/**
+ * Textos da Evolução (D-057): pt-BR neutro quanto a gênero, sem travessão longo, sem a expressão vetada, sem palavra de julgamento
+ * ("gastou demais", "aumentou muito"), sem produto financeiro e sem marca. A variação entre dois meses é só um fato ("a mais", "a menos",
+ * "sem diferença"), com as duas datas, e nunca fala em "mês a mês" entre meses que não são vizinhos.
+ */
+describe('textos da Evolução (D-057)', () => {
+  const GENDERED = /\b(o|a)s? usuári[oa]s?\b|\bobrigad[oa]s?\b|\bbem-vind[oa]s?\b|\bpreocupad[oa]s?\b|\bendividad[oa]s?\b|\bcadastrad[oa]\b|\(a\)|\(o\)|\bo\/a\b|\bvocê (é|está|ficou) \w+[oa]\b/i;
+  const VETOED =
+    /\bdemais\b|\balt[oa]s?\b|\bbaix[oa]s?\b|\bruim\b|cuidado|estour|gastou|gastão|gastona|exagero|\bculpa|\bperigo|\balerta|\bdeveria\b|\bprecisa(m)? (gastar|cortar)|\bcort(ar|e)\b|\bsupérfluo|parab[eé]ns|\bvoc[eê] conseguiu|incr[ií]vel|arrasou|\bvale a pena\b|\bsaldo disponível\b|aumentou|diminuiu|despencou|disparou|\bmuito\b|\bpouco\b|\batípic|\bdescontrol/i;
+  const BRANDS = /\b(nubank|ita[uú]|bradesco|santander|c6|sicredi|sicoob|btg|neon|picpay|mercado pago|visa|mastercard|hipercard|amex|serasa)\b/i;
+  const check = (texts: string[]) => {
+    expect(texts.length).toBeGreaterThan(0);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(FORBIDDEN_EXPANDED);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(VETOED);
+      expect(text, text).not.toMatch(GENDERED);
+      expect(text, text).not.toMatch(BRANDS);
+      expect(text, text).not.toMatch(/[–—]/);
+    }
+  };
+
+  const row = (month: string, paidCount: number, paidCents: number, receivedCount = 0, receivedCents = 0): EvolutionOverviewRow => ({ month, receivedCount, receivedCents, paidCount, paidCents });
+  /** Seis meses de 2026 (março sem Recebido) com abril em destaque, e outubro como mês atual (em andamento). */
+  const overview = [
+    row('2026-01', 10, 320_000, 2, 500_000),
+    row('2026-02', 11, 340_000, 2, 500_000),
+    row('2026-03', 12, 330_000),
+    row('2026-04', 13, 780_000, 2, 520_000),
+    row('2026-05', 14, 345_000, 2, 500_000),
+    row('2026-06', 15, 360_000, 2, 510_000),
+    row('2026-10', 3, 90_000, 1, 10_000),
+  ];
+
+  /** Todo texto montado pela tela, em todos os estados e com várias seleções. */
+  function samples(): string[] {
+    const texts: string[] = [];
+    const hiddenSets: string[][] = [[], ['2026-04'], ['2026-02', '2026-04'], ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06']];
+    for (const metric of ['recebido', 'pago'] as EvolutionMetric[]) {
+      for (const windowMonths of EVOLUTION_WINDOWS) {
+        for (const hiddenMonths of hiddenSets) {
+          const view = buildEvolutionView({ overview, metric, windowMonths, currentMonth: '2026-10', hiddenMonths });
+          texts.push(evolutionAnnouncement(view), EVOLUTION_TEXT.custom.banner(view.outCount, view.eligibleCount), EVOLUTION_TEXT.custom.list(view.stats.hiddenMonths));
+          texts.push(EVOLUTION_TEXT.chart.span(view.from, view.to), EVOLUTION_TEXT.chart.title(metric), EVOLUTION_TEXT.chart.maxValue(view.maxCents));
+          texts.push(EVOLUTION_TEXT.stats.ofMonths(view.stats.visibleCount, view.eligibleCount));
+          for (const p of view.points) {
+            texts.push(p.name, p.title, p.stateText, p.includedText, ...(p.valueText ? [p.valueText] : []));
+            const panel = evolutionPanel(view, p.month);
+            texts.push(panel.title, panel.valueCaption, panel.stateText, EVOLUTION_TEXT.panel.seeRecordsHint(p.month), p.stateLabel, ...(panel.notEligibleText ? [panel.notEligibleText] : []));
+            const v = panel.variation;
+            texts.push(v.text, ...(v.available ? [...(v.percentText ? [v.percentText] : []), ...(v.skippedText ? [v.skippedText] : [])] : []));
+          }
+        }
+      }
+    }
+    // Variações de março para abril, de abril para maio, sem diferença e base zero.
+    const pair = (a: number, b: number) =>
+      evolutionVariation(buildEvolutionView({ overview: [row('2026-03', 1, a), row('2026-04', 1, b)], metric: 'pago', windowMonths: 3, currentMonth: '2026-05', hiddenMonths: [] }), '2026-04');
+    for (const v of [pair(330_000, 780_000), pair(780_000, 330_000), pair(100, 100), pair(0, 5_000), pair(100_000_000, 100_000_001)]) {
+      texts.push(v.text, ...(v.available ? [...(v.percentText ? [v.percentText] : []), ...(v.skippedText ? [v.skippedText] : [])] : []));
+    }
+    texts.push(
+      EVOLUTION_TEXT.custom.banner(1, 1),
+      EVOLUTION_TEXT.custom.scope('pago'),
+      EVOLUTION_TEXT.custom.scope('recebido'),
+      EVOLUTION_TEXT.states.noRecordsBody('pago'),
+      EVOLUTION_TEXT.states.noRecordsBody('recebido'),
+      ...([3, 6, 12] as const).flatMap((w) => EVOLUTION_TEXT.states.olderMonths(w) ?? []),
+      EVOLUTION_TEXT.panel.noRecords('pago'),
+      EVOLUTION_TEXT.panel.noRecords('recebido'),
+      EVOLUTION_TEXT.panel.categoryShare('35,9%'),
+      EVOLUTION_TEXT.variation.skippedOut(['2026-02', '2026-03', '2026-04']),
+      EVOLUTION_TEXT.variation.skippedEmpty(['2026-03']),
+      EVOLUTION_TEXT.variation.skippedEmpty(['2026-02', '2026-03']),
+      EVOLUTION_TEXT.variation.percentTiny(true, '2026-03'),
+      EVOLUTION_TEXT.variation.percentTiny(false, '2026-03'),
+      EVOLUTION_TEXT.stats.announce(339_000, 340_000, 5, 6),
+    );
+    return texts;
+  }
+
+  it('as frases fixas passam nas regras', () => {
+    check(staticStrings(EVOLUTION_TEXT));
+    expect(staticStrings(EVOLUTION_TEXT).length).toBeGreaterThan(60);
+  });
+
+  it('as frases montadas, em todos os estados, com as duas métricas e as três janelas, passam nas regras', () => {
+    const texts = samples();
+    expect(texts.length).toBeGreaterThan(400);
+    check(texts);
+  });
+
+  it('o arquivo-fonte da tela passa pelas regras de texto', () => {
+    const source = readFileSync(join(CORE_SRC, 'evolucao-tela.ts'), 'utf8');
+    expect(source).not.toMatch(FORBIDDEN);
+    expect(source).not.toMatch(JUDGMENT);
+    expect(source).not.toMatch(BRANDS);
+  });
+
+  it('as frases pedidas pela especificação existem como estão', () => {
+    expect(EVOLUTION_TEXT.title).toBe('Evolução');
+    expect(EVOLUTION_TEXT.subtitle).toBe('Valores registrados, pela data do pagamento');
+    expect(EVOLUTION_TEXT.stats.average).toBe('Média dos meses na comparação');
+    expect(EVOLUTION_TEXT.stats.median).toBe('Mediana dos meses na comparação');
+    expect(EVOLUTION_TEXT.stats.total).toBe('Total dos meses exibidos');
+    expect(EVOLUTION_TEXT.table.show).toBe('Ver valores mês a mês');
+    expect(EVOLUTION_TEXT.table.columns.included).toBe('Na comparação?');
+    expect(EVOLUTION_TEXT.panel.switchLabel).toBe('Mostrar este mês na comparação');
+    expect(EVOLUTION_TEXT.panel.switchCaption).toBe('Tirar da comparação não apaga nem muda nenhum lançamento.');
+    expect(EVOLUTION_TEXT.panel.state.com_registros).toBe('Com registros');
+    expect(EVOLUTION_TEXT.panel.state.em_andamento).toBe('Mês em andamento');
+    expect(EVOLUTION_TEXT.panel.noRecords('pago')).toBe('Sem registros: mês sem anotação não quer dizer mês sem gastos');
+    expect(EVOLUTION_TEXT.states.allOutTitle).toBe('Escolha ao menos um mês para comparar');
+    expect(EVOLUTION_TEXT.custom.restore).toBe('Restaurar todos');
+    expect(EVOLUTION_TEXT.retry).toBe('Tentar de novo');
+    expect(EVOLUTION_TEXT.custom.banner(2, 6)).toBe('Comparação personalizada: 2 de 6 meses fora da comparação');
+    expect(EVOLUTION_TEXT.legend.excluded).toBe('Fora da comparação');
+    expect(evolutionFetchRange('2026-10')).toEqual({ from: '2025-11', to: '2026-10' });
+  });
+
+  it('a variação é um fato com as duas datas: "a mais", "a menos" ou "sem diferença", nunca "mês a mês" nem palavra de julgamento', () => {
+    const lines = samples().filter((t) => /^De [a-zç]+ para [a-zç]+: /.test(t));
+    expect(lines.length).toBeGreaterThan(10);
+    for (const text of lines) expect(text, text).toMatch(/^De [a-zç]+ para [a-zç]+: (R\$ [\d.]+,\d{2} a (mais|menos)|sem diferença)$/);
+    for (const text of samples().filter((t) => /% a (mais|menos) que /.test(t))) expect(text, text).toMatch(/^(Menos de )?[\d.,]+% a (mais|menos) que [a-zç]+$|^Menos de 0,1% a (mais|menos) que [a-zç]+$/);
+    for (const text of samples().filter((t) => /^De [a-zç]+ para /.test(t))) expect(text, text).not.toMatch(/mês a mês/i);
+  });
+});

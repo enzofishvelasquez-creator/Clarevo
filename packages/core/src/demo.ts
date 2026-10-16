@@ -49,10 +49,15 @@ export const DEMO_EMAIL = 'demo@clarevo.app';
  * - 'retorno': a montagem FICTÍCIA da sequência R do Ciclo A4 (D-030), anotada em 20/05/2026 e aberta em 07/10/2026;
  * - 'assinaturas': a base de aceite, com as duas assinaturas de exemplo cadastradas em 30/06/2026 e nunca revisadas, o que faz o
  *   lembrete "Faz tempo que você não revisa suas assinaturas" (D-046) aparecer em 07/10/2026. Os totais de outubro não mudam.
- * Conta nova nunca recebe nenhum dos três.
+ * - 'evolucao': a montagem FICTÍCIA do caso de referência da Evolução (D-057, EF §6): de janeiro a junho de 2026, Pago de
+ *   R$ 3.200, 3.400, 3.300, 7.800, 3.450 e 3.600 (abril com o "Reparo do carro" de R$ 4.400,00) e Recebido de R$ 5.000, 5.000, sem
+ *   registro em março, 5.200, 5.000 e 5.100. Não tem os lançamentos de setembro e outubro da base de aceite (que não vale neste
+ *   cenário): na janela de 12 meses, o total é R$ 24.750,00, a média dos 6 meses R$ 4.125,00 e a mediana R$ 3.425,00 (sem abril:
+ *   R$ 3.390,00 e R$ 3.400,00).
+ * Conta nova nunca recebe nenhum dos quatro.
  */
-export type DemoScenario = 'padrao' | 'retorno' | 'assinaturas';
-export const DEMO_SCENARIOS: readonly DemoScenario[] = ['padrao', 'retorno', 'assinaturas'];
+export type DemoScenario = 'padrao' | 'retorno' | 'assinaturas' | 'evolucao';
+export const DEMO_SCENARIOS: readonly DemoScenario[] = ['padrao', 'retorno', 'assinaturas', 'evolucao'];
 /** Dia em que as assinaturas de exemplo foram cadastradas no cenário 'assinaturas'. */
 export const DEMO_SUBSCRIPTIONS_SETUP_DAY = '2026-06-30';
 /** Dia da montagem do cenário 'retorno' (última anotação antes do tempo sem usar). */
@@ -78,6 +83,7 @@ export function createDemoCompanyHub(adminPersonId: string = 'pessoa-demo'): Mem
 
 export async function createDemoRepository(opts: { latencyMs?: number; scenario?: DemoScenario; cards?: boolean } = {}) {
   if (opts.scenario === 'retorno') return createReturnDemoRepository(opts.latencyMs);
+  if (opts.scenario === 'evolucao') return createEvolutionDemoRepository(opts.latencyMs);
   // O dia só muda, por um instante, para cadastrar as assinaturas de exemplo no cenário 'assinaturas'.
   let today: string = DEMO_TODAY;
   const repo = new MemoryRepository({
@@ -337,6 +343,57 @@ async function createReturnDemoRepository(latencyMs?: number) {
     category: 'Mercado',
   });
   today = DEMO_TODAY;
+  repo.latencyMs = latencyMs ?? 0;
+  return repo;
+}
+
+/**
+ * Cenário 'evolucao' (FICTÍCIO, identificado como demonstração): o caso de referência da Evolução financeira (D-057, EF §6). Só a
+ * "Conta principal", sem gastos fixos, metas, cartões nem orçamento, e os lançamentos de janeiro a junho de 2026 (hoje continua
+ * 07/10/2026, então a janela de 12 meses os mostra, com novembro e dezembro de 2025 e julho a outubro de 2026 sem registros).
+ * Pago por mês: 3.200, 3.400, 3.300, 7.800, 3.450 e 3.600 (o aluguel de R$ 2.000,00, o mercado, o combustível e o lazer; abril tem
+ * ainda o "Reparo do carro", de R$ 4.400,00). Recebido: salário de R$ 5.000,00 (R$ 5.200,00 em abril e R$ 5.100,00 em junho), e março
+ * sem nenhum recebimento anotado.
+ */
+async function createEvolutionDemoRepository(latencyMs?: number) {
+  const repo = new MemoryRepository({
+    actorId: 'pessoa-demo',
+    displayName: 'Maria Alves',
+    email: DEMO_EMAIL,
+    today: () => DEMO_TODAY,
+    latencyMs: 0,
+    company: createDemoCompanyHub(),
+  });
+  const space = await repo.ensurePersonalSpace('Conta principal');
+  const ctx = space.personalContextId;
+  const accountId = space.accounts[0]!.id;
+  const add = (kind: 'receita' | 'despesa', description: string, reais: number, occurredOn: string, category: string) =>
+    repo.createRecord(newOperationKey(), ctx, kind, { accountId, amountCents: reais * 100, occurredOn, description, category });
+  // Mercado, combustível e lazer de cada mês (o aluguel é sempre R$ 2.000,00).
+  const months: readonly (readonly [string, number, number, number])[] = [
+    ['2026-01', 800, 250, 150],
+    ['2026-02', 900, 300, 200],
+    ['2026-03', 850, 280, 170],
+    ['2026-04', 880, 300, 220],
+    ['2026-05', 900, 320, 230],
+    ['2026-06', 950, 330, 320],
+  ];
+  for (const [month, mercado, combustivel, lazer] of months) {
+    await add('despesa', 'Aluguel', 2000, `${month}-05`, 'Moradia');
+    await add('despesa', 'Mercado', mercado, `${month}-12`, 'Mercado');
+    await add('despesa', 'Combustível', combustivel, `${month}-18`, 'Transporte');
+    await add('despesa', 'Lazer', lazer, `${month}-24`, 'Lazer');
+  }
+  await add('despesa', 'Reparo do carro', 4400, '2026-04-22', 'Transporte');
+  for (const [month, reais] of [
+    ['2026-01', 5000],
+    ['2026-02', 5000],
+    ['2026-04', 5200],
+    ['2026-05', 5000],
+    ['2026-06', 5100],
+  ] as const) {
+    await add('receita', 'Salário', reais, `${month}-05`, 'Salário');
+  }
   repo.latencyMs = latencyMs ?? 0;
   return repo;
 }

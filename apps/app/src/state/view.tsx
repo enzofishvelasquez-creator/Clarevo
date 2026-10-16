@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { evolutionSelection } from '@/lib/evolution-memory';
 import { currentMonthOf, ViewContext, type SpaceKind, type ViewState } from '@/state/data';
 import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
@@ -27,6 +28,11 @@ export function ViewProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (familyGone) setSpace('pessoal');
   }, [familyGone]);
+
+  // Os meses tirados da comparação em Evolução (D-057) valem para o contexto em que foram tirados: trocar de contexto os esquece.
+  useEffect(() => {
+    evolutionSelection.clear();
+  }, [space]);
 
   // Cada pessoa começa em Pessoal, no mês atual (nada da sessão anterior permanece: o contexto escolhido é limpo ao sair da conta).
   useEffect(() => {
