@@ -14,6 +14,7 @@ import {
   PARTS_PER_YEAR_MAX,
   INVITE_CODE_PATTERN,
   FAMILY_MAX_PEOPLE,
+  FAMILY_DEPARTED_NAME,
   FAMILY_NEUTRAL_NAME,
   RepoError,
   SAVINGS_ANSWERS,
@@ -639,6 +640,9 @@ const KNOWN: RepoErrorCode[] = [
   'nao_sobre_si',
   'contexto_invalido',
   'familia_com_membros',
+  // Excluir a conta (D-058). Nenhum é sufixo de outro código da lista, nem tem outro como sufixo.
+  'confirmacao_invalida',
+  'transferir_antes',
   // Empresas (D-056). Nenhum é sufixo de outro código da lista, nem tem outro como sufixo.
   'email_invalido',
   'contrato_nao_vigente',
@@ -2765,6 +2769,21 @@ export class SupabaseRepository implements RecordsRepository {
   }
 
   // -------------------------------------------------------------------------
+  // Excluir a conta (D-058): delete_my_account, da migração 0015
+  // -------------------------------------------------------------------------
+
+  /**
+   * Chama delete_my_account com a palavra exata (o texto digitado nunca vai ao banco: quem chama passa DELETE_CONFIRMATION_WORD).
+   * A resposta é só {deleted: true}; qualquer outra forma é defeito, não recusa. Depois dela a conta não existe mais: quem chama sai
+   * da sessão.
+   */
+  async deleteMyAccount(confirmation: string, key: string): Promise<void> {
+    const { data, error } = await this.db.rpc('delete_my_account', { p_confirmation: confirmation, p_key: key });
+    if (error) throw repoError(error);
+    if ((data as { deleted?: unknown } | null)?.deleted !== true) throw new RepoError('desconhecido', 'exclusao_inconsistente');
+  }
+
+  // -------------------------------------------------------------------------
   // Empresas (D-056): as sete funções da migração 0014, a visão my_benefit e as tabelas que o RH lê (organizations,
   // benefit_contracts e licenses, sem o resumo do código nem a pessoa)
   // -------------------------------------------------------------------------
@@ -3017,7 +3036,9 @@ function toMember(r: MemberRow): FamilyMember {
     (r.status !== 'ativo' && r.status !== 'ex-membro') ||
     typeof r.first_name !== 'string' ||
     r.first_name === '' ||
-    (r.first_name !== FAMILY_NEUTRAL_NAME && /\s|@/.test(r.first_name)) ||
+    (r.first_name !== FAMILY_NEUTRAL_NAME && r.first_name !== FAMILY_DEPARTED_NAME && /\s|@/.test(r.first_name)) ||
+    // "Pessoa que saiu" (quem excluiu a conta, D-058) só aparece como ex-membro.
+    (r.first_name === FAMILY_DEPARTED_NAME && r.status !== 'ex-membro') ||
     typeof r.person_id !== 'string' ||
     (r.status === 'ativo') !== (r.left_at === null)
   ) {

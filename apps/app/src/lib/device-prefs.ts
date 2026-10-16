@@ -179,6 +179,20 @@ export function updatePrefs(userId: string, patch: Partial<DevicePrefs>, persist
   return next;
 }
 
+/** Esquece, neste aparelho, as preferências da pessoa (excluir a conta, D-058): a memória e o que foi gravado. */
+export function forgetPrefs(userId: string): void {
+  memory.delete(userId);
+  loading.delete(userId);
+  emit();
+  const key = PREFIX + userId;
+  try {
+    if (Platform.OS === 'web') webStorage()?.removeItem(key);
+    else AsyncStorage.removeItem(key).catch(() => {});
+  } catch {
+    // Sem armazenamento: nada a apagar.
+  }
+}
+
 function subscribe(listener: () => void) {
   listeners.add(listener);
   return () => {

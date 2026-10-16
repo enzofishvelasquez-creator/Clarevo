@@ -1,4 +1,4 @@
-import { BENEFIT_TEXT, FAMILY_ROLE_HELP, FAMILY_TEXT, GOALS_TEXT, RETURN_TEXT, SAVINGS_TEXT } from '@clarevo/core';
+import { BENEFIT_TEXT, DELETE_TEXT, FAMILY_ROLE_HELP, FAMILY_TEXT, GOALS_TEXT, RETURN_TEXT, SAVINGS_TEXT } from '@clarevo/core';
 import { router } from 'expo-router';
 import { User } from 'lucide-react-native';
 import { View } from 'react-native';
@@ -6,7 +6,7 @@ import { View } from 'react-native';
 import { MemberLine } from '@/components/family-parts';
 import { ContextPill, SubHeader } from '@/components/header';
 import { TopicLink } from '@/components/topic-link';
-import { Button, Card, Screen, Txt } from '@/components/ui';
+import { Button, Card, LinkButton, Screen, Txt } from '@/components/ui';
 import { useView } from '@/state/data';
 import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
@@ -78,6 +78,9 @@ export default function QuemVeScreen() {
           <Txt color={colors.textSecondary}>{SAVINGS_TEXT.privacy}</Txt>
         </>
       ) : null}
+      {/* Excluir a conta (D-058): o Pessoal é apagado de verdade, e o que foi anotado na Família continua sem nome. */}
+      <Txt color={colors.textSecondary}>{DELETE_TEXT.whoSees}</Txt>
+      <LinkButton label={DELETE_TEXT.whoSeesLink} onPress={() => router.push('/conta/excluir')} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
       <TopicLink slug="empresa-ve" label="A empresa vê meus gastos?" style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
       <Button label="Entendi" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
     </Screen>

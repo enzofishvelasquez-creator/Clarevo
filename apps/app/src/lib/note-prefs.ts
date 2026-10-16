@@ -139,6 +139,20 @@ export async function rememberPayee(userId: string, payeeId: string, memoryOfPay
   save(userId, { ...current, payees }, persist);
 }
 
+/** Esquece, neste aparelho, as memórias da pessoa (excluir a conta, D-058): a memória e o que foi gravado. */
+export function forgetNotePrefs(userId: string): void {
+  generation++;
+  memory.delete(userId);
+  loading.delete(userId);
+  const key = PREFIX + userId;
+  try {
+    if (Platform.OS === 'web') webStorage()?.removeItem(key);
+    else AsyncStorage.removeItem(key).catch(() => {});
+  } catch {
+    // Sem armazenamento: nada a apagar.
+  }
+}
+
 /** Ao sair da conta (ou trocar de pessoa): esquece as memórias em RAM. O que foi gravado no aparelho vale só para a mesma pessoa. */
 export function clearNotePrefsMemory(): void {
   generation++;

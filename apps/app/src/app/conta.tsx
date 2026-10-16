@@ -1,5 +1,5 @@
-import { BENEFIT_TEXT, COMPANY_TEXT, EXPORT_TEXT, FAMILY_ROLE_LABEL, FAMILY_TEXT } from '@clarevo/core';
-import { AlertCircle, Building2, Check, FileDown, KeyRound, LogOut, MonitorSmartphone, Users } from 'lucide-react-native';
+import { BENEFIT_TEXT, COMPANY_TEXT, DELETE_TEXT, EXPORT_TEXT, FAMILY_ROLE_LABEL, FAMILY_TEXT } from '@clarevo/core';
+import { AlertCircle, Building2, Check, FileDown, KeyRound, LogOut, MonitorSmartphone, Trash2, Users } from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Platform, ScrollView, View } from 'react-native';
@@ -216,6 +216,17 @@ export default function ContaScreen() {
         <Txt variant="caption" color={colors.textSecondary} style={{ textAlign: 'center' }}>
           Sair encerra a sessão neste aparelho. Seus registros continuam guardados.
         </Txt>
+
+        {/* Excluir minha conta (D-058): o último item de Conta, sem destaque de alerta. A tela seguinte explica o que é apagado. */}
+        <Card style={{ gap: space[3] }}>
+          <Txt variant="title" accessibilityRole="header" aria-level={2}>
+            {DELETE_TEXT.entry}
+          </Txt>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {DELETE_TEXT.entryHint}
+          </Txt>
+          <Button label={DELETE_TEXT.entryButton} icon={Trash2} tone="soft" accessibilityLabel={DELETE_TEXT.entryA11y} onPress={() => router.push('/conta/excluir')} />
+        </Card>
       </Screen>
 
       <ConfirmDialog

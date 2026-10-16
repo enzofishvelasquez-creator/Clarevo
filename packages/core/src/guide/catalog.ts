@@ -8,8 +8,9 @@ import { QUICK_PAY_TEXT } from '../commitments';
 import { COMMITTED_TEXT } from '../committed';
 import { BENEFIT_TEXT, COMPANY_TEXT } from '../company';
 import { COMPROVANTE_TEXT } from '../comprovante/fluxo';
+import { DELETE_CONFIRMATION_WORD, DELETE_TEXT } from '../deletion';
 import { EXPORT_TEXT } from '../export';
-import { FAMILY_TEXT, INVITE_TEXT } from '../family';
+import { FAMILY_DEPARTED_NAME, FAMILY_TEXT, INVITE_TEXT } from '../family';
 import { GOALS_TEXT } from '../goals';
 import { IMPORT_TEXT } from '../importar/textos';
 import { LEARN_SECTIONS } from '../learn/sections';
@@ -660,6 +661,26 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     screenshot: '291_exportar_meus_dados.png',
   },
   {
+    id: 'excluir-conta',
+    group: 'conta-e-privacidade',
+    title: 'Excluir minha conta',
+    purpose: 'Apaga a sua conta e o seu Pessoal de verdade, e não é possível desfazer. O e-mail fica livre para uma conta nova. Na Família, o que você anotou continua como histórico da casa.',
+    where: [ACCOUNT_SCREEN, DELETE_TEXT.entry],
+    steps: [
+      `Em Conta, no último card, ${q(DELETE_TEXT.entry)}, toque em ${q(DELETE_TEXT.entryButton)}.`,
+      `Leia ${q(DELETE_TEXT.erasedTitle)} e ${q(DELETE_TEXT.keptTitle)}. O Pessoal inteiro é apagado de verdade; na Família, quem é membro ou só vê sai, e o que anotou continua com a autoria ${q(FAMILY_DEPARTED_NAME)}.`,
+      `Quem é titular com outras pessoas na Família passa a titularidade ou remove as pessoas antes: toque em ${q(DELETE_TEXT.familyOpen)}. Quem é titular sem mais ninguém tem a Família apagada junto.`,
+      `Se quiser guardar uma cópia, toque em ${q(DELETE_TEXT.exportButton)}: depois de excluir, não há como recuperar.`,
+      `Digite ${q(DELETE_CONFIRMATION_WORD)} no campo e toque em ${q(DELETE_TEXT.submit)}. Você sai da conta, e a tela de entrada confirma com ${q(DELETE_TEXT.done)} Pronto.`,
+      'Se a sua empresa oferece o Clarevo como benefício, a licença termina na hora e a empresa vê só que ela terminou. Na demonstração, nada é apagado.',
+    ],
+    screenName: DELETE_TEXT.title,
+    href: '/conta/excluir',
+    keywords: ['excluir', 'excluir conta', 'excluir minha conta', 'apagar conta', 'apagar meus dados', 'excluir meus dados', 'deletar conta', 'encerrar conta', 'cancelar conta', 'lgpd', 'privacidade', 'sair do clarevo'],
+    routes: ['/conta/excluir'],
+    screenshot: '460_excluir_conta.png',
+  },
+  {
     id: 'familia',
     group: 'conta-e-privacidade',
     title: 'Família',
@@ -671,7 +692,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Quem recebe o link entra ou cria a conta, vê o nome da Família e quem convidou e toca em ${q(INVITE_TEXT.accept)}.`,
       `Com Família, o seletor ${q('Pessoal')} e ${q(FAMILY_TEXT.context)} aparece no topo das abas: cada tela usa o contexto escolhido, e os formulários dizem onde a anotação vai ficar.`,
       `O titular muda o papel de cada pessoa, remove, usa ${q(FAMILY_TEXT.transfer)} ou ${q(FAMILY_TEXT.end)}. Quem não é titular usa ${q(FAMILY_TEXT.leave)}.`,
-      'O que alguém anotou continua na Família depois que sai, como "ex-membro" e o primeiro nome.',
+      'O que alguém anotou continua na Família depois que sai, como "ex-membro" e o primeiro nome. Quem exclui a conta fica como "Pessoa que saiu", sem nome.',
     ],
     screenName: FAMILY_TEXT.title,
     href: '/familia',
@@ -730,6 +751,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       'Veja o nome e a permissão de cada pessoa com acesso. Em Pessoal, só você vê, anota, edita e exclui. Na Família, aparecem as pessoas e o papel de cada uma.',
       'A empresa que oferece o Clarevo como benefício administra só o seu acesso ao plano, não os seus registros.',
       'Gastos fixos, renda de referência, metas, simulações e a revisão dos últimos meses também são só seus no Pessoal.',
+      'Mais abaixo, a explicação da exclusão da conta: o Pessoal é apagado de verdade, e o que foi anotado na Família continua como "Pessoa que saiu".',
       `Para uma resposta mais completa, toque em ${q('A empresa vê meus gastos?')}.`,
     ],
     screenName: 'Quem vê estes dados?',

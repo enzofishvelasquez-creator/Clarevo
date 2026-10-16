@@ -25,6 +25,9 @@ import {
   affectedByEditFrom,
   affectedByEnd,
   affectedByYear,
+  DELETE_CONFIRMATION_WORD,
+  DELETE_ERROR_CODES,
+  FAMILY_DEPARTED_NAME,
   FAMILY_MAX_PEOPLE,
   FAMILY_NEUTRAL_NAME,
   FAMILY_TEXT,
@@ -8282,6 +8285,228 @@ describe('conversor da empresa', () => {
       for (const spy of spies) expect(spy).not.toHaveBeenCalled();
     } finally {
       for (const spy of spies) spy.mockRestore();
+    }
+  });
+});
+
+describe('API real: excluir a conta (Ciclo P, D-058)', () => {
+  // Hélio (membro da Família da Irene, com o Pessoal cheio), Irene (titular) e Joel (conta que nunca criou o espaço). Roda no fim: nada
+  // dos blocos anteriores depende destas pessoas. Pessoas FICTÍCIAS.
+  const TODAY = '2026-10-07';
+  const HELIO = '00000000-0000-0000-0000-0000000002a1';
+  const IRENE = '00000000-0000-0000-0000-0000000002b1';
+  const JOEL = '00000000-0000-0000-0000-0000000002c1';
+  const HELIO2 = '00000000-0000-0000-0000-0000000002d1';
+  const helio = repoFor(HELIO);
+  const irene = repoFor(IRENE);
+  const joel = repoFor(JOEL);
+  const count = (query: string) => Number(adminSql(query));
+  let fam = '';
+  let helioCtx = '';
+  let ireneCtx = '';
+  let famRecord = '';
+
+  const record = (accountId: string, description: string): RecordInput => ({ accountId, amountCents: 2500, occurredOn: TODAY, description, category: null });
+  /** Um resumo (md5) de tudo que importa nas tabelas de dados: serve para provar que repetir a exclusão não muda nada. */
+  const world = () =>
+    adminSql(
+      `select md5(concat_ws('|',
+         (select coalesce(string_agg(t::text, '|' order by t::text), '') from public.financial_records t),
+         (select coalesce(string_agg(t::text, '|' order by t::text), '') from public.persons t),
+         (select coalesce(string_agg(t::text, '|' order by t::text), '') from public.context_memberships t),
+         (select coalesce(string_agg(t::text, '|' order by t::text), '') from public.financial_contexts t),
+         (select coalesce(string_agg(id::text, '|' order by id::text), '') from auth.users)))`,
+    );
+
+  beforeAll(async () => {
+    adminSql(
+      `insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
+         ('${HELIO}', 'helio@exemplo.test', now(), '{"display_name":"Hélio Prado"}'),
+         ('${IRENE}', 'irene@exemplo.test', now(), '{"display_name":"Irene Souza"}'),
+         ('${JOEL}', 'joel@exemplo.test', now(), '{"display_name":"Joel Reis"}')`,
+    );
+    helioCtx = (await helio.ensurePersonalSpace('Conta principal')).personalContextId;
+    ireneCtx = (await irene.ensurePersonalSpace('Conta principal')).personalContextId;
+  });
+
+  it('1. a Família da Irene, o Pessoal do Hélio e o que ele anotou nos dois lados', async () => {
+    fam = (await irene.createFamily(newOperationKey(), 'Casa da Irene')).context.id;
+    const invite = await irene.createFamilyInvite(newOperationKey(), fam, 'membro');
+    await helio.acceptFamilyInvite(newOperationKey(), invite.code!);
+    const hAcc = (await helio.getSpace())!.accounts[0]!.id;
+    const fAcc = (await helio.listAccounts(fam))[0]!.id;
+    await helio.createRecord(newOperationKey(), helioCtx, 'despesa', record(hAcc, 'Mercado do Hélio'));
+    await helio.createCommitment(newOperationKey(), helioCtx, { description: 'Internet do Hélio', amountCents: 9000, dueOn: '2026-10-20', category: null });
+    famRecord = (await helio.createRecord(newOperationKey(), fam, 'despesa', record(fAcc, 'Padaria da casa'))).id;
+    await irene.createRecord(newOperationKey(), ireneCtx, 'despesa', record((await irene.getSpace())!.accounts[0]!.id, 'Mercado da Irene'));
+    expect(count(`select count(*) from public.financial_records where context_id = '${helioCtx}'`)).toBe(1);
+    expect(count(`select count(*) from public.financial_records where context_id = '${fam}' and created_by = '${HELIO}'`)).toBe(1);
+  });
+
+  it('2. recusas: sem sessão, confirmação errada de todos os jeitos, chave já usada e titular com outras pessoas; nada muda', async () => {
+    const used = newOperationKey();
+    await helio.createRecord(used, helioCtx, 'receita', record((await helio.getSpace())!.accounts[0]!.id, 'Bônus'));
+    const before = world();
+    const anon = new SupabaseRepository(clientFor(null), { id: HELIO });
+    expect(await err(anon.deleteMyAccount(DELETE_CONFIRMATION_WORD, newOperationKey()))).toBe('sem_permissao');
+    const denied = await clientFor(null).rpc('delete_my_account', { p_confirmation: 'EXCLUIR', p_key: newOperationKey() });
+    expect(denied.error?.code).toBe('42501');
+    expect(denied.error?.message).toMatch(/permission denied/);
+    for (const bad of ['excluir', ' EXCLUIR', 'EXCLUIR ', '', 'SIM', 'EXCLUIR!']) expect(await err(helio.deleteMyAccount(bad, newOperationKey())), JSON.stringify(bad)).toBe('confirmacao_invalida');
+    expect(await err(helio.deleteMyAccount(DELETE_CONFIRMATION_WORD, used))).toBe('chave_reutilizada');
+    // A titular com outras pessoas ativas passa a titularidade ou remove as pessoas antes.
+    expect(await err(irene.deleteMyAccount(DELETE_CONFIRMATION_WORD, newOperationKey()))).toBe('transferir_antes');
+    expect([...DELETE_ERROR_CODES]).toEqual(['confirmacao_invalida', 'transferir_antes']);
+    expect(world()).toBe(before);
+    expect(count(`select count(*) from auth.users where id in ('${HELIO}', '${IRENE}')`)).toBe(2);
+    expect((await irene.getFamily())!.members.filter((m) => m.status === 'ativo')).toHaveLength(2);
+    expect((await irene.listRecords(ireneCtx, '2026-10')).length).toBe(1);
+  });
+
+  it('3. Hélio exclui: o Pessoal some de verdade, o que ele anotou na Família fica como "Pessoa que saiu", e a Irene não perde nada', async () => {
+    const ireneBefore = adminSql(`select md5(coalesce(string_agg(t::text, '|' order by t::text), '')) from public.financial_records t where t.context_id in ('${ireneCtx}', '${fam}') and t.created_by <> '${HELIO}'`);
+    const key = newOperationKey();
+    await helio.deleteMyAccount(DELETE_CONFIRMATION_WORD, key);
+    // O banco: a conta, o Pessoal e o rastro saíram; sobrou só a linha anônima, enquanto ele é autor na Família.
+    expect(count(`select count(*) from auth.users where id = '${HELIO}' or lower(email) = 'helio@exemplo.test'`)).toBe(0);
+    expect(count(`select count(*) from public.financial_contexts where owner_person_id = '${HELIO}'`)).toBe(0);
+    expect(count(`select count(*) from public.financial_records where context_id = '${helioCtx}'`)).toBe(0);
+    expect(count(`select count(*) from public.commitments where context_id = '${helioCtx}'`)).toBe(0);
+    expect(count(`select count(*) from public.record_operations where actor_id = '${HELIO}'`)).toBe(0);
+    expect(adminSql(`select (deleted_at is not null)::text || '|' || display_name from public.persons where id = '${HELIO}'`)).toBe('true|');
+    expect(count(`select count(*) from public.financial_records where context_id = '${fam}' and created_by = '${HELIO}'`)).toBe(1);
+    // A Irene: a Família segue, o que ele anotou continua à vista e a autoria é "Pessoa que saiu".
+    const family = (await irene.getFamily())!;
+    const gone = family.members.find((m) => m.personId === HELIO)!;
+    expect(gone).toMatchObject({ firstName: FAMILY_DEPARTED_NAME, status: 'ex-membro', role: 'membro', isMe: false });
+    expect(authorLabel(family.members, HELIO)).toBe('Pessoa que saiu');
+    expect(JSON.stringify(family)).not.toMatch(/Hélio|Helio|Prado|helio@/);
+    expect((await irene.listRecords(fam, '2026-10')).map((r) => r.description)).toEqual(['Padaria da casa']);
+    expect((await irene.getRecord(famRecord))!.createdBy).toBe(HELIO);
+    expect((await irene.listRecords(ireneCtx, '2026-10')).map((r) => r.description)).toEqual(['Mercado da Irene']);
+    expect(adminSql(`select md5(coalesce(string_agg(t::text, '|' order by t::text), '')) from public.financial_records t where t.context_id in ('${ireneCtx}', '${fam}') and t.created_by <> '${HELIO}'`)).toBe(ireneBefore);
+    // Repetir a mesma chave (e outra) com o token ainda válido responde sem erro e sem efeito.
+    const w = world();
+    await helio.deleteMyAccount(DELETE_CONFIRMATION_WORD, key);
+    await helio.deleteMyAccount(DELETE_CONFIRMATION_WORD, newOperationKey());
+    expect(world()).toBe(w);
+  });
+
+  it('4. tentar entrar de novo com o mesmo token: a conta não existe, não lê nada e não volta a agir', async () => {
+    const w = world();
+    expect(await helio.getSpace()).toBeNull();
+    expect(await err(helio.ensurePersonalSpace('Conta principal'))).toBe('email_nao_confirmado');
+    expect(await helio.getFamily()).toBeNull();
+    expect(await helio.listRecords(fam, '2026-10')).toEqual([]);
+    expect(await helio.listRecords(helioCtx, '2026-10')).toEqual([]);
+    expect(await err(helio.createFamily(newOperationKey(), 'Casa fantasma'))).toBe('sem_permissao');
+    expect(await err(helio.createRecord(newOperationKey(), fam, 'despesa', record((await irene.listAccounts(fam))[0]!.id, 'x')))).toBe('sem_permissao');
+    expect(await helio.getMyBenefit()).toBeNull();
+    // A linha anônima é só dele para ler, e ele não a renomeia.
+    const db = clientFor(HELIO);
+    const own = await db.from('persons').select('id, display_name, deleted_at');
+    expect(own.error).toBeNull();
+    expect(own.data).toEqual([{ id: HELIO, display_name: '', deleted_at: expect.any(String) }]);
+    const rename = await db.from('persons').update({ display_name: 'Hélio Prado' }).eq('id', HELIO).select();
+    expect(rename.data ?? []).toEqual([]);
+    expect(world()).toBe(w);
+  });
+
+  it('5. o e-mail fica livre: a conta nova começa vazia e a Irene não a vê na Família', async () => {
+    adminSql(`insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values ('${HELIO2}', 'Helio@Exemplo.test', now(), '{"display_name":"Hélio Prado"}')`);
+    const novo = repoFor(HELIO2);
+    expect(await novo.getSpace()).toBeNull();
+    const space = await novo.ensurePersonalSpace('Conta principal');
+    expect(space.personalContextId).not.toBe(helioCtx);
+    expect(space.accounts).toHaveLength(1);
+    expect(await novo.listRecords(space.personalContextId, '2026-10')).toEqual([]);
+    expect(await novo.listCommitments(space.personalContextId, '2026-10')).toEqual([]);
+    expect(await novo.getFamily()).toBeNull();
+    expect(await novo.listRecords(fam, '2026-10')).toEqual([]);
+    expect((await irene.getFamily())!.members.map((m) => m.personId)).not.toContain(HELIO2);
+  });
+
+  it('6. Irene, agora sozinha na Família, exclui: o Pessoal e a Família somem, e a pessoa anônima do Hélio some com ela', async () => {
+    await irene.deleteMyAccount(DELETE_CONFIRMATION_WORD, newOperationKey());
+    expect(count(`select count(*) from auth.users where id = '${IRENE}'`)).toBe(0);
+    expect(count(`select count(*) from public.financial_contexts where id in ('${fam}', '${ireneCtx}')`)).toBe(0);
+    expect(count(`select count(*) from public.financial_records where context_id in ('${fam}', '${ireneCtx}')`)).toBe(0);
+    expect(count(`select count(*) from public.persons where id in ('${IRENE}', '${HELIO}')`)).toBe(0);
+    expect(count(`select count(*) from public.context_memberships where context_id = '${fam}'`)).toBe(0);
+    // A conta nova do e-mail do Hélio não foi tocada.
+    expect(count(`select count(*) from public.persons where id = '${HELIO2}' and deleted_at is null`)).toBe(1);
+    expect((await repoFor(HELIO2).getSpace())).not.toBeNull();
+    expect(await irene.getSpace()).toBeNull();
+  });
+
+  it('7. conta que nunca criou o espaço também exclui; a repetição responde sem erro', async () => {
+    expect(await joel.getSpace()).toBeNull();
+    const key = newOperationKey();
+    await joel.deleteMyAccount(DELETE_CONFIRMATION_WORD, key);
+    expect(count(`select count(*) from auth.users where id = '${JOEL}'`)).toBe(0);
+    await joel.deleteMyAccount(DELETE_CONFIRMATION_WORD, key);
+  });
+});
+
+describe('conversor da exclusão da conta', () => {
+  // Sem rede: os argumentos de delete_my_account, o resultado, os códigos de erro novos e a leitura de "Pessoa que saiu".
+  const calls: [string, Record<string, unknown>][] = [];
+  const ctxRow = { id: 'fam1', name: 'Casa Lima', created_at: '2026-10-07T12:00:00Z' };
+  const member = (over: Record<string, unknown> = {}) => ({
+    person_id: 'p1', first_name: 'Ana', role: 'titular', status: 'ativo', is_me: true, joined_at: '2026-10-07T12:00:00Z', left_at: null, ...over,
+  });
+  const query = (result: { data: unknown; error: unknown }) => {
+    const q: Record<string, unknown> = {};
+    for (const m of ['select', 'eq', 'is', 'gt', 'in', 'order', 'range', 'limit', 'maybeSingle']) q[m] = () => q;
+    q.then = (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) => Promise.resolve(result).then(resolve, reject);
+    return q;
+  };
+  const fake = (rpc: Record<string, unknown>, tables: Record<string, unknown> = {}, error: unknown = null) => {
+    const db = {
+      from: (table: string) => query(error ? { data: null, error } : { data: tables[table] ?? null, error: null }),
+      rpc: async (fn: string, args: Record<string, unknown>) => {
+        calls.push([fn, args]);
+        return error ? { data: null, error } : { data: rpc[fn] ?? null, error: null };
+      },
+    };
+    return new SupabaseRepository(db as unknown as SupabaseClient, { id: 'p1' });
+  };
+  const failure = (p: Promise<unknown>) => p.then(() => null, (e: unknown) => (e instanceof RepoError ? [e.code, e.message, e.detail ?? null] : String(e)));
+
+  it('chama delete_my_account com a palavra exata e a chave (p_confirmation e p_key) e só aceita {deleted: true}', async () => {
+    calls.length = 0;
+    await fake({ delete_my_account: { deleted: true } }).deleteMyAccount(DELETE_CONFIRMATION_WORD, 'chave-0001');
+    expect(calls).toEqual([['delete_my_account', { p_confirmation: 'EXCLUIR', p_key: 'chave-0001' }]]);
+    for (const data of [null, {}, { deleted: false }, { deleted: 'true' }, 'ok']) {
+      expect(await failure(fake({ delete_my_account: data }).deleteMyAccount(DELETE_CONFIRMATION_WORD, 'chave-0002'))).toEqual(['desconhecido', 'exclusao_inconsistente', null]);
+    }
+  });
+
+  it('as duas recusas novas e as comuns voltam com o próprio nome, sem o detalhe do banco; a rede é a rede', async () => {
+    const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((m) => vi.spyOn(console, m).mockImplementation(() => undefined));
+    try {
+      for (const code of ['confirmacao_invalida', 'transferir_antes', 'chave_reutilizada', 'nao_autenticado'] as const) {
+        for (const message of [code, `ERROR: ${code}`]) {
+          const repo = fake({}, {}, { message, code: 'PT409', details: 'Key (id)=(0000)=(segredo) já existe. 12345678' });
+          expect(await failure(repo.deleteMyAccount(DELETE_CONFIRMATION_WORD, 'chave-4001'))).toEqual([code, code, null]);
+        }
+      }
+      expect(await failure(fake({}, {}, { message: 'permission denied for function delete_my_account', code: '42501' }).deleteMyAccount(DELETE_CONFIRMATION_WORD, 'chave-4002'))).toEqual(['sem_permissao', 'sem_permissao', null]);
+      expect(await failure(fake({}, {}, { message: 'Failed to fetch' }).deleteMyAccount(DELETE_CONFIRMATION_WORD, 'chave-4003'))).toEqual(['rede', 'rede', null]);
+      for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+    } finally {
+      for (const spy of spies) spy.mockRestore();
+    }
+  });
+
+  it('"Pessoa que saiu" é o único primeiro nome com espaço além do neutro, e só como ex-membro', async () => {
+    const gone = member({ person_id: 'p9', first_name: FAMILY_DEPARTED_NAME, role: 'membro', status: 'ex-membro', is_me: false, left_at: '2026-10-09T00:00:00Z', joined_at: '2026-10-02T00:00:00Z' });
+    const f = (await fake({}, { financial_contexts: [ctxRow], family_member_items: [gone, member()] }).getFamily())!;
+    expect(f.members.map((m) => `${m.firstName}:${m.status}`)).toEqual(['Ana:ativo', 'Pessoa que saiu:ex-membro']);
+    expect(authorLabel(f.members, 'p9')).toBe('Pessoa que saiu');
+    // Ativo com este rótulo é defeito (quem saiu nunca está ativo), e variações do rótulo e nomes com espaço também.
+    for (const over of [{ first_name: FAMILY_DEPARTED_NAME, status: 'ativo', left_at: null }, { first_name: 'Pessoa que saiu da Família', status: 'ex-membro', left_at: '2026-10-09T00:00:00Z' }, { first_name: 'pessoa que saiu', status: 'ex-membro', left_at: '2026-10-09T00:00:00Z' }]) {
+      expect(await failure(fake({}, { financial_contexts: [ctxRow], family_member_items: [member(over as Record<string, unknown>), member({ person_id: 'p2', first_name: 'Bia', is_me: false })] }).getFamily())).toEqual(['desconhecido', 'familia_inconsistente', null]);
     }
   });
 });

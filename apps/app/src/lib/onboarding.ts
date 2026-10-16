@@ -72,6 +72,18 @@ function write(key: string, value: FirstStepsClose, persist: boolean) {
   }
 }
 
+/** Esquece, neste aparelho, o fechamento do card da pessoa (excluir a conta, D-058): a memória e o que foi gravado. */
+export function forgetFirstSteps(userId: string): void {
+  const key = `${PREFIX}${userId}`;
+  memory.delete(key);
+  try {
+    if (Platform.OS === 'web') webStorage()?.removeItem(key);
+    else AsyncStorage.removeItem(key).catch(() => {});
+  } catch {
+    // Sem armazenamento: nada a apagar.
+  }
+}
+
 /**
  * Situação do card para a pessoa. `userId` indefinido (sem sessão ou conta de demonstração com dados) fica em
  * "carregando", que nunca mostra o card. `persist` falso guarda só em memória (demonstração).

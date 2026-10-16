@@ -1,0 +1,139 @@
+import { FAMILY_DEPARTED_NAME, FAMILY_TEXT, canEndFamily } from './family';
+import type { FamilyOverview } from './family';
+import type { RepoErrorCode } from './repository';
+
+/**
+ * Excluir minha conta (D-058, Ciclo P), pelas regras de docs/00 (a confirmar com advogado: os prazos de guarda e os textos finais).
+ * Regras puras, repetidas no banco por `delete_my_account(p_confirmation, p_key)` (migração 0015):
+ *
+ * 1. Quem exclui perde o acesso na hora e não desfaz. O e-mail fica livre para uma conta nova, que começa vazia.
+ * 2. O Pessoal inteiro é apagado de verdade (não é exclusão lógica).
+ * 3. Família: quem é titular com outras pessoas ativas precisa passar a titularidade ou remover as pessoas antes (`transferir_antes`).
+ *    Titular sozinha ou sozinho: a Família é encerrada e os dados dela são apagados como no Pessoal. Membro ou leitor sai da Família, e
+ *    o que anotou continua como histórico da casa, com a autoria "Pessoa que saiu" (nome e e-mail apagados).
+ * 4. Benefício pela empresa: a licença ativa termina no ato (a empresa vê só que terminou) e os direitos ao plano são apagados.
+ * 5. Nada é mantido por garantia além do item 3. O rastro técnico da pessoa (P-010) sai junto.
+ *
+ * Nada aqui lê dados da pessoa nem grava. A tela mostra o que o banco vai fazer; quem decide é o banco.
+ */
+
+/** A palavra que a pessoa digita para confirmar. O banco aceita só esta, exatamente; o app aceita também minúsculas e espaços nas pontas. */
+export const DELETE_CONFIRMATION_WORD = 'EXCLUIR';
+
+/** O que a pessoa digitou, pronto para comparar: sem os espaços das pontas e em maiúsculas. */
+export function normalizeDeleteConfirmation(input: unknown): string {
+  return typeof input === 'string' ? input.trim().toLocaleUpperCase('pt-BR') : '';
+}
+
+/** A confirmação vale? O que o app envia ao banco é sempre `DELETE_CONFIRMATION_WORD`, nunca o texto digitado. */
+export function deleteConfirmationError(input: unknown): 'confirmacao_invalida' | null {
+  return normalizeDeleteConfirmation(input) === DELETE_CONFIRMATION_WORD ? null : 'confirmacao_invalida';
+}
+
+/**
+ * O que acontece com a Família da pessoa ao excluir a conta:
+ * - 'nenhuma': não está em nenhuma Família;
+ * - 'sai': membro ou leitor (sai, e o que anotou continua com a autoria "Pessoa que saiu");
+ * - 'encerra': titular sem outra pessoa ativa (a Família é encerrada e os dados dela, apagados);
+ * - 'bloqueia': titular com outras pessoas ativas (precisa passar a titularidade ou remover as pessoas antes).
+ */
+export type DeleteFamilyOutcome = 'nenhuma' | 'sai' | 'encerra' | 'bloqueia';
+
+export function deleteFamilyOutcome(family: Pick<FamilyOverview, 'role' | 'members'> | null | undefined): DeleteFamilyOutcome {
+  if (!family) return 'nenhuma';
+  if (family.role !== 'titular') return 'sai';
+  return canEndFamily(family.members) ? 'encerra' : 'bloqueia';
+}
+
+/** Os códigos que `delete_my_account` lança, além dos comuns (nao_autenticado, chave_invalida, chave_reutilizada). */
+export const DELETE_ERROR_CODES: readonly RepoErrorCode[] = ['confirmacao_invalida', 'transferir_antes'];
+
+export const DELETE_TEXT = {
+  /** Item de Conta (o último, sem destaque de alerta). */
+  entry: 'Excluir minha conta',
+  entryHint: 'Apaga a sua conta e os seus dados. Antes de confirmar, a próxima tela mostra o que é apagado e o que continua.',
+  entryButton: 'Ver o que é apagado',
+  entryA11y: 'Excluir minha conta: ver o que é apagado e o que continua',
+  /** A tela. */
+  title: 'Excluir minha conta',
+  intro: 'Ao excluir, você perde o acesso na hora e não é possível desfazer. O seu e-mail fica livre para uma conta nova, que começa vazia.',
+  erasedTitle: 'O que é apagado',
+  erased: [
+    'O seu Pessoal inteiro, de verdade e não só escondido: gastos e recebimentos, contas a pagar, gastos fixos, parcelamentos e contas do ano.',
+    'Metas e movimentos, cartões, lançamentos, faturas e notas, orçamento, limite e renda de referência.',
+    'Contas de origem, assinaturas, importações, a revisão dos últimos meses e a resposta do plano de guardar.',
+    'O histórico de operações e de atividade da sua conta.',
+    'O benefício pela empresa, se você tem um: a licença termina na hora e os seus direitos ao plano são apagados. A empresa vê só que a licença terminou.',
+  ],
+  keptTitle: 'O que continua',
+  keptNone: 'Nada é guardado por garantia.',
+  /** A Família de quem excluiu, conforme o papel. */
+  familyTitle: 'Sua Família',
+  familyNone: 'Você não está em nenhuma Família.',
+  familyLoading: 'Conferindo a sua Família…',
+  familyLeaves: (familyName: string): string =>
+    `Você sai da Família ${familyName}. O que você anotou continua lá, como histórico da casa, com a autoria "${FAMILY_DEPARTED_NAME}". O seu nome e o seu e-mail são apagados.`,
+  familyEnds: (familyName: string): string =>
+    `Você é a única pessoa ativa da Família ${familyName}. Ela é encerrada e os dados dela são apagados, como o seu Pessoal.`,
+  familyBlocked: (familyName: string): string =>
+    `Você é titular da Família ${familyName} e há outras pessoas nela. Antes de excluir a conta, passe a titularidade para outra pessoa ou remova as pessoas da Família.`,
+  familyBlockedHow: `Na Família, toque em "${FAMILY_TEXT.manage}" ao lado de uma pessoa e escolha "${FAMILY_TEXT.transfer}" ou "${FAMILY_TEXT.remove}".`,
+  familyOpen: 'Abrir a Família',
+  familyGeneral:
+    'Se você é membro ou só vê, sai da Família e o que anotou continua, com a autoria "Pessoa que saiu". Se é titular com outras pessoas, passa a titularidade antes. Se é titular sem mais ninguém, a Família é apagada junto.',
+  /** Exportar antes (D-047). */
+  exportTitle: 'Antes de excluir',
+  exportHint: 'Depois de excluir, não há como recuperar. Se quiser guardar uma cópia, exporte os seus dados antes.',
+  exportButton: 'Exportar meus dados antes',
+  /** Confirmar. */
+  confirmTitle: 'Confirmar',
+  confirmLabel: 'Digite EXCLUIR para confirmar',
+  confirmHint: 'Escreva a palavra EXCLUIR, em maiúsculas ou minúsculas.',
+  submit: 'Excluir minha conta',
+  submitBusy: 'Excluindo…',
+  cancel: 'Cancelar',
+  /** Demonstração: a tela abre e explica, mas nada é apagado. */
+  demo: 'Na demonstração nada é apagado. Para excluir uma conta de verdade, entre com uma conta sua.',
+  /** Depois de excluir: a tela de entrada mostra a faixa e a rota /conta-excluida o texto completo. */
+  done: 'Sua conta foi excluída.',
+  doneTitle: 'Sua conta foi excluída',
+  doneBody: 'Os seus dados foram apagados e o seu e-mail ficou livre. Se um dia quiser voltar, é só criar uma conta nova, que começa vazia.',
+  doneCreate: 'Criar uma conta',
+  doneStart: 'Voltar ao início',
+  /** "Quem vê estes dados?". */
+  whoSees:
+    'Quem exclui a conta apaga o Pessoal inteiro, de verdade. Na Família, quem sai deixa o que anotou como histórico da casa, com a autoria "Pessoa que saiu", sem nome e sem e-mail. Se a pessoa é a única titular, a Família é apagada junto. A empresa só vê que a licença terminou.',
+  whoSeesLink: 'Excluir minha conta',
+} as const;
+
+/** Mensagens de erro da tela. O que não é conhecido cai em `failed`. */
+export const DELETE_ERROR_TEXT = {
+  confirmacao_invalida: 'Digite EXCLUIR para confirmar.',
+  transferir_antes: 'Antes de excluir a conta, passe a titularidade da Família para outra pessoa ou remova as outras pessoas dela.',
+  rede: 'Sem conexão no momento. Tente de novo: se a conta já tiver sido excluída, você sai dela.',
+  failed: 'Não foi possível excluir a conta agora. Tente novamente.',
+} as const;
+
+/** Texto de um erro da tela; o que não é conhecido cai em "Não foi possível excluir a conta agora...". */
+export function deleteErrorText(code: string): string {
+  return (DELETE_ERROR_TEXT as Record<string, string>)[code] ?? DELETE_ERROR_TEXT.failed;
+}
+
+/** O resumo do que acontece com a Família, em uma frase (a tela escolhe a frase pelo resultado de `deleteFamilyOutcome`). */
+export function deleteFamilyText(outcome: DeleteFamilyOutcome, familyName: string): string {
+  switch (outcome) {
+    case 'nenhuma':
+      return DELETE_TEXT.familyNone;
+    case 'sai':
+      return DELETE_TEXT.familyLeaves(familyName);
+    case 'encerra':
+      return DELETE_TEXT.familyEnds(familyName);
+    case 'bloqueia':
+      return DELETE_TEXT.familyBlocked(familyName);
+  }
+}
+
+/** A pessoa pode confirmar? Só com a palavra certa, sem Família que exija passar a titularidade antes, e fora da demonstração o banco decide o resto. */
+export function canSubmitDelete(input: unknown, outcome: DeleteFamilyOutcome): boolean {
+  return deleteConfirmationError(input) === null && outcome !== 'bloqueia';
+}

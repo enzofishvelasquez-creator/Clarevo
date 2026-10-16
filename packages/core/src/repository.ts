@@ -705,6 +705,17 @@ export interface RecordsRepository {
   /** end_family. Só o titular e só sem outra pessoa ativa (familia_com_membros). Os dados ficam guardados, sem leitura por ninguém. */
   endFamily(key: string, contextId: string): Promise<void>;
 
+  // Excluir minha conta (D-058, Ciclo P). Regras e textos em deletion.ts, iguais aos da migração 0015 (delete_my_account).
+
+  /**
+   * delete_my_account. A confirmação precisa ser exatamente DELETE_CONFIRMATION_WORD ("EXCLUIR"). Apaga de verdade o Pessoal inteiro,
+   * encerra e apaga a Família de quem é titular sozinha ou sozinho, tira quem é membro ou leitor da Família (o que anotou continua,
+   * como "Pessoa que saiu"), encerra a licença ativa e apaga os direitos ao plano, as operações e a atividade. Ordem: sessão;
+   * chave_invalida; confirmacao_invalida; chave_reutilizada; transferir_antes (titular com outras pessoas ativas). Repetir depois de
+   * excluída responde sem erro e sem efeito. Depois dela a conta não existe mais: o app sai da sessão.
+   */
+  deleteMyAccount(confirmation: string, key: string): Promise<void>;
+
   // Empresas (D-056, Ciclo M). Regras e textos em company.ts, iguais aos da migração 0014 (as sete funções, a visão my_benefit e a
   // leitura de licenças do RH). Toda escrita leva uma chave de idempotência (o mesmo espaço das outras operações da pessoa): repetir
   // a mesma chave devolve o mesmo resultado; outro conteúdo com a mesma chave é chave_reutilizada. Nenhuma conta como anotação na
@@ -847,6 +858,8 @@ export type RepoErrorCode =
   | 'nao_sobre_si'
   | 'contexto_invalido'
   | 'familia_com_membros'
+  | 'confirmacao_invalida'
+  | 'transferir_antes'
   | 'email_invalido'
   | 'contrato_nao_vigente'
   | 'vagas_insuficientes'

@@ -13,6 +13,7 @@ export * from './pending-text';
 export * from './memory-repository';
 export * from './memory-family';
 export * from './family';
+export * from './deletion';
 export * from './memory-company';
 export * from './company';
 export * from './demo';

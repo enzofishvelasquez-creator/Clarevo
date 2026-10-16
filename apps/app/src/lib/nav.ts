@@ -33,6 +33,23 @@ export const signOutIntent = {
   },
 };
 
+let accountDeleted = false;
+
+/**
+ * Depois de excluir a conta (D-058): a sessão que termina em seguida não é "expirou" (que voltaria a Entrar para retomar o destino),
+ * e a entrada que aparece é a tela "Sua conta foi excluída". Lido uma única vez, quando a sessão termina.
+ */
+export const deletedAccountIntent = {
+  mark() {
+    accountDeleted = true;
+  },
+  consume(): boolean {
+    const d = accountDeleted;
+    accountDeleted = false;
+    return d;
+  },
+};
+
 let summaryFromTop = false;
 
 /**

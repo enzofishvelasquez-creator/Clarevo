@@ -14,7 +14,7 @@
  * orçamento, o excedente acima de 100% e o aviso de 80% dispensável, a legenda do Resumo, os percentuais dos grupos da renda comprometida,
  * a legenda do widget com valores ocultos e o card "Neste mês" em Metas) e do Ciclo L (Família, D-055: criar, convidar por link, aceitar,
  * papéis, sair e encerrar, com a Família simulada na memória) e do Ciclo M (Empresas, D-056: o painel do RH só na web, o convite da empresa por
- * link, a licença, o uso do app e a demonstração com a "Empresa Exemplo", com a empresa simulada na memória) na versão web, em modo demonstração (acesso simulado).
+ * link, a licença, o uso do app e a demonstração com a "Empresa Exemplo", com a empresa simulada na memória) e de Excluir conta (D-058: o card em Conta, a tela com o que é apagado e o que continua, o bloqueio de quem é titular com outras pessoas, a confirmação digitada, a demonstração que não apaga nada e a tela "Sua conta foi excluída", com a Família simulada na memória) na versão web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -8049,17 +8049,17 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await j1Keep();
   await j1Widths(async (w) => { await layoutChecks(`tutorial aprender com o guia ${w}px`); await shot(w === 390 ? '320_aprender_como_usar' : '320_aprender_como_usar_320px'); });
 
-  // ---- 7. A lista do guia: cinco grupos, trinta e duas entradas (28 do D-049, "Seu mês em 30 segundos", D-052, "Família", D-055, "Painel da empresa" e "Benefício pela empresa", D-056) ----
+  // ---- 7. A lista do guia: cinco grupos, trinta e três entradas (28 do D-049, "Seu mês em 30 segundos", D-052, "Família", D-055, "Painel da empresa" e "Benefício pela empresa", D-056, e "Excluir minha conta", D-058) ----
   await p.getByRole('button', { name: 'Como usar o Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
   const j1Groups = () => p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((h) => h.getBoundingClientRect().width > 0).map((h) => ({
     title: h.textContent, rows: [...h.parentElement.parentElement.querySelectorAll('[role=button]')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.getAttribute('aria-label') || b.textContent) })));
   const j1G = await j1Groups();
   ok('Tutorial guia: /aprender/guia com o título "Como usar o Clarevo", a barra inferior (Aprender marcada) e o botão "Ver o tour de novo"', j1Path() === '/aprender/guia' && (await h1Name()) === 'Como usar o Clarevo' &&
     (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1 && (await visibleCount('button', 'Ver o tour de novo')) === 1);
-  ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 8, 7, 8, 2 e 7 entradas (Dia a dia ganhou "Seu mês em 30 segundos" e Conta e privacidade ganhou "Família", "Painel da empresa" e "Benefício pela empresa")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
-    JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([8, 7, 8, 2, 7]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
+  ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 8, 7, 8, 2 e 8 entradas (Dia a dia ganhou "Seu mês em 30 segundos" e Conta e privacidade ganhou "Família", "Painel da empresa", "Benefício pela empresa" e "Excluir minha conta")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
+    JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([8, 7, 8, 2, 8]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
   const j1Rows = j1G.flatMap((g) => g.rows);
-  ok('Tutorial guia: cada linha tem o nome acessível "{título}. {para que serve}" (as funções novas: Buscar, Exportar e Importar)', j1Rows.length === 32 &&
+  ok('Tutorial guia: cada linha tem o nome acessível "{título}. {para que serve}" (as funções novas: Buscar, Exportar e Importar)', j1Rows.length === 33 &&
     j1Rows.includes('Buscar em Movimentos. Acha um gasto ou recebimento em todos os meses e mostra quanto deu no período.') &&
     j1Rows.includes('Exportar meus dados. Leva seus gastos e recebimentos para uma planilha (CSV) ou para um resumo em PDF, montado neste aparelho.') &&
     j1Rows.some((r) => r.startsWith('Importar extrato ou fatura. Traz gastos, recebimentos e compras no cartão de um arquivo do banco')) &&
@@ -9949,6 +9949,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await body();
   ok('Leitora: entra como "Só vê" e vê as três pessoas (Vera, Mauro e "Lia (você)"), sem "Convidar" nem "Gerenciar"', t.includes('Seu papel: Só vê') && t.includes('Vera') && t.includes('Mauro') && t.includes('Lia (você)') && (await visibleCount('button', 'Convidar')) === 0 && (await visibleCount('button', /^Gerenciar/)) === 0 && (await visibleCount('button', 'Sair da Família')) === 1, t.slice(0, 500));
   await famTab('Resumo').click(); await waitText('Diferença do mês'); await famTab('Ver dados de Família').click(); await p.waitForTimeout(600);
+  // Com a máquina ocupada, a Família ainda carrega depois de 600 ms (o cartão "Diferença do mês" só volta com os dados): espera, não adivinha.
+  await waitUntil(async () => (await body()).includes('Diferença do mês'), 10000);
   t = await body();
   ok('Leitora na Família: o Resumo não tem "Anotar gasto" nem "Anotar conta a pagar" (só vê)', (await visibleCount('button', 'Anotar gasto')) === 0 && (await visibleCount('button', 'Anotar conta a pagar')) === 0 && t.includes('Diferença do mês'), t.slice(0, 300));
   await famShots('411_resumo_leitor');
@@ -10384,6 +10386,223 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const empBad = empTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(bem-vind[oa]|cadastrad[oa]s?|usuári[oa]s?|colaborador(a|es|as)?|funcionári[oa]s?|administrador(a|es|as)?)\b/i)?.[0]).filter(Boolean);
   ok('Empresas: nenhum termo proibido, travessão longo, expressão vetada nem palavra com gênero nas telas novas', empTexts.length >= 12 && empBad.length === 0, `${empTexts.length} telas ${empBad.join(' | ')}`);
   ok('Empresas: nenhuma escrita direta na rede (as empresas do roteiro são simuladas na memória)', writes.length === empWrites0, writes.slice(empWrites0).join(' | '));
+
+  // =====================================================================================================================
+  // Excluir conta (D-058): o card em Conta, a tela que explica o que é apagado e o que continua (a Família conforme o papel), exportar
+  // antes, o bloqueio de quem é titular com outras pessoas, a confirmação digitada, a demonstração que não apaga nada, o texto em
+  // "Quem vê estes dados?" e a tela "Sua conta foi excluída". O roteiro web só usa a memória (acesso simulado): nada é apagado de
+  // verdade aqui (a demonstração diz que não apaga nada), e a exclusão de verdade é coberta por supabase/tests/99_exclusao.sql, pelos
+  // testes do core (MemoryRepository) e pelos testes de API.
+  // =====================================================================================================================
+  const delSizes = [[390, 844, ''], [360, 740, '_360px'], [320, 800, '_320px']];
+  // Capturas numeradas a partir de 460, em 390, 360 e 320 px, com as conferências de largura e de alvos de toque em cada uma.
+  const delShots = async (name, scroll = null) => {
+    for (const [w, h, suffix] of delSizes) {
+      await p.setViewportSize({ width: w, height: h }); await p.waitForTimeout(450);
+      if (scroll) await scroll();
+      await layoutChecks(`${name} ${w}px`);
+      await shot(`${name}${suffix}`);
+    }
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  };
+  const delTexts = [];
+  const delKeep = async () => { delTexts.push(await body()); await keepText(); };
+  const delWrites0 = writes.length;
+  // Rola até o título (nível 2) de um card, para a captura mostrar o card.
+  const delScroll = (title) => async () => {
+    await p.evaluate((title) => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === title && e.getBoundingClientRect().width > 0); if (h) h.scrollIntoView({ block: 'start' }); }, title);
+    await p.waitForTimeout(250);
+  };
+  const delTop = async () => { await p.evaluate(() => window.scrollTo(0, 0)); await p.evaluate(() => document.querySelectorAll('*').forEach((e) => { if (e.scrollTop > 0) e.scrollTop = 0; })); await p.waitForTimeout(250); };
+  const delFinal = () => btn('Excluir minha conta');
+  // Os títulos de card (nível 2) da tela, na ordem.
+  const delCards = () => p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
+  // De Conta para a tela de exclusão.
+  const delOpen = async () => { await famConta(); await btn('Excluir minha conta: ver o que é apagado e o que continua').click(); await waitText('O que é apagado'); await p.waitForTimeout(500); };
+  const delType = async (text) => { await field('Digite EXCLUIR para confirmar').fill(text); await p.waitForTimeout(250); };
+  // "Excluir minha conta" é também o nome do cabeçalho e do título do card de Conta; o botão final é o único botão com este nome na tela.
+  const delFinalEnabled = async () => (await visibleCount('button', 'Excluir minha conta')) === 1 && !(await delFinal().isDisabled());
+
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+
+  // ---- 1. Iris, conta nova sem Família: o card em Conta é o último item, sem destaque de alerta ----
+  await famCreateAccount('Iris Neves', 'iris.exclusao@exemplo.com');
+  await famConta();
+  const delContaCards = await delCards();
+  ok('Conta: "Excluir minha conta" é o último card, depois de "Sair deste aparelho"', delContaCards[delContaCards.length - 1] === 'Excluir minha conta' && (await visibleCount('button', 'Sair deste aparelho')) === 1, delContaCards.join(' | '));
+  t = await body();
+  ok('Conta: o card explica e leva à tela ("Ver o que é apagado"), sem apagar nada ali', t.includes('Apaga a sua conta e os seus dados. Antes de confirmar, a próxima tela mostra o que é apagado e o que continua.') &&
+    (await visibleCount('button', 'Excluir minha conta: ver o que é apagado e o que continua')) === 1 && t.indexOf('Sair encerra a sessão neste aparelho.') < t.indexOf('Apaga a sua conta e os seus dados.'), t.slice(-700));
+  // Sem destaque de alerta vermelho: nem o botão, nem o título, nem o card usam a cor de erro (#B42318) nem o fundo de erro.
+  const delRed = await p.evaluate(() => {
+    const card = [...document.querySelectorAll('[role=heading][aria-level="2"]')].find((e) => e.textContent === 'Excluir minha conta' && e.getBoundingClientRect().width > 0)?.parentElement;
+    if (!card) return ['sem card'];
+    const bad = /rgb\(180, 35, 24\)|rgb\(253, 236, 234\)/; // #B42318 e o fundo de erro (#FDECEA)
+    return [card, ...card.querySelectorAll('*')].flatMap((e) => { const c = getComputedStyle(e); return [c.color, c.backgroundColor, c.borderTopColor].filter((v) => bad.test(v)); });
+  });
+  ok('Conta: o card "Excluir minha conta" não usa a cor nem o fundo de alerta vermelho', delRed.length === 0, delRed.join(' | '));
+  await delKeep();
+  await delShots('461_conta_excluir_item', delScroll('Excluir minha conta'));
+
+  // ---- 2. A tela: o que é apagado, o que continua, exportar antes e a confirmação digitada ----
+  await btn('Excluir minha conta: ver o que é apagado e o que continua').click(); await waitText('O que é apagado'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Excluir: título, introdução (perde o acesso na hora, não é possível desfazer, e-mail livre, conta nova vazia) e as duas listas', (await famH1()) === 'Excluir minha conta' &&
+    t.includes('Ao excluir, você perde o acesso na hora e não é possível desfazer. O seu e-mail fica livre para uma conta nova, que começa vazia.') && t.includes('O que é apagado') && t.includes('O que continua') &&
+    t.includes('O seu Pessoal inteiro, de verdade e não só escondido') && t.includes('O benefício pela empresa, se você tem um: a licença termina na hora') && t.includes('A empresa vê só que a licença terminou.') &&
+    t.includes('Nada é guardado por garantia.'), t.slice(0, 900));
+  ok('Excluir sem Família: diz que não está em nenhuma Família e explica o que acontece em cada papel', t.includes('Você não está em nenhuma Família.') && t.includes('Se você é membro ou só vê, sai da Família e o que anotou continua, com a autoria "Pessoa que saiu".') &&
+    t.includes('Se é titular com outras pessoas, passa a titularidade antes. Se é titular sem mais ninguém, a Família é apagada junto.'), t.slice(900, 1800));
+  ok('Excluir: oferece "Exportar meus dados antes" e pede a palavra EXCLUIR; o botão final está desligado e não há alerta de erro', t.includes('Depois de excluir, não há como recuperar.') && (await visibleCount('button', 'Exportar meus dados antes')) === 1 &&
+    t.includes('Digite EXCLUIR para confirmar') && t.includes('Escreva a palavra EXCLUIR, em maiúsculas ou minúsculas.') && (await visibleCount('button', 'Excluir minha conta')) === 1 && !(await delFinalEnabled()) && !t.includes('Digite EXCLUIR para confirmar.'), t.slice(1800, 2600));
+  ok('Excluir: tela de formulário, sem a barra de abas (a confirmação não se perde)', (await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).count()) === 0);
+  ok('Excluir: nenhuma escrita na rede só por abrir a tela', writes.length === delWrites0);
+  await delKeep();
+  await delShots('460_excluir_conta', delTop);
+
+  // A palavra: só EXCLUIR (maiúsculas ou minúsculas, espaços nas pontas) liga o botão.
+  await delType('exclui');
+  ok('Confirmação: "exclui" não liga o botão', !(await delFinalEnabled()));
+  await delType('sim');
+  ok('Confirmação: "sim" não liga o botão', !(await delFinalEnabled()));
+  await delType('EXCLUIR!');
+  ok('Confirmação: "EXCLUIR!" não liga o botão', !(await delFinalEnabled()));
+  await delType('  excluir ');
+  ok('Confirmação: "excluir" (minúsculas, com espaços nas pontas) liga o botão', await delFinalEnabled());
+  await delType('');
+  ok('Confirmação: apagar o texto desliga o botão de novo', !(await delFinalEnabled()));
+
+  // ---- 3. Demonstração: o botão final diz que a demonstração não apaga nada ----
+  await delType('EXCLUIR');
+  ok('Confirmação: "EXCLUIR" liga o botão (conta simulada)', await delFinalEnabled());
+  await delShots('465_excluir_confirmacao', delScroll('Confirmar'));
+  await delFinal().click(); await waitText('Na demonstração nada é apagado.'); await p.waitForTimeout(400);
+  t = await body();
+  ok('Demonstração: o botão final avisa "Na demonstração nada é apagado. Para excluir uma conta de verdade, entre com uma conta sua." e fica na tela', t.includes('Na demonstração nada é apagado. Para excluir uma conta de verdade, entre com uma conta sua.') &&
+    (await famH1()) === 'Excluir minha conta', t.slice(-500));
+  await delKeep();
+  await delShots('466_excluir_demonstracao', delScroll('Confirmar'));
+  ok('Demonstração: nada foi para a rede e a conta segue aberta', writes.length === delWrites0);
+  await famGoResumo();
+  ok('Demonstração: o Resumo segue aberto, com a conta de Iris', (await body()).includes('Diferença do mês'));
+
+  // ---- 4. Exportar antes: abre a tela de exportar e volta para a confirmação ----
+  await delOpen();
+  await btn('Exportar meus dados antes').click(); await waitText('Preparar arquivo'); await p.waitForTimeout(400);
+  ok('Exportar antes: abre "Exportar meus dados" (D-047)', (await famH1()) === 'Exportar meus dados' && (await visibleCount('button', 'Preparar arquivo')) === 1);
+  await btn('Voltar').click(); await waitText('O que é apagado'); await p.waitForTimeout(300);
+  ok('Exportar antes: voltar leva à tela de exclusão', (await famH1()) === 'Excluir minha conta');
+  await btn('Cancelar').click(); await waitText('Privacidade neste aparelho'); await p.waitForTimeout(300);
+  ok('Cancelar: volta para Conta, sem apagar nada', (await famH1()) === 'Conta' && writes.length === delWrites0);
+
+  // ---- 5. Iris cria a Família e convida Teo; Teo entra como membro ----
+  await famGoFamilia();
+  await btn('Criar Família').click(); await waitText('Nome da Família');
+  await field('Nome da Família').fill('Casa Iris');
+  await btn('Criar Família').click(); await waitText('Seu papel: Titular'); await p.waitForTimeout(400);
+  await btn('Convidar').click(); await waitText('O que a pessoa poderá fazer');
+  await btn('Gerar link').click(); await waitText('Link do convite'); await p.waitForTimeout(400);
+  const delLink = await famLink();
+  await btn('Concluir').click(); await waitText('Seu papel: Titular'); await p.waitForTimeout(400);
+  await famSignOut();
+  await famCreateAccount('Teo Cruz', 'teo.exclusao@exemplo.com');
+  await famGoFamilia();
+  await field('Link do convite').fill(delLink); await btn('Ver convite').click(); await waitText('Aceitar convite');
+  await btn('Aceitar convite').click(); await waitText('Você entrou na Família Casa Iris.'); await p.waitForTimeout(400);
+
+  // ---- 6. Teo (membro): sai da Família, e o que anotou continua com a autoria "Pessoa que saiu" ----
+  await delOpen();
+  t = await body();
+  ok('Membro: "Você sai da Família Casa Iris. O que você anotou continua lá, como histórico da casa, com a autoria "Pessoa que saiu". O seu nome e o seu e-mail são apagados."', t.includes('Você sai da Família Casa Iris. O que você anotou continua lá, como histórico da casa, com a autoria "Pessoa que saiu". O seu nome e o seu e-mail são apagados.') &&
+    !t.includes('Antes de excluir a conta, passe a titularidade'), t.slice(900, 1800));
+  await delType('excluir');
+  ok('Membro: sem bloqueio, o botão liga com a palavra certa', await delFinalEnabled());
+  await delKeep();
+  await delShots('463_excluir_membro', delScroll('O que continua'));
+  await famGoResumo();
+
+  // ---- 7. Iris (titular com Teo): bloqueio, com o caminho para passar a titularidade ----
+  await famSignOut();
+  await famSignIn('iris.exclusao@exemplo.com');
+  await delOpen();
+  t = await body();
+  ok('Titular com outras pessoas: "Você é titular da Família Casa Iris e há outras pessoas nela. Antes de excluir a conta, passe a titularidade para outra pessoa ou remova as pessoas da Família."', t.includes('Você é titular da Família Casa Iris e há outras pessoas nela. Antes de excluir a conta, passe a titularidade para outra pessoa ou remova as pessoas da Família.'), t.slice(900, 1800));
+  ok('Titular com outras pessoas: mostra o caminho ("Gerenciar", "Passar a titularidade", "Remover da Família") e o botão "Abrir a Família"', t.includes('Na Família, toque em "Gerenciar" ao lado de uma pessoa e escolha "Passar a titularidade" ou "Remover da Família".') &&
+    (await visibleCount('button', 'Abrir a Família')) === 1, t.slice(900, 1900));
+  await delType('EXCLUIR');
+  ok('Titular com outras pessoas: mesmo com EXCLUIR digitado, o botão final continua desligado', !(await delFinalEnabled()));
+  await delKeep();
+  await delShots('462_excluir_titular_bloqueada', delScroll('O que continua'));
+  await btn('Abrir a Família').click(); await waitText('Seu papel: Titular'); await p.waitForTimeout(400);
+  ok('Abrir a Família: leva à tela Família, com "Gerenciar" ao lado de Teo e "Passar a titularidade" no menu', (await famH1()) === 'Família' && (await visibleCount('button', /^Gerenciar Teo/)) === 1);
+  await p.getByRole('button', { name: /^Gerenciar Teo/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
+  ok('Gerenciar: o menu oferece "Passar a titularidade" e "Remover da Família"', (await p.getByRole('alert').getByRole('button', { name: 'Passar a titularidade', exact: true }).count()) === 1 && (await p.getByRole('alert').getByRole('button', { name: 'Remover da Família', exact: true }).count()) === 1);
+  // Remove Teo: a Família fica só com Iris.
+  await p.getByRole('alert').getByRole('button', { name: 'Remover da Família', exact: true }).click(); await waitText('Remover Teo da Família?'); await confirmIn('Remover'); await waitText('Pessoa removida da Família.'); await p.waitForTimeout(400);
+
+  // ---- 8. Iris sozinha na Família: ela é encerrada e os dados dela apagados ----
+  await delOpen();
+  t = await body();
+  ok('Titular sem outras pessoas: "Você é a única pessoa ativa da Família Casa Iris. Ela é encerrada e os dados dela são apagados, como o seu Pessoal."', t.includes('Você é a única pessoa ativa da Família Casa Iris. Ela é encerrada e os dados dela são apagados, como o seu Pessoal.') &&
+    !t.includes('Antes de excluir a conta, passe a titularidade'), t.slice(900, 1800));
+  await delType('EXCLUIR');
+  ok('Titular sem outras pessoas: o botão liga com a palavra certa', await delFinalEnabled());
+  await delKeep();
+  await delShots('464_excluir_titular_sozinha', delScroll('O que continua'));
+
+  // ---- 9. "Quem vê estes dados?" ganha a explicação da exclusão ----
+  await btn('Cancelar').click(); await waitText('Privacidade neste aparelho'); await p.waitForTimeout(300);
+  await famGoFamilia();
+  await p.getByRole('button', { name: 'Quem vê estes dados?', exact: true }).filter({ visible: true }).first().click(); await waitText('Entendi'); await p.waitForTimeout(400);
+  t = await body();
+  ok('Quem vê estes dados?: explica a exclusão (Pessoal apagado de verdade, "Pessoa que saiu", Família da única titular apagada junto, a empresa só vê que a licença terminou)', t.includes('Quem exclui a conta apaga o Pessoal inteiro, de verdade.') &&
+    t.includes('com a autoria "Pessoa que saiu", sem nome e sem e-mail.') && t.includes('Se a pessoa é a única titular, a Família é apagada junto.') && t.includes('A empresa só vê que a licença terminou.') &&
+    (await visibleCount('button', 'Excluir minha conta')) === 1, t.slice(0, 1500));
+  await delKeep();
+  await delShots('467_quem_ve_exclusao', async () => { await p.evaluate(() => { const e = [...document.querySelectorAll('div,span')].find((x) => x.children.length === 0 && x.textContent.startsWith('Quem exclui a conta apaga')); if (e) e.scrollIntoView({ block: 'center' }); }); await p.waitForTimeout(250); });
+  await btn('Excluir minha conta').click(); await waitText('O que é apagado'); await p.waitForTimeout(400);
+  ok('Quem vê estes dados?: o link "Excluir minha conta" abre a tela de exclusão', (await famH1()) === 'Excluir minha conta');
+
+  // ---- 10. A Família aparece com a autoria "Pessoa que saiu" (visão do banco simulada pelo texto): os textos do core ----
+  await famGoResumo();
+  await famSignOut();
+
+  // ---- 11. "Sua conta foi excluída": a entrada depois de excluir (aberta sem sessão) ----
+  // A tela fica fora do grupo protegido de entrada (como os convites): o endereço abre direto, sem sessão, como o roteador a abre depois de excluir.
+  await p.goto(`http://localhost:${PORT}/conta-excluida`); await waitText('Sua conta foi excluída'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Sua conta foi excluída: título, texto (dados apagados, e-mail livre, conta nova começa vazia) e as duas saídas', (await famH1()) === 'Sua conta foi excluída' &&
+    t.includes('Os seus dados foram apagados e o seu e-mail ficou livre. Se um dia quiser voltar, é só criar uma conta nova, que começa vazia.') &&
+    (await visibleCount('button', 'Criar uma conta')) === 1 && (await visibleCount('button', 'Voltar ao início')) === 1, t.slice(0, 400));
+  ok('Sua conta foi excluída: tela de entrada, sem a barra de abas', (await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).count()) === 0);
+  await delKeep();
+  await delShots('468_conta_excluida');
+  await btn('Criar uma conta').click(); await waitText('Nome de apresentação'); await p.waitForTimeout(300);
+  ok('Sua conta foi excluída: "Criar uma conta" abre o cadastro', (await body()).includes('Nome de apresentação'));
+  await p.goto(`http://localhost:${PORT}/conta-excluida`); await waitText('Sua conta foi excluída');
+  await btn('Voltar ao início').click(); await waitText('Seu dinheiro'); await p.waitForTimeout(300);
+  ok('Sua conta foi excluída: "Voltar ao início" leva à boas-vindas', (await body()).includes('Seu dinheiro'));
+
+  // ---- 12. A demonstração com dados fictícios: a tela abre e explica, o botão final diz que nada é apagado e os totais não mudam ----
+  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+  await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
+  const delDemoBefore = await body();
+  await delOpen();
+  t = await body();
+  ok('Demonstração com dados fictícios: a tela abre e explica (sem Família de exemplo)', (await famH1()) === 'Excluir minha conta' && t.includes('Você não está em nenhuma Família.') && t.includes('O que é apagado'), t.slice(0, 300));
+  await delType('EXCLUIR');
+  await delFinal().click(); await waitText('Na demonstração nada é apagado.'); await p.waitForTimeout(400);
+  ok('Demonstração com dados fictícios: o botão final diz que a demonstração não apaga nada', (await body()).includes('Na demonstração nada é apagado. Para excluir uma conta de verdade, entre com uma conta sua.') && (await famH1()) === 'Excluir minha conta');
+  await delKeep();
+  await famGoResumo();
+  t = await body();
+  ok('Demonstração com dados fictícios: os totais seguem 6.000 / 3.900 / 2.100 (invariantes) e nada foi para a rede', t.includes('R$ 6.000,00') && t.includes('R$ 3.900,00') && t.includes('R$ 2.100,00') &&
+    delDemoBefore.includes('R$ 6.000,00') && writes.length === delWrites0, t.slice(0, 300));
+
+  // ---- 13. Textos e escritas ----
+  const delBad = delTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(bem-vind[oa]|convidad[oa]s?|cadastrad[oa]s?|usuári[oa]s?|sozinh[oa])\b/i)?.[0] ?? x.match(/tem certeza|cuidado|atenção|perigo|irrevers|lamentamos|sentiremos|fique|vai perder|última chance/i)?.[0]).filter(Boolean);
+  ok('Excluir conta: nenhum termo proibido, travessão longo, expressão vetada, palavra com gênero nem tom de alerta ou de pressão nas telas novas', delTexts.length >= 9 && delBad.length === 0, `${delTexts.length} telas ${delBad.join(' | ')}`);
+  ok('Excluir conta: nenhuma escrita direta na rede (a exclusão de verdade é coberta pelos testes do banco, da memória e da API)', writes.length === delWrites0, writes.slice(delWrites0).join(' | '));
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);

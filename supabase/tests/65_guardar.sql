@@ -709,13 +709,18 @@ do $$ begin
   assert pg_temp.sc('mara', 'fam') = 'consigo 20000 2026-10-07 - v2', 'a linha continua (sai junto com a pessoa ou o contexto)';
 end $$;
 
--- Nenhuma visão nem função agrega ou expõe as respostas: só set_savings_answer (da própria pessoa) toca a tabela.
+-- Nenhuma visão nem função agrega ou expõe as respostas: só set_savings_answer (da própria pessoa) lê e grava a tabela. A exclusão da
+-- conta (0015, D-058) só a APAGA: nas duas funções de apoio, toda menção à tabela é um "delete from", nunca uma leitura.
 do $$ begin
   assert (select count(*) from pg_views where schemaname = 'public' and definition ilike '%savings_checks%') = 0, 'nenhuma visão';
   assert (select count(*) from pg_matviews where definition ilike '%savings_checks%') = 0, 'nenhuma visão materializada';
   assert (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-           where n.nspname = 'public' and p.prosrc ilike '%savings_checks%') = array['set_savings_answer'],
-    'só set_savings_answer lê ou grava savings_checks';
+           where n.nspname = 'public' and p.prosrc ilike '%savings_checks%') = array['clarevo_erase_context', 'clarevo_erase_person', 'set_savings_answer'],
+    'só set_savings_answer lê ou grava savings_checks (a exclusão da conta só apaga)';
+  assert (select bool_and(regexp_count(p.prosrc, 'savings_checks') = regexp_count(p.prosrc, 'delete from public\.savings_checks'))
+            from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and p.proname in ('clarevo_erase_context', 'clarevo_erase_person')),
+    'a exclusão da conta só apaga savings_checks, nunca lê';
   assert (select count(*) from pg_policies where tablename = 'savings_checks') = 1
      and exists (select 1 from pg_policies where tablename = 'savings_checks' and policyname = 'savings_checks_own'
                    and cmd = 'SELECT' and roles = '{authenticated}'), 'uma política só, de leitura';
