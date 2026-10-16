@@ -261,8 +261,8 @@ export const EVOLUTION_TEXT = {
       return `${label}: ${side(fromCents, f)}, ${side(toCents, t)}, ${diff > 0 ? `${formatBRL(diff)} a mais` : `${formatBRL(-diff)} a menos`}`;
     },
     noCategoryChange: 'Nenhuma categoria mudou de valor.',
-    /** A soma das categorias mostradas não fecha a diferença total. Nunca diz que uma categoria foi a causa. */
-    others: (cents: number): string => `Outras categorias também mudaram: ${formatBRL(Math.abs(cents))} no total.`,
+    /** A soma das categorias mostradas não fecha a diferença total: a sobra líquida, com o sinal dito em palavras. Nunca diz que uma categoria foi a causa. */
+    others: (cents: number): string => `Outras categorias também mudaram: ${formatBRL(Math.abs(cents))} ${cents > 0 ? 'a mais' : 'a menos'} no total.`,
     relatedTitle: 'Lançamentos relacionados',
     /** "Os maiores lançamentos de abril em Transporte". */
     relatedIntro: (label: string, month: IsoMonth): string => `Os maiores lançamentos de ${formatMonthName(month)} em ${label}`,
@@ -734,7 +734,7 @@ export interface EvolutionExplanation {
   categories: EvolutionExplanationCategory[];
   /** "Nenhuma categoria mudou de valor." quando a diferença é zero e nenhuma categoria mudou; senão null. */
   noChangeText: string | null;
-  /** "Outras categorias também mudaram: R$ 100,00 no total." quando as categorias mostradas não fecham a diferença; senão null. */
+  /** "Outras categorias também mudaram: R$ 100,00 a mais no total." (ou "a menos") quando as categorias mostradas não fecham a diferença; senão null. */
   othersText: string | null;
   related: { title: string; intro: string; rows: EvolutionExplanationRecord[]; emptyText: string | null } | null;
   /** Quando os lançamentos lidos não fecham com os totais: diz que não detalha por categoria (e não há categorias nem lançamentos). */

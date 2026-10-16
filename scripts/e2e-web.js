@@ -10923,7 +10923,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Evolução entender (abril): a frase principal com o Pago registrado, a diferença e os nomes dos dois meses', evE1.includes('O Pago registrado foi R$ 4.500,00 maior em abril que em março.') && !evE1.includes('(março e abril não são meses vizinhos'), evE1);
   ok('Evolução entender (abril): as 3 categorias com maior diferença absoluta, cada uma com o valor nos dois meses e a diferença (Transporte, Mercado e Saúde); Lazer, a quarta, fica de fora', evE1.includes('Categorias que mais mudaram') &&
     evE1.includes('Transporte: R$ 300,00 em março, R$ 4.700,00 em abril, R$ 4.400,00 a mais') && evE1.includes('Mercado: R$ 730,00 em março, R$ 880,00 em abril, R$ 150,00 a mais') && evE1.includes('Saúde: R$ 150,00 em março, sem pagamentos em abril, R$ 150,00 a menos') && !evE1.includes('Lazer:') && !evE1.includes('Moradia:'), evE1);
-  ok('Evolução entender (abril): as 3 não fecham a diferença (4.400 + 150 - 150), então "Outras categorias também mudaram: R$ 100,00 no total.", sem dizer que uma categoria foi a causa', evE1.includes('Outras categorias também mudaram: R$ 100,00 no total.') &&
+  ok('Evolução entender (abril): as 3 não fecham a diferença (4.400 + 150 - 150), então "Outras categorias também mudaram: R$ 100,00 a mais no total.", sem dizer que uma categoria foi a causa', evE1.includes('Outras categorias também mudaram: R$ 100,00 a mais no total.') &&
     evE1.includes('Descreve o que está registrado nos dois meses. Não diz que uma categoria ou um lançamento é a causa da diferença.') && !/caus[ao]/.test(evE1.replace('é a causa da diferença', '')), evE1);
   ok('Evolução entender (abril): os lançamentos relacionados do mês na categoria que mais mudou: o "Reparo do carro" de R$ 4.400,00 (descrição, data e valor) e o combustível de R$ 300,00', evE1.includes('Lançamentos relacionados') && evE1.includes('Os maiores lançamentos de abril em Transporte') &&
     /Reparo do carro\s+22\/04\/2026 · R\$ 4\.400,00/.test(evE1) && /Combustível\s+18\/04\/2026 · R\$ 300,00/.test(evE1) && evE1.indexOf('Reparo do carro') < evE1.indexOf('Combustível'), evE1);
@@ -10967,7 +10967,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Evolução entender T14: com abril fora, maio compara com março: "O Pago registrado foi R$ 150,00 maior em maio que em março." e "(março e maio não são meses vizinhos na comparação: abril está fora)", nunca "mês a mês"', evE3.includes('O Pago registrado foi R$ 150,00 maior em maio que em março.') &&
     evE3.includes('(março e maio não são meses vizinhos na comparação: abril está fora)') && !/mês a mês/.test(evE3) && !evE3.includes('de abril para maio'), evE3);
   ok('Evolução entender T14: as categorias de maio contra março, a sobra de R$ 20,00 em "Outras categorias" e o lançamento de mercado de R$ 900,00; maio está na comparação, então o botão é "Comparar sem este mês"', evE3.includes('Mercado: R$ 730,00 em março, R$ 900,00 em maio, R$ 170,00 a mais') &&
-    evE3.includes('Saúde: R$ 150,00 em março, sem pagamentos em maio, R$ 150,00 a menos') && evE3.includes('Lazer: R$ 120,00 em março, R$ 230,00 em maio, R$ 110,00 a mais') && evE3.includes('Outras categorias também mudaram: R$ 20,00 no total.') &&
+    evE3.includes('Saúde: R$ 150,00 em março, sem pagamentos em maio, R$ 150,00 a menos') && evE3.includes('Lazer: R$ 120,00 em março, R$ 230,00 em maio, R$ 110,00 a mais') && evE3.includes('Outras categorias também mudaram: R$ 20,00 a mais no total.') &&
     /Mercado\s+12\/05\/2026 · R\$ 900,00/.test(evE3) && (await evExplainBtnIn('Comparar sem este mês').count()) === 1, evE3);
   await evShots('474_evolucao_entender_meses_nao_vizinhos', { scroll: evScrollBtn('Entender o que mudou') });
   // Volta a abril e a traz de volta pela própria seção: a média e o aviso voltam ao que eram.
@@ -11027,7 +11027,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await evKeep();
   const evE5 = await evExplainText();
   ok('Evolução entender, valores ocultos: a frase e as categorias dizem R$ •••• (os meses, as descrições e as datas seguem à vista) e nenhum valor em reais aparece na seção', evE5.includes('O Pago registrado foi R$ •••• maior em abril que em março.') && evE5.includes('Transporte: R$ •••• em março, R$ •••• em abril, R$ •••• a mais') &&
-    evE5.includes('Outras categorias também mudaram: R$ •••• no total.') && /Reparo do carro\s+22\/04\/2026 · R\$ ••••/.test(evE5) && !/\d,\d{2}/.test(evE5), evE5);
+    evE5.includes('Outras categorias também mudaram: R$ •••• a mais no total.') && /Reparo do carro\s+22\/04\/2026 · R\$ ••••/.test(evE5) && !/\d,\d{2}/.test(evE5), evE5);
   await hiddenShows('Evolução, entender o que mudou');
   const evE5names = await p.evaluate(() => [...document.querySelectorAll('[role=group][aria-label="Entender o que mudou"] [role=listitem][aria-label]')].map((e) => e.getAttribute('aria-label').replace(/ /g, ' ')));
   ok('Evolução entender, valores ocultos: o leitor de tela ouve "Reparo do carro, 22/04/2026, valor oculto" nos lançamentos relacionados', evE5names[0] === 'Reparo do carro, 22/04/2026, valor oculto' && evE5names.every((n) => !/R\$/.test(n)), JSON.stringify(evE5names));

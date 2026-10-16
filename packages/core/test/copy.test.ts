@@ -3041,6 +3041,7 @@ describe('textos da Evolução (D-057)', () => {
       EVOLUTION_TEXT.explain.gapIn('2026-03'),
       EVOLUTION_TEXT.explain.category('recebido', 'Salário', 0, 520_000, '2026-02', '2026-04'),
       EVOLUTION_TEXT.explain.category('pago', 'Sem categoria', 30_000, 0, '2026-03', '2026-04'),
+      EVOLUTION_TEXT.explain.others(10_000),
       EVOLUTION_TEXT.explain.others(-10_000),
       EVOLUTION_TEXT.explain.relatedIntro('Transporte', '2026-04'),
       EVOLUTION_TEXT.explain.relatedEmpty('Casa', '2026-04'),
@@ -3097,8 +3098,9 @@ describe('textos da Evolução (D-057)', () => {
     expect(E.headline('pago', 0, '2026-03', '2026-04')).toBe('O Pago registrado foi igual em abril e em março.');
     expect(E.notAdjacent('2026-03', '2026-05', ['2026-04'], [])).toBe('(março e maio não são meses vizinhos na comparação: abril está fora)');
     expect(E.category('pago', 'Casa', 120_000, 560_000, '2026-03', '2026-04')).toBe('Casa: R$ 1.200,00 em março, R$ 5.600,00 em abril, R$ 4.400,00 a mais');
-    expect(E.others(10_000)).toBe('Outras categorias também mudaram: R$ 100,00 no total.');
-    expect(E.others(-10_000)).toBe('Outras categorias também mudaram: R$ 100,00 no total.');
+    expect(E.others(10_000)).toBe('Outras categorias também mudaram: R$ 100,00 a mais no total.');
+    expect(E.others(-10_000)).toBe('Outras categorias também mudaram: R$ 100,00 a menos no total.');
+    expect(E.others(-200)).toBe('Outras categorias também mudaram: R$ 2,00 a menos no total.');
     expect(E.inProgress).toBe('Mês em andamento: os valores ainda podem mudar.');
     expect(E.needOtherMonth).toBe('Escolha outro mês na comparação para ver o que mudou.');
     expect(EVOLUTION_TEXT.gap.warning).toBe('Pode faltar algo neste mês: há conta prevista sem registro');

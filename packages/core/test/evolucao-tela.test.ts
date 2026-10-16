@@ -976,8 +976,12 @@ describe('Entender o que mudou: a explicação em texto', () => {
     const v = buildEvolutionView({ overview: rows([['2026-03', base], ['2026-04', next]]), metric: 'pago', windowMonths: 12, currentMonth: '2026-06', hiddenMonths: [] });
     const e = explain(v, '2026-04', base, next);
     expect(e.categories.map((c) => c.label)).toEqual(['Casa', 'Mercado', 'Lazer']);
-    expect(e.othersText).toBe('Outras categorias também mudaram: R$ 100,00 no total.');
+    expect(e.othersText).toBe('Outras categorias também mudaram: R$ 100,00 a mais no total.');
     expect(e.othersText).not.toMatch(/causa|culpa|motivo|por causa/i);
+    // Sobra negativa: as 3 categorias somam mais que a diferença total, e a frase diz "a menos".
+    const lower = [rec('Casa', 600_000, 'a', '2026-04-01'), rec('Mercado', 300_000, 'b', '2026-04-02'), rec('Lazer', 20_000, 'c', '2026-04-03'), rec('Saúde', 90_000, 'd', '2026-04-04')];
+    const vLower = buildEvolutionView({ overview: rows([['2026-03', base], ['2026-04', lower]]), metric: 'pago', windowMonths: 12, currentMonth: '2026-06', hiddenMonths: [] });
+    expect(explain(vLower, '2026-04', base, lower).othersText).toBe('Outras categorias também mudaram: R$ 100,00 a menos no total.');
     // Quando fecha, a frase não aparece.
     expect(explain().othersText).toBeNull();
   });
@@ -1012,7 +1016,7 @@ describe('Entender o que mudou: a explicação em texto', () => {
     });
   });
 
-  it('categoria da fatura sem lançamento no mês de chegada: "Nenhum lançamento em ..."', () => {
+  it('categoria que sumiu no mês de chegada, sem lançamento nela: "Nenhum lançamento em ..."', () => {
     // A categoria que mais mudou é Casa, que sumiu em abril: nenhum lançamento dela no mês escolhido.
     const base = [rec('Casa', 500_000, 'Reforma', '2026-03-10'), rec('Mercado', 10_000, 'Mercado', '2026-03-12')];
     const next = [rec('Mercado', 10_000, 'Mercado', '2026-04-12')];
@@ -1086,7 +1090,7 @@ describe('Entender o que mudou na demonstração (cenário "evolucao", EF §6)',
       'Saúde: R$ 150,00 em março, sem pagamentos em abril, R$ 150,00 a menos',
     ]);
     // 4.400 + 150 − 150 = 4.400: sobram R$ 100,00 de outras categorias (Lazer: R$ 120,00 para R$ 220,00).
-    expect(e.othersText).toBe('Outras categorias também mudaram: R$ 100,00 no total.');
+    expect(e.othersText).toBe('Outras categorias também mudaram: R$ 100,00 a mais no total.');
     expect(e.change.otherCents).toBe(100_00);
     expect(e.related).toMatchObject({ title: 'Lançamentos relacionados', intro: 'Os maiores lançamentos de abril em Transporte', emptyText: null });
     expect(e.related!.rows.map((r) => r.text)).toEqual(['Reparo do carro · 22/04/2026 · R$ 4.400,00', 'Combustível · 18/04/2026 · R$ 300,00']);

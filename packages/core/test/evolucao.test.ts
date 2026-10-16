@@ -3,13 +3,19 @@ import {
   COMPARISON_ELIGIBLE_STATES,
   EXPLAIN_TOP_CATEGORIES,
   EXPLAIN_TOP_RECORDS,
+  MemoryRepository,
+  categoryBreakdown,
   comparisonStats,
   evolutionPoints,
   explainChange,
+  loadInvoices,
+  loadInvoicesOfRecords,
   monthsOverview,
+  newOperationKey,
   paidCategoryParts,
   pointVariation,
   receivedCategoryParts,
+  summarizeMonth,
   type CategoryPart,
   type EvolutionPoint,
   type EvolutionPointState,
@@ -578,26 +584,67 @@ describe('explainChange', () => {
     expect(e.otherCents).toBe(0);
   });
 
-  it('T15: o pagamento de fatura entra dividido pelas categorias da fatura, uma só vez, e o lançamento relacionado mostra só a parte', () => {
-    const invoice = {
-      cardId: 'cartao',
-      month: '2026-04',
-      mix: [
-        { category: 'Mercado', charges: false, cents: 60_000 },
-        { category: 'Lazer', charges: false, cents: 40_000 },
-      ],
+  it('T15: cartão, compra, estorno e pagamento da fatura no repositório: as partes por categoria somam o Pago do mês, uma só vez', async () => {
+    const key = newOperationKey;
+    const clock = { today: '2026-10-07' };
+    const repo = new MemoryRepository({ actorId: 'pessoa-teste', displayName: 'Pessoa de teste', today: () => clock.today });
+    const space = await repo.ensurePersonalSpace('Conta principal');
+    const ctx = space.personalContextId;
+    // Outubro: um gasto comum de Mercado, R$ 100,00.
+    await repo.createRecord(key(), ctx, 'despesa', { accountId: space.accounts[0]!.id, amountCents: 10_000, occurredOn: '2026-10-06', description: 'Feira', category: 'Mercado' });
+    // Cartão que fecha dia 3: as duas compras (R$ 600,00 em Lazer e R$ 400,00 em Mercado) caem na fatura de novembro, com o estorno de R$ 150,00 em Lazer.
+    const { card } = await repo.createCard(key(), ctx, { name: 'Cartão de teste', lastDigits: '1234', closingDay: 3, dueDay: 10, limitCents: 500_000 });
+    await repo.addCardPurchase(key(), card.id, { description: 'Tênis', category: 'Lazer', purchasedOn: '2026-10-05', totalCents: 60_000, installments: 1 });
+    await repo.addCardPurchase(key(), card.id, { description: 'Compras do mês', category: 'Mercado', purchasedOn: '2026-10-06', totalCents: 40_000, installments: 1 });
+    clock.today = '2026-11-04';
+    await repo.addCardRefund(key(), card.id, { description: 'Devolução do tênis', category: 'Lazer', amountCents: 15_000, invoiceMonth: '2026-11' });
+    // Compra e estorno no cartão ainda não são gasto.
+    expect(summarizeMonth(await repo.listRecords(ctx, '2026-11'), ctx, '2026-11').paidCents).toBe(0);
+    clock.today = '2026-11-08';
+    const invoice = (await loadInvoices(repo, (await repo.getCard(card.id))!, clock.today)).find((i) => i.month === '2026-11')!;
+    expect(invoice.totalCents).toBe(60_000 + 40_000 - 15_000);
+    await repo.payInvoice(key(), card.id, '2026-11', invoice.commitmentVersion!, 85_000, '2026-11-08');
+
+    // O que o app lê de cada mês: os lançamentos, as faturas deles, as partes por categoria e o total do gráfico (monthsOverview).
+    const read = async (month: string) => {
+      const records = await repo.listRecords(ctx, month);
+      const summary = summarizeMonth(records, ctx, month);
+      const invoices = await loadInvoicesOfRecords(repo, summary.composition.paid, clock.today);
+      const parts = paidCategoryParts(summary.composition.paid, invoices);
+      return { records, summary, invoices, parts, side: { month, totalCents: summary.paidCents, parts } };
     };
-    const pay: FinancialRecord = { ...record('Cartão', 100_000, 'Fatura do cartão', '2026-04-10'), invoice: { cardId: 'cartao', month: '2026-04' } };
-    const e = explainChange(side('2026-03', [record('Mercado', 10_000, 'Mercado', '2026-03-12')]), {
-      month: '2026-04',
-      totalCents: 100_000,
-      parts: paidCategoryParts([pay], [invoice]),
-    });
-    expect(e.reconciled).toBe(true);
-    expect(e.categories.map((c) => [c.label, c.toCents, c.differenceCents])).toEqual([['Mercado', 60_000, 50_000], ['Lazer', 40_000, 40_000]]);
-    expect(e.related).toEqual([{ id: pay.id, description: 'Fatura do cartão', occurredOn: '2026-04-10', cents: 60_000, recordCents: 100_000, partial: true }]);
-    // Sem dupla contagem: as categorias do mês somam o total do mês, e a compra no cartão não existe como lançamento de Pago.
-    expect(e.categories.reduce((a, c) => a + c.toCents, 0)).toBe(100_000);
+    const overviewPaid = (await repo.monthsOverview(ctx, '2026-10', '2026-11')).map((r) => r.paidCents);
+    const [oct, nov] = [await read('2026-10'), await read('2026-11')];
+    expect(overviewPaid).toEqual([10_000, 85_000]);
+    expect([oct.summary.paidCents, nov.summary.paidCents]).toEqual(overviewPaid);
+
+    // Novembro tem um só lançamento: o pagamento da fatura. As compras e o estorno do cartão não viram lançamento.
+    expect(nov.records).toHaveLength(1);
+    expect(nov.records[0]).toMatchObject({ kind: 'despesa', amountCents: 85_000, invoice: { cardId: card.id, month: '2026-11' } });
+    // Lazer: 600,00 menos o estorno de 150,00; Mercado: 400,00. As partes somam o Pago do mês e cada lançamento só entra uma vez.
+    expect(nov.parts.map((p) => [p.label, p.cents, p.part])).toEqual([['Lazer', 45_000, true], ['Mercado', 40_000, true]]);
+    expect(nov.parts.reduce((a, p) => a + p.cents, 0)).toBe(nov.summary.paidCents);
+    expect(new Set(nov.parts.map((p) => p.record.id))).toEqual(new Set([nov.records[0]!.id]));
+    expect(oct.parts.reduce((a, p) => a + p.cents, 0)).toBe(oct.summary.paidCents);
+
+    // categoryBreakdown (Por categoria) dá as mesmas categorias e os mesmos centavos.
+    const rows = categoryBreakdown(nov.summary.composition.paid, nov.invoices);
+    expect(rows.map((r) => [r.label, r.cents])).toEqual([['Lazer', 45_000], ['Mercado', 40_000]]);
+    expect(rows.reduce((a, r) => a + r.cents, 0)).toBe(nov.summary.paidCents);
+
+    // explainChange parte das mesmas partes: as categorias de cada mês somam o Pago dele e a diferença fecha, sem sobra.
+    const e = explainChange(oct.side, nov.side);
+    expect(e).toMatchObject({ fromCents: 10_000, toCents: 85_000, differenceCents: 75_000, reconciled: true, otherCents: 0 });
+    expect(e.categories.map((c) => [c.label, c.fromCents, c.toCents, c.differenceCents])).toEqual([
+      ['Lazer', 0, 45_000, 45_000],
+      ['Mercado', 10_000, 40_000, 30_000],
+    ]);
+    expect(e.categories.reduce((a, c) => a + c.fromCents, 0)).toBe(oct.summary.paidCents);
+    expect(e.categories.reduce((a, c) => a + c.toCents, 0)).toBe(nov.summary.paidCents);
+    expect(e.categories.reduce((a, c) => a + c.differenceCents, 0)).toBe(e.differenceCents);
+    // O lançamento relacionado mostra só a parte do pagamento que cabe à categoria que mais mudou (Lazer).
+    expect(e.related).toEqual([{ id: nov.records[0]!.id, description: nov.records[0]!.description, occurredOn: '2026-11-08', cents: 45_000, recordCents: 85_000, partial: true }]);
+    repo.checkInvariants();
   });
 
   it('Recebido usa as mesmas contas, com as categorias dos recebimentos', () => {
@@ -630,10 +677,18 @@ describe('explainChange', () => {
     expect(() => explainChange({ ...a, parts: [negative] }, b)).toThrow(RangeError);
   });
 
-  it('os totais grandes continuam exatos (sem ponto flutuante nas somas de categoria)', () => {
-    const big = record('Casa', 999_999_999, 'grande', '2026-04-01');
-    const e = explainChange(side('2026-03', []), side('2026-04', [big, record('Casa', 1, 'um', '2026-04-02')]));
-    expect(e.differenceCents).toBe(1_000_000_000);
-    expect(e.categories[0]).toMatchObject({ toCents: 1_000_000_000, differenceCents: 1_000_000_000 });
+  it('perto de Number.MAX_SAFE_INTEGER as somas e as diferenças continuam exatas (uma conta em reais, em ponto flutuante, já erra aqui)', () => {
+    const marchBig = [record('Casa', 1_000_000_000_000_001, 'Aluguel', '2026-03-05'), record('Mercado', 3_000_000_000_000_007, 'Mercado', '2026-03-12')];
+    const aprilBig = [record('Casa', 4_500_000_000_000_003, 'Aluguel', '2026-04-05'), record('Mercado', 4_507_199_254_740_981, 'Mercado', '2026-04-12')];
+    // Os dados separam as duas contas: em reais (centavos / 100), a diferença total e a de Casa não voltam aos mesmos centavos.
+    const inReais = (to: number, from: number) => Math.round((to / 100 - from / 100) * 100);
+    expect(inReais(9_007_199_254_740_984, 4_000_000_000_000_008)).not.toBe(5_007_199_254_740_976);
+    expect(inReais(4_500_000_000_000_003, 1_000_000_000_000_001)).not.toBe(3_500_000_000_000_002);
+    expect(sum(aprilBig)).toBeLessThanOrEqual(Number.MAX_SAFE_INTEGER);
+    const e = explainChange(side('2026-03', marchBig), side('2026-04', aprilBig));
+    expect(e).toMatchObject({ fromCents: 4_000_000_000_000_008, toCents: 9_007_199_254_740_984, differenceCents: 5_007_199_254_740_976, reconciled: true, otherCents: 0 });
+    expect(e.categories.map((c) => [c.label, c.differenceCents])).toEqual([['Casa', 3_500_000_000_000_002], ['Mercado', 1_507_199_254_740_974]]);
+    // Acima do maior inteiro seguro a conta não é exata: lança RangeError em vez de somar errado.
+    expect(() => explainChange(side('2026-03', marchBig), { ...side('2026-04', aprilBig), totalCents: Number.MAX_SAFE_INTEGER + 1 })).toThrow(RangeError);
   });
 });
