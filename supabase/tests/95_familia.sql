@@ -1471,6 +1471,64 @@ begin
   assert (select count(*) from public.record_operations where idempotency_key like 'fa-f9-000%') = 1, 'só a passagem da titularidade gravou operação';
 end $$;
 
+-- ---------------------------------------------------------------------------
+-- 18. Apagar a conta de quem aceitou um convite: o `on delete set null` de family_invites.used_by passa pela guarda do convite, que
+--     aceita essa única mudança (used_by de uma pessoa para nulo, com o resto igual). Antes, a guarda recusava (campo_imutavel) e quem
+--     já tinha entrado na Família por um convite não conseguia apagar a conta. Olga é titular e Pedro, membro por convite.
+-- ---------------------------------------------------------------------------
+insert into ids values ('olga', '00000000-0000-0000-0000-0000000000a5'), ('pedro', '00000000-0000-0000-0000-0000000000b5');
+insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-0000000000a5', 'olga@exemplo.test',  now(), '{"display_name":"Olga Reis"}'),
+  ('00000000-0000-0000-0000-0000000000b5', 'pedro@exemplo.test', now(), '{"display_name":"Pedro Lima"}');
+set role authenticated;
+do $$
+declare
+  p text;
+  space jsonb;
+begin
+  foreach p in array array['olga', 'pedro'] loop
+    perform pg_temp.as_(p);
+    space := public.ensure_personal_space('Conta principal');
+    insert into ids values (p || '_ctx', (space ->> 'context_id')::uuid);
+  end loop;
+  perform pg_temp.as_('olga');
+  insert into ids values ('fol', (public.create_family('Casa da Olga', 'fa-del-0001') #>> '{context,id}')::uuid);
+  perform pg_temp.inv('pedro_in', 'olga', 'membro', 'fol');
+  perform pg_temp.as_('pedro');
+  perform public.accept_family_invite(pg_temp.code('pedro_in'), 'fa-del-0002');
+  assert pg_temp.mem('pedro', 'fol') = 'membro t t f f', 'Pedro entrou como membro pelo convite';
+end $$;
+reset role;
+create temp table inv_before as select * from public.family_invites where id = (select invite from codes where name = 'pedro_in');
+do $$
+declare
+  v_inv uuid := (select invite from codes where name = 'pedro_in');
+begin
+  assert (select (used_by, used_at is not null) from inv_before) = (pg_temp.id('pedro'), true), 'antes: convite usado por Pedro';
+  -- A guarda segue recusando qualquer outra mudança num convite usado.
+  perform pg_temp.expect_error(format($f$update public.family_invites set used_by = %L where id = %L$f$, pg_temp.id('olga'), v_inv), 'campo_imutavel');
+  perform pg_temp.expect_error(format($f$update public.family_invites set used_at = null where id = %L$f$, v_inv), 'campo_imutavel');
+  perform pg_temp.expect_error(format($f$update public.family_invites set used_by = null, used_at = used_at + interval '1 minute' where id = %L$f$, v_inv), 'campo_imutavel');
+  perform pg_temp.expect_error(format($f$update public.family_invites set used_by = null, role = 'leitor' where id = %L$f$, v_inv), 'campo_imutavel');
+  perform pg_temp.expect_error(format($f$update public.family_invites set used_by = null, cancelled_at = now() where id = %L$f$, v_inv), '%family_invites_estado%');
+  assert (select used_by from public.family_invites where id = v_inv) = pg_temp.id('pedro'), 'as recusas não mudaram nada';
+  -- Apagar a conta do Pedro (primeiro o espaço pessoal, como na exclusão da conta).
+  delete from public.financial_contexts where owner_person_id = pg_temp.id('pedro');
+  delete from auth.users where id = pg_temp.id('pedro');
+  assert not exists (select 1 from auth.users where id = pg_temp.id('pedro')) and not exists (select 1 from public.persons where id = pg_temp.id('pedro')), 'a conta do Pedro foi apagada';
+  assert not exists (select 1 from public.context_memberships where person_id = pg_temp.id('pedro')), 'o vínculo saiu com a conta';
+  assert (select used_by from public.family_invites where id = v_inv) is null, 'o convite ficou com used_by nulo';
+  assert (select (i.context_id, i.created_by, i.role, i.code_hash, i.expires_at, i.created_at, i.used_at, i.cancelled_at)
+            from public.family_invites i where i.id = v_inv)
+       = (select (b.context_id, b.created_by, b.role, b.code_hash, b.expires_at, b.created_at, b.used_at, b.cancelled_at) from inv_before b),
+    'o resto do convite não mudou (continua usado, não vale de novo)';
+  -- O convite usado, agora sem pessoa, segue sem valer.
+  perform pg_temp.as_('olga');
+  assert pg_temp.err(format($f$select public.preview_family_invite(%L)$f$, pg_temp.code('pedro_in'))) like 'convite_invalido|%', 'o link usado segue sem valer';
+  assert (select count(*) from public.context_memberships where context_id = pg_temp.id('fol') and revoked_at is null) = 1, 'a Olga segue titular, sozinha';
+end $$;
+drop table inv_before;
+
 select pg_temp.check_links();
 
 rollback;

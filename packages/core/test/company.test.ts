@@ -19,7 +19,6 @@ import {
   LICENSE_CODE_PATTERN,
   LICENSE_FILTER_LABEL,
   LICENSE_KIND_LABEL,
-  USAGE_MIN_ACTIVE,
   accessUntilDay,
   barModeFor,
   buildInviteCsv,
@@ -47,8 +46,6 @@ import {
   seatsOf,
   sha256Hex,
   splitEmailList,
-  usageJoinedLine,
-  usageMonthName,
   type BenefitContract,
   type License,
   type LicenseInviteResult,
@@ -223,7 +220,6 @@ describe('Empresas: vigência, situações e filtros', () => {
 
   it('as 30 dias de acesso pleno e o dia em que o acesso termina no fuso da pessoa', () => {
     expect(BENEFIT_GRACE_DAYS).toBe(30);
-    expect(USAGE_MIN_ACTIVE).toBe(5);
     expect(accessUntilDay('2026-11-06T23:59:59.000Z', 'America/Sao_Paulo')).toBe('2026-11-06');
     // 01:00 UTC ainda é o dia anterior em São Paulo.
     expect(accessUntilDay('2026-11-07T01:00:00.000Z', 'America/Sao_Paulo')).toBe('2026-11-06');
@@ -311,12 +307,16 @@ describe('Empresas: textos', () => {
     }
   });
 
-  it('a explicação de privacidade diz o que a empresa não vê e o que vê, com o limite de 5 pessoas ativas', () => {
+  it('a explicação de privacidade diz o que a empresa não vê e o que vê, sem indicador de entradas no app', () => {
     expect(COMPANY_PRIVACY).toBe('A empresa não vê valores, categorias, metas, contas, cartões nem a Família de ninguém, nem somados.');
     expect(COMPANY_TEXT.privacy).toBe(COMPANY_PRIVACY);
     expect(BENEFIT_TEXT.whoSees).toContain(COMPANY_PRIVACY);
-    expect(BENEFIT_TEXT.whoSees).toContain('5 pessoas ativas');
-    expect(COMPANY_TEXT.usageHidden).toBe('Aparece a partir de 5 pessoas ativas.');
+    // O indicador "pessoas que entraram no mês" saiu depois da revisão de segurança de 16/10/2026: nenhum texto o menciona.
+    expect(BENEFIT_TEXT.whoSees).toContain('Ela não vê quem usa o app depois de aceitar, nem quando.');
+    expect(companyTextSamples().join(' ')).not.toMatch(/pessoas que entraram|entraram no app|Aparece a partir de|5 pessoas ativas/);
+    expect(COMPANY_TEXT).not.toHaveProperty('usageHidden');
+    expect(COMPANY_TEXT).not.toHaveProperty('usageJoined');
+    expect(COMPANY_TEXT.usageIntro).toBe('Só a contagem das licenças. A empresa não vê quem entrou no app, nem quando, nem o que cada pessoa faz nele.');
     expect(COMPANY_TEXT.endBody).toContain('30 dias');
     expect(COMPANY_TEXT.endBody).toContain('nada é apagado');
   });
@@ -325,13 +325,6 @@ describe('Empresas: textos', () => {
     expect(BENEFIT_PLAN_LABEL).toEqual({ individual: 'Individual', familiar: 'Familiar' });
     expect(LICENSE_FILTER_LABEL).toEqual({ todas: 'Todas', convidada: 'Convidadas', ativa: 'Ativas', encerrada: 'Encerradas' });
     expect(LICENSE_KIND_LABEL.cancelada).toBe('Convite cancelado');
-  });
-
-  it('a linha de "Pessoas que entraram": o número, ou o aviso de que aparece a partir de 5 pessoas ativas', () => {
-    expect(usageMonthName('2026-10-01')).toBe('outubro');
-    expect(usageJoinedLine({ month: '2026-10-01', usageVisible: true, joinedThisMonth: 9 })).toEqual({ label: 'Pessoas que entraram em outubro', value: '9' });
-    expect(usageJoinedLine({ month: '2026-10-01', usageVisible: true, joinedThisMonth: 0 }).value).toBe('0');
-    expect(usageJoinedLine({ month: '2026-10-01', usageVisible: false, joinedThisMonth: null }).value).toBe('Aparece a partir de 5 pessoas ativas.');
   });
 
   it('textos para divulgar: quatro fixos, mais um do mês nos meses com tema de época, sem dado de ninguém', () => {
@@ -409,6 +402,19 @@ describe('Empresas: telas do app (lidas como código-fonte)', () => {
       expect(company, fn).toContain(`'${fn}'`);
     }
     expect(company).toContain("from('my_benefit')");
+  });
+
+  it('o card "Uso do app" mostra só as quatro contagens de licenças: nada de entradas no app, de acesso nem de pessoas', () => {
+    const panel = appFile('components/company-panel.tsx');
+    const card = panel.slice(panel.indexOf('export function UsageCard'), panel.indexOf('// Textos para divulgar'));
+    expect(card.length).toBeGreaterThan(300);
+    for (const label of ['usageSeats', 'usageInvited', 'usageActive', 'usageEnded']) expect(card, label).toContain(`T.${label}`);
+    expect((card.match(/<Row /g) ?? []).length).toBe(4);
+    expect(card).not.toMatch(/joined|entra|sign_?in|usageVisible|usageMinimum/i);
+    // O banco e o app não leem nem devolvem o último acesso de ninguém.
+    const repo = appFile('lib/supabase-repository.ts');
+    expect(repo).not.toMatch(/joined_this_month|usage_visible|usage_minimum|last_sign_in/);
+    expect(appFile('state/company.ts')).not.toMatch(/joined|last_sign_in/i);
   });
 
   it('o painel não lê nenhuma tabela de finanças: só os hooks da empresa', () => {

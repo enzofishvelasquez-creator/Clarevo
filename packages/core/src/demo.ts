@@ -66,9 +66,9 @@ export function demoScenarioFrom(param: string | null | undefined): DemoScenario
 
 /**
  * A empresa da demonstração (D-056): "Empresa Exemplo (demonstração)", FICTÍCIA e identificada, com licenças de pessoas fictícias
- * e números de uso fictícios, administrada pela conta de demonstração. Mora só neste hub, na memória do aparelho: o painel da
+ * e contagens de licenças fictícias, administrada pela conta de demonstração. Mora só neste hub, na memória do aparelho: o painel da
  * demonstração não grava nada fora dele e não toca o banco. Conta nova nunca recebe empresa de exemplo (o hub de uma conta nova
- * começa vazio). Vagas: 40; em uso: 18 (12 ativas e 6 convites); 3 encerradas e 1 convite cancelado; 9 das 12 ativas entraram em outubro.
+ * começa vazio). Vagas: 40; em uso: 18 (12 ativas e 6 convites); 3 encerradas e 1 convite cancelado.
  */
 export function createDemoCompanyHub(adminPersonId: string = 'pessoa-demo'): MemoryCompanyHub {
   const hub = new MemoryCompanyHub({ now: () => Date.parse(`${DEMO_TODAY}T12:00:00.000Z`), today: () => DEMO_TODAY });

@@ -716,7 +716,7 @@ export interface RecordsRepository {
    * código). Quem não administra nenhuma recebe uma lista vazia.
    */
   listAdministeredCompanies(): Promise<CompanyOverview[]>;
-  /** organization_usage: só quem administra (nao_encontrado). Com menos de 5 pessoas ativas, joinedThisMonth é nulo. */
+  /** organization_usage: só quem administra (nao_encontrado). Só contagens de licenças (vagas, convidadas, ativas e encerradas), nunca acesso ao app. */
   getCompanyUsage(organizationId: string): Promise<CompanyUsage>;
   /**
    * invite_licenses. Só quem administra o contrato. Normaliza os e-mails e tira os repetidos. Ordem: repetição; nao_encontrado;

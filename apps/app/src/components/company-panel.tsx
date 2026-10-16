@@ -20,7 +20,6 @@ import {
   planInvites,
   promoTexts,
   seatsOf,
-  usageJoinedLine,
   type BenefitContract,
   type CompanyOverview,
   type InviteLinkRow,
@@ -490,10 +489,9 @@ export function LicensesCard({
 // Uso do app
 // ---------------------------------------------------------------------------
 
-/** "Uso do app": só números do uso e das licenças (nunca quem entrou) e a explicação de privacidade. */
+/** "Uso do app": só as contagens das licenças (nunca quem entrou nem quando) e a explicação de privacidade. */
 export function UsageCard({ organizationId }: { organizationId: string }) {
   const usage = useCompanyUsage(organizationId);
-  const joined = usage.data ? usageJoinedLine(usage.data) : null;
   return (
     <Card style={{ gap: space[2] }}>
       <SectionTitle>{T.usageTitle}</SectionTitle>
@@ -502,7 +500,7 @@ export function UsageCard({ organizationId }: { organizationId: string }) {
       </Txt>
       {usage.isError ? (
         <ErrorState message={T.usageLoadFailed} onRetry={() => usage.refetch()} />
-      ) : !usage.data || !joined ? (
+      ) : !usage.data ? (
         <LoadingState />
       ) : (
         <>
@@ -510,7 +508,6 @@ export function UsageCard({ organizationId }: { organizationId: string }) {
           <Row label={T.usageInvited} value={String(usage.data.invited)} />
           <Row label={T.usageActive} value={String(usage.data.active)} />
           <Row label={T.usageEnded} value={String(usage.data.ended)} />
-          <Row label={joined.label} value={joined.value} strong />
         </>
       )}
       <Txt variant="label" style={{ marginTop: space[2] }}>

@@ -106,8 +106,6 @@ export class DemoAuth implements AuthService {
     const acc = this.accounts.get(email.trim().toLowerCase());
     if (!acc || acc.password !== password) throw new AuthError('credenciais_invalidas');
     if (!acc.user.emailConfirmed) throw new AuthError('email_nao_confirmado');
-    // O último acesso (auth.users.last_sign_in_at) que o uso do app, para a empresa, conta no mês.
-    this.companyHub.recordSignIn(acc.user.id);
     this.emit({ user: { ...acc.user }, recovery: false });
   }
 

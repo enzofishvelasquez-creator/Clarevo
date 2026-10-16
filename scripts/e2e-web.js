@@ -10098,6 +10098,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const empWrites0 = writes.length;
   // Linha "rótulo: valor" do contrato e do uso (o nome acessível junta os dois).
   const empRow = (label) => p.evaluate((label) => { const e = [...document.querySelectorAll('[aria-label]')].find((x) => x.getAttribute('aria-label').startsWith(`${label}: `) && x.getBoundingClientRect().width > 0); return e ? e.getAttribute('aria-label').slice(label.length + 2) : null; }, label);
+  // Há alguma linha (ou texto) de indicador de entradas no app? O indicador "pessoas que entraram no mês" saiu depois da revisão de segurança de 16/10/2026.
+  const empHasJoinedIndicator = () => p.evaluate(() => [...document.querySelectorAll('[aria-label]')].some((x) => /^Pessoas que entraram/.test(x.getAttribute('aria-label'))) || /Aparece a partir de|pessoas que entraram|entraram no app/i.test(document.body.innerText));
   // O link (do painel) de um e-mail, e só o código dele.
   const empLinkOf = (email) => p.evaluate((email) => { const e = [...document.querySelectorAll('[aria-label]')].find((x) => x.getAttribute('aria-label').startsWith(`Link de ${email}: `) && x.getBoundingClientRect().width > 0); return e ? e.getAttribute('aria-label').slice(`Link de ${email}: `.length) : null; }, email);
   const empStubClipboard = () => p.evaluate(() => { window.__copied = []; Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (x) => { window.__copied.push(x); } }, configurable: true }); });
@@ -10115,7 +10117,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await famConta(); await waitText('Abrir painel da empresa'); await waitText('Na demonstração não há benefício de exemplo.');
   t = await body();
   ok('Empresas, demonstração: Conta tem o card "Painel da empresa" (só na web) com a explicação e o botão "Abrir painel da empresa"', (await headingShown('Painel da empresa')) &&
-    t.includes('Convide pessoas para o benefício, acompanhe as licenças e veja como o app está sendo usado.') && (await visibleCount('button', 'Abrir painel da empresa')) === 1, t.slice(0, 300));
+    t.includes('Convide pessoas para o benefício e acompanhe as vagas e as licenças.') && (await visibleCount('button', 'Abrir painel da empresa')) === 1, t.slice(0, 300));
   ok('Empresas, demonstração: "Benefício pela empresa" diz que não há benefício de exemplo e não oferece colar convite', (await headingShown('Benefício pela empresa')) &&
     t.includes('Na demonstração não há benefício de exemplo. Para receber o convite de uma empresa, entre com uma conta sua.') && !t.includes('Tenho um convite da empresa'));
   await empKeep();
@@ -10132,9 +10134,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     const order = ['Contrato', 'Convidar pessoas', 'Licenças', 'Uso do app', 'Textos para divulgar'].map((h) => hs.indexOf(h));
     return order.every((i, n) => i >= 0 && (n === 0 || i > order[n - 1]));
   })());
-  ok('Painel: Uso do app com os números fictícios (40 vagas, 6 convites, 12 ativas, 3 encerradas, 9 entraram em outubro) e a explicação de privacidade',
+  ok('Painel: Uso do app só com as contagens fictícias (40 vagas, 6 convites, 12 ativas, 3 encerradas), sem indicador de entradas no app, e a explicação de privacidade',
     (await empRow('Vagas contratadas')) === '40' && (await empRow('Convites pendentes')) === '6' && (await empRow('Licenças ativas')) === '12' && (await empRow('Licenças encerradas')) === '3' &&
-    (await empRow('Pessoas que entraram em outubro')) === '9' && t.includes('A empresa não vê valores, categorias, metas, contas, cartões nem a Família de ninguém, nem somados.'), `${await empRow('Pessoas que entraram em outubro')}`);
+    !(await empHasJoinedIndicator()) && t.includes('Só a contagem das licenças. A empresa não vê quem entrou no app, nem quando, nem o que cada pessoa faz nele.') &&
+    t.includes('A empresa não vê valores, categorias, metas, contas, cartões nem a Família de ninguém, nem somados.'), `${await empRow('Vagas contratadas')}`);
   ok('Painel: Textos para divulgar (4 fixos mais "Neste mês: outubro"), cada um com "Copiar texto"; nenhum leva e-mail nem valor',
     (await headingShown('Textos para divulgar')) && ['Anúncio do benefício', 'Como entrar', 'Lembrete para quem ainda não entrou', 'O que a empresa vê', 'Neste mês: outubro'].every((x) => t.includes(x)) &&
     (await visibleCount('button', /^Copiar o texto /)) === 5 && t.includes('Em outubro, o Clarevo tem conteúdo sobre 13º salário e'), t.slice(-900));
@@ -10204,7 +10207,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await empShots('425_empresa_encerrar');
   await confirmIn('Encerrar licença'); await waitText('Licença encerrada.'); await p.waitForTimeout(500);
   ok('Encerrar licença: aviso, Ativas 11 e Encerradas 6; as linhas das ativas seguem com "Encerrar licença"', (await empChip('Ativas, 11').count()) === 1 && (await empChip('Encerradas, 6').count()) === 1 && (await visibleCount('button', /^Encerrar a licença de /)) === 11);
-  ok('Uso do app depois das ações: 6 convites, 11 ativas, 4 encerradas (o convite cancelado não conta) e 9 entraram em outubro', (await empRow('Convites pendentes')) === '6' && (await empRow('Licenças ativas')) === '11' && (await empRow('Licenças encerradas')) === '4' && (await empRow('Pessoas que entraram em outubro')) === '9',
+  ok('Uso do app depois das ações: 6 convites, 11 ativas e 4 encerradas (o convite cancelado não conta)', (await empRow('Convites pendentes')) === '6' && (await empRow('Licenças ativas')) === '11' && (await empRow('Licenças encerradas')) === '4' && !(await empHasJoinedIndicator()),
     `${await empRow('Convites pendentes')} ${await empRow('Licenças ativas')} ${await empRow('Licenças encerradas')}`);
   await empKeep();
   await empShots('426_empresa_uso', { scroll: empScroll('Uso do app') });
@@ -10240,7 +10243,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await body();
   ok('Painel de uma empresa real (da memória): "Empresa Alfa", sem aviso de demonstração, 6 vagas, 0 em uso, sem fim; sem licenças ainda', (await headingShown('Empresa Alfa')) && !t.includes('Demonstração: empresa e pessoas fictícias') && (await empRow('Vagas')) === '6' && (await empRow('Em uso')) === '0 de 6 vagas em uso' &&
     (await empRow('Fim')) === 'Sem data de fim' && t.includes('Nenhuma licença ainda. Convide pessoas acima.'), t.slice(0, 400));
-  ok('Uso do app com 0 pessoas ativas: os números de licenças aparecem e o de uso do mês diz "Aparece a partir de 5 pessoas ativas."', (await empRow('Pessoas que entraram em outubro')) === 'Aparece a partir de 5 pessoas ativas.' && (await empRow('Licenças ativas')) === '0');
+  ok('Uso do app com 0 pessoas ativas: só as contagens de licenças (0 ativas), sem indicador de entradas no app', (await empRow('Licenças ativas')) === '0' && (await empRow('Vagas contratadas')) === '6' && !(await empHasJoinedIndicator()));
   await field('E-mails').fill('bia.empresa@exemplo.com\ncaio.empresa@exemplo.com\nduda.empresa@exemplo.com');
   await btn('Convidar 3 pessoas').click(); await waitText('3 convites criados.'); await p.waitForTimeout(500);
   const empBia = await empLinkOf('bia.empresa@exemplo.com');
@@ -10297,8 +10300,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Quem vê estes dados?: a explicação do que a empresa vê.
   await p.getByRole('button', { name: 'Quem vê estes dados?' }).filter({ visible: true }).first().click(); await waitText('Entendi'); await p.waitForTimeout(400);
   t = await body();
-  ok('Quem vê estes dados?: explica o que a empresa vê (e-mails que convidou, situação e datas; uso do mês só com 5 pessoas ativas) e o que nunca vê', t.includes('A empresa que oferece o benefício vê os e-mails que ela mesma convidou, a situação de cada licença (convite enviado, ativa ou encerrada) e as datas.') &&
-    t.includes('Com 5 pessoas ativas ou mais, vê também quantas entraram no app no mês, sem dizer quem.') && t.includes('A empresa não vê valores, categorias, metas, contas, cartões nem a Família de ninguém, nem somados.') && t.includes('Se uma empresa oferecer o Clarevo como benefício'), t.slice(0, 600));
+  ok('Quem vê estes dados?: explica o que a empresa vê (e-mails que convidou, situação e datas) e o que nunca vê (nem quem usa o app, nem quando)', t.includes('A empresa que oferece o benefício vê os e-mails que ela mesma convidou, a situação de cada licença (convite enviado, ativa ou encerrada) e as datas.') &&
+    t.includes('Ela não vê quem usa o app depois de aceitar, nem quando.') && !/quantas entraram no app|5 pessoas ativas/.test(t) && t.includes('A empresa não vê valores, categorias, metas, contas, cartões nem a Família de ninguém, nem somados.') && t.includes('Se uma empresa oferecer o Clarevo como benefício'), t.slice(0, 600));
   await empKeep();
   await empShots('435_quem_ve_empresa');
   await btn('Entendi').click(); await waitText('Diferença do mês');
@@ -10322,19 +10325,19 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Aceitar benefício').click(); await waitText('Benefício ativado: Empresa Alfa.'); await p.waitForTimeout(500);
   ok('Caio: aceitou e a Conta mostra o benefício ativo', (await empRow('Empresa')) === 'Empresa Alfa' && (await empRow('Situação')) === 'Benefício ativo');
 
-  // ---- 7. Rita de volta: duas ativas, uma cancelada; o uso do mês só aparece com 5 pessoas ativas ----
+  // ---- 7. Rita de volta: duas ativas, uma cancelada; as contagens seguem as licenças, sem indicador de uso ----
   await famSignOut();
   await famSignIn('rita.empresa@exemplo.com');
   await empGoPanel();
   t = await body();
   ok('Painel da Rita: Bia e Caio ativas desde 07/10/2026, a Duda com convite cancelado; Todas 3, Convidadas 0, Ativas 2, Encerradas 1', (t.match(/Ativa desde 07\/10\/2026/g) ?? []).length === 2 && t.includes('duda.empresa@exemplo.com') && t.includes('Convite cancelado em 07/10/2026') &&
     (await empChip('Todas, 3').count()) === 1 && (await empChip('Convidadas, 0').count()) === 1 && (await empChip('Ativas, 2').count()) === 1 && (await empChip('Encerradas, 1').count()) === 1, t.slice(-700));
-  ok('Uso com 2 pessoas ativas: o número do mês segue escondido', (await empRow('Licenças ativas')) === '2' && (await empRow('Pessoas que entraram em outubro')) === 'Aparece a partir de 5 pessoas ativas.');
+  ok('Uso com 2 pessoas ativas: as contagens (2 ativas, 0 encerradas: o convite cancelado da Duda não conta) e nenhum indicador de entradas no app', (await empRow('Licenças ativas')) === '2' && (await empRow('Licenças encerradas')) === '0' && !(await empHasJoinedIndicator()));
   await field('E-mails').fill('edu.empresa@exemplo.com\nfabi.empresa@exemplo.com\ngui.empresa@exemplo.com');
   await btn('Convidar 3 pessoas').click(); await waitText('3 convites criados.'); await p.waitForTimeout(500);
   const empPeople = [];
   for (const n of ['edu', 'fabi', 'gui']) empPeople.push({ email: `${n}.empresa@exemplo.com`, code: (await empLinkOf(`${n}.empresa@exemplo.com`)).split('/').pop() });
-  // Outro aparelho: as três pessoas aceitam (cada uma com a conta dela); o último acesso de cada uma vem do hub.
+  // Outro aparelho: as três pessoas aceitam (cada uma com a conta dela).
   await p.evaluate(({ people }) => {
     const hub = window.__e2e.company();
     people.forEach((x, i) => {
@@ -10342,14 +10345,12 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
       hub.register(id, x.email, x.email.split('.')[0]);
       hub.accept(id, `empresa-aceite-${i}-xxxx`, x.code);
     });
-    hub.recordSignIn('pessoa-edu', '2026-09-30T12:00:00.000Z');
-    hub.recordSignIn('pessoa-fabi', '2026-10-06T12:00:00.000Z');
     return window.__e2e.refresh();
   }, { people: empPeople });
   await p.waitForTimeout(800);
   t = await body();
-  ok('Com 5 pessoas ativas o uso do mês aparece: entraram em outubro Bia, Caio e Fabi (3); o da Edu foi em setembro e a Gui ainda não entrou', (await empRow('Licenças ativas')) === '5' && (await empRow('Convites pendentes')) === '0' && (await empRow('Pessoas que entraram em outubro')) === '3' && (await empRow('Em uso')) === '5 de 6 vagas em uso', `${await empRow('Pessoas que entraram em outubro')}`);
-  ok('O número não diz quem entrou: nenhuma linha do uso tem nome nem e-mail', !(await p.evaluate(() => [...document.querySelectorAll('[aria-label^="Pessoas que entraram"]')].some((e) => /@/.test(e.textContent)))));
+  ok('Com 5 pessoas ativas o painel mostra só as contagens (5 ativas, 0 convites, 0 encerradas) e nada de uso: o indicador de entradas no app saiu', (await empRow('Licenças ativas')) === '5' && (await empRow('Convites pendentes')) === '0' && (await empRow('Licenças encerradas')) === '0' && (await empRow('Em uso')) === '5 de 6 vagas em uso' && !(await empHasJoinedIndicator()), `${await empRow('Licenças ativas')}`);
+  ok('As linhas do uso são só números: nenhuma tem nome nem e-mail', !(await p.evaluate(() => ['Vagas contratadas', 'Convites pendentes', 'Licenças ativas', 'Licenças encerradas'].some((label) => { const e = [...document.querySelectorAll('[aria-label]')].find((x) => x.getAttribute('aria-label').startsWith(`${label}: `) && x.getBoundingClientRect().width > 0); return !e || !/^\d+$/.test(e.getAttribute('aria-label').slice(label.length + 2)); }))));
   // Vagas: 5 de 6 usadas; duas pessoas novas não cabem, uma cabe.
   await field('E-mails').fill('hugo.empresa@exemplo.com\nivo.empresa@exemplo.com');
   await p.waitForTimeout(300);
@@ -10359,10 +10360,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.waitForTimeout(300);
   ok('Com uma pessoa nova cabe na última vaga: "Convidar 1 pessoa" ligado', !(await btn('Convidar 1 pessoa').isDisabled()));
   await field('E-mails').fill('');
-  // Encerrar a licença da Bia: sai de 5 para 4 pessoas ativas e o número do mês some de novo.
+  // Encerrar a licença da Bia: sai de 5 para 4 pessoas ativas.
   await empChip('Ativas, 5').click(); await p.waitForTimeout(300);
   await btn('Encerrar a licença de bia.empresa@exemplo.com').click(); await waitText('Encerrar a licença?'); await confirmIn('Encerrar licença'); await waitText('Licença encerrada.'); await p.waitForTimeout(600);
-  ok('Encerrada a licença da Bia: 4 ativas, 1 encerrada e o número do mês volta a "Aparece a partir de 5 pessoas ativas."', (await empRow('Licenças ativas')) === '4' && (await empRow('Licenças encerradas')) === '1' && (await empRow('Pessoas que entraram em outubro')) === 'Aparece a partir de 5 pessoas ativas.');
+  ok('Encerrada a licença da Bia: 4 ativas e 1 encerrada (o convite cancelado da Duda não conta)', (await empRow('Licenças ativas')) === '4' && (await empRow('Licenças encerradas')) === '1' && !(await empHasJoinedIndicator()));
   await empKeep();
 
   // ---- 8. Bia depois do fim do benefício: conta, histórico e acesso pleno por 30 dias ----

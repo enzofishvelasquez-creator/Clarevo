@@ -6,6 +6,7 @@ import {
   MemoryCompanyHub,
   MemoryRepository,
   contractAccessUntil,
+  contractEndedAt,
   createDemoCompanyHub,
   createDemoRepository,
   isRepoError,
@@ -284,6 +285,47 @@ describe('Empresas na memória: prévia e aceite (E3, E4)', () => {
     expect((await bia.repo.getMyBenefit())!.accessUntil).toBeNull();
     expect((await caio.repo.previewLicenseInvite(codeOf(w, 'caio@exemplo.test'))).organizationName).toBe('Beta');
   });
+
+  it('contrato terminado não prende a pessoa: a licença ativa dele se encerra, no fim do contrato, quando ela aceita o convite de outra empresa', async () => {
+    const { c, hub } = clock();
+    const rita = await person(hub, 'rita');
+    const antiga = hub.staffCreateOrganization({ name: 'Antiga', seats: 2, plan: 'individual', startsOn: '2026-08-01', endsOn: '2026-12-31', adminEmail: 'rita@alfa.test' });
+    const nova = hub.staffCreateOrganization({ name: 'Nova', seats: 2, plan: 'familiar', startsOn: '2026-08-01', endsOn: null, adminEmail: 'rita@alfa.test' });
+    const wa = await rita.repo.inviteLicenses(key(), antiga.contractId, ['bia@exemplo.test']);
+    const wn = await rita.repo.inviteLicenses(key(), nova.contractId, ['bia@exemplo.test']);
+    const bia = await person(hub, 'bia');
+    await bia.repo.acceptLicense(key(), codeOf(wa, 'bia@exemplo.test'));
+    // Com o contrato em vigor, uma licença ativa por vez.
+    await expectCode(bia.repo.acceptLicense(key(), codeOf(wn, 'bia@exemplo.test')), 'ja_tem_licenca');
+    expect(contractEndedAt('2026-12-31')).toBe(new Date('2027-01-01T02:59:59.000Z').toISOString());
+    expect(contractEndedAt(null)).toBeNull();
+
+    // O tempo passa: a Antiga terminou em 31/12/2026. Quem recebe já lê a licença como encerrada, no fim do contrato...
+    c.day = '2027-01-10';
+    expect(await bia.repo.getMyBenefit()).toMatchObject({
+      status: 'encerrada',
+      endedAt: contractEndedAt('2026-12-31'),
+      accessUntil: contractAccessUntil('2026-12-31'),
+      contractEndsOn: '2026-12-31',
+    });
+    // ...mas a empresa ainda vê a licença como ativa na lista, até a pessoa aceitar outra.
+    const antigaView = async () => (await rita.repo.listAdministeredCompanies()).find((o) => o.organization.name === 'Antiga')!.licenses[0]!;
+    expect(await antigaView()).toMatchObject({ status: 'ativa', endedAt: null });
+    expect(await rita.repo.getCompanyUsage(antiga.organizationId)).toEqual({ organizationId: antiga.organizationId, seats: 0, invited: 0, active: 1, ended: 0 });
+    // Um aceite que não vale não encerra nada.
+    await expectCode(bia.repo.acceptLicense(key(), 'f'.repeat(32)), 'convite_invalido');
+    expect(await antigaView()).toMatchObject({ status: 'ativa', endedAt: null });
+
+    // Aceitar o convite da Nova funciona, e a licença da Antiga se encerra no fim do contrato.
+    const b = await bia.repo.acceptLicense(key(), codeOf(wn, 'bia@exemplo.test'));
+    expect(b).toMatchObject({ status: 'ativa', organizationName: 'Nova', plan: 'familiar', endedAt: null, accessUntil: null });
+    expect(await antigaView()).toMatchObject({ status: 'encerrada', endedAt: contractEndedAt('2026-12-31'), cancelledAt: null });
+    expect(await rita.repo.getCompanyUsage(antiga.organizationId)).toEqual({ organizationId: antiga.organizationId, seats: 0, invited: 0, active: 0, ended: 1 });
+    expect(await rita.repo.getCompanyUsage(nova.organizationId)).toEqual({ organizationId: nova.organizationId, seats: 2, invited: 0, active: 1, ended: 0 });
+    expect(await bia.repo.getMyBenefit()).toMatchObject({ status: 'ativa', organizationName: 'Nova' });
+    // Conta, espaço e histórico continuam com a pessoa.
+    expect((await bia.repo.getSpace())!.accounts).toHaveLength(1);
+  });
 });
 
 describe('Empresas na memória: reenviar, cancelar e encerrar', () => {
@@ -380,30 +422,26 @@ describe('Empresas na memória: indicadores de uso (M-1)', () => {
     return people;
   }
 
-  it('só quem administra lê; com menos de 5 pessoas ativas o uso do mês é nulo; com 5, aparece, sem dizer quem', async () => {
+  it('só quem administra lê; devolve só as contagens de licenças, sem indicador de uso nem de pessoas', async () => {
     const { hub } = clock();
     const { rita, contractId, organizationId } = await alfa(hub);
     const ricardo = await person(hub, 'ricardo');
     await expectCode(ricardo.repo.getCompanyUsage(organizationId), 'nao_encontrado');
     await expectCode(rita.repo.getCompanyUsage('nao-existe'), 'nao_encontrado');
-    const four = await team(hub, contractId, rita, ['bia', 'caio', 'edu', 'fabi']);
-    for (const p of four) hub.recordSignIn(p.id, '2026-10-05T12:00:00.000Z');
+    await team(hub, contractId, rita, ['bia', 'caio', 'edu', 'fabi']);
     let u = await rita.repo.getCompanyUsage(organizationId);
-    expect(u).toMatchObject({ month: '2026-10-01', seats: 6, invited: 0, active: 4, ended: 0, joinedThisMonth: null, usageVisible: false, usageMinimum: 5 });
-    const [gui] = await team(hub, contractId, rita, ['gui']);
+    expect(u).toEqual({ organizationId, seats: 6, invited: 0, active: 4, ended: 0 });
+    // Com 5 pessoas ativas o resultado tem as mesmas cinco chaves: o indicador "pessoas que entraram no mês" saiu (revisão de segurança de 16/10/2026).
+    await team(hub, contractId, rita, ['gui']);
     u = await rita.repo.getCompanyUsage(organizationId);
-    expect(u).toMatchObject({ active: 5, joinedThisMonth: 4, usageVisible: true });
-    expect(Object.keys(u).sort()).toEqual(['active', 'ended', 'invited', 'joinedThisMonth', 'month', 'organizationId', 'seats', 'usageMinimum', 'usageVisible']);
-    // Entrar no mês é o último acesso no mês do fuso de São Paulo: 01:00 UTC de 1º/11 ainda é 31/10.
-    hub.recordSignIn(gui!.id, '2026-11-01T01:00:00.000Z');
-    expect((await rita.repo.getCompanyUsage(organizationId)).joinedThisMonth).toBe(5);
-    hub.recordSignIn(four[0]!.id, '2026-09-30T23:00:00.000-03:00');
-    expect((await rita.repo.getCompanyUsage(organizationId)).joinedThisMonth).toBe(4);
-    // Encerrar uma licença volta ao limite: a licença ativa cai para 4 e o número some de novo; convite cancelado não conta como encerrada.
+    expect(u).toEqual({ organizationId, seats: 6, invited: 0, active: 5, ended: 0 });
+    expect(Object.keys(u).sort()).toEqual(['active', 'ended', 'invited', 'organizationId', 'seats']);
+    expect('recordSignIn' in hub).toBe(false);
+    // Encerrar uma licença: a ativa cai para 4 e a encerrada sobe para 1; convite cancelado não conta como encerrada.
     const lic = (await rita.repo.listAdministeredCompanies())[0]!.licenses[0]!;
     await rita.repo.endLicense(key(), lic.id);
     u = await rita.repo.getCompanyUsage(organizationId);
-    expect(u).toMatchObject({ active: 4, ended: 1, joinedThisMonth: null, usageVisible: false });
+    expect(u).toEqual({ organizationId, seats: 6, invited: 0, active: 4, ended: 1 });
     const extra = await rita.repo.inviteLicenses(key(), contractId, ['hugo@exemplo.test']);
     await rita.repo.cancelLicenseInvite(key(), extra.results[0]!.license.id);
     expect(await rita.repo.getCompanyUsage(organizationId)).toMatchObject({ invited: 0, ended: 1 });
@@ -434,7 +472,7 @@ describe('Empresas na memória: conta nova e demonstração', () => {
     // Todos os e-mails são de pessoas fictícias do domínio reservado .example.
     expect(company!.licenses.every((l) => l.email.endsWith('@empresa-exemplo.example'))).toBe(true);
     const usage = await demo.getCompanyUsage(company!.organization.id);
-    expect(usage).toMatchObject({ seats: 40, invited: 6, active: 12, ended: 3, joinedThisMonth: 9, usageVisible: true, month: '2026-10-01' });
+    expect(usage).toEqual({ organizationId: company!.organization.id, seats: 40, invited: 6, active: 12, ended: 3 });
     // Nada sobra para quem recebe: a conta de demonstração não tem benefício.
     expect(await demo.getMyBenefit()).toBeNull();
     // O painel da demonstração funciona na memória: convidar cria o convite só no hub dela.

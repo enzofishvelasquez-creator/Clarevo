@@ -1,9 +1,11 @@
 -- Painel de empresas (D-056, migração 0014): invite_licenses, renew_license_invite, cancel_license_invite, end_license,
 -- preview_license_invite, accept_license, organization_usage, a visão my_benefit, as funções da equipe Clarevo (clarevo_staff_*),
--- o código do convite só como SHA-256, as vagas, a proteção de uso (menos de 5 pessoas ativas) e a escrita só por função.
+-- o código do convite só como SHA-256, as vagas, as contagens de licenças (sem indicador de uso por pessoa), o contrato terminado que
+-- não prende a pessoa, a conta que pode ser apagada depois da licença e a escrita só por função.
 -- Pessoas FICTÍCIAS: Rita (RH da Empresa Alfa) e Sofia (segunda pessoa do RH da Alfa), Ricardo (RH da Empresa Beta), Gil (RH de duas
--- empresas fora da vigência), Bia, Caio, Duda, Edu, Fabi e Gui (convidadas da Alfa), Hugo (pessoa comum), Iris e Nando (Família),
--- Otto (externo), Xena (sem espaço pessoal), Lara (e-mail não confirmado) e Rui (corrida nas vagas, com dados gravados de verdade).
+-- empresas fora da vigência e das empresas Antiga e Nova), Bia, Caio, Duda, Edu, Fabi e Gui (convidadas da Alfa), Tito, Lia e Nilo
+-- (convidados das empresas Antiga e Nova), Hugo (pessoa comum), Iris e Nando (Família), Otto (externo), Xena (sem espaço pessoal),
+-- Lara (e-mail não confirmado) e Rui (corrida nas vagas, com dados gravados de verdade).
 -- Tudo em uma transação desfeita no fim, menos a corrida (seção 15), que grava, confere e apaga. Valores em centavos.
 \set rita    '''00000000-0000-0000-0000-0000000000a8'''
 \set ricardo '''00000000-0000-0000-0000-0000000000b8'''
@@ -21,6 +23,9 @@
 \set gil     '''00000000-0000-0000-0000-000000000088'''
 \set lara    '''00000000-0000-0000-0000-000000000098'''
 \set sofia   '''00000000-0000-0000-0000-0000000000a9'''
+\set tito    '''00000000-0000-0000-0000-0000000000b0'''
+\set lia     '''00000000-0000-0000-0000-0000000000c0'''
+\set nilo    '''00000000-0000-0000-0000-0000000000d0'''
 
 begin;
 set local clarevo.today = '2026-10-07';
@@ -68,7 +73,7 @@ begin
 end $$;
 
 create temp table ids (name text primary key, id uuid);
-grant select, insert on ids to authenticated, anon;
+grant select, insert on ids to authenticated, anon, service_role;
 create temp table codes (name text primary key, code text);
 grant select, insert on codes to authenticated;
 create function pg_temp.id(p_name text) returns uuid language sql as $$ select id from ids where name = p_name $$;
@@ -143,7 +148,7 @@ $$;
 
 insert into ids values ('rita', :rita), ('ricardo', :ricardo), ('bia', :bia), ('caio', :caio), ('duda', :duda), ('edu', :edu),
   ('fabi', :fabi), ('gui', :gui), ('hugo', :hugo), ('iris', :iris), ('nando', :nando), ('otto', :otto), ('xena', :xena),
-  ('gil', :gil), ('lara', :lara), ('sofia', :sofia);
+  ('gil', :gil), ('lara', :lara), ('sofia', :sofia), ('tito', :tito), ('lia', :lia), ('nilo', :nilo);
 insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
   (:rita,    'rita@alfa.test',       now(), '{"display_name":"Rita Prado"}'),
   (:ricardo, 'ricardo@beta.test',    now(), '{"display_name":"Ricardo Alves"}'),
@@ -160,7 +165,10 @@ insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) value
   (:xena,    'xena@exemplo.test',    now(), '{"display_name":"Xena"}'),
   (:gil,     'gil@gama.test',        now(), '{"display_name":"Gil Prado"}'),
   (:lara,    'lara@exemplo.test',    null,  '{"display_name":"Lara"}'),
-  (:sofia,   'sofia@alfa.test',      now(), '{"display_name":"Sofia Lopes"}');
+  (:sofia,   'sofia@alfa.test',      now(), '{"display_name":"Sofia Lopes"}'),
+  (:tito,    'tito@exemplo.test',    now(), '{"display_name":"Tito Alves"}'),
+  (:lia,     'lia@exemplo.test',     now(), '{"display_name":"Lia Duarte"}'),
+  (:nilo,    'nilo@exemplo.test',    now(), '{"display_name":"Nilo Costa"}');
 
 -- ---------------------------------------------------------------------------
 -- 0. Primeira entrada de todos (menos Xena e Lara, sem espaço pessoal). Bia anota e cria uma Família: encerrar a licença não apaga nada.
@@ -171,7 +179,7 @@ declare
   p text;
   space jsonb;
 begin
-  foreach p in array array['rita', 'ricardo', 'bia', 'caio', 'duda', 'edu', 'fabi', 'gui', 'hugo', 'iris', 'nando', 'otto', 'gil', 'sofia'] loop
+  foreach p in array array['rita', 'ricardo', 'bia', 'caio', 'duda', 'edu', 'fabi', 'gui', 'hugo', 'iris', 'nando', 'otto', 'gil', 'sofia', 'tito', 'lia', 'nilo'] loop
     perform pg_temp.as_(p);
     space := public.ensure_personal_space('Conta principal');
     insert into ids values (p || '_ctx', (space ->> 'context_id')::uuid), (p || '_acc', (space #>> '{account,id}')::uuid);
@@ -260,15 +268,22 @@ begin
   perform pg_temp.expect_code(format($f$select public.clarevo_staff_add_org_admin(%L, 'ninguem@alfa.test')$f$, pg_temp.id('alfa_o')), 'administrador_sem_conta', 'P0002');
 end $$;
 
--- Só quem roda no SQL Editor (o dono) executa: nem authenticated, nem anon, nem public.
+-- Só quem roda no SQL Editor (o dono) executa: nem authenticated, nem anon, nem public, nem service_role (a chave de serviço do
+-- Supabase, que o 00_auth_shim.sql cria como lá, com execute padrão em tudo).
 do $$
 declare
   f text;
 begin
+  assert exists (select 1 from pg_roles where rolname = 'service_role' and rolbypassrls and not rolinherit and not rolcanlogin),
+    'o papel service_role existe, como no Supabase (sem login, sem herança, ignora a RLS)';
+  -- O teste vale: service_role executa as funções comuns (privilégio padrão), então só as da equipe foram tiradas dele.
+  assert has_function_privilege('service_role', 'public.clarevo_normalize_email(text)', 'execute')
+     and has_function_privilege('service_role', 'public.month_totals(uuid, date)', 'execute'), 'service_role mantém o execute padrão nas outras funções';
   foreach f in array array['clarevo_staff_create_organization(text, integer, text, date, date, text)', 'clarevo_staff_add_org_admin(uuid, text)',
                            'clarevo_staff_update_contract(uuid, integer, date)', 'clarevo_staff_find_admin(text)'] loop
     assert not has_function_privilege('authenticated', 'public.' || f, 'execute') and not has_function_privilege('anon', 'public.' || f, 'execute'),
       'sem execute para authenticated nem anon: ' || f;
+    assert not has_function_privilege('service_role', 'public.' || f, 'execute'), 'sem execute para service_role: ' || f;
     assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                         where n.nspname = 'public' and p.oid = ('public.' || f)::regprocedure
                           and exists (select 1 from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a where a.grantee = 0)),
@@ -285,6 +300,13 @@ select pg_temp.expect_error($f$select public.clarevo_staff_create_organization('
 reset role;
 set role anon;
 select pg_temp.expect_error($f$select public.clarevo_staff_create_organization('Intrusa', 3, 'individual', '2026-10-01', null, 'hugo@exemplo.test')$f$, 'permission denied%');
+select pg_temp.expect_error($f$select public.clarevo_staff_find_admin('hugo@exemplo.test')$f$, 'permission denied%');
+reset role;
+-- service_role: chave de serviço com BYPASSRLS, mas sem execute nas funções da equipe (só o dono do banco, no SQL Editor).
+set role service_role;
+select pg_temp.expect_error($f$select public.clarevo_staff_create_organization('Intrusa', 3, 'individual', '2026-10-01', null, 'hugo@exemplo.test')$f$, 'permission denied%');
+select pg_temp.expect_error(format($f$select public.clarevo_staff_add_org_admin(%L, 'rita@alfa.test')$f$, pg_temp.id('beta_o')), 'permission denied%');
+select pg_temp.expect_error(format($f$select public.clarevo_staff_update_contract(%L, 1000, null)$f$, pg_temp.id('beta_c')), 'permission denied%');
 select pg_temp.expect_error($f$select public.clarevo_staff_find_admin('hugo@exemplo.test')$f$, 'permission denied%');
 reset role;
 do $$ begin
@@ -566,7 +588,8 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- 5. Indicadores de uso (M-1): com menos de 5 pessoas ativas o uso do mês volta nulo; nada de finanças.
+-- 5. Contagens de licenças (M-1): só vagas, convidadas, ativas e encerradas; sem indicador de uso por pessoa (o último acesso saiu
+-- depois da revisão de segurança de 16/10/2026); nada de finanças.
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -576,10 +599,9 @@ begin
   perform pg_temp.as_('rita');
   u := public.organization_usage(pg_temp.id('alfa_o'));
   assert (select array_agg(k order by k collate "C") from jsonb_object_keys(u) k)
-    = array['active', 'ended', 'invited', 'joined_this_month', 'month', 'organization_id', 'seats', 'usage_minimum', 'usage_visible'], 'só contagens: nada de pessoas';
+    = array['active', 'ended', 'invited', 'organization_id', 'seats'], 'só contagens de licenças: nada de pessoas, de acessos nem de uso';
   assert (u ->> 'seats')::int = 6 and (u ->> 'invited')::int = 5 and (u ->> 'active')::int = 1 and (u ->> 'ended')::int = 0
-     and u ->> 'month' = '2026-10-01' and (u ->> 'usage_minimum')::int = 5, 'vagas 6, 5 convidadas, 1 ativa, 0 encerradas; mês 2026-10-01; mínimo 5';
-  assert (u ->> 'usage_visible')::boolean = false and u -> 'joined_this_month' = 'null'::jsonb, 'com 1 pessoa ativa o uso do mês volta nulo';
+     and (u ->> 'organization_id')::uuid = pg_temp.id('alfa_o'), 'vagas 6, 5 convidadas, 1 ativa, 0 encerradas';
   -- Quem não administra a Alfa: nao_encontrado (inclusive o RH de outra empresa e quem tem licença dela).
   foreach c in array array['ricardo', 'hugo', 'iris', 'nando', 'otto', 'bia', 'gil'] loop
     perform pg_temp.as_(c);
@@ -593,7 +615,8 @@ end $$;
 reset role;
 update auth.users set last_sign_in_at = '2026-10-05 12:00:00+00' where id = :bia;
 
--- Mais quatro pessoas aceitam (5 ativas); o acesso delas é marcado no mês, nas bordas do mês em São Paulo, e fora dele.
+-- Mais quatro pessoas aceitam (5 ativas). O último acesso de cada uma (auth.users.last_sign_in_at) não entra em número nenhum: a
+-- resposta tem sempre as mesmas cinco chaves e os mesmos números, qualquer que seja o acesso e com qualquer quantidade de ativas.
 set role authenticated;
 do $$
 declare
@@ -605,14 +628,12 @@ begin
     assert pg_temp.lst('lic_' || n) = 'ativa false false true', 'ativa: ' || n;
   end loop;
   perform pg_temp.as_('rita');
-  -- Todos estes acessos ainda não foram marcados (último acesso nulo) e há 5 ativas: o número aparece, e é zero.
-  assert (public.organization_usage(pg_temp.id('alfa_o')) ->> 'active')::int = 5
-     and (public.organization_usage(pg_temp.id('alfa_o')) ->> 'usage_visible')::boolean = true, 'com 5 pessoas ativas o uso aparece';
+  assert (public.organization_usage(pg_temp.id('alfa_o')) ->> 'active')::int = 5, 'cinco pessoas ativas';
 end $$;
 reset role;
-update auth.users set last_sign_in_at = '2026-10-01 01:00:00+00' where id = :caio;   -- 30/09 22:00 em São Paulo: fora do mês
-update auth.users set last_sign_in_at = '2026-10-31 23:30:00-03' where id = :edu;    -- 31/10 em São Paulo: dentro do mês
-update auth.users set last_sign_in_at = '2026-11-01 01:00:00-03' where id = :fabi;   -- 01/11: fora
+update auth.users set last_sign_in_at = '2026-10-01 01:00:00+00' where id = :caio;
+update auth.users set last_sign_in_at = '2026-10-31 23:30:00-03' where id = :edu;
+update auth.users set last_sign_in_at = '2026-11-01 01:00:00-03' where id = :fabi;
 update auth.users set last_sign_in_at = null where id = :gui;
 set role authenticated;
 do $$
@@ -621,15 +642,19 @@ declare
 begin
   perform pg_temp.as_('rita');
   u := public.organization_usage(pg_temp.id('alfa_o'));
-  assert (u ->> 'joined_this_month')::int = 2 and (u ->> 'active')::int = 5 and (u ->> 'invited')::int = 1 and (u ->> 'ended')::int = 0,
-    'entraram no mês: Bia (05/10) e Edu (31/10 em São Paulo); Caio, Fabi e Gui ficam de fora; 1 convidada (Duda)';
-  -- Sofia, a outra pessoa do RH, lê o mesmo número.
+  assert (select array_agg(k order by k collate "C") from jsonb_object_keys(u) k) = array['active', 'ended', 'invited', 'organization_id', 'seats']
+     and (u ->> 'active')::int = 5 and (u ->> 'invited')::int = 1 and (u ->> 'ended')::int = 0 and (u ->> 'seats')::int = 6,
+    'com 5 ativas e acessos de todo tipo (no mês, nas bordas do mês, fora dele e nenhum): as mesmas cinco chaves, só contagens; 1 convidada (Duda)';
+  assert u::text !~* '(joined|usage|month|sign_in|entr)', 'a resposta não traz indicador de uso nem de acesso';
+  -- Sofia, a outra pessoa do RH, lê os mesmos números.
   perform pg_temp.as_('sofia');
   assert public.organization_usage(pg_temp.id('alfa_o')) = u, 'a segunda pessoa do RH lê os mesmos números';
   -- A empresa Beta é outra: Ricardo lê só o que é da Beta.
   perform pg_temp.as_('ricardo');
   u := public.organization_usage(pg_temp.id('beta_o'));
-  assert (u ->> 'seats')::int = 3 and (u ->> 'invited')::int = 2 and (u ->> 'active')::int = 0 and u -> 'joined_this_month' = 'null'::jsonb, 'Beta: 3 vagas, 2 convidadas, nenhuma ativa';
+  assert (u ->> 'seats')::int = 3 and (u ->> 'invited')::int = 2 and (u ->> 'active')::int = 0 and (u ->> 'ended')::int = 0
+     and (select array_agg(k order by k collate "C") from jsonb_object_keys(u) k) = array['active', 'ended', 'invited', 'organization_id', 'seats'],
+    'Beta: 3 vagas, 2 convidadas, nenhuma ativa';
 end $$;
 
 -- Uma pessoa só ativa por vez (E4): a Bia, com licença na Alfa, não aceita a da Beta.
@@ -775,10 +800,10 @@ begin
   perform pg_temp.expect_code(format($f$select public.end_license(%L, 'em-end-0001')$f$, pg_temp.id('lic_caio')), 'chave_reutilizada', 'PT409');
   v_valid := (select valid_until from public.plan_entitlements where license_id = pg_temp.id('lic_bia'));
   assert pg_temp.lst('lic_bia') = 'encerrada false false true', 'a pessoa continua registrada na licença encerrada';
-  -- Quatro ativas (Caio, Edu, Fabi, Gui) e uma encerrada: com menos de 5 ativas o uso do mês volta nulo de novo.
+  -- Quatro ativas (Caio, Edu, Fabi, Gui) e uma encerrada.
   r := public.organization_usage(pg_temp.id('alfa_o'));
-  assert (r ->> 'active')::int = 4 and (r ->> 'ended')::int = 1 and (r ->> 'usage_visible')::boolean = false and r -> 'joined_this_month' = 'null'::jsonb,
-    'depois de encerrar: 4 ativas, 1 encerrada, uso do mês oculto';
+  assert (r ->> 'active')::int = 4 and (r ->> 'ended')::int = 1 and (select count(*) from jsonb_object_keys(r)) = 5,
+    'depois de encerrar: 4 ativas, 1 encerrada, só contagens';
 end $$;
 reset role;
 do $$ begin
@@ -863,6 +888,171 @@ do $$ begin
      and (select valid_until from public.plan_entitlements where license_id = pg_temp.id('lic_bia3')) is null, 'sem fim: o acesso pleno das licenças ativas fica aberto de novo';
   assert (select valid_until from public.plan_entitlements where license_id = pg_temp.id('lic_otto')) is not null, 'a licença de outro contrato não muda';
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- 9a. Contrato terminado não prende a pessoa (E7): a licença ativa de um contrato que já acabou é encerrada, no fim do contrato, quando a
+-- pessoa aceita o convite de outra empresa; o direito ao plano dela segue a regra dos 30 dias, contados do fim do contrato.
+-- Empresa Antiga (contrato até 31/12/2026, individual) e Empresa Nova (sem fim, familiar); RH das duas: Gil. Hoje: 07/10/2026; depois, 10/01/2027.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  r jsonb;
+begin
+  r := public.clarevo_staff_create_organization('Empresa Antiga', 3, 'individual', '2026-08-01', '2026-12-31', 'gil@gama.test');
+  insert into ids values ('antiga_o', (r ->> 'organization_id')::uuid), ('antiga_c', (r ->> 'contract_id')::uuid);
+  r := public.clarevo_staff_create_organization('Empresa Nova', 5, 'familiar', '2026-08-01', null, 'gil@gama.test');
+  insert into ids values ('nova_o', (r ->> 'organization_id')::uuid), ('nova_c', (r ->> 'contract_id')::uuid);
+end $$;
+set role authenticated;
+do $$
+begin
+  -- Tito e Lia recebem a licença da Antiga (em vigor hoje) e também um convite da Nova, que ainda não aceitam.
+  perform pg_temp.inv('gil', 'antiga_c', array['tito@exemplo.test', 'lia@exemplo.test'], 'em-ant-0001');
+  perform pg_temp.inv('gil', 'nova_c', array['tito@exemplo.test', 'lia@exemplo.test', 'nilo@exemplo.test'], 'em-nov-0001');
+  perform pg_temp.as_('tito');
+  perform public.accept_license(pg_temp.code('tito'), 'em-acc-tito-1');
+  perform pg_temp.as_('lia');
+  perform public.accept_license(pg_temp.code('lia'), 'em-acc-lia-1');
+  assert pg_temp.lst('lic_tito') = 'ativa false false true' and pg_temp.lst('lic_lia') = 'ativa false false true', 'Tito e Lia: licença ativa da Antiga';
+  -- Uma só licença ativa por pessoa continua valendo enquanto o contrato está em vigor.
+  perform pg_temp.as_('tito');
+  perform pg_temp.expect_code(format($f$select public.accept_license(%L, 'em-acc-tito-0')$f$, pg_temp.code('tito2')), 'ja_tem_licenca', 'PT409');
+end $$;
+reset role;
+do $$ begin
+  -- O acesso pleno da licença da Antiga vai até o fim do contrato + 30 dias (30/01/2027, 23:59:59 em São Paulo).
+  assert (select valid_until from public.plan_entitlements where license_id = pg_temp.id('lic_tito')) = ('2027-01-30 23:59:59'::timestamp at time zone 'America/Sao_Paulo'),
+    'o direito de Tito vale até o fim do contrato + 30 dias';
+  -- O backend zera o fim do acesso da Lia (o contrato ganhou o fim fora da função da equipe): a regra dos 30 dias vale do mesmo jeito.
+  update public.plan_entitlements set valid_until = null where license_id = pg_temp.id('lic_lia');
+  perform set_config('test.tito_footprint', pg_temp.footprint('tito'), true);
+end $$;
+
+-- O tempo passa: 10/01/2027. A Antiga terminou em 31/12/2026; a Nova segue em vigor.
+set local clarevo.today = '2027-01-10';
+set role authenticated;
+do $$
+declare
+  r jsonb;
+  v_end timestamptz := '2026-12-31 23:59:59'::timestamp at time zone 'America/Sao_Paulo';
+  v_access timestamptz := '2027-01-30 23:59:59'::timestamp at time zone 'America/Sao_Paulo';
+begin
+  -- Antes de aceitar: na tabela a licença ainda é "ativa", mas quem a recebe a lê como encerrada, com o fim do contrato.
+  perform pg_temp.as_('tito');
+  assert (select count(*) from public.my_benefit) = 1
+     and (select (organization_name, status, ended_at, access_until, contract_ends_on) from public.my_benefit)
+       = ('Empresa Antiga'::text, 'encerrada'::text, v_end, v_access, '2026-12-31'::date), 'my_benefit: contrato terminado, licença encerrada no fim do contrato';
+  perform pg_temp.as_('lia');
+  assert (select (status, ended_at, access_until is null) from public.my_benefit) = ('encerrada'::text, v_end, true), 'Lia: o mesmo, sem fim do acesso gravado';
+  assert pg_temp.lst('lic_tito') = 'ativa false false true', 'na tabela, a licença só é encerrada quando a pessoa aceita outra';
+  -- A empresa vê a situação gravada: sem vaga em vigor, e as licenças ainda ativas contadas.
+  perform pg_temp.as_('gil');
+  r := public.organization_usage(pg_temp.id('antiga_o'));
+  assert (r ->> 'seats')::int = 0 and (r ->> 'active')::int = 2 and (r ->> 'ended')::int = 0, 'Antiga: 0 vagas em vigor, 2 ativas gravadas';
+  -- Um aceite que falha não encerra nada (a mesma transação desfaz tudo): código de outra pessoa.
+  perform pg_temp.as_('lia');
+  assert pg_temp.err(format($f$select public.accept_license(%L, 'em-acc-lia-0')$f$, pg_temp.code('tito2'))) = 'convite_invalido|P0002||', 'código de outra pessoa: convite_invalido';
+  assert pg_temp.lst('lic_lia') = 'ativa false false true', 'o aceite recusado não encerrou a licença da Antiga';
+
+  -- Tito aceita o convite da Nova: antes era ja_tem_licenca, e agora a licença da Antiga se encerra no fim do contrato.
+  perform pg_temp.as_('tito');
+  r := public.accept_license(pg_temp.code('tito2'), 'em-acc-tito-2');
+  assert r ->> 'status' = 'ativa' and r ->> 'organization_name' = 'Empresa Nova' and r ->> 'plan' = 'familiar' and r ->> 'ended_at' is null
+     and r ->> 'access_until' is null, 'Tito: licença ativa da Nova (familiar, sem fim)';
+  assert public.accept_license(pg_temp.code('tito2'), 'em-acc-tito-2') = r, 'repetir a chave devolve o mesmo resultado';
+  perform pg_temp.as_('lia');
+  perform public.accept_license(pg_temp.code('lia2'), 'em-acc-lia-2');
+  -- Quem recebe lê os dois benefícios: o da Antiga, encerrado no fim do contrato, e o da Nova, ativo.
+  perform pg_temp.as_('tito');
+  assert (select count(*) from public.my_benefit) = 2
+     and (select (status, ended_at, access_until) from public.my_benefit where organization_name = 'Empresa Antiga') = ('encerrada'::text, v_end, v_access)
+     and (select (status, ended_at is null, access_until is null) from public.my_benefit where organization_name = 'Empresa Nova') = ('ativa'::text, true, true),
+    'Tito lê os dois benefícios';
+  -- A empresa vê o mesmo que a tabela guarda agora: nenhuma ativa na Antiga, duas encerradas; a Nova tem duas ativas e uma convidada.
+  perform pg_temp.as_('gil');
+  r := public.organization_usage(pg_temp.id('antiga_o'));
+  assert (r ->> 'active')::int = 0 and (r ->> 'ended')::int = 2, 'Antiga: 0 ativas, 2 encerradas';
+  r := public.organization_usage(pg_temp.id('nova_o'));
+  assert (r ->> 'seats')::int = 5 and (r ->> 'active')::int = 2 and (r ->> 'invited')::int = 1 and (r ->> 'ended')::int = 0, 'Nova: 5 vagas, 2 ativas, 1 convidada';
+end $$;
+reset role;
+do $$
+declare
+  v_end timestamptz := '2026-12-31 23:59:59'::timestamp at time zone 'America/Sao_Paulo';
+  v_access timestamptz := '2027-01-30 23:59:59'::timestamp at time zone 'America/Sao_Paulo';
+  n text;
+begin
+  foreach n in array array['tito', 'lia'] loop
+    assert pg_temp.lst('lic_' || n) = 'encerrada false false true', 'licença da Antiga encerrada, com a pessoa e sem resumo de código: ' || n;
+    assert (select ended_at from public.licenses where id = pg_temp.id('lic_' || n)) = v_end, 'ended_at é o fim do contrato (31/12/2026, 23:59:59 em São Paulo): ' || n;
+    assert (select valid_until from public.plan_entitlements where license_id = pg_temp.id('lic_' || n)) = v_access
+       and v_access = v_end + interval '30 days', 'o direito ao plano vale o fim do contrato + 30 dias (também quando o fim estava em branco): ' || n;
+    assert pg_temp.lst('lic_' || n || '2') = 'ativa false false true'
+       and (select (plan, valid_until is null, source::text) from public.plan_entitlements where license_id = pg_temp.id('lic_' || n || '2')) = ('familiar'::text, true, 'beneficio'::text),
+      'a licença da Nova ficou ativa, com o direito de origem benefício: ' || n;
+    assert (select count(*) from public.licenses where person_id = pg_temp.id(n) and status = 'ativa') = 1, 'uma licença ativa por pessoa: ' || n;
+  end loop;
+  assert pg_temp.footprint('tito') = current_setting('test.tito_footprint'), 'encerrar pelo contrato não apagou conta, histórico nem Família de Tito';
+end $$;
+set local clarevo.today = '2026-10-07';
+
+-- ---------------------------------------------------------------------------
+-- 9b. Apagar a conta de quem já teve licença (E8): a licença encerrada aceita só person_id passar a nulo (o `on delete set null` da
+-- fundação). Nilo aceita a licença da Nova e o RH a encerra; ao apagar a conta (primeiro o espaço pessoal), a licença fica como
+-- história da empresa, sem pessoa e com o resto igual. Licença ativa segue exigindo pessoa: a empresa encerra antes.
+-- ---------------------------------------------------------------------------
+create function pg_temp.drop_account(p_person text) returns void language plpgsql as $$
+begin
+  delete from public.financial_contexts where owner_person_id = pg_temp.id(p_person);
+  delete from auth.users where id = pg_temp.id(p_person);
+end $$;
+set role authenticated;
+do $$
+declare
+  r jsonb;
+begin
+  perform pg_temp.as_('nilo');
+  perform public.accept_license(pg_temp.code('nilo'), 'em-acc-nilo-1');
+  perform pg_temp.as_('gil');
+  r := public.end_license(pg_temp.id('lic_nilo'), 'em-end-nilo');
+  assert r #>> '{license,status}' = 'encerrada', 'a empresa encerrou a licença do Nilo';
+  assert (public.organization_usage(pg_temp.id('nova_o')) ->> 'ended')::int = 1, 'Nova: 1 encerrada';
+end $$;
+reset role;
+create temp table lic_before as select * from public.licenses where id = pg_temp.id('lic_nilo');
+do $$
+begin
+  assert (select person_id from lic_before) = pg_temp.id('nilo') and (select status from lic_before) = 'encerrada', 'antes: encerrada, ainda com a pessoa';
+  -- Licença ativa: apagar a conta é recusado até a empresa encerrar (a pessoa da licença não pode ficar nula); a transação desfaz o resto.
+  perform pg_temp.expect_code($f$select pg_temp.drop_account('tito')$f$, 'campo_imutavel', '42501');
+  assert exists (select 1 from auth.users where id = pg_temp.id('tito')) and exists (select 1 from public.financial_contexts where owner_person_id = pg_temp.id('tito')),
+    'a conta de quem tem licença ativa continua inteira';
+  -- Licença encerrada: apagar a conta funciona.
+  perform pg_temp.drop_account('nilo');
+  assert not exists (select 1 from auth.users where id = pg_temp.id('nilo')) and not exists (select 1 from public.persons where id = pg_temp.id('nilo')), 'a conta do Nilo foi apagada';
+  assert (select count(*) from public.licenses where id = pg_temp.id('lic_nilo')) = 1, 'a licença continua como história da empresa';
+  assert (select person_id from public.licenses where id = pg_temp.id('lic_nilo')) is null, 'a licença ficou com person_id nulo';
+  assert (select (l.contract_id, l.invited_email, l.status::text, l.created_at, l.invited_at, l.activated_at, l.ended_at, l.cancelled_at, l.code_hash)
+            from public.licenses l where l.id = pg_temp.id('lic_nilo'))
+       = (select (b.contract_id, b.invited_email, b.status::text, b.created_at, b.invited_at, b.activated_at, b.ended_at, b.cancelled_at, b.code_hash) from lic_before b),
+    'o resto da linha não mudou';
+  assert not exists (select 1 from public.plan_entitlements where license_id = pg_temp.id('lic_nilo')), 'o direito ao plano da pessoa saiu com a conta';
+  assert not exists (select 1 from public.record_operations where actor_id = pg_temp.id('nilo')), 'as operações da pessoa saíram com a conta';
+  assert pg_temp.lst('lic_nilo') = 'encerrada false false false', 'encerrada, sem pessoa, sem resumo do código';
+  -- A licença sem pessoa não muda mais: nada entra de volta.
+  perform pg_temp.expect_code(format($f$update public.licenses set person_id = %L where id = %L$f$, pg_temp.id('hugo'), pg_temp.id('lic_nilo')), 'campo_imutavel', '42501');
+  perform pg_temp.expect_code(format($f$update public.licenses set status = 'ativa', ended_at = null where id = %L$f$, pg_temp.id('lic_nilo')), 'campo_imutavel', '42501');
+end $$;
+set role authenticated;
+do $$
+begin
+  -- A empresa continua contando a licença encerrada e não vê quem foi (nem que a conta foi apagada).
+  perform pg_temp.as_('gil');
+  assert (public.organization_usage(pg_temp.id('nova_o')) ->> 'ended')::int = 1 and (public.organization_usage(pg_temp.id('nova_o')) ->> 'active')::int = 2, 'Nova: 1 encerrada, 2 ativas';
+  assert (select count(*) from public.licenses where status = 'encerrada' and contract_id = pg_temp.id('nova_c')) = 1, 'o RH ainda lê a licença encerrada';
+end $$;
+reset role;
+drop table lic_before;
 
 -- ---------------------------------------------------------------------------
 -- 10. A empresa não lê finanças, Família, contas nem atividade de ninguém, e ninguém grava licença direto.
@@ -1012,6 +1202,12 @@ do $$ begin
   perform pg_temp.expect_code(format($f$update public.licenses set status = 'ativa', ended_at = null where id = %L$f$, pg_temp.id('lic_bia')), 'campo_imutavel', '42501');
   perform pg_temp.expect_code(format($f$update public.licenses set ended_at = now() + interval '1 day' where id = %L$f$, pg_temp.id('lic_bia')), 'campo_imutavel', '42501');
   perform pg_temp.expect_code(format($f$update public.licenses set status = 'convidada', ended_at = null, activated_at = null, person_id = null where id = %L$f$, pg_temp.id('lic_duda')), 'campo_imutavel', '42501');
+  -- A única mudança aceita numa licença encerrada é person_id passar a nulo (conta apagada, seção 9b), com o resto igual: trocar a
+  -- pessoa, anular junto com outra mudança ou anular a pessoa de uma licença ativa continua recusado.
+  perform pg_temp.expect_code(format($f$update public.licenses set person_id = %L where id = %L$f$, pg_temp.id('hugo'), pg_temp.id('lic_bia')), 'campo_imutavel', '42501');
+  perform pg_temp.expect_code(format($f$update public.licenses set person_id = null, ended_at = ended_at + interval '1 day' where id = %L$f$, pg_temp.id('lic_bia')), 'campo_imutavel', '42501');
+  perform pg_temp.expect_code(format($f$update public.licenses set person_id = null, activated_at = null where id = %L$f$, pg_temp.id('lic_bia')), 'campo_imutavel', '42501');
+  perform pg_temp.expect_code(format($f$update public.licenses set person_id = null where id = %L$f$, pg_temp.id('lic_gui')), 'campo_imutavel', '42501');
   -- Convidada: o aceite exige pessoa, data e o resumo zerado; o cancelamento exige a data e o resumo zerado.
   perform pg_temp.expect_code(format($f$update public.licenses set status = 'ativa' where id = %L$f$, pg_temp.id('lic_bia2')), 'campo_imutavel', '42501');
   perform pg_temp.expect_code(format($f$update public.licenses set status = 'encerrada', code_hash = null where id = %L$f$, pg_temp.id('lic_bia2')), 'campo_imutavel', '42501');
@@ -1034,7 +1230,7 @@ begin
                            'clarevo_staff_find_admin(text)', 'clarevo_staff_create_organization(text, integer, text, date, date, text)',
                            'clarevo_staff_add_org_admin(uuid, text)', 'clarevo_staff_update_contract(uuid, integer, date)',
                            'clarevo_normalize_email(text)', 'clarevo_email_valid(text)', 'clarevo_contract_open(uuid, date)',
-                           'clarevo_contract_access_until(date)', 'clarevo_contract_used(uuid)', 'clarevo_license_json(uuid)',
+                           'clarevo_contract_access_until(date)', 'clarevo_contract_ended_at(date)', 'clarevo_contract_used(uuid)', 'clarevo_license_json(uuid)',
                            'clarevo_benefit_json(uuid)', 'clarevo_require_contract_admin(uuid)', 'clarevo_session_email()',
                            'licenses_guard()', 'licenses_seats_guard()', 'benefit_contracts_guard()'] loop
     v_def := pg_get_functiondef(('public.' || f)::regprocedure);
@@ -1043,9 +1239,10 @@ begin
   v_def := pg_get_viewdef('public.my_benefit'::regclass);
   assert v_def !~* v_fin, 'my_benefit não lê dados financeiros';
   assert v_def ~* 'auth\.uid\(\)' and (select reloptions from pg_class where oid = 'public.my_benefit'::regclass) @> array['security_barrier=true'], 'my_benefit filtra pela sessão';
-  -- organization_usage lê licenças, contratos, persons (fuso) e o último acesso, e mais nada.
+  -- organization_usage lê só licenças e contratos: nem auth.users (o último acesso de ninguém), nem persons, nem operações.
   v_def := pg_get_functiondef('public.organization_usage(uuid)'::regprocedure);
-  assert v_def ~* 'auth\.users' and v_def ~* 'last_sign_in_at' and v_def !~* 'record_operations', 'organization_usage lê só licenças, contratos e o último acesso';
+  assert v_def !~* 'auth\.users' and v_def !~* 'last_sign_in_at' and v_def !~* 'persons' and v_def !~* 'record_operations'
+     and v_def ~* 'public\.licenses' and v_def ~* 'public\.benefit_contracts', 'organization_usage lê só licenças e contratos';
   assert v_def ~* 'security definer' and v_def ~* 'search_path', 'security definer com search_path fixo';
   -- Todas as funções novas: security definer com search_path fixo (as guardas são gatilhos do dono da tabela, só com search_path).
   assert (select count(*) from pg_proc p where p.oid in (
@@ -1068,7 +1265,7 @@ begin
   end loop;
   -- Apoio e gatilhos: ninguém com sessão executa.
   foreach f in array array['clarevo_normalize_email(text)', 'clarevo_email_valid(text)', 'clarevo_contract_open(uuid, date)', 'clarevo_contract_access_until(date)',
-                           'clarevo_contract_used(uuid)', 'clarevo_license_json(uuid)', 'clarevo_benefit_json(uuid)', 'clarevo_require_contract_admin(uuid)',
+                           'clarevo_contract_ended_at(date)', 'clarevo_contract_used(uuid)', 'clarevo_license_json(uuid)', 'clarevo_benefit_json(uuid)', 'clarevo_require_contract_admin(uuid)',
                            'clarevo_session_email()', 'licenses_guard()', 'licenses_seats_guard()', 'benefit_contracts_guard()'] loop
     assert not has_function_privilege('authenticated', 'public.' || f, 'execute') and not has_function_privilege('anon', 'public.' || f, 'execute'),
       'sem execute para authenticated nem anon: ' || f;

@@ -34,7 +34,7 @@ Versão de 15/10/2026, atualizada em 16/10/2026: o **Ciclo L (Família) foi impl
 
 ## Ciclo M: painel de empresas
 
-**Feito em 16/10/2026 (D-056).** Enzo aceitou as recomendações M-1 a M-6; o banco (migração 0014), o core, o app (web) e os testes entraram juntos. Em resumo: o painel só existe na web (`/empresa`, em Conta › Painel da empresa); o RH vê vagas, convites, licenças e, a partir de 5 pessoas ativas, quantas entraram no mês, nunca finanças; o convite é um link de uso único que o RH envia pelo canal interno; as quatro funções `clarevo_staff_*` só rodam no SQL Editor; a licença só é gravada por `invite_licenses`, `renew_license_invite`, `cancel_license_invite`, `end_license` e `accept_license`; o fim do benefício dá 30 dias de acesso pleno e nada é apagado. As decisões de detalhe que não estavam em M-1 a M-6 são proposta do Claude, revisáveis por Enzo (`docs/00`, D-056 (5)).
+**Feito em 16/10/2026 (D-056).** Enzo aceitou as recomendações M-1 a M-6; o banco (migração 0014), o core, o app (web) e os testes entraram juntos. Em resumo: o painel só existe na web (`/empresa`, em Conta › Painel da empresa); o RH vê vagas, convites, licenças e só as contagens de licenças, nunca finanças nem o uso do app (**o indicador de entradas no mês saiu depois da revisão de segurança de 16/10/2026, pelo risco de identificar pessoas: o RH vê o e-mail de cada licença e pode controlar contas próprias; o RH vê só as contagens de licenças**); o convite é um link de uso único que o RH envia pelo canal interno; as quatro funções `clarevo_staff_*` só rodam no SQL Editor; a licença só é gravada por `invite_licenses`, `renew_license_invite`, `cancel_license_invite`, `end_license` e `accept_license`; o fim do benefício dá 30 dias de acesso pleno e nada é apagado. As decisões de detalhe que não estavam em M-1 a M-6 são proposta do Claude, revisáveis por Enzo (`docs/00`, D-056 (5)).
 
 ### Proposta
 
@@ -49,7 +49,7 @@ Versão de 15/10/2026, atualizada em 16/10/2026: o **Ciclo L (Família) foi impl
 
 | Nº | Pergunta | Recomendação |
 |---|---|---|
-| M-1 | O RH pode ver algum indicador somado e anônimo (por exemplo, "70% das pessoas usaram o app no mês")? | Só uso do app (licenças ativas e pessoas que entraram no mês), nunca finanças. Mudar isso exige rever a promessa "Quem vê estes dados?" e o contrato |
+| M-1 | O RH pode ver algum indicador somado e anônimo (por exemplo, "70% das pessoas usaram o app no mês")? | Só as contagens de licenças (vagas, convidadas, ativas e encerradas), nunca finanças nem o uso do app. A resposta aceita em 16/10/2026 incluía "pessoas que entraram no mês"; esse indicador saiu depois da revisão de segurança do mesmo dia, pelo risco de identificar pessoas (o RH vê o e-mail de cada licença). Mudar isso exige rever a promessa "Quem vê estes dados?" e o contrato |
 | M-2 | Como o convite chega às pessoas? | Link de convite da empresa que o RH envia pelo canal interno (sem custo). E-mail pelo Clarevo depende de P-008 |
 | M-3 | Quem cria a empresa no sistema? | A equipe Clarevo, a partir do contrato assinado |
 | M-4 | Prazo de acesso depois do fim do benefício (P-004) | 30 dias de acesso pleno, depois plano gratuito com leitura |

@@ -2969,36 +2969,14 @@ function toBenefit(r: Record<string, unknown> | null | undefined): Benefit {
   };
 }
 
-/** Quatro contagens inteiras e o mês; joinedThisMonth nulo só quando o uso não é visível. */
+/** Quatro contagens inteiras de licenças (vagas, convidadas, ativas e encerradas) e a organização; nada de acesso ao app. */
 function toUsage(data: unknown): CompanyUsage {
   const r = data as Record<string, unknown> | null;
   const int = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0;
-  if (
-    !r ||
-    typeof r.organization_id !== 'string' ||
-    typeof r.month !== 'string' ||
-    !int(r.seats) ||
-    !int(r.invited) ||
-    !int(r.active) ||
-    !int(r.ended) ||
-    !int(r.usage_minimum) ||
-    typeof r.usage_visible !== 'boolean' ||
-    (r.usage_visible ? !int(r.joined_this_month) : r.joined_this_month !== null) ||
-    r.usage_visible !== r.active >= r.usage_minimum
-  ) {
+  if (!r || typeof r.organization_id !== 'string' || !int(r.seats) || !int(r.invited) || !int(r.active) || !int(r.ended)) {
     throw new RepoError('desconhecido', 'uso_inconsistente');
   }
-  return {
-    organizationId: r.organization_id,
-    month: r.month,
-    seats: r.seats,
-    invited: r.invited,
-    active: r.active,
-    ended: r.ended,
-    joinedThisMonth: r.usage_visible ? (r.joined_this_month as number) : null,
-    usageVisible: r.usage_visible,
-    usageMinimum: r.usage_minimum,
-  };
+  return { organizationId: r.organization_id, seats: r.seats, invited: r.invited, active: r.active, ended: r.ended };
 }
 
 /** Linha de family_member_items. */

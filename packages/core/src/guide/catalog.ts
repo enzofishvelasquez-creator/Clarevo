@@ -683,7 +683,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     id: 'painel-da-empresa',
     group: 'conta-e-privacidade',
     title: 'Painel da empresa',
-    purpose: 'Para quem administra o benefício de uma empresa: convida pessoas por link, acompanha as licenças e vê números de uso. Só na web, e a empresa nunca vê os registros de ninguém.',
+    purpose: 'Para quem administra o benefício de uma empresa: convida pessoas por link e acompanha as vagas e as licenças. Só na web, e a empresa nunca vê os registros de ninguém, nem quem usa o app.',
     where: [ACCOUNT_SCREEN, COMPANY_TEXT.accountTitle],
     steps: [
       `Na web, em Conta, no card ${q(COMPANY_TEXT.accountTitle)}, toque em ${q(COMPANY_TEXT.accountOpen)}. O card só aparece para quem administra uma empresa.`,
@@ -691,7 +691,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Em ${q(COMPANY_TEXT.inviteTitle)}, cole os e-mails, um por linha ou separados por vírgula, confira a lista e confirme. Cada pessoa recebe um link de uso único.`,
       `Em ${q(COMPANY_TEXT.linksTitle)}, use ${q(COMPANY_TEXT.copyAll)} ou ${q(COMPANY_TEXT.download)} e envie cada link pelo canal interno da empresa. O Clarevo não envia e-mail, e os links aparecem só nessa hora.`,
       `Em ${q(COMPANY_TEXT.licensesTitle)}, filtre pela situação e use ${list([COMPANY_TEXT.renew, COMPANY_TEXT.cancelInvite, COMPANY_TEXT.end], 'ou')}. Quem tem a licença encerrada mantém conta, histórico e Família, com 30 dias de acesso pleno.`,
-      `Em ${q(COMPANY_TEXT.usageTitle)}, veja só números, sem dizer quem entrou. Em ${q(COMPANY_TEXT.promoTitle)}, copie textos prontos para divulgar o benefício.`,
+      `Em ${q(COMPANY_TEXT.usageTitle)}, veja só a contagem de vagas, convites e licenças: o painel não mostra quem entrou no app. Em ${q(COMPANY_TEXT.promoTitle)}, copie textos prontos para divulgar o benefício.`,
     ],
     screenName: COMPANY_TEXT.title,
     href: '/empresa',

@@ -31,7 +31,6 @@ import {
   INVITE_CODE_PATTERN,
   LICENSE_BATCH_MAX,
   LICENSE_CODE_PATTERN,
-  USAGE_MIN_ACTIVE,
   isValidEmail,
   licenseCodeHash,
   licenseLink,
@@ -7543,6 +7542,11 @@ describe('API real: Empresas (Ciclo M, D-056)', () => {
   const byEmail = async (who: SupabaseRepository, org: string, email: string) => (await licensesOf(who, org)).filter((l) => l.email === email);
   const count = (query: string) => Number(adminSql(query));
   const emailsOf = (r: { results: { email: string }[] }) => r.results.map((x) => x.email);
+  /** A recusa é de privilégio (permission denied, 42501), não só "algum erro". */
+  const denied = (error: { message?: string; code?: string } | null, label: string) => {
+    expect(error?.message, label).toMatch(/permission denied/);
+    expect(error?.code, label).toBe('42501');
+  };
 
   beforeAll(async () => {
     adminSql(
@@ -7588,13 +7592,13 @@ describe('API real: Empresas (Ciclo M, D-056)', () => {
         ['clarevo_staff_update_contract', { p_contract: alfa.contract, p_seats: 99, p_ends_on: null }],
         ['clarevo_staff_find_admin', { p_email: 'bruno@exemplo.test' }],
       ] as const) {
-        expect((await who.rpc(fn, args as Record<string, unknown>)).error, fn).not.toBeNull();
+        denied((await who.rpc(fn, args as Record<string, unknown>)).error, fn);
       }
     }
-    expect((await sql(ANA).from('organizations').insert({ name: 'Minha empresa' })).error).not.toBeNull();
-    expect((await sql(BRUNO).from('organization_admins').insert({ organization_id: alfa.org, person_id: BRUNO })).error).not.toBeNull();
-    expect((await sql(ANA).from('benefit_contracts').insert({ organization_id: alfa.org, seats: 999, plan: 'individual', starts_on: '2026-10-01' })).error).not.toBeNull();
-    expect((await sql(ANA).from('benefit_contracts').update({ seats: 999 }).eq('id', alfa.contract)).error).not.toBeNull();
+    denied((await sql(ANA).from('organizations').insert({ name: 'Minha empresa' })).error, 'organizations insert');
+    denied((await sql(BRUNO).from('organization_admins').insert({ organization_id: alfa.org, person_id: BRUNO })).error, 'organization_admins insert');
+    denied((await sql(ANA).from('benefit_contracts').insert({ organization_id: alfa.org, seats: 999, plan: 'individual', starts_on: '2026-10-01' })).error, 'benefit_contracts insert');
+    denied((await sql(ANA).from('benefit_contracts').update({ seats: 999 }).eq('id', alfa.contract)).error, 'benefit_contracts update');
     expect(count(`select seats from public.benefit_contracts where id = '${alfa.contract}'`)).toBe(6);
 
     // Cada administradora lê só a própria organização; quem não administra nada não lê nenhuma.
@@ -7705,7 +7709,7 @@ describe('API real: Empresas (Ciclo M, D-056)', () => {
     expect((await sql(DAVI).from('licenses').select('id')).data).toEqual([]);
   });
 
-  it('4. convite que não vale: de outra pessoa, malformado, inexistente e sem espaço dizem o mesmo (convite_invalido)', async () => {
+  it('4. convite que não vale: de outra pessoa, malformado e inexistente dizem o mesmo (convite_invalido); conta sem espaço pessoal (sem persons) responde sem_permissao para qualquer código', async () => {
     const stranger = 'b'.repeat(32);
     for (const who of [davi, carla, fabio, hana, eva]) expect(await err(who.previewLicenseInvite(codes.bruno!))).toBe('convite_invalido');
     for (const code of [stranger, 'não é um código', '', 'b'.repeat(31), 'B'.repeat(33)]) {
@@ -7715,8 +7719,14 @@ describe('API real: Empresas (Ciclo M, D-056)', () => {
     // O e-mail da conta tem de ser o do convite: Carla, Davi e Fábio com o código do Bruno, e o do Bruno com o de outra pessoa.
     for (const who of [carla, davi, fabio, hana, gil]) expect(await err(who.acceptLicense(newOperationKey(), codes.bruno!))).toBe('convite_invalido');
     expect(await err(bruno.acceptLicense(newOperationKey(), codes.carla!))).toBe('convite_invalido');
-    // Eva não confirmou o e-mail e não tem espaço: a resposta é a mesma para qualquer código, o que vale ou o que nem existe.
-    for (const code of [codes.bruno!, stranger]) expect(await err(eva.acceptLicense(newOperationKey(), code))).toBe('sem_permissao');
+    // Eva não confirmou o e-mail e não tem espaço (sem linha em persons): a resposta é sempre sem_permissao, para o código que vale e
+    // para o que nem existe...
+    for (const code of [codes.bruno!, stranger]) expect(await err(eva.acceptLicense(newOperationKey(), code)), code).toBe('sem_permissao');
+    // ...e também direto no banco, com o código malformado ou vazio (o repositório já recusa esses antes de chamar o banco, como convite_invalido).
+    for (const code of ['não é um código', 'b'.repeat(31), 'B'.repeat(33), '']) {
+      const raw = await sql(EVA).rpc('accept_license', { p_code: code, p_key: newOperationKey() });
+      expect(raw.error?.message, `direto no banco: "${code}"`).toBe('sem_permissao');
+    }
     // Sem sessão não há prévia nem aceite.
     const anon = clientFor(null);
     expect((await anon.rpc('preview_license_invite', { p_code: codes.bruno })).error).not.toBeNull();
@@ -7770,30 +7780,29 @@ describe('API real: Empresas (Ciclo M, D-056)', () => {
     expect(count(`select count(*) from public.licenses where contract_id = '${alfa.contract}' and status = 'ativa'`)).toBe(4);
   });
 
-  it('6. uso: números de licenças e "entraram no mês" só a partir de 5 pessoas ativas, e só contagens', async () => {
+  it('6. contagens de licenças: só vagas, convidadas, ativas e encerradas; nenhum indicador de uso nem de acesso', async () => {
     const before = await ana.getCompanyUsage(alfa.org);
-    expect(before).toEqual({ organizationId: alfa.org, month: '2026-10-01', seats: 6, invited: 2, active: 4, ended: 0, joinedThisMonth: null, usageVisible: false, usageMinimum: USAGE_MIN_ACTIVE });
-    // O último acesso: Bruno e Carla em outubro (Carla à 0h01 de São Paulo, 1.º de outubro), Davi uma hora antes (30 de setembro em São Paulo), Fábio em setembro.
+    expect(before).toEqual({ organizationId: alfa.org, seats: 6, invited: 2, active: 4, ended: 0 });
+    // O último acesso de cada pessoa (auth.users.last_sign_in_at) não entra em número nenhum, com qualquer valor.
     adminSql(`update auth.users set last_sign_in_at = '2026-10-06T12:00:00Z' where id = '${BRUNO}'`);
     adminSql(`update auth.users set last_sign_in_at = '2026-10-01T03:00:00Z' where id = '${CARLA}'`);
     adminSql(`update auth.users set last_sign_in_at = '2026-10-01T02:59:00Z' where id = '${DAVI}'`);
     adminSql(`update auth.users set last_sign_in_at = '2026-09-15T12:00:00Z' where id = '${FABIO}'`);
-    // Com 4 pessoas ativas, o número do mês continua escondido, mesmo com acessos.
-    expect((await ana.getCompanyUsage(alfa.org)).joinedThisMonth).toBeNull();
+    expect(await ana.getCompanyUsage(alfa.org)).toEqual(before);
 
     expect(await gil.acceptLicense(newOperationKey(), codes.gil!)).toMatchObject({ licenseId: licenseIds.gil, status: 'ativa' });
     const usage = await ana.getCompanyUsage(alfa.org);
-    expect(usage).toEqual({ organizationId: alfa.org, month: '2026-10-01', seats: 6, invited: 1, active: 5, ended: 0, joinedThisMonth: 2, usageVisible: true, usageMinimum: 5 });
-    // A resposta crua só tem contagens: nenhuma pessoa, e-mail, valor ou data de acesso.
+    expect(usage).toEqual({ organizationId: alfa.org, seats: 6, invited: 1, active: 5, ended: 0 });
+    // A resposta crua só tem contagens: nenhuma pessoa, e-mail, valor ou data de acesso, com 4 ou com 5 pessoas ativas.
     const raw = await sql(ANA).rpc('organization_usage', { p_org: alfa.org });
     expect(raw.error).toBeNull();
-    expect(Object.keys(raw.data as object).sort()).toEqual(['active', 'ended', 'invited', 'joined_this_month', 'month', 'organization_id', 'seats', 'usage_minimum', 'usage_visible']);
-    expect(JSON.stringify(raw.data)).not.toMatch(new RegExp(`${BRUNO}|${CARLA}|${GIL}|@|2026-10-06`));
+    expect(Object.keys(raw.data as object).sort()).toEqual(['active', 'ended', 'invited', 'organization_id', 'seats']);
+    expect(JSON.stringify(raw.data)).not.toMatch(new RegExp(`${BRUNO}|${CARLA}|${GIL}|@|2026-10-0|joined|usage|month`));
     // Só quem administra a organização lê o uso; as outras pessoas recebem o mesmo "não encontrado" de uma organização que não existe.
     for (const who of [bruno, davi, eva, gil]) expect(await err(who.getCompanyUsage(alfa.org))).toBe('nao_encontrado');
     expect(await err(ana.getCompanyUsage(beta.org))).toBe('nao_encontrado');
     expect(await err(ana.getCompanyUsage(randomUUID()))).toBe('nao_encontrado');
-    expect(await davi.getCompanyUsage(beta.org)).toMatchObject({ seats: 3, invited: 0, active: 0, ended: 0, joinedThisMonth: null, usageVisible: false });
+    expect(await davi.getCompanyUsage(beta.org)).toEqual({ organizationId: beta.org, seats: 3, invited: 0, active: 0, ended: 0 });
     // O uso não conta como anotação de ninguém: o Gil, que só aceitou o benefício, segue sem atividade.
     expect(await gil.getReturnReviewState((await gil.getSpace())!.personalContextId)).toMatchObject({ activity: null });
   });
@@ -7899,7 +7908,7 @@ describe('API real: Empresas (Ciclo M, D-056)', () => {
     expect(count(`select count(*) from public.persons where id = '${FABIO}'`)).toBe(1);
     // A vaga volta (a licença encerrada não conta); os números mostram uma encerrada e a pessoa não é identificada.
     const usage = await ana.getCompanyUsage(alfa.org);
-    expect(usage).toMatchObject({ seats: 6, invited: 1, active: 4, ended: 1, joinedThisMonth: null, usageVisible: false });
+    expect(usage).toEqual({ organizationId: alfa.org, seats: 6, invited: 1, active: 4, ended: 1 });
     expect((await byEmail(ana, alfa.org, 'fabio@exemplo.test'))[0]).toMatchObject({ status: 'encerrada', cancelledAt: null });
     // Quem teve a licença encerrada pode ser convidado de novo, em outra licença (a antiga fica no histórico).
     expect(await ana.inviteLicenses(newOperationKey(), alfa.contract, ['fabio@exemplo.test'])).toMatchObject({ inUse: 6 });
@@ -7964,6 +7973,19 @@ describe('API real: Empresas (Ciclo M, D-056)', () => {
     expect(await err(ana.renewLicenseInvite(newOperationKey(), fresh.license.id))).toBe('contrato_nao_vigente');
     expect((await ana.getCompanyUsage(alfa.org)).seats).toBe(0);
     expect(Date.parse((await bruno.getMyBenefit())!.accessUntil!)).toBe(Date.parse('2026-11-05T02:59:59Z'));
+    // O contrato da Alfa terminou: o Bruno já lê a licença como encerrada, no fim do contrato (5 de outubro, 23:59:59 em São Paulo)...
+    expect(await bruno.getMyBenefit()).toMatchObject({ status: 'encerrada', contractEndsOn: '2026-10-05' });
+    expect(Date.parse((await bruno.getMyBenefit())!.endedAt!)).toBe(Date.parse('2026-10-06T02:59:59Z'));
+    // ...e ela não o prende: ele aceita o convite de outra empresa (a Nova) e a licença da Alfa se encerra de verdade, no fim do contrato,
+    // com o direito ao plano de 30 dias contados dali.
+    const nova = staff(`select public.clarevo_staff_create_organization('Empresa Nova', 3, 'familiar', '2026-10-01', null, 'ana@exemplo.test')`);
+    const novaInvite = (await ana.inviteLicenses(newOperationKey(), nova.contract_id!, ['bruno@exemplo.test'])).results[0]!;
+    expect(count(`select count(*) from public.licenses where id = '${licenseIds.bruno}' and status = 'ativa'`)).toBe(1);
+    expect(await bruno.acceptLicense(newOperationKey(), novaInvite.code!)).toMatchObject({ status: 'ativa', organizationName: 'Empresa Nova', plan: 'familiar' });
+    expect(count(`select count(*) from public.licenses where id = '${licenseIds.bruno}' and status = 'encerrada' and ended_at = '2026-10-05 23:59:59-03'`)).toBe(1);
+    expect(count(`select count(*) from public.plan_entitlements where license_id = '${licenseIds.bruno}' and valid_until = '2026-11-04 23:59:59-03'`)).toBe(1);
+    expect(count(`select count(*) from public.licenses where person_id = '${BRUNO}' and status = 'ativa'`)).toBe(1);
+    expect(await bruno.getMyBenefit()).toMatchObject({ status: 'ativa', organizationName: 'Empresa Nova', contractEndsOn: null });
     // A equipe prorroga: o mesmo convite volta a valer e o aceite cria o direito com o fim + 30 dias.
     staff(`select public.clarevo_staff_update_contract('${alfa.contract}', 8, '2026-12-31')`);
     expect(await hana.previewLicenseInvite(fresh.code!)).toEqual({ organizationName: 'Empresa Alfa', plan: 'individual' });
@@ -7973,7 +7995,7 @@ describe('API real: Empresas (Ciclo M, D-056)', () => {
     // Sem fim de novo: o acesso fica aberto para todas as licenças ativas.
     expect(staff(`select public.clarevo_staff_update_contract('${alfa.contract}', 6, null)`)).toMatchObject({ seats: 6, ends_on: null });
     expect(await hana.getMyBenefit()).toMatchObject({ status: 'ativa', accessUntil: null, contractEndsOn: null });
-    expect(await bruno.getMyBenefit()).toMatchObject({ accessUntil: null, contractEndsOn: null });
+    expect(await gil.getMyBenefit()).toMatchObject({ status: 'ativa', accessUntil: null, contractEndsOn: null });
     expect(Date.parse((await fabio.getMyBenefit())!.accessUntil!)).toBeLessThan(Date.parse('2026-12-01'));
   });
 
@@ -8056,7 +8078,7 @@ describe('conversor da empresa', () => {
     license_id: 'l1', organization_name: 'Empresa Alfa', plan: 'individual', status: 'ativa', activated_at: '2026-10-08T12:00:00Z', ended_at: null, access_until: null, contract_ends_on: null, ...over,
   });
   const usageRow = (over: Record<string, unknown> = {}) => ({
-    organization_id: 'o1', month: '2026-10-01', seats: 6, invited: 1, active: 5, ended: 0, joined_this_month: 2, usage_visible: true, usage_minimum: 5, ...over,
+    organization_id: 'o1', seats: 6, invited: 1, active: 5, ended: 0, ...over,
   });
   const query = (table: string, result: { data: unknown; error: unknown }) => {
     const q: Record<string, unknown> = {};
@@ -8120,9 +8142,7 @@ describe('conversor da empresa', () => {
     expect(await repo.acceptLicense('chave-0005', CODE)).toEqual({
       licenseId: 'l1', organizationName: 'Empresa Alfa', plan: 'individual', status: 'ativa', activatedAt: '2026-10-08T12:00:00Z', endedAt: null, accessUntil: null, contractEndsOn: null,
     });
-    expect(await repo.getCompanyUsage('o1')).toEqual({
-      organizationId: 'o1', month: '2026-10-01', seats: 6, invited: 1, active: 5, ended: 0, joinedThisMonth: 2, usageVisible: true, usageMinimum: 5,
-    });
+    expect(await repo.getCompanyUsage('o1')).toEqual({ organizationId: 'o1', seats: 6, invited: 1, active: 5, ended: 0 });
     expect(calls).toEqual([
       ['invite_licenses', { p_contract: 'c1', p_emails: ['bruno@exemplo.test', 'carla@exemplo.test'], p_key: 'chave-0001' }],
       ['renew_license_invite', { p_license: 'l1', p_key: 'chave-0002' }],
@@ -8218,20 +8238,19 @@ describe('conversor da empresa', () => {
       null,
       usageRow({ seats: -1 }),
       usageRow({ active: 1.5 }),
-      usageRow({ month: 3 }),
-      usageRow({ joined_this_month: null }),
-      usageRow({ active: 3, usage_visible: false, joined_this_month: 1 }),
-      usageRow({ active: 3, usage_visible: true, joined_this_month: 1 }),
-      usageRow({ active: 7, usage_visible: false, joined_this_month: null }),
-      usageRow({ usage_minimum: 'cinco' }),
+      usageRow({ invited: '1' }),
+      usageRow({ ended: null }),
+      usageRow({ organization_id: 7 }),
     ]) {
       expect(await usage(row)).toEqual(['desconhecido', 'uso_inconsistente', null]);
     }
     expect(await failure(fake({ preview_license_invite: { organization_name: 'Empresa Alfa', plan: 'gratis' } }).previewLicenseInvite(CODE))).toEqual(['desconhecido', 'convite_inconsistente', null]);
     expect(await failure(fake({ preview_license_invite: null }).previewLicenseInvite(CODE))).toEqual(['desconhecido', 'convite_inconsistente', null]);
     expect(await failure(fake({ invite_licenses: { contract_id: 'c1', results: 'x', seats: 6, in_use: 1 } }).inviteLicenses('chave-0022', 'c1', ['a@b.co']))).toEqual(['desconhecido', 'convite_inconsistente', null]);
-    // O uso com menos de 5 pessoas vem com o número do mês nulo, e isso vale.
-    expect(await fake({ organization_usage: usageRow({ active: 3, usage_visible: false, joined_this_month: null }) }).getCompanyUsage('o1')).toMatchObject({ joinedThisMonth: null, usageVisible: false, active: 3 });
+    // Só as contagens: campos de uso que o banco já não manda (nem os antigos) não chegam ao app.
+    expect(await fake({ organization_usage: usageRow({ active: 3, joined_this_month: 2, usage_visible: true, month: '2026-10-01' }) }).getCompanyUsage('o1')).toEqual({
+      organizationId: 'o1', seats: 6, invited: 1, active: 3, ended: 0,
+    });
   });
 
   it('os códigos de erro da empresa voltam com o próprio nome, sem o detalhe do banco; só a posição e as vagas livres seguem', async () => {

@@ -93,6 +93,8 @@ comment on column public.family_invites.code_hash is
   'SHA-256 (64 hexadecimais) do código de 128 bits do link. O código nunca é gravado: aparece uma única vez, na resposta de create_family_invite.';
 
 -- Defesa adicional: identidade, contexto, autoria, papel, resumo e prazos nunca mudam; uso e cancelamento só passam de nulo a valor.
+-- Única exceção: used_by pode passar a nulo com o resto igual (o `on delete set null` da chave estrangeira, quando a pessoa que
+-- aceitou o convite apaga a conta); sem isso, quem aceitou um convite da Família nunca poderia apagar a conta.
 create or replace function public.family_invites_guard()
 returns trigger
 language plpgsql
@@ -101,7 +103,8 @@ as $$
 begin
   if new.id <> old.id or new.context_id <> old.context_id or new.created_by <> old.created_by or new.role <> old.role
      or new.code_hash <> old.code_hash or new.expires_at <> old.expires_at or new.created_at <> old.created_at
-     or (old.used_at is not null and (new.used_at is distinct from old.used_at or new.used_by is distinct from old.used_by))
+     or (old.used_at is not null and (new.used_at is distinct from old.used_at
+                                      or (new.used_by is distinct from old.used_by and not (new.used_by is null and old.used_by is not null))))
      or (old.cancelled_at is not null and new.cancelled_at is distinct from old.cancelled_at)
      or (old.used_at is null and new.used_by is not null and new.used_at is null) then
     raise exception 'campo_imutavel' using errcode = '42501';

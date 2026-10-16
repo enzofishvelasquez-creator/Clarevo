@@ -14,7 +14,7 @@ import type {
   LicenseStatus,
   Organization,
 } from './company';
-import { BENEFIT_GRACE_DAYS, LICENSE_BATCH_MAX, USAGE_MIN_ACTIVE, contractIsOpen, isValidEmail, licenseCodeHash, normalizeEmail } from './company';
+import { BENEFIT_GRACE_DAYS, LICENSE_BATCH_MAX, contractIsOpen, isValidEmail, licenseCodeHash, normalizeEmail } from './company';
 import type { IsoDate } from './dates';
 import { addDays, isValidIsoDate, todayIn } from './dates';
 import { RepoError } from './repository';
@@ -23,7 +23,7 @@ import { sha256Hex } from './sha256';
 /**
  * Empresas na memória (demonstração e testes): as mesmas regras e os mesmos códigos de erro das funções da migração 0014, para
  * várias pessoas ao mesmo tempo. Cada MemoryRepository registra a pessoa aqui; repositórios que compartilham o mesmo hub
- * compartilham organizações, contratos, licenças e direitos ao plano. Nada aqui sabe de finanças: só licenças e o último acesso.
+ * compartilham organizações, contratos, licenças e direitos ao plano. Nada aqui sabe de finanças nem de acesso ao app: só licenças.
  *
  * As funções da equipe Clarevo (`staff*`), que no banco só o SQL Editor executa, existem aqui só para montar cenários de teste e da
  * demonstração: nenhum repositório as expõe à pessoa. Tudo é síncrono e atômico: valida tudo antes da primeira mudança.
@@ -43,7 +43,7 @@ export class CompanyStaffError extends Error {
 export interface MemoryCompanyHubOptions {
   /** Relógio em milissegundos desde 1970. Padrão: Date.now. */
   now?: () => number;
-  /** Dia atual da empresa (vigência do contrato e mês do uso). Padrão: o dia de `now` em São Paulo. */
+  /** Dia atual da empresa (vigência do contrato). Padrão: o dia de `now` em São Paulo. */
   today?: () => IsoDate;
   /** Sorteio em [0, 1) do código do convite. Padrão: Math.random. */
   random?: () => number;
@@ -85,10 +85,13 @@ export function contractAccessUntil(endsOn: IsoDate | null): string | null {
   return endsOn === null ? null : new Date(`${addDays(endsOn, BENEFIT_GRACE_DAYS)}T23:59:59-03:00`).toISOString();
 }
 
+/** O instante em que o contrato termina em `endsOn`: o último segundo do dia, em São Paulo (clarevo_contract_ended_at). */
+export function contractEndedAt(endsOn: IsoDate | null): string | null {
+  return endsOn === null ? null : new Date(`${endsOn}T23:59:59-03:00`).toISOString();
+}
+
 export class MemoryCompanyHub {
   private people = new Map<string, StoredPerson>();
-  /** auth.users.last_sign_in_at, por pessoa: guardado à parte, porque o acesso pode vir antes de a pessoa criar o espaço pessoal. */
-  private signIns = new Map<string, string>();
   private orgs = new Map<string, Organization & { demo: boolean }>();
   private admins = new Set<string>();
   private contracts = new Map<string, BenefitContract>();
@@ -126,11 +129,6 @@ export class MemoryCompanyHub {
   /** A pessoa existe (tem espaço pessoal): é o que `persons` representa no banco. O e-mail é o da conta. */
   register(personId: string, email: string, displayName: string, timeZone: string = SP): void {
     this.people.set(personId, { id: personId, email: normalizeEmail(email), displayName, timeZone });
-  }
-
-  /** O último acesso da pessoa (auth.users.last_sign_in_at): agora, ou o instante dado. */
-  recordSignIn(personId: string, instant?: string): void {
-    this.signIns.set(personId, instant ?? this.nowIso());
   }
 
   // -------------------------------------------------------------------------
@@ -258,53 +256,51 @@ export class MemoryCompanyHub {
       });
   }
 
-  /** organization_usage. Só quem administra; com menos de 5 pessoas ativas o uso do mês é nulo. Nunca devolve quem entrou. */
+  /**
+   * organization_usage. Só quem administra; só contagens de licenças (o indicador de entradas no mês saiu depois da revisão de
+   * segurança de 16/10/2026: com o e-mail de cada licença à vista, identificaria quem entrou).
+   */
   usage(personId: string, organizationId: string): CompanyUsage {
     if (!this.orgs.has(organizationId) || !this.isAdminOf(personId, organizationId)) throw new RepoError('nao_encontrado');
     const today = this.today();
-    const month = `${today.slice(0, 7)}-01`;
-    const tz = this.people.get(personId)?.timeZone ?? SP;
     const contracts = [...this.contracts.values()].filter((c) => c.organizationId === organizationId);
     const ids = new Set(contracts.map((c) => c.id));
     const licenses = [...this.licenses.values()].filter((l) => ids.has(l.contractId));
-    const active = licenses.filter((l) => l.status === 'ativa');
-    const visible = active.length >= USAGE_MIN_ACTIVE;
-    const joined = active.filter((l) => {
-      const at = l.personId ? this.signIns.get(l.personId) : null;
-      return at ? todayIn(tz, new Date(at)).slice(0, 7) === month.slice(0, 7) : false;
-    }).length;
     return {
       organizationId,
-      month,
       seats: contracts.filter((c) => contractIsOpen(c, today)).reduce((sum, c) => sum + c.seats, 0),
       invited: licenses.filter((l) => l.status === 'convidada').length,
-      active: active.length,
+      active: licenses.filter((l) => l.status === 'ativa').length,
       ended: licenses.filter((l) => l.status === 'encerrada' && l.cancelledAt === null).length,
-      joinedThisMonth: visible ? joined : null,
-      usageVisible: visible,
-      usageMinimum: USAGE_MIN_ACTIVE,
     };
+  }
+
+  /** A licença ainda ativa, mas de um contrato que já terminou (ends_on antes de hoje): quem a recebe a lê como encerrada (E7). */
+  private contractEnded(l: StoredLicense): boolean {
+    const c = this.contracts.get(l.contractId);
+    return l.status === 'ativa' && c !== undefined && c.endsOn !== null && c.endsOn < this.today();
   }
 
   private benefitOf(l: StoredLicense): Benefit {
     const c = this.contracts.get(l.contractId)!;
     const o = this.orgs.get(c.organizationId)!;
+    const expired = this.contractEnded(l);
     return {
       licenseId: l.id,
       organizationName: o.name,
       plan: c.plan,
-      status: l.status === 'ativa' ? 'ativa' : 'encerrada',
+      status: l.status === 'ativa' && !expired ? 'ativa' : 'encerrada',
       activatedAt: l.activatedAt!,
-      endedAt: l.endedAt,
+      endedAt: expired ? contractEndedAt(c.endsOn) : l.endedAt,
       accessUntil: this.entitlements.get(l.id)?.validUntil ?? null,
       contractEndsOn: c.endsOn,
     };
   }
 
-  /** my_benefit: o benefício da própria pessoa. A licença ativa vale; sem ela, a encerrada mais recente. */
+  /** my_benefit: o benefício da própria pessoa. A licença ativa (de contrato em vigor) vale; sem ela, a encerrada mais recente. */
   myBenefit(personId: string): Benefit | null {
     const own = [...this.licenses.values()].filter((l) => l.personId === personId && l.activatedAt !== null);
-    const active = own.find((l) => l.status === 'ativa');
+    const active = own.find((l) => l.status === 'ativa' && !this.contractEnded(l));
     if (active) return this.benefitOf(active);
     const last = own.sort((a, b) => (b.activatedAt ?? '').localeCompare(a.activatedAt ?? ''))[0];
     return last ? this.benefitOf(last) : null;
@@ -485,7 +481,10 @@ export class MemoryCompanyHub {
     return { organizationName: this.orgs.get(c.organizationId)!.name, plan: c.plan };
   }
 
-  /** accept_license. Ordem: repetição; sem_permissao (sem espaço pessoal); convite_invalido; ja_tem_licenca. */
+  /**
+   * accept_license. Ordem: repetição; sem_permissao (sem espaço pessoal); convite_invalido; encerra as licenças ativas da pessoa
+   * cujo contrato já terminou (E7); ja_tem_licenca.
+   */
   accept(actor: string, key: string, code: string): Benefit {
     const hash = JSON.stringify(['aceitar_licenca', licenseCodeHash(code)]);
     const prev = this.replay(actor, key, 'aceitar_licenca', hash);
@@ -497,6 +496,17 @@ export class MemoryCompanyHub {
     if (!this.people.has(actor)) throw new RepoError('sem_permissao');
     const l = this.inviteFor(actor, code);
     if (!l) throw new RepoError('convite_invalido');
+    // E7: a licença ativa de um contrato que já terminou não prende a pessoa. Encerra no fim do contrato; o direito ao plano dela
+    // segue a regra dos 30 dias, contados a partir do fim do contrato (nunca depois do que já valia).
+    for (const x of this.licenses.values()) {
+      if (x.personId !== actor || !this.contractEnded(x)) continue;
+      const ended = this.contracts.get(x.contractId)!;
+      x.status = 'encerrada';
+      x.endedAt = contractEndedAt(ended.endsOn);
+      const e = this.entitlements.get(x.id);
+      const limit = contractAccessUntil(ended.endsOn)!;
+      if (e) e.validUntil = e.validUntil === null || e.validUntil > limit ? limit : e.validUntil;
+    }
     if ([...this.licenses.values()].some((x) => x.personId === actor && x.status === 'ativa')) throw new RepoError('ja_tem_licenca');
     const c = this.contracts.get(l.contractId)!;
     l.status = 'ativa';
@@ -513,7 +523,7 @@ export class MemoryCompanyHub {
   // -------------------------------------------------------------------------
 
   /**
-   * A "Empresa Exemplo (demonstração)": 40 vagas, plano individual, 12 licenças ativas (9 delas com acesso no mês), 6 convites
+   * A "Empresa Exemplo (demonstração)": 40 vagas, plano individual, 12 licenças ativas, 6 convites
    * pendentes, 3 licenças encerradas e 1 convite cancelado, todas de pessoas FICTÍCIAS (e-mails do domínio reservado .example).
    * Nenhuma delas é registrada como pessoa de verdade, e nada aqui chega a um servidor.
    */
@@ -524,13 +534,10 @@ export class MemoryCompanyHub {
     this.contracts.set(contractId, { id: contractId, organizationId, seats: 40, plan: 'individual', startsOn: '2026-03-01', endsOn: null });
     this.admins.add(`${organizationId}|${adminPersonId}`);
     const email = (prefix: string, n: number) => `${prefix}.${String(n).padStart(2, '0')}@empresa-exemplo.example`;
-    const add = (l: Partial<StoredLicense> & Pick<StoredLicense, 'email' | 'status'>, signedInAt: string | null = null) => {
+    const add = (l: Partial<StoredLicense> & Pick<StoredLicense, 'email' | 'status'>) => {
       const id = this.id('licenca');
       const person = l.status === 'ativa' || l.endedAt ? this.id('pessoa-ficticia') : null;
-      if (person) {
-        this.people.set(person, { id: person, email: l.email, displayName: 'Pessoa fictícia', timeZone: SP });
-        if (signedInAt) this.signIns.set(person, signedInAt);
-      }
+      if (person) this.people.set(person, { id: person, email: l.email, displayName: 'Pessoa fictícia', timeZone: SP });
       this.licenses.set(id, {
         id,
         contractId,
@@ -546,17 +553,11 @@ export class MemoryCompanyHub {
       if (l.activatedAt) this.entitlements.set(id, { licenseId: id, plan: 'individual', validUntil: l.endedAt ? new Date(Date.parse(l.endedAt) + BENEFIT_GRACE_DAYS * 86_400_000).toISOString() : null });
     };
     for (let n = 1; n <= 12; n += 1) {
-      add(
-        { email: email('pessoa', n), status: 'ativa', invitedAt: '2026-04-10T12:00:00.000Z', activatedAt: `2026-04-${String(10 + n).padStart(2, '0')}T12:00:00.000Z` },
-        n <= 9 ? `2026-10-0${1 + (n % 6)}T13:00:00.000Z` : '2026-09-20T13:00:00.000Z',
-      );
+      add({ email: email('pessoa', n), status: 'ativa', invitedAt: '2026-04-10T12:00:00.000Z', activatedAt: `2026-04-${String(10 + n).padStart(2, '0')}T12:00:00.000Z` });
     }
     for (let n = 1; n <= 6; n += 1) add({ email: email('convite', n), status: 'convidada', invitedAt: `2026-10-0${n}T12:00:00.000Z` });
     for (let n = 1; n <= 3; n += 1) {
-      add(
-        { email: email('antiga', n), status: 'encerrada', invitedAt: '2026-03-05T12:00:00.000Z', activatedAt: '2026-03-08T12:00:00.000Z', endedAt: `2026-09-0${n}T12:00:00.000Z` },
-        '2026-08-15T13:00:00.000Z',
-      );
+      add({ email: email('antiga', n), status: 'encerrada', invitedAt: '2026-03-05T12:00:00.000Z', activatedAt: '2026-03-08T12:00:00.000Z', endedAt: `2026-09-0${n}T12:00:00.000Z` });
     }
     add({ email: email('cancelado', 1), status: 'encerrada', invitedAt: '2026-09-20T12:00:00.000Z', cancelledAt: '2026-09-25T12:00:00.000Z' });
     return { organizationId, contractId };

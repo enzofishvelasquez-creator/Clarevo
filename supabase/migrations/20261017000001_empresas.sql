@@ -3,11 +3,12 @@
 -- Até aqui a empresa existia no modelo (organização, quem administra, contrato com vagas e plano, licença por e-mail e direito ao
 -- plano), mas a escrita em `licenses` era direta e só a equipe do backend criava organização e contrato. Esta migração dá o caminho
 -- completo, pelas recomendações M-1 a M-6 de docs/13_FAMILIA_E_EMPRESAS.md:
---   M-1 o RH vê vagas, convites, licenças e, no máximo, indicadores de uso do app (pessoas que entraram no mês), nunca finanças,
---       nem somadas; com menos de 5 pessoas ativas o número de uso do mês volta nulo (proteção contra identificar alguém);
+--   M-1 o RH vê vagas, convites, licenças e só as contagens de licenças (vagas, convidadas, ativas e encerradas), nunca finanças,
+--       nem somadas, nem o uso do app (o indicador "pessoas que entraram no mês" saiu depois da revisão de segurança de 16/10/2026:
+--       com o e-mail de cada licença à vista, ele permitiria identificar quem entrou);
 --   M-2 o convite é um link da empresa, enviado pelo canal interno do RH (sem custo de envio pelo Clarevo);
 --   M-3 a equipe Clarevo cria a organização, o contrato e a primeira pessoa administradora, por funções que só quem roda no SQL
---       Editor do Supabase executa (clarevo_staff_*, sem execute para public, anon nem authenticated);
+--       Editor do Supabase executa (clarevo_staff_*, sem execute para public, anon, authenticated nem service_role);
 --   M-4 fim do benefício: 30 dias de acesso pleno (plan_entitlements.valid_until) e depois o plano gratuito; encerrar nunca apaga
 --       conta, histórico nem Família;
 --   M-6 uma vaga por pessoa que recebe o benefício (licenças convidada + ativa nunca passam de seats).
@@ -28,10 +29,16 @@
 -- E4. Uma licença ativa por pessoa (índice único parcial). Aceitar cria o direito ao plano de origem `beneficio`; encerrar fecha o
 --     direito em fim + 30 dias e nunca apaga conta, registro, vínculo nem Família.
 -- E5. A empresa não lê finanças: nenhuma função nem visão desta migração lê registros, contas, contas a pagar, gastos fixos, metas,
---     cartões, orçamento, Família, vínculos nem atividade. organization_usage lê só licenças e o último acesso (auth.users).
+--     cartões, orçamento, Família, vínculos nem atividade. organization_usage lê só licenças e contratos e devolve só contagens
+--     (nada de auth.users, nem do último acesso de ninguém).
 -- E6. Cancelar um convite não apaga a linha: a licença passa a `encerrada` com cancelled_at (sem pessoa, sem ativação), e o e-mail
 --     pode ser convidado de novo.
--- Ordem de travas: chave -> trava consultiva do contrato (e da pessoa, no aceite) -> linha da licença. A atividade (gatilho de
+-- E7. Licença ativa de contrato já terminado não prende a pessoa: ao aceitar um convite novo, sob as travas, as licenças ativas dela
+--     cujo contrato terminou (ends_on antes de hoje) são encerradas com ended_at no fim do contrato, e o direito ao plano delas
+--     segue a regra dos 30 dias, contados do fim do contrato. my_benefit já mostra essa licença como encerrada.
+-- E8. Apagar a conta de quem já teve licença é possível: a licença encerrada aceita só a troca de person_id para nulo (o
+--     `on delete set null` da fundação) e o resto da linha não muda.
+-- Ordem de travas: chave -> trava consultiva do contrato (e da pessoa, no aceite, com os contratos em ordem fixa) -> linha da licença. A atividade (gatilho de
 -- record_operations, 0005) não conta nenhuma das cinco ações como anotação, e elas não têm contexto financeiro (context_id nulo).
 
 -- ---------------------------------------------------------------------------
@@ -61,7 +68,9 @@ comment on column public.licenses.invited_at is
   'Quando o convite foi enviado pela última vez (criação ou novo link).';
 
 -- Defesa adicional: identidade, contrato, e-mail e criação nunca mudam; o estado só anda para frente
--- (convidada -> ativa | encerrada por cancelamento; ativa -> encerrada) e uma licença encerrada não muda mais.
+-- (convidada -> ativa | encerrada por cancelamento; ativa -> encerrada) e uma licença encerrada não muda mais, com uma só
+-- exceção: person_id pode passar a nulo (o `on delete set null` da fundação, quando a pessoa apaga a conta), desde que o resto da
+-- linha continue igual. A licença ativa não aceita nem isso (ela exige pessoa): a empresa encerra a licença antes.
 create or replace function public.licenses_guard()
 returns trigger
 language plpgsql
@@ -72,7 +81,9 @@ begin
     raise exception 'campo_imutavel' using errcode = '42501';
   end if;
   if old.status = 'encerrada' then
-    if new.status <> old.status or new.person_id is distinct from old.person_id or new.activated_at is distinct from old.activated_at
+    if new.status <> old.status
+       or (new.person_id is distinct from old.person_id and not (new.person_id is null and old.person_id is not null))
+       or new.activated_at is distinct from old.activated_at
        or new.ended_at is distinct from old.ended_at or new.cancelled_at is distinct from old.cancelled_at
        or new.code_hash is distinct from old.code_hash or new.invited_at <> old.invited_at then
       raise exception 'campo_imutavel' using errcode = '42501';
@@ -297,6 +308,18 @@ as $$
                   where c.id = p_contract and c.starts_on <= p_day and (c.ends_on is null or c.ends_on >= p_day));
 $$;
 
+-- O instante em que o contrato termina em p_ends_on: o último segundo do dia, em São Paulo (o contrato vale até esse dia, inclusive).
+-- É o ended_at das licenças ativas que o aceite de um convite novo encerra por contrato terminado (E7).
+create or replace function public.clarevo_contract_ended_at(p_ends_on date)
+returns timestamptz
+language sql
+stable
+set search_path = public
+as $$
+  select case when p_ends_on is null then null
+              else (p_ends_on::timestamp + interval '23 hours 59 minutes 59 seconds') at time zone 'America/Sao_Paulo' end;
+$$;
+
 -- Até quando vale o acesso pleno quando o contrato termina em p_ends_on: 30 dias depois (M-4), no fim do dia em São Paulo.
 create or replace function public.clarevo_contract_access_until(p_ends_on date)
 returns timestamptz
@@ -333,7 +356,8 @@ as $$
     from public.licenses l where l.id = p_license;
 $$;
 
--- O benefício como a pessoa o lê: a licença, o nome da organização, o plano e até quando vale o acesso pleno.
+-- O benefício como a pessoa o lê: a licença, o nome da organização, o plano e até quando vale o acesso pleno. Licença ainda ativa de
+-- contrato que já terminou aparece como encerrada, com o fim do contrato (a mesma regra da visão my_benefit, E7).
 create or replace function public.clarevo_benefit_json(p_license uuid)
 returns jsonb
 language sql
@@ -341,9 +365,12 @@ stable
 security definer
 set search_path = public
 as $$
-  select jsonb_build_object('license_id', l.id, 'organization_name', o.name, 'plan', c.plan, 'status', l.status,
-                            'activated_at', l.activated_at, 'ended_at', l.ended_at, 'access_until', e.valid_until,
-                            'contract_ends_on', c.ends_on)
+  select jsonb_build_object('license_id', l.id, 'organization_name', o.name, 'plan', c.plan,
+                            'status', case when l.status = 'ativa' and c.ends_on < public.clarevo_today(auth.uid()) then 'encerrada' else l.status::text end,
+                            'activated_at', l.activated_at,
+                            'ended_at', case when l.status = 'ativa' and c.ends_on < public.clarevo_today(auth.uid())
+                                             then public.clarevo_contract_ended_at(c.ends_on) else l.ended_at end,
+                            'access_until', e.valid_until, 'contract_ends_on', c.ends_on)
     from public.licenses l
     join public.benefit_contracts c on c.id = l.contract_id
     join public.organizations o on o.id = c.organization_id
@@ -381,14 +408,18 @@ $$;
 -- O benefício de quem o recebe (M-1): a licença da própria pessoa, o nome da organização e o plano. Sem security_invoker e com
 -- security_barrier, como as outras visões: o filtro (a licença é de quem consulta) é explícito, e a visão lê a organização e o
 -- contrato com os privilégios de quem a criou. Nunca devolve vagas, outras licenças, e-mails nem a identidade de ninguém.
+-- Licença ainda ativa de contrato que já terminou (ends_on antes de hoje) aparece como encerrada, com o fim do contrato em
+-- ended_at (E7): o aceite de um convite novo a encerra de verdade, mas a pessoa já a lê assim antes disso. A visão só usa my_today()
+-- (a única função que o papel authenticated executa aqui) e a mesma conta de clarevo_contract_ended_at, escrita por extenso.
 -- ---------------------------------------------------------------------------
 create view public.my_benefit with (security_barrier = true) as
 select l.id as license_id,
        o.name as organization_name,
        c.plan,
-       l.status::text as status,
+       case when l.status = 'ativa' and c.ends_on < public.my_today() then 'encerrada' else l.status::text end as status,
        l.activated_at,
-       l.ended_at,
+       case when l.status = 'ativa' and c.ends_on < public.my_today()
+            then (c.ends_on::timestamp + interval '23 hours 59 minutes 59 seconds') at time zone 'America/Sao_Paulo' else l.ended_at end as ended_at,
        e.valid_until as access_until,
        c.ends_on as contract_ends_on
   from public.licenses l
@@ -544,6 +575,20 @@ revoke all on function public.clarevo_staff_find_admin(text) from public, anon, 
 revoke all on function public.clarevo_staff_create_organization(text, integer, text, date, date, text) from public, anon, authenticated;
 revoke all on function public.clarevo_staff_add_org_admin(uuid, text) from public, anon, authenticated;
 revoke all on function public.clarevo_staff_update_contract(uuid, integer, date) from public, anon, authenticated;
+-- No Supabase, os privilégios padrão dão execute também ao papel service_role (a chave de serviço, usada por backends e funções de
+-- borda). Estas funções são só de quem roda no SQL Editor (o dono do banco), então ele também perde o execute. O papel pode não
+-- existir (Postgres comum), por isso a conferência em pg_roles.
+do $$
+declare
+  f text;
+begin
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    foreach f in array array['clarevo_staff_find_admin(text)', 'clarevo_staff_create_organization(text, integer, text, date, date, text)',
+                             'clarevo_staff_add_org_admin(uuid, text)', 'clarevo_staff_update_contract(uuid, integer, date)'] loop
+      execute format('revoke all on function public.%s from service_role', f);
+    end loop;
+  end if;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- Convidar pessoas (M-2). Só quem administra a organização do contrato. Recebe uma lista de e-mails; normaliza (sem espaços nas
@@ -869,9 +914,12 @@ $$;
 -- Aceitar o convite da empresa (E3, E4). A pessoa logada aceita; o e-mail confirmado da conta precisa ser igual ao do convite (sem
 -- diferenciar maiúsculas), senão convite_invalido, o mesmo código de qualquer convite que não vale. Ordem: sessão; chave; repetição;
 -- espaço pessoal da pessoa (sem_permissao, antes de olhar o código: quem ainda não tem espaço recebe a mesma resposta para qualquer
--- código); depois, sob as travas da pessoa e do contrato, tudo de novo: convite_invalido; ja_tem_licenca (uma licença ativa por
--- pessoa). Marca a licença `ativa` com a pessoa e a data, zera o resumo do código e cria o direito ao plano de origem `beneficio`
--- (valid_until só se o contrato tem fim: fim + 30 dias). Repetir a mesma chave devolve o mesmo resultado.
+-- código); depois, sob as travas da pessoa e dos contratos, tudo de novo: convite_invalido; encerra as licenças ativas da pessoa
+-- cujo contrato já terminou (E7); ja_tem_licenca (uma licença ativa por pessoa). Marca a licença `ativa` com a pessoa e a data,
+-- zera o resumo do código e cria o direito ao plano de origem `beneficio` (valid_until só se o contrato tem fim: fim + 30 dias).
+-- Repetir a mesma chave devolve o mesmo resultado.
+-- Travas: a da pessoa e, em ordem fixa de contrato (para dois aceites cruzados nunca se travarem), a do contrato do convite e as dos
+-- contratos já terminados das licenças ativas dela.
 -- Retorno: {license_id, organization_name, plan, status, activated_at, ended_at, access_until, contract_ends_on}.
 -- ---------------------------------------------------------------------------
 create or replace function public.accept_license(p_code text, p_key text)
@@ -889,6 +937,9 @@ declare
   v_lic public.licenses%rowtype;
   v_contract public.benefit_contracts%rowtype;
   v_email text;
+  v_today date;
+  v_lock uuid;
+  v_old record;
 begin
   if v_uid is null then
     raise exception 'nao_autenticado' using errcode = '42501';
@@ -921,16 +972,40 @@ begin
     raise exception 'convite_invalido' using errcode = 'P0002';
   end if;
 
+  v_today := public.clarevo_today(v_uid);
   perform pg_advisory_xact_lock(hashtext('licenca:p:' || v_uid::text));
-  perform pg_advisory_xact_lock(hashtext('contrato:' || v_lic.contract_id::text));
+  for v_lock in
+    select s.contract_id
+      from (select v_lic.contract_id
+            union
+            select l.contract_id from public.licenses l join public.benefit_contracts c on c.id = l.contract_id
+             where l.person_id = v_uid and l.status = 'ativa' and c.ends_on < v_today) s
+     order by s.contract_id
+  loop
+    perform pg_advisory_xact_lock(hashtext('contrato:' || v_lock::text));
+  end loop;
   -- Com as travas, relê a licença e confere de novo (uso único, troca de link e cancelamento sob corrida).
   select * into v_lic from public.licenses where id = v_lic.id for update;
   select * into v_contract from public.benefit_contracts where id = v_lic.contract_id;
   if v_lic.status <> 'convidada' or v_lic.code_hash is distinct from v_code_hash
      or public.clarevo_normalize_email(v_lic.invited_email) <> v_email
-     or not public.clarevo_contract_open(v_lic.contract_id, public.clarevo_today(v_uid)) then
+     or not public.clarevo_contract_open(v_lic.contract_id, v_today) then
     raise exception 'convite_invalido' using errcode = 'P0002';
   end if;
+  -- E7: a licença ativa de um contrato que já terminou não prende a pessoa. Encerra no fim do contrato; o direito ao plano dela
+  -- segue a regra dos 30 dias, contados a partir do fim do contrato (nunca depois do que já valia). Não apaga nada da pessoa.
+  for v_old in
+    select l.id, c.ends_on
+      from public.licenses l join public.benefit_contracts c on c.id = l.contract_id
+     where l.person_id = v_uid and l.status = 'ativa' and c.ends_on < v_today
+     order by l.id
+       for update of l
+  loop
+    update public.licenses set status = 'encerrada', ended_at = public.clarevo_contract_ended_at(v_old.ends_on) where id = v_old.id;
+    update public.plan_entitlements
+       set valid_until = least(coalesce(valid_until, 'infinity'::timestamptz), public.clarevo_contract_access_until(v_old.ends_on))
+     where license_id = v_old.id;
+  end loop;
   if exists (select 1 from public.licenses where person_id = v_uid and status = 'ativa') then
     raise exception 'ja_tem_licenca' using errcode = 'PT409';
   end if;
@@ -949,12 +1024,13 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- Indicadores de uso (M-1). Só quem administra a organização (nao_encontrado para qualquer outra pessoa). Devolve vagas dos
--- contratos em vigor, licenças convidadas, ativas e encerradas (depois de ativadas; convites cancelados não contam) e "pessoas que
--- entraram no mês": licenças ativas cujo último acesso (auth.users.last_sign_in_at) cai no mês atual de quem consulta. Proteção
--- contra identificar alguém: com menos de 5 licenças ativas o número de uso do mês volta nulo (usage_visible falso). Lê só licenças e
--- o último acesso: nunca registros, contas, metas, cartões, Família nem atividade, e nunca devolve quem entrou.
--- Retorno: {organization_id, month, seats, invited, active, ended, joined_this_month, usage_visible, usage_minimum}.
+-- Contagens de licenças (M-1). Só quem administra a organização (nao_encontrado para qualquer outra pessoa). Devolve vagas dos
+-- contratos em vigor e licenças convidadas, ativas e encerradas (depois de ativadas; convites cancelados não contam): as mesmas
+-- contagens que o RH já vê na lista de licenças. O indicador "pessoas que entraram no mês" (último acesso, auth.users) saiu depois da
+-- revisão de segurança de 16/10/2026: o RH vê o e-mail de cada licença e pode controlar contas próprias, então um número de acessos
+-- permitiria identificar quem entrou (e o último acesso nem muda quando a sessão é renovada). Lê só licenças e contratos: nunca
+-- registros, contas, metas, cartões, Família, atividade nem auth.users, e nunca devolve pessoas.
+-- Retorno: {organization_id, seats, invited, active, ended}.
 -- ---------------------------------------------------------------------------
 create or replace function public.organization_usage(p_org uuid)
 returns jsonb
@@ -966,14 +1042,10 @@ as $$
 declare
   v_uid uuid := auth.uid();
   v_today date;
-  v_month date;
-  v_tz text;
   v_seats integer;
   v_invited integer;
   v_active integer;
   v_ended integer;
-  v_joined integer;
-  v_visible boolean;
 begin
   if v_uid is null then
     raise exception 'nao_autenticado' using errcode = '42501';
@@ -982,8 +1054,6 @@ begin
     raise exception 'nao_encontrado' using errcode = 'P0002';
   end if;
   v_today := public.clarevo_today(v_uid);
-  v_month := date_trunc('month', v_today)::date;
-  select coalesce(time_zone, 'America/Sao_Paulo') into v_tz from public.persons where id = v_uid;
 
   select coalesce(sum(c.seats), 0)::integer into v_seats
     from public.benefit_contracts c
@@ -994,21 +1064,8 @@ begin
     into v_invited, v_active, v_ended
     from public.licenses l join public.benefit_contracts c on c.id = l.contract_id
    where c.organization_id = p_org;
-  v_visible := v_active >= 5;
-  if v_visible then
-    select count(*)::integer into v_joined
-      from public.licenses l
-      join public.benefit_contracts c on c.id = l.contract_id
-      join auth.users u on u.id = l.person_id
-     where c.organization_id = p_org and l.status = 'ativa' and u.last_sign_in_at is not null
-       and (u.last_sign_in_at at time zone v_tz)::date >= v_month
-       and (u.last_sign_in_at at time zone v_tz)::date < (v_month + interval '1 month')::date;
-  end if;
 
-  return jsonb_build_object('organization_id', p_org, 'month', v_month, 'seats', v_seats, 'invited', v_invited,
-                            'active', v_active, 'ended', v_ended,
-                            'joined_this_month', case when v_visible then v_joined else null end,
-                            'usage_visible', v_visible, 'usage_minimum', 5);
+  return jsonb_build_object('organization_id', p_org, 'seats', v_seats, 'invited', v_invited, 'active', v_active, 'ended', v_ended);
 end;
 $$;
 
@@ -1027,6 +1084,19 @@ create policy licenses_admin on public.licenses for select to authenticated
 revoke all on all tables in schema public from anon, authenticated;
 revoke all on all sequences in schema public from anon, authenticated;
 revoke all on all functions in schema public from public, anon, authenticated;
+-- As funções da equipe Clarevo também não são executáveis por service_role (de novo aqui, para o estado final não depender da ordem
+-- dos blocos acima nem de privilégios padrão concedidos depois).
+do $$
+declare
+  f text;
+begin
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    foreach f in array array['clarevo_staff_find_admin(text)', 'clarevo_staff_create_organization(text, integer, text, date, date, text)',
+                             'clarevo_staff_add_org_admin(uuid, text)', 'clarevo_staff_update_contract(uuid, integer, date)'] loop
+      execute format('revoke all on function public.%s from service_role', f);
+    end loop;
+  end if;
+end $$;
 
 grant usage on schema public to authenticated;
 grant select on all tables in schema public to authenticated;

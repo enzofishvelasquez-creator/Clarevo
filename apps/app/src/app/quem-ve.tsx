@@ -61,7 +61,7 @@ export default function QuemVeScreen() {
         Se uma empresa oferecer o Clarevo como benefício, ela administra seu acesso ao plano. Seus registros financeiros têm permissões
         próprias e não ficam visíveis para a empresa.
       </Txt>
-      {/* O que a empresa vê (D-056): licenças e, com 5 pessoas ativas ou mais, quantas entraram no mês; nunca finanças. */}
+      {/* O que a empresa vê (D-056): e-mails que convidou, situação e datas das licenças; nunca finanças nem o uso do app. */}
       <Txt color={colors.textSecondary}>{BENEFIT_TEXT.whoSees}</Txt>
       {kind === 'pessoal' ? (
         <>

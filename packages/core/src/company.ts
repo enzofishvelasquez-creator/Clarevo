@@ -1,5 +1,5 @@
 import type { IsoDate } from './dates';
-import { formatDateBR, formatMonthName, todayIn } from './dates';
+import { formatDateBR, todayIn } from './dates';
 import { CSV_BOM, CSV_EOL, csvCell, csvText } from './export';
 import { INVITE_BASE_URL, INVITE_CODE_PATTERN, normalizeInviteCode } from './family';
 import { seasonalCard } from './learn/epoca';
@@ -12,8 +12,9 @@ import { ERROR_TEXT } from './validation';
  * renew_license_invite, cancel_license_invite, end_license, preview_license_invite, accept_license e organization_usage
  * (migração 0014), pelas recomendações M-1 a M-6:
  *
- * - M-1: a empresa vê vagas, convites, licenças e, no máximo, o uso do app (quantas pessoas entraram no mês), nunca finanças, nem
- *   somadas. Com menos de 5 pessoas ativas o número de uso do mês não aparece, para ninguém ser identificada.
+ * - M-1: a empresa vê vagas, convites e licenças (e só as contagens delas), nunca finanças, nem somadas, nem o uso do app. O
+ *   indicador "pessoas que entraram no mês" saiu depois da revisão de segurança de 16/10/2026: o RH vê o e-mail de cada licença e
+ *   pode controlar contas próprias, então um número de acessos permitiria identificar quem entrou.
  * - M-2: o convite é um link da empresa, enviado pelo canal interno do RH (sem custo de envio pelo Clarevo).
  * - M-3: a equipe Clarevo cadastra a empresa, o contrato e a primeira pessoa administradora, pelo SQL Editor do Supabase.
  * - M-4: ao encerrar a licença, 30 dias de acesso pleno e depois o plano gratuito, com leitura do histórico. Nada é apagado.
@@ -37,8 +38,6 @@ export const LICENSE_FILTERS: readonly LicenseFilter[] = ['todas', 'convidada', 
 
 /** Até quantas pessoas se convida por vez (a mesma conta do banco). */
 export const LICENSE_BATCH_MAX = 500;
-/** Menos pessoas ativas que isto: o número de uso do mês não aparece (proteção contra identificar alguém). */
-export const USAGE_MIN_ACTIVE = 5;
 /** Dias de acesso pleno depois do fim do benefício (M-4). */
 export const BENEFIT_GRACE_DAYS = 30;
 /** Tamanho máximo do e-mail e das partes dele. */
@@ -83,18 +82,16 @@ export interface CompanyOverview {
   demo: boolean;
 }
 
-/** Indicadores de uso (organization_usage). joinedThisMonth é nulo quando há menos de USAGE_MIN_ACTIVE pessoas ativas. */
+/**
+ * Contagens de licenças (organization_usage): vagas dos contratos em vigor, convidadas, ativas e encerradas (convite cancelado não
+ * conta). As mesmas contagens que o RH já vê na lista de licenças; nada de acesso ao app nem de pessoas.
+ */
 export interface CompanyUsage {
   organizationId: string;
-  /** Primeiro dia do mês dos números de uso. */
-  month: IsoDate;
   seats: number;
   invited: number;
   active: number;
   ended: number;
-  joinedThisMonth: number | null;
-  usageVisible: boolean;
-  usageMinimum: number;
 }
 
 export type InviteOutcome = 'convidada' | 'ja_convidado';
@@ -433,7 +430,7 @@ export const COMPANY_TEXT = {
   title: 'Painel da empresa',
   /** Conta (só na web, só para quem administra). */
   accountTitle: 'Painel da empresa',
-  accountHint: 'Convide pessoas para o benefício, acompanhe as licenças e veja como o app está sendo usado.',
+  accountHint: 'Convide pessoas para o benefício e acompanhe as vagas e as licenças.',
   accountOpen: 'Abrir painel da empresa',
   webOnly: 'O painel da empresa está disponível só na web. Abra o Clarevo no navegador para usá-lo.',
   notAdmin: 'Esta área é para quem administra o benefício de uma empresa. Se você deveria ter acesso, fale com a equipe do Clarevo.',
@@ -520,15 +517,13 @@ export const COMPANY_TEXT = {
   endConfirm: 'Encerrar licença',
   ended: 'Licença encerrada.',
   keep: 'Voltar',
-  /** Uso do app. */
+  /** Uso do app: só as contagens das licenças. */
   usageTitle: 'Uso do app',
-  usageIntro: 'Só números do uso do app e das licenças. Nenhum deles mostra quem entrou.',
+  usageIntro: 'Só a contagem das licenças. A empresa não vê quem entrou no app, nem quando, nem o que cada pessoa faz nele.',
   usageSeats: 'Vagas contratadas',
   usageInvited: 'Convites pendentes',
   usageActive: 'Licenças ativas',
   usageEnded: 'Licenças encerradas',
-  usageJoined: (monthName: string): string => `Pessoas que entraram em ${monthName}`,
-  usageHidden: `Aparece a partir de ${USAGE_MIN_ACTIVE} pessoas ativas.`,
   usageLoadFailed: 'Não foi possível carregar o uso do app.',
   privacy: COMPANY_PRIVACY,
   /** Textos para divulgar (P-028). */
@@ -571,7 +566,7 @@ const PROMO_BASE: readonly PromoText[] = [
     id: 'privacidade',
     title: 'O que a empresa vê',
     text:
-      'Sobre privacidade: a empresa vê quantas licenças existem, a situação de cada uma e, com 5 pessoas ativas ou mais, quantas pessoas entraram no app no mês, sem dizer quem. A empresa não vê valores, categorias, metas, contas, cartões nem a Família de ninguém, nem somados.',
+      'Sobre privacidade: a empresa vê quantas licenças existem e a situação de cada uma. Ela não vê quem usa o app, nem quando, e não vê valores, categorias, metas, contas, cartões nem a Família de ninguém, nem somados.',
   },
 ];
 
@@ -597,19 +592,6 @@ export function promoTexts(today: IsoDate): PromoText[] {
       text: `Em ${card.monthName}, o Clarevo tem conteúdo sobre ${joinTitles(titles)}. Em Aprender, o card "Neste mês" reúne os temas e as calculadoras do período. É informação pública, com fonte e data de revisão, para quem quiser se organizar com antecedência.`,
     },
   ];
-}
-
-/** O mês do uso, por extenso: "outubro". */
-export function usageMonthName(month: IsoDate): string {
-  return formatMonthName(month.slice(0, 7));
-}
-
-/** A linha de "Pessoas que entraram": o número, ou o aviso de que aparece a partir de 5 pessoas ativas. */
-export function usageJoinedLine(usage: Pick<CompanyUsage, 'joinedThisMonth' | 'usageVisible' | 'month'>): { label: string; value: string } {
-  return {
-    label: COMPANY_TEXT.usageJoined(usageMonthName(usage.month)),
-    value: usage.usageVisible && usage.joinedThisMonth !== null ? String(usage.joinedThisMonth) : COMPANY_TEXT.usageHidden,
-  };
 }
 
 /** Textos de quem recebe o benefício (rota /beneficio/[código] e o card de Conta). */
@@ -656,7 +638,7 @@ export const BENEFIT_TEXT = {
   planCardSituation: 'Benefício pela empresa',
   /** "Quem vê estes dados?". */
   whoSees:
-    'A empresa que oferece o benefício vê os e-mails que ela mesma convidou, a situação de cada licença (convite enviado, ativa ou encerrada) e as datas. Com 5 pessoas ativas ou mais, vê também quantas entraram no app no mês, sem dizer quem. ' +
+    'A empresa que oferece o benefício vê os e-mails que ela mesma convidou, a situação de cada licença (convite enviado, ativa ou encerrada) e as datas. Ela não vê quem usa o app depois de aceitar, nem quando. ' +
     COMPANY_PRIVACY,
 } as const;
 
@@ -728,7 +710,6 @@ export function companyTextSamples(): string[] {
     t.renewA11y('ana@empresa.com.br'),
     t.cancelInviteA11y('ana@empresa.com.br'),
     t.endA11y('ana@empresa.com.br'),
-    t.usageJoined('outubro'),
     t.promoCopyA11y('Anúncio do benefício'),
   );
   for (const label of Object.values(LICENSE_FILTER_LABEL)) out.push(label);
