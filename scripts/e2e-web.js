@@ -8892,7 +8892,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // ---- 5. Outro mês: setembro (sem orçamento, sem plano, em aberto zerado e sem comparação com agosto) ----
   await p.getByRole('button', { name: 'Mês anterior: setembro de 2026', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(600);
   t = await k1Keep(); k1s = await k1State();
-  ok('K1 setembro: o seletor leva ao mês, volta ao primeiro cartão e passa a ter 4 cartões (1 de 4, sem Orçamento)', t.includes('Pessoal · Setembro de 2026') && k1s.progress === '1 de 4' && JSON.stringify(k1s.h2) === JSON.stringify(['Entrou e saiu']) &&
+  ok('K1 setembro: o seletor leva ao mês, volta ao primeiro cartão e passa a ter 3 cartões (1 de 3, sem Orçamento e sem Metas, que não teve aporte nem resgate)', t.includes('Pessoal · Setembro de 2026') && k1s.progress === '1 de 3' && JSON.stringify(k1s.h2) === JSON.stringify(['Entrou e saiu']) &&
     t.includes('Recebido\nR$ 6.000,00') && t.includes('Pago\nR$ 3.750,00') && t.includes('Diferença do mês\nRecebido menos Pago\nR$ 2.250,00') && !t.includes('até 07/10'), JSON.stringify(k1s));
   ok('K1 setembro: o link "Voltar para outubro de 2026" aparece', (await visibleCount('button', 'Voltar para outubro de 2026')) === 1);
   await k1Next();
@@ -8901,12 +8901,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await k1Next();
   t = await k1Keep(); k1s = await k1State();
   ok('K1 setembro, 3º cartão: "O que ficou em aberto em setembro" com "Nada em aberto em setembro" e R$ 0,00', JSON.stringify(k1s.h2) === JSON.stringify(['O que ficou em aberto em setembro']) && t.includes('Em aberto\nNada em aberto em setembro\nR$ 0,00'), JSON.stringify(k1s));
-  await k1Next();
-  t = await k1Keep(); k1s = await k1State();
-  ok('K1 setembro, último cartão: Metas, com "Guardado em setembro" R$ 0,00 e sem o plano (o plano é o de hoje)', k1s.progress === '4 de 4' && JSON.stringify(k1s.h2) === JSON.stringify(['Metas']) && t.includes('Guardado em setembro\nR$ 0,00') && !t.includes('Plano das metas'), JSON.stringify(k1s));
+  ok('K1 setembro: sem aporte nem resgate o cartão Metas não aparece (3 de 3 é "O que ficou em aberto em setembro", com "Concluir"), nem o plano, que é o de hoje', k1s.progress === '3 de 3' && JSON.stringify(k1s.h2) === JSON.stringify(['O que ficou em aberto em setembro']) && (await visibleCount('button', 'Concluir')) === 1 && !t.includes('Guardado em setembro') && !t.includes('Plano das metas'), JSON.stringify(k1s));
   await shot('366_seu_mes_setembro');
   // Os links levam ao mesmo mês: Pago por categoria e Contas a pagar de setembro.
-  await btn('Anterior').click(); await p.waitForTimeout(500); await btn('Anterior').click(); await p.waitForTimeout(500);
+  await btn('Anterior').click(); await p.waitForTimeout(500);
   await btn('Ver Pago por categoria').click(); await waitText('Por categoria'); await p.waitForTimeout(600);
   t = await body();
   ok('K1 setembro: "Ver Pago por categoria" abre Pago por categoria de setembro (R$ 3.750,00)', k1Path() === '/composicao' && t.includes('Pessoal · Setembro de 2026') && t.includes('R$ 3.750,00'), `${k1Path()}`);
@@ -8918,6 +8916,15 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar para outubro de 2026').click(); await p.waitForTimeout(600);
   ok('K1 "Voltar para outubro de 2026" leva ao mês de hoje, no primeiro cartão', (await k1Progress()) === '1 de 5' && (await body()).includes('Pessoal · Outubro de 2026') && (await visibleCount('button', 'Voltar para outubro de 2026')) === 0);
   ok('K1 em outubro a seta para a frente do mês está desativada (não há resumo de um mês que não começou)', (await p.getByRole('button', { name: 'Próximo mês', exact: true }).filter({ visible: true }).first().getAttribute('aria-disabled')) === 'true');
+  // Voltando pelo seletor até março de 2025 (a demonstração não tem nada anotado ali, mas tem metas hoje): estado vazio de mês que passou,
+  // sem o cartão Metas (ter metas hoje não é anotação daquele mês) e sem valores de exemplo.
+  for (let i = 0; i < 40 && !(await body()).includes('Pessoal · Março de 2025'); i++) { await p.getByRole('button', { name: /^Mês anterior: / }).filter({ visible: true }).first().click(); await p.waitForTimeout(150); }
+  await waitText('Nada anotado em março'); await p.waitForTimeout(400);
+  t = await k1Keep();
+  ok('K1 março de 2025 (voltando pelo seletor): estado vazio "Nada anotado em março" com o aviso de mês fechado, o botão "Anotar gasto", sem cartões, sem Metas e sem valores',
+    t.includes('Pessoal · Março de 2025') && t.includes('Nada anotado em março') && t.includes('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.') &&
+    (await visibleCount('button', 'Anotar gasto')) === 1 && (await k1Progress()) === null && (await visibleCount('button', 'Próximo')) === 0 && !t.includes('Guardado em') && !/R\$ \d/.test(t), t.slice(0, 300));
+  await p.getByRole('button', { name: 'Voltar para outubro de 2026', exact: true }).filter({ visible: true }).first().click(); await waitText('Entrou e saiu'); await p.waitForTimeout(500);
   await btn('Voltar').click(); await p.waitForTimeout(500);
 
   // ---- 6. Endereços: /seu-mes?mes=AAAA-MM aberto direto, e meses que não valem ----
@@ -9184,8 +9191,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   let k2 = await k2Plain();
   ok('K2 13º salário: título de nível 1 "13º salário" (depois do "Aprender" do cabeçalho), "Organizar o mês · 2 min de leitura" e o subtítulo', JSON.stringify(await k2H1s()) === JSON.stringify(['Aprender', '13º salário']) &&
     t.includes('Organizar o mês · 2 min de leitura') && t.includes('Duas parcelas, o proporcional e os descontos'), JSON.stringify(await k2H1s()));
-  ok('K2 13º salário: os prazos da lei (entre fevereiro e 30 de novembro; até 20 de dezembro), o proporcional (1/12 por mês, 15 dias ou mais) e os descontos só na segunda parcela', k2.includes('entre fevereiro e 30 de novembro') && k2.includes('até 20 de dezembro') &&
-    k2.includes('1/12 da remuneração por mês de serviço') && k2.includes('uma fração de 15 dias ou mais conta como mês inteiro') && k2.includes('A primeira parcela sai sem desconto. Na segunda entram o INSS e o Imposto de Renda.') &&
+  ok('K2 13º salário: os prazos da lei (entre fevereiro e 30 de novembro; até 20 de dezembro), o proporcional (1/12 por mês, 15 dias ou mais) e os descontos sem afirmar em qual parcela (confira o contracheque)', k2.includes('entre fevereiro e 30 de novembro') && k2.includes('até 20 de dezembro') &&
+    k2.includes('1/12 da remuneração por mês de serviço') && k2.includes('uma fração de 15 dias ou mais conta como mês inteiro') && k2.includes('Confira no contracheque quais descontos incidem em cada parcela.') && !k2.includes('sai sem desconto') && !k2.includes('Na segunda entram') &&
     k2.includes('Confira os prazos do ano no site do Ministério do Trabalho e Emprego') && k2.includes('O Clarevo não calcula os descontos'), k2.slice(0, 300));
   ok('K2 13º salário: o exemplo com R$ 3.000,00, R$ 1.500,00, R$ 250,00 e R$ 1.750,00 (7 meses) e as hipóteses fictícias', k2.includes('R$ 3.000,00') && k2.includes('a primeira parcela é de R$ 1.500,00 e a segunda, de R$ 1.500,00 antes dos descontos') &&
     k2.includes('o proporcional é de R$ 250,00 por mês, ou R$ 1.750,00 no total') && k2.includes('Hipóteses do exemplo') && k2.includes('Exemplo fictício: salário fixo de R$ 3.000,00'), k2.slice(k2.indexOf('Exemplo') - 10, k2.indexOf('Exemplo') + 300));
@@ -9223,7 +9230,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await k2StubOpen();
   t = await k2Keep(); k2 = await k2Plain();
   ok('K2 Volta às aulas: título de nível 1 e a lei da anuidade (12 parcelas iguais, 45 dias antes do fim da matrícula), os itens de uso coletivo (Lei 12.886/2013) e os Procons', JSON.stringify(await k2H1s()) === JSON.stringify(['Aprender', 'Volta às aulas: mensalidade e material']) &&
-    k2.includes('é dividido em 12 parcelas mensais iguais, ou em 6, no caso de semestralidade') && k2.includes('pelo menos 45 dias antes do fim do prazo de matrícula') && k2.includes('Itens de uso coletivo, como material de limpeza e de escritório, não podem entrar na lista') &&
+    k2.includes('é dividido em 12 parcelas mensais iguais, ou em 6, no caso de semestralidade') && k2.includes('pelo menos 45 dias antes do fim do prazo de matrícula') && k2.includes('Itens de uso coletivo não podem entrar na lista') && !k2.includes('material de limpeza') &&
     k2.includes('Lei 12.886/2013') && k2.includes('Segundo os Procons, a escola também não escolhe a marca nem o local de compra'), k2.slice(0, 300));
   ok('K2 Volta às aulas: o exemplo R$ 14.400,00 em 12 parcelas de R$ 1.200,00 e, com R$ 600,00 de material, R$ 1.800,00', k2.includes('anuidade de R$ 14.400,00 em 12 parcelas iguais, cada parcela é de R$ 1.200,00') && k2.includes('lista de material custar R$ 600,00') && k2.includes('as saídas desse mês somam R$ 1.800,00'));
   const k2SrcVolta = await k2Sources('volta-as-aulas');

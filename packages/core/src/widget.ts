@@ -24,8 +24,8 @@ import { DEMO_TEXT } from './demo-badge';
 /** O interruptor "Mostrar valores no widget" começa desligado. */
 export const DEFAULT_WIDGET_SHOW_VALUES = false;
 
-/** Versão do formato guardado para o widget ler; muda se um campo mudar de sentido. */
-export const WIDGET_SNAPSHOT_VERSION = 1;
+/** Versão do formato guardado para o widget ler; muda se um campo mudar de sentido ou for acrescentado (2: `builtOn`). */
+export const WIDGET_SNAPSHOT_VERSION = 2;
 
 /** O que o widget mostra no lugar de um valor oculto (o mesmo de "Ocultar valores" no app). */
 export const WIDGET_HIDDEN_MONEY = 'R$ ••••';
@@ -135,6 +135,11 @@ export interface WidgetSnapshot extends WidgetContent {
   version: typeof WIDGET_SNAPSHOT_VERSION;
   /** Mês de "Ainda a pagar" (o de hoje). */
   month: IsoMonth;
+  /**
+   * Dia em que o app montou o conteúdo (AAAA-MM-DD, o `today` da entrada). O texto guardado tem datas relativas ("hoje", "amanhã") e
+   * vencidas contadas até esse dia: em outro dia ele já não vale, e o widget nativo mostra o estado sem dados (`isWidgetSnapshotFresh`).
+   */
+  builtOn: IsoDate;
 }
 
 const whenOf = (dueOn: IsoDate, today: IsoDate): string => (dueOn === today ? 'hoje' : dueOn === addDays(today, 1) ? 'amanhã' : formatDayMonth(dueOn));
@@ -219,5 +224,14 @@ export function buildWidgetContent(input: WidgetInput): WidgetContent {
 
 /** O formato guardado para o widget nativo ler. `JSON.stringify` do resultado é o que vai para o armazenamento compartilhado. */
 export function buildWidgetSnapshot(input: WidgetInput): WidgetSnapshot {
-  return { version: WIDGET_SNAPSHOT_VERSION, month: monthOf(input.today), ...buildWidgetContent(input) };
+  return { version: WIDGET_SNAPSHOT_VERSION, month: monthOf(input.today), builtOn: input.today, ...buildWidgetContent(input) };
+}
+
+/**
+ * O que o widget guardado ainda vale hoje? Só no mesmo dia em que foi montado (`builtOn`): no dia seguinte "hoje" e "amanhã" já não
+ * dizem o que diziam, e a virada de mês (de dezembro para janeiro, por exemplo) também muda o dia. Falso: o widget mostra
+ * `WIDGET_TEXT.medium.noData` ("Abra o Clarevo para atualizar"). `today` é o dia do aparelho, no fuso da pessoa.
+ */
+export function isWidgetSnapshotFresh(snapshot: Pick<WidgetSnapshot, 'builtOn'>, today: IsoDate): boolean {
+  return snapshot.builtOn === today;
 }

@@ -24,7 +24,7 @@ import type { CategoryShare, MonthSummary, ToPaySummary } from './summary';
  *     Só aparece se o mês tem gastos pagos.
  *  3. O que ainda vence: Ainda a pagar e as próximas contas (até 3), com as vencidas ditas à parte.
  *  4. Orçamento: as categorias que chegaram a 80% do orçamento ou mais; pula se não há orçamento no mês.
- *  5. Metas: o guardado no mês e o plano das metas; pula se não há metas.
+ *  5. Metas: o guardado no mês e o plano das metas; pula se não há metas, e em mês que passou sem aporte nem resgate.
  */
 
 export const SEU_MES_ROUTE = '/seu-mes';
@@ -379,6 +379,8 @@ function goalsCard(input: SeuMesInput, current: IsoMonth): SeuMesCard | null {
   if (!goals || goals.count === 0) return null;
   const { month } = input;
   const saved = goals.savedInMonthCents;
+  // Mês que passou sem aporte nem resgate: ter metas hoje não é anotação daquele mês (senão o estado vazio nunca apareceria).
+  if (month < current && saved === 0) return null;
   const rows: SeuMesRow[] = [
     {
       label: saved >= 0 ? SEU_MES_TEXT.goals.saved(month, current) : SEU_MES_TEXT.goals.withdrawn(month, current),
@@ -403,7 +405,8 @@ function goalsCard(input: SeuMesInput, current: IsoMonth): SeuMesCard | null {
 
 /**
  * Os cartões do mês. Entrou e saiu e O que ainda vence sempre existem; Para onde foi só com gastos pagos; Orçamento só com orçamento no
- * mês; Metas só com metas. Mês sem nada anotado nem a pagar (e sem orçamento nem metas): nenhum cartão, só o estado vazio.
+ * mês; Metas só com metas (num mês que passou, só com aporte ou resgate nele). Mês sem nada anotado nem a pagar (e sem orçamento nem
+ * metas): nenhum cartão, só o estado vazio.
  */
 export function buildSeuMes(input: SeuMesInput): SeuMesView {
   const current = monthOf(input.today);

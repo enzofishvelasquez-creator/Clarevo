@@ -13,6 +13,7 @@ import {
   buildWidgetContent,
   buildWidgetSnapshot,
   createDemoRepository,
+  isWidgetSnapshotFresh,
   summarizeToPay,
   type Commitment,
   type WidgetInput,
@@ -219,12 +220,30 @@ describe('widget pequeno', () => {
 });
 
 describe('o que o widget nativo lê', () => {
-  it('o formato guardado tem versão e mês, e vai e volta por JSON sem perder nada', async () => {
+  it('o formato guardado tem versão, mês e o dia da montagem, e vai e volta por JSON sem perder nada', async () => {
     const snapshot = buildWidgetSnapshot(input({ toPay: await demoToPay(), demo: true, showValues: true }));
     expect(snapshot.version).toBe(WIDGET_SNAPSHOT_VERSION);
+    expect(WIDGET_SNAPSHOT_VERSION).toBe(2);
     expect(snapshot.month).toBe('2026-10');
+    expect(snapshot.builtOn).toBe(DEMO_TODAY);
     expect(JSON.parse(JSON.stringify(snapshot))).toEqual(snapshot);
-    expect(Object.keys(snapshot).sort()).toEqual(['medium', 'month', 'small', 'version']);
+    expect(Object.keys(snapshot).sort()).toEqual(['builtOn', 'medium', 'month', 'small', 'version']);
+  });
+
+  it('o dia da montagem vale só naquele dia: no seguinte, e na virada de dezembro para janeiro, o widget pede para abrir o app', () => {
+    const built = (today: string) => buildWidgetSnapshot(input({ today, toPay: null }));
+    const snapshot = built('2026-10-07');
+    expect(isWidgetSnapshotFresh(snapshot, '2026-10-07')).toBe(true);
+    expect(isWidgetSnapshotFresh(snapshot, '2026-10-08')).toBe(false);
+    // Mesmo dia do mês em outro mês, ou o dia anterior, também não vale.
+    expect(isWidgetSnapshotFresh(snapshot, '2026-11-07')).toBe(false);
+    expect(isWidgetSnapshotFresh(snapshot, '2026-10-06')).toBe(false);
+    const newYearsEve = built('2026-12-31');
+    expect(newYearsEve.builtOn).toBe('2026-12-31');
+    expect(isWidgetSnapshotFresh(newYearsEve, '2026-12-31')).toBe(true);
+    expect(isWidgetSnapshotFresh(newYearsEve, '2027-01-01')).toBe(false);
+    // O estado que o widget nativo mostra quando não vale mais.
+    expect(WIDGET_TEXT.medium.noData).toBe('Abra o Clarevo para atualizar');
   });
 
   it('é puro: a mesma entrada dá a mesma saída e nada da entrada muda', async () => {

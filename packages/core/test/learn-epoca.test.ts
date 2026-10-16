@@ -18,6 +18,7 @@ import {
   expectedExampleNumbers,
   incomeTaxQuotas,
   learnReviewWarnings,
+  monthlyShareCents,
   numbersInText,
   publishedTopics,
   reviewDueOn,
@@ -268,14 +269,16 @@ describe('conteúdo de época: os quatro temas novos (D-053)', () => {
     for (const n of [300_000, 150_000, 25_000, 175_000]) expect(expected.has(`R$:${n}`), String(n)).toBe(true);
   });
 
-  it('13º salário: prazos da lei no texto (30 de novembro e 20 de dezembro), descontos na segunda parcela e "confira" o ano', () => {
+  it('13º salário: prazos da lei no texto (30 de novembro e 20 de dezembro), os descontos só mandam conferir o contracheque e "confira" o ano', () => {
     const text = topicDisplayTexts(topic('decimo-terceiro')).join(' ');
     expect(text).toContain('30 de novembro');
     expect(text).toContain('20 de dezembro');
     expect(text).toContain('1/12 da remuneração por mês de serviço');
     expect(text).toContain('15 dias ou mais conta como mês inteiro');
-    expect(text).toContain('A primeira parcela sai sem desconto');
-    expect(text).toContain('Na segunda entram o INSS e o Imposto de Renda');
+    // Quando cada desconto incide não tem fonte conferida: o texto manda conferir o contracheque e não afirma o momento.
+    expect(text).toContain('Confira no contracheque quais descontos incidem em cada parcela');
+    expect(text).toContain('Confira os descontos de cada parcela no contracheque');
+    expect(text).not.toMatch(/sai sem desconto|sem tributos|Na segunda entram|ficam na segunda|só na segunda/i);
     expect(text).toContain('Confira os prazos do ano');
     // Sem número de faixa, alíquota ou tabela: o app só explica e não calcula imposto.
     expect(numbersInText(text).filter((n) => !n.startsWith('R$'))).toEqual([]);
@@ -294,9 +297,14 @@ describe('conteúdo de época: os quatro temas novos (D-053)', () => {
 
   it('volta às aulas: R$ 14.400,00 em 12 parcelas = R$ 1.200,00; com R$ 600,00 de material, R$ 1.800,00', () => {
     const t = topic('volta-as-aulas');
-    expect(1_440_000 / 12).toBe(120_000);
-    expect(120_000 + 60_000).toBe(180_000);
+    const parcel = monthlyShareCents(1_440_000, 12);
+    expect(parcel).toBe(120_000);
+    expect(parcel + 60_000).toBe(180_000);
     for (const n of ['R$ 14.400,00', 'R$ 1.200,00', 'R$ 600,00', 'R$ 1.800,00']) expect(t.example, n).toContain(n);
+    // Os números do texto são os calculados pelas funções do core (os mesmos que o validador do catálogo confere).
+    const expected = expectedExampleNumbers('volta-as-aulas');
+    for (const n of [1_440_000, parcel, 60_000, parcel + 60_000]) expect(expected.has(`R$:${n}`), String(n)).toBe(true);
+    for (const n of numbersInText(`${t.example} ${t.calculation}`)) expect(expected.has(canonicalNumber(n)!), n).toBe(true);
     const text = topicDisplayTexts(t).join(' ');
     for (const part of ['12 parcelas mensais iguais', '45 dias antes do fim do prazo de matrícula', 'itens de uso coletivo', 'Lei 12.886/2013', 'Procons'])
       expect(text, part).toContain(part);

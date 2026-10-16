@@ -22,11 +22,11 @@ export const EPOCA_TOPICS: Topic[] = [
     subtitle: 'Duas parcelas, o proporcional e os descontos',
     question: 'Quando o 13º salário é pago e como é calculado?',
     short:
-      'Quem trabalha com carteira assinada recebe o 13º salário em duas parcelas: a primeira entre fevereiro e 30 de novembro, a segunda até 20 de dezembro. Os descontos de INSS e de Imposto de Renda ficam na segunda.',
+      'Quem trabalha com carteira assinada recebe o 13º salário em duas parcelas: a primeira entre fevereiro e 30 de novembro, a segunda até 20 de dezembro. Confira os descontos de cada parcela no contracheque.',
     paragraphs: [
       'O 13º salário, ou gratificação natalina, é pago em duas parcelas. A primeira pode ser paga entre fevereiro e 30 de novembro e corresponde à metade do salário do mês anterior. A segunda é paga até 20 de dezembro e completa o valor do ano, descontada a primeira. Confira os prazos do ano no site do Ministério do Trabalho e Emprego.',
       'Quem trabalhou só parte do ano recebe o 13º proporcional: 1/12 da remuneração por mês de serviço, e uma fração de 15 dias ou mais conta como mês inteiro. A primeira parcela também pode vir junto com as férias, se a pessoa pedir em janeiro.',
-      'A primeira parcela sai sem desconto. Na segunda entram o INSS e o Imposto de Renda. O INSS do 13º não se soma ao salário do mês para achar a faixa, e o Imposto de Renda é cobrado na fonte, à parte dos outros rendimentos. As faixas mudam com o tempo: confira as tabelas do ano.',
+      'Confira no contracheque quais descontos incidem em cada parcela. O INSS do 13º não se soma ao salário do mês para achar a faixa, e o Imposto de Renda é cobrado na fonte, à parte dos outros rendimentos. As faixas mudam com o tempo: confira as tabelas do ano.',
       'O Clarevo não calcula os descontos. Para anotar, registre cada parcela como recebimento: ela entra no mês em que o valor chega.',
     ],
     example:
@@ -47,7 +47,7 @@ export const EPOCA_TOPICS: Topic[] = [
         MTE,
         'Décimo terceiro salário: entenda o direito, regras e prazos de pagamento (dezembro de 2024)',
         'https://www.gov.br/trabalho-e-emprego/pt-br/noticias-e-conteudo/2024/Dezembro/decimo-terceiro-salario-entenda-o-direito-regras-e-prazos-de-pagamento',
-        'Fração igual ou superior a 15 dias conta como mês completo; a primeira parcela sai sem tributos, e os descontos de Imposto de Renda e INSS incidem na segunda. Trecho de resultado de busca misturado com páginas de prefeituras; a página não abriu',
+        'Fração igual ou superior a 15 dias conta como mês completo. Trecho de resultado de busca misturado com páginas de prefeituras; a página não abriu',
       ),
       oficialEpoca(
         PLANALTO,
@@ -144,7 +144,7 @@ export const EPOCA_TOPICS: Topic[] = [
     paragraphs: [
       'Nas escolas particulares, o valor da anuidade vale por um ano e é dividido em 12 parcelas mensais iguais, ou em 6, no caso de semestralidade. A escola também pode oferecer outros planos de pagamento, desde que a soma não passe do valor total.',
       'O texto da proposta de contrato, o valor da anuidade e o número de vagas por sala precisam ser divulgados em local de fácil acesso pelo menos 45 dias antes do fim do prazo de matrícula. Com essas informações, dá para somar o ano e comparar antes de decidir.',
-      'A lista de material pode pedir itens de uso individual. Itens de uso coletivo, como material de limpeza e de escritório, não podem entrar na lista: o custo deles já está na anuidade (Lei 12.886/2013). Segundo os Procons, a escola também não escolhe a marca nem o local de compra dos itens de uso individual.',
+      'A lista de material pode pedir itens de uso individual. Itens de uso coletivo não podem entrar na lista: o custo deles já está na anuidade (Lei 12.886/2013). Segundo os Procons, a escola também não escolhe a marca nem o local de compra dos itens de uso individual.',
       'Os Procons lembram que não é preciso comprar todo o material no começo do ano. No Clarevo, a parcela da escola pode ser um gasto fixo mensal, e a matrícula e a lista de material entram como conta do ano ou como gasto, na data em que forem pagas.',
     ],
     example:

@@ -16,6 +16,7 @@ import {
   isSeuMesMonth,
   loadInvoicesOfRecords,
   monthOf,
+  parseBRL,
   plannedForGoals,
   savedInMonth,
   searchAppScreens,
@@ -137,9 +138,9 @@ describe('Seu mês, demonstração de outubro (hoje é 07/10/2026)', () => {
 });
 
 describe('Seu mês, outro mês', () => {
-  it('setembro: sem orçamento o cartão pula, as contas em aberto viram "O que ficou em aberto" e o plano não entra', async () => {
+  it('setembro: sem orçamento o cartão pula, as contas em aberto viram "O que ficou em aberto" e sem aporte nem resgate o cartão Metas também pula', async () => {
     const view = buildSeuMes(await readInput(await createDemoRepository(), '2026-09'));
-    expect(view.cards.map((c) => c.id)).toEqual(['entrou-saiu', 'para-onde-foi', 'o-que-vence', 'metas']);
+    expect(view.cards.map((c) => c.id)).toEqual(['entrou-saiu', 'para-onde-foi', 'o-que-vence']);
     expect(rowsOf(card(view, 'entrou-saiu'))).toEqual([
       ['Recebido', 'R$ 6.000,00'],
       ['Pago', 'R$ 3.750,00'],
@@ -154,7 +155,26 @@ describe('Seu mês, outro mês', () => {
     expect(due.title).toBe('O que ficou em aberto em setembro');
     expect(rowsOf(due)).toEqual([['Em aberto', 'R$ 0,00', 'Nada em aberto em setembro']]);
     expect(due.action).toEqual({ label: 'Ver contas a pagar', href: '/a-pagar?mes=2026-09' });
-    expect(rowsOf(card(view, 'metas'))).toEqual([['Guardado em setembro', 'R$ 0,00']]);
+  });
+
+  it('mês que passou com metas, mas sem aporte nem resgate nele: o cartão Metas pula; com aporte (ou resgate), fica sem o plano', async () => {
+    const input = await readInput(await createDemoRepository(), '2026-09');
+    expect(input.goals!.count).toBeGreaterThan(0);
+    expect(input.goals!.savedInMonthCents).toBe(0);
+    expect(buildSeuMes(input).cards.map((c) => c.id)).not.toContain('metas');
+    const saved = buildSeuMes({ ...input, goals: { ...input.goals!, savedInMonthCents: 30_000 } });
+    expect(rowsOf(card(saved, 'metas'))).toEqual([['Guardado em setembro', 'R$ 300,00']]);
+    const withdrawn = buildSeuMes({ ...input, goals: { ...input.goals!, savedInMonthCents: -10_000 } });
+    expect(rowsOf(card(withdrawn, 'metas'))).toEqual([['Resgatado em setembro', 'R$ 100,00']]);
+  });
+
+  it('no mês de hoje o cartão Metas não pula, mesmo com R$ 0,00 guardado (o plano é o de hoje)', async () => {
+    const input = await readInput(await createDemoRepository(), '2026-10');
+    const view = buildSeuMes({ ...input, goals: { count: 2, savedInMonthCents: 0, plannedCents: 98_000 } });
+    expect(rowsOf(card(view, 'metas'))).toEqual([
+      ['Guardado em outubro', 'R$ 0,00'],
+      ['Plano das metas', 'R$ 980,00 por mês'],
+    ]);
   });
 
   it('mês anterior em outro ano: o nome leva o ano', async () => {
@@ -210,23 +230,26 @@ describe('Seu mês, comparação com o mês anterior', () => {
   });
 
   it('as 3 maiores por valor, mesmo "Sem categoria"; as outras viram uma linha', async () => {
-    const view = await withBreakdown(
-      [
-        share('Mercado', 100_000, 100, '10%'),
-        share('Lazer', 80_000, 80, '8%'),
-        share('Saúde', 60_000, 60, '6%'),
-        share('Transporte', 40_000, 40, '4%'),
-        share('Educação', 20_000, 20, '2%'),
-        share('Sem categoria', 700_000, 690, '69%', null),
-      ],
-      null,
-    );
+    const breakdown = [
+      share('Mercado', 100_000, 100, '10%'),
+      share('Lazer', 80_000, 80, '8%'),
+      share('Saúde', 60_000, 60, '6%'),
+      share('Transporte', 40_000, 40, '4%'),
+      share('Educação', 20_000, 20, '2%'),
+      share('Sem categoria', 700_000, 690, '69%', null),
+    ];
+    const paidCents = breakdown.reduce((acc, s) => acc + s.cents, 0);
+    const input = await readInput(await createDemoRepository(), '2026-10');
+    const view = buildSeuMes({ ...input, summary: { ...input.summary, paidCents }, breakdown, previousBreakdown: null });
     const rows = card(view, 'para-onde-foi').rows;
     expect(SEU_MES_TOP).toBe(3);
     expect(rows.map((r) => r.label)).toEqual(['Sem categoria', 'Mercado', 'Lazer', '3 outras categorias']);
     expect(rows[3]).toEqual({ label: '3 outras categorias', value: 'R$ 1.200,00', details: ['12% do pago'] });
-    // A soma dos centavos fecha com Pago.
-    expect(700_000 + 100_000 + 80_000 + 120_000).toBe(1_000_000);
+    // A soma dos centavos das linhas montadas (as 3 maiores e "outras") fecha com o Pago do cartão Entrou e saiu.
+    const shown = rows.reduce((acc, r) => acc + parseBRL(r.value!)!, 0);
+    const pago = parseBRL(rowsOf(card(view, 'entrou-saiu')).find((r) => r[0] === 'Pago')![1]!)!;
+    expect(pago).toBe(1_000_000);
+    expect(shown).toBe(pago);
   });
 
   it('empate no valor: por nome; uma categoria só entre as outras vira "1 outra categoria"', async () => {
@@ -336,6 +359,34 @@ describe('Seu mês, o que pula e o estado vazio', () => {
     const past = buildSeuMes(await readInput(repo, '2026-09'));
     expect(past.empty?.title).toBe('Nada anotado em setembro');
     expect(past.empty?.body).toBe('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.');
+  });
+
+  it('mês que passou sem nada anotado, mesmo com metas hoje: o estado vazio, sem cartão de Metas', async () => {
+    const input = await readInput(await createDemoRepository(), '2025-03', DEMO_TODAY);
+    expect(input.goals!.count).toBeGreaterThan(0);
+    const view = buildSeuMes(input);
+    expect(view.cards).toEqual([]);
+    expect(view.empty).toEqual({
+      title: 'Nada anotado em março',
+      body: 'Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.',
+      action: { label: 'Anotar gasto', href: '/registro/novo?tipo=despesa' },
+    });
+    // Com aporte no mês, o mês tem anotação e o estado vazio não aparece.
+    const withSaved = buildSeuMes({ ...input, goals: { ...input.goals!, savedInMonthCents: 10_000 } });
+    expect(withSaved.empty).toBeNull();
+    expect(withSaved.cards.map((c) => c.id)).toContain('metas');
+  });
+
+  it('no mês de hoje, com metas e nada anotado, o comportamento segue o mesmo: o cartão Metas existe e não há estado vazio', async () => {
+    const repo = new MemoryRepository({ actorId: 'pessoa-nova', displayName: 'Pat', today: () => DEMO_TODAY, latencyMs: 0 });
+    await repo.ensurePersonalSpace('Conta principal');
+    const input = await readInput(repo, '2026-10');
+    const view = buildSeuMes({ ...input, goals: { count: 1, savedInMonthCents: 0, plannedCents: 50_000 } });
+    expect(view.empty).toBeNull();
+    expect(view.cards.map((c) => c.id)).toContain('metas');
+    const past = buildSeuMes({ ...(await readInput(repo, '2026-09')), goals: { count: 1, savedInMonthCents: 0, plannedCents: 50_000 } });
+    expect(past.cards).toEqual([]);
+    expect(past.empty?.title).toBe('Nada anotado em setembro');
   });
 
   it('conta nova com uma conta a pagar e nada mais: os dois cartões que sempre existem, sem o vazio', async () => {
