@@ -1,6 +1,6 @@
 import { APP_SEARCH_TEXT, CALC_UI_TEXT, SIMULATE_TEXT, appScreenIsTab, searchAppScreens, type AppScreen, type LearnSection, type LearnSectionId } from '@clarevo/core';
 import { router, type Href } from 'expo-router';
-import { AppWindow, ArrowRight, BookOpenCheck, Calculator, CalendarDays, ChartLine, Compass, Search, SearchX, X } from 'lucide-react-native';
+import { AppWindow, ArrowRight, BookOpenCheck, Calculator, ChartLine, Compass, Search, SearchX, X } from 'lucide-react-native';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { AccessibilityInfo, Platform, Pressable, StyleSheet, TextInput, View, type ScrollView } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -9,6 +9,7 @@ import { CalcNavRow } from '@/components/calc/parts';
 import { FaqItem } from '@/components/faq-item';
 import { AppHeader } from '@/components/header';
 import { LearnArt } from '@/components/learn-art';
+import { SeasonCardView } from '@/components/season-card';
 import { TopicRow } from '@/components/topic-link';
 import { Body, Card, LinkButton, Screen, Txt, styles as ui } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
@@ -16,16 +17,13 @@ import { GUIDE_TEXT, guideSummary, openGuideEntry, searchGuide, type GuideEntry 
 import {
   LEARN_ACTIONS,
   LEARN_UI_TEXT,
-  SEASONAL_TEXT,
   START_HERE,
-  calculatorHref,
   explanationHref,
   learnSection,
   searchTopics,
   seasonalCard,
   topicBySlug,
   topicsBySection,
-  type SeasonalCard,
   type Topic,
 } from '@/lib/learn';
 import { useSession } from '@/state/session';
@@ -243,45 +241,6 @@ export default function AprenderScreen() {
         </View>
       </Screen>
     </View>
-  );
-}
-
-/**
- * Card "Neste mês" (D-053): título de nível 2 com a legenda "Temas para outubro", uma linha para cada tema do mês (as mesmas
- * linhas das seções, com o tempo de leitura) e, quando um tema liga uma calculadora, a linha dela ("Cota única ou parcelado?").
- */
-function SeasonCardView({ card }: { card: SeasonalCard }) {
-  return (
-    <Card style={{ gap: space[2] }}>
-      <View style={styles.sectionHead}>
-        <View style={styles.calcIcon}>
-          <CalendarDays size={22} color={colors.brand} strokeWidth={2.25} aria-hidden />
-        </View>
-        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <Txt variant="title" accessibilityRole="header" aria-level={2}>
-            {SEASONAL_TEXT.title}
-          </Txt>
-          <Txt variant="caption" color={colors.textSecondary}>
-            {SEASONAL_TEXT.caption(card.monthName)}
-          </Txt>
-        </View>
-      </View>
-      <View>
-        {card.topics.map((t, i) => (
-          <TopicRow key={t.slug} topic={t} last={i === card.topics.length - 1 && card.calculators.length === 0} onPress={() => open(t)} />
-        ))}
-        {card.calculators.map((c, i) => (
-          <CalcNavRow
-            key={`${c.slug}-${c.params.modo ?? ''}`}
-            icon={Calculator}
-            title={c.title}
-            caption={c.caption}
-            last={i === card.calculators.length - 1}
-            onPress={() => router.push(calculatorHref(c))}
-          />
-        ))}
-      </View>
-    </Card>
   );
 }
 

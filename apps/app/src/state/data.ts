@@ -6,6 +6,7 @@ import {
   annualCommitmentIds,
   budgetCrossing,
   buildSeuMes,
+  categoryRefunds,
   categoryBreakdown,
   committedGoalLines,
   essentialMonthly,
@@ -1011,6 +1012,27 @@ export function useMonthBudget(contextId: string | undefined, month: IsoMonth) {
   });
   const summary = useMemo(() => (query.data ? summarizeBudget(query.data) : null), [query.data]);
   return { ...query, summary };
+}
+
+/**
+ * Estornos de cartão informados numa fatura do mês, por categoria (D-054, E1), para a tela do orçamento explicar que o estorno conta
+ * no mês da fatura em que foi informado. Só lê (os lançamentos de cada cartão, que o app já guarda em cache); não muda o usado, que vem
+ * de `month_budget`. `refunds` é null enquanto carrega ou se alguma leitura falhou: nesse caso a tela não mostra a explicação, nunca um
+ * valor de mentira.
+ */
+export function useMonthRefunds(contextId: string | undefined, month: IsoMonth) {
+  const repo = useRepo();
+  const cards = useCards(contextId);
+  const list = cards.data ?? [];
+  const entries = useQueries({
+    queries: list.map((card) => ({
+      queryKey: cardKeys.entries(card.id),
+      queryFn: (): Promise<CardEntry[]> => repo.listCardEntries(card.id),
+    })),
+  });
+  const ready = cards.isSuccess && entries.every((q) => q.isSuccess);
+  const refunds = ready ? categoryRefunds(month, entries.flatMap((q) => q.data ?? [])) : null;
+  return { refunds };
 }
 
 /** Depois de gravar uma linha do orçamento: a lista confirmada entra na hora e o usado do mês recarrega; conta como anotação. */

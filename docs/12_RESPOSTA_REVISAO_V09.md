@@ -2,6 +2,8 @@
 
 15/10/2026. Avaliação item a item (CL-01 a CL-20 e casos T01 a T15) feita na versão atual do código, com sondas próprias no núcleo e num banco descartável (apagado depois). Verificações executadas nesta avaliação: `npm test` (1.352 testes), `npm run typecheck`, `npm run test:db` e `npm run test:api` (181 testes), todas aprovadas. Não foram feitos testes em aparelho nem no Supabase real. Em 15/10/2026, depois desta avaliação, os itens 1 a 8 do plano (seção 2, os que não dependem de decisão) foram implementados (D-050, sem migração); o que depende de Enzo (seção 3) segue sem alteração no app. A evidência de cada item está na seção 2.
 
+Em 16/10/2026, Enzo respondeu à seção 3 ("sim, recomendações", D-054) e o Ciclo N implementou o que dependia só de texto, tela e regra de exibição, sem migração: CL-01 (estorno E1: a regra fica e a tela explica, sugerindo "Editar compra"), CL-10 (barra cheia com trecho listrado e "R$ X acima"; aviso de 80% dispensável no card), CL-05 (legenda "Recebido menos pago até DD/MM · não é saldo") e CL-06 (maior resto nos grupos). Onde esta resposta descreve o app "hoje" nesses itens (partes 1 e 2), vale o que está em `docs/02` e em D-054 de `docs/00`. O roteiro do teste de usabilidade de CL-13 está em `docs/15_TESTE_DE_USABILIDADE.md`.
+
 ## 1. Resultado em uma página
 
 **Falhas confirmadas (corrigir):**

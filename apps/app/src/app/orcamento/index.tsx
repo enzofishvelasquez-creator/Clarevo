@@ -14,6 +14,7 @@ import { ChevronRight, PieChart } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { BudgetBar } from '@/components/budget-bar';
 import { useMoneyMask } from '@/components/committed-parts';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
@@ -21,7 +22,8 @@ import { MoneyTxt } from '@/components/money-text';
 import { MonthStepper } from '@/components/month-stepper';
 import { ErrorState } from '@/components/states';
 import { Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
-import { useMonthBudget, useSpace } from '@/state/data';
+import { useBudgetNotices } from '@/lib/budget-notices';
+import { useMonthBudget, useMonthRefunds, useSpace } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
@@ -32,6 +34,11 @@ import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
  * é por competência: a 1ª parcela de uma compra no cartão conta no mês da compra e as seguintes nos meses depois, mesmo antes de a fatura
  * ser paga; gastos e contas pagas contam no mês da data do pagamento (`BUDGET_TEXT.rule`, a mesma frase do guia e do manual).
  * `?mes=AAAA-MM` abre em outro mês (sem ele, o mês atual).
+ *
+ * D-054 (decisões de 16/10/2026): acima de 100% a barra fica cheia, com um trecho final listrado proporcional ao excedente e o texto
+ * "R$ X acima" (o leitor de tela diz "R$ X acima do orçamento"); de 80% a menos de 100% o card mostra "Chegou a 84% do orçamento." com
+ * "Dispensar aviso" (por categoria e mês, só neste aparelho; volta no mês seguinte); e a categoria com estorno informado numa fatura do
+ * mês explica o estorno em uma linha (`BUDGET_TEXT.refundNote`, a frase do core).
  */
 export default function OrcamentoScreen() {
   const { today } = useSession();
@@ -45,6 +52,7 @@ export default function OrcamentoScreen() {
   const contextId = useSpace().data?.personalContextId;
   const [notice] = useFlash();
   const budget = useMonthBudget(contextId, month);
+  const { refunds } = useMonthRefunds(contextId, month);
   const s = budget.summary;
   const prev = payablesStep(month, currentMonth, -1);
   const next = payablesStep(month, currentMonth, 1);
@@ -97,7 +105,7 @@ export default function OrcamentoScreen() {
             )}
 
             {s.rows.map((r) => (
-              <CategoryCard key={r.category} row={r} month={month} currentMonth={currentMonth} />
+              <CategoryCard key={r.category} row={r} month={month} currentMonth={currentMonth} refundCents={refunds?.[r.category] ?? 0} />
             ))}
 
             {s.without.length > 0 ? (
@@ -141,36 +149,61 @@ function openForm(category: string, month: IsoMonth, currentMonth: IsoMonth) {
   router.push({ pathname: '/orcamento/[categoria]', params: { categoria: category, ...(month !== currentMonth ? { mes: month } : {}) } });
 }
 
-/** Um card por categoria com orçamento: nome, percentual, barra, "usado de orçado" e o que falta (ou passa). Toque abre o formulário. */
-function CategoryCard({ row, month, currentMonth }: { row: BudgetRow; month: IsoMonth; currentMonth: IsoMonth }) {
+/**
+ * Um card por categoria com orçamento: nome, percentual, barra, "usado de orçado" e o que falta (ou passa). Toque abre o formulário.
+ * Fora da área tocável: o aviso de 80% com "Dispensar aviso" e a explicação do estorno, para o botão do aviso não ficar dentro de outro.
+ */
+function CategoryCard({ row, month, currentMonth, refundCents }: { row: BudgetRow; month: IsoMonth; currentMonth: IsoMonth; refundCents: number }) {
   const mask = useMoneyMask();
+  const notices = useBudgetNotices();
+  const showNear = row.nearNotice !== null && notices.ready && !notices.isDismissed(month, row.category);
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={mask.label(`${row.a11yLabel} ${BUDGET_TEXT.changeButton(row.category)}.`)}
-      onPress={() => openForm(row.category, month, currentMonth)}
-      style={(st) => [styles.card, st.pressed && { opacity: 0.85 }, (st as { focused?: boolean }).focused && styles.focusRing]}>
-      <View style={styles.cardHead} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <Txt variant="title" style={{ flexShrink: 1 }}>
-          {row.category}
-        </Txt>
-        <View style={styles.headRight}>
-          <Txt variant="label" style={[tabular, { fontFamily: fonts.bold }]}>
-            {row.percentText}
+    <View style={styles.card}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={mask.label(`${row.a11yLabel} ${BUDGET_TEXT.changeButton(row.category)}.`)}
+        onPress={() => openForm(row.category, month, currentMonth)}
+        style={(st) => [styles.cardPress, st.pressed && { opacity: 0.85 }, (st as { focused?: boolean }).focused && styles.focusRing]}>
+        <View style={styles.cardHead} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <Txt variant="title" style={{ flexShrink: 1 }}>
+            {row.category}
           </Txt>
-          <ChevronRight size={20} color={colors.textSecondary} aria-hidden />
+          <View style={styles.headRight}>
+            <Txt variant="label" style={[tabular, { fontFamily: fonts.bold }]}>
+              {row.percentText}
+            </Txt>
+            <ChevronRight size={20} color={colors.textSecondary} aria-hidden />
+          </View>
         </View>
-      </View>
-      <View style={styles.track} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <View style={[styles.fill, { width: `${row.barTenths / 10}%` }, row.barTenths === 0 && row.usedCents > 0 && styles.fillMin]} />
-      </View>
-      <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ gap: 2 }}>
-        <MoneyTxt style={[tabular, { fontFamily: fonts.bold }]}>{row.amountLine}</MoneyTxt>
-        <MoneyTxt variant="label" color={colors.textSecondary}>
-          {row.balanceLine}
+        <BudgetBar solidTenths={row.solidTenths} stripedTenths={row.stripedTenths} minimal={row.usedCents > 0} />
+        <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ gap: 2 }}>
+          <MoneyTxt style={[tabular, { fontFamily: fonts.bold }]}>{row.amountLine}</MoneyTxt>
+          {/* Acima de 100%: "R$ 100,00 acima", o texto que acompanha o trecho listrado (o botão diz "R$ 100,00 acima do orçamento"). */}
+          <MoneyTxt variant="label" color={colors.textSecondary} style={row.overText ? { fontFamily: fonts.bold, color: colors.text } : undefined}>
+            {row.overText ?? row.balanceLine}
+          </MoneyTxt>
+        </View>
+      </Pressable>
+      {showNear ? (
+        <View style={styles.notice}>
+          <Txt variant="label" style={{ flexShrink: 1 }}>
+            {row.nearNotice}
+          </Txt>
+          <LinkButton
+            label={BUDGET_TEXT.dismissNotice}
+            accessibilityLabel={BUDGET_TEXT.dismissNoticeA11y(row.category, month)}
+            accessibilityHint={BUDGET_TEXT.dismissNoticeHint}
+            style={styles.inlineLink}
+            onPress={() => notices.dismiss(month, row.category)}
+          />
+        </View>
+      ) : null}
+      {refundCents > 0 ? (
+        <MoneyTxt variant="caption" color={colors.textSecondary}>
+          {BUDGET_TEXT.refundNote(refundCents)}
         </MoneyTxt>
-      </View>
-    </Pressable>
+      ) : null}
+    </View>
   );
 }
 
@@ -208,11 +241,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 1,
   },
+  cardPress: { gap: space[3] },
+  notice: { gap: space[1], alignItems: 'flex-start' },
   cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[3] },
   headRight: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
-  track: { height: 12, borderRadius: radius.pill, backgroundColor: colors.brandTint, overflow: 'hidden' },
-  fill: { height: 12, borderRadius: radius.pill, backgroundColor: colors.brand },
-  fillMin: { width: 4 },
   defineRow: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 56 },
   divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
   focusRing: { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid', outlineOffset: 2 } as object,

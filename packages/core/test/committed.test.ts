@@ -317,8 +317,10 @@ describe('demonstração (renda de referência R$ 6.000,00 desde setembro)', () 
     expect([s.outsideCents, s.estimatedOpenCents, s.paidPartCents, s.overdueBeforeCents]).toEqual([217_000, 18_000, 0, 0]);
     const t = committedTexts(s);
     expect(t.highlight).toBe('63,8%');
+    // Maior resto (D-054, CL-06): os grupos somam o total que a tela mostra (44,6 + 14,2 + 5,0 = 63,8); arredondados um a um,
+    // 44,7 + 14,2 + 5,0 dariam 63,9.
     expect(t.groups.map((g) => g.line)).toEqual([
-      'Gastos fixos · R$ 2.680,00 · 44,7%',
+      'Gastos fixos · R$ 2.680,00 · 44,6%',
       'Parcelamentos · R$ 850,00 · 14,2%',
       'Outras contas a pagar · R$ 300,00 · 5,0%',
     ]);
@@ -326,8 +328,9 @@ describe('demonstração (renda de referência R$ 6.000,00 desde setembro)', () 
     expect(t.estimated).toBe('Inclui R$ 180,00 em valores estimados.');
     expect(t.outside).toBe('Fora dos compromissos: R$ 2.170,00');
     expect(t.received).toBeNull(); // sem o Recebido informado
-    // Os percentuais por grupo são arredondados um a um: 44,7 + 14,2 + 5,0 = 63,9, e o total sobre a soma dá 63,8%.
+    // O resumo guarda o arredondamento de cada grupo sozinho (44,7 + 14,2 + 5,0 = 63,9); a tela usa o maior resto e fecha em 63,8%.
     expect(s.fixedPermille! + s.installmentPermille! + s.otherPermille!).toBe(639);
+    expect(t.groups.map((g) => g.permille)).toEqual([446, 142, 50]);
     await d.identity(NOV);
   });
 
@@ -556,8 +559,9 @@ describe('casos de borda', () => {
     expect([s.committedPermille, s.annualPermille, s.debtPermille]).toEqual([988, 400, 142]);
     expect(s.estimatedOpenCents).toBe(258_000);
     const t = committedTexts(s);
+    // 98,8% no total: 44,6 + 40,0 + 14,2 + 0,0 (maior resto, D-054).
     expect(t.groups.map((g) => g.line)).toEqual([
-      'Gastos fixos · R$ 2.680,00 · 44,7%',
+      'Gastos fixos · R$ 2.680,00 · 44,6%',
       'Contas do ano · R$ 2.400,00 · 40,0%',
       'Parcelamentos · R$ 850,00 · 14,2%',
       'Outras contas a pagar · R$ 0,00 · 0,0%',

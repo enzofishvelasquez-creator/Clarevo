@@ -191,8 +191,12 @@ describe('conteúdo de época: o card "Neste mês" (D-053)', () => {
 
   it('o app lê o card pelo dia da sessão e o desenha entre "Calculadoras" e "Comece por aqui", sem estado nem gravação', () => {
     const screen = readFileSync(join(APP_SRC, 'app', '(tabs)', 'aprender.tsx'), 'utf8');
+    // O card é um componente só (D-054): Aprender e Metas o usam; o título e a legenda ficam nele.
+    const card = readFileSync(join(APP_SRC, 'components', 'season-card.tsx'), 'utf8');
     expect(screen).toContain('seasonalCard(today)');
-    expect(screen).toContain('SEASONAL_TEXT.title');
+    expect(screen).toContain("import { SeasonCardView } from '@/components/season-card'");
+    expect(card).toContain('SEASONAL_TEXT.title');
+    expect(card).toContain('SEASONAL_TEXT.caption(card.monthName)');
     const calc = screen.indexOf('CALC_UI_TEXT.learnCardTitle');
     const season = screen.indexOf('<SeasonCardView card={season}');
     const start = screen.indexOf('{LEARN_UI_TEXT.startHere}');

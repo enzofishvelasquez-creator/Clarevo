@@ -1,5 +1,5 @@
 import type { IsoDate, IsoMonth } from './dates';
-import { addDays, formatDayMonth, formatMonthName, monthOf } from './dates';
+import { addDays, daysBetween, formatDayMonth, formatMonthName, monthOf } from './dates';
 import { formatBRL } from './money';
 import type { Commitment } from './records';
 import type { ToPaySummary } from './summary';
@@ -15,7 +15,8 @@ import { DEMO_TEXT } from './demo-badge';
  * - Médio: "Ainda a pagar em {mês}" com o valor, a próxima conta a vencer (nome, data, valor ou "estimado") e quantas já venceram.
  * - Valores ocultos por padrão: só a preferência própria "Mostrar valores no widget" (desligada de início, neste aparelho) os mostra.
  *   Com os valores ocultos, o conteúdo montado nem chega a ter o número: o `WidgetSnapshot` guardado no aparelho para o widget ler
- *   traz "R$ ••••" e "valor oculto", nunca o valor em reais. O nome da conta a vencer aparece em qualquer caso.
+ *   traz "R$ ••••" e "valor oculto", nunca o valor em reais. Também não leva o nome da próxima conta (D-054, P-027): mostra só
+ *   "Próxima conta" e o prazo ("hoje", "amanhã", "em 3 dias"), como o lembrete de vencimento (D-025(3)), que nunca diz o nome.
  * - Estados: normal, vazio ("Nada em aberto neste mês"), sem sessão ("Entre no Clarevo para ver") e sem dados (ainda não lidos).
  *   Sem sessão, o conteúdo ignora tudo o que vier da leitura: nenhuma conta, nenhum valor.
  * - Demonstração: o mesmo conteúdo, com o selo "Demonstração" (os dados são fictícios).
@@ -45,7 +46,7 @@ export const WIDGET_TEXT = {
   availability: 'Disponível quando o app estiver nas lojas',
   explain: 'Mostra quanto ainda falta pagar no mês e a próxima conta a vencer, com um atalho para anotar um gasto.',
   showValues: 'Mostrar valores no widget',
-  showValuesCaption: 'Desligado, o widget mostra R$ •••• no lugar dos valores. Vale só para este aparelho.',
+  showValuesCaption: 'Desligado, o widget mostra R$ •••• no lugar dos valores e, na próxima conta, só o prazo, sem o nome. Vale só para este aparelho.',
   /** Widget pequeno. */
   small: {
     label: 'Anotar gasto',
@@ -61,6 +62,8 @@ export const WIDGET_TEXT = {
     /** "1 vencida", "2 vencidas". */
     overdue: (n: number): string => (n === 1 ? '1 vencida' : `${n} vencidas`),
     estimated: 'estimado',
+    /** Valores ocultos (D-054, P-027): no lugar do nome da conta. */
+    nextHidden: 'Próxima conta',
     badge: DEMO_TEXT.badge,
   },
 } as const;
@@ -91,15 +94,19 @@ export interface WidgetSmall {
   badge: string | null;
 }
 
-/** A próxima conta a vencer (vence hoje ou depois). */
+/**
+ * A próxima conta a vencer (vence hoje ou depois). Com os valores ocultos (D-054, P-027), nada da conta: o nome vira "Próxima conta",
+ * o prazo é dito em dias ("hoje", "amanhã", "em 3 dias"), o valor é "R$ ••••", `estimated` é falso e a linha traz só o nome e o prazo.
+ */
 export interface WidgetNext {
+  /** "Internet"; com os valores ocultos, "Próxima conta". */
   name: string;
-  /** "hoje", "amanhã" ou "15/10". */
+  /** "hoje", "amanhã" e "15/10"; com os valores ocultos, "hoje", "amanhã" e "em 8 dias". */
   when: string;
   /** "R$ 150,00", "≈ R$ 180,00" (valor estimado) ou "R$ ••••" com os valores ocultos. */
   amount: string;
   estimated: boolean;
-  /** "Internet · 15/10 · R$ 150,00" (e " · estimado" quando o valor é estimado). */
+  /** "Internet · 15/10 · R$ 150,00" (e " · estimado" quando o valor é estimado); oculto: "Próxima conta · em 8 dias". */
   line: string;
 }
 
@@ -144,13 +151,23 @@ export interface WidgetSnapshot extends WidgetContent {
 
 const whenOf = (dueOn: IsoDate, today: IsoDate): string => (dueOn === today ? 'hoje' : dueOn === addDays(today, 1) ? 'amanhã' : formatDayMonth(dueOn));
 
-/** "vence hoje", "vence amanhã" ou "vence em 15/10". */
-const dueSpoken = (when: string): string => (when === 'hoje' || when === 'amanhã' ? `vence ${when}` : `vence em ${when}`);
+/** O prazo em dias, sem data: "hoje", "amanhã" ou "em 3 dias" (valores ocultos, como o lembrete). */
+function daysWhenOf(dueOn: IsoDate, today: IsoDate): string {
+  const days = Math.max(0, daysBetween(today, dueOn));
+  return days === 0 ? 'hoje' : days === 1 ? 'amanhã' : `em ${days} dias`;
+}
+
+/** "vence hoje", "vence amanhã", "vence em 3 dias" ou "vence em 15/10". */
+const dueSpoken = (when: string): string => (when === 'hoje' || when === 'amanhã' ? `vence ${when}` : when.startsWith('em ') ? `vence ${when}` : `vence em ${when}`);
 
 function nextOf(c: Commitment, today: IsoDate, showValues: boolean): WidgetNext {
+  // Valores ocultos: nem o nome nem o valor da conta, só "Próxima conta" e o prazo (D-054, P-027).
+  if (!showValues) {
+    const when = daysWhenOf(c.dueOn, today);
+    return { name: WIDGET_TEXT.medium.nextHidden, when, amount: WIDGET_HIDDEN_MONEY, estimated: false, line: `${WIDGET_TEXT.medium.nextHidden} · ${when}` };
+  }
   const estimated = c.amountIsEstimate;
-  const money = showValues ? formatBRL(c.amountCents) : WIDGET_HIDDEN_MONEY;
-  const amount = estimated ? `≈ ${money}` : money;
+  const amount = estimated ? `≈ ${formatBRL(c.amountCents)}` : formatBRL(c.amountCents);
   const when = whenOf(c.dueOn, today);
   return {
     name: c.description,
@@ -162,7 +179,8 @@ function nextOf(c: Commitment, today: IsoDate, showValues: boolean): WidgetNext 
 }
 
 function nextSpoken(next: WidgetNext, c: Commitment, showValues: boolean): string {
-  const money = showValues ? formatBRL(c.amountCents) : WIDGET_HIDDEN_A11Y;
+  if (!showValues) return `${WIDGET_TEXT.medium.nextHidden}, ${dueSpoken(next.when)}.`;
+  const money = formatBRL(c.amountCents);
   const value = next.estimated ? `cerca de ${money}, valor estimado` : money;
   return `Próxima conta: ${next.name}, ${dueSpoken(next.when)}, ${value}.`;
 }

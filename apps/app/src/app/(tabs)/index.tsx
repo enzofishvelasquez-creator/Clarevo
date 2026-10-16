@@ -1,4 +1,4 @@
-import { COMMITTED_TEXT, ERROR_TEXT, SUMMARY_NAV_TEXT, committedLine, emptyMonthCaption, formatDateBR, formatMonthBR, monthOf, payablesMonthParams, toPayCaption } from '@clarevo/core';
+import { COMMITTED_TEXT, ERROR_TEXT, SUMMARY_NAV_TEXT, committedLine, emptyMonthCaption, formatMonthBR, monthOf, payablesMonthParams, toPayCaption } from '@clarevo/core';
 import { router, useFocusEffect } from 'expo-router';
 import { AlertCircle, ArrowRight, CalendarClock, ChevronRight, Plus, ShieldCheck } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -96,7 +96,7 @@ export default function ResumoScreen() {
               <>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Diferença do mês, ${moneyA11y(s.differenceCents, hidden)}`}
+                  accessibilityLabel={`Diferença do mês, ${moneyA11y(s.differenceCents, hidden)}. ${SUMMARY_NAV_TEXT.differenceCaptionA11y(month, today)}`}
                   accessibilityHint="Mostra os registros que compõem o total"
                   onPress={() => router.push({ pathname: '/composicao', params: { tipo: 'diferenca' } })}
                   style={(st) => (st as { focused?: boolean }).focused && styles.focusOnBrand}>
@@ -105,8 +105,7 @@ export default function ResumoScreen() {
                   </Txt>
                   <FitMoney cents={s.differenceCents} color={colors.textOnBrand} />
                   <Txt variant="caption" color={colors.textOnBrandSoft}>
-                    Recebimentos menos pagamentos confirmados
-                    {month === currentMonth ? ` · até ${formatDateBR(today).slice(0, 5)}` : ''}
+                    {SUMMARY_NAV_TEXT.differenceCaption(month, today)}
                   </Txt>
                   {s.differenceCents < 0 ? (
                     <Txt variant="caption" color={colors.textOnBrand} style={{ fontFamily: fonts.bold }}>

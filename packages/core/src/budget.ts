@@ -1,5 +1,5 @@
 import type { CardEntry } from './records';
-import { installmentAmounts } from './cards';
+import { CARDS_TEXT, installmentAmounts } from './cards';
 import type { IsoDate, IsoMonth } from './dates';
 import { addMonths, formatMonthName, formatMonthYearBR, isValidIsoMonth, monthOf, monthsBetween } from './dates';
 import { formatInteger } from './learn/format';
@@ -27,6 +27,11 @@ import { formatPermille } from './committed';
  *  − estornos de cartão informados com categoria, no mês da fatura em que foram informados (o estorno não tem data própria);
  *  nunca abaixo de zero por categoria. Encargos, saldo anterior e crédito levado não têm categoria e ficam fora. Movimentos de
  *  metas e recebimentos nunca contam.
+ *
+ * D-054 (decisões de 16/10/2026), sem mudar nenhuma regra acima: (1) a tela explica que o estorno conta no mês da fatura em que foi
+ * informado (`categoryRefunds`, `CARDS_TEXT.refundBudget`); (2) acima de 100% a barra fica cheia, com um trecho final listrado
+ * proporcional ao excedente (`overflowBar`) e o texto "R$ X acima"; o aviso de 80% pode ser dispensado no card, por categoria e mês,
+ * só neste aparelho (`budgetNoticeKey`, `dismissBudgetNotice`).
  *
  * Limite pessoal: de 10% a 100% da renda de referência, em pontos inteiros, com vigência "a partir de" um mês. É escolha da
  * pessoa e nunca vem preenchido. Uma linha sem percentual (null) encerra a vigência ("Tirar o limite a partir de novembro"),
@@ -148,6 +153,20 @@ export function categoryUsage(month: IsoMonth, source: BudgetUsageSource): Recor
   return Object.fromEntries(BUDGET_CATEGORIES.map((c) => [c, Math.max(0, spent.get(c) ?? 0)]));
 }
 
+/**
+ * Estornos informados com categoria numa fatura do mês (o que o usado do mês desconta), por categoria: as seis, em centavos. Só
+ * explica o usado (D-054, E1): a regra de `categoryUsage` não muda. Estorno automático (crédito levado) não tem categoria e fica fora.
+ */
+export function categoryRefunds(month: IsoMonth, entries: BudgetUsageSource['entries']): Record<string, Cents> {
+  const refunds = new Map<string, Cents>();
+  for (const e of entries) {
+    if (e.kind === 'estorno' && e.sourceMonth === null && e.invoiceMonth === month && e.category !== null && isBudgetCategory(e.category)) {
+      refunds.set(e.category, (refunds.get(e.category) ?? 0) + e.amountCents);
+    }
+  }
+  return Object.fromEntries(BUDGET_CATEGORIES.map((c) => [c, refunds.get(c) ?? 0]));
+}
+
 /** Uma linha de month_budget: a categoria, o orçamento vigente (null: nenhum ou encerrado) e o usado no mês. */
 export interface MonthBudgetLine {
   category: string;
@@ -204,6 +223,66 @@ export function percentFloor(usedCents: Cents, budgetCents: Cents): number {
   return (a - (a % budgetCents)) / budgetCents;
 }
 
+// ---------------------------------------------------------------------------
+// Acima de 100% (CL-10, D-054)
+// ---------------------------------------------------------------------------
+
+/** O trecho listrado nunca é menor que 2% da largura da barra, para o excedente aparecer mesmo quando é de poucos centavos. */
+export const OVERFLOW_MIN_TENTHS = 20;
+
+/** Barra de um valor contra o seu limite (orçamento ou limite pessoal). Larguras em décimos da barra inteira (0 a 1.000). */
+export interface OverflowBar {
+  /** max(0, usado − limite), em centavos. */
+  overCents: Cents;
+  /** Trecho sólido. Sem excedente, o percentual do limite (no máximo 1.000); com excedente, o que sobra do trecho listrado. */
+  solidTenths: number;
+  /** Trecho final listrado, proporcional ao excedente (excedente ÷ limite), de 2% da largura até a barra inteira; 0 sem excedente. */
+  stripedTenths: number;
+}
+
+/**
+ * A barra de `usedCents` contra `limitCents`. Até o limite, é o percentual de sempre. Acima dele, a barra fica cheia e termina num
+ * trecho listrado proporcional ao excedente, limitado à largura: 133,3% (R$ 400,00 de R$ 300,00) tem 33,3% listrado e 66,7% sólido;
+ * 200% ou mais é toda listrada. O excedente também sai sempre em texto ("R$ 100,00 acima"): a barra nunca é a única pista.
+ */
+export function overflowBar(usedCents: Cents, limitCents: Cents): OverflowBar {
+  if (limitCents <= 0) return { overCents: Math.max(0, usedCents), solidTenths: 0, stripedTenths: usedCents > 0 ? 1000 : 0 };
+  if (usedCents <= limitCents) return { overCents: 0, solidTenths: Math.min(1000, percentTenths(usedCents, limitCents)), stripedTenths: 0 };
+  const overCents = usedCents - limitCents;
+  const stripedTenths = Math.min(1000, Math.max(OVERFLOW_MIN_TENTHS, percentTenths(overCents, limitCents)));
+  return { overCents, solidTenths: 1000 - stripedTenths, stripedTenths };
+}
+
+/** Chave do aviso de 80% dispensado: categoria e mês ("2026-10|Mercado"). Volta no mês seguinte porque a chave muda. */
+export function budgetNoticeKey(month: IsoMonth, category: string): string {
+  return `${month}|${category}`;
+}
+
+/** No máximo 120 avisos dispensados guardados no aparelho, os mais novos; os de mais de 24 meses atrás saem. */
+export const BUDGET_NOTICE_KEEP = 120;
+
+/** A chave guardada tem a forma "AAAA-MM|Categoria"? (o que vem do aparelho é conferido antes de valer) */
+export function isBudgetNoticeKey(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const [month, category, ...rest] = value.split('|');
+  return rest.length === 0 && month !== undefined && isValidIsoMonth(month) && category !== undefined && isBudgetCategory(category);
+}
+
+/** O aviso de 80% desta categoria e mês foi dispensado neste aparelho? */
+export function isBudgetNoticeDismissed(dismissed: readonly string[], month: IsoMonth, category: string): boolean {
+  return dismissed.includes(budgetNoticeKey(month, category));
+}
+
+/**
+ * Lista nova com o aviso da categoria e do mês dispensado. Sem repetir, sem lixo (chaves inválidas saem), sem meses de mais de 24
+ * meses antes de hoje e com no máximo `BUDGET_NOTICE_KEEP` itens (os mais novos). Não muda a lista de entrada.
+ */
+export function dismissBudgetNotice(dismissed: readonly string[], month: IsoMonth, category: string, today: IsoDate): string[] {
+  const oldest = addMonths(monthOf(today), -BUDGET_MONTHS_BACK);
+  const next = [...dismissed, budgetNoticeKey(month, category)].filter((k, i, all) => isBudgetNoticeKey(k) && all.indexOf(k) === i && k.slice(0, 7) >= oldest);
+  return next.slice(-BUDGET_NOTICE_KEEP);
+}
+
 export interface BudgetRow {
   category: string;
   budgetId: string;
@@ -219,8 +298,20 @@ export interface BudgetRow {
   tenths: number;
   /** "34,4%" */
   percentText: string;
-  /** Largura da barra em décimos, de 0 a 1.000. */
+  /** Largura do preenchimento em décimos, de 0 a 1.000 (cheia a partir de 100%). */
   barTenths: number;
+  /** Trecho sólido da barra, em décimos da largura (D-054): com excedente, o que sobra do trecho listrado. */
+  solidTenths: number;
+  /** Trecho final listrado, proporcional ao excedente; 0 sem excedente. */
+  stripedTenths: number;
+  /** "R$ 100,00 acima" (só com excedente), o texto que acompanha o trecho listrado. */
+  overText: string | null;
+  /** "R$ 100,00 acima do orçamento" (só com excedente), o que o leitor de tela anuncia. */
+  overA11y: string | null;
+  /** De 80% a menos de 100% do orçamento: o percentual inteiro, para baixo (84,9% → 84); senão null. */
+  nearPercent: number | null;
+  /** "Chegou a 84% do orçamento." (só com `nearPercent`), o aviso de 80% do card, que a pessoa pode dispensar. */
+  nearNotice: string | null;
   level: BudgetLevel;
   /** "R$ 412,30 de R$ 1.200,00" */
   amountLine: string;
@@ -256,6 +347,9 @@ export function budgetRow(line: MonthBudgetLine & { budgetId: string; budgetVers
   const percentText = formatPermille(tenths, used);
   const balanceLine = balanceOf(b, used);
   const amountLine = BUDGET_TEXT.amounts(used, b);
+  const bar = overflowBar(used, b);
+  const level = budgetLevel(used, b);
+  const nearPercent = level === 1 && used < b ? percentFloor(used, b) : null;
   return {
     category,
     budgetId: line.budgetId,
@@ -268,7 +362,13 @@ export function budgetRow(line: MonthBudgetLine & { budgetId: string; budgetVers
     tenths,
     percentText,
     barTenths: Math.min(1000, tenths),
-    level: budgetLevel(used, b),
+    solidTenths: bar.solidTenths,
+    stripedTenths: bar.stripedTenths,
+    overText: bar.overCents > 0 ? BUDGET_TEXT.overShort(bar.overCents) : null,
+    overA11y: bar.overCents > 0 ? BUDGET_TEXT.over(bar.overCents) : null,
+    nearPercent,
+    nearNotice: nearPercent === null ? null : BUDGET_TEXT.nearNotice(nearPercent),
+    level,
     amountLine,
     balanceLine,
     a11yLabel: `${category}, ${amountLine}, ${percentText} do orçamento. ${balanceLine}.`,
@@ -481,6 +581,39 @@ export interface LimitStatus {
   line: string;
   /** Só 'perto' e 'acima': "Novembro está a 2,0 pontos do limite de 30% que você escolheu." */
   note: string | null;
+  /** A barra do comprometido contra o limite (D-054); null sem a renda de referência em centavos na chamada. */
+  bar: LimitBar | null;
+}
+
+/** Barra do limite pessoal: 100% da barra é o limite em reais (percentual × renda de referência). */
+export interface LimitBar extends OverflowBar {
+  /** Limite em centavos: a renda de referência × percentual ÷ 100, para baixo. */
+  limitCents: Cents;
+  /** "R$ 780,00 acima" (só 'acima'), o texto que acompanha o trecho listrado. */
+  overText: string | null;
+  /** "R$ 780,00 acima do limite" (só 'acima'), o que o leitor de tela anuncia. */
+  overA11y: string | null;
+}
+
+/** O limite em reais: renda de referência × percentual ÷ 100, para baixo (R$ 6.000,00 a 60% = R$ 3.600,00). */
+export function limitAmountCents(referenceCents: Cents, percent: number): Cents {
+  return Math.floor((referenceCents * percent) / 100);
+}
+
+/**
+ * A barra do comprometido contra o limite. Só fica "acima" quando a situação do mês também é 'acima' (a comparação em milésimos
+ * que a tela mostra), então a barra e a frase nunca discordam: o excedente é o comprometido menos o limite, de pelo menos R$ 0,01.
+ */
+function limitBar(kind: LimitKind, committedCents: Cents, referenceCents: Cents, percent: number): LimitBar {
+  const limitCents = limitAmountCents(referenceCents, percent);
+  const over = kind === 'acima' ? Math.max(1, committedCents - limitCents) : 0;
+  const bar = over > 0 ? overflowBar(limitCents + over, limitCents) : overflowBar(Math.min(committedCents, limitCents), limitCents);
+  return {
+    ...bar,
+    limitCents,
+    overText: over > 0 ? LIMIT_TEXT.overShort(over) : null,
+    overA11y: over > 0 ? LIMIT_TEXT.overA11y(over) : null,
+  };
 }
 
 /** "2,0" a partir de 20 décimos. */
@@ -496,7 +629,7 @@ function monthStart(month: IsoMonth, today: IsoDate): string {
 /**
  * Situação do mês pelo comprometido (milésimos da renda de referência) e pelo limite vigente. Sem referência ou sem limite,
  * null: o limite só aparece com a renda de referência definida. 'perto': a 5 pontos do limite ou menos (inclusive no limite);
- * 'acima': passou do limite.
+ * 'acima': passou do limite. referenceCents (opcional): a renda de referência, para a barra do limite (`bar`).
  */
 export function limitStatus(
   month: IsoMonth,
@@ -504,6 +637,7 @@ export function limitStatus(
   committedCents: Cents,
   limitPercent: number | null,
   today: IsoDate,
+  referenceCents: Cents | null = null,
 ): LimitStatus | null {
   if (committedPermilleValue === null || limitPercent === null) return null;
   const diffTenths = limitPercent * 10 - committedPermilleValue;
@@ -515,7 +649,8 @@ export function limitStatus(
   else if (kind === 'perto') {
     note = diffTenths === 0 ? LIMIT_TEXT.atLimit(start, limitPercent) : LIMIT_TEXT.near(start, tenthsText(diffTenths), pointsWord(diffTenths), limitPercent);
   }
-  return { month, percent: limitPercent, permille: committedPermilleValue, diffTenths, kind, line, note };
+  const bar = referenceCents === null || referenceCents <= 0 ? null : limitBar(kind, committedCents, referenceCents, limitPercent);
+  return { month, percent: limitPercent, permille: committedPermilleValue, diffTenths, kind, line, note, bar };
 }
 
 /** Um mês para o aviso ao gravar uma conta: comprometido em milésimos (null sem referência). */
@@ -603,6 +738,16 @@ export const BUDGET_TEXT = {
   /** "R$ 12,30 acima do orçamento" */
   over: (cents: Cents) => `${formatBRL(cents)} acima do orçamento`,
   full: 'Orçamento usado por inteiro',
+  /** O texto do trecho listrado da barra (D-054): "R$ 100,00 acima". O leitor de tela diz `over`. */
+  overShort: (cents: Cents) => `${formatBRL(cents)} acima`,
+  /** O aviso de 80% no card, que pode ser dispensado: "Chegou a 84% do orçamento." */
+  nearNotice: (percent: number) => `Chegou a ${formatInteger(percent)}% do orçamento.`,
+  dismissNotice: 'Dispensar aviso',
+  /** "Dispensar aviso de Mercado em outubro de 2026" */
+  dismissNoticeA11y: (category: string, month: IsoMonth) => `Dispensar aviso de ${category} em ${formatMonthYearBR(month)}`,
+  dismissNoticeHint: 'O aviso some só neste aparelho e volta no mês seguinte.',
+  /** Categoria com estorno informado numa fatura do mês (D-054, E1): "Inclui estorno de R$ 150,00. O estorno conta no mês da fatura..." */
+  refundNote: (cents: Cents) => `Inclui estorno de ${formatBRL(cents)}. ${CARDS_TEXT.refundBudget.rule}`,
   /** Legenda de Movimentos › Organizar. */
   organize: {
     title: 'Orçamento por categoria',
@@ -680,6 +825,10 @@ export const LIMIT_TEXT = {
   atLimit: (month: string, percent: number) => `${month} está no limite de ${percent}% que você escolheu.`,
   /** "Novembro passou 3,5 pontos do limite de 30% que você escolheu." */
   over: (month: string, points: string, word: string, percent: number) => `${month} passou ${points} ${word} do limite de ${percent}% que você escolheu.`,
+  /** O texto do trecho listrado da barra do limite (D-054): "R$ 780,00 acima". */
+  overShort: (cents: Cents) => `${formatBRL(cents)} acima`,
+  /** O que o leitor de tela diz: "R$ 780,00 acima do limite". */
+  overA11y: (cents: Cents) => `${formatBRL(cents)} acima do limite`,
   /** Aviso ao gravar uma conta: "Com esta conta, novembro chega a 32,0% da renda, acima do limite de 30% que você escolheu." */
   crossed: (monthName: string, percentText: string, percent: number) =>
     `Com esta conta, ${monthName} chega a ${percentText} da renda, acima do limite de ${percent}% que você escolheu.`,

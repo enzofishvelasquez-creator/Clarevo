@@ -1,4 +1,4 @@
-import { addMonths, formatMonthBR, isValidIsoMonth, type IsoMonth } from './dates';
+import { addMonths, formatDayMonth, formatMonthBR, isValidIsoMonth, monthOf, type IsoDate, type IsoMonth } from './dates';
 import { searchWords } from './learn/search';
 
 /**
@@ -166,6 +166,15 @@ export const SUMMARY_NAV_TEXT = {
   /** Dicas dos totais do cabeçalho (o nome acessível continua "Recebido, R$ ..." e "Pago, R$ ..."). */
   receivedHint: 'Abre os recebimentos do mês',
   paidHint: 'Abre os pagamentos do mês, com a divisão por categoria',
+  /**
+   * Legenda sob "Diferença do mês" (D-054, CL-05): "Recebido menos pago até 07/10 · não é saldo". No mês de hoje, a data de hoje da
+   * sessão; em outro mês, "no mês". A estrutura do Resumo não muda (D-022): é só o texto da legenda.
+   */
+  differenceCaption: (viewedMonth: IsoMonth, today: IsoDate): string =>
+    `Recebido menos pago ${monthOf(today) === viewedMonth ? `até ${formatDayMonth(today)}` : 'no mês'} · não é saldo`,
+  /** A mesma legenda para o leitor de tela, sem o ponto de separação: "Recebido menos pago até 07/10. Não é saldo." */
+  differenceCaptionA11y: (viewedMonth: IsoMonth, today: IsoDate): string =>
+    `Recebido menos pago ${monthOf(today) === viewedMonth ? `até ${formatDayMonth(today)}` : 'no mês'}. Não é saldo.`,
 } as const;
 
 // ---------------------------------------------------------------------------------------------------------------------

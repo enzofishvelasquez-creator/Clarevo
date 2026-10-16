@@ -1,7 +1,7 @@
 import type { IsoDate, IsoMonth } from './dates';
 import { addMonths, formatMonthBR, formatMonthName, formatMonthYearBR, isValidIsoMonth, monthOf, monthRange } from './dates';
 import { formatInteger } from './learn/format';
-import { monthlyShareCents, percentTenths } from './learn/math';
+import { monthlyShareCents, percentTenths, sharesCents } from './learn/math';
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS, formatBRL, parseBRL, roundDiv } from './money';
 import type { Commitment, CommitmentSeries, FinancialRecord, IncomeReference, SeriesKind, SeriesNature } from './records';
@@ -21,8 +21,10 @@ import { ERROR_TEXT } from './validation';
  * - Gastos anotados sem conta a pagar não entram. Contas em aberto vencidas antes do mês aparecem à parte (só no mês de
  *   hoje) e contam no mês do vencimento delas.
  * - Renda considerada = renda de referência viva com o maior "a partir de" até M; sem ela, só valores em reais.
- * - Percentual em milésimos, metade para cima, em inteiros: (2000 × comprometido + renda) ÷ (2 × renda); cada grupo é
- *   arredondado sozinho e o total sobre a soma.
+ * - Percentual em milésimos, metade para cima, em inteiros: (2000 × comprometido + renda) ÷ (2 × renda), o do total (o que o
+ *   banco devolve em month_committed). Na tela, os grupos dividem esse total pelo maior resto, na proporção dos centavos de cada um
+ *   (`groupPermilleShares`, como "Por categoria" do Pago, D-054): a soma dos percentuais dos grupos é sempre o percentual do total.
+ *   Os milésimos arredondados de cada grupo sozinho seguem em `CommittedSummary` (fixedPermille e os outros).
  * - "Fora dos compromissos" = renda − comprometido (pode ser negativo); não é saldo nem dinheiro disponível.
  * - Identidade: comprometido(M) = Σ pagas de C(M) + summarizeToPay(…, M).dueInMonthCents.
  * - Contas do ano (P-019): linha informativa com o valor do ano dividido por 12, fora do percentual.
@@ -666,6 +668,26 @@ export function paymentsForecast(paidCents: Cents, toPay: ToPaySummary): Payment
 
 const pctOrNull = (permille: number | null, cents: Cents) => (permille === null ? null : formatPermille(permille, cents));
 
+/**
+ * Milésimos de cada grupo para a tela (D-054, CL-06): o percentual do total (`committedPermille`, o do banco) dividido pelos grupos
+ * pelo maior resto, na proporção dos centavos de cada um. Cada grupo recebe o piso e os milésimos que sobram vão para os maiores
+ * restos, então a soma dos grupos é exatamente o percentual do total que a tela mostra. Sem referência, null em todos. Sem
+ * comprometido, 0 em todos. Novembro da demonstração: total 73,0%, grupos 44,7% + 14,2% + 9,1% + 5,0% (e não 9,2%, que somaria 73,1%).
+ */
+export function groupPermilleShares(s: Pick<CommittedSummary, 'committedPermille' | 'fixedCents' | 'annualCents' | 'installmentCents' | 'cardCents' | 'otherCents'>): Record<CommittedGroup, number | null> {
+  const cents: Record<CommittedGroup, Cents> = {
+    fixos: Math.max(0, s.fixedCents),
+    anuais: Math.max(0, s.annualCents),
+    parcelamentos: Math.max(0, s.installmentCents),
+    faturas: Math.max(0, s.cardCents),
+    outras: Math.max(0, s.otherCents),
+  };
+  if (s.committedPermille === null) return { fixos: null, anuais: null, parcelamentos: null, faturas: null, outras: null };
+  const weights = COMMITTED_GROUPS.map((g) => cents[g]);
+  const shares = weights.some((w) => w > 0) ? sharesCents(s.committedPermille, weights) : weights.map(() => 0);
+  return Object.fromEntries(COMMITTED_GROUPS.map((g, i) => [g, shares[i]!])) as Record<CommittedGroup, number | null>;
+}
+
 /** Textos fixos e montados da renda comprometida, da renda de referência e da previsão dos pagamentos do mês. */
 export const COMMITTED_TEXT = {
   title: 'Renda comprometida',
@@ -931,13 +953,8 @@ export function committedTexts(s: CommittedSummary, receivedCents: Cents | null 
     faturas: s.cardCents,
     outras: s.otherCents,
   };
-  const groupPermille: Record<CommittedGroup, number | null> = {
-    fixos: s.fixedPermille,
-    anuais: s.annualPermille,
-    parcelamentos: s.installmentPermille,
-    faturas: s.cardPermille,
-    outras: s.otherPermille,
-  };
+  // Os grupos dividem o percentual do total pelo maior resto: a soma na tela é exatamente o total (D-054, CL-06).
+  const groupPermille = groupPermilleShares(s);
   // Contas do ano e faturas de cartão só aparecem na composição quando há alguma no mês (os grupos vieram depois dos outros).
   const groups = COMMITTED_GROUPS.filter(
     (g) => (g !== 'anuais' || s.annualCents > 0 || s.items.anuais.length > 0) && (g !== 'faturas' || s.cardCents > 0 || s.items.faturas.length > 0),

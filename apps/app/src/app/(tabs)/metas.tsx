@@ -10,10 +10,11 @@ import { ClosedGoals, GoalCard, ReserveCard } from '@/components/goal-cards';
 import { AppHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
 import { SavingsCard, SavingsPlanInReserve } from '@/components/savings-card';
+import { SeasonCardView } from '@/components/season-card';
 import { EmptyState, ErrorState } from '@/components/states';
 import { TopicRow } from '@/components/topic-link';
 import { Body, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
-import { explanationHref, isTopicPublished, topicBySlug } from '@/lib/learn';
+import { explanationHref, isTopicPublished, seasonalCard, topicBySlug } from '@/lib/learn';
 import { useCommittedSummary, useGoalsOverview, useSavingsCard, useSpace, type GoalsOverview } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
@@ -22,7 +23,8 @@ import { colors, fonts, radius, space } from '@/theme/tokens';
  * Metas (Ciclo C, spec2 §4.6 e spec7; compacta em D-039). De cima para baixo: a pergunta compacta "Você consegue guardar algum
  * valor por mês?" (enquanto não respondida ou quando chega a hora de perguntar de novo), a reserva para imprevistos (com o
  * plano de guardar dentro do card, depois do "Sim"), as metas, Seu mês, "Fazer as contas" (Simular e Calculadoras), Aprender,
- * as concluídas e arquivadas (recolhidas), "Quem vê estes dados?" e o rodapé. Metas são só do contexto Pessoal. Nada aqui grava sem o servidor confirmar; falha de carga é ErrorState, nunca
+ * as concluídas e arquivadas (recolhidas), "Neste mês" (os temas de época do mês de hoje, o mesmo card de Aprender, D-054; some nos meses sem tema),
+ * "Quem vê estes dados?" e o rodapé. Metas são só do contexto Pessoal. Nada aqui grava sem o servidor confirmar; falha de carga é ErrorState, nunca
  * R$ 0,00 nem 0%.
  */
 export default function MetasScreen() {
@@ -34,6 +36,8 @@ export default function MetasScreen() {
   const savings = useSavingsCard(contextId);
   const [notice, setNotice] = useFlash();
   const data = overview.data;
+  // "Neste mês" (D-054, P-028): o mesmo card de Aprender, só pela data de hoje; some nos meses sem tema. Nada é gravado nem pedido.
+  const season = seasonalCard(today);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -100,6 +104,9 @@ export default function MetasScreen() {
 
           <LearnCard />
           {data ? <ClosedGoals goals={data.closed} /> : null}
+
+          {/* Neste mês (D-054, P-028): depois do conteúdo principal, os mesmos temas e links de Aprender. */}
+          {season ? <SeasonCardView card={season} /> : null}
 
           <Pressable accessibilityRole="button" onPress={() => router.push('/quem-ve')} style={styles.privacy} hitSlop={8}>
             <ShieldCheck size={18} color={colors.textSecondary} />

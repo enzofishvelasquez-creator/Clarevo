@@ -95,9 +95,10 @@ describe('widget: valores ocultos por padrão', () => {
     const content = buildWidgetContent(input({ toPay, demo: true }));
     expect(content.medium.value).toBe(WIDGET_HIDDEN_MONEY);
     expect(content.medium.next?.amount).toBe(WIDGET_HIDDEN_MONEY);
-    expect(content.medium.next?.line).toBe('Internet · 15/10 · R$ ••••');
+    // D-054 (P-027): nem o nome da conta, só "Próxima conta" e o prazo em dias.
+    expect(content.medium.next?.line).toBe('Próxima conta · em 8 dias');
     expect(content.medium.valuesShown).toBe(false);
-    expect(content.medium.a11y).toBe('Demonstração. Ainda a pagar em outubro, valor oculto. Próxima conta: Internet, vence em 15/10, valor oculto.');
+    expect(content.medium.a11y).toBe('Demonstração. Ainda a pagar em outubro, valor oculto. Próxima conta, vence em 8 dias.');
     // Nenhum valor em reais em lugar nenhum do que o widget nativo vai ler, nem no texto alternativo.
     const json = JSON.stringify(buildWidgetSnapshot(input({ toPay, demo: true })));
     expect(json).not.toMatch(/\d,\d{2}/);
@@ -114,22 +115,86 @@ describe('widget: valores ocultos por padrão', () => {
     expect(json).not.toContain(WIDGET_HIDDEN_MONEY);
   });
 
-  it('o nome da conta a vencer aparece nos dois casos (só os valores ficam ocultos)', async () => {
+  it('o nome da conta a vencer só aparece com os valores à mostra; oculto, é "Próxima conta" (D-054, P-027)', async () => {
     const toPay = await demoToPay();
-    for (const showValues of [true, false]) expect(buildWidgetContent(input({ toPay, showValues })).medium.next?.name).toBe('Internet');
+    expect(buildWidgetContent(input({ toPay, showValues: true })).medium.next?.name).toBe('Internet');
+    expect(buildWidgetContent(input({ toPay, showValues: false })).medium.next?.name).toBe('Próxima conta');
+    expect(WIDGET_TEXT.medium.nextHidden).toBe('Próxima conta');
+  });
+});
+
+describe('widget: valores ocultos também escondem o nome da próxima conta (D-054, P-027)', () => {
+  const names = ['Internet', 'Condomínio', 'Luz', 'Gás', 'Água', 'Aluguel do apartamento'];
+
+  it('mostra só "Próxima conta" e o prazo: hoje, amanhã e em N dias', () => {
+    const when = (dueOn: string) => buildWidgetContent(input({ toPay: toPayOf([bill({ id: 'a', description: 'Gás', amountCents: 9_000, dueOn })]), showValues: false })).medium;
+    const today = when('2026-10-07');
+    expect(today.next).toEqual({ name: 'Próxima conta', when: 'hoje', amount: WIDGET_HIDDEN_MONEY, estimated: false, line: 'Próxima conta · hoje' });
+    expect(today.a11y).toBe('Ainda a pagar em outubro, valor oculto. Próxima conta, vence hoje.');
+    const tomorrow = when('2026-10-08');
+    expect(tomorrow.next).toMatchObject({ when: 'amanhã', line: 'Próxima conta · amanhã' });
+    expect(tomorrow.a11y).toContain('Próxima conta, vence amanhã.');
+    const three = when('2026-10-10');
+    expect(three.next).toMatchObject({ when: 'em 3 dias', line: 'Próxima conta · em 3 dias' });
+    expect(three.a11y).toBe('Ainda a pagar em outubro, valor oculto. Próxima conta, vence em 3 dias.');
+    expect(when('2026-10-31').next?.line).toBe('Próxima conta · em 24 dias');
+  });
+
+  it('nenhum nome e nenhum valor, nem no snapshot guardado nem no texto de acessibilidade, em todos os casos', async () => {
+    const lists = [
+      toPayOf([bill({ id: 'a', description: 'Luz', amountCents: 18_000, dueOn: '2026-10-12', amountIsEstimate: true })]),
+      toPayOf([bill({ id: 'a', description: 'Condomínio', amountCents: 50_000, dueOn: '2026-10-07' }), bill({ id: 'b', description: 'Gás', amountCents: 4_000, dueOn: '2026-09-28' })]),
+      toPayOf([bill({ id: 'a', description: 'Aluguel do apartamento', amountCents: 250_000, dueOn: '2026-10-08' })]),
+      await demoToPay(),
+    ];
+    for (const toPay of lists) {
+      for (const demo of [false, true]) {
+        const snapshot = buildWidgetSnapshot(input({ toPay, demo, showValues: false }));
+        const json = JSON.stringify(snapshot);
+        for (const name of names) {
+          expect(json, `${name} no snapshot`).not.toContain(name);
+          expect(snapshot.medium.a11y, `${name} no texto alternativo`).not.toContain(name);
+        }
+        // Nenhum valor em reais (nem o total, nem o da conta) e nenhuma data da conta: o prazo é dito em dias.
+        expect(json).not.toMatch(/R\$ \d|\d,\d{2}/);
+        expect(JSON.stringify(snapshot.medium.next ?? {}).replace(/em \d+ dias/g, '')).not.toMatch(/\d/);
+        expect(snapshot.medium.a11y).not.toMatch(/R\$|\d,\d{2}|\d{1,2}\/\d{2}/);
+        expect(snapshot.medium.next?.line ?? 'Próxima conta').toMatch(/^Próxima conta( · (hoje|amanhã|em \d+ dias))?$/);
+        expect(snapshot.medium.next?.name ?? 'Próxima conta').toBe('Próxima conta');
+        expect(snapshot.medium.next?.estimated ?? false).toBe(false);
+      }
+    }
+  });
+
+  it('ligada a preferência, o nome, a data e o valor voltam como eram', () => {
+    const toPay = toPayOf([bill({ id: 'a', description: 'Luz', amountCents: 18_000, dueOn: '2026-10-12', amountIsEstimate: true })]);
+    const m = buildWidgetContent(input({ toPay, showValues: true })).medium;
+    expect(m.next).toMatchObject({ name: 'Luz', when: '12/10', line: 'Luz · 12/10 · ≈ R$ 180,00 · estimado' });
+    expect(m.a11y).toContain('Próxima conta: Luz, vence em 12/10, cerca de R$ 180,00, valor estimado.');
+  });
+
+  it('só vencidas, vazio, sem sessão e sem dados: nada muda (não há próxima conta para esconder)', () => {
+    const overdue = buildWidgetContent(input({ toPay: toPayOf([bill({ id: 'a', description: 'Gás', amountCents: 4_000, dueOn: '2026-10-05' })]), showValues: false })).medium;
+    expect([overdue.next, overdue.overdue, overdue.a11y]).toEqual([null, '1 vencida', 'Ainda a pagar em outubro, valor oculto. 1 vencida.']);
+    expect(buildWidgetContent(input({ toPay: toPayOf([]), showValues: false })).medium.next).toBeNull();
+  });
+
+  it('a legenda do interruptor em Conta diz o que fica escondido', () => {
+    expect(WIDGET_TEXT.showValuesCaption).toBe('Desligado, o widget mostra R$ •••• no lugar dos valores e, na próxima conta, só o prazo, sem o nome. Vale só para este aparelho.');
   });
 });
 
 describe('widget: a próxima conta a vencer', () => {
-  it('valor estimado: "≈ R$ 180,00 · estimado" (ou "≈ R$ ••••" com os valores ocultos, ainda dito estimado)', () => {
+  it('valor estimado: "≈ R$ 180,00 · estimado" (com os valores ocultos, nada disso: só o prazo)', () => {
     const toPay = toPayOf([bill({ id: 'a', description: 'Luz', amountCents: 18_000, dueOn: '2026-10-12', amountIsEstimate: true })]);
     const shown = buildWidgetContent(input({ toPay, showValues: true })).medium;
     expect(shown.next).toEqual({ name: 'Luz', when: '12/10', amount: '≈ R$ 180,00', estimated: true, line: 'Luz · 12/10 · ≈ R$ 180,00 · estimado' });
     expect(shown.a11y).toContain('Próxima conta: Luz, vence em 12/10, cerca de R$ 180,00, valor estimado.');
+    // Oculto (D-054, P-027): nem o nome, nem a data, nem se o valor é estimado; só "Próxima conta" e o prazo em dias.
     const hidden = buildWidgetContent(input({ toPay, showValues: false })).medium;
-    expect(hidden.next?.line).toBe('Luz · 12/10 · ≈ R$ •••• · estimado');
-    expect(hidden.next?.estimated).toBe(true);
-    expect(hidden.a11y).toContain('Próxima conta: Luz, vence em 12/10, cerca de valor oculto, valor estimado.');
+    expect(hidden.next?.line).toBe('Próxima conta · em 5 dias');
+    expect(hidden.next?.estimated).toBe(false);
+    expect(hidden.a11y).toContain('Próxima conta, vence em 5 dias.');
     expect(hidden.a11y).not.toMatch(/\d,\d{2}/);
   });
 

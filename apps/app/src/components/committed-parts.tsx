@@ -42,14 +42,17 @@ function useFillStyle(permille: number) {
   return useAnimatedStyle(() => ({ width: `${value.value}%` }));
 }
 
-/** Listras a 45° (3 px a cada 6 px na horizontal): o segmento "em aberto" não depende só da cor. */
-function Stripes({ height }: { height: number }) {
+/**
+ * Listras a 45° (3 px a cada 6 px na horizontal): o segmento "em aberto" não depende só da cor. `color`: o traço (padrão, o azul
+ * suave do "em aberto"; a barra do orçamento acima de 100% usa o azul da marca sobre branco).
+ */
+export function Stripes({ height, color = colors.brandSoft }: { height: number; color?: string }) {
   const id = `listras${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   return (
     <Svg width="100%" height={height} style={StyleSheet.absoluteFill} accessible={false}>
       <Defs>
         <Pattern id={id} patternUnits="userSpaceOnUse" width={6} height={6}>
-          <Path d="M-1 7 L7 -1 M-1 1 L1 -1 M5 7 L7 5" stroke={colors.brandSoft} strokeWidth={2.12} />
+          <Path d="M-1 7 L7 -1 M-1 1 L1 -1 M5 7 L7 5" stroke={color} strokeWidth={2.12} />
         </Pattern>
       </Defs>
       <Rect x={0} y={0} width="100%" height={height} fill={`url(#${id})`} />

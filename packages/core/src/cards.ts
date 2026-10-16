@@ -211,6 +211,39 @@ export function purchasePreview(
   return { text: purchaseNotice(first, card.name, today), blocked: false };
 }
 
+/** No máximo três compras na sugestão "Editar compra". */
+export const REFUND_EDIT_MAX = 3;
+
+/** Uma compra a que "Editar compra" serve no lugar de um estorno. */
+export interface RefundEditChoice {
+  entryId: string;
+  description: string;
+  amountCents: Cents;
+  installments: number;
+  /** Fatura da 1ª parcela (mês do vencimento): o mês que a tela de edição recebe. */
+  invoiceMonth: IsoMonth;
+}
+
+/**
+ * Compras do cartão que a pessoa pode corrigir em "Editar compra" em vez de registrar um estorno (D-054, E1): nenhuma parcela em
+ * fatura paga (`purchaseBlockedByPaidInvoice`) e a 1ª fatura no mês do estorno ou antes dele. Mais recentes primeiro (data da compra,
+ * depois descrição), no máximo `max`. Compra que já tem fatura paga não entra: ali só o estorno ajusta o valor. `paidMonths`:
+ * `paidInvoiceMonths(faturas)`.
+ */
+export function refundEditChoices(
+  entries: readonly Pick<CardEntry, 'id' | 'kind' | 'description' | 'amountCents' | 'installments' | 'invoiceMonth' | 'purchasedOn'>[],
+  paidMonths: Iterable<IsoMonth>,
+  refundMonth: IsoMonth,
+  max = REFUND_EDIT_MAX,
+): RefundEditChoice[] {
+  const paid = new Set(paidMonths);
+  return entries
+    .filter((e) => e.kind === 'compra' && e.invoiceMonth <= refundMonth && !purchaseBlockedByPaidInvoice(e.invoiceMonth, e.installments, paid))
+    .sort((a, b) => (b.purchasedOn ?? '').localeCompare(a.purchasedOn ?? '') || (a.description ?? '').localeCompare(b.description ?? '', 'pt-BR') || a.id.localeCompare(b.id))
+    .slice(0, Math.max(0, max))
+    .map((e) => ({ entryId: e.id, description: e.description ?? '', amountCents: e.amountCents, installments: e.installments, invoiceMonth: e.invoiceMonth }));
+}
+
 /**
  * A fatura pode receber o pagamento? Só depois do fechamento (situação fechada), com conta a pagar e total maior que zero.
  * Aberta (a atual) ou futura: o banco recusa com `fatura_aberta`; paga ou paga em parte: `compromisso_quitado`.
@@ -1392,6 +1425,21 @@ export const CARDS_TEXT = {
     invoiceFormula: 'Total = parcelas + encargos + saldo anterior - estornos',
   },
   invoiceEmpty: 'Sem lançamentos nesta fatura.',
+
+  /**
+   * O estorno no orçamento (D-054, E1 de CL-01): a regra do core e do banco não muda; a tela só a explica. A frase `rule` é a mesma
+   * no orçamento, no detalhe do estorno e no formulário (teste de cópia), e `editInstead` aponta "Editar compra" quando nenhuma fatura
+   * da compra foi paga (`refundEditChoices`).
+   */
+  refundBudget: {
+    rule: 'O estorno conta no mês da fatura em que foi informado e, por isso, o usado do mês da compra no orçamento não diminui.',
+    editInstead: 'Se nenhuma fatura da compra foi paga, corrija o valor em Editar compra, em vez de registrar um estorno.',
+    /** Nome acessível do link: "Editar compra Tênis de corrida, R$ 800,00 em 4 vezes". */
+    editA11y: (description: string, amountCents: Cents, installments: number) =>
+      `Editar compra ${description}, ${formatBRL(amountCents)}${installments > 1 ? ` em ${installments} vezes` : ''}`,
+    /** Legenda da compra sob o link: "R$ 800,00 em 4x" ou "R$ 89,90". */
+    editCaption: (amountCents: Cents, installments: number) => `${formatBRL(amountCents)}${installments > 1 ? ` em ${installments}x` : ''}`,
+  },
 
   // Pago e Por categoria.
   paymentOrigin: 'Pagamento de fatura',

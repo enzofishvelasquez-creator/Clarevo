@@ -245,6 +245,12 @@ export default function FaturaScreen() {
             onCancel={() => setLine(null)}
             choices={line ? lineChoices(line, invoice) : []}>
             {line ? <MoneyTxt style={[{ fontFamily: fonts.bold }, tabular]}>{invoiceLineText(line)}</MoneyTxt> : null}
+            {/* Detalhe do estorno (D-054, E1): a regra do orçamento em uma linha; nada muda no cálculo. */}
+            {line?.kind === 'estorno' ? (
+              <Txt variant="label" color={colors.textSecondary}>
+                {T.refundBudget.rule}
+              </Txt>
+            ) : null}
           </ChoiceDialog>
           <ConfirmDialog
             visible={line !== null && confirmDelete}

@@ -1344,9 +1344,11 @@ describe('integração: renda comprometida, lembretes e revisão dos últimos me
     expect(t.groups.map((g) => g.line)).toEqual([
       'Gastos fixos · R$ 2.680,00 · 44,7%',
       'Parcelamentos · R$ 850,00 · 14,2%',
-      'Faturas de cartão · R$ 550,00 · 9,2%',
+      'Faturas de cartão · R$ 550,00 · 9,1%',
       'Outras contas a pagar · R$ 300,00 · 5,0%',
     ]);
+    // Maior resto (D-054, CL-06): 44,7 + 14,2 + 9,1 + 5,0 = 73,0, o total da tela (cada grupo arredondado sozinho somaria 73,1).
+    expect(t.highlight).toBe('73,0%');
     expect(t.invoiceNote).toBe(COMMITTED_TEXT.invoiceNote);
     expect(committedTexts(oct).invoiceNote).toBeNull();
     expect(committedTexts(oct).groups.map((g) => g.label)).not.toContain('Faturas de cartão');

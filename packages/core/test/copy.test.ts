@@ -2756,3 +2756,138 @@ describe('textos de conteúdo de época (D-053)', () => {
     expect(ir).toContain('Confira a data oficial do ano no site da Receita');
   });
 });
+
+import { OVERFLOW_MIN_TENTHS, budgetRow, groupPermilleShares as groupShares, limitAmountCents, overflowBar as overflowOf } from '../src';
+
+/**
+ * Decisões de 16/10/2026 (D-054): o estorno no orçamento (E1), o excedente acima de 100% e o aviso de 80% dispensável (CL-10), a
+ * legenda do Resumo (CL-05) e o widget com valores ocultos (P-027). Em português do Brasil, neutros quanto a gênero, sem travessões
+ * longos, sem a expressão proibida e sem tom de julgamento ("estourou", "excedeu", "alerta").
+ */
+describe('textos das decisões de 16/10/2026 (D-054)', () => {
+  const GENDERED = /\b(o|a)s? usuári[oa]s?\b|\bobrigad[oa]s?\b|\bbem-vind[oa]s?\b|\bpreocupad[oa]s?\b|\bendividad[oa]s?\b|\bcadastrad[oa]\b|\(a\)|\(o\)|\bo\/a\b|\bvocê (é|está|ficou) \w+[oa]\b/i;
+  const VETOED = /estour|\bexcedeu\b|\bexcedid|gastou demais|controle-se|\bcuidado|\balerta|perigo|\bculpa|\bgastão|\bgastona|\bdeveria\b|\bprecisa(m)? (gastar|cortar)|\bcort(ar|e)\b/i;
+  const check = (texts: string[]) => {
+    expect(texts.length).toBeGreaterThan(0);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(FORBIDDEN_EXPANDED);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(VETOED);
+      expect(text, text).not.toMatch(GENDERED);
+      expect(text, text).not.toMatch(/[–—]/);
+      expect(text, text).not.toMatch(/!/);
+    }
+  };
+
+  it('o estorno no orçamento: a regra, a sugestão "Editar compra" e a nota do card', () => {
+    const R = CARDS_TEXT.refundBudget;
+    check([
+      R.rule,
+      R.editInstead,
+      R.editA11y('Tênis de corrida', 80_000, 4),
+      R.editA11y('Restaurante', 8_990, 1),
+      R.editCaption(80_000, 4),
+      R.editCaption(8_990, 1),
+      BUDGET_TEXT.refundNote(15_000),
+      BUDGET_TEXT.refundNote(1),
+    ]);
+    // Uma linha neutra: uma frase só, sem quebra de linha, que diz o mês da fatura e que o usado do mês da compra não diminui.
+    expect(R.rule).not.toMatch(/\n/);
+    expect(R.rule).toContain('mês da fatura em que foi informado');
+    expect(R.rule).toContain('o usado do mês da compra no orçamento não diminui');
+    expect(R.editInstead).toContain('Editar compra');
+    expect(R.editA11y('Tênis', 80_000, 4)).toBe('Editar compra Tênis, R$ 800,00 em 4 vezes');
+    expect(R.editA11y('Café', 890, 1)).toBe('Editar compra Café, R$ 8,90');
+    expect(R.editCaption(80_000, 4)).toBe('R$ 800,00 em 4x');
+    expect(BUDGET_TEXT.refundNote(15_000)).toBe(`Inclui estorno de R$ 150,00. ${R.rule}`);
+  });
+
+  it('a frase do estorno é a mesma no orçamento, no formulário e no detalhe do estorno (as telas leem do core, sem texto próprio)', () => {
+    const read = (file: string) => readFileSync(join(APP_SRC, file), 'utf8');
+    const budgetScreen = read(join('app', 'orcamento', 'index.tsx'));
+    const form = read(join('components', 'invoice-entry-form.tsx'));
+    const invoice = read(join('app', 'cartoes', '[id]', 'fatura', '[mes]', 'index.tsx'));
+    expect(budgetScreen).toContain('BUDGET_TEXT.refundNote(');
+    expect(form).toContain('CARDS_TEXT.refundBudget');
+    expect(form).toContain('R.rule');
+    expect(form).toContain('R.editInstead');
+    expect(invoice).toContain('T.refundBudget.rule');
+    // Nenhuma tela repete a frase com palavras próprias.
+    for (const [name, source] of [['orçamento', budgetScreen], ['formulário', form], ['fatura', invoice]] as const) {
+      expect(source, name).not.toContain('o usado do mês da compra');
+      expect(source, name).not.toContain('conta no mês da fatura em que foi informado');
+    }
+  });
+
+  it('acima de 100%: "R$ X acima", "R$ X acima do orçamento" e "R$ X acima do limite", do menor ao maior valor', () => {
+    const texts: string[] = [];
+    for (const cents of [1, 99, 100, 1_230, 10_000, 780_000, 999_999_999]) {
+      texts.push(BUDGET_TEXT.overShort(cents), BUDGET_TEXT.over(cents), LIMIT_TEXT.overShort(cents), LIMIT_TEXT.overA11y(cents));
+    }
+    check(texts);
+    expect(BUDGET_TEXT.overShort(10_000)).toMatch(/^R\$ 100,00 acima$/);
+    expect(LIMIT_TEXT.overA11y(78_000)).toBe('R$ 780,00 acima do limite');
+    // Cada barra que passa de 100% tem o texto: nunca só o desenho.
+    for (const used of [30_001, 31_000, 40_000, 60_000, 900_000]) {
+      const row = budgetRow({ category: 'Lazer', budgetId: 'b', budgetVersion: 1, budgetFrom: '2026-10', budgetCents: 30_000, usedCents: used });
+      expect(row.stripedTenths, String(used)).toBeGreaterThanOrEqual(OVERFLOW_MIN_TENTHS);
+      expect(row.overText, String(used)).toBe(`R$ ${((used - 30_000) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} acima`);
+      expect(row.a11yLabel).toContain(`${row.overA11y}.`);
+    }
+    expect(overflowOf(30_000, 30_000).stripedTenths).toBe(0);
+    expect(limitAmountCents(600_000, 60)).toBe(360_000);
+  });
+
+  it('o aviso de 80% e o "Dispensar aviso": nomes, dica e o aviso em todos os percentuais de 80 a 99', () => {
+    const texts: string[] = [BUDGET_TEXT.dismissNotice, BUDGET_TEXT.dismissNoticeHint];
+    for (const p of [80, 84, 99]) texts.push(BUDGET_TEXT.nearNotice(p));
+    for (const category of BUDGET_CATEGORIES) for (const month of ['2026-10', '2027-01']) texts.push(BUDGET_TEXT.dismissNoticeA11y(category, month));
+    check(texts);
+    expect(BUDGET_TEXT.dismissNotice).toBe('Dispensar aviso');
+    // O nome acessível contém o texto visível do botão (rótulo no nome).
+    expect(BUDGET_TEXT.dismissNoticeA11y('Mercado', '2026-10')).toBe('Dispensar aviso de Mercado em outubro de 2026');
+    expect(BUDGET_TEXT.dismissNoticeA11y('Mercado', '2026-10')).toContain(BUDGET_TEXT.dismissNotice);
+    expect(BUDGET_TEXT.nearNotice(84)).toBe('Chegou a 84% do orçamento.');
+    // O aviso do card diz o mês só na dica (volta no mês seguinte) e nunca vira cobrança.
+    expect(BUDGET_TEXT.dismissNoticeHint).toContain('volta no mês seguinte');
+  });
+
+  it('a legenda do topo do Resumo, em qualquer data e mês', () => {
+    const texts: string[] = [];
+    for (const today of ['2026-10-07', '2026-10-31', '2026-12-01', '2027-02-28']) for (const month of ['2026-09', '2026-10', '2026-12', '2027-02']) texts.push(SUMMARY_NAV_TEXT.differenceCaption(month, today));
+    check(texts);
+    expect(SUMMARY_NAV_TEXT.differenceCaption('2026-10', '2026-10-07')).toBe('Recebido menos pago até 07/10 · não é saldo');
+    for (const t of texts) expect(t.endsWith('não é saldo'), t).toBe(true);
+  });
+
+  it('a nota de percentuais da renda comprometida segue sem texto novo: os grupos só mudam de número', () => {
+    // A tela não ganha frase sobre arredondamento; a soma fecha no total (docs/02). O core mantém a ordem e os rótulos de sempre.
+    expect(groupShares({ committedPermille: 730, fixedCents: 268_000, annualCents: 0, installmentCents: 85_000, cardCents: 55_000, otherCents: 30_000 })).toEqual({
+      fixos: 447,
+      anuais: 0,
+      parcelamentos: 142,
+      faturas: 91,
+      outras: 50,
+    });
+  });
+
+  it('o widget com valores ocultos: "Próxima conta" e o prazo, sem nome, sem valor e sem data', () => {
+    const texts: string[] = [WIDGET_TEXT.medium.nextHidden, WIDGET_TEXT.showValuesCaption, WIDGET_TEXT.explain];
+    for (const when of ['2026-10-07', '2026-10-08', '2026-10-10', '2026-10-31']) {
+      const toPay = {
+        month: '2026-10',
+        isCurrentMonth: true,
+        items: [{ id: 'a' }],
+        toPayCents: 12_345,
+        overdueCount: 0,
+        nextDue: { id: 'a', description: 'Condomínio', amountCents: 12_345, amountIsEstimate: false, dueOn: when },
+      } as never;
+      const medium = buildWidgetContent({ today: DEMO_TODAY, signedIn: true, demo: false, showValues: false, toPay }).medium;
+      texts.push(medium.next!.line, medium.a11y);
+      expect(medium.next!.line, when).toMatch(/^Próxima conta · (hoje|amanhã|em \d+ dias)$/);
+      expect(medium.a11y, when).not.toMatch(/Condomínio|\d{1,2}\/\d{2}|\d,\d{2}/);
+    }
+    check(texts);
+  });
+});

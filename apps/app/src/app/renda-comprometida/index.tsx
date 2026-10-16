@@ -27,6 +27,7 @@ import Animated, { FadeInLeft, FadeInRight, ReduceMotion } from 'react-native-re
 
 import { openCalc } from '@/components/calc/open';
 import { CommitmentRow } from '@/components/commitment-row';
+import { BudgetBar } from '@/components/budget-bar';
 import { FitText, GroupBar, Meter, MeterLegend, useMoneyMask } from '@/components/committed-parts';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
@@ -229,13 +230,25 @@ function LimitCard({ contextId, s }: { contextId: string | undefined; s: Committ
     );
   }
   const limit = limitFor(limits.data, s.month);
-  const status = limit ? limitStatus(s.month, s.committedPermille, s.committedCents, limit.percent, today) : null;
+  const status = limit ? limitStatus(s.month, s.committedPermille, s.committedCents, limit.percent, today, s.referenceCents) : null;
   return (
     <Card style={{ gap: space[2] }}>
       <Title>{LIMIT_TEXT.title}</Title>
       {status ? (
         <>
           <Txt style={[tabular, { fontFamily: fonts.bold }]}>{status.line}</Txt>
+          {/* A barra é do comprometido contra o limite (100% da barra é o limite). Acima dele, cheia, com o trecho final listrado e
+              o texto "R$ X acima"; o leitor de tela diz "R$ X acima do limite" (D-054, CL-10). */}
+          {status.bar ? (
+            <View style={{ gap: space[1] }}>
+              <BudgetBar solidTenths={status.bar.solidTenths} stripedTenths={status.bar.stripedTenths} minimal={s.committedCents > 0} />
+              {status.bar.overText ? (
+                <MoneyTxt variant="label" style={{ fontFamily: fonts.bold }} accessibilityLabel={status.bar.overA11y ?? undefined}>
+                  {status.bar.overText}
+                </MoneyTxt>
+              ) : null}
+            </View>
+          ) : null}
           {status.note ? <Txt>{status.note}</Txt> : null}
           <LinkButton label={LIMIT_TEXT.change} style={styles.inlineLink} onPress={open} />
         </>

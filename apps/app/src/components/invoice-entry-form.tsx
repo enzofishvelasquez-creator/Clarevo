@@ -10,6 +10,8 @@ import {
   cardErrorText,
   centsToInput,
   invoiceMonthLabel,
+  paidInvoiceMonths,
+  refundEditChoices,
   validateCardChargeDraft,
   validateCardRefundDraft,
   type Card as CardData,
@@ -22,19 +24,20 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, type TextInput } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, View, type TextInput } from 'react-native';
 
 import { formatMoneyText } from '@/components/calc/parts';
 import { FormFooter } from '@/components/form-footer';
 import { ContextPill, SubHeader } from '@/components/header';
 import { useLeaveGuard } from '@/components/leave-guard';
+import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { useSavedBefore } from '@/components/saved-before';
 import { ChoiceGroup } from '@/components/series-parts';
-import { Card, Chip, Screen, TextField, Txt } from '@/components/ui';
+import { Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { invoiceHref } from '@/lib/cards';
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
-import { useAddCardCharge, useAddCardRefund, useCardOperationKey, useUpdateCardEntry } from '@/state/data';
+import { useAddCardCharge, useAddCardRefund, useCardEntries, useCardInvoices, useCardOperationKey, useUpdateCardEntry } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -194,6 +197,7 @@ export function InvoiceEntryForm({ kind, card, month, entry }: { kind: EntryKind
           <Txt variant="label" color={colors.textSecondary}>
             {charge ? I.chargesHint : I.refundHint}
           </Txt>
+          {charge ? null : <RefundBudgetNote card={card} month={month} suggest={!editing} />}
 
           {charge ? (
             <ChoiceGroup label={I.chargeType} error={errors.chargeType}>
@@ -247,6 +251,48 @@ export function InvoiceEntryForm({ kind, card, month, entry }: { kind: EntryKind
   );
 }
 
+/**
+ * O estorno no orçamento (D-054, E1 de CL-01): a regra não muda, a tela a explica em uma linha (`CARDS_TEXT.refundBudget.rule`, a frase
+ * do core). Quando alguma compra do cartão ainda não tem nenhuma fatura paga, sugere "Editar compra" no lugar do estorno, com o link
+ * para a edição de cada uma (no máximo três, as mais recentes). Estorno já registrado (edição) leva só a explicação. Só lê; nada é
+ * gravado aqui.
+ */
+function RefundBudgetNote({ card, month, suggest }: { card: CardData; month: IsoMonth; suggest: boolean }) {
+  const R = CARDS_TEXT.refundBudget;
+  const entries = useCardEntries(card.id);
+  const invoices = useCardInvoices(card);
+  const maskLabel = useMoneyLabelMask();
+  const choices = suggest && entries.data && invoices.data ? refundEditChoices(entries.data, paidInvoiceMonths(invoices.data), month) : [];
+  return (
+    <View style={{ gap: space[2] }}>
+      <Txt variant="label" color={colors.textSecondary}>
+        {R.rule}
+      </Txt>
+      {choices.length > 0 ? (
+        <View style={{ gap: space[1] }}>
+          <Txt variant="label" color={colors.textSecondary}>
+            {R.editInstead}
+          </Txt>
+          {choices.map((c) => (
+            <View key={c.entryId}>
+              <LinkButton
+                label={`${I.purchaseEdit}: ${c.description}`}
+                accessibilityLabel={maskLabel(R.editA11y(c.description, c.amountCents, c.installments))}
+                style={styles.inlineLink}
+                onPress={() => router.push({ pathname: '/cartoes/[id]/fatura/[mes]/compra', params: { id: card.id, mes: c.invoiceMonth, lancamento: c.entryId } })}
+              />
+              <MoneyTxt variant="caption" color={colors.textSecondary}>
+                {R.editCaption(c.amountCents, c.installments)}
+              </MoneyTxt>
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   body: { padding: space[5], gap: space[4], paddingBottom: space[6] },
+  inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
 });

@@ -9,8 +9,10 @@
  * Movimentos, D-045), do Ciclo H2 (assinaturas, D-046, com o cenário fictício "assinaturas" da demonstração) e do Ciclo H3
  * (exportar meus dados em CSV e PDF, D-047), do Ciclo I1 (importar extrato e fatura, D-048), do Tutorial (D-049: o guia em Aprender, o
  * tour de boas-vindas, o botão "?" nas telas e as capturas do manual) e do Ciclo I2 (comprovante de Pix e de pagamento em PDF,
- * D-051), do Ciclo K1 (Seu mês em 30 segundos e o interruptor do widget em Conta, D-052) e do Ciclo K2 (conteúdo de época: o card "Neste mês" em
- * Aprender e os temas de 13º salário, férias, volta às aulas e Imposto de Renda, D-053) na versão web, em modo demonstração (acesso simulado).
+ * D-051), do Ciclo K1 (Seu mês em 30 segundos e o interruptor do widget em Conta, D-052), do Ciclo K2 (conteúdo de época: o card "Neste mês" em
+ * Aprender e os temas de 13º salário, férias, volta às aulas e Imposto de Renda, D-053) e das decisões de 16/10/2026 (D-054: o estorno no
+ * orçamento, o excedente acima de 100% e o aviso de 80% dispensável, a legenda do Resumo, os percentuais dos grupos da renda comprometida,
+ * a legenda do widget com valores ocultos e o card "Neste mês" em Metas) na versão web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -2122,8 +2124,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     t.includes('Você planeja guardar R$ 500,00 por mês.') && t.includes('a terceira etapa (R$ 22.500,00, 6 meses dos seus gastos essenciais) chega em dezembro de 2029.') && t.includes('Guardado em outubro: R$ 500,00') &&
     /\d+,\d% da renda de referência já tem destino\./.test(t) && (await visibleCount('button', 'Ver renda comprometida')) === 1 && (await visibleCount('button', 'Ver o plano')) === 1 && (await visibleCount('button', 'Mudar valor')) === 1);
   ok('Metas: a pergunta "Você consegue guardar algum valor por mês?" não aparece depois da resposta "consigo"', !t.includes('Você consegue guardar algum valor por mês?') && (await visibleCount('button', 'Responder depois')) === 0);
-  ok('Metas: títulos na ordem (Reserva para imprevistos com o plano dentro, Suas metas, Seu mês, Fazer as contas, Aprender; D-039)', JSON.stringify((await headingList()).filter((h) => h.startsWith('2:'))) ===
-    JSON.stringify(['2:Reserva para imprevistos', '2:Suas metas', '2:Seu mês', '2:Fazer as contas', '2:Aprender']) && (await headingList()).includes('3:Seu plano de guardar'), JSON.stringify(await headingList()));
+  ok('Metas: títulos na ordem (Reserva para imprevistos com o plano dentro, Suas metas, Seu mês, Fazer as contas, Aprender e, depois do conteúdo principal, Neste mês; D-039 e D-054)', JSON.stringify((await headingList()).filter((h) => h.startsWith('2:'))) ===
+    JSON.stringify(['2:Reserva para imprevistos', '2:Suas metas', '2:Seu mês', '2:Fazer as contas', '2:Aprender', '2:Neste mês']) && (await headingList()).includes('3:Seu plano de guardar'), JSON.stringify(await headingList()));
   await keepText();
   // A aba mantém o acesso às calculadoras e ao simulador (linhas do mesmo card).
   const calcRows = [
@@ -3606,8 +3608,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await rcRow().click(); await waitText('da sua renda de referência em outubro de 2026'); await p.waitForTimeout(400); t = await body();
   ok('E renda comprometida de outubro: continua 52,5% e não mostra "Faturas de cartão" (nenhuma fatura vence em outubro)', t.includes('52,5%') && !t.includes('Faturas de cartão'));
   await rcMonth('novembro de 2026'); t = await body();
-  ok('E renda comprometida de novembro: 73,0%, o grupo "Faturas de cartão · R$ 550,00 · 9,2%" na composição, fora de "Dívidas" (R$ 850,00 · 14,2%), e a nota das faturas',
-    t.includes('73,0%') && t.includes('Faturas de cartão · R$ 550,00 · 9,2%') && t.includes('Dívidas: R$ 850,00 · 14,2% da renda de referência.') && t.includes('Compras no cartão entram pela fatura, no mês do vencimento dela. A linha de dívidas continua só com financiamento e compra parcelada.') &&
+  ok('E renda comprometida de novembro: 73,0%, o grupo "Faturas de cartão · R$ 550,00 · 9,1%" na composição (maior resto: os grupos somam o total, D-054), fora de "Dívidas" (R$ 850,00 · 14,2%), e a nota das faturas',
+    t.includes('73,0%') && t.includes('Faturas de cartão · R$ 550,00 · 9,1%') && t.includes('Dívidas: R$ 850,00 · 14,2% da renda de referência.') && t.includes('Compras no cartão entram pela fatura, no mês do vencimento dela. A linha de dívidas continua só com financiamento e compra parcelada.') &&
     t.includes('Outras contas a pagar · R$ 300,00'), t.split('\n').filter((l) => /Faturas|Dívidas|Outras/.test(l)).join(' | '));
   const rcOrder = await p.evaluate(() => {
     const top = (text) => [...document.querySelectorAll('div[dir="auto"]')].find((e) => e.textContent.startsWith(text) && e.getBoundingClientRect().width > 0)?.getBoundingClientRect().top ?? null;
@@ -6146,8 +6148,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     (await visibleCount('button', /^Moradia, R\$ 2\.500,00 de R\$ 2\.500,00, 100,0% do orçamento\. Orçamento usado por inteiro\. Alterar orçamento de Moradia\.$/)) === 1 && t.includes('Orçamento usado por inteiro'));
   ok('F2 /orcamento Mercado: "R$ 1.400,00 de R$ 1.800,00", 77,8% e "Faltam R$ 400,00"',
     (await visibleCount('button', /^Mercado, R\$ 1\.400,00 de R\$ 1\.800,00, 77,8% do orçamento\. Faltam R\$ 400,00\. Alterar orçamento de Mercado\.$/)) === 1 && t.includes('Faltam R$ 400,00'));
-  ok('F2 /orcamento Lazer: compra no cartão conta no mês da compra (parcela 1 do tênis, R$ 200,00, e o restaurante, R$ 200,00): "R$ 400,00 de R$ 300,00", 133,3% e "R$ 100,00 acima do orçamento"',
-    (await visibleCount('button', /^Lazer, R\$ 400,00 de R\$ 300,00, 133,3% do orçamento\. R\$ 100,00 acima do orçamento\. Alterar orçamento de Lazer\.$/)) === 1 && t.includes('R$ 100,00 acima do orçamento'));
+  ok('F2 /orcamento Lazer: compra no cartão conta no mês da compra (parcela 1 do tênis, R$ 200,00, e o restaurante, R$ 200,00): "R$ 400,00 de R$ 300,00", 133,3% e o texto "R$ 100,00 acima" (o leitor de tela diz "R$ 100,00 acima do orçamento", D-054)',
+    (await visibleCount('button', /^Lazer, R\$ 400,00 de R\$ 300,00, 133,3% do orçamento\. R\$ 100,00 acima do orçamento\. Alterar orçamento de Lazer\.$/)) === 1 && t.includes('R$ 400,00 de R$ 300,00\nR$ 100,00 acima\n'));
   const f2Define = async () => p.evaluate(() => {
     const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Definir orçamento' && e.getBoundingClientRect().width > 0);
     return h ? [h.getAttribute('aria-level'), ...[...h.parentElement.querySelectorAll('[role=button]')].map((b) => b.getAttribute('aria-label'))] : null;
@@ -6156,7 +6158,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     JSON.stringify(await f2Define()) === JSON.stringify(['2', 'Definir orçamento de Transporte', 'Definir orçamento de Saúde', 'Definir orçamento de Educação']) && t.includes('Gastos sem categoria não têm orçamento.'), JSON.stringify(await f2Define()));
   ok('F2 /orcamento deixa claro que Pago por categoria é do Pago e o orçamento é do usado no mês', t.includes('O orçamento conta o usado no mês. Pago por categoria mostra o que foi pago, e a compra no cartão entra em Pago quando a fatura é paga.'));
   const f2b = await f2Bars();
-  ok('F2 /orcamento: barras só na cor da marca, nas proporções 100%, 77,8% e 100% (acima do orçamento a barra enche e para), e nenhuma cor de alerta', JSON.stringify(f2b.widths) === JSON.stringify([1, 0.778, 1]) && f2b.red.length === 0, JSON.stringify(f2b));
+  ok('F2 /orcamento: barras só na cor da marca, o trecho sólido nas proporções 100%, 77,8% e 66,7% (acima de 100% a barra enche e o final é listrado, D-054), e nenhuma cor de alerta', JSON.stringify(f2b.widths) === JSON.stringify([1, 0.778, 0.667]) && f2b.red.length === 0, JSON.stringify(f2b));
   ok('F2 /orcamento: títulos "Moradia", "Mercado" e "Lazer" nos cards e o texto de "Mercado" lido como um botão só (nome acessível com o valor, o percentual e o que falta)', (await visibleCount('button', /^(Moradia|Mercado|Lazer), R\$ /)) === 3);
   await atWidths(async (w) => {
     await layoutChecks(`F2 /orcamento ${w}px`);
@@ -9039,7 +9041,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('K1 Conta: o card "Widget na tela inicial" (título de nível 2) diz "Disponível quando o app estiver nas lojas" e tem o interruptor "Mostrar valores no widget" desligado, depois de Privacidade', (await headingShown('Widget na tela inicial')) &&
     t.includes('Disponível quando o app estiver nas lojas') && t.includes('Mostra quanto ainda falta pagar no mês e a próxima conta a vencer, com um atalho para anotar um gasto.') &&
     (await k1Widget().getAttribute('aria-checked')) === 'false' && (await hideSwitch().getAttribute('aria-checked')) === 'false' && t.indexOf('Privacidade neste aparelho') < t.indexOf('Widget na tela inicial'), `${await k1Widget().getAttribute('aria-checked')}`);
-  ok('K1 Conta: o interruptor explica que, desligado, o widget mostra R$ •••• no lugar dos valores, só neste aparelho', t.includes('Desligado, o widget mostra R$ •••• no lugar dos valores. Vale só para este aparelho.'));
+  ok('K1 Conta: o interruptor explica que, desligado, o widget mostra R$ •••• no lugar dos valores e, na próxima conta, só o prazo, sem o nome, só neste aparelho (D-054)', t.includes('Desligado, o widget mostra R$ •••• no lugar dos valores e, na próxima conta, só o prazo, sem o nome. Vale só para este aparelho.'));
   await k1Shots('369_conta_widget', false, false);
   const k1StoreW0 = await k1Store();
   await k1Widget().click(); await p.waitForTimeout(400);
@@ -9326,6 +9328,330 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('K2 telas do conteúdo de época (Aprender, os quatro temas, o guia): nenhum termo proibido, travessão, expressão vetada, palavra de julgamento, produto financeiro nem nome de banco ou de bandeira nos textos da interface (as fontes ficam fora, menos o travessão)',
     k2Texts.length >= 8 && k2Vetoed.length === 0 && k2Dashes.length === 0 && k2Learn.length === 0 && k2Judging.length === 0 && k2Products.length === 0, `${k2Texts.length} telas ${k2Vetoed.join(' | ')} ${k2Learn.join(' | ')} ${k2Judging.join(' | ')} ${k2Products.join(' | ')}`);
   ok('K2 nenhuma escrita direta na rede (o card e os temas só leem; a demonstração e as contas novas ficam em memória)', writes.slice(k2Writes0).length === 0, writes.slice(k2Writes0).join(' | '));
+
+  // ==================================================================================================================
+  // Decisões de 16/10 (D-054) · Enzo aceitou as recomendações do pacote de 15/10/2026 ("sim, recomendações"). Aqui, na versão web:
+  // (1) o estorno no orçamento (E1): a regra fica e a tela explica em uma linha neutra, no formulário e no detalhe do estorno e no
+  // card do orçamento, com "Editar compra" quando nenhuma fatura da compra foi paga; (2) acima de 100% (CL-10): a barra do orçamento e
+  // a do limite pessoal ficam cheias, com o trecho final listrado e o texto "R$ X acima" (o leitor de tela diz "R$ X acima do
+  // orçamento" e "R$ X acima do limite"), e o aviso de 80% se dispensa no card, por categoria e mês, só neste aparelho; (3) a legenda
+  // do Resumo (CL-05): "Recebido menos pago até 07/10 · não é saldo"; (4) os percentuais dos grupos da renda comprometida somam o
+  // total pelo maior resto (CL-06); (5) o widget com valores ocultos também esconde o nome da próxima conta (P-027, no core; aqui, a
+  // legenda do interruptor em Conta); (6) o card "Neste mês" também em Metas, depois do conteúdo principal (P-028). Capturas 390 a
+  // 399, em 390, 360 e 320 px. Hoje é 07/10/2026. Os totais de outubro seguem 6.000 / 3.900 / 2.100 e 650.
+  // ==================================================================================================================
+  const d54Writes0 = writes.length;
+  const d54Texts = [];
+  const d54Keep = async () => { const x = await body(); d54Texts.push(x); screenTexts.push(x); return x; };
+  const d54Path = () => new URL(p.url()).pathname;
+  const d54Store = () => p.evaluate(() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]));
+  const d54Requests = [];
+  const d54OnRequest = (r) => { if (!r.url().startsWith('data:') && !r.url().startsWith(`http://localhost:${PORT}`)) d54Requests.push(r.url()); };
+  p.on('request', d54OnRequest);
+  const d54Rule = 'O estorno conta no mês da fatura em que foi informado e, por isso, o usado do mês da compra no orçamento não diminui.';
+  const d54Edit = 'Se nenhuma fatura da compra foi paga, corrija o valor em Editar compra, em vez de registrar um estorno.';
+  const d54Tab = (name) => p.getByRole('tab', { name: name === 'Movimentações' ? 'Movimentos: movimentações do mês' : name, exact: true }).filter({ visible: true }).first();
+  // Os três tamanhos de tela: confere a largura e os alvos de toque, roda a conferência própria de cada tamanho e captura em 390, 360 e 320 px.
+  const d54Shots = async (name, extra = null, scroll = null) => {
+    for (const [w, h, suffix] of [[390, 844, ''], [360, 740, '_360px'], [320, 800, '_320px']]) {
+      await p.setViewportSize({ width: w, height: h }); await p.waitForTimeout(450);
+      if (scroll) await scroll();
+      await layoutChecks(`D54 ${name} ${w}px`);
+      if (extra) await extra(w);
+      await shot(`${name}${suffix}`);
+    }
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  };
+  // As barras do orçamento e do limite (testID "barra-orcamento"): o trecho sólido e o listrado, como fração da barra inteira.
+  const d54Bars = () =>
+    p.evaluate(() =>
+      [...document.querySelectorAll('[data-testid="barra-orcamento"]')]
+        .filter((e) => e.getBoundingClientRect().width > 0)
+        .map((track) => {
+          const w = track.getBoundingClientRect().width;
+          const striped = track.querySelector('[data-testid="trecho-listrado"]');
+          const part = (e) => (e ? Math.round((e.getBoundingClientRect().width / w) * 1000) / 1000 : 0);
+          return { solid: part(track.firstElementChild), striped: part(striped), stripes: striped ? striped.querySelectorAll('svg rect').length : 0 };
+        }),
+    );
+  // Nenhuma cor de alerta (vermelho) em nenhum elemento da tela: o excedente não depende de cor.
+  const d54Red = () =>
+    p.evaluate(() => {
+      const red = [];
+      for (const e of document.querySelectorAll('body *')) {
+        const r = e.getBoundingClientRect(); if (r.width <= 0) continue;
+        const cs = getComputedStyle(e);
+        for (const k of ['color', 'backgroundColor', 'borderTopColor']) if (['rgb(180, 35, 24)', 'rgb(253, 236, 234)'].includes(cs[k])) red.push(`${k}:${(e.textContent || '').slice(0, 30)}`);
+      }
+      return red;
+    });
+  const d54OpenBudget = async () => {
+    await d54Tab('Movimentações').click(); await waitText('Organizar'); await p.waitForTimeout(400);
+    await p.getByRole('button', { name: /^Orçamento por categoria, / }).filter({ visible: true }).first().click();
+    await waitText('No orçamento, cada compra no cartão conta a partir do mês da compra'); await p.waitForTimeout(500);
+  };
+  const d54Step = async (name, label) => { await p.getByRole('button', { name }).filter({ visible: true }).first().click(); await waitText(`Pessoal · ${label}`); await p.waitForTimeout(500); };
+  // Cartões: Movimentos › Organizar › Cartões › o cartão › a fatura do mês.
+  const d54OpenInvoice = async (card, month) => {
+    await d54Tab('Movimentações').click(); await waitText('Registrar recebimento');
+    await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitText('Cadastrar cartão'); await p.waitForTimeout(500);
+    await p.getByRole('button', { name: new RegExp(`^${card}[ .·]`) }).filter({ visible: true }).first().click(); await waitText('Fatura atual'); await p.waitForTimeout(400);
+    await p.getByRole('button', { name: new RegExp(`^Fatura de ${month}, `) }).filter({ visible: true }).first().click(); await waitText('Lançamentos'); await p.waitForTimeout(500);
+  };
+  const d54NewAccount = async (name, email) => {
+    await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+    await btn('Criar conta').click(); await waitText('Nome de apresentação');
+    await field('Nome de apresentação').fill(name); await field('E-mail').fill(email); await field('Senha').fill('senha1234');
+    await btn('Criar conta').click(); await waitText('Confira seu e-mail');
+    await btn('Simular abertura do link').click(); await btn('Já confirmei meu e-mail').click(); await waitText('Sua primeira conta');
+    await btn('Começar meu mês').click(); await waitText('Diferença do mês'); await p.waitForTimeout(600);
+  };
+  const d54Rows = ['13º salário. Duas parcelas, o proporcional e os descontos. Leitura de 2 minutos.', 'Contas que chegam uma vez por ano. IPVA, IPTU, matrícula e material escolar. Leitura de 2 minutos.', 'Cota única ou parcelado? Descubra os juros embutidos no parcelamento da conta do ano'];
+
+  // ---- 1. Resumo: a legenda sob "Diferença do mês" (CL-05) ----
+  await j1Demo();
+  const d54Store0 = await d54Store();
+  t = await d54Keep();
+  ok('D54 Resumo: sob "Diferença do mês" a legenda é "Recebido menos pago até 07/10 · não é saldo" (a data de hoje da sessão), e a frase antiga saiu', t.includes('Recebido menos pago até 07/10 · não é saldo') && !t.includes('Recebimentos menos pagamentos confirmados'), t.slice(0, 300));
+  ok('D54 Resumo: a estrutura não mudou (D-022): os mesmos títulos de antes, e a legenda vem logo depois do valor da diferença e antes de Recebido e Pago',
+    JSON.stringify(await headingList()) === k1ResumoHeadings && t.indexOf('Diferença do mês') < t.indexOf('R$ 2.100,00') && t.indexOf('R$ 2.100,00') < t.indexOf('Recebido menos pago até 07/10') && t.indexOf('Recebido menos pago até 07/10') < t.indexOf('Recebido\nR$ 6.000,00'), JSON.stringify(await headingList()));
+  ok('D54 Resumo: o leitor de tela lê "Diferença do mês, R$ 2.100,00. Recebido menos pago até 07/10. Não é saldo." (nome do botão da diferença)',
+    (await p.getByRole('button', { name: 'Diferença do mês, R$ 2.100,00. Recebido menos pago até 07/10. Não é saldo.', exact: true }).filter({ visible: true }).count()) === 1);
+  await expectTotals('D54 Resumo: outubro segue 6.000 / 3.900 / 2.100 e 650 com a legenda nova', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  const d54Legend = () =>
+    p.evaluate(() => {
+      const e = [...document.querySelectorAll('div[dir="auto"]')].find((x) => x.textContent.startsWith('Recebido menos pago') && x.getBoundingClientRect().width > 0);
+      if (!e) return null;
+      const r = e.getBoundingClientRect();
+      return { right: Math.round(r.right), screen: window.innerWidth, clipped: e.scrollWidth > e.clientWidth + 1, lines: Math.round(r.height / parseFloat(getComputedStyle(e).lineHeight)) };
+    });
+  await d54Shots('390_resumo_legenda', async (w) => { const l = await d54Legend(); ok(`D54 Resumo (${w}px): a legenda inteira à vista, sem corte e em até duas linhas`, l !== null && l.right <= l.screen && !l.clipped && l.lines <= 2, JSON.stringify(l)); });
+  await p.getByRole('button', { name: /^Mês anterior: Setembro de 2026$/ }).filter({ visible: true }).first().click(); await waitText('Setembro de 2026'); await p.waitForTimeout(500);
+  t = await d54Keep();
+  ok('D54 Resumo de setembro: "Recebido menos pago no mês · não é saldo" (a data de hoje só vale no mês de hoje)', t.includes('Recebido menos pago no mês · não é saldo') && !t.includes('até 07/10'), t.slice(0, 300));
+  await p.getByRole('button', { name: /^Próximo mês: Outubro de 2026$/ }).filter({ visible: true }).first().click(); await waitText('Outubro de 2026'); await p.waitForTimeout(500);
+  ok('D54 Resumo: voltando a outubro, a legenda volta com a data de hoje', (await body()).includes('Recebido menos pago até 07/10 · não é saldo'));
+
+  // ---- 2. Orçamento acima de 100%: barra cheia, trecho final listrado e o texto "R$ X acima" (CL-10) ----
+  await d54OpenBudget();
+  t = await d54Keep();
+  const d54Oct = await d54Bars();
+  ok('D54 /orcamento: Moradia (100%) é só sólida e cheia; Mercado (77,8%) vai até 77,8%; Lazer (133,3%) tem a barra cheia com o trecho final listrado de 33,3% (66,7% sólido)',
+    JSON.stringify(d54Oct.map((b) => [b.solid, b.striped])) === JSON.stringify([[1, 0], [0.778, 0], [0.667, 0.333]]) && JSON.stringify(d54Oct.map((b) => b.stripes > 0)) === JSON.stringify([false, false, true]), JSON.stringify(d54Oct));
+  ok('D54 /orcamento: o excedente não depende de cor: o texto "R$ 100,00 acima" acompanha o trecho listrado, só na Lazer (Moradia, a 100%, segue "Orçamento usado por inteiro")',
+    t.includes('R$ 400,00 de R$ 300,00\nR$ 100,00 acima') && !/R\$ 100,00 acima do orçamento/.test(t) && t.includes('R$ 2.500,00 de R$ 2.500,00\nOrçamento usado por inteiro') && (t.match(/ acima\n/g) ?? []).length === 1, t.slice(t.indexOf('Orçado'), t.indexOf('Orçado') + 500));
+  ok('D54 /orcamento: o leitor de tela anuncia "R$ 100,00 acima do orçamento" no nome do botão da Lazer, e o percentual real segue 133,3%',
+    (await visibleCount('button', /^Lazer, R\$ 400,00 de R\$ 300,00, 133,3% do orçamento\. R\$ 100,00 acima do orçamento\. Alterar orçamento de Lazer\.$/)) === 1);
+  ok('D54 /orcamento: nenhuma cor de alerta (a barra segue na cor da marca) e o total "Orçado R$ 4.600,00 · Usado R$ 4.300,00" não mudou', (await d54Red()).length === 0 && t.includes('Orçado R$ 4.600,00 · Usado R$ 4.300,00'));
+  await d54Shots('391_orcamento_acima', async (w) => {
+    const b = await d54Bars();
+    ok(`D54 /orcamento (${w}px): as três barras seguem 100%, 77,8% e 66,7% sólido com 33,3% listrado na Lazer, na largura de qualquer tela`,
+      JSON.stringify(b.map((x) => [x.solid, x.striped])) === JSON.stringify([[1, 0], [0.778, 0], [0.667, 0.333]]) && b[2].stripes > 0, JSON.stringify(b));
+  }, () => scrollTo('Moradia'));
+
+  // O aviso de 80%: Mercado a 83% (R$ 1.500,00 de R$ 1.800,00) em outubro e a 89% em setembro (R$ 1.250,00 anotados na demonstração contra um orçamento de R$ 1.400,00 que só existe neste roteiro).
+  await otherDevice(async (repo, ctx) => {
+    const space = await repo.getSpace();
+    const k = () => `e2e-${Math.random()}`;
+    await repo.createRecord(k(), ctx, 'despesa', { accountId: space.accounts[0].id, amountCents: 10000, occurredOn: '2026-10-06', description: 'Feira', category: 'Mercado' });
+    await repo.setCategoryBudget(k(), ctx, 'Mercado', '2026-09', 0, 140000);
+  });
+  await waitText('Chegou a 83% do orçamento.'); await p.waitForTimeout(500);
+  t = await d54Keep();
+  const d54Dismiss = (month) => p.getByRole('button', { name: `Dispensar aviso de Mercado em ${month}`, exact: true }).filter({ visible: true });
+  ok('D54 /orcamento: de 80% a menos de 100% o card mostra "Chegou a 83% do orçamento." com o botão "Dispensar aviso" (nome acessível com a categoria e o mês), só na Mercado',
+    (await p.getByText('Chegou a 83% do orçamento.', { exact: true }).filter({ visible: true }).count()) === 1 && (await d54Dismiss('outubro de 2026').count()) === 1 && (await d54Dismiss('outubro de 2026').first().innerText()) === 'Dispensar aviso' &&
+    (await p.getByText(/^Chegou a \d+% do orçamento\.$/).filter({ visible: true }).count()) === 1, t.slice(t.indexOf('Mercado'), t.indexOf('Mercado') + 300));
+  ok('D54 /orcamento: o card da Mercado segue um botão só (o aviso e "Dispensar aviso" ficam fora da área tocável)', (await visibleCount('button', /^Mercado, R\$ 1\.500,00 de R\$ 1\.800,00, 83,3% do orçamento\. Faltam R\$ 300,00\. Alterar orçamento de Mercado\.$/)) === 1);
+  await d54Shots('392_orcamento_aviso_80', async (w) => { ok(`D54 /orcamento (${w}px): o aviso de 80% e o botão "Dispensar aviso" inteiros na tela`, (await d54Dismiss('outubro de 2026').count()) === 1); }, () => scrollTo('Moradia'));
+  const d54Writes1 = writes.length;
+  // Setembro (89%): dispensar aqui não mexe em outubro, e dispensar em outubro não volta setembro.
+  await d54Step(/^Mês anterior: setembro de 2026$/, 'Setembro de 2026');
+  t = await d54Keep();
+  ok('D54 /orcamento em setembro: Mercado a 89% ("Chegou a 89% do orçamento.") com o próprio "Dispensar aviso" (o aviso é por categoria e mês)', t.includes('Chegou a 89% do orçamento.') && (await d54Dismiss('setembro de 2026').count()) === 1 && (await d54Dismiss('outubro de 2026').count()) === 0, t.slice(0, 400));
+  await d54Dismiss('setembro de 2026').first().click(); await p.waitForTimeout(500);
+  ok('D54 /orcamento: dispensar o aviso de setembro o tira do card de setembro', !(await body()).includes('Chegou a 89% do orçamento.') && (await d54Dismiss('setembro de 2026').count()) === 0);
+  await d54Step(/^Próximo mês: outubro de 2026$/, 'Outubro de 2026');
+  ok('D54 /orcamento: o aviso de outubro continua lá (voltou no mês seguinte ao dispensado) e a Lazer não ganhou aviso', (await body()).includes('Chegou a 83% do orçamento.') && (await d54Dismiss('outubro de 2026').count()) === 1);
+  await d54Dismiss('outubro de 2026').first().click(); await p.waitForTimeout(500);
+  t = await d54Keep();
+  ok('D54 /orcamento: dispensado, o aviso de outubro some, e o resto do card (R$ 1.500,00 de R$ 1.800,00, 83,3%, "Faltam R$ 300,00") fica como era',
+    !t.includes('Chegou a 83% do orçamento.') && (await p.getByText(/^Chegou a \d+% do orçamento\.$/).filter({ visible: true }).count()) === 0 && (await visibleCount('button', /^Mercado, R\$ 1\.500,00 de R\$ 1\.800,00, 83,3% do orçamento\. Faltam R\$ 300,00\./)) === 1);
+  await d54Step(/^Mês anterior: setembro de 2026$/, 'Setembro de 2026');
+  ok('D54 /orcamento: setembro segue dispensado depois de ir e voltar de mês', !(await body()).includes('Chegou a 89% do orçamento.'));
+  await d54Step(/^Próximo mês: outubro de 2026$/, 'Outubro de 2026');
+  ok('D54 /orcamento: dispensar só fica no aparelho: nenhuma escrita na rede e, na demonstração, nada guardado no armazenamento (só em memória)', writes.length === d54Writes1 && (await d54Store()) === d54Store0, `${writes.length - d54Writes1}`);
+
+  // ---- 3. Limite pessoal acima de 100%: a mesma barra (CL-10) ----
+  await j1Demo();
+  await p.getByRole('button', { name: /^Renda comprometida em / }).filter({ visible: true }).first().click(); await waitText('da sua renda de referência em outubro de 2026'); await p.waitForTimeout(500);
+  t = await d54Keep();
+  const d54Lim0 = await d54Bars();
+  ok('D54 Seu limite em outubro (52,5% de 60%): a barra vai a 87,5% do limite, toda sólida, sem listras e sem texto de excedente', t.includes('52,5% de 60% que você escolheu') && d54Lim0.length === 1 && d54Lim0[0].solid === 0.875 && d54Lim0[0].striped === 0 && !/R\$ [\d.,]+ acima/.test(t), JSON.stringify(d54Lim0));
+  await p.getByRole('radio', { name: 'Renda comprometida de novembro de 2026', exact: true }).filter({ visible: true }).first().click(); await waitText('da sua renda de referência em novembro de 2026'); await p.waitForTimeout(600);
+  t = await d54Keep();
+  const d54Lim1 = await d54Bars();
+  ok('D54 Seu limite em novembro (73,0% de 60%): barra cheia com o trecho final listrado de 21,7% (R$ 780,00 acima do limite de R$ 3.600,00) e o texto "R$ 780,00 acima"',
+    t.includes('73,0% de 60% que você escolheu') && t.includes('Novembro passou 13,0 pontos do limite de 60% que você escolheu.') && t.includes('R$ 780,00 acima') && d54Lim1.length === 1 && d54Lim1[0].solid === 0.783 && d54Lim1[0].striped === 0.217 && d54Lim1[0].stripes > 0, JSON.stringify(d54Lim1));
+  ok('D54 Seu limite: o leitor de tela anuncia "R$ 780,00 acima do limite", e a tela não usa cor de alerta', (await p.locator('[aria-label="R$ 780,00 acima do limite"]').filter({ visible: true }).count()) === 1 && (await d54Red()).length === 0);
+  await d54Shots('393_limite_acima', async (w) => {
+    const b = await d54Bars();
+    ok(`D54 Seu limite (${w}px): barra cheia, 78,3% sólido e 21,7% listrado, com "R$ 780,00 acima" inteiro na tela`, b.length === 1 && b[0].solid === 0.783 && b[0].striped === 0.217 && (await p.getByText('R$ 780,00 acima', { exact: true }).filter({ visible: true }).count()) === 1, JSON.stringify(b));
+  }, () => scrollTo('Seu limite'));
+
+  // ---- 4. Estorno no orçamento: a regra fica e a tela explica (E1 de CL-01) ----
+  await j1Demo();
+  await d54OpenInvoice('Cartão Exemplo', 'novembro');
+  await btn('Registrar estorno').click(); await waitText('Descrição do estorno'); await p.waitForTimeout(500);
+  t = await d54Keep();
+  ok('D54 Registrar estorno: a regra do orçamento em uma linha neutra, logo depois da explicação de sempre', t.includes('Estorno ou devolução de uma compra. O valor abate a categoria escolhida.') && t.includes(d54Rule) &&
+    t.indexOf('O valor abate a categoria escolhida.') < t.indexOf(d54Rule) && t.indexOf(d54Rule) < t.indexOf('Descrição do estorno\n'), t.slice(0, 700));
+  ok('D54 Registrar estorno: nenhuma fatura das compras do cartão foi paga, então sugere "Editar compra" em vez de estorno, com o link das três mais recentes (Restaurante, Notebook e Tênis de corrida)',
+    t.includes(d54Edit) && (await p.getByRole('button', { name: 'Editar compra Restaurante, R$ 200,00', exact: true }).filter({ visible: true }).count()) === 1 &&
+    (await p.getByRole('button', { name: 'Editar compra Notebook, R$ 1.500,00 em 10 vezes', exact: true }).filter({ visible: true }).count()) === 1 &&
+    (await p.getByRole('button', { name: 'Editar compra Tênis de corrida, R$ 600,00 em 3 vezes', exact: true }).filter({ visible: true }).count()) === 1 &&
+    t.includes('Editar compra: Restaurante') && t.includes('R$ 600,00 em 3x'), t.slice(t.indexOf('Estorno ou devolução'), t.indexOf('Estorno ou devolução') + 700));
+  await d54Shots('394_estorno_formulario', async (w) => {
+    ok(`D54 Registrar estorno (${w}px): a regra e os três links "Editar compra" na tela, sem corte`, (await p.getByText(d54Rule, { exact: true }).filter({ visible: true }).count()) === 1 && (await p.getByRole('button', { name: /^Editar compra / }).filter({ visible: true }).count()) === 3);
+  });
+  await p.getByRole('button', { name: 'Editar compra Restaurante, R$ 200,00', exact: true }).filter({ visible: true }).first().click(); await waitText('Salvar compra'); await p.waitForTimeout(500);
+  ok('D54 "Editar compra: Restaurante" abre a edição da compra (título "Editar compra" e o nome da compra no campo da descrição)', (await h1Name()) === 'Editar compra' &&
+    (await p.evaluate(() => [...document.querySelectorAll('input')].some((i) => i.value === 'Restaurante' && i.getBoundingClientRect().width > 0))), `${await h1Name()}`);
+  await btn('Voltar').click(); await waitText('Descrição do estorno'); await p.waitForTimeout(400);
+  // O estorno de R$ 100,00 em Lazer na fatura de novembro.
+  await field('Descrição do estorno').fill('Devolução do tênis'); await field('Valor do estorno').fill('100'); await radio('Lazer').click();
+  await btn('Salvar estorno').click(); await waitText('Estorno registrado na fatura.'); await waitText('Lançamentos'); await p.waitForTimeout(600);
+  t = await d54Keep();
+  ok('D54 a fatura de novembro com o estorno: R$ 450,00 (550 − 100) e a linha "Devolução do tênis · − R$ 100,00"', (await visibleCount('button', 'Devolução do tênis · − R$ 100,00')) === 1 && /Total da fatura\s+R\$ 450,00/.test(t) && /Estornos\s+− R\$ 100,00/.test(t));
+  await btn('Devolução do tênis · − R$ 100,00').click(); await waitText('Editar lançamento'); await p.waitForTimeout(400);
+  const d54Detail = await dialogText();
+  ok('D54 detalhe do estorno: a mesma regra em uma linha, com "Editar lançamento" e "Excluir lançamento"', d54Detail.includes(d54Rule) && d54Detail.includes('Devolução do tênis · − R$ 100,00') && (await visibleCount('button', 'Editar lançamento')) === 1 && (await visibleCount('button', 'Excluir lançamento')) === 1, d54Detail);
+  await d54Shots('395_estorno_detalhe');
+  await btn('Fechar').click(); await p.waitForTimeout(400);
+  // O estorno aberto para edição leva só a explicação (a sugestão é de quem ainda vai registrar).
+  await btn('Devolução do tênis · − R$ 100,00').click(); await waitText('Editar lançamento'); await btn('Editar lançamento').click(); await waitText('Salvar estorno'); await p.waitForTimeout(400);
+  t = await d54Keep();
+  ok('D54 Editar estorno: a regra aparece e a sugestão "Editar compra" não (o estorno já foi registrado)', t.includes(d54Rule) && !t.includes(d54Edit) && (await p.getByRole('button', { name: /^Editar compra / }).filter({ visible: true }).count()) === 0);
+  await btn('Cancelar').click(); await waitText('Lançamentos'); await p.waitForTimeout(400);
+  // O orçamento: novembro leva o estorno (Lazer R$ 200,00 da parcela 2 − R$ 100,00 = R$ 100,00) e explica; outubro não diminui.
+  await d54OpenBudget();
+  t = await d54Keep();
+  ok('D54 /orcamento de outubro com o estorno informado em novembro: Lazer segue R$ 400,00 de R$ 300,00 (133,3%) e nenhuma categoria ganha a nota do estorno (o usado do mês da compra não diminui)',
+    (await visibleCount('button', /^Lazer, R\$ 400,00 de R\$ 300,00, 133,3% do orçamento\. R\$ 100,00 acima do orçamento\./)) === 1 && !t.includes('Inclui estorno') && t.includes('Orçado R$ 4.600,00 · Usado R$ 4.300,00'), t.slice(t.indexOf('Orçado'), t.indexOf('Orçado') + 300));
+  await d54Step(/^Próximo mês: novembro de 2026$/, 'Novembro de 2026');
+  t = await d54Keep();
+  ok('D54 /orcamento de novembro: Lazer R$ 100,00 de R$ 300,00 (a parcela 2 do tênis, R$ 200,00, menos o estorno de R$ 100,00), com a nota "Inclui estorno de R$ 100,00." e a regra em uma linha, só na Lazer',
+    (await visibleCount('button', /^Lazer, R\$ 100,00 de R\$ 300,00, 33,3% do orçamento\. Faltam R\$ 200,00\. Alterar orçamento de Lazer\.$/)) === 1 && t.includes(`Inclui estorno de R$ 100,00. ${d54Rule}`) && (t.match(/Inclui estorno/g) ?? []).length === 1, t.slice(t.indexOf('Orçado'), t.indexOf('Orçado') + 700));
+  await d54Shots('396_orcamento_estorno', null, () => scrollTo('Lazer'));
+  // Valores ocultos: a nota do estorno também sai sem o valor.
+  await d54Tab('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
+  await openConta(); await hideSwitch().click(); await p.waitForTimeout(300); await btn('Voltar').click(); await waitText('Diferença do mês');
+  await d54OpenBudget(); await d54Step(/^Próximo mês: novembro de 2026$/, 'Novembro de 2026');
+  t = await d54Keep();
+  ok('D54 /orcamento com valores ocultos: a nota do estorno vira "Inclui estorno de R$ ••••." (a regra segue à vista) e nenhum valor em reais aparece', t.includes(`Inclui estorno de R$ ••••. ${d54Rule}`) && !/R\$ \d/.test(t), t.slice(0, 500));
+
+  // Quando alguma fatura da compra foi paga, a sugestão sai: cartão com uma compra de setembro e a fatura de outubro paga.
+  await j1Demo();
+  await otherDevice(async (repo, ctx) => {
+    const k = () => `e2e-${Math.random()}`;
+    const card = (await repo.createCard(k(), ctx, { name: 'Cartão azul', lastDigits: null, closingDay: 1, dueDay: 5, limitCents: null })).card;
+    await repo.addCardPurchase(k(), card.id, { description: 'Mochila', category: 'Lazer', purchasedOn: '2026-09-20', totalCents: 12000, installments: 1 });
+    const bill = (await repo.listInvoiceCommitments(card.id)).find((c) => c.invoice.month === '2026-10');
+    await repo.payInvoice(k(), card.id, '2026-10', bill.version, 12000, '2026-10-07');
+  });
+  await d54OpenInvoice('Cartão azul', 'novembro');
+  await btn('Registrar estorno').click(); await waitText('Descrição do estorno'); await p.waitForTimeout(500);
+  t = await d54Keep();
+  ok('D54 Registrar estorno num cartão cuja única compra tem fatura paga: a regra aparece, e a sugestão "Editar compra" não (ali só o estorno ajusta o valor)', t.includes(d54Rule) && !t.includes(d54Edit) && (await p.getByRole('button', { name: /^Editar compra / }).filter({ visible: true }).count()) === 0, t.slice(0, 500));
+
+  // ---- 5. Renda comprometida: os percentuais dos grupos somam o total pelo maior resto (CL-06) ----
+  await j1Demo();
+  await p.getByRole('button', { name: /^Renda comprometida em / }).filter({ visible: true }).first().click(); await waitText('da sua renda de referência em outubro de 2026'); await p.waitForTimeout(500);
+  t = await d54Keep();
+  ok('D54 renda comprometida de outubro (52,5%): gastos fixos 41,7% + outras contas 10,8% = 52,5%, como era', t.includes('52,5%') && t.includes('Gastos fixos · R$ 2.500,00 · 41,7%') && t.includes('Parcelamentos · R$ 0,00 · 0,0%') && t.includes('Outras contas a pagar · R$ 650,00 · 10,8%'));
+  await p.getByRole('radio', { name: 'Renda comprometida de novembro de 2026', exact: true }).filter({ visible: true }).first().click(); await waitText('da sua renda de referência em novembro de 2026'); await p.waitForTimeout(600);
+  t = await d54Keep();
+  const d54Groups = ['Gastos fixos · R$ 2.680,00 · 44,7%', 'Parcelamentos · R$ 850,00 · 14,2%', 'Faturas de cartão · R$ 550,00 · 9,1%', 'Outras contas a pagar · R$ 300,00 · 5,0%'];
+  const d54Tenths = d54Groups.map((x) => { const m = /· (\d+),(\d)%$/.exec(x); return Number(m[1]) * 10 + Number(m[2]); });
+  ok('D54 renda comprometida de novembro: 73,0% no total e os grupos 44,7% + 14,2% + 9,1% + 5,0% = 73,0% (maior resto; arredondados um a um, as faturas dariam 9,2% e a soma 73,1%)',
+    t.includes('73,0%') && d54Groups.every((x) => t.includes(x)) && !t.includes('9,2%') && d54Tenths.reduce((a, b) => a + b, 0) === 730 && t.includes('Dívidas: R$ 850,00 · 14,2% da renda de referência.'), t.slice(t.indexOf('Composição'), t.indexOf('Composição') + 500));
+  ok('D54 renda comprometida: a tela não ganha nota nem texto novo sobre arredondamento (só os números dos grupos mudam)', !/arredond/i.test(t));
+  await d54Shots('397_renda_comprometida_grupos', null, () => scrollTo('Composição'));
+
+  // ---- 6. Widget com valores ocultos (P-027): a legenda do interruptor em Conta ----
+  await j1Demo();
+  await openConta(); await scrollTo('Widget na tela inicial'); await p.waitForTimeout(300);
+  t = await d54Keep();
+  ok('D54 Conta › Widget na tela inicial: o interruptor "Mostrar valores no widget" (desligado) diz que, desligado, o widget mostra R$ •••• no lugar dos valores e, na próxima conta, só o prazo, sem o nome',
+    t.includes('Desligado, o widget mostra R$ •••• no lugar dos valores e, na próxima conta, só o prazo, sem o nome. Vale só para este aparelho.') && (await p.getByRole('switch', { name: 'Mostrar valores no widget' }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'false');
+  await d54Shots('398_conta_widget_oculto', null, () => scrollTo('Widget na tela inicial'));
+  await btn('Voltar').click(); await waitText('Diferença do mês');
+
+  // ---- 7. "Neste mês" em Metas, depois do conteúdo principal (P-028) ----
+  const d54Req0 = d54Requests.length;
+  const d54Writes2 = writes.length;
+  await d54Tab('Metas').click(); await waitText('Neste mês'); await p.waitForTimeout(500);
+  t = await d54Keep();
+  const d54Heads = (await headingList()).map((x) => x.replace(/^\d:/, ''));
+  ok('D54 Metas: o card "Neste mês" (título de nível 2, "Temas para outubro") vem depois de "Fazer as contas", do card "Aprender" e das metas, e antes de "Quem vê estes dados?"',
+    (await headingList()).includes('2:Neste mês') && t.includes('Neste mês\nTemas para outubro') && d54Heads.indexOf('Neste mês') > d54Heads.indexOf('Fazer as contas') && d54Heads.indexOf('Neste mês') > d54Heads.indexOf('Aprender') &&
+    t.indexOf('Neste mês') < t.indexOf('Quem vê estes dados?') && t.indexOf('Neste mês') > t.indexOf('Fazer as contas'), JSON.stringify(await headingList()));
+  ok('D54 Metas: as mesmas linhas de Aprender (13º salário, Contas que chegam uma vez por ano e a calculadora "Cota única ou parcelado?"), cada uma com o nome acessível completo', JSON.stringify(await cardButtons('Neste mês')) === JSON.stringify(d54Rows), JSON.stringify(await cardButtons('Neste mês')));
+  ok('D54 Metas: o resto de Metas não mudou (Reserva, Seu mês, Fazer as contas e Aprender seguem lá) e o Resumo segue sem "Neste mês"', ['Seu mês', 'Fazer as contas', 'Aprender'].every((x) => d54Heads.includes(x)));
+  await d54Shots('399_metas_neste_mes', null, () => scrollTo('Neste mês'));
+  await p.getByRole('button', { name: d54Rows[0], exact: true }).filter({ visible: true }).first().click(); await waitText('Voltar para Aprender'); await p.waitForTimeout(500);
+  ok('D54 Metas: o tema abre como em Aprender (13º salário, "Voltar para Aprender")', (await d54Keep()).includes('13º salário') && d54Path() === '/explicacao/decimo-terceiro', d54Path());
+  await btn('Voltar para Aprender').click(); await waitText('Neste mês'); await p.waitForTimeout(400);
+  await d54Tab('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
+  ok('D54 Resumo: sem "Neste mês" (o card é de Aprender e de Metas)', !(await body()).includes('Neste mês'));
+  ok('D54 Metas: nada gravado e nada enviado pelo card (nenhuma escrita, nenhuma requisição para fora)', writes.length === d54Writes2 && d54Requests.length === d54Req0, `${writes.length - d54Writes2} ${d54Requests.slice(d54Req0).join(' | ')}`);
+  // Conta nova: o mesmo card (conteúdo público), e o aviso de 80% dispensado também some (na conta simulada, como na demonstração, a
+  // preferência do aparelho fica só em memória; no aparelho de verdade vai para o armazenamento, só da própria pessoa).
+  await d54NewAccount('Kai Decisões', 'kai.decisoes@exemplo.com');
+  await d54Tab('Metas').click(); await waitText('Neste mês'); await p.waitForTimeout(500);
+  t = await d54Keep();
+  ok('D54 Metas de conta nova: o mesmo card "Neste mês" com as três linhas, sem valor da pessoa', JSON.stringify(await cardButtons('Neste mês')) === JSON.stringify(d54Rows) && t.includes('Temas para outubro') && !/R\$ \d/.test(t.slice(t.indexOf('Neste mês'), t.indexOf('Quem vê estes dados?'))));
+  await otherDevice(async (repo, ctx) => {
+    const space = await repo.getSpace();
+    const k = () => `e2e-${Math.random()}`;
+    await repo.setCategoryBudget(k(), ctx, 'Mercado', '2026-10', 0, 100000);
+    await repo.createRecord(k(), ctx, 'despesa', { accountId: space.accounts[0].id, amountCents: 85000, occurredOn: '2026-10-05', description: 'Feira do mês', category: 'Mercado' });
+  });
+  await d54OpenBudget(); await waitText('Chegou a 85% do orçamento.'); await p.waitForTimeout(400);
+  const d54Writes3 = writes.length;
+  const d54Store1 = await d54Store();
+  await d54Dismiss('outubro de 2026').first().click(); await p.waitForTimeout(500);
+  ok('D54 conta nova: "Dispensar aviso" tira o aviso do card, sem nenhuma escrita na rede e sem dado financeiro no armazenamento do aparelho', !(await body()).includes('Chegou a 85% do orçamento.') && writes.length === d54Writes3 && !/Mercado|85000|Feira/.test(await d54Store()) && (await d54Store()).length >= d54Store1.length - 1, `${(await d54Store()).slice(0, 200)}`);
+
+  // ---- 8. O guia (D-049): os passos que mudaram ----
+  await d54Tab('Aprender e dúvidas').click(); await waitText('Como usar o Clarevo'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: 'Como usar o Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
+  const d54Guide = async (name, text) => {
+    await p.getByRole('button', { name }).filter({ visible: true }).first().click(); await waitText('Para que serve'); await p.waitForTimeout(400);
+    const x = await d54Keep();
+    await btn('Voltar').click(); await waitText('Ver o tour de novo');
+    return text.every((s) => x.includes(s));
+  };
+  ok('D54 guia: "Resumo do mês" diz que a diferença é até hoje e que a legenda lembra que não é saldo', await d54Guide(/^Resumo do mês\./, ['recebeu menos o que já pagou até hoje, e a legenda lembra que não é saldo']));
+  ok('D54 guia: "Orçamento por categoria" explica a barra cheia com o trecho listrado e "Dispensar aviso"', await d54Guide(/^Orçamento por categoria\./, ['Acima de 100%, a barra fica cheia, com um trecho listrado', '"Dispensar aviso"']));
+  ok('D54 guia: "Cartões e faturas" sugere "Editar compra" quando nenhuma fatura da compra foi paga', await d54Guide(/^Cartões e faturas\./, [d54Edit]));
+  ok('D54 guia: "Metas e reserva" aponta o card "Neste mês" no fim da tela', await d54Guide(/^Metas e reserva\./, ['No fim da tela, "Neste mês" traz os temas de Aprender do mês']));
+  ok('D54 guia: "Ocultar valores e biometria" diz que o widget desligado não mostra o nome da próxima conta', await d54Guide(/^Ocultar valores e biometria\./, ['o widget não mostra o nome da próxima conta, só o prazo']));
+
+  // ---- 9. Demonstração de novo: os totais não mudam; nada gravado, nada na rede ----
+  await j1Demo();
+  ok('D54 Resumo da demonstração: os títulos e os blocos são os de antes (D-022) depois das decisões de 16/10', JSON.stringify(await headingList()) === k1ResumoHeadings, JSON.stringify(await headingList()));
+  await expectTotals('D54 demonstração: outubro segue 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  p.off('request', d54OnRequest);
+  ok('D54 nenhuma requisição para fora do servidor local (barras, avisos, cartões e Metas vêm do aparelho)', d54Requests.length === 0, d54Requests.slice(0, 3).join(' | '));
+
+  // ---- 10. Textos e escritas ----
+  const d54Vetoed = d54Texts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(VETOED)?.[0]).filter(Boolean);
+  const d54Dashes = d54Texts.map((x) => x.match(/[–—]/)?.[0]).filter(Boolean);
+  const d54Judging = d54Texts.map((x) => x.match(/\b(demais|estour\w*|excedeu|excedid\w*|gastou|gast[aã]o|exagero|cuidado|desperd[ií]cio|vale a pena|alerta|perigo|parab[eé]ns|incr[ií]vel)\b|\bvoc[eê] conseguiu\b|\busuári[oa]s?\b|\bbem-vind[oa]\b/i)?.[0]).filter(Boolean);
+  ok('D54 telas das decisões de 16/10 (Resumo, orçamento, limite, estorno, renda comprometida, Conta, Metas, guia): nenhum termo proibido, travessão, expressão vetada nem palavra de julgamento nos textos da interface (o "−" de estorno é o sinal de menos)',
+    d54Texts.length >= 20 && d54Vetoed.length === 0 && d54Dashes.length === 0 && d54Judging.length === 0, `${d54Texts.length} telas ${d54Vetoed.join(' | ')} ${d54Judging.join(' | ')} ${d54Dashes.join(' | ')}`);
+  ok('D54 nenhuma escrita direta na rede (os estornos e os cadastros preparados do roteiro ficam em memória; dispensar avisos, ler barras e abrir Metas só leem e guardam no aparelho)', writes.slice(d54Writes0).length === 0, writes.slice(d54Writes0).join(' | '));
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);

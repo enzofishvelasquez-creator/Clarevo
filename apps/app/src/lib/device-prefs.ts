@@ -1,4 +1,13 @@
-import { DEFAULT_REMINDER_HOUR, DEFAULT_WIDGET_SHOW_VALUES, MEMORY_LIMIT, isReminderHour, type ImportMemory, type ReminderHour } from '@clarevo/core';
+import {
+  BUDGET_NOTICE_KEEP,
+  DEFAULT_REMINDER_HOUR,
+  DEFAULT_WIDGET_SHOW_VALUES,
+  MEMORY_LIMIT,
+  isBudgetNoticeKey,
+  isReminderHour,
+  type ImportMemory,
+  type ReminderHour,
+} from '@clarevo/core';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
@@ -48,6 +57,12 @@ export interface DevicePrefs {
    * widget (`buildWidgetSnapshot`, no core). Separada de "Ocultar valores ao abrir": uma não muda a outra.
    */
   widgetShowValues: boolean;
+  /**
+   * Avisos de 80% do orçamento dispensados no card (D-054, CL-10), uma chave "AAAA-MM|Categoria" para cada categoria e mês
+   * (`budgetNoticeKey`). O aviso volta no mês seguinte porque a chave é outra. Só neste aparelho; não é dado financeiro e nada vai
+   * para o servidor. No máximo 120, os mais novos.
+   */
+  budgetNoticesDismissed: string[];
 }
 
 export const DEFAULT_PREFS: DevicePrefs = {
@@ -62,6 +77,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   importCategories: {},
   tourSeen: false,
   widgetShowValues: DEFAULT_WIDGET_SHOW_VALUES,
+  budgetNoticesDismissed: [],
 };
 
 const PREFIX = 'clarevo.aparelho.v1.';
@@ -89,6 +105,7 @@ function parse(raw: string | null | undefined): DevicePrefs {
       importCategories: parseMemory(v.importCategories),
       tourSeen: v.tourSeen === true,
       widgetShowValues: v.widgetShowValues === true,
+      budgetNoticesDismissed: Array.isArray(v.budgetNoticesDismissed) ? v.budgetNoticesDismissed.filter(isBudgetNoticeKey).slice(-BUDGET_NOTICE_KEEP) : [],
     };
   } catch {
     return DEFAULT_PREFS;
