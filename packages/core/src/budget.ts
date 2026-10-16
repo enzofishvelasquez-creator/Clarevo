@@ -275,11 +275,13 @@ export function isBudgetNoticeDismissed(dismissed: readonly string[], month: Iso
 
 /**
  * Lista nova com o aviso da categoria e do mês dispensado. Sem repetir, sem lixo (chaves inválidas saem), sem meses de mais de 24
- * meses antes de hoje e com no máximo `BUDGET_NOTICE_KEEP` itens (os mais novos). Não muda a lista de entrada.
+ * meses antes de hoje (só das chaves que já estavam guardadas: a chave nova nunca é podada) e com no máximo `BUDGET_NOTICE_KEEP`
+ * itens (os mais novos). Não muda a lista de entrada.
  */
 export function dismissBudgetNotice(dismissed: readonly string[], month: IsoMonth, category: string, today: IsoDate): string[] {
   const oldest = addMonths(monthOf(today), -BUDGET_MONTHS_BACK);
-  const next = [...dismissed, budgetNoticeKey(month, category)].filter((k, i, all) => isBudgetNoticeKey(k) && all.indexOf(k) === i && k.slice(0, 7) >= oldest);
+  const kept = dismissed.filter((k) => isBudgetNoticeKey(k) && k.slice(0, 7) >= oldest);
+  const next = [...kept, budgetNoticeKey(month, category)].filter((k, i, all) => isBudgetNoticeKey(k) && all.indexOf(k) === i);
   return next.slice(-BUDGET_NOTICE_KEEP);
 }
 

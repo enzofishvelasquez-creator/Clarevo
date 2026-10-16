@@ -1,7 +1,7 @@
 import { dismissBudgetNotice, isBudgetNoticeDismissed, type IsoMonth } from '@clarevo/core';
 import { useEffect } from 'react';
 
-import { loadPrefs, updatePrefs, useDevicePrefs } from '@/lib/device-prefs';
+import { getPrefs, loadPrefs, updatePrefs, useDevicePrefs } from '@/lib/device-prefs';
 import { useSession } from '@/state/session';
 
 /**
@@ -22,7 +22,9 @@ export function useBudgetNotices() {
     ready: prefs !== undefined,
     isDismissed: (month: IsoMonth, category: string) => isBudgetNoticeDismissed(dismissed, month, category),
     dismiss: (month: IsoMonth, category: string) => {
-      if (userId && prefs) updatePrefs(userId, { budgetNoticesDismissed: dismissBudgetNotice(prefs.budgetNoticesDismissed, month, category, today) }, persist);
+      // Lê o valor de agora, não o da renderização: duas dispensas seguidas em cards diferentes não perdem a primeira.
+      const current = userId ? getPrefs(userId) : undefined;
+      if (userId && current) updatePrefs(userId, { budgetNoticesDismissed: dismissBudgetNotice(current.budgetNoticesDismissed, month, category, today) }, persist);
     },
   };
 }

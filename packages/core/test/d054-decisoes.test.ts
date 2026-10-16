@@ -25,9 +25,10 @@ import {
   isBudgetNoticeKey,
   limitAmountCents,
   limitStatus,
+  loadInvoices,
   overflowBar,
   paidInvoiceMonths,
-  readMonthBudget,
+  purchaseBlockedByPaidInvoice,
   refundEditChoices,
   seasonalCard,
   summarizeBudget,
@@ -134,16 +135,27 @@ describe('estorno no orçamento: a regra fica e a tela explica (D-054, E1)', () 
     expect(paidInvoiceMonths([{ month: '2026-10', situation: 'paga' }, { month: '2026-11', situation: 'paga_em_parte' }, { month: '2026-12', situation: 'aberta' }])).toEqual(['2026-10', '2026-11']);
   });
 
-  it('na demonstração: as compras do cartão sem fatura paga entram na sugestão, a mais recente primeiro', async () => {
+  it('na demonstração: com as faturas reais do cartão, só entram compras sem fatura paga, a mais recente primeiro', async () => {
     const repo = await createDemoRepository();
     const ctx = (await repo.getSpace())!.personalContextId;
     const cards = await repo.listCards(ctx);
     expect(cards).toHaveLength(1);
     const entries = await repo.listCardEntries(cards[0]!.id);
-    const choices = refundEditChoices(entries, [], '2026-11');
-    expect(choices.length).toBeGreaterThan(0);
-    expect(choices.length).toBeLessThanOrEqual(REFUND_EDIT_MAX);
+    const invoices = await loadInvoices(repo, cards[0]!, DEMO_TODAY);
+    // Nenhuma fatura da demonstração está paga: as três compras (todas com a 1ª fatura em novembro) servem a "Editar compra".
+    const paid = paidInvoiceMonths(invoices);
+    expect(paid).toEqual([]);
+    const choices = refundEditChoices(entries, paid, '2026-11');
+    expect(choices.map((c) => c.description)).toEqual(['Restaurante', 'Notebook', 'Tênis de corrida']);
     expect(choices.every((c) => entries.some((e) => e.id === c.entryId && e.kind === 'compra'))).toBe(true);
+    expect(choices.every((c) => !purchaseBlockedByPaidInvoice(c.invoiceMonth, c.installments, paid))).toBe(true);
+    // Fevereiro de 2027 paga (as mesmas faturas, com essa situação): só o Notebook (10 parcelas) tem parcela ali e sai da sugestão.
+    const withFebPaid = invoices.map((i) => (i.month === '2027-02' ? { ...i, situation: 'paga' as const } : i));
+    const paidFeb = paidInvoiceMonths(withFebPaid);
+    expect(paidFeb).toEqual(['2027-02']);
+    const rest = refundEditChoices(entries, paidFeb, '2026-11');
+    expect(rest.map((c) => c.description)).toEqual(['Restaurante', 'Tênis de corrida']);
+    expect(rest.length).toBeLessThanOrEqual(REFUND_EDIT_MAX);
   });
 });
 
@@ -251,14 +263,12 @@ describe('aviso de 80% no card, que a pessoa pode dispensar (D-054, CL-10)', () 
     expect(isBudgetNoticeKey(undefined)).toBe(false);
   });
 
-  it('dispensar não muda nenhum número: o resumo e as linhas são os mesmos', async () => {
-    const repo = await createDemoRepository();
-    const ctx = (await repo.getSpace())!.personalContextId;
-    const read = await repo.getMonthBudget(ctx, '2026-10');
-    const before = JSON.stringify(summarizeBudget(read));
-    dismissBudgetNotice([], '2026-10', 'Mercado', DEMO_TODAY);
-    expect(JSON.stringify(summarizeBudget(read))).toBe(before);
-    expect(readMonthBudget('2026-10', [], { records: [], entries: [] }).lines.every((l) => l.budgetCents === null)).toBe(true);
+  it('um mês de mais de 24 meses atrás ainda pode ser dispensado: só as chaves antigas já guardadas saem, a nova fica', () => {
+    // Setembro de 2024 está a 25 meses de outubro de 2026: a chave nova não pode ser podada junto com as antigas.
+    expect(dismissBudgetNotice([], '2024-09', 'Mercado', '2026-10-07')).toEqual(['2024-09|Mercado']);
+    expect(dismissBudgetNotice(['2024-08|Lazer', '2026-10|Lazer'], '2024-09', 'Mercado', '2026-10-07')).toEqual(['2026-10|Lazer', '2024-09|Mercado']);
+    // Dispensar de novo a mesma chave antiga não a repete.
+    expect(dismissBudgetNotice(['2024-09|Mercado'], '2024-09', 'Mercado', '2026-10-07')).toEqual(['2024-09|Mercado']);
   });
 });
 
