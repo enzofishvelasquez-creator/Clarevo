@@ -27,7 +27,7 @@ import { MoneyTxt } from '@/components/money-text';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Banner, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
-import { useMarkSubscriptionsReviewed, useSeriesList, useSpace } from '@/state/data';
+import { useMarkSubscriptionsReviewed, useSeriesList, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
 
@@ -114,8 +114,8 @@ function ReviewRow({
  */
 export default function RevisarAssinaturas() {
   const { today } = useSession();
-  const personal = useSpace().data;
-  const list = useSeriesList(personal?.personalContextId);
+  const personal = useWork().data;
+  const list = useSeriesList(personal?.contextId);
   const mark = useMarkSubscriptionsReviewed();
   const [kept, setKept] = useState<ReadonlySet<string>>(new Set());
   /** Dia gravado por "Revisei minhas assinaturas" nesta visita (null: ainda não revisou aqui). */
@@ -143,7 +143,7 @@ export default function RevisarAssinaturas() {
     setBusy(true);
     setError(null);
     try {
-      const result = await mark.mutateAsync({ key: key.current, contextId: personal.personalContextId });
+      const result = await mark.mutateAsync({ key: key.current, contextId: personal.contextId });
       key.current = newOperationKey();
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setDoneOn(result.reviewedOn ?? today);

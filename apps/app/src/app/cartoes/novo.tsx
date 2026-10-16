@@ -6,17 +6,17 @@ import { CardForm } from '@/components/card-form';
 import { ContextPill, SubHeader } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Screen } from '@/components/ui';
-import { useSpace } from '@/state/data';
+import { useWork } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
 /** Novo cartão (D-037). `?origem=gasto`: veio de Anotar gasto e, depois de salvar, volta para lá. */
 export default function NovoCartaoScreen() {
   const { origem } = useLocalSearchParams<{ origem?: string }>();
-  const personal = useSpace();
+  const personal = useWork();
   if (personal.data) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <CardForm mode={{ type: 'novo', backToExpense: origem === 'gasto' }} contextId={personal.data.personalContextId} />
+        <CardForm mode={{ type: 'novo', backToExpense: origem === 'gasto' }} contextId={personal.data.contextId} />
       </View>
     );
   }

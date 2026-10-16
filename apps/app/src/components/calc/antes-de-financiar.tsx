@@ -31,7 +31,7 @@ import {
 import { MoneyTxt } from '@/components/money-text';
 import { Button, Card, LinkButton, Txt } from '@/components/ui';
 import { setValuesHidden, useValuesHidden } from '@/lib/privacy';
-import { useCommittedSummary, useSpace } from '@/state/data';
+import { useCommittedSummary, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -49,7 +49,7 @@ const MASKED_VALUE = '••••';
 export function AntesDeFinanciarCalc({ prefill }: { prefill: CalcPrefill<'antes-de-financiar'> }) {
   const { today } = useSession();
   const hidden = useValuesHidden();
-  const contextId = useSpace().data?.personalContextId;
+  const contextId = useWork().data?.contextId;
   const summary = useCommittedSummary(contextId, monthOf(today));
   const form = useCalcForm<Key>(() => ({ preco: '', entrada: '', parcelas: '', taxaMes: '', renda: '', guardar: '', rendimento: '' }));
   const [first, setFirst] = useState(ANTES_FIELDS.primeiraEmUmMes!.default === true);

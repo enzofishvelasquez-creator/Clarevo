@@ -5,6 +5,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { LogoSymbol } from '@/components/brand';
 import { ErrorState, LoadingState } from '@/components/states';
+import { pendingInvite } from '@/lib/invite-target';
 import { afterLogin, restoreTarget } from '@/lib/nav';
 import { useSession } from '@/state/session';
 import { useSpaceStatus } from '@/state/space-status';
@@ -21,7 +22,10 @@ export default function Carregando() {
     else if (status === 'sem-conta') router.replace('/primeira-conta');
     else if (status === 'pronto' && user) {
       const target = afterLogin.take(user.id);
+      // Um convite para a Família que esperava a entrada (D-055) volta a abrir; o endereço pedido antes tem a vez primeiro.
+      const invite = pendingInvite.take();
       if (target) restoreTarget(target);
+      else if (invite) restoreTarget(`/convite/${invite}`);
       else router.replace('/');
     }
   }, [status, recovery, user]);

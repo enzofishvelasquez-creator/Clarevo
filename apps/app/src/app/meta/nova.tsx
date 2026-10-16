@@ -6,7 +6,7 @@ import { GoalForm, readGoalPrefill, type GoalPrefillParams } from '@/components/
 import { ContextPill, SubHeader } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Screen } from '@/components/ui';
-import { useSpace } from '@/state/data';
+import { useWork } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
 /**
@@ -15,11 +15,11 @@ import { colors, space } from '@/theme/tokens';
  */
 export default function NovaMetaScreen() {
   const params = useLocalSearchParams<GoalPrefillParams>();
-  const personal = useSpace();
+  const personal = useWork();
   if (personal.data) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <GoalForm mode={{ type: 'nova', prefill: readGoalPrefill(params) }} contextId={personal.data.personalContextId} />
+        <GoalForm mode={{ type: 'nova', prefill: readGoalPrefill(params) }} contextId={personal.data.contextId} />
       </View>
     );
   }

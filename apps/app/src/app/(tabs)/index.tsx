@@ -6,7 +6,6 @@ import { Pressable, StyleSheet, useWindowDimensions, View, type ScrollView } fro
 import Animated, { FadeIn, FadeInLeft, FadeInRight, FadeOut, ReduceMotion } from 'react-native-reanimated';
 
 import { Meter, useMoneyMask } from '@/components/committed-parts';
-import { FamilyNotLinked } from '@/components/family-state';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { AppHeader, ContextSwitch, MonthSwitcher } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
@@ -20,7 +19,7 @@ import { totalChange, type TotalChange } from '@/lib/highlight';
 import { explanationHref } from '@/lib/learn';
 import { summaryTop } from '@/lib/nav';
 import { maskMoneyLabel, moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
-import { useCommitments, useCommittedSummary, useMonthRecords, useSpace, useView } from '@/state/data';
+import { useCommitments, useCommittedSummary, useMonthRecords, useWork, useView, type SpaceKind } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 
@@ -30,15 +29,16 @@ export default function ResumoScreen() {
   const narrow = useWindowDimensions().width < 360;
   const hidden = useValuesHidden();
   const [notice, setNotice] = useFlash();
-  const personal = useSpace().data;
-  const contextId = kind === 'pessoal' ? personal?.personalContextId : undefined;
+  const work = useWork().data;
+  const contextId = work?.contextId;
+  const canWrite = work?.canWrite ?? true;
   const records = useMonthRecords(contextId, month);
   const s = records.summary;
   const monthName = formatMonthBR(month);
   // "Nada anotado em junho." (e variações): só em meses fechados, como uma linha a mais no cabeçalho (D-030(6)).
   const emptyCaption = s ? emptyMonthCaption(s, month, currentMonth) : null;
   // Faixa "Seus últimos meses" (D-030): só no Pessoal e no mês atual, no lugar dos avisos temporários.
-  const band = useReturnBand(month === currentMonth ? contextId : undefined);
+  const band = useReturnBand(kind === 'pessoal' && month === currentMonth ? contextId : undefined);
 
   // "Ver resumo do mês" volta a este Resumo, que continua na pilha: mostrar do topo, com os totais à vista.
   // Voltar com "Voltar" mantém a posição da rolagem.
@@ -50,20 +50,20 @@ export default function ResumoScreen() {
   );
 
   // Efeito do último registro salvo ("+ R$ 80,00"), mostrado por alguns segundos e anunciado uma vez.
-  const [change, setChange] = useState<TotalChange | null>(null);
+  const [change, setChange] = useState<(TotalChange & { kind: SpaceKind }) | null>(null);
   useFocusEffect(
     useCallback(() => {
-      const c = kind === 'pessoal' ? totalChange.take(month) : null;
-      if (c) setChange(c);
-    }, [kind, month]),
+      const c = totalChange.take(month);
+      if (c) setChange({ ...c, kind });
+    }, [month, kind]),
   );
   useEffect(() => {
     if (!change) return;
     const t = setTimeout(() => setChange(null), 3200);
     return () => clearTimeout(t);
   }, [change]);
-  // Só no mês do registro: trocar de mês antes de o destaque sumir não leva o "+ R$" para outro mês.
-  const shownChange = change && change.month === month && kind === 'pessoal' ? change : null;
+  // Só no mês e no contexto do registro: trocar de mês ou de contexto antes de o destaque sumir não leva o "+ R$" para outro lugar.
+  const shownChange = change && change.month === month && change.kind === kind ? change : null;
 
   // Troca de mês desliza na direção escolhida; troca de contexto só esmaece (CL-V008).
   const entering = (monthDirection > 0 ? FadeInRight : FadeInLeft).duration(motion.context).reduceMotion(ReduceMotion.System);
@@ -76,11 +76,7 @@ export default function ResumoScreen() {
           <MonthSwitcher />
 
           <Animated.View key={`${kind}-${month}`} entering={entering} style={styles.heroContent}>
-            {kind === 'familia' ? (
-              <Txt variant="title" color={colors.textOnBrand}>
-                Família ainda não está ativa
-              </Txt>
-            ) : records.isPending ? (
+            {records.isPending ? (
               <View accessibilityRole="progressbar" accessibilityLabel="Carregando o resumo" style={{ gap: space[3] }}>
                 <Skeleton width={160} height={20} onBrand />
                 <Skeleton width="70%" height={40} onBrand />
@@ -149,18 +145,15 @@ export default function ResumoScreen() {
             ordem dos blocos aprovados: a faixa "Seus últimos meses" tem precedência; o card de Primeiros passos espera a
             revisão carregar e volta quando a faixa some (conta nova nunca vê a faixa).
           */}
-          {kind === 'familia' ? null : (
+          {canWrite ? (
             <Button label="Anotar gasto" icon={Plus} onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } })} />
-          )}
+          ) : null}
           <FlashBanner message={notice} />
           {band.status === 'visivel' ? <ReturnBand band={band} onMovedOn={(text) => setNotice(text)} /> : null}
           {band.status === 'oculta' ? <PrimeirosPassos contextId={contextId} /> : null}
 
-          {kind === 'familia' ? (
-            <FamilyNotLinked />
-          ) : (
-            <>
-              <ToPayCard contextId={contextId} />
+          <>
+            <ToPayCard contextId={contextId} canWrite={canWrite} />
 
               <Card>
                 <View style={styles.cardHead}>
@@ -184,8 +177,7 @@ export default function ResumoScreen() {
                     .map((r, i, arr) => <RecordRow key={r.id} record={r} last={i === arr.length - 1} onPress={() => router.push(`/registro/${r.id}`)} />)
                 )}
               </Card>
-            </>
-          )}
+          </>
 
           <Pressable
             accessibilityRole="button"
@@ -218,7 +210,7 @@ export default function ResumoScreen() {
  * "Ainda a pagar" (D-021): rótulo fora da área tocável, resumo tocável que abre /a-pagar e,
  * como irmão (nunca dentro), o link "Anotar conta a pagar". Falha de carga nunca vira R$ 0,00.
  */
-function ToPayCard({ contextId }: { contextId: string | undefined }) {
+function ToPayCard({ contextId, canWrite }: { contextId: string | undefined; canWrite: boolean }) {
   const { today } = useSession();
   const { month, currentMonth } = useView();
   const hidden = useValuesHidden();
@@ -308,7 +300,7 @@ function ToPayCard({ contextId }: { contextId: string | undefined }) {
         </Pressable>
       )}
       <CommittedRow contextId={contextId} />
-      <LinkButton label="Anotar conta a pagar" icon={Plus} style={styles.toPayLink} onPress={() => router.push('/a-pagar/nova')} />
+      {canWrite ? <LinkButton label="Anotar conta a pagar" icon={Plus} style={styles.toPayLink} onPress={() => router.push('/a-pagar/nova')} /> : null}
     </Card>
   );
 }

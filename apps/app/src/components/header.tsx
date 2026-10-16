@@ -1,4 +1,4 @@
-import { addMonths, contextPillText, formatMonthBR } from '@clarevo/core';
+import { addMonths, contextLabelFor, contextPillText, formatMonthBR } from '@clarevo/core';
 import { router } from 'expo-router';
 import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, Users } from 'lucide-react-native';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -12,6 +12,7 @@ import { DemoPill, TopInset, Txt } from '@/components/ui';
 import type { HelpScreen } from '@/lib/guide';
 import { PRIVACY_TEXT, setValuesHidden, useValuesHidden } from '@/lib/privacy';
 import { canGoForward, useView, type SpaceKind } from '@/state/data';
+import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
 import { LOGOTYPE_HEIGHT, LOGOTYPE_WIDTH } from '@/theme/logo-paths';
 import { colors, fonts, motion, radius, space } from '@/theme/tokens';
@@ -146,11 +147,15 @@ export function SubHeader({ title, onBack, right, help }: { title: string; onBac
 
 /**
  * Contexto fixo durante o preenchimento ou na leitura de um registro. Na demonstração (CL-11), a pílula vira "Demonstração · Pessoal",
- * no lima do selo das abas, para nenhum formulário nem detalhe parecer uma conta real.
+ * no lima do selo das abas, para nenhum formulário nem detalhe parecer uma conta real. Os textos das telas dizem "Pessoal"
+ * ("Salvando em Pessoal", "Importando em Pessoal"); com a Família escolhida no seletor (D-055), a pílula diz onde a anotação vai
+ * ficar: "Salvando em Família". `fixed`: a tela é só do Pessoal (exportar), e a pílula não muda.
  */
-export function ContextPill({ label }: { label: string }) {
+export function ContextPill({ label: given, fixed }: { label: string; fixed?: boolean }) {
   const { auth } = useSession();
+  const { space: kind } = useView();
   const demo = auth.mode === 'demo';
+  const label = fixed ? given : contextLabelFor(given, kind);
   const text = contextPillText(label, demo);
   return (
     <View style={[styles.pill, demo && styles.pillDemo]} accessible accessibilityLabel={`Contexto: ${text}`}>
@@ -166,8 +171,17 @@ const OPTIONS: { kind: SpaceKind; label: string }[] = [
   { kind: 'familia', label: 'Família' },
 ];
 
-/** Seletor Pessoal/Família sempre visível nas abas (CL-V002). A pílula branca desliza em 200 ms. */
+/**
+ * Seletor Pessoal/Família nas abas (CL-V002). A pílula branca desliza em 200 ms. Só aparece para quem tem uma Família (D-055):
+ * sem ela, o Pessoal é o único contexto e o seletor não ocupa lugar. A Família se cria e se administra em Conta.
+ */
 export function ContextSwitch() {
+  const family = useFamily();
+  if (!family.data) return null;
+  return <ContextSwitchTrack />;
+}
+
+function ContextSwitchTrack() {
   const { space: active, setSpace } = useView();
   const reduced = useReducedMotion();
   const [width, setWidth] = useState(0);

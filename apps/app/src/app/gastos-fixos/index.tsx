@@ -39,7 +39,7 @@ import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
 import { useSubscriptionSnooze } from '@/lib/subscription-reminder';
-import { useSeriesList, useSpace } from '@/state/data';
+import { useSeriesList, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
@@ -250,8 +250,8 @@ function SubscriptionGroup({ list, today }: { list: readonly CommitmentSeries[];
  */
 export default function GastosFixosScreen() {
   const { today } = useSession();
-  const personal = useSpace().data;
-  const list = useSeriesList(personal?.personalContextId);
+  const personal = useWork().data;
+  const list = useSeriesList(personal?.contextId);
   const [notice] = useFlash();
   const snooze = useSubscriptionSnooze();
 
@@ -339,7 +339,7 @@ export default function GastosFixosScreen() {
           </>
         )}
 
-        <Button label="Novo gasto fixo ou parcelamento" icon={Plus} onPress={() => router.push('/gastos-fixos/novo')} />
+        {personal?.canWrite === false ? null : <Button label="Novo gasto fixo ou parcelamento" icon={Plus} onPress={() => router.push('/gastos-fixos/novo')} />}
 
         {list.isPending ? (
           <View style={{ gap: space[3] }}>

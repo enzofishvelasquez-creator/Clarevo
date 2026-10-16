@@ -1,5 +1,5 @@
-import { EXPORT_TEXT } from '@clarevo/core';
-import { AlertCircle, Check, FileDown, KeyRound, LogOut, MonitorSmartphone } from 'lucide-react-native';
+import { EXPORT_TEXT, FAMILY_ROLE_LABEL, FAMILY_TEXT } from '@clarevo/core';
+import { AlertCircle, Check, FileDown, KeyRound, LogOut, MonitorSmartphone, Users } from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
@@ -13,7 +13,8 @@ import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Screen, Txt } from '@/components/ui';
 import { AuthError, RESEND_INTERVAL_SECONDS } from '@/lib/auth';
 import { signOutIntent } from '@/lib/nav';
-import { useSpace } from '@/state/data';
+import { useWork } from '@/state/data';
+import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -34,7 +35,8 @@ function Message({ msg }: { msg: Msg }) {
 /** Conta: perfil, suas contas (origem do dinheiro, D-043), segurança, lembretes, privacidade neste aparelho e situação do acesso ao plano. */
 export default function ContaScreen() {
   const { user, auth, signOut } = useSession();
-  const personal = useSpace().data;
+  const personal = useWork().data;
+  const family = useFamily();
   // Avisos das telas de contas ("Conta adicionada.", "Conta salva."): lidos uma única vez, quando esta tela abre.
   const [notice] = useFlash();
   const [securityMsg, setSecurityMsg] = useState<Msg>(null);
@@ -107,8 +109,25 @@ export default function ContaScreen() {
           ) : null}
         </Card>
 
+        {/* Família (D-055): criar, convidar e administrar; abre a tela Família. */}
+        <Card style={{ gap: space[3] }}>
+          <Txt variant="title" accessibilityRole="header" aria-level={2}>
+            {FAMILY_TEXT.accountTitle}
+          </Txt>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {family.data ? FAMILY_TEXT.accountHintIn(family.data.context.name, family.data.role) : FAMILY_TEXT.accountHintNone}
+          </Txt>
+          <Button
+            label={family.data ? FAMILY_TEXT.accountOpen : FAMILY_TEXT.accountCreate}
+            icon={Users}
+            tone="soft"
+            accessibilityLabel={family.data ? `${FAMILY_TEXT.accountOpen}, ${FAMILY_ROLE_LABEL[family.data.role]}` : undefined}
+            onPress={() => router.push('/familia')}
+          />
+        </Card>
+
         <View onLayout={(e) => setAccountsY(e.nativeEvent.layout.y)}>
-          <AccountsCard contextId={personal?.personalContextId} />
+          <AccountsCard contextId={personal?.contextId} canWrite={personal?.canWrite ?? true} />
         </View>
 
         <Card style={{ gap: space[3] }}>
@@ -116,7 +135,7 @@ export default function ContaScreen() {
             Segurança
           </Txt>
           <Txt variant="caption" color={colors.textSecondary}>
-            Seus registros ficam protegidos por permissões no servidor: só você vê o contexto Pessoal.
+            Seus registros ficam protegidos por permissões no servidor: só você vê o contexto Pessoal. Na Família, cada pessoa vê o que o papel dela permite.
           </Txt>
           <Message msg={securityMsg} />
           <Button

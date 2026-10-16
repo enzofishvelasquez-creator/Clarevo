@@ -12,6 +12,9 @@ SECRET="segredo-de-teste-local-clarevo-0123456789abcdef"
 ANA=00000000-0000-0000-0000-0000000000a1
 BRUNO=00000000-0000-0000-0000-0000000000b1
 EVA=00000000-0000-0000-0000-0000000000e1
+CARLA=00000000-0000-0000-0000-0000000000c1
+DAVI=00000000-0000-0000-0000-0000000000d1
+FABIO=00000000-0000-0000-0000-0000000000f1
 
 createdb "$DB"
 cleanup() {
@@ -34,7 +37,10 @@ grant anon, authenticated to clarevo_api_teste;
 insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
   ('$ANA', 'ana@exemplo.test', now(), '{"display_name":"Ana"}'),
   ('$BRUNO', 'bruno@exemplo.test', now(), '{"display_name":"Bruno"}'),
-  ('$EVA', 'eva@exemplo.test', null, '{"display_name":"Eva"}');
+  ('$EVA', 'eva@exemplo.test', null, '{"display_name":"Eva"}'),
+  ('$CARLA', 'carla@exemplo.test', now(), '{"display_name":"Carla Souza"}'),
+  ('$DAVI', 'davi@exemplo.test', now(), '{"display_name":"Davi Prado"}'),
+  ('$FABIO', 'fabio@exemplo.test', now(), '{"display_name":"Fábio Reis"}');
 alter database "$DB" set clarevo.today = '2026-10-07';
 -- Só neste banco descartável: o cabeçalho x-clarevo-today muda o "hoje" de uma requisição, para conferir a geração
 -- de contas de gasto fixo com o passar dos meses. Sem o cabeçalho, vale o dia fixo acima.
@@ -54,7 +60,7 @@ SQL
 PGRST_DB_URI="postgres://clarevo_api_teste:senha-local-de-teste@127.0.0.1:${PGPORT:-5432}/$DB" \
 PGRST_DB_SCHEMAS=public PGRST_DB_ANON_ROLE=anon PGRST_JWT_SECRET="$SECRET" PGRST_SERVER_PORT=$API_PORT \
 PGRST_DB_PRE_REQUEST=clarevo_teste.hoje_da_requisicao \
-  postgrest > /tmp/clarevo-postgrest.log 2>&1 &
+  postgrest > "${TMPDIR:-/tmp}/clarevo-postgrest-$API_PORT.log" 2>&1 &
 PGRST_PID=$!
 node tests/api-proxy.js $PROXY_PORT $API_PORT &
 PROXY_PID=$!
@@ -64,6 +70,6 @@ for i in $(seq 1 40); do
 done
 
 cd "$ROOT"
-CLAREVO_API_URL="http://127.0.0.1:$PROXY_PORT" CLAREVO_JWT_SECRET="$SECRET" \
-CLAREVO_ANA=$ANA CLAREVO_BRUNO=$BRUNO CLAREVO_EVA=$EVA \
+CLAREVO_DB="$DB" CLAREVO_API_URL="http://127.0.0.1:$PROXY_PORT" CLAREVO_JWT_SECRET="$SECRET" \
+CLAREVO_ANA=$ANA CLAREVO_BRUNO=$BRUNO CLAREVO_EVA=$EVA CLAREVO_CARLA=$CARLA CLAREVO_DAVI=$DAVI CLAREVO_FABIO=$FABIO \
   npx vitest run --root apps/app test/supabase-api.int.test.ts

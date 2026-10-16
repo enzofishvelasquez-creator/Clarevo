@@ -3,7 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 
 import { CommitmentForm } from '@/components/commitment-form';
 import { LoadingState } from '@/components/states';
-import { useSpace } from '@/state/data';
+import { useWork } from '@/state/data';
 
 type Params = { descricao?: string; valor?: string; vencimento?: string; categoria?: string };
 
@@ -23,7 +23,7 @@ function prefillFrom(p: Params): Partial<CommitmentInput> | undefined {
 
 export default function NovaContaAPagar() {
   const params = useLocalSearchParams<Params>();
-  const space = useSpace().data;
+  const space = useWork().data;
   if (!space) return <LoadingState />;
   return <CommitmentForm mode={{ type: 'nova', prefill: prefillFrom(params) }} space={space} />;
 }

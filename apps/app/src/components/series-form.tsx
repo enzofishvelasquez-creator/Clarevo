@@ -40,7 +40,6 @@ import {
   type AnnualStartChoice,
   type IsoDate,
   type IsoMonth,
-  type PersonalSpace,
   type SeriesDraft,
   type SeriesField,
   type SeriesFieldErrors,
@@ -77,6 +76,7 @@ import { SumValues } from '@/components/sum-values';
 import { TermHint } from '@/components/term-hint';
 import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
+import { UnsavedChangesText } from '@/components/context-text';
 import { flash } from '@/lib/flash';
 import { explanationHref } from '@/lib/learn';
 import {
@@ -89,6 +89,7 @@ import {
   useSetSeriesSubscription,
   useUpdateSeriesFrom,
   withNotice,
+  type WorkSpace,
 } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
@@ -189,7 +190,7 @@ export function SeriesForm({
   prefill?: SeriesPrefill;
   /** O preenchimento veio do que a pessoa digitou em "Anotar conta a pagar": sair sem salvar pede confirmação. */
   typed?: boolean;
-  space: PersonalSpace;
+  space: WorkSpace;
 }) {
   const { today, auth } = useSession();
   const repo = useRepo();
@@ -201,8 +202,8 @@ export function SeriesForm({
   const limitWatch = useLimitWatch();
   // Tentativa incerta na memória do app (CL-03 e CL-19): sair do formulário e cadastrar de novo confere a anterior e reusa a chave.
   const keys = useSeriesOperationKey('gasto-fixo:novo');
-  const contextId = personal.personalContextId;
-  const contextName = 'Pessoal';
+  const contextId = personal.contextId;
+  const contextName = personal.contextName;
   const currentMonth = monthOf(today);
   const chipMonths = [currentMonth, addMonths(currentMonth, 1)];
 
@@ -1168,7 +1169,7 @@ export function SeriesForm({
           setConfirmDiscard(null);
           if (action) leave(action);
         }}>
-        <Txt color={colors.textSecondary}>Você tem alterações que ainda não foram salvas em {contextName}.</Txt>
+        <UnsavedChangesText />
       </ConfirmDialog>
     </KeyboardAvoidingView>
   );

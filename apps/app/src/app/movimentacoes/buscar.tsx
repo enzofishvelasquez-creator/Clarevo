@@ -34,7 +34,7 @@ import { ChoiceGroup } from '@/components/series-parts';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Button, Card, Chip, Screen, Skeleton, TextField, Txt, styles as ui } from '@/components/ui';
 import { maskMoneyText, spokenText, useValuesHidden } from '@/lib/privacy';
-import { useAccounts, useCards, useRecordSearch, useSpace } from '@/state/data';
+import { useAccounts, useCards, useRecordSearch, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -60,8 +60,8 @@ function useDebounced<V>(value: V, ms: number): V {
 export default function BuscarScreen() {
   const { today } = useSession();
   const hidden = useValuesHidden();
-  const personal = useSpace().data;
-  const contextId = personal?.personalContextId;
+  const personal = useWork().data;
+  const contextId = personal?.contextId;
   const accounts = useAccounts(contextId);
   const cards = useCards(contextId);
 

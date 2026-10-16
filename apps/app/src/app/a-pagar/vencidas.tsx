@@ -45,7 +45,7 @@ import { openCommitment } from '@/lib/cards';
 import { totalChange } from '@/lib/highlight';
 import { useLastAccount } from '@/lib/last-account';
 import { moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
-import { useCommitments, useDeleteCommitment, usePayCommitment, useSeriesList, useSkipSeriesYear, useSpace, useUpdateRecord } from '@/state/data';
+import { useCommitments, useDeleteCommitment, usePayCommitment, useSeriesList, useSkipSeriesYear, useWork, useUpdateRecord } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, motion, space, tabular } from '@/theme/tokens';
 
@@ -162,8 +162,8 @@ type Pending =
 export default function ContasVencidas() {
   const { today } = useSession();
   const insets = useSafeAreaInsets();
-  const personal = useSpace().data;
-  const ctx = personal?.personalContextId;
+  const personal = useWork().data;
+  const ctx = personal?.contextId;
   const commitments = useCommitments(ctx, monthOf(today));
   const remove = useDeleteCommitment();
   const skipYear = useSkipSeriesYear();

@@ -4,6 +4,7 @@
  * compatível com a do Supabase (PostgREST), com tokens de pessoas diferentes.
  * Executado por `npm run test:api` (ver supabase/tests/run_api.sh). Pessoas FICTÍCIAS.
  */
+import { execFileSync } from 'node:child_process';
 import { createHmac, randomUUID } from 'node:crypto';
 
 import {
@@ -24,6 +25,13 @@ import {
   affectedByEditFrom,
   affectedByEnd,
   affectedByYear,
+  FAMILY_MAX_PEOPLE,
+  FAMILY_TEXT,
+  INVITE_CODE_PATTERN,
+  authorLabel,
+  inviteCodeHash,
+  inviteLink,
+  seatsLeft,
   annualCommitmentIds,
   annualYearSummary,
   budgetCaption,
@@ -111,6 +119,8 @@ import {
   weeklySavingsToMonthly,
   wholeYearPayment,
   type AccountKind,
+  type FamilyInvite,
+  type FamilyOverview,
   type AffectedRef,
   type AmountMode,
   type Card,
@@ -164,6 +174,9 @@ const SECRET = process.env.CLAREVO_JWT_SECRET!;
 const ANA = process.env.CLAREVO_ANA!;
 const BRUNO = process.env.CLAREVO_BRUNO!;
 const EVA = process.env.CLAREVO_EVA!;
+const CARLA = process.env.CLAREVO_CARLA!;
+const DAVI = process.env.CLAREVO_DAVI!;
+const FABIO = process.env.CLAREVO_FABIO!;
 
 function jwt(payload: Record<string, unknown>) {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -6854,5 +6867,558 @@ describe('conversor da importação de extrato e fatura', () => {
     expect(await fake({}, { record_operations: null }).findImportOperation('chave-0010')).toBeNull();
     expect(await failure(fake({}, { record_operations: { ...op, import_result: { created: 'x' } } }).findImportOperation('chave-0011'))).toEqual(['desconhecido', 'importacao_inconsistente', null]);
     expect(await failure(fake({}, { record_operations: { ...op, target_id: null } }).findImportOperation('chave-0012'))).toEqual(['desconhecido', 'operacao_inconsistente', null]);
+  });
+});
+
+
+/**
+ * Só para a Família: o banco descartável do run_api.sh (CLAREVO_DB), lido e mexido como superusuário. Vencer um convite precisa
+ * mexer no relógio guardado (a API não deixa), e conferir que os dados de uma Família encerrada seguem no banco precisa ler sem a RLS.
+ */
+function adminSql(sql: string): string {
+  const db = process.env.CLAREVO_DB;
+  if (!db) throw new Error('CLAREVO_DB não definido: rode pelo run_api.sh (npm run test:api)');
+  return execFileSync('psql', ['-v', 'ON_ERROR_STOP=1', '-qAt', '-d', db, '-c', sql], { encoding: 'utf8' }).trim();
+}
+
+/** O convite venceu há 1 dia (a guarda de family_invites fica desligada só neste comando). */
+async function expireInvite(codeHash: string) {
+  expect(codeHash).toMatch(/^[0-9a-f]{64}$/);
+  adminSql(
+    `alter table public.family_invites disable trigger family_invites_guard;
+     update public.family_invites set created_at = created_at - interval '9 days', expires_at = expires_at - interval '9 days' where code_hash = '${codeHash}';
+     alter table public.family_invites enable trigger family_invites_guard;`,
+  );
+}
+
+/** O que o banco guarda de uma Família: encerrada, registros vivos e vínculos ativos. */
+async function famRows(context: string) {
+  const [ended, records, memberships] = adminSql(
+    `select (ended_at is not null)::text || '|' ||
+            (select count(*) from public.financial_records r where r.context_id = c.id and r.deleted_at is null) || '|' ||
+            (select count(*) from public.context_memberships m where m.context_id = c.id and m.revoked_at is null)
+       from public.financial_contexts c where c.id = '${context}'`,
+  ).split('|');
+  return { ended: ended === 'true', records: Number(records), memberships: Number(memberships) };
+}
+
+describe('API real: Família (Ciclo L, D-055)', () => {
+  // Ana (titular), Bruno (membro), Carla (só vê), Fábio (membro, sai) e Davi (de fora, com Família própria). Eva não confirmou o e-mail.
+  // Roda no fim: as Famílias criadas aqui não mudam nenhum bloco anterior. Pessoas FICTÍCIAS.
+  const TODAY = '2026-10-07';
+  const ana = repoFor(ANA);
+  const bruno = repoFor(BRUNO);
+  const carla = repoFor(CARLA);
+  const davi = repoFor(DAVI);
+  const fabio = repoFor(FABIO);
+  let anaCtx = '';
+  let fam = '';
+  let famAccount = '';
+  const codes: Record<string, string> = {};
+  const inviteIds: Record<string, string> = {};
+
+  const record = (accountId: string, description: string, cents = 1500): RecordInput => ({
+    accountId,
+    amountCents: cents,
+    occurredOn: TODAY,
+    description,
+    category: null,
+  });
+  const names = (f: FamilyOverview) => f.members.map((m) => `${m.firstName}:${m.role}:${m.status}`);
+  const viewOf = (who: SupabaseRepository) => who.getFamily();
+  const sql = (who: string) => clientFor(who);
+
+  beforeAll(async () => {
+    anaCtx = (await ana.getSpace())!.personalContextId;
+    for (const r of [carla, davi, fabio]) await r.ensurePersonalSpace('Conta principal');
+  });
+
+  it('1. sem Família: nada a mostrar; nome inválido, chave curta e quem ainda não tem espaço são recusados', async () => {
+    expect(await ana.getFamily()).toBeNull();
+    expect(await err(ana.createFamily(newOperationKey(), '   '))).toBe('nome_da_familia_invalido');
+    expect(await err(ana.createFamily(newOperationKey(), 'x'.repeat(61)))).toBe('nome_da_familia_invalido');
+    // Eva não confirmou o e-mail: não tem espaço pessoal, então não tem permissão para nada.
+    expect(await err(repoFor(EVA).createFamily(newOperationKey(), 'Casa'))).toBe('sem_permissao');
+    expect(await ana.getFamily()).toBeNull();
+  });
+
+  it('2. criar a Família: Ana vira titular, com a Conta principal e nenhum dado de exemplo; repetir a chave devolve o mesmo resultado', async () => {
+    const key = newOperationKey();
+    const joined = await ana.createFamily(key, '  Casa Lima ');
+    fam = joined.context.id;
+    expect(joined).toMatchObject({ role: 'titular', invitedBy: null, context: { name: 'Casa Lima' } });
+    expect(await ana.createFamily(key, 'Casa Lima')).toEqual(joined);
+    expect(await err(ana.createFamily(key, 'Outro nome'))).toBe('chave_reutilizada');
+    expect(await err(ana.createFamily(newOperationKey(), 'Outra casa'))).toBe('ja_em_familia');
+    const overview = (await ana.getFamily())!;
+    expect(overview.context).toEqual(joined.context);
+    expect(overview.role).toBe('titular');
+    expect(overview.invites).toEqual([]);
+    expect(overview.members).toEqual([expect.objectContaining({ personId: ANA, firstName: 'Ana', role: 'titular', status: 'ativo', isMe: true, leftAt: null })]);
+    const accounts = await ana.listAccounts(fam);
+    expect(accounts).toHaveLength(1);
+    expect(accounts[0]).toMatchObject({ name: 'Conta principal', kind: 'banco', status: 'ativa', isDefault: true, contextId: fam });
+    famAccount = accounts[0]!.id;
+    expect(await ana.listRecords(fam, '2026-10')).toEqual([]);
+    expect(await ana.listCommitments(fam, '2026-10')).toEqual([]);
+    expect(await ana.listGoals(fam)).toEqual([]);
+    expect(await ana.listCards(fam)).toEqual([]);
+    // O Pessoal continua o mesmo, e nenhuma operação da Família conta como anotação.
+    expect((await ana.getSpace())!.personalContextId).toBe(anaCtx);
+    expect(await ana.getReturnReviewState(fam)).toMatchObject({ activity: null });
+    // Davi cria a Família dele: Famílias de outras pessoas não aparecem.
+    await davi.createFamily(newOperationKey(), 'Casa Prado');
+    expect((await ana.getFamily())!.context.id).toBe(fam);
+    expect((await davi.getFamily())!.context.id).not.toBe(fam);
+  });
+
+  it('3. convite: o código aparece uma vez, o banco guarda só o resumo, e a prévia mostra só o necessário', async () => {
+    const key = newOperationKey();
+    const w = await ana.createFamilyInvite(key, fam, 'membro');
+    expect(w.code).toMatch(INVITE_CODE_PATTERN);
+    codes.bruno = w.code!;
+    inviteIds.bruno = w.invite.id;
+    expect(w.invite).toMatchObject({ contextId: fam, role: 'membro', createdBy: ANA, usedAt: null, cancelledAt: null });
+    expect(Date.parse(w.invite.expiresAt) - Date.parse(w.invite.createdAt)).toBe(7 * 24 * 60 * 60 * 1000);
+    // Repetir a chave devolve o convite sem o código; outro papel com a mesma chave é recusado.
+    const again = await ana.createFamilyInvite(key, fam, 'membro');
+    expect(again.code).toBeNull();
+    expect(again.invite).toEqual(w.invite);
+    expect(await err(ana.createFamilyInvite(key, fam, 'leitor'))).toBe('chave_reutilizada');
+    // O titular lê os convites válidos; quem não é titular, não. O resumo do código não é lido por ninguém.
+    expect((await ana.getFamily())!.invites).toEqual([w.invite]);
+    expect(inviteLink(w.code!)).toBe(`https://clarevo.pages.dev/convite/${w.code}`);
+    const direct = await sql(ANA).from('family_invites').select('id, role, used_at');
+    expect(direct.error).toBeNull();
+    expect(direct.data).toEqual([{ id: w.invite.id, role: 'membro', used_at: null }]);
+    expect((await sql(ANA).from('family_invites').select('code_hash')).error).not.toBeNull();
+    expect((await sql(ANA).from('family_invites').select('*')).error).not.toBeNull();
+    expect((await sql(BRUNO).from('family_invites').select('id')).data).toEqual([]);
+    // Recusas.
+    expect(await err(bruno.createFamilyInvite(newOperationKey(), fam, 'membro'))).toBe('nao_encontrado');
+    expect(await err(ana.createFamilyInvite(newOperationKey(), anaCtx, 'membro'))).toBe('contexto_invalido');
+    expect(await err(ana.createFamilyInvite(newOperationKey(), fam, 'titular' as never))).toBe('papel_invalido');
+    // Prévia: nome da Família, primeiro nome de quem convidou, papel e validade.
+    expect(await bruno.previewFamilyInvite(w.code!)).toEqual({ familyName: 'Casa Lima', invitedBy: 'Ana', role: 'membro', expiresAt: w.invite.expiresAt });
+    expect(await bruno.previewFamilyInvite(` ${w.code!.toUpperCase()} `)).toEqual(await bruno.previewFamilyInvite(w.code!));
+    expect(inviteCodeHash(w.code)).toMatch(/^[0-9a-f]{64}$/);
+    // A prévia não usa o convite.
+    expect(await bruno.getFamily()).toBeNull();
+  });
+
+  it('4. convite que não vale: usado, cancelado, vencido, inexistente e malformado dizem o mesmo (convite_invalido)', async () => {
+    const cancelled = await ana.createFamilyInvite(newOperationKey(), fam, 'membro');
+    const cancelKey = newOperationKey();
+    const done = await ana.cancelFamilyInvite(cancelKey, cancelled.invite.id);
+    expect(done.cancelledAt).not.toBeNull();
+    expect(await ana.cancelFamilyInvite(cancelKey, cancelled.invite.id)).toEqual(done);
+    expect(await ana.cancelFamilyInvite(newOperationKey(), cancelled.invite.id)).toEqual(done);
+    expect(await err(bruno.cancelFamilyInvite(newOperationKey(), cancelled.invite.id))).toBe('nao_encontrado');
+    const expired = await ana.createFamilyInvite(newOperationKey(), fam, 'membro');
+    // Vencer o convite: o banco de teste muda o relógio só aqui, com o titular de superusuário.
+    const hash = inviteCodeHash(expired.code)!;
+    await expireInvite(hash);
+    for (const code of [cancelled.code!, expired.code!, 'b'.repeat(32), 'não é um código']) {
+      expect(await err(davi.previewFamilyInvite(code))).toBe('convite_invalido');
+      expect(await err(davi.acceptFamilyInvite(newOperationKey(), code))).toBe('convite_invalido');
+    }
+    expect((await ana.getFamily())!.invites.map((i) => i.id)).toEqual([inviteIds.bruno]);
+  });
+
+  it('5. aceitar: Bruno entra como membro, uma vez; o Pessoal de ninguém aparece; quem já tem Família não aceita', async () => {
+    const key = newOperationKey();
+    const joined = await bruno.acceptFamilyInvite(key, codes.bruno!);
+    expect(joined).toMatchObject({ role: 'membro', invitedBy: 'Ana', context: { id: fam, name: 'Casa Lima' } });
+    expect(await bruno.acceptFamilyInvite(key, codes.bruno!)).toEqual(joined);
+    expect(await err(bruno.acceptFamilyInvite(newOperationKey(), codes.bruno!))).toBe('convite_invalido');
+    expect(await err(carla.acceptFamilyInvite(newOperationKey(), codes.bruno!))).toBe('convite_invalido');
+    // A mesma chave com outro código é recusada antes de olhar o código; uma chave nova com código que não existe é convite_invalido.
+    expect(await err(bruno.acceptFamilyInvite(key, 'a'.repeat(32)))).toBe('chave_reutilizada');
+    expect(await err(bruno.acceptFamilyInvite(newOperationKey(), 'a'.repeat(32)))).toBe('convite_invalido');
+    const view = (await bruno.getFamily())!;
+    expect(view.role).toBe('membro');
+    expect(view.invites).toEqual([]);
+    expect(names(view)).toEqual(['Ana:titular:ativo', 'Bruno:membro:ativo']);
+    expect(view.members.find((m) => m.isMe)!.personId).toBe(BRUNO);
+    expect(JSON.stringify(view)).not.toMatch(/@|Souza|Prado|Reis/);
+    expect((await ana.getFamily())!.invites).toEqual([]);
+    // Davi tem Família própria: não aceita outro convite, e o convite continua valendo.
+    const dv = await ana.createFamilyInvite(newOperationKey(), fam, 'leitor');
+    expect(await err(davi.acceptFamilyInvite(newOperationKey(), dv.code!))).toBe('ja_em_familia');
+    expect((await ana.getFamily())!.invites.map((i) => i.id)).toEqual([dv.invite.id]);
+    await ana.cancelFamilyInvite(newOperationKey(), dv.invite.id);
+    // Cada um vê só o que é seu: Bruno não lê o Pessoal da Ana.
+    expect(await bruno.listRecords(anaCtx, '2026-10')).toEqual([]);
+    expect(await bruno.listAccounts(anaCtx)).toEqual([]);
+  });
+
+  it('6. limite de 6 pessoas: pessoas ativas mais convites válidos; cancelar libera uma vaga', async () => {
+    const created: { code: string; invite: FamilyInvite }[] = [];
+    for (let i = 0; i < FAMILY_MAX_PEOPLE - 2; i += 1) {
+      const w = await ana.createFamilyInvite(newOperationKey(), fam, i === 0 ? 'leitor' : 'membro');
+      created.push({ code: w.code!, invite: w.invite });
+    }
+    expect(await err(ana.createFamilyInvite(newOperationKey(), fam, 'membro'))).toBe('familia_cheia');
+    const overview = (await ana.getFamily())!;
+    expect(seatsLeft(overview, Date.now())).toBe(0);
+    await ana.cancelFamilyInvite(newOperationKey(), created[3]!.invite.id);
+    expect(seatsLeft((await ana.getFamily())!, Date.now())).toBe(1);
+    const [forCarla, forFabio] = created;
+    codes.carla = forCarla!.code;
+    codes.fabio = forFabio!.code;
+    await carla.acceptFamilyInvite(newOperationKey(), codes.carla);
+    await fabio.acceptFamilyInvite(newOperationKey(), codes.fabio);
+    // Restam dois convites válidos e quatro pessoas ativas: 6.
+    const full = (await ana.getFamily())!;
+    expect(names(full)).toEqual(['Ana:titular:ativo', 'Bruno:membro:ativo', 'Carla:leitor:ativo', 'Fábio:membro:ativo']);
+    expect(full.invites).toHaveLength(1);
+    expect(seatsLeft(full, Date.now())).toBe(1);
+    await ana.cancelFamilyInvite(newOperationKey(), full.invites[0]!.id);
+    const fresh = (await ana.getFamily())!;
+    expect(fresh.invites).toEqual([]);
+    expect(seatsLeft(fresh, Date.now())).toBe(2);
+  });
+
+  it('7. na Família quem tem escrita anota, quem só vê lê, e quem é de fora não lê nem grava', async () => {
+    famAccount = (await bruno.listAccounts(fam))[0]!.id;
+    expect(famAccount).toBeTruthy();
+    const casa = await bruno.createRecord(newOperationKey(), fam, 'despesa', record(famAccount, 'Mercado da casa', 15000));
+    expect(casa).toMatchObject({ contextId: fam, createdBy: BRUNO });
+    const seen = await ana.listRecords(fam, '2026-10');
+    expect(seen.map((r) => r.id)).toEqual([casa.id]);
+    expect((await carla.listRecords(fam, '2026-10')).map((r) => r.id)).toEqual([casa.id]);
+    expect(await err(carla.createRecord(newOperationKey(), fam, 'despesa', record(famAccount, 'Intrusa')))).toBe('sem_permissao');
+    expect(await err(davi.createRecord(newOperationKey(), fam, 'despesa', record(famAccount, 'Intruso')))).toBe('sem_permissao');
+    expect(await davi.listRecords(fam, '2026-10')).toEqual([]);
+    expect(await davi.getRecord(casa.id)).toBeNull();
+    // Quem anota altera só o que anotou, salvo o titular ("editar de outras pessoas").
+    expect(await err(fabio.updateRecord(newOperationKey(), casa.id, casa.version, record(famAccount, 'x')))).toBe('sem_permissao');
+    const edited = await ana.updateRecord(newOperationKey(), casa.id, casa.version, record(famAccount, 'Mercado da casa', 16000));
+    expect(edited.amountCents).toBe(16000);
+    // Os totais do mês da Família seguem o mesmo cálculo do core.
+    const s = summarizeMonth(await ana.listRecords(fam, '2026-10'), fam, '2026-10');
+    expect([s.receivedCents, s.paidCents, s.differenceCents]).toEqual([0, 16000, -16000]);
+    const { data } = await sql(ANA).rpc('month_totals', { p_context_id: fam, p_month: '2026-10-01' }).single();
+    expect(Number((data as { paid_cents: number }).paid_cents)).toBe(16000);
+    // Quem lê a Família e a autoria: "Bruno" para os outros; o primeiro nome só.
+    const members = (await ana.getFamily())!.members;
+    expect(authorLabel(members, casa.createdBy)).toBe('Bruno');
+    expect(authorLabel((await bruno.getFamily())!.members, casa.createdBy)).toBe('Bruno (você)');
+  });
+
+  it('8. L-4: quem anota marca como paga a conta de outra pessoa; desfazer, só quem pagou ou o titular; alterar e excluir seguem a edição', async () => {
+    const luz = (await ana.createCommitment(newOperationKey(), fam, { description: 'Luz da casa', amountCents: 12000, dueOn: '2026-10-15', category: null })).commitment;
+    const pay = (id: string, version: number) => ({ accountId: famAccount, amountCents: 12000, paidOn: TODAY, category: null }) satisfies PaymentInput;
+    const paid = await bruno.payCommitment(newOperationKey(), luz.id, luz.version, pay(luz.id, luz.version));
+    expect(paid.commitment.status).toBe('quitado');
+    expect(paid.record.createdBy).toBe(BRUNO);
+    // Alterar e excluir seguem a edição; quem só vê e quem é de fora não pagam.
+    expect(await err(bruno.updateCommitment(newOperationKey(), luz.id, paid.commitment.version, { description: 'Luz', amountCents: 100, dueOn: '2026-10-15', category: null }))).toBe('sem_permissao');
+    expect(await err(bruno.deleteCommitment(newOperationKey(), luz.id, paid.commitment.version))).toBe('sem_permissao');
+    expect(await err(fabio.undoCommitmentPayment(newOperationKey(), luz.id, paid.commitment.version))).toBe('sem_permissao');
+    const open = (await ana.createCommitment(newOperationKey(), fam, { description: 'Água da casa', amountCents: 8000, dueOn: '2026-10-16', category: null })).commitment;
+    expect(await err(carla.payCommitment(newOperationKey(), open.id, open.version, pay(open.id, open.version)))).toBe('sem_permissao');
+    expect(await err(davi.payCommitment(newOperationKey(), open.id, open.version, pay(open.id, open.version)))).toBe('nao_encontrado');
+    // O titular desfaz o pagamento de outra pessoa; quem pagou desfaz o próprio.
+    const undone = await ana.undoCommitmentPayment(newOperationKey(), luz.id, paid.commitment.version);
+    expect(undone.commitment.status).toBe('aberto');
+    const again = await bruno.payCommitment(newOperationKey(), luz.id, undone.commitment.version, pay(luz.id, undone.commitment.version));
+    const own = await bruno.undoCommitmentPayment(newOperationKey(), luz.id, again.commitment.version);
+    expect(own.commitment.status).toBe('aberto');
+    // O Pessoal da Ana não se paga por outra pessoa.
+    const internet = (await ana.listCommitments(anaCtx, '2026-10'))[0]!;
+    expect(await err(bruno.payCommitment(newOperationKey(), internet.id, internet.version, pay(internet.id, internet.version)))).toBe('nao_encontrado');
+    // "Ainda a pagar" da Família: igual no core e no banco.
+    const toPay = summarizeToPay(await ana.listCommitments(fam, '2026-10'), fam, '2026-10', TODAY);
+    const { data } = await sql(ANA).rpc('month_to_pay', { p_context_id: fam, p_month: '2026-10-01' }).single();
+    expect(Number((data as { to_pay_cents: number }).to_pay_cents)).toBe(toPay.toPayCents);
+    expect(toPay.toPayCents).toBe(20000);
+  });
+
+  it('9. L-5: a renda de referência é da casa; quem só vê não grava; no Pessoal a regra é a de sempre', async () => {
+    const OCT = '2026-10';
+    const first = await ana.setIncomeReference(newOperationKey(), fam, OCT, 0, 500000, false);
+    const byBruno = await bruno.setIncomeReference(newOperationKey(), fam, OCT, first.version, 520000, true);
+    expect(byBruno).toMatchObject({ version: 2, amountCents: 520000, createdBy: ANA });
+    expect(await err(carla.setIncomeReference(newOperationKey(), fam, OCT, 2, 1, false))).toBe('sem_permissao');
+    expect(await err(carla.deleteIncomeReference(newOperationKey(), first.id, 2))).toBe('sem_permissao');
+    expect(await err(davi.deleteIncomeReference(newOperationKey(), first.id, 2))).toBe('nao_encontrado');
+    const gone = await fabio.deleteIncomeReference(newOperationKey(), first.id, 2);
+    expect(gone).toMatchObject({ id: first.id, createdBy: ANA });
+    expect(await ana.listIncomeReferences(fam)).toEqual([]);
+    // O Pessoal da Ana: Bruno não grava nem exclui lá.
+    expect(await err(bruno.setIncomeReference(newOperationKey(), anaCtx, OCT, 0, 100, false))).toBe('sem_permissao');
+    const own = await ana.listIncomeReferences(anaCtx);
+    if (own.length > 0) expect(await err(bruno.deleteIncomeReference(newOperationKey(), own[0]!.id, own[0]!.version))).toBe('nao_encontrado');
+  });
+
+  it('10. papéis: o titular muda; quem só vê passa a anotar e volta; as recusas', async () => {
+    const k = newOperationKey();
+    await ana.setMemberRole(k, fam, CARLA, 'membro');
+    await ana.setMemberRole(k, fam, CARLA, 'membro');
+    expect((await ana.getFamily())!.members.find((m) => m.personId === CARLA)!.role).toBe('membro');
+    const mine = await carla.createRecord(newOperationKey(), fam, 'despesa', record(famAccount, 'Pão da Carla', 900));
+    expect(mine.createdBy).toBe(CARLA);
+    await ana.setMemberRole(newOperationKey(), fam, CARLA, 'leitor');
+    expect(await err(carla.createRecord(newOperationKey(), fam, 'despesa', record(famAccount, 'Outro')))).toBe('sem_permissao');
+    expect(await err(bruno.setMemberRole(newOperationKey(), fam, CARLA, 'membro'))).toBe('sem_permissao');
+    expect(await err(ana.setMemberRole(newOperationKey(), fam, ANA, 'leitor'))).toBe('nao_sobre_si');
+    expect(await err(ana.setMemberRole(newOperationKey(), fam, CARLA, 'titular' as never))).toBe('papel_invalido');
+    expect(await err(ana.setMemberRole(newOperationKey(), fam, DAVI, 'leitor'))).toBe('nao_encontrado');
+    expect(await err(ana.setMemberRole(k, fam, CARLA, 'leitor'))).toBe('chave_reutilizada');
+  });
+
+  it('11. sair e remover: o vínculo some na hora, o que a pessoa anotou continua e aparece como "ex-membro · Nome"', async () => {
+    await fabio.createRecord(newOperationKey(), fam, 'despesa', record(famAccount, 'Café do Fábio', 700));
+    const k = newOperationKey();
+    await fabio.leaveFamily(k, fam);
+    await fabio.leaveFamily(k, fam);
+    expect(await fabio.getFamily()).toBeNull();
+    expect(await fabio.listRecords(fam, '2026-10')).toEqual([]);
+    expect(await err(fabio.createRecord(newOperationKey(), fam, 'despesa', record(famAccount, 'Depois')))).toBe('sem_permissao');
+    expect(await err(fabio.leaveFamily(newOperationKey(), fam))).toBe('nao_encontrado');
+    expect(await err(ana.leaveFamily(newOperationKey(), fam))).toBe('titular_nao_sai');
+    expect(await err(fabio.leaveFamily(newOperationKey(), anaCtx))).toBe('nao_encontrado');
+    const members = (await ana.getFamily())!.members;
+    expect(names((await ana.getFamily())!)).toEqual(['Ana:titular:ativo', 'Bruno:membro:ativo', 'Carla:leitor:ativo', 'Fábio:membro:ex-membro']);
+    const cafe = (await ana.listRecords(fam, '2026-10')).find((r) => r.description === 'Café do Fábio')!;
+    expect(authorLabel(members, cafe.createdBy)).toBe('ex-membro · Fábio');
+    expect(members.find((m) => m.personId === FABIO)!.leftAt).not.toBeNull();
+    // Remover: só o titular, nunca sobre si; a pessoa perde a leitura na hora.
+    expect(await err(bruno.removeFamilyMember(newOperationKey(), fam, CARLA))).toBe('sem_permissao');
+    expect(await err(ana.removeFamilyMember(newOperationKey(), fam, ANA))).toBe('nao_sobre_si');
+    expect(await err(ana.removeFamilyMember(newOperationKey(), fam, FABIO))).toBe('nao_encontrado');
+    const rk = newOperationKey();
+    await ana.removeFamilyMember(rk, fam, CARLA);
+    await ana.removeFamilyMember(rk, fam, CARLA);
+    expect(await carla.getFamily()).toBeNull();
+    expect(await carla.listRecords(fam, '2026-10')).toEqual([]);
+    // Os ex-membros vêm na ordem em que saíram.
+    expect(names((await ana.getFamily())!)).toEqual(['Ana:titular:ativo', 'Bruno:membro:ativo', 'Fábio:membro:ex-membro', 'Carla:leitor:ex-membro']);
+    // Quem saiu pode voltar por um novo convite, e o vínculo é o mesmo.
+    const back = await ana.createFamilyInvite(newOperationKey(), fam, 'membro');
+    const rejoined = await fabio.acceptFamilyInvite(newOperationKey(), back.code!);
+    expect(rejoined.role).toBe('membro');
+    expect((await fabio.listRecords(fam, '2026-10')).some((r) => r.description === 'Café do Fábio')).toBe(true);
+    await fabio.leaveFamily(newOperationKey(), fam);
+  });
+
+  it('12. passar a titularidade: quem era titular vira membro, o convite pendente continua e some quando ela sai', async () => {
+    const pending = await ana.createFamilyInvite(newOperationKey(), fam, 'membro');
+    expect(await err(ana.transferFamilyOwnership(newOperationKey(), fam, ANA))).toBe('nao_sobre_si');
+    expect(await err(ana.transferFamilyOwnership(newOperationKey(), fam, CARLA))).toBe('nao_encontrado');
+    expect(await err(bruno.transferFamilyOwnership(newOperationKey(), fam, BRUNO))).toBe('sem_permissao');
+    const k = newOperationKey();
+    await ana.transferFamilyOwnership(k, fam, BRUNO);
+    await ana.transferFamilyOwnership(k, fam, BRUNO);
+    expect(names((await bruno.getFamily())!).slice(0, 2)).toEqual(['Bruno:titular:ativo', 'Ana:membro:ativo']);
+    expect((await ana.getFamily())!.role).toBe('membro');
+    // O novo titular vê o convite pendente e a ex-titular já não convida nem remove.
+    expect((await bruno.getFamily())!.invites.map((i) => i.id)).toEqual([pending.invite.id]);
+    expect(await err(ana.createFamilyInvite(newOperationKey(), fam, 'membro'))).toBe('sem_permissao');
+    expect(await err(ana.cancelFamilyInvite(newOperationKey(), pending.invite.id))).toBe('sem_permissao');
+    // O titular novo edita o que é de outras pessoas.
+    const mercado = (await bruno.listRecords(fam, '2026-10')).find((r) => r.description === 'Mercado da casa')!;
+    await bruno.updateRecord(newOperationKey(), mercado.id, mercado.version, record(famAccount, 'Mercado da casa', 15500));
+    await ana.leaveFamily(newOperationKey(), fam);
+    expect(await ana.getFamily()).toBeNull();
+    expect(await err(davi.previewFamilyInvite(pending.code!))).toBe('convite_invalido');
+    expect((await bruno.getFamily())!.invites).toEqual([]);
+    // Ana pode abrir uma Família própria.
+    expect((await ana.createFamily(newOperationKey(), 'Casa da Ana')).role).toBe('titular');
+    await ana.endFamily(newOperationKey(), (await ana.getFamily())!.context.id);
+  });
+
+  it('13. encerrar: só o titular e só sem outra pessoa ativa; os dados ficam guardados, sem leitura por ninguém', async () => {
+    expect(await err(bruno.endFamily(newOperationKey(), anaCtx))).toBe('nao_encontrado');
+    const overview = (await bruno.getFamily())!;
+    expect(names(overview).filter((n) => n.endsWith(':ativo'))).toEqual(['Bruno:titular:ativo']);
+    const last = await bruno.createFamilyInvite(newOperationKey(), fam, 'leitor');
+    const k = newOperationKey();
+    await bruno.endFamily(k, fam);
+    await bruno.endFamily(k, fam);
+    for (const who of [bruno, ana, carla, fabio, davi]) {
+      expect(who === davi ? (await who.getFamily())?.context.id !== fam : (await who.getFamily()) === null || (await who.getFamily())!.context.id !== fam).toBe(true);
+      expect(await who.listRecords(fam, '2026-10')).toEqual([]);
+      expect(await who.listAccounts(fam)).toEqual([]);
+    }
+    expect(await err(davi.acceptFamilyInvite(newOperationKey(), last.code!))).toBe('convite_invalido');
+    expect(await err(bruno.createFamilyInvite(newOperationKey(), fam, 'membro'))).toBe('nao_encontrado');
+    expect(await err(bruno.createRecord(newOperationKey(), fam, 'despesa', record(famAccount, 'Depois')))).toBe('sem_permissao');
+    expect((await bruno.createFamily(newOperationKey(), 'Casa Dias')).role).toBe('titular');
+    // Os dados seguem no banco (leitura de superusuário), e a Família está marcada como encerrada.
+    expect(await famRows(fam)).toMatchObject({ ended: true, records: 3, memberships: 0 });
+  });
+
+  it('14. sem sessão e gravação direta: nada é lido nem gravado fora das funções', async () => {
+    const anon = clientFor(null);
+    for (const [fn, args] of [
+      ['create_family', { p_name: 'Casa', p_key: newOperationKey() }],
+      ['create_family_invite', { p_context: fam, p_role: 'membro', p_key: newOperationKey() }],
+      ['cancel_family_invite', { p_invite: randomUUID(), p_key: newOperationKey() }],
+      ['preview_family_invite', { p_code: 'b'.repeat(32) }],
+      ['accept_family_invite', { p_code: 'b'.repeat(32), p_key: newOperationKey() }],
+      ['leave_family', { p_context: fam, p_key: newOperationKey() }],
+      ['remove_family_member', { p_context: fam, p_person: ANA, p_key: newOperationKey() }],
+      ['set_member_role', { p_context: fam, p_person: ANA, p_role: 'leitor', p_key: newOperationKey() }],
+      ['transfer_family_ownership', { p_context: fam, p_person: ANA, p_key: newOperationKey() }],
+      ['end_family', { p_context: fam, p_key: newOperationKey() }],
+    ] as const) {
+      const r = await anon.rpc(fn, args as Record<string, unknown>);
+      expect(r.error, fn).not.toBeNull();
+    }
+    expect((await anon.from('family_invites').select('id')).error).not.toBeNull();
+    expect((await anon.from('family_member_items').select('person_id')).error).not.toBeNull();
+    const db = sql(BRUNO);
+    expect((await db.from('family_invites').insert({ context_id: fam, created_by: BRUNO, role: 'membro', code_hash: 'a'.repeat(64), expires_at: '2030-01-01T00:00:00Z' })).error).not.toBeNull();
+    expect((await db.from('family_invites').update({ cancelled_at: '2030-01-01T00:00:00Z' }).eq('context_id', fam)).error).not.toBeNull();
+    expect((await db.from('context_memberships').update({ can_write: true }).eq('person_id', BRUNO)).error).not.toBeNull();
+    expect((await db.from('context_memberships').update({ revoked_at: null }).eq('context_id', fam)).error).not.toBeNull();
+    expect((await db.from('context_memberships').delete().eq('context_id', fam)).error).not.toBeNull();
+    expect((await db.from('financial_contexts').update({ ended_at: null }).eq('id', fam)).error).not.toBeNull();
+    expect((await db.from('financial_contexts').insert({ kind: 'familia', name: 'Intrusa', owner_person_id: BRUNO })).error).not.toBeNull();
+    // A tradução mantém a promessa do texto.
+    expect(FAMILY_TEXT.privacy).toContain('ninguém da Família');
+  });
+});
+
+describe('conversor da Família', () => {
+  // Sem rede: os argumentos de cada função, a leitura das linhas, a recusa de linha incoerente e os códigos de erro novos.
+  const calls: [string, Record<string, unknown>][] = [];
+  const ctxRow = { id: 'fam1', name: 'Casa Lima', created_at: '2026-10-07T12:00:00Z' };
+  const member = (over: Record<string, unknown> = {}) => ({
+    person_id: 'p1', first_name: 'Ana', role: 'titular', status: 'ativo', is_me: true, joined_at: '2026-10-07T12:00:00Z', left_at: null, ...over,
+  });
+  const inviteRow = { id: 'i1', context_id: 'fam1', role: 'membro', created_by: 'p1', expires_at: '2026-10-14T12:00:00Z', used_at: null, cancelled_at: null, created_at: '2026-10-07T12:00:00Z' };
+  const query = (result: { data: unknown; error: unknown }) => {
+    const q: Record<string, unknown> = {};
+    for (const m of ['select', 'eq', 'is', 'gt', 'in', 'order', 'range', 'limit', 'maybeSingle']) q[m] = () => q;
+    q.then = (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) => Promise.resolve(result).then(resolve, reject);
+    return q;
+  };
+  const fake = (rpc: Record<string, unknown>, tables: Record<string, unknown> = {}, error: unknown = null) => {
+    const db = {
+      from: (table: string) => query(error ? { data: null, error } : { data: tables[table] ?? null, error: null }),
+      rpc: async (fn: string, args: Record<string, unknown>) => {
+        calls.push([fn, args]);
+        return error ? { data: null, error } : { data: rpc[fn] ?? null, error: null };
+      },
+    };
+    return new SupabaseRepository(db as unknown as SupabaseClient, { id: 'p1' });
+  };
+  const failure = (p: Promise<unknown>) => p.then(() => null, (e: unknown) => (e instanceof RepoError ? [e.code, e.message, e.detail ?? null] : String(e)));
+  const joined = { context: { id: 'fam1', name: 'Casa Lima', created_at: '2026-10-07T12:00:00Z', ended_at: null }, role: 'titular' };
+
+  it('argumentos das nove funções e da prévia, com os nomes de parâmetro da especificação (a chave por último)', async () => {
+    calls.length = 0;
+    const repo = fake({
+      create_family: joined,
+      create_family_invite: { invite: inviteRow, code: '0123456789abcdef0123456789abcdef' },
+      cancel_family_invite: { invite: { ...inviteRow, cancelled_at: '2026-10-08T00:00:00Z' } },
+      preview_family_invite: { family_name: 'Casa Lima', invited_by: 'Ana', role: 'membro', expires_at: '2026-10-14T12:00:00Z' },
+      accept_family_invite: { ...joined, role: 'membro', invited_by: 'Ana' },
+    });
+    expect(await repo.createFamily('chave-0001', 'Casa Lima')).toEqual({ context: { id: 'fam1', name: 'Casa Lima', createdAt: '2026-10-07T12:00:00Z' }, role: 'titular', invitedBy: null });
+    expect(await repo.createFamilyInvite('chave-0002', 'fam1', 'membro')).toEqual({
+      invite: { id: 'i1', contextId: 'fam1', role: 'membro', createdBy: 'p1', expiresAt: '2026-10-14T12:00:00Z', usedAt: null, cancelledAt: null, createdAt: '2026-10-07T12:00:00Z' },
+      code: '0123456789abcdef0123456789abcdef',
+    });
+    expect((await repo.cancelFamilyInvite('chave-0003', 'i1')).cancelledAt).toBe('2026-10-08T00:00:00Z');
+    expect(await repo.previewFamilyInvite(' 0123456789ABCDEF0123456789abcdef ')).toEqual({ familyName: 'Casa Lima', invitedBy: 'Ana', role: 'membro', expiresAt: '2026-10-14T12:00:00Z' });
+    expect(await repo.acceptFamilyInvite('chave-0004', '0123456789abcdef0123456789abcdef')).toMatchObject({ role: 'membro', invitedBy: 'Ana' });
+    await repo.leaveFamily('chave-0005', 'fam1');
+    await repo.removeFamilyMember('chave-0006', 'fam1', 'p2');
+    await repo.setMemberRole('chave-0007', 'fam1', 'p2', 'leitor');
+    await repo.transferFamilyOwnership('chave-0008', 'fam1', 'p2');
+    await repo.endFamily('chave-0009', 'fam1');
+    expect(calls).toEqual([
+      ['create_family', { p_name: 'Casa Lima', p_key: 'chave-0001' }],
+      ['create_family_invite', { p_context: 'fam1', p_role: 'membro', p_key: 'chave-0002' }],
+      ['cancel_family_invite', { p_invite: 'i1', p_key: 'chave-0003' }],
+      ['preview_family_invite', { p_code: '0123456789abcdef0123456789abcdef' }],
+      ['accept_family_invite', { p_code: '0123456789abcdef0123456789abcdef', p_key: 'chave-0004' }],
+      ['leave_family', { p_context: 'fam1', p_key: 'chave-0005' }],
+      ['remove_family_member', { p_context: 'fam1', p_person: 'p2', p_key: 'chave-0006' }],
+      ['set_member_role', { p_context: 'fam1', p_person: 'p2', p_role: 'leitor', p_key: 'chave-0007' }],
+      ['transfer_family_ownership', { p_context: 'fam1', p_person: 'p2', p_key: 'chave-0008' }],
+      ['end_family', { p_context: 'fam1', p_key: 'chave-0009' }],
+    ]);
+  });
+
+  it('código fora do formato vira convite_invalido sem ir à rede; a repetição do convite vem sem o código', async () => {
+    calls.length = 0;
+    const repo = fake({ create_family_invite: { invite: inviteRow, code: null } });
+    for (const bad of ['', 'abc', 'x'.repeat(32), '0123456789abcdef0123456789abcdef0']) {
+      expect(await failure(repo.previewFamilyInvite(bad))).toEqual(['convite_invalido', 'convite_invalido', null]);
+      expect(await failure(repo.acceptFamilyInvite('chave-0010', bad))).toEqual(['convite_invalido', 'convite_invalido', null]);
+    }
+    expect(calls).toEqual([]);
+    expect((await repo.createFamilyInvite('chave-0011', 'fam1', 'membro')).code).toBeNull();
+    // Um código com formato errado na resposta é defeito, não recusa.
+    expect(await failure(fake({ create_family_invite: { invite: inviteRow, code: 'curto' } }).createFamilyInvite('chave-0012', 'fam1', 'membro'))).toEqual(['desconhecido', 'convite_inconsistente', null]);
+  });
+
+  it('getFamily lê o contexto, as pessoas (ativas primeiro, o titular no topo, ex-membros depois) e, só para o titular, os convites', async () => {
+    const rows = [
+      member({ person_id: 'p9', first_name: 'Carla', role: 'leitor', status: 'ex-membro', is_me: false, left_at: '2026-10-09T00:00:00Z', joined_at: '2026-10-02T00:00:00Z' }),
+      member({ person_id: 'p2', first_name: 'Bruno', role: 'membro', is_me: false, joined_at: '2026-10-08T00:00:00Z' }),
+      member(),
+    ];
+    const f = (await fake({}, { financial_contexts: [ctxRow], family_member_items: rows, family_invites: [inviteRow] }).getFamily())!;
+    expect(f.context).toEqual({ id: 'fam1', name: 'Casa Lima', createdAt: '2026-10-07T12:00:00Z' });
+    expect(f.role).toBe('titular');
+    expect(f.members.map((m) => `${m.firstName}:${m.role}:${m.status}`)).toEqual(['Ana:titular:ativo', 'Bruno:membro:ativo', 'Carla:leitor:ex-membro']);
+    expect(f.invites.map((i) => i.id)).toEqual(['i1']);
+    // Quem não é titular não lê convites: a lista vem vazia mesmo que a tabela devolvesse linhas.
+    const asMember = (await fake({}, { financial_contexts: [ctxRow], family_member_items: [member({ person_id: 'p1', role: 'membro' }), member({ person_id: 'p2', first_name: 'Bruno', is_me: false })], family_invites: [inviteRow] }).getFamily())!;
+    expect(asMember.role).toBe('membro');
+    expect(asMember.invites).toEqual([]);
+    // Sem contexto legível, sem Família; sem linha "eu" ativa, também.
+    expect(await fake({}, { financial_contexts: [] }).getFamily()).toBeNull();
+    expect(await fake({}, { financial_contexts: [ctxRow], family_member_items: [member({ is_me: false })] }).getFamily()).toBeNull();
+  });
+
+  it('linha incoerente é recusada: papel, situação, primeiro nome e datas', async () => {
+    const bad: Record<string, unknown>[] = [
+      { role: 'dono' },
+      { status: 'suspenso' },
+      { first_name: '' },
+      { first_name: 'Ana Lima' },
+      { first_name: 'ana@exemplo.test' },
+      { status: 'ex-membro' },
+      { status: 'ativo', left_at: '2026-10-09T00:00:00Z' },
+    ];
+    for (const over of bad) {
+      expect(await failure(fake({}, { financial_contexts: [ctxRow], family_member_items: [member(over)] }).getFamily())).toEqual(['desconhecido', 'familia_inconsistente', null]);
+    }
+    for (const row of [{ ...inviteRow, role: 'titular' }, { ...inviteRow, id: undefined }, null]) {
+      expect(await failure(fake({ cancel_family_invite: { invite: row } }).cancelFamilyInvite('chave-0020', 'i1'))).toEqual(['desconhecido', 'convite_inconsistente', null]);
+    }
+    for (const data of [null, { role: 'titular' }, { ...joined, role: 'dono' }, { ...joined, context: { ...joined.context, id: 7 } }]) {
+      expect(await failure(fake({ create_family: data }).createFamily('chave-0021', 'Casa'))).toEqual(['desconhecido', 'familia_inconsistente', null]);
+    }
+    expect(await failure(fake({ preview_family_invite: { family_name: 'Casa', invited_by: 'Ana', role: 'titular', expires_at: 'x' } }).previewFamilyInvite('0123456789abcdef0123456789abcdef'))).toEqual(['desconhecido', 'convite_inconsistente', null]);
+  });
+
+  it('as dez recusas novas voltam com o próprio nome, sem o detalhe do banco', async () => {
+    const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((m) => vi.spyOn(console, m).mockImplementation(() => undefined));
+    try {
+      for (const code of [
+        'nome_da_familia_invalido', 'ja_em_familia', 'familia_cheia', 'convite_invalido', 'convite_ja_usado', 'papel_invalido', 'titular_nao_sai', 'nao_sobre_si',
+        'contexto_invalido', 'familia_com_membros',
+      ] as const) {
+        for (const message of [code, `ERROR: ${code}`]) {
+          const repo = fake({}, {}, { message, code: 'PT409', details: 'Key (id)=(0000)=(segredo) já existe. 12345678' });
+          expect(await failure(repo.createFamily('chave-4001', 'Casa'))).toEqual([code, code, null]);
+          expect(await failure(repo.acceptFamilyInvite('chave-4002', '0123456789abcdef0123456789abcdef'))).toEqual([code, code, null]);
+          expect(await failure(repo.leaveFamily('chave-4003', 'fam1'))).toEqual([code, code, null]);
+          expect(await failure(repo.getFamily())).toEqual([code, code, null]);
+        }
+      }
+      expect(await failure(fake({}, {}, { message: 'permission denied for table family_invites', code: '42501' }).getFamily())).toEqual(['sem_permissao', 'sem_permissao', null]);
+      for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+    } finally {
+      for (const spy of spies) spy.mockRestore();
+    }
   });
 });

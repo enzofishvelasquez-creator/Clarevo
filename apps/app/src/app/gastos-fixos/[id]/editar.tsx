@@ -7,7 +7,7 @@ import { SubHeader } from '@/components/header';
 import { SeriesEditForm } from '@/components/series-edit-form';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Card, Txt } from '@/components/ui';
-import { useSeries, useSeriesOccurrences, useSeriesOpenOccurrences, useSpace } from '@/state/data';
+import { useSeries, useSeriesOccurrences, useSeriesOpenOccurrences, useWork } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
 type Params = { id: string; 'a-partir'?: string; valor?: string };
@@ -17,8 +17,8 @@ const intParam = (v: string | undefined) => (typeof v === 'string' && /^\d{1,9}$
 /** "Esta e as próximas": /gastos-fixos/[id]/editar?a-partir=<n>&valor=<centavos>. */
 export default function EditarGastoFixo() {
   const params = useLocalSearchParams<Params>();
-  const personal = useSpace().data;
-  const ctx = personal?.personalContextId;
+  const personal = useWork().data;
+  const ctx = personal?.contextId;
   const series = useSeries(params.id, ctx);
   const occ = useSeriesOccurrences(params.id, ctx);
   // Todas as em aberto: o conjunto afetado que o banco confere vai além das 60 da lista.

@@ -21,7 +21,6 @@ import {
   type Card as CardData,
   type Invoice,
   type InvoicePaymentDraft,
-  type PersonalSpace,
 } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
@@ -44,7 +43,7 @@ import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
 import { totalChange } from '@/lib/highlight';
 import { useLastAccount } from '@/lib/last-account';
-import { useCardOperationKey, usePayInvoice } from '@/state/data';
+import { useCardOperationKey, usePayInvoice, type WorkSpace } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
 
@@ -58,7 +57,7 @@ const S = CARDS_TEXT.screens;
  * "Quanto custa pagar só uma parte?". Só se paga fatura fechada (a aberta mostra quando poderá ser paga); a data do pagamento pode
  * ser anterior ao fechamento, para quem pagou antes.
  */
-export function InvoicePayForm({ card, invoice, space: personal }: { card: CardData; invoice: Invoice; space: PersonalSpace }) {
+export function InvoicePayForm({ card, invoice, space: personal }: { card: CardData; invoice: Invoice; space: WorkSpace }) {
   const { today } = useSession();
   const lastAccount = useLastAccount();
   const qc = useQueryClient();

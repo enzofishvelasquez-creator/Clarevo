@@ -56,7 +56,7 @@ import { Banner, Button, Card, Chip, LinkButton, Screen, Skeleton, Txt } from '@
 import { announceOnIOS } from '@/lib/a11y';
 import { flash } from '@/lib/flash';
 import { useLastAccount } from '@/lib/last-account';
-import { useReturnReview, useSeriesList, useSpace, type ReturnReviewData } from '@/state/data';
+import { useReturnReview, useSeriesList, useWork, type ReturnReviewData } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, motion, space, tabular } from '@/theme/tokens';
 
@@ -113,8 +113,8 @@ export default function AtualizarMeses() {
   const qc = useQueryClient();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const personal = useSpace().data;
-  const ctx = personal?.personalContextId;
+  const personal = useWork().data;
+  const ctx = personal?.contextId;
   const query = useReturnReview(ctx);
   const seriesList = useSeriesList(ctx);
   const writer = useReturnWriter();

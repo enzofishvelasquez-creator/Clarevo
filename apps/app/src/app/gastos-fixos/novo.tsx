@@ -12,7 +12,7 @@ import { useLocalSearchParams } from 'expo-router';
 
 import { SeriesForm, type SeriesPrefill } from '@/components/series-form';
 import { LoadingState } from '@/components/states';
-import { useSpace } from '@/state/data';
+import { useWork } from '@/state/data';
 
 /**
  * Parâmetros da rota (todos opcionais): tipo=mensal|parcelada|anual, descricao, valor (centavos), categoria,
@@ -88,7 +88,7 @@ function prefillFrom(p: Params): SeriesPrefill | undefined {
 
 export default function NovoGastoFixo() {
   const params = useLocalSearchParams<Params>();
-  const space = useSpace().data;
+  const space = useWork().data;
   if (!space) return <LoadingState />;
   const prefill = prefillFrom(params);
   return (

@@ -203,7 +203,7 @@ Em todos os itens, os blocos de D-022 e a ordem entre eles continuam iguais. Mud
 - Por quê: Enzo pediu para sempre perguntar se a pessoa consegue guardar. O 4º passo só alcança contas novas, e quem já abriu Metas aprendeu que a aba estava vazia ("Metas chegam em uma próxima versão").
 - Recomendação: **aprovar para quando o Ciclo C entrar**, junto com B1, para o aviso não empurrar "Anotar gasto".
 
-**B6 · Baixa · "Voltar para Pessoal" no estado vazio da Família.**
+**B6 · Baixa · "Voltar para Pessoal" no estado vazio da Família.** *(Resolvida de outro jeito pelo Ciclo L, D-055: sem Família o seletor "Pessoal | Família" não aparece, então ninguém cai num estado vazio por curiosidade; a Família se cria e se administra em Conta › Família.)*
 - O que muda: no Resumo, em "Nenhuma família vinculada", o botão "Voltar para Pessoal".
 - Por quê: quem toca em "Família" por curiosidade perde "Anotar gasto" sem explicação, e a escolha vale também para Movimentos até fechar o app.
 - Recomendação: aprovar. É uma ação dentro de um estado vazio já aprovado.

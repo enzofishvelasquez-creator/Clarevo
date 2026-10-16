@@ -44,7 +44,7 @@ import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
 import { useLastAccount } from '@/lib/last-account';
 import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
-import { useAccounts, useAddGoalMovement, useDeleteGoalMovement, useGoalOperationKey, useSpace, useUpdateGoalMovement } from '@/state/data';
+import { useAccounts, useAddGoalMovement, useDeleteGoalMovement, useGoalOperationKey, useWork, useUpdateGoalMovement } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -78,7 +78,7 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
   // Aporte, resgate e rendimento novos: a tentativa incerta fica na memória do app, para sair e voltar não duplicar (CL-03 e CL-19).
   const keys = useGoalOperationKey(mode.type === 'editar' || mode.type === 'atualizar' ? undefined : `meta-movimento:${goal.id}:${mode.kind}`);
   const lastAccount = useLastAccount();
-  const activeAccounts = useSpace().data?.accounts ?? [];
+  const activeAccounts = useWork().data?.accounts ?? [];
   const allAccounts = useAccounts(goal.contextId);
   const editing = mode.type === 'editar' ? mode.movement : null;
   // O movimento em edição pode ter mudado (outro aparelho): sempre o da lista mais recente.

@@ -9,7 +9,7 @@ import { InvoicePayForm } from '@/components/invoice-pay-form';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Card, Screen, Txt } from '@/components/ui';
 import { invoiceHref, readInvoiceMonth } from '@/lib/cards';
-import { useCard, useCardEntry, useCardInvoices, useSpace } from '@/state/data';
+import { useCard, useCardEntry, useCardInvoices, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -41,7 +41,7 @@ export function InvoicePayRoute() {
   const { today } = useSession();
   const card = useCard(id);
   const invoices = useCardInvoices(card.data ?? null);
-  const personal = useSpace();
+  const personal = useWork();
   const title = S.payTitle;
 
   if (card.isError || invoices.isError || personal.isError) {

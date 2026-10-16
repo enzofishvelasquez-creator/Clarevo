@@ -39,7 +39,7 @@ import { Banner, Button, Card, Chip, LinkButton, Screen, Skeleton, Txt, styles a
 import { openCommitment } from '@/lib/cards';
 import { LEARN_UI_TEXT } from '@/lib/learn';
 import { HIDDEN_MONEY_A11Y } from '@/lib/privacy';
-import { useCommitmentLimits, useCommittedGoalLines, useCommittedSummary, useCommittedUpcoming, useMonthRecords, useSpace, useView } from '@/state/data';
+import { useCommitmentLimits, useCommittedGoalLines, useCommittedSummary, useCommittedUpcoming, useMonthRecords, useWork, useView } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 
@@ -55,7 +55,7 @@ export default function RendaComprometidaScreen() {
   const { month: viewMonth } = useView();
   const params = useLocalSearchParams<{ mes?: string }>();
   const month: IsoMonth = typeof params.mes === 'string' && isValidIsoMonth(params.mes) ? params.mes : viewMonth;
-  const contextId = useSpace().data?.personalContextId;
+  const contextId = useWork().data?.contextId;
   const [notice] = useFlash();
   const [direction, setDirection] = useState<1 | -1>(1);
   // A primeira exibição não desliza; só a troca de mês, na direção escolhida (CL-V008).

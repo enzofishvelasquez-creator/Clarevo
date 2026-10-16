@@ -336,7 +336,7 @@ describe('CL-11: demonstração visível nos formulários e em Metas', () => {
       expect(source, file).toContain("auth.mode === 'demo'");
     }
     const metas = read('apps/app/src/app/(tabs)/metas.tsx');
-    expect(metas).toContain('<AppHeader title={GOALS_TEXT.tabTitle} context="Pessoal" />');
+    expect(metas).toContain('<AppHeader title={GOALS_TEXT.tabTitle} context="Pessoal">');
     // A conta real com o e-mail da demonstração não esconde "Primeiros passos".
     expect(read('apps/app/src/components/primeiros-passos.tsx')).toContain("const demoWithData = auth.mode === 'demo' && user?.email === DEMO_EMAIL;");
   });

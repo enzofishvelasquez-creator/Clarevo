@@ -85,7 +85,6 @@ import {
   type PaymentChoice,
   type PaymentForm,
   type PendingAttempt,
-  type PersonalSpace,
   type ReceiptMatch,
   type RecordDraft,
   type StoreMemory,
@@ -113,6 +112,7 @@ import { ChoiceGroup } from '@/components/series-parts';
 import { useSavedBefore } from '@/components/saved-before';
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt, styles as ui } from '@/components/ui';
+import { UnsavedChangesText } from '@/components/context-text';
 import { announceOnIOS } from '@/lib/a11y';
 import { cardHref, invoiceHref } from '@/lib/cards';
 import { loadPrefs, updatePrefs, useDevicePrefs } from '@/lib/device-prefs';
@@ -141,6 +141,7 @@ import {
   useReturnReview,
   useUpdateRecord,
   withNotice,
+  type WorkSpace,
 } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
@@ -221,7 +222,7 @@ const COPY = {
  * fechado já escolhido; o campo de data vira "Dia" ("/06/2026"), com "Usar outra data", e o rodapé ganha "Salvar e
  * anotar outro" (limpa descrição, valor e categoria; mantém tipo, conta e mês) e "Salvar" (volta à revisão).
  */
-export function RecordForm({ mode, space: personal }: { mode: Mode; space: PersonalSpace }) {
+export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkSpace }) {
   const { today, user, auth } = useSession();
   const params = useLocalSearchParams<{ mes?: string; origem?: string; cartao?: string }>();
   /** Mês fechado do modo "Dia" (só ao criar); null no formulário comum. */
@@ -239,7 +240,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
 
   const kind = mode.type === 'novo' ? mode.kind : mode.record.kind;
   const copy = COPY[kind];
-  const contextId = mode.type === 'novo' ? personal.personalContextId : mode.record.contextId;
+  const contextId = mode.type === 'novo' ? personal.contextId : mode.record.contextId;
 
   // Como você pagou? (D-037): só em gasto novo, fora do modo "Dia". Dinheiro, débito ou Pix é o jeito de sempre; cartão de
   // crédito anota a compra na fatura (ela só entra em Pago quando a fatura for paga).
@@ -412,7 +413,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
     JSON.stringify(draft) !== JSON.stringify(initial) || (dayMode && dayText !== initialDay) || installmentsText !== '1' || note !== null || proof !== null;
   const day = dayMode && dayMonth ? dayInMonthDate(dayMonth, dayText) : null;
   const account = (allAccounts.data ?? personal.accounts).find((a) => a.id === draft.accountId) ?? personal.accounts[0];
-  const contextName = 'Pessoal';
+  const contextName = personal.contextName;
 
   // Sair com alterações não salvas pede confirmação (voltar, gesto, botão do sistema).
   usePreventRemove(dirty && !leaveTo, ({ data }) => {
@@ -1818,7 +1819,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: Perso
           setConfirmDiscard(null);
           if (action) leave(action);
         }}>
-        <Txt color={colors.textSecondary}>Você tem alterações que ainda não foram salvas em {contextName}.</Txt>
+        <UnsavedChangesText />
       </ConfirmDialog>
     </KeyboardAvoidingView>
   );

@@ -8,6 +8,7 @@ import { QUICK_PAY_TEXT } from '../commitments';
 import { COMMITTED_TEXT } from '../committed';
 import { COMPROVANTE_TEXT } from '../comprovante/fluxo';
 import { EXPORT_TEXT } from '../export';
+import { FAMILY_TEXT, INVITE_TEXT } from '../family';
 import { GOALS_TEXT } from '../goals';
 import { IMPORT_TEXT } from '../importar/textos';
 import { LEARN_SECTIONS } from '../learn/sections';
@@ -658,16 +659,36 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     screenshot: '291_exportar_meus_dados.png',
   },
   {
+    id: 'familia',
+    group: 'conta-e-privacidade',
+    title: 'Família',
+    purpose: 'Reúne até 6 pessoas para ver e anotar as contas da casa em conjunto. O Pessoal de cada pessoa continua só dela.',
+    where: [ACCOUNT_SCREEN, FAMILY_TEXT.title],
+    steps: [
+      `Em Conta, no card ${q(FAMILY_TEXT.title)}, toque em ${q(FAMILY_TEXT.create)}, dê um nome e confirme. Quem cria é titular.`,
+      `Toque em ${q(FAMILY_TEXT.invite)}, escolha ${q('Anota e vê')} ou ${q('Só vê')} e toque em ${q(FAMILY_TEXT.inviteGenerate)}. Envie o link com ${q(FAMILY_TEXT.share)}: ele vale por 7 dias e serve uma vez.`,
+      `Quem recebe o link entra ou cria a conta, vê o nome da Família e quem convidou e toca em ${q(INVITE_TEXT.accept)}.`,
+      `Com Família, o seletor ${q('Pessoal')} e ${q(FAMILY_TEXT.context)} aparece no topo das abas: cada tela usa o contexto escolhido, e os formulários dizem onde a anotação vai ficar.`,
+      `O titular muda o papel de cada pessoa, remove, usa ${q(FAMILY_TEXT.transfer)} ou ${q(FAMILY_TEXT.end)}. Quem não é titular usa ${q(FAMILY_TEXT.leave)}.`,
+      'O que alguém anotou continua na Família depois que sai, como "ex-membro" e o primeiro nome.',
+    ],
+    screenName: FAMILY_TEXT.title,
+    href: '/familia',
+    keywords: ['família', 'familia', 'casa', 'convidar', 'convite', 'link de convite', 'pessoas', 'membros', 'titular', 'dividir contas da casa', 'anotar junto', 'compartilhar contas'],
+    routes: ['/familia'],
+    screenshot: '400_familia_criar.png',
+  },
+  {
     id: 'quem-ve',
     group: 'conta-e-privacidade',
     title: 'Quem vê estes dados',
-    purpose: 'Mostra quem tem acesso aos seus registros. Em Pessoal, só você. A empresa que oferece o plano não vê seus registros.',
+    purpose: 'Mostra quem tem acesso aos registros: em Pessoal, só você; na Família, as pessoas e o papel de cada uma. A empresa que oferece o plano não vê seus registros.',
     where: [TAB.resumo, 'Quem vê estes dados?'],
     steps: [
       `No fim do Resumo, de Contas a pagar e de outras telas, toque em ${q('Quem vê estes dados?')}.`,
-      'Veja o nome e a permissão de cada pessoa com acesso. Em Pessoal, só você vê, anota, edita e exclui.',
+      'Veja o nome e a permissão de cada pessoa com acesso. Em Pessoal, só você vê, anota, edita e exclui. Na Família, aparecem as pessoas e o papel de cada uma.',
       'A empresa que oferece o Clarevo como benefício administra só o seu acesso ao plano, não os seus registros.',
-      'Gastos fixos, renda de referência, metas, simulações e a revisão dos últimos meses também são só seus.',
+      'Gastos fixos, renda de referência, metas, simulações e a revisão dos últimos meses também são só seus no Pessoal.',
       `Para uma resposta mais completa, toque em ${q('A empresa vê meus gastos?')}.`,
     ],
     screenName: 'Quem vê estes dados?',

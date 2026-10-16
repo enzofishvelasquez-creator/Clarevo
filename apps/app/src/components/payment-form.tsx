@@ -36,7 +36,6 @@ import {
   type PaymentDraft,
   type PaymentInput,
   type PendingAttempt,
-  type PersonalSpace,
   type WholeYearPayment,
 } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
@@ -57,6 +56,7 @@ import { CheckOption, yearA11yLabel } from '@/components/series-parts';
 import { SumValues } from '@/components/sum-values';
 import { TermHint } from '@/components/term-hint';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
+import { UnsavedChangesText } from '@/components/context-text';
 import { flash } from '@/lib/flash';
 import { explanationHref } from '@/lib/learn';
 import { totalChange } from '@/lib/highlight';
@@ -72,6 +72,7 @@ import {
   useSkipSeriesYear,
   useUpdateRecord,
   withNotice,
+  type WorkSpace,
 } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
@@ -91,7 +92,7 @@ const paymentText = (code: string) =>
  * esta parcela com o valor total e, só depois do pagamento confirmado, tira as outras (skip_series_year). Se a segunda
  * escrita falhar, o pagamento continua registrado e a faixa diz o que fazer.
  */
-export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { commitment: Commitment; space: PersonalSpace; paidOnDue?: boolean }) {
+export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { commitment: Commitment; space: WorkSpace; paidOnDue?: boolean }) {
   const { today } = useSession();
   const lastAccount = useLastAccount();
   const repo = useRepo();
@@ -103,7 +104,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
   const skipYear = useSkipSeriesYear();
   const skipKeys = useSeriesOperationKey();
   const qc = useQueryClient();
-  const contextName = 'Pessoal';
+  const contextName = personal.contextName;
   // Conta do ano com parcelas: a série e todas as contas dela, para a caixa "Paguei o ano todo de uma vez".
   const yearParts = c.series?.kind === 'anual' && (c.series.partsPerYear ?? 1) > 1;
   const seriesId = yearParts ? c.series!.id : undefined;
@@ -637,7 +638,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
           setConfirmDiscard(null);
           if (action) leave(action);
         }}>
-        <Txt color={colors.textSecondary}>Você tem alterações que ainda não foram salvas em {contextName}.</Txt>
+        <UnsavedChangesText />
       </ConfirmDialog>
     </KeyboardAvoidingView>
   );

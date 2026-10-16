@@ -1018,7 +1018,11 @@ end $$;
 
 -- Ana revoga o Bruno: a série dele para de gerar (generating = false), e nada é criado em nome dele.
 select set_config('request.jwt.claim.sub', :ana, true);
+-- (O vínculo só é alterado pelas funções da Família, testadas em 95_familia; aqui o backend revoga, sem gravar operação.)
+reset role;
 update public.context_memberships set revoked_at = now() where context_id = pg_temp.id('familia') and person_id = :bruno;
+set role authenticated;
+select set_config('request.jwt.claim.sub', :ana, true);
 do $$ begin
   assert (select generating from public.series_items where id = pg_temp.id('feira_familia')) = false, 'série do Bruno parou de gerar';
   assert (select generating from public.series_items where id = pg_temp.id('condominio')) = true, 'série da Ana continua gerando';
@@ -1208,17 +1212,20 @@ do $$ begin
 
   assert (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
-    = array['add_card_charge', 'add_card_purchase', 'add_card_refund', 'add_goal_movement', 'context_permission',
-            'create_account', 'create_card', 'create_commitment', 'create_goal', 'create_record', 'create_series',
-            'create_series_occurrence', 'decide_return_review', 'delete_account', 'delete_card', 'delete_card_entry',
-            'delete_category_budget', 'delete_commitment', 'delete_commitment_limit', 'delete_goal', 'delete_goal_movement',
-            'delete_income_reference', 'delete_record', 'delete_series', 'end_series', 'ensure_personal_space',
-            'import_records', 'inform_series_year', 'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'mark_subscriptions_reviewed', 'month_budget',
-            'month_committed', 'month_to_pay', 'month_totals', 'months_overview', 'my_today', 'pay_commitment', 'pay_invoice',
-            'set_account_status', 'set_card_status', 'set_category_budget', 'set_commitment_limit', 'set_default_account',
-            'set_goal_status', 'set_income_reference', 'set_savings_answer', 'set_series_subscription', 'skip_series_year', 'sync_series_occurrences',
-            'undo_commitment_payment', 'undo_invoice_payment', 'update_account', 'update_card', 'update_card_entry',
-            'update_commitment', 'update_goal', 'update_goal_movement', 'update_record', 'update_series_from'],
+    = array['accept_family_invite', 'add_card_charge', 'add_card_purchase', 'add_card_refund', 'add_goal_movement',
+            'cancel_family_invite', 'context_permission', 'create_account', 'create_card', 'create_commitment', 'create_family',
+            'create_family_invite', 'create_goal', 'create_record', 'create_series', 'create_series_occurrence',
+            'decide_return_review', 'delete_account', 'delete_card', 'delete_card_entry', 'delete_category_budget',
+            'delete_commitment', 'delete_commitment_limit', 'delete_goal', 'delete_goal_movement', 'delete_income_reference',
+            'delete_record', 'delete_series', 'end_family', 'end_series', 'ensure_personal_space', 'import_records',
+            'inform_series_year', 'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'leave_family',
+            'mark_subscriptions_reviewed', 'month_budget', 'month_committed', 'month_to_pay', 'month_totals', 'months_overview',
+            'my_today', 'pay_commitment', 'pay_invoice', 'preview_family_invite', 'remove_family_member', 'set_account_status',
+            'set_card_status', 'set_category_budget', 'set_commitment_limit', 'set_default_account', 'set_goal_status',
+            'set_income_reference', 'set_member_role', 'set_savings_answer', 'set_series_subscription', 'skip_series_year',
+            'sync_series_occurrences', 'transfer_family_ownership', 'undo_commitment_payment', 'undo_invoice_payment',
+            'update_account', 'update_card', 'update_card_entry', 'update_commitment', 'update_goal', 'update_goal_movement',
+            'update_record', 'update_series_from'],
     'authenticated executa só as funções expostas';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')), 'anon não executa nenhuma função';

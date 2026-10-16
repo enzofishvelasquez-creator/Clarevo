@@ -62,6 +62,7 @@ import { ChoiceGroup, monthChipLabel, seriesStyles as styles } from '@/component
 import { SettingSwitch } from '@/components/setting-switch';
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
+import { UnsavedChangesText } from '@/components/context-text';
 import { flash } from '@/lib/flash';
 import {
   useLimitWatch,
@@ -690,7 +691,7 @@ export function SeriesEditForm({
           setConfirmDiscard(null);
           if (action) leave(action);
         }}>
-        <Txt color={colors.textSecondary}>Você tem alterações que ainda não foram salvas em Pessoal.</Txt>
+        <UnsavedChangesText />
       </ConfirmDialog>
     </KeyboardAvoidingView>
   );

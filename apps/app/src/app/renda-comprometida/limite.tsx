@@ -31,9 +31,10 @@ import { MonthStepper } from '@/components/month-stepper';
 import { seriesStyles as styles } from '@/components/series-parts';
 import { ErrorState } from '@/components/states';
 import { Banner, Button, Card, Screen, Skeleton, TextField, Txt } from '@/components/ui';
+import { UnsavedChangesText } from '@/components/context-text';
 import { announceOnIOS } from '@/lib/a11y';
 import { flash } from '@/lib/flash';
-import { isRefusal, useBudgetOperationKey, useCommitmentLimits, useDeleteCommitmentLimit, useSetCommitmentLimit, useSpace } from '@/state/data';
+import { isRefusal, useBudgetOperationKey, useCommitmentLimits, useDeleteCommitmentLimit, useSetCommitmentLimit, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -46,7 +47,7 @@ import { colors, fonts, space } from '@/theme/tokens';
  * de operação guardada entre tentativas. `?mes=AAAA-MM` escolhe o mês inicial (sem ele, o mês atual).
  */
 export default function LimiteScreen() {
-  const contextId = useSpace().data?.personalContextId;
+  const contextId = useWork().data?.contextId;
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {contextId ? (
@@ -376,7 +377,7 @@ function LimitForm({ contextId }: { contextId: string }) {
           setConfirmDiscard(null);
           if (action) leave(action);
         }}>
-        <Txt color={colors.textSecondary}>Você tem alterações que ainda não foram salvas em Pessoal.</Txt>
+        <UnsavedChangesText />
       </ConfirmDialog>
     </KeyboardAvoidingView>
   );

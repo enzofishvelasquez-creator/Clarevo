@@ -3,10 +3,11 @@ import { router } from 'expo-router';
 import { ChevronRight, Coins, FileUp, Landmark, Plus, Wallet, type LucideIcon } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { ContextPill } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
 import { TermHint } from '@/components/term-hint';
 import { Button, Card, LinkButton, Txt } from '@/components/ui';
-import { useAccounts } from '@/state/data';
+import { useAccounts, useView } from '@/state/data';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
 const ICON: Record<AccountKind, LucideIcon> = { banco: Landmark, dinheiro: Wallet, outra: Coins };
@@ -16,13 +17,20 @@ const ICON: Record<AccountKind, LucideIcon> = { banco: Landmark, dinheiro: Walle
  * abre o formulário (renomear, mudar o tipo, tornar principal, arquivar ou reativar, excluir); "Adicionar conta" abre o cadastro. A conta
  * só informa a origem: o Clarevo não guarda saldo por conta nem movimenta dinheiro.
  */
-export function AccountsCard({ contextId }: { contextId: string | undefined }) {
+export function AccountsCard({ contextId, canWrite = true }: { contextId: string | undefined; canWrite?: boolean }) {
   const accounts = useAccounts(contextId);
+  const { space: kind } = useView();
   return (
     <Card style={{ gap: space[3] }}>
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
         {ACCOUNTS_TEXT.title}
       </Txt>
+      {/* Com a Família escolhida (D-055), as contas são as dela: a pílula diz de qual contexto é a lista. */}
+      {kind === 'familia' ? (
+        <View style={{ alignSelf: 'flex-start' }}>
+          <ContextPill label="Família" fixed />
+        </View>
+      ) : null}
       <Txt variant="caption" color={colors.textSecondary}>
         {ACCOUNTS_TEXT.intro}
       </Txt>
@@ -37,26 +45,30 @@ export function AccountsCard({ contextId }: { contextId: string | undefined }) {
               <AccountRow key={a.id} account={a} last={i === accounts.data.length - 1} />
             ))}
           </View>
-          <Button
-            label={ACCOUNTS_TEXT.add}
-            icon={Plus}
-            tone="soft"
-            disabled={!canAddActiveAccount(accounts.data)}
-            onPress={() => router.push('/contas/nova')}
-          />
-          {canAddActiveAccount(accounts.data) ? null : (
+          {canWrite ? (
+            <Button
+              label={ACCOUNTS_TEXT.add}
+              icon={Plus}
+              tone="soft"
+              disabled={!canAddActiveAccount(accounts.data)}
+              onPress={() => router.push('/contas/nova')}
+            />
+          ) : null}
+          {canWrite && !canAddActiveAccount(accounts.data) ? (
             <Txt variant="caption" color={colors.textSecondary}>
               {ACCOUNTS_TEXT.limitNote}
             </Txt>
-          )}
+          ) : null}
           {/* Importar extrato (D-048): atalho para trazer os lançamentos de um arquivo do banco para uma destas contas. */}
-          <LinkButton
-            label={IMPORT_TEXT.accountsShortcut}
-            icon={FileUp}
-            accessibilityHint={IMPORT_TEXT.accountsShortcutHint}
-            style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
-            onPress={() => router.push('/importar')}
-          />
+          {canWrite ? (
+            <LinkButton
+              label={IMPORT_TEXT.accountsShortcut}
+              icon={FileUp}
+              accessibilityHint={IMPORT_TEXT.accountsShortcutHint}
+              style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
+              onPress={() => router.push('/importar')}
+            />
+          ) : null}
         </>
       )}
       <Txt variant="caption" color={colors.textSecondary}>

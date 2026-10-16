@@ -12,6 +12,8 @@ import {
   MAX_RECORD_CENTS,
   NO_CATEGORY_LABEL,
   PARTS_PER_YEAR_MAX,
+  INVITE_CODE_PATTERN,
+  FAMILY_MAX_PEOPLE,
   RepoError,
   SAVINGS_ANSWERS,
   SAVINGS_MIN_MONTHLY_CENTS,
@@ -19,6 +21,7 @@ import {
   searchTermPattern,
   activeAccounts,
   addMonths,
+  normalizeInviteCode,
   monthRange,
   receiptKeyValid,
   type AccountAction,
@@ -48,6 +51,14 @@ import {
   type CommitmentSeries,
   type CommitmentWrite,
   type ContextActivity,
+  type FamilyInvite,
+  type FamilyInviteWrite,
+  type FamilyInvitePreview,
+  type FamilyJoin,
+  type FamilyMember,
+  type FamilyOverview,
+  type FamilyRole,
+  type InviteRole,
   type FinancialAccount,
   type FinancialRecord,
   type Goal,
@@ -604,6 +615,17 @@ const KNOWN: RepoErrorCode[] = [
   'destino_invalido',
   'itens_invalidos',
   'chave_de_importacao_invalida',
+  // Família (D-055). Nenhum é sufixo de outro código da lista, nem tem outro como sufixo.
+  'nome_da_familia_invalido',
+  'ja_em_familia',
+  'familia_cheia',
+  'convite_invalido',
+  'convite_ja_usado',
+  'papel_invalido',
+  'titular_nao_sai',
+  'nao_sobre_si',
+  'contexto_invalido',
+  'familia_com_membros',
 ];
 
 /**
@@ -2600,6 +2622,195 @@ export class SupabaseRepository implements RecordsRepository {
     if (!data.target_id) throw new RepoError('desconhecido', 'operacao_inconsistente');
     return { targetId: data.target_id as string, result: toImportResult(data.import_result) };
   }
+
+  // -------------------------------------------------------------------------
+  // Família (D-055): as nove funções da migração 0013, a visão family_member_items e a tabela family_invites (só o titular lê)
+  // -------------------------------------------------------------------------
+
+  /**
+   * A Família ativa da pessoa: o contexto (a RLS só deixa ler quem tem vínculo ativo, e Família encerrada ninguém lê), as pessoas
+   * pela visão family_member_items (ativos e ex-membros, só o primeiro nome) e, para o titular, os convites ainda válidos.
+   */
+  async getFamily(): Promise<FamilyOverview | null> {
+    const ctx = await this.db
+      .from('financial_contexts')
+      .select('id, name, created_at')
+      .eq('kind', 'familia')
+      .is('ended_at', null)
+      .order('created_at')
+      .order('id')
+      .limit(1);
+    if (ctx.error) throw repoError(ctx.error);
+    const context = (ctx.data ?? [])[0] as { id: string; name: string; created_at: string } | undefined;
+    if (!context) return null;
+    const rows = await readAll<MemberRow>((from, to) =>
+      this.db
+        .from('family_member_items')
+        .select('person_id, first_name, role, status, is_me, joined_at, left_at')
+        .eq('context_id', context.id)
+        .order('joined_at')
+        .order('person_id')
+        .range(from, to),
+    );
+    const members = rows.map(toMember);
+    const me = members.find((m) => m.isMe && m.status === 'ativo');
+    if (!me) return null;
+    if (members.filter((m) => m.status === 'ativo').length > FAMILY_MAX_PEOPLE) throw new RepoError('desconhecido', 'familia_inconsistente');
+    // Ativos primeiro (titular no topo), ex-membros depois: a ordem não depende do banco.
+    const active = members.filter((m) => m.status === 'ativo').sort((a, b) => Number(b.role === 'titular') - Number(a.role === 'titular') || a.joinedAt.localeCompare(b.joinedAt));
+    const former = members.filter((m) => m.status === 'ex-membro').sort((a, b) => (a.leftAt ?? '').localeCompare(b.leftAt ?? ''));
+    let invites: FamilyInvite[] = [];
+    if (me.role === 'titular') {
+      const { data, error } = await this.db
+        .from('family_invites')
+        .select(INVITE_COLUMNS)
+        .eq('context_id', context.id)
+        .is('used_at', null)
+        .is('cancelled_at', null)
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at')
+        .order('id');
+      if (error) throw repoError(error);
+      invites = ((data ?? []) as InviteRow[]).map(toInvite);
+    }
+    return { context: { id: context.id, name: context.name, createdAt: context.created_at }, role: me.role, members: [...active, ...former], invites };
+  }
+
+  async createFamily(key: string, name: string): Promise<FamilyJoin> {
+    const { data, error } = await this.db.rpc('create_family', { p_name: name, p_key: key });
+    if (error) throw repoError(error);
+    return toFamilyJoin(data);
+  }
+
+  async createFamilyInvite(key: string, contextId: string, role: InviteRole): Promise<FamilyInviteWrite> {
+    const { data, error } = await this.db.rpc('create_family_invite', { p_context: contextId, p_role: role, p_key: key });
+    if (error) throw repoError(error);
+    const r = data as { invite?: unknown; code?: unknown } | null;
+    if (!r || (r.code !== null && (typeof r.code !== 'string' || !INVITE_CODE_PATTERN.test(r.code)))) throw new RepoError('desconhecido', 'convite_inconsistente');
+    return { invite: toInvite(r.invite as InviteRow), code: (r.code as string | null) ?? null };
+  }
+
+  async cancelFamilyInvite(key: string, inviteId: string): Promise<FamilyInvite> {
+    const { data, error } = await this.db.rpc('cancel_family_invite', { p_invite: inviteId, p_key: key });
+    if (error) throw repoError(error);
+    return toInvite((data as { invite?: unknown } | null)?.invite as InviteRow);
+  }
+
+  async previewFamilyInvite(code: string): Promise<FamilyInvitePreview> {
+    const normalized = normalizeInviteCode(code);
+    // Código fora do formato: a mesma resposta do banco para qualquer convite que não vale, sem ir à rede.
+    if (normalized === null) throw new RepoError('convite_invalido');
+    const { data, error } = await this.db.rpc('preview_family_invite', { p_code: normalized });
+    if (error) throw repoError(error);
+    const r = data as { family_name?: unknown; invited_by?: unknown; role?: unknown; expires_at?: unknown } | null;
+    if (!r || typeof r.family_name !== 'string' || typeof r.invited_by !== 'string' || !isInviteRoleValue(r.role) || typeof r.expires_at !== 'string') {
+      throw new RepoError('desconhecido', 'convite_inconsistente');
+    }
+    return { familyName: r.family_name, invitedBy: r.invited_by, role: r.role, expiresAt: r.expires_at };
+  }
+
+  async acceptFamilyInvite(key: string, code: string): Promise<FamilyJoin> {
+    const normalized = normalizeInviteCode(code);
+    if (normalized === null) throw new RepoError('convite_invalido');
+    const { data, error } = await this.db.rpc('accept_family_invite', { p_code: normalized, p_key: key });
+    if (error) throw repoError(error);
+    return toFamilyJoin(data);
+  }
+
+  async leaveFamily(key: string, contextId: string): Promise<void> {
+    const { error } = await this.db.rpc('leave_family', { p_context: contextId, p_key: key });
+    if (error) throw repoError(error);
+  }
+
+  async removeFamilyMember(key: string, contextId: string, personId: string): Promise<void> {
+    const { error } = await this.db.rpc('remove_family_member', { p_context: contextId, p_person: personId, p_key: key });
+    if (error) throw repoError(error);
+  }
+
+  async setMemberRole(key: string, contextId: string, personId: string, role: InviteRole): Promise<void> {
+    const { error } = await this.db.rpc('set_member_role', { p_context: contextId, p_person: personId, p_role: role, p_key: key });
+    if (error) throw repoError(error);
+  }
+
+  async transferFamilyOwnership(key: string, contextId: string, personId: string): Promise<void> {
+    const { error } = await this.db.rpc('transfer_family_ownership', { p_context: contextId, p_person: personId, p_key: key });
+    if (error) throw repoError(error);
+  }
+
+  async endFamily(key: string, contextId: string): Promise<void> {
+    const { error } = await this.db.rpc('end_family', { p_context: contextId, p_key: key });
+    if (error) throw repoError(error);
+  }
+}
+
+/** Linha de family_member_items. */
+interface MemberRow {
+  person_id: string;
+  first_name: string;
+  role: string;
+  status: string;
+  is_me: boolean;
+  joined_at: string;
+  left_at: string | null;
+}
+
+/** Colunas de family_invites que o titular pode ler (o resumo do código nunca é lido). */
+const INVITE_COLUMNS = 'id, context_id, role, created_by, expires_at, used_at, cancelled_at, created_at';
+
+interface InviteRow {
+  id: string;
+  context_id: string;
+  role: string;
+  created_by: string;
+  expires_at: string;
+  used_at: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+}
+
+const isInviteRoleValue = (v: unknown): v is InviteRole => v === 'membro' || v === 'leitor';
+const isFamilyRoleValue = (v: unknown): v is FamilyRole => v === 'titular' || v === 'membro' || v === 'leitor';
+
+/** Linha da visão: papel e situação conhecidos e primeiro nome sem espaço nem arroba; qualquer outra forma é defeito, não recusa. */
+function toMember(r: MemberRow): FamilyMember {
+  if (
+    !isFamilyRoleValue(r.role) ||
+    (r.status !== 'ativo' && r.status !== 'ex-membro') ||
+    typeof r.first_name !== 'string' ||
+    r.first_name === '' ||
+    /\s|@/.test(r.first_name) ||
+    typeof r.person_id !== 'string' ||
+    (r.status === 'ativo') !== (r.left_at === null)
+  ) {
+    throw new RepoError('desconhecido', 'familia_inconsistente');
+  }
+  return { personId: r.person_id, firstName: r.first_name, role: r.role, status: r.status, isMe: r.is_me === true, joinedAt: r.joined_at, leftAt: r.left_at };
+}
+
+function toInvite(r: InviteRow | null | undefined): FamilyInvite {
+  if (!r || !isInviteRoleValue(r.role) || typeof r.id !== 'string' || typeof r.context_id !== 'string' || typeof r.expires_at !== 'string') {
+    throw new RepoError('desconhecido', 'convite_inconsistente');
+  }
+  return {
+    id: r.id,
+    contextId: r.context_id,
+    role: r.role,
+    createdBy: r.created_by,
+    expiresAt: r.expires_at,
+    usedAt: r.used_at ?? null,
+    cancelledAt: r.cancelled_at ?? null,
+    createdAt: r.created_at,
+  };
+}
+
+/** {context: {id, name, created_at}, role, invited_by?} de create_family e accept_family_invite. */
+function toFamilyJoin(data: unknown): FamilyJoin {
+  const r = data as { context?: { id?: unknown; name?: unknown; created_at?: unknown }; role?: unknown; invited_by?: unknown } | null;
+  const c = r?.context;
+  if (!r || !c || typeof c.id !== 'string' || typeof c.name !== 'string' || typeof c.created_at !== 'string' || !isFamilyRoleValue(r.role)) {
+    throw new RepoError('desconhecido', 'familia_inconsistente');
+  }
+  return { context: { id: c.id, name: c.name, createdAt: c.created_at }, role: r.role, invitedBy: typeof r.invited_by === 'string' ? r.invited_by : null };
 }
 
 /** {created, skipped} de import_records: dois inteiros de 0 a 500; qualquer outra forma é defeito, não recusa. */

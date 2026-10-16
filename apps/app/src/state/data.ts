@@ -1,7 +1,9 @@
 import {
   ESSENTIAL_LOOKBACK_MONTHS,
   INSTALLMENT_NATURES,
+  activeAccounts,
   addDays,
+  contextName,
   addMonths,
   annualCommitmentIds,
   budgetCrossing,
@@ -70,6 +72,8 @@ import {
   type CommittedProjection,
   type CommittedSummary,
   type EssentialEstimate,
+  type ContextKind,
+  type FamilyRole,
   type FinancialRecord,
   type Goal,
   type GoalAction,
@@ -94,6 +98,7 @@ import {
   type NewGoalInput,
   type OccurrenceMode,
   type PaymentInput,
+  type PersonalSpace,
   type PaymentsForecast,
   type ReceiptMatch,
   type RecordInput,
@@ -118,6 +123,7 @@ import { AppState } from 'react-native';
 
 import { pendingAttempts } from '@/lib/pending-attempts';
 import { valuesHidden } from '@/lib/privacy';
+import { useFamily } from '@/state/family';
 import { useRepo, useSession } from '@/state/session';
 
 /** Lista, detalhe e totais leem a mesma origem: os registros do contexto no mês. */
@@ -125,6 +131,84 @@ export function useSpace() {
   const repo = useRepo();
   const { user } = useSession();
   return useQuery({ queryKey: ['space', user?.id], queryFn: () => repo.getSpace() });
+}
+
+/**
+ * O contexto em que as telas trabalham (D-055): o Pessoal ou, com a Família escolhida no seletor, a Família. Tem a forma do
+ * espaço pessoal, com o contexto escolhido à frente: `contextId` é o contexto das leituras e gravações, `accounts` são as contas
+ * ativas dele (a principal primeiro) e `personalContextId` continua sendo o Pessoal, para o que é só da pessoa (exportar, lembretes).
+ */
+export interface WorkSpace extends PersonalSpace {
+  contextId: string;
+  contextKind: ContextKind;
+  /** "Pessoal" ou "Família": o nome do contexto nas pílulas e nos avisos dos formulários. */
+  contextName: string;
+  /** O nome que a Família recebeu ("Casa Lima"); nulo no Pessoal. */
+  familyName: string | null;
+  /** Papel no contexto: titular no Pessoal; titular, membro ou leitor na Família. */
+  role: FamilyRole;
+  /** Quem só lê a Família (leitor) não anota. */
+  canWrite: boolean;
+}
+
+/** Resultado de useWork: a parte de UseQueryResult que as telas usam. */
+export interface WorkResult {
+  data: WorkSpace | undefined;
+  isPending: boolean;
+  isError: boolean;
+  isSuccess: boolean;
+  error: Error | null;
+  refetch: () => Promise<unknown>;
+}
+
+/**
+ * O contexto escolhido ("Pessoal | Família", `useView().space`) com as contas dele. A Família só vale com a Família carregada; sem
+ * ela, o Pessoal. Todas as telas que leem ou gravam um contexto usam isto no lugar de `useSpace`.
+ */
+export function useWork(): WorkResult {
+  const space = useSpace();
+  const family = useFamily();
+  const { space: kind } = useView();
+  const familyId = kind === 'familia' ? family.data?.context.id : undefined;
+  const accounts = useAccounts(familyId);
+  const personal = space.data;
+  const fam = family.data;
+  const famAccounts = accounts.data;
+  const data = useMemo((): WorkSpace | undefined => {
+    if (!personal) return undefined;
+    if (kind === 'familia' && fam) {
+      if (!famAccounts) return undefined;
+      return {
+        ...personal,
+        accounts: activeAccounts(famAccounts),
+        contextId: fam.context.id,
+        contextKind: 'familia',
+        contextName: contextName('familia'),
+        familyName: fam.context.name,
+        role: fam.role,
+        canWrite: fam.role !== 'leitor',
+      };
+    }
+    return {
+      ...personal,
+      contextId: personal.personalContextId,
+      contextKind: 'pessoal',
+      contextName: contextName('pessoal'),
+      familyName: null,
+      role: 'titular',
+      canWrite: true,
+    };
+  }, [personal, kind, fam, famAccounts]);
+  const loadingFamily = kind === 'familia' && Boolean(fam) && accounts.isPending;
+  const failed = space.isError || (kind === 'familia' && Boolean(fam) && accounts.isError);
+  return {
+    data,
+    isPending: space.isPending || loadingFamily,
+    isError: failed,
+    isSuccess: data !== undefined,
+    error: (space.error ?? accounts.error) as Error | null,
+    refetch: () => (space.isError ? space.refetch() : kind === 'familia' && accounts.isError ? accounts.refetch() : space.refetch()),
+  };
 }
 
 /**
@@ -1471,7 +1555,11 @@ export function useAccountOperationKey(scope?: string) {
       if (found.action !== 'criar_conta') return true;
       const space = await repo.getSpace();
       if (!space) return false;
-      return (await repo.listAccounts(space.personalContextId)).some((a) => a.id === found.accountId);
+      // A conta pode ter sido criada no Pessoal ou na Família da pessoa.
+      const family = await repo.getFamily();
+      const contexts = family ? [space.personalContextId, family.context.id] : [space.personalContextId];
+      for (const ctx of contexts) if ((await repo.listAccounts(ctx)).some((a) => a.id === found.accountId)) return true;
+      return false;
     },
   );
 }

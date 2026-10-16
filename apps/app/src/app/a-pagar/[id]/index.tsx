@@ -62,10 +62,11 @@ import {
   useSeriesOpenOccurrences,
   useSeriesOperationKey,
   useSkipSeriesYear,
-  useSpace,
+  useWork,
   useUndoCommitmentPayment,
   useView,
 } from '@/state/data';
+import { useAuthorship } from '@/components/family-parts';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -99,8 +100,8 @@ function startAfter(date: IsoDate, today: IsoDate): IsoMonth {
 export default function DetalheContaAPagar() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const commitment = useCommitment(id);
-  const personal = useSpace().data;
-  const allAccounts = useAccounts(personal?.personalContextId);
+  const personal = useWork().data;
+  const allAccounts = useAccounts(personal?.contextId);
   const view = useView();
   const { user, today } = useSession();
   const remove = useDeleteCommitment();
@@ -128,6 +129,7 @@ export default function DetalheContaAPagar() {
   const toList = () => (router.canGoBack() ? router.back() : router.replace('/a-pagar'));
 
   const c = commitment.data;
+  const by = useAuthorship(c?.contextId ?? '', c?.createdBy ?? '');
   const situation = c ? commitmentSituation(c, today) : null;
   const paid = c?.status === 'quitado' ? c.payment : null;
   const ref = c?.series ?? null;
@@ -308,7 +310,6 @@ export default function DetalheContaAPagar() {
     // Paga: o mês da data do pagamento. Em aberto: o mês do vencimento, ou o corrente se ela ainda vai vencer depois dele.
     const target = paid ? monthOf(paid.paidOn) : monthOf(c.dueOn) < view.currentMonth ? monthOf(c.dueOn) : view.currentMonth;
     view.setMonth(target);
-    view.setSpace('pessoal');
     openSummary();
   };
 
@@ -432,7 +433,7 @@ export default function DetalheContaAPagar() {
                   </View>
                 ) : null}
                 <View>
-                  <Row label="Contexto" value="Pessoal" />
+                  <Row label="Contexto" value={by.contextName} />
                   <Row label="Vencimento" value={formatDateBR(c.dueOn)} />
                   <Row label="Categoria" value={c.category ?? NO_CATEGORY_LABEL} />
                   {paid ? (
@@ -448,7 +449,7 @@ export default function DetalheContaAPagar() {
                   <Txt variant="caption" color={colors.textSecondary}>
                     {ref
                       ? `Criada ${bySeries(ref.kind)} em ${formatDateTimeBR(c.createdAt, deviceTimeZone())}`
-                      : `Anotada por ${c.createdBy === user?.id ? 'você' : 'outra pessoa da família'} em ${formatDateTimeBR(c.createdAt, deviceTimeZone())}`}
+                      : `Anotada por ${by.by} em ${formatDateTimeBR(c.createdAt, deviceTimeZone())}`}
                   </Txt>
                   {c.version > 1 ? (
                     <Txt variant="caption" color={colors.textSecondary}>

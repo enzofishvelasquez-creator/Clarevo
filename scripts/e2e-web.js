@@ -10,7 +10,8 @@
  * (exportar meus dados em CSV e PDF, D-047), do Ciclo I1 (importar extrato e fatura, D-048), do Tutorial (D-049: o guia em Aprender, o
  * tour de boas-vindas, o botão "?" nas telas e as capturas do manual) e do Ciclo I2 (comprovante de Pix e de pagamento em PDF,
  * D-051), do Ciclo K1 (Seu mês em 30 segundos e o interruptor do widget em Conta, D-052) e do Ciclo K2 (conteúdo de época: o card "Neste mês" em
- * Aprender e os temas de 13º salário, férias, volta às aulas e Imposto de Renda, D-053) na versão web, em modo demonstração (acesso simulado).
+ * Aprender e os temas de 13º salário, férias, volta às aulas e Imposto de Renda, D-053) e do Ciclo L (Família, D-055: criar, convidar por link,
+ * aceitar, papéis, sair e encerrar, com a Família simulada na memória) na versão web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -281,9 +282,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('button', { name: /Mês anterior/ }).filter({ visible: true }).first().click(); await waitText('Setembro de 2026'); await p.waitForTimeout(600);
   ok('primeiros passos: fora do mês anterior', !(await headingShown('Primeiros passos')));
   await p.getByRole('button', { name: /Próximo mês/ }).filter({ visible: true }).first().click(); await waitText('Outubro de 2026'); await waitText('Primeiros passos');
-  await p.getByRole('tab', { name: 'Ver dados de Família' }).filter({ visible: true }).first().click(); await waitText('Nenhuma família vinculada'); await p.waitForTimeout(400);
-  ok('primeiros passos: fora de Família', !(await headingShown('Primeiros passos')));
-  await p.getByRole('tab', { name: 'Ver dados de Pessoal' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês'); await waitText('Primeiros passos');
+  // Sem Família (D-055) o seletor "Pessoal | Família" não aparece; "fora de Família" é conferido no bloco "Família (D-055)", com uma Família criada.
+  ok('primeiros passos: sem Família, o Resumo não tem o seletor "Pessoal | Família" e o card fica no Pessoal', (await p.getByRole('tab', { name: /^Ver dados de / }).filter({ visible: true }).count()) === 0 && (await headingShown('Primeiros passos')));
   // Passo 1 abre o cadastro de gasto fixo; o passo fica concluído quando existe um gasto fixo.
   await btn(PP.fixos).click(); await waitText('Demonstração · Pessoal');
   ok('primeiros passos: o passo 1 abre "Novo gasto fixo", vazio, em "Todo mês"', (await h1Name()) === 'Novo gasto fixo' && (await radio('Todo mês').getAttribute('aria-checked')) === 'true' && (await field('Descrição').inputValue()) === '');
@@ -1882,14 +1882,15 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Os links só abrem calculadoras: o repositório fica igual até o "outro aparelho" anotar a conta vencida.
   const repoBeforeLinks = await repoSnapshot();
   const writesBeforeLinks = writes.length;
-  await p.getByRole('tab', { name: 'Ver dados de Família' }).filter({ visible: true }).first().click(); await waitText('Nenhuma família vinculada');
+  // Sem Família (D-055) o link vive na tela Família, aberta por Conta (o seletor só aparece para quem tem uma Família).
+  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho');
+  await p.getByRole('button', { name: 'Criar Família', exact: true }).filter({ visible: true }).first().click(); await waitText('Anotar a casa em conjunto');
   await btn('Enquanto isso, dividir as contas da casa').click();
   await waitUntil(async () => (await h1Name()) === 'Dividir as contas da casa', 8000);
   ok('Família sem vínculo: "Enquanto isso, dividir as contas da casa" abre "Dividir as contas da casa"', (await h1Name()) === 'Dividir as contas da casa' && (await field('Total das contas').count()) === 1);
-  await btn('Voltar').click(); await waitText('Nenhuma família vinculada');
-  await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Nenhuma família vinculada'); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Anotar a casa em conjunto');
+  await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês'); await p.waitForTimeout(300);
   ok('Família no Resumo: sem o link (o Resumo não muda)', (await visibleCount('button', 'Enquanto isso, dividir as contas da casa')) === 0);
-  await p.getByRole('tab', { name: 'Ver dados de Pessoal' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês');
 
   // Lista de gastos fixos: "Dividir estas contas" com o "Por mês" da tela.
   await openToPay(); await openSeriesList();
@@ -2084,12 +2085,14 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('mover para outubro: setembro volta a 3.750 / 2.250', t.includes('R$ 3.750,00') && t.includes('R$ 2.250,00'));
   await p.getByRole('button', { name: /Próximo mês/ }).filter({ visible: true }).first().click(); await waitText('Outubro de 2026');
 
-  // Família: estado explicativo
-  await p.getByRole('tab', { name: 'Ver dados de Família' }).filter({ visible: true }).first().click(); await waitText('Nenhuma família vinculada');
+  // Família na demonstração (D-055): sem seletor, e a tela Família (por Conta) explica, sem membros simulados nem botão de anotar
+  ok('demonstração: o Resumo não mostra o seletor "Pessoal | Família"', (await p.getByRole('tab', { name: /^Ver dados de / }).filter({ visible: true }).count()) === 0);
+  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho');
+  await p.getByRole('button', { name: 'Criar Família', exact: true }).filter({ visible: true }).first().click(); await waitText('Anotar a casa em conjunto');
   t = await body();
-  ok('família sem membros simulados nem botão de anotar', t.includes('Nenhuma família vinculada') && !t.includes('Anotar gasto') && !t.includes('Anotar conta a pagar'));
+  ok('família sem membros simulados nem botão de anotar', t.includes('Anotar a casa em conjunto') && t.includes('Na demonstração não há Família de exemplo.') && !t.includes('Anotar gasto') && !t.includes('Anotar conta a pagar') && !t.includes('Titular'));
   await shot('15_familia');
-  await p.getByRole('tab', { name: 'Ver dados de Pessoal' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês');
+  await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês');
 
   // Contexto fixo durante o preenchimento; descartar não salva nada
   await btn('Anotar gasto').click(); await waitText('Será salvo em');
@@ -6810,9 +6813,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('H1 Movimentações: o campo "Buscar" (lupa, "Gastos e recebimentos de todos os meses") é um botão e fica no topo, acima de "Anotar gasto"',
     (await visibleCount('button', /^Buscar\. Abre a busca em todos os meses\.$/)) === 1 && t.includes('Gastos e recebimentos de todos os meses') && h1EntryBox.buscar !== null && h1EntryBox.anotar !== null && h1EntryBox.buscar < h1EntryBox.anotar, JSON.stringify(h1EntryBox));
   await atWidths(async (w) => { await layoutChecks(`H1 Movimentações com o campo Buscar ${w}px`); if (w === 390) await shot('260_movimentos_buscar_entrada'); });
-  await p.getByRole('tab', { name: 'Ver dados de Família' }).filter({ visible: true }).first().click(); await waitText('Nenhuma família vinculada'); await p.waitForTimeout(400);
-  ok('H1 Movimentações em Família: sem o campo "Buscar" (a busca é do contexto Pessoal)', (await visibleCount('button', /^Buscar\./)) === 0);
-  await p.getByRole('tab', { name: 'Ver dados de Pessoal' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento'); await p.waitForTimeout(400);
+  // Com Família (D-055) a busca vale para o contexto escolhido: conferido no bloco "Família (D-055)".
 
   // ---- 3. A tela: consulta com barra, campo, tipo e período (12 meses marcado), tudo à vista ----
   await p.getByRole('button', { name: /^Buscar\./ }).filter({ visible: true }).first().click(); await waitText('O que você procura'); await p.waitForTimeout(600);
@@ -8043,17 +8044,17 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await j1Keep();
   await j1Widths(async (w) => { await layoutChecks(`tutorial aprender com o guia ${w}px`); await shot(w === 390 ? '320_aprender_como_usar' : '320_aprender_como_usar_320px'); });
 
-  // ---- 7. A lista do guia: cinco grupos, vinte e nove entradas (28 do D-049 e "Seu mês em 30 segundos", D-052) ----
+  // ---- 7. A lista do guia: cinco grupos, trinta entradas (28 do D-049, "Seu mês em 30 segundos", D-052, e "Família", D-055) ----
   await p.getByRole('button', { name: 'Como usar o Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
   const j1Groups = () => p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((h) => h.getBoundingClientRect().width > 0).map((h) => ({
     title: h.textContent, rows: [...h.parentElement.parentElement.querySelectorAll('[role=button]')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.getAttribute('aria-label') || b.textContent) })));
   const j1G = await j1Groups();
   ok('Tutorial guia: /aprender/guia com o título "Como usar o Clarevo", a barra inferior (Aprender marcada) e o botão "Ver o tour de novo"', j1Path() === '/aprender/guia' && (await h1Name()) === 'Como usar o Clarevo' &&
     (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1 && (await visibleCount('button', 'Ver o tour de novo')) === 1);
-  ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 8, 7, 8, 2 e 4 entradas (Dia a dia ganhou "Seu mês em 30 segundos")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
-    JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([8, 7, 8, 2, 4]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
+  ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 8, 7, 8, 2 e 5 entradas (Dia a dia ganhou "Seu mês em 30 segundos" e Conta e privacidade ganhou "Família")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
+    JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([8, 7, 8, 2, 5]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
   const j1Rows = j1G.flatMap((g) => g.rows);
-  ok('Tutorial guia: cada linha tem o nome acessível "{título}. {para que serve}" (as funções novas: Buscar, Exportar e Importar)', j1Rows.length === 29 &&
+  ok('Tutorial guia: cada linha tem o nome acessível "{título}. {para que serve}" (as funções novas: Buscar, Exportar e Importar)', j1Rows.length === 30 &&
     j1Rows.includes('Buscar em Movimentos. Acha um gasto ou recebimento em todos os meses e mostra quanto deu no período.') &&
     j1Rows.includes('Exportar meus dados. Leva seus gastos e recebimentos para uma planilha (CSV) ou para um resumo em PDF, montado neste aparelho.') &&
     j1Rows.some((r) => r.startsWith('Importar extrato ou fatura. Traz gastos, recebimentos e compras no cartão de um arquivo do banco')) &&
@@ -9326,6 +9327,367 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('K2 telas do conteúdo de época (Aprender, os quatro temas, o guia): nenhum termo proibido, travessão, expressão vetada, palavra de julgamento, produto financeiro nem nome de banco ou de bandeira nos textos da interface (as fontes ficam fora, menos o travessão)',
     k2Texts.length >= 8 && k2Vetoed.length === 0 && k2Dashes.length === 0 && k2Learn.length === 0 && k2Judging.length === 0 && k2Products.length === 0, `${k2Texts.length} telas ${k2Vetoed.join(' | ')} ${k2Learn.join(' | ')} ${k2Judging.join(' | ')} ${k2Products.join(' | ')}`);
   ok('K2 nenhuma escrita direta na rede (o card e os temas só leem; a demonstração e as contas novas ficam em memória)', writes.slice(k2Writes0).length === 0, writes.slice(k2Writes0).join(' | '));
+
+
+  // =====================================================================================================================
+  // Família (D-055): criar, convidar por link, aceitar, papéis, sair e encerrar. O roteiro web só usa a memória (acesso simulado):
+  // as contas simuladas compartilham uma Família simulada (a administração: pessoas, papéis e convites), e o banco de verdade é
+  // coberto por supabase/tests/95_familia.sql e pelos testes de API. A conta de demonstração com dados fictícios não tem Família.
+  // =====================================================================================================================
+  const famSizes = [[390, 844, ''], [360, 740, '_360px'], [320, 800, '_320px']];
+  // Capturas numeradas a partir de 400, em 390, 360 e 320 px, com as conferências de largura e de alvos de toque em cada uma.
+  const famShots = async (name, scroll = null) => {
+    for (const [w, h, suffix] of famSizes) {
+      await p.setViewportSize({ width: w, height: h }); await p.waitForTimeout(450);
+      if (scroll) await scroll();
+      await layoutChecks(`${name} ${w}px`);
+      await shot(`${name}${suffix}`);
+    }
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  };
+  const famPath = () => new URL(p.url()).pathname;
+  const famCreateAccount = async (name, email) => {
+    await btn('Criar conta').click(); await waitText('Nome de apresentação');
+    await field('Nome de apresentação').fill(name); await field('E-mail').fill(email); await field('Senha').fill('senha1234');
+    await btn('Criar conta').click(); await waitText('Confira seu e-mail');
+    await btn('Simular abertura do link').click(); await btn('Já confirmei meu e-mail').click(); await waitText('Sua primeira conta');
+    await btn('Começar meu mês').click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
+  };
+  const famSignIn = async (email) => {
+    await btn('Entrar').click(); await waitText('Esqueci minha senha');
+    await field('E-mail').fill(email); await field('Senha').fill('senha1234');
+    await btn('Entrar').click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
+  };
+  const famGoResumo = async () => {
+    const tab = () => p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true });
+    for (let i = 0; i < 5 && (await tab().count()) === 0; i++) { await btn('Voltar').click(); await p.waitForTimeout(400); }
+    await tab().first().click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
+  };
+  const famConta = async () => { await famGoResumo(); await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho'); };
+  const famSignOut = async () => { await famConta(); await btn('Sair deste aparelho').click(); await waitText('Seu dinheiro'); };
+  const famTab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
+  const famGoFamilia = async () => { await famConta(); await p.getByRole('button', { name: /^(Criar Família|Abrir Família)/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(500); };
+  const famSelectorCount = () => p.getByRole('tab', { name: /^Ver dados de / }).filter({ visible: true }).count();
+  const famH1 = async () => (await h1Name());
+  const famLink = async () => {
+    const m = (await body()).match(/https?:\/\/[^\s]+\/convite\/[0-9a-f]{32}/);
+    return m ? m[0] : null;
+  };
+  // Textos de cada tela nova (para conferir termos proibidos, travessão e linguagem) e as escritas na rede antes do bloco.
+  const famTexts = [];
+  const famKeep = async () => { famTexts.push(await body()); await keepText(); };
+  const famWrites0 = writes.length;
+
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+
+  // ---- 1. Vera cria a conta: sem Família, o Resumo não tem seletor e o Pessoal é o único contexto ----
+  await famCreateAccount('Vera Lima', 'vera.familia@exemplo.com');
+  ok('Família: sem Família, o Resumo não mostra o seletor "Pessoal | Família"', (await famSelectorCount()) === 0);
+  await famConta();
+  t = await body();
+  ok('Família: Conta tem o card "Família" com a explicação e "Criar Família"', t.includes('Crie uma Família para ver e anotar as contas da casa em conjunto, com até 6 pessoas.') && (await visibleCount('button', 'Criar Família')) === 1, t.slice(0, 200));
+  await p.getByRole('button', { name: 'Criar Família', exact: true }).filter({ visible: true }).first().click(); await waitText('Anotar a casa em conjunto'); await p.waitForTimeout(400);
+  t = await body();
+  ok('Família sem Família: explica (até 6 pessoas, titular, link), diz que o Pessoal é de cada pessoa e que é uma Família por vez', (await famH1()) === 'Família' && t.includes('Uma Família reúne até 6 pessoas') &&
+    t.includes('O Pessoal de cada pessoa continua só dela: ninguém da Família vê o seu, e você não vê o de ninguém.') && t.includes('Cada pessoa participa de uma Família por vez.'), t.slice(0, 300));
+  ok('Família sem Família: "Criar Família", "Tenho um convite" e "Enquanto isso, dividir as contas da casa"', (await visibleCount('button', 'Criar Família')) === 1 && t.includes('Tenho um convite') && (await visibleCount('button', 'Enquanto isso, dividir as contas da casa')) === 1);
+  ok('Família sem Família: a barra de abas aparece (tela de consulta) e o seletor continua oculto', (await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).count()) === 1 && (await famSelectorCount()) === 0);
+  await famKeep();
+  await famShots('400_familia_criar');
+
+  // ---- 2. Criar a Família: nome obrigatório, titular, o seletor aparece ----
+  await btn('Criar Família').click(); await waitText('Nome da Família'); await p.waitForTimeout(400);
+  ok('Criar Família: título, campo com a dica e a regra de uma Família por vez', (await famH1()) === 'Criar Família' && (await body()).includes('Por exemplo: Casa. Quem entra na Família vê este nome.') && (await body()).includes('Cada pessoa participa de uma Família por vez.'));
+  await famShots('401_familia_nova');
+  await btn('Criar Família').click(); await waitText('Dê um nome de 1 a 60 caracteres para a Família.');
+  ok('Criar Família: nome vazio é recusado junto ao campo, sem criar nada', (await body()).includes('Dê um nome de 1 a 60 caracteres para a Família.') && (await famH1()) === 'Criar Família');
+  await field('Nome da Família').fill('Casa Lima');
+  await btn('Criar Família').click(); await waitText('Família criada.'); await waitText('Seu papel: Titular'); await p.waitForTimeout(400);
+  t = await body();
+  ok('Família criada: aviso, nome, "Seu papel: Titular" e a pessoa na lista, "Vera (você)"', t.includes('Família criada.') && t.includes('Casa Lima') && t.includes('Seu papel: Titular') && t.includes('Vera (você)') && t.includes('Pessoas'), t.slice(0, 300));
+  ok('Família do titular: convites vazios, vagas (5), "Convidar" e "Encerrar a Família" (só o titular, sozinho), aviso de que titular não sai e privacidade', t.includes('Nenhum convite pendente.') &&
+    t.includes('Cabem mais 5 pessoas, contando os convites pendentes.') && (await visibleCount('button', 'Convidar')) === 1 && (await visibleCount('button', 'Encerrar a Família')) === 1 &&
+    t.includes('Titular não sai da Família.') && t.includes('O Pessoal de cada pessoa continua só dela'), t.slice(300, 900));
+  ok('Família do titular: sem "Sair da Família" e sem "Gerenciar" (não há outra pessoa)', (await visibleCount('button', 'Sair da Família')) === 0 && (await visibleCount('button', /^Gerenciar/)) === 0);
+  await famKeep();
+  await famShots('402_familia_titular');
+
+  // ---- 3. Com Família: o seletor aparece e cada tela usa o contexto escolhido ----
+  await famTab('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
+  ok('Com Família: o Resumo mostra o seletor "Pessoal | Família" (Pessoal marcado)', (await famSelectorCount()) === 2 && (await famTab('Ver dados de Pessoal').getAttribute('aria-selected')) === 'true');
+  await famShots('403_resumo_seletor');
+  await famTab('Ver dados de Família').click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Resumo na Família: começa vazio, sem "Primeiros passos" (só no Pessoal) e com "Anotar gasto"', t.includes('R$ 0,00') && !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Anotar gasto')) === 1, t.slice(0, 200));
+  await btn('Anotar gasto').click(); await p.waitForTimeout(600);
+  t = await body();
+  ok('Anotar gasto na Família: a pílula diz onde a anotação fica ("Demonstração · Família") e o gasto sai da conta da Família', t.includes('Demonstração · Família') && t.includes('Saiu de: Conta principal') && t.includes('Será salvo em Família, Conta principal.'), t.slice(0, 120));
+  await field('Descrição').fill('Mercado da casa'); await field('Valor em reais').fill('250');
+  await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Detalhe na Família: "Contexto: Família" e "Anotado por Vera (você)"', t.includes('Contexto') && t.includes('Família') && t.includes('Anotado por Vera (você) em'), t.slice(0, 400));
+  await famKeep();
+  await famShots('404_familia_gasto_detalhe');
+  await famGoResumo();
+  t = await body();
+  ok('Resumo na Família: o gasto de R$ 250,00 aparece em Pago e a "Diferença do mês" é -R$ 250,00', t.includes('R$ 250,00') && t.includes('Mercado da casa'), t.slice(0, 300));
+  await famTab('Ver dados de Pessoal').click(); await waitText('Primeiros passos'); await p.waitForTimeout(400);
+  t = await body();
+  ok('Resumo no Pessoal: o gasto da Família não aparece (R$ 0,00 e "Primeiros passos" de volta)', !t.includes('Mercado da casa') && t.includes('R$ 0,00') && (await headingShown('Primeiros passos')), t.slice(0, 200));
+  await famTab('Ver dados de Família').click(); await p.waitForTimeout(500);
+  await famTab('Movimentos: movimentações do mês').click(); await waitText('Mercado da casa'); await p.waitForTimeout(400);
+  ok('Movimentações na Família: o gasto está lá, e o seletor aparece também em Movimentações', (await famSelectorCount()) === 2 && (await body()).includes('Mercado da casa'));
+  await p.getByRole('button', { name: /^Buscar\./ }).filter({ visible: true }).first().click(); await waitText('Procure um gasto ou um recebimento em todos os meses.'); await p.waitForTimeout(400);
+  await p.getByRole('searchbox', { name: 'O que você procura' }).filter({ visible: true }).first().fill('mercado'); await p.waitForTimeout(1200); await waitText('1 gasto'); await p.waitForTimeout(400);
+  t = await body();
+  ok('Buscar na Família: a busca vale para o contexto escolhido (acha "Mercado da casa", 1 gasto de R$ 250,00) e a pílula diz "Família"', t.includes('Mercado da casa') && t.includes('1 gasto · R$ 250,00 no período') && t.includes('Demonstração · Família'), t.slice(0, 300));
+  await btn('Voltar').click(); await p.waitForTimeout(500);
+  await famTab('Ver dados de Pessoal').click(); await waitGone('Mercado da casa'); await p.waitForTimeout(300);
+  ok('Movimentações no Pessoal: sem o gasto da Família', !(await body()).includes('Mercado da casa'));
+  await famTab('Metas').click(); await waitUntil(async () => (await famSelectorCount()) === 2, 8000); await p.waitForTimeout(600);
+  ok('Metas: o seletor também aparece (a pílula do contexto acompanha a escolha)', (await famSelectorCount()) === 2);
+  await famTab('Ver dados de Família').click(); await p.waitForTimeout(500);
+  ok('Metas na Família: a pílula diz "Demonstração · Família"', (await body()).includes('Demonstração · Família'));
+  await famTab('Resumo').click(); await waitText('Diferença do mês'); await famTab('Ver dados de Pessoal').click(); await p.waitForTimeout(400);
+
+  // ---- 4. Convidar: papel, link que aparece uma vez, compartilhamento do aparelho e cancelar ----
+  // O compartilhamento do aparelho (Web Share) não existe no Chromium de teste: este substituto só anota o que seria compartilhado.
+  await p.evaluate(() => { window.__shared = []; navigator.share = async (d) => { window.__shared.push(d); }; });
+  await famGoFamilia();
+  await btn('Convidar').click(); await waitText('O que a pessoa poderá fazer'); await p.waitForTimeout(400);
+  t = await body();
+  ok('Convidar: título, escolha do papel ("Anota e vê" marcado), a ajuda do papel, vagas e a validade do link', (await famH1()) === 'Convidar para a Família' && (await radio('Anota e vê').getAttribute('aria-checked')) === 'true' &&
+    (await radio('Só vê').getAttribute('aria-checked')) === 'false' && t.includes('Vê e anota. Altera só o que anotou.') && t.includes('Cabem mais 5 pessoas, contando os convites pendentes.') && t.includes('O link vale por 7 dias e serve uma única vez.'), t.slice(0, 300));
+  await radio('Só vê').click(); await p.waitForTimeout(200);
+  ok('Convidar: escolher "Só vê" troca a ajuda ("Só vê. Não anota nem altera nada.")', (await body()).includes('Só vê. Não anota nem altera nada.'));
+  await radio('Anota e vê').click(); await p.waitForTimeout(200);
+  await famShots('405_familia_convidar');
+  await btn('Gerar link').click(); await waitText('Link do convite'); await p.waitForTimeout(500);
+  t = await body();
+  const famLink1 = await famLink();
+  ok('Convidar: o link aparece (endereço do app mais /convite/ e 32 caracteres), com a validade, "Compartilhar", "Copiar link" e a regra de ver o link só agora', famLink1 !== null && famLink1.startsWith(`http://localhost:${PORT}/convite/`) &&
+    t.includes('Anota e vê · vale até 14/10') && (await visibleCount('button', 'Compartilhar')) === 1 && (await visibleCount('button', 'Copiar link')) === 1 && t.includes('Ele aparece só agora'), `${famLink1} ${t.slice(0, 200)}`);
+  const shared1 = await p.evaluate(() => window.__shared);
+  ok('Convidar: o compartilhamento do aparelho abriu sozinho com a mensagem e o link', shared1.length === 1 && shared1[0].text === `Convite para a Família Casa Lima no Clarevo: ${famLink1}` && shared1[0].title === 'Convite para a Família', JSON.stringify(shared1));
+  await btn('Compartilhar').click(); await p.waitForTimeout(300);
+  ok('Convidar: "Compartilhar" abre o compartilhamento de novo', (await p.evaluate(() => window.__shared.length)) === 2);
+  await btn('Copiar link').click(); await waitText('Link copiado.').catch(() => {}); await p.waitForTimeout(300);
+  ok('Convidar: "Copiar link" avisa "Link copiado."', (await body()).includes('Link copiado.'));
+  await famKeep();
+  await famShots('406_familia_convite_link');
+  await btn('Concluir').click(); await waitText('Seu papel: Titular'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Família com convite: a lista traz "Anota e vê · vale até 14/10", "Cancelar convite" e as vagas (4)', t.includes('Anota e vê · vale até 14/10') && (await visibleCount('button', /^Cancelar convite para Anota e vê/)) === 1 && t.includes('Cabem mais 4 pessoas, contando os convites pendentes.'), t.slice(0, 500));
+  // Segundo convite ("Só vê"), cancelado em seguida: o link deixa de valer.
+  await btn('Convidar').click(); await waitText('O que a pessoa poderá fazer');
+  await radio('Só vê').click(); await btn('Gerar link').click(); await waitText('Link do convite'); await p.waitForTimeout(400);
+  const famLink2 = await famLink();
+  ok('Convidar: o segundo link é outro (um código por convite)', famLink2 !== null && famLink2 !== famLink1 && (await body()).includes('Só vê · vale até 14/10'));
+  await btn('Concluir').click(); await waitText('Seu papel: Titular'); await p.waitForTimeout(400);
+  ok('Família com dois convites: as vagas caem para 3', (await body()).includes('Cabem mais 3 pessoas, contando os convites pendentes.'));
+  await p.getByRole('button', { name: 'Cancelar convite para Só vê, que vale até 14/10/2026', exact: true }).filter({ visible: true }).first().click(); await waitText('Convite cancelado.'); await p.waitForTimeout(400);
+  t = await body();
+  ok('Cancelar convite: aviso, o convite "Só vê" sai da lista e a vaga volta (4)', t.includes('Convite cancelado.') && !t.includes('Só vê · vale até') && t.includes('Anota e vê · vale até 14/10') && t.includes('Cabem mais 4 pessoas, contando os convites pendentes.'), t.slice(0, 400));
+  // Terceiro convite ("Só vê"), para a terceira pessoa.
+  await btn('Convidar').click(); await waitText('O que a pessoa poderá fazer');
+  await radio('Só vê').click(); await btn('Gerar link').click(); await waitText('Link do convite'); await p.waitForTimeout(400);
+  const famLink3 = await famLink();
+  ok('Convidar: terceiro link (para quem só vê)', famLink3 !== null && famLink3 !== famLink1 && famLink3 !== famLink2);
+  await btn('Concluir').click(); await waitText('Seu papel: Titular'); await p.waitForTimeout(400);
+
+  // ---- 5. Mauro recebe o link: cola em "Tenho um convite", vê a prévia e aceita ----
+  await famSignOut();
+  await famCreateAccount('Mauro Dias', 'mauro.familia@exemplo.com');
+  ok('Mauro (conta nova, sem Família): o Resumo não tem seletor', (await famSelectorCount()) === 0);
+  await famGoFamilia();
+  await field('Link do convite').fill('isto não é um convite');
+  await btn('Ver convite').click(); await waitText('Não encontramos um convite neste texto.');
+  ok('Tenho um convite: um texto sem link é recusado junto ao campo, sem sair da tela', (await body()).includes('Não encontramos um convite neste texto. Confira o link que você recebeu.') && (await famH1()) === 'Família');
+  await field('Link do convite').fill(`Oi! Entre na nossa Família: ${famLink1}`);
+  await btn('Ver convite').click(); await waitText('Aceitar convite'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Convite: a prévia mostra quem convidou ("Convite de Vera"), o nome da Família, o papel, a validade e que o Pessoal de ninguém fica visível', (await famH1()) === 'Convite para a Família' && t.includes('Convite de Vera') && t.includes('Casa Lima') &&
+    t.includes('Anota e vê. Você poderá ver e anotar.') && t.includes('Vale até 14/10/2026.') && t.includes('Aceitar não mostra nem copia o seu Pessoal. Você também não vê o Pessoal de ninguém da Família.') &&
+    (await visibleCount('button', 'Aceitar convite')) === 1 && (await visibleCount('button', 'Agora não')) === 1, t.slice(0, 400));
+  ok('Convite: a prévia não mostra o código, o e-mail nem o sobrenome de quem convidou', !t.includes(famLink1.split('/').pop()) && !t.includes('vera.familia@exemplo.com') && !t.includes('Vera Lima'));
+  ok('Convite: tela de formulário, sem a barra de abas', (await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).count()) === 0);
+  await famKeep();
+  await famShots('407_convite_previa');
+  await btn('Agora não').click(); await waitText('Diferença do mês');
+  ok('Convite: "Agora não" volta ao início e não entra na Família (sem seletor)', (await famSelectorCount()) === 0);
+  await famGoFamilia();
+  await field('Link do convite').fill(famLink1); await btn('Ver convite').click(); await waitText('Aceitar convite');
+  await btn('Aceitar convite').click(); await waitText('Você entrou na Família Casa Lima.'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Aceitar: abre a Família com o aviso "Você entrou na Família Casa Lima." e o papel "Anota e vê"', famPath() === '/familia' && t.includes('Você entrou na Família Casa Lima.') && t.includes('Seu papel: Anota e vê') && t.includes('Casa Lima'), `${famPath()} ${t.slice(0, 200)}`);
+  ok('Membro: vê as pessoas (Vera titular, "Mauro (você)" com "Anota e vê"), sem convites, sem "Convidar", sem "Gerenciar" e com "Sair da Família"', t.includes('Vera') && t.includes('Titular') && t.includes('Mauro (você)') && t.includes('Anota e vê') && !t.includes('Convites') &&
+    (await visibleCount('button', 'Convidar')) === 0 && (await visibleCount('button', /^Gerenciar/)) === 0 && (await visibleCount('button', 'Sair da Família')) === 1 && (await visibleCount('button', 'Encerrar a Família')) === 0, t.slice(0, 500));
+  await famKeep();
+  await famShots('408_familia_membro');
+  await famTab('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
+  ok('Membro: o seletor aparece (Pessoal marcado) e, na Família, "Anotar gasto" está disponível', (await famSelectorCount()) === 2 && (await famTab('Ver dados de Pessoal').getAttribute('aria-selected')) === 'true');
+  await famTab('Ver dados de Família').click(); await p.waitForTimeout(500);
+  ok('Membro na Família: pode anotar (o papel "Anota e vê")', (await visibleCount('button', 'Anotar gasto')) === 1);
+  await famConta();
+  t = await body();
+  ok('Membro na Família: Conta mostra "Suas contas" da Família (pílula "Demonstração · Família", "Conta principal", "Adicionar conta" disponível)', t.includes('Suas contas') && t.includes('Demonstração · Família') && t.includes('Conta principal') && (await visibleCount('button', 'Adicionar conta')) === 1, t.slice(0, 300));
+  await famGoResumo();
+  await famTab('Ver dados de Pessoal').click(); await p.waitForTimeout(300);
+  // O mesmo link não serve duas vezes: a prévia de um convite usado diz o mesmo que a de um inexistente.
+  await famSignOut();
+  await famCreateAccount('Nina Reis', 'nina.familia@exemplo.com');
+  await famGoFamilia();
+  await field('Link do convite').fill(famLink1); await btn('Ver convite').click(); await waitText('Convite indisponível'); await p.waitForTimeout(400);
+  t = await body();
+  ok('Convite usado: "Convite indisponível. Este convite não está disponível. Peça um novo link a quem convidou." (sem dizer o motivo)', t.includes('Convite indisponível') && t.includes('Este convite não está disponível. Peça um novo link a quem convidou.') && !/usad|cancelad|venc|expir/i.test(t.replace('Convite indisponível', '')), t.slice(0, 300));
+  await famKeep();
+  await famShots('409_convite_indisponivel');
+  await btn('Ir para o início').click(); await waitText('Diferença do mês');
+  // O convite cancelado também diz o mesmo.
+  await famGoFamilia();
+  await field('Link do convite').fill(famLink2); await btn('Ver convite').click(); await waitText('Convite indisponível');
+  ok('Convite cancelado: a mesma mensagem de convite indisponível', (await body()).includes('Este convite não está disponível. Peça um novo link a quem convidou.'));
+  await btn('Ir para o início').click(); await waitText('Diferença do mês');
+
+  // ---- 6. Quem não tem conta: o link leva a criar a conta e volta ao convite ----
+  await famSignOut();
+  // Sem recarregar a página (recarregar zera o acesso simulado): o endereço do convite entra pelo histórico, como um link aberto no app.
+  await p.evaluate((path) => { history.pushState({}, '', path); window.dispatchEvent(new PopStateEvent('popstate')); }, new URL(famLink3).pathname);
+  await waitText('Você recebeu um convite para uma Família no Clarevo.'); await p.waitForTimeout(400);
+  t = await body();
+  ok('Convite sem conta: explica, oferece "Criar conta" e "Entrar" e diz que o Pessoal de ninguém fica visível', famPath() === new URL(famLink3).pathname && (await famH1()) === 'Convite para a Família' &&
+    t.includes('Entre ou crie sua conta para ver quem convidou e aceitar. Depois você volta para este convite.') && (await visibleCount('button', 'Criar conta')) === 1 && (await visibleCount('button', 'Entrar')) === 1 &&
+    t.includes('Aceitar não mostra nem copia o seu Pessoal.'), `${famPath()} ${t.slice(0, 300)}`);
+  ok('Convite sem conta: nada do convite (Família, quem convidou) aparece antes de entrar', !t.includes('Casa Lima') && !t.includes('Convite de Vera'));
+  await famKeep();
+  await famShots('410_convite_sem_conta');
+  await btn('Criar conta').click(); await waitText('Nome de apresentação');
+  await field('Nome de apresentação').fill('Lia Souza'); await field('E-mail').fill('lia.familia@exemplo.com'); await field('Senha').fill('senha1234');
+  await btn('Criar conta').click(); await waitText('Confira seu e-mail');
+  await btn('Simular abertura do link').click(); await btn('Já confirmei meu e-mail').click();
+  await waitUntil(async () => (await famH1()) === 'Sua primeira conta', 8000);
+  ok('Convite sem conta: depois de entrar, a tela da primeira conta abre sozinha (o convite espera por baixo)', (await famH1()) === 'Sua primeira conta', `${await famH1()}`);
+  await btn('Começar meu mês').click(); await waitText('Aceitar convite'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Convite sem conta: depois de criar a conta, volta ao convite e mostra a prévia ("Só vê. Você poderá só ver.")', famPath() === new URL(famLink3).pathname && t.includes('Convite de Vera') && t.includes('Casa Lima') && t.includes('Só vê. Você poderá só ver.'), `${famPath()} ${t.slice(0, 300)}`);
+  await btn('Aceitar convite').click(); await waitText('Você entrou na Família Casa Lima.'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Leitora: entra como "Só vê" e vê as três pessoas (Vera, Mauro e "Lia (você)"), sem "Convidar" nem "Gerenciar"', t.includes('Seu papel: Só vê') && t.includes('Vera') && t.includes('Mauro') && t.includes('Lia (você)') && (await visibleCount('button', 'Convidar')) === 0 && (await visibleCount('button', /^Gerenciar/)) === 0 && (await visibleCount('button', 'Sair da Família')) === 1, t.slice(0, 500));
+  await famTab('Resumo').click(); await waitText('Diferença do mês'); await famTab('Ver dados de Família').click(); await p.waitForTimeout(600);
+  t = await body();
+  ok('Leitora na Família: o Resumo não tem "Anotar gasto" nem "Anotar conta a pagar" (só vê)', (await visibleCount('button', 'Anotar gasto')) === 0 && (await visibleCount('button', 'Anotar conta a pagar')) === 0 && t.includes('Diferença do mês'), t.slice(0, 300));
+  await famShots('411_resumo_leitor');
+  await famTab('Movimentos: movimentações do mês').click(); await p.waitForTimeout(600);
+  ok('Leitora na Família: Movimentações também sem botões de anotar', (await visibleCount('button', /^Anotar/)) === 0 && (await visibleCount('button', 'Registrar recebimento')) === 0, (await body()).slice(0, 200));
+  await famConta();
+  t = await body();
+  ok('Leitora na Família: Conta mostra "Suas contas" da Família (pílula "Demonstração · Família"), sem "Adicionar conta" nem importar', t.includes('Suas contas') && t.includes('Demonstração · Família') && (await visibleCount('button', 'Adicionar conta')) === 0 && !t.includes('Importar extrato'), t.slice(0, 300));
+  await famGoResumo();
+  await famTab('Resumo').click(); await waitText('Diferença do mês'); await famTab('Ver dados de Pessoal').click(); await p.waitForTimeout(500);
+  ok('Leitora no Pessoal: continua anotando no Pessoal (o papel vale só na Família)', (await visibleCount('button', 'Anotar gasto')) === 1);
+  // Quem vê estes dados?, na Família: as pessoas e o papel de cada uma.
+  await famTab('Ver dados de Família').click(); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: 'Quem vê estes dados?' }).filter({ visible: true }).first().click(); await waitText('Estas pessoas veem os registros da Família'); await p.waitForTimeout(400);
+  t = await body();
+  ok('Quem vê estes dados? na Família: "Casa Lima", as três pessoas com o papel de cada uma e o que cada papel pode fazer', famPath() === '/quem-ve' && t.includes('Casa Lima') && t.includes('Vera') && t.includes('Mauro') && t.includes('Lia (você)') &&
+    t.includes('Vê, anota e edita o que é de outras pessoas.') && t.includes('Vê e anota. Altera só o que anotou.') && t.includes('Só vê. Não anota nem altera nada.') && t.includes('Demonstração · Família'), t.slice(0, 500));
+  ok('Quem vê estes dados? na Família: o Pessoal de ninguém aparece, a empresa não vê e os textos do Pessoal ("só seus") não valem aqui', t.includes('O Pessoal de cada pessoa continua só dela') && t.includes('Se uma empresa oferecer o Clarevo como benefício') && !t.includes('Única pessoa que vê, anota, edita e exclui') && !t.includes('Gastos fixos e parcelamentos também são só seus.'));
+  await famKeep();
+  await famShots('412_quem_ve_familia');
+  await btn('Entendi').click(); await p.waitForTimeout(400);
+  await famTab('Ver dados de Pessoal').click(); await p.waitForTimeout(500);
+  await p.getByRole('button', { name: 'Quem vê estes dados?' }).filter({ visible: true }).first().click(); await waitText('Única pessoa que vê, anota, edita e exclui'); await p.waitForTimeout(300);
+  t = await body();
+  ok('Quem vê estes dados? no Pessoal (com Família): só a própria pessoa, e a Família não vê o Pessoal', t.includes('Lia Souza (você)') && t.includes('O Pessoal de cada pessoa continua só dela') && !t.includes('Casa Lima'), t.slice(0, 300));
+  await btn('Entendi').click(); await p.waitForTimeout(300);
+
+  // ---- 7. O titular administra: mudar papel, remover, passar a titularidade e sair ----
+  await famSignOut();
+  await famSignIn('vera.familia@exemplo.com');
+  await famGoFamilia();
+  t = await body();
+  ok('Titular com três pessoas: Vera (você) titular, Mauro "Anota e vê" e Lia "Só vê"; sem convites; vagas (3); "Gerenciar" para cada pessoa; sem "Encerrar a Família" e o motivo', t.includes('Vera (você)') && t.includes('Mauro') && t.includes('Lia') && t.includes('Nenhum convite pendente.') &&
+    t.includes('Cabem mais 3 pessoas, contando os convites pendentes.') && (await visibleCount('button', 'Gerenciar Mauro, Anota e vê')) === 1 && (await visibleCount('button', 'Gerenciar Lia, Só vê')) === 1 &&
+    (await visibleCount('button', 'Encerrar a Família')) === 0 && t.includes('Para encerrar, remova antes as outras pessoas ou passe a titularidade.'), t.slice(0, 700));
+  await famKeep();
+  await famShots('413_familia_titular_pessoas');
+  await p.getByRole('button', { name: 'Gerenciar Mauro, Anota e vê', exact: true }).filter({ visible: true }).first().click(); await waitText('Ações para Mauro'); await p.waitForTimeout(300);
+  const manageText = await dialogText();
+  ok('Gerenciar uma pessoa: "Ações para Mauro" com mudar o papel, passar a titularidade e remover', manageText.includes('Ações para Mauro') && (await p.getByRole('alert').getByRole('button', { name: 'Mudar para "Só vê"', exact: true }).count()) === 1 &&
+    (await p.getByRole('alert').getByRole('button', { name: 'Passar a titularidade', exact: true }).count()) === 1 && (await p.getByRole('alert').getByRole('button', { name: 'Remover da Família', exact: true }).count()) === 1, manageText);
+  await famShots('414_familia_gerenciar');
+  await p.getByRole('alert').getByRole('button', { name: 'Mudar para "Só vê"', exact: true }).click(); await waitText('Papel atualizado.'); await p.waitForTimeout(400);
+  ok('Mudar o papel: aviso e "Gerenciar Mauro, Só vê"', (await body()).includes('Papel atualizado.') && (await visibleCount('button', 'Gerenciar Mauro, Só vê')) === 1);
+  await p.getByRole('button', { name: 'Gerenciar Mauro, Só vê', exact: true }).filter({ visible: true }).first().click(); await waitText('Ações para Mauro');
+  ok('Gerenciar quem só vê: a opção passa a ser "Mudar para "Anota e vê""', (await p.getByRole('alert').getByRole('button', { name: 'Mudar para "Anota e vê"', exact: true }).count()) === 1);
+  await p.getByRole('alert').getByRole('button', { name: 'Mudar para "Anota e vê"', exact: true }).click(); await waitText('Papel atualizado.'); await p.waitForTimeout(400);
+  ok('Mudar o papel de volta: "Gerenciar Mauro, Anota e vê"', (await visibleCount('button', 'Gerenciar Mauro, Anota e vê')) === 1);
+  // Remover Lia: confirma, e ela vira ex-membro (o que anotou continua como histórico).
+  await p.getByRole('button', { name: 'Gerenciar Lia, Só vê', exact: true }).filter({ visible: true }).first().click(); await waitText('Ações para Lia');
+  await p.getByRole('alert').getByRole('button', { name: 'Remover da Família', exact: true }).click(); await waitText('Remover Lia da Família?'); await p.waitForTimeout(300);
+  const removeText = await dialogText();
+  ok('Remover: pede confirmação e diz que o que a pessoa anotou continua e que o Pessoal dela não muda', removeText.includes('Remover Lia da Família?') && removeText.includes('O que ela anotou continua, como histórico da casa. O Pessoal dela não muda.'), removeText);
+  await famShots('415_familia_remover');
+  await confirmIn('Remover'); await waitText('Pessoa removida da Família.'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Removida: aviso, "Ex-membros" com "ex-membro · Lia" e a nota do histórico, e a vaga volta (4)', t.includes('Pessoa removida da Família.') && t.includes('Ex-membros') && t.includes('ex-membro · Lia') && t.includes('O que essas pessoas anotaram continua na Família, como histórico da casa.') &&
+    t.includes('Cabem mais 4 pessoas, contando os convites pendentes.') && (await visibleCount('button', /^Gerenciar Lia/)) === 0, t.slice(0, 600));
+  await famKeep();
+  await famShots('416_familia_ex_membro');
+  // Passar a titularidade para Mauro: Vera continua como "Anota e vê".
+  await p.getByRole('button', { name: 'Gerenciar Mauro, Anota e vê', exact: true }).filter({ visible: true }).first().click(); await waitText('Ações para Mauro');
+  await p.getByRole('alert').getByRole('button', { name: 'Passar a titularidade', exact: true }).click(); await waitText('Passar a titularidade para Mauro?'); await p.waitForTimeout(300);
+  const transferText = await dialogText();
+  ok('Passar a titularidade: pede confirmação e explica (a pessoa vira titular, você fica "Anota e vê", só ela convida, remove e encerra)', transferText.includes('Passar a titularidade para Mauro?') && transferText.includes('você continua na Família com o papel "Anota e vê". Só ela poderá convidar, remover e encerrar.'), transferText);
+  await confirmIn('Passar a titularidade'); await waitText('Titularidade transferida.'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Titularidade passada: Vera agora é "Anota e vê" (sem convites, sem "Gerenciar", com "Sair da Família"), e Mauro é titular', t.includes('Seu papel: Anota e vê') && t.includes('Titularidade transferida.') && !t.includes('Convites') && (await visibleCount('button', /^Gerenciar/)) === 0 &&
+    (await visibleCount('button', 'Sair da Família')) === 1 && (await visibleCount('button', 'Convidar')) === 0, t.slice(0, 500));
+  // Sair da Família: confirma; a pessoa volta ao Pessoal e o seletor some.
+  await btn('Sair da Família').click(); await waitText('Sair da Família?'); await p.waitForTimeout(300);
+  const leaveText = await dialogText();
+  ok('Sair da Família: pede confirmação e diz que o que anotou continua e que o Pessoal não muda', leaveText.includes('Sair da Família?') && leaveText.includes('O que você anotou continua lá, como histórico da casa. O seu Pessoal não muda.'), leaveText);
+  await famShots('417_familia_sair');
+  await confirmIn('Sair da Família'); await waitText('Você saiu da Família.'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Saiu: aviso e a tela volta ao estado sem Família ("Anotar a casa em conjunto", "Criar Família")', t.includes('Você saiu da Família.') && t.includes('Anotar a casa em conjunto') && (await visibleCount('button', 'Criar Família')) === 1, t.slice(0, 300));
+  await famGoResumo();
+  ok('Saiu: o seletor some e o Resumo volta a ser o Pessoal', (await famSelectorCount()) === 0 && !(await body()).includes('Mercado da casa'));
+  // Entrar em outra Família depois de sair é possível, e a pessoa não volta direto para o contexto Família.
+
+  // ---- 8. O titular que ficou encerra a Família ----
+  await famSignOut();
+  await famSignIn('mauro.familia@exemplo.com');
+  await famGoFamilia();
+  t = await body();
+  ok('Novo titular: "Seu papel: Titular", Vera e Lia como ex-membros, sem outras pessoas ativas e "Encerrar a Família" disponível', t.includes('Seu papel: Titular') && t.includes('Mauro (você)') && t.includes('ex-membro · Vera') && t.includes('ex-membro · Lia') && (await visibleCount('button', 'Encerrar a Família')) === 1 && !t.includes('Para encerrar, remova'), t.slice(0, 600));
+  await btn('Encerrar a Família').click(); await waitText('Encerrar a Família?'); await p.waitForTimeout(300);
+  const endText = await dialogText();
+  ok('Encerrar: pede confirmação e explica (deixa de existir para todas as pessoas; o Pessoal de cada pessoa não muda)', endText.includes('Encerrar a Família?') && endText.includes('A Família deixa de existir para todas as pessoas.') && endText.includes('O Pessoal de cada pessoa não muda.'), endText);
+  await famShots('418_familia_encerrar');
+  await confirmIn('Encerrar a Família'); await waitText('Família encerrada.'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Encerrada: aviso e a tela volta ao estado sem Família, com "Criar Família"', t.includes('Família encerrada.') && t.includes('Anotar a casa em conjunto') && (await visibleCount('button', 'Criar Família')) === 1, t.slice(0, 300));
+  await famGoResumo();
+  ok('Encerrada: o seletor some', (await famSelectorCount()) === 0);
+
+  // ---- 9. A demonstração com dados fictícios: sem Família de exemplo, sem seletor e sem criar ----
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+  await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
+  ok('Demonstração: o Resumo não tem o seletor "Pessoal | Família" e os totais seguem 6.000 / 3.900 / 2.100', (await famSelectorCount()) === 0 && (await body()).includes('R$ 6.000,00') && (await body()).includes('R$ 3.900,00') && (await body()).includes('R$ 2.100,00'));
+  await famConta();
+  await p.getByRole('button', { name: 'Criar Família', exact: true }).filter({ visible: true }).first().click(); await waitText('Anotar a casa em conjunto'); await p.waitForTimeout(400);
+  t = await body();
+  ok('Demonstração: a tela Família explica e diz que não há Família de exemplo (sem membros simulados, sem "Criar Família" e sem "Tenho um convite")', t.includes('Na demonstração não há Família de exemplo. Para criar uma Família, entre com uma conta sua.') &&
+    (await visibleCount('button', 'Criar Família')) === 0 && !t.includes('Tenho um convite') && !t.includes('Titular') && (await visibleCount('button', 'Enquanto isso, dividir as contas da casa')) === 1, t.slice(0, 400));
+  await famKeep();
+  await famShots('419_familia_demonstracao');
+
+  // ---- 10. Textos e escritas ----
+  const famBad = famTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(bem-vind[oa]|convidad[oa]s?|cadastrad[oa]s?|usuári[oa]s?)\b/i)?.[0]).filter(Boolean);
+  ok('Família: nenhum termo proibido, travessão longo, expressão vetada nem palavra com gênero nas telas novas', famTexts.length >= 10 && famBad.length === 0, `${famTexts.length} telas ${famBad.join(' | ')}`);
+  ok('Família: nenhuma escrita direta na rede (a Família do roteiro é simulada na memória)', writes.length === famWrites0, writes.slice(famWrites0).join(' | '));
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);

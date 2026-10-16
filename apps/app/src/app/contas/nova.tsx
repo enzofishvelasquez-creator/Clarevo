@@ -5,13 +5,13 @@ import { AccountForm } from '@/components/account-form';
 import { ContextPill, SubHeader } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Screen } from '@/components/ui';
-import { useAccounts, useSpace } from '@/state/data';
+import { useAccounts, useWork } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
 /** Nova conta de origem do dinheiro (D-043). */
 export default function NovaContaScreen() {
-  const personal = useSpace();
-  const ctx = personal.data?.personalContextId;
+  const personal = useWork();
+  const ctx = personal.data?.contextId;
   const accounts = useAccounts(ctx);
   if (ctx && accounts.data) {
     return (

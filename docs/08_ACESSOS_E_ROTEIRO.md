@@ -66,7 +66,7 @@ Não há contradição na `spec3`. O "5. Calcular" do Anexo A é texto antigo, e
 
 ### 2.2 Desenho e textos exatos
 
-**Movimentos** (só no contexto Pessoal; na Família continua `FamilyNotLinked`):
+**Movimentos** (desenho de 10/10/2026, só no Pessoal; com a Família, D-055, a tela usa o contexto escolhido no seletor):
 
 ```
 Movimentações
@@ -153,7 +153,7 @@ de produto financeiro nem oferta de crédito.
 - Não há cor de alerta. O cálculo é em centavos, no core, e não mexe no banco.
 - Hoje não existe visão por categoria em nenhuma tela.
 
-**Família sem vínculo:** o estado "Nenhuma família vinculada" ganha o link "Enquanto isso, dividir as contas da casa". O link leva à calculadora 7, que não grava nada sobre outra pessoa.
+**Família sem vínculo:** o estado explicativo da tela Família (em Conta › Família, depois de D-055) ganha o link "Enquanto isso, dividir as contas da casa". O link leva à calculadora 7, que não grava nada sobre outra pessoa.
 
 **Somar valores** (em todos os campos Valor: registro, conta a pagar, pagamento, série e valor do ano):
 
@@ -489,7 +489,8 @@ Situação em 15/10/2026, depois dos Ciclos A6 (D-035), A4 (D-030), A5 (D-031 e 
 | Cartões de crédito e faturas (E) | Existe (D-037): cartões, compra parcelada no cartão, fatura como conta a pagar, pagamento total ou parcial com saldo anterior, encargos e estornos, "Por categoria" e grupo "Faturas de cartão" na renda comprometida; desde D-042, o card "Faturas de outubro" no topo de `/cartoes`, com a soma das faturas do mês, quanto isso é da renda de referência e as próximas faturas. Falta: o teste em aparelho e a interface na Família (`docs/04`) | Movimentos › "Organizar" › Cartões; "Como você pagou?" em Anotar gasto; `/cartoes` |
 | Tutorial de uso (J1) | Existe (D-049): o guia em Aprender (card "Como usar o Clarevo", `/aprender/guia`, 29 entradas em 5 grupos (a 29ª é "Seu mês em 30 segundos", D-052), cada uma com "Para que serve", "Onde fica", "Como usar" e "Abrir {tela}", e o grupo "Como usar" na busca), o tour de 5 cartões na primeira entrada (uma vez por pessoa em cada aparelho, sempre pulável, nunca sobre "Seus últimos meses" nem sobre formulários), o botão "?" nas telas listadas em D-049(4) e o manual para compartilhar (`scripts/gerar-manual.js`, `docs/manual`). Falta: o teste em aparelho (`docs/04`) | Aprender › "Como usar o Clarevo"; Resumo (tour); cabeçalho das telas com "?"; `docs/manual/index.html` |
 | Seu mês em 30 segundos e o núcleo do widget (K1) | Existe (D-052): `/seu-mes`, de 2 a 5 cartões lidos um por vez ("Próximo", "Anterior" e "Concluir", ou deslizar): Entrou e saiu (Recebido, Pago e Diferença, "não é saldo"), Para onde foi (as 3 maiores categorias, com a diferença para o mês anterior só como fato), O que ainda vence (Ainda a pagar e as próximas 3 contas), Orçamento (as categorias a 80% ou mais, se houver orçamento) e Metas (guardado no mês e plano, se houver); seletor de mês até hoje, valores ocultos, leitor de tela e movimento reduzido. O núcleo do widget (`buildWidgetContent`, pequeno "Anotar gasto" e médio "Ainda a pagar em outubro", valores ocultos por padrão) e o interruptor "Mostrar valores no widget" em Conta existem; o widget nativo espera o build das lojas. Falta: o teste em aparelho e a conferência de Enzo sobre as regras de detalhe (P-027) | Movimentos (linha abaixo de Buscar), guia, busca "No app" e Conta › "Widget na tela inicial" |
-| Família, integração bancária, IA, crédito, painel de empresas | Fora do ciclo atual (Enzo, 11/10/2026: a ordem dos próximos ciclos é bancos, família e empresas; a integração bancária ficou de fora por custo e o que se faz é importar extrato e fatura, D-048); a Família sem vínculo ganhou só o link "Enquanto isso, dividir as contas da casa" (fora do Resumo, A6) | Ciclos seguintes de `docs/04`, ou nunca (crédito) |
+| Família (Ciclo L) | Existe (D-055, 16/10/2026): criar a Família, convidar por link (papel "anota e vê" ou "só vê", 7 dias, uso único), aceitar com prévia, papéis, sair, remover, passar a titularidade e encerrar; o seletor "Pessoal | Família" só aparece com Família e todas as telas usam o contexto escolhido. Falta: o teste em aparelho, o convite por e-mail (P-008) e abrir o link direto no app do celular (lojas, P-006) | Ciclos seguintes de `docs/04` |
+| Integração bancária, IA, crédito, painel de empresas | Fora do ciclo atual (Enzo, 11/10/2026: a ordem dos próximos ciclos é bancos, família e empresas; a integração bancária ficou de fora por custo e o que se faz é importar extrato e fatura, D-048; a Família entrou no Ciclo L, D-055) | Ciclos seguintes de `docs/04`, ou nunca (crédito) |
 
 ## 5. Sugestões fundamentais com base em pesquisa
 

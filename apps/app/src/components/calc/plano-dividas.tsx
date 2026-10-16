@@ -22,7 +22,7 @@ import { MoneyTxt } from '@/components/money-text';
 import { ChoiceGroup } from '@/components/series-parts';
 import { Button, Card, LinkButton, Skeleton, Txt } from '@/components/ui';
 import { HIDDEN_MONEY_A11Y, setValuesHidden, useValuesHidden } from '@/lib/privacy';
-import { useSavingsCheck, useSeriesDebts, useSpace } from '@/state/data';
+import { useSavingsCheck, useSeriesDebts, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -48,8 +48,8 @@ const blank = (id: number): Debt => ({ id, tipo: null, apelido: '', fromSeries: 
 
 export function PlanoDividasCalc() {
   const { today } = useSession();
-  const spaceQuery = useSpace();
-  const contextId = spaceQuery.data?.personalContextId;
+  const spaceQuery = useWork();
+  const contextId = spaceQuery.data?.contextId;
   const hidden = useValuesHidden();
   const form = useCalcForm<'extra'>(() => ({ extra: '' }));
   const [debts, setDebts] = useState<Debt[]>([]);

@@ -5,12 +5,12 @@ import { ContextPill, SubHeader } from '@/components/header';
 import { ImportFlow } from '@/components/import-flow';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Screen } from '@/components/ui';
-import { useSpace } from '@/state/data';
+import { useWork } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
 /** Importar extrato ou fatura (D-048): arquivo OFX ou planilha CSV do banco, lido no aparelho, revisado e importado. Só no espaço Pessoal. */
 export default function ImportarScreen() {
-  const personal = useSpace();
+  const personal = useWork();
   if (personal.data) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>

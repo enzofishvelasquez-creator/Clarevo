@@ -28,7 +28,6 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
 import { cardsCaption } from '@/components/card-parts';
-import { FamilyNotLinked } from '@/components/family-state';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { AppHeader, ContextSwitch, MonthSwitcher } from '@/components/header';
 import { RecordRow } from '@/components/record-row';
@@ -37,7 +36,7 @@ import { SeuMesEntry } from '@/components/seu-mes-parts';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, Chip, Money, Screen, Skeleton, Txt } from '@/components/ui';
 import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
-import { useAccounts, useCardsOverview, useCommitments, useMonthBudget, useMonthRecords, useSeriesList, useSpace, useView } from '@/state/data';
+import { useAccounts, useCardsOverview, useCommitments, useMonthBudget, useMonthRecords, useSeriesList, useWork, useView } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space } from '@/theme/tokens';
 
@@ -122,11 +121,11 @@ const rowLayout = LinearTransition.duration(motion.detail).reduceMotion(ReduceMo
 
 export default function MovimentacoesScreen() {
   const { today } = useSession();
-  const { space: kind, month, currentMonth } = useView();
-  const personal = useSpace().data;
-  const contextId = kind === 'pessoal' ? personal?.personalContextId : undefined;
+  const { month, currentMonth } = useView();
+  const work = useWork().data;
+  const contextId = work?.contextId;
+  const canWrite = work?.canWrite ?? true;
   const records = useMonthRecords(contextId, month);
-  // Só no contexto Pessoal (na Família, contextId fica vazio e as consultas não rodam).
   const commitments = useCommitments(contextId, month);
   const seriesList = useSeriesList(contextId);
   const cardsOverview = useCardsOverview(contextId);
@@ -159,31 +158,30 @@ export default function MovimentacoesScreen() {
         </AppHeader>
         <Body>
           <FlashBanner message={notice} />
-          {kind === 'familia' ? (
-            <FamilyNotLinked splitLink />
-          ) : (
-            <>
+          <>
               {/* Buscar (D-045): campo no topo que abre a busca em todos os meses; nada é digitado aqui. */}
               <SearchEntry onPress={() => router.push('/movimentacoes/buscar')} />
 
               {/* Seu mês em 30 segundos (D-052): logo abaixo de Buscar; abre no mês em exibição. */}
               <SeuMesEntry onPress={() => router.push({ pathname: '/seu-mes', params: seuMesParams(month, currentMonth) })} />
 
-              <View style={styles.actions}>
-                <Button
-                  label="Anotar gasto"
-                  icon={Minus}
-                  style={styles.action}
-                  onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } })}
-                />
-                <Button
-                  label="Registrar recebimento"
-                  icon={Plus}
-                  tone="soft"
-                  style={styles.action}
-                  onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'receita' } })}
-                />
-              </View>
+              {canWrite ? (
+                <View style={styles.actions}>
+                  <Button
+                    label="Anotar gasto"
+                    icon={Minus}
+                    style={styles.action}
+                    onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } })}
+                  />
+                  <Button
+                    label="Registrar recebimento"
+                    icon={Plus}
+                    tone="soft"
+                    style={styles.action}
+                    onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'receita' } })}
+                  />
+                </View>
+              ) : null}
 
               <Card style={styles.shortcuts}>
                 <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -278,8 +276,7 @@ export default function MovimentacoesScreen() {
                   ))
                 )}
               </Card>
-            </>
-          )}
+          </>
         </Body>
       </Screen>
     </View>

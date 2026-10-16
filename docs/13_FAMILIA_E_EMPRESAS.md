@@ -1,11 +1,11 @@
 # Família e painel de empresas: proposta para decisão
 
-Versão de 15/10/2026. Nada aqui foi construído. As prioridades seguem a ordem que Enzo definiu em 11/10/2026: bancos, família, empresas. Bancos foram resolvidos sem custo, com a importação de extrato e fatura (D-048) e a leitura de comprovantes de Pix (D-051). Este documento prepara os próximos dois ciclos.
+Versão de 15/10/2026, atualizada em 16/10/2026: o **Ciclo L (Família) foi implementado** depois das respostas de Enzo (D-055; o que foi feito e onde está em `docs/00`, `docs/03` e `docs/05`); o Ciclo M (painel de empresas, D-056) segue como proposta. As prioridades seguem a ordem que Enzo definiu em 11/10/2026: bancos, família, empresas. Bancos foram resolvidos sem custo, com a importação de extrato e fatura (D-048) e a leitura de comprovantes de Pix (D-051). Este documento prepara os próximos dois ciclos.
 
 ## O que já existe no banco
 
-- Contexto Família, vínculos com papel (titular ou membro) e três permissões: ler, anotar e editar de outras pessoas.
-- Todas as regras de gastos, recebimentos, contas a pagar, gastos fixos, contas do ano, metas, cartões, orçamento, contas de origem e importação já valem para a Família, com testes de permissão. Falta a tela e o convite.
+- Contexto Família, vínculos com papel (titular, membro ou leitor) e três permissões: ler, anotar e editar de outras pessoas.
+- Todas as regras de gastos, recebimentos, contas a pagar, gastos fixos, contas do ano, metas, cartões, orçamento, contas de origem e importação já valem para a Família, com testes de permissão. Faltavam a tela e o convite, que entraram com o Ciclo L (migração 0013: `create_family`, `create_family_invite`, `cancel_family_invite`, `accept_family_invite`, `leave_family`, `remove_family_member`, `set_member_role`, `transfer_family_ownership` e `end_family`).
 - Empresa: organização, quem administra, contrato de benefício com número de vagas e plano (individual ou familiar), licenças por e-mail e direito ao plano. A empresa não vê finanças, nem em números somados (regras 7, 14 e 49 de `03_ACESSO_E_PERMISSOES.md`).
 
 ## Ciclo L: Família
@@ -17,7 +17,7 @@ Versão de 15/10/2026. Nada aqui foi construído. As prioridades seguem a ordem 
 3. **Aceitar.** Quem recebe abre o link, entra ou cria a conta e vê o nome da Família, quem convidou e o que poderá fazer, antes de aceitar. Aceitar nunca mostra nem copia o Pessoal de ninguém.
 4. **Alternar.** No topo do app, um seletor "Pessoal | Família" troca o contexto. Todas as telas atuais passam a funcionar na Família, com as regras de permissão do banco.
 5. **Sair e remover.** Membro sai quando quiser. Titular remove membro e muda o papel. O que a pessoa anotou continua na Família, porque é histórico da casa.
-6. **Gravação só por funções**, como o resto do app: `create_family`, `create_family_invite`, `cancel_family_invite`, `accept_family_invite`, `leave_family`, `remove_family_member`, `set_member_role`, com chave de idempotência, versão e testes em `supabase/tests`. O convite guarda só o resumo SHA-256 do código.
+6. **Gravação só por funções**, como o resto do app: `create_family`, `create_family_invite`, `cancel_family_invite`, `accept_family_invite`, `leave_family`, `remove_family_member`, `set_member_role` (e, na implementação, `transfer_family_ownership` e `end_family`, para o titular não ficar sem saída, L-7), com chave de idempotência, versão e testes em `supabase/tests`. O convite guarda só o resumo SHA-256 do código.
 
 ### Perguntas para Enzo
 
