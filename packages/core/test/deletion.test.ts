@@ -12,11 +12,14 @@ import {
   FAMILY_TEXT,
   authorLabel,
   canSubmitDelete,
+  createDeletionIntent,
   deleteConfirmationError,
   deleteErrorText,
   deleteFamilyOutcome,
   deleteFamilyText,
+  deleteOutcomeUncertain,
   normalizeDeleteConfirmation,
+  sessionEndAfterDeletion,
   type FamilyMember,
 } from '../src';
 
@@ -179,5 +182,73 @@ describe('textos de excluir a conta (D-058)', () => {
     expect(deleteErrorText('rede')).toBe(DELETE_ERROR_TEXT.rede);
     expect(deleteErrorText('qualquer_outro')).toBe(DELETE_ERROR_TEXT.failed);
     expect(deleteErrorText('')).toBe(DELETE_ERROR_TEXT.failed);
+  });
+});
+
+describe('resposta perdida ao excluir a conta (D-058, revisão de segurança)', () => {
+  it('a intenção é marcada antes do pedido e lida uma única vez, quando a sessão termina', () => {
+    const intent = createDeletionIntent();
+    expect(intent.consume()).toBe('nenhuma');
+    intent.begin();
+    expect(intent.consume()).toBe('em-andamento');
+    expect(intent.consume()).toBe('nenhuma');
+    intent.begin();
+    intent.confirm();
+    expect(intent.consume()).toBe('confirmada');
+    expect(intent.consume()).toBe('nenhuma');
+    // Recusa definitiva: a conta segue, e a sessão que terminar depois não é uma exclusão.
+    intent.begin();
+    intent.clear();
+    expect(intent.consume()).toBe('nenhuma');
+    // Cada marcador é independente.
+    const other = createDeletionIntent();
+    intent.begin();
+    expect(other.consume()).toBe('nenhuma');
+  });
+
+  it('só a falta de resposta deixa o resultado incerto; qualquer recusa do banco é definitiva', () => {
+    expect(deleteOutcomeUncertain('rede')).toBe(true);
+    expect(deleteOutcomeUncertain('desconhecido')).toBe(true);
+    for (const code of ['confirmacao_invalida', 'transferir_antes', 'chave_reutilizada', 'chave_invalida', 'sem_permissao', 'nao_autenticado', '']) {
+      expect(deleteOutcomeUncertain(code), code).toBe(false);
+    }
+  });
+
+  it('sessão que termina: confirmada abre "Sua conta foi excluída"; sem confirmação, limpa o aparelho e diz que não foi possível confirmar', () => {
+    expect(sessionEndAfterDeletion('confirmada', true)).toEqual({ screen: 'excluida', forgetDevice: false });
+    expect(sessionEndAfterDeletion('confirmada', false)).toEqual({ screen: 'excluida', forgetDevice: false });
+    // A resposta se perdeu e a sessão caiu sozinha: o aparelho esquece a pessoa e a tela manda entrar de novo para conferir.
+    expect(sessionEndAfterDeletion('em-andamento', false)).toEqual({ screen: 'nao-confirmada', forgetDevice: true });
+    // Quem sai do aparelho por vontade própria não excluiu nada, mesmo com um pedido sem resposta pendente.
+    expect(sessionEndAfterDeletion('em-andamento', true)).toBeNull();
+    // Sem pedido de exclusão, vale o fluxo de sempre (sessão expirada ou saída manual).
+    expect(sessionEndAfterDeletion('nenhuma', false)).toBeNull();
+    expect(sessionEndAfterDeletion('nenhuma', true)).toBeNull();
+  });
+
+  it('o ciclo inteiro: pedido sem resposta e sessão caída; pedido recusado e sessão expirada; pedido confirmado', () => {
+    const intent = createDeletionIntent();
+    // A resposta se perde (rede) e a sessão cai: aparelho limpo, tela "não foi possível confirmar".
+    intent.begin();
+    expect(deleteOutcomeUncertain('rede')).toBe(true);
+    expect(sessionEndAfterDeletion(intent.consume(), false)).toEqual({ screen: 'nao-confirmada', forgetDevice: true });
+    // O banco recusa (titular com outras pessoas): a intenção é limpa, e uma sessão que expira depois segue o fluxo de sempre.
+    intent.begin();
+    expect(deleteOutcomeUncertain('transferir_antes')).toBe(false);
+    intent.clear();
+    expect(sessionEndAfterDeletion(intent.consume(), false)).toBeNull();
+    // O banco confirma: "Sua conta foi excluída".
+    intent.begin();
+    intent.confirm();
+    expect(sessionEndAfterDeletion(intent.consume(), true)).toEqual({ screen: 'excluida', forgetDevice: false });
+  });
+
+  it('o texto de "não foi possível confirmar" manda entrar de novo para conferir e não pressiona', () => {
+    expect(DELETE_TEXT.unsureTitle).toBe('Não foi possível confirmar a exclusão');
+    expect(DELETE_TEXT.unsureBody).toContain('Entre de novo para conferir');
+    expect(DELETE_TEXT.unsureBody).toContain('e-mail está livre');
+    expect(DELETE_TEXT.unsureBody).toContain('continuam como estavam');
+    expect(DELETE_TEXT.unsureEnter).toBe('Entrar');
+    expect(DELETE_TEXT.unsureTitle).not.toBe(DELETE_TEXT.doneTitle);
   });
 });

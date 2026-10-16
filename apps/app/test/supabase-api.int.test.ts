@@ -8297,6 +8297,7 @@ describe('API real: excluir a conta (Ciclo P, D-058)', () => {
   const IRENE = '00000000-0000-0000-0000-0000000002b1';
   const JOEL = '00000000-0000-0000-0000-0000000002c1';
   const HELIO2 = '00000000-0000-0000-0000-0000000002d1';
+  const KATIA = '00000000-0000-0000-0000-0000000002e1';
   const helio = repoFor(HELIO);
   const irene = repoFor(IRENE);
   const joel = repoFor(JOEL);
@@ -8392,23 +8393,38 @@ describe('API real: excluir a conta (Ciclo P, D-058)', () => {
     expect(world()).toBe(w);
   });
 
-  it('4. tentar entrar de novo com o mesmo token: a conta não existe, não lê nada e não volta a agir', async () => {
+  it('4. a conta não existe mais: a linha de auth.users sumiu e, com o token antigo ou com um token novo para o mesmo id, nada é lido, recriado nem gravado', async () => {
     const w = world();
-    expect(await helio.getSpace()).toBeNull();
-    expect(await err(helio.ensurePersonalSpace('Conta principal'))).toBe('email_nao_confirmado');
-    expect(await helio.getFamily()).toBeNull();
-    expect(await helio.listRecords(fam, '2026-10')).toEqual([]);
-    expect(await helio.listRecords(helioCtx, '2026-10')).toEqual([]);
-    expect(await err(helio.createFamily(newOperationKey(), 'Casa fantasma'))).toBe('sem_permissao');
-    expect(await err(helio.createRecord(newOperationKey(), fam, 'despesa', record((await irene.listAccounts(fam))[0]!.id, 'x')))).toBe('sem_permissao');
-    expect(await helio.getMyBenefit()).toBeNull();
-    // A linha anônima é só dele para ler, e ele não a renomeia.
-    const db = clientFor(HELIO);
-    const own = await db.from('persons').select('id, display_name, deleted_at');
-    expect(own.error).toBeNull();
-    expect(own.data).toEqual([{ id: HELIO, display_name: '', deleted_at: expect.any(String) }]);
-    const rename = await db.from('persons').update({ display_name: 'Hélio Prado' }).eq('id', HELIO).select();
-    expect(rename.data ?? []).toEqual([]);
+    // Entrar de novo, no servidor de autenticação de verdade, exige a linha de auth.users (e-mail e senha): ela sumiu, e o e-mail está livre.
+    expect(count(`select count(*) from auth.users where id = '${HELIO}' or lower(email) = 'helio@exemplo.test'`)).toBe(0);
+    // Este ambiente só tem o PostgREST, que confere a assinatura do token e não o usuário. O equivalente a "token novo recusado" é um token
+    // novo para o mesmo id (outro iat e outro jti) que, como o antigo, não lê, não recria a conta e não grava nada.
+    const fresh = new SupabaseRepository(
+      createClient(API, ANON_KEY(), { accessToken: async () => jwt({ role: 'authenticated', sub: HELIO, iat: Math.floor(Date.now() / 1000) + 1, jti: randomUUID() }) }),
+      { id: HELIO },
+    );
+    const accountId = (await irene.listAccounts(fam))[0]!.id;
+    for (const [name, repo] of [['token antigo', helio], ['token novo', fresh]] as const) {
+      expect(await repo.getSpace(), name).toBeNull();
+      expect(await err(repo.ensurePersonalSpace('Conta principal')), name).toBe('email_nao_confirmado');
+      expect(await repo.getFamily(), name).toBeNull();
+      expect(await repo.listRecords(fam, '2026-10'), name).toEqual([]);
+      expect(await repo.listRecords(helioCtx, '2026-10'), name).toEqual([]);
+      expect(await err(repo.createFamily(newOperationKey(), 'Casa fantasma')), name).toBe('sem_permissao');
+      expect(await err(repo.createRecord(newOperationKey(), fam, 'despesa', record(accountId, 'x'))), name).toBe('sem_permissao');
+      expect(await repo.getMyBenefit(), name).toBeNull();
+      // A linha anônima é só dele para ler, e ele não a renomeia.
+      const db = repo === helio ? clientFor(HELIO) : createClient(API, ANON_KEY(), { accessToken: async () => jwt({ role: 'authenticated', sub: HELIO, jti: randomUUID() }) });
+      const own = await db.from('persons').select('id, display_name, deleted_at');
+      expect(own.error, name).toBeNull();
+      expect(own.data, name).toEqual([{ id: HELIO, display_name: '', deleted_at: expect.any(String) }]);
+      const rename = await db.from('persons').update({ display_name: 'Hélio Prado' }).eq('id', HELIO).select();
+      expect(rename.data ?? [], name).toEqual([]);
+    }
+    // Nada voltou a existir: nem usuário, nem Pessoal, nem pessoa viva; o resumo de todas as tabelas é o mesmo.
+    expect(count(`select count(*) from auth.users where id = '${HELIO}'`)).toBe(0);
+    expect(count(`select count(*) from public.financial_contexts where owner_person_id = '${HELIO}'`)).toBe(0);
+    expect(count(`select count(*) from public.persons where id = '${HELIO}' and deleted_at is null`)).toBe(0);
     expect(world()).toBe(w);
   });
 
@@ -8426,12 +8442,64 @@ describe('API real: excluir a conta (Ciclo P, D-058)', () => {
     expect((await irene.getFamily())!.members.map((m) => m.personId)).not.toContain(HELIO2);
   });
 
+  it('5b. outro aparelho grava na Família durante a exclusão (duas conexões de verdade): a gravação é recusada, nada da pessoa sobra e a exclusão termina', async () => {
+    // Kátia entra na Família da Irene, anota nela e no Pessoal. Uma sessão separada executa a exclusão e segura a transação aberta; a
+    // gravação do outro aparelho espera a linha da pessoa. Quando a exclusão termina, a gravação já não encontra a conta e é desfeita.
+    adminSql(`insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values ('${KATIA}', 'katia@exemplo.test', now(), '{"display_name":"Kátia Alves"}')`);
+    const katia = repoFor(KATIA);
+    const kSpace = await katia.ensurePersonalSpace('Conta principal');
+    await katia.acceptFamilyInvite(newOperationKey(), (await irene.createFamilyInvite(newOperationKey(), fam, 'membro')).code!);
+    const fAcc = (await katia.listAccounts(fam))[0]!.id;
+    await katia.createRecord(newOperationKey(), fam, 'despesa', record(fAcc, 'Feira da Kátia'));
+    await katia.createRecord(newOperationKey(), kSpace.personalContextId, 'despesa', record(kSpace.accounts[0]!.id, 'Mercado da Kátia'));
+    expect(count(`select count(*) from public.record_operations where actor_id = '${KATIA}'`)).toBeGreaterThan(0);
+
+    const holder = spawn('psql', ['-v', 'ON_ERROR_STOP=1', '-qAt', '-d', process.env.CLAREVO_DB!], { stdio: ['pipe', 'pipe', 'inherit'] });
+    let out = '';
+    holder.stdout.on('data', (d) => {
+      out += String(d);
+    });
+    const until = async (check: () => boolean, what: string) => {
+      const start = Date.now();
+      while (!check()) {
+        if (Date.now() - start > 20000) throw new Error(`tempo esgotado esperando: ${what}`);
+        await new Promise((resolve) => setTimeout(resolve, 40));
+      }
+    };
+    let write: Promise<string | null>;
+    try {
+      holder.stdin.write(
+        `begin;\nset local role authenticated;\nselect set_config('request.jwt.claim.sub', '${KATIA}', true);\nselect public.delete_my_account('EXCLUIR', 'api-corrida-excluir-0001');\nselect 'exclusao-feita';\n`,
+      );
+      await until(() => out.includes('exclusao-feita'), 'a sessão de apoio executar a exclusão e segurar a transação');
+      // O outro aparelho grava na Família agora: espera (a exclusão ainda não terminou).
+      write = err(katia.createRecord(newOperationKey(), fam, 'despesa', record(fAcc, 'Feira fantasma')));
+      await until(() => count(`select count(*) from pg_locks where not granted`) >= 1, 'a gravação esperar a exclusão');
+      holder.stdin.write('commit;\n');
+      holder.stdin.end();
+      expect(await write).toBe('sem_permissao');
+    } finally {
+      holder.stdin.end();
+      holder.kill();
+    }
+    // Nada da Kátia sobrou além do que a regra 3 mantém: a anotação antiga na Família, com a autoria anônima.
+    expect(count(`select count(*) from auth.users where id = '${KATIA}'`)).toBe(0);
+    expect(count(`select count(*) from public.financial_records where description = 'Feira fantasma'`)).toBe(0);
+    expect(count(`select count(*) from public.financial_records where context_id = '${fam}' and created_by = '${KATIA}'`)).toBe(1);
+    expect(count(`select count(*) from public.financial_records where context_id = '${kSpace.personalContextId}'`)).toBe(0);
+    expect(count(`select count(*) from public.record_operations where actor_id = '${KATIA}'`)).toBe(0);
+    expect(count(`select count(*) from public.context_activity where person_id = '${KATIA}'`)).toBe(0);
+    expect(adminSql(`select (deleted_at is not null)::text || '|' || display_name from public.persons where id = '${KATIA}'`)).toBe('true|');
+    expect((await irene.listRecords(fam, '2026-10')).map((r) => r.description).sort()).toEqual(['Feira da Kátia', 'Padaria da casa'].sort());
+    // A mesma corrida ao contrário (a gravação chegou antes e terminou) está em supabase/tests/99_exclusao.sql, seção 10 (S6).
+  });
+
   it('6. Irene, agora sozinha na Família, exclui: o Pessoal e a Família somem, e a pessoa anônima do Hélio some com ela', async () => {
     await irene.deleteMyAccount(DELETE_CONFIRMATION_WORD, newOperationKey());
     expect(count(`select count(*) from auth.users where id = '${IRENE}'`)).toBe(0);
     expect(count(`select count(*) from public.financial_contexts where id in ('${fam}', '${ireneCtx}')`)).toBe(0);
     expect(count(`select count(*) from public.financial_records where context_id in ('${fam}', '${ireneCtx}')`)).toBe(0);
-    expect(count(`select count(*) from public.persons where id in ('${IRENE}', '${HELIO}')`)).toBe(0);
+    expect(count(`select count(*) from public.persons where id in ('${IRENE}', '${HELIO}', '${KATIA}')`)).toBe(0);
     expect(count(`select count(*) from public.context_memberships where context_id = '${fam}'`)).toBe(0);
     // A conta nova do e-mail do Hélio não foi tocada.
     expect(count(`select count(*) from public.persons where id = '${HELIO2}' and deleted_at is null`)).toBe(1);

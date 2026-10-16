@@ -100,6 +100,11 @@ export const DELETE_TEXT = {
   doneBody: 'Os seus dados foram apagados e o seu e-mail ficou livre. Se um dia quiser voltar, é só criar uma conta nova, que começa vazia.',
   doneCreate: 'Criar uma conta',
   doneStart: 'Voltar ao início',
+  /** Resposta perdida: a sessão terminou depois de pedir a exclusão, sem a confirmação do servidor. */
+  unsureTitle: 'Não foi possível confirmar a exclusão',
+  unsureBody:
+    'A conexão caiu antes da resposta e a sessão terminou neste aparelho. Entre de novo para conferir: se a conta foi excluída, o seu e-mail está livre; se não, a conta e os seus dados continuam como estavam.',
+  unsureEnter: 'Entrar',
   /** "Quem vê estes dados?". */
   whoSees:
     'Quem exclui a conta apaga o Pessoal inteiro, de verdade. Na Família, quem sai deixa o que anotou como histórico da casa, com a autoria "Pessoa que saiu", sem nome e sem e-mail. Se a pessoa é a única titular, a Família é apagada junto. A empresa só vê que a licença terminou.',
@@ -136,4 +141,74 @@ export function deleteFamilyText(outcome: DeleteFamilyOutcome, familyName: strin
 /** A pessoa pode confirmar? Só com a palavra certa, sem Família que exija passar a titularidade antes, e fora da demonstração o banco decide o resto. */
 export function canSubmitDelete(input: unknown, outcome: DeleteFamilyOutcome): boolean {
   return deleteConfirmationError(input) === null && outcome !== 'bloqueia';
+}
+
+/**
+ * A exclusão neste aparelho quando a resposta se perde. A tela marca a intenção ANTES de chamar o banco:
+ * - 'em-andamento': o pedido saiu e o servidor ainda não respondeu (a conexão caiu, ou a resposta se perdeu);
+ * - 'confirmada': o servidor respondeu que a conta foi excluída;
+ * - 'nenhuma': nada foi pedido, ou o servidor recusou (a conta segue).
+ * Se o servidor excluiu a conta e a resposta se perdeu, a sessão cai sozinha pouco depois (o servidor já não conhece a pessoa); sem a
+ * intenção marcada, o app abriria a tela Entrar sem limpar o aparelho e sem dizer nada.
+ */
+export type DeletionAttempt = 'nenhuma' | 'em-andamento' | 'confirmada';
+
+export interface DeletionIntent {
+  /** O pedido vai ser enviado. */
+  begin(): void;
+  /** O servidor respondeu que a conta foi excluída. */
+  confirm(): void;
+  /** O servidor recusou (ou a pessoa desistiu antes de pedir): a conta segue. */
+  clear(): void;
+  /** Lido uma única vez, quando a sessão termina; volta a 'nenhuma'. */
+  consume(): DeletionAttempt;
+}
+
+/** O marcador fica só na memória do app (nunca em disco). */
+export function createDeletionIntent(): DeletionIntent {
+  let state: DeletionAttempt = 'nenhuma';
+  return {
+    begin() {
+      state = 'em-andamento';
+    },
+    confirm() {
+      state = 'confirmada';
+    },
+    clear() {
+      state = 'nenhuma';
+    },
+    consume() {
+      const s = state;
+      state = 'nenhuma';
+      return s;
+    },
+  };
+}
+
+/** Os códigos em que o servidor não respondeu: o resultado é incerto e a mesma chave deve ser reenviada. */
+export const DELETE_UNCERTAIN_CODES: readonly string[] = ['rede', 'desconhecido'];
+
+/** A falha deixa o resultado incerto (a conta pode ter sido excluída)? Qualquer outra é uma recusa definitiva: a conta segue. */
+export function deleteOutcomeUncertain(code: string): boolean {
+  return DELETE_UNCERTAIN_CODES.includes(code);
+}
+
+/** O que o app faz quando a sessão termina. */
+export type DeletionSessionEnd = {
+  /** A tela de entrada que aparece: a conta foi excluída, ou não foi possível confirmar. */
+  screen: 'excluida' | 'nao-confirmada';
+  /** O aparelho esquece a pessoa (preferências, memórias, lembretes agendados). */
+  forgetDevice: boolean;
+};
+
+/**
+ * A sessão terminou. Com a exclusão confirmada, a tela "Sua conta foi excluída" (o aparelho já foi limpo pela tela). Com o pedido
+ * enviado e sem confirmação (a resposta se perdeu e a sessão caiu), o aparelho é limpo do mesmo jeito e a tela diz que não foi possível
+ * confirmar, para a pessoa entrar de novo e conferir. Sair do aparelho por vontade própria não é uma exclusão. Sem pedido de
+ * exclusão, nada muda aqui (nulo): vale o fluxo de sempre (sessão expirada ou saída manual).
+ */
+export function sessionEndAfterDeletion(attempt: DeletionAttempt, manualSignOut: boolean): DeletionSessionEnd | null {
+  if (attempt === 'confirmada') return { screen: 'excluida', forgetDevice: false };
+  if (attempt === 'em-andamento' && !manualSignOut) return { screen: 'nao-confirmada', forgetDevice: true };
+  return null;
 }

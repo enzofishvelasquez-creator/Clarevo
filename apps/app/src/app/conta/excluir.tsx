@@ -7,7 +7,7 @@ import { View } from 'react-native';
 import { SubHeader } from '@/components/header';
 import { Banner, Button, Card, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { forgetDevice } from '@/lib/device-forget';
-import { deletedAccountIntent, signOutIntent } from '@/lib/nav';
+import { signOutIntent } from '@/lib/nav';
 import { useDeleteAccount } from '@/state/account';
 import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
@@ -60,9 +60,10 @@ export default function ExcluirContaScreen() {
       setMsg({ tone: 'erro', text: deleteErrorText(r.code) });
       return;
     }
-    // A conta já não existe: o que o aparelho guardava dela sai também, a sessão termina e a entrada diz "Sua conta foi excluída".
+    // A conta já não existe (o hook marcou a exclusão como confirmada): o que o aparelho guardava dela sai também, a sessão termina e
+    // a entrada diz "Sua conta foi excluída". Se a resposta se perder, o hook deixa a intenção marcada e o layout faz o mesmo quando a
+    // sessão cair (e diz que não foi possível confirmar).
     if (user) await forgetDevice(user.id);
-    deletedAccountIntent.mark();
     signOutIntent.mark();
     try {
       await signOut();

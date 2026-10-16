@@ -11230,6 +11230,27 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar ao início').click(); await waitText('Seu dinheiro'); await p.waitForTimeout(300);
   ok('Sua conta foi excluída: "Voltar ao início" leva à boas-vindas', (await body()).includes('Seu dinheiro'));
 
+  // ---- 11b. A resposta da exclusão se perdeu e a sessão caiu, sem a confirmação do servidor: o app diz que não foi possível confirmar ----
+  // O roteador abre esta tela (estado=nao-confirmada) depois de limpar o aparelho; a decisão é coberta pelos testes do core
+  // (createDeletionIntent e sessionEndAfterDeletion). Aberta sem sessão, como a anterior.
+  await p.goto(`http://localhost:${PORT}/conta-excluida?estado=nao-confirmada`); await waitText('Não foi possível confirmar a exclusão'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Resposta perdida: título, texto (a conexão caiu, entrar de novo para conferir, e-mail livre ou conta como estava) e as duas saídas', (await famH1()) === 'Não foi possível confirmar a exclusão' &&
+    t.includes('A conexão caiu antes da resposta e a sessão terminou neste aparelho. Entre de novo para conferir: se a conta foi excluída, o seu e-mail está livre; se não, a conta e os seus dados continuam como estavam.') &&
+    (await visibleCount('button', 'Entrar')) === 1 && (await visibleCount('button', 'Voltar ao início')) === 1 && !t.includes('Sua conta foi excluída'), t.slice(0, 500));
+  ok('Resposta perdida: tela de entrada, sem a barra de abas', (await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).count()) === 0);
+  await delKeep();
+  await delShots('469_conta_excluida_sem_confirmacao');
+  await btn('Entrar').click(); await waitText('Esqueci minha senha'); await p.waitForTimeout(300);
+  ok('Resposta perdida: "Entrar" abre a entrada, para conferir se a conta ainda existe', (await body()).includes('Esqueci minha senha'));
+  await p.goto(`http://localhost:${PORT}/conta-excluida?estado=nao-confirmada`); await waitText('Não foi possível confirmar a exclusão');
+  await btn('Voltar ao início').click(); await waitText('Seu dinheiro'); await p.waitForTimeout(300);
+  ok('Resposta perdida: "Voltar ao início" leva à boas-vindas', (await body()).includes('Seu dinheiro'));
+  // Sem o parâmetro (ou com outro valor), a tela é a de sempre: "Sua conta foi excluída".
+  await p.goto(`http://localhost:${PORT}/conta-excluida?estado=qualquer`); await waitText('Sua conta foi excluída');
+  ok('Sua conta foi excluída: um estado desconhecido cai na tela de sempre', (await famH1()) === 'Sua conta foi excluída' && !(await body()).includes('Não foi possível confirmar'));
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro'); await p.waitForTimeout(300);
+
   // ---- 12. A demonstração com dados fictícios: a tela abre e explica, o botão final diz que nada é apagado e os totais não mudam ----
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
@@ -11248,7 +11269,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // ---- 13. Textos e escritas ----
   const delBad = delTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(bem-vind[oa]|convidad[oa]s?|cadastrad[oa]s?|usuári[oa]s?|sozinh[oa])\b/i)?.[0] ?? x.match(/tem certeza|cuidado|atenção|perigo|irrevers|lamentamos|sentiremos|fique|vai perder|última chance/i)?.[0]).filter(Boolean);
-  ok('Excluir conta: nenhum termo proibido, travessão longo, expressão vetada, palavra com gênero nem tom de alerta ou de pressão nas telas novas', delTexts.length >= 9 && delBad.length === 0, `${delTexts.length} telas ${delBad.join(' | ')}`);
+  ok('Excluir conta: nenhum termo proibido, travessão longo, expressão vetada, palavra com gênero nem tom de alerta ou de pressão nas telas novas', delTexts.length >= 10 && delBad.length === 0, `${delTexts.length} telas ${delBad.join(' | ')}`);
   ok('Excluir conta: nenhuma escrita direta na rede (a exclusão de verdade é coberta pelos testes do banco, da memória e da API)', writes.length === delWrites0, writes.slice(delWrites0).join(' | '));
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);

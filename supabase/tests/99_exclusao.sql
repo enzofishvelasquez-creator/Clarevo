@@ -957,6 +957,12 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- 9. Estrutura: as chaves estrangeiras que a exclusão cobre, o gatilho de auth.users, os privilégios e as guardas.
 -- ---------------------------------------------------------------------------
+-- As funções de public que o app executa (com sessão), com a definição; a definição só é lida das que passam no filtro.
+create function pg_temp.app_functions() returns table (proname name, def text) language sql as $$
+  select p.proname, case when p.prokind = 'f' then pg_get_functiondef(p.oid) end
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')
+$$;
 do $$
 declare
   f text;
@@ -999,8 +1005,8 @@ begin
   assert (select array_agg(a.parameter_name) from (select unnest(proargnames) as parameter_name from pg_proc where oid = 'public.delete_my_account(text, text)'::regprocedure) a) = array['p_confirmation', 'p_key'],
     'os parâmetros são p_confirmation e p_key';
   -- As funções de apoio e os gatilhos: ninguém executa (nem a chave de serviço).
-  foreach f in array array['persons_auth_guard()', 'financial_contexts_person_guard()', 'context_memberships_person_guard()', 'clarevo_erase_context(uuid)',
-                           'clarevo_erase_person(uuid)', 'clarevo_erase_on_user_delete()'] loop
+  foreach f in array array['persons_auth_guard()', 'financial_contexts_person_guard()', 'context_memberships_person_guard()', 'record_operations_actor_guard()',
+                           'clarevo_erase_context(uuid)', 'clarevo_erase_person(uuid)', 'clarevo_erase_on_user_delete()'] loop
     assert not has_function_privilege('authenticated', 'public.' || f, 'execute') and not has_function_privilege('anon', 'public.' || f, 'execute')
        and not has_function_privilege('service_role', 'public.' || f, 'execute')
        and not exists (select 1 from aclexplode((select proacl from pg_proc where oid = ('public.' || f)::regprocedure)) a where a.grantee = 0),
@@ -1018,8 +1024,510 @@ begin
   assert (select array_agg(attname::text order by attnum) from pg_attribute where attrelid = 'public.family_member_items'::regclass and attnum > 0 and not attisdropped)
        = array['context_id', 'person_id', 'first_name', 'role', 'status', 'is_me', 'joined_at', 'left_at']
      and (select reloptions @> array['security_barrier=true'] from pg_class where oid = 'public.family_member_items'::regclass), 'a visão dos membros manteve as colunas e a barreira';
+  -- Correções da revisão de segurança (X5 a X7): as travas estão nas definições, na ordem certa.
+  -- A guarda de persons trava a linha de auth.users (for key share) e recusa se ela não existe.
+  assert (select pg_get_functiondef(oid) from pg_proc where oid = 'public.persons_auth_guard()'::regprocedure) ~ 'from auth\.users u where u\.id = new\.id for key share',
+    'persons_auth_guard trava a linha de auth.users com for key share';
+  -- ensure_personal_space toma a trava por pessoa da exclusão ANTES de ler auth.users.
+  assert (select position('familia:p:' in pg_get_functiondef(oid)) > 0
+              and position('familia:p:' in pg_get_functiondef(oid)) < position('from auth.users where id' in pg_get_functiondef(oid))
+            from pg_proc where oid = 'public.ensure_personal_space(text, text)'::regprocedure),
+    'ensure_personal_space toma a trava por pessoa antes de ler auth.users';
+  -- O gatilho de record_operations: antes de gravar, em cada linha, ligado; trava a pessoa e recusa a excluída ou anônima.
+  assert exists (select 1 from pg_trigger t where t.tgrelid = 'public.record_operations'::regclass and t.tgname = 'record_operations_actor_guard' and not t.tgisinternal
+                    and (t.tgtype & 1) = 1 and (t.tgtype & 2) = 2 and (t.tgtype & 4) = 4 and t.tgenabled = 'O'), 'gatilho antes de gravar em record_operations';
+  assert (select pg_get_functiondef(oid) from pg_proc where oid = 'public.record_operations_actor_guard()'::regprocedure) ~ 'for key share'
+     and (select pg_get_functiondef(oid) from pg_proc where oid = 'public.record_operations_actor_guard()'::regprocedure) ~ 'conta_excluida',
+    'o gatilho de record_operations trava a pessoa (for key share) e recusa com conta_excluida';
+  -- A exclusão: trava da pessoa, travas das Famílias, linha da pessoa (for update) e só depois o que é dela e o que é dos outros.
+  assert (select position('familia:p:' in d) < position('familia:c:' in d)
+              and position('familia:c:' in d) < position('for update' in d)
+              and position('for update' in d) < position('select coalesce(array_agg(c.id order by c.id), ''{}'') into v_owned' in d)
+              and position('select coalesce(array_agg(c.id order by c.id), ''{}'') into v_owned' in d) < position('transferir_antes' in d)
+            from (select pg_get_functiondef('public.clarevo_erase_person(uuid)'::regprocedure) as d) x),
+    'clarevo_erase_person: trava da pessoa, travas das Famílias, linha da pessoa e só depois o cálculo do que é dela';
+  -- A pessoa só vira anônima se já não é dona nem titular de nada.
+  assert (select pg_get_functiondef('public.clarevo_erase_person(uuid)'::regprocedure) ~ 'owner_person_id = p_person\)\s+or exists \(select 1 from public\.context_memberships m where m\.person_id = p_person and m\.role = ''titular'' and m\.revoked_at is null\) then\s+raise exception ''transferir_antes''')
+    , 'o ramo anônimo recusa se a pessoa ainda é dona ou titular de algo';
+  -- A geração de contas de gasto fixo, a única escrita sem operação, confere a pessoa que criou a série antes de travar a série.
+  assert (select position('persons p where p.id = v_creator and p.deleted_at is null for key share' in d) > 0
+              and position('persons p where p.id = v_creator' in d) < position('where id = p_series_id for update' in d)
+            from (select pg_get_functiondef('public.clarevo_materialize_series(uuid)'::regprocedure) as d) x),
+    'clarevo_materialize_series confere a pessoa que criou a série antes de travar a série';
+  -- Toda função de escrita que o app executa termina gravando a operação (o gatilho acima é o ponto comum). As únicas sem operação:
+  -- delete_my_account (a pessoa sai com o rastro), ensure_personal_space (cria a pessoa, sob a trava por pessoa e a guarda de auth.users)
+  -- e sync_series_occurrences (a geração, que confere a pessoa que criou a série).
+  assert (select array_agg(x.proname::text order by x.proname) from pg_temp.app_functions() x
+           where (x.def ~* '(insert into|update|delete from) (public|auth)\.' or x.def ~* 'clarevo_materialize_series') and x.def !~* 'insert into public\.record_operations')
+       = array['delete_my_account', 'ensure_personal_space', 'sync_series_occurrences'],
+    'toda função de escrita grava a operação, menos delete_my_account, ensure_personal_space e sync_series_occurrences';
+  assert (select count(*) from pg_temp.app_functions() x where x.def ~* 'insert into public\.record_operations') = 63,
+    'as 63 funções de escrita com operação são as que o gatilho de record_operations protege';
   -- Nada novo em record_operations: a conta some com o rastro, então nenhuma ação nova.
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m where c.conname = 'record_operations_action_check') = 63,
     'a lista de ações de record_operations segue com 63 (excluir a conta não deixa operação)';
 end $$;
 rollback;
+
+-- ---------------------------------------------------------------------------
+-- 10. Corridas (revisão de segurança): duas sessões de verdade, uma segurando a transação aberta e a outra esperando a trava.
+-- As sessões do dblink só enxergam dados gravados: esta parte grava de verdade (pessoas fictícias abaixo) e, no fim, apaga tudo.
+-- Sem a extensão dblink (ou sem conexão local), roda o equivalente determinístico numa sessão só (a primeira termina antes da
+-- segunda) e avisa. Para conferir o equivalente com dblink disponível: set clarevo.sem_dblink = 'on'.
+--   S1. A titularidade chega a Beto enquanto ele exclui a conta: a Família nunca fica sem titular (transferir_antes).
+--   S2. A titular passa a titularidade enquanto exclui a conta: ela sai como membro, e a Família segue com o novo titular.
+--   S3. ensure_personal_space durante a exclusão: a pessoa e o Pessoal não são recriados.
+--   S4. Criar a linha de persons direto durante a exclusão do usuário: pessoa_sem_conta (a guarda trava auth.users).
+--   S5. create_record na Família durante a exclusão (outro aparelho): erro, e nada da pessoa sobra (nem operação, nem atividade).
+--   S6. A mesma gravação, mas que chegou antes: termina, e a exclusão a leva (o registro fica na Família, com a autoria anônima).
+--   S7. A geração das contas de gasto fixo durante a exclusão de quem criou a série: nada é gerado em nome de quem saiu.
+--   S8. As outras funções de escrita: set_savings_answer, accept_family_invite e accept_license durante a exclusão.
+-- ---------------------------------------------------------------------------
+\set t1 '''00000000-0000-0000-0000-00000000c101'''
+\set b1 '''00000000-0000-0000-0000-00000000c102'''
+\set t2 '''00000000-0000-0000-0000-00000000c103'''
+\set b2 '''00000000-0000-0000-0000-00000000c104'''
+\set uli '''00000000-0000-0000-0000-00000000c105'''
+\set gus '''00000000-0000-0000-0000-00000000c106'''
+\set t5 '''00000000-0000-0000-0000-00000000c107'''
+\set b5 '''00000000-0000-0000-0000-00000000c108'''
+\set b6 '''00000000-0000-0000-0000-00000000c109'''
+\set b7 '''00000000-0000-0000-0000-00000000c10a'''
+\set t8 '''00000000-0000-0000-0000-00000000c10b'''
+\set b8a '''00000000-0000-0000-0000-00000000c10c'''
+\set b8b '''00000000-0000-0000-0000-00000000c10d'''
+\set b8c '''00000000-0000-0000-0000-00000000c10e'''
+\set t8d '''00000000-0000-0000-0000-00000000c10f'''
+\set gil8 '''00000000-0000-0000-0000-00000000c110'''
+insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
+  (:t1,   't1@corrida-exclusao.test',   now(), '{"display_name":"Tina Um"}'),
+  (:b1,   'b1@corrida-exclusao.test',   now(), '{"display_name":"Beto Um"}'),
+  (:t2,   't2@corrida-exclusao.test',   now(), '{"display_name":"Tina Dois"}'),
+  (:b2,   'b2@corrida-exclusao.test',   now(), '{"display_name":"Beto Dois"}'),
+  (:uli,  'uli@corrida-exclusao.test',  now(), '{"display_name":"Ulisses Corrida"}'),
+  (:gus,  'gus@corrida-exclusao.test',  now(), '{"display_name":"Gustavo Corrida"}'),
+  (:t5,   't5@corrida-exclusao.test',   now(), '{"display_name":"Tina Cinco"}'),
+  (:b5,   'b5@corrida-exclusao.test',   now(), '{"display_name":"Beto Cinco"}'),
+  (:b6,   'b6@corrida-exclusao.test',   now(), '{"display_name":"Beto Seis"}'),
+  (:b7,   'b7@corrida-exclusao.test',   now(), '{"display_name":"Beto Sete"}'),
+  (:t8,   't8@corrida-exclusao.test',   now(), '{"display_name":"Tina Oito"}'),
+  (:b8a,  'b8a@corrida-exclusao.test',  now(), '{"display_name":"Beto Oito A"}'),
+  (:b8b,  'b8b@corrida-exclusao.test',  now(), '{"display_name":"Beto Oito B"}'),
+  (:b8c,  'b8c@corrida-exclusao.test',  now(), '{"display_name":"Beto Oito C"}'),
+  (:t8d,  't8d@corrida-exclusao.test',  now(), '{"display_name":"Tina Oito D"}'),
+  (:gil8, 'gil8@corrida-exclusao.test', now(), '{"display_name":"Gil Oito"}');
+
+create temp table cp (name text primary key, id uuid, code text);
+grant select, insert on cp to authenticated;
+create function pg_temp.cid(p_name text) returns uuid language sql as $$ select id from cp where name = p_name $$;
+create function pg_temp.ccode(p_name text) returns text language sql as $$ select code from cp where name = p_name $$;
+create function pg_temp.cas(p_name text) returns text language sql as $$
+  select set_config('request.jwt.claim.sub', coalesce(pg_temp.cid(p_name)::text, ''), true)
+$$;
+-- A sessão de uma pessoa nas conexões do dblink (e o "hoje" dela): a Tina Cinco gera as contas em dezembro.
+create function pg_temp.csess(p_name text, p_today text default '2026-10-07') returns text language sql as $$
+  select format('set local clarevo.today = %L; set local role authenticated; set local "request.jwt.claim.sub" = %L', p_today, pg_temp.cid(p_name))
+$$;
+insert into cp (name, id) values ('t1', :t1), ('b1', :b1), ('t2', :t2), ('b2', :b2), ('uli', :uli), ('gus', :gus), ('t5', :t5), ('b5', :b5), ('b6', :b6),
+  ('b7', :b7), ('t8', :t8), ('b8a', :b8a), ('b8b', :b8b), ('b8c', :b8c), ('t8d', :t8d), ('gil8', :gil8);
+
+-- 10.0 Montagem (gravada de verdade): o Pessoal de todos, as Famílias e o que cada pessoa anotou.
+set role authenticated;
+begin;
+set local clarevo.today = '2026-10-07';
+do $$
+declare
+  n text;
+  r jsonb;
+  fam uuid;
+  code text;
+  acc uuid;
+begin
+  foreach n in array array['t1', 'b1', 't2', 'b2', 'uli', 't5', 'b5', 'b6', 'b7', 't8', 'b8a', 'b8b', 'b8c', 't8d', 'gil8'] loop
+    perform pg_temp.cas(n);
+    r := public.ensure_personal_space('Conta principal');
+    insert into cp values (n || '_ctx', (r ->> 'context_id')::uuid, null), (n || '_acc', (r #>> '{account,id}')::uuid, null);
+    perform public.create_record('cor-pes-' || n, (r ->> 'context_id')::uuid, (r #>> '{account,id}')::uuid, 'despesa', 1500, '2026-10-02', 'Mercado ' || n, 'Mercado');
+  end loop;
+  -- Famílias: a de S1 (t1 titular, b1 membro), a de S2 (t2, b2), a de S5 a S7 (t5, b5, b6, b7), a de S8 (t8, b8a, b8b, b8c) e a que b8b encontra depois (t8d).
+  foreach n in array array['f1:t1:b1', 'f2:t2:b2', 'f5:t5:b5,b6,b7', 'f8:t8:b8a,b8b,b8c', 'f8d:t8d:'] loop
+    perform pg_temp.cas(split_part(n, ':', 2));
+    fam := (public.create_family('Casa ' || split_part(n, ':', 1), 'cor-fam-' || split_part(n, ':', 1)) #>> '{context,id}')::uuid;
+    insert into cp values (split_part(n, ':', 1), fam, null);
+    acc := (select id from public.financial_accounts where context_id = fam order by created_at limit 1);
+    insert into cp values (split_part(n, ':', 1) || '_acc', acc, null);
+    perform public.create_record('cor-rt-' || split_part(n, ':', 2), fam, acc, 'despesa', 2500, '2026-10-03', 'Feira da titular ' || split_part(n, ':', 2), null);
+    for code in select unnest(string_to_array(nullif(split_part(n, ':', 3), ''), ',')) loop
+      perform pg_temp.cas(split_part(n, ':', 2));
+      r := public.create_family_invite(fam, 'membro', 'cor-inv-' || code);
+      perform pg_temp.cas(code);
+      perform public.accept_family_invite(r ->> 'code', 'cor-acc-' || code);
+      -- Cada membro anota uma vez na Família (por isso a linha dele fica anônima depois de excluir a conta).
+      perform public.create_record('cor-rm-' || code, fam, acc, 'despesa', 1800, '2026-10-04', 'Padaria de ' || code, null);
+    end loop;
+  end loop;
+end $$;
+commit;
+reset role;
+
+-- A conta de b8b sai da Casa f8 antes da corrida (ela fica com uma anotação lá) e recebe o convite da Casa f8d.
+set role authenticated;
+begin;
+set local clarevo.today = '2026-10-07';
+do $$
+declare
+  r jsonb;
+begin
+  perform pg_temp.cas('b8b');
+  perform public.leave_family(pg_temp.cid('f8'), 'cor-lv-b8b');
+  perform pg_temp.cas('t8d');
+  r := public.create_family_invite(pg_temp.cid('f8d'), 'membro', 'cor-inv-b8b-d');
+  insert into cp values ('code_b8b', null, r ->> 'code');
+end $$;
+commit;
+reset role;
+
+-- A série de gasto fixo de b7 na Casa f5 (S7), com as contas de outubro e novembro geradas.
+set role authenticated;
+begin;
+set local clarevo.today = '2026-10-07';
+do $$
+declare
+  ser uuid;
+begin
+  perform pg_temp.cas('b7');
+  ser := (public.create_series('cor-ser-b7', pg_temp.cid('f5'), 'mensal', 'conta', 'Streaming corrida', null, 4500, 'fixo', 10, '2026-10-01', 1, null, null, null) #>> '{series,id}')::uuid;
+  insert into cp values ('ser_b7', ser, null);
+end $$;
+commit;
+reset role;
+
+-- A empresa da corrida: Gil Oito convida b8c, que ainda não aceitou (S8).
+begin;
+set local clarevo.today = '2026-10-07';
+do $$
+declare
+  r jsonb;
+  x jsonb;
+begin
+  r := public.clarevo_staff_create_organization('Empresa da Corrida do Banco', 3, 'individual', '2026-01-01', null, 'gil8@corrida-exclusao.test');
+  insert into cp values ('org', (r ->> 'organization_id')::uuid, null), ('contrato', (r ->> 'contract_id')::uuid, null);
+end $$;
+set local role authenticated;
+do $$
+declare
+  r jsonb;
+begin
+  perform pg_temp.cas('gil8');
+  r := public.invite_licenses(pg_temp.cid('contrato'), array['b8c@corrida-exclusao.test'], 'cor-lic-0001');
+  insert into cp values ('code_b8c', null, r #>> '{results,0,code}');
+end $$;
+commit;
+reset role;
+
+-- A extensão dblink e a corrida: a sessão A segura a transação aberta; a sessão B começa depois e espera a trava; A grava (commit) e B
+-- termina (ou é recusada). Devolve o desfecho de B: 'ok:<resposta>' ou '<sqlstate>:<mensagem>'. Sem dblink, o equivalente numa sessão só.
+create temp table cmode (dblink boolean);
+do $$
+declare
+  v_ok boolean := exists (select 1 from pg_available_extensions where name = 'dblink') and coalesce(current_setting('clarevo.sem_dblink', true), '') <> 'on';
+begin
+  if v_ok then
+    create schema testes_dblink;
+    create extension dblink schema testes_dblink;
+    begin
+      perform testes_dblink.dblink_connect('conectar', format('dbname=%s port=%s', current_database(), current_setting('port')));
+      perform testes_dblink.dblink_disconnect('conectar');
+    exception when others then
+      raise notice '99/10: dblink sem conexão local (%); conferência sequencial numa sessão só', sqlerrm;
+      drop extension dblink;
+      drop schema testes_dblink;
+      v_ok := false;
+    end;
+  else
+    raise notice '99/10: extensão dblink indisponível (ou desligada); conferência sequencial numa sessão só';
+  end if;
+  insert into cmode values (v_ok);
+end $$;
+
+create function pg_temp.race(p_a_sess text, p_a_sql text, p_b_sess text, p_b_sql text, p_b_waits boolean default true) returns text
+language plpgsql as $$
+declare
+  v_conn text := format('dbname=%s port=%s', current_database(), current_setting('port'));
+  v_pid int;
+  v_waited boolean := false;
+  v_out text;
+  i int;
+begin
+  if (select dblink from cmode) then
+    perform testes_dblink.dblink_connect('ra', v_conn);
+    perform testes_dblink.dblink_connect('rb', v_conn);
+    -- A: faz a sua parte e segura a transação aberta.
+    perform testes_dblink.dblink_exec('ra', 'begin; ' || p_a_sess);
+    perform * from testes_dblink.dblink('ra', p_a_sql) as t(r text);
+    -- B: começa depois e espera.
+    perform testes_dblink.dblink_exec('rb', 'begin; ' || p_b_sess);
+    select pid into v_pid from testes_dblink.dblink('rb', 'select pg_backend_pid()') as t(pid int);
+    perform testes_dblink.dblink_send_query('rb', p_b_sql);
+    if p_b_waits then
+      for i in 1 .. 200 loop
+        if exists (select 1 from pg_locks where pid = v_pid and not granted) then
+          v_waited := true;
+          exit;
+        end if;
+        perform pg_sleep(0.05);
+      end loop;
+      if not v_waited then
+        raise exception 'a sessão B deveria esperar a trava da sessão A';
+      end if;
+    end if;
+    perform testes_dblink.dblink_exec('ra', 'commit');
+    begin
+      select r into v_out from testes_dblink.dblink_get_result('rb') as t(r text);
+      v_out := 'ok:' || coalesce(v_out, '');
+    exception when others then
+      v_out := sqlstate || ':' || sqlerrm;
+    end;
+    begin
+      perform * from testes_dblink.dblink_get_result('rb') as t(r text);
+    exception when others then
+      null;
+    end;
+    -- B que terminou grava (commit); B recusada já foi desfeita pelo banco.
+    perform testes_dblink.dblink_exec('rb', case when v_out like 'ok:%' then 'commit' else 'rollback' end);
+    perform testes_dblink.dblink_disconnect('ra');
+    perform testes_dblink.dblink_disconnect('rb');
+    return v_out;
+  end if;
+  -- Equivalente determinístico: A termina antes de B.
+  if p_a_sess <> '' then
+    execute p_a_sess;
+  end if;
+  execute p_a_sql;
+  reset role;
+  begin
+    if p_b_sess <> '' then
+      execute p_b_sess;
+    end if;
+    execute p_b_sql into v_out;
+    v_out := 'ok:' || coalesce(v_out, '');
+  exception when others then
+    v_out := sqlstate || ':' || sqlerrm;
+  end;
+  reset role;
+  return v_out;
+end $$;
+
+-- Com dblink, o erro exato; sem ele (A termina antes de B), B é recusada por uma guarda mais cedo (o vínculo já foi revogado, a conta já não
+-- existe), então basta que seja recusada.
+create function pg_temp.same_failure(p_out text, p_expected text) returns boolean language sql as $$
+  select case when (select dblink from cmode) then p_out = p_expected else p_out not like 'ok:%' end
+$$;
+
+-- ---------------------------------------------------------------------------
+-- S1. Tina Um passa a titularidade para Beto Um enquanto ele exclui a conta. Beto espera a trava da Família, vê que agora é titular com
+-- outra pessoa ativa e recebe transferir_antes: a Família continua com um titular (antes, ele saía "como membro" e a Família ficava sem).
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  o text;
+  fam uuid := pg_temp.cid('f1');
+  b1 uuid := pg_temp.cid('b1');
+  t1 uuid := pg_temp.cid('t1');
+begin
+  o := pg_temp.race(pg_temp.csess('t1'), format($q$select public.transfer_family_ownership(%L, %L, 'cor-tr-s1-0001')::text$q$, fam, b1),
+                    pg_temp.csess('b1'), $q$select public.delete_my_account('EXCLUIR', 'cor-del-s1-0001')::text$q$);
+  assert pg_temp.same_failure(o, 'PT409:transferir_antes'), 'S1: ' || o;
+  assert (select count(*) from public.context_memberships where context_id = fam and role = 'titular' and revoked_at is null) = 1
+     and (select person_id from public.context_memberships where context_id = fam and role = 'titular' and revoked_at is null) = b1
+     and (select owner_person_id from public.financial_contexts where id = fam) = b1, 'S1: a Família tem um titular ativo, Beto, e é dele';
+  assert (select role from public.context_memberships where context_id = fam and person_id = t1 and revoked_at is null) = 'membro', 'S1: Tina segue na Família, como membro';
+  assert exists (select 1 from auth.users where id = b1) and exists (select 1 from public.persons where id = b1 and deleted_at is null)
+     and exists (select 1 from public.financial_contexts where id = pg_temp.cid('b1_ctx'))
+     and (select count(*) from public.financial_records where context_id = pg_temp.cid('b1_ctx')) = 1, 'S1: a conta e o Pessoal de Beto seguem como estavam';
+  -- Sem corrida, a mesma recusa: Beto é titular com Tina ativa.
+  assert pg_temp.race('', $q$select 'x'$q$, pg_temp.csess('b1'), $q$select public.delete_my_account('EXCLUIR', 'cor-del-s1-0002')::text$q$, false) = 'PT409:transferir_antes', 'S1: sem corrida, a mesma recusa';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- S2. Tina Dois passa a titularidade para Beto Dois e, em outro aparelho, exclui a conta ao mesmo tempo. Tina espera a trava da Família,
+-- vê que já não é titular e sai como membro; a Família continua, com Beto como titular (antes: "titular com outras pessoas", recusa).
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  o text;
+  fam uuid := pg_temp.cid('f2');
+  b2 uuid := pg_temp.cid('b2');
+  t2 uuid := pg_temp.cid('t2');
+begin
+  o := pg_temp.race(pg_temp.csess('t2'), format($q$select public.transfer_family_ownership(%L, %L, 'cor-tr-s2-0001')::text$q$, fam, b2),
+                    pg_temp.csess('t2'), $q$select public.delete_my_account('EXCLUIR', 'cor-del-s2-0001')::text$q$);
+  assert o = 'ok:{"deleted": true}', 'S2: ' || o;
+  assert (select count(*) from public.context_memberships where context_id = fam and role = 'titular' and revoked_at is null) = 1
+     and (select person_id from public.context_memberships where context_id = fam and role = 'titular' and revoked_at is null) = b2
+     and (select owner_person_id from public.financial_contexts where id = fam) = b2, 'S2: a Família segue com Beto como titular ativo';
+  assert (select revoked_at is not null from public.context_memberships where context_id = fam and person_id = t2), 'S2: Tina saiu da Família';
+  assert not exists (select 1 from auth.users where id = t2) and not exists (select 1 from public.financial_contexts where id = pg_temp.cid('t2_ctx'))
+     and (select deleted_at is not null and display_name = '' from public.persons where id = t2), 'S2: a conta e o Pessoal de Tina saíram; a linha dela ficou anônima';
+  assert (select count(*) from public.financial_records where context_id = fam and created_by = t2) = 1, 'S2: o que Tina anotou continua na Família';
+  assert exists (select 1 from auth.users where id = b2) and (select count(*) from public.financial_records where context_id = pg_temp.cid('b2_ctx')) = 1, 'S2: Beto não perdeu nada';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- S3. ensure_personal_space durante a exclusão (outro aparelho entrando de novo): espera, não acha a conta e não recria a pessoa.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  o text;
+  uli uuid := pg_temp.cid('uli');
+begin
+  o := pg_temp.race(pg_temp.csess('uli'), $q$select public.delete_my_account('EXCLUIR', 'cor-del-s3-0001')::text$q$,
+                    pg_temp.csess('uli'), $q$select public.ensure_personal_space('Conta principal')::text$q$);
+  assert o = '42501:email_nao_confirmado', 'S3: ' || o;
+  assert not exists (select 1 from auth.users where id = uli) and not exists (select 1 from public.persons where id = uli)
+     and not exists (select 1 from public.financial_contexts where owner_person_id = uli) and not exists (select 1 from public.financial_accounts where context_id = pg_temp.cid('uli_ctx'))
+     and not exists (select 1 from public.context_memberships where person_id = uli) and not exists (select 1 from public.record_operations where actor_id = uli),
+    'S3: a pessoa, o Pessoal e a conta de origem não voltaram';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- S4. Criar a linha de persons direto (sem passar por ensure_personal_space) enquanto o usuário é apagado: a guarda trava a linha de
+-- auth.users, espera o fim da exclusão e recusa. (Antes: a guarda lia a linha que ainda não tinha saído e a pessoa renascia sem usuário.)
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  o text;
+  gus uuid := pg_temp.cid('gus');
+begin
+  o := pg_temp.race('', format($q$delete from auth.users where id = %L returning id::text$q$, gus),
+                    '', format($q$insert into public.persons (id, display_name) values (%L, 'Fantasma') returning id::text$q$, gus));
+  assert o = '23503:pessoa_sem_conta', 'S4: ' || o;
+  assert not exists (select 1 from auth.users where id = gus) and not exists (select 1 from public.persons where id = gus), 'S4: nenhuma pessoa sem usuário';
+  assert not exists (select 1 from public.persons p where p.deleted_at is null and not exists (select 1 from auth.users u where u.id = p.id)), 'S4: nenhuma pessoa viva sem usuário no banco';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- S5. create_record na Família, em outro aparelho, durante a exclusão: o gravador espera a linha da pessoa, vê que ela saiu (anônima) e a
+-- transação inteira dele é desfeita (conta_excluida). Nada da pessoa sobra além da anotação antiga que a regra 3 mantém.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  o text;
+  fam uuid := pg_temp.cid('f5');
+  b5 uuid := pg_temp.cid('b5');
+begin
+  o := pg_temp.race(pg_temp.csess('b5'), $q$select public.delete_my_account('EXCLUIR', 'cor-del-s5-0001')::text$q$,
+                    pg_temp.csess('b5'), format($q$select (public.create_record('cor-rec-s5-0001', %L, %L, 'despesa', 3100, '2026-10-06', 'Feira fantasma', null)).id::text$q$, fam, pg_temp.cid('f5_acc')));
+  assert pg_temp.same_failure(o, '42501:conta_excluida'), 'S5: ' || o;
+  assert not exists (select 1 from public.financial_records where description = 'Feira fantasma'), 'S5: o registro novo não foi gravado';
+  assert (select count(*) from public.financial_records where context_id = fam and created_by = b5) = 1, 'S5: sobra só a anotação antiga da Família';
+  assert not exists (select 1 from public.record_operations where actor_id = b5) and not exists (select 1 from public.context_activity where person_id = b5),
+    'S5: nem operação nem atividade da pessoa';
+  assert (select deleted_at is not null and display_name = '' from public.persons where id = b5) and not exists (select 1 from auth.users where id = b5)
+     and not exists (select 1 from public.financial_contexts where id = pg_temp.cid('b5_ctx')), 'S5: a conta saiu, o Pessoal também, e a linha dela ficou anônima';
+  assert (select count(*) from public.financial_records where context_id = fam and created_by = pg_temp.cid('t5')) = 1, 'S5: Tina não perdeu nada';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- S6. A mesma gravação, mas que chegou antes da exclusão: ela termina, e a exclusão espera a linha da pessoa e a leva: o registro fica na
+-- Família com a autoria anônima (regra 3), e a operação e a atividade da pessoa saem com ela.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  o text;
+  fam uuid := pg_temp.cid('f5');
+  b6 uuid := pg_temp.cid('b6');
+begin
+  o := pg_temp.race(pg_temp.csess('b6'), format($q$select (public.create_record('cor-rec-s6-0001', %L, %L, 'despesa', 3200, '2026-10-06', 'Feira que chegou antes', null)).id::text$q$, fam, pg_temp.cid('f5_acc')),
+                    pg_temp.csess('b6'), $q$select public.delete_my_account('EXCLUIR', 'cor-del-s6-0001')::text$q$);
+  assert o = 'ok:{"deleted": true}', 'S6: ' || o;
+  assert (select count(*) from public.financial_records where context_id = fam and created_by = b6) = 2
+     and exists (select 1 from public.financial_records where context_id = fam and created_by = b6 and description = 'Feira que chegou antes'), 'S6: os dois registros dele ficam na Família';
+  assert not exists (select 1 from public.record_operations where actor_id = b6) and not exists (select 1 from public.context_activity where person_id = b6),
+    'S6: nem operação nem atividade da pessoa';
+  assert (select deleted_at is not null and display_name = '' from public.persons where id = b6) and not exists (select 1 from auth.users where id = b6), 'S6: a conta saiu e a linha ficou anônima';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- S7. Tina Cinco abre a Família em dezembro (a geração das contas de gasto fixo) enquanto Beto Sete, que criou o gasto fixo, exclui a
+-- conta: nada é gerado em nome de quem saiu (antes, as contas de dezembro e janeiro nasciam com a autoria anônima, depois da saída).
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  o text;
+  fam uuid := pg_temp.cid('f5');
+  ser uuid := pg_temp.cid('ser_b7');
+  b7 uuid := pg_temp.cid('b7');
+begin
+  assert (select count(*) from public.commitments where series_id = ser) = 2, 'S7: antes, as contas de outubro e novembro';
+  o := pg_temp.race(pg_temp.csess('b7'), $q$select public.delete_my_account('EXCLUIR', 'cor-del-s7-0001')::text$q$,
+                    pg_temp.csess('t5', '2026-12-10'), format($q$select public.sync_series_occurrences(%L)::text$q$, fam));
+  assert o = 'ok:{"created": 0, "created_overdue": 0}', 'S7: ' || o;
+  assert (select count(*) from public.commitments where series_id = ser) = 2, 'S7: nenhuma conta nova em nome de quem saiu';
+  assert (select deleted_at is not null from public.persons where id = b7) and not exists (select 1 from auth.users where id = b7), 'S7: a conta saiu';
+  -- Sem corrida, em dezembro, a geração segue sem criar nada para a série de quem saiu.
+  assert pg_temp.race('', $q$select 'x'$q$, pg_temp.csess('t5', '2026-12-10'), format($q$select public.sync_series_occurrences(%L)::text$q$, fam), false) = 'ok:{"created": 0, "created_overdue": 0}', 'S7: depois, a mesma resposta';
+  assert (select count(*) from public.commitments where series_id = ser) = 2, 'S7: e continua sem conta nova';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- S8. As outras funções de escrita durante a exclusão: todas terminam em record_operations, então o mesmo gatilho as desfaz por inteiro.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  o text;
+  fam uuid := pg_temp.cid('f8');
+  b8a uuid := pg_temp.cid('b8a');
+  b8b uuid := pg_temp.cid('b8b');
+  b8c uuid := pg_temp.cid('b8c');
+begin
+  -- set_savings_answer (grava savings_checks da pessoa, na Família).
+  o := pg_temp.race(pg_temp.csess('b8a'), $q$select public.delete_my_account('EXCLUIR', 'cor-del-s8a-0001')::text$q$,
+                    pg_temp.csess('b8a'), format($q$select public.set_savings_answer('cor-sav-s8a-0001', %L, 0, 'depois')::text$q$, fam));
+  assert pg_temp.same_failure(o, '42501:conta_excluida'), 'S8 set_savings_answer: ' || o;
+  assert not exists (select 1 from public.savings_checks where person_id = b8a) and not exists (select 1 from public.record_operations where actor_id = b8a)
+     and (select deleted_at is not null from public.persons where id = b8a), 'S8 set_savings_answer: nada da pessoa sobrou';
+
+  -- accept_family_invite (b8b saiu da Casa f8 e recebeu o convite da Casa f8d): a Casa f8d não ganha o vínculo da pessoa excluída.
+  o := pg_temp.race(pg_temp.csess('b8b'), $q$select public.delete_my_account('EXCLUIR', 'cor-del-s8b-0001')::text$q$,
+                    pg_temp.csess('b8b'), format($q$select public.accept_family_invite(%L, 'cor-acc-s8b-0001')::text$q$, pg_temp.ccode('code_b8b')));
+  assert pg_temp.same_failure(o, '42501:sem_permissao'), 'S8 accept_family_invite: ' || o;
+  assert not exists (select 1 from public.context_memberships where context_id = pg_temp.cid('f8d') and person_id = b8b)
+     and not exists (select 1 from public.family_invites where context_id = pg_temp.cid('f8d') and (used_at is not null or used_by is not null))
+     and not exists (select 1 from public.record_operations where actor_id = b8b), 'S8 accept_family_invite: a Casa f8d segue só com a titular, e o convite segue sem uso';
+
+  -- accept_license (b8c aceita a licença da empresa): a licença segue convidada, sem pessoa e sem direito ao plano.
+  o := pg_temp.race(pg_temp.csess('b8c'), $q$select public.delete_my_account('EXCLUIR', 'cor-del-s8c-0001')::text$q$,
+                    pg_temp.csess('b8c'), format($q$select public.accept_license(%L, 'cor-lic-s8c-0001')::text$q$, pg_temp.ccode('code_b8c')));
+  assert pg_temp.same_failure(o, '42501:conta_excluida'), 'S8 accept_license: ' || o;
+  assert (select status from public.licenses where contract_id = pg_temp.cid('contrato') and invited_email = 'b8c@corrida-exclusao.test') = 'convidada'
+     and not exists (select 1 from public.licenses where person_id = b8c) and not exists (select 1 from public.plan_entitlements where person_id = b8c)
+     and not exists (select 1 from public.record_operations where actor_id = b8c) and (select deleted_at is not null from public.persons where id = b8c), 'S8 accept_license: nada da pessoa sobrou';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- Limpeza: tudo que esta parte gravou (a empresa, as Famílias, o Pessoal e as pessoas, as anônimas inclusive).
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  n text;
+  v_dblink boolean := (select dblink from cmode);
+begin
+  delete from public.organizations where id = pg_temp.cid('org');
+  -- Quem é membro sai antes; titulares sozinhas levam a Família e as pessoas anônimas dela.
+  foreach n in array array['t1', 'b1', 'b2', 't2', 'uli', 'gus', 'b5', 'b6', 'b7', 't5', 'b8a', 'b8b', 'b8c', 't8', 't8d', 'gil8'] loop
+    delete from auth.users where id = pg_temp.cid(n);
+  end loop;
+  if v_dblink then
+    perform testes_dblink.dblink_disconnect(c) from unnest(testes_dblink.dblink_get_connections()) c;
+    drop extension dblink;
+    drop schema testes_dblink;
+  end if;
+  assert not exists (select 1 from auth.users where email like '%@corrida-exclusao.test') and not exists (select 1 from public.persons where id in (select id from cp))
+     and not exists (select 1 from public.financial_contexts where id in (select id from cp) or owner_person_id in (select id from cp))
+     and not exists (select 1 from public.context_memberships where person_id in (select id from cp))
+     and not exists (select 1 from public.record_operations where actor_id in (select id from cp)) and not exists (select 1 from public.context_activity where person_id in (select id from cp))
+     and not exists (select 1 from public.financial_records where created_by in (select id from cp)) and not exists (select 1 from public.commitments where created_by in (select id from cp))
+     and not exists (select 1 from public.organizations where name = 'Empresa da Corrida do Banco') and not exists (select 1 from public.licenses where invited_email like '%@corrida-exclusao.test'),
+    'a corrida não deixou nada (nem a pessoa anônima)';
+end $$;

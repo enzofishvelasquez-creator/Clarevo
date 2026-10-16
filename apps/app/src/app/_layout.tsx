@@ -4,6 +4,7 @@ import { Manrope_500Medium } from '@expo-google-fonts/manrope/500Medium';
 import { Manrope_600SemiBold } from '@expo-google-fonts/manrope/600SemiBold';
 import { Manrope_700Bold } from '@expo-google-fonts/manrope/700Bold';
 import { Manrope_800ExtraBold } from '@expo-google-fonts/manrope/800ExtraBold';
+import { sessionEndAfterDeletion } from '@clarevo/core';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { router, Stack, useGlobalSearchParams, usePathname, type Href } from 'expo-router';
 import { useFonts } from 'expo-font';
@@ -16,6 +17,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { DeviceFeatures } from '@/components/device-features';
 import { BrowseTabBar } from '@/components/tab-bar';
+import { forgetDevice } from '@/lib/device-forget';
 import { afterLogin, deletedAccountIntent, restoreTarget, signOutIntent } from '@/lib/nav';
 import { SessionProvider, useSession } from '@/state/session';
 import { SpaceStatusContext, type SpaceStatus } from '@/state/space-status';
@@ -129,9 +131,13 @@ function Navigation() {
   useEffect(() => {
     if (prevUser.current && !user) {
       const manual = signOutIntent.consume();
-      if (deletedAccountIntent.consume()) {
-        // Conta excluída (D-058): nada a retomar depois; a entrada diz "Sua conta foi excluída".
-        setTimeout(() => router.replace('/conta-excluida'), 0);
+      const deletion = sessionEndAfterDeletion(deletedAccountIntent.consume(), manual);
+      if (deletion) {
+        // Conta excluída (D-058): nada a retomar depois. Confirmada: a entrada diz "Sua conta foi excluída". Sem a resposta do servidor
+        // (a resposta se perdeu e a sessão caiu): o aparelho esquece a pessoa e a entrada diz que não foi possível confirmar.
+        if (deletion.forgetDevice) void forgetDevice(prevUser.current.id);
+        const target = deletion.screen === 'excluida' ? '/conta-excluida' : '/conta-excluida?estado=nao-confirmada';
+        setTimeout(() => router.replace(target), 0);
       } else if (!manual) {
         afterLogin.set(lastPath.current, prevUser.current.id);
         // As rotas protegidas já saíram da pilha; levar a pessoa direto para Entrar.

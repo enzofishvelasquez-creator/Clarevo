@@ -1,3 +1,4 @@
+import { createDeletionIntent } from '@clarevo/core';
 import { router, type Href } from 'expo-router';
 
 /**
@@ -33,22 +34,13 @@ export const signOutIntent = {
   },
 };
 
-let accountDeleted = false;
-
 /**
- * Depois de excluir a conta (D-058): a sessão que termina em seguida não é "expirou" (que voltaria a Entrar para retomar o destino),
- * e a entrada que aparece é a tela "Sua conta foi excluída". Lido uma única vez, quando a sessão termina.
+ * Excluir a conta (D-058): a tela marca a intenção antes de chamar o banco e o hook a confirma ou a limpa conforme a resposta. Lida uma
+ * única vez, quando a sessão termina: com a exclusão confirmada, a sessão que termina não é "expirou" (que voltaria a Entrar para
+ * retomar o destino) e a tela que aparece é "Sua conta foi excluída"; com o pedido sem resposta (a resposta se perdeu e a sessão caiu),
+ * o aparelho é limpo e a tela diz que não foi possível confirmar. Só na memória do app.
  */
-export const deletedAccountIntent = {
-  mark() {
-    accountDeleted = true;
-  },
-  consume(): boolean {
-    const d = accountDeleted;
-    accountDeleted = false;
-    return d;
-  },
-};
+export const deletedAccountIntent = createDeletionIntent();
 
 let summaryFromTop = false;
 

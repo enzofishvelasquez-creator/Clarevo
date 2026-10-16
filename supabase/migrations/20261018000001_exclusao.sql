@@ -27,8 +27,17 @@
 --     são recusados (sem_permissao), nada do que ela lia aparece e a linha anônima não se renomeia.
 -- X3. A autoria nunca é reescrita: created_by e deleted_by continuam apontando para a mesma linha de persons, que fica anônima.
 -- X4. Uma Família que acaba (titular sozinho apaga a conta) leva junto as pessoas anônimas que só existiam por causa dela.
--- Ordem de travas: trava consultiva da pessoa (a mesma de create_family e accept_family_invite) -> contextos da pessoa (for update) ->
--- trava consultiva de cada Família, em ordem de identificador.
+-- X5. Nenhuma escrita em andamento deixa rastro: quem exclui trava a linha da pessoa (for update) antes de apagar qualquer coisa, e
+--     toda gravação em record_operations (todas as funções de escrita terminam nela) confere a pessoa com for key share: se a
+--     exclusão terminou, a pessoa já não existe ou está anônima, e a transação inteira de quem escrevia é desfeita (conta_excluida).
+--     A geração das contas de gasto fixo (sync_series_occurrences), a única escrita sem operação, confere a pessoa que criou a série.
+-- X6. A pessoa não volta a existir: persons_auth_guard trava a linha de auth.users (for key share) e recusa se ela sumiu, e
+--     ensure_personal_space toma a mesma trava por pessoa da exclusão antes de ler auth.users.
+-- X7. A Família nunca fica sem titular: o que é da pessoa e o que é dos outros é calculado DEPOIS das travas (passar a titularidade
+--     e excluir a conta ao mesmo tempo), e a pessoa só vira anônima se já não é dona nem titular de nada.
+-- Ordem de travas (a mesma em todos os caminhos, para duas sessões nunca se esperarem em volta): trava consultiva da pessoa (a mesma
+-- de create_family, accept_family_invite e ensure_personal_space) -> trava consultiva de cada Família da pessoa, em ordem de
+-- identificador -> linha da pessoa em persons (for update) -> contextos da pessoa (for update).
 
 -- ---------------------------------------------------------------------------
 -- Pessoas: sem chave estrangeira para auth.users; a linha anônima mantém só o que a autoria precisa
@@ -43,7 +52,8 @@ comment on column public.persons.deleted_at is
   'Quando a pessoa excluiu a conta (delete_my_account). A linha só fica, sem nome, enquanto a pessoa ainda é autora de algo numa Família que continua; some junto com o último vestígio.';
 
 -- A chave estrangeira garantia que toda pessoa tem conta: o gatilho a substitui na criação (a linha anônima nunca é criada, só
--- nasce de uma pessoa que existia).
+-- nasce de uma pessoa que existia). A linha de auth.users é travada (for key share): se alguém a está apagando agora, a criação
+-- espera o fim da exclusão e então recusa, em vez de enxergar a linha que ainda não saiu e recriar a pessoa depois que ela se foi.
 create or replace function public.persons_auth_guard()
 returns trigger
 language plpgsql
@@ -51,7 +61,8 @@ security definer
 set search_path = public
 as $$
 begin
-  if not exists (select 1 from auth.users u where u.id = new.id) then
+  perform 1 from auth.users u where u.id = new.id for key share;
+  if not found then
     raise exception 'pessoa_sem_conta' using errcode = '23503';
   end if;
   return new;
@@ -98,6 +109,192 @@ $$;
 create trigger context_memberships_person_guard
   before insert on public.context_memberships
   for each row execute function public.context_memberships_person_guard();
+
+-- X5: toda função de escrita termina gravando a operação em record_operations (idempotência e rastro), e as que mudam dados em nome de
+-- alguém o fazem antes ou junto dela, na mesma transação. Este gatilho é o ponto comum: trava a linha da pessoa (for key share, que
+-- espera a exclusão em andamento, que a trava com for update) e relê o estado. Se a exclusão terminou, a linha sumiu ou está
+-- anônima, e a transação inteira de quem escrevia é desfeita: nenhum registro, operação nem atividade fica para trás. Quem chegou
+-- antes da exclusão termina e é apagado por ela (a exclusão espera a linha da pessoa). 42501 como sem_permissao: para o app, um
+-- aparelho com a conta já excluída.
+create or replace function public.record_operations_actor_guard()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_deleted timestamptz;
+begin
+  select p.deleted_at into v_deleted from public.persons p where p.id = new.actor_id for key share;
+  if not found or v_deleted is not null then
+    raise exception 'conta_excluida' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger record_operations_actor_guard
+  before insert on public.record_operations
+  for each row execute function public.record_operations_actor_guard();
+
+-- ---------------------------------------------------------------------------
+-- Funções antigas recriadas com a mesma assinatura (X5 e X6): ensure_personal_space toma a trava por pessoa antes de ler auth.users, e
+-- a geração de gastos fixos confere a pessoa que criou a série. O resto de cada função é o da migração anterior, sem mudança.
+-- ---------------------------------------------------------------------------
+create or replace function public.ensure_personal_space(p_account_name text default 'Conta principal', p_time_zone text default null)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_user auth.users%rowtype;
+  v_name text;
+  v_ctx uuid;
+  v_account public.financial_accounts%rowtype;
+  v_account_name text := btrim(coalesce(p_account_name, ''));
+begin
+  if v_uid is null then
+    raise exception 'nao_autenticado' using errcode = '42501';
+  end if;
+  -- X6: a trava por pessoa da exclusão (a mesma de create_family e accept_family_invite) vem ANTES de ler auth.users. Com a exclusão
+  -- em andamento, esta chamada espera o fim dela e então não encontra a conta (email_nao_confirmado); sem a trava, ela leria a linha
+  -- que ainda não saiu e recriaria a pessoa e o Pessoal depois que a conta se foi.
+  perform pg_advisory_xact_lock(hashtext('familia:p:' || v_uid::text));
+  select * into v_user from auth.users where id = v_uid;
+  if not found or v_user.email_confirmed_at is null then
+    raise exception 'email_nao_confirmado' using errcode = '42501';
+  end if;
+
+  perform pg_advisory_xact_lock(hashtext('space:' || v_uid::text));
+
+  v_name := left(coalesce(nullif(btrim(v_user.raw_user_meta_data ->> 'display_name'), ''), split_part(v_user.email, '@', 1), 'Pessoa'), 80);
+  -- Fuso do aparelho no primeiro acesso (validado); sem ele, São Paulo.
+  insert into public.persons (id, display_name, time_zone)
+  values (v_uid, v_name,
+          coalesce((select name from pg_timezone_names where name = p_time_zone limit 1), 'America/Sao_Paulo'))
+  on conflict (id) do nothing;
+
+  select id into v_ctx from public.financial_contexts where owner_person_id = v_uid and kind = 'pessoal';
+  if v_ctx is null then
+    insert into public.financial_contexts (kind, name, owner_person_id) values ('pessoal', 'Pessoal', v_uid) returning id into v_ctx;
+    insert into public.context_memberships (context_id, person_id, role, can_read, can_write, can_edit_others)
+    values (v_ctx, v_uid, 'titular', true, true, true);
+  end if;
+
+  -- A conta que volta é a principal (ou, faltando, a ativa mais antiga): nunca uma arquivada nem uma excluída (A2 garante que há uma).
+  select * into v_account from public.financial_accounts
+   where context_id = v_ctx and deleted_at is null
+   order by is_default desc, (status = 'ativa') desc, created_at, id
+   limit 1;
+  if not found then
+    if char_length(v_account_name) not between 1 and 40 then
+      raise exception 'nome_da_conta_invalido' using errcode = '22023';
+    end if;
+    insert into public.financial_accounts (context_id, name, created_by)
+    values (v_ctx, v_account_name, v_uid)
+    returning * into v_account;
+  end if;
+
+  return jsonb_build_object(
+    'person_id', v_uid,
+    'display_name', (select display_name from public.persons where id = v_uid),
+    'context_id', v_ctx,
+    'account', jsonb_build_object('id', v_account.id, 'name', v_account.name, 'currency', v_account.currency)
+  );
+end;
+$$;
+
+create or replace function public.clarevo_materialize_series(p_series_id uuid)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  v_creator uuid;
+  v_s public.commitment_series%rowtype;
+  v_t public.series_terms%rowtype;
+  v_today date;
+  v_floor date;
+  v_top date;
+  v_anchor date;
+  v_year_top int;
+  v_from int;
+  v_to int;
+  v_due date;
+  v_created int := 0;
+  v_overdue int := 0;
+begin
+  -- X5: a geração não grava operação, então a pessoa que criou a série é conferida aqui, ANTES da trava da série (a ordem da exclusão:
+  -- pessoa, depois o que é dela). Com a exclusão dela em andamento, espera o fim e, se a pessoa já não existe ou está anônima, não
+  -- gera nada: uma conta de gasto fixo nunca nasce em nome de quem saiu.
+  select s.created_by into v_creator from public.commitment_series s where s.id = p_series_id;
+  if not found then
+    return jsonb_build_object('created', 0, 'created_overdue', 0);
+  end if;
+  perform 1 from public.persons p where p.id = v_creator and p.deleted_at is null for key share;
+  if not found then
+    return jsonb_build_object('created', 0, 'created_overdue', 0);
+  end if;
+  select * into v_s from public.commitment_series where id = p_series_id for update;        -- trava 1: série
+  if not found or v_s.deleted_at is not null then
+    return jsonb_build_object('created', 0, 'created_overdue', 0);
+  end if;
+  -- Quem criou a série perdeu a escrita no contexto: nada é gerado em nome dessa pessoa.
+  if not exists (select 1 from public.context_memberships m
+                  where m.context_id = v_s.context_id and m.person_id = v_s.created_by
+                    and m.revoked_at is null and m.can_read and m.can_write) then
+    return jsonb_build_object('created', 0, 'created_overdue', 0);
+  end if;
+  v_today := public.clarevo_today(v_s.created_by);
+  v_floor := (date_trunc('month', v_today::timestamp) - interval '1 month')::date;
+  if v_s.kind = 'anual' then
+    v_top := (date_trunc('month', v_today::timestamp) + interval '2 months')::date;
+    v_anchor := public.clarevo_series_month(v_s, 1);
+    if v_top < v_anchor then
+      return jsonb_build_object('created', 0, 'created_overdue', 0);
+    end if;
+    v_year_top := public.clarevo_months_between(v_anchor, v_top) / 12;                       -- último ano que já entrou
+    v_from := greatest(v_s.first_number, (v_year_top - 1) * v_s.parts_per_year + 1);
+    v_to   := (v_year_top + 1) * v_s.parts_per_year;
+  else
+    v_top  := (date_trunc('month', v_today::timestamp) + interval '1 month')::date;
+    v_from := greatest(v_s.first_number, v_s.first_number + public.clarevo_months_between(v_s.first_due_month, v_floor));
+    v_to   := v_s.first_number + public.clarevo_months_between(v_s.first_due_month, v_top);
+  end if;
+  if v_s.last_number is not null then
+    v_to := least(v_to, v_s.last_number);
+  end if;
+  for v_n in v_from .. v_to loop
+    -- Parcela de mês antes do piso: fica "sem conta registrada".
+    continue when public.clarevo_series_month(v_s, v_n) < v_floor;
+    -- Viva, ou excluída só neste mês (ou tirada do ano): não cria. Removida por encerramento: recria (retomar).
+    continue when exists (select 1 from public.commitments c
+                           where c.series_id = v_s.id and c.occurrence_number = v_n
+                             and (c.deleted_at is null or c.series_skipped));
+    select * into v_t from public.series_terms
+     where series_id = v_s.id and superseded_at is null and from_number <= v_n
+     order by from_number desc limit 1;
+    v_due := public.clarevo_series_due(v_s, v_n, v_t.due_day);
+    insert into public.commitments (context_id, description, amount_cents, currency, due_on, status, category,
+                                    created_by, series_id, occurrence_number, amount_is_estimate)
+    values (v_s.context_id, v_t.description, v_t.amount_cents, v_s.currency, v_due, 'aberto', v_t.category,
+            v_s.created_by, v_s.id, v_n, v_t.amount_mode = 'variavel')
+    on conflict (series_id, occurrence_number) where series_id is not null and deleted_at is null do nothing;
+    if found then
+      v_created := v_created + 1;
+      if v_due < v_today then
+        v_overdue := v_overdue + 1;
+      end if;
+    end if;
+  end loop;
+  return jsonb_build_object('created', v_created, 'created_overdue', v_overdue);
+end;
+$$;
 
 -- A pessoa anônima não renomeia a própria linha com um token ainda válido.
 drop policy persons_update_self on public.persons;
@@ -203,6 +400,12 @@ $$;
 -- Apagar uma pessoa (regras 2 a 5 de D-058), na ordem certa para as chaves estrangeiras. Idempotente: sem linha viva em persons
 -- (conta que nunca criou espaço, já excluída ou anônima), não há o que apagar. Recusa transferir_antes (titular com outras pessoas
 -- ativas) antes de mudar qualquer coisa. Chamada por delete_my_account e pelo gatilho de auth.users.
+--
+-- Ordem (X5 e X7): 1) trava por pessoa; 2) trava de cada Família com que a pessoa tem ou teve vínculo, em ordem de identificador (o
+-- conjunto não cresce com a trava da pessoa: aceitar convite e criar Família usam a mesma, e passar a titularidade só vai para quem
+-- já é membro); 3) linha da pessoa em persons, for update, que faz esperar quem está gravando por ela (record_operations_actor_guard)
+-- e deixa a exclusão esperar quem já gravou; 4) SÓ ENTÃO o que é dela e o que é dos outros, com as Famílias paradas: calcular antes
+-- das travas deixava a Família sem titular quando a titularidade chegava à pessoa enquanto ela excluía.
 -- ---------------------------------------------------------------------------
 create or replace function public.clarevo_erase_person(p_person uuid)
 returns void
@@ -212,6 +415,7 @@ security definer
 set search_path = public
 as $$
 declare
+  v_cand uuid[];
   v_owned uuid[];
   v_member uuid[];
   v_ctx uuid;
@@ -219,30 +423,38 @@ begin
   if p_person is null then
     return;
   end if;
-  -- Trava por pessoa: a mesma de create_family e accept_family_invite, para nenhuma delas entrar no meio da exclusão.
+  -- 1. Trava por pessoa: a mesma de create_family, accept_family_invite e ensure_personal_space.
   perform pg_advisory_xact_lock(hashtext('familia:p:' || p_person::text));
-  if not exists (select 1 from public.persons p where p.id = p_person and p.deleted_at is null) then
+
+  -- 2. As Famílias candidatas (dona, titular, membro, leitora ou ex-membro) e a trava de cada uma, em ordem de identificador.
+  select coalesce(array_agg(x.id order by x.id), '{}') into v_cand
+    from (select c.id from public.financial_contexts c
+           where c.kind = 'familia' and c.owner_person_id = p_person
+          union
+          select m.context_id from public.context_memberships m
+            join public.financial_contexts c on c.id = m.context_id and c.kind = 'familia'
+           where m.person_id = p_person) x;
+  foreach v_ctx in array v_cand loop
+    perform pg_advisory_xact_lock(hashtext('familia:c:' || v_ctx::text));
+  end loop;
+
+  -- 3. A linha da pessoa. Sem linha viva (nunca criou espaço, já excluída ou anônima), não há o que apagar.
+  perform 1 from public.persons p where p.id = p_person and p.deleted_at is null for update;
+  if not found then
     return;
   end if;
 
-  -- O que é dela: o Pessoal e as Famílias em que é titular (ou dona, de Família já encerrada).
+  -- 4. Agora, com as Famílias travadas: o que é dela (o Pessoal e as Famílias em que é titular, ou dona de Família já encerrada) e o
+  -- que é dos outros e ela só frequenta (as Famílias em que é membro, leitora ou ex-membro).
   select coalesce(array_agg(c.id order by c.id), '{}') into v_owned
     from public.financial_contexts c
    where c.owner_person_id = p_person
       or (c.kind = 'familia' and exists (select 1 from public.context_memberships m
                                           where m.context_id = c.id and m.person_id = p_person and m.role = 'titular' and m.revoked_at is null));
-  -- O que é dos outros e ela só frequenta: as Famílias em que é membro, leitora ou ex-membro.
   select coalesce(array_agg(m.context_id order by m.context_id), '{}') into v_member
     from public.context_memberships m
     join public.financial_contexts c on c.id = m.context_id and c.kind = 'familia'
    where m.person_id = p_person and not (m.context_id = any (v_owned));
-
-  -- Trava de cada Família, em ordem de identificador, e as linhas dos contextos dela (nenhuma anotação nova entra no meio).
-  for v_ctx in select x from unnest(v_owned || v_member) x order by x loop
-    if exists (select 1 from public.financial_contexts c where c.id = v_ctx and c.kind = 'familia') then
-      perform pg_advisory_xact_lock(hashtext('familia:c:' || v_ctx::text));
-    end if;
-  end loop;
   perform 1 from public.financial_contexts where id = any (v_owned) order by id for update;
 
   -- Regra 3: titular com outras pessoas ativas passa a titularidade ou remove as pessoas antes. Nada mudou até aqui.
@@ -277,10 +489,15 @@ begin
 
   delete from public.record_operations where actor_id = p_person;
 
-  -- A linha de persons sai; se ainda é autora de algo numa Família que continua, vira a pessoa anônima (X1).
+  -- A linha de persons sai; se ainda é autora de algo numa Família que continua, vira a pessoa anônima (X1). Nunca como dona nem
+  -- titular: com a Família parada isso já não acontece, e a conferência abaixo é o último fecho (X7), antes de a pessoa virar anônima.
   begin
     delete from public.persons where id = p_person;
   exception when foreign_key_violation then
+    if exists (select 1 from public.financial_contexts c where c.owner_person_id = p_person)
+       or exists (select 1 from public.context_memberships m where m.person_id = p_person and m.role = 'titular' and m.revoked_at is null) then
+      raise exception 'transferir_antes' using errcode = 'PT409';
+    end if;
     update public.persons
        set display_name = '', deleted_at = now(), time_zone = 'America/Sao_Paulo', locale = 'pt-BR'
      where id = p_person;
@@ -289,10 +506,14 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- Excluir a minha conta. Ordem: sessão (nao_autenticado); chave (chave_invalida); confirmação exata (confirmacao_invalida); chave já
--- usada em outra operação da pessoa (chave_reutilizada); trava da pessoa; clarevo_erase_person (transferir_antes); por fim a linha
--- de auth.users. A resposta não traz dado nenhum: {deleted: true}, também quando a conta já não existe (repetição da mesma chave
--- com um token ainda válido: sem erro e sem efeito).
+-- Excluir a minha conta. Ordem: sessão (nao_autenticado); chave (chave_invalida); confirmação exata (confirmacao_invalida); trava da
+-- pessoa; chave já usada em outra operação da pessoa (chave_reutilizada); clarevo_erase_person, que trava as Famílias da pessoa e
+-- depois a linha dela em persons (for update, X5) e só então calcula o que apagar (transferir_antes); por fim a linha de auth.users.
+-- A trava da linha fica DENTRO de clarevo_erase_person, logo depois das travas das Famílias (e não antes delas): quem passa a
+-- titularidade segura a trava da Família e depois grava a nova titular, e uma exclusão com a linha já travada esperaria a Família
+-- enquanto essa pessoa espera a linha (as duas se esperariam). O efeito é o mesmo de travar no começo: nada é apagado, e ninguém grava
+-- em nome da pessoa, sem que a linha esteja travada. A resposta não traz dado nenhum: {deleted: true}, também quando a conta já não
+-- existe (repetição da mesma chave com um token ainda válido: sem erro e sem efeito).
 -- ---------------------------------------------------------------------------
 create or replace function public.delete_my_account(p_confirmation text, p_key text)
 returns jsonb
@@ -345,6 +566,7 @@ create trigger clarevo_erase_on_user_delete
 revoke all on function public.persons_auth_guard() from public, anon, authenticated;
 revoke all on function public.financial_contexts_person_guard() from public, anon, authenticated;
 revoke all on function public.context_memberships_person_guard() from public, anon, authenticated;
+revoke all on function public.record_operations_actor_guard() from public, anon, authenticated;
 revoke all on function public.clarevo_erase_context(uuid) from public, anon, authenticated;
 revoke all on function public.clarevo_erase_person(uuid) from public, anon, authenticated;
 revoke all on function public.clarevo_erase_on_user_delete() from public, anon, authenticated;
@@ -356,7 +578,7 @@ declare
 begin
   if exists (select 1 from pg_roles where rolname = 'service_role') then
     foreach f in array array['persons_auth_guard()', 'financial_contexts_person_guard()', 'context_memberships_person_guard()',
-                             'clarevo_erase_context(uuid)', 'clarevo_erase_person(uuid)', 'clarevo_erase_on_user_delete()'] loop
+                             'record_operations_actor_guard()', 'clarevo_erase_context(uuid)', 'clarevo_erase_person(uuid)', 'clarevo_erase_on_user_delete()'] loop
       execute format('revoke all on function public.%s from service_role', f);
     end loop;
   end if;
