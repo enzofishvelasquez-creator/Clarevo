@@ -145,8 +145,8 @@ select pg_temp.expect_error($$insert into public.commitments (context_id, descri
   values (gen_random_uuid(), 'x', 1, '2026-10-10', auth.uid())$$, 'permission denied%');
 select pg_temp.expect_error($$insert into public.financial_contexts (kind, name, owner_person_id) values ('familia', 'Outra', auth.uid())$$, 'permission denied%');
 
--- Bruno não muda as próprias permissões.
-update public.context_memberships set can_edit_others = true where person_id = auth.uid();
+-- Bruno não muda as próprias permissões (nem ninguém altera vínculos direto: só as funções da Família, testadas em 95_familia).
+select pg_temp.expect_error($$update public.context_memberships set can_edit_others = true where person_id = auth.uid()$$, 'permission denied%');
 reset role;
 do $$ begin
   assert (select can_edit_others from public.context_memberships m join ids on ids.id = m.context_id and ids.name = 'familia'
@@ -218,10 +218,16 @@ select pg_temp.expect_error(format($$select public.update_commitment('chave-bru-
   (select id from ids where name = 'familia_gas')), 'sem_permissao');
 select pg_temp.expect_error(format($$select public.delete_commitment('chave-bru-c021', %L, 1)$$,
   (select id from ids where name = 'familia_gas')), 'sem_permissao');
-select pg_temp.expect_error(format($$select public.pay_commitment('chave-bru-c022', %L, 1, %L, 9000, '2026-10-07')$$,
-  (select id from ids where name = 'familia_gas'), (select id from ids where name = 'familia_conta')), 'sem_permissao');
-select pg_temp.expect_error(format($$select public.undo_commitment_payment('chave-bru-c023', %L, 1)$$,
-  (select id from ids where name = 'familia_gas')), 'sem_permissao');
+-- Pagar é diferente (L-4, D-055): na Família, quem tem escrita marca como paga a conta criada por outra pessoa, e quem pagou desfaz.
+select public.pay_commitment('chave-bru-c022', (select id from ids where name = 'familia_gas'), 1,
+  (select id from ids where name = 'familia_conta'), 9000, '2026-10-07');
+do $$ begin
+  assert (select status from public.commitment_items where id = (select id from ids where name = 'familia_gas')) = 'quitado', 'Bruno pagou o Gás da Ana (L-4)';
+end $$;
+select public.undo_commitment_payment('chave-bru-c023', (select id from ids where name = 'familia_gas'), 2);
+do $$ begin
+  assert (select status from public.commitment_items where id = (select id from ids where name = 'familia_gas')) = 'aberto', 'Bruno desfez o próprio pagamento';
+end $$;
 -- Bruno anota e paga a própria conta a pagar na família, só com conta da família.
 with c as (
   select public.create_commitment('chave-bru-c001', (select id from ids where name = 'familia'), 4000, '2026-10-12', 'Feira') as res
@@ -311,12 +317,14 @@ set role authenticated;
 
 -- 6. Ana revoga Bruno: bloqueio imediato de leitura e escrita.
 select set_config('request.jwt.claim.sub', :ana, true);
-update public.context_memberships set revoked_at = now() where person_id = auth.uid();
+select pg_temp.expect_error($$update public.context_memberships set revoked_at = now() where person_id = auth.uid()$$, 'permission denied%');
+select pg_temp.expect_error(format($$select public.remove_family_member(%L, %L, 'chave-ana-rev1')$$,
+  (select id from ids where name = 'familia'), :ana), 'nao_sobre_si');
 do $$ begin
   assert (select count(*) from public.context_memberships where person_id = auth.uid() and revoked_at is not null) = 0, 'titular NÃO revoga o próprio vínculo';
   assert (select count(*) from public.financial_contexts) = 2, 'Ana continua vendo pessoal e família';
 end $$;
-update public.context_memberships set revoked_at = now() where person_id = '00000000-0000-0000-0000-00000000000b';
+select public.remove_family_member((select id from ids where name = 'familia'), :bruno, 'chave-ana-rev2');
 select set_config('request.jwt.claim.sub', :bruno, true);
 do $$ begin assert (select count(*) from public.financial_records) = 0, 'Bruno revogado não vê a família'; end $$;
 select pg_temp.expect_error(format($$select public.create_record('chave-bru-0007', %L, %L, 'despesa', 100, '2026-10-05', 'Depois da revogação')$$,

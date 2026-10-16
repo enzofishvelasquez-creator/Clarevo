@@ -30,6 +30,7 @@ import { seriesStyles as styles, yearA11y, yearA11yLabel } from '@/components/se
 import { ErrorState } from '@/components/states';
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Screen, TextField, Txt } from '@/components/ui';
+import { UnsavedChangesText } from '@/components/context-text';
 import { flash } from '@/lib/flash';
 import { useInformSeriesYear, useSeriesOccurrences, useSeriesOpenOccurrences, useSeriesOperationKey } from '@/state/data';
 import { useSession } from '@/state/session';
@@ -284,7 +285,7 @@ export function YearInformForm({ series: s, number, contextId }: { series: Commi
           setConfirmDiscard(null);
           if (action) leave(action);
         }}>
-        <Txt color={colors.textSecondary}>Você tem alterações que ainda não foram salvas em Pessoal.</Txt>
+        <UnsavedChangesText />
       </ConfirmDialog>
     </KeyboardAvoidingView>
   );

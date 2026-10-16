@@ -5,7 +5,7 @@ import { ContextPill, SubHeader } from '@/components/header';
 import { MinimumReserve } from '@/components/minimum-reserve';
 import { ErrorState } from '@/components/states';
 import { Card, Screen, Skeleton } from '@/components/ui';
-import { useSavingsCheck, useSavingsPlanInputs, useSpace } from '@/state/data';
+import { useSavingsCheck, useSavingsPlanInputs, useWork } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
 /**
@@ -14,8 +14,8 @@ import { colors, space } from '@/theme/tokens';
  * reserva que já existe troca a criação por um link para ela.
  */
 export default function ReservaMinimaScreen() {
-  const personal = useSpace();
-  const contextId = personal.data?.personalContextId;
+  const personal = useWork();
+  const contextId = personal.data?.contextId;
   const check = useSavingsCheck(contextId);
   const inputs = useSavingsPlanInputs(contextId);
   const failed = personal.isError || check.isError || inputs.isError;

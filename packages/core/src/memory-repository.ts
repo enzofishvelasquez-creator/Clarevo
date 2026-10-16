@@ -65,6 +65,9 @@ import type {
 import { RepoError } from './repository';
 import type { ImportDestination, ImportItem, ImportResult } from './importar/tipos';
 import { IMPORT_BATCH } from './importar/tipos';
+import type { FamilyAction, FamilyInvite, FamilyInviteWrite, FamilyInvitePreview, FamilyJoin, FamilyOverview, InviteRole } from './family';
+import { isFamilyAction } from './family';
+import { MemoryFamilyHub } from './memory-family';
 import { SEARCH_LIMIT, compareNewestPurchase, compareNewestRecord, purchaseMatchesFilter, recordMatchesFilter } from './search';
 import type { RecordSearchFilter, SearchPage } from './search';
 import { referenceMonthError } from './committed';
@@ -159,7 +162,8 @@ interface Operation {
     | CardAction
     | AccountAction
     | SubscriptionReviewAction
-    | ImportAction;
+    | ImportAction
+    | FamilyAction;
   hash: string;
   contextId: string;
   recordId: string | null;
@@ -274,6 +278,12 @@ export interface MemoryRepositoryOptions {
   today: () => IsoDate;
   /** Atraso artificial (ms) para exibir estados de envio no protótipo. */
   latencyMs?: number;
+  /**
+   * Família (D-055): vínculos, convites e papéis. Repositórios de pessoas diferentes que compartilham o mesmo hub compartilham a
+   * administração da Família (criar, convidar, aceitar, sair, remover, mudar papel, passar a titularidade e encerrar). Sem hub, o
+   * repositório tem o próprio, só com a pessoa dele. O que cada pessoa anota na Família fica no repositório dela.
+   */
+  family?: MemoryFamilyHub;
 }
 
 /**
@@ -328,8 +338,13 @@ export class MemoryRepository implements RecordsRepository {
   /** Atraso artificial (ms) em cada operação. */
   latencyMs: number;
 
+  /** Família: compartilhada entre repositórios quando o hub vem das opções. */
+  private readonly hub: MemoryFamilyHub;
+
   constructor(private readonly opts: MemoryRepositoryOptions) {
     this.latencyMs = opts.latencyMs ?? 0;
+    // Sem hub próprio, o relógio da Família é o dia da pessoa (ao meio-dia), para os convites vencerem junto com o "hoje" dos testes.
+    this.hub = opts.family ?? new MemoryFamilyHub({ now: () => Date.parse(`${opts.today()}T12:00:00.000Z`) });
   }
 
   /** Ids com tamanho fixo: a ordem do texto é a ordem de criação (desempate das listas). */
@@ -430,7 +445,8 @@ export class MemoryRepository implements RecordsRepository {
       if (this.space) return this.spaceView()!;
       const name = accountName.trim();
       if (name.length < 1 || name.length > 40) throw new RepoError('nome_da_conta_invalido');
-      const contextId = this.id('ctx');
+      // O id leva a pessoa: repositórios que compartilham um MemoryFamilyHub não podem repetir o id do Pessoal.
+      const contextId = `${this.id('ctx')}-${this.opts.actorId}`;
       const account: StoredAccount = {
         id: this.id('conta'),
         contextId,
@@ -451,6 +467,7 @@ export class MemoryRepository implements RecordsRepository {
         timeZone: timeZone ?? this.opts.timeZone ?? 'America/Sao_Paulo',
         personalContextId: contextId,
       };
+      this.hub.register(this.opts.actorId, this.opts.displayName, contextId);
       return this.spaceView()!;
     });
   }
@@ -643,7 +660,9 @@ export class MemoryRepository implements RecordsRepository {
 
   async listRecords(contextId: string, month: IsoMonth) {
     return this.read(() =>
-      [...this.records.values()].filter((r) => !r.deletedAt && r.contextId === contextId && monthOf(r.occurredOn) === month).map(strip),
+      this.canRead(contextId)
+        ? [...this.records.values()].filter((r) => !r.deletedAt && r.contextId === contextId && monthOf(r.occurredOn) === month).map(strip)
+        : [],
     );
   }
 
@@ -772,7 +791,8 @@ export class MemoryRepository implements RecordsRepository {
     return this.read(() =>
       [...this.commitments.values()]
         .filter(
-          (c) => !c.deletedAt && c.contextId === contextId && (monthOf(c.dueOn) === month || c.status === 'aberto' || paidInMonth(c)),
+          (c) =>
+            !c.deletedAt && c.contextId === contextId && this.canRead(contextId) && (monthOf(c.dueOn) === month || c.status === 'aberto' || paidInMonth(c)),
         )
         .sort(byDue)
         .map((c) => this.toCommitment(c)),
@@ -3691,7 +3711,7 @@ export class MemoryRepository implements RecordsRepository {
    * ela passa a ser a última ausência. Mesmo dia ou relógio para trás: nada muda.
    */
   private trackActivity(action: Operation['action'], contextId: string) {
-    if (action === 'decidir_revisao' || action === 'responder_guardar' || action === 'revisar_assinaturas') return;
+    if (action === 'decidir_revisao' || action === 'responder_guardar' || action === 'revisar_assinaturas' || isFamilyAction(action)) return;
     const day = this.opts.today();
     const a = this.activity.get(contextId);
     if (!a) {
@@ -3857,6 +3877,8 @@ export class MemoryRepository implements RecordsRepository {
   private liveRecord(id: string) {
     const r = this.records.get(id);
     if (!r || r.deletedAt || !this.canRead(r.contextId)) throw new RepoError('nao_encontrado');
+    // Quem só lê a Família (leitor) não altera nem exclui; no Pessoal, quem lê escreve.
+    if (!this.canWrite(r.contextId)) throw new RepoError('sem_permissao');
     return r;
   }
 
@@ -3876,13 +3898,15 @@ export class MemoryRepository implements RecordsRepository {
     return s;
   }
 
+  /** O Pessoal da pessoa, ou uma Família em que ela tem vínculo ativo (Família encerrada não se lê). */
   private canRead(contextId: string) {
-    return this.space?.personalContextId === contextId;
+    return this.space?.personalContextId === contextId || this.hub.canRead(contextId, this.opts.actorId);
   }
 
-  /** Aqui só existe o contexto pessoal, então ler e escrever equivalem; o nome segue a regra do banco. */
+  /** No Pessoal ler e escrever equivalem; na Família, escreve quem é titular ou membro, nunca quem só vê. */
   private canWrite(contextId: string) {
-    return this.canRead(contextId);
+    if (this.space?.personalContextId === contextId) return true;
+    return this.hub.canWrite(contextId, this.opts.actorId);
   }
 
   /**
@@ -3905,6 +3929,149 @@ export class MemoryRepository implements RecordsRepository {
       const { min, max } = dueDateBounds(this.opts.today());
       if (input.dueOn < min || input.dueOn > max) throw new RepoError('vencimento_fora_do_intervalo');
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Família (D-055): as nove funções da migração 0013, sobre o hub compartilhado
+  // ---------------------------------------------------------------------------
+
+  /** Uma chave já usada por outra operação da pessoa (fora da Família) é chave_reutilizada: o espaço de chaves é um só. */
+  private familyKey(key: string) {
+    const prev = this.operations.get(key);
+    if (prev && !isFamilyAction(prev.action)) throw new RepoError('chave_reutilizada');
+  }
+
+  /** Marca a chave como usada, uma vez (a repetição não grava de novo). Não conta como anotação na atividade. */
+  private familyDone(key: string, action: FamilyAction, contextId: string) {
+    if (this.operations.has(key)) return;
+    this.operations.set(key, {
+      action,
+      hash: '',
+      contextId,
+      recordId: null,
+      commitmentId: null,
+      seriesId: null,
+      referenceId: null,
+      budgetId: null,
+      goalId: null,
+      movementId: null,
+      cardId: null,
+      entryId: null,
+      accountId: null,
+      importResult: null,
+    });
+  }
+
+  /**
+   * A Família nasce com a "Conta principal" (F7), como o Pessoal. Aqui a conta fica no repositório de quem cria e de quem entra:
+   * cada pessoa guarda o que anota na Família no próprio repositório.
+   */
+  private ensureFamilyAccount(contextId: string) {
+    if (this.liveAccounts().some((a) => a.contextId === contextId)) return;
+    const account: StoredAccount = {
+      id: this.id('conta'),
+      contextId,
+      name: 'Conta principal',
+      currency: 'BRL',
+      initialBalanceCents: null,
+      kind: 'banco',
+      status: 'ativa',
+      isDefault: true,
+      version: 1,
+      createdBy: this.opts.actorId,
+      createdAt: new Date().toISOString(),
+    };
+    this.accountsById.set(account.id, account);
+  }
+
+  private get ownPersonal(): string | null {
+    return this.space?.personalContextId ?? null;
+  }
+
+  async getFamily(): Promise<FamilyOverview | null> {
+    return this.read(() => this.hub.getFamily(this.opts.actorId));
+  }
+
+  async createFamily(key: string, name: string): Promise<FamilyJoin> {
+    return this.write(() => {
+      this.familyKey(key);
+      const joined = this.hub.create(this.opts.actorId, key, name);
+      this.ensureFamilyAccount(joined.context.id);
+      this.familyDone(key, 'criar_familia', joined.context.id);
+      return joined;
+    });
+  }
+
+  async createFamilyInvite(key: string, contextId: string, role: InviteRole): Promise<FamilyInviteWrite> {
+    return this.write(() => {
+      this.familyKey(key);
+      const r = this.hub.createInvite(this.opts.actorId, key, contextId, role, this.ownPersonal);
+      this.familyDone(key, 'criar_convite_familia', contextId);
+      return r;
+    });
+  }
+
+  async cancelFamilyInvite(key: string, inviteId: string): Promise<FamilyInvite> {
+    return this.write(() => {
+      this.familyKey(key);
+      const r = this.hub.cancelInvite(this.opts.actorId, key, inviteId);
+      this.familyDone(key, 'cancelar_convite_familia', r.contextId);
+      return r;
+    });
+  }
+
+  async previewFamilyInvite(code: string): Promise<FamilyInvitePreview> {
+    return this.read(() => this.hub.preview(code));
+  }
+
+  async acceptFamilyInvite(key: string, code: string): Promise<FamilyJoin> {
+    return this.write(() => {
+      this.familyKey(key);
+      const joined = this.hub.accept(this.opts.actorId, key, code);
+      this.ensureFamilyAccount(joined.context.id);
+      this.familyDone(key, 'aceitar_convite_familia', joined.context.id);
+      return joined;
+    });
+  }
+
+  async leaveFamily(key: string, contextId: string): Promise<void> {
+    return this.write(() => {
+      this.familyKey(key);
+      this.hub.leave(this.opts.actorId, key, contextId, this.ownPersonal);
+      this.familyDone(key, 'sair_familia', contextId);
+    });
+  }
+
+  async removeFamilyMember(key: string, contextId: string, personId: string): Promise<void> {
+    return this.write(() => {
+      this.familyKey(key);
+      this.hub.remove(this.opts.actorId, key, contextId, personId, this.ownPersonal);
+      this.familyDone(key, 'remover_membro_familia', contextId);
+    });
+  }
+
+  async setMemberRole(key: string, contextId: string, personId: string, role: InviteRole): Promise<void> {
+    return this.write(() => {
+      this.familyKey(key);
+      this.hub.setRole(this.opts.actorId, key, contextId, personId, role, this.ownPersonal);
+      this.familyDone(key, 'alterar_papel_familia', contextId);
+    });
+  }
+
+  async transferFamilyOwnership(key: string, contextId: string, personId: string): Promise<void> {
+    return this.write(() => {
+      this.familyKey(key);
+      this.hub.transfer(this.opts.actorId, key, contextId, personId, this.ownPersonal);
+      this.familyDone(key, 'transferir_titularidade_familia', contextId);
+    });
+  }
+
+  async endFamily(key: string, contextId: string): Promise<void> {
+    return this.write(() => {
+      this.familyKey(key);
+      this.hub.end(this.opts.actorId, key, contextId, this.ownPersonal);
+      this.familyDone(key, 'encerrar_familia', contextId);
+    });
   }
 }
 

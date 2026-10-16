@@ -41,6 +41,7 @@ import type {
   SeriesEditInput,
   SeriesInput,
 } from './records';
+import type { FamilyInvite, FamilyInviteWrite, FamilyInvitePreview, FamilyJoin, FamilyOverview, InviteRole } from './family';
 import type { ImportDestination, ImportItem, ImportResult } from './importar/tipos';
 import type { RecordSearchFilter, SearchPage } from './search';
 
@@ -660,6 +661,48 @@ export interface RecordsRepository {
     commitmentId: string | null;
     recordId: string | null;
   } | null>;
+
+  // Família (D-055, Ciclo L). Regras e textos em family.ts, iguais aos da migração 0013 (as nove funções). Toda escrita leva uma
+  // chave de idempotência (o mesmo espaço das outras operações da pessoa): repetir a mesma chave devolve o mesmo resultado;
+  // outro conteúdo com a mesma chave é chave_reutilizada. Nenhuma conta como anotação na atividade (D-030). No MemoryRepository,
+  // vínculos, convites e papéis são compartilhados entre repositórios por um MemoryFamilyHub; o que cada pessoa anota na Família
+  // fica no repositório dela.
+
+  /** A Família ativa da pessoa (inclusive as pessoas, com o primeiro nome, e, para o titular, os convites válidos), ou null. */
+  getFamily(): Promise<FamilyOverview | null>;
+  /**
+   * create_family. Quem cria vira titular (ler, anotar e editar de outras pessoas) e a Família nasce com a "Conta principal". Ordem:
+   * repetição; sem_permissao (sem espaço pessoal); nome_da_familia_invalido (1 a 60 caracteres); ja_em_familia.
+   */
+  createFamily(key: string, name: string): Promise<FamilyJoin>;
+  /**
+   * create_family_invite. Só o titular. Ordem: repetição; nao_encontrado (Família que não lê); contexto_invalido (o Pessoal);
+   * sem_permissao; papel_invalido; familia_cheia (pessoas ativas mais convites válidos já somam 6). O código aparece uma única
+   * vez; repetir a chave devolve o convite com code null.
+   */
+  createFamilyInvite(key: string, contextId: string, role: InviteRole): Promise<FamilyInviteWrite>;
+  /** cancel_family_invite. Só o titular. Convite já usado: convite_ja_usado; já cancelado ou vencido: segue cancelado, sem erro. */
+  cancelFamilyInvite(key: string, inviteId: string): Promise<FamilyInvite>;
+  /**
+   * preview_family_invite (só leitura): o nome da Família, o primeiro nome de quem convidou, o papel e a validade. Convite
+   * malformado, que não existe, usado, cancelado ou vencido: sempre convite_invalido, sem revelar qual caso.
+   */
+  previewFamilyInvite(code: string): Promise<FamilyInvitePreview>;
+  /**
+   * accept_family_invite. Confere tudo de novo: convite_invalido, ja_em_familia (inclui esta mesma Família) e familia_cheia. Uso
+   * único. Nunca copia nem mostra o Pessoal de ninguém.
+   */
+  acceptFamilyInvite(key: string, code: string): Promise<FamilyJoin>;
+  /** leave_family. Membro ou leitor sai; o titular recebe titular_nao_sai. Os convites que a pessoa criou são cancelados. */
+  leaveFamily(key: string, contextId: string): Promise<void>;
+  /** remove_family_member. Só o titular, nunca sobre si (nao_sobre_si). A pessoa precisa estar ativa (nao_encontrado). */
+  removeFamilyMember(key: string, contextId: string, personId: string): Promise<void>;
+  /** set_member_role. Só o titular, nunca sobre si. 'membro' lê e anota; 'leitor' só lê. */
+  setMemberRole(key: string, contextId: string, personId: string, role: InviteRole): Promise<void>;
+  /** transfer_family_ownership. Só o titular, para uma pessoa ativa; quem era titular vira membro. */
+  transferFamilyOwnership(key: string, contextId: string, personId: string): Promise<void>;
+  /** end_family. Só o titular e só sem outra pessoa ativa (familia_com_membros). Os dados ficam guardados, sem leitura por ninguém. */
+  endFamily(key: string, contextId: string): Promise<void>;
 }
 
 export type RepoErrorCode =
@@ -755,6 +798,16 @@ export type RepoErrorCode =
   | 'chave_de_importacao_invalida'
   | 'marca_invalida'
   | 'assinatura_so_gasto_fixo'
+  | 'nome_da_familia_invalido'
+  | 'ja_em_familia'
+  | 'familia_cheia'
+  | 'convite_invalido'
+  | 'convite_ja_usado'
+  | 'papel_invalido'
+  | 'titular_nao_sai'
+  | 'nao_sobre_si'
+  | 'contexto_invalido'
+  | 'familia_com_membros'
   | 'desconhecido';
 
 export class RepoError extends Error {

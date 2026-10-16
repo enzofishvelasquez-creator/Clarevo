@@ -8,7 +8,7 @@ import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Button, Card, Screen, Skeleton, Txt } from '@/components/ui';
-import { useCardsOverview, useIncomeReferences, useSpace } from '@/state/data';
+import { useCardsOverview, useIncomeReferences, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -20,9 +20,9 @@ const T = CARDS_TEXT;
  */
 export default function CartoesScreen() {
   const { today } = useSession();
-  const personal = useSpace().data;
-  const overview = useCardsOverview(personal?.personalContextId);
-  const refs = useIncomeReferences(personal?.personalContextId);
+  const personal = useWork().data;
+  const overview = useCardsOverview(personal?.contextId);
+  const refs = useIncomeReferences(personal?.contextId);
   const month = monthOf(today);
   // Faturas do mês (D-042): as de todos os cartões do contexto, ativos e arquivados, como a renda comprometida as conta.
   const monthTotal = overview.data ? cardInvoicesMonth(overview.data.flatMap((o) => o.invoices), month, refs.data ?? []) : null;
@@ -45,7 +45,7 @@ export default function CartoesScreen() {
           />
         ) : null}
         <Txt color={colors.textSecondary}>{T.screens.listIntro}</Txt>
-        <Button label={T.newCard} icon={Plus} onPress={() => router.push('/cartoes/novo')} />
+        {personal?.canWrite === false ? null : <Button label={T.newCard} icon={Plus} onPress={() => router.push('/cartoes/novo')} />}
 
         {overview.isPending ? (
           <View style={{ gap: space[3] }} accessibilityRole="progressbar" accessibilityLabel="Carregando cartões">

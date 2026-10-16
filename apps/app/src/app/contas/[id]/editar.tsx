@@ -6,14 +6,14 @@ import { AccountForm } from '@/components/account-form';
 import { ContextPill, SubHeader } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Card, Screen, Txt } from '@/components/ui';
-import { useAccounts, useSpace } from '@/state/data';
+import { useAccounts, useWork } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
 /** Editar conta (D-043). Conta excluída ou sem leitura: a mensagem de sempre, nunca um formulário vazio. */
 export default function EditarContaScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const personal = useSpace();
-  const ctx = personal.data?.personalContextId;
+  const personal = useWork();
+  const ctx = personal.data?.contextId;
   const accounts = useAccounts(ctx);
   const account = accounts.data?.find((a) => a.id === id);
 

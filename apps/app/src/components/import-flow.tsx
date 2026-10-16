@@ -50,7 +50,7 @@ import { flash } from '@/lib/flash';
 import { latestMonthOf, loadImportContext, type ImportContext } from '@/lib/import-context';
 import { moneyText, useValuesHidden } from '@/lib/privacy';
 import { pickImportFile, type PickedImport } from '@/lib/import-file';
-import { isRefusal, useCards, useImportRecords, useSpace, useView } from '@/state/data';
+import { isRefusal, useCards, useImportRecords, useWork, useView } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -83,10 +83,10 @@ export function ImportFlow() {
   const repo = useRepo();
   const { today, user, auth } = useSession();
   const { setMonth, currentMonth } = useView();
-  const personal = useSpace();
+  const personal = useWork();
   const hidden = useValuesHidden();
   const timeZone = personal.data?.timeZone;
-  const contextId = personal.data?.personalContextId;
+  const contextId = personal.data?.contextId;
   const accounts = personal.data?.accounts ?? [];
   const cards = useCards(contextId);
   const importer = useImportRecords();

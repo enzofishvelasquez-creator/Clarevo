@@ -8,13 +8,13 @@ import { PaymentForm } from '@/components/payment-form';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Card, Txt } from '@/components/ui';
 import { invoiceHref } from '@/lib/cards';
-import { useCommitment, useSpace } from '@/state/data';
+import { useCommitment, useWork } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
 /** /a-pagar/[id]/pagar?data=vencimento: a data do pagamento abre no vencimento (Contas vencidas). */
 export default function MarcarComoPaga() {
   const { id, data } = useLocalSearchParams<{ id: string; data?: string }>();
-  const personal = useSpace().data;
+  const personal = useWork().data;
   const commitment = useCommitment(id);
   const c = commitment.data;
   // Aberto o formulário, ele fica na tela: o pagamento confirmado aqui atualiza a consulta antes de voltar.

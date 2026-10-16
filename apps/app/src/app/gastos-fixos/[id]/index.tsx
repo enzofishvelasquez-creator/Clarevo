@@ -60,7 +60,8 @@ import { Banner, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/compo
 import { flash } from '@/lib/flash';
 import { explanationHref } from '@/lib/learn';
 import { moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
-import { useDeleteSeries, useSeries, useSeriesOccurrences, useSeriesOpenOccurrences, useSeriesOperationKey, useSpace } from '@/state/data';
+import { useDeleteSeries, useSeries, useSeriesOccurrences, useSeriesOpenOccurrences, useSeriesOperationKey, useWork } from '@/state/data';
+import { useAuthorship } from '@/components/family-parts';
 import { useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
 
@@ -70,8 +71,8 @@ const parcelas = (n: number) => (n === 1 ? '1 parcela' : `${n} parcelas`);
 export default function DetalheGastoFixo() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { today } = useSession();
-  const personal = useSpace().data;
-  const ctx = personal?.personalContextId;
+  const personal = useWork().data;
+  const ctx = personal?.contextId;
   const series = useSeries(id, ctx);
   const occ = useSeriesOccurrences(id, ctx);
   const openOcc = useSeriesOpenOccurrences(id, ctx);
@@ -295,6 +296,7 @@ export default function DetalheGastoFixo() {
 
 /** Cabeçalho do gasto fixo: período, valor atual, histórico de valores e, no parcelamento, o progresso. */
 function Overview({ series: s, today }: { series: CommitmentSeries; today: IsoDate }) {
+  const by = useAuthorship(s.contextId, s.createdBy);
   const term = currentTerm(s, today);
   const variable = term.amountMode === 'variavel';
   const history = termHistory(s);
@@ -347,8 +349,9 @@ function Overview({ series: s, today }: { series: CommitmentSeries; today: IsoDa
           </>
         ) : null}
         <View>
-          <Row label="Contexto" value="Pessoal" />
+          <Row label="Contexto" value={by.contextName} />
           {s.kind === 'parcelada' ? <Row label="Tipo" value={SERIES_NATURE_LABEL[s.nature]} /> : null}
+          {by.kind === 'familia' ? <Row label="Criado por" value={by.by} /> : null}
           <Row label="Categoria" value={term.category ?? NO_CATEGORY_LABEL} last />
         </View>
         {!s.generating ? (

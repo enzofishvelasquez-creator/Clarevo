@@ -23,7 +23,7 @@ import { EmptyState, ErrorState } from '@/components/states';
 import { Banner, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { explanationHref } from '@/lib/learn';
-import { useReturnReview, useSpace } from '@/state/data';
+import { useReturnReview, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, motion, space, tabular } from '@/theme/tokens';
 
@@ -37,8 +37,8 @@ const openIn = FadeIn.duration(motion.detail).reduceMotion(ReduceMotion.System);
  */
 export default function SeusUltimosMeses() {
   const { today } = useSession();
-  const personal = useSpace().data;
-  const ctx = personal?.personalContextId;
+  const personal = useWork().data;
+  const ctx = personal?.contextId;
   const query = useReturnReview(ctx);
   const writer = useReturnWriter();
   const [busy, setBusy] = useState(false);

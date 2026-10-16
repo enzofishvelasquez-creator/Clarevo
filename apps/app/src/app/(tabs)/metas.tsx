@@ -7,7 +7,7 @@ import { openCalc } from '@/components/calc/open';
 import { CalcNavRow } from '@/components/calc/parts';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ClosedGoals, GoalCard, ReserveCard } from '@/components/goal-cards';
-import { AppHeader } from '@/components/header';
+import { AppHeader, ContextSwitch } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
 import { SavingsCard, SavingsPlanInReserve } from '@/components/savings-card';
 import { SeasonCardView } from '@/components/season-card';
@@ -15,7 +15,7 @@ import { EmptyState, ErrorState } from '@/components/states';
 import { TopicRow } from '@/components/topic-link';
 import { Body, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { explanationHref, isTopicPublished, seasonalCard, topicBySlug } from '@/lib/learn';
-import { useCommittedSummary, useGoalsOverview, useSavingsCard, useSpace, type GoalsOverview } from '@/state/data';
+import { useCommittedSummary, useGoalsOverview, useSavingsCard, useWork, type GoalsOverview } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -29,8 +29,8 @@ import { colors, fonts, radius, space } from '@/theme/tokens';
  */
 export default function MetasScreen() {
   const { today } = useSession();
-  const personal = useSpace();
-  const contextId = personal.data?.personalContextId;
+  const personal = useWork();
+  const contextId = personal.data?.contextId;
   const overview = useGoalsOverview(contextId);
   const committed = useCommittedSummary(contextId, monthOf(today));
   const savings = useSavingsCard(contextId);
@@ -42,7 +42,9 @@ export default function MetasScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Screen wide>
-        <AppHeader title={GOALS_TEXT.tabTitle} context="Pessoal" />
+        <AppHeader title={GOALS_TEXT.tabTitle} context="Pessoal">
+          <ContextSwitch />
+        </AppHeader>
         <Body>
           <FlashBanner message={notice} />
           <SavingsCard contextId={contextId} card={savings} onNotice={setNotice} planInReserve={overview.isPending || Boolean(data)} />
@@ -65,7 +67,7 @@ export default function MetasScreen() {
                 planSlot={<SavingsPlanInReserve contextId={contextId} card={savings} />}
                 planLink={savings.data?.state.kind === 'oculto'}
               />
-              <GoalsSection active={data.active} plans={data.plans} />
+              <GoalsSection active={data.active} plans={data.plans} canWrite={personal.data?.canWrite ?? true} />
               <MonthCard overview={data} committed={committed} />
             </>
           ) : (
@@ -159,7 +161,7 @@ function MonthCard({ overview, committed }: { overview: GoalsOverview; committed
   );
 }
 
-function GoalsSection({ active, plans }: { active: readonly Goal[]; plans: GoalsOverview['plans'] }) {
+function GoalsSection({ active, plans, canWrite }: { active: readonly Goal[]; plans: GoalsOverview['plans']; canWrite: boolean }) {
   return (
     <View style={{ gap: space[3] }}>
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -174,7 +176,7 @@ function GoalsSection({ active, plans }: { active: readonly Goal[]; plans: Goals
       ) : (
         active.map((g) => <GoalCard key={g.id} goal={g} plan={plans[g.id]!} />)
       )}
-      <Button label={GOALS_TEXT.newGoal} icon={Plus} tone="soft" onPress={() => router.push('/meta/nova')} />
+      {canWrite ? <Button label={GOALS_TEXT.newGoal} icon={Plus} tone="soft" onPress={() => router.push('/meta/nova')} /> : null}
     </View>
   );
 }

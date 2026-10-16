@@ -1,4 +1,13 @@
-import { DEMO_EMAIL, DEMO_TODAY, MemoryRepository, createDemoRepository, demoScenarioFrom, type DemoScenario, type RecordsRepository } from '@clarevo/core';
+import {
+  DEMO_EMAIL,
+  DEMO_TODAY,
+  MemoryFamilyHub,
+  MemoryRepository,
+  createDemoRepository,
+  demoScenarioFrom,
+  type DemoScenario,
+  type RecordsRepository,
+} from '@clarevo/core';
 
 import { AuthError, type AuthService, type AuthState, type AuthUser } from './auth';
 
@@ -33,6 +42,12 @@ export class DemoAuth implements AuthService {
   private listeners = new Set<(s: AuthState) => void>();
   private demoRepo: Promise<MemoryRepository> | null = null;
   private readonly scenario: DemoScenario = scenarioFromAddress();
+  /**
+   * A Família simulada (D-055): as contas criadas aqui compartilham um só hub, com o dia fixo da demonstração, para um convite criado
+   * por uma conta poder ser aceito por outra no mesmo uso. A conta de demonstração com dados fictícios fica fora: ela não tem
+   * Família de exemplo nem membros simulados. Nada disto sai da memória do app.
+   */
+  private readonly familyHub = new MemoryFamilyHub({ now: () => Date.parse(`${DEMO_TODAY}T12:00:00.000Z`) });
 
   constructor() {
     this.accounts.set(DEMO_EMAIL, {
@@ -127,7 +142,13 @@ export class DemoAuth implements AuthService {
       return lazy(this.demoRepo);
     }
     const acc = this.accounts.get(user.email)!;
-    acc.repo ??= new MemoryRepository({ actorId: user.id, displayName: user.displayName, today: () => DEMO_TODAY, latencyMs: 300 });
+    acc.repo ??= new MemoryRepository({
+      actorId: user.id,
+      displayName: user.displayName,
+      today: () => DEMO_TODAY,
+      latencyMs: 300,
+      family: this.familyHub,
+    });
     return acc.repo;
   }
 }

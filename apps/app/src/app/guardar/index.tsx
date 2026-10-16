@@ -6,7 +6,7 @@ import { ContextPill, SubHeader } from '@/components/header';
 import { SavingsPlanForm } from '@/components/savings-plan-form';
 import { ErrorState } from '@/components/states';
 import { Card, Screen, Skeleton } from '@/components/ui';
-import { useCommittedSummary, useSavingsCard, useSavingsPlanInputs, useSpace } from '@/state/data';
+import { useCommittedSummary, useSavingsCard, useSavingsPlanInputs, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -19,8 +19,8 @@ import { colors, space } from '@/theme/tokens';
 export default function GuardarScreen() {
   const { editar } = useLocalSearchParams<{ editar?: string }>();
   const { today } = useSession();
-  const personal = useSpace();
-  const contextId = personal.data?.personalContextId;
+  const personal = useWork();
+  const contextId = personal.data?.contextId;
   const card = useSavingsCard(contextId);
   const inputs = useSavingsPlanInputs(contextId);
   const month = monthOf(today);

@@ -11,6 +11,8 @@ export * from './repository';
 export * from './pending';
 export * from './pending-text';
 export * from './memory-repository';
+export * from './memory-family';
+export * from './family';
 export * from './demo';
 export * from './demo-badge';
 export * from './learn';

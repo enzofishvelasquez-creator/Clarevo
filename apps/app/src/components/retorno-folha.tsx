@@ -22,7 +22,7 @@ import { yearA11yLabel } from '@/components/series-parts';
 import { Button, Chip, Txt } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
 import { useLastAccount } from '@/lib/last-account';
-import { useSpace } from '@/state/data';
+import { useWork } from '@/state/data';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
 type Step = { type: 'linha' } | { type: 'pagar' } | { type: 'nao_houve' };
@@ -54,7 +54,7 @@ export function RegisterMonthSheet({
 }) {
   const reduced = useReducedMotion();
   const { height } = useWindowDimensions();
-  const personal = useSpace().data;
+  const personal = useWork().data;
   const writer = useReturnWriter();
   /** Dados atuais de cada linha (conta criada e pagamento que falhou), pela chave da linha recebida. */
   const [current, setCurrent] = useState<Record<string, ReviewRow>>({});

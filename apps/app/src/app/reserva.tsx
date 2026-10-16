@@ -6,13 +6,13 @@ import { ContextPill, SubHeader } from '@/components/header';
 import { ReserveForm, readReservePrefill, type ReservePrefillParams } from '@/components/reserve-form';
 import { ErrorState } from '@/components/states';
 import { Card, Screen, Skeleton } from '@/components/ui';
-import { useEssentialEstimate, useGoalDetail, useGoalsOverview, useSpace } from '@/state/data';
+import { useEssentialEstimate, useGoalDetail, useGoalsOverview, useWork } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
 export default function ReservaScreen() {
   const params = useLocalSearchParams<ReservePrefillParams>();
-  const personal = useSpace();
-  const contextId = personal.data?.personalContextId;
+  const personal = useWork();
+  const contextId = personal.data?.contextId;
   const overview = useGoalsOverview(contextId);
   const estimate = useEssentialEstimate(contextId);
   const reserve = overview.data?.reserve ?? null;

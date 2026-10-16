@@ -7,7 +7,7 @@ import { SubHeader } from '@/components/header';
 import { SeriesEndForm } from '@/components/series-end-form';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Card, Txt } from '@/components/ui';
-import { useSeries, useSeriesOccurrences, useSeriesOpenOccurrences, useSpace } from '@/state/data';
+import { useSeries, useSeriesOccurrences, useSeriesOpenOccurrences, useWork } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
 /**
@@ -16,8 +16,8 @@ import { colors, space } from '@/theme/tokens';
  */
 export default function EncerrarGastoFixo() {
   const { id, depois } = useLocalSearchParams<{ id: string; depois?: string }>();
-  const personal = useSpace().data;
-  const ctx = personal?.personalContextId;
+  const personal = useWork().data;
+  const ctx = personal?.contextId;
   const series = useSeries(id, ctx);
   const occ = useSeriesOccurrences(id, ctx);
   // Todas as em aberto: o conjunto afetado que o banco confere vai além das 60 da lista.

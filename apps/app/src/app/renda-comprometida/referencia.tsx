@@ -31,6 +31,7 @@ import { ChoiceGroup, monthChipLabel, seriesStyles as styles } from '@/component
 import { ErrorState } from '@/components/states';
 import { TermHint } from '@/components/term-hint';
 import { Banner, Button, Card, Chip, Screen, Skeleton, TextField, Txt } from '@/components/ui';
+import { UnsavedChangesText } from '@/components/context-text';
 import { announceOnIOS } from '@/lib/a11y';
 import { flash } from '@/lib/flash';
 import {
@@ -40,7 +41,7 @@ import {
   useIncomeReferences,
   useReferenceSuggestion,
   useSetIncomeReference,
-  useSpace,
+  useWork,
 } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
@@ -54,7 +55,7 @@ import { colors, fonts, space } from '@/theme/tokens';
  * `?mes=AAAA-MM` escolhe o mês de vigência inicial (sem ele, este mês).
  */
 export default function ReferenciaScreen() {
-  const contextId = useSpace().data?.personalContextId;
+  const contextId = useWork().data?.contextId;
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {contextId ? (
@@ -352,7 +353,7 @@ function ReferenceForm({ contextId }: { contextId: string }) {
           setConfirmDiscard(null);
           if (action) leave(action);
         }}>
-        <Txt color={colors.textSecondary}>Você tem alterações que ainda não foram salvas em Pessoal.</Txt>
+        <UnsavedChangesText />
       </ConfirmDialog>
     </KeyboardAvoidingView>
   );

@@ -8,7 +8,7 @@ import { View } from 'react-native';
 import { CalcChip, CalcField, CalcResult, CalcScreen, calcInlineLink, onlyChoicesMissing, useCalcForm, type CalcBinding } from '@/components/calc/parts';
 import { ChoiceGroup } from '@/components/series-parts';
 import { Button, Card, LinkButton, Txt } from '@/components/ui';
-import { useGoals, useSpace } from '@/state/data';
+import { useGoals, useWork } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
 type Key = 'essenciais' | 'meses' | 'guardado' | 'mensal';
@@ -33,8 +33,8 @@ export function ReservaCalc({ prefill }: { prefill: CalcPrefill<'reserva'> }) {
   const outcome = calcReserva({ ...form.values, meses: monthsText });
   const errors = outcome.ok ? {} : outcome.errors;
   // Só para o nome do botão: com uma reserva não arquivada, os valores vão para ela. Se a lista não carregar, vale "Criar reserva".
-  const personal = useSpace();
-  const goals = useGoals(personal.data?.personalContextId);
+  const personal = useWork();
+  const goals = useGoals(personal.data?.contextId);
   const hasReserve = goals.data ? organizeGoals(goals.data).reserve !== null : false;
   const calc: CalcBinding<Key> = { slug: 'reserva', form, errors };
   // Sem mês escolhido, o aviso ("Escolha ...") aparece quando é a única coisa que falta. O "Digite ..." fica para "Outro".

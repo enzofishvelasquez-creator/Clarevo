@@ -21,7 +21,7 @@ import { SeuMesCardView } from '@/components/seu-mes-parts';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
-import { useSeuMes, useSpace, useView } from '@/state/data';
+import { useSeuMes, useWork, useView } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, motion, space } from '@/theme/tokens';
 
@@ -51,7 +51,7 @@ export default function SeuMesScreen() {
     setStep({ month: seuMesStartMonth(params.mes, currentMonth), index: 0, direction: 1 });
   }, [params.mes, currentMonth]);
   const { month, index, direction } = step;
-  const contextId = useSpace().data?.personalContextId;
+  const contextId = useWork().data?.contextId;
   const view = useSeuMes(contextId, month);
   const prev = seuMesStep(month, currentMonth, -1);
   const next = seuMesStep(month, currentMonth, 1);

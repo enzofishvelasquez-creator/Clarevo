@@ -48,7 +48,6 @@ import {
   type IsoMonth,
   type PaymentDraft,
   type PaymentInput,
-  type PersonalSpace,
   type SeriesWrite,
 } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
@@ -67,6 +66,7 @@ import { MoneyTxt } from '@/components/money-text';
 import { CheckOption, ChoiceGroup, joinList, lastYearHint, monthChipLabel, seriesStyles as styles, yearA11yLabel } from '@/components/series-parts';
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
+import { UnsavedChangesText } from '@/components/context-text';
 import { flash } from '@/lib/flash';
 import { useLastAccount } from '@/lib/last-account';
 import { totalChange } from '@/lib/highlight';
@@ -78,6 +78,7 @@ import {
   useSeriesOpenOccurrences,
   useSeriesOperationKey,
   useUpdateRecord,
+  type WorkSpace,
 } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
@@ -109,7 +110,7 @@ export function SeriesEndForm({
   thenNew = false,
 }: {
   series: CommitmentSeries;
-  space: PersonalSpace;
+  space: WorkSpace;
   thenNew?: boolean;
 }) {
   const { today } = useSession();
@@ -121,7 +122,7 @@ export function SeriesEndForm({
   const pay = usePayCommitment();
   const updateRecord = useUpdateRecord();
   const keys = useSeriesOperationKey();
-  const contextId = personal.personalContextId;
+  const contextId = personal.contextId;
   const live = useSeries(opened.id, contextId);
   const occ = useSeriesOccurrences(opened.id, contextId);
   const openOcc = useSeriesOpenOccurrences(opened.id, contextId);
@@ -792,7 +793,7 @@ export function SeriesEndForm({
           setConfirmDiscard(null);
           if (action) leave(action);
         }}>
-        <Txt color={colors.textSecondary}>Você tem alterações que ainda não foram salvas em Pessoal.</Txt>
+        <UnsavedChangesText />
       </ConfirmDialog>
     </KeyboardAvoidingView>
   );

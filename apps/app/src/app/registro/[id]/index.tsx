@@ -36,7 +36,8 @@ import { totalChange } from '@/lib/highlight';
 import { invoiceHref } from '@/lib/cards';
 import { openOfficialUrl, receiptLinks } from '@/lib/receipt-link';
 import { openSummary } from '@/lib/nav';
-import { useAccounts, useDeleteRecord, useRecord, useSpace, useView } from '@/state/data';
+import { useAccounts, useDeleteRecord, useRecord, useWork, useView } from '@/state/data';
+import { useAuthorship } from '@/components/family-parts';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -66,7 +67,7 @@ function openAsSeries(r: FinancialRecord, today: IsoDate) {
 export default function DetalheRegistro() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const record = useRecord(id);
-  const personal = useSpace().data;
+  const personal = useWork().data;
   const view = useView();
   const { user, today } = useSession();
   const remove = useDeleteRecord();
@@ -78,6 +79,7 @@ export default function DetalheRegistro() {
   const toList = () => (router.canGoBack() ? router.back() : router.replace('/movimentacoes'));
 
   const r = record.data;
+  const by = useAuthorship(r?.contextId ?? '', r?.createdBy ?? '');
   // Conta de origem (D-043): também a arquivada de um registro antigo ("Carteira (arquivada)").
   const accounts = useAccounts(r?.contextId);
   const accountList = accounts.data ?? personal?.accounts ?? [];
@@ -146,7 +148,7 @@ export default function DetalheRegistro() {
                 </Txt>
                 <FitMoney cents={r.amountCents} />
                 <View>
-                  <Row label="Contexto" value="Pessoal" />
+                  <Row label="Contexto" value={by.contextName} />
                   <Row
                     label={r.kind === 'despesa' ? ACCOUNTS_TEXT.out : ACCOUNTS_TEXT.into}
                     value={accountName}
@@ -159,7 +161,7 @@ export default function DetalheRegistro() {
                 </View>
                 <View style={styles.trail} accessible>
                   <Txt variant="caption" color={colors.textSecondary}>
-                    Anotado por {r.createdBy === user?.id ? 'você' : 'outra pessoa da família'} em {formatDateTimeBR(r.createdAt, deviceTimeZone())}
+                    Anotado por {by.by} em {formatDateTimeBR(r.createdAt, deviceTimeZone())}
                   </Txt>
                   {r.version > 1 ? (
                     <Txt variant="caption" color={colors.textSecondary}>
@@ -219,7 +221,6 @@ export default function DetalheRegistro() {
                 tone="soft"
                 onPress={() => {
                   view.setMonth(monthOf(r.occurredOn));
-                  view.setSpace('pessoal');
                   openSummary();
                 }}
               />

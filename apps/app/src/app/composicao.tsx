@@ -12,7 +12,7 @@ import { TopicLink } from '@/components/topic-link';
 import { Button, Card, FitMoney, LinkButton, Money, Screen, Skeleton, spaceKeyPress, Txt } from '@/components/ui';
 import { maskMoneyLabel, useValuesHidden } from '@/lib/privacy';
 import { useSession } from '@/state/session';
-import { currentMonthOf, useCategoryBreakdown, useMonthBudget, useMonthRecords, useSpace, useView } from '@/state/data';
+import { currentMonthOf, useCategoryBreakdown, useMonthBudget, useMonthRecords, useWork, useView } from '@/state/data';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
 const COPY = {
@@ -43,8 +43,8 @@ function Composicao({ kind, byCategory: startByCategory }: { kind: keyof typeof 
   const copy = COPY[kind];
   const { month } = useView();
   const { today } = useSession();
-  const personal = useSpace().data;
-  const records = useMonthRecords(personal?.personalContextId, month);
+  const personal = useWork().data;
+  const records = useMonthRecords(personal?.contextId, month);
   const s = records.summary;
   // "Por categoria" só existe em Pago (spec4 §2.2); a escolha fica só nesta tela.
   // A busca de Aprender (grupo "No app") abre já em "Por categoria" (?vista=categoria).
@@ -52,11 +52,11 @@ function Composicao({ kind, byCategory: startByCategory }: { kind: keyof typeof 
   const byCategory = kind === 'pago' && breakdown === 'categoria';
   // Pagamentos de fatura de cartão entram divididos pelas categorias das compras da fatura (D-037); a consulta só lê as faturas
   // dos cartões que aparecem no Pago do mês e só roda aqui (kind 'pago').
-  const categories = useCategoryBreakdown(kind === 'pago' ? personal?.personalContextId : undefined, month);
+  const categories = useCategoryBreakdown(kind === 'pago' ? personal?.contextId : undefined, month);
   const hasInvoicePayment = Boolean(s?.composition.paid.some((r) => r.invoice));
   // Orçamento do mês (D-041): a linha "de R$ 1.200,00 orçados" só aparece na categoria que tem orçamento. Por categoria continua
   // sendo do Pago; o orçamento é do usado no mês (competência). Sem a leitura do orçamento, a tela segue sem a linha.
-  const budget = useMonthBudget(kind === 'pago' ? personal?.personalContextId : undefined, month);
+  const budget = useMonthBudget(kind === 'pago' ? personal?.contextId : undefined, month);
   const budgets = new Map((budget.summary?.rows ?? []).map((r) => [r.category, r.budgetCents] as const));
 
   const sections = !s

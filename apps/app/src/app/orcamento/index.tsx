@@ -23,7 +23,7 @@ import { MonthStepper } from '@/components/month-stepper';
 import { ErrorState } from '@/components/states';
 import { Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { useBudgetNotices } from '@/lib/budget-notices';
-import { useMonthBudget, useMonthRefunds, useSpace } from '@/state/data';
+import { useMonthBudget, useMonthRefunds, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
@@ -49,7 +49,7 @@ export default function OrcamentoScreen() {
   useEffect(() => {
     setMonth(payablesStartMonth(params.mes, currentMonth));
   }, [params.mes, currentMonth]);
-  const contextId = useSpace().data?.personalContextId;
+  const contextId = useWork().data?.contextId;
   const [notice] = useFlash();
   const budget = useMonthBudget(contextId, month);
   const { refunds } = useMonthRefunds(contextId, month);

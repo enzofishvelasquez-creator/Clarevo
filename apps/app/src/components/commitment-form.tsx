@@ -36,7 +36,6 @@ import {
   type DraftField,
   type FieldErrors,
   type PendingAttempt,
-  type PersonalSpace,
 } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useNavigation } from 'expo-router';
@@ -55,9 +54,10 @@ import { SumValues } from '@/components/sum-values';
 import { ChoiceGroup, ofSeries, SERIES_NOUN } from '@/components/series-parts';
 import { TermHint } from '@/components/term-hint';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
+import { UnsavedChangesText } from '@/components/context-text';
 import { flash } from '@/lib/flash';
 import { explanationHref } from '@/lib/learn';
-import { useAttemptSlot, useCreateCommitment, useLimitWatch, useUpdateCommitment, withNotice } from '@/state/data';
+import { useAttemptSlot, useCreateCommitment, useLimitWatch, useUpdateCommitment, withNotice, type WorkSpace } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -80,7 +80,7 @@ const monthWord = (dueOn: string, today: string) => `${formatMonthName(monthOf(d
  * Conta de gasto fixo ("Só esta conta"): o vencimento fica no mesmo mês (o banco recusa outro mês) e a conta passa a ser
  * alterada só neste mês. "Informar o valor da conta" tira a marca de estimado, mesmo com o valor igual à estimativa.
  */
-export function CommitmentForm({ mode, space: personal }: { mode: CommitmentFormMode; space: PersonalSpace }) {
+export function CommitmentForm({ mode, space: personal }: { mode: CommitmentFormMode; space: WorkSpace }) {
   const { today } = useSession();
   const repo = useRepo();
   const insets = useSafeAreaInsets();
@@ -90,8 +90,8 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
   const limitWatch = useLimitWatch();
   const qc = useQueryClient();
 
-  const contextId = mode.type === 'nova' ? personal.personalContextId : mode.commitment.contextId;
-  const contextName = 'Pessoal';
+  const contextId = mode.type === 'nova' ? personal.contextId : mode.commitment.contextId;
+  const contextName = personal.contextName;
   /** Conta de gasto fixo em edição: o número e o mês nunca mudam. */
   const occurrence = mode.type === 'editar' && mode.commitment.series ? mode.commitment : null;
   const occurrenceMonth = occurrence ? monthOf(occurrence.dueOn) : null;
@@ -601,7 +601,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
           setConfirmDiscard(null);
           if (action) leave(action);
         }}>
-        <Txt color={colors.textSecondary}>Você tem alterações que ainda não foram salvas em {contextName}.</Txt>
+        <UnsavedChangesText />
       </ConfirmDialog>
     </KeyboardAvoidingView>
   );

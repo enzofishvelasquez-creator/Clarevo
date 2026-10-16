@@ -7,7 +7,7 @@ import { SubHeader } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Card, Txt } from '@/components/ui';
 import { YearInformForm } from '@/components/year-inform-form';
-import { useSeries, useSpace } from '@/state/data';
+import { useSeries, useWork } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
 const intParam = (v: string | undefined) => (typeof v === 'string' && /^\d{1,9}$/.test(v) ? Number(v) : undefined);
@@ -15,8 +15,8 @@ const intParam = (v: string | undefined) => (typeof v === 'string' && /^\d{1,9}$
 /** "Informar o valor de 2027": /gastos-fixos/[id]/informar?numero=<n>, com n uma parcela do ano (conta do ano). */
 export default function InformarValorDoAno() {
   const { id, numero } = useLocalSearchParams<{ id: string; numero?: string }>();
-  const personal = useSpace().data;
-  const ctx = personal?.personalContextId;
+  const personal = useWork().data;
+  const ctx = personal?.contextId;
   const series = useSeries(id, ctx);
   const number = intParam(numero);
   // Aberto o formulário, ele fica na tela: uma recusa mostra o aviso ali, sem perder o valor digitado.

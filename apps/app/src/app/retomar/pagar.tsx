@@ -27,7 +27,6 @@ import {
   type FieldErrors,
   type PaymentDraft,
   type PaymentInput,
-  type PersonalSpace,
   type ReviewRow,
 } from '@clarevo/core';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
@@ -46,11 +45,12 @@ import { PayRowError, codeOf, isConflict, isUncertain, openRowFrom, returnSessio
 import { ErrorState, LoadingState } from '@/components/states';
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
+import { UnsavedChangesText } from '@/components/context-text';
 import { flash } from '@/lib/flash';
 import { useLastAccount } from '@/lib/last-account';
 import { explanationHref } from '@/lib/learn';
 import { totalChange } from '@/lib/highlight';
-import { useReturnReview, useSeries, useSpace } from '@/state/data';
+import { useReturnReview, useSeries, useWork, type WorkSpace } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
 
@@ -63,8 +63,8 @@ import { colors, fonts, space, tabular } from '@/theme/tokens';
 export default function RegistrarPagamento() {
   const { serie, numero } = useLocalSearchParams<{ serie?: string; numero?: string }>();
   const { today } = useSession();
-  const personal = useSpace().data;
-  const ctx = personal?.personalContextId;
+  const personal = useWork().data;
+  const ctx = personal?.contextId;
   const n = Number(numero);
   const review = useReturnReview(ctx);
   const series = useSeries(serie, ctx);
@@ -102,7 +102,7 @@ function OutOfRange({ text }: { text: string }) {
   );
 }
 
-function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: PersonalSpace }) {
+function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: WorkSpace }) {
   const { today } = useSession();
   const repo = useRepo();
   const insets = useSafeAreaInsets();
@@ -163,7 +163,7 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: Person
     const ref = row.series;
     if (!ref) return null;
     try {
-      const bills = await repo.listCommitmentsDueBetween(personal.personalContextId, row.month, row.month);
+      const bills = await repo.listCommitmentsDueBetween(personal.contextId, row.month, row.month);
       return bills.find((c) => c.series?.id === ref.id && c.series.number === ref.number) ?? null;
     } catch {
       return null;
@@ -387,7 +387,7 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: Person
           setConfirmDiscard(null);
           if (action) leave(action);
         }}>
-        <Txt color={colors.textSecondary}>Você tem alterações que ainda não foram salvas em Pessoal.</Txt>
+        <UnsavedChangesText />
       </ConfirmDialog>
     </KeyboardAvoidingView>
   );

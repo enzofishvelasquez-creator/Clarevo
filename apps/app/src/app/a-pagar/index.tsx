@@ -50,7 +50,7 @@ import { loadPrefs, useDevicePrefs } from '@/lib/device-prefs';
 import { useLastAccount } from '@/lib/last-account';
 import { totalChange } from '@/lib/highlight';
 import { explanationHref } from '@/lib/learn';
-import { useCommitments, usePayCommitment, usePaymentsForecast, useSeriesList, useSeriesSync, useSpace, useUpdateRecord, useView } from '@/state/data';
+import { useCommitments, usePayCommitment, usePaymentsForecast, useSeriesList, useSeriesSync, useWork, useUpdateRecord, useView } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 
@@ -181,8 +181,8 @@ export default function ContasAPagarScreen() {
     openedWith.current = stamp;
     setMonth(payablesStartMonth(params.mes, currentMonth));
   }, [params.mes, params.abrir, currentMonth]);
-  const personal = useSpace().data;
-  const ctx = personal?.personalContextId;
+  const personal = useWork().data;
+  const ctx = personal?.contextId;
   const commitments = useCommitments(ctx, month);
   const seriesList = useSeriesList(ctx);
   const sync = useSeriesSync(ctx);
@@ -341,7 +341,7 @@ export default function ContasAPagarScreen() {
           )}
         </View>
 
-        <Button label="Anotar conta a pagar" icon={Plus} onPress={() => router.push('/a-pagar/nova')} />
+        {personal?.canWrite === false ? null : <Button label="Anotar conta a pagar" icon={Plus} onPress={() => router.push('/a-pagar/nova')} />}
         <SeriesLink count={seriesList.data?.length ?? null} />
 
         {result ? (

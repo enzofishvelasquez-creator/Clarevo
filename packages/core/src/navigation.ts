@@ -51,6 +51,10 @@ const FORM_PATHS: readonly RegExp[] = [
   /^\/retomar\/(atualizar|pagar)$/,
   // Importar extrato ou fatura (D-048): escolher o arquivo, o destino, revisar as linhas e importar, com rodapé fixo.
   /^\/importar$/,
+  // Família (D-055): criar e convidar são formulários com rodapé fixo. A lista da Família (/familia) é de consulta.
+  /^\/familia\/(nova|convidar)$/,
+  // Convite para a Família: abre antes de entrar e depois de entrar, como as telas de entrada, sem barra.
+  new RegExp(`^/convite/${ID}$`),
   // Entrada, cadastro, recuperação e carregamento.
   /^\/(boas-vindas|criar-conta|confirmar-email|entrar|recuperar-acesso|nova-senha|primeira-conta|carregando|confirmado)$/,
 ];
@@ -329,6 +333,13 @@ export const APP_SCREENS: readonly AppScreen[] = [
     caption: 'Esconder os valores na tela, em Conta e no olho do cabeçalho',
     href: '/conta',
     keywords: ['ocultar', 'esconder', 'valores', 'privacidade', 'biometria', 'digital', 'rosto', 'olho'],
+  },
+  {
+    id: 'familia',
+    title: 'Família',
+    caption: 'Criar a Família, convidar por link e ver as pessoas e o papel de cada uma',
+    href: '/familia',
+    keywords: ['família', 'familia', 'convidar', 'convite', 'link de convite', 'membros', 'titular', 'sair da família', 'anotar junto', 'contas da casa'],
   },
   {
     id: 'conta',

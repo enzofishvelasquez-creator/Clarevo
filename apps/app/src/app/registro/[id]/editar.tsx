@@ -6,12 +6,12 @@ import { RecordForm } from '@/components/record-form';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Txt } from '@/components/ui';
 import { invoiceHref } from '@/lib/cards';
-import { useRecord, useSpace } from '@/state/data';
+import { useRecord, useWork } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
 export default function EditarRegistro() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const personal = useSpace().data;
+  const personal = useWork().data;
   const record = useRecord(id);
 
   if (record.isPending || !personal) return <LoadingState />;
