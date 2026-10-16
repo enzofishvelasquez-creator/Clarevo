@@ -15,16 +15,22 @@ import {
   demoScenarioFrom,
   evolutionAnnouncement,
   evolutionFetchRange,
+  evolutionGapMonths,
   evolutionMonths,
   evolutionPanel,
   evolutionSelectedMonth,
   evolutionTopCategories,
   evolutionVariation,
   isEvolutionWindow,
+  loadEvolutionGaps,
   loadInvoicesOfRecords,
+  MemoryRepository,
   monthOf,
+  newOperationKey,
   summarizeMonth,
   topicTabFor,
+  type Commitment,
+  type CommitmentSeries,
   type EvolutionMetric,
   type EvolutionWindow,
   type MonthOverview,
@@ -368,11 +374,25 @@ describe('meses fora da comparação na memória (D03, T13, T19)', () => {
     store.restoreAll(scope, 'pago');
     expect(store.get(scope, 'pago').size).toBe(0);
     expect([...store.get(scope, 'recebido')]).toEqual(['2026-02']);
-    // Cada métrica vai para o mesmo cálculo, com a sua própria seleção.
-    const pago = buildEvolutionView({ overview, metric: 'pago', windowMonths: 6, currentMonth: '2026-12', hiddenMonths: store.get(scope, 'pago') });
-    const recebido = buildEvolutionView({ overview, metric: 'recebido', windowMonths: 6, currentMonth: '2026-12', hiddenMonths: store.get(scope, 'recebido') });
+    // Cada métrica vai para o mesmo cálculo (12 meses, com os seis de janeiro a junho fechados), com a sua própria seleção.
+    const build = (metric: EvolutionMetric) =>
+      buildEvolutionView({ overview, metric, windowMonths: 12, currentMonth: '2026-12', hiddenMonths: store.get(scope, metric) });
+    // Fevereiro foi tirado só de Recebido: Pago não o herda.
+    const pago = build('pago');
+    const recebido = build('recebido');
+    expect(recebido.stats.hiddenMonths).toEqual(['2026-02']);
+    expect(recebido.outCount).toBe(1);
+    expect(pago.stats.hiddenMonths).toEqual([]);
     expect(pago.outCount).toBe(0);
-    expect(recebido.points.length).toBe(6);
+    expect(pago.points.find((p) => p.month === '2026-02')).toMatchObject({ participation: 'na_comparacao', included: true });
+    // O contrário: abril tirado só de Pago não chega a Recebido, e restaurar Pago não devolve o fevereiro de Recebido.
+    store.setHidden(scope, 'pago', '2026-04', true);
+    expect(build('pago').stats.hiddenMonths).toEqual(['2026-04']);
+    expect(build('recebido').stats.hiddenMonths).toEqual(['2026-02']);
+    expect(build('recebido').points.find((p) => p.month === '2026-04')).toMatchObject({ participation: 'na_comparacao', included: true });
+    store.restoreAll(scope, 'pago');
+    expect(build('pago').stats.hiddenMonths).toEqual([]);
+    expect(build('recebido').stats.hiddenMonths).toEqual(['2026-02']);
   });
 
   it('por pessoa e por contexto: outra pessoa ou outro contexto começa sem nada', () => {
@@ -416,6 +436,258 @@ describe('meses fora da comparação na memória (D03, T13, T19)', () => {
     off();
     store.setHidden(scope, 'pago', '2026-05', true);
     expect(calls).toBe(4);
+  });
+});
+
+describe('meses tirados em outra janela (Restaurar todos restaura tudo, com a pessoa sabendo)', () => {
+  const store = () => {
+    const st = new EvolutionSelectionStore();
+    const scope = EvolutionSelectionStore.scope('pessoa-1', 'contexto-1')!;
+    return { st, scope };
+  };
+  const build = (st: EvolutionSelectionStore, scope: string, windowMonths: EvolutionWindow, metric: EvolutionMetric = 'pago') =>
+    buildEvolutionView({ overview, metric, windowMonths, currentMonth: '2026-06', hiddenMonths: st.get(scope, metric) });
+
+  it('a janela de 3 meses (abril a junho) conta e cita fevereiro, que foi tirado na janela de 6 meses', () => {
+    const { st, scope } = store();
+    st.setHidden(scope, 'pago', '2026-02', true);
+    st.setHidden(scope, 'pago', '2026-05', true);
+    const view = build(st, scope, 3);
+    // O aviso conta só os meses da janela (maio); fevereiro é dito à parte, com o ano.
+    expect(view.outCount).toBe(1);
+    expect(view.eligibleCount).toBe(2);
+    expect(view.stats.hiddenMonths).toEqual(['2026-05']);
+    expect(view.outsideMonths).toEqual(['2026-02']);
+    expect(EVOLUTION_TEXT.custom.banner(view.outCount, view.eligibleCount)).toBe('Comparação personalizada: 1 de 2 meses fora da comparação');
+    expect(EVOLUTION_TEXT.custom.list(view.stats.hiddenMonths, view.outsideMonths)).toBe(
+      'Fora da comparação: maio, e 1 mês fora desta janela (fevereiro de 2026).',
+    );
+    // Na janela de 6 meses os dois estão à vista, e nada fica fora dela.
+    const six = build(st, scope, 6);
+    expect(six.outCount).toBe(2);
+    expect(six.outsideMonths).toEqual([]);
+    expect(EVOLUTION_TEXT.custom.list(six.stats.hiddenMonths, six.outsideMonths)).toBe('Fora da comparação: fevereiro e maio.');
+    // "Restaurar todos" devolve também o que estava fora da janela: o aviso disse que eram dois.
+    st.restoreAll(scope, 'pago');
+    expect(build(st, scope, 3).outsideMonths).toEqual([]);
+    expect(build(st, scope, 3).outCount).toBe(0);
+    expect(build(st, scope, 6).outCount).toBe(0);
+  });
+
+  it('vários meses fora da janela: no plural, em ordem e com o ano de cada um; a média da janela não muda', () => {
+    const { st, scope } = store();
+    for (const m of ['2026-03', '2026-01', '2025-11']) st.setHidden(scope, 'pago', m, true);
+    const view = build(st, scope, 3);
+    expect(view.outsideMonths).toEqual(['2025-11', '2026-01', '2026-03']);
+    expect(view.outCount).toBe(0);
+    expect(view.stats.average).toBe(Math.round((780_000 + 345_000) / 2));
+    expect(EVOLUTION_TEXT.custom.list(['2026-05'], view.outsideMonths)).toBe(
+      'Fora da comparação: maio, e 3 meses fora desta janela (novembro de 2025, janeiro de 2026 e março de 2026).',
+    );
+    expect(EVOLUTION_TEXT.custom.list(['2026-05'], [])).toBe('Fora da comparação: maio.');
+    expect(EVOLUTION_TEXT.custom.list(['2026-05'])).toBe('Fora da comparação: maio.');
+  });
+
+  it('cada valor mostrado tem os seus meses fora da janela, e o mês de outra métrica nunca entra', () => {
+    const { st, scope } = store();
+    st.setHidden(scope, 'recebido', '2026-02', true);
+    expect(build(st, scope, 3, 'pago').outsideMonths).toEqual([]);
+    expect(build(st, scope, 3, 'recebido').outsideMonths).toEqual(['2026-02']);
+  });
+});
+
+describe('lacuna em mês fechado de Pago (D04, segunda metade, e D10)', () => {
+  const WARNING = 'Pode faltar algo neste mês: há conta prevista sem registro';
+  const gapView = (gapMonths: string[], hiddenMonths: string[] = [], metric: EvolutionMetric = 'pago', windowMonths: EvolutionWindow = 6) =>
+    buildEvolutionView({ overview, metric, windowMonths, currentMonth: '2026-06', hiddenMonths, gapMonths });
+
+  it('o ponto ganha o campo gap, continua na comparação e a média, a mediana e o total não mudam', () => {
+    const plain = fromJune();
+    const view = gapView(['2026-03']);
+    expect(plain.points.every((p) => p.gap === false)).toBe(true);
+    expect(view.points.map((p) => [p.month, p.gap])).toEqual([
+      ['2026-01', false],
+      ['2026-02', false],
+      ['2026-03', true],
+      ['2026-04', false],
+      ['2026-05', false],
+      ['2026-06', false],
+    ]);
+    expect(view.points[2]).toMatchObject({ participation: 'na_comparacao', included: true, eligible: true });
+    expect(view.stats).toEqual(plain.stats);
+    expect(view.eligibleCount).toBe(plain.eligibleCount);
+    expect(view.totalCents).toBe(plain.totalCents);
+    expect(view.situation).toBe(plain.situation);
+  });
+
+  it('o aviso está no nome acessível do ponto, e o texto tem a frase combinada', () => {
+    expect(EVOLUTION_TEXT.gap.warning).toBe(WARNING);
+    const view = gapView(['2026-03', '2026-04']);
+    expect(view.points[2]!.name).toBe(`Março de 2026, R$ 3.300,00, na comparação, pode faltar algo neste mês: há conta prevista sem registro`);
+    // O mês pode estar fora da comparação por escolha: o aviso continua.
+    const out = gapView(['2026-04'], ['2026-04']);
+    expect(out.points[3]).toMatchObject({ gap: true, participation: 'fora_escolha', included: false });
+    expect(out.points[3]!.name).toBe('Abril de 2026, R$ 7.800,00, fora da comparação, pode faltar algo neste mês: há conta prevista sem registro');
+    // Mês sem lacuna não muda de nome.
+    expect(view.points[0]!.name).toBe('Janeiro de 2026, R$ 3.200,00, na comparação');
+  });
+
+  it('o painel traz o aviso e, com ele, a variação e as categorias do mês (D10); sem lacuna, gapText é null', () => {
+    const view = gapView(['2026-04']);
+    const panel = evolutionPanel(view, '2026-04');
+    expect(panel.gapText).toBe(WARNING);
+    expect(panel.stateText).toBe('Com registros');
+    expect(panel.variation).toMatchObject({ available: true, text: 'De março para abril: R$ 4.500,00 a mais' });
+    expect(panel).toMatchObject({ showsCategories: true, showsRecords: true, canToggle: true, included: true });
+    expect(evolutionPanel(view, '2026-05').gapText).toBeNull();
+    expect(evolutionPanel(fromJune(), '2026-04').gapText).toBeNull();
+  });
+
+  it('só Pago, e só mês fechado com registros: Recebido, mês sem registros e mês em andamento nunca têm o aviso', () => {
+    // Em Recebido, março não tem registros e junho está em andamento; a lista de lacunas vale para Pago.
+    const received = gapView(['2026-03', '2026-04', '2026-06'], [], 'recebido');
+    expect(received.points.every((p) => p.gap === false)).toBe(true);
+    expect(received.points[2]!.name).toBe('Março de 2026, sem registros, fora da comparação');
+    expect(evolutionPanel(received, '2026-04').gapText).toBeNull();
+    // Em Pago, junho (em andamento) e um mês fora da janela da leitura não ganham o aviso.
+    const paid = gapView(['2026-06', '2025-01']);
+    expect(paid.points.every((p) => p.gap === false)).toBe(true);
+    // Mês sem registros em Pago (nenhum lançamento): o aviso de "sem registros" basta, sem aviso de lacuna e sem explicação (D10).
+    const empty = buildEvolutionView({ overview: [], metric: 'pago', windowMonths: 3, currentMonth: '2026-06', hiddenMonths: [], gapMonths: ['2026-04', '2026-05'] });
+    expect(empty.points.every((p) => p.gap === false && p.state === 'sem_registros')).toBe(true);
+    const panel = evolutionPanel(empty, '2026-05');
+    expect(panel).toMatchObject({ gapText: null, showsCategories: false, showsRecords: false, canToggle: false });
+    expect(panel.variation.available).toBe(false);
+  });
+
+  it('o mês vizinho do painel, para "Mês anterior" e "Mês seguinte", e null no limite da janela', () => {
+    const view = fromJune();
+    expect(evolutionPanel(view, '2026-04')).toMatchObject({ previousMonth: '2026-03', nextMonth: '2026-05' });
+    expect(evolutionPanel(view, '2026-01')).toMatchObject({ previousMonth: null, nextMonth: '2026-02' });
+    expect(evolutionPanel(view, '2026-06')).toMatchObject({ previousMonth: '2026-05', nextMonth: null });
+    expect(EVOLUTION_TEXT.panel.previous).toBe('Mês anterior');
+    expect(EVOLUTION_TEXT.panel.next).toBe('Mês seguinte');
+    expect(EVOLUTION_TEXT.panel.stepHint('2026-03')).toBe('Mostra março de 2026');
+  });
+
+  describe('evolutionGapMonths e loadEvolutionGaps', () => {
+    /** Aluguel mensal desde maio, cadastrado em 20/05/2026; o dia passa a 07/10/2026 sem a geração das contas (como "Seus últimos meses"). */
+    async function seriesRepo() {
+      let today = '2026-05-20';
+      const repo = new MemoryRepository({ actorId: 'pessoa-1', displayName: 'Pessoa Um', email: 'um@exemplo.com', today: () => today, latencyMs: 0 });
+      const space = await repo.ensurePersonalSpace('Conta principal');
+      const ctx = space.personalContextId;
+      const write = await repo.createSeries(newOperationKey(), ctx, {
+        kind: 'mensal',
+        nature: 'conta',
+        description: 'Aluguel',
+        category: 'Moradia',
+        amountCents: 250_000,
+        amountMode: 'fixo',
+        dueDay: 5,
+        firstDueMonth: '2026-05',
+        firstNumber: 1,
+        installmentTotal: null,
+        partsPerYear: null,
+        lastMonth: null,
+      });
+      const may = write.occurrences.find((c) => c.dueOn === '2026-05-05')!;
+      await repo.payCommitment(newOperationKey(), may.id, may.version, { accountId: space.accounts[0]!.id, amountCents: 250_000, paidOn: '2026-05-05', category: 'Moradia' });
+      today = '2026-10-07';
+      return { repo, ctx, space };
+    }
+
+    it('números da série sem conta registrada: de junho a setembro, e maio (paga) fica de fora', async () => {
+      const { repo, ctx } = await seriesRepo();
+      const series = await repo.listSeries(ctx);
+      const commitments = await repo.listCommitmentsDueBetween(ctx, '2025-11', '2026-09');
+      expect(evolutionGapMonths(series, commitments, '2025-11', '2026-09')).toEqual(['2026-06', '2026-07', '2026-08', '2026-09']);
+      expect(evolutionGapMonths(series, commitments, '2026-09', '2025-11')).toEqual([]);
+      expect(await loadEvolutionGaps(repo, ctx, '2026-10')).toEqual(['2026-06', '2026-07', '2026-08', '2026-09']);
+    });
+
+    it('depois da geração do dia, as contas de agosto e setembro em aberto continuam sendo lacuna; as pagas deixam de ser', async () => {
+      const { repo, ctx, space } = await seriesRepo();
+      await repo.syncSeriesOccurrences(ctx);
+      // A geração cria setembro, outubro e novembro (em aberto): junho a agosto seguem sem conta, e setembro tem conta vencida em aberto.
+      expect(await loadEvolutionGaps(repo, ctx, '2026-10')).toEqual(['2026-06', '2026-07', '2026-08', '2026-09']);
+      const sept = (await repo.listCommitmentsDueBetween(ctx, '2026-09', '2026-09')).find((c) => c.series?.number === 5)!;
+      await repo.payCommitment(newOperationKey(), sept.id, sept.version, { accountId: space.accounts[0]!.id, amountCents: 250_000, paidOn: '2026-09-05', category: 'Moradia' });
+      expect(await loadEvolutionGaps(repo, ctx, '2026-10')).toEqual(['2026-06', '2026-07', '2026-08']);
+    });
+
+    it('conta avulsa em aberto vencida em mês fechado é lacuna; a paga, a do mês atual e a de fora do período não', async () => {
+      const repo = await createDemoRepository({ scenario: 'evolucao' });
+      const ctx = (await repo.getSpace())!.personalContextId;
+      expect(await loadEvolutionGaps(repo, ctx, '2026-10')).toEqual([]);
+      const open = async (description: string, dueOn: string) => repo.createCommitment(newOperationKey(), ctx, { description, amountCents: 18_000, dueOn, category: 'Moradia' });
+      await open('Luz de março', '2026-03-20');
+      await open('Água de março', '2026-03-25');
+      await open('Gás de setembro', '2026-09-28');
+      await open('Internet de outubro', '2026-10-15');
+      const paid = await open('Seguro de maio', '2026-05-10');
+      await repo.payCommitment(newOperationKey(), paid.commitment.id, paid.commitment.version, {
+        accountId: (await repo.getSpace())!.accounts[0]!.id,
+        amountCents: 18_000,
+        paidOn: '2026-05-10',
+        category: 'Moradia',
+      });
+      // Março (duas contas, um mês só) e setembro; outubro é o mês atual e maio está pago.
+      expect(await loadEvolutionGaps(repo, ctx, '2026-10')).toEqual(['2026-03', '2026-09']);
+      // E o aviso entra no ponto de março, que tem registros, e não no de setembro, que não tem.
+      const range = evolutionFetchRange('2026-10');
+      const rows = await repo.monthsOverview(ctx, range.from, range.to);
+      const view = buildEvolutionView({ overview: rows, metric: 'pago', windowMonths: 12, currentMonth: '2026-10', hiddenMonths: [], gapMonths: await loadEvolutionGaps(repo, ctx, '2026-10') });
+      expect(view.points.filter((p) => p.gap).map((p) => p.month)).toEqual(['2026-03']);
+      expect(view.points.find((p) => p.month === '2026-09')).toMatchObject({ state: 'sem_registros', gap: false });
+    });
+
+    it('serie_inconsistente é capturada: a série sem vigência é pulada, as outras seguem e outro erro continua sendo lançado', async () => {
+      const { repo, ctx } = await seriesRepo();
+      const [good] = await repo.listSeries(ctx);
+      const commitments = await repo.listCommitmentsDueBetween(ctx, '2025-11', '2026-09');
+      const broken: CommitmentSeries = { ...good!, id: 'serie-quebrada', terms: [] };
+      expect(() => evolutionGapMonths([broken], commitments, '2025-11', '2026-09')).not.toThrow();
+      // Sem as contas, a série quebrada não dá nenhum mês; com elas, só a conta em aberto de junho (que a série não precisa para valer).
+      expect(evolutionGapMonths([broken], [], '2025-11', '2026-09')).toEqual([]);
+      expect(evolutionGapMonths([broken], commitments, '2025-11', '2026-09')).toEqual(['2026-06']);
+      expect(evolutionGapMonths([broken, good!], commitments, '2025-11', '2026-09')).toEqual(['2026-06', '2026-07', '2026-08', '2026-09']);
+      expect(() => evolutionGapMonths([{ ...good!, terms: null as never }], commitments, '2025-11', '2026-09')).toThrow(TypeError);
+    });
+
+    it('lê só listSeries e listCommitmentsDueBetween, dos 12 meses até o mês anterior ao atual; falha de leitura é falha (a tela mostra sem o aviso)', async () => {
+      const calls: string[] = [];
+      const repo = {
+        listSeries: async (ctx: string) => {
+          calls.push(`series:${ctx}`);
+          return [] as CommitmentSeries[];
+        },
+        listCommitmentsDueBetween: async (ctx: string, from: string, to: string) => {
+          calls.push(`due:${ctx}:${from}:${to}`);
+          return [] as Commitment[];
+        },
+      };
+      expect(await loadEvolutionGaps(repo, 'ctx-1', '2026-10')).toEqual([]);
+      expect(calls.sort()).toEqual(['due:ctx-1:2025-11:2026-09', 'series:ctx-1']);
+      const failing = { ...repo, listSeries: async (): Promise<CommitmentSeries[]> => Promise.reject(new Error('falha de leitura')) };
+      await expect(loadEvolutionGaps(failing, 'ctx-1', '2026-10')).rejects.toThrow('falha de leitura');
+    });
+
+    it('a demonstração padrão e a do cenário "evolucao" não têm lacuna; a de "retorno" tem, mas só em meses sem registros', async () => {
+      for (const scenario of [undefined, 'evolucao'] as const) {
+        const repo = await createDemoRepository(scenario ? { scenario } : {});
+        const ctx = (await repo.getSpace())!.personalContextId;
+        expect(await loadEvolutionGaps(repo, ctx, monthOf(DEMO_TODAY)), String(scenario)).toEqual([]);
+      }
+      const repo = await createDemoRepository({ scenario: 'retorno' });
+      const ctx = (await repo.getSpace())!.personalContextId;
+      const gaps = await loadEvolutionGaps(repo, ctx, monthOf(DEMO_TODAY));
+      expect(gaps).toEqual(['2026-06', '2026-07', '2026-08', '2026-09']);
+      const { from, to } = evolutionFetchRange(monthOf(DEMO_TODAY));
+      const view = buildEvolutionView({ overview: await repo.monthsOverview(ctx, from, to), metric: 'pago', windowMonths: 12, currentMonth: monthOf(DEMO_TODAY), hiddenMonths: [], gapMonths: gaps });
+      expect(view.points.some((p) => p.gap)).toBe(false);
+      expect(view.points.find((p) => p.month === '2026-05')).toMatchObject({ state: 'com_registros', gap: false });
+    });
   });
 });
 
@@ -495,7 +767,6 @@ describe('a demonstração da Evolução (cenário fictício "evolucao")', () =>
   });
 
   it('uma conta nova nunca recebe dado de exemplo: nenhum ponto tem registros', async () => {
-    const { MemoryRepository } = await import('../src');
     const repo = new MemoryRepository({ actorId: 'pessoa-nova', displayName: 'Pessoa Nova', email: 'nova@exemplo.com', today: () => DEMO_TODAY, latencyMs: 0 });
     const ctx = (await repo.ensurePersonalSpace('Conta principal')).personalContextId;
     const { from, to } = evolutionFetchRange(monthOf(DEMO_TODAY));

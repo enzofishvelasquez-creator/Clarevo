@@ -6,9 +6,9 @@ import {
   type EvolutionView,
   type IsoMonth,
 } from '@clarevo/core';
-import { Ban, ChartLine, ChevronDown, ChevronRight, ChevronUp, Hourglass, Minus, RotateCcw, type LucideIcon } from 'lucide-react-native';
+import { Ban, ChartLine, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleAlert, Hourglass, Minus, RotateCcw, type LucideIcon } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { useState } from 'react';
+import { useState, type Ref } from 'react';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 
 import { MoneyTxt } from '@/components/money-text';
@@ -239,19 +239,24 @@ function Swatch({ kind, icon: Icon }: { kind: 'included' | 'excluded' | 'none' |
 // ---------------------------------------------------------------------------------------------------------------------
 
 /**
- * Painel do mês escolhido, na mesma tela (tela B): mês e ano, valor exato com centavos, estado, a variação com as duas datas, as 3
- * maiores categorias de Pago, o interruptor "Mostrar este mês na comparação" e "Ver lançamentos". Tirar da comparação só muda a
- * média, a mediana e o desenho: nenhum lançamento é lido para isso, nem gravado.
+ * Painel do mês escolhido, na mesma tela (tela B): mês e ano (com "Mês anterior" e "Mês seguinte", alvos de 44 px), valor exato com
+ * centavos, estado, o aviso de lacuna do mês fechado de Pago, a variação com as duas datas, as 3 maiores categorias de Pago, o
+ * interruptor "Mostrar este mês na comparação" e "Ver lançamentos". Tirar da comparação só muda a média, a mediana e o desenho: nenhum
+ * lançamento é lido para isso, nem gravado. O título é o que recebe o foco quando a pessoa escolhe o mês pela tabela (`headRef`).
  */
 export function MonthPanelCard({
   panel,
   contextId,
+  headRef,
+  onStep,
   onToggle,
   onSeeRecords,
   onSeeCategories,
 }: {
   panel: EvolutionPanel;
   contextId: string | undefined;
+  headRef: Ref<View>;
+  onStep: (month: IsoMonth) => void;
   onToggle: (included: boolean) => void;
   onSeeRecords: () => void;
   onSeeCategories: () => void;
@@ -259,9 +264,27 @@ export function MonthPanelCard({
   const v = panel.variation;
   return (
     <Card style={{ gap: space[3] }}>
-      <Txt variant="title" accessibilityRole="header" aria-level={2}>
-        {panel.title}
-      </Txt>
+      <View style={styles.panelHead}>
+        <StepButton
+          label={T.panel.previous}
+          hint={panel.previousMonth ? T.panel.stepHint(panel.previousMonth) : undefined}
+          icon={ChevronLeft}
+          disabled={panel.previousMonth === null}
+          onPress={() => panel.previousMonth && onStep(panel.previousMonth)}
+        />
+        <View ref={headRef} tabIndex={-1} accessible accessibilityRole="header" aria-level={2} style={styles.panelTitle}>
+          <Txt variant="title" style={{ textAlign: 'center' }}>
+            {panel.title}
+          </Txt>
+        </View>
+        <StepButton
+          label={T.panel.next}
+          hint={panel.nextMonth ? T.panel.stepHint(panel.nextMonth) : undefined}
+          icon={ChevronRight}
+          disabled={panel.nextMonth === null}
+          onPress={() => panel.nextMonth && onStep(panel.nextMonth)}
+        />
+      </View>
       <View style={{ gap: space[1] }}>
         <Txt variant="caption" color={colors.textSecondary} style={{ fontFamily: fonts.bold }}>
           {panel.valueCaption}
@@ -274,6 +297,7 @@ export function MonthPanelCard({
           </Txt>
         )}
         <Txt color={colors.textSecondary}>{panel.stateText}</Txt>
+        {panel.gapText ? <GapNote text={panel.gapText} /> : null}
       </View>
 
       <View style={styles.block}>
@@ -315,6 +339,34 @@ export function MonthPanelCard({
         />
       ) : null}
     </Card>
+  );
+}
+
+/** "Mês anterior" e "Mês seguinte" do painel: botão redondo de 44 px; no limite da janela fica desativado. */
+function StepButton({ label, hint, icon: Icon, disabled, onPress }: { label: string; hint: string | undefined; icon: LucideIcon; disabled: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={hint}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={(s) => [styles.step, disabled && { opacity: 0.35 }, !disabled && s.pressed && { opacity: 0.7 }, !disabled && (s as { focused?: boolean }).focused && ui.focusRing]}>
+      <Icon size={22} color={colors.brand} strokeWidth={2.25} aria-hidden />
+    </Pressable>
+  );
+}
+
+/** O aviso de lacuna de um mês fechado de Pago (D04): ícone e texto, nunca só cor. */
+function GapNote({ text }: { text: string }) {
+  return (
+    <View style={styles.gap}>
+      <CircleAlert size={18} color={colors.text} strokeWidth={2.25} aria-hidden style={{ marginTop: 2 }} />
+      <Txt variant="caption" style={{ flex: 1, minWidth: 0, fontFamily: fonts.medium }}>
+        {text}
+      </Txt>
+    </View>
   );
 }
 
@@ -374,7 +426,7 @@ export function CustomComparisonNotice({ view, onRestore }: { view: EvolutionVie
         {T.custom.banner(view.outCount, view.eligibleCount)}
       </Txt>
       <Txt variant="caption" color={colors.textSecondary}>
-        {`${T.custom.list(view.stats.hiddenMonths)} ${T.custom.scope(view.metric)}`}
+        {`${T.custom.list(view.stats.hiddenMonths, view.outsideMonths)} ${T.custom.scope(view.metric)}`}
       </Txt>
       <Button label={T.custom.restore} icon={RotateCcw} onPress={onRestore} />
     </View>
@@ -453,9 +505,11 @@ function StatCard({ title, cents, caption, stacked }: { title: string; cents: nu
 
 /**
  * "Ver valores mês a mês": a mesma informação do gráfico em texto, um bloco por mês, com o mês, o valor, o estado e "Na comparação?"
- * ("Sim" ou "Fora da comparação"). Começa fechada; a escolha vale só enquanto a tela está aberta.
+ * ("Sim" ou "Fora da comparação"), e o aviso de lacuna do mês fechado de Pago. Cada bloco é um botão (44 px ou mais) que escolhe o mês
+ * e leva o foco ao painel: é o caminho de toque largo com 12 meses, em que a coluna do gráfico fica estreita. Começa fechada; a
+ * escolha de abrir vale só enquanto a tela está aberta.
  */
-export function ValuesTable({ view }: { view: EvolutionView }) {
+export function ValuesTable({ view, selected, onPick }: { view: EvolutionView; selected: IsoMonth; onPick: (month: IsoMonth) => void }) {
   const [open, setOpen] = useState(false);
   const hidden = useValuesHidden();
   return (
@@ -471,30 +525,34 @@ export function ValuesTable({ view }: { view: EvolutionView }) {
       {open ? (
         <View role="list" style={{ gap: space[1] }}>
           {view.points.map((p, i) => (
-            <View
-              key={p.month}
-              role="listitem"
-              accessible
-              focusable={false}
-              accessibilityLabel={maskMoneyLabel(
-                `${p.title}, ${p.valueText ?? T.table.noValue}, ${p.stateLabel}, ${T.table.columns.included} ${p.includedText}`,
-                hidden,
-              )}
-              style={[styles.tableRow, i < view.points.length - 1 && styles.divider]}>
-              <View style={styles.tableHead}>
-                <Txt variant="label" style={{ fontFamily: fonts.bold, flexShrink: 1 }}>
-                  {p.title}
-                </Txt>
-                {p.valueText !== null ? (
-                  <Money cents={p.cents} variant="label" style={[styles.tableValue, { flexShrink: 0 }]} />
-                ) : (
-                  <Txt variant="label" color={colors.textSecondary} style={{ flexShrink: 0 }}>
-                    {T.table.noValue}
-                  </Txt>
+            <View key={p.month} role="listitem" style={i < view.points.length - 1 && styles.divider}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={maskMoneyLabel(
+                  `${p.title}, ${p.valueText ?? T.table.noValue}, ${p.stateLabel}, ${T.table.columns.included} ${p.includedText}${p.gap ? `, ${T.gap.warning}` : ''}`,
+                  hidden,
                 )}
-              </View>
-              <TableField name={T.table.columns.state} value={p.stateLabel} />
-              <TableField name={T.table.columns.included} value={p.includedText} />
+                accessibilityHint={T.table.rowHint}
+                accessibilityState={{ selected: p.month === selected }}
+                aria-pressed={p.month === selected}
+                onPress={() => onPick(p.month)}
+                style={(s) => [styles.tableRow, p.month === selected && styles.tableRowSelected, s.pressed && { opacity: 0.7 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
+                <View style={styles.tableHead}>
+                  <Txt variant="label" style={{ fontFamily: fonts.bold, flexShrink: 1 }}>
+                    {p.title}
+                  </Txt>
+                  {p.valueText !== null ? (
+                    <Money cents={p.cents} variant="label" style={[styles.tableValue, { flexShrink: 0 }]} />
+                  ) : (
+                    <Txt variant="label" color={colors.textSecondary} style={{ flexShrink: 0 }}>
+                      {T.table.noValue}
+                    </Txt>
+                  )}
+                </View>
+                <TableField name={T.table.columns.state} value={p.stateLabel} />
+                <TableField name={T.table.columns.included} value={p.includedText} />
+                {p.gap ? <GapNote text={T.gap.warning} /> : null}
+              </Pressable>
             </View>
           ))}
           <Txt variant="caption" color={colors.textSecondary}>
@@ -535,6 +593,10 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: space[1], flexShrink: 1 },
   swatch: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   block: { gap: space[2], paddingTop: space[3], borderTopWidth: 1, borderTopColor: colors.border },
+  panelHead: { flexDirection: 'row', alignItems: 'center', columnGap: space[1] },
+  panelTitle: { flex: 1, minWidth: 0 },
+  step: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  gap: { flexDirection: 'row', alignItems: 'flex-start', columnGap: space[2], paddingTop: space[1] },
   link: { alignSelf: 'flex-start', paddingHorizontal: 0 },
   category: { flexDirection: 'row', alignItems: 'flex-start', columnGap: space[3], paddingVertical: space[2] },
   categoryValue: { fontFamily: fonts.bold, fontSize: 16 },
@@ -544,7 +606,8 @@ const styles = StyleSheet.create({
   stat: { flexGrow: 1, flexBasis: 120, minWidth: 0, padding: space[3], gap: space[1] },
   statValue: { fontFamily: fonts.extrabold, fontSize: 18, lineHeight: 26 },
   toggle: { alignSelf: 'flex-start', paddingHorizontal: 0, minHeight: 48 },
-  tableRow: { gap: 2, paddingVertical: space[2] },
+  tableRow: { gap: 2, minHeight: 48, paddingVertical: space[2], paddingHorizontal: space[2], borderRadius: 10 },
+  tableRowSelected: { backgroundColor: colors.brandTint },
   tableHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', columnGap: space[3] },
   tableValue: { fontFamily: fonts.bold, fontSize: 15 },
   tableField: { flexDirection: 'row', justifyContent: 'space-between', columnGap: space[3] },

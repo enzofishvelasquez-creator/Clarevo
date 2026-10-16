@@ -21,6 +21,7 @@ import {
   lastIncomeReferenceChangeAt,
   limitCrossing,
   loadInvoices,
+  loadEvolutionGaps,
   loadInvoicesOfRecords,
   receiptKeyValid,
   reserveEssentialBaseCents,
@@ -299,6 +300,25 @@ export function useMonthsOverview(contextId: string | undefined, from: IsoMonth,
     queryFn: () => repo.monthsOverview(contextId!, from, to),
     enabled: Boolean(contextId),
   });
+}
+
+/**
+ * Meses fechados com sinal de lacuna para a Evolução (D-057, D04): número de gasto fixo, parcelamento ou conta do ano sem conta
+ * registrada, ou conta em aberto vencida no mês (`loadEvolutionGaps`). Só depois da sincronização do dia, como a revisão dos últimos
+ * meses: sem ela, uma conta que a geração ainda vai criar apareceria como lacuna. É só um aviso, que a tela nunca espera: enquanto
+ * a leitura não termina, ou se ela falha (ou se a série é inconsistente), o gráfico sai sem o aviso. A chave começa por 'returnReview',
+ * que toda escrita invalida (a conta paga, criada ou excluída muda o sinal na hora).
+ */
+export function useEvolutionGaps(contextId: string | undefined) {
+  const repo = useRepo();
+  const { today } = useSession();
+  const sync = useSeriesSync(contextId);
+  const query = useQuery({
+    queryKey: ['returnReview', 'evolucao', contextId, today],
+    queryFn: (): Promise<IsoMonth[]> => loadEvolutionGaps(repo, contextId!, monthOf(today)),
+    enabled: Boolean(contextId) && synced(sync),
+  });
+  return useMemo((): IsoMonth[] => (query.isError ? [] : (query.data ?? [])), [query.isError, query.data]);
 }
 
 /** Resultado da sincronização do dia: contas de gastos fixos criadas e, entre elas, as já vencidas. */

@@ -10475,6 +10475,39 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const evH2s = () => p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((h) => h.getBoundingClientRect().width > 0).map((h) => h.textContent));
   const evStore = () => p.evaluate(() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]));
   const evMoney = (n) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  // Escritas no repositório da demonstração: a demonstração não usa a rede, então `writes` nunca vê uma escrita aqui. A escuta embrulha
+  // todo método de escrita do repositório (create*, update*, delete*, set*, add*, pay*, undo*, end*, skip*, inform*, import*, mark*, decide*,
+  // cancel*, renew*, invite*, accept*, leave*, remove*, transfer*, rename*, ensure*, sync*) e guarda o nome de cada chamada em window.__evWrites.
+  // Vale para a página aberta: refaça depois de recarregar. Devolve quantos métodos foram embrulhados.
+  const evSpyStart = () => p.evaluate(async () => {
+    const repo = await window.__e2e.repo();
+    const WRITE = /^(create|update|delete|set|add|pay|undo|end|skip|inform|import|mark|decide|cancel|renew|invite|accept|leave|remove|transfer|rename|ensure|sync)[A-Z]/;
+    const names = new Set();
+    for (let o = repo; o && o !== Object.prototype; o = Object.getPrototypeOf(o)) for (const n of Object.getOwnPropertyNames(o)) if (WRITE.test(n) && typeof repo[n] === 'function') names.add(n);
+    window.__evWrites = [];
+    for (const n of names) {
+      const orig = repo[n];
+      if (orig.__evSpy) continue;
+      const spy = function (...a) { window.__evWrites.push(n); return orig.apply(this, a); };
+      spy.__evSpy = true;
+      repo[n] = spy;
+    }
+    return names.size;
+  });
+  const evSpyCalls = () => p.evaluate(() => (window.__evWrites || []).slice());
+  // Alvos de toque do que está à vista: a largura de cada coluna do gráfico, o tamanho de "Mês anterior" e "Mês seguinte" e o de cada linha da tabela.
+  const evTouch = () => p.evaluate(() => {
+    const vis = (e) => e.getBoundingClientRect().width > 0;
+    const size = (e) => { const r = e.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; };
+    const step = (name) => { const e = [...document.querySelectorAll('[aria-label]')].find((b) => vis(b) && b.getAttribute('aria-label') === name); return e ? size(e) : null; };
+    return {
+      cols: [...document.querySelectorAll('[role=group][aria-label^="Meses do gráfico"] button')].filter(vis).map((e) => size(e)[0]),
+      prev: step('Mês anterior'),
+      next: step('Mês seguinte'),
+      rows: [...document.querySelectorAll('[role=listitem] button')].filter(vis).map(size),
+    };
+  });
+  const evFocus = () => p.evaluate(() => { const e = document.activeElement; return e ? { role: e.getAttribute('role'), text: e.textContent } : null; });
 
   // ---- 1. Demonstração padrão: o Resumo não muda, e a linha "Evolução" fica em Movimentos, logo abaixo de "Seu mês em 30 segundos" ----
   await evEnter();
@@ -10605,6 +10638,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await evEnter('evolucao');
   await evOpen();
   const evStore0 = await evStore();
+  const evSpied = await evSpyStart();
+  ok('Evolução sem gravar: a escuta embrulhou os métodos de escrita do repositório da demonstração (create, update, delete, set, add, pay e os outros) e começa sem nenhuma chamada', evSpied >= 30 && (await evSpyCalls()).length === 0, `${evSpied} métodos`);
   names = await evNames();
   t = await evKeep();
   ok('Evolução cenário (6 meses, de maio a outubro): maio R$ 3.450,00 e junho R$ 3.600,00 na comparação, julho a outubro sem registros; média R$ 3.525,00 e mediana R$ 3.525,00, "2 de 2 meses"', names.length === 6 &&
@@ -10689,7 +10724,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Tabela equivalente, com os meses fora rotulados.
   await p.getByRole('button', { name: 'Ver valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(500);
   t = await evKeep();
-  const evRows = await p.evaluate(() => [...document.querySelectorAll('[role=listitem]')].filter((e) => e.getBoundingClientRect().width > 0 && /de (2025|2026), /.test(e.getAttribute('aria-label') || '')).map((e) => (e.getAttribute('aria-label') || '').replace(/ /g, ' ')));
+  const evRows = await p.evaluate(() => [...document.querySelectorAll('[role=listitem] button')].filter((e) => e.getBoundingClientRect().width > 0 && /de (2025|2026), /.test(e.getAttribute('aria-label') || '')).map((e) => (e.getAttribute('aria-label') || '').replace(/ /g, ' ')));
   ok('Evolução tabela "Ver valores mês a mês": uma linha por mês (12), com mês, valor, estado e "Na comparação?" ("Sim" ou "Fora da comparação"), e "Sem valor" nos meses sem registros', evRows.length === 12 &&
     evRows[2] === 'Janeiro de 2026, R$ 3.200,00, Com registros, Na comparação? Sim' && evRows[3] === 'Fevereiro de 2026, R$ 3.400,00, Com registros, Na comparação? Fora da comparação' && evRows[0] === 'Novembro de 2025, Sem valor, Sem registros, Na comparação? Fora da comparação' &&
     t.includes('Na comparação?\nFora da comparação') && t.includes('Sem valor') && (await visibleCount('button', 'Esconder valores mês a mês')) === 1 && t.includes('O total dos meses exibidos não depende do que está na comparação.'), JSON.stringify(evRows.slice(0, 4)));
@@ -10712,6 +10747,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     t.includes('Só um mês na comparação: a média e a mediana são o valor dele.') && t.includes('Variação não disponível: não há outro mês na comparação antes deste.'));
   await evShots('450_evolucao_um_mes_na_comparacao');
   await p.getByRole('button', { name: 'Restaurar todos', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(500);
+  const evCallsMid = await evSpyCalls();
+  ok('Evolução sem gravar: tirar abril, vários meses e todos, e restaurar (T02 a T09), não chamou nenhuma função de escrita do repositório', evCallsMid.length === 0, JSON.stringify(evCallsMid));
 
   // ---- 15. T13: Recebido e Pago têm cada um a sua seleção; mês sem registros em Recebido (março) ----
   await evSet('Abril', false);
@@ -10752,7 +10789,23 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await evShots('457_evolucao_janela_sem_registros');
   await radio('12 meses').click(); await p.waitForTimeout(600);
   ok('Evolução janela de 12 meses: abril segue fora da comparação (a seleção é guardada por valor mostrado, não por janela)', (await evNames())[5] === 'Abril de 2026, R$ 7.800,00, fora da comparação' && (await body()).includes('Comparação personalizada: 1 de 6 meses fora da comparação'));
-  ok('Evolução sem gravar: tirar e restaurar meses não escreve nada no aparelho (nem no armazenamento do navegador)', (await evStore()) === evStore0, await evStore());
+  // "Restaurar todos" devolve também o que foi tirado em outra janela, e o aviso diz isso antes: em 6 meses (maio a outubro), abril, tirado na janela de 12, está fora dela.
+  await radio('6 meses').click(); await p.waitForTimeout(600);
+  await evSet('Junho', false);
+  t = await body();
+  ok('Evolução meses tirados em outra janela: em 6 meses, com junho tirado agora e abril tirado antes, o aviso conta o de dentro ("1 de 2 meses fora da comparação") e cita o de fora ("e 1 mês fora desta janela (abril de 2026)")', t.includes('Comparação personalizada: 1 de 2 meses fora da comparação') &&
+    t.includes('Fora da comparação: junho, e 1 mês fora desta janela (abril de 2026). Vale só para Pago.') && (await visibleCount('button', 'Restaurar todos')) >= 1, t.slice(0, 1200));
+  await p.getByRole('button', { name: 'Restaurar todos', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(500);
+  await radio('12 meses').click(); await p.waitForTimeout(600);
+  t = await body();
+  ok('Evolução meses tirados em outra janela: "Restaurar todos" devolveu os dois (junho e o abril de fora da janela), sem aviso na janela de 12 meses', !t.includes('Comparação personalizada') && (await evNames())[5] === 'Abril de 2026, R$ 7.800,00, na comparação' && (await evNames())[7] === 'Junho de 2026, R$ 3.600,00, na comparação', JSON.stringify((await evNames()).slice(4, 8)));
+  await evSet('Abril', false);
+  ok('Evolução meses tirados em outra janela: abril fora de novo, como o resto do roteiro espera', (await evNames())[5] === 'Abril de 2026, R$ 7.800,00, fora da comparação' && (await body()).includes('Comparação personalizada: 1 de 6 meses fora da comparação'));
+  const evCallsEnd = await evSpyCalls();
+  ok('Evolução sem gravar: tirar e restaurar meses (com a troca de valor e de janela e a ida à composição) não chamou nenhuma função de escrita do repositório e não escreve nada no aparelho (nem no armazenamento do navegador)', evCallsEnd.length === 0 && (await evStore()) === evStore0, `${JSON.stringify(evCallsEnd)} ${await evStore()}`);
+  // A escuta pode falhar: uma escrita de controle (excluir um registro que não existe; o repositório recusa e nada é gravado) é contada.
+  const evControl = await p.evaluate(async () => { const repo = await window.__e2e.repo(); try { await repo.deleteRecord('e2e-evolucao-controle', 'registro-que-nao-existe', 1); } catch { /* recusada: é o esperado */ } return window.__evWrites.slice(); });
+  ok('Evolução sem gravar: a escuta enxerga uma escrita (controle: uma exclusão recusada é contada como deleteRecord), então a verificação anterior poderia falhar', evControl.length === 1 && evControl[0] === 'deleteRecord', JSON.stringify(evControl));
 
   // ---- 16. Teclado e leitor de tela (T23): botões com nome, pontos escondidos, seleção anunciada ----
   await evMonth('Maio').focus(); await p.keyboard.press('Enter'); await p.waitForTimeout(400);
@@ -10772,8 +10825,35 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Evolução leitor de tela: um grupo "Meses do gráfico" com 12 botões, todos com nome, todos com 44 px ou mais de altura, um só pressionado, o desenho escondido e os seletores em grupos nomeados', evA11y.groups === 1 && evA11y.buttons === 12 && evA11y.unnamed === 0 && evA11y.small === 0 && evA11y.pressed === 1 && evA11y.svgHidden &&
     evA11y.radios.includes('Valor mostrado') && evA11y.radios.includes('Meses mostrados'), JSON.stringify(evA11y));
   ok('Evolução leitor de tela: títulos em ordem (h1 "Evolução", h2 "Recebido/Pago por mês" e o mês do painel, h2 da seção de comparação)', evA11y.headings[0] === '1:Evolução' && evA11y.headings.includes('2:Pago por mês') && evA11y.headings.includes('2:Junho de 2026'), JSON.stringify(evA11y.headings));
-  const evWidthsOk = await p.evaluate(() => { const bs = [...document.querySelectorAll('[role=group][aria-label^="Meses do gráfico"] button')].filter((b) => b.getBoundingClientRect().width > 0); return bs.map((b) => Math.round(b.getBoundingClientRect().width)); });
-  ok('Evolução alvos de toque: com 12 meses, cada mês é uma coluna inteira com 22 px ou mais de largura, sem sobrepor a vizinha (a tabela é o caminho com alvo largo)', evWidthsOk.length === 12 && evWidthsOk.every((w) => w >= 22), JSON.stringify(evWidthsOk));
+  // Com 12 meses a coluna do gráfico é estreita (22 px em 320 px), então o caminho de 44 px é o painel ("Mês anterior" e "Mês seguinte") e a
+  // tabela, cujas linhas são botões que escolhem o mês e levam o foco ao painel. Mede em 390 e em 320 px, com a tabela aberta.
+  await p.getByRole('button', { name: 'Ver valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
+  const evTouch390 = await evTouch();
+  const evBig = (sz) => Array.isArray(sz) && sz[0] >= 44 && sz[1] >= 44;
+  ok('Evolução alvos de toque (12 meses, 390 px): as 12 colunas do gráfico têm 22 px ou mais de largura, e "Mês anterior", "Mês seguinte" e as 12 linhas da tabela são botões de 44 px ou mais, de largura e de altura', evTouch390.cols.length === 12 && evTouch390.cols.every((w) => w >= 22) &&
+    evBig(evTouch390.prev) && evBig(evTouch390.next) && evTouch390.rows.length === 12 && evTouch390.rows.every(evBig), JSON.stringify(evTouch390));
+  await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(500);
+  const evTouch320 = await evTouch();
+  ok('Evolução alvos de toque (12 meses, 320 px): colunas de 22 px ou mais (cerca de 22,7), e "Mês anterior", "Mês seguinte" e as 12 linhas da tabela seguem com 44 px ou mais, de largura e de altura', evTouch320.cols.length === 12 && evTouch320.cols.every((w) => w >= 22) &&
+    evBig(evTouch320.prev) && evBig(evTouch320.next) && evTouch320.rows.length === 12 && evTouch320.rows.every(evBig), JSON.stringify(evTouch320));
+  // Em 320 px: a linha da tabela escolhe o mês e leva o foco ao título do painel.
+  await p.locator('[role=listitem] button[aria-label^="Março de 2026"]').filter({ visible: true }).first().click(); await p.waitForTimeout(500);
+  const evTableFocus = await evFocus();
+  ok('Evolução tabela (320 px): tocar na linha de março escolhe o mês (o gráfico e a linha ficam pressionados) e leva o foco ao título do painel ("Março de 2026")', (await evPressed()).join('').startsWith('Março de 2026') &&
+    (await p.locator('[role=listitem] button[aria-pressed="true"]').count()) === 1 && evTableFocus && evTableFocus.role === 'heading' && evTableFocus.text === 'Março de 2026', JSON.stringify(evTableFocus));
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(500);
+  await p.getByRole('button', { name: 'Esconder valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+  // "Mês seguinte" e "Mês anterior": o painel muda de mês, o botão segue com o foco e o leitor de tela ouve o mês novo; nos limites, o botão fica desativado.
+  const evStepBtn = (name) => p.getByRole('button', { name, exact: true }).filter({ visible: true }).first();
+  await evStepBtn('Mês seguinte').click(); await p.waitForTimeout(400);
+  ok('Evolução "Mês seguinte": de março vai para abril (painel e gráfico), o leitor de tela ouve o nome do ponto ("Abril de 2026, R$ 7.800,00, fora da comparação") e o foco fica no botão', (await evPressed()).join('').startsWith('Abril de 2026') && (await evH2s()).includes('Abril de 2026') &&
+    (await evLive()).some((x) => x.startsWith('Abril de 2026, R$ 7.800,00')) && (await p.evaluate(() => document.activeElement?.getAttribute('aria-label'))) === 'Mês seguinte', JSON.stringify([await evPressed(), await evLive()]));
+  await evStepBtn('Mês anterior').click(); await evStepBtn('Mês anterior').click(); await p.waitForTimeout(400);
+  ok('Evolução "Mês anterior": duas vezes, de abril a fevereiro (o painel mostra "Fevereiro de 2026")', (await evPressed()).join('').startsWith('Fevereiro de 2026') && (await evH2s()).includes('Fevereiro de 2026'));
+  await p.getByRole('button', { name: /^Novembro de 2025/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
+  ok('Evolução "Mês anterior": no primeiro mês da janela (novembro de 2025) fica desativado, e "Mês seguinte" não', (await evStepBtn('Mês anterior').isDisabled()) && !(await evStepBtn('Mês seguinte').isDisabled()), (await evPressed()).join(''));
+  await p.getByRole('button', { name: /^Outubro de 2026/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
+  ok('Evolução "Mês seguinte": no último mês da janela (outubro de 2026) fica desativado, e "Mês anterior" não', (await evStepBtn('Mês seguinte').isDisabled()) && !(await evStepBtn('Mês anterior').isDisabled()), (await evPressed()).join(''));
   await radio('6 meses').click(); await p.waitForTimeout(500);
   const evWidths6 = await p.evaluate(() => [...document.querySelectorAll('[role=group][aria-label^="Meses do gráfico"] button')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => Math.round(b.getBoundingClientRect().width)));
   ok('Evolução alvos de toque: com 6 meses, cada coluna tem 44 px ou mais de largura e de altura em 390 px', evWidths6.length === 6 && evWidths6.every((w) => w >= 44), JSON.stringify(evWidths6));
@@ -10820,6 +10900,54 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   names = await evNames();
   t = await body();
   ok('Evolução T24 recuperação: "Tentar de novo" traz os dados de volta, e a seleção de abril continua fora', names.length === 12 && names[5] === 'Abril de 2026, R$ 7.800,00, fora da comparação' && t.includes('Comparação personalizada: 1 de 6 meses fora da comparação'));
+
+  // ---- 18b. D04 (segunda metade) e D10: o aviso de lacuna em mês fechado de Pago ----
+  // A demonstração não tem lacuna em mês com registros (a de "retorno" só tem em meses sem registros), então a conta vencida em aberto de março
+  // vem de "outro aparelho", pela mesma função do cadastro. Se a leitura das séries e das contas falha, o gráfico sai sem o aviso.
+  const evGapText = 'Pode faltar algo neste mês: há conta prevista sem registro';
+  await evEnter('evolucao');
+  await evOpen();
+  await radio('12 meses').click(); await p.waitForTimeout(600);
+  names = await evNames();
+  t = await body();
+  ok('Evolução lacuna: sem conta em aberto vencida nem número sem conta registrada, nenhum ponto traz o aviso (a demonstração não tem lacuna em mês com registros)', names.length === 12 && !names.some((n) => n.includes('pode faltar algo')) && !t.includes('Pode faltar algo'), JSON.stringify(names.slice(4, 8)));
+  await otherDevice((repo, ctx) => repo.createCommitment('e2e-evolucao-lacuna', ctx, { description: 'Luz de março', amountCents: 18000, dueOn: '2026-03-20', category: 'Moradia' }));
+  await p.waitForTimeout(1200);
+  names = await evNames();
+  ok('Evolução lacuna: com uma conta de março em aberto, só março ganha o aviso no nome acessível ("Março de 2026, R$ 3.300,00, na comparação, pode faltar algo neste mês: há conta prevista sem registro"), e o ponto segue na comparação', names[4] === `Março de 2026, R$ 3.300,00, na comparação, ${evGapText.charAt(0).toLowerCase()}${evGapText.slice(1)}` &&
+    names.filter((n) => n.includes('pode faltar algo')).length === 1, JSON.stringify(names.slice(2, 8)));
+  await evPick('Março');
+  t = await evKeep();
+  ok('Evolução lacuna, painel de março (D10): o aviso vem logo abaixo do estado, e a variação ("De fevereiro para março: R$ 100,00 a menos"), as categorias e o interruptor ligado continuam à mostra', t.includes(`Março de 2026\nPago\nR$ 3.300,00\nCom registros\n${evGapText}`) &&
+    t.includes('De fevereiro para março: R$ 100,00 a menos') && t.includes('Maiores categorias do mês') && (await evSwitch().getAttribute('aria-checked')) === 'true', t.slice(700, 1300));
+  ok('Evolução lacuna: o mês com aviso entra nas contas como qualquer outro (média R$ 4.125,00, mediana R$ 3.425,00, "6 de 6 meses"; total R$ 24.750,00) e não há aviso de comparação personalizada', t.includes('Média dos meses na comparação\nR$ 4.125,00\n6 de 6 meses') && t.includes('Mediana dos meses na comparação\nR$ 3.425,00\n6 de 6 meses') &&
+    t.includes('Total dos meses exibidos\nR$ 24.750,00') && !t.includes('Comparação personalizada') && (await evMark('Março')).kind === 'escolhido');
+  await evShots('458_evolucao_lacuna', { scroll: evScroll('Março de 2026') });
+  await p.getByRole('button', { name: 'Ver valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
+  const evGapRows = await p.evaluate(() => [...document.querySelectorAll('[role=listitem] button')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => ({ label: (e.getAttribute('aria-label') || '').replace(/\u00a0/g, ' '), text: e.textContent })));
+  ok('Evolução lacuna: a linha de março da tabela traz o aviso (no nome e no texto) e as outras linhas não', evGapRows.length === 12 && evGapRows[4].label === `Março de 2026, R$ 3.300,00, Com registros, Na comparação? Sim, ${evGapText}` && evGapRows[4].text.includes(evGapText) &&
+    evGapRows.filter((r) => r.label.includes('Pode faltar algo')).length === 1, JSON.stringify(evGapRows[4]));
+  await p.getByRole('button', { name: 'Esconder valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+  await radio('Recebido').click(); await p.waitForTimeout(600);
+  names = await evNames();
+  t = await body();
+  ok('Evolução lacuna: o aviso é só de Pago; em Recebido nenhum ponto, painel ou tabela o traz', !names.some((n) => n.includes('pode faltar algo')) && !t.includes('Pode faltar algo'), JSON.stringify(names.slice(2, 8)));
+  await radio('Pago').click(); await p.waitForTimeout(600);
+  // A leitura das séries falha: o gráfico, as contas e o painel seguem, só sem o aviso.
+  await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.__origSeries = repo.listSeries; repo.listSeries = () => Promise.reject(new Error('falha simulada')); await window.__e2e.refresh(); });
+  await p.waitForTimeout(3500);
+  names = await evNames();
+  t = await body();
+  ok('Evolução lacuna: se a leitura das séries falha, o gráfico, a média e o painel seguem e só o aviso some (sem tela de erro)', names.length === 12 && names[4] === 'Março de 2026, R$ 3.300,00, na comparação' && !t.includes('Pode faltar algo') && !t.includes('Não foi possível carregar') &&
+    t.includes('Média dos meses na comparação\nR$ 4.125,00\n6 de 6 meses'), JSON.stringify(names.slice(2, 8)));
+  await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.listSeries = repo.__origSeries; await window.__e2e.refresh(); });
+  await p.waitForTimeout(1500);
+  ok('Evolução lacuna: a leitura volta e o aviso volta com ela', (await evNames())[4].includes('pode faltar algo') && (await body()).includes(evGapText));
+  // Conta que deixa de estar em aberto (aqui, excluída): o aviso some na hora, sem recarregar a página.
+  await otherDevice(async (repo, ctx) => { const c = (await repo.listCommitmentsDueBetween(ctx, '2026-03', '2026-03')).find((x) => x.description === 'Luz de março'); await repo.deleteCommitment('e2e-evolucao-lacuna-fim', c.id, c.version); });
+  await p.waitForTimeout(1200);
+  names = await evNames();
+  ok('Evolução lacuna: sem a conta em aberto, o aviso de março some', names[4] === 'Março de 2026, R$ 3.300,00, na comparação' && !(await body()).includes('Pode faltar algo'), JSON.stringify(names.slice(2, 8)));
 
   // ---- 19. Conta nova (T19): nada de exemplo, e a seleção de outra pessoa nunca passa ----
   await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');

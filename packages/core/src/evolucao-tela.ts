@@ -1,4 +1,4 @@
-import { addMonths, formatMonthBR, formatMonthName, formatMonthSpanBR, type IsoMonth } from './dates';
+import { addMonths, formatMonthBR, formatMonthName, formatMonthSpanBR, formatMonthYearBR, monthOf, type IsoMonth } from './dates';
 import {
   COMPARISON_ELIGIBLE_STATES,
   comparisonStats,
@@ -12,7 +12,9 @@ import {
 import { formatTenths } from './learn/format';
 import type { Cents } from './money';
 import { formatBRL } from './money';
-import type { MonthOverview } from './records';
+import type { Commitment, CommitmentSeries, MonthOverview } from './records';
+import type { RecordsRepository } from './repository';
+import { seriesGapsInRange } from './retorno';
 import type { CategoryShare } from './summary';
 
 /**
@@ -68,6 +70,15 @@ function nameList(months: readonly IsoMonth[]): string {
 }
 
 const upperFirst = (text: string): string => `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+const lowerFirst = (text: string): string => `${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+
+/** "novembro de 2025", "novembro de 2025 e janeiro de 2026": meses de outro período, com o ano. */
+function yearNameList(months: readonly IsoMonth[]): string {
+  const names = months.map(formatMonthYearBR);
+  return names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`;
+}
+
+const GAP_WARNING = 'Pode faltar algo neste mês: há conta prevista sem registro';
 
 export const EVOLUTION_TEXT = {
   /** Título da tela, da linha em Movimentos e do guia. */
@@ -125,8 +136,14 @@ export const EVOLUTION_TEXT = {
     /** "Comparação personalizada: 2 de 6 meses fora da comparação". */
     banner: (out: number, total: number): string => `Comparação personalizada: ${out} de ${total} ${total === 1 ? 'mês' : 'meses'} fora da comparação`,
     restore: 'Restaurar todos',
-    /** "Fora da comparação: abril e junho." */
-    list: (months: readonly IsoMonth[]): string => `Fora da comparação: ${nameList(months)}.`,
+    /**
+     * "Fora da comparação: abril e junho." Com meses tirados em outra janela (o "Restaurar todos" devolve também esses), a frase os
+     * conta e os cita: "Fora da comparação: abril e junho, e 1 mês fora desta janela (novembro de 2025)."
+     */
+    list: (months: readonly IsoMonth[], outside: readonly IsoMonth[] = []): string =>
+      `Fora da comparação: ${nameList(months)}${
+        outside.length === 0 ? '' : `, e ${outside.length} ${outside.length === 1 ? 'mês fora' : 'meses fora'} desta janela (${yearNameList(outside)})`
+      }.`,
     /** A seleção é de cada valor mostrado: "Vale só para Pago." */
     scope: (metric: EvolutionMetric): string => `Vale só para ${METRIC_LABEL[metric]}.`,
   },
@@ -145,6 +162,10 @@ export const EVOLUTION_TEXT = {
     /** Todos os meses foram tirados: nunca média zero. */
     allOutTitle: 'Escolha ao menos um mês para comparar',
     allOutBody: 'Todos os meses estão fora da comparação, então não há média nem mediana.',
+  },
+  /** Mês fechado com sinal de lacuna (D04): entra na comparação, com este aviso no painel, no nome do ponto e na tabela. */
+  gap: {
+    warning: GAP_WARNING,
   },
   panel: {
     /** "Pago" ou "Recebido", sobre o valor. */
@@ -166,6 +187,10 @@ export const EVOLUTION_TEXT = {
     categoriesNote: 'Mostra o que foi pago. Compra no cartão entra quando a fatura é paga.',
     categoriesAction: 'Ver Pago por categoria',
     categoriesLoadError: 'Não foi possível carregar as categorias do mês.',
+    previous: 'Mês anterior',
+    next: 'Mês seguinte',
+    /** Dica dos botões "Mês anterior" e "Mês seguinte": o mês que o painel vai mostrar. */
+    stepHint: (month: IsoMonth): string => `Mostra ${formatMonthBR(month).toLowerCase()}`,
     seeRecords: 'Ver lançamentos',
     /** Dica do botão "Ver lançamentos": o mês que a composição vai mostrar. */
     seeRecordsHint: (month: IsoMonth): string => `Abre os lançamentos de ${formatMonthBR(month).toLowerCase()}`,
@@ -199,6 +224,8 @@ export const EVOLUTION_TEXT = {
     noValue: 'Sem valor',
     noRecords: 'Sem registros',
     note: 'O total dos meses exibidos não depende do que está na comparação.',
+    /** Dica da linha da tabela, que é um botão: escolhe o mês e leva ao painel. */
+    rowHint: 'Mostra este mês no painel',
   },
 } as const;
 
@@ -233,7 +260,12 @@ export interface EvolutionPointView extends EvolutionPoint {
   stateLabel: string;
   /** "Sim" ou "Fora da comparação" (coluna "Na comparação?"). */
   includedText: string;
-  /** Nome acessível do ponto: "Abril de 2026, R$ 7.800,00, fora da comparação". */
+  /**
+   * Mês fechado de Pago com sinal de lacuna (D04): há número de gasto fixo, parcelamento ou conta do ano sem conta registrada, ou conta em
+   * aberto vencida no mês. O ponto segue na comparação (ou fora, se a pessoa o tirou) e ganha o aviso `EVOLUTION_TEXT.gap.warning`.
+   */
+  gap: boolean;
+  /** Nome acessível do ponto: "Abril de 2026, R$ 7.800,00, fora da comparação" (com o aviso de lacuna, se houver). */
   name: string;
 }
 
@@ -251,6 +283,11 @@ export interface EvolutionView {
   outCount: number;
   /** N: os meses fechados com registros. */
   eligibleCount: number;
+  /**
+   * Meses que a pessoa tirou da comparação deste valor e que estão fora da janela atual (em outra janela de 3, 6 ou 12 meses). A
+   * seleção vale em qualquer janela e "Restaurar todos" devolve também esses, então o aviso os conta e os cita. Não entram em `outCount`.
+   */
+  outsideMonths: IsoMonth[];
   /** O que a faixa de comparação e os cartões mostram. */
   situation: EvolutionSituation;
   /** Total dos meses exibidos (todos os pontos), igual ao dos relatórios e sem relação com a seleção. */
@@ -265,11 +302,12 @@ function participationOf(state: EvolutionPointState, hidden: boolean): Evolution
   return hidden ? 'fora_escolha' : 'na_comparacao';
 }
 
-function pointName(point: EvolutionPoint, participation: EvolutionParticipation): string {
+function pointName(point: EvolutionPoint, participation: EvolutionParticipation, gap: boolean): string {
   const T = EVOLUTION_TEXT.participation;
   const parts = [formatMonthBR(point.month), point.state === 'sem_registros' ? T.noRecords : formatBRL(point.cents)];
   if (point.state === 'em_andamento') parts.push(T.inProgress);
   parts.push(participation === 'na_comparacao' ? T.included : T.excluded);
+  if (gap) parts.push(lowerFirst(EVOLUTION_TEXT.gap.warning));
   return parts.join(', ');
 }
 
@@ -281,6 +319,11 @@ export interface EvolutionViewInput {
   currentMonth: IsoMonth;
   /** Meses que a pessoa tirou da comparação nesta métrica. */
   hiddenMonths: Iterable<IsoMonth>;
+  /**
+   * Meses fechados com sinal de lacuna (`evolutionGapMonths`). Só valem para Pago e só para mês fechado com registros: em Recebido,
+   * no mês em andamento e no mês sem registros não há aviso. Sem a leitura (ou se ela falhou), omita: o gráfico sai sem o aviso.
+   */
+  gapMonths?: Iterable<IsoMonth>;
 }
 
 /**
@@ -297,9 +340,13 @@ export function buildEvolutionView(input: EvolutionViewInput): EvolutionView {
   );
   const points = evolutionPoints(rows, metric, currentMonth);
   const hidden = new Set(input.hiddenMonths);
+  const gaps = new Set(metric === 'pago' ? (input.gapMonths ?? []) : []);
   const stats = comparisonStats(points, hidden);
+  const inWindow = new Set(months);
+  const outsideMonths = [...hidden].filter((m) => !inWindow.has(m)).sort();
   const views = points.map((p): EvolutionPointView => {
     const participation = participationOf(p.state, hidden.has(p.month));
+    const gap = p.state === 'com_registros' && gaps.has(p.month);
     const T = EVOLUTION_TEXT;
     return {
       ...p,
@@ -312,7 +359,8 @@ export function buildEvolutionView(input: EvolutionViewInput): EvolutionView {
       stateText: p.state === 'sem_registros' ? T.panel.noRecords(metric) : p.state === 'em_andamento' ? T.panel.state.em_andamento : T.panel.state.com_registros,
       stateLabel: p.state === 'sem_registros' ? T.table.noRecords : p.state === 'em_andamento' ? T.panel.state.em_andamento : T.panel.state.com_registros,
       includedText: participation === 'na_comparacao' ? T.table.yes : T.table.out,
-      name: pointName(p, participation),
+      gap,
+      name: pointName(p, participation, gap),
     };
   });
   const total = Number(stats.canonicalTotal);
@@ -336,6 +384,7 @@ export function buildEvolutionView(input: EvolutionViewInput): EvolutionView {
     stats,
     outCount: stats.hiddenMonths.length,
     eligibleCount: stats.eligibleCount,
+    outsideMonths,
     situation,
     totalCents: total,
     maxCents: views.reduce((max, p) => Math.max(max, p.cents), 0),
@@ -428,6 +477,11 @@ export interface EvolutionPanel {
   included: boolean;
   /** Frase no lugar do interruptor quando o mês nunca entra na comparação. */
   notEligibleText: string | null;
+  /** O aviso de lacuna do mês fechado de Pago (D04); null sem lacuna. A variação e as categorias seguem à mostra com ele (D10). */
+  gapText: string | null;
+  /** O mês vizinho da janela, para "Mês anterior" e "Mês seguinte"; null no limite (o botão fica desativado). */
+  previousMonth: IsoMonth | null;
+  nextMonth: IsoMonth | null;
   variation: EvolutionVariation;
   /** Pago com lançamentos: o app lê as categorias do mês. */
   showsCategories: boolean;
@@ -441,6 +495,7 @@ export interface EvolutionPanel {
 /** O painel do mês escolhido (tela B). Não lê nada: as categorias vêm de `categoryBreakdown`, no app. */
 export function evolutionPanel(view: EvolutionView, month: IsoMonth): EvolutionPanel {
   const point = view.points.find((p) => p.month === month) ?? view.points[view.points.length - 1]!;
+  const at = view.points.indexOf(point);
   const T = EVOLUTION_TEXT.panel;
   return {
     month: point.month,
@@ -453,6 +508,9 @@ export function evolutionPanel(view: EvolutionView, month: IsoMonth): EvolutionP
     canToggle: point.eligible,
     included: point.included,
     notEligibleText: point.state === 'em_andamento' ? T.notEligible.em_andamento : point.state === 'sem_registros' ? T.notEligible.sem_registros : null,
+    gapText: point.gap ? EVOLUTION_TEXT.gap.warning : null,
+    previousMonth: view.points[at - 1]?.month ?? null,
+    nextMonth: view.points[at + 1]?.month ?? null,
     variation: evolutionVariation(view, point.month),
     showsCategories: view.metric === 'pago' && point.state !== 'sem_registros',
     showsRecords: point.state !== 'sem_registros',
@@ -475,6 +533,57 @@ export function evolutionAnnouncement(view: EvolutionView): string {
   return s.average === null || s.median === null
     ? EVOLUTION_TEXT.stats.announceNone
     : EVOLUTION_TEXT.stats.announce(s.average, s.median, s.visibleCount, s.eligibleCount);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Sinal de lacuna em mês fechado (D04, segunda metade)
+// ---------------------------------------------------------------------------------------------------------------------
+
+/**
+ * Os meses fechados de `from` a `to` com sinal de lacuna em Pago: junta os números de gasto fixo, parcelamento e conta do ano sem conta
+ * registrada (`seriesGapsInRange`, o mesmo sinal de "Seus últimos meses") às contas em aberto vencidas nesses meses. É um aviso de
+ * que pode faltar um gasto, nunca uma conta: nada aqui muda média, mediana, total nem variação. `commitments`:
+ * `listCommitmentsDueBetween(from, to)`, abertas e pagas. Meses em ordem, sem repetir; vazio com from depois de to.
+ * Uma série com `serie_inconsistente` (sem vigência no primeiro número) é pulada: sem ela, o aviso só some, nunca inventa mês. Outro
+ * erro continua sendo lançado.
+ */
+export function evolutionGapMonths(
+  series: readonly CommitmentSeries[],
+  commitments: readonly Commitment[],
+  from: IsoMonth,
+  to: IsoMonth,
+): IsoMonth[] {
+  if (from > to) return [];
+  const months = new Set<IsoMonth>();
+  for (const s of series) {
+    try {
+      for (const row of seriesGapsInRange(s, commitments, from, to)) months.add(row.month);
+    } catch (e) {
+      if (!(e instanceof Error) || e.message !== 'serie_inconsistente') throw e;
+    }
+  }
+  for (const c of commitments) {
+    const month = monthOf(c.dueOn);
+    if (c.status === 'aberto' && month >= from && month <= to) months.add(month);
+  }
+  return [...months].sort();
+}
+
+/**
+ * Leitura do sinal de lacuna da Evolução: `listSeries` e `listCommitmentsDueBetween` dos meses fechados dos últimos 12 (do mês mais
+ * antigo da leitura até o mês anterior ao atual), como `loadReturnReview` lê para a revisão. Chame depois de `syncSeriesOccurrences`
+ * dar certo: sem ela, uma conta que a geração ainda vai criar apareceria como lacuna. Quem chama trata a falha da leitura mostrando o
+ * gráfico sem o aviso.
+ */
+export async function loadEvolutionGaps(
+  repo: Pick<RecordsRepository, 'listSeries' | 'listCommitmentsDueBetween'>,
+  contextId: string,
+  currentMonth: IsoMonth,
+): Promise<IsoMonth[]> {
+  const from = evolutionFetchRange(currentMonth).from;
+  const to = addMonths(currentMonth, -1);
+  const [series, commitments] = await Promise.all([repo.listSeries(contextId), repo.listCommitmentsDueBetween(contextId, from, to)]);
+  return evolutionGapMonths(series, commitments, from, to);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

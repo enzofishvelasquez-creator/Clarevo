@@ -2,7 +2,7 @@
 
 16/10/2026. Avaliação só de leitura de `/home/user/clarevo`: nenhum arquivo alterado e nenhum teste executado.
 
-> **Situação em 16/10/2026: a fase 1b está feita (D-057, Ciclo O).** A tela `/evolucao` (telas A, B, C e E), a entrada em Movimentações e na busca de Aprender, o guia, o cenário `?cenario=evolucao` e o bloco "Evolução (D-057)" do roteiro web entraram sem migração e sem pacote novo; onde e como está em `docs/00` (D-057), `docs/01`, `docs/02` (regra de exibição), `docs/04` (Ciclo O) e `docs/10`. As seções abaixo são a avaliação de 16/10/2026, mantida como registro; onde dizem "nenhum está implementado", leia a situação de antes da fase 1b. Seguem adiadas a fase 2 (tela D, "Entender o que mudou", e o aviso de lacuna em mês fechado, a segunda metade de D04), a fase 3 (comprometimento e metas) e a 3b (competência).
+> **Situação em 16/10/2026: a fase 1b está feita (D-057, Ciclo O).** A tela `/evolucao` (telas A, B, C e E), a entrada em Movimentações e na busca de Aprender, o guia, o cenário `?cenario=evolucao` e o bloco "Evolução (D-057)" do roteiro web entraram sem migração e sem pacote novo; onde e como está em `docs/00` (D-057), `docs/01`, `docs/02` (regra de exibição), `docs/04` (Ciclo O) e `docs/10`. As seções abaixo são a avaliação de 16/10/2026, mantida como registro; onde dizem "nenhum está implementado", leia a situação de antes da fase 1b. O aviso de lacuna em mês fechado de Pago (a segunda metade de D04) entrou na revisão da fase 1b, no mesmo dia (`evolutionGapMonths` e `loadEvolutionGaps`, com `seriesGapsInRange`; `docs/00`, D-057, itens 11 e 12). Seguem adiadas a fase 2 (tela D, "Entender o que mudou", com D10), a fase 3 (comprometimento e metas) e a 3b (competência).
 
 ## 1. O que já existe e pode ser reaproveitado
 
@@ -80,7 +80,7 @@
 | Fase | Entrega | Esforço | Depende de |
 |---|---|---|---|
 | 1a | `evolucao.ts` e testes | P | nada |
-| 1b | Telas A, B, C e E, demonstração, guia e roteiro web (**feita em 16/10/2026**) | M | D01, D03, D04, D05, D09 |
+| 1b | Telas A, B, C e E, demonstração, guia e roteiro web, e o aviso de lacuna em mês fechado de Pago (**feita em 16/10/2026**) | M | D01, D03, D04, D05, D09 |
 | 2 | Categorias e "Entender o que mudou" | M | D06, D08, D10 |
 | 3 | Comprometimento e metas | M | D02 |
 | 3b | Consumo por competência | G | D07, regra nova, talvez migração |

@@ -2946,14 +2946,16 @@ describe('textos da Evolução (D-057)', () => {
     for (const metric of ['recebido', 'pago'] as EvolutionMetric[]) {
       for (const windowMonths of EVOLUTION_WINDOWS) {
         for (const hiddenMonths of hiddenSets) {
-          const view = buildEvolutionView({ overview, metric, windowMonths, currentMonth: '2026-10', hiddenMonths });
-          texts.push(evolutionAnnouncement(view), EVOLUTION_TEXT.custom.banner(view.outCount, view.eligibleCount), EVOLUTION_TEXT.custom.list(view.stats.hiddenMonths));
+          // Março e abril com sinal de lacuna (D04): o aviso entra no nome do ponto, no painel e na tabela.
+          const view = buildEvolutionView({ overview, metric, windowMonths, currentMonth: '2026-10', hiddenMonths, gapMonths: ['2026-03', '2026-04'] });
+          texts.push(evolutionAnnouncement(view), EVOLUTION_TEXT.custom.banner(view.outCount, view.eligibleCount), EVOLUTION_TEXT.custom.list(view.stats.hiddenMonths, view.outsideMonths));
           texts.push(EVOLUTION_TEXT.chart.span(view.from, view.to), EVOLUTION_TEXT.chart.title(metric), EVOLUTION_TEXT.chart.maxValue(view.maxCents));
           texts.push(EVOLUTION_TEXT.stats.ofMonths(view.stats.visibleCount, view.eligibleCount));
           for (const p of view.points) {
             texts.push(p.name, p.title, p.stateText, p.includedText, ...(p.valueText ? [p.valueText] : []));
             const panel = evolutionPanel(view, p.month);
             texts.push(panel.title, panel.valueCaption, panel.stateText, EVOLUTION_TEXT.panel.seeRecordsHint(p.month), p.stateLabel, ...(panel.notEligibleText ? [panel.notEligibleText] : []));
+            texts.push(...(panel.gapText ? [panel.gapText] : []), ...(panel.previousMonth ? [EVOLUTION_TEXT.panel.stepHint(panel.previousMonth)] : []), ...(panel.nextMonth ? [EVOLUTION_TEXT.panel.stepHint(panel.nextMonth)] : []));
             const v = panel.variation;
             texts.push(v.text, ...(v.available ? [...(v.percentText ? [v.percentText] : []), ...(v.skippedText ? [v.skippedText] : [])] : []));
           }
@@ -2968,6 +2970,10 @@ describe('textos da Evolução (D-057)', () => {
     }
     texts.push(
       EVOLUTION_TEXT.custom.banner(1, 1),
+      EVOLUTION_TEXT.custom.list(['2026-05'], ['2025-11']),
+      EVOLUTION_TEXT.custom.list(['2026-05'], ['2025-11', '2026-01', '2026-03']),
+      EVOLUTION_TEXT.gap.warning,
+      EVOLUTION_TEXT.table.rowHint,
       EVOLUTION_TEXT.custom.scope('pago'),
       EVOLUTION_TEXT.custom.scope('recebido'),
       EVOLUTION_TEXT.states.noRecordsBody('pago'),
