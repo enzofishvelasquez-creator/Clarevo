@@ -138,6 +138,12 @@ export function isFamilyAction(action: string): action is FamilyAction {
 
 /** Rótulo de quem não tem nome para mostrar: nome vazio, que parece e-mail ou que é o início do e-mail (a mesma frase do banco). */
 export const FAMILY_NEUTRAL_NAME = 'Pessoa da Família';
+/**
+ * Rótulo de quem excluiu a conta (D-058): o que a pessoa anotou continua na Família como histórico da casa, e a autoria passa a ser
+ * esta frase, sem nome e sem e-mail (a mesma do banco, na visão family_member_items). É o único primeiro nome com espaço, além do
+ * neutro, e nenhum nome de verdade tem esta forma: um primeiro nome nunca tem espaço.
+ */
+export const FAMILY_DEPARTED_NAME = 'Pessoa que saiu';
 
 /**
  * Primeiro nome para mostrar a outras pessoas (L-6): a primeira palavra do nome, no máximo 40 caracteres. O e-mail de outra pessoa
@@ -276,12 +282,12 @@ export const FAMILY_TEXT = {
   peopleTitle: 'Pessoas',
   you: 'você',
   exMembersTitle: 'Ex-membros',
-  exMembersNote: 'O que essas pessoas anotaram continua na Família, como histórico da casa.',
-  exMember: (firstName: string): string => `ex-membro · ${firstName}`,
+  exMembersNote: 'O que essas pessoas anotaram continua na Família, como histórico da casa. Quem excluiu a conta aparece como "Pessoa que saiu".',
+  exMember: (firstName: string): string => (firstName === FAMILY_DEPARTED_NAME ? FAMILY_DEPARTED_NAME : `ex-membro · ${firstName}`),
   memberLine: (firstName: string, isMe: boolean): string => (isMe ? `${firstName} (você)` : firstName),
   memberA11y: (firstName: string, role: FamilyRole, isMe: boolean): string =>
     `${isMe ? `${firstName}, você` : firstName}, ${FAMILY_ROLE_LABEL[role]}`,
-  exMemberA11y: (firstName: string): string => `Ex-membro ${firstName}`,
+  exMemberA11y: (firstName: string): string => (firstName === FAMILY_DEPARTED_NAME ? 'Ex-membro, pessoa que excluiu a conta' : `Ex-membro ${firstName}`),
   /** Ações do titular sobre uma pessoa. */
   manage: 'Gerenciar',
   manageA11y: (firstName: string, role: FamilyRole): string => `Gerenciar ${firstName}, ${FAMILY_ROLE_LABEL[role]}`,
@@ -347,7 +353,7 @@ export const FAMILY_TEXT = {
   /** "Quem vê estes dados?" na Família. */
   whoSeesIntro: 'Estas pessoas veem os registros da Família, cada uma conforme o papel que tem.',
   whoSeesNote:
-    'Gastos, contas a pagar, gastos fixos, parcelamentos, cartões, metas e contas de origem da Família ficam visíveis para estas pessoas. O que cada pessoa anotou continua na Família, com o primeiro nome dela, mesmo depois de sair.',
+    'Gastos, contas a pagar, gastos fixos, parcelamentos, cartões, metas e contas de origem da Família ficam visíveis para estas pessoas. O que cada pessoa anotou continua na Família, com o primeiro nome dela, mesmo depois de sair. Quem exclui a conta fica como "Pessoa que saiu", sem nome e sem e-mail.',
   /** Quem anotou, nos detalhes (L-6). */
   notedBy: (label: string): string => `Anotado por ${label}`,
   /** Onde a anotação vai ficar. */
@@ -439,7 +445,8 @@ export const FAMILY_ERROR_CODES: readonly RepoErrorCode[] = [
 
 /**
  * Nome de quem anotou, para os detalhes na Família: o primeiro nome (e "você" para quem consulta); quem saiu ou foi removido aparece
- * como "ex-membro · Nome". Pessoa que não está na lista (nunca deveria ocorrer) devolve null: a tela não mostra a linha.
+ * como "ex-membro · Nome", e quem excluiu a conta (D-058), como "Pessoa que saiu". Pessoa que não está na lista (nunca deveria
+ * ocorrer) devolve null: a tela não mostra a linha.
  */
 export function authorLabel(members: readonly FamilyMember[], personId: string): string | null {
   const m = members.find((x) => x.personId === personId);

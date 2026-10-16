@@ -16,7 +16,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { DeviceFeatures } from '@/components/device-features';
 import { BrowseTabBar } from '@/components/tab-bar';
-import { afterLogin, restoreTarget, signOutIntent } from '@/lib/nav';
+import { afterLogin, deletedAccountIntent, restoreTarget, signOutIntent } from '@/lib/nav';
 import { SessionProvider, useSession } from '@/state/session';
 import { SpaceStatusContext, type SpaceStatus } from '@/state/space-status';
 import { ViewProvider } from '@/state/view';
@@ -127,10 +127,16 @@ function Navigation() {
   // Sessão encerrada sem a pessoa pedir (expirou): voltar à entrada e retomar o destino depois,
   // só se a mesma pessoa entrar de novo.
   useEffect(() => {
-    if (prevUser.current && !user && !signOutIntent.consume()) {
-      afterLogin.set(lastPath.current, prevUser.current.id);
-      // As rotas protegidas já saíram da pilha; levar a pessoa direto para Entrar.
-      setTimeout(() => router.replace('/entrar'), 0);
+    if (prevUser.current && !user) {
+      const manual = signOutIntent.consume();
+      if (deletedAccountIntent.consume()) {
+        // Conta excluída (D-058): nada a retomar depois; a entrada diz "Sua conta foi excluída".
+        setTimeout(() => router.replace('/conta-excluida'), 0);
+      } else if (!manual) {
+        afterLogin.set(lastPath.current, prevUser.current.id);
+        // As rotas protegidas já saíram da pilha; levar a pessoa direto para Entrar.
+        setTimeout(() => router.replace('/entrar'), 0);
+      }
     }
     prevUser.current = user;
   }, [user]);
@@ -231,6 +237,8 @@ function Navigation() {
           <Stack.Screen name="empresa/index" />
           {/* Exportar meus dados (D-047): planilha (CSV) ou resumo em PDF, montado no aparelho. */}
           <Stack.Screen name="conta/exportar" />
+          {/* Excluir minha conta (D-058): o que é apagado e o que continua, exportar antes e digitar EXCLUIR; sem barra. */}
+          <Stack.Screen name="conta/excluir" />
           {/* Contas de origem do dinheiro (D-043). /contas/nova é rota estática e tem precedência sobre /contas/[id]/editar. */}
           <Stack.Screen name="contas/nova" />
           <Stack.Screen name="contas/[id]/editar" />
@@ -276,6 +284,9 @@ function Navigation() {
         <Stack.Screen name="convite/[codigo]" />
         {/* Convite da empresa (D-056): o mesmo caminho do convite da Família, aberto pelo link do RH, com ou sem conta. */}
         <Stack.Screen name="beneficio/[codigo]" />
+        {/* Depois de excluir a conta (D-058): a entrada que diz "Sua conta foi excluída". Fora da proteção, como os convites: o roteador a abre
+            logo que a sessão termina, sem esperar o grupo de entrada. Com sessão aberta, a tela volta ao início. */}
+        <Stack.Screen name="conta-excluida" />
         <Stack.Protected guard={signedOut || inRecovery}>
           <Stack.Screen name="nova-senha" />
         </Stack.Protected>

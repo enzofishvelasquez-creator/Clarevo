@@ -2809,7 +2809,7 @@ do $$ begin
             'create_card', 'create_commitment', 'create_family', 'create_family_invite', 'create_goal', 'create_record',
             'create_series', 'create_series_occurrence', 'decide_return_review', 'delete_account', 'delete_card',
             'delete_card_entry', 'delete_category_budget', 'delete_commitment', 'delete_commitment_limit', 'delete_goal',
-            'delete_goal_movement', 'delete_income_reference', 'delete_record', 'delete_series', 'end_family', 'end_license',
+            'delete_goal_movement', 'delete_income_reference', 'delete_my_account', 'delete_record', 'delete_series', 'end_family', 'end_license',
             'end_series', 'ensure_personal_space', 'import_records', 'inform_series_year', 'invite_licenses',
             'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'leave_family',
             'mark_subscriptions_reviewed', 'month_budget', 'month_committed', 'month_to_pay', 'month_totals',
@@ -2820,7 +2820,7 @@ do $$ begin
             'transfer_family_ownership', 'undo_commitment_payment', 'undo_invoice_payment', 'update_account', 'update_card',
             'update_card_entry', 'update_commitment', 'update_goal', 'update_goal_movement', 'update_record',
             'update_series_from'],
-    'authenticated executa só as 79 funções expostas (as 5 de contas, testadas em 85, as 5 de orçamento e limite, testadas em 80, as 11 de cartão, as 4 de data e as de antes)';
+    'authenticated executa só as 80 funções expostas (as 5 de contas, testadas em 85, as 5 de orçamento e limite, testadas em 80, as 11 de cartão, as 4 de data, a exclusão da conta, testada em 99, e as de antes)';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')), 'anon não executa nenhuma função';
   -- Auxiliares, guardas e gatilhos de consistência: sem execute para authenticated.

@@ -146,10 +146,10 @@ describe('barra inferior (D-039)', () => {
   it('toda tela do app é classificada: o que se chama novo, editar ou pagar não tem barra, e o resto tem', () => {
     const routes = appRoutes();
     expect(routes.length).toBeGreaterThan(50);
-    const formName = /\/(novo|nova|editar|pagar|encargo|estorno|compra|encerrar|informar|movimento|atualizar|vencidas|referencia|limite|minima|reserva|guardar|importar|convidar)$/;
+    const formName = /\/(novo|nova|editar|pagar|encargo|estorno|compra|encerrar|informar|movimento|atualizar|vencidas|referencia|limite|minima|reserva|guardar|importar|convidar|excluir)$/;
     // O formulário do orçamento de uma categoria é a rota dinâmica /orcamento/[categoria].
     const budgetForm = /^\/orcamento\/\[categoria\]$/;
-    const entry = /^\/(boas-vindas|criar-conta|confirmar-email|entrar|recuperar-acesso|nova-senha|primeira-conta|carregando|confirmado|convite\/\[codigo\]|beneficio\/\[codigo\])$/;
+    const entry = /^\/(boas-vindas|criar-conta|confirmar-email|entrar|recuperar-acesso|nova-senha|primeira-conta|carregando|confirmado|conta-excluida|convite\/\[codigo\]|beneficio\/\[codigo\])$/;
     for (const { pattern, sample } of routes) {
       const mode = barModeFor(sample);
       if (entry.test(pattern) || formName.test(pattern) || budgetForm.test(pattern)) expect(mode, pattern).toBe('formulario');

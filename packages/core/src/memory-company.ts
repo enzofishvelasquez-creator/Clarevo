@@ -131,6 +131,26 @@ export class MemoryCompanyHub {
     this.people.set(personId, { id: personId, email: normalizeEmail(email), displayName, timeZone });
   }
 
+  /**
+   * Excluir a conta (D-058, regra 4): a licença ativa termina no ato, os direitos ao plano da pessoa e a administração das
+   * organizações saem, as operações dela também, e a licença encerrada fica sem a pessoa (o e-mail é o que a empresa convidou).
+   */
+  erasePerson(personId: string): void {
+    const now = this.nowIso();
+    for (const l of this.licenses.values()) {
+      if (l.personId !== personId) continue;
+      if (l.status === 'ativa') {
+        l.status = 'encerrada';
+        l.endedAt = now;
+      }
+      this.entitlements.delete(l.id);
+      l.personId = null;
+    }
+    for (const key of [...this.admins]) if (key.endsWith(`|${personId}`)) this.admins.delete(key);
+    for (const key of [...this.ops.keys()]) if (key.startsWith(`${personId}|`)) this.ops.delete(key);
+    this.people.delete(personId);
+  }
+
   // -------------------------------------------------------------------------
   // Equipe Clarevo (o SQL Editor, no banco)
   // -------------------------------------------------------------------------

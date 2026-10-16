@@ -1023,10 +1023,13 @@ create temp table lic_before as select * from public.licenses where id = pg_temp
 do $$
 begin
   assert (select person_id from lic_before) = pg_temp.id('nilo') and (select status from lic_before) = 'encerrada', 'antes: encerrada, ainda com a pessoa';
-  -- Licença ativa: apagar a conta é recusado até a empresa encerrar (a pessoa da licença não pode ficar nula); a transação desfaz o resto.
-  perform pg_temp.expect_code($f$select pg_temp.drop_account('tito')$f$, 'campo_imutavel', '42501');
-  assert exists (select 1 from auth.users where id = pg_temp.id('tito')) and exists (select 1 from public.financial_contexts where owner_person_id = pg_temp.id('tito')),
-    'a conta de quem tem licença ativa continua inteira';
+  -- Licença ativa: a guarda segue recusando anular a pessoa direto (o backend não deixa a licença ativa sem pessoa). Desde a 0015 (D-058),
+  -- quem tem licença ativa apaga a conta pelo caminho certo (delete_my_account, ou o gatilho de auth.users) e a licença termina no
+  -- ato; isso é testado a fundo em 99_exclusao.sql. Aqui, o que a 0014 garantia continua: nada anula a pessoa de uma licença ativa.
+  perform pg_temp.expect_code(format($f$update public.licenses set person_id = null where person_id = %L and status = 'ativa'$f$, pg_temp.id('tito')), 'campo_imutavel', '42501');
+  assert exists (select 1 from auth.users where id = pg_temp.id('tito')) and exists (select 1 from public.financial_contexts where owner_person_id = pg_temp.id('tito'))
+     and exists (select 1 from public.licenses where person_id = pg_temp.id('tito') and status = 'ativa'),
+    'a recusa não mexeu na conta nem na licença ativa de Tito';
   -- Licença encerrada: apagar a conta funciona.
   perform pg_temp.drop_account('nilo');
   assert not exists (select 1 from auth.users where id = pg_temp.id('nilo')) and not exists (select 1 from public.persons where id = pg_temp.id('nilo')), 'a conta do Nilo foi apagada';

@@ -57,8 +57,10 @@ const FORM_PATHS: readonly RegExp[] = [
   new RegExp(`^/convite/${ID}$`),
   // Convite da empresa (D-056): o mesmo caminho do convite da Família, aberto pelo link do RH, sem barra.
   new RegExp(`^/beneficio/${ID}$`),
-  // Entrada, cadastro, recuperação e carregamento.
-  /^\/(boas-vindas|criar-conta|confirmar-email|entrar|recuperar-acesso|nova-senha|primeira-conta|carregando|confirmado)$/,
+  // Excluir minha conta (D-058): o que é apagado, exportar antes e digitar EXCLUIR; sem barra, para a confirmação não se perder.
+  /^\/conta\/excluir$/,
+  // Entrada, cadastro, recuperação e carregamento; "Sua conta foi excluída" é a entrada depois de excluir a conta (D-058).
+  /^\/(boas-vindas|criar-conta|confirmar-email|entrar|recuperar-acesso|nova-senha|primeira-conta|carregando|confirmado|conta-excluida)$/,
 ];
 
 /** Caminho sem parâmetros nem barra final: "/a-pagar/vencidas/?x=1" → "/a-pagar/vencidas". */
@@ -378,6 +380,13 @@ export const APP_SCREENS: readonly AppScreen[] = [
     caption: 'Planilha (CSV) ou resumo em PDF dos seus gastos e recebimentos',
     href: '/conta/exportar',
     keywords: ['exportar', 'exportação', 'planilha', 'excel', 'csv', 'pdf', 'backup', 'baixar', 'baixar meus dados', 'levar meus dados', 'relatório', 'cópia dos dados'],
+  },
+  {
+    id: 'excluir-conta',
+    title: 'Excluir minha conta',
+    caption: 'O que é apagado e o que continua, exportar antes e confirmar com a palavra EXCLUIR',
+    href: '/conta/excluir',
+    keywords: ['excluir', 'excluir conta', 'apagar conta', 'apagar meus dados', 'excluir meus dados', 'deletar conta', 'encerrar conta', 'cancelar conta', 'sair do clarevo', 'lgpd', 'privacidade'],
   },
   {
     id: 'importar-extrato',

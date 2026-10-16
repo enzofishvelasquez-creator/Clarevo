@@ -8,7 +8,7 @@ import type {
   FamilyRole,
   InviteRole,
 } from './family';
-import { FAMILY_MAX_PEOPLE, INVITE_VALID_DAYS, familyNameError, firstNameOf, inviteCodeHash, inviteRoleError, normalizeFamilyName } from './family';
+import { FAMILY_DEPARTED_NAME, FAMILY_MAX_PEOPLE, INVITE_VALID_DAYS, familyNameError, firstNameOf, inviteCodeHash, inviteRoleError, normalizeFamilyName } from './family';
 import { RepoError } from './repository';
 import { sha256Hex } from './sha256';
 
@@ -67,6 +67,8 @@ export class MemoryFamilyHub {
   private members = new Map<string, StoredMember>();
   private invites = new Map<string, StoredInvite>();
   private ops = new Map<string, StoredOp>();
+  /** Quem excluiu a conta (D-058) e ainda aparece como ex-membro de alguma Família: o nome vira "Pessoa que saiu". */
+  private departed = new Set<string>();
   private seq = 0;
 
   constructor(private readonly opts: MemoryFamilyHubOptions = {}) {}
@@ -134,6 +136,7 @@ export class MemoryFamilyHub {
   }
 
   private nameOf(personId: string): string {
+    if (this.departed.has(personId)) return FAMILY_DEPARTED_NAME;
     return firstNameOf(this.people.get(personId)?.displayName ?? '');
   }
 
@@ -446,6 +449,60 @@ export class MemoryFamilyHub {
     target.canWrite = true;
     family.ownerId = personId;
     this.save(actor, key, 'transferir_titularidade_familia', hash, contextId, personId);
+  }
+
+  // -------------------------------------------------------------------------
+  // Excluir a conta (D-058): as regras 3 e 5 de clarevo_erase_person, na ordem do banco
+  // -------------------------------------------------------------------------
+
+  /**
+   * Quem é titular (ou dona de Família ainda ativa) com outras pessoas ativas precisa passar a titularidade ou remover as pessoas
+   * antes: transferir_antes. Não muda nada.
+   */
+  assertCanErase(personId: string): void {
+    for (const f of this.families.values()) {
+      if (f.endedAt !== null) continue;
+      if (f.ownerId !== personId && !this.activeMember(f.id, personId)?.owner) continue;
+      if ([...this.members.values()].some((m) => m.contextId === f.id && m.leftAt === null && m.personId !== personId)) {
+        throw new RepoError('transferir_antes');
+      }
+    }
+  }
+
+  /**
+   * Apaga a pessoa da administração da Família. As Famílias dela (titular, ou dona de Família já encerrada) acabam por inteiro, com
+   * os convites e as pessoas anônimas que só continuavam por causa delas. Nas outras, a pessoa sai e os convites que criou somem; ela
+   * continua na lista como "Pessoa que saiu" só se anotou algo ali (`authoredIn`, os contextos em que o repositório dela tem
+   * dados): quem não anotou nada some, como no banco. Valida antes de mudar qualquer coisa.
+   */
+  erase(personId: string, authoredIn: ReadonlySet<string> = new Set()): void {
+    this.assertCanErase(personId);
+    const now = this.nowIso();
+    for (const f of [...this.families.values()]) {
+      if (f.ownerId === personId || this.activeMember(f.id, personId)?.owner) this.dropFamily(f.id);
+    }
+    for (const [key, m] of [...this.members]) {
+      if (m.personId !== personId) continue;
+      if (m.leftAt === null) m.leftAt = now;
+      if (!authoredIn.has(m.contextId)) this.members.delete(key);
+    }
+    for (const [id, i] of [...this.invites]) {
+      if (i.createdBy === personId) this.invites.delete(id);
+      else if (i.usedBy === personId) i.usedBy = null;
+    }
+    for (const key of [...this.ops.keys()]) if (key.startsWith(`${personId}|`)) this.ops.delete(key);
+    this.people.delete(personId);
+    if ([...this.members.values()].some((m) => m.personId === personId)) this.departed.add(personId);
+  }
+
+  /** Uma Família que acaba leva os vínculos, os convites, as operações e as pessoas anônimas que só existiam por causa dela. */
+  private dropFamily(contextId: string): void {
+    const ghosts = [...this.members.values()].filter((m) => m.contextId === contextId && this.departed.has(m.personId)).map((m) => m.personId);
+    this.families.delete(contextId);
+    for (const [key, m] of [...this.members]) if (m.contextId === contextId) this.members.delete(key);
+    for (const [id, i] of [...this.invites]) if (i.contextId === contextId) this.invites.delete(id);
+    for (const [key, op] of [...this.ops]) if (op.contextId === contextId) this.ops.delete(key);
+    for (const g of ghosts) if (![...this.members.values()].some((m) => m.personId === g)) this.departed.delete(g);
   }
 
   /** end_family. Só sem outra pessoa ativa (familia_com_membros). Repetir a chave devolve o resultado mesmo depois de encerrar. */

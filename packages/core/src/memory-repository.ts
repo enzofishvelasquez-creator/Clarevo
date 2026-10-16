@@ -67,6 +67,7 @@ import type { ImportDestination, ImportItem, ImportResult } from './importar/tip
 import { IMPORT_BATCH } from './importar/tipos';
 import type { FamilyAction, FamilyInvite, FamilyInviteWrite, FamilyInvitePreview, FamilyJoin, FamilyOverview, InviteRole } from './family';
 import { isFamilyAction } from './family';
+import { DELETE_CONFIRMATION_WORD } from './deletion';
 import { MemoryFamilyHub } from './memory-family';
 import type { Benefit, BenefitPreview, CompanyAction, CompanyOverview, CompanyUsage, License, LicenseInviteWrite, LicenseRenewWrite } from './company';
 import { isCompanyAction } from './company';
@@ -350,6 +351,9 @@ export class MemoryRepository implements RecordsRepository {
   /** Atraso artificial (ms) em cada operação. */
   latencyMs: number;
 
+  /** A conta foi excluída (D-058): este repositório não guarda mais nada e não cria espaço de novo. */
+  private deleted = false;
+
   /** Família: compartilhada entre repositórios quando o hub vem das opções. */
   private readonly hub: MemoryFamilyHub;
   /** Empresas: compartilhada entre repositórios quando o hub vem das opções. */
@@ -457,6 +461,8 @@ export class MemoryRepository implements RecordsRepository {
 
   async ensurePersonalSpace(accountName: string, timeZone?: string) {
     return this.write(() => {
+      // Conta excluída: como no banco, a conta já não existe (o e-mail não está mais em auth.users).
+      if (this.deleted) throw new RepoError('email_nao_confirmado');
       if (this.space) return this.spaceView()!;
       const name = accountName.trim();
       if (name.length < 1 || name.length > 40) throw new RepoError('nome_da_conta_invalido');
@@ -4087,6 +4093,70 @@ export class MemoryRepository implements RecordsRepository {
       this.familyKey(key);
       this.hub.end(this.opts.actorId, key, contextId, this.ownPersonal);
       this.familyDone(key, 'encerrar_familia', contextId);
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Excluir minha conta (D-058): delete_my_account, da migração 0015
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Os contextos de Família em que este repositório tem dados (o que a pessoa anotou ali). A "Conta principal" que cada pessoa guarda
+   * ao entrar na Família é só um apoio da memória (no banco, só quem cria a Família tem uma) e não conta como anotação.
+   */
+  private authoredFamilyContexts(): Set<string> {
+    const ids = new Set<string>();
+    const personal = this.ownPersonal;
+    const add = (contextId: string) => {
+      if (contextId !== personal) ids.add(contextId);
+    };
+    for (const r of this.records.values()) add(r.contextId);
+    for (const c of this.commitments.values()) add(c.contextId);
+    for (const x of this.seriesById.values()) add(x.contextId);
+    for (const x of this.incomeRefs.values()) add(x.contextId);
+    for (const x of this.budgets.values()) add(x.contextId);
+    for (const x of this.limits.values()) add(x.contextId);
+    for (const x of this.goals.values()) add(x.contextId);
+    for (const x of this.goalMovements.values()) add(x.contextId);
+    for (const x of this.cards.values()) add(x.contextId);
+    for (const x of this.cardEntries.values()) add(x.contextId);
+    for (const a of this.accountsById.values()) if (a.name !== 'Conta principal') add(a.contextId);
+    return ids;
+  }
+
+  /**
+   * Ordem do banco: confirmação exata (confirmacao_invalida); conta já excluída (repetir responde sem erro e sem efeito); chave já
+   * usada em outra operação (chave_reutilizada); transferir_antes (titular com outras pessoas ativas). Depois apaga de verdade
+   * tudo o que este repositório guarda, encerra a licença ativa e tira a pessoa da Família e da empresa. O que cada pessoa anotou na
+   * Família fica no repositório dela, então aqui some junto; a autoria "Pessoa que saiu" só existe de verdade no banco, onde as
+   * anotações da Família são compartilhadas (conferida em 99_exclusao.sql).
+   */
+  async deleteMyAccount(confirmation: string, key: string): Promise<void> {
+    return this.write(() => {
+      if (confirmation !== DELETE_CONFIRMATION_WORD) throw new RepoError('confirmacao_invalida');
+      if (this.deleted) return;
+      if (this.operations.has(key)) throw new RepoError('chave_reutilizada');
+      this.hub.assertCanErase(this.opts.actorId);
+      this.hub.erase(this.opts.actorId, this.authoredFamilyContexts());
+      this.company.erasePerson(this.opts.actorId);
+      this.records.clear();
+      this.commitments.clear();
+      this.seriesById.clear();
+      this.terms.clear();
+      this.operations.clear();
+      this.activity.clear();
+      this.reviews.clear();
+      this.incomeRefs.clear();
+      this.budgets.clear();
+      this.limits.clear();
+      this.goals.clear();
+      this.goalMovements.clear();
+      this.savingsChecks.clear();
+      this.cards.clear();
+      this.cardEntries.clear();
+      this.accountsById.clear();
+      this.space = null;
+      this.deleted = true;
     });
   }
 
