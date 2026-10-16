@@ -109,7 +109,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     steps: [
       `Em Movimentos, logo abaixo de ${q(SEU_MES_TEXT.title)}, toque em ${q(EVOLUTION_TEXT.title)}.`,
       `Escolha ${q(EVOLUTION_TEXT.metrics.recebido)} ou ${q(EVOLUTION_TEXT.metrics.pago)} e ${list(EVOLUTION_WINDOWS.map((n) => EVOLUTION_TEXT.windowLabel[n]), 'ou')}. O gráfico tem um ponto por mês, pela data do pagamento.`,
-      'Toque em um mês para ver o valor exato, a variação com o mês anterior na comparação e as 3 maiores categorias de Pago.',
+      `Toque em um mês para ver o valor exato, a variação com o mês anterior na comparação e as 3 maiores categorias do mês. ${q(EVOLUTION_TEXT.explain.title)} mostra as categorias e os lançamentos que mais mudaram entre os dois meses, sem dizer qual é a causa.`,
       `Para tirar um mês da comparação, desligue ${q(EVOLUTION_TEXT.panel.switchLabel)}. Isso não apaga nem muda lançamento, e ${q(EVOLUTION_TEXT.custom.restore)} traz os meses de volta.`,
       `${q(EVOLUTION_TEXT.stats.average)} e ${q(EVOLUTION_TEXT.stats.median)} usam só os meses da comparação. ${q(EVOLUTION_TEXT.stats.total)} soma todos e não muda.`,
       `${q(EVOLUTION_TEXT.table.show)} abre os mesmos valores em texto. O mês em andamento e os meses sem registros ficam à vista, fora das contas. A seleção vale só enquanto o app está aberto.`,

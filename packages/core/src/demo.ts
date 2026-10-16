@@ -354,6 +354,11 @@ async function createReturnDemoRepository(latencyMs?: number) {
  * Pago por mês: 3.200, 3.400, 3.300, 7.800, 3.450 e 3.600 (o aluguel de R$ 2.000,00, o mercado, o combustível e o lazer; abril tem
  * ainda o "Reparo do carro", de R$ 4.400,00). Recebido: salário de R$ 5.000,00 (R$ 5.200,00 em abril e R$ 5.100,00 em junho), e março
  * sem nenhum recebimento anotado.
+ *
+ * "Entender o que mudou" (fase 2): março tem ainda uma "Farmácia" de R$ 150,00 (Saúde) que abril não tem, e os valores de mercado,
+ * combustível e lazer de março e abril são tais que, de março para abril (R$ 4.500,00 a mais), as categorias que mais mudam são
+ * Transporte (R$ 300,00 para R$ 4.700,00, R$ 4.400,00 a mais), Mercado (R$ 150,00 a mais) e Saúde (R$ 150,00 a menos), que somam
+ * R$ 4.400,00: sobram R$ 100,00 de outras categorias (Lazer). Os totais de março (R$ 3.300,00) e de abril (R$ 7.800,00) não mudam.
  */
 async function createEvolutionDemoRepository(latencyMs?: number) {
   const repo = new MemoryRepository({
@@ -369,11 +374,12 @@ async function createEvolutionDemoRepository(latencyMs?: number) {
   const accountId = space.accounts[0]!.id;
   const add = (kind: 'receita' | 'despesa', description: string, reais: number, occurredOn: string, category: string) =>
     repo.createRecord(newOperationKey(), ctx, kind, { accountId, amountCents: reais * 100, occurredOn, description, category });
-  // Mercado, combustível e lazer de cada mês (o aluguel é sempre R$ 2.000,00).
+  // Mercado, combustível e lazer de cada mês (o aluguel é sempre R$ 2.000,00). Março tem ainda a farmácia de R$ 150,00 (abaixo), então
+  // os três valores dele somam R$ 1.150,00 e o mês fecha em R$ 3.300,00.
   const months: readonly (readonly [string, number, number, number])[] = [
     ['2026-01', 800, 250, 150],
     ['2026-02', 900, 300, 200],
-    ['2026-03', 850, 280, 170],
+    ['2026-03', 730, 300, 120],
     ['2026-04', 880, 300, 220],
     ['2026-05', 900, 320, 230],
     ['2026-06', 950, 330, 320],
@@ -384,6 +390,7 @@ async function createEvolutionDemoRepository(latencyMs?: number) {
     await add('despesa', 'Combustível', combustivel, `${month}-18`, 'Transporte');
     await add('despesa', 'Lazer', lazer, `${month}-24`, 'Lazer');
   }
+  await add('despesa', 'Farmácia', 150, '2026-03-09', 'Saúde');
   await add('despesa', 'Reparo do carro', 4400, '2026-04-22', 'Transporte');
   for (const [month, reais] of [
     ['2026-01', 5000],

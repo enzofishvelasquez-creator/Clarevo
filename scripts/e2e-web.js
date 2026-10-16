@@ -7885,6 +7885,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('I1 conta nova: a revisão não tem "Já anotado" por semelhança (nada anotado ainda), e a memória do aparelho é de outra pessoa (a padaria volta a "Mercado")', t1.includes('7 linhas · 5 marcadas') && t1.includes('02/10/2026 · Saída · Mercado') && !t1.includes('Já anotado'));
   await btn('Importar 5 lançamentos').click();
   await waitText('Importação concluída', 12000);
+  // O título "Importação concluída" aparece antes da frase do resultado: a frase fica num aviso com entrada animada (FadeIn), e o Reanimated na web
+  // o mantém com visibility:hidden até o primeiro quadro da animação, então o texto visível ainda não a tem. A espera usa a mesma leitura do ok
+  // (até 8 segundos) e não engole nada: se a frase não vier, ou vier outra ("4 lançamentos importados."), o ok falha.
+  await waitUntil(async () => (await body()).includes('5 lançamentos importados.'), 8000);
   ok('I1 conta nova: "5 lançamentos importados."', (await body()).includes('5 lançamentos importados.'));
   await btn('Ver em Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(500);
   ok('I1 conta nova: os lançamentos importados aparecem em Movimentos', (await body()).includes('COMPRA PADARIA SÃO JOÃO') && (await body()).includes('SALÁRIO EMPRESA EXEMPLO LTDA'));
@@ -10511,6 +10515,14 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     };
   });
   const evFocus = () => p.evaluate(() => { const e = document.activeElement; return e ? { role: e.getAttribute('role'), text: e.textContent } : null; });
+  // "Entender o que mudou" (fase 2): o botão do painel (recolhido por padrão), o grupo aberto com a explicação e os botões de dentro dele.
+  const evExplainBtn = () => p.getByRole('button', { name: 'Entender o que mudou', exact: true }).filter({ visible: true }).first();
+  const evExplainOpened = async () => (await evExplainBtn().getAttribute('aria-expanded')) === 'true';
+  const evExplainOpen = async () => { if (!(await evExplainOpened())) await evExplainBtn().click(); await p.getByRole('group', { name: 'Entender o que mudou', exact: true }).filter({ visible: true }).first().waitFor({ timeout: 8000 }); await p.waitForTimeout(700); };
+  const evExplainClose = async () => { if (await evExplainOpened()) await evExplainBtn().click(); await p.waitForTimeout(300); };
+  const evExplainGroup = () => p.getByRole('group', { name: 'Entender o que mudou', exact: true }).filter({ visible: true }).first();
+  const evExplainText = async () => (await evExplainGroup().innerText()).replace(/\u00a0/g, ' ');
+  const evExplainBtnIn = (name) => evExplainGroup().getByRole('button', { name, exact: true });
 
   // ---- 1. Demonstração padrão: o Resumo não muda, e a linha "Evolução" fica em Movimentos, logo abaixo de "Seu mês em 30 segundos" ----
   await evEnter();
@@ -10566,6 +10578,28 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Evolução T10: meses sem registros ficam no eixo, com um traço na linha de base e o ícone do eixo, e nunca viram um ponto em R$ 0,00', (await evMark('Maio')).kind === 'traco' && (await evMark('Maio')).icon && (await evMark('Setembro')).kind === 'cheio' && !(await evMark('Setembro')).icon && (await evMark('Outubro')).kind === 'escolhido_vazio', JSON.stringify([await evMark('Maio'), await evMark('Setembro'), await evMark('Outubro')]));
   ok('Evolução legenda: "Na comparação", "Mês em andamento", "Sem registros" e "Mês escolhido", em texto', t.includes('Na comparação') && t.includes('Mês em andamento') && t.includes('Sem registros') && t.includes('Mês escolhido'));
   await evShots('441_evolucao_demonstracao_6_meses');
+
+  // ---- 3b. "Entender o que mudou" (fase 2) no mês em andamento (outubro contra setembro) e com um só mês na comparação (setembro) ----
+  ok('Evolução entender, recolhido: o painel de outubro traz o botão "Entender o que mudou" recolhido (aria-expanded falso), e fechado nenhuma explicação aparece nem é lida', (await visibleCount('button', 'Entender o que mudou')) === 1 &&
+    (await evExplainBtn().getAttribute('aria-expanded')) === 'false' && !t.includes('O Pago registrado') && !t.includes('Categorias que mais mudaram') && !t.includes('Lançamentos relacionados') && (await visibleCount('button', 'Comparar sem este mês')) === 0);
+  await evExplainOpen();
+  t = await evKeep();
+  const evE0 = await evExplainText();
+  ok('Evolução entender, mês em andamento (D10): "O Pago registrado foi R$ 150,00 maior em outubro que em setembro." com o aviso "Mês em andamento: os valores ainda podem mudar."', (await evExplainOpened()) && evE0.includes('O Pago registrado foi R$ 150,00 maior em outubro que em setembro.') &&
+    evE0.includes('Mês em andamento: os valores ainda podem mudar.'), evE0);
+  ok('Evolução entender, outubro: Mercado de R$ 1.250,00 para R$ 1.400,00 (R$ 150,00 a mais), sem "Outras categorias", com o lançamento relacionado de R$ 1.400,00 e as ações "Ver categorias" e "Ver lançamentos" (sem "Comparar sem este mês": o mês em andamento não tem interruptor)', evE0.includes('Categorias que mais mudaram') &&
+    evE0.includes('Mercado: R$ 1.250,00 em setembro, R$ 1.400,00 em outubro, R$ 150,00 a mais') && !evE0.includes('Outras categorias também mudaram') && evE0.includes('Os maiores lançamentos de outubro em Mercado') && /Mercado\s+06\/10\/2026 · R\$ 1\.400,00/.test(evE0) &&
+    (await evExplainBtnIn('Ver categorias').count()) === 1 && (await evExplainBtnIn('Ver lançamentos').count()) === 1 && (await evExplainBtnIn('Comparar sem este mês').count()) === 0 && (await evExplainBtnIn('Voltar a comparar com este mês').count()) === 0, evE0);
+  await evShots('470_evolucao_entender_em_andamento', { scroll: evScrollBtn('Entender o que mudou') });
+  await evExplainClose();
+  await evPick('Setembro');
+  if (!(await evExplainOpened())) await evExplainBtn().click();
+  await p.waitForTimeout(600);
+  t = await evKeep();
+  ok('Evolução entender, um só mês na comparação (setembro): "Escolha outro mês na comparação para ver o que mudou.", sem frase de diferença, sem categorias e sem ações', (await visibleCount('button', 'Entender o que mudou')) === 1 && t.includes('Escolha outro mês na comparação para ver o que mudou.') &&
+    !t.includes('O Pago registrado') && !t.includes('Categorias que mais mudaram') && (await visibleCount('button', 'Comparar sem este mês')) === 0, t.slice(300, 1000));
+  await evShots('471_evolucao_entender_um_mes', { scroll: evScrollBtn('Entender o que mudou') });
+  await evExplainClose();
 
   // ---- 4. T09 e T08 na demonstração padrão: o único mês fora (nunca média zero) e "Restaurar todos" ----
   await evPick('Setembro');
@@ -10769,8 +10803,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await evShots('452_evolucao_recebido_sem_registros', { scroll: evScroll('Março de 2026') });
   await evPick('Abril');
   t = await body();
-  ok('Evolução Recebido, abril: "Recebido" R$ 5.200,00, variação "De fevereiro para abril: R$ 200,00 a mais" com "4% a mais que fevereiro" e "Março está sem registros.", sem categorias (só o link "Ver lançamentos")', t.includes('Abril de 2026\nRecebido\nR$ 5.200,00') &&
-    t.includes('De fevereiro para abril: R$ 200,00 a mais') && t.includes('4% a mais que fevereiro') && t.includes('Março está sem registros.') && !t.includes('Maiores categorias do mês') && (await visibleCount('button', 'Ver lançamentos')) === 1 && (await visibleCount('button', 'Ver Pago por categoria')) === 0);
+  ok('Evolução Recebido, abril: "Recebido" R$ 5.200,00, variação "De fevereiro para abril: R$ 200,00 a mais" com "4% a mais que fevereiro" e "Março está sem registros.", as maiores categorias do mês (Salário, 100% do recebido; fase 2) e o link "Ver lançamentos", sem "Ver Pago por categoria"', t.includes('Abril de 2026\nRecebido\nR$ 5.200,00') &&
+    t.includes('De fevereiro para abril: R$ 200,00 a mais') && t.includes('4% a mais que fevereiro') && t.includes('Março está sem registros.') && t.includes('Maiores categorias do mês') && t.includes('Salário\n100% do recebido') && (await visibleCount('button', 'Ver lançamentos')) === 1 &&
+    (await visibleCount('button', 'Ver Pago por categoria')) === 0);
   await btn('Ver lançamentos').click(); await waitText('Pessoal · Abril de 2026'); await p.waitForTimeout(500);
   t = await body();
   ok('Evolução Recebido: "Ver lançamentos" abre a composição de Recebido de abril (R$ 5.200,00)', evPath() === '/composicao' && new URL(p.url()).searchParams.get('tipo') === 'recebido' && t.includes('R$ 5.200,00') && t.includes('Salário'), p.url());
@@ -10866,6 +10901,112 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(400);
   await radio('12 meses').click(); await p.waitForTimeout(400);
 
+  // ---- 16b. "Entender o que mudou" (fase 2: D06, D08 e D10; EF-16 e EF-17; T14, T15 e T28) no cenário "evolucao" ----
+  // A seção do painel começa recolhida e, fechada, não lê nem mostra nada. Aberta, descreve o que mudou entre o mês escolhido e o anterior que está
+  // na comparação (o mesmo da variação, com as duas datas): a frase principal, as 3 categorias com maior diferença, "Outras categorias também
+  // mudaram" quando a soma não fecha, os maiores lançamentos do mês na categoria que mais mudou e as ações. Só leitura: nenhuma escrita.
+  const evCallsBefore16b = (await evSpyCalls()).length;
+  await p.getByRole('button', { name: 'Restaurar todos', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(500);
+  await evPick('Abril');
+  t = await evKeep();
+  const evOrder = ['Variação', 'Entender o que mudou', 'Maiores categorias do mês', 'Mostrar este mês na comparação'].map((x) => t.indexOf(x));
+  ok('Evolução entender, recolhido (abril): o botão "Entender o que mudou" fica logo abaixo da variação e acima das categorias e do interruptor, recolhido (aria-expanded falso), e fechado nada da explicação aparece', (await visibleCount('button', 'Entender o que mudou')) === 1 &&
+    (await evExplainBtn().getAttribute('aria-expanded')) === 'false' && evOrder.every((i, k) => i >= 0 && (k === 0 || i > evOrder[k - 1])) && !t.includes('O Pago registrado') && !t.includes('Categorias que mais mudaram') &&
+    !t.includes('Lançamentos relacionados') && (await visibleCount('button', 'Comparar sem este mês')) === 0 && (await visibleCount('button', 'Ver lançamentos')) === 1, JSON.stringify(evOrder));
+  await evShots('472_evolucao_entender_fechado', { scroll: evScrollBtn('Entender o que mudou') });
+  // Pelo teclado: Enter no botão abre; o foco continua nele.
+  await evExplainBtn().focus(); await p.keyboard.press('Enter');
+  await evExplainGroup().waitFor({ timeout: 8000 }); await p.waitForTimeout(700);
+  t = await evKeep();
+  const evE1 = await evExplainText();
+  ok('Evolução entender, teclado: Enter no botão abre a seção (aria-expanded verdadeiro), o foco fica no botão e o conteúdo é um grupo "Entender o que mudou"', (await evExplainOpened()) && (await p.evaluate(() => document.activeElement?.textContent)) === 'Entender o que mudou' && (await evExplainGroup().count()) === 1);
+  ok('Evolução entender (abril): a frase principal com o Pago registrado, a diferença e os nomes dos dois meses', evE1.includes('O Pago registrado foi R$ 4.500,00 maior em abril que em março.') && !evE1.includes('(março e abril não são meses vizinhos'), evE1);
+  ok('Evolução entender (abril): as 3 categorias com maior diferença absoluta, cada uma com o valor nos dois meses e a diferença (Transporte, Mercado e Saúde); Lazer, a quarta, fica de fora', evE1.includes('Categorias que mais mudaram') &&
+    evE1.includes('Transporte: R$ 300,00 em março, R$ 4.700,00 em abril, R$ 4.400,00 a mais') && evE1.includes('Mercado: R$ 730,00 em março, R$ 880,00 em abril, R$ 150,00 a mais') && evE1.includes('Saúde: R$ 150,00 em março, sem pagamentos em abril, R$ 150,00 a menos') && !evE1.includes('Lazer:') && !evE1.includes('Moradia:'), evE1);
+  ok('Evolução entender (abril): as 3 não fecham a diferença (4.400 + 150 - 150), então "Outras categorias também mudaram: R$ 100,00 no total.", sem dizer que uma categoria foi a causa', evE1.includes('Outras categorias também mudaram: R$ 100,00 no total.') &&
+    evE1.includes('Descreve o que está registrado nos dois meses. Não diz que uma categoria ou um lançamento é a causa da diferença.') && !/caus[ao]/.test(evE1.replace('é a causa da diferença', '')), evE1);
+  ok('Evolução entender (abril): os lançamentos relacionados do mês na categoria que mais mudou: o "Reparo do carro" de R$ 4.400,00 (descrição, data e valor) e o combustível de R$ 300,00', evE1.includes('Lançamentos relacionados') && evE1.includes('Os maiores lançamentos de abril em Transporte') &&
+    /Reparo do carro\s+22\/04\/2026 · R\$ 4\.400,00/.test(evE1) && /Combustível\s+18\/04\/2026 · R\$ 300,00/.test(evE1) && evE1.indexOf('Reparo do carro') < evE1.indexOf('Combustível'), evE1);
+  ok('Evolução entender (abril): as ações "Ver categorias", "Ver lançamentos" e "Comparar sem este mês", e nenhum R$ 0,00', (await evExplainBtnIn('Ver categorias').count()) === 1 && (await evExplainBtnIn('Ver lançamentos').count()) === 1 && (await evExplainBtnIn('Comparar sem este mês').count()) === 1 &&
+    (await visibleCount('button', 'Ver lançamentos')) === 2 && !evE1.includes('R$ 0,00'));
+  const evA11yE = await p.evaluate(() => {
+    const vis = (e) => e.getBoundingClientRect().width > 0;
+    const group = [...document.querySelectorAll('[role=group][aria-label="Entender o que mudou"]')].find(vis);
+    const heads = [...group.querySelectorAll('[role=heading]')].filter(vis).map((h) => `${h.getAttribute('aria-level')}:${h.textContent}`);
+    const items = [...group.querySelectorAll('[role=listitem]')].filter(vis);
+    return { heads, lists: [...group.querySelectorAll('[role=list]')].filter(vis).length, items: items.length, related: items.filter((e) => e.getAttribute('aria-label')).map((e) => e.getAttribute('aria-label').replace(/ /g, ' ')) };
+  });
+  ok('Evolução entender, leitor de tela: títulos de nível 4 ("Categorias que mais mudaram" e "Lançamentos relacionados"), duas listas (3 categorias e 2 lançamentos), cada lançamento com nome "Reparo do carro, 22/04/2026, R$ 4.400,00"', JSON.stringify(evA11yE.heads) === JSON.stringify(['4:Categorias que mais mudaram', '4:Lançamentos relacionados']) &&
+    evA11yE.lists === 2 && evA11yE.items === 5 && evA11yE.related[0] === 'Reparo do carro, 22/04/2026, R$ 4.400,00' && evA11yE.related[1] === 'Combustível, 18/04/2026, R$ 300,00', JSON.stringify(evA11yE));
+  await evShots('473_evolucao_entender_abril', { scroll: evScrollBtn('Entender o que mudou') });
+  // As ações: "Ver categorias" e "Ver lançamentos" abrem a Composição no mês do painel; a tela continua como estava ao voltar.
+  await evExplainBtnIn('Ver categorias').click(); await waitText('Pessoal · Abril de 2026'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Evolução entender "Ver categorias": abre Pago por categoria de abril, com os R$ 7.800,00', evPath() === '/composicao' && new URL(p.url()).searchParams.get('vista') === 'categoria' && t.includes('Pessoal · Abril de 2026') && t.includes('R$ 7.800,00'), p.url());
+  await btn('Voltar').click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(500);
+  await evExplainOpen();
+  await evExplainBtnIn('Ver lançamentos').click(); await waitText('Pessoal · Abril de 2026'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Evolução entender "Ver lançamentos": abre a composição de Pago de abril, com o "Reparo do carro" de R$ 4.400,00', evPath() === '/composicao' && new URL(p.url()).searchParams.get('tipo') === 'pago' && t.includes('Reparo do carro') && t.includes('R$ 4.400,00'), p.url());
+  await btn('Voltar').click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(500);
+  await evExplainOpen();
+  // "Comparar sem este mês": o mesmo interruptor do painel. A explicação continua (abril contra março), e o botão passa a "Voltar a comparar com este mês".
+  await evExplainBtnIn('Comparar sem este mês').click(); await p.waitForTimeout(600);
+  t = await evKeep();
+  const evE2 = await evExplainText();
+  ok('Evolução entender "Comparar sem este mês": abril sai da comparação (ponto vazio, média R$ 3.390,00, mediana R$ 3.400,00, "5 de 6 meses", aviso de comparação personalizada, o interruptor do painel desligado), e o leitor de tela ouve a nova média', (await evMark('Abril')).kind === 'escolhido_vazio' &&
+    t.includes('Média dos meses na comparação\nR$ 3.390,00\n5 de 6 meses') && t.includes('Mediana dos meses na comparação\nR$ 3.400,00\n5 de 6 meses') && t.includes('Comparação personalizada: 1 de 6 meses fora da comparação') &&
+    (await evSwitch().getAttribute('aria-checked')) === 'false' && (await evLive()).includes('Média R$ 3.390,00, mediana R$ 3.400,00, 5 de 6 meses.'), JSON.stringify(await evLive()));
+  ok('Evolução entender "Comparar sem este mês": a explicação continua aberta e igual (abril contra março), o botão agora diz "Voltar a comparar com este mês" e o foco fica nele', evE2.includes('O Pago registrado foi R$ 4.500,00 maior em abril que em março.') && (await evExplainBtnIn('Voltar a comparar com este mês').count()) === 1 &&
+    (await evExplainBtnIn('Comparar sem este mês').count()) === 0 && (await p.evaluate(() => document.activeElement?.textContent)) === 'Voltar a comparar com este mês', evE2);
+  // T14: março e maio com abril fora. A seção segue aberta e compara maio com março, com as duas datas e o mês fora.
+  await evPick('Maio');
+  await waitText('maior em maio que em março', 8000); await p.waitForTimeout(300);
+  t = await evKeep();
+  const evE3 = await evExplainText();
+  ok('Evolução entender T14: com abril fora, maio compara com março: "O Pago registrado foi R$ 150,00 maior em maio que em março." e "(março e maio não são meses vizinhos na comparação: abril está fora)", nunca "mês a mês"', evE3.includes('O Pago registrado foi R$ 150,00 maior em maio que em março.') &&
+    evE3.includes('(março e maio não são meses vizinhos na comparação: abril está fora)') && !/mês a mês/.test(evE3) && !evE3.includes('de abril para maio'), evE3);
+  ok('Evolução entender T14: as categorias de maio contra março, a sobra de R$ 20,00 em "Outras categorias" e o lançamento de mercado de R$ 900,00; maio está na comparação, então o botão é "Comparar sem este mês"', evE3.includes('Mercado: R$ 730,00 em março, R$ 900,00 em maio, R$ 170,00 a mais') &&
+    evE3.includes('Saúde: R$ 150,00 em março, sem pagamentos em maio, R$ 150,00 a menos') && evE3.includes('Lazer: R$ 120,00 em março, R$ 230,00 em maio, R$ 110,00 a mais') && evE3.includes('Outras categorias também mudaram: R$ 20,00 no total.') &&
+    /Mercado\s+12\/05\/2026 · R\$ 900,00/.test(evE3) && (await evExplainBtnIn('Comparar sem este mês').count()) === 1, evE3);
+  await evShots('474_evolucao_entender_meses_nao_vizinhos', { scroll: evScrollBtn('Entender o que mudou') });
+  // Volta a abril e a traz de volta pela própria seção: a média e o aviso voltam ao que eram.
+  await evPick('Abril');
+  await evExplainBtnIn('Voltar a comparar com este mês').click(); await p.waitForTimeout(600);
+  t = await evKeep();
+  ok('Evolução entender: "Voltar a comparar com este mês" devolve abril (ponto cheio, média R$ 4.125,00, mediana R$ 3.425,00, "6 de 6 meses"); o aviso some e o botão volta a "Comparar sem este mês"', (await evMark('Abril')).kind === 'escolhido' && t.includes('Média dos meses na comparação\nR$ 4.125,00\n6 de 6 meses') &&
+    t.includes('Mediana dos meses na comparação\nR$ 3.425,00\n6 de 6 meses') && !t.includes('Comparação personalizada') && (await evExplainBtnIn('Comparar sem este mês').count()) === 1 && (await evRestoreCount()) === 0);
+  // Mês sem registros: a seção não aparece (D10).
+  await evPick('Julho');
+  t = await evKeep();
+  ok('Evolução entender (julho, sem registros): a seção "Entender o que mudou" não aparece (nem fechada nem aberta), e o painel diz que não há registros', (await visibleCount('button', 'Entender o que mudou')) === 0 && (await evExplainGroup().count()) === 0 &&
+    t.includes('Variação não disponível: mês sem registros.') && !t.includes('O Pago registrado'), t.slice(500, 1100));
+  await evShots('475_evolucao_entender_sem_registros', { scroll: evScroll('Julho de 2026') });
+  // Recebido: as 3 maiores categorias também aparecem no painel, e a explicação usa as categorias dos recebimentos (abril contra fevereiro: março sem registros).
+  await radio('Recebido').click(); await p.waitForTimeout(700);
+  if ((await evRestoreCount()) > 0) { await p.getByRole('button', { name: 'Restaurar todos', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(500); }
+  await evPick('Março');
+  ok('Evolução entender, Recebido (março, sem registros): a seção não aparece', (await visibleCount('button', 'Entender o que mudou')) === 0);
+  await evPick('Abril');
+  t = await evKeep();
+  ok('Evolução Recebido, painel de abril: "Maiores categorias do mês" com Salário R$ 5.200,00 (100% do recebido), a nota "Mostra o que foi recebido.", sem "Ver Pago por categoria" (Recebido não tem Por categoria) e com "Ver lançamentos"', t.includes('Maiores categorias do mês') && /Salário\n100% do recebido/.test(t) && t.includes('R$ 5.200,00') &&
+    t.includes('Mostra o que foi recebido.') && !t.includes('Compra no cartão entra quando a fatura é paga') && (await visibleCount('button', 'Ver Pago por categoria')) === 0 && (await visibleCount('button', 'Ver lançamentos')) === 1);
+  await evExplainOpen();
+  t = await evKeep();
+  const evE4 = await evExplainText();
+  ok('Evolução entender, Recebido (abril): "O Recebido registrado foi R$ 200,00 maior em abril que em fevereiro.", "(fevereiro e abril não são meses vizinhos na comparação: março está sem registros)" e Salário de R$ 5.000,00 para R$ 5.200,00', evE4.includes('O Recebido registrado foi R$ 200,00 maior em abril que em fevereiro.') &&
+    evE4.includes('(fevereiro e abril não são meses vizinhos na comparação: março está sem registros)') && evE4.includes('Salário: R$ 5.000,00 em fevereiro, R$ 5.200,00 em abril, R$ 200,00 a mais') && !evE4.includes('Outras categorias também mudaram'), evE4);
+  ok('Evolução entender, Recebido: o lançamento relacionado (Salário de 05/04/2026, R$ 5.200,00) e as ações "Ver lançamentos" e "Comparar sem este mês", sem "Ver categorias" (só Pago tem a tela)', /Salário\s+05\/04\/2026 · R\$ 5\.200,00/.test(evE4) && evE4.includes('Os maiores lançamentos de abril em Salário') &&
+    (await evExplainBtnIn('Ver lançamentos').count()) === 1 && (await evExplainBtnIn('Comparar sem este mês').count()) === 1 && (await evExplainBtnIn('Ver categorias').count()) === 0 && !evE4.includes('R$ 0,00'), evE4);
+  await evShots('476_evolucao_entender_recebido', { scroll: evScrollBtn('Entender o que mudou') });
+  await evExplainClose();
+  await radio('Pago').click(); await p.waitForTimeout(700);
+  // Nada foi gravado: abrir, fechar, ir às telas e "Comparar sem este mês" só mudam o que a tela mostra.
+  const evCallsAfter16b = await evSpyCalls();
+  ok('Evolução entender sem gravar: abrir a seção, "Ver categorias", "Ver lançamentos" e "Comparar sem este mês" (e voltar) não chamaram nenhuma função de escrita do repositório', evCallsAfter16b.length === evCallsBefore16b, JSON.stringify(evCallsAfter16b));
+  // Deixa a tela como o resto do roteiro espera: 12 meses, Pago, abril fora da comparação.
+  await evSet('Abril', false);
+
   // ---- 17. Valores ocultos: pontos sem valor no leitor de tela, eixo sem números, tabela e cartões em R$ •••• ----
   await tabByName('Movimentações').click(); await waitText('Registrar recebimento');
   await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
@@ -10880,6 +11021,18 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Evolução valores ocultos: o eixo sem números ("Maior valor do gráfico" some), a média, a mediana, o total e o valor do painel em R$ ••••; os percentuais e os meses seguem à vista', !t.includes('Maior valor do gráfico') && t.includes('Média dos meses na comparação\nR$ ••••\n5 de 6 meses') && t.includes('Mediana dos meses na comparação\nR$ ••••') &&
     t.includes('Total dos meses exibidos\nR$ ••••') && t.includes('Abril de 2026\nPago\nR$ ••••') && t.includes('136,4% a mais que março') && t.includes('De março para abril: R$ •••• a mais') && t.includes('Transporte\n60,3% do pago'), t.slice(900, 1500));
   await evShots('453_evolucao_valores_ocultos');
+  // "Entender o que mudou" com valores ocultos: a frase, as categorias e os lançamentos em R$ ••••, e "valor oculto" ao leitor de tela; os nomes dos meses,
+  // as descrições, as datas e a palavra "maior" ou "menor" seguem à vista.
+  await evExplainOpen();
+  t = await evKeep();
+  const evE5 = await evExplainText();
+  ok('Evolução entender, valores ocultos: a frase e as categorias dizem R$ •••• (os meses, as descrições e as datas seguem à vista) e nenhum valor em reais aparece na seção', evE5.includes('O Pago registrado foi R$ •••• maior em abril que em março.') && evE5.includes('Transporte: R$ •••• em março, R$ •••• em abril, R$ •••• a mais') &&
+    evE5.includes('Outras categorias também mudaram: R$ •••• no total.') && /Reparo do carro\s+22\/04\/2026 · R\$ ••••/.test(evE5) && !/\d,\d{2}/.test(evE5), evE5);
+  await hiddenShows('Evolução, entender o que mudou');
+  const evE5names = await p.evaluate(() => [...document.querySelectorAll('[role=group][aria-label="Entender o que mudou"] [role=listitem][aria-label]')].map((e) => e.getAttribute('aria-label').replace(/ /g, ' ')));
+  ok('Evolução entender, valores ocultos: o leitor de tela ouve "Reparo do carro, 22/04/2026, valor oculto" nos lançamentos relacionados', evE5names[0] === 'Reparo do carro, 22/04/2026, valor oculto' && evE5names.every((n) => !/R\$/.test(n)), JSON.stringify(evE5names));
+  await evShots('477_evolucao_entender_valores_ocultos', { scroll: evScrollBtn('Entender o que mudou') });
+  await evExplainClose();
   await p.getByRole('button', { name: 'Ver valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
   await hiddenShows('Evolução, tabela');
   t = await body();
@@ -10926,6 +11079,20 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Evolução lacuna: o mês com aviso entra nas contas como qualquer outro (média R$ 4.125,00, mediana R$ 3.425,00, "6 de 6 meses"; total R$ 24.750,00) e não há aviso de comparação personalizada', t.includes('Média dos meses na comparação\nR$ 4.125,00\n6 de 6 meses') && t.includes('Mediana dos meses na comparação\nR$ 3.425,00\n6 de 6 meses') &&
     t.includes('Total dos meses exibidos\nR$ 24.750,00') && !t.includes('Comparação personalizada') && (await evMark('Março')).kind === 'escolhido');
   await evShots('458_evolucao_lacuna', { scroll: evScroll('Março de 2026') });
+  // D10: "Entender o que mudou" também aparece em mês com sinal de lacuna, com o mesmo aviso, e avisa quando é o mês de comparação que tem a lacuna.
+  await evExplainOpen();
+  t = await evKeep();
+  const evE6 = await evExplainText();
+  ok('Evolução entender, mês com lacuna (março): a seção aparece com "O Pago registrado foi R$ 100,00 menor em março que em fevereiro." e o aviso "Pode faltar algo neste mês: há conta prevista sem registro"', evE6.includes('O Pago registrado foi R$ 100,00 menor em março que em fevereiro.') &&
+    evE6.includes(evGapText) && evE6.includes('Mercado: R$ 900,00 em fevereiro, R$ 730,00 em março, R$ 170,00 a menos') && evE6.includes('Saúde: sem pagamentos em fevereiro, R$ 150,00 em março, R$ 150,00 a mais') && evE6.includes('Lazer: R$ 200,00 em fevereiro, R$ 120,00 em março, R$ 80,00 a menos'), evE6);
+  ok('Evolução entender, março: as 3 categorias fecham a diferença (-170 + 150 - 80 = -100), então não há "Outras categorias também mudaram"', !evE6.includes('Outras categorias também mudaram'));
+  await evShots('478_evolucao_entender_lacuna', { scroll: evScrollBtn('Entender o que mudou') });
+  await evPick('Abril');
+  await waitText('maior em abril que em março', 8000); await p.waitForTimeout(300);
+  const evE7 = await evExplainText();
+  ok('Evolução entender, abril contra março com lacuna: o aviso diz o mês ("Pode faltar algo em março: há conta prevista sem registro"), sem o aviso do mês escolhido', evE7.includes('Pode faltar algo em março: há conta prevista sem registro') && !evE7.includes(evGapText));
+  await evExplainClose();
+  await evPick('Março');
   await p.getByRole('button', { name: 'Ver valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
   const evGapRows = await p.evaluate(() => [...document.querySelectorAll('[role=listitem] button')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => ({ label: (e.getAttribute('aria-label') || '').replace(/\u00a0/g, ' '), text: e.textContent })));
   ok('Evolução lacuna: a linha de março da tabela traz o aviso (no nome e no texto) e as outras linhas não', evGapRows.length === 12 && evGapRows[4].label === `Março de 2026, R$ 3.300,00, Com registros, Na comparação? Sim, ${evGapText}` && evGapRows[4].text.includes(evGapText) &&

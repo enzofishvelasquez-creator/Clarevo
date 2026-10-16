@@ -2,7 +2,7 @@
 
 16/10/2026. Avaliação só de leitura de `/home/user/clarevo`: nenhum arquivo alterado e nenhum teste executado.
 
-> **Situação em 16/10/2026: a fase 1b está feita (D-057, Ciclo O).** A tela `/evolucao` (telas A, B, C e E), a entrada em Movimentações e na busca de Aprender, o guia, o cenário `?cenario=evolucao` e o bloco "Evolução (D-057)" do roteiro web entraram sem migração e sem pacote novo; onde e como está em `docs/00` (D-057), `docs/01`, `docs/02` (regra de exibição), `docs/04` (Ciclo O) e `docs/10`. As seções abaixo são a avaliação de 16/10/2026, mantida como registro; onde dizem "nenhum está implementado", leia a situação de antes da fase 1b. O aviso de lacuna em mês fechado de Pago (a segunda metade de D04) entrou na revisão da fase 1b, no mesmo dia (`evolutionGapMonths` e `loadEvolutionGaps`, com `seriesGapsInRange`; `docs/00`, D-057, itens 11 e 12). Seguem adiadas a fase 2 (tela D, "Entender o que mudou", com D10), a fase 3 (comprometimento e metas) e a 3b (competência).
+> **Situação em 16/10/2026: as fases 1b e 2 estão feitas (D-057, Ciclos O e O2).** A fase 2 (tela D, "Entender o que mudou", com D06, D08 e D10; EF-16 e EF-17) trouxe o Recebido por categoria (`receivedCategoryBreakdown`) e a seção recolhida do painel (`explainChange`, `evolutionExplainPlan`, `evolutionExplanation`), sem migração e sem pacote novo; os detalhes e as decisões do Claude estão em `docs/00` (D-057, itens 16 a 25) e `docs/02`. Abaixo, a situação da fase 1b, como estava. **A fase 1b está feita (D-057, Ciclo O).** A tela `/evolucao` (telas A, B, C e E), a entrada em Movimentações e na busca de Aprender, o guia, o cenário `?cenario=evolucao` e o bloco "Evolução (D-057)" do roteiro web entraram sem migração e sem pacote novo; onde e como está em `docs/00` (D-057), `docs/01`, `docs/02` (regra de exibição), `docs/04` (Ciclo O) e `docs/10`. As seções abaixo são a avaliação de 16/10/2026, mantida como registro; onde dizem "nenhum está implementado", leia a situação de antes da fase 1b. O aviso de lacuna em mês fechado de Pago (a segunda metade de D04) entrou na revisão da fase 1b, no mesmo dia (`evolutionGapMonths` e `loadEvolutionGaps`, com `seriesGapsInRange`; `docs/00`, D-057, itens 11 e 12). Seguem adiadas a fase 3 (comprometimento e metas) e a 3b (competência).
 
 ## 1. O que já existe e pode ser reaproveitado
 
@@ -66,7 +66,7 @@
 | A | `/evolucao`, consulta com barra e aba Movimentos marcada (`TAB_OF_TOPIC`, `navigation.ts:72`); entrada abaixo de "Seu mês em 30 segundos" (`movimentacoes.tsx:170`) e na busca de Aprender (`APP_SCREENS`, `navigation.ts:210`). Recebido ou Pago, 3, 6 ou 12 meses, linha SVG com toque de 44 px e "Ver valores mês a mês" |
 | B | Painel do mês na mesma tela: valor, estado, variação com as duas datas, 3 maiores categorias, interruptor e "Ver lançamentos" (define o mês e abre `/composicao?tipo=pago`, como `setsMonth` do Seu mês) |
 | C | "Comparação personalizada: 2 de 6 meses fora da comparação", "Restaurar todos" e lista dos ocultos |
-| D | "Entender o que mudou" dentro do painel (fase 2) |
+| D | "Entender o que mudou" dentro do painel (fase 2, **feita em 16/10/2026**: botão recolhido abaixo da variação) |
 | E | Carregando e erro sem dado parcial (`combineParts`, `data.ts:729`); sem registros; em andamento; um ponto; todos ocultos; valores ocultos; Família (`FamilyNotLinked`, `movimentacoes.tsx:163`) |
 
 **Acesso:**
@@ -81,7 +81,7 @@
 |---|---|---|---|
 | 1a | `evolucao.ts` e testes | P | nada |
 | 1b | Telas A, B, C e E, demonstração, guia e roteiro web, e o aviso de lacuna em mês fechado de Pago (**feita em 16/10/2026**) | M | D01, D03, D04, D05, D09 |
-| 2 | Categorias e "Entender o que mudou" | M | D06, D08, D10 |
+| 2 | Categorias e "Entender o que mudou" (**feita em 16/10/2026**) | M | D06, D08, D10 |
 | 3 | Comprometimento e metas | M | D02 |
 | 3b | Consumo por competência | G | D07, regra nova, talvez migração |
 

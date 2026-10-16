@@ -1,7 +1,8 @@
-import { isValidIsoMonth, monthsBetween, type IsoMonth } from './dates';
+import { isValidIsoMonth, monthsBetween, type IsoDate, type IsoMonth } from './dates';
 import { averageCents, roundDivBig } from './learn/math';
 import type { Cents } from './money';
 import type { MonthOverview } from './records';
+import type { CategoryPart } from './summary';
 
 /**
  * Evolução financeira, fase 1a (docs/14 §4): só contas puras sobre as linhas que months_overview já entrega. Sem banco,
@@ -10,6 +11,8 @@ import type { MonthOverview } from './records';
  * - Recebido e Pago pela data do pagamento, como no Resumo (a mesma soma de month_totals).
  * - Mês sem lançamentos é "sem registros", nunca zero confirmado (P-022 segue pendente).
  * - Ocultar um mês só tira o ponto da comparação: o total canônico não depende dele.
+ *
+ * Fase 2 (D-057, "Entender o que mudou"): `explainChange` compara dois meses por categoria, também em conta pura, sem texto.
  */
 
 /** Qual série mostrar: o que entrou (Recebido) ou o que saiu (Pago). */
@@ -171,4 +174,144 @@ export function pointVariation(a: EvolutionPoint, b: EvolutionPoint): PointVaria
   const permille = roundDivBig((BigInt(b.cents) - BigInt(a.cents)) * 1000n, BigInt(a.cents));
   if (permille > BigInt(Number.MAX_SAFE_INTEGER) || permille < -BigInt(Number.MAX_SAFE_INTEGER)) throw new RangeError('variação grande demais');
   return { ...base, comparable: true, permille: Number(permille) };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Entender o que mudou (fase 2, EF-16 e EF-17)
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** Quantas categorias a explicação mostra e quantos lançamentos ela relaciona. */
+export const EXPLAIN_TOP_CATEGORIES = 3;
+export const EXPLAIN_TOP_RECORDS = 3;
+
+/** Um dos dois meses da explicação: o total da métrica (o mesmo dos pontos do gráfico) e as partes por categoria dos lançamentos dele. */
+export interface ChangeSide {
+  month: IsoMonth;
+  /** Recebido ou Pago do mês, como o gráfico e a variação mostram (`months_overview`). */
+  totalCents: Cents;
+  /** `paidCategoryParts` (Pago) ou `receivedCategoryParts` (Recebido) dos lançamentos do mês. */
+  parts: readonly CategoryPart[];
+}
+
+export interface CategoryChange {
+  /** null = "Sem categoria". */
+  category: string | null;
+  label: string;
+  fromCents: Cents;
+  toCents: Cents;
+  /** toCents menos fromCents, com sinal (positivo: subiu). Nunca 0 nas categorias devolvidas. */
+  differenceCents: number;
+}
+
+/** Um lançamento do mês de chegada na categoria que mais mudou: o valor é a parte dele nessa categoria. */
+export interface RelatedRecord {
+  id: string;
+  description: string;
+  occurredOn: IsoDate;
+  /** O que o lançamento tem na categoria (num pagamento de fatura, só a parte que cabe a ela). */
+  cents: Cents;
+  /** O valor do lançamento inteiro. */
+  recordCents: Cents;
+  /** A parte é menor que o lançamento inteiro (pagamento de fatura dividido por categorias). */
+  partial: boolean;
+}
+
+export interface ChangeExplanation {
+  fromMonth: IsoMonth;
+  toMonth: IsoMonth;
+  fromCents: Cents;
+  toCents: Cents;
+  /** toCents menos fromCents, com sinal. */
+  differenceCents: number;
+  /**
+   * As partes por categoria fecham com o total de cada mês. Se não fecham (leitura incompleta ou de outro instante), a explicação por
+   * categoria não vale: `categories`, `otherCents` e `related` vêm vazios e o app diz que não consegue detalhar.
+   */
+  reconciled: boolean;
+  /** As categorias com maior diferença absoluta (até 3, só as que mudaram), da maior para a menor; empate: nome. */
+  categories: CategoryChange[];
+  /**
+   * O que sobra da diferença total depois de somar as categorias de `categories` (com sinal); 0 quando elas fecham a diferença.
+   * Diferente de 0 quer dizer que outras categorias também mudaram, nunca que uma categoria foi a causa.
+   */
+  otherCents: number;
+  /** Os maiores lançamentos do mês de chegada na categoria de maior diferença (até 3); vazio se o mês não tem nenhum nela. */
+  related: RelatedRecord[];
+}
+
+function checkSide(side: ChangeSide, name: string): void {
+  if (!isValidIsoMonth(side.month)) throw new RangeError(`${name}: mês inválido: ${side.month}`);
+  nonNegativeSafeInt(side.totalCents, `${name}: total`);
+  for (const p of side.parts) nonNegativeSafeInt(p.cents, `${name}: parte`);
+}
+
+function sumByCategory(parts: readonly CategoryPart[]): Map<string | null, Cents> {
+  const out = new Map<string | null, Cents>();
+  for (const p of parts) out.set(p.category, (out.get(p.category) ?? 0) + p.cents);
+  return out;
+}
+
+const byLabel = (a: { label: string }, b: { label: string }): number => a.label.localeCompare(b.label, 'pt-BR');
+
+/**
+ * O que mudou entre dois meses da mesma métrica, descrito sem julgamento e sem causa: a diferença total, as categorias com maior
+ * diferença absoluta e os maiores lançamentos do mês de chegada na categoria que mais mudou. Determinística: mesmas entradas, mesma
+ * saída (empate de categoria pelo nome; de lançamento por valor, data mais recente, descrição e id). Usa as mesmas partes de
+ * `categoryBreakdown`, então o pagamento de fatura entra dividido pelas categorias e nada é contado duas vezes (T15).
+ *
+ * Março com Casa R$ 1.200,00 e abril com Casa R$ 5.600,00: Casa muda R$ 4.400,00 a mais. Se a soma das 3 categorias que mais mudaram
+ * não é a diferença total, a sobra vai em `otherCents` ("Outras categorias também mudaram"). Não altera o que recebe. Lança RangeError
+ * com mês inválido, os dois meses iguais, total negativo ou não inteiro e parte negativa.
+ */
+export function explainChange(from: ChangeSide, to: ChangeSide): ChangeExplanation {
+  checkSide(from, 'mês de partida');
+  checkSide(to, 'mês de chegada');
+  if (from.month === to.month) throw new RangeError(`os dois meses são ${from.month}`);
+  const before = sumByCategory(from.parts);
+  const after = sumByCategory(to.parts);
+  let beforeSum = 0;
+  for (const c of before.values()) beforeSum += c;
+  let afterSum = 0;
+  for (const c of after.values()) afterSum += c;
+  const differenceCents = to.totalCents - from.totalCents;
+  const reconciled = beforeSum === from.totalCents && afterSum === to.totalCents;
+  const empty: ChangeExplanation = {
+    fromMonth: from.month,
+    toMonth: to.month,
+    fromCents: from.totalCents,
+    toCents: to.totalCents,
+    differenceCents,
+    reconciled,
+    categories: [],
+    otherCents: 0,
+    related: [],
+  };
+  if (!reconciled) return empty;
+  const labels = new Map<string | null, string>();
+  for (const p of [...from.parts, ...to.parts]) labels.set(p.category, p.label);
+  const changes: CategoryChange[] = [...new Set([...before.keys(), ...after.keys()])]
+    .map((category): CategoryChange => {
+      const fromCents = before.get(category) ?? 0;
+      const toCents = after.get(category) ?? 0;
+      return { category, label: labels.get(category)!, fromCents, toCents, differenceCents: toCents - fromCents };
+    })
+    .filter((c) => c.differenceCents !== 0)
+    .sort((a, b) => Math.abs(b.differenceCents) - Math.abs(a.differenceCents) || byLabel(a, b));
+  const categories = changes.slice(0, EXPLAIN_TOP_CATEGORIES);
+  const otherCents = differenceCents - categories.reduce((acc, c) => acc + c.differenceCents, 0);
+  const leading = categories[0];
+  const perRecord = new Map<string, RelatedRecord>();
+  if (leading) {
+    for (const p of to.parts) {
+      if (p.category !== leading.category) continue;
+      const seen = perRecord.get(p.record.id);
+      if (seen) seen.cents += p.cents;
+      else perRecord.set(p.record.id, { id: p.record.id, description: p.record.description, occurredOn: p.record.occurredOn, cents: p.cents, recordCents: p.record.amountCents, partial: false });
+    }
+  }
+  const related = [...perRecord.values()]
+    .map((r) => ({ ...r, partial: r.cents < r.recordCents }))
+    .sort((a, b) => b.cents - a.cents || b.occurredOn.localeCompare(a.occurredOn) || a.description.localeCompare(b.description, 'pt-BR') || a.id.localeCompare(b.id))
+    .slice(0, EXPLAIN_TOP_RECORDS);
+  return { ...empty, categories, otherCents, related };
 }

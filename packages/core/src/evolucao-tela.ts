@@ -1,9 +1,12 @@
-import { addMonths, formatMonthBR, formatMonthName, formatMonthSpanBR, formatMonthYearBR, monthOf, type IsoMonth } from './dates';
+import { addMonths, formatDateBR, formatMonthBR, formatMonthName, formatMonthSpanBR, formatMonthYearBR, monthOf, type IsoDate, type IsoMonth } from './dates';
 import {
   COMPARISON_ELIGIBLE_STATES,
   comparisonStats,
   evolutionPoints,
+  explainChange,
   pointVariation,
+  type ChangeExplanation,
+  type ChangeSide,
   type ComparisonStats,
   type EvolutionMetric,
   type EvolutionPoint,
@@ -77,6 +80,14 @@ function yearNameList(months: readonly IsoMonth[]): string {
   const names = months.map(formatMonthYearBR);
   return names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`;
 }
+
+/** "abril" e "março"; com os dois meses em anos diferentes, "janeiro de 2026" e "dezembro de 2025". */
+function monthLabels(a: IsoMonth, b: IsoMonth): [string, string] {
+  return a.slice(0, 4) === b.slice(0, 4) ? [formatMonthName(a), formatMonthName(b)] : [formatMonthYearBR(a), formatMonthYearBR(b)];
+}
+
+/** "abril está", "abril e maio estão". */
+const beVerb = (months: readonly IsoMonth[]): string => `${nameList(months)} ${months.length === 1 ? 'está' : 'estão'}`;
 
 const GAP_WARNING = 'Pode faltar algo neste mês: há conta prevista sem registro';
 
@@ -183,8 +194,10 @@ export const EVOLUTION_TEXT = {
       sem_registros: 'Este mês fica fora da comparação porque não tem registros.',
     },
     categoriesTitle: 'Maiores categorias do mês',
-    categoryShare: (percentText: string): string => `${percentText} do pago`,
+    /** "35,9% do pago" (Pago) ou "100% do recebido" (Recebido). */
+    categoryShare: (percentText: string, metric: EvolutionMetric = 'pago'): string => `${percentText} do ${metric === 'pago' ? 'pago' : 'recebido'}`,
     categoriesNote: 'Mostra o que foi pago. Compra no cartão entra quando a fatura é paga.',
+    categoriesNoteReceived: 'Mostra o que foi recebido.',
     categoriesAction: 'Ver Pago por categoria',
     categoriesLoadError: 'Não foi possível carregar as categorias do mês.',
     previous: 'Mês anterior',
@@ -213,6 +226,62 @@ export const EVOLUTION_TEXT = {
     unavailableNoBase: 'Variação não disponível: não há outro mês na comparação antes deste.',
     unavailableInProgress: 'Variação não disponível: o mês ainda está em andamento.',
     unavailableNoRecords: 'Variação não disponível: mês sem registros.',
+  },
+  /** "Entender o que mudou" (fase 2, EF-16 e EF-17): a explicação descritiva entre o mês escolhido e o mês de comparação da variação. */
+  explain: {
+    title: 'Entender o que mudou',
+    /** Dica do botão que abre: os dois meses comparados. */
+    hint: (from: IsoMonth, to: IsoMonth): string => {
+      const [t, f] = monthLabels(to, from);
+      return `Compara ${t} com ${f}`;
+    },
+    /** "O Pago registrado foi R$ 4.500,00 maior em abril que em março." */
+    headline: (metric: EvolutionMetric, differenceCents: number, from: IsoMonth, to: IsoMonth): string => {
+      const [t, f] = monthLabels(to, from);
+      if (differenceCents === 0) return `O ${METRIC_LABEL[metric]} registrado foi igual em ${t} e em ${f}.`;
+      return `O ${METRIC_LABEL[metric]} registrado foi ${formatBRL(Math.abs(differenceCents))} ${differenceCents > 0 ? 'maior' : 'menor'} em ${t} que em ${f}.`;
+    },
+    /** Mês fora da comparação entre os dois: "(março e maio não são meses vizinhos na comparação: abril está fora)". */
+    notAdjacent: (from: IsoMonth, to: IsoMonth, chosenOut: readonly IsoMonth[], empty: readonly IsoMonth[]): string => {
+      const [t, f] = monthLabels(to, from);
+      const reasons = [...(chosenOut.length > 0 ? [`${beVerb(chosenOut)} fora`] : []), ...(empty.length > 0 ? [`${beVerb(empty)} sem registros`] : [])];
+      return `(${f} e ${t} não são meses vizinhos na comparação: ${reasons.join('; ')})`;
+    },
+    inProgress: 'Mês em andamento: os valores ainda podem mudar.',
+    /** O aviso do mês de partida com lacuna ("neste mês", do mês escolhido, é o `gap.warning`). */
+    gapIn: (month: IsoMonth): string => `Pode faltar algo em ${formatMonthName(month)}: há conta prevista sem registro`,
+    needOtherMonth: 'Escolha outro mês na comparação para ver o que mudou.',
+    categoriesTitle: 'Categorias que mais mudaram',
+    /** "Casa: R$ 1.200,00 em março, R$ 5.600,00 em abril, R$ 4.400,00 a mais" (sem valor num dos meses: "sem pagamentos em março"). */
+    category: (metric: EvolutionMetric, label: string, fromCents: Cents, toCents: Cents, from: IsoMonth, to: IsoMonth): string => {
+      const [t, f] = monthLabels(to, from);
+      const none = metric === 'pago' ? 'sem pagamentos' : 'sem recebimentos';
+      const side = (cents: Cents, month: string): string => `${cents === 0 ? none : formatBRL(cents)} em ${month}`;
+      const diff = toCents - fromCents;
+      return `${label}: ${side(fromCents, f)}, ${side(toCents, t)}, ${diff > 0 ? `${formatBRL(diff)} a mais` : `${formatBRL(-diff)} a menos`}`;
+    },
+    noCategoryChange: 'Nenhuma categoria mudou de valor.',
+    /** A soma das categorias mostradas não fecha a diferença total. Nunca diz que uma categoria foi a causa. */
+    others: (cents: number): string => `Outras categorias também mudaram: ${formatBRL(Math.abs(cents))} no total.`,
+    relatedTitle: 'Lançamentos relacionados',
+    /** "Os maiores lançamentos de abril em Transporte". */
+    relatedIntro: (label: string, month: IsoMonth): string => `Os maiores lançamentos de ${formatMonthName(month)} em ${label}`,
+    relatedEmpty: (label: string, month: IsoMonth): string => `Nenhum lançamento em ${label} em ${formatMonthName(month)}.`,
+    /** "Reparo do carro · 22/04/2026 · R$ 4.400,00". */
+    relatedRow: (description: string, date: IsoDate, cents: Cents): string => `${description} · ${formatDateBR(date)} · ${formatBRL(cents)}`,
+    relatedRowA11y: (description: string, date: IsoDate, cents: Cents, partial: boolean): string =>
+      `${description}, ${formatDateBR(date)}, ${formatBRL(cents)}${partial ? ', parte do pagamento da fatura' : ''}`,
+    partOfInvoice: 'Parte do pagamento da fatura',
+    note: 'Descreve o que está registrado nos dois meses. Não diz que uma categoria ou um lançamento é a causa da diferença.',
+    limitation: 'Os lançamentos lidos não fecham com o total dos dois meses, então não dá para detalhar por categoria agora.',
+    loading: 'Carregando o que mudou',
+    loadError: 'Não foi possível carregar o que mudou.',
+    seeCategories: 'Ver categorias',
+    seeRecords: 'Ver lançamentos',
+    /** O mesmo interruptor "Mostrar este mês na comparação": o botão tira o mês da comparação ou o traz de volta. */
+    compareWithout: 'Comparar sem este mês',
+    compareWith: 'Voltar a comparar com este mês',
+    compareHint: 'Só muda a média, a mediana e o gráfico. Nenhum lançamento é apagado nem mudado.',
   },
   table: {
     show: 'Ver valores mês a mês',
@@ -422,6 +491,21 @@ export type EvolutionVariation =
     }
   | { available: false; text: string };
 
+/** O mês de comparação do mês escolhido: o anterior que está na comparação (o da variação e de "Entender o que mudou"); undefined se não há. */
+function comparisonBase(view: EvolutionView, selected: EvolutionPointView): EvolutionPointView | undefined {
+  const before = view.points.filter((p) => p.month < selected.month && p.included);
+  return before[before.length - 1];
+}
+
+/** Os meses entre o de comparação e o escolhido, que ficaram fora da comparação: os que a pessoa tirou e os sem registros. */
+function skippedMonths(view: EvolutionView, base: EvolutionPointView, selected: EvolutionPointView): { chosenOut: IsoMonth[]; empty: IsoMonth[] } {
+  const between = view.points.filter((p) => p.month > base.month && p.month < selected.month && !p.included);
+  return {
+    chosenOut: between.filter((p) => p.participation === 'fora_escolha').map((p) => p.month),
+    empty: between.filter((p) => p.participation === 'fora_sem_registros').map((p) => p.month),
+  };
+}
+
 /**
  * A variação do mês escolhido: do mês anterior que está na comparação até ele. Com mês tirado ou sem registros no meio, a frase
  * diz as duas datas ("De março para maio") e quais meses ficaram de fora, e nunca chama a variação de "mês a mês" (D06). O mês em
@@ -433,8 +517,7 @@ export function evolutionVariation(view: EvolutionView, month: IsoMonth): Evolut
   if (!selected) return { available: false, text: T.unavailableNoBase };
   if (selected.state === 'sem_registros') return { available: false, text: T.unavailableNoRecords };
   if (selected.state === 'em_andamento') return { available: false, text: T.unavailableInProgress };
-  const before = view.points.filter((p) => p.month < selected.month && p.included);
-  const base = before[before.length - 1];
+  const base = comparisonBase(view, selected);
   if (!base) return { available: false, text: T.unavailableNoBase };
   const v = pointVariation(base, selected);
   const diff = v.differenceCents;
@@ -445,9 +528,7 @@ export function evolutionVariation(view: EvolutionView, month: IsoMonth): Evolut
     else if (v.permille === 0) percentText = T.percentTiny(diff > 0, base.month);
     else percentText = (diff > 0 ? T.percentMore : T.percentLess)(formatTenths(Math.abs(v.permille)), base.month);
   }
-  const between = view.points.filter((p) => p.month > base.month && p.month < selected.month && !p.included);
-  const chosenOut = between.filter((p) => p.participation === 'fora_escolha').map((p) => p.month);
-  const empty = between.filter((p) => p.participation === 'fora_sem_registros').map((p) => p.month);
+  const { chosenOut, empty } = skippedMonths(view, base, selected);
   const skipped = [...(chosenOut.length > 0 ? [T.skippedOut(chosenOut)] : []), ...(empty.length > 0 ? [T.skippedEmpty(empty)] : [])];
   return {
     available: true,
@@ -483,13 +564,21 @@ export interface EvolutionPanel {
   previousMonth: IsoMonth | null;
   nextMonth: IsoMonth | null;
   variation: EvolutionVariation;
-  /** Pago com lançamentos: o app lê as categorias do mês. */
+  /** O valor mostrado: Pago ou Recebido. */
+  metric: EvolutionMetric;
+  /** O mês tem lançamentos na métrica: o app lê as categorias do mês (Pago, com a fatura dividida, ou Recebido). */
   showsCategories: boolean;
+  /** "Mostra o que foi pago. Compra no cartão entra quando a fatura é paga." ou "Mostra o que foi recebido." */
+  categoriesNote: string;
+  /** "Ver Pago por categoria" aparece: só em Pago, que é o único valor com a tela Por categoria. */
+  showsCategoriesAction: boolean;
   /** "Ver lançamentos" aparece (o mês tem registros). */
   showsRecords: boolean;
   /** Composição de Recebido ou Pago, aberta com o mês do painel. */
   recordsHref: string;
   categoriesHref: string;
+  /** "Entender o que mudou" (fase 2): se aparece, com qual mês de comparação e com quais avisos. */
+  explain: EvolutionExplainPlan;
 }
 
 /** O painel do mês escolhido (tela B). Não lê nada: as categorias vêm de `categoryBreakdown`, no app. */
@@ -512,19 +601,197 @@ export function evolutionPanel(view: EvolutionView, month: IsoMonth): EvolutionP
     previousMonth: view.points[at - 1]?.month ?? null,
     nextMonth: view.points[at + 1]?.month ?? null,
     variation: evolutionVariation(view, point.month),
-    showsCategories: view.metric === 'pago' && point.state !== 'sem_registros',
+    metric: view.metric,
+    showsCategories: point.state !== 'sem_registros',
+    categoriesNote: view.metric === 'pago' ? T.categoriesNote : T.categoriesNoteReceived,
+    showsCategoriesAction: view.metric === 'pago' && point.state !== 'sem_registros',
     showsRecords: point.state !== 'sem_registros',
     recordsHref: `/composicao?tipo=${view.metric === 'pago' ? 'pago' : 'recebido'}`,
     categoriesHref: '/composicao?tipo=pago&vista=categoria',
+    explain: evolutionExplainPlan(view, point.month),
   };
 }
 
 /**
- * As maiores categorias de Pago do mês, para o painel: por valor, do maior para o menor (empate: nome), com "Sem categoria"
- * entrando pelo valor, como em "Seu mês em 30 segundos". `shares` é `categoryBreakdown` de Pago (a fatura já dividida).
+ * As maiores categorias do mês, para o painel: por valor, do maior para o menor (empate: nome), com "Sem categoria" entrando pelo
+ * valor, como em "Seu mês em 30 segundos". `shares` é `categoryBreakdown` de Pago (a fatura já dividida) ou
+ * `receivedCategoryBreakdown` de Recebido.
  */
 export function evolutionTopCategories(shares: readonly CategoryShare[]): CategoryShare[] {
   return [...shares].sort((a, b) => b.cents - a.cents || a.label.localeCompare(b.label, 'pt-BR')).slice(0, EVOLUTION_TOP_CATEGORIES);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Entender o que mudou (fase 2: D06, D08 e D10)
+// ---------------------------------------------------------------------------------------------------------------------
+
+/**
+ * O que a seção "Entender o que mudou" precisa saber antes de ler qualquer lançamento: se aparece, contra qual mês compara, os avisos
+ * e as ações. Calculado da visão do gráfico (`months_overview`), sem ler nada.
+ * - Não aparece (`visible` falso) quando o mês escolhido está sem registros. O mês de comparação sempre tem registros, porque é um mês da
+ *   comparação (D06: o anterior que está na comparação, o mesmo da variação, sempre com as duas datas).
+ * - Mês em andamento aparece, com o aviso de que os valores ainda podem mudar (a variação do painel não existe nele, mas a descrição sim).
+ * - Mês com sinal de lacuna aparece, com o aviso (D10), tanto o escolhido quanto o de comparação.
+ * - Sem outro mês antes na comparação (`baseMonth` nulo), só diz para escolher outro mês.
+ */
+export interface EvolutionExplainPlan {
+  visible: boolean;
+  metric: EvolutionMetric;
+  /** O mês escolhido. */
+  month: IsoMonth;
+  /** O mês de comparação; null quando não há outro mês na comparação antes do escolhido. */
+  baseMonth: IsoMonth | null;
+  /** Recebido ou Pago do mês escolhido e do mês de comparação, como no gráfico. */
+  cents: Cents;
+  baseCents: Cents;
+  /** "Escolha outro mês na comparação para ver o que mudou." quando não há mês de comparação; senão null. */
+  unavailableText: string | null;
+  /** Dica do botão que abre: "Compara abril com março"; null sem mês de comparação. */
+  hint: string | null;
+  /** Avisos, nesta ordem: mês em andamento, lacuna do mês escolhido e lacuna do mês de comparação. */
+  notices: string[];
+  /** "(março e maio não são meses vizinhos na comparação: abril está fora)" quando há mês fora entre os dois; senão null. */
+  adjacencyText: string | null;
+  /** "Comparar sem este mês" (ou "Voltar a comparar com este mês"): o mesmo interruptor do painel. Só no mês fechado com registros. */
+  compare: { included: boolean; label: string; hint: string } | null;
+  /** "Ver categorias" aparece (só em Pago, o único valor com Por categoria). */
+  showsCategoriesAction: boolean;
+}
+
+/** O plano da seção "Entender o que mudou" para o mês escolhido. Não lê nada nem altera a visão. */
+export function evolutionExplainPlan(view: EvolutionView, month: IsoMonth): EvolutionExplainPlan {
+  const T = EVOLUTION_TEXT.explain;
+  const selected = view.points.find((p) => p.month === month) ?? view.points[view.points.length - 1]!;
+  const none: EvolutionExplainPlan = {
+    visible: false,
+    metric: view.metric,
+    month: selected.month,
+    baseMonth: null,
+    cents: selected.cents,
+    baseCents: 0,
+    unavailableText: null,
+    hint: null,
+    notices: [],
+    adjacencyText: null,
+    compare: null,
+    showsCategoriesAction: false,
+  };
+  if (selected.state === 'sem_registros') return none;
+  const base = comparisonBase(view, selected);
+  if (!base) return { ...none, visible: true, unavailableText: T.needOtherMonth };
+  const { chosenOut, empty } = skippedMonths(view, base, selected);
+  const notices = [
+    ...(selected.state === 'em_andamento' ? [T.inProgress] : []),
+    ...(selected.gap ? [EVOLUTION_TEXT.gap.warning] : []),
+    ...(base.gap ? [T.gapIn(base.month)] : []),
+  ];
+  return {
+    visible: true,
+    metric: view.metric,
+    month: selected.month,
+    baseMonth: base.month,
+    cents: selected.cents,
+    baseCents: base.cents,
+    unavailableText: null,
+    hint: T.hint(base.month, selected.month),
+    notices,
+    adjacencyText: chosenOut.length + empty.length > 0 ? T.notAdjacent(base.month, selected.month, chosenOut, empty) : null,
+    compare: selected.eligible ? { included: selected.included, label: selected.included ? T.compareWithout : T.compareWith, hint: T.compareHint } : null,
+    showsCategoriesAction: view.metric === 'pago',
+  };
+}
+
+export interface EvolutionExplanationCategory {
+  key: string;
+  label: string;
+  /** "Casa: R$ 1.200,00 em março, R$ 5.600,00 em abril, R$ 4.400,00 a mais". */
+  text: string;
+}
+
+export interface EvolutionExplanationRecord {
+  key: string;
+  description: string;
+  /** "22/04/2026". */
+  dateText: string;
+  /** "R$ 4.400,00". */
+  valueText: string;
+  cents: Cents;
+  /** "Parte do pagamento da fatura" quando o valor é só a parte da categoria; senão null. */
+  partialText: string | null;
+  /** "Reparo do carro · 22/04/2026 · R$ 4.400,00". */
+  text: string;
+  /** "Reparo do carro, 22/04/2026, R$ 4.400,00". */
+  a11y: string;
+}
+
+/** A explicação pronta para mostrar: só texto e números já descritos, sem causa e sem julgamento. */
+export interface EvolutionExplanation {
+  /** "O Pago registrado foi R$ 4.500,00 maior em abril que em março." */
+  headline: string;
+  adjacencyText: string | null;
+  notices: string[];
+  categoriesTitle: string;
+  categories: EvolutionExplanationCategory[];
+  /** "Nenhuma categoria mudou de valor." quando a diferença é zero e nenhuma categoria mudou; senão null. */
+  noChangeText: string | null;
+  /** "Outras categorias também mudaram: R$ 100,00 no total." quando as categorias mostradas não fecham a diferença; senão null. */
+  othersText: string | null;
+  related: { title: string; intro: string; rows: EvolutionExplanationRecord[]; emptyText: string | null } | null;
+  /** Quando os lançamentos lidos não fecham com os totais: diz que não detalha por categoria (e não há categorias nem lançamentos). */
+  limitation: string | null;
+  note: string;
+  /** O cálculo bruto, para quem precisar dos números. */
+  change: ChangeExplanation;
+}
+
+/**
+ * A explicação de "Entender o que mudou" a partir do plano e das partes por categoria dos dois meses (`paidCategoryParts` ou
+ * `receivedCategoryParts`, os mesmos registros e as mesmas regras do Resumo; o pagamento de fatura vem dividido e estorno no cartão já
+ * abateu a fatura). Determinística. Os totais vêm do gráfico (`plan.cents` e `plan.baseCents`), então a frase principal é a mesma
+ * diferença da variação. Lança RangeError sem mês de comparação ou se os lados não são os meses do plano.
+ */
+export function evolutionExplanation(plan: EvolutionExplainPlan, baseParts: ChangeSide['parts'], parts: ChangeSide['parts']): EvolutionExplanation {
+  const T = EVOLUTION_TEXT.explain;
+  if (!plan.visible || plan.baseMonth === null) throw new RangeError('sem mês de comparação');
+  const from = plan.baseMonth;
+  const to = plan.month;
+  const change = explainChange({ month: from, totalCents: plan.baseCents, parts: baseParts }, { month: to, totalCents: plan.cents, parts });
+  const headline = T.headline(plan.metric, change.differenceCents, from, to);
+  const base = { headline, adjacencyText: plan.adjacencyText, notices: plan.notices, categoriesTitle: T.categoriesTitle, note: T.note, change };
+  if (!change.reconciled) {
+    return { ...base, categories: [], noChangeText: null, othersText: null, related: null, limitation: T.limitation };
+  }
+  const categories = change.categories.map((c): EvolutionExplanationCategory => ({
+    key: c.category ?? '\u0000sem-categoria',
+    label: c.label,
+    text: T.category(plan.metric, c.label, c.fromCents, c.toCents, from, to),
+  }));
+  const leading = change.categories[0];
+  const related = leading
+    ? {
+        title: T.relatedTitle,
+        intro: T.relatedIntro(leading.label, to),
+        rows: change.related.map((r): EvolutionExplanationRecord => ({
+          key: r.id,
+          description: r.description,
+          dateText: formatDateBR(r.occurredOn),
+          valueText: formatBRL(r.cents),
+          cents: r.cents,
+          partialText: r.partial ? T.partOfInvoice : null,
+          text: T.relatedRow(r.description, r.occurredOn, r.cents),
+          a11y: T.relatedRowA11y(r.description, r.occurredOn, r.cents, r.partial),
+        })),
+        emptyText: change.related.length === 0 ? T.relatedEmpty(leading.label, to) : null,
+      }
+    : null;
+  return {
+    ...base,
+    categories,
+    noChangeText: categories.length === 0 && change.differenceCents === 0 ? T.noCategoryChange : null,
+    othersText: change.otherCents !== 0 ? T.others(change.otherCents) : null,
+    related,
+    limitation: null,
+  };
 }
 
 /** Frase do anúncio ao tirar ou pôr um mês na comparação (média, mediana e "n de N meses"; nunca média zero). */

@@ -1,6 +1,9 @@
 import {
   EVOLUTION_TEXT,
   evolutionTopCategories,
+  type CategoryShare,
+  type EvolutionExplainPlan,
+  type EvolutionMetric,
   type EvolutionPanel,
   type EvolutionPointView,
   type EvolutionView,
@@ -16,7 +19,7 @@ import { SettingSwitch } from '@/components/setting-switch';
 import { ErrorState } from '@/components/states';
 import { Button, Card, FitMoney, LinkButton, Money, Skeleton, Txt, styles as ui } from '@/components/ui';
 import { maskMoneyLabel, useValuesHidden } from '@/lib/privacy';
-import { useCategoryBreakdown } from '@/state/data';
+import { useCategoryBreakdown, useEvolutionExplanation, useReceivedBreakdown } from '@/state/data';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
 
 const T = EVOLUTION_TEXT;
@@ -240,9 +243,10 @@ function Swatch({ kind, icon: Icon }: { kind: 'included' | 'excluded' | 'none' |
 
 /**
  * Painel do mês escolhido, na mesma tela (tela B): mês e ano (com "Mês anterior" e "Mês seguinte", alvos de 44 px), valor exato com
- * centavos, estado, o aviso de lacuna do mês fechado de Pago, a variação com as duas datas, as 3 maiores categorias de Pago, o
- * interruptor "Mostrar este mês na comparação" e "Ver lançamentos". Tirar da comparação só muda a média, a mediana e o desenho: nenhum
- * lançamento é lido para isso, nem gravado. O título é o que recebe o foco quando a pessoa escolhe o mês pela tabela (`headRef`).
+ * centavos, estado, o aviso de lacuna do mês fechado de Pago, a variação com as duas datas, "Entender o que mudou" (recolhido; fase 2),
+ * as 3 maiores categorias do mês (Pago ou Recebido), o interruptor "Mostrar este mês na comparação" e "Ver lançamentos". Tirar da
+ * comparação só muda a média, a mediana e o desenho: nenhum lançamento é lido para isso, nem gravado. O título é o que recebe o foco
+ * quando a pessoa escolhe o mês pela tabela (`headRef`).
  */
 export function MonthPanelCard({
   panel,
@@ -257,6 +261,7 @@ export function MonthPanelCard({
   contextId: string | undefined;
   headRef: Ref<View>;
   onStep: (month: IsoMonth) => void;
+  /** O interruptor "Mostrar este mês na comparação" (também o de "Comparar sem este mês" em "Entender o que mudou"). */
   onToggle: (included: boolean) => void;
   onSeeRecords: () => void;
   onSeeCategories: () => void;
@@ -319,7 +324,11 @@ export function MonthPanelCard({
         ) : null}
       </View>
 
-      {panel.showsCategories ? <Categories contextId={contextId} month={panel.month} onSeeCategories={onSeeCategories} /> : null}
+      {panel.explain.visible ? (
+        <ExplainSection plan={panel.explain} contextId={contextId} onToggle={onToggle} onSeeRecords={onSeeRecords} onSeeCategories={onSeeCategories} />
+      ) : null}
+
+      {panel.showsCategories ? <Categories panel={panel} contextId={contextId} onSeeCategories={onSeeCategories} /> : null}
 
       <View style={styles.block}>
         {panel.canToggle ? (
@@ -358,11 +367,11 @@ function StepButton({ label, hint, icon: Icon, disabled, onPress }: { label: str
   );
 }
 
-/** O aviso de lacuna de um mês fechado de Pago (D04): ícone e texto, nunca só cor. */
-function GapNote({ text }: { text: string }) {
+/** O aviso de lacuna de um mês fechado de Pago (D04), ou de mês em andamento: ícone e texto, nunca só cor. */
+function GapNote({ text, icon: Icon = CircleAlert }: { text: string; icon?: LucideIcon }) {
   return (
     <View style={styles.gap}>
-      <CircleAlert size={18} color={colors.text} strokeWidth={2.25} aria-hidden style={{ marginTop: 2 }} />
+      <Icon size={18} color={colors.text} strokeWidth={2.25} aria-hidden style={{ marginTop: 2 }} />
       <Txt variant="caption" style={{ flex: 1, minWidth: 0, fontFamily: fonts.medium }}>
         {text}
       </Txt>
@@ -370,9 +379,43 @@ function GapNote({ text }: { text: string }) {
   );
 }
 
-/** As 3 maiores categorias de Pago do mês, com a fatura já dividida (categoryBreakdown), e o link para Por categoria. */
-function Categories({ contextId, month, onSeeCategories }: { contextId: string | undefined; month: IsoMonth; onSeeCategories: () => void }) {
-  const categories = useCategoryBreakdown(contextId, month);
+/**
+ * As 3 maiores categorias do mês: de Pago, com a fatura já dividida (categoryBreakdown), e o link para Por categoria; de Recebido, as
+ * categorias dos recebimentos (receivedCategoryBreakdown), sem tela de categorias (o link do painel é "Ver lançamentos").
+ */
+function Categories({ panel, contextId, onSeeCategories }: { panel: EvolutionPanel; contextId: string | undefined; onSeeCategories: () => void }) {
+  const props = { contextId, month: panel.month, note: panel.categoriesNote, onSeeCategories: panel.showsCategoriesAction ? onSeeCategories : null };
+  return panel.metric === 'pago' ? <PaidCategories {...props} /> : <ReceivedCategories {...props} />;
+}
+
+interface CategoriesProps {
+  contextId: string | undefined;
+  month: IsoMonth;
+  note: string;
+  onSeeCategories: (() => void) | null;
+}
+
+function PaidCategories({ contextId, month, note, onSeeCategories }: CategoriesProps) {
+  const query = useCategoryBreakdown(contextId, month);
+  return <CategoryList metric="pago" query={query} note={note} onSeeCategories={onSeeCategories} />;
+}
+
+function ReceivedCategories({ contextId, month, note, onSeeCategories }: CategoriesProps) {
+  const query = useReceivedBreakdown(contextId, month);
+  return <CategoryList metric="recebido" query={query} note={note} onSeeCategories={onSeeCategories} />;
+}
+
+function CategoryList({
+  metric,
+  query: categories,
+  note,
+  onSeeCategories,
+}: {
+  metric: EvolutionMetric;
+  query: { isPending: boolean; isError: boolean; data: CategoryShare[] | undefined; refetch: () => unknown };
+  note: string;
+  onSeeCategories: (() => void) | null;
+}) {
   const hidden = useValuesHidden();
   const { width, fontScale } = useWindowDimensions();
   const stacked = width < 360 || fontScale > 1.3;
@@ -397,7 +440,7 @@ function Categories({ contextId, month, onSeeCategories }: { contextId: string |
                   {c.label}
                 </Txt>
                 <Txt variant="caption" color={colors.textSecondary}>
-                  {T.panel.categoryShare(c.percentText)}
+                  {T.panel.categoryShare(c.percentText, metric)}
                 </Txt>
                 {stacked ? <Money cents={c.cents} variant="label" style={styles.categoryValue} /> : null}
               </View>
@@ -405,11 +448,173 @@ function Categories({ contextId, month, onSeeCategories }: { contextId: string |
             </View>
           ))}
           <Txt variant="caption" color={colors.textSecondary}>
-            {T.panel.categoriesNote}
+            {note}
           </Txt>
-          <LinkButton label={T.panel.categoriesAction} trailing={ChevronRight} style={styles.link} onPress={onSeeCategories} />
+          {onSeeCategories ? <LinkButton label={T.panel.categoriesAction} trailing={ChevronRight} style={styles.link} onPress={onSeeCategories} /> : null}
         </>
       )}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Entender o que mudou (fase 2)
+// ---------------------------------------------------------------------------------------------------------------------
+
+/**
+ * "Entender o que mudou" (D-057, fase 2; EF-16 e EF-17): um botão recolhido por padrão que abre a descrição do que mudou entre o mês
+ * escolhido e o mês de comparação da variação (o anterior que está na comparação), sempre com as duas datas. Nada é lido enquanto
+ * está fechada; aberta, usa as leituras de sempre dos dois meses (os lançamentos e as faturas) e não grava nada. A seção não aparece em
+ * mês sem registros (o painel decide). O estado aberto vale enquanto a seção está na tela.
+ */
+function ExplainSection({
+  plan,
+  contextId,
+  onToggle,
+  onSeeRecords,
+  onSeeCategories,
+}: {
+  plan: EvolutionExplainPlan;
+  contextId: string | undefined;
+  onToggle: (included: boolean) => void;
+  onSeeRecords: () => void;
+  onSeeCategories: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={styles.block}>
+      <LinkButton
+        label={T.explain.title}
+        icon={open ? ChevronUp : ChevronDown}
+        accessibilityHint={plan.hint ?? undefined}
+        accessibilityState={{ expanded: open }}
+        aria-expanded={open}
+        onPress={() => setOpen((o) => !o)}
+        style={styles.toggle}
+      />
+      {open ? (
+        plan.baseMonth === null ? (
+          <Txt color={colors.textSecondary}>{plan.unavailableText ?? T.explain.needOtherMonth}</Txt>
+        ) : (
+          <ExplainBody plan={plan} contextId={contextId} onToggle={onToggle} onSeeRecords={onSeeRecords} onSeeCategories={onSeeCategories} />
+        )
+      ) : null}
+    </View>
+  );
+}
+
+/** O conteúdo aberto: a frase principal, os avisos, as categorias que mais mudaram, os lançamentos relacionados e as ações. */
+function ExplainBody({
+  plan,
+  contextId,
+  onToggle,
+  onSeeRecords,
+  onSeeCategories,
+}: {
+  plan: EvolutionExplainPlan;
+  contextId: string | undefined;
+  onToggle: (included: boolean) => void;
+  onSeeRecords: () => void;
+  onSeeCategories: () => void;
+}) {
+  const E = T.explain;
+  const query = useEvolutionExplanation(contextId, plan);
+  const hidden = useValuesHidden();
+  if (query.isPending) {
+    return (
+      <View accessibilityRole="progressbar" accessibilityLabel={E.loading} style={{ gap: space[2] }}>
+        <Skeleton width="100%" height={20} />
+        <Skeleton width="85%" height={20} />
+        <Skeleton width="60%" height={20} />
+      </View>
+    );
+  }
+  if (query.isError || !query.data) return <ErrorState message={E.loadError} retryLabel={T.retry} onRetry={() => query.refetch()} />;
+  const e = query.data;
+  return (
+    <View role="group" accessibilityLabel={E.title} style={{ gap: space[3] }}>
+      <View style={{ gap: space[1] }}>
+        <MoneyTxt style={{ fontFamily: fonts.bold }}>{e.headline}</MoneyTxt>
+        {e.adjacencyText ? (
+          <Txt variant="caption" color={colors.textSecondary}>
+            {e.adjacencyText}
+          </Txt>
+        ) : null}
+      </View>
+      {e.notices.map((notice) => (
+        <GapNote key={notice} text={notice} icon={notice === E.inProgress ? Hourglass : CircleAlert} />
+      ))}
+      {e.limitation ? <Txt color={colors.textSecondary}>{e.limitation}</Txt> : null}
+
+      {e.categories.length > 0 || e.noChangeText ? (
+        <View style={{ gap: space[1] }}>
+          <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={4}>
+            {e.categoriesTitle}
+          </Txt>
+          {e.noChangeText ? <Txt color={colors.textSecondary}>{e.noChangeText}</Txt> : null}
+          {e.categories.length > 0 ? (
+            <View role="list" style={{ gap: space[1] }}>
+              {e.categories.map((c, i) => (
+                <View key={c.key} role="listitem" style={[styles.explainRow, i < e.categories.length - 1 && styles.divider]}>
+                  <MoneyTxt>{c.text}</MoneyTxt>
+                </View>
+              ))}
+            </View>
+          ) : null}
+          {e.othersText ? <MoneyTxt color={colors.textSecondary}>{e.othersText}</MoneyTxt> : null}
+        </View>
+      ) : null}
+
+      {e.related ? (
+        <View style={{ gap: space[1] }}>
+          <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={4}>
+            {e.related.title}
+          </Txt>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {e.related.intro}
+          </Txt>
+          {e.related.emptyText ? <Txt color={colors.textSecondary}>{e.related.emptyText}</Txt> : null}
+          {e.related.rows.length > 0 ? (
+            <View role="list" style={{ gap: space[1] }}>
+              {e.related.rows.map((r, i, rows) => (
+                <View
+                  key={r.key}
+                  role="listitem"
+                  accessible
+                  accessibilityLabel={maskMoneyLabel(r.a11y, hidden)}
+                  style={[styles.explainRow, i < rows.length - 1 && styles.divider]}>
+                  <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>
+                    {r.description}
+                  </Txt>
+                  <MoneyTxt variant="caption" color={colors.textSecondary}>{`${r.dateText} · ${r.valueText}`}</MoneyTxt>
+                  {r.partialText ? (
+                    <Txt variant="caption" color={colors.textSecondary}>
+                      {r.partialText}
+                    </Txt>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      <Txt variant="caption" color={colors.textSecondary}>
+        {e.note}
+      </Txt>
+
+      <View style={{ gap: space[1] }}>
+        <LinkButton label={E.seeRecords} accessibilityHint={T.panel.seeRecordsHint(plan.month)} trailing={ChevronRight} style={styles.link} onPress={onSeeRecords} />
+        {plan.showsCategoriesAction ? <LinkButton label={E.seeCategories} trailing={ChevronRight} style={styles.link} onPress={onSeeCategories} /> : null}
+        {plan.compare ? (
+          <View style={{ gap: space[1] }}>
+            <Button label={plan.compare.label} tone="soft" icon={plan.compare.included ? Ban : RotateCcw} onPress={() => onToggle(!(plan.compare?.included ?? true))} />
+            <Txt variant="caption" color={colors.textSecondary}>
+              {plan.compare.hint}
+            </Txt>
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -611,4 +816,5 @@ const styles = StyleSheet.create({
   tableHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', columnGap: space[3] },
   tableValue: { fontFamily: fonts.bold, fontSize: 15 },
   tableField: { flexDirection: 'row', justifyContent: 'space-between', columnGap: space[3] },
+  explainRow: { gap: 2, paddingVertical: space[2] },
   });

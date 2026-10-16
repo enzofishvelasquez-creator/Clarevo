@@ -121,18 +121,80 @@ export function sortNewestFirst(records: readonly FinancialRecord[]): FinancialR
   return [...records].sort(newestFirst);
 }
 
-/** Uma barra de "Por categoria" na composição de Pago. */
+/** Uma barra de "Por categoria" na composição de Pago (ou de Recebido, na Evolução). */
 export interface CategoryShare {
   /** null = "Sem categoria". */
   category: string | null;
   label: string;
   cents: Cents;
-  /** Percentual de Pago em décimos; a soma de todas é 1.000 (maior resto). */
+  /** Percentual de Pago (ou de Recebido) em décimos; a soma de todas é 1.000 (maior resto). */
   tenths: number;
   /** "23,4%" */
   percentText: string;
-  /** "Mercado, R$ 412,30, 23,4% do pago" */
+  /** "Mercado, R$ 412,30, 23,4% do pago" (em Recebido, "do recebido") */
   a11yLabel: string;
+}
+
+/**
+ * A parte de um lançamento numa categoria: o gasto comum cabe inteiro na categoria dele; o pagamento de fatura de cartão (D-037) vem
+ * dividido pelas categorias da fatura paga, uma parte para cada. A soma das partes de uma lista é o total dela (Pago ou Recebido),
+ * então nada é contado duas vezes. `part` é verdadeiro quando a parte é menor que o lançamento inteiro.
+ */
+export interface CategoryPart {
+  record: FinancialRecord;
+  /** null = "Sem categoria"; "Encargos do cartão" para os encargos de uma fatura. */
+  category: string | null;
+  label: string;
+  cents: Cents;
+  part: boolean;
+}
+
+/**
+ * As partes por categoria dos gastos de uma lista (os de Pago), com a mesma divisão da fatura de `categoryBreakdown`. Recebimentos
+ * que vierem na lista ficam de fora. `invoices` traz as faturas desses gastos (loadInvoicesOfRecords); sem a fatura na lista, o gasto
+ * fica inteiro na categoria dele.
+ */
+export function paidCategoryParts(paid: readonly FinancialRecord[], invoices: readonly Pick<Invoice, 'cardId' | 'month' | 'mix'>[] = []): CategoryPart[] {
+  const out: CategoryPart[] = [];
+  for (const r of paid) {
+    if (r.kind !== 'despesa') continue;
+    const shares = recordShares(r, invoices);
+    if (shares) {
+      for (const share of shares) {
+        const category = share.charges ? CARD_CHARGES_CATEGORY : share.category;
+        out.push({ record: r, category, label: category ?? NO_CATEGORY_LABEL, cents: share.cents, part: share.cents < r.amountCents });
+      }
+    } else {
+      out.push({ record: r, category: r.category, label: r.category ?? NO_CATEGORY_LABEL, cents: r.amountCents, part: false });
+    }
+  }
+  return out;
+}
+
+/** As partes por categoria dos recebimentos de uma lista (os de Recebido): cada um inteiro na categoria dele. Gastos ficam de fora. */
+export function receivedCategoryParts(received: readonly FinancialRecord[]): CategoryPart[] {
+  return received
+    .filter((r) => r.kind === 'receita')
+    .map((r) => ({ record: r, category: r.category, label: r.category ?? NO_CATEGORY_LABEL, cents: r.amountCents, part: false }));
+}
+
+/** Soma as partes por categoria, em ordem decrescente de valor (empate: nome), com "Sem categoria" por último; percentuais pelo maior resto. */
+function rankedShares(parts: readonly CategoryPart[], noun: 'pago' | 'recebido'): CategoryShare[] {
+  const byCategory = new Map<string | null, Cents>();
+  for (const p of parts) byCategory.set(p.category, (byCategory.get(p.category) ?? 0) + p.cents);
+  const rows = [...byCategory.entries()]
+    .map(([category, cents]) => ({ category, label: category ?? NO_CATEGORY_LABEL, cents }))
+    .sort((a, b) => {
+      if ((a.category === null) !== (b.category === null)) return a.category === null ? 1 : -1;
+      return b.cents - a.cents || a.label.localeCompare(b.label, 'pt-BR');
+    });
+  const total = rows.reduce((acc, r) => acc + r.cents, 0);
+  if (total <= 0) return [];
+  const tenths = sharesCents(1000, rows.map((r) => r.cents));
+  return rows.map((r, i) => {
+    const percentText = formatTenths(tenths[i]!);
+    return { ...r, tenths: tenths[i]!, percentText, a11yLabel: `${r.label}, ${formatBRL(r.cents)}, ${percentText} do ${noun}` };
+  });
 }
 
 /**
@@ -146,25 +208,14 @@ export interface CategoryShare {
  * dele.
  */
 export function categoryBreakdown(paid: readonly FinancialRecord[], invoices: readonly Pick<Invoice, 'cardId' | 'month' | 'mix'>[] = []): CategoryShare[] {
-  const byCategory = new Map<string | null, Cents>();
-  const add = (category: string | null, cents: Cents) => byCategory.set(category, (byCategory.get(category) ?? 0) + cents);
-  for (const r of paid) {
-    if (r.kind !== 'despesa') continue;
-    const shares = recordShares(r, invoices);
-    if (shares) for (const share of shares) add(share.charges ? CARD_CHARGES_CATEGORY : share.category, share.cents);
-    else add(r.category, r.amountCents);
-  }
-  const rows = [...byCategory.entries()]
-    .map(([category, cents]) => ({ category, label: category ?? NO_CATEGORY_LABEL, cents }))
-    .sort((a, b) => {
-      if ((a.category === null) !== (b.category === null)) return a.category === null ? 1 : -1;
-      return b.cents - a.cents || a.label.localeCompare(b.label, 'pt-BR');
-    });
-  const total = rows.reduce((acc, r) => acc + r.cents, 0);
-  if (total <= 0) return [];
-  const tenths = sharesCents(1000, rows.map((r) => r.cents));
-  return rows.map((r, i) => {
-    const percentText = formatTenths(tenths[i]!);
-    return { ...r, tenths: tenths[i]!, percentText, a11yLabel: `${r.label}, ${formatBRL(r.cents)}, ${percentText} do pago` };
-  });
+  return rankedShares(paidCategoryParts(paid, invoices), 'pago');
+}
+
+/**
+ * Recebido por categoria (Evolução, D-057 fase 2): o mesmo desenho de `categoryBreakdown` para os recebimentos. Soma por categoria,
+ * em ordem decrescente de valor (empate: nome), com "Sem categoria" por último, percentuais em décimos pelo maior resto (a soma é
+ * 1.000) e a soma dos centavos igual a Recebido. Gastos que vierem na lista ficam de fora; sem recebimentos, lista vazia.
+ */
+export function receivedCategoryBreakdown(received: readonly FinancialRecord[]): CategoryShare[] {
+  return rankedShares(receivedCategoryParts(received), 'recebido');
 }

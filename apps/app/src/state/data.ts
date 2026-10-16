@@ -12,6 +12,7 @@ import {
   categoryRefunds,
   categoryBreakdown,
   committedGoalLines,
+  evolutionExplanation,
   essentialMonthly,
   goalPlan,
   isRefusal,
@@ -23,7 +24,10 @@ import {
   loadInvoices,
   loadEvolutionGaps,
   loadInvoicesOfRecords,
+  paidCategoryParts,
   receiptKeyValid,
+  receivedCategoryBreakdown,
+  receivedCategoryParts,
   reserveEssentialBaseCents,
   seriesDebtDrafts,
   seriesEnded,
@@ -65,6 +69,7 @@ import {
   type CardSummary,
   type CardWrite,
   type CategoryBudget,
+  type CategoryPart,
   type CategoryShare,
   type Cents,
   type Commitment,
@@ -75,6 +80,9 @@ import {
   type CommittedProjection,
   type CommittedSummary,
   type EssentialEstimate,
+  type EvolutionExplainPlan,
+  type EvolutionExplanation,
+  type EvolutionMetric,
   type ContextKind,
   type FamilyRole,
   type FinancialRecord,
@@ -1915,6 +1923,51 @@ export function useCategoryBreakdown(contextId: string | undefined, month: IsoMo
     [paid, invoices.data],
   );
   return combineParts<CategoryShare[]>(parts, value);
+}
+
+/**
+ * "Recebido por categoria" do mês (Evolução, fase 2): os recebimentos de useMonthRecords agrupados por categoria
+ * (`receivedCategoryBreakdown`, o mesmo desenho de "Por categoria" de Pago). Sem dado parcial: falha de leitura é erro, nunca lista vazia.
+ */
+export function useReceivedBreakdown(contextId: string | undefined, month: IsoMonth) {
+  const records = useMonthRecords(contextId, month);
+  const received = records.summary?.composition.received;
+  const value = useMemo((): CategoryShare[] | undefined => (received ? receivedCategoryBreakdown(received) : undefined), [received]);
+  return combineParts<CategoryShare[]>([records], value);
+}
+
+/**
+ * As partes por categoria dos lançamentos do mês na métrica da Evolução (`paidCategoryParts` com as faturas dos pagamentos de fatura, ou
+ * `receivedCategoryParts`): as mesmas leituras de "Por categoria" e do Resumo (as chaves começam por 'records' e 'cards': toda escrita
+ * recarrega). Sem dado parcial: uma falha de qualquer leitura falha tudo. Só leitura.
+ */
+function useMonthCategoryParts(contextId: string | undefined, month: IsoMonth, metric: EvolutionMetric) {
+  const records = useMonthRecords(contextId, month);
+  const paid = records.summary?.composition.paid;
+  const received = records.summary?.composition.received;
+  // Em Recebido não há fatura para ler: a lista vazia deixa a consulta de faturas sem trabalho.
+  const invoices = useInvoicesOfRecords(contextId, month, metric === 'pago' ? paid : received ? [] : undefined);
+  const value = useMemo(
+    (): CategoryPart[] | undefined =>
+      metric === 'pago' ? (paid && invoices.data ? paidCategoryParts(paid, invoices.data) : undefined) : received && invoices.data ? receivedCategoryParts(received) : undefined,
+    [metric, paid, received, invoices.data],
+  );
+  return combineParts<CategoryPart[]>([records, invoices], value);
+}
+
+/**
+ * "Entender o que mudou" (Evolução, fase 2): a explicação entre o mês escolhido e o mês de comparação do plano, montada no core
+ * (`evolutionExplanation`) com os lançamentos dos dois meses, que as consultas de sempre já trazem. Chame só com o plano pronto (com
+ * mês de comparação) e só quando a seção está aberta: fechada, nada é lido. Só leitura, nada é gravado. Sem dado parcial.
+ */
+export function useEvolutionExplanation(contextId: string | undefined, plan: EvolutionExplainPlan) {
+  const base = useMonthCategoryParts(contextId, plan.baseMonth ?? plan.month, plan.metric);
+  const current = useMonthCategoryParts(contextId, plan.month, plan.metric);
+  const value = useMemo((): EvolutionExplanation | undefined => {
+    if (!base.data || !current.data || plan.baseMonth === null) return undefined;
+    return evolutionExplanation(plan, base.data, current.data);
+  }, [plan, base.data, current.data]);
+  return combineParts<EvolutionExplanation>([base, current], value);
 }
 
 /**

@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
   COMPARISON_ELIGIBLE_STATES,
+  EXPLAIN_TOP_CATEGORIES,
+  EXPLAIN_TOP_RECORDS,
   comparisonStats,
   evolutionPoints,
+  explainChange,
   monthsOverview,
+  paidCategoryParts,
   pointVariation,
+  receivedCategoryParts,
+  type CategoryPart,
   type EvolutionPoint,
   type EvolutionPointState,
   type FinancialRecord,
@@ -435,5 +441,199 @@ describe('pointVariation', () => {
     const b = Object.freeze(point('2026-04', 780_000));
     expect(() => pointVariation(a, b)).not.toThrow();
     expect(a).toEqual(point('2026-03', 330_000));
+  });
+});
+
+/**
+ * Entender o que mudou (fase 2, EF-16 e EF-17): a descrição determinística da diferença entre dois meses por categoria e por
+ * lançamento. Nada é causa: a soma das categorias mostradas pode não fechar a diferença, e a sobra é dita à parte.
+ */
+describe('explainChange', () => {
+  let seq = 0;
+  const record = (category: string | null, amountCents: number, description: string, occurredOn: string, kind: 'despesa' | 'receita' = 'despesa'): FinancialRecord => ({
+    id: `r${++seq}`,
+    contextId: 'c',
+    accountId: 'a',
+    kind,
+    status: 'realizado',
+    amountCents,
+    currency: 'BRL',
+    occurredOn,
+    description,
+    category,
+    commitmentId: null,
+    invoice: null,
+    receiptKey: null,
+    createdBy: 'p',
+    version: 1,
+    createdAt: `${occurredOn}T00:00:00Z`,
+    updatedAt: `${occurredOn}T00:00:00Z`,
+  });
+  const sum = (records: readonly FinancialRecord[]) => records.reduce((a, r) => a + r.amountCents, 0);
+  const side = (month: string, records: readonly FinancialRecord[]) => ({ month, totalCents: sum(records), parts: paidCategoryParts(records) });
+
+  // Março: Casa R$ 1.200,00 e Mercado R$ 800,00. Abril: Casa R$ 5.600,00 (com o reparo de R$ 4.400,00), Mercado R$ 800,00 e Lazer R$ 100,00.
+  const march = [record('Casa', 120_000, 'Aluguel', '2026-03-05'), record('Mercado', 80_000, 'Mercado', '2026-03-12')];
+  const april = [
+    record('Casa', 120_000, 'Aluguel', '2026-04-05'),
+    record('Casa', 440_000, 'Reparo do carro', '2026-04-22'),
+    record('Mercado', 80_000, 'Mercado', '2026-04-12'),
+    record('Lazer', 10_000, 'Cinema', '2026-04-24'),
+  ];
+
+  it('a diferença total, as categorias com maior diferença e os lançamentos relacionados; quando as categorias fecham a diferença, nada sobra', () => {
+    const e = explainChange(side('2026-03', march), side('2026-04', april));
+    expect(e).toMatchObject({ fromMonth: '2026-03', toMonth: '2026-04', fromCents: 200_000, toCents: 650_000, differenceCents: 450_000, reconciled: true });
+    expect(e.categories).toEqual([
+      { category: 'Casa', label: 'Casa', fromCents: 120_000, toCents: 560_000, differenceCents: 440_000 },
+      { category: 'Lazer', label: 'Lazer', fromCents: 0, toCents: 10_000, differenceCents: 10_000 },
+    ]);
+    // 440.000 + 10.000 fecham os 450.000: nada sobra.
+    expect(e.otherCents).toBe(0);
+    expect(e.related.map((r) => [r.description, r.occurredOn, r.cents, r.partial])).toEqual([
+      ['Reparo do carro', '2026-04-22', 440_000, false],
+      ['Aluguel', '2026-04-05', 120_000, false],
+    ]);
+  });
+
+  it('só as 3 categorias que mais mudaram entram, e a sobra das outras é dita à parte, com sinal', () => {
+    const base = [record('Casa', 100_000, 'a', '2026-03-01'), record('Mercado', 100_000, 'b', '2026-03-02'), record('Lazer', 100_000, 'c', '2026-03-03'), record('Saúde', 100_000, 'd', '2026-03-04'), record('Educação', 100_000, 'e', '2026-03-05')];
+    const next = [
+      record('Casa', 600_000, 'a', '2026-04-01'),
+      record('Mercado', 300_000, 'b', '2026-04-02'),
+      record('Lazer', 20_000, 'c', '2026-04-03'),
+      record('Saúde', 110_000, 'd', '2026-04-04'),
+      record('Educação', 105_000, 'e', '2026-04-05'),
+    ];
+    const e = explainChange(side('2026-03', base), side('2026-04', next));
+    expect(EXPLAIN_TOP_CATEGORIES).toBe(3);
+    expect(e.categories.map((c) => [c.label, c.differenceCents])).toEqual([['Casa', 500_000], ['Mercado', 200_000], ['Lazer', -80_000]]);
+    // Total: 1.135.000 − 500.000 = 635.000; as 3 somam 620.000; Saúde (+10.000) e Educação (+5.000) sobram.
+    expect(e.differenceCents).toBe(635_000);
+    expect(e.otherCents).toBe(15_000);
+  });
+
+  it('a sobra pode ser negativa, e vale 0 quando as categorias mostradas fecham a diferença', () => {
+    const base = [record('Casa', 100_000, 'a', '2026-03-01'), record('Mercado', 100_000, 'b', '2026-03-02'), record('Lazer', 100_000, 'c', '2026-03-03'), record('Saúde', 100_000, 'd', '2026-03-04')];
+    const next = [record('Casa', 300_000, 'a', '2026-04-01'), record('Mercado', 250_000, 'b', '2026-04-02'), record('Lazer', 220_000, 'c', '2026-04-03'), record('Saúde', 90_000, 'd', '2026-04-04')];
+    const e = explainChange(side('2026-03', base), side('2026-04', next));
+    expect(e.categories.map((c) => c.label)).toEqual(['Casa', 'Mercado', 'Lazer']);
+    expect(e.otherCents).toBe(-10_000);
+    expect(explainChange(side('2026-03', march), side('2026-04', april)).otherCents).toBe(0);
+  });
+
+  it('a diferença para menos: as categorias com sinal negativo, e o lançamento relacionado é do mês de chegada', () => {
+    const e = explainChange(side('2026-04', april), side('2026-03', march));
+    expect(e).toMatchObject({ differenceCents: -450_000, reconciled: true });
+    expect(e.categories.map((c) => [c.label, c.differenceCents])).toEqual([['Casa', -440_000], ['Lazer', -10_000]]);
+    // O mês de chegada é março: os maiores lançamentos dele na Casa.
+    expect(e.related.map((r) => [r.description, r.cents])).toEqual([['Aluguel', 120_000]]);
+  });
+
+  it('empate de diferença: pelo nome da categoria; empate de valor do lançamento: data mais recente, depois a descrição e o id', () => {
+    const base = [record('Zoo', 10_000, 'z', '2026-03-01'), record('Lazer', 10_000, 'l', '2026-03-01')];
+    const next = [record('Zoo', 20_000, 'z', '2026-04-01'), record('Lazer', 20_000, 'l', '2026-04-01')];
+    expect(explainChange(side('2026-03', base), side('2026-04', next)).categories.map((c) => c.label)).toEqual(['Lazer', 'Zoo']);
+    const tie = [
+      record('Casa', 50_000, 'B', '2026-04-10'),
+      record('Casa', 50_000, 'A', '2026-04-10'),
+      record('Casa', 50_000, 'C', '2026-04-20'),
+      record('Casa', 40_000, 'D', '2026-04-30'),
+      record('Casa', 30_000, 'E', '2026-04-30'),
+    ];
+    const e = explainChange(side('2026-03', []), side('2026-04', tie));
+    expect(EXPLAIN_TOP_RECORDS).toBe(3);
+    expect(e.related.map((r) => r.description)).toEqual(['C', 'A', 'B']);
+  });
+
+  it('é determinística, não altera o que recebe e dá o mesmo resultado com as partes em outra ordem', () => {
+    const a = side('2026-03', march);
+    const b = side('2026-04', april);
+    const before = JSON.stringify([a, b]);
+    const first = explainChange(a, b);
+    expect(JSON.stringify([a, b])).toBe(before);
+    expect(explainChange(a, b)).toEqual(first);
+    expect(explainChange({ ...a, parts: [...a.parts].reverse() }, { ...b, parts: [...b.parts].reverse() })).toEqual(first);
+  });
+
+  it('diferença zero e nenhuma categoria mudou: nada a listar; só a diferença total zero com categorias que se compensam lista as categorias', () => {
+    const same = explainChange(side('2026-03', march), side('2026-04', march.map((r) => ({ ...r, id: `${r.id}b`, occurredOn: r.occurredOn.replace('-03-', '-04-') }))));
+    expect(same).toMatchObject({ differenceCents: 0, reconciled: true, categories: [], otherCents: 0, related: [] });
+    const swapped = explainChange(
+      side('2026-03', [record('Casa', 10_000, 'a', '2026-03-01'), record('Mercado', 20_000, 'b', '2026-03-01')]),
+      side('2026-04', [record('Casa', 20_000, 'a', '2026-04-01'), record('Mercado', 10_000, 'b', '2026-04-01')]),
+    );
+    expect(swapped.differenceCents).toBe(0);
+    expect(swapped.categories.map((c) => [c.label, c.differenceCents])).toEqual([['Casa', 10_000], ['Mercado', -10_000]]);
+    expect(swapped.otherCents).toBe(0);
+  });
+
+  it('categoria que some ou aparece vale 0 no outro mês, e "Sem categoria" entra como qualquer outra', () => {
+    const e = explainChange(side('2026-03', [record(null, 30_000, 'x', '2026-03-01')]), side('2026-04', [record('Lazer', 30_000, 'y', '2026-04-01'), record(null, 5_000, 'z', '2026-04-02')]));
+    expect(e.categories.map((c) => [c.category, c.label, c.fromCents, c.toCents])).toEqual([
+      ['Lazer', 'Lazer', 0, 30_000],
+      [null, 'Sem categoria', 30_000, 5_000],
+    ]);
+    expect(e.differenceCents).toBe(5_000);
+    expect(e.otherCents).toBe(0);
+  });
+
+  it('T15: o pagamento de fatura entra dividido pelas categorias da fatura, uma só vez, e o lançamento relacionado mostra só a parte', () => {
+    const invoice = {
+      cardId: 'cartao',
+      month: '2026-04',
+      mix: [
+        { category: 'Mercado', charges: false, cents: 60_000 },
+        { category: 'Lazer', charges: false, cents: 40_000 },
+      ],
+    };
+    const pay: FinancialRecord = { ...record('Cartão', 100_000, 'Fatura do cartão', '2026-04-10'), invoice: { cardId: 'cartao', month: '2026-04' } };
+    const e = explainChange(side('2026-03', [record('Mercado', 10_000, 'Mercado', '2026-03-12')]), {
+      month: '2026-04',
+      totalCents: 100_000,
+      parts: paidCategoryParts([pay], [invoice]),
+    });
+    expect(e.reconciled).toBe(true);
+    expect(e.categories.map((c) => [c.label, c.toCents, c.differenceCents])).toEqual([['Mercado', 60_000, 50_000], ['Lazer', 40_000, 40_000]]);
+    expect(e.related).toEqual([{ id: pay.id, description: 'Fatura do cartão', occurredOn: '2026-04-10', cents: 60_000, recordCents: 100_000, partial: true }]);
+    // Sem dupla contagem: as categorias do mês somam o total do mês, e a compra no cartão não existe como lançamento de Pago.
+    expect(e.categories.reduce((a, c) => a + c.toCents, 0)).toBe(100_000);
+  });
+
+  it('Recebido usa as mesmas contas, com as categorias dos recebimentos', () => {
+    const received = (month: string, rows: [string, number][]) => ({
+      month,
+      totalCents: rows.reduce((a, r) => a + r[1], 0),
+      parts: receivedCategoryParts(rows.map(([category, cents], i) => record(category, cents, `Recebimento ${i}`, `${month}-05`, 'receita'))),
+    });
+    const e = explainChange(received('2026-02', [['Salário', 500_000]]), received('2026-04', [['Salário', 500_000], ['Freela', 120_000]]));
+    expect(e.differenceCents).toBe(120_000);
+    expect(e.categories.map((c) => [c.label, c.differenceCents])).toEqual([['Freela', 120_000]]);
+    expect(e.related.map((r) => r.cents)).toEqual([120_000]);
+  });
+
+  it('partes que não fecham com o total do mês: reconciled falso, sem categorias, sem sobra e sem lançamentos', () => {
+    const wrong = explainChange({ ...side('2026-03', march), totalCents: 250_000 }, side('2026-04', april));
+    expect(wrong).toMatchObject({ reconciled: false, categories: [], otherCents: 0, related: [], differenceCents: 400_000 });
+    const missing = explainChange(side('2026-03', march), { month: '2026-04', totalCents: 650_000, parts: april.slice(0, 2).map((r) => paidCategoryParts([r])[0]!) });
+    expect(missing.reconciled).toBe(false);
+  });
+
+  it('entradas inválidas lançam RangeError: mês inválido, meses iguais, total negativo ou não inteiro, parte negativa', () => {
+    const a = side('2026-03', march);
+    const b = side('2026-04', april);
+    expect(() => explainChange({ ...a, month: '2026-13' }, b)).toThrow(RangeError);
+    expect(() => explainChange(a, { ...b, month: '2026-03' })).toThrow(RangeError);
+    expect(() => explainChange({ ...a, totalCents: -1 }, b)).toThrow(RangeError);
+    expect(() => explainChange(a, { ...b, totalCents: 1.5 })).toThrow(RangeError);
+    const negative: CategoryPart = { ...a.parts[0]!, cents: -5 };
+    expect(() => explainChange({ ...a, parts: [negative] }, b)).toThrow(RangeError);
+  });
+
+  it('os totais grandes continuam exatos (sem ponto flutuante nas somas de categoria)', () => {
+    const big = record('Casa', 999_999_999, 'grande', '2026-04-01');
+    const e = explainChange(side('2026-03', []), side('2026-04', [big, record('Casa', 1, 'um', '2026-04-02')]));
+    expect(e.differenceCents).toBe(1_000_000_000);
+    expect(e.categories[0]).toMatchObject({ toCents: 1_000_000_000, differenceCents: 1_000_000_000 });
   });
 });

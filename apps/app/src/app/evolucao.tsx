@@ -35,8 +35,8 @@ import { colors, space } from '@/theme/tokens';
 const T = EVOLUTION_TEXT;
 
 /**
- * Evolução (D-057, fase 1b): Recebido ou Pago mês a mês, pela data do pagamento, em um gráfico de linha com média, mediana e o total dos
- * meses exibidos, e o painel do mês escolhido. A pessoa pode tirar um mês da comparação sem apagar nem mudar nenhum lançamento: isso
+ * Evolução (D-057, fases 1b e 2): Recebido ou Pago mês a mês, pela data do pagamento, em um gráfico de linha com média, mediana e o total dos
+ * meses exibidos, e o painel do mês escolhido (com a seção recolhida "Entender o que mudou", que só lê quando aberta). A pessoa pode tirar um mês da comparação sem apagar nem mudar nenhum lançamento: isso
  * só muda a média, a mediana e o desenho, vale só enquanto o app está aberto (por pessoa, contexto e valor mostrado) e nada é
  * gravado nem enviado (D03). Tela de consulta, com a barra inferior (Movimentos marcada). Lê `months_overview` de uma vez (12 meses
  * até o mês atual) no contexto escolhido; erro nunca mostra dado parcial. O aviso de lacuna em mês fechado de Pago (D04) vem de outra

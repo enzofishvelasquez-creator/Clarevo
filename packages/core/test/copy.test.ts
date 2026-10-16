@@ -2897,10 +2897,15 @@ import {
   EVOLUTION_WINDOWS,
   buildEvolutionView,
   evolutionAnnouncement,
+  evolutionExplainPlan,
+  evolutionExplanation,
   evolutionFetchRange,
   evolutionPanel,
   evolutionVariation,
+  paidCategoryParts,
+  receivedCategoryParts,
   type EvolutionMetric,
+  type FinancialRecord as EvolutionRecord,
   type MonthOverview as EvolutionOverviewRow,
 } from '../src';
 
@@ -2939,6 +2944,43 @@ describe('textos da Evolução (D-057)', () => {
     row('2026-10', 3, 90_000, 1, 10_000),
   ];
 
+  /** Um lançamento de teste: o valor do mês dividido em Casa (3/5), Mercado (1/5) e Sem categoria, com um pagamento de fatura entre eles. */
+  const record = (id: string, category: string | null, amountCents: number, occurredOn: string, kind: 'despesa' | 'receita'): EvolutionRecord => ({
+    id,
+    contextId: 'c',
+    accountId: 'a',
+    kind,
+    status: 'realizado',
+    amountCents,
+    currency: 'BRL',
+    occurredOn,
+    description: category ? `Lançamento de ${category}` : 'Lançamento sem categoria',
+    category,
+    commitmentId: null,
+    invoice: null,
+    receiptKey: null,
+    createdBy: 'p',
+    version: 1,
+    createdAt: `${occurredOn}T00:00:00Z`,
+    updatedAt: `${occurredOn}T00:00:00Z`,
+  });
+  const recordsOf = (month: string, cents: number, kind: 'despesa' | 'receita'): EvolutionRecord[] => {
+    if (cents <= 0) return [];
+    const casa = Math.floor((cents * 3) / 5);
+    const mercado = Math.floor(cents / 5);
+    return [record(`${month}-a`, 'Casa', casa, `${month}-05`, kind), record(`${month}-b`, 'Mercado', mercado, `${month}-12`, kind), record(`${month}-c`, null, cents - casa - mercado, `${month}-20`, kind)].filter((r) => r.amountCents > 0);
+  };
+  /** Os textos de "Entender o que mudou" do mês escolhido: o plano, e a explicação quando há mês de comparação e partes que fecham os totais. */
+  function explainTexts(view: ReturnType<typeof buildEvolutionView>, month: string, metric: EvolutionMetric): string[] {
+    const plan = evolutionExplainPlan(view, month);
+    const texts = [...plan.notices, ...(plan.hint ? [plan.hint] : []), ...(plan.adjacencyText ? [plan.adjacencyText] : []), ...(plan.unavailableText ? [plan.unavailableText] : []), ...(plan.compare ? [plan.compare.label, plan.compare.hint] : [])];
+    if (!plan.visible || plan.baseMonth === null) return texts;
+    const kind = metric === 'pago' ? 'despesa' : 'receita';
+    const parts = (m: string, cents: number) => (metric === 'pago' ? paidCategoryParts(recordsOf(m, cents, kind)) : receivedCategoryParts(recordsOf(m, cents, kind)));
+    const e = evolutionExplanation(plan, parts(plan.baseMonth, plan.baseCents), parts(plan.month, plan.cents));
+    return [...texts, e.headline, e.categoriesTitle, e.note, ...e.categories.map((c) => c.text), ...(e.othersText ? [e.othersText] : []), ...(e.noChangeText ? [e.noChangeText] : []), ...(e.limitation ? [e.limitation] : []), ...(e.related ? [e.related.title, e.related.intro, ...(e.related.emptyText ? [e.related.emptyText] : []), ...e.related.rows.flatMap((r) => [r.text, r.a11y, ...(r.partialText ? [r.partialText] : [])])] : [])];
+  }
+
   /** Todo texto montado pela tela, em todos os estados e com várias seleções. */
   function samples(): string[] {
     const texts: string[] = [];
@@ -2958,6 +3000,8 @@ describe('textos da Evolução (D-057)', () => {
             texts.push(...(panel.gapText ? [panel.gapText] : []), ...(panel.previousMonth ? [EVOLUTION_TEXT.panel.stepHint(panel.previousMonth)] : []), ...(panel.nextMonth ? [EVOLUTION_TEXT.panel.stepHint(panel.nextMonth)] : []));
             const v = panel.variation;
             texts.push(v.text, ...(v.available ? [...(v.percentText ? [v.percentText] : []), ...(v.skippedText ? [v.skippedText] : [])] : []));
+            texts.push(panel.categoriesNote, EVOLUTION_TEXT.panel.categoryShare('12,5%', metric));
+            texts.push(...explainTexts(view, p.month, metric));
           }
         }
       }
@@ -2988,6 +3032,20 @@ describe('textos da Evolução (D-057)', () => {
       EVOLUTION_TEXT.variation.percentTiny(true, '2026-03'),
       EVOLUTION_TEXT.variation.percentTiny(false, '2026-03'),
       EVOLUTION_TEXT.stats.announce(339_000, 340_000, 5, 6),
+      EVOLUTION_TEXT.explain.headline('pago', 450_000, '2026-03', '2026-04'),
+      EVOLUTION_TEXT.explain.headline('recebido', -20_000, '2026-02', '2026-04'),
+      EVOLUTION_TEXT.explain.headline('pago', 0, '2025-12', '2026-01'),
+      EVOLUTION_TEXT.explain.hint('2025-12', '2026-01'),
+      EVOLUTION_TEXT.explain.notAdjacent('2026-03', '2026-06', ['2026-04'], ['2026-05']),
+      EVOLUTION_TEXT.explain.notAdjacent('2026-01', '2026-05', ['2026-02', '2026-03', '2026-04'], []),
+      EVOLUTION_TEXT.explain.gapIn('2026-03'),
+      EVOLUTION_TEXT.explain.category('recebido', 'Salário', 0, 520_000, '2026-02', '2026-04'),
+      EVOLUTION_TEXT.explain.category('pago', 'Sem categoria', 30_000, 0, '2026-03', '2026-04'),
+      EVOLUTION_TEXT.explain.others(-10_000),
+      EVOLUTION_TEXT.explain.relatedIntro('Transporte', '2026-04'),
+      EVOLUTION_TEXT.explain.relatedEmpty('Casa', '2026-04'),
+      EVOLUTION_TEXT.explain.relatedRow('Reparo do carro', '2026-04-22', 440_000),
+      EVOLUTION_TEXT.explain.relatedRowA11y('Fatura do cartão', '2026-04-10', 60_000, true),
     );
     return texts;
   }
@@ -3029,6 +3087,34 @@ describe('textos da Evolução (D-057)', () => {
     expect(EVOLUTION_TEXT.custom.banner(2, 6)).toBe('Comparação personalizada: 2 de 6 meses fora da comparação');
     expect(EVOLUTION_TEXT.legend.excluded).toBe('Fora da comparação');
     expect(evolutionFetchRange('2026-10')).toEqual({ from: '2025-11', to: '2026-10' });
+  });
+
+  it('"Entender o que mudou" (fase 2): as frases pedidas existem como estão', () => {
+    const E = EVOLUTION_TEXT.explain;
+    expect(E.title).toBe('Entender o que mudou');
+    expect(E.headline('pago', 450_000, '2026-03', '2026-04')).toBe('O Pago registrado foi R$ 4.500,00 maior em abril que em março.');
+    expect(E.headline('pago', -1_000, '2026-03', '2026-04')).toBe('O Pago registrado foi R$ 10,00 menor em abril que em março.');
+    expect(E.headline('pago', 0, '2026-03', '2026-04')).toBe('O Pago registrado foi igual em abril e em março.');
+    expect(E.notAdjacent('2026-03', '2026-05', ['2026-04'], [])).toBe('(março e maio não são meses vizinhos na comparação: abril está fora)');
+    expect(E.category('pago', 'Casa', 120_000, 560_000, '2026-03', '2026-04')).toBe('Casa: R$ 1.200,00 em março, R$ 5.600,00 em abril, R$ 4.400,00 a mais');
+    expect(E.others(10_000)).toBe('Outras categorias também mudaram: R$ 100,00 no total.');
+    expect(E.others(-10_000)).toBe('Outras categorias também mudaram: R$ 100,00 no total.');
+    expect(E.inProgress).toBe('Mês em andamento: os valores ainda podem mudar.');
+    expect(E.needOtherMonth).toBe('Escolha outro mês na comparação para ver o que mudou.');
+    expect(EVOLUTION_TEXT.gap.warning).toBe('Pode faltar algo neste mês: há conta prevista sem registro');
+    expect(E.seeCategories).toBe('Ver categorias');
+    expect(E.seeRecords).toBe('Ver lançamentos');
+    expect(E.compareWithout).toBe('Comparar sem este mês');
+  });
+
+  it('a explicação descreve e nunca diz que uma categoria ou um lançamento foi a causa, nem julga', () => {
+    const E = EVOLUTION_TEXT.explain;
+    // A única linha que fala em causa é o aviso que a nega.
+    const { note, ...rest } = E;
+    expect(note).toMatch(/Não diz que/);
+    for (const text of [...staticStrings(rest), ...samples().filter((t) => /Outras categorias|registrado foi|Compara |Casa:|Mercado:|vizinhos/.test(t))]) {
+      expect(text, text).not.toMatch(/\bcaus[ao]|\bculp|\bmotivo|\bresponsáv|\bpor conta d|\bvilã|\bvilão|\bjustifica|\bprova\b|\bexplica por/i);
+    }
   });
 
   it('a variação é um fato com as duas datas: "a mais", "a menos" ou "sem diferença", nunca "mês a mês" nem palavra de julgamento', () => {

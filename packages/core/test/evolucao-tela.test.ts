@@ -14,6 +14,8 @@ import {
   createDemoRepository,
   demoScenarioFrom,
   evolutionAnnouncement,
+  evolutionExplainPlan,
+  evolutionExplanation,
   evolutionFetchRange,
   evolutionGapMonths,
   evolutionMonths,
@@ -27,12 +29,16 @@ import {
   MemoryRepository,
   monthOf,
   newOperationKey,
+  paidCategoryParts,
+  receivedCategoryParts,
   summarizeMonth,
   topicTabFor,
   type Commitment,
   type CommitmentSeries,
+  type CategoryPart,
   type EvolutionMetric,
   type EvolutionWindow,
+  type FinancialRecord,
   type MonthOverview,
 } from '../src';
 
@@ -323,13 +329,31 @@ describe('painel do mês (tela B)', () => {
     expect(evolutionPanel(fromJune(['2026-04']), '2026-04')).toMatchObject({ canToggle: true, included: false });
   });
 
-  it('mês em andamento e mês sem registros: sem interruptor, com a razão; Recebido sem categorias', () => {
+  it('mês em andamento e mês sem registros: sem interruptor, com a razão; Recebido com categorias só no mês com registros', () => {
     const june = evolutionPanel(fromJune(), '2026-06');
     expect(june).toMatchObject({ stateText: 'Mês em andamento', canToggle: false, included: false, notEligibleText: 'Este mês fica fora da comparação até terminar.', showsCategories: true });
     const march = evolutionPanel(fromJune([], 'recebido'), '2026-03');
     expect(march).toMatchObject({ valueText: null, canToggle: false, notEligibleText: 'Este mês fica fora da comparação porque não tem registros.', showsCategories: false, showsRecords: false });
     const received = evolutionPanel(fromJune([], 'recebido'), '2026-04');
-    expect(received).toMatchObject({ valueCaption: 'Recebido', valueText: 'R$ 5.200,00', showsCategories: false, showsRecords: true, recordsHref: '/composicao?tipo=recebido' });
+    // Fase 2: Recebido também mostra as 3 maiores categorias do mês (sem tela de categorias, então sem "Ver Pago por categoria").
+    expect(received).toMatchObject({
+      metric: 'recebido',
+      valueCaption: 'Recebido',
+      valueText: 'R$ 5.200,00',
+      showsCategories: true,
+      categoriesNote: 'Mostra o que foi recebido.',
+      showsCategoriesAction: false,
+      showsRecords: true,
+      recordsHref: '/composicao?tipo=recebido',
+    });
+    expect(evolutionPanel(fromJune(), '2026-04')).toMatchObject({ metric: 'pago', categoriesNote: 'Mostra o que foi pago. Compra no cartão entra quando a fatura é paga.', showsCategoriesAction: true });
+    expect(march).toMatchObject({ showsCategories: false, showsCategoriesAction: false });
+  });
+
+  it('as categorias do painel falam do pago ou do recebido', () => {
+    expect(EVOLUTION_TEXT.panel.categoryShare('35,9%')).toBe('35,9% do pago');
+    expect(EVOLUTION_TEXT.panel.categoryShare('35,9%', 'pago')).toBe('35,9% do pago');
+    expect(EVOLUTION_TEXT.panel.categoryShare('100%', 'recebido')).toBe('100% do recebido');
   });
 
   it('o mês escolhido que sai da janela, ou ainda não escolhido, é o mais recente com lançamentos', () => {
@@ -773,5 +797,328 @@ describe('a demonstração da Evolução (cenário fictício "evolucao")', () =>
     const view = buildEvolutionView({ overview: await repo.monthsOverview(ctx, from, to), metric: 'pago', windowMonths: 12, currentMonth: monthOf(DEMO_TODAY), hiddenMonths: [] });
     expect(view.situation).toBe('sem_registros');
     expect(view.totalCents).toBe(0);
+  });
+});
+
+/**
+ * "Entender o que mudou" (fase 2: D06, D08 e D10; EF-16, EF-17, T14 e T28): quando a seção aparece, contra qual mês compara, os avisos e
+ * a explicação por categoria e por lançamento. Descritiva: nunca diz que uma categoria foi a causa.
+ */
+describe('Entender o que mudou: o plano (quando aparece e contra qual mês)', () => {
+  const WARNING = 'Pode faltar algo neste mês: há conta prevista sem registro';
+  const gapView = (gapMonths: string[], hiddenMonths: string[] = [], metric: EvolutionMetric = 'pago') =>
+    buildEvolutionView({ overview, metric, windowMonths: 6, currentMonth: '2026-06', hiddenMonths, gapMonths });
+
+  it('abril contra março, os vizinhos da comparação, sempre com as duas datas e sem aviso', () => {
+    const plan = evolutionExplainPlan(fromJune(), '2026-04');
+    expect(plan).toEqual({
+      visible: true,
+      metric: 'pago',
+      month: '2026-04',
+      baseMonth: '2026-03',
+      cents: 780_000,
+      baseCents: 330_000,
+      unavailableText: null,
+      hint: 'Compara abril com março',
+      notices: [],
+      adjacencyText: null,
+      compare: { included: true, label: 'Comparar sem este mês', hint: 'Só muda a média, a mediana e o gráfico. Nenhum lançamento é apagado nem mudado.' },
+      showsCategoriesAction: true,
+    });
+    // O painel traz o mesmo plano.
+    expect(evolutionPanel(fromJune(), '2026-04').explain).toEqual(plan);
+  });
+
+  it('o mês de comparação é o mesmo da variação, em todos os meses e com meses fora', () => {
+    for (const hidden of [[], ['2026-04'], ['2026-02', '2026-04'], ['2026-03']]) {
+      const view = fromJune(hidden);
+      for (const point of view.points) {
+        const variation = evolutionVariation(view, point.month);
+        const plan = evolutionExplainPlan(view, point.month);
+        if (variation.available) expect(plan.baseMonth, `${point.month} sem ${hidden}`).toBe(variation.fromMonth);
+        // Sem variação por falta de outro mês antes, também não há mês de comparação (o mês em andamento não tem variação, mas tem a
+        // descrição, contra o mesmo mês que a variação usaria).
+        else if (point.state === 'com_registros') expect(plan.baseMonth, `${point.month} sem ${hidden}`).toBeNull();
+      }
+    }
+  });
+
+  it('T14: março e maio com abril fora não são vizinhos, e o texto diz as duas datas e qual mês está fora', () => {
+    const plan = evolutionExplainPlan(fromJune(['2026-04']), '2026-05');
+    expect(plan).toMatchObject({ baseMonth: '2026-03', month: '2026-05', hint: 'Compara maio com março', adjacencyText: '(março e maio não são meses vizinhos na comparação: abril está fora)' });
+    // Vários meses fora no meio.
+    const many = evolutionExplainPlan(fromJune(['2026-02', '2026-03', '2026-04']), '2026-05');
+    expect(many).toMatchObject({ baseMonth: '2026-01', adjacencyText: '(janeiro e maio não são meses vizinhos na comparação: fevereiro, março e abril estão fora)' });
+    // O próprio mês fora da comparação (abril) ainda compara com o anterior que está nela: vizinhos.
+    expect(evolutionExplainPlan(fromJune(['2026-04']), '2026-04')).toMatchObject({ baseMonth: '2026-03', adjacencyText: null, compare: { included: false, label: 'Voltar a comparar com este mês' } });
+  });
+
+  it('mês sem registros no meio também é dito, e junto com mês tirado', () => {
+    // Em Recebido, março não tem registros: abril compara com fevereiro.
+    const received = evolutionExplainPlan(fromJune([], 'recebido'), '2026-04');
+    expect(received).toMatchObject({ baseMonth: '2026-02', adjacencyText: '(fevereiro e abril não são meses vizinhos na comparação: março está sem registros)', showsCategoriesAction: false });
+    const both = evolutionExplainPlan(fromJune(['2026-02'], 'recebido'), '2026-04');
+    expect(both).toMatchObject({ baseMonth: '2026-01', adjacencyText: '(janeiro e abril não são meses vizinhos na comparação: fevereiro está fora; março está sem registros)' });
+  });
+
+  it('D10: não aparece em mês sem registros; aparece em mês com lacuna, com o aviso já existente, e o mês de comparação com lacuna também avisa', () => {
+    expect(evolutionExplainPlan(fromJune([], 'recebido'), '2026-03')).toMatchObject({ visible: false, baseMonth: null, notices: [], compare: null });
+    const empty = buildEvolutionView({ overview: [], metric: 'pago', windowMonths: 3, currentMonth: '2026-06', hiddenMonths: [], gapMonths: ['2026-04'] });
+    for (const point of empty.points) expect(evolutionExplainPlan(empty, point.month).visible).toBe(false);
+    expect(evolutionExplainPlan(gapView(['2026-04']), '2026-04').notices).toEqual([WARNING]);
+    expect(evolutionExplainPlan(gapView(['2026-03']), '2026-04').notices).toEqual(['Pode faltar algo em março: há conta prevista sem registro']);
+    expect(evolutionExplainPlan(gapView(['2026-03', '2026-04']), '2026-04').notices).toEqual([WARNING, 'Pode faltar algo em março: há conta prevista sem registro']);
+    // A lacuna é só de Pago.
+    expect(evolutionExplainPlan(gapView(['2026-03', '2026-04'], [], 'recebido'), '2026-04').notices).toEqual([]);
+  });
+
+  it('mês em andamento aparece, com o aviso de que os valores ainda podem mudar, e sem interruptor', () => {
+    const plan = evolutionExplainPlan(fromJune(), '2026-06');
+    expect(plan).toMatchObject({ visible: true, baseMonth: '2026-05', notices: ['Mês em andamento: os valores ainda podem mudar.'], compare: null, cents: 360_000, baseCents: 345_000 });
+    // Com lacuna no mês de comparação, o aviso de andamento vem primeiro.
+    expect(evolutionExplainPlan(gapView(['2026-05']), '2026-06').notices).toEqual(['Mês em andamento: os valores ainda podem mudar.', 'Pode faltar algo em maio: há conta prevista sem registro']);
+  });
+
+  it('um só mês na comparação (ou nenhum antes do escolhido): "Escolha outro mês na comparação para ver o que mudou."', () => {
+    const text = 'Escolha outro mês na comparação para ver o que mudou.';
+    expect(evolutionExplainPlan(fromJune(), '2026-01')).toMatchObject({ visible: true, baseMonth: null, unavailableText: text, hint: null, notices: [], compare: null });
+    // Só maio na comparação: nenhum outro mês antes dele.
+    const onlyMay = fromJune(['2026-01', '2026-02', '2026-03', '2026-04']);
+    expect(evolutionExplainPlan(onlyMay, '2026-05')).toMatchObject({ visible: true, baseMonth: null, unavailableText: text });
+    // Janela de 3 meses: o primeiro mês dela não tem outro antes.
+    expect(evolutionExplainPlan(buildEvolutionView({ overview, metric: 'pago', windowMonths: 3, currentMonth: '2026-06', hiddenMonths: [] }), '2026-04')).toMatchObject({ baseMonth: null, unavailableText: text });
+  });
+
+  it('o mês escolhido que não existe na janela vira o último; não altera a visão', () => {
+    const view = fromJune();
+    const before = structuredClone(view);
+    expect(evolutionExplainPlan(view, '2025-01').month).toBe('2026-06');
+    expect(view).toEqual(before);
+  });
+});
+
+describe('Entender o que mudou: a explicação em texto', () => {
+  let seq = 0;
+  const rec = (category: string | null, amountCents: number, description: string, occurredOn: string, kind: 'despesa' | 'receita' = 'despesa'): FinancialRecord => ({
+    id: `e${++seq}`,
+    contextId: 'c',
+    accountId: 'a',
+    kind,
+    status: 'realizado',
+    amountCents,
+    currency: 'BRL',
+    occurredOn,
+    description,
+    category,
+    commitmentId: null,
+    invoice: null,
+    receiptKey: null,
+    createdBy: 'p',
+    version: 1,
+    createdAt: `${occurredOn}T00:00:00Z`,
+    updatedAt: `${occurredOn}T00:00:00Z`,
+  });
+  const total = (rows: readonly FinancialRecord[]) => rows.reduce((a, r) => a + r.amountCents, 0);
+  const rows = (months: [string, FinancialRecord[]][]): MonthOverview[] =>
+    months.map(([month, records]) => ({ month, receivedCount: 0, receivedCents: 0, paidCount: records.length, paidCents: total(records) }));
+
+  const march = [rec('Casa', 120_000, 'Aluguel', '2026-03-05'), rec('Mercado', 80_000, 'Mercado', '2026-03-12')];
+  const april = [rec('Casa', 120_000, 'Aluguel', '2026-04-05'), rec('Casa', 440_000, 'Reparo do carro', '2026-04-22'), rec('Mercado', 80_000, 'Mercado', '2026-04-12'), rec('Lazer', 10_000, 'Cinema', '2026-04-24')];
+  const view = (hidden: string[] = []) => buildEvolutionView({ overview: rows([['2026-03', march], ['2026-04', april]]), metric: 'pago', windowMonths: 12, currentMonth: '2026-06', hiddenMonths: hidden });
+  const explain = (v = view(), month = '2026-04', base = march, current = april) => evolutionExplanation(evolutionExplainPlan(v, month), paidCategoryParts(base), paidCategoryParts(current));
+
+  it('a frase principal com os dois meses, as categorias com os dois valores e a diferença, e o lançamento relacionado', () => {
+    const e = explain();
+    expect(e.headline).toBe('O Pago registrado foi R$ 4.500,00 maior em abril que em março.');
+    expect(e.adjacencyText).toBeNull();
+    expect(e.notices).toEqual([]);
+    expect(e.categoriesTitle).toBe('Categorias que mais mudaram');
+    expect(e.categories.map((c) => c.text)).toEqual([
+      'Casa: R$ 1.200,00 em março, R$ 5.600,00 em abril, R$ 4.400,00 a mais',
+      'Lazer: sem pagamentos em março, R$ 100,00 em abril, R$ 100,00 a mais',
+    ]);
+    expect(e.othersText).toBeNull();
+    expect(e.limitation).toBeNull();
+    expect(e.related).toEqual({
+      title: 'Lançamentos relacionados',
+      intro: 'Os maiores lançamentos de abril em Casa',
+      emptyText: null,
+      rows: [
+        { key: april[1]!.id, description: 'Reparo do carro', dateText: '22/04/2026', valueText: 'R$ 4.400,00', cents: 440_000, partialText: null, text: 'Reparo do carro · 22/04/2026 · R$ 4.400,00', a11y: 'Reparo do carro, 22/04/2026, R$ 4.400,00' },
+        { key: april[0]!.id, description: 'Aluguel', dateText: '05/04/2026', valueText: 'R$ 1.200,00', cents: 120_000, partialText: null, text: 'Aluguel · 05/04/2026 · R$ 1.200,00', a11y: 'Aluguel, 05/04/2026, R$ 1.200,00' },
+      ],
+    });
+    expect(e.change.differenceCents).toBe(450_000);
+    expect(e.note).toBe('Descreve o que está registrado nos dois meses. Não diz que uma categoria ou um lançamento é a causa da diferença.');
+  });
+
+  it('"maior", "menor" e "igual": o mesmo fato com o sinal, sempre com os dois meses', () => {
+    expect(EVOLUTION_TEXT.explain.headline('pago', 450_000, '2026-03', '2026-04')).toBe('O Pago registrado foi R$ 4.500,00 maior em abril que em março.');
+    expect(EVOLUTION_TEXT.explain.headline('pago', -450_000, '2026-03', '2026-04')).toBe('O Pago registrado foi R$ 4.500,00 menor em abril que em março.');
+    expect(EVOLUTION_TEXT.explain.headline('pago', 0, '2026-03', '2026-04')).toBe('O Pago registrado foi igual em abril e em março.');
+    expect(EVOLUTION_TEXT.explain.headline('recebido', 20_000, '2026-02', '2026-04')).toBe('O Recebido registrado foi R$ 200,00 maior em abril que em fevereiro.');
+    // Anos diferentes: os dois meses levam o ano.
+    expect(EVOLUTION_TEXT.explain.headline('pago', 100, '2025-12', '2026-01')).toBe('O Pago registrado foi R$ 1,00 maior em janeiro de 2026 que em dezembro de 2025.');
+    expect(EVOLUTION_TEXT.explain.hint('2025-12', '2026-01')).toBe('Compara janeiro de 2026 com dezembro de 2025');
+  });
+
+  it('abril menor que março: "a menos", e o lançamento relacionado é do mês escolhido (março)', () => {
+    const v = buildEvolutionView({ overview: rows([['2026-03', april], ['2026-04', march]]), metric: 'pago', windowMonths: 12, currentMonth: '2026-06', hiddenMonths: [] });
+    const e = explain(v, '2026-04', april, march);
+    expect(e.headline).toBe('O Pago registrado foi R$ 4.500,00 menor em abril que em março.');
+    expect(e.categories[0]!.text).toBe('Casa: R$ 5.600,00 em março, R$ 1.200,00 em abril, R$ 4.400,00 a menos');
+    expect(e.related!.rows.map((r) => r.description)).toEqual(['Aluguel']);
+  });
+
+  it('as categorias que não fecham a diferença: "Outras categorias também mudaram", sem dizer que uma categoria foi a causa', () => {
+    const base = [rec('Casa', 100_000, 'a', '2026-03-01'), rec('Mercado', 100_000, 'b', '2026-03-02'), rec('Lazer', 100_000, 'c', '2026-03-03'), rec('Saúde', 100_000, 'd', '2026-03-04')];
+    const next = [rec('Casa', 600_000, 'a', '2026-04-01'), rec('Mercado', 300_000, 'b', '2026-04-02'), rec('Lazer', 20_000, 'c', '2026-04-03'), rec('Saúde', 110_000, 'd', '2026-04-04')];
+    const v = buildEvolutionView({ overview: rows([['2026-03', base], ['2026-04', next]]), metric: 'pago', windowMonths: 12, currentMonth: '2026-06', hiddenMonths: [] });
+    const e = explain(v, '2026-04', base, next);
+    expect(e.categories.map((c) => c.label)).toEqual(['Casa', 'Mercado', 'Lazer']);
+    expect(e.othersText).toBe('Outras categorias também mudaram: R$ 100,00 no total.');
+    expect(e.othersText).not.toMatch(/causa|culpa|motivo|por causa/i);
+    // Quando fecha, a frase não aparece.
+    expect(explain().othersText).toBeNull();
+  });
+
+  it('T14: março e maio com abril fora: a frase diz as duas datas reais e o mês fora; nunca "mês a mês"', () => {
+    const may = [rec('Casa', 120_000, 'Aluguel', '2026-05-05'), rec('Mercado', 95_000, 'Mercado', '2026-05-12')];
+    const v = buildEvolutionView({ overview: rows([['2026-03', march], ['2026-04', april], ['2026-05', may]]), metric: 'pago', windowMonths: 12, currentMonth: '2026-06', hiddenMonths: ['2026-04'] });
+    const e = explain(v, '2026-05', march, may);
+    expect(e.headline).toBe('O Pago registrado foi R$ 150,00 maior em maio que em março.');
+    expect(e.adjacencyText).toBe('(março e maio não são meses vizinhos na comparação: abril está fora)');
+    expect(`${e.headline} ${e.adjacencyText}`).not.toMatch(/mês a mês/i);
+    expect(e.categories.map((c) => c.text)).toEqual(['Mercado: R$ 800,00 em março, R$ 950,00 em maio, R$ 150,00 a mais']);
+  });
+
+  it('diferença zero sem categoria que mudou: "igual" e "Nenhuma categoria mudou de valor."', () => {
+    const copy = march.map((r) => ({ ...r, id: `${r.id}x`, occurredOn: r.occurredOn.replace('-03-', '-04-') }));
+    const v = buildEvolutionView({ overview: rows([['2026-03', march], ['2026-04', copy]]), metric: 'pago', windowMonths: 12, currentMonth: '2026-06', hiddenMonths: [] });
+    const e = explain(v, '2026-04', march, copy);
+    expect(e.headline).toBe('O Pago registrado foi igual em abril e em março.');
+    expect(e).toMatchObject({ categories: [], noChangeText: 'Nenhuma categoria mudou de valor.', othersText: null, related: null });
+  });
+
+  it('lançamentos que não fecham com os totais dos meses: só a limitação, sem categoria e sem lançamento', () => {
+    const v = buildEvolutionView({ overview: rows([['2026-03', march], ['2026-04', april]]), metric: 'pago', windowMonths: 12, currentMonth: '2026-06', hiddenMonths: [] });
+    const e = explain(v, '2026-04', march, april.slice(0, 2));
+    expect(e.headline).toBe('O Pago registrado foi R$ 4.500,00 maior em abril que em março.');
+    expect(e).toMatchObject({
+      categories: [],
+      related: null,
+      othersText: null,
+      limitation: 'Os lançamentos lidos não fecham com o total dos dois meses, então não dá para detalhar por categoria agora.',
+    });
+  });
+
+  it('categoria da fatura sem lançamento no mês de chegada: "Nenhum lançamento em ..."', () => {
+    // A categoria que mais mudou é Casa, que sumiu em abril: nenhum lançamento dela no mês escolhido.
+    const base = [rec('Casa', 500_000, 'Reforma', '2026-03-10'), rec('Mercado', 10_000, 'Mercado', '2026-03-12')];
+    const next = [rec('Mercado', 10_000, 'Mercado', '2026-04-12')];
+    const v = buildEvolutionView({ overview: rows([['2026-03', base], ['2026-04', next]]), metric: 'pago', windowMonths: 12, currentMonth: '2026-06', hiddenMonths: [] });
+    const e = explain(v, '2026-04', base, next);
+    expect(e.categories[0]!.text).toBe('Casa: R$ 5.000,00 em março, sem pagamentos em abril, R$ 5.000,00 a menos');
+    expect(e.related).toMatchObject({ rows: [], emptyText: 'Nenhum lançamento em Casa em abril.' });
+  });
+
+  it('pagamento de fatura: o lançamento relacionado mostra a parte da categoria e diz que é parte', () => {
+    const invoice = { cardId: 'cartao', month: '2026-04', mix: [{ category: 'Mercado', charges: false, cents: 60_000 }, { category: 'Lazer', charges: false, cents: 40_000 }] };
+    const pay: FinancialRecord = { ...rec('Cartão', 100_000, 'Fatura do cartão', '2026-04-10'), invoice: { cardId: 'cartao', month: '2026-04' } };
+    const base = [rec('Mercado', 10_000, 'Mercado', '2026-03-12')];
+    const v = buildEvolutionView({ overview: rows([['2026-03', base], ['2026-04', [pay]]]), metric: 'pago', windowMonths: 12, currentMonth: '2026-06', hiddenMonths: [] });
+    const e = evolutionExplanation(evolutionExplainPlan(v, '2026-04'), paidCategoryParts(base), paidCategoryParts([pay], [invoice]));
+    expect(e.categories.map((c) => c.text)).toEqual([
+      'Mercado: R$ 100,00 em março, R$ 600,00 em abril, R$ 500,00 a mais',
+      'Lazer: sem pagamentos em março, R$ 400,00 em abril, R$ 400,00 a mais',
+    ]);
+    expect(e.related!.rows).toEqual([
+      { key: pay.id, description: 'Fatura do cartão', dateText: '10/04/2026', valueText: 'R$ 600,00', cents: 60_000, partialText: 'Parte do pagamento da fatura', text: 'Fatura do cartão · 10/04/2026 · R$ 600,00', a11y: 'Fatura do cartão, 10/04/2026, R$ 600,00, parte do pagamento da fatura' },
+    ]);
+  });
+
+  it('Recebido: "O Recebido registrado foi ...", com as categorias dos recebimentos e "sem recebimentos"', () => {
+    const feb = [rec('Salário', 500_000, 'Salário', '2026-02-05', 'receita')];
+    const apr = [rec('Salário', 500_000, 'Salário', '2026-04-05', 'receita'), rec('Freela', 120_000, 'Projeto', '2026-04-20', 'receita')];
+    const ov: MonthOverview[] = [
+      { month: '2026-02', receivedCount: 1, receivedCents: 500_000, paidCount: 0, paidCents: 0 },
+      { month: '2026-04', receivedCount: 2, receivedCents: 620_000, paidCount: 0, paidCents: 0 },
+    ];
+    const v = buildEvolutionView({ overview: ov, metric: 'recebido', windowMonths: 12, currentMonth: '2026-06', hiddenMonths: [] });
+    const plan = evolutionExplainPlan(v, '2026-04');
+    expect(plan).toMatchObject({ baseMonth: '2026-02', adjacencyText: '(fevereiro e abril não são meses vizinhos na comparação: março está sem registros)', showsCategoriesAction: false });
+    const e = evolutionExplanation(plan, receivedCategoryParts(feb), receivedCategoryParts(apr));
+    expect(e.headline).toBe('O Recebido registrado foi R$ 1.200,00 maior em abril que em fevereiro.');
+    expect(e.categories.map((c) => c.text)).toEqual(['Freela: sem recebimentos em fevereiro, R$ 1.200,00 em abril, R$ 1.200,00 a mais']);
+    expect(e.related!.rows.map((r) => [r.description, r.valueText])).toEqual([['Projeto', 'R$ 1.200,00']]);
+  });
+
+  it('sem mês de comparação não há explicação (lança RangeError)', () => {
+    const plan = evolutionExplainPlan(fromJune(), '2026-01');
+    expect(() => evolutionExplanation(plan, [] as CategoryPart[], [] as CategoryPart[])).toThrow(RangeError);
+    expect(() => evolutionExplanation(evolutionExplainPlan(fromJune([], 'recebido'), '2026-03'), [], [])).toThrow(RangeError);
+  });
+});
+
+describe('Entender o que mudou na demonstração (cenário "evolucao", EF §6)', () => {
+  async function demoSides(metric: EvolutionMetric) {
+    const repo = await createDemoRepository({ scenario: 'evolucao' });
+    const ctx = (await repo.getSpace())!.personalContextId;
+    const { from, to } = evolutionFetchRange(monthOf(DEMO_TODAY));
+    const overviewRows = await repo.monthsOverview(ctx, from, to);
+    const parts = async (month: string): Promise<CategoryPart[]> => {
+      const summary = summarizeMonth(await repo.listRecords(ctx, month), ctx, month);
+      return metric === 'pago'
+        ? paidCategoryParts(summary.composition.paid, await loadInvoicesOfRecords(repo, summary.composition.paid, DEMO_TODAY))
+        : receivedCategoryParts(summary.composition.received);
+    };
+    const build = (hidden: string[] = []) => buildEvolutionView({ overview: overviewRows, metric, windowMonths: 12, currentMonth: monthOf(DEMO_TODAY), hiddenMonths: hidden });
+    return { parts, build };
+  }
+
+  it('abril contra março: R$ 4.500,00 maior, o reparo de R$ 4.400,00 como lançamento relacionado e "Outras categorias também mudaram" com os R$ 100,00 restantes', async () => {
+    const { parts, build } = await demoSides('pago');
+    const e = evolutionExplanation(evolutionExplainPlan(build(), '2026-04'), await parts('2026-03'), await parts('2026-04'));
+    expect(e.headline).toBe('O Pago registrado foi R$ 4.500,00 maior em abril que em março.');
+    expect(e.categories.map((c) => c.text)).toEqual([
+      'Transporte: R$ 300,00 em março, R$ 4.700,00 em abril, R$ 4.400,00 a mais',
+      'Mercado: R$ 730,00 em março, R$ 880,00 em abril, R$ 150,00 a mais',
+      'Saúde: R$ 150,00 em março, sem pagamentos em abril, R$ 150,00 a menos',
+    ]);
+    // 4.400 + 150 − 150 = 4.400: sobram R$ 100,00 de outras categorias (Lazer: R$ 120,00 para R$ 220,00).
+    expect(e.othersText).toBe('Outras categorias também mudaram: R$ 100,00 no total.');
+    expect(e.change.otherCents).toBe(100_00);
+    expect(e.related).toMatchObject({ title: 'Lançamentos relacionados', intro: 'Os maiores lançamentos de abril em Transporte', emptyText: null });
+    expect(e.related!.rows.map((r) => r.text)).toEqual(['Reparo do carro · 22/04/2026 · R$ 4.400,00', 'Combustível · 18/04/2026 · R$ 300,00']);
+    expect(e.limitation).toBeNull();
+    expect(e.change.reconciled).toBe(true);
+  });
+
+  it('T14 no cenário: com abril fora, maio contra março diz as duas datas, "R$ 150,00 maior" e que abril está fora', async () => {
+    const { parts, build } = await demoSides('pago');
+    const e = evolutionExplanation(evolutionExplainPlan(build(['2026-04']), '2026-05'), await parts('2026-03'), await parts('2026-05'));
+    expect(e.headline).toBe('O Pago registrado foi R$ 150,00 maior em maio que em março.');
+    expect(e.adjacencyText).toBe('(março e maio não são meses vizinhos na comparação: abril está fora)');
+  });
+
+  it('Recebido: abril contra fevereiro (março sem registros), com o salário como categoria', async () => {
+    const { parts, build } = await demoSides('recebido');
+    const plan = evolutionExplainPlan(build(), '2026-04');
+    expect(plan.baseMonth).toBe('2026-02');
+    const e = evolutionExplanation(plan, await parts('2026-02'), await parts('2026-04'));
+    expect(e.headline).toBe('O Recebido registrado foi R$ 200,00 maior em abril que em fevereiro.');
+    expect(e.categories.map((c) => c.text)).toEqual(['Salário: R$ 5.000,00 em fevereiro, R$ 5.200,00 em abril, R$ 200,00 a mais']);
+    expect(e.related!.rows.map((r) => r.text)).toEqual(['Salário · 05/04/2026 · R$ 5.200,00']);
+    expect(e.othersText).toBeNull();
+  });
+
+  it('nenhum mês da demonstração tem lançamentos que não fechem com o total do gráfico (Pago e Recebido, janela de 12 meses)', async () => {
+    for (const metric of ['pago', 'recebido'] as EvolutionMetric[]) {
+      const { parts, build } = await demoSides(metric);
+      const view = build();
+      const closed = view.points.filter((p) => p.state === 'com_registros');
+      expect(closed.length).toBe(metric === 'pago' ? 6 : 5);
+      for (const point of closed) expect((await parts(point.month)).reduce((a, p) => a + p.cents, 0), `${metric} ${point.month}`).toBe(point.cents);
+    }
   });
 });
