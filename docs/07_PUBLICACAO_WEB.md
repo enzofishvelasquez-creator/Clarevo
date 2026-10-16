@@ -46,7 +46,7 @@ Serve para quando uma publicação nova da `main` traz um problema e é preciso 
 
 ### 1. Saber qual versão está no ar
 
-- Cada publicação é identificada pelo **commit da `main`** (no painel da Cloudflare, na lista de implantações, ou em `git log -1 --format=%h main`) e pela **última migração aplicada** no Supabase (a lista de `docs/05`; a última colada e conferida é a 0014, `20261017000001_empresas.sql`, em 16/10/2026; a 0015, `20261018000001_exclusao.sql`, vem antes do app do Ciclo P).
+- Cada publicação é identificada pelo **commit da `main`** (no painel da Cloudflare, na lista de implantações, ou em `git log -1 --format=%h main`) e pela **última migração aplicada** no Supabase (a lista de `docs/05`; a última colada e conferida é a 0015, `20261018000001_exclusao.sql`, em 16/10/2026).
 - As notas de cada versão devem citar os dois: "commit abc1234, migração 0012". Assim dá para dizer quais regras de cálculo estavam no ar e para qual versão voltar.
 - Antes de qualquer mudança, anote o commit e a migração que estão no ar agora. É o ponto de volta.
 
