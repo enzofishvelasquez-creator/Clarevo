@@ -5,6 +5,7 @@ import {
   FAMILY_ERROR_TEXT,
   FAMILY_MAX_PEOPLE,
   FAMILY_NAME_MAX,
+  FAMILY_NEUTRAL_NAME,
   FAMILY_ROLE_HELP,
   FAMILY_ROLE_LABEL,
   FAMILY_TEXT,
@@ -15,6 +16,7 @@ import {
   authorLabel,
   canEndFamily,
   contextLabelFor,
+  contextKindOfItem,
   contextName,
   familyErrorText,
   familyNameError,
@@ -101,16 +103,24 @@ describe('Família: constantes e validação', () => {
     expect(isFamilyAction('sair_da_familia')).toBe(false);
   });
 
-  it('primeiro nome: a primeira palavra, no máximo 40 caracteres; e-mail e vazio viram "Pessoa"', () => {
+  it('primeiro nome: a primeira palavra, no máximo 40 caracteres; e-mail, vazio e início do e-mail viram "Pessoa da Família"', () => {
+    expect(FAMILY_NEUTRAL_NAME).toBe('Pessoa da Família');
     expect(firstNameOf('Maria da Silva')).toBe('Maria');
     expect(firstNameOf('  João   Pedro ')).toBe('João');
     expect(firstNameOf('Zé')).toBe('Zé');
     expect(firstNameOf('a'.repeat(60))).toBe('a'.repeat(40));
-    expect(firstNameOf('maria@exemplo.test')).toBe('Pessoa');
-    expect(firstNameOf('@maria')).toBe('Pessoa');
-    expect(firstNameOf('')).toBe('Pessoa');
-    expect(firstNameOf('   ')).toBe('Pessoa');
-    expect(firstNameOf(undefined as unknown as string)).toBe('Pessoa');
+    expect(firstNameOf('Maria maria@exemplo.test')).toBe('Maria');
+    for (const neutral of ['maria@exemplo.test', '@maria', '', '   ', undefined as unknown as string]) expect(firstNameOf(neutral)).toBe(FAMILY_NEUTRAL_NAME);
+    // O nome que é o início do e-mail (o que o banco grava quando a pessoa não informa um): exato, no nome inteiro e na primeira palavra.
+    const email = 'maria.lopes@exemplo.test';
+    expect(firstNameOf('maria.lopes', email)).toBe(FAMILY_NEUTRAL_NAME);
+    expect(firstNameOf('  maria.lopes ', email)).toBe(FAMILY_NEUTRAL_NAME);
+    expect(firstNameOf('maria.lopes Souza', email)).toBe(FAMILY_NEUTRAL_NAME);
+    expect(firstNameOf('Maria Lopes', email)).toBe('Maria');
+    expect(firstNameOf('maria', 'maria@exemplo.test')).toBe(FAMILY_NEUTRAL_NAME);
+    expect(firstNameOf('Maria', 'maria@exemplo.test')).toBe('Maria');
+    expect(firstNameOf('Maria', null)).toBe('Maria');
+    expect(firstNameOf('Maria', '')).toBe('Maria');
   });
 });
 
@@ -218,6 +228,16 @@ describe('Família: contexto das telas', () => {
     expect(contextLabelFor('Família', 'familia')).toBe('Família');
     expect(unsavedChangesText('pessoal')).toBe('Você tem alterações que ainda não foram salvas em Pessoal.');
     expect(unsavedChangesText('familia')).toBe('Você tem alterações que ainda não foram salvas em Família.');
+  });
+
+  it('o contexto de um item vem do contexto DELE, não do seletor: Pessoal, Família ou nenhum dos dois', () => {
+    expect(contextKindOfItem('ctx-pessoal', 'ctx-pessoal', 'ctx-familia')).toBe('pessoal');
+    expect(contextKindOfItem('ctx-familia', 'ctx-pessoal', 'ctx-familia')).toBe('familia');
+    expect(contextKindOfItem('ctx-familia', 'ctx-pessoal', undefined)).toBeNull();
+    expect(contextKindOfItem('ctx-familia', undefined, null)).toBeNull();
+    expect(contextKindOfItem('ctx-outro', 'ctx-pessoal', 'ctx-familia')).toBeNull();
+    expect(contextKindOfItem(undefined, 'ctx-pessoal', 'ctx-familia')).toBeNull();
+    expect(contextKindOfItem('', '', '')).toBeNull();
   });
 });
 

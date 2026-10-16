@@ -399,7 +399,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
       <SubHeader
         title={mode.type === 'nova' ? 'Anotar conta a pagar' : informValue ? 'Informar o valor da conta' : 'Editar conta a pagar'}
         onBack={requestCancel}
-        right={<ContextPill label={`Salvando em ${contextName}`} />}
+        right={<ContextPill label={`Salvando em ${contextName}`} fixed />}
       />
       <Screen contentStyle={styles.body}>
         {conflict ? (

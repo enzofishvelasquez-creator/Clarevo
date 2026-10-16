@@ -8,18 +8,19 @@ import { SubHeader } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Card, Txt } from '@/components/ui';
 import { invoiceHref } from '@/lib/cards';
-import { useCommitment, useWork } from '@/state/data';
+import { useCommitment, useWorkFor } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
 /** /a-pagar/[id]/editar ("Só esta conta" numa conta de gasto fixo) e ?informar=1 ("Informar o valor da conta"). */
 export default function EditarContaAPagar() {
   const { id, informar } = useLocalSearchParams<{ id: string; informar?: string }>();
-  const personal = useWork().data;
   const commitment = useCommitment(id);
   const c = commitment.data;
   // Aberto o formulário, ele fica na tela: um conflito mostra o aviso ali, sem perder o preenchimento.
   const [opened, setOpened] = useState<Commitment | null>(null);
   if (!opened && c && c.status === 'aberto') setOpened(c);
+  // O contexto DA CONTA (e o rótulo "Salvando em"), não o do seletor.
+  const personal = useWorkFor(opened?.contextId ?? c?.contextId).data;
   if (c?.invoice) return <Redirect href={invoiceHref(c.invoice.cardId, c.invoice.month)} />;
 
   if (opened && personal) {

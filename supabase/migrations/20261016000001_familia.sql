@@ -33,6 +33,13 @@
 --     guardados, sem leitura por ninguém, até a política de retenção (P-010).
 -- F7. Criar a Família cria a primeira conta de origem ("Conta principal"), como o Pessoal; nunca há dados de exemplo.
 -- F8. Convite vale para quem o criou enquanto essa pessoa está na Família: ao sair ou ser removida, os convites dela são cancelados.
+-- F9. Quem age como titular é conferido DEPOIS da trava da Família: as funções de titular (convidar, cancelar convite, remover,
+--     mudar papel, passar a titularidade e encerrar) tomam a trava consultiva da Família antes de clarevo_require_family_owner e
+--     buscam o alvo com role <> 'titular'. Assim, duas chamadas ao mesmo tempo (por exemplo passar a titularidade a B e remover B)
+--     se enfileiram, e a segunda confere a titularidade já com o resultado da primeira: a Família nunca fica sem titular ativo.
+-- F10. Uma pessoa lê só a própria linha de persons (política persons_read recriada aqui): o nome inteiro de outra pessoa não é
+--     lido por ninguém. O primeiro nome dos outros vem só de family_member_items e das respostas das funções, e um nome que é o
+--     início do e-mail (o que ensure_personal_space grava sem nome) ou que parece e-mail aparece como "Pessoa da Família".
 -- Ordem de travas: chave -> trava consultiva da pessoa (create_family, accept_family_invite) -> trava consultiva da Família
 -- -> convite ou vínculo. A atividade (gatilho de record_operations, 0005) não conta nenhuma das nove ações como anotação.
 
@@ -50,6 +57,13 @@ create unique index context_memberships_one_owner on public.context_memberships 
 
 -- Ninguém altera vínculos direto: só as funções desta migração.
 drop policy memberships_manage on public.context_memberships;
+
+-- Pessoas (F10): cada pessoa lê só a própria linha. A política da 0001 também deixava ler o nome inteiro (display_name) de quem
+-- divide um contexto ativo; na Família só o primeiro nome aparece (L-6), e vem de family_member_items, nunca de persons.
+-- Nada no app nem no banco lê a linha de outra pessoa: a tela "Quem vê estes dados?" usa family_member_items, e as funções e a
+-- visão que precisam de um nome rodam com os privilégios de quem as criou.
+drop policy persons_read on public.persons;
+create policy persons_read on public.persons for select to authenticated using (id = auth.uid());
 
 -- ---------------------------------------------------------------------------
 -- Convites
@@ -204,16 +218,34 @@ as $$
   select exists (select 1 from public.financial_contexts c where c.id = p_context and c.kind = 'familia');
 $$;
 
--- Primeiro nome para mostrar a outras pessoas (L-6): a primeira palavra do nome, no máximo 40 caracteres. Um nome que parece
--- e-mail (tem arroba) ou está vazio vira "Pessoa": o e-mail de outra pessoa nunca aparece.
-create or replace function public.clarevo_first_name(p_name text)
+-- Primeiro nome para mostrar a outras pessoas (L-6): a primeira palavra do nome, no máximo 40 caracteres. O e-mail de outra pessoa
+-- nunca aparece: vira o rótulo neutro "Pessoa da Família" o nome vazio, o que tem arroba na primeira palavra (parece e-mail) e o
+-- que é o início do e-mail (p_email, antes do arroba), que é o nome que ensure_personal_space grava quando a pessoa não informa um.
+-- Sem p_email vale só o que se vê no nome. A comparação com o início do e-mail é exata (com maiúsculas e minúsculas), no nome
+-- inteiro e na primeira palavra, porque o nome gravado por falta de nome é o início do e-mail como veio.
+create or replace function public.clarevo_first_name(p_name text, p_email text default null)
 returns text
 language sql
 immutable
 set search_path = public
 as $$
-  select case when s.t = '' or position('@' in s.t) > 0 then 'Pessoa' else left(s.t, 40) end
-    from (select coalesce((regexp_split_to_array(public.clarevo_trim(p_name), '\s+'))[1], '') as t) s;
+  select case when s.t = '' or position('@' in s.t) > 0 or (s.l <> '' and (s.n = s.l or s.t = s.l))
+              then 'Pessoa da Família' else left(s.t, 40) end
+    from (select public.clarevo_trim(p_name) as n,
+                 coalesce((regexp_split_to_array(public.clarevo_trim(p_name), '\s+'))[1], '') as t,
+                 left(split_part(coalesce(p_email, ''), '@', 1), 80) as l) s;
+$$;
+
+-- O mesmo, de uma pessoa pelo identificador (lê persons e o e-mail com os privilégios de quem criou a função).
+create or replace function public.clarevo_person_label(p_person uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.clarevo_first_name((select p.display_name from public.persons p where p.id = p_person),
+                                   (select u.email from auth.users u where u.id = p_person));
 $$;
 
 -- Resumo SHA-256 (64 hexadecimais) de um código de convite (32 hexadecimais, sem diferenciar maiúsculas); nulo se o formato não vale.
@@ -340,15 +372,18 @@ $$;
 
 -- ---------------------------------------------------------------------------
 -- Membros (L-6): ativos e ex-membros, com o primeiro nome e a situação. Nunca o e-mail nem o nome inteiro. Sem security_invoker e
--- com security_barrier, como as outras visões: o filtro de leitura do contexto é explícito (o ex-membro não é mais visível em persons).
+-- com security_barrier, como as outras visões: o filtro de leitura do contexto é explícito (persons só é lida pela própria pessoa,
+-- F10, e o ex-membro não é mais visível em lugar nenhum). A visão lê persons e o e-mail com os privilégios de quem a criou.
 -- role: titular, membro (lê e anota) ou leitor (só lê). status: ativo ou ex-membro.
 -- ---------------------------------------------------------------------------
--- O primeiro nome é calculado na própria visão, só com funções internas (a mesma regra de clarevo_first_name): as funções
--- auxiliares da Família não têm execute para authenticated, e uma visão sem security_invoker checa o execute de quem consulta.
+-- O primeiro nome é calculado na própria visão, só com funções internas, pela mesma regra de clarevo_first_name (nome vazio, com
+-- arroba ou igual ao início do e-mail vira "Pessoa da Família"): as funções auxiliares da Família não têm execute para
+-- authenticated, e uma visão sem security_invoker checa o execute de quem consulta.
 create view public.family_member_items with (security_barrier = true) as
 select m.context_id,
        m.person_id,
-       case when n.t = '' or position('@' in n.t) > 0 then 'Pessoa' else left(n.t, 40) end as first_name,
+       case when b.t = '' or position('@' in b.t) > 0 or (a.l <> '' and (a.n = a.l or b.t = a.l))
+            then 'Pessoa da Família' else left(b.t, 40) end as first_name,
        case when m.role = 'titular' then 'titular' when m.can_write then 'membro' else 'leitor' end as role,
        case when m.revoked_at is null then 'ativo' else 'ex-membro' end as status,
        (m.person_id = auth.uid()) as is_me,
@@ -357,12 +392,17 @@ select m.context_id,
   from public.context_memberships m
   join public.financial_contexts c on c.id = m.context_id and c.kind = 'familia'
   join public.persons p on p.id = m.person_id
+  left join auth.users u on u.id = m.person_id
   cross join lateral (
-    select coalesce((regexp_split_to_array(regexp_replace(coalesce(p.display_name, ''), '^\s+|\s+$', '', 'g'), '\s+'))[1], '') as t
-  ) n
+    select regexp_replace(coalesce(p.display_name, ''), '^\s+|\s+$', '', 'g') as n,
+           left(split_part(coalesce(u.email, ''), '@', 1), 80) as l
+  ) a
+  cross join lateral (
+    select coalesce((regexp_split_to_array(a.n, '\s+'))[1], '') as t
+  ) b
  where public.context_permission(m.context_id, 'read');
 comment on view public.family_member_items is
-  'Membros da Família que quem consulta pode ler: ativos e ex-membros, com o primeiro nome, o papel e a situação. Nunca devolve e-mail nem o nome inteiro de outra pessoa.';
+  'Membros da Família que quem consulta pode ler: ativos e ex-membros, com o primeiro nome, o papel e a situação. Nunca devolve e-mail nem o nome inteiro de outra pessoa; nome que é o início do e-mail vira "Pessoa da Família".';
 
 -- ---------------------------------------------------------------------------
 -- Criar a Família (L-1, L-3, F7). Quem cria vira titular (ler, anotar e editar de outras pessoas) e a Família nasce com a
@@ -466,11 +506,12 @@ begin
     return jsonb_build_object('invite', public.clarevo_invite_json(v_op.target_id), 'code', null);
   end if;
 
+  -- F9: a trava da Família vem antes de conferir o titular, para que a conferência veja o que a chamada anterior gravou.
+  perform pg_advisory_xact_lock(hashtext('familia:c:' || p_context::text));
   perform public.clarevo_require_family_owner(p_context);
   if p_role is null or p_role not in ('membro', 'leitor') then
     raise exception 'papel_invalido' using errcode = '22023';
   end if;
-  perform pg_advisory_xact_lock(hashtext('familia:c:' || p_context::text));
   if public.clarevo_family_active_count(p_context) + public.clarevo_family_valid_invites(p_context) >= 6 then
     raise exception 'familia_cheia' using errcode = 'PT409';
   end if;
@@ -524,9 +565,10 @@ begin
     return jsonb_build_object('invite', public.clarevo_invite_json(v_op.target_id));
   end if;
 
+  -- O contexto de um convite nunca muda: ler antes da trava é seguro. F9: trava, depois a conferência do titular.
   select context_id into v_ctx from public.family_invites where id = p_invite;
-  perform public.clarevo_require_family_owner(v_ctx);
   perform pg_advisory_xact_lock(hashtext('familia:c:' || v_ctx::text));
+  perform public.clarevo_require_family_owner(v_ctx);
   select * into v_inv from public.family_invites where id = p_invite for update;
   if v_inv.used_at is not null then
     raise exception 'convite_ja_usado' using errcode = 'PT409';
@@ -575,7 +617,7 @@ begin
   end if;
   return jsonb_build_object(
     'family_name', v_ctx.name,
-    'invited_by', public.clarevo_first_name((select display_name from public.persons where id = v_inv.created_by)),
+    'invited_by', public.clarevo_person_label(v_inv.created_by),
     'role', v_inv.role,
     'expires_at', v_inv.expires_at);
 end;
@@ -592,12 +634,14 @@ as $$
   select jsonb_build_object(
            'context', public.clarevo_family_json(i.context_id),
            'role', public.clarevo_member_role(i.context_id, auth.uid()),
-           'invited_by', public.clarevo_first_name((select p.display_name from public.persons p where p.id = i.created_by)))
+           'invited_by', public.clarevo_person_label(i.created_by))
     from public.family_invites i where i.id = p_invite;
 $$;
 
 -- ---------------------------------------------------------------------------
--- Aceitar o convite (F2, F3, F4). Confere tudo de novo sob trava: convite_invalido (o mesmo código de preview_family_invite),
+-- Aceitar o convite (F2, F3, F4). Ordem: sessão; chave; repetição; espaço pessoal da pessoa (sem_permissao, antes de olhar o
+-- código: quem ainda não tem espaço recebe a mesma resposta para qualquer código); depois, sob trava, tudo de novo:
+-- convite_invalido (o mesmo código de preview_family_invite),
 -- ja_em_familia (inclui esta mesma Família) e familia_cheia. Uso único: marca used_at e used_by; cria (ou reativa) o vínculo com o
 -- papel do convite (membro: ler e anotar; leitor: só ler). Repetir a mesma chave devolve o mesmo resultado, enquanto o vínculo vale.
 -- Retorno: {context: {...}, role, invited_by}.
@@ -636,16 +680,17 @@ begin
     return public.clarevo_accept_json(v_op.target_id);
   end if;
 
+  -- Quem ainda não tem espaço (primeira entrada) não tem permissão para nada: a conferência vem antes de olhar o código (como em
+  -- create_family), para que essa conta receba a mesma resposta qualquer que seja o código e não descubra quais valem.
+  if not exists (select 1 from public.persons where id = v_uid) then
+    raise exception 'sem_permissao' using errcode = '42501';
+  end if;
   if v_code_hash is null then
     raise exception 'convite_invalido' using errcode = 'P0002';
   end if;
   select * into v_inv from public.family_invites where code_hash = v_code_hash;
   if not found then
     raise exception 'convite_invalido' using errcode = 'P0002';
-  end if;
-  -- Quem ainda não tem espaço (primeira entrada) não tem permissão para nada.
-  if not exists (select 1 from public.persons where id = v_uid) then
-    raise exception 'sem_permissao' using errcode = '42501';
   end if;
 
   perform pg_advisory_xact_lock(hashtext('familia:p:' || v_uid::text));
@@ -773,6 +818,8 @@ begin
     return jsonb_build_object('context_id', v_op.context_id, 'person_id', v_op.target_id, 'removed', true);
   end if;
 
+  -- F9: trava da Família antes de conferir o titular; o alvo nunca é o titular ativo (sempre sobra um).
+  perform pg_advisory_xact_lock(hashtext('familia:c:' || p_context::text));
   perform public.clarevo_require_family_owner(p_context);
   if p_person is null then
     raise exception 'nao_encontrado' using errcode = 'P0002';
@@ -780,9 +827,8 @@ begin
   if p_person = v_uid then
     raise exception 'nao_sobre_si' using errcode = 'PT409';
   end if;
-  perform pg_advisory_xact_lock(hashtext('familia:c:' || p_context::text));
   perform 1 from public.context_memberships
-   where context_id = p_context and person_id = p_person and revoked_at is null for update;
+   where context_id = p_context and person_id = p_person and revoked_at is null and role <> 'titular' for update;
   if not found then
     raise exception 'nao_encontrado' using errcode = 'P0002';
   end if;
@@ -832,6 +878,8 @@ begin
                               'role', public.clarevo_member_role(v_op.context_id, v_op.target_id));
   end if;
 
+  -- F9: trava da Família antes de conferir o titular; o papel de titular só muda por transfer_family_ownership.
+  perform pg_advisory_xact_lock(hashtext('familia:c:' || p_context::text));
   perform public.clarevo_require_family_owner(p_context);
   if p_role is null or p_role not in ('membro', 'leitor') then
     raise exception 'papel_invalido' using errcode = '22023';
@@ -842,9 +890,8 @@ begin
   if p_person = v_uid then
     raise exception 'nao_sobre_si' using errcode = 'PT409';
   end if;
-  perform pg_advisory_xact_lock(hashtext('familia:c:' || p_context::text));
   perform 1 from public.context_memberships
-   where context_id = p_context and person_id = p_person and revoked_at is null for update;
+   where context_id = p_context and person_id = p_person and revoked_at is null and role <> 'titular' for update;
   if not found then
     raise exception 'nao_encontrado' using errcode = 'P0002';
   end if;
@@ -895,6 +942,9 @@ begin
     return jsonb_build_object('context_id', v_op.context_id, 'person_id', v_op.target_id, 'role', 'titular');
   end if;
 
+  -- F9: trava da Família antes de conferir o titular, para a conferência e a troca verem o mesmo estado. Com a conferência antes
+  -- da trava, passar a titularidade a B e remover B ao mesmo tempo deixariam a Família sem titular ativo.
+  perform pg_advisory_xact_lock(hashtext('familia:c:' || p_context::text));
   perform public.clarevo_require_family_owner(p_context);
   if p_person is null then
     raise exception 'nao_encontrado' using errcode = 'P0002';
@@ -902,9 +952,8 @@ begin
   if p_person = v_uid then
     raise exception 'nao_sobre_si' using errcode = 'PT409';
   end if;
-  perform pg_advisory_xact_lock(hashtext('familia:c:' || p_context::text));
   perform 1 from public.context_memberships
-   where context_id = p_context and person_id = p_person and revoked_at is null for update;
+   where context_id = p_context and person_id = p_person and revoked_at is null and role <> 'titular' for update;
   if not found then
     raise exception 'nao_encontrado' using errcode = 'P0002';
   end if;
@@ -958,8 +1007,9 @@ begin
     return jsonb_build_object('context_id', v_op.context_id, 'ended', true);
   end if;
 
-  perform public.clarevo_require_family_owner(p_context);
+  -- F9: trava da Família antes de conferir o titular (uma passagem de titularidade em curso termina antes desta conferência).
   perform pg_advisory_xact_lock(hashtext('familia:c:' || p_context::text));
+  perform public.clarevo_require_family_owner(p_context);
   if exists (select 1 from public.context_memberships
               where context_id = p_context and revoked_at is null and person_id <> v_uid) then
     raise exception 'familia_com_membros' using errcode = 'PT409';

@@ -62,9 +62,9 @@ import {
   useSeriesOpenOccurrences,
   useSeriesOperationKey,
   useSkipSeriesYear,
-  useWork,
   useUndoCommitmentPayment,
   useView,
+  useWorkFor,
 } from '@/state/data';
 import { useAuthorship } from '@/components/family-parts';
 import { useSession } from '@/state/session';
@@ -100,8 +100,9 @@ function startAfter(date: IsoDate, today: IsoDate): IsoMonth {
 export default function DetalheContaAPagar() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const commitment = useCommitment(id);
-  const personal = useWork().data;
-  const allAccounts = useAccounts(personal?.contextId);
+  // As contas (o nome da conta do pagamento) são as do contexto DA CONTA A PAGAR, não as do seletor.
+  const personal = useWorkFor(commitment.data?.contextId).data;
+  const allAccounts = useAccounts(commitment.data?.contextId);
   const view = useView();
   const { user, today } = useSession();
   const remove = useDeleteCommitment();
@@ -349,7 +350,7 @@ export default function DetalheContaAPagar() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SubHeader title="Conta a pagar" onBack={toList} right={<ContextPill label="Pessoal" />} />
+      <SubHeader title="Conta a pagar" onBack={toList} right={c ? <ContextPill label={by.contextName} fixed /> : <ContextPill label="Pessoal" />} />
       <Screen>
         <View style={styles.body}>
           {commitment.isPending ? (

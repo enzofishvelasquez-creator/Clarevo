@@ -136,13 +136,21 @@ export function isFamilyAction(action: string): action is FamilyAction {
 // Validação (a mesma do banco)
 // ---------------------------------------------------------------------------
 
+/** Rótulo de quem não tem nome para mostrar: nome vazio, que parece e-mail ou que é o início do e-mail (a mesma frase do banco). */
+export const FAMILY_NEUTRAL_NAME = 'Pessoa da Família';
+
 /**
- * Primeiro nome para mostrar a outras pessoas (L-6): a primeira palavra do nome, no máximo 40 caracteres. Um nome vazio ou que
- * parece e-mail (tem arroba) vira "Pessoa": o e-mail de outra pessoa nunca aparece. É a mesma regra de clarevo_first_name no banco.
+ * Primeiro nome para mostrar a outras pessoas (L-6): a primeira palavra do nome, no máximo 40 caracteres. O e-mail de outra pessoa
+ * nunca aparece: o nome vazio, o que tem arroba na primeira palavra e o que é o início do e-mail (`email`, antes do arroba; é o
+ * nome que o banco grava quando a pessoa não informa um) viram "Pessoa da Família". A comparação com o início do e-mail é exata,
+ * no nome inteiro e na primeira palavra. É a mesma regra de clarevo_first_name no banco.
  */
-export function firstNameOf(displayName: string): string {
-  const first = (typeof displayName === 'string' ? displayName : '').trim().split(/\s+/)[0] ?? '';
-  return first === '' || first.includes('@') ? 'Pessoa' : first.slice(0, 40);
+export function firstNameOf(displayName: string, email?: string | null): string {
+  const name = (typeof displayName === 'string' ? displayName : '').trim();
+  const first = name.split(/\s+/)[0] ?? '';
+  const local = (typeof email === 'string' ? email : '').split('@')[0]!.slice(0, 80);
+  if (first === '' || first.includes('@') || (local !== '' && (name === local || first === local))) return FAMILY_NEUTRAL_NAME;
+  return first.slice(0, 40);
 }
 
 /** Nome da Família sem os espaços das pontas. */
@@ -443,6 +451,23 @@ export function authorLabel(members: readonly FamilyMember[], personId: string):
 // ---------------------------------------------------------------------------
 // Contexto de trabalho (qual contexto as telas usam)
 // ---------------------------------------------------------------------------
+
+/**
+ * O contexto a que um item (conta a pagar, registro) pertence, pelo identificador do contexto dele: "pessoal" se é o Pessoal da
+ * pessoa, "familia" se é a Família dela, null se não é nenhum dos dois (ainda não carregou, ou a pessoa não lê esse contexto). As
+ * telas de pagar e editar usam as contas e o rótulo "Salvando em" DESTE contexto, e não o do seletor: abrir de novo (recarregar a
+ * página) o endereço de uma conta da Família com o seletor em Pessoal não pode oferecer as contas do Pessoal.
+ */
+export function contextKindOfItem(
+  contextId: string | null | undefined,
+  personalContextId: string | null | undefined,
+  familyContextId: string | null | undefined,
+): ContextKind | null {
+  if (!contextId) return null;
+  if (contextId === personalContextId) return 'pessoal';
+  if (contextId === familyContextId) return 'familia';
+  return null;
+}
 
 /** O nome do contexto nas pílulas e nos avisos: "Pessoal" ou "Família". */
 export function contextName(kind: ContextKind): string {

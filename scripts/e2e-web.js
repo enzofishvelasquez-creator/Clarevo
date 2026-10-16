@@ -9775,6 +9775,53 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Metas na Família: a pílula diz "Demonstração · Família"', (await body()).includes('Demonstração · Família'));
   await famTab('Resumo').click(); await waitText('Diferença do mês'); await famTab('Ver dados de Pessoal').click(); await p.waitForTimeout(400);
 
+  // ---- 3b. Um item da Família aberto com o seletor em Pessoal usa as contas e o "Salvando em" DO ITEM ----
+  // Antes, pagar e editar usavam as contas do contexto do seletor: recarregar /a-pagar/<id de conta da Família>/pagar com o seletor
+  // em Pessoal oferecia a conta do Pessoal, e o banco recusava com conta_invalida. Recarregar a página zera o acesso simulado, então
+  // o endereço volta pelo histórico, como um link aberto de novo: a tela abre na Família, volta ao Resumo, o seletor vai para
+  // Pessoal e "avançar" do navegador abre o mesmo endereço (a tela monta de novo, agora com o seletor em Pessoal).
+  const famForwardTo = async (pathname) => {
+    for (let i = 0; i < 3 && famPath() !== pathname; i++) { await p.goForward(); await p.waitForTimeout(800); }
+  };
+  const famBackToResumo = async (times) => {
+    for (let i = 0; i < times; i++) { await btn('Voltar').click(); await p.waitForTimeout(500); }
+    await waitText('Diferença do mês');
+  };
+  await famTab('Ver dados de Família').click(); await p.waitForTimeout(500);
+  await btn('Anotar conta a pagar').click(); await waitText('Demonstração · Família');
+  await field('Descrição').fill('Luz da casa'); await field('Valor em reais').fill('120'); await field('Data de vencimento').fill('15/10/2026');
+  await btn('Salvar conta a pagar').click(); await waitText('Conta a pagar salva'); await p.waitForTimeout(400);
+  const famBillPath = famPath();
+  ok('Conta a pagar da Família salva: o detalhe é de /a-pagar/<id> e diz "Contexto: Família"', /^\/a-pagar\/[^/]+$/.test(famBillPath) && (await body()).includes('Luz da casa') && (await body()).includes('Família'), `${famBillPath} ${(await body()).slice(0, 200)}`);
+  await btn('Já paguei').click(); await waitText('Confirmar pagamento');
+  ok('Pagar a conta da Família com o seletor em Família: a pílula diz "Família"', famPath() === `${famBillPath}/pagar` && (await body()).includes('Demonstração · Família'));
+  await famBackToResumo(2);
+  await famTab('Ver dados de Pessoal').click(); await waitText('Primeiros passos'); await p.waitForTimeout(400);
+  ok('Seletor em Pessoal antes de abrir de novo o endereço da conta da Família', (await famTab('Ver dados de Pessoal').getAttribute('aria-selected')) === 'true');
+  await famForwardTo(`${famBillPath}/pagar`); await waitText('Confirmar pagamento');
+  t = await body();
+  ok('Pagar a conta da Família com o seletor em Pessoal: a pílula diz o contexto da conta ("Família"), não o do seletor', famPath() === `${famBillPath}/pagar` && t.includes('Demonstração · Família') && !t.includes('Demonstração · Pessoal'), `${famPath()} ${t.slice(0, 200)}`);
+  await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Pagar a conta da Família com o seletor em Pessoal: o pagamento é registrado e a conta aparece paga no detalhe, em Família', t.includes('Pagamento registrado') && t.includes('Luz da casa') && t.includes('Demonstração · Família') && !/Escolha uma conta|conta_invalida|n[aã]o foi poss[ií]vel/i.test(t), t.slice(0, 300));
+  await famGoResumo();
+  // O mesmo para editar um gasto da Família.
+  await famTab('Ver dados de Família').click(); await p.waitForTimeout(500);
+  await btn('Anotar gasto').click(); await waitText('Demonstração · Família');
+  await field('Descrição').fill('Padaria da casa'); await field('Valor em reais').fill('50');
+  await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(500);
+  const famRecordPath = famPath();
+  await btn('Editar registro').click(); await waitText('Será salvo em');
+  ok('Editar o gasto da Família com o seletor em Família: a pílula e o aviso dizem "Família"', famPath() === `${famRecordPath}/editar` && (await body()).includes('Demonstração · Família') && (await body()).includes('Será salvo em Família, Conta principal.'));
+  await famBackToResumo(2);
+  await famTab('Ver dados de Pessoal').click(); await waitText('Primeiros passos'); await p.waitForTimeout(400);
+  await famForwardTo(`${famRecordPath}/editar`); await waitText('Será salvo em');
+  t = await body();
+  ok('Editar o gasto da Família com o seletor em Pessoal: a pílula e o aviso dizem "Família", com a conta da Família', famPath() === `${famRecordPath}/editar` && t.includes('Demonstração · Família') && !t.includes('Demonstração · Pessoal') &&
+    t.includes('Será salvo em Família, Conta principal.'), `${famPath()} ${t.slice(0, 300)}`);
+  await famBackToResumo(2);
+  ok('Depois de abrir os itens da Família, o seletor continua em Pessoal', (await famTab('Ver dados de Pessoal').getAttribute('aria-selected')) === 'true');
+
   // ---- 4. Convidar: papel, link que aparece uma vez, compartilhamento do aparelho e cancelar ----
   // O compartilhamento do aparelho (Web Share) não existe no Chromium de teste: este substituto só anota o que seria compartilhado.
   await p.evaluate(() => { window.__shared = []; navigator.share = async (d) => { window.__shared.push(d); }; });

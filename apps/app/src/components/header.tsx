@@ -149,7 +149,8 @@ export function SubHeader({ title, onBack, right, help }: { title: string; onBac
  * Contexto fixo durante o preenchimento ou na leitura de um registro. Na demonstração (CL-11), a pílula vira "Demonstração · Pessoal",
  * no lima do selo das abas, para nenhum formulário nem detalhe parecer uma conta real. Os textos das telas dizem "Pessoal"
  * ("Salvando em Pessoal", "Importando em Pessoal"); com a Família escolhida no seletor (D-055), a pílula diz onde a anotação vai
- * ficar: "Salvando em Família". `fixed`: a tela é só do Pessoal (exportar), e a pílula não muda.
+ * ficar: "Salvando em Família". `fixed`: a pílula não muda, porque a tela é só do Pessoal (exportar) ou porque o rótulo já traz o
+ * contexto do item aberto (pagar e editar uma conta ou um registro de outro contexto que o do seletor).
  */
 export function ContextPill({ label: given, fixed }: { label: string; fixed?: boolean }) {
   const { auth } = useSession();

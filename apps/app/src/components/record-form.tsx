@@ -1374,7 +1374,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
       <SubHeader
         title={mode.type === 'novo' ? copy.newTitle : copy.editTitle}
         onBack={requestCancel}
-        right={<ContextPill label={`Salvando em ${contextName}`} />}
+        right={<ContextPill label={`Salvando em ${contextName}`} fixed />}
       />
       <Screen contentStyle={styles.body}>
         {noted ? (

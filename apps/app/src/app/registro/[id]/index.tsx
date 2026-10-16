@@ -108,7 +108,7 @@ export default function DetalheRegistro() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SubHeader title={r ? (r.kind === 'despesa' ? 'Gasto' : 'Recebimento') : 'Registro'} onBack={toList} right={<ContextPill label="Pessoal" />} />
+      <SubHeader title={r ? (r.kind === 'despesa' ? 'Gasto' : 'Recebimento') : 'Registro'} onBack={toList} right={r ? <ContextPill label={by.contextName} fixed /> : <ContextPill label="Pessoal" />} />
       <Screen>
         <View style={styles.body}>
           {record.isPending ? (

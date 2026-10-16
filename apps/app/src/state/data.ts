@@ -3,6 +3,7 @@ import {
   INSTALLMENT_NATURES,
   activeAccounts,
   addDays,
+  contextKindOfItem,
   contextName,
   addMonths,
   annualCommitmentIds,
@@ -163,13 +164,12 @@ export interface WorkResult {
 }
 
 /**
- * O contexto escolhido ("Pessoal | Família", `useView().space`) com as contas dele. A Família só vale com a Família carregada; sem
- * ela, o Pessoal. Todas as telas que leem ou gravam um contexto usam isto no lugar de `useSpace`.
+ * O espaço de trabalho de um tipo de contexto, com as contas dele. A Família só vale com a Família carregada; sem ela, o Pessoal.
+ * É o corpo de useWork (o contexto do seletor) e de useWorkFor (o contexto de um item).
  */
-export function useWork(): WorkResult {
+function useWorkOf(kind: SpaceKind): WorkResult {
   const space = useSpace();
   const family = useFamily();
-  const { space: kind } = useView();
   const familyId = kind === 'familia' ? family.data?.context.id : undefined;
   const accounts = useAccounts(familyId);
   const personal = space.data;
@@ -210,6 +210,35 @@ export function useWork(): WorkResult {
     error: (space.error ?? accounts.error) as Error | null,
     refetch: () => (space.isError ? space.refetch() : kind === 'familia' && accounts.isError ? accounts.refetch() : space.refetch()),
   };
+}
+
+/**
+ * O contexto escolhido ("Pessoal | Família", `useView().space`) com as contas dele. Todas as telas que leem ou gravam um contexto
+ * usam isto no lugar de `useSpace`. As telas de UM item (pagar, editar) usam `useWorkFor`, com o contexto do item.
+ */
+export function useWork(): WorkResult {
+  const { space: kind } = useView();
+  return useWorkOf(kind);
+}
+
+/**
+ * O espaço de trabalho do contexto de um item (a conta a pagar, o registro), e não o do seletor: as contas oferecidas e o rótulo
+ * "Salvando em" são os do contexto do item. Recarregar `/a-pagar/<id de conta da Família>/pagar` com o seletor em Pessoal oferecia as
+ * contas do Pessoal, e o banco recusava com `conta_invalida`. Sem o item ainda (`contextId` indefinido) ou com um contexto que não
+ * é o Pessoal nem a Família da pessoa, vale o contexto do seletor (a tela mostra o "não encontrado" de sempre); enquanto a Família
+ * carrega, fica pendente, sem mostrar as contas do Pessoal.
+ */
+export function useWorkFor(contextId: string | undefined): WorkResult {
+  const selected = useWork();
+  const space = useSpace();
+  const family = useFamily();
+  const kind = contextKindOfItem(contextId, space.data?.personalContextId, family.data?.context.id);
+  const ofItem = useWorkOf(kind ?? 'pessoal');
+  if (kind) return ofItem;
+  if (contextId && family.isPending && family.fetchStatus !== 'idle') {
+    return { ...selected, data: undefined, isPending: true, isSuccess: false };
+  }
+  return selected;
 }
 
 /**

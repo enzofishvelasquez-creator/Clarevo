@@ -115,7 +115,8 @@ do $$ begin
   assert (select count(*) from public.financial_contexts where id = (select id from ids where name = 'ana_ctx')) = 0, 'contexto pessoal da Ana oculto';
   assert (select count(*) from public.financial_accounts where id = (select id from ids where name = 'ana_conta')) = 0, 'conta pessoal da Ana oculta';
   assert (select count(*) from public.commitments) = 0, 'compromissos pessoais da Ana ocultos';
-  assert (select count(*) from public.persons) = 2, 'Bruno vê a si e a Ana (mesma família)';
+  -- Persons é lida só pela própria pessoa (0013, F10): quem divide a família não lê o nome inteiro do outro.
+  assert (select count(*) from public.persons) = 1 and (select id from public.persons) = auth.uid(), 'Bruno vê só a si, não a Ana (mesma família)';
 end $$;
 select pg_temp.expect_error(format($$select public.create_record('chave-bru-0001', %L, %L, 'despesa', 100, '2026-10-05', 'Intruso')$$,
   (select id from ids where name = 'ana_ctx'), (select id from ids where name = 'ana_conta')), 'sem_permissao');

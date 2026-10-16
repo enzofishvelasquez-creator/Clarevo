@@ -441,7 +441,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <SubHeader title="Marcar como paga" onBack={requestCancel} right={<ContextPill label={`Salvando em ${contextName}`} />} />
+      <SubHeader title="Marcar como paga" onBack={requestCancel} right={<ContextPill label={`Salvando em ${contextName}`} fixed />} />
       <Screen contentStyle={styles.body}>
         {conflict ? (
           <Banner tone="erro" icon={AlertCircle}>

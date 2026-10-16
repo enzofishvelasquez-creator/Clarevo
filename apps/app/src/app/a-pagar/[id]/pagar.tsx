@@ -8,18 +8,20 @@ import { PaymentForm } from '@/components/payment-form';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Card, Txt } from '@/components/ui';
 import { invoiceHref } from '@/lib/cards';
-import { useCommitment, useWork } from '@/state/data';
+import { useCommitment, useWorkFor } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
 /** /a-pagar/[id]/pagar?data=vencimento: a data do pagamento abre no vencimento (Contas vencidas). */
 export default function MarcarComoPaga() {
   const { id, data } = useLocalSearchParams<{ id: string; data?: string }>();
-  const personal = useWork().data;
   const commitment = useCommitment(id);
   const c = commitment.data;
   // Aberto o formulário, ele fica na tela: o pagamento confirmado aqui atualiza a consulta antes de voltar.
   const [opened, setOpened] = useState<Commitment | null>(null);
   if (!opened && c && c.status === 'aberto') setOpened(c);
+  // As contas e o "Salvando em" são os do contexto DA CONTA, não os do seletor (recarregar o endereço de uma conta da Família com o
+  // seletor em Pessoal não oferece as contas do Pessoal).
+  const personal = useWorkFor(opened?.contextId ?? c?.contextId).data;
   if (c?.invoice) return <Redirect href={invoiceHref(c.invoice.cardId, c.invoice.month)} />;
 
   if (opened && personal) return <PaymentForm key={opened.id} commitment={opened} space={personal} paidOnDue={data === 'vencimento'} />;

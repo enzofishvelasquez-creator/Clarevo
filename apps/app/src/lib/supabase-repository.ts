@@ -14,6 +14,7 @@ import {
   PARTS_PER_YEAR_MAX,
   INVITE_CODE_PATTERN,
   FAMILY_MAX_PEOPLE,
+  FAMILY_NEUTRAL_NAME,
   RepoError,
   SAVINGS_ANSWERS,
   SAVINGS_MIN_MONTHLY_CENTS,
@@ -2771,14 +2772,17 @@ interface InviteRow {
 const isInviteRoleValue = (v: unknown): v is InviteRole => v === 'membro' || v === 'leitor';
 const isFamilyRoleValue = (v: unknown): v is FamilyRole => v === 'titular' || v === 'membro' || v === 'leitor';
 
-/** Linha da visão: papel e situação conhecidos e primeiro nome sem espaço nem arroba; qualquer outra forma é defeito, não recusa. */
+/**
+ * Linha da visão: papel e situação conhecidos e primeiro nome sem espaço nem arroba (ou o rótulo neutro "Pessoa da Família", que
+ * o banco usa para quem não tem nome); qualquer outra forma é defeito, não recusa.
+ */
 function toMember(r: MemberRow): FamilyMember {
   if (
     !isFamilyRoleValue(r.role) ||
     (r.status !== 'ativo' && r.status !== 'ex-membro') ||
     typeof r.first_name !== 'string' ||
     r.first_name === '' ||
-    /\s|@/.test(r.first_name) ||
+    (r.first_name !== FAMILY_NEUTRAL_NAME && /\s|@/.test(r.first_name)) ||
     typeof r.person_id !== 'string' ||
     (r.status === 'ativo') !== (r.left_at === null)
   ) {

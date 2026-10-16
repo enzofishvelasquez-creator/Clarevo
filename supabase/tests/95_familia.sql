@@ -730,6 +730,41 @@ begin
 end $$;
 reset role;
 
+-- Quem ainda não tem espaço pessoal (Xena) recebe a mesma resposta para qualquer código, válido ou não: o aceite confere o espaço
+-- antes de olhar o código, então a resposta não diz quais códigos existem (e quem tem espaço, Úrsula, recebe convite_invalido acima).
+insert into public.family_invites (context_id, created_by, role, code_hash, expires_at)
+  values ((select id from ids where name = 'fam'), :vera, 'membro', encode(sha256(convert_to('cccccccccccccccccccccccccccccccc', 'UTF8')), 'hex'), now() + interval '7 days');
+set role authenticated;
+do $$
+declare
+  cases text[] := array[
+    'cccccccccccccccccccccccccccccccc',          -- válido, ainda não usado
+    pg_temp.code('mauro'),                       -- usado
+    pg_temp.code('x1'),                          -- cancelado
+    pg_temp.code('saulo'),                       -- vencido
+    'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',          -- não existe
+    'não é um código',                           -- malformado
+    ''];                                         -- vazio
+  seen text[] := '{}';
+  i int;
+begin
+  perform pg_temp.as_('xena');
+  for i in 1 .. array_length(cases, 1) loop
+    seen := seen || pg_temp.err(format('select public.accept_family_invite(%L, %L)', cases[i], 'fa-ac-xena' || i));
+  end loop;
+  assert (select count(distinct x) from unnest(seen) x) = 1 and seen[1] = 'sem_permissao|42501||',
+    'sem espaço pessoal, o aceite responde igual para qualquer código: ' || seen::text;
+  assert pg_temp.mem('xena') is null, 'Xena não entrou';
+end $$;
+reset role;
+do $$
+begin
+  assert (select used_at is null and cancelled_at is null from public.family_invites
+           where code_hash = encode(sha256(convert_to('cccccccccccccccccccccccccccccccc', 'UTF8')), 'hex')), 'a recusa não usa o convite';
+  assert (select count(*) from public.record_operations where idempotency_key like 'fa-ac-xena%') = 0, 'e não grava operação';
+  delete from public.family_invites where code_hash = encode(sha256(convert_to('cccccccccccccccccccccccccccccccc', 'UTF8')), 'hex');
+end $$;
+
 -- ---------------------------------------------------------------------------
 -- 10. L-6: family_member_items. Ativos e ex-membros, com o primeiro nome e a situação; nunca o e-mail nem o nome inteiro.
 -- ---------------------------------------------------------------------------
@@ -737,9 +772,19 @@ do $$
 begin
   assert public.clarevo_first_name('Maria da Silva') = 'Maria' and public.clarevo_first_name('  João   Pedro ') = 'João'
      and public.clarevo_first_name('Zé') = 'Zé' and public.clarevo_first_name(repeat('a', 60)) = repeat('a', 40), 'primeiro nome';
-  assert public.clarevo_first_name('maria@exemplo.test') = 'Pessoa' and public.clarevo_first_name('Maria maria@exemplo.test') = 'Maria'
-     and public.clarevo_first_name('@maria') = 'Pessoa' and public.clarevo_first_name('') = 'Pessoa'
-     and public.clarevo_first_name('   ') = 'Pessoa' and public.clarevo_first_name(null) = 'Pessoa', 'um e-mail nunca vira nome';
+  assert public.clarevo_first_name('maria@exemplo.test') = 'Pessoa da Família' and public.clarevo_first_name('Maria maria@exemplo.test') = 'Maria'
+     and public.clarevo_first_name('@maria') = 'Pessoa da Família' and public.clarevo_first_name('') = 'Pessoa da Família'
+     and public.clarevo_first_name('   ') = 'Pessoa da Família' and public.clarevo_first_name(null) = 'Pessoa da Família', 'um e-mail nunca vira nome';
+  -- O nome que é o início do e-mail (o que ensure_personal_space grava sem nome) também vira o rótulo neutro; com o e-mail à mão a
+  -- comparação é exata, no nome inteiro e na primeira palavra.
+  assert public.clarevo_first_name('maria.lopes', 'maria.lopes@exemplo.test') = 'Pessoa da Família'
+     and public.clarevo_first_name('  maria.lopes ', 'maria.lopes@exemplo.test') = 'Pessoa da Família'
+     and public.clarevo_first_name('maria.lopes Souza', 'maria.lopes@exemplo.test') = 'Pessoa da Família'
+     and public.clarevo_first_name('Maria Lopes', 'maria.lopes@exemplo.test') = 'Maria'
+     and public.clarevo_first_name('Maria', 'maria@exemplo.test') = 'Maria'
+     and public.clarevo_first_name('maria', 'maria@exemplo.test') = 'Pessoa da Família'
+     and public.clarevo_first_name('Maria', null) = 'Maria' and public.clarevo_first_name('Maria', '') = 'Maria',
+    'início do e-mail vira rótulo neutro; o nome escrito de outro jeito continua';
   assert (select array_agg(attname::text order by attnum) from pg_attribute where attrelid = 'public.family_member_items'::regclass and attnum > 0
             and not attisdropped)
        = array['context_id', 'person_id', 'first_name', 'role', 'status', 'is_me', 'joined_at', 'left_at'], 'colunas da visão: sem e-mail nem nome inteiro';
@@ -895,7 +940,7 @@ begin
     assert (select proconfig is not null and exists (select 1 from unnest(proconfig) c where c like 'search_path=public%')
               from pg_proc where oid = ('public.' || f)::regprocedure), 'search_path fixo: ' || f;
   end loop;
-  foreach f in array array['clarevo_is_family(uuid)', 'clarevo_first_name(text)', 'clarevo_invite_hash(text)', 'clarevo_member_role(uuid, uuid)',
+  foreach f in array array['clarevo_is_family(uuid)', 'clarevo_first_name(text, text)', 'clarevo_person_label(uuid)', 'clarevo_invite_hash(text)', 'clarevo_member_role(uuid, uuid)',
                            'clarevo_active_family(uuid)', 'clarevo_family_active_count(uuid)', 'clarevo_family_valid_invites(uuid)',
                            'clarevo_family_json(uuid)', 'clarevo_invite_json(uuid)', 'clarevo_require_family_owner(uuid)',
                            'clarevo_cancel_invites_of(uuid, uuid)', 'clarevo_accept_json(uuid)', 'clarevo_lock_commitment_for_payment(uuid)',
@@ -1253,6 +1298,177 @@ begin
   assert (select count(*) from public.financial_records where context_id = pg_temp.id('vera_ctx')) = 2
      and (select count(*) from public.financial_records where context_id = pg_temp.id('mauro_ctx')) = 1, 'os Pessoais seguem como estavam (a Vera pagou a própria Internet)';
   assert (select count(*) from public.financial_accounts where context_id in (select id from ids where name like 'fam%' and name not like '%acc%')) = 5, 'uma conta por Família criada';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 17. F10: ninguém lê o nome inteiro de outra pessoa (persons só é lida pela própria pessoa) e o nome que é o início do e-mail, ou
+--     que parece e-mail, aparece como "Pessoa da Família" na visão dos membros, na prévia do convite e no resultado do aceite.
+--     Yara não informou nome (ensure_personal_space grava o início do e-mail); Zilda digitou um e-mail no lugar do nome; Nara
+--     digitou o início do e-mail e um sobrenome; Wagner tem nome comum.
+-- ---------------------------------------------------------------------------
+insert into ids values ('yara', '00000000-0000-0000-0000-000000000067'), ('zilda', '00000000-0000-0000-0000-000000000077'),
+  ('nara', '00000000-0000-0000-0000-000000000087'), ('wagner', '00000000-0000-0000-0000-000000000097');
+insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-000000000067', 'yara.lopes@exemplo.test',  now(), '{}'),
+  ('00000000-0000-0000-0000-000000000077', 'zilda@exemplo.test',       now(), '{"display_name":"zilda@casa.test"}'),
+  ('00000000-0000-0000-0000-000000000087', 'nara.dias@exemplo.test',   now(), '{"display_name":"nara.dias Neves"}'),
+  ('00000000-0000-0000-0000-000000000097', 'wagner@exemplo.test',      now(), '{"display_name":"Wagner Costa"}');
+set role authenticated;
+do $$
+declare
+  p text;
+  space jsonb;
+  r jsonb;
+  pv jsonb;
+begin
+  foreach p in array array['yara', 'zilda', 'nara', 'wagner'] loop
+    perform pg_temp.as_(p);
+    space := public.ensure_personal_space('Conta principal');
+    insert into ids values (p || '_ctx', (space ->> 'context_id')::uuid);
+  end loop;
+  perform pg_temp.as_('yara');
+  assert (select display_name from public.persons where id = auth.uid()) = 'yara.lopes', 'sem nome, o banco guarda o início do e-mail';
+  r := public.create_family('Casa Yara', 'fa-f10-0001');
+  insert into ids values ('cy', (r #>> '{context,id}')::uuid);
+  perform pg_temp.inv('wagner', 'yara', 'membro', 'cy');
+  perform pg_temp.inv('zilda', 'yara', 'membro', 'cy');
+  perform pg_temp.inv('nara', 'yara', 'leitor', 'cy');
+
+  -- Prévia e aceite: quem convidou aparece com o rótulo neutro, nunca com o início do e-mail.
+  perform pg_temp.as_('wagner');
+  pv := public.preview_family_invite(pg_temp.code('wagner'));
+  assert pv ->> 'invited_by' = 'Pessoa da Família' and pv ->> 'family_name' = 'Casa Yara', 'prévia: o rótulo neutro no lugar do início do e-mail';
+  assert pv::text not like '%yara%' and pv::text not like '%@%', 'a prévia não traz o início do e-mail nem e-mail';
+  r := public.accept_family_invite(pg_temp.code('wagner'), 'fa-f10-0002');
+  assert r ->> 'invited_by' = 'Pessoa da Família' and r::text not like '%yara%' and r::text not like '%@%', 'aceite: o rótulo neutro';
+  assert public.accept_family_invite(pg_temp.code('wagner'), 'fa-f10-0002') = r, 'e a repetição devolve o mesmo';
+  perform pg_temp.as_('zilda');
+  assert public.accept_family_invite(pg_temp.code('zilda'), 'fa-f10-0003') ->> 'invited_by' = 'Pessoa da Família', 'Zilda também';
+  perform pg_temp.as_('nara');
+  assert public.accept_family_invite(pg_temp.code('nara'), 'fa-f10-0004') ->> 'invited_by' = 'Pessoa da Família', 'Nara também';
+
+  -- A visão, vista por cada papel: o rótulo neutro para quem não tem nome de verdade; nunca e-mail, início de e-mail nem nome inteiro.
+  foreach p in array array['yara', 'zilda', 'nara', 'wagner'] loop
+    perform pg_temp.as_(p);
+    assert (select first_name from public.family_member_items where person_id = pg_temp.id('yara')) = 'Pessoa da Família', p || ' vê a Yara sem o início do e-mail';
+    assert (select first_name from public.family_member_items where person_id = pg_temp.id('zilda')) = 'Pessoa da Família', p || ' vê a Zilda sem o e-mail';
+    assert (select first_name from public.family_member_items where person_id = pg_temp.id('nara')) = 'Pessoa da Família', p || ' vê a Nara sem o início do e-mail';
+    assert (select first_name from public.family_member_items where person_id = pg_temp.id('wagner')) = 'Wagner', p || ' vê o primeiro nome do Wagner';
+    assert (select count(*) from public.family_member_items) = 4, p || ' vê as quatro pessoas';
+    assert not exists (select 1 from public.family_member_items i
+                        where to_jsonb(i)::text ~* '(@|yara|zilda|nara|exemplo|casa\.test|Neves|Costa)' and i.first_name <> 'Wagner'),
+      p || ': nenhuma linha traz e-mail, início de e-mail ou sobrenome';
+    assert (select string_agg(i.first_name, ',' order by i.first_name collate "C") from public.family_member_items i)
+         = 'Pessoa da Família,Pessoa da Família,Pessoa da Família,Wagner', p || ': os quatro nomes';
+  end loop;
+
+  -- persons: cada pessoa lê só a própria linha, qualquer que seja o papel (titular, membro e leitora).
+  foreach p in array array['yara', 'zilda', 'nara', 'wagner'] loop
+    perform pg_temp.as_(p);
+    assert (select count(*) from public.persons) = 1 and (select id from public.persons) = auth.uid(), p || ' lê só a própria linha de persons';
+    assert (select count(*) from public.persons where id <> auth.uid()) = 0, p || ' não lê o nome inteiro de ninguém';
+  end loop;
+  perform pg_temp.as_('wagner');
+  assert (select display_name from public.persons where id = pg_temp.id('yara')) is null, 'o nome da Yara não é lido pelo Wagner';
+  assert (select display_name from public.persons where id = auth.uid()) = 'Wagner Costa', 'mas a própria pessoa lê o seu';
+  assert (select count(*) from public.persons p join public.context_memberships m on m.person_id = p.id
+           where m.context_id = pg_temp.id('cy')) = 1, 'unir vínculos a persons também só devolve a própria';
+  -- Ninguém muda a linha de outra pessoa; a própria muda, e a visão acompanha.
+  update public.persons set display_name = 'Yara Intrusa' where id = pg_temp.id('yara');
+  update public.persons set display_name = 'wagner' where id = auth.uid();
+  assert (select first_name from public.family_member_items where person_id = pg_temp.id('wagner')) = 'Pessoa da Família',
+    'o nome que é o início do e-mail (wagner@) vira o rótulo neutro, também quando a pessoa o escreve depois';
+  update public.persons set display_name = 'Wagner Costa' where id = auth.uid();
+  assert (select first_name from public.family_member_items where person_id = pg_temp.id('wagner')) = 'Wagner', 'e volta a mostrar o primeiro nome';
+  perform pg_temp.as_('yara');
+  assert (select display_name from public.persons) = 'yara.lopes', 'ninguém mudou a linha da Yara';
+  update public.persons set display_name = 'Yara Lopes' where id = auth.uid();
+  perform pg_temp.as_('wagner');
+  assert (select first_name from public.family_member_items where person_id = pg_temp.id('yara')) = 'Yara', 'com nome de verdade, o primeiro nome aparece';
+  -- Ex-membro: o rótulo segue a mesma regra.
+  perform pg_temp.as_('yara');
+  perform public.remove_family_member(pg_temp.id('cy'), pg_temp.id('zilda'), 'fa-f10-0005');
+  assert (select first_name || ':' || status from public.family_member_items where person_id = pg_temp.id('zilda')) = 'Pessoa da Família:ex-membro',
+    'ex-membro sem nome de verdade também aparece com o rótulo neutro';
+  -- Quem é de fora não lê a Casa Yara nem a pessoa dela.
+  perform pg_temp.as_('otto');
+  assert (select count(*) from public.family_member_items where context_id = pg_temp.id('cy')) = 0, 'Otto não vê a Casa Yara';
+  assert (select count(*) from public.persons) = 1, 'e lê só a própria linha';
+end $$;
+reset role;
+do $$
+begin
+  -- A política: uma só de leitura, só a própria linha. A atualização continua só da própria pessoa.
+  assert (select count(*) from pg_policies where schemaname = 'public' and tablename = 'persons' and cmd = 'SELECT') = 1
+     and (select qual from pg_policies where schemaname = 'public' and tablename = 'persons' and policyname = 'persons_read') = '(id = auth.uid())',
+    'persons_read: só id = auth.uid()';
+  assert (select count(*) from pg_policies where schemaname = 'public' and tablename = 'persons' and cmd = 'UPDATE') = 1, 'e uma política de atualização';
+  -- A visão e a função usam a mesma regra (a função de apoio lê o e-mail com os privilégios de quem a criou).
+  perform pg_temp.as_('yara');
+  assert (select count(*) from public.family_member_items where context_id = pg_temp.id('cy')) = 4, 'a visão, lida como dona';
+  assert not exists (select 1 from public.family_member_items i where i.first_name is distinct from public.clarevo_person_label(i.person_id)),
+    'a visão e clarevo_person_label dão o mesmo primeiro nome';
+  assert public.clarevo_person_label(pg_temp.id('zilda')) = 'Pessoa da Família' and public.clarevo_person_label(pg_temp.id('nara')) = 'Pessoa da Família'
+     and public.clarevo_person_label(pg_temp.id('wagner')) = 'Wagner' and public.clarevo_person_label(pg_temp.id('yara')) = 'Yara'
+     and public.clarevo_person_label(gen_random_uuid()) = 'Pessoa da Família', 'o rótulo por pessoa';
+  perform set_config('request.jwt.claim.sub', '', true);
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 18. F9: a trava da Família vem antes da conferência do titular, nas seis funções de titular, e o aceite confere o espaço da pessoa
+--     antes de buscar o código. A corrida de verdade (duas chamadas ao mesmo tempo) está em `npm run test:api`, no teste de
+--     concorrência da Família; aqui o efeito é conferido de forma determinística, pela ordem do que cada função faz.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  f text;
+  src text;
+begin
+  foreach f in array array['create_family_invite(uuid, text, text)', 'cancel_family_invite(uuid, text)', 'remove_family_member(uuid, uuid, text)',
+                           'set_member_role(uuid, uuid, text, text)', 'transfer_family_ownership(uuid, uuid, text)', 'end_family(uuid, text)'] loop
+    src := (select prosrc from pg_proc where oid = ('public.' || f)::regprocedure);
+    assert position('pg_advisory_xact_lock(hashtext(''familia:c:''' in src) > 0 and position('clarevo_require_family_owner(' in src) > 0
+       and position('pg_advisory_xact_lock(hashtext(''familia:c:''' in src) < position('clarevo_require_family_owner(' in src),
+      'a trava da Família vem antes de conferir o titular: ' || f;
+    assert (select count(*) from regexp_matches(src, 'familia:c:', 'g')) = 1 and (select count(*) from regexp_matches(src, 'clarevo_require_family_owner\(', 'g')) = 1,
+      'uma trava e uma conferência: ' || f;
+  end loop;
+  -- O alvo de remover, mudar papel e passar a titularidade nunca é o titular ativo.
+  foreach f in array array['remove_family_member(uuid, uuid, text)', 'set_member_role(uuid, uuid, text, text)', 'transfer_family_ownership(uuid, uuid, text)'] loop
+    src := (select prosrc from pg_proc where oid = ('public.' || f)::regprocedure);
+    assert position('revoked_at is null and role <> ''titular'' for update' in src) > 0, 'a busca do alvo exclui o titular: ' || f;
+  end loop;
+  -- Aceitar: o espaço pessoal antes do código (a conta sem espaço recebe a mesma resposta para qualquer código).
+  src := (select prosrc from pg_proc where oid = 'public.accept_family_invite(text, text)'::regprocedure);
+  assert position('from public.persons where id = v_uid' in src) > 0
+     and position('from public.persons where id = v_uid' in src) < position('from public.family_invites where code_hash' in src)
+     and position('from public.persons where id = v_uid' in src) < position('v_code_hash is null' in src),
+    'accept_family_invite confere persons antes de olhar o código';
+end $$;
+-- A sequência que a trava garante na corrida: depois que a titularidade passa, quem era titular perde cada ação de titular e não
+-- remove o novo titular. Sempre sobra um titular ativo.
+set role authenticated;
+do $$
+declare
+  cy uuid := pg_temp.id('cy');
+  inv uuid := (select invite from codes where name = 'nara');
+begin
+  perform pg_temp.as_('yara');
+  perform public.transfer_family_ownership(cy, pg_temp.id('wagner'), 'fa-f9-0001');
+  perform pg_temp.expect_code(format($f$select public.remove_family_member(%L, %L, 'fa-f9-0002')$f$, cy, pg_temp.id('wagner')), 'sem_permissao', '42501');
+  perform pg_temp.expect_code(format($f$select public.set_member_role(%L, %L, 'leitor', 'fa-f9-0003')$f$, cy, pg_temp.id('wagner')), 'sem_permissao', '42501');
+  perform pg_temp.expect_code(format($f$select public.transfer_family_ownership(%L, %L, 'fa-f9-0004')$f$, cy, pg_temp.id('nara')), 'sem_permissao', '42501');
+  perform pg_temp.expect_code(format($f$select public.create_family_invite(%L, 'membro', 'fa-f9-0005')$f$, cy), 'sem_permissao', '42501');
+  perform pg_temp.expect_code(format($f$select public.cancel_family_invite(%L, 'fa-f9-0006')$f$, inv), 'sem_permissao', '42501');
+  perform pg_temp.expect_code(format($f$select public.end_family(%L, 'fa-f9-0007')$f$, cy), 'sem_permissao', '42501');
+end $$;
+reset role;
+do $$
+begin
+  assert (select count(*) from public.context_memberships where context_id = pg_temp.id('cy') and role = 'titular' and revoked_at is null) = 1
+     and pg_temp.mem('wagner', 'cy') = 'titular t t t f', 'sempre um titular ativo, e é o Wagner';
+  assert pg_temp.mem('yara', 'cy') = 'membro t t f f', 'e a Yara virou membro';
+  assert (select count(*) from public.record_operations where idempotency_key like 'fa-f9-000%') = 1, 'só a passagem da titularidade gravou operação';
 end $$;
 
 select pg_temp.check_links();

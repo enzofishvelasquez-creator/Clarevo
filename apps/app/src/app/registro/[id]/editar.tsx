@@ -6,13 +6,14 @@ import { RecordForm } from '@/components/record-form';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Txt } from '@/components/ui';
 import { invoiceHref } from '@/lib/cards';
-import { useRecord, useWork } from '@/state/data';
+import { useRecord, useWorkFor } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
 export default function EditarRegistro() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const personal = useWork().data;
   const record = useRecord(id);
+  // As contas e o "Salvando em" são os do contexto DO REGISTRO, não os do seletor.
+  const personal = useWorkFor(record.data?.contextId).data;
 
   if (record.isPending || !personal) return <LoadingState />;
   if (record.isError) return <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => record.refetch()} />;

@@ -4,7 +4,7 @@
  * compatível com a do Supabase (PostgREST), com tokens de pessoas diferentes.
  * Executado por `npm run test:api` (ver supabase/tests/run_api.sh). Pessoas FICTÍCIAS.
  */
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createHmac, randomUUID } from 'node:crypto';
 
 import {
@@ -26,6 +26,7 @@ import {
   affectedByEnd,
   affectedByYear,
   FAMILY_MAX_PEOPLE,
+  FAMILY_NEUTRAL_NAME,
   FAMILY_TEXT,
   INVITE_CODE_PATTERN,
   authorLabel,
@@ -7022,6 +7023,13 @@ describe('API real: Família (Ciclo L, D-055)', () => {
       expect(await err(davi.previewFamilyInvite(code))).toBe('convite_invalido');
       expect(await err(davi.acceptFamilyInvite(newOperationKey(), code))).toBe('convite_invalido');
     }
+    // Eva não tem espaço pessoal (e-mail não confirmado): o aceite confere isso antes de olhar o código e responde igual para
+    // qualquer um, também para o convite que ainda vale; a resposta não diz quais códigos existem.
+    const eva = repoFor(EVA);
+    for (const code of [codes.bruno!, cancelled.code!, expired.code!, 'b'.repeat(32)]) {
+      expect(await err(eva.acceptFamilyInvite(newOperationKey(), code))).toBe('sem_permissao');
+    }
+    expect((await ana.getFamily())!.invites.map((i) => i.id)).toEqual([inviteIds.bruno]);
     expect((await ana.getFamily())!.invites.map((i) => i.id)).toEqual([inviteIds.bruno]);
   });
 
@@ -7041,6 +7049,10 @@ describe('API real: Família (Ciclo L, D-055)', () => {
     expect(names(view)).toEqual(['Ana:titular:ativo', 'Bruno:membro:ativo']);
     expect(view.members.find((m) => m.isMe)!.personId).toBe(BRUNO);
     expect(JSON.stringify(view)).not.toMatch(/@|Souza|Prado|Reis/);
+    // O nome inteiro de outra pessoa não é lido, nem por quem divide a Família: persons só devolve a própria linha.
+    expect((await sql(BRUNO).from('persons').select('id, display_name')).data).toEqual([{ id: BRUNO, display_name: 'Bruno' }]);
+    expect((await sql(ANA).from('persons').select('id, display_name')).data).toEqual([{ id: ANA, display_name: 'Ana' }]);
+    expect((await sql(BRUNO).from('persons').select('display_name').eq('id', ANA)).data).toEqual([]);
     expect((await ana.getFamily())!.invites).toEqual([]);
     // Davi tem Família própria: não aceita outro convite, e o convite continua valendo.
     const dv = await ana.createFamilyInvite(newOperationKey(), fam, 'leitor');
@@ -7280,6 +7292,61 @@ describe('API real: Família (Ciclo L, D-055)', () => {
     // A tradução mantém a promessa do texto.
     expect(FAMILY_TEXT.privacy).toContain('ninguém da Família');
   });
+
+  it('15. concorrência: titularidade, remoção, papel, convite, cancelamento e encerramento ao mesmo tempo nunca deixam a Família sem titular', async () => {
+    // Ana abre outra Família (já não tem uma), convida Carla e deixa um convite pendente para o cancelamento.
+    const house = (await ana.createFamily(newOperationKey(), 'Casa Rocha')).context.id;
+    const toCarla = await ana.createFamilyInvite(newOperationKey(), house, 'membro');
+    await carla.acceptFamilyInvite(newOperationKey(), toCarla.code!);
+    const pending = await ana.createFamilyInvite(newOperationKey(), house, 'leitor');
+    const titulars = () => Number(adminSql(`select count(*) from public.context_memberships where context_id = '${house}' and role = 'titular' and revoked_at is null`));
+    expect(titulars()).toBe(1);
+
+    // Uma sessão separada segura a trava da Família. As seis chamadas entram na fila UMA DE CADA VEZ (esperando a anterior chegar à
+    // trava), então a ordem de execução é a da fila: a titularidade passa para Carla primeiro. Cada chamada seguinte confere o
+    // titular só depois de ganhar a trava, já com o resultado da primeira: Ana já não é titular e todas respondem sem_permissao.
+    // (Com a conferência antes da trava, a remoção tiraria Carla, que já era titular, e a Família ficaria sem titular.)
+    const holder = spawn('psql', ['-v', 'ON_ERROR_STOP=1', '-qAt', '-d', process.env.CLAREVO_DB!], { stdio: ['pipe', 'ignore', 'inherit'] });
+    const advisory = (granted: boolean) => Number(adminSql(`select count(*) from pg_locks where locktype = 'advisory' and ${granted ? '' : 'not '}granted`));
+    const until = async (check: () => boolean, what: string) => {
+      const start = Date.now();
+      while (!check()) {
+        if (Date.now() - start > 20000) throw new Error(`tempo esgotado esperando: ${what}`);
+        await new Promise((resolve) => setTimeout(resolve, 40));
+      }
+    };
+    try {
+      holder.stdin.write(`select pg_advisory_lock(hashtext('familia:c:${house}'));\n`);
+      await until(() => advisory(true) === 1, 'a sessão de apoio segurar a trava da Família');
+
+      const calls: [string, () => Promise<unknown>][] = [
+        ['passar a titularidade', () => ana.transferFamilyOwnership(newOperationKey(), house, CARLA)],
+        ['remover', () => ana.removeFamilyMember(newOperationKey(), house, CARLA)],
+        ['mudar o papel', () => ana.setMemberRole(newOperationKey(), house, CARLA, 'leitor')],
+        ['convidar', () => ana.createFamilyInvite(newOperationKey(), house, 'membro')],
+        ['cancelar o convite', () => ana.cancelFamilyInvite(newOperationKey(), pending.invite.id)],
+        ['encerrar', () => ana.endFamily(newOperationKey(), house)],
+      ];
+      const outcomes: Promise<string | null>[] = [];
+      for (const [i, [name, run]] of calls.entries()) {
+        outcomes.push(err(run()));
+        await until(() => advisory(false) === i + 1, `${name} chegar à trava da Família`);
+      }
+      holder.stdin.end();
+      expect(await Promise.all(outcomes)).toEqual([null, 'sem_permissao', 'sem_permissao', 'sem_permissao', 'sem_permissao', 'sem_permissao']);
+    } finally {
+      holder.stdin.end();
+      holder.kill();
+    }
+
+    // Sobrou um titular ativo, Carla; Ana é membro; nada mais mudou (nenhum convite novo, o pendente não foi cancelado, a Família segue ativa).
+    expect(titulars()).toBe(1);
+    const view = (await carla.getFamily())!;
+    expect(names(view)).toEqual(['Carla:titular:ativo', 'Ana:membro:ativo']);
+    expect(view.invites.map((i) => i.id)).toEqual([pending.invite.id]);
+    expect((await ana.getFamily())!.role).toBe('membro');
+    expect((await famRows(house)).ended).toBe(false);
+  });
 });
 
 describe('conversor da Família', () => {
@@ -7373,6 +7440,9 @@ describe('conversor da Família', () => {
     const asMember = (await fake({}, { financial_contexts: [ctxRow], family_member_items: [member({ person_id: 'p1', role: 'membro' }), member({ person_id: 'p2', first_name: 'Bruno', is_me: false })], family_invites: [inviteRow] }).getFamily())!;
     expect(asMember.role).toBe('membro');
     expect(asMember.invites).toEqual([]);
+    // Quem não tem nome para mostrar vem com o rótulo neutro do banco ("Pessoa da Família"), o único primeiro nome com espaço que vale.
+    const neutral = (await fake({}, { financial_contexts: [ctxRow], family_member_items: [member(), member({ person_id: 'p3', first_name: 'Pessoa da Família', role: 'membro', is_me: false })] }).getFamily())!;
+    expect(neutral.members.map((m) => m.firstName)).toEqual(['Ana', FAMILY_NEUTRAL_NAME]);
     // Sem contexto legível, sem Família; sem linha "eu" ativa, também.
     expect(await fake({}, { financial_contexts: [] }).getFamily()).toBeNull();
     expect(await fake({}, { financial_contexts: [ctxRow], family_member_items: [member({ is_me: false })] }).getFamily()).toBeNull();
@@ -7385,6 +7455,8 @@ describe('conversor da Família', () => {
       { first_name: '' },
       { first_name: 'Ana Lima' },
       { first_name: 'ana@exemplo.test' },
+      { first_name: 'Pessoa da Familia' },
+      { first_name: 'Pessoa da Família Lima' },
       { status: 'ex-membro' },
       { status: 'ativo', left_at: '2026-10-09T00:00:00Z' },
     ];
