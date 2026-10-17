@@ -95,6 +95,7 @@ export function Screen({
   bottomInset = true,
   wide,
   scrollRef,
+  onScroll,
 }: {
   children: ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
@@ -103,6 +104,8 @@ export function Screen({
   wide?: boolean;
   /** Acesso à rolagem (por exemplo, para voltar ao topo). */
   scrollRef?: Ref<ScrollView>;
+  /** A posição da rolagem, em px, a cada movimento (para uma tela decidir se algo já está à vista). */
+  onScroll?: (offsetY: number) => void;
 }) {
   const insets = useSafeAreaInsets();
   // Barra das telas de consulta (sobreposta ao fim da tela): já inclui a área segura de baixo. Soma-se ao respiro de baixo que a
@@ -114,6 +117,8 @@ export function Screen({
   return (
     <ScrollView
       ref={scrollRef}
+      onScroll={onScroll ? (e) => onScroll(e.nativeEvent.contentOffset.y) : undefined}
+      scrollEventThrottle={onScroll ? 64 : undefined}
       style={styles.screen}
       contentContainerStyle={[!wide && styles.screenContent, bottomInset && { paddingBottom: insets.bottom + space[10] }, contentStyle, underBar]}
       keyboardShouldPersistTaps="handled">

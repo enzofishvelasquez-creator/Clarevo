@@ -3127,3 +3127,131 @@ describe('textos da Evolução (D-057)', () => {
     for (const text of samples().filter((t) => /^De [a-zç]+ para /.test(t))) expect(text, text).not.toMatch(/mês a mês/i);
   });
 });
+
+import {
+  ANALYSES_TEXT,
+  ANALYSES_UPCOMING_MONTHS,
+  analysesBudgetSummary,
+  analysesEvolutionSummary,
+  analysesUpcomingSummary,
+  categoryBubbles,
+  evolutionFetchRange as analysesFetchRange,
+  fitBubbleLabel,
+  projectCommitted as analysesProject,
+  selectedCategoryCard,
+  summarizeBudget as analysesSummarizeBudget,
+  upcomingCommittedMonths as analysesUpcomingMonths,
+  type CategoryShare as AnalysesShare,
+} from '../src';
+
+/**
+ * Textos de Análises (D-059): pt-BR neutro quanto a gênero, sem travessão longo, sem a expressão vetada, sem palavra de julgamento, sem
+ * produto financeiro e sem marca. Só fatos: o percentual e o valor de cada categoria, sem nota, sem cor que julgue e sem "demais".
+ */
+describe('textos de Análises (D-059)', () => {
+  const GENDERED = /\b(o|a)s? usuári[oa]s?\b|\bobrigad[oa]s?\b|\bbem-vind[oa]s?\b|\bpreocupad[oa]s?\b|\bendividad[oa]s?\b|\bcadastrad[oa]\b|\(a\)|\(o\)|\bo\/a\b|\bvocê (é|está|ficou) \w+[oa]\b/i;
+  const VETOED =
+    /\bdemais\b|\balt[oa]s?\b|\bbaix[oa]s?\b|\bruim\b|cuidado|estour|gastou|gastão|gastona|exagero|\bculpa|\bperigo|\balerta|\bdeveria\b|\bprecisa(m)? (gastar|cortar)|\bcort(ar|e)\b|\bsupérfluo|parab[eé]ns|\bvoc[eê] conseguiu|incr[ií]vel|arrasou|\bvale a pena\b|\bsaldo disponível\b|aumentou|diminuiu|despencou|disparou|\bmuito\b|\bpouco\b|\batípic|\bdescontrol/i;
+  const BRANDS = /\b(nubank|ita[uú]|bradesco|santander|c6|sicredi|sicoob|btg|neon|picpay|mercado pago|visa|mastercard|hipercard|amex|serasa)\b/i;
+  const check = (texts: string[]) => {
+    expect(texts.length).toBeGreaterThan(0);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(FORBIDDEN_EXPANDED);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(VETOED);
+      expect(text, text).not.toMatch(GENDERED);
+      expect(text, text).not.toMatch(BRANDS);
+      expect(text, text).not.toMatch(/[–—]/);
+    }
+  };
+
+  const share = (category: string | null, label: string, cents: number, percentText: string): AnalysesShare => ({ category, label, cents, tenths: 0, percentText, a11yLabel: '' });
+
+  /** As frases montadas, em vários meses, contas e estados. */
+  async function samples(): Promise<string[]> {
+    const texts: string[] = [];
+    const T = ANALYSES_TEXT;
+    for (const month of ['2026-01', '2026-10', '2025-12']) {
+      texts.push(T.categories.title(month), T.categories.empty(month), T.evolution.title(month), T.evolution.outside(month), T.upcoming.title(month), T.budget.title(month), T.budget.none(month));
+    }
+    for (const n of [1, 2, 3, 12]) texts.push(T.categories.selected.count(n), T.categories.selected.more(n), T.budget.count(n));
+    texts.push(
+      T.categories.selected.share('23,4%'),
+      T.categories.selected.a11y('Mercado', '23,4%', 92_000),
+      T.categories.selected.announce('Mercado', '23,4%', 92_000),
+      T.categories.selected.rowA11y('Fatura do cartão', '2026-10-10', 60_000, true),
+      T.categories.selected.rowA11y('Feira', '2026-10-02', 25_000, false),
+      T.categories.barValue(92_000, '23,4%'),
+      T.budget.nearest('Lazer', 'R$ 400,00 de R$ 300,00', '133,3%'),
+    );
+    const bubbles = categoryBubbles(
+      [share('Moradia', 'Moradia', 250_000, '64,1%'), share('Mercado', 'Mercado', 140_000, '35,9%'), share(null, 'Sem categoria', 3_000, '0,1%')],
+      310,
+    );
+    for (const b of bubbles.bubbles) texts.push(b.a11yLabel, ...b.lines);
+    texts.push(...fitBubbleLabel('Mensalidade da escola de música', '4,0%', 38).lines);
+    // A demonstração e o cenário da Evolução: os resumos das três abas e o cartão da categoria.
+    for (const scenario of ['padrao', 'evolucao'] as const) {
+      const repo = await createDemoRepository({ scenario });
+      const ctx = (await repo.getSpace())!.personalContextId;
+      const { from, to } = analysesFetchRange('2026-10');
+      const overview = await repo.monthsOverview(ctx, from, to);
+      for (const hiddenMonths of [[], ['2026-04']]) {
+        const view = buildEvolutionView({ overview, metric: 'pago', windowMonths: 12, currentMonth: '2026-10', hiddenMonths, gapMonths: ['2026-03'] });
+        for (const p of view.points) {
+          const s = analysesEvolutionSummary(view, p.month)!;
+          texts.push(s.title, s.stateText, s.variationText, s.basis, ...(s.percentText ? [s.percentText] : []));
+        }
+      }
+      const months = analysesUpcomingMonths('2026-10');
+      const [series, due, refs] = await Promise.all([repo.listSeries(ctx), repo.listCommitmentsDueBetween(ctx, months[0]!, months[months.length - 1]!), repo.listIncomeReferences(ctx)]);
+      const up = analysesUpcomingSummary(analysesProject(series, due, refs, months, '2026-10-07'), '2026-10');
+      texts.push(up.title, up.legend, ...(up.emptyText ? [up.emptyText] : []), ...up.rows.flatMap((r) => [r.text, r.a11y]));
+      for (const month of ['2026-09', '2026-10']) {
+        const b = analysesBudgetSummary(analysesSummarizeBudget(await repo.getMonthBudget(ctx, month)));
+        texts.push(b.title, ...[b.totalLine, b.countText, b.nearestLine, b.emptyText, b.note].filter((x): x is string => x !== null));
+      }
+      for (const month of ['2026-03', '2026-04', '2026-10']) {
+        const paid = summarizeMonth(await repo.listRecords(ctx, month), ctx, month).composition.paid;
+        const shares = categoryBreakdown(paid);
+        const parts = paidCategoryParts(paid);
+        for (const sh of shares) {
+          const card = selectedCategoryCard(shares, parts, sh.category === null ? 'sem-categoria' : `c:${sh.category}`)!;
+          texts.push(card.title, card.name, card.valueText, card.shareText, card.a11y, card.announce, card.countText, ...(card.moreText ? [card.moreText] : []), ...card.rows.flatMap((r) => [r.a11y, ...(r.partialText ? [r.partialText] : [])]));
+        }
+      }
+    }
+    return texts;
+  }
+
+  it('as frases fixas passam nas regras', () => {
+    check(staticStrings(ANALYSES_TEXT));
+    expect(staticStrings(ANALYSES_TEXT).length).toBeGreaterThan(35);
+  });
+
+  it('as frases montadas, nos três meses, nas contas da demonstração e nos dois cenários, passam nas regras', async () => {
+    const texts = await samples();
+    expect(texts.length).toBeGreaterThan(150);
+    check(texts);
+    expect(ANALYSES_UPCOMING_MONTHS).toBe(3);
+  });
+
+  it('o arquivo-fonte das análises passa pelas regras de texto', () => {
+    const source = readFileSync(join(CORE_SRC, 'analises.ts'), 'utf8');
+    expect(source).not.toMatch(FORBIDDEN);
+    expect(source).not.toMatch(JUDGMENT);
+    expect(source).not.toMatch(BRANDS);
+  });
+
+  it('as frases são fatos, sem nota nem comparação que julgue: o cartão da categoria e o resumo do orçamento só dizem valor, percentual e quanto falta', () => {
+    const texts = [
+      ANALYSES_TEXT.categories.selected.announce('Lazer', '12,0%', 40_000),
+      ANALYSES_TEXT.budget.nearest('Lazer', 'R$ 400,00 de R$ 300,00', '133,3%'),
+      ANALYSES_TEXT.categories.hint,
+      ANALYSES_TEXT.categories.legend,
+      ANALYSES_TEXT.categories.minimumNote,
+    ];
+    for (const text of texts) expect(text, text).not.toMatch(/\bmelhor\b|\bpior\b|\bexcesso\b|\bdesperd|\bgasto(u)? (a )?mais\b|\bcontrole\b|\bculp/i);
+  });
+});

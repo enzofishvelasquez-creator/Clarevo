@@ -8,6 +8,7 @@ import {
   addMonths,
   committedTexts,
   formatMonthYearBR,
+  isUpcomingSection,
   isValidIsoMonth,
   limitFor,
   limitNotesFor,
@@ -21,8 +22,8 @@ import {
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ExternalLink, HandCoins, ListChecks, ListOrdered, Repeat, ShieldCheck, Wallet } from 'lucide-react-native';
-import { useState } from 'react';
-import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInLeft, FadeInRight, ReduceMotion } from 'react-native-reanimated';
 
 import { openCalc } from '@/components/calc/open';
@@ -54,7 +55,7 @@ import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 export default function RendaComprometidaScreen() {
   const { today } = useSession();
   const { month: viewMonth } = useView();
-  const params = useLocalSearchParams<{ mes?: string }>();
+  const params = useLocalSearchParams<{ mes?: string; secao?: string }>();
   const month: IsoMonth = typeof params.mes === 'string' && isValidIsoMonth(params.mes) ? params.mes : viewMonth;
   const contextId = useWork().data?.contextId;
   const [notice] = useFlash();
@@ -75,10 +76,26 @@ export default function RendaComprometidaScreen() {
   };
   const entering = switched ? (direction > 0 ? FadeInRight : FadeInLeft).duration(motion.context).reduceMotion(ReduceMotion.System) : undefined;
 
+  // ?secao=proximos (vindo de Análises › Próximos meses): rola até o card "Próximos meses". Os cards de cima carregam aos poucos e
+  // empurram o de baixo, então a rolagem acompanha a posição dele nos primeiros segundos e depois deixa a pessoa em paz.
+  const scroll = useRef<ScrollView>(null);
+  const openedAt = useRef(Date.now());
+  const scrolledTo = useRef<number | null>(null);
+  const [bodyY, setBodyY] = useState<number | null>(null);
+  const [upcomingY, setUpcomingY] = useState<number | null>(null);
+  const toUpcoming = isUpcomingSection(params.secao);
+  useEffect(() => {
+    if (!toUpcoming || bodyY === null || upcomingY === null || Date.now() - openedAt.current > 3000) return;
+    const y = Math.max(0, bodyY + upcomingY - space[4]);
+    if (scrolledTo.current === y) return;
+    scrolledTo.current = y;
+    scroll.current?.scrollTo({ y, animated: false });
+  }, [toUpcoming, bodyY, upcomingY]);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title={COMMITTED_TEXT.title} right={<ContextPill label="Pessoal" />} help="renda-comprometida" />
-      <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
+      <Screen scrollRef={scroll} contentStyle={{ padding: space[5], gap: space[4] }}>
         <FlashBanner message={notice} />
         <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Mês">
           {months.map((m) => (
@@ -91,8 +108,8 @@ export default function RendaComprometidaScreen() {
             />
           ))}
         </View>
-        <Animated.View key={month} entering={entering} style={{ gap: space[4] }}>
-          <MonthBody contextId={contextId} month={month} />
+        <Animated.View key={month} entering={entering} style={{ gap: space[4] }} onLayout={(e) => setBodyY(e.nativeEvent.layout.y)}>
+          <MonthBody contextId={contextId} month={month} onUpcomingLayout={setUpcomingY} />
         </Animated.View>
       </Screen>
     </View>
@@ -111,7 +128,7 @@ function openReference(month: IsoMonth) {
   router.push({ pathname: '/renda-comprometida/referencia', params: { mes: month } });
 }
 
-function MonthBody({ contextId, month }: { contextId: string | undefined; month: IsoMonth }) {
+function MonthBody({ contextId, month, onUpcomingLayout }: { contextId: string | undefined; month: IsoMonth; onUpcomingLayout: (y: number) => void }) {
   const { today } = useSession();
   const summary = useCommittedSummary(contextId, month, { withSeries: true });
   const records = useMonthRecords(contextId, month);
@@ -138,7 +155,9 @@ function MonthBody({ contextId, month }: { contextId: string | undefined; month:
       <GoalLinesCard contextId={contextId} month={month} />
       <ReferenceCard s={s} t={t} />
       <MonthBills s={s} />
-      <Upcoming contextId={contextId} month={month} />
+      <View onLayout={(e) => onUpcomingLayout(e.nativeEvent.layout.y)}>
+        <Upcoming contextId={contextId} month={month} />
+      </View>
       <HowWeCalculate t={t} />
       <Links month={month} currentMonth={monthOf(today)} />
     </>

@@ -1,10 +1,13 @@
 import {
   BUDGET_NOTICE_KEEP,
+  DEFAULT_CATEGORY_VIEW,
   DEFAULT_REMINDER_HOUR,
   DEFAULT_WIDGET_SHOW_VALUES,
   MEMORY_LIMIT,
   isBudgetNoticeKey,
+  isCategoryView,
   isReminderHour,
+  type CategoryView,
   type ImportMemory,
   type ReminderHour,
 } from '@clarevo/core';
@@ -63,6 +66,11 @@ export interface DevicePrefs {
    * para o servidor. No máximo 120, os mais novos.
    */
   budgetNoticesDismissed: string[];
+  /**
+   * "Barras | Bolhas" em Análises › Categorias (D-059): a forma de mostrar o Pago por categoria. Barras de início (a comparação mais
+   * precisa). Só neste aparelho, por pessoa; não é dado financeiro e nada vai para o servidor. Valor desconhecido volta às barras.
+   */
+  categoryView: CategoryView;
 }
 
 export const DEFAULT_PREFS: DevicePrefs = {
@@ -78,6 +86,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   tourSeen: false,
   widgetShowValues: DEFAULT_WIDGET_SHOW_VALUES,
   budgetNoticesDismissed: [],
+  categoryView: DEFAULT_CATEGORY_VIEW,
 };
 
 const PREFIX = 'clarevo.aparelho.v1.';
@@ -106,6 +115,7 @@ function parse(raw: string | null | undefined): DevicePrefs {
       tourSeen: v.tourSeen === true,
       widgetShowValues: v.widgetShowValues === true,
       budgetNoticesDismissed: Array.isArray(v.budgetNoticesDismissed) ? v.budgetNoticesDismissed.filter(isBudgetNoticeKey).slice(-BUDGET_NOTICE_KEEP) : [],
+      categoryView: isCategoryView(v.categoryView) ? v.categoryView : DEFAULT_CATEGORY_VIEW,
     };
   } catch {
     return DEFAULT_PREFS;

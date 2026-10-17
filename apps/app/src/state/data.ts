@@ -1926,6 +1926,41 @@ export function useCategoryBreakdown(contextId: string | undefined, month: IsoMo
 }
 
 /**
+ * Análises › Categorias (D-059): o mesmo "Por categoria" do Pago (`categoryBreakdown`, com a fatura paga dividida pelas categorias dela)
+ * e as partes por categoria dos mesmos gastos (`paidCategoryParts`), para o cartão "Categoria selecionada" listar os lançamentos do mês
+ * em cada categoria. As leituras são as de sempre (`records` e as faturas), então toda escrita recarrega a tela. Sem dado parcial: uma
+ * falha de qualquer leitura falha tudo, nunca um gasto na categoria errada por falta de leitura. Só leitura.
+ */
+export interface CategoryAnalysis {
+  paidCents: number;
+  shares: CategoryShare[];
+  parts: CategoryPart[];
+  /** Algum gasto do mês é pagamento de fatura de cartão (a tela explica que ele entra dividido pelas categorias). */
+  hasInvoicePayment: boolean;
+}
+
+export function useCategoryAnalysis(contextId: string | undefined, month: IsoMonth) {
+  const records = useMonthRecords(contextId, month);
+  const paid = records.summary?.composition.paid;
+  const paidCents = records.summary?.paidCents;
+  const invoices = useInvoicesOfRecords(contextId, month, paid);
+  const parts: QueryPart[] = [records, invoices];
+  const value = useMemo(
+    (): CategoryAnalysis | undefined =>
+      paid && paidCents !== undefined && invoices.data
+        ? {
+            paidCents,
+            shares: categoryBreakdown(paid, invoices.data),
+            parts: paidCategoryParts(paid, invoices.data),
+            hasInvoicePayment: paid.some((r) => Boolean(r.invoice)),
+          }
+        : undefined,
+    [paid, paidCents, invoices.data],
+  );
+  return combineParts<CategoryAnalysis>(parts, value);
+}
+
+/**
  * "Recebido por categoria" do mês (Evolução, fase 2): os recebimentos de useMonthRecords agrupados por categoria
  * (`receivedCategoryBreakdown`, o mesmo desenho de "Por categoria" de Pago). Sem dado parcial: falha de leitura é erro, nunca lista vazia.
  */

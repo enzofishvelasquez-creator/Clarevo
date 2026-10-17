@@ -1,4 +1,5 @@
 import { ACCOUNTS_TEXT } from '../accounts';
+import { ANALYSES_TABS, ANALYSES_TEXT } from '../analises';
 import { BUDGET_TEXT, LIMIT_TEXT } from '../budget';
 import { ANTES_FIELDS, ANTES_TEXT } from '../calculators/antes-de-financiar';
 import { CALCULATORS, CALC_GROUPS, CALC_UI_TEXT } from '../calculators/catalog';
@@ -119,6 +120,26 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     keywords: ['evolução', 'evolucao', 'gráfico', 'mês a mês', 'comparar meses', 'comparação', 'média', 'mediana', 'variação', 'tirar mês da comparação', 'linha do tempo'],
     routes: ['/evolucao'],
     screenshot: '443_evolucao_abril_fora.png',
+  },
+  {
+    id: 'analises',
+    group: 'dia-a-dia',
+    title: ANALYSES_TEXT.title,
+    purpose: 'Reúne, em quatro abas, as categorias do Pago em barras ou bolhas, a evolução, os próximos meses e o orçamento do mês escolhido.',
+    where: [TAB.movimentos, ANALYSES_TEXT.title],
+    steps: [
+      `Em Movimentos, logo abaixo de ${q(EVOLUTION_TEXT.title)}, toque em ${q(ANALYSES_TEXT.title)}. Use as setas ao lado do nome do mês para escolher o mês.`,
+      `Toque em uma aba: ${list(ANALYSES_TABS.map((t) => ANALYSES_TEXT.tabs[t]), 'ou')}.`,
+      `Em ${q(ANALYSES_TEXT.tabs.categorias)}, escolha ${q(ANALYSES_TEXT.categories.views.barras)} ou ${q(ANALYSES_TEXT.categories.views.bolhas)}. As barras comparam com mais precisão; as bolhas são uma visão exploratória, com o nome e o percentual escritos em cada uma. A escolha fica só neste aparelho.`,
+      `Toque em uma categoria para abrir o cartão ${q(ANALYSES_TEXT.categories.selected.title)}, com o valor, o percentual e os lançamentos do mês nela. Toque em um lançamento para abri-lo.`,
+      `${q(ANALYSES_TEXT.tabs.evolucao)}, ${q(ANALYSES_TEXT.tabs['proximos-meses'])} e ${q(ANALYSES_TEXT.tabs.orcamento)} mostram um resumo do mês e um botão (${q(ANALYSES_TEXT.evolution.action)}, ${q(ANALYSES_TEXT.upcoming.action)} ou ${q(ANALYSES_TEXT.budget.action)}) para a tela completa.`,
+      'As análises só leem: nada é gravado. Os valores seguem Ocultar valores, e o contexto é o que está escolhido, Pessoal ou Família.',
+    ],
+    screenName: ANALYSES_TEXT.title,
+    href: '/analises',
+    keywords: ['análises', 'análise', 'analisar', 'categorias', 'bolhas', 'barras', 'distribuição', 'para onde foi', 'comparar categorias', 'explorar'],
+    routes: ['/analises'],
+    screenshot: '481_analises_categorias_barras.png',
   },
   {
     id: 'anotar-gasto',

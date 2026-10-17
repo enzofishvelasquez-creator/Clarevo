@@ -6,6 +6,7 @@ import {
   IMPORT_TEXT,
   ORGANIZE_TEXT,
   accountFilterOptions,
+  analysesParams,
   filterByAccount,
   formatDayHeader,
   formatMonthBR,
@@ -32,6 +33,7 @@ import { FlashBanner, useFlash } from '@/components/flash';
 import { AppHeader, ContextSwitch, MonthSwitcher } from '@/components/header';
 import { RecordRow } from '@/components/record-row';
 import { SearchEntry } from '@/components/search-parts';
+import { AnalysesEntry } from '@/components/analises-parts';
 import { EvolutionEntry } from '@/components/evolucao-parts';
 import { SeuMesEntry } from '@/components/seu-mes-parts';
 import { EmptyState, ErrorState } from '@/components/states';
@@ -168,6 +170,9 @@ export default function MovimentacoesScreen() {
 
               {/* Evolução (D-057): logo abaixo de "Seu mês em 30 segundos"; sempre abre na janela de 6 meses até o mês atual. */}
               <EvolutionEntry onPress={() => router.push('/evolucao')} />
+
+              {/* Análises (D-059): logo abaixo de "Evolução"; abre no mês em exibição, com Categorias, Evolução, Próximos meses e Orçamento. */}
+              <AnalysesEntry onPress={() => router.push({ pathname: '/analises', params: analysesParams(month, currentMonth) })} />
 
               {canWrite ? (
                 <View style={styles.actions}>

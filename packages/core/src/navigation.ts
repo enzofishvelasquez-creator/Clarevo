@@ -77,7 +77,7 @@ export function barModeFor(pathname: string): BarMode {
 
 /** Abas que uma tela de consulta abre quando a pessoa não veio de nenhuma (endereço aberto direto): a do assunto. */
 const TAB_OF_TOPIC: readonly [RegExp, TabRoute][] = [
-  [/^\/(a-pagar|gastos-fixos|cartoes|registro|orcamento|movimentacoes|importar|seu-mes|evolucao)(\/|$)/, '/movimentacoes'],
+  [/^\/(a-pagar|gastos-fixos|cartoes|registro|orcamento|movimentacoes|importar|seu-mes|evolucao|analises)(\/|$)/, '/movimentacoes'],
   [/^\/(meta|reserva|guardar|simular|renda-comprometida)(\/|$)/, '/metas'],
   [/^\/(explicacao|aprender)(\/|$)/, '/aprender'],
 ];
@@ -331,6 +331,14 @@ export const APP_SCREENS: readonly AppScreen[] = [
     caption: 'Recebido e pago mês a mês, com média e mediana, e os meses que você tira da comparação',
     href: '/evolucao',
     keywords: ['evolução', 'evolucao', 'gráfico', 'grafico', 'mês a mês', 'comparar meses', 'comparação', 'média', 'mediana', 'variação', 'tirar mês da comparação', 'linha do tempo'],
+  },
+  {
+    // O título e a legenda são os de ANALYSES_TEXT (analises.ts), conferidos por teste: o arquivo das Análises importa este.
+    id: 'analises',
+    title: 'Análises',
+    caption: 'Categorias em barras ou bolhas, evolução, próximos meses e orçamento do mês',
+    href: '/analises',
+    keywords: ['análises', 'análise', 'analisar', 'explorar', 'bolhas', 'barras', 'gráfico de bolhas', 'categorias em bolhas', 'distribuição', 'distribuição dos gastos', 'comparar categorias', 'próximos meses'],
   },
   {
     id: 'lembretes',

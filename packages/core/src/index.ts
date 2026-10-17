@@ -48,3 +48,4 @@ export * from './widget';
 export * from './seu-mes';
 export * from './evolucao';
 export * from './evolucao-tela';
+export * from './analises';
