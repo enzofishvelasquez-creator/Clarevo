@@ -269,6 +269,36 @@ export function layoutBubbles(values: readonly number[], width: number, options:
   return { width, height, bubbles, minRadius: round2(minRadius), maxRadius: round2(maxRadius) };
 }
 
+/**
+ * Qual bolha contém o ponto (x, y), em px na mesma área do arranjo (a borda conta como dentro)? Nenhuma bolha toca outra, então no máximo
+ * uma contém o ponto; fora de todas, devolve null. O botão de cada bolha é um quadrado, e nos aparelhos o canto do quadrado de uma
+ * bolha menor cobre a borda da vizinha maior: o toque é resolvido por aqui, não pelo quadrado.
+ */
+export function bubbleAtPoint<T extends Pick<Bubble, 'cx' | 'cy' | 'r'>>(bubbles: readonly T[], x: number, y: number): T | null {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  let found: T | null = null;
+  let depth = Infinity;
+  for (const b of bubbles) {
+    const inside = Math.hypot(x - b.cx, y - b.cy) - b.r;
+    if (inside <= 0 && inside < depth) {
+      found = b;
+      depth = inside;
+    }
+  }
+  return found;
+}
+
+/**
+ * A bolha que um toque escolhe: `tapped` é a bolha cujo botão recebeu o toque e (locationX, locationY) é o ponto tocado, em px a partir
+ * do canto de cima e da esquerda do quadrado dela. Devolve a bolha que contém o ponto (pode ser a vizinha maior, sob o canto do quadrado),
+ * ou null quando o ponto está fora de todas (toque ignorado). Sem coordenadas (clique da web, ativação do leitor de tela), vale a
+ * própria bolha tocada.
+ */
+export function bubbleForTap<T extends Pick<Bubble, 'cx' | 'cy' | 'r'>>(bubbles: readonly T[], tapped: T, locationX: number | undefined, locationY: number | undefined): T | null {
+  if (typeof locationX !== 'number' || typeof locationY !== 'number' || !Number.isFinite(locationX) || !Number.isFinite(locationY)) return tapped;
+  return bubbleAtPoint(bubbles, tapped.cx - tapped.r + locationX, tapped.cy - tapped.r + locationY);
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Bolhas: o nome e o percentual dentro de cada uma
 // ---------------------------------------------------------------------------------------------------------------------
@@ -491,7 +521,8 @@ export const ANALYSES_TEXT = {
   upcoming: {
     /** "Previsto depois de outubro de 2026". */
     title: (month: IsoMonth): string => `Previsto depois de ${formatMonthYearBR(month)}`,
-    none: 'Nenhuma conta prevista nos próximos meses.',
+    /** Vale para os meses que a aba mostra (`ANALYSES_UPCOMING_MONTHS`), não para os seis da seção completa. */
+    none: 'Nenhuma conta prevista nos próximos 3 meses.',
     legend: COMMITTED_TEXT.upcomingLegend,
     action: 'Abrir Renda comprometida',
     actionHint: 'Abre Renda comprometida, na seção Próximos meses',
@@ -666,7 +697,7 @@ export interface AnalysesUpcomingRow {
 export interface AnalysesUpcomingSummary {
   title: string;
   rows: AnalysesUpcomingRow[];
-  /** "Nenhuma conta prevista nos próximos meses." quando os meses mostrados não têm nada previsto; senão null. */
+  /** "Nenhuma conta prevista nos próximos 3 meses." quando os meses mostrados não têm nada previsto; senão null. */
   emptyText: string | null;
   legend: string;
 }

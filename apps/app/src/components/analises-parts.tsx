@@ -7,6 +7,7 @@ import {
   analysesEvolutionSummary,
   analysesTabForKey,
   analysesUpcomingSummary,
+  bubbleForTap,
   buildEvolutionView,
   categoryAccessibleName,
   categoryBubbles,
@@ -20,7 +21,7 @@ import {
   type SelectedCategoryCard,
 } from '@clarevo/core';
 import { Check, ChartPie, ChevronRight } from 'lucide-react-native';
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
@@ -222,8 +223,9 @@ function CategoryBars({ shares, selectedKey, onSelect }: { shares: CategoryShare
 /**
  * Pago por categoria em bolhas (SVG): a área de cada bolha é proporcional ao valor (raio pela raiz), com um tamanho mínimo legível, e o
  * arranjo vem do core (`categoryBubbles`): nenhuma bolha toca outra, em qualquer largura. O nome e o percentual ficam escritos dentro
- * de cada bolha (nunca só cor), e cada bolha é um botão com o nome acessível "Mercado, 23,4%, R$ 920,00". A escolhida fica lima, com
- * contorno escuro mais grosso. As bolhas não mostram valor em reais; o nome acessível, sim (e segue "Ocultar valores").
+ * de cada bolha (nunca só cor), e cada bolha é um botão com o nome acessível "Mercado, 23,4%, R$ 920,00". O toque escolhe a bolha que
+ * contém o ponto tocado (`bubbleForTap`), não a do quadrado do botão. A escolhida fica lima, com contorno escuro mais grosso. As bolhas
+ * não mostram valor em reais; o nome acessível, sim (e segue "Ocultar valores").
  */
 function CategoryBubbleChart({ shares, selectedKey, onSelect }: { shares: CategoryShare[]; selectedKey: string | null; onSelect: (key: string) => void }) {
   const hidden = useValuesHidden();
@@ -259,7 +261,11 @@ function CategoryBubbleChart({ shares, selectedKey, onSelect }: { shares: Catego
                 accessibilityLabel={maskMoneyLabel(b.a11yLabel, hidden)}
                 accessibilityState={{ selected }}
                 aria-pressed={selected}
-                onPress={() => onSelect(b.key)}
+                onPress={(e) => {
+                  // O botão é um quadrado: o canto dele pode cobrir a borda de uma bolha vizinha maior. O ponto tocado decide a bolha.
+                  const hit = bubbleForTap(layout.bubbles, b, e?.nativeEvent?.locationX, e?.nativeEvent?.locationY);
+                  if (hit) onSelect(hit.key);
+                }}
                 style={(s) => [
                   styles.bubble,
                   { left: b.cx - b.r, top: b.cy - b.r, width: 2 * b.r, height: 2 * b.r, borderRadius: b.r },
@@ -307,11 +313,13 @@ function SelectedCategory({
   card: SelectedCategoryCard;
   onOpenRecord: (href: string) => void;
   onSeeAll: () => void;
-  onLayout: (y: number) => void;
+  onLayout: (y: number | null) => void;
 }) {
   const hidden = useValuesHidden();
   const { width, fontScale } = useWindowDimensions();
   const stacked = width < 360 || fontScale > 1.3;
+  // Ao sair da tela (outro mês, outra aba), a posição guardada deixa de valer: a próxima só vale depois do primeiro layout do cartão novo.
+  useEffect(() => () => onLayout(null), [onLayout]);
   return (
     <View onLayout={(e) => onLayout(e.nativeEvent.layout.y)}>
       <Card style={{ gap: space[3] }}>
@@ -415,7 +423,7 @@ export function CategoriesTab({
   onOpenRecord: (href: string) => void;
   onSeeAll: () => void;
   onAddExpense: () => void;
-  onCardLayout: (y: number) => void;
+  onCardLayout: (y: number | null) => void;
 }) {
   const analysis = useCategoryAnalysis(contextId, month);
   const pref = useCategoryViewPref();
@@ -461,9 +469,13 @@ function CategoriesBody({
   onOpenRecord: (href: string) => void;
   onSeeAll: () => void;
   onAddExpense: () => void;
-  onCardLayout: (y: number) => void;
+  onCardLayout: (y: number | null) => void;
 }) {
   const card = useMemo(() => (selectedKey ? selectedCategoryCard(data.shares, data.parts, selectedKey) : null), [data, selectedKey]);
+  // Barras e Bolhas têm alturas diferentes: a posição guardada do cartão deixa de valer até o layout novo dele (antes de qualquer layout).
+  useLayoutEffect(() => {
+    onCardLayout(null);
+  }, [view, onCardLayout]);
   if (data.shares.length === 0) {
     return (
       <Card>

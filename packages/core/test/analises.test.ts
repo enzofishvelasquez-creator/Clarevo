@@ -18,6 +18,7 @@ import {
   DEMO_TODAY,
   EVOLUTION_TEXT,
   GUIDE_ENTRIES,
+  MemoryRepository,
   NO_CATEGORY_KEY,
   NO_CATEGORY_LABEL,
   analysesBudgetSummary,
@@ -29,6 +30,8 @@ import {
   analysesTabFrom,
   analysesUpcomingSummary,
   barModeFor,
+  bubbleAtPoint,
+  bubbleForTap,
   buildEvolutionView,
   categoryAccessibleName,
   categoryBreakdown,
@@ -44,6 +47,7 @@ import {
   labelWidthEm,
   layoutBubbles,
   monthOf,
+  newOperationKey,
   paidCategoryParts,
   projectCommitted,
   searchAppScreens,
@@ -257,6 +261,74 @@ describe('bolhas: o arranjo (layoutBubbles)', () => {
       expect(h).toBeGreaterThan(150);
       expect(h).toBeLessThan(380);
     }
+  });
+});
+
+describe('bolhas: qual bolha o toque escolhe (bubbleAtPoint e bubbleForTap)', () => {
+  // Uma grande e uma menor na diagonal, com a folga de 8 px: o canto de cima e da esquerda do quadrado da menor (152, 152) cai dentro da grande.
+  const big = { key: 'grande', cx: 100, cy: 100, r: 80 };
+  const small = { key: 'pequena', cx: 190, cy: 190, r: BUBBLE_MIN_RADIUS };
+  const pair = [big, small];
+
+  it('o centro de cada bolha é dela, a borda conta como dentro e fora de todas devolve null', () => {
+    expect(bubbleAtPoint(pair, 100, 100)).toBe(big);
+    expect(bubbleAtPoint(pair, 190, 190)).toBe(small);
+    expect(bubbleAtPoint(pair, 180, 100)).toBe(big);
+    expect(bubbleAtPoint(pair, 180.01, 100)).toBeNull();
+    expect(bubbleAtPoint(pair, 190, 190 + BUBBLE_MIN_RADIUS)).toBe(small);
+    // O canto de cima e da direita do quadrado da menor fica fora das duas.
+    expect(bubbleAtPoint(pair, 228, 152)).toBeNull();
+    expect(bubbleAtPoint(pair, -5, -5)).toBeNull();
+    expect(bubbleAtPoint([], 10, 10)).toBeNull();
+    expect(bubbleAtPoint(pair, Number.NaN, 100)).toBeNull();
+    expect(bubbleAtPoint(pair, 100, Number.POSITIVE_INFINITY)).toBeNull();
+  });
+
+  it('a borda da bolha grande sob o canto do quadrado da pequena escolhe a grande', () => {
+    // O ponto (153, 153) está no quadrado da pequena (152 a 228) e dentro da grande (distância cerca de 75 < 80), mas fora da pequena (distância cerca de 52 > 38).
+    const corner = { x: 153, y: 153 };
+    expect(Math.abs(corner.x - small.cx) <= small.r && Math.abs(corner.y - small.cy) <= small.r).toBe(true);
+    expect(Math.hypot(corner.x - small.cx, corner.y - small.cy)).toBeGreaterThan(small.r);
+    expect(bubbleAtPoint(pair, corner.x, corner.y)).toBe(big);
+    // O toque chega ao botão da pequena, a 1 px do canto do quadrado dela: quem é escolhida é a grande.
+    expect(bubbleForTap(pair, small, 1, 1)).toBe(big);
+  });
+
+  it('o centro e o miolo do botão escolhem a própria bolha; o canto do quadrado fora de todas é ignorado', () => {
+    expect(bubbleForTap(pair, small, small.r, small.r)).toBe(small);
+    expect(bubbleForTap(pair, big, big.r, big.r)).toBe(big);
+    expect(bubbleForTap(pair, small, 2 * small.r - 1, 1)).toBeNull();
+    expect(bubbleForTap(pair, big, 1, 1)).toBeNull();
+    // Sem coordenadas (clique da web, ativação do leitor de tela), vale a bolha do botão.
+    expect(bubbleForTap(pair, small, undefined, undefined)).toBe(small);
+    expect(bubbleForTap(pair, small, Number.NaN, 3)).toBe(small);
+  });
+
+  it('em 320, 360 e 390 px: o centro de cada bolha é dela, e cada ponto do quadrado de uma bolha escolhe a bolha que o contém (ou nenhuma)', () => {
+    const random = lcg(59);
+    let overlapsOfSquare = 0;
+    for (const [name, values] of Object.entries({ seis: [300_000, 140_000, 60_000, 40_000, 30_000, 20_000], sete: [470_000, 200_000, 88_000, 40_000, 22_000, 15_000, 9_000] })) {
+      for (const width of WIDTHS) {
+        const { bubbles } = layoutBubbles(values, width);
+        for (const b of bubbles) {
+          expect(bubbleAtPoint(bubbles, b.cx, b.cy), `${name} ${width} centro ${b.index}`).toBe(b);
+          expect(bubbleForTap(bubbles, b, b.r, b.r)).toBe(b);
+          for (let k = 0; k < 400; k++) {
+            const lx = random() * 2 * b.r;
+            const ly = random() * 2 * b.r;
+            const hit = bubbleForTap(bubbles, b, lx, ly);
+            const x = b.cx - b.r + lx;
+            const y = b.cy - b.r + ly;
+            const expected = bubbles.filter((o) => Math.hypot(x - o.cx, y - o.cy) <= o.r);
+            expect(expected.length, `${name} ${width}: nenhuma bolha toca outra`).toBeLessThanOrEqual(1);
+            expect(hit, `${name} ${width} ${b.index} (${lx.toFixed(1)}, ${ly.toFixed(1)})`).toBe(expected[0] ?? null);
+            if (hit && hit !== b) overlapsOfSquare += 1;
+          }
+        }
+      }
+    }
+    // O defeito existe nos arranjos reais: pontos do quadrado de uma bolha que são de outra.
+    expect(overlapsOfSquare).toBeGreaterThan(0);
   });
 });
 
@@ -543,7 +615,42 @@ describe('Análises: os resumos das outras abas, com os números da demonstraç�
     expect(summary.legend).toBe('Previsto: contas já criadas e repetições programadas. Valores estimados podem mudar.');
     // Conta nova: nada previsto, a frase diz isso e nunca mostra três meses de R$ 0,00 como se fossem uma previsão.
     const blank = projectCommitted([], [], [], months, DEMO_TODAY);
-    expect(analysesUpcomingSummary(blank, '2026-10').emptyText).toBe('Nenhuma conta prevista nos próximos meses.');
+    expect(analysesUpcomingSummary(blank, '2026-10').emptyText).toBe('Nenhuma conta prevista nos próximos 3 meses.');
+  });
+
+  it('Próximos meses: a frase de "nada previsto" fala só dos 3 meses que a aba mostra, e uma conta do ano no 5º mês não a contradiz', async () => {
+    expect(ANALYSES_TEXT.upcoming.none).toBe(`Nenhuma conta prevista nos próximos ${ANALYSES_UPCOMING_MONTHS} meses.`);
+    const repo = new MemoryRepository({ actorId: 'pessoa-teste', displayName: 'Pessoa teste', today: () => DEMO_TODAY });
+    const ctx = (await repo.ensurePersonalSpace('Conta principal')).personalContextId;
+    // IPVA em março de 2027: o 5º mês depois de outubro de 2026 (novembro, dezembro, janeiro, fevereiro, março).
+    await repo.createSeries(newOperationKey(), ctx, {
+      kind: 'anual',
+      nature: 'conta',
+      description: 'IPVA',
+      category: null,
+      amountCents: 251_230,
+      amountMode: 'fixo',
+      dueDay: 10,
+      firstDueMonth: '2027-03',
+      firstNumber: 1,
+      installmentTotal: null,
+      partsPerYear: 1,
+      lastMonth: null,
+    });
+    const months = upcomingCommittedMonths('2026-10');
+    const projection = projectCommitted(await repo.listSeries(ctx), [], [], months, DEMO_TODAY);
+    expect(projection.months.map((m) => m.committedCents)).toEqual([0, 0, 0, 0, 251_230, 0]);
+    expect(projection.months[4]!.month).toBe('2027-03');
+    const summary = analysesUpcomingSummary(projection, '2026-10');
+    expect(summary.rows.map((r) => r.month)).toEqual(['2026-11', '2026-12', '2027-01']);
+    expect(summary.emptyText).toBe('Nenhuma conta prevista nos próximos 3 meses.');
+    // Com a conta dentro dos 3 meses mostrados, a frase some e as linhas aparecem.
+    const within = projectCommitted(await repo.listSeries(ctx), [], [], upcomingCommittedMonths('2026-12'), DEMO_TODAY);
+    expect(within.months[2]!.month).toBe('2027-03');
+    expect(within.months[2]!.committedCents).toBe(251_230);
+    const shown = analysesUpcomingSummary(within, '2026-12');
+    expect(shown.emptyText).toBeNull();
+    expect(shown.rows.map((r) => r.month)).toEqual(['2027-01', '2027-02', '2027-03']);
   });
 
   it('Orçamento: orçado e usado de outubro, a categoria com o maior percentual, e a frase de mês sem orçamento', async () => {

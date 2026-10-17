@@ -59,7 +59,9 @@ export default function AnalisesScreen() {
   const [picked, setPicked] = useState<{ scope: string; key: string } | null>(null);
   const selectedKey = picked && picked.scope === scope ? picked.key : null;
 
-  // Ao escolher uma categoria, o cartão dela aparece abaixo do gráfico: se ainda não está à vista, a tela rola até ele.
+  // Ao escolher uma categoria, o cartão dela aparece abaixo do gráfico: se ainda não está à vista, a tela rola até ele. A posição do
+  // cartão é zerada quando ele sai da tela (outro mês ou outra aba) e quando o gráfico muda de altura (Barras e Bolhas): a tela só rola
+  // depois do primeiro layout novo do cartão, nunca com a posição de antes.
   const scroll = useRef<ScrollView>(null);
   const scrollY = useRef(0);
   const reduced = useReducedMotion();

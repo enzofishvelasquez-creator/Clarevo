@@ -11472,7 +11472,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     anInfo.items.every((b) => b.texts[b.texts.length - 1].text === b.name.split(', ')[1]), JSON.stringify(anInfo.items.map((b) => b.name)));
   ok('Análises sete categorias, bolhas: as bolhas menores aparecem no tamanho mínimo (76 px) e a legenda avisa que o percentual escrito é o que vale; as maiores seguem a área proporcional', t.includes('As bolhas menores aparecem no tamanho mínimo, para o nome caber. O percentual escrito é o que vale.') &&
     anInfo.items.filter((b) => Math.abs(b.w - 76) < 0.6).length >= 3 && anInfo.items[0].w > anInfo.items[1].w && anInfo.items[1].w > 76, JSON.stringify(anInfo.items.map((b) => Math.round(b.w))));
-  ok('Análises sete categorias, bolhas: "Sem categoria" cabe dentro da bolha mínima, escrita em duas linhas e o percentual', JSON.stringify(anInfo.items[6].texts.map((x) => x.text)) === JSON.stringify(['Sem', 'categoria', '2,5%']) || anInfo.items[6].texts.length >= 3, JSON.stringify(anInfo.items[6].texts));
+  ok('Análises sete categorias, bolhas: "Sem categoria" cabe dentro da bolha mínima, escrita em duas linhas e o percentual', anInfo.items[6].name.startsWith('Sem categoria, ') && JSON.stringify(anInfo.items[6].texts.map((x) => x.text)) === JSON.stringify(['Sem', 'categoria', '2,5%']), JSON.stringify(anInfo.items[6].texts));
   await anShots('491_analises_sete_categorias_bolhas', { scroll: evScroll('Pago em março de 2026'), extra: async (w) => { await anBubbleChecks(`Análises sete categorias, bolhas ${w}px`, 7); } });
   // Toque na bolha de "Sem categoria": o cartão mostra o lançamento sem categoria e o link para ele.
   await anBtn(anBarNames[6]).click(); await p.waitForTimeout(700);
@@ -11626,7 +11626,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await anKeep();
   ok('Análises conta nova: "Nenhum gasto anotado em outubro de 2026.", o botão "Anotar gasto" e nenhum valor de exemplo; Barras marcada', t.includes('Nenhum gasto anotado em outubro de 2026.') && (await visibleCount('button', 'Anotar gasto')) === 1 && !/R\$ \d/.test(t) && (await anBars()) === null && !(await body()).includes('Moradia'));
   await anShots('497_analises_conta_nova');
-  for (const [tab, texts] of [['Evolução', ['Pago em outubro de 2026', 'Sem registros']], ['Próximos meses', ['Nenhuma conta prevista nos próximos meses.']], ['Orçamento', ['Nenhum orçamento definido em outubro de 2026.']]]) {
+  for (const [tab, texts] of [['Evolução', ['Pago em outubro de 2026', 'Sem registros']], ['Próximos meses', ['Nenhuma conta prevista nos próximos 3 meses.']], ['Orçamento', ['Nenhum orçamento definido em outubro de 2026.']]]) {
     await anTab(tab).click(); await p.waitForTimeout(700);
     t = await anKeep();
     ok(`Análises conta nova, ${tab}: ${texts.join(' / ')}, o botão para a tela completa e nenhum valor de exemplo`, texts.every((x) => t.includes(x)) && !/R\$ \d/.test(t) && (await visibleCount('button', /^Abrir /)) === 1, t.slice(0, 300));
@@ -11677,7 +11677,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await anRow().click(); await waitText('Consulte o mês escolhido'); await p.waitForTimeout(900);
   await anTab('Categorias').click(); await p.waitForTimeout(700);
   anBarList = await anBars();
-  ok('Análises ao voltar ao Pessoal: os dados são os do Pessoal de novo (Mercado, R$ 120,00), sem a categoria escolhida na Família', (await anMonthLabel()).includes('Pessoal · Outubro de 2026') && ((anBarList?.length === 1 && anBarList[0].name === 'Mercado, 100%, R$ 120,00') || (await anBubbleInfo())?.items[0]?.name === 'Mercado, 100%, R$ 120,00'));
+  ok('Análises ao voltar ao Pessoal: os dados são os do Pessoal de novo (Mercado, R$ 120,00), sem a categoria escolhida na Família', (await anMonthLabel()).includes('Pessoal · Outubro de 2026') && (await anCardText()) === null && ((anBarList?.length === 1 && anBarList[0].name === 'Mercado, 100%, R$ 120,00') || (await anBubbleInfo())?.items[0]?.name === 'Mercado, 100%, R$ 120,00'));
   await famSignOut();
 
   // ---- 13. Textos e escritas ----
