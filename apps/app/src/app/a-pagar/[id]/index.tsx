@@ -9,6 +9,7 @@ import {
   affectedByYear,
   annualYearLabelOf,
   annualYearErrorText,
+  commitmentDueNotice,
   commitmentSituation,
   deviceTimeZone,
   dueText,
@@ -42,6 +43,7 @@ import { ChoiceDialog } from '@/components/choice-dialog';
 import { bySeries, ofSeries, SERIES_NOUN, yearA11yLabel } from '@/components/series-parts';
 import { SITUATION_LOOK } from '@/components/commitment-row';
 import { ConfirmDialog } from '@/components/dialog';
+import { DueDayNotice } from '@/components/due-day-notice';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
@@ -132,6 +134,8 @@ export default function DetalheContaAPagar() {
   const c = commitment.data;
   const by = useAuthorship(c?.contextId ?? '', c?.createdBy ?? '');
   const situation = c ? commitmentSituation(c, today) : null;
+  // Vencimento em sábado, domingo ou feriado nacional (D-060 item 3): só avisa, a data não muda.
+  const dueNotice = c ? commitmentDueNotice(c, today) : null;
   const paid = c?.status === 'quitado' ? c.payment : null;
   const ref = c?.series ?? null;
   const series = useSeries(ref?.id, c?.contextId);
@@ -405,6 +409,7 @@ export default function DetalheContaAPagar() {
                 <Txt variant="label" color={situation === 'vencida' ? colors.error : colors.textSecondary}>
                   {dueText(c, today)}
                 </Txt>
+                {dueNotice ? <DueDayNotice notice={dueNotice} /> : null}
                 {lateCalc ? (
                   <>
                     <LinkButton

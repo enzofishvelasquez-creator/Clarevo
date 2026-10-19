@@ -1,4 +1,5 @@
 import {
+  commitmentDueNotice,
   commitmentSituation,
   dueText,
   formatMonthBR,
@@ -11,6 +12,7 @@ import {
 import { AlertCircle, CalendarClock, CalendarRange, Check, type LucideIcon } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
+import { DueDaySign } from '@/components/due-day-notice';
 import { Txt } from '@/components/ui';
 import { maskMoneyLabel, maskMoneyText, moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
@@ -37,6 +39,8 @@ export interface RowAction {
 /**
  * Linha de conta a pagar: abre o detalhe; nenhuma ação aninhada. Conta de gasto fixo leva o rótulo em texto
  * ("Todo mês", "Parcela 13 de 48") e, com valor estimado, "≈" no valor e "estimado" na legenda (nunca só a cor).
+ * Conta em aberto que vence em sábado, domingo ou feriado nacional leva, abaixo da legenda, o sinal "Não é dia útil · próximo dia
+ * útil: terça, 13/10" (D-060 item 3): texto com ícone, discreto, e a data de vencimento não muda.
  * action: botão secundário pequeno logo abaixo, irmão da linha (nunca dentro dela), alinhado ao texto.
  */
 export function CommitmentRow({
@@ -58,6 +62,7 @@ export function CommitmentRow({
   const situation = commitmentSituation(c, today);
   const look = SITUATION_LOOK[situation];
   const due = dueText(c, today);
+  const dueNotice = commitmentDueNotice(c, today);
   const paid = situation === 'paga' || situation === 'paga_em_parte' ? c.payment : null;
   const cents = paid ? paid.amountCents : c.amountCents;
   // O valor pago é sempre o real; só a conta em aberto pode estar estimada.
@@ -74,7 +79,8 @@ export function CommitmentRow({
     (estimate ? `cerca de ${moneyA11y(cents, hidden)}, valor estimado` : moneyA11y(cents, hidden)) +
     (paidMonth ? `, conta em Pago de ${paidMonth}` : '') +
     (showsPlanned ? `, previsto ${moneyA11y(c.amountCents, hidden)}`.toLowerCase() : '') +
-    (c.series ? seriesA11y(c.series.kind, seriesLabel!) : '');
+    (c.series ? seriesA11y(c.series.kind, seriesLabel!) : '') +
+    (dueNotice ? `, ${dueNotice.signA11y}` : '');
 
   const amount = (
     <View style={stacked ? undefined : styles.amountCol}>
@@ -114,6 +120,7 @@ export function CommitmentRow({
           style={situation === 'vence_hoje' ? { fontFamily: fonts.bold } : undefined}>
           {caption}
         </Txt>
+        {dueNotice ? <DueDaySign notice={dueNotice} /> : null}
         {stacked ? amount : null}
       </View>
       {stacked ? null : amount}

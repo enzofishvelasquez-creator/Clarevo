@@ -1,4 +1,5 @@
 import { addDays, isValidIsoDate, type IsoDate } from './dates';
+import { isBusinessDay } from './dia-util';
 import type { Commitment } from './records';
 
 /**
@@ -39,6 +40,9 @@ export const REMINDER_TEXT = {
   channelName: 'Lembretes de contas a pagar',
 } as const;
 
+/** O que o corpo do aviso ganha quando o vencimento avisado não é dia útil (D-060 (3)). */
+export const REMINDER_NOT_BUSINESS_DAY = ', que não é dia útil';
+
 export function isReminderHour(value: unknown): value is ReminderHour {
   return typeof value === 'number' && (REMINDER_HOURS as readonly number[]).includes(value);
 }
@@ -62,9 +66,16 @@ export function reminderHourA11y(hour: ReminderHour): string {
   return `${hour} horas`;
 }
 
-/** "Você tem 1 conta com vencimento amanhã." / "Você tem 3 contas com vencimento amanhã." */
-export function reminderBody(count: number): string {
-  return count === 1 ? 'Você tem 1 conta com vencimento amanhã.' : `Você tem ${count} contas com vencimento amanhã.`;
+/**
+ * "Você tem 1 conta com vencimento amanhã." / "Você tem 3 contas com vencimento amanhã."
+ *
+ * D-060 (3): com `dueOn` em sábado, domingo ou feriado nacional, o aviso diz só isso a mais: "Você tem 1 conta com vencimento
+ * amanhã, que não é dia útil." Cabe sem valor nem descrição (D-025(3)), não promete nada sobre encargos e não muda quando o
+ * aviso é agendado nem a data de vencimento. Sem `dueOn`, o texto é o de sempre.
+ */
+export function reminderBody(count: number, dueOn?: IsoDate): string {
+  const tail = dueOn !== undefined && isValidIsoDate(dueOn) && !isBusinessDay(dueOn) ? REMINDER_NOT_BUSINESS_DAY : '';
+  return count === 1 ? `Você tem 1 conta com vencimento amanhã${tail}.` : `Você tem ${count} contas com vencimento amanhã${tail}.`;
 }
 
 export interface ReminderItem {
@@ -132,7 +143,7 @@ export function reminderPlan(
         dueOn,
         count,
         title: REMINDER_TEXT.notificationTitle,
-        body: reminderBody(count),
+        body: reminderBody(count, dueOn),
       };
     });
 }

@@ -8,6 +8,7 @@ import {
   formatBRL,
   formatDayMonth,
   invoiceCanBePaid,
+  invoiceDueNotice,
   invoiceFor,
   invoiceLineText,
   invoiceMonthLabel,
@@ -25,6 +26,7 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { ChoiceDialog, type DialogChoice } from '@/components/choice-dialog';
 import { ConfirmDialog } from '@/components/dialog';
+import { DueDayNotice } from '@/components/due-day-notice';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
@@ -302,6 +304,8 @@ function InvoiceBody({
   onUndo: () => void;
 }) {
   const t = invoiceTexts(invoice, today);
+  // Vencimento em sábado, domingo ou feriado nacional (D-060 item 3): só avisa, o vencimento do cartão não muda.
+  const dueNotice = invoiceDueNotice(invoice, today);
   const paid = invoice.situation === 'paga' || invoice.situation === 'paga_em_parte';
   // Só se paga fatura fechada; a aberta mostra quando poderá ser paga (t.payHint).
   const canPay = invoiceCanBePaid(invoice);
@@ -362,6 +366,8 @@ function InvoiceBody({
             </Txt>
           </Banner>
         ) : null}
+
+        {dueNotice ? <DueDayNotice notice={dueNotice} /> : null}
 
         {t.partial ? (
           <Card style={{ gap: space[2] }}>

@@ -1,6 +1,6 @@
 # Aprender e dúvidas: catálogo, fontes e revisões
 
-15/10/2026 · conteúdo em `packages/core/src/learn` (D-031, D-032 e, para os temas de época e o card "Neste mês", D-053). Este documento registra o catálogo, como cada fato foi conferido, os temas em rascunho e o que falta, e as revisões feitas. Ao mudar um tema, atualize este arquivo junto.
+15/10/2026, com a seção 11 de 19/10/2026 · conteúdo em `packages/core/src/learn` (D-031, D-032 e, para os temas de época e o card "Neste mês", D-053; a seção 11 registra a lista de feriados nacionais do aviso de dia útil, D-060, que não é tema). Este documento registra o catálogo, como cada fato foi conferido, os temas em rascunho e o que falta, e as revisões feitas. Ao mudar um tema, atualize este arquivo junto.
 
 ## 1. Como funciona
 
@@ -603,6 +603,7 @@ Nenhuma muda o texto publicado hoje; todas estão também na seção 4, no tema.
 - Caderno de Educação Financeira do Banco Central (2013): o parágrafo dos gastos necessários, com alimentação, moradia e vestuário, foi confirmado sem trecho literal de `bcb.gov.br`; há uma 2ª edição, de 2026, não conferida (`essenciais`, `renda-variavel`).
 - Calculadora do Cidadão, aplicação com depósitos regulares: a fórmula e o "início de cada período" vieram de um resultado de busca; abrir a página e comparar um resultado com o do simulador (`simulacao`).
 - A página da CVM sobre a reserva (6 a 12 meses de gastos) foi confirmada por busca para o tema `reserva-imprevistos`. A calculadora de reserva do Ciclo A6 ainda mostra a referência sem link e sem número (`RESERVA_REFERENCIA`, D-035(3)); usar a mesma conferência ali depende de decisão.
+- Feriados nacionais do aviso de dia útil (19/10/2026, seção 11): nenhuma das três páginas do Planalto abriu (DNS na leitura de páginas e bloqueio de saída na linha de comando); abrir e comparar o artigo de cada lei com o `locator`. Pontos mais frágeis: os nomes usuais dos feriados (as Leis 662 e 10.607 citam só as datas, e a Lei 14.759 diz "Dia Nacional de Zumbi e da Consciência Negra"), e os anos de início de vigência de 21 de abril e 2 de novembro (2003, pela Lei 10.607/2002) e de 12 de outubro (1980), que o aviso nunca usa porque só olha vencimentos de hoje em diante.
 
 ## 7. Prazos de revisão
 
@@ -613,6 +614,7 @@ Nenhuma muda o texto publicado hoje; todas estão também na seção 4, no tema.
 | 15/04/2027 (6 meses) | `imposto-de-renda` (D-053: o prazo de cada ano só sai pouco antes de março) | 16/03/2027 |
 | 09/10/2027 (12 meses) | os demais temas com fonte externa publicados em 09/10/2026, inclusive os 2 rascunhos | 09/09/2027 |
 | 15/10/2027 (12 meses) | `decimo-terceiro`, `ferias` e `volta-as-aulas` (D-053) | 15/09/2027 |
+| 19/10/2027 (12 meses) | lista de feriados nacionais do aviso de dia útil (`packages/core/src/dia-util.ts`, D-060), que não é tema de Aprender | `dia-util.test.ts` reprova depois do prazo, sem aviso antes |
 | Sem prazo | temas que citam só decisões do Clarevo | |
 
 Depois do prazo, `npm test` reprova o tema, com o slug na mensagem, de propósito: as regras de IOF, rotativo, cheque especial, taxa legal, mínimo existencial e limite do FGC mudam por decreto, resolução ou lei.
@@ -648,6 +650,7 @@ Em relação ao conteúdo checado da especificação de 08/10/2026 (Anexo A e te
 | 09/10/2026 | `renda-comprometida`, `renda-variavel`, `aporte`, `essenciais`, `simulacao` | Cinco temas novos, todos publicados (`reviewedOn` 09/10/2026, revisão a cada 12 meses): o catálogo passa a 42 temas, 40 publicados; decisões D-026, D-027 e D-028 citadas e registradas em `docs/00`; atalho "Simular" em Aprender e ações "No Clarevo" nas telas dos ciclos | Busca na web, fato a fato (CVM: duas frases do `aporte`; Banco Central: Estudo Especial nº 80, Séries 6 e 8, glossário e Caderno; Susep; IBGE; Calculadora do Cidadão), com as ressalvas da seção 4 e da seção 6 |
 | 10/10/2026 | `fatura`, `rotativo-cartao` | Os cartões entraram no app (D-037): o segundo parágrafo de `fatura` e o último de `rotativo-cartao` deixaram de dizer que não há cartões; as fontes do Clarevo ganharam D-037; `reviewedOn` 10/10/2026 (prazo de `rotativo-cartao`: 10/04/2027) | Texto do app conferido com D-037 e com os testes de `cards.test.ts`; nenhum fato externo novo, então as datas de consulta ficam em 09/10/2026 |
 | 15/10/2026 | `decimo-terceiro`, `ferias`, `volta-as-aulas`, `imposto-de-renda` | Quatro temas de época novos, todos publicados (`reviewedOn` e `consultedOn` 15/10/2026; revisão a cada 12 meses, e `imposto-de-renda` a cada 6): o catálogo passa a 46 temas, 44 publicados; calendário `learn/epoca.ts` e card "Neste mês" em Aprender (D-053); passo novo na entrada "Aprender" do guia (D-049) | Busca na web, fato a fato, pelo Ministério do Trabalho e Emprego, Planalto, Câmara dos Deputados, INSS, Receita Federal, Procon de Mato Grosso e Prefeitura de Sinop; as páginas não abriram (DNS), então cada trecho é de resultado de busca e está dito no `locator`; ressalvas nas seções 4 e 6 |
+| 19/10/2026 | Lista de feriados nacionais do aviso de dia útil (não é tema) | Nove feriados nacionais com a lei que define cada um e a data da consulta; entra no app como aviso de vencimento em sábado, domingo ou feriado nacional (D-060 item 3, Ciclo T); `reviewedOn` 19/10/2026, revisão a cada 12 meses | Busca na web, lei por lei (Planalto e Câmara dos Deputados); as páginas não abriram, então cada trecho é de resultado de busca e está dito no `locator`; ressalvas na seção 6 e na seção 11 |
 
 ## 10. Como revisar um tema
 
@@ -656,3 +659,33 @@ Em relação ao conteúdo checado da especificação de 08/10/2026 (Anexo A e te
 3. Se um número do exemplo mudou, atualizar a conta em `learn/examples.ts` (sempre por uma função de `learn/math.ts`) ou o fato de norma do tema; `npm test` recusa qualquer "R$" ou "%" que não bata.
 4. Fato que não se confirma: tirar ou reescrever a frase; se o tema não se sustenta, passar para `rascunho`, com o que falta em `pending`.
 5. Rodar `npm test` e `npm run typecheck` e registrar a revisão na seção 9 (data, temas, o que mudou e como foi conferido), com as ressalvas novas nas seções 4 e 6.
+
+## 11. Feriados nacionais do aviso de dia útil (Ciclo T, D-060)
+
+Não é tema de Aprender: a lista vive em `packages/core/src/dia-util.ts` (`nationalHolidays`, `NATIONAL_HOLIDAY_SOURCES`), com o mesmo método das seções 3 e 10 e o teste `packages/core/test/dia-util.test.ts`, que confere a lista, as fontes, esta seção e o prazo de revisão. O aviso de "vence em dia que não é útil" (D-060 item 3) só considera feriados definidos em lei federal. Revisar até 19/10/2027 (12 meses); depois do prazo o teste reprova, de propósito, como nos temas.
+
+| Data | Feriado (nome usual) | Lei | Desde |
+|---|---|---|---|
+| 1º de janeiro | Confraternização Universal | Lei nº 662/1949, com a redação da Lei nº 10.607/2002 | 1949 |
+| 21 de abril | Tiradentes | Lei nº 662/1949, com a redação da Lei nº 10.607/2002 | 2003 |
+| 1º de maio | Dia do Trabalho | Lei nº 662/1949, com a redação da Lei nº 10.607/2002 | 1949 |
+| 7 de setembro | Independência do Brasil | Lei nº 662/1949, com a redação da Lei nº 10.607/2002 | 1949 |
+| 12 de outubro | Nossa Senhora Aparecida | Lei nº 6.802/1980 | 1980 |
+| 2 de novembro | Finados | Lei nº 662/1949, com a redação da Lei nº 10.607/2002 | 2003 |
+| 15 de novembro | Proclamação da República | Lei nº 662/1949, com a redação da Lei nº 10.607/2002 | 1949 |
+| 20 de novembro | Dia Nacional de Zumbi e da Consciência Negra | Lei nº 14.759/2023 | 2024 (a lei entrou em vigor em 22/12/2023; o primeiro feriado foi em 20/11/2024) |
+| 25 de dezembro | Natal | Lei nº 662/1949, com a redação da Lei nº 10.607/2002 | 1949 |
+
+Os nomes são os usuais e só aparecem no texto do aviso; as Leis 662 e 10.607 citam apenas as datas. Para anos antes de 2003 a lista não foi conferida, e o app só avisa de vencimentos de hoje em diante.
+
+**Não entram:** Carnaval, Sexta-feira Santa, Corpus Christi e os feriados estaduais e municipais. O texto de "Saiba mais" diz isso e diz que quem cobra pode ter outro calendário. O aviso nunca diz que o pagamento no próximo dia útil vale para qualquer cobrança nem que não há encargos: termina com "Confira com quem cobra se o pagamento pode ser feito no próximo dia útil."
+
+Fontes (todas oficiais, em `planalto.gov.br`; consulta em 19/10/2026):
+
+1. Oficial. Presidência da República: Lei nº 662, de 6 de abril de 1949, com a redação da Lei nº 10.607, de 19 de dezembro de 2002. <https://www.planalto.gov.br/ccivil_03/leis/l0662.htm>. Trecho: art. 1º, "Redação dada pela Lei nº 10.607, de 19.12.2002": 1º de janeiro, 21 de abril, 1º de maio, 7 de setembro, 2 de novembro, 15 de novembro e 25 de dezembro; a Lei nº 662/1949 original listava cinco datas, e a Lei nº 10.607/2002 acrescentou duas. Trecho de resultado de busca; a página não abriu. Consulta: 19/10/2026.
+2. Oficial. Presidência da República: Lei nº 6.802, de 30 de junho de 1980. <https://www.planalto.gov.br/ccivil_03/LEIS/L6802.htm>. Trecho: art. 1º, declarado feriado nacional o dia 12 de outubro, para culto público e oficial a Nossa Senhora Aparecida, Padroeira do Brasil; vigência na data da publicação (Diário Oficial de 1º de julho de 1980). Trecho de resultado de busca; a página não abriu. Consulta: 19/10/2026.
+3. Oficial. Presidência da República: Lei nº 14.759, de 21 de dezembro de 2023. <https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2023/lei/l14759.htm>. Trecho: art. 1º, declarado feriado nacional o dia 20 de novembro, Dia Nacional de Zumbi e da Consciência Negra; art. 2º, vigência na data da publicação (Diário Oficial de 22 de dezembro de 2023). Trecho de resultado de busca; a página não abriu. Consulta: 19/10/2026.
+
+Conferido por busca (19/10/2026): o portal da Câmara dos Deputados mostra "Não consta revogação expressa" para as Leis 6.802/1980 e 14.759/2023, e o texto consolidado da Lei 662/1949 traz a redação de 2002 no art. 1º. Projetos de lei que acrescentariam feriados (Carnaval, Sexta-feira Santa e Corpus Christi, ou outra data para Tiradentes) apareceram nos resultados e não são lei.
+
+Para revisar: abrir as três páginas (ou, se não abrirem, buscar o trecho da própria fonte), conferir se alguma lei nova criou, mudou ou tirou um feriado nacional, atualizar `NATIONAL_HOLIDAY_SOURCES`, as regras de `dia-util.ts`, a tabela acima e `NATIONAL_HOLIDAYS_REVIEWED_ON`, e registrar na seção 9.

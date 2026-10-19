@@ -23,6 +23,7 @@ import {
   mergeOccurrences,
   missingMonths,
   monthOf,
+  plannedDueNotice,
   projectSeries,
   quitarAntesLink,
   rowShortName,
@@ -49,6 +50,7 @@ import { openCalc } from '@/components/calc/open';
 import { ChoiceDialog } from '@/components/choice-dialog';
 import { CommitmentRow } from '@/components/commitment-row';
 import { ConfirmDialog } from '@/components/dialog';
+import { DueDaySign } from '@/components/due-day-notice';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { RegisterMonthSheet } from '@/components/retorno-folha';
 import { ContextPill, SubHeader } from '@/components/header';
@@ -497,7 +499,7 @@ function Occurrences({
           </Txt>
         ) : null}
         {projected.map((p, i) => (
-          <ProjectedRow key={p.number} planned={p} last={i === projected.length - 1} />
+          <ProjectedRow key={p.number} planned={p} today={today} last={i === projected.length - 1} />
         ))}
       </Card>
 
@@ -653,11 +655,15 @@ function Actions({
   );
 }
 
-/** Conta prevista: ainda não existe, não é tocável e não entra em total. */
-function ProjectedRow({ planned: p, last }: { planned: PlannedOccurrence; last: boolean }) {
+/**
+ * Conta prevista: ainda não existe, não é tocável e não entra em total. Com vencimento em sábado, domingo ou feriado nacional,
+ * leva o mesmo sinal das contas a pagar (D-060 item 3): só avisa, a data prevista não muda.
+ */
+function ProjectedRow({ planned: p, today, last }: { planned: PlannedOccurrence; today: IsoDate; last: boolean }) {
   const hidden = useValuesHidden();
   const amount = estimateText(p.amountCents, p.amountIsEstimate, hidden);
-  const label = `${p.description}, prevista, vence em ${formatDateBR(p.dueOn)}, ${amount.a11y}${p.amountIsEstimate ? ', valor estimado' : ''}`;
+  const dueNotice = plannedDueNotice(p.dueOn, today);
+  const label = `${p.description}, prevista, vence em ${formatDateBR(p.dueOn)}, ${amount.a11y}${p.amountIsEstimate ? ', valor estimado' : ''}${dueNotice ? `, ${dueNotice.signA11y}` : ''}`;
   return (
     <View style={[styles.row, !last && styles.divider]} accessible accessibilityLabel={label}>
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -668,6 +674,7 @@ function ProjectedRow({ planned: p, last }: { planned: PlannedOccurrence; last: 
           Prevista · vence em {formatDateBR(p.dueOn)}
           {p.amountIsEstimate ? ' · estimado' : ''}
         </Txt>
+        {dueNotice ? <DueDaySign notice={dueNotice} /> : null}
       </View>
       <Txt variant="label" style={[styles.amount, tabular]}>
         {amount.text}

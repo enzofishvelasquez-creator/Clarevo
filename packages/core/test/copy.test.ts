@@ -11,6 +11,12 @@ import {
   validateAccountDraft,
   NOTA_ERROR_TEXT,
   ANNUAL_HELP_TEXT,
+  DUE_DAY_TEXT,
+  NATIONAL_HOLIDAY_LAWS,
+  addDays,
+  dueDayNotice,
+  nationalHolidays,
+  reminderBody,
   CARD_MONTH_TEXT,
   NOTA_FLOW_TEXT,
   NOTA_PAYMENT_TEXT,
@@ -3253,5 +3259,103 @@ describe('textos de Análises (D-059)', () => {
       ANALYSES_TEXT.categories.minimumNote,
     ];
     for (const text of texts) expect(text, text).not.toMatch(/\bmelhor\b|\bpior\b|\bexcesso\b|\bdesperd|\bgasto(u)? (a )?mais\b|\bcontrole\b|\bculp/i);
+  });
+});
+
+/**
+ * Aviso de vencimento em sábado, domingo ou feriado nacional (D-060 item 3, `dia-util.ts`): português do Brasil, linguagem neutra
+ * de gênero, sem travessão longo, sem a expressão vetada, sem julgamento e, sobretudo, sem prometer que o pagamento no próximo dia
+ * útil vale para qualquer cobrança nem que não há encargos. Vale para as frases fixas, para o aviso de cada sábado, domingo e
+ * feriado de 2026 a 2030, para o corpo do lembrete e para o arquivo-fonte.
+ */
+describe('textos do aviso de dia útil (D-060)', () => {
+  const PROMISE =
+    /\bsem\s+(?:multa|juros|encargos?|custos?|taxas?|cobran[cç]as?)(?![\p{L}])|\bn[aã]o\s+(?:h[aá]|tem|ter[aá]|cobra|cobram|incide|incidem|existe)(?![\p{L}])[^.]*(?<![\p{L}])(?:multa|juros|encargos?)(?![\p{L}])|\bgarant|\bsempre (?:pode|vale)\b|\bpode pagar\b|\bsem problema|\bsem prejuízo|\bnão perde|\bvale para qualquer/iu;
+  const ORDERS = /\bdeve(ria)?\b|\bpague\b|\bpague já\b|\bnão esqueça|\burgente|\batrasad|\bvencid[oa]s?\b|\bperd[ae]r?\b|\bcuidado|\bpreocup/i;
+  const check = (texts: string[]) => {
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(FORBIDDEN_EXPANDED);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(NEUTRAL);
+      expect(text, text).not.toMatch(GENDERED);
+      expect(text, text).not.toMatch(PROMISE);
+      expect(text, text).not.toMatch(ORDERS);
+    }
+  };
+
+  /** Sábados, domingos e feriados nacionais de 2026 a 2030: um aviso por dia. */
+  const notices = () => {
+    const out: NonNullable<ReturnType<typeof dueDayNotice>>[] = [];
+    for (let d = '2026-01-01'; d <= '2030-12-31'; d = addDays(d, 1)) {
+      const n = dueDayNotice(d);
+      if (n) out.push(n);
+    }
+    return out;
+  };
+
+  it('as listas reprovam o que deve (promessa de ausência de encargos, ordem e julgamento) e aceitam o texto do aviso', () => {
+    for (const bad of [
+      'Sem multa no próximo dia útil.',
+      'Pagando no próximo dia útil, não há juros.',
+      'Não cobra encargos nesse caso.',
+      'Pagamento garantido sem encargos.',
+      'Você pode pagar sem problema.',
+      'Vale para qualquer cobrança.',
+    ])
+      expect(PROMISE.test(bad), bad).toBe(true);
+    for (const bad of ['Você deve pagar antes.', 'Pague já', 'Não esqueça', 'Conta atrasada', 'Cuidado com o vencimento']) expect(ORDERS.test(bad), bad).toBe(true);
+    expect(PROMISE.test(DUE_DAY_TEXT.advice)).toBe(false);
+    expect(ORDERS.test(DUE_DAY_TEXT.advice)).toBe(false);
+  });
+
+  it('as frases fixas passam nas regras e dizem o que o aviso é e o que não é', () => {
+    const fixed = [DUE_DAY_TEXT.advice, DUE_DAY_TEXT.sign, DUE_DAY_TEXT.learnMore, DUE_DAY_TEXT.learnMoreA11y, DUE_DAY_TEXT.learnMoreTitle, ...DUE_DAY_TEXT.learnMoreParagraphs, DUE_DAY_TEXT.source];
+    check(fixed);
+    const more = DUE_DAY_TEXT.learnMoreParagraphs.join(' ');
+    // O "Saiba mais" diz que a data não muda, quais feriados contam e quais não entram.
+    expect(more).toContain('não muda a data de vencimento');
+    for (const day of ['1º de janeiro', '21 de abril', '1º de maio', '7 de setembro', '12 de outubro', '2 de novembro', '15 de novembro', '20 de novembro', '25 de dezembro']) expect(more, day).toContain(day);
+    for (const out of ['Carnaval', 'Sexta-feira Santa', 'Corpus Christi', 'estados e municípios']) expect(more, out).toContain(out);
+    expect(more).toContain('confira com quem cobra');
+    // A fonte lista as três leis e a data da consulta.
+    for (const law of NATIONAL_HOLIDAY_LAWS) expect(DUE_DAY_TEXT.source).toContain(law);
+    expect(DUE_DAY_TEXT.source).toContain('19/10/2026');
+  });
+
+  it('o aviso de cada sábado, domingo e feriado de 2026 a 2030 passa nas regras, abre com "Vence" e termina com a frase neutra', () => {
+    const list = notices();
+    expect(list.length).toBeGreaterThan(550);
+    const texts = list.flatMap((n) => [n.text, n.advice, n.sign, n.signLine, n.signA11y, n.a11y]);
+    check(texts);
+    for (const n of list) {
+      expect(n.text, n.dueOn).toMatch(/^Vence (no|na) (domingo|segunda|terça|quarta|quinta|sexta|sábado), \d{2}\/\d{2}\/\d{4}, que não é dia útil( \(feriado nacional: [^)]+\))?\. O próximo dia útil é (domingo|segunda|terça|quarta|quinta|sexta|sábado), \d{2}\/\d{2}\/\d{4}\.$/);
+      expect(n.a11y.endsWith('Confira com quem cobra se o pagamento pode ser feito no próximo dia útil.'), n.dueOn).toBe(true);
+      expect(n.signLine, n.dueOn).toMatch(/^Não é dia útil · próximo dia útil: [a-zçáéíóú]+, \d{2}\/\d{2}$/);
+    }
+  });
+
+  it('os nomes dos feriados passam nas regras', () => {
+    const names = [2026, 2027, 2028, 2029, 2030].flatMap((y) => nationalHolidays(y).flatMap((h) => [h.name, h.law]));
+    check(names);
+  });
+
+  it('o corpo do lembrete, com e sem a frase de dia que não é útil, passa nas regras e não leva valor nem descrição (D-025(3))', () => {
+    const bodies = [1, 2, 3, 12].flatMap((n) => [reminderBody(n), reminderBody(n, '2026-10-11'), reminderBody(n, '2026-10-12'), reminderBody(n, '2026-10-13')]);
+    check(bodies);
+    for (const b of bodies) {
+      expect(b, b).toMatch(/^Você tem (1 conta|\d+ contas) com vencimento amanhã(, que não é dia útil)?\.$/);
+      expect(b, b).not.toMatch(/R\$|\d{2}\/\d{2}/);
+    }
+  });
+
+  it('o arquivo-fonte passa pelas regras de texto (os comentários dizem "sem prometer", e isso não é promessa)', () => {
+    const source = readFileSync(join(CORE_SRC, 'dia-util.ts'), 'utf8');
+    expect(source).not.toMatch(FORBIDDEN);
+    expect(source).not.toMatch(FORBIDDEN_EXPANDED);
+    expect(source).not.toMatch(JUDGMENT);
+    // Aviso fixo na cópia: nenhuma frase que a pessoa vê usa "garantido" nem "sem encargos" (só os comentários do código falam disso).
+    const shown = [DUE_DAY_TEXT.advice, ...DUE_DAY_TEXT.learnMoreParagraphs].join(' ');
+    expect(shown).not.toMatch(/garant|sem encargos|sem multa/i);
   });
 });

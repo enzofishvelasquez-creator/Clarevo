@@ -17,7 +17,8 @@
  * link, a licença, o uso do app e a demonstração com a "Empresa Exemplo", com a empresa simulada na memória, da Evolução (D-057: Recebido
  * e Pago mês a mês, média, mediana e total, meses tirados da comparação só na memória, e o cenário fictício "evolucao") e de Excluir conta (D-058: o card em Conta, a tela com o que é apagado e o que continua, o bloqueio
  * de quem é titular com outras pessoas, a confirmação digitada, a demonstração que não apaga nada e a tela "Sua conta foi excluída", com a
- * Família simulada na memória) e das Análises (D-059: Categorias em Barras e Bolhas, Evolução, Próximos meses e Orçamento, só leitura) na versão web, em modo demonstração (acesso simulado).
+ * Família simulada na memória), das Análises (D-059: Categorias em Barras e Bolhas, Evolução, Próximos meses e Orçamento, só leitura) e do Dia útil (D-060: o aviso de
+ * vencimento em sábado, domingo ou feriado nacional, que não muda a data nem os totais) na versão web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -660,9 +661,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Ciclo A: Aluguel, Luz e o financiamento são gastos fixos; Internet, Condomínio e Seguro continuam avulsas.
   // D-037: as dez faturas do "Cartão Exemplo" (novembro a agosto de 2027) são contas a pagar de "Próximos meses"; a de novembro vem
   // depois do Seguro (também dia 10) e antes da Luz (dia 12); as outras nove vêm no fim, por vencimento.
-  const FAT = (due, cents) => `Fatura Cartão Exemplo, vence em ${due}, cerca de R$ ${cents}, valor estimado`;
+  // D-060 item 3: a fatura que vence em sábado ou domingo (10/01, 10/04 e 10/07/2027) ganha, no nome acessível, "não é dia útil, próximo dia útil segunda, 11/01"; a data não muda.
+  const FAT = (due, cents, next = '') => `Fatura Cartão Exemplo, vence em ${due}, cerca de R$ ${cents}, valor estimado${next ? `, não é dia útil, próximo dia útil ${next}` : ''}`;
   const laterBase = ['Aluguel, vence em 05/11/2026, R$ 2.500,00, gasto fixo', 'Financiamento do carro, vence em 10/11/2026, R$ 850,00, parcela 13 de 48', 'Seguro do carro, vence em 10/11/2026, R$ 300,00', FAT('10/11/2026', '550,00'),
-    'Luz, vence em 12/11/2026, cerca de R$ 180,00, valor estimado, gasto fixo', FAT('10/12/2026', '350,00'), FAT('10/01/2027', '350,00'), ...['10/02/2027', '10/03/2027', '10/04/2027', '10/05/2027', '10/06/2027', '10/07/2027', '10/08/2027'].map((d) => FAT(d, '150,00'))];
+    'Luz, vence em 12/11/2026, cerca de R$ 180,00, valor estimado, gasto fixo', FAT('10/12/2026', '350,00'), FAT('10/01/2027', '350,00', 'segunda, 11/01'),
+    ...['10/02/2027', '10/03/2027', '10/04/2027', '10/05/2027', '10/06/2027', '10/07/2027', '10/08/2027'].map((d) => FAT(d, '150,00', { '10/04/2027': 'segunda, 12/04', '10/07/2027': 'segunda, 12/07' }[d]))];
   // Espera a lista completa (e não só a seção): as faturas do cartão chegam na mesma leitura, mas a tela pode estar num instante intermediário.
   const laterBaseJson = JSON.stringify(laterBase);
   await waitUntil(async () => JSON.stringify(await sectionRows('Próximos meses')) === laterBaseJson, 10000);
@@ -1263,7 +1266,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('valor informado: faixa e o total de 2026/2027 em R$ 456,00, sem "cerca de"', t.includes('Valor de 2026/2027 informado. As parcelas deixaram de ser estimadas.') &&
     t.includes('2026/2027 · 4 parcelas · 4 em aberto · R$ 456,00') && (await visibleCount('button', 'Informar o valor de 2026 a 2027')) === 0, t.slice(0, 300));
   await btn('Ver as 4 parcelas').click(); await waitText('Esconder as parcelas');
-  const partRow = (n, rest = 'R\\$ 114,00') => new RegExp(`^Seguro residencial, vence em [0-9/]+, ${rest}, parcela ${n} de 4 de 2026 a 2027, conta do ano$`);
+  const partRow = (n, rest = 'R\\$ 114,00') => new RegExp(`^Seguro residencial, vence em [0-9/]+, ${rest}, parcela ${n} de 4 de 2026 a 2027, conta do ano(, não é dia útil, próximo dia útil [^,]+, \\d{2}/\\d{2})?$`);
   ok('"Ver as 4 parcelas": linhas tocáveis com a parcela e o ano, sem estimado', (await Promise.all([1, 2, 3, 4].map((n) => visibleCount('button', partRow(n))))).every((n) => n === 1) &&
     (await p.getByRole('button', { name: 'Esconder as parcelas', exact: true }).filter({ visible: true }).first().getAttribute('aria-expanded')) === 'true');
   await scrollTo('Ano a ano');
@@ -1334,7 +1337,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await waitRows('Próximos meses', (rows) => (rows ?? []).some((r) => r.startsWith('Seguro residencial, vence em 15/11/2026')));
   const seguroRows = ((await sectionRows('Próximos meses')) ?? []).filter((r) => r.startsWith('Seguro residencial'));
   ok('desfazer: a parcela 1 volta sozinha, sem grupo, e as parcelas 2 a 4 continuam fora',
-    JSON.stringify(seguroRows) === JSON.stringify(['Seguro residencial, vence em 15/11/2026, R$ 114,00, parcela 1 de 4 de 2026 a 2027, conta do ano']), seguroRows.join(' | '));
+    JSON.stringify(seguroRows) === JSON.stringify(['Seguro residencial, vence em 15/11/2026, R$ 114,00, parcela 1 de 4 de 2026 a 2027, conta do ano, não é dia útil, próximo dia útil segunda, 16/11']), seguroRows.join(' | '));
 
   // "Não houve em 2026" na Matrícula (cota única): a conta sai e não volta.
   await openSeriesList();
@@ -11925,6 +11928,188 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const delBad = delTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(bem-vind[oa]|convidad[oa]s?|cadastrad[oa]s?|usuári[oa]s?|sozinh[oa])\b/i)?.[0] ?? x.match(/tem certeza|cuidado|atenção|perigo|irrevers|lamentamos|sentiremos|fique|vai perder|última chance/i)?.[0]).filter(Boolean);
   ok('Excluir conta: nenhum termo proibido, travessão longo, expressão vetada, palavra com gênero nem tom de alerta ou de pressão nas telas novas', delTexts.length >= 10 && delBad.length === 0, `${delTexts.length} telas ${delBad.join(' | ')}`);
   ok('Excluir conta: nenhuma escrita direta na rede (a exclusão de verdade é coberta pelos testes do banco, da memória e da API)', writes.length === delWrites0, writes.slice(delWrites0).join(' | '));
+
+  // =====================================================================================================================
+  // Dia útil (D-060 item 3, Ciclo T, resolve P-014): a data de vencimento calculada NÃO muda (nada no banco, nenhum total); o app só
+  // avisa quando ela cai em sábado, domingo ou feriado nacional: "Vence no domingo, 11/10/2026, que não é dia útil. O próximo dia
+  // útil é terça, 13/10/2026." e a frase neutra "Confira com quem cobra se o pagamento pode ser feito no próximo dia útil.", com
+  // "Saiba mais" (quais feriados contam e quais não, as fontes e a consulta de 19/10/2026). Aparece no detalhe da conta a pagar, na
+  // lista (sinal discreto, com texto), no detalhe da fatura do cartão e nas contas de gasto fixo e de conta do ano, e só em conta em
+  // aberto que ainda não venceu. Hoje é 07/10/2026 (quarta); em 2026, 10 e 11/10 são sábado e domingo, 12/10 é feriado (segunda).
+  // Capturas numeradas a partir de 520, em 390, 360 e 320 px.
+  // =====================================================================================================================
+  const duSizes = [[390, 844, ''], [360, 740, '_360px'], [320, 800, '_320px']];
+  const duShots = async (name, scroll = null) => {
+    for (const [w, h, suffix] of duSizes) {
+      await p.setViewportSize({ width: w, height: h }); await p.waitForTimeout(450);
+      if (scroll) await scroll();
+      await layoutChecks(`${name} ${w}px`);
+      await shot(`${name}${suffix}`);
+    }
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  };
+  const duTexts = [];
+  const duKeep = async () => { duTexts.push(await body()); await keepText(); };
+  const duWrites0 = writes.length;
+  const duEscape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Rola até um texto, para a captura mostrar o trecho.
+  const duScroll = (text) => async () => { await scrollTo(text).catch(() => {}); };
+  const duTab = async (name) => {
+    const tab = () => p.getByRole('tab', { name }).filter({ visible: true });
+    for (let i = 0; i < 8; i++) { await tab().first().waitFor({ timeout: 1500 }).catch(() => {}); if ((await tab().count()) > 0) break; await btn('Voltar').click(); await p.waitForTimeout(400); }
+    await tab().first().click(); await p.waitForTimeout(500);
+  };
+  // Nome acessível da linha de uma conta na lista (começa pela descrição).
+  const duRow = (description) => p.getByRole('button', { name: new RegExp(`^${duEscape(description)}, `) }).filter({ visible: true }).first();
+  const duRowLabel = async (description) => (await duRow(description).count()) === 0 ? null : await duRow(description).getAttribute('aria-label');
+  const duNotices = () => p.evaluate(() => [...document.querySelectorAll('div,span')].filter((e) => e.children.length === 0 && /^Não é dia útil/.test(e.textContent) && e.getBoundingClientRect().width > 0).map((e) => e.textContent));
+  const duMoreButton = () => p.getByRole('button', { name: 'Saiba mais sobre vencimento em dia que não é útil', exact: true }).filter({ visible: true });
+  const duOpenList = async () => { await p.getByRole('button', { name: /^Ainda a pagar neste mês, R\$ / }).filter({ visible: true }).first().click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(400); };
+  // Do Resumo, por Movimentações, para um atalho de "Organizar".
+  const duShortcut = async (name) => { await duTab('Movimentações'); await waitText('Registrar recebimento'); await p.getByRole('button', { name }).filter({ visible: true }).first().click(); await p.waitForTimeout(600); };
+  const DU_ADVICE = 'Confira com quem cobra se o pagamento pode ser feito no próximo dia útil.';
+
+  // ---- 1. A demonstração: nada em outubro cai em dia que não é útil; em "Próximos meses", as faturas do Cartão Exemplo de 10/01, 10/04 e 10/07/2027 (domingo e sábados) levam o aviso ----
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('R$ 2.100,00'); await p.waitForTimeout(400);
+  t = await body();
+  ok('Dia útil, demonstração: os totais de outubro seguem 6.000 / 3.900 / 2.100 / 650 (invariantes)', ['R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00'].every((x) => t.includes(x)), t.slice(0, 300));
+  await duOpenList();
+  const duDemoOct = (await sectionRows('A vencer em outubro de 2026')) ?? [];
+  const duDemoNext = (await sectionRows('Próximos meses')) ?? [];
+  ok('Dia útil, demonstração: as contas de outubro (Internet 15/10 e Condomínio 20/10, quinta e terça) ficam sem aviso',
+    duDemoOct.some((r) => r.startsWith('Internet, vence em 15/10/2026')) && duDemoOct.some((r) => r.startsWith('Condomínio, vence em 20/10/2026')) && !duDemoOct.some((r) => /dia útil/.test(r)), JSON.stringify(duDemoOct));
+  const duFatura = (date) => duDemoNext.find((r) => r.startsWith(`Fatura Cartão Exemplo, vence em ${date}`)) ?? '';
+  ok('Dia útil, demonstração, "Próximos meses": as faturas de 10/01/2027 (domingo) e 10/04 e 10/07/2027 (sábados) levam "não é dia útil, próximo dia útil segunda" (11/01, 12/04 e 12/07); as de 10/12/2026, 10/02 e 10/03/2027 (dias úteis), não',
+    /não é dia útil, próximo dia útil segunda, 11\/01$/.test(duFatura('10/01/2027')) && /não é dia útil, próximo dia útil segunda, 12\/04$/.test(duFatura('10/04/2027')) && /não é dia útil, próximo dia útil segunda, 12\/07$/.test(duFatura('10/07/2027')) &&
+    ['10/11/2026', '10/12/2026', '10/02/2027', '10/03/2027'].every((d) => duFatura(d) !== '' && !/dia útil/.test(duFatura(d))), JSON.stringify(duDemoNext));
+  ok('Dia útil, demonstração: o sinal aparece escrito ("Não é dia útil · próximo dia útil: segunda, 11/01"), e o vencimento de cada fatura segue o de sempre', (await body()).includes('Não é dia útil · próximo dia útil: segunda, 11/01') && /vence em 10\/01\/2027/.test(duFatura('10/01/2027')));
+  await duKeep();
+
+  // ---- 2. Contas em sábado, domingo, feriado, dia útil e já vencida entram por "outro aparelho" ----
+  await otherDevice(async (repo, ctx) => {
+    const add = (description, cents, dueOn) => repo.createCommitment(`e2e-du-${description}-${Date.now()}`, ctx, { description, amountCents: cents, dueOn, category: 'Moradia' });
+    await add('Escola (exemplo)', 10000, '2026-10-11'); // domingo
+    await add('Oficina (exemplo)', 25000, '2026-10-12'); // segunda e feriado nacional (Nossa Senhora Aparecida)
+    await add('Seguro da casa (exemplo)', 8000, '2026-10-17'); // sábado
+    await add('Taxa do clube (exemplo)', 6000, '2026-10-14'); // quarta, dia útil
+    await add('Conta antiga (exemplo)', 4000, '2026-10-03'); // sábado, mas já venceu
+  });
+  await waitText('Escola (exemplo)'); await p.waitForTimeout(600);
+  const duOct = (await sectionRows('A vencer em outubro de 2026')) ?? [];
+  const duLabels = {};
+  for (const d of ['Escola (exemplo)', 'Oficina (exemplo)', 'Seguro da casa (exemplo)', 'Taxa do clube (exemplo)', 'Conta antiga (exemplo)']) duLabels[d] = await duRowLabel(d);
+  t = await body();
+  ok('Dia útil, lista: domingo 11/10 e sábado 17/10 mostram "Não é dia útil · próximo dia útil: terça, 13/10" e "segunda, 19/10", e o feriado de 12/10 também (terça, 13/10)',
+    t.includes('Não é dia útil · próximo dia útil: terça, 13/10') && t.includes('Não é dia útil · próximo dia útil: segunda, 19/10') && duOct.filter((r) => /dia útil/.test(r)).length === 3 && (await duNotices()).filter((x) => x === 'Não é dia útil · próximo dia útil: terça, 13/10').length === 2, JSON.stringify(duOct));
+  ok('Dia útil, lista: o nome acessível diz "não é dia útil, próximo dia útil ..." e a data de vencimento continua a mesma (11/10, 12/10 e 17/10)',
+    /^Escola \(exemplo\), vence em 4 dias · 11\/10, .*, não é dia útil, próximo dia útil terça, 13\/10$/.test(duLabels['Escola (exemplo)'] ?? '') &&
+    /^Oficina \(exemplo\), vence em 5 dias · 12\/10, .*, não é dia útil, próximo dia útil terça, 13\/10$/.test(duLabels['Oficina (exemplo)'] ?? '') &&
+    /^Seguro da casa \(exemplo\), vence em 10\/17|^Seguro da casa \(exemplo\), vence em 10 dias|^Seguro da casa \(exemplo\), vence em 17\/10\/2026, .*, não é dia útil, próximo dia útil segunda, 19\/10$/.test(duLabels['Seguro da casa (exemplo)'] ?? ''), JSON.stringify(duLabels));
+  ok('Dia útil, lista: dia útil (Taxa do clube, 14/10) e conta já vencida (Conta antiga, sábado 03/10) ficam sem sinal',
+    !/dia útil/.test(duLabels['Taxa do clube (exemplo)'] ?? 'x') && !/dia útil/.test(duLabels['Conta antiga (exemplo)'] ?? 'x') && /vence em 7 dias|vence em 14\/10|vence/.test(duLabels['Taxa do clube (exemplo)'] ?? '') && /venceu em 03\/10\/2026/.test(duLabels['Conta antiga (exemplo)'] ?? ''), JSON.stringify(duLabels));
+  ok('Dia útil, lista: o total de Ainda a pagar conta cada conta no mês do vencimento sem mover nada (R$ 650,00 + 100 + 250 + 80 + 60 + 40 = R$ 1.180,00)', (await body()).includes('R$ 1.180,00'), (await body()).slice(0, 300));
+  await duKeep();
+  await duShots('520_dia_util_lista', duScroll('Escola (exemplo)'));
+
+  // ---- 3. Detalhe de uma conta em domingo: o aviso, a frase neutra e "Saiba mais" ----
+  await duRow('Escola (exemplo)').click(); await waitText('Valor previsto').catch(() => {}); await waitText('Vencimento'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Dia útil, detalhe (domingo): "Vence no domingo, 11/10/2026, que não é dia útil. O próximo dia útil é terça, 13/10/2026." e a frase neutra',
+    t.includes('Vence no domingo, 11/10/2026, que não é dia útil. O próximo dia útil é terça, 13/10/2026.') && t.includes(DU_ADVICE), t.slice(0, 700));
+  ok('Dia útil, detalhe: o vencimento segue 11/10/2026 e o resumo afetado segue o de outubro', /Vencimento\n?\s*11\/10\/2026/.test(t) && t.includes('Ainda a pagar de outubro de 2026'), t.slice(300, 900));
+  ok('Dia útil, detalhe: nunca promete que não há encargos (sem "sem multa", "sem juros", "sem encargos" nem "garantido")', !/sem (multa|juros|encargos?)|garant|n[aã]o (h[aá]|tem|cobra) (multa|juros|encargos?)/i.test(t));
+  ok('Dia útil, detalhe: "Saiba mais" é um botão recolhido (aria-expanded=false) e a explicação ainda não aparece', (await duMoreButton().count()) === 1 && (await duMoreButton().first().getAttribute('aria-expanded')) === 'false' && !t.includes('Contam como feriado nacional só os definidos em lei federal'));
+  await duKeep();
+  await duShots('521_dia_util_conta_domingo', duScroll('Vence no domingo, 11/10/2026, que não é dia útil. O próximo dia útil é terça, 13/10/2026.'));
+  await duMoreButton().first().click(); await waitText('Contam como feriado nacional só os definidos em lei federal'); await p.waitForTimeout(400);
+  t = await body();
+  ok('Dia útil, "Saiba mais": a data não muda, os nove feriados nacionais por data, o que não entra (Carnaval, Sexta-feira Santa, Corpus Christi, estados e municípios) e "confira com quem cobra"',
+    t.includes('O Clarevo não muda a data de vencimento') && ['1º de janeiro', '21 de abril', '1º de maio', '7 de setembro', '12 de outubro', '2 de novembro', '15 de novembro', '20 de novembro', '25 de dezembro'].every((x) => t.includes(x)) &&
+    t.includes('Carnaval, Sexta-feira Santa, Corpus Christi e os feriados de estados e municípios não entram.') && t.includes('Quem cobra pode ter outro calendário.') && t.includes('confira com quem cobra'), t.slice(300, 1500));
+  ok('Dia útil, "Saiba mais": a fonte lista as três leis e a data da consulta (19/10/2026), e o botão passa a aria-expanded=true',
+    t.includes('Fontes: Lei nº 662/1949, com a redação da Lei nº 10.607/2002; Lei nº 6.802/1980; Lei nº 14.759/2023. Consultadas em 19/10/2026.') && (await duMoreButton().first().getAttribute('aria-expanded')) === 'true');
+  await duKeep();
+  await duShots('522_dia_util_saiba_mais', duScroll('Vencimento em dia que não é útil'));
+  await duMoreButton().first().click(); await p.waitForTimeout(400);
+  ok('Dia útil, "Saiba mais": tocar de novo recolhe a explicação', !(await body()).includes('Contam como feriado nacional só os definidos em lei federal') && (await duMoreButton().first().getAttribute('aria-expanded')) === 'false');
+  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(300);
+
+  // ---- 4. Feriado em dia de semana: o aviso diz qual ----
+  await duRow('Oficina (exemplo)').click(); await waitText('Vencimento'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Dia útil, detalhe (feriado na segunda): "Vence na segunda, 12/10/2026, que não é dia útil (feriado nacional: Nossa Senhora Aparecida). O próximo dia útil é terça, 13/10/2026."',
+    t.includes('Vence na segunda, 12/10/2026, que não é dia útil (feriado nacional: Nossa Senhora Aparecida). O próximo dia útil é terça, 13/10/2026.') && t.includes(DU_ADVICE) && /Vencimento\n?\s*12\/10\/2026/.test(t), t.slice(0, 700));
+  await duKeep();
+  await duShots('523_dia_util_conta_feriado', duScroll('Vence na segunda, 12/10/2026, que não é dia útil (feriado nacional: Nossa Senhora Aparecida). O próximo dia útil é terça, 13/10/2026.'));
+  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(300);
+
+  // ---- 5. Dia útil e conta vencida: sem aviso no detalhe ----
+  await duRow('Taxa do clube (exemplo)').click(); await waitText('Vencimento'); await p.waitForTimeout(400);
+  t = await body();
+  ok('Dia útil, detalhe de uma conta em dia útil (quarta, 14/10): sem aviso e sem "Saiba mais"', !t.includes('que não é dia útil') && !t.includes(DU_ADVICE) && (await duMoreButton().count()) === 0, t.slice(0, 400));
+  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(300);
+  await duRow('Conta antiga (exemplo)').click(); await waitText('Vencimento'); await p.waitForTimeout(400);
+  t = await body();
+  ok('Dia útil, detalhe de uma conta já vencida (sábado 03/10): "Venceu em 03/10/2026", sem aviso', t.includes('Venceu em 03/10/2026') && !t.includes('que não é dia útil') && (await duMoreButton().count()) === 0, t.slice(0, 400));
+  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(300);
+
+  // ---- 6. Conta paga: o aviso e o sinal somem ----
+  await btn('Já paguei Seguro da casa (exemplo), vence 17/10').click(); await waitText('Confirmar pagamento'); await confirmIn('Confirmar pagamento'); await waitText('marcada como paga'); await p.waitForTimeout(700);
+  t = await body();
+  const duOct2 = (await sectionRows('A vencer em outubro de 2026')) ?? [];
+  ok('Dia útil, conta paga: a linha de 17/10 vira "Paga em 07/10/2026" sem sinal, e o aviso de domingo e o de feriado seguem nas outras duas', t.includes('Paga em 07/10/2026') && duOct2.filter((r) => /dia útil/.test(r)).length === 2 && !/^Seguro da casa \(exemplo\).*dia útil/.test((await duRowLabel('Seguro da casa (exemplo)')) ?? ''), JSON.stringify(duOct2));
+
+  // ---- 7. Gasto fixo: a conta de 12/10 (feriado) e a prevista de 12/12 (sábado) ----
+  await otherDevice((repo, ctx) => repo.createSeries(`e2e-du-fixo-${Date.now()}`, ctx, { kind: 'mensal', nature: 'conta', description: 'Clube de leitura (exemplo)', category: 'Lazer', amountCents: 4000, amountMode: 'fixo', dueDay: 12, firstDueMonth: '2026-10', firstNumber: 1, installmentTotal: null, partsPerYear: null, lastMonth: null }));
+  await waitText('Clube de leitura (exemplo)'); await p.waitForTimeout(600);
+  await duRow('Clube de leitura (exemplo)').click(); await waitText('Vencimento'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Dia útil, conta de gasto fixo (12/10, feriado): o detalhe traz o aviso do feriado e o mês da conta não muda', t.includes('Vence na segunda, 12/10/2026, que não é dia útil (feriado nacional: Nossa Senhora Aparecida).') && t.includes('Parte de: Clube de leitura (exemplo) · todo mês, dia 12'), t.slice(0, 700));
+  await btn('Ver gasto fixo').click(); await waitText('Próximas contas'); await p.waitForTimeout(600);
+  t = await body();
+  const duFixoRows = await p.evaluate(() => [...document.querySelectorAll('[aria-label]')].filter((e) => e.getBoundingClientRect().width > 0 && /^Clube de leitura \(exemplo\), /.test(e.getAttribute('aria-label'))).map((e) => e.getAttribute('aria-label')));
+  ok('Dia útil, detalhe do gasto fixo: a conta de 12/10 (feriado) e a prevista de 12/12 (sábado) levam o sinal com o próximo dia útil (terça, 13/10 e segunda, 14/12); as de 12/11 e 12/01 (dias úteis), não',
+    t.includes('Não é dia útil · próximo dia útil: terça, 13/10') && t.includes('Não é dia útil · próximo dia útil: segunda, 14/12') && (await duNotices()).length === 2 && duFixoRows.length >= 3 &&
+    duFixoRows.filter((l) => /não é dia útil/.test(l)).length === 2, JSON.stringify(duFixoRows) + t.slice(0, 600));
+  ok('Dia útil, detalhe do gasto fixo: as previstas seguem em 12/12/2026 (a data calculada), e a conta de 12/11 (quinta) fica sem sinal', t.includes('Prevista · vence em 12/12/2026') && duFixoRows.filter((l) => /vence em 12\/11\/2026/.test(l)).length === 1 && !duFixoRows.some((l) => /vence em 12\/11\/2026/.test(l) && /dia útil/.test(l)), t.slice(0, 800));
+  await duKeep();
+  await duShots('524_dia_util_gasto_fixo', duScroll('Próximas contas'));
+
+  // ---- 8. Conta do ano em cota única, 25/12/2026 (sexta, Natal) ----
+  await otherDevice((repo, ctx) => repo.createSeries(`e2e-du-ano-${Date.now()}`, ctx, { kind: 'anual', nature: 'conta', description: 'Seguro do ano (exemplo)', category: 'Transporte', amountCents: 120000, amountMode: 'variavel', dueDay: 25, firstDueMonth: '2026-12', firstNumber: 1, installmentTotal: null, partsPerYear: 1, lastMonth: null }));
+  await p.waitForTimeout(700);
+  await btn('Voltar').click(); await p.waitForTimeout(500);
+  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês').catch(() => {}); await p.waitForTimeout(400);
+  await duShortcut(/^Gastos fixos e parcelamentos, /); await waitText('Contas do ano'); await p.waitForTimeout(500);
+  await p.getByRole('button', { name: /^Seguro do ano \(exemplo\), / }).filter({ visible: true }).first().click(); await waitText('Ano a ano'); await p.waitForTimeout(700);
+  t = await body();
+  const duAnoRows = await p.evaluate(() => [...document.querySelectorAll('[aria-label]')].filter((e) => e.getBoundingClientRect().width > 0 && /^Seguro do ano \(exemplo\), /.test(e.getAttribute('aria-label') || '')).map((e) => e.getAttribute('aria-label')));
+  ok('Dia útil, conta do ano (25/12/2026, sexta e Natal): "Ano a ano" mostra o sinal "Não é dia útil · próximo dia útil: segunda, 28/12" e a conta segue vencendo em 25/12',
+    t.includes('Não é dia útil · próximo dia útil: segunda, 28/12') && (await duNotices()).length === 1 && duAnoRows.some((l) => /25\/12/.test(l) && /não é dia útil, próximo dia útil segunda, 28\/12/.test(l)), JSON.stringify(duAnoRows) + t.slice(0, 700));
+  await duKeep();
+  await duShots('525_dia_util_conta_do_ano', duScroll('Ano a ano'));
+
+  // ---- 9. Fatura da demonstração que vence em 10/01/2027 (domingo): o aviso no detalhe da fatura ----
+  await duTab('Resumo'); await duOpenList();
+  await p.getByRole('button', { name: /^Fatura Cartão Exemplo, vence em 10\/01\/2027/ }).filter({ visible: true }).first().click(); await waitText('Lançamentos'); await waitText('Fatura de janeiro de 2027'); await p.waitForTimeout(700);
+  t = await body();
+  ok('Dia útil, detalhe da fatura (vence em 10/01/2027, domingo): "Vence no domingo, 10/01/2027, que não é dia útil. O próximo dia útil é segunda, 11/01/2027." e a frase neutra, e o vencimento da fatura segue 10/01',
+    t.includes('Vence no domingo, 10/01/2027, que não é dia útil. O próximo dia útil é segunda, 11/01/2027.') && t.includes(DU_ADVICE) && t.includes('Fecha em 03/01 · Vence em 10/01'), t.slice(0, 900));
+  ok('Dia útil, detalhe da fatura: "Saiba mais" também abre a explicação, com as fontes', (await duMoreButton().count()) === 1 && await (async () => { await duMoreButton().first().click(); await p.waitForTimeout(300); return (await body()).includes('Consultadas em 19/10/2026.'); })());
+  await duMoreButton().first().click(); await p.waitForTimeout(300);
+  await duKeep();
+  await duShots('526_dia_util_fatura', duScroll('Vence no domingo, 10/01/2027, que não é dia útil. O próximo dia útil é segunda, 11/01/2027.'));
+  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /^Fatura Cartão Exemplo, vence em 10\/11\/2026/ }).filter({ visible: true }).first().click(); await waitText('Lançamentos'); await waitText('Fatura de novembro'); await p.waitForTimeout(700);
+  t = await body();
+  ok('Dia útil, fatura de novembro (vence em 10/11/2026, terça): sem aviso e sem "Saiba mais"', t.includes('Vence em 10/11') && !t.includes('que não é dia útil') && (await duMoreButton().count()) === 0, t.slice(0, 500));
+  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(300);
+
+  // ---- 10. Textos e escritas ----
+  const duBad = duTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(demais|cuidado|atenção|perigo|urgente|atrasad[oa]s?|sem (multa|juros|encargos?)|garantid[oa])\b/i)?.[0]).filter(Boolean);
+  ok('Dia útil: nenhum termo proibido, travessão longo, expressão vetada, tom de alerta nem promessa de ausência de encargos nas telas novas', duTexts.length >= 8 && duBad.length === 0, `${duTexts.length} telas ${duBad.join(' | ')}`);
+  ok('Dia útil: nenhuma escrita direta na rede (o aviso só lê; a data de vencimento não muda)', writes.length === duWrites0, writes.slice(duWrites0).join(' | '));
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);

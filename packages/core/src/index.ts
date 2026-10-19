@@ -49,3 +49,4 @@ export * from './seu-mes';
 export * from './evolucao';
 export * from './evolucao-tela';
 export * from './analises';
+export * from './dia-util';
