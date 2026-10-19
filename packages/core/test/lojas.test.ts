@@ -147,7 +147,7 @@ describe('configuração de publicação', () => {
     ]);
   });
 
-  it('app.json: ícones e abertura existem e são os arquivos gerados por scripts/gerar-icones.js', () => {
+  it('app.json: ícones e abertura existem e são PNG de 1024 x 1024 (a comparação pixel a pixel com os SVG é `node scripts/gerar-icones.js --verificar`)', () => {
     const imagens = [
       app.icon,
       app.ios.icon,
@@ -170,14 +170,17 @@ describe('configuração de publicação', () => {
     expect([play.readUInt32BE(16), play.readUInt32BE(20), play[24], play[25]]).toEqual([512, 512, 8, 6]);
   });
 
-  it('eas.json: perfis development, preview e production; AAB e versões remotas na loja, APK no preview; sem identificadores de conta', () => {
-    expect(Object.keys(eas.build)).toEqual(['development', 'preview', 'production']);
+  it('eas.json: perfis preview e production (sem development, porque expo-dev-client não está instalado); AAB e versões remotas somadas sozinhas, APK no preview; sem identificadores de conta', () => {
+    expect(Object.keys(eas.build)).toEqual(['preview', 'production']);
     expect(eas.cli.appVersionSource).toBe('remote');
-    expect(eas.build.development).toMatchObject({ developmentClient: true, distribution: 'internal' });
-    expect(eas.build.preview).toMatchObject({ distribution: 'internal', android: { buildType: 'apk' }, ios: { distribution: 'store' } });
+    expect(JSON.stringify(eas)).not.toContain('developmentClient');
+    // O preview gera build de loja no iOS (TestFlight) com versão remota: sem autoIncrement, o segundo envio repetiria o número de build.
+    expect(eas.build.preview).toMatchObject({ distribution: 'internal', autoIncrement: true, android: { buildType: 'apk' }, ios: { distribution: 'store' } });
     expect(eas.build.production).toMatchObject({ distribution: 'store', autoIncrement: true, android: { buildType: 'app-bundle' } });
     // Nenhum segredo nem chave no repositório (o identificador do projeto EAS, que Enzo gera com `eas init`, não é segredo).
-    expect(JSON.stringify(eas)).not.toMatch(/password|secret|eyJ|sb_(publishable|secret)/i);
-    expect(JSON.stringify(app)).not.toMatch(/password|secret|supabase\.co|eyJ|sb_(publishable|secret)/i);
+    // Os campos de conta da Apple e do Google ficam fora do arquivo: Enzo os informa no envio, nunca no repositório.
+    const CONTA = 'appleId|ascAppId|appleTeamId|serviceAccountKeyPath';
+    expect(JSON.stringify(eas)).not.toMatch(new RegExp(`password|secret|eyJ|sb_(publishable|secret)|${CONTA}`, 'i'));
+    expect(JSON.stringify(app)).not.toMatch(new RegExp(`password|secret|supabase\\.co|eyJ|sb_(publishable|secret)|${CONTA}`, 'i'));
   });
 });

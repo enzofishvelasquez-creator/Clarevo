@@ -32,7 +32,11 @@
 - A exportação: o arquivo CSV ou PDF vai ao compartilhamento do aparelho por ação da pessoa.
 - A leitura da página pública da Sefaz-RJ: o aparelho consulta o site do governo diretamente, a pedido da pessoa, sem servidor do Clarevo no meio (`apps/app/src/lib/sefaz-fetch.ts`). Não é coleta pelo Clarevo; o advogado confere se o texto da política precisa citar essa consulta.
 
-**Não existe no app:** anúncios, SDK de anúncio ou de análise de uso, identificador de publicidade, localização, contatos, fotos da galeria, microfone, saúde, histórico de navegação, compras dentro do app (cobrança está fora do ciclo atual) e venda ou cessão de dados.
+**Não existe no app:** anúncios, SDK de anúncio ou de análise de uso escolhido pelo Clarevo, identificador de publicidade, localização, contatos, fotos da galeria, microfone, saúde, histórico de navegação, compras dentro do app (cobrança está fora do ciclo atual) e venda ou cessão de dados.
+
+**Exceção no Android: SDK do Google na leitura de código.** O `expo-camera` inclui `com.google.android.gms:play-services-code-scanner` e `com.google.mlkit:barcode-scanning` (`node_modules/expo-camera/android/build.gradle`, linhas 43 e 44). A imagem é lida no aparelho, mas esses SDKs do Google podem enviar métricas de uso e de desempenho com identificadores do aparelho. Por isso a seção 3 declara, por precaução, identificadores do aparelho e diagnósticos; **confirmar na documentação do ML Kit antes de enviar**. No iOS o `expo-camera` lê o código com o leitor do sistema (VisionKit e AVFoundation) e, para PDF417, Code 39 e Codabar, com a biblioteca de decodificação ZXingObjC (`node_modules/expo-camera/ios/ExpoCameraBarcodeScanning.podspec`); o app só pede QR Code e Code 128 (`apps/app/src/components/receipt-scan.tsx`, linha 266). Nenhum SDK do Google entra no iOS, e a resposta da Apple não muda.
+
+**Compras e notas, nas duas lojas.** As compras no cartão e as notas fiscais lidas ou digitadas entram em "Outras informações financeiras" na Apple e no Google, e não em "Compras" nem em "Histórico de compras", porque são anotações financeiras que a pessoa digita, não compras feitas dentro do app nem histórico de uma loja.
 
 ## 2. Apple: App Privacy (App Store Connect)
 
@@ -42,18 +46,18 @@
 |---|---|---|---|---|
 | Informações de contato › Endereço de e-mail | Sim | Sim | Funcionalidade do app | Entrar, confirmar o e-mail, recuperar o acesso |
 | Informações de contato › Nome | Sim | Sim | Funcionalidade do app | Nome de apresentação, mostrado a quem convive na mesma Família |
-| Informações financeiras › Outras informações financeiras | Sim | Sim | Funcionalidade do app | Renda, gastos, contas, dívidas e metas que a pessoa digita |
+| Informações financeiras › Outras informações financeiras | Sim | Sim | Funcionalidade do app | Renda, gastos, contas, dívidas e metas que a pessoa digita, inclusive compras no cartão e notas lidas ou digitadas |
 | Informações financeiras › Informações de pagamento | **Depende** | Sim | Funcionalidade do app | O app guarda só os 4 últimos dígitos do cartão, se a pessoa quiser, nunca o número inteiro (D-037). A Apple define "informações de pagamento" como forma de pagamento, número de cartão ou de conta. **Proposta:** declarar por prudência enquanto o campo existir; decisão de Enzo e do advogado. Tirar o campo é a alternativa |
 | Conteúdo do usuário › Outro conteúdo do usuário | Sim | Sim | Funcionalidade do app | Descrições livres de registros, nomes de contas, de metas e de cartões. A Apple manda marcar este tipo para campos de texto livres |
 | Identificadores › ID do usuário | Sim | Sim | Funcionalidade do app | Identificador interno da conta |
 | Diagnósticos › Dados de falhas e de desempenho | **Não hoje; depende do Sentry** | Se o Sentry for instalado, ligar ou não ao usuário depende da configuração | Funcionalidade do app | Hoje o app não envia relatório de falha. Se o Sentry entrar: declarar estes tipos, sem enviar valores, descrições nem e-mail (não ligados à pessoa), e atualizar a política |
-| Uso do app, localização, contatos, saúde e atividade física, fotos ou vídeos, áudio, histórico de busca ou de navegação, compras, informações sensíveis, ID do dispositivo | Não | | | |
+| Uso do app, localização, contatos, saúde e atividade física, fotos ou vídeos, áudio, histórico de busca ou de navegação, compras, informações sensíveis, ID do dispositivo | Não | | | "Compras" é a Apple e a loja; as compras no cartão que a pessoa anota são "Outras informações financeiras" (acima). Sem SDK do Google no iOS (ponto 3 abaixo) |
 
 **Resultado no cartão da App Store:** "Dados ligados a você": informações de contato, informações financeiras, conteúdo do usuário e identificadores. "Dados usados para rastreá-lo": nenhum.
 
 **Links.** URL da política de privacidade: obrigatória (campo para Enzo em `docs/lojas/ficha.md`, seção 8). URL de opções de privacidade: opcional; a página de exclusão da conta pode ocupar este campo.
 
-**Pontos de atenção da Apple.** (1) "Coletar" não inclui o que é enviado só para atender o pedido e descartado; este caso não existe no Clarevo (tudo que é enviado fica na conta). (2) O IP: se o Clarevo guardar o endereço IP das pessoas, a Apple manda declará-lo conforme o uso (a página cita localização, ID do dispositivo ou diagnósticos). O Supabase pode guardar IP e agente do navegador nos registros de autenticação: **conferir no painel do Supabase** e decidir com o advogado se entra como "Outros dados de diagnóstico". (3) Nenhum SDK de terceiros que colete dados está no app (conferido em `apps/app/package.json`); as bibliotecas do Expo trazem os próprios manifestos de privacidade. Conferir no primeiro envio ao TestFlight se a Apple reclama de algum (ver `docs/16`, "Conferir no primeiro build").
+**Pontos de atenção da Apple.** (1) "Coletar" não inclui o que é enviado só para atender o pedido e descartado; este caso não existe no Clarevo (tudo que é enviado fica na conta). (2) O IP: se o Clarevo guardar o endereço IP das pessoas, a Apple manda declará-lo conforme o uso (a página cita localização, ID do dispositivo ou diagnósticos). O Supabase pode guardar IP e agente do navegador nos registros de autenticação: **conferir no painel do Supabase** e decidir com o advogado se entra como "Outros dados de diagnóstico". (3) O Clarevo não instala SDK de anúncio nem de análise (conferido em `apps/app/package.json`), mas as bibliotecas do Expo trazem SDKs e manifestos de privacidade próprios. No iOS, o único caso a olhar é a leitura de código: usa o leitor do sistema e a ZXingObjC, sem SDK do Google (seção 1), então a tabela acima não muda. Conferir no primeiro envio ao TestFlight se a Apple reclama de algum manifesto (ver `docs/16`, "Conferir no primeiro build").
 
 ## 3. Google Play: Segurança dos dados (Data safety)
 
@@ -73,12 +77,14 @@
 | Informações pessoais › Nome | Sim | Não | Obrigatório (nome de apresentação) | Funcionalidade do app; gerenciamento de conta |
 | Informações pessoais › Endereço de e-mail | Sim | Não | Obrigatório | Funcionalidade do app; gerenciamento de conta |
 | Informações pessoais › IDs de usuário | Sim | Não | Obrigatório | Funcionalidade do app; gerenciamento de conta |
-| Informações financeiras › Outras informações financeiras | Sim | Não | Opcional (a pessoa escolhe o que anota) | Funcionalidade do app |
-| Informações financeiras › Histórico de compras | **Depende** | Não | Opcional | Funcionalidade do app. O tipo é "informações sobre compras ou transações feitas pelo usuário", e o app guarda as transações que a pessoa anota. **Proposta:** declarar por prudência; decisão de Enzo e do advogado |
+| Informações financeiras › Outras informações financeiras | Sim | Não | Opcional (a pessoa escolhe o que anota) | Funcionalidade do app. Inclui compras no cartão e notas lidas ou digitadas (seção 1) |
+| Informações financeiras › Histórico de compras | Não | | | Tratado como na Apple: o que a pessoa anota é "Outras informações financeiras" (linha acima). Conferir o enquadramento na tela do formulário |
 | Informações financeiras › Informações de pagamento do usuário | **Depende** | Não | Opcional | Funcionalidade do app. Mesma questão dos 4 últimos dígitos do cartão (seção 2) |
 | Atividade no app › Outro conteúdo gerado pelo usuário | Sim | Não | Opcional | Funcionalidade do app (descrições livres) |
-| Informações e desempenho do app › Registros de falhas e diagnósticos | **Não hoje; depende do Sentry** | Não | | Se o Sentry entrar, declarar e atualizar a política |
-| Localização, mensagens, fotos e vídeos, áudio, arquivos e documentos, agenda, contatos, saúde e condicionamento, navegação na web, IDs do dispositivo ou outros IDs | Não | | | Os arquivos que a pessoa escolhe (PDF, OFX, CSV) são lidos no aparelho e não são enviados, e o app não pede acesso ao armazenamento: por isso "arquivos e documentos" não é coletado |
+| Informações e desempenho do app › Diagnósticos | **Sim, por precaução** (SDK de leitura de código do Google, só no Android) | Não | Opcional (só quando a pessoa abre o leitor da nota) | Finalidade provável: análises e funcionalidade do app, só do SDK; **nenhum uso para anúncios**. Evidência: `play-services-code-scanner` e `com.google.mlkit:barcode-scanning` em `node_modules/expo-camera/android/build.gradle`, linhas 43 e 44. **Confirmar na documentação do ML Kit antes de enviar** |
+| Informações e desempenho do app › Registros de falhas | **Não hoje; depende do Sentry** | Não | | Do app, ainda não instalado. Se o Sentry entrar, declarar e atualizar a política |
+| Dispositivo ou outros IDs › ID do dispositivo ou outros IDs | **Sim, por precaução** (SDK de leitura de código do Google, só no Android) | Não | Opcional (só quando a pessoa abre o leitor da nota) | Finalidade provável: análises e funcionalidade do app, só do SDK; **nenhum uso para anúncios**. Mesma evidência da linha acima. **Confirmar na documentação do ML Kit antes de enviar** |
+| Localização, mensagens, fotos e vídeos, áudio, arquivos e documentos, agenda, contatos, saúde e condicionamento, navegação na web | Não | | | Os arquivos que a pessoa escolhe (PDF, OFX, CSV) são lidos no aparelho e não são enviados, e o app não pede acesso ao armazenamento: por isso "arquivos e documentos" não é coletado |
 
 **Compartilhamento: nenhum.** O Supabase hospeda a autenticação e o banco em nome do Clarevo (prestador de serviço), o que o Google não conta como compartilhamento; **conferir o enquadramento na tela do formulário** e, no texto da política, nomear o prestador. A Família mostra o que a pessoa lança às outras pessoas da mesma Família, por escolha dela (convite por link). A empresa que oferece o Clarevo como benefício nunca lê finanças, nem somadas (D-056, M-5).
 
@@ -91,10 +97,10 @@
 | Retenção do rastro técnico de registros excluídos que ficam na Família (P-010) | Assessoria de privacidade | Texto da política |
 | Canal para pedidos de titular da LGPD, art. 18 (P-023), e a página de exclusão exigida pelo Google | Domínio e e-mail próprios (P-006) | URL de exclusão e de suporte |
 | Os 4 últimos dígitos do cartão: declarar "informações de pagamento" (Apple) e "informações de pagamento do usuário" (Google), ou tirar o campo | Enzo e advogado | As duas tabelas acima |
-| "Histórico de compras" no Google | Enzo e advogado | A tabela da seção 3 |
+| Compras no cartão e notas como "Outras informações financeiras" nas duas lojas, e "Histórico de compras" (Google) e "Compras" (Apple) como "Não" | Enzo e advogado, e a tela do formulário | As tabelas das seções 2 e 3 |
 | IP e agente do navegador nos registros do Supabase Auth | Painel do Supabase e advogado | Possível linha "Outros dados de diagnóstico" (Apple) |
 | Provedor de hospedagem é empresa estrangeira (o projeto fica em São Paulo) | Advogado (LGPD, art. 33) | Texto da política |
-| Leitura do QR Code no Android: `expo-camera` usa o ML Kit do Google (modelo dentro do app, leitura no aparelho) | Página de divulgação de dados do ML Kit, que esta rede não abriu | Conferir antes de responder "compartilhamento: nenhum" e "IDs do dispositivo: não" no Google |
+| Leitura do QR Code no Android: `expo-camera` usa o ML Kit do Google (modelo dentro do app, leitura no aparelho; `build.gradle`, linhas 43 e 44) | Página de divulgação de dados do ML Kit, que esta rede não abriu | Já declarados por precaução: identificadores do aparelho e diagnósticos, não compartilhados, sem anúncios. Confirmar na documentação do ML Kit antes de enviar, inclusive "compartilhamento: nenhum"; a resposta pode mudar de finalidade ou sair |
 | Relatório de falhas (Sentry) ainda não instalado | Decisão de Enzo | Diagnósticos nas duas lojas, o manifesto de privacidade e a política. Instalar já com `sendDefaultPii` desligado e sem valores, descrições nem e-mail nos eventos |
 | Classificação etária: 18+ ou não (P-002) | Enzo | Substituição da classificação na Apple (`docs/lojas/ficha.md`, seção 9) |
 

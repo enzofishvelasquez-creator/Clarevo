@@ -32,7 +32,7 @@ Nenhuma destas foi tomada pelo Claude. A coluna "Proposta" é só o que está no
 | 7 | Classificação etária (P-002) | 4+ pelo questionário; 18+ por substituição se os termos exigirem | Se o contrato de uso tem idade mínima acima da calculada, a Apple exige substituir (`.../manage-app-information/set-an-app-age-rating`) |
 | 8 | Declaração de exportação de criptografia (`ITSAppUsesNonExemptEncryption`) | **Não foi escrita em `app.json`.** O app usa HTTPS e resumo SHA-256 | A Apple avisa que quem declara isenção responde por erro de interpretação (`.../manage-app-information/overview-of-export-compliance`). Sem a chave, o App Store Connect pergunta a cada build; depois de decidir, a chave `ios.config.usesNonExemptEncryption` em `app.json` evita a pergunta |
 | 9 | Backup automático do Android (`android.allowBackup`) | **Não foi mexido** (padrão do Android, ligado) | Com ele ligado, o Android copia os dados do app para o Google Drive da pessoa. Para um app financeiro, a recomendação é `"allowBackup": false` em `app.json`; é uma linha, mas muda o que a pessoa recebe ao trocar de celular |
-| 10 | Os 4 últimos dígitos do cartão e o "histórico de compras" nas respostas de privacidade | Declarar por prudência (ou tirar o campo) | `docs/lojas/privacidade.md`, seções 2 e 3 |
+| 10 | Os 4 últimos dígitos do cartão nas respostas de privacidade; compras no cartão e notas entram em "outras informações financeiras" nas duas lojas | Declarar por prudência (ou tirar o campo) | `docs/lojas/privacidade.md`, seções 1 a 3 |
 | 11 | Sentry (relatório de falhas) antes do lançamento? | Instalar antes, com `sendDefaultPii` desligado | Muda as respostas de diagnóstico nas duas lojas e a política |
 | 12 | Preço | Gratuito no lançamento (cobrança está fora do ciclo atual, P-005) | Com cobrança ou compra dentro do app, entram acordos e formulários que não estão aqui; conferir na página oficial |
 | 13 | Países e regiões | Brasil | |
@@ -41,7 +41,7 @@ Nenhuma destas foi tomada pelo Claude. A coluna "Proposta" é só o que está no
 
 | Arquivo | O que é |
 |---|---|
-| `apps/app/eas.json` | Perfis `development`, `preview` e `production`; submissão `production` |
+| `apps/app/eas.json` | Perfis `preview` e `production`; submissão `production` |
 | `apps/app/app.json` | Nome, versão 1.0.0, identificadores, `buildNumber` 1, `versionCode` 1, orientação retrato, fundo `#2457F5`, `scheme` `clarevo`, textos de permissão, permissões bloqueadas do Android |
 | `apps/app/assets/images/` | `icon.png`, `android-icon-*.png` e `splash-icon.png` (gerados); `favicon.png` e `notification-icon.png` (mantidos) |
 | `apps/app/assets/loja/icone-play-512.png` | Ícone da página do app no Google Play |
@@ -68,11 +68,11 @@ A ordem importa: o caminho mais longo é o das contas (CNPJ, domínio, verifica�
 
 1. Criar a conta em `expo.dev` (gratuita para começar; limites de build do plano gratuito: conferir na página oficial de preços).
 2. Em `apps/app`: `npx eas-cli@latest login` e `npx eas-cli@latest init`. O `init` grava `extra.eas.projectId` em `app.json`: é o primeiro identificador de conta no repositório, não é segredo, e só Enzo o gera.
-3. Variáveis de ambiente do app, criadas no EAS (nunca no repositório). O app lê `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_KEY` (a chave pública, `docs/07`). Cada perfil de `eas.json` aponta um ambiente do EAS: `development`, `preview` (use o projeto `clarevo-teste`) e `production` (`clarevo-producao`). Exemplo, com a visibilidade `plaintext` (as variáveis `EXPO_PUBLIC_*` vão dentro do app e **não podem** ser "secret", segundo a documentação do Expo):
+3. Variáveis de ambiente do app, criadas no EAS (nunca no repositório). O app lê `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_KEY` (a chave pública, `docs/07`). Cada perfil de `eas.json` aponta um ambiente do EAS: `preview` (use o projeto `clarevo-teste`) e `production` (`clarevo-producao`). Exemplo, com a visibilidade `plaintext` (as variáveis `EXPO_PUBLIC_*` vão dentro do app e **não podem** ser "secret", segundo a documentação do Expo):
    `npx eas-cli@latest env:set --name EXPO_PUBLIC_SUPABASE_URL --environment production --visibility plaintext` (o comando pede o valor).
    Sem as duas variáveis, o build de produção abre "Configuração incompleta" (`apps/app/src/state/session.tsx`), de propósito: nunca vira demonstração em silêncio.
 4. Primeiro build de teste, para pessoas de confiança: `npx eas-cli@latest build --platform android --profile preview` (gera o APK, instalável por link). No iOS, o perfil `preview` gera um build de loja, que vai ao TestFlight.
-5. **Versões:** `cli.appVersionSource` é `remote` e o perfil `production` soma o número de build sozinho (`autoIncrement`), que é o comportamento recomendado pelo Expo para evitar "versão duplicada" na loja. Na primeira vez, o EAS pergunta se começa a partir dos valores de `app.json` (1 e 1). A versão que a pessoa vê (`version`, 1.0.0) só Enzo muda, a cada lançamento.
+5. **Versões:** `cli.appVersionSource` é `remote` e os perfis `preview` e `production` somam o número de build sozinhos (`autoIncrement`), que é o comportamento recomendado pelo Expo para evitar "versão duplicada" na loja (o `preview` também vai ao TestFlight no iOS, então um segundo build com o mesmo número seria recusado). Na primeira vez, o EAS pergunta se começa a partir dos valores de `app.json` (1 e 1). A versão que a pessoa vê (`version`, 1.0.0) só Enzo muda, a cada lançamento.
 
 ### Fase 2. Conta Apple e iPhone
 
@@ -153,13 +153,14 @@ O ícone da notificação (`notification-icon.png`) e o favicon continuam como e
 
 ## 8. Configuração de build e permissões
 
-**`apps/app/eas.json`** (validado em 19/10/2026 com o esquema oficial `@expo/eas-json` 25.2.0, que resolveu os seis perfis por plataforma sem erro):
+**`apps/app/eas.json`** (validado em 19/10/2026 com o esquema oficial `@expo/eas-json` 25.2.0, que resolveu os três perfis de então por plataforma sem erro; depois disso o perfil `development` saiu e o `autoIncrement` entrou no `preview`, e esta versão do arquivo só foi conferida como JSON, porque o pacote do esquema não está instalado no repositório):
 
 | Perfil | Distribuição | Android | iOS | Ambiente EAS |
 |---|---|---|---|---|
-| `development` | interna, cliente de desenvolvimento | APK | build para aparelho (precisa de aparelho cadastrado na Apple; para o simulador, criar um perfil à parte, como o Expo sugere) | `development` |
-| `preview` | interna | APK (instalável por link) | **loja** (vai ao TestFlight, sem cadastrar aparelhos) | `preview` |
+| `preview` | interna | APK (instalável por link) | **loja** (vai ao TestFlight, sem cadastrar aparelhos); soma o número de build sozinho | `preview` |
 | `production` | loja | **AAB** | loja | `production` |
+
+**Sem perfil `development`.** O cliente de desenvolvimento (`expo-dev-client`) não está instalado, e um perfil com `developmentClient: true` geraria um build sem ele. Se for preciso, instalar depois com `npx expo install expo-dev-client` e então criar o perfil `development` (`developmentClient: true`, distribuição `internal`, ambiente `development`; para o simulador do iOS, um perfil à parte com `ios.simulator: true`, como o Expo sugere).
 
 `cli.version` exige `>= 25.2.0` (a versão com que o arquivo foi validado) e `appVersionSource` é `remote`. A submissão `production` usa `track: internal` e `releaseStatus: draft` no Android e `language: pt-BR` no iOS. Não há `appleId`, `ascAppId`, `appleTeamId`, chave de serviço nem senha de keystore.
 
@@ -196,6 +197,7 @@ O ícone da notificação (`notification-icon.png`) e o favicon continuam como e
 ## 10. Conferir no primeiro build
 
 - **Manifesto de privacidade do iOS.** O projeto gerado não traz um `PrivacyInfo.xcprivacy` próprio; as bibliotecas do Expo trazem os delas. Se a Apple mandar e-mail por falta de declaração de motivo de uso de API, acrescentar `ios.privacyManifests` em `app.json`.
+- **SDK de leitura de código do Google (Android).** O `expo-camera` traz `com.google.mlkit:barcode-scanning` e `play-services-code-scanner` (`node_modules/expo-camera/android/build.gradle`, linhas 43 e 44), que podem enviar métricas de uso e de desempenho com identificadores do aparelho. A "Segurança dos dados" declara isso por precaução; **confirmar na documentação do ML Kit antes de enviar** (`docs/lojas/privacidade.md`, seção 3). O iOS não usa esse SDK.
 - **Permissões do Android.** Abrir o AAB ou o APK e listar as permissões (por exemplo, `aapt dump permissions`): devem ser as sete da seção 8.
 - **`aps-environment` no iOS.** O plugin de notificações liga a capacidade de notificação remota, embora o app só agende lembretes locais. Conferir se o App Store Connect não faz pergunta sobre isso e, na primeira revisão, se a Apple aceita.
 - **Idioma do binário.** O `Info.plist` não tem localização em português; os textos do app e das permissões estão em português. Ver como a loja mostra o idioma no TestFlight.

@@ -13,7 +13,11 @@
  *
  * Uso:
  *   node scripts/gerar-icones.js              grava os PNG
- *   node scripts/gerar-icones.js --verificar  não grava: sai com erro se algum PNG gravado difere do que os SVG produzem
+ *   node scripts/gerar-icones.js --verificar  não grava: sai com erro se algum PNG gravado difere do que os SVG produzem. A
+ *                                             comparação é por pixel (o Chromium decodifica o arquivo e o PNG recém-gerado e
+ *                                             compara os dois), e não pelos bytes comprimidos, que mudam com a versão do zlib
+ *                                             ou com um otimizador de PNG sem mudar a imagem. Confere também o tipo de cor (RGB
+ *                                             sem canal alfa onde a loja exige).
  * Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  */
 const fs = require('node:fs');
@@ -98,6 +102,49 @@ function azulDoIcone() {
   return m[1];
 }
 
+/** Tipo de cor do PNG (byte 25 do arquivo: 2 = RGB, 6 = RGBA) e profundidade (byte 24), ou null se não for um PNG. */
+function formatoPng(buf) {
+  return buf.length > 26 && buf.toString('ascii', 1, 4) === 'PNG' ? { profundidade: buf[24], tipoDeCor: buf[25] } : null;
+}
+
+/** O Chromium decodifica os dois PNG pelo mesmo caminho e compara pixel a pixel (RGBA de 8 bits). */
+async function compararPixels(pagina, arquivoPng, esperadoPng) {
+  return pagina.evaluate(
+    async ({ a, b }) => {
+      const ler = async (b64) => {
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const bmp = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+        const canvas = document.createElement('canvas');
+        canvas.width = bmp.width;
+        canvas.height = bmp.height;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(bmp, 0, 0);
+        return { largura: bmp.width, altura: bmp.height, dados: ctx.getImageData(0, 0, bmp.width, bmp.height).data };
+      };
+      let x;
+      try {
+        x = await ler(a);
+      } catch (e) {
+        return { ilegivel: true };
+      }
+      const y = await ler(b);
+      if (x.largura !== y.largura || x.altura !== y.altura) return { largura: x.largura, altura: x.altura, tamanhoDiferente: true };
+      let diferentes = 0;
+      let maior = 0;
+      for (let i = 0; i < x.dados.length; i += 4) {
+        let d = 0;
+        for (let k = 0; k < 4; k++) d = Math.max(d, Math.abs(x.dados[i + k] - y.dados[i + k]));
+        if (d > 0) diferentes++;
+        if (d > maior) maior = d;
+      }
+      return { largura: x.largura, altura: x.altura, diferentes, maior };
+    },
+    { a: arquivoPng.toString('base64'), b: esperadoPng.toString('base64') },
+  );
+}
+
 async function desenhar(pagina, svg, tamanho) {
   const b64 = await pagina.evaluate(
     async ({ svg, tamanho }) => {
@@ -133,9 +180,24 @@ async function desenhar(pagina, svg, tamanho) {
     const png = codificarPng(s.tamanho, s.tamanho, await desenhar(pagina, svg, s.tamanho), s.alfa);
     const rel = path.relative(RAIZ, s.arquivo);
     if (verificar) {
-      const igual = fs.existsSync(s.arquivo) && fs.readFileSync(s.arquivo).equals(png);
-      if (!igual) divergentes++;
-      console.log(`${igual ? 'OK      ' : 'DIVERGE '} ${rel}`);
+      let motivo = '';
+      if (!fs.existsSync(s.arquivo)) motivo = 'arquivo ausente';
+      else {
+        const gravado = fs.readFileSync(s.arquivo);
+        const formato = formatoPng(gravado);
+        const esperado = formatoPng(png);
+        if (!formato) motivo = 'não é um PNG';
+        else if (formato.profundidade !== esperado.profundidade || formato.tipoDeCor !== esperado.tipoDeCor)
+          motivo = `tipo de cor ${formato.tipoDeCor} e ${formato.profundidade} bits, esperado ${esperado.tipoDeCor} e ${esperado.profundidade} bits (${s.alfa ? 'RGBA' : 'RGB sem canal alfa'})`;
+        else {
+          const r = await compararPixels(pagina, gravado, png);
+          if (r.ilegivel) motivo = 'o Chromium não decodificou o PNG';
+          else if (r.tamanhoDiferente) motivo = `${r.largura}x${r.altura}, esperado ${s.tamanho}x${s.tamanho}`;
+          else if (r.diferentes > 0) motivo = `${r.diferentes} pixels diferentes (maior diferença ${r.maior} de 255)`;
+        }
+      }
+      if (motivo) divergentes++;
+      console.log(motivo ? `DIVERGE  ${rel}  ${motivo}` : `OK       ${rel}  ${s.tamanho}x${s.tamanho}, 0 pixels diferentes`);
     } else {
       fs.mkdirSync(path.dirname(s.arquivo), { recursive: true });
       fs.writeFileSync(s.arquivo, png);
@@ -144,7 +206,7 @@ async function desenhar(pagina, svg, tamanho) {
   }
   await browser.close();
   if (verificar && divergentes > 0) {
-    console.error(`${divergentes} PNG diferem do que os SVG de docs/marca produzem: rode "node scripts/gerar-icones.js".`);
+    console.error(`${divergentes} PNG diferem (por pixel) do que os SVG de docs/marca produzem: rode "node scripts/gerar-icones.js".`);
     process.exit(1);
   }
 })().catch((e) => {
