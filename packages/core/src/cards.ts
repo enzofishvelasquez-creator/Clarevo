@@ -12,6 +12,7 @@ import {
   monthOf,
   parseDateBR,
 } from './dates';
+import { effectiveOverdue, nextBusinessDayDueText } from './dia-util';
 import { sharesCents } from './learn/math';
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS, formatBRL, parseBRL } from './money';
@@ -512,8 +513,9 @@ export interface Invoice {
   creditOutCents: Cents;
   situation: InvoiceSituation;
   /**
-   * Vencida (CL-07), calculada na leitura como nas contas (D-021(4)): fechada, sem pagamento, com total a pagar e vencimento antes
-   * de hoje. Não é gravada e não muda `situation` (que é a do banco): a fatura continua "fechada" e pode ser paga.
+   * Vencida (CL-07), calculada na leitura como nas contas (D-021(4)): fechada, sem pagamento, com total a pagar e vencida de verdade
+   * (D-061: com vencimento em sábado, domingo ou feriado nacional, só depois que o próximo dia útil termina). Não é gravada e não muda
+   * `situation` (que é a do banco): a fatura continua "fechada" e pode ser paga.
    */
   overdue: boolean;
   /** Aberta: o valor pode mudar com novas compras. */
@@ -677,7 +679,7 @@ function makeInvoice(
     totalCents,
     creditOutCents: Math.max(0, -rawCents),
     situation,
-    overdue: situation === 'fechada' && totalCents > 0 && dueOn < today,
+    overdue: situation === 'fechada' && totalCents > 0 && effectiveOverdue(dueOn, 'fatura', today),
     estimated: situation === 'aberta',
     isFuture: period.startOn > today,
     commitmentId: commitment ? commitment.id : null,
@@ -1137,8 +1139,13 @@ export function closesText(closingOn: IsoDate, today: IsoDate): string {
   return closingOn < today ? `Fechou em ${formatDayMonth(closingOn)}` : `Fecha em ${formatDayMonth(closingOn)}`;
 }
 
-/** "Vence hoje", "Venceu em 10/10" ou "Vence em 10/11". */
+/**
+ * "Vence hoje", "Venceu em 10/10" ou "Vence em 10/11". Fatura com vencimento em dia que não é útil (D-061): "Vence segunda, 11/01
+ * (próximo dia útil)", e só "Venceu em 10/01" depois desse dia.
+ */
 export function dueTextOf(dueOn: IsoDate, today: IsoDate): string {
+  const grace = nextBusinessDayDueText(dueOn, 'fatura', today);
+  if (grace) return grace;
   if (dueOn === today) return 'Vence hoje';
   return dueOn < today ? `Venceu em ${formatDayMonth(dueOn)}` : `Vence em ${formatDayMonth(dueOn)}`;
 }

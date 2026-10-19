@@ -6,6 +6,7 @@ import type { Cents } from './money';
 import { MAX_RECORD_CENTS, formatBRL, parseBRL, roundDiv } from './money';
 import type { Commitment, CommitmentSeries, FinancialRecord, IncomeReference, SeriesKind, SeriesNature } from './records';
 import { DEBT_NATURES } from './records';
+import { isCommitmentOverdue } from './dia-util';
 import { annualYearOf, projectSeries, seriesMonthOf, seriesYearlyTotal, termFor } from './series';
 import type { ToPaySummary } from './summary';
 import { ERROR_TEXT } from './validation';
@@ -202,6 +203,12 @@ export interface CommittedSummary {
   estimatedOpenCents: Cents;
   /** month_committed.overdue_before_cents: só no mês de hoje, em aberto com vencimento antes dele. Fora do percentual. */
   overdueBeforeCents: Cents;
+  /**
+   * Todas as contas de `overdueBeforeCents` já venceram de verdade (D-061). O total segue a data cadastrada, como o banco; só o texto
+   * muda: nos primeiros dias do mês, uma conta de dia que não é útil no fim do mês anterior ainda está no próximo dia útil, e então
+   * o texto diz "com vencimento antes de", não "vencidas antes de". Sem contas: verdadeiro.
+   */
+  overdueBeforeAllLate: boolean;
   /** Referência vigente (month_committed.reference_cents e reference_from). */
   reference: IncomeReference | null;
   referenceCents: Cents | null;
@@ -280,6 +287,7 @@ export function summarizeCommitted(
     openPartCents: t.open,
     estimatedOpenCents: t.estimatedOpen,
     overdueBeforeCents: overdueBefore.reduce((acc, c) => acc + c.amountCents, 0),
+    overdueBeforeAllLate: overdueBefore.every((c) => isCommitmentOverdue(c, today)),
     reference,
     referenceCents: ref,
     referenceFrom: reference?.fromMonth ?? null,
@@ -747,9 +755,12 @@ export const COMMITTED_TEXT = {
   outsideNote: 'Não é saldo: ainda precisa cobrir gastos do dia a dia, como mercado, e não considera o dinheiro que já estava na conta.',
   /** "Inclui R$ 180,00 em valores estimados." */
   estimated: (cents: Cents) => `Inclui ${formatBRL(cents)} em valores estimados.`,
-  /** "Além disso, R$ 40,00 de contas vencidas antes de outubro continuam em aberto. Elas contam no mês do vencimento." */
-  overdueBefore: (cents: Cents, month: IsoMonth) =>
-    `Além disso, ${formatBRL(cents)} de contas vencidas antes de ${formatMonthName(month)} continuam em aberto. Elas contam no mês do vencimento.`,
+  /**
+   * "Além disso, R$ 40,00 de contas vencidas antes de outubro continuam em aberto. Elas contam no mês do vencimento." Com alguma
+   * ainda no próximo dia útil (D-061, `allLate` falso): "de contas com vencimento antes de outubro".
+   */
+  overdueBefore: (cents: Cents, month: IsoMonth, allLate: boolean = true) =>
+    `Além disso, ${formatBRL(cents)} de contas ${allLate ? 'vencidas' : 'com vencimento'} antes de ${formatMonthName(month)} continuam em aberto. Elas contam no mês do vencimento.`,
   seeOverdue: 'Ver contas vencidas',
   /** "As contas do mês passam a renda de referência em R$ 720,00." */
   overReference: (cents: Cents) => `As contas do mês passam a renda de referência em ${formatBRL(cents)}.`,
@@ -986,7 +997,7 @@ export function committedTexts(s: CommittedSummary, receivedCents: Cents | null 
     outsideNote: s.outsideCents === null || s.outsideCents < 0 ? null : COMMITTED_TEXT.outsideNote,
     estimated: s.estimatedOpenCents > 0 ? COMMITTED_TEXT.estimated(s.estimatedOpenCents) : null,
     invoiceNote: s.items.faturas.length > 0 ? COMMITTED_TEXT.invoiceNote : null,
-    overdueBefore: s.overdueBeforeCents > 0 ? COMMITTED_TEXT.overdueBefore(s.overdueBeforeCents, s.month) : null,
+    overdueBefore: s.overdueBeforeCents > 0 ? COMMITTED_TEXT.overdueBefore(s.overdueBeforeCents, s.month, s.overdueBeforeAllLate) : null,
     overReference: s.overReference && ref !== null ? COMMITTED_TEXT.overReference(s.committedCents - ref) : null,
     annualShare: s.annualShare ? COMMITTED_TEXT.annualShare(s.annualShare.monthlyCents) : null,
     annualShareNote: s.annualShare ? COMMITTED_TEXT.annualShareNote : null,

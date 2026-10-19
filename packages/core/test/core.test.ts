@@ -493,10 +493,15 @@ describe('contas a pagar', () => {
       [commitment({ dueOn: '2026-10-07' }), 'vence_hoje', 'Vence hoje'],
       [commitment({ dueOn: '2026-10-08' }), 'a_vencer', 'Vence amanhã'],
       [commitment({ dueOn: '2026-10-09' }), 'a_vencer', 'Vence em 2 dias · 09/10'],
-      [commitment({ dueOn: '2026-10-10' }), 'a_vencer', 'Vence em 3 dias · 10/10'],
+      // 10/10/2026 é sábado e 12/10 é feriado (D-061): vence no próximo dia útil, terça, 13/10.
+      [commitment({ dueOn: '2026-10-10' }), 'a_vencer', 'Vence terça, 13/10 (próximo dia útil)'],
+      [commitment({ dueOn: '2026-10-11' }), 'a_vencer', 'Vence terça, 13/10 (próximo dia útil)'],
+      [commitment({ dueOn: '2026-10-13' }), 'a_vencer', 'Vence em 6 dias · 13/10'],
       [commitment({ dueOn: '2026-10-14' }), 'a_vencer', 'Vence em 7 dias · 14/10'],
       [commitment({ dueOn: '2026-10-15' }), 'a_vencer', 'Vence em 15/10/2026'],
       [commitment({ dueOn: '2026-10-05' }), 'vencida', 'Venceu em 05/10/2026'],
+      // Sábado, 03/10: o próximo dia útil (segunda, 05/10) já terminou, então está vencida.
+      [commitment({ dueOn: '2026-10-03' }), 'vencida', 'Venceu em 03/10/2026'],
       [paidCommitment('2026-10-15', '2026-10-01'), 'paga', 'Paga em 01/10/2026'],
       [paidCommitment('2026-10-05', '2026-10-07'), 'paga', 'Paga em 07/10/2026'],
     ] as const)('4. situação e texto: %#', (c, situation, text) => {

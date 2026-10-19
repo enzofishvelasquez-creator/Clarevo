@@ -15,6 +15,7 @@ import {
   formatBRL,
   formatDateBR,
   formatMonthBR,
+  isCommitmentOverdue,
   isRepoError,
   maskDateBR,
   mergeOccurrences,
@@ -22,6 +23,8 @@ import {
   dropAttempts,
   keyForSend,
   newOperationKey,
+  nextBusinessDayDueText,
+  dueKindOf,
   recordUncertain,
   refuseKey,
   relevantAttempts,
@@ -431,7 +434,9 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
   const paidOn = parseDateBR(draft.dateText);
   const valid = amount !== null && amount > 0 && amount <= MAX_RECORD_CENTS && paidOn !== null && paidOn <= today;
   const yesterday = addDays(today, -1);
-  const overdue = shown.dueOn < today;
+  // D-061: vencida só depois do próximo dia útil; antes disso, em dia que não é útil, "Vence terça, 13/10 (próximo dia útil)".
+  const overdue = isCommitmentOverdue(shown, today);
+  const graceDue = nextBusinessDayDueText(shown.dueOn, dueKindOf(shown), today);
   const sumText = (w: WholeYearPayment) =>
     `Soma das ${w.others.length + 1} parcelas de ${w.year.label} em aberto: ${w.approximate ? 'cerca de ' : ''}${formatBRL(w.openTotalCents)}. Informe o valor que saiu da conta, com desconto, se houver.`;
   const afterText = (w: WholeYearPayment) =>
@@ -469,7 +474,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
             {shown.description}
           </Txt>
           <MoneyTxt variant="caption" color={overdue ? colors.error : colors.textSecondary}>
-            {`${overdue ? 'Venceu em' : 'Vence em'} ${formatDateBR(shown.dueOn)} · ${
+            {`${overdue ? `Venceu em ${formatDateBR(shown.dueOn)}` : (graceDue ?? `Vence em ${formatDateBR(shown.dueOn)}`)} · ${
               shown.amountIsEstimate ? `estimado ≈ ${keepTogether(formatBRL(shown.amountCents))}` : `previsto ${keepTogether(formatBRL(shown.amountCents))}`
             }`}
           </MoneyTxt>

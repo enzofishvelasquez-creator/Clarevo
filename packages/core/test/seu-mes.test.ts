@@ -297,12 +297,12 @@ describe('Seu mês, o que ainda vence', () => {
     const view = await dueView(async (repo, ctx) => {
       await repo.createSeries('seu-mes-luz', ctx, {
         kind: 'mensal', nature: 'conta', description: 'Luz de teste', category: 'Moradia', amountCents: 18_000, amountMode: 'variavel',
-        dueDay: 12, firstDueMonth: '2026-10', firstNumber: 1, installmentTotal: null, partsPerYear: null, lastMonth: null,
+        dueDay: 14, firstDueMonth: '2026-10', firstNumber: 1, installmentTotal: null, partsPerYear: null, lastMonth: null,
       });
     });
     const c = card(view, 'o-que-vence');
     expect(c.rows[0]).toMatchObject({ value: 'R$ 830,00', details: ['Inclui R$ 180,00 em valores estimados.'] });
-    expect(c.rows.find((r) => r.label === 'Luz de teste')).toMatchObject({ value: '≈ R$ 180,00', details: ['Vence 12/10 · estimado'] });
+    expect(c.rows.find((r) => r.label === 'Luz de teste')).toMatchObject({ value: '≈ R$ 180,00', details: ['Vence 14/10 · estimado'] });
   });
 
   it('nada em aberto: R$ 0,00 e "Nada em aberto neste mês"', async () => {

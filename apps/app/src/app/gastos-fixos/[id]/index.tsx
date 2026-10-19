@@ -14,6 +14,7 @@ import {
   cotaUnicaLink,
   currentTerm,
   custoPorAnoLink,
+  dueKindOfSeries,
   formatBRL,
   formatDateBR,
   installmentProgress,
@@ -23,6 +24,7 @@ import {
   mergeOccurrences,
   missingMonths,
   monthOf,
+  nextBusinessDayDueText,
   plannedDueNotice,
   projectSeries,
   quitarAntesLink,
@@ -35,6 +37,7 @@ import {
   termHistory,
   type Commitment,
   type CommitmentSeries,
+  type DueKind,
   type IsoDate,
   type PlannedOccurrence,
   type ReviewRow,
@@ -499,7 +502,7 @@ function Occurrences({
           </Txt>
         ) : null}
         {projected.map((p, i) => (
-          <ProjectedRow key={p.number} planned={p} today={today} last={i === projected.length - 1} />
+          <ProjectedRow key={p.number} planned={p} kind={dueKindOfSeries(s.kind)} today={today} last={i === projected.length - 1} />
         ))}
       </Card>
 
@@ -657,13 +660,16 @@ function Actions({
 
 /**
  * Conta prevista: ainda não existe, não é tocável e não entra em total. Com vencimento em sábado, domingo ou feriado nacional,
- * leva o mesmo sinal das contas a pagar (D-060 item 3): só avisa, a data prevista não muda.
+ * leva o mesmo sinal das contas a pagar (D-060 item 3) e, como elas, o próximo dia útil (D-061): "Prevista · vence segunda, 14/12
+ * (próximo dia útil)". A data prevista não muda.
  */
-function ProjectedRow({ planned: p, today, last }: { planned: PlannedOccurrence; today: IsoDate; last: boolean }) {
+function ProjectedRow({ planned: p, kind, today, last }: { planned: PlannedOccurrence; kind: DueKind; today: IsoDate; last: boolean }) {
   const hidden = useValuesHidden();
   const amount = estimateText(p.amountCents, p.amountIsEstimate, hidden);
-  const dueNotice = plannedDueNotice(p.dueOn, today);
-  const label = `${p.description}, prevista, vence em ${formatDateBR(p.dueOn)}, ${amount.a11y}${p.amountIsEstimate ? ', valor estimado' : ''}${dueNotice ? `, ${dueNotice.signA11y}` : ''}`;
+  const dueNotice = plannedDueNotice(p.dueOn, today, kind);
+  const graceDue = nextBusinessDayDueText(p.dueOn, kind, today);
+  const dueText = graceDue ? graceDue.toLowerCase() : `vence em ${formatDateBR(p.dueOn)}`;
+  const label = `${p.description}, prevista, ${dueText}, ${amount.a11y}${p.amountIsEstimate ? ', valor estimado' : ''}${dueNotice ? `, ${dueNotice.signA11y}` : ''}`;
   return (
     <View style={[styles.row, !last && styles.divider]} accessible accessibilityLabel={label}>
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -671,7 +677,7 @@ function ProjectedRow({ planned: p, today, last }: { planned: PlannedOccurrence;
           {p.description}
         </Txt>
         <Txt variant="caption" color={colors.textSecondary}>
-          Prevista · vence em {formatDateBR(p.dueOn)}
+          Prevista · {dueText}
           {p.amountIsEstimate ? ' · estimado' : ''}
         </Txt>
         {dueNotice ? <DueDaySign notice={dueNotice} /> : null}

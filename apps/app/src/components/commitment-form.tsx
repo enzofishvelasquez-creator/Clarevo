@@ -11,6 +11,8 @@ import {
   annualYearLabelOf,
   centsToInput,
   charCount,
+  dueKindOfSeries,
+  effectiveOverdue,
   fieldForErrorCode,
   formatBRL,
   formatDateBR,
@@ -374,7 +376,8 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
 
   // Avisos ao vivo (informativos; a validação continua no salvar).
   const dueOn = parseDateBR(draft.dateText);
-  const alreadyDue = dueOn !== null && dueOn < today;
+  // Vencida de verdade (D-061): em dia que não é útil, só depois do próximo dia útil; conta do ano, depois da data.
+  const alreadyDue = dueOn !== null && effectiveOverdue(dueOn, occurrence?.series ? dueKindOfSeries(occurrence.series.kind) : 'conta', today);
   // Conta de gasto fixo não muda de mês: em vez do aviso, o salvar mostra o erro no campo.
   const movesFrom = !occurrence && base && dueOn && monthOf(dueOn) !== monthOf(base.dueOn) ? monthOf(base.dueOn) : null;
   const looksLikeInvoice = INVOICE_HINT.test(draft.description);

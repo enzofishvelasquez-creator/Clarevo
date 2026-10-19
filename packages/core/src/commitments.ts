@@ -1,5 +1,6 @@
 import type { IsoDate } from './dates';
-import { addDays, addMonths, addMonthsToDate, daysBetween, formatDateBR, formatDayMonth, formatMonthName } from './dates';
+import { addDays, addMonths, addMonthsToDate, daysBetween, formatDateBR, formatDayMonth, formatMonthName, monthRange } from './dates';
+import { dueKindOf, isCommitmentOverdue, lastOnTimeDay, nextBusinessDayWhen } from './dia-util';
 import { formatBRL } from './money';
 import type { Commitment, CommitmentInput } from './records';
 import type { ToPaySummary } from './summary';
@@ -18,12 +19,23 @@ export function isPartialInvoicePayment(c: Pick<Commitment, 'invoice' | 'status'
 /**
  * Comparação de texto ISO, sem passar por Date local. Paga nunca é vencida, mesmo paga depois do vencimento. A conta de uma fatura
  * paga em parte é "paga em parte", igual à tela da fatura.
+ *
+ * "Vencida" é a de D-061 (`effectiveOverdue`): com vencimento em sábado, domingo ou feriado nacional, só depois que o próximo dia útil
+ * termina (conta do ano: a partir do dia seguinte à data cadastrada). Até lá a conta é "a vencer", ou "vence hoje" no último dia sem
+ * atraso, que nessa tolerância é o próximo dia útil.
  */
 export function commitmentSituation(c: Commitment, today: IsoDate): CommitmentSituation {
   if (c.status === 'quitado') return isPartialInvoicePayment(c) ? 'paga_em_parte' : 'paga';
-  if (c.dueOn < today) return 'vencida';
-  if (c.dueOn === today) return 'vence_hoje';
+  const last = lastOnTimeDay(c.dueOn, dueKindOf(c));
+  if (last < today) return 'vencida';
+  if (last === today) return 'vence_hoje';
   return 'a_vencer';
+}
+
+/** "Vence terça, 13/10 (próximo dia útil)" quando a tolerância de D-061 vale para a conta; senão null. */
+function nextBusinessDayDueLabel(c: Pick<Commitment, 'dueOn' | 'invoice' | 'series'>, today: IsoDate): string | null {
+  const w = nextBusinessDayWhen(c.dueOn, dueKindOf(c), today);
+  return w === null ? null : `Vence ${w.when}`;
 }
 
 /** Mês por extenso no texto: "dezembro" e, em outro ano que o de hoje, "janeiro de 2027" (como invoiceMonthLabel, em cards.ts). */
@@ -34,7 +46,8 @@ function monthLabelFor(month: string, today: IsoDate): string {
 
 /**
  * Legenda da conta a pagar: "Vence amanhã", "Vence em 3 dias · 10/10", "Venceu em 05/10/2026", "Paga em 07/10/2026" e, na conta de
- * uma fatura paga em parte, "Paga em parte em 08/11/2026 · R$ 230,00 foram para a fatura de dezembro".
+ * uma fatura paga em parte, "Paga em parte em 08/11/2026 · R$ 230,00 foram para a fatura de dezembro". Com vencimento em dia que não
+ * é útil (D-061): "Vence terça, 13/10 (próximo dia útil)" ou "Vence hoje (próximo dia útil)"; a data cadastrada segue no detalhe.
  */
 export function dueText(c: Commitment, today: IsoDate): string {
   switch (commitmentSituation(c, today)) {
@@ -48,8 +61,10 @@ export function dueText(c: Commitment, today: IsoDate): string {
     case 'vencida':
       return `Venceu em ${formatDateBR(c.dueOn)}`;
     case 'vence_hoje':
-      return 'Vence hoje';
+      return nextBusinessDayDueLabel(c, today) ?? 'Vence hoje';
     case 'a_vencer': {
+      const grace = nextBusinessDayDueLabel(c, today);
+      if (grace) return grace;
       const days = daysBetween(today, c.dueOn);
       if (days === 1) return 'Vence amanhã';
       if (days <= 7) return `Vence em ${days} dias · ${formatDayMonth(c.dueOn)}`;
@@ -79,18 +94,33 @@ export function findNextMonthCommitment(list: readonly Commitment[], c: Commitme
 const contas = (n: number) => (n === 1 ? '1 conta' : `${n} contas`);
 const vencidas = (n: number) => `${contas(n)} ${n === 1 ? 'vencida' : 'vencidas'}`;
 
-/** Vencimento curto do card: "hoje", "amanhã" ou "15/10". */
-function shortDue(dueOn: IsoDate, today: IsoDate): string {
-  if (dueOn === today) return 'hoje';
-  if (dueOn === addDays(today, 1)) return 'amanhã';
-  return formatDayMonth(dueOn);
+/**
+ * Vencimento curto do card: "hoje", "amanhã" ou "15/10". Com vencimento em dia que não é útil (D-061), o próximo dia útil:
+ * "terça, 13/10 (próximo dia útil)" ou "hoje (próximo dia útil)".
+ */
+function shortDue(c: Pick<Commitment, 'dueOn' | 'invoice' | 'series'>, today: IsoDate): string {
+  const grace = nextBusinessDayWhen(c.dueOn, dueKindOf(c), today);
+  if (grace) return grace.when;
+  if (c.dueOn === today) return 'hoje';
+  if (c.dueOn === addDays(today, 1)) return 'amanhã';
+  return formatDayMonth(c.dueOn);
 }
 
-/** Com um único item: "vence em 15/10", "vence hoje", "vence amanhã" ou "venceu em 05/10". */
-function singleDue(dueOn: IsoDate, today: IsoDate): string {
-  if (dueOn < today) return `venceu em ${formatDayMonth(dueOn)}`;
-  const when = shortDue(dueOn, today);
-  return dueOn <= addDays(today, 1) ? `vence ${when}` : `vence em ${when}`;
+/** Com um único item: "vence em 15/10", "vence hoje", "vence amanhã", "vence terça, 13/10 (próximo dia útil)" ou "venceu em 05/10". */
+function singleDue(c: Pick<Commitment, 'dueOn' | 'invoice' | 'series'>, today: IsoDate): string {
+  if (isCommitmentOverdue(c, today)) return `venceu em ${formatDayMonth(c.dueOn)}`;
+  const when = shortDue(c, today);
+  return when === 'hoje' || when === 'amanhã' || nextBusinessDayWhen(c.dueOn, dueKindOf(c), today) ? `vence ${when}` : `vence em ${when}`;
+}
+
+/**
+ * "vencidas" ou "com vencimento": as contas em aberto de antes do mês continuam num total à parte pela data cadastrada (o banco
+ * calcula o mesmo número), mas só se chamam "vencidas" quando todas já venceram de verdade (D-061). Nos primeiros dias do mês, uma
+ * conta de dia que não é útil no fim do mês anterior ainda está no próximo dia útil: o texto diz "com vencimento antes de".
+ */
+function overdueBeforeWord(s: Pick<ToPaySummary, 'items' | 'month'>, today: IsoDate): 'vencidas' | 'com vencimento' {
+  const { start } = monthRange(s.month);
+  return s.items.filter((c) => c.dueOn < start).every((c) => isCommitmentOverdue(c, today)) ? 'vencidas' : 'com vencimento';
 }
 
 /** Textos do card "Ainda a pagar" no Resumo. */
@@ -103,14 +133,13 @@ export function toPayCaption(
   let main: string | null;
   if (!first) main = null;
   else if (!s.isCurrentMonth) main = `${contas(n)} em aberto`;
-  else if (n === 1) main = `${first.description} · ${singleDue(first.dueOn, today)}`;
-  else if (s.nextDue) main = `${contas(n)} · próxima: ${s.nextDue.description}, ${shortDue(s.nextDue.dueOn, today)}`;
+  else if (n === 1) main = `${first.description} · ${singleDue(first, today)}`;
+  else if (s.nextDue) main = `${contas(n)} · próxima: ${s.nextDue.description}, ${shortDue(s.nextDue, today)}`;
   else main = vencidas(n);
   return {
     main,
     overdue: s.isCurrentMonth && s.overdueCount > 0 && s.overdueCount < n ? vencidas(s.overdueCount) : null,
-    includes:
-      s.overdueBeforeCents > 0 ? `Inclui ${formatBRL(s.overdueBeforeCents)} de contas vencidas antes de ${formatMonthName(s.month)}.` : null,
+    includes: s.overdueBeforeCents > 0 ? `Inclui ${formatBRL(s.overdueBeforeCents)} de contas ${overdueBeforeWord(s, today)} antes de ${formatMonthName(s.month)}.` : null,
     estimated: s.estimatedCents > 0 ? `Inclui ${formatBRL(s.estimatedCents)} em valores estimados.` : null,
   };
 }
@@ -125,7 +154,7 @@ export function quickPayDraft(
   today: IsoDate,
 ): { amountCents: number; paidOn: IsoDate; category: string | null } | null {
   // Fatura de cartão: paga pela fatura (pay_invoice), nunca por "Já paguei" (pay_commitment recusa com conta_de_fatura).
-  if (c.invoice || c.status !== 'aberto' || c.amountIsEstimate || c.dueOn < today) return null;
+  if (c.invoice || c.status !== 'aberto' || c.amountIsEstimate || isCommitmentOverdue(c, today)) return null;
   return { amountCents: c.amountCents, paidOn: today, category: c.category };
 }
 
@@ -134,7 +163,7 @@ export function quickPayDraft(
  * formulário de pagamento) ou null (paga ou vencida).
  */
 export function quickPayAction(c: Commitment, today: IsoDate): 'pagar' | 'informar' | null {
-  if (c.invoice || c.status !== 'aberto' || c.dueOn < today) return null;
+  if (c.invoice || c.status !== 'aberto' || isCommitmentOverdue(c, today)) return null;
   return c.amountIsEstimate ? 'informar' : 'pagar';
 }
 

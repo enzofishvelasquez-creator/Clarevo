@@ -1,5 +1,6 @@
 import type { IsoDate, IsoMonth } from './dates';
 import { addMonths, addYearsClamped, dateInMonth, isValidIsoDate, isValidIsoMonth, monthOf, monthsBetween } from './dates';
+import { dueKindOfSeries, effectiveOverdue } from './dia-util';
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS } from './money';
 import type {
@@ -3849,7 +3850,7 @@ export class MemoryRepository implements RecordsRepository {
       };
       this.commitments.set(c.id, c);
       created += 1;
-      if (o.dueOn < today) createdOverdue += 1;
+      if (effectiveOverdue(o.dueOn, dueKindOfSeries(s.kind), today)) createdOverdue += 1;
     }
     return { created, createdOverdue };
   }

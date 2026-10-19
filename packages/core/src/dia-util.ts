@@ -1,13 +1,20 @@
 import { addDays, formatDateBR, formatDayMonth, isValidIsoDate, type IsoDate } from './dates';
 import type { Invoice } from './cards';
-import type { Commitment } from './records';
+import type { Commitment, SeriesKind } from './records';
 
 /**
- * Vencimento em sábado, domingo ou feriado nacional (D-060 item 3, resolve P-014; Ciclo T).
+ * Vencimento em sábado, domingo ou feriado nacional (D-060 item 3, resolve P-014; Ciclo T) e o padrão de mercado do próximo dia
+ * útil (D-061; Ciclo T2).
  *
- * Só avisa: a data de vencimento calculada NÃO muda (nada no banco, nenhum total, nenhuma ocorrência de gasto fixo ou de conta do
- * ano), e o app nunca promete que o pagamento no próximo dia útil vale para qualquer cobrança nem que não há encargos. Cada
- * cobrança tem a própria regra, então o aviso termina mandando conferir com quem cobra.
+ * A data de vencimento calculada NÃO muda (nada no banco, nenhum total, nenhuma ocorrência de gasto fixo ou de conta do ano), e o
+ * app nunca promete que o pagamento no próximo dia útil vale para qualquer cobrança nem que não há encargos. Cada cobrança tem a
+ * própria regra, então o aviso termina mandando conferir com quem cobra.
+ *
+ * D-061: conta a pagar, boleto, fatura, gasto fixo e parcelamento com vencimento em dia que não é útil aparecem como "Vence terça,
+ * 13/10 (próximo dia útil)" e só passam a "vencida" depois que esse dia termina (`effectiveOverdue`, no dia da sessão). Contas do
+ * ano (IPVA, IPTU, matrícula e outras, que costumam ser tributos) NÃO ganham a tolerância: seguem "vencida" a partir do dia
+ * seguinte à data cadastrada, e o aviso manda conferir a data no carnê ou no site do órgão. A ordem, os totais e o horário do
+ * lembrete seguem pela data cadastrada.
  *
  * Tudo aqui trabalha com data civil (`AAAA-MM-DD`), sem passar pelo fuso local: o dia da semana sai de `Date.UTC`, e o "hoje"
  * que decide se o aviso aparece é o da sessão (`todayIn(fuso)`), nunca o do relógio do aparelho. Sem banco, sem rede e sem
@@ -78,6 +85,39 @@ export const NATIONAL_HOLIDAY_LAWS = [
   'Lei nº 14.759/2023',
 ] as const;
 
+/** Data da consulta das fontes da regra do próximo dia útil (D-061), em `docs/09_APRENDER.md`, seção 11. */
+export const DUE_RULE_CONSULTED_ON: IsoDate = '2026-10-19';
+
+/** Rótulo curto da lei que o aviso cita: a Lei nº 7.089/1983. */
+export const DUE_RULE_LAW = 'Lei nº 7.089/1983';
+
+/**
+ * Fontes da regra do próximo dia útil (D-061): a lei e, como notícia (não é o acórdão), o entendimento do STJ sobre o que acontece
+ * se o pagamento passar do primeiro dia útil. Como nas leis dos feriados, as páginas não abriram a partir do ambiente de trabalho
+ * (DNS e bloqueio de saída): cada trecho vem de resultado de busca da própria fonte, e o `locator` diz isso.
+ */
+export const DUE_RULE_SOURCES: readonly HolidaySource[] = [
+  {
+    kind: 'oficial',
+    publisher: PLANALTO,
+    title: 'Lei nº 7.089, de 23 de março de 1983 (juros de mora em título que vence em sábado, domingo ou feriado)',
+    url: 'https://www.planalto.gov.br/ccivil_03/leis/l7089.htm',
+    locator:
+      'Art. 1º: "Fica proibida a cobrança de juros de mora, por estabelecimentos bancários e instituições financeiras, sobre títulos de qualquer natureza, cujo vencimento se dê em sábado, domingo ou feriado, desde que seja quitado no primeiro dia subsequente."; o art. 2º foi vetado e a lei não menciona multa. Trecho de resultado de busca; a página não abriu',
+    consultedOn: DUE_RULE_CONSULTED_ON,
+  },
+  {
+    kind: 'oficial',
+    publisher: 'Superior Tribunal de Justiça',
+    title:
+      'Notícia do STJ: juros sobre dívida não paga no primeiro dia útil subsequente incidem a partir do vencimento original (REsp 1.954.924, Terceira Turma). É notícia do tribunal, não o acórdão',
+    url: 'https://www.stj.jus.br/sites/portalp/Paginas/Comunicacao/Noticias/25022022-Juros-sobre-divida-nao-paga-no-primeiro-dia-util-subsequente-incidem-a-partir-do-vencimento-original.aspx',
+    locator:
+      'Se a dívida vence em dia não útil e o pagamento não é feito no primeiro dia útil subsequente, os juros de mora são contados a partir do vencimento original (fatura de cartão que venceu num sábado e foi paga depois); a proteção do art. 1º da Lei 7.089/1983 depende do pagamento no primeiro dia útil seguinte. Trecho de resultado de busca; a página não abriu',
+    consultedOn: DUE_RULE_CONSULTED_ON,
+  },
+] as const;
+
 export interface NationalHoliday {
   /** Data civil do feriado naquele ano. */
   date: IsoDate;
@@ -101,7 +141,9 @@ interface HolidayRule {
   /**
    * Primeiro ano em que vale pela lei: 1949 (Lei 662), 1951 (21 de abril: já era feriado nacional pela Lei 1.266, de 08/12/1950,
    * art. 3, que a Lei 10.607, de 19/12/2002, revogou e cuja data manteve na redação que deu à Lei 662), 1980 (Lei 6.802), 2003 (2 de
-   * novembro entrou pela Lei 10.607) e 2024 (Lei 14.759, em vigor desde 22/12/2023).
+   * novembro entrou pela Lei 10.607; **a conferir**: nenhuma fonte consultada traz a cláusula de vigência da Lei 10.607, então 2003
+   * é só o primeiro 2 de novembro depois da publicação, em 20/12/2002, e `docs/09`, seção 11, não afirma o ano) e 2024 (Lei 14.759,
+   * em vigor desde 22/12/2023). O aviso só olha vencimentos de hoje em diante, então o ano de 2003 nunca decide nada na tela.
    */
   fromYear: number;
 }
@@ -189,10 +231,62 @@ function onWeekday(date: IsoDate): string {
   return w === null ? '' : `${w === 0 || w === 6 ? 'no' : 'na'} ${WEEKDAY[w]}`;
 }
 
+/**
+ * Tipo de cobrança, para a regra do próximo dia útil (D-061). A tolerância vale para conta avulsa, boleto, fatura, gasto fixo e
+ * parcelamento; a conta do ano não a tem (costuma ser tributo, e imposto pode ter regra diferente).
+ */
+export type DueKind = 'conta' | 'fatura' | 'gasto_fixo' | 'parcelamento' | 'conta_do_ano';
+
+/** Todos os tipos, para testes e para quem precisa percorrer todos. */
+export const DUE_KINDS: readonly DueKind[] = ['conta', 'fatura', 'gasto_fixo', 'parcelamento', 'conta_do_ano'];
+
+/** A conta do ano é a única sem a tolerância do próximo dia útil (D-061 item 3). */
+export function hasNextBusinessDayGrace(kind: DueKind): boolean {
+  return kind !== 'conta_do_ano';
+}
+
+/** Tipo de cobrança de uma série: gasto fixo, parcelamento ou conta do ano. */
+export function dueKindOfSeries(kind: SeriesKind): DueKind {
+  return kind === 'anual' ? 'conta_do_ano' : kind === 'parcelada' ? 'parcelamento' : 'gasto_fixo';
+}
+
+/** Tipo de cobrança de uma conta a pagar: fatura de cartão, ocorrência de série ou conta avulsa. */
+export function dueKindOf(c: Pick<Commitment, 'invoice' | 'series'>): DueKind {
+  if (c.invoice) return 'fatura';
+  return c.series ? dueKindOfSeries(c.series.kind) : 'conta';
+}
+
+/**
+ * O último dia em que a conta ainda NÃO está vencida: o próprio vencimento, ou, com a tolerância (D-061), o próximo dia útil quando
+ * o vencimento cai em sábado, domingo ou feriado nacional. Data inválida e conta do ano: o próprio vencimento.
+ */
+export function lastOnTimeDay(dueOn: IsoDate, kind: DueKind): IsoDate {
+  if (!hasNextBusinessDayGrace(kind) || !isValidIsoDate(dueOn) || isBusinessDay(dueOn)) return dueOn;
+  return nextBusinessDay(dueOn) ?? dueOn;
+}
+
+/**
+ * Vencida de verdade (D-061): só depois que o último dia sem atraso termina. `today` é o dia da sessão (`todayIn(fuso)`), nunca o do
+ * relógio do aparelho. Sexta feriado, sábado e domingo: vencida só na terça (segunda útil termina). Conta do ano: a partir do dia
+ * seguinte à data cadastrada. É a única regra de "vencida" do app, usada por toda tela, resumo, widget e revisão que a mostram.
+ */
+export function effectiveOverdue(dueOn: IsoDate, kind: DueKind, today: IsoDate): boolean {
+  return lastOnTimeDay(dueOn, kind) < today;
+}
+
+/** `effectiveOverdue` de uma conta a pagar (sem olhar se está paga: quem chama já separou as em aberto). */
+export function isCommitmentOverdue(c: Pick<Commitment, 'dueOn' | 'invoice' | 'series'>, today: IsoDate): boolean {
+  return effectiveOverdue(c.dueOn, dueKindOf(c), today);
+}
+
 /** Textos fixos do aviso. Sem promessa de ausência de encargos, sem julgamento, sem produto financeiro. */
 export const DUE_DAY_TEXT = {
-  /** Frase neutra, sempre depois do aviso. */
+  /** Frase neutra, depois do aviso de conta, boleto, fatura, gasto fixo e parcelamento. */
   advice: 'Confira com quem cobra se o pagamento pode ser feito no próximo dia útil.',
+  /** Frase da conta do ano (costuma ser tributo), no lugar da anterior (D-061 item 3). */
+  adviceYearBill: 'Impostos podem ter regra diferente. Confira a data no carnê ou no site do órgão.',
+  /** Etiqueta da data em que a conta passa a contar como vencida: "Vence terça, 13/10 (próximo dia útil)". */
+  nextBusinessDayTag: '(próximo dia útil)',
   /** Sinal da lista de contas a pagar (texto, nunca só ícone ou cor). */
   sign: 'Não é dia útil',
   /** Botão que abre a explicação, no próprio lugar. */
@@ -201,83 +295,129 @@ export const DUE_DAY_TEXT = {
   learnMoreTitle: 'Vencimento em dia que não é útil',
   /** Corpo da explicação. */
   learnMoreParagraphs: [
-    'O Clarevo não muda a data de vencimento: ela segue como você anotou, ou como o dia escolhido do gasto fixo, do parcelamento ou da conta do ano a calcula. O aviso só diz quando essa data cai em sábado, domingo ou feriado nacional e qual é o próximo dia útil.',
+    'O Clarevo não muda a data de vencimento: ela segue como você anotou, ou como o dia escolhido do gasto fixo, do parcelamento ou da conta do ano a calcula. Quando essa data cai em sábado, domingo ou feriado nacional, a conta, o boleto ou a fatura aparece como "Vence terça, 13/10 (próximo dia útil)" e só passa a vencida depois que esse dia termina. Os totais, a ordem das contas e o lembrete seguem na data de vencimento.',
+    'A Lei nº 7.089/1983 proíbe bancos e instituições financeiras de cobrar juros de mora sobre título que vence em sábado, domingo ou feriado, quando o pagamento é feito no primeiro dia útil seguinte. A multa e as regras de cada cobrança podem variar, e o Clarevo não sabe qual vale para a sua conta. Por isso, confira com quem cobra antes de escolher a data do pagamento.',
+    'Se o pagamento passar do primeiro dia útil, os juros podem contar desde a data original do vencimento: é o entendimento do STJ, que o tribunal divulgou em notícia sobre um caso de fatura de cartão.',
+    'Contas do ano, como IPVA, IPTU e matrícula, costumam ser tributos e não ganham essa tolerância no Clarevo: ficam vencidas a partir do dia seguinte ao vencimento. Impostos podem ter regra diferente. Confira a data no carnê ou no site do órgão.',
     'Contam só os feriados nacionais de data fixa definidos em lei federal: 1º de janeiro, 21 de abril, 1º de maio, 7 de setembro, 12 de outubro, 2 de novembro, 15 de novembro, 20 de novembro e 25 de dezembro. Carnaval, Sexta-feira Santa, Corpus Christi e os feriados de estados e municípios não entram. O dia de eleição cai sempre num domingo, que já é coberto pelo fim de semana. Quem cobra pode ter outro calendário.',
-    'Cada cobrança tem a própria regra para vencimento em dia que não é útil, e o Clarevo não sabe qual vale para a sua conta. Por isso, confira com quem cobra antes de escolher a data do pagamento.',
   ],
   /** Fonte e data da consulta, no fim da explicação. */
-  source: `Fontes: ${NATIONAL_HOLIDAY_LAWS.join('; ')}. Consultadas em ${formatDateBR(NATIONAL_HOLIDAYS_CONSULTED_ON)}.`,
+  source: `Fontes: ${NATIONAL_HOLIDAY_LAWS.join('; ')}; ${DUE_RULE_LAW}; notícia do STJ sobre o REsp 1.954.924. Consultadas em ${formatDateBR(NATIONAL_HOLIDAYS_CONSULTED_ON)}.`,
 } as const;
+
+/**
+ * A etiqueta de uma conta com tolerância (D-061), ainda sem atraso: "terça, 13/10 (próximo dia útil)" ou "hoje (próximo dia útil)".
+ * `null` quando não se aplica: dia útil, conta do ano, data inválida ou conta já vencida de verdade.
+ */
+export function nextBusinessDayWhen(dueOn: IsoDate, kind: DueKind, today: IsoDate): { lastOnTime: IsoDate; when: string } | null {
+  if (!hasNextBusinessDayGrace(kind) || !isValidIsoDate(dueOn) || isBusinessDay(dueOn)) return null;
+  const last = nextBusinessDay(dueOn)!;
+  if (last < today) return null;
+  const when = last === today ? 'hoje' : `${weekdayName(last)}, ${formatDayMonth(last)}`;
+  return { lastOnTime: last, when: `${when} ${DUE_DAY_TEXT.nextBusinessDayTag}` };
+}
+
+/** "Vence terça, 13/10 (próximo dia útil)", "Vence hoje (próximo dia útil)" ou `null` (ver `nextBusinessDayWhen`). */
+export function nextBusinessDayDueText(dueOn: IsoDate, kind: DueKind, today: IsoDate): string | null {
+  const w = nextBusinessDayWhen(dueOn, kind, today);
+  return w === null ? null : `Vence ${w.when}`;
+}
 
 export interface DueDayNotice {
   /** Vencimento avisado (a data calculada, que não muda). */
   dueOn: IsoDate;
+  /** Tipo de cobrança que decidiu o aviso. */
+  kind: DueKind;
+  /** A tolerância do próximo dia útil vale para este tipo (D-061): falso na conta do ano. */
+  grace: boolean;
   /** Por que não é dia útil: sábado, domingo ou, em dia de semana, feriado nacional. */
   reason: 'sabado' | 'domingo' | 'feriado';
   /** Feriado nacional na data, mesmo quando ela também cai em fim de semana. */
   holiday: NationalHoliday | null;
   /** O próximo dia útil depois do vencimento. */
   nextBusinessDay: IsoDate;
-  /** "Vence no domingo, 11/10/2026, que não é dia útil. O próximo dia útil é terça, 13/10/2026." */
+  /** O último dia sem atraso: o próximo dia útil com a tolerância; o próprio vencimento na conta do ano. */
+  lastOnTimeDay: IsoDate;
+  /**
+   * Com tolerância: "Vence no domingo, 11/10/2026, que não é dia útil. O próximo dia útil é terça, 13/10/2026. Só depois desse dia ela
+   * passa a vencida." Conta do ano: "Vence na sexta, 25/12/2026, que não é dia útil (feriado nacional: Natal). Em conta do ano, o
+   * Clarevo não usa o próximo dia útil: ela passa a vencida a partir do dia seguinte ao vencimento."
+   */
   text: string;
-  /** "Confira com quem cobra se o pagamento pode ser feito no próximo dia útil." */
+  /** Com tolerância, "Confira com quem cobra se o pagamento pode ser feito no próximo dia útil."; conta do ano, a frase dos impostos. */
   advice: string;
   /** Sinal curto da lista: "Não é dia útil". */
   sign: string;
-  /** Sinal da lista com o próximo dia útil: "Não é dia útil · próximo dia útil: terça, 13/10". */
+  /**
+   * Sinal da lista: "Não é dia útil · vencimento anotado: domingo, 11/10" (a etiqueta "Vence terça, 13/10 (próximo dia útil)" já
+   * está na legenda da conta) ou, na conta do ano, "Não é dia útil · confira a data no carnê ou no site do órgão".
+   */
   signLine: string;
-  /** O que o leitor de tela diz do sinal da lista: "não é dia útil, próximo dia útil terça, 13/10". */
+  /** O que o leitor de tela diz do sinal da lista: "não é dia útil, vencimento anotado domingo, 11/10". */
   signA11y: string;
   /** O que o leitor de tela diz do aviso inteiro: o aviso e a frase neutra. */
   a11y: string;
 }
 
 /**
- * O aviso de uma data de vencimento, ou `null` quando é dia útil (ou a data é inválida). Só depende da data civil: quem decide
- * se o aviso aparece (conta em aberto, que ainda não venceu) são `commitmentDueNotice` e `invoiceDueNotice`.
+ * O aviso de uma data de vencimento, ou `null` quando é dia útil (ou a data é inválida). Só depende da data civil e do tipo de
+ * cobrança: quem decide se o aviso aparece (conta em aberto, que ainda não venceu) são `commitmentDueNotice` e `invoiceDueNotice`.
+ * `kind` padrão: `conta`, com a tolerância do próximo dia útil (D-061).
  *
  * Em feriado nacional que cai em dia de semana, o texto diz qual: "Vence na segunda, 12/10/2026, que não é dia útil (feriado
- * nacional: Nossa Senhora Aparecida). O próximo dia útil é terça, 13/10/2026."
+ * nacional: Nossa Senhora Aparecida). O próximo dia útil é terça, 13/10/2026. Só depois desse dia ela passa a vencida."
  */
-export function dueDayNotice(dueOn: IsoDate): DueDayNotice | null {
+export function dueDayNotice(dueOn: IsoDate, kind: DueKind = 'conta'): DueDayNotice | null {
   if (!isValidIsoDate(dueOn) || isBusinessDay(dueOn)) return null;
   const next = nextBusinessDay(dueOn)!;
   const holiday = nationalHolidayOn(dueOn);
   const w = weekdayOf(dueOn);
   const reason = w === 6 ? 'sabado' : w === 0 ? 'domingo' : 'feriado';
   const why = holiday ? ` (feriado nacional: ${holiday.name})` : '';
-  const text = `Vence ${onWeekday(dueOn)}, ${formatDateBR(dueOn)}, que não é dia útil${why}. O próximo dia útil é ${weekdayName(next)}, ${formatDateBR(next)}.`;
+  const grace = hasNextBusinessDayGrace(kind);
+  const opening = `Vence ${onWeekday(dueOn)}, ${formatDateBR(dueOn)}, que não é dia útil${why}.`;
+  const text = grace
+    ? `${opening} O próximo dia útil é ${weekdayName(next)}, ${formatDateBR(next)}. Só depois desse dia ela passa a vencida.`
+    : `${opening} Em conta do ano, o Clarevo não usa o próximo dia útil: ela passa a vencida a partir do dia seguinte ao vencimento.`;
+  const advice = grace ? DUE_DAY_TEXT.advice : DUE_DAY_TEXT.adviceYearBill;
+  const registered = `${weekdayName(dueOn)}, ${formatDayMonth(dueOn)}`;
   return {
     dueOn,
+    kind,
+    grace,
     reason,
     holiday,
     nextBusinessDay: next,
+    lastOnTimeDay: grace ? next : dueOn,
     text,
-    advice: DUE_DAY_TEXT.advice,
+    advice,
     sign: DUE_DAY_TEXT.sign,
-    signLine: `${DUE_DAY_TEXT.sign} · próximo dia útil: ${weekdayName(next)}, ${formatDayMonth(next)}`,
-    signA11y: `${DUE_DAY_TEXT.sign.toLowerCase()}, próximo dia útil ${weekdayName(next)}, ${formatDayMonth(next)}`,
-    a11y: `${text} ${DUE_DAY_TEXT.advice}`,
+    signLine: grace ? `${DUE_DAY_TEXT.sign} · vencimento anotado: ${registered}` : `${DUE_DAY_TEXT.sign} · confira a data no carnê ou no site do órgão`,
+    signA11y: grace
+      ? `${DUE_DAY_TEXT.sign.toLowerCase()}, vencimento anotado ${registered}`
+      : `${DUE_DAY_TEXT.sign.toLowerCase()}, confira a data no carnê ou no site do órgão`,
+    a11y: `${text} ${advice}`,
   };
 }
 
 /**
- * Aviso de uma conta a pagar (detalhe, lista, gasto fixo e conta do ano): só conta em aberto que vence hoje ou depois. Conta
- * paga ou já vencida não mostra aviso. `today` é o dia da sessão (`todayIn(fuso)`), nunca o do relógio do aparelho. Vale também
- * para a conta de uma fatura de cartão.
+ * Aviso de uma conta a pagar (detalhe, lista, gasto fixo e conta do ano): só conta em aberto que ainda não está vencida de verdade
+ * (D-061: com a tolerância, depois do próximo dia útil; conta do ano, depois da data cadastrada). Conta paga ou vencida não mostra
+ * aviso. `today` é o dia da sessão (`todayIn(fuso)`), nunca o do relógio do aparelho. Vale também para a conta de uma fatura de cartão.
  */
-export function commitmentDueNotice(c: Pick<Commitment, 'status' | 'dueOn'>, today: IsoDate): DueDayNotice | null {
-  if (c.status !== 'aberto' || c.dueOn < today) return null;
-  return dueDayNotice(c.dueOn);
+export function commitmentDueNotice(c: Pick<Commitment, 'status' | 'dueOn' | 'invoice' | 'series'>, today: IsoDate): DueDayNotice | null {
+  if (c.status !== 'aberto') return null;
+  const kind = dueKindOf(c);
+  return effectiveOverdue(c.dueOn, kind, today) ? null : dueDayNotice(c.dueOn, kind);
 }
 
-/** Aviso do detalhe de uma fatura de cartão: só fatura aberta ou fechada, com valor a pagar, que vence hoje ou depois. */
+/** Aviso do detalhe de uma fatura de cartão: só fatura aberta ou fechada, com valor a pagar, que ainda não venceu de verdade. */
 export function invoiceDueNotice(invoice: Pick<Invoice, 'situation' | 'dueOn' | 'totalCents'>, today: IsoDate): DueDayNotice | null {
-  if ((invoice.situation !== 'aberta' && invoice.situation !== 'fechada') || invoice.totalCents <= 0 || invoice.dueOn < today) return null;
-  return dueDayNotice(invoice.dueOn);
+  if ((invoice.situation !== 'aberta' && invoice.situation !== 'fechada') || invoice.totalCents <= 0) return null;
+  return effectiveOverdue(invoice.dueOn, 'fatura', today) ? null : dueDayNotice(invoice.dueOn, 'fatura');
 }
 
-/** Conta prevista de um gasto fixo (ainda não é conta a pagar): o aviso vale enquanto o vencimento é hoje ou depois. */
-export function plannedDueNotice(dueOn: IsoDate, today: IsoDate): DueDayNotice | null {
-  return dueOn < today ? null : dueDayNotice(dueOn);
+/** Conta prevista de um gasto fixo, parcelamento ou conta do ano (ainda não é conta a pagar): o aviso vale enquanto não venceu de verdade. */
+export function plannedDueNotice(dueOn: IsoDate, today: IsoDate, kind: DueKind = 'gasto_fixo'): DueDayNotice | null {
+  return effectiveOverdue(dueOn, kind, today) ? null : dueDayNotice(dueOn, kind);
 }

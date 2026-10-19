@@ -25,6 +25,7 @@ import type {
   ReturnReviewState,
   SeriesKind,
 } from './records';
+import { isCommitmentOverdue } from './dia-util';
 import type { AnnualYearSummary } from './series';
 import { annualYearLabelOf, numberAtOrAfter, numberAtOrBefore, occurrenceLabel, seriesMonthOf, termFor } from './series';
 import type { RecordsRepository } from './repository';
@@ -39,7 +40,8 @@ import { ERROR_TEXT, PAYMENT_ERROR_TEXT } from './validation';
  * - Ausência longa entre os dias a < b: b − a ≥ 45 dias ou meses(mês(a), mês(b)) ≥ 2 (um mês inteiro sem anotação).
  * - A revisão aparece enquanto durar a ausência ("ausencia") ou por 14 dias contando o dia da volta ("volta"), e some
  *   com uma decisão posterior à âncora. Cobre os meses fechados desde o mês da âncora (no máximo os 11 anteriores ao
- *   atual, e depois do último mês já revisado) e as contas em aberto do mês atual vencidas antes de hoje.
+ *   atual, e depois do último mês já revisado) e as contas em aberto do mês atual vencidas antes de hoje (vencida de verdade, D-061:
+ *   conta de dia que não é útil só entra depois do próximo dia útil, e conta do ano, a partir do dia seguinte à data cadastrada).
  * - Nada é preenchido por média ou estimativa; nenhuma conta vira paga sem confirmação. Os textos não contam dias nem
  *   falam de ausência, e nunca cobram.
  */
@@ -379,7 +381,7 @@ export function buildReturnReview(
     const m = monthOf(c.dueOn);
     const row = () => openRow(c, c.series ? (versionOf.get(c.series.id) ?? null) : null);
     if (m >= fromMonth && m <= toMonth) closed.push(row());
-    else if (m === currentMonth && c.dueOn < today) currentRows.push(row());
+    else if (m === currentMonth && isCommitmentOverdue(c, today)) currentRows.push(row());
   }
   const rank = (r: ReviewRow) => (r.series ? (order.get(r.series.id) ?? series.length) : series.length + 1);
   const byDue = (a: ReviewRow, b: ReviewRow) =>

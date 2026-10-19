@@ -11,6 +11,7 @@ import {
   formatMonthName,
   annualYearLabelOf,
   groupAnnualLater,
+  isCommitmentOverdue,
   isRepoError,
   monthOf,
   newOperationKey,
@@ -345,7 +346,7 @@ export default function ContasVencidas() {
           const n = yearTargetPlan.changing.length;
           const total = yearTargetPlan.changing.reduce((acc, c) => acc + c.amountCents, 0);
           const approximate = yearTargetPlan.changing.some((c) => c.amountIsEstimate);
-          const notDue = n - yearTargetPlan.changing.filter((c) => c.dueOn < today).length;
+          const notDue = n - yearTargetPlan.changing.filter((c) => isCommitmentOverdue(c, today)).length;
           return {
             line: `${yearTarget.title} · ${n === 1 ? '1 parcela' : `${n} parcelas`} · ${approximate ? 'cerca de ' : ''}${formatBRL(total)}`,
             notDue:

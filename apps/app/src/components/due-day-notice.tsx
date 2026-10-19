@@ -8,10 +8,12 @@ import { Banner, LinkButton, Txt } from '@/components/ui';
 import { colors, fonts, motion, radius, space } from '@/theme/tokens';
 
 /**
- * Aviso de vencimento em sábado, domingo ou feriado nacional (D-060 item 3): "Vence no domingo, 11/10/2026, que não é dia útil. O
- * próximo dia útil é terça, 13/10/2026." e a frase neutra "Confira com quem cobra se o pagamento pode ser feito no próximo dia
- * útil.", com "Saiba mais" (quais feriados contam e quais não, as fontes e a data da consulta). Só informa: a data de vencimento
- * não muda, e o texto nunca promete que o pagamento no próximo dia útil vale para qualquer cobrança nem que não há encargos.
+ * Aviso de vencimento em sábado, domingo ou feriado nacional (D-060 item 3 e D-061): "Vence no domingo, 11/10/2026, que não é dia útil.
+ * O próximo dia útil é terça, 13/10/2026. Só depois desse dia ela passa a vencida." e a frase neutra "Confira com quem cobra se o
+ * pagamento pode ser feito no próximo dia útil.". Na conta do ano (sem a tolerância), "Impostos podem ter regra diferente. Confira a data
+ * no carnê ou no site do órgão.". Com "Saiba mais" (a Lei 7.089/1983, o que pode variar, o entendimento do STJ, quais feriados contam e
+ * quais não, as fontes e a data da consulta). A data de vencimento não muda, e o texto nunca promete que o pagamento no próximo dia
+ * útil vale para qualquer cobrança nem que não há encargos.
  * O texto sempre acompanha o ícone (nunca só ícone ou cor); sem valores em reais, então nada se oculta com "Ocultar valores".
  */
 export function DueDayNotice({ notice }: { notice: Notice }) {
@@ -50,7 +52,7 @@ export function DueDayNotice({ notice }: { notice: Notice }) {
   );
 }
 
-/** Sinal discreto da lista, com texto: "Não é dia útil · próximo dia útil: terça, 13/10". */
+/** Sinal discreto da lista, com texto: "Não é dia útil · vencimento anotado: domingo, 11/10" (conta do ano: "... · confira a data no carnê ou no site do órgão"). */
 export function DueDaySign({ notice }: { notice: Notice }) {
   return (
     <View style={styles.sign}>

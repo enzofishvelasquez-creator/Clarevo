@@ -39,8 +39,10 @@ export interface RowAction {
 /**
  * Linha de conta a pagar: abre o detalhe; nenhuma ação aninhada. Conta de gasto fixo leva o rótulo em texto
  * ("Todo mês", "Parcela 13 de 48") e, com valor estimado, "≈" no valor e "estimado" na legenda (nunca só a cor).
- * Conta em aberto que vence em sábado, domingo ou feriado nacional leva, abaixo da legenda, o sinal "Não é dia útil · próximo dia
- * útil: terça, 13/10" (D-060 item 3): texto com ícone, discreto, e a data de vencimento não muda.
+ * Conta em aberto que vence em sábado, domingo ou feriado nacional (D-060 item 3 e D-061) tem a legenda "Vence terça, 13/10 (próximo dia
+ * útil)", fica "a vencer" até esse dia terminar e leva, abaixo, o sinal "Não é dia útil · vencimento anotado: domingo, 11/10": texto com
+ * ícone, discreto, e a data de vencimento não muda. Conta do ano não ganha o próximo dia útil: a legenda é a de sempre e o sinal manda
+ * conferir a data no carnê ou no site do órgão.
  * action: botão secundário pequeno logo abaixo, irmão da linha (nunca dentro dela), alinhado ao texto.
  */
 export function CommitmentRow({

@@ -22,6 +22,7 @@ import {
   formatMonthInputBR,
   formatMonthName,
   formatMonthYearBR,
+  isCommitmentOverdue,
   isRepoError,
   lastNumberFromEndYear,
   maskMonthBR,
@@ -202,7 +203,7 @@ export function SeriesEditForm({
     }
     const dueLabel = (c: Commitment, withYear: boolean) => {
       const date = withYear ? formatDateBR(c.dueOn) : formatDayMonth(c.dueOn);
-      return c.dueOn < today ? `venceu em ${date}` : `vence em ${date}`;
+      return isCommitmentOverdue(c, today) ? `venceu em ${date}` : `vence em ${date}`;
     };
     return [
       ...open.map((c) => ({

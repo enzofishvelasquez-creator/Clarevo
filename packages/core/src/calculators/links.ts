@@ -1,5 +1,6 @@
 import type { IsoDate } from '../dates';
 import { daysBetween } from '../dates';
+import { isCommitmentOverdue } from '../dia-util';
 import { MAX_RECORD_CENTS, centsToInput, type Cents } from '../money';
 import type { Commitment, CommitmentSeries } from '../records';
 import { DEBT_NATURES } from '../records';
@@ -273,9 +274,16 @@ export function quitarAntesLink(
   };
 }
 
-/** "Calcular multa e juros" numa conta vencida em aberto: valor previsto e dias depois do vencimento (até 3.650). */
-export function multaLink(c: Pick<Commitment, 'status' | 'dueOn' | 'amountCents'>, today: IsoDate): CalcLinkValues<'multa-e-juros'> | null {
-  if (c.status !== 'aberto' || c.dueOn >= today) return null;
+/**
+ * "Calcular multa e juros" numa conta vencida em aberto: valor previsto e dias depois do vencimento (até 3.650). Vencida é a de D-061:
+ * com vencimento em dia que não é útil, só depois do próximo dia útil (a conta do ano, depois da data cadastrada); os dias contam da data
+ * cadastrada, como na calculadora.
+ */
+export function multaLink(
+  c: Pick<Commitment, 'status' | 'dueOn' | 'amountCents'> & Partial<Pick<Commitment, 'invoice' | 'series'>>,
+  today: IsoDate,
+): CalcLinkValues<'multa-e-juros'> | null {
+  if (c.status !== 'aberto' || !isCommitmentOverdue({ dueOn: c.dueOn, invoice: c.invoice ?? null, series: c.series ?? null }, today)) return null;
   return { valorCents: c.amountCents, dias: Math.min(daysBetween(c.dueOn, today), 3_650), origem: 'conta' };
 }
 

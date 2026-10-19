@@ -1,6 +1,7 @@
 import type { BudgetRow, BudgetSummary } from './budget';
 import { BUDGET_TEXT } from './budget';
 import { toPayCaption } from './commitments';
+import { nextBusinessDayDueText, dueKindOf } from './dia-util';
 import type { IsoDate, IsoMonth } from './dates';
 import { addMonths, formatDayMonth, formatMonthName, formatMonthYearBR, isValidIsoMonth, monthOf } from './dates';
 import { formatTenths } from './learn/format';
@@ -297,12 +298,14 @@ function whereItWent(input: SeuMesInput): SeuMesCard | null {
   };
 }
 
-function dueRow(c: Commitment): SeuMesRow {
+function dueRow(c: Commitment, today: IsoDate): SeuMesRow {
   const money = formatBRL(c.amountCents);
+  // D-061: em dia que não é útil, "Vence terça, 13/10 (próximo dia útil)"; a data cadastrada e a ordem seguem como estavam.
+  const due = nextBusinessDayDueText(c.dueOn, dueKindOf(c), today) ?? SEU_MES_TEXT.due.dueOn(c.dueOn);
   return {
     label: c.description,
     value: c.amountIsEstimate ? `≈ ${money}` : money,
-    details: [c.amountIsEstimate ? `${SEU_MES_TEXT.due.dueOn(c.dueOn)} · ${SEU_MES_TEXT.due.estimated}` : SEU_MES_TEXT.due.dueOn(c.dueOn)],
+    details: [c.amountIsEstimate ? `${due} · ${SEU_MES_TEXT.due.estimated}` : due],
   };
 }
 
@@ -331,7 +334,7 @@ function stillDue(input: SeuMesInput, current: IsoMonth): SeuMesCard {
     if (isCurrent && toPay.overdueCount > 0) {
       rows.push({ label: SEU_MES_TEXT.due.overdue(toPay.overdueCount), value: formatBRL(sumOf(toPay.overdue)), details: [] });
     }
-    for (const c of upcoming.slice(0, SEU_MES_TOP)) rows.push(dueRow(c));
+    for (const c of upcoming.slice(0, SEU_MES_TOP)) rows.push(dueRow(c, today));
   }
   const extra = Math.max(0, (isCurrent ? toPay.upcomingInMonth : toPay.items).length - SEU_MES_TOP);
   const notes: string[] = [SEU_MES_TEXT.due.note];

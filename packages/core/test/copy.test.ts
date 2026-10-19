@@ -193,6 +193,7 @@ import {
   toPayCaption,
   wholeYearPayment,
 } from '../src';
+import { dueText, nextBusinessDayDueText, type Commitment as DiaUtilCommitment } from '../src';
 import { APP_SCREENS, APP_SEARCH_TEXT, BAR_TEXT, GOALS_NAV_TEXT, PAYABLES_NAV_TEXT, SUMMARY_NAV_TEXT, searchAppScreens } from '../src';
 import { DEFAULT_SEARCH_DRAFT, SEARCH_PAGE, SEARCH_PERIODS, SEARCH_TEXT, searchFromDraft } from '../src';
 import { SUBSCRIPTION_ERROR_TEXT, SUBSCRIPTION_TEXT, subscriptionCount, subscriptionErrorText } from '../src';
@@ -3268,10 +3269,18 @@ describe('textos de Análises (D-059)', () => {
  * útil vale para qualquer cobrança nem que não há encargos. Vale para as frases fixas, para o aviso de cada sábado, domingo e
  * feriado de 2026 a 2030, para o corpo do lembrete e para o arquivo-fonte.
  */
-describe('textos do aviso de dia útil (D-060)', () => {
+describe('textos do aviso de dia útil (D-060) e do próximo dia útil (D-061)', () => {
+  /** Conta a pagar mínima em aberto, para os textos de D-061. */
+  const bill = (dueOn: string, over: Partial<DiaUtilCommitment> = {}): DiaUtilCommitment =>
+    ({
+      id: `c-${dueOn}`, contextId: 'ctx', description: 'Escola', amountCents: 10_000, currency: 'BRL', dueOn, category: 'Moradia', status: 'aberto', payment: null,
+      series: null, seriesOverride: false, invoice: null, amountIsEstimate: false, createdBy: 'p', version: 1, createdAt: '2026-10-01T12:00:00Z', updatedAt: '2026-10-01T12:00:00Z', ...over,
+    }) as DiaUtilCommitment;
   const PROMISE =
     /\bsem\s+(?:multa|juros|encargos?|custos?|taxas?|cobran[cç]as?)(?![\p{L}])|\bn[aã]o\s+(?:h[aá]|tem|ter[aá]|cobra|cobram|incide|incidem|existe)(?![\p{L}])[^.]*(?<![\p{L}])(?:multa|juros|encargos?)(?![\p{L}])|\bgarant|\bsempre (?:pode|vale)\b|\bpode pagar\b|\bsem problema|\bsem prejuízo|\bnão perde|\bvale para qualquer/iu;
-  const ORDERS = /\bdeve(ria)?\b|\bpague\b|\bpague já\b|\bnão esqueça|\burgente|\batrasad|\bvencid[oa]s?\b|\bperd[ae]r?\b|\bcuidado|\bpreocup/i;
+  // D-061 precisa dizer quando a conta "passa a vencida": a palavra é o rótulo que o app já mostra, então só ela saiu da lista. Ordem,
+  // pressa, perda e atraso continuam fora (o aviso nunca manda pagar, nem cobra).
+  const ORDERS = /\bdeve(ria)?\b|\bpague\b|\bpague já\b|\bnão esqueça|\burgente|\batrasad|\bperd[ae]r?\b|\bcuidado|\bpreocup/i;
   const check = (texts: string[]) => {
     for (const text of texts) {
       expect(text, text).not.toMatch(FORBIDDEN);
@@ -3288,8 +3297,11 @@ describe('textos do aviso de dia útil (D-060)', () => {
   const notices = () => {
     const out: NonNullable<ReturnType<typeof dueDayNotice>>[] = [];
     for (let d = '2026-01-01'; d <= '2030-12-31'; d = addDays(d, 1)) {
-      const n = dueDayNotice(d);
-      if (n) out.push(n);
+      // Com a tolerância do próximo dia útil (D-061) e, na conta do ano, sem ela.
+      for (const kind of ['conta', 'conta_do_ano'] as const) {
+        const n = dueDayNotice(d, kind);
+        if (n) out.push(n);
+      }
     }
     return out;
   };
@@ -3310,7 +3322,7 @@ describe('textos do aviso de dia útil (D-060)', () => {
   });
 
   it('as frases fixas passam nas regras e dizem o que o aviso é e o que não é', () => {
-    const fixed = [DUE_DAY_TEXT.advice, DUE_DAY_TEXT.sign, DUE_DAY_TEXT.learnMore, DUE_DAY_TEXT.learnMoreA11y, DUE_DAY_TEXT.learnMoreTitle, ...DUE_DAY_TEXT.learnMoreParagraphs, DUE_DAY_TEXT.source];
+    const fixed = [DUE_DAY_TEXT.advice, DUE_DAY_TEXT.adviceYearBill, DUE_DAY_TEXT.nextBusinessDayTag, DUE_DAY_TEXT.sign, DUE_DAY_TEXT.learnMore, DUE_DAY_TEXT.learnMoreA11y, DUE_DAY_TEXT.learnMoreTitle, ...DUE_DAY_TEXT.learnMoreParagraphs, DUE_DAY_TEXT.source];
     check(fixed);
     const more = DUE_DAY_TEXT.learnMoreParagraphs.join(' ');
     // O "Saiba mais" diz que a data não muda, quais feriados contam (nacionais, de data fixa, em lei federal) e quais não entram.
@@ -3325,16 +3337,51 @@ describe('textos do aviso de dia útil (D-060)', () => {
     expect(DUE_DAY_TEXT.source).toContain('19/10/2026');
   });
 
-  it('o aviso de cada sábado, domingo e feriado de 2026 a 2030 passa nas regras, abre com "Vence" e termina com a frase neutra', () => {
+  it('o aviso de cada sábado, domingo e feriado de 2026 a 2030 passa nas regras, abre com "Vence" e termina com a frase de conferir (D-061: com quem cobra, ou no carnê ou no site do órgão)', () => {
     const list = notices();
-    expect(list.length).toBeGreaterThan(550);
+    expect(list.length).toBeGreaterThan(1100);
     const texts = list.flatMap((n) => [n.text, n.advice, n.sign, n.signLine, n.signA11y, n.a11y]);
     check(texts);
+    const opening = /^Vence (no|na) (domingo|segunda|terça|quarta|quinta|sexta|sábado), \d{2}\/\d{2}\/\d{4}, que não é dia útil( \(feriado nacional: [^)]+\))?\./;
+    const weekday = '(domingo|segunda|terça|quarta|quinta|sexta|sábado)';
     for (const n of list) {
-      expect(n.text, n.dueOn).toMatch(/^Vence (no|na) (domingo|segunda|terça|quarta|quinta|sexta|sábado), \d{2}\/\d{2}\/\d{4}, que não é dia útil( \(feriado nacional: [^)]+\))?\. O próximo dia útil é (domingo|segunda|terça|quarta|quinta|sexta|sábado), \d{2}\/\d{2}\/\d{4}\.$/);
-      expect(n.a11y.endsWith('Confira com quem cobra se o pagamento pode ser feito no próximo dia útil.'), n.dueOn).toBe(true);
-      expect(n.signLine, n.dueOn).toMatch(/^Não é dia útil · próximo dia útil: [a-zçáéíóú]+, \d{2}\/\d{2}$/);
+      expect(n.text, n.dueOn).toMatch(opening);
+      if (n.grace) {
+        expect(n.text, n.dueOn).toMatch(new RegExp(`\\. O próximo dia útil é ${weekday}, \\d{2}\\/\\d{2}\\/\\d{4}\\. Só depois desse dia ela passa a vencida\\.$`));
+        expect(n.a11y.endsWith('Confira com quem cobra se o pagamento pode ser feito no próximo dia útil.'), n.dueOn).toBe(true);
+        expect(n.signLine, n.dueOn).toMatch(/^Não é dia útil · vencimento anotado: [a-zçáéíóú]+, \d{2}\/\d{2}$/);
+      } else {
+        expect(n.text, n.dueOn).toMatch(/\. Em conta do ano, o Clarevo não usa o próximo dia útil: ela passa a vencida a partir do dia seguinte ao vencimento\.$/);
+        expect(n.a11y.endsWith('Impostos podem ter regra diferente. Confira a data no carnê ou no site do órgão.'), n.dueOn).toBe(true);
+        expect(n.signLine, n.dueOn).toBe('Não é dia útil · confira a data no carnê ou no site do órgão');
+      }
     }
+  });
+
+  it('a etiqueta "Vence terça, 13/10 (próximo dia útil)" e os textos que a usam passam nas regras (D-061), em todo dia que não é útil de 2026 a 2030', () => {
+    const labels: string[] = [];
+    for (let d = '2026-01-01'; d <= '2030-12-31'; d = addDays(d, 1)) {
+      const label = nextBusinessDayDueText(d, 'conta', addDays(d, -3));
+      if (label) {
+        labels.push(label);
+        expect(label, d).toMatch(/^Vence (segunda|terça|quarta|quinta|sexta), \d{2}\/\d{2} \(próximo dia útil\)$/);
+      }
+    }
+    expect(labels.length).toBeGreaterThan(550);
+    check(labels);
+    check([nextBusinessDayDueText('2026-10-11', 'conta', '2026-10-13')!, dueText(bill('2026-10-11'), '2026-10-13'), toPayCaption(summarizeToPay([bill('2026-10-11')], 'ctx', '2026-10', '2026-10-12'), '2026-10-12').main!]);
+    expect(dueText(bill('2026-10-11'), '2026-10-13')).toBe('Vence hoje (próximo dia útil)');
+  });
+
+  it('o "Saiba mais" de D-061 diz o que a lei diz e o que ela não diz, e nunca promete ausência de encargos', () => {
+    const more = DUE_DAY_TEXT.learnMoreParagraphs.join(' ');
+    expect(more).toContain('A Lei nº 7.089/1983 proíbe bancos e instituições financeiras de cobrar juros de mora');
+    expect(more).toContain('A multa e as regras de cada cobrança podem variar');
+    expect(more).toContain('é o entendimento do STJ');
+    expect(more).toContain('IPVA, IPTU e matrícula');
+    expect(more).not.toMatch(/sem (multa|juros|encargos?)|garant|n[aã]o (h[aá]|tem|cobra|cobram) (multa|juros|encargos?)/i);
+    // Todo parágrafo e a fonte dizem "a conferir com quem cobra" ou citam a fonte; nenhum cita banco, empresa ou produto.
+    expect(more).not.toMatch(/\b(banco do|caixa econ|itaú|bradesco|nubank|santander)\b/i);
   });
 
   it('os nomes dos feriados passam nas regras', () => {

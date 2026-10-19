@@ -1,5 +1,6 @@
 import type { IsoDate, IsoMonth } from './dates';
 import { addDays, daysBetween, formatDayMonth, formatMonthName, monthOf } from './dates';
+import { dueKindOf, lastOnTimeDay } from './dia-util';
 import { formatBRL } from './money';
 import type { Commitment } from './records';
 import type { ToPaySummary } from './summary';
@@ -161,14 +162,16 @@ function daysWhenOf(dueOn: IsoDate, today: IsoDate): string {
 const dueSpoken = (when: string): string => (when === 'hoje' || when === 'amanhã' ? `vence ${when}` : when.startsWith('em ') ? `vence ${when}` : `vence em ${when}`);
 
 function nextOf(c: Commitment, today: IsoDate, showValues: boolean): WidgetNext {
+  // D-061: com vencimento em dia que não é útil, o prazo é o do próximo dia útil (o último dia sem atraso), como na lista de Contas a pagar.
+  const dueOn = lastOnTimeDay(c.dueOn, dueKindOf(c));
   // Valores ocultos: nem o nome nem o valor da conta, só "Próxima conta" e o prazo (D-054, P-027).
   if (!showValues) {
-    const when = daysWhenOf(c.dueOn, today);
+    const when = daysWhenOf(dueOn, today);
     return { name: WIDGET_TEXT.medium.nextHidden, when, amount: WIDGET_HIDDEN_MONEY, estimated: false, line: `${WIDGET_TEXT.medium.nextHidden} · ${when}` };
   }
   const estimated = c.amountIsEstimate;
   const amount = estimated ? `≈ ${formatBRL(c.amountCents)}` : formatBRL(c.amountCents);
-  const when = whenOf(c.dueOn, today);
+  const when = whenOf(dueOn, today);
   return {
     name: c.description,
     when,

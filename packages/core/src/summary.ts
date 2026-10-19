@@ -2,6 +2,7 @@ import type { IsoDate, IsoMonth } from './dates';
 import { monthOf, monthRange } from './dates';
 import type { Cents } from './money';
 import { CARD_CHARGES_CATEGORY, recordShares, type Invoice } from './cards';
+import { isCommitmentOverdue } from './dia-util';
 import { formatTenths } from './learn/format';
 import { sharesCents } from './learn/math';
 import { formatBRL } from './money';
@@ -62,18 +63,25 @@ export interface ToPaySummary {
   toPayCents: Cents;
   /** Em aberto com vencimento no mês. */
   dueInMonthCents: Cents;
-  /** Em aberto vencidas antes do mês (só no mês corrente). */
+  /**
+   * Em aberto com vencimento cadastrado antes do mês (só no mês corrente). A conta é pela data cadastrada, como no banco
+   * (`month_to_pay`), e fora de "vencida de verdade" (D-061): nos primeiros dias do mês, a conta de um dia que não é útil no fim do mês
+   * anterior ainda pode estar no próximo dia útil, e o texto de `toPayCaption` então diz "com vencimento", não "vencidas".
+   */
   overdueBeforeCents: Cents;
   /** Parte do total com valor estimado (gasto fixo que muda, como luz): "Inclui R$ 180,00 em valores estimados." */
   estimatedCents: Cents;
   /** Compõem o total; ordem: vencimento, criação, id. */
   items: Commitment[];
-  /** Itens com vencimento antes de hoje. */
+  /**
+   * Itens vencidos de verdade (D-061): com vencimento antes de hoje e, quando cai em sábado, domingo ou feriado nacional, depois
+   * que o próximo dia útil termina (conta do ano: a partir do dia seguinte à data cadastrada, sem tolerância).
+   */
   overdue: Commitment[];
-  /** Itens com vencimento de hoje em diante. */
+  /** Itens que ainda não venceram de verdade: vencimento de hoje em diante ou no próximo dia útil (D-061). Ordem pela data cadastrada. */
   upcomingInMonth: Commitment[];
   overdueCount: number;
-  /** Primeiro item com vencimento de hoje em diante. */
+  /** Primeiro item que ainda não venceu de verdade. */
   nextDue: Commitment | null;
   /**
    * Pagas que pertencem ao mês: com vencimento no mês ou com pagamento no mês (o gasto entra em Pago
@@ -95,8 +103,9 @@ export function summarizeToPay(list: readonly Commitment[], contextId: string, m
   const all = list.filter((c) => c.contextId === contextId).sort(byDue);
   const open = all.filter((c) => c.status === 'aberto');
   const items = open.filter((c) => c.dueOn < endExclusive && (isCurrentMonth || c.dueOn >= start));
-  const overdue = items.filter((c) => c.dueOn < today);
-  const upcomingInMonth = items.filter((c) => c.dueOn >= today);
+  // D-061: só os totais e a ordem seguem a data cadastrada; "vencida" é `isCommitmentOverdue` (próximo dia útil, conta do ano sem tolerância).
+  const overdue = items.filter((c) => isCommitmentOverdue(c, today));
+  const upcomingInMonth = items.filter((c) => !isCommitmentOverdue(c, today));
   return {
     month,
     isCurrentMonth,

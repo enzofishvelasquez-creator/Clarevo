@@ -10,6 +10,7 @@ import {
   monthOf,
   monthsBetween,
 } from './dates';
+import { dueKindOfSeries, effectiveOverdue, nextBusinessDayWhen, type DueKind } from './dia-util';
 import type { Cents } from './money';
 import { formatBRL, roundDiv } from './money';
 import type {
@@ -1129,7 +1130,7 @@ export function seriesPreview(input: SeriesInput, today: IsoDate): SeriesPreview
     lastMonth,
     next,
     createdNow,
-    firstOverdue: next[0] !== undefined && next[0].dueOn < today,
+    firstOverdue: next[0] !== undefined && effectiveOverdue(next[0].dueOn, dueKindOfSeries(input.kind), today),
     count,
     totalCents,
     lastDueOn,
@@ -1139,10 +1140,18 @@ export function seriesPreview(input: SeriesInput, today: IsoDate): SeriesPreview
   };
 }
 
-/** "venceu em 05/10", "vence hoje" ou "vence em 15/10" (com o ano, se pedido). */
-function whenDue(dueOn: IsoDate, today: IsoDate, withYear: boolean): string {
+/**
+ * "venceu em 05/10", "vence hoje" ou "vence em 15/10" (com o ano, se pedido). "Venceu" é a de D-061 (`effectiveOverdue`): data
+ * passada em dia que não é útil, ainda no próximo dia útil, diz "vence terça, 13/10 (próximo dia útil)". A conta do ano não tem essa tolerância.
+ */
+function whenDue(dueOn: IsoDate, today: IsoDate, withYear: boolean, kind: DueKind): string {
   const date = withYear ? formatDateBR(dueOn) : formatDayMonth(dueOn);
-  return dueOn < today ? `venceu em ${date}` : dueOn === today ? 'vence hoje' : `vence em ${date}`;
+  if (effectiveOverdue(dueOn, kind, today)) return `venceu em ${date}`;
+  if (dueOn < today) {
+    const grace = nextBusinessDayWhen(dueOn, kind, today);
+    if (grace) return `vence ${grace.when}`;
+  }
+  return dueOn === today ? 'vence hoje' : `vence em ${date}`;
 }
 
 /**
@@ -1155,7 +1164,7 @@ export function firstMonthChoices(dueDay: number, today: IsoDate): { month: IsoM
   const choices = months.map((month) => {
     const dueOn = dateInMonth(month, dueDay);
     const name = formatMonthName(month);
-    return { month, dueOn, label: `${name.charAt(0).toUpperCase()}${name.slice(1)} (${whenDue(dueOn, today, false)})`, isDefault: false };
+    return { month, dueOn, label: `${name.charAt(0).toUpperCase()}${name.slice(1)} (${whenDue(dueOn, today, false, 'gasto_fixo')})`, isDefault: false };
   });
   const def = choices.find((c) => c.dueOn >= today) ?? choices[choices.length - 1]!;
   def.isDefault = true;
@@ -1202,7 +1211,7 @@ export function annualStartChoices(k: number, month: number, day: number, today:
     const start = `${y}-${mm}`;
     const firstDue = dateInMonth(start, day);
     if (start >= min && start <= max) {
-      const when = whenDue(firstDue, today, true);
+      const when = whenDue(firstDue, today, true, 'conta_do_ano');
       years.push({ firstDueMonth: start, firstNumber: 1, dueOn: firstDue, label: `${label(start)} (${k === 1 ? when : `primeira ${when}`})`, isDefault: false });
     }
     // Ano já começado: o mais recente com a 1ª parcela vencida e alguma das seguintes na faixa.
@@ -1212,7 +1221,7 @@ export function annualStartChoices(k: number, month: number, day: number, today:
         const m = addMonths(start, p - 1);
         if (m < min) continue;
         const dueOn = dateInMonth(m, day);
-        parts.push({ firstDueMonth: m, firstNumber: p, dueOn, label: `Parcela ${p} (${whenDue(dueOn, today, false)})`, isDefault: false });
+        parts.push({ firstDueMonth: m, firstNumber: p, dueOn, label: `Parcela ${p} (${whenDue(dueOn, today, false, 'conta_do_ano')})`, isDefault: false });
       }
       started = {
         yearLabel: label(start),
