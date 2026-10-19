@@ -17,6 +17,8 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+# Chave de serviço do Google (EAS Submit): fica só na conta Expo, nunca no repositório
+*service-account*.json
 
 # Metro
 .metro-health-check*
