@@ -17,6 +17,7 @@ import {
   NATIONAL_HOLIDAY_SOURCES,
   MemoryRepository,
   REMINDER_NOT_BUSINESS_DAY,
+  RETURN_TEXT,
   addDays,
   addMonthsToDate,
   buildInvoices,
@@ -26,6 +27,7 @@ import {
   commitmentSituation,
   committedTexts,
   createDemoRepository,
+  createdOverdueShown,
   dueDayNotice,
   dueKindOf,
   dueKindOfSeries,
@@ -46,11 +48,14 @@ import {
   nextBusinessDayWhen,
   nationalHolidayOn,
   nationalHolidays,
+  occurrencesToMaterialize,
+  openAffectedText,
   plannedDueNotice,
   quickPayAction,
   reminderBody,
   reminderPlan,
   reminderSignature,
+  reviewMonthCard,
   summarizeCommitted,
   summarizeToPay,
   toPayCaption,
@@ -832,13 +837,21 @@ describe('vencida só depois do próximo dia útil: effectiveOverdue (D-061)', (
     expect([sp, ki]).toEqual(['2026-10-13', '2026-10-14']);
     expect(effectiveOverdue('2026-10-11', 'conta', sp)).toBe(false);
     expect(effectiveOverdue('2026-10-11', 'conta', ki)).toBe(true);
-    // Muda com o TZ do aparelho? Não: a regra só usa a data civil recebida.
+    // Muda com o TZ do aparelho? Não: converte-se um instante de verdade, 23h30 de terça em São Paulo (UTC-3), que já é quarta em UTC.
+    // O dia da sessão é o de São Paulo (terça, último dia sem atraso) com qualquer TZ do aparelho; o de UTC, o dia seguinte, é só o contraste.
+    const night = new Date('2026-10-13T23:30:00-03:00');
+    expect(night.toISOString()).toBe('2026-10-14T02:30:00.000Z');
     const before = process.env.TZ;
     try {
-      for (const tz of ['Pacific/Kiritimati', 'Pacific/Honolulu', 'UTC']) {
+      for (const tz of ['Pacific/Kiritimati', 'Pacific/Honolulu', 'America/Sao_Paulo', 'UTC']) {
         process.env.TZ = tz;
-        expect(effectiveOverdue('2026-10-11', 'conta', '2026-10-13'), tz).toBe(false);
-        expect(effectiveOverdue('2026-10-11', 'conta', '2026-10-14'), tz).toBe(true);
+        const session = todayIn('America/Sao_Paulo', night);
+        const utc = todayIn('UTC', night);
+        expect([session, utc], tz).toEqual(['2026-10-13', '2026-10-14']);
+        expect(effectiveOverdue('2026-10-11', 'conta', session), tz).toBe(false);
+        expect(effectiveOverdue('2026-10-11', 'conta', utc), tz).toBe(true);
+        expect(commitmentSituation(bill('2026-10-11'), session), tz).toBe('vence_hoje');
+        expect(commitmentSituation(bill('2026-10-11'), utc), tz).toBe('vencida');
       }
     } finally {
       if (before === undefined) delete process.env.TZ;
@@ -1017,6 +1030,44 @@ describe('os lugares que decidem "vencida" seguem a regra (D-061)', () => {
     expect(rows('2026-10-14')).toEqual(['Segunda útil', 'IPTU', 'Sábado']); // por vencimento; a série vem antes da avulsa no mesmo dia
   });
 
+  it('revisão dos últimos meses: a conta avulsa de sábado 31/10 ainda no prazo em 02/11 (feriado) não é chamada de "vencida" em nenhum texto', () => {
+    const window: ReturnWindow = { kind: 'ausencia', anchor: '2026-05-20', returnedOn: null, fromMonth: '2026-10', toMonth: '2026-10', currentMonth: '2026-11', cutBefore: null };
+    const list = [bill('2026-10-31', { id: 'sab', description: 'Escola' })];
+    const at = (today: IsoDate) => buildReturnReview(window, [], list, [], today);
+    for (const today of ['2026-11-02', '2026-11-03', '2026-11-04'] as const) {
+      const review = at(today);
+      expect(review.current.rows, today).toEqual([]); // é de outubro, mês fechado: não entra em "Este mês"
+      expect(review.months[0]!.loose.map((r) => r.description), today).toEqual(['Escola']);
+      const lines = reviewMonthCard(review.months[0]!).lines;
+      expect(lines, today).toContain('Outras contas em aberto: 1 · R$ 100,00');
+      for (const text of [...lines, RETURN_TEXT.sectionLoose, RETURN_TEXT.stillOpenDone]) expect(text, `${today}: ${text}`).not.toMatch(/vencid/i);
+    }
+    // No mês atual a revisão só lista a conta que venceu de verdade (sábado 07/11: no prazo até segunda, 09/11), e ali a palavra é "vencida".
+    const current = [bill('2026-11-07', { id: 'sab2', description: 'Luz' })];
+    const w2: ReturnWindow = { ...window, fromMonth: '2026-11', toMonth: '2026-10' };
+    expect(buildReturnReview(w2, [], current, [], '2026-11-09').current.rows).toEqual([]);
+    expect(buildReturnReview(w2, [], current, [], '2026-11-10').current.rows.map((r) => r.description)).toEqual(['Luz']);
+  });
+
+  it('detalhe da conta: "como vencida" só com atraso de verdade; no prazo do próximo dia útil, "com vencimento em outubro"', () => {
+    // 31/10/2026 é sábado e 02/11 é feriado: no prazo até terça, 03/11.
+    const sab = bill('2026-10-31');
+    expect(openAffectedText(sab, '2026-11', '2026-11-01')).toBe('Ainda a pagar de novembro de 2026, com vencimento em outubro');
+    expect(openAffectedText(sab, '2026-11', '2026-11-02')).toBe('Ainda a pagar de novembro de 2026, com vencimento em outubro');
+    expect(openAffectedText(sab, '2026-11', '2026-11-03')).toBe('Ainda a pagar de novembro de 2026, com vencimento em outubro');
+    expect(openAffectedText(sab, '2026-11', '2026-11-04')).toBe('Ainda a pagar de novembro de 2026, como vencida');
+    expect(commitmentSituation(sab, '2026-11-01')).toBe('a_vencer'); // a legenda "Vence terça, 03/11 (próximo dia útil)" e o texto concordam
+    expect(dueText(sab, '2026-11-01')).toBe('Vence terça, 03/11 (próximo dia útil)');
+    // Conta do ano não tem tolerância: vencida desde o dia seguinte.
+    expect(openAffectedText(bill('2026-10-31', { series: serie('anual') }), '2026-11', '2026-11-01')).toBe('Ainda a pagar de novembro de 2026, como vencida');
+    // Dia útil de mês anterior, já vencido, e conta do mês: como sempre.
+    expect(openAffectedText(bill('2026-09-30'), '2026-11', '2026-11-01')).toBe('Ainda a pagar de novembro de 2026, como vencida');
+    expect(openAffectedText(bill('2026-11-10'), '2026-11', '2026-11-01')).toBe('Ainda a pagar de novembro de 2026');
+    // Virada de ano: 31/12/2028 é domingo e 01/01/2029 é feriado; o mês vem com o ano quando difere do de hoje.
+    expect(openAffectedText(bill('2028-12-31'), '2029-01', '2029-01-01')).toBe('Ainda a pagar de janeiro de 2029, com vencimento em dezembro de 2028');
+    expect(openAffectedText(bill('2028-12-31'), '2029-01', '2029-01-03')).toBe('Ainda a pagar de janeiro de 2029, como vencida');
+  });
+
   it('widget: a contagem de vencidas e o prazo da próxima conta seguem o próximo dia útil', () => {
     const list = [bill('2026-10-10', { id: 'a', description: 'Escola' }), bill('2026-10-20', { id: 'c', description: 'Luz' })];
     const at = (today: IsoDate, showValues = true) =>
@@ -1044,7 +1095,7 @@ describe('os lugares que decidem "vencida" seguem a regra (D-061)', () => {
     expect(item!.body).toBe('Você tem 1 conta com vencimento amanhã, que não é dia útil.');
   });
 
-  it('gasto fixo criado depois de um tempo: a conta no próximo dia útil não entra em "criou contas que já venceram"', async () => {
+  it('gasto fixo criado depois de um tempo: a memória conta "já venceu" pela data anotada, como o banco, e a faixa mostra as vencidas de verdade', async () => {
     const volta = async (back: IsoDate) => {
       let today = '2026-07-20';
       const repo = new MemoryRepository({ actorId: 'pessoa-1', displayName: 'Maria', today: () => today });
@@ -1054,12 +1105,42 @@ describe('os lugares que decidem "vencida" seguem a regra (D-061)', () => {
         firstDueMonth: '2026-07', firstNumber: 1, installmentTotal: null, partsPerYear: null, lastMonth: null,
       });
       today = back;
-      return repo.syncSeriesOccurrences(ctx);
+      // A mesma conta de `checkedSync` em apps/app/test/supabase-api.int.test.ts (o banco: `v_due < v_today` em `sync_series_occurrences`).
+      const planned = (
+        await Promise.all((await repo.listSeries(ctx)).map(async (s) => occurrencesToMaterialize(s, await repo.listSeriesOccurrences(s.id), back)))
+      ).flat();
+      const result = await repo.syncSeriesOccurrences(ctx);
+      expect(result).toEqual({ created: planned.length, createdOverdue: planned.filter((o) => o.dueOn < back).length });
+      const month = back.slice(0, 7);
+      return { result, summary: summarizeToPay(await repo.listCommitments(ctx, month), ctx, month, back) };
     };
-    // Volta em 12/10: setembro (quinta, 10/09), outubro (sábado, 10/10) e novembro entram; só a de setembro venceu de verdade.
-    expect(await volta('2026-10-12')).toEqual({ created: 3, createdOverdue: 1 });
-    // Em 14/10 a de outubro, que cai em sábado, também passou do próximo dia útil (terça, 13/10).
-    expect(await volta('2026-10-14')).toEqual({ created: 3, createdOverdue: 2 });
+    // Volta em 12/10: setembro (quinta, 10/09), outubro (sábado, 10/10) e novembro entram; o banco conta 2 (setembro e outubro passaram da
+    // data anotada), mas só a de setembro venceu de verdade, e a faixa mostra 1.
+    const sunday = await volta('2026-10-12');
+    expect(sunday.result).toEqual({ created: 3, createdOverdue: 2 });
+    expect(createdOverdueShown(sunday.result.createdOverdue, sunday.summary, '2026-10-12')).toBe(1);
+    // Em 14/10 a de outubro, que cai em sábado, também passou do próximo dia útil (terça, 13/10): as 2 contam.
+    const late = await volta('2026-10-14');
+    expect(late.result).toEqual({ created: 3, createdOverdue: 2 });
+    expect(createdOverdueShown(late.result.createdOverdue, late.summary, '2026-10-14')).toBe(2);
+  });
+
+  it('a contagem da faixa: tira as contas de série no prazo do próximo dia útil e nunca passa das vencidas de série de agora', () => {
+    const fixa = (dueOn: IsoDate, id: string) => bill(dueOn, { id, series: serie('mensal') });
+    // Hoje, segunda 12/10 (feriado): setembro venceu de verdade, outubro (sábado 10/10) está no prazo, e há uma vencida antiga de agosto.
+    const list = [fixa('2026-08-10', 'ago'), fixa('2026-09-10', 'set'), fixa('2026-10-10', 'out'), bill('2026-09-20', { id: 'avulsa' })];
+    const s = summarizeToPay(list, 'ctx', '2026-10', '2026-10-12');
+    expect(s.overdue.map((c) => c.id)).toEqual(['ago', 'set', 'avulsa']);
+    expect(s.upcomingInMonth.map((c) => c.id)).toEqual(['out']);
+    expect(createdOverdueShown(2, s, '2026-10-12')).toBe(1); // 2 pela data anotada, menos a de outubro no prazo
+    expect(createdOverdueShown(1, s, '2026-10-12')).toBe(0);
+    expect(createdOverdueShown(0, s, '2026-10-12')).toBe(0);
+    // As vencidas antigas (agosto) não aumentam o número: 5 criadas, mas só 2 de série vencidas de verdade.
+    expect(createdOverdueShown(5, s, '2026-10-12')).toBe(2);
+    // Depois do prazo, a de outubro também venceu: o número é o do banco, limitado às vencidas de série.
+    const after = summarizeToPay(list, 'ctx', '2026-10', '2026-10-14');
+    expect(createdOverdueShown(3, after, '2026-10-14')).toBe(3);
+    expect(createdOverdueShown(4, after, '2026-10-14')).toBe(3);
   });
 });
 
@@ -1087,7 +1168,7 @@ describe('fontes da regra do próximo dia útil (D-061)', () => {
   it('docs/09 registra as duas fontes da regra, a consulta, o que a lei não diz e o 2 de novembro "a conferir"', () => {
     const text = readFileSync(`${DOCS}09_APRENDER.md`, 'utf8');
     for (const src of DUE_RULE_SOURCES) expect(text, src.url).toContain(src.url);
-    for (const needle of ['Lei nº 7.089', 'REsp 1.954.924', 'entendimento do STJ', 'notícia', 'não menciona multa', '19/10/2026', 'a conferir']) expect(text, needle).toContain(needle);
+    for (const needle of ['Lei nº 7.089', 'REsp 1.954.924', 'entendimento do STJ', 'notícia', 'não menciona multa', '19/10/2026', 'a conferir', 'primeiro dia subsequente']) expect(text, needle).toContain(needle);
     // Nenhuma data de início do 2 de novembro afirmada sem fonte: a tabela diz "a conferir".
     expect(text).toMatch(/2 de novembro \| Finados \|[^\n]*\| a conferir/);
   });

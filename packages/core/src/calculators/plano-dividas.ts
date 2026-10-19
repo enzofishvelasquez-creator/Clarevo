@@ -1,6 +1,7 @@
 import { looksLikeCardNumber } from '../cards';
 import type { IsoDate, IsoMonth } from '../dates';
 import { addMonths, formatMonthYearBR, monthOf } from '../dates';
+import { effectiveOverdue } from '../dia-util';
 import { roundDivBig } from '../learn/math';
 import { centsToInput, formatBRL, type Cents } from '../money';
 import type { Commitment, CommitmentSeries } from '../records';
@@ -604,8 +605,9 @@ export interface SeriesDebtDraft {
 /**
  * Parcelamentos com parcelas a vencer (financiamento, compra parcelada ou outro parcelamento; nunca gasto fixo nem conta do
  * ano), na ordem em que vieram, até 10. `occurrences` são as contas vivas da série e `open` as em aberto (mesmas listas de
- * "Quanto economizo se quitar antes?"). Regra: contam só as parcelas com vencimento de hoje em diante; as já vencidas e em
- * aberto ficam fora (a tela diz isso), e um parcelamento sem nenhuma parcela a vencer fica fora, esteja ou não encerrado.
+ * "Quanto economizo se quitar antes?"). Regra: contam só as parcelas que ainda não venceram de verdade (D-061: vencimento de hoje em
+ * diante ou ainda no próximo dia útil); as já vencidas e em aberto ficam fora (a tela diz isso), e um parcelamento sem nenhuma parcela
+ * a vencer fica fora, esteja ou não encerrado.
  */
 export function seriesDebtDrafts(
   items: readonly { series: CommitmentSeries; occurrences: readonly Commitment[]; open: readonly Commitment[] }[],
@@ -615,7 +617,7 @@ export function seriesDebtDrafts(
   for (const { series: s, occurrences, open } of items) {
     if (out.length >= PLANO_MAX_DEBTS) break;
     if (s.kind !== 'parcelada' || !INSTALLMENT_NATURES.includes(s.nature)) continue;
-    const next = remainingInstallments(s, occurrences, open, today)?.filter((x) => x.dueOn >= today);
+    const next = remainingInstallments(s, occurrences, open, today)?.filter((x) => !effectiveOverdue(x.dueOn, 'parcelamento', today));
     if (!next || next.length === 0 || next.length > 480) continue;
     const term = [...s.terms].reverse().find((t) => t.fromNumber <= next[0]!.number) ?? s.terms[0];
     const raw = [...(term?.description ?? '').trim()].slice(0, PLANO_NAME_MAX).join('').trim();

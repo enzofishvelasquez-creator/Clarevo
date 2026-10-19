@@ -305,7 +305,7 @@ export interface ReviewMonth {
    * leva as linhas dos meses seguintes (que não se repetem nesses meses).
    */
   items: ReviewItem[];
-  /** "Outras contas vencidas": avulsas em aberto com vencimento no mês. */
+  /** "Outras contas em aberto": avulsas em aberto com vencimento no mês (uma de fim de mês pode estar no prazo do próximo dia útil, D-061). */
   loose: ReviewRow[];
   /**
    * "Com algo sem registro": sem recebimento anotado, sem gasto anotado ou com número de série sem conta registrada. Um mês que a pessoa
@@ -769,8 +769,8 @@ export const RETURN_TEXT = {
   /** "5 parcelas sem conta registrada" ou "2 parcelas em aberto" (linha do grupo de conta do ano). */
   groupState: (n: number, state: ReviewRowState) =>
     state === 'sem_conta' ? `${plural(n, 'parcela', 'parcelas')} sem conta registrada` : `${plural(n, 'parcela', 'parcelas')} em aberto`,
-  /** "Outras contas vencidas: 1 · R$ 150,00" */
-  looseBills: (count: number, totalCents: Cents) => `Outras contas vencidas: ${count} · ${formatBRL(totalCents)}`,
+  /** "Outras contas em aberto: 1 · R$ 150,00" (não diz "vencidas": no mês fechado, a de um dia não útil pode estar no prazo, D-061) */
+  looseBills: (count: number, totalCents: Cents) => `Outras contas em aberto: ${count} · ${formatBRL(totalCents)}`,
   nothingToCheck: 'Nenhuma conta para conferir.',
   /** "1 conta vencida em aberto: Aluguel, R$ 2.500,00, venceu em 05/10." */
   currentOne: (row: Pick<ReviewRow, 'description' | 'amountCents' | 'amountIsEstimate' | 'dueOn'>) =>
@@ -794,7 +794,7 @@ export const RETURN_TEXT = {
   /** "Mês 1 de 5" */
   stepCounter: (i: number, n: number) => `Mês ${i} de ${n}`,
   sectionSeries: 'Gastos fixos, parcelamentos e contas do ano',
-  sectionLoose: 'Outras contas vencidas',
+  sectionLoose: 'Outras contas em aberto',
   sectionRecords: 'Recebimentos e gastos',
   stateOpen: 'em aberto',
   stateGap: 'sem conta registrada',
@@ -853,7 +853,7 @@ export const RETURN_TEXT = {
   notHappenedOpenSeriesBody: 'Ela sai de Contas a pagar e não volta a ser criada.',
   notHappenedOpenLooseBody: 'Ela sai de Contas a pagar.',
   notHappenedOpenConfirm: 'Tirar conta',
-  stillOpenDone: 'Registrada em aberto. Ela aparece em Contas a pagar como vencida.',
+  stillOpenDone: 'Registrada em aberto. Ela continua em Contas a pagar.',
   /** Linha resolvida: "Paga em 05/07/2026 · R$ 2.500,00" */
   resolvedPaid: (paidOn: IsoDate, amountCents: Cents) => `Paga em ${formatDateBR(paidOn)} · ${formatBRL(amountCents)}`,
   resolvedNotHappened: 'Não houve',

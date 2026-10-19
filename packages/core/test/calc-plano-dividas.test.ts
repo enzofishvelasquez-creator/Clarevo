@@ -686,6 +686,29 @@ describe('dívidas lidas dos parcelamentos', () => {
     expect(PLANO_TEXT.hypotheses.overdueOut).toBe('Dos seus parcelamentos, entram só as parcelas que vencem de hoje em diante; as já vencidas e em aberto ficam fora desta conta.');
   });
 
+  it('parcela de dia não útil ainda no prazo do próximo dia útil (D-061) entra na conta; depois do prazo, fica fora', async () => {
+    // "Sábado": 6 parcelas de R$ 120,00 desde 10/10/2026 (sábado). Em 12/10 (segunda, feriado) a de 10/10 ainda não venceu de verdade (o prazo vai
+    // até terça, 13/10); em 14/10 ela venceu e fica fora, como uma parcela vencida e em aberto.
+    const repo = await createDemoRepository();
+    const ctx = (await repo.getSpace())!.personalContextId;
+    await repo.createSeries(newOperationKey(), ctx, {
+      kind: 'parcelada', nature: 'compra_parcelada', description: 'Sábado', category: null, amountCents: 12_000, amountMode: 'fixo', dueDay: 10,
+      firstDueMonth: '2026-10', firstNumber: 1, installmentTotal: 6, partsPerYear: null, lastMonth: null,
+    });
+    const series = await repo.listSeries(ctx);
+    const items = await Promise.all(series.map(async (s) => ({ series: s, occurrences: await repo.listSeriesOccurrences(s.id), open: await repo.listOpenSeriesOccurrences(s.id) })));
+    const sab = items.find((i) => i.series.terms[0]?.description === 'Sábado')!;
+    expect(sab.open.map((c) => c.dueOn)).toEqual(['2026-10-10', '2026-11-10']);
+    const rest = (today: string) => seriesDebtDrafts(items, today).find((d) => d.name === 'Sábado')?.restantes;
+    expect(rest('2026-10-10')).toBe(6); // vence hoje
+    expect(rest('2026-10-12')).toBe(6); // fim de semana e feriado: no prazo
+    expect(rest('2026-10-13')).toBe(6); // terça, o próximo dia útil: último dia sem atraso
+    expect(rest('2026-10-14')).toBe(5); // venceu de verdade: fora
+    // Parcelamento de dia útil não muda: vencida a partir do dia seguinte.
+    const util = items.find((i) => i.series.nature === 'financiamento')!;
+    expect(seriesDebtDrafts([util], '2026-10-07')[0]?.restantes).toBe(36);
+  });
+
   it('o link da calculadora não leva nenhum campo (a taxa nunca vem no link)', () => {
     expect(calcLinkParams('plano-dividas', {})).toEqual({});
     expect(calcLinkParams('plano-dividas', { origem: 'renda' })).toEqual({ origem: 'renda' });

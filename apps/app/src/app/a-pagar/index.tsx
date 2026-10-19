@@ -5,6 +5,7 @@ import {
   REMINDERS_SETTINGS_HREF,
   QUICK_PAY_TEXT,
   RETURN_TEXT,
+  createdOverdueShown,
   formatMonthBR,
   groupAnnualLater,
   isRepoError,
@@ -202,9 +203,9 @@ export default function ContasAPagarScreen() {
   const isCurrent = month === currentMonth;
   const caption = s ? toPayCaption(s, today) : null;
   // A sincronização do dia criou contas já vencidas: a faixa fica enquanto alguma conta de gasto fixo continuar vencida. O banco conta
-  // "já venceu" pela data cadastrada; a contagem mostrada nunca passa das vencidas de verdade (D-061: dia que não é útil só vence
-  // depois do próximo dia útil).
-  const createdOverdue = Math.min(sync.data?.createdOverdue ?? 0, s?.overdue.filter((c) => c.series).length ?? 0);
+  // "já venceu" pela data anotada; a contagem mostrada é a das vencidas de verdade (D-061: dia que não é útil só vence depois do
+  // próximo dia útil), sem somar as vencidas antigas.
+  const createdOverdue = s ? createdOverdueShown(sync.data?.createdOverdue ?? 0, s, today) : 0;
   const showCreatedOverdue = isCurrent && createdOverdue > 0 && Boolean(s?.overdue.some((c) => c.series));
   // Com a faixa "Seus últimos meses" ativa no Resumo, o aviso leva ao mesmo resumo (um só pedido, D-030).
   const returnBandOn = useReturnBand(isCurrent ? ctx : undefined).status === 'visivel';

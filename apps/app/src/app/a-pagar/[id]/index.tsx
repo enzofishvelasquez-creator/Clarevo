@@ -27,6 +27,7 @@ import {
   newOperationKey,
   nextMonthPrefill,
   occurrenceLabel,
+  openAffectedText,
   termFor,
   type Commitment,
   type IsoDate,
@@ -322,9 +323,7 @@ export default function DetalheContaAPagar() {
     ? ''
     : paid
       ? `Pago de ${formatMonthBR(monthOf(paid.paidOn)).toLowerCase()}`
-      : monthOf(c.dueOn) < view.currentMonth
-        ? `Ainda a pagar de ${formatMonthBR(view.currentMonth).toLowerCase()}, como vencida`
-        : `Ainda a pagar de ${formatMonthBR(monthOf(c.dueOn)).toLowerCase()}`;
+      : openAffectedText(c, view.currentMonth, today);
   const look = situation ? SITUATION_LOOK[situation] : null;
 
   // "Parte de: Aluguel · todo mês, dia 5", "Parcela 13 de 48 de Financiamento do carro" ou, na conta do ano, "Parte de:

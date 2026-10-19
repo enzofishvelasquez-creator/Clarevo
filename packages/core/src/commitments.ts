@@ -1,5 +1,5 @@
-import type { IsoDate } from './dates';
-import { addDays, addMonths, addMonthsToDate, daysBetween, formatDateBR, formatDayMonth, formatMonthName, monthRange } from './dates';
+import type { IsoDate, IsoMonth } from './dates';
+import { addDays, addMonths, addMonthsToDate, daysBetween, formatDateBR, formatDayMonth, formatMonthBR, formatMonthName, monthOf, monthRange } from './dates';
 import { dueKindOf, isCommitmentOverdue, lastOnTimeDay, nextBusinessDayWhen } from './dia-util';
 import { formatBRL } from './money';
 import type { Commitment, CommitmentInput } from './records';
@@ -71,6 +71,29 @@ export function dueText(c: Commitment, today: IsoDate): string {
       return `Vence em ${formatDateBR(c.dueOn)}`;
     }
   }
+}
+
+/**
+ * Onde a conta em aberto entra, no detalhe: em "Ainda a pagar" do mês do vencimento ou, com vencimento de mês anterior ao corrente, no
+ * do mês corrente. "Como vencida" só quando ela venceu de verdade (D-061); ainda no prazo do próximo dia útil, "com vencimento em outubro".
+ */
+export function openAffectedText(c: Pick<Commitment, 'dueOn' | 'invoice' | 'series'>, currentMonth: IsoMonth, today: IsoDate): string {
+  const due = monthOf(c.dueOn);
+  if (due >= currentMonth) return `Ainda a pagar de ${formatMonthBR(due).toLowerCase()}`;
+  const base = `Ainda a pagar de ${formatMonthBR(currentMonth).toLowerCase()}`;
+  return isCommitmentOverdue(c, today) ? `${base}, como vencida` : `${base}, com vencimento em ${monthLabelFor(due, today)}`;
+}
+
+/**
+ * Contas de série criadas pela sincronização do dia que já venceram, para a faixa de Contas a pagar. O banco conta pela data anotada
+ * (`sync_series_occurrences`, e a memória igual); a faixa mostra pela regra de "vencida" (D-061): tira da contagem as contas de série
+ * que passaram da data anotada e ainda estão no prazo do próximo dia útil, e nunca passa das vencidas de série de agora, para as
+ * vencidas antigas não aumentarem o número.
+ */
+export function createdOverdueShown(createdByDate: number, s: Pick<ToPaySummary, 'overdue' | 'upcomingInMonth'>, today: IsoDate): number {
+  const inGrace = s.upcomingInMonth.filter((c) => c.series && c.dueOn < today).length;
+  const overdue = s.overdue.filter((c) => c.series).length;
+  return Math.min(Math.max(createdByDate - inGrace, 0), overdue);
 }
 
 /** Preenchimento de "Adicionar a conta do próximo mês": mesma conta, vencimento um mês depois (dia limitado ao fim do mês). */

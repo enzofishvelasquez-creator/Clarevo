@@ -4389,8 +4389,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   for (const name of ['Selecionar Aluguel de agosto, R$ 2.500,00', 'Selecionar Financiamento do carro de agosto, R$ 850,00']) await p.getByRole('checkbox', { name }).click();
   await btn('Marcar as 2 selecionadas como pagas no vencimento').click(); await waitText('Marcar 2 contas como pagas?');
   await confirmIn('Marcar como pagas'); await waitText('Paga em 10/08/2026 · R$ 850,00');
-  await btn('Ainda não paguei: Luz de agosto').click(); await waitText('Registrada em aberto. Ela aparece em Contas a pagar como vencida.');
-  ok('"Ainda não paguei": a Luz de agosto fica registrada em aberto, sem diálogo', (await body()).includes('Registrada em aberto. Ela aparece em Contas a pagar como vencida.'));
+  await btn('Ainda não paguei: Luz de agosto').click(); await waitText('Registrada em aberto. Ela continua em Contas a pagar.');
+  ok('"Ainda não paguei": a Luz de agosto fica registrada em aberto, sem diálogo', (await body()).includes('Registrada em aberto. Ela continua em Contas a pagar.'));
   await keepReturnText();
   await shot('78_atualizar_agosto');
   await btn('Próximo mês').click(); await waitText('Mês 3 de 4');
@@ -12057,7 +12057,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Dia útil, "Saiba mais": a fonte lista as três leis e a data da consulta (19/10/2026), e o botão passa a aria-expanded=true',
     t.includes('Fontes: Lei nº 662/1949, com a redação da Lei nº 10.607/2002; Lei nº 6.802/1980; Lei nº 14.759/2023; Lei nº 7.089/1983; notícia do STJ sobre o REsp 1.954.924. Consultadas em 19/10/2026.') && (await duMoreButton().first().getAttribute('aria-expanded')) === 'true');
   ok('Dia útil, "Saiba mais" (D-061): cita a Lei nº 7.089/1983, diz que a multa e as regras de cada cobrança podem variar (confira com quem cobra), que passar do primeiro dia útil pode contar juros desde a data original (entendimento do STJ) e que conta do ano não ganha a tolerância',
-    t.includes('A Lei nº 7.089/1983 proíbe bancos e instituições financeiras de cobrar juros de mora sobre título que vence em sábado, domingo ou feriado, quando o pagamento é feito no primeiro dia útil seguinte.') &&
+    t.includes('A Lei nº 7.089/1983 proíbe bancos e instituições financeiras de cobrar juros de mora sobre título que vence em sábado, domingo ou feriado, desde que seja quitado no primeiro dia subsequente, que o STJ lê como o primeiro dia útil seguinte.') &&
     t.includes('A multa e as regras de cada cobrança podem variar, e o Clarevo não sabe qual vale para a sua conta. Por isso, confira com quem cobra antes de escolher a data do pagamento.') &&
     t.includes('Se o pagamento passar do primeiro dia útil, os juros podem contar desde a data original do vencimento: é o entendimento do STJ') &&
     t.includes('Contas do ano, como IPVA, IPTU e matrícula, costumam ser tributos e não ganham essa tolerância no Clarevo') && t.includes(DU_YEAR_ADVICE) &&
@@ -12065,7 +12065,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Dia útil, "Saiba mais": nenhuma promessa de ausência de encargos (sem "sem multa", "sem juros", "sem encargos", "garantido" nem "não há multa")', !/sem (multa|juros|encargos?)|garant|n[aã]o (h[aá]|tem|cobra|cobram) (multa|juros|encargos?)/i.test(t));
   await duKeep();
   await duShots('522_dia_util_saiba_mais', duScroll('Vencimento em dia que não é útil'));
-  await duShots('528_dia_util_saiba_mais_lei_7089', duScroll('A Lei nº 7.089/1983 proíbe bancos e instituições financeiras de cobrar juros de mora sobre título que vence em sábado, domingo ou feriado, quando o pagamento é feito no primeiro dia útil seguinte. A multa e as regras de cada cobrança podem variar, e o Clarevo não sabe qual vale para a sua conta. Por isso, confira com quem cobra antes de escolher a data do pagamento.'));
+  await duShots('528_dia_util_saiba_mais_lei_7089', duScroll('A Lei nº 7.089/1983 proíbe bancos e instituições financeiras de cobrar juros de mora sobre título que vence em sábado, domingo ou feriado, desde que seja quitado no primeiro dia subsequente, que o STJ lê como o primeiro dia útil seguinte. A multa e as regras de cada cobrança podem variar, e o Clarevo não sabe qual vale para a sua conta. Por isso, confira com quem cobra antes de escolher a data do pagamento.'));
   await duMoreButton().first().click(); await p.waitForTimeout(400);
   ok('Dia útil, "Saiba mais": tocar de novo recolhe a explicação', !(await body()).includes('Contam só os feriados nacionais de data fixa definidos em lei federal') && (await duMoreButton().first().getAttribute('aria-expanded')) === 'false');
   await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(300);

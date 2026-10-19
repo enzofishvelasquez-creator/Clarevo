@@ -12,6 +12,7 @@ import {
   NOTA_ERROR_TEXT,
   ANNUAL_HELP_TEXT,
   DUE_DAY_TEXT,
+  DUE_RULE_SOURCES,
   NATIONAL_HOLIDAY_LAWS,
   addDays,
   dueDayNotice,
@@ -3331,9 +3332,11 @@ describe('textos do aviso de dia útil (D-060) e do próximo dia útil (D-061)',
     }) as DiaUtilCommitment;
   const PROMISE =
     /\bsem\s+(?:multa|juros|encargos?|custos?|taxas?|cobran[cç]as?)(?![\p{L}])|\bn[aã]o\s+(?:h[aá]|tem|ter[aá]|cobra|cobram|incide|incidem|existe)(?![\p{L}])[^.]*(?<![\p{L}])(?:multa|juros|encargos?)(?![\p{L}])|\bgarant|\bsempre (?:pode|vale)\b|\bpode pagar\b|\bsem problema|\bsem prejuízo|\bnão perde|\bvale para qualquer/iu;
-  // D-061 precisa dizer quando a conta "passa a vencida": a palavra é o rótulo que o app já mostra, então só ela saiu da lista. Ordem,
-  // pressa, perda e atraso continuam fora (o aviso nunca manda pagar, nem cobra).
-  const ORDERS = /\bdeve(ria)?\b|\bpague\b|\bpague já\b|\bnão esqueça|\burgente|\batrasad|\bperd[ae]r?\b|\bcuidado|\bpreocup/i;
+  // "vencida" continua na lista de ordens e julgamento. D-061 só precisa dizer quando a conta "passa a vencida" (e, na conta do ano,
+  // que "ficam vencidas" a partir do dia seguinte): só essas duas expressões exatas são liberadas, e qualquer outro uso da palavra,
+  // como também ordem, pressa, perda e atraso, segue reprovado (o aviso nunca manda pagar, nem cobra).
+  const ORDERS = /\bdeve(ria)?\b|\bpague\b|\bpague já\b|\bnão esqueça|\burgente|\batrasad|\bvencid[oa]s?\b|\bperd[ae]r?\b|\bcuidado|\bpreocup/i;
+  const VENCIDA_LIBERADA = /\bpassa a vencida\b|\bficam vencidas\b/gi;
   const check = (texts: string[]) => {
     for (const text of texts) {
       expect(text, text).not.toMatch(FORBIDDEN);
@@ -3342,7 +3345,7 @@ describe('textos do aviso de dia útil (D-060) e do próximo dia útil (D-061)',
       expect(text, text).not.toMatch(NEUTRAL);
       expect(text, text).not.toMatch(GENDERED);
       expect(text, text).not.toMatch(PROMISE);
-      expect(text, text).not.toMatch(ORDERS);
+      expect(text.replace(VENCIDA_LIBERADA, ''), text).not.toMatch(ORDERS);
     }
   };
 
@@ -3369,9 +3372,14 @@ describe('textos do aviso de dia útil (D-060) e do próximo dia útil (D-061)',
       'Vale para qualquer cobrança.',
     ])
       expect(PROMISE.test(bad), bad).toBe(true);
-    for (const bad of ['Você deve pagar antes.', 'Pague já', 'Não esqueça', 'Conta atrasada', 'Cuidado com o vencimento']) expect(ORDERS.test(bad), bad).toBe(true);
+    for (const bad of ['Você deve pagar antes.', 'Pague já', 'Não esqueça', 'Conta atrasada', 'Cuidado com o vencimento', 'Conta vencida', 'Duas contas vencidas']) expect(ORDERS.test(bad), bad).toBe(true);
     expect(PROMISE.test(DUE_DAY_TEXT.advice)).toBe(false);
     expect(ORDERS.test(DUE_DAY_TEXT.advice)).toBe(false);
+    // "vencida" só passa nas duas expressões liberadas; fora delas, o que sobra depois de tirá-las ainda é reprovado.
+    const sobra = (text: string) => ORDERS.test(text.replace(VENCIDA_LIBERADA, ''));
+    expect(sobra('Só depois desse dia ela passa a vencida.')).toBe(false);
+    expect(sobra('Contas do ano ficam vencidas a partir do dia seguinte ao vencimento.')).toBe(false);
+    for (const bad of ['Esta conta está vencida.', 'Você tem uma conta vencida.', 'Ela fica vencida amanhã.', 'As contas passam a vencidas.', 'Ela passa a vencida e depois, vencida de novo.']) expect(sobra(bad), bad).toBe(true);
   });
 
   it('as frases fixas passam nas regras e dizem o que o aviso é e o que não é', () => {
@@ -3429,6 +3437,10 @@ describe('textos do aviso de dia útil (D-060) e do próximo dia útil (D-061)',
   it('o "Saiba mais" de D-061 diz o que a lei diz e o que ela não diz, e nunca promete ausência de encargos', () => {
     const more = DUE_DAY_TEXT.learnMoreParagraphs.join(' ');
     expect(more).toContain('A Lei nº 7.089/1983 proíbe bancos e instituições financeiras de cobrar juros de mora');
+    // A palavra da lei é "primeiro dia subsequente" (trecho do art. 1º em DUE_RULE_SOURCES); o "dia útil" vem da leitura do STJ, dita como tal.
+    expect(more).toContain('desde que seja quitado no primeiro dia subsequente, que o STJ lê como o primeiro dia útil seguinte');
+    expect(more).not.toContain('quando o pagamento é feito no primeiro dia útil seguinte');
+    expect(DUE_RULE_SOURCES[0]!.locator).toContain('desde que seja quitado no primeiro dia subsequente');
     expect(more).toContain('A multa e as regras de cada cobrança podem variar');
     expect(more).toContain('é o entendimento do STJ');
     expect(more).toContain('IPVA, IPTU e matrícula');
