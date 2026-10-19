@@ -329,7 +329,7 @@ export interface EvolutionPointView extends EvolutionPoint {
   shortLabel: string;
   /** "R$ 7.800,00"; "R$ 0,00" só no zero confirmado; null em mês sem registros (nunca "R$ 0,00" sem a conferência). */
   valueText: string | null;
-  /** "Com registros", "Mês em andamento", "Você conferiu: não houve gastos em março de 2026." ou o aviso de mês sem registros (o texto do painel). */
+  /** "Com registros", "Mês em andamento", "Você conferiu: não houve pagamentos em março de 2026." ou o aviso de mês sem registros (o texto do painel). */
   stateText: string;
   /** "Com registros", "Conferido", "Mês em andamento" ou "Sem registros" (a coluna "Estado" da tabela). */
   stateLabel: string;
@@ -353,6 +353,11 @@ export interface EvolutionView {
   to: IsoMonth;
   currentMonth: IsoMonth;
   points: EvolutionPointView[];
+  /**
+   * As linhas de months_overview da janela, uma por mês, na mesma ordem dos pontos: o painel lê delas a versão da marca "Conferi este
+   * mês" e o aviso de compras no cartão (D-060). Mês que a leitura não trouxe vale a linha zerada.
+   */
+  rows: MonthOverview[];
   stats: ComparisonStats;
   /** X de "X de N meses fora da comparação": os meses fechados com registros que a pessoa tirou. */
   outCount: number;
@@ -377,7 +382,7 @@ function participationOf(state: EvolutionPointState, hidden: boolean): Evolution
   return hidden ? 'fora_escolha' : 'na_comparacao';
 }
 
-/** O que o painel diz do estado do mês: no zero confirmado, a própria conferência ("Você conferiu: não houve gastos em março de 2026."). */
+/** O que o painel diz do estado do mês: no zero confirmado, a própria conferência ("Você conferiu: não houve pagamentos em março de 2026."). */
 function pointStateText(point: EvolutionPoint, metric: EvolutionMetric): string {
   const T = EVOLUTION_TEXT;
   if (point.state === 'sem_registros') return T.panel.noRecords(metric);
@@ -478,6 +483,7 @@ export function buildEvolutionView(input: EvolutionViewInput): EvolutionView {
     to: months[months.length - 1]!,
     currentMonth,
     points: views,
+    rows,
     stats,
     outCount: stats.hiddenMonths.length,
     eligibleCount: stats.eligibleCount,
@@ -590,8 +596,9 @@ export interface EvolutionPanel {
   /** O aviso de lacuna do mês fechado de Pago (D04); null sem lacuna. A variação e as categorias seguem à mostra com ele (D10). */
   gapText: string | null;
   /**
-   * "Conferi este mês" (D-060): o botão "Conferi: não houve gastos em março de 2026" no mês fechado sem registros (com escrita), ou a
-   * frase de mês conferido com "Desfazer a conferência". null nos meses com registros e no mês em andamento.
+   * "Conferi este mês" (D-060): o botão "Conferi: não houve pagamentos em março de 2026" no mês fechado sem registros (com escrita), ou a
+   * frase de mês conferido com "Desfazer a conferência"; em Pago, o aviso de compras no cartão do mês vem junto. null nos meses com
+   * registros e no mês em andamento.
    */
   check: MonthCheckPlan | null;
   /** O mês vizinho da janela, para "Mês anterior" e "Mês seguinte"; null no limite (o botão fica desativado). */
@@ -625,11 +632,11 @@ function hasRecords(point: EvolutionPoint): boolean {
  * conferência" (zero confirmado). O mês em andamento e o mês com registros não têm nada disso. A linha do banco vira o plano de
  * `monthCheckPlan`, que decide o que aparece com e sem escrita.
  */
-function evolutionCheckPlan(point: EvolutionPoint, metric: EvolutionMetric, currentMonth: IsoMonth, canWrite: boolean): MonthCheckPlan | null {
-  if (point.month >= currentMonth || (point.state !== 'sem_registros' && point.state !== 'zero_confirmado')) return null;
-  const checked = point.state === 'zero_confirmado';
-  const row: MonthOverview = { month: point.month, receivedCount: 0, receivedCents: 0, paidCount: 0, paidCents: 0, receivedChecked: checked, paidChecked: checked };
-  return monthCheckPlan(row, checkKindOf(metric), currentMonth, canWrite);
+function evolutionCheckPlan(view: EvolutionView, point: EvolutionPoint, canWrite: boolean): MonthCheckPlan | null {
+  if (point.month >= view.currentMonth || (point.state !== 'sem_registros' && point.state !== 'zero_confirmado')) return null;
+  // A linha da leitura traz a versão da marca e as compras no cartão; sem ela (janela montada à mão), a linha zerada do ponto.
+  const row: MonthOverview = view.rows.find((r) => r.month === point.month) ?? { month: point.month, receivedCount: 0, receivedCents: 0, paidCount: 0, paidCents: 0 };
+  return monthCheckPlan(row, checkKindOf(view.metric), view.currentMonth, canWrite);
 }
 
 /**
@@ -652,7 +659,7 @@ export function evolutionPanel(view: EvolutionView, month: IsoMonth, canWrite = 
     included: point.included,
     notEligibleText: point.state === 'em_andamento' ? T.notEligible.em_andamento : point.state === 'sem_registros' ? T.notEligible.sem_registros : null,
     gapText: point.gap ? EVOLUTION_TEXT.gap.warning : null,
-    check: evolutionCheckPlan(point, view.metric, view.currentMonth, canWrite),
+    check: evolutionCheckPlan(view, point, canWrite),
     previousMonth: view.points[at - 1]?.month ?? null,
     nextMonth: view.points[at + 1]?.month ?? null,
     variation: evolutionVariation(view, point.month),

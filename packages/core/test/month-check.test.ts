@@ -5,6 +5,7 @@ import {
   MONTH_CHECK_TEXT,
   MemoryFamilyHub,
   MemoryRepository,
+  MonthCheckKeys,
   buildEvolutionView,
   buildReturnReview,
   checkKindOf,
@@ -13,26 +14,36 @@ import {
   evolutionPoints,
   evolutionSelectedMonth,
   evolutionVariation,
+  importKey,
+  invoiceFor,
   isRepoError,
+  loadInvoices,
   loadReturnReview,
+  monthCheckCardPurchases,
   monthCheckErrorText,
+  monthCheckOutcome,
   monthCheckPlan,
   monthCheckState,
   monthCheckTextSamples,
   monthCheckValid,
+  monthCheckVersion,
   monthsOverview,
   newOperationKey,
   reviewMonthCard,
   returnWindow,
+  summarizeMonth,
+  type ImportItem,
   type MonthOverview,
   type RepoError,
   type RepoErrorCode,
 } from '../src';
 
 /**
- * "Conferi este mês" (D-060, item 2; resolve P-022): o zero confirmado. Regras puras (estado e plano de cada mês e tipo), a Evolução
- * (estado `zero_confirmado`, que entra nas médias e na mediana como zero), "Seus últimos meses" (o mês conferido deixa de ser lacuna) e
- * o repositório em memória (as mesmas regras de set_month_check e clear_month_check, testadas no banco em 48_mes_conferido.sql).
+ * "Conferi este mês" (D-060, item 2; resolve P-022): o zero confirmado. Regras puras (estado e plano de cada mês e tipo, a versão que a
+ * tela manda, o aviso de compras no cartão, o resultado e as chaves das tentativas), a Evolução (estado `zero_confirmado`, que entra
+ * nas médias e na mediana como zero), "Seus últimos meses" (o mês conferido deixa de ser lacuna) e o repositório em memória (as mesmas
+ * regras de set_month_check e clear_month_check, testadas no banco em 48_mes_conferido.sql). Pago é caixa, pela data do pagamento:
+ * a conferência fala de "pagamentos", e compra no cartão só entra no Pago quando a fatura é paga.
  */
 
 const key = () => newOperationKey();
@@ -56,6 +67,9 @@ const row = (month: string, over: Partial<MonthOverview> = {}): MonthOverview =>
   paidCents: 0,
   receivedChecked: false,
   paidChecked: false,
+  receivedCheckVersion: 0,
+  paidCheckVersion: 0,
+  cardPurchaseCount: 0,
   ...over,
 });
 
@@ -82,23 +96,113 @@ describe('monthCheckState e monthCheckPlan', () => {
     const open = monthCheckPlan(row('2026-08'), 'pagamentos', now, true);
     expect(open).toMatchObject({
       state: 'sem_registros',
-      action: 'Conferi: não houve gastos em agosto de 2026',
+      version: 0,
+      action: 'Conferi: não houve pagamentos em agosto de 2026',
       actionNote: 'Não muda nenhum valor e você pode desfazer.',
       doneText: null,
+      cardNotice: null,
       undo: null,
     });
     expect(monthCheckPlan(row('2026-08'), 'recebimentos', now, true).action).toBe('Conferi: não houve recebimentos em agosto de 2026');
     // Quem só lê não vê o botão.
     expect(monthCheckPlan(row('2026-08'), 'pagamentos', now, false)).toMatchObject({ state: 'sem_registros', action: null, actionNote: null, doneText: null, undo: null });
     const done = monthCheckPlan(row('2026-08', { paidChecked: true }), 'pagamentos', now, true);
-    expect(done).toMatchObject({ state: 'conferido', action: null, doneText: 'Você conferiu: não houve gastos em agosto de 2026.', undo: 'Desfazer a conferência' });
-    expect(done.undoA11y).toBe('Desfazer a conferência: não houve gastos em agosto de 2026');
+    expect(done).toMatchObject({ state: 'conferido', action: null, doneText: 'Você conferiu: não houve pagamentos em agosto de 2026.', undo: 'Desfazer a conferência' });
+    expect(done.undoA11y).toBe('Desfazer a conferência: não houve pagamentos em agosto de 2026');
     const reader = monthCheckPlan(row('2026-08', { receivedChecked: true }), 'recebimentos', now, false);
     expect(reader).toMatchObject({ state: 'conferido', doneText: 'Você conferiu: não houve recebimentos em agosto de 2026.', undo: null, undoA11y: null });
     // Mês atual e mês com registro: nada.
     for (const r of [row('2026-10'), row('2026-08', { paidCount: 1, paidCents: 1 })]) {
       expect(monthCheckPlan(r, 'pagamentos', now, true)).toMatchObject({ action: null, doneText: null, undo: null });
     }
+  });
+
+  it('a versão que a tela manda é a da linha da marca (0 sem linha), ligada ou desligada, no tipo certo', () => {
+    const now = '2026-10';
+    expect(monthCheckVersion(row('2026-08'), 'pagamentos')).toBe(0);
+    expect(monthCheckVersion(row('2026-08', { paidCheckVersion: 4, receivedCheckVersion: 2 }), 'pagamentos')).toBe(4);
+    expect(monthCheckVersion(row('2026-08', { paidCheckVersion: 4, receivedCheckVersion: 2 }), 'recebimentos')).toBe(2);
+    // Linha de um banco sem a 0016, ou fora da forma: 0.
+    expect(monthCheckVersion({ month: '2026-08', receivedCount: 0, receivedCents: 0, paidCount: 0, paidCents: 0 }, 'pagamentos')).toBe(0);
+    expect(monthCheckVersion(row('2026-08', { paidCheckVersion: -1 }), 'pagamentos')).toBe(0);
+    expect(monthCheckVersion(row('2026-08', { paidCheckVersion: 1.5 }), 'pagamentos')).toBe(0);
+    // O plano leva a versão: a linha desligada (versão 2) manda 2 ao marcar; a ligada (versão 3) manda 3 ao desfazer.
+    expect(monthCheckPlan(row('2026-08', { paidCheckVersion: 2 }), 'pagamentos', now, true)).toMatchObject({ state: 'sem_registros', version: 2 });
+    expect(monthCheckPlan(row('2026-08', { paidCheckVersion: 3, paidChecked: true }), 'pagamentos', now, true)).toMatchObject({ state: 'conferido', version: 3 });
+    // Dois tipos, duas versões.
+    const both = row('2026-08', { paidCheckVersion: 3, paidChecked: true, receivedCheckVersion: 1 });
+    expect(monthCheckPlan(both, 'recebimentos', now, true)).toMatchObject({ state: 'sem_registros', version: 1 });
+  });
+
+  it('compra no cartão não é registro de Pago: o aviso vem junto da conferência de pagamentos (botão ou frase), só com compras vivas pela data da compra', () => {
+    const now = '2026-10';
+    const NOTICE = 'Há compras no cartão em agosto de 2026. Elas entram no Pago quando a fatura é paga.';
+    expect(monthCheckCardPurchases(row('2026-08'))).toBe(0);
+    expect(monthCheckCardPurchases(row('2026-08', { cardPurchaseCount: 3 }))).toBe(3);
+    expect(monthCheckCardPurchases({ month: '2026-08', receivedCount: 0, receivedCents: 0, paidCount: 0, paidCents: 0 })).toBe(0);
+    expect(monthCheckCardPurchases(row('2026-08', { cardPurchaseCount: -2 }))).toBe(0);
+    // Só uma compra no cartão: o mês segue "sem registros" de Pago, o botão aparece e o aviso vem junto.
+    const onlyCard = row('2026-08', { cardPurchaseCount: 1 });
+    expect(monthCheckState(onlyCard, 'pagamentos', now)).toBe('sem_registros');
+    expect(monthCheckPlan(onlyCard, 'pagamentos', now, true)).toMatchObject({ state: 'sem_registros', action: 'Conferi: não houve pagamentos em agosto de 2026', cardNotice: NOTICE });
+    // Conferido: a frase de mês conferido e o aviso (também para quem só lê).
+    const checked = row('2026-08', { cardPurchaseCount: 2, paidChecked: true, paidCheckVersion: 1 });
+    expect(monthCheckPlan(checked, 'pagamentos', now, true)).toMatchObject({ state: 'conferido', doneText: 'Você conferiu: não houve pagamentos em agosto de 2026.', cardNotice: NOTICE });
+    expect(monthCheckPlan(checked, 'pagamentos', now, false)).toMatchObject({ state: 'conferido', cardNotice: NOTICE, undo: null });
+    // Quem só lê um mês ainda a conferir não vê botão nem aviso (não há o que mostrar).
+    expect(monthCheckPlan(onlyCard, 'pagamentos', now, false)).toMatchObject({ action: null, doneText: null, cardNotice: null });
+    // Só uma fatura paga: o pagamento é um registro de Pago (pela data em que foi pago), então não há o que conferir, nem aviso.
+    expect(monthCheckPlan(row('2026-08', { paidCount: 1, paidCents: 25_000 }), 'pagamentos', now, true)).toMatchObject({ state: 'com_registros', action: null, cardNotice: null });
+    // Com registro de Pago e compra no cartão no mês, também não: o mês tem registros.
+    expect(monthCheckPlan(row('2026-08', { paidCount: 1, paidCents: 100, cardPurchaseCount: 1 }), 'pagamentos', now, true).cardNotice).toBeNull();
+    // Recebimentos nunca traz o aviso (compra no cartão é de Pago).
+    expect(monthCheckPlan(row('2026-08', { cardPurchaseCount: 1 }), 'recebimentos', now, true)).toMatchObject({ state: 'sem_registros', action: 'Conferi: não houve recebimentos em agosto de 2026', cardNotice: null });
+    // O mês atual não tem nada.
+    expect(monthCheckPlan(row('2026-10', { cardPurchaseCount: 1 }), 'pagamentos', now, true)).toMatchObject({ state: 'nao_encerrado', action: null, cardNotice: null });
+  });
+
+  it('o resultado confere o estado: marcar só é "feito" com a marca ligada, desfazer só com ela desligada', () => {
+    expect(monthCheckOutcome('marcar', { checked: true })).toBe('feito');
+    expect(monthCheckOutcome('marcar', { checked: false })).toBe('mudou');
+    expect(monthCheckOutcome('desfazer', { checked: false })).toBe('feito');
+    expect(monthCheckOutcome('desfazer', { checked: true })).toBe('mudou');
+    expect(MONTH_CHECK_TEXT.changedElsewhere).toBe(MONTH_CHECK_TEXT.errors.versao_desatualizada);
+  });
+
+  it('as chaves das tentativas: a incerta é guardada e repetida; quando o estado muda (versão, estado, mês ou tipo), as guardadas são esquecidas', () => {
+    let n = 0;
+    const keys = new MonthCheckKeys(() => `chave-${++n}`);
+    const plan = (over: Partial<{ month: string; kind: 'recebimentos' | 'pagamentos'; state: 'sem_registros' | 'conferido'; version: number }> = {}) => ({ month: '2026-08', kind: 'pagamentos' as const, state: 'sem_registros' as const, version: 0, ...over });
+    // Sem resultado incerto, cada pedido tem chave nova.
+    expect(keys.keyFor('marcar', plan())).toBe('chave-1');
+    expect(keys.keyFor('marcar', plan())).toBe('chave-2');
+    // Resultado incerto: a chave fica, e a repetição usa a mesma (com o mesmo estado, a mesma versão).
+    keys.keep('marcar', plan(), 'chave-2');
+    expect(keys.size).toBe(1);
+    expect(keys.keyFor('marcar', plan())).toBe('chave-2');
+    expect(keys.keyFor('desfazer', plan())).toBe('chave-3');
+    // Um pedido que terminou (certo, recusado ou de estado diferente) esquece a chave.
+    keys.settle('marcar');
+    expect(keys.size).toBe(0);
+    expect(keys.keyFor('marcar', plan())).toBe('chave-4');
+    // O estado mudou (outro aparelho marcou e desmarcou: a versão da linha subiu): a chave guardada não vale mais.
+    keys.keep('marcar', plan(), 'chave-4');
+    keys.keep('desfazer', plan(), 'chave-5');
+    expect(keys.size).toBe(2);
+    expect(keys.sync(plan())).toBe(false);
+    expect(keys.sync(plan({ version: 2 }))).toBe(true);
+    expect(keys.size).toBe(0);
+    expect(keys.keyFor('marcar', plan({ version: 2 }))).toBe('chave-5');
+    // Estado, mês e tipo diferentes também limpam; a mesma chamada de novo não limpa nada.
+    for (const other of [plan({ version: 2, state: 'conferido' }), plan({ version: 2, month: '2026-07' }), plan({ version: 2, kind: 'recebimentos' })]) {
+      keys.keep('marcar', plan({ version: 2 }), 'chave-6');
+      expect(keys.sync(other), JSON.stringify(other)).toBe(true);
+      expect(keys.size).toBe(0);
+      keys.sync(plan({ version: 2 }));
+    }
+    // Pedir com outro estado nunca devolve a chave guardada do estado antigo.
+    keys.keep('marcar', plan({ version: 2 }), 'chave-7');
+    expect(keys.keyFor('marcar', plan({ version: 3 }))).not.toBe('chave-7');
   });
 
   it('os textos de recusa são os da tela, e o resto é a falha genérica de salvar', () => {
@@ -167,7 +271,7 @@ describe('Evolução: zero confirmado (D04)', () => {
       eligible: true,
       valueText: 'R$ 0,00',
       stateLabel: 'Conferido',
-      stateText: 'Você conferiu: não houve gastos em março de 2026.',
+      stateText: 'Você conferiu: não houve pagamentos em março de 2026.',
       includedText: 'Sim',
     });
     expect(march.name).toBe('Março de 2026, R$ 0,00, conferido, na comparação');
@@ -178,12 +282,12 @@ describe('Evolução: zero confirmado (D04)', () => {
     // O painel: o valor é R$ 0,00; a frase de mês conferido e "Desfazer" (com escrita); nada de categorias nem de lançamentos.
     const panel = evolutionPanel(view, '2026-03', true);
     expect(panel).toMatchObject({ state: 'zero_confirmado', valueText: 'R$ 0,00', canToggle: true, included: true, showsCategories: false, showsRecords: false, showsCategoriesAction: false });
-    expect(panel.check).toMatchObject({ state: 'conferido', doneText: 'Você conferiu: não houve gastos em março de 2026.', undo: 'Desfazer a conferência', action: null });
+    expect(panel.check).toMatchObject({ state: 'conferido', doneText: 'Você conferiu: não houve pagamentos em março de 2026.', undo: 'Desfazer a conferência', action: null });
     expect(panel.explain.visible).toBe(false);
     // A variação até o zero é um fato: de fevereiro para março, R$ 3.400,00 a menos (100% a menos).
     expect(evolutionVariation(view, '2026-03')).toMatchObject({ available: true, text: 'De fevereiro para março: R$ 3.400,00 a menos', percentText: '100% a menos que fevereiro' });
     // Quem só lê vê a frase, sem o botão.
-    expect(evolutionPanel(view, '2026-03', false).check).toMatchObject({ doneText: 'Você conferiu: não houve gastos em março de 2026.', undo: null });
+    expect(evolutionPanel(view, '2026-03', false).check).toMatchObject({ doneText: 'Você conferiu: não houve pagamentos em março de 2026.', undo: null });
     // Abril tem "Entender o que mudou" com março (zero) como mês de comparação.
     const april = evolutionPanel(view, '2026-04');
     expect(april.explain).toMatchObject({ visible: true, baseMonth: '2026-03', baseCents: 0 });
@@ -195,7 +299,7 @@ describe('Evolução: zero confirmado (D04)', () => {
     expect(march.state).toBe('sem_registros');
     expect(march.valueText).toBeNull();
     expect(march.stateText).toBe('Sem registros: mês sem anotação não quer dizer mês sem gastos');
-    expect(march.check).toMatchObject({ state: 'sem_registros', action: 'Conferi: não houve gastos em março de 2026', undo: null });
+    expect(march.check).toMatchObject({ state: 'sem_registros', version: 0, action: 'Conferi: não houve pagamentos em março de 2026', undo: null });
     expect(evolutionPanel(view, '2026-03', false).check).toMatchObject({ state: 'sem_registros', action: null });
     // Recebido: abril é o mês sem recebimentos, e o tipo é "recebimentos".
     const received = buildEvolutionView({ overview, metric: 'recebido', windowMonths: 6, currentMonth: '2026-07', hiddenMonths: [] });
@@ -207,6 +311,26 @@ describe('Evolução: zero confirmado (D04)', () => {
     expect(evolutionPanel(current, '2026-07', true).check).toBeNull();
     // Mês com registros: sem plano.
     expect(evolutionPanel(view, '2026-05', true).check).toBeNull();
+  });
+
+  it('o painel leva a versão da linha da marca e o aviso de compras no cartão da linha do mês', () => {
+    const rows = [
+      row('2026-04', { paidCount: 2, paidCents: 9_000 }),
+      // Março: a linha foi ligada, desligada e ligada de novo (versão 3), e há uma compra no cartão pela data da compra.
+      row('2026-03', { paidChecked: true, paidCheckVersion: 3, cardPurchaseCount: 1 }),
+      // Fevereiro: desligada (versão 2), sem compra no cartão.
+      row('2026-02', { paidCheckVersion: 2 }),
+    ];
+    const view = buildEvolutionView({ overview: rows, metric: 'pago', windowMonths: 6, currentMonth: '2026-07', hiddenMonths: [] });
+    expect(view.rows.map((r) => r.month)).toEqual(['2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07']);
+    expect(evolutionPanel(view, '2026-03', true).check).toMatchObject({
+      state: 'conferido',
+      version: 3,
+      cardNotice: 'Há compras no cartão em março de 2026. Elas entram no Pago quando a fatura é paga.',
+    });
+    expect(evolutionPanel(view, '2026-02', true).check).toMatchObject({ state: 'sem_registros', version: 2, action: 'Conferi: não houve pagamentos em fevereiro de 2026', cardNotice: null });
+    // Mês que a leitura não trouxe: a linha zerada (sem linha, versão 0).
+    expect(evolutionPanel(view, '2026-05', true).check).toMatchObject({ state: 'sem_registros', version: 0 });
   });
 
   it('o painel abre no mais recente com lançamentos; sem nenhum, no conferido mais recente', () => {
@@ -264,7 +388,7 @@ describe('"Seus últimos meses": o mês conferido deixa de ser lacuna', () => {
   it('o cartão do mês diz "conferido, não houve" e fica compacto quando nada mais falta', () => {
     const r = review(months.map((m) => row(m, { receivedCount: 1, receivedCents: 100, paidCount: 0, paidCents: 0, paidChecked: m === '2026-07' })));
     const july = reviewMonthCard(r.months.find((m) => m.month === '2026-07')!);
-    expect(july.paid).toBe('Pago: conferido, não houve gastos');
+    expect(july.paid).toBe('Pago: conferido, não houve pagamentos');
     expect(july.received).toBe('Recebido: R$ 1,00 · 1 recebimento');
     expect(july.compact).toBe(true);
     const june = reviewMonthCard(r.months.find((m) => m.month === '2026-06')!);
@@ -275,13 +399,26 @@ describe('"Seus últimos meses": o mês conferido deixa de ser lacuna', () => {
   it('o resumo puro de months_overview devolve as marcas só quando o mês não tem registro do tipo', () => {
     const rec = { id: 'r', contextId: 'c', accountId: 'a', kind: 'despesa' as const, status: 'realizado' as const, amountCents: 1_000, currency: 'BRL' as const, occurredOn: '2026-08-10', description: 'x', category: null, commitmentId: null, invoice: null, receiptKey: null, createdBy: 'p', version: 1, createdAt: '', updatedAt: '' };
     const checks = [
-      { month: '2026-08', kind: 'pagamentos' as const },
-      { month: '2026-08', kind: 'recebimentos' as const },
-      { month: '2026-07', kind: 'pagamentos' as const },
+      { month: '2026-08', kind: 'pagamentos' as const, checked: true, version: 1 },
+      { month: '2026-08', kind: 'recebimentos' as const, checked: true, version: 3 },
+      { month: '2026-07', kind: 'pagamentos' as const, checked: true, version: 1 },
+      // Linha desligada: não vale, e a versão dela vai junto.
+      { month: '2026-07', kind: 'recebimentos' as const, checked: false, version: 2 },
     ];
     const out = monthsOverview([rec], 'c', '2026-07', '2026-08', checks);
-    expect(out[0]).toMatchObject({ month: '2026-07', paidChecked: true, receivedChecked: false });
-    expect(out[1]).toMatchObject({ month: '2026-08', paidCount: 1, paidChecked: false, receivedChecked: true });
+    expect(out[0]).toMatchObject({ month: '2026-07', paidChecked: true, receivedChecked: false, paidCheckVersion: 1, receivedCheckVersion: 2 });
+    // O registro vence a marca (que fica, com a versão dela), e só o tipo sem registro vale.
+    expect(out[1]).toMatchObject({ month: '2026-08', paidCount: 1, paidChecked: false, receivedChecked: true, paidCheckVersion: 1, receivedCheckVersion: 3 });
+  });
+
+  it('o resumo puro conta as compras no cartão pela data da compra, uma por compra, e mais nada muda em Pago', () => {
+    const out = monthsOverview([], 'c', '2026-02', '2026-05', [], [{ purchasedOn: '2026-02-03' }, { purchasedOn: '2026-03-31' }, { purchasedOn: '2026-03-01' }, { purchasedOn: '2026-05-08' }]);
+    expect(out.map((r) => [r.month, r.cardPurchaseCount, r.paidCount, r.paidCents])).toEqual([
+      ['2026-02', 1, 0, 0],
+      ['2026-03', 2, 0, 0],
+      ['2026-04', 0, 0, 0],
+      ['2026-05', 1, 0, 0],
+    ]);
   });
 });
 
@@ -322,12 +459,46 @@ describe('MemoryRepository: set_month_check e clear_month_check', () => {
     // Desmarcar: a versão certa; repetir devolve o mesmo; chave de outra ação é recusada.
     const kc = key();
     const cleared = await lia.repo.clearMonthCheck(kc, lia.ctx, '2026-08', 'pagamentos', 1);
-    expect(cleared).toEqual({ contextId: lia.ctx, month: '2026-08', kind: 'pagamentos', checked: false, version: 0, checkedAt: null });
+    // A linha persiste, desligada, e cada mudança soma 1 à versão: desmarcar deixa a versão 2.
+    expect(cleared).toEqual({ contextId: lia.ctx, month: '2026-08', kind: 'pagamentos', checked: false, version: 2, checkedAt: null });
     expect(await lia.repo.clearMonthCheck(kc, lia.ctx, '2026-08', 'pagamentos', 1)).toEqual(cleared);
     await expectCode(lia.repo.setMonthCheck(kc, lia.ctx, '2026-08', 'pagamentos', 0), 'chave_reutilizada');
-    expect(await overviewOf(lia.repo, lia.ctx, '2026-08')).toMatchObject({ paidChecked: false, receivedChecked: true });
-    // Marcar de novo depois de desmarcar vale (versão 0).
-    expect((await lia.repo.setMonthCheck(key(), lia.ctx, '2026-08', 'pagamentos', 0)).checked).toBe(true);
+    expect(await overviewOf(lia.repo, lia.ctx, '2026-08')).toMatchObject({ paidChecked: false, receivedChecked: true, paidCheckVersion: 2, receivedCheckVersion: 1 });
+    // Marcar de novo depois de desmarcar manda a versão lida (2): vale, na versão 3.
+    expect(await lia.repo.setMonthCheck(key(), lia.ctx, '2026-08', 'pagamentos', 2)).toMatchObject({ checked: true, version: 3 });
+    expect(await overviewOf(lia.repo, lia.ctx, '2026-08')).toMatchObject({ paidChecked: true, paidCheckVersion: 3 });
+  });
+
+  it('dois aparelhos: cada um manda a versão que leu, e a versão antiga responde versao_desatualizada (marcar e desmarcar somam 1)', async () => {
+    const { mk } = await harness();
+    const lia = await mk('lia', 'Lia');
+    const at = (kind: 'pagamentos' | 'recebimentos' = 'pagamentos') => lia.repo.monthsOverview(lia.ctx, '2026-02', '2026-02').then((r) => (kind === 'pagamentos' ? r[0]!.paidCheckVersion : r[0]!.receivedCheckVersion));
+    // Os dois leram "sem linha" (versão 0): A marca (versão 1); B, com a versão 0, é recusado e recebe a versão nova.
+    expect(await at()).toBe(0);
+    expect(await lia.repo.setMonthCheck(key(), lia.ctx, '2026-02', 'pagamentos', 0)).toMatchObject({ checked: true, version: 1 });
+    await expectCode(lia.repo.setMonthCheck(key(), lia.ctx, '2026-02', 'pagamentos', 0), 'versao_desatualizada', 'versao_atual=1');
+    // Os dois leram "marcado, versão 1": A desmarca (versão 2); B, com a versão 1, é recusado.
+    expect(await lia.repo.clearMonthCheck(key(), lia.ctx, '2026-02', 'pagamentos', 1)).toMatchObject({ checked: false, version: 2 });
+    await expectCode(lia.repo.clearMonthCheck(key(), lia.ctx, '2026-02', 'pagamentos', 1), 'versao_desatualizada', 'versao_atual=2');
+    // Desmarcar o que já está desligado, mesmo com a versão da linha, também é recusado; marcar com versão velha (0 ou 1), idem.
+    await expectCode(lia.repo.clearMonthCheck(key(), lia.ctx, '2026-02', 'pagamentos', 2), 'versao_desatualizada', 'versao_atual=2');
+    for (const v of [0, 1, 3, null as never]) await expectCode(lia.repo.setMonthCheck(key(), lia.ctx, '2026-02', 'pagamentos', v), 'versao_desatualizada', 'versao_atual=2');
+    expect(await at()).toBe(2);
+    // B lê de novo (versão 2) e marca (versão 3); A, que também leu a 2, é recusado com a 3.
+    expect(await lia.repo.setMonthCheck(key(), lia.ctx, '2026-02', 'pagamentos', 2)).toMatchObject({ checked: true, version: 3 });
+    await expectCode(lia.repo.setMonthCheck(key(), lia.ctx, '2026-02', 'pagamentos', 2), 'versao_desatualizada', 'versao_atual=3');
+    await expectCode(lia.repo.clearMonthCheck(key(), lia.ctx, '2026-02', 'pagamentos', 2), 'versao_desatualizada', 'versao_atual=3');
+    expect(await lia.repo.clearMonthCheck(key(), lia.ctx, '2026-02', 'pagamentos', 3)).toMatchObject({ checked: false, version: 4 });
+    expect(await at()).toBe(4);
+    // O outro tipo tem a própria linha e a própria versão.
+    expect(await at('recebimentos')).toBe(0);
+    expect(await lia.repo.setMonthCheck(key(), lia.ctx, '2026-02', 'recebimentos', 0)).toMatchObject({ checked: true, version: 1 });
+    // A repetição da chave de uma marcação antiga devolve o estado de agora (não refaz a marca).
+    const k = key();
+    expect(await lia.repo.setMonthCheck(k, lia.ctx, '2026-02', 'pagamentos', 4)).toMatchObject({ checked: true, version: 5 });
+    await lia.repo.clearMonthCheck(key(), lia.ctx, '2026-02', 'pagamentos', 5);
+    expect(await lia.repo.setMonthCheck(k, lia.ctx, '2026-02', 'pagamentos', 4)).toMatchObject({ checked: false, version: 6, checkedAt: null });
+    expect(await at()).toBe(6);
   });
 
   it('o mês atual, os futuros, o que não é o primeiro dia e o tipo errado são recusados; recusa não grava', async () => {
@@ -352,7 +523,7 @@ describe('MemoryRepository: set_month_check e clear_month_check', () => {
     await expectCode(bia.repo.setMonthCheck(key(), bia.ctx, '2026-11', 'pagamentos', 0), 'mes_invalido');
   });
 
-  it('versão: marcar espera 0 e nenhuma marca viva; desmarcar espera a versão viva; sem marca, versao_atual=0', async () => {
+  it('versão: marcar espera a versão da linha (0 sem linha) e a marca desligada; desmarcar espera a da linha ligada; sem linha, versao_atual=0', async () => {
     const { mk } = await harness();
     const lia = await mk('lia', 'Lia');
     await lia.repo.setMonthCheck(key(), lia.ctx, '2026-08', 'pagamentos', 0);
@@ -459,7 +630,16 @@ describe('MemoryRepository: set_month_check e clear_month_check', () => {
     const kc = key();
     lia.repo.failNextWrite = 'depois';
     await expectCode(lia.repo.clearMonthCheck(kc, lia.ctx, '2026-08', 'pagamentos', 1), 'rede');
-    expect(await lia.repo.clearMonthCheck(kc, lia.ctx, '2026-08', 'pagamentos', 1)).toMatchObject({ checked: false, version: 0 });
+    expect(await lia.repo.clearMonthCheck(kc, lia.ctx, '2026-08', 'pagamentos', 1)).toMatchObject({ checked: false, version: 2 });
+    // Resultado incerto e outro aparelho muda a marca antes da repetição: a repetição da mesma chave devolve o estado de agora (aqui,
+    // desligada), e a tela confere o `checked` antes de anunciar (monthCheckOutcome).
+    const kset = key();
+    lia.repo.failNextWrite = 'depois';
+    await expectCode(lia.repo.setMonthCheck(kset, lia.ctx, '2026-08', 'recebimentos', 0), 'rede');
+    await lia.repo.clearMonthCheck(key(), lia.ctx, '2026-08', 'recebimentos', 1);
+    const again = await lia.repo.setMonthCheck(kset, lia.ctx, '2026-08', 'recebimentos', 0);
+    expect(again).toMatchObject({ checked: false, version: 2 });
+    expect(monthCheckOutcome('marcar', again)).toBe('mudou');
   });
 
   it('"Seus últimos meses" lê as marcas: conferir os meses vazios esvazia a revisão; excluir a conta apaga as marcas', async () => {
@@ -487,5 +667,71 @@ describe('MemoryRepository: set_month_check e clear_month_check', () => {
     // Conta excluída: o repositório não guarda mais nada (a marca some com o contexto).
     await lia.repo.deleteMyAccount('EXCLUIR', key());
     await expectCode(lia.repo.monthsOverview(lia.ctx, '2026-08', '2026-08'), 'sem_permissao');
+  });
+});
+
+describe('MemoryRepository: compra no cartão, fatura paga e importação (a marca segue o caixa, D-057 D07)', () => {
+  const importItem = (name: string, amountCents: number, occurredOn: string, description: string): ImportItem => ({
+    importKey: importKey('teste', { date: '2026-01-01', amountCents: 1, description: name, fitId: null }, 0),
+    kind: 'compra',
+    amountCents,
+    occurredOn,
+    description,
+    category: null,
+  });
+
+  it('só uma compra no cartão: o mês aceita a marca de pagamentos, ela vale e o aviso aparece; só a fatura paga é registro de Pago', async () => {
+    const repo = new MemoryRepository({ actorId: 'mara', displayName: 'Mara', today: () => '2026-10-07' });
+    const space = await repo.ensurePersonalSpace('Conta principal');
+    const ctx = space.personalContextId;
+    const card = (await repo.createCard(key(), ctx, { name: 'Cartão da Mara', lastDigits: '1234', closingDay: 5, dueDay: 15, limitCents: null })).card.id;
+    const month = async (m: string) => (await repo.monthsOverview(ctx, m, m))[0]!;
+    const paidOf = async (m: string) => summarizeMonth(await repo.listRecords(ctx, m), ctx, m).paidCents;
+
+    // (a) Só uma compra no cartão (fevereiro): nenhum registro de Pago, e o mês avisa a compra.
+    await repo.addCardPurchase(key(), card, { description: 'Compra de fevereiro', category: 'Mercado', purchasedOn: '2026-02-03', totalCents: 25_000, installments: 1 });
+    expect(await month('2026-02')).toMatchObject({ paidCount: 0, paidCents: 0, paidChecked: false, paidCheckVersion: 0, cardPurchaseCount: 1 });
+    expect(await paidOf('2026-02')).toBe(0);
+    const plan = (row: MonthOverview, canWrite = true) => monthCheckPlan(row, 'pagamentos', '2026-10', canWrite);
+    expect(plan(await month('2026-02'))).toMatchObject({
+      state: 'sem_registros',
+      action: 'Conferi: não houve pagamentos em fevereiro de 2026',
+      cardNotice: 'Há compras no cartão em fevereiro de 2026. Elas entram no Pago quando a fatura é paga.',
+    });
+    expect(await repo.setMonthCheck(key(), ctx, '2026-02', 'pagamentos', 0)).toMatchObject({ checked: true, version: 1 });
+    expect(await month('2026-02')).toMatchObject({ paidChecked: true, paidCheckVersion: 1, cardPurchaseCount: 1 });
+    expect(plan(await month('2026-02'))).toMatchObject({ state: 'conferido', version: 1, doneText: 'Você conferiu: não houve pagamentos em fevereiro de 2026.', cardNotice: expect.stringContaining('Há compras no cartão') });
+    expect(await paidOf('2026-02')).toBe(0);
+    // Um parcelamento de 3 vezes em março conta uma compra, em março; as parcelas de abril e maio não são compras de abril nem de maio.
+    await repo.addCardPurchase(key(), card, { description: 'Compra parcelada', category: null, purchasedOn: '2026-03-04', totalCents: 30_000, installments: 3 });
+    expect(await repo.monthsOverview(ctx, '2026-02', '2026-06').then((rows) => rows.map((r) => r.cardPurchaseCount))).toEqual([1, 1, 0, 0, 0]);
+
+    // (b) Só uma fatura paga (abril): o pagamento de 02/04 é um registro de Pago em abril; marcar pagamentos é recusado, sem aviso.
+    const stored = (await repo.getCard(card))!;
+    const feb = invoiceFor(stored, await loadInvoices(repo, stored, '2026-10-07'), '2026-02', '2026-10-07');
+    await repo.payInvoice(key(), card, '2026-02', feb.commitmentVersion!, 25_000, '2026-04-02');
+    expect(await month('2026-04')).toMatchObject({ paidCount: 1, paidCents: 25_000, paidChecked: false, cardPurchaseCount: 0 });
+    expect(await paidOf('2026-04')).toBe(25_000);
+    await expectCode(repo.setMonthCheck(key(), ctx, '2026-04', 'pagamentos', 0), 'mes_com_registros');
+    expect(plan(await month('2026-04'))).toMatchObject({ state: 'com_registros', action: null, cardNotice: null });
+    expect((await repo.setMonthCheck(key(), ctx, '2026-04', 'recebimentos', 0)).checked).toBe(true);
+    expect(await paidOf('2026-04')).toBe(25_000);
+    // Fevereiro segue conferido, com o aviso, mesmo com a fatura paga em abril.
+    expect(await month('2026-02')).toMatchObject({ paidChecked: true, cardPurchaseCount: 1 });
+
+    // (c) Só uma importação para o cartão (maio): é uma compra no cartão pela data dela, não um registro de Pago.
+    expect(await repo.importRecords(key(), ctx, 'cartao', card, [importItem('c1', 8_050, '2026-05-08', 'Mercado importado')])).toEqual({ created: 1, skipped: 0 });
+    expect(await month('2026-05')).toMatchObject({ paidCount: 0, paidChecked: false, cardPurchaseCount: 1 });
+    expect(await repo.setMonthCheck(key(), ctx, '2026-05', 'pagamentos', 0)).toMatchObject({ checked: true, version: 1 });
+    expect(plan(await month('2026-05'))).toMatchObject({ state: 'conferido', cardNotice: expect.stringContaining('maio de 2026') });
+    // Excluída a compra, o aviso some (só conta compra viva) e a marca segue valendo.
+    const bought = (await repo.listCardEntries(card)).find((e) => e.kind === 'compra' && e.description === 'Mercado importado')!;
+    await repo.deleteCardEntry(key(), bought.id, bought.version);
+    expect(await month('2026-05')).toMatchObject({ paidChecked: true, cardPurchaseCount: 0 });
+    expect(plan(await month('2026-05')).cardNotice).toBeNull();
+    // Uma compra importada num mês com registro de Pago: o aviso aparece nos dados, mas a marca não vale (o registro vence).
+    await repo.importRecords(key(), ctx, 'cartao', card, [importItem('c2', 1_500, '2026-04-20', 'Compra de abril importada')]);
+    expect(await month('2026-04')).toMatchObject({ paidCount: 1, paidChecked: false, cardPurchaseCount: 1 });
+    expect(plan(await month('2026-04'))).toMatchObject({ state: 'com_registros', cardNotice: null });
   });
 });

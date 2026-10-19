@@ -110,6 +110,7 @@ declare
   inv_ver int;
   inv_total bigint;
   v_month date;
+  v_month2 date;
 begin
   -- Contas de origem do dinheiro.
   res := public.create_account(t || '-acc-0001', p_ctx, 'Carteira ' || t, 'dinheiro');
@@ -169,14 +170,16 @@ begin
   end if;
   perform public.decide_return_review(t || '-rev-0001', p_ctx, 0, '2026-09-01', 'seguiu');
   -- "Conferi este mês" (D-060): um mês já terminado e sem nenhum registro, conferido nos dois tipos. Cada preenchimento usa o primeiro mês
-  -- (de agosto para trás) ainda sem marca no contexto, porque há uma marca por contexto, mês e tipo.
+  -- (de agosto para trás) ainda sem linha no contexto, porque há uma linha por contexto, mês e tipo (e ela não sai ao desmarcar).
   v_month := (select g::date from generate_series(timestamp '2026-08-01', timestamp '2026-01-01', interval '-1 month') g
                where not exists (select 1 from public.month_checks c where c.context_id = p_ctx and c.month = g::date) limit 1);
   perform public.set_month_check(p_ctx, v_month, 'recebimentos', t || '-mes-0001', 0);
   perform public.set_month_check(p_ctx, v_month, 'pagamentos', t || '-mes-0002', 0);
-  -- Uma marca desfeita (a marca some, só fica a operação).
-  perform public.set_month_check(p_ctx, date '2026-05-01', 'recebimentos', t || '-mes-0004', 0);
-  perform public.clear_month_check(p_ctx, date '2026-05-01', 'recebimentos', t || '-mes-0005', 1);
+  -- Uma marca desfeita, em outro mês: a linha fica, desligada, na versão 2 (e o rastro, a operação).
+  v_month2 := (select g::date from generate_series(timestamp '2026-08-01', timestamp '2026-01-01', interval '-1 month') g
+                where not exists (select 1 from public.month_checks c where c.context_id = p_ctx and c.month = g::date) limit 1);
+  perform public.set_month_check(p_ctx, v_month2, 'recebimentos', t || '-mes-0004', 0);
+  perform public.clear_month_check(p_ctx, v_month2, 'recebimentos', t || '-mes-0005', 1);
   -- Cartões: compra parcelada com nota, encargo, estorno, fatura de outubro paga, um lançamento excluído e um cartão excluído.
   card := (public.create_card(t || '-crt-0001', p_ctx, 'Cartão ' || t, '1234', 5, 12, 500000) #>> '{card,id}')::uuid;
   perform public.add_card_purchase(t || '-crt-0002', card, '2026-09-20', 30000, 3, 'Geladeira ' || t, 'Moradia', pg_temp.k(t || 'nota2'));
@@ -605,16 +608,19 @@ begin
       'commitment_series.deleted_by', 'commitments.created_by', 'commitments.deleted_by', 'context_memberships.person_id',
       'financial_accounts.created_by', 'financial_accounts.deleted_by', 'financial_records.created_by', 'financial_records.deleted_by',
       'goal_movements.created_by', 'goal_movements.deleted_by', 'goals.created_by', 'goals.deleted_by', 'income_references.created_by',
-      'income_references.deleted_by', 'month_checks.checked_by', 'series_terms.created_by', 'series_terms.superseded_by'],
+      'income_references.deleted_by', 'month_checks.updated_by', 'series_terms.created_by', 'series_terms.superseded_by'],
     'a autoria (criou, excluiu, trocou a vigência) e o vínculo ficaram, em todos os módulos: ' || pg_temp.refs_to(eli)::text;
-  -- Conferi este mês (D-060): as marcas do Pessoal do Eli saíram com o contexto; na Casa da Bia ficam as dele (2) e as da Bia (2), e a autoria
-  -- das dele é a pessoa anônima ("Pessoa que saiu"); a marca segue valendo para quem lê a Casa (conferido abaixo, como Bia e Lia).
+  -- Conferi este mês (D-060): as linhas do Pessoal do Eli saíram com o contexto; na Casa da Bia ficam as dele (2 ligadas e 1 desligada) e as
+  -- da Bia (2 ligadas e 1 desligada), e a autoria das dele é a pessoa anônima ("Pessoa que saiu"); a marca segue valendo para quem lê a
+  -- Casa (conferido abaixo, como Bia e Lia).
   assert (select count(*) from public.month_checks where context_id = pg_temp.id('eli_ctx')) = 0, 'as marcas do Pessoal do Eli saíram com o contexto';
-  assert (select count(*) from public.month_checks where context_id = fam) = 4
-     and (select count(*) from public.month_checks where context_id = fam and checked_by = eli) = 2
-     and (select count(*) from public.month_checks where context_id = fam and checked_by = pg_temp.id('bia')) = 2,
-    'na Casa da Bia, as marcas do Eli e da Bia continuam';
-  assert not exists (select 1 from public.month_checks where checked_by = eli and context_id <> fam), 'nenhuma marca do Eli fora da Casa da Bia';
+  assert (select count(*) from public.month_checks where context_id = fam) = 6
+     and (select count(*) from public.month_checks where context_id = fam and updated_by = eli and checked) = 2
+     and (select count(*) from public.month_checks where context_id = fam and updated_by = eli and not checked) = 1
+     and (select count(*) from public.month_checks where context_id = fam and updated_by = pg_temp.id('bia') and checked) = 2
+     and (select count(*) from public.month_checks where context_id = fam and updated_by = pg_temp.id('bia') and not checked) = 1,
+    'na Casa da Bia, as linhas do Eli e da Bia continuam, ligadas e desligadas';
+  assert not exists (select 1 from public.month_checks where updated_by = eli and context_id <> fam), 'nenhuma marca do Eli fora da Casa da Bia';
 
   -- A Casa da Bia: o que o Eli anotou continua, igual, e ninguém perdeu nada.
   assert pg_temp.snap_ctx(fam, eli) = pg_temp.was('fam1_dados'), 'o conteúdo da Casa da Bia está idêntico (registros, contas, séries, metas, cartões, orçamento, de todos)';
@@ -997,7 +1003,7 @@ begin
       'context_memberships.person_id', 'family_invites.created_by', 'family_invites.used_by', 'financial_accounts.created_by',
       'financial_accounts.deleted_by', 'financial_contexts.owner_person_id', 'financial_records.created_by', 'financial_records.deleted_by',
       'goal_movements.created_by', 'goal_movements.deleted_by', 'goals.created_by', 'goals.deleted_by', 'income_references.created_by',
-      'income_references.deleted_by', 'licenses.person_id', 'month_checks.checked_by', 'organization_admins.person_id', 'plan_entitlements.person_id',
+      'income_references.deleted_by', 'licenses.person_id', 'month_checks.updated_by', 'organization_admins.person_id', 'plan_entitlements.person_id',
       'record_operations.actor_id', 'return_reviews.person_id', 'savings_checks.person_id', 'series_terms.created_by', 'series_terms.superseded_by'],
     'as chaves estrangeiras para persons são as 36 que a exclusão da conta trata';
   -- E as que apontam para financial_contexts (financial_records é restrict: por isso os registros saem antes do contexto).

@@ -260,7 +260,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Toque em ${q(RETURN_TEXT.seeSummary)} para ver, mês a mês, o que está registrado e as contas para conferir.`,
       'Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.',
       `Toque em ${q(RETURN_TEXT.updateNow)} para passar pelos meses um a um. Em cada conta, use ${list([RETURN_TEXT.paidButton, RETURN_TEXT.notHappenedButton, RETURN_TEXT.stillOpenButton], 'ou')}; nos meses, ${q(RETURN_TEXT.addReceipts)} ou ${q(RETURN_TEXT.addExpenses)}.`,
-      `Num mês sem recebimentos ou sem gastos, o botão que começa com ${q('Conferi')} confirma que não houve: o mês deixa de aparecer como possível lacuna, e ${q(MONTH_CHECK_TEXT.undo)} desfaz.`,
+      `Num mês sem recebimentos ou sem pagamentos, o botão que começa com ${q('Conferi')} confirma que não houve: o mês deixa de aparecer como possível lacuna, e ${q(MONTH_CHECK_TEXT.undo)} desfaz. Compra no cartão só entra no Pago quando a fatura é paga, e o app avisa quando o mês tem compras no cartão.`,
       `Para deixar como está, toque em ${q(RETURN_TEXT.moveOn)}. Nada é criado, pago nem excluído.`,
     ],
     screenName: RETURN_TEXT.title,

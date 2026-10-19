@@ -355,6 +355,9 @@ const zeroOverview = (month: IsoMonth): MonthOverview => ({
   paidCents: 0,
   receivedChecked: false,
   paidChecked: false,
+  receivedCheckVersion: 0,
+  paidCheckVersion: 0,
+  cardPurchaseCount: 0,
 });
 
 /** Meses de from a to (vazio quando from > to). */
@@ -572,17 +575,28 @@ export function emptyMonthCaption(summary: Pick<MonthSummary, 'composition'>, mo
   return null;
 }
 
+/** Uma linha de month_checks do contexto: a marca do tipo no mês, ligada ou desligada, com a versão da linha. */
+export interface MonthCheckLine {
+  month: IsoMonth;
+  kind: MonthCheckKind;
+  checked: boolean;
+  version: number;
+}
+
 /**
  * Recebimentos e gastos por mês, de from a to (months_overview): registros realizados do contexto pela data. Os
- * registros vêm sem os excluídos. `checks`: as marcas "Conferi este mês" do contexto (month_checks); a marca de um tipo vale no
- * mês só se o mês não tem registro do tipo (receivedChecked e paidChecked, como no banco).
+ * registros vêm sem os excluídos. `checks`: as linhas de "Conferi este mês" do contexto (month_checks, ligadas e desligadas); a marca
+ * de um tipo vale no mês só se está ligada e o mês não tem registro do tipo (receivedChecked e paidChecked, como no banco), e a versão
+ * da linha vai junto (0 sem linha). `cardPurchases`: as compras no cartão vivas do contexto, uma por compra, pela data da compra
+ * (cardPurchaseCount, que só informa: compra no cartão não entra em Pago).
  */
 export function monthsOverview(
   records: readonly FinancialRecord[],
   contextId: string,
   from: IsoMonth,
   to: IsoMonth,
-  checks: readonly { month: IsoMonth; kind: MonthCheckKind }[] = [],
+  checks: readonly MonthCheckLine[] = [],
+  cardPurchases: readonly { purchasedOn: IsoDate }[] = [],
 ): MonthOverview[] {
   return monthList(from, to).map((month) => {
     const out = zeroOverview(month);
@@ -596,9 +610,12 @@ export function monthsOverview(
         out.paidCents += r.amountCents;
       }
     }
-    const has = (kind: MonthCheckKind) => checks.some((c) => c.month === month && c.kind === kind);
-    out.receivedChecked = has('recebimentos') && out.receivedCount === 0;
-    out.paidChecked = has('pagamentos') && out.paidCount === 0;
+    const line = (kind: MonthCheckKind) => checks.find((c) => c.month === month && c.kind === kind);
+    out.receivedChecked = line('recebimentos')?.checked === true && out.receivedCount === 0;
+    out.paidChecked = line('pagamentos')?.checked === true && out.paidCount === 0;
+    out.receivedCheckVersion = line('recebimentos')?.version ?? 0;
+    out.paidCheckVersion = line('pagamentos')?.version ?? 0;
+    out.cardPurchaseCount = cardPurchases.filter((p) => monthOf(p.purchasedOn) === month).length;
     return out;
   });
 }
@@ -740,7 +757,7 @@ export const RETURN_TEXT = {
     o.paidCount > 0
       ? `Pago: ${formatBRL(o.paidCents)} · ${plural(o.paidCount, 'gasto', 'gastos')}`
       : monthCheckValid(o, 'pagamentos')
-        ? 'Pago: conferido, não houve gastos'
+        ? 'Pago: conferido, não houve pagamentos'
         : 'Pago: nenhum gasto anotado',
   /** "Contas em aberto: 3 · R$ 3.530,00 · inclui R$ 180,00 estimados" */
   openBills: (count: number, totalCents: Cents, estimatedCents: Cents) =>

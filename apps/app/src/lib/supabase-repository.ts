@@ -276,9 +276,14 @@ interface MonthOverviewRow {
   received_cents: number;
   paid_count: number;
   paid_cents: number;
-  /** "Conferi este mês" (0016): a marca vale (existe e o mês não tem registro do tipo). Ausente (banco sem a 0016): sem marca. */
+  /** "Conferi este mês" (0016): a marca vale (está ligada e o mês não tem registro do tipo). Ausente (banco sem a 0016): sem marca. */
   received_checked?: boolean | null;
   paid_checked?: boolean | null;
+  /** A versão da linha da marca (0 sem linha), que o app manda ao marcar e desmarcar. Ausente (banco sem a 0016): 0. */
+  received_check_version?: number | null;
+  paid_check_version?: number | null;
+  /** Compras no cartão vivas pela data da compra no mês (só informa; não entra em Pago). Ausente (banco sem a 0016): 0. */
+  card_purchase_count?: number | null;
 }
 
 /** Retorno de set_month_check e clear_month_check (0016): o estado da marca do contexto, mês e tipo. */
@@ -881,7 +886,16 @@ function toMonthOverview(m: MonthOverviewRow): MonthOverview {
     paidCents: Number(m.paid_cents),
     receivedChecked: m.received_checked === true,
     paidChecked: m.paid_checked === true,
+    receivedCheckVersion: countOf(m.received_check_version),
+    paidCheckVersion: countOf(m.paid_check_version),
+    cardPurchaseCount: countOf(m.card_purchase_count),
   };
+}
+
+/** Inteiro não negativo que o banco devolve (versão ou contagem); ausente, nulo ou fora da forma vale 0 (banco sem a 0016). */
+function countOf(value: number | null | undefined): number {
+  const n = Number(value ?? 0);
+  return Number.isInteger(n) && n > 0 ? n : 0;
 }
 
 /** Marca de "Conferi este mês": o banco guarda o mês como AAAA-MM-01; o core usa AAAA-MM. Sem marca, versão 0 e sem hora. */
@@ -1940,9 +1954,9 @@ export class SupabaseRepository implements RecordsRepository {
   }
 
   /**
-   * "Conferi este mês" (0016): marca que o mês já terminado não teve recebimentos ('recebimentos') ou gastos ('pagamentos'); marcar
-   * espera a versão 0. Devolve o estado da marca; uma repetição com a mesma chave devolve o estado de agora. Reconciliação: repetir com
-   * a mesma chave e os mesmos argumentos.
+   * "Conferi este mês" (0016): marca que o mês já terminado não teve recebimentos ('recebimentos') ou pagamentos ('pagamentos', a base
+   * de Pago); marcar espera a versão da linha que a tela leu (0 sem linha). Devolve o estado da marca; uma repetição com a mesma chave
+   * devolve o estado de agora (a tela confere o `checked`). Reconciliação: repetir com a mesma chave e os mesmos argumentos.
    */
   async setMonthCheck(key: string, contextId: string, month: IsoMonth, kind: MonthCheckKind, expectedVersion: number): Promise<MonthCheck> {
     const { data, error } = await this.db.rpc('set_month_check', {
@@ -1957,7 +1971,7 @@ export class SupabaseRepository implements RecordsRepository {
     return toMonthCheck(data as MonthCheckRow);
   }
 
-  /** Desfaz a marca (clear_month_check); desmarcar espera a versão da marca viva, 1. */
+  /** Desfaz a marca (clear_month_check); desmarcar espera a versão da linha ligada que a tela leu. A linha fica, desligada, na versão seguinte. */
   async clearMonthCheck(key: string, contextId: string, month: IsoMonth, kind: MonthCheckKind, expectedVersion: number): Promise<MonthCheck> {
     const { data, error } = await this.db.rpc('clear_month_check', {
       p_context: contextId,

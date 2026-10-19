@@ -1,4 +1,4 @@
-import { MONTH_CHECK_TEXT, monthCheckErrorText, newOperationKey, type MonthCheckPlan } from '@clarevo/core';
+import { MONTH_CHECK_TEXT, MonthCheckKeys, monthCheckErrorText, monthCheckOutcome, newOperationKey, type MonthCheckMove, type MonthCheckPlan } from '@clarevo/core';
 import * as Haptics from 'expo-haptics';
 import { Check, Undo2 } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
@@ -21,13 +21,17 @@ function focusNode(node: View | null) {
 }
 
 /**
- * "Conferi este mês" (D-060, item 2; resolve P-022) num lugar da tela: o botão "Conferi: não houve gastos em agosto de 2026" para o mês
- * fechado sem registros, ou a frase "Você conferiu: não houve gastos em agosto de 2026." com "Desfazer a conferência". Quem só lê o
- * contexto vê a frase, sem os botões (o plano vem do core, que decide pela escrita). Marcar não muda nenhum valor e não conta como
- * anotação; nada aparece como feito antes da confirmação do servidor. A chave da operação fica entre as tentativas: depois de uma falha
- * de rede, repetir com a mesma chave é seguro (o banco reconhece a repetição e devolve a marca). Uma recusa (algo mudou em outro
- * aparelho) recarrega a leitura e explica em uma frase. O sucesso é dito uma vez ao leitor de tela, e o foco vai para o botão que
- * passa a valer (desfazer depois de marcar, conferir depois de desfazer).
+ * "Conferi este mês" (D-060, item 2; resolve P-022) num lugar da tela: o botão "Conferi: não houve pagamentos em agosto de 2026" para o
+ * mês fechado sem registros, ou a frase "Você conferiu: não houve pagamentos em agosto de 2026." com "Desfazer a conferência". Em
+ * pagamentos, quando o mês tem compras no cartão, o aviso "Há compras no cartão em agosto de 2026. Elas entram no Pago quando a fatura é
+ * paga." vem junto (compra no cartão não é pagamento: só a fatura paga entra no Pago). Quem só lê o contexto vê a frase, sem os botões
+ * (o plano vem do core, que decide pela escrita). Marcar não muda nenhum valor e não conta como anotação; nada aparece como feito antes
+ * da confirmação do servidor, e o resultado é conferido (`checked`) antes de anunciar "Conferência registrada" ou "Conferência
+ * desfeita": a repetição de uma chave devolve o estado de agora, que pode não ser o pedido. A tela manda a versão da marca que leu; a
+ * versão antiga é recusada. A chave da operação fica entre as tentativas só depois de um resultado incerto: repetir com a mesma chave
+ * e a mesma versão é seguro (o banco reconhece a repetição e devolve a marca), e as chaves guardadas são esquecidas quando o estado
+ * muda. Uma recusa (algo mudou em outro aparelho) recarrega a leitura e explica em uma frase. O sucesso é dito uma vez ao leitor de
+ * tela, e o foco vai para o botão que passa a valer (desfazer depois de marcar, conferir depois de desfazer).
  */
 export function MonthCheckBlock({ contextId, plan, style }: { contextId: string | undefined; plan: MonthCheckPlan | null; style?: object }) {
   const set = useSetMonthCheck();
@@ -35,12 +39,20 @@ export function MonthCheckBlock({ contextId, plan, style }: { contextId: string 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState('');
-  // Uma chave por tentativa de cada ação e mês; só se guarda depois de um resultado incerto.
-  const keys = useRef(new Map<string, string>());
+  // Uma chave por tentativa de cada ação; só se guarda depois de um resultado incerto, e se esquece quando o estado muda.
+  const keys = useRef(new MonthCheckKeys(newOperationKey));
   const actionRef = useRef<View>(null);
   const undoRef = useRef<View>(null);
   const focusNext = useRef<'undo' | 'action' | null>(null);
   const state = plan?.state ?? null;
+  const version = plan?.version ?? 0;
+  const month = plan?.month;
+  const checkKind = plan?.kind;
+
+  // O estado mudou (outro mês, outro tipo, outro estado ou outra versão da marca): as chaves guardadas já não servem.
+  useEffect(() => {
+    if (month && checkKind && state) keys.current.sync({ month, kind: checkKind, state, version });
+  }, [month, checkKind, state, version]);
 
   useEffect(() => {
     // O botão novo só existe depois de a leitura recarregar: o foco vai para ele nesse momento.
@@ -56,29 +68,34 @@ export function MonthCheckBlock({ contextId, plan, style }: { contextId: string 
   if (!plan || !contextId) return null;
   if (!plan.action && !plan.doneText) return null;
 
-  const run = async (kind: 'marcar' | 'desfazer') => {
+  const run = async (move: MonthCheckMove) => {
     if (busy) return;
-    const slot = `${kind}|${plan.month}|${plan.kind}`;
-    const key = keys.current.get(slot) ?? newOperationKey();
-    keys.current.set(slot, key);
+    const key = keys.current.keyFor(move, plan);
     setBusy(true);
     setError(null);
     try {
-      const v = { key, contextId, month: plan.month, kind: plan.kind };
-      if (kind === 'marcar') await set.mutateAsync({ ...v, expectedVersion: 0 });
-      else await clear.mutateAsync({ ...v, expectedVersion: 1 });
-      keys.current.delete(slot);
-      focusNext.current = kind === 'marcar' ? 'undo' : 'action';
-      const text = kind === 'marcar' ? MONTH_CHECK_TEXT.announceDone(plan.kind, plan.month) : MONTH_CHECK_TEXT.announceUndone(plan.kind, plan.month);
+      // A versão é a da marca que esta tela leu: marcar manda a da linha (0 sem linha); desfazer, a da linha ligada.
+      const v = { key, contextId, month: plan.month, kind: plan.kind, expectedVersion: plan.version };
+      const result = move === 'marcar' ? await set.mutateAsync(v) : await clear.mutateAsync(v);
+      keys.current.settle(move);
+      // O banco respondeu, mas a marca pode não ter ficado como pedida (a mesma chave devolve o estado de agora, e outro aparelho pode
+      // ter desfeito ou refeito): nada é anunciado como feito, e a leitura recarregada mostra o que está valendo.
+      if (monthCheckOutcome(move, result) === 'mudou') {
+        setError(MONTH_CHECK_TEXT.changedElsewhere);
+        return;
+      }
+      focusNext.current = move === 'marcar' ? 'undo' : 'action';
+      const text = move === 'marcar' ? MONTH_CHECK_TEXT.announceDone(plan.kind, plan.month) : MONTH_CHECK_TEXT.announceUndone(plan.kind, plan.month);
       setLive(text);
       announceOnIOS(text, { queue: true });
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (e) {
       if (isUncertain(e)) {
-        // A gravação pode ter acontecido: a próxima tentativa usa a mesma chave e o banco devolve o que já gravou.
+        // A gravação pode ter acontecido: a próxima tentativa usa a mesma chave e a mesma versão, e o banco devolve o que já gravou.
+        keys.current.keep(move, plan, key);
         setError(MONTH_CHECK_TEXT.uncertain);
       } else {
-        keys.current.delete(slot);
+        keys.current.settle(move);
         setError(monthCheckErrorText(codeOf(e)));
       }
     } finally {
@@ -94,6 +111,11 @@ export function MonthCheckBlock({ contextId, plan, style }: { contextId: string 
             <Check size={18} color={colors.text} strokeWidth={2.25} aria-hidden style={{ marginTop: 2 }} />
             <Txt style={{ flex: 1, minWidth: 0 }}>{plan.doneText}</Txt>
           </View>
+          {plan.cardNotice ? (
+            <Txt variant="caption" color={colors.textSecondary}>
+              {plan.cardNotice}
+            </Txt>
+          ) : null}
           {plan.undo ? (
             <LinkButton
               // @ts-expect-error O LinkButton repassa `ref` ao Pressable (React 19), como o Button.
@@ -121,6 +143,11 @@ export function MonthCheckBlock({ contextId, plan, style }: { contextId: string 
           {plan.actionNote ? (
             <Txt variant="caption" color={colors.textSecondary}>
               {plan.actionNote}
+            </Txt>
+          ) : null}
+          {plan.cardNotice ? (
+            <Txt variant="caption" color={colors.textSecondary}>
+              {plan.cardNotice}
             </Txt>
           ) : null}
         </>

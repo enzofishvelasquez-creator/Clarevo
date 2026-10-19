@@ -1,11 +1,14 @@
 -- "Conferi este mês" (D-060, item 2; resolve P-022; migração 0016): month_checks, set_month_check, clear_month_check e a leitura da marca em
--- months_overview (received_checked e paid_checked). A pessoa marca que um mês já terminado não teve recebimentos ("recebimentos") ou não
--- teve gastos ("pagamentos"): o zero confirmado, que se distingue do mês sem registro. A marca é por contexto, mês e tipo, nunca muda um
--- total, não conta como anotação para a atividade de "Seus últimos meses" (D-030) e deixa de valer (sem ser apagada) quando aparece um
--- registro do tipo no mês. Na Família, quem escreve marca e desmarca; quem só lê vê; a empresa nunca lê. Confere também permissões,
--- validação do mês e do tipo, idempotência e versão, a ação nova em record_operations, a gravação direta recusada, a exclusão da conta
--- (D-058: o Pessoal some; na Família a marca fica com a autoria "Pessoa que saiu") e os privilégios.
--- Pessoas FICTÍCIAS: Lia (titular da Família da Lia e do Pessoal), Davi (leitor), Mara (membro), Nuno (membro, depois removido),
+-- months_overview (received_checked, paid_checked, as versões da linha e o aviso de compras no cartão). A pessoa marca que um mês já
+-- terminado não teve recebimentos ("recebimentos") ou não teve pagamentos ("pagamentos", a base de Pago: caixa, pela data do pagamento):
+-- o zero confirmado, que se distingue do mês sem registro. A marca é uma linha persistente por contexto, mês e tipo, com o estado
+-- (checked) e uma versão que cresce 1 a cada marcar e desmarcar; nunca muda um total, não conta como anotação para a atividade de "Seus
+-- últimos meses" (D-030) e deixa de valer (sem ser desligada) quando aparece um registro do tipo no mês. Compra no cartão não é registro
+-- de Pago (só o pagamento da fatura é): a marca de pagamentos aceita o mês só com compras no cartão e months_overview avisa. Na Família,
+-- quem escreve marca e desmarca; quem só lê vê; a empresa nunca lê. Confere também permissões, validação do mês e do tipo, idempotência
+-- e versão (inclusive dois aparelhos), a ação nova em record_operations, a gravação direta recusada, a exclusão da conta (D-058: o
+-- Pessoal some; na Família a marca fica com a autoria "Pessoa que saiu") e os privilégios.
+-- Pessoas FICTÍCIAS: Lia (titular da Família da Lia e do Pessoal), Davi (leitor), Mara (membro; o Pessoal dela tem o cartão), Nuno (membro, depois removido),
 -- Otávio (externo), Paula (RH da empresa; Lia tem a licença), Quim (conta nova), Ester (membro, que depois exclui a conta) e Tito
 -- (titular sozinho, que exclui a conta). Tudo em uma transação desfeita no fim. Valores em centavos.
 \set ON_ERROR_STOP 1
@@ -86,15 +89,31 @@ create function pg_temp.ov(p_ctx text, p_month date) returns text language sql a
                 paid_count, paid_cents, case when paid_checked then 't' else 'f' end)
     from public.months_overview(pg_temp.id(p_ctx), p_month, p_month)
 $$;
+-- As colunas novas do mês: "recebido v<versão da linha> pago v<versão> cartão <compras no cartão pela data da compra>".
+create function pg_temp.ovx(p_ctx text, p_month date) returns text language sql as $$
+  select format('recebido v%s pago v%s cartão %s', received_check_version, paid_check_version, card_purchase_count)
+    from public.months_overview(pg_temp.id(p_ctx), p_month, p_month)
+$$;
 
--- As marcas do contexto, direto na tabela (sem a RLS): "2026-08 pagamentos por Lia v1; ...".
+-- As marcas LIGADAS do contexto, direto na tabela (sem a RLS): "2026-08 pagamentos por Lia v1; ..." (a autoria é de quem fez a última
+-- mudança). As linhas desligadas ficam em rows().
 create function pg_temp.marks(p_ctx text) returns text language sql security definer set search_path = public, pg_temp as $$
   select coalesce(string_agg(format('%s %s por %s v%s', to_char(c.month, 'YYYY-MM'), c.kind,
-                                    coalesce(nullif((select p.display_name from public.persons p where p.id = c.checked_by), ''), 'anônima'), c.version),
+                                    coalesce(nullif((select p.display_name from public.persons p where p.id = c.updated_by), ''), 'anônima'), c.version),
+                             '; ' order by c.month, c.kind), '-')
+    from public.month_checks c where c.context_id = pg_temp.id(p_ctx) and c.checked
+$$;
+-- Todas as linhas do contexto, ligadas e desligadas: "2026-08 pagamentos v3 on; 2026-02 pagamentos v4 off".
+create function pg_temp.rows(p_ctx text) returns text language sql security definer set search_path = public, pg_temp as $$
+  select coalesce(string_agg(format('%s %s v%s %s', to_char(c.month, 'YYYY-MM'), c.kind, c.version, case when c.checked then 'on' else 'off' end),
                              '; ' order by c.month, c.kind), '-')
     from public.month_checks c where c.context_id = pg_temp.id(p_ctx)
 $$;
+-- Quantas marcas ligadas (nmarks) e quantas linhas (nrows) existem, em todos os contextos.
 create function pg_temp.nmarks() returns bigint language sql security definer set search_path = public, pg_temp as $$
+  select count(*) from public.month_checks where checked
+$$;
+create function pg_temp.nrows() returns bigint language sql security definer set search_path = public, pg_temp as $$
   select count(*) from public.month_checks
 $$;
 -- Operações de conferir (marcar e desmarcar) da pessoa, ou todas.
@@ -113,6 +132,10 @@ create function pg_temp.act(p_person text, p_ctx text) returns text language sql
   select format('%s %s %s', to_char(last_write_on, 'YYYY-MM-DD'), coalesce(to_char(absence_from_on, 'YYYY-MM-DD'), '-'),
                 coalesce(to_char(absence_until_on, 'YYYY-MM-DD'), '-'))
     from public.context_activity where person_id = pg_temp.id(p_person) and context_id = pg_temp.id(p_ctx)
+$$;
+-- A versão da conta da fatura (para pay_invoice), como o app a lê na visão invoice_items.
+create function pg_temp.iv_ver(p_card uuid, p_month date) returns int language sql as $$
+  select commitment_version from public.invoice_items where card_id = p_card and month = p_month
 $$;
 -- Impressão digital de tudo o que a marca não pode mudar: registros, contas a pagar, séries, renda de referência, metas, movimentos,
 -- cartões, revisões, atividade e contas.
@@ -210,15 +233,17 @@ do $$ begin
   perform pg_temp.as_('quim');
   assert (select count(*) from public.month_checks) = 0, 'conta nova sem marca de exemplo';
   assert pg_temp.ov('quim_ctx', '2026-08-01') = 'recebido 0/0/f pago 0/0/f', 'mês sem anotação: zeros e sem marca';
+  assert pg_temp.ovx('quim_ctx', '2026-08-01') = 'recebido v0 pago v0 cartão 0', 'sem linha: versão 0 e nenhuma compra no cartão';
 end $$;
 reset role;
 do $$ begin
-  assert pg_temp.nmarks() = 0, 'criar os espaços e a Família não grava marca para ninguém';
+  assert pg_temp.nrows() = 0, 'criar os espaços e a Família não grava marca para ninguém (nem linha desligada)';
   assert pg_temp.nops() = 0, 'nenhuma operação de conferir ainda';
 end $$;
 
 -- ---------------------------------------------------------------------------
--- 2. Marcar no Pessoal: os dois tipos, o resultado, a linha, a operação e o que NÃO muda.
+-- 2. Marcar no Pessoal: os dois tipos, o resultado, a linha, a operação e o que NÃO muda. A última anotação da Lia é de 07/10/2026 e
+--    as marcas são feitas em 12/10/2026 (outro dia, ainda em outubro): se marcar contasse como anotação, o dia da última anotação mudaria.
 -- ---------------------------------------------------------------------------
 set role authenticated;
 do $$ begin
@@ -236,6 +261,7 @@ declare
   totals_before text;
 begin
   perform pg_temp.as_('lia');
+  perform pg_temp.today('2026-10-12');
   totals_before := (select format('%s/%s/%s', received_cents, paid_cents, difference_cents) from public.month_totals(pg_temp.id('lia_ctx'), '2026-08-01'));
   assert pg_temp.ov('lia_ctx', '2026-08-01') = 'recebido 0/0/f pago 0/0/f', 'agosto: sem registro, sem marca';
   -- Marcar: "não houve gastos em agosto" e "não houve recebimentos em agosto".
@@ -258,12 +284,17 @@ begin
   assert (select string_agg(format('%s:%s%s', to_char(month, 'MM'), case when received_checked then 'R' else '-' end, case when paid_checked then 'P' else '-' end),
                             ' ' order by month)
             from public.months_overview(pg_temp.id('lia_ctx'), '2026-06-01', '2026-09-01')) = '06:-- 07:-- 08:RP 09:--', 'quatro meses de uma vez';
+  -- As versões da linha vêm junto: 1 nas duas marcadas, 0 sem linha.
+  assert pg_temp.ovx('lia_ctx', '2026-08-01') = 'recebido v1 pago v1 cartão 0' and pg_temp.ovx('lia_ctx', '2026-07-01') = 'recebido v0 pago v0 cartão 0',
+    'versões da linha: ' || pg_temp.ovx('lia_ctx', '2026-08-01');
+  perform pg_temp.today('2026-10-07');
 end $$;
 reset role;
 do $$ begin
   assert pg_temp.marks('lia_ctx') = '2026-08 pagamentos por Lia v1; 2026-08 recebimentos por Lia v1', 'ordem por mês e tipo: ' || pg_temp.marks('lia_ctx');
   assert pg_temp.fp() = pg_temp.was('fp0'), 'nenhum registro, conta, série, meta, cartão, revisão, atividade nem conta de origem mudou';
-  assert pg_temp.act('lia', 'lia_ctx') = pg_temp.was('act0'), 'conferir um mês não conta como anotação (a atividade de D-030 não mudou)';
+  assert pg_temp.was('act0') like '2026-10-07 %' and pg_temp.act('lia', 'lia_ctx') = pg_temp.was('act0'),
+    'conferir um mês, em outro dia que o da última anotação, não conta como anotação (a atividade de D-030 não mudou): ' || pg_temp.act('lia', 'lia_ctx');
   assert pg_temp.nops('lia') = 2 and pg_temp.nops('lia', 'marcar_mes_conferido') = 2, 'duas operações de marcar';
   assert not exists (select 1 from public.record_operations
                       where action in ('marcar_mes_conferido', 'desmarcar_mes_conferido')
@@ -341,11 +372,18 @@ do $$ begin
   perform public.set_month_check(pg_temp.id('lia_ctx'), '2019-03-01', 'pagamentos', 'mc-old-0001', 0);
   assert pg_temp.ov('lia_ctx', '2019-03-01') = 'recebido 0/0/f pago 0/0/t', 'março de 2019';
   perform public.clear_month_check(pg_temp.id('lia_ctx'), '2019-03-01', 'pagamentos', 'mc-old-0002', 1);
+  assert pg_temp.ov('lia_ctx', '2019-03-01') = 'recebido 0/0/f pago 0/0/f' and pg_temp.ovx('lia_ctx', '2019-03-01') = 'recebido v0 pago v2 cartão 0',
+    'desmarcar desliga a marca e a linha fica, com a versão 2';
 end $$;
 reset role;
+do $$ begin
+  -- A linha é persistente: desmarcar não a apaga (a versão cresce), e só as ligadas aparecem em marks().
+  assert pg_temp.rows('lia_ctx') = '2019-03 pagamentos v2 off; 2026-08 pagamentos v1 on; 2026-08 recebimentos v1 on; 2026-10 recebimentos v2 off', 'linhas: ' || pg_temp.rows('lia_ctx');
+  assert pg_temp.marks('lia_ctx') = '2026-08 pagamentos por Lia v1; 2026-08 recebimentos por Lia v1', 'só as ligadas: ' || pg_temp.marks('lia_ctx');
+end $$;
 
 -- ---------------------------------------------------------------------------
--- 4. Idempotência e versão.
+-- 4. Idempotência e versão: a linha é persistente e cada marcar e cada desmarcar soma 1; versão antiga é recusada (dois aparelhos).
 -- ---------------------------------------------------------------------------
 set role authenticated;
 do $$
@@ -369,7 +407,7 @@ begin
                                      pg_temp.acc('lia_ctx'), 'despesa', '2026-09-05'::date, 'Outro'), 'chave_reutilizada', 'PT409');
   -- A chave de um registro não serve para marcar.
   perform pg_temp.expect_code(pg_temp.sm('mc-lia-rec-0001', 'lia_ctx', '2026-07-01', 'pagamentos', 0), 'chave_reutilizada', 'PT409');
-  -- Marcar o que já está marcado: versão desatualizada (a marca viva é a 1), com ou sem a versão certa; marcar com versão que não é 0 também.
+  -- Marcar o que já está marcado: versão desatualizada (a marca ligada é a 1), com ou sem a versão da linha; marcar sem linha com versão que não é 0 também.
   perform pg_temp.expect_stale(pg_temp.sm('mc-ver-0001', 'lia_ctx', '2026-08-01', 'pagamentos', 0), 'versao_atual=1');
   perform pg_temp.expect_stale(pg_temp.sm('mc-ver-0002', 'lia_ctx', '2026-08-01', 'pagamentos', 1), 'versao_atual=1');
   perform pg_temp.expect_stale(pg_temp.sm('mc-ver-0003', 'lia_ctx', '2026-08-01', 'pagamentos', null), 'versao_atual=1');
@@ -385,29 +423,77 @@ begin
   assert pg_temp.ov('lia_ctx', '2026-08-01') = 'recebido 0/0/t pago 0/0/t', 'as recusas não desmarcaram nada';
   -- Desmarcar com a versão certa: a marca some, o outro tipo fica.
   r1 := public.clear_month_check(pg_temp.id('lia_ctx'), '2026-08-01', 'pagamentos', 'mc-lia-clr-0001', 1);
-  assert (r1 ->> 'checked', r1 ->> 'version', r1 ->> 'kind', r1 ->> 'month') = ('false', '0', 'pagamentos', '2026-08-01'), 'o resultado de desmarcar: ' || r1::text;
-  assert r1 -> 'checked_at' = 'null'::jsonb, 'sem hora quando não há marca';
+  assert (r1 ->> 'checked', r1 ->> 'version', r1 ->> 'kind', r1 ->> 'month') = ('false', '2', 'pagamentos', '2026-08-01'), 'o resultado de desmarcar: ' || r1::text;
+  assert r1 -> 'checked_at' = 'null'::jsonb, 'sem hora quando a marca está desligada';
   assert pg_temp.ov('lia_ctx', '2026-08-01') = 'recebido 0/0/t pago 0/0/f', 'só o tipo desmarcado deixa de valer';
+  assert pg_temp.ovx('lia_ctx', '2026-08-01') = 'recebido v1 pago v2 cartão 0', 'a linha de pagamentos fica, desligada, na versão 2';
   -- Repetir a mesma chamada de desmarcar devolve o mesmo resultado, sem outra operação.
   n := pg_temp.allops();
   r2 := public.clear_month_check(pg_temp.id('lia_ctx'), '2026-08-01', 'pagamentos', 'mc-lia-clr-0001', 1);
   assert r2 = r1 and pg_temp.allops() = n, 'a repetição de desmarcar devolve o mesmo resultado';
   perform pg_temp.expect_code(pg_temp.cm('mc-lia-clr-0001', 'lia_ctx', '2026-08-01', 'pagamentos', 2), 'chave_reutilizada', 'PT409');
   perform pg_temp.expect_code(pg_temp.sm('mc-lia-clr-0001', 'lia_ctx', '2026-08-01', 'pagamentos', 0), 'chave_reutilizada', 'PT409');
-  -- Quem repete a marcação antiga depois de desmarcar vê o estado de agora (sem marca), sem refazer a marca.
+  -- Quem repete a marcação antiga depois de desmarcar vê o estado de agora (desligada, versão 2), sem refazer a marca.
   r1 := public.set_month_check(pg_temp.id('lia_ctx'), '2026-08-01', 'pagamentos', 'mc-lia-set-0001', 0);
-  assert r1 ->> 'checked' = 'false' and r1 ->> 'version' = '0', 'a repetição mostra o estado atual: ' || r1::text;
+  assert r1 ->> 'checked' = 'false' and r1 ->> 'version' = '2', 'a repetição mostra o estado atual: ' || r1::text;
   assert pg_temp.ov('lia_ctx', '2026-08-01') = 'recebido 0/0/t pago 0/0/f', 'a repetição não refaz a marca';
-  -- Marcar de novo com chave nova e versão 0: vale (a versão da marca viva volta a ser 1) e a autoria é de quem marcou agora.
-  r1 := public.set_month_check(pg_temp.id('lia_ctx'), '2026-08-01', 'pagamentos', 'mc-lia-set-0003', 0);
-  assert (r1 ->> 'checked', r1 ->> 'version') = ('true', '1'), 'marcou de novo';
+  -- Com a linha desligada, marcar espera a versão dela (2): a que o app leu. A de uma linha que não existe (0) já é velha.
+  perform pg_temp.expect_stale(pg_temp.sm('mc-ver-0012', 'lia_ctx', '2026-08-01', 'pagamentos', 0), 'versao_atual=2');
+  perform pg_temp.expect_stale(pg_temp.sm('mc-ver-0013', 'lia_ctx', '2026-08-01', 'pagamentos', 1), 'versao_atual=2');
+  perform pg_temp.expect_stale(pg_temp.sm('mc-ver-0014', 'lia_ctx', '2026-08-01', 'pagamentos', 3), 'versao_atual=2');
+  perform pg_temp.expect_stale(pg_temp.sm('mc-ver-0015', 'lia_ctx', '2026-08-01', 'pagamentos', null), 'versao_atual=2');
+  -- Desmarcar o que já está desligado também é versão desatualizada (mesmo com a versão da linha).
+  perform pg_temp.expect_stale(pg_temp.cm('mc-ver-0016', 'lia_ctx', '2026-08-01', 'pagamentos', 2), 'versao_atual=2');
+  perform pg_temp.expect_stale(pg_temp.cm('mc-ver-0017', 'lia_ctx', '2026-08-01', 'pagamentos', 1), 'versao_atual=2');
+  assert pg_temp.ov('lia_ctx', '2026-08-01') = 'recebido 0/0/t pago 0/0/f', 'as recusas não ligaram nada';
+  -- Marcar de novo com chave nova e a versão lida (2): vale, a versão cresce para 3 e a autoria é de quem marcou agora.
+  r1 := public.set_month_check(pg_temp.id('lia_ctx'), '2026-08-01', 'pagamentos', 'mc-lia-set-0003', 2);
+  assert (r1 ->> 'checked', r1 ->> 'version') = ('true', '3'), 'marcou de novo: ' || r1::text;
+  assert (r1 ->> 'checked_at')::timestamptz between now() - interval '1 minute' and now() + interval '1 minute', 'a hora de quem marcou agora';
   assert pg_temp.ov('lia_ctx', '2026-08-01') = 'recebido 0/0/t pago 0/0/t', 'as duas valem de novo';
+  assert pg_temp.ovx('lia_ctx', '2026-08-01') = 'recebido v1 pago v3 cartão 0', 'a mesma linha, na versão 3';
 end $$;
 reset role;
 do $$ begin
+  assert pg_temp.rows('lia_ctx') = '2019-03 pagamentos v2 off; 2026-08 pagamentos v3 on; 2026-08 recebimentos v1 on; 2026-10 recebimentos v2 off',
+    'uma linha por contexto, mês e tipo: ' || pg_temp.rows('lia_ctx');
+  assert (select count(*) from public.month_checks where context_id = pg_temp.id('lia_ctx') and month = '2026-08-01' and kind = 'pagamentos') = 1, 'marcar de novo não cria outra linha';
   assert pg_temp.nops('lia', 'desmarcar_mes_conferido') = 3 and pg_temp.nops('lia', 'marcar_mes_conferido') = 5,
     'operações: ' || pg_temp.nops('lia', 'marcar_mes_conferido') || ' de marcar e ' || pg_temp.nops('lia', 'desmarcar_mes_conferido') || ' de desmarcar';
   assert (select count(*) from public.record_operations where idempotency_key = 'mc-lia-set-0001') = 1, 'uma operação por chave';
+end $$;
+
+-- Dois aparelhos da mesma pessoa em fevereiro de 2026 (pagamentos): cada um manda a versão que leu, e a versão antiga é recusada.
+set role authenticated;
+do $$
+declare
+  r jsonb;
+begin
+  perform pg_temp.as_('lia');
+  -- Os dois leram "sem linha" (versão 0): o primeiro que marca vence; o segundo recebe versao_desatualizada com a versão nova (1).
+  r := public.set_month_check(pg_temp.id('lia_ctx'), '2026-02-01', 'pagamentos', 'mc-dev-a-0001', 0);
+  assert (r ->> 'checked', r ->> 'version') = ('true', '1'), 'aparelho A marcou: ' || r::text;
+  perform pg_temp.expect_stale(pg_temp.sm('mc-dev-b-0001', 'lia_ctx', '2026-02-01', 'pagamentos', 0), 'versao_atual=1');
+  -- Os dois leram "marcado, versão 1": A desmarca (versão 2); B, ainda com a versão 1, é recusado, e a marca segue desligada.
+  r := public.clear_month_check(pg_temp.id('lia_ctx'), '2026-02-01', 'pagamentos', 'mc-dev-a-0002', 1);
+  assert (r ->> 'checked', r ->> 'version') = ('false', '2'), 'aparelho A desmarcou: ' || r::text;
+  perform pg_temp.expect_stale(pg_temp.cm('mc-dev-b-0002', 'lia_ctx', '2026-02-01', 'pagamentos', 1), 'versao_atual=2');
+  assert pg_temp.ov('lia_ctx', '2026-02-01') = 'recebido 0/0/f pago 0/0/f', 'desligada';
+  -- B lê de novo (versão 2, desligada) e marca; A, que também leu a versão 2, é recusado, e o resultado é o de B (versão 3).
+  r := public.set_month_check(pg_temp.id('lia_ctx'), '2026-02-01', 'pagamentos', 'mc-dev-b-0003', 2);
+  assert (r ->> 'checked', r ->> 'version') = ('true', '3'), 'aparelho B marcou: ' || r::text;
+  perform pg_temp.expect_stale(pg_temp.sm('mc-dev-a-0003', 'lia_ctx', '2026-02-01', 'pagamentos', 2), 'versao_atual=3');
+  perform pg_temp.expect_stale(pg_temp.cm('mc-dev-a-0004', 'lia_ctx', '2026-02-01', 'pagamentos', 2), 'versao_atual=3');
+  assert pg_temp.ov('lia_ctx', '2026-02-01') = 'recebido 0/0/f pago 0/0/t', 'ligada pelo B';
+  -- A recusa não gastou a chave e A pode seguir com a versão que leu agora (3).
+  r := public.clear_month_check(pg_temp.id('lia_ctx'), '2026-02-01', 'pagamentos', 'mc-dev-a-0004', 3);
+  assert (r ->> 'checked', r ->> 'version') = ('false', '4'), 'aparelho A desmarcou com a versão nova: ' || r::text;
+  assert pg_temp.ovx('lia_ctx', '2026-02-01') = 'recebido v0 pago v4 cartão 0', 'a versão da linha: 4';
+end $$;
+reset role;
+do $$ begin
+  assert pg_temp.rows('lia_ctx') like '2019-03 pagamentos v2 off; 2026-02 pagamentos v4 off; 2026-08 pagamentos v3 on;%', 'linhas depois dos dois aparelhos: ' || pg_temp.rows('lia_ctx');
+  assert pg_temp.nops('lia', 'marcar_mes_conferido') = 7 and pg_temp.nops('lia', 'desmarcar_mes_conferido') = 5, 'mais duas marcações e duas desmarcações';
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -437,22 +523,145 @@ begin
   -- Em agosto marcaram "pagamentos": um gasto de 31/08 faz a marca deixar de valer (a marca continua na tabela, versão 1).
   rec := pg_temp.rec('mc-reg-rec-0004', 'lia_ctx', 'despesa', 7000, '2026-08-31', 'Farmácia de agosto');
   assert pg_temp.ov('lia_ctx', '2026-08-01') = 'recebido 0/0/t pago 1/7000/f', 'com um gasto, a marca de pagamentos deixa de valer; a de recebimentos segue';
-  perform pg_temp.expect_code(pg_temp.sm('mc-reg-0007', 'lia_ctx', '2026-08-01', 'pagamentos', 0), 'versao_desatualizada', 'PT409', 'versao_atual=1');
+  perform pg_temp.expect_code(pg_temp.sm('mc-reg-0007', 'lia_ctx', '2026-08-01', 'pagamentos', 0), 'versao_desatualizada', 'PT409', 'versao_atual=3');
   -- Um segundo gasto, e a exclusão de um: a marca só volta a valer sem nenhum gasto vivo no mês.
   rec2 := pg_temp.rec('mc-reg-rec-0005', 'lia_ctx', 'despesa', 3000, '2026-08-01', 'Padaria de agosto');
   perform public.delete_record('mc-reg-del-0001', rec, 1);
   assert pg_temp.ov('lia_ctx', '2026-08-01') = 'recebido 0/0/t pago 1/3000/f', 'um gasto vivo ainda anula a marca';
   perform public.delete_record('mc-reg-del-0002', rec2, 1);
   assert pg_temp.ov('lia_ctx', '2026-08-01') = 'recebido 0/0/t pago 0/0/t', 'sem gasto vivo, a marca volta a valer (excluído não conta)';
-  -- A marca nunca foi apagada nem mudou: mesma linha, versão 1, mesma autoria.
-  assert (select count(*) from public.month_checks where context_id = pg_temp.id('lia_ctx') and month = '2026-08-01' and kind = 'pagamentos' and version = 1) = 1,
+  -- A marca nunca foi desligada nem mudou: mesma linha, ligada, na versão 3 (as exclusões de registro não mexem na linha).
+  assert (select count(*) from public.month_checks where context_id = pg_temp.id('lia_ctx') and month = '2026-08-01' and kind = 'pagamentos' and version = 3 and checked) = 1,
     'a marca de agosto é a mesma';
 end $$;
 reset role;
 do $$ begin
-  assert pg_temp.marks('lia_ctx') = '2026-07 pagamentos por Lia v1; 2026-08 pagamentos por Lia v1; 2026-08 recebimentos por Lia v1', 'marcas: ' || pg_temp.marks('lia_ctx');
-  -- Os registros do mês de outra pessoa, ou de outro contexto, não valem para esta marca.
+  assert pg_temp.marks('lia_ctx') = '2026-07 pagamentos por Lia v1; 2026-08 pagamentos por Lia v3; 2026-08 recebimentos por Lia v1', 'marcas: ' || pg_temp.marks('lia_ctx');
+end $$;
+
+-- Registro em OUTRO contexto não anula a marca do contexto conferido: a Mara anota gastos e recebimentos no Pessoal dela e na Família nos
+-- mesmos meses em que a Lia conferiu o Pessoal (agosto: pagamentos e recebimentos), e a marca da Lia segue valendo; e as marcas da
+-- Família de agosto (seção 6) valem com os registros de agosto que a Lia e a Mara têm nos Pessoais delas.
+set role authenticated;
+do $$
+declare
+  who text;
+  ctx text;
+begin
+  assert pg_temp.ov('lia_ctx', '2026-08-01') = 'recebido 0/0/t pago 0/0/t', 'antes: as duas marcas de agosto valem';
+  perform pg_temp.as_('mara');
+  perform pg_temp.rec('mc-out-rec-0001', 'mara_ctx', 'despesa', 9900, '2026-07-15', 'Gasto da Mara em julho');
+  perform pg_temp.rec('mc-out-rec-0002', 'mara_ctx', 'despesa', 4400, '2026-08-10', 'Gasto da Mara em agosto');
+  perform pg_temp.rec('mc-out-rec-0003', 'mara_ctx', 'receita', 12000, '2026-08-20', 'Recebimento da Mara em agosto');
+  assert pg_temp.ov('mara_ctx', '2026-08-01') = 'recebido 1/12000/f pago 1/4400/f', 'o Pessoal da Mara tem os registros dela';
+  perform pg_temp.rec('mc-out-rec-0004', 'fam', 'despesa', 7700, '2026-07-12', 'Gasto da Casa em julho');
+  perform pg_temp.as_('lia');
+  assert pg_temp.ov('lia_ctx', '2026-08-01') = 'recebido 0/0/t pago 0/0/t', 'os registros de agosto da Mara (Pessoal) e da Casa não anulam as marcas de agosto da Lia';
+  assert pg_temp.ovx('lia_ctx', '2026-08-01') = 'recebido v1 pago v3 cartão 0', 'e a versão da linha da Lia é a mesma';
+  -- E o contrário: o registro da Lia não aparece no Pessoal da Mara, e o da Casa só na Casa.
+  assert pg_temp.ov('fam', '2026-07-01') = 'recebido 0/0/f pago 1/7700/f', 'a Casa só vê o dela';
+  assert pg_temp.ov('fam', '2026-08-01') = 'recebido 0/0/f pago 0/0/f', 'a Casa não herda os registros de agosto dos Pessoais';
+  -- Marcar na Família um mês sem registro nela vale, mesmo com registro de outra pessoa no Pessoal dela.
+  perform public.set_month_check(pg_temp.id('fam'), '2026-04-01', 'pagamentos', 'mc-out-set-0001', 0);
+  perform pg_temp.as_('mara');
+  assert pg_temp.ov('fam', '2026-04-01') = 'recebido 0/0/f pago 0/0/t', 'a Mara lê a marca da Família de abril';
+  perform public.clear_month_check(pg_temp.id('fam'), '2026-04-01', 'pagamentos', 'mc-out-clr-0001', 1);
+end $$;
+reset role;
+do $$ begin
   assert (select count(*) from public.month_checks where context_id = pg_temp.id('davi_ctx')) = 0, 'o Pessoal do Davi não tem marca';
+  assert pg_temp.rows('mara_ctx') = '-', 'o Pessoal da Mara não ganhou marca com os registros dela';
+  assert pg_temp.marks('lia_ctx') = '2026-07 pagamentos por Lia v1; 2026-08 pagamentos por Lia v3; 2026-08 recebimentos por Lia v1', 'a Lia segue com as mesmas marcas: ' || pg_temp.marks('lia_ctx');
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 5b. Cartão: a marca de pagamentos segue a base de Pago (caixa, pela data do pagamento), então COMPRA no cartão não é registro: só a
+--     fatura paga é, no dia em que foi paga. Um mês só com compras no cartão (digitadas ou importadas) pode ser marcado, a marca vale, e
+--     months_overview avisa (card_purchase_count) que há compras no cartão pela data da compra. Mês só com a fatura paga é recusado
+--     (mes_com_registros), sem aviso (a compra é de outro mês). O Pessoal da Mara; fevereiro, março, abril e maio de 2026.
+-- ---------------------------------------------------------------------------
+set role authenticated;
+do $$
+declare
+  ctx uuid := pg_temp.id('mara_ctx');
+  card uuid;
+  res jsonb;
+  imported uuid;
+  paid_before bigint;
+begin
+  perform pg_temp.as_('mara');
+  card := (public.create_card('mc-card-0001', ctx, 'Cartão da Mara', '1234', 5, 15, null) #>> '{card,id}')::uuid;
+  insert into ids values ('mara_card', card);
+  assert pg_temp.ovx('mara_ctx', '2026-02-01') = 'recebido v0 pago v0 cartão 0', 'antes de qualquer compra: nenhum aviso';
+
+  -- (a) SÓ UMA COMPRA NO CARTÃO (fevereiro): nenhum registro de Pago; o mês pode ser marcado, a marca vale e o aviso aparece.
+  res := public.add_card_purchase('mc-card-0002', card, '2026-02-03', 25000, 1, 'Compra de fevereiro', 'Mercado');
+  assert res #>> '{entry,invoice_month}' = '2026-02-01', 'a compra de 03/02 vai para a fatura de fevereiro (fecha dia 5, vence dia 15)';
+  assert pg_temp.ov('mara_ctx', '2026-02-01') = 'recebido 0/0/f pago 0/0/f', 'a compra não entra em Pago: ' || pg_temp.ov('mara_ctx', '2026-02-01');
+  assert pg_temp.ovx('mara_ctx', '2026-02-01') = 'recebido v0 pago v0 cartão 1', 'mas o mês avisa uma compra no cartão: ' || pg_temp.ovx('mara_ctx', '2026-02-01');
+  assert (select paid_cents from public.month_totals(ctx, '2026-02-01')) = 0, 'Pago de fevereiro segue em zero';
+  res := public.set_month_check(ctx, '2026-02-01', 'pagamentos', 'mc-card-0003', 0);
+  assert (res ->> 'checked', res ->> 'version') = ('true', '1'), 'o mês só com compra no cartão aceita a marca de pagamentos: ' || res::text;
+  assert pg_temp.ov('mara_ctx', '2026-02-01') = 'recebido 0/0/f pago 0/0/t', 'e a marca vale (pagamentos): ' || pg_temp.ov('mara_ctx', '2026-02-01');
+  assert pg_temp.ovx('mara_ctx', '2026-02-01') = 'recebido v0 pago v1 cartão 1', 'o aviso continua com a marca: ' || pg_temp.ovx('mara_ctx', '2026-02-01');
+  assert (select paid_cents from public.month_totals(ctx, '2026-02-01')) = 0, 'marcar não muda Pago';
+  -- Um parcelamento em março (3 parcelas: faturas de março, abril e maio): conta uma compra, em março, pela data da compra.
+  perform public.add_card_purchase('mc-card-0004', card, '2026-03-04', 30000, 3, 'Compra parcelada de março', null);
+  assert pg_temp.ovx('mara_ctx', '2026-03-01') = 'recebido v0 pago v0 cartão 1', 'uma compra em 3 parcelas conta uma vez, em março: ' || pg_temp.ovx('mara_ctx', '2026-03-01');
+  assert pg_temp.ovx('mara_ctx', '2026-04-01') = 'recebido v0 pago v0 cartão 0', 'as parcelas de abril e maio não são compras de abril: ' || pg_temp.ovx('mara_ctx', '2026-04-01');
+  assert pg_temp.ov('mara_ctx', '2026-04-01') = 'recebido 0/0/f pago 0/0/f', 'e a fatura de abril ainda aberta não é registro de Pago';
+
+  -- (b) SÓ UMA FATURA PAGA (abril): a fatura de fevereiro paga em 02/04 é um registro de Pago em abril (pela data do pagamento).
+  res := public.pay_invoice('mc-card-0005', card, '2026-02-01', pg_temp.iv_ver(card, '2026-02-01'), 25000, '2026-04-02');
+  assert res #>> '{record,occurred_on}' = '2026-04-02' and (res #>> '{record,amount_cents}')::bigint = 25000, 'a fatura de fevereiro paga em 02/04';
+  assert pg_temp.ov('mara_ctx', '2026-04-01') = 'recebido 0/0/f pago 1/25000/f', 'a fatura paga conta em abril: ' || pg_temp.ov('mara_ctx', '2026-04-01');
+  assert pg_temp.ovx('mara_ctx', '2026-04-01') = 'recebido v0 pago v0 cartão 0', 'abril não tem compra no cartão pela data da compra: nenhum aviso';
+  paid_before := (select paid_cents from public.month_totals(ctx, '2026-04-01'));
+  perform pg_temp.expect_code(pg_temp.sm('mc-card-0006', 'mara_ctx', '2026-04-01', 'pagamentos', 0), 'mes_com_registros', 'PT409');
+  -- Recebimentos de abril, sem registro, aceita.
+  res := public.set_month_check(ctx, '2026-04-01', 'recebimentos', 'mc-card-0007', 0);
+  assert (res ->> 'checked', res ->> 'version') = ('true', '1'), 'o tipo sem registro aceita';
+  assert pg_temp.ov('mara_ctx', '2026-04-01') = 'recebido 0/0/t pago 1/25000/f', 'a marca de pagamentos não existe com a fatura paga: ' || pg_temp.ov('mara_ctx', '2026-04-01');
+  assert (select paid_cents from public.month_totals(ctx, '2026-04-01')) = paid_before, 'Pago de abril não mudou';
+  -- A fatura de fevereiro (paga) e a compra de fevereiro: fevereiro segue com a marca e o aviso (a compra é de fevereiro).
+  assert pg_temp.ov('mara_ctx', '2026-02-01') = 'recebido 0/0/f pago 0/0/t' and pg_temp.ovx('mara_ctx', '2026-02-01') = 'recebido v0 pago v1 cartão 1',
+    'fevereiro segue conferido, com o aviso, mesmo com a fatura paga em abril';
+
+  -- (c) SÓ UMA IMPORTAÇÃO PARA O CARTÃO (maio): a compra importada é uma compra no cartão pela data dela, não um registro de Pago.
+  res := public.import_records('mc-card-0008', ctx, 'cartao', card, jsonb_build_array(
+    jsonb_build_object('import_key', encode(sha256(convert_to('mc-imp-0001', 'UTF8')), 'hex'), 'kind', 'compra', 'amount_cents', 8050,
+                       'occurred_on', '2026-05-08', 'description', 'Mercado importado', 'category', null)));
+  assert res = '{"created": 1, "skipped": 0}'::jsonb, 'uma compra importada no cartão: ' || res::text;
+  assert pg_temp.ov('mara_ctx', '2026-05-01') = 'recebido 0/0/f pago 0/0/f', 'a importação para o cartão não entra em Pago';
+  assert pg_temp.ovx('mara_ctx', '2026-05-01') = 'recebido v0 pago v0 cartão 1', 'mas o mês avisa a compra importada: ' || pg_temp.ovx('mara_ctx', '2026-05-01');
+  res := public.set_month_check(ctx, '2026-05-01', 'pagamentos', 'mc-card-0009', 0);
+  assert (res ->> 'checked', res ->> 'version') = ('true', '1'), 'o mês só com importação para o cartão aceita a marca: ' || res::text;
+  assert pg_temp.ov('mara_ctx', '2026-05-01') = 'recebido 0/0/f pago 0/0/t' and pg_temp.ovx('mara_ctx', '2026-05-01') = 'recebido v0 pago v1 cartão 1', 'vale, com o aviso';
+  -- Excluída a compra importada, o aviso some (só conta compra viva); a marca segue valendo, porque nunca dependeu da compra.
+  select e.id into imported from public.card_entries e where e.card_id = card and e.import_key is not null and e.deleted_at is null;
+  perform public.delete_card_entry('mc-card-0010', imported, (select version from public.card_entries where id = imported));
+  assert pg_temp.ovx('mara_ctx', '2026-05-01') = 'recebido v0 pago v1 cartão 0', 'sem a compra viva, nenhum aviso: ' || pg_temp.ovx('mara_ctx', '2026-05-01');
+  assert pg_temp.ov('mara_ctx', '2026-05-01') = 'recebido 0/0/f pago 0/0/t', 'e a marca continua valendo';
+  -- Uma compra importada em um mês com registro de Pago: o aviso aparece, mas a marca não vale (o registro vence).
+  res := public.import_records('mc-card-0011', ctx, 'cartao', card, jsonb_build_array(
+    jsonb_build_object('import_key', encode(sha256(convert_to('mc-imp-0002', 'UTF8')), 'hex'), 'kind', 'compra', 'amount_cents', 1500,
+                       'occurred_on', '2026-04-20', 'description', 'Compra de abril importada', 'category', null)));
+  assert pg_temp.ov('mara_ctx', '2026-04-01') = 'recebido 0/0/t pago 1/25000/f' and pg_temp.ovx('mara_ctx', '2026-04-01') = 'recebido v1 pago v0 cartão 1',
+    'abril com a fatura paga e uma compra importada: ' || pg_temp.ovx('mara_ctx', '2026-04-01');
+  -- A leitura de vários meses de uma vez traz o aviso de cada um.
+  assert (select string_agg(format('%s:%s', to_char(month, 'MM'), card_purchase_count), ' ' order by month)
+            from public.months_overview(ctx, '2026-02-01', '2026-06-01')) = '02:1 03:1 04:1 05:0 06:0', 'compras no cartão por mês de compra';
+end $$;
+-- Um contexto vê só as compras do próprio contexto: a Lia (outra pessoa) não vê aviso nenhum nos mesmos meses.
+do $$ begin
+  perform pg_temp.as_('lia');
+  assert pg_temp.ovx('lia_ctx', '2026-02-01') like '% cartão 0', 'o cartão da Mara não aparece na leitura da Lia';
+  assert (select coalesce(sum(card_purchase_count), 0) from public.months_overview(pg_temp.id('lia_ctx'), '2026-02-01', '2026-06-01')) = 0, 'nenhuma compra no cartão no Pessoal da Lia';
+end $$;
+reset role;
+do $$ begin
+  assert pg_temp.rows('mara_ctx') = '2026-02 pagamentos v1 on; 2026-04 recebimentos v1 on; 2026-05 pagamentos v1 on', 'as linhas da Mara: ' || pg_temp.rows('mara_ctx');
+  assert not exists (select 1 from public.month_checks where context_id = pg_temp.id('mara_ctx') and month = '2026-04-01' and kind = 'pagamentos'), 'a recusa não gravou linha';
 end $$;
 
 -- O tipo "recebimentos" faz o mesmo: um recebimento no mês anula a marca de recebimentos (sem apagá-la), e excluí-lo a faz valer de novo.
@@ -476,7 +685,7 @@ begin
 end $$;
 reset role;
 do $$ begin
-  assert pg_temp.marks('lia_ctx') = '2026-07 pagamentos por Lia v1; 2026-08 pagamentos por Lia v1; 2026-08 recebimentos por Lia v1', 'depois de junho: marks ' || pg_temp.marks('lia_ctx');
+  assert pg_temp.marks('lia_ctx') = '2026-07 pagamentos por Lia v1; 2026-08 pagamentos por Lia v3; 2026-08 recebimentos por Lia v1', 'depois de junho: marks ' || pg_temp.marks('lia_ctx');
 end $$;
 
 -- Marca com registro já existente na linha do tempo: o gatilho de atividade e os totais seguem como estão; a desmarcação vale com registro.
@@ -487,7 +696,7 @@ begin
   perform pg_temp.rec('mc-reg-rec-0006', 'lia_ctx', 'despesa', 500, '2026-08-20', 'Café de agosto');
   assert pg_temp.ov('lia_ctx', '2026-08-01') = 'recebido 0/0/t pago 1/500/f', 'agosto com um gasto: marca de pagamentos sem valer';
   -- Desmarcar vale mesmo com registro no mês (a marca que deixou de valer também pode sair).
-  perform public.clear_month_check(pg_temp.id('lia_ctx'), '2026-08-01', 'pagamentos', 'mc-reg-clr-0001', 1);
+  perform public.clear_month_check(pg_temp.id('lia_ctx'), '2026-08-01', 'pagamentos', 'mc-reg-clr-0001', 3);
   assert pg_temp.marks('lia_ctx') = '2026-07 pagamentos por Lia v1; 2026-08 recebimentos por Lia v1', 'a marca de pagamentos saiu';
   assert pg_temp.ov('lia_ctx', '2026-08-01') = 'recebido 0/0/t pago 1/500/f', 'segue com o gasto';
 end $$;
@@ -507,7 +716,9 @@ begin
   assert pg_temp.ov('fam', '2026-08-01') = 'recebido 0/0/f pago 0/0/t', 'Mara lê a marca que fez';
   perform pg_temp.as_('davi');
   assert pg_temp.ov('fam', '2026-08-01') = 'recebido 0/0/f pago 0/0/t', 'Davi (leitor) vê a marca';
-  assert (select count(*) from public.month_checks where context_id = fam) = 1, 'Davi lê a linha pela tabela';
+  assert (select count(*) from public.month_checks where context_id = fam) = 2, 'Davi lê as linhas pela tabela (a de agosto e a desligada de abril)';
+  assert (select string_agg(format('%s %s %s', to_char(month, 'YYYY-MM'), kind, case when checked then 'on' else 'off' end), '; ' order by month, kind)
+            from public.month_checks where context_id = fam) = '2026-04 pagamentos off; 2026-08 pagamentos on', 'o leitor vê o estado de cada linha';
   perform pg_temp.expect_code(pg_temp.sm('mc-fam-0002', 'fam', '2026-08-01', 'recebimentos', 0), 'sem_permissao', '42501');
   perform pg_temp.expect_code(pg_temp.sm('mc-fam-0003', 'fam', '2026-07-01', 'pagamentos', 0), 'sem_permissao', '42501');
   perform pg_temp.expect_code(pg_temp.cm('mc-fam-0004', 'fam', '2026-08-01', 'pagamentos', 1), 'sem_permissao', '42501');
@@ -520,12 +731,14 @@ begin
   perform pg_temp.as_('nuno');
   perform public.clear_month_check(fam, '2026-08-01', 'recebimentos', 'mc-fam-0006', 1);
   assert pg_temp.ov('fam', '2026-08-01') = 'recebido 0/0/f pago 0/0/t', 'Nuno desmarcou a marca da Lia';
-  perform public.set_month_check(fam, '2026-08-01', 'recebimentos', 'mc-fam-0007', 0);
+  -- Marcar de novo o que ele desmarcou: a linha é a mesma, e ele manda a versão que leu (2, desligada).
+  perform pg_temp.expect_stale(pg_temp.sm('mc-fam-0009', 'fam', '2026-08-01', 'recebimentos', 0), 'versao_atual=2');
+  perform public.set_month_check(fam, '2026-08-01', 'recebimentos', 'mc-fam-0007', 2);
   perform public.set_month_check(fam, '2026-07-01', 'recebimentos', 'mc-fam-0008', 0);
 end $$;
 reset role;
 do $$ begin
-  assert pg_temp.marks('fam') = '2026-07 recebimentos por Nuno v1; 2026-08 pagamentos por Mara v1; 2026-08 recebimentos por Nuno v1', 'autoria na Família: ' || pg_temp.marks('fam');
+  assert pg_temp.marks('fam') = '2026-07 recebimentos por Nuno v1; 2026-08 pagamentos por Mara v1; 2026-08 recebimentos por Nuno v3', 'autoria na Família (de quem fez a última mudança): ' || pg_temp.marks('fam');
   -- A Família e o Pessoal são independentes: a marca de um não vale no outro.
   assert pg_temp.marks('lia_ctx') = '2026-07 pagamentos por Lia v1; 2026-08 recebimentos por Lia v1', 'o Pessoal da Lia não mudou';
 end $$;
@@ -575,13 +788,13 @@ begin
   perform pg_temp.expect_code(pg_temp.sm('mc-rem-0002', 'fam', '2026-06-01', 'pagamentos', 0), 'sem_permissao', '42501');
   perform pg_temp.expect_code(pg_temp.cm('mc-rem-0003', 'fam', '2026-08-01', 'recebimentos', 1), 'sem_permissao', '42501');
   -- Repetir a chave de uma marca feita antes de sair: o contexto já não é lido por ele (nao_encontrado).
-  perform pg_temp.expect_code(pg_temp.sm('mc-fam-0007', 'fam', '2026-08-01', 'recebimentos', 0), 'nao_encontrado', 'P0002');
+  perform pg_temp.expect_code(pg_temp.sm('mc-fam-0007', 'fam', '2026-08-01', 'recebimentos', 2), 'nao_encontrado', 'P0002');
   perform pg_temp.as_('lia');
   assert pg_temp.ov('fam', '2026-08-01') = 'recebido 0/0/t pago 0/0/t', 'a marca do Nuno segue valendo para a Família';
 end $$;
 reset role;
 do $$ begin
-  assert pg_temp.marks('fam') = '2026-07 recebimentos por Nuno v1; 2026-08 pagamentos por Mara v1; 2026-08 recebimentos por Nuno v1', 'o que o Nuno marcou ficou';
+  assert pg_temp.marks('fam') = '2026-07 recebimentos por Nuno v1; 2026-08 pagamentos por Mara v1; 2026-08 recebimentos por Nuno v3', 'o que o Nuno marcou ficou';
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -593,10 +806,11 @@ declare
   fam uuid := pg_temp.id('fam');
 begin
   perform pg_temp.as_('lia');
-  perform pg_temp.expect_error(format($f$insert into public.month_checks (context_id, month, kind, checked_by) values (%L, '2026-05-01', 'pagamentos', %L)$f$,
+  perform pg_temp.expect_error(format($f$insert into public.month_checks (context_id, month, kind, checked, updated_by) values (%L, '2026-05-01', 'pagamentos', true, %L)$f$,
     pg_temp.id('lia_ctx'), pg_temp.id('lia')), 'permission denied%');
   perform pg_temp.expect_error($f$update public.month_checks set kind = 'recebimentos'$f$, 'permission denied%');
   perform pg_temp.expect_error($f$update public.month_checks set version = 5$f$, 'permission denied%');
+  perform pg_temp.expect_error($f$update public.month_checks set checked = false$f$, 'permission denied%');
   perform pg_temp.expect_error($f$delete from public.month_checks$f$, 'permission denied%');
   perform pg_temp.expect_error($f$truncate public.month_checks$f$, 'permission denied%');
   assert (select count(*) from public.month_checks) >= 1, 'a titular segue lendo';
@@ -607,19 +821,29 @@ declare
   c uuid := pg_temp.id('lia_ctx');
   p uuid := pg_temp.id('lia');
 begin
-  -- A guarda: a marca não muda nem pelo dono da tabela (só nasce e some).
+  -- A guarda: a linha só muda de estado, uma versão por vez, nem pelo dono da tabela. Sem trocar o estado, ou sem somar exatamente 1 à
+  -- versão, ou mexendo na identidade (contexto, mês, tipo), é campo_imutavel.
   perform pg_temp.expect_code($f$update public.month_checks set version = version + 1$f$, 'campo_imutavel', '42501');
-  perform pg_temp.expect_code($f$update public.month_checks set checked_by = checked_by$f$, 'campo_imutavel', '42501');
-  perform pg_temp.expect_code($f$update public.month_checks set checked_at = now()$f$, 'campo_imutavel', '42501');
-  -- Restrições: um por contexto, mês e tipo; dia 1; tipo; contexto e autoria existentes; versão positiva.
-  perform pg_temp.expect_error(format($f$insert into public.month_checks (context_id, month, kind, checked_by) values (%L, '2026-08-01', 'recebimentos', %L)$f$, c, p), '%month_checks_unica%');
-  perform pg_temp.expect_error(format($f$insert into public.month_checks (context_id, month, kind, checked_by) values (%L, '2026-05-15', 'pagamentos', %L)$f$, c, p), '%month_checks_mes%');
-  perform pg_temp.expect_error(format($f$insert into public.month_checks (context_id, month, kind, checked_by) values (%L, '2026-05-01', 'gastos', %L)$f$, c, p), '%month_checks_tipo%');
-  perform pg_temp.expect_error(format($f$insert into public.month_checks (context_id, month, kind, checked_by) values (%L, null, 'pagamentos', %L)$f$, c, p), '%null value%');
-  perform pg_temp.expect_error(format($f$insert into public.month_checks (context_id, month, kind, checked_by) values (gen_random_uuid(), '2026-05-01', 'pagamentos', %L)$f$, p), '%month_checks_context_id_fkey%');
-  perform pg_temp.expect_error(format($f$insert into public.month_checks (context_id, month, kind, checked_by) values (%L, '2026-05-01', 'pagamentos', gen_random_uuid())$f$, c), '%month_checks_checked_by_fkey%');
-  perform pg_temp.expect_error(format($f$insert into public.month_checks (context_id, month, kind, checked_by, version) values (%L, '2026-05-01', 'pagamentos', %L, 0)$f$, c, p), '%month_checks_version_check%');
-  perform pg_temp.expect_error(format($f$insert into public.month_checks (context_id, month, kind, checked_by) values (%L, '2026-05-01', 'pagamentos', %L), (%L, '2026-05-01', 'pagamentos', %L)$f$, c, p, c, p), '%month_checks_unica%');
+  perform pg_temp.expect_code($f$update public.month_checks set updated_by = updated_by$f$, 'campo_imutavel', '42501');
+  perform pg_temp.expect_code($f$update public.month_checks set updated_at = now()$f$, 'campo_imutavel', '42501');
+  perform pg_temp.expect_code($f$update public.month_checks set checked = not checked$f$, 'campo_imutavel', '42501');
+  perform pg_temp.expect_code($f$update public.month_checks set checked = not checked, version = version + 2$f$, 'campo_imutavel', '42501');
+  perform pg_temp.expect_code($f$update public.month_checks set checked = not checked, version = version - 1$f$, 'campo_imutavel', '42501');
+  perform pg_temp.expect_code($f$update public.month_checks set checked = not checked, version = version + 1, kind = 'recebimentos'$f$, 'campo_imutavel', '42501');
+  perform pg_temp.expect_code($f$update public.month_checks set checked = not checked, version = version + 1, month = month - 31$f$, 'campo_imutavel', '42501');
+  perform pg_temp.expect_code($f$update public.month_checks set checked = not checked, version = version + 1, context_id = gen_random_uuid()$f$, 'campo_imutavel', '42501');
+  perform pg_temp.expect_code($f$update public.month_checks set checked = not checked, version = version + 1, id = gen_random_uuid()$f$, 'campo_imutavel', '42501');
+  -- Restrições: um por contexto, mês e tipo; dia 1; tipo; estado; contexto e autoria existentes; versão positiva.
+  perform pg_temp.expect_error(format($f$insert into public.month_checks (context_id, month, kind, checked, updated_by) values (%L, '2026-08-01', 'recebimentos', true, %L)$f$, c, p), '%month_checks_unica%');
+  perform pg_temp.expect_error(format($f$insert into public.month_checks (context_id, month, kind, checked, updated_by) values (%L, '2026-08-01', 'recebimentos', false, %L)$f$, c, p), '%month_checks_unica%');
+  perform pg_temp.expect_error(format($f$insert into public.month_checks (context_id, month, kind, checked, updated_by) values (%L, '2026-05-15', 'pagamentos', true, %L)$f$, c, p), '%month_checks_mes%');
+  perform pg_temp.expect_error(format($f$insert into public.month_checks (context_id, month, kind, checked, updated_by) values (%L, '2026-05-01', 'gastos', true, %L)$f$, c, p), '%month_checks_tipo%');
+  perform pg_temp.expect_error(format($f$insert into public.month_checks (context_id, month, kind, checked, updated_by) values (%L, null, 'pagamentos', true, %L)$f$, c, p), '%null value%');
+  perform pg_temp.expect_error(format($f$insert into public.month_checks (context_id, month, kind, checked, updated_by) values (%L, '2026-05-01', 'pagamentos', null, %L)$f$, c, p), '%null value%');
+  perform pg_temp.expect_error(format($f$insert into public.month_checks (context_id, month, kind, checked, updated_by) values (gen_random_uuid(), '2026-05-01', 'pagamentos', true, %L)$f$, p), '%month_checks_context_id_fkey%');
+  perform pg_temp.expect_error(format($f$insert into public.month_checks (context_id, month, kind, checked, updated_by) values (%L, '2026-05-01', 'pagamentos', true, gen_random_uuid())$f$, c), '%month_checks_updated_by_fkey%');
+  perform pg_temp.expect_error(format($f$insert into public.month_checks (context_id, month, kind, checked, updated_by, version) values (%L, '2026-05-01', 'pagamentos', true, %L, 0)$f$, c, p), '%month_checks_version_check%');
+  perform pg_temp.expect_error(format($f$insert into public.month_checks (context_id, month, kind, checked, updated_by) values (%L, '2026-05-01', 'pagamentos', true, %L), (%L, '2026-05-01', 'pagamentos', false, %L)$f$, c, p, c, p), '%month_checks_unica%');
   -- record_operations: as ações novas existem e são sem alvo; com alvo, a restrição de alvo recusa.
   perform pg_temp.expect_error(format($f$insert into public.record_operations (actor_id, idempotency_key, action, context_id, request_hash, target_id)
     values (%L, 'mc-ops-0001', 'marcar_mes_conferido', %L, 'x', gen_random_uuid())$f$, p, c), '%record_operations_target_check%');
@@ -693,7 +917,7 @@ declare
   tito uuid := pg_temp.id('tito');
   fam uuid := pg_temp.id('fam');
 begin
-  assert (select count(*) from public.month_checks where checked_by = ester) = 4 and (select count(*) from public.month_checks where checked_by = tito) = 3, 'as marcas de Ester e Tito';
+  assert (select count(*) from public.month_checks where updated_by = ester) = 4 and (select count(*) from public.month_checks where updated_by = tito) = 3, 'as marcas de Ester e Tito';
 end $$;
 
 -- Ester (membro) exclui a conta: o Pessoal dela some com as marcas; as da Família ficam, de autoria anônima.
@@ -710,7 +934,7 @@ declare
 begin
   assert (select count(*) from public.month_checks where context_id = pg_temp.id('ester_ctx')) = 0
      and not exists (select 1 from public.financial_contexts where id = pg_temp.id('ester_ctx')), 'o Pessoal da Ester e as marcas dele sumiram';
-  assert (select count(*) from public.month_checks where checked_by = ester) = 2 and (select count(*) from public.month_checks where checked_by = ester and context_id = fam) = 2,
+  assert (select count(*) from public.month_checks where updated_by = ester) = 2 and (select count(*) from public.month_checks where updated_by = ester and context_id = fam) = 2,
     'na Família ficaram as duas marcas dela';
   assert (select (deleted_at is not null, display_name) from public.persons where id = ester) = (true, ''::text), 'a autoria é a pessoa anônima, sem nome';
   assert pg_temp.marks('fam') = replace(pg_temp.was('fam_before'), 'por Ester', 'por anônima'), 'a Família guarda as marcas, com a autoria anônima: ' || pg_temp.marks('fam');
@@ -751,7 +975,7 @@ declare
   tito uuid := pg_temp.id('tito');
 begin
   assert (select count(*) from public.month_checks where context_id in (pg_temp.id('tito_ctx'), pg_temp.id('tfam'))) = 0
-     and (select count(*) from public.month_checks where checked_by = tito) = 0, 'as marcas do Pessoal e da Família do Tito sumiram';
+     and (select count(*) from public.month_checks where updated_by = tito) = 0, 'as marcas do Pessoal e da Família do Tito sumiram';
   assert not exists (select 1 from public.financial_contexts where id in (pg_temp.id('tito_ctx'), pg_temp.id('tfam')))
      and not exists (select 1 from public.persons where id = tito), 'sem contexto e sem pessoa anônima';
   assert pg_temp.nmarks() = pg_temp.was('marks_before')::bigint - 2 - 1 - 3, 'as 3 marcas do Tito saíram (e antes saíram 2 do Pessoal da Ester e 1 desmarcada pela Mara)';
@@ -763,10 +987,15 @@ declare
   c uuid;
 begin
   insert into public.financial_contexts (kind, name, owner_person_id) values ('familia', 'Casa do apagar', pg_temp.id('quim')) returning id into c;
-  insert into public.month_checks (context_id, month, kind, checked_by) values (c, '2026-05-01', 'pagamentos', pg_temp.id('quim'));
-  assert (select count(*) from public.month_checks where context_id = c) = 1, 'uma marca no contexto';
+  insert into public.month_checks (context_id, month, kind, checked, updated_by) values (c, '2026-05-01', 'pagamentos', true, pg_temp.id('quim'));
+  -- A guarda deixa a linha mudar de estado uma versão por vez (ligada, desligada, ligada), e cada mudança troca o estado e soma 1.
+  update public.month_checks set checked = false, version = version + 1 where context_id = c;
+  update public.month_checks set checked = true, version = version + 1, updated_at = now() where context_id = c;
+  assert (select (checked, version) from public.month_checks where context_id = c) = (true, 3), 'a linha mudou duas vezes: versão 3';
+  insert into public.month_checks (context_id, month, kind, checked, updated_by) values (c, '2026-05-01', 'recebimentos', false, pg_temp.id('quim'));
+  assert (select count(*) from public.month_checks where context_id = c) = 2, 'uma linha ligada e uma desligada no contexto';
   delete from public.financial_contexts where id = c;
-  assert (select count(*) from public.month_checks where context_id = c) = 0, 'o contexto levou a marca';
+  assert (select count(*) from public.month_checks where context_id = c) = 0, 'o contexto levou as linhas, ligadas e desligadas';
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -794,8 +1023,9 @@ do $$ begin
             select a.arg as a, a.t::regtype::text as t, a.o from pg_proc p,
                    lateral unnest(p.proargnames, p.proargmodes::text[], p.proallargtypes::oid[]) with ordinality as a(arg, m, t, o)
              where p.oid = 'public.months_overview(uuid, date, date)'::regprocedure and a.m = 't') z)
-       = array['month date', 'received_count integer', 'received_cents bigint', 'paid_count integer', 'paid_cents bigint', 'received_checked boolean', 'paid_checked boolean'],
-    'as 5 colunas de antes, na mesma ordem e com os mesmos tipos, e as 2 novas no fim';
+       = array['month date', 'received_count integer', 'received_cents bigint', 'paid_count integer', 'paid_cents bigint', 'received_checked boolean', 'paid_checked boolean',
+               'received_check_version integer', 'paid_check_version integer', 'card_purchase_count integer'],
+    'as 5 colunas de antes, na mesma ordem e com os mesmos tipos, e as 5 novas no fim';
   assert has_table_privilege('authenticated', 'public.month_checks', 'select')
      and not has_table_privilege('authenticated', 'public.month_checks', 'insert, update, delete, truncate')
      and not has_any_column_privilege('authenticated', 'public.month_checks', 'insert, update'), 'só leitura (filtrada pela RLS), sem escrita direta';
@@ -806,7 +1036,7 @@ do $$ begin
     'uma política de leitura, com a permissão de leitura do contexto';
   assert (select count(*) from pg_constraint where conrelid = 'public.month_checks'::regclass and contype = 'u' and conname = 'month_checks_unica') = 1, 'única por contexto, mês e tipo';
   assert (select array_agg(confdeltype::text order by conname) from pg_constraint where conrelid = 'public.month_checks'::regclass and contype = 'f')
-       = array['a', 'c'], 'a autoria (checked_by) não tem cascata; o contexto (context_id) tem';
+       = array['c', 'a'], 'o contexto (context_id) tem cascata; a autoria (updated_by) não tem';
   assert (select confdeltype from pg_constraint where conrelid = 'public.month_checks'::regclass and conname = 'month_checks_context_id_fkey') = 'c', 'context_id com on delete cascade';
   assert exists (select 1 from pg_trigger where tgname = 'month_checks_guard' and tgrelid = 'public.month_checks'::regclass and not tgisinternal and tgenabled = 'O'), 'guarda ligada';
   assert (select array_agg(m[1] order by m[1] collate "C") from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
@@ -816,9 +1046,15 @@ do $$ begin
     'o gatilho de atividade não conta as duas ações';
   -- Toda escrita termina na operação: as duas funções gravam em record_operations por último (depois da marca).
   assert (select position('insert into public.month_checks' in d) < position('insert into public.record_operations' in d)
+                 and position('update public.month_checks' in d) < position('insert into public.record_operations' in d)
+                 and position('delete from public.month_checks' in d) = 0
             from (select pg_get_functiondef('public.set_month_check(uuid, date, text, text, integer)'::regprocedure) as d) x)
-     and (select position('delete from public.month_checks' in d) < position('insert into public.record_operations' in d)
-            from (select pg_get_functiondef('public.clear_month_check(uuid, date, text, text, integer)'::regprocedure) as d) x), 'a operação é a última gravação';
+     and (select position('update public.month_checks' in d) < position('insert into public.record_operations' in d)
+                 and position('insert into public.month_checks' in d) = 0 and position('delete from public.month_checks' in d) = 0
+            from (select pg_get_functiondef('public.clear_month_check(uuid, date, text, text, integer)'::regprocedure) as d) x),
+    'a operação é a última gravação, e a marca nunca é apagada pelas funções';
+  assert exists (select 1 from pg_indexes where schemaname = 'public' and tablename = 'card_entries' and indexname = 'card_entries_purchased_on'
+                    and indexdef like '%(context_id, purchased_on)%'), 'o índice da data da compra no cartão (aviso de compras no cartão)';
 end $$;
 set role anon;
 select pg_temp.expect_error($$select public.set_month_check(gen_random_uuid(), '2026-08-01', 'pagamentos', 'mc-anon-0001', 0)$$, 'permission denied%');

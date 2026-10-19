@@ -218,8 +218,11 @@ type StoredCommitment = Omit<Commitment, 'payment' | 'series' | 'invoice'> & {
 type StoredSeries = Omit<CommitmentSeries, 'terms' | 'skippedNumbers' | 'paidCount' | 'openCount' | 'generating'> & { deletedAt?: string };
 /** Vigência: nunca editada; "esta e as próximas" marca as substituídas. */
 type StoredTerm = SeriesTerm & { id: string; seriesId: string; contextId: string; createdAt: string; supersededAt?: string };
-/** Marca "Conferi este mês" (month_checks): uma por contexto, mês e tipo; nunca muda (só nasce e some). A versão da marca viva é 1. */
-type StoredMonthCheck = { contextId: string; month: IsoMonth; kind: MonthCheckKind; checkedAt: string; version: 1 };
+/**
+ * Marca "Conferi este mês" (month_checks): uma linha persistente por contexto, mês e tipo, com o estado (`checked`) e a versão, que cresce
+ * 1 a cada marcar e cada desmarcar (a primeira marcação cria a linha na versão 1). `updatedAt` é a hora da última mudança.
+ */
+type StoredMonthCheck = { contextId: string; month: IsoMonth; kind: MonthCheckKind; checked: boolean; updatedAt: string; version: number };
 /** Renda de referência (income_references): exclusão lógica; no máximo uma viva por contexto e mês. */
 type StoredIncomeReference = IncomeReference & { deletedAt?: string; deletedBy?: string };
 /** Linha do orçamento por categoria (category_budgets) e do limite pessoal (commitment_limits): exclusão lógica; no máximo uma viva por chave. */
@@ -341,7 +344,7 @@ export class MemoryRepository implements RecordsRepository {
   /** context_activity e return_reviews da pessoa (só ela usa este repositório), por contexto. */
   private activity = new Map<string, ContextActivity>();
   private reviews = new Map<string, ReturnReviewMark>();
-  /** month_checks nos contextos que a pessoa lê (aqui, os dela), por "contexto|mês|tipo". */
+  /** month_checks nos contextos que a pessoa lê (aqui, os dela), por "contexto|mês|tipo"; a linha nunca sai (só com o contexto). */
   private monthChecks = new Map<string, StoredMonthCheck>();
   private incomeRefs = new Map<string, StoredIncomeReference>();
   private budgets = new Map<string, StoredBudget>();
@@ -1388,7 +1391,11 @@ export class MemoryRepository implements RecordsRepository {
       if (!this.canRead(contextId)) throw new RepoError('sem_permissao');
       const live = [...this.records.values()].filter((r) => !r.deletedAt).map(strip);
       const checks = [...this.monthChecks.values()].filter((c) => c.contextId === contextId);
-      return overviewOf(live, contextId, from, to, checks);
+      // Compras no cartão vivas do contexto, uma por compra (o lançamento 'compra'), pela data da compra: só informa, não entra em Pago.
+      const purchases = [...this.cardEntries.values()].filter(
+        (e): e is StoredCardEntry & { purchasedOn: IsoDate } => !e.deletedAt && e.contextId === contextId && e.kind === 'compra' && e.purchasedOn !== null,
+      );
+      return overviewOf(live, contextId, from, to, checks, purchases);
     });
   }
 
@@ -1499,18 +1506,22 @@ export class MemoryRepository implements RecordsRepository {
     if (typeof month !== 'string' || !isValidIsoMonth(month) || month >= monthOf(this.opts.today())) throw new RepoError('mes_invalido');
   }
 
-  /** O estado da marca do contexto, mês e tipo, como clarevo_month_check_result: sem marca, {checked: false, version: 0}. */
+  /**
+   * O estado da marca do contexto, mês e tipo, como clarevo_month_check_result: sem linha, {checked: false, version: 0}; com a linha
+   * desligada, {checked: false, version: n} sem hora; ligada, {checked: true, version: n} com a hora da última mudança.
+   */
   private monthCheckResult(contextId: string, month: IsoMonth, kind: MonthCheckKind): MonthCheck {
     const c = this.monthChecks.get(`${contextId}|${month}|${kind}`);
     return c
-      ? { contextId, month, kind, checked: true, version: c.version, checkedAt: c.checkedAt }
+      ? { contextId, month, kind, checked: c.checked, version: c.version, checkedAt: c.checked ? c.updatedAt : null }
       : { contextId, month, kind, checked: false, version: 0, checkedAt: null };
   }
 
   /**
    * Como set_month_check ("Conferi este mês", D-060). Ordem do banco: repetição; sem_permissao (escrita no contexto); tipo_invalido;
-   * mes_invalido; versao_desatualizada (marcar espera 0 e nenhuma marca viva); mes_com_registros (registro vivo do tipo no mês).
-   * Não conta como anotação, não muda nenhum total e vale por contexto.
+   * mes_invalido; versao_desatualizada (marcar espera a versão da linha, 0 sem linha, e a marca desligada); mes_com_registros (registro
+   * vivo do tipo no mês; compra no cartão não é registro de Pago); escrita (cria a linha na versão 1, ou liga a desligada e soma 1 à
+   * versão). Não conta como anotação, não muda nenhum total e vale por contexto.
    */
   async setMonthCheck(key: string, contextId: string, month: IsoMonth, kind: MonthCheckKind, expectedVersion: number): Promise<MonthCheck> {
     return this.write(() => {
@@ -1518,20 +1529,21 @@ export class MemoryRepository implements RecordsRepository {
       if (this.replay(key, 'marcar_mes_conferido', payload)) return this.monthCheckResult(contextId, month, kind);
       if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
       this.checkMonthCheckArgs(month, kind);
-      const live = this.monthChecks.get(`${contextId}|${month}|${kind}`);
-      if (live || expectedVersion !== 0) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${live?.version ?? 0}`);
+      const line = this.monthChecks.get(`${contextId}|${month}|${kind}`);
+      if (expectedVersion !== (line?.version ?? 0) || line?.checked) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${line?.version ?? 0}`);
       const wanted: RecordKind = kind === 'recebimentos' ? 'receita' : 'despesa';
       const hasRecords = [...this.records.values()].some((r) => !r.deletedAt && r.contextId === contextId && r.kind === wanted && monthOf(r.occurredOn) === month);
       if (hasRecords) throw new RepoError('mes_com_registros');
-      this.monthChecks.set(`${contextId}|${month}|${kind}`, { contextId, month, kind, checkedAt: this.stamp(), version: 1 });
+      this.monthChecks.set(`${contextId}|${month}|${kind}`, { contextId, month, kind, checked: true, updatedAt: this.stamp(), version: (line?.version ?? 0) + 1 });
       this.saveOperation(key, 'marcar_mes_conferido', payload, { contextId, recordId: null, commitmentId: null });
       return this.monthCheckResult(contextId, month, kind);
     });
   }
 
   /**
-   * Como clear_month_check. Mesma ordem; no lugar de mes_com_registros, a marca precisa existir e a versão esperada precisa ser a dela
-   * (versao_desatualizada com "versao_atual=0" quando já não há marca). Vale mesmo com registro no mês.
+   * Como clear_month_check. Mesma ordem; no lugar de mes_com_registros, a linha precisa existir, estar ligada e a versão esperada precisa
+   * ser a dela (versao_desatualizada com "versao_atual=0" quando não há linha, ou com a versão dela quando já está desligada). Vale mesmo
+   * com registro no mês. A linha fica, desligada, com a versão somada de 1.
    */
   async clearMonthCheck(key: string, contextId: string, month: IsoMonth, kind: MonthCheckKind, expectedVersion: number): Promise<MonthCheck> {
     return this.write(() => {
@@ -1539,9 +1551,9 @@ export class MemoryRepository implements RecordsRepository {
       if (this.replay(key, 'desmarcar_mes_conferido', payload)) return this.monthCheckResult(contextId, month, kind);
       if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
       this.checkMonthCheckArgs(month, kind);
-      const live = this.monthChecks.get(`${contextId}|${month}|${kind}`);
-      if (!live || expectedVersion !== live.version) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${live?.version ?? 0}`);
-      this.monthChecks.delete(`${contextId}|${month}|${kind}`);
+      const line = this.monthChecks.get(`${contextId}|${month}|${kind}`);
+      if (!line || !line.checked || expectedVersion !== line.version) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${line?.version ?? 0}`);
+      this.monthChecks.set(`${contextId}|${month}|${kind}`, { ...line, checked: false, updatedAt: this.stamp(), version: line.version + 1 });
       this.saveOperation(key, 'desmarcar_mes_conferido', payload, { contextId, recordId: null, commitmentId: null });
       return this.monthCheckResult(contextId, month, kind);
     });

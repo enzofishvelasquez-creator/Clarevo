@@ -400,20 +400,25 @@ export interface RecordsRepository {
     decision: ReturnDecision,
   ): Promise<ReturnReviewMark>;
 
-  // "Conferi este mês" (D-060, item 2; resolve P-022). A marca vem junto de monthsOverview (receivedChecked e paidChecked).
+  // "Conferi este mês" (D-060, item 2; resolve P-022). A marca vem junto de monthsOverview (receivedChecked e paidChecked, com a versão
+  // da linha em receivedCheckVersion e paidCheckVersion e as compras no cartão do mês em cardPurchaseCount).
 
   /**
-   * set_month_check: a pessoa conferiu que o mês já terminado não teve recebimentos ('recebimentos') ou gastos ('pagamentos'). Exige
-   * escrita no contexto (na Família, quem escreve marca; quem só lê, não). Marcar espera a versão 0 (ainda sem marca). Ordem: repetição
-   * (chave_reutilizada se a ação ou o conteúdo mudam); sem_permissao; tipo_invalido; mes_invalido (o mês atual, os futuros e o que não é
-   * o primeiro dia de um mês); versao_desatualizada (já há marca, ou a versão não é 0; RepoError.detail "versao_atual=N"); mes_com_registros
-   * (o mês já tem registro do tipo). A marca nunca muda um total e não conta como anotação na atividade. Mesma chave e conteúdo: devolve
-   * o estado de agora. Reconciliação: repetir a chave.
+   * set_month_check: a pessoa conferiu que o mês já terminado não teve recebimentos ('recebimentos') ou pagamentos ('pagamentos', a base
+   * de Pago: caixa, pela data do pagamento; compra no cartão só entra quando a fatura é paga). Exige escrita no contexto (na Família,
+   * quem escreve marca; quem só lê, não). A marca é uma linha persistente por contexto, mês e tipo, com a versão crescente: marcar espera
+   * a versão que a pessoa leu (0 sem linha, ou a da linha desligada). Ordem: repetição (chave_reutilizada se a ação ou o conteúdo mudam);
+   * sem_permissao; tipo_invalido; mes_invalido (o mês atual, os futuros e o que não é o primeiro dia de um mês); versao_desatualizada
+   * (a versão não é a da linha, ou a marca já está ligada; RepoError.detail "versao_atual=N"); mes_com_registros (o mês já tem registro do
+   * tipo). A primeira marcação cria a linha na versão 1; depois, cada marcar e cada desmarcar soma 1. A marca nunca muda um total e não
+   * conta como anotação na atividade. Mesma chave e conteúdo: devolve o estado de agora (quem chama confere o `checked` antes de
+   * anunciar: monthCheckOutcome). Reconciliação: repetir a chave.
    */
   setMonthCheck(key: string, contextId: string, month: IsoMonth, kind: MonthCheckKind, expectedVersion: number): Promise<MonthCheck>;
   /**
-   * clear_month_check: desfaz a marca (a versão esperada é a da marca viva, 1). Mesma ordem; sem marca, versao_desatualizada com
-   * "versao_atual=0". Vale mesmo com registro no mês (a marca que deixou de valer também pode sair).
+   * clear_month_check: desliga a marca (a versão esperada é a da linha ligada). Mesma ordem; sem linha, ou com a marca já desligada,
+   * versao_desatualizada com a versão atual ("versao_atual=0" sem linha). A linha fica, desligada, na versão seguinte. Vale mesmo com
+   * registro no mês (a marca que deixou de valer também pode sair).
    */
   clearMonthCheck(key: string, contextId: string, month: IsoMonth, kind: MonthCheckKind, expectedVersion: number): Promise<MonthCheck>;
 

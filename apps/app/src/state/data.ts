@@ -878,7 +878,7 @@ export function useDecideReturnReview() {
 }
 
 /**
- * "Conferi este mês" e "Desfazer a conferência" (D-060): a marca de um mês fechado sem recebimentos ou sem gastos. Confirmada pelo
+ * "Conferi este mês" e "Desfazer a conferência" (D-060): a marca de um mês fechado sem recebimentos ou sem pagamentos (o tipo de Pago). Manda a versão que a tela leu; confirmada pelo
  * servidor, recarrega as leituras que mostram o mês (Evolução, Pago e Recebido, revisão dos últimos meses). A marca não muda nenhum
  * total nem conta como anotação, então só `months_overview` e a revisão precisam recarregar, e nada mais.
  */
@@ -1560,7 +1560,8 @@ export function useEssentialEstimate(contextId: string | undefined) {
 /**
  * "Seu mês em 30 segundos" (D-052): os cartões do mês, montados no core (`buildSeuMes`) com as leituras que o Resumo, Contas a pagar, o
  * orçamento e as metas já fazem (as mesmas chaves: toda escrita recarrega). O mês anterior entra só para a comparação em "Para onde
- * foi". Sem dado parcial: uma falha de qualquer leitura falha tudo, nunca um cartão com zero no lugar do valor.
+ * foi". Num mês que passou, lê também a marca "Conferi este mês" (a frase do mês vazio e conferido). Sem dado parcial: uma falha de
+ * qualquer leitura falha tudo, nunca um cartão com zero no lugar do valor.
  */
 export function useSeuMes(contextId: string | undefined, month: IsoMonth) {
   const { today } = useSession();
@@ -1571,10 +1572,14 @@ export function useSeuMes(contextId: string | undefined, month: IsoMonth) {
   const budget = useMonthBudget(contextId, month);
   const goals = useGoals(contextId);
   const movements = useGoalMovementsInMonth(contextId, month);
-  const parts: QueryPart[] = [records, breakdown, previous, commitments, budget, goals, movements];
+  // "Conferi este mês" (D-060): só num mês que passou, e só ele pode estar conferido; sem a leitura, nunca um "conferido" que não foi lido.
+  const needsCheck = month < monthOf(today);
+  const checks = useMonthCheckRow(needsCheck ? contextId : undefined, month);
+  const parts: QueryPart[] = [records, breakdown, previous, commitments, budget, goals, movements, ...(needsCheck ? [checks] : [])];
   const ready = parts.every((p) => p.isSuccess);
   const summary = records.summary;
   const toPay = commitments.summary;
+  const paidChecked = needsCheck ? checks.row?.paidChecked === true : false;
   const value = useMemo((): SeuMesView | undefined => {
     if (!ready || !summary || !toPay || !breakdown.data || !previous.data || !goals.data || !movements.data) return undefined;
     return buildSeuMes({
@@ -1586,8 +1591,9 @@ export function useSeuMes(contextId: string | undefined, month: IsoMonth) {
       toPay,
       budget: budget.summary,
       goals: { count: goals.data.length, savedInMonthCents: savedInMonth(movements.data, month), plannedCents: plannedForGoals(goals.data) },
+      paidChecked,
     });
-  }, [ready, month, today, summary, toPay, breakdown.data, previous.data, budget.summary, goals.data, movements.data]);
+  }, [ready, month, today, summary, toPay, breakdown.data, previous.data, budget.summary, goals.data, movements.data, paidChecked]);
   return combineParts<SeuMesView>(parts, value);
 }
 
@@ -2098,6 +2104,8 @@ function useInvalidateCard() {
     qc.invalidateQueries({ queryKey: ['commitment'] });
     // Compra, estorno e exclusão de lançamento mudam o usado no mês do orçamento (a competência vem dos lançamentos).
     qc.invalidateQueries({ queryKey: BUDGET_MONTH_KEY });
+    // E as compras no cartão do mês que months_overview conta (o aviso de "Conferi este mês": compra no cartão não entra em Pago).
+    qc.invalidateQueries({ queryKey: ['records', 'overview'] });
     if ('record' in w) {
       qc.invalidateQueries({ queryKey: ['records'] });
       qc.invalidateQueries({ queryKey: ['record', w.record.id] });

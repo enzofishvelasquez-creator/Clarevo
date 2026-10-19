@@ -1,30 +1,39 @@
 -- Clarevo · migração 0016 · "Conferi este mês" (D-060, item 2; resolve P-022, Ciclo S). Depois de 20261018000001_exclusao.sql.
--- A pessoa pode marcar que conferiu um mês já terminado e que ele não teve recebimentos ("recebimentos") ou não teve gastos
--- ("pagamentos"): é o "zero confirmado", que se distingue do mês sem registro. A marca é por contexto, mês e tipo, só nasce e só some
--- pelas funções abaixo e nunca muda nenhum total (Recebido, Pago, Diferença, renda comprometida): é uma afirmação da pessoa, não um
--- lançamento. Marcar e desmarcar exigem escrita no contexto (na Família, quem anota marca e desmarca; quem só lê vê); a empresa nunca
--- lê. Nenhuma função nova grava financial_records, commitments, card_entries nem metas.
+-- A pessoa pode marcar que conferiu um mês já terminado e que ele não teve recebimentos ("recebimentos") ou não teve pagamentos
+-- ("pagamentos", a base de Pago: caixa, pela data do pagamento, D-057 D07): é o "zero confirmado", que se distingue do mês sem registro.
+-- A marca é por contexto, mês e tipo, só nasce e só muda pelas funções abaixo e nunca muda nenhum total (Recebido, Pago, Diferença,
+-- renda comprometida): é uma afirmação da pessoa, não um lançamento. Marcar e desmarcar exigem escrita no contexto (na Família, quem
+-- anota marca e desmarca; quem só lê vê); a empresa nunca lê. Nenhuma função nova grava financial_records, commitments, card_entries
+-- nem metas.
 --
 -- Invariantes:
--- M1. No máximo uma marca por (contexto, mês, tipo). O mês é sempre o primeiro dia de um mês; o tipo é 'recebimentos' ou 'pagamentos'.
+-- M1. Uma linha persistente por (contexto, mês, tipo): nasce na primeira marcação e nunca é apagada (só sai com o contexto). O mês é
+--     sempre o primeiro dia de um mês; o tipo é 'recebimentos' ou 'pagamentos'. `checked` diz se a marca está ligada.
 -- M2. Só se marca um mês já terminado: o mês atual e os futuros, no fuso de quem marca, são recusados (mes_invalido).
--- M3. Só se marca um mês que, naquele tipo, não tem nenhum registro vivo (mes_com_registros). Se um registro aparecer depois, a marca
---     deixa de valer (months_overview devolve false) SEM ser apagada; ao excluir o registro, ela volta a valer. A marca vale só enquanto
---     a contagem do tipo no mês é zero.
--- M4. A marca nunca muda: nasce com a autoria e a hora de quem marcou e só sai por clear_month_check (ou com o contexto). A versão da
---     marca viva é sempre 1; marcar espera 0 (ainda sem marca) e desmarcar espera a versão viva, e quem chega com versão velha recebe
---     versao_desatualizada com o detalhe versao_atual (0 quando já não há marca).
--- M5. Autoria: checked_by aponta para persons. A conta excluída (D-058) leva as marcas do Pessoal e das Famílias que ela encerra (as
---     marcas saem com o contexto, em cascata); numa Família que continua, a marca fica e a autoria vira "Pessoa que saiu" (a linha
---     anônima de persons), porque a chave estrangeira impede apagar a pessoa enquanto ela for autora de algo.
+-- M3. Só se marca um mês que, naquele tipo, não tem nenhum registro vivo (mes_com_registros): o mesmo critério de Pago e de Recebido
+--     (financial_records vivos do tipo, pela data do pagamento). Compra no cartão NÃO é registro de Pago: ela só entra no Pago quando a
+--     fatura é paga (o pagamento da fatura é um registro, pela data em que foi pago). Por isso um mês só com compras no cartão pode ser
+--     marcado, e months_overview avisa (card_purchase_count) que há compras no cartão pela data da compra, inclusive as importadas.
+--     Se um registro aparecer depois da marca, ela deixa de valer (months_overview devolve false) SEM ser desligada; ao excluir o
+--     registro, ela volta a valer. A marca vale só enquanto `checked` e a contagem do tipo no mês é zero.
+-- M4. Versão crescente: a primeira marcação cria a linha com versão 1; cada marcar e cada desmarcar soma 1 e troca `checked`, nunca
+--     mais nem menos. Marcar espera a versão que a pessoa leu (0 quando ainda não há linha) e uma linha desligada; desmarcar espera a
+--     versão da linha ligada. Quem chega com versão velha, ou com a marca já no estado pedido, recebe versao_desatualizada com o
+--     detalhe versao_atual (0 quando não há linha). A linha só muda de estado: o contexto, o mês e o tipo nunca mudam.
+-- M5. Autoria: updated_by aponta para persons e é quem fez a última mudança (marcar ou desmarcar). A conta excluída (D-058) leva as
+--     linhas do Pessoal e das Famílias que ela encerra (saem com o contexto, em cascata); numa Família que continua, a linha fica e a
+--     autoria vira "Pessoa que saiu" (a linha anônima de persons), porque a chave estrangeira impede apagar a pessoa enquanto ela for
+--     autora de algo.
 -- M6. Marcar e desmarcar NÃO contam como anotação para a atividade de "Seus últimos meses" (D-030), como responder_guardar.
 -- M7. Escrita só pelas duas funções (security definer, search_path fixo, só authenticated); sem insert, update nem delete diretos.
 -- Ordem de travas: chave (consultiva da operação) -> (contexto, mês, tipo) (consultiva) -> linha da marca. A operação é a última
 -- gravação, como em toda função de escrita (record_operations_actor_guard, X5 da 0015: conta_excluida).
 --
--- months_overview ganha duas colunas no fim, received_checked e paid_checked (a marca vale: existe e o mês não tem registro do tipo),
--- com os mesmos argumentos: o app publicado lê as colunas por nome e ignora as novas. Como o tipo de retorno muda, a função é recriada
--- (drop e create) e os privilégios são concedidos de novo no fim, como em toda migração.
+-- months_overview ganha cinco colunas no fim, com os mesmos argumentos: received_checked e paid_checked (a marca vale: está ligada e o
+-- mês não tem registro do tipo), received_check_version e paid_check_version (a versão da linha da marca, 0 sem linha: é a que o app
+-- manda ao marcar e desmarcar) e card_purchase_count (compras no cartão vivas pela data da compra no mês; só informa, nunca entra em
+-- Pago). O app publicado lê as colunas por nome e ignora as novas. Como o tipo de retorno muda, a função é recriada (drop e create) e
+-- os privilégios são concedidos de novo no fim, como em toda migração.
 
 -- ---------------------------------------------------------------------------
 -- Marcas de "Conferi este mês"
@@ -34,31 +43,41 @@ create table public.month_checks (
   context_id uuid not null references public.financial_contexts (id) on delete cascade,
   month date not null,
   kind text not null,
-  checked_by uuid not null references public.persons (id),
-  checked_at timestamptz not null default now(),
+  checked boolean not null,
+  updated_by uuid not null references public.persons (id),
+  updated_at timestamptz not null default now(),
   version integer not null default 1 check (version >= 1),
   constraint month_checks_unica unique (context_id, month, kind),
   constraint month_checks_mes check (extract(day from month) = 1),
   constraint month_checks_tipo check (kind in ('recebimentos', 'pagamentos'))
 );
 comment on table public.month_checks is
-  'Marca de "Conferi este mês": a pessoa conferiu que o mês já terminado não teve recebimentos ou gastos (zero confirmado, P-022). '
-  'Por contexto, mês e tipo. Vale só enquanto o mês não tem registro do tipo; nunca muda um total. Escrita só por set_month_check e clear_month_check.';
+  'Marca de "Conferi este mês": a pessoa conferiu que o mês já terminado não teve recebimentos ou pagamentos (zero confirmado, P-022). '
+  'Uma linha por contexto, mês e tipo, com o estado (checked) e a versão, que cresce 1 a cada marcar e desmarcar. Vale só enquanto o mês não tem registro do tipo; '
+  'nunca muda um total. Escrita só por set_month_check e clear_month_check.';
 
--- M4: a marca não muda (só nasce e some).
+-- M4: a linha só muda de estado, uma versão por vez (a identidade da marca nunca muda).
 create or replace function public.month_checks_guard()
 returns trigger
 language plpgsql
 set search_path = public
 as $$
 begin
-  raise exception 'campo_imutavel' using errcode = '42501';
+  if new.id <> old.id or new.context_id <> old.context_id or new.month <> old.month or new.kind <> old.kind
+     or new.checked = old.checked or new.version <> old.version + 1 then
+    raise exception 'campo_imutavel' using errcode = '42501';
+  end if;
+  return new;
 end;
 $$;
 
 create trigger month_checks_guard
   before update on public.month_checks
   for each row execute function public.month_checks_guard();
+
+-- Compras no cartão pela data da compra, por contexto (só a primeira parcela, uma por compra): a leitura de months_overview.
+create index card_entries_purchased_on on public.card_entries (context_id, purchased_on)
+  where kind = 'parcela' and installment_number = 1 and deleted_at is null;
 
 -- ---------------------------------------------------------------------------
 -- Operações: lista completa vigente (a da 0014, que a 0015 não mudou) mais as duas ações novas, sem alvo (o contexto já está em
@@ -150,7 +169,8 @@ $$;
 
 -- ---------------------------------------------------------------------------
 -- Resultado das duas funções (e da repetição da mesma chave): o estado atual da marca do contexto, mês e tipo. Sem execute para
--- authenticated: só as funções abaixo chamam.
+-- authenticated: só as funções abaixo chamam. Sem linha: {checked: false, version: 0}; com a linha desligada: {checked: false,
+-- version: n}, sem hora.
 -- ---------------------------------------------------------------------------
 create or replace function public.clarevo_month_check_result(p_context uuid, p_month date, p_kind text)
 returns jsonb
@@ -159,8 +179,8 @@ stable
 set search_path = public
 as $$
   select coalesce(
-    (select jsonb_build_object('context_id', c.context_id, 'month', c.month, 'kind', c.kind, 'checked', true,
-                               'version', c.version, 'checked_at', c.checked_at)
+    (select jsonb_build_object('context_id', c.context_id, 'month', c.month, 'kind', c.kind, 'checked', c.checked,
+                               'version', c.version, 'checked_at', case when c.checked then c.updated_at end)
        from public.month_checks c where c.context_id = p_context and c.month = p_month and c.kind = p_kind),
     jsonb_build_object('context_id', p_context, 'month', p_month, 'kind', p_kind, 'checked', false, 'version', 0, 'checked_at', null));
 $$;
@@ -188,11 +208,12 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- Marcar: "Conferi: não houve recebimentos (ou gastos) em {mês}". Ordem: sessão (nao_autenticado); chave (chave_invalida); trava da
+-- Marcar: "Conferi: não houve recebimentos (ou pagamentos) em {mês}". Ordem: sessão (nao_autenticado); chave (chave_invalida); trava da
 -- chave; repetição (chave_reutilizada se a ação ou o hash mudam; nao_encontrado se a leitura do contexto se perdeu); sem_permissao
--- (escrita no contexto); tipo_invalido; mes_invalido; trava da marca; versao_desatualizada (marcar espera p_version 0 e nenhuma marca
--- viva); mes_com_registros (o mês tem registro vivo do tipo); escrita; operação. Recusa não grava nada (a chave pode ser usada de
--- novo). Retorno: {context_id, month, kind, checked, version, checked_at}; na repetição, o estado atual.
+-- (escrita no contexto); tipo_invalido; mes_invalido; trava da marca; versao_desatualizada (marcar espera p_version igual à versão da
+-- linha, 0 sem linha, e a marca desligada); mes_com_registros (o mês tem registro vivo do tipo; compra no cartão não é registro de
+-- Pago); escrita (cria a linha com versão 1, ou liga a desligada e soma 1 à versão); operação. Recusa não grava nada (a chave pode
+-- ser usada de novo). Retorno: {context_id, month, kind, checked, version, checked_at}; na repetição, o estado atual.
 -- ---------------------------------------------------------------------------
 create or replace function public.set_month_check(p_context uuid, p_month date, p_kind text, p_key text, p_version integer)
 returns jsonb
@@ -231,14 +252,15 @@ begin
   end if;
   perform public.clarevo_month_check_validate(v_uid, p_month, p_kind);
 
-  -- A marca pode ainda não existir: a trava consultiva serializa quem marca e desmarca o mesmo mês e tipo; depois, a linha.
+  -- A linha pode ainda não existir: a trava consultiva serializa quem marca e desmarca o mesmo mês e tipo; depois, a linha.
   perform pg_advisory_xact_lock(hashtext('conferido:' || p_context::text || ':' || p_month::text || ':' || p_kind));
   select * into v_row from public.month_checks where context_id = p_context and month = p_month and kind = p_kind for update;
-  if found or p_version is distinct from 0 then
+  if p_version is distinct from coalesce(v_row.version, 0) or coalesce(v_row.checked, false) then
     raise exception 'versao_desatualizada' using errcode = 'PT409', detail = 'versao_atual=' || coalesce(v_row.version, 0);
   end if;
 
-  -- M3: o mesmo critério de months_overview e month_totals (registros vivos do tipo, pela data).
+  -- M3: o mesmo critério de months_overview e month_totals (registros vivos do tipo, pela data). Compra no cartão não conta: o que
+  -- entra no Pago é o pagamento da fatura, que é um registro.
   select count(*) into v_count from public.financial_records r
    where r.context_id = p_context and r.deleted_at is null
      and r.kind = (case p_kind when 'recebimentos' then 'receita' else 'despesa' end)::public.record_kind
@@ -247,7 +269,11 @@ begin
     raise exception 'mes_com_registros' using errcode = 'PT409';
   end if;
 
-  insert into public.month_checks (context_id, month, kind, checked_by) values (p_context, p_month, p_kind, v_uid);
+  if v_row.id is null then
+    insert into public.month_checks (context_id, month, kind, checked, updated_by) values (p_context, p_month, p_kind, true, v_uid);
+  else
+    update public.month_checks set checked = true, version = version + 1, updated_by = v_uid, updated_at = now() where id = v_row.id;
+  end if;
 
   insert into public.record_operations (actor_id, idempotency_key, action, context_id, request_hash, record_id, commitment_id, target_id)
   values (v_uid, p_key, 'marcar_mes_conferido', p_context, v_hash, null, null, null);
@@ -257,9 +283,10 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- Desmarcar. Mesma ordem; no lugar de mes_com_registros, a marca precisa existir e p_version precisa ser a dela (versao_desatualizada
--- com versao_atual=0 quando já não há marca, por exemplo se outro aparelho desmarcou). Desmarcar vale mesmo com registro no mês (a marca
--- que deixou de valer também pode sair). Retorno: o estado depois de desmarcar ({checked: false, version: 0}).
+-- Desmarcar. Mesma ordem; no lugar de mes_com_registros, a linha precisa existir, estar ligada e p_version precisa ser a dela
+-- (versao_desatualizada com versao_atual=0 quando não há linha, ou com a versão dela quando outro aparelho já desmarcou). Desmarcar vale
+-- mesmo com registro no mês (a marca que deixou de valer também pode sair). A linha fica, desligada, com a versão somada de 1.
+-- Retorno: o estado depois de desmarcar ({checked: false, version: n + 1}).
 -- ---------------------------------------------------------------------------
 create or replace function public.clear_month_check(p_context uuid, p_month date, p_kind text, p_key text, p_version integer)
 returns jsonb
@@ -299,11 +326,11 @@ begin
 
   perform pg_advisory_xact_lock(hashtext('conferido:' || p_context::text || ':' || p_month::text || ':' || p_kind));
   select * into v_row from public.month_checks where context_id = p_context and month = p_month and kind = p_kind for update;
-  if not found or p_version is distinct from v_row.version then
+  if not found or not v_row.checked or p_version is distinct from v_row.version then
     raise exception 'versao_desatualizada' using errcode = 'PT409', detail = 'versao_atual=' || coalesce(v_row.version, 0);
   end if;
 
-  delete from public.month_checks where id = v_row.id;
+  update public.month_checks set checked = false, version = version + 1, updated_by = v_uid, updated_at = now() where id = v_row.id;
 
   insert into public.record_operations (actor_id, idempotency_key, action, context_id, request_hash, record_id, commitment_id, target_id)
   values (v_uid, p_key, 'desmarcar_mes_conferido', p_context, v_hash, null, null, null);
@@ -313,14 +340,18 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- Recebido e pago por mês (a mesma de antes, 0005), agora com a marca. received_checked e paid_checked: existe marca do tipo no mês e o
--- mês não tem registro do tipo (M3). Mês sem anotação aparece com zeros e false (nunca é omitido). Security invoker: a RLS de quem
--- consulta vale (a de financial_records e a de month_checks). Mesma ordem de conferência: primeiro o período, depois a permissão.
+-- Recebido e pago por mês (a mesma de antes, 0005), agora com a marca e as compras no cartão. received_checked e paid_checked: a
+-- marca do tipo está ligada no mês e o mês não tem registro do tipo (M3). received_check_version e paid_check_version: a versão da linha
+-- da marca (0 sem linha), que o app manda ao marcar e desmarcar. card_purchase_count: compras no cartão vivas pela data da compra no
+-- mês (uma por compra, inclusive as importadas); só informa, não entra em Pago nem muda a marca. Mês sem anotação aparece com zeros e
+-- false (nunca é omitido). Security invoker: a RLS de quem consulta vale (a de financial_records, a de card_entries e a de
+-- month_checks). Mesma ordem de conferência: primeiro o período, depois a permissão.
 -- ---------------------------------------------------------------------------
 drop function public.months_overview(uuid, date, date);
 create function public.months_overview(p_context_id uuid, p_from date, p_to date)
 returns table (month date, received_count integer, received_cents bigint, paid_count integer, paid_cents bigint,
-               received_checked boolean, paid_checked boolean)
+               received_checked boolean, paid_checked boolean, received_check_version integer, paid_check_version integer,
+               card_purchase_count integer)
 language plpgsql
 stable
 security invoker
@@ -343,8 +374,13 @@ begin
          coalesce(sum(r.amount_cents) filter (where r.kind = 'receita'), 0)::bigint,
          (count(r.id) filter (where r.kind = 'despesa'))::int,
          coalesce(sum(r.amount_cents) filter (where r.kind = 'despesa'), 0)::bigint,
-         (cr.id is not null and count(r.id) filter (where r.kind = 'receita') = 0),
-         (cp.id is not null and count(r.id) filter (where r.kind = 'despesa') = 0)
+         (coalesce(cr.checked, false) and count(r.id) filter (where r.kind = 'receita') = 0),
+         (coalesce(cp.checked, false) and count(r.id) filter (where r.kind = 'despesa') = 0),
+         coalesce(cr.version, 0),
+         coalesce(cp.version, 0),
+         (select count(*)::int from public.card_entries e
+           where e.context_id = p_context_id and e.kind = 'parcela' and e.installment_number = 1 and e.deleted_at is null
+             and e.purchased_on >= g.m::date and e.purchased_on < (g.m + interval '1 month')::date)
     from generate_series(p_from::timestamp, p_to::timestamp, interval '1 month') as g(m)
     left join public.financial_records r
       on r.context_id = p_context_id and r.deleted_at is null

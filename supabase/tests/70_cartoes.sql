@@ -142,7 +142,8 @@ create function pg_temp.money_oct(p_ctx text) returns text language sql as $$
     union all select 3, (select to_jsonb(t)::text from public.month_to_pay(pg_temp.id(p_ctx), '2026-10-01') t)
     union all select 4, (select to_jsonb(t)::text from public.month_committed(pg_temp.id(p_ctx), '2026-09-01') t)
     union all select 5, (select to_jsonb(t)::text from public.month_committed(pg_temp.id(p_ctx), '2026-10-01') t)
-    union all select 6, (select jsonb_agg(to_jsonb(o) order by o.month)::text
+    -- Sem card_purchase_count (0016): ele só informa as compras no cartão pela data da compra e muda com cada compra, sem entrar em Pago.
+    union all select 6, (select jsonb_agg((to_jsonb(o) - 'card_purchase_count') order by o.month)::text
                            from public.months_overview(pg_temp.id(p_ctx), '2026-08-01', '2026-10-01') o)) s
 $$;
 
