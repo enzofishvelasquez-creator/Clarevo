@@ -12019,20 +12019,20 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     t.includes('Vence no domingo, 11/10/2026, que não é dia útil. O próximo dia útil é terça, 13/10/2026.') && t.includes(DU_ADVICE), t.slice(0, 700));
   ok('Dia útil, detalhe: o vencimento segue 11/10/2026 e o resumo afetado segue o de outubro', /Vencimento\n?\s*11\/10\/2026/.test(t) && t.includes('Ainda a pagar de outubro de 2026'), t.slice(300, 900));
   ok('Dia útil, detalhe: nunca promete que não há encargos (sem "sem multa", "sem juros", "sem encargos" nem "garantido")', !/sem (multa|juros|encargos?)|garant|n[aã]o (h[aá]|tem|cobra) (multa|juros|encargos?)/i.test(t));
-  ok('Dia útil, detalhe: "Saiba mais" é um botão recolhido (aria-expanded=false) e a explicação ainda não aparece', (await duMoreButton().count()) === 1 && (await duMoreButton().first().getAttribute('aria-expanded')) === 'false' && !t.includes('Contam como feriado nacional só os definidos em lei federal'));
+  ok('Dia útil, detalhe: "Saiba mais" é um botão recolhido (aria-expanded=false) e a explicação ainda não aparece', (await duMoreButton().count()) === 1 && (await duMoreButton().first().getAttribute('aria-expanded')) === 'false' && !t.includes('Contam só os feriados nacionais de data fixa definidos em lei federal'));
   await duKeep();
   await duShots('521_dia_util_conta_domingo', duScroll('Vence no domingo, 11/10/2026, que não é dia útil. O próximo dia útil é terça, 13/10/2026.'));
-  await duMoreButton().first().click(); await waitText('Contam como feriado nacional só os definidos em lei federal'); await p.waitForTimeout(400);
+  await duMoreButton().first().click(); await waitText('Contam só os feriados nacionais de data fixa definidos em lei federal'); await p.waitForTimeout(400);
   t = await body();
-  ok('Dia útil, "Saiba mais": a data não muda, os nove feriados nacionais por data, o que não entra (Carnaval, Sexta-feira Santa, Corpus Christi, estados e municípios) e "confira com quem cobra"',
+  ok('Dia útil, "Saiba mais": a data não muda, os nove feriados nacionais de data fixa, o que não entra (Carnaval, Sexta-feira Santa, Corpus Christi, estados e municípios), o dia de eleição (domingo) e "confira com quem cobra"',
     t.includes('O Clarevo não muda a data de vencimento') && ['1º de janeiro', '21 de abril', '1º de maio', '7 de setembro', '12 de outubro', '2 de novembro', '15 de novembro', '20 de novembro', '25 de dezembro'].every((x) => t.includes(x)) &&
-    t.includes('Carnaval, Sexta-feira Santa, Corpus Christi e os feriados de estados e municípios não entram.') && t.includes('Quem cobra pode ter outro calendário.') && t.includes('confira com quem cobra'), t.slice(300, 1500));
+    t.includes('Carnaval, Sexta-feira Santa, Corpus Christi e os feriados de estados e municípios não entram.') && t.includes('O dia de eleição cai sempre num domingo, que já é coberto pelo fim de semana.') && t.includes('Quem cobra pode ter outro calendário.') && t.includes('confira com quem cobra'), t.slice(300, 1500));
   ok('Dia útil, "Saiba mais": a fonte lista as três leis e a data da consulta (19/10/2026), e o botão passa a aria-expanded=true',
     t.includes('Fontes: Lei nº 662/1949, com a redação da Lei nº 10.607/2002; Lei nº 6.802/1980; Lei nº 14.759/2023. Consultadas em 19/10/2026.') && (await duMoreButton().first().getAttribute('aria-expanded')) === 'true');
   await duKeep();
   await duShots('522_dia_util_saiba_mais', duScroll('Vencimento em dia que não é útil'));
   await duMoreButton().first().click(); await p.waitForTimeout(400);
-  ok('Dia útil, "Saiba mais": tocar de novo recolhe a explicação', !(await body()).includes('Contam como feriado nacional só os definidos em lei federal') && (await duMoreButton().first().getAttribute('aria-expanded')) === 'false');
+  ok('Dia útil, "Saiba mais": tocar de novo recolhe a explicação', !(await body()).includes('Contam só os feriados nacionais de data fixa definidos em lei federal') && (await duMoreButton().first().getAttribute('aria-expanded')) === 'false');
   await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(300);
 
   // ---- 4. Feriado em dia de semana: o aviso diz qual ----

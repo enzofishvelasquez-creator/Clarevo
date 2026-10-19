@@ -603,7 +603,7 @@ Nenhuma muda o texto publicado hoje; todas estão também na seção 4, no tema.
 - Caderno de Educação Financeira do Banco Central (2013): o parágrafo dos gastos necessários, com alimentação, moradia e vestuário, foi confirmado sem trecho literal de `bcb.gov.br`; há uma 2ª edição, de 2026, não conferida (`essenciais`, `renda-variavel`).
 - Calculadora do Cidadão, aplicação com depósitos regulares: a fórmula e o "início de cada período" vieram de um resultado de busca; abrir a página e comparar um resultado com o do simulador (`simulacao`).
 - A página da CVM sobre a reserva (6 a 12 meses de gastos) foi confirmada por busca para o tema `reserva-imprevistos`. A calculadora de reserva do Ciclo A6 ainda mostra a referência sem link e sem número (`RESERVA_REFERENCIA`, D-035(3)); usar a mesma conferência ali depende de decisão.
-- Feriados nacionais do aviso de dia útil (19/10/2026, seção 11): nenhuma das três páginas do Planalto abriu (DNS na leitura de páginas e bloqueio de saída na linha de comando); abrir e comparar o artigo de cada lei com o `locator`. Pontos mais frágeis: os nomes usuais dos feriados (as Leis 662 e 10.607 citam só as datas, e a Lei 14.759 diz "Dia Nacional de Zumbi e da Consciência Negra"), e os anos de início de vigência de 21 de abril e 2 de novembro (2003, pela Lei 10.607/2002) e de 12 de outubro (1980), que o aviso nunca usa porque só olha vencimentos de hoje em diante.
+- Feriados nacionais do aviso de dia útil (19/10/2026, seção 11): nenhuma das três páginas do Planalto abriu (DNS na leitura de páginas e bloqueio de saída na linha de comando); abrir e comparar o artigo de cada lei com o `locator`. Pontos mais frágeis: os nomes usuais dos feriados (as Leis 662 e 10.607 citam só as datas, e a Lei 14.759 diz "Dia Nacional de Zumbi e da Consciência Negra"), e os anos de início de vigência de 2 de novembro (2003, pela Lei 10.607/2002) e de 12 de outubro (1980), que o aviso nunca usa porque só olha vencimentos de hoje em diante. O 21 de abril vale desde 1951 (Lei 1.266/1950, art. 3, que a Lei 10.607/2002 revogou ao manter a data): o artigo 3º da Lei 1.266 e a revogação vieram só de resultado de busca (Senado Federal e Planalto), e a Lei 1.266 não está na lista de fontes do código.
 
 ## 7. Prazos de revisão
 
@@ -667,7 +667,7 @@ Não é tema de Aprender: a lista vive em `packages/core/src/dia-util.ts` (`nati
 | Data | Feriado (nome usual) | Lei | Desde |
 |---|---|---|---|
 | 1º de janeiro | Confraternização Universal | Lei nº 662/1949, com a redação da Lei nº 10.607/2002 | 1949 |
-| 21 de abril | Tiradentes | Lei nº 662/1949, com a redação da Lei nº 10.607/2002 | 2003 |
+| 21 de abril | Tiradentes | Lei nº 662/1949, com a redação da Lei nº 10.607/2002 (antes, Lei nº 1.266/1950, art. 3, revogada pela Lei nº 10.607/2002, que manteve a data) | 1951 |
 | 1º de maio | Dia do Trabalho | Lei nº 662/1949, com a redação da Lei nº 10.607/2002 | 1949 |
 | 7 de setembro | Independência do Brasil | Lei nº 662/1949, com a redação da Lei nº 10.607/2002 | 1949 |
 | 12 de outubro | Nossa Senhora Aparecida | Lei nº 6.802/1980 | 1980 |
@@ -676,15 +676,16 @@ Não é tema de Aprender: a lista vive em `packages/core/src/dia-util.ts` (`nati
 | 20 de novembro | Dia Nacional de Zumbi e da Consciência Negra | Lei nº 14.759/2023 | 2024 (a lei entrou em vigor em 22/12/2023; o primeiro feriado foi em 20/11/2024) |
 | 25 de dezembro | Natal | Lei nº 662/1949, com a redação da Lei nº 10.607/2002 | 1949 |
 
-Os nomes são os usuais e só aparecem no texto do aviso; as Leis 662 e 10.607 citam apenas as datas. Para anos antes de 2003 a lista não foi conferida, e o app só avisa de vencimentos de hoje em diante.
+Os nomes são os usuais e só aparecem no texto do aviso; as Leis 662 e 10.607 citam apenas as datas. Antes de 2003 só o 21 de abril foi conferido (desde 1951, pela Lei nº 1.266/1950); as outras datas desses anos não foram, e o app só avisa de vencimentos de hoje em diante.
 
-**Não entram:** Carnaval, Sexta-feira Santa, Corpus Christi e os feriados estaduais e municipais. O texto de "Saiba mais" diz isso e diz que quem cobra pode ter outro calendário. O aviso nunca diz que o pagamento no próximo dia útil vale para qualquer cobrança nem que não há encargos: termina com "Confira com quem cobra se o pagamento pode ser feito no próximo dia útil."
+**Não entram:** Carnaval, Sexta-feira Santa, Corpus Christi e os feriados estaduais e municipais. O texto de "Saiba mais" diz isso, diz que só contam os feriados nacionais de data fixa definidos em lei federal, que o dia de eleição cai sempre num domingo e já é coberto pelo fim de semana, e que quem cobra pode ter outro calendário. O aviso nunca diz que o pagamento no próximo dia útil vale para qualquer cobrança nem que não há encargos: termina com "Confira com quem cobra se o pagamento pode ser feito no próximo dia útil."
 
-Fontes (todas oficiais, em `planalto.gov.br`; consulta em 19/10/2026):
+Fontes (todas oficiais; as três primeiras em `planalto.gov.br`; consulta em 19/10/2026):
 
-1. Oficial. Presidência da República: Lei nº 662, de 6 de abril de 1949, com a redação da Lei nº 10.607, de 19 de dezembro de 2002. <https://www.planalto.gov.br/ccivil_03/leis/l0662.htm>. Trecho: art. 1º, "Redação dada pela Lei nº 10.607, de 19.12.2002": 1º de janeiro, 21 de abril, 1º de maio, 7 de setembro, 2 de novembro, 15 de novembro e 25 de dezembro; a Lei nº 662/1949 original listava cinco datas, e a Lei nº 10.607/2002 acrescentou duas. Trecho de resultado de busca; a página não abriu. Consulta: 19/10/2026.
+1. Oficial. Presidência da República: Lei nº 662, de 6 de abril de 1949, com a redação da Lei nº 10.607, de 19 de dezembro de 2002. <https://www.planalto.gov.br/ccivil_03/leis/l0662.htm>. Trecho: art. 1º, "Redação dada pela Lei nº 10.607, de 19.12.2002": 1º de janeiro, 21 de abril, 1º de maio, 7 de setembro, 2 de novembro, 15 de novembro e 25 de dezembro; a Lei nº 10.607/2002 revogou a Lei nº 1.266, de 8 de dezembro de 1950, cujo art. 3º já declarava feriado nacional o 21 de abril (Tiradentes), por isso o 21 de abril vale desde 1951. Trecho de resultado de busca; a página não abriu. Consulta: 19/10/2026.
 2. Oficial. Presidência da República: Lei nº 6.802, de 30 de junho de 1980. <https://www.planalto.gov.br/ccivil_03/LEIS/L6802.htm>. Trecho: art. 1º, declarado feriado nacional o dia 12 de outubro, para culto público e oficial a Nossa Senhora Aparecida, Padroeira do Brasil; vigência na data da publicação (Diário Oficial de 1º de julho de 1980). Trecho de resultado de busca; a página não abriu. Consulta: 19/10/2026.
 3. Oficial. Presidência da República: Lei nº 14.759, de 21 de dezembro de 2023. <https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2023/lei/l14759.htm>. Trecho: art. 1º, declarado feriado nacional o dia 20 de novembro, Dia Nacional de Zumbi e da Consciência Negra; art. 2º, vigência na data da publicação (Diário Oficial de 22 de dezembro de 2023). Trecho de resultado de busca; a página não abriu. Consulta: 19/10/2026.
+4. Oficial, só histórica (não está em `NATIONAL_HOLIDAY_SOURCES`; explica por que o 21 de abril vale desde 1951). Senado Federal: Lei nº 1.266, de 8 de dezembro de 1950. <https://legis.senado.leg.br/norma/542911>. Trecho: art. 3º, o 21 de abril declarado feriado nacional, em honra a Tiradentes; revogada pela Lei nº 10.607/2002. Trecho de resultado de busca; a página não abriu. Consulta: 19/10/2026.
 
 Conferido por busca (19/10/2026): o portal da Câmara dos Deputados mostra "Não consta revogação expressa" para as Leis 6.802/1980 e 14.759/2023, e o texto consolidado da Lei 662/1949 traz a redação de 2002 no art. 1º. Projetos de lei que acrescentariam feriados (Carnaval, Sexta-feira Santa e Corpus Christi, ou outra data para Tiradentes) apareceram nos resultados e não são lei.
 

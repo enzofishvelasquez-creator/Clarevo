@@ -27,6 +27,7 @@ import {
   plannedDueNotice,
   reminderBody,
   reminderPlan,
+  reminderSignature,
   summarizeToPay,
   todayIn,
   weekdayName,
@@ -162,6 +163,30 @@ describe('feriados nacionais (D-060 item 3)', () => {
     expect(nationalHolidays(2024).map((h) => h.date)).toContain('2024-11-20');
     expect(nationalHolidays(2025)).toHaveLength(9);
     for (const bad of [0, 99, 10_000, 2026.5, Number.NaN, -2026]) expect(nationalHolidays(bad), String(bad)).toEqual([]);
+  });
+
+  it('antes de 2003: o 21 de abril já era feriado nacional desde 1951 (Lei 1.266/1950, art. 3, revogada pela Lei 10.607/2002, que manteve a data), o 12 de outubro vale de 1980 e o 2 de novembro, de 2003', () => {
+    const datas = (year: number) => nationalHolidays(year).map((h) => h.date);
+    // 2000: sete feriados, com o 21 de abril e o 12 de outubro, sem 2 e 20 de novembro.
+    expect(datas(2000)).toEqual(['2000-01-01', '2000-04-21', '2000-05-01', '2000-09-07', '2000-10-12', '2000-11-15', '2000-12-25']);
+    expect(datas(2002)).toEqual(['2002-01-01', '2002-04-21', '2002-05-01', '2002-09-07', '2002-10-12', '2002-11-15', '2002-12-25']);
+    expect(datas(2003)).toContain('2003-11-02');
+    expect(datas(2003)).toHaveLength(8);
+    // 21 de abril: fora em 1950 (a Lei 1.266 é de 8/12/1950), dentro de 1951 em diante.
+    expect(datas(1950)).not.toContain('1950-04-21');
+    expect(datas(1951)).toEqual(['1951-01-01', '1951-04-21', '1951-05-01', '1951-09-07', '1951-11-15', '1951-12-25']);
+    // 12 de outubro: a Lei 6.802 é de 30/06/1980.
+    expect(datas(1979)).not.toContain('1979-10-12');
+    expect(datas(1980)).toContain('1980-10-12');
+    // 21/04/2000 foi uma sexta; 21/04/2001, um sábado.
+    expect(nationalHolidayOn('2000-04-21')?.name).toBe('Tiradentes');
+    expect(weekdayOf('2000-04-21')).toBe(5);
+    expect(isBusinessDay('2000-04-21')).toBe(false);
+    expect(nextBusinessDay('2000-04-21')).toBe('2000-04-24');
+    expect(dueDayNotice('2000-04-21')!.text).toBe('Vence na sexta, 21/04/2000, que não é dia útil (feriado nacional: Tiradentes). O próximo dia útil é segunda, 24/04/2000.');
+    const sat = dueDayNotice('2001-04-21')!;
+    expect([sat.reason, sat.holiday?.name, sat.nextBusinessDay]).toEqual(['sabado', 'Tiradentes', '2001-04-23']);
+    expect(nationalHolidayOn('1999-04-21')?.name).toBe('Tiradentes');
   });
 
   it('Carnaval, Sexta-feira Santa, Corpus Christi e as datas de estados e municípios não entram', () => {
@@ -422,16 +447,24 @@ describe('quando o aviso aparece: conta a pagar, fatura e conta prevista', () =>
 });
 
 describe('a data de vencimento calculada não muda (D-060 item 3)', () => {
-  it('conta avulsa, gasto fixo, parcelamento e conta do ano em fim de semana ou feriado mantêm o vencimento e os totais do mês', async () => {
+  it('conta avulsa, gasto fixo, parcelamento e conta do ano em fim de semana ou feriado mantêm o vencimento e os totais de outubro a dezembro', async () => {
     const repo = await createDemoRepository();
     const ctx = (await repo.getSpace())!.personalContextId;
-    const toPayBefore = summarizeToPay(await repo.listCommitments(ctx, '2026-10'), ctx, '2026-10', DEMO_TODAY).toPayCents;
+    // Ainda a pagar de outubro, novembro e dezembro de 2026 (a soma que a tela mostra para cada mês).
+    const totals = async () => {
+      const out: number[] = [];
+      for (const m of ['2026-10', '2026-11', '2026-12'] as const) out.push(summarizeToPay(await repo.listCommitments(ctx, m), ctx, m, DEMO_TODAY).toPayCents);
+      return out;
+    };
+    const before = await totals();
+    const toPayBefore = before[0]!;
 
     // Conta avulsa em um domingo: continua em 11/10 e conta em Ainda a pagar de outubro.
     const avulsa = await repo.createCommitment(newOperationKey(), ctx, { description: 'Condomínio extra', amountCents: 10_000, dueOn: '2026-10-11', category: 'Moradia' });
     expect(avulsa.commitment.dueOn).toBe('2026-10-11');
     expect((await repo.getCommitment(avulsa.commitment.id))!.dueOn).toBe('2026-10-11');
     expect(summarizeToPay(await repo.listCommitments(ctx, '2026-10'), ctx, '2026-10', DEMO_TODAY).toPayCents).toBe(toPayBefore + 10_000);
+    expect(await totals()).toEqual([before[0]! + 10_000, before[1]!, before[2]!]);
 
     // Gasto fixo no dia 15: novembro de 2026 cai em domingo e feriado; dezembro, em terça. O dia escolhido segue sendo o do cálculo.
     const w = await repo.createSeries(newOperationKey(), ctx, {
@@ -455,6 +488,8 @@ describe('a data de vencimento calculada não muda (D-060 item 3)', () => {
     ]);
     expect(commitmentDueNotice(all[1]!, DEMO_TODAY)?.holiday?.name).toBe('Proclamação da República');
     expect(commitmentDueNotice(all[0]!, DEMO_TODAY)).toBeNull(); // 15/10/2026 é quinta
+    // Os totais contam as duas contas do gasto fixo nos meses do vencimento calculado (15/10 e 15/11), não no próximo dia útil (16/11).
+    expect(await totals()).toEqual([before[0]! + 10_000 + 9_000, before[1]! + 9_000, before[2]!]);
 
     // Parcelamento no dia 17: a parcela de outubro vence em sábado, 17/10/2026, e a de novembro, em terça.
     const p = await repo.createSeries(newOperationKey(), ctx, {
@@ -474,6 +509,7 @@ describe('a data de vencimento calculada não muda (D-060 item 3)', () => {
     const parcelas = (await repo.listSeriesOccurrences(p.series.id)).sort((a, b) => a.series!.number - b.series!.number);
     expect(parcelas.map((c) => c.dueOn)).toEqual(['2026-10-17', '2026-11-17']);
     expect(commitmentDueNotice(parcelas[0]!, DEMO_TODAY)?.text).toBe('Vence no sábado, 17/10/2026, que não é dia útil. O próximo dia útil é segunda, 19/10/2026.');
+    expect(await totals()).toEqual([before[0]! + 10_000 + 9_000 + 40_000, before[1]! + 9_000 + 40_000, before[2]!]);
 
     // Conta do ano em cota única, dia 25 de dezembro de 2026 (sexta e feriado): o vencimento segue 25/12/2026.
     const ano = await repo.createSeries(newOperationKey(), ctx, {
@@ -494,6 +530,9 @@ describe('a data de vencimento calculada não muda (D-060 item 3)', () => {
     expect(anuais.map((c) => c.dueOn)).toEqual(['2026-12-25']);
     expect(commitmentDueNotice(anuais[0]!, DEMO_TODAY)?.holiday?.name).toBe('Natal');
     expect(commitmentDueNotice(anuais[0]!, DEMO_TODAY)?.nextBusinessDay).toBe('2026-12-28');
+    // A conta do ano entra em dezembro com o valor e o vencimento de sempre (25/12/2026), e os totais de outubro e novembro não mudam.
+    expect(anuais[0]!.amountCents).toBe(120_000);
+    expect(await totals()).toEqual([before[0]! + 10_000 + 9_000 + 40_000, before[1]! + 9_000 + 40_000, before[2]! + 120_000]);
   });
 });
 
@@ -567,6 +606,21 @@ describe('lembrete (D-025(3)): o corpo diz que o vencimento não é dia útil, s
     expect(reminderBody(3, '2026-10-12')).toBe('Você tem 3 contas com vencimento amanhã, que não é dia útil.');
     expect(reminderBody(2, 'inválida')).toBe('Você tem 2 contas com vencimento amanhã.');
     expect(REMINDER_NOT_BUSINESS_DAY).toBe(', que não é dia útil');
+  });
+
+  it('a assinatura do aviso agendado leva o corpo: um lembrete já agendado com o texto antigo é reagendado', () => {
+    const [novo] = reminderPlan([conta('2026-10-11', 1)], '2026-10-07', 9);
+    expect(reminderSignature(novo!)).toBe('2026-10-10T09:00|1|Você tem 1 conta com vencimento amanhã, que não é dia útil.');
+    // O mesmo aviso, agendado antes da frase nova, tinha o corpo antigo: a assinatura difere e o aparelho troca o aviso.
+    const antigo = { ...novo!, body: reminderBody(1) };
+    expect(reminderSignature(antigo)).toBe('2026-10-10T09:00|1|Você tem 1 conta com vencimento amanhã.');
+    expect(reminderSignature(antigo)).not.toBe(reminderSignature(novo!));
+    // Aviso igual, assinatura igual; dia, hora e contagem seguem mudando a assinatura; dia útil não ganha a frase.
+    expect(reminderSignature({ ...novo! })).toBe(reminderSignature(novo!));
+    expect(reminderSignature({ ...novo!, fireAt: '2026-10-10T12:00' })).not.toBe(reminderSignature(novo!));
+    expect(reminderSignature({ ...novo!, count: 2 })).not.toBe(reminderSignature(novo!));
+    const [util] = reminderPlan([conta('2026-10-13', 2)], '2026-10-07', 9);
+    expect(reminderSignature(util!)).toBe('2026-10-12T09:00|1|Você tem 1 conta com vencimento amanhã.');
   });
 
   it('o plano agenda o mesmo dia e hora de antes e só o corpo ganha a frase; nada de valor, nome ou data', () => {

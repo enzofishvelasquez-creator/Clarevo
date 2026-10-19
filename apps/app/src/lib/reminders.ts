@@ -3,6 +3,7 @@ import {
   monthOf,
   REMINDER_LIMIT,
   reminderPlan,
+  reminderSignature,
   todayIn,
   type RecordsRepository,
   type ReminderHour,
@@ -55,7 +56,7 @@ async function apply(job: ReminderJob): Promise<ReminderOutcome> {
     contextId: job.contextId,
   });
   await syncScheduledReminders(
-    plan.map((i) => ({ id: i.id, date: fireDate(i), title: i.title, body: i.body, signature: `${i.fireAt}|${i.count}` })),
+    plan.map((i) => ({ id: i.id, date: fireDate(i), title: i.title, body: i.body, signature: reminderSignature(i) })),
   );
   return 'agendado';
 }

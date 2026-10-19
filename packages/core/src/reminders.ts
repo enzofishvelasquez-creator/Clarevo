@@ -148,6 +148,14 @@ export function reminderPlan(
     });
 }
 
+/**
+ * Assinatura de um aviso agendado: muda quando o dia, a hora, a contagem ou o texto muda, e só então o aparelho cancela e agenda de
+ * novo. O corpo entra para que um lembrete já agendado com o texto antigo (sem ", que não é dia útil", D-060 item 3) seja trocado.
+ */
+export function reminderSignature(item: Pick<ReminderItem, 'fireAt' | 'count' | 'body'>): string {
+  return `${item.fireAt}|${item.count}|${item.body}`;
+}
+
 /** O identificador é de um aviso do Clarevo? (O app nunca cancela notificações de outra origem.) */
 export function isReminderId(id: string): boolean {
   return id.startsWith(REMINDER_ID_PREFIX);

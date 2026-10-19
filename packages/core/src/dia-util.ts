@@ -48,7 +48,7 @@ export const NATIONAL_HOLIDAY_SOURCES: readonly HolidaySource[] = [
     title: 'Lei nº 662, de 6 de abril de 1949, com a redação da Lei nº 10.607, de 19 de dezembro de 2002 (feriados nacionais)',
     url: 'https://www.planalto.gov.br/ccivil_03/leis/l0662.htm',
     locator:
-      'Art. 1º, "Redação dada pela Lei nº 10.607, de 19.12.2002": 1º de janeiro, 21 de abril, 1º de maio, 7 de setembro, 2 de novembro, 15 de novembro e 25 de dezembro. Trecho de resultado de busca; a página não abriu',
+      'Art. 1º, "Redação dada pela Lei nº 10.607, de 19.12.2002": 1º de janeiro, 21 de abril, 1º de maio, 7 de setembro, 2 de novembro, 15 de novembro e 25 de dezembro. A Lei nº 10.607/2002 revogou a Lei nº 1.266, de 8.12.1950, cujo art. 3º já declarava feriado nacional o 21 de abril (Tiradentes). Trecho de resultado de busca; a página não abriu',
     consultedOn: NATIONAL_HOLIDAYS_CONSULTED_ON,
   },
   {
@@ -99,20 +99,21 @@ interface HolidayRule {
   /** Índice da lei em `NATIONAL_HOLIDAY_LAWS` e `NATIONAL_HOLIDAY_SOURCES`. */
   law: 0 | 1 | 2;
   /**
-   * Primeiro ano em que vale pela lei: 1949 (Lei 662), 1980 (Lei 6.802), 2003 (21 de abril e 2 de novembro entraram pela Lei 10.607,
-   * de 19/12/2002) e 2024 (Lei 14.759, em vigor desde 22/12/2023).
+   * Primeiro ano em que vale pela lei: 1949 (Lei 662), 1951 (21 de abril: já era feriado nacional pela Lei 1.266, de 08/12/1950,
+   * art. 3, que a Lei 10.607, de 19/12/2002, revogou e cuja data manteve na redação que deu à Lei 662), 1980 (Lei 6.802), 2003 (2 de
+   * novembro entrou pela Lei 10.607) e 2024 (Lei 14.759, em vigor desde 22/12/2023).
    */
   fromYear: number;
 }
 
 /**
  * Os nove feriados nacionais, em ordem de data. O 20 de novembro só vale de 2024 em diante: a Lei 14.759 entrou em vigor em
- * 22/12/2023, depois de 20/11/2023. Para anos antes de 2003 a lista não foi conferida (o app só avisa de vencimentos de hoje em
- * diante).
+ * 22/12/2023, depois de 20/11/2023. Antes de 2003 a lista só foi conferida para o 21 de abril (desde 1951); as outras datas desses anos
+ * não (o app só avisa de vencimentos de hoje em diante).
  */
 const RULES: readonly HolidayRule[] = [
   { month: 1, day: 1, name: 'Confraternização Universal', law: 0, fromYear: 1949 },
-  { month: 4, day: 21, name: 'Tiradentes', law: 0, fromYear: 2003 },
+  { month: 4, day: 21, name: 'Tiradentes', law: 0, fromYear: 1951 },
   { month: 5, day: 1, name: 'Dia do Trabalho', law: 0, fromYear: 1949 },
   { month: 9, day: 7, name: 'Independência do Brasil', law: 0, fromYear: 1949 },
   { month: 10, day: 12, name: 'Nossa Senhora Aparecida', law: 1, fromYear: 1980 },
@@ -201,7 +202,7 @@ export const DUE_DAY_TEXT = {
   /** Corpo da explicação. */
   learnMoreParagraphs: [
     'O Clarevo não muda a data de vencimento: ela segue como você anotou, ou como o dia escolhido do gasto fixo, do parcelamento ou da conta do ano a calcula. O aviso só diz quando essa data cai em sábado, domingo ou feriado nacional e qual é o próximo dia útil.',
-    'Contam como feriado nacional só os definidos em lei federal: 1º de janeiro, 21 de abril, 1º de maio, 7 de setembro, 12 de outubro, 2 de novembro, 15 de novembro, 20 de novembro e 25 de dezembro. Carnaval, Sexta-feira Santa, Corpus Christi e os feriados de estados e municípios não entram. Quem cobra pode ter outro calendário.',
+    'Contam só os feriados nacionais de data fixa definidos em lei federal: 1º de janeiro, 21 de abril, 1º de maio, 7 de setembro, 12 de outubro, 2 de novembro, 15 de novembro, 20 de novembro e 25 de dezembro. Carnaval, Sexta-feira Santa, Corpus Christi e os feriados de estados e municípios não entram. O dia de eleição cai sempre num domingo, que já é coberto pelo fim de semana. Quem cobra pode ter outro calendário.',
     'Cada cobrança tem a própria regra para vencimento em dia que não é útil, e o Clarevo não sabe qual vale para a sua conta. Por isso, confira com quem cobra antes de escolher a data do pagamento.',
   ],
   /** Fonte e data da consulta, no fim da explicação. */

@@ -3313,8 +3313,10 @@ describe('textos do aviso de dia útil (D-060)', () => {
     const fixed = [DUE_DAY_TEXT.advice, DUE_DAY_TEXT.sign, DUE_DAY_TEXT.learnMore, DUE_DAY_TEXT.learnMoreA11y, DUE_DAY_TEXT.learnMoreTitle, ...DUE_DAY_TEXT.learnMoreParagraphs, DUE_DAY_TEXT.source];
     check(fixed);
     const more = DUE_DAY_TEXT.learnMoreParagraphs.join(' ');
-    // O "Saiba mais" diz que a data não muda, quais feriados contam e quais não entram.
+    // O "Saiba mais" diz que a data não muda, quais feriados contam (nacionais, de data fixa, em lei federal) e quais não entram.
     expect(more).toContain('não muda a data de vencimento');
+    expect(more).toContain('Contam só os feriados nacionais de data fixa definidos em lei federal');
+    expect(more).toContain('O dia de eleição cai sempre num domingo, que já é coberto pelo fim de semana.');
     for (const day of ['1º de janeiro', '21 de abril', '1º de maio', '7 de setembro', '12 de outubro', '2 de novembro', '15 de novembro', '20 de novembro', '25 de dezembro']) expect(more, day).toContain(day);
     for (const out of ['Carnaval', 'Sexta-feira Santa', 'Corpus Christi', 'estados e municípios']) expect(more, out).toContain(out);
     expect(more).toContain('confira com quem cobra');

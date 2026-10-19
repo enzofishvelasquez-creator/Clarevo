@@ -58,7 +58,7 @@ export interface ScheduledReminder {
   date: Date;
   title: string;
   body: string;
-  /** Muda quando o aviso muda (dia, horário ou contagem): avisos iguais não são agendados de novo. */
+  /** Muda quando o aviso muda (dia, horário, contagem ou texto): avisos iguais não são agendados de novo. */
   signature: string;
 }
 
