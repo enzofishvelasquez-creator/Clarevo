@@ -26,6 +26,8 @@ import type {
   IncomeReference,
   InvoiceItem,
   ReceiptMatch,
+  MonthCheck,
+  MonthCheckKind,
   MonthOverview,
   NewGoalInput,
   OccurrenceMode,
@@ -179,6 +181,12 @@ export type SeriesAction =
  * operação). Como 'decidir_revisao' e 'responder_guardar', não conta como anotação na atividade (D-030).
  */
 export type SubscriptionReviewAction = 'revisar_assinaturas';
+
+/**
+ * "Conferi este mês" (set_month_check e clear_month_check, D-060, migração 0016), gravadas em record_operations sem alvo (o contexto
+ * está na operação). Como 'decidir_revisao' e 'responder_guardar', não contam como anotação na atividade (D-030).
+ */
+export type MonthCheckAction = 'marcar_mes_conferido' | 'desmarcar_mes_conferido';
 
 /**
  * Importar extrato ou fatura (import_records, D-048), gravada em record_operations com a conta ou o cartão de destino em
@@ -391,6 +399,23 @@ export interface RecordsRepository {
     reviewedThrough: IsoMonth,
     decision: ReturnDecision,
   ): Promise<ReturnReviewMark>;
+
+  // "Conferi este mês" (D-060, item 2; resolve P-022). A marca vem junto de monthsOverview (receivedChecked e paidChecked).
+
+  /**
+   * set_month_check: a pessoa conferiu que o mês já terminado não teve recebimentos ('recebimentos') ou gastos ('pagamentos'). Exige
+   * escrita no contexto (na Família, quem escreve marca; quem só lê, não). Marcar espera a versão 0 (ainda sem marca). Ordem: repetição
+   * (chave_reutilizada se a ação ou o conteúdo mudam); sem_permissao; tipo_invalido; mes_invalido (o mês atual, os futuros e o que não é
+   * o primeiro dia de um mês); versao_desatualizada (já há marca, ou a versão não é 0; RepoError.detail "versao_atual=N"); mes_com_registros
+   * (o mês já tem registro do tipo). A marca nunca muda um total e não conta como anotação na atividade. Mesma chave e conteúdo: devolve
+   * o estado de agora. Reconciliação: repetir a chave.
+   */
+  setMonthCheck(key: string, contextId: string, month: IsoMonth, kind: MonthCheckKind, expectedVersion: number): Promise<MonthCheck>;
+  /**
+   * clear_month_check: desfaz a marca (a versão esperada é a da marca viva, 1). Mesma ordem; sem marca, versao_desatualizada com
+   * "versao_atual=0". Vale mesmo com registro no mês (a marca que deixou de valer também pode sair).
+   */
+  clearMonthCheck(key: string, contextId: string, month: IsoMonth, kind: MonthCheckKind, expectedVersion: number): Promise<MonthCheck>;
 
   // Renda de referência (D-026, Ciclo B). Para "Próximos meses", as contas por vencimento vêm de
   // listCommitmentsDueBetween (mesma leitura de commitment_items).
@@ -804,6 +829,7 @@ export type RepoErrorCode =
   | 'modo_invalido'
   | 'decisao_invalida'
   | 'mes_invalido'
+  | 'mes_com_registros'
   | 'periodo_invalido'
   | 'referencia_fora_do_intervalo'
   | 'vigencia_fora_do_intervalo'

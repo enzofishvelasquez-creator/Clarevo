@@ -13,6 +13,8 @@ import {
   categoryBubbles,
   categoryKey,
   evolutionFetchRange,
+  monthCheckPlan,
+  monthOf,
   selectedCategoryCard,
   type AnalysesTab,
   type CategoryShare,
@@ -26,12 +28,13 @@ import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'reac
 import Svg, { Circle } from 'react-native-svg';
 
 import { MoneyTxt } from '@/components/money-text';
+import { MonthCheckBlock } from '@/components/month-check';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Button, Card, LinkButton, Money, Skeleton, Txt, spaceKeyPress, styles as ui } from '@/components/ui';
 import { useCategoryViewPref } from '@/lib/category-view';
 import { useHiddenMonths } from '@/lib/evolution-memory';
 import { maskMoneyLabel, useValuesHidden } from '@/lib/privacy';
-import { useCategoryAnalysis, useCommittedUpcoming, useMonthBudget, useMonthsOverview, type CategoryAnalysis } from '@/state/data';
+import { useCategoryAnalysis, useCommittedUpcoming, useMonthBudget, useMonthCheckRow, useMonthsOverview, type CategoryAnalysis } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
@@ -432,6 +435,7 @@ export function CategoriesTab({
   return (
     <CategoriesBody
       data={analysis.data}
+      contextId={contextId}
       month={month}
       canWrite={canWrite}
       view={pref.view}
@@ -448,6 +452,7 @@ export function CategoriesTab({
 
 function CategoriesBody({
   data,
+  contextId,
   month,
   canWrite,
   view,
@@ -460,6 +465,7 @@ function CategoriesBody({
   onCardLayout,
 }: {
   data: CategoryAnalysis;
+  contextId: string | undefined;
   month: IsoMonth;
   canWrite: boolean;
   view: CategoryView;
@@ -472,6 +478,11 @@ function CategoriesBody({
   onCardLayout: (y: number | null) => void;
 }) {
   const card = useMemo(() => (selectedKey ? selectedCategoryCard(data.shares, data.parts, selectedKey) : null), [data, selectedKey]);
+  // "Conferi este mês" (D-060): num mês terminado sem gastos, a pessoa confere que não houve; a frase de mês sem anotação vira "Você conferiu: ...".
+  const { today } = useSession();
+  const currentMonth = monthOf(today);
+  const checks = useMonthCheckRow(data.shares.length === 0 && month < currentMonth ? contextId : undefined, month);
+  const plan = checks.row ? monthCheckPlan(checks.row, 'pagamentos', currentMonth, canWrite) : null;
   // Barras e Bolhas têm alturas diferentes: a posição guardada do cartão deixa de valer até o layout novo dele (antes de qualquer layout).
   useLayoutEffect(() => {
     onCardLayout(null);
@@ -479,8 +490,15 @@ function CategoriesBody({
   if (data.shares.length === 0) {
     return (
       <Card>
-        <EmptyState title={T.categories.empty(month)} action={canWrite ? <Button label={T.categories.emptyAction} onPress={onAddExpense} /> : undefined}>
-          {T.categories.emptyBody}
+        <EmptyState
+          title={T.categories.empty(month)}
+          action={
+            <View style={{ gap: space[3], alignSelf: 'stretch' }}>
+              <MonthCheckBlock contextId={contextId} plan={plan} />
+              {canWrite && plan?.state !== 'conferido' ? <Button label={T.categories.emptyAction} onPress={onAddExpense} /> : null}
+            </View>
+          }>
+          {plan?.state === 'conferido' ? undefined : T.categories.emptyBody}
         </EmptyState>
       </Card>
     );

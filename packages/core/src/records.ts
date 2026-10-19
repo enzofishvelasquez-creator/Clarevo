@@ -350,13 +350,43 @@ export interface SavingsCheck {
   updatedAt: string;
 }
 
-/** Recebimentos e gastos anotados num mês (months_overview, mesmo critério de month_totals). */
+/**
+ * "Conferi este mês" (D-060, item 2; resolve P-022): o que a pessoa conferiu num mês já terminado. 'recebimentos': não houve
+ * recebimentos; 'pagamentos': não houve gastos (o tipo do Pago, pela data do pagamento). Dois tipos separados, com a marca de
+ * cada um por contexto e mês (month_checks).
+ */
+export type MonthCheckKind = 'recebimentos' | 'pagamentos';
+
+/** Os dois tipos de marca, na ordem em que as telas os mostram (Recebido e depois Pago). */
+export const MONTH_CHECK_KINDS: readonly MonthCheckKind[] = ['recebimentos', 'pagamentos'];
+
+/**
+ * Resultado de set_month_check e clear_month_check: o estado da marca do contexto, mês e tipo depois da escrita (e, numa repetição
+ * da mesma chave, o estado de agora). `checked` falso: sem marca (version 0 e checkedAt nulo). A marca viva tem version 1: marcar
+ * espera 0 (ainda sem marca) e desmarcar espera a versão viva.
+ */
+export interface MonthCheck {
+  contextId: string;
+  month: IsoMonth;
+  kind: MonthCheckKind;
+  checked: boolean;
+  version: number;
+  checkedAt: string | null;
+}
+
+/**
+ * Recebimentos e gastos anotados num mês (months_overview, mesmo critério de month_totals), com a marca "Conferi este mês" de cada
+ * tipo. `receivedChecked` e `paidChecked`: existe marca do tipo no mês E o mês não tem registro do tipo (a marca deixa de valer, sem
+ * ser apagada, quando aparece um registro, e volta a valer quando ele sai). Ausente vale falso (sem marca).
+ */
 export interface MonthOverview {
   month: IsoMonth;
   receivedCount: number;
   receivedCents: Cents;
   paidCount: number;
   paidCents: Cents;
+  receivedChecked?: boolean;
+  paidChecked?: boolean;
 }
 
 /** create_series_occurrence: a conta do mês passado fica em aberto ou registrada como "não houve". */

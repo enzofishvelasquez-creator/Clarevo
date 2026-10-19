@@ -273,8 +273,8 @@ describe('comparisonStats', () => {
     expect(comparisonStats(points, ['2026-06'])).toEqual(s);
   });
 
-  it('a regra de elegibilidade é um parâmetro: o padrão é só com_registros, e sem_registros nunca entra', () => {
-    expect(COMPARISON_ELIGIBLE_STATES).toEqual(['com_registros']);
+  it('a regra de elegibilidade é um parâmetro: o padrão é com_registros e zero_confirmado, e sem_registros nunca entra', () => {
+    expect(COMPARISON_ELIGIBLE_STATES).toEqual(['com_registros', 'zero_confirmado']);
     const points = [point('2026-04', 100_000), point('2026-05', 200_000, 1, 'em_andamento'), point('2026-06', 0, 0, 'sem_registros')];
     expect(comparisonStats(points, []).eligibleCount).toBe(1);
     const withCurrent = comparisonStats(points, [], ['com_registros', 'em_andamento']);

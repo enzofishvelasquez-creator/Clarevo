@@ -14,6 +14,7 @@ import { EVOLUTION_TEXT, EVOLUTION_WINDOWS } from '../evolucao-tela';
 import { EXPORT_TEXT } from '../export';
 import { FAMILY_DEPARTED_NAME, FAMILY_TEXT, INVITE_TEXT } from '../family';
 import { GOALS_TEXT } from '../goals';
+import { MONTH_CHECK_TEXT } from '../month-check';
 import { IMPORT_TEXT } from '../importar/textos';
 import { LEARN_SECTIONS } from '../learn/sections';
 import { LEARN_UI_TEXT, SEASONAL_TEXT } from '../learn/ui-text';
@@ -113,7 +114,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Toque em um mês para ver o valor exato, a variação com o mês anterior na comparação e as 3 maiores categorias do mês. ${q(EVOLUTION_TEXT.explain.title)} mostra as categorias e os lançamentos que mais mudaram entre os dois meses, sem dizer qual é a causa.`,
       `Para tirar um mês da comparação, desligue ${q(EVOLUTION_TEXT.panel.switchLabel)}. Isso não apaga nem muda lançamento, e ${q(EVOLUTION_TEXT.custom.restore)} traz os meses de volta.`,
       `${q(EVOLUTION_TEXT.stats.average)} e ${q(EVOLUTION_TEXT.stats.median)} usam só os meses da comparação. ${q(EVOLUTION_TEXT.stats.total)} soma todos e não muda.`,
-      `${q(EVOLUTION_TEXT.table.show)} abre os mesmos valores em texto. O mês em andamento e os meses sem registros ficam à vista, fora das contas. A seleção vale só enquanto o app está aberto.`,
+      `${q(EVOLUTION_TEXT.table.show)} abre os mesmos valores em texto. O mês em andamento e os meses sem registros ficam à vista, fora das contas, a menos que você use o botão que começa com ${q('Conferi')} num mês fechado sem registros: o zero fica ${q(MONTH_CHECK_TEXT.zeroConfirmed)} e entra nas contas como zero. A seleção vale só enquanto o app está aberto.`,
     ],
     screenName: EVOLUTION_TEXT.title,
     href: '/evolucao',
@@ -259,6 +260,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Toque em ${q(RETURN_TEXT.seeSummary)} para ver, mês a mês, o que está registrado e as contas para conferir.`,
       'Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.',
       `Toque em ${q(RETURN_TEXT.updateNow)} para passar pelos meses um a um. Em cada conta, use ${list([RETURN_TEXT.paidButton, RETURN_TEXT.notHappenedButton, RETURN_TEXT.stillOpenButton], 'ou')}; nos meses, ${q(RETURN_TEXT.addReceipts)} ou ${q(RETURN_TEXT.addExpenses)}.`,
+      `Num mês sem recebimentos ou sem gastos, o botão que começa com ${q('Conferi')} confirma que não houve: o mês deixa de aparecer como possível lacuna, e ${q(MONTH_CHECK_TEXT.undo)} desfaz.`,
       `Para deixar como está, toque em ${q(RETURN_TEXT.moveOn)}. Nada é criado, pago nem excluído.`,
     ],
     screenName: RETURN_TEXT.title,

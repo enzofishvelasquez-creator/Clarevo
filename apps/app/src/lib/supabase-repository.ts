@@ -92,6 +92,8 @@ import {
   type LicenseRenewWrite,
   type LicenseStatus,
   type MonthBudgetRead,
+  type MonthCheck,
+  type MonthCheckKind,
   type MonthOverview,
   type NewGoalInput,
   type OccurrenceMode,
@@ -274,6 +276,19 @@ interface MonthOverviewRow {
   received_cents: number;
   paid_count: number;
   paid_cents: number;
+  /** "Conferi este mês" (0016): a marca vale (existe e o mês não tem registro do tipo). Ausente (banco sem a 0016): sem marca. */
+  received_checked?: boolean | null;
+  paid_checked?: boolean | null;
+}
+
+/** Retorno de set_month_check e clear_month_check (0016): o estado da marca do contexto, mês e tipo. */
+interface MonthCheckRow {
+  context_id: string;
+  month: string;
+  kind: string;
+  checked: boolean;
+  version: number;
+  checked_at: string | null;
 }
 
 /** Linha de income_references (e retorno de set/delete_income_reference, que traz também deleted_at e deleted_by). */
@@ -576,6 +591,7 @@ const KNOWN: RepoErrorCode[] = [
   'modo_invalido',
   'decisao_invalida',
   'mes_invalido',
+  'mes_com_registros',
   'periodo_invalido',
   // Renda de referência (D-026). Nenhum é sufixo de outro código da lista, nem tem outro como sufixo.
   'referencia_fora_do_intervalo',
@@ -863,6 +879,24 @@ function toMonthOverview(m: MonthOverviewRow): MonthOverview {
     receivedCents: Number(m.received_cents),
     paidCount: Number(m.paid_count),
     paidCents: Number(m.paid_cents),
+    receivedChecked: m.received_checked === true,
+    paidChecked: m.paid_checked === true,
+  };
+}
+
+/** Marca de "Conferi este mês": o banco guarda o mês como AAAA-MM-01; o core usa AAAA-MM. Sem marca, versão 0 e sem hora. */
+function toMonthCheck(r: MonthCheckRow): MonthCheck {
+  const kind = r.kind;
+  const consistent =
+    FIRST_DAY.test(r.month) && (kind === 'recebimentos' || kind === 'pagamentos') && typeof r.checked === 'boolean' && Number.isInteger(Number(r.version));
+  if (!consistent) throw new RepoError('desconhecido', 'marca_inconsistente');
+  return {
+    contextId: r.context_id,
+    month: r.month.slice(0, 7),
+    kind: kind as MonthCheckKind,
+    checked: r.checked,
+    version: Number(r.version),
+    checkedAt: r.checked_at ?? null,
   };
 }
 
@@ -1903,6 +1937,38 @@ export class SupabaseRepository implements RecordsRepository {
     const { data, error } = await this.db.rpc('months_overview', { p_context_id: contextId, p_from: `${from}-01`, p_to: `${to}-01` });
     if (error) throw repoError(error);
     return ((data ?? []) as MonthOverviewRow[]).map(toMonthOverview);
+  }
+
+  /**
+   * "Conferi este mês" (0016): marca que o mês já terminado não teve recebimentos ('recebimentos') ou gastos ('pagamentos'); marcar
+   * espera a versão 0. Devolve o estado da marca; uma repetição com a mesma chave devolve o estado de agora. Reconciliação: repetir com
+   * a mesma chave e os mesmos argumentos.
+   */
+  async setMonthCheck(key: string, contextId: string, month: IsoMonth, kind: MonthCheckKind, expectedVersion: number): Promise<MonthCheck> {
+    const { data, error } = await this.db.rpc('set_month_check', {
+      p_context: contextId,
+      p_month: `${month}-01`,
+      p_kind: kind,
+      p_key: key,
+      p_version: expectedVersion,
+    });
+    if (error) throw repoError(error);
+    if (!data) throw new RepoError('desconhecido');
+    return toMonthCheck(data as MonthCheckRow);
+  }
+
+  /** Desfaz a marca (clear_month_check); desmarcar espera a versão da marca viva, 1. */
+  async clearMonthCheck(key: string, contextId: string, month: IsoMonth, kind: MonthCheckKind, expectedVersion: number): Promise<MonthCheck> {
+    const { data, error } = await this.db.rpc('clear_month_check', {
+      p_context: contextId,
+      p_month: `${month}-01`,
+      p_kind: kind,
+      p_key: key,
+      p_version: expectedVersion,
+    });
+    if (error) throw repoError(error);
+    if (!data) throw new RepoError('desconhecido');
+    return toMonthCheck(data as MonthCheckRow);
   }
 
   /**

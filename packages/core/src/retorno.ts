@@ -19,6 +19,7 @@ import type {
   CommitmentSeries,
   CommitmentSeriesRef,
   FinancialRecord,
+  MonthCheckKind,
   MonthOverview,
   RecordKind,
   ReturnDecision,
@@ -27,6 +28,7 @@ import type {
 } from './records';
 import type { AnnualYearSummary } from './series';
 import { annualYearLabelOf, numberAtOrAfter, numberAtOrBefore, occurrenceLabel, seriesMonthOf, termFor } from './series';
+import { monthCheckValid } from './month-check';
 import type { RecordsRepository } from './repository';
 import type { MonthSummary } from './summary';
 import { ERROR_TEXT, PAYMENT_ERROR_TEXT } from './validation';
@@ -303,9 +305,12 @@ export interface ReviewMonth {
   items: ReviewItem[];
   /** "Outras contas vencidas": avulsas em aberto com vencimento no mês. */
   loose: ReviewRow[];
-  /** "Com algo sem registro": sem recebimento anotado, sem gasto anotado ou com número de série sem conta registrada. */
+  /**
+   * "Com algo sem registro": sem recebimento anotado, sem gasto anotado ou com número de série sem conta registrada. Um mês que a pessoa
+   * conferiu sem recebimentos (ou sem gastos), "Conferi este mês" (D-060), deixa de contar como sem registro naquele tipo.
+   */
   missing: boolean;
-  /** Entra nos passos de "Atualizar agora": sem recebimento ou gasto anotado, ou com algo a mostrar (items ou loose). */
+  /** Entra nos passos de "Atualizar agora": sem recebimento ou gasto anotado (e não conferido), ou com algo a mostrar (items ou loose). */
   toCheck: boolean;
 }
 
@@ -342,7 +347,15 @@ export interface ReturnReview {
   isEmpty: boolean;
 }
 
-const zeroOverview = (month: IsoMonth): MonthOverview => ({ month, receivedCount: 0, receivedCents: 0, paidCount: 0, paidCents: 0 });
+const zeroOverview = (month: IsoMonth): MonthOverview => ({
+  month,
+  receivedCount: 0,
+  receivedCents: 0,
+  paidCount: 0,
+  paidCents: 0,
+  receivedChecked: false,
+  paidChecked: false,
+});
 
 /** Meses de from a to (vazio quando from > to). */
 function monthList(from: IsoMonth, to: IsoMonth): IsoMonth[] {
@@ -419,7 +432,8 @@ export function buildReturnReview(
     const rows = closed.filter((r) => r.month === month);
     const items = itemsByMonth.get(month) ?? [];
     const loose = rows.filter((r) => r.series === null);
-    const noRecords = ov.receivedCount === 0 || ov.paidCount === 0;
+    // Sem recebimento (ou sem gasto) anotado e sem a conferência da pessoa naquele tipo: possível lacuna. Conferido, o zero é um fato.
+    const noRecords = (ov.receivedCount === 0 && !monthCheckValid(ov, 'recebimentos')) || (ov.paidCount === 0 && !monthCheckValid(ov, 'pagamentos'));
     return {
       month,
       overview: ov,
@@ -560,9 +574,16 @@ export function emptyMonthCaption(summary: Pick<MonthSummary, 'composition'>, mo
 
 /**
  * Recebimentos e gastos por mês, de from a to (months_overview): registros realizados do contexto pela data. Os
- * registros vêm sem os excluídos.
+ * registros vêm sem os excluídos. `checks`: as marcas "Conferi este mês" do contexto (month_checks); a marca de um tipo vale no
+ * mês só se o mês não tem registro do tipo (receivedChecked e paidChecked, como no banco).
  */
-export function monthsOverview(records: readonly FinancialRecord[], contextId: string, from: IsoMonth, to: IsoMonth): MonthOverview[] {
+export function monthsOverview(
+  records: readonly FinancialRecord[],
+  contextId: string,
+  from: IsoMonth,
+  to: IsoMonth,
+  checks: readonly { month: IsoMonth; kind: MonthCheckKind }[] = [],
+): MonthOverview[] {
   return monthList(from, to).map((month) => {
     const out = zeroOverview(month);
     for (const r of records) {
@@ -575,6 +596,9 @@ export function monthsOverview(records: readonly FinancialRecord[], contextId: s
         out.paidCents += r.amountCents;
       }
     }
+    const has = (kind: MonthCheckKind) => checks.some((c) => c.month === month && c.kind === kind);
+    out.receivedChecked = has('recebimentos') && out.receivedCount === 0;
+    out.paidChecked = has('pagamentos') && out.paidCount === 0;
     return out;
   });
 }
@@ -702,13 +726,22 @@ export const RETURN_TEXT = {
   learnMoreA11y: 'Entenda o mês sem registro',
   monthTitle: (month: IsoMonth) => formatMonthBR(month),
   currentTitle: (month: IsoMonth) => `${formatMonthBR(month)} (este mês)`,
-  /** "Recebido: R$ 6.000,00 · 1 recebimento" ou "Recebido: nenhum recebimento anotado" */
+  /**
+   * "Recebido: R$ 6.000,00 · 1 recebimento", "Recebido: nenhum recebimento anotado" ou, com a conferência da pessoa ("Conferi este
+   * mês", D-060), "Recebido: conferido, não houve recebimentos".
+   */
   received: (o: MonthOverview) =>
     o.receivedCount > 0
       ? `Recebido: ${formatBRL(o.receivedCents)} · ${plural(o.receivedCount, 'recebimento', 'recebimentos')}`
-      : 'Recebido: nenhum recebimento anotado',
+      : monthCheckValid(o, 'recebimentos')
+        ? 'Recebido: conferido, não houve recebimentos'
+        : 'Recebido: nenhum recebimento anotado',
   paid: (o: MonthOverview) =>
-    o.paidCount > 0 ? `Pago: ${formatBRL(o.paidCents)} · ${plural(o.paidCount, 'gasto', 'gastos')}` : 'Pago: nenhum gasto anotado',
+    o.paidCount > 0
+      ? `Pago: ${formatBRL(o.paidCents)} · ${plural(o.paidCount, 'gasto', 'gastos')}`
+      : monthCheckValid(o, 'pagamentos')
+        ? 'Pago: conferido, não houve gastos'
+        : 'Pago: nenhum gasto anotado',
   /** "Contas em aberto: 3 · R$ 3.530,00 · inclui R$ 180,00 estimados" */
   openBills: (count: number, totalCents: Cents, estimatedCents: Cents) =>
     `Contas em aberto: ${count} · ${formatBRL(totalCents)}${estimatedCents > 0 ? ` · inclui ${formatBRL(estimatedCents)} estimados` : ''}`,
@@ -813,9 +846,19 @@ export const RETURN_TEXT = {
   announceStillOpen: (shortName: string) => `Registrada em aberto: ${shortName}.`,
   /** "Já paguei" numa conta que já estava paga (em outro aparelho): nada foi pago de novo. Aviso na tela de origem, anunciado no iOS. */
   paidElsewhere: 'Esta conta já foi paga em outro aparelho.',
-  /** "Recebimentos: R$ 6.000,00 · 1" ou "Recebimentos: nenhum anotado" */
-  receiptsLine: (o: MonthOverview) => (o.receivedCount > 0 ? `Recebimentos: ${formatBRL(o.receivedCents)} · ${o.receivedCount}` : 'Recebimentos: nenhum anotado'),
-  expensesLine: (o: MonthOverview) => (o.paidCount > 0 ? `Gastos: ${formatBRL(o.paidCents)} · ${o.paidCount}` : 'Gastos: nenhum anotado'),
+  /** "Recebimentos: R$ 6.000,00 · 1", "Recebimentos: nenhum anotado" ou "Recebimentos: conferido, não houve" (D-060). */
+  receiptsLine: (o: MonthOverview) =>
+    o.receivedCount > 0
+      ? `Recebimentos: ${formatBRL(o.receivedCents)} · ${o.receivedCount}`
+      : monthCheckValid(o, 'recebimentos')
+        ? 'Recebimentos: conferido, não houve'
+        : 'Recebimentos: nenhum anotado',
+  expensesLine: (o: MonthOverview) =>
+    o.paidCount > 0
+      ? `Gastos: ${formatBRL(o.paidCents)} · ${o.paidCount}`
+      : monthCheckValid(o, 'pagamentos')
+        ? 'Gastos: conferido, não houve'
+        : 'Gastos: nenhum anotado',
   addReceipts: 'Anotar recebimentos',
   addExpenses: 'Anotar gastos',
   /** "Anote só o que você sabe. Se não lembra de cada gasto, pode anotar um total, como "Mercado de junho"." */
@@ -1104,8 +1147,10 @@ export function returnTextSamples(): string[] {
     T.currentTitle('2026-10'),
     T.received(ov(0, 0)),
     T.received(ov(1, 4)),
+    T.received({ ...ov(0, 0), receivedChecked: true }),
     T.paid(ov(0, 0)),
     T.paid(ov(2, 1)),
+    T.paid({ ...ov(0, 0), paidChecked: true }),
     T.openBills(3, 353_000, 18_000),
     T.gapBills([rowName(luz), rowName(carro), rowName(iptu), rowName(ipva)]),
     T.groupState(5, 'sem_conta'),
@@ -1144,8 +1189,10 @@ export function returnTextSamples(): string[] {
     T.announceStillOpen(rowShortName(luz)),
     T.receiptsLine(ov(0, 2)),
     T.receiptsLine(ov(1, 2)),
+    T.receiptsLine({ ...ov(0, 2), receivedChecked: true }),
     T.expensesLine(ov(1, 0)),
     T.expensesLine(ov(1, 2)),
+    T.expensesLine({ ...ov(1, 0), paidChecked: true }),
     T.recordsHint('2026-06'),
     T.finished(true),
     T.finished(false),

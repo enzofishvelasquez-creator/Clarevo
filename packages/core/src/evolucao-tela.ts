@@ -13,9 +13,10 @@ import {
   type EvolutionPointState,
 } from './evolucao';
 import { formatTenths } from './learn/format';
+import { MONTH_CHECK_TEXT, monthCheckPlan, type MonthCheckPlan } from './month-check';
 import type { Cents } from './money';
 import { formatBRL } from './money';
-import type { Commitment, CommitmentSeries, MonthOverview } from './records';
+import type { Commitment, CommitmentSeries, MonthCheckKind, MonthOverview } from './records';
 import type { RecordsRepository } from './repository';
 import { seriesGapsInRange } from './retorno';
 import type { CategoryShare } from './summary';
@@ -25,7 +26,8 @@ import type { CategoryShare } from './summary';
  * contas de `evolucao.ts` (fase 1a). Aqui moram os textos, o que a tela mostra em cada estado e a memória dos meses que a pessoa
  * tirou da comparação. Nenhuma regra financeira é nova, nada é gravado e nada sai do aparelho.
  *
- * - Recebido e Pago pela data do pagamento, as mesmas somas do Resumo; mês sem lançamentos é "sem registros", nunca zero.
+ * - Recebido e Pago pela data do pagamento, as mesmas somas do Resumo; mês sem lançamentos é "sem registros", nunca zero, a não ser que a
+ *   pessoa tenha conferido o mês (D-060, "Conferi este mês"): aí é zero confirmado, "R$ 0,00, conferido", e entra nas contas como zero.
  * - Mês em andamento e mês sem registros ficam à vista no eixo e fora da média e da mediana (D04).
  * - Tirar um mês da comparação só muda a média, a mediana e o desenho; o total dos meses exibidos nunca muda (EF-09).
  */
@@ -120,6 +122,7 @@ export const EVOLUTION_TEXT = {
     included: 'Na comparação',
     excluded: 'Fora da comparação',
     noRecords: 'Sem registros',
+    zeroConfirmed: 'Conferido, sem lançamentos',
     inProgress: 'Mês em andamento',
     selected: 'Mês escolhido',
   },
@@ -129,6 +132,7 @@ export const EVOLUTION_TEXT = {
     excluded: 'fora da comparação',
     inProgress: 'mês em andamento',
     noRecords: 'sem registros',
+    zeroConfirmed: MONTH_CHECK_TEXT.zeroConfirmed,
   },
   stats: {
     average: 'Média dos meses na comparação',
@@ -184,6 +188,7 @@ export const EVOLUTION_TEXT = {
     noValue: 'Sem registros',
     state: {
       com_registros: 'Com registros',
+      zero_confirmado: 'Conferido',
       em_andamento: 'Mês em andamento',
     },
     noRecords: (metric: EvolutionMetric): string => `Sem registros: mês sem anotação não quer dizer mês sem ${THINGS[metric]}`,
@@ -292,6 +297,7 @@ export const EVOLUTION_TEXT = {
     out: 'Fora da comparação',
     noValue: 'Sem valor',
     noRecords: 'Sem registros',
+    zeroConfirmed: 'Conferido',
     note: 'O total dos meses exibidos não depende do que está na comparação.',
     /** Dica da linha da tabela, que é um botão: escolhe o mês e leva ao painel. */
     rowHint: 'Mostra este mês no painel',
@@ -304,8 +310,8 @@ export const EVOLUTION_TEXT = {
 
 /**
  * Como o mês entra na comparação:
- * - na_comparacao: mês fechado, com registros, que a pessoa não tirou;
- * - fora_escolha: mês fechado, com registros, que a pessoa tirou da comparação;
+ * - na_comparacao: mês fechado, com registros ou conferido sem lançamentos (zero confirmado), que a pessoa não tirou;
+ * - fora_escolha: mês fechado, com registros ou zero confirmado, que a pessoa tirou da comparação;
  * - fora_andamento: o mês atual (D04);
  * - fora_sem_registros: nenhum lançamento (D04).
  */
@@ -315,17 +321,17 @@ export interface EvolutionPointView extends EvolutionPoint {
   participation: EvolutionParticipation;
   /** Entra na média e na mediana. */
   included: boolean;
-  /** Mês fechado com registros: o único que a pessoa pode tirar da comparação. */
+  /** Mês fechado com registros ou zero confirmado: o único que a pessoa pode tirar da comparação. */
   eligible: boolean;
   /** "Abril de 2026". */
   title: string;
   /** "abr". */
   shortLabel: string;
-  /** "R$ 7.800,00"; null em mês sem registros (nunca "R$ 0,00"). */
+  /** "R$ 7.800,00"; "R$ 0,00" só no zero confirmado; null em mês sem registros (nunca "R$ 0,00" sem a conferência). */
   valueText: string | null;
-  /** "Com registros", "Mês em andamento" ou o aviso de mês sem registros (o texto do painel). */
+  /** "Com registros", "Mês em andamento", "Você conferiu: não houve gastos em março de 2026." ou o aviso de mês sem registros (o texto do painel). */
   stateText: string;
-  /** "Com registros", "Mês em andamento" ou "Sem registros" (a coluna "Estado" da tabela). */
+  /** "Com registros", "Conferido", "Mês em andamento" ou "Sem registros" (a coluna "Estado" da tabela). */
   stateLabel: string;
   /** "Sim" ou "Fora da comparação" (coluna "Na comparação?"). */
   includedText: string;
@@ -371,9 +377,31 @@ function participationOf(state: EvolutionPointState, hidden: boolean): Evolution
   return hidden ? 'fora_escolha' : 'na_comparacao';
 }
 
+/** O que o painel diz do estado do mês: no zero confirmado, a própria conferência ("Você conferiu: não houve gastos em março de 2026."). */
+function pointStateText(point: EvolutionPoint, metric: EvolutionMetric): string {
+  const T = EVOLUTION_TEXT;
+  if (point.state === 'sem_registros') return T.panel.noRecords(metric);
+  if (point.state === 'zero_confirmado') return MONTH_CHECK_TEXT.done(checkKindOf(metric), point.month);
+  return point.state === 'em_andamento' ? T.panel.state.em_andamento : T.panel.state.com_registros;
+}
+
+/** A coluna "Estado" da tabela. */
+function pointStateLabel(point: EvolutionPoint): string {
+  const T = EVOLUTION_TEXT;
+  if (point.state === 'sem_registros') return T.table.noRecords;
+  if (point.state === 'zero_confirmado') return T.table.zeroConfirmed;
+  return point.state === 'em_andamento' ? T.panel.state.em_andamento : T.panel.state.com_registros;
+}
+
+/** O tipo de marca de "Conferi este mês" de cada valor: Recebido confere recebimentos, Pago confere gastos (pagamentos). */
+export function checkKindOf(metric: EvolutionMetric): MonthCheckKind {
+  return metric === 'recebido' ? 'recebimentos' : 'pagamentos';
+}
+
 function pointName(point: EvolutionPoint, participation: EvolutionParticipation, gap: boolean): string {
   const T = EVOLUTION_TEXT.participation;
   const parts = [formatMonthBR(point.month), point.state === 'sem_registros' ? T.noRecords : formatBRL(point.cents)];
+  if (point.state === 'zero_confirmado') parts.push(T.zeroConfirmed);
   if (point.state === 'em_andamento') parts.push(T.inProgress);
   parts.push(participation === 'na_comparacao' ? T.included : T.excluded);
   if (gap) parts.push(lowerFirst(EVOLUTION_TEXT.gap.warning));
@@ -425,8 +453,8 @@ export function buildEvolutionView(input: EvolutionViewInput): EvolutionView {
       title: formatMonthBR(p.month),
       shortLabel: formatMonthName(p.month).slice(0, 3),
       valueText: p.state === 'sem_registros' ? null : formatBRL(p.cents),
-      stateText: p.state === 'sem_registros' ? T.panel.noRecords(metric) : p.state === 'em_andamento' ? T.panel.state.em_andamento : T.panel.state.com_registros,
-      stateLabel: p.state === 'sem_registros' ? T.table.noRecords : p.state === 'em_andamento' ? T.panel.state.em_andamento : T.panel.state.com_registros,
+      stateText: pointStateText(p, metric),
+      stateLabel: pointStateLabel(p),
       includedText: participation === 'na_comparacao' ? T.table.yes : T.table.out,
       gap,
       name: pointName(p, participation, gap),
@@ -461,14 +489,15 @@ export function buildEvolutionView(input: EvolutionViewInput): EvolutionView {
 }
 
 /**
- * O mês do painel: o que a pessoa escolheu, se ainda está na janela; senão, o mais recente que tem lançamentos (ou, sem nenhum, o
- * último da janela).
+ * O mês do painel: o que a pessoa escolheu, se ainda está na janela; senão, o mais recente que tem lançamentos (ou, sem nenhum, o mais
+ * recente conferido sem lançamentos e, sem nenhum, o último da janela).
  */
 export function evolutionSelectedMonth(view: EvolutionView, chosen: IsoMonth | null): IsoMonth {
   const picked = view.points.find((p) => p.month === chosen);
   if (picked) return picked.month;
-  const latest = [...view.points].reverse().find((p) => p.state !== 'sem_registros');
-  return (latest ?? view.points[view.points.length - 1]!).month;
+  const withRecords = [...view.points].reverse().find((p) => p.state === 'com_registros' || p.state === 'em_andamento');
+  const confirmed = [...view.points].reverse().find((p) => p.state === 'zero_confirmado');
+  return (withRecords ?? confirmed ?? view.points[view.points.length - 1]!).month;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -560,6 +589,11 @@ export interface EvolutionPanel {
   notEligibleText: string | null;
   /** O aviso de lacuna do mês fechado de Pago (D04); null sem lacuna. A variação e as categorias seguem à mostra com ele (D10). */
   gapText: string | null;
+  /**
+   * "Conferi este mês" (D-060): o botão "Conferi: não houve gastos em março de 2026" no mês fechado sem registros (com escrita), ou a
+   * frase de mês conferido com "Desfazer a conferência". null nos meses com registros e no mês em andamento.
+   */
+  check: MonthCheckPlan | null;
   /** O mês vizinho da janela, para "Mês anterior" e "Mês seguinte"; null no limite (o botão fica desativado). */
   previousMonth: IsoMonth | null;
   nextMonth: IsoMonth | null;
@@ -581,8 +615,28 @@ export interface EvolutionPanel {
   explain: EvolutionExplainPlan;
 }
 
-/** O painel do mês escolhido (tela B). Não lê nada: as categorias vêm de `categoryBreakdown`, no app. */
-export function evolutionPanel(view: EvolutionView, month: IsoMonth): EvolutionPanel {
+/** O ponto tem lançamentos (mês fechado ou em andamento): há o que listar e categorias a mostrar. */
+function hasRecords(point: EvolutionPoint): boolean {
+  return point.state === 'com_registros' || point.state === 'em_andamento';
+}
+
+/**
+ * "Conferi este mês" no painel: só o mês fechado, sem registros do valor mostrado, tem o botão (sem a marca) ou a frase com "Desfazer a
+ * conferência" (zero confirmado). O mês em andamento e o mês com registros não têm nada disso. A linha do banco vira o plano de
+ * `monthCheckPlan`, que decide o que aparece com e sem escrita.
+ */
+function evolutionCheckPlan(point: EvolutionPoint, metric: EvolutionMetric, currentMonth: IsoMonth, canWrite: boolean): MonthCheckPlan | null {
+  if (point.month >= currentMonth || (point.state !== 'sem_registros' && point.state !== 'zero_confirmado')) return null;
+  const checked = point.state === 'zero_confirmado';
+  const row: MonthOverview = { month: point.month, receivedCount: 0, receivedCents: 0, paidCount: 0, paidCents: 0, receivedChecked: checked, paidChecked: checked };
+  return monthCheckPlan(row, checkKindOf(metric), currentMonth, canWrite);
+}
+
+/**
+ * O painel do mês escolhido (tela B). Não lê nada: as categorias vêm de `categoryBreakdown`, no app. `canWrite`: a pessoa escreve no
+ * contexto (na Família, quem só lê vê a conferência, sem os botões); sem ele (padrão), o painel não oferece conferir nem desfazer.
+ */
+export function evolutionPanel(view: EvolutionView, month: IsoMonth, canWrite = false): EvolutionPanel {
   const point = view.points.find((p) => p.month === month) ?? view.points[view.points.length - 1]!;
   const at = view.points.indexOf(point);
   const T = EVOLUTION_TEXT.panel;
@@ -598,14 +652,15 @@ export function evolutionPanel(view: EvolutionView, month: IsoMonth): EvolutionP
     included: point.included,
     notEligibleText: point.state === 'em_andamento' ? T.notEligible.em_andamento : point.state === 'sem_registros' ? T.notEligible.sem_registros : null,
     gapText: point.gap ? EVOLUTION_TEXT.gap.warning : null,
+    check: evolutionCheckPlan(point, view.metric, view.currentMonth, canWrite),
     previousMonth: view.points[at - 1]?.month ?? null,
     nextMonth: view.points[at + 1]?.month ?? null,
     variation: evolutionVariation(view, point.month),
     metric: view.metric,
-    showsCategories: point.state !== 'sem_registros',
+    showsCategories: hasRecords(point),
     categoriesNote: view.metric === 'pago' ? T.categoriesNote : T.categoriesNoteReceived,
-    showsCategoriesAction: view.metric === 'pago' && point.state !== 'sem_registros',
-    showsRecords: point.state !== 'sem_registros',
+    showsCategoriesAction: view.metric === 'pago' && hasRecords(point),
+    showsRecords: hasRecords(point),
     recordsHref: `/composicao?tipo=${view.metric === 'pago' ? 'pago' : 'recebido'}`,
     categoriesHref: '/composicao?tipo=pago&vista=categoria',
     explain: evolutionExplainPlan(view, point.month),
@@ -628,8 +683,8 @@ export function evolutionTopCategories(shares: readonly CategoryShare[]): Catego
 /**
  * O que a seção "Entender o que mudou" precisa saber antes de ler qualquer lançamento: se aparece, contra qual mês compara, os avisos
  * e as ações. Calculado da visão do gráfico (`months_overview`), sem ler nada.
- * - Não aparece (`visible` falso) quando o mês escolhido está sem registros. O mês de comparação sempre tem registros, porque é um mês da
- *   comparação (D06: o anterior que está na comparação, o mesmo da variação, sempre com as duas datas).
+ * - Não aparece (`visible` falso) quando o mês escolhido está sem registros ou é um zero confirmado (não há o que descrever por categoria).
+ *   O mês de comparação tem registros, ou é um zero confirmado (que entra na comparação como zero): as categorias dele são vazias.
  * - Mês em andamento aparece, com o aviso de que os valores ainda podem mudar (a variação do painel não existe nele, mas a descrição sim).
  * - Mês com sinal de lacuna aparece, com o aviso (D10), tanto o escolhido quanto o de comparação.
  * - Sem outro mês antes na comparação (`baseMonth` nulo), só diz para escolher outro mês.
@@ -676,7 +731,7 @@ export function evolutionExplainPlan(view: EvolutionView, month: IsoMonth): Evol
     compare: null,
     showsCategoriesAction: false,
   };
-  if (selected.state === 'sem_registros') return none;
+  if (selected.state === 'sem_registros' || selected.state === 'zero_confirmado') return none;
   const base = comparisonBase(view, selected);
   if (!base) return { ...none, visible: true, unavailableText: T.needOtherMonth };
   const { chosenOut, empty } = skippedMonths(view, base, selected);

@@ -109,6 +109,7 @@ declare
   items jsonb;
   inv_ver int;
   inv_total bigint;
+  v_month date;
 begin
   -- Contas de origem do dinheiro.
   res := public.create_account(t || '-acc-0001', p_ctx, 'Carteira ' || t, 'dinheiro');
@@ -167,6 +168,15 @@ begin
     perform public.delete_commitment_limit(t || '-bud-0006', extra, 1);
   end if;
   perform public.decide_return_review(t || '-rev-0001', p_ctx, 0, '2026-09-01', 'seguiu');
+  -- "Conferi este mês" (D-060): um mês já terminado e sem nenhum registro, conferido nos dois tipos. Cada preenchimento usa o primeiro mês
+  -- (de agosto para trás) ainda sem marca no contexto, porque há uma marca por contexto, mês e tipo.
+  v_month := (select g::date from generate_series(timestamp '2026-08-01', timestamp '2026-01-01', interval '-1 month') g
+               where not exists (select 1 from public.month_checks c where c.context_id = p_ctx and c.month = g::date) limit 1);
+  perform public.set_month_check(p_ctx, v_month, 'recebimentos', t || '-mes-0001', 0);
+  perform public.set_month_check(p_ctx, v_month, 'pagamentos', t || '-mes-0002', 0);
+  -- Uma marca desfeita (a marca some, só fica a operação).
+  perform public.set_month_check(p_ctx, date '2026-05-01', 'recebimentos', t || '-mes-0004', 0);
+  perform public.clear_month_check(p_ctx, date '2026-05-01', 'recebimentos', t || '-mes-0005', 1);
   -- Cartões: compra parcelada com nota, encargo, estorno, fatura de outubro paga, um lançamento excluído e um cartão excluído.
   card := (public.create_card(t || '-crt-0001', p_ctx, 'Cartão ' || t, '1234', 5, 12, 500000) #>> '{card,id}')::uuid;
   perform public.add_card_purchase(t || '-crt-0002', card, '2026-09-20', 30000, 3, 'Geladeira ' || t, 'Moradia', pg_temp.k(t || 'nota2'));
@@ -448,10 +458,10 @@ declare
   t text;
   expected text[] := array['card_entries', 'cards', 'category_budgets', 'commitment_limits', 'commitment_series', 'commitments',
     'context_activity', 'context_memberships', 'family_invites', 'financial_accounts', 'financial_records', 'goal_movements', 'goals',
-    'income_references', 'record_operations', 'return_reviews', 'savings_checks', 'series_terms'];
+    'income_references', 'month_checks', 'record_operations', 'return_reviews', 'savings_checks', 'series_terms'];
 begin
   -- A lista das tabelas com context_id é a que a exclusão cobre: tabela nova com context_id obriga a revisar clarevo_erase_context.
-  assert pg_temp.ctx_tables() = expected, 'as tabelas com context_id são as 18 que a exclusão cobre: ' || array_to_string(pg_temp.ctx_tables(), ', ');
+  assert pg_temp.ctx_tables() = expected, 'as tabelas com context_id são as 19 que a exclusão cobre: ' || array_to_string(pg_temp.ctx_tables(), ', ');
   -- O Pessoal do Eli tem linhas em todas as tabelas de dados (menos convites, que só existem na Família).
   foreach t in array expected loop
     assert (t = 'family_invites' and pg_temp.rows_of('eli_ctx', t) = 0) or pg_temp.rows_of('eli_ctx', t) > 0, 'o Pessoal do Eli tem linhas em ' || t;
@@ -595,8 +605,16 @@ begin
       'commitment_series.deleted_by', 'commitments.created_by', 'commitments.deleted_by', 'context_memberships.person_id',
       'financial_accounts.created_by', 'financial_accounts.deleted_by', 'financial_records.created_by', 'financial_records.deleted_by',
       'goal_movements.created_by', 'goal_movements.deleted_by', 'goals.created_by', 'goals.deleted_by', 'income_references.created_by',
-      'income_references.deleted_by', 'series_terms.created_by', 'series_terms.superseded_by'],
+      'income_references.deleted_by', 'month_checks.checked_by', 'series_terms.created_by', 'series_terms.superseded_by'],
     'a autoria (criou, excluiu, trocou a vigência) e o vínculo ficaram, em todos os módulos: ' || pg_temp.refs_to(eli)::text;
+  -- Conferi este mês (D-060): as marcas do Pessoal do Eli saíram com o contexto; na Casa da Bia ficam as dele (2) e as da Bia (2), e a autoria
+  -- das dele é a pessoa anônima ("Pessoa que saiu"); a marca segue valendo para quem lê a Casa (conferido abaixo, como Bia e Lia).
+  assert (select count(*) from public.month_checks where context_id = pg_temp.id('eli_ctx')) = 0, 'as marcas do Pessoal do Eli saíram com o contexto';
+  assert (select count(*) from public.month_checks where context_id = fam) = 4
+     and (select count(*) from public.month_checks where context_id = fam and checked_by = eli) = 2
+     and (select count(*) from public.month_checks where context_id = fam and checked_by = pg_temp.id('bia')) = 2,
+    'na Casa da Bia, as marcas do Eli e da Bia continuam';
+  assert not exists (select 1 from public.month_checks where checked_by = eli and context_id <> fam), 'nenhuma marca do Eli fora da Casa da Bia';
 
   -- A Casa da Bia: o que o Eli anotou continua, igual, e ninguém perdeu nada.
   assert pg_temp.snap_ctx(fam, eli) = pg_temp.was('fam1_dados'), 'o conteúdo da Casa da Bia está idêntico (registros, contas, séries, metas, cartões, orçamento, de todos)';
@@ -641,6 +659,9 @@ begin
     assert (select (first_name, role, status, is_me, left_at is not null) from public.family_member_items where context_id = pg_temp.id('fam1') and person_id = pg_temp.id('eli'))
          = ('Pessoa que saiu'::text, 'membro'::text, 'ex-membro'::text, false, true), n || ' lê a autoria anônima';
     assert (select count(*) from public.family_member_items where context_id = pg_temp.id('fam1')) = 3, n || ' lê as três pessoas';
+    -- A marca do Eli em agosto (recebimentos e pagamentos) segue valendo na Casa, lida por quem fica.
+    assert (select (received_checked, paid_checked, received_count, paid_count) from public.months_overview(pg_temp.id('fam1'), '2026-08-01', '2026-08-01'))
+         = (true, true, 0, 0), n || ' lê a marca do Eli em agosto';
     assert not exists (select 1 from public.family_member_items where first_name like '%@%' or first_name ilike '%Prado%' or first_name ilike '%eli%'), 'nenhum nome nem e-mail do Eli';
     assert (select count(*) from public.financial_records where context_id = pg_temp.id('fam1') and created_by = pg_temp.id('eli')) = pg_temp.was('fam1_registros_eli_vivos')::int
        and pg_temp.was('fam1_registros_eli_vivos')::int > 0, n || ' ainda lê o que o Eli anotou';
@@ -967,7 +988,7 @@ do $$
 declare
   f text;
 begin
-  -- As 35 chaves estrangeiras para persons: 10 são do que é só da pessoa (apagadas), 25 são autoria e vínculo (ficam, anônimas).
+  -- As 36 chaves estrangeiras para persons: 10 são do que é só da pessoa (apagadas), 26 são autoria e vínculo (ficam, anônimas).
   -- Uma chave nova obriga a decidir aqui, e em clarevo_erase_person, o que fazer com ela.
   assert pg_temp.person_fks() = array[
       'card_entries.created_by', 'card_entries.deleted_by', 'cards.created_by', 'cards.deleted_by', 'category_budgets.created_by',
@@ -976,17 +997,17 @@ begin
       'context_memberships.person_id', 'family_invites.created_by', 'family_invites.used_by', 'financial_accounts.created_by',
       'financial_accounts.deleted_by', 'financial_contexts.owner_person_id', 'financial_records.created_by', 'financial_records.deleted_by',
       'goal_movements.created_by', 'goal_movements.deleted_by', 'goals.created_by', 'goals.deleted_by', 'income_references.created_by',
-      'income_references.deleted_by', 'licenses.person_id', 'organization_admins.person_id', 'plan_entitlements.person_id',
+      'income_references.deleted_by', 'licenses.person_id', 'month_checks.checked_by', 'organization_admins.person_id', 'plan_entitlements.person_id',
       'record_operations.actor_id', 'return_reviews.person_id', 'savings_checks.person_id', 'series_terms.created_by', 'series_terms.superseded_by'],
-    'as chaves estrangeiras para persons são as 35 que a exclusão da conta trata';
+    'as chaves estrangeiras para persons são as 36 que a exclusão da conta trata';
   -- E as que apontam para financial_contexts (financial_records é restrict: por isso os registros saem antes do contexto).
   assert (select array_agg(c.conrelid::regclass::text || '.' || a.attname || ' ' || c.confdeltype::text order by c.conrelid::regclass::text, a.attname)
             from pg_constraint c join pg_attribute a on a.attrelid = c.conrelid and a.attnum = c.conkey[1]
            where c.contype = 'f' and c.confrelid = 'public.financial_contexts'::regclass)
        = array['cards.context_id c', 'category_budgets.context_id c', 'commitment_limits.context_id c', 'commitment_series.context_id c', 'commitments.context_id c',
                'context_activity.context_id c', 'context_memberships.context_id c', 'family_invites.context_id c', 'financial_accounts.context_id c',
-               'financial_records.context_id r', 'goals.context_id c', 'income_references.context_id c', 'return_reviews.context_id c', 'savings_checks.context_id c'],
-    'as chaves estrangeiras para financial_contexts: 13 com cascata e financial_records com restrict';
+               'financial_records.context_id r', 'goals.context_id c', 'income_references.context_id c', 'month_checks.context_id c', 'return_reviews.context_id c', 'savings_checks.context_id c'],
+    'as chaves estrangeiras para financial_contexts: 14 com cascata e financial_records com restrict';
   assert not exists (select 1 from pg_constraint where conrelid = 'public.persons'::regclass and contype = 'f'), 'persons não depende mais de auth.users por chave estrangeira';
   assert (select count(*) from pg_attribute where attrelid = 'public.persons'::regclass and attname = 'deleted_at' and not attisdropped) = 1
      and (select pg_get_constraintdef(oid) from pg_constraint where conname = 'persons_display_name_check') like '%deleted_at IS NOT NULL%', 'persons.deleted_at e a regra do nome vazio';
@@ -1014,7 +1035,7 @@ begin
     assert (select prosecdef from pg_proc where oid = ('public.' || f)::regprocedure), 'security definer: ' || f;
   end loop;
   assert (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-           where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) = 80, 'authenticated executa 80 funções (as 79 de antes e delete_my_account)';
+           where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) = 82, 'authenticated executa 82 funções (as 80 da 0015 e as 2 de conferir o mês)';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')), 'anon não executa nenhuma função';
 
@@ -1061,11 +1082,11 @@ begin
            where (x.def ~* '(insert into|update|delete from) (public|auth)\.' or x.def ~* 'clarevo_materialize_series') and x.def !~* 'insert into public\.record_operations')
        = array['delete_my_account', 'ensure_personal_space', 'sync_series_occurrences'],
     'toda função de escrita grava a operação, menos delete_my_account, ensure_personal_space e sync_series_occurrences';
-  assert (select count(*) from pg_temp.app_functions() x where x.def ~* 'insert into public\.record_operations') = 63,
-    'as 63 funções de escrita com operação são as que o gatilho de record_operations protege';
-  -- Nada novo em record_operations: a conta some com o rastro, então nenhuma ação nova.
-  assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m where c.conname = 'record_operations_action_check') = 63,
-    'a lista de ações de record_operations segue com 63 (excluir a conta não deixa operação)';
+  assert (select count(*) from pg_temp.app_functions() x where x.def ~* 'insert into public\.record_operations') = 65,
+    'as 65 funções de escrita com operação são as que o gatilho de record_operations protege';
+  -- Nada novo em record_operations pela exclusão: a conta some com o rastro, então nenhuma ação nova (as 2 de conferir o mês vêm da 0016).
+  assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m where c.conname = 'record_operations_action_check') = 65,
+    'a lista de ações de record_operations segue com 65 (excluir a conta não deixa operação)';
 end $$;
 rollback;
 

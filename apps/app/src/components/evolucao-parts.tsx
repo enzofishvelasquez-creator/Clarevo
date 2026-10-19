@@ -9,12 +9,13 @@ import {
   type EvolutionView,
   type IsoMonth,
 } from '@clarevo/core';
-import { Ban, ChartLine, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleAlert, Hourglass, Minus, RotateCcw, type LucideIcon } from 'lucide-react-native';
+import { Ban, Check, ChartLine, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleAlert, Hourglass, Minus, RotateCcw, type LucideIcon } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useState, type Ref } from 'react';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 
 import { MoneyTxt } from '@/components/money-text';
+import { MonthCheckBlock } from '@/components/month-check';
 import { SettingSwitch } from '@/components/setting-switch';
 import { ErrorState } from '@/components/states';
 import { Button, Card, FitMoney, LinkButton, Money, Skeleton, Txt, styles as ui } from '@/components/ui';
@@ -179,7 +180,8 @@ function MonthColumn({
   hiddenValues: boolean;
   onPress: () => void;
 }) {
-  const Icon = AXIS_ICON[point.participation];
+  // Zero confirmado ("Conferi este mês", D-060): o ícone de conferido sob o mês, para o ponto não depender só do valor "R$ 0,00".
+  const Icon = point.state === 'zero_confirmado' && point.included ? Check : AXIS_ICON[point.participation];
   const label = letters ? point.shortLabel.charAt(0).toUpperCase() : point.shortLabel;
   return (
     <Pressable
@@ -207,6 +209,9 @@ function Legend({ view }: { view: EvolutionView }) {
   if (has('na_comparacao')) items.push({ key: 'in', label: T.legend.included, swatch: <Swatch kind="included" /> });
   if (has('fora_escolha')) items.push({ key: 'out', label: T.legend.excluded, swatch: <Swatch kind="excluded" icon={Ban} /> });
   if (has('fora_andamento')) items.push({ key: 'andamento', label: T.legend.inProgress, swatch: <Swatch kind="excluded" icon={Hourglass} /> });
+  if (view.points.some((p) => p.state === 'zero_confirmado' && p.included)) {
+    items.push({ key: 'conferido', label: T.legend.zeroConfirmed, swatch: <Swatch kind="included" icon={Check} /> });
+  }
   if (has('fora_sem_registros')) items.push({ key: 'sem', label: T.legend.noRecords, swatch: <Swatch kind="none" icon={Minus} /> });
   items.push({ key: 'sel', label: T.legend.selected, swatch: <Swatch kind="selected" /> });
   return (
@@ -244,7 +249,8 @@ function Swatch({ kind, icon: Icon }: { kind: 'included' | 'excluded' | 'none' |
 /**
  * Painel do mês escolhido, na mesma tela (tela B): mês e ano (com "Mês anterior" e "Mês seguinte", alvos de 44 px), valor exato com
  * centavos, estado, o aviso de lacuna do mês fechado de Pago, a variação com as duas datas, "Entender o que mudou" (recolhido; fase 2),
- * as 3 maiores categorias do mês (Pago ou Recebido), o interruptor "Mostrar este mês na comparação" e "Ver lançamentos". Tirar da
+ * as 3 maiores categorias do mês (Pago ou Recebido), o interruptor "Mostrar este mês na comparação" e "Ver lançamentos". No mês fechado
+ * sem registros, "Conferi: não houve gastos em março de 2026" (D-060), que vira a frase "Você conferiu" com "Desfazer a conferência". Tirar da
  * comparação só muda a média, a mediana e o desenho: nenhum lançamento é lido para isso, nem gravado. O título é o que recebe o foco
  * quando a pessoa escolhe o mês pela tabela (`headRef`).
  */
@@ -301,8 +307,10 @@ export function MonthPanelCard({
             {T.panel.noValue}
           </Txt>
         )}
-        <Txt color={colors.textSecondary}>{panel.stateText}</Txt>
+        {/* No zero confirmado a própria conferência ("Você conferiu: ...") diz o estado: o bloco abaixo a mostra, com "Desfazer a conferência". */}
+        {panel.check?.doneText ? null : <Txt color={colors.textSecondary}>{panel.stateText}</Txt>}
         {panel.gapText ? <GapNote text={panel.gapText} /> : null}
+        <MonthCheckBlock contextId={contextId} plan={panel.check} />
       </View>
 
       <View style={styles.block}>

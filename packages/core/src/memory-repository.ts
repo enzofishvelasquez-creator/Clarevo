@@ -26,6 +26,8 @@ import type {
   GoalMovementKind,
   GoalStatus,
   IncomeReference,
+  MonthCheck,
+  MonthCheckKind,
   NewGoalInput,
   OccurrenceMode,
   PaymentRequest,
@@ -55,6 +57,7 @@ import type {
   IncomeReferenceAction,
   InvoicePaymentWrite,
   RecordsRepository,
+  MonthCheckAction,
   ReturnReviewAction,
   SavingsAction,
   SeriesAction,
@@ -132,7 +135,7 @@ import {
   normalizeGoalNote,
   type GoalMovementChange,
 } from './goals';
-import { PARTS_PER_YEAR_MAX } from './records';
+import { MONTH_CHECK_KINDS, PARTS_PER_YEAR_MAX } from './records';
 import { isLongAbsence, isReviewableMonth, monthsOverview as overviewOf } from './retorno';
 import { savingsAnswerError, savingsAskAgainOn } from './savings';
 import {
@@ -166,6 +169,7 @@ interface Operation {
     | CardAction
     | AccountAction
     | SubscriptionReviewAction
+    | MonthCheckAction
     | ImportAction
     | FamilyAction
     | CompanyAction;
@@ -214,6 +218,8 @@ type StoredCommitment = Omit<Commitment, 'payment' | 'series' | 'invoice'> & {
 type StoredSeries = Omit<CommitmentSeries, 'terms' | 'skippedNumbers' | 'paidCount' | 'openCount' | 'generating'> & { deletedAt?: string };
 /** Vigência: nunca editada; "esta e as próximas" marca as substituídas. */
 type StoredTerm = SeriesTerm & { id: string; seriesId: string; contextId: string; createdAt: string; supersededAt?: string };
+/** Marca "Conferi este mês" (month_checks): uma por contexto, mês e tipo; nunca muda (só nasce e some). A versão da marca viva é 1. */
+type StoredMonthCheck = { contextId: string; month: IsoMonth; kind: MonthCheckKind; checkedAt: string; version: 1 };
 /** Renda de referência (income_references): exclusão lógica; no máximo uma viva por contexto e mês. */
 type StoredIncomeReference = IncomeReference & { deletedAt?: string; deletedBy?: string };
 /** Linha do orçamento por categoria (category_budgets) e do limite pessoal (commitment_limits): exclusão lógica; no máximo uma viva por chave. */
@@ -335,6 +341,8 @@ export class MemoryRepository implements RecordsRepository {
   /** context_activity e return_reviews da pessoa (só ela usa este repositório), por contexto. */
   private activity = new Map<string, ContextActivity>();
   private reviews = new Map<string, ReturnReviewMark>();
+  /** month_checks nos contextos que a pessoa lê (aqui, os dela), por "contexto|mês|tipo". */
+  private monthChecks = new Map<string, StoredMonthCheck>();
   private incomeRefs = new Map<string, StoredIncomeReference>();
   private budgets = new Map<string, StoredBudget>();
   private limits = new Map<string, StoredLimit>();
@@ -404,6 +412,7 @@ export class MemoryRepository implements RecordsRepository {
       operations: new Map(this.operations),
       activity: new Map(this.activity),
       reviews: new Map(this.reviews),
+      monthChecks: new Map(this.monthChecks),
       incomeRefs: new Map(this.incomeRefs),
       budgets: new Map(this.budgets),
       limits: new Map(this.limits),
@@ -428,6 +437,7 @@ export class MemoryRepository implements RecordsRepository {
         operations: this.operations,
         activity: this.activity,
         reviews: this.reviews,
+        monthChecks: this.monthChecks,
         incomeRefs: this.incomeRefs,
         budgets: this.budgets,
         limits: this.limits,
@@ -1377,7 +1387,8 @@ export class MemoryRepository implements RecordsRepository {
       if (!isValidIsoMonth(from) || !isValidIsoMonth(to) || to < from || monthsBetween(from, to) > 11) throw new RepoError('periodo_invalido');
       if (!this.canRead(contextId)) throw new RepoError('sem_permissao');
       const live = [...this.records.values()].filter((r) => !r.deletedAt).map(strip);
-      return overviewOf(live, contextId, from, to);
+      const checks = [...this.monthChecks.values()].filter((c) => c.contextId === contextId);
+      return overviewOf(live, contextId, from, to, checks);
     });
   }
 
@@ -1476,6 +1487,63 @@ export class MemoryRepository implements RecordsRepository {
       this.reviews.set(contextId, mark);
       this.saveOperation(key, 'decidir_revisao', payload, { contextId, recordId: null, commitmentId: null });
       return mark;
+    });
+  }
+
+  /**
+   * Como set_month_check e clear_month_check: a validação comum é o tipo (tipo_invalido) e depois o mês, que precisa ser um mês já
+   * terminado (o atual e os futuros são mes_invalido), no dia de hoje da pessoa.
+   */
+  private checkMonthCheckArgs(month: IsoMonth, kind: MonthCheckKind) {
+    if (typeof kind !== 'string' || !MONTH_CHECK_KINDS.includes(kind)) throw new RepoError('tipo_invalido');
+    if (typeof month !== 'string' || !isValidIsoMonth(month) || month >= monthOf(this.opts.today())) throw new RepoError('mes_invalido');
+  }
+
+  /** O estado da marca do contexto, mês e tipo, como clarevo_month_check_result: sem marca, {checked: false, version: 0}. */
+  private monthCheckResult(contextId: string, month: IsoMonth, kind: MonthCheckKind): MonthCheck {
+    const c = this.monthChecks.get(`${contextId}|${month}|${kind}`);
+    return c
+      ? { contextId, month, kind, checked: true, version: c.version, checkedAt: c.checkedAt }
+      : { contextId, month, kind, checked: false, version: 0, checkedAt: null };
+  }
+
+  /**
+   * Como set_month_check ("Conferi este mês", D-060). Ordem do banco: repetição; sem_permissao (escrita no contexto); tipo_invalido;
+   * mes_invalido; versao_desatualizada (marcar espera 0 e nenhuma marca viva); mes_com_registros (registro vivo do tipo no mês).
+   * Não conta como anotação, não muda nenhum total e vale por contexto.
+   */
+  async setMonthCheck(key: string, contextId: string, month: IsoMonth, kind: MonthCheckKind, expectedVersion: number): Promise<MonthCheck> {
+    return this.write(() => {
+      const payload = [contextId, month, kind, expectedVersion];
+      if (this.replay(key, 'marcar_mes_conferido', payload)) return this.monthCheckResult(contextId, month, kind);
+      if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      this.checkMonthCheckArgs(month, kind);
+      const live = this.monthChecks.get(`${contextId}|${month}|${kind}`);
+      if (live || expectedVersion !== 0) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${live?.version ?? 0}`);
+      const wanted: RecordKind = kind === 'recebimentos' ? 'receita' : 'despesa';
+      const hasRecords = [...this.records.values()].some((r) => !r.deletedAt && r.contextId === contextId && r.kind === wanted && monthOf(r.occurredOn) === month);
+      if (hasRecords) throw new RepoError('mes_com_registros');
+      this.monthChecks.set(`${contextId}|${month}|${kind}`, { contextId, month, kind, checkedAt: this.stamp(), version: 1 });
+      this.saveOperation(key, 'marcar_mes_conferido', payload, { contextId, recordId: null, commitmentId: null });
+      return this.monthCheckResult(contextId, month, kind);
+    });
+  }
+
+  /**
+   * Como clear_month_check. Mesma ordem; no lugar de mes_com_registros, a marca precisa existir e a versão esperada precisa ser a dela
+   * (versao_desatualizada com "versao_atual=0" quando já não há marca). Vale mesmo com registro no mês.
+   */
+  async clearMonthCheck(key: string, contextId: string, month: IsoMonth, kind: MonthCheckKind, expectedVersion: number): Promise<MonthCheck> {
+    return this.write(() => {
+      const payload = [contextId, month, kind, expectedVersion];
+      if (this.replay(key, 'desmarcar_mes_conferido', payload)) return this.monthCheckResult(contextId, month, kind);
+      if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      this.checkMonthCheckArgs(month, kind);
+      const live = this.monthChecks.get(`${contextId}|${month}|${kind}`);
+      if (!live || expectedVersion !== live.version) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${live?.version ?? 0}`);
+      this.monthChecks.delete(`${contextId}|${month}|${kind}`);
+      this.saveOperation(key, 'desmarcar_mes_conferido', payload, { contextId, recordId: null, commitmentId: null });
+      return this.monthCheckResult(contextId, month, kind);
     });
   }
 
@@ -3729,11 +3797,20 @@ export class MemoryRepository implements RecordsRepository {
 
   /**
    * Como o gatilho clarevo_track_activity em record_operations: toda operação nova, menos decidir_revisao,
-   * responder_guardar e revisar_assinaturas, deixa o último dia com anotação >= hoje; se o intervalo desde o último for uma ausência longa,
+   * responder_guardar, revisar_assinaturas e as duas de "Conferi este mês", deixa o último dia com anotação >= hoje; se o intervalo desde o último for uma ausência longa,
    * ela passa a ser a última ausência. Mesmo dia ou relógio para trás: nada muda.
    */
   private trackActivity(action: Operation['action'], contextId: string) {
-    if (action === 'decidir_revisao' || action === 'responder_guardar' || action === 'revisar_assinaturas' || isFamilyAction(action) || isCompanyAction(action)) return;
+    if (
+      action === 'decidir_revisao' ||
+      action === 'responder_guardar' ||
+      action === 'revisar_assinaturas' ||
+      action === 'marcar_mes_conferido' ||
+      action === 'desmarcar_mes_conferido' ||
+      isFamilyAction(action) ||
+      isCompanyAction(action)
+    )
+      return;
     const day = this.opts.today();
     const a = this.activity.get(contextId);
     if (!a) {
@@ -4146,6 +4223,7 @@ export class MemoryRepository implements RecordsRepository {
       this.operations.clear();
       this.activity.clear();
       this.reviews.clear();
+      this.monthChecks.clear();
       this.incomeRefs.clear();
       this.budgets.clear();
       this.limits.clear();

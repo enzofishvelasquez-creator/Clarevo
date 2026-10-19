@@ -494,7 +494,7 @@ describe('buildReturnReview e returnBannerText', () => {
     // Maio compacto: recebido e pago anotados, tudo pago.
     const may = monthOfReview(review, '2026-05');
     expect(may).toMatchObject({ missing: false, toCheck: false, rows: [] });
-    expect(may.overview).toEqual({ month: '2026-05', receivedCount: 1, receivedCents: 600_000, paidCount: 4, paidCents: 476_530 });
+    expect(may.overview).toEqual({ month: '2026-05', receivedCount: 1, receivedCents: 600_000, paidCount: 4, paidCents: 476_530, receivedChecked: false, paidChecked: false });
     expect(reviewMonthCard(may)).toEqual({
       title: 'Maio de 2026',
       received: 'Recebido: R$ 6.000,00 · 1 recebimento',

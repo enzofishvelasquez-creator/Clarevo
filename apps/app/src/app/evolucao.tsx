@@ -73,7 +73,7 @@ export default function EvolucaoScreen() {
   const retry = () => (work.isError ? work.refetch() : overview.refetch());
 
   const selected = view ? evolutionSelectedMonth(view, chosen) : null;
-  const panel = view && selected ? evolutionPanel(view, selected) : null;
+  const panel = view && selected ? evolutionPanel(view, selected, canWrite) : null;
 
   // Ao tirar ou pôr um mês, a nova média e mediana são ditas ao leitor de tela (a troca de valor e de meses, não).
   const [live, setLive] = useState('');
