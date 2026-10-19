@@ -9,7 +9,8 @@ import type { CategoryPart } from './summary';
  * sem tela e sem texto. Dinheiro em centavos inteiros; somas em bigint; arredondamento metade para cima.
  *
  * - Recebido e Pago pela data do pagamento, como no Resumo (a mesma soma de month_totals).
- * - Mês sem lançamentos é "sem registros", nunca zero confirmado (P-022 segue pendente).
+ * - Mês sem lançamentos é "sem registros" (nunca um zero), a não ser que a pessoa tenha conferido (D-060, "Conferi este mês",
+ *   P-022): aí é "zero confirmado", um zero de verdade que entra nas médias e na mediana (D04).
  * - Ocultar um mês só tira o ponto da comparação: o total canônico não depende dele.
  *
  * Fase 2 (D-057, "Entender o que mudou"): `explainChange` compara dois meses por categoria, também em conta pura, sem texto.
@@ -20,11 +21,13 @@ export type EvolutionMetric = 'recebido' | 'pago';
 
 /**
  * Estado de um ponto mensal:
- * - sem_registros: a contagem de lançamentos é 0 (o valor 0 não quer dizer que nada foi gasto ou recebido);
+ * - sem_registros: a contagem de lançamentos é 0 e a pessoa não conferiu o mês (o valor 0 não quer dizer que nada foi gasto ou recebido);
+ * - zero_confirmado: a contagem é 0 e a pessoa conferiu o mês já terminado (D-060): o zero é um fato, a tela mostra "R$ 0,00, conferido"
+ *   e ele entra nas médias e na mediana como zero (D04);
  * - em_andamento: o mês atual, que ainda pode receber lançamentos;
  * - com_registros: os demais, com ao menos um lançamento.
  */
-export type EvolutionPointState = 'sem_registros' | 'em_andamento' | 'com_registros';
+export type EvolutionPointState = 'sem_registros' | 'zero_confirmado' | 'em_andamento' | 'com_registros';
 
 export interface EvolutionPoint {
   month: IsoMonth;
@@ -42,7 +45,9 @@ function nonNegativeSafeInt(value: number, name: string): number {
 /**
  * Pontos da série, do mês mais antigo ao mais recente, a partir das linhas de months_overview (ou de monthsOverview, no
  * core). Linhas fora de ordem são ordenadas; mês repetido, mês inválido, valor negativo ou não inteiro lançam RangeError.
- * A contagem 0 vence: o mês atual sem lançamento é sem_registros. Não altera o que recebe.
+ * A contagem 0 vence: o mês atual sem lançamento é sem_registros. Contagem 0 e a marca "conferi" (receivedChecked ou paidChecked, da
+ * métrica) num mês já terminado é zero_confirmado; no mês atual ou num futuro a marca não vale (o banco nem a deixa existir). Com
+ * lançamento a marca não conta: o mês é com_registros. Não altera o que recebe.
  * evolutionPoints([{ month: '2026-04', receivedCount: 0, receivedCents: 0, paidCount: 2, paidCents: 780.000 }], 'pago', '2026-06')
  * → [{ month: '2026-04', cents: 780.000, count: 2, state: 'com_registros' }].
  */
@@ -53,7 +58,9 @@ export function evolutionPoints(overview: readonly MonthOverview[], metric: Evol
     if (!isValidIsoMonth(row.month)) throw new RangeError(`mês inválido: ${row.month}`);
     const cents = nonNegativeSafeInt(metric === 'recebido' ? row.receivedCents : row.paidCents, 'valor');
     const count = nonNegativeSafeInt(metric === 'recebido' ? row.receivedCount : row.paidCount, 'contagem');
-    const state: EvolutionPointState = count === 0 ? 'sem_registros' : row.month === currentMonth ? 'em_andamento' : 'com_registros';
+    const checked = (metric === 'recebido' ? row.receivedChecked : row.paidChecked) === true;
+    const state: EvolutionPointState =
+      count === 0 ? (checked && row.month < currentMonth ? 'zero_confirmado' : 'sem_registros') : row.month === currentMonth ? 'em_andamento' : 'com_registros';
     return { month: row.month, cents, count, state };
   });
   points.sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0));
@@ -63,8 +70,11 @@ export function evolutionPoints(overview: readonly MonthOverview[], metric: Evol
   return points;
 }
 
-/** Estados que entram na média e na mediana (D04): só mês fechado e com lançamentos. */
-export const COMPARISON_ELIGIBLE_STATES: readonly Exclude<EvolutionPointState, 'sem_registros'>[] = ['com_registros'];
+/**
+ * Estados que entram na média e na mediana (D04): só mês fechado e com lançamentos, ou conferido sem lançamentos (zero confirmado, que
+ * entra como zero). O mês em andamento e o mês sem registros ficam de fora.
+ */
+export const COMPARISON_ELIGIBLE_STATES: readonly Exclude<EvolutionPointState, 'sem_registros'>[] = ['com_registros', 'zero_confirmado'];
 
 export interface ComparisonStats {
   /** N: pontos elegíveis (com ou sem ocultos). */
@@ -95,13 +105,15 @@ function medianCents(values: readonly Cents[]): Cents {
 
 /**
  * Média, mediana e totais da comparação.
- * - Elegíveis: os pontos cujo estado está em eligibleStates (padrão COMPARISON_ELIGIBLE_STATES: só com_registros, então o
- *   mês em andamento e os meses sem registros ficam de fora). Sem registros nunca é elegível, mesmo se a lista pedir.
+ * - Elegíveis: os pontos cujo estado está em eligibleStates (padrão COMPARISON_ELIGIBLE_STATES: com_registros e zero_confirmado, então o
+ *   mês em andamento e os meses sem registros ficam de fora). Sem registros nunca é elegível, mesmo se a lista pedir. O zero confirmado
+ *   entra com valor 0: puxa a média e a mediana para baixo, como o zero que é.
  * - Visíveis: os elegíveis fora de hiddenMonths. Mês oculto que não existe nos pontos, ou que não é elegível, é ignorado.
  * - canonicalTotal soma todos os pontos e não depende de hiddenMonths nem de eligibleStates.
  * Com n = 0, average e median são null. Não altera points nem hiddenMonths.
  * Seis meses 320.000, 340.000, 330.000, 780.000, 345.000 e 360.000: média 412.500, mediana 342.500, total 2.475.000;
- * sem o de 780.000, média 339.000, mediana 340.000, n = 5, total 2.475.000.
+ * sem o de 780.000, média 339.000, mediana 340.000, n = 5, total 2.475.000. Com um sétimo mês, zero confirmado: média 353.571
+ * (2.475.000 / 7, metade para cima), mediana 340.000, n = 7.
  */
 export function comparisonStats(
   points: readonly EvolutionPoint[],

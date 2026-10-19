@@ -47,6 +47,7 @@ export * from './comprovante';
 export * from './widget';
 export * from './seu-mes';
 export * from './evolucao';
+export * from './month-check';
 export * from './evolucao-tela';
 export * from './analises';
 export * from './dia-util';

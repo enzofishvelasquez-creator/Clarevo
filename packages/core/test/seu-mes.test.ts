@@ -361,6 +361,31 @@ describe('Seu mês, o que pula e o estado vazio', () => {
     expect(past.empty?.body).toBe('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.');
   });
 
+  it('mês que passou, vazio e conferido ("Conferi este mês", D-060): a frase de mês sem anotação vira a de mês conferido', async () => {
+    const repo = new MemoryRepository({ actorId: 'pessoa-nova', displayName: 'Pat', today: () => DEMO_TODAY, latencyMs: 0 });
+    const space = await repo.ensurePersonalSpace('Conta principal');
+    const unchecked = await readInput(repo, '2026-09');
+    // O input do app traz a marca de pagamentos do mês (months_overview): sem ela, a frase de sempre.
+    expect(buildSeuMes({ ...unchecked, paidChecked: false }).empty?.body).toBe('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.');
+    await repo.setMonthCheck('chave-seu-mes-0001', space.personalContextId, '2026-09', 'pagamentos', 0);
+    const row = (await repo.monthsOverview(space.personalContextId, '2026-09', '2026-09'))[0]!;
+    expect(row.paidChecked).toBe(true);
+    const checked = buildSeuMes({ ...unchecked, paidChecked: row.paidChecked });
+    expect(checked.cards).toEqual([]);
+    expect(checked.empty).toEqual({
+      title: 'Nada anotado em setembro',
+      body: 'Você conferiu: não houve pagamentos em setembro de 2026.',
+      action: { label: 'Anotar gasto', href: '/registro/novo?tipo=despesa' },
+    });
+    expect(checked.empty?.body).not.toContain('Mês sem anotação');
+    // O mês de hoje nunca é conferido (ainda não terminou): a frase de "ainda" segue, mesmo com a marca no dado.
+    const current = buildSeuMes({ ...(await readInput(repo, '2026-10')), paidChecked: true });
+    expect(current.empty?.body).toBe('Anote um gasto ou um recebimento e volte aqui para ver o mês em poucos passos.');
+    // Um mês conferido que ganhou registro deixa de ser vazio (o estado vazio não aparece).
+    await repo.createRecord('chave-seu-mes-0002', space.personalContextId, 'despesa', { accountId: space.accounts[0]!.id, amountCents: 1_000, occurredOn: '2026-08-10', description: 'Teste', category: null });
+    expect(buildSeuMes({ ...(await readInput(repo, '2026-08')), paidChecked: false }).empty).toBeNull();
+  });
+
   it('mês que passou sem nada anotado, mesmo com metas hoje: o estado vazio, sem cartão de Metas', async () => {
     const input = await readInput(await createDemoRepository(), '2025-03', DEMO_TODAY);
     expect(input.goals!.count).toBeGreaterThan(0);

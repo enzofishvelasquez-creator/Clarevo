@@ -17,8 +17,9 @@
  * link, a licença, o uso do app e a demonstração com a "Empresa Exemplo", com a empresa simulada na memória, da Evolução (D-057: Recebido
  * e Pago mês a mês, média, mediana e total, meses tirados da comparação só na memória, e o cenário fictício "evolucao") e de Excluir conta (D-058: o card em Conta, a tela com o que é apagado e o que continua, o bloqueio
  * de quem é titular com outras pessoas, a confirmação digitada, a demonstração que não apaga nada e a tela "Sua conta foi excluída", com a
- * Família simulada na memória), das Análises (D-059: Categorias em Barras e Bolhas, Evolução, Próximos meses e Orçamento, só leitura) e do Dia útil (D-060 e D-061: o aviso de
- * vencimento em sábado, domingo ou feriado nacional e o padrão de mercado do próximo dia útil, que não mudam a data nem os totais) na versão web, em modo demonstração (acesso simulado).
+ * Família simulada na memória), das Análises (D-059: Categorias em Barras e Bolhas, Evolução, Próximos meses e Orçamento, só leitura), do Dia útil (D-060 e D-061: o aviso de
+ * vencimento em sábado, domingo ou feriado nacional e o padrão de mercado do próximo dia útil, que não mudam a data nem os totais) e de Mês conferido (D-060: "Conferi: não houve pagamentos em {mês}" e o zero
+ * confirmado na Evolução, em Pago e Recebido, em Análises e em "Seus últimos meses") na versão web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -12158,6 +12159,341 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const duBad = duTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(demais|cuidado|atenção|perigo|urgente|atrasad[oa]s?|sem (multa|juros|encargos?)|garantid[oa])\b/i)?.[0]).filter(Boolean);
   ok('Dia útil: nenhum termo proibido, travessão longo, expressão vetada, tom de alerta nem promessa de ausência de encargos nas telas novas', duTexts.length >= 8 && duBad.length === 0, `${duTexts.length} telas ${duBad.join(' | ')}`);
   ok('Dia útil: nenhuma escrita direta na rede (o aviso só lê; a data de vencimento não muda)', writes.length === duWrites0, writes.slice(duWrites0).join(' | '));
+
+  // =====================================================================================================================
+  // Mês conferido (D-060, item 2; resolve P-022): "Conferi: não houve pagamentos (ou recebimentos) em {mês}". A pessoa confere um mês já
+  // terminado que não tem registro do tipo e ele vira "zero confirmado": na Evolução o ponto mostra "R$ 0,00, conferido" e entra nas
+  // médias como zero; em "Seus últimos meses" o mês deixa de ser apontado como possível lacuna; nas telas de Pago e Recebido do mês e em
+  // Análises, "Mês sem anotação não quer dizer mês sem gastos" vira "Você conferiu: não houve pagamentos em {mês}.". Desfazer é possível no
+  // mesmo lugar; a marca vale por tipo e por contexto, nunca muda um total nem conta como anotação, e deixa de valer (sem sumir) quando
+  // aparece um registro do tipo no mês. Aqui, na versão web (memória): (1) a Evolução, no cenário "evolucao" (Pago de janeiro a junho de 2026,
+  // 12 meses); (2) Pago e Recebido do mês passado; (3) Análises, Categorias; (4) "Seus últimos meses", no cenário "retorno"; (5) a Família
+  // (quem só lê não vê o botão); (6) a conta nova, com "Seu mês" de um mês vazio e conferido e o aviso de compras no cartão. A marca é uma
+  // linha por contexto, mês e tipo, com a versão que a tela manda; o resultado incerto é conferido antes de anunciar. O banco de verdade é
+  // coberto por supabase/tests/48_mes_conferido.sql e pela API. Pago é caixa, pela data do pagamento: a conferência fala de "pagamentos".
+  // Capturas a partir de 500, em 390, 360 e 320 px. Hoje é 07/10/2026.
+  // =====================================================================================================================
+  const mcWrites0 = writes.length;
+  const mcTexts = [];
+  const mcKeep = async () => { const x = await body(); mcTexts.push(x); screenTexts.push(x); return x; };
+  const mcPath = () => new URL(p.url()).pathname;
+  const mcGoResumo = async () => {
+    const tab = () => p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true });
+    for (let i = 0; i < 5 && (await tab().count()) === 0; i++) { await btn('Voltar').click(); await p.waitForTimeout(400); }
+    await tab().first().click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
+  };
+  // O mês do Resumo vale para as outras telas (é o mês em exibição do app): vai para setembro ou outubro de 2026, o que ainda não for.
+  const mcResumoMonth = async (title) => {
+    if (await headingShown(title)) return;
+    const back = title === 'Setembro de 2026';
+    await p.getByRole('button', { name: back ? /Mês anterior/ : /Próximo mês/ }).filter({ visible: true }).first().click(); await waitText(title); await p.waitForTimeout(500);
+  };
+  // Do Resumo para a composição de Pago ou Recebido de setembro (o mês anterior).
+  const mcOpenComposicao = async (kind) => {
+    await mcGoResumo();
+    await mcResumoMonth('Setembro de 2026');
+    await p.getByRole('button', { name: kind === 'pago' ? /^Pago, R\$/ : /^Recebido, R\$/ }).filter({ visible: true }).first().click();
+    await waitText(kind === 'pago' ? 'Gastos pagos com data de pagamento neste mês.' : 'Recebimentos realizados com data de recebimento neste mês.'); await p.waitForTimeout(500);
+  };
+  const mcRepoState = () => otherDevice(async (repo, ctx) => JSON.stringify([await repo.getReturnReviewState(ctx), await repo.listRecords(ctx, '2026-09'), await repo.listRecords(ctx, '2026-08')]));
+  const mcMarks = (kinds) => otherDevice(async (repo, ctx, months) => (await repo.monthsOverview(ctx, months[0], months[1])).map((r) => `${r.month}:${r.receivedChecked ? 'R' : '-'}${r.paidChecked ? 'P' : '-'}`).join(' '), kinds);
+  const mcFocus = () => p.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.textContent ?? null);
+  // As chamadas de escrita do repositório depois de `from`, sem a geração diária de contas (que a tela pode repetir sozinha).
+  const mcCalls = async (from) => (await evSpyCalls()).slice(from).filter((x) => x !== 'syncSeriesOccurrences');
+  const mcConferiBtns = () => p.getByRole('button', { name: /^Conferi: não houve / }).filter({ visible: true }).count();
+
+  // ---- 1. Evolução, Pago: setembro sem registros, a conferir ----
+  await evEnter('evolucao');
+  await evOpen();
+  await radio('12 meses').click(); await p.waitForTimeout(600);
+  await evSpyStart();
+  const mcStateBefore = await mcRepoState();
+  const mcTotalBefore = (await body()).match(/Total dos meses exibidos\n(R\$ [\d.]+,\d{2})/)?.[1];
+  t = await body();
+  ok('Mês conferido, Evolução antes de conferir: sem marca, a média é R$ 4.125,00 e a mediana R$ 3.425,00, "6 de 6 meses", e o total R$ 24.750,00', t.includes('Média dos meses na comparação\nR$ 4.125,00\n6 de 6 meses') && t.includes('Mediana dos meses na comparação\nR$ 3.425,00\n6 de 6 meses') && mcTotalBefore === 'R$ 24.750,00', t.slice(0, 900));
+  await evPick('Setembro');
+  t = await mcKeep();
+  ok('Mês conferido, painel de setembro (Pago): "Sem registros: mês sem anotação não quer dizer mês sem gastos", o botão "Conferi: não houve pagamentos em setembro de 2026" e a nota "Não muda nenhum valor e você pode desfazer."',
+    t.includes('Setembro de 2026\nPago\nSem registros\nSem registros: mês sem anotação não quer dizer mês sem gastos') && (await visibleCount('button', 'Conferi: não houve pagamentos em setembro de 2026')) === 1 && t.includes('Não muda nenhum valor e você pode desfazer.') && !t.includes('Você conferiu'), t.slice(600, 1300));
+  ok('Mês conferido: o ponto de setembro é "sem registros" (um traço, nunca um ponto em zero) e fora da comparação', (await evNames())[10] === 'Setembro de 2026, sem registros, fora da comparação' && (await evMark('Setembro')).kind === 'escolhido_traco', JSON.stringify(await evMark('Setembro')));
+  // Só o mês fechado sem registros do tipo tem o botão: abril tem registros, outubro (o mês atual) ainda não terminou, novembro de 2025 sim.
+  await evPick('Abril');
+  ok('Mês conferido: abril (com registros) não tem o botão', (await mcConferiBtns()) === 0);
+  await evPick('Outubro');
+  ok('Mês conferido: outubro (o mês atual, que ainda não terminou) não tem o botão, mesmo sem registros', (await mcConferiBtns()) === 0 && (await body()).includes('Este mês fica fora da comparação porque não tem registros.'));
+  await p.getByRole('button', { name: /^Novembro de 2025/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
+  ok('Mês conferido: novembro de 2025 (o primeiro mês da janela, sem registros) tem o botão, com o ano no nome', (await visibleCount('button', 'Conferi: não houve pagamentos em novembro de 2025')) === 1);
+  await evPick('Setembro');
+  await evShots('500_conferi_evolucao_a_conferir', { scroll: evScroll('Setembro de 2026') });
+
+  // ---- 2. Conferir: o ponto vira "R$ 0,00, conferido" e entra nas médias como zero ----
+  const mcWritesCalls0 = (await evSpyCalls()).length;
+  await btn('Conferi: não houve pagamentos em setembro de 2026').click(); await waitText('Você conferiu: não houve pagamentos em setembro de 2026.'); await p.waitForTimeout(700);
+  t = await mcKeep();
+  let mcNames = await evNames();
+  ok('Mês conferido, Evolução depois de conferir: o nome do ponto diz "Setembro de 2026, R$ 0,00, conferido, na comparação" e o ponto entra na comparação', mcNames[10] === 'Setembro de 2026, R$ 0,00, conferido, na comparação' && (await evMark('Setembro')).kind === 'escolhido', JSON.stringify(mcNames.slice(8)));
+  ok('Mês conferido, painel: "R$ 0,00", a frase "Você conferiu: não houve pagamentos em setembro de 2026." e "Desfazer a conferência", sem o botão de conferir nem a frase de mês sem anotação', t.includes('Setembro de 2026\nPago\nR$ 0,00\nVocê conferiu: não houve pagamentos em setembro de 2026.') &&
+    (await visibleCount('button', 'Desfazer a conferência: não houve pagamentos em setembro de 2026')) === 1 && (await mcConferiBtns()) === 0 && !t.includes('Sem registros: mês sem anotação'), t.slice(600, 1300));
+  ok('Mês conferido: o zero entra nas médias como zero (média R$ 3.535,71, mediana R$ 3.400,00, "7 de 7 meses"), e o total dos meses exibidos não muda (R$ 24.750,00)', t.includes('Média dos meses na comparação\nR$ 3.535,71\n7 de 7 meses') &&
+    t.includes('Mediana dos meses na comparação\nR$ 3.400,00\n7 de 7 meses') && t.includes('Total dos meses exibidos\nR$ 24.750,00') && !t.includes('Comparação personalizada'), t.slice(1200, 2200));
+  ok('Mês conferido: o painel mostra o interruptor "Mostrar este mês na comparação" ligado, a variação até o zero ("De agosto para setembro" não existe: agosto está sem registros; o mês de comparação é junho) e nenhuma categoria nem "Entender o que mudou"',
+    (await evSwitch().getAttribute('aria-checked')) === 'true' && t.includes('De junho para setembro: R$ 3.600,00 a menos') && t.includes('100% a menos que junho') && !t.includes('Maiores categorias do mês') && (await visibleCount('button', 'Entender o que mudou')) === 0 && (await visibleCount('button', 'Ver lançamentos')) === 0, t.slice(700, 1500));
+  ok('Mês conferido: a legenda ganha "Conferido, sem lançamentos" e o eixo ganha o ícone de conferido sob o mês', t.includes('Conferido, sem lançamentos') && (await evMark('Setembro')).icon === true);
+  ok('Mês conferido: a escrita foi uma só (setMonthCheck) e nenhum registro, atividade nem decisão mudou', JSON.stringify(await mcCalls(mcWritesCalls0)) === JSON.stringify(['setMonthCheck']) && (await mcRepoState()) === mcStateBefore, JSON.stringify(await mcCalls(mcWritesCalls0)));
+  ok('Mês conferido: o foco vai para "Desfazer a conferência", o botão que passou a valer', (await mcFocus()) === 'Desfazer a conferência: não houve pagamentos em setembro de 2026', await mcFocus());
+  ok('Mês conferido: o resultado é dito uma vez ao leitor de tela ("Conferência registrada: não houve pagamentos em setembro de 2026.")', (await evLive()).some((x) => x.includes('Conferência registrada: não houve pagamentos em setembro de 2026.')), JSON.stringify(await evLive()));
+  await evShots('501_conferi_evolucao_conferido', { scroll: evScroll('Setembro de 2026') });
+  await evShots('511_conferi_evolucao_grafico');
+  // A tabela equivalente.
+  await p.getByRole('button', { name: 'Ver valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
+  const mcRows = await p.evaluate(() => [...document.querySelectorAll('[role=listitem] button')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => ({ label: (e.getAttribute('aria-label') || '').replace(/ /g, ' '), text: e.textContent.replace(/ /g, ' ') })));
+  ok('Mês conferido, tabela: a linha de setembro traz "R$ 0,00", o estado "Conferido" e "Na comparação? Sim"; a de agosto segue "Sem registros"', mcRows.length === 12 && mcRows[10].label === 'Setembro de 2026, R$ 0,00, Conferido, Na comparação? Sim' && mcRows[10].text.includes('Conferido') && mcRows[9].label.includes('Sem valor, Sem registros'), JSON.stringify([mcRows[9], mcRows[10]]));
+  await evShots('502_conferi_evolucao_tabela', { scroll: evScrollBtn('Esconder valores mês a mês') });
+  await p.getByRole('button', { name: 'Esconder valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+  // O zero confirmado pode sair da comparação como qualquer mês escolhido.
+  await evSwitch().click(); await p.waitForTimeout(500);
+  t = await body();
+  ok('Mês conferido: tirar o zero da comparação volta a média a R$ 4.125,00 ("6 de 7 meses fora")... com o aviso de comparação personalizada e o ponto vazio', t.includes('Comparação personalizada: 1 de 7 meses fora da comparação') && t.includes('Média dos meses na comparação\nR$ 4.125,00\n6 de 7 meses') && (await evNames())[10] === 'Setembro de 2026, R$ 0,00, conferido, fora da comparação', t.slice(1000, 1800));
+  await evSwitch().click(); await p.waitForTimeout(500);
+
+  // ---- 3. Desfazer a conferência: no mesmo lugar, e o mês volta a ser "sem registros" ----
+  await btn('Desfazer a conferência: não houve pagamentos em setembro de 2026').click(); await waitText('Conferi: não houve pagamentos em setembro de 2026'); await p.waitForTimeout(700);
+  t = await body();
+  ok('Mês conferido, desfazer: setembro volta a "sem registros" e a média volta a R$ 4.125,00 ("6 de 6 meses"); o foco vai para "Conferi: ..."', (await evNames())[10] === 'Setembro de 2026, sem registros, fora da comparação' && t.includes('Média dos meses na comparação\nR$ 4.125,00\n6 de 6 meses') && !t.includes('Você conferiu') &&
+    (await mcFocus()) === 'Conferi: não houve pagamentos em setembro de 2026', `${await mcFocus()}`);
+  await btn('Conferi: não houve pagamentos em setembro de 2026').click(); await waitText('Você conferiu: não houve pagamentos em setembro de 2026.'); await p.waitForTimeout(600);
+
+  // ---- 4. Recebido é outro tipo: a marca de Pago não vale em Recebido ----
+  await radio('Recebido').click(); await p.waitForTimeout(700);
+  await evPick('Setembro');
+  t = await mcKeep();
+  ok('Mês conferido, Recebido: a marca de Pago não vale em Recebido (dois tipos separados); o painel de setembro pede "Conferi: não houve recebimentos em setembro de 2026"', (await evNames())[10] === 'Setembro de 2026, sem registros, fora da comparação' && t.includes('Sem registros: mês sem anotação não quer dizer mês sem recebimentos') &&
+    (await visibleCount('button', 'Conferi: não houve recebimentos em setembro de 2026')) === 1 && (await visibleCount('button', /^Desfazer a conferência/)) === 0 && !t.includes('Você conferiu'), t.slice(500, 1200));
+  await btn('Conferi: não houve recebimentos em setembro de 2026').click(); await waitText('Você conferiu: não houve recebimentos em setembro de 2026.'); await p.waitForTimeout(600);
+  ok('Mês conferido, Recebido: depois de conferir, o ponto de Recebido também é "R$ 0,00, conferido" e a marca de Pago segue', (await evNames())[10] === 'Setembro de 2026, R$ 0,00, conferido, na comparação' && (await mcMarks(['2026-09', '2026-09'])) === '2026-09:RP');
+  await radio('Pago').click(); await p.waitForTimeout(600);
+  ok('Mês conferido: de volta a Pago, setembro continua conferido', (await evNames())[10] === 'Setembro de 2026, R$ 0,00, conferido, na comparação');
+
+  // ---- 5. Um registro no mês: a marca deixa de valer, sem sumir, e volta quando o registro sai ----
+  await otherDevice(async (repo, ctx) => {
+    const acc = (await repo.getSpace()).accounts[0].id;
+    return repo.createRecord('e2e-conferi-gasto', ctx, 'despesa', { accountId: acc, amountCents: 4500, occurredOn: '2026-09-12', description: 'Farmácia de setembro', category: 'Saúde' });
+  });
+  await p.waitForTimeout(1200);
+  await evPick('Setembro');
+  t = await mcKeep();
+  ok('Mês conferido, regra 3: com um gasto em setembro, a marca de Pago deixa de valer (setembro volta a "com registros", R$ 45,00), sem "Você conferiu" nem botão de conferir, e a média usa o gasto', (await evNames())[10] === 'Setembro de 2026, R$ 45,00, na comparação' && t.includes('Setembro de 2026\nPago\nR$ 45,00\nCom registros') && !t.includes('Você conferiu') &&
+    (await mcConferiBtns()) === 0 && t.includes('7 de 7 meses'), t.slice(500, 1200));
+  ok('Mês conferido, regra 3: o que a leitura devolve é só o que vale (Recebido conferido, Pago com registros); a marca de Pago volta com o fim do gasto, logo abaixo', (await mcMarks(['2026-09', '2026-09'])) === '2026-09:R-', await mcMarks(['2026-09', '2026-09']));
+  await otherDevice(async (repo, ctx) => { const r = (await repo.listRecords(ctx, '2026-09')).find((x) => x.description === 'Farmácia de setembro'); await repo.deleteRecord('e2e-conferi-gasto-fim', r.id, r.version); });
+  await p.waitForTimeout(1200);
+  await evPick('Setembro');
+  t = await body();
+  ok('Mês conferido, regra 3: sem o gasto, a marca volta a valer (R$ 0,00, conferido) sem nenhuma ação da pessoa', (await evNames())[10] === 'Setembro de 2026, R$ 0,00, conferido, na comparação' && t.includes('Você conferiu: não houve pagamentos em setembro de 2026.'));
+
+  // ---- 5b. Resultado incerto: a conexão cai depois de gravar, e outro aparelho muda a marca antes da repetição ----
+  // Pago de setembro está conferido. O desfazer grava, mas a resposta se perde: a tela diz que não deu para confirmar, guarda a chave e segue
+  // mostrando o que leu. Outro aparelho marca de novo (sem recarregar esta tela). Ao repetir, o banco devolve o estado de agora (marcado),
+  // que não é o pedido: a tela confere o `checked`, não anuncia "Conferência desfeita", avisa que algo mudou e recarrega. Como o estado
+  // mudou, a chave guardada é esquecida: o desfazer seguinte usa chave e versão novas e funciona, e só então a conferência é desfeita.
+  const mcQuiet = (fn, arg = null) => p.evaluate(async ({ src, arg }) => { const repo = await window.__e2e.repo(); const space = await repo.getSpace(); return (0, eval)(`(${src})`)(repo, space.personalContextId, arg); }, { src: fn.toString(), arg });
+  const mcRow = () => mcQuiet(async (repo, ctx) => { const r = (await repo.monthsOverview(ctx, '2026-09', '2026-09'))[0]; return `${r.paidChecked ? 'on' : 'off'} v${r.paidCheckVersion}`; });
+  ok('Mês conferido, antes do resultado incerto: Pago de setembro está conferido, na versão 3 (marcou, desmarcou e marcou de novo)', (await mcRow()) === 'on v3', await mcRow());
+  // Os anúncios de conferência que já estavam na região viva (de antes) não mudam: só um anúncio novo contaria como "dito".
+  const mcAnnounced = async () => (await evLive()).filter((x) => x.startsWith('Conferência')).join(' | ');
+  const mcAnnounced0 = await mcAnnounced();
+  await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
+  await btn('Desfazer a conferência: não houve pagamentos em setembro de 2026').click(); await waitText('Não deu para confirmar se salvou. Toque de novo: repetir é seguro.'); await p.waitForTimeout(400);
+  t = await mcKeep();
+  ok('Mês conferido, resultado incerto: a tela diz "Não deu para confirmar se salvou. Toque de novo: repetir é seguro.", segue mostrando o que leu ("Você conferiu") e não anuncia nada como feito, embora a gravação tenha acontecido (desligada, versão 4)',
+    t.includes('Não deu para confirmar se salvou. Toque de novo: repetir é seguro.') && t.includes('Você conferiu: não houve pagamentos em setembro de 2026.') && (await mcAnnounced()) === mcAnnounced0 && !(await mcAnnounced()).includes('Conferência desfeita') && (await mcRow()) === 'off v4', `${await mcRow()} ${JSON.stringify(await evLive())}`);
+  await mcQuiet(async (repo, ctx) => repo.setMonthCheck('e2e-conferi-outro-aparelho', ctx, '2026-09', 'pagamentos', 4));
+  ok('Mês conferido, outro aparelho: marcou de novo (versão 5) sem recarregar esta tela, que segue com o botão de desfazer da versão antiga', (await mcRow()) === 'on v5' && (await visibleCount('button', 'Desfazer a conferência: não houve pagamentos em setembro de 2026')) === 1);
+  await btn('Desfazer a conferência: não houve pagamentos em setembro de 2026').click(); await waitText('Algo mudou em outro aparelho. A tela foi atualizada; confira e tente de novo.'); await p.waitForTimeout(500);
+  t = await mcKeep();
+  ok('Mês conferido, repetição com o estado mudado: o banco devolve "marcada" (versão 5), a tela confere, não anuncia "Conferência desfeita", diz "Algo mudou em outro aparelho. A tela foi atualizada; confira e tente de novo." e segue conferida',
+    t.includes('Algo mudou em outro aparelho. A tela foi atualizada; confira e tente de novo.') && (await mcAnnounced()) === mcAnnounced0 && !(await evLive()).some((x) => x.includes('Conferência desfeita')) && t.includes('Você conferiu: não houve pagamentos em setembro de 2026.') && (await mcRow()) === 'on v5', `${await mcRow()} ${JSON.stringify(await evLive())}`);
+  await btn('Desfazer a conferência: não houve pagamentos em setembro de 2026').click(); await waitText('Conferi: não houve pagamentos em setembro de 2026'); await p.waitForTimeout(600);
+  t = await mcKeep();
+  ok('Mês conferido, depois da mudança de estado: a chave guardada foi esquecida, o desfazer usa chave e versão novas (versão 5), funciona sem "Não foi possível salvar", é anunciado uma vez ("Conferência desfeita") e deixa a linha desligada na versão 6',
+    (await mcRow()) === 'off v6' && !t.includes('Não foi possível salvar') && !t.includes('Algo mudou em outro aparelho') && (await evLive()).filter((x) => x.includes('Conferência desfeita: pagamentos em setembro de 2026.')).length === 1 && (await mcFocus()) === 'Conferi: não houve pagamentos em setembro de 2026', `${await mcRow()} ${JSON.stringify(await evLive())}`);
+  await btn('Conferi: não houve pagamentos em setembro de 2026').click(); await waitText('Você conferiu: não houve pagamentos em setembro de 2026.'); await p.waitForTimeout(500);
+  ok('Mês conferido: conferiu de novo (versão 7), com a versão que leu, e Pago de setembro volta a "R$ 0,00, conferido"', (await mcRow()) === 'on v7' && (await evNames())[10] === 'Setembro de 2026, R$ 0,00, conferido, na comparação', `${await mcRow()} ${JSON.stringify((await evNames())[10])}`);
+
+  // ---- 6. Pago e Recebido do mês passado ----
+  await mcOpenComposicao('pago');
+  t = await mcKeep();
+  ok('Mês conferido, Pago de setembro (conferido): a frase "Você conferiu: não houve pagamentos em setembro de 2026." toma o lugar de "Mês sem anotação não quer dizer mês sem gastos", com "Desfazer a conferência"', mcPath() === '/composicao' && t.includes('Nenhum registro neste critério') && t.includes('Você conferiu: não houve pagamentos em setembro de 2026.') &&
+    !t.includes('Mês sem anotação não quer dizer mês sem gastos') && (await visibleCount('button', 'Desfazer a conferência: não houve pagamentos em setembro de 2026')) === 1, t.slice(0, 900));
+  await evShots('503_conferi_pago_conferido');
+  await btn('Desfazer a conferência: não houve pagamentos em setembro de 2026').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.'); await p.waitForTimeout(600);
+  t = await mcKeep();
+  ok('Mês conferido, Pago de setembro (a conferir): a frase de mês sem anotação, "Conferi: não houve pagamentos em setembro de 2026" e "Anotar gasto"', t.includes('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.') &&
+    (await visibleCount('button', 'Conferi: não houve pagamentos em setembro de 2026')) === 1 && (await visibleCount('button', 'Anotar gasto')) === 1 && !t.includes('Você conferiu'), t.slice(0, 900));
+  await evShots('504_conferi_pago_a_conferir');
+  await btn('Conferi: não houve pagamentos em setembro de 2026').click(); await waitText('Você conferiu: não houve pagamentos em setembro de 2026.'); await p.waitForTimeout(500);
+  ok('Mês conferido, Pago de setembro: conferir de novo traz a frase, e "Anotar gasto" sai de cima (conferido, não há o que anotar aqui)', (await visibleCount('button', 'Anotar gasto')) === 0 && (await visibleCount('button', 'Desfazer a conferência: não houve pagamentos em setembro de 2026')) === 1);
+  // A linha do Resumo do mês não muda: "Nenhum gasto anotado em setembro." segue verdadeira.
+  await mcGoResumo();
+  await mcResumoMonth('Setembro de 2026');
+  t = await body();
+  ok('Mês conferido, Resumo de setembro: a linha de cabeçalho segue "Nada anotado em setembro." e os totais seguem em R$ 0,00 (a conferência não muda total)', t.includes('Nada anotado em setembro.') && (await p.getByRole('button', { name: /^Pago, R\$ 0,00/ }).filter({ visible: true }).count()) === 1 && (await p.getByRole('button', { name: /^Recebido, R\$ 0,00/ }).filter({ visible: true }).count()) === 1, t.slice(0, 500));
+  await p.getByRole('button', { name: /^Recebido, R\$/ }).filter({ visible: true }).first().click(); await waitText('Recebimentos realizados com data de recebimento neste mês.'); await p.waitForTimeout(500);
+  t = await mcKeep();
+  ok('Mês conferido, Recebido de setembro (já conferido na Evolução): "Você conferiu: não houve recebimentos em setembro de 2026."', t.includes('Você conferiu: não houve recebimentos em setembro de 2026.') && !t.includes('Mês sem anotação não quer dizer mês sem recebimentos') && (await visibleCount('button', 'Desfazer a conferência: não houve recebimentos em setembro de 2026')) === 1, t.slice(0, 700));
+  await btn('Desfazer a conferência: não houve recebimentos em setembro de 2026').click(); await waitText('Mês sem anotação não quer dizer mês sem recebimentos: aqui aparece só o que está registrado no Clarevo.'); await p.waitForTimeout(500);
+  ok('Mês conferido, Recebido de setembro (a conferir): "Conferi: não houve recebimentos em setembro de 2026" e "Registrar recebimento"', (await visibleCount('button', 'Conferi: não houve recebimentos em setembro de 2026')) === 1 && (await visibleCount('button', 'Registrar recebimento')) === 1);
+  await evShots('505_conferi_recebido_a_conferir');
+  // No mês atual não há botão: outubro ainda não terminou.
+  await mcGoResumo();
+  await mcResumoMonth('Outubro de 2026');
+  await p.getByRole('button', { name: /^Recebido, R\$/ }).filter({ visible: true }).first().click(); await waitText('Recebimentos realizados com data de recebimento neste mês.'); await p.waitForTimeout(500);
+  ok('Mês conferido, Recebido de outubro (o mês atual, com recebimento): sem botão de conferir', (await mcConferiBtns()) === 0);
+
+  // ---- 7. Análises, Categorias: o mês sem gastos ----
+  await mcGoResumo();
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await p.getByRole('button', { name: 'Análises. Categorias, Evolução, Próximos meses e Orçamento.', exact: true }).filter({ visible: true }).first().click(); await waitText('Consulte o mês escolhido.'); await p.waitForTimeout(900);
+  if (!(await p.evaluate(() => [...document.querySelectorAll('[role=toolbar][aria-label="Mês das análises"]')].some((e) => e.getBoundingClientRect().width > 0 && e.innerText.includes('Setembro de 2026'))))) {
+    await p.getByRole('button', { name: /^Mês anterior: / }).filter({ visible: true }).first().click(); await p.waitForTimeout(800);
+  }
+  t = await mcKeep();
+  ok('Mês conferido, Análises (setembro, Pago conferido): "Nenhum gasto anotado em setembro de 2026." e a frase "Você conferiu: não houve pagamentos em setembro de 2026." no lugar de "Mês sem anotação não quer dizer mês sem gastos"', t.includes('Nenhum gasto anotado em setembro de 2026.') && t.includes('Você conferiu: não houve pagamentos em setembro de 2026.') &&
+    !t.includes('Mês sem anotação não quer dizer mês sem gastos') && (await visibleCount('button', 'Desfazer a conferência: não houve pagamentos em setembro de 2026')) === 1 && (await visibleCount('button', 'Anotar gasto')) === 0, t.slice(0, 900));
+  await evShots('506_conferi_analises');
+  await btn('Desfazer a conferência: não houve pagamentos em setembro de 2026').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.'); await p.waitForTimeout(500);
+  ok('Mês conferido, Análises (a conferir): a frase de mês sem anotação, "Conferi: não houve pagamentos em setembro de 2026" e "Anotar gasto"', (await visibleCount('button', 'Conferi: não houve pagamentos em setembro de 2026')) === 1 && (await visibleCount('button', 'Anotar gasto')) === 1);
+  await btn('Conferi: não houve pagamentos em setembro de 2026').click(); await waitText('Você conferiu: não houve pagamentos em setembro de 2026.'); await p.waitForTimeout(500);
+  ok('Mês conferido: nenhuma escrita na rede até aqui (a demonstração grava só na memória) e os totais da demonstração não mudaram', writes.length === mcWrites0, writes.slice(mcWrites0).join(' | '));
+
+  // ---- 8. "Seus últimos meses": o mês conferido deixa de ser lacuna ----
+  await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Seu dinheiro');
+  await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('Sua última anotação foi em 20/05/2026.', 12000).catch(() => {});
+  await evSpyStart();
+  const mcBand = async () => p.evaluate(() => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Seus últimos meses' && e.getBoundingClientRect().width > 0); let box = h?.parentElement; while (box && !box.querySelector('[role=button]')) box = box.parentElement; return box ? box.innerText.replace(/ /g, ' ') : null; });
+  const mcReturnState = () => otherDevice(async (repo, ctx) => JSON.stringify(await repo.getReturnReviewState(ctx)));
+  const mcReturnBefore = await mcReturnState();
+  let band2 = await mcBand();
+  ok('Mês conferido, retorno: a faixa começa com "4 meses com algo sem registro e 13 contas para conferir" (junho a setembro)', band2 !== null && band2.includes('Sua última anotação foi em 20/05/2026. Desde então: 4 meses com algo sem registro e 13 contas para conferir.'), band2 ?? '');
+  await btn('Ver resumo').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos.'); await p.waitForTimeout(500);
+  await btn('Atualizar agora').click(); await waitText('Mês 1 de'); await p.waitForTimeout(700);
+  t = await mcKeep();
+  ok('Mês conferido, "Atualizar agora" (junho): "Recebimentos: nenhum anotado" com "Conferi: não houve recebimentos em junho de 2026" e "Gastos: nenhum anotado" com "Conferi: não houve pagamentos em junho de 2026"', t.includes('Junho de 2026') && t.includes('Recebimentos: nenhum anotado') && t.includes('Gastos: nenhum anotado') &&
+    (await visibleCount('button', 'Conferi: não houve recebimentos em junho de 2026')) === 1 && (await visibleCount('button', 'Conferi: não houve pagamentos em junho de 2026')) === 1 && t.indexOf('Recebimentos: nenhum anotado') < t.indexOf('Conferi: não houve recebimentos') && t.indexOf('Conferi: não houve recebimentos') < t.indexOf('Gastos: nenhum anotado'), t.slice(0, 1200));
+  await evShots('507_conferi_revisao_passo', { scroll: evScroll('Recebimentos e gastos') });
+  const mcCalls0 = (await evSpyCalls()).length;
+  await btn('Conferi: não houve recebimentos em junho de 2026').click(); await waitText('Você conferiu: não houve recebimentos em junho de 2026.'); await p.waitForTimeout(500);
+  await btn('Conferi: não houve pagamentos em junho de 2026').click(); await waitText('Você conferiu: não houve pagamentos em junho de 2026.'); await p.waitForTimeout(600);
+  t = await mcKeep();
+  ok('Mês conferido, junho conferido nos dois tipos: "Recebimentos: conferido, não houve", "Gastos: conferido, não houve", as duas frases de "Você conferiu" e "Desfazer a conferência" nos dois', t.includes('Recebimentos: conferido, não houve') && t.includes('Gastos: conferido, não houve') &&
+    (await visibleCount('button', 'Desfazer a conferência: não houve recebimentos em junho de 2026')) === 1 && (await visibleCount('button', 'Desfazer a conferência: não houve pagamentos em junho de 2026')) === 1 && (await mcConferiBtns()) === 0, t.slice(0, 1200));
+  ok('Mês conferido, revisão: foram duas escritas (setMonthCheck) e nenhuma decisão, anotação, conta nem registro mudou (a marca não é anotação)', JSON.stringify(await mcCalls(mcCalls0)) === JSON.stringify(['setMonthCheck', 'setMonthCheck']) && (await mcReturnState()) === mcReturnBefore, JSON.stringify(await mcCalls(mcCalls0)));
+  await evShots('508_conferi_revisao_conferido', { scroll: evScroll('Recebimentos e gastos') });
+  await btn('Voltar').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos.'); await p.waitForTimeout(600);
+  const mcJune = await p.evaluate(() => { const h = [...document.querySelectorAll('[role=heading][aria-level="2"]')].find((e) => e.textContent === 'Junho de 2026' && e.getBoundingClientRect().width > 0); return h ? h.parentElement.innerText.replace(/ /g, ' ') : null; });
+  ok('Mês conferido, /retomar: o cartão de junho diz "Recebido: conferido, não houve recebimentos" e "Pago: conferido, não houve pagamentos", e segue com as 3 contas em aberto', mcJune !== null && mcJune.includes('Recebido: conferido, não houve recebimentos') && mcJune.includes('Pago: conferido, não houve pagamentos') && mcJune.includes('Contas em aberto: 3'), mcJune ?? '');
+  await mcKeep();
+  await btn('Voltar').click(); await waitText('Seus últimos meses'); await p.waitForTimeout(600);
+  band2 = await mcBand();
+  ok('Mês conferido, Resumo: junho deixa de ser apontado como possível lacuna, e a faixa passa a dizer "3 meses com algo sem registro e 13 contas para conferir" (as contas continuam)', band2 !== null && band2.includes('Sua última anotação foi em 20/05/2026. Desde então: 3 meses com algo sem registro e 13 contas para conferir.'), band2 ?? '');
+  // Julho tem números sem conta registrada: conferir os dois tipos não o tira de "algo sem registro".
+  await btn('Ver resumo').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos.'); await btn('Atualizar agora').click(); await waitText('Mês 1 de');
+  for (let i = 0; i < 4 && (await visibleCount('button', 'Conferi: não houve recebimentos em julho de 2026')) === 0; i++) { await btn('Pular este mês').click(); await p.waitForTimeout(600); }
+  await btn('Conferi: não houve recebimentos em julho de 2026').click(); await waitText('Você conferiu: não houve recebimentos em julho de 2026.'); await p.waitForTimeout(400);
+  await btn('Conferi: não houve pagamentos em julho de 2026').click(); await waitText('Você conferiu: não houve pagamentos em julho de 2026.'); await p.waitForTimeout(400);
+  await btn('Voltar').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos.'); await btn('Voltar').click(); await waitText('Seus últimos meses'); await p.waitForTimeout(500);
+  band2 = await mcBand();
+  ok('Mês conferido, julho conferido nos dois tipos: segue "com algo sem registro" por causa das 3 contas sem conta registrada ("3 meses", "13 contas"): a conferência só tira a lacuna do tipo conferido', band2 !== null && band2.includes('Desde então: 3 meses com algo sem registro e 13 contas para conferir.'), band2 ?? '');
+  // Desfazer a conferência de junho traz o mês de volta.
+  await btn('Ver resumo').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos.'); await btn('Atualizar agora').click(); await waitText('Mês 1 de'); await p.waitForTimeout(500);
+  await btn('Desfazer a conferência: não houve recebimentos em junho de 2026').click(); await waitText('Conferi: não houve recebimentos em junho de 2026'); await p.waitForTimeout(500);
+  await btn('Voltar').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos.'); await btn('Voltar').click(); await waitText('Seus últimos meses'); await p.waitForTimeout(500);
+  band2 = await mcBand();
+  ok('Mês conferido, desfazer uma das duas conferências de junho (recebimentos) traz o mês de volta: "4 meses com algo sem registro"', band2 !== null && band2.includes('Desde então: 4 meses com algo sem registro e 13 contas para conferir.'), band2 ?? '');
+  ok('Mês conferido, revisão: a decisão ("Seguir adiante" ou "Concluir") nunca foi gravada pelas marcas', (await mcReturnState()).includes('"mark":null'), await mcReturnState());
+  await evShots('509_conferi_revisao_resumo', { tab: true });
+
+  // ---- 9. Família: quem só lê vê, quem escreve marca e desmarca ----
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await famCreateAccount('Vera Conferi', 'vera.conferi@exemplo.com');
+  await famGoFamilia();
+  await btn('Criar Família').click(); await waitText('Nome da Família'); await field('Nome da Família').fill('Casa Conferi');
+  await btn('Criar Família').click(); await waitText('Família criada.'); await p.waitForTimeout(400);
+  await btn('Convidar').click(); await waitText('O que a pessoa poderá fazer');
+  await radio('Só vê').click().catch(() => {}); await p.waitForTimeout(300);
+  await btn('Gerar link').click(); await waitText('Link do convite'); await p.waitForTimeout(400);
+  const mcLink = await famLink();
+  await btn('Concluir').click(); await waitText('Seu papel: Titular'); await p.waitForTimeout(400);
+  // Vera (titular) em Família: o mês anterior sem gastos tem o botão.
+  await famTab('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
+  await famTab('Ver dados de Família').click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
+  await mcResumoMonth('Setembro de 2026');
+  await p.getByRole('button', { name: /^Pago, R\$/ }).filter({ visible: true }).first().click(); await waitText('Gastos pagos com data de pagamento neste mês.'); await p.waitForTimeout(500);
+  t = await mcKeep();
+  ok('Mês conferido, Família (titular): a composição de Pago de setembro na Família tem "Conferi: não houve pagamentos em setembro de 2026"', t.includes('Demonstração · Família') && (await visibleCount('button', 'Conferi: não houve pagamentos em setembro de 2026')) === 1, t.slice(0, 500));
+  await btn('Conferi: não houve pagamentos em setembro de 2026').click(); await waitText('Você conferiu: não houve pagamentos em setembro de 2026.'); await p.waitForTimeout(500);
+  await famGoResumo(); await famSignOut();
+  // Lia só vê: entra pelo convite, e na Família não há botão de conferir nem de desfazer.
+  await famCreateAccount('Lia Conferi', 'lia.conferi@exemplo.com');
+  await famGoFamilia();
+  await field('Link do convite').fill(mcLink); await btn('Ver convite').click(); await waitText('Aceitar convite');
+  await btn('Aceitar convite').click(); await waitText('Você entrou na Família Casa Conferi.'); await p.waitForTimeout(400);
+  await famTab('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
+  await famTab('Ver dados de Família').click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
+  await mcResumoMonth('Setembro de 2026');
+  await p.getByRole('button', { name: /^Pago, R\$/ }).filter({ visible: true }).first().click(); await waitText('Gastos pagos com data de pagamento neste mês.'); await p.waitForTimeout(500);
+  t = await mcKeep();
+  ok('Mês conferido, Família (só lê): a composição de Pago de setembro mostra "Mês sem anotação não quer dizer mês sem gastos", sem "Conferi" e sem "Desfazer"', t.includes('Demonstração · Família') && t.includes('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.') &&
+    (await mcConferiBtns()) === 0 && (await visibleCount('button', /^Desfazer a conferência/)) === 0, t.slice(0, 700));
+  await evShots('510_conferi_familia_leitor');
+  await famGoResumo(); await famSignOut();
+
+  // ---- 10. Conta nova: nenhuma marca de exemplo ----
+  await famCreateAccount('Noa Conferi', 'noa.conferi@exemplo.com');
+  ok('Mês conferido, conta nova: nenhuma marca, nenhuma frase de "Você conferiu" e nenhum botão de conferir no Resumo', (await mcMarks(['2026-05', '2026-09'])) === '2026-05:-- 2026-06:-- 2026-07:-- 2026-08:-- 2026-09:--' && !(await body()).includes('Você conferiu') && (await mcConferiBtns()) === 0);
+
+  // ---- 10b. Seu mês: um mês que passou, vazio e conferido troca "Mês sem anotação não quer dizer mês sem gastos" pela frase de mês conferido ----
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await p.getByRole('button', { name: 'Seu mês em 30 segundos. O que entrou, saiu e vence, em cartões curtos.', exact: true }).filter({ visible: true }).first().click(); await waitText('Nada anotado em outubro ainda'); await p.waitForTimeout(500);
+  await p.getByRole('button', { name: /^Mês anterior: / }).filter({ visible: true }).first().click(); await waitText('Nada anotado em setembro'); await p.getByRole('button', { name: /^Mês anterior: / }).filter({ visible: true }).first().click(); await waitText('Nada anotado em agosto'); await p.waitForTimeout(500);
+  t = await mcKeep();
+  ok('Mês conferido, Seu mês (agosto, vazio, sem conferir): segue "Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo."', t.includes('Pessoal · Agosto de 2026') && t.includes('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.') && !t.includes('Você conferiu'), t.slice(0, 600));
+  await otherDevice(async (repo, ctx) => repo.setMonthCheck('e2e-conferi-seumes', ctx, '2026-08', 'pagamentos', 0));
+  await p.waitForTimeout(900);
+  t = await mcKeep();
+  ok('Mês conferido, Seu mês (agosto, vazio e conferido): a frase vira "Você conferiu: não houve pagamentos em agosto de 2026.", sem "Mês sem anotação não quer dizer mês sem gastos"; o título segue "Nada anotado em agosto"', t.includes('Nada anotado em agosto') && t.includes('Você conferiu: não houve pagamentos em agosto de 2026.') && !t.includes('Mês sem anotação não quer dizer mês sem gastos'), t.slice(0, 600));
+  await mcGoResumo();
+
+  // ---- 10c. Cartão: compra no cartão não é registro de Pago; o mês só com compra no cartão pode ser conferido, com o aviso ----
+  // Pago é caixa, pela data do pagamento: a compra no cartão só entra no Pago quando a fatura é paga. A conta nova ganha um cartão e uma compra
+  // de 03/09 (que não é registro de Pago): setembro aceita a conferência de pagamentos, e o aviso vem junto do botão e da frase.
+  await otherDevice(async (repo, ctx) => {
+    const card = (await repo.createCard('e2e-conferi-cartao', ctx, { name: 'Cartão Conferi', lastDigits: '1234', closingDay: 5, dueDay: 15, limitCents: null })).card.id;
+    await repo.addCardPurchase('e2e-conferi-compra', card, { description: 'Compra de setembro', category: 'Mercado', purchasedOn: '2026-09-03', totalCents: 25000, installments: 1 });
+  });
+  await mcOpenComposicao('pago');
+  t = await mcKeep();
+  ok('Mês conferido, cartão (Pago de setembro, só uma compra no cartão): Pago segue R$ 0,00, o botão "Conferi: não houve pagamentos em setembro de 2026" aparece com o aviso "Há compras no cartão em setembro de 2026. Elas entram no Pago quando a fatura é paga."',
+    t.includes('Nenhum registro neste critério') && (await visibleCount('button', 'Conferi: não houve pagamentos em setembro de 2026')) === 1 && t.includes('Há compras no cartão em setembro de 2026. Elas entram no Pago quando a fatura é paga.') && t.includes('Mês sem anotação não quer dizer mês sem gastos') && !t.includes('Você conferiu'), t.slice(0, 900));
+  await btn('Conferi: não houve pagamentos em setembro de 2026').click(); await waitText('Você conferiu: não houve pagamentos em setembro de 2026.'); await p.waitForTimeout(500);
+  t = await mcKeep();
+  ok('Mês conferido, cartão: depois de conferir, a frase de mês conferido e o aviso de compras no cartão ficam juntos, com "Desfazer a conferência"; o mês só com compra no cartão aceitou a marca', t.includes('Você conferiu: não houve pagamentos em setembro de 2026.') && t.includes('Há compras no cartão em setembro de 2026. Elas entram no Pago quando a fatura é paga.') &&
+    (await visibleCount('button', 'Desfazer a conferência: não houve pagamentos em setembro de 2026')) === 1 && (await mcMarks(['2026-09', '2026-09'])) === '2026-09:-P', t.slice(0, 900));
+  await mcGoResumo();
+  await mcResumoMonth('Setembro de 2026');
+  await p.getByRole('button', { name: /^Recebido, R\$/ }).filter({ visible: true }).first().click(); await waitText('Recebimentos realizados com data de recebimento neste mês.'); await p.waitForTimeout(500);
+  t = await mcKeep();
+  ok('Mês conferido, cartão (Recebido de setembro): compra no cartão não é recebimento, então o aviso não aparece em Recebido; o botão de recebimentos segue a conferir', (await visibleCount('button', 'Conferi: não houve recebimentos em setembro de 2026')) === 1 && !t.includes('Há compras no cartão'), t.slice(0, 700));
+  await mcGoResumo();
+  ok('Mês conferido, cartão: a compra no cartão não mudou Pago nem Recebido de setembro (R$ 0,00 nos dois)', (await mcResumoMonth('Setembro de 2026'), (await p.getByRole('button', { name: /^Pago, R\$ 0,00/ }).filter({ visible: true }).count()) === 1 && (await p.getByRole('button', { name: /^Recebido, R\$ 0,00/ }).filter({ visible: true }).count()) === 1));
+  await famSignOut();
+
+  // ---- 11. Demonstração de novo: os totais não mudam; textos e escritas ----
+  await evEnter();
+  await expectTotals('Mês conferido, demonstração: outubro segue 6.000 / 3.900 / 2.100 e 650 depois de tudo', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  const mcBad = mcTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(demais|alt[oa]s?|baix[oa]s?|gastou|aumentou|diminuiu|despencou|disparou|cuidado|estour\w*|exagero|usuári[oa]s?|bem-vind[oa]s?|parab[eé]ns|incr[ií]vel|garant\w*)\b/i)?.[0]).filter(Boolean);
+  ok('Mês conferido: nenhum termo proibido, travessão longo, expressão vetada, palavra de julgamento nem palavra com gênero nas telas novas', mcTexts.length >= 12 && mcBad.length === 0, `${mcTexts.length} telas ${mcBad.join(' | ')}`);
+  ok('Mês conferido: nenhuma escrita direta na rede (a conferência fica na memória da demonstração; o banco é coberto pelos testes de banco e de API)', writes.length === mcWrites0, writes.slice(mcWrites0).join(' | '));
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);

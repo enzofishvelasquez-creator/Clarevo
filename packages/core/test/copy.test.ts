@@ -2902,7 +2902,9 @@ describe('textos das decisões de 16/10/2026 (D-054)', () => {
 import {
   EVOLUTION_TEXT,
   EVOLUTION_WINDOWS,
+  MONTH_CHECK_TEXT,
   buildEvolutionView,
+  monthCheckTextSamples,
   evolutionAnnouncement,
   evolutionExplainPlan,
   evolutionExplanation,
@@ -3132,6 +3134,57 @@ describe('textos da Evolução (D-057)', () => {
     for (const text of lines) expect(text, text).toMatch(/^De [a-zç]+ para [a-zç]+: (R\$ [\d.]+,\d{2} a (mais|menos)|sem diferença)$/);
     for (const text of samples().filter((t) => /% a (mais|menos) que /.test(t))) expect(text, text).toMatch(/^(Menos de )?[\d.,]+% a (mais|menos) que [a-zç]+$|^Menos de 0,1% a (mais|menos) que [a-zç]+$/);
     for (const text of samples().filter((t) => /^De [a-zç]+ para /.test(t))) expect(text, text).not.toMatch(/mês a mês/i);
+  });
+
+  it('zero confirmado ("Conferi este mês", D-060): o ponto diz "R$ 0,00, conferido", com as frases de conferir e desfazer, sem julgamento', () => {
+    // Março sem Recebido, conferido; julho (fechado, com outubro como mês atual) sem Recebido nem Pago, conferido nos dois.
+    const checked = [
+      ...overview.map((r) => (r.month === '2026-03' ? { ...r, receivedChecked: true } : r)),
+      { ...row('2026-07', 0, 0), receivedChecked: true, paidChecked: true, receivedCheckVersion: 1, paidCheckVersion: 3, cardPurchaseCount: 2 },
+      // Agosto: só com compras no cartão e sem conferir (o botão de pagamentos traz o aviso de compras no cartão).
+      { ...row('2026-08', 0, 0), cardPurchaseCount: 1 },
+    ];
+    const texts: string[] = [...monthCheckTextSamples()];
+    for (const metric of ['recebido', 'pago'] as EvolutionMetric[]) {
+      for (const windowMonths of EVOLUTION_WINDOWS) {
+        for (const canWrite of [true, false]) {
+          const view = buildEvolutionView({ overview: checked, metric, windowMonths, currentMonth: '2026-10', hiddenMonths: ['2026-04'] });
+          texts.push(evolutionAnnouncement(view));
+          for (const p of view.points) {
+            texts.push(p.name, p.stateText, p.stateLabel, ...(p.valueText ? [p.valueText] : []));
+            const check = evolutionPanel(view, p.month, canWrite).check;
+            if (check) texts.push(...[check.action, check.actionNote, check.doneText, check.cardNotice, check.undo, check.undoA11y].filter((t): t is string => t !== null));
+          }
+        }
+      }
+    }
+    texts.push(EVOLUTION_TEXT.legend.zeroConfirmed, EVOLUTION_TEXT.panel.state.zero_confirmado, EVOLUTION_TEXT.participation.zeroConfirmed, EVOLUTION_TEXT.table.zeroConfirmed);
+    check(texts);
+    // As frases pedidas pela especificação, exatamente.
+    // Pago é caixa, pela data do pagamento (D-057 D07): a conferência fala de "pagamentos", não de "gastos".
+    expect(MONTH_CHECK_TEXT.action('pagamentos', '2026-03')).toBe('Conferi: não houve pagamentos em março de 2026');
+    expect(MONTH_CHECK_TEXT.action('recebimentos', '2026-03')).toBe('Conferi: não houve recebimentos em março de 2026');
+    expect(MONTH_CHECK_TEXT.done('pagamentos', '2026-03')).toBe('Você conferiu: não houve pagamentos em março de 2026.');
+    expect(MONTH_CHECK_TEXT.done('recebimentos', '2026-03')).toBe('Você conferiu: não houve recebimentos em março de 2026.');
+    expect(MONTH_CHECK_TEXT.cardNotice('2026-03')).toBe('Há compras no cartão em março de 2026. Elas entram no Pago quando a fatura é paga.');
+    for (const text of monthCheckTextSamples()) expect(text, text).not.toMatch(/não houve gastos|sem gastos em/);
+    const zero = buildEvolutionView({ overview: checked, metric: 'recebido', windowMonths: 12, currentMonth: '2026-10', hiddenMonths: [] }).points.find((p) => p.month === '2026-03')!;
+    expect(zero.name).toBe('Março de 2026, R$ 0,00, conferido, na comparação');
+    expect(zero.stateText).toBe('Você conferiu: não houve recebimentos em março de 2026.');
+    const zeroPaid = buildEvolutionView({ overview: checked, metric: 'pago', windowMonths: 12, currentMonth: '2026-10', hiddenMonths: [] }).points.find((p) => p.month === '2026-07')!;
+    expect(zeroPaid.name).toContain('R$ 0,00, conferido');
+    expect(zeroPaid.stateText).toBe('Você conferiu: não houve pagamentos em julho de 2026.');
+    // O aviso de compras no cartão vem junto da conferência de pagamentos (botão ou frase), nunca da de recebimentos.
+    const pagoView = buildEvolutionView({ overview: checked, metric: 'pago', windowMonths: 12, currentMonth: '2026-10', hiddenMonths: [] });
+    expect(evolutionPanel(pagoView, '2026-07', true).check).toMatchObject({ state: 'conferido', cardNotice: 'Há compras no cartão em julho de 2026. Elas entram no Pago quando a fatura é paga.' });
+    expect(evolutionPanel(pagoView, '2026-08', true).check).toMatchObject({ state: 'sem_registros', action: 'Conferi: não houve pagamentos em agosto de 2026', cardNotice: 'Há compras no cartão em agosto de 2026. Elas entram no Pago quando a fatura é paga.' });
+    const recebidoView = buildEvolutionView({ overview: checked, metric: 'recebido', windowMonths: 12, currentMonth: '2026-10', hiddenMonths: [] });
+    expect(evolutionPanel(recebidoView, '2026-07', true).check!.cardNotice).toBeNull();
+    expect(evolutionPanel(recebidoView, '2026-08', true).check!.cardNotice).toBeNull();
+    // Mês sem anotação e sem conferência continua dizendo que não é mês sem gastos.
+    const unchecked = buildEvolutionView({ overview: [...overview, row('2026-07', 0, 0)], metric: 'pago', windowMonths: 12, currentMonth: '2026-10', hiddenMonths: [] }).points.find((p) => p.month === '2026-07')!;
+    expect(unchecked.stateText).toBe('Sem registros: mês sem anotação não quer dizer mês sem gastos');
+    for (const text of texts) expect(text, text).not.toMatch(/\bnão gastou|\bsem gastos de verdade|\bcom certeza\b|\bgarant/i);
   });
 });
 

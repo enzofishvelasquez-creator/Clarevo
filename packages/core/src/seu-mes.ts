@@ -7,6 +7,7 @@ import { addMonths, formatDayMonth, formatMonthName, formatMonthYearBR, isValidI
 import { formatTenths } from './learn/format';
 import type { Cents } from './money';
 import { formatBRL } from './money';
+import { MONTH_CHECK_TEXT } from './month-check';
 import { PAYABLES_FIRST_MONTH } from './navigation';
 import type { Commitment } from './records';
 import { payablesCaption } from './shortcuts';
@@ -227,6 +228,11 @@ export interface SeuMesInput {
   budget: BudgetSummary | null;
   /** Metas do contexto: quantas, o guardado no mês (aportes menos resgates) e o plano por mês das metas ativas. null: não lido. */
   goals: { count: number; savedInMonthCents: Cents; plannedCents: Cents } | null;
+  /**
+   * "Conferi este mês" (D-060): a marca de pagamentos do mês vale (`paidChecked` de months_overview). Num mês que passou e está vazio, a
+   * frase "Mês sem anotação não quer dizer mês sem gastos" dá lugar a "Você conferiu: não houve pagamentos em {mês}." Ausente: não conferido.
+   */
+  paidChecked?: boolean;
 }
 
 /** "Recebido R$ 6.000,00" e companhia, para o leitor de tela: "{nome}, {valor}. {detalhe}. {detalhe}." */
@@ -422,7 +428,11 @@ export function buildSeuMes(input: SeuMesInput): SeuMesView {
       cards: [],
       empty: {
         title: isCurrent ? SEU_MES_TEXT.empty.titleCurrent(input.month) : SEU_MES_TEXT.empty.titlePast(input.month),
-        body: isCurrent ? SEU_MES_TEXT.empty.bodyCurrent : SEU_MES_TEXT.empty.bodyPast,
+        body: isCurrent
+          ? SEU_MES_TEXT.empty.bodyCurrent
+          : input.paidChecked === true
+            ? MONTH_CHECK_TEXT.done('pagamentos', input.month)
+            : SEU_MES_TEXT.empty.bodyPast,
         action: { label: SEU_MES_TEXT.empty.action, href: '/registro/novo?tipo=despesa' },
       },
     };

@@ -46,7 +46,9 @@ import {
   annualYearSummary,
   budgetCaption,
   budgetCrossing,
+  buildEvolutionView,
   buildReturnReview,
+  monthCheckPlan,
   cardErrorText,
   cardLimitUsed,
   categoryBreakdown,
@@ -2414,6 +2416,9 @@ describe('conversor da revisão dos últimos meses', () => {
   // Sem rede: os argumentos das funções do Ciclo A4 e a leitura das linhas (mês AAAA-MM-01 ↔ AAAA-MM).
   const calls: [string, Record<string, unknown>][] = [];
   const mark = { reviewed_through: '2026-09-01', decision: 'seguiu', decided_on: '2026-10-07', version: 1 };
+  // O que a API devolve de months_overview e de set_month_check e clear_month_check neste bloco (mudado pelos casos de "Conferi este mês").
+  let overviewRows: object[] = [{ month: '2026-05-01', received_count: 1, received_cents: 600000, paid_count: 4, paid_cents: 476530 }];
+  let monthCheckRow: object | null = null;
   const fake = (activity: object | null, review: object | null) => {
     const db = {
       from: (table: string) => {
@@ -2426,7 +2431,8 @@ describe('conversor da revisão dos últimos meses', () => {
       },
       rpc: async (fn: string, args: Record<string, unknown>) => {
         calls.push([fn, args]);
-        if (fn === 'months_overview') return { data: [{ month: '2026-05-01', received_count: 1, received_cents: 600000, paid_count: 4, paid_cents: 476530 }], error: null };
+        if (fn === 'months_overview') return { data: overviewRows, error: null };
+        if (fn === 'set_month_check' || fn === 'clear_month_check') return { data: monthCheckRow, error: null };
         if (fn === 'decide_return_review') return { data: { person_id: 'p1', context_id: 'ctx', ...mark, created_at: 'x', updated_at: 'x' }, error: null };
         return { data: null, error: { message: 'ocorrencia_existente', code: 'PT409' } };
       },
@@ -2452,7 +2458,7 @@ describe('conversor da revisão dos últimos meses', () => {
     calls.length = 0;
     const repo = fake(null, null);
     expect(await repo.monthsOverview('ctx', '2026-05', '2026-09')).toEqual([
-      { month: '2026-05', receivedCount: 1, receivedCents: 600000, paidCount: 4, paidCents: 476530 },
+      { month: '2026-05', receivedCount: 1, receivedCents: 600000, paidCount: 4, paidCents: 476530, receivedChecked: false, paidChecked: false, receivedCheckVersion: 0, paidCheckVersion: 0, cardPurchaseCount: 0 },
     ]);
     expect(await repo.decideReturnReview('chave-0007', 'ctx', 0, '2026-09', 'seguiu')).toEqual({
       reviewedThrough: '2026-09',
@@ -2466,6 +2472,65 @@ describe('conversor da revisão dos últimos meses', () => {
       ['decide_return_review', { p_idempotency_key: 'chave-0007', p_context_id: 'ctx', p_expected_version: 0, p_reviewed_through: '2026-09-01', p_decision: 'seguiu' }],
       ['create_series_occurrence', { p_idempotency_key: 'chave-0008', p_series_id: 's1', p_expected_version: 3, p_number: 7, p_mode: 'nao_houve' }],
     ]);
+  });
+
+  it('"Conferi este mês" (D-060): as marcas de months_overview, os cinco argumentos de set_month_check e clear_month_check e o resultado', async () => {
+    calls.length = 0;
+    // As marcas que valem vêm do banco, com a versão da linha e as compras no cartão do mês; ausentes ou nulas (banco antes da 0016) valem
+    // false, 0 e 0, e só true vale.
+    overviewRows = [
+      { month: '2026-06-01', received_count: 0, received_cents: 0, paid_count: 0, paid_cents: 0, received_checked: true, paid_checked: false, received_check_version: 3, paid_check_version: 2, card_purchase_count: 0 },
+      { month: '2026-07-01', received_count: 0, received_cents: 0, paid_count: 2, paid_cents: 900, received_checked: null, paid_checked: true, received_check_version: null, paid_check_version: 1, card_purchase_count: 2 },
+    ];
+    const repo = fake(null, null);
+    expect(await repo.monthsOverview('ctx', '2026-06', '2026-07')).toEqual([
+      { month: '2026-06', receivedCount: 0, receivedCents: 0, paidCount: 0, paidCents: 0, receivedChecked: true, paidChecked: false, receivedCheckVersion: 3, paidCheckVersion: 2, cardPurchaseCount: 0 },
+      { month: '2026-07', receivedCount: 0, receivedCents: 0, paidCount: 2, paidCents: 900, receivedChecked: false, paidChecked: true, receivedCheckVersion: 0, paidCheckVersion: 1, cardPurchaseCount: 2 },
+    ]);
+    monthCheckRow = { context_id: 'ctx', month: '2026-08-01', kind: 'pagamentos', checked: true, version: 1, checked_at: '2026-10-07T12:00:00Z' };
+    expect(await repo.setMonthCheck('chave-1001', 'ctx', '2026-08', 'pagamentos', 0)).toEqual({
+      contextId: 'ctx',
+      month: '2026-08',
+      kind: 'pagamentos',
+      checked: true,
+      version: 1,
+      checkedAt: '2026-10-07T12:00:00Z',
+    });
+    // Desmarcar devolve a linha desligada, com a versão seguinte e sem hora.
+    monthCheckRow = { context_id: 'ctx', month: '2026-08-01', kind: 'recebimentos', checked: false, version: 2, checked_at: null };
+    expect(await repo.clearMonthCheck('chave-1002', 'ctx', '2026-08', 'recebimentos', 1)).toEqual({
+      contextId: 'ctx',
+      month: '2026-08',
+      kind: 'recebimentos',
+      checked: false,
+      version: 2,
+      checkedAt: null,
+    });
+    expect(calls).toEqual([
+      ['months_overview', { p_context_id: 'ctx', p_from: '2026-06-01', p_to: '2026-07-01' }],
+      ['set_month_check', { p_context: 'ctx', p_month: '2026-08-01', p_kind: 'pagamentos', p_key: 'chave-1001', p_version: 0 }],
+      ['clear_month_check', { p_context: 'ctx', p_month: '2026-08-01', p_kind: 'recebimentos', p_key: 'chave-1002', p_version: 1 }],
+    ]);
+    // Resultado vazio ou fora da forma (mês fora do dia 1, tipo desconhecido, "checked" que não é verdadeiro ou falso): nunca uma marca inventada.
+    for (const bad of [null, { ...(monthCheckRow as object), month: '2026-08-15' }, { ...(monthCheckRow as object), kind: 'gastos' }, { ...(monthCheckRow as object), checked: 'sim' }]) {
+      monthCheckRow = bad;
+      const out = await failure(repo.setMonthCheck('chave-1003', 'ctx', '2026-08', 'pagamentos', 0));
+      expect(out?.[0]).toBe('desconhecido');
+    }
+    overviewRows = [{ month: '2026-05-01', received_count: 1, received_cents: 600000, paid_count: 4, paid_cents: 476530 }];
+  });
+
+  it('os códigos novos voltam com o nome (mes_com_registros, mes_invalido, tipo_invalido, versao_desatualizada com a versão atual)', async () => {
+    const withError = (message: string, details: string | null = null) =>
+      new SupabaseRepository(
+        { rpc: async () => ({ data: null, error: { message, code: 'PT409', details } }) } as unknown as SupabaseClient,
+        { id: 'p1' },
+      );
+    for (const code of ['mes_com_registros', 'mes_invalido', 'tipo_invalido', 'sem_permissao', 'chave_reutilizada'] as const) {
+      expect(await failure(withError(code).setMonthCheck('chave-1004', 'ctx', '2026-08', 'pagamentos', 0))).toEqual([code, code]);
+    }
+    const stale = await withError('versao_desatualizada', 'versao_atual=1').setMonthCheck('chave-1005', 'ctx', '2026-08', 'pagamentos', 0).catch((e: RepoError) => e);
+    expect([(stale as RepoError).code, (stale as RepoError).detail]).toEqual(['versao_desatualizada', 'versao_atual=1']);
   });
 });
 
@@ -8576,5 +8641,422 @@ describe('conversor da exclusão da conta', () => {
     for (const over of [{ first_name: FAMILY_DEPARTED_NAME, status: 'ativo', left_at: null }, { first_name: 'Pessoa que saiu da Família', status: 'ex-membro', left_at: '2026-10-09T00:00:00Z' }, { first_name: 'pessoa que saiu', status: 'ex-membro', left_at: '2026-10-09T00:00:00Z' }]) {
       expect(await failure(fake({}, { financial_contexts: [ctxRow], family_member_items: [member(over as Record<string, unknown>), member({ person_id: 'p2', first_name: 'Bia', is_me: false })] }).getFamily())).toEqual(['desconhecido', 'familia_inconsistente', null]);
     }
+  });
+});
+
+describe('API real: Conferi este mês (Ciclo S, D-060)', () => {
+  // Lívia (titular da Casa Moura, com o Pessoal), Mário (membro), Nádia (só vê), Pedro (de fora) e Rita (repetição com a resposta
+  // perdida). A marca "Conferi este mês" não muda nenhum total, não é anotação e vale por contexto. Roda no fim: nada dos blocos anteriores
+  // depende destas pessoas. Pessoas FICTÍCIAS.
+  const TODAY = '2026-10-07';
+  const LIVIA = '00000000-0000-0000-0000-0000000003a1';
+  const MARIO = '00000000-0000-0000-0000-0000000003b1';
+  const NADIA = '00000000-0000-0000-0000-0000000003c1';
+  const PEDRO = '00000000-0000-0000-0000-0000000003d1';
+  const RITA = '00000000-0000-0000-0000-0000000003e1';
+  const livia = repoFor(LIVIA);
+  const mario = repoFor(MARIO);
+  const nadia = repoFor(NADIA);
+  const pedro = repoFor(PEDRO);
+  let liviaCtx = '';
+  let liviaAcc = '';
+  let fam = '';
+  let famAcc = '';
+
+  const fail = async (p: Promise<unknown>) => (await p.then(() => null, (e: unknown) => e)) as RepoError;
+  const row = async (who: SupabaseRepository, ctx: string, month: IsoMonth) => (await who.monthsOverview(ctx, month, month))[0]!;
+  const flags = async (who: SupabaseRepository, ctx: string, month: IsoMonth) => {
+    const r = await row(who, ctx, month);
+    return [r.receivedChecked, r.paidChecked, r.receivedCount, r.paidCount];
+  };
+  // As marcas LIGADAS do contexto ("2026-08 pagamentos v1; ..."), direto na tabela; rows() traz todas as linhas, ligadas e desligadas.
+  const marks = (ctx: string) => adminSql(`select coalesce(string_agg(to_char(month, 'YYYY-MM') || ' ' || kind || ' v' || version, '; ' order by month, kind), '-') from public.month_checks where context_id = '${ctx}' and checked`);
+  const rows = (ctx: string) => adminSql(`select coalesce(string_agg(to_char(month, 'YYYY-MM') || ' ' || kind || ' v' || version || case when checked then ' on' else ' off' end, '; ' order by month, kind), '-') from public.month_checks where context_id = '${ctx}'`);
+  const versions = async (who: SupabaseRepository, ctx: string, month: IsoMonth) => {
+    const r = await row(who, ctx, month);
+    return [r.receivedCheckVersion, r.paidCheckVersion, r.cardPurchaseCount];
+  };
+  const totals = async (who: SupabaseRepository, ctx: string, month: IsoMonth) => {
+    const s = summarizeMonth(await who.listRecords(ctx, month), ctx, month);
+    return [s.receivedCents, s.paidCents, s.differenceCents];
+  };
+  const expense = (who: SupabaseRepository, ctx: string, acc: string, occurredOn: IsoDate, amountCents = 3000) =>
+    who.createRecord(newOperationKey(), ctx, 'despesa', { accountId: acc, amountCents, occurredOn, description: 'Farmácia', category: null });
+
+  beforeAll(async () => {
+    adminSql(
+      `insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
+         ('${LIVIA}', 'livia@exemplo.test', now(), '{"display_name":"Lívia Moura"}'),
+         ('${MARIO}', 'mario@exemplo.test', now(), '{"display_name":"Mário Moura"}'),
+         ('${NADIA}', 'nadia@exemplo.test', now(), '{"display_name":"Nádia Moura"}'),
+         ('${PEDRO}', 'pedro@exemplo.test', now(), '{"display_name":"Pedro Lima"}'),
+         ('${RITA}', 'rita.s@exemplo.test', now(), '{"display_name":"Rita Sá"}')`,
+    );
+    const space = await livia.ensurePersonalSpace('Conta principal');
+    liviaCtx = space.personalContextId;
+    liviaAcc = space.accounts[0]!.id;
+    for (const r of [mario, nadia, pedro, repoFor(RITA)]) await r.ensurePersonalSpace('Conta principal');
+    fam = (await livia.createFamily(newOperationKey(), 'Casa Moura')).context.id;
+    famAcc = (await livia.listAccounts(fam))[0]!.id;
+    await mario.acceptFamilyInvite(newOperationKey(), (await livia.createFamilyInvite(newOperationKey(), fam, 'membro')).code!);
+    await nadia.acceptFamilyInvite(newOperationKey(), (await livia.createFamilyInvite(newOperationKey(), fam, 'leitor')).code!);
+  });
+
+  it('1. conta nova: nenhuma marca de exemplo; a leitura traz as marcas em false e a mesma contagem de antes', async () => {
+    expect(marks(liviaCtx)).toBe('-');
+    expect(await flags(livia, liviaCtx, '2026-08')).toEqual([false, false, 0, 0]);
+    const six = await livia.monthsOverview(liviaCtx, '2026-05', '2026-10');
+    expect(six).toHaveLength(6);
+    for (const r of six) {
+      expect(r).toEqual({ month: r.month, receivedCount: 0, receivedCents: 0, paidCount: 0, paidCents: 0, receivedChecked: false, paidChecked: false, receivedCheckVersion: 0, paidCheckVersion: 0, cardPurchaseCount: 0 });
+    }
+  });
+
+  it('2. marcar: devolve a marca, a leitura mostra só o tipo marcado, nenhum total muda e a atividade não conta', async () => {
+    await expense(livia, liviaCtx, liviaAcc, '2026-09-10', 4500);
+    const before = await totals(livia, liviaCtx, '2026-08');
+    const activityBefore = await livia.getReturnReviewState(liviaCtx);
+    expect(activityBefore.activity).toMatchObject({ lastWriteOn: TODAY });
+    // As marcas são feitas em OUTRO dia que o da última anotação (12/10, ainda em outubro): se marcar contasse como anotação, o dia da
+    // última anotação mudaria e o teste falharia.
+    const later = repoFor(LIVIA, '2026-10-12');
+    const key = newOperationKey();
+    const w = await later.setMonthCheck(key, liviaCtx, '2026-08', 'pagamentos', 0);
+    expect(w).toMatchObject({ contextId: liviaCtx, month: '2026-08', kind: 'pagamentos', checked: true, version: 1 });
+    expect(w.checkedAt).toMatch(/^2026-|^20\d\d-/);
+    expect(await flags(livia, liviaCtx, '2026-08')).toEqual([false, true, 0, 0]);
+    expect((await later.setMonthCheck(newOperationKey(), liviaCtx, '2026-08', 'recebimentos', 0)).kind).toBe('recebimentos');
+    expect(await flags(livia, liviaCtx, '2026-08')).toEqual([true, true, 0, 0]);
+    expect(await versions(livia, liviaCtx, '2026-08')).toEqual([1, 1, 0]);
+    expect(await totals(livia, liviaCtx, '2026-08')).toEqual(before);
+    expect(await later.getReturnReviewState(liviaCtx)).toEqual(activityBefore);
+    expect((await later.getReturnReviewState(liviaCtx)).activity).toMatchObject({ lastWriteOn: TODAY });
+    expect(marks(liviaCtx)).toBe('2026-08 pagamentos v1; 2026-08 recebimentos v1');
+    // Repetir devolve o mesmo, sem outra marca; a mesma chave com outros argumentos, ou de outra ação, é recusada.
+    expect(await later.setMonthCheck(key, liviaCtx, '2026-08', 'pagamentos', 0)).toEqual(w);
+    expect(await err(livia.setMonthCheck(key, liviaCtx, '2026-08', 'recebimentos', 0))).toBe('chave_reutilizada');
+    expect(await err(livia.clearMonthCheck(key, liviaCtx, '2026-08', 'pagamentos', 1))).toBe('chave_reutilizada');
+    expect(marks(liviaCtx)).toBe('2026-08 pagamentos v1; 2026-08 recebimentos v1');
+    // A marca de setembro não existe: setembro tem registros nos dois tipos? Só Pago; marcar Recebido vale, marcar Pago, não.
+    expect(await err(livia.setMonthCheck(newOperationKey(), liviaCtx, '2026-09', 'pagamentos', 0))).toBe('mes_com_registros');
+    expect((await livia.setMonthCheck(newOperationKey(), liviaCtx, '2026-09', 'recebimentos', 0)).checked).toBe(true);
+  });
+
+  it('3. recusas: mês atual e futuro, outro dia que não o 1º, tipo, versão e permissão; recusa não grava nem gasta a chave', async () => {
+    const before = marks(liviaCtx);
+    const key = newOperationKey();
+    for (const month of ['2026-10', '2026-11', '2031-01']) {
+      expect(await err(livia.setMonthCheck(key, liviaCtx, month, 'pagamentos', 0))).toBe('mes_invalido');
+    }
+    // O banco só aceita o primeiro dia do mês; o repositório sempre manda o dia 1, então o dia 15 vai direto à função.
+    const db = clientFor(LIVIA);
+    const raw = await db.rpc('set_month_check', { p_context: liviaCtx, p_month: '2026-07-15', p_kind: 'pagamentos', p_key: key, p_version: 0 });
+    expect(raw.error?.message).toBe('mes_invalido');
+    expect(await err(livia.setMonthCheck(key, liviaCtx, '2026-07', 'gastos' as never, 0))).toBe('tipo_invalido');
+    // Versão: marcar o que já está marcado, ou com versão que não é 0; desmarcar com a versão errada ou sem marca.
+    const stale = await fail(livia.setMonthCheck(newOperationKey(), liviaCtx, '2026-08', 'pagamentos', 0));
+    expect([stale.code, stale.detail]).toEqual(['versao_desatualizada', 'versao_atual=1']);
+    const none = await fail(livia.setMonthCheck(newOperationKey(), liviaCtx, '2026-07', 'pagamentos', 1));
+    expect([none.code, none.detail]).toEqual(['versao_desatualizada', 'versao_atual=0']);
+    const wrong = await fail(livia.clearMonthCheck(newOperationKey(), liviaCtx, '2026-08', 'pagamentos', 2));
+    expect([wrong.code, wrong.detail]).toEqual(['versao_desatualizada', 'versao_atual=1']);
+    const absent = await fail(livia.clearMonthCheck(newOperationKey(), liviaCtx, '2026-07', 'pagamentos', 1));
+    expect([absent.code, absent.detail]).toEqual(['versao_desatualizada', 'versao_atual=0']);
+    // Pessoa de fora: nem lê nem escreve, no Pessoal da Lívia e na Casa Moura; contexto que não existe dá o mesmo erro.
+    for (const ctx of [liviaCtx, fam, randomUUID()]) {
+      expect(await err(pedro.setMonthCheck(newOperationKey(), ctx, '2026-07', 'pagamentos', 0))).toBe('sem_permissao');
+      expect(await err(pedro.clearMonthCheck(newOperationKey(), ctx, '2026-08', 'pagamentos', 1))).toBe('sem_permissao');
+      expect(await err(pedro.monthsOverview(ctx, '2026-08', '2026-08'))).toBe('sem_permissao');
+    }
+    const peek = await clientFor(PEDRO).from('month_checks').select('*');
+    expect(peek.error).toBeNull();
+    expect(peek.data).toEqual([]);
+    expect(marks(liviaCtx)).toBe(before);
+    // Sem sessão: o anônimo não executa nem lê.
+    const anon = clientFor(null);
+    expect((await anon.rpc('set_month_check', { p_context: liviaCtx, p_month: '2026-07-01', p_kind: 'pagamentos', p_key: newOperationKey(), p_version: 0 })).error?.code).toBe('42501');
+    expect((await anon.rpc('months_overview', { p_context_id: liviaCtx, p_from: '2026-08-01', p_to: '2026-08-01' })).error?.code).toBe('42501');
+    expect((await anon.from('month_checks').select('*')).error?.code).toBe('42501');
+  });
+
+  it('4. gravação direta recusada: nem a dona do contexto insere, muda ou apaga em month_checks', async () => {
+    const db = clientFor(LIVIA);
+    const ins = await db.from('month_checks').insert({ context_id: liviaCtx, month: '2026-06-01', kind: 'pagamentos', checked: true, updated_by: LIVIA });
+    expect(ins.error?.code).toBe('42501');
+    const upd = await db.from('month_checks').update({ kind: 'recebimentos' }).eq('context_id', liviaCtx);
+    expect(upd.error?.code).toBe('42501');
+    const off = await db.from('month_checks').update({ checked: false, version: 2 }).eq('context_id', liviaCtx);
+    expect(off.error?.code).toBe('42501');
+    const del = await db.from('month_checks').delete().eq('context_id', liviaCtx);
+    expect(del.error?.code).toBe('42501');
+    expect(marks(liviaCtx)).toBe('2026-08 pagamentos v1; 2026-08 recebimentos v1; 2026-09 recebimentos v1');
+    // A leitura direta traz as marcas do contexto (RLS) e só elas.
+    const read = await db.from('month_checks').select('context_id, month, kind, checked, updated_by, version').eq('context_id', liviaCtx);
+    expect(read.data).toHaveLength(3);
+    expect(read.data!.every((r) => r.updated_by === LIVIA && r.version === 1 && r.checked === true)).toBe(true);
+  });
+
+  it('5. a marca deixa de valer com um registro do tipo no mês, sem ser apagada, e volta a valer quando o registro sai', async () => {
+    const first = await expense(livia, liviaCtx, liviaAcc, '2026-08-31', 7000);
+    expect(await flags(livia, liviaCtx, '2026-08')).toEqual([true, false, 0, 1]);
+    expect(marks(liviaCtx)).toContain('2026-08 pagamentos v1');
+    const second = await expense(livia, liviaCtx, liviaAcc, '2026-08-01', 2000);
+    await livia.deleteRecord(newOperationKey(), first.id, first.version);
+    expect(await flags(livia, liviaCtx, '2026-08')).toEqual([true, false, 0, 1]);
+    await livia.deleteRecord(newOperationKey(), second.id, second.version);
+    expect(await flags(livia, liviaCtx, '2026-08')).toEqual([true, true, 0, 0]);
+    // Marcar de novo com a marca (que deixou de valer) ainda ligada: versão desatualizada, não duplica.
+    await expense(livia, liviaCtx, liviaAcc, '2026-08-15', 100);
+    const again = await fail(livia.setMonthCheck(newOperationKey(), liviaCtx, '2026-08', 'pagamentos', 0));
+    expect([again.code, again.detail]).toEqual(['versao_desatualizada', 'versao_atual=1']);
+    expect(await versions(livia, liviaCtx, '2026-08')).toEqual([1, 1, 0]);
+    // Desmarcar vale mesmo com registro no mês; a linha fica, desligada, na versão 2.
+    const off = await livia.clearMonthCheck(newOperationKey(), liviaCtx, '2026-08', 'pagamentos', 1);
+    expect(off).toMatchObject({ checked: false, version: 2, checkedAt: null });
+    expect(await flags(livia, liviaCtx, '2026-08')).toEqual([true, false, 0, 1]);
+    expect(rows(liviaCtx)).toBe('2026-08 pagamentos v2 off; 2026-08 recebimentos v1 on; 2026-09 recebimentos v1 on');
+  });
+
+  it('6. desmarcar: a versão certa, a repetição devolve o mesmo e o mês pode ser marcado de novo (a versão só cresce)', async () => {
+    const key = newOperationKey();
+    const cleared = await livia.clearMonthCheck(key, liviaCtx, '2026-08', 'recebimentos', 1);
+    expect(cleared).toEqual({ contextId: liviaCtx, month: '2026-08', kind: 'recebimentos', checked: false, version: 2, checkedAt: null });
+    expect(await livia.clearMonthCheck(key, liviaCtx, '2026-08', 'recebimentos', 1)).toEqual(cleared);
+    expect(await err(livia.setMonthCheck(key, liviaCtx, '2026-08', 'recebimentos', 0))).toBe('chave_reutilizada');
+    expect(await flags(livia, liviaCtx, '2026-08')).toEqual([false, false, 0, 1]);
+    expect(await versions(livia, liviaCtx, '2026-08')).toEqual([2, 2, 0]);
+    // Marcar manda a versão que a tela leu (2): a versão velha (0, de quando não havia linha, ou 1) é recusada.
+    for (const stale of [0, 1, 3]) {
+      const out = await fail(livia.setMonthCheck(newOperationKey(), liviaCtx, '2026-08', 'recebimentos', stale));
+      expect([out.code, out.detail]).toEqual(['versao_desatualizada', 'versao_atual=2']);
+    }
+    // Desmarcar o que já está desligado, mesmo com a versão da linha, também é recusado.
+    const twice = await fail(livia.clearMonthCheck(newOperationKey(), liviaCtx, '2026-08', 'recebimentos', 2));
+    expect([twice.code, twice.detail]).toEqual(['versao_desatualizada', 'versao_atual=2']);
+    const set = await livia.setMonthCheck(newOperationKey(), liviaCtx, '2026-08', 'recebimentos', 2);
+    expect(set).toMatchObject({ checked: true, version: 3 });
+    expect(await flags(livia, liviaCtx, '2026-08')).toEqual([true, false, 0, 1]);
+    expect(await versions(livia, liviaCtx, '2026-08')).toEqual([3, 2, 0]);
+    expect(rows(liviaCtx)).toBe('2026-08 pagamentos v2 off; 2026-08 recebimentos v3 on; 2026-09 recebimentos v1 on');
+  });
+
+  it('6b. dois aparelhos: cada um manda a versão que leu, e a versão antiga é recusada, em marcar e em desmarcar', async () => {
+    // Fevereiro de 2026, tipo pagamentos, na conta da Lívia: os dois aparelhos são a mesma pessoa com o mesmo mês aberto.
+    const A = repoFor(LIVIA);
+    const B = repoFor(LIVIA);
+    const stale = async (p: Promise<unknown>) => {
+      const out = await fail(p);
+      return [out.code, out.detail];
+    };
+    // Os dois leram "sem linha" (versão 0): A marca; B, com a versão 0, é recusado e recebe a versão nova.
+    expect((await versions(B, liviaCtx, '2026-02'))[1]).toBe(0);
+    expect(await A.setMonthCheck(newOperationKey(), liviaCtx, '2026-02', 'pagamentos', 0)).toMatchObject({ checked: true, version: 1 });
+    expect(await stale(B.setMonthCheck(newOperationKey(), liviaCtx, '2026-02', 'pagamentos', 0))).toEqual(['versao_desatualizada', 'versao_atual=1']);
+    // Os dois leram "marcado, versão 1": A desmarca (versão 2); B, com a versão 1, é recusado, e a marca segue desligada.
+    expect(await A.clearMonthCheck(newOperationKey(), liviaCtx, '2026-02', 'pagamentos', 1)).toMatchObject({ checked: false, version: 2 });
+    expect(await stale(B.clearMonthCheck(newOperationKey(), liviaCtx, '2026-02', 'pagamentos', 1))).toEqual(['versao_desatualizada', 'versao_atual=2']);
+    expect(await flags(B, liviaCtx, '2026-02')).toEqual([false, false, 0, 0]);
+    // B lê de novo (versão 2) e marca (versão 3); A, que também leu a 2, é recusado nos dois pedidos.
+    expect(await B.setMonthCheck(newOperationKey(), liviaCtx, '2026-02', 'pagamentos', 2)).toMatchObject({ checked: true, version: 3 });
+    expect(await stale(A.setMonthCheck(newOperationKey(), liviaCtx, '2026-02', 'pagamentos', 2))).toEqual(['versao_desatualizada', 'versao_atual=3']);
+    expect(await stale(A.clearMonthCheck(newOperationKey(), liviaCtx, '2026-02', 'pagamentos', 2))).toEqual(['versao_desatualizada', 'versao_atual=3']);
+    // A resposta de uma repetição é o estado de agora: a chave de uma marcação antiga, repetida depois de desmarcar, devolve "desligada".
+    const kept = newOperationKey();
+    expect(await A.clearMonthCheck(newOperationKey(), liviaCtx, '2026-02', 'pagamentos', 3)).toMatchObject({ checked: false, version: 4 });
+    expect(await A.setMonthCheck(kept, liviaCtx, '2026-02', 'pagamentos', 4)).toMatchObject({ checked: true, version: 5 });
+    await B.clearMonthCheck(newOperationKey(), liviaCtx, '2026-02', 'pagamentos', 5);
+    expect(await A.setMonthCheck(kept, liviaCtx, '2026-02', 'pagamentos', 4)).toMatchObject({ checked: false, version: 6, checkedAt: null });
+    expect(await versions(A, liviaCtx, '2026-02')).toEqual([0, 6, 0]);
+    expect(rows(liviaCtx)).toBe('2026-02 pagamentos v6 off; 2026-08 pagamentos v2 off; 2026-08 recebimentos v3 on; 2026-09 recebimentos v1 on');
+  });
+
+  it('7. a resposta se perde: a marca ficou gravada e repetir com a mesma chave devolve a marca, sem refazer', async () => {
+    const rita = new SupabaseRepository(clientFor(RITA, undefined, lostResponse), { id: RITA });
+    const ritaCtx = (await repoFor(RITA).getSpace())!.personalContextId;
+    const key = newOperationKey();
+    expect(await err(rita.setMonthCheck(key, ritaCtx, '2026-08', 'pagamentos', 0))).toBe('rede');
+    expect(await flags(repoFor(RITA), ritaCtx, '2026-08')).toEqual([false, true, 0, 0]);
+    const again = await repoFor(RITA).setMonthCheck(key, ritaCtx, '2026-08', 'pagamentos', 0);
+    expect(again).toMatchObject({ checked: true, version: 1 });
+    expect(marks(ritaCtx)).toBe('2026-08 pagamentos v1');
+    const keyClear = newOperationKey();
+    expect(await err(rita.clearMonthCheck(keyClear, ritaCtx, '2026-08', 'pagamentos', 1))).toBe('rede');
+    expect(await flags(repoFor(RITA), ritaCtx, '2026-08')).toEqual([false, false, 0, 0]);
+    expect(await repoFor(RITA).clearMonthCheck(keyClear, ritaCtx, '2026-08', 'pagamentos', 1)).toMatchObject({ checked: false, version: 2 });
+    expect(rows(ritaCtx)).toBe('2026-08 pagamentos v2 off');
+  });
+
+  it('8. Família: quem escreve (titular e membro) marca e desmarca a marca de outra pessoa; quem só lê vê, sem escrever', async () => {
+    const w = await mario.setMonthCheck(newOperationKey(), fam, '2026-08', 'pagamentos', 0);
+    expect(w).toMatchObject({ contextId: fam, checked: true, version: 1 });
+    expect(marks(fam)).toBe('2026-08 pagamentos v1');
+    expect(adminSql(`select updated_by = '${MARIO}' from public.month_checks where context_id = '${fam}'`)).toBe('t');
+    for (const who of [livia, mario, nadia]) expect(await flags(who, fam, '2026-08')).toEqual([false, true, 0, 0]);
+    // Nádia só vê: não marca nem desmarca; os dois tipos recusam com sem_permissao.
+    expect(await err(nadia.setMonthCheck(newOperationKey(), fam, '2026-08', 'recebimentos', 0))).toBe('sem_permissao');
+    expect(await err(nadia.clearMonthCheck(newOperationKey(), fam, '2026-08', 'pagamentos', 1))).toBe('sem_permissao');
+    expect(await flags(nadia, fam, '2026-08')).toEqual([false, true, 0, 0]);
+    // Lívia (titular) desmarca a marca do Mário (a linha fica, desligada, e a autoria passa a ser da Lívia); a marca do Pessoal da Lívia
+    // não tem relação com a da Casa.
+    expect(await livia.clearMonthCheck(newOperationKey(), fam, '2026-08', 'pagamentos', 1)).toMatchObject({ checked: false, version: 2 });
+    expect(adminSql(`select updated_by = '${LIVIA}' from public.month_checks where context_id = '${fam}' and kind = 'pagamentos'`)).toBe('t');
+    expect(await flags(mario, fam, '2026-08')).toEqual([false, false, 0, 0]);
+    expect((await livia.setMonthCheck(newOperationKey(), fam, '2026-08', 'recebimentos', 0)).checked).toBe(true);
+    expect(await flags(livia, liviaCtx, '2026-08')).toEqual([true, false, 0, 1]);
+    // O registro da Casa vale só nela: um gasto da Casa em agosto anula a marca de pagamentos da Casa, não a do Pessoal.
+    await mario.setMonthCheck(newOperationKey(), fam, '2026-07', 'pagamentos', 0);
+    await expense(mario, fam, famAcc, '2026-07-12', 1200);
+    expect(await flags(livia, fam, '2026-07')).toEqual([false, false, 0, 1]);
+    expect(await flags(livia, liviaCtx, '2026-07')).toEqual([false, false, 0, 0]);
+    // Ex-membro: perde a leitura e a escrita, e o que marcou continua.
+    await livia.removeFamilyMember(newOperationKey(), fam, MARIO);
+    expect(await err(mario.setMonthCheck(newOperationKey(), fam, '2026-06', 'pagamentos', 0))).toBe('sem_permissao');
+    expect(await err(mario.monthsOverview(fam, '2026-07', '2026-07'))).toBe('sem_permissao');
+    expect(marks(fam)).toBe('2026-07 pagamentos v1; 2026-08 recebimentos v1');
+  });
+
+  it('9. o core e o banco concordam: monthsOverview puro com os mesmos registros e marcas devolve as mesmas linhas', async () => {
+    const months = ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09'] as IsoMonth[];
+    const records = (await Promise.all(months.map((m) => livia.listRecords(liviaCtx, m)))).flat();
+    // As linhas da marca, ligadas e desligadas, com a versão (o que o banco guarda), e as compras no cartão vivas do contexto.
+    const checks = adminSql(`select coalesce(string_agg(to_char(month, 'YYYY-MM') || ',' || kind || ',' || checked || ',' || version, ';'), '') from public.month_checks where context_id = '${liviaCtx}'`)
+      .split(';')
+      .filter(Boolean)
+      .map((s) => {
+        const [month, kind, checked, version] = s.split(',');
+        return { month: month!, kind: kind as 'recebimentos' | 'pagamentos', checked: checked === 'true' || checked === 't', version: Number(version) };
+      });
+    expect(checks.length).toBeGreaterThan(0);
+    expect(checks.some((c) => !c.checked)).toBe(true);
+    const cardPurchases = adminSql(`select coalesce(string_agg(purchased_on::text, ';'), '') from public.card_entries where context_id = '${liviaCtx}' and kind = 'parcela' and installment_number = 1 and deleted_at is null`)
+      .split(';')
+      .filter(Boolean)
+      .map((purchasedOn) => ({ purchasedOn }));
+    expect(monthsOverview(records, liviaCtx, '2026-05', '2026-09', checks, cardPurchases)).toEqual(await livia.monthsOverview(liviaCtx, '2026-05', '2026-09'));
+    // E o estado dos pontos: o zero confirmado de agosto (Recebido) vem do banco.
+    const received = buildEvolutionView({ overview: await livia.monthsOverview(liviaCtx, '2025-11', '2026-10'), metric: 'recebido', windowMonths: 12, currentMonth: '2026-10', hiddenMonths: [] });
+    expect(received.points.find((p) => p.month === '2026-08')).toMatchObject({ state: 'zero_confirmado', valueText: 'R$ 0,00' });
+    expect(received.points.find((p) => p.month === '2026-07')!.state).toBe('sem_registros');
+  });
+
+  it('10. a revisão dos últimos meses lê as marcas: o mês conferido deixa de ser lacuna', async () => {
+    // Rita volta a anotar em 21/05/2033 e, em 07/10/2033, os meses de junho a setembro estão sem anotação.
+    const SETUP = '2033-05-21';
+    const R1 = '2033-10-07';
+    const at = (today: IsoDate) => repoFor(RITA, today);
+    const ritaCtx = (await at(SETUP).getSpace())!.personalContextId;
+    const acc = (await at(SETUP).getSpace())!.accounts[0]!.id;
+    await at(SETUP).createRecord(newOperationKey(), ritaCtx, 'despesa', { accountId: acc, amountCents: 1000, occurredOn: '2033-05-20', description: 'Mercado', category: null });
+    await at(SETUP).createRecord(newOperationKey(), ritaCtx, 'receita', { accountId: acc, amountCents: 5000, occurredOn: '2033-05-21', description: 'Venda', category: null });
+    const load = async () => (await loadReturnReview(at(R1), ritaCtx, R1)).review!;
+    const open = await load();
+    const gaps = open.months.filter((m) => m.missing).map((m) => m.month);
+    expect(gaps).toEqual(['2033-06', '2033-07', '2033-08', '2033-09']);
+    for (const m of ['2033-06', '2033-07']) {
+      await at(R1).setMonthCheck(newOperationKey(), ritaCtx, m, 'recebimentos', 0);
+      await at(R1).setMonthCheck(newOperationKey(), ritaCtx, m, 'pagamentos', 0);
+    }
+    // Agosto: só os gastos conferidos (falta o recebimento); setembro segue aberto.
+    await at(R1).setMonthCheck(newOperationKey(), ritaCtx, '2033-08', 'pagamentos', 0);
+    const after = await load();
+    expect(after.months.filter((m) => m.missing).map((m) => m.month)).toEqual(['2033-08', '2033-09']);
+    expect(after.counts.monthsWithGaps).toBe(2);
+    expect(after.steps.map((s) => s.month)).toEqual(['2033-08', '2033-09']);
+    expect(after.months.find((m) => m.month === '2033-06')!.overview).toMatchObject({ receivedChecked: true, paidChecked: true });
+    // Conferir o resto esvazia a revisão.
+    await at(R1).setMonthCheck(newOperationKey(), ritaCtx, '2033-08', 'recebimentos', 0);
+    for (const kind of ['recebimentos', 'pagamentos'] as const) await at(R1).setMonthCheck(newOperationKey(), ritaCtx, '2033-09', kind, 0);
+    const done = await load();
+    expect(done.isEmpty).toBe(true);
+    // A marca nunca contou como anotação: a última anotação de Rita segue sendo a de 21/05/2033.
+    expect((await at(R1).getReturnReviewState(ritaCtx)).activity).toMatchObject({ lastWriteOn: '2033-05-21' });
+  });
+
+  it('10b. cartão: compra no cartão não é registro de Pago (a marca segue o caixa): só uma compra, só uma fatura paga e só uma importação para o cartão', async () => {
+    // O Pessoal do Pedro, que não tem marca nenhuma. Pago é caixa, pela data do pagamento (D-057 D07): a compra no cartão só entra no Pago
+    // quando a fatura é paga (o pagamento é um registro, no dia em que foi pago). Hoje é 07/10/2026.
+    const ctx = (await pedro.getSpace())!.personalContextId;
+    const card = (await pedro.createCard(newOperationKey(), ctx, { name: 'Cartão do Pedro', lastDigits: '1234', closingDay: 5, dueDay: 15, limitCents: null })).card.id;
+    const month = (m: IsoMonth) => row(pedro, ctx, m);
+    const paidOf = async (m: IsoMonth) => (await totals(pedro, ctx, m))[1];
+    const plan = async (m: IsoMonth, canWrite = true) => monthCheckPlan(await month(m), 'pagamentos', '2026-10', canWrite);
+    const importItem = (name: string, amountCents: number, occurredOn: IsoDate, description: string) => ({
+      importKey: importKey('teste', { date: '2026-01-01', amountCents: 1, description: name, fitId: null }, 0),
+      kind: 'compra' as const,
+      amountCents,
+      occurredOn,
+      description,
+      category: null,
+    });
+
+    // (a) Só uma compra no cartão (fevereiro): nenhum registro de Pago; o mês aceita a marca, ela vale e o aviso aparece.
+    await pedro.addCardPurchase(newOperationKey(), card, { description: 'Compra de fevereiro', category: 'Mercado', purchasedOn: '2026-02-03', totalCents: 25_000, installments: 1 });
+    expect(await month('2026-02')).toMatchObject({ paidCount: 0, paidCents: 0, paidChecked: false, paidCheckVersion: 0, cardPurchaseCount: 1 });
+    expect(await paidOf('2026-02')).toBe(0);
+    expect(await plan('2026-02')).toMatchObject({
+      state: 'sem_registros',
+      version: 0,
+      action: 'Conferi: não houve pagamentos em fevereiro de 2026',
+      cardNotice: 'Há compras no cartão em fevereiro de 2026. Elas entram no Pago quando a fatura é paga.',
+    });
+    expect(await pedro.setMonthCheck(newOperationKey(), ctx, '2026-02', 'pagamentos', 0)).toMatchObject({ checked: true, version: 1 });
+    expect(await month('2026-02')).toMatchObject({ paidChecked: true, paidCheckVersion: 1, cardPurchaseCount: 1 });
+    expect(await plan('2026-02')).toMatchObject({ state: 'conferido', version: 1, cardNotice: expect.stringContaining('Há compras no cartão em fevereiro de 2026') });
+    expect(await paidOf('2026-02')).toBe(0);
+    // Um parcelamento de 3 vezes em março conta uma compra, em março; as parcelas de abril e maio não são compras de abril nem de maio.
+    await pedro.addCardPurchase(newOperationKey(), card, { description: 'Compra parcelada', category: null, purchasedOn: '2026-03-04', totalCents: 30_000, installments: 3 });
+    expect((await pedro.monthsOverview(ctx, '2026-02', '2026-06')).map((r) => r.cardPurchaseCount)).toEqual([1, 1, 0, 0, 0]);
+
+    // (b) Só uma fatura paga (abril): o pagamento de 02/04 é um registro de Pago em abril; marcar pagamentos é recusado, sem aviso.
+    const feb = (await pedro.listInvoiceItems(card)).find((i) => i.month === '2026-02')!;
+    await pedro.payInvoice(newOperationKey(), card, '2026-02', feb.commitmentVersion!, 25_000, '2026-04-02');
+    expect(await month('2026-04')).toMatchObject({ paidCount: 1, paidCents: 25_000, paidChecked: false, cardPurchaseCount: 0 });
+    expect(await paidOf('2026-04')).toBe(25_000);
+    expect(await err(pedro.setMonthCheck(newOperationKey(), ctx, '2026-04', 'pagamentos', 0))).toBe('mes_com_registros');
+    expect(await plan('2026-04')).toMatchObject({ state: 'com_registros', action: null, cardNotice: null });
+    expect((await pedro.setMonthCheck(newOperationKey(), ctx, '2026-04', 'recebimentos', 0)).checked).toBe(true);
+    expect(await paidOf('2026-04')).toBe(25_000);
+    // Fevereiro segue conferido, com o aviso, mesmo com a fatura paga em abril.
+    expect(await month('2026-02')).toMatchObject({ paidChecked: true, cardPurchaseCount: 1 });
+
+    // (c) Só uma importação para o cartão (maio): é uma compra no cartão pela data dela, não um registro de Pago.
+    expect(await pedro.importRecords(newOperationKey(), ctx, 'cartao', card, [importItem('c1', 8_050, '2026-05-08', 'Mercado importado')])).toEqual({ created: 1, skipped: 0 });
+    expect(await month('2026-05')).toMatchObject({ paidCount: 0, paidChecked: false, cardPurchaseCount: 1 });
+    expect(await paidOf('2026-05')).toBe(0);
+    expect(await pedro.setMonthCheck(newOperationKey(), ctx, '2026-05', 'pagamentos', 0)).toMatchObject({ checked: true, version: 1 });
+    expect(await plan('2026-05')).toMatchObject({ state: 'conferido', cardNotice: expect.stringContaining('maio de 2026') });
+    // Excluída a compra, o aviso some (só conta compra viva) e a marca segue valendo, porque nunca dependeu da compra.
+    const bought = (await pedro.listCardEntries(card)).find((e) => e.kind === 'compra' && e.description === 'Mercado importado')!;
+    await pedro.deleteCardEntry(newOperationKey(), bought.id, bought.version);
+    expect(await month('2026-05')).toMatchObject({ paidChecked: true, cardPurchaseCount: 0 });
+    expect((await plan('2026-05')).cardNotice).toBeNull();
+    // Uma compra importada num mês com registro de Pago: o aviso aparece nos dados, mas a marca não vale (o registro vence).
+    await pedro.importRecords(newOperationKey(), ctx, 'cartao', card, [importItem('c2', 1_500, '2026-04-20', 'Compra de abril importada')]);
+    expect(await month('2026-04')).toMatchObject({ paidCount: 1, paidChecked: false, cardPurchaseCount: 1 });
+    expect(await plan('2026-04')).toMatchObject({ state: 'com_registros', cardNotice: null });
+    // Outra pessoa não vê as compras no cartão do Pedro (a leitura é do contexto).
+    expect(await err(livia.monthsOverview(ctx, '2026-02', '2026-02'))).toBe('sem_permissao');
+    expect(adminSql(`select coalesce(string_agg(to_char(month, 'YYYY-MM') || ' ' || kind || ' v' || version || case when checked then ' on' else ' off' end, '; ' order by month, kind), '-') from public.month_checks where context_id = '${ctx}'`))
+      .toBe('2026-02 pagamentos v1 on; 2026-04 recebimentos v1 on; 2026-05 pagamentos v1 on');
+  });
+
+  it('11. excluir a conta: o Pessoal some com as marcas; na Casa, a marca fica, com a autoria "Pessoa que saiu"', async () => {
+    const before = marks(fam);
+    expect(before).toBe('2026-07 pagamentos v1; 2026-08 recebimentos v1');
+    // Nádia (leitora) não marca; Lívia é titular e tem a Casa com outra pessoa ativa (Nádia): precisa passar a titularidade antes.
+    expect(await err(livia.deleteMyAccount(DELETE_CONFIRMATION_WORD, newOperationKey()))).toBe('transferir_antes');
+    // Mário voltou como membro para marcar e depois excluir a conta.
+    await livia.createFamilyInvite(newOperationKey(), fam, 'membro').then(async (w) => mario.acceptFamilyInvite(newOperationKey(), w.code!));
+    await mario.setMonthCheck(newOperationKey(), fam, '2026-05', 'recebimentos', 0);
+    const marioCtx = (await mario.getSpace())!.personalContextId;
+    await mario.setMonthCheck(newOperationKey(), marioCtx, '2026-05', 'pagamentos', 0);
+    expect(marks(marioCtx)).toBe('2026-05 pagamentos v1');
+    await mario.deleteMyAccount(DELETE_CONFIRMATION_WORD, newOperationKey());
+    expect(adminSql(`select count(*) from public.month_checks where context_id = '${marioCtx}'`)).toBe('0');
+    expect(marks(fam)).toBe('2026-05 recebimentos v1; 2026-07 pagamentos v1; 2026-08 recebimentos v1');
+    expect(adminSql(`select (deleted_at is not null)::text || ':' || display_name from public.persons where id = '${MARIO}'`)).toBe('true:');
+    // Quem fica lê as marcas; a Família mostra a autoria anônima.
+    expect(await flags(livia, fam, '2026-05')).toEqual([true, false, 0, 0]);
+    expect((await livia.getFamily())!.members.find((m) => m.personId === MARIO)).toMatchObject({ firstName: FAMILY_DEPARTED_NAME, status: 'ex-membro' });
   });
 });

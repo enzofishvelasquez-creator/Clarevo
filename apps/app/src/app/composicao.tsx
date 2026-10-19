@@ -1,9 +1,10 @@
-import { BUDGET_TEXT, CARDS_TEXT, ERROR_TEXT, formatBRL, formatMonthBR, payablesMonthParams, type CategoryShare } from '@clarevo/core';
+import { BUDGET_TEXT, CARDS_TEXT, ERROR_TEXT, MONTH_CHECK_TEXT, formatBRL, formatMonthBR, monthCheckPlan, payablesMonthParams, type CategoryShare, type MonthCheckKind } from '@clarevo/core';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { Check, Minus, Plus } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
+import { MonthCheckBlock } from '@/components/month-check';
 import { RecordRow } from '@/components/record-row';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
@@ -12,7 +13,7 @@ import { TopicLink } from '@/components/topic-link';
 import { Button, Card, FitMoney, LinkButton, Money, Screen, Skeleton, spaceKeyPress, Txt } from '@/components/ui';
 import { maskMoneyLabel, useValuesHidden } from '@/lib/privacy';
 import { useSession } from '@/state/session';
-import { currentMonthOf, useCategoryBreakdown, useMonthBudget, useMonthRecords, useWork, useView } from '@/state/data';
+import { currentMonthOf, useCategoryBreakdown, useMonthBudget, useMonthCheckRow, useMonthRecords, useWork, useView } from '@/state/data';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
 const COPY = {
@@ -46,6 +47,10 @@ function Composicao({ kind, byCategory: startByCategory }: { kind: keyof typeof 
   const personal = useWork().data;
   const records = useMonthRecords(personal?.contextId, month);
   const s = records.summary;
+  // "Conferi este mês" (D-060): num mês já terminado sem registros do tipo, a pessoa confere que não houve; a leitura é a de months_overview.
+  const currentMonth = currentMonthOf(today);
+  const checks = useMonthCheckRow(month < currentMonth ? personal?.contextId : undefined, month);
+  const canWrite = personal?.canWrite ?? true;
   // "Por categoria" só existe em Pago (spec4 §2.2); a escolha fica só nesta tela.
   // A busca de Aprender (grupo "No app") abre já em "Por categoria" (?vista=categoria).
   const [breakdown, setBreakdown] = useState<Breakdown>(startByCategory ? 'categoria' : 'registro');
@@ -123,21 +128,35 @@ function Composicao({ kind, byCategory: startByCategory }: { kind: keyof typeof 
             />
           )
         ) : (
-          sections.map((sec) => (
+          sections.map((sec) => {
+            // Só o mês terminado, sem registros do tipo, e com a leitura da conferência carregada (nunca um "conferido" que não foi lido).
+            const kind: MonthCheckKind = sec.kind === 'receita' ? 'recebimentos' : 'pagamentos';
+            const plan = sec.list.length === 0 && checks.row ? monthCheckPlan(checks.row, kind, currentMonth, canWrite) : null;
+            return (
             <Card key={sec.label}>
               <View style={styles.head}>
                 <Txt variant="title">{sec.label}</Txt>
                 <Money cents={sec.total} variant="title" />
               </View>
               {sec.list.length === 0 ? (
-                <EmptyState title="Nenhum registro neste critério" action={emptyAction(sec.kind)} />
+                <EmptyState
+                  title="Nenhum registro neste critério"
+                  action={
+                    <View style={{ gap: space[3], alignSelf: 'stretch' }}>
+                      <MonthCheckBlock contextId={personal?.contextId} plan={plan} />
+                      {plan?.state === 'conferido' ? null : emptyAction(sec.kind)}
+                    </View>
+                  }>
+                  {plan?.state === 'sem_registros' ? MONTH_CHECK_TEXT.unchecked(kind) : undefined}
+                </EmptyState>
               ) : (
                 sec.list.map((r, i) => (
                   <RecordRow key={r.id} record={r} last={i === sec.list.length - 1} onPress={() => router.push(`/registro/${r.id}`)} />
                 ))
               )}
             </Card>
-          ))
+            );
+          })
         )}
 
         <TopicLink slug="diferenca" label="Como este total é calculado?" color={colors.textSecondary} />

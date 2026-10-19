@@ -107,6 +107,7 @@ import {
   type LimitWatchMonth,
   type MonthBudgetLine,
   type NewGoalInput,
+  type MonthCheckKind,
   type OccurrenceMode,
   type PaymentInput,
   type PersonalSpace,
@@ -308,6 +309,17 @@ export function useMonthsOverview(contextId: string | undefined, from: IsoMonth,
     queryFn: () => repo.monthsOverview(contextId!, from, to),
     enabled: Boolean(contextId),
   });
+}
+
+/**
+ * A linha de `months_overview` de um mês (D-060, "Conferi este mês"): a contagem de recebimentos e de gastos e as marcas que valem, para a
+ * tela de Pago e Recebido do mês e para a revisão dos últimos meses. A mesma chave da Evolução ('records', 'overview'), então toda
+ * escrita de registro e toda marca nova recarregam. `undefined` enquanto carrega ou se a leitura falhou: a tela não mostra a conferência
+ * sem ela (nunca um "conferido" que não foi lido).
+ */
+export function useMonthCheckRow(contextId: string | undefined, month: IsoMonth) {
+  const query = useMonthsOverview(contextId, month, month);
+  return { ...query, row: query.data?.find((r) => r.month === month) };
 }
 
 /**
@@ -861,6 +873,46 @@ export function useDecideReturnReview() {
         return { state, review: returnWindow(state, today) ? old.review : null };
       });
       qc.invalidateQueries({ queryKey: ['returnReview'] });
+    },
+  });
+}
+
+/**
+ * "Conferi este mês" e "Desfazer a conferência" (D-060): a marca de um mês fechado sem recebimentos ou sem pagamentos (o tipo de Pago). Manda a versão que a tela leu; confirmada pelo
+ * servidor, recarrega as leituras que mostram o mês (Evolução, Pago e Recebido, revisão dos últimos meses). A marca não muda nenhum
+ * total nem conta como anotação, então só `months_overview` e a revisão precisam recarregar, e nada mais.
+ */
+function useInvalidateMonthChecks() {
+  const qc = useQueryClient();
+  return () => {
+    qc.invalidateQueries({ queryKey: ['records', 'overview'] });
+    qc.invalidateQueries({ queryKey: ['returnReview'] });
+  };
+}
+
+export function useSetMonthCheck() {
+  const repo = useRepo();
+  const invalidate = useInvalidateMonthChecks();
+  return useMutation({
+    mutationFn: (v: { key: string; contextId: string; month: IsoMonth; kind: MonthCheckKind; expectedVersion: number }) =>
+      repo.setMonthCheck(v.key, v.contextId, v.month, v.kind, v.expectedVersion),
+    onSuccess: invalidate,
+    // Algo mudou em outro aparelho (já marcado, ou já com registro): a tela recarrega e mostra o que está valendo.
+    onError: (e) => {
+      if (isRepoError(e, 'versao_desatualizada') || isRepoError(e, 'mes_com_registros')) invalidate();
+    },
+  });
+}
+
+export function useClearMonthCheck() {
+  const repo = useRepo();
+  const invalidate = useInvalidateMonthChecks();
+  return useMutation({
+    mutationFn: (v: { key: string; contextId: string; month: IsoMonth; kind: MonthCheckKind; expectedVersion: number }) =>
+      repo.clearMonthCheck(v.key, v.contextId, v.month, v.kind, v.expectedVersion),
+    onSuccess: invalidate,
+    onError: (e) => {
+      if (isRepoError(e, 'versao_desatualizada')) invalidate();
     },
   });
 }
@@ -1508,7 +1560,8 @@ export function useEssentialEstimate(contextId: string | undefined) {
 /**
  * "Seu mês em 30 segundos" (D-052): os cartões do mês, montados no core (`buildSeuMes`) com as leituras que o Resumo, Contas a pagar, o
  * orçamento e as metas já fazem (as mesmas chaves: toda escrita recarrega). O mês anterior entra só para a comparação em "Para onde
- * foi". Sem dado parcial: uma falha de qualquer leitura falha tudo, nunca um cartão com zero no lugar do valor.
+ * foi". Num mês que passou, lê também a marca "Conferi este mês" (a frase do mês vazio e conferido). Sem dado parcial: uma falha de
+ * qualquer leitura falha tudo, nunca um cartão com zero no lugar do valor.
  */
 export function useSeuMes(contextId: string | undefined, month: IsoMonth) {
   const { today } = useSession();
@@ -1519,10 +1572,14 @@ export function useSeuMes(contextId: string | undefined, month: IsoMonth) {
   const budget = useMonthBudget(contextId, month);
   const goals = useGoals(contextId);
   const movements = useGoalMovementsInMonth(contextId, month);
-  const parts: QueryPart[] = [records, breakdown, previous, commitments, budget, goals, movements];
+  // "Conferi este mês" (D-060): só num mês que passou, e só ele pode estar conferido; sem a leitura, nunca um "conferido" que não foi lido.
+  const needsCheck = month < monthOf(today);
+  const checks = useMonthCheckRow(needsCheck ? contextId : undefined, month);
+  const parts: QueryPart[] = [records, breakdown, previous, commitments, budget, goals, movements, ...(needsCheck ? [checks] : [])];
   const ready = parts.every((p) => p.isSuccess);
   const summary = records.summary;
   const toPay = commitments.summary;
+  const paidChecked = needsCheck ? checks.row?.paidChecked === true : false;
   const value = useMemo((): SeuMesView | undefined => {
     if (!ready || !summary || !toPay || !breakdown.data || !previous.data || !goals.data || !movements.data) return undefined;
     return buildSeuMes({
@@ -1534,8 +1591,9 @@ export function useSeuMes(contextId: string | undefined, month: IsoMonth) {
       toPay,
       budget: budget.summary,
       goals: { count: goals.data.length, savedInMonthCents: savedInMonth(movements.data, month), plannedCents: plannedForGoals(goals.data) },
+      paidChecked,
     });
-  }, [ready, month, today, summary, toPay, breakdown.data, previous.data, budget.summary, goals.data, movements.data]);
+  }, [ready, month, today, summary, toPay, breakdown.data, previous.data, budget.summary, goals.data, movements.data, paidChecked]);
   return combineParts<SeuMesView>(parts, value);
 }
 
@@ -2046,6 +2104,8 @@ function useInvalidateCard() {
     qc.invalidateQueries({ queryKey: ['commitment'] });
     // Compra, estorno e exclusão de lançamento mudam o usado no mês do orçamento (a competência vem dos lançamentos).
     qc.invalidateQueries({ queryKey: BUDGET_MONTH_KEY });
+    // E as compras no cartão do mês que months_overview conta (o aviso de "Conferi este mês": compra no cartão não entra em Pago).
+    qc.invalidateQueries({ queryKey: ['records', 'overview'] });
     if ('record' in w) {
       qc.invalidateQueries({ queryKey: ['records'] });
       qc.invalidateQueries({ queryKey: ['record', w.record.id] });

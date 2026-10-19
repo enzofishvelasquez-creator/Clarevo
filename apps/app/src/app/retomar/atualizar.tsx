@@ -1,6 +1,8 @@
 import {
   ACCOUNTS_TEXT,
   RETURN_TEXT,
+  monthCheckPlan,
+  monthOf,
   batchEligible,
   groupActions,
   lastClosedMonth,
@@ -38,6 +40,7 @@ import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
+import { MonthCheckBlock } from '@/components/month-check';
 import {
   PayRowError,
   codeOf,
@@ -652,9 +655,12 @@ export default function AtualizarMeses() {
                     <MoneyTxt variant="label" style={tabular}>
                       {RETURN_TEXT.receiptsLine(overview)}
                     </MoneyTxt>
+                    {/* "Conferi este mês" (D-060): o mês sem recebimentos (ou sem gastos) que a pessoa confere deixa de ser lacuna. */}
+                    <MonthCheckBlock contextId={ctx} plan={monthCheckPlan(overview, 'recebimentos', monthOf(today), personal?.canWrite ?? true)} />
                     <MoneyTxt variant="label" style={tabular}>
                       {RETURN_TEXT.expensesLine(overview)}
                     </MoneyTxt>
+                    <MonthCheckBlock contextId={ctx} plan={monthCheckPlan(overview, 'pagamentos', monthOf(today), personal?.canWrite ?? true)} />
                   </>
                 ) : null}
                 <View style={styles.actions}>

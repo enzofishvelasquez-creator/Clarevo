@@ -714,7 +714,7 @@ end $$;
 reset role;
 
 -- ---------------------------------------------------------------------------
--- 8. record_operations: as quatro ações novas apontam só para a linha (target_id); a lista vigente tem 63 ações.
+-- 8. record_operations: as quatro ações novas apontam só para a linha (target_id); a lista vigente tem 65 ações.
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -752,16 +752,16 @@ begin
             'criar_compra_cartao', 'criar_compromisso', 'criar_conta', 'criar_convite_familia', 'criar_encargo_cartao',
             'criar_estorno_cartao', 'criar_familia', 'criar_meta', 'criar_ocorrencia', 'criar_serie', 'decidir_revisao',
             'definir_limite_comprometimento', 'definir_orcamento_categoria', 'definir_renda_referencia', 'desfazer_pagamento',
-            'desfazer_pagamento_fatura', 'editar', 'editar_compromisso', 'encerrar_familia', 'encerrar_licenca',
+            'desfazer_pagamento_fatura', 'desmarcar_mes_conferido', 'editar', 'editar_compromisso', 'encerrar_familia', 'encerrar_licenca',
             'encerrar_serie', 'excluir', 'excluir_cartao', 'excluir_compromisso', 'excluir_conta',
             'excluir_lancamento_cartao', 'excluir_limite_comprometimento', 'excluir_meta', 'excluir_movimento_meta',
             'excluir_orcamento_categoria', 'excluir_renda_referencia', 'excluir_serie', 'importar_extrato', 'informar_ano',
-            'marcar_assinatura', 'pagar_compromisso', 'pagar_fatura', 'registrar_movimento_meta', 'remover_membro_familia',
+            'marcar_assinatura', 'marcar_mes_conferido', 'pagar_compromisso', 'pagar_fatura', 'registrar_movimento_meta', 'remover_membro_familia',
             'renovar_convite_licenca', 'responder_guardar', 'revisar_assinaturas', 'sair_familia', 'situacao_cartao',
             'situacao_conta', 'situacao_meta', 'tirar_ano', 'transferir_titularidade_familia'],
-    'as 63 ações vigentes (com as 4 de orçamento e limite, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas; as outras, testadas em 30 a 70)';
+    'as 65 ações vigentes (com as 4 de orçamento e limite, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas; as outras, testadas em 30 a 70)';
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-           where c.conname = 'record_operations_action_check') = 63, '63 ações';
+           where c.conname = 'record_operations_action_check') = 65, '65 ações';
   -- Toda operação nova aponta para uma linha do mesmo contexto; a exclusão, para uma linha excluída.
   assert not exists (select 1 from public.record_operations o
                       where o.action in ('definir_orcamento_categoria', 'excluir_orcamento_categoria')
@@ -911,7 +911,7 @@ do $$ begin
   assert (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
     = array['accept_family_invite', 'accept_license', 'add_card_charge', 'add_card_purchase', 'add_card_refund',
-            'add_goal_movement', 'cancel_family_invite', 'cancel_license_invite', 'context_permission', 'create_account',
+            'add_goal_movement', 'cancel_family_invite', 'cancel_license_invite', 'clear_month_check', 'context_permission', 'create_account',
             'create_card', 'create_commitment', 'create_family', 'create_family_invite', 'create_goal', 'create_record',
             'create_series', 'create_series_occurrence', 'decide_return_review', 'delete_account', 'delete_card',
             'delete_card_entry', 'delete_category_budget', 'delete_commitment', 'delete_commitment_limit', 'delete_goal',
@@ -922,7 +922,7 @@ do $$ begin
             'months_overview', 'my_today', 'organization_usage', 'pay_commitment', 'pay_invoice', 'preview_family_invite',
             'preview_license_invite', 'remove_family_member', 'renew_license_invite', 'set_account_status', 'set_card_status',
             'set_category_budget', 'set_commitment_limit', 'set_default_account', 'set_goal_status', 'set_income_reference',
-            'set_member_role', 'set_savings_answer', 'set_series_subscription', 'skip_series_year', 'sync_series_occurrences',
+            'set_member_role', 'set_month_check', 'set_savings_answer', 'set_series_subscription', 'skip_series_year', 'sync_series_occurrences',
             'transfer_family_ownership', 'undo_commitment_payment', 'undo_invoice_payment', 'update_account', 'update_card',
             'update_card_entry', 'update_commitment', 'update_goal', 'update_goal_movement', 'update_record',
             'update_series_from'],

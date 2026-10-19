@@ -142,7 +142,8 @@ create function pg_temp.money_oct(p_ctx text) returns text language sql as $$
     union all select 3, (select to_jsonb(t)::text from public.month_to_pay(pg_temp.id(p_ctx), '2026-10-01') t)
     union all select 4, (select to_jsonb(t)::text from public.month_committed(pg_temp.id(p_ctx), '2026-09-01') t)
     union all select 5, (select to_jsonb(t)::text from public.month_committed(pg_temp.id(p_ctx), '2026-10-01') t)
-    union all select 6, (select jsonb_agg(to_jsonb(o) order by o.month)::text
+    -- Sem card_purchase_count (0016): ele só informa as compras no cartão pela data da compra e muda com cada compra, sem entrar em Pago.
+    union all select 6, (select jsonb_agg((to_jsonb(o) - 'card_purchase_count') order by o.month)::text
                            from public.months_overview(pg_temp.id(p_ctx), '2026-08-01', '2026-10-01') o)) s
 $$;
 
@@ -1918,7 +1919,7 @@ reset role;
 
 -- ---------------------------------------------------------------------------
 -- 10. record_operations: as onze ações de cartão apontam para o cartão (target_id); as cinco de lançamento também para o
--- lançamento (entry_id); pagar e desfazer a fatura, também para a conta da fatura e o gasto; a lista vigente tem 63 ações (37, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas).
+-- lançamento (entry_id); pagar e desfazer a fatura, também para a conta da fatura e o gasto; a lista vigente tem 65 ações (37, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, e as 2 de conferir o mês, testadas em 48).
 -- Uma operação por escrita. Atividade (A4): toda ação de cartão é anotação de quem a fez no contexto.
 -- ---------------------------------------------------------------------------
 reset role;
@@ -1987,7 +1988,7 @@ begin
     = array['alterar_cartao', 'alterar_lancamento_cartao', 'criar_cartao', 'criar_compra_cartao', 'criar_encargo_cartao', 'criar_estorno_cartao',
             'desfazer_pagamento_fatura', 'excluir_cartao', 'excluir_lancamento_cartao', 'pagar_fatura', 'situacao_cartao'], 'as 11 ações de cartão';
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-           where c.conname = 'record_operations_action_check') = 63, 'a lista vigente tem 63 ações (37, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas)';
+           where c.conname = 'record_operations_action_check') = 65, 'a lista vigente tem 65 ações (37, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, e as 2 de conferir o mês, testadas em 48)';
 
   -- Cada operação aponta para um cartão do mesmo contexto; a de lançamento, para um lançamento do mesmo cartão; a de fatura, para
   -- a conta e o gasto daquele cartão.
@@ -2805,7 +2806,7 @@ do $$ begin
   assert (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
     = array['accept_family_invite', 'accept_license', 'add_card_charge', 'add_card_purchase', 'add_card_refund',
-            'add_goal_movement', 'cancel_family_invite', 'cancel_license_invite', 'context_permission', 'create_account',
+            'add_goal_movement', 'cancel_family_invite', 'cancel_license_invite', 'clear_month_check', 'context_permission', 'create_account',
             'create_card', 'create_commitment', 'create_family', 'create_family_invite', 'create_goal', 'create_record',
             'create_series', 'create_series_occurrence', 'decide_return_review', 'delete_account', 'delete_card',
             'delete_card_entry', 'delete_category_budget', 'delete_commitment', 'delete_commitment_limit', 'delete_goal',
@@ -2816,7 +2817,7 @@ do $$ begin
             'months_overview', 'my_today', 'organization_usage', 'pay_commitment', 'pay_invoice', 'preview_family_invite',
             'preview_license_invite', 'remove_family_member', 'renew_license_invite', 'set_account_status', 'set_card_status',
             'set_category_budget', 'set_commitment_limit', 'set_default_account', 'set_goal_status', 'set_income_reference',
-            'set_member_role', 'set_savings_answer', 'set_series_subscription', 'skip_series_year', 'sync_series_occurrences',
+            'set_member_role', 'set_month_check', 'set_savings_answer', 'set_series_subscription', 'skip_series_year', 'sync_series_occurrences',
             'transfer_family_ownership', 'undo_commitment_payment', 'undo_invoice_payment', 'update_account', 'update_card',
             'update_card_entry', 'update_commitment', 'update_goal', 'update_goal_movement', 'update_record',
             'update_series_from'],

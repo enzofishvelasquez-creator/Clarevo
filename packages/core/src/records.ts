@@ -350,13 +350,51 @@ export interface SavingsCheck {
   updatedAt: string;
 }
 
-/** Recebimentos e gastos anotados num mês (months_overview, mesmo critério de month_totals). */
+/**
+ * "Conferi este mês" (D-060, item 2; resolve P-022): o que a pessoa conferiu num mês já terminado. 'recebimentos': não houve
+ * recebimentos; 'pagamentos': não houve pagamentos (a base de Pago: caixa, pela data do pagamento, D-057 D07; compra no cartão só
+ * entra quando a fatura é paga). Dois tipos separados, com a marca de cada um por contexto e mês (month_checks).
+ */
+export type MonthCheckKind = 'recebimentos' | 'pagamentos';
+
+/** Os dois tipos de marca, na ordem em que as telas os mostram (Recebido e depois Pago). */
+export const MONTH_CHECK_KINDS: readonly MonthCheckKind[] = ['recebimentos', 'pagamentos'];
+
+/**
+ * Resultado de set_month_check e clear_month_check: o estado da marca do contexto, mês e tipo depois da escrita (e, numa repetição
+ * da mesma chave, o estado de agora). A marca é uma linha persistente por contexto, mês e tipo, com a versão crescente: a primeira
+ * marcação cria a linha na versão 1, e cada marcar e cada desmarcar soma 1. `checked` falso: sem marca (checkedAt nulo), com a
+ * versão da linha desligada (0 quando nunca houve linha). Marcar espera a versão que a pessoa leu (0 sem linha) e desmarcar espera
+ * a versão da linha ligada.
+ */
+export interface MonthCheck {
+  contextId: string;
+  month: IsoMonth;
+  kind: MonthCheckKind;
+  checked: boolean;
+  version: number;
+  checkedAt: string | null;
+}
+
+/**
+ * Recebimentos e gastos anotados num mês (months_overview, mesmo critério de month_totals), com a marca "Conferi este mês" de cada
+ * tipo. `receivedChecked` e `paidChecked`: a marca do tipo está ligada no mês E o mês não tem registro do tipo (a marca deixa de
+ * valer, sem ser desligada, quando aparece um registro, e volta a valer quando ele sai). `receivedCheckVersion` e `paidCheckVersion`:
+ * a versão da linha da marca (0 sem linha), a que o app manda ao marcar e desmarcar. `cardPurchaseCount`: compras no cartão vivas
+ * pela data da compra no mês, inclusive as importadas; só informa (compra no cartão não entra em Pago, só o pagamento da fatura).
+ * Ausentes valem falso, 0 e 0 (linha de um banco sem a 0016, ou montada à mão).
+ */
 export interface MonthOverview {
   month: IsoMonth;
   receivedCount: number;
   receivedCents: Cents;
   paidCount: number;
   paidCents: Cents;
+  receivedChecked?: boolean;
+  paidChecked?: boolean;
+  receivedCheckVersion?: number;
+  paidCheckVersion?: number;
+  cardPurchaseCount?: number;
 }
 
 /** create_series_occurrence: a conta do mês passado fica em aberto ou registrada como "não houve". */

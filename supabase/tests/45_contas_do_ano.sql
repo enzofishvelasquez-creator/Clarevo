@@ -1249,7 +1249,7 @@ do $$ begin
   assert (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
     = array['accept_family_invite', 'accept_license', 'add_card_charge', 'add_card_purchase', 'add_card_refund',
-            'add_goal_movement', 'cancel_family_invite', 'cancel_license_invite', 'context_permission', 'create_account',
+            'add_goal_movement', 'cancel_family_invite', 'cancel_license_invite', 'clear_month_check', 'context_permission', 'create_account',
             'create_card', 'create_commitment', 'create_family', 'create_family_invite', 'create_goal', 'create_record',
             'create_series', 'create_series_occurrence', 'decide_return_review', 'delete_account', 'delete_card',
             'delete_card_entry', 'delete_category_budget', 'delete_commitment', 'delete_commitment_limit', 'delete_goal',
@@ -1260,7 +1260,7 @@ do $$ begin
             'months_overview', 'my_today', 'organization_usage', 'pay_commitment', 'pay_invoice', 'preview_family_invite',
             'preview_license_invite', 'remove_family_member', 'renew_license_invite', 'set_account_status', 'set_card_status',
             'set_category_budget', 'set_commitment_limit', 'set_default_account', 'set_goal_status', 'set_income_reference',
-            'set_member_role', 'set_savings_answer', 'set_series_subscription', 'skip_series_year', 'sync_series_occurrences',
+            'set_member_role', 'set_month_check', 'set_savings_answer', 'set_series_subscription', 'skip_series_year', 'sync_series_occurrences',
             'transfer_family_ownership', 'undo_commitment_payment', 'undo_invoice_payment', 'update_account', 'update_card',
             'update_card_entry', 'update_commitment', 'update_goal', 'update_goal_movement', 'update_record',
             'update_series_from'],
