@@ -7,9 +7,12 @@
     "icon": "./assets/images/icon.png",
     "scheme": "clarevo",
     "userInterfaceStyle": "light",
+    "backgroundColor": "#2457F5",
     "ios": {
       "icon": "./assets/images/icon.png",
-      "bundleIdentifier": "app.clarevo"
+      "bundleIdentifier": "app.clarevo",
+      "buildNumber": "1",
+      "supportsTablet": false
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +22,13 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "app.clarevo"
+      "package": "app.clarevo",
+      "versionCode": 1,
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
     },
     "web": {
       "output": "single",
