@@ -1,9 +1,10 @@
 import type { Topic } from '../types';
-import { BCB_CADERNO, CVM_EMERGENCIAS, CVM_GUIA, CVM_RESERVAS, REVIEWED_ON, bcb, clarevo, mercado, oficial } from './common';
+import { BCB_CADERNO, CVM_EMERGENCIAS, CVM_GUIA, CVM_RESERVAS, MEDIA_REVIEWED_ON, REVIEWED_ON, bcb, clarevo, mercado, oficial, oficialMedia } from './common';
 
 /**
- * Seção "Organizar o mês" (Anexo A, temas 1, 2, 3 e 5, com os ajustes de spec3 §3.4 e da conferência de fontes) e os
- * temas dos Ciclos B (renda comprometida e renda que muda) e C (aporte e gastos essenciais).
+ * Seção "Organizar o mês" (Anexo A, temas 1, 2, 3 e 5, com os ajustes de spec3 §3.4 e da conferência de fontes), os
+ * temas dos Ciclos B (renda comprometida e renda que muda) e C (aporte e gastos essenciais) e "Média e mediana" (Ciclo W,
+ * D-062), que explica os dois números da tela Evolução. Os temas de época ficam em `epoca.ts`, logo depois destes.
  */
 export const ORGANIZAR_TOPICS: Topic[] = [
   {
@@ -318,6 +319,48 @@ export const ORGANIZAR_TOPICS: Topic[] = [
       clarevo('D-027'),
     ],
     reviewedOn: REVIEWED_ON,
+    reviewEveryMonths: 12,
+  },
+  {
+    slug: 'media-e-mediana',
+    section: 'organizar',
+    kind: 'tema',
+    status: 'publicado',
+    title: 'Média e mediana',
+    subtitle: 'Dois jeitos de resumir vários meses',
+    question: 'Qual a diferença entre média e mediana?',
+    short:
+      'A média soma os valores e divide pela quantidade deles. A mediana é o valor do meio, com os valores em ordem. Um mês muito diferente dos outros puxa a média e mexe pouco na mediana.',
+    paragraphs: [
+      'Para resumir vários valores em um número só, há duas medidas comuns, que o IBGE chama de medidas de tendência central. A média soma todos os valores e divide pela quantidade deles. A mediana põe os valores em ordem e pega o do meio; com quantidade par de valores, é a média dos dois do meio.',
+      'A diferença aparece quando um valor foge dos outros. Todos os valores entram na média, então um mês bem maior ou bem menor puxa o resultado para o lado dele. A mediana depende da posição dos valores, e não do tamanho dos extremos: o IBGE diz que ela pode dar um valor típico do conjunto, porque não é afetada por valores extremos.',
+      'Na Evolução, o Clarevo mostra as duas lado a lado para o Recebido ou o Pago dos meses da comparação. Uma não é melhor que a outra: as duas respondem a perguntas diferentes. A média diz quanto cada mês teria se todos fossem iguais, e a mediana diz o valor do meio. Se as duas ficam distantes, olhe o mês que mais se afasta dos outros.',
+      'Ao tirar um mês da comparação, as duas contas são refeitas sem ele, e nenhum lançamento muda. O mês em andamento e os meses sem registros ficam de fora; o mês conferido, sem lançamentos, entra como zero.',
+    ],
+    example:
+      'Pago de janeiro a junho: R$ 3.200,00, R$ 3.400,00, R$ 3.300,00, R$ 7.800,00 (abril, com um conserto), R$ 3.450,00 e R$ 3.600,00. A média é R$ 4.125,00. Em ordem, os dois do meio são R$ 3.400,00 e R$ 3.450,00, e a mediana é R$ 3.425,00. Sem abril, a média é R$ 3.390,00 e a mediana, R$ 3.400,00.',
+    calculation:
+      '3.200,00 + 3.400,00 + 3.300,00 + 7.800,00 + 3.450,00 + 3.600,00 = 24.750,00 · 24.750,00 ÷ 6 = 4.125,00 · em ordem: 3.200,00, 3.300,00, 3.400,00, 3.450,00, 3.600,00 e 7.800,00 · (3.400,00 + 3.450,00) ÷ 2 = 3.425,00 · sem abril: 16.950,00 ÷ 5 = 3.390,00 · o valor do meio de 3.200,00, 3.300,00, 3.400,00, 3.450,00 e 3.600,00 é 3.400,00.',
+    hypotheses: 'Exemplo fictício: Pago de seis meses fechados, todos com lançamentos. O conserto de abril é um gasto pontual.',
+    facts: [],
+    keywords: ['média', 'mediana', 'média e mediana', 'valor do meio', 'valor típico', 'tendência central', 'mês diferente dos outros', 'média dos meses', 'comparar meses'],
+    related: ['renda-variavel', 'essenciais', 'sem-registro'],
+    sources: [
+      oficialMedia(
+        'IBGE',
+        'A Mediana (Educa Jovens)',
+        'https://educa.ibge.gov.br/jovens/conheca-o-brasil/populacao/17870-a-mediana.html',
+        'A mediana é o valor que está exatamente no meio de um conjunto de dados ordenados; com quantidade par de valores, é a média aritmética dos dois valores centrais (posições n/2 e n/2 + 1); pode dar um valor típico do conjunto porque não é afetada por valores extremos. Trecho de resultado de busca; a página não abriu',
+      ),
+      oficialMedia(
+        'IBGE',
+        'A Média Aritmética (Educa Jovens)',
+        'https://educa.ibge.gov.br/jovens/conheca-o-brasil/populacao/17862-media-pagina-inicial.html',
+        'Média aritmética simples: soma dos valores dividida pelo número de observações; é medida de tendência central, ao lado da moda e da mediana; fica entre o menor e o maior valor, e todos os valores entram no cálculo. Trecho de resultado de busca; a página não abriu',
+      ),
+      clarevo('D-057', 'D-062'),
+    ],
+    reviewedOn: MEDIA_REVIEWED_ON,
     reviewEveryMonths: 12,
   },
 ];

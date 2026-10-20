@@ -23,6 +23,7 @@ import {
   installmentCents,
   iofCents,
   lateChargesCents,
+  medianCents,
   monthlyShareCents,
   monthsToReach,
   percentTenths,
@@ -301,6 +302,30 @@ describe('learn/math: bordas', () => {
     expect(monthsToReach(0, 100)).toBe(0);
     expect(monthsToReach(-5, 100)).toBe(0);
     expect(averageCents([1, 2])).toBe(2);
+  });
+
+  it('medianCents (Ciclo W, D-062): o valor do meio, ou a média dos dois do meio com metade para cima, sem depender da ordem de entrada', () => {
+    expect(medianCents([5])).toBe(5);
+    expect(medianCents([9, 1, 5])).toBe(5);
+    expect(medianCents([4, 1, 3, 2])).toBe(3); // (2 + 3) ÷ 2 = 2,5 → 3
+    expect(medianCents([1, 2])).toBe(2);
+    expect(medianCents([1, 1])).toBe(1);
+    expect(medianCents([0, 0, 0])).toBe(0);
+    // O caso de referência da Evolução: seis meses de Pago e as mesmas contas sem abril.
+    expect(medianCents([320_000, 340_000, 330_000, 780_000, 345_000, 360_000])).toBe(342_500);
+    expect(medianCents([320_000, 340_000, 330_000, 345_000, 360_000])).toBe(340_000);
+    // Um valor muito maior move a média e não a posição do meio.
+    expect(medianCents([320_000, 340_000, 330_000, 7_800_000, 345_000, 360_000])).toBe(342_500);
+    // Não mexe na lista de entrada.
+    const input = [3, 1, 2];
+    medianCents(input);
+    expect(input).toEqual([3, 1, 2]);
+    // Sem passar por ponto flutuante: dois valores perto do limite seguro somam mais que Number.MAX_SAFE_INTEGER.
+    expect(medianCents([Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER - 1])).toBe(Number.MAX_SAFE_INTEGER);
+    expect(() => medianCents([])).toThrow(RangeError);
+    expect(() => medianCents([1, -2])).toThrow(RangeError);
+    expect(() => medianCents([1, 2.5])).toThrow(RangeError);
+    expect(() => medianCents([1, Number.NaN])).toThrow(RangeError);
   });
 
   it('sacTotals distribui os centavos que sobram nas primeiras amortizações', () => {

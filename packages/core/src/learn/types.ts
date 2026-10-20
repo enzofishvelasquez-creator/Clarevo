@@ -8,8 +8,8 @@ import type { IsoDate } from '../dates';
 export type LearnSectionId = 'usar' | 'organizar' | 'juros' | 'tempo' | 'duvidas';
 
 /**
- * Os 46 temas do catálogo, na ordem das seções (spec3 §3.3, com os temas dos Ciclos B, C e D e os quatro de época do
- * Ciclo K2, D-053). Um slug nunca é reaproveitado (R1).
+ * Os 47 temas do catálogo, na ordem das seções (spec3 §3.3, com os temas dos Ciclos B, C e D, "Média e mediana" do Ciclo W
+ * (D-062) e os quatro de época do Ciclo K2, D-053). Um slug nunca é reaproveitado (R1).
  */
 export const TOPIC_SLUGS = [
   'diferenca',
@@ -28,6 +28,7 @@ export const TOPIC_SLUGS = [
   'renda-variavel',
   'aporte',
   'essenciais',
+  'media-e-mediana',
   'decimo-terceiro',
   'ferias',
   'volta-as-aulas',

@@ -14,17 +14,19 @@ import { colors, fonts, motion, radius, space } from '@/theme/tokens';
  * por cima da tarefa e "Voltar à tarefa" volta para o formulário preenchido (CL C005).
  * Nome acessível "O que é isso? {termo}", com o estado aberto ou fechado. Tema em rascunho não desenha nada (R12).
  * O painel aparece só com esmaecimento de 200 ms, sem animar altura; com "reduzir movimento", direto.
+ * `label` troca o texto visível quando a pergunta é sobre o termo ("O que é mediana?", na Evolução, D-062); o nome acessível passa a
+ * ser o próprio texto visível (WCAG 2.5.3), e o estado aberto ou fechado segue igual.
  */
-export function TermHint({ term, slug, style }: { term: string; slug: TopicSlug; style?: StyleProp<ViewStyle> }) {
+export function TermHint({ term, slug, label, style }: { term: string; slug: TopicSlug; label?: string; style?: StyleProp<ViewStyle> }) {
   const [open, setOpen] = useState(false);
   const topic = topicBySlug(slug);
   if (!topic) return null;
   return (
     <View style={[styles.wrap, style]}>
       <LinkButton
-        label={LEARN_UI_TEXT.termHint}
+        label={label ?? LEARN_UI_TEXT.termHint}
         icon={CircleQuestionMark}
-        accessibilityLabel={LEARN_UI_TEXT.termHintA11y(term)}
+        accessibilityLabel={label ?? LEARN_UI_TEXT.termHintA11y(term)}
         accessibilityState={{ expanded: open }}
         aria-expanded={open}
         onPress={() => setOpen((o) => !o)}

@@ -1,5 +1,5 @@
 import { isValidIsoMonth, monthsBetween, type IsoDate, type IsoMonth } from './dates';
-import { averageCents, roundDivBig } from './learn/math';
+import { averageCents, medianCents, roundDivBig } from './learn/math';
 import type { Cents } from './money';
 import type { MonthOverview } from './records';
 import type { CategoryPart } from './summary';
@@ -93,14 +93,6 @@ export interface ComparisonStats {
   visibleMonths: IsoMonth[];
   /** Meses elegíveis que a pessoa ocultou, na ordem dos pontos. */
   hiddenMonths: IsoMonth[];
-}
-
-/** Mediana de uma lista não vazia: o do meio, ou a média dos dois do meio (metade para cima), sem somar em ponto flutuante. */
-function medianCents(values: readonly Cents[]): Cents {
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 === 1) return sorted[middle]!;
-  return Number(roundDivBig(BigInt(sorted[middle - 1]!) + BigInt(sorted[middle]!), 2n));
 }
 
 /**

@@ -405,9 +405,10 @@ describe('conteúdo de época: os quatro temas novos (D-053)', () => {
     expect(first('informe de rendimentos')[0]).toBe('imposto-de-renda');
   });
 
-  it('o calendário é só um dado: nenhum tema de época fora do catálogo e a ordem do catálogo põe os quatro depois de "essenciais"', () => {
+  it('o calendário é só um dado: nenhum tema de época fora do catálogo e a ordem do catálogo põe os quatro depois de "essenciais" e de "Média e mediana" (Ciclo W, D-062)', () => {
     const i = TOPIC_SLUGS.indexOf('essenciais');
-    expect(TOPIC_SLUGS.slice(i + 1, i + 5)).toEqual([...EPOCA_SLUGS]);
+    expect(TOPIC_SLUGS[i + 1]).toBe('media-e-mediana');
+    expect(TOPIC_SLUGS.slice(i + 2, i + 6)).toEqual([...EPOCA_SLUGS]);
     for (const m of SEASONAL_CALENDAR) for (const slug of m.slugs as readonly TopicSlug[]) expect(TOPIC_SLUGS).toContain(slug);
   });
 

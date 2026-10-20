@@ -18,6 +18,7 @@ import { MoneyTxt } from '@/components/money-text';
 import { MonthCheckBlock } from '@/components/month-check';
 import { SettingSwitch } from '@/components/setting-switch';
 import { ErrorState } from '@/components/states';
+import { TermHint } from '@/components/term-hint';
 import { Button, Card, FitMoney, LinkButton, Money, Skeleton, Txt, styles as ui } from '@/components/ui';
 import { maskMoneyLabel, useValuesHidden } from '@/lib/privacy';
 import { useCategoryBreakdown, useEvolutionExplanation, useReceivedBreakdown } from '@/state/data';
@@ -678,6 +679,8 @@ export function StatsSection({ view, onRestore }: { view: EvolutionView; onResto
             <StatCard title={T.stats.average} cents={s.average} caption={T.stats.ofMonths(s.visibleCount, view.eligibleCount)} stacked={stacked} />
             <StatCard title={T.stats.median} cents={s.median} caption={T.stats.ofMonths(s.visibleCount, view.eligibleCount)} stacked={stacked} />
           </View>
+          {/* D-062: o "O que é isso?" da mediana abre no lugar o resumo do tema de Aprender e leva à explicação completa. */}
+          <TermHint term="Mediana" slug="media-e-mediana" label={T.stats.whatIsMedian} />
           {view.situation === 'um_mes' ? (
             <Txt variant="caption" color={colors.textSecondary}>
               {T.stats.onlyOne}
