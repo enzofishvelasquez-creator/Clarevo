@@ -289,6 +289,19 @@ export function averageCents(values: readonly Cents[]): Cents {
   return toNumber(roundDivBig(sum, BigInt(values.length)));
 }
 
+/**
+ * Mediana em centavos: o valor do meio dos valores em ordem; com quantidade par, a média dos dois do meio, metade para cima, sem somar
+ * em ponto flutuante. medianCents([320.000, 340.000, 330.000, 780.000, 345.000, 360.000]) = 342.500. É a mesma conta da Evolução
+ * (`comparisonStats`) e do tema "Média e mediana" de Aprender. Lista vazia: RangeError.
+ */
+export function medianCents(values: readonly Cents[]): Cents {
+  if (values.length === 0) throw new RangeError('lista vazia');
+  const sorted = values.map((v) => int(v, 'valor')).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  const middle = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) return toNumber(sorted[middle]!);
+  return toNumber(roundDivBig(sorted[middle - 1]! + sorted[middle]!, 2n));
+}
+
 /** Meses para juntar um valor guardando o mesmo tanto por mês, para cima: monthsToReach(375.000, 50.000) = 8. */
 export function monthsToReach(targetCents: Cents, monthlyCents: Cents): number {
   const m = int(monthlyCents, 'por mês', 1);

@@ -81,6 +81,8 @@ export const LEARN_ACTIONS: Partial<Record<TopicSlug, readonly LearnAction[]>> =
   'renda-variavel': [{ label: 'Revisar minha renda de referência', href: '/renda-comprometida/referencia' }],
   aporte: [{ label: 'Abrir Metas', href: '/metas' }],
   essenciais: [{ label: 'Calcular minha reserva', href: '/reserva' }],
+  // Ciclo W (D-062): o tema leva à tela que mostra a média e a mediana; a Evolução leva de volta pelo "O que é mediana?".
+  'media-e-mediana': [{ label: 'Ver na Evolução', href: '/evolucao' }],
   simulacao: [{ label: 'Simular um plano', href: '/simular' }],
 };
 

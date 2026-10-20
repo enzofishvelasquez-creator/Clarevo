@@ -19,7 +19,8 @@
  * de quem é titular com outras pessoas, a confirmação digitada, a demonstração que não apaga nada e a tela "Sua conta foi excluída", com a
  * Família simulada na memória), das Análises (D-059: Categorias em Barras e Bolhas, Evolução, Próximos meses e Orçamento, só leitura), do Dia útil (D-060 e D-061: o aviso de
  * vencimento em sábado, domingo ou feriado nacional e o padrão de mercado do próximo dia útil, que não mudam a data nem os totais) e de Mês conferido (D-060: "Conferi: não houve pagamentos em {mês}" e o zero
- * confirmado na Evolução, em Pago e Recebido, em Análises e em "Seus últimos meses") na versão web, em modo demonstração (acesso simulado).
+ * confirmado na Evolução, em Pago e Recebido, em Análises e em "Seus últimos meses") e de Média e mediana (D-062: o tema de Aprender e a ligação com a
+ * Evolução nos dois sentidos, "Ver na Evolução" e "O que é mediana?") na versão web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -2410,7 +2411,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.evaluate(() => { window.open = window.__realOpen; });
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   const externalTopics = [...learnSeen].filter(([, n]) => n > 0).map(([s]) => s);
-  ok('Aprender: 44 temas publicados abrem pela aba (37 nas seções, com os quatro de época, e 7 dúvidas), cada um com o título como cabeçalho de nível 1', learnSeen.size === 44 && learnLabels.length === 37 && faqNames.length === 7 &&
+  ok('Aprender: 45 temas publicados abrem pela aba (38 nas seções, com os quatro de época e Média e mediana, e 7 dúvidas), cada um com o título como cabeçalho de nível 1', learnSeen.size === 45 && learnLabels.length === 38 && faqNames.length === 7 &&
     learnIssues.titulo.length === 0, `${learnSeen.size} temas, ${learnLabels.length} linhas, ${faqNames.length} dúvidas ${learnIssues.titulo.slice(0, 3).join(' | ')}`);
   ok('temas: nenhum termo vetado nem travessão longo nos textos exibidos', learnIssues.termos.length === 0, learnIssues.termos.slice(0, 3).join(' | '));
   ok('temas: fontes com papel de link, data de consulta e domínio permitido (oficial; FGC só no tema do FGC; Serasa só em renda-comprometida)', externalTopics.length >= 20 && learnIssues.fontes.length === 0,
@@ -12494,6 +12495,192 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const mcBad = mcTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(demais|alt[oa]s?|baix[oa]s?|gastou|aumentou|diminuiu|despencou|disparou|cuidado|estour\w*|exagero|usuári[oa]s?|bem-vind[oa]s?|parab[eé]ns|incr[ií]vel|garant\w*)\b/i)?.[0]).filter(Boolean);
   ok('Mês conferido: nenhum termo proibido, travessão longo, expressão vetada, palavra de julgamento nem palavra com gênero nas telas novas', mcTexts.length >= 12 && mcBad.length === 0, `${mcTexts.length} telas ${mcBad.join(' | ')}`);
   ok('Mês conferido: nenhuma escrita direta na rede (a conferência fica na memória da demonstração; o banco é coberto pelos testes de banco e de API)', writes.length === mcWrites0, writes.slice(mcWrites0).join(' | '));
+
+  // =====================================================================================================================
+  // Média e mediana (D-062, item 3; Ciclo W): tema novo de Aprender, "Média e mediana" (seção Organizar o mês, depois de "Gastos essenciais"),
+  // com duas fontes do IBGE Educa consultadas em 20/10/2026 e o caso de referência da Evolução como exemplo (Pago de janeiro a junho de
+  // 2026: média R$ 4.125,00 e mediana R$ 3.425,00; sem abril, R$ 3.390,00 e R$ 3.400,00, os mesmos números da tela). Ligação nos dois
+  // sentidos: o tema tem "Ver na Evolução" e a Evolução tem "O que é mediana?" (o padrão "O que é isso?"), que abre o resumo no lugar e leva
+  // à explicação completa. Só leitura: nada é gravado nem enviado, e o tema é igual para todas as pessoas. Aqui, na versão web: (1) a
+  // Evolução do cenário "evolucao" com o "O que é mediana?" fechado e aberto; (2) a explicação aberta a partir dele, com o exemplo, "Ver a
+  // conta", "Ver na Evolução", os relacionados e as fontes; (3) a volta à Evolução e as mesmas contas com abril fora; (4) valores ocultos;
+  // (5) a aba Aprender: a linha, a busca e o caminho até a Evolução; (6) a conta nova (sem dado de exemplo). Capturas a partir de 560, em
+  // 390, 360 e 320 px. Hoje é 07/10/2026.
+  // =====================================================================================================================
+  const mmWrites0 = writes.length;
+  const mmTexts = [];
+  const mmKeep = async () => { const x = await body(); mmTexts.push(x); screenTexts.push(x); return x; };
+  const mmPath = () => new URL(p.url()).pathname;
+  const mmH1s = () => p.evaluate(() => [...document.querySelectorAll('h1')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
+  const mmHint = () => p.getByRole('button', { name: 'O que é mediana?', exact: true }).filter({ visible: true });
+  const mmHintScroll = async () => { await mmHint().first().evaluate((e) => e.scrollIntoView({ block: 'center' })); await p.waitForTimeout(250); };
+  const mmShots = async (name, scroll = null) => {
+    for (const [w, h, suffix] of [[390, 844, ''], [360, 740, '_360px'], [320, 800, '_320px']]) {
+      await p.setViewportSize({ width: w, height: h }); await p.waitForTimeout(450);
+      if (scroll) await scroll(); else await evTop();
+      await layoutChecks(`${name} ${w}px`);
+      ok(`${name} ${w}px: sem o símbolo C`, (await symbolCount()) === 0);
+      await shot(`${name}${suffix}`);
+    }
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  };
+  const mmStubOpen = () => p.evaluate(() => { window.__opened = []; window.__realOpen = window.__realOpen ?? window.open; window.open = (u) => { window.__opened.push(String(u)); return null; }; });
+  const mmShort = 'A média soma os valores e divide pela quantidade deles. A mediana é o valor do meio, com os valores em ordem. Um mês muito diferente dos outros puxa a média e mexe pouco na mediana.';
+  const mmRowMedia = 'Média e mediana. Dois jeitos de resumir vários meses. Leitura de 2 minutos.';
+  const mmUrls = ['https://educa.ibge.gov.br/jovens/conheca-o-brasil/populacao/17870-a-mediana.html', 'https://educa.ibge.gov.br/jovens/conheca-o-brasil/populacao/17862-media-pagina-inicial.html'];
+  const mmStat = (t, title) => (t.match(new RegExp(`${title}\\n(R\\$ [\\d.]+,\\d{2}|R\\$ ••••)\\n(\\d+ de \\d+ meses?)`)) ?? []).slice(1, 3).join(' · ');
+
+  // ---- 1. Evolução (cenário "evolucao"): o "O que é mediana?" abaixo da média e da mediana, fechado ----
+  await evEnter('evolucao');
+  await evOpen();
+  await radio('12 meses').click(); await p.waitForTimeout(600);
+  await evSpyStart();
+  const mmStore0 = await evStore();
+  t = await mmKeep();
+  const mmAll = [mmStat(t, 'Média dos meses na comparação'), mmStat(t, 'Mediana dos meses na comparação')];
+  ok('Média e mediana, Evolução: a média é R$ 4.125,00 e a mediana R$ 3.425,00, "6 de 6 meses", como no tema', mmAll[0] === 'R$ 4.125,00 · 6 de 6 meses' && mmAll[1] === 'R$ 3.425,00 · 6 de 6 meses', JSON.stringify(mmAll));
+  const mmMedianBox = await p.getByText('Mediana dos meses na comparação', { exact: true }).filter({ visible: true }).first().boundingBox();
+  const mmTotalBox = await p.getByText('Total dos meses exibidos', { exact: true }).filter({ visible: true }).first().boundingBox();
+  const mmHintBox = await mmHint().first().boundingBox();
+  ok('Média e mediana, Evolução: há um único "O que é mediana?", abaixo dos cartões da média e da mediana e acima do total, fechado (aria-expanded=false) e com alvo de 44 px; nenhum outro "O que é isso?" na tela',
+    (await mmHint().count()) === 1 && (await mmHint().first().getAttribute('aria-expanded')) === 'false' && mmHintBox !== null && mmHintBox.height >= 43.5 && mmMedianBox !== null && mmTotalBox !== null &&
+    mmMedianBox.y < mmHintBox.y && mmHintBox.y < mmTotalBox.y && (await visibleCount('button', /^O que é isso\?/)) === 0, JSON.stringify([mmMedianBox, mmHintBox, mmTotalBox]));
+  ok('Média e mediana, Evolução: o painel só aparece depois de tocar (nada do tema à vista)', !t.includes('Ler explicação completa') && !t.includes(mmShort));
+  await mmShots('560_media_mediana_evolucao', mmHintScroll);
+
+  // ---- 2. Abrir no lugar: o resumo do tema e "Ler explicação completa"; fechar e abrir de novo; teclado ----
+  await mmHint().first().click(); await waitText('Ler explicação completa'); await p.waitForTimeout(400);
+  t = await mmKeep();
+  ok('Média e mediana, Evolução: tocar abre o painel no lugar, com o resumo do tema e "Ler explicação completa" (aria-expanded=true), sem sair da tela e sem mudar a média nem a mediana',
+    mmPath() === '/evolucao' && (await mmHint().first().getAttribute('aria-expanded')) === 'true' && t.includes(mmShort) && (await visibleCount('button', 'Ler explicação completa')) === 1 &&
+    mmStat(t, 'Média dos meses na comparação') === mmAll[0] && mmStat(t, 'Mediana dos meses na comparação') === mmAll[1], t.slice(t.indexOf('Mediana dos meses') - 20, t.indexOf('Mediana dos meses') + 420));
+  await mmShots('561_media_mediana_evolucao_resumo', mmHintScroll);
+  await mmHint().first().click(); await waitGone('Ler explicação completa');
+  ok('Média e mediana, Evolução: tocar de novo fecha o painel', (await mmHint().first().getAttribute('aria-expanded')) === 'false' && (await visibleCount('button', 'Ler explicação completa')) === 0 && !(await body()).includes(mmShort));
+  await mmHint().first().focus(); await p.keyboard.press('Enter'); await waitText('Ler explicação completa');
+  ok('Média e mediana, Evolução: pelo teclado (Enter) o painel também abre', (await mmHint().first().getAttribute('aria-expanded')) === 'true' && (await visibleCount('button', 'Ler explicação completa')) === 1);
+
+  // ---- 3. A explicação, aberta da Evolução: "Voltar à tarefa", exemplo, "Ver a conta", "No Clarevo", relacionados e fontes ----
+  await mmStubOpen();
+  await btn('Ler explicação completa').click(); await waitText('Voltar à tarefa'); await p.waitForTimeout(500);
+  t = await mmKeep();
+  const mmTopic = t;
+  ok('Média e mediana, tema: /explicacao/media-e-mediana com o cabeçalho "Aprender", o título "Média e mediana" como cabeçalho de nível 1, "Organizar o mês · 2 min de leitura" e "Voltar à tarefa" (não "Voltar para Aprender")',
+    mmPath() === '/explicacao/media-e-mediana' && JSON.stringify(await mmH1s()) === JSON.stringify(['Aprender', 'Média e mediana']) && t.includes('Organizar o mês · 2 min de leitura') && t.includes('Dois jeitos de resumir vários meses') &&
+    (await visibleCount('button', 'Voltar à tarefa')) === 1 && (await visibleCount('button', 'Voltar para Aprender')) === 0, `${mmPath()} ${JSON.stringify(await mmH1s())}`);
+  ok('Média e mediana, tema: o resumo e os parágrafos dizem o que é cada uma, a diferença com um mês muito diferente dos outros e o que a Evolução faz',
+    t.includes(mmShort) && t.includes('A média soma todos os valores e divide pela quantidade deles.') && t.includes('com quantidade par de valores, é a média dos dois do meio') && t.includes('medidas de tendência central') &&
+    t.includes('porque não é afetada por valores extremos') && t.includes('Na Evolução, o Clarevo mostra as duas lado a lado') && t.includes('Uma não é melhor que a outra') && t.includes('o mês conferido, sem lançamentos, entra como zero'));
+  ok('Média e mediana, tema: o exemplo traz os seis meses, a média R$ 4.125,00 e a mediana R$ 3.425,00 e, sem abril, R$ 3.390,00 e R$ 3.400,00, e as hipóteses dizem que é fictício',
+    ['R$ 3.200,00', 'R$ 3.400,00', 'R$ 3.300,00', 'R$ 7.800,00', 'R$ 3.450,00', 'R$ 3.600,00', 'A média é R$ 4.125,00', 'a mediana é R$ 3.425,00', 'Sem abril, a média é R$ 3.390,00 e a mediana, R$ 3.400,00'].every((x) => t.includes(x)) && /fict[ií]cio/i.test(t), t.slice(t.indexOf('Exemplo'), t.indexOf('Exemplo') + 700));
+  await mmShots('562_media_mediana_tema');
+  await btn('Ver a conta').click(); await waitText('24.750,00 ÷ 6 = 4.125,00'); await p.waitForTimeout(300);
+  t = await mmKeep();
+  ok('Média e mediana, tema: "Ver a conta" mostra a soma, a divisão, os valores em ordem, os dois do meio e as contas sem abril',
+    ['3.200,00 + 3.400,00 + 3.300,00 + 7.800,00 + 3.450,00 + 3.600,00 = 24.750,00', '24.750,00 ÷ 6 = 4.125,00', 'em ordem: 3.200,00, 3.300,00, 3.400,00, 3.450,00, 3.600,00 e 7.800,00', '(3.400,00 + 3.450,00) ÷ 2 = 3.425,00', 'sem abril: 16.950,00 ÷ 5 = 3.390,00',
+      'o valor do meio de 3.200,00, 3.300,00, 3.400,00, 3.450,00 e 3.600,00 é 3.400,00'].every((x) => t.includes(x)));
+  const mmNoClarevo = async () => { await scrollTo('No Clarevo'); };
+  ok('Média e mediana, tema: "No Clarevo" (título de nível 2) traz o botão "Ver na Evolução"', (await learnH2()).includes('No Clarevo') && (await visibleCount('button', 'Ver na Evolução')) === 1, JSON.stringify(await learnH2()));
+  const mmRelated = (await topicRows()).map((r) => r.split('. ')[0]);
+  ok('Média e mediana, tema: "Temas relacionados" são "Quando a renda muda todo mês", "Gastos essenciais" e "Mês sem registro", nessa ordem', (await learnH2()).includes('Temas relacionados') && JSON.stringify(mmRelated) === JSON.stringify(['Quando a renda muda todo mês', 'Gastos essenciais', 'Mês sem registro']), JSON.stringify(mmRelated));
+  await mmShots('563_media_mediana_tema_conta', mmNoClarevo);
+  // Fontes: duas páginas do IBGE Educa, com papel de link, "Consultada em 20/10/2026" e endereço oficial permitido.
+  await scrollTo('Fontes');
+  const mmLinks = p.getByRole('link').filter({ visible: true });
+  const mmLinkNames = [];
+  const mmOpened = [];
+  for (let i = 0; i < (await mmLinks.count()); i++) {
+    mmLinkNames.push(await mmLinks.nth(i).getAttribute('aria-label'));
+    await mmLinks.nth(i).click();
+    mmOpened.push(await p.evaluate(() => window.__opened[window.__opened.length - 1] ?? ''));
+  }
+  ok('Média e mediana, tema: duas fontes oficiais do IBGE (Educa Jovens), com papel de link, "Consultada em 20/10/2026" no nome e os endereços das páginas A Mediana e A Média Aritmética',
+    mmLinkNames.length === 2 && mmLinkNames.every((n) => (n ?? '').includes('Consultada em 20/10/2026') && (n ?? '').startsWith('IBGE: A M')) && JSON.stringify(mmOpened) === JSON.stringify(mmUrls) && mmOpened.every((u) => allowedSourceUrl(u, 'media-e-mediana')),
+    `${JSON.stringify(mmLinkNames)} ${JSON.stringify(mmOpened)}`);
+  t = await body();
+  ok('Média e mediana, tema: "Clarevo: D-057, D-062" entre as fontes, "Revisado em 20/10/2026" e nenhum aviso de investimento (a seção não tem)', t.includes('Clarevo: D-057, D-062') && t.includes('Revisado em 20/10/2026') && !t.includes('Conteúdo educativo e geral. Não é recomendação'));
+
+  // ---- 4. Voltar à tarefa: a Evolução como estava; com abril fora, as mesmas contas do exemplo do tema ----
+  await btn('Voltar à tarefa').click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(600);
+  t = await mmKeep();
+  ok('Média e mediana, volta: "Voltar à tarefa" devolve a Evolução (12 meses, Pago) com a mesma média e a mesma mediana', mmPath() === '/evolucao' && (await h1Name()) === 'Evolução' && mmStat(t, 'Média dos meses na comparação') === mmAll[0] && mmStat(t, 'Mediana dos meses na comparação') === mmAll[1], `${mmPath()} ${await h1Name()}`);
+  await evSet('Abril', false);
+  t = await mmKeep();
+  const mmNoApril = [mmStat(t, 'Média dos meses na comparação'), mmStat(t, 'Mediana dos meses na comparação')];
+  ok('Média e mediana, Evolução sem abril: a média é R$ 3.390,00 e a mediana R$ 3.400,00, "5 de 6 meses", os números que o tema usa no exemplo', mmNoApril[0] === 'R$ 3.390,00 · 5 de 6 meses' && mmNoApril[1] === 'R$ 3.400,00 · 5 de 6 meses' &&
+    [mmAll[0], mmAll[1], 'R$ 3.390,00', 'R$ 3.400,00'].every((x) => mmTopic.includes(x.split(' · ')[0])), JSON.stringify(mmNoApril));
+  const mmCalls = (await evSpyCalls()).filter((x) => x !== 'syncSeriesOccurrences');
+  ok('Média e mediana: abrir e fechar o "O que é mediana?", ler o tema, abrir as fontes e tirar um mês da comparação não chamaram nenhuma função de escrita do repositório e não guardaram nada no aparelho', mmCalls.length === 0 && (await evStore()) === mmStore0, `${JSON.stringify(mmCalls)}`);
+  await evSet('Abril', true);
+
+  // ---- 5. Valores ocultos: o link e o painel seguem, sem valor nenhum no resumo; o exemplo do tema (fictício) segue à vista ----
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento');
+  await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  await radio('12 meses').click(); await p.waitForTimeout(500);
+  await mmHint().first().click(); await waitText('Ler explicação completa'); await p.waitForTimeout(300);
+  t = await mmKeep();
+  ok('Média e mediana, valores ocultos: a média, a mediana e o total em R$ ••••, "O que é mediana?" aberto com o mesmo resumo e nenhum valor em reais à vista', t.includes('Média dos meses na comparação\nR$ ••••\n6 de 6 meses') && t.includes('Mediana dos meses na comparação\nR$ ••••\n6 de 6 meses') && t.includes(mmShort) &&
+    (await moneyLeaks()).length === 0, (await moneyLeaks()).slice(0, 3).join(' | '));
+  await mmShots('564_media_mediana_valores_ocultos', mmHintScroll);
+  await btn('Ler explicação completa').click(); await waitText('Voltar à tarefa'); await p.waitForTimeout(400);
+  t = await mmKeep();
+  ok('Média e mediana, valores ocultos: o exemplo do tema é fictício e segue à vista (R$ 4.125,00 e R$ 3.425,00), como nos outros temas', t.includes('A média é R$ 4.125,00') && t.includes('a mediana é R$ 3.425,00'));
+
+  // ---- 6. Aprender: a linha entre "Gastos essenciais" e "13º salário", a busca e o caminho até a Evolução ----
+  await evEnter();
+  await p.getByRole('tab', { name: 'Aprender e dúvidas', exact: true }).filter({ visible: true }).first().click(); await waitText('Comece por aqui'); await p.waitForTimeout(400);
+  const mmRows = await topicRows();
+  const mmRowEssenciais = mmRows.find((r) => r.startsWith('Gastos essenciais. '));
+  const mmRow13 = mmRows.find((r) => r.startsWith('13º salário. '));
+  const mmIdx = mmRows.indexOf(mmRowMedia);
+  ok('Média e mediana, Aprender: a linha "Média e mediana" fica em Organizar o mês, logo depois de "Gastos essenciais" e antes de "13º salário"', mmIdx > 0 && mmRows[mmIdx - 1] === mmRowEssenciais && mmRows[mmIdx + 1] === mmRow13, JSON.stringify(mmRows.slice(Math.max(0, mmIdx - 2), mmIdx + 3)));
+  await mmShots('565_media_mediana_aprender', async () => { await p.getByRole('button', { name: mmRowMedia, exact: true }).filter({ visible: true }).first().evaluate((e) => e.scrollIntoView({ block: 'center' })); await p.waitForTimeout(250); });
+  await mmStubOpen();
+  await p.getByRole('button', { name: mmRowMedia, exact: true }).filter({ visible: true }).first().click(); await waitText('Voltar para Aprender'); await p.waitForTimeout(400);
+  ok('Média e mediana, Aprender: a linha abre o tema com "Voltar para Aprender" (origem Aprender) e o mesmo conteúdo', mmPath() === '/explicacao/media-e-mediana' && (await visibleCount('button', 'Voltar à tarefa')) === 0 && (await body()).includes('A média é R$ 4.125,00'));
+  await btn('Ver na Evolução').click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(600);
+  t = await mmKeep();
+  ok('Média e mediana, "Ver na Evolução": abre /evolucao com o título "Evolução" e a barra inferior das telas de consulta, que marca a aba de onde a pessoa veio (Aprender)', mmPath() === '/evolucao' && (await h1Name()) === 'Evolução' && (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1 && (await p.getByRole('tab').filter({ visible: true }).count()) === 4, `${mmPath()} ${await h1Name()}`);
+  await btn('Voltar').click(); await waitText('Voltar para Aprender'); await learnBackToTab();
+  const mmSearch = async (query, expectFirst) => {
+    await learnSearch().fill(query); await waitText(`para "${query}"`); await p.waitForTimeout(350);
+    const rows = await topicRows();
+    ok(`Média e mediana, busca "${query}": o primeiro resultado é "Média e mediana"`, rows[0] === expectFirst, JSON.stringify(rows.slice(0, 3)));
+  };
+  await learnSearch().scrollIntoViewIfNeeded();
+  for (const query of ['mediana', 'média', 'valor do meio', 'tendência central']) await mmSearch(query, mmRowMedia);
+  await learnSearch().fill('média'); await waitText('para "média"'); await p.waitForTimeout(350);
+  const mmMedia = await topicRows();
+  ok('Média e mediana, busca "média": os temas que já falavam de média seguem achados (Gastos essenciais e Quando a renda muda todo mês)', mmMedia.some((r) => r.startsWith('Gastos essenciais. ')) && mmMedia.some((r) => r.startsWith('Quando a renda muda todo mês. ')), JSON.stringify(mmMedia));
+  await learnSearch().fill(''); await waitText('Comece por aqui'); await p.waitForTimeout(300);
+  ok('Média e mediana, Aprender: nenhuma escrita direta na rede durante a leitura e a busca', writes.length === mmWrites0, writes.slice(mmWrites0).join(' | '));
+
+  // ---- 7. Conta nova: o tema é igual (conteúdo público) e a Evolução vazia não mostra o "O que é mediana?" ----
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await btn('Criar conta').click(); await waitText('Nome de apresentação');
+  await field('Nome de apresentação').fill('Mia Mediana'); await field('E-mail').fill('mia.mediana@exemplo.com'); await field('Senha').fill('senha1234');
+  await btn('Criar conta').click(); await waitText('Confira seu e-mail');
+  await btn('Simular abertura do link').click(); await btn('Já confirmei meu e-mail').click(); await waitText('Sua primeira conta');
+  await btn('Começar meu mês').click(); await waitText('Diferença do mês'); await p.waitForTimeout(600);
+  await evOpen();
+  t = await mmKeep();
+  ok('Média e mediana, conta nova: a Evolução vazia diz "Sem registros nestes meses" e não mostra média, mediana nem "O que é mediana?" (nenhum dado de exemplo)', t.includes('Sem registros nestes meses') && !t.includes('Média dos meses na comparação') && (await mmHint().count()) === 0 && !/R\$ \d/.test(t), t.slice(0, 400));
+  await mmShots('566_media_mediana_conta_nova');
+  await btn('Voltar').click(); await waitText('Registrar recebimento');
+  await p.getByRole('tab', { name: 'Aprender e dúvidas', exact: true }).filter({ visible: true }).first().click(); await waitText('Comece por aqui'); await p.waitForTimeout(400);
+  ok('Média e mediana, conta nova: Aprender mostra a mesma linha "Média e mediana", e a explicação não traz nenhum valor da pessoa', (await topicRows()).includes(mmRowMedia));
+  await p.getByRole('button', { name: mmRowMedia, exact: true }).filter({ visible: true }).first().click(); await waitText('Voltar para Aprender'); await p.waitForTimeout(400);
+  t = await mmKeep();
+  ok('Média e mediana, conta nova: a explicação é a mesma (exemplo fictício, fontes do IBGE) e "Ver na Evolução" está lá', t.includes('A média é R$ 4.125,00') && t.includes('Consultada em 20/10/2026') && (await visibleCount('button', 'Ver na Evolução')) === 1);
+
+  // ---- 8. Demonstração de novo: os totais não mudam; textos e escritas ----
+  await evEnter();
+  await expectTotals('Média e mediana, demonstração: outubro segue 6.000 / 3.900 / 2.100 e 650 depois de tudo', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  const mmBad = mmTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(demais|alt[oa]s?|baix[oa]s?|at[ií]pic[oa]s?|anormal|anormais|outlier\w*|ruins?|gastou|aumentou|diminuiu|despencou|disparou|cuidado|estour\w*|exagero|usuári[oa]s?|bem-vind[oa]s?|parab[eé]ns|incr[ií]vel|garant\w*|invista|poupan\w*)\b/i)?.[0]).filter(Boolean);
+  ok('Média e mediana: nenhum termo proibido, travessão longo, expressão vetada, palavra de julgamento, produto financeiro nem palavra com gênero nas telas novas', mmTexts.length >= 8 && mmBad.length === 0, `${mmTexts.length} telas ${mmBad.join(' | ')}`);
+  ok('Média e mediana: nenhuma escrita direta na rede (a leitura do tema e da Evolução só lê; a conta nova e a demonstração ficam na memória)', writes.length === mmWrites0, writes.slice(mmWrites0).join(' | '));
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);

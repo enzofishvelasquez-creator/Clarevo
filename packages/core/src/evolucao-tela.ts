@@ -142,6 +142,8 @@ export const EVOLUTION_TEXT = {
     total: 'Total dos meses exibidos',
     totalNote: 'Soma de todos os meses do gráfico. Não muda quando você tira um mês da comparação.',
     onlyOne: 'Só um mês na comparação: a média e a mediana são o valor dele.',
+    /** Ligação com o tema "Média e mediana" de Aprender (D-062): abre o "O que é isso?" no próprio lugar, com "Ler explicação completa". */
+    whatIsMedian: 'O que é mediana?',
     /** Frase do anúncio ao tirar ou pôr um mês: "Média R$ 3.390,00, mediana R$ 3.400,00, 5 de 6 meses." */
     announce: (average: Cents, median: Cents, n: number, total: number): string =>
       `Média ${formatBRL(average)}, mediana ${formatBRL(median)}, ${ofMonthsText(n, total)}.`,

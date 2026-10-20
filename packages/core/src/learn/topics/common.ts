@@ -20,6 +20,13 @@ export const CARDS_REVIEWED_ON: IsoDate = '2026-10-10';
 export const EPOCA_REVIEWED_ON: IsoDate = '2026-10-15';
 export const EPOCA_CONSULTED_ON: IsoDate = '2026-10-15';
 
+/**
+ * Tema "Média e mediana" (Ciclo W, D-062): escrito e conferido em 20/10/2026, pelo mesmo método (trecho de resultado de busca da
+ * própria fonte, porque as páginas do IBGE não abrem a partir do ambiente de trabalho).
+ */
+export const MEDIA_REVIEWED_ON: IsoDate = '2026-10-20';
+export const MEDIA_CONSULTED_ON: IsoDate = '2026-10-20';
+
 export const clarevo = (...refs: string[]): LearnSource => ({ kind: 'clarevo', refs });
 
 export const oficial = (publisher: string, title: string, url: string, locator: string | null = null): LearnSource => ({
@@ -39,6 +46,16 @@ export const oficialEpoca = (publisher: string, title: string, url: string, loca
   url,
   locator,
   consultedOn: EPOCA_CONSULTED_ON,
+});
+
+/** Fonte oficial do tema "Média e mediana" (D-062), consultada em 20/10/2026. */
+export const oficialMedia = (publisher: string, title: string, url: string, locator: string | null = null): LearnSource => ({
+  kind: 'oficial',
+  publisher,
+  title,
+  url,
+  locator,
+  consultedOn: MEDIA_CONSULTED_ON,
 });
 
 export const mercado = (publisher: string, title: string, url: string, locator: string | null = null): LearnSource => ({

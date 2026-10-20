@@ -17,6 +17,7 @@ import {
   installmentCents,
   iofCents,
   lateChargesCents,
+  medianCents,
   monthlyShareCents,
   percentTenths,
   presentValueCents,
@@ -191,6 +192,18 @@ export const EXAMPLE_NUMBERS: Partial<Record<TopicSlug, () => ExampleNumbers>> =
     const g = simulateGrowth({ initial: 0, monthly: 50_000, months: 120, rateBp: 1_000, inflationBp: 450 });
     // 10.072.879, 6.000.000, 4.072.879 e 6.486.205
     return { money: [50_000, g.finalCents, g.contributedCents, g.earningsCents, g.todayValueCents!], bp: [1_000, equivalentMonthlyBp(1_000), 450], tenths: [] };
+  },
+  // Ciclo W (D-062): os seis meses de Pago do caso de referência da Evolução (EF §6) e as mesmas contas sem abril. As contas são as da tela
+  // (`comparisonStats` usa averageCents e medianCents): média 4.125,00 e mediana 3.425,00; sem abril, 3.390,00 e 3.400,00.
+  'media-e-mediana': () => {
+    const months = [320_000, 340_000, 330_000, 780_000, 345_000, 360_000];
+    const withoutApril = months.filter((_, i) => i !== 3);
+    const total = months.reduce((a, b) => a + b, 0); // 2.475.000
+    const totalWithoutApril = withoutApril.reduce((a, b) => a + b, 0); // 1.695.000
+    return {
+      money: [...months, averageCents(months), medianCents(months), averageCents(withoutApril), medianCents(withoutApril), total, totalWithoutApril],
+      bp: [],
+    };
   },
   // Ciclo K2 (D-053), conteúdo de época. Os percentuais e os limites de norma (multa do Imposto de Renda, quotas) ficam nos
   // `facts` do tema, com a fonte.
