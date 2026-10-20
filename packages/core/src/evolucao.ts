@@ -21,7 +21,7 @@ import type { CategoryPart } from './summary';
  * "Guardado em metas" (`savingsEvolutionPoints`, aportes menos resgates, `savedInMonth`), só de meses fechados: o mês atual e os
  * futuros nunca têm valor (nada de previsão). Cada um tem a própria base; mês sem base (renda de referência) ou sem registros fica
  * fora das médias e nunca vira zero; zero só quando há como afirmar (renda comprometida: nunca sem conta anotada; guardado: com
- * meta ativa no mês).
+ * meta no mês).
  */
 
 /** Qual série mostrar: o que entrou (Recebido) ou o que saiu (Pago). */
@@ -45,7 +45,7 @@ export function isPhase3Metric(value: unknown): value is EvolutionPhase3Metric {
  * - em_andamento: o mês atual, que ainda pode receber lançamentos (na fase 3 não tem valor: só meses fechados);
  * - com_registros: os demais, com ao menos um lançamento;
  * - sem_base (só na Renda comprometida, fase 3): mês fechado sem renda de referência, sem o que dividir: nunca é zero e fica fora das contas.
- *   Em "Guardado em metas", zero_confirmado é o mês fechado sem aporte nem resgate com ao menos uma meta ativa.
+ *   Em "Guardado em metas", zero_confirmado é o mês fechado sem aporte nem resgate com ao menos uma meta existente no mês.
  */
 export type EvolutionPointState = 'sem_registros' | 'zero_confirmado' | 'em_andamento' | 'com_registros' | 'sem_base';
 
@@ -406,16 +406,23 @@ export function committedEvolutionPoints(input: {
 }
 
 /**
- * A meta estava ativa no mês `month`? O Clarevo só guarda a situação de agora, sem histórico: vale a meta ativa hoje que foi criada até o
- * fim do mês (no fuso de quem usa) ou que tem algum movimento, de qualquer tipo, no mês (o saldo inicial pode ter data de antes da
- * criação). Meta concluída ou arquivada não conta, porque não há como saber desde quando ficou assim: na dúvida, o mês fica sem registros
- * e nunca vira um zero afirmado.
+ * Meta como a Evolução a lê: só o que decide se ela existia num mês. `deletedAt` (data e hora da exclusão) é opcional porque a leitura de
+ * `listGoals` traz só metas vivas e não o informa; uma `Goal` serve como está.
  */
-function goalActiveIn(goal: Goal, movements: readonly GoalMovement[], month: IsoMonth, timeZone: string): boolean {
-  if (goal.status !== 'ativa') return false;
-  if (movements.some((m) => m.goalId === goal.id)) return true;
+export type GoalExistence = Pick<Goal, 'createdAt'> & { deletedAt?: string | null };
+
+/**
+ * A meta existia no mês `month`? Existia se foi criada até o fim do mês (no fuso de quem usa) e não foi excluída antes do começo dele (a
+ * exclusão no próprio mês ainda conta). Não depende da situação de agora (concluída ou arquivada continua existindo: aportes e resgates
+ * zerados num mês com meta são um fato) nem de movimento (o saldo inicial, o rendimento e a valorização podem ter data de antes da
+ * criação e não provam que a meta existia). Data de criação ilegível, ou de exclusão ilegível numa meta excluída, não afirma nada.
+ */
+function goalExistedIn(goal: GoalExistence, month: IsoMonth, timeZone: string): boolean {
   const created = new Date(goal.createdAt);
-  return !Number.isNaN(created.getTime()) && monthOf(todayIn(timeZone, created)) <= month;
+  if (Number.isNaN(created.getTime()) || monthOf(todayIn(timeZone, created)) > month) return false;
+  if (goal.deletedAt === undefined || goal.deletedAt === null) return true;
+  const deleted = new Date(goal.deletedAt);
+  return !Number.isNaN(deleted.getTime()) && monthOf(todayIn(timeZone, deleted)) >= month;
 }
 
 /**
@@ -423,15 +430,16 @@ function goalActiveIn(goal: Goal, movements: readonly GoalMovement[], month: Iso
  * criar, rendimentos e valorizações ficam fora), que pode ser negativo:
  * - mês atual: em_andamento, sem valor (só meses fechados);
  * - mês fechado com ao menos um aporte ou resgate: com_registros, com o valor (R$ 0,00 se se anularam);
- * - mês fechado sem aporte nem resgate: zero_confirmado (R$ 0,00) se havia ao menos uma meta ativa no mês, senão sem_registros, sem
- *   valor (sem meta, não há o que afirmar). Meta ativa: ver `goalActiveIn`.
+ * - mês fechado sem aporte nem resgate: zero_confirmado (R$ 0,00) se existia ao menos uma meta no mês, senão sem_registros, sem valor
+ *   (sem meta, não há o que afirmar). Meta existente: ver `goalExistedIn` (criada até o fim do mês e não excluída antes do começo dele,
+ *   em qualquer situação, e sem contar movimento como prova).
  * `movementsByMonth` traz os movimentos de cada mês fechado (`listGoalMovementsInMonth`); `goals` vem de `listGoals`. Mês fechado que
- * falta lança RangeError, e mês depois do atual também. `timeZone` é o fuso de quem usa (a data de criação da meta).
+ * falta lança RangeError, e mês depois do atual também. `timeZone` é o fuso de quem usa (as datas de criação e de exclusão da meta).
  */
 export function savingsEvolutionPoints(input: {
   months: readonly IsoMonth[];
   currentMonth: IsoMonth;
-  goals: readonly Goal[];
+  goals: readonly GoalExistence[];
   movementsByMonth: ReadonlyMap<IsoMonth, readonly GoalMovement[]>;
   timeZone: string;
 }): Phase3Point[] {
@@ -446,8 +454,8 @@ export function savingsEvolutionPoints(input: {
       const saved = savedInMonth(movements, month);
       return { month, cents: saved, count: counted.length, state: 'com_registros', valueText: formatBRL(saved) };
     }
-    const active = input.goals.some((g) => goalActiveIn(g, movements, month, input.timeZone));
-    return active ? { month, cents: 0, count: 0, state: 'zero_confirmado', valueText: formatBRL(0) } : noValue(month, 'sem_registros');
+    const existed = input.goals.some((g) => goalExistedIn(g, month, input.timeZone));
+    return existed ? { month, cents: 0, count: 0, state: 'zero_confirmado', valueText: formatBRL(0) } : noValue(month, 'sem_registros');
   });
 }
 

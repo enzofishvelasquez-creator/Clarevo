@@ -14,6 +14,7 @@ import {
   evolutionSubtitle,
   isPhase3Metric,
   monthOf,
+  phase3ClosedMonths,
   phase3Empty,
   phase3Panel,
   type EvolutionPhase3Metric,
@@ -201,7 +202,7 @@ export default function EvolucaoScreen() {
             <ErrorState message={T.loadError} retryLabel={T.retry} onRetry={retry} />
           </Card>
         ) : phase3View && view.situation === 'sem_registros' ? (
-          <Phase3EmptyCard view={phase3View} canWrite={canWrite} currentMonth={currentMonth} />
+          <Phase3EmptyCard view={phase3View} canWrite={canWrite} referenceFrom={phase3ClosedMonths(windowMonthsList, currentMonth)[0] ?? currentMonth} />
         ) : !phase3View && view.situation === 'sem_registros' && (metric === 'recebido' || metric === 'pago') ? (
           <Card>
             <EmptyState
@@ -255,12 +256,14 @@ export default function EvolucaoScreen() {
 
 /**
  * Renda comprometida ou Guardado em metas sem nenhum mês fechado com valor (fase 3): "Sem base para estes meses" (sem renda de referência),
- * "Sem registros nestes meses" (sem conta anotada ou sem meta ativa) e, com escrita no contexto, o botão que leva a criar a base.
+ * "Sem registros nestes meses" (sem conta anotada ou sem meta no mês) e, com escrita no contexto, o botão que leva a criar a base. "Informar
+ * renda de referência" abre o formulário com o mês fechado mais antigo da janela (`referenceFrom`) como início, para a referência cobrir os
+ * meses do gráfico (sem ele, o formulário começaria no mês atual e a Evolução seguiria sem base).
  */
-function Phase3EmptyCard({ view, canWrite, currentMonth }: { view: EvolutionView<EvolutionPhase3Metric>; canWrite: boolean; currentMonth: IsoMonth }) {
+function Phase3EmptyCard({ view, canWrite, referenceFrom }: { view: EvolutionView<EvolutionPhase3Metric>; canWrite: boolean; referenceFrom: IsoMonth }) {
   const empty = phase3Empty(view, canWrite);
   const go = (kind: 'referencia' | 'conta' | 'meta') => {
-    if (kind === 'referencia') router.push({ pathname: '/renda-comprometida/referencia', params: { mes: currentMonth } });
+    if (kind === 'referencia') router.push({ pathname: '/renda-comprometida/referencia', params: { mes: referenceFrom } });
     else if (kind === 'conta') router.push('/a-pagar/nova');
     else router.push('/meta/nova');
   };

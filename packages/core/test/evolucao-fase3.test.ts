@@ -230,24 +230,16 @@ describe('Renda comprometida: os pontos', () => {
     expect(PHASE3_MAX_MONTH_READS).toBe(12);
   });
 
-  it('as leituras do repositório: uma listCommitments por mês fechado (11 em 12 meses), e o percentual fecha com summarizeCommitted', async () => {
+  it('o percentual da demonstração fecha com summarizeCommitted (quantas vezes a tela chama listCommitments, 11 em 12 meses, só o e2e confere)', async () => {
     const repo = await createDemoRepository();
     const space = await repo.ensurePersonalSpace('Conta principal');
     const ctx = space.personalContextId;
     await repo.createCommitment(newOperationKey(), ctx, { description: 'Escola', amountCents: 150_000, dueOn: '2026-08-10', category: 'Educação' });
-    const reads: string[] = [];
-    const original = repo.listCommitments.bind(repo);
-    repo.listCommitments = async (c: string, m: string) => {
-      reads.push(m);
-      return original(c, m);
-    };
     const months = evolutionMonths(monthOf(DEMO_TODAY), 12);
     const closed = phase3ClosedMonths(months, monthOf(DEMO_TODAY));
     const lists = new Map<IsoMonth, Commitment[]>();
     for (const m of closed) lists.set(m, await repo.listCommitments(ctx, m));
     const references = await repo.listIncomeReferences(ctx);
-    expect(reads).toHaveLength(11);
-    expect(new Set(reads).size).toBe(11);
     const points = committedEvolutionPoints({ months, currentMonth: monthOf(DEMO_TODAY), contextId: ctx, today: DEMO_TODAY, commitmentsByMonth: lists, refs: references });
     // A demonstração tem referência de R$ 6.000,00 desde setembro: antes disso é sem base (inclusive agosto, que tem a conta de R$ 1.500,00);
     // setembro não tem conta; outubro (52,5%) é o mês atual e fica sem valor.
@@ -296,7 +288,7 @@ describe('Guardado em metas: os pontos', () => {
     expect(savingsPoints(6, { movementsByMonth: withOctober }).at(-1)).toMatchObject({ month: '2026-10', state: 'em_andamento', cents: 0, valueText: null });
   });
 
-  it('mês sem aporte nem resgate: zero confirmado só com meta ativa no mês; sem meta ativa é "sem registros", nunca zero', () => {
+  it('mês sem aporte nem resgate: zero confirmado só com meta existente no mês; sem meta é "sem registros", nunca zero', () => {
     // Maio é anterior à criação da meta (junho): sem registros. Com a meta criada antes, o mesmo maio é zero confirmado.
     expect(savingsPoints()[0]!.state).toBe('sem_registros');
     expect(savingsPoints(6, { goals: [goal('antiga', '2026-01-10T12:00:00Z')] })[0]).toMatchObject({ state: 'zero_confirmado', cents: 0, valueText: 'R$ 0,00' });
@@ -304,21 +296,71 @@ describe('Guardado em metas: os pontos', () => {
     expect(savingsPoints(6, { goals: [] }).map((p) => p.state)).toEqual(['sem_registros', 'com_registros', 'com_registros', 'sem_registros', 'com_registros', 'em_andamento']);
   });
 
-  it('só meta ativa conta: concluída e arquivada não provam uma meta ativa no mês (o Clarevo não guarda o histórico da situação)', () => {
+  it('a situação de agora não conta: concluída e arquivada existem como a ativa, e o histórico é o mesmo antes e depois de arquivar', () => {
     const old = '2026-01-10T12:00:00Z';
+    const ativa = savingsPoints(6, { goals: [goal('x', old)] });
+    expect(ativa[0]).toMatchObject({ state: 'zero_confirmado', cents: 0, valueText: 'R$ 0,00' });
     for (const status of ['concluida', 'arquivada'] as const) {
-      expect(savingsPoints(6, { goals: [goal('x', old, { status })] })[0]).toMatchObject({ state: 'sem_registros', valueText: null });
+      expect(savingsPoints(6, { goals: [goal('x', old, { status })] })).toEqual(ativa);
     }
-    // Uma ativa junto com a arquivada basta.
-    expect(savingsPoints(6, { goals: [goal('x', old, { status: 'arquivada' }), goal('y', old)] })[0]!.state).toBe('zero_confirmado');
+    // A meta do teste (criada em junho, com aportes) arquivada em outubro: nem os meses antes da criação ganham zero, nem os depois perdem.
+    expect(savingsPoints(6, { goals: [goal('g1', g1.createdAt, { status: 'arquivada', version: 2, updatedAt: '2026-10-02T12:00:00Z' })] })).toEqual(savingsPoints());
   });
 
-  it('um movimento de qualquer tipo no mês prova a meta ativa, mesmo com a meta criada depois (o saldo inicial pode ter data de antes)', () => {
+  it('meta reativada (arquivada e ativa de novo): o histórico é o mesmo de uma meta que nunca saiu de ativa', () => {
+    const base = goal('r', '2026-01-10T12:00:00Z');
+    const reativada = goal('r', '2026-01-10T12:00:00Z', { status: 'ativa', version: 4, updatedAt: '2026-09-20T12:00:00Z' });
+    expect(savingsPoints(6, { goals: [reativada] })).toEqual(savingsPoints(6, { goals: [base] }));
+    expect(savingsPoints(6, { goals: [reativada] })[0]).toMatchObject({ state: 'zero_confirmado' });
+  });
+
+  it('saldo inicial, rendimento ou valorização datados antes da criação da meta não provam que ela existia: o mês fica "sem registros"', () => {
     const late = goal('tarde', '2026-10-01T12:00:00Z');
-    const onlyInitial = new Map(movementsByMonth).set('2026-05', [movement('tarde', 'saldo_inicial', 100_000, '2026-05-10')]);
-    expect(savingsPoints(6, { goals: [late], movementsByMonth: onlyInitial })[0]).toMatchObject({ state: 'zero_confirmado', cents: 0 });
-    // O movimento de outra meta (não ativa) não prova nada, e o de uma meta ativa de outro mês também não vale para este.
+    const before = new Map(movementsByMonth)
+      .set('2026-05', [movement('tarde', 'saldo_inicial', 100_000, '2026-05-10')])
+      .set('2026-08', [movement('tarde', 'rendimento', 1_000, '2026-08-31'), movement('tarde', 'valorizacao', 2_000, '2026-08-15')]);
+    const points = savingsPoints(6, { goals: [late], movementsByMonth: before });
+    expect(points[0]).toMatchObject({ month: '2026-05', state: 'sem_registros', cents: 0, count: 0, valueText: null });
+    expect(points[3]).toMatchObject({ month: '2026-08', state: 'sem_registros', cents: 0, count: 0, valueText: null });
+    // Com a meta criada antes do mês, os mesmos movimentos convivem com o zero afirmado (e continuam fora do valor).
+    const early = goal('cedo', '2026-05-02T12:00:00Z');
+    const withEarly = savingsPoints(6, { goals: [early], movementsByMonth: before });
+    expect(withEarly[0]).toMatchObject({ state: 'zero_confirmado', cents: 0, count: 0, valueText: 'R$ 0,00' });
+    expect(withEarly[3]).toMatchObject({ state: 'zero_confirmado', cents: 0, count: 0 });
+    // O movimento de outra meta também não prova nada: só a criação vale.
     expect(savingsPoints(6, { goals: [late], movementsByMonth })[0]!.state).toBe('sem_registros');
+  });
+
+  it('meta excluída: existia até o mês da exclusão (inclusive) e depois não prova nada; a exclusão usa o fuso de quem usa', () => {
+    const months = ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09'] as const;
+    const empty = new Map<IsoMonth, GoalMovement[]>(months.map((m) => [m, []]));
+    const deleted = (deletedAt: string | null | undefined, timeZone = SP) =>
+      savingsEvolutionPoints({
+        months: evolutionMonths(CURRENT, 6),
+        currentMonth: CURRENT,
+        goals: [{ ...goal('d', '2026-05-10T12:00:00Z'), deletedAt }],
+        movementsByMonth: empty,
+        timeZone,
+      }).map((p) => p.state);
+    // Excluída em 15/07: maio a julho existia (julho, o mês da exclusão, ainda conta); agosto e setembro não.
+    expect(deleted('2026-07-15T12:00:00Z')).toEqual(['zero_confirmado', 'zero_confirmado', 'zero_confirmado', 'sem_registros', 'sem_registros', 'em_andamento']);
+    // Sem data de exclusão (a leitura do app só traz metas vivas), a meta vale desde a criação.
+    expect(deleted(undefined)).toEqual(['zero_confirmado', 'zero_confirmado', 'zero_confirmado', 'zero_confirmado', 'zero_confirmado', 'em_andamento']);
+    expect(deleted(null)).toEqual(deleted(undefined));
+    // 22h de 31/07 em São Paulo já é agosto em UTC: lá a exclusão é de antes do começo de agosto, aqui ainda é de agosto.
+    expect(deleted('2026-08-01T01:00:00Z', SP)).toEqual(['zero_confirmado', 'zero_confirmado', 'zero_confirmado', 'sem_registros', 'sem_registros', 'em_andamento']);
+    expect(deleted('2026-08-01T01:00:00Z', 'UTC')).toEqual(['zero_confirmado', 'zero_confirmado', 'zero_confirmado', 'zero_confirmado', 'sem_registros', 'em_andamento']);
+    // Data de exclusão ilegível não afirma nada.
+    expect(deleted('não é data')).toEqual(['sem_registros', 'sem_registros', 'sem_registros', 'sem_registros', 'sem_registros', 'em_andamento']);
+    // Outra meta ainda viva continua provando o mês depois da exclusão da primeira.
+    const both = savingsEvolutionPoints({
+      months: evolutionMonths(CURRENT, 6),
+      currentMonth: CURRENT,
+      goals: [{ ...goal('d', '2026-05-10T12:00:00Z'), deletedAt: '2026-06-15T12:00:00Z' }, goal('v', '2026-05-12T12:00:00Z')],
+      movementsByMonth: empty,
+      timeZone: SP,
+    });
+    expect(both.slice(0, 5).map((p) => p.state)).toEqual(Array(5).fill('zero_confirmado'));
   });
 
   it('rendimento, valorização e saldo inicial não são aporte nem resgate: ficam fora do valor e da contagem', () => {
@@ -481,7 +523,7 @@ describe('a visão do Guardado em metas', () => {
       'Maio de 2026, sem registros, fora da comparação',
       'Junho de 2026, R$ 500,00, na comparação',
       'Julho de 2026, -R$ 500,00, na comparação',
-      'Agosto de 2026, R$ 0,00, sem aportes nem resgates, com meta ativa, na comparação',
+      'Agosto de 2026, R$ 0,00, sem aportes nem resgates, com meta já criada, na comparação',
       'Setembro de 2026, R$ 200,00, na comparação',
       'Outubro de 2026, mês em andamento, fora da comparação',
     ]);
@@ -492,7 +534,7 @@ describe('a visão do Guardado em metas', () => {
     expect(view.maxCents).toBe(50_000);
     expect(view.minCents).toBe(-50_000);
     expect(view.points[3]).toMatchObject({ participation: 'na_comparacao', hasValue: true, valueText: 'R$ 0,00', stateLabel: 'Sem movimento' });
-    expect(view.points[3]!.stateText).toBe('Sem aportes nem resgates, com meta ativa neste mês');
+    expect(view.points[3]!.stateText).toBe('Sem aportes nem resgates, com meta já criada neste mês');
     expect(evolutionAnnouncement(view)).toBe('Média R$ 50,00, mediana R$ 100,00, 4 de 4 meses.');
   });
 
@@ -515,7 +557,7 @@ describe('a visão do Guardado em metas', () => {
     expect(view.situation).toBe('sem_registros');
     expect(phase3Empty(view, true)).toEqual({
       title: 'Sem registros nestes meses',
-      body: 'O Clarevo não tem meta ativa anotada nestes meses. Só meses já fechados entram aqui.',
+      body: 'O Clarevo não tem meta criada nestes meses. Só meses já fechados entram aqui.',
       action: { kind: 'meta', label: 'Criar meta' },
     });
     expect(phase3Empty(view, false).action).toBeNull();

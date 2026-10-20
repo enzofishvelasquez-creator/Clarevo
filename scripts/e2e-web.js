@@ -12903,6 +12903,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await move('e2e-f3-m3', 'resgate', 70000, '2026-07-20');
     await move('e2e-f3-m4', 'rendimento', 500, '2026-08-15', null);
     await move('e2e-f3-m5', 'aporte', 30000, '2026-09-05');
+    // A criação da meta vem do relógio de agora (outubro); aqui a reserva "existe desde junho" para agosto, sem aporte nem resgate, ser um zero afirmado.
+    repo.goals.set(reserva.id, { ...repo.goals.get(reserva.id), createdAt: '2026-06-01T12:00:00.000Z' });
   });
   // As escritas do repositório desde `from`, sem a geração do dia dos gastos fixos (que roda de novo a cada recarga de "outro aparelho").
   const f3WritesSince = async (from) => (await evSpyCalls()).slice(from).filter((x) => x !== 'syncSeriesOccurrences');
@@ -12944,13 +12946,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     new Set([...(await f3ReadsOf(f3R0, 'listCommitments'))]).size === 11, JSON.stringify(f3C12));
   await radio('6 meses').click(); await p.waitForTimeout(500);
 
-  // Guardado em metas na demonstração: as metas são de outubro, então nenhum mês fechado tem meta ativa.
+  // Guardado em metas na demonstração: as metas são de outubro, então nenhum mês fechado tem meta criada.
   const f3G0 = (await f3Reads()).length;
   await f3Pick('Guardado em metas');
   t = await f3Keep();
   const f3GReads = await f3ReadsOf(f3G0, 'listGoalMovementsInMonth');
   ok('Evolução fase 3, Guardado em metas na demonstração: "Sem registros nestes meses" (as metas são de outubro, o mês atual), a base "Aportes menos resgates nas metas", "Só meses já fechados" e o botão "Criar meta"', t.includes('Sem registros nestes meses') &&
-    t.includes('O Clarevo não tem meta ativa anotada nestes meses. Só meses já fechados entram aqui.') && t.includes(F3_BASE.guardado) && t.includes(F3_CLOSED) && (await visibleCount('button', 'Criar meta')) === 1 && (await evNames()).length === 0 && !/R\$ \d/.test(t) && !t.includes('Total dos meses exibidos'), t.slice(0, 500));
+    t.includes('O Clarevo não tem meta criada nestes meses. Só meses já fechados entram aqui.') && t.includes(F3_BASE.guardado) && t.includes(F3_CLOSED) && (await visibleCount('button', 'Criar meta')) === 1 && (await evNames()).length === 0 && !/R\$ \d/.test(t) && !t.includes('Total dos meses exibidos'), t.slice(0, 500));
   ok('Evolução fase 3, leituras: os movimentos das metas são lidos por mês fechado (maio a setembro), nunca o de outubro', JSON.stringify(f3Months(f3GReads)) === JSON.stringify(f3Closed(5, 9)), JSON.stringify(f3GReads));
   await evShots('572_evolucao_f3_guardado_sem_registros');
   await btn('Criar meta').click(); await waitText('Nova meta'); await p.waitForTimeout(500);
@@ -13039,9 +13041,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await waitText('Guardado em metas por mês', 15000); await p.waitForTimeout(600);
   t = await f3Keep();
   f3Names = await evNames();
-  ok('Evolução fase 3, Guardado em metas: maio sem registros (a meta é de outubro), junho R$ 1.000,00, julho -R$ 500,00 (aporte de R$ 200,00 e resgate de R$ 700,00), agosto R$ 0,00 com meta ativa (só um rendimento), setembro R$ 300,00 e outubro em andamento, sem o aporte de R$ 500,00 que ele já tem', f3Names.length === 6 &&
+  ok('Evolução fase 3, Guardado em metas: maio sem registros (a reserva existe desde junho), junho R$ 1.000,00, julho -R$ 500,00 (aporte de R$ 200,00 e resgate de R$ 700,00), agosto R$ 0,00 com meta já criada (só um rendimento), setembro R$ 300,00 e outubro em andamento, sem o aporte de R$ 500,00 que ele já tem', f3Names.length === 6 &&
     f3Names[0] === 'Maio de 2026, sem registros, fora da comparação' && f3Names[1] === 'Junho de 2026, R$ 1.000,00, na comparação' && f3Names[2] === 'Julho de 2026, -R$ 500,00, na comparação' &&
-    f3Names[3] === 'Agosto de 2026, R$ 0,00, sem aportes nem resgates, com meta ativa, na comparação' && f3Names[4] === 'Setembro de 2026, R$ 300,00, na comparação' && f3Names[5] === 'Outubro de 2026, mês em andamento, fora da comparação', JSON.stringify(f3Names));
+    f3Names[3] === 'Agosto de 2026, R$ 0,00, sem aportes nem resgates, com meta já criada, na comparação' && f3Names[4] === 'Setembro de 2026, R$ 300,00, na comparação' && f3Names[5] === 'Outubro de 2026, mês em andamento, fora da comparação', JSON.stringify(f3Names));
   ok('Evolução fase 3, Guardado em metas: média R$ 200,00, mediana R$ 150,00 e "4 de 4 meses" (o zero confirmado e o mês negativo entram), "Total dos meses exibidos" de R$ 800,00 e "Maior valor do gráfico: R$ 1.000,00"', t.includes('Média dos meses na comparação\nR$ 200,00\n4 de 4 meses') &&
     t.includes('Mediana dos meses na comparação\nR$ 150,00\n4 de 4 meses') && t.includes('Total dos meses exibidos\nR$ 800,00') && t.includes('Maior valor do gráfico: R$ 1.000,00') && t.includes(F3_BASE.guardado) && t.includes(F3_CLOSED), t.slice(300, 1400));
   const f3Zero = await f3ZeroLines();
@@ -13057,12 +13059,12 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await evShots('578_evolucao_f3_guardado_negativo', { scroll: evScroll('Julho de 2026') });
   await evPick('Agosto');
   t = await f3Keep();
-  ok('Evolução fase 3, painel de agosto (zero confirmado): "R$ 0,00" com "Sem aportes nem resgates, com meta ativa neste mês", a legenda "Sem aportes nem resgates, com meta ativa" e o interruptor', t.includes('Agosto de 2026\nGuardado em metas\nR$ 0,00\nSem aportes nem resgates, com meta ativa neste mês') && t.includes('Sem aportes nem resgates, com meta ativa\n') &&
+  ok('Evolução fase 3, painel de agosto (zero confirmado): "R$ 0,00" com "Sem aportes nem resgates, com meta já criada neste mês", a legenda "Sem aportes nem resgates, com meta já criada" e o interruptor', t.includes('Agosto de 2026\nGuardado em metas\nR$ 0,00\nSem aportes nem resgates, com meta já criada neste mês') && t.includes('Sem aportes nem resgates, com meta já criada\n') &&
     (await evSwitch().getAttribute('aria-checked')) === 'true' && (await evMark('Agosto')).kind === 'escolhido');
   await evShots('579_evolucao_f3_guardado_zero', { scroll: evScroll('Agosto de 2026') });
   await evPick('Maio');
   t = await f3Keep();
-  ok('Evolução fase 3, painel de maio (sem registros): "Sem registros" no lugar do valor, "nenhuma meta ativa anotada neste mês", sem interruptor e sem R$ 0,00 no painel', t.includes('Maio de 2026\nGuardado em metas\nSem registros\nSem registros: nenhuma meta ativa anotada neste mês') && t.includes('Este mês fica fora da comparação porque não tem registros.') &&
+  ok('Evolução fase 3, painel de maio (sem registros): "Sem registros" no lugar do valor, "nenhuma meta criada até este mês", sem interruptor e sem R$ 0,00 no painel', t.includes('Maio de 2026\nGuardado em metas\nSem registros\nSem registros: nenhuma meta criada até este mês') && t.includes('Este mês fica fora da comparação porque não tem registros.') &&
     (await visibleCount('switch', 'Mostrar este mês na comparação')) === 0 && !/Maio de 2026\nGuardado em metas\nR\$ 0,00/.test(t));
   // Julho fora da comparação: a média e a mediana mudam; o total, não.
   await evSet('Julho', false);
@@ -13075,12 +13077,18 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Evolução fase 3, 3 meses (agosto a outubro): agosto R$ 0,00 e setembro R$ 300,00, média R$ 150,00 e "2 de 2 meses"; o julho tirado fica fora desta janela e não muda a conta', (await evNames()).length === 3 && t.includes('Média dos meses na comparação\nR$ 150,00\n2 de 2 meses') && t.includes('Mediana dos meses na comparação\nR$ 150,00\n2 de 2 meses') && (await f3ZeroLines()).length === 0, JSON.stringify(await evNames()));
   await radio('6 meses').click(); await p.waitForTimeout(500);
   await evSet('Julho', true);
-  // Uma meta com saldo inicial em maio: o mês passa a ter meta ativa, e o zero é afirmado.
+  // Uma meta criada agora (outubro) com saldo inicial datado de maio: o saldo inicial não prova que a meta existia em maio, que segue sem registros.
   await otherDevice(async (repo, ctx) => repo.createGoal('e2e-f3-antiga', ctx, { goalType: 'objetivo', name: 'Meta antiga', targetCents: 100000, targetMonth: null, plannedMonthlyCents: null, essentialBaseCents: null, essentialMonths: null, essentialBaseSource: null, initialCents: 10000, initialOn: '2026-05-20' }));
   await p.waitForTimeout(1200);
   t = await f3Keep();
   f3Names = await evNames();
-  ok('Evolução fase 3, meta com saldo inicial em maio: maio vira "R$ 0,00, sem aportes nem resgates, com meta ativa" (o saldo inicial não é aporte), e as contas passam a 5 meses (média R$ 160,00, mediana R$ 0,00)', f3Names[0] === 'Maio de 2026, R$ 0,00, sem aportes nem resgates, com meta ativa, na comparação' && t.includes('Média dos meses na comparação\nR$ 160,00\n5 de 5 meses') &&
+  ok('Evolução fase 3, meta criada em outubro com saldo inicial em maio: maio segue "sem registros" (saldo inicial datado antes da criação não prova meta no mês) e a média segue R$ 200,00 em 4 meses', f3Names[0] === 'Maio de 2026, sem registros, fora da comparação' && t.includes('Média dos meses na comparação\nR$ 200,00\n4 de 4 meses') && !t.includes('5 de 5 meses'), JSON.stringify(f3Names));
+  // A mesma meta com a criação em 2 de maio (a data vem do relógio do banco; aqui o roteiro a recua): maio passa a ter meta, e o zero é afirmado.
+  await otherDevice(async (repo, ctx) => { const g = (await repo.listGoals(ctx)).find((x) => x.name === 'Meta antiga'); repo.goals.set(g.id, { ...repo.goals.get(g.id), createdAt: '2026-05-02T12:00:00.000Z' }); });
+  await p.waitForTimeout(1200);
+  t = await f3Keep();
+  f3Names = await evNames();
+  ok('Evolução fase 3, meta criada em 2 de maio, com saldo inicial em maio: maio vira "R$ 0,00, sem aportes nem resgates, com meta já criada" (o saldo inicial não é aporte), e as contas passam a 5 meses (média R$ 160,00, mediana R$ 0,00)', f3Names[0] === 'Maio de 2026, R$ 0,00, sem aportes nem resgates, com meta já criada, na comparação' && t.includes('Média dos meses na comparação\nR$ 160,00\n5 de 5 meses') &&
     t.includes('Mediana dos meses na comparação\nR$ 0,00\n5 de 5 meses') && t.includes('Total dos meses exibidos\nR$ 800,00'), JSON.stringify(f3Names));
   await radio('12 meses').click(); await p.waitForTimeout(900);
   names = await evNames();
@@ -13153,11 +13161,21 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     t.includes('Sem a renda de referência, não há com o que dividir as contas do mês. Ela é informada em Renda comprometida. Só meses já fechados entram aqui.') && (await visibleCount('button', 'Informar renda de referência')) === 1 && (await evNames()).length === 0 && !/R\$ \d/.test(t) && !t.includes('Média dos meses'), t.slice(0, 400));
   await evShots('584_evolucao_f3_conta_nova_comprometida');
   await btn('Informar renda de referência').click(); await waitText('Valor por mês'); await p.waitForTimeout(500);
-  ok('Evolução fase 3, "Informar renda de referência" abre o formulário da renda (/renda-comprometida/referencia)', evPath() === '/renda-comprometida/referencia', p.url());
+  ok('Evolução fase 3, "Informar renda de referência" abre o formulário da renda (/renda-comprometida/referencia) com "Vale a partir de" no mês fechado mais antigo da janela (maio de 2026, em 6 meses), e não no mês atual', evPath() === '/renda-comprometida/referencia' &&
+    (await radio('Vale a partir de maio de 2026').getAttribute('aria-checked')) === 'true' && (await radio('Vale a partir de outubro de 2026').getAttribute('aria-checked')) === 'false', p.url());
   await btn('Voltar').click(); await waitText('Sem base para estes meses'); await p.waitForTimeout(400);
+  await radio('3 meses').click(); await p.waitForTimeout(700);
+  await btn('Informar renda de referência').click(); await waitText('Valor por mês'); await p.waitForTimeout(500);
+  ok('Evolução fase 3, "Informar renda de referência" na janela de 3 meses: "Vale a partir de" em agosto de 2026, o mês fechado mais antigo dela', evPath() === '/renda-comprometida/referencia' && (await radio('Vale a partir de agosto de 2026').getAttribute('aria-checked')) === 'true', p.url());
+  await btn('Voltar').click(); await waitText('Sem base para estes meses'); await p.waitForTimeout(400);
+  await radio('12 meses').click(); await p.waitForTimeout(900);
+  await btn('Informar renda de referência').click(); await waitText('Valor por mês'); await p.waitForTimeout(500);
+  ok('Evolução fase 3, "Informar renda de referência" na janela de 12 meses: "Vale a partir de" em novembro de 2025, o mês fechado mais antigo dela', evPath() === '/renda-comprometida/referencia' && (await radio('Vale a partir de novembro de 2025').getAttribute('aria-checked')) === 'true', p.url());
+  await btn('Voltar').click(); await waitText('Sem base para estes meses'); await p.waitForTimeout(400);
+  await radio('6 meses').click(); await p.waitForTimeout(700);
   await f3Pick('Guardado em metas');
   t = await f3Keep();
-  ok('Evolução fase 3, conta nova, Guardado em metas: "Sem registros nestes meses", "nenhuma meta ativa anotada", o botão "Criar meta", sem total e sem R$ 0,00 de exemplo', t.includes('Sem registros nestes meses') && t.includes('O Clarevo não tem meta ativa anotada nestes meses.') && (await visibleCount('button', 'Criar meta')) === 1 && !t.includes('Total dos meses exibidos') && !t.includes('R$ 0,00') && (await evNames()).length === 0);
+  ok('Evolução fase 3, conta nova, Guardado em metas: "Sem registros nestes meses", "nenhuma meta criada", o botão "Criar meta", sem total e sem R$ 0,00 de exemplo', t.includes('Sem registros nestes meses') && t.includes('O Clarevo não tem meta criada nestes meses.') && (await visibleCount('button', 'Criar meta')) === 1 && !t.includes('Total dos meses exibidos') && !t.includes('R$ 0,00') && (await evNames()).length === 0);
   await evShots('585_evolucao_f3_conta_nova_guardado');
   // Família: a casa tem renda de referência desde agosto (R$ 8.000,00), contas em agosto e setembro e uma meta com saldo inicial em agosto e aporte em setembro; o Pessoal, só uma conta em setembro.
   await famGoFamilia();
@@ -13189,8 +13207,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await waitText('Guardado em metas por mês', 15000);
   names = await evNames();
   t = await f3Keep();
-  ok('Evolução fase 3, Família, Guardado em metas: agosto R$ 0,00 (a meta da casa tem saldo inicial em agosto) e setembro R$ 700,00, média R$ 350,00; as metas do Pessoal não entram', names[3] === 'Agosto de 2026, R$ 0,00, sem aportes nem resgates, com meta ativa, na comparação' && names[4] === 'Setembro de 2026, R$ 700,00, na comparação' &&
-    t.includes('Média dos meses na comparação\nR$ 350,00\n2 de 2 meses') && t.includes('Total dos meses exibidos\nR$ 700,00'), JSON.stringify(names));
+  ok('Evolução fase 3, Família, Guardado em metas: agosto sem registros (a meta da casa foi criada em outubro, e o saldo inicial de agosto não prova meta no mês) e setembro R$ 700,00, média R$ 700,00 em 1 de 1 mês; as metas do Pessoal não entram', names[3] === 'Agosto de 2026, sem registros, fora da comparação' && names[4] === 'Setembro de 2026, R$ 700,00, na comparação' &&
+    t.includes('Média dos meses na comparação\nR$ 700,00\n1 de 1 mês') && t.includes('Total dos meses exibidos\nR$ 700,00'), JSON.stringify(names));
   await evSet('Setembro', false);
   await btn('Voltar').click(); await waitText('Registrar recebimento');
   await famTab('Ver dados de Pessoal').click(); await p.waitForTimeout(500);

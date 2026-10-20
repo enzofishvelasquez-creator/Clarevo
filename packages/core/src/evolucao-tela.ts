@@ -137,8 +137,8 @@ export const EVOLUTION_TEXT = {
     selected: 'Mês escolhido',
     /** Renda comprometida: mês fechado sem renda de referência. */
     noBase: 'Sem base',
-    /** Guardado em metas: mês fechado sem aporte nem resgate, com meta ativa. */
-    zeroSaved: 'Sem aportes nem resgates, com meta ativa',
+    /** Guardado em metas: mês fechado sem aporte nem resgate, com meta já criada. */
+    zeroSaved: 'Sem aportes nem resgates, com meta já criada',
   },
   /** O que cada mês do eixo é, para quem lê só o texto. */
   participation: {
@@ -148,7 +148,7 @@ export const EVOLUTION_TEXT = {
     noRecords: 'sem registros',
     zeroConfirmed: MONTH_CHECK_TEXT.zeroConfirmed,
     noBase: 'sem base',
-    zeroSaved: 'sem aportes nem resgates, com meta ativa',
+    zeroSaved: 'sem aportes nem resgates, com meta já criada',
   },
   stats: {
     average: 'Média dos meses na comparação',
@@ -330,8 +330,8 @@ export const EVOLUTION_TEXT = {
       },
       guardado: {
         com_registros: 'Com aportes ou resgates',
-        zero_confirmado: 'Sem aportes nem resgates, com meta ativa neste mês',
-        sem_registros: 'Sem registros: nenhuma meta ativa anotada neste mês',
+        zero_confirmado: 'Sem aportes nem resgates, com meta já criada neste mês',
+        sem_registros: 'Sem registros: nenhuma meta criada até este mês',
         em_andamento: 'Mês em andamento: só meses já fechados entram aqui',
       },
     },
@@ -363,7 +363,7 @@ export const EVOLUTION_TEXT = {
       noRecordsBody:
         'Mês sem conta anotada não quer dizer mês sem contas: aqui aparece só o que está registrado no Clarevo. Só meses já fechados entram aqui.',
       noRecordsAction: 'Anotar conta a pagar',
-      savingsBody: 'O Clarevo não tem meta ativa anotada nestes meses. Só meses já fechados entram aqui.',
+      savingsBody: 'O Clarevo não tem meta criada nestes meses. Só meses já fechados entram aqui.',
       savingsAction: 'Criar meta',
     },
   },
