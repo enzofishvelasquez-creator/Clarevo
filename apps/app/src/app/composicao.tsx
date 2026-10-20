@@ -1,4 +1,19 @@
-import { BUDGET_TEXT, CARDS_TEXT, ERROR_TEXT, MONTH_CHECK_TEXT, formatBRL, formatMonthBR, monthCheckPlan, payablesMonthParams, type CategoryShare, type MonthCheckKind } from '@clarevo/core';
+import {
+  BUDGET_TEXT,
+  CARDS_TEXT,
+  ERROR_TEXT,
+  MONTH_CHECK_TEXT,
+  formatBRL,
+  formatMonthBR,
+  isLongList,
+  monthCheckPlan,
+  payablesMonthParams,
+  titledRows,
+  type CategoryShare,
+  type FinancialRecord,
+  type MonthCheckKind,
+  type TitledRow,
+} from '@clarevo/core';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { Check, Minus, Plus } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
@@ -10,7 +25,7 @@ import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
 import { EmptyState, ErrorState } from '@/components/states';
 import { TopicLink } from '@/components/topic-link';
-import { Button, Card, FitMoney, LinkButton, Money, Screen, Skeleton, spaceKeyPress, Txt } from '@/components/ui';
+import { Button, Card, CardSlice, FitMoney, LinkButton, Money, ScreenList, Skeleton, spaceKeyPress, Txt } from '@/components/ui';
 import { maskMoneyLabel, useValuesHidden } from '@/lib/privacy';
 import { useSession } from '@/state/session';
 import { currentMonthOf, useCategoryBreakdown, useMonthBudget, useMonthCheckRow, useMonthRecords, useWork, useView } from '@/state/data';
@@ -25,6 +40,12 @@ const COPY = {
       'Recebimentos menos pagamentos confirmados no período. Não é o saldo da conta nem dinheiro disponível: o saldo também depende do saldo inicial e de outros movimentos. Contas a pagar não entram.',
   },
 } as const;
+
+/** Um total da tela: o recebido, o pago (ou os dois, na diferença do mês). */
+type Section = { label: string; total: number; list: FinancialRecord[]; kind: 'receita' | 'despesa' };
+
+/** Linha da lista: o cartão de um total inteiro (poucos registros) ou, na lista longa, o título e um registro por linha. */
+type Cell = { section: Section } & ({ type: 'card'; key: string; first: boolean; last: boolean } | TitledRow<FinancialRecord>);
 
 type Breakdown = 'registro' | 'categoria';
 const BREAKDOWNS: { value: Breakdown; label: string }[] = [
@@ -87,80 +108,128 @@ function Composicao({ kind, byCategory: startByCategory }: { kind: keyof typeof 
     />
   );
 
+  /** O cartão de um total, como sempre foi: o título com o valor e todas as linhas (ou o estado vazio com a conferência do mês). */
+  const sectionCard = (sec: Section) => {
+    // Só o mês terminado, sem registros do tipo, e com a leitura da conferência carregada (nunca um "conferido" que não foi lido).
+    const kind: MonthCheckKind = sec.kind === 'receita' ? 'recebimentos' : 'pagamentos';
+    const plan = sec.list.length === 0 && checks.row ? monthCheckPlan(checks.row, kind, currentMonth, canWrite) : null;
+    return (
+      <Card>
+        <View style={styles.head}>
+          <Txt variant="title" accessibilityRole="header" aria-level={2}>
+            {sec.label}
+          </Txt>
+          <Money cents={sec.total} variant="title" />
+        </View>
+        {sec.list.length === 0 ? (
+          <EmptyState
+            title="Nenhum registro neste critério"
+            action={
+              <View style={{ gap: space[3], alignSelf: 'stretch' }}>
+                <MonthCheckBlock contextId={personal?.contextId} plan={plan} />
+                {plan?.state === 'conferido' ? null : emptyAction(sec.kind)}
+              </View>
+            }>
+            {plan?.state === 'sem_registros' ? MONTH_CHECK_TEXT.unchecked(kind) : undefined}
+          </EmptyState>
+        ) : (
+          sec.list.map((r, i) => <RecordRow key={r.id} record={r} last={i === sec.list.length - 1} onPress={() => router.push(`/registro/${r.id}`)} />)
+        )}
+      </Card>
+    );
+  };
+
+  // Total com muitos registros (D-062 item 5): a lista monta só as linhas perto da tela. Abaixo disso, o cartão de sempre.
+  const cells: Cell[] =
+    byCategory && s
+      ? []
+      : sections.flatMap((sec): Cell[] =>
+          isLongList(sec.list.length)
+            ? titledRows(sec.label, sec.list, (r) => r.id).map((row) => ({ ...row, section: sec }))
+            : [{ type: 'card', key: sec.label, first: true, last: true, section: sec }],
+        );
+
+  const header = (
+    <View style={{ gap: space[4] }}>
+      <View style={{ gap: space[1] }}>
+        <Txt variant="caption" color={colors.textSecondary}>
+          Pessoal · {formatMonthBR(month)}
+        </Txt>
+        {records.isPending ? (
+          <Skeleton width={180} height={40} />
+        ) : records.isError || !s ? (
+          <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => records.refetch()} />
+        ) : (
+          <FitMoney cents={kind === 'diferenca' ? s.differenceCents : sections[0]!.total} />
+        )}
+        <Txt color={colors.textSecondary}>{copy.criterio}</Txt>
+      </View>
+
+      {kind === 'pago' && s ? <Segment value={breakdown} onChange={setBreakdown} /> : null}
+
+      {byCategory && s ? (
+        categories.isPending ? (
+          <Card>
+            <Skeleton width="100%" height={120} />
+          </Card>
+        ) : categories.isError || !categories.data ? (
+          <Card>
+            <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => categories.refetch()} />
+          </Card>
+        ) : (
+          <CategoryCard
+            shares={categories.data}
+            totalCents={s.paidCents}
+            action={emptyAction('despesa')}
+            invoiceNote={hasInvoicePayment}
+            budgets={budgets}
+            month={month}
+            currentMonth={currentMonth}
+          />
+        )
+      ) : null}
+    </View>
+  );
+
+  /** Uma linha da lista: o cartão inteiro (poucos registros) ou um pedaço dele (título do total, ou um registro). */
+  const renderCell = ({ item }: { item: Cell }) => {
+    // O vão de 16 px entre o que vem antes e o primeiro pedaço de cada cartão (o mesmo vão que a tela sempre teve).
+    const spacing = item.first ? styles.cellFirst : null;
+    if (item.type === 'card') return <View style={spacing}>{sectionCard(item.section)}</View>;
+    return (
+      <View style={spacing}>
+        <CardSlice first={item.first} last={item.last}>
+          {item.type === 'title' ? (
+            <View style={styles.head}>
+              <Txt variant="title" accessibilityRole="header" aria-level={2}>
+                {item.section.label}
+              </Txt>
+              <Money cents={item.section.total} variant="title" />
+            </View>
+          ) : (
+            <RecordRow record={item.item} last={item.lastItem} onPress={() => router.push(`/registro/${item.item.id}`)} />
+          )}
+        </CardSlice>
+      </View>
+    );
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title={copy.title} right={<ContextPill label="Pessoal" />} />
-      <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
-        <View style={{ gap: space[1] }}>
-          <Txt variant="caption" color={colors.textSecondary}>
-            Pessoal · {formatMonthBR(month)}
-          </Txt>
-          {records.isPending ? (
-            <Skeleton width={180} height={40} />
-          ) : records.isError || !s ? (
-            <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => records.refetch()} />
-          ) : (
-            <FitMoney cents={kind === 'diferenca' ? s.differenceCents : sections[0]!.total} />
-          )}
-          <Txt color={colors.textSecondary}>{copy.criterio}</Txt>
-        </View>
-
-        {kind === 'pago' && s ? <Segment value={breakdown} onChange={setBreakdown} /> : null}
-
-        {byCategory && s ? (
-          categories.isPending ? (
-            <Card>
-              <Skeleton width="100%" height={120} />
-            </Card>
-          ) : categories.isError || !categories.data ? (
-            <Card>
-              <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => categories.refetch()} />
-            </Card>
-          ) : (
-            <CategoryCard
-              shares={categories.data}
-              totalCents={s.paidCents}
-              action={emptyAction('despesa')}
-              invoiceNote={hasInvoicePayment}
-              budgets={budgets}
-              month={month}
-              currentMonth={currentMonthOf(today)}
-            />
-          )
-        ) : (
-          sections.map((sec) => {
-            // Só o mês terminado, sem registros do tipo, e com a leitura da conferência carregada (nunca um "conferido" que não foi lido).
-            const kind: MonthCheckKind = sec.kind === 'receita' ? 'recebimentos' : 'pagamentos';
-            const plan = sec.list.length === 0 && checks.row ? monthCheckPlan(checks.row, kind, currentMonth, canWrite) : null;
-            return (
-            <Card key={sec.label}>
-              <View style={styles.head}>
-                <Txt variant="title">{sec.label}</Txt>
-                <Money cents={sec.total} variant="title" />
-              </View>
-              {sec.list.length === 0 ? (
-                <EmptyState
-                  title="Nenhum registro neste critério"
-                  action={
-                    <View style={{ gap: space[3], alignSelf: 'stretch' }}>
-                      <MonthCheckBlock contextId={personal?.contextId} plan={plan} />
-                      {plan?.state === 'conferido' ? null : emptyAction(sec.kind)}
-                    </View>
-                  }>
-                  {plan?.state === 'sem_registros' ? MONTH_CHECK_TEXT.unchecked(kind) : undefined}
-                </EmptyState>
-              ) : (
-                sec.list.map((r, i) => (
-                  <RecordRow key={r.id} record={r} last={i === sec.list.length - 1} onPress={() => router.push(`/registro/${r.id}`)} />
-                ))
-              )}
-            </Card>
-            );
-          })
-        )}
-
-        <TopicLink slug="diferenca" label="Como este total é calculado?" color={colors.textSecondary} />
-      </Screen>
+      <ScreenList
+        data={cells}
+        keyExtractor={(c) => c.key}
+        renderItem={renderCell}
+        extraData={[checks.row, canWrite, month]}
+        contentStyle={{ padding: space[5] }}
+        header={header}
+        footer={
+          <View style={styles.cellFirst}>
+            <TopicLink slug="diferenca" label="Como este total é calculado?" color={colors.textSecondary} />
+          </View>
+        }
+      />
     </View>
   );
 }
@@ -221,7 +290,9 @@ function CategoryCard({
   return (
     <Card style={{ gap: space[3] }}>
       <View style={styles.head}>
-        <Txt variant="title">Pago</Txt>
+        <Txt variant="title" accessibilityRole="header" aria-level={2}>
+          Pago
+        </Txt>
         <Money cents={totalCents} variant="title" />
       </View>
       {shares.length === 0 ? (
@@ -277,6 +348,7 @@ function CategoryCard({
 }
 
 const styles = StyleSheet.create({
+  cellFirst: { marginTop: space[4] },
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space[1], gap: space[2] },
   track: { flexDirection: 'row', backgroundColor: '#E6EBF5', borderRadius: radius.md, padding: 4, gap: 4 },
   option: { flex: 1, minHeight: 48, borderRadius: radius.sm, flexDirection: 'row', gap: space[1], alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[2] },

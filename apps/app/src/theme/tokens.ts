@@ -18,6 +18,7 @@ export const colors = {
   surface: '#FFFFFF',
   background: '#F6F8FC',
   brandTint: '#EAF0FF',
+  brandTintPressed: '#DDE7FF', // botão suave pressionado: azul sobre ele 4,51:1 (era #DCE6FF, 4,47:1)
   border: '#E3E8F2', // divisórias decorativas
   borderStrong: '#7D8AA6', // contorno de campos e chips: 3,4:1 sobre branco
   error: '#B42318',
@@ -25,7 +26,7 @@ export const colors = {
   success: '#087E58',
   successText: '#06704F', // texto sobre successTint: 5,6:1
   successTint: '#E3F5EE',
-  placeholder: '#68748C', // 4,7:1 sobre branco
+  placeholder: '#616D85', // 5,2:1 sobre branco e 4,55:1 sobre o fundo de erro (era #68748C, 4,11:1 no campo com erro)
 } as const;
 
 export const space = { 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 24, 8: 32, 10: 40 } as const;

@@ -62,7 +62,7 @@ const TabFace = forwardRef<View, FaceProps>(function TabFace({ focused, label, a
         (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid' },
       ]}>
       <Icon size={22} color={color} strokeWidth={focused ? 2.25 : 2} />
-      <Txt variant="caption" color={color} style={{ fontFamily: fonts.bold, fontSize: narrow ? 11.5 : 13 }} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+      <Txt variant="caption" color={color} style={{ fontFamily: fonts.bold, fontSize: narrow ? 11.5 : 13 }} numberOfLines={1} maxFontSizeMultiplier={1.3} adjustsFontSizeToFit minimumFontScale={0.8}>
         {label}
       </Txt>
     </Pressable>

@@ -267,7 +267,9 @@ export function useMonthRecords(contextId: string | undefined, month: IsoMonth) 
     queryFn: () => repo.listRecords(contextId!, month),
     enabled: Boolean(contextId),
   });
-  const summary = query.data && contextId ? summarizeMonth(query.data, contextId, month) : null;
+  // Os totais do mês só são refeitos quando os registros mudam (não a cada quadro da tela, com centenas de lançamentos).
+  const data = query.data;
+  const summary = useMemo(() => (data && contextId ? summarizeMonth(data, contextId, month) : null), [data, contextId, month]);
   return { ...query, summary };
 }
 
@@ -416,7 +418,8 @@ export function useCommitments(contextId: string | undefined, month: IsoMonth) {
     enabled: Boolean(contextId) && synced(sync),
   });
   const result = afterSync(sync, query);
-  const summary = result.data && contextId ? summarizeToPay(result.data, contextId, month, today) : null;
+  const data = result.data;
+  const summary = useMemo(() => (data && contextId ? summarizeToPay(data, contextId, month, today) : null), [data, contextId, month, today]);
   return { ...result, summary };
 }
 

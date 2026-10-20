@@ -42,7 +42,7 @@ export function ScanLine({ onPress, disabled, variant = 'nota' }: { onPress: () 
       accessibilityLabel={proof ? COMPROVANTE_TEXT.lineA11y : NOTA_FLOW_TEXT.scanLineA11y}
       disabled={disabled}
       onPress={onPress}
-      style={(s) => [styles.scanLine, (s as { focused?: boolean }).focused && ui.focusRing, s.pressed && { backgroundColor: '#DCE6FF' }]}>
+      style={(s) => [styles.scanLine, (s as { focused?: boolean }).focused && ui.focusRing, s.pressed && { backgroundColor: colors.brandTintPressed }]}>
       <Icon size={24} color={colors.brand} strokeWidth={2.25} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.bold }}>

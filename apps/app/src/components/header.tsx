@@ -1,4 +1,4 @@
-import { addMonths, contextLabelFor, contextPillText, formatMonthBR } from '@clarevo/core';
+import { DEMO_PILL_MAX_FONT_SCALE, addMonths, contextLabelFor, contextPillText, formatMonthBR } from '@clarevo/core';
 import { router } from 'expo-router';
 import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, Users } from 'lucide-react-native';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -37,7 +37,7 @@ function eyeFits(windowWidth: number, narrow: boolean, demo: boolean): boolean {
   const gap = narrow ? space[2] : space[3];
   const row = Math.min(windowWidth, 560) - 2 * space[6];
   const logo = (narrow ? 20 : 24) * (LOGOTYPE_WIDTH / LOGOTYPE_HEIGHT);
-  const pill = demo ? DEMO_PILL_WIDTH * Math.max(1, PixelRatio.getFontScale()) + gap : 0;
+  const pill = demo ? DEMO_PILL_WIDTH * Math.min(DEMO_PILL_MAX_FONT_SCALE, Math.max(1, PixelRatio.getFontScale())) + gap : 0;
   return logo + gap + pill + 44 + gap + 44 <= row;
 }
 
@@ -264,7 +264,8 @@ const styles = StyleSheet.create({
   inner: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: space[6], paddingTop: space[4], paddingBottom: space[6] },
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space[5], gap: space[3] },
   topRight: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
-  title: { fontSize: 24, lineHeight: 32, marginBottom: space[4] },
+  // overflowWrap (web): uma palavra mais larga que a faixa quebra em vez de passar da tela com letra muito grande; no aparelho o texto já quebra.
+  title: { fontSize: 24, lineHeight: 32, marginBottom: space[4], overflowWrap: 'anywhere' } as object,
   titleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[3], rowGap: space[1], marginBottom: space[4] },
   avatar: { minWidth: 44, height: 44, paddingHorizontal: 4, borderRadius: 22, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   eye: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
@@ -273,8 +274,9 @@ const styles = StyleSheet.create({
   backBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   subMain: { flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[2], rowGap: space[1] },
   // O título ocupa a largura natural: se não couber numa linha ao lado do contexto, o contexto passa para baixo.
-  subTitle: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 },
-  pill: { backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: space[1], marginRight: space[3] },
+  subTitle: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0, overflowWrap: 'anywhere' } as object,
+  // flexShrink: com letra grande, o texto quebra dentro da pílula em vez de passar da largura da tela.
+  pill: { backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: space[1], marginRight: space[3], flexShrink: 1 },
   pillDemo: { backgroundColor: colors.accent },
   track: { flexDirection: 'row', backgroundColor: colors.brandDeep, borderRadius: radius.md, padding: 4 },
   indicator: { position: 'absolute', left: 4, top: 4, bottom: 4, borderRadius: 13, backgroundColor: colors.surface },

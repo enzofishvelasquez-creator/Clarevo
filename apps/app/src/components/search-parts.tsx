@@ -2,7 +2,7 @@ import { SEARCH_TEXT, type CardEntry } from '@clarevo/core';
 import { ChevronRight, CreditCard, Search } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import { Money, Txt, styles as ui } from '@/components/ui';
+import { Money, Txt, clampLines, styles as ui } from '@/components/ui';
 import { moneyA11y, useValuesHidden } from '@/lib/privacy';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -55,10 +55,10 @@ export function PurchaseRow({ entry, cardName, last, onPress }: { entry: CardEnt
         <CreditCard size={18} color={colors.brand} aria-hidden />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={2}>
+        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={clampLines(2)}>
           {entry.description}
         </Txt>
-        <Txt variant="caption" color={colors.textSecondary} numberOfLines={2}>
+        <Txt variant="caption" color={colors.textSecondary}>
           {caption}
         </Txt>
         {stacked ? <Money cents={entry.amountCents} variant="label" style={styles.amount} /> : null}

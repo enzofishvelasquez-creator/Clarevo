@@ -17,7 +17,7 @@ import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { GoalProgress } from '@/components/goal-progress';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
-import { Card, FitMoney, LinkButton, Money, Txt, styles as ui } from '@/components/ui';
+import { Card, FitMoney, LinkButton, Money, Txt, clampLines, styles as ui } from '@/components/ui';
 import { cardHref, invoiceHref } from '@/lib/cards';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
@@ -58,7 +58,7 @@ export function CardTile({ summary, today }: { summary: CardSummary; today: IsoD
           <CreditCard size={20} color={colors.brand} strokeWidth={2.25} aria-hidden />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Txt variant="title" numberOfLines={2} style={{ fontSize: 17, lineHeight: 24 }}>
+          <Txt variant="title" numberOfLines={clampLines(2)} style={{ fontSize: 17, lineHeight: 24 }}>
             {card.name}
           </Txt>
           {fin || archived ? (
@@ -134,7 +134,7 @@ export function InvoiceRow({ invoice, today, last }: { invoice: Invoice; today: 
         <Receipt size={18} color={colors.brand} aria-hidden />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={2}>
+        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={clampLines(2)}>
           {t.title}
         </Txt>
         <Txt variant="caption" color={colors.textSecondary}>

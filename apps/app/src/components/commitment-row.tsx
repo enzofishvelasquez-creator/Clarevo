@@ -13,7 +13,7 @@ import { AlertCircle, CalendarClock, CalendarRange, Check, type LucideIcon } fro
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { DueDaySign } from '@/components/due-day-notice';
-import { Txt } from '@/components/ui';
+import { Txt, clampLines } from '@/components/ui';
 import { maskMoneyLabel, maskMoneyText, moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
@@ -113,7 +113,7 @@ export function CommitmentRow({
         <look.Icon size={18} color={situation === 'paga' || situation === 'paga_em_parte' ? colors.success : look.fg} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={2}>
+        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={clampLines(2)}>
           {c.description}
         </Txt>
         <Txt
@@ -148,7 +148,7 @@ function RowActionButton({ label, accessibilityLabel, onPress, icon: Icon = Chec
       onPress={onPress}
       style={(s) => [
         styles.action,
-        { backgroundColor: s.pressed ? '#DCE6FF' : colors.brandTint, opacity: disabled ? 0.65 : 1 },
+        { backgroundColor: s.pressed ? colors.brandTintPressed : colors.brandTint, opacity: disabled ? 0.65 : 1 },
         !disabled && (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid', outlineOffset: 2 },
       ]}>
       <Icon size={18} color={colors.brand} strokeWidth={2.25} />
@@ -198,7 +198,7 @@ export function AnnualGroupRow({ group: g, onPress, last }: { group: AnnualGroup
         <CalendarRange size={18} color={colors.brand} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={2}>
+        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={clampLines(2)}>
           {g.title}
         </Txt>
         <Txt variant="caption" color={colors.textSecondary}>
