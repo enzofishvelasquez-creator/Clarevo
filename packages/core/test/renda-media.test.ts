@@ -15,6 +15,8 @@ import {
   isRepoError,
   loadIncomeAverage,
   newOperationKey,
+  suggestReference,
+  withoutReimbursements,
   type IncomeAverageChoice,
   type IncomeAverageOutcome,
   type IsoMonth,
@@ -25,7 +27,8 @@ import {
 /**
  * Renda variável (D-062 item 2, Ciclo V): "Calcular pela média" no formulário da renda de referência. A média do Recebido dos 3 ou dos 6
  * meses fechados antes do mês de hoje, com as regras da Evolução (D04, D-060): entra o mês com recebimentos e o mês conferido como zero;
- * fica de fora o mês atual e o mês sem registros. A conta é a exata de `comparisonStats` (metade para cima no centavo).
+ * fica de fora o mês atual e o mês sem registros. A conta é a exata de `comparisonStats` (metade para cima no centavo). Reembolsos ficam
+ * fora (D-026(2)), como na sugestão "Usar R$ X".
  */
 
 const row = (month: string, receivedCents = 0, over: Partial<MonthOverview> = {}): MonthOverview => ({
@@ -142,8 +145,9 @@ describe('incomeAverage: a média exata do Recebido', () => {
     expect(ok(incomeAverage([row('2026-07', 1), row('2026-08', 2)], 3, NOW)).averageCents).toBe(2);
     // Dois meses de R$ 0,01 e um zero conferido: 2 ÷ 3 = 0,67: 1.
     expect(ok(incomeAverage([row('2026-07', 1), row('2026-08', 1), row('2026-09', 0, { receivedChecked: true })], 3, NOW)).averageCents).toBe(1);
-    // 1 ÷ 3 = 0,33 arredonda para zero, e a referência não pode ser zero: não há valor para preencher.
-    expect(incomeAverage([row('2026-07', 1), row('2026-08', 0, { receivedChecked: true }), row('2026-09', 0, { receivedChecked: true })], 3, NOW)).toMatchObject({ ok: false, reason: 'sem_meses' });
+    // 1 ÷ 3 = 0,33 arredonda para zero, e a referência não pode ser zero: não há valor para preencher. Há recebimento (R$ 0,01), então o
+    // motivo não é "sem_meses".
+    expect(incomeAverage([row('2026-07', 1), row('2026-08', 0, { receivedChecked: true }), row('2026-09', 0, { receivedChecked: true })], 3, NOW)).toMatchObject({ ok: false, reason: 'media_zero' });
     // Com seis meses: 6 ÷ 6 = 1 e 7 ÷ 6 = 1,17 dão 1; 9 ÷ 6 = 1,5 dá 2.
     const six = (cents: number[]) => cents.map((c, i) => row(`2026-0${4 + i}`, c));
     expect(ok(incomeAverage(six([1, 1, 1, 1, 1, 2]), 6, NOW)).averageCents).toBe(1);
@@ -181,7 +185,10 @@ describe('incomeAverage: a média exata do Recebido', () => {
     expect(six.window).toEqual(['2026-08', '2026-09', '2026-10', '2026-11', '2026-12', '2027-01']);
     expect(six.included).toEqual(['2026-09', '2026-10', '2026-11', '2026-12', '2027-01']);
     expect(six.excluded).toEqual(['2026-08']);
-    expect(six.averageCents).toBe(Math.round((900_000 + 400_000 + 500_000 + 600_000 + 9_000_000) / 5));
+    // 11.400.000 ÷ 5 = 2.280.000, metade para cima em inteiros (bigint): (2·soma + n) ÷ 2n, sem ponto flutuante.
+    const sum = 900_000n + 400_000n + 500_000n + 600_000n + 9_000_000n;
+    expect(six.averageCents).toBe(Number((2n * sum + 5n) / (2n * 5n)));
+    expect(six.averageCents).toBe(2_280_000);
   });
 
   it('é a mesma conta da Evolução (comparisonStats) e não altera as linhas recebidas', () => {
@@ -272,12 +279,17 @@ describe('loadIncomeAverage: a leitura de months_overview do contexto escolhido'
     expect(ok(await loadIncomeAverage(vera.repo, fam, NOW, 6))).toMatchObject({ averageCents: 900_000, excluded: ['2026-04', '2026-05', '2026-06'] });
   });
 
-  it('só lê: pede um único months_overview, dos meses da janela, e nenhuma escrita; a falha da leitura passa como veio', async () => {
+  it('só lê: pede um months_overview, dos meses da janela, e os registros só dos meses com recebimentos, sem escrita; a falha da leitura passa como veio', async () => {
     const calls: unknown[][] = [];
+    const reads: unknown[][] = [];
     const fake = {
       monthsOverview: async (...args: unknown[]) => {
         calls.push(args);
         return [row('2026-09', 510_000)];
+      },
+      listRecords: async (...args: unknown[]) => {
+        reads.push(args);
+        return [{ kind: 'receita', category: 'Salário', occurredOn: '2026-09-05', amountCents: 510_000 }] as never;
       },
     };
     expect(ok(await loadIncomeAverage(fake, 'ctx', NOW, 3)).averageCents).toBe(510_000);
@@ -286,11 +298,120 @@ describe('loadIncomeAverage: a leitura de months_overview do contexto escolhido'
       ['ctx', '2026-07', '2026-09'],
       ['ctx', '2026-04', '2026-09'],
     ]);
+    // Julho e agosto (sem linha) e abril a agosto não têm recebimento: só setembro tem os registros lidos.
+    expect(reads).toEqual([
+      ['ctx', '2026-09'],
+      ['ctx', '2026-09'],
+    ]);
     const boom = new Error('rede caiu');
-    await expect(loadIncomeAverage({ monthsOverview: async () => Promise.reject(boom) }, 'ctx', NOW, 3)).rejects.toBe(boom);
+    await expect(loadIncomeAverage({ ...fake, monthsOverview: async () => Promise.reject(boom) }, 'ctx', NOW, 3)).rejects.toBe(boom);
+    await expect(loadIncomeAverage({ ...fake, listRecords: async () => Promise.reject(boom) }, 'ctx', NOW, 3)).rejects.toBe(boom);
     // Janela inválida nem chega a ler.
     await expect(loadIncomeAverage(fake, 'ctx', NOW, 4 as IncomeAverageChoice)).rejects.toBeInstanceOf(RangeError);
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(3);
+    expect(reads).toHaveLength(2);
+  });
+});
+
+describe('reembolsos ficam fora da média (D-026(2)), como em "Usar R$ X"', () => {
+  const rec = (month: string, amountCents: number, category: string | null = 'Salário', kind: 'receita' | 'despesa' = 'receita') => ({
+    kind,
+    category,
+    occurredOn: `${month}-05`,
+    amountCents,
+  });
+
+  it('withoutReimbursements: tira só a categoria Reembolso (sem caixa e sem espaços nas pontas), sem tocar nas linhas recebidas', () => {
+    const rows = [row('2026-07', 430_000), row('2026-08', 620_000), row('2026-09', 0, { receivedChecked: true })];
+    const copy = JSON.parse(JSON.stringify(rows)) as MonthOverview[];
+    const out = withoutReimbursements(rows, [
+      rec('2026-07', 400_000, 'Salário'),
+      rec('2026-07', 30_000, 'Reembolso'),
+      rec('2026-08', 120_000, 'Renda extra'),
+      rec('2026-08', 500_000, ' reembolso '),
+      rec('2026-08', 900_000, 'REEMBOLSO'),
+      rec('2026-08', 7_000, null),
+      rec('2026-08', 55_555, 'Mercado', 'despesa'),
+      rec('2026-06', 99_999, 'Salário'),
+    ]);
+    expect(out[0]).toMatchObject({ month: '2026-07', receivedCount: 1, receivedCents: 400_000 });
+    // "Sem categoria" não é reembolso; gasto e registro de outro mês não entram.
+    expect(out[1]).toMatchObject({ month: '2026-08', receivedCount: 2, receivedCents: 127_000 });
+    // Linha sem recebimentos fica como veio, com a marca "Conferi este mês".
+    expect(out[2]).toEqual(rows[2]);
+    expect(rows).toEqual(copy);
+  });
+
+  it('o mês que só tem reembolsos vale "sem registros", e a marca antiga não faz dele um zero conferido', () => {
+    const rows = [row('2026-07', 430_000), row('2026-08', 800_000, { receivedChecked: true }), row('2026-09', 510_000)];
+    const out = ok(incomeAverage(withoutReimbursements(rows, [rec('2026-07', 430_000), rec('2026-08', 800_000, 'Reembolso'), rec('2026-09', 510_000)]), 3, NOW));
+    expect(out).toMatchObject({ averageCents: 470_000, included: ['2026-07', '2026-09'], excluded: ['2026-08'], zeroConfirmed: [] });
+  });
+
+  it('um reembolso grande não muda a média: com e sem ele, o mesmo valor, os mesmos meses e a mesma contagem', async () => {
+    const hub = new MemoryFamilyHub({ now: () => Date.parse('2026-10-07T12:00:00.000Z') });
+    const repo = new MemoryRepository({ actorId: 'ana', displayName: 'ana', today: () => '2026-10-07', family: hub });
+    const space = await repo.ensurePersonalSpace('Conta principal');
+    const ctx = space.personalContextId;
+    const acc = space.accounts[0]!.id;
+    const receive = (amountCents: number, occurredOn: string, category: string) =>
+      repo.createRecord(newOperationKey(), ctx, 'receita', { accountId: acc, amountCents, occurredOn, description: 'Recebimento', category });
+    await receive(430_000, '2026-07-05', 'Salário');
+    await receive(620_000, '2026-08-05', 'Salário');
+    await receive(510_000, '2026-09-05', 'Salário');
+    const before = ok(await loadIncomeAverage(repo, ctx, NOW, 3));
+    expect(before.averageCents).toBe(520_000);
+    // Um reembolso de R$ 80.000,00 em agosto e outro de R$ 1.234,56 em setembro: com eles somados, a média passaria de R$ 22.000,00.
+    await receive(8_000_000, '2026-08-20', 'Reembolso');
+    await receive(123_456, '2026-09-20', 'reembolso');
+    const after = ok(await loadIncomeAverage(repo, ctx, NOW, 3));
+    expect(after).toEqual(before);
+    expect(after.points.find((p) => p.month === '2026-08')).toMatchObject({ cents: 620_000, count: 1 });
+    // Recebimento que não é reembolso continua entrando (Renda extra).
+    await receive(100_000, '2026-08-25', 'Renda extra');
+    // Agosto passa a R$ 7.200,00: (4.300,00 + 7.200,00 + 5.100,00) ÷ 3 = 5.533,33.
+    expect(ok(await loadIncomeAverage(repo, ctx, NOW, 3)).averageCents).toBe(553_333);
+  });
+
+  it('"Usar R$ X" e "Calcular pela média" dão o mesmo valor para os mesmos meses, com reembolso, com mês só de reembolso e com seis meses', async () => {
+    const hub = new MemoryFamilyHub({ now: () => Date.parse('2026-10-07T12:00:00.000Z') });
+    const repo = new MemoryRepository({ actorId: 'ana', displayName: 'ana', today: () => '2026-10-07', family: hub });
+    const space = await repo.ensurePersonalSpace('Conta principal');
+    const ctx = space.personalContextId;
+    const acc = space.accounts[0]!.id;
+    const receive = (amountCents: number, occurredOn: string, category: string | null) =>
+      repo.createRecord(newOperationKey(), ctx, 'receita', { accountId: acc, amountCents, occurredOn, description: 'Recebimento', category });
+    const suggestion = async () => suggestReference((await Promise.all(['2026-07', '2026-08', '2026-09'].map((m) => repo.listRecords(ctx, m)))).flat(), NOW);
+    // Só setembro, com um reembolso grande: os dois dizem R$ 5.100,00, de setembro.
+    await receive(510_000, '2026-09-05', 'Salário');
+    await receive(9_000_000, '2026-09-12', 'Reembolso');
+    expect(await suggestion()).toEqual({ amountCents: 510_000, months: ['2026-09'] });
+    expect(ok(await loadIncomeAverage(repo, ctx, NOW, 3))).toMatchObject({ averageCents: 510_000, included: ['2026-09'], excluded: ['2026-07', '2026-08'] });
+    // Julho só com reembolso (nenhum recebimento que conte): fora nos dois. Agosto com Salário e Renda extra: entra com os dois.
+    await receive(3_000_000, '2026-07-03', 'Reembolso');
+    await receive(300_000, '2026-08-05', 'Salário');
+    await receive(150_001, '2026-08-15', 'Renda extra');
+    const sug = (await suggestion())!;
+    const avg = ok(await loadIncomeAverage(repo, ctx, NOW, 3));
+    expect(sug).toEqual({ amountCents: 480_001, months: ['2026-08', '2026-09'] });
+    expect(avg).toMatchObject({ averageCents: sug.amountCents, included: sug.months, excluded: ['2026-07'] });
+    // Seis meses: o mesmo valor, porque abril a junho não têm nada além do que já estava.
+    expect(ok(await loadIncomeAverage(repo, ctx, NOW, 6)).averageCents).toBe(sug.amountCents);
+  });
+
+  it('só reembolsos na janela: não há média ("sem_meses"), nunca uma média de reembolsos', async () => {
+    const hub = new MemoryFamilyHub({ now: () => Date.parse('2026-10-07T12:00:00.000Z') });
+    const repo = new MemoryRepository({ actorId: 'ana', displayName: 'ana', today: () => '2026-10-07', family: hub });
+    const space = await repo.ensurePersonalSpace('Conta principal');
+    const ctx = space.personalContextId;
+    await repo.createRecord(newOperationKey(), ctx, 'receita', {
+      accountId: space.accounts[0]!.id,
+      amountCents: 5_000_000,
+      occurredOn: '2026-09-05',
+      description: 'Reembolso de viagem',
+      category: 'Reembolso',
+    });
+    expect(await loadIncomeAverage(repo, ctx, NOW, 3)).toMatchObject({ ok: false, reason: 'sem_meses', excluded: ['2026-07', '2026-08', '2026-09'] });
   });
 });
 
@@ -303,7 +424,6 @@ describe('os textos do resultado', () => {
       headline: 'Média de julho a setembro: R$ 5.200,00',
       count: 'Meses usados: 3 de 3',
       zero: null,
-      basis: 'Entram todos os recebimentos anotados no mês, inclusive reembolsos.',
       notice: 'É uma estimativa feita com o que você anotou. Ajuste se souber que o próximo mês será diferente.',
       filled: 'O valor foi para o campo "Valor por mês". Ele só é salvo quando você toca em "Salvar renda de referência".',
       empty: null,
@@ -356,9 +476,27 @@ describe('os textos do resultado', () => {
     const three = incomeAverageTexts(incomeAverage([], 3, NOW));
     expect(three.empty).toBe('Para calcular a média, é preciso ter pelo menos um mês fechado com recebimentos anotados. Nos últimos 3 meses (julho a setembro), nenhum mês tem.');
     expect(three.announce).toBe(three.empty);
-    expect([three.headline, three.count, three.zero, three.basis, three.notice, three.filled]).toEqual([null, null, null, null, null, null]);
+    expect([three.headline, three.count, three.zero, three.notice, three.filled]).toEqual([null, null, null, null, null]);
     expect(incomeAverageTexts(incomeAverage([], 6, NOW)).empty).toContain('Nos últimos 6 meses (abril a setembro), nenhum mês tem.');
     expect(incomeAverageTexts(incomeAverage([], 3, '2027-02')).empty).toContain('Nos últimos 3 meses (novembro de 2026 a janeiro de 2027), nenhum mês tem.');
+  });
+
+  it('média menor que um centavo (R$ 0,01 e dois meses conferidos como zero): explicação própria, que não diz que nenhum mês tem recebimentos', () => {
+    const out = incomeAverage([row('2026-07', 1), row('2026-08', 0, { receivedChecked: true }), row('2026-09', 0, { receivedChecked: true })], 3, NOW);
+    expect(out).toMatchObject({ ok: false, reason: 'media_zero' });
+    expect('averageCents' in out).toBe(false);
+    const t = incomeAverageTexts(out);
+    expect(t.empty).toBe('A média dos meses usados é menor que um centavo, e a renda de referência precisa ser maior que zero. Por isso o campo não mudou.');
+    expect(t.empty).toBe(T.tooSmall);
+    expect(t.empty).not.toContain('nenhum mês tem');
+    expect(t.announce).toBe(t.empty);
+    expect([t.headline, t.count, t.zero, t.notice, t.filled]).toEqual([null, null, null, null, null]);
+    // Só meses conferidos como zero (soma zero) seguem com a explicação de que falta um mês com recebimentos.
+    const zeros = incomeAverageTexts(incomeAverage([row('2026-07', 0, { receivedChecked: true })], 3, NOW));
+    expect(zeros.empty).toContain('nenhum mês tem');
+    expect(zeros.empty).not.toBe(T.tooSmall);
+    // A média que arredonda para 1 centavo já é uma média.
+    expect(incomeAverage([row('2026-07', 1), row('2026-08', 1), row('2026-09', 0, { receivedChecked: true })], 3, NOW)).toMatchObject({ ok: true, averageCents: 1 });
   });
 
   it('as opções e o botão', () => {

@@ -540,7 +540,7 @@ export interface ReferenceSuggestion {
   months: IsoMonth[];
 }
 
-const isReimbursement = (category: string | null) => category !== null && category.trim().toLocaleLowerCase('pt-BR') === 'reembolso';
+export const isReimbursement = (category: string | null) => category !== null && category.trim().toLocaleLowerCase('pt-BR') === 'reembolso';
 
 /**
  * Entre os 3 meses fechados anteriores ao mês de hoje, os que têm algum recebimento que não é reembolso; média, com

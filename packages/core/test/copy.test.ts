@@ -3521,6 +3521,8 @@ describe('textos de "Calcular pela média" (D-062 item 2)', () => {
       [[row('2026-10', 400_000), row('2026-11', 500_000), row('2026-12', 600_000)], 3, '2027-01'],
       [[row('2026-12', 500_000), row('2027-01', 600_000)], 3, '2027-02'],
       [[row('2026-08', 0, { receivedChecked: true }), row('2026-09', 100), row('2026-12', 700_000)], 6, '2027-01'],
+      // R$ 0,01 e dois meses conferidos como zero: a média arredonda para zero, e a explicação é a de "menor que um centavo".
+      [[row('2026-07', 1), row('2026-08', 0, { receivedChecked: true }), row('2026-09', 0, { receivedChecked: true })], 3, '2026-10'],
     ];
     for (const [rows, choice, now] of scenarios) {
       const t = incomeAverageTexts(incomeAverage(rows, choice, now));

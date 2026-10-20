@@ -10,6 +10,7 @@ import {
   TOPIC_SLUGS,
   averageCents,
   canonicalNumber,
+  centsToInput,
   comparisonStats,
   expectedExampleNumbers,
   guideEntry,
@@ -76,8 +77,8 @@ describe('Média e mediana: as contas do exemplo (EF §6)', () => {
   });
 
   it('o mês fora do comum puxa a média (R$ 735,00 a mais sem mexer em nenhum dos outros cinco) e a mediana muda R$ 25,00', () => {
-    expect(412_500 - 339_000).toBe(73_500);
-    expect(342_500 - 340_000).toBe(2_500);
+    expect(averageCents(SIX) - averageCents(WITHOUT_APRIL)).toBe(73_500);
+    expect(medianCents(SIX) - medianCents(WITHOUT_APRIL)).toBe(2_500);
     // Com um valor ainda maior em abril, a média sobe e a mediana fica onde estava.
     const bigger = [320_000, 340_000, 330_000, 7_800_000, 345_000, 360_000];
     expect(averageCents(bigger)).toBeGreaterThan(averageCents(SIX));
@@ -125,8 +126,8 @@ describe('Média e mediana: o tema no catálogo', () => {
       expect(s.locator!).toMatch(/Trecho de resultado de busca; a página não abriu/);
     }
     expect(external.map((s) => (s.kind === 'oficial' ? s.url : ''))).toEqual([
-      'https://educa.ibge.gov.br/jovens/conheca-o-brasil/populacao/17870-a-mediana.html',
-      'https://educa.ibge.gov.br/jovens/conheca-o-brasil/populacao/17862-media-pagina-inicial.html',
+      'https://educa.ibge.gov.br/jovens/materias-especiais/17870-a-mediana.html',
+      'https://educa.ibge.gov.br/jovens/materias-especiais/17862-media-pagina-inicial.html',
     ]);
     const refs = t.sources.flatMap((s) => (s.kind === 'clarevo' ? s.refs : []));
     expect(refs).toEqual(['D-057', 'D-062']);
@@ -181,10 +182,14 @@ describe('Média e mediana: o tema no catálogo', () => {
       'o valor do meio de 3.200,00, 3.300,00, 3.400,00, 3.450,00 e 3.600,00 é 3.400,00',
     ])
       expect(c, part).toContain(part);
-    // Os números da conta, em centavos, conferem com as funções.
-    expect(2_475_000 / 100).toBe(24_750);
-    expect(1_695_000 / 100).toBe(16_950);
-    expect((340_000 + 345_000) / 2).toBe(342_500);
+    // Os números da conta vêm das mesmas funções da tela (a soma exata, a média e a mediana), escritos como o tema os escreve.
+    const points = MONTHS.map((m, i) => point(m, SIX[i]!));
+    const all = comparisonStats(points, []);
+    const noApril = comparisonStats(points, ['2026-04']);
+    expect(c).toContain(`${centsToInput(Number(all.visibleSum))} ÷ 6 = ${centsToInput(all.average!)}`);
+    expect(c).toContain(`sem abril: ${centsToInput(Number(noApril.visibleSum))} ÷ 5 = ${centsToInput(noApril.average!)}`);
+    expect(c).toContain(`(3.400,00 + 3.450,00) ÷ 2 = ${centsToInput(medianCents([340_000, 345_000]))}`);
+    expect(c).toContain(`é ${centsToInput(noApril.median!)}`);
   });
 
   it('o texto explica o que cada uma é, a diferença com o mês fora do comum, o que a Evolução faz e a fonte do IBGE', () => {
@@ -226,7 +231,8 @@ describe('Média e mediana: o tema no catálogo', () => {
 });
 
 describe('Média e mediana: a ligação nos dois sentidos', () => {
-  it('o tema tem a ação "Ver na Evolução", que abre /evolucao, na seção "No Clarevo"', () => {
+  // Estes dois testes conferem o código-fonte (as ligações escritas nos arquivos); o comportamento, abrir o painel e levar ao tema, é coberto pelo e2e.
+  it('código-fonte: o tema tem a ação "Ver na Evolução", que abre /evolucao, na seção "No Clarevo"', () => {
     const learn = read('lib/learn.ts');
     expect(learn).toContain("'media-e-mediana': [{ label: 'Ver na Evolução', href: '/evolucao' }]");
     // A tela de explicação desenha as ações de topicActions sob "No Clarevo".
@@ -235,7 +241,7 @@ describe('Média e mediana: a ligação nos dois sentidos', () => {
     expect(screen).toContain('LEARN_UI_TEXT.inClarevo');
   });
 
-  it('a Evolução tem "O que é mediana?", o padrão "O que é isso?" que abre o resumo e leva ao tema', () => {
+  it('código-fonte: a Evolução tem "O que é mediana?", o padrão "O que é isso?" que abre o resumo e leva ao tema', () => {
     expect(EVOLUTION_TEXT.stats.whatIsMedian).toBe('O que é mediana?');
     const parts = read('components/evolucao-parts.tsx');
     expect(parts).toContain('<TermHint term="Mediana" slug="media-e-mediana" label={T.stats.whatIsMedian} />');
@@ -260,7 +266,7 @@ describe('Média e mediana: a ligação nos dois sentidos', () => {
   it('o guia da Evolução cita "O que é mediana?", e o nome existe na tela', () => {
     const steps = guideEntry('evolucao')!.steps.join(' ');
     expect(steps).toContain('"O que é mediana?"');
-    expect(steps).toContain('abrir o tema completo em Aprender');
+    expect(steps).toContain('abrir o tema completo, com um exemplo, em Aprender');
   });
 
   it('docs: a decisão D-062 cita o tema, e docs/09 lista o catálogo de 47 temas e o tema com fontes e prazo', () => {

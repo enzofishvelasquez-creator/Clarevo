@@ -349,13 +349,13 @@ export const ORGANIZAR_TOPICS: Topic[] = [
       oficialMedia(
         'IBGE',
         'A Mediana (Educa Jovens)',
-        'https://educa.ibge.gov.br/jovens/conheca-o-brasil/populacao/17870-a-mediana.html',
+        'https://educa.ibge.gov.br/jovens/materias-especiais/17870-a-mediana.html',
         'A mediana é o valor que está exatamente no meio de um conjunto de dados ordenados; com quantidade par de valores, é a média aritmética dos dois valores centrais (posições n/2 e n/2 + 1); pode dar um valor típico do conjunto porque não é afetada por valores extremos. Trecho de resultado de busca; a página não abriu',
       ),
       oficialMedia(
         'IBGE',
         'A Média Aritmética (Educa Jovens)',
-        'https://educa.ibge.gov.br/jovens/conheca-o-brasil/populacao/17862-media-pagina-inicial.html',
+        'https://educa.ibge.gov.br/jovens/materias-especiais/17862-media-pagina-inicial.html',
         'Média aritmética simples: soma dos valores dividida pelo número de observações; é medida de tendência central, ao lado da moda e da mediana; fica entre o menor e o maior valor, e todos os valores entram no cálculo. Trecho de resultado de busca; a página não abriu',
       ),
       clarevo('D-057', 'D-062'),

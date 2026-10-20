@@ -63,7 +63,7 @@ import { colors, fonts, space, tabular } from '@/theme/tokens';
  * `?mes=AAAA-MM` escolhe o mês de vigência inicial (sem ele, este mês).
  *
  * "Calcular pela média" (D-062, renda variável): a média do Recebido dos 3 ou dos 6 meses fechados anteriores ao mês de hoje
- * (`months_overview` do contexto escolhido, com os meses conferidos como zero e sem os meses sem registros: `loadIncomeAverage`). Só
+ * (`months_overview` do contexto escolhido, com os meses conferidos como zero, sem os meses sem registros e sem reembolsos, como a sugestão: `loadIncomeAverage`). Só
  * preenche o campo, como "Usar": quem grava é a pessoa, pela mesma `set_income_reference`, e o texto diz que é uma estimativa.
  */
 export default function ReferenciaScreen() {
@@ -378,11 +378,6 @@ function ReferenceForm({ contextId }: { contextId: string }) {
                     <MoneyTxt style={[tabular, { fontFamily: fonts.extrabold, fontSize: 18, lineHeight: 26 }]}>{avgTexts.headline}</MoneyTxt>
                     {avgTexts.count ? <Txt>{avgTexts.count}</Txt> : null}
                     {avgTexts.zero ? <MoneyTxt>{avgTexts.zero}</MoneyTxt> : null}
-                    {avgTexts.basis ? (
-                      <Txt variant="caption" color={colors.textSecondary}>
-                        {avgTexts.basis}
-                      </Txt>
-                    ) : null}
                     {avgTexts.notice ? (
                       <Txt variant="caption" color={colors.textSecondary}>
                         {avgTexts.notice}
