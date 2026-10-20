@@ -258,10 +258,12 @@ describe('catálogo do guia (D-049)', () => {
     expect(guideWhere(painel.where)).toBe('Conta › Painel da empresa');
     expect(painel.purpose).toContain('Só na web');
     const passos = painel.steps.join(' ');
-    for (const name of ['"Abrir painel da empresa"', '"Contrato"', '"Convidar pessoas"', '"Links para enviar"', '"Copiar todos"', '"Baixar lista"', '"Licenças"', '"Reenviar convite"', '"Cancelar convite"', '"Encerrar licença"', '"Uso do app"', '"Textos para divulgar"']) {
+    for (const name of ['"Abrir painel da empresa"', '"Contrato"', '"Convidar pessoas"', '"Links para enviar"', '"Copiar todos"', '"Baixar lista"', '"Licenças"', '"Reenviar convite"', '"Cancelar convite"', '"Encerrar licença"', '"Uso do app"', '"Relatório de adesão"', '"Textos para divulgar"']) {
       expect(passos, name).toContain(name);
     }
     expect(passos).toContain('30 dias');
+    expect(passos).toContain('com a lista de licenças só se você marcar');
+    for (const query of ['relatório', 'adesão']) expect(searchGuide(query).map((e) => e.id), query).toContain('painel-da-empresa');
     expect(painel.screenshot).toBe('421_empresa_painel.png');
     const beneficio = guideEntry('beneficio-da-empresa')!;
     expect(beneficio.href).toBe('/conta');

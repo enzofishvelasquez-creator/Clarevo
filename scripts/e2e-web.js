@@ -19,7 +19,7 @@
  * de quem é titular com outras pessoas, a confirmação digitada, a demonstração que não apaga nada e a tela "Sua conta foi excluída", com a
  * Família simulada na memória), das Análises (D-059: Categorias em Barras e Bolhas, Evolução, Próximos meses e Orçamento, só leitura), do Dia útil (D-060 e D-061: o aviso de
  * vencimento em sábado, domingo ou feriado nacional e o padrão de mercado do próximo dia útil, que não mudam a data nem os totais) e de Mês conferido (D-060: "Conferi: não houve pagamentos em {mês}" e o zero
- * confirmado na Evolução, em Pago e Recebido, em Análises e em "Seus últimos meses") na versão web, em modo demonstração (acesso simulado).
+ * confirmado na Evolução, em Pago e Recebido, em Análises e em "Seus últimos meses") e do Relatório do RH (D-062: o relatório de adesão do painel da empresa, em planilha e em PDF, com ou sem a lista de licenças) na versão web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -12494,6 +12494,205 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const mcBad = mcTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(demais|alt[oa]s?|baix[oa]s?|gastou|aumentou|diminuiu|despencou|disparou|cuidado|estour\w*|exagero|usuári[oa]s?|bem-vind[oa]s?|parab[eé]ns|incr[ií]vel|garant\w*)\b/i)?.[0]).filter(Boolean);
   ok('Mês conferido: nenhum termo proibido, travessão longo, expressão vetada, palavra de julgamento nem palavra com gênero nas telas novas', mcTexts.length >= 12 && mcBad.length === 0, `${mcTexts.length} telas ${mcBad.join(' | ')}`);
   ok('Mês conferido: nenhuma escrita direta na rede (a conferência fica na memória da demonstração; o banco é coberto pelos testes de banco e de API)', writes.length === mcWrites0, writes.slice(mcWrites0).join(' | '));
+
+  // =====================================================================================================================
+  // Relatório do RH (D-062 item 1, Ciclo U): no painel /empresa (só na web), o cartão "Relatório de adesão" baixa o resumo do benefício
+  // em planilha (CSV, ponto e vírgula, UTF-8 com BOM) e em PDF (a mesma página de impressão da exportação D-047, com o logotipo
+  // "clarevo."): o nome da organização, o contrato (plano, vagas, início e fim), a data de geração, as quatro contagens do "Uso do app" e,
+  // só se a pessoa marcar "Incluir a lista de licenças", o e-mail, a situação e a data de cada licença, como o painel mostra. Nada
+  // financeiro e nada de uso individual; o rodapé diz "A empresa não vê dados financeiros de ninguém, nem somados.". A demonstração
+  // baixa o relatório fictício da "Empresa Exemplo (demonstração)". Nada é gravado: o arquivo é montado no navegador. Aqui: (1) o
+  // cartão na demonstração; (2) a planilha sem a lista; (3) a planilha com a lista (22 licenças, na ordem do painel); (4) o PDF com a
+  // lista; (5) o PDF sem a lista; (6) a janela de impressão bloqueada; (7) o relatório acompanha o painel (um convite novo); (8) uma
+  // empresa de verdade (da memória) com nome que precisa de escape; (9) quem não administra nada não tem relatório; (10) os totais da
+  // demonstração; (11) textos e escritas. Capturas a partir de 540, em 390, 360, 320 e 1280 px (a página de impressão em 794 px).
+  // =====================================================================================================================
+  const rhWrites0 = writes.length;
+  const rhTexts = [];
+  const rhFiles = [];
+  const rhKeep = async () => { const x = await body(); rhTexts.push(x); screenTexts.push(x); return x; };
+  const rhBom = (buf) => buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf;
+  const rhDownload = async (name) => {
+    const [dl] = await Promise.all([p.waitForEvent('download'), btn(name).click()]);
+    const buf = fs.readFileSync(await dl.path());
+    const text = buf.toString('utf8');
+    rhFiles.push(text);
+    return { name: dl.suggestedFilename(), buf, text, lines: text.split('\r\n') };
+  };
+  // Conta os pedidos de impressão da janela aberta (o roteiro não imprime de verdade).
+  const rhStubOpen = () => p.evaluate(() => {
+    const open = window.open.bind(window);
+    window.__rhPrints = 0;
+    window.open = (...a) => { const w = open(...a); if (w) w.print = () => { window.__rhPrints++; }; return w; };
+  });
+  const rhPopup = async (name) => {
+    const [popup] = await Promise.all([p.waitForEvent('popup'), btn(name).click()]);
+    await popup.waitForLoadState('domcontentloaded'); await p.waitForTimeout(1200);
+    const html = await popup.content();
+    const text = (await popup.locator('body').innerText()).replace(/ /g, ' ').replace(/\s+/g, ' ');
+    const logo = await popup.evaluate(() => { const s = document.querySelector('.logo svg'); return s ? [...s.querySelectorAll('path, circle')].map((x) => (x.getAttribute('fill') || '').toUpperCase()).join(' ') : ''; });
+    rhFiles.push(text);
+    return { popup, html, text, logo };
+  };
+  const rhBox = () => p.getByRole('checkbox', { name: /^Incluir a lista de licenças/ }).filter({ visible: true }).first();
+  const rhChecked = async () => (await rhBox().getAttribute('aria-checked')) === 'true';
+  const rhSetList = async (want) => { if ((await rhChecked()) !== want) { await rhBox().click(); await p.waitForTimeout(300); } };
+  const rhGoCard = async () => { await empScroll('Relatório de adesão')(); };
+  const RH_FOOTER = 'A empresa não vê dados financeiros de ninguém, nem somados.';
+  const RH_DEMO_HEAD = ['Relatório de adesão ao benefício', 'Empresa;Empresa Exemplo (demonstração)', 'Gerado em;07/10/2026', 'Demonstração: empresa e pessoas fictícias.', ''];
+  const rhDemoTop = (convites) => [
+    ...RH_DEMO_HEAD,
+    'Contrato', 'Plano;Individual', 'Vagas;40', 'Início;01/03/2026', 'Fim;Sem data de fim', '',
+    'Contagens de licenças', 'Vagas contratadas;40', `Convites pendentes;${convites}`, 'Licenças ativas;12', 'Licenças encerradas;3', '',
+  ];
+  const pad2 = (n) => String(n).padStart(2, '0');
+
+  // ---- 1. Demonstração: o cartão "Relatório de adesão" no painel, entre "Uso do app" e "Textos para divulgar" ----
+  await evEnter();
+  await empGoPanel();
+  t = await rhKeep();
+  const rhHeads = await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
+  ok('Relatório do RH, demonstração: o painel tem o cartão "Relatório de adesão" entre "Uso do app" e "Textos para divulgar"',
+    rhHeads.indexOf('Uso do app') >= 0 && rhHeads.indexOf('Relatório de adesão') === rhHeads.indexOf('Uso do app') + 1 && rhHeads.indexOf('Textos para divulgar') === rhHeads.indexOf('Relatório de adesão') + 1, JSON.stringify(rhHeads));
+  ok('Relatório do RH: o cartão explica o que leva (contrato, vagas e contagens), que o arquivo é montado no navegador e que o Clarevo não guarda cópia',
+    t.includes('Leve o resumo do benefício para uma reunião ou para o arquivo do RH: o contrato, as vagas e as contagens de licenças. O arquivo é montado neste navegador, e o Clarevo não guarda cópia dele.'));
+  ok('Relatório do RH: a caixa "Incluir a lista de licenças" começa desmarcada (a lista é opcional), com a explicação do que a lista leva; os dois botões de download à vista',
+    (await visibleCount('checkbox', /^Incluir a lista de licenças/)) === 1 && !(await rhChecked()) &&
+    t.includes('Leva o e-mail, a situação e a data de cada licença, como o painel mostra. Sem a lista, o arquivo tem só as contagens.') && !t.includes('Com a lista, o arquivo tem e-mails de pessoas.') &&
+    (await visibleCount('button', 'Baixar relatório em planilha (CSV)')) === 1 && (await visibleCount('button', 'Baixar relatório em PDF')) === 1, t.slice(-900));
+  await empShots('540_relatorio_rh_cartao', { scroll: empScroll('Relatório de adesão'), wide: true });
+
+  // ---- 2. A planilha sem a lista: só o contrato e as contagens ----
+  await rhGoCard();
+  const rhCsv1 = await rhDownload('Baixar relatório em planilha (CSV)');
+  ok('Relatório do RH, planilha: nome clarevo-relatorio-adesao-2026-10-07.csv e UTF-8 com BOM (EF BB BF)', rhCsv1.name === 'clarevo-relatorio-adesao-2026-10-07.csv' && rhBom(rhCsv1.buf), `${rhCsv1.name} ${[...rhCsv1.buf.slice(0, 4)].join(',')}`);
+  ok('Relatório do RH, planilha sem a lista: organização, data de geração, contrato (Individual, 40 vagas, 01/03/2026, sem fim), as quatro contagens (40, 6, 12, 3) e a frase do rodapé, em linhas CRLF separadas por ponto e vírgula',
+    JSON.stringify(rhCsv1.lines) === JSON.stringify(['\ufeff' + rhDemoTop(6)[0], ...rhDemoTop(6).slice(1), RH_FOOTER, '']), JSON.stringify(rhCsv1.lines));
+  ok('Relatório do RH, planilha sem a lista: nenhum e-mail, nenhuma licença nomeada e nenhuma seção "Licenças"', !/@/.test(rhCsv1.text) && !rhCsv1.text.includes('pessoa.') && !rhCsv1.text.includes('Data da situação') && !rhCsv1.lines.includes('Licenças'));
+  ok('Relatório do RH, planilha: nenhum id interno, resumo de código nem valor em reais', !/licenca-|contrato-|empresa-[0-9]|pessoa-(demo|ficticia)|[0-9a-f]{8}-[0-9a-f]{4}-|[0-9a-f]{32}|R\$/.test(rhCsv1.text));
+  await waitText('Relatório baixado. Confira a pasta de downloads.'); await p.waitForTimeout(300);
+  t = await rhKeep();
+  ok('Relatório do RH: depois de baixar, o aviso "Relatório baixado. Confira a pasta de downloads." e nada mais mudou no painel (Convites pendentes segue 6)', t.includes('Relatório baixado. Confira a pasta de downloads.') && (await empRow('Convites pendentes')) === '6');
+
+  // ---- 3. A planilha com a lista: 22 licenças, na ordem do painel, com a data que o painel mostra ----
+  await rhGoCard();
+  await rhSetList(true);
+  t = await rhKeep();
+  ok('Relatório do RH: marcar "Incluir a lista de licenças" avisa que o arquivo terá e-mails de pessoas e que se compartilha só com quem precisa', (await rhChecked()) && t.includes('Com a lista, o arquivo tem e-mails de pessoas. Compartilhe só com quem precisa.'));
+  await empShots('541_relatorio_rh_lista_marcada', { scroll: empScroll('Relatório de adesão'), wide: true });
+  await rhGoCard();
+  const rhCsv2 = await rhDownload('Baixar relatório em planilha (CSV)');
+  const rhLic = [
+    ...Array.from({ length: 6 }, (_, i) => `convite.${pad2(i + 1)}@empresa-exemplo.example;Convite enviado;${pad2(i + 1)}/10/2026`),
+    ...Array.from({ length: 12 }, (_, i) => `pessoa.${pad2(i + 1)}@empresa-exemplo.example;Ativa;${pad2(11 + i)}/04/2026`),
+    ...Array.from({ length: 3 }, (_, i) => `antiga.${pad2(i + 1)}@empresa-exemplo.example;Encerrada;${pad2(i + 1)}/09/2026`),
+    'cancelado.01@empresa-exemplo.example;Convite cancelado;25/09/2026',
+  ];
+  ok('Relatório do RH, planilha com a lista: as contagens do cabeçalho, "Licenças", o cabeçalho "E-mail;Situação;Data da situação" e as 22 licenças na ordem do painel (convites, ativas, encerradas), cada uma com a data que o painel mostra em pt-BR',
+    JSON.stringify(rhCsv2.lines) === JSON.stringify(['\ufeff' + rhDemoTop(6)[0], ...rhDemoTop(6).slice(1), 'Licenças', 'E-mail;Situação;Data da situação', ...rhLic,
+      'O convite cancelado aparece na lista e não entra na contagem de licenças encerradas.', '', RH_FOOTER, '']), JSON.stringify(rhCsv2.lines.slice(15, 30)));
+  ok('Relatório do RH, planilha com a lista: BOM, nome do arquivo e só e-mails da empresa fictícia (22), nenhum campo além de e-mail, situação e data', rhBom(rhCsv2.buf) && rhCsv2.name === 'clarevo-relatorio-adesao-2026-10-07.csv' &&
+    (rhCsv2.text.match(/[^;\r\n]+@[^;\r\n]+/g) ?? []).length === 22 && (rhCsv2.text.match(/[^;\r\n]+@[^;\r\n]+/g) ?? []).every((x) => x.endsWith('@empresa-exemplo.example')) &&
+    rhCsv2.lines.slice(rhCsv2.lines.indexOf('E-mail;Situação;Data da situação') + 1).filter((l) => l.includes('@')).every((l) => l.split(';').length === 3));
+  ok('Relatório do RH, planilha com a lista: nenhum id interno, nenhuma pessoa ligada ao e-mail, nenhum valor em reais e nenhuma palavra de uso do app', !/licenca-|contrato-|empresa-[0-9]|pessoa-(demo|ficticia)|[0-9a-f]{8}-[0-9a-f]{4}-|[0-9a-f]{32}|R\$|último acesso|entrou no app|acessou/i.test(rhCsv2.text));
+
+  // ---- 4. O PDF com a lista: a página de impressão com o logotipo "clarevo." ----
+  await rhGoCard();
+  await rhStubOpen();
+  const rhPdf1 = await rhPopup('Baixar relatório em PDF');
+  ok('Relatório do RH, PDF: a página de impressão tem o logotipo oficial "clarevo." (azul, ponto lima), o título, o nome da empresa, a data de geração e o aviso de dados fictícios',
+    rhPdf1.logo === '#2457F5 #D4F05B' && rhPdf1.text.includes('Relatório de adesão ao benefício') && rhPdf1.text.includes('Empresa Exemplo (demonstração)') && rhPdf1.text.includes('Gerado em 07/10/2026') &&
+    rhPdf1.text.includes('Demonstração: empresa e pessoas fictícias.'), rhPdf1.text.slice(0, 300));
+  ok('Relatório do RH, PDF: contrato (Plano Individual, Vagas 40, Início 01/03/2026, Fim Sem data de fim) e as quatro contagens (40, 6, 12 e 3)',
+    ['Contrato', 'Plano Individual', 'Vagas 40', 'Início 01/03/2026', 'Fim Sem data de fim', 'Contagens de licenças', 'Vagas contratadas 40', 'Convites pendentes 6', 'Licenças ativas 12', 'Licenças encerradas 3'].every((x) => rhPdf1.text.includes(x)), rhPdf1.text.slice(0, 700));
+  ok('Relatório do RH, PDF com a lista: a tabela "E-mail Situação Data da situação" com as 22 licenças e as datas em pt-BR, e a nota do convite cancelado',
+    rhPdf1.text.includes('E-mail Situação Data da situação') && rhPdf1.text.includes('convite.01@empresa-exemplo.example Convite enviado 01/10/2026') && rhPdf1.text.includes('pessoa.12@empresa-exemplo.example Ativa 22/04/2026') &&
+    rhPdf1.text.includes('antiga.03@empresa-exemplo.example Encerrada 03/09/2026') && rhPdf1.text.includes('cancelado.01@empresa-exemplo.example Convite cancelado 25/09/2026') &&
+    (rhPdf1.text.match(/@empresa-exemplo\.example/g) ?? []).length === 22 && rhPdf1.text.includes('O convite cancelado aparece na lista e não entra na contagem de licenças encerradas.'), rhPdf1.text.slice(700, 1500));
+  ok('Relatório do RH, PDF: a frase do rodapé "A empresa não vê dados financeiros de ninguém, nem somados." dentro do <footer>, depois das tabelas', rhPdf1.html.includes(`<footer>${RH_FOOTER}</footer>`) && rhPdf1.html.indexOf('<footer>') > rhPdf1.html.indexOf('cancelado.01@'));
+  ok('Relatório do RH, PDF: a página pede a impressão uma vez, é o HTML inteiro, sem script nem imagem ou folha de estilo de fora (só o espaço de nomes do SVG do logotipo), com o título do arquivo', (await p.evaluate(() => window.__rhPrints)) === 1 && !/<script/i.test(rhPdf1.html) && !/(src|href|url\()=?["']?https?:/i.test(rhPdf1.html) && rhPdf1.html.includes('<title>clarevo-relatorio-adesao-2026-10-07</title>'), String(await p.evaluate(() => window.__rhPrints)));
+  await rhPdf1.popup.setViewportSize({ width: 794, height: 1000 });
+  await rhPdf1.popup.screenshot({ path: `${OUT}/542_relatorio_rh_pagina_de_impressao.png`, fullPage: true });
+  await rhPdf1.popup.close(); await p.bringToFront();
+  await waitText('A página de impressão foi aberta. Escolha "Salvar como PDF" ou imprima.'); await p.waitForTimeout(300);
+  t = await rhKeep();
+  ok('Relatório do RH, PDF: o aviso "A página de impressão foi aberta. Escolha "Salvar como PDF" ou imprima."', t.includes('A página de impressão foi aberta. Escolha "Salvar como PDF" ou imprima.'));
+
+  // ---- 5. O PDF sem a lista ----
+  await rhGoCard();
+  await rhSetList(false);
+  await rhStubOpen();
+  const rhPdf2 = await rhPopup('Baixar relatório em PDF');
+  ok('Relatório do RH, PDF sem a lista: o contrato e as contagens, nenhum e-mail, sem a seção "Licenças" e com o mesmo rodapé', rhPdf2.text.includes('Licenças encerradas 3') && !/@/.test(rhPdf2.text) && !rhPdf2.text.includes('Data da situação') && !rhPdf2.html.includes('<h2>Licenças</h2>') && rhPdf2.html.includes(`<footer>${RH_FOOTER}</footer>`), rhPdf2.text.slice(0, 600));
+  await rhPdf2.popup.setViewportSize({ width: 794, height: 1000 });
+  await rhPdf2.popup.screenshot({ path: `${OUT}/543_relatorio_rh_pagina_sem_lista.png`, fullPage: true });
+  await rhPdf2.popup.close(); await p.bringToFront();
+
+  // ---- 6. A janela de impressão bloqueada: o aviso diz o que fazer ----
+  await rhGoCard();
+  await p.evaluate(() => { window.open = () => null; });
+  await btn('Baixar relatório em PDF').click(); await waitText('O navegador bloqueou a janela de impressão.'); await p.waitForTimeout(300);
+  t = await rhKeep();
+  ok('Relatório do RH, janela bloqueada: "O navegador bloqueou a janela de impressão. Permita janelas para este site e tente de novo." e a planilha segue disponível', t.includes('O navegador bloqueou a janela de impressão. Permita janelas para este site e tente de novo.') && (await visibleCount('button', 'Baixar relatório em planilha (CSV)')) === 1);
+  await empShots('544_relatorio_rh_janela_bloqueada', { scroll: empScroll('Relatório de adesão'), wide: true });
+
+  // ---- 7. O relatório acompanha o painel: um convite novo muda as contagens e a lista ----
+  await empScroll('Convidar pessoas')();
+  await field('E-mails').fill('nova.pessoa@empresa-exemplo.example');
+  await btn('Convidar 1 pessoa').click(); await waitText('1 convite criado.'); await p.waitForTimeout(600);
+  ok('Relatório do RH: depois de convidar 1 pessoa, o painel mostra 7 convites pendentes', (await empRow('Convites pendentes')) === '7', `${await empRow('Convites pendentes')}`);
+  await rhGoCard();
+  await rhSetList(true);
+  const rhCsv3 = await rhDownload('Baixar relatório em planilha (CSV)');
+  ok('Relatório do RH, depois de convidar: a planilha traz "Convites pendentes;7" (a mesma contagem do painel), a pessoa nova como "Convite enviado" em 07/10/2026 e 23 licenças', rhCsv3.lines.includes('Convites pendentes;7') &&
+    rhCsv3.lines.includes('nova.pessoa@empresa-exemplo.example;Convite enviado;07/10/2026') && (rhCsv3.text.match(/@empresa-exemplo\.example/g) ?? []).length === 23, rhCsv3.lines.slice(8, 12).join(' | '));
+
+  // ---- 8. Uma empresa de verdade (da memória): nome com ponto e vírgula, aspas e "=", contrato com fim; o nome é protegido na planilha e escapado na página ----
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await famCreateAccount('Rita Relatório', 'rita.relatorio@exemplo.com');
+  await p.evaluate(() => window.__e2e.company().staffCreateOrganization({ name: '=Alfa; "Beta" Ltda', seats: 8, plan: 'familiar', startsOn: '2026-10-01', endsOn: '2027-09-30', adminEmail: 'rita.relatorio@exemplo.com' }));
+  await p.evaluate(() => window.__e2e.refresh()); await p.waitForTimeout(600);
+  await empGoPanel();
+  await field('E-mails').fill('bia.rh@exemplo.com');
+  await btn('Convidar 1 pessoa').click(); await waitText('1 convite criado.'); await p.waitForTimeout(600);
+  await rhGoCard();
+  t = await rhKeep();
+  ok('Relatório do RH, empresa de verdade: o cartão aparece, a caixa da lista começa desmarcada e não há aviso de demonstração', (await headingShown('Relatório de adesão')) && !(await rhChecked()) && !t.includes('Demonstração: empresa e pessoas fictícias.'));
+  const rhCsv4 = await rhDownload('Baixar relatório em planilha (CSV)');
+  ok('Relatório do RH, empresa de verdade, sem a lista: o nome protegido contra fórmula e entre aspas (apóstrofo na frente, aspas dobradas), contrato Familiar com 8 vagas e fim em 30/09/2027, contagens 8, 1, 0 e 0, sem linha de demonstração',
+    JSON.stringify(rhCsv4.lines) === JSON.stringify(['\ufeffRelatório de adesão ao benefício', 'Empresa;"\'=Alfa; ""Beta"" Ltda"', 'Gerado em;07/10/2026', '', 'Contrato', 'Plano;Familiar', 'Vagas;8', 'Início;01/10/2026', 'Fim;30/09/2027', '',
+      'Contagens de licenças', 'Vagas contratadas;8', 'Convites pendentes;1', 'Licenças ativas;0', 'Licenças encerradas;0', '', RH_FOOTER, '']), JSON.stringify(rhCsv4.lines));
+  await rhSetList(true);
+  const rhCsv5 = await rhDownload('Baixar relatório em planilha (CSV)');
+  ok('Relatório do RH, empresa de verdade, com a lista: a licença convidada em 07/10/2026 e nenhuma outra', rhCsv5.lines.includes('Licenças') && rhCsv5.lines.includes('E-mail;Situação;Data da situação') && rhCsv5.lines.includes('bia.rh@exemplo.com;Convite enviado;07/10/2026') &&
+    (rhCsv5.text.match(/@/g) ?? []).length === 1 && !rhCsv5.text.includes('O convite cancelado aparece'), rhCsv5.lines.join(' | '));
+  await rhStubOpen();
+  const rhPdf3 = await rhPopup('Baixar relatório em PDF');
+  ok('Relatório do RH, empresa de verdade, PDF: o nome aparece como foi escrito, como texto, Plano Familiar, Fim 30/09/2027 e a licença', rhPdf3.text.includes('=Alfa; "Beta" Ltda') && !rhPdf3.html.includes('<img') && rhPdf3.text.includes('Plano Familiar') && rhPdf3.text.includes('Fim 30/09/2027') &&
+    rhPdf3.text.includes('bia.rh@exemplo.com Convite enviado 07/10/2026') && !rhPdf3.text.includes('fictícias'), rhPdf3.text.slice(0, 500));
+  await rhPdf3.popup.close(); await p.bringToFront();
+  await empShots('545_relatorio_rh_empresa', { scroll: empScroll('Relatório de adesão'), wide: true });
+
+  // ---- 9. Quem não administra uma empresa não tem o painel, e portanto não tem o relatório ----
+  await famSignOut();
+  await famCreateAccount('Noa Relatório', 'noa.relatorio@exemplo.com');
+  await famConta(); await waitText('Tenho um convite da empresa');
+  ok('Relatório do RH, conta sem empresa: Conta não oferece o painel', (await visibleCount('button', 'Abrir painel da empresa')) === 0 && !(await headingShown('Painel da empresa')));
+  t = await rhKeep();
+  ok('Relatório do RH, conta sem empresa: nada de "Relatório de adesão", de botão de download nem da caixa da lista em Conta (a tela da empresa só mostra o aviso de acesso a quem não administra)', !(await headingShown('Relatório de adesão')) && (await visibleCount('button', /^Baixar relatório/)) === 0 && (await visibleCount('checkbox', /^Incluir a lista/)) === 0, t.slice(0, 300));
+  await famSignOut();
+
+  // ---- 10. Demonstração de novo: os totais de outubro não mudam e o Resumo não ganhou nada da empresa ----
+  await evEnter();
+  await expectTotals('Relatório do RH, demonstração: outubro segue 6.000 / 3.900 / 2.100 e 650 (invariantes)', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  ok('Relatório do RH, demonstração: o Resumo não menciona empresa, relatório nem licença', !/Empresa Exemplo|Relatório de adesão|licen/i.test(await body()));
+
+  // ---- 11. Textos e escritas ----
+  const rhBad = rhTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(bem-vind[oa]|cadastrad[oa]s?|usuári[oa]s?|colaborador(a|es|as)?|funcionári[oa]s?|administrador(a|es|as)?)\b/i)?.[0]).filter(Boolean);
+  ok('Relatório do RH: nenhum termo proibido, travessão longo, expressão vetada nem palavra com gênero nas telas novas', rhTexts.length >= 6 && rhBad.length === 0, `${rhTexts.length} telas ${rhBad.join(' | ')}`);
+  const rhFileBad = rhFiles.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(bem-vind[oa]|usuári[oa]s?|colaborador(a|es|as)?|funcionári[oa]s?|administrador(a|es|as)?|demais|estour\w*|cuidado)\b/i)?.[0] ?? x.match(/R\$|\bsaldo\b|último acesso|entrou no app/i)?.[0]).filter(Boolean);
+  ok('Relatório do RH: nenhum arquivo (planilhas e páginas de impressão) tem termo proibido, travessão, palavra com gênero, julgamento, valor financeiro nem uso do app', rhFiles.length === 8 && rhFileBad.length === 0, `${rhFiles.length} arquivos ${rhFileBad.join(' | ')}`);
+  ok('Relatório do RH: nenhuma escrita direta na rede (o relatório é montado no navegador; as empresas do roteiro vivem na memória)', writes.length === rhWrites0, writes.slice(rhWrites0).join(' | '));
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);

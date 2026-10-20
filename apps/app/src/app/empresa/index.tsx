@@ -2,7 +2,7 @@ import { COMPANY_TEXT, licenseLink, type InviteLinkRow, type License } from '@cl
 import { useEffect, useMemo, useState } from 'react';
 import { Platform, View } from 'react-native';
 
-import { ContractCard, InviteCard, LicensesCard, LinksCard, OrganizationChoice, PromoCard, UsageCard } from '@/components/company-panel';
+import { ContractCard, InviteCard, LicensesCard, LinksCard, OrganizationChoice, PromoCard, ReportCard, UsageCard } from '@/components/company-panel';
 import { SubHeader } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Banner, Card, Screen, Txt } from '@/components/ui';
@@ -15,7 +15,7 @@ const T = COMPANY_TEXT;
 
 /**
  * Painel da empresa (D-056, Ciclo M), só na web e só para quem administra uma organização: contrato, convidar pessoas, links para
- * enviar, licenças, uso do app e textos para divulgar. A empresa nunca vê finanças: nada aqui lê registros, contas, metas, cartões
+ * enviar, licenças, uso do app, relatório de adesão (D-062) e textos para divulgar. A empresa nunca vê finanças: nada aqui lê registros, contas, metas, cartões
  * nem a Família de ninguém. Na demonstração, mostra a "Empresa Exemplo (demonstração)", fictícia, que vive só na memória do aparelho.
  */
 export default function EmpresaScreen() {
@@ -98,6 +98,7 @@ function Panel() {
         onRemoved={(email) => setLinks((prev) => prev.filter((r) => r.email !== email))}
       />
       <UsageCard organizationId={company.organization.id} />
+      <ReportCard company={company} today={today} />
       <PromoCard today={today} />
     </>
   );

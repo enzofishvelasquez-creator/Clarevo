@@ -406,7 +406,7 @@ describe('Empresas: telas do app (lidas como código-fonte)', () => {
 
   it('o card "Uso do app" mostra só as quatro contagens de licenças: nada de entradas no app, de acesso nem de pessoas', () => {
     const panel = appFile('components/company-panel.tsx');
-    const card = panel.slice(panel.indexOf('export function UsageCard'), panel.indexOf('// Textos para divulgar'));
+    const card = panel.slice(panel.indexOf('export function UsageCard'), panel.indexOf('// Relatório de adesão (D-062)'));
     expect(card.length).toBeGreaterThan(300);
     for (const label of ['usageSeats', 'usageInvited', 'usageActive', 'usageEnded']) expect(card, label).toContain(`T.${label}`);
     expect((card.match(/<Row /g) ?? []).length).toBe(4);

@@ -1,4 +1,4 @@
-import type { ExportFile } from '@clarevo/core';
+import type { ExportDeliverable } from '@clarevo/core';
 import { File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -41,7 +41,7 @@ export function cleanupExportFiles(): void {
   }
 }
 
-export async function deliverExportFile(file: ExportFile, dialogTitle: string): Promise<DeliverResult> {
+export async function deliverExportFile(file: ExportDeliverable, dialogTitle: string): Promise<DeliverResult> {
   let target: File | null = null;
   let printed: File | null = null;
   let keepTarget = false;
