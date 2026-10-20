@@ -20,6 +20,7 @@ import { LEARN_SECTIONS } from '../learn/sections';
 import { LEARN_UI_TEXT, SEASONAL_TEXT } from '../learn/ui-text';
 import { GOALS_NAV_TEXT, REMINDERS_SETTINGS_HREF, SUMMARY_NAV_TEXT } from '../navigation';
 import { NOTA_TEXT } from '../nota';
+import { INCOME_AVERAGE_TEXT } from '../renda-media';
 import { REMINDER_TEXT } from '../reminders';
 import { RETURN_TEXT } from '../retorno';
 import { SAVINGS_TEXT } from '../savings';
@@ -457,12 +458,12 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Veja o percentual da renda que já tem destino no mês, por grupo: ${COMMITTED_TEXT.groupLabel.fixos.toLowerCase()}, ${COMMITTED_TEXT.groupLabel.parcelamentos.toLowerCase()}, ${COMMITTED_TEXT.groupLabel.anuais.toLowerCase()}, ${COMMITTED_TEXT.groupLabel.faturas.toLowerCase()} e outras contas.`,
       `Em ${q(COMMITTED_TEXT.upcomingTitle)}, veja a previsão dos meses seguintes e, em ${q(COMMITTED_TEXT.milestonesTitle)}, quando uma parcela termina.`,
       `Em ${q(LIMIT_TEXT.title)}, toque em ${q(LIMIT_TEXT.choose)} e informe até quantos por cento da renda você quer comprometer. A escolha é sua: o Clarevo não sugere um valor.`,
-      `Se a renda mudar, toque em ${q(COMMITTED_TEXT.change)} na renda de referência.`,
+      `Se a renda mudar, toque em ${q(COMMITTED_TEXT.change)} na renda de referência. Se ela muda de um mês para o outro, toque em ${q(INCOME_AVERAGE_TEXT.action)} e escolha os últimos 3 ou 6 meses: o valor vai para o campo e só é salvo quando você toca em ${q(COMMITTED_TEXT.reference.save)}.`,
       'Metas e aportes não entram no percentual: guardar não é conta a pagar.',
     ],
     screenName: COMMITTED_TEXT.title,
     href: '/renda-comprometida',
-    keywords: ['renda comprometida', 'comprometimento', 'renda de referência', 'quanto da renda', 'fora dos compromissos', 'meu limite', 'limite de renda', 'limite de comprometimento'],
+    keywords: ['renda comprometida', 'comprometimento', 'renda de referência', 'quanto da renda', 'fora dos compromissos', 'meu limite', 'limite de renda', 'limite de comprometimento', 'renda variável', 'renda que varia', 'média da renda', 'calcular pela média'],
     routes: ['/renda-comprometida', '/renda-comprometida/referencia', '/renda-comprometida/limite'],
     help: ['renda-comprometida'],
     screenshot: '101_renda_comprometida_outubro.png',

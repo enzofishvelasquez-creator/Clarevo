@@ -250,6 +250,16 @@ describe('catálogo do guia (D-049)', () => {
     expect(searchGuide('cartão').map((e) => e.id)).toEqual(['cartoes']);
   });
 
+  it('a renda comprometida ensina "Calcular pela média" (D-062): o valor vai para o campo e só é salvo quando a pessoa toca em salvar', () => {
+    const entry = guideEntry('renda-comprometida')!;
+    expect(entry.steps.length).toBeLessThanOrEqual(6);
+    const steps = entry.steps.join(' ');
+    for (const name of ['"Calcular pela média"', '"Salvar renda de referência"', '"Alterar"']) expect(steps, name).toContain(name);
+    expect(steps).toContain('escolha os últimos 3 ou 6 meses');
+    expect(steps).toContain('só é salvo quando você toca em "Salvar renda de referência"');
+    for (const query of ['renda variável', 'calcular pela média']) expect(searchGuide(query).map((e) => e.id), query).toContain('renda-comprometida');
+  });
+
   it('o painel da empresa e o benefício pela empresa (D-056) têm entrada, com o lugar e os nomes reais das telas', () => {
     const painel = guideEntry('painel-da-empresa')!;
     expect(painel.group).toBe('conta-e-privacidade');

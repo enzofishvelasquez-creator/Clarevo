@@ -48,6 +48,11 @@ import {
   budgetCrossing,
   buildEvolutionView,
   buildReturnReview,
+  centsToInput,
+  incomeAverage,
+  incomeAverageTexts,
+  loadIncomeAverage,
+  validateIncomeReferenceDraft,
   monthCheckPlan,
   cardErrorText,
   cardLimitUsed,
@@ -9058,5 +9063,228 @@ describe('API real: Conferi este mês (Ciclo S, D-060)', () => {
     // Quem fica lê as marcas; a Família mostra a autoria anônima.
     expect(await flags(livia, fam, '2026-05')).toEqual([true, false, 0, 0]);
     expect((await livia.getFamily())!.members.find((m) => m.personId === MARIO)).toMatchObject({ firstName: FAMILY_DEPARTED_NAME, status: 'ex-membro' });
+  });
+});
+
+describe('API real: Renda variável (Ciclo V, D-062)', () => {
+  // "Calcular pela média" no formulário da renda de referência: a média do Recebido dos 3 ou dos 6 meses fechados, lida de months_overview
+  // do banco (com as marcas de "Conferi este mês"), no Pessoal e na Família. Lia (titular da Casa Dias, com o Pessoal), Marcos (membro),
+  // Nina (só vê) e Otto (de fora). Só lê: nada é gravado ao calcular, e quem grava é a mesma set_income_reference de sempre. Roda no fim:
+  // nada dos blocos anteriores depende destas pessoas. Pessoas FICTÍCIAS. Hoje é 07/10/2026.
+  const LIA = '00000000-0000-0000-0000-0000000004a1';
+  const MARCOS = '00000000-0000-0000-0000-0000000004b1';
+  const NINA = '00000000-0000-0000-0000-0000000004c1';
+  const OTTO = '00000000-0000-0000-0000-0000000004d1';
+  const lia = repoFor(LIA);
+  const marcos = repoFor(MARCOS);
+  const nina = repoFor(NINA);
+  const otto = repoFor(OTTO);
+  const NOW = '2026-10';
+  let liaCtx = '';
+  let liaAcc = '';
+  let marcosCtx = '';
+  let marcosAcc = '';
+  let fam = '';
+  let famAcc = '';
+
+  const receive = (who: SupabaseRepository, ctx: string, acc: string, amountCents: number, occurredOn: IsoDate, description = 'Recebimento') =>
+    who.createRecord(newOperationKey(), ctx, 'receita', { accountId: acc, amountCents, occurredOn, description, category: null });
+  /** O que a conta guarda, para provar que calcular não grava nada. */
+  const stored = (ctx: string) =>
+    adminSql(
+      `select (select count(*) from public.record_operations where actor_id in ('${LIA}', '${MARCOS}', '${NINA}', '${OTTO}'))
+          || '|' || (select count(*) from public.financial_records where context_id = '${ctx}')
+          || '|' || (select count(*) from public.month_checks where context_id = '${ctx}')
+          || '|' || (select count(*) from public.income_references where context_id = '${ctx}')`,
+    );
+  const ok = (out: Awaited<ReturnType<typeof loadIncomeAverage>>) => {
+    if (!out.ok) throw new Error(`esperava média, veio ${out.reason}`);
+    return out;
+  };
+
+  beforeAll(async () => {
+    adminSql(
+      `insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
+         ('${LIA}', 'lia.dias@exemplo.test', now(), '{"display_name":"Lia Dias"}'),
+         ('${MARCOS}', 'marcos.dias@exemplo.test', now(), '{"display_name":"Marcos Dias"}'),
+         ('${NINA}', 'nina.dias@exemplo.test', now(), '{"display_name":"Nina Dias"}'),
+         ('${OTTO}', 'otto.lima@exemplo.test', now(), '{"display_name":"Otto Lima"}')`,
+    );
+    const space = await lia.ensurePersonalSpace('Conta principal');
+    liaCtx = space.personalContextId;
+    liaAcc = space.accounts[0]!.id;
+    const mine = await marcos.ensurePersonalSpace('Conta principal');
+    marcosCtx = mine.personalContextId;
+    marcosAcc = mine.accounts[0]!.id;
+    for (const r of [nina, otto]) await r.ensurePersonalSpace('Conta principal');
+    fam = (await lia.createFamily(newOperationKey(), 'Casa Dias')).context.id;
+    famAcc = (await lia.listAccounts(fam))[0]!.id;
+    await marcos.acceptFamilyInvite(newOperationKey(), (await lia.createFamilyInvite(newOperationKey(), fam, 'membro')).code!);
+    await nina.acceptFamilyInvite(newOperationKey(), (await lia.createFamilyInvite(newOperationKey(), fam, 'leitor')).code!);
+  });
+
+  it('1. conta nova: nenhum recebimento, nenhum mês conferido, e a explicação de que precisa de um mês fechado com recebimentos', async () => {
+    for (const choice of [3, 6] as const) {
+      const out = await loadIncomeAverage(lia, liaCtx, NOW, choice);
+      expect(out).toMatchObject({ ok: false, reason: 'sem_meses', choice });
+      expect(out.excluded).toEqual(out.window);
+      expect(incomeAverageTexts(out).empty).toContain('pelo menos um mês fechado com recebimentos');
+    }
+    expect(incomeAverageTexts(await loadIncomeAverage(lia, liaCtx, NOW, 3)).empty).toBe(
+      'Para calcular a média, é preciso ter pelo menos um mês fechado com recebimentos anotados. Nos últimos 3 meses (julho a setembro), nenhum mês tem.',
+    );
+  });
+
+  it('2. Pessoal: a média de months_overview real em 3 e em 6 meses, com o mês atual, os gastos e o mês sem registros de fora', async () => {
+    await receive(lia, liaCtx, liaAcc, 520_000, '2026-04-05', 'Comissão de abril');
+    await receive(lia, liaCtx, liaAcc, 500_000, '2026-05-05', 'Comissão de maio');
+    await receive(lia, liaCtx, liaAcc, 510_000, '2026-06-05', 'Comissão de junho');
+    // Julho só tem um gasto: para o Recebido é um mês sem registros.
+    await lia.createRecord(newOperationKey(), liaCtx, 'despesa', { accountId: liaAcc, amountCents: 10_000, occurredOn: '2026-07-10', description: 'Gasto de julho', category: null });
+    await receive(lia, liaCtx, liaAcc, 300_000, '2026-08-05', 'Aula de agosto');
+    await receive(lia, liaCtx, liaAcc, 120_000, '2026-08-20', 'Aula extra de agosto');
+    await receive(lia, liaCtx, liaAcc, 650_001, '2026-09-05', 'Venda de setembro');
+    await receive(lia, liaCtx, liaAcc, 900_000, '2026-10-05', 'Venda de outubro, o mês atual');
+    const before = stored(liaCtx);
+
+    // Três meses (julho a setembro): agosto 4.200,00 e setembro 6.500,01; julho fica de fora. 10.700,01 ÷ 2 = 5.350,005, metade para cima.
+    const three = ok(await loadIncomeAverage(lia, liaCtx, NOW, 3));
+    expect(three).toMatchObject({ choice: 3, averageCents: 535_001, included: ['2026-08', '2026-09'], excluded: ['2026-07'], zeroConfirmed: [] });
+    expect(incomeAverageTexts(three)).toMatchObject({
+      headline: 'Média de agosto e setembro: R$ 5.350,01',
+      count: 'Meses usados: 2 de 3, julho sem registros ficou de fora',
+      zero: null,
+      notice: 'É uma estimativa feita com o que você anotou. Ajuste se souber que o próximo mês será diferente.',
+    });
+    // Seis meses (abril a setembro): 26.000,01 ÷ 5 = 5.200,002.
+    const six = ok(await loadIncomeAverage(lia, liaCtx, NOW, 6));
+    expect(six).toMatchObject({ choice: 6, averageCents: 520_000, included: ['2026-04', '2026-05', '2026-06', '2026-08', '2026-09'], excluded: ['2026-07'] });
+    expect(six.points.find((p) => p.month === '2026-08')).toMatchObject({ cents: 420_000, count: 2, state: 'com_registros' });
+    expect(incomeAverageTexts(six).headline).toBe('Média de abril, maio, junho, agosto e setembro: R$ 5.200,00');
+    // Calcular só lê.
+    expect(stored(liaCtx)).toBe(before);
+  });
+
+  it('3. o mês conferido como zero entra (set_month_check); um registro no mês tira a marca de vigor; excluí-lo a devolve; desfazer tira o mês', async () => {
+    const mark = await lia.setMonthCheck(newOperationKey(), liaCtx, '2026-07', 'recebimentos', 0);
+    expect(mark).toMatchObject({ checked: true, version: 1 });
+    // 10.700,01 ÷ 3 = 3.566,67; seis meses: 26.000,01 ÷ 6 = 4.333,335, metade para cima: 4.333,34.
+    const three = ok(await loadIncomeAverage(lia, liaCtx, NOW, 3));
+    expect(three).toMatchObject({ averageCents: 356_667, included: ['2026-07', '2026-08', '2026-09'], excluded: [], zeroConfirmed: ['2026-07'] });
+    expect(incomeAverageTexts(three)).toMatchObject({
+      headline: 'Média de julho a setembro: R$ 3.566,67',
+      count: 'Meses usados: 3 de 3',
+      zero: 'Julho entrou com R$ 0,00 porque você conferiu que não houve recebimentos.',
+    });
+    expect(ok(await loadIncomeAverage(lia, liaCtx, NOW, 6)).averageCents).toBe(433_334);
+    // O Pago de julho tem um gasto, mas a conferência foi dos recebimentos: o gasto não atrapalha, e a conferência de pagamentos é recusada.
+    expect(await err(lia.setMonthCheck(newOperationKey(), liaCtx, '2026-07', 'pagamentos', 0))).toBe('mes_com_registros');
+    // Um recebimento em julho: o registro vence a marca, que deixa de valer (sem ser desligada).
+    const july = await receive(lia, liaCtx, liaAcc, 100_000, '2026-07-15', 'Aula de julho');
+    const withRecord = ok(await loadIncomeAverage(lia, liaCtx, NOW, 3));
+    expect(withRecord).toMatchObject({ averageCents: 390_000, zeroConfirmed: [], excluded: [] });
+    expect(withRecord.points[0]).toMatchObject({ month: '2026-07', cents: 100_000, count: 1, state: 'com_registros' });
+    // Excluído o registro, a marca volta a valer.
+    await lia.deleteRecord(newOperationKey(), july.id, july.version);
+    expect(ok(await loadIncomeAverage(lia, liaCtx, NOW, 3))).toMatchObject({ averageCents: 356_667, zeroConfirmed: ['2026-07'] });
+    // Desfazer a conferência: julho volta a ficar de fora.
+    await lia.clearMonthCheck(newOperationKey(), liaCtx, '2026-07', 'recebimentos', 1);
+    expect(ok(await loadIncomeAverage(lia, liaCtx, NOW, 3))).toMatchObject({ averageCents: 535_001, excluded: ['2026-07'], zeroConfirmed: [] });
+  });
+
+  it('4. o core e o banco concordam: incomeAverage sobre months_overview real = sobre monthsOverview puro dos mesmos registros e marcas', async () => {
+    await lia.setMonthCheck(newOperationKey(), liaCtx, '2026-07', 'recebimentos', 2);
+    const months = ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09'] as IsoMonth[];
+    const records = (await Promise.all(months.map((m) => lia.listRecords(liaCtx, m)))).flat();
+    const checks = adminSql(`select coalesce(string_agg(to_char(month, 'YYYY-MM') || ',' || kind || ',' || checked || ',' || version, ';'), '') from public.month_checks where context_id = '${liaCtx}'`)
+      .split(';')
+      .filter(Boolean)
+      .map((line) => {
+        const [month, kind, checked, version] = line.split(',');
+        return { month: month!, kind: kind as 'recebimentos' | 'pagamentos', checked: checked === 'true' || checked === 't', version: Number(version) };
+      });
+    expect(checks.some((c) => c.checked)).toBe(true);
+    for (const choice of [3, 6] as const) {
+      const pure = incomeAverage(monthsOverview(records, liaCtx, months[0]!, months[5]!, checks, []), choice, NOW);
+      expect(await loadIncomeAverage(lia, liaCtx, NOW, choice)).toEqual(pure);
+    }
+    expect(ok(await loadIncomeAverage(lia, liaCtx, NOW, 3)).zeroConfirmed).toEqual(['2026-07']);
+    // Desfeita a conferência (a versão da linha é a 3), os próximos casos partem de julho sem registros.
+    await lia.clearMonthCheck(newOperationKey(), liaCtx, '2026-07', 'recebimentos', 3);
+    expect(ok(await loadIncomeAverage(lia, liaCtx, NOW, 3)).averageCents).toBe(535_001);
+  });
+
+  it('5. Família: quem escreve e quem só lê calculam a média da casa, sem misturar com o Pessoal; de fora não lê nada', async () => {
+    for (const [cents, on] of [[800_000, '2026-07-05'], [1_000_000, '2026-08-05'], [900_001, '2026-09-05']] as const) {
+      await receive(lia, fam, famAcc, cents, on, 'Renda da casa');
+    }
+    // (8.000,00 + 10.000,00 + 9.000,01) ÷ 3 = 9.000,0033: R$ 9.000,00, sem o Pessoal da Lia.
+    for (const who of [lia, marcos, nina]) {
+      const out = ok(await loadIncomeAverage(who, fam, NOW, 3));
+      expect(out).toMatchObject({ averageCents: 900_000, included: ['2026-07', '2026-08', '2026-09'], excluded: [], zeroConfirmed: [] });
+      expect(incomeAverageTexts(out).headline).toBe('Média de julho a setembro: R$ 9.000,00');
+    }
+    // Seis meses na Família: abril a junho sem registros ficam de fora.
+    expect(incomeAverageTexts(ok(await loadIncomeAverage(marcos, fam, NOW, 6))).count).toBe('Meses usados: 3 de 6, abril, maio e junho sem registros ficaram de fora');
+    // O Pessoal da Lia não é da casa: Marcos e Nina não o leem, e a média do Pessoal não muda por causa da Família.
+    expect(await err(loadIncomeAverage(marcos, liaCtx, NOW, 3))).toBe('sem_permissao');
+    expect(await err(loadIncomeAverage(nina, liaCtx, NOW, 3))).toBe('sem_permissao');
+    expect(ok(await loadIncomeAverage(lia, liaCtx, NOW, 3)).averageCents).toBe(535_001);
+    // Quem é de fora não lê a Família nem o Pessoal de ninguém.
+    expect(await err(loadIncomeAverage(otto, fam, NOW, 3))).toBe('sem_permissao');
+    expect(await err(loadIncomeAverage(otto, liaCtx, NOW, 6))).toBe('sem_permissao');
+    // A marca de "Conferi este mês" é do contexto: Marcos confere agosto no Pessoal dele e a Família não muda. Um mês conferido como zero
+    // sozinho não dá média (a referência precisa ser maior que zero).
+    await marcos.setMonthCheck(newOperationKey(), marcosCtx, '2026-08', 'recebimentos', 0);
+    expect(ok(await loadIncomeAverage(nina, fam, NOW, 3)).zeroConfirmed).toEqual([]);
+    const onlyZero = await loadIncomeAverage(marcos, marcosCtx, NOW, 3);
+    expect(onlyZero).toMatchObject({ ok: false, reason: 'sem_meses', excluded: ['2026-07', '2026-09'] });
+    expect(onlyZero.points.find((p) => p.month === '2026-08')).toMatchObject({ cents: 0, state: 'zero_confirmado' });
+    await marcos.clearMonthCheck(newOperationKey(), marcosCtx, '2026-08', 'recebimentos', 1);
+  });
+
+  it('6. virada de ano: em janeiro e em fevereiro de 2027, a janela passa por 2026 e o texto traz o ano quando preciso', async () => {
+    const jan = repoFor(MARCOS, '2027-01-12');
+    for (const [cents, on] of [[400_000, '2026-10-05'], [500_000, '2026-11-05'], [600_001, '2026-12-05'], [900_000, '2027-01-05']] as const) {
+      await receive(jan, marcosCtx, marcosAcc, cents, on, 'Renda de Marcos');
+    }
+    // Em janeiro de 2027: outubro, novembro e dezembro de 2026; janeiro, o mês atual, fica de fora. 15.000,01 ÷ 3 = 5.000,003 → 5.000,00.
+    const inJan = ok(await loadIncomeAverage(jan, marcosCtx, '2027-01', 3));
+    expect(inJan).toMatchObject({ averageCents: 500_000, window: ['2026-10', '2026-11', '2026-12'], included: ['2026-10', '2026-11', '2026-12'] });
+    expect(incomeAverageTexts(inJan).headline).toBe('Média de outubro a dezembro: R$ 5.000,00');
+    // Em fevereiro de 2027: novembro, dezembro e janeiro (outubro sai): (5.000,00 + 6.000,01 + 9.000,00) ÷ 3 = 6.666,67.
+    const inFeb = ok(await loadIncomeAverage(jan, marcosCtx, '2027-02', 3));
+    expect(inFeb).toMatchObject({ averageCents: 666_667, included: ['2026-11', '2026-12', '2027-01'] });
+    expect(incomeAverageTexts(inFeb).headline).toBe('Média de novembro de 2026 a janeiro de 2027: R$ 6.666,67');
+    // Seis meses em fevereiro de 2027: agosto de 2026 a janeiro de 2027; agosto e setembro não têm registros. 24.000,01 ÷ 4 = 6.000,0025.
+    const six = ok(await loadIncomeAverage(jan, marcosCtx, '2027-02', 6));
+    expect(six).toMatchObject({ averageCents: 600_000, window: ['2026-08', '2026-09', '2026-10', '2026-11', '2026-12', '2027-01'], excluded: ['2026-08', '2026-09'] });
+  });
+
+  it('7. a média só preenche o campo: o texto do campo é aceito como está pela validação do formulário, e quem grava é a set_income_reference de sempre', async () => {
+    const avg = ok(await loadIncomeAverage(lia, liaCtx, NOW, 3)).averageCents;
+    expect(avg).toBe(535_001);
+    const before = stored(liaCtx);
+    const draft = validateIncomeReferenceDraft({ amountText: centsToInput(avg), fromMonth: NOW, varies: true }, '2026-10-07');
+    expect(draft).toMatchObject({ ok: true, amountCents: avg });
+    expect(stored(liaCtx)).toBe(before);
+    // Só depois de a pessoa salvar, a referência existe, no valor exato da média.
+    const saved = await lia.setIncomeReference(newOperationKey(), liaCtx, NOW, 0, avg, true);
+    expect(saved).toMatchObject({ amountCents: 535_001, fromMonth: NOW, varies: true, version: 1 });
+    expect((await lia.listIncomeReferences(liaCtx)).map((r) => [r.fromMonth, r.amountCents, r.varies])).toEqual([[NOW, 535_001, true]]);
+    // Calcular de novo não toca na referência salva.
+    const after = stored(liaCtx);
+    await loadIncomeAverage(lia, liaCtx, NOW, 6);
+    expect(stored(liaCtx)).toBe(after);
+  });
+
+  it('8. a leitura que falha (rede) ou que o banco recusa passa como erro, nunca como "sem registros"', async () => {
+    const down: typeof fetch = async () => {
+      throw new TypeError('Failed to fetch');
+    };
+    const offline = new SupabaseRepository(clientFor(LIA, undefined, down), { id: LIA });
+    expect(await err(loadIncomeAverage(offline, liaCtx, NOW, 3))).toBe('rede');
+    expect(await err(loadIncomeAverage(otto, 'ctx-que-nao-existe', NOW, 3))).not.toBeNull();
+    expect(await err(loadIncomeAverage(otto, fam, NOW, 3))).toBe('sem_permissao');
   });
 });
