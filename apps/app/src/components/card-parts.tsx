@@ -5,6 +5,7 @@ import {
   formatBRL,
   invoiceMonthLabel,
   invoiceTexts,
+  isStackedLayout,
   type Card as CardData,
   type CardInvoicesMonth,
   type CardSummary,
@@ -34,7 +35,7 @@ export const finalText = (card: Pick<CardData, 'lastDigits'>) => (card.lastDigit
 export function CardTile({ summary, today }: { summary: CardSummary; today: IsoDate }) {
   const maskLabel = useMoneyLabelMask();
   const { width, fontScale } = useWindowDimensions();
-  const stacked = width < 360 || fontScale > 1.3;
+  const stacked = isStackedLayout(width, fontScale);
   const { card } = summary;
   const t = cardSummaryTexts(summary, today);
   const inv = invoiceTexts(summary.current, today);
@@ -111,7 +112,7 @@ export function CardTile({ summary, today }: { summary: CardSummary; today: IsoD
 export function InvoiceRow({ invoice, today, last }: { invoice: Invoice; today: IsoDate; last: boolean }) {
   const maskLabel = useMoneyLabelMask();
   const { width, fontScale } = useWindowDimensions();
-  const stacked = width < 360 || fontScale > 1.3;
+  const stacked = isStackedLayout(width, fontScale);
   const t = invoiceTexts(invoice, today);
   const amount = (
     <View style={stacked ? undefined : styles.amountCol}>

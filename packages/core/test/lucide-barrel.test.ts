@@ -7,7 +7,8 @@ import { describe, expect, it } from 'vitest';
 /**
  * Ícones do app (D-062 item 5, `docs/19`): o Metro troca `lucide-react-native` por `apps/app/src/lib/lucide.ts`, que traz só os ícones
  * usados. Importar o pacote inteiro põe 1.867 ícones no pacote web (2,1 MB a mais antes de comprimir). Se uma tela importa um ícone
- * que o arquivo não exporta, o app quebraria ao abrir essa tela: este teste pega isso antes.
+ * que o arquivo não exporta, o app quebraria ao abrir essa tela: este teste pega isso antes (e o TypeScript também, pelo `paths` de
+ * `apps/app/tsconfig.json`, que lê `lib/lucide.ts` no lugar do pacote).
  */
 const APP = fileURLToPath(new URL('../../../apps/app/', import.meta.url));
 const APP_SRC = join(APP, 'src');
@@ -17,18 +18,21 @@ function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
     if (statSync(path).isDirectory()) return sourceFiles(path);
-    return /\.(ts|tsx)$/.test(name) ? [path] : [];
+    return /\.(ts|tsx|js|jsx)$/.test(name) ? [path] : [];
   });
 }
 
-/** Nomes importados de 'lucide-react-native' como valor (os `type` ficam de fora: somem na compilação). */
+/**
+ * Nomes importados de 'lucide-react-native' como valor, com aspas simples ou duplas, em `import { … } from` e em `export { … } from`
+ * (a reexportação também puxa o ícone). Os `type` ficam de fora: somem na compilação.
+ */
 function usedIcons(): Map<string, string[]> {
   const used = new Map<string, string[]>();
   for (const file of sourceFiles(APP_SRC)) {
     const rel = file.slice(APP_SRC.length + 1);
     if (rel === join('lib', 'lucide.ts')) continue;
     const text = readFileSync(file, 'utf8');
-    for (const m of text.matchAll(/import\s+(type\s+)?\{([^}]*)\}\s*from\s*'lucide-react-native'/g)) {
+    for (const m of text.matchAll(/\b(?:import|export)\s+(type\s+)?(?:\w+\s*,\s*)?\{([^}]*)\}\s*from\s*(['"])lucide-react-native\3/g)) {
       if (m[1]) continue;
       for (const part of m[2]!.split(',')) {
         const name = part.trim();
@@ -45,7 +49,7 @@ function usedIcons(): Map<string, string[]> {
 function barrel(): Map<string, string> {
   const text = readFileSync(join(APP_SRC, 'lib', 'lucide.ts'), 'utf8');
   const map = new Map<string, string>();
-  for (const m of text.matchAll(/^export \{ default as (\w+) \} from 'lucide-react-native\/icons\/([a-z0-9-]+)';$/gm)) map.set(m[1]!, m[2]!);
+  for (const m of text.matchAll(/^export \{\s*default as (\w+)\s*\} from\s*(['"])lucide-react-native\/icons\/([a-z0-9-]+)\2;?$/gm)) map.set(m[1]!, m[3]!);
   return map;
 }
 
@@ -88,17 +92,19 @@ describe('ícones do app: só os usados entram no pacote (D-062 item 5)', () => 
     expect(names.filter((n) => !used.has(n!)).length).toBeLessThanOrEqual(10);
   });
 
-  it('o Metro troca o pacote pelo arquivo (apps/app/metro.config.js) e nenhuma tela importa o pacote todo nem pelo require', () => {
+  it('o Metro e o TypeScript trocam o pacote pelo arquivo (metro.config.js e paths do tsconfig.json) e nenhuma tela importa o pacote todo nem pelo require', () => {
     const config = readFileSync(join(APP, 'metro.config.js'), 'utf8');
     expect(config).toContain("moduleName === 'lucide-react-native'");
     expect(config).toContain("path.join(__dirname, 'src', 'lib', 'lucide.ts')");
+    const tsconfig = JSON.parse(readFileSync(join(APP, 'tsconfig.json'), 'utf8')) as { compilerOptions?: { paths?: Record<string, string[]> } };
+    expect(tsconfig.compilerOptions?.paths?.['lucide-react-native'], 'sem o paths, ícone que falta em lib/lucide.ts passa no typecheck').toEqual(['./src/lib/lucide.ts']);
     for (const file of sourceFiles(APP_SRC)) {
       const rel = file.slice(APP_SRC.length + 1);
       if (rel === join('lib', 'lucide.ts')) continue;
       const text = readFileSync(file, 'utf8');
-      expect(text, `${rel}: importe os ícones pelo nome, não o pacote todo`).not.toMatch(/import\s+\*\s+as\s+\w+\s+from\s+'lucide-react-native'/);
-      expect(text, `${rel}: sem require do pacote`).not.toMatch(/require\(\s*'lucide-react-native'\s*\)/);
-      expect(text, `${rel}: sem import dinâmico do pacote`).not.toMatch(/import\(\s*'lucide-react-native'\s*\)/);
+      expect(text, `${rel}: importe os ícones pelo nome, não o pacote todo`).not.toMatch(/\b(?:import|export)\s+\*(?:\s+as\s+\w+)?\s+from\s*(['"])lucide-react-native\1/);
+      expect(text, `${rel}: sem require do pacote`).not.toMatch(/require\(\s*(['"])lucide-react-native\1\s*\)/);
+      expect(text, `${rel}: sem import dinâmico do pacote`).not.toMatch(/import\(\s*(['"])lucide-react-native\1\s*\)/);
     }
   });
 });

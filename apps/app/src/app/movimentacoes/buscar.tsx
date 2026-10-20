@@ -80,7 +80,12 @@ export default function BuscarScreen() {
   const text = useDebounced(draft.text, 400);
   const min = useDebounced(draft.min, 400);
   const max = useDebounced(draft.max, 400);
-  const parsed = searchFromDraft({ ...draft, text, min, max });
+  // O rascunho lido só muda com os campos que valem (o texto e os valores, depois do instante parado): `params` é o mesmo objeto
+  // enquanto nada disso muda, e é ele que a conferência e a soma abaixo usam como chave.
+  const parsed = useMemo(
+    () => searchFromDraft({ text, min, max, kind: draft.kind, period: draft.period, category: draft.category, accountId: draft.accountId }),
+    [text, min, max, draft.kind, draft.period, draft.category, draft.accountId],
+  );
   const params = parsed.ok ? parsed.params : null;
   const errors = parsed.ok ? {} : parsed.errors;
   const search = useRecordSearch(contextId, params);
@@ -92,17 +97,16 @@ export default function BuscarScreen() {
   const showMore = expanded || Boolean(errors.min) || Boolean(errors.max);
 
   // A conferência do texto nas até 1.000 linhas e a soma só se refazem quando o resultado ou os filtros valem de novo (não a cada tecla
-  // digitada: o texto só vale depois de 400 ms parado). `params` é um objeto novo a cada quadro; a chave é o conteúdo dele.
-  const paramsKey = params ? JSON.stringify(params) : '';
+  // digitada: o texto só vale depois de 400 ms parado).
   const recordItems = search.records.data?.items;
   const purchaseItems = search.withCards ? search.purchases.data?.items : undefined;
-  const found = useMemo(() => (params && recordItems ? searchResultRecords(recordItems, params, today) : []), [recordItems, paramsKey, today]);
+  const found = useMemo(() => (params && recordItems ? searchResultRecords(recordItems, params, today) : []), [recordItems, params, today]);
   const summary = useMemo(() => summarizeSearch(found), [found]);
-  const purchases = useMemo(() => (params && purchaseItems ? searchResultPurchases(purchaseItems, params, today) : []), [purchaseItems, paramsKey, today]);
+  const purchases = useMemo(() => (params && purchaseItems ? searchResultPurchases(purchaseItems, params, today) : []), [purchaseItems, params, today]);
   const recordsTruncated = Boolean(search.records.data?.truncated);
   const purchasesTruncated = Boolean(search.withCards && search.purchases.data?.truncated);
   const truncated = recordsTruncated || purchasesTruncated;
-  const cardNames = new Map((cards.data ?? []).map((c) => [c.id, c.name]));
+  const cardNames = useMemo(() => new Map((cards.data ?? []).map((c) => [c.id, c.name])), [cards.data]);
   const lines = searchSummaryLines(summary, recordsTruncated);
   const purchasesPending = search.withCards && search.purchases.isPending;
   const purchasesFailed = search.withCards && search.purchases.isError;
@@ -154,9 +158,7 @@ export default function BuscarScreen() {
           ))}
         </View>
       )),
-    // cardNames sai de cards.data; o Map novo a cada quadro não entra na lista.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [purchaseMonths, cards.data],
+    [purchaseMonths, cardNames],
   );
 
   return (

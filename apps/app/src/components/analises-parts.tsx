@@ -13,6 +13,7 @@ import {
   categoryBubbles,
   categoryKey,
   evolutionFetchRange,
+  isStackedLayout,
   monthCheckPlan,
   monthOf,
   selectedCategoryCard,
@@ -320,7 +321,7 @@ function SelectedCategory({
 }) {
   const hidden = useValuesHidden();
   const { width, fontScale } = useWindowDimensions();
-  const stacked = width < 360 || fontScale > 1.3;
+  const stacked = isStackedLayout(width, fontScale);
   // Ao sair da tela (outro mês, outra aba), a posição guardada deixa de valer: a próxima só vale depois do primeiro layout do cartão novo.
   useEffect(() => () => onLayout(null), [onLayout]);
   return (

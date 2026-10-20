@@ -1,4 +1,4 @@
-import { SEARCH_TEXT, type CardEntry } from '@clarevo/core';
+import { SEARCH_TEXT, isStackedLayout, type CardEntry } from '@clarevo/core';
 import { ChevronRight, CreditCard, Search } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
@@ -38,7 +38,7 @@ export function SearchEntry({ onPress }: { onPress: () => void }) {
 export function PurchaseRow({ entry, cardName, last, onPress }: { entry: CardEntry; cardName: string | null; last?: boolean; onPress: () => void }) {
   const { width, fontScale } = useWindowDimensions();
   const hidden = useValuesHidden();
-  const stacked = width < 360 || fontScale > 1.3;
+  const stacked = isStackedLayout(width, fontScale);
   const caption = SEARCH_TEXT.purchaseCaption(entry.purchasedOn ?? '', cardName, entry.installments);
   return (
     <Pressable

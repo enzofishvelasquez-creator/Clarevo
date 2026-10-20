@@ -1,4 +1,4 @@
-import { CARDS_TEXT, formatDateBR, type FinancialRecord } from '@clarevo/core';
+import { CARDS_TEXT, formatDateBR, isStackedLayout, type FinancialRecord } from '@clarevo/core';
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
@@ -26,7 +26,7 @@ export function RecordRow({
 }) {
   const { width, fontScale } = useWindowDimensions();
   const hidden = useValuesHidden();
-  const stacked = width < 360 || fontScale > 1.3;
+  const stacked = isStackedLayout(width, fontScale);
   const isIn = record.kind === 'receita';
   const Icon = isIn ? ArrowDownLeft : ArrowUpRight;
   // Gasto gerado ao marcar uma conta a pagar como paga: a origem aparece na legenda.

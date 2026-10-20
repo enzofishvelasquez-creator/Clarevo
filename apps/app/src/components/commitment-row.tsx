@@ -3,6 +3,7 @@ import {
   commitmentSituation,
   dueText,
   formatMonthBR,
+  isStackedLayout,
   monthOf,
   occurrenceLabel,
   type AnnualGroup,
@@ -60,7 +61,7 @@ export function CommitmentRow({
 }) {
   const { width, fontScale } = useWindowDimensions();
   const hidden = useValuesHidden();
-  const stacked = width < 360 || fontScale > 1.3;
+  const stacked = isStackedLayout(width, fontScale);
   const situation = commitmentSituation(c, today);
   const look = SITUATION_LOOK[situation];
   const due = dueText(c, today);
@@ -174,7 +175,7 @@ function seriesA11y(kind: NonNullable<Commitment['series']>['kind'], label: stri
 export function AnnualGroupRow({ group: g, onPress, last }: { group: AnnualGroup; onPress: () => void; last?: boolean }) {
   const { width, fontScale } = useWindowDimensions();
   const hidden = useValuesHidden();
-  const stacked = width < 360 || fontScale > 1.3;
+  const stacked = isStackedLayout(width, fontScale);
   const amount = (
     <View style={stacked ? undefined : styles.amountCol}>
       <Txt variant="label" style={[styles.amount, tabular]}>

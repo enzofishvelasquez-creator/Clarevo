@@ -24,7 +24,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { CircleAlert, Plus, Receipt, Undo2, Wallet } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { ChoiceDialog, type DialogChoice } from '@/components/choice-dialog';
@@ -51,6 +51,8 @@ type FaturaCell = { type: 'card'; key: string; first: boolean; last: boolean } |
 const T = CARDS_TEXT;
 const I = CARDS_TEXT.invoice;
 const S = CARDS_TEXT.screens;
+
+const editable = (l: InvoiceLine) => l.entryId !== null && l.version !== null && (l.kind === 'parcela' || l.kind === 'encargo' || l.kind === 'estorno');
 
 /**
  * Fatura (D-037): faixa azul com o mês, a situação e o total (estimado enquanto aberta), fechamento, vencimento e período; o que
@@ -150,8 +152,6 @@ export default function FaturaScreen() {
     }
   }
 
-  const editable = (l: InvoiceLine) => l.entryId !== null && l.version !== null && (l.kind === 'parcela' || l.kind === 'encargo' || l.kind === 'estorno');
-
   const lineChoices = (l: InvoiceLine, inv: Invoice): DialogChoice[] => {
     const choices: DialogChoice[] = [];
     const paidInvoice = inv.situation === 'paga' || inv.situation === 'paga_em_parte';
@@ -182,10 +182,10 @@ export default function FaturaScreen() {
     return choices;
   };
 
-  const openLine = (l: InvoiceLine) => {
+  const openLine = useCallback((l: InvoiceLine) => {
     setActionError(null);
     setLine(l);
-  };
+  }, []);
   const loading = card.isPending || (c && invoices.isPending);
   const failed = card.isError || invoices.isError;
   const showInvoice = !loading && !failed && c !== null && month !== null && invoice !== null;
@@ -193,6 +193,42 @@ export default function FaturaScreen() {
   // Fatura com muitos lançamentos (D-062 item 5): a lista monta só as linhas perto da tela; abaixo disso, o cartão de sempre.
   const long = showInvoice && invoice !== null && isLongList(invoice.lines.length);
   const cells: FaturaCell[] = !showInvoice || !invoice ? [] : long ? titledRows('lancamentos', invoice.lines, (l) => l.key) : [{ type: 'card', key: 'lancamentos', first: true, last: true }];
+
+  const renderItem = useCallback(
+    ({ item }: { item: FaturaCell }) => {
+      if (!invoice) return null;
+      const spacing = item.first ? styles.cellFirst : null;
+      if (item.type === 'card') {
+        return (
+          <ListCell style={spacing}>
+            <InvoiceLinesCard invoice={invoice} today={today} paid={paid} editable={editable} onLine={openLine} />
+          </ListCell>
+        );
+      }
+      return (
+        <ListCell style={spacing}>
+          <CardSlice first={item.first} last={item.last}>
+            {item.type === 'title' ? (
+              <Txt variant="title" accessibilityRole="header" aria-level={2} style={{ paddingBottom: space[1] }}>
+                {S.entriesTitle}
+              </Txt>
+            ) : (
+              <LineRow
+                line={item.item}
+                last={item.lastItem}
+                locked={paid && item.item.kind !== 'parcela'}
+                editable={editable(item.item)}
+                onPress={() => openLine(item.item)}
+              />
+            )}
+          </CardSlice>
+        </ListCell>
+      );
+    },
+    [invoice, today, paid, openLine],
+  );
+  // O `ScreenList` só monta de novo as linhas quando o item, o `renderItem` ou isto muda: o que a linha usa além do item.
+  const extraData = useMemo(() => [invoice, busy, paid], [invoice, busy, paid]);
 
   const header = loading ? (
     <View style={[styles.hero, { gap: space[3] }]}>
@@ -240,39 +276,10 @@ export default function FaturaScreen() {
         wide
         data={cells}
         keyExtractor={(cell) => cell.key}
-        extraData={[invoice, busy, paid]}
+        extraData={extraData}
         header={header}
         footer={invoice && showInvoice ? <InvoiceBottom cardId={c!.id} invoice={invoice} today={today} hasPrev={hasPrev} hasNext={hasNext} /> : null}
-        renderItem={({ item }) => {
-          if (!invoice) return null;
-          const spacing = item.first ? styles.cellFirst : null;
-          if (item.type === 'card') {
-            return (
-              <ListCell style={spacing}>
-                <InvoiceLinesCard invoice={invoice} today={today} paid={paid} editable={editable} onLine={openLine} />
-              </ListCell>
-            );
-          }
-          return (
-            <ListCell style={spacing}>
-              <CardSlice first={item.first} last={item.last}>
-                {item.type === 'title' ? (
-                  <Txt variant="title" accessibilityRole="header" aria-level={2} style={{ paddingBottom: space[1] }}>
-                    {S.entriesTitle}
-                  </Txt>
-                ) : (
-                  <LineRow
-                    line={item.item}
-                    last={item.lastItem}
-                    locked={paid && item.item.kind !== 'parcela'}
-                    editable={editable(item.item)}
-                    onPress={() => openLine(item.item)}
-                  />
-                )}
-              </CardSlice>
-            </ListCell>
-          );
-        }}
+        renderItem={renderItem}
       />
 
       {invoice ? (

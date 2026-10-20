@@ -2,8 +2,14 @@
  * Os ícones do app, um por um (D-062 item 5, `docs/19`). O Metro troca `import ... from 'lucide-react-native'` por este arquivo
  * (`metro.config.js`): importar o pacote inteiro põe os 1.867 ícones no pacote web (2,1 MB a mais, antes de comprimir) e só
  * 98 são usados. Ícone novo: acrescente a linha aqui (o nome de `lucide-react-native` e o arquivo em kebab-case); o teste
- * `packages/core/test/lucide-barrel.test.ts` falha se uma tela importa um ícone que não está aqui.
+ * `packages/core/test/lucide-barrel.test.ts` falha se uma tela importa um ícone que não está aqui. O TypeScript também lê este arquivo no lugar do
+ * pacote (`paths` em `apps/app/tsconfig.json`): ícone que não está aqui é erro de tipo em `npm run typecheck`.
  */
+
+import type Icon from 'lucide-react-native/icons/check';
+
+/** O tipo de um ícone (`LucideIcon` do pacote, o mesmo para todos eles): as telas o importam daqui, como importam os ícones. */
+export type LucideIcon = typeof Icon;
 
 export { default as AlertCircle } from 'lucide-react-native/icons/circle-alert';
 export { default as AppWindow } from 'lucide-react-native/icons/app-window';

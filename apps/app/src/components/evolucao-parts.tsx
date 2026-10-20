@@ -1,6 +1,7 @@
 import {
   EVOLUTION_TEXT,
   evolutionTopCategories,
+  isStackedLayout,
   type CategoryShare,
   type EvolutionExplainPlan,
   type EvolutionMetric,
@@ -427,7 +428,7 @@ function CategoryList({
 }) {
   const hidden = useValuesHidden();
   const { width, fontScale } = useWindowDimensions();
-  const stacked = width < 360 || fontScale > 1.3;
+  const stacked = isStackedLayout(width, fontScale);
   return (
     <View style={styles.block}>
       <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={3}>
