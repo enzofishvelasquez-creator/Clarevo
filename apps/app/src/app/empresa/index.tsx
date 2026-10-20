@@ -1,4 +1,4 @@
-import { COMPANY_TEXT, licenseLink, type InviteLinkRow, type License } from '@clarevo/core';
+import { COMPANY_TEXT, currentContract, licenseLink, type InviteLinkRow, type License } from '@clarevo/core';
 import { useEffect, useMemo, useState } from 'react';
 import { Platform, View } from 'react-native';
 
@@ -58,7 +58,7 @@ function Panel() {
   if (companies.isError) return <ErrorState message={T.loadFailed} onRetry={() => companies.refetch()} />;
   if (!company) return <Message text={T.notAdmin} />;
 
-  const contract = company.contracts[0];
+  const contract = currentContract(company.contracts, today);
   const licenses = company.licenses;
 
   const addLinks = (rows: InviteLinkRow[]) =>

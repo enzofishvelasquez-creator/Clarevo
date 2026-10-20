@@ -11,6 +11,7 @@ import {
   buildInviteListText,
   companyErrorText,
   contractState,
+  currentContract,
   dayOf,
   deviceTimeZone,
   filterLicenses,
@@ -549,7 +550,7 @@ export function ReportCard({ company, today }: { company: CompanyOverview; today
       const report = buildCompanyReport({
         organization: company.organization,
         demo: company.demo,
-        contract: company.contracts[0] ?? null,
+        contract: currentContract(company.contracts, today),
         usage: usage.data,
         licenses: includeList ? company.licenses : null,
         generatedOn: today,

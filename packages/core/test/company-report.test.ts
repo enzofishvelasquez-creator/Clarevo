@@ -398,7 +398,7 @@ describe('Relatório do RH (D-062): tela do painel (lida como código-fonte)', (
     expect(card).toContain('deliverExportFile');
     expect(card).not.toMatch(/\buseWork\b|\buseFamily\b|listRecords|listCommitments|listGoals|listCards|financial_records|getSpace|\.mutate|useMutation|attemptFamily/);
     // A lista só entra no arquivo quando a caixa está marcada, e começa desmarcada.
-    expect(card).toContain('useState(false)');
+    expect(card).toContain('[includeList, setIncludeList] = useState(false)');
     expect(card).toMatch(/includeList \? .* : null/);
   });
 });

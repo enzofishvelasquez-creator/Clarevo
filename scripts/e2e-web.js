@@ -12650,7 +12650,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // ---- 8. Uma empresa de verdade (da memória): nome com ponto e vírgula, aspas e "=", contrato com fim; o nome é protegido na planilha e escapado na página ----
   await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
   await famCreateAccount('Rita Relatório', 'rita.relatorio@exemplo.com');
-  await p.evaluate(() => window.__e2e.company().staffCreateOrganization({ name: '=Alfa; "Beta" Ltda', seats: 8, plan: 'familiar', startsOn: '2026-10-01', endsOn: '2027-09-30', adminEmail: 'rita.relatorio@exemplo.com' }));
+  await p.evaluate(() => window.__e2e.company().staffCreateOrganization({ name: '=Alfa; "Beta" <b>Ltda</b> & Cia &amp; Co', seats: 8, plan: 'familiar', startsOn: '2026-10-01', endsOn: '2027-09-30', adminEmail: 'rita.relatorio@exemplo.com' }));
   await p.evaluate(() => window.__e2e.refresh()); await p.waitForTimeout(600);
   await empGoPanel();
   await field('E-mails').fill('bia.rh@exemplo.com');
@@ -12659,8 +12659,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await rhKeep();
   ok('Relatório do RH, empresa de verdade: o cartão aparece, a caixa da lista começa desmarcada e não há aviso de demonstração', (await headingShown('Relatório de adesão')) && !(await rhChecked()) && !t.includes('Demonstração: empresa e pessoas fictícias.'));
   const rhCsv4 = await rhDownload('Baixar relatório em planilha (CSV)');
-  ok('Relatório do RH, empresa de verdade, sem a lista: o nome protegido contra fórmula e entre aspas (apóstrofo na frente, aspas dobradas), contrato Familiar com 8 vagas e fim em 30/09/2027, contagens 8, 1, 0 e 0, sem linha de demonstração',
-    JSON.stringify(rhCsv4.lines) === JSON.stringify(['\ufeffRelatório de adesão ao benefício', 'Empresa;"\'=Alfa; ""Beta"" Ltda"', 'Gerado em;07/10/2026', '', 'Contrato', 'Plano;Familiar', 'Vagas;8', 'Início;01/10/2026', 'Fim;30/09/2027', '',
+  ok('Relatório do RH, empresa de verdade, sem a lista: o nome (com <b> e &) protegido contra fórmula e entre aspas (apóstrofo na frente, aspas dobradas), contrato Familiar com 8 vagas e fim em 30/09/2027, contagens 8, 1, 0 e 0, sem linha de demonstração',
+    JSON.stringify(rhCsv4.lines) === JSON.stringify(['\ufeffRelatório de adesão ao benefício', 'Empresa;"\'=Alfa; ""Beta"" <b>Ltda</b> & Cia &amp; Co"', 'Gerado em;07/10/2026', '', 'Contrato', 'Plano;Familiar', 'Vagas;8', 'Início;01/10/2026', 'Fim;30/09/2027', '',
       'Contagens de licenças', 'Vagas contratadas;8', 'Convites pendentes;1', 'Licenças ativas;0', 'Licenças encerradas;0', '', RH_FOOTER, '']), JSON.stringify(rhCsv4.lines));
   await rhSetList(true);
   const rhCsv5 = await rhDownload('Baixar relatório em planilha (CSV)');
@@ -12668,7 +12668,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     (rhCsv5.text.match(/@/g) ?? []).length === 1 && !rhCsv5.text.includes('O convite cancelado aparece'), rhCsv5.lines.join(' | '));
   await rhStubOpen();
   const rhPdf3 = await rhPopup('Baixar relatório em PDF');
-  ok('Relatório do RH, empresa de verdade, PDF: o nome aparece como foi escrito, como texto, Plano Familiar, Fim 30/09/2027 e a licença', rhPdf3.text.includes('=Alfa; "Beta" Ltda') && !rhPdf3.html.includes('<img') && rhPdf3.text.includes('Plano Familiar') && rhPdf3.text.includes('Fim 30/09/2027') &&
+  ok('Relatório do RH, empresa de verdade, PDF: o nome aparece como foi escrito (com <b> e &, como texto e escapado no HTML), Plano Familiar, Fim 30/09/2027 e a licença', rhPdf3.text.includes('=Alfa; "Beta" <b>Ltda</b> & Cia &amp; Co') && rhPdf3.html.includes('&lt;b&gt;Ltda&lt;/b&gt; &amp; Cia &amp;amp; Co') && !rhPdf3.html.includes('<b>Ltda') && !rhPdf3.html.includes('<img') && rhPdf3.text.includes('Plano Familiar') && rhPdf3.text.includes('Fim 30/09/2027') &&
     rhPdf3.text.includes('bia.rh@exemplo.com Convite enviado 07/10/2026') && !rhPdf3.text.includes('fictícias'), rhPdf3.text.slice(0, 500));
   await rhPdf3.popup.close(); await p.bringToFront();
   await empShots('545_relatorio_rh_empresa', { scroll: empScroll('Relatório de adesão'), wide: true });
@@ -12680,6 +12680,26 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Relatório do RH, conta sem empresa: Conta não oferece o painel', (await visibleCount('button', 'Abrir painel da empresa')) === 0 && !(await headingShown('Painel da empresa')));
   t = await rhKeep();
   ok('Relatório do RH, conta sem empresa: nada de "Relatório de adesão", de botão de download nem da caixa da lista em Conta (a tela da empresa só mostra o aviso de acesso a quem não administra)', !(await headingShown('Relatório de adesão')) && (await visibleCount('button', /^Baixar relatório/)) === 0 && (await visibleCount('checkbox', /^Incluir a lista/)) === 0, t.slice(0, 300));
+  // /empresa não abre por pushState (as rotas protegidas voltam ao Resumo) nem por page.goto (recarregar perde a conta simulada e a rota
+  // não está em ENTRY_PATH): a navegação é pedida ao navegador de rotas do app, o mesmo que o botão usaria.
+  await p.evaluate(() => {
+    const root = document.getElementById('root');
+    const key = Object.keys(root).find((k) => k.startsWith('__reactContainer$'));
+    const stack = [root[key].stateNode.current];
+    while (stack.length > 0) {
+      const f = stack.pop();
+      const v = f.memoizedProps?.value;
+      if (v && typeof v === 'object' && typeof v.getRootState === 'function' && typeof v.navigate === 'function') { v.navigate('empresa/index'); return; }
+      if (f.sibling) stack.push(f.sibling);
+      if (f.child) stack.push(f.child);
+    }
+    throw new Error('navegador de rotas não encontrado');
+  });
+  await waitText('Esta área é para quem administra o benefício de uma empresa.');
+  ok('Relatório do RH, conta sem empresa: o endereço é /empresa', famPath() === '/empresa', p.url());
+  t = await rhKeep();
+  ok('Relatório do RH, conta sem empresa: /empresa mostra só o aviso "Esta área é para quem administra o benefício de uma empresa. Se você deveria ter acesso, fale com a equipe do Clarevo." e nada de relatório, de contrato nem de download', t.includes('Esta área é para quem administra o benefício de uma empresa. Se você deveria ter acesso, fale com a equipe do Clarevo.') &&
+    !(await headingShown('Relatório de adesão')) && !(await headingShown('Contrato')) && (await visibleCount('button', /^Baixar relatório/)) === 0 && (await visibleCount('checkbox', /^Incluir a lista/)) === 0, t.slice(0, 300));
   await famSignOut();
 
   // ---- 10. Demonstração de novo: os totais de outubro não mudam e o Resumo não ganhou nada da empresa ----
