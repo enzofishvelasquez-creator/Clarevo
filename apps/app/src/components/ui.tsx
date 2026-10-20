@@ -1,7 +1,9 @@
-import { formatBRL } from '@clarevo/core';
+import { DEMO_PILL_MAX_FONT_SCALE, clampedLines, formatBRL } from '@clarevo/core';
 import { Check, Eye, EyeOff, type LucideIcon } from 'lucide-react-native';
-import { Children, forwardRef, useEffect, useId, useState, type ReactNode, type Ref } from 'react';
+import { Children, forwardRef, useEffect, useId, useState, type ReactElement, type ReactNode, type Ref } from 'react';
 import {
+  FlatList,
+  PixelRatio,
   Platform,
   Pressable,
   ScrollView,
@@ -9,6 +11,7 @@ import {
   Text,
   TextInput,
   View,
+  type ListRenderItem,
   type PressableProps,
   type StyleProp,
   type TextInputProps,
@@ -44,6 +47,12 @@ export function Txt({ variant = 'body', color = colors.text, style, children, ..
     </Text>
   );
 }
+
+/**
+ * Linhas que um título de lista pode ocupar. Com letra grande no aparelho (escala de fonte acima de 1), ele quebra quanto precisar:
+ * terminar em "…" esconderia parte do nome (a legenda da linha já quebra sem limite). Na web a escala é sempre 1, então vale o limite.
+ */
+export const clampLines = (lines: number): number | undefined => clampedLines(lines, PixelRatio.getFontScale());
 
 /** Valor em reais. Com valores ocultos (lib/privacy.ts), mostra "R$ ••••" e o leitor de tela diz "valor oculto". */
 export function Money({
@@ -89,6 +98,21 @@ export function FitMoney({ cents, color = colors.text, maxSize = 36, minSize = 2
   );
 }
 
+/**
+ * Estilo do conteúdo de uma tela que rola (`Screen` e `ScreenList`): limite de largura, respiro de baixo com a área segura e,
+ * nas telas de consulta, o espaço da barra inferior sobreposta ao fim da tela.
+ */
+function useScreenContentStyle(contentStyle: StyleProp<ViewStyle> | undefined, bottomInset: boolean, wide: boolean | undefined) {
+  const insets = useSafeAreaInsets();
+  // Barra das telas de consulta (sobreposta ao fim da tela): já inclui a área segura de baixo. Soma-se ao respiro de baixo que a
+  // tela já tem (o `padding` de `contentStyle` ou o padrão), por último, para nada ficar atrás da barra.
+  const barInset = useBrowseBarInset();
+  const own = StyleSheet.flatten(contentStyle) as ViewStyle | undefined;
+  const ownBottom = own?.paddingBottom ?? own?.paddingVertical ?? own?.padding;
+  const underBar = bottomInset && barInset > 0 ? { paddingBottom: barInset + (typeof ownBottom === 'number' ? ownBottom : space[10]) } : null;
+  return [!wide && styles.screenContent, bottomInset && { paddingBottom: insets.bottom + space[10] }, contentStyle, underBar];
+}
+
 export function Screen({
   children,
   contentStyle,
@@ -107,24 +131,89 @@ export function Screen({
   /** A posição da rolagem, em px, a cada movimento (para uma tela decidir se algo já está à vista). */
   onScroll?: (offsetY: number) => void;
 }) {
-  const insets = useSafeAreaInsets();
-  // Barra das telas de consulta (sobreposta ao fim da tela): já inclui a área segura de baixo. Soma-se ao respiro de baixo que a
-  // tela já tem (o `padding` de `contentStyle` ou o padrão), por último, para nada ficar atrás da barra.
-  const barInset = useBrowseBarInset();
-  const own = StyleSheet.flatten(contentStyle) as ViewStyle | undefined;
-  const ownBottom = own?.paddingBottom ?? own?.paddingVertical ?? own?.padding;
-  const underBar = bottomInset && barInset > 0 ? { paddingBottom: barInset + (typeof ownBottom === 'number' ? ownBottom : space[10]) } : null;
+  const content = useScreenContentStyle(contentStyle, bottomInset, wide);
   return (
     <ScrollView
       ref={scrollRef}
       onScroll={onScroll ? (e) => onScroll(e.nativeEvent.contentOffset.y) : undefined}
       scrollEventThrottle={onScroll ? 64 : undefined}
       style={styles.screen}
-      contentContainerStyle={[!wide && styles.screenContent, bottomInset && { paddingBottom: insets.bottom + space[10] }, contentStyle, underBar]}
+      contentContainerStyle={content}
       keyboardShouldPersistTaps="handled">
       {children}
     </ScrollView>
   );
+}
+
+/**
+ * Tela que rola numa lista virtualizada (D-062 item 5): o cabeçalho e o que vem antes da lista ficam em `header`, o que vem depois
+ * em `footer`, e a lista monta só as linhas perto da área visível. O `Screen` (ScrollView) monta tudo de uma vez, o que pesa em
+ * celular simples com centenas de linhas. Não se põe uma FlatList dentro de um `Screen`: a lista aninhada monta tudo do mesmo jeito.
+ * Cada item é uma linha inteira; use `ListCell` para limitar a largura a 560 px e `CardSlice` para desenhar o cartão em pedaços.
+ */
+export function ScreenList<T>({
+  data,
+  renderItem,
+  keyExtractor,
+  extraData,
+  header,
+  footer,
+  contentStyle,
+  bottomInset = true,
+  wide,
+}: {
+  data: readonly T[];
+  renderItem: ListRenderItem<T>;
+  keyExtractor: (item: T, index: number) => string;
+  /** O que a linha usa além do item (a lista só monta de novo a linha quando o item ou isto muda). */
+  extraData?: unknown;
+  header?: ReactElement | null;
+  footer?: ReactElement | null;
+  contentStyle?: StyleProp<ViewStyle>;
+  bottomInset?: boolean;
+  wide?: boolean;
+}) {
+  const content = useScreenContentStyle(contentStyle, bottomInset, wide);
+  return (
+    <FlatList
+      data={data}
+      renderItem={renderItem}
+      keyExtractor={keyExtractor}
+      extraData={extraData}
+      ListHeaderComponent={header}
+      ListFooterComponent={footer}
+      style={styles.screen}
+      contentContainerStyle={content}
+      keyboardShouldPersistTaps="handled"
+      initialNumToRender={LIST_INITIAL_ROWS}
+      maxToRenderPerBatch={LIST_BATCH_ROWS}
+      windowSize={LIST_WINDOW}
+      updateCellsBatchingPeriod={LIST_BATCH_MS}
+    />
+  );
+}
+
+/**
+ * Linhas montadas de início, por lote, o intervalo entre lotes (ms) e a janela (em telas de altura) da lista virtualizada. Medido no
+ * Chromium com a CPU 4x mais lenta e 500 lançamentos (docs/19): lotes pequenos espalham o trabalho em quadros curtos; lotes de 14
+ * linhas e janela de 7 telas travavam quadros de 90 ms.
+ */
+const LIST_INITIAL_ROWS = 12;
+const LIST_BATCH_ROWS = 6;
+const LIST_BATCH_MS = 30;
+const LIST_WINDOW = 5;
+
+/** Uma linha de `ScreenList` com a largura do `Body` (560 px, centralizada, margem de 24 px dos lados). */
+export function ListCell({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  return <View style={[styles.listCell, style]}>{children}</View>;
+}
+
+/**
+ * Um pedaço do cartão de uma lista longa: o `Card` branco inteiro não cabe numa linha só, então o primeiro pedaço leva os cantos de
+ * cima e o respiro de cima, o último leva os de baixo. Sem a sombra do `Card` (a sombra de cada pedaço riscaria o vizinho).
+ */
+export function CardSlice({ first, last, children, style }: { first?: boolean; last?: boolean; children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  return <View style={[styles.slice, first && styles.sliceFirst, last && styles.sliceLast, style]}>{children}</View>;
 }
 
 /** Conteúdo das abas abaixo do cabeçalho de ponta a ponta: limitado a 560 px e centralizado. */
@@ -161,7 +250,7 @@ type ButtonTone = 'brand' | 'soft' | 'danger' | 'ghost' | 'onBrand';
 
 const TONES: Record<ButtonTone, { bg: string; bgPressed: string; fg: string }> = {
   brand: { bg: colors.brand, bgPressed: colors.brandPressed, fg: colors.textOnBrand },
-  soft: { bg: colors.brandTint, bgPressed: '#DCE6FF', fg: colors.brand },
+  soft: { bg: colors.brandTint, bgPressed: colors.brandTintPressed, fg: colors.brand },
   danger: { bg: colors.surface, bgPressed: colors.errorTint, fg: colors.error },
   ghost: { bg: 'transparent', bgPressed: colors.brandTint, fg: colors.brand },
   onBrand: { bg: 'transparent', bgPressed: 'rgba(255,255,255,0.16)', fg: colors.textOnBrand },
@@ -446,7 +535,7 @@ export function Skeleton({ width, height, onBrand, style }: { width: number | `$
 export function DemoPill() {
   return (
     <View style={styles.demo} accessible accessibilityLabel="Demonstração: acesso simulado e dados fictícios">
-      <Txt variant="caption" color={colors.text} style={{ fontFamily: fonts.bold, fontSize: 12, lineHeight: 16 }}>
+      <Txt variant="caption" color={colors.text} style={{ fontFamily: fonts.bold, fontSize: 12, lineHeight: 16 }} maxFontSizeMultiplier={DEMO_PILL_MAX_FONT_SCALE}>
         Demonstração
       </Txt>
     </View>
@@ -457,6 +546,10 @@ export const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   screenContent: { width: '100%', maxWidth: 560, alignSelf: 'center' },
   body: { width: '100%', maxWidth: 560, alignSelf: 'center', padding: space[6], gap: space[4] },
+  listCell: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: space[6] },
+  slice: { backgroundColor: colors.surface, paddingHorizontal: space[5] },
+  sliceFirst: { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, paddingTop: space[5] },
+  sliceLast: { borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg, paddingBottom: space[5] },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,

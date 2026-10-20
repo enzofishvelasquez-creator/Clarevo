@@ -1,4 +1,4 @@
-import { SEU_MES_TEXT, type SeuMesAction, type SeuMesCard, type SeuMesRow } from '@clarevo/core';
+import { SEU_MES_TEXT, isStackedLayout, type SeuMesAction, type SeuMesCard, type SeuMesRow } from '@clarevo/core';
 import { ChevronRight, Timer } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
@@ -37,7 +37,7 @@ export function SeuMesEntry({ onPress }: { onPress: () => void }) {
  */
 function RowView({ row }: { row: SeuMesRow }) {
   const { width, fontScale } = useWindowDimensions();
-  const stacked = width < 360 || fontScale > 1.3;
+  const stacked = isStackedLayout(width, fontScale);
   const value = row.value ? (
     <MoneyTxt variant="label" style={[tabular, styles.value, row.strong && styles.valueStrong, stacked ? null : { flexShrink: 0 }]}>
       {row.value}

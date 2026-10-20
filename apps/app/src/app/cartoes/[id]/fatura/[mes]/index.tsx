@@ -13,15 +13,18 @@ import {
   invoiceLineText,
   invoiceMonthLabel,
   invoiceTexts,
+  isLongList,
   monthOf,
   partialPaymentCalcLink,
+  titledRows,
   type Invoice,
   type InvoiceLine,
+  type TitledRow,
 } from '@clarevo/core';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { CircleAlert, Plus, Receipt, Undo2, Wallet } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { ChoiceDialog, type DialogChoice } from '@/components/choice-dialog';
@@ -31,7 +34,7 @@ import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { ErrorState } from '@/components/states';
-import { Banner, Body, Button, Card, FitMoney, LinkButton, Money, Screen, Skeleton, Txt, styles as ui } from '@/components/ui';
+import { Banner, Body, Button, Card, CardSlice, FitMoney, LinkButton, ListCell, Money, ScreenList, Skeleton, Txt, clampLines, styles as ui } from '@/components/ui';
 import { cap } from '@/components/series-parts';
 import { cardHref, invoiceHref, readInvoiceMonth } from '@/lib/cards';
 import { announceOnIOS } from '@/lib/a11y';
@@ -42,9 +45,14 @@ import { useCard, useCardInvoices, useCardOperationKey, useDeleteCardEntry, useU
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
+/** Linha da lista da fatura: o cartão de lançamentos inteiro (poucos lançamentos) ou, na lista longa, o título e um lançamento por linha. */
+type FaturaCell = { type: 'card'; key: string; first: boolean; last: boolean } | TitledRow<InvoiceLine>;
+
 const T = CARDS_TEXT;
 const I = CARDS_TEXT.invoice;
 const S = CARDS_TEXT.screens;
+
+const editable = (l: InvoiceLine) => l.entryId !== null && l.version !== null && (l.kind === 'parcela' || l.kind === 'encargo' || l.kind === 'estorno');
 
 /**
  * Fatura (D-037): faixa azul com o mês, a situação e o total (estimado enquanto aberta), fechamento, vencimento e período; o que
@@ -144,8 +152,6 @@ export default function FaturaScreen() {
     }
   }
 
-  const editable = (l: InvoiceLine) => l.entryId !== null && l.version !== null && (l.kind === 'parcela' || l.kind === 'encargo' || l.kind === 'estorno');
-
   const lineChoices = (l: InvoiceLine, inv: Invoice): DialogChoice[] => {
     const choices: DialogChoice[] = [];
     const paidInvoice = inv.situation === 'paga' || inv.situation === 'paga_em_parte';
@@ -176,56 +182,105 @@ export default function FaturaScreen() {
     return choices;
   };
 
+  const openLine = useCallback((l: InvoiceLine) => {
+    setActionError(null);
+    setLine(l);
+  }, []);
+  const loading = card.isPending || (c && invoices.isPending);
+  const failed = card.isError || invoices.isError;
+  const showInvoice = !loading && !failed && c !== null && month !== null && invoice !== null;
+  const paid = invoice ? invoice.situation === 'paga' || invoice.situation === 'paga_em_parte' : false;
+  // Fatura com muitos lançamentos (D-062 item 5): a lista monta só as linhas perto da tela; abaixo disso, o cartão de sempre.
+  const long = showInvoice && invoice !== null && isLongList(invoice.lines.length);
+  const cells: FaturaCell[] = !showInvoice || !invoice ? [] : long ? titledRows('lancamentos', invoice.lines, (l) => l.key) : [{ type: 'card', key: 'lancamentos', first: true, last: true }];
+
+  const renderItem = useCallback(
+    ({ item }: { item: FaturaCell }) => {
+      if (!invoice) return null;
+      const spacing = item.first ? styles.cellFirst : null;
+      if (item.type === 'card') {
+        return (
+          <ListCell style={spacing}>
+            <InvoiceLinesCard invoice={invoice} today={today} paid={paid} editable={editable} onLine={openLine} />
+          </ListCell>
+        );
+      }
+      return (
+        <ListCell style={spacing}>
+          <CardSlice first={item.first} last={item.last}>
+            {item.type === 'title' ? (
+              <Txt variant="title" accessibilityRole="header" aria-level={2} style={{ paddingBottom: space[1] }}>
+                {S.entriesTitle}
+              </Txt>
+            ) : (
+              <LineRow
+                line={item.item}
+                last={item.lastItem}
+                locked={paid && item.item.kind !== 'parcela'}
+                editable={editable(item.item)}
+                onPress={() => openLine(item.item)}
+              />
+            )}
+          </CardSlice>
+        </ListCell>
+      );
+    },
+    [invoice, today, paid, openLine],
+  );
+  // O `ScreenList` só monta de novo as linhas quando o item, o `renderItem` ou isto muda: o que a linha usa além do item.
+  const extraData = useMemo(() => [invoice, busy, paid], [invoice, busy, paid]);
+
+  const header = loading ? (
+    <View style={[styles.hero, { gap: space[3] }]}>
+      <View style={styles.heroInner}>
+        <Skeleton width="50%" height={24} onBrand />
+        <Skeleton width="60%" height={40} onBrand />
+        <Skeleton width="100%" height={16} onBrand />
+      </View>
+    </View>
+  ) : failed ? (
+    <Body>
+      <ErrorState
+        message={ERROR_TEXT.carregar_falhou}
+        onRetry={() => {
+          card.refetch();
+          invoices.refetch();
+        }}
+      />
+    </Body>
+  ) : !c || !month || !invoice ? (
+    <Body>
+      <Card style={{ gap: space[3] }}>
+        <Txt>{CARD_ERROR_TEXT.nao_encontrado}</Txt>
+        <Button label="Ir para Cartões" onPress={() => router.replace('/cartoes')} />
+      </Card>
+    </Body>
+  ) : (
+    <InvoiceTop
+      cardName={c.name}
+      cardId={c.id}
+      cardActive={c.status === 'ativo'}
+      invoice={invoice}
+      today={today}
+      notice={notice}
+      actionError={actionError}
+      busy={busy}
+      onUndo={() => setConfirmUndo(true)}
+    />
+  );
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title={S.invoiceHeader} onBack={back} right={<ContextPill label="Pessoal" />} help="fatura" />
-      <Screen wide>
-        {card.isPending || (c && invoices.isPending) ? (
-          <View style={[styles.hero, { gap: space[3] }]}>
-            <View style={styles.heroInner}>
-              <Skeleton width="50%" height={24} onBrand />
-              <Skeleton width="60%" height={40} onBrand />
-              <Skeleton width="100%" height={16} onBrand />
-            </View>
-          </View>
-        ) : card.isError || invoices.isError ? (
-          <Body>
-            <ErrorState
-              message={ERROR_TEXT.carregar_falhou}
-              onRetry={() => {
-                card.refetch();
-                invoices.refetch();
-              }}
-            />
-          </Body>
-        ) : !c || !month || !invoice ? (
-          <Body>
-            <Card style={{ gap: space[3] }}>
-              <Txt>{CARD_ERROR_TEXT.nao_encontrado}</Txt>
-              <Button label="Ir para Cartões" onPress={() => router.replace('/cartoes')} />
-            </Card>
-          </Body>
-        ) : (
-          <InvoiceBody
-            cardName={c.name}
-            cardId={c.id}
-            cardActive={c.status === 'ativo'}
-            invoice={invoice}
-            today={today}
-            notice={notice}
-            actionError={actionError}
-            busy={busy}
-            hasPrev={hasPrev}
-            hasNext={hasNext}
-            editable={editable}
-            onLine={(l) => {
-              setActionError(null);
-              setLine(l);
-            }}
-            onUndo={() => setConfirmUndo(true)}
-          />
-        )}
-      </Screen>
+      <ScreenList
+        wide
+        data={cells}
+        keyExtractor={(cell) => cell.key}
+        extraData={extraData}
+        header={header}
+        footer={invoice && showInvoice ? <InvoiceBottom cardId={c!.id} invoice={invoice} today={today} hasPrev={hasPrev} hasNext={hasNext} /> : null}
+        renderItem={renderItem}
+      />
 
       {invoice ? (
         <>
@@ -274,7 +329,8 @@ export default function FaturaScreen() {
   );
 }
 
-function InvoiceBody({
+/** A faixa azul da fatura e, abaixo, o que vem antes dos lançamentos: avisos, pagamento parcial e as ações. */
+function InvoiceTop({
   cardName,
   cardId,
   cardActive,
@@ -283,10 +339,6 @@ function InvoiceBody({
   notice,
   actionError,
   busy,
-  hasPrev,
-  hasNext,
-  editable,
-  onLine,
   onUndo,
 }: {
   cardName: string;
@@ -297,10 +349,6 @@ function InvoiceBody({
   notice: string | null;
   actionError: string | null;
   busy: boolean;
-  hasPrev: boolean;
-  hasNext: boolean;
-  editable: (l: InvoiceLine) => boolean;
-  onLine: (l: InvoiceLine) => void;
   onUndo: () => void;
 }) {
   const t = invoiceTexts(invoice, today);
@@ -312,8 +360,6 @@ function InvoiceBody({
   const canUndo = paid && invoice.commitmentVersion !== null;
   const calc = invoice.situation === 'paga_em_parte' ? partialPaymentCalcLink(invoice.remainingCents) : null;
   const sub = (m: string) => ({ pathname: '/cartoes/[id]/fatura/[mes]/pagar' as const, params: { id: cardId, mes: m } });
-  const prev = addMonths(invoice.month, -1);
-  const next = addMonths(invoice.month, 1);
 
   return (
     <>
@@ -357,7 +403,7 @@ function InvoiceBody({
         </View>
       </View>
 
-      <Body>
+      <Body style={styles.bodyTop}>
         <FlashBanner message={notice} />
         {actionError ? (
           <Banner tone="erro" icon={CircleAlert}>
@@ -430,66 +476,93 @@ function InvoiceBody({
             {S.noPayable}
           </Txt>
         ) : null}
-
-        <Card style={{ gap: space[1] }}>
-          <Txt variant="title" accessibilityRole="header" aria-level={2}>
-            {S.entriesTitle}
-          </Txt>
-          {invoice.lines.length === 0 ? (
-            <Txt variant="label" color={colors.textSecondary} style={{ paddingVertical: space[2] }}>
-              {t.empty ?? CARDS_TEXT.invoiceEmpty}
-            </Txt>
-          ) : (
-            invoice.lines.map((l, i) => (
-              <LineRow
-                key={l.key}
-                line={l}
-                last={i === invoice.lines.length - 1}
-                locked={paid && l.kind !== 'parcela'}
-                editable={editable(l)}
-                onPress={() => onLine(l)}
-              />
-            ))
-          )}
-        </Card>
-
-        <Card style={{ gap: space[1] }}>
-          <Txt variant="title" accessibilityRole="header" aria-level={2}>
-            {S.compositionTitle}
-          </Txt>
-          <SumRow label={S.installmentsLine} cents={invoice.installmentsCents} />
-          {invoice.chargesCents > 0 ? <SumRow label={S.chargesLine} cents={invoice.chargesCents} /> : null}
-          {invoice.balanceCents > 0 ? <SumRow label={S.balanceLine} cents={invoice.balanceCents} /> : null}
-          {invoice.refundsCents > 0 ? <SumRow label={S.refundsLine} cents={invoice.refundsCents} negative /> : null}
-          {invoice.creditInCents > 0 ? <SumRow label={S.creditLine} cents={invoice.creditInCents} negative /> : null}
-          <SumRow label={S.totalLine} cents={invoice.totalCents} strong last />
-          <Txt variant="caption" color={colors.textSecondary} style={{ paddingTop: space[1] }}>
-            {I.invoiceFormula}
-          </Txt>
-        </Card>
-
-        {hasPrev || hasNext ? (
-          <View style={styles.nav}>
-            {hasPrev ? (
-              <LinkButton
-                label={`‹ ${cap(invoiceMonthLabel(prev, today))}`}
-                accessibilityLabel={`Fatura anterior: ${invoiceMonthLabel(prev, today)}`}
-                onPress={() => router.replace(invoiceHref(cardId, prev))}
-              />
-            ) : (
-              <View />
-            )}
-            {hasNext ? (
-              <LinkButton
-                label={`${cap(invoiceMonthLabel(next, today))} ›`}
-                accessibilityLabel={`Próxima fatura: ${invoiceMonthLabel(next, today)}`}
-                onPress={() => router.replace(invoiceHref(cardId, next))}
-              />
-            ) : null}
-          </View>
-        ) : null}
       </Body>
     </>
+  );
+}
+
+/** O cartão "Lançamentos" inteiro, como sempre foi (fatura com poucos lançamentos). */
+function InvoiceLinesCard({
+  invoice,
+  today,
+  paid,
+  editable,
+  onLine,
+}: {
+  invoice: Invoice;
+  today: string;
+  paid: boolean;
+  editable: (l: InvoiceLine) => boolean;
+  onLine: (l: InvoiceLine) => void;
+}) {
+  const t = invoiceTexts(invoice, today);
+  return (
+    <Card style={{ gap: space[1] }}>
+      <Txt variant="title" accessibilityRole="header" aria-level={2}>
+        {S.entriesTitle}
+      </Txt>
+      {invoice.lines.length === 0 ? (
+        <Txt variant="label" color={colors.textSecondary} style={{ paddingVertical: space[2] }}>
+          {t.empty ?? CARDS_TEXT.invoiceEmpty}
+        </Txt>
+      ) : (
+        invoice.lines.map((l, i) => (
+          <LineRow
+            key={l.key}
+            line={l}
+            last={i === invoice.lines.length - 1}
+            locked={paid && l.kind !== 'parcela'}
+            editable={editable(l)}
+            onPress={() => onLine(l)}
+          />
+        ))
+      )}
+    </Card>
+  );
+}
+
+/** O que vem depois dos lançamentos: a composição do total e a ida às faturas vizinhas. */
+function InvoiceBottom({ cardId, invoice, today, hasPrev, hasNext }: { cardId: string; invoice: Invoice; today: string; hasPrev: boolean; hasNext: boolean }) {
+  const prev = addMonths(invoice.month, -1);
+  const next = addMonths(invoice.month, 1);
+  return (
+    <Body style={styles.bodyBottom}>
+      <Card style={{ gap: space[1] }}>
+        <Txt variant="title" accessibilityRole="header" aria-level={2}>
+          {S.compositionTitle}
+        </Txt>
+        <SumRow label={S.installmentsLine} cents={invoice.installmentsCents} />
+        {invoice.chargesCents > 0 ? <SumRow label={S.chargesLine} cents={invoice.chargesCents} /> : null}
+        {invoice.balanceCents > 0 ? <SumRow label={S.balanceLine} cents={invoice.balanceCents} /> : null}
+        {invoice.refundsCents > 0 ? <SumRow label={S.refundsLine} cents={invoice.refundsCents} negative /> : null}
+        {invoice.creditInCents > 0 ? <SumRow label={S.creditLine} cents={invoice.creditInCents} negative /> : null}
+        <SumRow label={S.totalLine} cents={invoice.totalCents} strong last />
+        <Txt variant="caption" color={colors.textSecondary} style={{ paddingTop: space[1] }}>
+          {I.invoiceFormula}
+        </Txt>
+      </Card>
+
+      {hasPrev || hasNext ? (
+        <View style={styles.nav}>
+          {hasPrev ? (
+            <LinkButton
+              label={`‹ ${cap(invoiceMonthLabel(prev, today))}`}
+              accessibilityLabel={`Fatura anterior: ${invoiceMonthLabel(prev, today)}`}
+              onPress={() => router.replace(invoiceHref(cardId, prev))}
+            />
+          ) : (
+            <View />
+          )}
+          {hasNext ? (
+            <LinkButton
+              label={`${cap(invoiceMonthLabel(next, today))} ›`}
+              accessibilityLabel={`Próxima fatura: ${invoiceMonthLabel(next, today)}`}
+              onPress={() => router.replace(invoiceHref(cardId, next))}
+            />
+          ) : null}
+        </View>
+      ) : null}
+    </Body>
   );
 }
 
@@ -513,7 +586,7 @@ function LineRow({ line: l, last, locked, editable, onPress }: { line: InvoiceLi
   const body = (
     <>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={2}>
+        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={clampLines(2)}>
           {l.description}
         </Txt>
         {caption ? (
@@ -572,6 +645,10 @@ const styles = StyleSheet.create({
   heroHead: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3] },
   statusPill: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: 2 },
   inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
+  // O topo e o fim são um `Body` cada um, sem o respiro entre eles: o vão de 16 px até a lista é do `cellFirst`, e o do fim é do `bodyBottom`.
+  bodyTop: { paddingBottom: 0 },
+  cellFirst: { marginTop: space[4] },
+  bodyBottom: { paddingTop: space[4] },
   row: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 52, paddingVertical: space[2] },
   divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
   amountCol: { flexShrink: 0, alignItems: 'flex-end' },

@@ -7,9 +7,12 @@ import {
   ORGANIZE_TEXT,
   accountFilterOptions,
   analysesParams,
+  dayRows,
   filterByAccount,
   formatDayHeader,
   formatMonthBR,
+  groupRecordsByDay,
+  isLongList,
   payablesCaptionFromSummary,
   recordAccountName,
   payablesMonthParams,
@@ -17,14 +20,14 @@ import {
   seuMesParams,
   shortcutA11yLabel,
   sortNewestFirst,
-  type FinancialRecord,
+  type DayRow,
   type IsoMonth,
   budgetCaption,
   type BudgetSummary,
 } from '@clarevo/core';
 import { router } from 'expo-router';
 import { Calculator, CalendarClock, ChevronRight, CreditCard, FileUp, Minus, Plus, Repeat, Target, type LucideIcon } from 'lucide-react-native';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
@@ -37,7 +40,7 @@ import { AnalysesEntry } from '@/components/analises-parts';
 import { EvolutionEntry } from '@/components/evolucao-parts';
 import { SeuMesEntry } from '@/components/seu-mes-parts';
 import { EmptyState, ErrorState } from '@/components/states';
-import { Body, Button, Card, Chip, Money, Screen, Skeleton, Txt } from '@/components/ui';
+import { Body, Button, Card, CardSlice, Chip, ListCell, Money, ScreenList, Skeleton, Txt } from '@/components/ui';
 import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
 import { useAccounts, useCardsOverview, useCommitments, useMonthBudget, useMonthRecords, useSeriesList, useWork, useView } from '@/state/data';
 import { useSession } from '@/state/session';
@@ -50,16 +53,8 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: 'despesa', label: 'Pagos' },
 ];
 
-/** Agrupa por dia, do mais recente para o mais antigo. */
-function groupByDay(list: FinancialRecord[]) {
-  const groups: { day: string; items: FinancialRecord[] }[] = [];
-  for (const r of list) {
-    const last = groups[groups.length - 1];
-    if (last && last.day === r.occurredOn) last.items.push(r);
-    else groups.push({ day: r.occurredOn, items: [r] });
-  }
-  return groups;
-}
+/** Linha da lista: o cartão inteiro (lista curta) ou, na lista longa, o título de um dia ou um registro. */
+type Cell = { type: 'card'; key: string; first: boolean; last: boolean } | DayRow;
 
 type Shortcut = { icon: LucideIcon; title: string; caption: string; open: () => void };
 
@@ -149,145 +144,181 @@ export default function MovimentacoesScreen() {
   const accountId = accountOptions.some((o) => o.id === accountFilter) ? accountFilter : null;
   const [notice] = useFlash();
   const s = records.summary;
-  const list = records.data ? filterByAccount(sortNewestFirst(records.data), accountId).filter((r) => filter === 'todos' || r.kind === filter) : [];
-  const groups = groupByDay(list);
+  const list = useMemo(
+    () => (records.data ? filterByAccount(sortNewestFirst(records.data), accountId).filter((r) => filter === 'todos' || r.kind === filter) : []),
+    [records.data, accountId, filter],
+  );
+  const groups = useMemo(() => groupRecordsByDay(list), [list]);
+  // Mês com muitos lançamentos (D-062 item 5): a lista passa a montar só as linhas perto da tela. Abaixo disso, o cartão de sempre.
+  const long = !records.isPending && !records.isError && isLongList(list.length);
+  const rows = useMemo(() => (long ? dayRows(groups) : []), [long, groups]);
+  const cells: Cell[] = long ? rows : [{ type: 'card', key: 'card', first: true, last: true }];
+
+  const header = (
+    <>
+      <AppHeader title="Movimentações">
+        <ContextSwitch />
+        <MonthSwitcher />
+      </AppHeader>
+      <Body style={styles.bodyTop}>
+        <FlashBanner message={notice} />
+        {/* Buscar (D-045): campo no topo que abre a busca em todos os meses; nada é digitado aqui. */}
+        <SearchEntry onPress={() => router.push('/movimentacoes/buscar')} />
+
+        {/* Seu mês em 30 segundos (D-052): logo abaixo de Buscar; abre no mês em exibição. */}
+        <SeuMesEntry onPress={() => router.push({ pathname: '/seu-mes', params: seuMesParams(month, currentMonth) })} />
+
+        {/* Evolução (D-057): logo abaixo de "Seu mês em 30 segundos"; sempre abre na janela de 6 meses até o mês atual. */}
+        <EvolutionEntry onPress={() => router.push('/evolucao')} />
+
+        {/* Análises (D-059): logo abaixo de "Evolução"; abre no mês em exibição, com Categorias, Evolução, Próximos meses e Orçamento. */}
+        <AnalysesEntry onPress={() => router.push({ pathname: '/analises', params: analysesParams(month, currentMonth) })} />
+
+        {canWrite ? (
+          <View style={styles.actions}>
+            <Button
+              label="Anotar gasto"
+              icon={Minus}
+              style={styles.action}
+              onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } })}
+            />
+            <Button
+              label="Registrar recebimento"
+              icon={Plus}
+              tone="soft"
+              style={styles.action}
+              onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'receita' } })}
+            />
+          </View>
+        ) : null}
+
+        <Card style={styles.shortcuts}>
+          <Txt variant="title" accessibilityRole="header" aria-level={2}>
+            {ORGANIZE_TEXT.title}
+          </Txt>
+          <View>
+            {shortcuts.map((sc, i) => (
+              <ShortcutRow key={sc.title} {...sc} last={i === shortcuts.length - 1} />
+            ))}
+          </View>
+        </Card>
+
+        {s ? (
+          <View style={styles.totals}>
+            <Card style={styles.total}>
+              <Txt variant="caption" color={colors.textSecondary} style={{ fontFamily: fonts.bold }}>
+                Recebido em {formatMonthBR(month).split(' ')[0]!.toLowerCase()}
+              </Txt>
+              <Money cents={s.receivedCents} variant="label" style={styles.totalValue} color={colors.success} />
+            </Card>
+            <Card style={styles.total}>
+              <Txt variant="caption" color={colors.textSecondary} style={{ fontFamily: fonts.bold }}>
+                Pago em {formatMonthBR(month).split(' ')[0]!.toLowerCase()}
+              </Txt>
+              <Money cents={s.paidCents} variant="label" style={styles.totalValue} />
+            </Card>
+          </View>
+        ) : null}
+
+        <View style={styles.filters} accessibilityRole="radiogroup" accessibilityLabel="Mostrar">
+          {FILTERS.map((f) => (
+            <Chip key={f.value} label={f.label} selected={filter === f.value} onPress={() => setFilter(f.value)} />
+          ))}
+        </View>
+
+        {accountOptions.length > 0 ? (
+          <View style={styles.filters} accessibilityRole="radiogroup" accessibilityLabel={ACCOUNTS_TEXT.filterLabel}>
+            {accountOptions.map((o) => (
+              <Chip key={o.id ?? 'todas'} label={o.label} selected={accountId === o.id} onPress={() => setAccountFilter(o.id)} />
+            ))}
+          </View>
+        ) : null}
+      </Body>
+    </>
+  );
+
+  /** O cartão da lista como sempre foi: carregando, erro, vazio ou todos os grupos (linhas com animação de saída e de lugar). */
+  const card = (
+    <Card>
+      {records.isPending ? (
+        <View style={{ gap: space[3] }} accessibilityRole="progressbar" accessibilityLabel="Carregando movimentações">
+          <Skeleton width={80} height={14} />
+          <Skeleton width="100%" height={44} />
+          <Skeleton width="100%" height={44} />
+        </View>
+      ) : records.isError ? (
+        <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => records.refetch()} />
+      ) : list.length === 0 ? (
+        <EmptyState
+          title={`Nenhum registro em ${formatMonthBR(month).toLowerCase()}`}
+          // Filtro sem registros num mês que tem outros: a ação volta para todos.
+          action={
+            (filter !== 'todos' || accountId !== null) && (records.data?.length ?? 0) > 0 ? (
+              <Button
+                label="Mostrar todos"
+                tone="soft"
+                onPress={() => {
+                  setFilter('todos');
+                  setAccountFilter(null);
+                }}
+              />
+            ) : undefined
+          }>
+          {filter === 'todos' && accountId === null
+            ? 'Recebimentos e gastos já realizados aparecem aqui, do mais recente para o mais antigo.'
+            : accountId !== null
+              ? 'Nenhum registro desta conta no mês.'
+              : 'Nenhum registro deste tipo no mês.'}
+        </EmptyState>
+      ) : (
+        groups.map((g) => (
+          <Animated.View key={g.day} layout={rowLayout}>
+            <Txt variant="caption" color={colors.textSecondary} style={styles.day} accessibilityRole="header" aria-level={3}>
+              {formatDayHeader(g.day, today)}
+            </Txt>
+            {g.items.map((r, i) => (
+              <Animated.View key={r.id} exiting={rowExit} layout={rowLayout}>
+                <RecordRow
+                  record={r}
+                  last={i === g.items.length - 1}
+                  accountName={accounts.data ? recordAccountName(accounts.data, r) : null}
+                  onPress={() => router.push(`/registro/${r.id}`)}
+                />
+              </Animated.View>
+            ))}
+          </Animated.View>
+        ))
+      )}
+    </Card>
+  );
+
+  /** Uma linha da lista: o cartão inteiro (lista curta) ou um pedaço dele (lista longa, só o que está perto da tela). */
+  const renderCell = ({ item }: { item: Cell }) => {
+    const spacing = [item.first && styles.cellFirst, item.last && styles.cellLast];
+    if (item.type === 'card') return <ListCell style={spacing}>{card}</ListCell>;
+    return (
+      <ListCell style={spacing}>
+        <CardSlice first={item.first} last={item.last}>
+          {item.type === 'day' ? (
+            <Txt variant="caption" color={colors.textSecondary} style={styles.day} accessibilityRole="header" aria-level={3}>
+              {formatDayHeader(item.day, today)}
+            </Txt>
+          ) : (
+            <RecordRow
+              record={item.record}
+              last={item.lastInDay}
+              accountName={accounts.data ? recordAccountName(accounts.data, item.record) : null}
+              onPress={() => router.push(`/registro/${item.record.id}`)}
+            />
+          )}
+        </CardSlice>
+      </ListCell>
+    );
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Screen wide>
-        <AppHeader title="Movimentações">
-          <ContextSwitch />
-          <MonthSwitcher />
-        </AppHeader>
-        <Body>
-          <FlashBanner message={notice} />
-          <>
-              {/* Buscar (D-045): campo no topo que abre a busca em todos os meses; nada é digitado aqui. */}
-              <SearchEntry onPress={() => router.push('/movimentacoes/buscar')} />
-
-              {/* Seu mês em 30 segundos (D-052): logo abaixo de Buscar; abre no mês em exibição. */}
-              <SeuMesEntry onPress={() => router.push({ pathname: '/seu-mes', params: seuMesParams(month, currentMonth) })} />
-
-              {/* Evolução (D-057): logo abaixo de "Seu mês em 30 segundos"; sempre abre na janela de 6 meses até o mês atual. */}
-              <EvolutionEntry onPress={() => router.push('/evolucao')} />
-
-              {/* Análises (D-059): logo abaixo de "Evolução"; abre no mês em exibição, com Categorias, Evolução, Próximos meses e Orçamento. */}
-              <AnalysesEntry onPress={() => router.push({ pathname: '/analises', params: analysesParams(month, currentMonth) })} />
-
-              {canWrite ? (
-                <View style={styles.actions}>
-                  <Button
-                    label="Anotar gasto"
-                    icon={Minus}
-                    style={styles.action}
-                    onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } })}
-                  />
-                  <Button
-                    label="Registrar recebimento"
-                    icon={Plus}
-                    tone="soft"
-                    style={styles.action}
-                    onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'receita' } })}
-                  />
-                </View>
-              ) : null}
-
-              <Card style={styles.shortcuts}>
-                <Txt variant="title" accessibilityRole="header" aria-level={2}>
-                  {ORGANIZE_TEXT.title}
-                </Txt>
-                <View>
-                  {shortcuts.map((sc, i) => (
-                    <ShortcutRow key={sc.title} {...sc} last={i === shortcuts.length - 1} />
-                  ))}
-                </View>
-              </Card>
-
-              {s ? (
-                <View style={styles.totals}>
-                  <Card style={styles.total}>
-                    <Txt variant="caption" color={colors.textSecondary} style={{ fontFamily: fonts.bold }}>
-                      Recebido em {formatMonthBR(month).split(' ')[0]!.toLowerCase()}
-                    </Txt>
-                    <Money cents={s.receivedCents} variant="label" style={styles.totalValue} color={colors.success} />
-                  </Card>
-                  <Card style={styles.total}>
-                    <Txt variant="caption" color={colors.textSecondary} style={{ fontFamily: fonts.bold }}>
-                      Pago em {formatMonthBR(month).split(' ')[0]!.toLowerCase()}
-                    </Txt>
-                    <Money cents={s.paidCents} variant="label" style={styles.totalValue} />
-                  </Card>
-                </View>
-              ) : null}
-
-              <View style={styles.filters} accessibilityRole="radiogroup" accessibilityLabel="Mostrar">
-                {FILTERS.map((f) => (
-                  <Chip key={f.value} label={f.label} selected={filter === f.value} onPress={() => setFilter(f.value)} />
-                ))}
-              </View>
-
-              {accountOptions.length > 0 ? (
-                <View style={styles.filters} accessibilityRole="radiogroup" accessibilityLabel={ACCOUNTS_TEXT.filterLabel}>
-                  {accountOptions.map((o) => (
-                    <Chip key={o.id ?? 'todas'} label={o.label} selected={accountId === o.id} onPress={() => setAccountFilter(o.id)} />
-                  ))}
-                </View>
-              ) : null}
-
-              <Card>
-                {records.isPending ? (
-                  <View style={{ gap: space[3] }} accessibilityRole="progressbar" accessibilityLabel="Carregando movimentações">
-                    <Skeleton width={80} height={14} />
-                    <Skeleton width="100%" height={44} />
-                    <Skeleton width="100%" height={44} />
-                  </View>
-                ) : records.isError ? (
-                  <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => records.refetch()} />
-                ) : list.length === 0 ? (
-                  <EmptyState
-                    title={`Nenhum registro em ${formatMonthBR(month).toLowerCase()}`}
-                    // Filtro sem registros num mês que tem outros: a ação volta para todos.
-                    action={
-                      (filter !== 'todos' || accountId !== null) && (records.data?.length ?? 0) > 0 ? (
-                        <Button
-                          label="Mostrar todos"
-                          tone="soft"
-                          onPress={() => {
-                            setFilter('todos');
-                            setAccountFilter(null);
-                          }}
-                        />
-                      ) : undefined
-                    }>
-                    {filter === 'todos' && accountId === null
-                      ? 'Recebimentos e gastos já realizados aparecem aqui, do mais recente para o mais antigo.'
-                      : accountId !== null
-                        ? 'Nenhum registro desta conta no mês.'
-                        : 'Nenhum registro deste tipo no mês.'}
-                  </EmptyState>
-                ) : (
-                  groups.map((g) => (
-                    <Animated.View key={g.day} layout={rowLayout}>
-                      <Txt variant="caption" color={colors.textSecondary} style={styles.day} accessibilityRole="header" aria-level={3}>
-                        {formatDayHeader(g.day, today)}
-                      </Txt>
-                      {g.items.map((r, i) => (
-                        <Animated.View key={r.id} exiting={rowExit} layout={rowLayout}>
-                          <RecordRow
-                            record={r}
-                            last={i === g.items.length - 1}
-                            accountName={accounts.data ? recordAccountName(accounts.data, r) : null}
-                            onPress={() => router.push(`/registro/${r.id}`)}
-                          />
-                        </Animated.View>
-                      ))}
-                    </Animated.View>
-                  ))
-                )}
-              </Card>
-          </>
-        </Body>
-      </Screen>
+      <ScreenList wide data={cells} keyExtractor={(c) => c.key} renderItem={renderCell} extraData={[accounts.data, today]} header={header} />
     </View>
   );
 }
@@ -323,6 +354,10 @@ function ShortcutRow({ icon: Icon, title, caption, open, last }: Shortcut & { la
 }
 
 const styles = StyleSheet.create({
+  // O topo é um `Body` sem o respiro de baixo: o espaço até a lista é o `cellFirst` (o mesmo vão de 16 px entre cartões).
+  bodyTop: { paddingBottom: 0 },
+  cellFirst: { marginTop: space[4] },
+  cellLast: { paddingBottom: space[6] },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space[3] },
   action: { flexGrow: 1, flexBasis: 220, alignSelf: 'auto' },
   totals: { flexDirection: 'row', gap: space[3], flexWrap: 'wrap' },

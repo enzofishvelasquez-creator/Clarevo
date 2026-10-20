@@ -5,6 +5,7 @@ import {
   formatBRL,
   invoiceMonthLabel,
   invoiceTexts,
+  isStackedLayout,
   type Card as CardData,
   type CardInvoicesMonth,
   type CardSummary,
@@ -17,7 +18,7 @@ import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { GoalProgress } from '@/components/goal-progress';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
-import { Card, FitMoney, LinkButton, Money, Txt, styles as ui } from '@/components/ui';
+import { Card, FitMoney, LinkButton, Money, Txt, clampLines, styles as ui } from '@/components/ui';
 import { cardHref, invoiceHref } from '@/lib/cards';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
@@ -34,7 +35,7 @@ export const finalText = (card: Pick<CardData, 'lastDigits'>) => (card.lastDigit
 export function CardTile({ summary, today }: { summary: CardSummary; today: IsoDate }) {
   const maskLabel = useMoneyLabelMask();
   const { width, fontScale } = useWindowDimensions();
-  const stacked = width < 360 || fontScale > 1.3;
+  const stacked = isStackedLayout(width, fontScale);
   const { card } = summary;
   const t = cardSummaryTexts(summary, today);
   const inv = invoiceTexts(summary.current, today);
@@ -58,7 +59,7 @@ export function CardTile({ summary, today }: { summary: CardSummary; today: IsoD
           <CreditCard size={20} color={colors.brand} strokeWidth={2.25} aria-hidden />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Txt variant="title" numberOfLines={2} style={{ fontSize: 17, lineHeight: 24 }}>
+          <Txt variant="title" numberOfLines={clampLines(2)} style={{ fontSize: 17, lineHeight: 24 }}>
             {card.name}
           </Txt>
           {fin || archived ? (
@@ -111,7 +112,7 @@ export function CardTile({ summary, today }: { summary: CardSummary; today: IsoD
 export function InvoiceRow({ invoice, today, last }: { invoice: Invoice; today: IsoDate; last: boolean }) {
   const maskLabel = useMoneyLabelMask();
   const { width, fontScale } = useWindowDimensions();
-  const stacked = width < 360 || fontScale > 1.3;
+  const stacked = isStackedLayout(width, fontScale);
   const t = invoiceTexts(invoice, today);
   const amount = (
     <View style={stacked ? undefined : styles.amountCol}>
@@ -134,7 +135,7 @@ export function InvoiceRow({ invoice, today, last }: { invoice: Invoice; today: 
         <Receipt size={18} color={colors.brand} aria-hidden />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={2}>
+        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={clampLines(2)}>
           {t.title}
         </Txt>
         <Txt variant="caption" color={colors.textSecondary}>

@@ -24,7 +24,7 @@ import {
 } from '@clarevo/core';
 import { router } from 'expo-router';
 import { ChevronDown, ChevronUp, Search, X } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ContextPill, SubHeader } from '@/components/header';
@@ -80,7 +80,12 @@ export default function BuscarScreen() {
   const text = useDebounced(draft.text, 400);
   const min = useDebounced(draft.min, 400);
   const max = useDebounced(draft.max, 400);
-  const parsed = searchFromDraft({ ...draft, text, min, max });
+  // O rascunho lido só muda com os campos que valem (o texto e os valores, depois do instante parado): `params` é o mesmo objeto
+  // enquanto nada disso muda, e é ele que a conferência e a soma abaixo usam como chave.
+  const parsed = useMemo(
+    () => searchFromDraft({ text, min, max, kind: draft.kind, period: draft.period, category: draft.category, accountId: draft.accountId }),
+    [text, min, max, draft.kind, draft.period, draft.category, draft.accountId],
+  );
   const params = parsed.ok ? parsed.params : null;
   const errors = parsed.ok ? {} : parsed.errors;
   const search = useRecordSearch(contextId, params);
@@ -91,13 +96,17 @@ export default function BuscarScreen() {
   const activeFilters = moreFiltersActive({ ...draft, accountId });
   const showMore = expanded || Boolean(errors.min) || Boolean(errors.max);
 
-  const found = params && search.records.data ? searchResultRecords(search.records.data.items, params, today) : [];
-  const summary = summarizeSearch(found);
-  const purchases = params && search.withCards && search.purchases.data ? searchResultPurchases(search.purchases.data.items, params, today) : [];
+  // A conferência do texto nas até 1.000 linhas e a soma só se refazem quando o resultado ou os filtros valem de novo (não a cada tecla
+  // digitada: o texto só vale depois de 400 ms parado).
+  const recordItems = search.records.data?.items;
+  const purchaseItems = search.withCards ? search.purchases.data?.items : undefined;
+  const found = useMemo(() => (params && recordItems ? searchResultRecords(recordItems, params, today) : []), [recordItems, params, today]);
+  const summary = useMemo(() => summarizeSearch(found), [found]);
+  const purchases = useMemo(() => (params && purchaseItems ? searchResultPurchases(purchaseItems, params, today) : []), [purchaseItems, params, today]);
   const recordsTruncated = Boolean(search.records.data?.truncated);
   const purchasesTruncated = Boolean(search.withCards && search.purchases.data?.truncated);
   const truncated = recordsTruncated || purchasesTruncated;
-  const cardNames = new Map((cards.data ?? []).map((c) => [c.id, c.name]));
+  const cardNames = useMemo(() => new Map((cards.data ?? []).map((c) => [c.id, c.name])), [cards.data]);
   const lines = searchSummaryLines(summary, recordsTruncated);
   const purchasesPending = search.withCards && search.purchases.isPending;
   const purchasesFailed = search.withCards && search.purchases.isError;
@@ -105,8 +114,52 @@ export default function BuscarScreen() {
   // Sem achados e sem erro nas compras no cartão: com a leitura das compras falha, a tela mostra o erro em vez de "Nada encontrado".
   const nothing = found.length === 0 && purchases.length === 0 && !purchasesPending && !purchasesFailed;
 
-  const shownRecords = found.slice(0, recordLimit);
-  const shownPurchases = purchases.slice(0, purchaseLimit);
+  const shownRecords = useMemo(() => found.slice(0, recordLimit), [found, recordLimit]);
+  const shownPurchases = useMemo(() => purchases.slice(0, purchaseLimit), [purchases, purchaseLimit]);
+  const recordMonths = useMemo(() => groupByMonth(shownRecords, (r) => r.occurredOn), [shownRecords]);
+  const purchaseMonths = useMemo(() => groupByMonth(shownPurchases, (e) => e.purchasedOn ?? ''), [shownPurchases]);
+
+  // As linhas são elementos prontos: digitar no campo refaz a tela, mas não as até 1.000 linhas, que só mudam com o resultado.
+  const recordList = useMemo(
+    () =>
+      recordMonths.map((g) => (
+        <View key={g.month}>
+          <Txt variant="caption" color={colors.textSecondary} style={styles.month} accessibilityRole="header" aria-level={2}>
+            {formatMonthBR(g.month)}
+          </Txt>
+          {g.items.map((r, i) => (
+            <RecordRow
+              key={r.id}
+              record={r}
+              last={i === g.items.length - 1}
+              accountName={accounts.data ? recordAccountName(accounts.data, r) : null}
+              onPress={() => router.push(`/registro/${r.id}`)}
+            />
+          ))}
+        </View>
+      )),
+    [recordMonths, accounts.data],
+  );
+  const purchaseList = useMemo(
+    () =>
+      purchaseMonths.map((g) => (
+        <View key={g.month}>
+          <Txt variant="caption" color={colors.textSecondary} style={styles.month} accessibilityRole="header" aria-level={3}>
+            {formatMonthBR(g.month)}
+          </Txt>
+          {g.items.map((e, i) => (
+            <PurchaseRow
+              key={e.id}
+              entry={e}
+              cardName={cardNames.get(e.cardId) ?? null}
+              last={i === g.items.length - 1}
+              onPress={() => router.push({ pathname: '/cartoes/[id]/fatura/[mes]', params: { id: e.cardId, mes: e.invoiceMonth } })}
+            />
+          ))}
+        </View>
+      )),
+    [purchaseMonths, cardNames],
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -258,22 +311,7 @@ export default function BuscarScreen() {
 
             {found.length > 0 ? (
               <Card style={{ gap: space[1] }}>
-                {groupByMonth(shownRecords, (r) => r.occurredOn).map((g) => (
-                  <View key={g.month}>
-                    <Txt variant="caption" color={colors.textSecondary} style={styles.month} accessibilityRole="header" aria-level={2}>
-                      {formatMonthBR(g.month)}
-                    </Txt>
-                    {g.items.map((r, i) => (
-                      <RecordRow
-                        key={r.id}
-                        record={r}
-                        last={i === g.items.length - 1}
-                        accountName={accounts.data ? recordAccountName(accounts.data, r) : null}
-                        onPress={() => router.push(`/registro/${r.id}`)}
-                      />
-                    ))}
-                  </View>
-                ))}
+                {recordList}
                 {found.length > shownRecords.length ? (
                   <MoreButton shown={shownRecords.length} total={found.length} onPress={() => setRecordLimit((n) => n + SEARCH_PAGE)} />
                 ) : null}
@@ -293,22 +331,7 @@ export default function BuscarScreen() {
                 <Txt variant="caption" color={colors.textSecondary} style={styles.note}>
                   {T.cardsNote}
                 </Txt>
-                {groupByMonth(shownPurchases, (e) => e.purchasedOn ?? '').map((g) => (
-                  <View key={g.month}>
-                    <Txt variant="caption" color={colors.textSecondary} style={styles.month} accessibilityRole="header" aria-level={3}>
-                      {formatMonthBR(g.month)}
-                    </Txt>
-                    {g.items.map((e, i) => (
-                      <PurchaseRow
-                        key={e.id}
-                        entry={e}
-                        cardName={cardNames.get(e.cardId) ?? null}
-                        last={i === g.items.length - 1}
-                        onPress={() => router.push({ pathname: '/cartoes/[id]/fatura/[mes]', params: { id: e.cardId, mes: e.invoiceMonth } })}
-                      />
-                    ))}
-                  </View>
-                ))}
+                {purchaseList}
                 {purchases.length > shownPurchases.length ? (
                   <MoreButton shown={shownPurchases.length} total={purchases.length} onPress={() => setPurchaseLimit((n) => n + SEARCH_PAGE)} />
                 ) : null}

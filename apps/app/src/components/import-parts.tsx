@@ -15,7 +15,7 @@ import { memo } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ChoiceGroup, CheckOption } from '@/components/series-parts';
-import { Chip, LinkButton, Money, TextField, Txt, spaceKeyPress } from '@/components/ui';
+import { Chip, LinkButton, Money, TextField, Txt, clampLines, spaceKeyPress } from '@/components/ui';
 import { HIDDEN_MONEY, maskMoneyText, moneyA11y, useValuesHidden } from '@/lib/privacy';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
@@ -74,7 +74,7 @@ export const ReviewRow = memo(function ReviewRow({
         </Pressable>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <View style={styles.titleRow}>
-            <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15, flex: 1, minWidth: 0 }} numberOfLines={2}>
+            <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15, flex: 1, minWidth: 0 }} numberOfLines={clampLines(2)}>
               {line.description || IMPORT_TEXT.noDescription}
             </Txt>
             <Money cents={line.amountCents} variant="label" style={styles.amount} color={line.kind === 'receita' ? colors.success : colors.text} />

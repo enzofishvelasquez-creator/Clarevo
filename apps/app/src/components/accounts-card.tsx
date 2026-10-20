@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ContextPill } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
 import { TermHint } from '@/components/term-hint';
-import { Button, Card, LinkButton, Txt } from '@/components/ui';
+import { Button, Card, LinkButton, Txt, clampLines } from '@/components/ui';
 import { useAccounts, useView } from '@/state/data';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -97,7 +97,7 @@ function AccountRow({ account, last }: { account: FinancialAccount; last: boolea
         <Icon size={20} color={archived ? colors.textSecondary : colors.brand} strokeWidth={2.25} aria-hidden />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} color={archived ? colors.textSecondary : colors.text} numberOfLines={2}>
+        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} color={archived ? colors.textSecondary : colors.text} numberOfLines={clampLines(2)}>
           {account.name}
         </Txt>
         <Txt variant="caption" color={colors.textSecondary}>

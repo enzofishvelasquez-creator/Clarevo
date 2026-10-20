@@ -22,8 +22,9 @@
  * confirmado na Evolução, em Pago e Recebido, em Análises e em "Seus últimos meses"), de Média e mediana (D-062: o tema de Aprender e a ligação com a
  * Evolução nos dois sentidos, "Ver na Evolução" e "O que é mediana?"), de Renda variável (D-062: "Calcular pela média" no formulário da renda de
  * referência, com 3 ou 6 meses fechados, o mês conferido como zero, a explicação sem mês com recebimentos e a Família), do Relatório do RH (D-062: o relatório de
- * adesão do painel da empresa, em planilha e em PDF, com ou sem a lista de licenças) e de Evolução, fase 3 (D-062: "Renda comprometida" e "Guardado em metas" no
- * seletor, só de meses já fechados, com a própria base no subtítulo) na versão web, em modo demonstração (acesso simulado).
+ * adesão do painel da empresa, em planilha e em PDF, com ou sem a lista de licenças), de Evolução, fase 3 (D-062: "Renda comprometida" e "Guardado em metas" no
+ * seletor, só de meses já fechados, com a própria base no subtítulo) e de Acessibilidade (D-062 item 5: o pacote, o contraste, os
+ * nomes, os alvos de toque, a letra grande, "reduzir movimento" e a lista com 500 lançamentos) na versão web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -13452,6 +13453,413 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const f3Bad = f3Texts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(demais|alt[oa]s?|baix[oa]s?|gastou|aumentou|diminuiu|despencou|disparou|cuidado|estour\w*|exagero|usuári[oa]s?|bem-vind[oa]s?|parab[eé]ns|incr[ií]vel|garant\w*|ruim|perdeu|errou|economiz\w*)\b/i)?.[0]).filter(Boolean);
   ok('Evolução fase 3: nenhum termo proibido, travessão longo, expressão vetada, palavra de julgamento nem palavra com gênero nas telas novas', f3Texts.length >= 25 && f3Bad.length === 0, `${f3Texts.length} telas ${f3Bad.join(' | ')}`);
   ok('Evolução fase 3: nenhuma escrita direta na rede (a tela só lê; as escritas do roteiro ficam na memória da demonstração)', writes.length === f3Writes0, writes.slice(f3Writes0).join(' | '));
+
+  // Acessibilidade (D-062, item 5; Ciclo Y): revisão de acessibilidade e de desempenho em Android simples, com o que foi corrigido.
+  // Conferido aqui, na versão web, em modo demonstração: (1) o pacote: o JavaScript principal fica abaixo de 5,5 MB (só os ícones
+  // usados, `apps/app/src/lib/lucide.ts`) e o leitor de PDF (1,7 MB) é um arquivo à parte que não é pedido ao abrir o app nem nas
+  // telas principais; (2) em cerca de 60 telas: contraste de cada texto visível (4,5:1; 3:1 em texto grande e ícones), nome
+  // acessível de botões, caixas, rádios e campos, nada clicável sem papel e alvos de toque de 44 x 44 px; (3) títulos da
+  // composição; (4) letra grande: o texto do aparelho a 1,3 e a 2,0 vez (simulada, porque na web a escala é sempre 1) nas telas
+  // principais, sem nada cortado, por cima de outro texto nem fora da tela; (5) "reduzir movimento"; (6) lista com 500 lançamentos
+  // (montada só aqui, a demonstração não muda): Movimentações, fatura e composição montam só as linhas perto da tela, e os totais,
+  // o filtro e o fim da lista seguem certos; (7) textos e escritas. Capturas a partir de 590, em 360 px (1,3 vez), 359 px (2,0
+  // vezes) e 390 px. Hoje é 07/10/2026.
+  // =====================================================================================================================
+  const acWrites0 = writes.length;
+  const acTexts = [];
+  const acKeep = async () => { const x = await body(); acTexts.push(x); screenTexts.push(x); return x; };
+  // Funções que rodam na página (refeitas depois de cada carregamento da página): contraste calculado com as camadas de fundo e as
+  // opacidades de cada elemento, alvos de toque, elementos clicáveis sem papel, texto cortado, texto por cima de texto e a letra grande.
+  const AC_SRC = `
+    window.__acc = {
+      parse(c) { const m = c.match(/rgba?\\(([^)]+)\\)/); if (!m) return [0, 0, 0, 0]; const a = m[1].split(/[ ,\\/]+/).filter(Boolean).map(Number); return [a[0], a[1], a[2], a.length > 3 ? a[3] : 1]; },
+      over(f, bg) { const a = f[3]; return [f[0] * a + bg[0] * (1 - a), f[1] * a + bg[1] * (1 - a), f[2] * a + bg[2] * (1 - a), 1]; },
+      lum(c) { const ch = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * ch(c[0]) + 0.7152 * ch(c[1]) + 0.0722 * ch(c[2]); },
+      ratio(a, b) { const la = this.lum(a), lb = this.lum(b); return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05); },
+      hex(c) { return '#' + c.slice(0, 3).map((v) => Math.round(v).toString(16).padStart(2, '0')).join('').toUpperCase(); },
+      shown(e) { const r = e.getBoundingClientRect(); if (!(r.width > 0 && r.height > 0)) return false; for (let x = e; x && x !== document.documentElement; x = x.parentElement) { const cs = getComputedStyle(x); if (cs.visibility === 'hidden' || cs.display === 'none') return false; } return true; },
+      paint(el) {
+        const chain = []; for (let e = el; e && e !== document.documentElement; e = e.parentElement) chain.unshift(e);
+        let acc = [255, 255, 255, 1]; let behindT = acc; let layeredT = acc; let o = 1;
+        for (const e of chain) {
+          const cs = getComputedStyle(e); const bg = this.parse(cs.backgroundColor); const op = parseFloat(cs.opacity);
+          const behind = acc; const layered = bg[3] > 0 ? this.over(bg, acc) : acc;
+          acc = op < 1 ? [0, 1, 2].map((i) => op * layered[i] + (1 - op) * behind[i]).concat([1]) : layered;
+          if (e === el) { behindT = behind; layeredT = layered; o = op; }
+        }
+        const text = this.over(this.parse(getComputedStyle(el).color), layeredT);
+        return { fg: o < 1 ? [0, 1, 2].map((i) => o * text[i] + (1 - o) * behindT[i]).concat([1]) : text, bg: o < 1 ? [0, 1, 2].map((i) => o * layeredT[i] + (1 - o) * behindT[i]).concat([1]) : layeredT };
+      },
+      // Todo texto visível: texto normal pede 4,5:1; texto grande (24 px, ou 18,66 px em negrito) pede 3:1. Componente desabilitado fica de fora (WCAG 1.4.3).
+      contrast() {
+        const bad = []; let n = 0;
+        for (const el of document.querySelectorAll('body *')) {
+          if (el.closest('svg')) continue;
+          const own = [...el.childNodes].filter((x) => x.nodeType === 3 && x.textContent.trim()).map((x) => x.textContent.trim()).join(' ');
+          if (!own || !this.shown(el) || el.closest('[aria-disabled="true"]')) continue;
+          const cs = getComputedStyle(el); const size = parseFloat(cs.fontSize); const bold = /Bold/.test(cs.fontFamily);
+          const need = size >= 24 || (size >= 18.66 && bold) ? 3 : 4.5;
+          const { fg, bg } = this.paint(el); const r = this.ratio(fg, bg); n++;
+          if (r < need) bad.push(own.slice(0, 30) + ' ' + this.hex(fg) + ' sobre ' + this.hex(bg) + ' ' + r.toFixed(2));
+        }
+        return { n, bad };
+      },
+      label(e) { return (e.getAttribute('aria-label') || e.textContent || e.getAttribute('placeholder') || '').replace(/\\s+/g, ' ').trim().slice(0, 40); },
+      targets() {
+        const sel = '[role=button],[role=tab],[role=radio],[role=checkbox],[role=switch],[role=link],button,a[href],input:not([type=hidden]),textarea,select';
+        const small = []; let n = 0;
+        for (const e of document.querySelectorAll(sel)) {
+          if (!this.shown(e)) continue; n++; const r = e.getBoundingClientRect();
+          if (r.width < 43.5 || r.height < 43.5) small.push((e.getAttribute('role') || e.tagName.toLowerCase()) + ' ' + this.label(e) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height));
+        }
+        return { n, small };
+      },
+      noRole() {
+        const sel = '[role=button],[role=tab],[role=radio],[role=checkbox],[role=switch],[role=link],button,a[href],input,textarea,select,[role=combobox]';
+        const out = [];
+        for (const e of document.querySelectorAll('body *')) { if (!this.shown(e) || e.closest('svg') || getComputedStyle(e).cursor !== 'pointer' || e.closest(sel)) continue; out.push(this.label(e) || e.tagName); }
+        return out.slice(0, 5);
+      },
+      overflow() {
+        const out = [];
+        if (document.documentElement.scrollWidth > innerWidth + 1) out.push('pagina ' + document.documentElement.scrollWidth + ' > ' + innerWidth);
+        for (const e of document.querySelectorAll('body *')) {
+          if (!this.shown(e) || e.closest('svg')) continue; const b = e.getBoundingClientRect();
+          if (b.right > innerWidth + 0.5 || b.left < -0.5) { out.push(this.label(e) + ' [' + Math.round(b.left) + '-' + Math.round(b.right) + ']'); if (out.length > 5) break; }
+        }
+        return out;
+      },
+      // Texto cortado: rolagem interna maior que a caixa, com o excesso escondido. Os rótulos das abas ficam de fora (a escala deles tem teto próprio).
+      cut() {
+        const out = [];
+        for (const e of document.querySelectorAll('body *')) {
+          if (!this.shown(e) || e.closest('svg') || e.children.length > 0 || e.closest('[role=tablist],[role=tab]')) continue;
+          if (![...e.childNodes].some((x) => x.nodeType === 3 && x.textContent.trim())) continue;
+          const cs = getComputedStyle(e);
+          if ((e.scrollWidth > e.clientWidth + 1 && cs.overflowX !== 'visible') || (e.scrollHeight > e.clientHeight + 2 && cs.overflowY !== 'visible')) out.push(e.textContent.slice(0, 40));
+        }
+        return out.slice(0, 5);
+      },
+      // Parte da caixa que aparece: o texto que rolou para fora de uma área com rolagem (o formulário por trás do rodapé fixo) não conta.
+      visibleBox(e, b) {
+        let r = { left: b.left, top: b.top, right: b.right, bottom: b.bottom };
+        for (let a = e.parentElement; a && a !== document.documentElement; a = a.parentElement) {
+          const cs = getComputedStyle(a);
+          if (cs.overflowX === 'visible' && cs.overflowY === 'visible') continue;
+          const ab = a.getBoundingClientRect();
+          r = { left: Math.max(r.left, ab.left), top: Math.max(r.top, ab.top), right: Math.min(r.right, ab.right), bottom: Math.min(r.bottom, ab.bottom) };
+        }
+        if (!(r.right > r.left && r.bottom > r.top) || (r.bottom - r.top) < 0.6 * b.height) return null;
+        return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.right - r.left, height: r.bottom - r.top };
+      },
+      // Texto por cima de texto: caixas de texto de elementos diferentes que se cruzam por mais de um terço da menor altura.
+      overlap() {
+        const boxes = [];
+        for (const e of document.querySelectorAll('body *')) {
+          if (e.closest('svg') || e.children.length > 0 || !this.shown(e) || e.closest('[role=tablist],[role=tab]')) continue;
+          if (![...e.childNodes].some((x) => x.nodeType === 3 && x.textContent.trim())) continue;
+          const r = document.createRange(); r.selectNodeContents(e); const raw = r.getBoundingClientRect();
+          const b = raw.width > 0 && raw.height > 0 ? this.visibleBox(e, raw) : null;
+          if (b) boxes.push({ e, b });
+        }
+        const out = [];
+        for (let i = 0; i < boxes.length && out.length < 4; i++) for (let j = i + 1; j < boxes.length; j++) {
+          const a = boxes[i].b, c = boxes[j].b;
+          const ox = Math.min(a.right, c.right) - Math.max(a.left, c.left), oy = Math.min(a.bottom, c.bottom) - Math.max(a.top, c.top);
+          if (ox > 3 && oy > 0.35 * Math.min(a.height, c.height)) { out.push(boxes[i].e.textContent.slice(0, 24) + ' / ' + boxes[j].e.textContent.slice(0, 24)); break; }
+        }
+        return out;
+      },
+      // Letra grande do aparelho: tamanho e altura da linha de todo texto vezes k (rótulos das abas e avatar: no máximo 1,3, como no app).
+      // Os títulos com limite de linhas ficam sem limite, como o app faz com a escala acima de 1 (clampLines).
+      scale(k) {
+        const apply = (root) => {
+          for (const e of root.querySelectorAll('*')) {
+            if (e.__scaled || e.closest('svg')) continue;
+            if (![...e.childNodes].some((x) => x.nodeType === 3 && x.textContent.trim()) && e.tagName !== 'INPUT' && e.tagName !== 'TEXTAREA') continue;
+            const cs = getComputedStyle(e); const fs = parseFloat(cs.fontSize); const lh = parseFloat(cs.lineHeight);
+            const kk = e.closest('[role=tablist]') || e.closest('[aria-label^="Conta: perfil"]') || e.closest('[aria-label^="Demonstração: acesso simulado"]') ? Math.min(k, 1.3) : k;
+            e.__scaled = true; e.style.fontSize = (fs * kk) + 'px'; if (!isNaN(lh)) e.style.lineHeight = (lh * kk) + 'px';
+            if (cs.webkitLineClamp && cs.webkitLineClamp !== 'none') { e.style.webkitLineClamp = 'unset'; e.style.display = 'block'; e.style.overflow = 'visible'; }
+          }
+        };
+        // O olho do cabeçalho some quando a letra grande não deixa espaço (eyeFits no app): em Conta continuam "Ocultar valores".
+        const eye = () => { if (k > 1) for (const e of document.querySelectorAll('[aria-label="Ocultar valores"],[aria-label="Mostrar valores"]')) e.style.display = 'none'; };
+        apply(document.body); eye();
+        if (!window.__accMo) { window.__accMo = new MutationObserver(() => { clearTimeout(window.__accT); window.__accT = setTimeout(() => { apply(document.body); eye(); }, 30); }); window.__accMo.observe(document.body, { childList: true, subtree: true }); }
+      },
+    };
+  `;
+  const acInstall = () => p.evaluate(AC_SRC);
+  // Nomes acessíveis que o Chromium entrega ao leitor de tela: botão, caixa, rádio, campo, aba, link, chave ou imagem sem nome.
+  const acNoName = async () => {
+    const roles = new Set(['button', 'checkbox', 'radio', 'link', 'textbox', 'tab', 'switch', 'combobox', 'searchbox', 'img', 'slider', 'progressbar']);
+    const { nodes } = await cdp.send('Accessibility.getFullAXTree');
+    return nodes.filter((n) => !n.ignored && roles.has(n.role?.value) && !(n.name?.value ?? '').trim()).map((n) => n.role.value);
+  };
+  // Leva o app a uma rota pelo navegador de rotas (o mesmo que os botões usam): a demonstração vive na memória, e recarregar a perde.
+  const acNav = (route, params) => p.evaluate(({ route, params }) => {
+    const root = document.getElementById('root');
+    const key = Object.keys(root).find((x) => x.startsWith('__reactContainer$'));
+    const stack = [root[key].stateNode.current];
+    while (stack.length > 0) {
+      const f = stack.pop();
+      const v = f.memoizedProps?.value;
+      if (v && typeof v === 'object' && typeof v.getRootState === 'function' && typeof v.navigate === 'function') { v.navigate(route, params); return; }
+      if (f.sibling) stack.push(f.sibling);
+      if (f.child) stack.push(f.child);
+    }
+    throw new Error('navegador de rotas não encontrado');
+  }, { route, params });
+  const acEnter = async () => { await evEnter(); await acInstall(); };
+  // Tela atual: o que cada conferência acha, juntando por categoria (com o nome da tela para achar o problema).
+  const acFound = { contraste: [], nome: [], papel: [], alvo: [], largura: [], cortado: [], cruzado: [] };
+  const acCount = { texto: 0, alvo: 0, telas: 0 };
+  const acScan = async (name) => {
+    await p.waitForTimeout(800);
+    const r = await p.evaluate(() => ({ c: window.__acc.contrast(), t: window.__acc.targets(), role: window.__acc.noRole(), o: window.__acc.overflow(), cut: window.__acc.cut(), ov: window.__acc.overlap() }));
+    const names = await acNoName();
+    acCount.telas++; acCount.texto += r.c.n; acCount.alvo += r.t.n;
+    for (const x of r.c.bad) acFound.contraste.push(`${name}: ${x}`);
+    for (const x of names) acFound.nome.push(`${name}: ${x}`);
+    for (const x of r.role) acFound.papel.push(`${name}: ${x}`);
+    for (const x of r.t.small) acFound.alvo.push(`${name}: ${x}`);
+    for (const x of r.o) acFound.largura.push(`${name}: ${x}`);
+    for (const x of r.cut) acFound.cortado.push(`${name}: ${x}`);
+    for (const x of r.ov) acFound.cruzado.push(`${name}: ${x}`);
+    return r;
+  };
+  const acResetFound = () => { for (const k of Object.keys(acFound)) acFound[k] = []; acCount.texto = 0; acCount.alvo = 0; acCount.telas = 0; };
+  const acRows = (re) => p.evaluate((src) => [...document.querySelectorAll('[role=button]')].filter((e) => new RegExp(src).test(e.getAttribute('aria-label') || '') && e.getBoundingClientRect().width > 0).length, re.source);
+  // Rola a tela que está à vista até aparecer uma linha com este texto (a lista longa só monta o que está perto da tela).
+  const acScrollTo = (re, steps = 150) => p.evaluate(async ({ src, steps }) => {
+    const sc = [...document.querySelectorAll('*')].filter((e) => /(auto|scroll)/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 10 && e.getBoundingClientRect().width > 0).sort((a, b) => b.scrollHeight - a.scrollHeight)[0];
+    if (!sc) return false;
+    const found = () => [...document.querySelectorAll('[role=button]')].some((e) => new RegExp(src).test(e.getAttribute('aria-label') || '') && e.getBoundingClientRect().width > 0);
+    for (let i = 0; i < steps && !found(); i++) { sc.scrollTop += Math.round(sc.clientHeight * 0.8); await new Promise((r) => setTimeout(r, 90)); }
+    return found();
+  }, { src: re.source, steps });
+  // Rola até um texto aparecer dentro da janela (o que está montado mas abaixo da tela não conta).
+  const acScrollToText = (text, steps = 200) => p.evaluate(async ({ text, steps }) => {
+    const sc = [...document.querySelectorAll('*')].filter((e) => /(auto|scroll)/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 10 && e.getBoundingClientRect().width > 0).sort((a, b) => b.scrollHeight - a.scrollHeight)[0];
+    if (!sc) return false;
+    const inView = () => [...document.querySelectorAll('div[dir="auto"], span, h1, h2, h3')].some((e) => e.children.length === 0 && e.textContent.trim() === text && e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().top < innerHeight && e.getBoundingClientRect().bottom > 0);
+    for (let i = 0; i < steps && !inView(); i++) { sc.scrollTop += Math.round(sc.clientHeight * 0.8); await new Promise((r) => setTimeout(r, 90)); }
+    return inView();
+  }, { text, steps });
+  const acTop = () => p.evaluate(() => { const sc = [...document.querySelectorAll('*')].filter((e) => /(auto|scroll)/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 10 && e.getBoundingClientRect().width > 0).sort((a, b) => b.scrollHeight - a.scrollHeight)[0]; if (sc) sc.scrollTop = 0; });
+
+  // ---- 1. O pacote: só os ícones usados, e o leitor de PDF à parte ----
+  const acJsDir = path.join(DIST, '_expo', 'static', 'js', 'web');
+  const acJs = fs.readdirSync(acJsDir).filter((f) => f.endsWith('.js')).map((f) => ({ f, size: fs.statSync(path.join(acJsDir, f)).size }));
+  const acEntry = acJs.filter((x) => x.f.startsWith('entry-'));
+  const acPdf = acJs.filter((x) => x.f.startsWith('pdfjs-'));
+  ok('Acessibilidade, pacote: o JavaScript principal fica abaixo de 5,5 MB (só os 98 ícones usados; o pacote inteiro de ícones o levava a 6,9 MB)', acEntry.length === 1 && acEntry[0].size < 5_500_000, acEntry.map((x) => `${x.f} ${(x.size / 1e6).toFixed(2)} MB`).join(' '));
+  ok('Acessibilidade, pacote: o leitor de PDF (pdfjs, mais de 1 MB) é um arquivo à parte do principal', acPdf.length === 1 && acPdf[0].size > 1_000_000 && acEntry[0].size < acPdf[0].size * 4, acPdf.map((x) => `${x.f} ${(x.size / 1e6).toFixed(2)} MB`).join(' '));
+  const acPdfReqs = [];
+  p.on('request', (r) => { if (/pdfjs/.test(r.url())) acPdfReqs.push(r.url()); });
+  await acEnter();
+  await expectTotals('Acessibilidade: a demonstração abre com os totais de sempre (6.000 / 3.900 / 2.100 e 650)', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  await acScan('resumo');
+  await shot('590_acessibilidade_resumo_390px');
+  for (const name of ['Movimentações', 'Metas', 'Aprender e dúvidas']) { await tabByName(name).click(); await p.waitForTimeout(900); await acScan(`aba ${name}`); }
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento');
+
+  // ---- 2. Em cerca de 60 telas: contraste, nomes, papéis e alvos de toque ----
+  const acIds = await p.evaluate(async () => {
+    const repo = await window.__e2e.repo(); const sp = await repo.getSpace(); const ctx = sp.personalContextId;
+    const recs = await repo.listRecords(ctx, '2026-10'); const com = await repo.listCommitments(ctx, '2026-10'); const ser = await repo.listSeries(ctx);
+    const goals = await repo.listGoals(ctx); const cards = await repo.listCards(ctx); const accounts = await repo.listAccounts(ctx);
+    return { rec: recs[0].id, com: (com.find((c) => c.status !== 'pago') ?? com[0]).id, ser: ser[0].id, goal: goals[0].id, card: cards[0].id, account: accounts[0].id };
+  });
+  const AC_ROUTES = [
+    ['registro novo, gasto', 'registro/novo', { tipo: 'despesa' }], ['registro novo, recebimento', 'registro/novo', { tipo: 'receita' }],
+    ['registro, detalhe', 'registro/[id]/index', { id: acIds.rec }], ['registro, editar', 'registro/[id]/editar', { id: acIds.rec }],
+    ['buscar', 'movimentacoes/buscar', {}], ['seu mês', 'seu-mes', {}], ['análises', 'analises', {}], ['importar', 'importar/index', {}],
+    ['contas a pagar', 'a-pagar/index', {}], ['conta a pagar, nova', 'a-pagar/nova', {}], ['contas vencidas', 'a-pagar/vencidas', {}],
+    ['conta a pagar, detalhe', 'a-pagar/[id]/index', { id: acIds.com }], ['conta a pagar, editar', 'a-pagar/[id]/editar', { id: acIds.com }], ['conta a pagar, pagar', 'a-pagar/[id]/pagar', { id: acIds.com }],
+    ['gastos fixos', 'gastos-fixos/index', {}], ['gasto fixo, novo', 'gastos-fixos/novo', {}], ['assinaturas', 'gastos-fixos/assinaturas', {}],
+    ['gasto fixo, detalhe', 'gastos-fixos/[id]/index', { id: acIds.ser }], ['gasto fixo, editar', 'gastos-fixos/[id]/editar', { id: acIds.ser }], ['gasto fixo, encerrar', 'gastos-fixos/[id]/encerrar', { id: acIds.ser }],
+    ['composição de Pago', 'composicao', { tipo: 'pago' }], ['composição de Recebido', 'composicao', { tipo: 'recebido' }],
+    ['quem vê', 'quem-ve', {}], ['conta', 'conta', {}], ['exportar', 'conta/exportar', {}], ['excluir conta', 'conta/excluir', {}],
+    ['conta de origem, nova', 'contas/nova', {}], ['conta de origem, editar', 'contas/[id]/editar', { id: acIds.account }], ['família', 'familia/index', {}], ['família, nova', 'familia/nova', {}],
+    ['explicação', 'explicacao/[tema]', { tema: 'media-e-mediana' }], ['guia', 'aprender/guia/index', {}], ['guia, entrada', 'aprender/guia/[id]', { id: 'resumo' }],
+    ['calculadoras', 'calcular/index', {}], ['calculadora, reserva', 'calcular/[slug]', { slug: 'reserva' }], ['calculadora, antes de financiar', 'calcular/[slug]', { slug: 'antes-de-financiar' }],
+    ['renda comprometida', 'renda-comprometida/index', {}], ['renda, limite', 'renda-comprometida/limite', {}], ['renda, referência', 'renda-comprometida/referencia', {}],
+    ['reserva', 'reserva', {}], ['plano de guardar', 'guardar/index', {}], ['reserva mínima', 'guardar/minima', {}],
+    ['meta, nova', 'meta/nova', {}], ['meta, detalhe', 'meta/[id]/index', { id: acIds.goal }], ['meta, editar', 'meta/[id]/editar', { id: acIds.goal }], ['meta, aporte', 'meta/[id]/movimento', { id: acIds.goal }],
+    ['orçamento', 'orcamento/index', {}], ['orçamento, categoria', 'orcamento/[categoria]', { categoria: 'Mercado' }],
+    ['cartões', 'cartoes/index', {}], ['cartão, novo', 'cartoes/novo', {}], ['cartão', 'cartoes/[id]/index', { id: acIds.card }], ['cartão, editar', 'cartoes/[id]/editar', { id: acIds.card }],
+    ['fatura', 'cartoes/[id]/fatura/[mes]/index', { id: acIds.card, mes: '2026-10' }], ['fatura, compra', 'cartoes/[id]/fatura/[mes]/compra', { id: acIds.card, mes: '2026-10' }],
+    ['fatura, encargo', 'cartoes/[id]/fatura/[mes]/encargo', { id: acIds.card, mes: '2026-10' }], ['fatura, estorno', 'cartoes/[id]/fatura/[mes]/estorno', { id: acIds.card, mes: '2026-10' }], ['fatura, pagar', 'cartoes/[id]/fatura/[mes]/pagar', { id: acIds.card, mes: '2026-10' }],
+    ['revisão dos últimos meses', 'retomar/index', {}], ['simulador', 'simular', {}],
+  ];
+  const acRouteNames = [];
+  for (const [name, route, params] of AC_ROUTES) { await acNav(route, params); await acScan(name); acRouteNames.push(name); }
+  ok(`Acessibilidade, ${acCount.telas} telas: o contraste de cada texto visível chega a 4,5:1 (3:1 no texto grande), fora o botão desabilitado (${acCount.texto} textos conferidos)`, acCount.telas >= 60 && acCount.texto > 1500 && acFound.contraste.length === 0, acFound.contraste.slice(0, 4).join(' | '));
+  ok(`Acessibilidade, ${acCount.telas} telas: nenhum botão, caixa, rádio, aba, campo, link ou imagem sem nome acessível`, acFound.nome.length === 0, acFound.nome.slice(0, 4).join(' | '));
+  ok('Acessibilidade: nada que parece clicável (cursor de mão) fica sem papel de botão, link, aba, caixa, rádio ou campo', acFound.papel.length === 0, acFound.papel.slice(0, 4).join(' | '));
+  ok(`Acessibilidade: ${acCount.alvo} alvos de toque (botões, abas, rádios, caixas, chaves, links e campos) com 44 x 44 px ou mais, largura e altura`, acCount.alvo > 400 && acFound.alvo.length === 0, acFound.alvo.slice(0, 4).join(' | '));
+  ok('Acessibilidade: nenhuma das telas passa da largura de 390 px', acFound.largura.length === 0, acFound.largura.slice(0, 4).join(' | '));
+  ok('Acessibilidade: nenhum texto cortado (nada escondido pelo limite da caixa) em 390 px', acFound.cortado.length === 0, acFound.cortado.slice(0, 4).join(' | '));
+
+  // ---- 3. Títulos da composição (a "Pago" e a "Recebido" ganharam o papel de título) ----
+  await acNav('composicao', { tipo: 'pago' }); await p.waitForTimeout(900);
+  const acHeads = await p.evaluate(() => [...document.querySelectorAll('[role=heading]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => `${e.getAttribute('aria-level')}:${e.textContent}`));
+  ok('Acessibilidade, composição de Pago: "Pago" é um título de nível 2, como os outros cartões das telas', acHeads.includes('2:Pago') && acHeads.includes('1:Pago'), JSON.stringify(acHeads));
+  await acNav('composicao', { tipo: 'recebido' }); await p.waitForTimeout(900);
+  const acHeads2 = await p.evaluate(() => [...document.querySelectorAll('[role=heading]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => `${e.getAttribute('aria-level')}:${e.textContent}`));
+  ok('Acessibilidade, composição de Recebido: "Recebido" é um título de nível 2', acHeads2.includes('2:Recebido') && acHeads2.includes('1:Recebido'), JSON.stringify(acHeads2));
+  await acNav('composicao', { tipo: 'diferenca' }); await p.waitForTimeout(900);
+  const acHeads3 = await p.evaluate(() => [...document.querySelectorAll('[role=heading]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => `${e.getAttribute('aria-level')}:${e.textContent}`));
+  ok('Acessibilidade, composição da diferença do mês: "Recebido" e "Pago" são títulos de nível 2, nessa ordem', acHeads3.filter((h) => h.startsWith('2:')).join(',') === '2:Recebido,2:Pago', JSON.stringify(acHeads3));
+  // A legenda do registro quebra em mais de uma linha em vez de terminar em "…" (a origem e a conta ficavam escondidas).
+  await acNav('composicao', { tipo: 'pago' }); await p.waitForTimeout(900);
+  const acCaption = await p.evaluate(() => { const e = [...document.querySelectorAll('div[dir="auto"]')].find((x) => /^Pago · 05\/10\/2026 · conta a pagar/.test(x.textContent) && x.getBoundingClientRect().width > 0); return e ? { text: e.textContent, clipped: e.scrollWidth > e.clientWidth + 1 || getComputedStyle(e).textOverflow === 'ellipsis' || getComputedStyle(e).webkitLineClamp !== 'none' && getComputedStyle(e).webkitLineClamp !== '' } : null; });
+  ok('Acessibilidade, linha de registro: a legenda "Pago · 05/10/2026 · conta a pagar" aparece inteira, sem o corte "…"', acCaption !== null && acCaption.text === 'Pago · 05/10/2026 · conta a pagar' && !acCaption.clipped, JSON.stringify(acCaption));
+  await shot('591_acessibilidade_composicao_pago_390px');
+
+  // ---- 4. O leitor de PDF só é pedido quando a pessoa lê um PDF ----
+  ok(`Acessibilidade, pacote: abrir o app, o Resumo, as abas e ${acRouteNames.length} telas não pediu o leitor de PDF (pdfjs)`, acPdfReqs.length === 0, acPdfReqs.join(' '));
+
+  // ---- 5. Reduzir movimento: sem animação de entrada, sem escala ao tocar ----
+  const acMotion = async (reduce) => {
+    const c2 = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, reducedMotion: reduce ? 'reduce' : 'no-preference' });
+    await c2.addInitScript(() => { window.__clarevoSemTour = true; });
+    const q = await c2.newPage();
+    await q.goto(`http://localhost:${PORT}/`); await q.getByText('Seu dinheiro', { exact: false }).filter({ visible: true }).first().waitFor({ timeout: 15000 });
+    await q.getByRole('button', { name: 'Ver demonstração com dados fictícios', exact: true }).filter({ visible: true }).first().click();
+    await q.getByText('Diferença do mês', { exact: false }).filter({ visible: true }).first().waitFor({ timeout: 15000 });
+    await q.waitForTimeout(1500);
+    const parado = await q.evaluate(() => document.getAnimations().length);
+    await q.getByRole('button', { name: /Mês anterior/ }).filter({ visible: true }).first().click(); await q.waitForTimeout(60);
+    const trocando = await q.evaluate(() => document.getAnimations().map((a) => a.animationName || a.transitionProperty || '').filter(Boolean));
+    await q.waitForTimeout(900);
+    const bt = q.getByRole('button', { name: 'Anotar gasto', exact: true }).filter({ visible: true }).first();
+    const box = await bt.boundingBox(); await q.mouse.move(box.x + 20, box.y + 20); await q.mouse.down(); await q.waitForTimeout(250);
+    const escala = await bt.evaluate((e) => { for (let n = e; n; n = n.parentElement) { const t = getComputedStyle(n).transform; if (t !== 'none') return t; } return 'none'; });
+    await q.mouse.up(); await c2.close();
+    return { parado, trocando, escala };
+  };
+  const acMoveOn = await acMotion(false);
+  const acMoveOff = await acMotion(true);
+  ok('Acessibilidade, movimento: com a animação ligada, trocar de mês toca a entrada (FadeIn) e o botão encolhe a 0,98 ao tocar (a conferência vale)', acMoveOn.trocando.some((n) => /Fade/.test(n)) && acMoveOn.escala === 'matrix(0.98, 0, 0, 0.98, 0, 0)', JSON.stringify(acMoveOn));
+  ok('Acessibilidade, movimento: com "reduzir movimento", nada anima parado nem ao trocar de mês, e o botão não encolhe ao tocar', acMoveOff.parado === 0 && acMoveOff.trocando.length === 0 && (acMoveOff.escala === 'none' || acMoveOff.escala === 'matrix(1, 0, 0, 1, 0, 0)'), JSON.stringify(acMoveOff));
+
+  // ---- 6. Letra grande: o texto a 1,3 vez (360 px) e a 2,0 vezes (359 px, que empilha como o aparelho faz acima de 1,3), nas telas principais ----
+  // Na web a escala de fonte é sempre 1: a simulação multiplica o tamanho e a altura da linha de todo texto (abas e avatar até 1,3, como
+  // no app) e tira o limite de linhas dos títulos, como o app faz com a escala acima de 1. Só o aparelho confirma o resto.
+  const AC_BIG = [
+    ['resumo', 'Resumo', null, null], ['movimentações', 'Movimentações', null, null], ['metas', 'Metas', null, null],
+    ['registrar gasto', null, 'registro/novo', { tipo: 'despesa' }], ['contas a pagar', null, 'a-pagar/index', {}], ['cartões', null, 'cartoes/index', {}],
+    ['cartão', null, 'cartoes/[id]/index', { id: acIds.card }], ['fatura', null, 'cartoes/[id]/fatura/[mes]/index', { id: acIds.card, mes: '2026-10' }],
+    ['buscar', null, 'movimentacoes/buscar', {}], ['composição', null, 'composicao', { tipo: 'pago' }], ['gastos fixos', null, 'gastos-fixos/index', {}], ['conta', null, 'conta', {}],
+  ];
+  let acShotN = 592;
+  for (const [scale, width, suffix] of [[1.3, 360, '130'], [2, 359, '200']]) {
+    acResetFound();
+    await acEnter();
+    await p.setViewportSize({ width, height: 800 }); await p.waitForTimeout(500);
+    for (const [name, tab, route, params] of AC_BIG) {
+      if (tab) { await tabByName(tab).click(); await waitText(tab === 'Resumo' ? 'Diferença do mês' : tab === 'Metas' ? 'Reserva para imprevistos' : 'Registrar recebimento'); }
+      else await acNav(route, params);
+      await p.waitForTimeout(700);
+      await p.evaluate((k) => window.__acc.scale(k), scale);
+      await p.waitForTimeout(500);
+      await acScan(`${name} ${scale}x`);
+      if (['resumo', 'movimentações', 'registrar gasto', 'contas a pagar', 'fatura', 'metas', 'cartão', 'conta'].includes(name)) await shot(`${acShotN++}_letra_grande_${suffix}_${name.replace(/ /g, '_').replace(/ç/g, 'c').replace(/õ/g, 'o').replace(/ã/g, 'a')}_${width}px`);
+    }
+    ok(`Acessibilidade, letra grande ${scale}x em ${width} px (${AC_BIG.length} telas): nada passa da largura da tela`, acFound.largura.length === 0, acFound.largura.slice(0, 4).join(' | '));
+    ok(`Acessibilidade, letra grande ${scale}x em ${width} px: nenhum texto cortado (fora os rótulos das abas, que têm teto de 1,3 e encolhem no aparelho)`, acFound.cortado.length === 0, acFound.cortado.slice(0, 4).join(' | '));
+    ok(`Acessibilidade, letra grande ${scale}x em ${width} px: nenhum texto por cima de outro`, acFound.cruzado.length === 0, acFound.cruzado.slice(0, 4).join(' | '));
+    ok(`Acessibilidade, letra grande ${scale}x em ${width} px: os botões e campos seguem com 44 x 44 px ou mais`, acFound.alvo.length === 0, acFound.alvo.slice(0, 4).join(' | '));
+    await acKeep();
+  }
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+  acResetFound();
+
+  // ---- 7. Lista com 500 lançamentos (montada só aqui): Movimentações, fatura e composição montam só o que está perto da tela ----
+  await acEnter();
+  await otherDevice(async (repo, ctx) => {
+    const space = await repo.getSpace();
+    const acc = space.accounts[0].id;
+    const cards = await repo.listCards(ctx);
+    // A demonstração simula uma rede lenta; sem a espera, as 1.000 gravações levam um instante.
+    repo.latencyMs = 0;
+    for (let n = 0; n < 500; n++) {
+      const day = String((n % 30) + 1).padStart(2, '0');
+      await repo.createRecord(crypto.randomUUID(), ctx, n % 7 === 0 ? 'receita' : 'despesa', { accountId: acc, amountCents: 1000 + n, occurredOn: `2026-09-${day}`, description: `Lançamento fictício ${String(n).padStart(3, '0')}`, category: null });
+    }
+    for (let n = 0; n < 500; n++) await repo.addCardPurchase(crypto.randomUUID(), cards[0].id, { description: `Compra fictícia ${String(n).padStart(3, '0')}`, category: 'Lazer', purchasedOn: '2026-09-20', totalCents: 500 + n, installments: 1 });
+  });
+  const acExpected = await p.evaluate(async () => {
+    const repo = await window.__e2e.repo(); const sp = await repo.getSpace();
+    const list = await repo.listRecords(sp.personalContextId, '2026-09');
+    const sum = (k) => list.filter((r) => r.kind === k).reduce((a, r) => a + r.amountCents, 0);
+    const fmt = (c) => 'R$ ' + (c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return { total: list.length, receitas: list.filter((r) => r.kind === 'receita').length, despesas: list.filter((r) => r.kind === 'despesa').length, recebido: fmt(sum('receita')), pago: fmt(sum('despesa')) };
+  });
+  ok('Acessibilidade, lista longa: o mês de setembro tem os 500 lançamentos do roteiro mais os da demonstração', acExpected.total >= 503 && acExpected.receitas >= 72, JSON.stringify(acExpected));
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento');
+  await p.getByRole('button', { name: /Mês anterior/ }).filter({ visible: true }).first().click(); await waitText('Lançamento fictício'); await p.waitForTimeout(800);
+  const acLongRows = await acRows(/Lançamento fictício/);
+  t = await body();
+  ok('Acessibilidade, lista longa: Movimentações de setembro monta só as linhas perto da tela (menos de 100 de mais de 500), com o título do dia', acLongRows >= 10 && acLongRows < 100 && (await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="3"]')].filter((e) => e.getBoundingClientRect().width > 0).length)) >= 1, `${acLongRows} linhas`);
+  ok('Acessibilidade, lista longa: os totais do mês (Recebido e Pago de setembro) são os de todos os lançamentos, e o topo da tela segue igual (Buscar, Organizar, filtros)', t.includes(acExpected.recebido) && t.includes(acExpected.pago) && t.includes('Organizar') && t.includes('Buscar') && (await visibleCount('radio', 'Recebidos')) === 1, `${acExpected.recebido} ${acExpected.pago}`);
+  const acDomNodes = await p.evaluate(() => document.querySelectorAll('*').length);
+  ok('Acessibilidade, lista longa: a tela tem poucos elementos (menos de 2.500; com as 500 linhas montadas eram mais de 5.000)', acDomNodes < 2500, `${acDomNodes} elementos`);
+  await acInstall();
+  await acScan('Movimentações com 500 lançamentos');
+  await shot('608_lista_longa_movimentacoes_390px');
+  ok('Acessibilidade, lista longa: a lista montada tem os alvos de 44 px, nome acessível e contraste de sempre (nenhum achado novo)', acFound.alvo.length === 0 && acFound.nome.length === 0 && acFound.contraste.length === 0, [...acFound.alvo, ...acFound.nome, ...acFound.contraste].slice(0, 3).join(' | '));
+  const acReachedEnd = await acScrollTo(/Lançamento fictício 000/);
+  const acLastTitle = await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="3"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
+  ok('Acessibilidade, lista longa: rolando até o fim aparece o lançamento mais antigo ("Lançamento fictício 000", dia 01) e as linhas montadas continuam poucas', acReachedEnd && (await acRows(/Lançamento fictício/)) < 100 && acLastTitle.some((x) => /^1 de setembro/.test(x)), `${acLastTitle.join(' | ')}`);
+  await shot('609_lista_longa_movimentacoes_fim_390px');
+  await acTop();
+  // Filtro: "Recebidos" deixa 72 ou mais linhas (abaixo de 80 a lista é a de sempre, tudo montado) e voltar a "Todos" volta à lista longa, sem sair da tela.
+  await radio('Recebidos').click(); await p.waitForTimeout(900);
+  const acRecRows = await acRows(/Lançamento fictício.*Recebido/);
+  ok('Acessibilidade, lista longa: "Recebidos" mostra todos os recebimentos de setembro de uma vez (a lista passou a ter menos de 80 linhas e volta a ser a de sempre)', (await radio('Recebidos').getAttribute('aria-checked')) === 'true' && acRecRows >= acExpected.receitas - 4 && acRecRows <= acExpected.receitas, `${acRecRows} de ${acExpected.receitas}`);
+  await radio('Todos').click(); await p.waitForTimeout(900);
+  ok('Acessibilidade, lista longa: voltar a "Todos" volta a montar só as linhas perto da tela, na mesma tela, com o filtro marcado', (await radio('Todos').getAttribute('aria-checked')) === 'true' && (await acRows(/Lançamento fictício/)) < 100 && (await acRows(/Lançamento fictício/)) >= 10, `${await acRows(/Lançamento fictício/)} linhas`);
+  // Outubro (a demonstração) continua com a lista de sempre, poucas linhas e todas montadas.
+  await p.getByRole('button', { name: /Próximo mês/ }).filter({ visible: true }).first().click(); await waitText('Aluguel'); await p.waitForTimeout(700);
+  t = await body();
+  ok('Acessibilidade, lista longa: outubro (poucos registros) segue com a lista de sempre: Aluguel, Mercado e o salário, todos montados', t.includes('Aluguel') && t.includes('Mercado') && t.includes('Recebido · 01/10/2026') && !t.includes('Lançamento fictício'), t.slice(0, 200));
+  await p.getByRole('button', { name: /Mês anterior/ }).filter({ visible: true }).first().click(); await waitText('Lançamento fictício'); await p.waitForTimeout(600);
+
+  // Composição de Pago de setembro (mês escolhido em Movimentações): título do total, linhas perto da tela e o fim da tela.
+  await acNav('composicao', { tipo: 'pago' }); await waitText('Gastos pagos com data de pagamento neste mês'); await p.waitForTimeout(900);
+  const acCompRows = await acRows(/Lançamento fictício/);
+  t = await body();
+  ok('Acessibilidade, lista longa: a composição de Pago de setembro monta só as linhas perto da tela, com o total e o título "Pago"', acCompRows >= 8 && acCompRows < 100 && t.includes(acExpected.pago) && (await headingShown('Pago')), `${acCompRows} linhas`);
+  await shot('610_lista_longa_composicao_pago_390px');
+  ok('Acessibilidade, lista longa: rolando a composição até o fim aparecem os lançamentos do dia 1 e o link "Como este total é calculado?", e as linhas montadas continuam poucas', (await acScrollToText('Como este total é calculado?')) && (await acRows(/Lançamento fictício/)) < 100, `${await acRows(/Lançamento fictício/)} linhas`);
+  await radio('Por categoria').click(); await p.waitForTimeout(900);
+  t = await body();
+  ok('Acessibilidade, lista longa: "Por categoria" segue igual (as barras, sem linhas de registro) e voltar a "Por registro" traz a lista de novo', t.includes('Sem categoria') && (await acRows(/Lançamento fictício/)) === 0, t.slice(0, 160));
+  await radio('Por registro').click(); await p.waitForTimeout(900);
+  ok('Acessibilidade, lista longa: de volta a "Por registro", a lista longa aparece de novo', (await waitText('Lançamento fictício').then(() => true, () => false)) && (await acRows(/Lançamento fictício/)) >= 8, `${await acRows(/Lançamento fictício/)} linhas`);
+
+  // Fatura de outubro com as 500 compras (mais as da demonstração): título, linhas perto da tela, composição e a ida às faturas vizinhas no fim.
+  await acNav('cartoes/[id]/fatura/[mes]/index', { id: acIds.card, mes: '2026-10' }); await waitText('Lançamentos'); await p.waitForTimeout(1000);
+  const acInvRows = await acRows(/Compra fictícia/);
+  t = await body();
+  ok('Acessibilidade, lista longa: a fatura de outubro monta só as linhas perto da tela (menos de 100 de mais de 500), com o título "Lançamentos" e o topo (pagar, encargos)', acInvRows >= 8 && acInvRows < 100 && (await headingShown('Lançamentos')) && t.includes('Informar encargos'), `${acInvRows} linhas`);
+  await shot('611_lista_longa_fatura_390px');
+  ok('Acessibilidade, lista longa: rolando a fatura até o fim aparecem a última compra e "Como o total é formado"', (await acScrollTo(/Compra fictícia 499/)) && (await acScrollToText('Como o total é formado')), `${await acRows(/Compra fictícia/)} linhas`);
+  await shot('612_lista_longa_fatura_fim_390px');
+  await acNav('cartoes/[id]/fatura/[mes]/index', { id: acIds.card, mes: '2026-11' }); await waitText('Lançamentos'); await p.waitForTimeout(800);
+  t = await body();
+  ok('Acessibilidade, lista longa: a fatura de novembro (poucas parcelas) segue com a lista de sempre, todas montadas, e "Como o total é formado" logo abaixo', t.includes('Como o total é formado') && t.includes('Lançamentos'), t.slice(0, 200));
+
+  // ---- 8. Demonstração de novo: os totais não mudam; textos e escritas ----
+  await evEnter();
+  await expectTotals('Acessibilidade, demonstração: outubro segue 6.000 / 3.900 / 2.100 e 650 (invariantes)', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  const acBad = acTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\bbem-vind[oa]\b/i)?.[0]).filter(Boolean);
+  ok('Acessibilidade: nenhum termo proibido, travessão longo nem expressão vetada nas telas com letra grande', acTexts.length >= 2 && acBad.length === 0, `${acTexts.length} telas ${acBad.join(' | ')}`);
+  ok('Acessibilidade: nenhuma escrita direta na rede (a demonstração e as 1.000 gravações do roteiro vivem na memória)', writes.length === acWrites0, writes.slice(acWrites0).join(' | '));
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);

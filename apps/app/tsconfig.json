@@ -8,6 +8,9 @@
       ],
       "@/assets/*": [
         "./assets/*"
+      ],
+      "lucide-react-native": [
+        "./src/lib/lucide.ts"
       ]
     }
   },

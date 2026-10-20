@@ -1,8 +1,8 @@
-import { CARDS_TEXT, formatDateBR, type FinancialRecord } from '@clarevo/core';
+import { CARDS_TEXT, formatDateBR, isStackedLayout, type FinancialRecord } from '@clarevo/core';
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import { Money, Txt } from '@/components/ui';
+import { Money, Txt, clampLines } from '@/components/ui';
 import { moneyA11y, useValuesHidden } from '@/lib/privacy';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -26,7 +26,7 @@ export function RecordRow({
 }) {
   const { width, fontScale } = useWindowDimensions();
   const hidden = useValuesHidden();
-  const stacked = width < 360 || fontScale > 1.3;
+  const stacked = isStackedLayout(width, fontScale);
   const isIn = record.kind === 'receita';
   const Icon = isIn ? ArrowDownLeft : ArrowUpRight;
   // Gasto gerado ao marcar uma conta a pagar como paga: a origem aparece na legenda.
@@ -49,10 +49,11 @@ export function RecordRow({
         <Icon size={18} color={isIn ? colors.success : colors.brand} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={2}>
+        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={clampLines(2)}>
           {record.description}
         </Txt>
-        <Txt variant="caption" color={colors.textSecondary} numberOfLines={1}>
+        {/* A legenda quebra em mais de uma linha em vez de terminar em "…": a origem e a conta de origem não ficam escondidas. */}
+        <Txt variant="caption" color={colors.textSecondary}>
           {when}
         </Txt>
         {stacked ? (

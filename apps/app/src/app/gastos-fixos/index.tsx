@@ -11,6 +11,7 @@ import {
   formatDayMonth,
   formatMonthName,
   formatMonthYearBR,
+  isStackedLayout,
   monthOf,
   numberAtOrAfter,
   seriesDueOn,
@@ -115,7 +116,7 @@ function seriesRowParts(s: CommitmentSeries, today: IsoDate, hidden: boolean): P
 function SeriesRow({ series: s, today, last }: { series: CommitmentSeries; today: IsoDate; last: boolean }) {
   const { width, fontScale } = useWindowDimensions();
   const hidden = useValuesHidden();
-  const stacked = width < 360 || fontScale > 1.3;
+  const stacked = isStackedLayout(width, fontScale);
   const parts = seriesRowParts(s, today, hidden);
   const Icon = s.kind === 'parcelada' ? Layers : s.kind === 'anual' ? CalendarSync : Repeat;
   const name = currentTerm(s, today).description;

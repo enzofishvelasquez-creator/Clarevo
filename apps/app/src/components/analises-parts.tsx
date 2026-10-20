@@ -13,6 +13,7 @@ import {
   categoryBubbles,
   categoryKey,
   evolutionFetchRange,
+  isStackedLayout,
   monthCheckPlan,
   monthOf,
   selectedCategoryCard,
@@ -30,7 +31,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { MoneyTxt } from '@/components/money-text';
 import { MonthCheckBlock } from '@/components/month-check';
 import { EmptyState, ErrorState } from '@/components/states';
-import { Button, Card, LinkButton, Money, Skeleton, Txt, spaceKeyPress, styles as ui } from '@/components/ui';
+import { Button, Card, LinkButton, Money, Skeleton, Txt, clampLines, spaceKeyPress, styles as ui } from '@/components/ui';
 import { useCategoryViewPref } from '@/lib/category-view';
 import { useHiddenMonths } from '@/lib/evolution-memory';
 import { maskMoneyLabel, useValuesHidden } from '@/lib/privacy';
@@ -320,7 +321,7 @@ function SelectedCategory({
 }) {
   const hidden = useValuesHidden();
   const { width, fontScale } = useWindowDimensions();
-  const stacked = width < 360 || fontScale > 1.3;
+  const stacked = isStackedLayout(width, fontScale);
   // Ao sair da tela (outro mês, outra aba), a posição guardada deixa de valer: a próxima só vale depois do primeiro layout do cartão novo.
   useEffect(() => () => onLayout(null), [onLayout]);
   return (
@@ -361,7 +362,7 @@ function SelectedCategory({
                 onPress={() => onOpenRecord(row.href)}
                 style={(s) => [styles.row, i < card.rows.length - 1 && styles.rowDivider, s.pressed && { opacity: 0.7 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
                 <View style={{ flex: 1, minWidth: 0 }} {...decorative}>
-                  <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={2}>
+                  <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={clampLines(2)}>
                     {row.description}
                   </Txt>
                   <Txt variant="caption" color={colors.textSecondary}>

@@ -53,3 +53,6 @@ export * from './evolucao-tela';
 export * from './analises';
 export * from './dia-util';
 export * from './renda-media';
+export * from './contrast';
+export * from './long-list';
+export * from './text-scale';
