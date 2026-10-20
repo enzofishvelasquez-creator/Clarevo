@@ -11,8 +11,11 @@ import {
   buildSeuMes,
   categoryRefunds,
   categoryBreakdown,
+  committedEvolutionPoints,
   committedGoalLines,
+  deviceTimeZone,
   evolutionExplanation,
+  evolutionMonths,
   essentialMonthly,
   goalPlan,
   isRefusal,
@@ -25,6 +28,7 @@ import {
   loadEvolutionGaps,
   loadInvoicesOfRecords,
   paidCategoryParts,
+  phase3ClosedMonths,
   receiptKeyValid,
   receivedCategoryBreakdown,
   receivedCategoryParts,
@@ -45,6 +49,7 @@ import {
   returnWindow,
   savedInMonth,
   savingsCardState,
+  savingsEvolutionPoints,
   searchFilterOf,
   suggestReference,
   summarizeBudget,
@@ -83,6 +88,8 @@ import {
   type EvolutionExplainPlan,
   type EvolutionExplanation,
   type EvolutionMetric,
+  type EvolutionWindow,
+  type Phase3Point,
   type ContextKind,
   type FamilyRole,
   type FinancialRecord,
@@ -2061,6 +2068,98 @@ export function useEvolutionExplanation(contextId: string | undefined, plan: Evo
     return evolutionExplanation(plan, base.data, current.data);
   }, [plan, base.data, current.data]);
   return combineParts<EvolutionExplanation>([base, current], value);
+}
+
+/**
+ * "Renda comprometida" mês a mês na Evolução (fase 3, D-062 item 4): uma leitura de `listCommitments` por mês fechado da janela (a mesma
+ * do "Ainda a pagar" e da tela Renda comprometida, `month_committed` repetido no core por `summarizeCommitted`; no máximo 11 por janela, e
+ * as chaves `['commitments', contexto, mês]` são compartilhadas entre as janelas de 3, 6 e 12 meses) e uma de `listIncomeReferences`.
+ * Só depois da sincronização do dia, como `useCommitments` (o mês anterior pode ganhar conta na geração), e só com `enabled` (o valor
+ * Renda comprometida escolhido): fora dele nada é lido. O mês atual nunca é lido (só meses fechados). As chaves começam por
+ * 'commitments' e 'incomeRefs', então toda escrita de conta, pagamento ou referência recarrega. Sem dado parcial: uma falha de qualquer
+ * leitura falha tudo, nunca um 0%.
+ */
+export function useEvolutionCommitted(contextId: string | undefined, months: readonly IsoMonth[], enabled: boolean) {
+  const repo = useRepo();
+  const { today } = useSession();
+  const currentMonth = monthOf(today);
+  const sync = useSeriesSync(contextId);
+  const on = enabled && Boolean(contextId);
+  const closed = useMemo(() => phase3ClosedMonths(months, currentMonth), [months, currentMonth]);
+  const lists = useQueries({
+    queries: closed.map((m) => ({
+      queryKey: ['commitments', contextId, m],
+      queryFn: () => repo.listCommitments(contextId!, m),
+      enabled: on && synced(sync),
+    })),
+  });
+  const refs = useQuery({ queryKey: ['incomeRefs', contextId], queryFn: () => repo.listIncomeReferences(contextId!), enabled: on });
+  const done = synced(sync);
+  const syncPart: QueryPart = { isSuccess: done, isError: !done && sync.isError, error: sync.error, isFetching: sync.isFetching, refetch: () => sync.refetch() };
+  const parts: QueryPart[] = [syncPart, ...lists, refs];
+  const ready = on && parts.every((p) => p.isSuccess);
+  const version = stamp(lists);
+  const value = useMemo(
+    (): Phase3Point[] | undefined =>
+      ready && contextId
+        ? committedEvolutionPoints({
+            months,
+            currentMonth,
+            contextId,
+            today,
+            commitmentsByMonth: new Map(closed.map((m, i) => [m, lists[i]!.data!] as const)),
+            refs: refs.data!,
+          })
+        : undefined,
+    [ready, contextId, months, currentMonth, today, closed, version, refs.data], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  return combineParts<Phase3Point[]>(parts, value);
+}
+
+/**
+ * "Guardado em metas" mês a mês na Evolução (fase 3, D-062 item 4): as metas (`listGoals`) e os movimentos de cada mês fechado da janela
+ * (`listGoalMovementsInMonth`, no máximo 11 por janela, com as chaves `['goals', 'month', contexto, mês]` das telas de metas), pela conta
+ * de `savedInMonth` (aportes menos resgates). Só com `enabled` (o valor Guardado em metas escolhido); o mês atual nunca é lido. Toda escrita
+ * de meta recarrega (as chaves começam por 'goals'). Sem dado parcial: uma falha de qualquer leitura falha tudo.
+ */
+export function useEvolutionSavings(contextId: string | undefined, months: readonly IsoMonth[], enabled: boolean) {
+  const repo = useRepo();
+  const { today } = useSession();
+  const currentMonth = monthOf(today);
+  const on = enabled && Boolean(contextId);
+  const closed = useMemo(() => phase3ClosedMonths(months, currentMonth), [months, currentMonth]);
+  const goals = useQuery({ queryKey: ['goals', 'list', contextId], queryFn: () => repo.listGoals(contextId!), enabled: on });
+  const lists = useQueries({
+    queries: closed.map((m) => ({
+      queryKey: ['goals', 'month', contextId, m],
+      queryFn: () => repo.listGoalMovementsInMonth(contextId!, m),
+      enabled: on,
+    })),
+  });
+  const parts: QueryPart[] = [goals, ...lists];
+  const ready = on && parts.every((p) => p.isSuccess);
+  const version = stamp(lists);
+  const value = useMemo(
+    (): Phase3Point[] | undefined =>
+      ready
+        ? savingsEvolutionPoints({
+            months,
+            currentMonth,
+            goals: goals.data!,
+            movementsByMonth: new Map(closed.map((m, i) => [m, lists[i]!.data!] as const)),
+            timeZone: deviceTimeZone(),
+          })
+        : undefined,
+    [ready, months, currentMonth, closed, version, goals.data], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  return combineParts<Phase3Point[]>(parts, value);
+}
+
+/** Os meses de uma janela da Evolução, do mais antigo ao mês atual (estável entre renderizações). */
+export function useEvolutionWindowMonths(windowMonths: EvolutionWindow): IsoMonth[] {
+  const { today } = useSession();
+  const currentMonth = monthOf(today);
+  return useMemo(() => evolutionMonths(currentMonth, windowMonths), [currentMonth, windowMonths]);
 }
 
 /**

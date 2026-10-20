@@ -2905,6 +2905,13 @@ import {
   EVOLUTION_WINDOWS,
   MONTH_CHECK_TEXT,
   buildEvolutionView,
+  buildPhase3View,
+  committedEvolutionPoints,
+  evolutionMonths,
+  evolutionSubtitle,
+  phase3Empty,
+  phase3Panel,
+  savingsEvolutionPoints,
   monthCheckTextSamples,
   evolutionAnnouncement,
   evolutionExplainPlan,
@@ -3186,6 +3193,73 @@ describe('textos da Evolução (D-057)', () => {
     const unchecked = buildEvolutionView({ overview: [...overview, row('2026-07', 0, 0)], metric: 'pago', windowMonths: 12, currentMonth: '2026-10', hiddenMonths: [] }).points.find((p) => p.month === '2026-07')!;
     expect(unchecked.stateText).toBe('Sem registros: mês sem anotação não quer dizer mês sem gastos');
     for (const text of texts) expect(text, text).not.toMatch(/\bnão gastou|\bsem gastos de verdade|\bcom certeza\b|\bgarant/i);
+  });
+
+  it('fase 3 (D-062 item 4): Renda comprometida e Guardado em metas, em todos os estados, janelas e seleções, passam nas regras e dizem só fatos', () => {
+    const bill = (id: string, dueOn: string, amountCents: number) =>
+      ({ id, contextId: 'c', description: id, amountCents, currency: 'BRL', dueOn, category: null, status: 'aberto', payment: null, series: null, seriesOverride: false, amountIsEstimate: false, invoice: null, createdBy: 'p', version: 1, createdAt: `${dueOn}T00:00:00Z`, updatedAt: `${dueOn}T00:00:00Z` }) as const;
+    const ref = (fromMonth: string) => ({ id: `r-${fromMonth}`, contextId: 'c', fromMonth, amountCents: 600_000, varies: false, createdBy: 'p', version: 1, createdAt: `${fromMonth}-01T00:00:00Z`, updatedAt: `${fromMonth}-01T00:00:00Z`, amountChangedAt: null });
+    const goal = (createdAt: string, status: 'ativa' | 'concluida' = 'ativa') =>
+      ({ id: 'g', contextId: 'c', goalType: 'objetivo', name: 'Viagem', targetCents: 600_000, targetMonth: null, plannedMonthlyCents: null, essentialBaseCents: null, essentialMonths: null, essentialBaseSource: null, status, createdBy: 'p', version: 1, createdAt, updatedAt: createdAt, savedCents: 0, initialCents: 0, depositsCents: 0, withdrawalsCents: 0, incomeCents: 0, appreciationCents: 0, depreciationCents: 0, lastMovementOn: null }) as const;
+    const mv = (kind: 'aporte' | 'resgate' | 'rendimento', amountCents: number, occurredOn: string, i: number) =>
+      ({ id: `m${i}`, goalId: 'g', contextId: 'c', kind, amountCents, occurredOn, note: null, accountId: null, createdBy: 'p', version: 1, createdAt: `${occurredOn}T00:00:00Z`, updatedAt: `${occurredOn}T00:00:00Z` }) as const;
+    const texts: string[] = [];
+    for (const windowMonths of EVOLUTION_WINDOWS) {
+      const months = evolutionMonths('2026-10', windowMonths);
+      const closed = months.filter((m) => m < '2026-10');
+      const sets = [
+        { refs: [ref('2026-07')], goals: [goal('2026-06-15T12:00:00Z')] },
+        { refs: [] as ReturnType<typeof ref>[], goals: [] as ReturnType<typeof goal>[] },
+        { refs: [ref('2025-01')], goals: [goal('2026-06-15T12:00:00Z', 'concluida')] },
+      ];
+      for (const { refs, goals } of sets) {
+        const lists = new Map(closed.map((m, i) => [m, i % 3 === 2 ? [] : [bill(`conta-${m}`, `${m}-10`, 150_000 + i * 70_000)]]));
+        const moves = new Map(closed.map((m, i) => [m, i % 4 === 0 ? [] : i % 4 === 1 ? [mv('aporte', 40_000, `${m}-05`, i), mv('resgate', 90_000, `${m}-20`, i + 100)] : i % 4 === 2 ? [mv('rendimento', 500, `${m}-28`, i)] : [mv('aporte', 25_000, `${m}-09`, i)]]));
+        const views = [
+          { metric: 'comprometida' as const, points: committedEvolutionPoints({ months, currentMonth: '2026-10', contextId: 'c', today: '2026-10-07', commitmentsByMonth: lists, refs }) },
+          { metric: 'guardado' as const, points: savingsEvolutionPoints({ months, currentMonth: '2026-10', goals, movementsByMonth: moves, timeZone: 'America/Sao_Paulo' }) },
+        ];
+        for (const { metric, points } of views) {
+          for (const hiddenMonths of [[], closed.slice(0, 1), closed.slice(-2), closed, ['2025-01']]) {
+            const view = buildPhase3View({ metric, points, windowMonths, currentMonth: '2026-10', hiddenMonths });
+            const sub = evolutionSubtitle(metric);
+            texts.push(sub.base, ...(sub.note ? [sub.note] : []), evolutionAnnouncement(view), EVOLUTION_TEXT.custom.banner(view.outCount, view.eligibleCount), EVOLUTION_TEXT.custom.list(view.stats.hiddenMonths, view.outsideMonths), EVOLUTION_TEXT.custom.scope(metric));
+            texts.push(EVOLUTION_TEXT.chart.span(view.from, view.to), EVOLUTION_TEXT.chart.title(metric), EVOLUTION_TEXT.stats.ofMonths(view.stats.visibleCount, view.eligibleCount));
+            if (view.averageText) texts.push(view.averageText);
+            if (view.medianText) texts.push(view.medianText);
+            if (view.maxCents > 0) texts.push(view.unit === 'permille' ? EVOLUTION_TEXT.chart.maxPercent('52,5%') : EVOLUTION_TEXT.chart.maxValue(view.maxCents));
+            for (const p of view.points) {
+              texts.push(p.name, p.title, p.stateText, p.stateLabel, p.includedText, ...(p.valueText ? [p.valueText] : []));
+              const panel = phase3Panel(view, p.month);
+              texts.push(panel.title, panel.valueCaption, panel.stateText, panel.baseText, panel.explainTitle, panel.explainNote, panel.switchCaption, ...(panel.noValueText ? [panel.noValueText] : []), ...(panel.notEligibleText ? [panel.notEligibleText] : []));
+              texts.push(...(panel.previousMonth ? [EVOLUTION_TEXT.panel.stepHint(panel.previousMonth)] : []), ...(panel.nextMonth ? [EVOLUTION_TEXT.panel.stepHint(panel.nextMonth)] : []));
+            }
+            if (view.situation === 'sem_registros') {
+              for (const canWrite of [true, false]) {
+                const empty = phase3Empty(view, canWrite);
+                texts.push(empty.title, empty.body, ...(empty.action ? [empty.action.label] : []));
+              }
+            }
+          }
+        }
+      }
+    }
+    texts.push(EVOLUTION_TEXT.table.noteNoTotal, EVOLUTION_TEXT.chart.zeroNote, EVOLUTION_TEXT.legend.noBase, EVOLUTION_TEXT.legend.zeroSaved, EVOLUTION_TEXT.stats.announceText('52,5%', '50,0%', 2, 3));
+    expect(texts.length).toBeGreaterThan(900);
+    check(texts);
+    // As frases pedidas, como estão.
+    expect(EVOLUTION_TEXT.phase3.subtitle.comprometida).toBe('Percentual da renda de referência ligado a contas do mês');
+    expect(EVOLUTION_TEXT.phase3.subtitle.guardado).toBe('Aportes menos resgates nas metas');
+    expect(EVOLUTION_TEXT.phase3.closedOnly).toMatch(/^Só meses já fechados\./);
+    expect(EVOLUTION_TEXT.phase3.explainNote).toBe('Disponível para Recebido e Pago');
+    // Nada aqui é previsão, e a ausência nunca é afirmada como zero.
+    for (const text of texts) {
+      expect(text, text).not.toMatch(/\bprevis(ão|to|ta)\b.*\b(serão|vai|irá)\b|\bvocê vai\b|\bsó falta\b/i);
+      expect(text, text).not.toMatch(/\bnão guardou\b|\bnão comprometeu\b|\bnão há contas\b|\bsem contas de verdade\b/i);
+    }
+    // Quem não tem base ou registro nunca vê "0%" nem "R$ 0,00" no lugar do dado.
+    const noBase = buildPhase3View({ metric: 'comprometida', points: committedEvolutionPoints({ months: evolutionMonths('2026-10', 6), currentMonth: '2026-10', contextId: 'c', today: '2026-10-07', commitmentsByMonth: new Map(evolutionMonths('2026-10', 6).filter((m) => m < '2026-10').map((m) => [m, []])), refs: [] }), windowMonths: 6, currentMonth: '2026-10', hiddenMonths: [] });
+    for (const p of noBase.points) for (const text of [p.name, p.stateText, p.valueText ?? '']) expect(text, text).not.toMatch(/\b0(,0)?%|R\$ 0,00/);
   });
 });
 

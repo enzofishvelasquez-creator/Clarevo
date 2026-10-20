@@ -328,6 +328,32 @@ describe('learn/math: bordas', () => {
     expect(() => medianCents([1, Number.NaN])).toThrow(RangeError);
   });
 
+  it('averageCents e medianCents com { signed: true } (Evolução, Guardado em metas, D-062 item 4): aceitam valor negativo, e o padrão segue recusando', () => {
+    // Um mês com mais resgates que aportes é um valor negativo de verdade: R$ 1.000,00, -R$ 500,00, R$ 0,00 e R$ 300,00.
+    const months = [100_000, -50_000, 0, 30_000];
+    expect(averageCents(months, { signed: true })).toBe(20_000);
+    expect(medianCents(months, { signed: true })).toBe(15_000);
+    expect(averageCents([100_000, 0, 30_000], { signed: true })).toBe(43_333);
+    expect(medianCents([100_000, 0, 30_000], { signed: true })).toBe(30_000);
+    // O meio centavo vai para longe do zero, como roundDivBig, nos dois sinais.
+    expect(averageCents([1, 2], { signed: true })).toBe(2);
+    expect(averageCents([-1, -2], { signed: true })).toBe(-2);
+    expect(medianCents([-1, -2], { signed: true })).toBe(-2);
+    expect(medianCents([-3, -1, -2, -4], { signed: true })).toBe(-3);
+    // Sem valor negativo, com ou sem a opção, o resultado é o mesmo.
+    expect(averageCents([16_530, 18_000, 17_190], { signed: true })).toBe(averageCents([16_530, 18_000, 17_190]));
+    expect(medianCents([320_000, 340_000, 330_000, 780_000, 345_000, 360_000], { signed: true })).toBe(342_500);
+    // Sem a opção, o negativo continua sendo recusado (a média e a mediana de Aprender não mudam).
+    expect(() => averageCents(months)).toThrow(RangeError);
+    expect(() => medianCents(months)).toThrow(RangeError);
+    expect(() => medianCents(months, {})).toThrow(RangeError);
+    expect(() => medianCents(months, { signed: false })).toThrow(RangeError);
+    // Com a opção, lista vazia, fração e NaN seguem recusados.
+    expect(() => averageCents([], { signed: true })).toThrow(RangeError);
+    expect(() => medianCents([1, 2.5], { signed: true })).toThrow(RangeError);
+    expect(() => medianCents([1, Number.NaN], { signed: true })).toThrow(RangeError);
+  });
+
   it('sacTotals distribui os centavos que sobram nas primeiras amortizações', () => {
     const s = sacTotals(100, 0, 3);
     expect(s.rows.map((r) => r.amortizationCents)).toEqual([34, 33, 33]);

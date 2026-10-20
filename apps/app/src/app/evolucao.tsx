@@ -6,12 +6,18 @@ import {
   EVOLUTION_WINDOWS,
   EvolutionSelectionStore,
   buildEvolutionView,
+  buildPhase3View,
   evolutionAnnouncement,
   evolutionFetchRange,
   evolutionPanel,
   evolutionSelectedMonth,
+  evolutionSubtitle,
+  isPhase3Metric,
   monthOf,
-  type EvolutionMetric,
+  phase3Empty,
+  phase3Panel,
+  type EvolutionPhase3Metric,
+  type EvolutionSelectionMetric,
   type EvolutionView,
   type EvolutionWindow,
   type IsoMonth,
@@ -21,14 +27,14 @@ import { Minus, Plus } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, findNodeHandle, Platform, StyleSheet, View } from 'react-native';
 
-import { CustomComparisonNotice, EvolutionChart, MonthPanelCard, StatsSection, ValuesTable } from '@/components/evolucao-parts';
+import { CustomComparisonNotice, EvolutionChart, MonthPanelCard, Phase3PanelCard, StatsSection, ValuesTable } from '@/components/evolucao-parts';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Button, Card, Chip, Screen, Skeleton, Txt } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
 import { evolutionSelection, useHiddenMonths } from '@/lib/evolution-memory';
-import { useEvolutionGaps, useMonthsOverview, useView, useWork } from '@/state/data';
+import { useEvolutionCommitted, useEvolutionGaps, useEvolutionSavings, useEvolutionWindowMonths, useMonthsOverview, useView, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -41,6 +47,13 @@ const T = EVOLUTION_TEXT;
  * gravado nem enviado (D03). Tela de consulta, com a barra inferior (Movimentos marcada). Lê `months_overview` de uma vez (12 meses
  * até o mês atual) no contexto escolhido; erro nunca mostra dado parcial. O aviso de lacuna em mês fechado de Pago (D04) vem de outra
  * leitura (`useEvolutionGaps`) que a tela não espera: se ela falha, o gráfico sai sem o aviso.
+ *
+ * Fase 3 (D-062 item 4): depois de Recebido e Pago, o seletor tem "Renda comprometida" (o percentual da renda de referência ligado a contas
+ * do mês) e "Guardado em metas" (aportes menos resgates), só de meses já fechados, cada um com a própria base escrita no subtítulo. Eles não
+ * leem `months_overview`: a Renda comprometida lê as contas de cada mês fechado (no máximo 11 leituras por janela, com cache pela chave e
+ * recarga a cada escrita) e a renda de referência, e o Guardado em metas lê as metas e os movimentos de cada mês fechado. Mês sem renda de
+ * referência é "sem base", e mês sem registros fica fora das médias: nunca viram zero. Cada valor tem a própria seleção de meses fora da
+ * comparação (T13). "Entender o que mudou" segue só em Recebido e Pago.
  */
 export default function EvolucaoScreen() {
   const { today, user } = useSession();
@@ -49,7 +62,7 @@ export default function EvolucaoScreen() {
   const work = useWork();
   const contextId = work.data?.contextId;
   const canWrite = work.data?.canWrite ?? true;
-  const [metric, setMetric] = useState<EvolutionMetric>(EVOLUTION_DEFAULT_METRIC);
+  const [metric, setMetric] = useState<EvolutionSelectionMetric>(EVOLUTION_DEFAULT_METRIC);
   const [windowMonths, setWindowMonths] = useState<EvolutionWindow>(EVOLUTION_DEFAULT_WINDOW);
   const [chosen, setChosen] = useState<IsoMonth | null>(null);
   const { from, to } = evolutionFetchRange(currentMonth);
@@ -58,28 +71,48 @@ export default function EvolucaoScreen() {
   const hidden = useHiddenMonths(scope, metric);
   const gapMonths = useEvolutionGaps(contextId);
 
-  const view = useMemo((): EvolutionView | null => {
-    if (!overview.data || overview.isError) return null;
+  // Recebido e Pago leem months_overview; Renda comprometida e Guardado em metas leem só o que o valor escolhido pede (nada é lido antes).
+  const phase3 = isPhase3Metric(metric);
+  const windowMonthsList = useEvolutionWindowMonths(windowMonths);
+  const committed = useEvolutionCommitted(contextId, windowMonthsList, metric === 'comprometida');
+  const savings = useEvolutionSavings(contextId, windowMonthsList, metric === 'guardado');
+  const phase3Points = metric === 'comprometida' ? committed : savings;
+
+  const build = (hiddenMonths: ReadonlySet<IsoMonth>): EvolutionView<EvolutionSelectionMetric> | null => {
+    if (isPhase3Metric(metric)) {
+      return phase3Points.data ? buildPhase3View({ metric, points: phase3Points.data, windowMonths, currentMonth, hiddenMonths }) : null;
+    }
+    return overview.data && !overview.isError ? buildEvolutionView({ overview: overview.data, metric, windowMonths, currentMonth, hiddenMonths, gapMonths }) : null;
+  };
+  const view = useMemo((): EvolutionView<EvolutionSelectionMetric> | null => {
     try {
-      return buildEvolutionView({ overview: overview.data, metric, windowMonths, currentMonth, hiddenMonths: hidden, gapMonths });
+      return build(hidden);
     } catch {
       // Linha que o banco nunca devolveria (valor negativo, mês repetido): erro, nunca um gráfico com dado parcial.
       return null;
     }
-  }, [overview.data, overview.isError, metric, windowMonths, currentMonth, hidden, gapMonths]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overview.data, overview.isError, phase3Points.data, metric, windowMonths, currentMonth, hidden, gapMonths]);
 
-  const loading = work.isPending || (overview.isPending && !overview.isError);
-  const failed = !loading && (work.isError || overview.isError || view === null);
-  const retry = () => (work.isError ? work.refetch() : overview.refetch());
+  const query = phase3 ? phase3Points : overview;
+  const loading = work.isPending || (query.isPending && !query.isError);
+  const failed = !loading && (work.isError || query.isError || view === null);
+  const retry = () => (work.isError ? work.refetch() : query.refetch());
 
   const selected = view ? evolutionSelectedMonth(view, chosen) : null;
-  const panel = view && selected ? evolutionPanel(view, selected, canWrite) : null;
+  // O painel de Recebido e Pago (`evolutionPanel`, só com a visão deles) e o da fase 3 (`phase3Panel`) são diferentes.
+  const cashView = view && !isPhase3Metric(view.metric) ? (view as EvolutionView) : null;
+  const phase3View = view && isPhase3Metric(view.metric) ? (view as EvolutionView<EvolutionPhase3Metric>) : null;
+  const panel = cashView && selected ? evolutionPanel(cashView, selected, canWrite) : null;
+  const panel3 = phase3View && selected ? phase3Panel(phase3View, selected) : null;
 
   // Ao tirar ou pôr um mês, a nova média e mediana são ditas ao leitor de tela (a troca de valor e de meses, não).
+  const subtitle = evolutionSubtitle(metric);
   const [live, setLive] = useState('');
   const announce = (nextHidden: ReadonlySet<IsoMonth>) => {
-    if (!overview.data) return;
-    const text = evolutionAnnouncement(buildEvolutionView({ overview: overview.data, metric, windowMonths, currentMonth, hiddenMonths: nextHidden, gapMonths }));
+    const next = build(nextHidden);
+    if (!next) return;
+    const text = evolutionAnnouncement(next);
     setLive(text);
     announceOnIOS(text, { queue: true });
   };
@@ -122,7 +155,7 @@ export default function EvolucaoScreen() {
     setViewMonth(month);
     router.push(href as Href);
   };
-  const pickMetric = (m: EvolutionMetric) => {
+  const pickMetric = (m: EvolutionSelectionMetric) => {
     setLive('');
     setMetric(m);
   };
@@ -135,7 +168,14 @@ export default function EvolucaoScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title={T.title} right={<ContextPill label="Pessoal" />} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
-        <Txt color={colors.textSecondary}>{T.subtitle}</Txt>
+        <View style={{ gap: space[1] }}>
+          <Txt color={colors.textSecondary}>{subtitle.base}</Txt>
+          {subtitle.note ? (
+            <Txt variant="caption" color={colors.textSecondary}>
+              {subtitle.note}
+            </Txt>
+          ) : null}
+        </View>
 
         <View style={{ gap: space[3] }}>
           <View style={styles.filters} accessibilityRole="radiogroup" accessibilityLabel={T.metricGroup}>
@@ -156,11 +196,13 @@ export default function EvolucaoScreen() {
             <Skeleton width="100%" height={220} />
             <Skeleton width="100%" height={120} />
           </View>
-        ) : failed || !view || !panel || !selected ? (
+        ) : failed || !view || !selected || !(panel || panel3) ? (
           <Card>
             <ErrorState message={T.loadError} retryLabel={T.retry} onRetry={retry} />
           </Card>
-        ) : view.situation === 'sem_registros' ? (
+        ) : phase3View && view.situation === 'sem_registros' ? (
+          <Phase3EmptyCard view={phase3View} canWrite={canWrite} currentMonth={currentMonth} />
+        ) : !phase3View && view.situation === 'sem_registros' && (metric === 'recebido' || metric === 'pago') ? (
           <Card>
             <EmptyState
               title={T.states.noRecordsTitle}
@@ -181,15 +223,19 @@ export default function EvolucaoScreen() {
             <Card style={styles.chartCard}>
               <EvolutionChart view={view} selected={selected} onSelect={setChosen} />
             </Card>
-            <MonthPanelCard
-              panel={panel}
-              contextId={contextId}
-              headRef={panelHead}
-              onStep={step}
-              onToggle={(included) => toggle(panel.month, included)}
-              onSeeRecords={() => open(panel.recordsHref, panel.month)}
-              onSeeCategories={() => open(panel.categoriesHref, panel.month)}
-            />
+            {panel ? (
+              <MonthPanelCard
+                panel={panel}
+                contextId={contextId}
+                headRef={panelHead}
+                onStep={step}
+                onToggle={(included) => toggle(panel.month, included)}
+                onSeeRecords={() => open(panel.recordsHref, panel.month)}
+                onSeeCategories={() => open(panel.categoriesHref, panel.month)}
+              />
+            ) : panel3 ? (
+              <Phase3PanelCard panel={panel3} headRef={panelHead} onStep={step} onToggle={(included) => toggle(panel3.month, included)} />
+            ) : null}
             {view.outCount > 0 ? <CustomComparisonNotice view={view} onRestore={restore} /> : null}
             <StatsSection view={view} onRestore={restore} />
             <ValuesTable view={view} selected={selected} onPick={pickFromTable} />
@@ -204,6 +250,26 @@ export default function EvolucaoScreen() {
         </View>
       </Screen>
     </View>
+  );
+}
+
+/**
+ * Renda comprometida ou Guardado em metas sem nenhum mês fechado com valor (fase 3): "Sem base para estes meses" (sem renda de referência),
+ * "Sem registros nestes meses" (sem conta anotada ou sem meta ativa) e, com escrita no contexto, o botão que leva a criar a base.
+ */
+function Phase3EmptyCard({ view, canWrite, currentMonth }: { view: EvolutionView<EvolutionPhase3Metric>; canWrite: boolean; currentMonth: IsoMonth }) {
+  const empty = phase3Empty(view, canWrite);
+  const go = (kind: 'referencia' | 'conta' | 'meta') => {
+    if (kind === 'referencia') router.push({ pathname: '/renda-comprometida/referencia', params: { mes: currentMonth } });
+    else if (kind === 'conta') router.push('/a-pagar/nova');
+    else router.push('/meta/nova');
+  };
+  return (
+    <Card>
+      <EmptyState title={empty.title} action={empty.action ? <Button label={empty.action.label} icon={Plus} onPress={() => go(empty.action!.kind)} /> : undefined}>
+        {empty.body}
+      </EmptyState>
+    </Card>
   );
 }
 

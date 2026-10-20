@@ -1,19 +1,23 @@
 import {
   EVOLUTION_TEXT,
   evolutionTopCategories,
+  formatPermille,
   type CategoryShare,
   type EvolutionExplainPlan,
   type EvolutionMetric,
   type EvolutionPanel,
   type EvolutionPointView,
+  type EvolutionSelectionMetric,
   type EvolutionView,
   type IsoMonth,
+  type Phase3Panel,
 } from '@clarevo/core';
-import { Ban, Check, ChartLine, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleAlert, Hourglass, Minus, RotateCcw, type LucideIcon } from 'lucide-react-native';
+import { Ban, Check, ChartLine, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleAlert, CircleOff, Hourglass, Minus, RotateCcw, type LucideIcon } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useState, type Ref } from 'react';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 
+import { FitText } from '@/components/committed-parts';
 import { MoneyTxt } from '@/components/money-text';
 import { MonthCheckBlock } from '@/components/month-check';
 import { SettingSwitch } from '@/components/setting-switch';
@@ -25,6 +29,9 @@ import { useCategoryBreakdown, useEvolutionExplanation, useReceivedBreakdown } f
 import { colors, fonts, space, tabular } from '@/theme/tokens';
 
 const T = EVOLUTION_TEXT;
+
+/** A visão do gráfico, da comparação e da tabela, de qualquer valor mostrado (Recebido, Pago, Renda comprometida ou Guardado em metas). */
+type AnyView = EvolutionView<EvolutionSelectionMetric>;
 
 /** Esconde de leitores de tela o que só desenha (o botão de cada mês, a tabela e os textos já dizem tudo). */
 const decorative = { accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants', 'aria-hidden': true } as const;
@@ -76,6 +83,7 @@ const AXIS_ICON: Record<EvolutionPointView['participation'], LucideIcon | null> 
   fora_escolha: Ban,
   fora_andamento: Hourglass,
   fora_sem_registros: Minus,
+  fora_sem_base: CircleOff,
 };
 
 /**
@@ -85,8 +93,11 @@ const AXIS_ICON: Record<EvolutionPointView['participation'], LucideIcon | null> 
  * linha é interrompida nos dois lados de todo mês fora da comparação: nunca atravessa o intervalo. A escala parte do zero e não muda
  * com a seleção, então o ponto de um mês volta ao mesmo lugar. Nada depende só de cor: o ponto vazio, o ícone sob o mês e a
  * legenda dizem o mesmo que as cores. Com valores ocultos, o gráfico some com os números e o leitor de tela diz "valor oculto".
+ * Fase 3 (D-062 item 4): na Renda comprometida os valores são percentuais (que seguem à vista com valores ocultos); no Guardado em metas
+ * o mês pode ficar abaixo do zero (mais resgates que aportes), então a escala vai do menor valor ao maior e a linha do zero é desenhada.
+ * O mês em andamento e o mês sem base ou sem registros não têm valor e viram um traço na linha de base, com o ícone do eixo.
  */
-export function EvolutionChart({ view, selected, onSelect }: { view: EvolutionView; selected: IsoMonth; onSelect: (month: IsoMonth) => void }) {
+export function EvolutionChart({ view, selected, onSelect }: { view: AnyView; selected: IsoMonth; onSelect: (month: IsoMonth) => void }) {
   const hiddenValues = useValuesHidden();
   const { fontScale } = useWindowDimensions();
   const [width, setWidth] = useState(0);
@@ -97,7 +108,12 @@ export function EvolutionChart({ view, selected, onSelect }: { view: EvolutionVi
   const letters = width > 0 && step < 24 * fontScale;
   const usable = BASE_Y - PAD_TOP;
   const xOf = (i: number) => (i + 0.5) * step;
-  const yOf = (cents: number) => BASE_Y - (view.maxCents > 0 ? cents / view.maxCents : 0) * usable;
+  // A escala vai de minCents (0, ou o menor mês do Guardado em metas) a maxCents; sem mês negativo é a de sempre, que parte do zero.
+  const range = view.maxCents - view.minCents;
+  const belowZero = view.minCents < 0;
+  // Com mês abaixo do zero, o menor valor fica um pouco acima da linha de base, onde moram os traços dos meses sem valor.
+  const floor = belowZero ? 2 * R_POINT : 0;
+  const yOf = (cents: number) => BASE_Y - floor - (range > 0 ? (cents - view.minCents) / range : 0) * (usable - floor);
 
   // Trechos de linha: só entre meses vizinhos que entram na comparação.
   const runs: string[] = [];
@@ -121,11 +137,22 @@ export function EvolutionChart({ view, selected, onSelect }: { view: EvolutionVi
         <Txt variant="caption" color={colors.textSecondary}>
           {T.chart.span(view.from, view.to)}
         </Txt>
-        {hiddenValues || view.maxCents <= 0 ? null : (
+        {view.unit === 'permille' ? (
+          view.maxCents <= 0 ? null : (
+            <Txt variant="caption" color={colors.textSecondary} style={tabular}>
+              {T.chart.maxPercent(formatPermille(view.maxCents, 1))}
+            </Txt>
+          )
+        ) : hiddenValues || view.maxCents <= 0 ? null : (
           <Txt variant="caption" color={colors.textSecondary} style={tabular}>
             {T.chart.maxValue(view.maxCents)}
           </Txt>
         )}
+        {belowZero ? (
+          <Txt variant="caption" color={colors.textSecondary}>
+            {T.chart.zeroNote}
+          </Txt>
+        ) : null}
       </View>
       <View role="group" accessibilityLabel={T.chart.group} onLayout={(e) => setWidth(Math.floor(e.nativeEvent.layout.width))} style={styles.chart}>
         <View style={styles.columns}>
@@ -137,11 +164,12 @@ export function EvolutionChart({ view, selected, onSelect }: { view: EvolutionVi
           <Svg width={width} height={PLOT_HEIGHT} style={styles.plot} pointerEvents="none" accessible={false} {...decorative}>
             <Line x1={0} y1={BASE_Y + 0.5} x2={width} y2={BASE_Y + 0.5} stroke={colors.borderStrong} strokeWidth={1} />
             <Line x1={0} y1={PAD_TOP + 0.5} x2={width} y2={PAD_TOP + 0.5} stroke={colors.border} strokeWidth={1} />
+            {belowZero ? <Line x1={0} y1={yOf(0)} x2={width} y2={yOf(0)} stroke={colors.text} strokeWidth={1.5} /> : null}
             {runs.map((d) => (
               <Path key={d} d={d} stroke={colors.brand} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" fill="none" />
             ))}
-            {points.map((p, i) => (p.month === selected ? null : <Marker key={p.month} point={p} x={xOf(i)} y={p.state === 'sem_registros' ? BASE_Y : yOf(p.cents)} />))}
-            {points.map((p, i) => (p.month === selected ? <Marker key={p.month} point={p} x={xOf(i)} y={p.state === 'sem_registros' ? BASE_Y : yOf(p.cents)} selected /> : null))}
+            {points.map((p, i) => (p.month === selected ? null : <Marker key={p.month} point={p} x={xOf(i)} y={p.hasValue ? yOf(p.cents) : BASE_Y} />))}
+            {points.map((p, i) => (p.month === selected ? <Marker key={p.month} point={p} x={xOf(i)} y={p.hasValue ? yOf(p.cents) : BASE_Y} selected /> : null))}
           </Svg>
         ) : null}
       </View>
@@ -152,7 +180,7 @@ export function EvolutionChart({ view, selected, onSelect }: { view: EvolutionVi
 
 /** O ponto de um mês: azul cheio (na comparação), vazio (fora), traço na base (sem registros) e lima com contorno (escolhido). */
 function Marker({ point, x, y, selected }: { point: EvolutionPointView; x: number; y: number; selected?: boolean }) {
-  const none = point.state === 'sem_registros';
+  const none = !point.hasValue;
   if (selected) {
     return (
       <>
@@ -204,16 +232,17 @@ function MonthColumn({
 }
 
 /** Legenda em texto, só do que aparece no gráfico: o mesmo desenho do ponto e do ícone do eixo, com o nome. */
-function Legend({ view }: { view: EvolutionView }) {
+function Legend({ view }: { view: AnyView }) {
   const has = (participation: EvolutionPointView['participation']) => view.points.some((p) => p.participation === participation);
   const items: { key: string; label: string; swatch: ReturnType<typeof Swatch> }[] = [];
   if (has('na_comparacao')) items.push({ key: 'in', label: T.legend.included, swatch: <Swatch kind="included" /> });
   if (has('fora_escolha')) items.push({ key: 'out', label: T.legend.excluded, swatch: <Swatch kind="excluded" icon={Ban} /> });
   if (has('fora_andamento')) items.push({ key: 'andamento', label: T.legend.inProgress, swatch: <Swatch kind="excluded" icon={Hourglass} /> });
   if (view.points.some((p) => p.state === 'zero_confirmado' && p.included)) {
-    items.push({ key: 'conferido', label: T.legend.zeroConfirmed, swatch: <Swatch kind="included" icon={Check} /> });
+    items.push({ key: 'conferido', label: view.metric === 'guardado' ? T.legend.zeroSaved : T.legend.zeroConfirmed, swatch: <Swatch kind="included" icon={Check} /> });
   }
   if (has('fora_sem_registros')) items.push({ key: 'sem', label: T.legend.noRecords, swatch: <Swatch kind="none" icon={Minus} /> });
+  if (has('fora_sem_base')) items.push({ key: 'sem-base', label: T.legend.noBase, swatch: <Swatch kind="none" icon={CircleOff} /> });
   items.push({ key: 'sel', label: T.legend.selected, swatch: <Swatch kind="selected" /> });
   return (
     <View style={styles.legend}>
@@ -276,27 +305,7 @@ export function MonthPanelCard({
   const v = panel.variation;
   return (
     <Card style={{ gap: space[3] }}>
-      <View style={styles.panelHead}>
-        <StepButton
-          label={T.panel.previous}
-          hint={panel.previousMonth ? T.panel.stepHint(panel.previousMonth) : undefined}
-          icon={ChevronLeft}
-          disabled={panel.previousMonth === null}
-          onPress={() => panel.previousMonth && onStep(panel.previousMonth)}
-        />
-        <View ref={headRef} tabIndex={-1} accessible accessibilityRole="header" aria-level={2} style={styles.panelTitle}>
-          <Txt variant="title" style={{ textAlign: 'center' }}>
-            {panel.title}
-          </Txt>
-        </View>
-        <StepButton
-          label={T.panel.next}
-          hint={panel.nextMonth ? T.panel.stepHint(panel.nextMonth) : undefined}
-          icon={ChevronRight}
-          disabled={panel.nextMonth === null}
-          onPress={() => panel.nextMonth && onStep(panel.nextMonth)}
-        />
-      </View>
+      <PanelHead title={panel.title} previousMonth={panel.previousMonth} nextMonth={panel.nextMonth} headRef={headRef} onStep={onStep} />
       <View style={{ gap: space[1] }}>
         <Txt variant="caption" color={colors.textSecondary} style={{ fontFamily: fonts.bold }}>
           {panel.valueCaption}
@@ -356,6 +365,104 @@ export function MonthPanelCard({
           onPress={onSeeRecords}
         />
       ) : null}
+    </Card>
+  );
+}
+
+/** O cabeçalho do painel: o mês e o ano no meio, com "Mês anterior" e "Mês seguinte" (alvos de 44 px). O título recebe o foco (`headRef`). */
+function PanelHead({
+  title,
+  previousMonth,
+  nextMonth,
+  headRef,
+  onStep,
+}: {
+  title: string;
+  previousMonth: IsoMonth | null;
+  nextMonth: IsoMonth | null;
+  headRef: Ref<View>;
+  onStep: (month: IsoMonth) => void;
+}) {
+  return (
+    <View style={styles.panelHead}>
+      <StepButton
+        label={T.panel.previous}
+        hint={previousMonth ? T.panel.stepHint(previousMonth) : undefined}
+        icon={ChevronLeft}
+        disabled={previousMonth === null}
+        onPress={() => previousMonth && onStep(previousMonth)}
+      />
+      <View ref={headRef} tabIndex={-1} accessible accessibilityRole="header" aria-level={2} style={styles.panelTitle}>
+        <Txt variant="title" style={{ textAlign: 'center' }}>
+          {title}
+        </Txt>
+      </View>
+      <StepButton
+        label={T.panel.next}
+        hint={nextMonth ? T.panel.stepHint(nextMonth) : undefined}
+        icon={ChevronRight}
+        disabled={nextMonth === null}
+        onPress={() => nextMonth && onStep(nextMonth)}
+      />
+    </View>
+  );
+}
+
+/**
+ * Painel do mês escolhido na Renda comprometida e no Guardado em metas (D-062 item 4): o mês e o ano (com "Mês anterior" e "Mês seguinte"),
+ * o valor (percentual ou em reais) ou o motivo de não haver ("Sem base", "Sem registros", "Mês em andamento"), o estado, a base da conta,
+ * "Entender o que mudou" com a frase "Disponível para Recebido e Pago" e o interruptor "Mostrar este mês na comparação" (só no mês
+ * fechado com valor). Nada é lido nem gravado aqui: tirar um mês da comparação só muda a média, a mediana e o desenho.
+ */
+export function Phase3PanelCard({
+  panel,
+  headRef,
+  onStep,
+  onToggle,
+}: {
+  panel: Phase3Panel;
+  headRef: Ref<View>;
+  onStep: (month: IsoMonth) => void;
+  onToggle: (included: boolean) => void;
+}) {
+  return (
+    <Card style={{ gap: space[3] }}>
+      <PanelHead title={panel.title} previousMonth={panel.previousMonth} nextMonth={panel.nextMonth} headRef={headRef} onStep={onStep} />
+      <View style={{ gap: space[1] }}>
+        <Txt variant="caption" color={colors.textSecondary} style={{ fontFamily: fonts.bold }}>
+          {panel.valueCaption}
+        </Txt>
+        {panel.valueText !== null ? (
+          panel.unit === 'permille' ? (
+            <FitText text={panel.valueText} maxSize={32} minSize={22} />
+          ) : (
+            <FitMoney cents={panel.cents} maxSize={32} minSize={22} />
+          )
+        ) : (
+          <Txt variant="amount" accessibilityRole="header" aria-level={3}>
+            {panel.noValueText}
+          </Txt>
+        )}
+        <Txt color={colors.textSecondary}>{panel.stateText}</Txt>
+        <Txt variant="caption" color={colors.textSecondary}>
+          {panel.baseText}
+        </Txt>
+      </View>
+
+      <View style={styles.block}>
+        <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={3}>
+          {panel.explainTitle}
+        </Txt>
+        <Txt color={colors.textSecondary}>{panel.explainNote}</Txt>
+      </View>
+
+      <View style={styles.block}>
+        {panel.canToggle ? (
+          <SettingSwitch label={T.panel.switchLabel} caption={panel.switchCaption} value={panel.included} onChange={onToggle} />
+        ) : (
+          <Txt color={colors.textSecondary}>{panel.notEligibleText ?? ''}</Txt>
+        )}
+      </View>
     </Card>
   );
 }
@@ -633,7 +740,7 @@ function ExplainBody({
 // ---------------------------------------------------------------------------------------------------------------------
 
 /** O aviso fixo de comparação personalizada (tela C): quantos meses estão fora, quais e "Restaurar todos". */
-export function CustomComparisonNotice({ view, onRestore }: { view: EvolutionView; onRestore: () => void }) {
+export function CustomComparisonNotice({ view, onRestore }: { view: AnyView; onRestore: () => void }) {
   return (
     <View style={styles.notice}>
       <Txt style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={2}>
@@ -652,7 +759,7 @@ export function CustomComparisonNotice({ view, onRestore }: { view: EvolutionVie
  * meses fora, a média e a mediana não aparecem (nunca R$ 0,00) e a tela pede ao menos um mês; só com o mês em andamento, diz que
  * ainda não há mês fechado. O total soma todos os meses do gráfico.
  */
-export function StatsSection({ view, onRestore }: { view: EvolutionView; onRestore: () => void }) {
+export function StatsSection({ view, onRestore }: { view: AnyView; onRestore: () => void }) {
   const { width, fontScale } = useWindowDimensions();
   const stacked = fontScale > 1.3 || width < 300;
   const s = view.stats;
@@ -673,11 +780,11 @@ export function StatsSection({ view, onRestore }: { view: EvolutionView; onResto
           </Txt>
           <Txt color={colors.textSecondary}>{T.states.noClosedBody}</Txt>
         </Card>
-      ) : s.average !== null && s.median !== null ? (
+      ) : s.average !== null && s.median !== null && view.averageText !== null && view.medianText !== null ? (
         <>
           <View style={styles.statsRow}>
-            <StatCard title={T.stats.average} cents={s.average} caption={T.stats.ofMonths(s.visibleCount, view.eligibleCount)} stacked={stacked} />
-            <StatCard title={T.stats.median} cents={s.median} caption={T.stats.ofMonths(s.visibleCount, view.eligibleCount)} stacked={stacked} />
+            <StatCard title={T.stats.average} cents={s.average} text={view.averageText} unit={view.unit} caption={T.stats.ofMonths(s.visibleCount, view.eligibleCount)} stacked={stacked} />
+            <StatCard title={T.stats.median} cents={s.median} text={view.medianText} unit={view.unit} caption={T.stats.ofMonths(s.visibleCount, view.eligibleCount)} stacked={stacked} />
           </View>
           {/* D-062: o "O que é isso?" da mediana abre no lugar o resumo do tema de Aprender e leva à explicação completa. */}
           <TermHint term="Mediana" slug="media-e-mediana" label={T.stats.whatIsMedian} />
@@ -688,26 +795,29 @@ export function StatsSection({ view, onRestore }: { view: EvolutionView; onResto
           ) : null}
         </>
       ) : null}
-      <Card style={{ gap: space[1], padding: space[4] }}>
-        <Txt variant="caption" color={colors.textSecondary} style={{ fontFamily: fonts.bold }}>
-          {T.stats.total}
-        </Txt>
-        <Money cents={view.totalCents} variant="label" style={styles.statValue} />
-        <Txt variant="caption" color={colors.textSecondary}>
-          {T.stats.totalNote}
-        </Txt>
-      </Card>
+      {view.totalCents !== null ? (
+        <Card style={{ gap: space[1], padding: space[4] }}>
+          <Txt variant="caption" color={colors.textSecondary} style={{ fontFamily: fonts.bold }}>
+            {T.stats.total}
+          </Txt>
+          <Money cents={view.totalCents} variant="label" style={styles.statValue} />
+          <Txt variant="caption" color={colors.textSecondary}>
+            {T.stats.totalNote}
+          </Txt>
+        </Card>
+      ) : null}
     </View>
   );
 }
 
-function StatCard({ title, cents, caption, stacked }: { title: string; cents: number; caption: string; stacked: boolean }) {
+/** Um cartão de média ou mediana: em reais, com a regra de valores ocultos; em percentual (Renda comprometida), o texto à vista. */
+function StatCard({ title, cents, text, unit, caption, stacked }: { title: string; cents: number; text: string; unit: 'cents' | 'permille'; caption: string; stacked: boolean }) {
   return (
     <Card style={[styles.stat, stacked && { flexBasis: '100%' }]}>
       <Txt variant="caption" color={colors.textSecondary} style={{ fontFamily: fonts.bold }}>
         {title}
       </Txt>
-      <FitMoney cents={cents} maxSize={22} minSize={14} />
+      {unit === 'permille' ? <FitText text={text} maxSize={22} minSize={14} /> : <FitMoney cents={cents} maxSize={22} minSize={14} />}
       <Txt variant="caption" color={colors.textSecondary}>
         {caption}
       </Txt>
@@ -725,7 +835,7 @@ function StatCard({ title, cents, caption, stacked }: { title: string; cents: nu
  * e leva o foco ao painel: é o caminho de toque largo com 12 meses, em que a coluna do gráfico fica estreita. Começa fechada; a
  * escolha de abrir vale só enquanto a tela está aberta.
  */
-export function ValuesTable({ view, selected, onPick }: { view: EvolutionView; selected: IsoMonth; onPick: (month: IsoMonth) => void }) {
+export function ValuesTable({ view, selected, onPick }: { view: AnyView; selected: IsoMonth; onPick: (month: IsoMonth) => void }) {
   const [open, setOpen] = useState(false);
   const hidden = useValuesHidden();
   return (
@@ -757,7 +867,11 @@ export function ValuesTable({ view, selected, onPick }: { view: EvolutionView; s
                   <Txt variant="label" style={{ fontFamily: fonts.bold, flexShrink: 1 }}>
                     {p.title}
                   </Txt>
-                  {p.valueText !== null ? (
+                  {p.valueText !== null && view.unit === 'permille' ? (
+                    <Txt variant="label" style={[styles.tableValue, tabular, { flexShrink: 0 }]}>
+                      {p.valueText}
+                    </Txt>
+                  ) : p.valueText !== null ? (
                     <Money cents={p.cents} variant="label" style={[styles.tableValue, { flexShrink: 0 }]} />
                   ) : (
                     <Txt variant="label" color={colors.textSecondary} style={{ flexShrink: 0 }}>
@@ -772,7 +886,7 @@ export function ValuesTable({ view, selected, onPick }: { view: EvolutionView; s
             </View>
           ))}
           <Txt variant="caption" color={colors.textSecondary}>
-            {T.table.note}
+            {view.totalCents === null ? T.table.noteNoTotal : T.table.note}
           </Txt>
         </View>
       ) : null}
