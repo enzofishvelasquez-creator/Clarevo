@@ -1,13 +1,17 @@
 import {
   BENEFIT_PLAN_LABEL,
+  COMPANY_REPORT_TEXT,
   COMPANY_TEXT,
   LICENSE_FILTERS,
   LICENSE_FILTER_LABEL,
   LICENSE_KIND_LABEL,
+  buildCompanyReport,
+  buildCompanyReportFile,
   buildInviteCsv,
   buildInviteListText,
   companyErrorText,
   contractState,
+  currentContract,
   dayOf,
   deviceTimeZone,
   filterLicenses,
@@ -22,21 +26,24 @@ import {
   seatsOf,
   type BenefitContract,
   type CompanyOverview,
+  type CompanyReportFormat,
   type InviteLinkRow,
   type IsoDate,
   type License,
   type LicenseFilter,
   type LicenseKind,
 } from '@clarevo/core';
-import { Check, CircleAlert, Copy, Download, Plus } from 'lucide-react-native';
+import { Check, CircleAlert, Copy, Download, FileText, Plus } from 'lucide-react-native';
 import { useMemo, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ConfirmDialog } from '@/components/dialog';
-import { ChoiceGroup } from '@/components/series-parts';
+import { CheckOption, ChoiceGroup } from '@/components/series-parts';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Banner, Button, Card, Chip, TextField, Txt } from '@/components/ui';
 import { CAN_DOWNLOAD, downloadTextFile } from '@/lib/company-file';
+import { EXPORT_LOGO_SVG } from '@/lib/export-logo';
+import { deliverExportFile } from '@/lib/export-share';
 import { CAN_COPY, copyInvite, inviteBaseUrl } from '@/lib/invite-share';
 import {
   useCancelLicenseInvite,
@@ -49,6 +56,7 @@ import { attemptFamily, useFamilyKeys } from '@/state/family';
 import { colors, fonts, space } from '@/theme/tokens';
 
 const T = COMPANY_TEXT;
+const R = COMPANY_REPORT_TEXT;
 
 type Notice = { tone: 'sucesso' | 'erro'; text: string } | null;
 
@@ -513,6 +521,84 @@ export function UsageCard({ organizationId }: { organizationId: string }) {
       <Txt variant="label" style={{ marginTop: space[2] }}>
         {T.privacy}
       </Txt>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Relatório de adesão (D-062)
+// ---------------------------------------------------------------------------
+
+/**
+ * "Relatório de adesão": o resumo do benefício para levar ao RH, em planilha (CSV) ou em PDF (a página de impressão que a exportação
+ * D-047 também usa). Usa só o que o painel já leu: o nome, o contrato, as licenças e as quatro contagens de `organization_usage`; a
+ * lista de licenças só entra se a caixa estiver marcada. O arquivo é montado no navegador, sem escrita e sem guardar cópia.
+ */
+export function ReportCard({ company, today }: { company: CompanyOverview; today: IsoDate }) {
+  const usage = useCompanyUsage(company.organization.id);
+  const [includeList, setIncludeList] = useState(false);
+  const [busy, setBusy] = useState<CompanyReportFormat | null>(null);
+  const [notice, setNotice] = useState<Notice>(null);
+  if (!CAN_DOWNLOAD) return null;
+
+  // O PDF abre uma janela: tudo antes de entregar o arquivo é síncrono, para o navegador ligar a janela ao toque.
+  async function download(format: CompanyReportFormat) {
+    if (busy || !usage.data) return;
+    setBusy(format);
+    setNotice(null);
+    try {
+      const report = buildCompanyReport({
+        organization: company.organization,
+        demo: company.demo,
+        contract: currentContract(company.contracts, today),
+        usage: usage.data,
+        licenses: includeList ? company.licenses : null,
+        generatedOn: today,
+        timeZone: deviceTimeZone(),
+      });
+      const file = buildCompanyReportFile(report, format, { logoSvg: EXPORT_LOGO_SVG });
+      const r = await deliverExportFile(file, R.cardTitle);
+      setNotice(
+        r === 'ok'
+          ? { tone: 'sucesso', text: format === 'pdf' ? R.pdfOpened : R.csvDone }
+          : { tone: 'erro', text: r === 'bloqueado' ? R.popupBlocked : R.failed },
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Card style={{ gap: space[3] }}>
+      <SectionTitle>{R.cardTitle}</SectionTitle>
+      <Txt variant="caption" color={colors.textSecondary}>
+        {R.cardIntro}
+      </Txt>
+      <NoticeBanner notice={notice} />
+      <CheckOption
+        label={R.includeLabel}
+        hint={R.includeHint}
+        checked={includeList}
+        onPress={() => {
+          setIncludeList((v) => !v);
+          setNotice(null);
+        }}
+      />
+      {includeList ? (
+        <Txt variant="caption" color={colors.textSecondary}>
+          {R.includeNote}
+        </Txt>
+      ) : null}
+      {usage.isError ? (
+        <ErrorState message={R.usageFailed} onRetry={() => usage.refetch()} />
+      ) : !usage.data ? (
+        <LoadingState label={R.usageLoading} />
+      ) : (
+        <View style={{ gap: space[2] }}>
+          <Button label={R.csvButton} icon={Download} busy={busy === 'csv'} busyLabel={T.loadingAction} disabled={busy !== null} onPress={() => download('csv')} />
+          <Button label={R.pdfButton} icon={FileText} tone="soft" busy={busy === 'pdf'} busyLabel={T.loadingAction} disabled={busy !== null} onPress={() => download('pdf')} />
+        </View>
+      )}
     </Card>
   );
 }

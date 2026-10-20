@@ -433,7 +433,8 @@ export function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-const PDF_STYLE = `
+/** A folha de estilo da página de impressão (A4, logotipo e tabelas). O relatório do RH (D-062) usa a mesma. */
+export const PDF_STYLE = `
 @page { size: A4; margin: 14mm; }
 * { box-sizing: border-box; }
 body { font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #17223B; font-size: 11px; line-height: 1.4; margin: 0; }
@@ -534,6 +535,9 @@ export function exportReportHtml(report: ExportReport, options: { logoSvg?: stri
 // ---------------------------------------------------------------------------
 
 export type ExportFileId = 'lancamentos' | 'compras' | 'resumo';
+
+/** O que a entrega do arquivo precisa (CSV baixado ou HTML da página de impressão): o relatório do RH (D-062) usa o mesmo caminho. */
+export type ExportDeliverable = Pick<ExportFile, 'fileName' | 'mime' | 'kind' | 'content'>;
 
 export interface ExportFile {
   id: ExportFileId;

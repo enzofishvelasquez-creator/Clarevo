@@ -27,6 +27,7 @@ import {
   companyTextSamples,
   contractIsOpen,
   contractState,
+  currentContract,
   filterLicenses,
   inviteCsvFileName,
   inviteLinkRows,
@@ -201,6 +202,26 @@ describe('Empresas: vigência, situações e filtros', () => {
     expect(contractState(c, '2026-09-30')).toBe('futuro');
     expect(contractState(c, '2026-10-15')).toBe('vigente');
     expect(contractState(c, '2026-11-01')).toBe('encerrado');
+  });
+
+  it('o contrato da tela e do relatório é o vigente no dia, e não o mais antigo da lista', () => {
+    const first = contract({ id: 'ct-1', startsOn: '2025-01-01', endsOn: '2025-12-31' });
+    const renewed = contract({ id: 'ct-2', startsOn: '2026-01-01', endsOn: null });
+    // Contrato renovado: o primeiro terminou e o segundo vale, em qualquer ordem da lista.
+    expect(currentContract([first, renewed], '2026-10-20')?.id).toBe('ct-2');
+    expect(currentContract([renewed, first], '2026-10-20')?.id).toBe('ct-2');
+    // Vigente com fim no futuro (inclusive no último dia).
+    const ending = contract({ id: 'ct-3', startsOn: '2026-01-01', endsOn: '2026-12-31' });
+    expect(currentContract([first, ending], '2026-10-20')?.id).toBe('ct-3');
+    expect(currentContract([first, ending], '2026-12-31')?.id).toBe('ct-3');
+    // Todos vencidos: o de início mais recente.
+    const old = contract({ id: 'ct-4', startsOn: '2024-01-01', endsOn: '2024-12-31' });
+    expect(currentContract([old, first], '2026-10-20')?.id).toBe('ct-1');
+    expect(currentContract([first, old], '2026-10-20')?.id).toBe('ct-1');
+    // Um só contrato, vigente ou não, e nenhum.
+    expect(currentContract([renewed], '2026-10-20')?.id).toBe('ct-2');
+    expect(currentContract([first], '2026-10-20')?.id).toBe('ct-1');
+    expect(currentContract([], '2026-10-20')).toBeNull();
   });
 
   it('a situação na tela: o convite cancelado é dito à parte; a contagem junta cancelados e encerrados', () => {
@@ -406,7 +427,7 @@ describe('Empresas: telas do app (lidas como código-fonte)', () => {
 
   it('o card "Uso do app" mostra só as quatro contagens de licenças: nada de entradas no app, de acesso nem de pessoas', () => {
     const panel = appFile('components/company-panel.tsx');
-    const card = panel.slice(panel.indexOf('export function UsageCard'), panel.indexOf('// Textos para divulgar'));
+    const card = panel.slice(panel.indexOf('export function UsageCard'), panel.indexOf('// Relatório de adesão (D-062)'));
     expect(card.length).toBeGreaterThan(300);
     for (const label of ['usageSeats', 'usageInvited', 'usageActive', 'usageEnded']) expect(card, label).toContain(`T.${label}`);
     expect((card.match(/<Row /g) ?? []).length).toBe(4);

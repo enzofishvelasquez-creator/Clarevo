@@ -16,6 +16,7 @@ export * from './family';
 export * from './deletion';
 export * from './memory-company';
 export * from './company';
+export * from './company-report';
 export * from './demo';
 export * from './demo-badge';
 export * from './learn';

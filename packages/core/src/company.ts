@@ -250,6 +250,15 @@ export function contractState(contract: Pick<BenefitContract, 'startsOn' | 'ends
   return contract.endsOn !== null && contract.endsOn < day ? 'encerrado' : 'vigente';
 }
 
+/**
+ * O contrato que vale para a tela e para o relatório no dia: o vigente (se houver mais de um, o de início mais recente, que é o
+ * renovado). Sem contrato vigente, o de início mais recente. Não depende da ordem da lista. Sem contrato nenhum, `null`.
+ */
+export function currentContract<T extends Pick<BenefitContract, 'startsOn' | 'endsOn'>>(contracts: readonly T[], day: IsoDate): T | null {
+  const latest = (list: readonly T[]): T | null => list.reduce<T | null>((best, c) => (best === null || c.startsOn > best.startsOn ? c : best), null);
+  return latest(contracts.filter((c) => contractIsOpen(c, day))) ?? latest(contracts);
+}
+
 /** A licença ocupa vaga: convidada ou ativa. */
 export function licenseUsesSeat(license: Pick<License, 'status'>): boolean {
   return license.status === 'convidada' || license.status === 'ativa';

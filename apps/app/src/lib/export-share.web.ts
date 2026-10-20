@@ -1,8 +1,9 @@
 /**
  * Versão web de `export-share.ts` (D-047): o CSV é baixado por Blob e o resumo abre uma página de impressão com o mesmo HTML
- * (a pessoa escolhe "Salvar como PDF"). Os pacotes nativos ficam fora do site. Nada vai ao servidor e nada é guardado.
+ * (a pessoa escolhe "Salvar como PDF"). Os pacotes nativos ficam fora do site. Nada vai ao servidor e nada é guardado. O relatório do
+ * RH (D-062) entrega o CSV e a página de impressão por aqui também.
  */
-import type { ExportFile } from '@clarevo/core';
+import type { ExportDeliverable } from '@clarevo/core';
 
 import type { DeliverResult } from './export-share';
 
@@ -13,7 +14,7 @@ export const EXPORT_NATIVE = false;
 /** Na web não há cópia temporária: o CSV baixa por Blob e a página de impressão não grava nada. */
 export function cleanupExportFiles(): void {}
 
-export async function deliverExportFile(file: ExportFile, _dialogTitle: string): Promise<DeliverResult> {
+export async function deliverExportFile(file: ExportDeliverable, _dialogTitle: string): Promise<DeliverResult> {
   try {
     if (file.kind === 'csv') {
       const url = URL.createObjectURL(new Blob([file.content], { type: file.mime }));
