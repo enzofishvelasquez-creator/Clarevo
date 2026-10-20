@@ -21,8 +21,9 @@
  * vencimento em sábado, domingo ou feriado nacional e o padrão de mercado do próximo dia útil, que não mudam a data nem os totais) e de Mês conferido (D-060: "Conferi: não houve pagamentos em {mês}" e o zero
  * confirmado na Evolução, em Pago e Recebido, em Análises e em "Seus últimos meses"), de Média e mediana (D-062: o tema de Aprender e a ligação com a
  * Evolução nos dois sentidos, "Ver na Evolução" e "O que é mediana?"), de Renda variável (D-062: "Calcular pela média" no formulário da renda de
- * referência, com 3 ou 6 meses fechados, o mês conferido como zero, a explicação sem mês com recebimentos e a Família) e do Relatório do RH (D-062: o relatório de
- * adesão do painel da empresa, em planilha e em PDF, com ou sem a lista de licenças) na versão web, em modo demonstração (acesso simulado).
+ * referência, com 3 ou 6 meses fechados, o mês conferido como zero, a explicação sem mês com recebimentos e a Família), do Relatório do RH (D-062: o relatório de
+ * adesão do painel da empresa, em planilha e em PDF, com ou sem a lista de licenças) e de Evolução, fase 3 (D-062: "Renda comprometida" e "Guardado em metas" no
+ * seletor, só de meses já fechados, com a própria base no subtítulo) na versão web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -13063,6 +13064,394 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const rhFileBad = rhFiles.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(bem-vind[oa]|usuári[oa]s?|colaborador(a|es|as)?|funcionári[oa]s?|administrador(a|es|as)?|demais|estour\w*|cuidado)\b/i)?.[0] ?? x.match(/R\$|\bsaldo\b|último acesso|entrou no app/i)?.[0]).filter(Boolean);
   ok('Relatório do RH: nenhum arquivo (planilhas e páginas de impressão) tem termo proibido, travessão, palavra com gênero, julgamento, valor financeiro nem uso do app', rhFiles.length === 8 && rhFileBad.length === 0, `${rhFiles.length} arquivos ${rhFileBad.join(' | ')}`);
   ok('Relatório do RH: nenhuma escrita direta na rede (o relatório é montado no navegador; as empresas do roteiro vivem na memória)', writes.length === rhWrites0, writes.slice(rhWrites0).join(' | '));
+
+  // =====================================================================================================================
+  // Evolução, fase 3 (D-062 item 4): "Renda comprometida" (percentual da renda de referência ligado a contas do mês) e "Guardado em metas"
+  // (aportes menos resgates), os dois valores novos do seletor, depois de Recebido e Pago, só de meses já fechados. Cada um escreve a
+  // própria base no subtítulo e diz "Só meses já fechados"; o mês em andamento nunca tem valor; mês sem renda de referência é "sem base",
+  // mês sem registros fica fora das médias, e nada disso vira zero. A seleção de meses fora da comparação é de cada valor (T13) e
+  // "Entender o que mudou" segue só em Recebido e Pago. Leituras: uma de contas (ou de movimentos de metas) por mês fechado, no máximo
+  // 11 por janela, com cache pela chave e recarga a cada escrita. Aqui, na versão web (memória): (1) o seletor e a demonstração padrão
+  // (só setembro tem renda de referência e nenhuma conta antes de outubro: sem registros), as leituras e as ações; (2) Renda
+  // comprometida com a renda de referência de julho (R$ 5.000,00) e a de setembro (R$ 6.000,00) e contas de maio a setembro: painéis, tabela,
+  // mês fora da comparação e T13; (3) Guardado em metas com aportes, um resgate maior que o aporte do mês, zero confirmado e meta antiga;
+  // (4) carregando e erro; (5) valores ocultos (os percentuais seguem à vista); (6) conta nova e Família. Capturas a partir de 570, em 390,
+  // 360 e 320 px. Hoje é 07/10/2026.
+  // =====================================================================================================================
+  const f3Writes0 = writes.length;
+  const f3Texts = [];
+  const f3Keep = async () => { const x = await body(); f3Texts.push(x); screenTexts.push(x); return x; };
+  const f3Chips = () => p.evaluate(() => [...document.querySelectorAll('[role=radiogroup][aria-label="Valor mostrado"] [role=radio]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label') || e.textContent));
+  // Leituras do repositório da demonstração (o que a tela pede, nome:mês): contas de um mês, metas, movimentos de metas de um mês e renda de referência.
+  const f3ReadSpyStart = () => p.evaluate(async () => {
+    const repo = await window.__e2e.repo();
+    window.__f3Reads = [];
+    for (const n of ['listCommitments', 'listGoals', 'listGoalMovementsInMonth', 'listIncomeReferences', 'monthsOverview']) {
+      const orig = repo[n];
+      if (orig.__f3Spy) continue;
+      const spy = function (...a) { window.__f3Reads.push([n, ...a.slice(1).filter((x) => typeof x === 'string')].join(':')); return orig.apply(this, a); };
+      spy.__f3Spy = true;
+      repo[n] = spy;
+    }
+  });
+  const f3Reads = () => p.evaluate(() => (window.__f3Reads || []).slice());
+  // As leituras de um método desde `from` (índice), sem as do mês atual (que o Resumo e as outras telas fazem por conta própria).
+  const f3ReadsOf = async (from, name) => (await f3Reads()).slice(from).filter((x) => x.startsWith(`${name}:`) && x !== `${name}:2026-10`);
+  const f3Months = (list) => list.map((x) => x.split(':')[1]).sort();
+  const f3Closed = (from, to) => { const out = []; for (let m = from; m <= to; m++) out.push(`2026-${String(m).padStart(2, '0')}`); return out; };
+  const f3Pick = async (label) => { await radio(label).click(); await p.waitForTimeout(900); };
+  // O zero do gráfico: a linha escura de 1,5 px (só aparece com mês abaixo de zero).
+  const f3ZeroLines = () => p.evaluate(() => {
+    const svg = [...document.querySelectorAll('svg')].find((s) => s.getBoundingClientRect().height > 100 && s.getBoundingClientRect().width > 0 && s.querySelector('line'));
+    return svg ? [...svg.querySelectorAll('line')].filter((l) => l.getAttribute('stroke') === '#17223B' && l.getAttribute('stroke-width') === '1.5').map((l) => Number(l.getAttribute('y1'))) : [];
+  });
+  // Os dados de "outro aparelho": a renda de referência de julho e as contas de maio a setembro; os aportes e o resgate das metas.
+  const f3SeedCommitted = () => otherDevice(async (repo, ctx) => {
+    const account = (await repo.listAccounts(ctx))[0].id;
+    await repo.setIncomeReference('e2e-f3-ref', ctx, '2026-07', 0, 500000, false);
+    const bill = (key, description, amountCents, dueOn) => repo.createCommitment(key, ctx, { description, amountCents, dueOn, category: 'Moradia' });
+    await bill('e2e-f3-mai', 'Conta de maio', 80000, '2026-05-10');
+    const aluguel = await bill('e2e-f3-jul-a', 'Aluguel de julho', 200000, '2026-07-05');
+    await bill('e2e-f3-jul-b', 'Luz de julho', 25000, '2026-07-12');
+    await repo.payCommitment('e2e-f3-jul-pago', aluguel.commitment.id, aluguel.commitment.version, { accountId: account, amountCents: 195000, paidOn: '2026-07-05', category: 'Moradia' });
+    await bill('e2e-f3-ago', 'Escola de agosto', 300000, '2026-08-10');
+    await bill('e2e-f3-set-a', 'Internet de setembro', 150000, '2026-09-15');
+    await bill('e2e-f3-set-b', 'Condomínio de setembro', 100000, '2026-09-20');
+  });
+  const f3SeedSavings = () => otherDevice(async (repo, ctx) => {
+    const account = (await repo.listAccounts(ctx))[0].id;
+    const reserva = (await repo.listGoals(ctx)).find((g) => g.goalType === 'emergencia');
+    const move = (key, kind, amountCents, occurredOn, accountId = account) => repo.addGoalMovement(key, reserva.id, kind, { amountCents, occurredOn, note: null, accountId });
+    await move('e2e-f3-m1', 'aporte', 100000, '2026-06-10');
+    await move('e2e-f3-m2', 'aporte', 20000, '2026-07-10');
+    await move('e2e-f3-m3', 'resgate', 70000, '2026-07-20');
+    await move('e2e-f3-m4', 'rendimento', 500, '2026-08-15', null);
+    await move('e2e-f3-m5', 'aporte', 30000, '2026-09-05');
+    // A criação da meta vem do relógio de agora (outubro); aqui a reserva "existe desde junho" para agosto, sem aporte nem resgate, ser um zero afirmado.
+    repo.goals.set(reserva.id, { ...repo.goals.get(reserva.id), createdAt: '2026-06-01T12:00:00.000Z' });
+  });
+  // As escritas do repositório desde `from`, sem a geração do dia dos gastos fixos (que roda de novo a cada recarga de "outro aparelho").
+  const f3WritesSince = async (from) => (await evSpyCalls()).slice(from).filter((x) => x !== 'syncSeriesOccurrences');
+  const F3_BASE = { comprometida: 'Percentual da renda de referência ligado a contas do mês', guardado: 'Aportes menos resgates nas metas' };
+  const F3_CLOSED = 'Só meses já fechados. O mês em andamento fica de fora e nada aqui é previsão.';
+
+  // ---- 1. O seletor e a demonstração padrão: nada é lido antes de escolher; sem base e sem registros, nunca zero ----
+  await evEnter();
+  await f3ReadSpyStart();
+  await evOpen();
+  t = await f3Keep();
+  const f3Chips0 = await f3Chips();
+  ok('Evolução fase 3, seletor: "Recebido", "Pago", "Renda comprometida" e "Guardado em metas", nesta ordem, com Pago marcado e a base de sempre no subtítulo, sem o aviso dos meses fechados', JSON.stringify(f3Chips0) === JSON.stringify(['Recebido', 'Pago', 'Renda comprometida', 'Guardado em metas']) &&
+    (await radio('Pago').getAttribute('aria-checked')) === 'true' && (await radio('Renda comprometida').getAttribute('aria-checked')) === 'false' && t.includes('Valores registrados, pela data do pagamento') && !t.includes('Só meses já fechados'), JSON.stringify(f3Chips0));
+  const f3Early = [...await f3ReadsOf(0, 'listCommitments'), ...await f3ReadsOf(0, 'listGoalMovementsInMonth')];
+  ok('Evolução fase 3, leituras: abrir a tela em Pago não lê contas de meses fechados nem movimentos de metas (só se lê o que o valor escolhido pede)', f3Early.length === 0, JSON.stringify(f3Early));
+  await evShots('570_evolucao_f3_seletor');
+
+  // Renda comprometida na demonstração: a renda de referência vale desde setembro e não há conta antes de outubro (o mês atual não entra).
+  const f3R0 = (await f3Reads()).length;
+  await f3Pick('Renda comprometida');
+  t = await f3Keep();
+  const f3Names0 = await evNames();
+  const f3C6 = await f3ReadsOf(f3R0, 'listCommitments');
+  ok('Evolução fase 3, Renda comprometida na demonstração: "Sem registros nestes meses" (setembro tem a renda de referência e nenhuma conta; antes dela é sem base), sem gráfico, sem percentual e sem zero', (await radio('Renda comprometida').getAttribute('aria-checked')) === 'true' &&
+    t.includes('Sem registros nestes meses') && t.includes('Mês sem conta anotada não quer dizer mês sem contas: aqui aparece só o que está registrado no Clarevo. Só meses já fechados entram aqui.') && f3Names0.length === 0 && !/\d%/.test(t.replace(/\b6 meses\b|\b12 meses\b|\b3 meses\b/g, '')) && !/R\$ \d/.test(t) && !t.includes('Média dos meses'), t.slice(0, 500));
+  ok('Evolução fase 3, subtítulo: a base própria ("Percentual da renda de referência ligado a contas do mês") e "Só meses já fechados", em vez da base de Pago', t.includes(F3_BASE.comprometida) && t.includes(F3_CLOSED) && !t.includes('Valores registrados, pela data do pagamento'));
+  ok('Evolução fase 3, leituras: 6 meses leem as contas dos 5 meses fechados (maio a setembro), uma vez cada, e nunca as de outubro (o mês atual), dentro do limite de 12 por janela', JSON.stringify(f3Months(f3C6)) === JSON.stringify(f3Closed(5, 9)) && f3C6.length <= 12, JSON.stringify(f3C6));
+  ok('Evolução fase 3, ação: com escrita no contexto, o botão "Anotar conta a pagar"', (await visibleCount('button', 'Anotar conta a pagar')) === 1 && (await visibleCount('button', 'Informar renda de referência')) === 0);
+  await evShots('571_evolucao_f3_comprometida_sem_registros');
+  // A janela de 3 meses usa as mesmas leituras (cache pela chave); a de 12 lê só os 6 meses que faltam (novembro a abril).
+  const f3R1 = (await f3Reads()).length;
+  await radio('3 meses').click(); await p.waitForTimeout(700);
+  const f3C3 = await f3ReadsOf(f3R1, 'listCommitments');
+  ok('Evolução fase 3, cache: trocar para 3 meses não lê nada de novo (as mesmas chaves, ainda em cache)', f3C3.length === 0, JSON.stringify(f3C3));
+  await radio('12 meses').click(); await p.waitForTimeout(1200);
+  const f3C12 = await f3ReadsOf(f3R1, 'listCommitments');
+  ok('Evolução fase 3, leituras: 12 meses leem só os meses que faltavam (novembro de 2025 a abril de 2026, 6 leituras), e o total chega a 11 meses fechados, nenhum a mais de uma vez e nenhum de outubro', JSON.stringify(f3Months(f3C12)) === JSON.stringify(['2025-11', '2025-12', '2026-01', '2026-02', '2026-03', '2026-04']) &&
+    new Set([...(await f3ReadsOf(f3R0, 'listCommitments'))]).size === 11, JSON.stringify(f3C12));
+  await radio('6 meses').click(); await p.waitForTimeout(500);
+
+  // Guardado em metas na demonstração: as metas são de outubro, então nenhum mês fechado tem meta criada.
+  const f3G0 = (await f3Reads()).length;
+  await f3Pick('Guardado em metas');
+  t = await f3Keep();
+  const f3GReads = await f3ReadsOf(f3G0, 'listGoalMovementsInMonth');
+  ok('Evolução fase 3, Guardado em metas na demonstração: "Sem registros nestes meses" (as metas são de outubro, o mês atual), a base "Aportes menos resgates nas metas", "Só meses já fechados" e o botão "Criar meta"', t.includes('Sem registros nestes meses') &&
+    t.includes('O Clarevo não tem meta criada nestes meses. Só meses já fechados entram aqui.') && t.includes(F3_BASE.guardado) && t.includes(F3_CLOSED) && (await visibleCount('button', 'Criar meta')) === 1 && (await evNames()).length === 0 && !/R\$ \d/.test(t) && !t.includes('Total dos meses exibidos'), t.slice(0, 500));
+  ok('Evolução fase 3, leituras: os movimentos das metas são lidos por mês fechado (maio a setembro), nunca o de outubro', JSON.stringify(f3Months(f3GReads)) === JSON.stringify(f3Closed(5, 9)), JSON.stringify(f3GReads));
+  await evShots('572_evolucao_f3_guardado_sem_registros');
+  await btn('Criar meta').click(); await waitText('Nova meta'); await p.waitForTimeout(500);
+  ok('Evolução fase 3, "Criar meta" abre o formulário de meta (/meta/nova)', evPath() === '/meta/nova', p.url());
+  await btn('Voltar').click(); await waitText('Aportes menos resgates nas metas'); await p.waitForTimeout(400);
+  await f3Pick('Renda comprometida');
+  await btn('Anotar conta a pagar').click(); await p.waitForTimeout(700);
+  ok('Evolução fase 3, "Anotar conta a pagar" abre o formulário de conta (/a-pagar/nova)', evPath() === '/a-pagar/nova', p.url());
+  await btn('Voltar').click(); await waitText('Percentual da renda de referência ligado a contas do mês'); await p.waitForTimeout(400);
+
+  // ---- 2. Renda comprometida com dados: a renda de referência de julho e as contas de maio a setembro ----
+  await evSpyStart();
+  const f3R2 = (await f3Reads()).length;
+  await f3SeedCommitted();
+  await waitText('Renda comprometida por mês', 15000); await p.waitForTimeout(800);
+  const f3Calls0 = (await evSpyCalls()).length;
+  const f3Refetch = await f3ReadsOf(f3R2, 'listCommitments');
+  ok('Evolução fase 3, recarga pelas escritas: depois de escrever (contas e renda de referência de outro aparelho), as contas dos meses fechados da janela foram lidas de novo, e a tela mostra o que mudou sem recarregar a página', new Set(f3Months(f3Refetch)).size >= 5 && (await f3Keep()).includes('Renda comprometida por mês'), JSON.stringify(f3Refetch));
+  t = await f3Keep();
+  let f3Names = await evNames();
+  ok('Evolução fase 3, Renda comprometida: maio e junho sem base (a renda vale desde julho, mesmo com conta em maio), julho 44,0%, agosto 60,0%, setembro 41,7%, e outubro em andamento, sem valor, mesmo com as contas dele', f3Names.length === 6 &&
+    f3Names[0] === 'Maio de 2026, sem base, fora da comparação' && f3Names[1] === 'Junho de 2026, sem base, fora da comparação' && f3Names[2] === 'Julho de 2026, 44,0%, na comparação' && f3Names[3] === 'Agosto de 2026, 60,0%, na comparação' &&
+    f3Names[4] === 'Setembro de 2026, 41,7%, na comparação' && f3Names[5] === 'Outubro de 2026, mês em andamento, fora da comparação' && !t.includes('52,5%'), JSON.stringify(f3Names));
+  ok('Evolução fase 3, Renda comprometida: média 48,6%, mediana 44,0% e "3 de 3 meses" (só meses fechados com a renda e com contas), "Maior valor do gráfico: 60,0%" e nenhum total (somar percentuais não dá percentual)', t.includes('Média dos meses na comparação\n48,6%\n3 de 3 meses') &&
+    t.includes('Mediana dos meses na comparação\n44,0%\n3 de 3 meses') && t.includes('Maior valor do gráfico: 60,0%') && !t.includes('Total dos meses exibidos') && !t.includes('Comparação personalizada') && t.includes('Renda comprometida por mês'), t.slice(300, 1300));
+  ok('Evolução fase 3, legenda: "Na comparação", "Sem base", "Mês em andamento" e "Mês escolhido", em texto (setembro, o mês fechado mais recente com valor, abre no painel)', t.includes('Na comparação') && t.includes('Sem base') && t.includes('Mês em andamento') && t.includes('Mês escolhido') &&
+    (await evPressed()).join('') === 'Setembro de 2026, 41,7%, na comparação');
+  ok('Evolução fase 3, desenho: maio e junho viram traço na linha de base (sem base, nunca um ponto em zero), julho a setembro são pontos cheios e outubro, sem valor, é traço', (await evMark('Maio')).kind === 'traco' && (await evMark('Junho')).kind === 'traco' && (await evMark('Julho')).kind === 'cheio' &&
+    (await evMark('Agosto')).kind === 'cheio' && (await evMark('Setembro')).kind === 'escolhido' && (await evMark('Outubro')).kind === 'traco', JSON.stringify([await evMark('Maio'), await evMark('Julho'), await evMark('Outubro')]));
+  ok('Evolução fase 3, painel de setembro: "Renda comprometida", 41,7%, "Com contas no mês", a base da conta, "Entender o que mudou" com "Disponível para Recebido e Pago" e o interruptor ligado', t.includes('Setembro de 2026\nRenda comprometida\n41,7%\nCom contas no mês\nPercentual da renda de referência ligado a contas do mês') &&
+    t.includes('Entender o que mudou\nDisponível para Recebido e Pago') && (await evSwitch().getAttribute('aria-checked')) === 'true' && t.includes('Tirar da comparação não apaga nem muda nenhuma conta, meta ou lançamento.') && (await visibleCount('button', 'Entender o que mudou')) === 0 && !t.includes('Variação'), t.slice(900, 1700));
+  await evShots('573_evolucao_f3_comprometida');
+  await evPick('Maio');
+  t = await f3Keep();
+  ok('Evolução fase 3, painel de maio: "Sem base" no lugar do valor, o motivo, sem interruptor e a frase de que fica fora da comparação', t.includes('Maio de 2026\nRenda comprometida\nSem base\nSem base: não há renda de referência para este mês') &&
+    t.includes('Este mês fica fora da comparação porque não há renda de referência para ele.') && (await visibleCount('switch', 'Mostrar este mês na comparação')) === 0 && (await evMark('Maio')).kind === 'escolhido_traco' && !/Maio de 2026\nRenda comprometida\n[\d,]+%/.test(t), t.slice(900, 1500));
+  await evShots('574_evolucao_f3_comprometida_sem_base', { scroll: evScroll('Maio de 2026') });
+  await evPick('Outubro');
+  t = await f3Keep();
+  ok('Evolução fase 3, painel de outubro (mês em andamento): "Mês em andamento", "Só meses já fechados", sem valor (nem o das contas que ele já tem), sem interruptor', t.includes('Outubro de 2026\nRenda comprometida\nMês em andamento\nMês em andamento: só meses já fechados entram aqui') && t.includes('Este mês fica fora da comparação até terminar.') &&
+    (await visibleCount('switch', 'Mostrar este mês na comparação')) === 0 && !t.includes('52,5%') && (await evNames())[5] === 'Outubro de 2026, mês em andamento, fora da comparação');
+  await evPick('Setembro');
+  // A tabela equivalente.
+  await p.getByRole('button', { name: 'Ver valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(500);
+  t = await f3Keep();
+  const f3Rows = await p.evaluate(() => [...document.querySelectorAll('[role=listitem] button')].filter((e) => e.getBoundingClientRect().width > 0 && /de 2026, /.test(e.getAttribute('aria-label') || '')).map((e) => (e.getAttribute('aria-label') || '').replace(/ /g, ' ')));
+  ok('Evolução fase 3, tabela: uma linha por mês com o percentual ou "Sem valor", o estado ("Sem base", "Com registros", "Mês em andamento") e "Na comparação?", e a nota sem total', f3Rows.length === 6 && f3Rows[0] === 'Maio de 2026, Sem valor, Sem base, Na comparação? Fora da comparação' && f3Rows[2] === 'Julho de 2026, 44,0%, Com registros, Na comparação? Sim' &&
+    f3Rows[5] === 'Outubro de 2026, Sem valor, Mês em andamento, Na comparação? Fora da comparação' && t.includes('Tirar um mês da comparação só muda a média e a mediana. O percentual de cada mês não muda.') && !t.includes('O total dos meses exibidos não depende'), JSON.stringify(f3Rows));
+  await evShots('575_evolucao_f3_comprometida_tabela', { scroll: evScrollBtn('Esconder valores mês a mês') });
+  await p.getByRole('button', { name: 'Esconder valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+  // Agosto fora da comparação: média e mediana dos outros dois (julho e setembro), com o aviso próprio deste valor.
+  await evSet('Agosto', false);
+  await evPick('Setembro');
+  t = await f3Keep();
+  ok('Evolução fase 3, agosto fora da comparação: média 42,9% e mediana 42,9% (a metade do centésimo vai para cima), "2 de 3 meses", o aviso "1 de 3 meses fora da comparação" e "Vale só para Renda comprometida."', t.includes('Média dos meses na comparação\n42,9%\n2 de 3 meses') && t.includes('Mediana dos meses na comparação\n42,9%\n2 de 3 meses') &&
+    t.includes('Comparação personalizada: 1 de 3 meses fora da comparação') && t.includes('Fora da comparação: agosto. Vale só para Renda comprometida.') && (await evRestoreCount()) === 1 && (await evMark('Agosto')).kind === 'vazio');
+  ok('Evolução fase 3, agosto fora: o ponto continua no mesmo lugar, vazio e com o ícone, e o leitor de tela ouve a nova média e mediana ("Média 42,9%, mediana 42,9%, 2 de 3 meses.")', (await evNames())[3] === 'Agosto de 2026, 60,0%, fora da comparação' && (await evLive()).includes('Média 42,9%, mediana 42,9%, 2 de 3 meses.'), JSON.stringify([await evNames(), await evLive()]));
+  await evShots('576_evolucao_f3_comprometida_mes_fora', { scroll: evScroll('Comparação personalizada: 1 de 3 meses fora da comparação') });
+  // T13: cada valor tem a própria seleção.
+  await f3Pick('Pago');
+  t = await body();
+  ok('Evolução fase 3, T13: em Pago a seleção de Renda comprometida não vem junto (sem aviso nem "Restaurar todos")', !t.includes('Comparação personalizada') && (await evRestoreCount()) === 0 && t.includes('Valores registrados, pela data do pagamento') && !t.includes('Só meses já fechados'));
+  await f3Pick('Guardado em metas');
+  t = await body();
+  ok('Evolução fase 3, T13: em Guardado em metas também não (a seleção é de cada valor)', !t.includes('Comparação personalizada') && (await evRestoreCount()) === 0);
+  await f3Pick('Renda comprometida');
+  t = await body();
+  ok('Evolução fase 3, T13: de volta a Renda comprometida, agosto continua fora e o resto dentro', (await evNames())[3] === 'Agosto de 2026, 60,0%, fora da comparação' && (await evNames())[2] === 'Julho de 2026, 44,0%, na comparação' && t.includes('Fora da comparação: agosto. Vale só para Renda comprometida.'));
+  await btn('Restaurar todos').click(); await p.waitForTimeout(500);
+  t = await body();
+  ok('Evolução fase 3, "Restaurar todos" devolve agosto: média 48,6%, mediana 44,0%, "3 de 3 meses", sem aviso', t.includes('Média dos meses na comparação\n48,6%\n3 de 3 meses') && t.includes('Mediana dos meses na comparação\n44,0%\n3 de 3 meses') && !t.includes('Comparação personalizada'));
+  // Um mês só na comparação e todos fora: nunca média zero.
+  await evSet('Julho', false); await evSet('Setembro', false);
+  t = await f3Keep();
+  ok('Evolução fase 3, só agosto na comparação: média e mediana de 60,0%, "1 de 3 meses" e a frase que explica', t.includes('Média dos meses na comparação\n60,0%\n1 de 3 meses') && t.includes('Mediana dos meses na comparação\n60,0%\n1 de 3 meses') && t.includes('Só um mês na comparação: a média e a mediana são o valor dele.'));
+  await evSet('Agosto', false);
+  t = await f3Keep();
+  ok('Evolução fase 3, todos fora: "Escolha ao menos um mês para comparar", "Restaurar todos", sem média nem mediana e sem 0%; o anúncio diz "Nenhum mês na comparação."', t.includes('Escolha ao menos um mês para comparar') && !t.includes('Média dos meses na comparação') && !t.includes('Mediana dos meses na comparação') && !/(?<![\d,])0(,0)?%/.test(t) && (await evRestoreCount()) === 2 && (await evLive()).includes('Nenhum mês na comparação.'));
+  await p.getByRole('button', { name: 'Restaurar todos', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(500);
+  ok('Evolução fase 3, Renda comprometida: tirar e restaurar meses não chamou nenhuma função de escrita do repositório (as escritas de "outro aparelho" vieram antes)', JSON.stringify(await f3WritesSince(f3Calls0)) === '[]', JSON.stringify(await f3WritesSince(f3Calls0)));
+
+  // ---- 3. Guardado em metas: aportes, um resgate maior que o aporte do mês, zero confirmado e uma meta antiga ----
+  await f3SeedSavings();
+  const f3Calls1 = (await evSpyCalls()).length;
+  await f3Pick('Guardado em metas');
+  await waitText('Guardado em metas por mês', 15000); await p.waitForTimeout(600);
+  t = await f3Keep();
+  f3Names = await evNames();
+  ok('Evolução fase 3, Guardado em metas: maio sem registros (a reserva existe desde junho), junho R$ 1.000,00, julho -R$ 500,00 (aporte de R$ 200,00 e resgate de R$ 700,00), agosto R$ 0,00 com meta já criada (só um rendimento), setembro R$ 300,00 e outubro em andamento, sem o aporte de R$ 500,00 que ele já tem', f3Names.length === 6 &&
+    f3Names[0] === 'Maio de 2026, sem registros, fora da comparação' && f3Names[1] === 'Junho de 2026, R$ 1.000,00, na comparação' && f3Names[2] === 'Julho de 2026, -R$ 500,00, na comparação' &&
+    f3Names[3] === 'Agosto de 2026, R$ 0,00, sem aportes nem resgates, com meta já criada, na comparação' && f3Names[4] === 'Setembro de 2026, R$ 300,00, na comparação' && f3Names[5] === 'Outubro de 2026, mês em andamento, fora da comparação', JSON.stringify(f3Names));
+  ok('Evolução fase 3, Guardado em metas: média R$ 200,00, mediana R$ 150,00 e "4 de 4 meses" (o zero confirmado e o mês negativo entram), "Total dos meses exibidos" de R$ 800,00 e "Maior valor do gráfico: R$ 1.000,00"', t.includes('Média dos meses na comparação\nR$ 200,00\n4 de 4 meses') &&
+    t.includes('Mediana dos meses na comparação\nR$ 150,00\n4 de 4 meses') && t.includes('Total dos meses exibidos\nR$ 800,00') && t.includes('Maior valor do gráfico: R$ 1.000,00') && t.includes(F3_BASE.guardado) && t.includes(F3_CLOSED), t.slice(300, 1400));
+  const f3Zero = await f3ZeroLines();
+  const f3Jul = await evMark('Julho');
+  const f3Jun = await evMark('Junho');
+  ok('Evolução fase 3, escala com mês abaixo de zero: a linha do zero aparece (uma só), com a frase que a explica; julho (negativo) fica abaixo dela e junho acima, e maio, sem registros, é traço na base', f3Zero.length === 1 && f3Jul.cy > f3Zero[0] && f3Jun.cy < f3Zero[0] && (await evMark('Maio')).kind === 'traco' &&
+    t.includes('A linha mais escura marca o zero. Abaixo dela estão os meses com mais resgates que aportes.'), JSON.stringify([f3Zero, f3Jul, f3Jun]));
+  await evShots('577_evolucao_f3_guardado');
+  await evPick('Julho');
+  t = await f3Keep();
+  ok('Evolução fase 3, painel de julho: "-R$ 500,00", "Com aportes ou resgates" e a base; o painel de um mês de resgate maior não diz que foi ruim', t.includes('Julho de 2026\nGuardado em metas\n-R$ 500,00\nCom aportes ou resgates\nAportes menos resgates nas metas') && t.includes('Entender o que mudou\nDisponível para Recebido e Pago') &&
+    (await evSwitch().getAttribute('aria-checked')) === 'true' && !/\b(ruim|queda|perdeu|errou)\b/i.test(t));
+  await evShots('578_evolucao_f3_guardado_negativo', { scroll: evScroll('Julho de 2026') });
+  await evPick('Agosto');
+  t = await f3Keep();
+  ok('Evolução fase 3, painel de agosto (zero confirmado): "R$ 0,00" com "Sem aportes nem resgates, com meta já criada neste mês", a legenda "Sem aportes nem resgates, com meta já criada" e o interruptor', t.includes('Agosto de 2026\nGuardado em metas\nR$ 0,00\nSem aportes nem resgates, com meta já criada neste mês') && t.includes('Sem aportes nem resgates, com meta já criada\n') &&
+    (await evSwitch().getAttribute('aria-checked')) === 'true' && (await evMark('Agosto')).kind === 'escolhido');
+  await evShots('579_evolucao_f3_guardado_zero', { scroll: evScroll('Agosto de 2026') });
+  await evPick('Maio');
+  t = await f3Keep();
+  ok('Evolução fase 3, painel de maio (sem registros): "Sem registros" no lugar do valor, "nenhuma meta criada até este mês", sem interruptor e sem R$ 0,00 no painel', t.includes('Maio de 2026\nGuardado em metas\nSem registros\nSem registros: nenhuma meta criada até este mês') && t.includes('Este mês fica fora da comparação porque não tem registros.') &&
+    (await visibleCount('switch', 'Mostrar este mês na comparação')) === 0 && !/Maio de 2026\nGuardado em metas\nR\$ 0,00/.test(t));
+  // Julho fora da comparação: a média e a mediana mudam; o total, não.
+  await evSet('Julho', false);
+  await evPick('Setembro');
+  t = await f3Keep();
+  ok('Evolução fase 3, julho fora da comparação: média R$ 433,33 e mediana R$ 300,00, "3 de 4 meses", e o total dos meses exibidos segue R$ 800,00', t.includes('Média dos meses na comparação\nR$ 433,33\n3 de 4 meses') && t.includes('Mediana dos meses na comparação\nR$ 300,00\n3 de 4 meses') &&
+    t.includes('Total dos meses exibidos\nR$ 800,00') && t.includes('Fora da comparação: julho. Vale só para Guardado em metas.') && (await evMark('Julho')).kind === 'vazio' && (await f3ZeroLines()).length === 1, t.slice(300, 1300));
+  await radio('3 meses').click(); await p.waitForTimeout(700);
+  t = await f3Keep();
+  ok('Evolução fase 3, 3 meses (agosto a outubro): agosto R$ 0,00 e setembro R$ 300,00, média R$ 150,00 e "2 de 2 meses"; o julho tirado fica fora desta janela e não muda a conta', (await evNames()).length === 3 && t.includes('Média dos meses na comparação\nR$ 150,00\n2 de 2 meses') && t.includes('Mediana dos meses na comparação\nR$ 150,00\n2 de 2 meses') && (await f3ZeroLines()).length === 0, JSON.stringify(await evNames()));
+  await radio('6 meses').click(); await p.waitForTimeout(500);
+  await evSet('Julho', true);
+  // Uma meta criada agora (outubro) com saldo inicial datado de maio: o saldo inicial não prova que a meta existia em maio, que segue sem registros.
+  await otherDevice(async (repo, ctx) => repo.createGoal('e2e-f3-antiga', ctx, { goalType: 'objetivo', name: 'Meta antiga', targetCents: 100000, targetMonth: null, plannedMonthlyCents: null, essentialBaseCents: null, essentialMonths: null, essentialBaseSource: null, initialCents: 10000, initialOn: '2026-05-20' }));
+  await p.waitForTimeout(1200);
+  t = await f3Keep();
+  f3Names = await evNames();
+  ok('Evolução fase 3, meta criada em outubro com saldo inicial em maio: maio segue "sem registros" (saldo inicial datado antes da criação não prova meta no mês) e a média segue R$ 200,00 em 4 meses', f3Names[0] === 'Maio de 2026, sem registros, fora da comparação' && t.includes('Média dos meses na comparação\nR$ 200,00\n4 de 4 meses') && !t.includes('5 de 5 meses'), JSON.stringify(f3Names));
+  // A mesma meta com a criação em 2 de maio (a data vem do relógio do banco; aqui o roteiro a recua): maio passa a ter meta, e o zero é afirmado.
+  await otherDevice(async (repo, ctx) => { const g = (await repo.listGoals(ctx)).find((x) => x.name === 'Meta antiga'); repo.goals.set(g.id, { ...repo.goals.get(g.id), createdAt: '2026-05-02T12:00:00.000Z' }); });
+  await p.waitForTimeout(1200);
+  t = await f3Keep();
+  f3Names = await evNames();
+  ok('Evolução fase 3, meta criada em 2 de maio, com saldo inicial em maio: maio vira "R$ 0,00, sem aportes nem resgates, com meta já criada" (o saldo inicial não é aporte), e as contas passam a 5 meses (média R$ 160,00, mediana R$ 0,00)', f3Names[0] === 'Maio de 2026, R$ 0,00, sem aportes nem resgates, com meta já criada, na comparação' && t.includes('Média dos meses na comparação\nR$ 160,00\n5 de 5 meses') &&
+    t.includes('Mediana dos meses na comparação\nR$ 0,00\n5 de 5 meses') && t.includes('Total dos meses exibidos\nR$ 800,00'), JSON.stringify(f3Names));
+  await radio('12 meses').click(); await p.waitForTimeout(900);
+  names = await evNames();
+  t = await f3Keep();
+  const f3G12 = await f3ReadsOf(f3G0, 'listGoalMovementsInMonth');
+  ok('Evolução fase 3, 12 meses de Guardado em metas: os meses antes das metas ficam "sem registros", nunca R$ 0,00, e as leituras de movimentos não passam de 11 meses diferentes (nenhum de outubro)', names.length === 12 && names[0] === 'Novembro de 2025, sem registros, fora da comparação' && names[5] === 'Abril de 2026, sem registros, fora da comparação' &&
+    new Set(f3G12).size <= 11 && !f3G12.includes('listGoalMovementsInMonth:2026-10'), JSON.stringify(names.slice(0, 7)));
+  await radio('6 meses').click(); await p.waitForTimeout(400);
+  ok('Evolução fase 3, Guardado em metas: tirar e restaurar meses e escolher valores e janelas não chamou nenhuma função de escrita do repositório', JSON.stringify((await f3WritesSince(f3Calls1)).filter((x) => x !== 'createGoal')) === '[]', JSON.stringify(await f3WritesSince(f3Calls1)));
+
+  // ---- 4. Carregando e erro (T24): sem dado parcial, "Tentar de novo" e nada de zero ----
+  await evEnter();
+  await evOpen();
+  await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.__origC = repo.listCommitments; repo.listCommitments = (...a) => new Promise((r) => setTimeout(r, 9000)).then(() => repo.__origC.apply(repo, a)); });
+  await radio('Renda comprometida').click();
+  await p.getByRole('progressbar', { name: 'Carregando a evolução' }).first().waitFor({ timeout: 4000 });
+  t = await f3Keep();
+  ok('Evolução fase 3, carregando: o esqueleto "Carregando a evolução", com o título, os seletores, a base de Renda comprometida e nenhum valor nem gráfico', (await visibleCount('progressbar', 'Carregando a evolução')) === 1 && (await h1Name()) === 'Evolução' && t.includes(F3_BASE.comprometida) && !/R\$ \d|\d%/.test(t.replace(/\b[36] meses\b|\b12 meses\b/g, '')) && (await evNames()).length === 0, t.slice(0, 300));
+  await evShots('580_evolucao_f3_carregando');
+  await waitText('Sem registros nestes meses', 20000); await p.waitForTimeout(500);
+  await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.listCommitments = repo.__origC; });
+  ok('Evolução fase 3, carregando: com a resposta, o esqueleto sai', (await visibleCount('progressbar', 'Carregando a evolução')) === 0);
+  await f3SeedSavings();
+  await f3Pick('Guardado em metas');
+  await waitText('Guardado em metas por mês', 15000);
+  await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.__origG = repo.listGoalMovementsInMonth; repo.listGoalMovementsInMonth = () => Promise.reject(new Error('falha simulada')); await window.__e2e.refresh(); });
+  await waitText('Não foi possível carregar a evolução.', 20000); await p.waitForTimeout(400);
+  t = await f3Keep();
+  ok('Evolução fase 3, erro (T24): "Não foi possível carregar a evolução." com "Tentar de novo", sem gráfico, sem média, sem total e sem nenhum valor em reais (nem o que já estava carregado), com o título e os seletores', t.includes('Não foi possível carregar a evolução.') && (await visibleCount('button', 'Tentar de novo')) === 1 && (await evNames()).length === 0 &&
+    !t.includes('Média dos meses na comparação') && !t.includes('Total dos meses exibidos') && !/R\$ \d/.test(t) && (await h1Name()) === 'Evolução' && (await radio('Guardado em metas').getAttribute('aria-checked')) === 'true' && (await p.getByRole('alert').filter({ hasText: 'Não foi possível carregar a evolução.' }).count()) >= 1, t.slice(0, 300));
+  await evShots('581_evolucao_f3_erro');
+  await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.listGoalMovementsInMonth = repo.__origG; });
+  await btn('Tentar de novo').click(); await waitText('Guardado em metas por mês', 15000); await p.waitForTimeout(600);
+  ok('Evolução fase 3, recuperação: "Tentar de novo" traz os dados de volta', (await evNames()).length === 6 && (await evNames())[1] === 'Junho de 2026, R$ 1.000,00, na comparação');
+
+  // ---- 5. Valores ocultos: em reais (Guardado em metas) viram R$ ••••; os percentuais seguem à vista ----
+  await f3SeedCommitted();
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento');
+  await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  await f3Pick('Guardado em metas');
+  await waitText('Guardado em metas por mês', 15000);
+  await evPick('Julho');
+  await hiddenShows('Evolução, Guardado em metas');
+  names = await evNames();
+  t = await f3Keep();
+  ok('Evolução fase 3, valores ocultos (Guardado em metas): os pontos dizem "valor oculto" ao leitor de tela (inclusive o negativo), sem número nenhum, e os meses sem valor seguem como são', names[1] === 'Junho de 2026, valor oculto, na comparação' && names[2] === 'Julho de 2026, valor oculto, na comparação' && names[0] === 'Maio de 2026, sem registros, fora da comparação' &&
+    names[5] === 'Outubro de 2026, mês em andamento, fora da comparação' && !names.some((n) => /R\$|\d,\d{2}/.test(n)), JSON.stringify(names));
+  ok('Evolução fase 3, valores ocultos (Guardado em metas): o eixo sem "Maior valor do gráfico", e a média, a mediana, o total e o valor do painel em R$ ••••', !t.includes('Maior valor do gráfico') && t.includes('Média dos meses na comparação\nR$ ••••\n4 de 4 meses') && t.includes('Mediana dos meses na comparação\nR$ ••••') &&
+    t.includes('Total dos meses exibidos\nR$ ••••') && t.includes('Julho de 2026\nGuardado em metas\nR$ ••••') && !/-R\$/.test(t), t.slice(300, 1400));
+  await evShots('582_evolucao_f3_guardado_valores_ocultos', { scroll: evScroll('Julho de 2026') });
+  await f3Pick('Renda comprometida');
+  await waitText('Renda comprometida por mês', 15000);
+  await evPick('Julho');
+  names = await evNames();
+  t = await f3Keep();
+  const f3Leaks = await moneyLeaks();
+  ok('Evolução fase 3, valores ocultos (Renda comprometida): os percentuais seguem à vista (nomes, painel, média, mediana e "Maior valor do gráfico: 60,0%"), e nenhum valor em reais aparece', names[2] === 'Julho de 2026, 44,0%, na comparação' && names[3] === 'Agosto de 2026, 60,0%, na comparação' && t.includes('Julho de 2026\nRenda comprometida\n44,0%') &&
+    t.includes('Média dos meses na comparação\n48,6%\n3 de 3 meses') && t.includes('Maior valor do gráfico: 60,0%') && !/R\$/.test(t) && f3Leaks.length === 0, JSON.stringify([names.slice(0, 5), f3Leaks.slice(0, 3)]));
+  await evShots('583_evolucao_f3_comprometida_valores_ocultos', { scroll: evScroll('Julho de 2026') });
+
+  // ---- 6. Conta nova: nada de exemplo; e a Família, que lê os dados da casa e não os do Pessoal ----
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await famCreateAccount('Rui Metas', 'rui.metas@exemplo.com');
+  await evOpen();
+  await f3Pick('Renda comprometida');
+  t = await f3Keep();
+  ok('Evolução fase 3, conta nova, Renda comprometida: "Sem base para estes meses", a frase de que a renda é informada em Renda comprometida, o botão "Informar renda de referência" e nenhum percentual, gráfico ou valor de exemplo', t.includes('Sem base para estes meses') &&
+    t.includes('Sem a renda de referência, não há com o que dividir as contas do mês. Ela é informada em Renda comprometida. Só meses já fechados entram aqui.') && (await visibleCount('button', 'Informar renda de referência')) === 1 && (await evNames()).length === 0 && !/R\$ \d/.test(t) && !t.includes('Média dos meses'), t.slice(0, 400));
+  await evShots('584_evolucao_f3_conta_nova_comprometida');
+  await btn('Informar renda de referência').click(); await waitText('Valor por mês'); await p.waitForTimeout(500);
+  ok('Evolução fase 3, "Informar renda de referência" abre o formulário da renda (/renda-comprometida/referencia) com "Vale a partir de" no mês fechado mais antigo da janela (maio de 2026, em 6 meses), e não no mês atual', evPath() === '/renda-comprometida/referencia' &&
+    (await radio('Vale a partir de maio de 2026').getAttribute('aria-checked')) === 'true' && (await radio('Vale a partir de outubro de 2026').getAttribute('aria-checked')) === 'false', p.url());
+  await btn('Voltar').click(); await waitText('Sem base para estes meses'); await p.waitForTimeout(400);
+  await radio('3 meses').click(); await p.waitForTimeout(700);
+  await btn('Informar renda de referência').click(); await waitText('Valor por mês'); await p.waitForTimeout(500);
+  ok('Evolução fase 3, "Informar renda de referência" na janela de 3 meses: "Vale a partir de" em agosto de 2026, o mês fechado mais antigo dela', evPath() === '/renda-comprometida/referencia' && (await radio('Vale a partir de agosto de 2026').getAttribute('aria-checked')) === 'true', p.url());
+  await btn('Voltar').click(); await waitText('Sem base para estes meses'); await p.waitForTimeout(400);
+  await radio('12 meses').click(); await p.waitForTimeout(900);
+  await btn('Informar renda de referência').click(); await waitText('Valor por mês'); await p.waitForTimeout(500);
+  ok('Evolução fase 3, "Informar renda de referência" na janela de 12 meses: "Vale a partir de" em novembro de 2025, o mês fechado mais antigo dela', evPath() === '/renda-comprometida/referencia' && (await radio('Vale a partir de novembro de 2025').getAttribute('aria-checked')) === 'true', p.url());
+  await btn('Voltar').click(); await waitText('Sem base para estes meses'); await p.waitForTimeout(400);
+  await radio('6 meses').click(); await p.waitForTimeout(700);
+  await f3Pick('Guardado em metas');
+  t = await f3Keep();
+  ok('Evolução fase 3, conta nova, Guardado em metas: "Sem registros nestes meses", "nenhuma meta criada", o botão "Criar meta", sem total e sem R$ 0,00 de exemplo', t.includes('Sem registros nestes meses') && t.includes('O Clarevo não tem meta criada nestes meses.') && (await visibleCount('button', 'Criar meta')) === 1 && !t.includes('Total dos meses exibidos') && !t.includes('R$ 0,00') && (await evNames()).length === 0);
+  await evShots('585_evolucao_f3_conta_nova_guardado');
+  // Família: a casa tem renda de referência desde agosto (R$ 8.000,00), contas em agosto e setembro e uma meta com saldo inicial em agosto e aporte em setembro; o Pessoal, só uma conta em setembro.
+  await famGoFamilia();
+  await btn('Criar Família').click(); await waitText('Nome da Família'); await field('Nome da Família').fill('Casa Metas');
+  await btn('Criar Família').click(); await waitText('Família criada.'); await p.waitForTimeout(400);
+  await otherDevice(async (repo, ctx) => {
+    await repo.setIncomeReference('e2e-f3-p-ref', ctx, '2026-09', 0, 600000, false);
+    await repo.createCommitment('e2e-f3-p-set', ctx, { description: 'Internet pessoal', amountCents: 60000, dueOn: '2026-09-12', category: null });
+    const fam = (await repo.getFamily()).context.id;
+    const famAccount = (await repo.listAccounts(fam))[0].id;
+    await repo.setIncomeReference('e2e-f3-f-ref', fam, '2026-08', 0, 800000, false);
+    await repo.createCommitment('e2e-f3-f-ago', fam, { description: 'Aluguel da casa', amountCents: 400000, dueOn: '2026-08-05', category: null });
+    await repo.createCommitment('e2e-f3-f-set', fam, { description: 'Escola da casa', amountCents: 200000, dueOn: '2026-09-05', category: null });
+    await repo.createGoal('e2e-f3-f-meta', fam, { goalType: 'objetivo', name: 'Viagem da casa', targetCents: 1000000, targetMonth: null, plannedMonthlyCents: null, essentialBaseCents: null, essentialMonths: null, essentialBaseSource: null, initialCents: 500000, initialOn: '2026-08-12' });
+    const meta = (await repo.listGoals(fam))[0];
+    await repo.addGoalMovement('e2e-f3-f-aporte', meta.id, 'aporte', { amountCents: 70000, occurredOn: '2026-09-10', note: null, accountId: famAccount });
+  });
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await famTab('Ver dados de Família').click(); await p.waitForTimeout(500);
+  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  await f3Pick('Renda comprometida');
+  await waitText('Renda comprometida por mês', 15000);
+  names = await evNames();
+  t = await f3Keep();
+  ok('Evolução fase 3, Família, Renda comprometida: a pílula diz "Demonstração · Família" e os percentuais são os da casa (agosto 50,0% e setembro 25,0% de R$ 8.000,00), sem a conta nem a renda do Pessoal (10,0%)', t.includes('Demonstração · Família') && names.length === 6 && names[3] === 'Agosto de 2026, 50,0%, na comparação' && names[4] === 'Setembro de 2026, 25,0%, na comparação' &&
+    t.includes('Média dos meses na comparação\n37,5%\n2 de 2 meses') && !t.includes('10,0%') && names[2] === 'Julho de 2026, sem base, fora da comparação', JSON.stringify(names));
+  await evShots('586_evolucao_f3_familia_comprometida');
+  await f3Pick('Guardado em metas');
+  await waitText('Guardado em metas por mês', 15000);
+  names = await evNames();
+  t = await f3Keep();
+  ok('Evolução fase 3, Família, Guardado em metas: agosto sem registros (a meta da casa foi criada em outubro, e o saldo inicial de agosto não prova meta no mês) e setembro R$ 700,00, média R$ 700,00 em 1 de 1 mês; as metas do Pessoal não entram', names[3] === 'Agosto de 2026, sem registros, fora da comparação' && names[4] === 'Setembro de 2026, R$ 700,00, na comparação' &&
+    t.includes('Média dos meses na comparação\nR$ 700,00\n1 de 1 mês') && t.includes('Total dos meses exibidos\nR$ 700,00'), JSON.stringify(names));
+  await evSet('Setembro', false);
+  await btn('Voltar').click(); await waitText('Registrar recebimento');
+  await famTab('Ver dados de Pessoal').click(); await p.waitForTimeout(500);
+  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  await f3Pick('Guardado em metas');
+  t = await f3Keep();
+  ok('Evolução fase 3, de volta ao Pessoal: trocar de contexto esquece os meses tirados (setembro da Família) e mostra só o Pessoal ("Sem registros nestes meses", sem meta)', t.includes('Sem registros nestes meses') && !t.includes('Comparação personalizada') && !/R\$ \d/.test(t));
+  await f3Pick('Renda comprometida');
+  await waitText('Renda comprometida por mês', 15000);
+  names = await evNames();
+  ok('Evolução fase 3, Pessoal: setembro 10,0% (R$ 600,00 de R$ 6.000,00), sem a renda de R$ 8.000,00 da Família', names[4] === 'Setembro de 2026, 10,0%, na comparação' && names[3] === 'Agosto de 2026, sem base, fora da comparação', JSON.stringify(names));
+  await famGoResumo(); await famSignOut();
+
+  // ---- 7. A demonstração de novo: os totais não mudam; textos e escritas ----
+  await evEnter();
+  await expectTotals('Evolução fase 3, demonstração: outubro segue 6.000 / 3.900 / 2.100 e 650 depois de tudo', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  const f3Bad = f3Texts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(demais|alt[oa]s?|baix[oa]s?|gastou|aumentou|diminuiu|despencou|disparou|cuidado|estour\w*|exagero|usuári[oa]s?|bem-vind[oa]s?|parab[eé]ns|incr[ií]vel|garant\w*|ruim|perdeu|errou|economiz\w*)\b/i)?.[0]).filter(Boolean);
+  ok('Evolução fase 3: nenhum termo proibido, travessão longo, expressão vetada, palavra de julgamento nem palavra com gênero nas telas novas', f3Texts.length >= 25 && f3Bad.length === 0, `${f3Texts.length} telas ${f3Bad.join(' | ')}`);
+  ok('Evolução fase 3: nenhuma escrita direta na rede (a tela só lê; as escritas do roteiro ficam na memória da demonstração)', writes.length === f3Writes0, writes.slice(f3Writes0).join(' | '));
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);

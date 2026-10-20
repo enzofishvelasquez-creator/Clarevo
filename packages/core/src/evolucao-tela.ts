@@ -1,16 +1,21 @@
+import { formatPermille } from './committed';
 import { addMonths, formatDateBR, formatMonthBR, formatMonthName, formatMonthSpanBR, formatMonthYearBR, monthOf, type IsoDate, type IsoMonth } from './dates';
 import {
   COMPARISON_ELIGIBLE_STATES,
   comparisonStats,
   evolutionPoints,
   explainChange,
+  isPhase3Metric,
   pointVariation,
   type ChangeExplanation,
   type ChangeSide,
   type ComparisonStats,
   type EvolutionMetric,
+  type EvolutionPhase3Metric,
   type EvolutionPoint,
   type EvolutionPointState,
+  type EvolutionSelectionMetric,
+  type Phase3Point,
 } from './evolucao';
 import { formatTenths } from './learn/format';
 import { MONTH_CHECK_TEXT, monthCheckPlan, type MonthCheckPlan } from './month-check';
@@ -40,7 +45,8 @@ export type EvolutionWindow = (typeof EVOLUTION_WINDOWS)[number];
 export const EVOLUTION_DEFAULT_WINDOW: EvolutionWindow = 6;
 /** Quantos meses `months_overview` entrega por chamada (o banco recusa mais que 12). */
 export const EVOLUTION_MAX_MONTHS = 12;
-export const EVOLUTION_METRICS: readonly EvolutionMetric[] = ['recebido', 'pago'];
+/** O seletor: Recebido e Pago (pela data do pagamento) e, depois deles, os dois valores da fase 3 (D-062 item 4). */
+export const EVOLUTION_METRICS: readonly EvolutionSelectionMetric[] = ['recebido', 'pago', 'comprometida', 'guardado'];
 export const EVOLUTION_DEFAULT_METRIC: EvolutionMetric = 'pago';
 /** Quantas categorias o painel do mês mostra. */
 export const EVOLUTION_TOP_CATEGORIES = 3;
@@ -59,8 +65,8 @@ export function evolutionMonths(currentMonth: IsoMonth, windowMonths: EvolutionW
   return Array.from({ length: windowMonths }, (_, i) => addMonths(currentMonth, i - (windowMonths - 1)));
 }
 
-/** Nomes das métricas nas frases (Recebido e Pago, como no Resumo). */
-const METRIC_LABEL: Record<EvolutionMetric, string> = { recebido: 'Recebido', pago: 'Pago' };
+/** Nomes dos valores nas frases (Recebido e Pago, como no Resumo, e os dois da fase 3). */
+const METRIC_LABEL: Record<EvolutionSelectionMetric, string> = { recebido: 'Recebido', pago: 'Pago', comprometida: 'Renda comprometida', guardado: 'Guardado em metas' };
 
 /** "5 de 6 meses", "1 de 1 mês". */
 const ofMonthsText = (n: number, total: number): string => `${n} de ${total} ${total === 1 ? 'mês' : 'meses'}`;
@@ -109,14 +115,18 @@ export const EVOLUTION_TEXT = {
   loadError: 'Não foi possível carregar a evolução.',
   retry: 'Tentar de novo',
   chart: {
-    title: (metric: EvolutionMetric): string => `${METRIC_LABEL[metric]} por mês`,
+    title: (metric: EvolutionSelectionMetric): string => `${METRIC_LABEL[metric]} por mês`,
     /** "Meses: de maio a outubro de 2026". */
     span: (from: IsoMonth, to: IsoMonth): string => `Meses: ${formatMonthSpanBR(from, to)}`,
     /** Nome acessível do grupo de botões (um por mês). */
     group: 'Meses do gráfico. Escolha um mês para ver os detalhes.',
     /** "Maior valor do gráfico: R$ 7.800,00". Some com os valores ocultos. */
     maxValue: (cents: Cents): string => `Maior valor do gráfico: ${formatBRL(cents)}`,
+    /** Renda comprometida: "Maior valor do gráfico: 52,5%". O percentual segue à vista com valores ocultos. */
+    maxPercent: (percentText: string): string => `Maior valor do gráfico: ${percentText}`,
     scaleNote: 'O gráfico parte do zero.',
+    /** Guardado em metas com mês negativo (mais resgates que aportes): o zero fica no meio do desenho. */
+    zeroNote: 'A linha mais escura marca o zero. Abaixo dela estão os meses com mais resgates que aportes.',
   },
   legend: {
     included: 'Na comparação',
@@ -125,6 +135,10 @@ export const EVOLUTION_TEXT = {
     zeroConfirmed: 'Conferido, sem lançamentos',
     inProgress: 'Mês em andamento',
     selected: 'Mês escolhido',
+    /** Renda comprometida: mês fechado sem renda de referência. */
+    noBase: 'Sem base',
+    /** Guardado em metas: mês fechado sem aporte nem resgate, com meta já criada. */
+    zeroSaved: 'Sem aportes nem resgates, com meta já criada',
   },
   /** O que cada mês do eixo é, para quem lê só o texto. */
   participation: {
@@ -133,6 +147,8 @@ export const EVOLUTION_TEXT = {
     inProgress: 'mês em andamento',
     noRecords: 'sem registros',
     zeroConfirmed: MONTH_CHECK_TEXT.zeroConfirmed,
+    noBase: 'sem base',
+    zeroSaved: 'sem aportes nem resgates, com meta já criada',
   },
   stats: {
     average: 'Média dos meses na comparação',
@@ -148,6 +164,8 @@ export const EVOLUTION_TEXT = {
     announce: (average: Cents, median: Cents, n: number, total: number): string =>
       `Média ${formatBRL(average)}, mediana ${formatBRL(median)}, ${ofMonthsText(n, total)}.`,
     announceNone: 'Nenhum mês na comparação.',
+    /** O mesmo anúncio com os valores já escritos (percentual da Renda comprometida): "Média 52,5%, mediana 50,0%, 2 de 3 meses." */
+    announceText: (average: string, median: string, n: number, total: number): string => `Média ${average}, mediana ${median}, ${ofMonthsText(n, total)}.`,
   },
   custom: {
     /** "Comparação personalizada: 2 de 6 meses fora da comparação". */
@@ -162,7 +180,7 @@ export const EVOLUTION_TEXT = {
         outside.length === 0 ? '' : `, e ${outside.length} ${outside.length === 1 ? 'mês fora' : 'meses fora'} desta janela (${yearNameList(outside)})`
       }.`,
     /** A seleção é de cada valor mostrado: "Vale só para Pago." */
-    scope: (metric: EvolutionMetric): string => `Vale só para ${METRIC_LABEL[metric]}.`,
+    scope: (metric: EvolutionSelectionMetric): string => `Vale só para ${METRIC_LABEL[metric]}.`,
   },
   states: {
     /** Nenhum mês dos exibidos tem lançamentos. */
@@ -186,7 +204,7 @@ export const EVOLUTION_TEXT = {
   },
   panel: {
     /** "Pago" ou "Recebido", sobre o valor. */
-    valueCaption: (metric: EvolutionMetric): string => METRIC_LABEL[metric],
+    valueCaption: (metric: EvolutionSelectionMetric): string => METRIC_LABEL[metric],
     noValue: 'Sem registros',
     state: {
       com_registros: 'Com registros',
@@ -199,6 +217,8 @@ export const EVOLUTION_TEXT = {
     notEligible: {
       em_andamento: 'Este mês fica fora da comparação até terminar.',
       sem_registros: 'Este mês fica fora da comparação porque não tem registros.',
+      /** Renda comprometida de mês fechado sem renda de referência (fase 3). */
+      sem_base: 'Este mês fica fora da comparação porque não há renda de referência para ele.',
     },
     categoriesTitle: 'Maiores categorias do mês',
     /** "35,9% do pago" (Pago) ou "100% do recebido" (Recebido). */
@@ -290,6 +310,63 @@ export const EVOLUTION_TEXT = {
     compareWith: 'Voltar a comparar com este mês',
     compareHint: 'Só muda a média, a mediana e o gráfico. Nenhum lançamento é apagado nem mudado.',
   },
+  /**
+   * Fase 3 (D-062 item 4): "Renda comprometida" (percentual da renda de referência ligado a contas do mês) e "Guardado em metas" (aportes
+   * menos resgates), sempre só de meses já fechados. Cada um escreve a própria base no subtítulo. Previsão nunca entra.
+   */
+  phase3: {
+    subtitle: {
+      comprometida: 'Percentual da renda de referência ligado a contas do mês',
+      guardado: 'Aportes menos resgates nas metas',
+    } as Record<EvolutionPhase3Metric, string>,
+    closedOnly: 'Só meses já fechados. O mês em andamento fica de fora e nada aqui é previsão.',
+    /** O que o painel diz do estado de cada mês. */
+    state: {
+      comprometida: {
+        com_registros: 'Com contas no mês',
+        sem_base: 'Sem base: não há renda de referência para este mês',
+        sem_registros: 'Sem registros: mês sem conta anotada não quer dizer mês sem contas',
+        em_andamento: 'Mês em andamento: só meses já fechados entram aqui',
+      },
+      guardado: {
+        com_registros: 'Com aportes ou resgates',
+        zero_confirmado: 'Sem aportes nem resgates, com meta já criada neste mês',
+        sem_registros: 'Sem registros: nenhuma meta criada até este mês',
+        em_andamento: 'Mês em andamento: só meses já fechados entram aqui',
+      },
+    },
+    /** A coluna "Estado" da tabela. */
+    stateLabel: {
+      com_registros: 'Com registros',
+      zero_confirmado: 'Sem movimento',
+      sem_registros: 'Sem registros',
+      sem_base: 'Sem base',
+      em_andamento: 'Mês em andamento',
+    },
+    /** No lugar do valor, num mês sem valor. */
+    noValue: {
+      sem_base: 'Sem base',
+      sem_registros: 'Sem registros',
+      em_andamento: 'Mês em andamento',
+    },
+    switchCaption: 'Tirar da comparação não apaga nem muda nenhuma conta, meta ou lançamento.',
+    /** "Entender o que mudou" não se aplica nesta fase. */
+    explainTitle: 'Entender o que mudou',
+    explainNote: 'Disponível para Recebido e Pago',
+    /** Tela sem nenhum mês fechado com valor. */
+    empty: {
+      noBaseTitle: 'Sem base para estes meses',
+      noBaseBody:
+        'Sem a renda de referência, não há com o que dividir as contas do mês. Ela é informada em Renda comprometida. Só meses já fechados entram aqui.',
+      noBaseAction: 'Informar renda de referência',
+      noRecordsTitle: 'Sem registros nestes meses',
+      noRecordsBody:
+        'Mês sem conta anotada não quer dizer mês sem contas: aqui aparece só o que está registrado no Clarevo. Só meses já fechados entram aqui.',
+      noRecordsAction: 'Anotar conta a pagar',
+      savingsBody: 'O Clarevo não tem meta criada nestes meses. Só meses já fechados entram aqui.',
+      savingsAction: 'Criar meta',
+    },
+  },
   table: {
     show: 'Ver valores mês a mês',
     hide: 'Esconder valores mês a mês',
@@ -301,6 +378,8 @@ export const EVOLUTION_TEXT = {
     noRecords: 'Sem registros',
     zeroConfirmed: 'Conferido',
     note: 'O total dos meses exibidos não depende do que está na comparação.',
+    /** Renda comprometida não tem total (somar percentuais de meses não dá um percentual). */
+    noteNoTotal: 'Tirar um mês da comparação só muda a média e a mediana. O percentual de cada mês não muda.',
     /** Dica da linha da tabela, que é um botão: escolhe o mês e leva ao painel. */
     rowHint: 'Mostra este mês no painel',
   },
@@ -315,12 +394,18 @@ export const EVOLUTION_TEXT = {
  * - na_comparacao: mês fechado, com registros ou conferido sem lançamentos (zero confirmado), que a pessoa não tirou;
  * - fora_escolha: mês fechado, com registros ou zero confirmado, que a pessoa tirou da comparação;
  * - fora_andamento: o mês atual (D04);
- * - fora_sem_registros: nenhum lançamento (D04).
+ * - fora_sem_registros: nenhum lançamento (D04);
+ * - fora_sem_base: Renda comprometida de mês fechado sem renda de referência (fase 3): não há com o que dividir.
  */
-export type EvolutionParticipation = 'na_comparacao' | 'fora_escolha' | 'fora_andamento' | 'fora_sem_registros';
+export type EvolutionParticipation = 'na_comparacao' | 'fora_escolha' | 'fora_andamento' | 'fora_sem_registros' | 'fora_sem_base';
 
 export interface EvolutionPointView extends EvolutionPoint {
   participation: EvolutionParticipation;
+  /**
+   * O ponto tem um valor para desenhar: falso no mês sem registros (nunca um ponto em zero) e, na fase 3, também no mês em andamento
+   * (só meses fechados) e no mês sem base. O desenho vira um traço na linha de base.
+   */
+  hasValue: boolean;
   /** Entra na média e na mediana. */
   included: boolean;
   /** Mês fechado com registros ou zero confirmado: o único que a pessoa pode tirar da comparação. */
@@ -329,7 +414,10 @@ export interface EvolutionPointView extends EvolutionPoint {
   title: string;
   /** "abr". */
   shortLabel: string;
-  /** "R$ 7.800,00"; "R$ 0,00" só no zero confirmado; null em mês sem registros (nunca "R$ 0,00" sem a conferência). */
+  /**
+   * "R$ 7.800,00"; "R$ 0,00" só no zero confirmado; null em mês sem registros (nunca "R$ 0,00" sem a conferência). Na Renda comprometida,
+   * o percentual ("52,5%"); em mês sem valor da fase 3 (em andamento, sem base, sem registros), null.
+   */
   valueText: string | null;
   /** "Com registros", "Mês em andamento", "Você conferiu: não houve pagamentos em março de 2026." ou o aviso de mês sem registros (o texto do painel). */
   stateText: string;
@@ -348,8 +436,18 @@ export interface EvolutionPointView extends EvolutionPoint {
 
 export type EvolutionSituation = 'normal' | 'sem_registros' | 'sem_mes_fechado' | 'todos_fora' | 'um_mes';
 
-export interface EvolutionView {
-  metric: EvolutionMetric;
+/** O que os valores da visão são: centavos (Recebido, Pago e Guardado em metas) ou milésimos da renda de referência (Renda comprometida). */
+export type EvolutionUnit = 'cents' | 'permille';
+
+/**
+ * A visão do gráfico, da comparação e da tabela. O parâmetro é o valor mostrado: a visão de Recebido e Pago (`buildEvolutionView`) é a
+ * padrão, a da fase 3 é `EvolutionView<EvolutionPhase3Metric>` (`buildPhase3View`). Onde `cents` aparece (pontos, média, mediana, escala),
+ * a unidade é `unit`.
+ */
+export interface EvolutionView<M extends EvolutionSelectionMetric = EvolutionMetric> {
+  metric: M;
+  /** A unidade dos valores: centavos ou, na Renda comprometida, milésimos (525 = 52,5%). */
+  unit: EvolutionUnit;
   windowMonths: EvolutionWindow;
   from: IsoMonth;
   to: IsoMonth;
@@ -357,10 +455,13 @@ export interface EvolutionView {
   points: EvolutionPointView[];
   /**
    * As linhas de months_overview da janela, uma por mês, na mesma ordem dos pontos: o painel lê delas a versão da marca "Conferi este
-   * mês" e o aviso de compras no cartão (D-060). Mês que a leitura não trouxe vale a linha zerada.
+   * mês" e o aviso de compras no cartão (D-060). Mês que a leitura não trouxe vale a linha zerada. Vazio na fase 3.
    */
   rows: MonthOverview[];
   stats: ComparisonStats;
+  /** A média e a mediana já escritas ("R$ 3.390,00" ou "52,5%"); null quando não há mês na comparação (nunca zero). */
+  averageText: string | null;
+  medianText: string | null;
   /** X de "X de N meses fora da comparação": os meses fechados com registros que a pessoa tirou. */
   outCount: number;
   /** N: os meses fechados com registros. */
@@ -372,14 +473,20 @@ export interface EvolutionView {
   outsideMonths: IsoMonth[];
   /** O que a faixa de comparação e os cartões mostram. */
   situation: EvolutionSituation;
-  /** Total dos meses exibidos (todos os pontos), igual ao dos relatórios e sem relação com a seleção. */
-  totalCents: Cents;
-  /** O maior valor entre todos os pontos: a escala do gráfico, que não muda com a seleção. */
+  /**
+   * Total dos meses exibidos (todos os pontos), igual ao dos relatórios e sem relação com a seleção. Null na Renda comprometida: somar
+   * percentuais de meses não dá um percentual.
+   */
+  totalCents: Cents | null;
+  /** O maior valor entre todos os pontos, nunca abaixo de 0: o alto da escala do gráfico, que não muda com a seleção. */
   maxCents: Cents;
+  /** O menor valor entre todos os pontos, nunca acima de 0: o pé da escala. Só o Guardado em metas passa de 0 (mês com mais resgates que aportes). */
+  minCents: Cents;
 }
 
 function participationOf(state: EvolutionPointState, hidden: boolean): EvolutionParticipation {
   if (state === 'sem_registros') return 'fora_sem_registros';
+  if (state === 'sem_base') return 'fora_sem_base';
   if (state === 'em_andamento') return 'fora_andamento';
   return hidden ? 'fora_escolha' : 'na_comparacao';
 }
@@ -455,6 +562,7 @@ export function buildEvolutionView(input: EvolutionViewInput): EvolutionView {
     return {
       ...p,
       participation,
+      hasValue: p.state !== 'sem_registros',
       included: participation === 'na_comparacao',
       eligible: (COMPARISON_ELIGIBLE_STATES as readonly EvolutionPointState[]).includes(p.state),
       title: formatMonthBR(p.month),
@@ -480,6 +588,7 @@ export function buildEvolutionView(input: EvolutionViewInput): EvolutionView {
           : 'normal';
   return {
     metric,
+    unit: 'cents',
     windowMonths,
     from: months[0]!,
     to: months[months.length - 1]!,
@@ -487,12 +596,15 @@ export function buildEvolutionView(input: EvolutionViewInput): EvolutionView {
     points: views,
     rows,
     stats,
+    averageText: stats.average === null ? null : formatBRL(stats.average),
+    medianText: stats.median === null ? null : formatBRL(stats.median),
     outCount: stats.hiddenMonths.length,
     eligibleCount: stats.eligibleCount,
     outsideMonths,
     situation,
     totalCents: total,
     maxCents: views.reduce((max, p) => Math.max(max, p.cents), 0),
+    minCents: 0,
   };
 }
 
@@ -500,9 +612,14 @@ export function buildEvolutionView(input: EvolutionViewInput): EvolutionView {
  * O mês do painel: o que a pessoa escolheu, se ainda está na janela; senão, o mais recente que tem lançamentos (ou, sem nenhum, o mais
  * recente conferido sem lançamentos e, sem nenhum, o último da janela).
  */
-export function evolutionSelectedMonth(view: EvolutionView, chosen: IsoMonth | null): IsoMonth {
+export function evolutionSelectedMonth<M extends EvolutionSelectionMetric>(view: EvolutionView<M>, chosen: IsoMonth | null): IsoMonth {
   const picked = view.points.find((p) => p.month === chosen);
   if (picked) return picked.month;
+  // Fase 3: o mês em andamento não tem valor (só meses fechados), então abre no fechado mais recente que tem valor; sem nenhum, o último.
+  if (isPhase3Metric(view.metric)) {
+    const valued = [...view.points].reverse().find((p) => p.hasValue);
+    return (valued ?? view.points[view.points.length - 1]!).month;
+  }
   const withRecords = [...view.points].reverse().find((p) => p.state === 'com_registros' || p.state === 'em_andamento');
   const confirmed = [...view.points].reverse().find((p) => p.state === 'zero_confirmado');
   return (withRecords ?? confirmed ?? view.points[view.points.length - 1]!).month;
@@ -859,11 +976,11 @@ export function evolutionExplanation(plan: EvolutionExplainPlan, baseParts: Chan
 }
 
 /** Frase do anúncio ao tirar ou pôr um mês na comparação (média, mediana e "n de N meses"; nunca média zero). */
-export function evolutionAnnouncement(view: EvolutionView): string {
+export function evolutionAnnouncement<M extends EvolutionSelectionMetric>(view: EvolutionView<M>): string {
   const s = view.stats;
-  return s.average === null || s.median === null
+  return view.averageText === null || view.medianText === null || s.average === null || s.median === null
     ? EVOLUTION_TEXT.stats.announceNone
-    : EVOLUTION_TEXT.stats.announce(s.average, s.median, s.visibleCount, s.eligibleCount);
+    : EVOLUTION_TEXT.stats.announceText(view.averageText, view.medianText, s.visibleCount, s.eligibleCount);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -918,12 +1035,218 @@ export async function loadEvolutionGaps(
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// Fase 3 (D-062 item 4): Renda comprometida e Guardado em metas
+// ---------------------------------------------------------------------------------------------------------------------
+
+/**
+ * A base de cada valor, escrita no subtítulo da tela: a de Recebido e Pago é a de sempre ("Valores registrados, pela data do pagamento");
+ * a dos valores da fase 3 é a própria, e eles dizem que só entram meses já fechados.
+ */
+export function evolutionSubtitle(metric: EvolutionSelectionMetric): { base: string; note: string | null } {
+  return isPhase3Metric(metric)
+    ? { base: EVOLUTION_TEXT.phase3.subtitle[metric], note: EVOLUTION_TEXT.phase3.closedOnly }
+    : { base: EVOLUTION_TEXT.subtitle, note: null };
+}
+
+/** O estado do mês na fase 3, dito no painel. */
+function phase3StateText(metric: EvolutionPhase3Metric, state: EvolutionPointState): string {
+  const T = EVOLUTION_TEXT.phase3.state;
+  if (metric === 'comprometida') {
+    if (state === 'com_registros') return T.comprometida.com_registros;
+    if (state === 'sem_base') return T.comprometida.sem_base;
+    if (state === 'em_andamento') return T.comprometida.em_andamento;
+    return T.comprometida.sem_registros;
+  }
+  if (state === 'com_registros') return T.guardado.com_registros;
+  if (state === 'zero_confirmado') return T.guardado.zero_confirmado;
+  if (state === 'em_andamento') return T.guardado.em_andamento;
+  return T.guardado.sem_registros;
+}
+
+/** O que o mês é, em poucas palavras, no nome acessível do ponto. */
+function phase3PointName(point: Phase3Point, participation: EvolutionParticipation): string {
+  const T = EVOLUTION_TEXT.participation;
+  const parts = [formatMonthBR(point.month)];
+  if (point.state === 'com_registros' || point.state === 'zero_confirmado') parts.push(point.valueText ?? '');
+  else parts.push(point.state === 'sem_base' ? T.noBase : point.state === 'em_andamento' ? T.inProgress : T.noRecords);
+  if (point.state === 'zero_confirmado') parts.push(T.zeroSaved);
+  parts.push(participation === 'na_comparacao' ? T.included : T.excluded);
+  return parts.join(', ');
+}
+
+export interface Phase3ViewInput {
+  metric: EvolutionPhase3Metric;
+  /** Um ponto por mês da janela, de `committedEvolutionPoints` ou de `savingsEvolutionPoints`. */
+  points: readonly Phase3Point[];
+  windowMonths: EvolutionWindow;
+  currentMonth: IsoMonth;
+  /** Meses que a pessoa tirou da comparação deste valor. */
+  hiddenMonths: Iterable<IsoMonth>;
+}
+
+/**
+ * Tudo o que a tela mostra para a Renda comprometida ou o Guardado em metas na janela escolhida (D-062 item 4). Só meses fechados têm valor:
+ * o mês em andamento aparece no eixo, sem valor, e nunca entra nas contas. Mês sem base (Renda comprometida sem renda de referência) e mês
+ * sem registros ficam à vista no eixo, rotulados e fora da média e da mediana, nunca como zero. A média e a mediana valem para os dois
+ * (percentual em milésimos, metade para cima); o total só existe no Guardado em metas. `points` precisa ter exatamente os meses da janela;
+ * ponto do mês atual com valor lança RangeError (nada de previsão). Não altera o que recebe.
+ */
+export function buildPhase3View(input: Phase3ViewInput): EvolutionView<EvolutionPhase3Metric> {
+  const { metric, windowMonths, currentMonth } = input;
+  const months = evolutionMonths(currentMonth, windowMonths);
+  const byMonth = new Map(input.points.map((p) => [p.month, p] as const));
+  if (input.points.length !== months.length || months.some((m) => !byMonth.has(m))) throw new RangeError('os pontos não são os meses da janela');
+  const ordered = months.map((m) => byMonth.get(m)!);
+  const current = ordered[ordered.length - 1]!;
+  if (current.state !== 'em_andamento' || current.valueText !== null || current.cents !== 0) throw new RangeError('o mês atual não tem valor: só meses fechados');
+  const hidden = new Set(input.hiddenMonths);
+  const stats = comparisonStats(ordered, hidden);
+  const inWindow = new Set(months);
+  const outsideMonths = [...hidden].filter((m) => !inWindow.has(m)).sort();
+  const T = EVOLUTION_TEXT;
+  const views = ordered.map((p): EvolutionPointView => {
+    const participation = participationOf(p.state, hidden.has(p.month));
+    const hasValue = p.state === 'com_registros' || p.state === 'zero_confirmado';
+    return {
+      month: p.month,
+      cents: p.cents,
+      count: p.count,
+      state: p.state,
+      participation,
+      hasValue,
+      included: participation === 'na_comparacao',
+      eligible: hasValue,
+      title: formatMonthBR(p.month),
+      shortLabel: formatMonthName(p.month).slice(0, 3),
+      valueText: hasValue ? p.valueText : null,
+      stateText: phase3StateText(metric, p.state),
+      stateLabel: T.phase3.stateLabel[p.state],
+      includedText: participation === 'na_comparacao' ? T.table.yes : T.table.out,
+      gap: false,
+      name: phase3PointName(p, participation),
+    };
+  });
+  const unit: EvolutionUnit = metric === 'comprometida' ? 'permille' : 'cents';
+  const total = Number(stats.canonicalTotal);
+  if (!Number.isSafeInteger(total)) throw new RangeError('total grande demais');
+  const text = (value: number | null): string | null => (value === null ? null : unit === 'permille' ? formatPermille(value, 1) : formatBRL(value));
+  const situation: EvolutionSituation =
+    stats.eligibleCount === 0 ? 'sem_registros' : stats.visibleCount === 0 ? 'todos_fora' : stats.visibleCount === 1 ? 'um_mes' : 'normal';
+  return {
+    metric,
+    unit,
+    windowMonths,
+    from: months[0]!,
+    to: months[months.length - 1]!,
+    currentMonth,
+    points: views,
+    rows: [],
+    stats,
+    averageText: text(stats.average),
+    medianText: text(stats.median),
+    outCount: stats.hiddenMonths.length,
+    eligibleCount: stats.eligibleCount,
+    outsideMonths,
+    situation,
+    totalCents: unit === 'permille' ? null : total,
+    maxCents: views.reduce((max, p) => (p.hasValue ? Math.max(max, p.cents) : max), 0),
+    minCents: views.reduce((min, p) => (p.hasValue ? Math.min(min, p.cents) : min), 0),
+  };
+}
+
+/** O painel do mês escolhido na fase 3: o mês, o valor (ou o motivo de não ter), o estado, o interruptor e o aviso de que "Entender o que mudou" é de Recebido e Pago. */
+export interface Phase3Panel {
+  month: IsoMonth;
+  /** "Abril de 2026". */
+  title: string;
+  metric: EvolutionPhase3Metric;
+  /** "Renda comprometida" ou "Guardado em metas". */
+  valueCaption: string;
+  /** "52,5%" ou "R$ 200,00"; null sem valor (então `noValueText` diz por quê). */
+  valueText: string | null;
+  /** "Sem base", "Sem registros" ou "Mês em andamento", no lugar do valor; null com valor. */
+  noValueText: string | null;
+  cents: number;
+  unit: EvolutionUnit;
+  state: EvolutionPointState;
+  stateText: string;
+  /** A base da conta, a mesma do subtítulo da tela. */
+  baseText: string;
+  /** Só o mês fechado com valor tem o interruptor. */
+  canToggle: boolean;
+  included: boolean;
+  /** "Tirar da comparação não apaga nem muda nenhuma conta, meta ou lançamento." */
+  switchCaption: string;
+  /** Frase no lugar do interruptor quando o mês nunca entra na comparação. */
+  notEligibleText: string | null;
+  previousMonth: IsoMonth | null;
+  nextMonth: IsoMonth | null;
+  /** "Entender o que mudou" e a frase "Disponível para Recebido e Pago" (a explicação não se aplica a estes valores nesta fase). */
+  explainTitle: string;
+  explainNote: string;
+}
+
+/** O painel do mês `month` (ou o último da janela, se não estiver nela). Não lê nada. */
+export function phase3Panel(view: EvolutionView<EvolutionPhase3Metric>, month: IsoMonth): Phase3Panel {
+  const point = view.points.find((p) => p.month === month) ?? view.points[view.points.length - 1]!;
+  const at = view.points.indexOf(point);
+  const T = EVOLUTION_TEXT;
+  const noValueText = point.hasValue ? null : point.state === 'sem_base' ? T.phase3.noValue.sem_base : point.state === 'em_andamento' ? T.phase3.noValue.em_andamento : T.phase3.noValue.sem_registros;
+  return {
+    month: point.month,
+    title: point.title,
+    metric: view.metric,
+    valueCaption: T.panel.valueCaption(view.metric),
+    valueText: point.valueText,
+    noValueText,
+    cents: point.cents,
+    unit: view.unit,
+    state: point.state,
+    stateText: point.stateText,
+    baseText: T.phase3.subtitle[view.metric],
+    canToggle: point.eligible,
+    included: point.included,
+    switchCaption: T.phase3.switchCaption,
+    notEligibleText: point.state === 'em_andamento' ? T.panel.notEligible.em_andamento : point.state === 'sem_base' ? T.panel.notEligible.sem_base : point.state === 'sem_registros' ? T.panel.notEligible.sem_registros : null,
+    previousMonth: view.points[at - 1]?.month ?? null,
+    nextMonth: view.points[at + 1]?.month ?? null,
+    explainTitle: T.phase3.explainTitle,
+    explainNote: T.phase3.explainNote,
+  };
+}
+
+/** O que a tela diz quando nenhum mês fechado da janela tem valor, e a ação que leva a criar a base (só com escrita). */
+export interface Phase3Empty {
+  title: string;
+  body: string;
+  /** A ação: a renda de referência, uma conta a pagar ou uma meta; null sem escrita no contexto (quem só lê não vê o botão). */
+  action: { kind: 'referencia' | 'conta' | 'meta'; label: string } | null;
+}
+
+/**
+ * Tela sem mês fechado com valor (situação 'sem_registros' da fase 3). Na Renda comprometida, "Sem base" quando nenhum mês fechado tem
+ * renda de referência, e "Sem registros" quando há renda mas nenhuma conta anotada. No Guardado em metas, "Sem registros" (nenhuma meta
+ * ativa anotada). `canWrite`: quem só lê (Família) não recebe o botão.
+ */
+export function phase3Empty(view: EvolutionView<EvolutionPhase3Metric>, canWrite: boolean): Phase3Empty {
+  const T = EVOLUTION_TEXT.phase3.empty;
+  if (view.metric === 'guardado') {
+    return { title: T.noRecordsTitle, body: T.savingsBody, action: canWrite ? { kind: 'meta', label: T.savingsAction } : null };
+  }
+  const closed = view.points.filter((p) => p.month < view.currentMonth);
+  const withBase = closed.some((p) => p.state !== 'sem_base');
+  return withBase
+    ? { title: T.noRecordsTitle, body: T.noRecordsBody, action: canWrite ? { kind: 'conta', label: T.noRecordsAction } : null }
+    : { title: T.noBaseTitle, body: T.noBaseBody, action: canWrite ? { kind: 'referencia', label: T.noBaseAction } : null };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
 // Memória dos meses fora da comparação (D03)
 // ---------------------------------------------------------------------------------------------------------------------
 
 /**
  * Meses que a pessoa tirou da comparação, só na memória do app (D03): por pessoa, por contexto (Pessoal ou Família) e por
- * métrica, de modo que Recebido e Pago nunca herdam a seleção um do outro (T13, EF-14). Nunca vai ao aparelho nem ao servidor e
+ * métrica (Recebido, Pago, Renda comprometida e Guardado em metas), de modo que nenhum herda a seleção de outro (T13, EF-14). Nunca vai ao aparelho nem ao servidor e
  * some ao sair da conta, ao trocar de pessoa, ao trocar de contexto e ao recarregar a página. O app tem uma instância
  * (`lib/evolution-memory.ts`) e a limpa onde limpa as outras memórias (`clearReceiptMemory`).
  */
@@ -937,17 +1260,17 @@ export class EvolutionSelectionStore {
     return personId && contextId ? `${personId}|${contextId}` : null;
   }
 
-  private key(scope: string, metric: EvolutionMetric): string {
+  private key(scope: string, metric: EvolutionSelectionMetric): string {
     return `${scope}|${metric}`;
   }
 
   /** Os meses tirados nesta métrica. A mesma referência enquanto nada muda (serve de snapshot para a tela). */
-  get(scope: string | null, metric: EvolutionMetric): ReadonlySet<IsoMonth> {
+  get(scope: string | null, metric: EvolutionSelectionMetric): ReadonlySet<IsoMonth> {
     return (scope && this.sets.get(this.key(scope, metric))) || EvolutionSelectionStore.EMPTY;
   }
 
   /** Tira (hidden true) ou devolve (false) um mês da comparação desta métrica. */
-  setHidden(scope: string, metric: EvolutionMetric, month: IsoMonth, hidden: boolean): void {
+  setHidden(scope: string, metric: EvolutionSelectionMetric, month: IsoMonth, hidden: boolean): void {
     const current = this.get(scope, metric);
     if (current.has(month) === hidden) return;
     const next = new Set(current);
@@ -957,7 +1280,7 @@ export class EvolutionSelectionStore {
   }
 
   /** "Restaurar todos": só desta métrica. */
-  restoreAll(scope: string, metric: EvolutionMetric): void {
+  restoreAll(scope: string, metric: EvolutionSelectionMetric): void {
     if (this.get(scope, metric).size === 0) return;
     this.write(scope, metric, new Set());
   }
@@ -976,7 +1299,7 @@ export class EvolutionSelectionStore {
     };
   };
 
-  private write(scope: string, metric: EvolutionMetric, next: ReadonlySet<IsoMonth>): void {
+  private write(scope: string, metric: EvolutionSelectionMetric, next: ReadonlySet<IsoMonth>): void {
     if (next.size === 0) this.sets.delete(this.key(scope, metric));
     else this.sets.set(this.key(scope, metric), next);
     this.emit();

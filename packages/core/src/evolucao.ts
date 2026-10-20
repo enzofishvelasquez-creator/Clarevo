@@ -1,7 +1,9 @@
-import { isValidIsoMonth, monthsBetween, type IsoDate, type IsoMonth } from './dates';
+import { summarizeCommitted, formatPermille } from './committed';
+import { isValidIsoMonth, monthOf, monthsBetween, todayIn, type IsoDate, type IsoMonth } from './dates';
+import { savedInMonth } from './goals';
 import { averageCents, medianCents, roundDivBig } from './learn/math';
-import type { Cents } from './money';
-import type { MonthOverview } from './records';
+import { formatBRL, type Cents } from './money';
+import type { Commitment, Goal, GoalMovement, IncomeReference, MonthOverview } from './records';
 import type { CategoryPart } from './summary';
 
 /**
@@ -14,20 +16,38 @@ import type { CategoryPart } from './summary';
  * - Ocultar um mês só tira o ponto da comparação: o total canônico não depende dele.
  *
  * Fase 2 (D-057, "Entender o que mudou"): `explainChange` compara dois meses por categoria, também em conta pura, sem texto.
+ *
+ * Fase 3 (D-062 item 4): "Renda comprometida" (`committedEvolutionPoints`, o percentual do mês que `summarizeCommitted` já calcula) e
+ * "Guardado em metas" (`savingsEvolutionPoints`, aportes menos resgates, `savedInMonth`), só de meses fechados: o mês atual e os
+ * futuros nunca têm valor (nada de previsão). Cada um tem a própria base; mês sem base (renda de referência) ou sem registros fica
+ * fora das médias e nunca vira zero; zero só quando há como afirmar (renda comprometida: nunca sem conta anotada; guardado: com
+ * meta no mês).
  */
 
 /** Qual série mostrar: o que entrou (Recebido) ou o que saiu (Pago). */
 export type EvolutionMetric = 'recebido' | 'pago';
+
+/** Os dois valores novos da fase 3 (D-062 item 4): o percentual da renda de referência ligado a contas do mês e o guardado em metas. */
+export type EvolutionPhase3Metric = 'comprometida' | 'guardado';
+
+/** Tudo o que o seletor da Evolução oferece; a seleção de meses fora da comparação é separada por valor (T13). */
+export type EvolutionSelectionMetric = EvolutionMetric | EvolutionPhase3Metric;
+
+export function isPhase3Metric(value: unknown): value is EvolutionPhase3Metric {
+  return value === 'comprometida' || value === 'guardado';
+}
 
 /**
  * Estado de um ponto mensal:
  * - sem_registros: a contagem de lançamentos é 0 e a pessoa não conferiu o mês (o valor 0 não quer dizer que nada foi gasto ou recebido);
  * - zero_confirmado: a contagem é 0 e a pessoa conferiu o mês já terminado (D-060): o zero é um fato, a tela mostra "R$ 0,00, conferido"
  *   e ele entra nas médias e na mediana como zero (D04);
- * - em_andamento: o mês atual, que ainda pode receber lançamentos;
- * - com_registros: os demais, com ao menos um lançamento.
+ * - em_andamento: o mês atual, que ainda pode receber lançamentos (na fase 3 não tem valor: só meses fechados);
+ * - com_registros: os demais, com ao menos um lançamento;
+ * - sem_base (só na Renda comprometida, fase 3): mês fechado sem renda de referência, sem o que dividir: nunca é zero e fica fora das contas.
+ *   Em "Guardado em metas", zero_confirmado é o mês fechado sem aporte nem resgate com ao menos uma meta existente no mês.
  */
-export type EvolutionPointState = 'sem_registros' | 'zero_confirmado' | 'em_andamento' | 'com_registros';
+export type EvolutionPointState = 'sem_registros' | 'zero_confirmado' | 'em_andamento' | 'com_registros' | 'sem_base';
 
 export interface EvolutionPoint {
   month: IsoMonth;
@@ -74,7 +94,7 @@ export function evolutionPoints(overview: readonly MonthOverview[], metric: Evol
  * Estados que entram na média e na mediana (D04): só mês fechado e com lançamentos, ou conferido sem lançamentos (zero confirmado, que
  * entra como zero). O mês em andamento e o mês sem registros ficam de fora.
  */
-export const COMPARISON_ELIGIBLE_STATES: readonly Exclude<EvolutionPointState, 'sem_registros'>[] = ['com_registros', 'zero_confirmado'];
+export const COMPARISON_ELIGIBLE_STATES: readonly Exclude<EvolutionPointState, 'sem_registros' | 'sem_base'>[] = ['com_registros', 'zero_confirmado'];
 
 export interface ComparisonStats {
   /** N: pontos elegíveis (com ou sem ocultos). */
@@ -98,8 +118,10 @@ export interface ComparisonStats {
 /**
  * Média, mediana e totais da comparação.
  * - Elegíveis: os pontos cujo estado está em eligibleStates (padrão COMPARISON_ELIGIBLE_STATES: com_registros e zero_confirmado, então o
- *   mês em andamento e os meses sem registros ficam de fora). Sem registros nunca é elegível, mesmo se a lista pedir. O zero confirmado
- *   entra com valor 0: puxa a média e a mediana para baixo, como o zero que é.
+ *   mês em andamento e os meses sem registros ficam de fora). Sem registros e sem base nunca são elegíveis, mesmo se a lista pedir. O
+ *   zero confirmado entra com valor 0: puxa a média e a mediana para baixo, como o zero que é. Os valores podem ser negativos (Guardado
+ *   em metas, com mais resgates que aportes) e podem ser milésimos da renda (Renda comprometida): a média e a mediana são as mesmas
+ *   contas, metade para cima (para longe do zero nos negativos).
  * - Visíveis: os elegíveis fora de hiddenMonths. Mês oculto que não existe nos pontos, ou que não é elegível, é ignorado.
  * - canonicalTotal soma todos os pontos e não depende de hiddenMonths nem de eligibleStates.
  * Com n = 0, average e median são null. Não altera points nem hiddenMonths.
@@ -110,11 +132,12 @@ export interface ComparisonStats {
 export function comparisonStats(
   points: readonly EvolutionPoint[],
   hiddenMonths: Iterable<IsoMonth>,
-  eligibleStates: readonly Exclude<EvolutionPointState, 'sem_registros'>[] = COMPARISON_ELIGIBLE_STATES,
+  eligibleStates: readonly Exclude<EvolutionPointState, 'sem_registros' | 'sem_base'>[] = COMPARISON_ELIGIBLE_STATES,
 ): ComparisonStats {
   const hidden = new Set(hiddenMonths);
   const eligible = new Set<EvolutionPointState>(eligibleStates);
   eligible.delete('sem_registros');
+  eligible.delete('sem_base');
   let canonicalTotal = 0n;
   let eligibleCount = 0;
   let visibleSum = 0n;
@@ -136,8 +159,8 @@ export function comparisonStats(
     eligibleCount,
     visibleCount: visible.length,
     visibleSum,
-    average: values.length === 0 ? null : averageCents(values),
-    median: values.length === 0 ? null : medianCents(values),
+    average: values.length === 0 ? null : averageCents(values, { signed: true }),
+    median: values.length === 0 ? null : medianCents(values, { signed: true }),
     canonicalTotal,
     visibleMonths: visible.map((p) => p.month),
     hiddenMonths: hiddenOut,
@@ -319,3 +342,127 @@ export function explainChange(from: ChangeSide, to: ChangeSide): ChangeExplanati
     .slice(0, EXPLAIN_TOP_RECORDS);
   return { ...empty, categories, otherCents, related };
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Fase 3 (D-062 item 4): Renda comprometida e Guardado em metas, só de meses fechados
+// ---------------------------------------------------------------------------------------------------------------------
+
+/**
+ * Um mês de "Renda comprometida" ou de "Guardado em metas". `cents` é o valor da métrica: milésimos da renda de referência na Renda
+ * comprometida (525 = 52,5%) e centavos, com sinal, no Guardado em metas (aportes menos resgates; negativo com mais resgates que
+ * aportes). Sem valor (mês em andamento, sem base, sem registros), `cents` é 0 e `valueText` é null: nunca se lê o 0 como dado.
+ */
+export interface Phase3Point extends EvolutionPoint {
+  /** "52,5%", "menos de 0,1%" ou "R$ 200,00"; null quando o mês não tem valor. */
+  valueText: string | null;
+}
+
+function checkPhase3Months(months: readonly IsoMonth[], currentMonth: IsoMonth): void {
+  if (!isValidIsoMonth(currentMonth)) throw new RangeError(`mês atual inválido: ${currentMonth}`);
+  for (const month of months) {
+    if (!isValidIsoMonth(month)) throw new RangeError(`mês inválido: ${month}`);
+    if (month > currentMonth) throw new RangeError(`mês futuro: ${month}`);
+  }
+}
+
+const noValue = (month: IsoMonth, state: EvolutionPointState): Phase3Point => ({ month, cents: 0, count: 0, state, valueText: null });
+
+/**
+ * Os pontos da "Renda comprometida" (D-062 item 4), um por mês de `months`, do mês de cada conta que `summarizeCommitted` já resume (o
+ * percentual do mês é o `committedPermille` dele, o mesmo de `month_committed`; por mês, uma leitura de `listCommitments`):
+ * - mês atual: em_andamento, sem valor (só meses fechados: nada do mês atual nem de meses futuros);
+ * - mês fechado sem renda de referência que valha nele: sem_base, sem valor, nunca 0% (não há com o que dividir), mesmo com contas;
+ * - mês fechado com a referência e sem nenhuma conta anotada com vencimento nele: sem_registros, sem valor (conta não anotada não é
+ *   0%, como Pago sem lançamento não é R$ 0,00);
+ * - os demais: com_registros, com o percentual em milésimos ("52,5%", "menos de 0,1%").
+ * `commitmentsByMonth` traz a leitura de cada mês fechado (`listCommitments(contexto, mês)`); mês fechado que falta lança RangeError (a
+ * tela só monta com tudo lido, nunca com dado parcial) e mês depois do atual também. Contas e referências de outro contexto ficam fora.
+ */
+export function committedEvolutionPoints(input: {
+  months: readonly IsoMonth[];
+  currentMonth: IsoMonth;
+  contextId: string;
+  today: IsoDate;
+  commitmentsByMonth: ReadonlyMap<IsoMonth, readonly Commitment[]>;
+  refs: readonly IncomeReference[];
+}): Phase3Point[] {
+  const { months, currentMonth } = input;
+  checkPhase3Months(months, currentMonth);
+  return months.map((month): Phase3Point => {
+    if (month === currentMonth) return noValue(month, 'em_andamento');
+    const list = input.commitmentsByMonth.get(month);
+    if (!list) throw new RangeError(`contas do mês não lidas: ${month}`);
+    const summary = summarizeCommitted(list, input.contextId, month, input.today, input.refs);
+    if (summary.referenceCents === null || summary.committedPermille === null) return noValue(month, 'sem_base');
+    if (summary.count === 0) return noValue(month, 'sem_registros');
+    return {
+      month,
+      cents: summary.committedPermille,
+      count: summary.count,
+      state: 'com_registros',
+      valueText: formatPermille(summary.committedPermille, summary.committedCents),
+    };
+  });
+}
+
+/**
+ * Meta como a Evolução a lê: só o que decide se ela existia num mês. `deletedAt` (data e hora da exclusão) é opcional porque a leitura de
+ * `listGoals` traz só metas vivas e não o informa; uma `Goal` serve como está.
+ */
+export type GoalExistence = Pick<Goal, 'createdAt'> & { deletedAt?: string | null };
+
+/**
+ * A meta existia no mês `month`? Existia se foi criada até o fim do mês (no fuso de quem usa) e não foi excluída antes do começo dele (a
+ * exclusão no próprio mês ainda conta). Não depende da situação de agora (concluída ou arquivada continua existindo: aportes e resgates
+ * zerados num mês com meta são um fato) nem de movimento (o saldo inicial, o rendimento e a valorização podem ter data de antes da
+ * criação e não provam que a meta existia). Data de criação ilegível, ou de exclusão ilegível numa meta excluída, não afirma nada.
+ */
+function goalExistedIn(goal: GoalExistence, month: IsoMonth, timeZone: string): boolean {
+  const created = new Date(goal.createdAt);
+  if (Number.isNaN(created.getTime()) || monthOf(todayIn(timeZone, created)) > month) return false;
+  if (goal.deletedAt === undefined || goal.deletedAt === null) return true;
+  const deleted = new Date(goal.deletedAt);
+  return !Number.isNaN(deleted.getTime()) && monthOf(todayIn(timeZone, deleted)) >= month;
+}
+
+/**
+ * Os pontos do "Guardado em metas" (D-062 item 4), um por mês de `months`: aportes menos resgates do mês (`savedInMonth`; o já guardado ao
+ * criar, rendimentos e valorizações ficam fora), que pode ser negativo:
+ * - mês atual: em_andamento, sem valor (só meses fechados);
+ * - mês fechado com ao menos um aporte ou resgate: com_registros, com o valor (R$ 0,00 se se anularam);
+ * - mês fechado sem aporte nem resgate: zero_confirmado (R$ 0,00) se existia ao menos uma meta no mês, senão sem_registros, sem valor
+ *   (sem meta, não há o que afirmar). Meta existente: ver `goalExistedIn` (criada até o fim do mês e não excluída antes do começo dele,
+ *   em qualquer situação, e sem contar movimento como prova).
+ * `movementsByMonth` traz os movimentos de cada mês fechado (`listGoalMovementsInMonth`); `goals` vem de `listGoals`. Mês fechado que
+ * falta lança RangeError, e mês depois do atual também. `timeZone` é o fuso de quem usa (as datas de criação e de exclusão da meta).
+ */
+export function savingsEvolutionPoints(input: {
+  months: readonly IsoMonth[];
+  currentMonth: IsoMonth;
+  goals: readonly GoalExistence[];
+  movementsByMonth: ReadonlyMap<IsoMonth, readonly GoalMovement[]>;
+  timeZone: string;
+}): Phase3Point[] {
+  const { months, currentMonth } = input;
+  checkPhase3Months(months, currentMonth);
+  return months.map((month): Phase3Point => {
+    if (month === currentMonth) return noValue(month, 'em_andamento');
+    const movements = input.movementsByMonth.get(month);
+    if (!movements) throw new RangeError(`movimentos das metas do mês não lidos: ${month}`);
+    const counted = movements.filter((m) => monthOf(m.occurredOn) === month && (m.kind === 'aporte' || m.kind === 'resgate'));
+    if (counted.length > 0) {
+      const saved = savedInMonth(movements, month);
+      return { month, cents: saved, count: counted.length, state: 'com_registros', valueText: formatBRL(saved) };
+    }
+    const existed = input.goals.some((g) => goalExistedIn(g, month, input.timeZone));
+    return existed ? { month, cents: 0, count: 0, state: 'zero_confirmado', valueText: formatBRL(0) } : noValue(month, 'sem_registros');
+  });
+}
+
+/** Os meses fechados de uma janela (todos menos o atual), do mais antigo ao mais recente: o que a Renda comprometida e o Guardado em metas leem. */
+export function phase3ClosedMonths(months: readonly IsoMonth[], currentMonth: IsoMonth): IsoMonth[] {
+  return months.filter((m) => m < currentMonth);
+}
+
+/** Meses lidos por janela, no máximo: um `listCommitments` por mês fechado (11 numa janela de 12 meses; o limite do contrato é 12). */
+export const PHASE3_MAX_MONTH_READS = 12;
