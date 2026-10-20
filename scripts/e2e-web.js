@@ -19,7 +19,8 @@
  * de quem é titular com outras pessoas, a confirmação digitada, a demonstração que não apaga nada e a tela "Sua conta foi excluída", com a
  * Família simulada na memória), das Análises (D-059: Categorias em Barras e Bolhas, Evolução, Próximos meses e Orçamento, só leitura), do Dia útil (D-060 e D-061: o aviso de
  * vencimento em sábado, domingo ou feriado nacional e o padrão de mercado do próximo dia útil, que não mudam a data nem os totais) e de Mês conferido (D-060: "Conferi: não houve pagamentos em {mês}" e o zero
- * confirmado na Evolução, em Pago e Recebido, em Análises e em "Seus últimos meses") na versão web, em modo demonstração (acesso simulado).
+ * confirmado na Evolução, em Pago e Recebido, em Análises e em "Seus últimos meses") e de Renda variável (D-062: "Calcular pela média" no formulário da renda de referência, com
+ * 3 ou 6 meses fechados, o mês conferido como zero, a explicação sem mês com recebimentos e a Família) na versão web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -12494,6 +12495,163 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const mcBad = mcTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(demais|alt[oa]s?|baix[oa]s?|gastou|aumentou|diminuiu|despencou|disparou|cuidado|estour\w*|exagero|usuári[oa]s?|bem-vind[oa]s?|parab[eé]ns|incr[ií]vel|garant\w*)\b/i)?.[0]).filter(Boolean);
   ok('Mês conferido: nenhum termo proibido, travessão longo, expressão vetada, palavra de julgamento nem palavra com gênero nas telas novas', mcTexts.length >= 12 && mcBad.length === 0, `${mcTexts.length} telas ${mcBad.join(' | ')}`);
   ok('Mês conferido: nenhuma escrita direta na rede (a conferência fica na memória da demonstração; o banco é coberto pelos testes de banco e de API)', writes.length === mcWrites0, writes.slice(mcWrites0).join(' | '));
+
+  // =====================================================================================================================
+  // Renda variável (D-062 item 2, Ciclo V): "Calcular pela média" no formulário da renda de referência. Para quem a renda muda de um mês para
+  // o outro, a média do Recebido dos últimos 3 ou 6 meses fechados (months_overview do contexto escolhido, com a conta exata da Evolução):
+  // entra o mês com recebimentos e o mês conferido como zero (D-060); ficam de fora o mês atual e os meses sem registros. O resultado diz
+  // quais meses entraram ("Média de abril a junho: R$ 5.100,00") e quantos ("Meses usados: 3 de 6, julho, agosto e setembro sem registros
+  // ficaram de fora"), traz o aviso de estimativa e SÓ preenche o campo: quem grava é a pessoa, pela mesma set_income_reference. Sem nenhum
+  // mês fechado com recebimentos, o botão explica que precisa de pelo menos um. Aqui, na versão web (memória): (1) a demonstração padrão
+  // (só setembro tem Recebido, R$ 6.000,00), com 3 e 6 meses e o salvar; (2) o cenário "evolucao" (abril a junho com R$ 5.200,00, 5.000,00 e
+  // 5.100,00): sem mês em 3 meses, 3 de 6 em 6 meses, julho conferido como zero (4 de 6, R$ 3.825,00) e o descarte sem gravar; (3) conta
+  // nova; (4) a Família, que lê os meses da casa e não os do Pessoal. Hoje é 07/10/2026. Capturas a partir de 550, em 390, 360 e 320 px.
+  // =====================================================================================================================
+  const rvWrites0 = writes.length;
+  const rvTexts = [];
+  const rvKeep = async () => { const x = await body(); rvTexts.push(x); screenTexts.push(x); return x; };
+  const rvCalls = async (from) => (await evSpyCalls()).slice(from).filter((x) => x !== 'syncSeriesOccurrences');
+  const rvAmount = () => field('Valor por mês').inputValue();
+  const rvChecked = (n) => radio(`Últimos ${n} meses`).getAttribute('aria-checked');
+  // Do Resumo ao formulário: com referência, a linha de renda comprometida e "Alterar"; sem ela, o convite e "Informar renda de referência".
+  const rvOpenForm = async () => {
+    await goResumo(); await p.waitForTimeout(500);
+    await p.getByRole('button', { name: /^Renda comprometida em |^Veja quanto da sua renda já está comprometido/ }).filter({ visible: true }).first().click();
+    const change = p.getByRole('button', { name: /^(Alterar|Informar renda de referência)$/ }).filter({ visible: true }).first();
+    await change.waitFor({ timeout: 8000 }); await p.waitForTimeout(500);
+    await change.click();
+    await waitText('Valor por mês'); await p.waitForTimeout(600);
+  };
+  // Escolhe os meses e calcula; espera o texto pedido, que só aparece com o resultado desta conta (a escolha e o botão apagam o anterior).
+  const rvCalc = async (n, waitFor) => {
+    await radio(`Últimos ${n} meses`).click(); await p.waitForTimeout(250);
+    await btn('Calcular pela média').click();
+    await waitText(waitFor); await p.waitForTimeout(450);
+    return rvKeep();
+  };
+  const rvShots = (name) => evShots(name, { scroll: evScrollBtn('Calcular pela média') });
+  const RV_NOTICE = 'É uma estimativa feita com o que você anotou. Ajuste se souber que o próximo mês será diferente.';
+  const RV_BASIS = 'Entram todos os recebimentos anotados no mês, inclusive reembolsos.';
+  const RV_FILLED = 'O valor foi para o campo "Valor por mês". Ele só é salvo quando você toca em "Salvar renda de referência".';
+  const RV_EMPTY_3 = 'Para calcular a média, é preciso ter pelo menos um mês fechado com recebimentos anotados. Nos últimos 3 meses (julho a setembro), nenhum mês tem.';
+
+  // ---- 1. Demonstração padrão: só setembro tem recebimento (R$ 6.000,00) ----
+  await evEnter();
+  await rvOpenForm();
+  await evSpyStart();
+  const rvCalls0 = (await evSpyCalls()).length;
+  t = await rvKeep();
+  ok('Renda variável, formulário: o card traz a explicação, "Meses para a média" com "Últimos 3 meses" marcado e "Últimos 6 meses", e o botão "Calcular pela média"',
+    t.includes('Se a sua renda muda de um mês para o outro, calcule a média do que você recebeu nos últimos meses fechados.') && t.includes('O mês atual fica de fora, e os meses sem registros também, a não ser que você tenha conferido que não houve recebimentos.') &&
+    t.includes('Meses para a média') && (await rvChecked(3)) === 'true' && (await rvChecked(6)) === 'false' && (await visibleCount('button', 'Calcular pela média')) === 1 && (await visibleCount('radio', /^Últimos [36] meses$/)) === 2, t.slice(0, 900));
+  ok('Renda variável, formulário: o card vem depois do tipo de renda e antes do salvar, sem resultado nem aviso antes de calcular, e o campo segue com R$ 6.000,00',
+    t.indexOf('Tipo de renda') < t.indexOf('Meses para a média') && t.indexOf('Meses para a média') < t.indexOf('Salvar renda de referência') && !t.includes('Meses usados') && !t.includes(RV_NOTICE) && (await rvAmount()) === '6.000,00' && (await visibleCount('button', 'Usar R$ 6.000,00')) === 1);
+  await rvShots('550_renda_variavel_formulario');
+  await field('Valor por mês').fill('1234'); await p.waitForTimeout(200);
+  t = await rvCalc(3, 'Meses usados: 1 de 3');
+  ok('Renda variável, 3 meses (demonstração): "Média de setembro: R$ 6.000,00" e "Meses usados: 1 de 3, julho e agosto sem registros ficaram de fora"', t.includes('Média de setembro: R$ 6.000,00') && t.includes('Meses usados: 1 de 3, julho e agosto sem registros ficaram de fora'), t.slice(900, 1800));
+  ok('Renda variável: o resultado traz o aviso de estimativa, o que entra na conta e que o valor só é salvo quando a pessoa toca em salvar', t.includes(RV_NOTICE) && t.includes(RV_BASIS) && t.includes(RV_FILLED), t.slice(900, 1900));
+  ok('Renda variável: o valor digitado (1234) foi trocado pela média no campo (R$ 6.000,00), mas nada foi gravado: nenhuma escrita no repositório nem na rede', (await rvAmount()) === '6.000,00' && JSON.stringify(await rvCalls(rvCalls0)) === '[]' && writes.length === rvWrites0, JSON.stringify(await rvCalls(rvCalls0)));
+  ok('Renda variável: o resultado é dito uma vez ao leitor de tela (região viva) e o botão volta a "Calcular pela média"', (await evLive()).some((x) => x.includes('Média de setembro: R$ 6.000,00')) && (await visibleCount('button', 'Calcular pela média')) === 1);
+  await rvShots('551_renda_variavel_3_meses');
+  // Trocar de 3 para 6 meses apaga o resultado antigo (a conta é outra) e o campo fica como está.
+  await radio('Últimos 6 meses').click(); await p.waitForTimeout(400);
+  t = await body();
+  ok('Renda variável: ao trocar a escolha, o resultado antigo some, "Últimos 6 meses" fica marcado e o campo não muda', !t.includes('Meses usados') && !t.includes('Média de setembro') && (await rvChecked(6)) === 'true' && (await rvChecked(3)) === 'false' && (await rvAmount()) === '6.000,00');
+  t = await rvCalc(6, 'Meses usados: 1 de 6');
+  ok('Renda variável, 6 meses (demonstração): "Média de setembro: R$ 6.000,00" e "Meses usados: 1 de 6, abril, maio, junho, julho e agosto sem registros ficaram de fora"', t.includes('Média de setembro: R$ 6.000,00') &&
+    t.includes('Meses usados: 1 de 6, abril, maio, junho, julho e agosto sem registros ficaram de fora'), t.slice(900, 1800));
+  await rvShots('552_renda_variavel_6_meses');
+  // Salvar é da pessoa: a mesma set_income_reference de sempre, e o percentual de outubro segue 52,5% (6.000,00 contra 6.000,00).
+  await btn('Salvar renda de referência').click(); await waitText('Renda de referência salva. Ela vale a partir de outubro.'); await waitText('52,5%'); await p.waitForTimeout(400);
+  ok('Renda variável: salvar grava só pela set_income_reference (uma escrita), e a renda comprometida de outubro segue 52,5%', JSON.stringify(await rvCalls(rvCalls0)) === JSON.stringify(['setIncomeReference']) && (await body()).includes('52,5%'), JSON.stringify(await rvCalls(rvCalls0)));
+
+  // ---- 2. Cenário "evolucao": abril a junho com Recebido; julho a setembro sem registros ----
+  await evEnter('evolucao');
+  await rvOpenForm();
+  await evSpyStart();
+  const rvCalls1 = (await evSpyCalls()).length;
+  ok('Renda variável (evolução): sem referência, o campo vem vazio e o card de médias aparece do mesmo jeito', (await rvAmount()) === '' && (await visibleCount('button', 'Calcular pela média')) === 1);
+  t = await rvCalc(3, 'Para calcular a média');
+  ok('Renda variável, sem nenhum mês fechado com recebimentos (julho a setembro): o botão explica que é preciso pelo menos um mês fechado com recebimentos, e o campo segue vazio', t.includes(RV_EMPTY_3) && !t.includes('Meses usados') && !t.includes(RV_NOTICE) && (await rvAmount()) === '', t.slice(900, 1800));
+  ok('Renda variável, sem mês: nenhuma escrita, e o resultado vazio também é dito ao leitor de tela', JSON.stringify(await rvCalls(rvCalls1)) === '[]' && (await evLive()).some((x) => x.includes(RV_EMPTY_3)));
+  await rvShots('553_renda_variavel_sem_meses');
+  t = await rvCalc(6, 'Meses usados: 3 de 6');
+  ok('Renda variável, 6 meses (evolução): "Média de abril a junho: R$ 5.100,00" (R$ 5.200,00 + R$ 5.000,00 + R$ 5.100,00 ÷ 3) e "Meses usados: 3 de 6, julho, agosto e setembro sem registros ficaram de fora"', t.includes('Média de abril a junho: R$ 5.100,00') &&
+    t.includes('Meses usados: 3 de 6, julho, agosto e setembro sem registros ficaram de fora') && !t.includes('conferiu que não houve recebimentos.'), t.slice(900, 1800));
+  ok('Renda variável (evolução): o campo ganha R$ 5.100,00, o aviso aparece e nada foi gravado', (await rvAmount()) === '5.100,00' && t.includes(RV_NOTICE) && JSON.stringify(await rvCalls(rvCalls1)) === '[]');
+  await rvShots('554_renda_variavel_evolucao_6_meses');
+  // Calcular não grava: sair descartando deixa a casa sem referência.
+  await btn('Voltar').click(); await waitText('Descartar o preenchimento?'); await confirmIn('Descartar alterações'); await waitText('Informar renda de referência'); await p.waitForTimeout(500);
+  ok('Renda variável: sair sem salvar (descartando o preenchimento) não deixa nenhuma referência', (await otherDevice(async (repo, ctx) => (await repo.listIncomeReferences(ctx)).length)) === 0 && (await visibleCount('button', 'Informar renda de referência')) === 1);
+  // Julho conferido como zero (D-060, feito pelo Recebido de julho) entra na média como R$ 0,00.
+  await otherDevice(async (repo, ctx) => repo.setMonthCheck('e2e-rv-julho-zero', ctx, '2026-07', 'recebimentos', 0));
+  const rvCalls2 = (await evSpyCalls()).length;
+  await btn('Informar renda de referência').click(); await waitText('Valor por mês'); await p.waitForTimeout(600);
+  t = await rvCalc(6, 'Meses usados: 4 de 6');
+  ok('Renda variável, julho conferido como zero: "Média de abril a julho: R$ 3.825,00" e "Meses usados: 4 de 6, agosto e setembro sem registros ficaram de fora"', t.includes('Média de abril a julho: R$ 3.825,00') &&
+    t.includes('Meses usados: 4 de 6, agosto e setembro sem registros ficaram de fora'), t.slice(900, 1900));
+  ok('Renda variável, julho conferido como zero: a frase "Julho entrou com R$ 0,00 porque você conferiu que não houve recebimentos." e o campo em R$ 3.825,00', t.includes('Julho entrou com R$ 0,00 porque você conferiu que não houve recebimentos.') && (await rvAmount()) === '3.825,00');
+  await rvShots('555_renda_variavel_mes_conferido');
+  // Só o mês conferido como zero não dá média: a referência precisa ser maior que zero, e o campo não muda.
+  t = await rvCalc(3, 'Para calcular a média');
+  ok('Renda variável: em 3 meses só julho está conferido (zero) e não há mês com recebimentos: a explicação volta e o campo segue em R$ 3.825,00', t.includes(RV_EMPTY_3) && !t.includes('Meses usados') && (await rvAmount()) === '3.825,00');
+  await radio('Últimos 6 meses').click(); await p.waitForTimeout(300);
+  await btn('Salvar renda de referência').click(); await waitText('Renda de referência salva. Ela vale a partir de outubro.'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Renda variável: salvar grava a média como referência (R$ 3.825,00) pela set_income_reference, a única escrita depois da conferência', t.includes('R$ 3.825,00') && JSON.stringify(await rvCalls(rvCalls2)) === JSON.stringify(['setIncomeReference']), JSON.stringify(await rvCalls(rvCalls2)));
+  ok('Renda variável: a referência salva é de outubro, no valor exato da média, e não tem a marca "Minha renda varia" porque a pessoa não a escolheu', JSON.stringify(await otherDevice(async (repo, ctx) => (await repo.listIncomeReferences(ctx)).map((r) => [r.fromMonth, r.amountCents, r.varies]))) === JSON.stringify([['2026-10', 382500, false]]));
+
+  // ---- 3. Conta nova: nada de exemplo, e a explicação de que precisa de um mês com recebimentos ----
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await famCreateAccount('Rui Renda', 'rui.renda@exemplo.com');
+  await rvOpenForm();
+  t = await rvKeep();
+  ok('Renda variável, conta nova: o campo vem vazio, o card está lá e nenhuma média nem mês de exemplo aparece', (await rvAmount()) === '' && (await visibleCount('button', 'Calcular pela média')) === 1 && !t.includes('Meses usados') && !t.includes('Média de'));
+  t = await rvCalc(6, 'Para calcular a média');
+  ok('Renda variável, conta nova (6 meses): a explicação diz "Nos últimos 6 meses (abril a setembro), nenhum mês tem." e nada é preenchido', t.includes('Nos últimos 6 meses (abril a setembro), nenhum mês tem.') && (await rvAmount()) === '');
+  await rvShots('556_renda_variavel_conta_nova');
+  await btn('Voltar').click(); await waitText('Informar renda de referência'); await p.waitForTimeout(400);
+
+  // ---- 4. Família: a média é dos meses da casa, não dos do Pessoal ----
+  await famGoFamilia();
+  await btn('Criar Família').click(); await waitText('Nome da Família'); await field('Nome da Família').fill('Casa Renda');
+  await btn('Criar Família').click(); await waitText('Família criada.'); await p.waitForTimeout(400);
+  await otherDevice(async (repo, ctx) => {
+    const personal = (await repo.listAccounts(ctx))[0].id;
+    await repo.createRecord('e2e-rv-pessoal-set', ctx, 'receita', { accountId: personal, amountCents: 100000, occurredOn: '2026-09-05', description: 'Aula particular', category: null });
+    const fam = (await repo.getFamily()).context.id;
+    const account = (await repo.listAccounts(fam))[0].id;
+    let i = 0;
+    for (const [cents, on] of [[800000, '2026-07-05'], [1000000, '2026-08-05'], [900000, '2026-09-05']]) {
+      await repo.createRecord(`e2e-rv-familia-${i++}`, fam, 'receita', { accountId: account, amountCents: cents, occurredOn: on, description: 'Renda da casa', category: null });
+    }
+  });
+  await famGoResumo();
+  await famTab('Ver dados de Família').click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
+  await rvOpenForm();
+  t = await rvKeep();
+  const rvPill = await p.evaluate(() => [...document.querySelectorAll('[aria-label^="Contexto:"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label')));
+  ok('Renda variável, Família: a pílula do formulário diz Família (na demonstração, "Demonstração · Família") e o card é o mesmo', JSON.stringify(rvPill) === JSON.stringify(['Contexto: Demonstração · Família']) && (await visibleCount('button', 'Calcular pela média')) === 1, JSON.stringify(rvPill));
+  t = await rvCalc(3, 'Meses usados: 3 de 3');
+  ok('Renda variável, Família: "Média de julho a setembro: R$ 9.000,00" (R$ 8.000,00, R$ 10.000,00 e R$ 9.000,00 da casa), "Meses usados: 3 de 3", e o campo em R$ 9.000,00', t.includes('Média de julho a setembro: R$ 9.000,00') && t.includes('Meses usados: 3 de 3') && (await rvAmount()) === '9.000,00', t.slice(900, 1800));
+  await rvShots('557_renda_variavel_familia');
+  await btn('Voltar').click(); await waitText('Descartar o preenchimento?'); await confirmIn('Descartar alterações'); await waitText('Informar renda de referência'); await p.waitForTimeout(400);
+  await famGoResumo();
+  await famTab('Ver dados de Pessoal').click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
+  await rvOpenForm();
+  t = await rvCalc(3, 'Meses usados: 1 de 3');
+  ok('Renda variável, Pessoal da mesma pessoa: "Média de setembro: R$ 1.000,00", só o Pessoal, sem misturar com a Família', t.includes('Média de setembro: R$ 1.000,00') && t.includes('Meses usados: 1 de 3, julho e agosto sem registros ficaram de fora') && !t.includes('R$ 9.000,00') && (await rvAmount()) === '1.000,00', t.slice(900, 1800));
+  await btn('Voltar').click(); await waitText('Descartar o preenchimento?'); await confirmIn('Descartar alterações'); await waitText('Informar renda de referência'); await p.waitForTimeout(400);
+  ok('Renda variável: calcular na Família e no Pessoal não gravou nenhuma referência', (await otherDevice(async (repo, ctx) => `${(await repo.listIncomeReferences(ctx)).length} ${(await repo.listIncomeReferences((await repo.getFamily()).context.id)).length}`)) === '0 0');
+  await famGoResumo(); await famSignOut();
+
+  // ---- 5. Demonstração de novo: os totais não mudam; textos e escritas ----
+  await evEnter();
+  await expectTotals('Renda variável, demonstração: outubro segue 6.000 / 3.900 / 2.100 e 650 depois de tudo', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  const rvBad = rvTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(demais|alt[oa]s?|baix[oa]s?|gastou|aumentou|diminuiu|despencou|disparou|cuidado|estour\w*|exagero|usuári[oa]s?|bem-vind[oa]s?|parab[eé]ns|incr[ií]vel|garant\w*|instável|instabilidade)\b/i)?.[0]).filter(Boolean);
+  ok('Renda variável: nenhum termo proibido, travessão longo, expressão vetada, palavra de julgamento nem palavra com gênero nas telas novas', rvTexts.length >= 12 && rvBad.length === 0, `${rvTexts.length} telas ${rvBad.join(' | ')}`);
+  ok('Renda variável: nenhuma escrita direta na rede (a referência fica na memória da demonstração; o banco é coberto pelos testes de banco e de API)', writes.length === rvWrites0, writes.slice(rvWrites0).join(' | '));
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);

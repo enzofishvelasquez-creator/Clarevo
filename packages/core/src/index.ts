@@ -51,3 +51,4 @@ export * from './month-check';
 export * from './evolucao-tela';
 export * from './analises';
 export * from './dia-util';
+export * from './renda-media';

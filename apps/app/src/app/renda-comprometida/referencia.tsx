@@ -1,17 +1,25 @@
 import {
   COMMITTED_TEXT,
   ERROR_TEXT,
+  INCOME_AVERAGE_CHOICES,
+  INCOME_AVERAGE_DEFAULT_CHOICE,
+  INCOME_AVERAGE_TEXT,
   INCOME_REFERENCE_ERROR_TEXT,
   UNCERTAIN_TEXT,
   centsToInput,
   formatBRL,
   formatMonthYearBR,
+  incomeAverageTexts,
   isRepoError,
   isValidIsoMonth,
+  loadIncomeAverage,
+  monthOf,
   referenceFor,
   referenceMonthChoices,
   referenceMonthError,
   validateIncomeReferenceDraft,
+  type IncomeAverageChoice,
+  type IncomeAverageOutcome,
   type IncomeReference,
   type IsoMonth,
 } from '@clarevo/core';
@@ -43,8 +51,8 @@ import {
   useSetIncomeReference,
   useWork,
 } from '@/state/data';
-import { useSession } from '@/state/session';
-import { colors, fonts, space } from '@/theme/tokens';
+import { useRepo, useSession } from '@/state/session';
+import { colors, fonts, space, tabular } from '@/theme/tokens';
 
 /**
  * Renda de referência (D-026): quanto costuma cair na conta por mês, já com descontos. Serve só para calcular percentuais
@@ -53,6 +61,10 @@ import { colors, fonts, space } from '@/theme/tokens';
  * quando a pessoa toca em "Usar": nunca é aplicada sozinha. Escrita só por set_income_reference e delete_income_reference,
  * com chave de operação: depois de falha de rede a tentativa fica guardada e repetir o mesmo conteúdo reconcilia.
  * `?mes=AAAA-MM` escolhe o mês de vigência inicial (sem ele, este mês).
+ *
+ * "Calcular pela média" (D-062, renda variável): a média do Recebido dos 3 ou dos 6 meses fechados anteriores ao mês de hoje
+ * (`months_overview` do contexto escolhido, com os meses conferidos como zero e sem os meses sem registros: `loadIncomeAverage`). Só
+ * preenche o campo, como "Usar": quem grava é a pessoa, pela mesma `set_income_reference`, e o texto diz que é uma estimativa.
  */
 export default function ReferenciaScreen() {
   const contextId = useWork().data?.contextId;
@@ -88,6 +100,7 @@ function ReferenceForm({ contextId }: { contextId: string }) {
   const del = useDeleteIncomeReference();
   const setKeys = useIncomeReferenceOperationKey();
   const delKeys = useIncomeReferenceOperationKey();
+  const repo = useRepo();
 
   const defaultMonth = referenceMonthChoices(today).find((c) => c.isDefault)!.month;
   const requested = typeof params.mes === 'string' && isValidIsoMonth(params.mes) && referenceMonthError(params.mes, today) === null ? params.mes : null;
@@ -104,6 +117,13 @@ function ReferenceForm({ contextId }: { contextId: string }) {
   const [leaveTo, setLeaveTo] = useState<null | (() => void)>(null);
   const [confirmDiscard, setConfirmDiscard] = useState<null | (() => void)>(null);
   const amountRef = useRef<TextInput>(null);
+  // "Calcular pela média": a escolha de 3 ou 6 meses, a leitura em andamento e o resultado (ou a falha) da última conta.
+  const [avgChoice, setAvgChoice] = useState<IncomeAverageChoice>(INCOME_AVERAGE_DEFAULT_CHOICE);
+  const [avgBusy, setAvgBusy] = useState(false);
+  const [avgOutcome, setAvgOutcome] = useState<IncomeAverageOutcome | null>(null);
+  const [avgFailed, setAvgFailed] = useState(false);
+  /** Qual pedido de média vale: trocar de 3 para 6 meses no meio da leitura descarta a resposta antiga. */
+  const avgRun = useRef(0);
   /** Tentativa de salvar com resultado incerto: o conteúdo e a versão enviados, para repetir idêntico (mesma chave). */
   const attempt = useRef<{ contentKey: string; expectedVersion: number } | null>(null);
 
@@ -226,6 +246,40 @@ function ReferenceForm({ contextId }: { contextId: string }) {
     announceOnIOS(`Valor por mês preenchido com ${formatBRL(cents)}.`);
   };
 
+  const pickAverageChoice = (n: IncomeAverageChoice) => {
+    if (n === avgChoice) return;
+    avgRun.current += 1;
+    setAvgChoice(n);
+    setAvgOutcome(null);
+    setAvgFailed(false);
+    setAvgBusy(false);
+  };
+
+  /** Lê months_overview dos meses da janela e, havendo média, só preenche o campo (nada é gravado aqui). */
+  const calculateAverage = async () => {
+    if (avgBusy) return;
+    const run = ++avgRun.current;
+    setAvgBusy(true);
+    setAvgFailed(false);
+    setAvgOutcome(null);
+    try {
+      const outcome = await loadIncomeAverage(repo, contextId, monthOf(today), avgChoice);
+      if (run !== avgRun.current) return;
+      setAvgOutcome(outcome);
+      if (outcome.ok) {
+        setAmountDraft(centsToInput(outcome.averageCents));
+        setErrors((e) => ({ ...e, amountText: undefined }));
+      }
+      announceOnIOS(incomeAverageTexts(outcome).announce);
+    } catch {
+      // Leitura que falhou (rede ou permissão): nada é preenchido, e tocar de novo repete a leitura.
+      if (run === avgRun.current) setAvgFailed(true);
+    } finally {
+      if (run === avgRun.current) setAvgBusy(false);
+    }
+  };
+
+  const avgTexts = avgOutcome ? incomeAverageTexts(avgOutcome) : null;
   const chosen = suggestion.data;
 
   return (
@@ -301,6 +355,47 @@ function ReferenceForm({ contextId }: { contextId: string }) {
                 <Chip label={COMMITTED_TEXT.reference.varies} selected={varies} onPress={() => setVariesDraft(true)} />
               </ChoiceGroup>
               <TermHint term="Minha renda varia" slug="renda-variavel" />
+            </Card>
+
+            <Card style={{ gap: space[3] }}>
+              <Txt color={colors.textSecondary}>{INCOME_AVERAGE_TEXT.intro}</Txt>
+              <ChoiceGroup label={INCOME_AVERAGE_TEXT.choiceLabel}>
+                {INCOME_AVERAGE_CHOICES.map((n) => (
+                  <Chip key={n} label={INCOME_AVERAGE_TEXT.choices[n]} selected={n === avgChoice} onPress={() => pickAverageChoice(n)} />
+                ))}
+              </ChoiceGroup>
+              <Button label={INCOME_AVERAGE_TEXT.action} busyLabel={INCOME_AVERAGE_TEXT.busy} busy={avgBusy} tone="soft" onPress={() => calculateAverage()} />
+              {/* Sempre montada: o resultado e a explicação de "sem mês com recebimentos" são ditos quando aparecem (no iOS, por announceOnIOS). */}
+              <View collapsable={false} style={{ gap: space[2] }} accessibilityLiveRegion="polite" aria-live="polite">
+                {avgFailed ? (
+                  <Txt variant="label" color={colors.error} style={{ fontFamily: fonts.bold }}>
+                    {INCOME_AVERAGE_TEXT.failed}
+                  </Txt>
+                ) : null}
+                {avgTexts?.empty ? <Txt color={colors.textSecondary}>{avgTexts.empty}</Txt> : null}
+                {avgTexts?.headline ? (
+                  <>
+                    <MoneyTxt style={[tabular, { fontFamily: fonts.extrabold, fontSize: 18, lineHeight: 26 }]}>{avgTexts.headline}</MoneyTxt>
+                    {avgTexts.count ? <Txt>{avgTexts.count}</Txt> : null}
+                    {avgTexts.zero ? <MoneyTxt>{avgTexts.zero}</MoneyTxt> : null}
+                    {avgTexts.basis ? (
+                      <Txt variant="caption" color={colors.textSecondary}>
+                        {avgTexts.basis}
+                      </Txt>
+                    ) : null}
+                    {avgTexts.notice ? (
+                      <Txt variant="caption" color={colors.textSecondary}>
+                        {avgTexts.notice}
+                      </Txt>
+                    ) : null}
+                    {avgTexts.filled ? (
+                      <Txt variant="caption" color={colors.textSecondary}>
+                        {avgTexts.filled}
+                      </Txt>
+                    ) : null}
+                  </>
+                ) : null}
+              </View>
             </Card>
 
             {exact ? <Button label={COMMITTED_TEXT.reference.delete} tone="danger" onPress={() => setConfirmDelete(true)} /> : null}

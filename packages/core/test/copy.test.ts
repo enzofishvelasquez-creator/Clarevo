@@ -3473,3 +3473,86 @@ describe('textos do aviso de dia útil (D-060) e do próximo dia útil (D-061)',
     expect(shown).not.toMatch(/garant|sem encargos|sem multa/i);
   });
 });
+
+import { INCOME_AVERAGE_TEXT, incomeAverage, incomeAverageTextSamples, incomeAverageTexts, type MonthOverview as IncomeOverviewRow } from '../src';
+
+/**
+ * Textos de "Calcular pela média" (D-062 item 2, Ciclo V): pt-BR neutro quanto a gênero, sem travessão longo, sem a expressão vetada,
+ * sem julgamento sobre a renda ("renda baixa", "instável"), sem prometer o próximo mês e sem produto financeiro. É uma estimativa, e
+ * o texto diz isso; o resultado só preenche o campo, e quem grava é a pessoa.
+ */
+describe('textos de "Calcular pela média" (D-062 item 2)', () => {
+  const GENDERED = /\b(o|a)s? usuári[oa]s?\b|\bobrigad[oa]s?\b|\bbem-vind[oa]s?\b|\bpreocupad[oa]s?\b|\bendividad[oa]s?\b|\bcadastrad[oa]\b|\(a\)|\(o\)|\bo\/a\b|\bvocê (é|está|ficou) \w+[oa]\b/i;
+  const VETOED =
+    /\bdemais\b|\balt[oa]s?\b|\bbaix[oa]s?\b|\bruim\b|cuidado|estour|gastou|exagero|\bculpa|\bperigo|\balerta|\bdeveria\b|parab[eé]ns|incr[ií]vel|\bvale a pena\b|aumentou|diminuiu|despencou|disparou|\bmuito\b|\bpouco\b|\bdescontrol|\binst[aá]vel|\binstabilidade|\bgaranti\w*|\bprevis[aã]o\b|\bcertamente\b|\bcom certeza\b|\bsempre\b/i;
+  const BRANDS = /\b(nubank|ita[uú]|bradesco|santander|c6|sicredi|sicoob|btg|neon|picpay|mercado pago|visa|mastercard|hipercard|amex|serasa)\b/i;
+  const check = (texts: string[]) => {
+    expect(texts.length).toBeGreaterThan(0);
+    for (const text of new Set(texts)) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(FORBIDDEN_EXPANDED);
+      expect(text, text).not.toMatch(JUDGMENT);
+      expect(text, text).not.toMatch(VETOED);
+      expect(text, text).not.toMatch(GENDERED);
+      expect(text, text).not.toMatch(BRANDS);
+      expect(text, text).not.toMatch(/[–—]/);
+    }
+  };
+  const row = (month: string, receivedCents = 0, over: Partial<IncomeOverviewRow> = {}): IncomeOverviewRow => ({
+    month,
+    receivedCount: receivedCents > 0 ? 1 : 0,
+    receivedCents,
+    paidCount: 0,
+    paidCents: 0,
+    ...over,
+  });
+
+  it('todos os textos e os resultados de várias entradas passam nas regras de texto', () => {
+    const texts = [...incomeAverageTextSamples()];
+    const scenarios: [IncomeOverviewRow[], 3 | 6, string][] = [
+      [[], 3, '2026-10'],
+      [[], 6, '2026-10'],
+      [[row('2026-07', 430_000), row('2026-08', 620_000), row('2026-09', 510_000)], 3, '2026-10'],
+      [[row('2026-07', 430_000), row('2026-09', 510_000)], 3, '2026-10'],
+      [[row('2026-09', 510_000)], 3, '2026-10'],
+      [[row('2026-07', 430_000), row('2026-08', 0, { receivedChecked: true }), row('2026-09', 0, { receivedChecked: true })], 3, '2026-10'],
+      [[row('2026-04', 520_000), row('2026-05', 500_000), row('2026-06', 510_000)], 6, '2026-10'],
+      [[row('2026-04', 520_000), row('2026-06', 510_000), row('2026-08', 0, { receivedChecked: true })], 6, '2026-10'],
+      [[row('2026-10', 400_000), row('2026-11', 500_000), row('2026-12', 600_000)], 3, '2027-01'],
+      [[row('2026-12', 500_000), row('2027-01', 600_000)], 3, '2027-02'],
+      [[row('2026-08', 0, { receivedChecked: true }), row('2026-09', 100), row('2026-12', 700_000)], 6, '2027-01'],
+    ];
+    for (const [rows, choice, now] of scenarios) {
+      const t = incomeAverageTexts(incomeAverage(rows, choice, now));
+      texts.push(...Object.values(t).filter((v): v is string => typeof v === 'string'));
+    }
+    expect(texts.length).toBeGreaterThan(80);
+    check(texts);
+  });
+
+  it('as frases pedidas pela especificação, exatamente', () => {
+    expect(INCOME_AVERAGE_TEXT.action).toBe('Calcular pela média');
+    expect(INCOME_AVERAGE_TEXT.notice).toBe('É uma estimativa feita com o que você anotou. Ajuste se souber que o próximo mês será diferente.');
+    const three = incomeAverageTexts(incomeAverage([row('2026-07', 430_000), row('2026-08', 620_000), row('2026-09', 510_000)], 3, '2026-10'));
+    expect(three.headline).toBe('Média de julho a setembro: R$ 5.200,00');
+    expect(three.count).toContain('3 de 3');
+    const two = incomeAverageTexts(incomeAverage([row('2026-07', 430_000), row('2026-08', 620_000)], 3, '2026-10'));
+    expect(two.count).toContain('2 de 3, setembro sem registros ficou de fora');
+    const none = incomeAverageTexts(incomeAverage([], 3, '2026-10'));
+    expect(none.empty).toContain('pelo menos um mês fechado com recebimentos');
+  });
+
+  it('o aviso diz que é estimativa e o texto do campo diz que só salva quando a pessoa toca em salvar; nada promete o próximo mês', () => {
+    const t = incomeAverageTexts(incomeAverage([row('2026-09', 510_000)], 3, '2026-10'));
+    expect(t.notice).toMatch(/estimativa/);
+    expect(t.filled).toMatch(/só é salvo quando você toca/);
+    for (const text of incomeAverageTextSamples()) expect(text, text).not.toMatch(/vai receber|você receberá|renda (baixa|alta|instável)|próximo mês (vai|será) (de |igual|maior|menor)/i);
+  });
+
+  it('o arquivo-fonte passa nas regras de texto', () => {
+    const source = readFileSync(join(CORE_SRC, 'renda-media.ts'), 'utf8');
+    expect(source).not.toMatch(FORBIDDEN);
+    expect(source).not.toMatch(FORBIDDEN_EXPANDED);
+    expect(source).not.toMatch(JUDGMENT);
+  });
+});

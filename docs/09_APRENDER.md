@@ -187,6 +187,7 @@ Revisar até 09/10/2027 (12 meses). Em materiais da CVM e do Banco Central, "ren
 Ressalvas e ajustes:
 
 - Nenhuma fonte oficial prescreve um método para a renda de referência (média de N meses, menor mês). A sugestão do app (média dos meses fechados com recebimentos anotados, sem reembolsos) é escolha do Clarevo e o texto diz isso; "usar o menor valor dos últimos meses" aparece como opção, sem atribuição.
+- O botão "Calcular pela média" do formulário da renda de referência (D-062, Ciclo V) é outra escolha do Clarevo, no mesmo espírito: a média do Recebido dos últimos 3 ou 6 meses fechados (com os meses conferidos como zero e sem os meses sem registros), que só preenche o campo e diz que é uma estimativa. O tema não muda: ele já diz que o método é escolha do Clarevo e não uma regra oficial, e nenhum texto do tema cita o botão. O tema "Média e mediana" (Ciclo W, D-062 item 3) é o que explica a conta.
 - A faixa de seis meses a um ano é da Susep, com base na renda; a da CVM é em gastos. O tema atribui cada uma à sua fonte e não mapeia 12 meses a renda variável pela autoridade da CVM.
 - Há uma 2ª edição do Caderno do Banco Central (2026) que não foi conferida; a citação é da edição de 2013. Nenhum limite de imposto ou de INSS entra no texto, porque mudam por ano.
 
