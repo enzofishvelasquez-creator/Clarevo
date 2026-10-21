@@ -9,6 +9,7 @@
  * Uso:  node scripts/gerar-fontes.js           (gera os cinco arquivos e mostra o tamanho de cada um)
  *       node scripts/gerar-fontes.js --verificar  (não grava nada: confere que os arquivos do repositório saem iguais)
  * Precisa de `pyftsubset` (fonttools: `pip install fonttools`). `PYFTSUBSET=/caminho/pyftsubset` troca o programa.
+ * Os arquivos do repositório saem do fonttools 4.66.1; o `--verificar` avisa se a versão instalada for outra (a saída pode mudar).
  *
  * O que entra (conjunto fechado: um caractere novo nos textos pede uma linha aqui e `node scripts/gerar-fontes.js`):
  *   U+0020-007E  Latin básico (algarismos, letras, "R$", pontuação, aspas retas)
@@ -33,6 +34,8 @@ const PACKAGE = path.join(ROOT, 'node_modules', '@expo-google-fonts', 'manrope')
 const OUT = path.join(ROOT, 'apps', 'app', 'assets', 'fonts');
 /** Os cinco pesos que `apps/app/src/theme/tokens.ts` usa (`fonts`), na ordem de peso. */
 const WEIGHTS = ['400Regular', '500Medium', '600SemiBold', '700Bold', '800ExtraBold'];
+/** Versão do fonttools com que os arquivos de `apps/app/assets/fonts` foram gerados. */
+const FONTTOOLS_VERSION = '4.66.1';
 const UNICODES = ['U+0020-007E', 'U+00A0-00FF', 'U+2018', 'U+2019', 'U+201C', 'U+201D', 'U+2022', 'U+2026', 'U+2039', 'U+203A', 'U+2192', 'U+2212', 'U+2248'];
 
 function subset(source, target) {
@@ -43,34 +46,47 @@ function subset(source, target) {
   if (r.status !== 0) throw new Error(`pyftsubset falhou para ${path.basename(source)}: ${r.error ? r.error.message : r.stderr || r.stdout}`);
 }
 
+/** Versão do fonttools instalada (a do `python3`), ou null se não der para ler. */
+function fonttoolsVersion() {
+  const r = spawnSync('python3', ['-c', 'import fontTools; print(fontTools.version)'], { encoding: 'utf8' });
+  return r.status === 0 ? r.stdout.trim() : null;
+}
+
 const sha = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const verify = process.argv.includes('--verificar');
+if (verify) {
+  const version = fonttoolsVersion();
+  if (version !== FONTTOOLS_VERSION) console.warn(`Aviso: fonttools ${version ?? 'não encontrado'} em vez do ${FONTTOOLS_VERSION} dos arquivos do repositório; uma diferença abaixo pode ser só da versão.`);
+}
 const work = verify ? fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'clarevo-fontes-')) : OUT;
 if (!verify) fs.mkdirSync(OUT, { recursive: true });
 
 let before = 0;
 let after = 0;
 let different = 0;
-for (const w of WEIGHTS) {
-  const name = `Manrope_${w}.ttf`;
-  const source = path.join(PACKAGE, w, name);
-  const target = path.join(work, name);
-  subset(source, target);
-  const b = fs.statSync(source).size;
-  const a = fs.statSync(target).size;
-  before += b;
-  after += a;
-  if (verify && (!fs.existsSync(path.join(OUT, name)) || sha(path.join(OUT, name)) !== sha(target))) different++;
-  console.log(`${name.padEnd(28)} ${String(b).padStart(7)} B -> ${String(a).padStart(6)} B (${((100 * a) / b).toFixed(1)}%)`);
-}
-console.log(`${'Total'.padEnd(28)} ${String(before).padStart(7)} B -> ${String(after).padStart(6)} B (${((100 * after) / before).toFixed(1)}%), ${before - after} B a menos`);
-if (verify) {
-  fs.rmSync(work, { recursive: true, force: true });
-  if (different > 0) {
-    console.error(`${different} arquivo(s) de apps/app/assets/fonts diferem do que o script gera: rode node scripts/gerar-fontes.js`);
-    process.exit(1);
+try {
+  for (const w of WEIGHTS) {
+    const name = `Manrope_${w}.ttf`;
+    const source = path.join(PACKAGE, w, name);
+    const target = path.join(work, name);
+    subset(source, target);
+    const b = fs.statSync(source).size;
+    const a = fs.statSync(target).size;
+    before += b;
+    after += a;
+    if (verify && (!fs.existsSync(path.join(OUT, name)) || sha(path.join(OUT, name)) !== sha(target))) different++;
+    console.log(`${name.padEnd(28)} ${String(b).padStart(7)} B -> ${String(a).padStart(6)} B (${((100 * a) / b).toFixed(1)}%)`);
   }
-  console.log('Os arquivos de apps/app/assets/fonts saem iguais ao que o script gera.');
-} else {
-  fs.copyFileSync(path.join(PACKAGE, 'LICENSE_FONT'), path.join(OUT, 'OFL.txt'));
+  console.log(`${'Total'.padEnd(28)} ${String(before).padStart(7)} B -> ${String(after).padStart(6)} B (${((100 * after) / before).toFixed(1)}%), ${before - after} B a menos`);
+  if (!verify) {
+    fs.copyFileSync(path.join(PACKAGE, 'LICENSE_FONT'), path.join(OUT, 'OFL.txt'));
+  } else if (different > 0) {
+    console.error(`${different} arquivo(s) de apps/app/assets/fonts diferem do que o script gera: rode node scripts/gerar-fontes.js`);
+    process.exitCode = 1;
+  } else {
+    console.log('Os arquivos de apps/app/assets/fonts saem iguais ao que o script gera.');
+  }
+} finally {
+  // A pasta temporária da verificação sai mesmo se algo falhar.
+  if (verify) fs.rmSync(work, { recursive: true, force: true });
 }

@@ -124,12 +124,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Requisições de escrita (Ciclo A6: as calculadoras nunca gravam nada, nem pela rede).
   const writes = []; p.on('request', (r) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(r.method()) && writes.push(`${r.method()} ${r.url()}`));
   // Texto da tela, com o espaço não separável ("R$\u00a0900,00" nunca quebra a linha) lido como espaço comum.
-  const body = async () => { const t = (await p.locator('body').innerText()).replace(/\u00a0/g, ' '); await headingWatch(); return t; };
+  const bodyText = async () => (await p.locator('body').innerText()).replace(/\u00a0/g, ' ');
+  const body = async () => { const t = await bodyText(); await headingWatch(); return t; };
   // Hierarquia de títulos (D-063 item 2, Ciclo Z), conferida em toda leitura da tela: o roteiro lê o texto da tela (`body`) em cada
-  // tela que visita, então essa leitura também confere a regra "no máximo um título de nível 1 por tela e nenhum salto de nível"
+  // tela que visita, então essa leitura também confere a regra estrita "um título de nível 1 por tela, o primeiro título no nível 1 e nenhum salto de nível"
   // (de 1 para 3, por exemplo) em todas elas. A janela aberta (diálogo, folha) é um escopo à parte da tela por baixo: o título dela é o
-  // nível 1 dela. O resultado fecha o roteiro (verificação "Hierarquia de títulos"). Um achado só vale se continuar 250 ms depois
-  // (troca de tela em andamento não conta).
+  // nível 1 dela. O resultado fecha o roteiro (verificação "Hierarquia de títulos"). Um achado só vale se continuar depois de duas
+  // novas leituras, com 250 ms e 750 ms de espera (troca de tela em andamento não conta).
   const headingsOnPage = () => p.evaluate(() => {
     const shown = (e) => { const r = e.getBoundingClientRect(); if (!(r.width > 0 && r.height > 0)) return false; for (let x = e; x && x !== document.documentElement; x = x.parentElement) { const cs = getComputedStyle(x); if (cs.visibility === 'hidden' || cs.display === 'none') return false; } return true; };
     const WIN = '[role=dialog],[role=alertdialog],[aria-modal="true"]';
@@ -163,8 +164,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
       if (sig === headingRule.last) return;
       headingRule.last = sig;
       headingRule.checks++; headingRule.paths.add(new URL(p.url()).pathname);
-      let issues = list.length > 0 ? headingIssues(list) : [];
-      if (issues.length > 0) { await p.waitForTimeout(250); list = await headingsOnPage(); issues = list.length > 0 ? headingIssues(list) : []; }
+      let issues = list.length > 0 ? headingIssues(list, true) : [];
+      for (const wait of [250, 750]) { if (issues.length === 0) break; await p.waitForTimeout(wait); list = await headingsOnPage(); issues = list.length > 0 ? headingIssues(list, true) : []; }
       for (const x of issues) { const key = `${new URL(p.url()).pathname}: ${x}`; headingRule.problems.set(key, (headingRule.problems.get(key) ?? 0) + 1); }
       if (list.length > 0 && !list.some((h) => h.scope === -1 && h.level === 1)) headingRule.noH1.add(new URL(p.url()).pathname);
     } catch { /* a página mudou no meio da leitura: a próxima leitura confere */ }
@@ -177,8 +178,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Texto da tela no primeiro instante em que um texto aparece (leitura contínua, sem o intervalo de espera do Playwright):
   // mostra o que a tela exibe junto com uma faixa, antes de qualquer nova leitura de dados terminar.
   const firstBodyWith = async (text, timeout = 8000) => {
-    for (const end = Date.now() + timeout; Date.now() < end;) { const t = await body(); if (t.includes(text)) return t; }
-    return body();
+    for (const end = Date.now() + timeout; Date.now() < end;) { const t = await bodyText(); if (t.includes(text)) return t; }
+    return bodyText();
   };
   // Espera um texto sumir (linhas saem com FadeOut); se não sumir, a conferência seguinte acusa.
   const waitGone = async (t, timeout=3000) => { for (const end = Date.now() + timeout; Date.now() < end && (await body()).includes(t);) await p.waitForTimeout(100); };
@@ -13954,7 +13955,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const forbidden = screenTexts.map((s) => s.match(FORBIDDEN)?.[0]).filter(Boolean);
   ok('contas do ano e calculadoras: nenhum termo proibido nem travessão longo nas telas novas', screenTexts.length > 0 && forbidden.length === 0, `${screenTexts.length} telas ${forbidden.join(' | ')}`);
   // Hierarquia de títulos (D-063 item 2): o resultado da conferência feita em cada leitura de tela do roteiro inteiro (`headingWatch`).
-  ok(`Hierarquia de títulos: em todas as telas do roteiro (${headingRule.checks} conferências em ${headingRule.paths.size} endereços) há no máximo um título de nível 1 por tela (janela aberta à parte) e nenhum salto de nível`,
+  ok(`Hierarquia de títulos: em todas as telas do roteiro (${headingRule.checks} conferências em ${headingRule.paths.size} endereços) há um título de nível 1 por tela (janela aberta à parte), o primeiro título é de nível 1 e não há salto de nível`,
     headingRule.checks > 500 && headingRule.paths.size > 100 && headingRule.problems.size === 0, [...headingRule.problems].slice(0, 6).map(([k, n]) => `${k} (${n}x)`).join(' | '));
   console.log(`Telas lidas sem título de nível 1 (informativo): ${[...headingRule.noH1].join(', ') || 'nenhuma'}`);
   ok('sem erros de JavaScript no console', errors.length === 0, errors.slice(0,3).join(' | '));

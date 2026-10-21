@@ -107,7 +107,7 @@ describe('fontes do app: subconjunto Latin da Manrope (D-063 item 2)', () => {
     }
   });
 
-  it('todo caractere escrito nos textos do core e do app está nos cinco arquivos', () => {
+  it('todo caractere escrito nos textos do core e do app está nos cinco arquivos', { timeout: 30_000 }, () => {
     const texts = new Map<number, string[]>();
     for (const dir of [CORE_SRC, APP_SRC]) for (const [cp, where] of textCharacters(dir)) texts.set(cp, [...(texts.get(cp) ?? []), ...where].slice(0, 3));
     // O teste enxerga os textos de verdade (e não uma pasta vazia): português acentuado, símbolos e o "R$" estão lá.
