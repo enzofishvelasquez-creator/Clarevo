@@ -11,7 +11,8 @@
  *                                convertidos de `docs/legal/politica-de-privacidade.md`, `termos-de-uso.md` e `exclusao-de-conta.md`
  *   estilo.css, _headers         estilo próprio (claro e escuro, contraste conferido por `packages/core/test/site.test.ts`) e cabeçalhos
  *                                de segurança do Cloudflare Pages (nenhum recurso de fora é permitido)
- *   fontes/, marca/, favicon.svg cópias de `apps/app/assets/fonts` (Manrope, subconjunto Latin, licença OFL) e de `docs/marca`
+ *   fontes/, marca/, favicon.svg cópias de `apps/app/assets/fonts` (Manrope, subconjunto Latin, licença OFL) e de `docs/marca` (logotipo
+ *                                reverso na tela e logotipo de fundo claro na impressão)
  * `site/dados-da-empresa.json` é a ENTRADA (não é gerada): os valores que trocam os marcadores `[RAZÃO SOCIAL]`, `[CNPJ]`, `[ENDEREÇO]`,
  * `[E-MAIL DE PRIVACIDADE]`, `[E-MAIL DE SUPORTE]`, `[DOMÍNIO]` e `[DATA DE VIGÊNCIA]`. Valor vazio mantém o marcador visível e
  * destacado, e a página ganha no topo a faixa "Versão preliminar, em revisão" (o mesmo vale para `[A DEFINIR: ...]` e para qualquer
@@ -20,7 +21,11 @@
  *
  * Uso:
  *   node scripts/gerar-site.js                 grava o site em `site/`
- *   node scripts/gerar-site.js --final         só grava se não sobrar marcador nem `[A DEFINIR`; senão sai com código 1 e lista o que falta
+ *   node scripts/gerar-site.js --final         só grava se estiver pronto para publicar; senão sai com código 1 e lista o que falta: marcador sem
+ *                                              valor, `[A DEFINIR`, `[PROPOSTA`, a frase "Rascunho preparado ... Não é parecer jurídico.", texto de
+ *                                              proposta ("Proposta:", "proposta, ainda sem confirmação"), travessão, a expressão proibida pela
+ *                                              orientação do projeto, título fora de ordem e link interno quebrado. Sem `--final`, tudo isso
+ *                                              continua só como aviso
  *   node scripts/gerar-site.js --pdf <arquivo> também gera, com o Chromium do Playwright, o PDF A4 "Pacote para revisão jurídica" (resumo
  *                                              para o advogado, privacidade, termos, exclusão de conta e pontos do contrato com
  *                                              empresas, nesta ordem, com os marcadores visíveis). O PDF não vai para o repositório.
@@ -79,15 +84,18 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const nfc = (s) => String(s).normalize('NFC');
 
-/** Marcador de dado, `[A DEFINIR: ...]` ou qualquer outro texto em MAIÚSCULAS entre colchetes (que não seja o texto de um link). */
+/**
+ * Marcador de dado, `[A DEFINIR: ...]` (o que não está decidido), `[PROPOSTA: ...]` (o que é só proposta da equipe, ainda sem confirmação
+ * jurídica) ou qualquer outro texto em MAIÚSCULAS entre colchetes (que não seja o texto de um link).
+ */
 const FONTE_MARCADOR =
-  '\\[A DEFINIR[^\\]\\n]*\\](?!\\()' +
+  '\\[(?:A DEFINIR|PROPOSTA)[^\\]\\n]*\\](?!\\()' +
   `|\\[(?:${MARCADORES.map(escRe).join('|')})\\](?!\\()` +
   '|\\[[A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þ0-9 /.\\-]{2,}\\](?!\\()';
 
 function classificarMarcador(m) {
   const dentro = m.slice(1, -1);
-  if (/^A DEFINIR/.test(dentro)) return { tipo: 'definir' };
+  if (/^(A DEFINIR|PROPOSTA)/.test(dentro)) return { tipo: 'definir' };
   if (MARCADORES.includes(dentro)) return { tipo: 'dado', nome: dentro };
   return { tipo: 'desconhecido' };
 }
@@ -527,6 +535,7 @@ main:focus{outline:none}
 .topo .miolo{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.25rem 1.5rem;padding-top:12px;padding-bottom:8px}
 .marca{display:inline-flex;align-items:center;min-height:44px;padding:4px 0}
 .marca img{display:block;height:28px;width:auto}
+.marca .logo-papel{display:none}
 .menu ul,.rodape ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:0 .25rem}
 .menu a{display:inline-flex;align-items:center;min-height:44px;padding:0 .6rem;color:var(--sobre-topo);font-weight:700;font-size:.9375rem;text-decoration:none;border-radius:10px}
 .menu a:hover{text-decoration:underline;text-underline-offset:.2em}
@@ -598,7 +607,8 @@ mark.pendente{background:var(--lima);color:var(--sobre-lima);padding:0 .25em;bor
   body{background:#fff;color:#000}
   .topo,.capa{background:#fff;color:#000;border-radius:0}
   .capa h1,.capa .lead,.capa a{color:#000}
-  .marca img{filter:invert(1)}
+  .marca .logo-tela{display:none}
+  .marca .logo-papel{display:block}
 }
 `;
 
@@ -646,7 +656,7 @@ ${robots}<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <a class="pular" href="#conteudo">Pular para o conteúdo</a>
 ${faixa}<header class="topo">
 <div class="miolo">
-<a class="marca" href="index.html"><img src="marca/clarevo-logotipo-reverso.svg" alt="Clarevo, página inicial" width="140" height="28"></a>
+<a class="marca" href="index.html"><img src="marca/clarevo-logotipo-reverso.svg" alt="Clarevo, página inicial" width="140" height="28" class="logo-tela"><img src="marca/clarevo-logotipo.svg" alt="Clarevo, página inicial" width="140" height="28" class="logo-papel"></a>
 ${menuHtml(arquivo)}
 </div>
 </header>
@@ -710,7 +720,7 @@ function paginaInicial(valores) {
 </article>
 <article class="cartao">
 <h3>Para empresas</h3>
-<p>A empresa pode oferecer o Clarevo como benefício. O painel das empresas existe só na web e mostra vagas, convites e licenças ativas ou encerradas.</p>
+<p>A empresa pode oferecer o Clarevo como benefício. O painel das empresas existe só na web e mostra os e-mails convidados, a situação de cada convite ou licença, as datas e as contagens de vagas. Nunca mostra finanças.</p>
 <p>Para conhecer o benefício, escreva para [E-MAIL DE SUPORTE].</p>
 </article>
 </div>
@@ -718,7 +728,7 @@ function paginaInicial(valores) {
 
 <section class="secao destaque" aria-labelledby="empresa-nao-ve">
 <h2 id="empresa-nao-ve">A empresa nunca vê suas finanças</h2>
-<p>Se a sua empresa oferece o Clarevo, ela só sabe quem recebeu a licença e se ela está ativa ou encerrada. Nunca vê gastos, recebimentos, valores, categorias, metas, contas, cartões nem o que você faz no app, e também não vê números somados.</p>
+<p>Se a sua empresa oferece o Clarevo, ela vê os e-mails que convidou, a situação de cada convite ou licença (convite enviado, convite cancelado, ativa ou encerrada), as datas e as contagens de vagas e licenças. Nunca vê gastos, recebimentos, valores, categorias, metas, contas, cartões, a sua Família nem o que você faz no app, e também não vê números somados.</p>
 <p>Se o benefício terminar, sua conta e seu histórico não são apagados.</p>
 </section>
 
@@ -736,7 +746,7 @@ function paginaInicial(valores) {
 
 <section class="secao" aria-labelledby="dados">
 <h2 id="dados">Seus dados</h2>
-<p>Sem anúncios, sem venda de dados e sem rastreamento. A conexão é protegida. Você exclui a sua conta e os seus dados quando quiser: dentro do app, em Conta, ou pela página <a href="excluir-conta.html">Excluir conta</a>. Os detalhes estão na <a href="privacidade.html">Política de privacidade</a>.</p>
+<p>Sem anúncios, sem venda de dados e sem rastreamento para publicidade. A conexão é protegida. Você exclui a sua conta e os seus dados quando quiser, dentro do app, em Conta. Se não conseguir entrar no app, peça pela página <a href="excluir-conta.html">Excluir conta</a>. Os detalhes estão na <a href="privacidade.html">Política de privacidade</a>.</p>
 </section>
 
 <section class="secao" aria-labelledby="contato">
@@ -768,10 +778,10 @@ function paginaSuporte(valores) {
     ['Como excluo minha conta e meus dados?', 'No app, abra Conta e, no último item, toque em "Excluir minha conta". Para confirmar, digite EXCLUIR. A exclusão é definitiva: você perde o acesso na hora e não dá para desfazer. Quem é titular de uma Família com outras pessoas precisa antes passar a titularidade ou remover as pessoas. Também dá para pedir pela página <a href="excluir-conta.html">Excluir conta</a>.'],
     ['Como funciona a Família?', 'A Família reúne até 6 pessoas. Quem cria é a pessoa titular e convida as outras por um link de uso único, válido por 7 dias, com o papel de quem anota e vê ou de quem só vê. O Pessoal de cada pessoa continua separado e nunca é copiado para a Família. Quem quiser pode sair, e a pessoa titular pode encerrar a Família.'],
     ['Recebi o Clarevo da minha empresa. Como ativo o benefício?', 'A empresa envia um link de convite, de uso único. Abra o link, entre ou crie a sua conta e siga as instruções na tela. Se o benefício terminar, você mantém o acesso completo por 30 dias e depois passa para o plano gratuito, com leitura do histórico. Nada é apagado.'],
-    ['O que a minha empresa vê?', 'Só quem recebeu a licença e se ela está ativa ou encerrada, com as datas. A empresa nunca vê gastos, recebimentos, valores, categorias, metas, contas, cartões, Família nem números somados, e também não vê o que você faz no app.'],
-    ['Onde ficam os meus dados?', 'Em um serviço de banco de dados e de autenticação, em servidores na região de São Paulo, com conexão protegida e regras de acesso que valem no próprio banco. O app não guarda o número completo do cartão, o código de segurança, a validade nem fotos de notas fiscais. Os detalhes estão na <a href="privacidade.html">Política de privacidade</a>.'],
+    ['O que a minha empresa vê?', 'Os e-mails que ela convidou, a situação de cada convite ou licença (convite enviado, convite cancelado, ativa ou encerrada), as datas e as contagens de vagas e licenças. A empresa nunca vê gastos, recebimentos, valores, categorias, metas, contas, cartões, Família nem números somados, e também não vê o que você faz no app.'],
+    ['Onde ficam os meus dados?', 'Em um serviço de banco de dados e de autenticação, com conexão protegida e regras de acesso que valem no próprio banco. O app não guarda o número completo do cartão, o código de segurança, a validade nem fotos de notas fiscais. Quais serviços recebem dados e onde ficam estão na <a href="privacidade.html">Política de privacidade</a>.'],
     ['O Clarevo se conecta ao meu banco?', 'Não. Tudo o que aparece no app foi anotado por você ou importado de um arquivo de extrato ou de fatura (OFX ou CSV) que você escolhe e confere linha por linha antes de gravar.'],
-    ['Posso levar meus dados comigo?', 'Pode. No app, é possível exportar os seus dados em CSV ou em PDF.'],
+    ['Posso levar meus dados comigo?', 'Pode levar os seus gastos e recebimentos do Pessoal, e as compras no cartão à parte, em planilha (CSV) ou em resumo em PDF, escolhendo o período, em Conta, "Exportar meus dados". A exportação não leva tudo o que o Clarevo guarda, como metas e contas a pagar em aberto, e o arquivo é montado no seu aparelho.'],
   ];
   const faq = duvidas.map(([p, r]) => `<h3>${esc(p)}</h3>\n<p>${r}</p>`).join('\n');
   const fonte = `
@@ -850,6 +860,48 @@ function linksQuebrados(arquivos) {
   return problemas;
 }
 
+/**
+ * O que ainda marca um texto como rascunho, além dos marcadores. No modo normal só vira aviso; o `--final` recusa. Os padrões de
+ * proposta cobrem o texto corrido ("Proposta: ...") que o advogado precisa resolver; a marca padrão de proposta é `[PROPOSTA: ...]`,
+ * tratada como os outros marcadores.
+ */
+const MARCAS_DE_RASCUNHO = [
+  { re: /Rascunho preparado pela equipe do Clarevo/i, motivo: 'frase de rascunho ("Rascunho preparado pela equipe do Clarevo para revisão jurídica. Não é parecer jurídico.")', visivel: true },
+  { re: /\b[Pp]ropostas?\s*:/, motivo: 'texto de proposta ("Proposta:")', visivel: true },
+  { re: /propostas?,?\s+ainda\s+sem\s+confirma/i, motivo: 'texto de proposta ("proposta, ainda sem confirmação")', visivel: true },
+  { re: /[\u2013\u2014]/, motivo: 'travessão (a redação do produto não usa)', visivel: false },
+  { re: /faz\w*\s+sentido/i, motivo: 'expressão proibida pela orientação do projeto', visivel: false },
+];
+
+/** O texto que a pessoa lê (sem etiquetas, estilo nem título do navegador), com espaços simples. */
+function textoVisivel(html) {
+  return html
+    .replace(/<(style|title)[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ');
+}
+
+/** Problemas de uma página que o `--final` não aceita: marcas de rascunho e de proposta, travessão e título fora de ordem. */
+function problemasFinaisDaPagina(nome, html) {
+  const problemas = [];
+  const visivel = textoVisivel(html);
+  for (const { re, motivo, visivel: soVisivel } of MARCAS_DE_RASCUNHO) {
+    const alvo = soVisivel ? visivel : html;
+    const m = re.exec(alvo);
+    if (m) {
+      const trecho = alvo.slice(Math.max(0, m.index - 20), m.index + m[0].length + 30).replace(/\s+/g, ' ').trim();
+      problemas.push(`${nome}: ${motivo}, em "...${trecho}..."`);
+    }
+  }
+  for (const problema of problemasDeTitulos(html)) problemas.push(`${nome}: ${problema}`);
+  return problemas;
+}
+
 const CABECALHOS = `# Gerado por scripts/gerar-site.js. Cloudflare Pages lê este arquivo e não o publica.
 # Nenhum recurso de fora é permitido: o site não carrega fontes, imagens, scripts nem estilos de outros endereços.
 /*
@@ -863,12 +915,14 @@ const CABECALHOS = `# Gerado por scripts/gerar-site.js. Cloudflare Pages lê est
 /**
  * Gera todos os arquivos do site em memória: `Map` de caminho (relativo a `site/`) em texto ou `Buffer`.
  * `legal`: pasta dos Markdown. `dados`: valores dos marcadores, ou `arquivoDados`: o JSON de onde lê (padrão: `site/dados-da-empresa.json`).
- * Devolve também `avisos` e `pendencias` (por página, os marcadores que ainda faltam).
+ * Devolve também `avisos`, `pendencias` (por página, os marcadores que ainda faltam) e `problemasFinais` (o que o `--final` recusa além
+ * dos marcadores: marca de rascunho ou de proposta, travessão, título fora de ordem e link interno quebrado).
  */
 function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dados, arquivoDados } = {}) {
   const avisos = [];
   const arquivos = new Map();
   const pendencias = new Map();
+  const problemasFinais = [];
   let valores = dados;
   if (!valores) {
     const lido = lerDados(arquivoDados || path.join(raiz, 'site', 'dados-da-empresa.json'));
@@ -894,16 +948,25 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
     arquivos.set(nomes[k], pg.html);
     pendencias.set(nomes[k], pg.pendencias);
     for (const problema of problemasDeTitulos(pg.html)) avisos.push(`${nomes[k]}: ${problema}`);
+    const finais = problemasFinaisDaPagina(nomes[k], pg.html);
+    problemasFinais.push(...finais);
+    // Sem `--final` o gerador só avisa. Travessão, expressão proibida, título e link já viram aviso mais acima; entram aqui as marcas
+    // de rascunho e de proposta, que de outro modo só apareceriam destacadas na página.
+    avisos.push(...finais.filter((f) => /frase de rascunho|texto de proposta/.test(f)).map((f) => `o --final recusaria: ${f}`));
   });
   arquivos.set('estilo.css', CSS);
   arquivos.set('_headers', CABECALHOS);
   for (const peso of PESOS_FONTE) arquivos.set(`fontes/Manrope_${peso}.ttf`, fs.readFileSync(path.join(raiz, 'apps', 'app', 'assets', 'fonts', `Manrope_${peso}.ttf`)));
   arquivos.set('fontes/OFL.txt', fs.readFileSync(path.join(raiz, 'apps', 'app', 'assets', 'fonts', 'OFL.txt')));
   arquivos.set('marca/clarevo-logotipo-reverso.svg', fs.readFileSync(path.join(raiz, 'docs', 'marca', 'clarevo-logotipo-reverso.svg')));
+  // Na impressão o cabeçalho fica sem fundo azul: entra o logotipo oficial de fundo claro, em vez de inverter as cores do reverso.
+  arquivos.set('marca/clarevo-logotipo.svg', fs.readFileSync(path.join(raiz, 'docs', 'marca', 'clarevo-logotipo.svg')));
   arquivos.set('marca/icone-app.png', fs.readFileSync(path.join(raiz, 'docs', 'marca', 'icone-app-1024.png')));
   arquivos.set('favicon.svg', fs.readFileSync(path.join(raiz, 'docs', 'marca', 'clarevo-simbolo.svg')));
-  avisos.push(...linksQuebrados(arquivos));
-  return { arquivos, avisos, pendencias, valores };
+  const quebrados = linksQuebrados(arquivos);
+  avisos.push(...quebrados);
+  problemasFinais.push(...quebrados.map((q) => `link interno quebrado em ${q}`));
+  return { arquivos, avisos, pendencias, problemasFinais, valores };
 }
 
 // ------------------------------------------------------------------------------------------------------------------------------
@@ -1040,10 +1103,18 @@ async function principal(argv) {
 
   const faltas = [];
   for (const [pagina, lista] of resultado.pendencias) for (const m of lista) faltas.push(`${pagina}: ${m}`);
-  if (final && faltas.length > 0) {
-    console.error(`--final: o site não está pronto para publicar. Falta preencher (${faltas.length}):`);
-    for (const f of faltas) console.error(`  ${f}`);
-    console.error('Preencha site/dados-da-empresa.json e os trechos [A DEFINIR] de docs/legal, e rode de novo.');
+  const problemas = resultado.problemasFinais;
+  if (final && (faltas.length > 0 || problemas.length > 0)) {
+    console.error('--final: o site não está pronto para publicar.');
+    if (faltas.length > 0) {
+      console.error(`Falta preencher (${faltas.length}):`);
+      for (const f of faltas) console.error(`  ${f}`);
+    }
+    if (problemas.length > 0) {
+      console.error(`Ainda no texto (${problemas.length}):`);
+      for (const q of problemas) console.error(`  ${q}`);
+    }
+    console.error('Preencha site/dados-da-empresa.json, resolva os trechos [A DEFINIR] e [PROPOSTA] e tire as frases de rascunho de docs/legal, e rode de novo.');
     process.exitCode = 1;
     return;
   }

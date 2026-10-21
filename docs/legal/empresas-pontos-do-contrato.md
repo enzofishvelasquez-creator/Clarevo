@@ -33,7 +33,7 @@ Texto proposto: "O link de convite é de uso único e é enviado pela EMPRESA, p
 
 ## 4. O que a empresa vê e o que não vê
 
-Texto proposto: "A EMPRESA vê apenas: os e-mails que convidou, a situação de cada licença (convite enviado, ativa ou encerrada), as datas correspondentes e as contagens do contrato (vagas contratadas, convites pendentes, licenças ativas e encerradas). A EMPRESA pode baixar um relatório de adesão com essas informações."
+Texto proposto: "A EMPRESA vê apenas: os e-mails que convidou, a situação de cada licença (convite enviado, convite cancelado, ativa ou encerrada), as datas correspondentes e as contagens do contrato (vagas contratadas, convites pendentes, licenças ativas e encerradas). A EMPRESA pode baixar um relatório de adesão com essas informações."
 
 Texto proposto: "A EMPRESA nunca vê dados financeiros das pessoas, como valores, categorias, metas, contas, cartões ou Família, nem em números somados. A EMPRESA também não vê quando ou como a pessoa usa o aplicativo."
 

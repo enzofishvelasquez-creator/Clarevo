@@ -1,5 +1,5 @@
-import { BENEFIT_TEXT, COMPANY_TEXT, DELETE_TEXT, EXPORT_TEXT, FAMILY_ROLE_LABEL, FAMILY_TEXT } from '@clarevo/core';
-import { AlertCircle, Building2, Check, FileDown, KeyRound, LogOut, MonitorSmartphone, Trash2, Users } from 'lucide-react-native';
+import { BENEFIT_TEXT, COMPANY_TEXT, DELETE_TEXT, EXPORT_TEXT, FAMILY_ROLE_LABEL, FAMILY_TEXT, LEGAL_TEXT, type SitePage } from '@clarevo/core';
+import { AlertCircle, Building2, Check, FileDown, FileText, KeyRound, LogOut, MonitorSmartphone, ShieldCheck, Trash2, Users } from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Platform, ScrollView, View } from 'react-native';
@@ -14,6 +14,7 @@ import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Screen, Txt } from '@/components/ui';
 import { AuthError, RESEND_INTERVAL_SECONDS } from '@/lib/auth';
 import { signOutIntent } from '@/lib/nav';
+import { SITE_URL, openSitePage } from '@/lib/site';
 import { useCompanies, useMyBenefit } from '@/state/company';
 import { useWork } from '@/state/data';
 import { useFamily } from '@/state/family';
@@ -47,6 +48,7 @@ export default function ContaScreen() {
   const [busy, setBusy] = useState<'senha' | 'sessoes' | null>(null);
   const [cooldown, setCooldown] = useState(0);
   const [confirmAll, setConfirmAll] = useState(false);
+  const [siteFailed, setSiteFailed] = useState(false);
   // ?secao=lembretes (vindo de Contas a pagar) ou ?secao=contas (o atalho "Gerenciar contas" dos seletores): rola até o card.
   const { secao } = useLocalSearchParams<{ secao?: string }>();
   const scroll = useRef<ScrollView>(null);
@@ -81,6 +83,12 @@ export default function ContaScreen() {
     } finally {
       setBusy(null);
     }
+  };
+
+  /** "Privacidade e termos" (D-064): abre a página do site no navegador; se não abrir, avisa no próprio card. */
+  const openSite = async (page: SitePage) => {
+    setSiteFailed(false);
+    if (!(await openSitePage(page))) setSiteFailed(true);
   };
 
   const signOutEverywhere = async () => {
@@ -152,7 +160,7 @@ export default function ContaScreen() {
             Segurança
           </Txt>
           <Txt variant="caption" color={colors.textSecondary}>
-            Seus registros ficam protegidos por permissões no servidor: só você vê o contexto Pessoal. Na Família, cada pessoa vê o que o papel dela permite.
+            {LEGAL_TEXT.whoSees.security}
           </Txt>
           <Message msg={securityMsg} />
           <Button
@@ -203,6 +211,28 @@ export default function ContaScreen() {
             plano. Seus registros financeiros têm permissões próprias.
           </Txt>
         </Card>
+
+        {/* Privacidade e termos (D-064): só quando `EXPO_PUBLIC_SITE_URL` aponta para o site publicado; sem endereço, nada é desenhado. */}
+        {SITE_URL ? (
+          <Card style={{ gap: space[3] }}>
+            <Txt variant="title" accessibilityRole="header" aria-level={2}>
+              {LEGAL_TEXT.account.title}
+            </Txt>
+            <Txt variant="caption" color={colors.textSecondary}>
+              {LEGAL_TEXT.account.hint}
+            </Txt>
+            {siteFailed ? (
+              <Banner tone="erro" icon={AlertCircle}>
+                <Txt variant="label" color={colors.error}>
+                  {LEGAL_TEXT.account.openFailed}
+                </Txt>
+              </Banner>
+            ) : null}
+            <Button label={LEGAL_TEXT.account.privacy} icon={ShieldCheck} tone="soft" onPress={() => openSite('privacidade')} />
+            <Button label={LEGAL_TEXT.account.terms} icon={FileText} tone="soft" onPress={() => openSite('termos')} />
+            <Button label={LEGAL_TEXT.account.deletion} icon={Trash2} tone="soft" onPress={() => openSite('exclusao')} />
+          </Card>
+        ) : null}
 
         <Button
           label="Sair deste aparelho"

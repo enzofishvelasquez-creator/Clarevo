@@ -4,7 +4,7 @@ Rascunho preparado pela equipe do Clarevo para revisão jurídica. Não é parec
 
 Vigência: [DATA DE VIGÊNCIA]
 
-Estes Termos explicam as regras de uso do Clarevo, aplicativo e serviço web oferecidos por [RAZÃO SOCIAL], CNPJ [CNPJ], com sede em [ENDEREÇO] (neste texto, "o Clarevo"). Ao criar uma conta ou usar o Clarevo, você concorda com estes Termos. [A DEFINIR: como e quando o aceite é registrado; hoje a criação de conta não pede aceite]
+Estes Termos explicam as regras de uso do Clarevo, aplicativo e serviço web oferecidos por [RAZÃO SOCIAL], CNPJ [CNPJ], com sede em [ENDEREÇO] (neste texto, "o Clarevo"). Ao criar uma conta, o app mostra, acima do botão "Criar conta", que você confirma ter 18 anos ou mais e concorda com estes Termos e com a Política de Privacidade. [A DEFINIR: forma do aceite (caixa de seleção ou só o texto) e registro da versão aceita e da data; hoje o aceite não é registrado]
 
 Para saber como tratamos os seus dados pessoais, leia a Política de Privacidade.
 
@@ -28,7 +28,7 @@ O Clarevo ajuda pessoas e famílias a entender o próprio mês: o que entrou, o 
 
 ## 3. Quem pode usar?
 
-O Clarevo é para pessoas com 18 anos ou mais e com capacidade para contratar. [A DEFINIR: como a idade é declarada, hoje o cadastro não pergunta, P-002]
+O Clarevo é para pessoas com 18 anos ou mais e com capacidade para contratar. No cadastro, você confirma isso pelo texto acima do botão "Criar conta". [A DEFINIR: forma da declaração de idade, P-002]
 
 Cada conta é de uma pessoa. Para dividir as contas da casa, use a Família (seção 5).
 
@@ -38,12 +38,12 @@ Cada conta é de uma pessoa. Para dividir as contas da casa, use a Família (se�
 - Escolha uma senha com pelo menos 8 caracteres, com letras e números, e não a compartilhe.
 - Você pode pedir biometria para abrir o app, ocultar valores na tela e encerrar a sessão em todos os aparelhos, em Conta.
 - Avise o suporte, em [E-MAIL DE SUPORTE], se achar que alguém entrou na sua conta.
-- Você é responsável pelo que acontece na sua conta, a menos que o acesso indevido tenha ocorrido por falha do Clarevo.
+- Cuide da sua senha e dos seus aparelhos. Se alguém entrar na sua conta sem a sua autorização, avise o suporte para que o acesso seja bloqueado. Você não responde por acesso indevido causado por falha de segurança do Clarevo.
 - O Clarevo pode suspender uma conta em caso de uso que ponha outras pessoas ou o serviço em risco. [A DEFINIR: regras de suspensão, aviso e prazo para a pessoa se manifestar]
 
 ## 5. Pessoal e Família
 
-**Pessoal.** É só seu. Ninguém da Família nem da sua empresa o vê.
+**Pessoal.** Entre as pessoas que usam o app, só você o vê. Ninguém da Família nem da sua empresa o vê. O acesso da equipe do Clarevo está descrito na Política de Privacidade.
 
 **Família.**
 
@@ -62,7 +62,7 @@ Uma empresa pode oferecer o Clarevo como benefício às pessoas que trabalham ne
 
 - A empresa convida pelo e-mail da pessoa e envia um link de uso único. A pessoa decide se aceita. Para aceitar, ela precisa ter uma conta com o mesmo e-mail do convite, já confirmado.
 - A empresa não escolhe quem aceita e não ativa a licença. Quem ativa é a pessoa, ao aceitar. Cada pessoa tem uma licença ativa por vez.
-- **O que a empresa vê:** os e-mails que ela convidou, a situação de cada licença (convite enviado, ativa ou encerrada), as datas e as contagens (vagas, convites, licenças ativas e encerradas).
+- **O que a empresa vê:** os e-mails que ela convidou, a situação de cada licença (convite enviado, convite cancelado, ativa ou encerrada), as datas e as contagens (vagas, convites, licenças ativas e encerradas).
 - **O que a empresa não vê:** valores, categorias, metas, contas, cartões, a Família de ninguém, nem números somados, e não vê quando ou como a pessoa usa o app.
 - **Quando o benefício acaba** (a empresa encerra a licença ou o contrato termina): a pessoa mantém a conta, o histórico e a Família, continua com acesso pleno por 30 dias e depois passa ao plano gratuito, com leitura do histórico. Nada é apagado. [A DEFINIR: o que o plano gratuito inclui e se haverá cobrança, P-005; hoje o app ainda não limita recursos por plano]
 - Se a pessoa excluir a conta, a licença termina na hora.
@@ -81,7 +81,7 @@ Uma empresa pode oferecer o Clarevo como benefício às pessoas que trabalham ne
 
 O Clarevo trabalha para manter o serviço disponível, mas pode haver pausas para manutenção, falhas de fornecedores e outras situações fora do nosso controle. Quando possível, avisaremos antes. [A DEFINIR: compromisso de disponibilidade, se houver]
 
-Podemos mudar ou retirar recursos. Se uma mudança afetar de forma importante o que você usa, avisaremos com antecedência e, se o serviço acabar, daremos prazo para você exportar os seus dados. [A DEFINIR: prazo de aviso]
+Podemos mudar recursos para melhorar o serviço, por segurança, por exigência legal ou por limite técnico, sem prejudicar de forma injustificada quem já usa o Clarevo. Se uma mudança ou a retirada de um recurso afetar de forma importante o que você usa, avisaremos com antecedência, e você poderá exportar os seus dados e excluir a conta se não concordar. Se o serviço acabar, daremos prazo para você exportar os seus dados. [A DEFINIR: prazo de aviso; proposta de 30 dias]
 
 Podemos atualizar estes Termos. Mudanças importantes serão avisadas antes de valerem. [A DEFINIR: forma do aviso e do novo aceite]
 
@@ -89,13 +89,15 @@ Podemos atualizar estes Termos. Mudanças importantes serão avisadas antes de v
 
 O Clarevo responde pelo serviço nos termos da lei, inclusive do Código de Defesa do Consumidor. Nada nestes Termos retira direitos que a lei garante a você.
 
-Os números do Clarevo vêm do que você anotou ou importou. Por isso, o Clarevo não se responsabiliza por decisões tomadas só com base nesses números, nem por erro de dado digitado ou conferido de forma incorreta, nem por falha de serviço de terceiros fora do nosso controle, nos limites que a lei permite. [A DEFINIR: revisão jurídica desta cláusula, para que seja compatível com o CDC]
+Os números do Clarevo vêm do que você anotou ou importou. Por isso, o Clarevo não se responsabiliza por decisões tomadas só com base nesses números nem por erro de dado digitado ou conferido de forma incorreta, nos limites que a lei permite.
+
+O Clarevo responde pelos serviços de terceiros que escolhe para operar o app, como hospedagem e banco de dados. Não responde por falha de algo que você contratou por conta própria, como a sua internet, o seu aparelho ou a loja de aplicativos. [A DEFINIR: revisão jurídica desta cláusula, para que seja compatível com o CDC]
 
 ## 10. Propriedade intelectual
 
 A marca "clarevo.", o logotipo, os textos, o design e o código do Clarevo pertencem à [RAZÃO SOCIAL] ou a quem nos licenciou. Você recebe uma licença pessoal, limitada, não exclusiva e que pode ser revogada, para usar o app.
 
-Os seus dados continuam sendo seus. Você nos autoriza a tratá-los só para prestar o serviço, como explica a Política de Privacidade.
+Os seus dados continuam sendo seus. O Clarevo trata esses dados para prestar o serviço que você contratou e para cumprir obrigações legais, como explica a Política de Privacidade.
 
 O app usa programas de código aberto, cada um com a sua licença. [A DEFINIR: tela de licenças no app]
 

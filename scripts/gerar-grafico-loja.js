@@ -9,8 +9,10 @@
  *   - o subtítulo da ficha (`docs/lojas/ficha.md`, campo `apple-subtitulo`), lido do arquivo, e uma linha de recursos;
  *   - a tela Resumo da demonstração (dados fictícios, com a etiqueta "Demonstração") de `docs/lojas/capturas/`, num aparelho simples
  *     desenhado em CSS, saindo pela borda de baixo.
- * Texto e aparelho ficam na área central (margens de 72 px dos lados e 44 px do alto). Sem preço, ranking, "melhor", "grátis",
- * chamada para baixar nem selos das lojas.
+ * Texto e aparelho ficam fora de duas zonas livres e longe das bordas (margens de 72 px dos lados e 44 px do alto): o Google pode
+ * sobrepor o botão de vídeo no centro e na faixa de baixo ao meio, então nada importante entra em `ZONAS_LIVRES` (o script confere
+ * cada linha de texto e o aparelho e recusa o desenho se algo entrar). Sem preço, ranking, "melhor", "grátis", chamada para baixar
+ * nem selos das lojas.
  * Fonte: Manrope (OFL), de `apps/app/assets/fonts`, embutida no HTML.
  *
  * Uso: node scripts/gerar-grafico-loja.js [arquivo de saída]
@@ -28,6 +30,12 @@ const LARGURA = 1024;
 const ALTURA = 500;
 const MAXIMO_BYTES = 1024 * 1024;
 const AZUL = '#2457F5';
+/** Zonas onde nada importante pode ficar (o botão de vídeo do Google) e a margem mínima das bordas, em pixels do gráfico. */
+const ZONAS_LIVRES = [
+  { nome: 'centro (botão de vídeo)', x0: 440, y0: 180, x1: 584, y1: 320 },
+  { nome: 'faixa inferior central', x0: 352, y0: 340, x1: 672, y1: 500 },
+];
+const MARGEM_MINIMA = { x: 48, topo: 32 };
 const CAPTURA = path.join(RAIZ, 'docs', 'lojas', 'capturas', 'google-play-celular-1080x1920', '01_resumo.png');
 
 // ---- PNG sem dependências (o mesmo codificador de `gerar-icones.js`): RGB de 8 bits, filtro 0, zlib no nível máximo. ----
@@ -103,23 +111,23 @@ function montarHtml() {
 html,body{width:${LARGURA}px;height:${ALTURA}px;overflow:hidden;background:${AZUL}}
 body{position:relative;font-family:Manrope,sans-serif;color:#fff}
 .disco{position:absolute;left:560px;top:90px;width:520px;height:520px;border-radius:50%;background:#1D47CC}
-.texto{position:absolute;left:72px;top:96px;width:470px}
-.texto img{display:block;width:340px;height:auto}
-.barra{width:56px;height:8px;border-radius:4px;background:#D4F05B;margin:44px 0 22px}
+.texto{position:absolute;left:72px;top:72px;width:372px}
+.texto img{display:block;width:300px;height:auto}
+.barra{width:56px;height:8px;border-radius:4px;background:#D4F05B;margin:34px 0 20px}
 h1{font-weight:800;font-size:46px;line-height:1.12;letter-spacing:-.01em}
-p{margin-top:20px;font-weight:600;font-size:21px;line-height:1.4;color:#EEF2FF}
-.aparelho{position:absolute;left:646px;top:44px;width:268px;padding:10px;border-radius:44px;background:#0B1330;box-shadow:0 26px 60px rgba(6,16,64,.5),inset 0 0 0 2px #3A4A86}
+p{margin-top:20px;max-width:268px;font-weight:600;font-size:21px;line-height:1.4;color:#EEF2FF}
+.aparelho{position:absolute;left:676px;top:44px;width:268px;padding:10px;border-radius:44px;background:#0B1330;box-shadow:0 26px 60px rgba(6,16,64,.5),inset 0 0 0 2px #3A4A86}
 .tela{width:100%;border-radius:34px 34px 0 0;overflow:hidden;background:#F6F8FC}
 .tela img{display:block;width:100%;height:auto}
 </style></head><body>
 <div class="disco"></div>
-<div class="texto">
+<div class="texto" data-importante>
 <img src="data:image/svg+xml;base64,${logo}" alt="Clarevo">
 <div class="barra"></div>
 <h1>${esc(subtituloDaFicha())}</h1>
 <p>Contas a pagar, cartões, metas e Família.</p>
 </div>
-<div class="aparelho"><div class="tela"><img src="data:image/png;base64,${b64(CAPTURA)}" alt="Tela Resumo do Clarevo, com dados fictícios de demonstração"></div></div>
+<div class="aparelho" data-importante><div class="tela"><img src="data:image/png;base64,${b64(CAPTURA)}" alt="Tela Resumo do Clarevo, com dados fictícios de demonstração"></div></div>
 </body></html>`;
 }
 
@@ -130,6 +138,36 @@ p{margin-top:20px;font-weight:600;font-size:21px;line-height:1.4;color:#EEF2FF}
     const pagina = await browser.newPage({ viewport: { width: LARGURA, height: ALTURA }, deviceScaleFactor: 1 });
     await pagina.setContent(montarHtml(), { waitUntil: 'load' });
     await pagina.evaluate(() => Promise.all([document.fonts.ready, ...[...document.images].map((i) => i.decode())]));
+    // O que importa (logotipo, cada linha de texto e o aparelho) não pode tocar as zonas livres nem encostar nas bordas. O aparelho sai
+    // pela borda de baixo de propósito (só a margem de cima e dos lados vale para ele).
+    const invasoes = await pagina.evaluate(
+      ({ zonas, margem, largura }) => {
+        const achados = [];
+        const caixas = [];
+        for (const raiz of document.querySelectorAll('[data-importante]')) {
+          const aparelho = raiz.classList.contains('aparelho');
+          const itens = aparelho ? [raiz] : [...raiz.querySelectorAll('img, h1, p')];
+          for (const el of itens) {
+            const rects = [];
+            if (el.tagName === 'IMG' || aparelho) rects.push(el.getBoundingClientRect());
+            else {
+              const faixa = document.createRange();
+              faixa.selectNodeContents(el);
+              rects.push(...faixa.getClientRects());
+            }
+            for (const r of rects) caixas.push({ r, nome: el.tagName.toLowerCase() + (aparelho ? ' (aparelho)' : ''), aparelho });
+          }
+        }
+        for (const { r, nome, aparelho } of caixas) {
+          for (const z of zonas) if (r.left < z.x1 && r.right > z.x0 && r.top < z.y1 && r.bottom > z.y0) achados.push(`${nome} entra em "${z.nome}" (x ${Math.round(r.left)}-${Math.round(r.right)}, y ${Math.round(r.top)}-${Math.round(r.bottom)})`);
+          if (r.left < margem.x || r.right > largura - margem.x || r.top < margem.topo) achados.push(`${nome} fica perto demais da borda (x ${Math.round(r.left)}-${Math.round(r.right)}, y ${Math.round(r.top)})`);
+          void aparelho;
+        }
+        return achados;
+      },
+      { zonas: ZONAS_LIVRES, margem: MARGEM_MINIMA, largura: LARGURA },
+    );
+    if (invasoes.length > 0) throw new Error(`o desenho invade as zonas livres do gráfico:\n  ${invasoes.join('\n  ')}`);
     const foto = await pagina.screenshot({ type: 'png', clip: { x: 0, y: 0, width: LARGURA, height: ALTURA } });
     // O Chromium grava o PNG com canal alfa: decodifica, confere que tudo é opaco e regrava em RGB de 24 bits.
     const rgbaB64 = await pagina.evaluate(async (png) => {

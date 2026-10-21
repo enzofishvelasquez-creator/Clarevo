@@ -910,7 +910,7 @@ export const GOALS_TEXT = {
   whoSees: 'Quem vê estes dados?',
   /** Acréscimo em "Quem vê estes dados?" (Ciclos A a D). */
   whoSeesGoals:
-    'Gastos fixos, renda de referência, renda comprometida, metas e simulações também são só seus. A empresa que oferece o benefício não vê nada disso, nem em números somados aos de outras pessoas.',
+    'Gastos fixos, renda de referência, renda comprometida, metas e simulações também ficam só no seu Pessoal, sem nenhuma outra pessoa do app ver. A empresa que oferece o benefício não vê nada disso, nem em números somados aos de outras pessoas.',
   footer: 'O Clarevo não guarda nem movimenta dinheiro. Os valores mostram só o que você registrou.',
 
   // Calculadora da reserva (/reserva).

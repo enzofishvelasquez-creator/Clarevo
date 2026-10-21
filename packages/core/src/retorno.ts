@@ -945,7 +945,7 @@ export const RETURN_TEXT = {
   progressGaps: (n: number) => `Sem conta registrada: ${n}`,
 
   // "Quem vê estes dados?"
-  privacy: 'A data da sua última anotação e suas escolhas na revisão dos últimos meses ficam só com você. A empresa e outras pessoas da Família não veem.',
+  privacy: 'A data da sua última anotação e suas escolhas na revisão dos últimos meses não aparecem para a empresa nem para outras pessoas da Família.',
 
   // Resumo de meses fechados (emptyMonthCaption).
   nothingNoted: (month: IsoMonth) => `Nada anotado em ${formatMonthName(month)}.`,

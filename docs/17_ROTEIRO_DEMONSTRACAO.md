@@ -110,7 +110,7 @@ Não use `clarevo.pages.dev` na apresentação: é a versão com login real (`do
 
 **10. Quem vê estes dados? (0:30).**
 - Aba Resumo › role até o fim › "Quem vê estes dados?".
-- Diga: "No Pessoal, só a própria pessoa vê, anota, edita e exclui. A permissão é conferida no banco a cada leitura, não só escondida na tela."
+- Diga: "No Pessoal, entre as pessoas do app, só você vê, anota, edita e exclui. A equipe do Clarevo não olha os dados no dia a dia. A permissão é conferida no banco a cada leitura, não só escondida na tela."
 
 **Fechamento (0:50).**
 - Diga: "Hoje existe o produto funcionando em demonstração, com as regras financeiras e as permissões testadas. O que falta para chegar às pessoas é, em boa parte, de fora do código: contas das lojas, política de privacidade e termos com advogado, teste com pessoas reais e preço." Abra para perguntas.

@@ -35,9 +35,9 @@ Tudo o que está no seu Pessoal, de verdade, e não apenas escondido:
 - contas de origem do dinheiro, assinaturas, importações, a revisão dos últimos meses e a resposta do plano de guardar;
 - o histórico de operações e de atividade da sua conta (o rastro técnico);
 - o seu cadastro: e-mail, nome de apresentação e login;
-- o que o app guardava no seu aparelho: preferências, memórias de lojas e nomes, lembretes agendados e o resumo do widget.
+- o que o app guardava no aparelho em que você faz a exclusão: preferências, memórias de lojas e nomes, lembretes agendados e o resumo do widget. Em outro aparelho onde você já tenha entrado, o que ficou lá continua até você desinstalar o app ou limpar os dados dele (na versão web, os dados do site no navegador).
 
-Apagar um registro isolado, sem excluir a conta, tira o item das listas e dos totais, mas o Clarevo ainda guarda uma marca técnica de exclusão. [A DEFINIR: prazo de guarda dessa marca, P-010] Excluir a conta apaga tudo, inclusive essas marcas.
+Apagar um registro isolado, sem excluir a conta, tira o item das listas e dos totais, e ele deixa de aparecer no app. Mas o item não é apagado de verdade: o Clarevo só o marca como excluído, com a data e quem excluiu, e o valor, a descrição, a data e a categoria continuam guardados. [A DEFINIR: P-010, prazo para eliminar de vez os itens marcados como excluídos; proposta de 6 meses] Excluir a conta apaga tudo, inclusive esses itens.
 
 ## E a sua Família?
 
@@ -61,7 +61,7 @@ A empresa nunca vê as suas finanças.
 - O que você anotou numa Família de outras pessoas, sem o seu nome e sem e-mail (veja "E a sua Família?").
 - O e-mail informado pela empresa, na licença encerrada (veja acima).
 - Cópias de segurança do serviço de banco de dados, que podem guardar dados já apagados por um tempo. [A DEFINIR: prazo, previsto em 7 dias; confirmar no painel] Se uma cópia for restaurada, as contas excluídas depois dela serão excluídas de novo.
-- Registros técnicos de acesso, como o IP, mantidos pela infraestrutura. [A DEFINIR: prazo, frente à guarda de registros de acesso do Marco Civil da Internet, art. 15]
+- Registros técnicos de acesso, como o IP, mantidos pela infraestrutura. O Clarevo não cria registros de acesso próprios, os dos serviços têm prazo curto e o registro de auditoria da autenticação pode manter e-mail e IP depois da exclusão. [A DEFINIR: o que guardar, onde e por quanto tempo, frente à guarda de registros de acesso do Marco Civil da Internet, art. 15, e conferir o que cada serviço mantém]
 - O que a lei exigir que guardemos. [A DEFINIR]
 
 Fora isso, o Clarevo não guarda nada por garantia.
@@ -70,7 +70,7 @@ Fora isso, o Clarevo não guarda nada por garantia.
 
 Escreva para [E-MAIL DE PRIVACIDADE], do e-mail cadastrado na sua conta, com o assunto "Excluir minha conta". Não envie senha, documentos nem dados financeiros.
 
-- Como confirmamos que o pedido é seu: [A DEFINIR]. Proposta: respondemos ao e-mail cadastrado com um pedido de confirmação, sem pedir documentos.
+- Como confirmamos que o pedido é seu: [A DEFINIR: forma de confirmar a identidade] [PROPOSTA: respondemos ao e-mail cadastrado com um pedido de confirmação, sem pedir documentos.]
 - Prazo para atender: [A DEFINIR].
 - Se você não tem mais acesso ao e-mail cadastrado: [A DEFINIR].
 - O resultado é o mesmo da exclusão pelo app, inclusive o que continua (veja acima). Se você é Titular com outras pessoas na Família, precisamos que a titularidade seja passada antes.

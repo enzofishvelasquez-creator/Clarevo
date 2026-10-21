@@ -674,7 +674,7 @@ function instantesDosSinais(nome, esperados, achados) {
         await rolarPara('fim', 1600);
         await pausa(500);
         await tocar(botao('Quem vê estes dados?'));
-        await esperar('Única pessoa que vê, anota, edita e exclui');
+        await esperar('Única pessoa do app que vê, anota, edita e exclui');
         await pausa(2000);
         await rolarAte(texto('A empresa que oferece o benefício vê os e-mails', false), 1500, 110);
         await pausa(1000);

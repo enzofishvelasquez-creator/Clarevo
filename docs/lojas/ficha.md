@@ -13,13 +13,13 @@
 | Nome (Apple e Google) | 7 caracteres | 30 |
 | Nome, alternativa | 26 caracteres | 30 |
 | Subtítulo (Apple) | 26 caracteres | 30 |
-| Texto promocional (Apple) | 164 caracteres | 170 |
+| Texto promocional (Apple) | 167 caracteres | 170 |
 | Palavras-chave (Apple) | 98 bytes | 100 bytes |
-| Descrição (Apple) | 2612 caracteres | 4000 |
+| Descrição (Apple) | 2692 caracteres | 4000 |
 | Descrição curta (Google) | 76 caracteres | 80 (a conferir) |
-| Descrição completa (Google) | 2612 caracteres | 4000 (a conferir) |
+| Descrição completa (Google) | 2692 caracteres | 4000 (a conferir) |
 | Notas da versão (Google) | 94 caracteres | 500 (a conferir) |
-| Notas para a revisão (Apple) | 906 bytes | 4000 bytes |
+| Notas para a revisão (Apple) | 940 bytes | 4000 bytes |
 
 ## 1. Nome, subtítulo e categoria
 
@@ -52,7 +52,7 @@ Pode ser trocado a qualquer momento, sem nova versão.
 
 <!-- campo: apple-promocional | limite: 170 | unidade: caracteres -->
 ```
-Anote gastos e recebimentos, acompanhe contas a pagar e cartões e aprenda o essencial. O Clarevo não se conecta a contas bancárias, e sua empresa não vê seus dados.
+Anote gastos e recebimentos, acompanhe contas a pagar e cartões e aprenda o essencial. O Clarevo não se conecta a contas bancárias, e sua empresa não vê suas finanças.
 ```
 
 ## 3. Palavras-chave (Apple, até 100 bytes)
@@ -72,7 +72,7 @@ Texto simples, sem HTML. A mesma descrição serve de base para o Google (seçã
 ```
 O Clarevo ajuda você e sua família a organizar o dinheiro do mês e a entender melhor as próprias contas. Você anota o que recebe e o que paga, e o app mostra quanto entrou, quanto saiu e quanto ainda vai vencer, cada coisa separada da outra.
 
-O Clarevo não se conecta a contas bancárias. Tudo o que aparece no app foi anotado ou importado por você, e é você quem decide o que registrar. Se sua empresa oferecer o Clarevo como benefício, ela só vê se a licença está ativa: nunca vê seus gastos, seus valores nem o que você faz no app.
+O Clarevo não se conecta a contas bancárias. Tudo o que aparece no app foi anotado ou importado por você, e é você quem decide o que registrar. Se sua empresa oferecer o Clarevo como benefício, ela vê o e-mail que convidou e a situação do convite ou da licença, com as datas: nunca vê seus gastos, seus valores nem o que você faz no app.
 
 O QUE VOCÊ FAZ NO CLAREVO
 
@@ -89,11 +89,11 @@ O QUE VOCÊ FAZ NO CLAREVO
 • Família: até 6 pessoas, com os papéis de titular, membro e leitor, convite por link e a opção de sair ou encerrar quando quiser.
 • Aprender: explicações curtas sobre juros, taxas e contas do dia a dia, cada uma com fonte e data de revisão.
 • Ocultar valores na tela e pedir biometria para abrir o app.
-• Exportar seus dados em CSV ou PDF e excluir a conta dentro do app.
+• Exportar seus gastos e recebimentos em CSV ou PDF e excluir a conta dentro do app.
 
 SEUS DADOS
 
-• Sem anúncios, sem venda de dados e sem rastreamento.
+• Sem anúncios, sem venda de dados e sem rastreamento para publicidade.
 • Conexão protegida (criptografia em trânsito).
 • A exclusão da conta e dos dados é feita por você, em Conta.
 
@@ -117,7 +117,7 @@ Anote gastos, veja contas e cartões e aprenda. Sem ligar a contas bancárias.
 ```
 O Clarevo ajuda você e sua família a organizar o dinheiro do mês e a entender melhor as próprias contas. Você anota o que recebe e o que paga, e o app mostra quanto entrou, quanto saiu e quanto ainda vai vencer, cada coisa separada da outra.
 
-O Clarevo não se conecta a contas bancárias. Tudo o que aparece no app foi anotado ou importado por você, e é você quem decide o que registrar. Se sua empresa oferecer o Clarevo como benefício, ela só vê se a licença está ativa: nunca vê seus gastos, seus valores nem o que você faz no app.
+O Clarevo não se conecta a contas bancárias. Tudo o que aparece no app foi anotado ou importado por você, e é você quem decide o que registrar. Se sua empresa oferecer o Clarevo como benefício, ela vê o e-mail que convidou e a situação do convite ou da licença, com as datas: nunca vê seus gastos, seus valores nem o que você faz no app.
 
 O QUE VOCÊ FAZ NO CLAREVO
 
@@ -134,11 +134,11 @@ O QUE VOCÊ FAZ NO CLAREVO
 • Família: até 6 pessoas, com os papéis de titular, membro e leitor, convite por link e a opção de sair ou encerrar quando quiser.
 • Aprender: explicações curtas sobre juros, taxas e contas do dia a dia, cada uma com fonte e data de revisão.
 • Ocultar valores na tela e pedir biometria para abrir o app.
-• Exportar seus dados em CSV ou PDF e excluir a conta dentro do app.
+• Exportar seus gastos e recebimentos em CSV ou PDF e excluir a conta dentro do app.
 
 SEUS DADOS
 
-• Sem anúncios, sem venda de dados e sem rastreamento.
+• Sem anúncios, sem venda de dados e sem rastreamento para publicidade.
 • Conexão protegida (criptografia em trânsito).
 • A exclusão da conta e dos dados é feita por você, em Conta.
 
@@ -217,7 +217,7 @@ Permissões: a câmera é usada só para ler o QR Code da nota fiscal (nenhuma f
 
 Exclusão da conta: Conta, último item, "Excluir minha conta" (exige digitar EXCLUIR).
 
-Uma empresa pode oferecer o Clarevo como benefício. Ela só vê se a licença está ativa e nunca vê gastos nem valores. O painel das empresas existe só na web.
+Uma empresa pode oferecer o Clarevo como benefício. Ela vê os e-mails que convidou, a situação das licenças e as datas, e nunca vê gastos nem valores. O painel das empresas existe só na web.
 ```
 
 **Google Play, "Acesso ao app".** Informar que o app exige login, e preencher as instruções de acesso com a conta de teste (nome de usuário e senha nos campos do Play Console, nunca no repositório). Texto das instruções: "Entre com o e-mail e a senha da conta de teste. Todos os dados são fictícios. A exclusão da conta fica em Conta, último item."

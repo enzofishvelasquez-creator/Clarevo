@@ -21,12 +21,13 @@ Os dois são publicados sozinhos a cada atualização da branch `main` do GitHub
 | Framework preset | None | None |
 | Comando de build | `npm --workspace apps/app run export:web` | `npm --workspace apps/app run export:demo` |
 | Pasta publicada | `apps/app/dist` | `apps/app/dist` |
-| Variáveis | `NODE_VERSION=22`, `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_KEY` (chave pública) | só `NODE_VERSION=22` |
+| Variáveis | `NODE_VERSION=22`, `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_KEY` (chave pública) e, só quando o site público estiver publicado, `EXPO_PUBLIC_SITE_URL` (veja "Endereço do site no app", abaixo) | só `NODE_VERSION=22` (nunca `EXPO_PUBLIC_SITE_URL`) |
 
 - O Cloudflare instala as dependências sozinho a partir do `package-lock.json` da raiz.
 - O app web é uma página única (`web.output: "single"`): sem `404.html`, o Cloudflare devolve o `index.html` em qualquer endereço, e o Expo Router abre a tela certa.
 - `export:web` e `export:demo` rodam com `--clear`, para o cache do Metro não misturar as variáveis de um build com as de outro.
 - A demonstração usa dados fictícios mesmo se alguém configurar o Supabase no projeto `clarevo-demo`: `EXPO_PUBLIC_MODO_DEMO=1` sempre vence (`apps/app/src/state/session.tsx`).
+- **Endereço do site no app.** O app só mostra os links para os Termos de uso e a Política de privacidade (no cadastro) e a seção "Privacidade e termos" (em Conta) quando `EXPO_PUBLIC_SITE_URL` tem o endereço do site público, por exemplo `https://clarevo-site.pages.dev` (ou `https://[DOMÍNIO]`, com o domínio). É a única fonte do endereço (lida em `apps/app/src/lib/site.ts`, sem valor padrão no código); as páginas são fixas (`privacidade.html`, `termos.html`, `excluir-conta.html` e `suporte.html`, em `packages/core/src/legal.ts`). **Configure a variável só quando o site estiver publicado** (depois da revisão do advogado e do `--final`), no projeto `clarevo` do Cloudflare Pages (variáveis de produção, ao lado das do Supabase) e no EAS, nos ambientes `preview` e `production` (`docs/16`, fase 1). Sem ela, os links não aparecem e o texto do cadastro vai sem link. A demonstração (`clarevo-demo` e `npm run export:demo`) nunca mostra os links: o `export:demo` força a variável vazia. A variável vai dentro do app (`EXPO_PUBLIC_*` não é segredo); depois de mudá-la, é preciso um novo build, e no web o `--clear` do `export:web` já evita misturar valores do cache.
 - Node 22 está em manutenção. Quando o Expo recomendar, trocar `NODE_VERSION` para a versão LTS seguinte nos dois projetos.
 
 ## Supabase (Authentication → URL Configuration)
@@ -58,6 +59,8 @@ Os textos de `docs/legal/` são rascunhos para o advogado; o site mostra os marc
 
 **Como mexer.** Editou um Markdown de `docs/legal/`, o JSON da empresa ou o script: rode `node scripts/gerar-site.js` e confira o `git diff` de `site/`. Se faltar rodar, o `npm test` falha ("páginas em dia"). Se um dos três Markdown ainda não existir, o script avisa e a página sai como espaço reservado com `[A DEFINIR]` (assim os links do rodapé nunca quebram). O site não tem JavaScript, cookies, analytics nem recurso de fora; o `_headers` reforça isso com uma política de segurança que só aceita arquivos do próprio site.
 
+**O que o `--final` recusa.** Além de marcador de dado sem valor, `[A DEFINIR: ...]` e `[PROPOSTA: ...]`, ele sai com código 1 e lista (por página) a frase "Rascunho preparado pela equipe do Clarevo para revisão jurídica. Não é parecer jurídico.", texto de proposta ("Proposta:" e "proposta, ainda sem confirmação"), travessão, a expressão proibida pela orientação do projeto, título fora de ordem e link interno quebrado. Sem `--final`, tudo isso continua só como aviso (ou aparece destacado na página). `[PROPOSTA: ...]` é a marca padrão do que a equipe propõe e o advogado ainda não confirmou: ela some quando o texto é aprovado.
+
 **Pacote para o advogado.** `node scripts/gerar-site.js --pdf pacote.pdf` gera, no Chromium do Playwright, um PDF A4 "Pacote para revisão jurídica" com `docs/legal/resumo-para-advogado.md`, a política de privacidade, os termos, a exclusão de conta e `empresas-pontos-do-contrato.md`, nessa ordem, com capa, número de página e os marcadores visíveis. O PDF não vai para o repositório.
 
 ### Criar o projeto no Cloudflare Pages (passo a passo para Enzo)
@@ -69,21 +72,27 @@ Só depois da revisão do advogado (veja "Quando publicar").
 3. **Nome do projeto:** `clarevo-site`. O endereço será `clarevo-site.pages.dev` se o nome estiver livre; vale o endereço que a Cloudflare mostrar.
 4. **Branch de produção:** `main`. **Framework preset:** None. **Comando de build:** deixe vazio (sem comando de build). **Pasta de saída do build (Build output directory):** `site`. Não há variáveis de ambiente.
 5. Salve e implante. Em **Configurações**, **Compilações e implantações**, desligue as implantações de prévia das outras branches, como nos outros dois projetos.
-6. Abra o endereço, confira as cinco páginas no celular e no computador (e o modo escuro) e só então informe as URLs nas lojas (`docs/16`, seção 3, e `docs/lojas/ficha.md`, seção 8).
+6. **Desligue o que a Cloudflare liga sozinha e quebraria o site.** O site não tem JavaScript e o `_headers` usa uma política de segurança (CSP) que só aceita arquivos do próprio site. Dois recursos da Cloudflare injetam um script e, por isso, não podem ficar ligados neste projeto:
+   - **Web Analytics** (no projeto `clarevo-site`, em Configurações, "Web Analytics" ou "Métricas"): deixe **desligado**. A CSP bloquearia o script de medição (aparece erro no console) e, mais importante, medir acessos contradiz a Política de privacidade ("sem análise de uso").
+   - **Email Address Obfuscation** (proteção contra coleta de e-mail, em Scrape Shield, na zona do domínio quando houver): deixe **desligado**. Ligado, a Cloudflare troca o e-mail do suporte por um texto "[email protected]" e depende de um script que a CSP bloqueia, então o e-mail deixa de aparecer e de funcionar. Como o `pages.dev` não tem zona própria, confira a opção de novo quando o domínio for ligado (próxima seção).
+   Os nomes dos menus mudam de tempos em tempos: o que vale é que nenhum desses dois recursos esteja ligado.
+7. Abra o endereço, confira as cinco páginas no celular e no computador (e o modo escuro), confira que o e-mail do suporte aparece por extenso e como link (não como "[email protected]") e que o console do navegador não mostra bloqueio da CSP. Só então informe as URLs nas lojas (`docs/16`, seção 3, e `docs/lojas/ficha.md`, seção 8) e configure `EXPO_PUBLIC_SITE_URL` (seção "Endereço do site no app", acima).
 
 ### Quando publicar
 
 Todas as condições, nesta ordem:
 
-1. O advogado revisou `docs/legal/*.md` e os trechos `[A DEFINIR: ...]` foram resolvidos nos Markdown. Também saem dos Markdown as frases de rascunho (como "Rascunho ... Não é parecer jurídico"), que o `--final` não detecta.
+1. O advogado revisou `docs/legal/*.md`, os trechos `[A DEFINIR: ...]` e `[PROPOSTA: ...]` foram resolvidos nos Markdown e saíram as frases de rascunho ("Rascunho ... Não é parecer jurídico", "Proposta:"). O `--final` confere tudo isso (veja "O que o `--final` recusa").
 2. `site/dados-da-empresa.json` está preenchido com os dados legais conferidos.
-3. `node scripts/gerar-site.js --final` termina sem erro (ele recusa, com código 1 e a lista do que falta, qualquer marcador ou `[A DEFINIR` que sobrar).
+3. `node scripts/gerar-site.js --final` termina sem erro (ele recusa, com código 1 e a lista do que falta, o que sobrar de marcador, `[A DEFINIR`, `[PROPOSTA`, frase de rascunho, texto de proposta, travessão ou link quebrado).
 4. `npm test` e `npm run typecheck` passam, e `site/` está gravado com o resultado do passo 3.
 5. A `main` recebe a pasta `site/`; o projeto `clarevo-site` é criado (ou, se já existia, publica sozinho).
 
 ### Domínio (depois, a confirmar)
 
-Quando o domínio existir (P-006): registrar `[DOMÍNIO]` em `site/dados-da-empresa.json` e regenerar o site; em `clarevo-site`, **Domínios personalizados**, apontar o **domínio raiz** para o site; em `clarevo`, apontar `app.` do domínio para o app (o site no domínio raiz e o app em `app.` é a proposta, **a confirmar com Enzo**). Mudar o endereço do app obriga a atualizar, no Supabase, o Site URL e as Redirect URLs (seção "Supabase" acima) e o botão "Abrir a versão web" do site (`URL_APP` em `scripts/gerar-site.js`), e a trocar as URLs das lojas pelas do domínio (`docs/16`, seção 3).
+Quando o domínio existir (P-006): registrar `[DOMÍNIO]` em `site/dados-da-empresa.json` e regenerar o site; em `clarevo-site`, **Domínios personalizados**, apontar o **domínio raiz** para o site; em `clarevo`, apontar `app.` do domínio para o app (o site no domínio raiz e o app em `app.` é a proposta, **a confirmar com Enzo**). Mudar o endereço do app obriga a atualizar, no Supabase, o Site URL e as Redirect URLs (seção "Supabase" acima) e o botão "Abrir a versão web" do site (`URL_APP` em `scripts/gerar-site.js`), e a trocar as URLs das lojas pelas do domínio (`docs/16`, seção 3), e a mudar `EXPO_PUBLIC_SITE_URL` (Cloudflare e EAS) para o endereço novo do site.
+
+**Com o domínio ligado, confira duas coisas.** (1) **Email Address Obfuscation** desligado na zona do domínio (Scrape Shield), como no passo 6 de "Criar o projeto". (2) **HSTS** (`Strict-Transport-Security`): só então acrescente, no bloco `/*` de `CABECALHOS` em `scripts/gerar-site.js` (é ele que gera `site/_headers`, que não se edita à mão), a linha `Strict-Transport-Security: max-age=31536000` e rode `node scripts/gerar-site.js`. Por que só depois do domínio: o navegador guarda a regra por um ano para aquele endereço e, durante esse tempo, recusa abrir o site sem HTTPS; no endereço `pages.dev`, que não é nosso, e antes de o domínio abrir sem erro por HTTPS, não vale arriscar uma regra que não dá para desfazer pelo servidor. Comece sem `includeSubDomains` e sem `preload`: o `app.` do domínio e outros subdomínios precisam abrir sempre por HTTPS antes disso, e `preload` é praticamente irreversível.
 
 ## Como voltar atrás
 

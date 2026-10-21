@@ -13,7 +13,7 @@
 | Dado | De onde vem | Onde fica |
 |---|---|---|
 | E-mail | Digitado ao criar a conta e ao entrar | Autenticação do Supabase (`auth.users`); o banco do app não o copia. A empresa só vê o e-mail que ela mesma convidou (D-056) |
-| Nome de apresentação (1 a 80 caracteres), fuso e idioma | Digitado ao criar a conta | `persons` |
+| Nome de apresentação (1 a 80 caracteres), fuso e idioma | O nome é digitado ao criar a conta; o fuso vem do aparelho no primeiro acesso (`ensure_personal_space`, com America/Sao_Paulo se o aparelho não informar) e o idioma é o português do Brasil | `persons` |
 | Identificador interno da conta | Criado pelo Supabase | `auth.users` e em toda linha da pessoa |
 | Dados financeiros digitados: valores (em centavos), datas, descrições (até 80 caracteres), categorias, contas a pagar, gastos fixos, parcelamentos e contas do ano, metas e aportes, renda de referência, limite e orçamento, contas de origem do dinheiro, cartões (apelido, 4 últimos dígitos se a pessoa quiser, dias de fechamento e vencimento, limite) e faturas | Digitados ou importados pela pessoa | `financial_records`, `commitments`, `commitment_series`, `goals`, `cards`, `card_entries`, `category_budgets` e as outras tabelas de `docs/05` |
 | Resumo SHA-256 da chave da nota fiscal e de cada linha importada | Calculado no aparelho | `receipt_key` e o resumo de cada linha importada. Só o resumo, nunca a chave, o CNPJ, o CPF nem o texto da nota |
@@ -67,7 +67,7 @@
 |---|---|
 | O app coleta ou compartilha algum dos tipos de dados exigidos? | Sim, coleta. Compartilha: não |
 | Todos os dados coletados são criptografados em trânsito? | Sim: toda a comunicação com o Supabase é por HTTPS. O projeto nativo gerado para produção deixa `NSAllowsArbitraryLoads` falso no iOS (conferido em um `expo prebuild` de teste em 19/10/2026) e o Android bloqueia tráfego sem criptografia por padrão |
-| As pessoas podem pedir a exclusão dos dados? | Sim: dentro do app (Conta › Excluir minha conta, D-058). O Google também pede o endereço de uma página que explique o pedido: **falta criar** (campo em `docs/lojas/ficha.md`, seção 8; depende do domínio, P-006, e de P-023) |
+| As pessoas podem pedir a exclusão dos dados? | Sim: dentro do app (Conta › Excluir minha conta, D-058). O Google também pede o endereço de uma página que explique o pedido: a página existe como rascunho em `site/excluir-conta.html` (texto em `docs/legal/exclusao-de-conta.md`, D-064), com o endereço do projeto `clarevo-site` ou do domínio (P-006); **só vale publicar depois da revisão do advogado** e do e-mail de privacidade (P-023). Campo em `docs/lojas/ficha.md`, seção 8 |
 | Público-alvo | Adultos (18 anos ou mais); P-002 é recomendação, ainda não decisão de Enzo |
 
 **Tipos de dados** (categorias da página `declare-data-use` do Android)
@@ -104,4 +104,4 @@
 | Relatório de falhas (Sentry) ainda não instalado | Decisão de Enzo | Diagnósticos nas duas lojas, o manifesto de privacidade e a política. Instalar já com `sendDefaultPii` desligado e sem valores, descrições nem e-mail nos eventos |
 | Classificação etária: 18+ ou não (P-002) | Enzo | Substituição da classificação na Apple (`docs/lojas/ficha.md`, seção 9) |
 
-Os textos da política de privacidade e dos termos de uso **não existem no repositório** (`docs/12`, CL-16): precisam ser escritos com o advogado antes de qualquer envio às lojas. A política é obrigatória nas duas lojas e precisa ter também um acesso dentro do app (Apple, App Review Guidelines 5.1.1(i)); o app hoje só tem "Quem vê estes dados?".
+Os textos da política de privacidade, dos termos de uso e da exclusão de conta **existem como rascunho para o advogado** em `docs/legal/` (D-064; `docs/12`, CL-16) e as páginas do site, em `site/`, com as URLs `privacidade`, `termos` e `excluir-conta` do projeto `clarevo-site` (ou do domínio, P-006). Nada disso é publicado nem informado às lojas antes da revisão do advogado e de `node scripts/gerar-site.js --final` passar. A política é obrigatória nas duas lojas e precisa ter também um acesso dentro do app (Apple, App Review Guidelines 5.1.1(i)): o app já traz, em Conta, a seção "Privacidade e termos" e, no cadastro, os links para os Termos de uso e a Política de privacidade, mas só quando `EXPO_PUBLIC_SITE_URL` aponta para o site publicado (`docs/07` e `docs/16`); sem a variável, os links não aparecem. Os rascunhos das duas lojas devem continuar iguais ao que a política disser: se o advogado mudar o que é guardado ou compartilhado, atualize este arquivo.

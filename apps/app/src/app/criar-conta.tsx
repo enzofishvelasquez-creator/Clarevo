@@ -1,11 +1,14 @@
+import { LEGAL_TEXT, signupConsentParts } from '@clarevo/core';
 import { router } from 'expo-router';
 import { AlertCircle } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import type { TextInput } from 'react-native';
 
 import { AuthShell } from '@/components/auth-shell';
+import { SiteTextLink } from '@/components/site-link';
 import { Banner, Button, LinkButton, TextField, Txt } from '@/components/ui';
 import { AuthError, PASSWORD_RULE, emailProblem, passwordProblem, pendingCredentials } from '@/lib/auth';
+import { SITE_URL } from '@/lib/site';
 import { useSession } from '@/state/session';
 import { colors } from '@/theme/tokens';
 
@@ -98,6 +101,19 @@ export default function CriarConta() {
           </Txt>
         </Banner>
       ) : null}
+      {/* Aceite (D-064): texto curto acima do botão, sem caixa de seleção por enquanto (pergunta 25 ao advogado). Os dois nomes só
+          viram links quando há endereço do site (`EXPO_PUBLIC_SITE_URL`); sem endereço, o texto sai sem link. */}
+      <Txt variant="caption" color={colors.textSecondary}>
+        {signupConsentParts().map((part, i) =>
+          part.page && SITE_URL ? (
+            <SiteTextLink key={i} page={part.page} onFail={() => setBanner(LEGAL_TEXT.account.openFailed)}>
+              {part.text}
+            </SiteTextLink>
+          ) : (
+            part.text
+          ),
+        )}
+      </Txt>
       <Button label="Criar conta" busy={busy} busyLabel="Criando…" onPress={submit} />
       <LinkButton label="Já tenho conta · Entrar" onPress={() => router.replace('/entrar')} />
     </AuthShell>
