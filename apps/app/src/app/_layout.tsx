@@ -1,9 +1,6 @@
-// Só os pesos usados (importar o pacote inteiro levaria todos os pesos para o app).
-import { Manrope_400Regular } from '@expo-google-fonts/manrope/400Regular';
-import { Manrope_500Medium } from '@expo-google-fonts/manrope/500Medium';
-import { Manrope_600SemiBold } from '@expo-google-fonts/manrope/600SemiBold';
-import { Manrope_700Bold } from '@expo-google-fonts/manrope/700Bold';
-import { Manrope_800ExtraBold } from '@expo-google-fonts/manrope/800ExtraBold';
+// Manrope em subconjunto Latin (português do Brasil), gerado de @expo-google-fonts/manrope por `scripts/gerar-fontes.js`: cinco
+// arquivos de 34 KB no lugar de cinco de 97 KB (D-063 item 2, docs/19). O pacote continua instalado, mas não é importado. Só os
+// pesos usados (`fonts` em theme/tokens.ts). `packages/core/test/fontes.test.ts` confere que todo caractere dos textos está neles.
 import { sessionEndAfterDeletion } from '@clarevo/core';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { router, Stack, useGlobalSearchParams, usePathname, type Href } from 'expo-router';
@@ -67,11 +64,11 @@ const hasEntryTarget = () => entryTarget !== null;
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
-    Manrope_400Regular,
-    Manrope_500Medium,
-    Manrope_600SemiBold,
-    Manrope_700Bold,
-    Manrope_800ExtraBold,
+    Manrope_400Regular: require('../../assets/fonts/Manrope_400Regular.ttf'),
+    Manrope_500Medium: require('../../assets/fonts/Manrope_500Medium.ttf'),
+    Manrope_600SemiBold: require('../../assets/fonts/Manrope_600SemiBold.ttf'),
+    Manrope_700Bold: require('../../assets/fonts/Manrope_700Bold.ttf'),
+    Manrope_800ExtraBold: require('../../assets/fonts/Manrope_800ExtraBold.ttf'),
   });
   const [queryClient] = useState(
     () => new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 }, mutations: { retry: 0 } } }),

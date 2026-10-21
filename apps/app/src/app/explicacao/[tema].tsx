@@ -37,7 +37,7 @@ export default function ExplicacaoScreen() {
   const origem = learnOrigin(params.origem);
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SubHeader title={LEARN_UI_TEXT.backHeader} />
+      <SubHeader title={LEARN_UI_TEXT.backHeader} plainTitle={topic !== null} />
       {topic ? <TopicBody key={topic.slug} topic={topic} origem={origem} /> : <Unavailable />}
     </View>
   );
