@@ -1,8 +1,8 @@
 # Clarevo · Roteiro da demonstração ao vivo (10 minutos)
 
-20/10/2026. Roteiro para Enzo mostrar o app a quem investe, ao vivo, pelo celular ou pelo computador. Baseado só no que existe no código e em `docs/00_VISAO_E_DECISOES.md` (as decisões vêm citadas, como D-056). Quando a resposta depende de algo que ainda não foi feito ou decidido, o texto diz. Se perguntarem o que não está aqui, a resposta certa é "vou confirmar e te retorno".
+20/10/2026, atualizado em 21/10/2026 (D-063 item 1: Evolução com "Renda comprometida" e "Guardado em metas" e o relatório do RH no painel da empresa). Roteiro para Enzo mostrar o app a quem investe, ao vivo, pelo celular ou pelo computador. Baseado só no que existe no código e em `docs/00_VISAO_E_DECISOES.md` (as decisões vêm citadas, como D-056). Quando a resposta depende de algo que ainda não foi feito ou decidido, o texto diz. Se perguntarem o que não está aqui, a resposta certa é "vou confirmar e te retorno".
 
-A versão gravada, de cerca de 2 min 45 s, para enviar pelo WhatsApp, sai de `node scripts/video-demonstracao.js --saida <pasta>` (usa a mesma demonstração, só com dados fictícios). Serve também de plano B.
+A versão gravada, de cerca de 2 min 55 s (175 s, 13,9 MB, 12 passos), para enviar pelo WhatsApp, sai de `node scripts/video-demonstracao.js --saida <pasta>` (usa a mesma demonstração, só com dados fictícios). Serve também de plano B. Os passos do vídeo estão na seção 6.
 
 ## 1. Antes de começar
 
@@ -38,8 +38,10 @@ Não use `clarevo.pages.dev` na apresentação: é a versão com login real (`do
 | Depois de anotar a "Feira de sábado" | Pago R$ 3.986,40, Diferença R$ 2.013,60 |
 | Cartão Exemplo | Fatura de novembro R$ 550,00, limite usado R$ 2.300,00 de R$ 5.000,00 |
 | Cenário da Evolução, 12 meses | Média R$ 4.125,00 e mediana R$ 3.425,00 (6 de 6 meses). Sem abril: média R$ 3.390,00 e mediana R$ 3.400,00 (5 de 6). Total R$ 24.750,00 |
+| Cenário da Evolução, "Renda comprometida" e "Guardado em metas" | Não há renda de referência nem meta nesse cenário: o primeiro mostra "Sem base para estes meses" (com "Informar renda de referência") e o segundo "Sem registros nestes meses" (com "Criar meta"). Nunca aparece um zero no lugar |
 | Metas | Reserva para imprevistos R$ 3.500,00 de R$ 22.500,00 (15%), plano de guardar R$ 500,00 por mês |
 | Painel da empresa | 40 vagas, 18 em uso, 22 livres. Uso do app: 6 convites, 12 licenças ativas, 3 encerradas |
+| Relatório de adesão (planilha) | Arquivo `clarevo-relatorio-adesao-2026-10-07.csv`, com o contrato (Individual, 40 vagas) e as contagens 40, 6, 12 e 3, sem nenhum e-mail |
 
 ## 2. Roteiro
 
@@ -47,16 +49,16 @@ Não use `clarevo.pages.dev` na apresentação: é a versão com login real (`do
 |---|---|---|
 | 0:00 | Abertura | 0:30 |
 | 0:30 | 1. Resumo | 0:50 |
-| 1:20 | 2. Anotar gasto | 1:10 |
-| 2:30 | 3. Contas a pagar | 0:50 |
-| 3:20 | 4. Cartões e a fatura | 0:50 |
-| 4:10 | 5. Análises | 0:50 |
-| 5:00 | 6. Evolução (aba B) | 1:30 |
-| 6:30 | 7. Metas | 0:35 |
-| 7:05 | 8. Aprender | 0:40 |
-| 7:45 | 9. Painel da empresa | 0:55 |
-| 8:40 | 10. Quem vê estes dados? | 0:30 |
-| 9:10 | Fechamento e perguntas | 0:50 |
+| 1:20 | 2. Anotar gasto | 1:00 |
+| 2:20 | 3. Contas a pagar | 0:50 |
+| 3:10 | 4. Cartões e a fatura | 0:50 |
+| 4:00 | 5. Análises | 0:50 |
+| 4:50 | 6. Evolução (aba B) | 1:45 |
+| 6:35 | 7. Metas | 0:30 |
+| 7:05 | 8. Aprender | 0:35 |
+| 7:40 | 9. Painel da empresa e relatório do RH | 1:10 |
+| 8:50 | 10. Quem vê estes dados? | 0:30 |
+| 9:20 | Fechamento e perguntas | 0:40 |
 
 **Abertura (0:30).** Aba A, na tela "Seu dinheiro, mais claro".
 - Diga: "O Clarevo ajuda a entender o próprio mês: o que entrou, o que foi pago, o que vence e o que é só previsão. Tudo o que vocês vão ver é fictício, e a tela diz isso."
@@ -87,6 +89,8 @@ Não use `clarevo.pages.dev` na apresentação: é a versão com login real (`do
 **6. Evolução (1:30).** Troque para a aba B.
 - Aba Movimentos › "Evolução" › "12 meses". Toque em abril: R$ 7.800,00, com o "Reparo do carro" de R$ 4.400,00. Role até a média e a mediana (R$ 4.125,00 e R$ 3.425,00). Abra "Entender o que mudou". Desligue "Mostrar este mês na comparação": média R$ 3.390,00 e mediana R$ 3.400,00.
 - Diga: "Um gasto grande distorce a média. Dá para tirar o mês da comparação sem apagar nada: os lançamentos e o total ficam, só a média e a mediana mudam. E 'Entender o que mudou' descreve a diferença entre dois meses sem dizer que algo foi a causa." (D-057)
+- Volte ao topo e mostre o seletor: além de "Recebido" e "Pago", ele tem "Renda comprometida" e "Guardado em metas" (D-062). Toque em cada um e volte a "Pago" (abril continua fora da comparação, porque a escolha vale só para Pago). Os dois valem só para meses já fechados, e cada um escreve a própria base no subtítulo. Nesta aba não há renda de referência nem meta, então a tela diz "Sem base para estes meses" e "Sem registros nestes meses".
+- Diga: "O mesmo gráfico mostra também quanto da renda de referência estava ligado a contas e quanto foi guardado nas metas, só de meses fechados. Sem a renda ou sem a meta, a tela diz que não há base e não inventa um zero." (D-062)
 - Aviso: o Resumo desta aba está zerado. Vá direto a Movimentos.
 
 **7. Metas (0:35).** Volte para a aba A.
@@ -100,6 +104,8 @@ Não use `clarevo.pages.dev` na apresentação: é a versão com login real (`do
 **9. Painel da empresa (0:55).**
 - Resumo › avatar "MA" › Conta › "Abrir painel da empresa". Mostre o "Contrato" e role até "Uso do app".
 - Diga: "A empresa paga o benefício e administra vagas e licenças. Vê os e-mails que ela mesma convidou e a situação de cada licença. Não vê quem usa o app, nem quando, e nenhum valor, categoria, meta, conta ou cartão, nem somado." (D-056)
+- Role até "Relatório de adesão" e toque em "Baixar relatório em planilha (CSV)": o app responde "Relatório baixado. Confira a pasta de downloads." A caixa "Incluir a lista de licenças" começa desmarcada, e sem ela o arquivo tem só o contrato e as quatro contagens, sem e-mail. Não toque em "Baixar relatório em PDF" ao vivo: ele abre a página de impressão em outra janela, e o navegador pode pedir para permitir janelas.
+- Diga: "Para a reunião com o RH, o relatório leva o contrato e as contagens de licenças, o mesmo que o painel mostra. O arquivo é montado neste navegador, e o Clarevo não guarda cópia. O rodapé repete que a empresa não vê dados financeiros de ninguém, nem somados." (D-062)
 - A empresa e as pessoas da demonstração são fictícias, e a tela diz: "Nada é gravado fora deste aparelho."
 
 **10. Quem vê estes dados? (0:30).**
@@ -203,4 +209,26 @@ Expo (React Native), um código para iOS, Android e web, e Supabase (Postgres, a
 - **A demonstração travou ou os números mudaram:** recarregue a aba. Ela volta ao estado inicial, e é preciso tocar de novo em "Ver demonstração com dados fictícios".
 - **O Resumo da aba B está zerado:** é o esperado no cenário da Evolução. Vá a Movimentos › Evolução.
 - **Não aparece "Painel da empresa" em Conta:** confira se está no navegador (web) e na demonstração, não no app nativo.
+- **O relatório do RH não baixou ou o PDF não abriu:** o navegador pode ter bloqueado o download ou a janela de impressão. Permita-os para o site e toque de novo, ou mostre só a planilha.
 - **A internet caiu:** mostre o vídeo e as capturas de `docs/lojas/capturas/`.
+
+## 6. Vídeo gravado (plano B)
+
+`node scripts/video-demonstracao.js --saida <pasta> --nome clarevo-demonstracao-v2.mp4` grava a demonstração, em tela de celular, com uma legenda curta no rodapé, e confere o arquivo no fim (H.264, yuv420p, `+faststart`, no máximo 15 MB e de 2 a 3 minutos). O build vem de `apps/app/dist` (`--build` o refaz) e a gravação não usa rede: qualquer pedido para fora de `localhost` faz o script falhar. A gravação de 21/10/2026 tem 175 s e 13,9 MB, e a pasta de saída traz 1 quadro de conferência por passo, tirado do próprio MP4.
+
+| Passo | Tela | Legenda |
+|---|---|---|
+| 1 | Resumo | Resumo do mês: recebido, pago e o que falta pagar |
+| 2 | Anotar gasto | Anotar gasto: descrição, valor e categoria em poucos toques |
+| 3 | Contas a pagar | Vencimento em fim de semana: o app avisa o próximo dia útil |
+| 4 | Cartões e a fatura | A fatura mostra cada parcela e como o total é formado |
+| 5 | Análises, com as Bolhas | Toque numa categoria para ver os lançamentos do mês |
+| 6 | Evolução (cenário), abril fora da comparação | Sem abril, média e mediana mudam e nenhum lançamento é apagado |
+| 7 | Evolução: "Renda comprometida" e "Guardado em metas" (novo) | Também renda comprometida e guardado em metas, só de meses fechados |
+| 8 | Metas | Metas: reserva para imprevistos e plano de guardar |
+| 9 | Aprender, "Neste mês" | Neste mês: o 13º salário, com exemplo calculado e fonte |
+| 10 | Painel "Empresa Exemplo (demonstração)" | Uso do app: só contagens de licenças, nenhum dado financeiro |
+| 11 | Relatório de adesão do RH, planilha baixada (novo) | O arquivo é montado no navegador, e o Clarevo não guarda cópia |
+| 12 | Quem vê estes dados? | Quem vê estes dados?: só a própria pessoa, não a empresa |
+
+No passo 7 o vídeo toca em "Renda comprometida" e em "Guardado em metas", mostra o estado vazio de cada um (o cenário não tem renda de referência nem meta) e volta a "Pago". No passo 11 ele baixa só a planilha: o PDF abriria outra janela e fica de fora da gravação.

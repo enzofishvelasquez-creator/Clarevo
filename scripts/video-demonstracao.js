@@ -3,10 +3,11 @@
  * "Demonstração · Pessoal" no alto de cada tela), em tela de celular (390 x 844, escala 2), com ritmo calmo e uma legenda curta
  * numa faixa no rodapé (fundo #17223B, texto branco), injetada na página só durante a gravação.
  *
- * Percurso: Resumo, Anotar gasto (salvo só na memória da demonstração), Contas a pagar (com o aviso de dia útil), Cartões e a
- * fatura, Movimentações e Análises (Bolhas, tocando numa categoria), Evolução (cenário "evolucao", 12 meses, abril fora da
- * comparação, média, mediana e "Entender o que mudou"), Metas, Aprender ("Neste mês"), o painel "Empresa Exemplo (demonstração)"
- * e "Quem vê estes dados?".
+ * Percurso (12 passos, um quadro de conferência por passo): Resumo, Anotar gasto (salvo só na memória da demonstração), Contas a
+ * pagar (com o aviso de dia útil), Cartões e a fatura, Movimentações e Análises (Bolhas, tocando numa categoria), Evolução (cenário
+ * "evolucao", 12 meses, abril fora da comparação, média, mediana e "Entender o que mudou"), o seletor da Evolução com "Renda
+ * comprometida" e "Guardado em metas" (D-062 item 4, só de meses fechados), Metas, Aprender ("Neste mês"), o painel "Empresa
+ * Exemplo (demonstração)", o "Relatório de adesão" do RH (D-062 item 1, planilha só com contagens) e "Quem vê estes dados?".
  *
  * Nenhum dado real e nenhuma rede: o build é o de demonstração (`npm --workspace apps/app run export:demo`, que ignora o
  * Supabase), tudo o que o roteiro anota fica na memória da página (ela é recriada a cada carga) e qualquer requisição para fora de
@@ -32,6 +33,7 @@
  *   node scripts/video-demonstracao.js                       gera o build se não houver apps/app/dist, grava e converte
  *   node scripts/video-demonstracao.js --build               refaz o build de demonstração antes
  *   node scripts/video-demonstracao.js --saida <pasta>       pasta do MP4 e dos quadros (padrão: <pasta temporária>/clarevo-demonstracao)
+ *   node scripts/video-demonstracao.js --nome <arquivo.mp4>  nome do MP4 (padrão: clarevo-demonstracao.mp4), para não sobrescrever outra versão
  *   node scripts/video-demonstracao.js --manter-bruto        guarda os três trechos originais (WebM) em <pasta>/bruto, para outros cortes
  * Ambiente: VIDEO_PORT (padrão 8399; se estiver ocupada, usa outra livre), RITMO (1 = calmo; 0.4 acelera as pausas para testar),
  * FFMPEG e FFPROBE (padrão /usr/bin/ffmpeg e /usr/bin/ffprobe, ou os do PATH), CHROMIUM_PATH (outro Chromium) e
@@ -51,6 +53,7 @@ const LOGOTIPO = path.join(RAIZ, 'docs', 'marca', 'clarevo-logotipo-reverso.svg'
 const argv = process.argv.slice(2);
 const opcao = (nome) => { const i = argv.indexOf(nome); return i >= 0 ? argv[i + 1] : null; };
 const SAIDA = path.resolve(opcao('--saida') || path.join(os.tmpdir(), 'clarevo-demonstracao'));
+const NOME_MP4 = path.basename(opcao('--nome') || 'clarevo-demonstracao.mp4');
 const RITMO = Number(process.env.RITMO || 1);
 const FFMPEG = process.env.FFMPEG || (fs.existsSync('/usr/bin/ffmpeg') ? '/usr/bin/ffmpeg' : 'ffmpeg');
 const FFPROBE = process.env.FFPROBE || (fs.existsSync('/usr/bin/ffprobe') ? '/usr/bin/ffprobe' : 'ffprobe');
@@ -88,11 +91,14 @@ const LEGENDAS = {
   entender: 'Entender o que mudou: abril contra março, sem apontar causa',
   tirar: 'Evolução: tire um mês da comparação sem apagar nada',
   semAbril: 'Sem abril, média e mediana mudam e nenhum lançamento é apagado',
+  fase3: 'Também renda comprometida e guardado em metas, só de meses fechados',
   metas: 'Metas: reserva para imprevistos e plano de guardar',
   aprender: 'Aprender: explicações curtas para o momento do mês',
   nesteMes: 'Neste mês: o 13º salário, com exemplo calculado e fonte',
   empresa: 'Painel da empresa (só na web): vagas e licenças, sem finanças',
   usoApp: 'Uso do app: só contagens de licenças, nenhum dado financeiro',
+  relatorio: 'Relatório para o RH: só contagens de licenças, nada financeiro',
+  relatorioBaixado: 'O arquivo é montado no navegador, e o Clarevo não guarda cópia',
   quemVe: 'Quem vê estes dados?: só a própria pessoa, não a empresa',
 };
 
@@ -376,12 +382,12 @@ function instantesDosSinais(nome, esperados, achados) {
     const digitar = async (loc, t, atraso) => { await loc.click(); await loc.pressSequentially(t, { delay: atraso }); };
     const sinais = [];
     const marcar = (id, ms) => { sinais.push({ id, quando: Date.now() }); return p.evaluate((a) => window.__demo.marcar(a.id, a.ms), { id, ms }); };
-    // Cada passo tem o seu sinal (1 a 10), seguido de uma parada de 1,5 s: o quadro de conferência sai dali, sem o sinal.
+    // Cada passo tem o seu sinal (1, 2, 3... em cada trecho; 0 e 15 ficam para a abertura e o fim), seguido de uma parada de 1,35 s: o quadro de conferência sai dali (1,05 s depois), sem o sinal.
     const quadros = [];
     const quadro = async (nomeDoQuadro) => {
       quadros.push({ nome: nomeDoQuadro, id: quadros.length + 1 });
       await marcar(quadros.length, 700);
-      await p.waitForTimeout(1500);
+      await p.waitForTimeout(1350);
     };
     const entrar = async () => {
       await p.goto(base + (cenario ? `/?cenario=${cenario}` : '/'));
@@ -438,10 +444,10 @@ function instantesDosSinais(nome, esperados, achados) {
 
         // 1. Resumo
         await legenda(LEGENDAS.resumo);
-        await pausa(2800);
+        await pausa(2300);
         await quadro('passo-01-resumo');
         await rolarAte(texto('Pagamentos do mês', true), 2000, 150);
-        await pausa(1800);
+        await pausa(1400);
         await rolarPara(0, 1500);
         await pausa(400);
 
@@ -460,16 +466,16 @@ function instantesDosSinais(nome, esperados, achados) {
         await legenda(LEGENDAS.salvo);
         await tocar(botao('Salvar gasto'));
         await esperar('Gasto salvo');
-        await pausa(2000);
+        await pausa(1500);
         await tocar(aba('Resumo'));
         await esperar('R$ 3.986,40');
-        await pausa(2600);
+        await pausa(2000);
 
         // 3. Contas a pagar, com o aviso de dia útil
         await legenda(LEGENDAS.contas);
         await tocar(p.getByRole('button', { name: /^Ainda a pagar neste mês, R\$/ }).filter({ visible: true }).first());
         await esperar('Contas em aberto com vencimento até o fim do mês');
-        await pausa(2400);
+        await pausa(1800);
         await rolarAte(texto('Próximos meses', true), 1500, 110);
         await pausa(700);
         const diaUtil = p.getByRole('button', { name: /^Fatura Cartão Exemplo, vence segunda, 11\/01 \(próximo dia útil\)/ }).filter({ visible: true }).first();
@@ -486,7 +492,7 @@ function instantesDosSinais(nome, esperados, achados) {
         await pausa(800);
         await tocar(p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first());
         await esperar('Cadastrar cartão');
-        await pausa(2200);
+        await pausa(1700);
         await tocar(p.getByRole('button', { name: /^Cartão Exemplo · final 1234\./ }).filter({ visible: true }).first());
         await esperar('Fatura atual');
         await pausa(1400);
@@ -511,7 +517,7 @@ function instantesDosSinais(nome, esperados, achados) {
         await pausa(1200);
         await tocar(radio('Bolhas'));
         await p.getByRole('group', { name: 'Pago por categoria, em bolhas' }).filter({ visible: true }).first().waitFor({ timeout: 8000 });
-        await pausa(2200);
+        await pausa(1800);
         await legenda(LEGENDAS.categoria);
         await pausa(600);
         await tocar(p.getByRole('button', { name: /^Moradia, / }).filter({ visible: true }).first());
@@ -525,7 +531,7 @@ function instantesDosSinais(nome, esperados, achados) {
     });
 
     // ---------------------------------------------------------------------------------------------------------------
-    // Trecho 2 (cenário fictício "evolucao"): passo 6.
+    // Trecho 2 (cenário fictício "evolucao"): passos 6 e 7.
     // ---------------------------------------------------------------------------------------------------------------
     await gravar({
       nome: 'trecho 2', cenario: 'evolucao', intro: ENTRE, lead: 0.5, despedida: ENTRE,
@@ -536,29 +542,29 @@ function instantesDosSinais(nome, esperados, achados) {
         await c.legenda(LEGENDAS.evolucao);
       },
       roteiro: async (c) => {
-        const { p, pausa, botao, texto, esperar, legenda, rolarAte, rolarPara, tocar, quadro } = c;
+        const { p, pausa, botao, radio, texto, esperar, legenda, rolarAte, rolarPara, tocar, quadro } = c;
         // 6. Evolução: com os 12 meses e abril na comparação, depois sem abril; média e mediana antes e depois.
         await pausa(800);
         await tocar(botao('Evolução. Recebido e pago mês a mês, com média e mediana.'));
         await esperar('Valores registrados, pela data do pagamento');
         await pausa(1200);
         await tocar(p.getByRole('radio', { name: '12 meses' }).or(botao('12 meses')).filter({ visible: true }).first());
-        await pausa(2200);
+        await pausa(1600);
         await tocar(p.getByRole('button', { name: /^Abril de 2026/ }).filter({ visible: true }).first());
         await pausa(700);
         const media = texto('Média dos meses na comparação', true);
         await rolarAte(media, 1500, 120);
         await esperar('R$ 4.125,00');
-        await pausa(1600);
+        await pausa(1200);
         await legenda(LEGENDAS.entender);
         const entender = botao('Entender o que mudou');
         await rolarAte(entender, 1500, 130);
         await pausa(400);
         await tocar(entender);
         await p.getByRole('group', { name: 'Entender o que mudou', exact: true }).filter({ visible: true }).first().waitFor({ timeout: 8000 });
-        await pausa(2200);
+        await pausa(1800);
         await rolarAte(texto('Lançamentos relacionados', true), 1300, 110);
-        await pausa(1600);
+        await pausa(1200);
         const interruptor = p.getByRole('switch', { name: 'Mostrar este mês na comparação', exact: true }).filter({ visible: true }).first();
         await rolarAte(interruptor, 1400, 260);
         await legenda(LEGENDAS.tirar);
@@ -572,12 +578,30 @@ function instantesDosSinais(nome, esperados, achados) {
         await esperar('R$ 3.390,00');
         await pausa(800);
         await quadro('passo-06-evolucao');
-        await pausa(1400);
+        await pausa(800);
+
+        // 7. Evolução, fase 3 (D-062 item 4): o seletor ganha "Renda comprometida" e "Guardado em metas", só de meses fechados. No cenário
+        // não há renda de referência nem meta, então cada um mostra o estado vazio honesto; volta a Pago, com abril ainda fora.
+        await rolarPara(0, 1300);
+        await pausa(500);
+        await legenda(LEGENDAS.fase3);
+        await pausa(1100);
+        await tocar(radio('Renda comprometida'));
+        await esperar('Sem base para estes meses');
+        await pausa(1500);
+        await tocar(radio('Guardado em metas'));
+        await esperar('Sem registros nestes meses');
+        await pausa(1500);
+        await tocar(radio('Pago'));
+        await esperar('Pago por mês');
+        await pausa(700);
+        await quadro('passo-07-evolucao-renda-e-metas');
+        await pausa(900);
       },
     });
 
     // ---------------------------------------------------------------------------------------------------------------
-    // Trecho 3 (demonstração padrão de novo): passos 7 a 10.
+    // Trecho 3 (demonstração padrão de novo): passos 8 a 12.
     // ---------------------------------------------------------------------------------------------------------------
     await gravar({
       nome: 'trecho 3', cenario: null, intro: ENTRE, lead: 0.5, despedida: FIM,
@@ -585,17 +609,17 @@ function instantesDosSinais(nome, esperados, achados) {
       roteiro: async (c) => {
         const { p, pausa, botao, aba, texto, esperar, legenda, rolarAte, rolarPara, tocar, quadro } = c;
 
-        // 7. Metas
+        // 8. Metas
         await pausa(600);
         await tocar(aba('Metas'));
         await esperar('Reserva para imprevistos');
         await esperar('Seu plano de guardar');
         await pausa(1600);
-        await quadro('passo-07-metas');
+        await quadro('passo-08-metas');
         await rolarAte(texto('Suas metas', true), 1700, 130);
         await pausa(1500);
 
-        // 8. Aprender, com "Neste mês"
+        // 9. Aprender, com "Neste mês"
         await legenda(LEGENDAS.aprender);
         await tocar(aba('Aprender e dúvidas'));
         await esperar('Comece por aqui');
@@ -603,16 +627,16 @@ function instantesDosSinais(nome, esperados, achados) {
         await rolarAte(texto('Neste mês', true), 1400, 120);
         await legenda(LEGENDAS.nesteMes);
         await pausa(700);
-        await quadro('passo-08-aprender');
+        await quadro('passo-09-aprender');
         await tocar(p.getByRole('button', { name: /^13º salário\. Duas parcelas/ }).filter({ visible: true }).first());
         await esperar('Ver a conta');
         await pausa(1600);
         await rolarAte(texto('Exemplo', true), 1500, 110);
-        await pausa(2000);
+        await pausa(1500);
         await rolarAte(texto('Fontes', true), 1700, 120);
         await pausa(1200);
 
-        // 9. Painel da empresa (só na web)
+        // 10. Painel da empresa (só na web)
         await legenda(LEGENDAS.empresa);
         await tocar(aba('Resumo'));
         await esperar('Diferença do mês');
@@ -622,14 +646,27 @@ function instantesDosSinais(nome, esperados, achados) {
         await pausa(900);
         await tocar(botao('Abrir painel da empresa'));
         await esperar('Empresa Exemplo (demonstração)');
-        await pausa(2400);
+        await pausa(1800);
         await rolarAte(texto('Uso do app', true), 2200, 110);
         await legenda(LEGENDAS.usoApp);
         await pausa(900);
-        await quadro('passo-09-painel-da-empresa');
-        await pausa(800);
+        await quadro('passo-10-painel-da-empresa');
+        await pausa(500);
 
-        // 10. Quem vê estes dados?
+        // 11. Relatório de adesão para o RH (D-062 item 1): só contagens, em planilha ou PDF. Baixa a planilha (o arquivo é montado no
+        // navegador por Blob, que a gravação permite); o PDF abriria outra janela e fica de fora.
+        const cartao = texto('Relatório de adesão', true);
+        await rolarAte(cartao, 1500, 110);
+        await legenda(LEGENDAS.relatorio);
+        await pausa(1700);
+        await tocar(botao('Baixar relatório em planilha (CSV)'));
+        await esperar('Relatório baixado. Confira a pasta de downloads.');
+        await legenda(LEGENDAS.relatorioBaixado);
+        await pausa(600);
+        await quadro('passo-11-relatorio-do-rh');
+        await pausa(500);
+
+        // 12. Quem vê estes dados?
         await legenda(LEGENDAS.quemVe);
         await tocar(aba('Resumo'));
         await esperar('Diferença do mês');
@@ -641,7 +678,7 @@ function instantesDosSinais(nome, esperados, achados) {
         await pausa(2000);
         await rolarAte(texto('A empresa que oferece o benefício vê os e-mails', false), 1500, 110);
         await pausa(1000);
-        await quadro('passo-10-quem-ve-estes-dados');
+        await quadro('passo-12-quem-ve-estes-dados');
         await pausa(1400);
       },
     });
@@ -673,7 +710,7 @@ function instantesDosSinais(nome, esperados, achados) {
   let acumulado = 0;
   for (const t of cortes) { t.noFinal = acumulado; acumulado += t.duracao; }
 
-  const destino = path.join(SAIDA, 'clarevo-demonstracao.mp4');
+  const destino = path.join(SAIDA, NOME_MP4);
   const entradas = cortes.flatMap((t) => ['-ss', t.inicioVideo.toFixed(3), '-t', t.duracao.toFixed(3), '-i', t.arquivo]);
   const filtro = cortes.map((t, i) => `[${i}:v]fps=25,${t.cobrir.length ? `${t.cobrir.join(',')},` : ''}scale=${W}:${H}:flags=lanczos,setsar=1,format=yuv420p[v${i}]`).join(';')
     + `;${cortes.map((_, i) => `[v${i}]`).join('')}concat=n=${cortes.length}:v=1:a=0[v]`;
