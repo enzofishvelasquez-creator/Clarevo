@@ -46,6 +46,7 @@ export * from './importar';
 export * from './guide';
 export * from './comprovante';
 export * from './widget';
+export * from './widget-sync';
 export * from './seu-mes';
 export * from './evolucao';
 export * from './month-check';

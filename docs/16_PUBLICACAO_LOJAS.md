@@ -8,7 +8,7 @@
 
 | | Estado |
 |---|---|
-| Configuração de build (`apps/app/eas.json`, `apps/app/app.json`) | Pronta e validada (seção 8), sem nenhum identificador de conta. Nunca rodou um build de verdade: o primeiro é do Enzo |
+| Configuração de build (`apps/app/eas.json`, `apps/app/app.json`, `apps/app/app.config.js`) | Pronta e validada (seção 8), sem nenhum identificador de conta. Nunca rodou um build de verdade: o primeiro é do Enzo. O perfil `preview-widget` (D-063 item 3) liga o widget da tela inicial só para teste (`docs/21`) |
 | Ícones e abertura | Prontos, gerados por `scripts/gerar-icones.js` a partir de `docs/marca/` (seção 6) |
 | Capturas das lojas | Prontas, 8 telas em 3 tamanhos, geradas por `scripts/capturas-lojas.js` com a demonstração (seção 7) |
 | Ficha (pt-BR) | Pronta, com limites conferidos: `docs/lojas/ficha.md`. Campos de contato, URLs e direitos autorais: vazios para Enzo |
@@ -41,7 +41,8 @@ Nenhuma destas foi tomada pelo Claude. A coluna "Proposta" é só o que está no
 
 | Arquivo | O que é |
 |---|---|
-| `apps/app/eas.json` | Perfis `preview` e `production`; submissão `production` |
+| `apps/app/eas.json` | Perfis `preview`, `preview-widget` (parte do `preview` e só liga `CLAREVO_WIDGET=1`, o widget nativo preparado e desligado, `docs/21`) e `production`; submissão `production` |
+| `apps/app/app.config.js` e `widget.config.js` | Devolvem o `app.json` sem mudar; só com `CLAREVO_WIDGET=1` acrescentam os plugins do widget (`docs/21` seção 4). Os builds `preview` e `production` não mudam |
 | `apps/app/app.json` | Nome, versão 1.0.0, identificadores, `buildNumber` 1, `versionCode` 1, orientação retrato, fundo `#2457F5`, `scheme` `clarevo`, textos de permissão, permissões bloqueadas do Android |
 | `apps/app/assets/images/` | `icon.png`, `android-icon-*.png` e `splash-icon.png` (gerados); `favicon.png` e `notification-icon.png` (mantidos) |
 | `apps/app/assets/loja/icone-play-512.png` | Ícone da página do app no Google Play |
@@ -71,7 +72,7 @@ A ordem importa: o caminho mais longo é o das contas (CNPJ, domínio, verifica�
 3. Variáveis de ambiente do app, criadas no EAS (nunca no repositório). O app lê `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_KEY` (a chave pública, `docs/07`). Cada perfil de `eas.json` aponta um ambiente do EAS: `preview` (use o projeto `clarevo-teste`) e `production` (`clarevo-producao`). Exemplo, com a visibilidade `plaintext` (as variáveis `EXPO_PUBLIC_*` vão dentro do app e **não podem** ser "secret", segundo a documentação do Expo):
    `npx eas-cli@latest env:set --name EXPO_PUBLIC_SUPABASE_URL --environment production --visibility plaintext` (o comando pede o valor).
    Sem as duas variáveis, o build de produção abre "Configuração incompleta" (`apps/app/src/state/session.tsx`), de propósito: nunca vira demonstração em silêncio.
-4. Primeiro build de teste, para pessoas de confiança: `npx eas-cli@latest build --platform android --profile preview` (gera o APK, instalável por link). No iOS, o perfil `preview` gera um build de loja, que vai ao TestFlight.
+4. Primeiro build de teste, para pessoas de confiança: `npx eas-cli@latest build --platform android --profile preview` (gera o APK, instalável por link). No iOS, o perfil `preview` gera um build de loja, que vai ao TestFlight. Para testar o widget da tela inicial (D-063 item 3), o mesmo comando com `--profile preview-widget` (`docs/21`): é o `preview` mais `CLAREVO_WIDGET=1`, e o iOS cria na conta Apple o App Group `group.app.clarevo` e a extensão do widget na primeira vez. Não use esse perfil para a loja enquanto o widget não for conferido no aparelho.
 5. **Versões:** `cli.appVersionSource` é `remote` e os perfis `preview` e `production` somam o número de build sozinhos (`autoIncrement`), que é o comportamento recomendado pelo Expo para evitar "versão duplicada" na loja (o `preview` também vai ao TestFlight no iOS, então um segundo build com o mesmo número seria recusado). Na primeira vez, o EAS pergunta se começa a partir dos valores de `app.json` (1 e 1). A versão que a pessoa vê (`version`, 1.0.0) só Enzo muda, a cada lançamento.
 
 ### Fase 2. Conta Apple e iPhone
@@ -158,13 +159,16 @@ O ícone da notificação (`notification-icon.png`) e o favicon continuam como e
 | Perfil | Distribuição | Android | iOS | Ambiente EAS |
 |---|---|---|---|---|
 | `preview` | interna | APK (instalável por link) | **loja** (vai ao TestFlight, sem cadastrar aparelhos); soma o número de build sozinho | `preview` |
+| `preview-widget` (D-063 item 3, Ciclo AA) | a do `preview` (`extends`) | a do `preview` | a do `preview` | `preview`; só acrescenta `CLAREVO_WIDGET=1`, que liga o widget da tela inicial (`docs/21`) |
 | `production` | loja | **AAB** | loja | `production` |
 
 **Sem perfil `development`.** O cliente de desenvolvimento (`expo-dev-client`) não está instalado, e um perfil com `developmentClient: true` geraria um build sem ele. Se for preciso, instalar depois com `npx expo install expo-dev-client` e então criar o perfil `development` (`developmentClient: true`, distribuição `internal`, ambiente `development`; para o simulador do iOS, um perfil à parte com `ios.simulator: true`, como o Expo sugere).
 
+**`preview-widget`** só existe para testar o widget da tela inicial em aparelho. Ele não muda `preview` nem `production`: sem `CLAREVO_WIDGET=1` o app é o de antes (`docs/21` seção 4). Conferido com `JSON.parse` e com `packages/core/test/widget-config.test.ts` (o esquema oficial do EAS continua fora do repositório).
+
 `cli.version` exige `>= 25.2.0` (a versão com que o arquivo foi validado) e `appVersionSource` é `remote`. A submissão `production` usa `track: internal` e `releaseStatus: draft` no Android e `language: pt-BR` no iOS. Não há `appleId`, `ascAppId`, `appleTeamId`, chave de serviço nem senha de keystore.
 
-**`apps/app/app.json`**, em relação ao que já existia: `backgroundColor` `#2457F5`, `ios.buildNumber` `"1"`, `ios.supportsTablet` `false`, `android.versionCode` `1` e `android.blockedPermissions`. O resto (nome "Clarevo", versão 1.0.0, retrato, `scheme` `clarevo`, os dois identificadores `app.clarevo`, ícones, abertura e os textos de permissão) já estava e foi conferido. `npx expo config --type public` rodou sem erro; um `expo prebuild` de teste em cópia fora do repositório gerou o `Info.plist` e o `AndroidManifest.xml` descritos abaixo.
+**`apps/app/app.json`**, em relação ao que já existia: `backgroundColor` `#2457F5`, `ios.buildNumber` `"1"`, `ios.supportsTablet` `false`, `android.versionCode` `1` e `android.blockedPermissions`. O resto (nome "Clarevo", versão 1.0.0, retrato, `scheme` `clarevo`, os dois identificadores `app.clarevo`, ícones, abertura e os textos de permissão) já estava e foi conferido. `app.config.js` (D-063 item 3) devolve esse `app.json` sem mudar quando `CLAREVO_WIDGET` não é `1`; `npx expo config --type public` rodou sem erro e saiu idêntico com e sem o `app.config.js`; um `expo prebuild` de teste em cópia fora do repositório gerou o `Info.plist` e o `AndroidManifest.xml` descritos abaixo.
 
 **Permissões que o app usa de fato** (conferidas no código):
 
@@ -192,7 +196,7 @@ O ícone da notificação (`notification-icon.png`) e o favicon continuam como e
 8. Conta de teste da revisão (seção 5).
 9. Teste em aparelho e teste de usabilidade (seção 4, fase 4).
 10. Primeiro build de verdade no EAS (a configuração só foi validada por esquema e por `expo prebuild` local) e a conferência abaixo.
-11. Fora desta fase, porque dependem do build das lojas e do domínio: abrir o link do convite direto no app (links universais), "Compartilhar com o Clarevo" a partir de outros apps e o widget nativo (`docs/04`).
+11. Fora desta fase, porque dependem do build das lojas e do domínio: abrir o link do convite direto no app (links universais), "Compartilhar com o Clarevo" a partir de outros apps e o widget nativo, que já está preparado e desligado (`docs/21`) e só falta ser compilado e conferido no aparelho.
 
 ## 10. Conferir no primeiro build
 

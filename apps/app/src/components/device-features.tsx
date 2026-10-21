@@ -13,6 +13,7 @@ import { loadPrefs, updatePrefs, useDevicePrefs } from '@/lib/device-prefs';
 import { signOutIntent } from '@/lib/nav';
 import { PRIVACY_TEXT, setValuesHidden } from '@/lib/privacy';
 import { enableReminders, queueReminders } from '@/lib/reminders';
+import { queueWidget } from '@/lib/widget-sync';
 import { useView } from '@/state/data';
 import { useSession } from '@/state/session';
 import { useSpaceStatus } from '@/state/space-status';
@@ -28,6 +29,8 @@ const LOCK_AFTER_MS = 60_000;
  * - "Ocultar valores ao abrir": aplica a preferência da pessoa ao abrir o app ou entrar (também na web);
  * - lembretes (só no aparelho): reagenda ao abrir, ao voltar para o app e depois de escritas, e o toque no aviso abre
  *   Contas a pagar;
+ * - widget da tela inicial (só no aparelho, só em build com o widget nativo; D-063 item 3): grava o resumo para o widget nos mesmos
+ *   momentos dos lembretes, e ao mudar "Mostrar valores no widget" ou entrar e sair da conta (lib/widget-sync.ts);
  * - oferta de lembretes depois do primeiro gasto fixo salvo no Pessoal (só no aparelho);
  * - biometria ao abrir (só no aparelho), que nunca impede de sair da conta.
  */
@@ -76,23 +79,26 @@ function NativeFeatures() {
   const run = () => {
     if (!ready) return;
     if (!userId || !repo) {
-      // Sem sessão neste aparelho: nenhum aviso de conta fica agendado.
+      // Sem sessão neste aparelho: nenhum aviso de conta fica agendado, e o widget deixa de mostrar o que a pessoa viu.
       queueReminders({ enabled: false });
+      queueWidget({ kind: 'signed-out' });
       return;
     }
     if (!prefs || status !== 'pronto' || !contextId) return;
     if (demo || !prefs.reminders) queueReminders({ enabled: false });
     else queueReminders({ enabled: true, repo, contextId, hour: prefs.reminderHour });
+    // Widget: sempre o contexto Pessoal (nunca a Família); na demonstração, nada é gravado.
+    queueWidget(demo ? { kind: 'demo' } : { kind: 'signed-in', repo, contextId, showValues: prefs.widgetShowValues });
   };
   const runRef = useRef(run);
   useEffect(() => {
     runRef.current = run;
   });
 
-  // Ao abrir, ao entrar e ao mudar a preferência ou o horário.
+  // Ao abrir, ao entrar e ao mudar a preferência ou o horário (e "Mostrar valores no widget").
   useEffect(() => {
     runRef.current();
-  }, [ready, userId, contextId, status, prefs?.reminders, prefs?.reminderHour, demo]);
+  }, [ready, userId, contextId, status, prefs?.reminders, prefs?.reminderHour, prefs?.widgetShowValues, demo]);
 
   // Ao voltar para o app, depois de qualquer escrita concluída e da geração do dia dos gastos fixos.
   useEffect(() => {
