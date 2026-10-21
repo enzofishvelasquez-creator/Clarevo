@@ -23,8 +23,10 @@
  * Evolução nos dois sentidos, "Ver na Evolução" e "O que é mediana?"), de Renda variável (D-062: "Calcular pela média" no formulário da renda de
  * referência, com 3 ou 6 meses fechados, o mês conferido como zero, a explicação sem mês com recebimentos e a Família), do Relatório do RH (D-062: o relatório de
  * adesão do painel da empresa, em planilha e em PDF, com ou sem a lista de licenças), de Evolução, fase 3 (D-062: "Renda comprometida" e "Guardado em metas" no
- * seletor, só de meses já fechados, com a própria base no subtítulo) e de Acessibilidade (D-062 item 5: o pacote, o contraste, os
- * nomes, os alvos de toque, a letra grande, "reduzir movimento" e a lista com 500 lançamentos) na versão web, em modo demonstração (acesso simulado).
+ * seletor, só de meses já fechados, com a própria base no subtítulo), de Acessibilidade (D-062 item 5: o pacote, o contraste, os
+ * nomes, os alvos de toque, a letra grande, "reduzir movimento" e a lista com 500 lançamentos) e de Hierarquia de títulos (D-063 item 2:
+ * no máximo um título de nível 1 por tela e nenhum salto de nível, conferidos em toda leitura de tela do roteiro e nas 63 telas) na versão
+ * web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
@@ -122,7 +124,51 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Requisições de escrita (Ciclo A6: as calculadoras nunca gravam nada, nem pela rede).
   const writes = []; p.on('request', (r) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(r.method()) && writes.push(`${r.method()} ${r.url()}`));
   // Texto da tela, com o espaço não separável ("R$\u00a0900,00" nunca quebra a linha) lido como espaço comum.
-  const body = async () => (await p.locator('body').innerText()).replace(/\u00a0/g, ' ');
+  const body = async () => { const t = (await p.locator('body').innerText()).replace(/\u00a0/g, ' '); await headingWatch(); return t; };
+  // Hierarquia de títulos (D-063 item 2, Ciclo Z), conferida em toda leitura da tela: o roteiro lê o texto da tela (`body`) em cada
+  // tela que visita, então essa leitura também confere a regra "no máximo um título de nível 1 por tela e nenhum salto de nível"
+  // (de 1 para 3, por exemplo) em todas elas. A janela aberta (diálogo, folha) é um escopo à parte da tela por baixo: o título dela é o
+  // nível 1 dela. O resultado fecha o roteiro (verificação "Hierarquia de títulos"). Um achado só vale se continuar 250 ms depois
+  // (troca de tela em andamento não conta).
+  const headingsOnPage = () => p.evaluate(() => {
+    const shown = (e) => { const r = e.getBoundingClientRect(); if (!(r.width > 0 && r.height > 0)) return false; for (let x = e; x && x !== document.documentElement; x = x.parentElement) { const cs = getComputedStyle(x); if (cs.visibility === 'hidden' || cs.display === 'none') return false; } return true; };
+    const WIN = '[role=dialog],[role=alertdialog],[aria-modal="true"]';
+    const wins = [...document.querySelectorAll(WIN)];
+    return [...document.querySelectorAll('[role=heading],h1,h2,h3,h4,h5,h6')].filter(shown).map((e) => {
+      const level = Number(e.getAttribute('aria-level')) || (/^H[1-6]$/.test(e.tagName) ? Number(e.tagName[1]) : 2);
+      const w = e.closest(WIN);
+      return { level, text: (e.getAttribute('aria-label') || e.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40), scope: w ? wins.indexOf(w) : -1 };
+    });
+  });
+  // Achados da regra numa lista de títulos na ordem da tela. `strict`: a tela da página (fora de janelas) também precisa de um nível 1
+  // e o primeiro título não pode pular; sem `strict`, só a repetição do nível 1 e o salto entre títulos seguidos contam.
+  const headingIssues = (list, strict = false) => {
+    const out = [];
+    for (const scope of [...new Set(list.map((h) => h.scope))]) {
+      const hs = list.filter((h) => h.scope === scope);
+      const where = scope === -1 ? 'tela' : 'janela';
+      const ones = hs.filter((h) => h.level === 1);
+      if (ones.length > 1) out.push(`${where}: ${ones.length} títulos de nível 1 (${ones.map((h) => h.text).join(' | ')})`);
+      if (strict && scope === -1 && ones.length === 0) out.push(`${where}: sem título de nível 1 (${hs.map((h) => `${h.level}:${h.text}`).join(' | ')})`);
+      let prev = strict && scope === -1 ? 0 : hs[0].level;
+      for (const h of hs) { if (h.level > prev + 1) out.push(`${where}: salto de ${prev} para ${h.level} em "${h.text}"`); prev = h.level; }
+    }
+    return out;
+  };
+  const headingRule = { checks: 0, paths: new Set(), problems: new Map(), noH1: new Set(), last: '' };
+  const headingWatch = async () => {
+    try {
+      let list = await headingsOnPage();
+      const sig = p.url() + JSON.stringify(list);
+      if (sig === headingRule.last) return;
+      headingRule.last = sig;
+      headingRule.checks++; headingRule.paths.add(new URL(p.url()).pathname);
+      let issues = list.length > 0 ? headingIssues(list) : [];
+      if (issues.length > 0) { await p.waitForTimeout(250); list = await headingsOnPage(); issues = list.length > 0 ? headingIssues(list) : []; }
+      for (const x of issues) { const key = `${new URL(p.url()).pathname}: ${x}`; headingRule.problems.set(key, (headingRule.problems.get(key) ?? 0) + 1); }
+      if (list.length > 0 && !list.some((h) => h.scope === -1 && h.level === 1)) headingRule.noH1.add(new URL(p.url()).pathname);
+    } catch { /* a página mudou no meio da leitura: a próxima leitura confere */ }
+  };
   const btn = (name) => p.getByRole('button', { name, exact: true }).filter({ visible: true }).first();
   const field = (name) => p.getByLabel(name, { exact: true }).filter({ visible: true }).first();
   // Espera as transições terminarem antes de capturar.
@@ -284,7 +330,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('primeiros passos: título de nível 2, depois de "Anotar gasto" (D-039: o botão fica logo abaixo do cabeçalho), passos com 56 px', ppOrder.card !== null && ppOrder.anotar !== null && ppOrder.anotar < ppOrder.card && ppOrder.level === '2' && ppOrder.minStep >= 56, JSON.stringify(ppOrder));
   // Ciclo A4: conta nova (sem nenhuma anotação) nunca vê "Seus últimos meses"; os títulos do Resumo seguem na ordem.
   ok('conta nova: sem a faixa "Seus últimos meses" e com os títulos do Resumo na ordem de sempre', !(await bandShown()) &&
-    JSON.stringify(await headingList()) === JSON.stringify(['2:Outubro de 2026', '2:Primeiros passos', '2:Pagamentos do mês']), JSON.stringify(await headingList()));
+    JSON.stringify(await headingList()) === JSON.stringify(['1:Outubro de 2026', '2:Primeiros passos', '2:Pagamentos do mês']), JSON.stringify(await headingList()));
   await layoutChecks('primeiros passos 390px');
   await scrollTo('Primeiros passos');
   await shot('50_primeiros_passos');
@@ -506,7 +552,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('primeiros passos: fora da conta de demonstração com dados', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Agora não')) === 0 && !t.includes('Quatro passos para o Clarevo'));
   // Ciclo A4: a demonstração padrão foi toda anotada em 07/10/2026 e não mostra a faixa; a ordem do Resumo não muda.
   ok('demonstração padrão: sem a faixa "Seus últimos meses" e com os títulos do Resumo na ordem de sempre', !(await bandShown()) && !t.includes('Sua última anotação') &&
-    JSON.stringify(await headingList()) === JSON.stringify(['2:Outubro de 2026', '2:Pagamentos do mês']), JSON.stringify(await headingList()));
+    JSON.stringify(await headingList()) === JSON.stringify(['1:Outubro de 2026', '2:Pagamentos do mês']), JSON.stringify(await headingList()));
 
   const expectTotals = async (name, rec, pago, dif, aPagar = 'R$ 650,00') => {
     // Só a cópia visível: as outras abas e as telas da pilha continuam montadas, escondidas.
@@ -2378,8 +2424,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await waitText('Voltar para Aprender');
     const slug = decodeURIComponent(new URL(p.url()).pathname.split('/')[2] ?? '');
     const h1s = await p.evaluate(() => [...document.querySelectorAll('h1')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
-    // O cabeçalho da pilha também é de nível 1 ("Aprender"); o título do tema vem depois dele.
-    if (!(h1s.length === 2 && h1s[0] === 'Aprender' && expectTitle(h1s[1]))) learnIssues.titulo.push(`${slug}: ${JSON.stringify(h1s)}`);
+    // D-063: o título do tema é o único nível 1 da tela; a barra ("Aprender") é só texto.
+    if (!(h1s.length === 1 && expectTitle(h1s[0]))) learnIssues.titulo.push(`${slug}: ${JSON.stringify(h1s)}`);
     const text = await body();
     const shownText = text.split('\nFontes\n')[0] + '\n' + (text.split('Revisado em')[1] ?? '');
     // A referência de 30% da renda com parcelas de dívidas é de uma fonte privada identificada (P-024): a Serasa só pode aparecer em "renda-comprometida".
@@ -2624,7 +2670,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('B Resumo: a linha está dentro do card "Ainda a pagar" (sem card novo, sem título novo)', rcInCard !== null && rcInCard.heads.length === 0 && !rcInCard.anotarGasto && rcInCard.anotarConta, JSON.stringify(rcInCard));
   const rcOrder = ['Anotar gasto', 'Ainda a pagar neste mês', 'Renda comprometida em outubro', 'Anotar conta a pagar', 'Pagamentos do mês', 'Fatura sem contar duas vezes', 'Quem vê estes dados?'].map((x) => t.indexOf(x));
   ok('B Resumo: a ordem dos blocos não mudou (Anotar gasto, Ainda a pagar com a linha, Anotar conta a pagar, Pagamentos do mês, Fatura sem contar duas vezes, Quem vê estes dados?)', rcOrder.every((v, i) => v >= 0 && (i === 0 || v > rcOrder[i - 1])), JSON.stringify(rcOrder));
-  ok('B Resumo: títulos de sempre (Outubro de 2026 e Pagamentos do mês)', JSON.stringify(await headingList()) === JSON.stringify(['2:Outubro de 2026', '2:Pagamentos do mês']), JSON.stringify(await headingList()));
+  ok('B Resumo: títulos de sempre (Outubro de 2026 e Pagamentos do mês)', JSON.stringify(await headingList()) === JSON.stringify(['1:Outubro de 2026', '2:Pagamentos do mês']), JSON.stringify(await headingList()));
   await layoutChecks('Resumo com renda comprometida 390px');
   await shot('100_resumo_renda_comprometida');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
@@ -4224,7 +4270,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('retorno: nenhum valor em reais na faixa', band !== null && !band.includes('R$'), band ?? '');
   const bo = await bandOrder();
   ok('retorno: a faixa fica no lugar dos avisos temporários, depois de "Anotar gasto" (D-039), título de nível 2', bo.faixa !== null && bo.anotar !== null && bo.anotar < bo.faixa &&
-    JSON.stringify(await headingList()) === JSON.stringify(['2:Outubro de 2026', '2:Seus últimos meses', '2:Pagamentos do mês']), `${JSON.stringify(bo)} ${JSON.stringify(await headingList())}`);
+    JSON.stringify(await headingList()) === JSON.stringify(['1:Outubro de 2026', '2:Seus últimos meses', '2:Pagamentos do mês']), `${JSON.stringify(bo)} ${JSON.stringify(await headingList())}`);
   ok('retorno: cenário fictício identificado com a pílula "Demonstração"', (await p.locator('[aria-label="Demonstração: acesso simulado e dados fictícios"]').filter({ visible: true }).count()) === 1);
   ok('retorno: Ainda a pagar R$ 10.590,00 com "Inclui R$ 540,00 em valores estimados."', (await toPayIs('10.590,00')()) && (await body()).includes('Inclui R$ 540,00 em valores estimados.'));
   await keepReturnText();
@@ -7965,7 +8011,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   }, j1TOUR);
   const j1TourGone = async () => { await j1Dialog(j1TOUR).first().waitFor({ state: 'hidden', timeout: 4000 }).catch(() => {}); return (await j1Dialog(j1TOUR).count()) === 0; };
   const j1Next = async () => { await j1Dialog(j1TOUR).getByRole('button', { name: /^(Próximo|Começar)$/ }).first().click(); await p.waitForTimeout(250); };
-  const j1Baseline = ['2:Outubro de 2026', '2:Primeiros passos', '2:Pagamentos do mês'];
+  const j1Baseline = ['1:Outubro de 2026', '2:Primeiros passos', '2:Pagamentos do mês'];
 
   // ---- 1. Conta nova: o tour abre sozinho no Resumo, com cinco cartões, "Pular" e "Próximo" (no fim, "Começar") ----
   await j1NewAccount('Jo Tutorial', 'jo@exemplo.com');
@@ -8034,7 +8080,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   j1s = await j1TourState();
   ok('Tutorial tour: na demonstração o tour também abre, com "Pular"', j1s !== null && j1s.title === 'Resumo do mês' && j1s.buttons.includes('Pular'), JSON.stringify(j1s));
   await j1Dialog(j1TOUR).getByRole('button', { name: 'Pular', exact: true }).click();
-  ok('Tutorial tour: a demonstração segue com os títulos de sempre', (await j1TourGone()) && JSON.stringify(await headingList()) === JSON.stringify(['2:Outubro de 2026', '2:Pagamentos do mês']), JSON.stringify(await headingList()));
+  ok('Tutorial tour: a demonstração segue com os títulos de sempre', (await j1TourGone()) && JSON.stringify(await headingList()) === JSON.stringify(['1:Outubro de 2026', '2:Pagamentos do mês']), JSON.stringify(await headingList()));
 
   // ---- 5. Nunca sobre "Seus últimos meses" (D-030) nem sobre formulários ----
   await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Seu dinheiro'); await j1TourOn();
@@ -9215,7 +9261,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await k2StubOpen();
   t = await k2Keep();
   let k2 = await k2Plain();
-  ok('K2 13º salário: título de nível 1 "13º salário" (depois do "Aprender" do cabeçalho), "Organizar o mês · 2 min de leitura" e o subtítulo', JSON.stringify(await k2H1s()) === JSON.stringify(['Aprender', '13º salário']) &&
+  ok('K2 13º salário: título de nível 1 "13º salário" (o único da tela; a barra "Aprender" é só texto), "Organizar o mês · 2 min de leitura" e o subtítulo', JSON.stringify(await k2H1s()) === JSON.stringify(['13º salário']) &&
     t.includes('Organizar o mês · 2 min de leitura') && t.includes('Duas parcelas, o proporcional e os descontos'), JSON.stringify(await k2H1s()));
   ok('K2 13º salário: os prazos da lei (entre fevereiro e 30 de novembro; até 20 de dezembro), o proporcional (1/12 por mês, 15 dias ou mais) e os descontos sem afirmar em qual parcela (confira o contracheque)', k2.includes('entre fevereiro e 30 de novembro') && k2.includes('até 20 de dezembro') &&
     k2.includes('1/12 da remuneração por mês de serviço') && k2.includes('uma fração de 15 dias ou mais conta como mês inteiro') && k2.includes('Confira no contracheque quais descontos incidem em cada parcela.') && !k2.includes('sai sem desconto') && !k2.includes('Na segunda entram') &&
@@ -9236,7 +9282,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('button', { name: k2RowFerias, exact: true }).filter({ visible: true }).first().click(); await waitText('Fazer a conta com os seus números'); await p.waitForTimeout(400);
   await k2StubOpen();
   t = await k2Keep(); k2 = await k2Plain();
-  ok('K2 Férias: título de nível 1 "Férias: pagamento, um terço e abono" e o subtítulo da lei', JSON.stringify(await k2H1s()) === JSON.stringify(['Aprender', 'Férias: pagamento, um terço e abono']) && t.includes('O que a lei prevê para quem tem carteira assinada'), JSON.stringify(await k2H1s()));
+  ok('K2 Férias: título de nível 1 "Férias: pagamento, um terço e abono" e o subtítulo da lei', JSON.stringify(await k2H1s()) === JSON.stringify(['Férias: pagamento, um terço e abono']) && t.includes('O que a lei prevê para quem tem carteira assinada'), JSON.stringify(await k2H1s()));
   ok('K2 Férias: 30 dias, um terço, pagamento até dois dias antes, abono até 15 dias antes do fim do período aquisitivo, até três períodos (um de 14 dias) e o 13º junto com as férias', k2.includes('São 30 dias corridos para quem não faltou mais de cinco vezes sem justificativa') &&
     k2.includes('com pelo menos um terço a mais que o salário normal') && k2.includes('O pagamento das férias deve ser feito até dois dias antes do início') && k2.includes('até 15 dias antes do fim do período aquisitivo') &&
     k2.includes('até três períodos, e um deles precisa ter pelo menos 14 dias corridos') && k2.includes('se a pessoa pedir em janeiro'), k2.slice(0, 300));
@@ -9255,7 +9301,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('button', { name: k2RowVolta, exact: true }).filter({ visible: true }).first().click(); await waitText('Voltar para Aprender'); await p.waitForTimeout(400);
   await k2StubOpen();
   t = await k2Keep(); k2 = await k2Plain();
-  ok('K2 Volta às aulas: título de nível 1 e a lei da anuidade (12 parcelas iguais, 45 dias antes do fim da matrícula), os itens de uso coletivo (Lei 12.886/2013) e os Procons', JSON.stringify(await k2H1s()) === JSON.stringify(['Aprender', 'Volta às aulas: mensalidade e material']) &&
+  ok('K2 Volta às aulas: título de nível 1 e a lei da anuidade (12 parcelas iguais, 45 dias antes do fim da matrícula), os itens de uso coletivo (Lei 12.886/2013) e os Procons', JSON.stringify(await k2H1s()) === JSON.stringify(['Volta às aulas: mensalidade e material']) &&
     k2.includes('é dividido em 12 parcelas mensais iguais, ou em 6, no caso de semestralidade') && k2.includes('pelo menos 45 dias antes do fim do prazo de matrícula') && k2.includes('Itens de uso coletivo não podem entrar na lista') && !k2.includes('material de limpeza') &&
     k2.includes('Lei 12.886/2013') && k2.includes('Segundo os Procons, a escola também não escolhe a marca nem o local de compra'), k2.slice(0, 300));
   ok('K2 Volta às aulas: o exemplo R$ 14.400,00 em 12 parcelas de R$ 1.200,00 e, com R$ 600,00 de material, R$ 1.800,00', k2.includes('anuidade de R$ 14.400,00 em 12 parcelas iguais, cada parcela é de R$ 1.200,00') && k2.includes('lista de material custar R$ 600,00') && k2.includes('as saídas desse mês somam R$ 1.800,00'));
@@ -9266,7 +9312,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('button', { name: k2RowIR, exact: true }).filter({ visible: true }).first().click(); await waitText('Voltar para Aprender'); await p.waitForTimeout(400);
   await k2StubOpen();
   t = await k2Keep(); k2 = await k2Plain();
-  ok('K2 Imposto de Renda: título de nível 1 e o prazo de 2026 dito como fato do ano, com "Confira a data oficial do ano no site da Receita" e sem data do ano seguinte', JSON.stringify(await k2H1s()) === JSON.stringify(['Aprender', 'Declaração do Imposto de Renda']) &&
+  ok('K2 Imposto de Renda: título de nível 1 e o prazo de 2026 dito como fato do ano, com "Confira a data oficial do ano no site da Receita" e sem data do ano seguinte', JSON.stringify(await k2H1s()) === JSON.stringify(['Declaração do Imposto de Renda']) &&
     k2.includes('em 2026, o prazo foi de 23 de março a 29 de maio') && k2.includes('Confira a data oficial do ano no site da Receita') && !/2027|2028/.test(k2.split('Fontes')[0]), k2.slice(0, 300));
   ok('K2 Imposto de Renda: a multa (1% ao mês ou fração, mínimo de R$ 165,74 e máximo de 20%) e as quotas (até 8, nenhuma menor que R$ 50,00, imposto abaixo de R$ 100,00 de uma vez)', k2.includes('Quem precisa declarar e entrega depois do prazo paga multa de 1% ao mês ou fração de atraso sobre o imposto devido, com mínimo de R$ 165,74 e máximo de 20% do imposto') &&
     k2.includes('dividido em até 8 quotas mensais, e nenhuma quota pode ser menor que R$ 50,00') && k2.includes('Imposto menor que R$ 100,00 é pago de uma só vez') && k2.includes('A primeira quota, paga no prazo, não tem juros'));
@@ -9281,7 +9327,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // ---- 4. As outras duas linhas do card: Contas que chegam uma vez por ano e a calculadora "Cota única ou parcelado?" ----
   await scrollTo('Neste mês');
   await p.getByRole('button', { name: k2RowContas, exact: true }).filter({ visible: true }).first().click(); await waitText('Voltar para Aprender'); await p.waitForTimeout(300);
-  ok('K2 card: a linha "Contas que chegam uma vez por ano" abre a explicação (/explicacao/contas-do-ano) com "Voltar para Aprender"', k2Path() === '/explicacao/contas-do-ano' && JSON.stringify(await k2H1s()) === JSON.stringify(['Aprender', 'Contas que chegam uma vez por ano']), k2Path());
+  ok('K2 card: a linha "Contas que chegam uma vez por ano" abre a explicação (/explicacao/contas-do-ano) com "Voltar para Aprender"', k2Path() === '/explicacao/contas-do-ano' && JSON.stringify(await k2H1s()) === JSON.stringify(['Contas que chegam uma vez por ano']), k2Path());
   await btn('Voltar para Aprender').click(); await waitText('Neste mês'); await p.waitForTimeout(300);
   await scrollTo('Neste mês');
   await p.getByRole('button', { name: k2RowCalc, exact: true }).filter({ visible: true }).first().click(); await waitText('Simulação com os valores e as taxas que você informou.'); await p.waitForTimeout(500);
@@ -12570,7 +12616,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await mmKeep();
   const mmTopic = t;
   ok('Média e mediana, tema: /explicacao/media-e-mediana com o cabeçalho "Aprender", o título "Média e mediana" como cabeçalho de nível 1, "Organizar o mês · 2 min de leitura" e "Voltar à tarefa" (não "Voltar para Aprender")',
-    mmPath() === '/explicacao/media-e-mediana' && JSON.stringify(await mmH1s()) === JSON.stringify(['Aprender', 'Média e mediana']) && t.includes('Organizar o mês · 2 min de leitura') && t.includes('Dois jeitos de resumir vários meses') &&
+    mmPath() === '/explicacao/media-e-mediana' && JSON.stringify(await mmH1s()) === JSON.stringify(['Média e mediana']) && t.includes('Organizar o mês · 2 min de leitura') && t.includes('Dois jeitos de resumir vários meses') &&
     (await visibleCount('button', 'Voltar à tarefa')) === 1 && (await visibleCount('button', 'Voltar para Aprender')) === 0, `${mmPath()} ${JSON.stringify(await mmH1s())}`);
   ok('Média e mediana, tema: o resumo e os parágrafos dizem o que é cada uma, a diferença com um mês muito diferente dos outros e o que a Evolução faz',
     t.includes(mmShort) && t.includes('A média soma todos os valores e divide pela quantidade deles.') && t.includes('com quantidade par de valores, é a média dos dois do meio') && t.includes('medidas de tendência central') &&
@@ -13613,12 +13659,14 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   }, { route, params });
   const acEnter = async () => { await evEnter(); await acInstall(); };
   // Tela atual: o que cada conferência acha, juntando por categoria (com o nome da tela para achar o problema).
-  const acFound = { contraste: [], nome: [], papel: [], alvo: [], largura: [], cortado: [], cruzado: [] };
+  const acFound = { contraste: [], nome: [], papel: [], alvo: [], largura: [], cortado: [], cruzado: [], titulos: [] };
   const acCount = { texto: 0, alvo: 0, telas: 0 };
   const acScan = async (name) => {
     await p.waitForTimeout(800);
     const r = await p.evaluate(() => ({ c: window.__acc.contrast(), t: window.__acc.targets(), role: window.__acc.noRole(), o: window.__acc.overflow(), cut: window.__acc.cut(), ov: window.__acc.overlap() }));
     const names = await acNoName();
+    // D-063: cada tela tem um só título de nível 1 e nenhum salto de nível (a janela aberta, se houver, conta à parte).
+    for (const x of headingIssues(await headingsOnPage(), true)) acFound.titulos.push(`${name}: ${x}`);
     acCount.telas++; acCount.texto += r.c.n; acCount.alvo += r.t.n;
     for (const x of r.c.bad) acFound.contraste.push(`${name}: ${x}`);
     for (const x of names) acFound.nome.push(`${name}: ${x}`);
@@ -13660,6 +13708,14 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   p.on('request', (r) => { if (/pdfjs/.test(r.url())) acPdfReqs.push(r.url()); });
   await acEnter();
   await expectTotals('Acessibilidade: a demonstração abre com os totais de sempre (6.000 / 3.900 / 2.100 e 650)', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+  // D-063 item 2: as cinco Manrope do pacote são os subconjuntos Latin de apps/app/assets/fonts (34 KB cada, e não os 97 KB do pacote de
+  // fontes), e o navegador as carregou e usa (o texto não cai na fonte do sistema).
+  const acFontDir = path.join(DIST, 'assets', 'assets', 'fonts');
+  const acFonts = fs.existsSync(acFontDir) ? fs.readdirSync(acFontDir).filter((f) => f.endsWith('.ttf')).map((f) => ({ f, size: fs.statSync(path.join(acFontDir, f)).size })) : [];
+  const acFontsLoaded = await p.evaluate(() => [...document.fonts].filter((f) => f.status === 'loaded').map((f) => f.family).sort());
+  ok('Acessibilidade, fontes: o pacote traz as cinco Manrope em subconjunto Latin (menos de 40 KB cada, menos de 200 KB juntas), sem as fontes completas do pacote @expo-google-fonts, e o navegador carregou os pesos usados',
+    acFonts.length === 5 && acFonts.every((x) => x.size < 40_000) && acFonts.reduce((a, x) => a + x.size, 0) < 200_000 && !fs.existsSync(path.join(DIST, 'assets', '__node_modules', '@expo-google-fonts')) &&
+    ['Manrope_500Medium', 'Manrope_600SemiBold', 'Manrope_700Bold', 'Manrope_800ExtraBold'].every((f) => acFontsLoaded.includes(f)), `${acFonts.map((x) => `${x.f.split('.')[0]} ${x.size} B`).join(', ')}; carregadas: ${acFontsLoaded.join(', ')}`);
   await acScan('resumo');
   await shot('590_acessibilidade_resumo_390px');
   for (const name of ['Movimentações', 'Metas', 'Aprender e dúvidas']) { await tabByName(name).click(); await p.waitForTimeout(900); await acScan(`aba ${name}`); }
@@ -13700,6 +13756,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok(`Acessibilidade, ${acCount.telas} telas: nenhum botão, caixa, rádio, aba, campo, link ou imagem sem nome acessível`, acFound.nome.length === 0, acFound.nome.slice(0, 4).join(' | '));
   ok('Acessibilidade: nada que parece clicável (cursor de mão) fica sem papel de botão, link, aba, caixa, rádio ou campo', acFound.papel.length === 0, acFound.papel.slice(0, 4).join(' | '));
   ok(`Acessibilidade: ${acCount.alvo} alvos de toque (botões, abas, rádios, caixas, chaves, links e campos) com 44 x 44 px ou mais, largura e altura`, acCount.alvo > 400 && acFound.alvo.length === 0, acFound.alvo.slice(0, 4).join(' | '));
+  ok(`Acessibilidade, ${acCount.telas} telas: um só título de nível 1 por tela e nenhum salto de nível (1, 2, 3; D-063)`, acCount.telas >= 60 && acFound.titulos.length === 0, acFound.titulos.slice(0, 4).join(' | '));
   ok('Acessibilidade: nenhuma das telas passa da largura de 390 px', acFound.largura.length === 0, acFound.largura.slice(0, 4).join(' | '));
   ok('Acessibilidade: nenhum texto cortado (nada escondido pelo limite da caixa) em 390 px', acFound.cortado.length === 0, acFound.cortado.slice(0, 4).join(' | '));
 
@@ -13718,6 +13775,37 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const acCaption = await p.evaluate(() => { const e = [...document.querySelectorAll('div[dir="auto"]')].find((x) => /^Pago · 05\/10\/2026 · conta a pagar/.test(x.textContent) && x.getBoundingClientRect().width > 0); return e ? { text: e.textContent, clipped: e.scrollWidth > e.clientWidth + 1 || getComputedStyle(e).textOverflow === 'ellipsis' || getComputedStyle(e).webkitLineClamp !== 'none' && getComputedStyle(e).webkitLineClamp !== '' } : null; });
   ok('Acessibilidade, linha de registro: a legenda "Pago · 05/10/2026 · conta a pagar" aparece inteira, sem o corte "…"', acCaption !== null && acCaption.text === 'Pago · 05/10/2026 · conta a pagar' && !acCaption.clipped, JSON.stringify(acCaption));
   await shot('591_acessibilidade_composicao_pago_390px');
+
+  // ---- 3b. Hierarquia de títulos (D-063 item 2, Ciclo Z): o Resumo ganhou o nível 1, a explicação ficou com um só e as quatro telas não pulam ----
+  const acLevels = async () => (await headingsOnPage()).filter((h) => h.scope === -1).map((h) => `${h.level}:${h.text}`);
+  await acEnter();
+  const acResumo = await acLevels();
+  const acH1Text = () => p.evaluate(() => [...document.querySelectorAll('h1')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
+  ok('Hierarquia de títulos, Resumo: o mês do cabeçalho é o título de nível 1 (lido "Resumo de outubro de 2026", visto "Outubro de 2026"), depois só títulos de nível 2',
+    acResumo[0] === '1:Resumo de outubro de 2026' && acResumo.length >= 2 && acResumo.slice(1).every((h) => h.startsWith('2:')) && JSON.stringify(await acH1Text()) === JSON.stringify(['Outubro de 2026']) &&
+    (await visibleCount('heading', 'Resumo de outubro de 2026')) === 1, JSON.stringify(acResumo));
+  await p.getByRole('button', { name: /Mês anterior/ }).filter({ visible: true }).first().click(); await waitText('Setembro de 2026'); await p.waitForTimeout(500);
+  ok('Hierarquia de títulos, Resumo em outro mês: o nome do título de nível 1 acompanha o mês ("Resumo de setembro de 2026")', JSON.stringify((await acLevels()).filter((h) => h.startsWith('1:'))) === JSON.stringify(['1:Resumo de setembro de 2026']), JSON.stringify(await acLevels()));
+  await tabByName('Movimentações').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(500);
+  const acMov = await acLevels();
+  ok('Hierarquia de títulos, Movimentações: "Movimentações" é o nível 1 e o mês, nível 2 (a aba traz o título dela)', acMov[0] === '1:Movimentações' && acMov.some((h) => /^2:[A-Za-zçÇ]+ de 2026$/.test(h)) && acMov.filter((h) => h.startsWith('1:')).length === 1, JSON.stringify(acMov));
+  await acNav('explicacao/[tema]', { tema: 'media-e-mediana' }); await p.waitForTimeout(900);
+  const acTopic = await acLevels();
+  ok('Hierarquia de títulos, explicação de um tema: o título do tema é o único nível 1; a barra "Aprender" é só texto, sem papel de título',
+    acTopic[0] === '1:Média e mediana' && acTopic.filter((h) => h.startsWith('1:')).length === 1 && acTopic.slice(1).every((h) => h.startsWith('2:')) && !(await headingShown('Aprender')) && (await body()).includes('Aprender'), JSON.stringify(acTopic));
+  await acNav('explicacao/[tema]', { tema: 'tema-que-nao-existe' }); await p.waitForTimeout(900);
+  ok('Hierarquia de títulos, explicação indisponível: "Aprender" segue como o nível 1 e "Este conteúdo não está disponível." vem em nível 2', JSON.stringify(await acLevels()) === JSON.stringify(['1:Aprender', '2:Este conteúdo não está disponível.']), JSON.stringify(await acLevels()));
+  for (const [name, route, params, expected] of [
+    ['reserva', 'reserva', {}, ['1:Reserva para imprevistos', '2:Seus gastos essenciais por mês']],
+    ['plano de guardar', 'guardar/index', {}, ['1:Seu plano de guardar', '2:Seus gastos essenciais por mês', '2:Etapas do plano']],
+    ['editar a reserva', 'meta/[id]/editar', { id: acIds.goal }, ['1:Reserva para imprevistos', '2:Seus gastos essenciais por mês']],
+    ['assinaturas', 'gastos-fixos/assinaturas', {}, ['1:Revisar assinaturas', '2:Academia (exemplo)', '2:Streaming (exemplo)']],
+  ]) {
+    await acNav(route, params); await p.waitForTimeout(900);
+    const lv = await acLevels();
+    ok(`Hierarquia de títulos, ${name}: 1 e depois 2, sem o salto de 1 para 3 de antes`, expected.every((h) => lv.includes(h)) && lv[0] === expected[0] && !lv.some((h) => h.startsWith('3:')) && headingIssues(await headingsOnPage(), true).length === 0, JSON.stringify(lv));
+  }
+  await acEnter();
 
   // ---- 4. O leitor de PDF só é pedido quando a pessoa lê um PDF ----
   ok(`Acessibilidade, pacote: abrir o app, o Resumo, as abas e ${acRouteNames.length} telas não pediu o leitor de PDF (pdfjs)`, acPdfReqs.length === 0, acPdfReqs.join(' '));
@@ -13865,6 +13953,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);
   const forbidden = screenTexts.map((s) => s.match(FORBIDDEN)?.[0]).filter(Boolean);
   ok('contas do ano e calculadoras: nenhum termo proibido nem travessão longo nas telas novas', screenTexts.length > 0 && forbidden.length === 0, `${screenTexts.length} telas ${forbidden.join(' | ')}`);
+  // Hierarquia de títulos (D-063 item 2): o resultado da conferência feita em cada leitura de tela do roteiro inteiro (`headingWatch`).
+  ok(`Hierarquia de títulos: em todas as telas do roteiro (${headingRule.checks} conferências em ${headingRule.paths.size} endereços) há no máximo um título de nível 1 por tela (janela aberta à parte) e nenhum salto de nível`,
+    headingRule.checks > 500 && headingRule.paths.size > 100 && headingRule.problems.size === 0, [...headingRule.problems].slice(0, 6).map(([k, n]) => `${k} (${n}x)`).join(' | '));
+  console.log(`Telas lidas sem título de nível 1 (informativo): ${[...headingRule.noH1].join(', ') || 'nenhuma'}`);
   ok('sem erros de JavaScript no console', errors.length === 0, errors.slice(0,3).join(' | '));
   await b.close();
   for (const r of results) console.log(r.join('  '));

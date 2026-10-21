@@ -1,4 +1,4 @@
-import { DEMO_PILL_MAX_FONT_SCALE, addMonths, contextLabelFor, contextPillText, formatMonthBR } from '@clarevo/core';
+import { DEMO_PILL_MAX_FONT_SCALE, SUMMARY_NAV_TEXT, addMonths, contextLabelFor, contextPillText, formatMonthBR } from '@clarevo/core';
 import { router } from 'expo-router';
 import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, Users } from 'lucide-react-native';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -112,8 +112,10 @@ export function AppHeader({ title, context, children }: { title?: string; contex
  * para os dois lado a lado (telas estreitas, letra grande), o contexto desce para baixo do
  * título, alinhado a ele: nem o título nem o contexto são cortados.
  * `help`: nas telas que têm entrada no guia (D-049(3)), o botão "?" (44 px) fica à direita e abre a folha "Como usar".
+ * `plainTitle`: o título da barra é só texto, sem papel de título. Só a explicação de um tema usa: ali o título do tema é o nível 1 da
+ * tela (D-063 item 2), e a barra ("Aprender") diz de onde a pessoa veio. Uma tela tem no máximo um título de nível 1.
  */
-export function SubHeader({ title, onBack, right, help }: { title: string; onBack?: () => void; right?: ReactNode; help?: HelpScreen }) {
+export function SubHeader({ title, onBack, right, help, plainTitle }: { title: string; onBack?: () => void; right?: ReactNode; help?: HelpScreen; plainTitle?: boolean }) {
   const back = onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/')));
   return (
     <View style={styles.subBand}>
@@ -132,8 +134,8 @@ export function SubHeader({ title, onBack, right, help }: { title: string; onBac
             variant="title"
             color={colors.textOnBrand}
             style={styles.subTitle}
-            accessibilityRole="header"
-            aria-level={1}
+            accessibilityRole={plainTitle ? undefined : 'header'}
+            aria-level={plainTitle ? undefined : 1}
             accessibilityLabel={yearA11yLabel(title)}>
             {title}
           </Txt>
@@ -226,8 +228,12 @@ function ContextSwitchTrack() {
   );
 }
 
-/** Período mensal com mês anterior e seguinte (até o mês atual). */
-export function MonthSwitcher({ color = colors.textOnBrand }: { color?: string }) {
+/**
+ * Período mensal com mês anterior e seguinte (até o mês atual). O mês é um título de nível 2, abaixo do título da aba. No Resumo, que
+ * não tem outro título (a estrutura é a de D-022), o mês é o título de nível 1 da tela e o leitor de tela lê "Resumo de outubro de
+ * 2026" (`titleLevel` 1; o que se vê não muda).
+ */
+export function MonthSwitcher({ color = colors.textOnBrand, titleLevel = 2 }: { color?: string; titleLevel?: 1 | 2 }) {
   const { month, setMonth, currentMonth } = useView();
   const forward = canGoForward(month, currentMonth);
   const prev = addMonths(month, -1);
@@ -242,7 +248,13 @@ export function MonthSwitcher({ color = colors.textOnBrand }: { color?: string }
         style={(s) => [styles.monthBtn, (s as { focused?: boolean }).focused && focusOnBrand]}>
         <ChevronLeft size={22} color={color} />
       </Pressable>
-      <Txt variant="label" color={color} style={{ flex: 1, textAlign: 'center', fontFamily: fonts.semibold }} accessibilityRole="header" aria-level={2}>
+      <Txt
+        variant="label"
+        color={color}
+        style={{ flex: 1, textAlign: 'center', fontFamily: fonts.semibold }}
+        accessibilityRole="header"
+        aria-level={titleLevel}
+        accessibilityLabel={titleLevel === 1 ? SUMMARY_NAV_TEXT.pageTitleA11y(month) : undefined}>
         {formatMonthBR(month)}
       </Txt>
       <Pressable

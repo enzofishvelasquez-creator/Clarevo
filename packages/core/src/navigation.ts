@@ -171,6 +171,11 @@ export const SUMMARY_NAV_TEXT = {
   /** Link do card "Ainda a pagar" (a seta › é desenho). */
   viewPayables: 'Ver contas',
   viewPayablesA11y: 'Ver contas a pagar',
+  /**
+   * Título de nível 1 do Resumo para o leitor de tela (D-063 item 2): o mês que se vê no cabeçalho ("Outubro de 2026") é o título da
+   * tela, e o nome dele diz o que a tela é: "Resumo de outubro de 2026". Nada muda no que se vê.
+   */
+  pageTitleA11y: (month: IsoMonth): string => `Resumo de ${formatMonthBR(month).toLowerCase()}`,
   /** Dicas dos totais do cabeçalho (o nome acessível continua "Recebido, R$ ..." e "Pago, R$ ..."). */
   receivedHint: 'Abre os recebimentos do mês',
   paidHint: 'Abre os pagamentos do mês, com a divisão por categoria',

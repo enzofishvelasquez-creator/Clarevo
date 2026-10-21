@@ -73,7 +73,7 @@ export default function ResumoScreen() {
       <Screen wide scrollRef={scroll}>
         <AppHeader>
           <ContextSwitch />
-          <MonthSwitcher />
+          <MonthSwitcher titleLevel={1} />
 
           <Animated.View key={`${kind}-${month}`} entering={entering} style={styles.heroContent}>
             {records.isPending ? (

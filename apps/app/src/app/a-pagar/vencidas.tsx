@@ -460,7 +460,7 @@ export default function ContasVencidas() {
                         variant="label"
                         style={{ fontFamily: fonts.bold, fontSize: 15 }}
                         accessibilityRole="header"
-                        aria-level={3}
+                        aria-level={2}
                         accessibilityLabel={yearA11yLabel(`${group.title} · ${group.count} parcelas vencidas`)}>
                         {group.title} · {group.count} parcelas vencidas
                       </Txt>

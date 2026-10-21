@@ -48,7 +48,7 @@ export function EssentialsBlock({
 
   return (
     <View style={{ gap: space[2] }}>
-      <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={3}>
+      <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={2}>
         {R.essentialsTitle}
       </Txt>
       {editing || validCents === null ? (

@@ -1,13 +1,13 @@
 # Clarevo · Acessibilidade e desempenho em Android simples (D-062 item 5)
 
-Ciclo Y, 20/10/2026. Revisão de acessibilidade (contraste, leitor de tela, letra grande, movimento e alvos de toque) e de desempenho (pacote, listas longas, cálculos repetidos, consultas e imagens), com as correções seguras e locais. **Sem migração, sem função nova no banco e sem pacote novo** (a troca do pacote de ícones é uma regra do Metro, `apps/app/metro.config.js`, sem dependência nova). Decisão: `docs/00` (D-062 item 5). Passos do ciclo: `docs/04` (Ciclo Y).
+Ciclo Y, 20/10/2026, e Ciclo Z, 21/10/2026 (D-063 item 2: as pendências da seção 10, resolvidas ou avaliadas na seção 14). Revisão de acessibilidade (contraste, leitor de tela, letra grande, movimento e alvos de toque) e de desempenho (pacote, listas longas, cálculos repetidos, consultas e imagens), com as correções seguras e locais. **Sem migração, sem função nova no banco e sem pacote novo** (a troca do pacote de ícones é uma regra do Metro, `apps/app/metro.config.js`, sem dependência nova). Decisão: `docs/00` (D-062 item 5 e D-063 item 2). Passos dos ciclos: `docs/04` (Ciclo Y e Ciclo Z). O Ciclo Z também não tem migração nem função nova no banco, e não instala pacote (o `@expo-google-fonts/manrope` continua instalado, só deixou de ser importado).
 
 ## 1. Resumo
 
 | Área | O que a auditoria achou | Situação |
 |---|---|---|
 | Contraste | De 1.866 textos em 63 telas, nenhum abaixo da meta fora o botão desabilitado (2,93:1, que o WCAG dispensa). Na tabela de estados, dois pares abaixo de 4,5:1: o texto de exemplo (placeholder) no campo com erro (4,11:1) e o azul sobre o botão suave pressionado (4,47:1) | Corrigido: `placeholder` de #68748C para #616D85 (4,55:1 no campo com erro, 5,2:1 no branco) e novo `brandTintPressed` #DDE7FF (4,51:1). Azul, lima e #17223B não mudaram |
-| Leitor de tela | Nenhum botão, caixa, rádio, aba, campo, link ou imagem sem nome (878 alvos em 63 telas); nada clicável sem papel; estados anunciados. Dois cartões de total ("Pago" e "Recebido" na composição) sem papel de título | "Pago" e "Recebido" viraram títulos de nível 2. O resto sem achado (seção 4) |
+| Leitor de tela | Nenhum botão, caixa, rádio, aba, campo, link ou imagem sem nome (878 alvos em 63 telas); nada clicável sem papel; estados anunciados. Dois cartões de total ("Pago" e "Recebido" na composição) sem papel de título | "Pago" e "Recebido" viraram títulos de nível 2. O resto sem achado (seção 4). A hierarquia de títulos (Resumo sem título de nível 1, duas na explicação, saltos de 1 para 3) ficou para o Ciclo Z e foi resolvida: seção 14.1 |
 | Letra grande | Legenda do registro cortada em "…" já no tamanho normal (a origem e a conta ficavam escondidas); títulos de lista limitados a 2 linhas com letra grande; selo "Demonstração" e pílula de contexto passando da tela com letra 2,0; título longo sem quebra na web; rótulo da aba "Movimentos" cortado a partir de 1,3 | Corrigidos (seção 5). A parte que só o aparelho mostra está na seção 11 |
 | Movimento | Nenhum achado: toda animação (Reanimated, FadeIn, FadeOut, layout, escala ao tocar, esqueleto, trilho do seletor, transição de telas, janelas) respeita "reduzir movimento" | Conferido no código e no navegador, nos dois modos |
 | Alvos de toque | Nenhum alvo abaixo de 44 x 44 px (largura e altura) em 63 telas | Sem correção. O roteiro media só a altura e só em parte das telas; agora mede largura e altura em todas |
@@ -15,7 +15,7 @@ Ciclo Y, 20/10/2026. Revisão de acessibilidade (contraste, leitor de tela, letr
 | Listas longas | Movimentações, fatura e composição montavam todas as linhas de uma vez (500 lançamentos: 5.479 elementos e 3.116 ms para abrir). Busca e importação já mostram 100 por vez | `FlatList` a partir de 80 linhas nas três telas (500 lançamentos: 526 elementos e 486 ms). Custo: arrastar a lista em ritmo de fling fica mais travado na web com CPU lenta (seção 8.3) |
 | Cálculos repetidos | Totais do mês e da busca refeitos a cada quadro; digitar na busca recalculava as até 1.000 linhas | `useMemo` nos totais, na busca e na lista de Movimentações (digitar na busca: 131 a 152 para 106 a 108 ms por tecla) |
 | Consultas | `staleTime` de 30 s em todas (padrão do `QueryClient`) | Sem achado |
-| Imagens | Maior imagem do pacote: 25 KB (ícone de abertura). Cinco fontes Manrope de 97 KB | Imagens sem achado. Fontes: pendência (seção 10) |
+| Imagens | Maior imagem do pacote: 25 KB (ícone de abertura). Cinco fontes Manrope de 97 KB | Imagens sem achado. Fontes: Ciclo Z, subconjunto Latin de 34 KB cada, 484.996 para 172.128 B (seção 14.2) |
 
 ## 2. Como foi medido
 
@@ -92,7 +92,7 @@ Observações:
 | Imagens sem descrição | Nenhuma: o logotipo é imagem com o nome "Clarevo"; as ilustrações são decorativas (`aria-hidden`) |
 | Elemento clicável sem `accessibilityRole` | Nenhum no navegador. No código há um `Pressable` com `accessible={false}` de propósito (a caixa do campo "Dia" em `record-form.tsx`, que só leva o foco ao campo) |
 | Título sem papel de título | Corrigido: "Pago" e "Recebido" na composição (nível 2). Os títulos de estado vazio (`EmptyState`) ficam como texto: são a mensagem do estado, e a seção já tem título (decisão, seção 10) |
-| Níveis de título | Uma só `h1` por tela, com três exceções antigas e fixadas pelo roteiro: o Resumo não tem `h1` (estrutura preservada, D-022), a explicação de um tema tem duas (a barra "Aprender" e o título do tema), e quatro telas pulam de `h1` para `h3` (reserva, plano de guardar, editar meta e assinaturas). Não mudaram (seção 10) |
+| Níveis de título | No Ciclo Y havia três exceções antigas, fixadas pelo roteiro: o Resumo sem `h1` (estrutura preservada, D-022), a explicação de um tema com duas e quatro telas que pulavam de `h1` para `h3` (reserva, plano de guardar, editar meta e assinaturas). **Resolvidas no Ciclo Z** (seção 14.1): cada tela tem uma só `h1`, sem salto de nível, e o roteiro confere isso em todas as telas que visita |
 | Ordem de leitura | A ordem do DOM é a visual: nenhum `row-reverse`, e a posição absoluta só na barra inferior e nos rodapés fixos |
 | Estados | Aba `aria-selected`; rádio, caixa e chave `aria-checked`; 23 usos de `aria-expanded`; `accessibilityState.disabled` e `busy` no botão; janelas com `accessibilityViewIsModal`. Nenhum rádio, aba, caixa ou chave sem o estado, em 63 telas |
 
@@ -129,7 +129,7 @@ Nenhum botão, aba, rádio, caixa, chave, link ou campo abaixo de 44 x 44 px em 
 | Entrada (`entry-*.js`) | 6.880.023 B (6,88 MB) | 4.778.278 B (4,78 MB) | 1.433.689 B | 1.231.950 B |
 | Leitor de PDF (`pdfjs-*.js`, carregado sob demanda) | 1.735.611 B | 1.735.611 B | 506.753 B | 506.753 B |
 | Rotas e módulos pequenos (3 arquivos `index-*.js`) | 77.029 B | 77.029 B | 24.031 B | 24.031 B |
-| Fontes Manrope (5 pesos) | 485.000 B | 485.000 B | sem mudança | sem mudança |
+| Fontes Manrope (5 pesos) | 484.996 B | 484.996 B (Ciclo Y); 172.128 B no Ciclo Z | 209.277 B | 209.277 B; 86.019 B no Ciclo Z |
 
 Os 1.867 ícones do `lucide-react-native` somavam 2,1 MB da entrada: o Metro não elimina o que não se usa, e `import { Wallet } from 'lucide-react-native'` traz o pacote inteiro. O `metro.config.js` troca o pacote por `apps/app/src/lib/lucide.ts`, que reexporta só os 98 ícones usados, direto dos arquivos de cada ícone. As telas continuam importando `lucide-react-native`: nenhum arquivo de tela mudou. O TypeScript lê o mesmo arquivo: `paths` em `apps/app/tsconfig.json` aponta `lucide-react-native` para `src/lib/lucide.ts` (que também exporta o tipo `LucideIcon`), então ícone que não está lá é erro de tipo em `npm run typecheck`, não só falha ao abrir a tela. Ícone novo entra com uma linha em `lucide.ts`; `packages/core/test/lucide-barrel.test.ts` (aspas simples ou duplas, `import` e `export { … } from`, arquivos `.ts`, `.tsx`, `.js` e `.jsx`) falha se uma tela importa um ícone que não está lá, se uma linha aponta para o arquivo errado, se o `paths` sai do `tsconfig.json`, ou se alguém importa o pacote todo (`import *`, `export *`, `require` ou `import()`). O roteiro confere que a entrada fica abaixo de 5,5 MB.
 
@@ -164,7 +164,7 @@ O app compila com o React Compiler (`app.json`), que já memoiza boa parte. Conf
 
 ### 8.6 Imagens e fontes
 
-A maior imagem do pacote é o ícone de abertura (25 KB); o resto são ícones de 1 a 20 KB. As cinco fontes Manrope (400, 500, 600, 700 e 800) têm 97 KB cada, completas; reduzir ao alfabeto latino pede uma ferramenta de subconjunto de fontes (seção 10).
+A maior imagem do pacote é o ícone de abertura (25 KB); o resto são ícones de 1 a 20 KB. As cinco fontes Manrope (400, 500, 600, 700 e 800) tinham 97 KB cada, completas. No Ciclo Z viraram subconjuntos Latin de 34 KB (seção 14.2).
 
 ### 8.7 Medidas, antes e depois (CPU 4x mais lenta, mediana de 3)
 
@@ -192,13 +192,14 @@ Fatura e composição: os elementos incluem as telas escondidas da pilha (a comp
 4. Pacote: só os ícones usados (6,88 para 4,78 MB), com guarda em teste.
 5. Listas: Movimentações, fatura e composição virtualizadas a partir de 80 linhas; busca com `useMemo`; totais do mês e das contas a pagar com `useMemo`.
 6. Roteiro: bloco "Acessibilidade (D-062)" em `scripts/e2e-web.js` (63 telas, letra grande, movimento, lista de 500, pacote), capturas 590 a 612.
+7. Ciclo Z (D-063 item 2): hierarquia de títulos (uma só `h1` por tela, sem salto), fontes em subconjunto Latin (172.128 B no lugar de 484.996 B) e a avaliação das rotas sob demanda (não aplicadas). Seção 14.
 
 ## 10. O que não foi corrigido, e por quê (decisão de Enzo)
 
-- **Resumo sem `h1`, explicação com duas e pulo de `h1` para `h3` em quatro telas.** São decisões antigas que os testes do roteiro fixam (a estrutura do Resumo é D-022). Mudar pede revisar dezenas de verificações. Efeito: quem navega por títulos não encontra um título de página no Resumo (a aba selecionada diz "Resumo").
-- **Título de estado vazio como texto.** Marcar `EmptyState` como título mudaria a lista de títulos do Resumo de conta nova (conferida no roteiro). Proposta: dar o papel só onde o estado vazio é a seção inteira.
-- **Fontes completas.** Cinco fontes de 97 KB, completas. Um subconjunto só com o alfabeto latino reduziria bastante o tamanho (a medir); precisa de uma ferramenta de subconjunto de fontes (como `pyftsubset`), que não é pacote do app, mas muda os arquivos de fonte; fica a escolha de Enzo.
-- **Rotas carregadas sob demanda (`asyncRoutes` do Expo Router).** Dividiria a entrada por tela. Muda como cada tela abre (cada primeira abertura baixa um arquivo, e o aplicativo instalado sem rede precisa tê-los todos), então não entrou em um ciclo de correções seguras. Proposta: medir e decidir.
+- **Resumo sem `h1`, explicação com duas e pulo de `h1` para `h3` em quatro telas.** Resolvido no Ciclo Z (seção 14.1), com os testes atualizados.
+- **Título de estado vazio como texto.** Marcar `EmptyState` como título mudaria a lista de títulos do Resumo de conta nova (conferida no roteiro). Proposta: dar o papel só onde o estado vazio é a seção inteira. Segue como estava.
+- **Fontes completas.** Resolvido no Ciclo Z (seção 14.2): subconjunto Latin gerado com `pyftsubset` por `scripts/gerar-fontes.js`.
+- **Rotas carregadas sob demanda (`asyncRoutes` do Expo Router).** Avaliado no Ciclo Z e **não aplicado**: o tempo até o Resumo piora com a CPU 4 vezes mais lenta (seção 14.3).
 - **Lista virtualizada sem a sombra do cartão.** A partir de 80 linhas o cartão não tem a sombra de 6% de opacidade (a sombra de cada pedaço riscaria o vizinho). Abaixo disso, igual a antes.
 - **Importação e busca** continuam mostrando 100 linhas por vez, e quem toca em "Mostrar mais" até o fim monta todas (até 1.000 na busca). Não virou `FlatList` porque as duas telas misturam formulário e lista no mesmo rolar.
 
@@ -219,3 +220,95 @@ A Evolução (`app/evolucao.tsx`, `components/evolucao-parts.tsx`, `packages/cor
 - `npm test` (inclui contraste, lista longa, letra grande e ícones) e `npm run typecheck`.
 - `E2E_PORT=8299 npm run test:web`: o bloco "Acessibilidade (D-062)" faz a auditoria nas 63 telas, a letra grande a 1,3 e a 2,0, "reduzir movimento", a lista de 500 lançamentos e a conferência do pacote. As capturas 590 a 612 ficam em `docs/telas/`.
 - Ícone novo: uma linha em `apps/app/src/lib/lucide.ts`. Cor nova: no tema, com o par na tabela de `packages/core/src/contrast.ts`.
+- Caractere novo nos textos que a Manrope local não tem (`packages/core/test/fontes.test.ts` falha e diz qual): uma linha em `UNICODES` de `scripts/gerar-fontes.js` e `node scripts/gerar-fontes.js`. `node scripts/gerar-fontes.js --verificar` confere que os arquivos de `apps/app/assets/fonts` saem iguais ao que o script gera (precisa do `pyftsubset`, do fonttools; fica fora do `npm test` por isso).
+- Título novo: uma só `h1` por tela (`SubHeader` ou `AppHeader`), `h2` para as seções e `h3` para o que está dentro delas, sem pular. O roteiro confere em toda leitura de tela (bloco "Hierarquia de títulos", seção 14.1).
+
+## 14. Ciclo Z (D-063 item 2): títulos, fontes e rotas sob demanda
+
+Ciclo Z, 21/10/2026. Resolve as pendências de títulos e de fontes da seção 10 e avalia as rotas carregadas sob demanda. Sem migração, sem função nova no banco e sem pacote novo.
+
+### 14.1 Hierarquia de títulos
+
+Regra nova: **no máximo um título de nível 1 por tela e nenhum salto de nível** (de 1 para 2, de 2 para 3; nunca de 1 para 3). Uma janela aberta por cima (diálogo, folha de ajuda, tour) é um escopo à parte: o título dela é o nível 1 dela.
+
+| Tela | Antes | Depois |
+|---|---|---|
+| Resumo | Nenhum título de nível 1 (o mês era de nível 2) | O mês do cabeçalho é o título de nível 1. O leitor de tela lê "Resumo de outubro de 2026" (`SUMMARY_NAV_TEXT.pageTitleA11y`, o nome acompanha o mês); o que se vê continua "Outubro de 2026", no mesmo lugar e do mesmo tamanho. A estrutura de D-022 não mudou: nenhum texto, cartão ou título novo. As seções seguem de nível 2 ("Primeiros passos", "Seus últimos meses", "Pagamentos do mês") |
+| Explicação de um tema | Duas de nível 1: a barra "Aprender" e o título do tema | Uma só: o título do tema. A barra "Aprender" é texto, sem papel de título (`SubHeader` com `plainTitle`). Com o tema indisponível ("Este conteúdo não está disponível."), a barra segue como nível 1 e a mensagem é de nível 2 |
+| Reserva, plano de guardar, editar a reserva | 1, 3 ("Seus gastos essenciais por mês"), 2 | 1, 2, 2 (`EssentialsBlock` passou de nível 3 para 2: é irmão de "Valor da reserva" e de "Etapas do plano", não filho) |
+| Revisar assinaturas | 1, 3, 3 (o nome de cada assinatura) | 1, 2, 2 |
+| Contas vencidas, com parcelas de contas do ano | 1, 3 (o título de cada grupo "Material escolar de 2026 · 2 parcelas vencidas") | 1, 2 (`aria-level` do título do grupo, em `a-pagar/vencidas.tsx`) |
+
+A auditoria do Ciclo Y listava quatro telas que pulavam; a varredura das 63 telas do roteiro de acessibilidade (as quatro abas e 59 rotas) achou 6 com achado antes (Resumo, explicação e as quatro acima) e nenhuma depois. A sétima, Contas vencidas com grupos de parcelas do ano, **só apareceu quando o roteiro passou a conferir toda tela que visita**: a demonstração de sempre não tem esses grupos, e o roteiro os cria numa conta de teste. Foi o primeiro achado da conferência nova (a primeira rodada completa falhou nela, a segunda passou).
+
+Como o roteiro confere (`scripts/e2e-web.js`):
+
+- **Em toda tela que o roteiro visita.** `body()`, a leitura do texto da tela que o roteiro faz em cada tela, passou a conferir também a lista de títulos visíveis (`headingWatch`): mais de um nível 1 no escopo, ou um título que pula mais de um nível em relação ao anterior, vira achado (só vale se continuar 250 ms depois, para não pegar troca de tela em andamento). O resultado fecha o roteiro na verificação "Hierarquia de títulos": na rodada final, 1.005 conferências em 212 endereços diferentes, sem nenhum achado (a janela aberta por cima de uma tela conta à parte; a lista informativa de telas lidas sem título de nível 1 saiu vazia).
+- **Nas 63 telas do roteiro de acessibilidade**, a conferência é mais rígida (`acScan`): exatamente um nível 1, que vem primeiro, e nenhum salto.
+- **Nos casos que mudaram** (bloco "3b. Hierarquia de títulos"): o Resumo (nível 1 com o nome "Resumo de outubro de 2026" e o texto "Outubro de 2026"; em setembro, "Resumo de setembro de 2026"), Movimentações (nível 1 "Movimentações" e o mês em nível 2), a explicação com um só nível 1 e a barra "Aprender" sem papel de título, a explicação indisponível e as quatro telas que pulavam.
+- Testes que fixavam o estado antigo foram atualizados: os títulos do Resumo (`1:Outubro de 2026` no lugar de `2:Outubro de 2026`, em seis conferências) e os temas de Aprender (o único nível 1 é o título do tema, no lugar de `["Aprender", título]`, em 45 temas e em seis conferências de época e de Média e mediana).
+
+### 14.2 Fontes: subconjunto Latin
+
+As cinco Manrope que o app usa (400, 500, 600, 700 e 800) tinham 678 glifos de vários alfabetos. O app só escreve português do Brasil. `scripts/gerar-fontes.js` chama o `pyftsubset` (fonttools 4.66.1) sobre as fontes do pacote `@expo-google-fonts/manrope` e grava os subconjuntos em `apps/app/assets/fonts/`, com a licença (`OFL.txt`). O `useFonts` de `apps/app/src/app/_layout.tsx` carrega desses arquivos (`require('../../assets/fonts/Manrope_400Regular.ttf')` e os outros quatro, com os mesmos nomes de antes, então `theme/tokens.ts` não mudou). O pacote continua instalado e deixou de ser importado.
+
+O que entra (202 glifos): Latin básico (U+0020 a U+007E: algarismos, letras, "R$", pontuação, aspas retas), Latin-1 (U+00A0 a U+00FF: espaço que não quebra, letras com acento, cedilha, ordinais ª e º, "·", "§", "×", "÷", "°", "©"), as aspas curvas (U+2018, U+2019, U+201C, U+201D) e os símbolos que as telas escrevem: "•", "…", "‹", "›", "→", "−" (sinal de menos) e "≈". Ficam de fora os travessões (U+2013 e U+2014: os textos do produto não usam), outros alfabetos e o Latin estendido. Os recursos de layout ficam todos: o app usa números de largura fixa (`tabular-nums`, o `tnum` da fonte) e o pareamento de letras (`kern`). As larguras de todos os glifos que ficaram são iguais às da fonte completa (conferido com o fonttools), e o arquivo sai igual toda vez que o script roda (`--verificar`). Quem digita um caractere fora do conjunto (por exemplo "ő" na descrição de um gasto) vê esse caractere na fonte do sistema, sem erro. O desenho não muda: 11 telas (Resumo, as três outras abas, explicação, reserva, plano de guardar, assinaturas, vencidas, composição e Conta) capturadas em 390 px com a versão de antes e a de depois saem **iguais byte a byte**, e o roteiro confere que o navegador carrega os arquivos de 34 KB e usa os quatro pesos do texto.
+
+| Arquivo | Antes (B) | Depois (B) | Depois / antes |
+|---|---|---|---|
+| Manrope_400Regular.ttf | 96.832 | 34.400 | 35,5% |
+| Manrope_500Medium.ttf | 96.904 | 34.436 | 35,5% |
+| Manrope_600SemiBold.ttf | 96.936 | 34.424 | 35,5% |
+| Manrope_700Bold.ttf | 96.800 | 34.312 | 35,4% |
+| Manrope_800ExtraBold.ttf | 97.524 | 34.556 | 35,4% |
+| **Total** | **484.996** | **172.128** | **35,5%** (312.868 B a menos) |
+
+Comprimido (gzip, nível 6, como um servidor entrega): 209.277 para 86.019 B (123.258 B a menos). A entrada JavaScript do pacote web ficou 856 B menor (4.800.582 para 4.799.726 B: as duas linhas de importação do pacote de fontes). No aparelho, a diferença é de 312.868 B a menos no aplicativo, porque as fontes viajam dentro dele.
+
+Efeito no tempo (Chromium com a CPU 4 vezes mais lenta, servidor com gzip, janela de 390 x 844, mediana de 5 cargas de página nova, a cada rodada intercaladas as versões; o computador rodava outros dois ciclos ao mesmo tempo, então diferenças de uns 100 ms são ruído). "Antes" é o pacote com as fontes completas; "Depois", só as fontes do Ciclo Z:
+
+| Rede simulada | Medida | Antes | Depois |
+|---|---|---|---|
+| Local (como em 8.7) | Tela de boas-vindas pronta | 1.988 ms | 1.923 ms |
+| Local | Do toque em "Ver demonstração" até o Resumo | 1.371 ms | 1.354 ms |
+| Local | Do carregamento da página até o Resumo | 3.500 ms | 3.436 ms |
+| Local | Baixado até o Resumo, comprimido | 1.421 KB | 1.300 KB (121 KB a menos) |
+| 10 Mbps e 40 ms | Do carregamento da página até o Resumo | 4.741 ms | 4.585 ms |
+| 1,6 Mbps e 150 ms (mediana de 3) | Do carregamento da página até o Resumo | 10.760 ms | 10.162 ms |
+
+Os 121 KB a menos se pagam na rede: -156 ms em 10 Mbps e -598 ms em 1,6 Mbps. Na rede local o ganho (-64 ms) é do tamanho do ruído, porque a fonte não é o que a CPU mais gasta.
+
+O teste `packages/core/test/fontes.test.ts` (5 testes) lê a tabela de caracteres (`cmap`) de cada arquivo e confere que **todo caractere escrito nos textos do core e do app** (cadeias, modelos de texto e texto de JSX, lidos com o analisador do TypeScript; comentários ficam de fora) está nos cinco, que os cinco têm os mesmos caracteres, que os travessões não estão, que cada arquivo tem menos de 40 KB, que o `useFonts` carrega dos arquivos locais, que nenhuma tela importa o pacote `@expo-google-fonts` e que a licença acompanha. Quem acrescentar um caractere novo aos textos que a fonte não tem recebe o código do caractere e o arquivo em que ele aparece. Foi verificado trocando um peso por um subconjunto sem "≈", "→", "−", "•", "›" e "‹": o teste falhou e listou os seis.
+
+### 14.3 Rotas carregadas sob demanda (`asyncRoutes`): avaliadas, não aplicadas
+
+O Expo Router tem a opção `asyncRoutes` (a rede desta sessão não abriu `docs.expo.dev`; a opção foi lida no esquema do plugin instalado, `node_modules/expo-router/plugin/options.json`, e no código do `@expo/cli`, que a repassa ao Metro; no SDK 57 ela entra na configuração do plugin: `["expo-router", { "asyncRoutes": { "web": "production", "default": false } }]` em `app.json`; `production` vale só para a web, e o nativo fica de fora de qualquer jeito). Cada arquivo de `src/app` vira um arquivo JavaScript à parte, baixado na primeira vez que a tela abre. A condição era aplicar só se o roteiro web inteiro passasse e o tempo até o Resumo, com a CPU 4 vezes mais lenta, não piorasse. **Piora, então não foi aplicada.** Nada disso ficou no repositório (`app.json` está como estava).
+
+Pacote (exportação de demonstração, com as fontes do Ciclo Z nas duas):
+
+| | Sem rotas sob demanda | Com rotas sob demanda |
+|---|---|---|
+| Arquivos JavaScript | 5 | 87 (83 de rotas e módulos pequenos, mais `__common`, `__expo-metro-runtime`, `entry` e o leitor de PDF) |
+| Baixado antes de aparecer qualquer tela | `entry` 4.799.726 B | `entry` 1.099.426 B + `__common` 2.869.220 B + `__expo-metro-runtime` 3.537 B = 3.972.183 B (827.543 B a menos, 17%) |
+| Soma de todos os arquivos | 6.612.366 B | 6.619.008 B |
+| Soma comprimida (gzip) | 1.768.344 B | 1.834.360 B (66.016 B a mais: módulos repetidos em arquivos de rotas diferentes) |
+
+Tempo (CPU 4x, servidor com gzip, mediana de 5 cargas; na rede lenta, de 3). "Fontes completas" é o pacote antes do Ciclo Z; "Ciclo Z" é a versão entregue; "Ciclo Z + sob demanda" é a versão com a opção ligada:
+
+| Rede simulada | Medida | Fontes completas | Ciclo Z | Ciclo Z + sob demanda |
+|---|---|---|---|---|
+| Local | Tela de boas-vindas pronta | 1.988 ms | 1.923 ms | 2.052 ms |
+| Local | Do toque em "Ver demonstração" até o Resumo | 1.371 ms | 1.354 ms | 1.537 ms |
+| Local | **Do carregamento da página até o Resumo** | 3.500 ms | **3.436 ms** | **3.774 ms** (+338 ms, +10%) |
+| Local | Arquivos pedidos até o Resumo | 7 | 7 | 14 |
+| Local | Primeira abertura de Movimentações, Metas e Aprender | 455, 414, 522 ms | 460, 367, 509 ms | 494, 495, 645 ms |
+| 10 Mbps e 40 ms | Do carregamento da página até o Resumo | 4.741 ms | 4.585 ms | 4.743 ms (+158 ms) |
+| 1,6 Mbps e 150 ms | Do carregamento da página até o Resumo | 10.760 ms | 10.162 ms | 9.348 ms (-814 ms, -8%) |
+
+Leitura: a opção tira 17% do que é baixado antes da primeira tela, mas troca isso por mais pedidos em sequência (a tela de entrada, a barra de abas e o Resumo vêm em arquivos diferentes) e por mais trabalho de montagem. Com a CPU lenta e a rede boa, que é a condição pedida, o Resumo demora 10% a mais; ela só compensa na rede lenta (1,6 Mbps e 150 ms), e mesmo ali o ganho é de 814 ms (8%), contra uma piora de 338 ms (10%) na condição pedida. Custos que a medida não mostra: a primeira abertura de cada tela passa a depender de um arquivo (sem rede, a tela não abre, e depois de uma publicação nova uma aba antiga pede arquivos cujo nome mudou, o que exige manter os arquivos antigos no servidor ou recarregar a página), e o ganho existe só na web, porque o nativo não aceita a opção em produção. Com a opção ligada, a varredura das 63 telas abriu todas sem erro (hierarquia de títulos sem achado), mas o roteiro web inteiro não foi rodado nela, porque o critério de tempo já a barrou. **Reavaliar** se houver medida de uso real na web em rede lenta (Sentry, `docs/20`) mostrando que a primeira carga é o problema.
+
+### 14.4 O que só dá para conferir em aparelho
+
+1. Fontes no iOS e no Android: abrir o app (instalado, sem o Expo Go) e ver o texto em Manrope em Resumo, Movimentações, uma fatura e uma explicação de Aprender, com acentos, "R$", ordinais, "→", "≈" e "−" no lugar certo, e os valores alinhados em coluna (números de largura fixa).
+2. Leitor de tela: o Resumo anuncia "Resumo de outubro de 2026" como título; navegar por títulos no Resumo (VoiceOver: rotor Títulos; TalkBack: Títulos) pula de "Resumo de outubro de 2026" para "Pagamentos do mês"; a explicação de um tema anuncia o título do tema como o primeiro título e lê "Aprender" da barra como texto.
+3. A barra da explicação sem papel de título não muda a aparência (a conferência pixel a pixel foi feita na web; no aparelho, só olhar).

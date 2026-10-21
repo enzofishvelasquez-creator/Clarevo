@@ -10,7 +10,7 @@
 | Dados no app | TanStack Query | Estados de carregando, erro e nova tentativa; cache limpo ao sair ou trocar de pessoa. |
 | Regras financeiras | `@clarevo/core` (TypeScript puro) | As mesmas regras no app e nos testes; o banco repete as validações. |
 | Backend | Supabase: Postgres, Auth, RLS | Confirmação de e-mail e recuperação reais; autorização no banco em cada acesso, inclusive por ID. Região São Paulo. |
-| Fonte e ícones | Manrope (OFL), Lucide (ISC), Lexend (OFL) no nome do logo | Licenças livres para uso comercial. |
+| Fonte e ícones | Manrope (OFL, subconjunto Latin guardado em `apps/app/assets/fonts/` e gerado por `scripts/gerar-fontes.js`), Lucide (ISC), Lexend (OFL) no nome do logo | Licenças livres para uso comercial. |
 | Testes | Vitest (regras), SQL em Postgres local (permissões), Playwright (fluxos na web) | Cada camada testada onde a falha acontece. |
 
 ## Estrutura

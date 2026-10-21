@@ -67,7 +67,7 @@ function ReviewRow({
   return (
     <View style={[styles.row, !last && styles.divider]}>
       <View style={{ gap: 2 }}>
-        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 16 }} accessibilityRole="header" aria-level={3}>
+        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 16 }} accessibilityRole="header" aria-level={2}>
           {row.name}
         </Txt>
         <Txt variant="caption" color={colors.textSecondary} style={tabular} accessibilityLabel={`${row.name}, ${line.a11y}, todo dia ${row.dueDay}`}>
