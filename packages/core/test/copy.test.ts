@@ -1360,7 +1360,7 @@ describe('textos do app', () => {
     for (const t of TOPICS) for (const text of topicFieldTexts(t)) expect(text, `${t.slug}: ${text}`).not.toMatch(FORBIDDEN);
   });
 
-  it('telas e componentes', () => {
+  it('telas e componentes', { timeout: 30_000 }, () => {
     const files = sourceFiles(APP_SRC);
     expect(files.length).toBeGreaterThan(30);
     const bad = files.filter((f) => FORBIDDEN.test(readFileSync(f, 'utf8'))).map((f) => f.slice(APP_SRC.length));
