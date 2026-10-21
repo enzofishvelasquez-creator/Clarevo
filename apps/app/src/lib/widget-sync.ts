@@ -1,4 +1,4 @@
-import { deviceTimeZone, monthOf, planWidgetSync, summarizeToPay, todayIn, type RecordsRepository } from '@clarevo/core';
+import { deviceTimeZone, monthOf, nextLocalMidnight, planWidgetSync, summarizeToPay, todayIn, type RecordsRepository } from '@clarevo/core';
 
 import { widgetAvailable, writeWidget, type WidgetWrite } from '@/lib/widget-bridge';
 
@@ -21,15 +21,18 @@ export type WidgetJob =
   | { kind: 'signed-in'; repo: RecordsRepository; contextId: string; showValues: boolean };
 
 /**
- * O último texto gravado com sucesso, só na memória. Texto igual não é gravado de novo: o iOS limita os recarregamentos do widget por dia,
- * e o app pede a gravação a cada escrita. O texto leva o dia (`builtOn`), então o primeiro pedido de cada dia sempre grava.
+ * A última gravação feita com sucesso (o texto e a virada do dia do aparelho), só na memória. O mesmo par não é gravado de novo: o iOS
+ * limita os recarregamentos do widget por dia, e o app pede a gravação a cada escrita. O texto leva o dia (`builtOn`), então o primeiro
+ * pedido de cada dia sempre grava; a virada entra porque o iOS guarda a meia-noite do aparelho na linha do tempo, e uma troca de fuso no
+ * mesmo dia a muda sem mudar o texto.
  */
 let lastWritten: string | null = null;
 
 async function write(plan: WidgetWrite, now: Date): Promise<void> {
-  if (plan.json === lastWritten) return;
+  const key = `${plan.json}|${nextLocalMidnight(now).getTime()}`;
+  if (key === lastWritten) return;
   await writeWidget(plan, now);
-  lastWritten = plan.json;
+  lastWritten = key;
 }
 
 async function apply(job: WidgetJob): Promise<void> {

@@ -79,9 +79,10 @@ function NativeFeatures() {
   const run = () => {
     if (!ready) return;
     if (!userId || !repo) {
-      // Sem sessão neste aparelho: nenhum aviso de conta fica agendado, e o widget deixa de mostrar o que a pessoa viu.
+      // Sem sessão neste aparelho: nenhum aviso de conta fica agendado, e o widget deixa de mostrar o que a pessoa viu (na demonstração,
+      // nada é gravado, nem o estado sem sessão).
       queueReminders({ enabled: false });
-      queueWidget({ kind: 'signed-out' });
+      queueWidget(demo ? { kind: 'demo' } : { kind: 'signed-out' });
       return;
     }
     if (!prefs || status !== 'pronto' || !contextId) return;

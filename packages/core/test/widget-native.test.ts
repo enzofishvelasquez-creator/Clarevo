@@ -51,6 +51,24 @@ const withDemoClock = async <T>(run: () => Promise<T>) => {
     vi.useRealTimers();
   }
 };
+/**
+ * O fuso do aparelho trocado por `process.env.TZ` (como em dia-util.test.ts). Cada troca confere o desvio do fuso, escrito à mão (minutos a
+ * oeste de UTC, sem horário de verão nestes fusos em 2026): se `TZ` não valesse neste processo, o teste falharia em vez de provar nada.
+ */
+const OFFSETS: Record<string, number> = { 'America/Sao_Paulo': 180, 'America/Rio_Branco': 300, 'Asia/Tokyo': -540 };
+function setTimeZone(tz: string) {
+  process.env.TZ = tz;
+  expect(new Date(2026, 9, 7, 12).getTimezoneOffset(), tz).toBe(OFFSETS[tz]);
+}
+async function withTimeZones<T>(run: () => Promise<T> | T): Promise<T> {
+  const before = process.env.TZ;
+  try {
+    return await run();
+  } finally {
+    if (before === undefined) delete process.env.TZ;
+    else process.env.TZ = before;
+  }
+}
 function writePlan(plan: WidgetSyncPlan) {
   if (!plan.write) throw new Error('esperava gravar');
   return plan;
@@ -436,8 +454,55 @@ describe('pontes com o widget nativo', () => {
       { date: now, props: plan.snapshot },
       { date: new Date(2026, 9, 8, 0, 0, 0, 0), props: plan.afterMidnight },
     ]);
-    expect(entries[1].date).toEqual(nextLocalMidnight(now));
     expect(entries[1].props.medium.state).toBe('sem_dados');
+  });
+
+  it('a virada do dia (nextLocalMidnight) é a meia-noite do aparelho, em cada fuso, com valores esperados escritos à mão', async () => {
+    // Cada linha: o instante, e a meia-noite local seguinte, em UTC. Rio Branco é UTC-5 e Tóquio é UTC+9, sem horário de verão.
+    const cases: Record<string, [string, string][]> = {
+      'America/Rio_Branco': [
+        ['2026-10-07T12:00:00.000Z', '2026-10-08T05:00:00.000Z'], // 07h00 de 07/10
+        ['2026-10-08T04:59:59.999Z', '2026-10-08T05:00:00.000Z'], // 23h59 de 07/10: falta 1 ms
+        ['2026-10-08T05:00:00.000Z', '2026-10-09T05:00:00.000Z'], // exatamente 00h00 de 08/10: a virada é a do dia seguinte
+        ['2026-10-31T20:00:00.000Z', '2026-11-01T05:00:00.000Z'], // fim de mês
+        ['2026-12-31T15:00:00.000Z', '2027-01-01T05:00:00.000Z'], // fim de ano
+      ],
+      'Asia/Tokyo': [
+        ['2026-10-07T12:00:00.000Z', '2026-10-07T15:00:00.000Z'], // 21h00 de 07/10
+        ['2026-10-07T14:59:59.999Z', '2026-10-07T15:00:00.000Z'], // 23h59 de 07/10: falta 1 ms
+        ['2026-10-07T15:00:00.000Z', '2026-10-08T15:00:00.000Z'], // exatamente 00h00 de 08/10
+        ['2026-10-31T03:00:00.000Z', '2026-10-31T15:00:00.000Z'], // 12h00 de 31/10
+        ['2026-12-31T01:00:00.000Z', '2026-12-31T15:00:00.000Z'], // 10h00 de 31/12
+      ],
+    };
+    await withTimeZones(() => {
+      for (const [tz, rows] of Object.entries(cases)) {
+        setTimeZone(tz);
+        for (const [now, midnight] of rows) expect(nextLocalMidnight(new Date(now)).toISOString(), `${tz} ${now}`).toBe(midnight);
+      }
+    });
+  });
+
+  it('iOS: a segunda entrada da linha do tempo é a meia-noite do fuso do aparelho, e muda com o fuso mesmo no mesmo dia', async () => {
+    const updateTimeline = vi.fn();
+    const ios = loadApp(bridge('widget-bridge.ios.ts'), {
+      platform: 'ios',
+      mocks: { '@clarevo/core': core, '../widget-native/ios': { default: { updateTimeline } } },
+    });
+    const plan = await planFor();
+    const now = new Date('2026-10-07T12:00:00.000Z'); // 07/10 nos três fusos
+    await withTimeZones(async () => {
+      for (const tz of ['America/Sao_Paulo', 'America/Rio_Branco', 'Asia/Tokyo']) {
+        setTimeZone(tz);
+        await ios.writeWidget(plan, now);
+      }
+    });
+    const dates = updateTimeline.mock.calls.map(([entries]) => (entries as { date: Date }[]).map((entry) => entry.date.toISOString()));
+    expect(dates).toEqual([
+      ['2026-10-07T12:00:00.000Z', '2026-10-08T03:00:00.000Z'],
+      ['2026-10-07T12:00:00.000Z', '2026-10-08T05:00:00.000Z'],
+      ['2026-10-07T12:00:00.000Z', '2026-10-07T15:00:00.000Z'],
+    ]);
   });
 
   it('Android sem o módulo: "sem widget"; com o módulo, grava o texto do snapshot', async () => {
@@ -568,6 +633,41 @@ describe('gravador do app (lib/widget-sync.ts)', () => {
     });
   });
 
+  it('troca de fuso no mesmo dia: o texto é o mesmo, mas a meia-noite do aparelho mudou, então grava de novo (a linha do tempo do iOS a leva)', async () => {
+    const updateTimeline = vi.fn();
+    const ios = loadApp(path.join(SRC, 'lib', 'widget-bridge.ios.ts'), {
+      platform: 'ios',
+      mocks: { '@clarevo/core': core, '../widget-native/ios': { default: { updateTimeline } } },
+    });
+    const sync = loadApp(file, { platform: 'ios', mocks: { '@clarevo/core': core, '@/lib/widget-bridge': ios } });
+    const midnights = () => updateTimeline.mock.calls.map(([entries]) => (entries as { date: Date }[])[1]!.date.toISOString());
+    vi.useFakeTimers({ toFake: ['Date'] });
+    // 07/10 às 12h00 UTC é 07/10 em São Paulo (09h00), Rio Branco (07h00) e Tóquio (21h00): o texto gravado é o mesmo nos três.
+    vi.setSystemTime(new Date('2026-10-07T12:00:00.000Z'));
+    try {
+      await withTimeZones(async () => {
+        const request = async (tz: string) => {
+          setTimeZone(tz);
+          sync.queueWidget({ kind: 'signed-out' });
+          await settle();
+        };
+        await request('America/Sao_Paulo');
+        await request('America/Sao_Paulo'); // sem troca, nada novo
+        expect(midnights()).toEqual(['2026-10-08T03:00:00.000Z']);
+        await request('America/Rio_Branco');
+        await request('Asia/Tokyo');
+        await request('Asia/Tokyo');
+        expect(midnights()).toEqual(['2026-10-08T03:00:00.000Z', '2026-10-08T05:00:00.000Z', '2026-10-07T15:00:00.000Z']);
+        // Voltar ao fuso de antes também grava: o último gravado já é outro.
+        await request('America/Sao_Paulo');
+        expect(midnights()).toHaveLength(4);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(updateTimeline).toHaveBeenCalledTimes(4);
+  });
+
   it('gravação que falha não conta como gravada: o próximo pedido tenta de novo com o mesmo texto', async () => {
     const t = await setup(true);
     await withDemoClock(async () => {
@@ -590,5 +690,47 @@ describe('gravador do app (lib/widget-sync.ts)', () => {
     });
     const last = t.writeWidget.mock.calls.at(-1)![0] as Extract<WidgetSyncPlan, { write: true }>;
     expect(last.snapshot.medium.state).toBe('sem_sessao');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Registro da tarefa do Android: sem o módulo nativo, o app abre como sempre.
+// ---------------------------------------------------------------------------------------------------------------------------------
+
+describe('registro da tarefa do widget no Android (android-register.ts e android-entry.ts)', () => {
+  const register = path.join(SRC, 'widget-native', 'android-register.ts');
+  const entry = path.join(SRC, 'widget-native', 'android-entry.ts');
+  const library = 'react-native-android-widget';
+  const notLinked = () => new Throws(new Error("TurboModuleRegistry.getEnforcing(...): 'AndroidWidget' could not be found. Verify that a module by this name is registered in the native binary."));
+
+  it('com a biblioteca: registra a tarefa em segundo plano assim que o pacote carrega', () => {
+    const registerWidgetTaskHandler = vi.fn();
+    const widgetTaskHandler = vi.fn();
+    loadApp(register, { platform: 'android', mocks: { [library]: { registerWidgetTaskHandler }, './android': { widgetTaskHandler } } });
+    expect(registerWidgetTaskHandler).toHaveBeenCalledTimes(1);
+    expect(registerWidgetTaskHandler).toHaveBeenCalledWith(widgetTaskHandler);
+  });
+
+  it('sem o módulo nativo (Expo Go, ou um build feito sem o widget): não lança e não registra nada', () => {
+    // A biblioteca lança ao carregar (`TurboModuleRegistry.getEnforcing`); `./android` também a importa, sem mock aqui, como no app.
+    expect(() => loadApp(register, { platform: 'android', mocks: { [library]: notLinked() } })).not.toThrow();
+    // A biblioteca carrega e o que a tarefa usa não (por exemplo o AsyncStorage): também não fecha o app.
+    const registerWidgetTaskHandler = vi.fn();
+    expect(() => loadApp(register, { platform: 'android', mocks: { [library]: { registerWidgetTaskHandler }, './android': notLinked() } })).not.toThrow();
+    expect(registerWidgetTaskHandler).not.toHaveBeenCalled();
+  });
+
+  it('o ponto de entrada do Android (android-entry.ts) devolve o mesmo App, com ou sem o módulo nativo', () => {
+    const App = () => null;
+    const qualified = { App };
+    const registerWidgetTaskHandler = vi.fn();
+    const withModule = loadApp(entry, {
+      platform: 'android',
+      mocks: { [library]: { registerWidgetTaskHandler }, './android': { widgetTaskHandler: vi.fn() }, 'expo-router/build/qualified-entry': qualified },
+    });
+    expect(withModule.App).toBe(App);
+    expect(registerWidgetTaskHandler).toHaveBeenCalledTimes(1);
+    const without = loadApp(entry, { platform: 'android', mocks: { [library]: notLinked(), 'expo-router/build/qualified-entry': qualified } });
+    expect(without.App).toBe(App);
   });
 });
