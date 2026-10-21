@@ -1290,8 +1290,8 @@ do $$ begin
      and (select qual from pg_policies where tablename = 'financial_accounts' and policyname = 'accounts_rename') like '%deleted_at IS NULL%'
      and (select with_check from pg_policies where tablename = 'financial_accounts' and policyname = 'accounts_rename') like '%deleted_at IS NULL%',
     'duas políticas, as duas só para as contas não excluídas';
-  assert (select qual from pg_policies where tablename = 'financial_accounts' and policyname = 'accounts_rename') like '%created_by = auth.uid()%edit_others%'
-     and (select with_check from pg_policies where tablename = 'financial_accounts' and policyname = 'accounts_rename') like '%created_by = auth.uid()%edit_others%',
+  assert (select qual from pg_policies where tablename = 'financial_accounts' and policyname = 'accounts_rename') like '%created_by = ( SELECT auth.uid() AS uid)%edit_others%'
+     and (select with_check from pg_policies where tablename = 'financial_accounts' and policyname = 'accounts_rename') like '%created_by = ( SELECT auth.uid() AS uid)%edit_others%',
     'a renomeação direta exige a autoria ou "editar de outras pessoas"';
   assert (select provolatile from pg_proc where oid = 'public.clarevo_validate_record(uuid, uuid, uuid, bigint, date, text, text, uuid)'::regprocedure) = 'v'
      and (select prosrc from pg_proc where oid = 'public.clarevo_validate_record(uuid, uuid, uuid, bigint, date, text, text, uuid)'::regprocedure) like '%for share%',

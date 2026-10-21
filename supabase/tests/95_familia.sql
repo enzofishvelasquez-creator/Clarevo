@@ -1400,8 +1400,8 @@ do $$
 begin
   -- A política: uma só de leitura, só a própria linha. A atualização continua só da própria pessoa.
   assert (select count(*) from pg_policies where schemaname = 'public' and tablename = 'persons' and cmd = 'SELECT') = 1
-     and (select qual from pg_policies where schemaname = 'public' and tablename = 'persons' and policyname = 'persons_read') = '(id = auth.uid())',
-    'persons_read: só id = auth.uid()';
+     and (select qual from pg_policies where schemaname = 'public' and tablename = 'persons' and policyname = 'persons_read') = '(id = ( SELECT auth.uid() AS uid))',
+    'persons_read: só id = (select auth.uid()), a forma da 0017';
   assert (select count(*) from pg_policies where schemaname = 'public' and tablename = 'persons' and cmd = 'UPDATE') = 1, 'e uma política de atualização';
   -- A visão e a função usam a mesma regra (a função de apoio lê o e-mail com os privilégios de quem a criou).
   perform pg_temp.as_('yara');
