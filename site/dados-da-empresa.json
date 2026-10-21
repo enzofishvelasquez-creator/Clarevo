@@ -1,0 +1,10 @@
+{
+  "_leia-me": "Valores que trocam os marcadores das páginas. Vazio mantém o marcador visível e a faixa 'Versão preliminar, em revisão'. Preencha, rode 'node scripts/gerar-site.js --final' e só publique se passar. Em DOMÍNIO, só o endereço, sem https://. Dados legais: só depois de conferidos com a empresa e o advogado.",
+  "RAZÃO SOCIAL": "",
+  "CNPJ": "",
+  "ENDEREÇO": "",
+  "E-MAIL DE PRIVACIDADE": "",
+  "E-MAIL DE SUPORTE": "",
+  "DOMÍNIO": "",
+  "DATA DE VIGÊNCIA": ""
+}

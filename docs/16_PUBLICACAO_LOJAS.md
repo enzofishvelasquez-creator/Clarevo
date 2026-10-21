@@ -13,7 +13,8 @@
 | Capturas das lojas | Prontas, 8 telas em 3 tamanhos, geradas por `scripts/capturas-lojas.js` com a demonstração (seção 7) |
 | Ficha (pt-BR) | Pronta, com limites conferidos: `docs/lojas/ficha.md`. Campos de contato, URLs e direitos autorais: vazios para Enzo |
 | Privacidade nas lojas | Roteiro pronto, derivado do código e do banco: `docs/lojas/privacidade.md`. Depende do advogado e da decisão sobre o Sentry |
-| Política de privacidade, termos de uso, página de exclusão | **Não existem.** Obrigatórios nas duas lojas (seção 9) |
+| Gráfico de recursos do Google Play (1024 x 500) | **Feito** (D-064): `apps/app/assets/loja/grafico-recursos-1024x500.png`, gerado por `scripts/gerar-grafico-loja.js` (seção 6) |
+| Site público, política de privacidade, termos de uso, página de exclusão e suporte | Páginas prontas em `site/`, geradas por `scripts/gerar-site.js` dos textos em rascunho de `docs/legal/` (D-064, `docs/07`, seção "Site público"). **Nada foi publicado**: dependem da revisão do advogado, do nome legal, do CNPJ, do endereço e dos e-mails (marcadores em `site/dados-da-empresa.json`). As URLs que as lojas pedem estão na seção 3 |
 | Contas Apple, Google e Expo | **Não existem.** Dependem de CNPJ, domínio e da pessoa responsável (P-006) |
 | Conta de teste para a revisão | A criar (seção 5) |
 
@@ -46,12 +47,30 @@ Nenhuma destas foi tomada pelo Claude. A coluna "Proposta" é só o que está no
 | `apps/app/app.json` | Nome, versão 1.0.0, identificadores, `buildNumber` 1, `versionCode` 1, orientação retrato, fundo `#2457F5`, `scheme` `clarevo`, textos de permissão, permissões bloqueadas do Android |
 | `apps/app/assets/images/` | `icon.png`, `android-icon-*.png` e `splash-icon.png` (gerados); `favicon.png` e `notification-icon.png` (mantidos) |
 | `apps/app/assets/loja/icone-play-512.png` | Ícone da página do app no Google Play |
+| `apps/app/assets/loja/grafico-recursos-1024x500.png` | Gráfico de recursos do Google Play (D-064), 1024 x 500, PNG RGB de 24 bits, sem transparência |
+| `scripts/gerar-grafico-loja.js` | Desenha o gráfico em HTML no Chromium do Playwright, com o logotipo reverso oficial, o subtítulo da ficha e a captura do Resumo da demonstração |
+| `site/`, `scripts/gerar-site.js` | Site público (`clarevo-site`): início, privacidade, termos, excluir conta e suporte, sem JavaScript, cookies nem recurso de fora. Passo a passo e publicação em `docs/07` |
+| `packages/core/test/site.test.ts` | Teste do site (conversor de Markdown, páginas em dia com `docs/legal`, redação, contraste, `--final`) e do gráfico |
 | `scripts/gerar-icones.js` | Gera os PNG a partir de `docs/marca/` (`--verificar` confere sem gravar) |
 | `scripts/capturas-lojas.js` | Gera as capturas a partir da demonstração |
 | `docs/lojas/capturas/` | 24 capturas (8 telas em 3 tamanhos) |
 | `docs/lojas/ficha.md` | Ficha em pt-BR com limites conferidos |
 | `docs/lojas/privacidade.md` | Respostas de privacidade da Apple e do Google |
 | `packages/core/test/lojas.test.ts` | Teste dos limites e termos da ficha e da configuração (`npm test`) |
+
+### URLs que as lojas pedem (D-064)
+
+As páginas são as de `site/` (`docs/07`, seção "Site público"). Enquanto não houver domínio, o endereço é o do projeto `clarevo-site` no Cloudflare Pages, **a conferir**: `clarevo-site.pages.dev` só existe se o nome estiver livre, e vale o endereço que a Cloudflare mostrar ao criar o projeto. O Cloudflare Pages serve `privacidade.html` em `/privacidade`. Com o domínio, as mesmas páginas passam para o domínio raiz (o app web iria para `app.` do domínio, a confirmar).
+
+| Campo da loja | Loja | URL (projeto `clarevo-site`) | Com o domínio |
+|---|---|---|---|
+| URL da política de privacidade | Apple e Google | `https://clarevo-site.pages.dev/privacidade` | `https://[DOMÍNIO]/privacidade` |
+| Termos de uso (contrato de uso, se a loja pedir) | Apple e Google | `https://clarevo-site.pages.dev/termos` | `https://[DOMÍNIO]/termos` |
+| URL de exclusão da conta e dos dados | Google ("Segurança dos dados") | `https://clarevo-site.pages.dev/excluir-conta` | `https://[DOMÍNIO]/excluir-conta` |
+| URL de suporte | Apple | `https://clarevo-site.pages.dev/suporte` | `https://[DOMÍNIO]/suporte` |
+| URL de marketing (opcional) | Apple | `https://clarevo-site.pages.dev/` | `https://[DOMÍNIO]/` |
+
+Só informe uma URL na loja depois de a página estar publicada, sem faixa de versão preliminar e com o `--final` passando.
 
 ## 4. Passo a passo
 
@@ -102,7 +121,7 @@ Tudo desta fase é **a conferir na página oficial do Play Console**, porque a r
 5. **Primeiro envio:** `npx eas-cli@latest submit --platform android` cria a primeira versão na **faixa de teste interno**; o perfil `submit.production` de `eas.json` usa `track: internal` e `releaseStatus: draft`, e o app fica em rascunho no Play Console até a ficha e as declarações estarem completas.
 6. **Teste interno antes de publicar:** criar a lista de testadores (e-mails) e testar o app instalado pela loja, nos mesmos itens de aparelho do TestFlight.
 7. **Conteúdo do app** (todas as declarações são obrigatórias para sair do rascunho; conferir a lista atual no Play Console): política de privacidade (URL), acesso ao app (conta de teste: seção 5), anúncios (não há), classificação etária (`docs/lojas/ficha.md`, seção 9), público-alvo (adultos), **Segurança dos dados** (`docs/lojas/privacidade.md`, seção 3), recursos financeiros (declaração que o Play Console traz para apps de finanças: conferir as opções e responder conforme o app: ele não é banco, não concede crédito e não movimenta dinheiro), e as demais (governo, saúde, notícias: não se aplicam).
-8. **Página do app:** ícone `apps/app/assets/loja/icone-play-512.png` (512 x 512, PNG de 32 bits, sRGB, até 1024 KB, formato dado em `developer.android.com/distribute/google-play/resources/icon-design-specifications`), **gráfico de recursos de 1024 x 500** (falta; seção 9), capturas (seção 7), descrições curta e completa e categoria Finanças.
+8. **Página do app:** ícone `apps/app/assets/loja/icone-play-512.png` (512 x 512, PNG de 32 bits, sRGB, até 1024 KB, formato dado em `developer.android.com/distribute/google-play/resources/icon-design-specifications`), **gráfico de recursos de 1024 x 500** (`apps/app/assets/loja/grafico-recursos-1024x500.png`, feito; seção 6), capturas (seção 7), descrições curta e completa e categoria Finanças.
 9. Promover da faixa interna para teste fechado ou produção conforme as regras da conta.
 
 ### Fase 4. Antes do envio de produção
@@ -135,6 +154,9 @@ A Apple pede, quando o app exige login, uma **conta de demonstração ativa que 
 | `android-icon-monochrome.png` | `icone-android-uma-cor.svg` | 1024 x 1024, RGBA | Ícone temático do Android 13 em diante (o SDK 57 suporta `monochromeImage`) |
 | `splash-icon.png` | `icone-splash.svg` | 1024 x 1024, RGBA | Abertura, sobre o fundo azul do `expo-splash-screen` (largura 140) |
 | `apps/app/assets/loja/icone-play-512.png` | `icone-app.svg` | 512 x 512, PNG de 32 bits (RGBA) | Ícone da página do app no Google Play (fonte: `developer.android.com`, acima) |
+| `apps/app/assets/loja/grafico-recursos-1024x500.png` | `scripts/gerar-grafico-loja.js` (D-064) | 1024 x 500, PNG RGB de 24 bits, sem transparência, até 1 MB | Gráfico de recursos do Google Play (abaixo) |
+
+**Gráfico de recursos do Google Play (D-064).** `node scripts/gerar-grafico-loja.js` desenha, em HTML no Chromium do Playwright, o fundo azul da marca (`#2457F5`), o logotipo reverso oficial de `docs/marca/` (nada redesenhado), o subtítulo da ficha ("Organize seu mês e aprenda", lido de `docs/lojas/ficha.md`) e uma linha de recursos ("Contas a pagar, cartões, metas e Família."), com a tela Resumo da demonstração (`docs/lojas/capturas/google-play-celular-1080x1920/01_resumo.png`, dados fictícios e com a etiqueta "Demonstração") num aparelho simples desenhado em CSS. O texto e o aparelho ficam a 72 px das laterais e a 44 px do alto. Sem preço, ranking, "melhor", "grátis", chamada para baixar nem selos das lojas. O script confere 1024 x 500, opacidade total e até 1 MB (hoje, 71 KB) e grava PNG de 24 bits; `packages/core/test/site.test.ts` confere o arquivo. Os 1024 x 500, o PNG de 24 bits sem transparência e o limite de 1 MB seguem o pedido do projeto; **conferir o formato na página oficial do Play Console** (a rede desta sessão não abriu `support.google.com`).
 
 O ícone da notificação (`notification-icon.png`) e o favicon continuam como estavam. O prebuild de teste (feito fora do repositório em 19/10/2026) confirmou o ícone adaptativo com fundo, frente e monocromático, e o fundo azul da abertura e da janela.
 
@@ -187,10 +209,10 @@ O ícone da notificação (`notification-icon.png`) e o favicon continuam como e
 ## 9. O que falta
 
 1. Contas Apple, Google e Expo (P-006) e a pessoa responsável (decisão 5).
-2. **Política de privacidade e termos de uso**, escritos com o advogado (`docs/12`, CL-16), publicados em URL pública; o **acesso dentro do app** (por exemplo, em Conta) entra no código quando a URL existir. Hoje o app só tem "Quem vê estes dados?".
-3. **Página pública de exclusão da conta e dos dados**, exigida pelo Google na "Segurança dos dados" (a exclusão pelo app já existe).
-4. Domínio, site, e-mail de suporte e de recuperação (P-006, P-008, P-023).
-5. **Gráfico de recursos do Google Play (1024 x 500)**: não foi desenhado (seria um desenho novo; usar o logotipo oficial de `docs/marca/`). Conferir o formato na página oficial.
+2. **Política de privacidade e termos de uso**, revisados pelo advogado (`docs/12`, CL-16) e publicados em URL pública. Os rascunhos estão em `docs/legal/` e as páginas, em `site/` (D-064, `docs/07`); falta a revisão, o preenchimento de `site/dados-da-empresa.json` e a publicação. O **acesso dentro do app** (por exemplo, em Conta) entra no código quando a URL existir. Hoje o app só tem "Quem vê estes dados?".
+3. **Página pública de exclusão da conta e dos dados**, exigida pelo Google na "Segurança dos dados" (a exclusão pelo app já existe). A página `excluir-conta` já está em `site/` (gerada de `docs/legal/exclusao-de-conta.md`); falta a mesma revisão e a publicação.
+4. Domínio, e-mail de suporte e de recuperação (P-006, P-008, P-023). O site já existe em `site/` e vai ao Cloudflare Pages (`docs/07`) depois da revisão do advogado.
+5. ~~Gráfico de recursos do Google Play (1024 x 500)~~ **Feito** (D-064): `apps/app/assets/loja/grafico-recursos-1024x500.png`, seção 6. Falta só conferir o formato na página oficial do Play Console.
 6. Migração 0015 colada e conferida no Supabase de produção (`docs/05`).
 7. Decisões 1 a 13 da seção 2.
 8. Conta de teste da revisão (seção 5).

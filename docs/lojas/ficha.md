@@ -109,6 +109,8 @@ O Clarevo é uma ferramenta de organização e de educação financeira. Não é
 Anote gastos, veja contas e cartões e aprenda. Sem ligar a contas bancárias.
 ```
 
+**Gráfico de recursos (Google Play, 1024 x 500): feito** (D-064). `apps/app/assets/loja/grafico-recursos-1024x500.png`, gerado por `node scripts/gerar-grafico-loja.js` com o logotipo oficial, o subtítulo desta ficha e a tela Resumo da demonstração (`docs/16`, seção 6). Não leva preço, ranking, "melhor", "grátis" nem selos das lojas.
+
 ## 6. Google Play: descrição completa (até 4000)
 
 <!-- campo: google-descricao-completa | limite: 4000 | unidade: caracteres -->
@@ -156,15 +158,16 @@ Primeira versão do Clarevo: resumo do mês, contas a pagar, cartões, metas, Ap
 
 ## 8. Contato, links e direitos (campos para Enzo)
 
-Estes campos não podem ser inventados. Enquanto não houver domínio e e-mail próprios (P-006 e P-023), ficam vazios, e a submissão não passa sem eles.
+Estes campos não podem ser inventados. As quatro URLs abaixo são as do site público do projeto `clarevo-site` (D-064, `docs/07`, seção "Site público"); com o domínio (P-006), troque o começo pelo domínio. **Só preencha uma URL na loja depois de a página estar publicada**, sem a faixa "Versão preliminar, em revisão" e com `node scripts/gerar-site.js --final` passando, o que depende da revisão do advogado. O e-mail de suporte e os dados da empresa dependem do domínio e do e-mail próprio (P-006 e P-023); enquanto isso ficam vazios, e a submissão não passa sem eles.
 
 | Campo | Loja | O que a loja exige | Valor |
 |---|---|---|---|
 | E-mail de suporte | Apple (contato da revisão e suporte) e Google (contato do desenvolvedor) | Caixa lida por uma pessoa de verdade | [preencher: e-mail de suporte] |
-| URL de suporte | Apple | Página que leve a contato real (a Apple pede endereço legal, e-mail ou telefone) | [preencher: URL de suporte] |
-| URL da política de privacidade | Apple e Google | Página pública, aberta sem login; também precisa de um acesso dentro do app (App Review Guidelines 5.1.1(i)) | [preencher: URL da política de privacidade] |
-| URL de exclusão da conta e dos dados | Google | Página que explique como pedir a exclusão (o app já exclui pela tela Conta, D-058; a página ainda não existe) | [preencher: URL de exclusão] |
-| URL de marketing (opcional) | Apple | Site do produto | [preencher, se houver] |
+| URL de suporte | Apple | Página que leve a contato real (a Apple pede endereço legal, e-mail ou telefone) | `https://clarevo-site.pages.dev/suporte` (a conferir o endereço que a Cloudflare der) ou `https://[DOMÍNIO]/suporte` |
+| URL da política de privacidade | Apple e Google | Página pública, aberta sem login; também precisa de um acesso dentro do app (App Review Guidelines 5.1.1(i)) | `https://clarevo-site.pages.dev/privacidade` ou `https://[DOMÍNIO]/privacidade` |
+| URL dos termos de uso | Apple e Google (se pedirem) | Página pública, aberta sem login | `https://clarevo-site.pages.dev/termos` ou `https://[DOMÍNIO]/termos` |
+| URL de exclusão da conta e dos dados | Google | Página que explique como pedir a exclusão (o app já exclui pela tela Conta, D-058; a página existe no site, ainda não publicada) | `https://clarevo-site.pages.dev/excluir-conta` ou `https://[DOMÍNIO]/excluir-conta` |
+| URL de marketing (opcional) | Apple | Site do produto | `https://clarevo-site.pages.dev/` ou `https://[DOMÍNIO]/`, depois de publicado |
 | Direitos autorais | Apple | "2026 Nome legal de quem é dona ou dono do app" | [preencher: 2026 nome da empresa] |
 | Nome do desenvolvedor exibido | Apple (nome legal da organização) e Google | Nome que aparece como vendedora ou vendedor | [preencher: decisão de Enzo, `docs/16`] |
 
