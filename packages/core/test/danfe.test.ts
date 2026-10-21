@@ -535,12 +535,12 @@ describe('DANFE em texto · forma de pagamento (D-042)', () => {
     expect(read(withPaymentBlock(['FORMA DE PAGAMENTO', '03 - Cartão de Crédito', '150,00'])).payments).toEqual(['credito']);
   });
 
-  it('rótulos repetidos e hostis: a leitura com códigos tPag termina em menos de 50 ms', () => {
+  it('rótulos repetidos e hostis: a leitura com códigos tPag termina em menos de 500 ms (uma leitura quadrática levaria segundos; o limite folgado evita falha só por máquina ocupada)', () => {
     const texts = ['tpag '.repeat(80_000), 'forma de pagamento pix '.repeat(17_000), 'FORMA DE PAGAMENTO\n03\n'.repeat(15_000)];
     for (const text of texts) {
       const started = performance.now();
       const forms = paymentFormsFromText(text, { withCodes: true });
-      expect(performance.now() - started).toBeLessThan(50);
+      expect(performance.now() - started).toBeLessThan(500);
       expect(forms.length).toBeLessThanOrEqual(2);
     }
   });

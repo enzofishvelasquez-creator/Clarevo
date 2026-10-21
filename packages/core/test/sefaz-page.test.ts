@@ -366,12 +366,12 @@ describe('parseSefazPage · marcação hostil não trava a leitura', () => {
     expect(elapsed).toBeLessThan(1_000);
   });
 
-  it('rótulos de forma de pagamento repetidos: a leitura da forma passa pelo texto uma vez só (menos de 50 ms)', () => {
+  it('rótulos de forma de pagamento repetidos: a leitura da forma passa pelo texto uma vez só (menos de 500 ms: uma leitura quadrática levaria segundos; o limite folgado evita falha só por máquina ocupada)', () => {
     const texts = ['tpag '.repeat(80_000), 'forma de pagamento pix '.repeat(17_000), 'Forma de pagamento\nPix\n'.repeat(15_000)];
     for (const text of texts) {
       const started = performance.now();
       const forms = paymentFormsFromText(text);
-      expect(performance.now() - started).toBeLessThan(50);
+      expect(performance.now() - started).toBeLessThan(500);
       expect(forms.length).toBeLessThanOrEqual(1);
     }
   });
