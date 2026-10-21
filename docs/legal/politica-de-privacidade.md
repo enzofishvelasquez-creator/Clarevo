@@ -84,7 +84,7 @@ Seu Pessoal continua só seu. Entrar numa Família não mostra nem copia o seu P
 
 Se a sua empresa oferecer o Clarevo como benefício:
 
-- O e-mail que a empresa informou no convite vem da empresa, não de você. Guardamos esse e-mail, a situação da licença (convite enviado, ativa ou encerrada) e as datas.
+- O e-mail que a empresa informou no convite vem da empresa, não de você. Guardamos esse e-mail, a situação da licença (convite enviado, convite cancelado, ativa ou encerrada) e as datas.
 - Ao aceitar, guardamos que a sua licença está ativa e criamos o seu direito ao plano.
 - Quem administra o benefício na empresa também tem conta no Clarevo. Guardamos o vínculo dessa pessoa com a empresa e os dados do contrato (plano, número de vagas, início e fim).
 
@@ -93,7 +93,7 @@ Usamos esses dados para ativar, manter e encerrar o benefício. A empresa não r
 ### 3.5 Dados técnicos e de segurança
 
 - Rastro técnico das operações: quem fez qual operação (por exemplo, criar ou excluir um registro), quando, e um resumo do pedido. Ele serve para evitar gravar duas vezes a mesma operação e para investigar problemas de segurança. Quando você exclui a sua conta, o rastro técnico da sua conta é apagado junto.
-- Registros técnicos de acesso, como o endereço IP e o tipo de aparelho ou navegador, que o serviço de autenticação e a infraestrutura de hospedagem podem guardar. [A DEFINIR: quais registros cada serviço guarda e por quanto tempo, conferindo nos painéis]
+- Registros técnicos de acesso, como o endereço IP e o tipo de aparelho ou navegador, que o serviço de autenticação e a infraestrutura de hospedagem podem guardar. O Clarevo não cria registros de acesso próprios. Os registros desses serviços têm prazo curto, que depende do plano contratado, e o registro de auditoria da autenticação pode manter e-mail e IP depois que a conta é excluída. [A DEFINIR: conferir nos painéis quais registros cada serviço guarda, por quanto tempo e se algum deles mantém e-mail ou IP depois da exclusão da conta]
 - Hoje o Clarevo não envia relatórios de falha do app. Se isso passar a existir, esta política será atualizada antes (seção 8).
 
 ## 4. O que não guardamos?
@@ -123,7 +123,7 @@ A leitura acontece no seu aparelho. O Clarevo não tem servidor que receba esses
 
 ## 6. Para que usamos os dados e em que base legal?
 
-As bases abaixo são uma proposta, ainda sem confirmação jurídica.
+[PROPOSTA: as bases legais abaixo ainda não foram confirmadas juridicamente.]
 
 - Criar e manter a conta, mostrar e calcular o seu mês, Família e benefício: execução de contrato, a pedido da pessoa (LGPD, art. 7º, V). [A DEFINIR: confirmar a base]
 - Enviar e-mails do serviço (confirmação de cadastro e nova senha): execução de contrato (art. 7º, V). [A DEFINIR: confirmar a base]
@@ -137,13 +137,13 @@ Não tomamos decisões automatizadas sobre você, e o Clarevo não faz análise 
 
 ## 7. Quem vê os seus dados?
 
-**Você.** No Pessoal, só você vê, anota, edita e exclui. A tela "Quem vê estes dados?" mostra, em cada contexto, quem tem acesso.
+**Você.** Entre as pessoas que usam o app, só você vê, anota, edita e exclui o que está no seu Pessoal. A tela "Quem vê estes dados?" mostra, em cada contexto, quem tem acesso e traz o aviso sobre a equipe do Clarevo.
 
 **As pessoas da sua Família, na Família.** Cada pessoa vê o que o papel permite. Quem tem o papel "Titular" vê, anota e edita o que é de outras pessoas. Quem tem "Anota e vê" vê e anota, e altera só o que anotou. Quem tem "Só vê" não anota nem altera nada. As pessoas da Família veem o primeiro nome de quem anotou, nunca o e-mail nem o nome inteiro.
 
-**A sua empresa, se ela oferecer o benefício.** A empresa vê só os e-mails que ela mesma convidou, a situação de cada licença (convite enviado, ativa ou encerrada), as datas e as contagens (vagas, convites, licenças ativas e encerradas). A empresa não vê valores, categorias, metas, contas, cartões, a Família de ninguém, nem números somados, e não vê quando ou como você usa o app. O painel das empresas não lê nenhuma tabela de finanças.
+**A sua empresa, se ela oferecer o benefício.** A empresa vê só os e-mails que ela mesma convidou, a situação de cada licença (convite enviado, convite cancelado, ativa ou encerrada), as datas e as contagens (vagas, convites, licenças ativas e encerradas). A empresa não vê valores, categorias, metas, contas, cartões, a Família de ninguém, nem números somados, e não vê quando ou como você usa o app. O painel das empresas não lê nenhuma tabela de finanças.
 
-**A equipe do Clarevo.** O Clarevo não consulta o conteúdo financeiro de ninguém no dia a dia. Pessoas da equipe com acesso técnico ao banco de dados podem, tecnicamente, chegar aos dados guardados. [A DEFINIR: regra interna de quem acessa, em que situações (manutenção, segurança, pedido da própria pessoa, obrigação legal) e registro desses acessos, que hoje não existe]
+**A equipe do Clarevo.** O Clarevo não consulta o conteúdo financeiro de ninguém no dia a dia. [PROPOSTA: a equipe só acessa o conteúdo quando a lei exigir ou para resolver um problema que a própria pessoa pediu.] Tecnicamente, pessoas da equipe com acesso ao banco de dados conseguem chegar aos dados guardados. [A DEFINIR: regra interna escrita de quem acessa e em que situações (manutenção, segurança, pedido da própria pessoa, obrigação legal) e registro desses acessos, que hoje não existe]
 
 **Serviços que ajudam a operar o Clarevo.** Veja a seção 8.
 
@@ -156,7 +156,8 @@ O Clarevo não vende dados e não compartilha dados para publicidade.
 Hoje usamos:
 
 - **Supabase** (autenticação e banco de dados). Recebe todos os dados guardados pelo Clarevo descritos na seção 3. O projeto de produção fica na região de São Paulo. [A DEFINIR: confirmar a região no painel do projeto real]
-- **Cloudflare** (hospedagem da versão web e do site). Recebe os dados de acesso à versão web, como o IP, para entregar as páginas. Não recebe o que você anota. [A DEFINIR: confirmar onde a Cloudflare processa os acessos e se define algum cookie técnico]
+- **Cloudflare** (hospedagem da versão web e do site). Pela hospedagem, recebe os dados de acesso às páginas, como o IP, para entregá-las, e não recebe o que você anota. [A DEFINIR: confirmar se a Cloudflare também fica na frente do Supabase, caso em que as requisições do app ao banco passam por ela em trânsito, conferindo na lista de suboperadores do Supabase] [A DEFINIR: confirmar onde a Cloudflare processa os acessos e se define algum cookie técnico]
+- **Google (ML Kit), só no Android.** Componente de leitura de código incluído no app, usado quando você lê o QR Code da nota. A imagem é lida no aparelho, mas o componente pode enviar ao Google dados técnicos de uso e identificadores do aparelho, para fins de diagnóstico e funcionamento. Não recebe o que você anota. [A DEFINIR: confirmar na documentação do fornecedor o que é enviado, para quê e onde é tratado]
 - **Expo** (geração dos builds do app). Recebe o código do app. Não recebe dados de quem usa o app.
 - **Apple App Store e Google Play** (distribuição). Tratam os dados de download e de conta nas lojas, conforme as políticas delas.
 
@@ -179,22 +180,24 @@ Estas informações ficam só no seu aparelho (no armazenamento do app, ou no na
 
 A biometria é verificada pelo sistema do aparelho. O Clarevo recebe só "sim" ou "não".
 
-Ao sair da conta, essas preferências e memórias continuam no aparelho, ligadas à sua conta. [A DEFINIR: decisão de produto sobre apagar ao sair] Ao excluir a conta, o app apaga tudo isso do aparelho. Em um aparelho compartilhado, prefira "Sair" e use "Excluir minha conta" se não quiser deixar nada.
+Ao sair da conta, essas preferências e memórias continuam no aparelho, ligadas à sua conta. [A DEFINIR: decisão de produto sobre apagar ao sair] Ao excluir a conta, o app apaga tudo isso do aparelho em que você faz a exclusão. Em outro aparelho onde você já tenha entrado, o que ficou guardado lá continua até você desinstalar o app ou limpar os dados dele (na versão web, os dados do site no navegador). Em um aparelho compartilhado, saia da conta ao terminar e, se quiser tirar tudo, limpe os dados do app ou do navegador.
 
 [A DEFINIR: no Android, o backup automático do sistema pode copiar os dados do app para o Google Drive da pessoa; decidir se fica ligado]
 
 ## 10. Cookies e rastreadores
 
-O Clarevo não usa cookies de publicidade, de análise de uso de terceiros nem outros rastreadores. A versão web guarda a sessão e as preferências no armazenamento local do navegador, que serve só para o app funcionar. [A DEFINIR: confirmar que a hospedagem não define cookie técnico]
+O Clarevo não usa cookies de publicidade, não tem ferramenta de análise de uso escolhida por nós e não faz rastreamento para publicidade. A versão web guarda a sessão e as preferências no armazenamento local do navegador, que serve só para o app funcionar.
+
+A exceção é a leitura de código no Android: o componente do Google (ML Kit) pode enviar ao Google dados técnicos de uso e identificadores do aparelho, como descrito nas seções 5 e 8. Não usamos esses dados para publicidade. [A DEFINIR: confirmar que a hospedagem não define cookie técnico e confirmar na documentação do ML Kit o que o componente envia]
 
 ## 11. Por quanto tempo guardamos os dados?
 
 - **Enquanto a conta existir**, guardamos o que você anotou.
-- **Excluir um registro, uma conta a pagar ou uma meta** tira o item das listas e dos totais, mas o Clarevo ainda guarda uma marca técnica de exclusão. [A DEFINIR: prazo de guarda desse rastro técnico e quando ele é eliminado, P-010]
+- **Excluir um registro, uma conta a pagar, uma meta, um cartão ou uma conta de origem** (sem excluir a conta) tira o item das listas e dos totais, e ele deixa de aparecer no app. Mas o item não é apagado de verdade: o Clarevo só o marca como excluído, com a data e quem excluiu. Valor, descrição, data e categoria continuam guardados até você excluir a conta. [A DEFINIR: P-010, prazo para eliminar de vez os itens marcados como excluídos; proposta de 6 meses]
 - **Ao excluir a conta**, o seu Pessoal é apagado de verdade, na hora, e a sua sessão termina. Veja "Como excluir a sua conta" para o passo a passo e para o que continua (por exemplo, o que você anotou numa Família de outras pessoas, sem o seu nome).
 - **Família encerrada.** Os dados ficam guardados, sem leitura por ninguém, até a regra de guarda. [A DEFINIR: prazo, P-010]
 - **Cópias de segurança.** O serviço de banco de dados pode manter cópias de segurança, e dados já apagados podem ficar nelas por um tempo. [A DEFINIR: prazo, previsto em 7 dias no plano contratado; confirmar no painel] Se uma cópia for restaurada, as contas excluídas depois dela serão excluídas de novo.
-- **Registros de acesso.** [A DEFINIR: prazo, frente à guarda de registros de acesso de 6 meses do Marco Civil da Internet, art. 15]
+- **Registros de acesso.** O Clarevo não cria registros de acesso próprios. Os do Supabase e da Cloudflare têm prazo curto, que depende do plano, e o registro de auditoria da autenticação pode manter e-mail e IP depois da exclusão da conta. [A DEFINIR: o que guardar, onde e por quanto tempo, frente à guarda de registros de acesso do Marco Civil da Internet, art. 15, e conferir nos painéis o que cada serviço mantém]
 - **Contas sem uso.** Hoje o Clarevo não apaga contas por inatividade. [A DEFINIR: política para contas inativas]
 - **Obrigação legal e defesa de direitos.** Podemos guardar o necessário por mais tempo se a lei exigir ou para nos defendermos em processo. [A DEFINIR]
 
@@ -232,11 +235,11 @@ Se você achar que o tratamento não respeitou a lei, também pode reclamar à A
 - Códigos de convite e chaves de nota são guardados só como resumo matemático.
 - [A DEFINIR: confirmar com o fornecedor do banco de dados as medidas de proteção dos dados guardados, como a criptografia em repouso]
 
-Nenhum sistema é totalmente seguro. Se houver um incidente de segurança que possa trazer risco ou dano relevante, comunicaremos a ANPD e as pessoas afetadas. [A DEFINIR: prazo e forma de comunicação, conforme o art. 48 da LGPD e a regulamentação da ANPD]
+Nenhum sistema é totalmente seguro. Se houver um incidente de segurança que possa trazer risco ou dano relevante, comunicaremos a ANPD e as pessoas afetadas, dizendo o que aconteceu, quais dados foram atingidos e o que você pode fazer. [A DEFINIR: prazo e forma de comunicação, conforme o art. 48 da LGPD e a regulamentação da ANPD]
 
 ## 14. Quem pode usar o Clarevo?
 
-O Clarevo é para pessoas com 18 anos ou mais. Ele não é dirigido a crianças nem a adolescentes. [A DEFINIR: como a idade é declarada no cadastro, hoje o cadastro não pergunta, P-002]
+O Clarevo é para pessoas com 18 anos ou mais. Ele não é dirigido a crianças nem a adolescentes. No cadastro, o app mostra, acima do botão "Criar conta", que ao criar a conta você confirma ter 18 anos ou mais e concorda com os Termos de uso e com esta política. Não há caixa de seleção, e o app não registra a versão aceita nem a data. [A DEFINIR: forma da declaração de idade e do aceite e registro da versão e da data, P-002]
 
 ## 15. A política pode mudar?
 

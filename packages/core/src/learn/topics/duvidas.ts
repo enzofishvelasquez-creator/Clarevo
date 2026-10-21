@@ -14,9 +14,9 @@ export const DUVIDAS_TOPICS: Topic[] = [
     title: 'Quem vê meus dados?',
     subtitle: null,
     question: null,
-    short: 'No Pessoal, só você. As permissões são conferidas no servidor a cada leitura, não só escondidas na tela.',
+    short: 'No Pessoal, só você, entre as pessoas do app. As permissões são conferidas no servidor a cada leitura, não só escondidas na tela.',
     paragraphs: [
-      'Cada registro pertence a um espaço, Pessoal ou Família. No Pessoal, só você vê, anota, edita e exclui.',
+      'Cada registro pertence a um espaço, Pessoal ou Família. Entre as pessoas do app, só você vê, anota, edita e exclui o que está no Pessoal. A equipe do Clarevo não olha os seus dados no dia a dia e só acessa quando a lei exigir ou para resolver um problema que você pediu.',
       'Quando houver convites para a Família, cada pessoa terá permissões próprias, e entrar numa família não mostra seu histórico pessoal.',
     ],
     example: null,

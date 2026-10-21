@@ -1,4 +1,4 @@
-import { BENEFIT_TEXT, DELETE_TEXT, FAMILY_ROLE_HELP, FAMILY_TEXT, GOALS_TEXT, RETURN_TEXT, SAVINGS_TEXT } from '@clarevo/core';
+import { BENEFIT_TEXT, DELETE_TEXT, FAMILY_ROLE_HELP, FAMILY_TEXT, GOALS_TEXT, LEGAL_TEXT, RETURN_TEXT, SAVINGS_TEXT } from '@clarevo/core';
 import { router } from 'expo-router';
 import { User } from 'lucide-react-native';
 import { View } from 'react-native';
@@ -28,7 +28,7 @@ export default function QuemVeScreen() {
           <View style={{ flex: 1 }}>
             <Txt variant="label">{user?.displayName} (você)</Txt>
             <Txt variant="caption" color={colors.textSecondary}>
-              Única pessoa que vê, anota, edita e exclui registros em Pessoal.
+              {LEGAL_TEXT.whoSees.personal}
             </Txt>
           </View>
         </Card>
@@ -67,8 +67,8 @@ export default function QuemVeScreen() {
         <>
           {family ? <Txt color={colors.textSecondary}>{FAMILY_TEXT.privacy}</Txt> : null}
           <Txt color={colors.textSecondary}>
-            Gastos fixos e parcelamentos também são só seus. A empresa que oferece o benefício não vê nada disso, nem em números somados aos de
-            outras pessoas. Contas do ano, como IPVA, IPTU e matrícula, seguem a mesma regra.
+            Gastos fixos e parcelamentos também ficam só no seu Pessoal, sem nenhuma outra pessoa do app ver. A empresa que oferece o benefício não
+            vê nada disso, nem em números somados aos de outras pessoas. Contas do ano, como IPVA, IPTU e matrícula, seguem a mesma regra.
           </Txt>
           {/* Revisão dos últimos meses (D-030(9)): só datas, lidas só pela própria pessoa. */}
           <Txt color={colors.textSecondary}>{RETURN_TEXT.privacy}</Txt>
@@ -78,6 +78,8 @@ export default function QuemVeScreen() {
           <Txt color={colors.textSecondary}>{SAVINGS_TEXT.privacy}</Txt>
         </>
       ) : null}
+      {/* A equipe do Clarevo (D-064, política seção 7, pergunta 14 ao advogado): a redação que a política propõe, sem marcador. */}
+      <Txt color={colors.textSecondary}>{LEGAL_TEXT.whoSees.team}</Txt>
       {/* Excluir a conta (D-058): o Pessoal é apagado de verdade, e o que foi anotado na Família continua sem nome. */}
       <Txt color={colors.textSecondary}>{DELETE_TEXT.whoSees}</Txt>
       <LinkButton label={DELETE_TEXT.whoSeesLink} onPress={() => router.push('/conta/excluir')} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />

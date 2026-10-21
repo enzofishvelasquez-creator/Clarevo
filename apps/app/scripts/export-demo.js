@@ -8,6 +8,8 @@ const result = spawnSync('npx', ['expo', 'export', '--platform', 'web', '--clear
   stdio: 'inherit',
   shell: process.platform === 'win32',
   // Variáveis do Supabase vazias: o .env local não vale para a demonstração.
-  env: { ...process.env, EXPO_PUBLIC_MODO_DEMO: '1', EXPO_PUBLIC_SUPABASE_URL: '', EXPO_PUBLIC_SUPABASE_KEY: '', CI: '1' },
+  // EXPO_PUBLIC_SITE_URL vazia (D-064): a demonstração nunca mostra os links para o site público (cadastro e Conta), mesmo com a
+  // variável configurada no ambiente.
+  env: { ...process.env, EXPO_PUBLIC_MODO_DEMO: '1', EXPO_PUBLIC_SUPABASE_URL: '', EXPO_PUBLIC_SUPABASE_KEY: '', EXPO_PUBLIC_SITE_URL: '', CI: '1' },
 });
 process.exit(result.status ?? 1);

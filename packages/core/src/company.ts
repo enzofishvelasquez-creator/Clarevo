@@ -647,7 +647,7 @@ export const BENEFIT_TEXT = {
   planCardSituation: 'Benefício pela empresa',
   /** "Quem vê estes dados?". */
   whoSees:
-    'A empresa que oferece o benefício vê os e-mails que ela mesma convidou, a situação de cada licença (convite enviado, ativa ou encerrada) e as datas. Ela não vê quem usa o app depois de aceitar, nem quando. ' +
+    'A empresa que oferece o benefício vê os e-mails que ela mesma convidou, a situação de cada convite ou licença (convite enviado, convite cancelado, ativa ou encerrada) e as datas. Ela não vê se ou quando você usa o app depois de aceitar. ' +
     COMPANY_PRIVACY,
 } as const;
 

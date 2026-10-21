@@ -9,7 +9,7 @@ Rascunho preparado pela equipe do Clarevo para revisão jurídica. Não é parec
 1. O Clarevo é um aplicativo (iPhone e Android) e uma versão web para organizar finanças pessoais e familiares: mostra o que a pessoa anotou (Recebido, Pago, contas a pagar, cartões, metas) e traz conteúdo educativo com fonte.
 2. Não é banco, não movimenta dinheiro, não concede crédito, não recomenda produto financeiro e não se conecta a bancos. Os dados entram por digitação ou por arquivo lido no aparelho (nota, comprovante, extrato).
 3. Dois contextos: Pessoal (só a pessoa) e Família (até 6 pessoas, três papéis, convite por link de uso único).
-4. Empresas podem oferecer o Clarevo como benefício (licenças). A empresa vê só e-mails convidados, situação, datas e contagens, nunca finanças.
+4. Empresas podem oferecer o Clarevo como benefício (licenças). A empresa vê só os e-mails que convidou, a situação de cada convite ou licença (enviado, cancelado, ativa, encerrada), as datas e as contagens, nunca finanças.
 5. Estágio: pré-lançamento, sem contas nas lojas e sem cobrança. Pensado para maiores de 18 anos (P-002 ainda é recomendação, não decisão). Banco e autenticação no Supabase, hospedagem web na Cloudflare.
 
 ## b) Mapa de dados
@@ -18,14 +18,14 @@ Rascunho preparado pela equipe do Clarevo para revisão jurídica. Não é parec
 |---|---|---|---|---|---|
 | E-mail, senha, login | Cadastro | Autenticação do Supabase | A pessoa; equipe técnica; a empresa vê só o e-mail que ela convidou | Até excluir a conta | Contrato (art. 7º, V) |
 | Nome (1 a 80), fuso do aparelho, idioma | Cadastro e aparelho | Tabela `persons` | A pessoa; a Família vê só o primeiro nome | Até excluir; vira linha anônima ("Pessoa que saiu") só se ainda é autora de algo numa Família que continua | Contrato |
-| Gastos, recebimentos, contas a pagar, gastos fixos, parcelamentos, contas de origem, descrições livres | A pessoa (digitação ou arquivo lido no aparelho) | Tabelas do banco | A pessoa; na Família, conforme o papel; nunca a empresa | Até excluir a conta. Registro excluído fica com marca de exclusão sem prazo (P-010). Família encerrada fica sem leitura, sem prazo | Contrato |
+| Gastos, recebimentos, contas a pagar, gastos fixos, parcelamentos, contas de origem, descrições livres | A pessoa (digitação ou arquivo lido no aparelho) | Tabelas do banco | A pessoa; na Família, conforme o papel; nunca a empresa | Até excluir a conta. Registro excluído não é apagado: fica inteiro (valor, descrição, data, categoria), só marcado como excluído, sem prazo (P-010). Família encerrada fica sem leitura, sem prazo | Contrato |
 | Cartões: apelido, 4 últimos dígitos (opcional), dias, limite, lançamentos | A pessoa | `cards`, `card_entries` | Como a linha acima | Como a linha acima | Contrato |
 | Metas, orçamento, renda de referência, plano de guardar, "Conferi este mês", data da última anotação | A pessoa | Tabelas do banco | A pessoa. Plano de guardar, atividade e revisão: só a própria pessoa, nem a Família | Até excluir a conta | Contrato |
 | Resumo SHA-256 da chave da nota e de cada linha importada | Calculado no aparelho | `receipt_key`, `import_key` | Quem lê o registro | Como o registro | Contrato |
 | Família: vínculo, papel, convite (só o resumo do código) | A pessoa | Tabelas do banco | Pessoas da Família (primeiro nome); só quem é Titular lê convites | Até sair, encerrar ou excluir. O que a pessoa anotou fica com autoria anônima ou com o primeiro nome | Contrato; legítimo interesse (histórico) |
-| Benefício: e-mail informado pela empresa, situação, datas, direito ao plano | Empresa e pessoa | `licenses`, `plan_entitlements` | Empresa (e-mail, situação, datas); a pessoa lê a própria | O e-mail da empresa fica na licença encerrada mesmo após a exclusão da conta | Contrato; [A DEFINIR] |
+| Benefício: e-mail informado pela empresa, situação, datas, direito ao plano | Empresa e pessoa | `licenses`, `plan_entitlements` | Empresa (e-mail, situação, datas, inclusive convites pendentes e cancelados); a pessoa lê a própria | O e-mail da empresa fica na licença encerrada mesmo após a exclusão da conta | Contrato; [A DEFINIR] |
 | Rastro técnico: quem, qual operação, quando, resumo do pedido | Funções de escrita | `record_operations` | Só o sistema e a equipe técnica | Apagado junto com a conta da pessoa | Legítimo interesse |
-| Registros de acesso (IP, navegador) | Infraestrutura | Supabase e Cloudflare (a conferir nos painéis) | Equipe técnica | A conferir | Obrigação legal; legítimo interesse |
+| Registros de acesso (IP, navegador) | Infraestrutura | Supabase e Cloudflare (a conferir nos painéis). O app não cria os próprios | Equipe técnica | Prazo curto, conforme o plano (a conferir). A auditoria da autenticação pode manter e-mail e IP depois da exclusão (a conferir) | Obrigação legal; legítimo interesse |
 | Sessão, preferências, memórias de preenchimento | Aparelho | Só no aparelho | A pessoa | Até excluir a conta | Não chega ao Clarevo |
 | Fotos da câmera, PDF de nota e de comprovante, extrato | Aparelho | Não são guardados | Ninguém | Lidos e descartados | Não se aplica |
 
@@ -34,7 +34,7 @@ Rascunho preparado pela equipe do Clarevo para revisão jurídica. Não é parec
 | Serviço | Para quê | O que recebe | País ou região | Situação |
 |---|---|---|---|---|
 | Supabase | Autenticação e banco | Todos os dados da seção b | Projeto em São Paulo (docs/05); sede no exterior (confirmar) | Em uso |
-| Cloudflare | Hospedagem da web e do site | IP e dados de acesso; não o que a pessoa anota | Rede global; sede no exterior (confirmar) | Em uso |
+| Cloudflare | Hospedagem da web e do site | IP e dados de acesso às páginas; não o que a pessoa anota. Se também ficar na frente do Supabase (a conferir), as requisições do app ao banco passam por ela em trânsito | Rede global; sede no exterior (confirmar) | Em uso |
 | Expo (EAS) | Gerar os builds | Código do app; nenhum dado de quem usa (sem atualização remota nem push) | Sede no exterior (confirmar) | Quando houver builds |
 | Google, no Android | Leitura de código (ML Kit) | Possíveis dados técnicos do aparelho e de uso | Exterior | Embutido no app; a confirmar |
 | Sentry | Relatório de falhas | Só o erro técnico, IP desligado | A escolher | Previsto, não ligado |
@@ -43,28 +43,30 @@ Rascunho preparado pela equipe do Clarevo para revisão jurídica. Não é parec
 
 ## d) Já decidido e implementado (conferido no código)
 
-- **Exclusão da conta (D-058).** Pelo app, com a palavra EXCLUIR. Apaga o Pessoal de verdade, na hora. Em Família de outras pessoas, o que a pessoa anotou fica como "Pessoa que saiu", sem nome e sem e-mail. Titular com outras pessoas precisa passar a titularidade antes. A licença termina e o rastro técnico da pessoa é apagado. Marcada como "a confirmar com advogado".
-- **Empresa sem finanças (D-056).** Testado no banco. A empresa lê só licenças (e-mail, situação, datas) e contagens. O indicador de uso saiu em revisão de segurança, pelo risco de identificar pessoas.
+- **Exclusão da conta (D-058).** Pelo app, com a palavra EXCLUIR. Apaga o Pessoal de verdade, na hora, e limpa o que o app guardava no aparelho em que a exclusão é feita (não em outros aparelhos). Em Família de outras pessoas, o que a pessoa anotou fica como "Pessoa que saiu", sem nome e sem e-mail. Titular com outras pessoas precisa passar a titularidade antes. A licença termina e o rastro técnico da pessoa é apagado. Marcada como "a confirmar com advogado".
+- **Empresa sem finanças (D-056).** Testado no banco. A empresa lê só licenças (e-mail, situação, incluindo convite pendente e cancelado, e datas) e contagens (vagas, convites pendentes, licenças ativas e encerradas). O indicador de uso saiu em revisão de segurança, pelo risco de identificar pessoas.
 - **Família (D-055).** Até 6 pessoas, uma Família por pessoa, convite por link de 7 dias, só o resumo do código guardado.
 - **Dados de cartão e nota (D-037, D-038, D-051).** Nunca número completo, CVV, validade, CPF de nota, imagem nem PDF. Comprovante de Pix: lido no aparelho, sem guardar CPF, chave Pix, banco, conta nem identificador da transação.
 - **Segurança.** Permissão aplicada no banco, escrita só por funções, senha de 8 caracteres com letras e números, HTTPS. Revisão de segurança interna em 16/10/2026; sem auditoria externa.
 - **Sem anúncios, venda de dados, analytics de terceiros ou decisão automatizada.**
 
-**Pontos em que documentos e código divergem** (a política segue o código):
+**Pontos em que documentos e código divergem** (a política segue o código; "corrigido" quer dizer ajustado em 21/10/2026):
 
-- A ficha das lojas diz que a empresa "só vê se a licença está ativa". O código também mostra à empresa o e-mail convidado, outras situações (convidada, encerrada) e datas.
-- A tela de exclusão e a decisão D-058 dizem que nada é guardado por garantia. O e-mail informado pela empresa fica na licença encerrada, e há cópias de segurança e registros de infraestrutura.
-- A tela "Quem vê estes dados?" diz que no Pessoal só a pessoa vê. Quem opera o painel do banco acessa tudo, e o registro de acesso interno não existe.
-- O cadastro não pede aceite dos termos nem declaração de maioridade, e o app não tem acesso à política.
-- A ficha diz que o fuso é digitado. Ele vem do aparelho.
+- A ficha das lojas dizia que a empresa "só vê se a licença está ativa". O código também mostra o e-mail convidado, convites pendentes e cancelados, licenças encerradas e as datas. Corrigido na ficha e no site.
+- Estes rascunhos diziam que, ao excluir um registro, ficava "só uma marca técnica de exclusão". No código, excluir registro, conta a pagar, meta, cartão ou conta de origem só preenche a data de exclusão: valor, descrição, data e categoria continuam guardados até a exclusão da conta. Corrigido; é a pergunta 3.
+- A tela de exclusão e a D-058 dizem que nada é guardado por garantia. O e-mail informado pela empresa fica na licença encerrada, e há cópias de segurança e registros de infraestrutura (a página de exclusão já lista isso). A limpeza do aparelho vale só para o aparelho em que a exclusão é feita (corrigido nos textos).
+- "Quem vê estes dados?" dizia que no Pessoal só a pessoa vê, mas quem opera o painel do banco acessa tudo e não há registro de acesso interno. Corrigido: o app diz "pessoa do app" e que a equipe não olha os dados no dia a dia e só acessa quando a lei exigir ou para resolver um problema que a pessoa pediu (redação proposta, pergunta 14).
+- O cadastro não pedia aceite nem maioridade, e o app não tinha acesso à política. Agora mostra "Ao criar a conta, você confirma que tem 18 anos ou mais e concorda com os Termos de uso e a Política de privacidade", com links quando o site estiver publicado. Sem caixa de seleção e sem registro no banco (pergunta 25). Conta ganha "Privacidade e termos", também só com o site publicado.
+- A privacidade das lojas dizia que o fuso era digitado: vem do aparelho no primeiro acesso. Corrigido.
+- A premissa da primeira versão da pergunta 4 (registros de acesso por 6 meses no Supabase e na Cloudflare) estava errada: o prazo é curto, conforme o plano (a conferir no painel). Corrigido.
 - Nome do projeto do Supabase: `clarevo-producao` em docs/05, outro nome no painel em docs/07. A região precisa ser conferida.
 
 ## e) Perguntas ao advogado
 
 1. **Pequeno porte e alto risco (Res. CD/ANPD 2/2022).** O Clarevo se enquadra como agente de pequeno porte? Nossa leitura: sim, e não há tratamento de alto risco. Dados financeiros não são sensíveis na LGPD, não há decisão só automatizada nem menores. Atenção: o app aceita qualquer adulto, e idosos são critério específico; a categoria "Saúde" e descrições livres podem revelar dado sensível. Larga escala pode surgir com empresas grandes. Proposta: tratar como pequeno porte hoje e reavaliar com o crescimento.
 2. **Encarregado.** Nomear ou manter só canal? Proposta: só o canal `[E-MAIL DE PRIVACIDADE]`, com o enquadramento da pergunta 1.
-3. **Prazos de guarda e rastro técnico (P-010).** Hoje registros excluídos ficam marcados, sem eliminação, e a Família encerrada guarda dados sem leitura, sem prazo. Proposta: eliminar ambos em 6 meses e não apagar contas inativas. Exige código depois.
-4. **Marco Civil, art. 15.** Somos obrigados a guardar registros de acesso por 6 meses? O app não grava logs; Supabase e Cloudflare guardam os deles. Como isso convive com a exclusão (D-058)? Proposta: não criar logs próprios, aceitar o que a infraestrutura guarda por até 6 meses e dizer isso na política.
+3. **Prazos de guarda e rastro técnico (P-010).** Hoje o registro excluído (e a conta a pagar, meta, cartão ou conta de origem) não é apagado: só recebe a data de exclusão, e valor, descrição, data e categoria continuam guardados até a exclusão da conta. A Família encerrada guarda dados sem leitura, sem prazo. É compatível com a LGPD (arts. 15 e 16) e com o que a política diz? Proposta: eliminar ambos em 6 meses e não apagar contas inativas. Exige código depois.
+4. **Marco Civil, art. 15 (aplicação).** O art. 15 se aplica ao Clarevo, com a guarda de registros de acesso por 6 meses? Premissa corrigida: o app não cria registros de acesso, e os do Supabase têm prazo curto, conforme o plano (a conferir no painel), então hoje não há guarda de 6 meses. A tabela de auditoria da autenticação do Supabase pode manter e-mail e IP depois da exclusão da conta (a conferir). Proposta: tratar como aplicável por precaução e resolver na pergunta 18.
 5. **Cópias de segurança.** Previsão de 7 dias no plano Pro (a confirmar no painel). Dado apagado pode ficar nelas; se uma cópia for restaurada, reexcluímos as contas. Proposta: informar o prazo na política.
 6. **Exclusão e "Pessoa que saiu" (D-058).** O que a pessoa anotou numa Família de outros fica sem nome e sem e-mail. Isso é anonimização suficiente (arts. 5º, XI, e 12) e base de legítimo interesse da Família? Quem sai sem excluir a conta continua como "ex-membro" e primeiro nome: isso exige eliminar o nome ao sair? Proposta: manter como está e informar; apagar o nome do ex-membro se a pessoa pedir.
 7. **Papel da empresa (M-5).** A empresa é só pagadora e o Clarevo é controlador dos dados financeiros? E o e-mail que a empresa informa no convite? Proposta: sim; a empresa controla a lista de convidados, e o Clarevo a trata só para validar convite e licença. Hoje o e-mail fica na licença encerrada depois da exclusão da conta: proposta de anonimizar.
@@ -72,16 +74,24 @@ Rascunho preparado pela equipe do Clarevo para revisão jurídica. Não é parec
 9. **Transferência internacional (art. 33).** O banco fica em São Paulo, mas Supabase, Cloudflare, Google (ML Kit), Sentry e o provedor de e-mail têm sede ou processamento fora do Brasil. Qual mecanismo e qual contrato exigir de cada um? Proposta: usar os contratos padrão dos fornecedores e citar os países na política.
 10. **Bases legais.** Confirmar o quadro: contrato (art. 7º, V) para conta, Família e benefício; legítimo interesse (IX) para segurança e rastro; obrigação legal (II) para registros de acesso. Consentimento só onde o sistema pede (câmera, notificação, biometria), dados que não chegam ao Clarevo. Proposta: manter assim.
 11. **Família: dados de outra pessoa.** Quem anota "Pix para Maria" grava nome de terceiro, que a Família vê. Proposta: cláusula nos termos de que a pessoa anota só o necessário e responde pelo que anota; sem aviso ao terceiro.
-12. **Idade mínima e aceite (P-002).** 18 anos, sem menores. O cadastro hoje não registra aceite nem declaração de idade. Proposta: incluir caixa de aceite e declaração no cadastro, com versão e data guardadas, e a Apple classificar 18+. Isso exige código.
+12. **Idade mínima (P-002).** 18 anos, sem menores. O cadastro mostra a frase de confirmação de idade (ver pergunta 25 para a forma do aceite). Proposta: manter 18 anos, com a Apple classificando 18+.
 13. **Boleto e Pix copia e cola (P-013).** O app reconhece o código de boleto colado, avisa e não guarda. Pix copia e cola não é tratado. Proposta: não guardar nenhum dos dois; o cadastro de contas a pagar fica sem esse campo.
-14. **Acesso da equipe e suporte.** Hoje quem opera o banco acessa tudo, sem registro. Proposta: texto honesto na política (acesso técnico limitado a manutenção, segurança, pedido da pessoa e obrigação legal), regra interna escrita e registro de acessos antes do lançamento.
-15. **Responsabilidade e foro dos termos.** A cláusula 9 dos termos é compatível com o CDC (art. 51)? Proposta: sem excluir responsabilidade; limitar só o que a lei permite. Foro do domicílio da pessoa consumidora; para empresas, comarca da sede.
+14. **Acesso da equipe e suporte.** Hoje quem opera o banco acessa tudo, sem registro. O app já mostra, em "Quem vê estes dados?", que a equipe não olha os dados no dia a dia e só acessa quando a lei exigir ou para resolver um problema que a própria pessoa pediu: essa é a nossa redação proposta e precisa de confirmação. Proposta: manter o texto, escrever a regra interna e registrar os acessos antes do lançamento. Se o texto mudar, o ajuste no app é pequeno.
+15. **Responsabilidade e foro dos termos.** A cláusula 9 dos termos é compatível com o CDC (art. 51)? Proposta: sem excluir responsabilidade; limitar só o que a lei permite (ver também a pergunta 22). Foro do domicílio da pessoa consumidora; para empresas, comarca da sede.
 16. **Fim do benefício e plano gratuito (P-005).** 30 dias de acesso pleno, depois plano gratuito com leitura do histórico, sem apagar nada. O app ainda não limita recursos por plano. Proposta: manter o texto e definir o plano gratuito com o preço (P-005). Se houver cobrança, incluir arrependimento (CDC, art. 49).
 17. **Divulgações específicas.** A política cita a consulta opcional à Fazenda do RJ e o ML Kit do Google no Android. O texto basta, ou precisa de aviso no momento da leitura? Proposta: manter na política e na tela de permissão da câmera.
+18. **Marco Civil, art. 15 (o que guardar).** Se o art. 15 se aplica, o que guardar, onde e por quanto tempo, e como isso convive com a eliminação na exclusão da conta (D-058)? Proposta: registro mínimo (data, hora e IP do login) por 6 meses, em ambiente controlado e à parte da conta, sob obrigação legal (art. 7º, II), eliminado depois e descrito na política; e tirar e-mail e IP da auditoria da autenticação, se possível. Exige decisão técnica depois.
+19. **Cloudflare na frente do Supabase.** A Cloudflare faz parte da borda das APIs do Supabase, de modo que as requisições do app ao banco passam por ela em trânsito? A conferir na lista pública de suboperadores do Supabase (a rede deste ambiente não abriu a página). A seção 8 da política hoje diz que a Cloudflare, pela hospedagem, não recebe o que a pessoa anota, e traz um [A DEFINIR] sobre isso. Proposta: se confirmar, citá-la também como operadora do Supabase e na transferência internacional (pergunta 9).
+20. **Termos, cláusula 4 (conta).** Trocamos "você é responsável pelo que acontece na sua conta" por "cuide da sua senha, avise o suporte, e você não responde por acesso indevido causado por falha do Clarevo". Protege a pessoa consumidora o bastante? Proposta: manter.
+21. **Termos, cláusula 8 (mudar ou retirar recursos).** Isso viola o CDC (art. 51, XIII, alteração unilateral)? Reescrevemos para só por melhoria, segurança, exigência legal ou limite técnico, sem prejuízo injustificado, com aviso (proposta de 30 dias) e direito de exportar e excluir a conta. Proposta: manter.
+22. **Termos, cláusula 9 (terceiros).** O texto antigo afastava a responsabilidade por "falha de serviço de terceiros". Como Supabase, Cloudflare e os demais são operadores que o Clarevo escolhe, agora o Clarevo responde por eles e não responde só pelo que a pessoa contrata por conta própria (internet, aparelho, loja de aplicativos). Adequado ao CDC (arts. 14 e 25) e à LGPD (art. 42)? Proposta: manter.
+23. **Termos, cláusula 10 ("você nos autoriza").** "Autoriza" soava como consentimento, mas a base proposta é contrato. Trocamos por "o Clarevo trata esses dados para prestar o serviço que você contratou e para cumprir obrigações legais". Basta? Proposta: manter.
+24. **Prazo de comunicação de incidente (LGPD, art. 48).** Qual prazo e forma de comunicar a ANPD e as pessoas? A equipe lembra que a regulamentação da ANPD fixa prazo curto em dias úteis (a conferir a resolução vigente). Proposta: comunicar dentro do prazo da regulamentação, por e-mail e à ANPD, dizendo o que houve, os dados atingidos e o que a pessoa pode fazer; mesmo prazo para avisar as empresas clientes (contrato, cláusula 11).
+25. **Aceite no cadastro.** A frase de confirmação acima do botão "Criar conta", sem caixa de seleção, vale como aceite, ou precisa de caixa obrigatória? É preciso registrar no banco a versão aceita e a data? Hoje nada é registrado; registrar seria uma migração depois da resposta. Proposta: a frase basta por ora; registrar versão e data antes do lançamento nas lojas, se o advogado recomendar.
 
 ## f) O que pedimos e o que não precisa
 
-**Pedimos:** responder as 17 perguntas; revisar e corrigir a política, os termos, a página de exclusão e os pontos do contrato; resolver o que é [A DEFINIR] jurídico; indicar quais ajustes viram trabalho de produto (aceite no cadastro, rotina de eliminação, registro de acesso interno). Uma rodada de ajustes depois da nossa resposta.
+**Pedimos:** responder as 25 perguntas; revisar e corrigir a política, os termos, a página de exclusão e os pontos do contrato; resolver o que é [A DEFINIR] jurídico; indicar quais ajustes viram trabalho de produto (aceite no cadastro, rotina de eliminação, registro de acesso interno). Uma rodada de ajustes depois da nossa resposta.
 
 **Não precisa:** escrever os textos do zero; redigir a minuta completa do contrato com empresas (basta validar os pontos); parecer sobre integração bancária, cobrança ou inteligência artificial (fora do ciclo atual); revisar código; preencher as declarações das lojas (a equipe preenche e ajusta ao que for decidido); redigir o conteúdo do site.
 
@@ -89,10 +99,11 @@ Rascunho preparado pela equipe do Clarevo para revisão jurídica. Não é parec
 
 Citadas a partir da especificação interna. O texto oficial não pôde ser reaberto neste ambiente, então a redação e a numeração vigentes devem ser conferidas.
 
-- LGPD (Lei 13.709/2018), arts. 6º, 7º, 9º, 15 e 16, 18, 33, 37 a 41 e 46 a 49.
+- LGPD (Lei 13.709/2018), arts. 6º, 7º, 9º, 15 e 16, 18, 33, 37 a 42 e 46 a 49.
+- Regulamentação da ANPD sobre comunicação de incidente de segurança (pergunta 24): a resolução vigente e o prazo precisam ser conferidos, pois o texto não foi reaberto neste ambiente.
 - Resolução CD/ANPD nº 2/2022 (agentes de tratamento de pequeno porte): dispensa de encarregado com canal de comunicação; não vale para tratamento de alto risco (critério geral e critério específico ao mesmo tempo).
 - Guia de Elaboração de Termo de Uso e Política de Privacidade (Secretaria de Governo Digital, gov.br): só como referência de estrutura e de linguagem simples, por ser para serviços públicos.
 - Marco Civil da Internet (Lei 12.965/2014), art. 15.
-- Código de Defesa do Consumidor (Lei 8.078/1990), arts. 49 e 51.
+- Código de Defesa do Consumidor (Lei 8.078/1990), arts. 14, 25, 49 e 51.
 - Apple App Review Guidelines, 5.1.1 (política acessível no app e na ficha, exclusão de conta no app) e Google Play (Segurança dos dados e URL para pedir exclusão de conta e dados).
 - Internas: `docs/00_VISAO_E_DECISOES.md` (decisões e pendências citadas), `docs/13_FAMILIA_E_EMPRESAS.md`, `docs/lojas/privacidade.md` e `docs/lojas/ficha.md`.

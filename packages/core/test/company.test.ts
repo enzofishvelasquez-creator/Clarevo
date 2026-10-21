@@ -333,7 +333,8 @@ describe('Empresas: textos', () => {
     expect(COMPANY_TEXT.privacy).toBe(COMPANY_PRIVACY);
     expect(BENEFIT_TEXT.whoSees).toContain(COMPANY_PRIVACY);
     // O indicador "pessoas que entraram no mês" saiu depois da revisão de segurança de 16/10/2026: nenhum texto o menciona.
-    expect(BENEFIT_TEXT.whoSees).toContain('Ela não vê quem usa o app depois de aceitar, nem quando.');
+    expect(BENEFIT_TEXT.whoSees).toContain('Ela não vê se ou quando você usa o app depois de aceitar.');
+    expect(BENEFIT_TEXT.whoSees).toContain('(convite enviado, convite cancelado, ativa ou encerrada)');
     expect(companyTextSamples().join(' ')).not.toMatch(/pessoas que entraram|entraram no app|Aparece a partir de|5 pessoas ativas/);
     expect(COMPANY_TEXT).not.toHaveProperty('usageHidden');
     expect(COMPANY_TEXT).not.toHaveProperty('usageJoined');

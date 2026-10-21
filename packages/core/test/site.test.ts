@@ -24,6 +24,7 @@ interface Gerado {
   arquivos: Map<string, string | Buffer>;
   avisos: string[];
   pendencias: Map<string, string[]>;
+  problemasFinais: string[];
 }
 const gerador = require(SCRIPT) as {
   MARCADORES: string[];
@@ -435,7 +436,22 @@ describe('site público: as páginas geradas', () => {
 
   it('o logotipo e o favicon são os arquivos de docs/marca, sem redesenho', () => {
     expect(readFileSync(join(SITE, 'marca', 'clarevo-logotipo-reverso.svg')).equals(readFileSync(join(ROOT, 'docs', 'marca', 'clarevo-logotipo-reverso.svg')))).toBe(true);
+    expect(readFileSync(join(SITE, 'marca', 'clarevo-logotipo.svg')).equals(readFileSync(join(ROOT, 'docs', 'marca', 'clarevo-logotipo.svg')))).toBe(true);
     expect(readFileSync(join(SITE, 'favicon.svg')).equals(readFileSync(join(ROOT, 'docs', 'marca', 'clarevo-simbolo.svg')))).toBe(true);
+  });
+
+  it('na impressão entra o logotipo oficial de fundo claro, e não o reverso com as cores invertidas', () => {
+    const css = texto(gerado.arquivos.get('estilo.css'));
+    const impressao = /@media print\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? '';
+    expect(impressao).toContain('.marca .logo-tela{display:none}');
+    expect(impressao).toContain('.marca .logo-papel{display:block}');
+    expect(css).not.toMatch(/invert\(/);
+    expect(css).toContain('.marca .logo-papel{display:none}');
+    for (const nome of PAGINAS) {
+      const html = texto(gerado.arquivos.get(nome));
+      expect(html, nome).toContain('<img src="marca/clarevo-logotipo-reverso.svg" alt="Clarevo, página inicial" width="140" height="28" class="logo-tela">');
+      expect(html, nome).toContain('<img src="marca/clarevo-logotipo.svg" alt="Clarevo, página inicial" width="140" height="28" class="logo-papel">');
+    }
   });
 });
 
@@ -534,6 +550,63 @@ describe('site público: gerar-site.js na linha de comando', () => {
     }
   });
 
+  it('--final falha (código 1, com a lista) em cada caso de rascunho e passa num exemplo limpo, com dados preenchidos de teste e sem depender do estado do repositório', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'clarevo-final-casos-'));
+    const pastas: string[] = [];
+    try {
+      writeFileSync(join(dir, 'cheios.json'), JSON.stringify(PREENCHIDOS));
+      const LIMPO = EXEMPLO.replace('[A DEFINIR: prazo]', 'cinco anos');
+      /** Pasta de exemplo sem nenhuma pendência, com o ajuste do caso (arquivo e texto a somar ou a trocar). */
+      const pasta = (ajuste?: (md: Record<string, string>) => void): string => {
+        const legal = pastaDeExemplo();
+        pastas.push(legal);
+        const md: Record<string, string> = {
+          'politica-de-privacidade.md': LIMPO,
+          'termos-de-uso.md': readFileSync(join(legal, 'termos-de-uso.md'), 'utf8'),
+          'exclusao-de-conta.md': readFileSync(join(legal, 'exclusao-de-conta.md'), 'utf8'),
+        };
+        ajuste?.(md);
+        for (const [nome, conteudo] of Object.entries(md)) writeFileSync(join(legal, nome), conteudo);
+        return legal;
+      };
+      const saida = join(dir, 'site');
+      const final = (legal: string) => rodar(['--final', '--dados', join(dir, 'cheios.json'), '--legal', legal, '--saida', saida]);
+
+      // O exemplo limpo passa e grava as páginas.
+      const limpo = final(pasta());
+      expect(limpo.status, limpo.stderr).toBe(0);
+      expect(existsSync(join(saida, 'index.html'))).toBe(true);
+      rmSync(saida, { recursive: true, force: true });
+
+      const FRASE = 'Rascunho preparado pela equipe do Clarevo para revisão jurídica. Não é parecer jurídico.';
+      const casos: [string, (md: Record<string, string>) => void, string[]][] = [
+        ['a frase de rascunho', (md) => (md['termos-de-uso.md'] = `${FRASE}\n\n${md['termos-de-uso.md']}`), ['termos.html: frase de rascunho']],
+        ['"Proposta:"', (md) => (md['exclusao-de-conta.md'] += '\nProposta: pedir a confirmação pelo e-mail.\n'), ['excluir-conta.html: texto de proposta ("Proposta:")']],
+        ['"proposta, ainda sem confirmação"', (md) => (md['politica-de-privacidade.md'] += '\nAs bases abaixo são uma proposta, ainda sem confirmação jurídica.\n'), ['privacidade.html: texto de proposta ("proposta, ainda sem confirmação")']],
+        ['a marca [PROPOSTA]', (md) => (md['termos-de-uso.md'] += '\n[PROPOSTA: prazo de 30 dias]\n'), ['termos.html: [PROPOSTA: prazo de 30 dias]']],
+        ['travessão', (md) => (md['termos-de-uso.md'] += '\nTexto com travessão \u2014 aqui.\n'), ['termos.html: travessão']],
+        ['link interno para arquivo que não existe', (md) => (md['politica-de-privacidade.md'] += '\nVeja [o contrato](contrato.md).\n'), ['link interno quebrado em privacidade.html', 'contrato.md']],
+        ['link interno para âncora que não existe', (md) => (md['politica-de-privacidade.md'] += '\nVeja [os termos](termos-de-uso.md#nao-existe).\n'), ['link interno quebrado em privacidade.html', '#nao-existe']],
+        ['[A DEFINIR', (md) => (md['exclusao-de-conta.md'] += '\nPrazo: [A DEFINIR: prazo]\n'), ['excluir-conta.html: [A DEFINIR: prazo]']],
+        ['a expressão proibida', (md) => (md['termos-de-uso.md'] += `\nIsso não faz ${'sentido'}.\n`), ['termos.html: expressão proibida']],
+      ];
+      for (const [nome, ajuste, esperado] of casos) {
+        const r = final(pasta(ajuste));
+        expect(r.status, `${nome}: deve falhar\n${r.stderr}`).toBe(1);
+        expect(r.stderr, nome).toContain('--final');
+        for (const trecho of esperado) expect(r.stderr, `${nome}: ${trecho}`).toContain(trecho);
+        expect(existsSync(saida), `${nome}: não grava nada`).toBe(false);
+        // No modo normal os mesmos casos só viram aviso (ou ficam visíveis na página) e o site é gravado.
+        const normal = rodar(['--dados', join(dir, 'cheios.json'), '--legal', pastas[pastas.length - 1]!, '--saida', saida]);
+        expect(normal.status, `${nome}: sem --final não falha\n${normal.stderr}`).toBe(0);
+        rmSync(saida, { recursive: true, force: true });
+      }
+    } finally {
+      for (const legal of pastas) rmSync(legal, { recursive: true, force: true });
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('--final falha também com os dados e os textos atuais do repositório, enquanto houver valor vazio ou [A DEFINIR] (hoje: o advogado e a empresa ainda não entregaram)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'clarevo-final-'));
     try {
@@ -583,6 +656,10 @@ describe('gráfico de recursos do Google Play (scripts/gerar-grafico-loja.js)', 
     expect(script).toContain('clarevo-logotipo-reverso.svg');
     expect(script).toContain('apple-subtitulo');
     expect(script).toContain('01_resumo.png');
+    // Nada importante no centro nem na faixa de baixo ao meio (onde o Google pode sobrepor o botão de vídeo): o script mede e recusa o desenho.
+    expect(script).toContain('ZONAS_LIVRES');
+    expect(script).toContain('faixa inferior central');
+    expect(script).toContain('o desenho invade as zonas livres do gráfico');
     expect(existsSync(join(ROOT, 'docs', 'lojas', 'capturas', 'google-play-celular-1080x1920', '01_resumo.png'))).toBe(true);
     const ficha = readFileSync(join(ROOT, 'docs', 'lojas', 'ficha.md'), 'utf8');
     expect(ficha).toContain('Organize seu mês e aprenda');

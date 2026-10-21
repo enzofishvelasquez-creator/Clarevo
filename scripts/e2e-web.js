@@ -280,6 +280,21 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
   await shot('01_boas_vindas');
   await btn('Criar conta').click(); await waitText('Nome de apresentação');
+  // D-064 (privacidade e termos no app): o texto de aceite fica acima do botão "Criar conta", sem caixa de seleção. O build de demonstração
+  // sobe com EXPO_PUBLIC_SITE_URL vazia, então os dois nomes aparecem sem link (nem botão, nem endereço do site).
+  const cadTxt = await body();
+  const cadConsent = 'Ao criar a conta, você confirma que tem 18 anos ou mais e concorda com os Termos de uso e a Política de privacidade.';
+  const cadOrder = await p.evaluate((frase) => {
+    const shown = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    const texto = [...document.querySelectorAll('div,span')].filter(shown).filter((e) => (e.innerText || '').replace(/\s+/g, ' ').trim() === frase).pop();
+    const botoes = [...document.querySelectorAll('[role=button]')].filter(shown).filter((e) => (e.getAttribute('aria-label') || e.textContent || '').trim() === 'Criar conta');
+    return texto && botoes.length === 1 ? { textoY: texto.getBoundingClientRect().bottom, botaoY: botoes[0].getBoundingClientRect().top } : null;
+  }, cadConsent);
+  ok('cadastro (D-064): o texto "Ao criar a conta, você confirma que tem 18 anos ou mais e concorda com os Termos de uso e a Política de privacidade." fica acima do botão "Criar conta"',
+    cadTxt.includes(cadConsent) && cadOrder !== null && cadOrder.textoY <= cadOrder.botaoY + 0.5, `${JSON.stringify(cadOrder)} ${cadTxt.slice(0, 400)}`);
+  ok('cadastro (D-064): sem EXPO_PUBLIC_SITE_URL (a demonstração), "Termos de uso" e "Política de privacidade" saem sem link, e não há caixa de seleção',
+    (await visibleCount('link', /Termos de uso|Política de privacidade/)) === 0 && (await visibleCount('button', /Termos de uso|Política de privacidade/)) === 0 &&
+    (await p.locator('a[href*="termos"], a[href*="privacidade"], a[href*="excluir-conta"]').count()) === 0 && (await visibleCount('checkbox', /.*/)) === 0 && (await visibleCount('switch', /.*/)) === 0);
   await field('Nome de apresentação').fill('Ana Teste');
   await field('E-mail').fill('ana@exemplo');
   await field('Senha').fill('abc');
@@ -978,8 +993,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await scrollTo('Ano a ano');
   await shot('37_conta_do_ano_prevista');
   await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
-  await btn('Quem vê estes dados?').click(); await waitText('Gastos fixos e parcelamentos também são só seus.');
-  ok('"Quem vê estes dados?": gastos fixos e parcelamentos também são só seus', (await body()).includes('Gastos fixos e parcelamentos também são só seus. A empresa que oferece o benefício não vê nada disso, nem em números somados aos de outras pessoas.'));
+  await btn('Quem vê estes dados?').click(); await waitText('Gastos fixos e parcelamentos também ficam só no seu Pessoal');
+  ok('"Quem vê estes dados?": gastos fixos e parcelamentos também ficam só no Pessoal, sem outra pessoa do app, e a equipe do Clarevo não olha os dados no dia a dia', (await body()).includes('Gastos fixos e parcelamentos também ficam só no seu Pessoal, sem nenhuma outra pessoa do app ver. A empresa que oferece o benefício não vê nada disso, nem em números somados aos de outras pessoas.') && (await body()).includes('Única pessoa do app que vê, anota, edita e exclui registros em Pessoal.') && (await body()).includes('A equipe do Clarevo não olha os seus dados no dia a dia. Só acessa quando a lei exigir ou para resolver um problema que você pediu.'));
   ok('"Quem vê estes dados?": contas do ano seguem a mesma regra', (await body()).includes('Contas do ano, como IPVA, IPTU e matrícula, seguem a mesma regra.'));
   await btn('Entendi').click(); await waitText('Por mês, se os valores não mudarem');
 
@@ -3099,7 +3114,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('C conta nova: nenhuma meta nem reserva de exemplo', (await otherDevice(async (repo, ctx) => (await repo.listGoals(ctx)).length)) === 0 && !t.includes('Viagem de férias'));
   await btn('Sim, consigo').click(); await waitText('Quanto você consegue guardar por mês?'); await p.waitForTimeout(500);
   t = await body();
-  ok('C "Sim, consigo": campo de valor com a dica (R$ 1,00 a R$ 9.999.999,99), privacidade e o pedido dos gastos essenciais (conta nova, nada calculável)', (await h1Name()) === 'Seu plano de guardar' && t.includes('De R$ 1,00 a R$ 9.999.999,99.') && t.includes('Sua resposta e as datas de volta ficam só com você.') &&
+  ok('C "Sim, consigo": campo de valor com a dica (R$ 1,00 a R$ 9.999.999,99), privacidade e o pedido dos gastos essenciais (conta nova, nada calculável)', (await h1Name()) === 'Seu plano de guardar' && t.includes('De R$ 1,00 a R$ 9.999.999,99.') && t.includes('Sua resposta e as datas de volta não aparecem para outras pessoas do app.') &&
     t.includes('Informe quanto você gasta por mês com moradia, mercado, transporte, saúde e educação.'));
   await field('Quanto você consegue guardar por mês?').fill('400'); await field('Gastos essenciais por mês').fill('2000'); await p.waitForTimeout(500);
   t = await body();
@@ -7443,6 +7458,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('H3 Conta: o bloco "Exportar meus dados" (nível 2) com a legenda e o botão "Escolher período e formato", depois de Privacidade neste aparelho',
     (await headingShown('Exportar meus dados')) && t.includes('Planilha (CSV) ou resumo em PDF dos seus gastos e recebimentos') && (await visibleCount('button', 'Exportar meus dados. Abre a tela para gerar uma planilha ou um resumo em PDF.')) === 1 &&
     t.indexOf('Privacidade neste aparelho') < t.indexOf('Exportar meus dados') && t.indexOf('Exportar meus dados') < t.indexOf('Acesso ao plano'), t.slice(0, 900));
+  // D-064: a seção "Privacidade e termos" só existe com o endereço do site (EXPO_PUBLIC_SITE_URL); a demonstração sobe sem ele e não a mostra.
+  ok('H3 Conta (D-064): sem EXPO_PUBLIC_SITE_URL (a demonstração), a seção "Privacidade e termos" e os botões de política, termos e "Excluir conta: como funciona" não aparecem, e "Excluir minha conta" continua',
+    !(await headingShown('Privacidade e termos')) && !t.includes('Excluir conta: como funciona') && (await visibleCount('button', 'Política de privacidade')) === 0 && (await visibleCount('button', 'Termos de uso')) === 0 && t.includes('Excluir minha conta'));
   await atWidths(async (w) => { await layoutChecks(`H3 Conta com Exportar ${w}px`); if (w === 390) await shot('290_conta_exportar'); });
   await btn('Exportar meus dados. Abre a tela para gerar uma planilha ou um resumo em PDF.').click(); await waitText('O que vai no arquivo'); await p.waitForTimeout(500);
 
@@ -10035,12 +10053,12 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await body();
   ok('Quem vê estes dados? na Família: "Casa Lima", as três pessoas com o papel de cada uma e o que cada papel pode fazer', famPath() === '/quem-ve' && t.includes('Casa Lima') && t.includes('Vera') && t.includes('Mauro') && t.includes('Lia (você)') &&
     t.includes('Vê, anota e edita o que é de outras pessoas.') && t.includes('Vê e anota. Altera só o que anotou.') && t.includes('Só vê. Não anota nem altera nada.') && t.includes('Demonstração · Família'), t.slice(0, 500));
-  ok('Quem vê estes dados? na Família: o Pessoal de ninguém aparece, a empresa não vê e os textos do Pessoal ("só seus") não valem aqui', t.includes('O Pessoal de cada pessoa continua só dela') && t.includes('Se uma empresa oferecer o Clarevo como benefício') && !t.includes('Única pessoa que vê, anota, edita e exclui') && !t.includes('Gastos fixos e parcelamentos também são só seus.'));
+  ok('Quem vê estes dados? na Família: o Pessoal de ninguém aparece, a empresa não vê e os textos do Pessoal ("só no seu Pessoal") não valem aqui', t.includes('O Pessoal de cada pessoa continua só dela') && t.includes('Se uma empresa oferecer o Clarevo como benefício') && !t.includes('Única pessoa do app que vê, anota, edita e exclui') && !t.includes('Gastos fixos e parcelamentos também ficam só no seu Pessoal.'));
   await famKeep();
   await famShots('412_quem_ve_familia');
   await btn('Entendi').click(); await p.waitForTimeout(400);
   await famTab('Ver dados de Pessoal').click(); await p.waitForTimeout(500);
-  await p.getByRole('button', { name: 'Quem vê estes dados?' }).filter({ visible: true }).first().click(); await waitText('Única pessoa que vê, anota, edita e exclui'); await p.waitForTimeout(300);
+  await p.getByRole('button', { name: 'Quem vê estes dados?' }).filter({ visible: true }).first().click(); await waitText('Única pessoa do app que vê, anota, edita e exclui'); await p.waitForTimeout(300);
   t = await body();
   ok('Quem vê estes dados? no Pessoal (com Família): só a própria pessoa, e a Família não vê o Pessoal', t.includes('Lia Souza (você)') && t.includes('O Pessoal de cada pessoa continua só dela') && !t.includes('Casa Lima'), t.slice(0, 300));
   await btn('Entendi').click(); await p.waitForTimeout(300);
@@ -10369,8 +10387,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Quem vê estes dados?: a explicação do que a empresa vê.
   await p.getByRole('button', { name: 'Quem vê estes dados?' }).filter({ visible: true }).first().click(); await waitText('Entendi'); await p.waitForTimeout(400);
   t = await body();
-  ok('Quem vê estes dados?: explica o que a empresa vê (e-mails que convidou, situação e datas) e o que nunca vê (nem quem usa o app, nem quando)', t.includes('A empresa que oferece o benefício vê os e-mails que ela mesma convidou, a situação de cada licença (convite enviado, ativa ou encerrada) e as datas.') &&
-    t.includes('Ela não vê quem usa o app depois de aceitar, nem quando.') && !/quantas entraram no app|5 pessoas ativas/.test(t) && t.includes('A empresa não vê valores, categorias, metas, contas, cartões nem a Família de ninguém, nem somados.') && t.includes('Se uma empresa oferecer o Clarevo como benefício'), t.slice(0, 600));
+  ok('Quem vê estes dados?: explica o que a empresa vê (e-mails que convidou, situação e datas) e o que nunca vê (nem se ou quando a pessoa usa o app)', t.includes('A empresa que oferece o benefício vê os e-mails que ela mesma convidou, a situação de cada convite ou licença (convite enviado, convite cancelado, ativa ou encerrada) e as datas.') &&
+    t.includes('Ela não vê se ou quando você usa o app depois de aceitar.') && !/quantas entraram no app|5 pessoas ativas/.test(t) && t.includes('A empresa não vê valores, categorias, metas, contas, cartões nem a Família de ninguém, nem somados.') && t.includes('Se uma empresa oferecer o Clarevo como benefício'), t.slice(0, 600));
   await empKeep();
   await empShots('435_quem_ve_empresa');
   await btn('Entendi').click(); await waitText('Diferença do mês');

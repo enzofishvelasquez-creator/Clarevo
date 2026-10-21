@@ -38,6 +38,7 @@ export * from './sefaz-page';
 export * from './nota-pagamento';
 export * from './nota-flow';
 export * from './navigation';
+export * from './legal';
 export * from './budget';
 export * from './accounts';
 export * from './search';
