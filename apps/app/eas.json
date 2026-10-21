@@ -15,6 +15,12 @@
         "distribution": "store"
       }
     },
+    "preview-widget": {
+      "extends": "preview",
+      "env": {
+        "CLAREVO_WIDGET": "1"
+      }
+    },
     "production": {
       "distribution": "store",
       "environment": "production",

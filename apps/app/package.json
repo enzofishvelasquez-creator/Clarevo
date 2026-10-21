@@ -5,6 +5,7 @@
   "dependencies": {
     "@clarevo/core": "*",
     "@expo-google-fonts/manrope": "^0.4.2",
+    "@expo/ui": "~57.0.25",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "^2.117.3",
     "@tanstack/react-query": "^5.104.1",
@@ -24,10 +25,12 @@
     "expo-splash-screen": "~57.0.9",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.4",
+    "expo-widgets": "~57.0.23",
     "lucide-react-native": "^1.52.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
+    "react-native-android-widget": "^0.23.0",
     "react-native-gesture-handler": "~2.32.0",
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
@@ -41,6 +44,14 @@
     "@types/react": "~19.2.2",
     "typescript": "~6.0.3",
     "vitest": "^5.0.3"
+  },
+  "expo": {
+    "autolinking": {
+      "exclude": [
+        "expo-widgets",
+        "react-native-android-widget"
+      ]
+    }
   },
   "scripts": {
     "start": "expo start",

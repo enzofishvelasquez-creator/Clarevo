@@ -170,8 +170,10 @@ describe('configuração de publicação', () => {
     expect([play.readUInt32BE(16), play.readUInt32BE(20), play[24], play[25]]).toEqual([512, 512, 8, 6]);
   });
 
-  it('eas.json: perfis preview e production (sem development, porque expo-dev-client não está instalado); AAB e versões remotas somadas sozinhas, APK no preview; sem identificadores de conta', () => {
-    expect(Object.keys(eas.build)).toEqual(['preview', 'production']);
+  it('eas.json: perfis preview e production (sem development, porque expo-dev-client não está instalado) e o preview-widget do Ciclo AA, que só liga o widget; AAB e versões remotas somadas sozinhas, APK no preview; sem identificadores de conta', () => {
+    expect(Object.keys(eas.build)).toEqual(['preview', 'preview-widget', 'production']);
+    // D-063 item 3: o perfil do widget parte do preview e só acrescenta CLAREVO_WIDGET=1 (o resto está em widget-config.test.ts).
+    expect(eas.build['preview-widget']).toEqual({ extends: 'preview', env: { CLAREVO_WIDGET: '1' } });
     expect(eas.cli.appVersionSource).toBe('remote');
     expect(JSON.stringify(eas)).not.toContain('developmentClient');
     // O preview gera build de loja no iOS (TestFlight) com versão remota: sem autoIncrement, o segundo envio repetiria o número de build.
