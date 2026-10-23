@@ -7,6 +7,7 @@ const { rel } = require('../util');
 const { montarPagina, marcadoresEmHtml, colunaTexto, bloco } = require('../modelo');
 const { TEMAS } = require('./ajuda');
 const { lerPerguntas } = require('../conteudo');
+const { ligado } = require('../formularios');
 
 function paginaSobre({ valores }) {
   const arquivo = 'sobre.html';
@@ -108,12 +109,46 @@ ${links}
   });
 }
 
+/**
+ * As seções 3.6 (Contato pelo site) e 3.7 (Novidades por e-mail) da política descrevem os formulários, e só podem existir com o interruptor
+ * do formulário ligado: com ele desligado a política estaria descrevendo um envio de dados que o site não faz. Desligado, a seção continua
+ * no texto (o advogado precisa lê-la) mas sai da página marcada com `[A RETIRAR: ...]`, que o `--final` recusa; ligado e sem a seção, o
+ * problema é o contrário (o site recolhe dados sem avisar). Devolve o Markdown com as marcas e a lista de problemas para o `--final`.
+ */
+const SECOES_DOS_FORMULARIOS = [
+  { interruptor: 'formulario_contato', titulo: /^###\s+3\.6\b.*$/m, nome: '3.6 (Contato pelo site)', formulario: 'o formulário de contato' },
+  { interruptor: 'newsletter', titulo: /^###\s+3\.7\b.*$/m, nome: '3.7 (Novidades por e-mail)', formulario: 'o cadastro das Novidades por e-mail' },
+];
+
+function secoesDosFormularios(md, valores) {
+  let saida = md;
+  const problemas = [];
+  for (const s of SECOES_DOS_FORMULARIOS) {
+    const achou = s.titulo.exec(saida);
+    const ligada = ligado(valores, s.interruptor);
+    if (achou && !ligada) {
+      const fim = achou.index + achou[0].length;
+      saida = `${saida.slice(0, fim)}\n\n[A RETIRAR: seção ${s.nome} da política, porque ${s.formulario} está desligado (${s.interruptor} em site/dados-da-empresa.json)]${saida.slice(fim)}`;
+      problemas.push(`privacidade.html: a seção ${s.nome} da política descreve ${s.formulario}, que está desligado (${s.interruptor}): retire a seção ou ligue o interruptor`);
+    } else if (!achou && ligada) {
+      problemas.push(`privacidade.html: ${s.formulario} está ligado (${s.interruptor}) e a política não tem a seção ${s.nome}`);
+    }
+  }
+  return { md: saida, problemas };
+}
+
 /** Uma página legal a partir do Markdown, ou o espaço reservado (com `[A DEFINIR: ...]`) enquanto o texto não existir. */
 function paginaLegal(pagina, md, valores) {
   const avisos = [];
+  const problemasFinais = [];
   let fonte = md;
   if (md === null) {
     fonte = `# ${pagina.titulo}\n\nEste texto está em revisão e será publicado nesta página. [A DEFINIR: texto desta página, que vem de docs/legal/${pagina.md}]\n`;
+  } else if (pagina.md === 'politica-de-privacidade.md') {
+    const conferido = secoesDosFormularios(md, valores);
+    fonte = conferido.md;
+    problemasFinais.push(...conferido.problemas);
+    avisos.push(...conferido.problemas.map((p) => `o --final recusaria: ${p}`));
   }
   const { titulo, corpo } = separarTitulo(fonte);
   if (titulo === null) avisos.push(`docs/legal/${pagina.md}: não tem título "# ..." (usei "${pagina.titulo}")`);
@@ -130,7 +165,7 @@ function paginaLegal(pagina, md, valores) {
     valores,
     classeCapa: 'capa-simples',
   });
-  return { ...pg, avisos };
+  return { ...pg, avisos, problemasFinais };
 }
 
 function pagina404({ valores }) {
@@ -147,6 +182,7 @@ function pagina404({ valores }) {
 <ul>
 <li><a href="${u('app/index.html')}">O app</a></li>
 <li><a href="${u('aprender/index.html')}">Aprender</a></li>
+<li><a href="${u('calculadoras/index.html')}">Calculadoras</a></li>
 <li><a href="${u('novidades/index.html')}">Novidades</a></li>
 <li><a href="${u('suporte.html')}">Suporte</a></li>
 </ul>`,
@@ -155,4 +191,4 @@ function pagina404({ valores }) {
   return montarPagina({ arquivo, titulo: 'Página não encontrada', descricao: 'Esta página não existe no site do Clarevo.', capa, corpo, fonte: capa, valores, classeCapa: 'capa-simples', semIndexar: true });
 }
 
-module.exports = { paginaSobre, paginaSuporte, paginaLegal, pagina404, PAGINAS_LEGAIS };
+module.exports = { paginaSobre, paginaSuporte, paginaLegal, pagina404, secoesDosFormularios, PAGINAS_LEGAIS };

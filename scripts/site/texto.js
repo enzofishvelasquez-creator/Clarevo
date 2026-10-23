@@ -8,6 +8,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { RAIZ, MARCADORES, MARCADORES_EMAIL } = require('./config');
+const { INTERRUPTORES } = require('./formularios');
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -15,16 +16,16 @@ const nfc = (s) => String(s).normalize('NFC');
 
 /**
  * Marcador de dado, `[A DEFINIR: ...]` (o que não está decidido), `[PROPOSTA: ...]` (o que é só proposta da equipe, ainda sem confirmação
- * jurídica) ou qualquer outro texto em MAIÚSCULAS entre colchetes (que não seja o texto de um link).
+ * jurídica), `[A RETIRAR: ...]` (texto que não pode ir ao ar, como a seção de um formulário desligado) ou qualquer outro texto em MAIÚSCULAS entre colchetes (que não seja o texto de um link).
  */
 const FONTE_MARCADOR =
-  '\\[(?:A DEFINIR|PROPOSTA)[^\\]\\n]*\\](?!\\()' +
+  '\\[(?:A DEFINIR|PROPOSTA|A RETIRAR)[^\\]\\n]*\\](?!\\()' +
   `|\\[(?:${MARCADORES.map(escRe).join('|')})\\](?!\\()` +
   '|\\[[A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þ0-9 /.\\-]{2,}\\](?!\\()';
 
 function classificarMarcador(m) {
   const dentro = m.slice(1, -1);
-  if (/^(A DEFINIR|PROPOSTA)/.test(dentro)) return { tipo: 'definir' };
+  if (/^(A DEFINIR|PROPOSTA|A RETIRAR)/.test(dentro)) return { tipo: 'definir' };
   if (MARCADORES.includes(dentro)) return { tipo: 'dado', nome: dentro };
   return { tipo: 'desconhecido' };
 }
@@ -370,9 +371,13 @@ function problemasDeTitulos(html) {
   return problemas;
 }
 
-/** Os valores que o JSON da empresa traz, completos (marcador sem valor fica vazio) e com os avisos de chave desconhecida. */
+/**
+ * Os valores que o JSON da empresa traz, completos (marcador sem valor fica vazio) e com os avisos de chave desconhecida. Além dos
+ * marcadores (texto), há dois interruptores (`formulario_contato` e `newsletter`, booleanos, desligados por padrão) que mostram os
+ * formulários do site (D-066).
+ */
 function lerDados(arquivo) {
-  const dados = Object.fromEntries(MARCADORES.map((m) => [m, '']));
+  const dados = { ...Object.fromEntries(MARCADORES.map((m) => [m, ''])), ...Object.fromEntries(INTERRUPTORES.map((i) => [i, false])) };
   const avisos = [];
   if (!fs.existsSync(arquivo)) {
     avisos.push(`${path.relative(RAIZ, arquivo)} não existe: todos os marcadores ficam sem valor`);
@@ -387,7 +392,12 @@ function lerDados(arquivo) {
   for (const [k, v] of Object.entries(json)) {
     const nome = nfc(k);
     if (nome.startsWith('_')) continue;
-    if (!MARCADORES.includes(nome)) avisos.push(`${path.relative(RAIZ, arquivo)}: a chave "${k}" não é um marcador conhecido (${MARCADORES.join(', ')})`);
+    if (INTERRUPTORES.includes(nome)) {
+      if (typeof v !== 'boolean') avisos.push(`${path.relative(RAIZ, arquivo)}: o valor de "${k}" deve ser true ou false`);
+      else dados[nome] = v;
+      continue;
+    }
+    if (!MARCADORES.includes(nome)) avisos.push(`${path.relative(RAIZ, arquivo)}: a chave "${k}" não é um marcador conhecido (${[...MARCADORES, ...INTERRUPTORES].join(', ')})`);
     else if (typeof v !== 'string') avisos.push(`${path.relative(RAIZ, arquivo)}: o valor de "${k}" deve ser texto`);
     else dados[nome] = v.trim();
   }

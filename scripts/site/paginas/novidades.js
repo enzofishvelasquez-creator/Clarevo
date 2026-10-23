@@ -14,6 +14,7 @@ const { catalogo } = require('../catalogo');
 const { lerPosts, lerCabecalho } = require('../conteudo');
 const { SITE_SRC } = require('../config');
 const { fonteHtml, arquivoDoTema } = require('./aprender');
+const { blocoDaNewsletterEmNovidades } = require('./formularios');
 
 const PASTA_POSTS = path.join(SITE_SRC, 'novidades');
 const ARQUIVO_INDICE = 'novidades/index.html';
@@ -149,7 +150,7 @@ ${cartoes}
     titulo: 'Novidades',
     descricao: 'Textos curtos da Equipe Clarevo sobre o app, a empresa como benefício e educação financeira, cada um com data e fontes.',
     capa,
-    corpo,
+    corpo: [corpo, blocoDaNewsletterEmNovidades(valores, arquivo)].filter(Boolean).join('\n'),
     fonte: capa,
     valores,
     classeCapa: 'capa-simples',

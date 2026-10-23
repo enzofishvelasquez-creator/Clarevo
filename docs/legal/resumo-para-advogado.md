@@ -91,7 +91,7 @@ Rascunho preparado pela equipe do Clarevo para revisão jurídica. Não é parec
 
 ## f) O que pedimos e o que não precisa
 
-**Pedimos:** responder as 25 perguntas; revisar e corrigir a política, os termos, a página de exclusão e os pontos do contrato; resolver o que é [A DEFINIR] jurídico; indicar quais ajustes viram trabalho de produto (aceite no cadastro, rotina de eliminação, registro de acesso interno). Uma rodada de ajustes depois da nossa resposta.
+**Pedimos:** responder as 25 perguntas da seção e e as da seção h; revisar e corrigir a política, os termos, a página de exclusão e os pontos do contrato; resolver o que é [A DEFINIR] jurídico; indicar quais ajustes viram trabalho de produto (aceite no cadastro, rotina de eliminação, registro de acesso interno). Uma rodada de ajustes depois da nossa resposta.
 
 **Não precisa:** escrever os textos do zero; redigir a minuta completa do contrato com empresas (basta validar os pontos); parecer sobre integração bancária, cobrança ou inteligência artificial (fora do ciclo atual); revisar código; preencher as declarações das lojas (a equipe preenche e ajusta ao que for decidido); redigir o conteúdo do site.
 
@@ -107,3 +107,26 @@ Citadas a partir da especificação interna. O texto oficial não pôde ser reab
 - Código de Defesa do Consumidor (Lei 8.078/1990), arts. 14, 25, 49 e 51.
 - Apple App Review Guidelines, 5.1.1 (política acessível no app e na ficha, exclusão de conta no app) e Google Play (Segurança dos dados e URL para pedir exclusão de conta e dados).
 - Internas: `docs/00_VISAO_E_DECISOES.md` (decisões e pendências citadas), `docs/13_FAMILIA_E_EMPRESAS.md`, `docs/lojas/privacidade.md` e `docs/lojas/ficha.md`.
+
+## h) Novidades desde o envio ao advogado (D-066, 23/10/2026)
+
+A segunda etapa do site mudou o que a política descreve, e nada disso está no ar: tudo continua parado até a revisão e o domínio. As perguntas seguem a numeração da seção e. As seções novas da política (3.6, 3.7 e o acréscimo da seção 10) estão marcadas como `[PROPOSTA: ...]`.
+
+**O que mudou no site**
+
+- **Calculadoras no site.** As dez calculadoras do app rodam no navegador, com o mesmo código do app. Nada é enviado, gravado ou guardado (nem no armazenamento do navegador), e a página não lê da URL nada além do `modo` que os temas de Aprender já usam. Cada página repete o aviso do app: "Simulação com os valores e as taxas que você informou. Não é recomendação de produto financeiro nem oferta de crédito".
+- **Formulário de contato (Para empresas).** Pronto e desligado. Campos: nome, e-mail, empresa, faixa do número de pessoas e mensagem. O site não grava nada: o pedido chega a um worker da Cloudflare, que envia um e-mail à equipe pelo Resend e termina. Campo-isca escondido contra robôs, sem CAPTCHA de terceiros.
+- **Novidades por e-mail.** Pronta e desligada. Só o e-mail, com caixa de consentimento desmarcada e obrigatória e dupla confirmação por e-mail, pelo Brevo. O descadastro é o link que o Brevo põe em todo e-mail. O site não grava o e-mail.
+- **Contagem de visitas.** Sem script nem cookie no site: só as estatísticas de tráfego que a Cloudflare mostra no painel, medidas no servidor. O Web Analytics da Cloudflare, que carrega um script, continua desligado.
+- **Kit de imprensa.** Logotipo, símbolo, cores, fonte, descrições prontas, capturas da demonstração e regras de uso do logotipo.
+
+**Perguntas novas**
+
+26. **Formulário de contato: base legal e papéis.** A base é "procedimentos preliminares relacionados a contrato, a pedido da pessoa" (art. 7º, V) ou legítimo interesse (art. 7º, IX)? Cloudflare (hospedagem, recebe o pedido e o IP) e Resend (envio) são operadores, e o Clarevo controlador? Proposta: art. 7º, V, com os dois como operadores. É dado de quem fala em nome de uma empresa, não finanças pessoais.
+27. **Prazo da mensagem na caixa de e-mail e no Resend.** O site não guarda a mensagem, mas ela fica na caixa de e-mail do Clarevo, e o Resend guarda uma cópia nos registros dele (o prazo depende do plano e é a conferir no painel). Qual prazo para cada um, e como atender um pedido de eliminação, inclusive da cópia do Resend? Proposta: até 12 meses depois do último contato na caixa de e-mail, ou antes, se a pessoa pedir por `[E-MAIL DE PRIVACIDADE]`, e o menor prazo que o plano do Resend permitir para a cópia dele.
+28. **Novidades por e-mail: consentimento.** A caixa desmarcada e obrigatória, o texto "Quero receber as Novidades do Clarevo por e-mail. Posso cancelar quando quiser." e a dupla confirmação bastam como consentimento (art. 7º, I, e art. 8º)? É preciso o Clarevo guardar a prova (data, hora e IP da confirmação) ou basta o registro do Brevo (a conferir no painel)? Proposta: bastam, com o registro do Brevo.
+29. **Descadastro e eliminação.** O cancelamento é o link do Brevo em cada e-mail. O e-mail deve ser eliminado da lista ao cancelar, ou o Brevo pode manter o contato como "descadastrado" para não reenviar? Proposta: manter só o necessário para não reenviar, e eliminar se a pessoa pedir.
+30. **Transferência internacional (ligada à pergunta 9).** Resend e Brevo têm sede e tratamento fora do Brasil (a conferir). Qual mecanismo e qual contrato? Proposta: contratos padrão dos fornecedores e citar os países na política.
+31. **Estatísticas de tráfego da Cloudflare.** Usar só as estatísticas do painel (medidas no servidor, sem script nem cookie) exige citar na política e alguma base legal? O texto proposto está na seção 10. A Cloudflare pode guardar IP por um prazo (a conferir). Proposta: citar na seção 10, com legítimo interesse, sem identificar pessoas.
+32. **Marca e kit de imprensa.** O kit libera logotipo e capturas "para falar do Clarevo, sem alterar" e pede aviso prévio para outros usos (anúncio, parceria, produto). Isso basta como termos de uso da marca, enquanto o registro no INPI não sai? Proposta: manter e revisar quando houver registro.
+33. **Rastreamento de abertura e clique no Brevo.** O Brevo pode registrar se e quando cada e-mail das Novidades foi aberto e quais links foram clicados, por pessoa. A proposta é desligar esse rastreamento na conta e na campanha, e a política (seção 3.7) diz que ele está desligado (`[A DEFINIR: rastreamento de abertura e clique desligado no Brevo]`, até a conta existir e alguém conferir no painel). Com ele desligado, basta o consentimento da pergunta 28? Se o rastreamento for ligado um dia, ele precisa de aviso próprio e, talvez, de consentimento próprio?

@@ -6,6 +6,7 @@
  */
 const { rel } = require('../util');
 const { montarPagina, marcadoresEmHtml, bloco, celular, telaLarga } = require('../modelo');
+const { blocoDeContato } = require('./formularios');
 
 const ARQUIVO = 'empresas/index.html';
 
@@ -108,6 +109,7 @@ ${celular(img.beneficio, ARQUIVO)}
       `<h2 id="piloto">Falar sobre um piloto</h2>
 <p>Para conversar sobre um piloto, escreva para [E-MAIL DE CONTATO]. Ajuda contar o nome da empresa, quantas pessoas poderiam receber o benefício e quem seria a pessoa administradora, que precisa ter conta no Clarevo com o e-mail confirmado.</p>
 <p>Ainda não há tabela de preços. Em um piloto, combinamos o número de vagas e o prazo.</p>
+${blocoDeContato(valores, ARQUIVO)}
 <p class="nota">Não envie dados financeiros nem de pessoas que trabalham na empresa: para convidar, o painel pede só o e-mail de cada pessoa. Dúvidas de quem recebe o convite estão na <a href="${u('ajuda/beneficio.html')}">Ajuda</a>.</p>`,
       { rotulo: 'piloto' },
     ),

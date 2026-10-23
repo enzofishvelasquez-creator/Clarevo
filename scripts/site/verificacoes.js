@@ -13,7 +13,9 @@ function linksQuebrados(arquivos) {
     for (const m of html.matchAll(/\s(?:href|src)="([^"]*)"/g)) {
       const url = m[1].replace(/&amp;/g, '&');
       if (/^[a-z][a-z0-9+.-]*:/i.test(url)) continue;
-      const [alvo, ancora] = url.split('#');
+      // O endereço pode trazer parâmetros (`?modo=emprestimo`, como nos temas de Aprender): o arquivo é o que vem antes.
+      const [semAncora, ancora] = url.split('#');
+      const alvo = semAncora.split('?')[0];
       let destino = alvo === '' ? nome : alvo.startsWith('/') ? path.posix.normalize(alvo.slice(1)) : path.posix.normalize(path.posix.join(path.posix.dirname(nome), alvo));
       if (destino === '.' || destino === '' || destino.endsWith('/')) destino = `${destino === '.' ? '' : destino}index.html`;
       if (!arquivos.has(destino)) {

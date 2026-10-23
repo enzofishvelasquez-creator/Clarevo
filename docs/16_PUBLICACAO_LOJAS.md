@@ -70,6 +70,8 @@ As páginas são as de `site/` (`docs/07`, seção "Site público"). Enquanto n�
 | URL de suporte | Apple | `https://clarevo-site.pages.dev/suporte` | `https://[DOMÍNIO]/suporte` |
 | URL de marketing (opcional) | Apple | `https://clarevo-site.pages.dev/` | `https://[DOMÍNIO]/` |
 
+O site da segunda etapa (D-066, `docs/22_SITE.md`) tem também um **kit de imprensa** (`/imprensa`, com logotipo, capturas e descrições prontas) e **calculadoras** (`/calculadoras`), que as lojas não pedem mas podem ser citadas na ficha ou na resposta à revisão. O kit usa as mesmas capturas da demonstração de `docs/lojas/capturas/` (sem preço nem selos). O formulário de contato e as Novidades por e-mail do site ficam desligados até Enzo ligar; **se forem ligados antes do envio às lojas, a declaração de privacidade das lojas (`docs/lojas/privacidade.md`) precisa citar Resend e Brevo como operadores**, e o texto da página de privacidade precisa estar revisado (seções 3.6 e 3.7).
+
 Só informe uma URL na loja depois de a página estar publicada, sem faixa de versão preliminar e com o `--final` passando. A mesma regra vale para a variável `EXPO_PUBLIC_SITE_URL` do app (fase 1, passo 3): ela só é configurada com o site no ar.
 
 ## 4. Passo a passo

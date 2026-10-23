@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Gera o site público do Clarevo (D-064 e D-065, `docs/22_SITE.md`): páginas estáticas em `site/`, sem cookies, sem analytics e sem
- * nenhum arquivo de fora (fontes, logotipo, capturas e favicon são cópias locais). O único JavaScript é a busca da Ajuda
- * (`ajuda/busca.js`, do próprio site). Hospedagem prevista: um projeto novo e gratuito do Cloudflare Pages (`clarevo-site`), sem
+ * Gera o site público do Clarevo (D-064, D-065 e, na segunda etapa, D-066, `docs/22_SITE.md`): páginas estáticas em `site/`, sem cookies, sem
+ * analytics e sem nenhum arquivo de fora (fontes, logotipo, capturas e favicon são cópias locais). O JavaScript é só do próprio site: a busca
+ * da Ajuda (`ajuda/busca.js`) e as calculadoras (`calculadoras/calculadora.js` mais o núcleo de `js/nucleo/`). Hospedagem prevista: um projeto novo e gratuito do Cloudflare Pages (`clarevo-site`), sem
  * comando de build e com a pasta `site` como saída. **Nada vai ao ar antes da revisão do advogado.**
  *
  * Os módulos ficam em `scripts/site/` (modelo de página, páginas, conversor de Markdown, imagens, verificações); o conteúdo próprio, em
@@ -11,8 +11,13 @@
  * O que sai em `site/`:
  *   index.html, app/, empresas/, aprender/ (um tema por página, vindo do catálogo do app), novidades/ (posts e, só com domínio, feed.xml), ajuda/
  *   (por tema, com indice.json e busca.js), seguranca.html, sobre.html, suporte.html, 404.html
+ *   calculadoras/ (o índice e as dez calculadoras do app), js/nucleo/ (o código do core que as calculadoras rodam no navegador, transpilado
+ *   por `scripts/site/nucleo.js`), imprensa.html e imprensa/ (kit de imprensa)
  *   privacidade.html, termos.html, excluir-conta.html   convertidos de `docs/legal/*.md`
- *   estilo.css, _headers, robots.txt, sitemap.xml (só com domínio), imagens/, og/, fontes/, marca/, favicon.svg
+ *   estilo.css, _headers, _worker.js e _routes.json (o worker do Cloudflare Pages que recebe /api/contato e /api/newsletter), robots.txt,
+ *   sitemap.xml (só com domínio), imagens/, og/, fontes/, marca/, favicon.svg
+ *   contato-enviado.html, contato-erro.html, novidades/receber*.html   só com os interruptores `formulario_contato` e `newsletter` em
+ *                                              `site/dados-da-empresa.json` ligados (`true`); desligados, o site não tem formulário
  * Com `[DOMÍNIO]` preenchido o site ganha também `canonical`, `og:url`, `sitemap.xml` e o feed `novidades/feed.xml` (um feed precisa de endereços
  * completos, então sem domínio ele não é gerado e as páginas não apontam para ele).
  * `site/dados-da-empresa.json` é a ENTRADA (não é gerada): os valores que trocam os marcadores `[RAZÃO SOCIAL]`, `[CNPJ]`, `[ENDEREÇO]`,
@@ -31,8 +36,9 @@
  *                                              proposta ("Proposta:", "proposta, ainda sem confirmação"), travessão, a expressão proibida pela
  *                                              orientação do projeto, título fora de ordem, link interno quebrado, post de Novidades sem
  *                                              fontes, com data inválida ou futura (em relação a `--referencia`) ou com `{{tema:...}}` que não
- *                                              existe no catálogo, e o domínio sem valor (exigido de propósito, mesmo que nenhum texto cite
- *                                              `[DOMÍNIO]`). Sem `--final`, tudo isso continua só como aviso no console
+ *                                              existe no catálogo, o domínio sem valor (exigido de propósito, mesmo que nenhum texto cite
+ *                                              `[DOMÍNIO]`) e as seções 3.6 e 3.7 da política sem o formulário ligado (ou o formulário
+ *                                              ligado sem a seção). Sem `--final`, tudo isso continua só como aviso no console
  *   node scripts/gerar-site.js --pdf <arquivo> também gera, com o Chromium do Playwright, o PDF A4 "Pacote para revisão jurídica" (resumo
  *                                              para o advogado, privacidade, termos, exclusão de conta e pontos do contrato com
  *                                              empresas, nesta ordem, com os marcadores visíveis). O PDF não vai para o repositório.
@@ -153,7 +159,7 @@ async function principal(argv) {
       console.error(`Ainda no texto (${problemas.length}):`);
       for (const q of problemas) console.error(`  ${q}`);
     }
-    console.error('Preencha site/dados-da-empresa.json (inclusive o domínio), resolva os trechos [A DEFINIR] e [PROPOSTA], tire as frases de rascunho de docs/legal e corrija os posts de Novidades, e rode de novo.');
+    console.error('Preencha site/dados-da-empresa.json (inclusive o domínio), resolva os trechos [A DEFINIR] e [PROPOSTA], retire o que estiver marcado [A RETIRAR] (seção de um formulário desligado), tire as frases de rascunho de docs/legal e corrija os posts de Novidades, e rode de novo.');
     process.exitCode = 1;
     return;
   }

@@ -28,7 +28,7 @@ const require = createRequire(import.meta.url);
 
 interface GerarOpcoes {
   legal?: string;
-  dados?: Record<string, string>;
+  dados?: Record<string, string | boolean>;
   arquivoDados?: string;
   referencia?: string;
   novidades?: string;
@@ -103,9 +103,12 @@ const PAGINAS_BASE = [
   'excluir-conta.html',
   '404.html',
 ];
-const PAGINAS = [...PAGINAS_BASE, ...TEMAS_DO_SITE.map((t) => `aprender/${t.slug}.html`), ...POSTS];
+/** As dez calculadoras do app (D-066), na ordem do catálogo, e o índice delas. */
+const CALCULADORAS = ['antes-de-financiar', 'parcelado-ou-a-vista', 'custo-por-ano', 'custo-da-divida', 'quitar-antes', 'multa-e-juros', 'plano-dividas', 'reserva', 'juntar-para-objetivo', 'dividir-contas'];
+const PAGINAS_DE_CALCULADORAS = ['calculadoras/index.html', ...CALCULADORAS.map((c) => `calculadoras/${c}.html`)];
+const PAGINAS = [...PAGINAS_BASE, 'imprensa.html', ...PAGINAS_DE_CALCULADORAS, ...TEMAS_DO_SITE.map((t) => `aprender/${t.slug}.html`), ...POSTS];
 /** As páginas do menu principal (a página atual é marcada com aria-current). */
-const NO_MENU = ['index.html', 'app/index.html', 'empresas/index.html', 'aprender/index.html', 'novidades/index.html', 'ajuda/index.html', 'seguranca.html'];
+const NO_MENU = ['index.html', 'app/index.html', 'empresas/index.html', 'aprender/index.html', 'calculadoras/index.html', 'novidades/index.html', 'ajuda/index.html', 'seguranca.html'];
 
 const VAZIOS = Object.fromEntries(MARCADORES.map((m) => [m, '']));
 const PREENCHIDOS: Record<string, string> = {
@@ -208,7 +211,7 @@ function problemasDeXml(xml: string): string[] {
 const hostsPermitidos = (dominio: string): string[] => [...gerador.HOSTS_DE_LINK_PERMITIDOS, 'schema.org', ...(dominio ? [dominio] : [])];
 
 /** As verificações que valem para qualquer conjunto de páginas geradas (as gravadas em `site/` e as do texto de exemplo). */
-function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: string, paginas: string[] = PAGINAS_BASE) {
+function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: string, paginas: string[] = PAGINAS_BASE, opcoes: { formularios?: string[] } = {}) {
   const hosts = hostsPermitidos(dominio);
   const prefixoDe = (nome: string) => visto(nome, 'estilo.css').replace('estilo.css', '');
   for (const nome of paginas) {
@@ -220,17 +223,25 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
     expect(html, `${nome}: expressão proibida`).not.toMatch(PROIBIDO_EXPRESSAO);
     // Os códigos das decisões internas do projeto (D-011, D-053) não são conteúdo público: fontes do tipo `clarevo` saem como "Regra do próprio Clarevo".
     expect(html, `${nome}: código de decisão interna`).not.toMatch(/\bD-\d{3}\b/);
-    // Sem cookies e sem nada que rastreie: os únicos scripts são os dados estruturados (que não executam) e a busca da Ajuda.
+    // Sem cookies e sem nada que rastreie: os únicos scripts são os dados estruturados (que não executam), a busca da Ajuda e o módulo das
+    // calculadoras (que só faz a conta no navegador, com o núcleo de js/nucleo/).
+    const noCalc = /^calculadoras\/[a-z-]+\.html$/.test(nome) && nome !== 'calculadoras/index.html';
     for (const m of html.matchAll(/<script\b([^>]*)>/gi)) {
       const ld = /^\s*type="application\/ld\+json"\s*$/.test(m[1]!);
       const busca = noAjuda && /^\s*src="busca\.js"\s+defer\s*$/.test(m[1]!);
-      expect(ld || busca, `${nome}: script não permitido: ${m[0]}`).toBe(true);
+      const calculadora = noCalc && /^\s*type="module"\s+src="calculadora\.js"\s*$/.test(m[1]!);
+      expect(ld || busca || calculadora, `${nome}: script não permitido: ${m[0]}`).toBe(true);
     }
     expect(html, `${nome}: manipulador de evento`).not.toMatch(/\son[a-z]+\s*=/i);
     expect(html, `${nome}: atributo style (a política de segurança não permite)`).not.toMatch(/\sstyle\s*=/i);
-    expect(html, `${nome}: iframe, formulário ou objeto`).not.toMatch(/<(iframe|form|object|embed|video|audio)\b/i);
+    expect(html, `${nome}: iframe ou objeto`).not.toMatch(/<(iframe|object|embed|video|audio)\b/i);
+    // Formulário só nas páginas que o interruptor liga (D-066), e sempre um POST para o próprio site.
+    if (opcoes.formularios?.includes(nome)) {
+      for (const m of html.matchAll(/<form\b[^>]*>/gi)) expect(m[0], `${nome}: formulário`).toMatch(/^<form class="formulario" method="post" action="\/api\/(contato|newsletter)">$/);
+    } else expect(html, `${nome}: formulário`).not.toMatch(/<form\b/i);
     for (const m of html.matchAll(/<input\b[^>]*>/gi)) {
-      expect(noAjuda && /type="search"/.test(m[0]), `${nome}: campo que não é a busca da Ajuda: ${m[0]}`).toBe(true);
+      const campoDeFormulario = opcoes.formularios?.includes(nome) && /type="(text|email|checkbox)"/.test(m[0]);
+      expect(campoDeFormulario || (noAjuda && /type="search"/.test(m[0])), `${nome}: campo que não é a busca da Ajuda nem de um formulário ligado: ${m[0]}`).toBe(true);
     }
     // Recursos (src, link, preload) só locais; links de texto só para o app, as fontes citadas no catálogo, o domínio da empresa e as páginas oficiais.
     for (const m of html.matchAll(/<(?:img|link|source|script)\b[^>]*\s(?:src|href)="(https?:)?\/\/[^"]*"/gi)) {
@@ -266,10 +277,10 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
     expect(html, `${nome}: menu do celular`).toContain('<details class="menu-movel"><summary>Menu</summary>');
     const cabecalho = /<header class="topo">([\s\S]*?)<\/header>/.exec(html)?.[1] ?? '';
     if (NO_MENU.includes(nome)) expect(cabecalho.match(/aria-current="page"/g)?.length, `${nome}: aria-current`).toBe(2);
-    else if (/^(aprender|novidades|ajuda)\//.test(nome)) expect(cabecalho.match(/class="secao-atual"/g)?.length, `${nome}: seção atual`).toBe(2);
+    else if (/^(aprender|calculadoras|novidades|ajuda)\//.test(nome)) expect(cabecalho.match(/class="secao-atual"/g)?.length, `${nome}: seção atual`).toBe(2);
     // Rodapé em todas: todas as seções, as páginas legais e "[RAZÃO SOCIAL] · CNPJ [CNPJ]" (com os valores, quando houver).
     const rodape = /<footer class="rodape">([\s\S]*?)<\/footer>/.exec(html)?.[1] ?? '';
-    for (const p of ['index.html', 'app/index.html', 'empresas/index.html', 'aprender/index.html', 'aprender/agenda.html', 'novidades/index.html', 'novidades/como-escrevemos.html', 'ajuda/index.html', 'seguranca.html', 'sobre.html', 'suporte.html', 'privacidade.html', 'termos.html', 'excluir-conta.html']) {
+    for (const p of ['index.html', 'app/index.html', 'empresas/index.html', 'aprender/index.html', 'aprender/agenda.html', 'calculadoras/index.html', 'novidades/index.html', 'novidades/como-escrevemos.html', 'ajuda/index.html', 'seguranca.html', 'sobre.html', 'imprensa.html', 'suporte.html', 'privacidade.html', 'termos.html', 'excluir-conta.html']) {
       expect(rodape, `${nome}: rodapé sem ${p}`).toContain(`<a href="${visto(nome, p)}">`);
     }
     expect(rodape, `${nome}: rodapé`).toMatch(/·\s*CNPJ\s/);
@@ -482,8 +493,11 @@ describe('site público: as páginas geradas', () => {
 
   it('site/dados-da-empresa.json tem um campo para cada marcador, só com texto', () => {
     for (const m of MARCADORES) expect(typeof valores[m], m).toBe('string');
+    // Além dos marcadores, só os dois interruptores dos formulários (D-066), booleanos e desligados no repositório.
     const extras = Object.keys(valores).filter((k) => !k.startsWith('_') && !MARCADORES.includes(k));
-    expect(extras).toEqual([]);
+    expect(extras).toEqual(['formulario_contato', 'newsletter']);
+    expect((valores as unknown as Record<string, unknown>).formulario_contato).toBe(false);
+    expect((valores as unknown as Record<string, unknown>).newsletter).toBe(false);
   });
 
   it('o catálogo que o gerador lê (TypeScript do core, sem pacote novo) é o mesmo que o teste importa', () => {
@@ -499,7 +513,7 @@ describe('site público: as páginas geradas', () => {
     expect(PAGINAS.filter((n) => n.endsWith('.html')).length).toBeGreaterThanOrEqual(50);
     // O feed RSS só existe com domínio (endereços completos); sem ele não há feed nem link para ele.
     expect(gerado.arquivos.has('novidades/feed.xml'), 'feed.xml só com domínio').toBe(dominio !== '');
-    for (const extra of ['estilo.css', '_headers', 'robots.txt', 'ajuda/indice.json', 'ajuda/busca.js', 'favicon.svg', 'og/clarevo.png', 'marca/clarevo-logotipo-reverso.svg']) expect(gerado.arquivos.has(extra), extra).toBe(true);
+    for (const extra of ['estilo.css', '_headers', 'robots.txt', 'ajuda/indice.json', 'ajuda/busca.js', 'favicon.svg', 'og/clarevo.png', 'marca/clarevo-logotipo-reverso.svg', 'calculadoras/calculadora.js', 'js/nucleo/calculators/catalog.js', '_worker.js', '_routes.json', 'imprensa/clarevo-logotipo.svg', 'imprensa/clarevo-logotipo.png']) expect(gerado.arquivos.has(extra), extra).toBe(true);
     const htmls = [...gerado.arquivos.keys()].filter((k) => k.endsWith('.html'));
     expect(htmls.filter((n) => !PAGINAS.includes(n))).toEqual([]);
   });
@@ -555,6 +569,23 @@ describe('site público: as páginas geradas', () => {
 
   it('nenhuma página tem travessão, a expressão proibida, script além do permitido, atributo de evento ou endereço de fora além do permitido; um h1, títulos sem pular nível, rodapé e links internos', () => {
     verificarPaginas(gerado.arquivos, dominio, PAGINAS);
+  });
+
+  it('com os formulários ligados (D-066), todas as páginas, inclusive as de resposta, passam nas mesmas verificações e só as três páginas com formulário têm <form>', () => {
+    const g = gerarSite({ dados: { ...PREENCHIDOS, formulario_contato: true, newsletter: true }, referencia: '2026-10-23' });
+    const respostas = ['contato-enviado.html', 'contato-erro.html', 'novidades/receber.html', 'novidades/receber-enviado.html', 'novidades/receber-confirmado.html', 'novidades/receber-erro.html'];
+    for (const nome of respostas) expect(g.arquivos.has(nome), nome).toBe(true);
+    verificarPaginas(g.arquivos, 'exemplo.test', [...PAGINAS, ...respostas], { formularios: ['empresas/index.html', 'novidades/index.html', 'novidades/receber.html'] });
+    // As páginas de resposta não são indexadas nem entram no sitemap; a página da inscrição, sim.
+    const sitemap = texto(g.arquivos.get('sitemap.xml'));
+    for (const nome of ['contato-enviado', 'contato-erro', 'novidades/receber-enviado', 'novidades/receber-confirmado', 'novidades/receber-erro']) {
+      expect(sitemap, nome).not.toContain(`/${nome}<`);
+      expect(texto(g.arquivos.get(`${nome}.html`)), nome).toContain('<meta name="robots" content="noindex">');
+    }
+    expect(sitemap).toContain('<loc>https://exemplo.test/novidades/receber</loc>');
+    expect(sitemap).not.toContain('404');
+    // Os links entre as páginas e para o worker existem.
+    expect(gerador.linksQuebrados(g.arquivos)).toEqual([]);
   });
 
   it('todo texto gerado (páginas, feed, índice da busca e arquivos de apoio) está livre de travessão e da expressão proibida', () => {
@@ -812,6 +843,9 @@ describe('site público: as páginas geradas', () => {
     expect(h).not.toContain('unsafe-eval');
     expect(h).not.toMatch(/https?:\/\/[^\s]*;/);
     expect(h).toContain("frame-ancestors 'none'");
+    // Os formulários (D-066) enviam só para o próprio site; ninguém mais recebe um envio.
+    expect(h).toContain("form-action 'self'");
+    expect(h).not.toContain("form-action 'none'");
     expect(h).toContain('X-Content-Type-Options: nosniff');
     // `interest-cohort` era da FLoC, que acabou: só as permissões que o site realmente nega.
     expect(h).not.toContain('interest-cohort');

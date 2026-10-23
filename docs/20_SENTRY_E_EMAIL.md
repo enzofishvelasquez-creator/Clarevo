@@ -32,3 +32,12 @@ Versão de 20/10/2026 (D-062 itens 6 e 7). Os dois dependem de contas em nome da
 7. Criar uma conta de teste com um e-mail próprio e conferir que o e-mail de confirmação chega com o nome Clarevo e que o link abre o app.
 
 **O que eu faço depois:** conferir que os links dos e-mails abrem a tela certa no app e na web com o domínio novo, atualizar `docs/05`, `docs/07` e `docs/16` e, se o provedor permitir, preparar um texto de "Lembrete de vencimento por e-mail" para decisão futura (hoje os lembretes são só no aparelho, D-025).
+
+## 3. O mesmo provedor no site: contato e Novidades por e-mail (D-066)
+
+O site (`docs/22_SITE.md`, seções 8.3, 8.4 e 9) tem dois formulários **prontos e desligados**, que usam serviços de e-mail por chamada de API, sem SMTP e sem gravar nada no site:
+
+- **Contato de "Para empresas"**: o `_worker.js` do projeto `clarevo-site` manda a mensagem ao e-mail de contato pelo **Resend**. É o provedor já sugerido na seção 2, então a conta, o domínio verificado (SPF e DKIM) e o remetente podem ser os mesmos dos e-mails de confirmação de cadastro. A chave de API é **outra** (só envio, restrita ao domínio) e fica só como segredo no painel da Cloudflare, nunca no repositório nem no chat.
+- **Novidades por e-mail**: cadastro com dupla confirmação no **Brevo** (plano gratuito, a conferir), que também envia as Novidades e traz o link de cancelamento de cada e-mail. É uma conta à parte do Resend (o Brevo é para lista e envio em lote, o Resend para mensagens do serviço).
+
+Antes de ligar qualquer um: o domínio e o e-mail da empresa (P-006, P-008), as seções 3.6 e 3.7 da política revisadas pelo advogado (perguntas 26 a 30 e 33 do resumo), o limite de taxa da Cloudflare criado e conferido (`docs/22`, seção 9, passo 1) e a atualização de `docs/lojas/privacidade.md` se o texto das lojas citar os serviços (Resend e Brevo viram operadores da lista de terceiros da política, seção 8).
