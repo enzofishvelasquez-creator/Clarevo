@@ -17,7 +17,7 @@ Versão de 20/10/2026. Junta o que está em `docs/04` (tabela "O que só você p
 | Cloudflare Pages | Site e versão web | Plano gratuito em uso hoje | Já em uso |
 | Sentry | Registro de falhas, sem dados financeiros | Plano gratuito (a conferir) | Antes do piloto |
 | Advogado | Política de privacidade, termos de uso, contrato com empresas, prazos de guarda | Orçamento do escritório | Antes do piloto |
-| Busca de marca no INPI | Evitar conflito com o nome "Clarevo" | Taxa do INPI e eventual assessoria | Antes de divulgar |
+| Busca e registro de marca no INPI | Evitar conflito com o nome "Clarevo" e proteger a marca | Busca gratuita; pedido de registro (código 389, especificação pré-aprovada) com taxa única por classe que já inclui a concessão desde 20/09/2025: R$ 880, ou R$ 440 com o desconto de ME, EPP e MEI (Portaria GM/MDIC nº 110/2025; conferir a tabela vigente do INPI antes de gerar a GRU). Começar pela classe 9 | Busca antes do domínio; pedido quando houver caixa |
 | Recuperação para um ponto no tempo (Supabase) | Voltar o banco a qualquer minuto | Cerca de US$ 105 por mês a mais | Só com volume real |
 
 **Mínimo para lançar:** Apple (US$ 99 por ano), Google (US$ 25 uma vez), Supabase Pro (US$ 25 por mês, mais cerca de US$ 10 se mantiver o projeto de teste), domínio, contador e advogado. O resto começa no plano gratuito.
