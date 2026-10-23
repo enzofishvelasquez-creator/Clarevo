@@ -1,7 +1,7 @@
 {
   "_leia-me": "Valores que trocam os marcadores das páginas. Vazio mantém o marcador visível e a faixa 'Versão preliminar, em revisão'. Preencha, rode 'node scripts/gerar-site.js --final' e só publique se passar. Em DOMÍNIO, só o endereço, sem https://: com ele o site ganha sitemap.xml, link canônico e Open Graph com endereço completo. E-MAIL DE CONTATO é o e-mail de Sobre, Para empresas (piloto) e Como escrevemos. Dados legais: só depois de conferidos com a empresa e o advogado. formulario_contato e newsletter (true ou false) ligam o formulário de contato de Para empresas e as Novidades por e-mail; só ligue depois de configurar o Resend e o Brevo no painel da Cloudflare (docs/22_SITE.md, seção 9).",
-  "RAZÃO SOCIAL": "",
-  "CNPJ": "",
+  "RAZÃO SOCIAL": "CLAREVO INOVA SIMPLES (I.S.)",
+  "CNPJ": "69.771.864/0001-03",
   "ENDEREÇO": "",
   "E-MAIL DE PRIVACIDADE": "",
   "E-MAIL DE SUPORTE": "",

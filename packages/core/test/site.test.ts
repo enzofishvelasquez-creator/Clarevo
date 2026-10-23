@@ -21,6 +21,12 @@ import { LEARN_SECTIONS, LEARN_UI_TEXT, SEASONAL_CALENDAR, publishedTopics, rela
  * estruturados; as capturas; o contraste das cores (a regra de `src/contrast.ts`); a recusa de `--final` enquanto sobrar marcador;
  * a imagem de compartilhamento e o gráfico de recursos do Google Play.
  */
+/** A razão social como aparece no site gravado: o valor de `site/dados-da-empresa.json` ou, vazio, o marcador. */
+function razaoSocialDoSite(): string {
+  const dados = JSON.parse(readFileSync(join(SITE, 'dados-da-empresa.json'), 'utf8')) as Record<string, string>;
+  return dados['RAZÃO SOCIAL'] || '[RAZÃO SOCIAL]';
+}
+
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const SITE = join(ROOT, 'site');
 const SCRIPT = join(ROOT, 'scripts', 'gerar-site.js');
@@ -284,7 +290,7 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
       expect(rodape, `${nome}: rodapé sem ${p}`).toContain(`<a href="${visto(nome, p)}">`);
     }
     expect(rodape, `${nome}: rodapé`).toMatch(/·\s*CNPJ\s/);
-    expect(rodape, `${nome}: rodapé`).toMatch(/RAZÃO SOCIAL|Empresa Exemplo/);
+    expect(['RAZÃO SOCIAL', 'Empresa Exemplo', razaoSocialDoSite()].some((r) => rodape.includes(r)), `${nome}: rodapé com a razão social`).toBe(true);
     if (nome === '404.html') expect(html, 'a 404 usa caminhos a partir da raiz').toContain('href="/estilo.css"');
     expect(prefixoDe(nome)).toBe(nome === '404.html' ? '/' : nome.includes('/') ? '../'.repeat(nome.split('/').length - 1) : '');
     // Dados estruturados: JSON válido.
@@ -807,7 +813,7 @@ describe('site público: as páginas geradas', () => {
   it('Sobre fala do que move o Clarevo e de quem está por trás, sem nomes de pessoas, fotos nem números de uso', () => {
     const h = html('sobre.html');
     for (const frase of ['Clareza', 'Sem anúncio', 'Sem venda de dados', 'Sem recomendar produtos']) expect(h, frase).toContain(frase);
-    expect(h).toContain('[RAZÃO SOCIAL]');
+    expect(h).toContain(razaoSocialDoSite());
     expect(h).toContain('[E-MAIL DE CONTATO]');
     expect(h).not.toMatch(/<img[^>]*(foto|retrato|equipe)/i);
     expect(h).not.toMatch(/fundador|fundadora|CEO|\d+\s*mil\s+(pessoas|usu)|milh[õo]es/i);
