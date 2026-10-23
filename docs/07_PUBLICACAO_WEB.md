@@ -8,7 +8,7 @@
 |---|---|---|
 | `clarevo` | https://clarevo.pages.dev | App com login real no projeto Supabase |
 | `clarevo-demo` | https://clarevo-demo.pages.dev | Só demonstração, com dados fictícios (para apresentações) |
-| `clarevo-site` | **ainda não criado** (seção "Site público", abaixo, e `docs/22_SITE.md`) | Site público: início, o app, para empresas, Aprender, calculadoras, Novidades, Ajuda, segurança, sobre, imprensa, suporte, privacidade, termos e excluir conta (e, em modo avançado, `_worker.js` para o formulário de contato e as Novidades por e-mail, desligados até Enzo ligar) |
+| `clarevo-site` | https://clarevo-site.pages.dev (criado por Enzo em 23/10/2026, ramo `main`, sem build, pasta `site`, sem variáveis, Web Analytics desligado na aba Metrics; **versão preliminar**, com a faixa "em revisão" e sem indexação, até o domínio e a revisão do advogado; seção "Site público", abaixo, e `docs/22_SITE.md`) | Site público: início, o app, para empresas, Aprender, calculadoras, Novidades, Ajuda, segurança, sobre, imprensa, suporte, privacidade, termos e excluir conta (e, em modo avançado, `_worker.js` para o formulário de contato e as Novidades por e-mail, desligados até Enzo ligar) |
 
 Os dois são publicados sozinhos a cada atualização da branch `main` do GitHub. Implantações de prévia (outras branches) estão desligadas.
 
