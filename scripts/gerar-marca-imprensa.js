@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
  * PNG do logotipo e do símbolo para o kit de imprensa do site (D-066, `docs/22_SITE.md`). Nada é redesenhado: cada PNG é o SVG de
- * `docs/marca/` desenhado pelo Chromium do Playwright, com fundo transparente, e gravado em `site-src/imprensa/`. O gerador do site
+ * `docs/marca/` desenhado pelo Chromium do Playwright, com fundo transparente, e gravado em `site-src/imprensa/`. O desenho é o do SVG, sem
+ * mudança: o que o PNG acrescenta é só uma margem transparente em volta (o respiro), porque o logotipo do SVG vai até a borda e quem o
+ * coloca num documento ou numa página costuma encostá-lo em outras coisas. A margem existe só na exportação, não no SVG. O gerador do site
  * (`scripts/gerar-site.js`) copia os SVG de `docs/marca/` e estes PNG para `site/imprensa/`.
  *
- * `site-src/imprensa/origem.json` guarda o resumo SHA-256 de cada SVG de onde o PNG saiu: o teste do site confere que os SVG de
+ * `site-src/imprensa/origem.json` guarda o resumo SHA-256 de cada SVG de onde o PNG saiu, o tamanho do PNG e a margem em pixels: o teste do site confere que os SVG de
  * `docs/marca/` ainda têm esse resumo, e assim um logotipo que mudou sem refazer o PNG aparece sem precisar do Chromium.
  *
  * Uso:
@@ -23,14 +25,18 @@ const RAIZ = path.join(__dirname, '..');
 const MARCA = path.join(RAIZ, 'docs', 'marca');
 const SAIDA = path.join(RAIZ, 'site-src', 'imprensa');
 
-/** O nome de cada arquivo, a largura do PNG e a proporção do `viewBox` do SVG (a altura sai dela). */
+/**
+ * O nome de cada arquivo, a largura do DESENHO (a altura sai da proporção do `viewBox` do SVG) e a margem transparente que o PNG ganha em
+ * cada lado, em pixels. O PNG fica `largura + 2 * margem` de largura. A margem do logotipo é 4% da largura do desenho (20% da altura dele)
+ * e a do símbolo, 8%: o símbolo é quadrado e costuma ir sozinho num ícone, então pede um pouco mais de ar.
+ */
 const ARQUIVOS = [
-  { svg: 'clarevo-logotipo.svg', largura: 2400 },
-  { svg: 'clarevo-logotipo-reverso.svg', largura: 2400 },
-  { svg: 'clarevo-logotipo-uma-cor.svg', largura: 2400 },
-  { svg: 'clarevo-simbolo.svg', largura: 1024 },
-  { svg: 'clarevo-simbolo-reverso.svg', largura: 1024 },
-  { svg: 'clarevo-simbolo-uma-cor.svg', largura: 1024 },
+  { svg: 'clarevo-logotipo.svg', largura: 2400, margem: 96 },
+  { svg: 'clarevo-logotipo-reverso.svg', largura: 2400, margem: 96 },
+  { svg: 'clarevo-logotipo-uma-cor.svg', largura: 2400, margem: 96 },
+  { svg: 'clarevo-simbolo.svg', largura: 1024, margem: 80 },
+  { svg: 'clarevo-simbolo-reverso.svg', largura: 1024, margem: 80 },
+  { svg: 'clarevo-simbolo-uma-cor.svg', largura: 1024, margem: 80 },
 ];
 
 const sha256 = (buf) => crypto.createHash('sha256').update(buf).digest('hex');
@@ -42,16 +48,18 @@ function proporcao(svg) {
   return { largura: Number(m[3]), altura: Number(m[4]) };
 }
 
-async function desenhar(navegador, svg, largura) {
+async function desenhar(navegador, svg, largura, margem) {
   const p = proporcao(svg);
   const altura = Math.round((largura * p.altura) / p.largura);
-  const pagina = await navegador.newPage({ viewport: { width: largura, height: altura }, deviceScaleFactor: 1 });
+  const totalLargura = largura + 2 * margem;
+  const totalAltura = altura + 2 * margem;
+  const pagina = await navegador.newPage({ viewport: { width: totalLargura, height: totalAltura }, deviceScaleFactor: 1 });
   const uri = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
-  await pagina.setContent(`<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:transparent}img{display:block;width:${largura}px;height:${altura}px}</style><img src="${uri}" alt="">`);
+  await pagina.setContent(`<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:transparent}img{display:block;margin:${margem}px;width:${largura}px;height:${altura}px}</style><img src="${uri}" alt="">`);
   await pagina.evaluate(() => document.querySelector('img').decode());
-  const png = await pagina.screenshot({ omitBackground: true, clip: { x: 0, y: 0, width: largura, height: altura } });
+  const png = await pagina.screenshot({ omitBackground: true, clip: { x: 0, y: 0, width: totalLargura, height: totalAltura } });
   await pagina.close();
-  return { png, largura, altura };
+  return { png, largura: totalLargura, altura: totalAltura };
 }
 
 /** Compara dois PNG pixel a pixel no Chromium (a compressão muda com a versão do zlib sem mudar a imagem). */
@@ -90,9 +98,9 @@ async function mesmosPixels(navegador, a, b) {
   fs.mkdirSync(SAIDA, { recursive: true });
   for (const a of ARQUIVOS) {
     const svg = fs.readFileSync(path.join(MARCA, a.svg));
-    const { png, largura, altura } = await desenhar(navegador, svg.toString('utf8'), a.largura);
+    const { png, largura, altura } = await desenhar(navegador, svg.toString('utf8'), a.largura, a.margem);
     const nome = a.svg.replace(/\.svg$/, '.png');
-    origem[a.svg] = { sha256: sha256(svg), png: nome, largura, altura };
+    origem[a.svg] = { sha256: sha256(svg), png: nome, largura, altura, margem: a.margem };
     const alvo = path.join(SAIDA, nome);
     if (verificar) {
       const ok = fs.existsSync(alvo) && (await mesmosPixels(navegador, fs.readFileSync(alvo), png));

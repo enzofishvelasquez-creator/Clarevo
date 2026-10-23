@@ -3,7 +3,8 @@
  * Servidor local mínimo para o teste de navegador do site (`scripts/e2e-site.js`) e para as capturas: serve a pasta `site/` como o
  * Cloudflare Pages faz (`/x` abre `x.html`, `/pasta/` abre `pasta/index.html`, 404 com `404.html`), aplica os cabeçalhos do
  * `_headers` (a política de segurança inclusive, para o navegador acusar qualquer violação) e, se houver `_worker.js` (modo avançado),
- * entrega a ele as rotas `/api/*` com um `env.ASSETS` que devolve os arquivos estáticos. Sem pacote novo: só `node:http`.
+ * entrega a ele só o que o `_routes.json` manda (`include` menos `exclude`, com `*` no fim ou no meio, como o Pages; sem o arquivo, tudo),
+ * com um `env.ASSETS` que devolve os arquivos estáticos. O resto sai direto dos arquivos, sem passar pelo worker. Sem pacote novo: só `node:http`.
  */
 const fs = require('node:fs');
 const http = require('node:http');
@@ -28,6 +29,22 @@ function lerCabecalhos(pasta) {
   return fs.existsSync(arquivo) ? cabecalhosDoTexto(fs.readFileSync(arquivo, 'utf8')) : {};
 }
 
+const escRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * As rotas do `_routes.json` como uma função: `true` se o caminho vai para o worker. `include` diz o que entra (padrão: tudo), `exclude`
+ * tira de novo (e vale mais), e `*` casa com qualquer sequência. Sem o arquivo, o worker recebe tudo, como o Pages no modo avançado.
+ */
+function lerRotas(pasta) {
+  const arquivo = path.join(pasta, '_routes.json');
+  if (!fs.existsSync(arquivo)) return () => true;
+  const { include = ['/*'], exclude = [] } = JSON.parse(fs.readFileSync(arquivo, 'utf8'));
+  const regra = (padrao) => new RegExp(`^${String(padrao).split('*').map(escRe).join('.*')}$`);
+  const entra = include.map(regra);
+  const sai = exclude.map(regra);
+  return (caminho) => entra.some((r) => r.test(caminho)) && !sai.some((r) => r.test(caminho));
+}
+
 /** O arquivo de um caminho, como o Cloudflare Pages resolve: o próprio arquivo, `x.html` ou `x/index.html`. */
 function resolverArquivo(pasta, caminho) {
   const limpo = decodeURIComponent(caminho).replace(/^\/+/, '');
@@ -40,15 +57,20 @@ function resolverArquivo(pasta, caminho) {
 }
 
 /**
- * Sobe o servidor. `env`: as variáveis que o `_worker.js` recebe (nada, por padrão: as rotas de envio respondem 503). `fetchDoWorker`:
- * o `fetch` que o worker usa para falar com Resend e Brevo (um simulado nos testes; vale no processo todo até `fechar`). Devolve `{ url, fechar, pedidos }`.
+ * Sobe o servidor. `env`: as variáveis que o `_worker.js` recebe (nada, por padrão: as rotas de envio respondem 503). `hostDoSite`: põe em
+ * `env.SITE_HOST` o endereço deste servidor (`127.0.0.1:porta`, que só se sabe depois de subir), para o worker aceitar os pedidos dele.
+ * `fetchDoWorker`: o `fetch` que o worker usa para falar com Resend e Brevo (um simulado nos testes; vale no processo todo até `fechar`).
+ * Devolve `{ url, fechar, pedidos, doWorker }`: `pedidos` são todos os pedidos (`GET /x`) e `doWorker`, só os que passaram pelo worker.
  */
-async function servir(pasta, { porta = 0, env = {}, fetchDoWorker } = {}) {
+async function servir(pasta, { porta = 0, env = {}, hostDoSite = false, fetchDoWorker } = {}) {
   const cabecalhos = lerCabecalhos(pasta);
+  const noWorker = lerRotas(pasta);
+  const variaveis = { ...env };
   const arquivoDoWorker = path.join(pasta, '_worker.js');
   // O worker é um módulo ES sem importações: entra por um endereço `data:`, sem o aviso do Node sobre pasta sem "type".
   const worker = fs.existsSync(arquivoDoWorker) ? (await import(`data:text/javascript;base64,${fs.readFileSync(arquivoDoWorker).toString('base64')}`)).default : null;
   const pedidos = [];
+  const doWorker = [];
   const estatico = (caminho, metodo) => {
     const arquivo = resolverArquivo(pasta, caminho);
     const naoAchou = !arquivo;
@@ -71,8 +93,9 @@ async function servir(pasta, { porta = 0, env = {}, fetchDoWorker } = {}) {
       });
       const requisicao = new Request(url, { method: q.method, headers: q.headers, body: corpo, duplex: 'half' });
       let resposta;
-      if (worker) {
-        resposta = await worker.fetch(requisicao, { ...env, ASSETS: { fetch: (req) => Promise.resolve(estatico(new URL(req.url).pathname, req.method)) } });
+      if (worker && noWorker(url.pathname)) {
+        doWorker.push(`${q.method} ${url.pathname}`);
+        resposta = await worker.fetch(requisicao, { ...variaveis, ASSETS: { fetch: (req) => Promise.resolve(estatico(new URL(req.url).pathname, req.method)) } });
       } else resposta = estatico(url.pathname, q.method);
       const saida = { ...Object.fromEntries(resposta.headers), ...cabecalhos };
       r.writeHead(resposta.status, saida);
@@ -84,9 +107,11 @@ async function servir(pasta, { porta = 0, env = {}, fetchDoWorker } = {}) {
   });
   await new Promise((ok) => servidor.listen(porta, '127.0.0.1', ok));
   const { port } = servidor.address();
+  if (hostDoSite) variaveis.SITE_HOST = `127.0.0.1:${port}`;
   return {
     url: `http://127.0.0.1:${port}`,
     pedidos,
+    doWorker,
     fechar: () => {
       globalThis.fetch = fetchOriginal;
       return new Promise((ok) => servidor.close(ok));
@@ -94,4 +119,4 @@ async function servir(pasta, { porta = 0, env = {}, fetchDoWorker } = {}) {
   };
 }
 
-module.exports = { servir, lerCabecalhos, resolverArquivo };
+module.exports = { servir, lerCabecalhos, lerRotas, resolverArquivo };

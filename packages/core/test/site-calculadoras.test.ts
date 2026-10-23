@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import * as core from '../src/calculators';
@@ -22,8 +22,9 @@ const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const SITE = join(ROOT, 'site');
 const require = createRequire(import.meta.url);
 const gerador = require(join(ROOT, 'scripts', 'gerar-site.js')) as { gerarSite: (o?: Record<string, unknown>) => { arquivos: Map<string, string | Buffer> } };
-const { nucleo, ENTRADAS } = require(join(ROOT, 'scripts', 'site', 'nucleo.js')) as { nucleo: () => Map<string, string>; ENTRADAS: string[] };
-const { exemploDa, EXEMPLOS } = require(join(ROOT, 'scripts', 'site', 'paginas', 'calculadoras.js')) as {
+const { nucleo, fechoDe, ENTRADAS } = require(join(ROOT, 'scripts', 'site', 'nucleo.js')) as { nucleo: () => Map<string, string>; fechoDe: (raizes: string[]) => string[]; ENTRADAS: string[] };
+const { exemploDa, EXEMPLOS, precargaDaCalculadora } = require(join(ROOT, 'scripts', 'site', 'paginas', 'calculadoras.js')) as {
+  precargaDaCalculadora: (slug: string) => string[];
   exemploDa: (slug: string) => { linhas: { rotulo?: string; valor?: string; texto?: string }[]; resultado: { resultLines: string[]; hypotheses: string[]; notes: string[] } };
   EXEMPLOS: Record<string, unknown>;
 };
@@ -70,7 +71,13 @@ describe('site público: núcleo das calculadoras (o código do core no navegado
     for (const [nome, fonte] of arquivos) expect(gerado.arquivos.get(nome), nome).toBe(fonte);
     const segunda = gerador.gerarSite();
     for (const [nome] of arquivos) expect(segunda.arquivos.get(nome), nome).toBe(gerado.arquivos.get(nome));
-    expect(gerado.arquivos.get('calculadoras/calculadora.js')).toBe(readFileSync(join(ROOT, 'site-src', 'calculadoras', 'calculadora.js'), 'utf8'));
+    // Os scripts das calculadoras (o que inicia a página, as peças comuns e uma definição por calculadora) saem de site-src sem mudança.
+    const scripts = ['calculadora.js', 'base.js', ...CALCULATORS.map((c) => `definicoes/${c.slug}.js`)];
+    for (const arq of scripts) {
+      expect(gerado.arquivos.get(`calculadoras/${arq}`), arq).toBe(readFileSync(join(ROOT, 'site-src', 'calculadoras', arq), 'utf8'));
+      expect(readFileSync(join(SITE, 'calculadoras', arq), 'utf8'), `site/calculadoras/${arq} está desatualizado: rode node scripts/gerar-site.js`).toBe(gerado.arquivos.get(`calculadoras/${arq}`));
+    }
+    expect([...gerado.arquivos.keys()].filter((k) => /^calculadoras\/.+\.js$/.test(k)).sort()).toEqual(scripts.map((a) => `calculadoras/${a}`).sort());
     for (const [nome, fonte] of arquivos) expect(readFileSync(join(SITE, nome), 'utf8'), `site/${nome} está desatualizado: rode node scripts/gerar-site.js`).toBe(fonte);
   });
 
@@ -299,15 +306,22 @@ describe('site público: páginas das calculadoras', () => {
     expect(pagina('404.html')).toContain('href="/calculadoras/index.html">Calculadoras</a>');
   });
 
-  it('o script da página só monta a tela: nada de envio, armazenamento, cookie, HTML solto nem escrita na URL', () => {
-    const js = readFileSync(join(ROOT, 'site-src', 'calculadoras', 'calculadora.js'), 'utf8');
-    expect(js).not.toMatch(/https?:|\bfetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket|localStorage|sessionStorage|indexedDB|document\.cookie|eval\s*\(|new Function|innerHTML|outerHTML|insertAdjacentHTML|document\.write|history\.|location\.(href|search|hash|assign|replace)\s*=/);
-    // Todo import é do núcleo gerado.
-    for (const m of js.matchAll(/from '([^']+)'/g)) expect(m[1], m[0]).toMatch(/^\.\.\/js\/nucleo\/.+\.js$/);
+  it('os scripts das calculadoras só montam a tela: nada de envio, armazenamento, cookie, HTML solto nem escrita na URL', () => {
+    const nomes = ['calculadora.js', 'base.js', ...CALCULATORS.map((c) => `definicoes/${c.slug}.js`)];
+    for (const arq of nomes) {
+      const js = readFileSync(join(ROOT, 'site-src', 'calculadoras', arq), 'utf8');
+      expect(js, arq).not.toMatch(/https?:|\bfetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket|localStorage|sessionStorage|indexedDB|document\.cookie|eval\s*\(|new Function|innerHTML|outerHTML|insertAdjacentHTML|document\.write|history\.|location\.(href|search|hash|assign|replace)\s*=/);
+      // Todo import é do núcleo gerado ou de outro script das calculadoras (nunca de fora).
+      for (const m of js.matchAll(/from '([^']+)'/g)) expect(m[1], `${arq}: ${m[0]}`).toMatch(/^(\.\.?\/js\/nucleo\/.+\.js|\.\.\/\.\.\/js\/nucleo\/.+\.js|\.\/base\.js|\.\.\/base\.js)$/);
+      for (const m of js.matchAll(/\bimport\('([^']+)'\)/g)) expect(m[1], `${arq}: ${m[0]}`).toMatch(/^(\.\.\/js\/nucleo\/.+\.js|\.\/definicoes\/[a-z-]+\.js)$/);
+      // Nenhum import() com caminho montado na hora (o modulepreload e a política de segurança precisam saber o que carrega).
+      expect(js, arq).not.toMatch(/\bimport\s*\(\s*[^'\s)]/);
+      expect(js, arq).not.toMatch(/[–—]/);
+      expect(js, arq).not.toMatch(/faz\w*\s+sentido/i);
+    }
     // O único parâmetro de endereço lido é "modo".
-    expect([...js.matchAll(/\.get\('([a-z]+)'\)/g)].map((m) => m[1])).toEqual(['modo']);
-    expect(js).not.toMatch(/[–—]/);
-    expect(js).not.toMatch(/faz\w*\s+sentido/i);
+    const todos = nomes.map((a) => readFileSync(join(ROOT, 'site-src', 'calculadoras', a), 'utf8')).join('\n');
+    expect([...todos.matchAll(/\.get\('([a-z]+)'\)/g)].map((m) => m[1])).toEqual(['modo']);
   });
 
   it('o _headers permite os módulos do próprio site e nada de fora', () => {
@@ -315,4 +329,158 @@ describe('site público: páginas das calculadoras', () => {
     expect(h).toContain("script-src 'self'");
     expect(h).not.toMatch(/unsafe-inline|unsafe-eval|https?:\/\//);
   });
+});
+
+describe('site público: cada página de calculadora carrega só o que usa', () => {
+  const PASTA_DOS_SCRIPTS = join(ROOT, 'site-src', 'calculadoras');
+  const lerScript = (nomeDoScript: string) => readFileSync(join(PASTA_DOS_SCRIPTS, nomeDoScript), 'utf8');
+  const ENTRADA = lerScript('calculadora.js');
+  const BASE = lerScript('base.js');
+  const nome = (slug: string) => `calculadoras/${slug}.html`;
+  const slugs = CALCULATORS.map((c) => c.slug);
+  const PESADOS = ['series', 'cards', 'committed', 'simulate', 'validation', 'dia-util'].map((m) => `js/nucleo/${m}.js`);
+  const COM_PESADOS = ['antes-de-financiar', 'plano-dividas'];
+  const importsDe = (fonte: string) => [...fonte.matchAll(/^import\s[^;]*?from\s+'([^']+)';/gm)].map((m) => m[1]!);
+  const doNucleo = (caminhos: string[], de: string) => caminhos.map((c) => posix.join(posix.dirname(de), c)).filter((c) => c.startsWith('js/nucleo/'));
+  const tamanho = (arquivos: string[]) => arquivos.reduce((n, a) => n + Buffer.byteLength(gerado.arquivos.get(a) as string), 0);
+  /** O que a página pré-carrega, em caminhos a partir da raiz do site. */
+  const preCarga = (slug: string) => [...pagina(nome(slug)).matchAll(/<link rel="modulepreload" href="([^"]+)">/g)].map((m) => posix.join('calculadoras', m[1]!));
+  /** Os módulos do núcleo que um script importa de cara, com tudo o que eles importam. */
+  const nucleoDe = (script: string, arquivo: string) => fechoDe(doNucleo(importsDe(script), arquivo));
+
+  it('o script que inicia a página importa de cara só as peças comuns, o catálogo e as datas; o resto vem de import() com caminho escrito por extenso', () => {
+    expect(importsDe(ENTRADA).sort()).toEqual(['../js/nucleo/calculators/catalog.js', '../js/nucleo/dates.js', './base.js']);
+    expect(importsDe(BASE).sort()).toEqual(['../js/nucleo/calculators/catalog.js', '../js/nucleo/calculators/inputs.js', '../js/nucleo/money.js']);
+    // O que ele puxa de cara não traz nenhuma das calculadoras pesadas (séries, cartões, lançamentos e simulação).
+    const deCara = [...new Set([...nucleoDe(ENTRADA, 'calculadoras/calculadora.js'), ...nucleoDe(BASE, 'calculadoras/base.js')])];
+    for (const pesado of PESADOS) expect(deCara, pesado).not.toContain(pesado);
+    expect(tamanho(deCara)).toBeLessThan(40_000);
+    // Cada calculadora tem o seu par de import() (o módulo do núcleo e a definição dela), e só um de cada, com caminho que existe.
+    const dinamicos = [...ENTRADA.matchAll(/\bimport\('([^']+)'\)/g)].map((m) => m[1]!);
+    for (const slug of slugs) {
+      expect(dinamicos.filter((d) => d === `../js/nucleo/calculators/${slug}.js`), slug).toHaveLength(1);
+      expect(dinamicos.filter((d) => d === `./definicoes/${slug}.js`), slug).toHaveLength(1);
+      expect(gerado.arquivos.has(`js/nucleo/calculators/${slug}.js`), slug).toBe(true);
+      expect(gerado.arquivos.has(`calculadoras/definicoes/${slug}.js`), slug).toBe(true);
+      expect(ENTRADA, slug).toMatch(new RegExp(`^\\s*(?:'${slug}'|${slug}): \\{ nucleo: \\(\\) => import\\('\\.\\./js/nucleo/calculators/${slug}\\.js'\\), definicao: \\(\\) => import\\('\\./definicoes/${slug}\\.js'\\) \\},`, 'm'));
+    }
+    expect(dinamicos.filter((d) => !d.startsWith('./definicoes/') && !/calculators\/(?!links)/.test(d))).toEqual(['../js/nucleo/calculators/links.js']);
+    // O links.js (que traz as séries e os cartões) só é pedido quando o endereço traz ?modo=: sem parâmetro o prefill do core é vazio.
+    expect(ENTRADA).toMatch(/modoDoEndereco \? import\('\.\.\/js\/nucleo\/calculators\/links\.js'\)/);
+    for (const slug of slugs) expect(calcPrefill(slug, {}), slug).toEqual({});
+    // Se o módulo não carregar, a página diz isso em vez de ficar parada em "carregando".
+    expect(ENTRADA).toContain('Não foi possível carregar a calculadora.');
+  });
+
+  it('cada definição importa só as peças comuns e o núcleo, e entrega a fábrica da tela (export default); nenhuma importa outra definição', () => {
+    for (const slug of slugs) {
+      const arquivo = `definicoes/${slug}.js`;
+      const fonte = lerScript(arquivo);
+      expect(fonte, slug).toMatch(/^export default \(ctx, pre, \{[^}]*\}\) => \{$/m);
+      for (const origem of importsDe(fonte)) expect(origem, `${slug}: ${origem}`).toMatch(/^(\.\.\/base\.js|\.\.\/\.\.\/js\/nucleo\/.+\.js)$/);
+      expect(fonte, slug).not.toMatch(/\bimport\s*\(/);
+      // O módulo do núcleo da calculadora chega por parâmetro (é o import() da página): a definição não o importa de novo.
+      expect(fonte, slug).not.toContain(`calculators/${slug}.js`);
+    }
+    expect(slugs).toHaveLength(10);
+  });
+
+  it('cada página tem o modulepreload dos scripts dela, do módulo do núcleo da calculadora e de tudo o que eles importam, e nada além disso', () => {
+    for (const slug of slugs) {
+      const html = pagina(nome(slug));
+      const links = preCarga(slug);
+      expect(links, slug).toEqual(precargaDaCalculadora(slug));
+      expect(links[0], slug).toBe('calculadoras/calculadora.js');
+      expect(links, slug).toContain('calculadoras/base.js');
+      expect(links, slug).toContain(`calculadoras/definicoes/${slug}.js`);
+      expect(links, slug).toContain(`js/nucleo/calculators/${slug}.js`);
+      // Nenhuma outra definição entra na página.
+      expect(links.filter((a) => a.startsWith('calculadoras/definicoes/')), slug).toEqual([`calculadoras/definicoes/${slug}.js`]);
+      for (const a of links) expect(gerado.arquivos.has(a), `${slug}: ${a} não existe`).toBe(true);
+      expect(new Set(links).size, slug).toBe(links.length);
+      // Os links ficam no <head>, antes do script do módulo, e o script continua sendo um módulo do próprio site.
+      const cabeca = html.slice(0, html.indexOf('</head>'));
+      expect(cabeca.match(/<link rel="modulepreload"/g), slug).toHaveLength(links.length);
+      expect(cabeca.indexOf('<link rel="modulepreload"'), slug).toBeLessThan(cabeca.indexOf('<script type="module" src="calculadora.js">'));
+      // O fecho do núcleo está completo: o módulo da calculadora, a definição e o que a página importa de cara, com tudo o que eles importam.
+      const defin = lerScript(`definicoes/${slug}.js`);
+      const raizes = [`js/nucleo/calculators/${slug}.js`, ...doNucleo(importsDe(defin), `calculadoras/definicoes/${slug}.js`), ...doNucleo(importsDe(ENTRADA), 'calculadoras/calculadora.js'), ...doNucleo(importsDe(BASE), 'calculadoras/base.js')];
+      expect(links.filter((a) => a.startsWith('js/nucleo/')), slug).toEqual(fechoDe(raizes));
+    }
+    // O índice não tem calculadora na página, então não pré-carrega nada.
+    expect(pagina('calculadoras/index.html')).not.toContain('modulepreload');
+  });
+
+  it('as calculadoras leves não carregam séries, cartões, lançamentos nem simulação; as duas que usam isso carregam, e cada página pesa bem menos que antes', () => {
+    // Antes da divisão, toda página carregava o núcleo inteiro (26 arquivos) e o script único de todas as calculadoras: 336.928 bytes.
+    const ANTES = 336_928;
+    const pesos: Record<string, number> = {};
+    for (const slug of slugs) {
+      const links = preCarga(slug);
+      pesos[slug] = tamanho(links);
+      expect(pesos[slug], slug).toBeLessThan(ANTES);
+      if (COM_PESADOS.includes(slug)) {
+        expect(links.some((a) => PESADOS.includes(a)), slug).toBe(true);
+        expect(pesos[slug], slug).toBeLessThan(ANTES * 0.75);
+        continue;
+      }
+      for (const pesado of PESADOS) expect(links, `${slug}: ${pesado}`).not.toContain(pesado);
+      expect(pesos[slug], `${slug}: bytes carregados`).toBeLessThan(ANTES / 5);
+    }
+  });
+
+  it('os campos e as mensagens de erro que o script monta, sem o fields.js do core, são exatamente os do core, para as dez calculadoras', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'clarevo-campos-'));
+    try {
+      for (const [arq, fonte] of nucleo()) {
+        mkdirSync(dirname(join(dir, arq)), { recursive: true });
+        writeFileSync(join(dir, arq), fonte);
+      }
+      for (const [arq, fonte] of gerado.arquivos) {
+        if (!/^calculadoras\/.+\.js$/.test(arq)) continue;
+        mkdirSync(dirname(join(dir, arq)), { recursive: true });
+        writeFileSync(join(dir, arq), fonte as string);
+      }
+      writeFileSync(join(dir, 'package.json'), '{"type":"module"}');
+      const consultas = slugs.flatMap((slug) => [
+        { slug, modo: undefined },
+        ...(slug === 'parcelado-ou-a-vista' ? [{ slug, modo: 'cota-unica' }] : []),
+      ]);
+      const erros = slugs.flatMap((slug) => [...Object.keys(calcFields(slug)), 'renda.1', 'apelido.0', 'tipo.2', 'campo-que-nao-existe'].flatMap((campo) => CODIGOS.map((codigo) => ({ slug, campo, codigo }))));
+      writeFileSync(join(dir, 'consultas.json'), JSON.stringify({ consultas, erros }));
+      writeFileSync(
+        join(dir, 'rodar.mjs'),
+        `import { readFileSync } from 'node:fs';
+globalThis.document = { querySelector: () => null };
+globalThis.window = { location: { search: '' } };
+const { MODULOS } = await import('./calculadoras/calculadora.js');
+const { NOMES_DOS_CAMPOS, camposDe, textoDoErro } = await import('./calculadoras/base.js');
+const { consultas, erros } = JSON.parse(readFileSync(new URL('./consultas.json', import.meta.url)));
+const modulos = {};
+for (const slug of Object.keys(MODULOS)) {
+  modulos[slug] = await MODULOS[slug].nucleo();
+  const definicao = await MODULOS[slug].definicao();
+  if (typeof definicao.default !== 'function') throw new Error(slug + ': a definição não exporta a fábrica');
+}
+process.stdout.write(JSON.stringify({
+  slugs: Object.keys(MODULOS),
+  nomes: Object.keys(NOMES_DOS_CAMPOS),
+  campos: consultas.map((c) => camposDe(c.slug, c.modo, modulos[c.slug])),
+  erros: erros.map((e) => textoDoErro(e.slug, e.campo, e.codigo, undefined, modulos[e.slug])),
+  errosCotaUnica: textoDoErro('parcelado-ou-a-vista', 'aVista', 'vazio', 'cota-unica', modulos['parcelado-ou-a-vista']),
+}));
+`,
+      );
+      const r = spawnSync(process.execPath, [join(dir, 'rodar.mjs')], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+      expect(r.status, r.stderr).toBe(0);
+      const saida = JSON.parse(r.stdout) as { slugs: string[]; nomes: string[]; campos: unknown[]; erros: string[]; errosCotaUnica: string };
+      expect([...saida.slugs].sort()).toEqual([...slugs].sort());
+      expect([...saida.nomes].sort()).toEqual([...slugs].sort());
+      consultas.forEach((c, i) => expect(saida.campos[i], `${c.slug} ${c.modo ?? ''}`).toEqual(JSON.parse(JSON.stringify(calcFields(c.slug, c.modo)))));
+      erros.forEach((e, i) => expect(saida.erros[i], `${e.slug} ${e.campo} ${e.codigo}`).toBe(calcErrorText(e.slug, e.campo, e.codigo)));
+      expect(saida.errosCotaUnica).toBe(calcErrorText('parcelado-ou-a-vista', 'aVista', 'vazio', 'cota-unica'));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
 });

@@ -16,16 +16,16 @@ const nfc = (s) => String(s).normalize('NFC');
 
 /**
  * Marcador de dado, `[A DEFINIR: ...]` (o que não está decidido), `[PROPOSTA: ...]` (o que é só proposta da equipe, ainda sem confirmação
- * jurídica) ou qualquer outro texto em MAIÚSCULAS entre colchetes (que não seja o texto de um link).
+ * jurídica), `[A RETIRAR: ...]` (texto que não pode ir ao ar, como a seção de um formulário desligado) ou qualquer outro texto em MAIÚSCULAS entre colchetes (que não seja o texto de um link).
  */
 const FONTE_MARCADOR =
-  '\\[(?:A DEFINIR|PROPOSTA)[^\\]\\n]*\\](?!\\()' +
+  '\\[(?:A DEFINIR|PROPOSTA|A RETIRAR)[^\\]\\n]*\\](?!\\()' +
   `|\\[(?:${MARCADORES.map(escRe).join('|')})\\](?!\\()` +
   '|\\[[A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þ0-9 /.\\-]{2,}\\](?!\\()';
 
 function classificarMarcador(m) {
   const dentro = m.slice(1, -1);
-  if (/^(A DEFINIR|PROPOSTA)/.test(dentro)) return { tipo: 'definir' };
+  if (/^(A DEFINIR|PROPOSTA|A RETIRAR)/.test(dentro)) return { tipo: 'definir' };
   if (MARCADORES.includes(dentro)) return { tipo: 'dado', nome: dentro };
   return { tipo: 'desconhecido' };
 }

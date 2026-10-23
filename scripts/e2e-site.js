@@ -5,9 +5,13 @@
  *   - as dez calculadoras: preenche os campos e compara o que aparece na tela com o que o core calcula (a mesma entrada, o mesmo texto);
  *   - nenhuma violação da política de segurança, erro de console ou erro de página; nenhum pedido para fora do próprio site; nenhum cookie e
  *     nada em localStorage, sessionStorage nem na URL;
- *   - sem JavaScript: cada calculadora mostra o aviso e o exemplo, e o formulário de contato continua enviando por POST comum;
+ *   - cada página de calculadora carrega só o que usa (o módulo dela e o que ele importa, tudo já pedido pelo modulepreload) e as leves nem
+ *     tocam nas séries, nos cartões nem nos lançamentos;
+ *   - sem JavaScript: cada calculadora mostra o aviso e o exemplo, e o formulário de contato continua enviando por POST comum, com a página
+ *     de erro dizendo qual campo conferir;
  *   - os formulários, ligados só para este teste (o site é gerado numa pasta temporária com os interruptores `true`), com o `_worker.js`
- *     de verdade e um `fetch` simulado no lugar do Resend e do Brevo: envio, validação, campo-isca e consentimento.
+ *     de verdade (com SITE_HOST) e um `fetch` simulado no lugar do Resend e do Brevo: envio, validação, campo-isca e consentimento, e o
+ *     Origin que o navegador manda de verdade num formulário da própria página.
  * Uso: npm run test:site   (gera o site numa pasta temporária, sobe o servidor local e percorre os fluxos; nada é gravado em `site/`)
  * Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  */
@@ -187,6 +191,7 @@ function roteiros(CALC) {
   };
   const servidor = await servir(saida, {
     env: { RESEND_API_KEY: 'chave-so-de-teste', CONTATO_DESTINO: 'contato@exemplo.test', CONTATO_REMETENTE: 'Clarevo <site@exemplo.test>', BREVO_API_KEY: 'chave-so-de-teste', BREVO_LISTA_ID: '7', BREVO_MODELO_CONFIRMACAO_ID: '3' },
+    hostDoSite: true,
     fetchDoWorker: fetchSimulado,
   });
   const origem = servidor.url;
@@ -207,11 +212,26 @@ function roteiros(CALC) {
       return p;
     };
 
-    // 1. As dez calculadoras: o que aparece na tela é o que o core calcula.
+    // 1. As dez calculadoras: o que aparece na tela é o que o core calcula, e cada página carrega só o que usa.
+    const PESADOS = ['series.js', 'cards.js', 'committed.js', 'simulate.js', 'validation.js', 'dia-util.js'];
+    const LEVES = ['parcelado-ou-a-vista', 'custo-por-ano', 'custo-da-divida', 'quitar-antes', 'multa-e-juros', 'reserva', 'juntar-para-objetivo', 'dividir-contas'];
+    const pesos = {};
     for (const rot of roteiros(CALC)) {
       const p = await pagina();
+      const modulos = [];
+      p.on('response', async (r) => {
+        if (r.url().endsWith('.js')) modulos.push({ url: r.url(), bytes: (await r.body()).length });
+      });
       await p.goto(`${origem}/calculadoras/${rot.slug}.html`);
       await p.waitForSelector('[data-pronta]');
+      {
+        const preCarga = await p.$$eval('link[rel="modulepreload"]', (ls) => ls.map((l) => l.href));
+        const carregados = [...new Set(modulos.map((m) => m.url))].sort();
+        ok(`${rot.slug}: tudo o que a página carrega foi pedido pelo modulepreload, e nada que ele pediu ficou sem uso`, JSON.stringify(carregados) === JSON.stringify([...new Set(preCarga)].sort()), `carregados ${carregados.length}, modulepreload ${preCarga.length}: ${carregados.filter((u) => !preCarga.includes(u)).join(', ')} / ${preCarga.filter((u) => !carregados.includes(u)).join(', ')}`);
+        ok(`${rot.slug}: carrega o módulo da própria calculadora`, carregados.some((u) => u.endsWith(`/calculators/${rot.slug}.js`)));
+        if (LEVES.includes(rot.slug)) ok(`${rot.slug}: calculadora leve, sem séries, cartões, lançamentos nem simulação`, !carregados.some((u) => PESADOS.some((n) => u.endsWith(`/${n}`))), carregados.filter((u) => PESADOS.some((n) => u.endsWith(`/${n}`))).join(', '));
+        pesos[rot.slug] = { pedidos: carregados.length, bytes: [...new Map(modulos.map((m) => [m.url, m.bytes]))].reduce((n, [, b]) => n + b, 0) };
+      }
       await rot.preencher(p);
       await p.click('h1');
       const esperado = rot.esperado();
@@ -242,8 +262,18 @@ function roteiros(CALC) {
       ok('cota única: resultado igual ao do core', JSON.stringify(await p.$$eval('.calc-resultados .calc-linhas p', (e) => e.map((x) => x.textContent))) === JSON.stringify(s.result.resultLines));
       await p.close();
       const q = await pagina();
+      const dinamicos = [];
+      q.on('request', (r) => r.url().endsWith('/calculators/links.js') && dinamicos.push(r.url()));
       await q.goto(`${origem}/calculadoras/custo-da-divida.html?modo=emprestimo`);
       await q.waitForSelector('[data-pronta]');
+      ok('dívida: o links.js (séries e cartões do core) só é pedido porque o endereço traz ?modo=', dinamicos.length === 1);
+      const sem = await pagina();
+      const semModo = [];
+      sem.on('request', (r) => r.url().endsWith('/calculators/links.js') && semModo.push(r.url()));
+      await sem.goto(`${origem}/calculadoras/custo-da-divida.html`);
+      await sem.waitForSelector('[data-pronta]');
+      ok('dívida: sem ?modo= o links.js nem é pedido', semModo.length === 0);
+      await sem.close();
       ok('dívida: o tipo "Empréstimo" já vem marcado pelo parâmetro do tema', await q.isChecked('input[name="r-tipo"][value="emprestimo"]'));
       await q.close();
     }
@@ -280,9 +310,23 @@ function roteiros(CALC) {
       await p.fill('#ct-mensagem', 'Quero conversar sobre um piloto.');
       const antes = chamadas.length;
       // Com o JavaScript desligado o Playwright não acusa o fim do carregamento: espera-se o endereço novo (`commit`) e o título aparecer.
-      await Promise.all([p.waitForURL('**/contato-enviado', { waitUntil: 'commit' }), p.click('button[type=submit]', { noWaitAfter: true })]);
+      // O envio é o implícito do formulário (Enter num campo, o mesmo POST do botão): com o JavaScript desligado o `click` do Playwright fica
+      // preso na ação neste Chromium (o botão nunca "estabiliza"), e o formulário não depende dele.
+      await p.focus('#ct-nome');
+      await Promise.all([p.waitForURL('**/contato-enviado', { waitUntil: 'commit' }), p.keyboard.press('Enter')]);
       await p.waitForSelector('h1');
       ok('sem JavaScript: o formulário de contato envia por POST e cai em "Mensagem enviada"', (await p.textContent('h1')) === 'Mensagem enviada' && chamadas.length === antes + 1);
+      // A página de erro diz qual campo conferir, sem JavaScript: o servidor manda para a página daquele campo.
+      const invalido = await semJs.request.post(`${origem}/api/contato`, {
+        form: { nome: 'Pessoa de Teste', email: 'isto-nao-e-um-email', empresa: 'Empresa Exemplo', faixa: '51-200', mensagem: 'Quero conversar sobre um piloto.' },
+        headers: { accept: 'text/html,application/xhtml+xml' },
+        maxRedirects: 0,
+      });
+      ok('sem JavaScript: o e-mail inválido (com os outros campos certos) é redirecionado para a página de erro do e-mail', invalido.status() === 303 && invalido.headers().location === '/contato-erro-email', `${invalido.status()} ${invalido.headers().location}`);
+      await p.goto(`${origem}/contato-erro-email`);
+      const erro = await p.textContent('main');
+      ok('sem JavaScript: a página de erro diz qual campo conferir e como voltar', (await p.textContent('h1')) === 'Confira o campo E-mail' && erro.includes('O campo "E-mail" está vazio') && (await p.$('a[href="empresas/index.html#formulario-contato"]')) !== null);
+      ok('sem JavaScript: nenhuma chamada ao Resend foi feita para o e-mail inválido', chamadas.length === antes + 1);
       await semJs.close();
     }
 
@@ -298,18 +342,34 @@ function roteiros(CALC) {
       await p.selectOption('#ct-faixa', '201-1000');
       await p.fill('#ct-mensagem', 'Linha 1\nLinha 2 <script>alert(1)</script>');
       const antes = chamadas.length;
+      // O que o navegador manda de verdade num formulário da própria página: com Referrer-Policy same-origin o Origin é o do site (com
+      // no-referrer viria "null", que o worker recusa) e o Sec-Fetch-Site é same-origin.
+      const cabecalhosDoEnvio = new Promise((resolve) => p.on('request', async (q) => q.method() === 'POST' && resolve(await q.allHeaders())));
       await Promise.all([p.waitForURL('**/contato-enviado'), p.click('button[type=submit]')]);
+      const enviado = await cabecalhosDoEnvio;
+      ok('contato: o navegador manda o Origin do site e Sec-Fetch-Site same-origin (e o worker aceita)', enviado.origin === origem && enviado['sec-fetch-site'] === 'same-origin', JSON.stringify({ origin: enviado.origin, site: enviado['sec-fetch-site'] }));
       const c = chamadas[chamadas.length - 1];
       ok('contato: o envio chega ao Resend com os campos e o texto escapado', chamadas.length === antes + 1 && c.url === 'https://api.resend.com/emails' && c.corpo.html.includes('&lt;script&gt;') && !c.corpo.html.includes('<script>') && c.corpo.to[0] === 'contato@exemplo.test' && c.corpo.reply_to === 'pessoa@exemplo.test');
       ok('contato: a chave vai só no cabeçalho do pedido ao Resend, nunca na página nem no corpo', !JSON.stringify(c.corpo).includes('chave-so-de-teste') && c.cabecalhos.Authorization === 'Bearer chave-so-de-teste' && !(await p.content()).includes('chave-so-de-teste'));
+      ok('contato: o pedido ao Resend leva User-Agent: clarevo-site', c.cabecalhos['User-Agent'] === 'clarevo-site');
 
       // Validação do servidor (o navegador é desligado de propósito) e campo-isca.
       await p.goto(`${origem}/empresas/`);
       await p.evaluate(() => { document.querySelector('form.formulario').noValidate = true; });
+      // Só o e-mail está errado (todos os outros campos estão certos): a página de erro é a dele, e nada é enviado.
       await p.fill('#ct-nome', 'Alguém');
       await p.fill('#ct-email', 'isto-nao-e-um-email');
-      await Promise.all([p.waitForURL('**/contato-erro'), p.click('button[type=submit]')]);
-      ok('contato: e-mail inválido cai na página de erro, sem enviar', (await p.textContent('h1')) === 'Não foi possível enviar' && chamadas.length === antes + 1);
+      await p.fill('#ct-empresa', 'Empresa Exemplo');
+      await p.selectOption('#ct-faixa', '51-200');
+      await p.fill('#ct-mensagem', 'Quero conversar sobre um piloto.');
+      await Promise.all([p.waitForURL('**/contato-erro-email'), p.click('button[type=submit]')]);
+      ok('contato: e-mail inválido (com os outros campos certos) cai na página de erro do e-mail, sem enviar', (await p.textContent('h1')) === 'Confira o campo E-mail' && chamadas.length === antes + 1);
+      // Campos vazios: a página de erro é a do primeiro campo, na ordem do formulário.
+      await p.goto(`${origem}/empresas/`);
+      await p.evaluate(() => { document.querySelector('form.formulario').noValidate = true; });
+      await p.fill('#ct-nome', 'Alguém');
+      await Promise.all([p.waitForURL('**/contato-erro-email'), p.click('button[type=submit]')]);
+      ok('contato: com vários campos errados, a página de erro é a do primeiro deles', (await p.textContent('h1')) === 'Confira o campo E-mail' && chamadas.length === antes + 1);
       await p.goto(`${origem}/empresas/`);
       await p.evaluate(() => { document.querySelector('form.formulario').noValidate = true; });
       await p.fill('#ct-nome', 'Robô');
@@ -334,8 +394,10 @@ function roteiros(CALC) {
       await p.goto(`${origem}/novidades/receber.html`);
       await p.evaluate(() => { document.querySelector('form.formulario').noValidate = true; });
       await p.fill('#nv-email', 'leitora@exemplo.test');
-      await Promise.all([p.waitForURL('**/novidades/receber-erro'), p.click('button[type=submit]')]);
-      ok('newsletter: sem consentimento o servidor recusa e nada é cadastrado', chamadas.length === antesN + 1);
+      await Promise.all([p.waitForURL('**/novidades/receber-erro-consentimento'), p.click('button[type=submit]')]);
+      ok('newsletter: sem consentimento o servidor recusa, a página de erro é a da caixa e nada é cadastrado', (await p.textContent('h1')) === 'Confira o campo Consentimento' && chamadas.length === antesN + 1);
+      const ua = chamadas.find((x) => x.url.includes('brevo'));
+      ok('newsletter: o pedido ao Brevo leva User-Agent: clarevo-site', ua && ua.cabecalhos['User-Agent'] === 'clarevo-site');
       await p.close();
     }
 
@@ -357,6 +419,7 @@ function roteiros(CALC) {
       await p.close();
     }
 
+    if (process.env.PESOS_DAS_CALCULADORAS) console.log(`\nJavaScript carregado por página de calculadora (sem compressão):\n${Object.entries(pesos).map(([s, v]) => `  ${s.padEnd(22)} ${String(v.pedidos).padStart(3)} pedidos ${String(v.bytes).padStart(7)} B`).join('\n')}\n`);
     ok('nenhuma violação da política de segurança, erro de console ou de página', problemas.length === 0, problemas.slice(0, 3).join(' | '));
     ok('nenhum pedido para fora do próprio site', pedidosDeFora.length === 0, pedidosDeFora.slice(0, 3).join(' | '));
     ok('nenhum cookie definido pelo site', (await ctx.cookies()).length === 0, JSON.stringify(await ctx.cookies()));

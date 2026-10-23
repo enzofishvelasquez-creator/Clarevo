@@ -75,6 +75,8 @@ function transpilar(ts, arquivo) {
 }
 
 let guardado = null;
+/** Quem importa quem, nos caminhos de saída (`js/nucleo/...`): serve ao `modulepreload` de cada página (`fechoDe`). */
+let grafo = null;
 
 /**
  * O núcleo: `Map` de caminho em `site/` (`js/nucleo/calculators/catalog.js`) para o texto do módulo. Guardado em memória: o gerador
@@ -89,16 +91,38 @@ function nucleo() {
     const arquivo = fila.shift();
     if (feitos.has(arquivo)) continue;
     const { saida, dependencias } = transpilar(ts, arquivo);
-    feitos.set(arquivo, saida);
+    feitos.set(arquivo, { texto: saida, deps: dependencias });
     fila.push(...dependencias);
   }
+  const saidaDe = (arquivo) => `${PASTA}/${path.relative(CORE_SRC, arquivo).split(path.sep).join('/').replace(/\.ts$/, '.js')}`;
   const arquivos = new Map();
-  for (const [arquivo, texto] of [...feitos].sort((a, b) => a[0].localeCompare(b[0]))) {
+  const dependencias = new Map();
+  for (const [arquivo, { texto, deps }] of [...feitos].sort((a, b) => a[0].localeCompare(b[0]))) {
     const relativo = path.relative(CORE_SRC, arquivo).split(path.sep).join('/');
-    arquivos.set(`${PASTA}/${relativo.replace(/\.ts$/, '.js')}`, `// Gerado por scripts/gerar-site.js a partir de packages/core/src/${relativo}. Não edite: rode "node scripts/gerar-site.js".\n${texto}`);
+    arquivos.set(saidaDe(arquivo), `// Gerado por scripts/gerar-site.js a partir de packages/core/src/${relativo}. Não edite: rode "node scripts/gerar-site.js".\n${texto}`);
+    dependencias.set(saidaDe(arquivo), [...new Set(deps.map(saidaDe))].sort());
   }
   guardado = arquivos;
+  grafo = dependencias;
   return arquivos;
 }
 
-module.exports = { nucleo, ENTRADAS, PASTA };
+/**
+ * O fecho de dependências (os próprios módulos e tudo o que eles importam, direta ou indiretamente) de uma lista de módulos do núcleo,
+ * em caminhos de `site/` (`js/nucleo/dates.js`), em ordem alfabética. É o que cada página de calculadora pré-carrega.
+ */
+function fechoDe(raizes) {
+  nucleo();
+  const visto = new Set();
+  const fila = [...raizes];
+  while (fila.length > 0) {
+    const m = fila.shift();
+    if (visto.has(m)) continue;
+    if (!grafo.has(m)) throw new Error(`nucleo: ${m} não é um módulo do núcleo`);
+    visto.add(m);
+    fila.push(...grafo.get(m));
+  }
+  return [...visto].sort();
+}
+
+module.exports = { nucleo, fechoDe, ENTRADAS, PASTA };

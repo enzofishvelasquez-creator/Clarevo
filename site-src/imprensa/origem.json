@@ -2,37 +2,43 @@
   "clarevo-logotipo.svg": {
     "sha256": "f46ad83288becdb4256f4ecaa07ed51beb42d31b7ec77d3dbde247479f8c9a04",
     "png": "clarevo-logotipo.png",
-    "largura": 2400,
-    "altura": 481
+    "largura": 2592,
+    "altura": 673,
+    "margem": 96
   },
   "clarevo-logotipo-reverso.svg": {
     "sha256": "7ab6f3aea2ff38fd40dd803ef2052ea2e0dd0203cc034cc62d52e9f3ff0d277f",
     "png": "clarevo-logotipo-reverso.png",
-    "largura": 2400,
-    "altura": 481
+    "largura": 2592,
+    "altura": 673,
+    "margem": 96
   },
   "clarevo-logotipo-uma-cor.svg": {
     "sha256": "774b32b766ee5f25173b1f805c744691060a0046d72e24d84017e5edcb266830",
     "png": "clarevo-logotipo-uma-cor.png",
-    "largura": 2400,
-    "altura": 481
+    "largura": 2592,
+    "altura": 673,
+    "margem": 96
   },
   "clarevo-simbolo.svg": {
     "sha256": "5ef4cea4dfa46391b6fafbad9440ae33c727f44e6ebbc7b6f49389b67dec5f68",
     "png": "clarevo-simbolo.png",
-    "largura": 1024,
-    "altura": 1069
+    "largura": 1184,
+    "altura": 1229,
+    "margem": 80
   },
   "clarevo-simbolo-reverso.svg": {
     "sha256": "bbf3fda2078b67f0f8c8b58db9f7fbf2626fac93922930699eee5c4f9c926551",
     "png": "clarevo-simbolo-reverso.png",
-    "largura": 1024,
-    "altura": 1069
+    "largura": 1184,
+    "altura": 1229,
+    "margem": 80
   },
   "clarevo-simbolo-uma-cor.svg": {
     "sha256": "389a2c7663a3674bd11c32093fe5acc12398e304cfc3e390a532ed41b5db59a4",
     "png": "clarevo-simbolo-uma-cor.png",
-    "largura": 1024,
-    "altura": 1069
+    "largura": 1184,
+    "altura": 1229,
+    "margem": 80
   }
 }

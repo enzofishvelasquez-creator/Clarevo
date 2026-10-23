@@ -105,8 +105,8 @@ Se você usar o formulário de contato da página "Para empresas":
 - **Dados.** Nome, e-mail, nome da empresa, a faixa do número aproximado de pessoas (por exemplo, "de 51 a 200 pessoas") e a mensagem que você escrever. O formulário não pede nem envia outros dados. Não escreva dados financeiros nem de pessoas que trabalham na empresa.
 - **Para quê.** Para responder ao seu contato sobre o Clarevo para empresas, como a conversa sobre um piloto do benefício.
 - **O site não guarda a mensagem.** Ela não é gravada em banco de dados nem em arquivo do site. O pedido chega ao servidor do site, que o repassa por e-mail à equipe do Clarevo e não guarda nada.
-- **Quem trata.** A Cloudflare, que hospeda o site, recebe o pedido de envio e o seu IP, e o Resend, serviço de envio de e-mail, entrega a mensagem à equipe. Os dois tratam os dados a serviço do Clarevo, como operadores. [A DEFINIR: confirmar o papel de operador, o país e o contrato de cada um]
-- **Por quanto tempo.** A mensagem fica na caixa de e-mail do Clarevo por [A DEFINIR: prazo na caixa de e-mail]. Você pode pedir a eliminação por [E-MAIL DE PRIVACIDADE].
+- **Quem trata.** A Cloudflare, que hospeda o site, recebe o pedido de envio e o seu IP, e o Resend, serviço de envio de e-mail, entrega a mensagem à equipe e guarda uma cópia dela nos registros dele, por [A DEFINIR: prazo de guarda no Resend]. Os dois tratam os dados a serviço do Clarevo, como operadores. [A DEFINIR: confirmar o papel de operador, o país e o contrato de cada um]
+- **Por quanto tempo.** A mensagem fica na caixa de e-mail do Clarevo por [A DEFINIR: prazo na caixa de e-mail], e a cópia nos registros do Resend, por [A DEFINIR: prazo de guarda no Resend]. Você pode pedir a eliminação por [E-MAIL DE PRIVACIDADE].
 
 ### 3.7 Novidades por e-mail
 
@@ -117,7 +117,7 @@ Se você pedir para receber as Novidades por e-mail:
 - **Dado.** O seu e-mail. O formulário não pede mais nada.
 - **Para quê.** Só para enviar as Novidades do Clarevo, os textos curtos da página Novidades, com data e fonte. Não enviamos publicidade de terceiros nem vendemos a lista.
 - **Consentimento.** Você marca a caixa "Quero receber as Novidades do Clarevo por e-mail. Posso cancelar quando quiser.", que vem desmarcada, e depois confirma o cadastro em um e-mail que enviamos (dupla confirmação). Sem confirmar, você não entra na lista e não recebe nada.
-- **Quem trata.** O Brevo, serviço de envio de e-mail, guarda o seu e-mail na lista e a confirmação do cadastro, e envia as Novidades. A Cloudflare recebe o pedido do formulário. Os dois tratam os dados a serviço do Clarevo, como operadores. O site não grava o e-mail. [A DEFINIR: confirmar o que o Brevo registra da confirmação (data, hora e IP), o país e o contrato]
+- **Quem trata.** O Brevo, serviço de envio de e-mail, guarda o seu e-mail na lista e a confirmação do cadastro, e envia as Novidades. A Cloudflare recebe o pedido do formulário. Os dois tratam os dados a serviço do Clarevo, como operadores. O site não grava o e-mail. [A DEFINIR: rastreamento de abertura e clique desligado no Brevo] [A DEFINIR: confirmar o que o Brevo registra da confirmação (data, hora e IP), o país e o contrato]
 - **Cancelar.** Todo e-mail das Novidades traz um link para cancelar, do próprio Brevo. Você também pode pedir por [E-MAIL DE PRIVACIDADE]. [A DEFINIR: por quanto tempo o Brevo mantém o e-mail depois do cancelamento, e se ele é eliminado da lista]
 
 ## 4. O que não guardamos?
@@ -191,7 +191,7 @@ Estão previstos, mas ainda não ligados:
 
 - **Sentry** (relatório de falhas do app). Se for ligado, receberá só o erro técnico, sem valores, descrições, e-mails ou dados financeiros, com coleta de IP desligada. Esta política será atualizada antes.
 - **Provedor de e-mail** (confirmação de cadastro e nova senha, com o nome do Clarevo). Receberá o seu e-mail e o conteúdo da mensagem do serviço. [A DEFINIR: provedor escolhido, P-008]
-- **Resend** (envio da mensagem do formulário de contato do site, seção 3.6, se for ligado). Receberá o que você escrever no formulário. [A DEFINIR: país, contrato e se também será o provedor dos e-mails de confirmação de cadastro e de nova senha, P-008]
+- **Resend** (envio da mensagem do formulário de contato do site, seção 3.6, se for ligado). Receberá o que você escrever no formulário e guarda uma cópia nos registros dele. [A DEFINIR: país, contrato e se também será o provedor dos e-mails de confirmação de cadastro e de nova senha, P-008]
 - **Brevo** (Novidades por e-mail, seção 3.7, se forem ligadas). Receberá o seu e-mail e a confirmação do cadastro. [A DEFINIR: país e contrato]
 
 **Transferência internacional.** Alguns desses serviços são prestados por empresas com sede fora do Brasil, e parte do tratamento pode ocorrer fora do país. [A DEFINIR: para cada serviço, país da sede e local do tratamento, mecanismo de transferência (LGPD, art. 33) e contrato com cada fornecedor]
@@ -228,7 +228,7 @@ A exceção é a leitura de código no Android: o componente do Google (ML Kit) 
 - **Família encerrada.** Os dados ficam guardados, sem leitura por ninguém, até a regra de guarda. [A DEFINIR: prazo, P-010]
 - **Cópias de segurança.** O serviço de banco de dados pode manter cópias de segurança, e dados já apagados podem ficar nelas por um tempo. [A DEFINIR: prazo, previsto em 7 dias no plano contratado; confirmar no painel] Se uma cópia for restaurada, as contas excluídas depois dela serão excluídas de novo.
 - **Registros de acesso.** O Clarevo não cria registros de acesso próprios. Os do Supabase e da Cloudflare têm prazo curto, que depende do plano, e o registro de auditoria da autenticação pode manter e-mail e IP depois da exclusão da conta. [A DEFINIR: o que guardar, onde e por quanto tempo, frente à guarda de registros de acesso do Marco Civil da Internet, art. 15, e conferir nos painéis o que cada serviço mantém]
-- **Mensagem do formulário de contato** (seção 3.6). Fica na caixa de e-mail do Clarevo por [A DEFINIR: prazo na caixa de e-mail]. O site não a guarda.
+- **Mensagem do formulário de contato** (seção 3.6). Fica na caixa de e-mail do Clarevo por [A DEFINIR: prazo na caixa de e-mail], e uma cópia fica nos registros do Resend por [A DEFINIR: prazo de guarda no Resend]. O site não a guarda.
 - **E-mail das Novidades** (seção 3.7). Fica no Brevo enquanto você não cancelar. [A DEFINIR: prazo depois do cancelamento]
 - **Contas sem uso.** Hoje o Clarevo não apaga contas por inatividade. [A DEFINIR: política para contas inativas]
 - **Obrigação legal e defesa de direitos.** Podemos guardar o necessário por mais tempo se a lei exigir ou para nos defendermos em processo. [A DEFINIR]

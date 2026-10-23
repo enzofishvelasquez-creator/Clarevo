@@ -3,9 +3,11 @@
 # script-src e connect-src 'self' valem só para os scripts do próprio site: a busca da Ajuda (ajuda/busca.js, que lê ajuda/indice.json) e as
 # calculadoras (calculadoras/calculadora.js e os módulos de js/nucleo/, que não enviam nada). form-action 'self' vale para os formulários de
 # contato e de novidades, que enviam só para o próprio site (/api/contato e /api/newsletter, recebidos por _worker.js).
+# Referrer-Policy: same-origin (e não no-referrer): com no-referrer o navegador manda "Origin: null" nos formulários, e o worker recusa o valor null.
+# Nenhum outro site recebe o endereço da página (a política só manda o referenciador para o próprio site).
 /*
   Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
-  Referrer-Policy: no-referrer
+  Referrer-Policy: same-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()

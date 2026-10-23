@@ -62,9 +62,10 @@ ${colunas}
  * Uma página completa. `fonte` é o texto original (Markdown ou modelo) onde se procuram os marcadores que faltam; o rodapé entra na
  * conta. `capa`: HTML do herói, com o `h1`; `corpo`: HTML que vai direto em `<main>`, depois da capa.
  * `jsonld`: objetos de dados estruturados. `scripts`: arquivos `.js` do próprio site, com caminho a partir da raiz. `modulos`: o mesmo, como módulo ES
- * (as calculadoras, que importam o núcleo de `js/nucleo/`). `cabecalho`: HTML a mais no `<head>`.
+ * (as calculadoras, que importam o núcleo de `js/nucleo/`). `precarga`: módulos ES que a página vai precisar, com `modulepreload` no `<head>`
+ * para o navegador pedir todos de uma vez (sem esperar cada `import`). `cabecalho`: HTML a mais no `<head>`.
  */
-function montarPagina({ arquivo, titulo, descricao, capa, corpo, fonte, valores, jsonld = [], scripts = [], modulos = [], cabecalho = '', classeCapa = '', tipoOg = 'website', semIndexar = false, tituloCompleto = false }) {
+function montarPagina({ arquivo, titulo, descricao, capa, corpo, fonte, valores, jsonld = [], scripts = [], modulos = [], precarga = [], cabecalho = '', classeCapa = '', tipoOg = 'website', semIndexar = false, tituloCompleto = false }) {
   const pendencias = pendenciasDoTexto(`${fonte}\n${RODAPE_LEGAL}`, valores);
   const faixa = pendencias.length
     ? `<div class="faixa" role="note"><div class="miolo"><p><strong>Versão preliminar, em revisão.</strong> Este texto ainda não vale como versão final: os trechos destacados serão preenchidos antes da publicação.</p></div></div>\n`
@@ -92,7 +93,7 @@ function montarPagina({ arquivo, titulo, descricao, capa, corpo, fonte, valores,
   }
   const canonical = url ? `<link rel="canonical" href="${esc(url)}">\n` : '';
   const dados = jsonld.map((o) => `<script type="application/ld+json">${jsonSeguro(o)}</script>`).join('\n');
-  const js = [...scripts.map((s) => `<script src="${rel(arquivo, s)}" defer></script>`), ...modulos.map((s) => `<script type="module" src="${rel(arquivo, s)}"></script>`)].join('\n');
+  const js = [...precarga.map((m) => `<link rel="modulepreload" href="${rel(arquivo, m)}">`), ...scripts.map((s) => `<script src="${rel(arquivo, s)}" defer></script>`), ...modulos.map((s) => `<script type="module" src="${rel(arquivo, s)}"></script>`)].join('\n');
   const html = `<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -102,7 +103,7 @@ function montarPagina({ arquivo, titulo, descricao, capa, corpo, fonte, valores,
 <meta name="description" content="${esc(descricao)}">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#2457F5">
-<meta name="referrer" content="no-referrer">
+<meta name="referrer" content="same-origin">
 ${noindex ? '<meta name="robots" content="noindex">\n' : ''}${canonical}${og.join('\n')}
 <link rel="icon" href="${rel(arquivo, 'favicon.svg')}" type="image/svg+xml">
 <link rel="apple-touch-icon" href="${rel(arquivo, 'marca/icone-app.png')}">

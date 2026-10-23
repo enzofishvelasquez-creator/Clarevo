@@ -11,7 +11,7 @@
 const { esc } = require('../texto');
 const { rel } = require('../util');
 const { montarPagina, marcadoresEmHtml, bloco, colunaTexto } = require('../modelo');
-const { TAMANHOS, FAIXAS, ISCA, ligado } = require('../formularios');
+const { TAMANHOS, FAIXAS, ISCA, CAMPOS, ligado } = require('../formularios');
 
 const ARQUIVOS = {
   contatoEnviado: 'contato-enviado.html',
@@ -21,6 +21,23 @@ const ARQUIVOS = {
   receberConfirmado: 'novidades/receber-confirmado.html',
   receberErro: 'novidades/receber-erro.html',
 };
+
+/** O que dizer de cada campo na página de erro dele: o nome na tela e o que costuma estar errado (os limites são os do worker e do `maxlength`). */
+const mil = (n) => n.toLocaleString('pt-BR');
+const ERROS_DO_CONTATO = {
+  nome: { rotulo: 'Nome', frase: `O campo "Nome" está vazio ou passa de ${TAMANHOS.nome} caracteres.` },
+  email: { rotulo: 'E-mail', frase: `O campo "E-mail" está vazio, passa de ${TAMANHOS.email} caracteres ou não parece um e-mail (como nome@exemplo.com.br).` },
+  empresa: { rotulo: 'Empresa', frase: `O campo "Empresa" está vazio ou passa de ${TAMANHOS.empresa} caracteres.` },
+  faixa: { rotulo: 'Número aproximado de pessoas', frase: 'Nenhuma faixa de "Número aproximado de pessoas" foi escolhida, ou a escolhida não está na lista.' },
+  mensagem: { rotulo: 'Mensagem', frase: `O campo "Mensagem" está vazio ou passa de ${mil(TAMANHOS.mensagem)} caracteres.` },
+};
+const ERROS_DA_NEWSLETTER = {
+  email: { rotulo: 'E-mail', frase: `O campo "E-mail" está vazio, passa de ${TAMANHOS.email} caracteres ou não parece um e-mail (como nome@exemplo.com.br).` },
+  consentimento: { rotulo: 'Consentimento', frase: 'A caixa de consentimento não foi marcada. Sem ela, nada é cadastrado.' },
+};
+
+/** O arquivo da página de erro de um campo: `contato-erro-email.html`, `novidades/receber-erro-consentimento.html`. O worker manda para ele. */
+const arquivoDoErro = (base, campo) => base.replace(/\.html$/, `-${campo}.html`);
 
 /** O campo-isca: escondido por CSS (não por atributo de estilo), fora da ordem do teclado e do leitor de tela. */
 const isca = (prefixo) => `<div class="campo-isca" aria-hidden="true"><label for="${prefixo}-${ISCA}">Não preencha este campo</label><input id="${prefixo}-${ISCA}" name="${ISCA}" type="text" tabindex="-1" autocomplete="off"></div>`;
@@ -42,7 +59,7 @@ ${isca(p)}
 <h3 id="priv-contato">O que acontece com a sua mensagem</h3>
 <ul>
 <li>Usamos o que você escreve só para responder sobre o Clarevo para empresas.</li>
-<li>O site não guarda a mensagem. Ela segue por e-mail para a equipe, por um serviço de envio de e-mail (Resend), e fica na caixa de e-mail do Clarevo. O pedido passa pela Cloudflare, que hospeda o site.</li>
+<li>O site não guarda a mensagem. Ela segue por e-mail para a equipe, por um serviço de envio de e-mail (Resend), e fica na caixa de e-mail do Clarevo. O Resend também guarda uma cópia nos registros dele, por [A DEFINIR: prazo de guarda no Resend]. O pedido passa pela Cloudflare, que hospeda o site.</li>
 <li>Os detalhes, inclusive por quanto tempo a mensagem fica na caixa de e-mail, estão na <a href="${rel(arquivo, 'privacidade.html')}">Política de privacidade</a>, na seção sobre o contato pelo site.</li>
 </ul>
 </aside>
@@ -99,6 +116,25 @@ function paginaDeResposta({ arquivo, titulo, lead, corpoHtml, descricao, valores
   return { arquivo, ...pg };
 }
 
+/**
+ * A página de erro de um campo, para quando o servidor recusa o envio por causa dele (o navegador já confere, mas quem está sem
+ * JavaScript ou com o navegador desatento chega aqui). É uma página só para cada campo, sem parâmetro e sem repetir nada do que a pessoa
+ * escreveu: o worker manda para `<erro>-<campo>`. `erros` diz o texto de cada campo; falta de texto para um campo de `CAMPOS` é erro do gerador.
+ */
+function paginaDeErroDeCampo({ base, campo, erros, voltar, rotuloVoltar, alternativa, valores }) {
+  const e = erros[campo];
+  if (!e) throw new Error(`falta o texto da página de erro do campo "${campo}" (${base})`);
+  const arquivo = arquivoDoErro(base, campo);
+  return paginaDeResposta({
+    arquivo,
+    titulo: `Confira o campo ${e.rotulo}`,
+    lead: `${e.frase} Nada foi guardado, e você pode tentar de novo.`,
+    corpoHtml: `<p><a href="${rel(arquivo, voltar)}">${esc(rotuloVoltar)}</a> ${esc(alternativa)}.</p>`,
+    descricao: `O envio não foi feito: confira o campo ${e.rotulo}.`,
+    valores,
+  });
+}
+
 /** As páginas dos formulários, só para o que está ligado. */
 function paginasDosFormularios({ valores }) {
   const paginas = [];
@@ -123,6 +159,7 @@ function paginasDosFormularios({ valores }) {
         descricao: 'Não foi possível enviar a mensagem pelo formulário de contato do Clarevo.',
         valores,
       }),
+      ...CAMPOS.contato.map((campo) => paginaDeErroDeCampo({ base: ARQUIVOS.contatoErro, campo, erros: ERROS_DO_CONTATO, voltar: 'empresas/index.html#formulario-contato', rotuloVoltar: 'Voltar para o formulário', alternativa: 'ou escreva direto para [E-MAIL DE CONTATO]', valores })),
     );
   }
   if (ligado(valores, 'newsletter')) {
@@ -189,9 +226,10 @@ ${formularioDaNewsletter(a)}`,
         descricao: 'Não foi possível cadastrar o e-mail nas Novidades do Clarevo.',
         valores,
       }),
+      ...CAMPOS.newsletter.map((campo) => paginaDeErroDeCampo({ base: ARQUIVOS.receberErro, campo, erros: ERROS_DA_NEWSLETTER, voltar: ARQUIVOS.receber, rotuloVoltar: 'Voltar para a inscrição', alternativa: 'ou leia as Novidades direto no site, sem se cadastrar', valores })),
     );
   }
   return paginas;
 }
 
-module.exports = { paginasDosFormularios, blocoDeContato, blocoDaNewsletterEmNovidades, formularioDeContato, formularioDaNewsletter, ARQUIVOS };
+module.exports = { paginasDosFormularios, blocoDeContato, blocoDaNewsletterEmNovidades, formularioDeContato, formularioDaNewsletter, arquivoDoErro, ARQUIVOS };

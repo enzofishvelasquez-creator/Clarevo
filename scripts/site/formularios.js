@@ -2,7 +2,7 @@
 /**
  * Regras dos dois formulários do site (D-066), num só lugar: o `_worker.js` (que recebe o envio) e as páginas (que desenham o formulário e
  * dizem o tamanho máximo de cada campo) leem daqui, e por isso nunca divergem. O gerador troca o marcador `/*LIMITES*\/` do modelo
- * `site-src/worker/worker.js` por este objeto.
+ * `site-src/worker/worker.js` por este objeto (e `/*ROTAS*\/` pelos interruptores, `rotasLigadas`).
  *
  * Os formulários são "prontos e desligados": só aparecem quando `site/dados-da-empresa.json` tem `"formulario_contato": true` e
  * `"newsletter": true`, e o envio só funciona com as variáveis do painel da Cloudflare (`docs/22_SITE.md`).
@@ -26,10 +26,20 @@ const ISCA = 'website';
 /** Os interruptores do JSON da empresa. Valem só se forem `true` (booleano). */
 const INTERRUPTORES = ['formulario_contato', 'newsletter'];
 
+/**
+ * Os campos de cada formulário, na ordem em que o worker os confere. Quando um falha, o navegador vai para a página de erro daquele
+ * campo (`contato-erro-<campo>.html`, `novidades/receber-erro-<campo>.html`), que o gerador cria para cada um: assim a pessoa sabe o que
+ * conferir sem JavaScript e sem parâmetro na página.
+ */
+const CAMPOS = { contato: ['nome', 'email', 'empresa', 'faixa', 'mensagem'], newsletter: ['email', 'consentimento'] };
+
 /** O que o worker precisa saber das páginas (o que o gerador injeta no modelo). */
-const LIMITES = { tamanhos: TAMANHOS, faixas: Object.fromEntries(FAIXAS.map((f) => [f.valor, f.rotulo])), isca: ISCA };
+const LIMITES = { tamanhos: TAMANHOS, faixas: Object.fromEntries(FAIXAS.map((f) => [f.valor, f.rotulo])), isca: ISCA, campos: CAMPOS };
 
 /** O formulário está ligado? Só o booleano `true` liga. */
 const ligado = (valores, nome) => Boolean(valores) && valores[nome] === true;
 
-module.exports = { TAMANHOS, FAIXAS, ISCA, INTERRUPTORES, LIMITES, ligado };
+/** As rotas do worker que existem: cada uma só com o interruptor dela ligado. Desligada, o worker responde 404, com ou sem variáveis. */
+const rotasLigadas = (valores) => ({ contato: ligado(valores, 'formulario_contato'), newsletter: ligado(valores, 'newsletter') });
+
+module.exports = { TAMANHOS, FAIXAS, ISCA, INTERRUPTORES, CAMPOS, LIMITES, ligado, rotasLigadas };

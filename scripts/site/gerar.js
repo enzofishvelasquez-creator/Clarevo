@@ -18,10 +18,10 @@ const { paginaInicial } = require('./paginas/inicio');
 const { paginaApp } = require('./paginas/app');
 const { paginaEmpresas } = require('./paginas/empresas');
 const { paginasAprender } = require('./paginas/aprender');
-const { paginasCalculadoras } = require('./paginas/calculadoras');
+const { paginasCalculadoras, scriptsDasCalculadoras } = require('./paginas/calculadoras');
 const { paginaImprensa, arquivosDaImprensa } = require('./paginas/imprensa');
 const { paginasDosFormularios } = require('./paginas/formularios');
-const { LIMITES } = require('./formularios');
+const { LIMITES, rotasLigadas } = require('./formularios');
 const { nucleo } = require('./nucleo');
 const { paginasNovidades } = require('./paginas/novidades');
 const { paginasAjuda, conferirCobertura } = require('./paginas/ajuda');
@@ -33,22 +33,29 @@ const CABECALHOS = `# Gerado por scripts/gerar-site.js. Cloudflare Pages lê est
 # script-src e connect-src 'self' valem só para os scripts do próprio site: a busca da Ajuda (ajuda/busca.js, que lê ajuda/indice.json) e as
 # calculadoras (calculadoras/calculadora.js e os módulos de js/nucleo/, que não enviam nada). form-action 'self' vale para os formulários de
 # contato e de novidades, que enviam só para o próprio site (/api/contato e /api/newsletter, recebidos por _worker.js).
+# Referrer-Policy: same-origin (e não no-referrer): com no-referrer o navegador manda "Origin: null" nos formulários, e o worker recusa o valor null.
+# Nenhum outro site recebe o endereço da página (a política só manda o referenciador para o próprio site).
 /*
   Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
-  Referrer-Policy: no-referrer
+  Referrer-Policy: same-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
 `;
 
 /**
- * O `_worker.js`: o modelo de `site-src/worker/worker.js` com os limites dos formulários (`scripts/site/formularios.js`) e os cabeçalhos
- * de segurança do `_headers` no lugar dos marcadores. O worker só existe no projeto `clarevo-site`.
+ * O `_worker.js`: o modelo de `site-src/worker/worker.js` com os limites dos formulários (`scripts/site/formularios.js`), os cabeçalhos
+ * de segurança do `_headers` e as rotas ligadas (os interruptores de `valores`) no lugar dos marcadores. O worker só existe no projeto
+ * `clarevo-site`; uma rota desligada responde 404 mesmo com as variáveis configuradas.
  */
-function workerDoSite() {
+function workerDoSite(valores) {
   const modelo = fs.readFileSync(path.join(SITE_SRC, 'worker', 'worker.js'), 'utf8');
-  for (const marcador of ['/*LIMITES*/ {}', '/*CABECALHOS*/ {}']) if (!modelo.includes(marcador)) throw new Error(`site-src/worker/worker.js perdeu o marcador ${marcador}`);
-  return modelo.replace('/*LIMITES*/ {}', JSON.stringify(LIMITES)).replace('/*CABECALHOS*/ {}', JSON.stringify(cabecalhosDoTexto(CABECALHOS)));
+  const marcadores = ['/*LIMITES*/ {}', '/*CABECALHOS*/ {}', '/*ROTAS*/ {}'];
+  for (const marcador of marcadores) if (!modelo.includes(marcador)) throw new Error(`site-src/worker/worker.js perdeu o marcador ${marcador}`);
+  return modelo
+    .replace('/*LIMITES*/ {}', () => JSON.stringify(LIMITES))
+    .replace('/*CABECALHOS*/ {}', () => JSON.stringify(cabecalhosDoTexto(CABECALHOS)))
+    .replace('/*ROTAS*/ {}', () => JSON.stringify(rotasLigadas(valores)));
 }
 
 /** robots.txt: com marcador pendente (versão preliminar) nada é indexado; pronto, tudo é, e o sitemap só existe com domínio. */
@@ -130,6 +137,8 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
     } else avisos.push(`docs/legal/${p.md} ainda não existe: ${p.arquivo} sai como espaço reservado, com [A DEFINIR]`);
     const pg = paginaLegal(p, md, valores);
     avisos.push(...pg.avisos);
+    // As seções 3.6 e 3.7 da política só podem existir com o formulário correspondente ligado (e vice-versa).
+    problemasFinais.push(...pg.problemasFinais);
     juntar({ ...pg, arquivo: p.arquivo });
   }
   juntar(pagina404(ctx));
@@ -168,15 +177,16 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
   if (novidades.feed) arquivos.set('novidades/feed.xml', novidades.feed);
   arquivos.set('ajuda/indice.json', `${JSON.stringify(ajuda.indice)}\n`);
   arquivos.set('ajuda/busca.js', ajuda.script);
-  // As calculadoras: o script da página (site-src) e o núcleo, o mesmo código do core transpilado para o navegador.
-  arquivos.set('calculadoras/calculadora.js', fs.readFileSync(path.join(SITE_SRC, 'calculadoras', 'calculadora.js'), 'utf8'));
+  // As calculadoras: os scripts da página (site-src/calculadoras: o que inicia a página, as peças comuns e uma definição por calculadora) e o
+  // núcleo, o mesmo código do core transpilado para o navegador.
+  for (const nome of scriptsDasCalculadoras()) arquivos.set(`calculadoras/${nome}`, fs.readFileSync(path.join(SITE_SRC, 'calculadoras', nome), 'utf8'));
   for (const [nome, texto] of nucleo()) arquivos.set(nome, texto);
   // O kit de imprensa: SVG de docs/marca (sem mudança), os PNG que scripts/gerar-marca-imprensa.js desenha deles e as capturas originais.
   const imprensa = arquivosDaImprensa();
   avisos.push(...imprensa.avisos);
   for (const [nome, bytes] of imprensa.arquivos) arquivos.set(nome, bytes);
   // O worker do Cloudflare Pages (modo avançado): recebe só /api/contato e /api/newsletter; o resto vai para os arquivos estáticos.
-  arquivos.set('_worker.js', workerDoSite());
+  arquivos.set('_worker.js', workerDoSite(valores));
   arquivos.set('_routes.json', `${JSON.stringify({ version: 1, include: ['/api/*'], exclude: [] })}\n`);
   for (const peso of PESOS_FONTE) arquivos.set(`fontes/Manrope_${peso}.ttf`, ler(FONTES, `Manrope_${peso}.ttf`));
   arquivos.set('fontes/OFL.txt', ler(FONTES, 'OFL.txt'));

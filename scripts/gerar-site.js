@@ -36,8 +36,9 @@
  *                                              proposta ("Proposta:", "proposta, ainda sem confirmação"), travessão, a expressão proibida pela
  *                                              orientação do projeto, título fora de ordem, link interno quebrado, post de Novidades sem
  *                                              fontes, com data inválida ou futura (em relação a `--referencia`) ou com `{{tema:...}}` que não
- *                                              existe no catálogo, e o domínio sem valor (exigido de propósito, mesmo que nenhum texto cite
- *                                              `[DOMÍNIO]`). Sem `--final`, tudo isso continua só como aviso no console
+ *                                              existe no catálogo, o domínio sem valor (exigido de propósito, mesmo que nenhum texto cite
+ *                                              `[DOMÍNIO]`) e as seções 3.6 e 3.7 da política sem o formulário ligado (ou o formulário
+ *                                              ligado sem a seção). Sem `--final`, tudo isso continua só como aviso no console
  *   node scripts/gerar-site.js --pdf <arquivo> também gera, com o Chromium do Playwright, o PDF A4 "Pacote para revisão jurídica" (resumo
  *                                              para o advogado, privacidade, termos, exclusão de conta e pontos do contrato com
  *                                              empresas, nesta ordem, com os marcadores visíveis). O PDF não vai para o repositório.
@@ -158,7 +159,7 @@ async function principal(argv) {
       console.error(`Ainda no texto (${problemas.length}):`);
       for (const q of problemas) console.error(`  ${q}`);
     }
-    console.error('Preencha site/dados-da-empresa.json (inclusive o domínio), resolva os trechos [A DEFINIR] e [PROPOSTA], tire as frases de rascunho de docs/legal e corrija os posts de Novidades, e rode de novo.');
+    console.error('Preencha site/dados-da-empresa.json (inclusive o domínio), resolva os trechos [A DEFINIR] e [PROPOSTA], retire o que estiver marcado [A RETIRAR] (seção de um formulário desligado), tire as frases de rascunho de docs/legal e corrija os posts de Novidades, e rode de novo.');
     process.exitCode = 1;
     return;
   }

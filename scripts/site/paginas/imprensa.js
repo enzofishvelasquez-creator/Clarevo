@@ -135,7 +135,7 @@ function paginaImprensa({ valores, img }) {
 <div class="marca-amostra marca-${m.fundo}"><img src="${u(svg)}" alt="${esc(m.titulo)}" width="${m.tipo === 'logotipo' ? 240 : 96}" height="${m.tipo === 'logotipo' ? 48 : 100}" loading="lazy" decoding="async"></div>
 <h3>${esc(m.titulo)}</h3>
 <p>${esc(m.uso)}</p>
-<p class="baixar"><a href="${u(svg)}" download>SVG (${kb(arquivos.get(svg).length)})</a>${dim ? ` · <a href="${u(pngArq)}" download>PNG, ${dim.largura} x ${dim.altura} px, fundo transparente (${kb(arquivos.get(pngArq).length)})</a>` : ''}</p>
+<p class="baixar"><a href="${u(svg)}" download>SVG (${kb(arquivos.get(svg).length)})</a>${dim ? ` · <a href="${u(pngArq)}" download>PNG, ${dim.largura} x ${dim.altura} px, fundo transparente e margem de respiro (${kb(arquivos.get(pngArq).length)})</a>` : ''}</p>
 </article>`;
   };
 
@@ -182,7 +182,7 @@ ${descricoes}
     ),
     bloco(
       `<h2 id="logotipo">Logotipo e símbolo</h2>
-<p class="lead-bloco">Os arquivos oficiais da marca, sem retoque. Os PNG são os mesmos SVG, desenhados em alta resolução.</p>
+<p class="lead-bloco">Os arquivos oficiais da marca, sem retoque. Os PNG são os mesmos SVG, desenhados em alta resolução, com uma margem transparente em volta para o logotipo respirar.</p>
 <div class="grade grade-3">
 ${MARCAS.map(cartaoDaMarca).join('\n')}
 </div>`,

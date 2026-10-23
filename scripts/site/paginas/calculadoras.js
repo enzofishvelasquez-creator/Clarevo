@@ -9,14 +9,64 @@
  *
  * Nada sai do navegador: sem envio, sem armazenamento e sem cookie.
  */
+const fs = require('node:fs');
+const path = require('node:path');
 const { esc } = require('../texto');
 const { rel, arquivoDaCalculadora, ARQUIVO_CALCULADORAS } = require('../util');
 const { montarPagina, bloco } = require('../modelo');
 const { catalogo } = require('../catalogo');
-const { URL_APP } = require('../config');
+const { URL_APP, SITE_SRC } = require('../config');
+const { fechoDe } = require('../nucleo');
 const { cartaoDoTema, SECOES_DO_SITE } = require('./aprender');
 
 const SCRIPT_DAS_CALCULADORAS = 'calculadoras/calculadora.js';
+
+/** Os scripts de `site-src/calculadoras/`, com o caminho a partir dessa pasta (`calculadora.js`, `base.js`, `definicoes/<slug>.js`), em ordem. */
+function scriptsDasCalculadoras() {
+  const pasta = path.join(SITE_SRC, 'calculadoras');
+  const achados = [];
+  const visitar = (dir, prefixo) => {
+    for (const nome of fs.readdirSync(dir).sort()) {
+      if (fs.statSync(path.join(dir, nome)).isDirectory()) visitar(path.join(dir, nome), `${prefixo}${nome}/`);
+      else if (nome.endsWith('.js')) achados.push(`${prefixo}${nome}`);
+    }
+  };
+  visitar(pasta, '');
+  return achados;
+}
+
+/** O que um script de `calculadoras/` importa de cara (`import ... from '...'`), em caminhos a partir da raiz do site. */
+function importsDe(publicado) {
+  const texto = fs.readFileSync(path.join(SITE_SRC, publicado), 'utf8');
+  return [...texto.matchAll(/^import\s[^;]*?from\s+'([^']+)';/gm)].map((m) => path.posix.join(path.posix.dirname(publicado), m[1]));
+}
+
+/**
+ * O que a página de uma calculadora carrega, para o `modulepreload`: o script que inicia a página, o que ele importa de cara, o módulo do
+ * núcleo da calculadora e a definição dela (os `import()` dela em `MODULOS`), com tudo o que cada um importa (scripts de `calculadoras/`
+ * e módulos de `js/nucleo/`). Lido dos próprios scripts (`site-src/calculadoras/`), para o `modulepreload` nunca divergir do que eles
+ * pedem; o teste de navegador confere que nada é pedido fora desta lista. Scripts primeiro, depois o núcleo, cada grupo em ordem alfabética.
+ */
+function precargaDaCalculadora(slug) {
+  const entrada = 'calculadoras/calculadora.js';
+  const script = fs.readFileSync(path.join(SITE_SRC, 'calculadoras', 'calculadora.js'), 'utf8');
+  const dela = new RegExp(`^\\s*(?:'${slug}'|${slug}):\\s*\\{\\s*nucleo:\\s*\\(\\)\\s*=>\\s*import\\('\\.\\./(js/nucleo/[^']+)'\\),\\s*definicao:\\s*\\(\\)\\s*=>\\s*import\\('\\./([^']+)'\\)`, 'm').exec(script);
+  if (!dela) throw new Error(`calculadora.js não declara os import() de "${slug}" em MODULOS (o modulepreload precisa deles)`);
+  const scripts = new Set();
+  const nucleoRaizes = new Set();
+  const fila = [entrada, dela[1], `calculadoras/${dela[2]}`];
+  while (fila.length > 0) {
+    const arquivo = fila.shift();
+    if (arquivo.startsWith('js/nucleo/')) {
+      nucleoRaizes.add(arquivo);
+      continue;
+    }
+    if (scripts.has(arquivo)) continue;
+    scripts.add(arquivo);
+    fila.push(...importsDe(arquivo));
+  }
+  return [entrada, ...[...scripts].filter((a) => a !== entrada).sort(), ...fechoDe([...nucleoRaizes])];
+}
 
 /**
  * O que cada calculadora faz, em uma frase. As duas que o guia de uso do app descreve (Antes de financiar e Plano para quitar dívidas)
@@ -225,6 +275,7 @@ ${exemplo}
     valores,
     classeCapa: 'capa-simples',
     modulos: [SCRIPT_DAS_CALCULADORAS],
+    precarga: precargaDaCalculadora(info.slug),
   });
   return { arquivo, ...pg };
 }
@@ -277,4 +328,4 @@ function paginasCalculadoras(ctx) {
   return [paginaIndice(ctx), ...catalogo().CALCULADORAS.map((info) => paginaDaCalculadora(info, ctx))];
 }
 
-module.exports = { paginasCalculadoras, exemploDa, EXEMPLOS, SCRIPT_DAS_CALCULADORAS, O_QUE_FAZ, DO_GUIA };
+module.exports = { paginasCalculadoras, exemploDa, precargaDaCalculadora, scriptsDasCalculadoras, EXEMPLOS, SCRIPT_DAS_CALCULADORAS, O_QUE_FAZ, DO_GUIA };
