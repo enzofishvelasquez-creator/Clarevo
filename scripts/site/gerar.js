@@ -13,11 +13,16 @@ const { dataExiste } = require('./conteudo');
 const { dominioDe } = require('./modelo');
 const { imagensDoSite } = require('./imagens');
 const { linksQuebrados, problemasFinaisDaPagina } = require('./verificacoes');
-const { caminhoLimpo } = require('./util');
+const { caminhoLimpo, cabecalhosDoTexto } = require('./util');
 const { paginaInicial } = require('./paginas/inicio');
 const { paginaApp } = require('./paginas/app');
 const { paginaEmpresas } = require('./paginas/empresas');
 const { paginasAprender } = require('./paginas/aprender');
+const { paginasCalculadoras } = require('./paginas/calculadoras');
+const { paginaImprensa, arquivosDaImprensa } = require('./paginas/imprensa');
+const { paginasDosFormularios } = require('./paginas/formularios');
+const { LIMITES } = require('./formularios');
+const { nucleo } = require('./nucleo');
 const { paginasNovidades } = require('./paginas/novidades');
 const { paginasAjuda, conferirCobertura } = require('./paginas/ajuda');
 const { paginaSeguranca } = require('./paginas/seguranca');
@@ -25,14 +30,26 @@ const { paginaSobre, paginaSuporte, paginaLegal, pagina404 } = require('./pagina
 
 const CABECALHOS = `# Gerado por scripts/gerar-site.js. Cloudflare Pages lê este arquivo e não o publica.
 # Nenhum recurso de fora é permitido: o site não carrega fontes, imagens, scripts nem estilos de outros endereços.
-# script-src e connect-src 'self' valem só para o script da busca da Ajuda (ajuda/busca.js), que lê ajuda/indice.json.
+# script-src e connect-src 'self' valem só para os scripts do próprio site: a busca da Ajuda (ajuda/busca.js, que lê ajuda/indice.json) e as
+# calculadoras (calculadoras/calculadora.js e os módulos de js/nucleo/, que não enviam nada). form-action 'self' vale para os formulários de
+# contato e de novidades, que enviam só para o próprio site (/api/contato e /api/newsletter, recebidos por _worker.js).
 /*
-  Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: no-referrer
   Permissions-Policy: camera=(), microphone=(), geolocation=()
 `;
+
+/**
+ * O `_worker.js`: o modelo de `site-src/worker/worker.js` com os limites dos formulários (`scripts/site/formularios.js`) e os cabeçalhos
+ * de segurança do `_headers` no lugar dos marcadores. O worker só existe no projeto `clarevo-site`.
+ */
+function workerDoSite() {
+  const modelo = fs.readFileSync(path.join(SITE_SRC, 'worker', 'worker.js'), 'utf8');
+  for (const marcador of ['/*LIMITES*/ {}', '/*CABECALHOS*/ {}']) if (!modelo.includes(marcador)) throw new Error(`site-src/worker/worker.js perdeu o marcador ${marcador}`);
+  return modelo.replace('/*LIMITES*/ {}', JSON.stringify(LIMITES)).replace('/*CABECALHOS*/ {}', JSON.stringify(cabecalhosDoTexto(CABECALHOS)));
+}
 
 /** robots.txt: com marcador pendente (versão preliminar) nada é indexado; pronto, tudo é, e o sitemap só existe com domínio. */
 function robots(preliminar, dominio) {
@@ -40,10 +57,11 @@ function robots(preliminar, dominio) {
   return `User-agent: *\nAllow: /\n${dominio ? `\nSitemap: https://${dominio}/sitemap.xml\n` : ''}`;
 }
 
+/** O sitemap: toda página que se quer indexada. A 404 e as páginas de resposta dos formulários (`semIndexar`) ficam de fora. */
 function sitemap(paginas, dominio) {
   const urls = paginas
-    .filter((n) => n !== '404.html')
-    .map((n) => `<url><loc>https://${dominio}${caminhoLimpo(n)}</loc></url>`)
+    .filter((p) => !p.semIndexar)
+    .map((p) => `<url><loc>https://${dominio}${caminhoLimpo(p.arquivo)}</loc></url>`)
     .join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }
@@ -89,6 +107,7 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
   juntar(paginaApp(ctx));
   juntar(paginaEmpresas(ctx));
   paginasAprender(ctx).forEach(juntar);
+  paginasCalculadoras(ctx).forEach(juntar);
   const novidades = paginasNovidades(ctx);
   novidades.paginas.forEach(juntar);
   // Post sem fontes, com data inválida ou futura, ou com {{tema:...}} que não existe: aviso no console e problema que o --final recusa.
@@ -98,6 +117,9 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
   ajuda.paginas.forEach(juntar);
   juntar(paginaSeguranca(ctx));
   juntar(paginaSobre(ctx));
+  juntar(paginaImprensa(ctx));
+  // Os formulários (contato e Novidades por e-mail) são prontos e desligados: as páginas deles só existem com o interruptor ligado.
+  paginasDosFormularios(ctx).forEach(juntar);
   juntar(paginaSuporte(ctx));
   for (const p of PAGINAS_LEGAIS) {
     const arquivo = path.join(legal, p.md);
@@ -141,11 +163,21 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
   arquivos.set('estilo.css', css);
   arquivos.set('_headers', CABECALHOS);
   arquivos.set('robots.txt', robots(preliminar, dominio));
-  if (dominio) arquivos.set('sitemap.xml', sitemap([...paginas.map((p) => p.arquivo)], dominio));
+  if (dominio) arquivos.set('sitemap.xml', sitemap(paginas, dominio));
   // O feed só existe com domínio: sem ele os endereços seriam relativos e o RSS, inválido.
   if (novidades.feed) arquivos.set('novidades/feed.xml', novidades.feed);
   arquivos.set('ajuda/indice.json', `${JSON.stringify(ajuda.indice)}\n`);
   arquivos.set('ajuda/busca.js', ajuda.script);
+  // As calculadoras: o script da página (site-src) e o núcleo, o mesmo código do core transpilado para o navegador.
+  arquivos.set('calculadoras/calculadora.js', fs.readFileSync(path.join(SITE_SRC, 'calculadoras', 'calculadora.js'), 'utf8'));
+  for (const [nome, texto] of nucleo()) arquivos.set(nome, texto);
+  // O kit de imprensa: SVG de docs/marca (sem mudança), os PNG que scripts/gerar-marca-imprensa.js desenha deles e as capturas originais.
+  const imprensa = arquivosDaImprensa();
+  avisos.push(...imprensa.avisos);
+  for (const [nome, bytes] of imprensa.arquivos) arquivos.set(nome, bytes);
+  // O worker do Cloudflare Pages (modo avançado): recebe só /api/contato e /api/newsletter; o resto vai para os arquivos estáticos.
+  arquivos.set('_worker.js', workerDoSite());
+  arquivos.set('_routes.json', `${JSON.stringify({ version: 1, include: ['/api/*'], exclude: [] })}\n`);
   for (const peso of PESOS_FONTE) arquivos.set(`fontes/Manrope_${peso}.ttf`, ler(FONTES, `Manrope_${peso}.ttf`));
   arquivos.set('fontes/OFL.txt', ler(FONTES, 'OFL.txt'));
   arquivos.set('marca/clarevo-logotipo-reverso.svg', ler(MARCA, 'clarevo-logotipo-reverso.svg'));

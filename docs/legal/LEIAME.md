@@ -10,7 +10,7 @@ Os textos foram escritos a partir do código e das decisões do produto (`docs/0
 
 | Arquivo | O que é | Vai para o site? |
 |---|---|---|
-| `resumo-para-advogado.md` | Comece por ele. Até 4 páginas: o produto, o mapa de dados, os serviços de terceiros, o que já está decidido, 25 perguntas com a nossa proposta, o escopo pedido e as referências | Não |
+| `resumo-para-advogado.md` | Comece por ele. Até 4 páginas: o produto, o mapa de dados, os serviços de terceiros, o que já está decidido, 25 perguntas com a nossa proposta (mais as da seção h, sobre o site da segunda etapa, D-066), o escopo pedido e as referências | Não |
 | `politica-de-privacidade.md` | Política de Privacidade, em linguagem simples | Sim |
 | `termos-de-uso.md` | Termos de Uso | Sim |
 | `exclusao-de-conta.md` | Página pública de exclusão de conta e dos dados, exigida pelo Google Play | Sim |
@@ -18,7 +18,7 @@ Os textos foram escritos a partir do código e das decisões do produto (`docs/0
 
 ## O que a pessoa que revisa precisa fazer
 
-1. Ler `resumo-para-advogado.md` e responder as 25 perguntas da seção e: confirmar a nossa proposta ou corrigir.
+1. Ler `resumo-para-advogado.md` e responder as 25 perguntas da seção e e as da seção h (a partir da 26): confirmar a nossa proposta ou corrigir.
 2. Revisar os 4 textos: política, termos, página de exclusão e pontos do contrato. Corrigir a redação e resolver cada `[A DEFINIR]` de natureza jurídica.
 3. Devolver os textos corrigidos e as respostas. Os `[A DEFINIR]` de produto (por exemplo, aceite no cadastro) viram trabalho nosso, e a pessoa que revisa indica quais são.
 
@@ -56,6 +56,7 @@ Os textos descrevem o que o app faz hoje. Se uma destas coisas mudar, atualize o
 - Família: papéis, convites e o que fica de quem sai (`packages/core/src/family.ts`);
 - um serviço novo de terceiros (por exemplo Sentry ou provedor de e-mail, `docs/20_SENTRY_E_EMAIL.md`), o widget ligado (`docs/21_WIDGET_NATIVO.md`) ou cobrança (P-005);
 - o texto do cadastro, a seção "Privacidade e termos" de Conta e as frases sobre a equipe do Clarevo em "Quem vê estes dados?" (`packages/core/src/legal.ts`, `apps/app/src/lib/site.ts`): são a redação proposta na política e dependem das perguntas 14 e 25 do resumo;
+- o formulário de contato e as Novidades por e-mail do site, se forem ligados (D-066, seções 3.6 e 3.7 da política, `site/dados-da-empresa.json` e `docs/22_SITE.md`): quem liga um formulário confere antes se o texto da política vale;
 - as declarações das lojas (`docs/lojas/privacidade.md`): os textos novos não podem contradizê-las.
 
 ## Verificação feita

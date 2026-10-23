@@ -45,6 +45,7 @@ const MENU = [
   { arquivo: 'app/index.html', rotulo: 'O app', pasta: 'app' },
   { arquivo: 'empresas/index.html', rotulo: 'Para empresas', pasta: 'empresas' },
   { arquivo: 'aprender/index.html', rotulo: 'Aprender', pasta: 'aprender' },
+  { arquivo: 'calculadoras/index.html', rotulo: 'Calculadoras', pasta: 'calculadoras' },
   { arquivo: 'novidades/index.html', rotulo: 'Novidades', pasta: 'novidades' },
   { arquivo: 'ajuda/index.html', rotulo: 'Ajuda', pasta: 'ajuda' },
   { arquivo: 'seguranca.html', rotulo: 'Segurança', pasta: null },
@@ -58,6 +59,7 @@ const RODAPE_COLUNAS = [
       { arquivo: 'app/index.html', rotulo: 'O app' },
       { arquivo: 'empresas/index.html', rotulo: 'Para empresas' },
       { arquivo: 'sobre.html', rotulo: 'Sobre' },
+      { arquivo: 'imprensa.html', rotulo: 'Imprensa' },
     ],
   },
   {
@@ -65,6 +67,7 @@ const RODAPE_COLUNAS = [
     links: [
       { arquivo: 'aprender/index.html', rotulo: 'Aprender' },
       { arquivo: 'aprender/agenda.html', rotulo: 'Agenda financeira' },
+      { arquivo: 'calculadoras/index.html', rotulo: 'Calculadoras' },
       { arquivo: 'novidades/index.html', rotulo: 'Novidades' },
       { arquivo: 'ajuda/index.html', rotulo: 'Ajuda' },
       { arquivo: 'suporte.html', rotulo: 'Suporte' },

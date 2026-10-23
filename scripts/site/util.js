@@ -12,6 +12,35 @@ function rel(de, para) {
   return ancora !== undefined ? `${r}#${ancora}` : r;
 }
 
+/** A página de uma calculadora do app (`packages/core/src/calculators`), no site, e o índice delas. */
+const ARQUIVO_CALCULADORAS = 'calculadoras/index.html';
+const arquivoDaCalculadora = (slug) => `calculadoras/${slug}.html`;
+
+/**
+ * Endereço da calculadora visto de uma página, com os parâmetros que o app já usa nos links dos temas de Aprender (hoje só `modo`, por
+ * exemplo `?modo=emprestimo`). Nada mais vai na URL.
+ */
+function enderecoDaCalculadora(de, slug, params = {}) {
+  const consulta = Object.entries(params).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+  return `${rel(de, arquivoDaCalculadora(slug))}${consulta ? `?${consulta}` : ''}`;
+}
+
+/** Os cabeçalhos do bloco `/*` de um texto no formato do `_headers` do Cloudflare Pages: `{ nome: valor }`. */
+function cabecalhosDoTexto(texto) {
+  const cabecalhos = {};
+  let dentro = false;
+  for (const linha of texto.split('\n')) {
+    if (linha.startsWith('#') || linha.trim() === '') continue;
+    if (!linha.startsWith(' ')) {
+      dentro = linha.trim() === '/*';
+      continue;
+    }
+    const i = linha.indexOf(':');
+    if (dentro && i > 0) cabecalhos[linha.slice(0, i).trim()] = linha.slice(i + 1).trim();
+  }
+  return cabecalhos;
+}
+
 /** Endereço limpo de uma página, como o Cloudflare Pages serve: `index.html` é a pasta, `x.html` é `x`. */
 function caminhoLimpo(arquivo) {
   if (arquivo === 'index.html') return '/';
@@ -54,4 +83,4 @@ function textoSimples(html) {
 /** JSON para dentro de `<script type="application/ld+json">`: nada que feche a etiqueta. */
 const jsonSeguro = (obj) => JSON.stringify(obj).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
 
-module.exports = { rel, caminhoLimpo, dataBR, dataPorExtensoIso, dataRfc822, maiuscula, paragrafos, textoSimples, jsonSeguro, MESES };
+module.exports = { cabecalhosDoTexto, rel, ARQUIVO_CALCULADORAS, arquivoDaCalculadora, enderecoDaCalculadora, caminhoLimpo, dataBR, dataPorExtensoIso, dataRfc822, maiuscula, paragrafos, textoSimples, jsonSeguro, MESES };

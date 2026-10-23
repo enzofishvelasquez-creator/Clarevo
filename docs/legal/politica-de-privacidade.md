@@ -31,7 +31,7 @@ Para a LGPD, a [RAZÃO SOCIAL] é a empresa controladora dos dados pessoais trat
 - Ao app Clarevo para iPhone e Android.
 - À versão web do Clarevo, em [DOMÍNIO].
 - Ao painel das empresas, que existe só na web e é usado por quem administra o benefício.
-- Às páginas informativas do site em [DOMÍNIO]. [A DEFINIR: confirmar que o site não tem formulário nem rastreador]
+- Às páginas informativas do site em [DOMÍNIO], inclusive as calculadoras (a conta é feita no navegador, e nada do que você digita é enviado nem guardado), o formulário de contato para empresas e o cadastro das Novidades por e-mail (seções 3.6 e 3.7). [PROPOSTA: os dois formulários só valem depois de ligados; até lá, o site não tem formulário.] [A DEFINIR: confirmar que o site não tem rastreador]
 
 O modo de demonstração usa dados fictícios e não grava nada no servidor.
 
@@ -96,6 +96,30 @@ Usamos esses dados para ativar, manter e encerrar o benefício. A empresa não r
 - Registros técnicos de acesso, como o endereço IP e o tipo de aparelho ou navegador, que o serviço de autenticação e a infraestrutura de hospedagem podem guardar. O Clarevo não cria registros de acesso próprios. Os registros desses serviços têm prazo curto, que depende do plano contratado, e o registro de auditoria da autenticação pode manter e-mail e IP depois que a conta é excluída. [A DEFINIR: conferir nos painéis quais registros cada serviço guarda, por quanto tempo e se algum deles mantém e-mail ou IP depois da exclusão da conta]
 - Hoje o Clarevo não envia relatórios de falha do app. Se isso passar a existir, esta política será atualizada antes (seção 8).
 
+### 3.6 Contato pelo site
+
+[PROPOSTA: seção a incluir só quando o formulário de contato da página "Para empresas" estiver ligado.]
+
+Se você usar o formulário de contato da página "Para empresas":
+
+- **Dados.** Nome, e-mail, nome da empresa, a faixa do número aproximado de pessoas (por exemplo, "de 51 a 200 pessoas") e a mensagem que você escrever. O formulário não pede nem envia outros dados. Não escreva dados financeiros nem de pessoas que trabalham na empresa.
+- **Para quê.** Para responder ao seu contato sobre o Clarevo para empresas, como a conversa sobre um piloto do benefício.
+- **O site não guarda a mensagem.** Ela não é gravada em banco de dados nem em arquivo do site. O pedido chega ao servidor do site, que o repassa por e-mail à equipe do Clarevo e não guarda nada.
+- **Quem trata.** A Cloudflare, que hospeda o site, recebe o pedido de envio e o seu IP, e o Resend, serviço de envio de e-mail, entrega a mensagem à equipe. Os dois tratam os dados a serviço do Clarevo, como operadores. [A DEFINIR: confirmar o papel de operador, o país e o contrato de cada um]
+- **Por quanto tempo.** A mensagem fica na caixa de e-mail do Clarevo por [A DEFINIR: prazo na caixa de e-mail]. Você pode pedir a eliminação por [E-MAIL DE PRIVACIDADE].
+
+### 3.7 Novidades por e-mail
+
+[PROPOSTA: seção a incluir só quando o cadastro das Novidades por e-mail estiver ligado.]
+
+Se você pedir para receber as Novidades por e-mail:
+
+- **Dado.** O seu e-mail. O formulário não pede mais nada.
+- **Para quê.** Só para enviar as Novidades do Clarevo, os textos curtos da página Novidades, com data e fonte. Não enviamos publicidade de terceiros nem vendemos a lista.
+- **Consentimento.** Você marca a caixa "Quero receber as Novidades do Clarevo por e-mail. Posso cancelar quando quiser.", que vem desmarcada, e depois confirma o cadastro em um e-mail que enviamos (dupla confirmação). Sem confirmar, você não entra na lista e não recebe nada.
+- **Quem trata.** O Brevo, serviço de envio de e-mail, guarda o seu e-mail na lista e a confirmação do cadastro, e envia as Novidades. A Cloudflare recebe o pedido do formulário. Os dois tratam os dados a serviço do Clarevo, como operadores. O site não grava o e-mail. [A DEFINIR: confirmar o que o Brevo registra da confirmação (data, hora e IP), o país e o contrato]
+- **Cancelar.** Todo e-mail das Novidades traz um link para cancelar, do próprio Brevo. Você também pode pedir por [E-MAIL DE PRIVACIDADE]. [A DEFINIR: por quanto tempo o Brevo mantém o e-mail depois do cancelamento, e se ele é eliminado da lista]
+
 ## 4. O que não guardamos?
 
 - Número completo de cartão, código de segurança (CVV) e validade. O app recusa apelidos que pareçam número de cartão.
@@ -131,6 +155,8 @@ A leitura acontece no seu aparelho. O Clarevo não tem servidor que receba esses
 - Guarda de registros de acesso exigida por lei e atendimento a ordem de autoridade: cumprimento de obrigação legal (art. 7º, II) e exercício regular de direitos (art. 7º, VI). [A DEFINIR: confirmar a base]
 - Manter, na Família, o histórico de quem saiu, sem identificar a pessoa: legítimo interesse das demais pessoas da Família (art. 7º, IX). [A DEFINIR: confirmar a base]
 - Benefício pela empresa: execução de contrato com a pessoa, que aceita o convite, e com a empresa (art. 7º, V). Para o e-mail que a empresa informa no convite: [A DEFINIR: base e papéis, conforme o contrato com a empresa].
+- Contato pelo formulário do site (seção 3.6): [PROPOSTA: procedimentos preliminares relacionados a contrato, a pedido da pessoa (art. 7º, V); alternativa, legítimo interesse (art. 7º, IX)]. [A DEFINIR: confirmar a base]
+- Novidades por e-mail (seção 3.7): consentimento (art. 7º, I), que você pode revogar a qualquer momento, cancelando pelo link de qualquer e-mail (art. 8º, § 5º). [A DEFINIR: confirmar a base e a forma de registrar o consentimento]
 - Funções do aparelho (câmera, biometria e lembretes): você liga e pode desligar a qualquer momento, e os dados dessas funções não chegam ao Clarevo. [A DEFINIR: confirmar se precisam de base própria]
 
 Não tomamos decisões automatizadas sobre você, e o Clarevo não faz análise de crédito.
@@ -156,7 +182,7 @@ O Clarevo não vende dados e não compartilha dados para publicidade.
 Hoje usamos:
 
 - **Supabase** (autenticação e banco de dados). Recebe todos os dados guardados pelo Clarevo descritos na seção 3. O projeto de produção fica na região de São Paulo. [A DEFINIR: confirmar a região no painel do projeto real]
-- **Cloudflare** (hospedagem da versão web e do site). Pela hospedagem, recebe os dados de acesso às páginas, como o IP, para entregá-las, e não recebe o que você anota. [A DEFINIR: confirmar se a Cloudflare também fica na frente do Supabase, caso em que as requisições do app ao banco passam por ela em trânsito, conferindo na lista de suboperadores do Supabase] [A DEFINIR: confirmar onde a Cloudflare processa os acessos e se define algum cookie técnico]
+- **Cloudflare** (hospedagem da versão web e do site). Pela hospedagem, recebe os dados de acesso às páginas, como o IP, para entregá-las, e não recebe o que você anota. Se o formulário de contato ou o cadastro das Novidades estiver ligado, o pedido de envio também passa por ela, que o entrega ao site e não o guarda. [A DEFINIR: confirmar com a Cloudflare] [A DEFINIR: confirmar se a Cloudflare também fica na frente do Supabase, caso em que as requisições do app ao banco passam por ela em trânsito, conferindo na lista de suboperadores do Supabase] [A DEFINIR: confirmar onde a Cloudflare processa os acessos e se define algum cookie técnico]
 - **Google (ML Kit), só no Android.** Componente de leitura de código incluído no app, usado quando você lê o QR Code da nota. A imagem é lida no aparelho, mas o componente pode enviar ao Google dados técnicos de uso e identificadores do aparelho, para fins de diagnóstico e funcionamento. Não recebe o que você anota. [A DEFINIR: confirmar na documentação do fornecedor o que é enviado, para quê e onde é tratado]
 - **Expo** (geração dos builds do app). Recebe o código do app. Não recebe dados de quem usa o app.
 - **Apple App Store e Google Play** (distribuição). Tratam os dados de download e de conta nas lojas, conforme as políticas delas.
@@ -165,6 +191,8 @@ Estão previstos, mas ainda não ligados:
 
 - **Sentry** (relatório de falhas do app). Se for ligado, receberá só o erro técnico, sem valores, descrições, e-mails ou dados financeiros, com coleta de IP desligada. Esta política será atualizada antes.
 - **Provedor de e-mail** (confirmação de cadastro e nova senha, com o nome do Clarevo). Receberá o seu e-mail e o conteúdo da mensagem do serviço. [A DEFINIR: provedor escolhido, P-008]
+- **Resend** (envio da mensagem do formulário de contato do site, seção 3.6, se for ligado). Receberá o que você escrever no formulário. [A DEFINIR: país, contrato e se também será o provedor dos e-mails de confirmação de cadastro e de nova senha, P-008]
+- **Brevo** (Novidades por e-mail, seção 3.7, se forem ligadas). Receberá o seu e-mail e a confirmação do cadastro. [A DEFINIR: país e contrato]
 
 **Transferência internacional.** Alguns desses serviços são prestados por empresas com sede fora do Brasil, e parte do tratamento pode ocorrer fora do país. [A DEFINIR: para cada serviço, país da sede e local do tratamento, mecanismo de transferência (LGPD, art. 33) e contrato com cada fornecedor]
 
@@ -186,7 +214,9 @@ Ao sair da conta, essas preferências e memórias continuam no aparelho, ligadas
 
 ## 10. Cookies e rastreadores
 
-O Clarevo não usa cookies de publicidade, não tem ferramenta de análise de uso escolhida por nós e não faz rastreamento para publicidade. A versão web guarda a sessão e as preferências no armazenamento local do navegador, que serve só para o app funcionar.
+O Clarevo não usa cookies de publicidade, não tem ferramenta de análise de uso escolhida por nós dentro do app e não faz rastreamento para publicidade.
+
+Nas páginas do site, não usamos cookies próprios, script de análise de acesso nem recurso de terceiros carregado no navegador. As calculadoras do site fazem a conta no seu navegador e não enviam nem guardam o que você digita, nem no armazenamento do navegador. [PROPOSTA: para saber quantas pessoas visitam o site, usamos só as estatísticas de tráfego que a própria Cloudflare mostra no painel da hospedagem. Elas são medidas no servidor, sem script na página e sem cookie, e não são usadas para publicidade.] [A DEFINIR: confirmar com a Cloudflare o que essas estatísticas guardam (por exemplo, IP) e por quanto tempo] A versão web guarda a sessão e as preferências no armazenamento local do navegador, que serve só para o app funcionar.
 
 A exceção é a leitura de código no Android: o componente do Google (ML Kit) pode enviar ao Google dados técnicos de uso e identificadores do aparelho, como descrito nas seções 5 e 8. Não usamos esses dados para publicidade. [A DEFINIR: confirmar que a hospedagem não define cookie técnico e confirmar na documentação do ML Kit o que o componente envia]
 
@@ -198,6 +228,8 @@ A exceção é a leitura de código no Android: o componente do Google (ML Kit) 
 - **Família encerrada.** Os dados ficam guardados, sem leitura por ninguém, até a regra de guarda. [A DEFINIR: prazo, P-010]
 - **Cópias de segurança.** O serviço de banco de dados pode manter cópias de segurança, e dados já apagados podem ficar nelas por um tempo. [A DEFINIR: prazo, previsto em 7 dias no plano contratado; confirmar no painel] Se uma cópia for restaurada, as contas excluídas depois dela serão excluídas de novo.
 - **Registros de acesso.** O Clarevo não cria registros de acesso próprios. Os do Supabase e da Cloudflare têm prazo curto, que depende do plano, e o registro de auditoria da autenticação pode manter e-mail e IP depois da exclusão da conta. [A DEFINIR: o que guardar, onde e por quanto tempo, frente à guarda de registros de acesso do Marco Civil da Internet, art. 15, e conferir nos painéis o que cada serviço mantém]
+- **Mensagem do formulário de contato** (seção 3.6). Fica na caixa de e-mail do Clarevo por [A DEFINIR: prazo na caixa de e-mail]. O site não a guarda.
+- **E-mail das Novidades** (seção 3.7). Fica no Brevo enquanto você não cancelar. [A DEFINIR: prazo depois do cancelamento]
 - **Contas sem uso.** Hoje o Clarevo não apaga contas por inatividade. [A DEFINIR: política para contas inativas]
 - **Obrigação legal e defesa de direitos.** Podemos guardar o necessário por mais tempo se a lei exigir ou para nos defendermos em processo. [A DEFINIR]
 
@@ -218,6 +250,7 @@ Você tem direito, a qualquer momento, de pedir (LGPD, art. 18):
 **Como pedir.**
 
 - Dentro do app, você já pode: ver e corrigir o que anotou, em cada tela; ver quem acessa cada contexto em "Quem vê estes dados?"; exportar os seus gastos e recebimentos do Pessoal e as compras no cartão em planilha ou PDF, em Conta, "Exportar meus dados" (a exportação não inclui tudo o que guardamos); e excluir a conta, em Conta, no último item.
+- Nas Novidades por e-mail, cancele pelo link de qualquer e-mail das Novidades.
 - Para os demais pedidos, escreva para [E-MAIL DE PRIVACIDADE], do e-mail cadastrado na sua conta.
 - Prazo de resposta: [A DEFINIR].
 - Como confirmamos a sua identidade: [A DEFINIR]. Não pediremos documentos nem dados financeiros para isso.

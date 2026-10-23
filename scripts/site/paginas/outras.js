@@ -147,6 +147,7 @@ function pagina404({ valores }) {
 <ul>
 <li><a href="${u('app/index.html')}">O app</a></li>
 <li><a href="${u('aprender/index.html')}">Aprender</a></li>
+<li><a href="${u('calculadoras/index.html')}">Calculadoras</a></li>
 <li><a href="${u('novidades/index.html')}">Novidades</a></li>
 <li><a href="${u('suporte.html')}">Suporte</a></li>
 </ul>`,

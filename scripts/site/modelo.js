@@ -41,7 +41,9 @@ function menuHtml(arquivo) {
 }
 
 function rodapeHtml(arquivo, valores) {
-  const colunas = RODAPE_COLUNAS.map(
+  // Com a newsletter ligada (D-066), a coluna "Aprender e ajuda" ganha o caminho para a inscrição.
+  const colunasDoRodape = RODAPE_COLUNAS.map((c) => (c.titulo === 'Aprender e ajuda' && valores && valores.newsletter === true ? { ...c, links: [...c.links, { arquivo: 'novidades/receber.html', rotulo: 'Novidades por e-mail' }] } : c));
+  const colunas = colunasDoRodape.map(
     (c) => `<div><h2>${esc(c.titulo)}</h2><ul>${c.links.map((l) => `<li><a href="${rel(arquivo, l.arquivo)}">${esc(l.rotulo)}</a></li>`).join('')}</ul></div>`,
   ).join('\n');
   const legal = marcadoresEmHtml(esc(RODAPE_LEGAL), valores);
@@ -59,9 +61,10 @@ ${colunas}
 /**
  * Uma página completa. `fonte` é o texto original (Markdown ou modelo) onde se procuram os marcadores que faltam; o rodapé entra na
  * conta. `capa`: HTML do herói, com o `h1`; `corpo`: HTML que vai direto em `<main>`, depois da capa.
- * `jsonld`: objetos de dados estruturados. `scripts`: arquivos `.js` do próprio site, com caminho a partir da raiz. `cabecalho`: HTML a mais no `<head>`.
+ * `jsonld`: objetos de dados estruturados. `scripts`: arquivos `.js` do próprio site, com caminho a partir da raiz. `modulos`: o mesmo, como módulo ES
+ * (as calculadoras, que importam o núcleo de `js/nucleo/`). `cabecalho`: HTML a mais no `<head>`.
  */
-function montarPagina({ arquivo, titulo, descricao, capa, corpo, fonte, valores, jsonld = [], scripts = [], cabecalho = '', classeCapa = '', tipoOg = 'website', semIndexar = false, tituloCompleto = false }) {
+function montarPagina({ arquivo, titulo, descricao, capa, corpo, fonte, valores, jsonld = [], scripts = [], modulos = [], cabecalho = '', classeCapa = '', tipoOg = 'website', semIndexar = false, tituloCompleto = false }) {
   const pendencias = pendenciasDoTexto(`${fonte}\n${RODAPE_LEGAL}`, valores);
   const faixa = pendencias.length
     ? `<div class="faixa" role="note"><div class="miolo"><p><strong>Versão preliminar, em revisão.</strong> Este texto ainda não vale como versão final: os trechos destacados serão preenchidos antes da publicação.</p></div></div>\n`
@@ -89,7 +92,7 @@ function montarPagina({ arquivo, titulo, descricao, capa, corpo, fonte, valores,
   }
   const canonical = url ? `<link rel="canonical" href="${esc(url)}">\n` : '';
   const dados = jsonld.map((o) => `<script type="application/ld+json">${jsonSeguro(o)}</script>`).join('\n');
-  const js = scripts.map((s) => `<script src="${rel(arquivo, s)}" defer></script>`).join('\n');
+  const js = [...scripts.map((s) => `<script src="${rel(arquivo, s)}" defer></script>`), ...modulos.map((s) => `<script type="module" src="${rel(arquivo, s)}"></script>`)].join('\n');
   const html = `<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -125,7 +128,7 @@ ${rodapeHtml(arquivo, valores)}
 </body>
 </html>
 `;
-  return { arquivo, html, pendencias };
+  return { arquivo, html, pendencias, semIndexar };
 }
 
 /** Uma coluna de texto (páginas de leitura): `<div class="miolo conteudo"><div class="texto">...</div></div>`. */

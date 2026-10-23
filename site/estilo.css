@@ -29,6 +29,7 @@
   --link-rodape:#D4F05B;
   --disco:#1D47CC;
   --aparelho:#0B1330;
+  --erro:#B3261E;
 }
 @media (prefers-color-scheme: dark){
   :root{
@@ -45,6 +46,7 @@
     --foco:#9DB7FF;
     --rodape:#0A1020;
     --disco:#183BAD;
+    --erro:#FFB4AB;
   }
 }
 
@@ -76,7 +78,7 @@ main:focus{outline:none}
 .marca .logo-papel{display:none}
 .menu{display:flex;align-items:center;gap:.25rem}
 .menu-lista{list-style:none;margin:0;padding:0;display:none;gap:0 .15rem}
-.menu a,.menu summary{display:inline-flex;align-items:center;min-height:44px;padding:0 .7rem;color:var(--sobre-topo);font-weight:700;font-size:.9375rem;text-decoration:none;border-radius:10px;cursor:pointer}
+.menu a,.menu summary{display:inline-flex;align-items:center;min-height:44px;padding:0 .6rem;color:var(--sobre-topo);font-weight:700;font-size:.9375rem;text-decoration:none;border-radius:10px;cursor:pointer}
 .menu a:hover,.menu summary:hover{text-decoration:underline;text-underline-offset:.2em}
 .menu [aria-current="page"],.menu .secao-atual{text-decoration:underline;text-decoration-thickness:3px;text-decoration-color:var(--lima);text-underline-offset:.3em}
 .menu-movel{position:relative}
@@ -87,7 +89,7 @@ main:focus{outline:none}
 .menu-movel ul{list-style:none;margin:.5rem 0 0;padding:.5rem;position:absolute;right:0;top:100%;width:min(18rem,calc(100vw - 32px));background:var(--topo);border:2px solid var(--sobre-topo);border-radius:16px;box-shadow:0 18px 40px rgba(6,16,64,.35)}
 .menu-movel li a{display:flex;width:100%}
 .menu .menu-cta{display:none}
-@media (min-width:62rem){
+@media (min-width:70rem){
   .menu-lista{display:flex}
   .menu-movel{display:none}
   .menu .menu-cta{display:inline-flex;min-height:44px;padding:0 1.1rem;background:var(--lima);color:var(--sobre-lima);border-radius:999px;font-weight:800;text-decoration:none}
@@ -261,6 +263,89 @@ details.conta ol{margin:.25rem 0 0;font-variant-numeric:tabular-nums}
 .mes li{margin:0 0 .9rem}
 .mes li:last-child{margin-bottom:0}
 .mes .tema-meta{margin-top:.25rem}
+
+/* Calculadoras: o formulário vem do script da página (calculadoras/calculadora.js); sem JavaScript, o aviso fica no <noscript> */
+.calc{margin:1.25rem 0 0;display:grid;gap:1rem;max-width:46rem}
+.calc-aviso{margin-top:0;max-width:46rem}
+.bloco .exemplo{max-width:46rem}
+.calc-carregando,.calc-sem-js{margin:0;padding:1rem 1.15rem;border:1px dashed var(--contorno);border-radius:16px;background:var(--superficie)}
+.calc-sem-js h3{margin-top:1rem}
+.calc-formulario,.calc-resultados{display:grid;gap:1rem}
+.calc-cartao{background:var(--superficie);border:1px solid var(--linha);border-radius:20px;padding:1.25rem;display:grid;gap:1.1rem}
+.calc-cartao h3,.calc-cartao h4,.calc-secao h3,.calc-resultado h3,.calc-resultado h4,.calc-resultado h5,.calc-titulo h3{margin:0}
+.calc-titulo{display:grid;gap:.15rem}
+.calc-item{display:grid;gap:1rem}
+.calc-item+.calc-item{border-top:1px solid var(--linha);padding-top:1.1rem}
+.campo{display:grid;gap:.3rem}
+.campo label,.escolha legend{font-weight:700;padding:0}
+.dica{margin:0;color:var(--texto-2);font-size:.9375rem}
+.campo-entrada{display:flex;align-items:stretch}
+.campo-prefixo{display:flex;align-items:center;padding:0 .85rem;border:2px solid var(--contorno);border-right:0;border-radius:14px 0 0 14px;background:var(--azul-claro);color:var(--texto);font-weight:700}
+.campo input{width:100%;min-width:0;min-height:52px;padding:0 1rem;border:2px solid var(--contorno);border-radius:14px;background:var(--superficie);color:var(--texto);font:inherit;font-size:1.0625rem;font-variant-numeric:tabular-nums}
+.campo-prefixo+input{border-radius:0 14px 14px 0}
+.campo input:focus-visible{outline:3px solid var(--foco);outline-offset:2px;border-color:var(--foco)}
+.campo input[aria-invalid="true"]{border-color:var(--erro)}
+.erro{margin:0;color:var(--erro);font-weight:700;font-size:.9375rem}
+.escolha{border:0;margin:0;padding:0;min-width:0;display:grid;gap:.3rem}
+.chips{display:flex;flex-wrap:wrap;gap:.5rem}
+.chip{position:relative;display:inline-flex}
+.chip input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.chip span{display:inline-flex;align-items:center;min-height:48px;padding:0 1.1rem;border:2px solid var(--contorno);border-radius:999px;background:var(--superficie);color:var(--texto);font-weight:700}
+.chip input:checked+span{border-color:var(--link);background:var(--azul-claro)}
+.chip input:checked+span::before{content:"";width:.45rem;height:.8rem;margin-right:.55rem;border-right:3px solid var(--link);border-bottom:3px solid var(--link);transform:translateY(-2px) rotate(45deg)}
+.chip input:focus-visible+span{outline:3px solid var(--foco);outline-offset:3px}
+.chip:hover span{border-color:var(--link)}
+button.botao{font:inherit;font-weight:800;cursor:pointer}
+button.botao-suave{background:transparent}
+button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min-height:48px;padding:0;border:0;background:none;color:var(--link);font:inherit;font-weight:700;text-decoration:underline;text-underline-offset:.18em;cursor:pointer;text-align:left}
+.calc-resultado,.calc-secao{background:var(--superficie);border:1px solid var(--linha);border-radius:20px;padding:1.25rem;display:grid;gap:.75rem}
+.calc-resultado{border-left:6px solid var(--azul)}
+.calc-secao .calc-resultado{border-left-width:1px;padding:0;border:0;background:none}
+.calc-resultado p,.calc-secao p,.calc-linhas{margin:0}
+.calc-linhas{display:grid;gap:.4rem;font-variant-numeric:tabular-nums}
+.calc-destaque{font-weight:800;font-size:1.25rem;line-height:1.4}
+.calc-destaque-2{font-weight:700}
+.calc-nota{margin:0;padding:.75rem 1rem;border-radius:12px;background:var(--azul-claro);color:var(--texto);font-size:.9375rem}
+.calc-hipoteses ul{margin:.4rem 0 0}
+.calc-hipoteses li{color:var(--texto-2);font-size:.9375rem}
+.calc-detalhes{display:grid;gap:.75rem;margin-top:.5rem}
+.calc-cenario{display:grid;gap:.25rem;padding-top:.5rem;border-top:1px solid var(--linha)}
+.calc-exemplo-resultado{font-variant-numeric:tabular-nums}
+.cartao-calculadoras{max-width:42rem}
+.so-leitor{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* Formulários (contato para empresas e Novidades por e-mail): prontos e desligados; o envio é um POST comum, sem JavaScript */
+.formulario{display:grid;gap:1.1rem;max-width:36rem;margin:1rem 0}
+.campo select,.campo textarea{width:100%;min-width:0;padding:.75rem 1rem;border:2px solid var(--contorno);border-radius:14px;background:var(--superficie);color:var(--texto);font:inherit;font-size:1.0625rem}
+.campo select{min-height:52px;padding-top:0;padding-bottom:0}
+.campo textarea{resize:vertical;line-height:1.5}
+.campo select:focus-visible,.campo textarea:focus-visible{outline:3px solid var(--foco);outline-offset:2px;border-color:var(--foco)}
+.consentimento{display:flex;gap:.75rem;align-items:flex-start}
+.consentimento input{flex:none;width:1.5rem;height:1.5rem;margin:.2rem 0 0;accent-color:var(--link)}
+.consentimento label{font-weight:700}
+.campo-isca{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
+.formulario-grade{display:grid;gap:1.25rem;align-items:start}
+@media (min-width:56rem){.formulario-grade{grid-template-columns:minmax(0,36rem) minmax(0,24rem);gap:2.5rem}.formulario-grade .formulario{margin:0}.formulario-grade .privacidade-curta{margin:0}}
+.privacidade-curta{max-width:36rem;margin:1rem 0 0;padding:1rem 1.15rem;border-radius:16px;background:var(--azul-claro);color:var(--texto);font-size:.9375rem}
+.privacidade-curta h3{margin:0 0 .4rem;font-size:1.0625rem}
+.privacidade-curta ul{margin:0}
+
+/* Kit de imprensa */
+.descricao h3{margin-top:0}
+.marca-cartao h3{margin:.75rem 0 .35rem}
+.marca-amostra{display:flex;align-items:center;justify-content:center;min-height:9rem;padding:1.25rem;border-radius:14px;border:1px solid var(--linha)}
+.marca-amostra img{display:block;max-width:100%;height:auto;max-height:5.5rem}
+.marca-claro{background:#FFFFFF}
+.marca-azul{background:#2457F5;border-color:#2457F5}
+.baixar{font-size:.9375rem;color:var(--texto-2)}
+.cor-cartao h3{margin:.75rem 0 .35rem}
+.amostra{height:5rem;border-radius:14px;border:1px solid var(--linha)}
+.amostra-azul{background:#2457F5}
+.amostra-lima{background:#D4F05B}
+.amostra-texto{background:#17223B}
+.capturas-imprensa{display:grid;gap:2rem 1.5rem;grid-template-columns:repeat(auto-fit,minmax(min(15.5rem,100%),1fr));justify-items:center}
+.captura-imprensa{display:grid;gap:.5rem;justify-items:center;max-width:15.5rem;width:100%}
+.captura-imprensa .baixar{margin:0;text-align:center}
 
 /* Novidades */
 .posts{list-style:none;padding:0;margin:0;display:grid;gap:1rem}

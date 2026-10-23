@@ -5,7 +5,7 @@
  * do core: nada é copiado à mão. As seções "usar" e "dúvidas" do catálogo vão para a Ajuda.
  */
 const { esc } = require('../texto');
-const { rel, maiuscula } = require('../util');
+const { rel, maiuscula, enderecoDaCalculadora, ARQUIVO_CALCULADORAS } = require('../util');
 const { montarPagina, colunaTexto, bloco, dominioDe, urlDoSite } = require('../modelo');
 const { catalogo } = require('../catalogo');
 const { AUTORIA_PADRAO } = require('../config');
@@ -64,6 +64,10 @@ ${temas.map((t) => cartaoDoTema(arquivo, t)).join('\n')}
       { variante: id === 'juros' ? 'alt' : '', rotulo: id },
     );
   });
+  const calculadoras = bloco(
+    `<a class="cartao cartao-calculadoras" href="${rel(arquivo, ARQUIVO_CALCULADORAS)}"><span class="titulo-cartao">${esc(c.CALC_UI.learnCardTitle)}</span><span class="tema-sub">${esc(c.CALC_UI.learnCardCaption)}. A conta é feita no seu navegador.</span></a>`,
+    { rotulo: null },
+  );
   const rodape = bloco(
     `<div class="aviso-edu"><p>${esc(c.TEXTO.footer)}</p></div>
 <p>Dúvidas sobre como usar o app? Veja a <a href="${rel(arquivo, 'ajuda/index.html')}">Ajuda</a>.</p>`,
@@ -73,6 +77,7 @@ ${temas.map((t) => cartaoDoTema(arquivo, t)).join('\n')}
 <p class="lead">Educação financeira em textos curtos, com fonte, data de revisão e exemplos calculados quando cabem. É o conteúdo que está no app, que não registra o que você lê. Este site não usa cookies próprios nem análise de acesso.</p>
 <div class="acoes">
 <a class="botao botao-principal" href="${rel(arquivo, 'aprender/agenda.html')}">Agenda financeira</a>
+<a class="botao botao-suave" href="${rel(arquivo, ARQUIVO_CALCULADORAS)}">Calculadoras</a>
 <a class="botao botao-suave" href="${rel(arquivo, 'novidades/como-escrevemos.html')}">Como escrevemos</a>
 </div>`;
   const pg = montarPagina({
@@ -80,7 +85,7 @@ ${temas.map((t) => cartaoDoTema(arquivo, t)).join('\n')}
     titulo: 'Aprender',
     descricao: 'Educação financeira em textos curtos: organizar o mês, juros e crédito, inflação e Selic, cada tema com fontes, data de revisão e exemplos calculados quando cabem.',
     capa,
-    corpo: [...secoes, rodape].join('\n'),
+    corpo: [calculadoras, ...secoes, rodape].join('\n'),
     fonte: capa,
     valores,
     classeCapa: 'capa-simples',
@@ -108,8 +113,9 @@ function paginaDoTema(t, { valores }) {
   const fatos = t.facts.length
     ? `<section class="fatos" aria-labelledby="fatos"><h2 id="fatos">Números e regras citados</h2><ul>${t.facts.map((f) => `<li>${esc(f.text)} <a href="#fonte-${f.source + 1}">Fonte ${f.source + 1}</a></li>`).join('')}</ul></section>`
     : '';
+  // A mesma calculadora do app, no navegador (com o parâmetro `modo` que o catálogo já define para o tema).
   const noApp = calc
-    ? `<p class="no-app">No app, você faz a conta com os seus números em ${esc(c.CALC_UI.learnCardTitle)}: ${esc(calc.titulo)}.</p>`
+    ? `<p class="no-app">Faça a conta com os seus números: <a href="${esc(enderecoDaCalculadora(arquivo, calc.slug, calc.params))}">${esc(calc.titulo)}</a>${/[?!.]$/.test(calc.titulo) ? '' : '.'} A conta é feita no seu navegador, sem enviar nada. No app, ela está em ${esc(c.CALC_UI.learnCardTitle)}.</p>`
     : '';
   const rel_ = relacionados.length
     ? `<h2 id="relacionados">${esc(c.TEXTO.related)}</h2>
@@ -217,4 +223,4 @@ function paginasAprender(ctx) {
   return [paginaIndice(ctx), paginaAgenda(ctx), ...temasDoSite().map((t) => paginaDoTema(t, ctx))];
 }
 
-module.exports = { paginasAprender, temasDoSite, arquivoDoTema, fontesHtml, fonteHtml, SECOES_DO_SITE, REGRA_DO_CLAREVO };
+module.exports = { paginasAprender, cartaoDoTema, temasDoSite, arquivoDoTema, fontesHtml, fonteHtml, SECOES_DO_SITE, REGRA_DO_CLAREVO };
