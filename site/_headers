@@ -1,7 +1,8 @@
 # Gerado por scripts/gerar-site.js. Cloudflare Pages lê este arquivo e não o publica.
 # Nenhum recurso de fora é permitido: o site não carrega fontes, imagens, scripts nem estilos de outros endereços.
+# script-src e connect-src 'self' valem só para o script da busca da Ajuda (ajuda/busca.js), que lê ajuda/indice.json.
 /*
-  Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: no-referrer

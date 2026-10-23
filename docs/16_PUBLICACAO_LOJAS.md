@@ -14,7 +14,7 @@
 | Ficha (pt-BR) | Pronta, com limites conferidos: `docs/lojas/ficha.md`. Campos de contato, URLs e direitos autorais: vazios para Enzo |
 | Privacidade nas lojas | Roteiro pronto, derivado do código e do banco: `docs/lojas/privacidade.md`. Depende do advogado e da decisão sobre o Sentry |
 | Gráfico de recursos do Google Play (1024 x 500) | **Feito** (D-064): `apps/app/assets/loja/grafico-recursos-1024x500.png`, gerado por `scripts/gerar-grafico-loja.js` (seção 6) |
-| Site público, política de privacidade, termos de uso, página de exclusão e suporte | Páginas prontas em `site/`, geradas por `scripts/gerar-site.js` dos textos em rascunho de `docs/legal/` (D-064, `docs/07`, seção "Site público"). **Nada foi publicado**: dependem da revisão do advogado, do nome legal, do CNPJ, do endereço e dos e-mails (marcadores em `site/dados-da-empresa.json`). As URLs que as lojas pedem estão na seção 3 |
+| Site público, política de privacidade, termos de uso, página de exclusão e suporte | Páginas prontas em `site/`, geradas por `scripts/gerar-site.js` dos textos em rascunho de `docs/legal/`, do catálogo e do guia do app e de `site-src/` (D-064 e D-065, `docs/07`, seção "Site público", e `docs/22_SITE.md`). **Nada foi publicado**: dependem da revisão do advogado, do nome legal, do CNPJ, do endereço e dos e-mails (marcadores em `site/dados-da-empresa.json`). As URLs que as lojas pedem estão na seção 3 |
 | Contas Apple, Google e Expo | **Não existem.** Dependem de CNPJ, domínio e da pessoa responsável (P-006) |
 | Conta de teste para a revisão | A criar (seção 5) |
 
@@ -49,8 +49,8 @@ Nenhuma destas foi tomada pelo Claude. A coluna "Proposta" é só o que está no
 | `apps/app/assets/loja/icone-play-512.png` | Ícone da página do app no Google Play |
 | `apps/app/assets/loja/grafico-recursos-1024x500.png` | Gráfico de recursos do Google Play (D-064), 1024 x 500, PNG RGB de 24 bits, sem transparência |
 | `scripts/gerar-grafico-loja.js` | Desenha o gráfico em HTML no Chromium do Playwright, com o logotipo reverso oficial, o subtítulo da ficha e a captura do Resumo da demonstração |
-| `site/`, `scripts/gerar-site.js` | Site público (`clarevo-site`): início, privacidade, termos, excluir conta e suporte, sem JavaScript, cookies nem recurso de fora. Passo a passo e publicação em `docs/07` |
-| `packages/core/test/site.test.ts` | Teste do site (conversor de Markdown, páginas em dia com `docs/legal`, redação, contraste, `--final`) e do gráfico |
+| `site/`, `site-src/`, `scripts/gerar-site.js`, `scripts/site/` | Site público (`clarevo-site`): início, o app, para empresas, Aprender, Novidades, Ajuda, segurança, sobre, suporte, privacidade, termos e excluir conta, sem cookies nem recurso de fora (o único JavaScript é a busca da Ajuda). Mapa e manual em `docs/22_SITE.md`; passo a passo e publicação em `docs/07` |
+| `packages/core/test/site.test.ts` | Teste do site (conversor de Markdown, páginas em dia, Aprender, Ajuda, Novidades, imagens, redação, contraste, `--final`), da imagem de compartilhamento e do gráfico |
 | `scripts/gerar-icones.js` | Gera os PNG a partir de `docs/marca/` (`--verificar` confere sem gravar) |
 | `scripts/capturas-lojas.js` | Gera as capturas a partir da demonstração |
 | `docs/lojas/capturas/` | 24 capturas (8 telas em 3 tamanhos) |

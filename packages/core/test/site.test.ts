@@ -3,17 +3,22 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { contrastRatio } from '../src/contrast';
+import { formatDateBR } from '../src/dates';
+import { GUIDE_ENTRIES } from '../src/guide';
+import { LEARN_SECTIONS, LEARN_UI_TEXT, SEASONAL_CALENDAR, publishedTopics, relatedTopics } from '../src/learn';
 
 /**
- * Site público (D-064, `docs/07` seção "Site público (clarevo-site)"): `scripts/gerar-site.js` converte `docs/legal/*.md` em páginas
- * estáticas em `site/` e escreve a página inicial e o suporte a partir dos modelos do próprio script. O teste confere o conversor de
- * Markdown, que as páginas gravadas estão em dia com os textos, as regras de redação, a ausência de qualquer recurso de fora, a
- * estrutura (um `h1`, títulos sem pular nível, links internos), o contraste das cores (a regra de `src/contrast.ts`), a recusa de
- * `--final` enquanto sobrar marcador e o gráfico de recursos do Google Play (1024 x 500).
+ * Site público (D-064 e D-065, `docs/22_SITE.md`): `scripts/gerar-site.js` gera o site em `site/` a partir de `docs/legal/*.md`, do
+ * catálogo de Aprender e do guia de uso do `packages/core`, do conteúdo próprio de `site-src/` e dos modelos de `scripts/site/`. O
+ * teste confere o conversor de Markdown; que as páginas gravadas estão em dia; a redação (sem travessão nem a expressão proibida);
+ * a ausência de recurso de fora; a estrutura (um `h1`, títulos sem pular nível, links internos); que cada tema publicado de Aprender
+ * tem página com o texto do catálogo, a data de revisão e as fontes; a Ajuda e a busca; as Novidades e o feed; os dados
+ * estruturados; as capturas; o contraste das cores (a regra de `src/contrast.ts`); a recusa de `--final` enquanto sobrar marcador;
+ * a imagem de compartilhamento e o gráfico de recursos do Google Play.
  */
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const SITE = join(ROOT, 'site');
@@ -25,6 +30,7 @@ interface Gerado {
   avisos: string[];
   pendencias: Map<string, string[]>;
   problemasFinais: string[];
+  posts: { arquivo: string; data: string; titulo: string; autoria: string; fontes: unknown[] }[];
 }
 const gerador = require(SCRIPT) as {
   MARCADORES: string[];
@@ -34,12 +40,64 @@ const gerador = require(SCRIPT) as {
   separarTitulo: (md: string) => { titulo: string | null; corpo: string };
   problemasDeTitulos: (html: string) => string[];
   pendenciasDoTexto: (texto: string, valores?: Record<string, string>) => string[];
+  slug: (texto: string) => string;
+  lerDados: (arquivo: string) => { dados: Record<string, string>; avisos: string[] };
   gerarSite: (opcoes?: { legal?: string; dados?: Record<string, string>; arquivoDados?: string }) => Gerado;
   linksQuebrados: (arquivos: Map<string, string | Buffer>) => string[];
 };
-const { markdownParaHtml, gerarSite, MARCADORES } = gerador;
+const conteudo = require(join(ROOT, 'scripts', 'site', 'conteudo.js')) as {
+  lerCabecalho: (t: string) => { meta: Record<string, string | string[]>; corpo: string };
+  lerPosts: (pasta: string) => { posts: { arquivo: string; data: string }[]; problemas: string[] };
+  lerPerguntas: (arquivo: string) => { pergunta: string; tema: string; id: string; resposta: string }[];
+};
+const png = require(join(ROOT, 'scripts', 'site', 'png.js')) as {
+  decodificar: (b: Buffer) => { largura: number; altura: number; rgb: Buffer };
+  dimensoes: (b: Buffer) => { largura: number; altura: number; tipoCor: number };
+  reduzir: (i: { largura: number; altura: number; rgb: Buffer }, l: number) => { largura: number; altura: number; rgb: Buffer };
+  codificar: (i: { largura: number; altura: number; rgb: Buffer }, o?: { paleta?: boolean }) => Buffer;
+};
+const { markdownParaHtml, MARCADORES } = gerador;
 
-const PAGINAS = ['index.html', 'suporte.html', 'privacidade.html', 'termos.html', 'excluir-conta.html'];
+/** O gerador é puro: o resultado com os dados do repositório é calculado uma vez e vale para todos os grupos de teste. */
+let geradoDoRepositorio: Gerado | null = null;
+const gerarSite = (opcoes?: { legal?: string; dados?: Record<string, string>; arquivoDados?: string }): Gerado => {
+  if (opcoes) return gerador.gerarSite(opcoes);
+  geradoDoRepositorio ??= gerador.gerarSite();
+  return geradoDoRepositorio;
+};
+
+const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+/** Os temas de Aprender que viram página: publicados, não legados, das seções organizar, juros e tempo. */
+const TEMAS_DO_SITE = publishedTopics().filter((t) => !t.legacy && ['organizar', 'juros', 'tempo'].includes(t.section));
+const TEMAS_DA_AJUDA = ['comecar', 'organizar', 'contas', 'familia', 'beneficio', 'privacidade', 'conta'];
+const POSTS = [
+  'novidades/2026-10-23-conheca-o-clarevo.html',
+  'novidades/2026-10-23-13o-salario-quando-cai-e-como-se-organizar.html',
+  'novidades/2026-10-23-como-a-empresa-oferece-o-clarevo-sem-ver-suas-financas.html',
+];
+const PAGINAS_BASE = [
+  'index.html',
+  'app/index.html',
+  'empresas/index.html',
+  'aprender/index.html',
+  'aprender/agenda.html',
+  'novidades/index.html',
+  'novidades/como-escrevemos.html',
+  'ajuda/index.html',
+  ...TEMAS_DA_AJUDA.map((t) => `ajuda/${t}.html`),
+  'seguranca.html',
+  'sobre.html',
+  'suporte.html',
+  'privacidade.html',
+  'termos.html',
+  'excluir-conta.html',
+  '404.html',
+];
+const PAGINAS = [...PAGINAS_BASE, ...TEMAS_DO_SITE.map((t) => `aprender/${t.slug}.html`), ...POSTS];
+/** As páginas do menu principal (a página atual é marcada com aria-current). */
+const NO_MENU = ['index.html', 'app/index.html', 'empresas/index.html', 'aprender/index.html', 'novidades/index.html', 'ajuda/index.html', 'seguranca.html'];
+
 const VAZIOS = Object.fromEntries(MARCADORES.map((m) => [m, '']));
 const PREENCHIDOS: Record<string, string> = {
   'RAZÃO SOCIAL': 'Empresa Exemplo Ltda',
@@ -47,6 +105,7 @@ const PREENCHIDOS: Record<string, string> = {
   ENDEREÇO: 'Rua Exemplo, 1, Rio de Janeiro',
   'E-MAIL DE PRIVACIDADE': 'privacidade@exemplo.test',
   'E-MAIL DE SUPORTE': 'suporte@exemplo.test',
+  'E-MAIL DE CONTATO': 'contato@exemplo.test',
   DOMÍNIO: 'exemplo.test',
   'DATA DE VIGÊNCIA': '1 de janeiro de 2027',
 };
@@ -105,23 +164,68 @@ function pastaDeExemplo(): string {
 
 const texto = (v: string | Buffer | undefined): string => (typeof v === 'string' ? v : v ? v.toString('utf8') : '');
 
+/** Caminho de um arquivo do site visto de uma página: relativo, e a partir da raiz na 404. */
+function visto(de: string, para: string): string {
+  if (de === '404.html') return `/${para}`;
+  return posix.relative(posix.dirname(de), para) || posix.basename(para);
+}
+
+/** O que o `--final` imprime como pendência: os marcadores por página e os problemas de texto. */
+function razoesFinais(g: Gerado): string[] {
+  return [...[...g.pendencias].flatMap(([p, l]) => l.map((m) => `${p}: ${m}`)), ...g.problemasFinais];
+}
+
+/** XML bem formado: declaração, etiquetas abertas e fechadas na ordem, atributos entre aspas e entidades válidas. */
+function problemasDeXml(xml: string): string[] {
+  const erros: string[] = [];
+  if (!xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>')) erros.push('sem a declaração XML');
+  const corpo = xml.replace(/<\?[\s\S]*?\?>/g, '').replace(/<!--[\s\S]*?-->/g, '');
+  const pilha: string[] = [];
+  let ultimo = 0;
+  const entreOk = (t: string) => !/[<>]/.test(t) && !/&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/.test(t);
+  for (const m of corpo.matchAll(/<(\/?)([A-Za-z][\w:.-]*)((?:\s+[\w:.-]+="[^"<]*")*)\s*(\/?)>/g)) {
+    if (!entreOk(corpo.slice(ultimo, m.index))) erros.push(`texto inválido antes de ${m[0].slice(0, 40)}`);
+    ultimo = (m.index ?? 0) + m[0].length;
+    if (m[1]) {
+      const topo = pilha.pop();
+      if (topo !== m[2]) erros.push(`fecha ${m[2]}, mas estava aberto ${topo}`);
+    } else if (!m[4]) pilha.push(m[2]!);
+  }
+  if (!entreOk(corpo.slice(ultimo))) erros.push('texto inválido no fim');
+  if (pilha.length) erros.push(`sem fechar: ${pilha.join(', ')}`);
+  return erros;
+}
+
+const hostsPermitidos = (dominio: string): string[] => [...gerador.HOSTS_DE_LINK_PERMITIDOS, 'schema.org', ...(dominio ? [dominio] : [])];
+
 /** As verificações que valem para qualquer conjunto de páginas geradas (as gravadas em `site/` e as do texto de exemplo). */
-function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: string) {
-  const hosts = [...gerador.HOSTS_DE_LINK_PERMITIDOS, ...(dominio ? [dominio] : [])];
-  for (const nome of PAGINAS) {
+function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: string, paginas: string[] = PAGINAS_BASE) {
+  const hosts = hostsPermitidos(dominio);
+  const prefixoDe = (nome: string) => visto(nome, 'estilo.css').replace('estilo.css', '');
+  for (const nome of paginas) {
     const html = texto(arquivos.get(nome));
+    const noAjuda = nome.startsWith('ajuda/');
     expect(html.length, nome).toBeGreaterThan(500);
     expect(html, nome).toMatch(/^<!doctype html>\n<html lang="pt-BR">/);
     expect(html, `${nome}: travessão`).not.toMatch(PROIBIDO_TRAVESSAO);
     expect(html, `${nome}: expressão proibida`).not.toMatch(PROIBIDO_EXPRESSAO);
-    // Sem JavaScript, sem cookies e sem nada que rastreie.
-    expect(html, `${nome}: script`).not.toMatch(/<script/i);
+    // Sem cookies e sem nada que rastreie: os únicos scripts são os dados estruturados (que não executam) e a busca da Ajuda.
+    for (const m of html.matchAll(/<script\b([^>]*)>/gi)) {
+      const ld = /^\s*type="application\/ld\+json"\s*$/.test(m[1]!);
+      const busca = noAjuda && /^\s*src="busca\.js"\s+defer\s*$/.test(m[1]!);
+      expect(ld || busca, `${nome}: script não permitido: ${m[0]}`).toBe(true);
+    }
     expect(html, `${nome}: manipulador de evento`).not.toMatch(/\son[a-z]+\s*=/i);
     expect(html, `${nome}: atributo style (a política de segurança não permite)`).not.toMatch(/\sstyle\s*=/i);
-    expect(html, `${nome}: iframe, formulário ou objeto`).not.toMatch(/<(iframe|form|object|embed|video|audio|input)\b/i);
-    // Recursos (src, link, preload) só locais; links de texto só para o app, o domínio da empresa e as páginas oficiais permitidas.
-    for (const m of html.matchAll(/<(?:img|link|source|script)\b[^>]*\s(?:src|href)="(https?:)?\/\/[^"]*"/gi)) expect.fail(`${nome}: recurso de fora em ${m[0]}`);
-    for (const m of html.matchAll(/https?:\/\/([^\s"'<>/]+)/g)) expect(hosts, `${nome}: ${m[0]}`).toContain(m[1]);
+    expect(html, `${nome}: iframe, formulário ou objeto`).not.toMatch(/<(iframe|form|object|embed|video|audio)\b/i);
+    for (const m of html.matchAll(/<input\b[^>]*>/gi)) {
+      expect(noAjuda && /type="search"/.test(m[0]), `${nome}: campo que não é a busca da Ajuda: ${m[0]}`).toBe(true);
+    }
+    // Recursos (src, link, preload) só locais; links de texto só para o app, as fontes citadas no catálogo, o domínio da empresa e as páginas oficiais.
+    for (const m of html.matchAll(/<(?:img|link|source|script)\b[^>]*\s(?:src|href)="(https?:)?\/\/[^"]*"/gi)) {
+      if (!/rel="canonical"/.test(m[0])) expect.fail(`${nome}: recurso de fora em ${m[0]}`);
+    }
+    for (const m of html.matchAll(/https?:\/\/([^\s"'<>/\\]+)/g)) expect(hosts, `${nome}: ${m[0]}`).toContain(m[1]);
     for (const m of html.matchAll(/<a\b[^>]*href="https?:[^"]*"[^>]*>/g)) expect(m[0], `${nome}: link externo sem noopener`).toContain('noopener');
     // Estrutura.
     expect(html.match(/<h1[\s>]/g)?.length, `${nome}: h1`).toBe(1);
@@ -129,17 +233,40 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
     expect(html.match(/<main\b/g)?.length, `${nome}: main`).toBe(1);
     expect(html, `${nome}: link para pular`).toContain('<a class="pular" href="#conteudo">Pular para o conteúdo</a>');
     expect(html, `${nome}: viewport`).toContain('<meta name="viewport" content="width=device-width, initial-scale=1">');
-    if (nome === 'index.html' || nome === 'suporte.html') expect(html, `${nome}: cookie ou analytics`).not.toMatch(/cookie|analytics|gtag|pixel/i);
-    expect(html, `${nome}: favicon`).toContain('<link rel="icon" href="favicon.svg" type="image/svg+xml">');
-    expect(html, `${nome}: logotipo oficial no cabeçalho`).toMatch(/<header class="topo">[\s\S]*<img src="marca\/clarevo-logotipo-reverso\.svg" alt="[^"]+"/);
-    for (const img of html.matchAll(/<img\b[^>]*>/g)) expect(img[0], `${nome}: imagem sem alt`).toMatch(/\salt="[^"]+"/);
-    // Rodapé em todas: os cinco links e "[RAZÃO SOCIAL] · CNPJ [CNPJ]" (com os valores, quando houver).
+    expect(html, `${nome}: cookie ou analytics`).not.toMatch(/gtag|pixel|google-analytics/i);
+    const titulo = /<title>([^<]+)<\/title>/.exec(html)?.[1] ?? '';
+    expect(titulo.length, `${nome}: título`).toBeGreaterThan(4);
+    expect(titulo.length, `${nome}: título longo demais (${titulo})`).toBeLessThanOrEqual(80);
+    const descricao = /<meta name="description" content="([^"]+)">/.exec(html)?.[1] ?? '';
+    expect(descricao.length, `${nome}: descrição`).toBeGreaterThanOrEqual(40);
+    expect(descricao.length, `${nome}: descrição longa demais`).toBeLessThanOrEqual(200);
+    expect(html, `${nome}: Open Graph`).toContain('<meta property="og:title"');
+    expect(html, `${nome}: favicon`).toContain(`<link rel="icon" href="${visto(nome, 'favicon.svg')}" type="image/svg+xml">`);
+    expect(html, `${nome}: estilo`).toContain(`<link rel="stylesheet" href="${visto(nome, 'estilo.css')}">`);
+    expect(html, `${nome}: logotipo oficial no cabeçalho`).toMatch(/<header class="topo">[\s\S]*<img src="[^"]*marca\/clarevo-logotipo-reverso\.svg" alt="[^"]+"/);
+    // Imagens: texto alternativo (só o logotipo decorativo do rodapé é vazio, dentro de um link com nome) e tamanho declarado.
+    for (const img of html.matchAll(/<img\b[^>]*>/g)) {
+      expect(img[0], `${nome}: imagem sem alt`).toMatch(/\salt="/);
+      expect(img[0], `${nome}: imagem sem tamanho`).toMatch(/\swidth="\d+"/);
+      expect(img[0], `${nome}: imagem sem altura`).toMatch(/\sheight="\d+"/);
+      if (!/rodape-marca/.test(html.slice(Math.max(0, (img.index ?? 0) - 200), img.index))) expect(img[0], `${nome}: alt vazio`).toMatch(/\salt="[^"]+"/);
+    }
+    // Menu: no celular é um <details>, que funciona sem JavaScript; a página atual é marcada.
+    expect(html, `${nome}: menu do celular`).toContain('<details class="menu-movel"><summary>Menu</summary>');
+    const cabecalho = /<header class="topo">([\s\S]*?)<\/header>/.exec(html)?.[1] ?? '';
+    if (NO_MENU.includes(nome)) expect(cabecalho.match(/aria-current="page"/g)?.length, `${nome}: aria-current`).toBe(2);
+    else if (/^(aprender|novidades|ajuda)\//.test(nome)) expect(cabecalho.match(/class="secao-atual"/g)?.length, `${nome}: seção atual`).toBe(2);
+    // Rodapé em todas: todas as seções, as páginas legais e "[RAZÃO SOCIAL] · CNPJ [CNPJ]" (com os valores, quando houver).
     const rodape = /<footer class="rodape">([\s\S]*?)<\/footer>/.exec(html)?.[1] ?? '';
-    for (const p of PAGINAS) expect(rodape, `${nome}: rodapé sem ${p}`).toContain(`<a href="${p}">`);
+    for (const p of ['index.html', 'app/index.html', 'empresas/index.html', 'aprender/index.html', 'aprender/agenda.html', 'novidades/index.html', 'novidades/como-escrevemos.html', 'ajuda/index.html', 'seguranca.html', 'sobre.html', 'suporte.html', 'privacidade.html', 'termos.html', 'excluir-conta.html']) {
+      expect(rodape, `${nome}: rodapé sem ${p}`).toContain(`<a href="${visto(nome, p)}">`);
+    }
     expect(rodape, `${nome}: rodapé`).toMatch(/·\s*CNPJ\s/);
     expect(rodape, `${nome}: rodapé`).toMatch(/RAZÃO SOCIAL|Empresa Exemplo/);
-    // A página atual está marcada no menu.
-    expect(html.match(/aria-current="page"/g)?.length, `${nome}: aria-current`).toBe(1);
+    if (nome === '404.html') expect(html, 'a 404 usa caminhos a partir da raiz').toContain('href="/estilo.css"');
+    expect(prefixoDe(nome)).toBe(nome === '404.html' ? '/' : nome.includes('/') ? '../'.repeat(nome.split('/').length - 1) : '');
+    // Dados estruturados: JSON válido.
+    for (const m of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) expect(() => JSON.parse(m[1]!), `${nome}: JSON-LD`).not.toThrow();
   }
   // Todo link interno (href e src, com âncora) existe.
   expect(gerador.linksQuebrados(arquivos)).toEqual([]);
@@ -264,10 +391,55 @@ describe('site público: conversor de Markdown (scripts/gerar-site.js)', () => {
   });
 });
 
+
+describe('site público: conversor de Markdown, novidades', () => {
+  it('links sem endereço completo são caminhos a partir da raiz do site e ficam relativos à página', () => {
+    expect(markdownParaHtml('[o app](app/index.html) e [a política](privacidade.html#x)', { paginaAtual: 'novidades/post.html' })).toBe(
+      '<p><a href="../app/index.html">o app</a> e <a href="../privacidade.html#x">a política</a></p>',
+    );
+    expect(markdownParaHtml('[o app](app/index.html)', { paginaAtual: 'index.html' })).toBe('<p><a href="app/index.html">o app</a></p>');
+    expect(markdownParaHtml('[fora](https://www.gov.br/x) [e-mail](mailto:a@b.test) [âncora](#x)', { paginaAtual: 'a/b.html' })).toContain('href="https://www.gov.br/x"');
+  });
+
+  it('o marcador [E-MAIL DE CONTATO] é um marcador de dado, com valor ou destacado', () => {
+    expect(MARCADORES).toContain('E-MAIL DE CONTATO');
+    expect(markdownParaHtml('Escreva para [E-MAIL DE CONTATO].')).toBe('<p>Escreva para <mark class="pendente">[E-MAIL DE CONTATO]</mark>.</p>');
+    expect(markdownParaHtml('Escreva para [E-MAIL DE CONTATO].', { valores: PREENCHIDOS })).toBe('<p>Escreva para <a href="mailto:contato@exemplo.test">contato@exemplo.test</a>.</p>');
+  });
+
+  it('o cabeçalho de um Markdown entende texto, lista e fontes de três tipos, e recusa o que não entende', () => {
+    const r = conteudo.lerCabecalho('---\ntitulo: Um título: com dois pontos\ndata: 2026-10-23\nfontes:\n  - tema: decimo-terceiro\n  - Rótulo | https://www.gov.br/x\n  - Só texto\n---\nCorpo\n');
+    expect(r.meta.titulo).toBe('Um título: com dois pontos');
+    expect(r.meta.fontes).toEqual(['tema: decimo-terceiro', 'Rótulo | https://www.gov.br/x', 'Só texto']);
+    expect(r.corpo).toBe('Corpo\n');
+    expect(conteudo.lerCabecalho('sem cabeçalho').meta).toEqual({});
+    expect(() => conteudo.lerCabecalho('---\nlinha solta\n---\n')).toThrow(/não entendi/);
+    expect(() => conteudo.lerCabecalho('---\ntitulo: x\n')).toThrow(/fecha/);
+  });
+
+  it('um post sem fontes, sem resumo ou com data diferente da do nome do arquivo é recusado com a lista do que falta', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'clarevo-posts-'));
+    try {
+      writeFileSync(join(dir, '2026-10-23-ok.md'), '---\ntitulo: Ok\ndata: 2026-10-23\nresumo: Resumo\nautoria: Equipe Clarevo\nfontes:\n  - Fonte\n---\nTexto\n');
+      writeFileSync(join(dir, '2026-10-22-sem-fontes.md'), '---\ntitulo: Sem\ndata: 2026-10-22\nresumo: Resumo\nautoria: Equipe Clarevo\n---\nTexto\n');
+      writeFileSync(join(dir, '2026-10-21-data-errada.md'), '---\ntitulo: Errada\ndata: 2026-10-20\nresumo: Resumo\nautoria: Equipe Clarevo\nfontes:\n  - Fonte\n---\nTexto\n');
+      writeFileSync(join(dir, 'sem-data.md'), 'ignorado');
+      const r = conteudo.lerPosts(dir);
+      expect(r.posts.map((p) => p.arquivo)).toEqual(['novidades/2026-10-23-ok.html', 'novidades/2026-10-22-sem-fontes.html', 'novidades/2026-10-21-data-errada.html']);
+      expect(r.problemas.some((p) => p.includes('2026-10-22-sem-fontes.md') && p.includes('fontes'))).toBe(true);
+      expect(r.problemas.some((p) => p.includes('2026-10-21-data-errada.md') && p.includes('não é a do nome do arquivo'))).toBe(true);
+      expect(r.problemas.some((p) => p.includes('2026-10-23-ok.md'))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('site público: as páginas geradas', () => {
   const gerado = gerarSite();
   const valores = JSON.parse(readFileSync(join(SITE, 'dados-da-empresa.json'), 'utf8')) as Record<string, string>;
   const dominio = (valores['DOMÍNIO'] ?? '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const html = (nome: string) => texto(gerado.arquivos.get(nome));
 
   it('site/dados-da-empresa.json tem um campo para cada marcador, só com texto', () => {
     for (const m of MARCADORES) expect(typeof valores[m], m).toBe('string');
@@ -275,7 +447,23 @@ describe('site público: as páginas geradas', () => {
     expect(extras).toEqual([]);
   });
 
-  it('as páginas e os arquivos gravados em site/ estão em dia com os Markdown de docs/legal e com o script (rode: node scripts/gerar-site.js)', () => {
+  it('o catálogo que o gerador lê (TypeScript do core, sem pacote novo) é o mesmo que o teste importa', () => {
+    const c = require(join(ROOT, 'scripts', 'site', 'catalogo.js')).catalogo();
+    expect(c.publicados.length).toBe(publishedTopics().filter((t) => !t.legacy).length);
+    expect(JSON.stringify(c.publicados)).toBe(JSON.stringify(publishedTopics().filter((t) => !t.legacy)));
+    expect(c.GUIA.length).toBe(GUIDE_ENTRIES.length);
+    expect(c.CALENDARIO.length).toBe(12);
+  });
+
+  it('todas as páginas existem: as do mapa do site, um tema por página de Aprender e os três posts iniciais', () => {
+    for (const nome of PAGINAS) expect(gerado.arquivos.has(nome), nome).toBe(true);
+    expect(PAGINAS.filter((n) => n.endsWith('.html')).length).toBeGreaterThanOrEqual(50);
+    for (const extra of ['estilo.css', '_headers', 'robots.txt', 'novidades/feed.xml', 'ajuda/indice.json', 'ajuda/busca.js', 'favicon.svg', 'og/clarevo.png', 'marca/clarevo-logotipo-reverso.svg']) expect(gerado.arquivos.has(extra), extra).toBe(true);
+    const htmls = [...gerado.arquivos.keys()].filter((k) => k.endsWith('.html'));
+    expect(htmls.filter((n) => !PAGINAS.includes(n))).toEqual([]);
+  });
+
+  it('as páginas e os arquivos gravados em site/ estão em dia com o gerador e o conteúdo (rode: node scripts/gerar-site.js)', () => {
     const desatualizados: string[] = [];
     for (const [nome, esperado] of gerado.arquivos) {
       const arquivo = join(SITE, nome);
@@ -285,7 +473,14 @@ describe('site público: as páginas geradas', () => {
       }
       const atual = readFileSync(arquivo);
       const certo = typeof esperado === 'string' ? Buffer.from(esperado, 'utf8') : esperado;
-      if (!atual.equals(certo)) desatualizados.push(nome);
+      if (atual.equals(certo)) continue;
+      // O zlib de cada versão do Node pode gerar bytes diferentes para o mesmo PNG: o que vale são os pixels.
+      if (nome.endsWith('.png')) {
+        const a = png.decodificar(atual);
+        const b = png.decodificar(certo);
+        if (a.largura === b.largura && a.altura === b.altura && a.rgb.equals(b.rgb)) continue;
+      }
+      desatualizados.push(nome);
     }
     expect(desatualizados, 'rode "node scripts/gerar-site.js" e confira as mudanças').toEqual([]);
   });
@@ -306,50 +501,96 @@ describe('site público: as páginas geradas', () => {
   it('cada página legal vem do Markdown quando ele existe e, senão, sai como espaço reservado com [A DEFINIR]', () => {
     const origem: Record<string, string> = { 'privacidade.html': 'politica-de-privacidade.md', 'termos.html': 'termos-de-uso.md', 'excluir-conta.html': 'exclusao-de-conta.md' };
     for (const [pagina, md] of Object.entries(origem)) {
-      const html = texto(gerado.arquivos.get(pagina));
       if (existsSync(join(ROOT, 'docs', 'legal', md))) {
-        expect(html, pagina).not.toContain('texto desta página, que vem de docs/legal');
+        expect(html(pagina), pagina).not.toContain('texto desta página, que vem de docs/legal');
         const titulo = gerador.separarTitulo(readFileSync(join(ROOT, 'docs', 'legal', md), 'utf8')).titulo;
         expect(titulo, `${md} precisa de um título "# ..."`).not.toBeNull();
       } else {
-        expect(html, pagina).toContain('[A DEFINIR: texto desta página');
+        expect(html(pagina), pagina).toContain('[A DEFINIR: texto desta página');
         expect(gerado.avisos.join('\n')).toContain(`docs/legal/${md} ainda não existe`);
       }
     }
   });
 
-  it('nenhuma página tem travessão, a expressão proibida, script, atributo de evento ou endereço de fora além do permitido; um h1, títulos sem pular nível, rodapé e links internos', () => {
-    verificarPaginas(gerado.arquivos, dominio);
+  it('nenhuma página tem travessão, a expressão proibida, script além do permitido, atributo de evento ou endereço de fora além do permitido; um h1, títulos sem pular nível, rodapé e links internos', () => {
+    verificarPaginas(gerado.arquivos, dominio, PAGINAS);
   });
 
-  it('com marcadores vazios, a faixa "Versão preliminar, em revisão" aparece no topo, os marcadores ficam destacados e a página não é indexada', () => {
+  it('todo texto gerado (páginas, feed, índice da busca e arquivos de apoio) está livre de travessão e da expressão proibida', () => {
+    for (const [nome, conteudoDoArquivo] of gerado.arquivos) {
+      if (!/\.(html|xml|json|js|css|txt)$/.test(nome) || nome === 'dados-da-empresa.json') continue;
+      const t = texto(conteudoDoArquivo);
+      expect(t, `${nome}: travessão`).not.toMatch(PROIBIDO_TRAVESSAO);
+      expect(t, `${nome}: expressão proibida`).not.toMatch(PROIBIDO_EXPRESSAO);
+    }
+    for (const f of readdirSync(join(ROOT, 'site-src', 'novidades'))) {
+      const t = readFileSync(join(ROOT, 'site-src', 'novidades', f), 'utf8');
+      expect(t, f).not.toMatch(PROIBIDO_TRAVESSAO);
+      expect(t, f).not.toMatch(PROIBIDO_EXPRESSAO);
+    }
+  });
+
+  it('com marcadores vazios, a faixa "Versão preliminar, em revisão" aparece no topo, os marcadores ficam destacados, nada é indexado e não há domínio nem sitemap', () => {
     const g = gerarSite({ dados: VAZIOS });
     for (const nome of PAGINAS) {
-      const html = texto(g.arquivos.get(nome));
-      expect(html, nome).toMatch(/<body>\n<a class="pular"[^\n]*\n<div class="faixa" role="note">[\s\S]*Versão preliminar, em revisão\./);
-      expect(html, nome).toContain('<meta name="robots" content="noindex">');
-      expect(html, nome).toContain('<mark class="pendente">[RAZÃO SOCIAL]</mark>');
+      const h = texto(g.arquivos.get(nome));
+      expect(h, nome).toMatch(/<body>\n<a class="pular"[^\n]*\n<div class="faixa" role="note">[\s\S]*Versão preliminar, em revisão\./);
+      expect(h, nome).toContain('<meta name="robots" content="noindex">');
+      expect(h, nome).toContain('<mark class="pendente">[RAZÃO SOCIAL]</mark>');
+      expect(h, nome).not.toContain('rel="canonical"');
+      expect(h, nome).not.toContain('og:image"');
       expect(g.pendencias.get(nome)?.length, nome).toBeGreaterThan(0);
     }
+    expect(g.arquivos.has('sitemap.xml')).toBe(false);
+    expect(texto(g.arquivos.get('robots.txt'))).toContain('Disallow: /');
     const suporte = texto(g.arquivos.get('suporte.html'));
     for (const m of ['E-MAIL DE SUPORTE', 'E-MAIL DE PRIVACIDADE', 'ENDEREÇO', 'CNPJ']) expect(suporte).toContain(`[${m}]`);
+    for (const nome of ['sobre.html', 'empresas/index.html', 'novidades/como-escrevemos.html']) expect(texto(g.arquivos.get(nome)), nome).toContain('<mark class="pendente">[E-MAIL DE CONTATO]</mark>');
   });
 
-  it('com todos os valores e sem [A DEFINIR], a faixa some, os valores entram (e-mail como link) e nada pendente resta', () => {
+  it('com todos os valores e sem [A DEFINIR], a faixa some, os valores entram (e-mail como link), há domínio com canonical, Open Graph, sitemap e robots, e nada pendente resta', () => {
     const dir = pastaDeExemplo();
     try {
       writeFileSync(join(dir, 'politica-de-privacidade.md'), EXEMPLO.replace('[A DEFINIR: prazo]', 'cinco anos'));
       const g = gerarSite({ legal: dir, dados: PREENCHIDOS });
       for (const nome of PAGINAS) {
-        const html = texto(g.arquivos.get(nome));
-        expect(html, nome).not.toContain('class="faixa"');
-        expect(html, nome).not.toContain('noindex');
-        expect(html, nome).not.toContain('class="pendente"');
-        expect(html, nome).toContain('Empresa Exemplo Ltda · CNPJ 00.000.000/0001-00');
+        const h = texto(g.arquivos.get(nome));
+        expect(h, nome).not.toContain('class="faixa"');
+        expect(h, nome).not.toContain('class="pendente"');
         expect(g.pendencias.get(nome), nome).toEqual([]);
+        expect(h, nome).toContain('Empresa Exemplo Ltda · CNPJ 00.000.000/0001-00');
+        if (nome === '404.html') {
+          expect(h).toContain('noindex');
+          continue;
+        }
+        expect(h, nome).not.toContain('noindex');
+        const limpo = nome === 'index.html' ? '/' : nome.endsWith('/index.html') ? `/${nome.slice(0, -'index.html'.length)}` : `/${nome.replace(/\.html$/, '')}`;
+        expect(h, nome).toContain(`<link rel="canonical" href="https://exemplo.test${limpo}">`);
+        expect(h, nome).toContain(`<meta property="og:url" content="https://exemplo.test${limpo}">`);
+        expect(h, nome).toContain('<meta property="og:image" content="https://exemplo.test/og/clarevo.png">');
+        expect(h, nome).toContain('<meta property="og:image:width" content="1200">');
+        expect(h, nome).toContain('<meta property="og:image:height" content="630">');
       }
+      const sobre = texto(g.arquivos.get('sobre.html'));
+      expect(sobre).toContain('<a href="mailto:contato@exemplo.test">contato@exemplo.test</a>');
       expect(texto(g.arquivos.get('suporte.html'))).toContain('<a href="mailto:suporte@exemplo.test">suporte@exemplo.test</a>');
       expect(texto(g.arquivos.get('privacidade.html'))).toContain('<h1>Política de exemplo</h1>');
+      const sitemap = texto(g.arquivos.get('sitemap.xml'));
+      expect(problemasDeXml(sitemap)).toEqual([]);
+      expect(sitemap).toContain('<loc>https://exemplo.test/</loc>');
+      expect(sitemap).toContain('<loc>https://exemplo.test/app/</loc>');
+      expect(sitemap).toContain('<loc>https://exemplo.test/aprender/decimo-terceiro</loc>');
+      expect(sitemap).not.toContain('404');
+      expect((sitemap.match(/<loc>/g) ?? []).length).toBe(PAGINAS.length - 1);
+      const robots = texto(g.arquivos.get('robots.txt'));
+      expect(robots).toContain('Allow: /');
+      expect(robots).toContain('Sitemap: https://exemplo.test/sitemap.xml');
+      expect(robots).not.toContain('Disallow');
+      const feed = texto(g.arquivos.get('novidades/feed.xml'));
+      expect(feed).toContain('<link>https://exemplo.test/novidades/2026-10-23-conheca-o-clarevo</link>');
+      expect(feed).toContain('<atom:link href="https://exemplo.test/novidades/feed.xml" rel="self" type="application/rss+xml"/>');
+      const org = /<script type="application\/ld\+json">(\{[^<]*"Organization"[^<]*\})<\/script>/.exec(texto(g.arquivos.get('index.html')));
+      expect(JSON.parse(org![1]!)).toMatchObject({ '@type': 'Organization', name: 'Clarevo', legalName: 'Empresa Exemplo Ltda', url: 'https://exemplo.test/' });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -359,10 +600,10 @@ describe('site público: as páginas geradas', () => {
     const dir = pastaDeExemplo();
     try {
       const g = gerarSite({ legal: dir, dados: PREENCHIDOS });
-      verificarPaginas(g.arquivos, 'exemplo.test');
-      const html = texto(g.arquivos.get('privacidade.html'));
-      expect(html).toContain('href="termos.html#quem-pode-usar"');
-      expect(html).toContain('href="excluir-conta.html"');
+      verificarPaginas(g.arquivos, 'exemplo.test', PAGINAS);
+      const h = texto(g.arquivos.get('privacidade.html'));
+      expect(h).toContain('href="termos.html#quem-pode-usar"');
+      expect(h).toContain('href="excluir-conta.html"');
       expect(g.avisos.filter((a) => !a.includes('dados-da-empresa'))).toEqual([]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -381,38 +622,118 @@ describe('site público: as páginas geradas', () => {
     }
   });
 
-  it('a página inicial traz o que o Clarevo é, a empresa que nunca vê finanças, o que ele não é, o app web e o aviso das lojas (sem selos)', () => {
-    const html = texto(gerado.arquivos.get('index.html'));
-    expect(html).toContain('<h1>Organize seu mês e aprenda</h1>');
-    expect(html).toContain('organizador de finanças pessoais e da família');
-    expect(html).toContain('Pode ser oferecido pela empresa como benefício');
-    expect(html).toContain('A empresa nunca vê suas finanças');
-    for (const frase of ['Não é banco', 'Não movimenta dinheiro', 'Não oferece crédito', 'Não recomenda produtos financeiros']) expect(html, frase).toContain(frase);
-    expect(html).toContain('href="https://clarevo.pages.dev"');
-    expect(html).toContain('Em breve na App Store e no Google Play.');
-    expect(html).toMatch(/Para pessoas/);
-    expect(html).toMatch(/Para empresas/);
-    // Sem selos das lojas, preço, depoimento nem número de uso inventado.
-    expect(html).not.toMatch(/<img[^>]*(apple|google|store|play)/i);
-    expect(html).not.toMatch(/R\$|gr[áa]tis|depoimento|milh[õo]es|\d+\s*mil\s+(pessoas|usu)|melhor/i);
+  it('a página inicial traz o que o Clarevo é, recursos com captura, a empresa que nunca vê finanças, o que ele não é, o app web e o aviso das lojas (sem selos)', () => {
+    const h = html('index.html');
+    expect(h).toContain('<h1>Organize seu mês e aprenda</h1>');
+    expect(h).toContain('organizador de finanças pessoais e da família');
+    expect(h).toContain('Pode ser oferecido pela empresa como benefício');
+    expect(h).toContain('A empresa nunca vê suas finanças');
+    for (const frase of ['Não é banco', 'Não movimenta dinheiro', 'Não oferece crédito', 'Não recomenda produtos financeiros']) expect(h, frase).toContain(frase);
+    expect(h).toContain('href="https://clarevo.pages.dev"');
+    expect(h).toContain('Em breve na App Store e no Google Play.');
+    expect(h).toMatch(/Para pessoas/);
+    expect(h).toMatch(/Para empresas/);
+    // De três a quatro recursos com captura e o herói com a tela Resumo, todos com a legenda de demonstração.
+    expect(h.match(/<figure class="celular">/g)?.length).toBe(5);
+    expect(h.match(/Dados fictícios de demonstração/g)?.length).toBe(5);
+    expect(h).toContain('src="imagens/resumo.png"');
+    for (const alvo of ['app/index.html', 'empresas/index.html', 'aprender/index.html', 'ajuda/index.html', 'novidades/index.html', 'seguranca.html']) expect(h, alvo).toContain(`href="${alvo}"`);
+    // Sem selos das lojas, preço, depoimento, cliente, prêmio nem número de uso inventado.
+    expect(h).not.toMatch(/<img[^>]*(apple|google|store|play)/i);
+    expect(h).not.toMatch(/R\$\s?\d{2,}[^\w]*\/|gr[áa]tis|depoimento|milh[õo]es|\d+\s*mil\s+(pessoas|usu)|melhor|pr[êe]mio|nossos clientes/i);
+    expect(h).not.toMatch(/Download on the|App Store badge|Get it on/i);
   });
 
-  it('o suporte tem o contato, de 6 a 8 perguntas frequentes e o link para a privacidade', () => {
-    const html = texto(gerado.arquivos.get('suporte.html'));
-    const perguntas = [...html.matchAll(/<h3>([^<]+)<\/h3>/g)].map((m) => m[1]);
-    expect(perguntas.length).toBeGreaterThanOrEqual(6);
-    expect(perguntas.length).toBeLessThanOrEqual(8);
-    expect(perguntas.join(' ')).toMatch(/senha/i);
-    expect(perguntas.join(' ')).toMatch(/exclu/i);
-    expect(perguntas.join(' ')).toMatch(/Família/);
-    expect(perguntas.join(' ')).toMatch(/empresa/i);
-    expect(perguntas.join(' ')).toMatch(/dados/i);
-    expect(html).toContain('[E-MAIL DE SUPORTE]');
-    expect(html).toContain('href="privacidade.html"');
+  it('O app passeia por todos os recursos pedidos, cada um com a captura da demonstração e o texto do guia de uso do app', () => {
+    const h = html('app/index.html');
+    expect(h).toContain('<h1>O Clarevo por dentro</h1>');
+    for (const titulo of ['Resumo do mês', 'Anotar gasto e recebimento', 'Leitura de nota fiscal', 'Contas a pagar e gastos fixos', 'Cartões e faturas', 'Metas e reserva', 'Família', 'Aprender e calculadoras', 'Lembretes']) expect(h, titulo).toContain(`>${titulo}</h`);
+    for (const id of ['resumo', 'anotar-gasto', 'nota-fiscal', 'contas-a-pagar', 'cartoes', 'metas', 'familia', 'aprender']) {
+      const e = GUIDE_ENTRIES.find((x) => x.id === id)!;
+      expect(h, id).toContain(esc(e.purpose));
+    }
+    const figuras = h.match(/<figure class="celular">/g)?.length ?? 0;
+    expect(figuras).toBeGreaterThanOrEqual(11);
+    expect(h.match(/Dados fictícios de demonstração/g)?.length).toBe(figuras);
+    expect(h).toContain('Na web, hoje');
+    expect(h).toContain('Em breve');
+    expect(h).toContain('Em breve na App Store e no Google Play.');
+    expect(h).not.toMatch(/<img[^>]*(apple|google|store|play)/i);
+    expect(h).not.toMatch(/gr[áa]tis|R\$\s?\d+,\d{2}\s*(por|\/)\s*m[eê]s/i);
+  });
+
+  it('Para empresas explica o benefício, o que a empresa vê e nunca vê (como no código e nos textos jurídicos), o painel só na web, o fim do benefício e o piloto, sem preço', () => {
+    const h = html('empresas/index.html');
+    for (const frase of ['Como funciona', 'A empresa vê', 'A empresa nunca vê', 'O painel, só na web', 'Quando o benefício acaba', 'Falar sobre um piloto']) expect(h, frase).toContain(frase);
+    expect(h).toContain('os e-mails que ela mesma convidou');
+    expect(h).toContain('convite enviado, convite cancelado, ativa ou encerrada');
+    for (const nunca of ['gastos, recebimentos e valores', 'categorias, metas, contas a pagar e cartões', 'a Família da pessoa', 'números somados de finanças']) expect(h, nunca).toContain(nunca);
+    expect(h).toContain('de 1 a 500 por vez');
+    expect(h).toContain('link de uso único');
+    expect(h).toContain('o Clarevo não envia e-mail de convite');
+    expect(h).toContain('O acesso pleno continua por 30 dias');
+    expect(h).toContain('[E-MAIL DE CONTATO]');
+    expect(h).toContain('Ainda não há tabela de preços');
+    expect(h).toContain('src="../imagens/empresa-painel.png"');
+    expect(h).toContain('Dados fictícios de demonstração');
+    expect(h).not.toMatch(/R\$\s?\d|por vaga|gr[áa]tis|nossos clientes|depoimento|\d+\s*empresas/i);
+  });
+
+  it('Segurança e privacidade traz o que guardamos, o que não guardamos, quem vê, a empresa, a exclusão e o link para a política', () => {
+    const h = html('seguranca.html');
+    for (const frase of ['O essencial', 'O que guardamos', 'O que não guardamos', 'Quem vê os seus dados', 'Como protegemos', 'Este site', 'Excluir a conta']) expect(h, frase).toContain(frase);
+    for (const nao of ['número completo de cartão, código de segurança (CVV) e validade', 'CPF da nota fiscal', 'dados do comprovante de Pix ou de pagamento', 'fotos e imagens da câmera']) expect(h, nao).toContain(nao);
+    expect(h).toContain('ela nunca vê as suas finanças, nem somadas às de outras pessoas');
+    expect(h).toContain('href="privacidade.html"');
+    expect(h).toContain('href="excluir-conta.html"');
+    expect(h).toContain('href="termos.html"');
+    expect(h).not.toContain('[PROPOSTA');
+  });
+
+  it('Sobre fala do que move o Clarevo e de quem está por trás, sem nomes de pessoas, fotos nem números de uso', () => {
+    const h = html('sobre.html');
+    for (const frase of ['Clareza', 'Sem anúncio', 'Sem venda de dados', 'Sem recomendar produtos']) expect(h, frase).toContain(frase);
+    expect(h).toContain('[RAZÃO SOCIAL]');
+    expect(h).toContain('[E-MAIL DE CONTATO]');
+    expect(h).not.toMatch(/<img[^>]*(foto|retrato|equipe)/i);
+    expect(h).not.toMatch(/fundador|fundadora|CEO|\d+\s*mil\s+(pessoas|usu)|milh[õo]es/i);
+  });
+
+  it('Suporte continua sendo a página de contato que as lojas citam, com a Ajuda e as perguntas mais comuns', () => {
+    const h = html('suporte.html');
+    expect(h).toContain('[E-MAIL DE SUPORTE]');
+    expect(h).toContain('[E-MAIL DE PRIVACIDADE]');
+    expect(h).toContain('href="privacidade.html"');
+    expect(h).toContain('href="ajuda/index.html"');
+    for (const p of conteudo.lerPerguntas(join(ROOT, 'site-src', 'ajuda', 'perguntas.md'))) expect(h, p.pergunta).toContain(esc(p.pergunta));
+    expect(h).toContain('o suporte nunca pede essas informações');
+  });
+
+  it('a 404 não pede indexação e usa só caminhos a partir da raiz', () => {
+    const h = html('404.html');
+    expect(h).toContain('noindex');
+    expect(h).toContain('<h1>Página não encontrada</h1>');
+    for (const m of h.matchAll(/(?:href|src)="([^"]+)"/g)) {
+      if (/^(https?:|mailto:|#)/.test(m[1]!)) continue;
+      expect(m[1], `caminho relativo na 404: ${m[1]}`).toMatch(/^\//);
+    }
+  });
+
+  it('os cabeçalhos de segurança permitem só o próprio site, um script próprio e nada inline', () => {
+    const h = html('_headers');
+    expect(h).toContain("default-src 'none'");
+    expect(h).toContain("script-src 'self'");
+    expect(h).toContain("connect-src 'self'");
+    expect(h).toContain("img-src 'self'");
+    expect(h).not.toContain('unsafe-inline');
+    expect(h).not.toContain('unsafe-eval');
+    expect(h).not.toMatch(/https?:\/\/[^\s]*;/);
+    expect(h).toContain("frame-ancestors 'none'");
+    expect(h).toContain('X-Content-Type-Options: nosniff');
   });
 
   it('o estilo não carrega nada de fora, usa só as fontes locais e tem foco visível, modo escuro e a identidade da marca', () => {
-    const css = texto(gerado.arquivos.get('estilo.css'));
+    const css = html('estilo.css');
     expect(css).not.toMatch(/https?:|@import|\/\/[a-z]/i);
     for (const m of css.matchAll(/url\(([^)]+)\)/g)) expect(m[1], 'url() no CSS').toMatch(/^fontes\/Manrope_(500Medium|700Bold|800ExtraBold)\.ttf$/);
     expect(css).toContain(':focus-visible');
@@ -421,17 +742,9 @@ describe('site público: as páginas geradas', () => {
     expect(css).toContain('--lima:#D4F05B');
     expect(css).toContain('--texto:#17223B');
     expect(css).not.toMatch(/[\u2013\u2014]/);
+    expect(css).toContain('@media print');
     for (const peso of ['500Medium', '700Bold', '800ExtraBold']) expect(existsSync(join(SITE, 'fontes', `Manrope_${peso}.ttf`)), peso).toBe(true);
     expect(readFileSync(join(SITE, 'fontes', 'OFL.txt'), 'utf8')).toContain('SIL OPEN FONT LICENSE Version 1.1');
-  });
-
-  it('os cabeçalhos de segurança não permitem recurso de fora nem script', () => {
-    const h = texto(gerado.arquivos.get('_headers'));
-    expect(h).toContain("default-src 'none'");
-    expect(h).not.toContain('unsafe-inline');
-    expect(h).not.toContain('unsafe-eval');
-    expect(h).toContain("frame-ancestors 'none'");
-    expect(h).toContain('X-Content-Type-Options: nosniff');
   });
 
   it('o logotipo e o favicon são os arquivos de docs/marca, sem redesenho', () => {
@@ -441,17 +754,378 @@ describe('site público: as páginas geradas', () => {
   });
 
   it('na impressão entra o logotipo oficial de fundo claro, e não o reverso com as cores invertidas', () => {
-    const css = texto(gerado.arquivos.get('estilo.css'));
+    const css = html('estilo.css');
     const impressao = /@media print\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? '';
     expect(impressao).toContain('.marca .logo-tela{display:none}');
     expect(impressao).toContain('.marca .logo-papel{display:block}');
     expect(css).not.toMatch(/invert\(/);
     expect(css).toContain('.marca .logo-papel{display:none}');
-    for (const nome of PAGINAS) {
-      const html = texto(gerado.arquivos.get(nome));
-      expect(html, nome).toContain('<img src="marca/clarevo-logotipo-reverso.svg" alt="Clarevo, página inicial" width="140" height="28" class="logo-tela">');
-      expect(html, nome).toContain('<img src="marca/clarevo-logotipo.svg" alt="Clarevo, página inicial" width="140" height="28" class="logo-papel">');
+    for (const nome of PAGINAS_BASE) {
+      const h = html(nome);
+      const p = visto(nome, 'marca/clarevo-logotipo-reverso.svg').replace('clarevo-logotipo-reverso.svg', '');
+      expect(h, nome).toContain(`<img src="${p}clarevo-logotipo-reverso.svg" alt="Clarevo, página inicial" width="140" height="28" class="logo-tela">`);
+      expect(h, nome).toContain(`<img src="${p}clarevo-logotipo.svg" alt="Clarevo, página inicial" width="140" height="28" class="logo-papel">`);
     }
+  });
+});
+
+describe('site público: Aprender (o catálogo do app, uma fonte de verdade)', () => {
+  const gerado = gerarSite();
+  const h = (nome: string) => texto(gerado.arquivos.get(nome));
+
+  it('o site tem 30 ou mais temas, só publicados e não legados, das seções organizar, juros e tempo', () => {
+    expect(TEMAS_DO_SITE.length).toBeGreaterThanOrEqual(30);
+    const paginas = [...gerado.arquivos.keys()].filter((k) => /^aprender\/[^/]+\.html$/.test(k) && !['aprender/index.html', 'aprender/agenda.html'].includes(k));
+    expect(paginas.sort()).toEqual(TEMAS_DO_SITE.map((t) => `aprender/${t.slug}.html`).sort());
+    // Nada de rascunho, de "usar" nem de "dúvidas" (esses vão para a Ajuda).
+    expect(gerado.arquivos.has('aprender/apagar-dados.html')).toBe(false);
+    expect(gerado.arquivos.has('aprender/diferenca.html')).toBe(false);
+    expect(gerado.arquivos.has('aprender/quem-ve-meus-dados.html')).toBe(false);
+  });
+
+  for (const t of TEMAS_DO_SITE) {
+    it(`tema ${t.slug}: a página tem o texto do catálogo, o exemplo, as hipóteses, os fatos, as fontes, a data de revisão e os temas relacionados`, () => {
+      const pagina = h(`aprender/${t.slug}.html`);
+      expect(pagina).toContain(`<h1>${esc(t.title)}</h1>`);
+      if (t.subtitle) expect(pagina).toContain(esc(t.subtitle));
+      expect(pagina).toContain(esc(t.short));
+      for (const p of t.paragraphs) expect(pagina).toContain(`<p>${esc(p)}</p>`);
+      if (t.example) expect(pagina).toContain(esc(t.example));
+      if (t.hypotheses) expect(pagina).toContain(esc(t.hypotheses));
+      if (t.calculation) {
+        for (const linha of t.calculation.split(' · ')) expect(pagina).toContain(`<li>${esc(linha.trim())}</li>`);
+      }
+      for (const f of t.facts) expect(pagina).toContain(`${esc(f.text)} <a href="#fonte-${f.source + 1}">Fonte ${f.source + 1}</a>`);
+      // A data de revisão e todas as fontes (o texto da linha, o endereço e a data de consulta).
+      expect(pagina).toContain(`Revisado em ${formatDateBR(t.reviewedOn)}.`);
+      expect(t.sources.length).toBeGreaterThan(0);
+      t.sources.forEach((s, i) => {
+        expect(pagina, `fonte ${i + 1}`).toContain(`id="fonte-${i + 1}"`);
+        expect(pagina).toContain(esc(LEARN_UI_TEXT.sourceLine(s)));
+        if (s.kind === 'oficial' || s.kind === 'mercado') {
+          expect(pagina).toContain(`href="${esc(s.url)}" rel="noopener noreferrer"`);
+          if (s.consultedOn) expect(pagina).toContain(`Consultada em ${formatDateBR(s.consultedOn)}`);
+        }
+      });
+      if (t.reviewEveryMonths) expect(pagina).toContain(`Revisamos este tema a cada ${t.reviewEveryMonths} meses.`);
+      expect(pagina).toContain(esc(LEARN_UI_TEXT.disclaimer));
+      for (const r of relatedTopics(t.slug).filter((x) => !x.legacy && TEMAS_DO_SITE.includes(x))) expect(pagina).toContain(`href="${r.slug}.html"`);
+      // Dados estruturados do artigo.
+      const ld = /<script type="application\/ld\+json">([^<]*)<\/script>/.exec(pagina)![1]!;
+      expect(JSON.parse(ld)).toMatchObject({ '@type': 'Article', headline: t.title, dateModified: t.reviewedOn });
+    });
+  }
+
+  it('o índice lista cada tema uma vez, nas seções do app e na ordem do catálogo', () => {
+    const indice = h('aprender/index.html');
+    expect(indice).toContain('<h1>Aprender</h1>');
+    let ultimo = -1;
+    for (const id of ['organizar', 'juros', 'tempo']) {
+      const secao = LEARN_SECTIONS.find((s) => s.id === id)!;
+      const pos = indice.indexOf(`<h2 id="${id}">${esc(secao.title)}</h2>`);
+      expect(pos, id).toBeGreaterThan(ultimo);
+      ultimo = pos;
+    }
+    for (const t of TEMAS_DO_SITE) expect(indice.split(`href="${t.slug}.html"`).length - 1, t.slug).toBe(1);
+    expect(indice).toContain('href="agenda.html"');
+  });
+
+  it('a Agenda financeira vem do calendário de época do catálogo: os doze meses, cada tema com link, data de revisão e fontes oficiais', () => {
+    const agenda = h('aprender/agenda.html');
+    expect(agenda).toContain('<h1>Agenda financeira</h1>');
+    const nomes = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    SEASONAL_CALENDAR.forEach((m) => {
+      expect(agenda).toContain(`<h2 id="mes-${m.month}">${nomes[m.month - 1]}</h2>`);
+      const secao = agenda.slice(agenda.indexOf(`<h2 id="mes-${m.month}">`)).split('</section>')[0]!;
+      if (m.slugs.length === 0) expect(secao).toContain('Sem tema de época neste mês');
+      for (const slug of m.slugs) {
+        const t = TEMAS_DO_SITE.find((x) => x.slug === slug)!;
+        expect(secao, `${nomes[m.month - 1]}: ${slug}`).toContain(`href="${slug}.html"`);
+        expect(secao).toContain(esc(t.short));
+        expect(secao).toContain(`Revisado em ${formatDateBR(t.reviewedOn)}`);
+        expect(secao).toContain('Fontes oficiais:');
+      }
+    });
+    expect(agenda).toContain('deve ser conferido na fonte oficial do ano');
+  });
+});
+
+describe('site público: Ajuda, busca e perguntas do suporte', () => {
+  const gerado = gerarSite();
+  const h = (nome: string) => texto(gerado.arquivos.get(nome));
+  const temas = TEMAS_DA_AJUDA.map((t) => `ajuda/${t}.html`);
+  const perguntasNasPaginas = temas.flatMap((nome) => [...h(nome).matchAll(/<article class="pergunta" id="([^"]+)"><h3>([^<]+)<\/h3>/g)].map((m) => ({ nome, id: m[1]!, pergunta: m[2]! })));
+  const indice = JSON.parse(h('ajuda/indice.json')) as { i: string; t: string; a: string; u: string; k: string; x: string }[];
+
+  it('a Ajuda tem os sete temas pedidos, com a lista completa visível sem JavaScript', () => {
+    const index = h('ajuda/index.html');
+    expect(index).toContain('<h1>Ajuda</h1>');
+    for (const titulo of ['Começar', 'Anotar e organizar', 'Contas e cartões', 'Família', 'Benefício da empresa', 'Privacidade e segurança', 'Conta e acesso']) expect(index, titulo).toContain(titulo);
+    for (const nome of temas) {
+      const pagina = h(nome);
+      expect(pagina).toContain('<article class="pergunta"');
+      // A busca começa escondida (sem JavaScript seria um campo morto); a lista completa nunca é escondida pela página.
+      expect(pagina).toMatch(/<div class="busca" role="search" data-busca data-indice="indice\.json" hidden>/);
+      expect(pagina).toContain('<div data-some-na-busca>\n');
+      expect(pagina).not.toMatch(/data-some-na-busca[^>]*hidden/);
+      expect(pagina).toContain('<script src="busca.js" defer></script>');
+      const faq = JSON.parse(/<script type="application\/ld\+json">([^<]*)<\/script>/.exec(pagina)![1]!);
+      expect(faq['@type']).toBe('FAQPage');
+      expect(faq.mainEntity.length).toBe(pagina.match(/<article class="pergunta"/g)!.length);
+      expect(faq.mainEntity[0]).toMatchObject({ '@type': 'Question', acceptedAnswer: { '@type': 'Answer' } });
+    }
+  });
+
+  it('toda função do guia de uso do app e todo tema de "usar" e "dúvidas" do catálogo tem resposta na Ajuda; o rascunho fica de fora', () => {
+    const ids = new Set(perguntasNasPaginas.map((p) => p.id));
+    for (const e of GUIDE_ENTRIES) expect(ids.has(`guia-${e.id}`), `guia ${e.id}`).toBe(true);
+    for (const t of publishedTopics().filter((x) => x.section === 'usar' || x.section === 'duvidas')) expect(ids.has(`tema-${t.slug}`), `tema ${t.slug}`).toBe(true);
+    expect(ids.has('tema-apagar-dados')).toBe(false);
+    expect(ids.size).toBe(perguntasNasPaginas.length);
+    for (const p of conteudo.lerPerguntas(join(ROOT, 'site-src', 'ajuda', 'perguntas.md'))) {
+      expect(ids.has(`p-${p.id}`), `suporte ${p.id}`).toBe(true);
+      expect(perguntasNasPaginas.find((x) => x.id === `p-${p.id}`)!.nome).toBe(`ajuda/${p.tema}.html`);
+    }
+    // O texto do guia é o do app: o "para que serve" e os passos.
+    const cartoes = GUIDE_ENTRIES.find((e) => e.id === 'cartoes')!;
+    expect(h('ajuda/contas.html')).toContain(esc(cartoes.purpose));
+    for (const passo of cartoes.steps) expect(h('ajuda/contas.html')).toContain(`<li>${esc(passo)}</li>`);
+  });
+
+  it('o índice da busca (JSON) tem todas as perguntas, com título, tema, endereço e texto, e cada endereço existe', () => {
+    expect(indice.length).toBe(perguntasNasPaginas.length);
+    for (const p of perguntasNasPaginas) {
+      const item = indice.find((x) => x.i === p.id);
+      expect(item, p.id).toBeDefined();
+      expect(item!.t).toBe(p.pergunta.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'"));
+      expect(item!.u).toBe(`${p.nome.replace('ajuda/', '')}#${p.id}`);
+      expect(item!.x.length).toBeGreaterThan(20);
+      expect(item!.a.length).toBeGreaterThan(3);
+    }
+    for (const item of indice) {
+      const [pagina, ancora] = item.u.split('#');
+      expect(h(`ajuda/${pagina}`), item.u).toContain(`id="${ancora}"`);
+    }
+    // Termos que a pessoa procura achariam resposta: senha, fatura, Família, empresa, exportar.
+    const acha = (t: string) => indice.filter((i) => `${i.t} ${i.k} ${i.x}`.toLowerCase().includes(t)).length;
+    for (const termo of ['senha', 'fatura', 'família', 'empresa', 'exportar', 'lembrete']) expect(acha(termo), termo).toBeGreaterThan(0);
+  });
+
+  it('o script da busca é do próprio site, só lê o índice local e não envia o que a pessoa digita', () => {
+    const js = h('ajuda/busca.js');
+    expect(js).toContain('fetch(caixa.getAttribute(\'data-indice\'))');
+    expect(js).not.toMatch(/https?:|XMLHttpRequest|sendBeacon|localStorage|sessionStorage|document\.cookie|eval\(|innerHTML/);
+    expect(js.length).toBeLessThan(5000);
+    expect(js).toContain('textContent');
+  });
+
+  it('a busca funciona no navegador: acha por palavra sem acento, mostra o resultado com link e devolve a lista inteira ao limpar', async () => {
+    // O script roda como no navegador, com um DOM mínimo e o índice real.
+    class No {
+      children: No[] = [];
+      hidden = false;
+      href = '';
+      value = '';
+      listeners: Record<string, () => void> = {};
+      private t = '';
+      get textContent() {
+        return this.t;
+      }
+      set textContent(v: string) {
+        this.t = v;
+        this.children = [];
+      }
+      appendChild(c: No) {
+        this.children.push(c);
+        return c;
+      }
+      addEventListener(e: string, f: () => void) {
+        this.listeners[e] = f;
+      }
+    }
+    const campo = new No();
+    const estado = new No();
+    const lista = new No();
+    const caixa = Object.assign(new No(), {
+      hidden: true,
+      getAttribute: () => 'indice.json',
+      querySelector: (s: string) => (s === 'input' ? campo : s === '.busca-estado' ? estado : lista),
+    });
+    const escondido = new No();
+    const doc = { querySelector: () => caixa, querySelectorAll: () => [escondido], createElement: () => new No() };
+    const consultas: string[] = [];
+    const fetchFalso = (url: string) => {
+      consultas.push(url);
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(indice) });
+    };
+    new Function('document', 'window', 'fetch', h('ajuda/busca.js'))(doc, { fetch: fetchFalso }, fetchFalso);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(consultas).toEqual(['indice.json']);
+    expect(caixa.hidden).toBe(false);
+    campo.value = 'SENHA';
+    campo.listeners.input!();
+    expect(escondido.hidden).toBe(true);
+    expect(estado.textContent).toMatch(/respostas? para "SENHA"/);
+    expect(lista.children.length).toBeGreaterThan(0);
+    expect(lista.children[0]!.children[0]!.href).toMatch(/^[a-z]+\.html#/);
+    campo.value = 'familía';
+    campo.listeners.input!();
+    expect(lista.children.length).toBeGreaterThan(0);
+    campo.value = 'xyzxyzxyz';
+    campo.listeners.input!();
+    expect(estado.textContent).toContain('Nenhuma resposta');
+    expect(lista.children.length).toBe(0);
+    campo.value = '';
+    campo.listeners.input!();
+    expect(escondido.hidden).toBe(false);
+    expect(estado.textContent).toBe('');
+  });
+});
+
+describe('site público: Novidades, feed e dados estruturados', () => {
+  const gerado = gerarSite();
+  const h = (nome: string) => texto(gerado.arquivos.get(nome));
+
+  it('os três posts iniciais têm data 23/10/2026, autoria "Equipe Clarevo", resumo, fontes e dados estruturados de artigo', () => {
+    expect(gerado.posts.map((p) => p.arquivo).sort()).toEqual([...POSTS].sort());
+    for (const nome of POSTS) {
+      const pagina = h(nome);
+      expect(pagina, nome).toContain('<time datetime="2026-10-23">23 de outubro de 2026</time> · Equipe Clarevo');
+      const fontes = /<h2 id="fontes">Fontes<\/h2>\s*<ol class="fontes">([\s\S]*?)<\/ol>/.exec(pagina)?.[1] ?? '';
+      expect((fontes.match(/<li/g) ?? []).length, `${nome}: fontes`).toBeGreaterThanOrEqual(2);
+      const ld = JSON.parse(/<script type="application\/ld\+json">([^<]*)<\/script>/.exec(pagina)![1]!);
+      expect(ld).toMatchObject({ '@type': 'Article', datePublished: '2026-10-23', author: { name: 'Equipe Clarevo' } });
+      expect(ld.headline.length).toBeGreaterThan(10);
+      expect(pagina, nome).toContain('corrigimos neste mesmo texto');
+      expect(pagina, nome).toContain('<link rel="alternate" type="application/rss+xml"');
+    }
+  });
+
+  it('"Conheça o Clarevo" só afirma o que o produto faz e manda para as páginas do site como fonte', () => {
+    const p = h(POSTS[0]!);
+    expect(p).toContain('<h1>Conheça o Clarevo</h1>');
+    expect(p).toContain('O Clarevo não é banco');
+    expect(p).toContain('href="../app/index.html"');
+    expect(p).toContain('href="../seguranca.html"');
+    expect(p).toContain('href="../empresas/index.html"');
+    expect(p).not.toMatch(/R\$\s?\d|gr[áa]tis|milh[õo]es|melhor/i);
+  });
+
+  it('"13º salário" usa o texto e as fontes do tema decimo-terceiro do catálogo, sem copiar à mão', () => {
+    const t = TEMAS_DO_SITE.find((x) => x.slug === 'decimo-terceiro')!;
+    const p = h(POSTS[1]!);
+    expect(p).toContain(`<p>${esc(t.short)}</p>`);
+    for (const par of t.paragraphs) expect(p).toContain(`<p>${esc(par)}</p>`);
+    expect(p).toContain(`<p>${esc(t.example!)}</p>`);
+    expect(p).toContain(`<p>${esc(t.hypotheses!)}</p>`);
+    for (const s of t.sources) {
+      expect(p).toContain(esc(LEARN_UI_TEXT.sourceLine(s)));
+      if (s.kind === 'oficial') expect(p).toContain(`href="${esc(s.url)}"`);
+    }
+    expect(p).toContain('href="../aprender/decimo-terceiro.html"');
+    expect(p).not.toMatch(/\{\{/);
+    // Nada sobra de diretiva: toda "{{tema:...}}" dos posts existe no catálogo.
+    for (const f of readdirSync(join(ROOT, 'site-src', 'novidades'))) {
+      for (const m of readFileSync(join(ROOT, 'site-src', 'novidades', f), 'utf8').matchAll(/\{\{tema:([a-z0-9-]+):/g)) expect(publishedTopics().some((x) => x.slug === m[1]), `${f}: ${m[1]}`).toBe(true);
+    }
+  });
+
+  it('"Como a empresa oferece o Clarevo sem ver suas finanças" bate com a página Para empresas e com o texto jurídico', () => {
+    const p = h(POSTS[2]!);
+    expect(p).toContain('os e-mails que ela mesma convidou');
+    expect(p).toContain('convite enviado, convite cancelado, ativa ou encerrada');
+    expect(p).toContain('números somados de finanças');
+    expect(p).toContain('o Clarevo não envia e-mail de convite');
+    expect(p).toContain('href="../ajuda/beneficio.html#tema-empresa-ve"');
+    expect(p).toContain('O banco de dados nega a leitura a quem administra o benefício, e isso é testado.');
+  });
+
+  it('o índice de Novidades lista os posts do mais novo para o mais antigo, com o feed e "Como escrevemos"', () => {
+    const i = h('novidades/index.html');
+    expect(i).toContain('<h1>Novidades</h1>');
+    for (const nome of POSTS) expect(i).toContain(`href="${nome.replace('novidades/', '')}"`);
+    expect(i).toContain('href="feed.xml"');
+    expect(i).toContain('href="como-escrevemos.html"');
+    expect(i).toContain('<link rel="alternate" type="application/rss+xml" title="Novidades do Clarevo" href="feed.xml">');
+  });
+
+  it('o feed RSS é XML bem formado, com um item por post, data e descrição', () => {
+    const feed = h('novidades/feed.xml');
+    expect(problemasDeXml(feed)).toEqual([]);
+    expect(feed).toContain('<rss version="2.0"');
+    expect((feed.match(/<item>/g) ?? []).length).toBe(3);
+    expect((feed.match(/<pubDate>Fri, 23 Oct 2026 12:00:00 -0300<\/pubDate>/g) ?? []).length).toBe(3);
+    for (const p of gerado.posts) expect(feed).toContain(`<title>${esc(p.titulo)}</title>`);
+    // O verificador de XML do teste pega o que é malformado.
+    expect(problemasDeXml('<?xml version="1.0" encoding="UTF-8"?><a><b></a></b>').length).toBeGreaterThan(0);
+    expect(problemasDeXml('<?xml version="1.0" encoding="UTF-8"?><a>1 & 2</a>').length).toBeGreaterThan(0);
+    expect(problemasDeXml('<a></a>').length).toBeGreaterThan(0);
+  });
+
+  it('"Como escrevemos" traz as regras editoriais: fonte, data, revisão, sem recomendar produto, sem publicidade e correções no próprio texto', () => {
+    const p = h('novidades/como-escrevemos.html');
+    expect(p).toContain('<h1>Como escrevemos</h1>');
+    for (const regra of ['Toda informação tem fonte', 'Toda informação tem data', 'a cada 6 ou 12 meses', 'Não recomendamos produto financeiro', 'Não há publicidade', 'Corrigimos no próprio texto', 'Não apagamos o erro em silêncio']) expect(p, regra).toContain(regra);
+    expect(p).toContain('[E-MAIL DE CONTATO]');
+  });
+});
+
+describe('site público: imagens, tamanho e Open Graph', () => {
+  const gerado = gerarSite();
+
+  it('as capturas são de demonstração, com largura adequada, tamanho declarado igual ao do arquivo e peso razoável', () => {
+    const imagens = [...gerado.arquivos.keys()].filter((k) => k.startsWith('imagens/'));
+    expect(imagens.length).toBeGreaterThanOrEqual(12);
+    let total = 0;
+    for (const nome of imagens) {
+      const bytes = gerado.arquivos.get(nome) as Buffer;
+      const d = png.dimensoes(bytes);
+      expect(d.largura, nome).toBeLessThanOrEqual(960);
+      expect(d.largura, nome).toBeGreaterThanOrEqual(480);
+      expect(bytes.length, nome).toBeLessThanOrEqual(120 * 1024);
+      total += bytes.length;
+      // Toda página que usa a imagem declara a mesma largura e altura.
+      for (const [pagina, conteudoDaPagina] of gerado.arquivos) {
+        if (!pagina.endsWith('.html')) continue;
+        for (const m of texto(conteudoDaPagina).matchAll(new RegExp(`<img src="[^"]*${nome.replace('/', '\\/')}"[^>]*>`, 'g'))) {
+          expect(m[0], `${pagina}: ${nome}`).toContain(`width="${d.largura}" height="${d.altura}"`);
+        }
+      }
+    }
+    expect(total, 'peso total das capturas').toBeLessThanOrEqual(1024 * 1024);
+    // O site inteiro, sem as fontes de licença aberta, cabe com folga.
+    const tudo = [...gerado.arquivos.values()].reduce((n, c) => n + Buffer.byteLength(c), 0);
+    expect(tudo).toBeLessThanOrEqual(4 * 1024 * 1024);
+  });
+
+  it('o reduzir mantém a proporção e o PNG gravado tem os mesmos pixels ao ler de volta', () => {
+    const orig = png.decodificar(readFileSync(join(ROOT, 'docs', 'telas', '402_familia_titular.png')));
+    const menor = png.reduzir(orig, 390);
+    expect(menor.largura).toBe(390);
+    expect(Math.abs(menor.altura / menor.largura - orig.altura / orig.largura)).toBeLessThan(0.01);
+    const volta = png.decodificar(png.codificar(menor));
+    expect(volta.rgb.equals(menor.rgb)).toBe(true);
+  });
+
+  it('a imagem de compartilhamento é um PNG de 1200 x 630, RGB de 24 bits, sem transparência, e vai para site/og/clarevo.png', () => {
+    const arquivo = join(ROOT, 'site-src', 'imagens', 'og-clarevo-1200x630.png');
+    const bytes = readFileSync(arquivo);
+    expect(bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))).toBe(true);
+    expect(bytes.readUInt32BE(16)).toBe(1200);
+    expect(bytes.readUInt32BE(20)).toBe(630);
+    expect(bytes[24], 'profundidade de bits').toBe(8);
+    expect(bytes[25], 'tipo de cor 2 = RGB, sem alfa').toBe(2);
+    expect(bytes.length).toBeLessThanOrEqual(600 * 1024);
+    expect((gerado.arquivos.get('og/clarevo.png') as Buffer).equals(bytes)).toBe(true);
+    const script = readFileSync(join(ROOT, 'scripts', 'gerar-og-site.js'), 'utf8');
+    expect(script).toContain('clarevo-logotipo-reverso.svg');
+    expect(script).toContain('apple-subtitulo');
+    expect(script).toContain('01_resumo.png');
+    // O texto que o desenho mostra (o subtítulo da ficha e a linha de recursos), sem preço, ranking, "melhor", "grátis" nem selos.
+    const ficha = readFileSync(join(ROOT, 'docs', 'lojas', 'ficha.md'), 'utf8');
+    const textoDoDesenho = [...script.matchAll(/<p>([^<$]*)<\/p>/g)].map((m) => m[1]).join(' ');
+    expect(textoDoDesenho.length).toBeGreaterThan(20);
+    expect(`${textoDoDesenho} ${ficha.match(/apple-subtitulo[^\n]*\n```\n([^\n]+)/)?.[1] ?? ''}`).not.toMatch(/gr[áa]tis|melhor|baixe|download|R\$|ranking|#1|\bn[úu]mero 1\b/i);
   });
 });
 
@@ -475,7 +1149,15 @@ describe('site público: contraste das cores (a regra de src/contrast.ts, 4,5:1 
     ['link', 'lima-claro', 'links dentro do destaque'],
     ['sobre-topo', 'topo', 'logotipo, menu, título e botão suave sobre o azul'],
     ['sobre-topo-suave', 'topo', 'texto de apoio sobre o azul'],
-    ['sobre-lima', 'lima', 'faixa de versão preliminar, marcador pendente e botão principal'],
+    ['sobre-lima', 'lima', 'faixa de versão preliminar, marcador pendente e botão principal na capa e no menu'],
+    ['sobre-botao', 'botao', 'botão principal fora da capa, número dos passos e tema atual da Ajuda'],
+    ['sobre-topo', 'disco', 'texto da capa sobre o disco decorativo'],
+    ['sobre-topo-suave', 'disco', 'texto de apoio da capa sobre o disco decorativo'],
+    ['sobre-rodape', 'rodape', 'títulos e linha legal do rodapé'],
+    ['sobre-rodape-2', 'rodape', 'texto do rodapé'],
+    ['link-rodape', 'rodape', 'links do rodapé'],
+    ['texto-2', 'azul-claro', 'legenda dentro de bloco azul'],
+    ['texto', 'lima-claro', 'resposta aberta pelo link da Ajuda e aviso "No app"'],
   ];
   /** [cor, fundo, onde aparece]: foco, contornos e sublinhado do menu (3:1). */
   const GRAFICOS: [string, string, string][] = [
@@ -483,7 +1165,11 @@ describe('site público: contraste das cores (a regra de src/contrast.ts, 4,5:1 
     ['foco', 'superficie', 'anel de foco sobre os cartões'],
     ['foco-topo', 'topo', 'anel de foco sobre o azul'],
     ['lima', 'topo', 'sublinhado da página atual e botão principal sobre o azul'],
-    ['sobre-topo', 'topo', 'contorno do botão suave'],
+    ['sobre-topo', 'topo', 'contorno do botão suave e do botão do menu'],
+    ['link', 'fundo', 'contorno do botão suave e dos temas da Ajuda'],
+    ['contorno', 'fundo', 'contorno do campo de busca'],
+    ['contorno', 'superficie', 'contorno do campo de busca nos blocos claros'],
+    ['link-rodape', 'rodape', 'anel de foco no rodapé'],
   ];
 
   it('as variáveis das duas aparências foram lidas (claro e escuro) e as marcas da identidade estão certas', () => {
@@ -514,9 +1200,24 @@ describe('site público: contraste das cores (a regra de src/contrast.ts, 4,5:1 
 
 describe('site público: gerar-site.js na linha de comando', () => {
   const rodar = (args: string[]) => spawnSync(process.execPath, [SCRIPT, ...args], { cwd: ROOT, encoding: 'utf8' });
+  const LIMPO = EXEMPLO.replace('[A DEFINIR: prazo]', 'cinco anos');
+  /** Pasta de exemplo sem nenhuma pendência, com o ajuste do caso (arquivo e texto a somar ou a trocar). */
+  const pasta = (pastas: string[], ajuste?: (md: Record<string, string>) => void): string => {
+    const legal = pastaDeExemplo();
+    pastas.push(legal);
+    const md: Record<string, string> = {
+      'politica-de-privacidade.md': LIMPO,
+      'termos-de-uso.md': readFileSync(join(legal, 'termos-de-uso.md'), 'utf8'),
+      'exclusao-de-conta.md': readFileSync(join(legal, 'exclusao-de-conta.md'), 'utf8'),
+    };
+    ajuste?.(md);
+    for (const [nome, conteudoDoArquivo] of Object.entries(md)) writeFileSync(join(legal, nome), conteudoDoArquivo);
+    return legal;
+  };
 
-  it('--final falha (código 1) e lista o que falta, sem gravar nada, enquanto sobrar marcador ou [A DEFINIR]', () => {
+  it('--final falha (código 1) e lista o que falta, sem gravar nada, enquanto sobrar marcador ou [A DEFINIR]; passa e grava o site todo quando está limpo', () => {
     const dir = mkdtempSync(join(tmpdir(), 'clarevo-final-'));
+    const pastas: string[] = [];
     try {
       writeFileSync(join(dir, 'vazios.json'), JSON.stringify(VAZIOS));
       const saida = join(dir, 'site');
@@ -526,58 +1227,39 @@ describe('site público: gerar-site.js na linha de comando', () => {
       expect(r.stderr).toContain('[RAZÃO SOCIAL]');
       expect(r.stderr).toContain('[CNPJ]');
       expect(r.stderr).toContain('suporte.html: [E-MAIL DE SUPORTE]');
+      expect(r.stderr).toContain('sobre.html: [E-MAIL DE CONTATO]');
+      expect(r.stderr).toContain('index.html: [RAZÃO SOCIAL]');
+      expect(r.stderr).toContain('aprender/decimo-terceiro.html: [RAZÃO SOCIAL]');
       expect(existsSync(saida)).toBe(false);
       // Com todos os valores mas com um [A DEFINIR] no texto, ainda falha.
-      const legal = pastaDeExemplo();
-      try {
-        writeFileSync(join(dir, 'cheios.json'), JSON.stringify(PREENCHIDOS));
-        const r2 = rodar(['--final', '--dados', join(dir, 'cheios.json'), '--legal', legal, '--saida', saida]);
-        expect(r2.status).toBe(1);
-        expect(r2.stderr).toContain('privacidade.html: [A DEFINIR: prazo]');
-        expect(r2.stderr).not.toContain('[RAZÃO SOCIAL]');
-        expect(existsSync(saida)).toBe(false);
-        // Sem nenhuma pendência, passa e grava as páginas na pasta pedida.
-        writeFileSync(join(legal, 'politica-de-privacidade.md'), EXEMPLO.replace('[A DEFINIR: prazo]', 'cinco anos'));
-        const r3 = rodar(['--final', '--dados', join(dir, 'cheios.json'), '--legal', legal, '--saida', saida]);
-        expect(r3.status, r3.stderr).toBe(0);
-        for (const nome of PAGINAS) expect(existsSync(join(saida, nome)), nome).toBe(true);
-        expect(readFileSync(join(saida, 'suporte.html'), 'utf8')).toContain('suporte@exemplo.test');
-      } finally {
-        rmSync(legal, { recursive: true, force: true });
-      }
+      const legal = pasta(pastas);
+      writeFileSync(join(legal, 'politica-de-privacidade.md'), EXEMPLO);
+      writeFileSync(join(dir, 'cheios.json'), JSON.stringify(PREENCHIDOS));
+      const r2 = rodar(['--final', '--dados', join(dir, 'cheios.json'), '--legal', legal, '--saida', saida]);
+      expect(r2.status).toBe(1);
+      expect(r2.stderr).toContain('privacidade.html: [A DEFINIR: prazo]');
+      expect(r2.stderr).not.toContain('[RAZÃO SOCIAL]');
+      expect(existsSync(saida)).toBe(false);
+      // Sem nenhuma pendência, passa e grava as páginas, o feed, o sitemap e a busca na pasta pedida.
+      const limpa = pasta(pastas);
+      const r3 = rodar(['--final', '--dados', join(dir, 'cheios.json'), '--legal', limpa, '--saida', saida]);
+      expect(r3.status, r3.stderr).toBe(0);
+      for (const nome of [...PAGINAS, 'sitemap.xml', 'robots.txt', 'novidades/feed.xml', 'ajuda/indice.json', 'ajuda/busca.js', 'og/clarevo.png', 'imagens/resumo.png']) expect(existsSync(join(saida, nome)), nome).toBe(true);
+      expect(readFileSync(join(saida, 'suporte.html'), 'utf8')).toContain('suporte@exemplo.test');
+      expect(r3.stdout).toMatch(/\d+ páginas/);
+      // Rodar de novo não muda nada (as capturas são comparadas pelos pixels).
+      const r4 = rodar(['--dados', join(dir, 'cheios.json'), '--legal', limpa, '--saida', saida]);
+      expect(r4.status, r4.stderr).toBe(0);
+      expect(r4.stdout).toContain('0 mudaram');
     } finally {
+      for (const p of pastas) rmSync(p, { recursive: true, force: true });
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, 180_000);
 
-  it('--final falha (código 1, com a lista) em cada caso de rascunho e passa num exemplo limpo, com dados preenchidos de teste e sem depender do estado do repositório', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'clarevo-final-casos-'));
+  it('--final recusa cada caso de rascunho (marca, proposta, travessão, link interno quebrado, expressão proibida) e, sem --final, os mesmos casos só viram aviso ou ficam visíveis', () => {
     const pastas: string[] = [];
     try {
-      writeFileSync(join(dir, 'cheios.json'), JSON.stringify(PREENCHIDOS));
-      const LIMPO = EXEMPLO.replace('[A DEFINIR: prazo]', 'cinco anos');
-      /** Pasta de exemplo sem nenhuma pendência, com o ajuste do caso (arquivo e texto a somar ou a trocar). */
-      const pasta = (ajuste?: (md: Record<string, string>) => void): string => {
-        const legal = pastaDeExemplo();
-        pastas.push(legal);
-        const md: Record<string, string> = {
-          'politica-de-privacidade.md': LIMPO,
-          'termos-de-uso.md': readFileSync(join(legal, 'termos-de-uso.md'), 'utf8'),
-          'exclusao-de-conta.md': readFileSync(join(legal, 'exclusao-de-conta.md'), 'utf8'),
-        };
-        ajuste?.(md);
-        for (const [nome, conteudo] of Object.entries(md)) writeFileSync(join(legal, nome), conteudo);
-        return legal;
-      };
-      const saida = join(dir, 'site');
-      const final = (legal: string) => rodar(['--final', '--dados', join(dir, 'cheios.json'), '--legal', legal, '--saida', saida]);
-
-      // O exemplo limpo passa e grava as páginas.
-      const limpo = final(pasta());
-      expect(limpo.status, limpo.stderr).toBe(0);
-      expect(existsSync(join(saida, 'index.html'))).toBe(true);
-      rmSync(saida, { recursive: true, force: true });
-
       const FRASE = 'Rascunho preparado pela equipe do Clarevo para revisão jurídica. Não é parecer jurídico.';
       const casos: [string, (md: Record<string, string>) => void, string[]][] = [
         ['a frase de rascunho', (md) => (md['termos-de-uso.md'] = `${FRASE}\n\n${md['termos-de-uso.md']}`), ['termos.html: frase de rascunho']],
@@ -590,22 +1272,41 @@ describe('site público: gerar-site.js na linha de comando', () => {
         ['[A DEFINIR', (md) => (md['exclusao-de-conta.md'] += '\nPrazo: [A DEFINIR: prazo]\n'), ['excluir-conta.html: [A DEFINIR: prazo]']],
         ['a expressão proibida', (md) => (md['termos-de-uso.md'] += `\nIsso não faz ${'sentido'}.\n`), ['termos.html: expressão proibida']],
       ];
+      // Um exemplo limpo não tem nenhum motivo para o --final recusar.
+      const limpo = gerarSite({ legal: pasta(pastas), dados: PREENCHIDOS });
+      expect(razoesFinais(limpo)).toEqual([]);
       for (const [nome, ajuste, esperado] of casos) {
-        const r = final(pasta(ajuste));
-        expect(r.status, `${nome}: deve falhar\n${r.stderr}`).toBe(1);
-        expect(r.stderr, nome).toContain('--final');
-        for (const trecho of esperado) expect(r.stderr, `${nome}: ${trecho}`).toContain(trecho);
-        expect(existsSync(saida), `${nome}: não grava nada`).toBe(false);
-        // No modo normal os mesmos casos só viram aviso (ou ficam visíveis na página) e o site é gravado.
-        const normal = rodar(['--dados', join(dir, 'cheios.json'), '--legal', pastas[pastas.length - 1]!, '--saida', saida]);
-        expect(normal.status, `${nome}: sem --final não falha\n${normal.stderr}`).toBe(0);
-        rmSync(saida, { recursive: true, force: true });
+        const g = gerarSite({ legal: pasta(pastas, ajuste), dados: PREENCHIDOS });
+        const motivos = razoesFinais(g).join('\n');
+        expect(motivos.length, `${nome}: o --final deveria recusar`).toBeGreaterThan(0);
+        for (const trecho of esperado) expect(motivos, `${nome}: ${trecho}`).toContain(trecho);
       }
     } finally {
-      for (const legal of pastas) rmSync(legal, { recursive: true, force: true });
+      for (const p of pastas) rmSync(p, { recursive: true, force: true });
+    }
+  }, 180_000);
+
+  it('na linha de comando, um caso de rascunho falha com código 1 e a lista, sem gravar nada, e sem --final só avisa e grava', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'clarevo-final-caso-'));
+    const pastas: string[] = [];
+    try {
+      writeFileSync(join(dir, 'cheios.json'), JSON.stringify(PREENCHIDOS));
+      const legal = pasta(pastas, (md) => (md['termos-de-uso.md'] += '\nTexto com travessão \u2014 aqui.\n'));
+      const saida = join(dir, 'site');
+      const r = rodar(['--final', '--dados', join(dir, 'cheios.json'), '--legal', legal, '--saida', saida]);
+      expect(r.status).toBe(1);
+      expect(r.stderr).toContain('--final');
+      expect(r.stderr).toContain('termos.html: travessão');
+      expect(existsSync(saida)).toBe(false);
+      const normal = rodar(['--dados', join(dir, 'cheios.json'), '--legal', legal, '--saida', saida]);
+      expect(normal.status, normal.stderr).toBe(0);
+      expect(normal.stderr).toContain('termos-de-uso.md, linha');
+      expect(existsSync(join(saida, 'index.html'))).toBe(true);
+    } finally {
+      for (const p of pastas) rmSync(p, { recursive: true, force: true });
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, 120_000);
 
   it('--final falha também com os dados e os textos atuais do repositório, enquanto houver valor vazio ou [A DEFINIR] (hoje: o advogado e a empresa ainda não entregaram)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'clarevo-final-'));
@@ -616,11 +1317,12 @@ describe('site público: gerar-site.js na linha de comando', () => {
       if (algumVazio) {
         expect(r.status).toBe(1);
         expect(r.stderr).toContain('Falta preencher');
+        expect(r.stderr).toContain('[E-MAIL DE CONTATO]');
       }
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, 120_000);
 
   it('sem --final, o gerador funciona com um aviso quando docs/legal não existe e grava só o que tem', () => {
     const dir = mkdtempSync(join(tmpdir(), 'clarevo-sem-legal-'));
@@ -634,8 +1336,9 @@ describe('site público: gerar-site.js na linha de comando', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, 120_000);
 });
+
 
 describe('gráfico de recursos do Google Play (scripts/gerar-grafico-loja.js)', () => {
   const arquivo = join(ROOT, 'apps', 'app', 'assets', 'loja', 'grafico-recursos-1024x500.png');
@@ -667,3 +1370,4 @@ describe('gráfico de recursos do Google Play (scripts/gerar-grafico-loja.js)', 
     expect(textoDoGrafico).not.toMatch(/gr[áa]tis|melhor|baixe|download|R\$|ranking|#1|\bn[úu]mero 1\b/i);
   });
 });
+

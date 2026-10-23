@@ -1,0 +1,3 @@
+# Versão preliminar, em revisão: nada deve ser indexado ainda.
+User-agent: *
+Disallow: /
