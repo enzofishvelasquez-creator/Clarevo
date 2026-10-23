@@ -1,5 +1,6 @@
 /// <reference types="node" />
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -25,6 +26,13 @@ const SITE = join(ROOT, 'site');
 const SCRIPT = join(ROOT, 'scripts', 'gerar-site.js');
 const require = createRequire(import.meta.url);
 
+interface GerarOpcoes {
+  legal?: string;
+  dados?: Record<string, string>;
+  arquivoDados?: string;
+  referencia?: string;
+  novidades?: string;
+}
 interface Gerado {
   arquivos: Map<string, string | Buffer>;
   avisos: string[];
@@ -42,12 +50,13 @@ const gerador = require(SCRIPT) as {
   pendenciasDoTexto: (texto: string, valores?: Record<string, string>) => string[];
   slug: (texto: string) => string;
   lerDados: (arquivo: string) => { dados: Record<string, string>; avisos: string[] };
-  gerarSite: (opcoes?: { legal?: string; dados?: Record<string, string>; arquivoDados?: string }) => Gerado;
+  gerarSite: (opcoes?: GerarOpcoes) => Gerado;
   linksQuebrados: (arquivos: Map<string, string | Buffer>) => string[];
 };
 const conteudo = require(join(ROOT, 'scripts', 'site', 'conteudo.js')) as {
   lerCabecalho: (t: string) => { meta: Record<string, string | string[]>; corpo: string };
-  lerPosts: (pasta: string) => { posts: { arquivo: string; data: string }[]; problemas: string[] };
+  lerPosts: (pasta: string, opcoes?: { referencia?: string | null }) => { posts: { arquivo: string; data: string }[]; problemas: string[] };
+  dataExiste: (iso: string) => boolean;
   lerPerguntas: (arquivo: string) => { pergunta: string; tema: string; id: string; resposta: string }[];
 };
 const png = require(join(ROOT, 'scripts', 'site', 'png.js')) as {
@@ -60,7 +69,7 @@ const { markdownParaHtml, MARCADORES } = gerador;
 
 /** O gerador é puro: o resultado com os dados do repositório é calculado uma vez e vale para todos os grupos de teste. */
 let geradoDoRepositorio: Gerado | null = null;
-const gerarSite = (opcoes?: { legal?: string; dados?: Record<string, string>; arquivoDados?: string }): Gerado => {
+const gerarSite = (opcoes?: GerarOpcoes): Gerado => {
   if (opcoes) return gerador.gerarSite(opcoes);
   geradoDoRepositorio ??= gerador.gerarSite();
   return geradoDoRepositorio;
@@ -209,6 +218,8 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
     expect(html, nome).toMatch(/^<!doctype html>\n<html lang="pt-BR">/);
     expect(html, `${nome}: travessão`).not.toMatch(PROIBIDO_TRAVESSAO);
     expect(html, `${nome}: expressão proibida`).not.toMatch(PROIBIDO_EXPRESSAO);
+    // Os códigos das decisões internas do projeto (D-011, D-053) não são conteúdo público: fontes do tipo `clarevo` saem como "Regra do próprio Clarevo".
+    expect(html, `${nome}: código de decisão interna`).not.toMatch(/\bD-\d{3}\b/);
     // Sem cookies e sem nada que rastreie: os únicos scripts são os dados estruturados (que não executam) e a busca da Ajuda.
     for (const m of html.matchAll(/<script\b([^>]*)>/gi)) {
       const ld = /^\s*type="application\/ld\+json"\s*$/.test(m[1]!);
@@ -417,18 +428,46 @@ describe('site público: conversor de Markdown, novidades', () => {
     expect(() => conteudo.lerCabecalho('---\ntitulo: x\n')).toThrow(/fecha/);
   });
 
-  it('um post sem fontes, sem resumo ou com data diferente da do nome do arquivo é recusado com a lista do que falta', () => {
+  it('um post sem fontes, sem resumo, com data diferente da do nome do arquivo ou com nome fora do padrão é recusado com a lista do que falta', () => {
     const dir = mkdtempSync(join(tmpdir(), 'clarevo-posts-'));
     try {
       writeFileSync(join(dir, '2026-10-23-ok.md'), '---\ntitulo: Ok\ndata: 2026-10-23\nresumo: Resumo\nautoria: Equipe Clarevo\nfontes:\n  - Fonte\n---\nTexto\n');
       writeFileSync(join(dir, '2026-10-22-sem-fontes.md'), '---\ntitulo: Sem\ndata: 2026-10-22\nresumo: Resumo\nautoria: Equipe Clarevo\n---\nTexto\n');
       writeFileSync(join(dir, '2026-10-21-data-errada.md'), '---\ntitulo: Errada\ndata: 2026-10-20\nresumo: Resumo\nautoria: Equipe Clarevo\nfontes:\n  - Fonte\n---\nTexto\n');
       writeFileSync(join(dir, 'sem-data.md'), 'ignorado');
+      writeFileSync(join(dir, 'notas.txt'), 'não é post');
       const r = conteudo.lerPosts(dir);
       expect(r.posts.map((p) => p.arquivo)).toEqual(['novidades/2026-10-23-ok.html', 'novidades/2026-10-22-sem-fontes.html', 'novidades/2026-10-21-data-errada.html']);
       expect(r.problemas.some((p) => p.includes('2026-10-22-sem-fontes.md') && p.includes('fontes'))).toBe(true);
       expect(r.problemas.some((p) => p.includes('2026-10-21-data-errada.md') && p.includes('não é a do nome do arquivo'))).toBe(true);
       expect(r.problemas.some((p) => p.includes('2026-10-23-ok.md'))).toBe(false);
+      // Um .md com nome fora do padrão não some em silêncio; outro tipo de arquivo não é post.
+      expect(r.problemas.some((p) => p.includes('sem-data.md') && p.includes('AAAA-MM-DD-slug.md'))).toBe(true);
+      expect(r.problemas.some((p) => p.includes('notas.txt'))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('uma data que não existe no calendário e uma data depois da referência explícita são problemas; até a referência, não', () => {
+    expect(['2026-10-23', '2024-02-29'].every((d) => conteudo.dataExiste(d))).toBe(true);
+    expect(['2026-02-30', '2026-13-01', '2026-10-32', '2025-02-29', '26-10-23', '', 'ontem'].some((d) => conteudo.dataExiste(d))).toBe(false);
+    const dir = mkdtempSync(join(tmpdir(), 'clarevo-posts-data-'));
+    try {
+      const post = (data: string) => `---\ntitulo: T\ndata: ${data}\nresumo: R\nautoria: Equipe Clarevo\nfontes:\n  - Fonte\n---\nTexto\n`;
+      writeFileSync(join(dir, '2026-02-30-impossivel.md'), post('2026-02-30'));
+      writeFileSync(join(dir, '2026-10-24-amanha.md'), post('2026-10-24'));
+      writeFileSync(join(dir, '2026-10-23-hoje.md'), post('2026-10-23'));
+      writeFileSync(join(dir, '2026-10-22-cabecalho-torto.md'), post('22/10/2026'));
+      const r = conteudo.lerPosts(dir, { referencia: '2026-10-23' });
+      const doArquivo = (nome: string) => r.problemas.filter((p) => p.includes(nome));
+      expect(doArquivo('2026-02-30-impossivel.md').some((p) => p.includes('não existe no calendário'))).toBe(true);
+      expect(doArquivo('2026-10-24-amanha.md').some((p) => p.includes('depois da data de referência (2026-10-23)'))).toBe(true);
+      expect(doArquivo('2026-10-23-hoje.md')).toEqual([]);
+      expect(doArquivo('2026-10-22-cabecalho-torto.md').some((p) => p.includes('não é uma data válida'))).toBe(true);
+      // Sem referência, só a validade do calendário conta; com a referência de amanhã, o post de amanhã passa.
+      expect(conteudo.lerPosts(dir).problemas.some((p) => p.includes('depois da data de referência'))).toBe(false);
+      expect(conteudo.lerPosts(dir, { referencia: '2026-10-24' }).problemas.some((p) => p.includes('2026-10-24-amanha.md'))).toBe(false);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -458,7 +497,9 @@ describe('site público: as páginas geradas', () => {
   it('todas as páginas existem: as do mapa do site, um tema por página de Aprender e os três posts iniciais', () => {
     for (const nome of PAGINAS) expect(gerado.arquivos.has(nome), nome).toBe(true);
     expect(PAGINAS.filter((n) => n.endsWith('.html')).length).toBeGreaterThanOrEqual(50);
-    for (const extra of ['estilo.css', '_headers', 'robots.txt', 'novidades/feed.xml', 'ajuda/indice.json', 'ajuda/busca.js', 'favicon.svg', 'og/clarevo.png', 'marca/clarevo-logotipo-reverso.svg']) expect(gerado.arquivos.has(extra), extra).toBe(true);
+    // O feed RSS só existe com domínio (endereços completos); sem ele não há feed nem link para ele.
+    expect(gerado.arquivos.has('novidades/feed.xml'), 'feed.xml só com domínio').toBe(dominio !== '');
+    for (const extra of ['estilo.css', '_headers', 'robots.txt', 'ajuda/indice.json', 'ajuda/busca.js', 'favicon.svg', 'og/clarevo.png', 'marca/clarevo-logotipo-reverso.svg']) expect(gerado.arquivos.has(extra), extra).toBe(true);
     const htmls = [...gerado.arquivos.keys()].filter((k) => k.endsWith('.html'));
     expect(htmls.filter((n) => !PAGINAS.includes(n))).toEqual([]);
   });
@@ -599,7 +640,7 @@ describe('site público: as páginas geradas', () => {
   it('um texto jurídico de exemplo (títulos, listas, tabela, links) gera páginas que passam em todas as verificações', () => {
     const dir = pastaDeExemplo();
     try {
-      const g = gerarSite({ legal: dir, dados: PREENCHIDOS });
+      const g = gerarSite({ legal: dir, dados: PREENCHIDOS, referencia: '2026-10-23' });
       verificarPaginas(g.arquivos, 'exemplo.test', PAGINAS);
       const h = texto(g.arquivos.get('privacidade.html'));
       expect(h).toContain('href="termos.html#quem-pode-usar"');
@@ -633,6 +674,20 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain('Em breve na App Store e no Google Play.');
     expect(h).toMatch(/Para pessoas/);
     expect(h).toMatch(/Para empresas/);
+    // O que aparece no app foi anotado ou importado pela pessoa ou pela Família dela, nunca "só por você".
+    expect(h).toContain('foi anotado ou importado por você ou pelas pessoas da sua Família');
+    expect(h).not.toContain('foi anotado ou importado por você,');
+    // Nem todo tema tem exemplo calculado (taxa-e-tarifa não tem): a página diz "quando cabe", e não "cada um com exemplo calculado".
+    expect(TEMAS_DO_SITE.some((t) => !t.example)).toBe(true);
+    expect(h).toContain('quando cabe, um exemplo calculado');
+    expect(h).not.toMatch(/cada um com exemplo calculado/);
+    // O contato de empresas é o [E-MAIL DE CONTATO]; o suporte do app fica na página Suporte.
+    expect(h).toContain('[E-MAIL DE CONTATO]');
+    expect(h).not.toContain('[E-MAIL DE SUPORTE]');
+    // A empresa não vê quando a pessoa abre o app nem o que anota; vê a data do aceite e a do encerramento.
+    expect(h).toContain('a em que você aceitou o convite e a de encerramento');
+    expect(h).toContain('Também não vê quando você abre o app nem o que você anota.');
+    expect(h).not.toContain('nem o que você faz no app');
     // De três a quatro recursos com captura e o herói com a tela Resumo, todos com a legenda de demonstração.
     expect(h.match(/<figure class="celular">/g)?.length).toBe(5);
     expect(h.match(/Dados fictícios de demonstração/g)?.length).toBe(5);
@@ -656,6 +711,14 @@ describe('site público: as páginas geradas', () => {
     expect(figuras).toBeGreaterThanOrEqual(11);
     expect(h.match(/Dados fictícios de demonstração/g)?.length).toBe(figuras);
     expect(h).toContain('Na web, hoje');
+    // "Cada texto vem do guia" não é verdade (os pontos são do site): só a explicação de abertura vem do guia do app.
+    expect(h).not.toContain('Cada texto vem do guia');
+    expect(h).toContain('A explicação de abertura de cada recurso é a do guia de uso do próprio app');
+    expect(h).toContain('tudo o que aparece foi anotado ou importado por você ou pelas pessoas da sua Família');
+    // Lembretes são do app para celular: a única captura que existe é a da web, que só avisa que eles não existem, então não há imagem.
+    expect(h).toContain('>Lembretes</h3>');
+    expect(h).not.toContain('imagens/lembretes.png');
+    expect(gerado.arquivos.has('imagens/lembretes.png')).toBe(false);
     expect(h).toContain('Em breve');
     expect(h).toContain('Em breve na App Store e no Google Play.');
     expect(h).not.toMatch(/<img[^>]*(apple|google|store|play)/i);
@@ -671,7 +734,16 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain('de 1 a 500 por vez');
     expect(h).toContain('link de uso único');
     expect(h).toContain('o Clarevo não envia e-mail de convite');
-    expect(h).toContain('O acesso pleno continua por 30 dias');
+    // O fim do benefício: só o que o código garante (nada é apagado; 30 dias de acesso pleno, o prazo de `BENEFIT_GRACE_DAYS` e da migração
+    // de empresas). O plano gratuito é [A DEFINIR] (P-005) nos termos e não é afirmado como fato.
+    expect(h).toContain('O acesso pleno continua por 30 dias, contados do encerramento da licença ou do fim do contrato');
+    expect(h).toContain('O que vale depois desses 30 dias ainda não está definido');
+    expect(h).not.toMatch(/plano gratuito|leitura do histórico/i);
+    expect(h).toContain('Nada é apagado por causa do fim do benefício');
+    // A empresa vê as datas do convite, do aceite ("Ativa desde") e do encerramento; não vê quando a pessoa abre o app nem o que anota.
+    expect(h).toContain('a de quando a pessoa aceitou ("Ativa desde") e a do encerramento');
+    expect(h).toContain('quando a pessoa abre o app e o que ela anota nele: o painel mostra só a data em que ela aceitou o convite e a do encerramento');
+    expect(h).not.toContain('o painel não mostra quem entrou no app');
     expect(h).toContain('[E-MAIL DE CONTATO]');
     expect(h).toContain('Ainda não há tabela de preços');
     expect(h).toContain('src="../imagens/empresa-painel.png"');
@@ -684,6 +756,17 @@ describe('site público: as páginas geradas', () => {
     for (const frase of ['O essencial', 'O que guardamos', 'O que não guardamos', 'Quem vê os seus dados', 'Como protegemos', 'Este site', 'Excluir a conta']) expect(h, frase).toContain(frase);
     for (const nao of ['número completo de cartão, código de segurança (CVV) e validade', 'CPF da nota fiscal', 'dados do comprovante de Pix ou de pagamento', 'fotos e imagens da câmera']) expect(h, nao).toContain(nao);
     expect(h).toContain('ela nunca vê as suas finanças, nem somadas às de outras pessoas');
+    // O site: sem cookies próprios nem análise de acesso; a hospedagem recebe o endereço da página e o IP (não "só para entregá-las").
+    expect(h).toContain('O site não usa cookies próprios, não tem análise de acesso');
+    expect(h).toContain('a hospedagem recebe o endereço da página que você abre e o seu IP');
+    expect(h).not.toContain('só para entregá-las');
+    expect(h).not.toContain('O site não usa cookies,');
+    // O Android lê o QR Code com um componente do Google (ML Kit), como nas seções 5 e 8 da política.
+    expect(h).toContain('No Android, a leitura do QR Code usa um componente do Google (ML Kit) incluído no app');
+    expect(h).toContain('pode enviar ao Google dados técnicos de uso e do aparelho');
+    expect(h).toContain('seções 5 e 8 da');
+    // Na Família, as pessoas anotam também: o que está guardado não é "só o que você anota".
+    expect(h).toContain('ou as pessoas da sua Família, anotam ou escolhem importar');
     expect(h).toContain('href="privacidade.html"');
     expect(h).toContain('href="excluir-conta.html"');
     expect(h).toContain('href="termos.html"');
@@ -730,6 +813,9 @@ describe('site público: as páginas geradas', () => {
     expect(h).not.toMatch(/https?:\/\/[^\s]*;/);
     expect(h).toContain("frame-ancestors 'none'");
     expect(h).toContain('X-Content-Type-Options: nosniff');
+    // `interest-cohort` era da FLoC, que acabou: só as permissões que o site realmente nega.
+    expect(h).not.toContain('interest-cohort');
+    expect(h).toContain('Permissions-Policy: camera=(), microphone=(), geolocation=()');
   });
 
   it('o estilo não carrega nada de fora, usa só as fontes locais e tem foco visível, modo escuro e a identidade da marca', () => {
@@ -801,7 +887,12 @@ describe('site público: Aprender (o catálogo do app, uma fonte de verdade)', (
       expect(t.sources.length).toBeGreaterThan(0);
       t.sources.forEach((s, i) => {
         expect(pagina, `fonte ${i + 1}`).toContain(`id="fonte-${i + 1}"`);
-        expect(pagina).toContain(esc(LEARN_UI_TEXT.sourceLine(s)));
+        if (s.kind === 'clarevo') {
+          // As referências internas do projeto ("Clarevo: D-011") não aparecem no site público: só "Regra do próprio Clarevo".
+          expect(pagina).toContain(`id="fonte-${i + 1}">Regra do próprio Clarevo<`);
+          expect(pagina).not.toContain(esc(LEARN_UI_TEXT.sourceLine(s)));
+          for (const ref of s.refs) expect(pagina, `código ${ref}`).not.toContain(ref);
+        } else expect(pagina).toContain(esc(LEARN_UI_TEXT.sourceLine(s)));
         if (s.kind === 'oficial' || s.kind === 'mercado') {
           expect(pagina).toContain(`href="${esc(s.url)}" rel="noopener noreferrer"`);
           if (s.consultedOn) expect(pagina).toContain(`Consultada em ${formatDateBR(s.consultedOn)}`);
@@ -890,6 +981,51 @@ describe('site público: Ajuda, busca e perguntas do suporte', () => {
     const cartoes = GUIDE_ENTRIES.find((e) => e.id === 'cartoes')!;
     expect(h('ajuda/contas.html')).toContain(esc(cartoes.purpose));
     for (const passo of cartoes.steps) expect(h('ajuda/contas.html')).toContain(`<li>${esc(passo)}</li>`);
+  });
+
+  it('as respostas que vêm do catálogo trazem o que o app mostra: "Ver a conta", as hipóteses (também sem exemplo), os números citados e a fonte, sem códigos internos', () => {
+    const tema = (slug: string) => publishedTopics().find((t) => t.slug === slug)!;
+    const resposta = (arquivo: string, slug: string) => {
+      const pagina = h(`ajuda/${arquivo}.html`);
+      const inicio = pagina.indexOf(`<article class="pergunta" id="tema-${slug}">`);
+      expect(inicio, `${arquivo}: tema-${slug}`).toBeGreaterThan(-1);
+      return pagina.slice(inicio, pagina.indexOf('</article>', inicio));
+    };
+    for (const [arquivo, slug] of [['comecar', 'diferenca'], ['contas', 'estimativa'], ['contas', 'parcelamentos']] as const) {
+      const t = tema(slug);
+      expect(t.calculation, `${slug} tem "Ver a conta" no catálogo`).toBeTruthy();
+      const r = resposta(arquivo, slug);
+      expect(r).toContain(`<summary>${LEARN_UI_TEXT.showCalculation}</summary>`);
+      for (const linha of t.calculation!.split(' · ')) expect(r, `${slug}: ${linha}`).toContain(`<li>${esc(linha.trim())}</li>`);
+      expect(r).toContain(esc(t.example!));
+      expect(r).toContain(esc(t.hypotheses!));
+    }
+    // "Mês sem registro" não tem exemplo, mas o app mostra as hipóteses e o número citado ("R$ 0,00"), e a Ajuda também.
+    const sem = tema('sem-registro');
+    expect(sem.example).toBeNull();
+    const rSem = resposta('organizar', 'sem-registro');
+    expect(rSem).toContain(esc(sem.hypotheses!));
+    for (const f of sem.facts) expect(rSem).toContain(`<strong>Números e regras citados:</strong> ${esc(f.text)}`);
+    // A fonte do tipo `clarevo` aparece como "Regra do próprio Clarevo", igual em todas as respostas que vêm do catálogo.
+    for (const t of publishedTopics().filter((x) => (x.section === 'usar' || x.section === 'duvidas') && !x.legacy)) {
+      const arquivo = TEMAS_DA_AJUDA.find((a) => new RegExp(`id="tema-${t.slug}"`).test(h(`ajuda/${a}.html`)))!;
+      const r = resposta(arquivo, t.slug);
+      expect(r, t.slug).toContain(`Revisado em ${formatDateBR(t.reviewedOn)}. Fonte: Regra do próprio Clarevo.`);
+      for (const s of t.sources) if (s.kind === 'clarevo') for (const ref of s.refs) expect(r, `${t.slug}: ${ref}`).not.toContain(ref);
+    }
+    expect(JSON.stringify(indice)).not.toMatch(/\bD-\d{3}\b/);
+    // A busca acha o passo a passo da conta e as hipóteses pelo texto.
+    expect(indice.find((i) => i.i === 'tema-diferenca')!.x).toContain('Ver a conta');
+  });
+
+  it('a Ajuda não afirma o plano gratuito como fato: o que vale depois dos 30 dias de acesso pleno ainda não está definido', () => {
+    const b = h('ajuda/beneficio.html');
+    expect(b).toContain('o acesso pleno continua por 30 dias. O que vale depois desses 30 dias ainda não está definido. Nada é apagado.');
+    expect(b).toContain('Também não vê quando você abre o app nem o que você anota.');
+    expect(b).toContain('as datas (como a em que você aceitou o convite e a de encerramento)');
+    expect(b).not.toContain('Os e-mails que ela convidou, a situação de cada convite ou licença (convite enviado, convite cancelado, ativa ou encerrada), as datas e as contagens');
+    expect(b).not.toContain('o que você faz no app');
+    expect(h('ajuda/comecar.html')).toContain('anotado por você ou pelas pessoas da sua Família, ou importado de um arquivo');
   });
 
   it('o índice da busca (JSON) tem todas as perguntas, com título, tema, endereço e texto, e cada endereço existe', () => {
@@ -997,7 +1133,6 @@ describe('site público: Novidades, feed e dados estruturados', () => {
       expect(ld).toMatchObject({ '@type': 'Article', datePublished: '2026-10-23', author: { name: 'Equipe Clarevo' } });
       expect(ld.headline.length).toBeGreaterThan(10);
       expect(pagina, nome).toContain('corrigimos neste mesmo texto');
-      expect(pagina, nome).toContain('<link rel="alternate" type="application/rss+xml"');
     }
   });
 
@@ -1005,6 +1140,7 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     const p = h(POSTS[0]!);
     expect(p).toContain('<h1>Conheça o Clarevo</h1>');
     expect(p).toContain('O Clarevo não é banco');
+    expect(p).toContain('tudo o que aparece no app foi anotado ou importado por você ou pelas pessoas da sua Família');
     expect(p).toContain('href="../app/index.html"');
     expect(p).toContain('href="../seguranca.html"');
     expect(p).toContain('href="../empresas/index.html"');
@@ -1019,7 +1155,10 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     expect(p).toContain(`<p>${esc(t.example!)}</p>`);
     expect(p).toContain(`<p>${esc(t.hypotheses!)}</p>`);
     for (const s of t.sources) {
-      expect(p).toContain(esc(LEARN_UI_TEXT.sourceLine(s)));
+      if (s.kind === 'clarevo') {
+        expect(p).toContain('Regra do próprio Clarevo');
+        expect(p).not.toContain(esc(LEARN_UI_TEXT.sourceLine(s)));
+      } else expect(p).toContain(esc(LEARN_UI_TEXT.sourceLine(s)));
       if (s.kind === 'oficial') expect(p).toContain(`href="${esc(s.url)}"`);
     }
     expect(p).toContain('href="../aprender/decimo-terceiro.html"');
@@ -1038,24 +1177,49 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     expect(p).toContain('o Clarevo não envia e-mail de convite');
     expect(p).toContain('href="../ajuda/beneficio.html#tema-empresa-ve"');
     expect(p).toContain('O banco de dados nega a leitura a quem administra o benefício, e isso é testado.');
+    // O fim do benefício diz só o que o código garante: nada é apagado e 30 dias de acesso pleno. O plano gratuito é [A DEFINIR] e não aparece.
+    expect(p).toContain('o acesso pleno continua por 30 dias, contados do encerramento da licença ou do fim do contrato');
+    expect(p).toContain('O que vale depois desses 30 dias ainda não está definido.');
+    expect(p).not.toMatch(/plano gratuito|leitura do histórico/i);
+    expect(p).toContain('a empresa a vê como encerrada, com a data');
+    // A empresa vê a data do aceite e a do encerramento, mas não quando a pessoa abre o app nem o que anota.
+    expect(p).toContain('a do convite, a de quando a pessoa aceitou e a do encerramento');
+    expect(p).toContain('quando a pessoa abre o app e o que ela anota nele: o painel mostra só a data em que ela aceitou o convite e a do encerramento');
+    expect(p).not.toContain('quando ou como a pessoa usa o app');
   });
 
-  it('o índice de Novidades lista os posts do mais novo para o mais antigo, com o feed e "Como escrevemos"', () => {
+  it('o índice de Novidades lista os posts do mais novo para o mais antigo, com "Como escrevemos"; o feed e o link para ele só existem com domínio', () => {
     const i = h('novidades/index.html');
     expect(i).toContain('<h1>Novidades</h1>');
     for (const nome of POSTS) expect(i).toContain(`href="${nome.replace('novidades/', '')}"`);
-    expect(i).toContain('href="feed.xml"');
     expect(i).toContain('href="como-escrevemos.html"');
-    expect(i).toContain('<link rel="alternate" type="application/rss+xml" title="Novidades do Clarevo" href="feed.xml">');
+    // Sem domínio (o caso do repositório hoje) não há feed.xml, nem botão, nem <link rel="alternate"> para ele.
+    const semDominio = gerarSite({ dados: { ...PREENCHIDOS, DOMÍNIO: '' }, referencia: '2026-10-23' });
+    expect(semDominio.arquivos.has('novidades/feed.xml')).toBe(false);
+    for (const [nome, conteudoDaPagina] of semDominio.arquivos) {
+      if (!nome.endsWith('.html')) continue;
+      expect(texto(conteudoDaPagina), nome).not.toMatch(/feed\.xml|application\/rss\+xml|Feed RSS/);
+    }
+    expect(gerador.linksQuebrados(semDominio.arquivos)).toEqual([]);
+    // Com domínio, o botão e o link existem e apontam para o feed.
+    const comDominio = gerarSite({ dados: PREENCHIDOS, referencia: '2026-10-23' });
+    const ic = texto(comDominio.arquivos.get('novidades/index.html'));
+    expect(ic).toContain('href="feed.xml">Feed RSS</a>');
+    expect(ic).toContain('<link rel="alternate" type="application/rss+xml" title="Novidades do Clarevo" href="feed.xml">');
+    for (const nome of POSTS) expect(texto(comDominio.arquivos.get(nome)), nome).toContain('<link rel="alternate" type="application/rss+xml" title="Novidades do Clarevo" href="feed.xml">');
   });
 
-  it('o feed RSS é XML bem formado, com um item por post, data e descrição', () => {
-    const feed = h('novidades/feed.xml');
+  it('o feed RSS (só com domínio) é XML bem formado, com um item por post, data, descrição e endereços completos, nunca relativos', () => {
+    const g = gerarSite({ dados: PREENCHIDOS, referencia: '2026-10-23' });
+    const feed = texto(g.arquivos.get('novidades/feed.xml'));
     expect(problemasDeXml(feed)).toEqual([]);
     expect(feed).toContain('<rss version="2.0"');
     expect((feed.match(/<item>/g) ?? []).length).toBe(3);
     expect((feed.match(/<pubDate>Fri, 23 Oct 2026 12:00:00 -0300<\/pubDate>/g) ?? []).length).toBe(3);
-    for (const p of gerado.posts) expect(feed).toContain(`<title>${esc(p.titulo)}</title>`);
+    for (const p of g.posts) expect(feed).toContain(`<title>${esc(p.titulo)}</title>`);
+    for (const m of feed.matchAll(/<(?:link|guid isPermaLink="true")>([^<]*)<\/(?:link|guid)>/g)) expect(m[1], 'endereço do feed').toMatch(/^https:\/\/exemplo\.test\//);
+    expect(feed).not.toContain('isPermaLink="false"');
+    expect(feed).toContain('<link>https://exemplo.test/novidades/</link>');
     // O verificador de XML do teste pega o que é malformado.
     expect(problemasDeXml('<?xml version="1.0" encoding="UTF-8"?><a><b></a></b>').length).toBeGreaterThan(0);
     expect(problemasDeXml('<?xml version="1.0" encoding="UTF-8"?><a>1 & 2</a>').length).toBeGreaterThan(0);
@@ -1096,6 +1260,27 @@ describe('site público: imagens, tamanho e Open Graph', () => {
     // O site inteiro, sem as fontes de licença aberta, cabe com folga.
     const tudo = [...gerado.arquivos.values()].reduce((n, c) => n + Buffer.byteLength(c), 0);
     expect(tudo).toBeLessThanOrEqual(4 * 1024 * 1024);
+  });
+
+  it('a chave do cache das imagens inclui o resumo do código de png.js e de imagens.js: mudar o método invalida o cache sozinho', () => {
+    const imagens = require(join(ROOT, 'scripts', 'site', 'imagens.js')) as {
+      RESUMO_DO_CODIGO: string;
+      chaveDoCache: (original: Buffer, largura: number, resumo?: string) => string;
+      IMAGENS: { id: string; origem: string }[];
+    };
+    const arquivoDoMetodo = readFileSync(join(ROOT, 'scripts', 'site', 'png.js'));
+    const arquivoDaLista = readFileSync(join(ROOT, 'scripts', 'site', 'imagens.js'));
+    expect(imagens.RESUMO_DO_CODIGO).toBe(createHash('sha1').update(arquivoDoMetodo).update('|').update(arquivoDaLista).digest('hex').slice(0, 12));
+    const original = Buffer.from('captura de teste');
+    const chave = imagens.chaveDoCache(original, 480);
+    expect(imagens.chaveDoCache(original, 480)).toBe(chave);
+    expect(imagens.chaveDoCache(original, 480, 'outro-codigo')).not.toBe(chave);
+    expect(imagens.chaveDoCache(original, 960)).not.toBe(chave);
+    expect(imagens.chaveDoCache(Buffer.from('outra captura'), 480)).not.toBe(chave);
+    // Nada de número de versão escrito à mão para lembrar de trocar.
+    expect(arquivoDaLista.toString('utf8')).not.toContain('VERSAO_DO_METODO');
+    // A tela de lembretes da web só avisa que o recurso não existe na web: não é captura do recurso.
+    expect(imagens.IMAGENS.some((i) => i.id === 'lembretes')).toBe(false);
   });
 
   it('o reduzir mantém a proporção e o PNG gravado tem os mesmos pixels ao ler de volta', () => {
@@ -1242,13 +1427,13 @@ describe('site público: gerar-site.js na linha de comando', () => {
       expect(existsSync(saida)).toBe(false);
       // Sem nenhuma pendência, passa e grava as páginas, o feed, o sitemap e a busca na pasta pedida.
       const limpa = pasta(pastas);
-      const r3 = rodar(['--final', '--dados', join(dir, 'cheios.json'), '--legal', limpa, '--saida', saida]);
+      const r3 = rodar(['--final', '--dados', join(dir, 'cheios.json'), '--legal', limpa, '--referencia', '2026-10-23', '--saida', saida]);
       expect(r3.status, r3.stderr).toBe(0);
       for (const nome of [...PAGINAS, 'sitemap.xml', 'robots.txt', 'novidades/feed.xml', 'ajuda/indice.json', 'ajuda/busca.js', 'og/clarevo.png', 'imagens/resumo.png']) expect(existsSync(join(saida, nome)), nome).toBe(true);
       expect(readFileSync(join(saida, 'suporte.html'), 'utf8')).toContain('suporte@exemplo.test');
       expect(r3.stdout).toMatch(/\d+ páginas/);
       // Rodar de novo não muda nada (as capturas são comparadas pelos pixels).
-      const r4 = rodar(['--dados', join(dir, 'cheios.json'), '--legal', limpa, '--saida', saida]);
+      const r4 = rodar(['--dados', join(dir, 'cheios.json'), '--legal', limpa, '--referencia', '2026-10-23', '--saida', saida]);
       expect(r4.status, r4.stderr).toBe(0);
       expect(r4.stdout).toContain('0 mudaram');
     } finally {
@@ -1273,10 +1458,10 @@ describe('site público: gerar-site.js na linha de comando', () => {
         ['a expressão proibida', (md) => (md['termos-de-uso.md'] += `\nIsso não faz ${'sentido'}.\n`), ['termos.html: expressão proibida']],
       ];
       // Um exemplo limpo não tem nenhum motivo para o --final recusar.
-      const limpo = gerarSite({ legal: pasta(pastas), dados: PREENCHIDOS });
+      const limpo = gerarSite({ legal: pasta(pastas), dados: PREENCHIDOS, referencia: '2026-10-23' });
       expect(razoesFinais(limpo)).toEqual([]);
       for (const [nome, ajuste, esperado] of casos) {
-        const g = gerarSite({ legal: pasta(pastas, ajuste), dados: PREENCHIDOS });
+        const g = gerarSite({ legal: pasta(pastas, ajuste), dados: PREENCHIDOS, referencia: '2026-10-23' });
         const motivos = razoesFinais(g).join('\n');
         expect(motivos.length, `${nome}: o --final deveria recusar`).toBeGreaterThan(0);
         for (const trecho of esperado) expect(motivos, `${nome}: ${trecho}`).toContain(trecho);
@@ -1337,6 +1522,126 @@ describe('site público: gerar-site.js na linha de comando', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   }, 120_000);
+
+  /** Uma cópia dos posts do repositório em uma pasta temporária, com o ajuste do caso (nome do arquivo para texto). */
+  const posts = (pastas: string[], ajuste?: (arquivos: Record<string, string>) => void): string => {
+    const dir = mkdtempSync(join(tmpdir(), 'clarevo-posts-final-'));
+    pastas.push(dir);
+    const origem = join(ROOT, 'site-src', 'novidades');
+    const arquivos: Record<string, string> = {};
+    for (const nome of readdirSync(origem)) arquivos[nome] = readFileSync(join(origem, nome), 'utf8');
+    ajuste?.(arquivos);
+    for (const [nome, c] of Object.entries(arquivos)) writeFileSync(join(dir, nome), c);
+    return dir;
+  };
+  const CABECALHO = (data: string, extra = '', fontes = '\nfontes:\n  - Fonte de teste') => `---\ntitulo: Post de teste\ndata: ${data}\nresumo: Um resumo curto.\nautoria: Equipe Clarevo${fontes}\n---\n${extra || 'Texto do post.\n'}`;
+  const REFERENCIA = '2026-10-23';
+
+  it('--final recusa cada caso de Novidades (post sem fontes, data inválida ou futura, tema que não existe, nome fora do padrão) e, sem --final, o aviso aparece e o texto não some em silêncio', () => {
+    const pastas: string[] = [];
+    try {
+      const limpa = pasta(pastas);
+      const gerar = (novidades: string, referencia = REFERENCIA, dados: Record<string, string> = PREENCHIDOS) => gerarSite({ legal: limpa, dados, referencia, novidades });
+      // Os posts do repositório, com tudo preenchido, não têm motivo nenhum para o --final recusar.
+      const bom = gerar(posts(pastas));
+      expect(razoesFinais(bom)).toEqual([]);
+      expect(bom.avisos.filter((a) => !a.includes('dados-da-empresa'))).toEqual([]);
+      const casos: [string, (a: Record<string, string>) => void, string[]][] = [
+        ['post sem fontes', (a) => (a['2026-10-22-sem-fontes.md'] = CABECALHO('2026-10-22', undefined, '')), ['site-src/novidades/2026-10-22-sem-fontes.md: falta "fontes" no cabeçalho']],
+        ['data que não existe no calendário', (a) => (a['2026-02-30-impossivel.md'] = CABECALHO('2026-02-30')), ['2026-02-30-impossivel.md: a data do nome do arquivo (2026-02-30) não existe no calendário']],
+        ['data com formato errado no cabeçalho', (a) => (a['2026-10-22-torto.md'] = CABECALHO('22/10/2026')), ['2026-10-22-torto.md: a data do cabeçalho (22/10/2026) não é uma data válida']],
+        ['data futura em relação à referência', (a) => (a['2026-10-24-amanha.md'] = CABECALHO('2026-10-24')), ['2026-10-24-amanha.md: a data (2026-10-24) é depois da data de referência (2026-10-23)']],
+        ['tema que não existe em {{tema:...}}', (a) => (a['2026-10-22-tema.md'] = CABECALHO('2026-10-22', '{{tema:nao-existe:p1}}\n')), ['2026-10-22-tema.md: {{tema:nao-existe:p1}} não existe no catálogo de Aprender']],
+        ['tema que não existe em "tema:" das fontes', (a) => (a['2026-10-22-fonte.md'] = CABECALHO('2026-10-22', undefined, '\nfontes:\n  - tema: nao-existe')), ['2026-10-22-fonte.md: a fonte "tema: nao-existe" não existe no catálogo de Aprender']],
+        ['nome fora do padrão', (a) => (a['sem-data.md'] = CABECALHO('2026-10-22')), ['site-src/novidades/sem-data.md: o nome do arquivo precisa ser AAAA-MM-DD-slug.md']],
+      ];
+      for (const [nome, ajuste, esperado] of casos) {
+        const g = gerar(posts(pastas, ajuste));
+        const motivos = razoesFinais(g).join('\n');
+        for (const trecho of esperado) {
+          expect(motivos, `${nome}: o --final deveria recusar com "${trecho}"`).toContain(trecho);
+          // Sem --final, o mesmo problema é um aviso (o console o mostra), e a geração continua.
+          expect(g.avisos.join('\n'), `${nome}: aviso`).toContain(trecho);
+        }
+      }
+      // A data de referência é explícita: o mesmo post passa quando a referência chega até a data dele.
+      const amanha = posts(pastas, (a) => (a['2026-10-24-amanha.md'] = CABECALHO('2026-10-24')));
+      expect(razoesFinais(gerar(amanha, '2026-10-24'))).toEqual([]);
+      expect(razoesFinais(gerar(amanha, '2026-10-23')).length).toBeGreaterThan(0);
+      expect(() => gerar(amanha, '2026-13-40')).toThrow(/data de referência/);
+      // O parágrafo de um tema que não existe não some em silêncio: fica na página, destacado como pendente.
+      const semTema = gerar(posts(pastas, (a) => (a['2026-10-22-tema.md'] = CABECALHO('2026-10-22', '{{tema:nao-existe:p1}}\n'))));
+      const pagina = texto(semTema.arquivos.get('novidades/2026-10-22-tema.html'));
+      expect(pagina).toContain('<mark class="pendente">Falta o texto do tema "nao-existe", campo "p1"');
+      expect(pagina).not.toContain('{{');
+      // O domínio é exigido de propósito no --final, mesmo que nenhum texto cite [DOMÍNIO] (o texto jurídico de exemplo não cita).
+      const semDominio = gerar(posts(pastas), REFERENCIA, { ...PREENCHIDOS, DOMÍNIO: '' });
+      expect(semDominio.pendencias.get('privacidade.html')).toEqual([]);
+      expect(razoesFinais(semDominio)).toEqual([expect.stringContaining('[DOMÍNIO] sem valor em site/dados-da-empresa.json')]);
+      expect(semDominio.avisos.join('\n')).toContain('o --final recusaria: [DOMÍNIO] sem valor');
+      const invalido = gerar(posts(pastas), REFERENCIA, { ...PREENCHIDOS, DOMÍNIO: 'isto não é um domínio' });
+      expect(razoesFinais(invalido)).toEqual([expect.stringContaining('não parece um domínio')]);
+      for (const bomDominio of ['clarevo.com.br', 'https://www.exemplo.test/', 'app.exemplo.com.br']) expect(razoesFinais(gerar(posts(pastas), REFERENCIA, { ...PREENCHIDOS, DOMÍNIO: bomDominio })), bomDominio).toEqual([]);
+    } finally {
+      for (const p of pastas) rmSync(p, { recursive: true, force: true });
+    }
+  }, 240_000);
+
+  it('na linha de comando, --final falha (código 1) e lista o post com problema ou o domínio sem valor, sem gravar nada; sem --final só avisa, grava e não cria feed sem domínio', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'clarevo-final-posts-'));
+    const pastas: string[] = [];
+    try {
+      writeFileSync(join(dir, 'cheios.json'), JSON.stringify(PREENCHIDOS));
+      writeFileSync(join(dir, 'sem-dominio.json'), JSON.stringify({ ...PREENCHIDOS, DOMÍNIO: '' }));
+      const legal = pasta(pastas);
+      const ruins = posts(pastas, (a) => {
+        a['2026-10-24-amanha.md'] = CABECALHO('2026-10-24');
+        a['2026-10-22-sem-fontes.md'] = CABECALHO('2026-10-22', undefined, '');
+        a['2026-10-22-tema.md'] = CABECALHO('2026-10-22', '{{tema:nao-existe:p1}}\n');
+      });
+      const saida = join(dir, 'site');
+      const r = rodar(['--final', '--dados', join(dir, 'cheios.json'), '--legal', legal, '--novidades', ruins, '--referencia', REFERENCIA, '--saida', saida]);
+      expect(r.status).toBe(1);
+      expect(r.stderr).toContain('--final');
+      expect(r.stderr).toContain('2026-10-24-amanha.md: a data (2026-10-24) é depois da data de referência (2026-10-23)');
+      expect(r.stderr).toContain('2026-10-22-sem-fontes.md: falta "fontes" no cabeçalho');
+      expect(r.stderr).toContain('{{tema:nao-existe:p1}} não existe no catálogo de Aprender');
+      expect(existsSync(saida)).toBe(false);
+      // Sem --final: avisos no console (stderr), e o site é gravado.
+      const normal = rodar(['--dados', join(dir, 'cheios.json'), '--legal', legal, '--novidades', ruins, '--referencia', REFERENCIA, '--saida', saida]);
+      expect(normal.status, normal.stderr).toBe(0);
+      expect(normal.stderr).toContain('aviso: site-src/novidades/2026-10-22-sem-fontes.md: falta "fontes" no cabeçalho');
+      expect(normal.stderr).toContain('aviso: site-src/novidades/2026-10-22-tema.md: {{tema:nao-existe:p1}} não existe no catálogo de Aprender');
+      expect(normal.stdout).toMatch(/o --final ainda recusaria \d+ ponto/);
+      expect(existsSync(join(saida, 'novidades', 'feed.xml'))).toBe(true);
+      // A data de referência inválida na linha de comando é recusada.
+      const ruim = rodar(['--dados', join(dir, 'cheios.json'), '--legal', legal, '--referencia', '2026-02-30', '--saida', join(dir, 'x')]);
+      expect(ruim.status).toBe(1);
+      expect(ruim.stderr).toContain('data de referência');
+      // Posts bons e domínio sem valor: o --final recusa só por causa do domínio, mesmo com a política sem [DOMÍNIO]; sem --final, não há feed.
+      const boa = posts(pastas);
+      const saida2 = join(dir, 'site2');
+      const semDominio = rodar(['--final', '--dados', join(dir, 'sem-dominio.json'), '--legal', legal, '--novidades', boa, '--referencia', REFERENCIA, '--saida', saida2]);
+      expect(semDominio.status).toBe(1);
+      expect(semDominio.stderr).toContain('[DOMÍNIO] sem valor em site/dados-da-empresa.json');
+      expect(semDominio.stderr).not.toContain('Falta preencher');
+      expect(existsSync(saida2)).toBe(false);
+      const semFinal = rodar(['--dados', join(dir, 'sem-dominio.json'), '--legal', legal, '--novidades', boa, '--referencia', REFERENCIA, '--saida', saida2]);
+      expect(semFinal.status, semFinal.stderr).toBe(0);
+      expect(semFinal.stderr).toContain('aviso: o --final recusaria: [DOMÍNIO] sem valor');
+      expect(existsSync(join(saida2, 'index.html'))).toBe(true);
+      expect(existsSync(join(saida2, 'novidades', 'feed.xml'))).toBe(false);
+      expect(existsSync(join(saida2, 'sitemap.xml'))).toBe(false);
+      // Com o domínio, passa e grava o feed.
+      const saida3 = join(dir, 'site3');
+      const ok = rodar(['--final', '--dados', join(dir, 'cheios.json'), '--legal', legal, '--novidades', boa, '--referencia', REFERENCIA, '--saida', saida3]);
+      expect(ok.status, ok.stderr).toBe(0);
+      expect(existsSync(join(saida3, 'novidades', 'feed.xml'))).toBe(true);
+    } finally {
+      for (const p of pastas) rmSync(p, { recursive: true, force: true });
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 240_000);
 });
 
 

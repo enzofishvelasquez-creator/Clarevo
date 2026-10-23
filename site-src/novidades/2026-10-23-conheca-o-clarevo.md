@@ -25,7 +25,7 @@ O passeio completo, com telas da demonstração, está na página [O app](app/in
 
 ## O que o Clarevo não faz
 
-O Clarevo não é banco e não guarda o seu dinheiro. Não movimenta dinheiro, não oferece crédito e não recomenda produtos financeiros. Também não se conecta a contas bancárias: tudo o que aparece no app foi anotado ou importado por você.
+O Clarevo não é banco e não guarda o seu dinheiro. Não movimenta dinheiro, não oferece crédito e não recomenda produtos financeiros. Também não se conecta a contas bancárias: tudo o que aparece no app foi anotado ou importado por você ou pelas pessoas da sua Família.
 
 ## Onde usar
 

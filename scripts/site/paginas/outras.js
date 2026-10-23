@@ -39,7 +39,7 @@ function paginaSobre({ valores }) {
     bloco(
       `<h2 id="como">Como pensamos o produto</h2>
 <ul>
-<li>O app mostra o que você anotou ou importou. Ele não se conecta ao banco e não movimenta dinheiro.</li>
+<li>O app mostra o que você ou as pessoas da sua Família anotaram ou importaram. Ele não se conecta ao banco e não movimenta dinheiro.</li>
 <li>A privacidade vale no banco de dados, e não só na tela: quem pode ver cada dado é decidido a cada leitura.</li>
 <li>Uma empresa pode oferecer o Clarevo como benefício sem ver as finanças de ninguém. <a href="${u('empresas/index.html')}">Veja como</a>.</li>
 <li>Escrevemos de forma simples, com fonte e data, e corrigimos no próprio texto. <a href="${u('novidades/como-escrevemos.html')}">Veja como escrevemos</a>.</li>

@@ -12,7 +12,7 @@ Este documento é o mapa do site, o manual de quem edita e a lista do que ficou 
 | O app | `app/index.html` | Modelo em `paginas/app.js`. O "para que serve" de cada recurso é o do **guia de uso do app** (`packages/core/src/guide`), e cada recurso tem a captura da demonstração com a legenda "Dados fictícios de demonstração". Web hoje, lojas "em breve", sem selos |
 | Para empresas | `empresas/index.html` | Modelo em `paginas/empresas.js`, conferido em `packages/core/src/company.ts`, `docs/13` e `docs/legal`. Só o que a empresa vê de fato: e-mails convidados, situação dos convites e licenças, datas e contagens. Sem preço (P-005), sem cliente nem número inventado |
 | Aprender | `aprender/index.html`, `aprender/<tema>.html`, `aprender/agenda.html` | **Catálogo do app** (`packages/core/src/learn`): um tema publicado e não legado das seções `organizar`, `juros` e `tempo` por página (30 hoje), com o texto, o exemplo calculado, as hipóteses, os fatos e as fontes com a data de consulta, a data de revisão e os temas relacionados. A Agenda financeira vem do calendário de época (`learn/epoca.ts`) |
-| Novidades | `novidades/index.html`, `novidades/AAAA-MM-DD-slug.html`, `novidades/feed.xml`, `novidades/como-escrevemos.html` | Posts em `site-src/novidades/*.md`; regras editoriais em `site-src/paginas/como-escrevemos.md` |
+| Novidades | `novidades/index.html`, `novidades/AAAA-MM-DD-slug.html`, `novidades/feed.xml` (só com domínio), `novidades/como-escrevemos.html` | Posts em `site-src/novidades/*.md`; regras editoriais em `site-src/paginas/como-escrevemos.md` |
 | Ajuda | `ajuda/index.html`, `ajuda/<tema>.html` (7 temas), `ajuda/indice.json`, `ajuda/busca.js` | Perguntas do suporte (`site-src/ajuda/perguntas.md`), seções "Usar o Clarevo" e "Dúvidas frequentes" do catálogo e o guia de uso do app. O mapa de qual resposta vai em qual tema fica em `paginas/ajuda.js` (`TEMAS`) |
 | Segurança e privacidade | `seguranca.html` | Modelo em `paginas/seguranca.js`, coerente com `docs/legal/politica-de-privacidade.md` |
 | Sobre | `sobre.html` | Modelo em `paginas/outras.js`. Sem nome de pessoa, foto nem número de uso |
@@ -30,12 +30,13 @@ Todas as páginas têm o mesmo cabeçalho (logotipo oficial e menu, que no celul
 node scripts/gerar-site.js                 grava o site em site/
 node scripts/gerar-site.js --final         só grava se estiver pronto para publicar; senão sai com código 1 e lista o que falta
 node scripts/gerar-site.js --pdf pacote.pdf  também gera o "Pacote para revisão jurídica" (PDF A4)
+node scripts/gerar-site.js --referencia AAAA-MM-DD   data de referência dos posts (nenhum pode ter data depois dela; padrão: hoje, em Brasília)
 node scripts/gerar-og-site.js              refaz a imagem de compartilhamento (precisa do Chromium do Playwright)
 ```
 
-`--final` recusa: marcador de dado sem valor, `[A DEFINIR`, `[PROPOSTA`, a frase de rascunho, texto de proposta, travessão, a expressão proibida pela orientação do projeto, título fora de ordem e link interno quebrado. Com os dados atuais (todos os campos de `site/dados-da-empresa.json` vazios e os textos jurídicos ainda em rascunho), ele falha, e é o que se espera até a revisão do advogado.
+`--final` recusa: marcador de dado sem valor, `[A DEFINIR`, `[PROPOSTA`, a frase de rascunho, texto de proposta, travessão, a expressão proibida pela orientação do projeto, título fora de ordem e link interno quebrado. Também recusa, em Novidades, o post sem fontes, com data que não existe ou depois da data de referência (`--referencia`, padrão hoje) e com `{{tema:...}}` ou `tema:` que não existe no catálogo (sem `--final`, cada um é um aviso no console, e o parágrafo de um `{{tema:...}}` que falta fica na página, destacado, em vez de sumir). E exige o **domínio preenchido** de propósito (`DOMÍNIO`, algo como `clarevo.com.br`), mesmo que a política deixe de citar `[DOMÍNIO]`. Com os dados atuais (todos os campos de `site/dados-da-empresa.json` vazios e os textos jurídicos ainda em rascunho), ele falha, e é o que se espera até a revisão do advogado.
 
-**Marcadores.** `site/dados-da-empresa.json` é a entrada: `RAZÃO SOCIAL`, `CNPJ`, `ENDEREÇO`, `E-MAIL DE PRIVACIDADE`, `E-MAIL DE SUPORTE`, `E-MAIL DE CONTATO` (novo, usado em Sobre, Para empresas e Como escrevemos), `DOMÍNIO` e `DATA DE VIGÊNCIA`. Valor vazio mantém o marcador destacado e a faixa de versão preliminar. **Com o domínio preenchido**, o site passa a ter `sitemap.xml`, `<link rel="canonical">`, `og:url` e `og:image` com endereço completo e o feed com links completos; sem domínio, nada disso existe. `robots.txt` pede para não indexar nada enquanto houver marcador pendente.
+**Marcadores.** `site/dados-da-empresa.json` é a entrada: `RAZÃO SOCIAL`, `CNPJ`, `ENDEREÇO`, `E-MAIL DE PRIVACIDADE`, `E-MAIL DE SUPORTE`, `E-MAIL DE CONTATO` (novo, usado em Sobre, Para empresas e Como escrevemos), `DOMÍNIO` e `DATA DE VIGÊNCIA`. Valor vazio mantém o marcador destacado e a faixa de versão preliminar. **Com o domínio preenchido**, o site passa a ter `sitemap.xml`, `<link rel="canonical">`, `og:url` e `og:image` com endereço completo e o feed `novidades/feed.xml` (RSS) com links completos; sem domínio, nada disso existe, nem o feed nem o botão e o link que apontam para ele, porque um feed precisa de endereços completos. `robots.txt` pede para não indexar nada enquanto houver marcador pendente.
 
 ### Como o TypeScript do core roda no Node, sem pacote novo
 
@@ -43,7 +44,7 @@ Aprender e a Ajuda leem o catálogo e o guia do `packages/core`, que são TypeSc
 
 ### Capturas de tela
 
-As capturas vêm da **demonstração** (dados fictícios): sete de `docs/lojas/capturas/apple-iphone-6-3pol-1206x2622/` e sete de `docs/telas/`. A lista, com o texto alternativo de cada uma, está em `scripts/site/imagens.js`. O gerador lê o original, reduz por média de área para 480 px (o painel da empresa, 960 px), reduz para até 256 cores sem pontilhado (as telas do app têm poucas cores de verdade) e grava PNG em `site/imagens/`. Cada imagem declara largura e altura na página. Resultado: 14 imagens com 28 a 95 KB cada (0,66 MB no total) e o site inteiro, com as 55 páginas, as fontes e o feed, com 1,58 MB. Uma cópia de cada resultado fica no cache `clarevo-site-imagens` da pasta temporária do sistema, e o teste compara os pixels, não os bytes, porque o zlib de cada versão do Node pode gerar bytes diferentes para o mesmo desenho.
+As capturas vêm da **demonstração** (dados fictícios): sete de `docs/lojas/capturas/apple-iphone-6-3pol-1206x2622/` e seis de `docs/telas/`. Os lembretes não têm captura: são do app para celular, e a única tela que existe, a da web, só avisa que eles não existem lá, então a página O app descreve o recurso só com texto. A lista, com o texto alternativo de cada uma, está em `scripts/site/imagens.js`. O gerador lê o original, reduz por média de área para 480 px (o painel da empresa, 960 px), reduz para até 256 cores sem pontilhado (as telas do app têm poucas cores de verdade) e grava PNG em `site/imagens/`. Cada imagem declara largura e altura na página. Resultado: 13 imagens com 28 a 95 KB cada (0,63 MB no total) e o site inteiro, com as 55 páginas e as fontes, com 1,53 MB. Uma cópia de cada resultado fica no cache `clarevo-site-imagens` da pasta temporária do sistema, e a chave dele junta os bytes do original, a largura e o resumo do código de `png.js` e de `imagens.js`: mudar o método invalida o cache sozinho. O teste compara os pixels, não os bytes, porque o zlib de cada versão do Node pode gerar bytes diferentes para o mesmo desenho.
 
 Toda captura mostra "Dados fictícios de demonstração" na legenda. Quando uma tela do app mudar, é preciso refazer a captura do app (`npm run test:web` regrava `docs/telas`; `scripts/capturas-lojas.js` regrava as das lojas) e rodar o gerador.
 
@@ -72,13 +73,13 @@ fontes:
 O corpo, em Markdown. Use ## para as seções (o título da página já é o h1).
 ```
 
-- **Data**: a do nome do arquivo e a do cabeçalho precisam ser a mesma, e a data é a de publicação.
+- **Data**: a do nome do arquivo e a do cabeçalho precisam ser a mesma, existir no calendário e não ser depois da data de referência (hoje, ou a de `--referencia`); a data é a de publicação. Um arquivo `.md` com nome fora do padrão `AAAA-MM-DD-slug.md` também é recusado, para um texto nunca ficar de fora sem aviso.
 - **Fontes**: pelo menos uma. `tema: slug` traz sozinhas as fontes do tema do catálogo de Aprender; `Rótulo | página.html` liga a outra página do site (o caminho parte da raiz do site); `Rótulo | https://...` liga uma fonte externa (só `https`; e a política de segurança do site só aceita links de texto).
 - **Texto do catálogo sem copiar**: uma linha sozinha, como `{{tema:decimo-terceiro:short}}`, é trocada pelo texto do catálogo (`titulo`, `subtitulo`, `short`, `p1` a `p5`, `exemplo` e `hipoteses`). Assim a mesma frase nunca existe em dois lugares, e o texto do post acompanha a revisão do tema.
 - **Só fato que já existe**: sem notícia externa nova, sem preço, sem número de uso, sem depoimento, sem recomendar produto financeiro.
 - **Correção**: se um erro for achado, corrija no próprio texto e registre a correção nele (uma seção "Correção", com a data e o que mudou). Não apague o erro em silêncio.
 
-O gerador recusa o post sem título, data, resumo, autoria ou fontes, com data diferente da do nome e com `tema:` ou `{{tema:...}}` que não existe no catálogo. O índice, o feed (`novidades/feed.xml`) e o sitemap se atualizam sozinhos.
+O gerador recusa o post sem título, data, resumo, autoria ou fontes, com data inválida, futura ou diferente da do nome e com `tema:` ou `{{tema:...}}` que não existe no catálogo: sem `--final`, é um aviso no console, e o `--final` falha. O índice, o feed (`novidades/feed.xml`, só com domínio) e o sitemap se atualizam sozinhos.
 
 ## 4. Regras editoriais
 
@@ -117,15 +118,18 @@ Decisões da Claude, revisáveis por Enzo:
 1. Estrutura do gerador em módulos (`scripts/site/*.js`), conteúdo próprio em `site-src/` e `node scripts/gerar-site.js` como único comando.
 2. Aprender com uma página por tema publicado das seções `organizar`, `juros` e `tempo`; "Usar o Clarevo" e "Dúvidas frequentes" vão para a Ajuda, e o tema em rascunho (`apagar-dados`) fica de fora, como no app.
 3. A página de um tema não mostra o campo "onde na fonte" (`locator`) das fontes, como o app também não mostra, porque ele guarda anotações de método (por exemplo, "trecho de resultado de busca; a página não abriu"). Mostra o nome da fonte com link, a data de consulta e a numeração que os "fatos" citam.
-4. As fontes do tipo "decisões do projeto" (`D-021`) aparecem como "Clarevo: D-021, ... Decisões do projeto Clarevo, sem link", como no app.
+4. As fontes do tipo "decisões do projeto" (`D-021`) aparecem no site como "Regra do próprio Clarevo", sem os códigos, que são referências internas (o app mostra "Clarevo: D-021"). É igual em Aprender, nos posts e na Ajuda; um teste recusa qualquer `D-NNN` nas páginas.
 5. A Ajuda tem sete temas, e cada resposta do guia de uso, do catálogo e do suporte fica em um só tema; uma função nova do app sem tema faz o gerador falhar com a lista.
 6. O novo marcador `[E-MAIL DE CONTATO]` (Sobre, piloto de empresas e correções), a ser trocado junto com os outros quando houver e-mail próprio.
 7. A busca da Ajuda usa JavaScript do próprio site, e a política de segurança do `_headers` ganhou `script-src 'self'` e `connect-src 'self'`.
-8. Sem domínio, não há `canonical`, `og:url`, `og:image` nem sitemap, e o feed usa endereços relativos.
+8. Sem domínio, não há `canonical`, `og:url`, `og:image`, sitemap nem feed (nem o botão e o link para ele): um feed com endereços relativos seria inválido. O `--final` exige o domínio preenchido.
+9. O fim do benefício, no site, diz só o que o código garante: nada é apagado e o acesso pleno continua por 30 dias, contados do encerramento da licença ou do fim do contrato (`BENEFIT_GRACE_DAYS` e `end_license`). O que vale depois disso (o "plano gratuito") é `[A DEFINIR]` (P-005) nos termos e o site não o afirma.
+10. A empresa não vê "quando a pessoa abre o app nem o que ela anota", mas vê a data em que a pessoa aceitou o convite ("Ativa desde") e a do encerramento (inclusive quando a pessoa exclui a conta). O site diz isso, e não "não vê o que você faz no app".
+11. A página Segurança diz que o site não usa **cookies próprios** nem análise de acesso e que a hospedagem recebe o endereço da página e o IP, e traz uma linha sobre o componente do Google (ML Kit) na leitura de QR Code no Android, como nas seções 5 e 8 da política (que ainda tem `[A DEFINIR]` sobre isso).
 
 Pendências:
 
-- **Política de privacidade** (`docs/legal`): a seção 2 diz "[A DEFINIR: confirmar que o site não tem formulário nem rastreador]". O site tem agora um campo de busca (sem `<form>`, sem envio, só leitura de um arquivo do próprio site) e dados estruturados, e continua sem cookies, análise e recurso de terceiros. Vale o advogado ler esta seção com o site novo.
+- **Política de privacidade** (`docs/legal`): a seção 2 diz "[A DEFINIR: confirmar que o site não tem formulário nem rastreador]". O site tem agora um campo de busca (sem `<form>`, sem envio, só leitura de um arquivo do próprio site) e dados estruturados, e continua sem cookies próprios, análise de acesso e recurso de terceiros (a hospedagem recebe o endereço da página e o IP, como em qualquer site). Vale o advogado ler esta seção com o site novo.
 - A página Segurança e privacidade repete fatos da política (o que guardamos, o que não guardamos, quem vê). Quando a política mudar, atualize `scripts/site/paginas/seguranca.js` junto (a lista de mudanças de `docs/legal/LEIAME.md` vale também para ela).
 - Os dois e-mails e o domínio ainda não existem (P-006, P-008, P-023): os marcadores ficam visíveis e o `--final` falha até lá.
 - Nada disso foi publicado.

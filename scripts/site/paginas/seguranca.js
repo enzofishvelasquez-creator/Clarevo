@@ -18,7 +18,7 @@ function paginaSeguranca({ valores, img }) {
     bloco(
       `<h2 id="essencial">O essencial</h2>
 <ul class="nao-e">
-<li>Guardamos só o que você anota ou escolhe importar.</li>
+<li>Guardamos só o que você, ou as pessoas da sua Família, anotam ou escolhem importar.</li>
 <li>O Clarevo não se conecta ao seu banco e não pede senha bancária.</li>
 <li>Não guardamos número completo de cartão, código de segurança, validade, CPF de nota fiscal nem imagens de notas ou comprovantes.</li>
 <li>Se a sua empresa oferecer o Clarevo como benefício, ela nunca vê as suas finanças, nem somadas às de outras pessoas.</li>
@@ -29,7 +29,7 @@ function paginaSeguranca({ valores, img }) {
     ),
     bloco(
       `<h2 id="guardamos">O que guardamos</h2>
-<p class="lead-bloco">Tudo o que está na lista é digitado, importado ou confirmado por você. O Clarevo não busca esses dados em bancos.</p>
+<p class="lead-bloco">Tudo o que está na lista é digitado, importado ou confirmado por você ou pelas pessoas da sua Família. O Clarevo não busca esses dados em bancos.</p>
 <div class="grade">
 <article class="cartao">
 <h3>Cadastro e login</h3>
@@ -77,7 +77,8 @@ function paginaSeguranca({ valores, img }) {
 </ul>
 </div>
 </div>
-<p class="nota">A leitura de nota, de comprovante e de extrato acontece no seu aparelho: o Clarevo não tem servidor que receba esses arquivos. O app só preenche o formulário, e nada é gravado sem você tocar em "Salvar".</p>`,
+<p class="nota">A leitura de nota, de comprovante e de extrato acontece no seu aparelho: o Clarevo não tem servidor que receba esses arquivos. O app só preenche o formulário, e nada é gravado sem você tocar em "Salvar".</p>
+<p class="nota">No Android, a leitura do QR Code usa um componente do Google (ML Kit) incluído no app. A imagem é lida no aparelho, mas o componente pode enviar ao Google dados técnicos de uso e do aparelho. Os detalhes estão nas seções 5 e 8 da <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>`,
       { rotulo: 'nao-guardamos' },
     ),
     bloco(
@@ -94,7 +95,7 @@ ${celular(img['quem-ve'], ARQUIVO)}
 </article>
 <article class="cartao">
 <h3>A sua empresa</h3>
-<p>Se ela oferecer o benefício, vê só os e-mails que convidou, a situação de cada licença, as datas e as contagens. Nunca vê valores, categorias, metas, contas, cartões, a Família de ninguém, nem números somados. <a href="${u('empresas/index.html')}">Veja Para empresas</a>.</p>
+<p>Se ela oferecer o benefício, vê só os e-mails que convidou, a situação de cada licença, as datas e as contagens. Nunca vê valores, categorias, metas, contas, cartões, a Família de ninguém, nem números somados, e também não vê quando você abre o app nem o que você anota. <a href="${u('empresas/index.html')}">Veja Para empresas</a>.</p>
 </article>
 <article class="cartao">
 <h3>A equipe do Clarevo</h3>
@@ -119,7 +120,7 @@ ${celular(img['quem-ve'], ARQUIVO)}
     ),
     bloco(
       `<h2 id="este-site">Este site</h2>
-<p>O site não usa cookies, não tem análise de acesso, não tem anúncios e não carrega fontes, imagens, scripts nem estilos de outros endereços. Os links para fontes oficiais em Aprender são só links de texto. A busca da Ajuda roda no seu navegador e não envia o que você digita. A hospedagem recebe os dados de acesso às páginas, como o IP, só para entregá-las.</p>`,
+<p>O site não usa cookies próprios, não tem análise de acesso, não tem anúncios e não carrega fontes, imagens, scripts nem estilos de outros endereços. Os links para fontes oficiais em Aprender são só links de texto. A busca da Ajuda roda no seu navegador e não envia o que você digita. Como em qualquer site, a hospedagem recebe o endereço da página que você abre e o seu IP. Os detalhes estão na <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>`,
       { variante: 'azul', rotulo: 'este-site' },
     ),
     bloco(

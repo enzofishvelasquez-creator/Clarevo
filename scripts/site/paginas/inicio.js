@@ -58,7 +58,7 @@ ${mini}
 <div class="grade">
 <article class="cartao">
 <h3>Para pessoas</h3>
-<p>Use o Clarevo para entender para onde o dinheiro do mês foi e o que ainda vai vencer. Tudo o que aparece no app foi anotado ou importado por você, e é você quem decide o que registrar.</p>
+<p>Use o Clarevo para entender para onde o dinheiro do mês foi e o que ainda vai vencer. Tudo o que aparece no app foi anotado ou importado por você ou pelas pessoas da sua Família. No seu Pessoal, só você anota e decide o que registrar.</p>
 <p>Dá para criar uma Família de até 6 pessoas, com convite por link, e sair ou encerrar quando quiser.</p>
 </article>
 <article class="cartao">
@@ -72,7 +72,7 @@ ${mini}
     bloco(
       `<div class="destaque">
 <h2 id="empresa-nao-ve">A empresa nunca vê suas finanças</h2>
-<p>Se a sua empresa oferece o Clarevo, ela vê os e-mails que convidou, a situação de cada convite ou licença (convite enviado, convite cancelado, ativa ou encerrada), as datas e as contagens de vagas e licenças. Nunca vê gastos, recebimentos, valores, categorias, metas, contas, cartões, a sua Família nem o que você faz no app, e também não vê números somados.</p>
+<p>Se a sua empresa oferece o Clarevo, ela vê os e-mails que convidou, a situação de cada convite ou licença (convite enviado, convite cancelado, ativa ou encerrada), as datas (como a em que você aceitou o convite e a de encerramento) e as contagens de vagas e licenças. Nunca vê gastos, recebimentos, valores, categorias, metas, contas, cartões, a sua Família nem números somados. Também não vê quando você abre o app nem o que você anota.</p>
 <p>Se o benefício terminar, sua conta e seu histórico não são apagados.</p>
 <p><a href="${u('empresas/index.html')}">Para empresas</a> · <a href="${u('seguranca.html')}">Segurança e privacidade</a></p>
 </div>`,
@@ -93,7 +93,7 @@ ${mini}
     bloco(
       `<h2 id="mais">Aprender, ficar por dentro e tirar dúvidas</h2>
 <div class="grade">
-<a class="cartao" href="${u('aprender/index.html')}"><span class="titulo-cartao">Aprender</span><p>${temas} temas de educação financeira, cada um com exemplo calculado, fontes e data de revisão.</p></a>
+<a class="cartao" href="${u('aprender/index.html')}"><span class="titulo-cartao">Aprender</span><p>${temas} temas de educação financeira, cada um com fontes, data de revisão e, quando cabe, um exemplo calculado.</p></a>
 <a class="cartao" href="${u('novidades/index.html')}"><span class="titulo-cartao">Novidades</span><p>Textos curtos da Equipe Clarevo, com fonte e data, e as regras de como escrevemos.</p></a>
 <a class="cartao" href="${u('ajuda/index.html')}"><span class="titulo-cartao">Ajuda</span><p>Respostas por tema e busca no próprio navegador, sem enviar o que você digita.</p></a>
 <a class="cartao" href="${u('seguranca.html')}"><span class="titulo-cartao">Segurança e privacidade</span><p>O que guardamos, o que não guardamos e quem vê o quê, em linguagem simples.</p></a>
@@ -104,7 +104,7 @@ ${mini}
       `<h2 id="dados">Seus dados</h2>
 <p>Sem anúncios, sem venda de dados e sem rastreamento para publicidade. A conexão é protegida. Você exclui a sua conta e os seus dados quando quiser, dentro do app, em Conta. Se não conseguir entrar no app, peça pela página <a href="${u('excluir-conta.html')}">Excluir conta</a>. Os detalhes estão na <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>
 <h2 id="contato">Contato</h2>
-<p>Dúvidas, pedidos e contato de empresas: [E-MAIL DE SUPORTE]. Veja também a página de <a href="${u('suporte.html')}">Suporte</a>.</p>`,
+<p>Para falar com a equipe, inclusive sobre o benefício para empresas: [E-MAIL DE CONTATO]. Para ajuda com o app, veja a <a href="${u('ajuda/index.html')}">Ajuda</a> e a página de <a href="${u('suporte.html')}">Suporte</a>.</p>`,
       { variante: 'alt', rotulo: 'dados' },
     ),
   ];

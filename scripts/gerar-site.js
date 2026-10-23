@@ -9,10 +9,12 @@
  * `site-src/` (estilo, posts de Novidades, perguntas da Ajuda, texto de "Como escrevemos" e a imagem de compartilhamento).
  *
  * O que sai em `site/`:
- *   index.html, app/, empresas/, aprender/ (um tema por página, vindo do catálogo do app), novidades/ (posts e feed.xml), ajuda/
+ *   index.html, app/, empresas/, aprender/ (um tema por página, vindo do catálogo do app), novidades/ (posts e, só com domínio, feed.xml), ajuda/
  *   (por tema, com indice.json e busca.js), seguranca.html, sobre.html, suporte.html, 404.html
  *   privacidade.html, termos.html, excluir-conta.html   convertidos de `docs/legal/*.md`
  *   estilo.css, _headers, robots.txt, sitemap.xml (só com domínio), imagens/, og/, fontes/, marca/, favicon.svg
+ * Com `[DOMÍNIO]` preenchido o site ganha também `canonical`, `og:url`, `sitemap.xml` e o feed `novidades/feed.xml` (um feed precisa de endereços
+ * completos, então sem domínio ele não é gerado e as páginas não apontam para ele).
  * `site/dados-da-empresa.json` é a ENTRADA (não é gerada): os valores que trocam os marcadores `[RAZÃO SOCIAL]`, `[CNPJ]`, `[ENDEREÇO]`,
  * `[E-MAIL DE PRIVACIDADE]`, `[E-MAIL DE SUPORTE]`, `[E-MAIL DE CONTATO]`, `[DOMÍNIO]` e `[DATA DE VIGÊNCIA]`. Valor vazio mantém o
  * marcador visível e destacado, e a página ganha no topo a faixa "Versão preliminar, em revisão" (o mesmo vale para `[A DEFINIR: ...]`,
@@ -27,11 +29,15 @@
  *   node scripts/gerar-site.js --final         só grava se estiver pronto para publicar; senão sai com código 1 e lista o que falta: marcador sem
  *                                              valor, `[A DEFINIR`, `[PROPOSTA`, a frase "Rascunho preparado ... Não é parecer jurídico.", texto de
  *                                              proposta ("Proposta:", "proposta, ainda sem confirmação"), travessão, a expressão proibida pela
- *                                              orientação do projeto, título fora de ordem e link interno quebrado. Sem `--final`, tudo isso
- *                                              continua só como aviso
+ *                                              orientação do projeto, título fora de ordem, link interno quebrado, post de Novidades sem
+ *                                              fontes, com data inválida ou futura (em relação a `--referencia`) ou com `{{tema:...}}` que não
+ *                                              existe no catálogo, e o domínio sem valor (exigido de propósito, mesmo que nenhum texto cite
+ *                                              `[DOMÍNIO]`). Sem `--final`, tudo isso continua só como aviso no console
  *   node scripts/gerar-site.js --pdf <arquivo> também gera, com o Chromium do Playwright, o PDF A4 "Pacote para revisão jurídica" (resumo
  *                                              para o advogado, privacidade, termos, exclusão de conta e pontos do contrato com
  *                                              empresas, nesta ordem, com os marcadores visíveis). O PDF não vai para o repositório.
+ *   --referencia <AAAA-MM-DD>  data de referência dos posts de Novidades: nenhum pode ter data depois dela (padrão: hoje, em Brasília)
+ *   --novidades <pasta>  lê os posts de outra pasta (padrão: site-src/novidades)
  *   --legal <pasta>   lê os Markdown de outra pasta (padrão: docs/legal)
  *   --saida <pasta>   grava o site em outra pasta (padrão: site)
  *   --dados <arquivo> lê os valores dos marcadores de outro JSON (padrão: site/dados-da-empresa.json)
@@ -124,8 +130,10 @@ async function principal(argv) {
   const destino = path.resolve(opcao('--saida') || SITE);
   const pdf = opcao('--pdf');
   const arquivoDados = opcao('--dados');
+  const referencia = opcao('--referencia');
+  const novidades = opcao('--novidades');
 
-  const resultado = gerarSite({ legal, arquivoDados: arquivoDados ? path.resolve(arquivoDados) : undefined });
+  const resultado = gerarSite({ legal, arquivoDados: arquivoDados ? path.resolve(arquivoDados) : undefined, referencia: referencia || undefined, novidades: novidades ? path.resolve(novidades) : undefined });
   for (const aviso of resultado.avisos) console.warn(`aviso: ${aviso}`);
 
   const faltas = [];
@@ -145,7 +153,7 @@ async function principal(argv) {
       console.error(`Ainda no texto (${problemas.length}):`);
       for (const q of problemas) console.error(`  ${q}`);
     }
-    console.error('Preencha site/dados-da-empresa.json, resolva os trechos [A DEFINIR] e [PROPOSTA] e tire as frases de rascunho de docs/legal, e rode de novo.');
+    console.error('Preencha site/dados-da-empresa.json (inclusive o domínio), resolva os trechos [A DEFINIR] e [PROPOSTA], tire as frases de rascunho de docs/legal e corrija os posts de Novidades, e rode de novo.');
     process.exitCode = 1;
     return;
   }
@@ -155,6 +163,7 @@ async function principal(argv) {
   const bytes = [...resultado.arquivos.values()].reduce((n, c) => n + Buffer.byteLength(c), 0);
   console.log(`site gravado em ${path.relative(RAIZ, destino) || destino}: ${resultado.arquivos.size} arquivos (${paginas} páginas, ${(bytes / 1024 / 1024).toFixed(2)} MB), ${mudou} mudaram${apagados ? `, ${apagados} sobra(s) apagada(s)` : ''}`);
   if (faltas.length > 0) console.log(`versão preliminar: ${faltas.length} marcador(es) ainda sem valor (a faixa "Versão preliminar, em revisão" aparece nas páginas)`);
+  else if (problemas.length > 0) console.log(`nenhum marcador pendente, mas o --final ainda recusaria ${problemas.length} ponto(s) (veja os avisos acima)`);
   else console.log('nenhum marcador pendente: pronto para o --final');
 
   if (pdf) {

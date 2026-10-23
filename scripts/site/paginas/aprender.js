@@ -15,6 +15,12 @@ const SECOES_DO_SITE = ['organizar', 'juros', 'tempo'];
 
 const arquivoDoTema = (slug) => `aprender/${slug}.html`;
 
+/**
+ * Como o site mostra uma fonte do tipo `clarevo` do catálogo ("Clarevo: D-011, D-053"): os códigos são referências internas do projeto e
+ * não aparecem no site público. Fica só o rótulo, igual em Aprender, nos posts e na Ajuda.
+ */
+const REGRA_DO_CLAREVO = 'Regra do próprio Clarevo';
+
 /** Um tema do catálogo cabe no site? Publicado, não legado e de uma das três seções. */
 const temasDoSite = () => catalogo().publicados.filter((t) => SECOES_DO_SITE.includes(t.section));
 
@@ -33,7 +39,7 @@ function fonteHtml(s, idDoItem) {
     return `<li${idAttr}><a href="${esc(s.url)}" rel="noopener noreferrer">${linha}</a>${meta.length ? `<span class="fonte-meta">${esc(meta.join(' · '))}</span>` : ''}</li>`;
   }
   if (s.kind === 'obra') return `<li${idAttr}>${linha}${s.consultedOn ? `<span class="fonte-meta">${esc(c.TEXTO.consultedOn(s.consultedOn))}</span>` : ''}</li>`;
-  return `<li${idAttr}>${linha}<span class="fonte-meta">Decisões do projeto Clarevo, sem link</span></li>`;
+  return `<li${idAttr}>${esc(REGRA_DO_CLAREVO)}<span class="fonte-meta">Sem link: é uma regra de como o app funciona</span></li>`;
 }
 
 /** As fontes de um tema (lista numerada na ordem do catálogo, que é a que os "fatos" citam). */
@@ -64,7 +70,7 @@ ${temas.map((t) => cartaoDoTema(arquivo, t)).join('\n')}
     { rotulo: null },
   );
   const capa = `<h1>Aprender</h1>
-<p class="lead">Educação financeira em textos curtos, com exemplo calculado, fonte e data de revisão. É o conteúdo que está no app. O site não registra o que você lê.</p>
+<p class="lead">Educação financeira em textos curtos, com fonte, data de revisão e exemplos calculados quando cabem. É o conteúdo que está no app, que não registra o que você lê. Este site não usa cookies próprios nem análise de acesso.</p>
 <div class="acoes">
 <a class="botao botao-principal" href="${rel(arquivo, 'aprender/agenda.html')}">Agenda financeira</a>
 <a class="botao botao-suave" href="${rel(arquivo, 'novidades/como-escrevemos.html')}">Como escrevemos</a>
@@ -72,7 +78,7 @@ ${temas.map((t) => cartaoDoTema(arquivo, t)).join('\n')}
   const pg = montarPagina({
     arquivo,
     titulo: 'Aprender',
-    descricao: 'Educação financeira em textos curtos: organizar o mês, juros e crédito, inflação e Selic, cada tema com exemplo calculado, fontes e data de revisão.',
+    descricao: 'Educação financeira em textos curtos: organizar o mês, juros e crédito, inflação e Selic, cada tema com fontes, data de revisão e exemplos calculados quando cabem.',
     capa,
     corpo: [...secoes, rodape].join('\n'),
     fonte: capa,
@@ -211,4 +217,4 @@ function paginasAprender(ctx) {
   return [paginaIndice(ctx), paginaAgenda(ctx), ...temasDoSite().map((t) => paginaDoTema(t, ctx))];
 }
 
-module.exports = { paginasAprender, temasDoSite, arquivoDoTema, fontesHtml, fonteHtml, SECOES_DO_SITE };
+module.exports = { paginasAprender, temasDoSite, arquivoDoTema, fontesHtml, fonteHtml, SECOES_DO_SITE, REGRA_DO_CLAREVO };

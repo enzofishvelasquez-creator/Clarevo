@@ -35,14 +35,14 @@ A Família reúne até 6 pessoas. Quem cria é a pessoa titular e convida as out
 - tema: beneficio
 - id: ativar
 
-A empresa envia um link de convite, de uso único. Abra o link, entre ou crie a sua conta e siga as instruções na tela. Se o benefício terminar, você mantém o acesso completo por 30 dias e depois passa para o plano gratuito, com leitura do histórico. Nada é apagado. Veja também [Para empresas](empresas/index.html).
+A empresa envia um link de convite, de uso único. Abra o link, entre ou crie a sua conta e siga as instruções na tela. Se o benefício terminar, você mantém a conta, o histórico e a Família, e o acesso pleno continua por 30 dias. O que vale depois desses 30 dias ainda não está definido. Nada é apagado. Veja também [Para empresas](empresas/index.html).
 
 ## O que a minha empresa vê?
 
 - tema: beneficio
 - id: empresa-ve
 
-Os e-mails que ela convidou, a situação de cada convite ou licença (convite enviado, convite cancelado, ativa ou encerrada), as datas e as contagens de vagas e licenças. A empresa nunca vê gastos, recebimentos, valores, categorias, metas, contas, cartões, Família nem números somados, e também não vê o que você faz no app.
+Os e-mails que ela convidou, a situação de cada convite ou licença (convite enviado, convite cancelado, ativa ou encerrada), as datas (como a em que você aceitou o convite e a de encerramento) e as contagens de vagas e licenças. A empresa nunca vê gastos, recebimentos, valores, categorias, metas, contas, cartões, Família nem números somados. Também não vê quando você abre o app nem o que você anota.
 
 ## Onde ficam os meus dados?
 
@@ -56,4 +56,4 @@ Em um serviço de banco de dados e de autenticação, com conexão protegida e r
 - tema: comecar
 - id: banco
 
-Não. Tudo o que aparece no app foi anotado por você ou importado de um arquivo de extrato ou de fatura (OFX ou CSV) que você escolhe e confere linha por linha antes de gravar.
+Não. Tudo o que aparece no app foi anotado por você ou pelas pessoas da sua Família, ou importado de um arquivo de extrato ou de fatura (OFX ou CSV) que a pessoa escolhe e confere linha por linha antes de gravar.

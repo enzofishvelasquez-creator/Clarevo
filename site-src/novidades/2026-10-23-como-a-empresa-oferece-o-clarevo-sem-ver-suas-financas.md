@@ -15,7 +15,7 @@ Uma empresa pode oferecer o Clarevo como benefício a quem trabalha nela. Neste 
 
 - os e-mails que ela mesma convidou;
 - a situação de cada convite ou licença: convite enviado, convite cancelado, ativa ou encerrada;
-- as datas dessas situações;
+- as datas dessas situações: a do convite, a de quando a pessoa aceitou e a do encerramento;
 - as contagens de vagas contratadas, convites pendentes, licenças ativas e encerradas;
 - os dados do contrato: plano, vagas, início e fim.
 
@@ -24,7 +24,7 @@ Uma empresa pode oferecer o Clarevo como benefício a quem trabalha nela. Neste 
 - gastos, recebimentos, valores, categorias, metas, contas a pagar e cartões;
 - a Família da pessoa;
 - números somados de finanças, nem os de várias pessoas juntas;
-- quando ou como a pessoa usa o app.
+- quando a pessoa abre o app e o que ela anota nele: o painel mostra só a data em que ela aceitou o convite e a do encerramento.
 
 {{tema:empresa-ve:p1}}
 
@@ -34,7 +34,7 @@ A equipe do Clarevo cadastra a empresa, o contrato e a primeira pessoa administr
 
 ## Quando o benefício termina
 
-Nada é apagado. A pessoa mantém a conta, o histórico e a Família, e o acesso pleno continua por 30 dias. Se a pessoa excluir a própria conta, a licença termina na hora e a empresa vê só que ela terminou.
+Nada é apagado. A pessoa mantém a conta, o histórico e a Família, e o acesso pleno continua por 30 dias, contados do encerramento da licença ou do fim do contrato. O que vale depois desses 30 dias ainda não está definido. Se a pessoa excluir a própria conta, a licença termina na hora e a empresa a vê como encerrada, com a data.
 
 ## Para saber mais
 

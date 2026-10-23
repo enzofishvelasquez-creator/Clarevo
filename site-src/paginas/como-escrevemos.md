@@ -25,7 +25,7 @@ Não indicamos banco, corretora, cartão, investimento nem crédito. O conteúdo
 
 ## Não há publicidade
 
-Não vendemos espaço, não publicamos conteúdo patrocinado e não ganhamos nada por citar uma empresa ou um produto. Os links para fontes são só links de texto para páginas públicas, e o site não usa cookies nem análise de acesso.
+Não vendemos espaço, não publicamos conteúdo patrocinado e não ganhamos nada por citar uma empresa ou um produto. Os links para fontes são só links de texto para páginas públicas, e o site não usa cookies próprios nem análise de acesso.
 
 ## Corrigimos no próprio texto
 

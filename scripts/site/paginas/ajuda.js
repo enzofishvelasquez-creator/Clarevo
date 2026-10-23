@@ -12,7 +12,7 @@ const { montarPagina, colunaTexto, bloco } = require('../modelo');
 const { catalogo } = require('../catalogo');
 const { lerPerguntas } = require('../conteudo');
 const { SITE_SRC } = require('../config');
-const { arquivoDoTema, SECOES_DO_SITE } = require('./aprender');
+const { arquivoDoTema, SECOES_DO_SITE, REGRA_DO_CLAREVO } = require('./aprender');
 
 /**
  * Os temas da Ajuda e o que vai em cada um. `guias`: ids do guia de uso do app; `topicos`: slugs do catálogo (seções "usar" e "dúvidas").
@@ -114,6 +114,34 @@ function destinoDoTopico(slug, deArquivo) {
   return tema ? { href: rel(deArquivo, `${arquivoDoTemaDaAjuda(tema.id)}#tema-${slug}`), titulo: t.title } : null;
 }
 
+/**
+ * O corpo de uma resposta que vem do catálogo, com tudo o que o app mostra no tema: resumo, parágrafos, exemplo com "Ver a conta",
+ * hipóteses (também quando não há exemplo), os números e regras citados e a fonte. A fonte do tipo `clarevo` aparece só como
+ * "Regra do próprio Clarevo", sem os códigos internos, como em Aprender.
+ */
+function htmlDoTopico(topico, rels) {
+  const c = catalogo();
+  const linhasDaConta = topico.calculation ? topico.calculation.split(' · ').map((l) => l.trim()).filter(Boolean) : [];
+  const conta = linhasDaConta.length
+    ? `\n<details class="conta"><summary>${esc(c.TEXTO.showCalculation)}</summary><ol>${linhasDaConta.map((l) => `<li>${esc(l)}</li>`).join('')}</ol></details>`
+    : '';
+  const hipoteses = topico.hypotheses ? `<p class="nota"><strong>${esc(c.TEXTO.hypotheses)}.</strong> ${esc(topico.hypotheses)}</p>` : '';
+  const exemplo = topico.example
+    ? `<div class="exemplo"><p><strong>${esc(c.TEXTO.example)}.</strong> ${esc(topico.example)}</p>${conta}${hipoteses ? `\n${hipoteses}` : ''}</div>`
+    : hipoteses || conta
+      ? `<div class="exemplo">${hipoteses}${conta}</div>`
+      : '';
+  const fatos = topico.facts.length ? `<p class="pequeno"><strong>Números e regras citados:</strong> ${topico.facts.map((f) => esc(f.text)).join('; ')}.</p>` : '';
+  const fontes = [...new Set(topico.sources.map((f) => (f.kind === 'clarevo' ? REGRA_DO_CLAREVO : c.TEXTO.sourceLine(f))))];
+  const fonte = `${esc(c.TEXTO.reviewedOn(topico.reviewedOn))}. ${fontes.length === 1 ? 'Fonte' : 'Fontes'}: ${esc(fontes.join('; '))}.`;
+  return `<p class="resposta-curta">${esc(topico.short)}</p>
+${topico.paragraphs.map((p) => `<p>${esc(p)}</p>`).join('\n')}
+${exemplo}
+${fatos}
+${rels.length ? `<p class="pequeno">Veja também: ${rels.map((r) => `<a href="${r.href}">${esc(r.titulo)}</a>`).join(', ')}.</p>` : ''}
+<p class="revisao">${fonte}</p>`;
+}
+
 /** Todas as respostas da Ajuda, por tema: `{ id, grupo, pergunta, html, texto, palavras }`. */
 function montarRespostas(valores) {
   const c = catalogo();
@@ -132,12 +160,7 @@ function montarRespostas(valores) {
       const topico = c.tema(slug);
       if (!topico) continue;
       const rels = c.relacionados(slug).map((r) => destinoDoTopico(r.slug, arquivo)).filter(Boolean);
-      const exemplo = topico.example ? `<div class="exemplo"><p><strong>${esc(c.TEXTO.example)}.</strong> ${esc(topico.example)}</p>${topico.hypotheses ? `<p class="nota">${esc(c.TEXTO.hypotheses)}: ${esc(topico.hypotheses)}</p>` : ''}</div>` : '';
-      const html = `<p class="resposta-curta">${esc(topico.short)}</p>
-${topico.paragraphs.map((p) => `<p>${esc(p)}</p>`).join('\n')}
-${exemplo}
-${rels.length ? `<p class="pequeno">Veja também: ${rels.map((r) => `<a href="${r.href}">${esc(r.titulo)}</a>`).join(', ')}.</p>` : ''}
-<p class="revisao">${esc(c.TEXTO.reviewedOn(topico.reviewedOn))}.</p>`;
+      const html = htmlDoTopico(topico, rels);
       porTema.get(t.id).push({ id: `tema-${slug}`, grupo: 'rapidas', pergunta: topico.title, html, palavras: topico.keywords.join(' ') });
     }
     for (const id of t.guias) {

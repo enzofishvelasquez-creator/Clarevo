@@ -111,16 +111,16 @@ const RECURSOS = [
     guia: ['aprender', 'calculadoras'],
     imagem: 'aprender',
     itens: [
-      'Explicações curtas, com exemplo calculado, fonte e data de revisão. O app não registra o que você lê nem o que busca.',
+      'Explicações curtas, com fonte, data de revisão e exemplos calculados quando cabem. O app não registra o que você lê nem o que busca.',
       'Calculadoras e simulador com os números que você digita, sem gravar nada.',
       'No site, os mesmos temas estão em Aprender.',
     ],
   },
 ];
 
-/** Recursos menores, com captura menor. */
+/** Recursos menores, com captura menor. Os lembretes não têm captura: são do app para celular, e a demonstração só existe no navegador, onde a tela mostra apenas o aviso de que eles não existem. */
 const MAIS = [
-  { id: 'lembretes', titulo: 'Lembretes', guia: 'lembretes', imagem: 'lembretes', texto: 'Um aviso no dia anterior ao vencimento de cada conta, no app para celular. Na tela bloqueada, o aviso não mostra valor nem descrição.' },
+  { id: 'lembretes', titulo: 'Lembretes', guia: 'lembretes', imagem: null, texto: 'Um aviso no dia anterior ao vencimento de cada conta, no app para celular. Na tela bloqueada, o aviso não mostra valor nem descrição.' },
   { id: 'quem-ve', titulo: 'Quem vê estes dados', guia: 'quem-ve', imagem: 'quem-ve', texto: 'Uma tela no próprio app mostra quem tem acesso aos registros: no Pessoal, só você, entre as pessoas do app.' },
   { id: 'beneficio', titulo: 'Benefício pela empresa', guia: 'beneficio-da-empresa', imagem: 'beneficio', texto: 'Quem recebe o convite da empresa aceita pelo link. O app mostra a empresa, o plano e desde quando vale.' },
 ];
@@ -155,10 +155,10 @@ ${celular(img[r.imagem], ARQUIVO)}
   const mais = MAIS.map((m) => {
     const e = guia(m.guia);
     if (!e) throw new Error(`o guia do core não tem a entrada "${m.guia}" (página O app)`);
-    return `<article class="cartao">
+    return `<article class="cartao${m.imagem ? '' : ' sem-captura'}">
 <h3>${esc(m.titulo)}</h3>
 <p>${esc(m.texto)}</p>
-${celular(img[m.imagem], ARQUIVO)}
+${m.imagem ? celular(img[m.imagem], ARQUIVO) : ''}
 <p class="pequeno"><a href="${u(`ajuda/${require('./ajuda').temaDoGuia(m.guia)}.html#guia-${m.guia}`)}">Como usar</a></p>
 </article>`;
   }).join('\n');
@@ -192,7 +192,7 @@ ${celular(img[m.imagem], ARQUIVO)}
     ),
     bloco(
       `<h2 id="recursos">Os recursos</h2>
-<p class="lead-bloco">Cada texto vem do guia de uso do próprio app. A legenda de cada tela lembra que os dados são de demonstração.</p>
+<p class="lead-bloco">A explicação de abertura de cada recurso é a do guia de uso do próprio app, e os pontos abaixo dela resumem o que ele faz hoje. A legenda de cada tela lembra que os dados são de demonstração.</p>
 <div class="recursos">
 ${linhas}
 </div>`,
@@ -208,7 +208,7 @@ ${mais}
     bloco(
       `<h2 id="nao-faz">O que o app não faz</h2>
 <ul class="nao-e">
-<li>Não se conecta ao seu banco: tudo o que aparece foi anotado ou importado por você.</li>
+<li>Não se conecta ao seu banco: tudo o que aparece foi anotado ou importado por você ou pelas pessoas da sua Família.</li>
 <li>Não movimenta dinheiro, não oferece crédito e não recomenda produtos financeiros.</li>
 <li>Não guarda o número completo do cartão, o código de segurança, a validade nem o CPF da nota.</li>
 </ul>

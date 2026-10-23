@@ -2,8 +2,9 @@
 /**
  * Capturas do site: telas da DEMONSTRAÇÃO do app (dados fictícios), vindas de `docs/lojas/capturas/` e de `docs/telas/`, reduzidas
  * para a largura que a página usa e gravadas em `site/imagens/` (PNG, sem pacote: `png.js`). O gerador lê o original e nunca o
- * altera. O resultado de cada imagem fica em um cache da pasta temporária (chave: bytes do original, largura e versão do método),
- * então rodar o gerador de novo é rápido. Cada imagem declara largura e altura na página, para a página não pular ao carregar.
+ * altera. O resultado de cada imagem fica em um cache da pasta temporária. A chave junta os bytes do original, a largura e o resumo do
+ * código que reduz e grava a imagem (`png.js` e este arquivo): qualquer mudança no método invalida o cache sozinha, e rodar o gerador
+ * de novo, sem mudança, é rápido. Cada imagem declara largura e altura na página, para a página não pular ao carregar.
  *
  * Todas as legendas dizem "Dados fictícios de demonstração" (`LEGENDA_DEMO`).
  */
@@ -14,7 +15,15 @@ const path = require('node:path');
 const { RAIZ } = require('./config');
 const png = require('./png');
 
-const VERSAO_DO_METODO = 3;
+/** Resumo do código que decide o resultado de cada imagem (o método de `png.js` e a lista de larguras deste arquivo). */
+const RESUMO_DO_CODIGO = crypto
+  .createHash('sha1')
+  .update(fs.readFileSync(path.join(__dirname, 'png.js')))
+  .update('|')
+  .update(fs.readFileSync(__filename))
+  .digest('hex')
+  .slice(0, 12);
+
 const LEGENDA_DEMO = 'Dados fictícios de demonstração';
 const LOJA = 'docs/lojas/capturas/apple-iphone-6-3pol-1206x2622';
 const TELAS = 'docs/telas';
@@ -33,7 +42,6 @@ const IMAGENS = [
   { id: 'aprender', origem: `${LOJA}/08_aprender.png`, largura: LARGURA_CELULAR, alt: 'Tela Aprender, com a busca, as calculadoras e os temas de educação financeira.' },
   { id: 'familia', origem: `${TELAS}/402_familia_titular.png`, largura: LARGURA_CELULAR, alt: 'Tela Família, com o nome da Família, as pessoas, o papel de cada uma e o botão Convidar.' },
   { id: 'nota', origem: `${TELAS}/150_anotar_gasto_escanear.png`, largura: LARGURA_CELULAR, alt: 'Tela Anotar gasto com o botão Escanear nota fiscal no alto do formulário.' },
-  { id: 'lembretes', origem: `${TELAS}/329_conta_privacidade.png`, largura: LARGURA_CELULAR, alt: 'Tela Conta, com as seções Lembretes, Privacidade neste aparelho, Exportar meus dados e Acesso ao plano.' },
   { id: 'beneficio', origem: `${TELAS}/433_conta_beneficio_ativo.png`, largura: LARGURA_CELULAR, alt: 'Tela Conta de quem recebeu o benefício, com a empresa, o plano, a data de início e a situação.' },
   { id: 'quem-ve', origem: `${TELAS}/330_quem_ve.png`, largura: LARGURA_CELULAR, alt: 'Tela Quem vê estes dados, que mostra quem tem acesso aos registros.' },
   { id: 'empresa-painel', origem: `${TELAS}/421_empresa_painel_1280px.png`, largura: LARGURA_LARGA, alt: 'Painel da empresa no navegador, com o contrato, as vagas contratadas, as vagas em uso e as datas.' },
@@ -48,11 +56,16 @@ function pastaDoCache() {
   return dir;
 }
 
+/** A chave do cache de uma imagem: o original, a largura e o resumo do código. */
+function chaveDoCache(original, largura, resumoDoCodigo = RESUMO_DO_CODIGO) {
+  return crypto.createHash('sha1').update(original).update(`|${largura}|${resumoDoCodigo}`).digest('hex').slice(0, 20);
+}
+
 function processar(def) {
   const arquivo = path.join(RAIZ, def.origem);
   if (!fs.existsSync(arquivo)) throw new Error(`a captura ${def.origem} não existe (imagem "${def.id}" do site)`);
   const original = fs.readFileSync(arquivo);
-  const chave = crypto.createHash('sha1').update(original).update(`|${def.largura}|${VERSAO_DO_METODO}`).digest('hex').slice(0, 20);
+  const chave = chaveDoCache(original, def.largura);
   if (memoria.has(chave)) return memoria.get(chave);
   const no_cache = path.join(pastaDoCache(), `${def.id}-${chave}.png`);
   let saida;
@@ -81,4 +94,4 @@ function imagensDoSite() {
   return { arquivos, info };
 }
 
-module.exports = { imagensDoSite, IMAGENS, LEGENDA_DEMO, VERSAO_DO_METODO };
+module.exports = { imagensDoSite, IMAGENS, LEGENDA_DEMO, RESUMO_DO_CODIGO, chaveDoCache };

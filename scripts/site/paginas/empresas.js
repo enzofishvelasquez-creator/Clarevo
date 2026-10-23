@@ -41,7 +41,7 @@ function paginaEmpresas({ valores, img }) {
 <ul>
 <li>os e-mails que ela mesma convidou;</li>
 <li>a situação de cada convite ou licença: convite enviado, convite cancelado, ativa ou encerrada;</li>
-<li>as datas dessas situações;</li>
+<li>as datas dessas situações: a do convite, a de quando a pessoa aceitou ("Ativa desde") e a do encerramento;</li>
 <li>as contagens: vagas contratadas, convites pendentes, licenças ativas e encerradas;</li>
 <li>os dados do contrato: plano, vagas, início e fim.</li>
 </ul>
@@ -53,7 +53,7 @@ function paginaEmpresas({ valores, img }) {
 <li>categorias, metas, contas a pagar e cartões;</li>
 <li>a Família da pessoa;</li>
 <li>números somados de finanças, nem os de várias pessoas juntas;</li>
-<li>quando ou como a pessoa usa o app: o painel não mostra quem entrou no app.</li>
+<li>quando a pessoa abre o app e o que ela anota nele: o painel mostra só a data em que ela aceitou o convite e a do encerramento.</li>
 </ul>
 </div>
 </div>
@@ -81,7 +81,7 @@ ${telaLarga(img['empresa-painel'], ARQUIVO)}
 <div class="grade">
 <article class="cartao">
 <h3>A lista de licenças</h3>
-<p>O que a empresa lê de cada licença: o e-mail convidado, a situação e a data. Nada de valores nem de uso do app.</p>
+<p>O que a empresa lê de cada licença: o e-mail convidado, a situação e as datas (do convite, de quando a pessoa aceitou e do encerramento). Nada de valores nem do que a pessoa anota.</p>
 ${celular(img['empresa-licencas'], ARQUIVO)}
 </article>
 <article class="cartao">
@@ -97,9 +97,10 @@ ${celular(img.beneficio, ARQUIVO)}
 <p class="lead-bloco">Nada é apagado por causa do fim do benefício.</p>
 <ul>
 <li>Se a licença for encerrada ou o contrato chegar ao fim, a pessoa mantém a conta, o histórico e a Família.</li>
-<li>O acesso pleno continua por 30 dias. Depois, a pessoa passa para o plano gratuito, com leitura do histórico.</li>
+<li>O acesso pleno continua por 30 dias, contados do encerramento da licença ou do fim do contrato. O app mostra para a pessoa até quando vai.</li>
+<li>O que vale depois desses 30 dias ainda não está definido.</li>
 <li>Para voltar a ter o benefício, será preciso convidar de novo.</li>
-<li>Se a pessoa excluir a própria conta, a licença termina na hora e a empresa vê só que ela terminou.</li>
+<li>Se a pessoa excluir a própria conta, a licença termina na hora e a empresa a vê como encerrada, com a data.</li>
 </ul>`,
       { variante: 'azul', rotulo: 'fim' },
     ),

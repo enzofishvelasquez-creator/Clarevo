@@ -53,14 +53,29 @@ function lerFonte(texto) {
 
 const POST = /^(\d{4})-(\d{2})-(\d{2})-([a-z0-9][a-z0-9-]*)\.md$/;
 
-/** Os posts de `site-src/novidades/`, do mais novo para o mais antigo. Valida o cabeçalho e devolve a lista de problemas. */
-function lerPosts(pasta) {
+/** "AAAA-MM-DD" que existe no calendário (2026-02-30 e 2026-13-01 não). */
+function dataExiste(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso));
+  if (!m) return false;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return d.getUTCFullYear() === Number(m[1]) && d.getUTCMonth() === Number(m[2]) - 1 && d.getUTCDate() === Number(m[3]);
+}
+
+/**
+ * Os posts de `site-src/novidades/`, do mais novo para o mais antigo. Valida o cabeçalho e devolve a lista de problemas (o `--final`
+ * recusa cada um deles). `referencia` ("AAAA-MM-DD", a data de hoje ou a que se pede com `--referencia`): um post com data depois
+ * dela é problema. Um `.md` com nome fora do padrão `AAAA-MM-DD-slug.md` também, para um texto nunca ficar de fora sem aviso.
+ */
+function lerPosts(pasta, { referencia = null } = {}) {
   const posts = [];
   const problemas = [];
   if (!fs.existsSync(pasta)) return { posts, problemas: [`${path.basename(pasta)} não existe`] };
   for (const nome of fs.readdirSync(pasta).sort()) {
     const m = POST.exec(nome);
-    if (!m) continue;
+    if (!m) {
+      if (/\.md$/i.test(nome)) problemas.push(`site-src/novidades/${nome}: o nome do arquivo precisa ser AAAA-MM-DD-slug.md (só letras minúsculas sem acento, números e hífens); este texto não foi publicado`);
+      continue;
+    }
     const onde = `site-src/novidades/${nome}`;
     let lido;
     try {
@@ -74,7 +89,10 @@ function lerPosts(pasta) {
     const falta = (campo) => problemas.push(`${onde}: falta "${campo}" no cabeçalho`);
     for (const campo of ['titulo', 'data', 'resumo', 'autoria']) if (typeof meta[campo] !== 'string' || meta[campo] === '') falta(campo);
     if (!Array.isArray(meta.fontes) || meta.fontes.length === 0) falta('fontes');
+    if (!dataExiste(dataDoNome)) problemas.push(`${onde}: a data do nome do arquivo (${dataDoNome}) não existe no calendário`);
+    if (typeof meta.data === 'string' && meta.data !== '' && !dataExiste(meta.data)) problemas.push(`${onde}: a data do cabeçalho (${meta.data}) não é uma data válida no formato AAAA-MM-DD`);
     if (typeof meta.data === 'string' && meta.data !== dataDoNome) problemas.push(`${onde}: a data do cabeçalho (${meta.data}) não é a do nome do arquivo (${dataDoNome})`);
+    if (referencia && dataExiste(dataDoNome) && dataDoNome > referencia) problemas.push(`${onde}: a data (${dataDoNome}) é depois da data de referência (${referencia}); um post não pode ter data futura`);
     if (typeof meta.resumo === 'string' && meta.resumo.length > 220) problemas.push(`${onde}: o resumo tem ${meta.resumo.length} caracteres (até 220)`);
     posts.push({
       arquivo: `novidades/${nome.replace(/\.md$/, '.html')}`,
@@ -114,4 +132,4 @@ function lerPerguntas(arquivo) {
   return itens;
 }
 
-module.exports = { lerCabecalho, lerFonte, lerPosts, lerPerguntas };
+module.exports = { lerCabecalho, lerFonte, lerPosts, lerPerguntas, dataExiste };
