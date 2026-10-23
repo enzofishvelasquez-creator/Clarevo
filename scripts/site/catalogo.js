@@ -16,6 +16,15 @@ const { RAIZ } = require('./config');
 const CORE_SRC = path.join(RAIZ, 'packages', 'core', 'src');
 let guardado = null;
 
+/** O compilador do TypeScript que já está instalado (dependência do core); sem ele, o gerador diz o que fazer. */
+function carregarTypescript() {
+  try {
+    return require('typescript');
+  } catch {
+    throw new Error('o pacote "typescript" não está instalado: rode "npm install" na raiz do repositório (ele já é dependência do packages/core)');
+  }
+}
+
 function carregarTs(ts, entradas) {
   const anterior = Module._extensions['.ts'];
   Module._extensions['.ts'] = (modulo, arquivo) => {
@@ -36,13 +45,8 @@ function carregarTs(ts, entradas) {
 /** Carrega (uma vez) `learn`, `guide`, as calculadoras e as datas do core. */
 function catalogo() {
   if (guardado) return guardado;
-  let ts;
-  try {
-    ts = require('typescript');
-  } catch {
-    throw new Error('o pacote "typescript" não está instalado: rode "npm install" na raiz do repositório (ele já é dependência do packages/core)');
-  }
-  const [learn, guide, calc, datas] = carregarTs(ts, ['learn/index.ts', 'guide/index.ts', 'calculators/catalog.ts', 'dates.ts']);
+  const ts = carregarTypescript();
+  const [learn, guide, calc, datas] = carregarTs(ts, ['learn/index.ts', 'guide/index.ts', 'calculators/index.ts', 'dates.ts']);
   const publicados = learn.publishedTopics().filter((t) => !t.legacy);
   guardado = {
     SECOES: learn.LEARN_SECTIONS,
@@ -58,9 +62,15 @@ function catalogo() {
     calculadora: (slug) => {
       const l = learn.topicCalculator(slug);
       if (!l) return null;
-      return { slug: l.slug, titulo: calc.calcTitle(l.slug, l.params.modo) };
+      return { slug: l.slug, params: { ...l.params }, titulo: calc.calcTitle(l.slug, l.params.modo) };
     },
     tituloDoCalculador: calc.calcTitle,
+    /** O catálogo das calculadoras (grupos, lista, textos fixos): a mesma fonte do app. */
+    CALC_GRUPOS: calc.CALC_GROUPS,
+    CALCULADORAS: calc.CALCULATORS,
+    calculadoraPorSlug: calc.calculatorBySlug,
+    /** Todo o módulo das calculadoras do core (funções de cálculo, campos e textos), para os exemplos calculados na geração. */
+    CALC: calc,
     CALC_UI: calc.CALC_UI_TEXT,
     nomeDoMes: (mes) => datas.formatMonthName(`2000-${String(mes).padStart(2, '0')}`),
     dataBR: (iso) => datas.formatDateBR(iso),
@@ -77,4 +87,4 @@ function hostsDeFontes() {
   return [...hosts].sort();
 }
 
-module.exports = { catalogo, hostsDeFontes };
+module.exports = { catalogo, hostsDeFontes, carregarTypescript, CORE_SRC };
