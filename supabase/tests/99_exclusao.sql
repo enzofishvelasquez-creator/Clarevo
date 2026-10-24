@@ -272,7 +272,7 @@ begin
   end loop;
   return md5(acc);
 end $$;
--- Resumo do que é só da pessoa (a linha em persons e em auth.users, direitos, licenças, administração, operações e as três tabelas por
+-- Resumo do que é só da pessoa (a linha em persons e em auth.users, direitos, licenças, administração, operações e as quatro tabelas por
 -- pessoa). p_except tira o que está ligado a um contexto que vai acabar (uma Família apagada leva as operações de todos os que anotaram nela).
 create function pg_temp.snap_person(p uuid, p_except uuid default null) returns text language sql security definer set search_path = public, pg_temp as $$
   select md5(concat_ws('#',
@@ -284,7 +284,8 @@ create function pg_temp.snap_person(p uuid, p_except uuid default null) returns 
     (select string_agg(t::text, '|' order by t::text) from public.record_operations t where t.actor_id = p and (p_except is null or t.context_id is distinct from p_except)),
     (select string_agg(t::text, '|' order by t::text) from public.context_activity t where t.person_id = p and (p_except is null or t.context_id is distinct from p_except)),
     (select string_agg(t::text, '|' order by t::text) from public.return_reviews t where t.person_id = p and (p_except is null or t.context_id is distinct from p_except)),
-    (select string_agg(t::text, '|' order by t::text) from public.savings_checks t where t.person_id = p and (p_except is null or t.context_id is distinct from p_except))))
+    (select string_agg(t::text, '|' order by t::text) from public.savings_checks t where t.person_id = p and (p_except is null or t.context_id is distinct from p_except)),
+    (select string_agg(t::text, '|' order by t::text) from public.signup_sources t where t.person_id = p)))
 $$;
 -- A empresa: organizações, contratos, quem administra, licenças e direitos, menos o que é da pessoa p e a licença l.
 create function pg_temp.snap_company(p uuid, l uuid) returns text language sql security definer set search_path = public, pg_temp as $$
@@ -449,6 +450,20 @@ begin
   perform pg_temp.as_('zeca');  perform pg_temp.fill(pg_temp.id('zeca_ctx'), 'zeca');
   perform pg_temp.fill(pg_temp.id('famv'), 'zef', false);
   perform pg_temp.as_('uri');   perform pg_temp.fill(pg_temp.id('uri_ctx'), 'uri');
+end $$;
+-- "Como você conheceu o Clarevo?" (D-067, 0018): a resposta é só da pessoa, e uma linha de signup_sources por pessoa que respondeu (inclusive
+-- quem vai ficar como "Pessoa que saiu"): a exclusão da conta precisa apagá-la, e a das outras pessoas não pode mexer nela.
+do $$
+declare
+  n text;
+  o text[] := array['instagram', 'indicacao', 'empresa', 'busca', 'outro', 'prefiro_nao_dizer'];
+  i int := 0;
+begin
+  foreach n in array array['eli', 'bia', 'lia', 'gil', 'mia', 'otto', 'pia', 'rita', 'saulo', 'teo', 'vic', 'zeca', 'uri'] loop
+    perform pg_temp.as_(n);
+    perform public.set_signup_source(o[1 + i % 6], 'ex-src-' || n, 0);
+    i := i + 1;
+  end loop;
 end $$;
 reset role;
 select pg_temp.check_links();
@@ -994,7 +1009,7 @@ do $$
 declare
   f text;
 begin
-  -- As 36 chaves estrangeiras para persons: 10 são do que é só da pessoa (apagadas), 26 são autoria e vínculo (ficam, anônimas).
+  -- As 37 chaves estrangeiras para persons: 11 são do que é só da pessoa (apagadas), 26 são autoria e vínculo (ficam, anônimas).
   -- Uma chave nova obriga a decidir aqui, e em clarevo_erase_person, o que fazer com ela.
   assert pg_temp.person_fks() = array[
       'card_entries.created_by', 'card_entries.deleted_by', 'cards.created_by', 'cards.deleted_by', 'category_budgets.created_by',
@@ -1004,8 +1019,9 @@ begin
       'financial_accounts.deleted_by', 'financial_contexts.owner_person_id', 'financial_records.created_by', 'financial_records.deleted_by',
       'goal_movements.created_by', 'goal_movements.deleted_by', 'goals.created_by', 'goals.deleted_by', 'income_references.created_by',
       'income_references.deleted_by', 'licenses.person_id', 'month_checks.updated_by', 'organization_admins.person_id', 'plan_entitlements.person_id',
-      'record_operations.actor_id', 'return_reviews.person_id', 'savings_checks.person_id', 'series_terms.created_by', 'series_terms.superseded_by'],
-    'as chaves estrangeiras para persons são as 36 que a exclusão da conta trata';
+      'record_operations.actor_id', 'return_reviews.person_id', 'savings_checks.person_id', 'series_terms.created_by', 'series_terms.superseded_by',
+      'signup_sources.person_id'],
+    'as chaves estrangeiras para persons são as 37 que a exclusão da conta trata';
   -- E as que apontam para financial_contexts (financial_records é restrict: por isso os registros saem antes do contexto).
   assert (select array_agg(c.conrelid::regclass::text || '.' || a.attname || ' ' || c.confdeltype::text order by c.conrelid::regclass::text, a.attname)
             from pg_constraint c join pg_attribute a on a.attrelid = c.conrelid and a.attnum = c.conkey[1]
@@ -1041,7 +1057,7 @@ begin
     assert (select prosecdef from pg_proc where oid = ('public.' || f)::regprocedure), 'security definer: ' || f;
   end loop;
   assert (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-           where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) = 82, 'authenticated executa 82 funções (as 80 da 0015 e as 2 de conferir o mês)';
+           where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) = 83, 'authenticated executa 83 funções (as 80 da 0015, as 2 de conferir o mês e a de responder de onde conheceu o Clarevo)';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')), 'anon não executa nenhuma função';
 
@@ -1088,11 +1104,11 @@ begin
            where (x.def ~* '(insert into|update|delete from) (public|auth)\.' or x.def ~* 'clarevo_materialize_series') and x.def !~* 'insert into public\.record_operations')
        = array['delete_my_account', 'ensure_personal_space', 'sync_series_occurrences'],
     'toda função de escrita grava a operação, menos delete_my_account, ensure_personal_space e sync_series_occurrences';
-  assert (select count(*) from pg_temp.app_functions() x where x.def ~* 'insert into public\.record_operations') = 65,
-    'as 65 funções de escrita com operação são as que o gatilho de record_operations protege';
+  assert (select count(*) from pg_temp.app_functions() x where x.def ~* 'insert into public\.record_operations') = 66,
+    'as 66 funções de escrita com operação são as que o gatilho de record_operations protege';
   -- Nada novo em record_operations pela exclusão: a conta some com o rastro, então nenhuma ação nova (as 2 de conferir o mês vêm da 0016).
-  assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m where c.conname = 'record_operations_action_check') = 65,
-    'a lista de ações de record_operations segue com 65 (excluir a conta não deixa operação)';
+  assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m where c.conname = 'record_operations_action_check') = 66,
+    'a lista de ações de record_operations segue com 66 (excluir a conta não deixa operação)';
 end $$;
 rollback;
 

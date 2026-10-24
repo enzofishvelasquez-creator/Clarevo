@@ -129,6 +129,7 @@ import {
   type SavingsAnswer,
   type SavingsCardState,
   type SavingsCheck,
+  type SignupSourceOption,
   type SearchParams,
   type SeriesAction,
   type SeriesDebtDraft,
@@ -1861,6 +1862,36 @@ export function useSetSavingsAnswer() {
     onSuccess: (check) => {
       qc.setQueryData(['savings', check.contextId], check);
       qc.invalidateQueries({ queryKey: ['savings'] });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// "Como você conheceu o Clarevo?" (D-067, item 2)
+// ---------------------------------------------------------------------------
+
+/**
+ * A resposta da própria pessoa, ou null (nunca respondeu). Só dela: nem a Família nem a empresa leem, e a leitura só roda em conta real
+ * (`enabled` falso na demonstração e antes de a pessoa existir). Falha de carga nunca vira "não respondeu": a tela não pergunta.
+ */
+export function useSignupSource(enabled: boolean) {
+  const repo = useRepo();
+  const { user } = useSession();
+  return useQuery({ queryKey: ['signupSource', user?.id], queryFn: () => repo.getSignupSource(), enabled: enabled && Boolean(user) });
+}
+
+/**
+ * Responder ou mudar a origem (versão 0 = ainda não respondeu). Confirmada pelo servidor, a resposta entra na hora no cache (o cartão do
+ * Resumo some e Conta mostra a escolha). Não é anotação: não mexe na revisão dos últimos meses.
+ */
+export function useSetSignupSource() {
+  const repo = useRepo();
+  const qc = useQueryClient();
+  const { user } = useSession();
+  return useMutation({
+    mutationFn: (v: { key: string; expectedVersion: number; source: SignupSourceOption }) => repo.setSignupSource(v.key, v.expectedVersion, v.source),
+    onSuccess: (row) => {
+      qc.setQueryData(['signupSource', user?.id], row);
     },
   });
 }

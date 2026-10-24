@@ -61,7 +61,7 @@ export const DELETE_TEXT = {
   erased: [
     'O seu Pessoal inteiro, de verdade e não só escondido: gastos e recebimentos, contas a pagar, gastos fixos, parcelamentos e contas do ano.',
     'Metas e movimentos, cartões, lançamentos, faturas e notas, orçamento, limite e renda de referência.',
-    'Contas de origem, assinaturas, importações, a revisão dos últimos meses e a resposta do plano de guardar.',
+    'Contas de origem, assinaturas, importações, a revisão dos últimos meses e as respostas do plano de guardar e de "Como você conheceu o Clarevo?".',
     'O histórico de operações e de atividade da sua conta.',
     'O benefício pela empresa, se você tem um: a licença termina na hora e os seus direitos ao plano são apagados. A empresa vê só que a licença terminou.',
   ],

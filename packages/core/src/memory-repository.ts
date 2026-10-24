@@ -60,6 +60,7 @@ import type {
   MonthCheckAction,
   ReturnReviewAction,
   SavingsAction,
+  SignupSourceAction,
   SeriesAction,
   SeriesWrite,
   SubscriptionReviewAction,
@@ -138,6 +139,7 @@ import {
 import { MONTH_CHECK_KINDS, PARTS_PER_YEAR_MAX } from './records';
 import { isLongAbsence, isReviewableMonth, monthsOverview as overviewOf } from './retorno';
 import { savingsAnswerError, savingsAskAgainOn } from './savings';
+import { signupSourceError, type SignupSource, type SignupSourceOption } from './signup-source';
 import {
   ANNUAL_MAX_YEARS,
   SERIES_LIMIT,
@@ -170,6 +172,7 @@ interface Operation {
     | AccountAction
     | SubscriptionReviewAction
     | MonthCheckAction
+    | SignupSourceAction
     | ImportAction
     | FamilyAction
     | CompanyAction;
@@ -353,6 +356,8 @@ export class MemoryRepository implements RecordsRepository {
   private goalMovements = new Map<string, StoredGoalMovement>();
   /** savings_checks da pessoa (só ela usa este repositório), por contexto: uma resposta viva por contexto. */
   private savingsChecks = new Map<string, SavingsCheck>();
+  /** signup_sources da pessoa (só ela usa este repositório): no máximo uma resposta, de "Como você conheceu o Clarevo?" (D-067). */
+  private signupSource: SignupSource | null = null;
   private cards = new Map<string, StoredCard>();
   private cardEntries = new Map<string, StoredCardEntry>();
   private seq = 0;
@@ -422,6 +427,7 @@ export class MemoryRepository implements RecordsRepository {
       goals: new Map(this.goals),
       goalMovements: new Map(this.goalMovements),
       savingsChecks: new Map(this.savingsChecks),
+      signupSource: this.signupSource,
       cards: new Map(this.cards),
       cardEntries: new Map(this.cardEntries),
       accountsById: new Map(this.accountsById),
@@ -447,6 +453,7 @@ export class MemoryRepository implements RecordsRepository {
         goals: this.goals,
         goalMovements: this.goalMovements,
         savingsChecks: this.savingsChecks,
+        signupSource: this.signupSource,
         cards: this.cards,
         cardEntries: this.cardEntries,
         accountsById: this.accountsById,
@@ -2093,6 +2100,41 @@ export class MemoryRepository implements RecordsRepository {
       this.savingsChecks.set(contextId, next);
       this.saveOperation(key, 'responder_guardar', payload, { contextId, recordId: null, commitmentId: null });
       return next;
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // "Como você conheceu o Clarevo?" (D-067, migração 0018): signup_sources e set_signup_source
+  // ---------------------------------------------------------------------------
+
+  /** Como a leitura de signup_sources (RLS: só a própria pessoa). */
+  async getSignupSource() {
+    return this.read(() => this.signupSource);
+  }
+
+  /**
+   * Como set_signup_source. Ordem: repetição; sem_permissao (a pessoa precisa ter o Pessoal); origem_invalida (signupSourceError);
+   * versao_desatualizada (versão 0 = ainda não há resposta; nula, negativa ou diferente da atual também; detalhe "versao_atual=N");
+   * escrita (a primeira resposta vale 1; mudar a origem soma 1; a mesma origem não grava nada). Operação sem alvo no Pessoal, que não conta
+   * como anotação na atividade.
+   */
+  async setSignupSource(key: string, expectedVersion: number, source: SignupSourceOption) {
+    return this.write(() => {
+      const payload = [source, expectedVersion];
+      const replayed = this.replay(key, 'responder_origem_cadastro', payload);
+      if (replayed) return this.signupSource!;
+      if (!this.space) throw new RepoError('sem_permissao');
+      const code = signupSourceError(source);
+      if (code) throw new RepoError(code);
+      const current = this.signupSource;
+      if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0 || expectedVersion !== (current?.version ?? 0)) {
+        throw new RepoError('versao_desatualizada', undefined, `versao_atual=${current?.version ?? 0}`);
+      }
+      const now = this.stamp();
+      if (!current) this.signupSource = { source, version: 1, answeredAt: now, updatedAt: now };
+      else if (current.source !== source) this.signupSource = { ...current, source, version: current.version + 1, updatedAt: now };
+      this.saveOperation(key, 'responder_origem_cadastro', payload, { contextId: this.space.personalContextId, recordId: null, commitmentId: null });
+      return this.signupSource!;
     });
   }
 
@@ -3809,13 +3851,14 @@ export class MemoryRepository implements RecordsRepository {
 
   /**
    * Como o gatilho clarevo_track_activity em record_operations: toda operação nova, menos decidir_revisao,
-   * responder_guardar, revisar_assinaturas e as duas de "Conferi este mês", deixa o último dia com anotação >= hoje; se o intervalo desde o último for uma ausência longa,
+   * responder_guardar, responder_origem_cadastro, revisar_assinaturas e as duas de "Conferi este mês", deixa o último dia com anotação >= hoje; se o intervalo desde o último for uma ausência longa,
    * ela passa a ser a última ausência. Mesmo dia ou relógio para trás: nada muda.
    */
   private trackActivity(action: Operation['action'], contextId: string) {
     if (
       action === 'decidir_revisao' ||
       action === 'responder_guardar' ||
+      action === 'responder_origem_cadastro' ||
       action === 'revisar_assinaturas' ||
       action === 'marcar_mes_conferido' ||
       action === 'desmarcar_mes_conferido' ||
@@ -4243,6 +4286,7 @@ export class MemoryRepository implements RecordsRepository {
       this.goals.clear();
       this.goalMovements.clear();
       this.savingsChecks.clear();
+      this.signupSource = null;
       this.cards.clear();
       this.cardEntries.clear();
       this.accountsById.clear();

@@ -9,9 +9,10 @@ import { Meter, useMoneyMask } from '@/components/committed-parts';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { AppHeader, ContextSwitch, MonthSwitcher } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
-import { PrimeirosPassos } from '@/components/primeiros-passos';
+import { PrimeirosPassos, type PrimeirosPassosState } from '@/components/primeiros-passos';
 import { RecordRow } from '@/components/record-row';
 import { ReturnBand, useReturnBand } from '@/components/retorno-faixa';
+import { SignupSourceCard } from '@/components/signup-source';
 import { EmptyState, ErrorState } from '@/components/states';
 import { WelcomeTour } from '@/components/tour';
 import { Body, Button, Card, FitMoney, LinkButton, Money, Screen, Skeleton, Txt } from '@/components/ui';
@@ -39,6 +40,8 @@ export default function ResumoScreen() {
   const emptyCaption = s ? emptyMonthCaption(s, month, currentMonth) : null;
   // Faixa "Seus últimos meses" (D-030): só no Pessoal e no mês atual, no lugar dos avisos temporários.
   const band = useReturnBand(kind === 'pessoal' && month === currentMonth ? contextId : undefined);
+  // "Como você conheceu o Clarevo?" (D-067): o último da fila de avisos temporários, depois de "Seus últimos meses" e de "Primeiros passos".
+  const [stepsState, setStepsState] = useState<PrimeirosPassosState>('carregando');
 
   // "Ver resumo do mês" volta a este Resumo, que continua na pilha: mostrar do topo, com os totais à vista.
   // Voltar com "Voltar" mantém a posição da rolagem.
@@ -142,14 +145,19 @@ export default function ResumoScreen() {
             "Anotar gasto" sempre logo abaixo do cabeçalho azul (D-039), como na tela original aprovada, em qualquer estado.
             Os avisos temporários (Primeiros passos, Seus últimos meses, confirmações) vêm depois dele, um por vez, sem mudar a
             ordem dos blocos aprovados: a faixa "Seus últimos meses" tem precedência; o card de Primeiros passos espera a
-            revisão carregar e volta quando a faixa some (conta nova nunca vê a faixa).
+            revisão carregar e volta quando a faixa some (conta nova nunca vê a faixa). A pergunta opcional "Como você conheceu o
+            Clarevo?" é a última da fila: só em conta real, a partir do dia seguinte ao primeiro dia de uso e quando nenhum dos
+            dois está na tela.
           */}
           {canWrite ? (
             <Button label="Anotar gasto" icon={Plus} onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } })} />
           ) : null}
           <FlashBanner message={notice} />
           {band.status === 'visivel' ? <ReturnBand band={band} onMovedOn={(text) => setNotice(text)} /> : null}
-          {band.status === 'oculta' ? <PrimeirosPassos contextId={contextId} /> : null}
+          {band.status === 'oculta' ? <PrimeirosPassos contextId={contextId} onState={setStepsState} /> : null}
+          {band.status === 'oculta' ? (
+            <SignupSourceCard eligible={kind === 'pessoal' && month === currentMonth} blocked={stepsState !== 'oculto'} onSaved={(text) => setNotice(text)} />
+          ) : null}
 
           <>
             <ToPayCard contextId={contextId} canWrite={canWrite} />

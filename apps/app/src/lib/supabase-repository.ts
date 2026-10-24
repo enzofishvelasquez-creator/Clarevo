@@ -20,6 +20,7 @@ import {
   SAVINGS_ANSWERS,
   SAVINGS_MIN_MONTHLY_CENTS,
   SEARCH_LIMIT,
+  SIGNUP_SOURCES,
   searchTermPattern,
   activeAccounts,
   addMonths,
@@ -118,6 +119,8 @@ import {
   type SeriesKind,
   type SeriesNature,
   type SeriesWrite,
+  type SignupSource,
+  type SignupSourceOption,
 } from '@clarevo/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -412,6 +415,14 @@ interface SavingsCheckRow {
   updated_at: string;
 }
 
+/** Linha de signup_sources (e retorno de set_signup_source). person_id é sempre o da sessão e o app não o usa. */
+interface SignupSourceRow {
+  source: string | null;
+  version: number;
+  answered_at: string | null;
+  updated_at: string | null;
+}
+
 /** Linha da visão card_items (e o cartão do retorno das funções de cartão, que traz também deleted_at e deleted_by). */
 interface CardRow {
   id: string;
@@ -495,6 +506,7 @@ const CATEGORY_BUDGET_COLUMNS = 'id, context_id, category, from_month, amount_ce
 const COMMITMENT_LIMIT_COLUMNS = 'id, context_id, from_month, percent, created_by, version, created_at, updated_at';
 const INCOME_REFERENCE_COLUMNS = 'id, context_id, from_month, amount_cents, varies, created_by, version, created_at, updated_at, amount_changed_at';
 const GOAL_MOVEMENT_COLUMNS = 'id, goal_id, context_id, kind, amount_cents, occurred_on, note, account_id, created_by, version, created_at, updated_at';
+const SIGNUP_SOURCE_COLUMNS = 'source, version, answered_at, updated_at';
 const SAVINGS_CHECK_COLUMNS = 'context_id, answer, monthly_cents, answered_on, ask_again_on, version, created_at, updated_at';
 
 const RECORD_ACTIONS = ['criar', 'editar', 'excluir'];
@@ -1149,6 +1161,15 @@ function toSavingsCheck(r: SavingsCheckRow): SavingsCheck {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
+}
+
+/** "Como você conheceu o Clarevo?": uma das seis origens, versão de 1 em diante e as duas datas. Sem resposta (versão 0), o banco devolve origem nula. */
+function toSignupSource(r: SignupSourceRow): SignupSource {
+  const version = whole(r.version);
+  if (typeof r.source !== 'string' || !(SIGNUP_SOURCES as readonly string[]).includes(r.source) || version < 1 || !r.answered_at || !r.updated_at) {
+    throw new RepoError('desconhecido', 'origem_inconsistente');
+  }
+  return { source: r.source as SignupSourceOption, version, answeredAt: r.answered_at, updatedAt: r.updated_at };
 }
 
 const CARD_STATUSES: readonly CardStatus[] = ['ativo', 'arquivado'];
@@ -2391,6 +2412,32 @@ export class SupabaseRepository implements RecordsRepository {
     if (error) throw repoError(error);
     if (!data) throw new RepoError('desconhecido');
     return toSavingsCheck(data as SavingsCheckRow);
+  }
+
+  // -------------------------------------------------------------------------
+  // "Como você conheceu o Clarevo?" (D-067, migração 0018)
+  // -------------------------------------------------------------------------
+
+  /** A resposta da própria pessoa, ou null (ainda não respondeu). A RLS já limita à pessoa; o filtro é redundante de propósito. */
+  async getSignupSource(): Promise<SignupSource | null> {
+    const { data, error } = await this.db
+      .from('signup_sources')
+      .select(SIGNUP_SOURCE_COLUMNS)
+      .eq('person_id', this.user.id)
+      .maybeSingle();
+    if (error) throw repoError(error);
+    return data ? toSignupSource(data as SignupSourceRow) : null;
+  }
+
+  /**
+   * Versão 0 = ainda não há resposta. Uma repetição com a mesma chave e o mesmo pedido devolve a resposta atual: é assim que se
+   * reconcilia um resultado incerto. Não é de nenhum contexto e não conta como anotação.
+   */
+  async setSignupSource(key: string, expectedVersion: number, source: SignupSourceOption): Promise<SignupSource> {
+    const { data, error } = await this.db.rpc('set_signup_source', { p_source: source, p_key: key, p_version: expectedVersion });
+    if (error) throw repoError(error);
+    if (!data) throw new RepoError('desconhecido');
+    return toSignupSource(data as SignupSourceRow);
   }
 
   // -------------------------------------------------------------------------

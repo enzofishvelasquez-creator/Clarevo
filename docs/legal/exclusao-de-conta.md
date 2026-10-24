@@ -32,7 +32,7 @@ Tudo o que está no seu Pessoal, de verdade, e não apenas escondido:
 
 - gastos e recebimentos, contas a pagar, gastos fixos, parcelamentos e contas do ano;
 - metas e movimentos, cartões, lançamentos, faturas e notas, orçamento, limite e renda de referência;
-- contas de origem do dinheiro, assinaturas, importações, a revisão dos últimos meses e a resposta do plano de guardar;
+- contas de origem do dinheiro, assinaturas, importações, a revisão dos últimos meses e as respostas do plano de guardar e de "Como você conheceu o Clarevo?";
 - o histórico de operações e de atividade da sua conta (o rastro técnico);
 - o seu cadastro: e-mail, nome de apresentação e login;
 - o que o app guardava no aparelho em que você faz a exclusão: preferências, memórias de lojas e nomes, lembretes agendados e o resumo do widget. Em outro aparelho onde você já tenha entrado, o que ficou lá continua até você desinstalar o app ou limpar os dados dele (na versão web, os dados do site no navegador).
