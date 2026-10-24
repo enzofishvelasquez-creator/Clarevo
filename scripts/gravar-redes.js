@@ -29,11 +29,23 @@
  *   node scripts/gravar-redes.js --so p02,p05,capturas  só estas peças (p02, p05, p08, p11, capturas)
  *   node scripts/gravar-redes.js --build                refaz o build de demonstração antes (sem ele, usa apps/app/dist se existir)
  *   node scripts/gravar-redes.js --manter-quadros       guarda os quadros brutos da captura em <pasta>/quadros-brutos
+ *   node scripts/gravar-redes.js --apresentacao         só os clipes da apresentação (abaixo), em vez das peças das redes
  * Ambiente: FFMPEG e FFPROBE (padrão /usr/bin/ffmpeg e /usr/bin/ffprobe, ou os do PATH), CHROMIUM_PATH (outro Chromium) e
  * PLAYWRIGHT_BROWSERS_PATH (padrão /opt/pw-browsers, se existir). Os arquivos de mídia NÃO vão para o repositório.
  *
  * Saída em <pasta>: pNN-nome.mp4, pNN-nome.srt, pNN-nome-capa.png, pNN-nome-conferencia-1..3.png, capturas/*.png (1080 x 1350),
  * manifesto.json (versão, data, números lidos da tela e a narração de cada peça) e montagem.png (a capa e um quadro de cada vídeo, mais as capturas).
+ *
+ * Opção `--apresentacao` (clipes para slides 16:9, que tocam dentro de um quadro de celular ou de tela): grava os cinco clipes de `CLIPES`
+ * (clipe-1-resumo, clipe-2-contas-a-pagar, clipe-3-familia, clipe-4-aprender-e-calculadora, clipe-5-painel-da-instituicao), com a mesma
+ * demonstração e a mesma captura de tela, mas sem narração nem .srt: cada clipe sai com o .mp4, um quadro parado em PNG do mesmo tamanho
+ * (a capa) e uma linha de legenda no manifesto. Os quatro primeiros são 1080 x 1920 (9:16) e o painel da instituição, 1920 x 1080 (16:9, o
+ * app visto como na web, a 1280 x 720 pontos ampliados 1,5 vez). Cada um dura de 18 a 35 s e pesa até 12 MB (o script baixa a qualidade até
+ * caber e falha se não couber). Os links de convite (Família e empresa) aparecem desfocados: o código nunca fica legível no vídeo. A
+ * Família da demonstração com dados fictícios não existe (D-055), então o clipe 3 cria, antes de gravar e fora do vídeo, três contas
+ * simuladas na memória da página (a conta titular e duas contas que aceitam o convite) e grava com a conta titular. O servidor local usa a porta 8599
+ * (`--porta` muda) para o aparelho; o painel usa uma porta livre. Saída: clipe-N-nome.mp4, clipe-N-nome-quadro.png e manifesto.json
+ * (arquivo, quadro, legenda, duração, tamanho, dimensões). `--so clipe-1,clipe-5` grava só estes.
  */
 'use strict';
 const fs = require('node:fs');
@@ -48,8 +60,10 @@ const RAIZ = path.join(__dirname, '..');
 const DIST = path.join(RAIZ, 'apps', 'app', 'dist');
 const argv = process.argv.slice(2);
 const opcao = (nome) => { const i = argv.indexOf(nome); return i >= 0 ? argv[i + 1] : null; };
-const SAIDA = path.resolve(opcao('--saida') || path.join(os.tmpdir(), 'clarevo-redes'));
-const SO = (opcao('--so') || 'p02,p05,p08,p11,capturas').split(',').map((s) => s.trim()).filter(Boolean);
+const SAIDA = path.resolve(opcao('--saida') || path.join(os.tmpdir(), argv.includes('--apresentacao') ? 'clarevo-apresentacao' : 'clarevo-redes'));
+const APRESENTACAO = argv.includes('--apresentacao');
+const PORTA = Number(opcao('--porta') || 8599);
+const SO = (opcao('--so') || (APRESENTACAO ? 'clipe-1,clipe-2,clipe-3,clipe-4,clipe-5' : 'p02,p05,p08,p11,capturas')).split(',').map((s) => s.trim()).filter(Boolean);
 const FFMPEG = process.env.FFMPEG || (fs.existsSync('/usr/bin/ffmpeg') ? '/usr/bin/ffmpeg' : 'ffmpeg');
 const FFPROBE = process.env.FFPROBE || (fs.existsSync('/usr/bin/ffprobe') ? '/usr/bin/ffprobe' : 'ffprobe');
 
@@ -80,21 +94,27 @@ function dimensoesPng(arquivo) {
   return { largura: b.readUInt32BE(16), altura: b.readUInt32BE(20) };
 }
 
-/** Servidor local: serve `apps/app/dist` como está; com `zoom`, a cópia de index.html entregue ao navegador ganha o viewport de 360 pontos ampliado 3 vezes. */
-async function servir(zoom) {
+/**
+ * Servidor local: serve `apps/app/dist` como está; com `zoom`, a cópia de index.html entregue ao navegador ganha o viewport ampliado
+ * (`true`: 360 pontos ampliados 3 vezes, o aparelho dos vídeos; `{ largura, escala }`: outra largura e outra escala, como os 1280 pontos
+ * ampliados 1,5 vez do painel em 1920 x 1080). `porta` 0 escolhe uma livre.
+ */
+async function servir(zoom, porta = 0) {
+  const vp = zoom === true ? { largura: LARGURA, escala: ESCALA } : zoom;
   const servidor = http.createServer((q, r) => {
     let p = path.join(DIST, decodeURIComponent(q.url.split('?')[0]));
     if (!p.startsWith(DIST) || !fs.existsSync(p) || fs.statSync(p).isDirectory()) p = path.join(DIST, 'index.html');
-    if (zoom && path.basename(p) === 'index.html') {
-      const html = fs.readFileSync(p, 'utf8').replace(/<meta name="viewport"[^>]*>/, `<meta name="viewport" content="width=${LARGURA}, initial-scale=${ESCALA}, minimum-scale=${ESCALA}, maximum-scale=${ESCALA}" />`);
+    if (vp && path.basename(p) === 'index.html') {
+      const html = fs.readFileSync(p, 'utf8').replace(/<meta name="viewport"[^>]*>/, `<meta name="viewport" content="width=${vp.largura}, initial-scale=${vp.escala}, minimum-scale=${vp.escala}, maximum-scale=${vp.escala}" />`);
       r.writeHead(200, { 'content-type': 'text/html' });
       return r.end(html);
     }
     r.writeHead(200, { 'content-type': TIPOS[path.extname(p)] || 'application/octet-stream' });
     fs.createReadStream(p).pipe(r);
   });
-  const porta = await new Promise((resolve, reject) => { servidor.once('error', reject); servidor.listen(0, () => resolve(servidor.address().port)); });
-  return { base: `http://localhost:${porta}`, fechar: () => servidor.close() };
+  const ouvir = (n) => new Promise((resolve, reject) => { servidor.once('error', reject); servidor.listen(n, () => resolve(servidor.address().port)); });
+  const portaFinal = await ouvir(porta);
+  return { base: `http://localhost:${portaFinal}`, fechar: () => servidor.close() };
 }
 
 /**
@@ -129,6 +149,23 @@ function prepararPagina(cfg) {
     const st = document.createElement('style');
     st.textContent = css;
     raiz.appendChild(st);
+    if (cfg.ocultarCodigos) {
+      // O link de convite (Família: /convite/<código>; empresa: /beneficio/<código>) fica desfocado: o código nunca é legível no vídeo.
+      // O desfoque entra na mesma microtarefa da mudança da tela, antes de o quadro ser desenhado.
+      const codigo = /\/(convite|beneficio)\/[0-9A-Za-z_-]{12,}/;
+      const desfocar = (no) => {
+        if (!no || no.nodeType !== 1) return;
+        for (const e of [no, ...no.querySelectorAll('div,span')]) {
+          if (e.children.length === 0 && codigo.test(e.textContent || '') && e.style.filter !== 'blur(9px)') e.style.filter = 'blur(9px)';
+        }
+      };
+      new MutationObserver((lista) => {
+        for (const m of lista) {
+          if (m.type === 'childList') m.addedNodes.forEach(desfocar);
+          else if (m.type === 'characterData') desfocar(m.target.parentElement);
+        }
+      }).observe(document, { childList: true, subtree: true, characterData: true });
+    }
     if (cfg.toque) {
       document.addEventListener('pointerdown', (e) => {
         const d = document.createElement('div');
@@ -335,21 +372,25 @@ function montarSrt(falas, fim) {
 // Vídeo: captura de tela do Chromium, quadro a quadro, com o instante de cada um.
 // ---------------------------------------------------------------------------------------------------------------------
 async function gravarVideo(browser, servidor, def, saida, manifesto, problemas) {
+  // A tela do vídeo: o aparelho (360 x 640 pontos ampliados 3 vezes) ou, nos clipes da apresentação, a que a definição pede.
+  const tela = def.tela || { largura: LARGURA, altura: ALTURA, escala: ESCALA };
+  const W = tela.largura * tela.escala;
+  const H = tela.altura * tela.escala;
   const ctx = await browser.newContext({
-    viewport: { width: LARGURA * ESCALA, height: ALTURA * ESCALA },
+    viewport: { width: W, height: H },
     deviceScaleFactor: 1,
     isMobile: true,
-    hasTouch: true,
+    hasTouch: !tela.desktop,
     locale: 'pt-BR',
     timezoneId: 'America/Sao_Paulo',
   });
-  await ctx.addInitScript(prepararPagina, { agora: AGORA, escala: ESCALA, zoom: true, toque: true });
+  await ctx.addInitScript(prepararPagina, { agora: AGORA, escala: tela.escala, zoom: true, toque: true, ocultarCodigos: Boolean(def.apresentacao) });
   const fora = [];
   await bloquearRede(ctx, fora);
   const p = await ctx.newPage();
   const erros = [];
   p.on('pageerror', (e) => erros.push(e.message));
-  const f = ferramentas(p, { altura: ALTURA });
+  const f = ferramentas(p, { altura: tela.altura, largura: tela.largura });
 
   const dirQuadros = fs.mkdtempSync(path.join(os.tmpdir(), `clarevo-redes-${def.id}-`));
   const quadros = [];
@@ -381,12 +422,20 @@ async function gravarVideo(browser, servidor, def, saida, manifesto, problemas) 
   };
   const c = { p, base: servidor.base, ...f, fala, quadro, lerCategoria: (cat) => lerCategoria(f, cat), lerTotalDoOrcamento: () => lerTotalDoOrcamento(f), lerValorDoResumo: (r) => lerValorDoResumo(p, r), numeros: {} };
 
-  await entrarNaDemo(p, servidor.base, f);
+  if (def.entrar) await def.entrar(c); else await entrarNaDemo(p, servidor.base, f);
   await def.preparar(c);
-  await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 94, maxWidth: LARGURA * ESCALA, maxHeight: ALTURA * ESCALA, everyNthFrame: 1 });
+  await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 94, maxWidth: W, maxHeight: H, everyNthFrame: 1 });
   await p.waitForTimeout(400);
   const t0 = Date.now() / 1000;
-  await def.roteiro(c);
+  try {
+    await def.roteiro(c);
+  } catch (e) {
+    // Se a tela não tem o que o roteiro espera, guarda o que a página mostrava, para saber o motivo.
+    await p.screenshot({ path: path.join(saida, `falha-${def.id}.png`) }).catch(() => {});
+    fs.writeFileSync(path.join(saida, `falha-${def.id}.txt`), `${e.message}\n\n${await p.locator('body').innerText().catch(() => '')}\n`);
+    fs.rmSync(dirQuadros, { recursive: true, force: true });
+    throw e;
+  }
   await p.waitForTimeout(1500);
   const t1 = Date.now() / 1000;
   await cdp.send('Page.stopScreencast');
@@ -408,28 +457,41 @@ async function gravarVideo(browser, servidor, def, saida, manifesto, problemas) 
   fs.writeFileSync(arqLista, `${lista.map((q) => `file '${q.arq}'\nduration ${q.dur.toFixed(6)}`).join('\n')}\nfile '${lista[lista.length - 1].arq}'\n`);
   const mp4 = path.join(saida, `${def.slug}.mp4`);
   // JPEG é BT.601 de faixa cheia; o vídeo sai em BT.709 de faixa limitada, marcado, para o azul da marca não mudar de tom no celular.
-  executar(FFMPEG, ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', arqLista,
-    '-vf', `fps=${FPS},scale=in_range=pc:out_range=tv:in_color_matrix=bt601:out_color_matrix=bt709:flags=lanczos,format=yuv420p`,
-    '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-profile:v', 'high', '-level', '4.1', '-r', String(FPS),
-    '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
-    '-an', '-metadata', `title=Clarevo: ${def.titulo} (demonstração com dados fictícios)`, '-movflags', '+faststart', mp4]);
+  // Nas peças das redes o CRF é 18; nos clipes da apresentação, que têm limite de tamanho, ele sobe de 18 até o arquivo caber.
+  const limiteBytes = def.limiteMB ? def.limiteMB * 1e6 : Infinity;
+  let crfUsado = 18;
+  for (const crf of def.limiteMB ? [18, 20, 22, 24, 27, 30] : [18]) {
+    crfUsado = crf;
+    executar(FFMPEG, ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', arqLista,
+      '-vf', `fps=${FPS},scale=in_range=pc:out_range=tv:in_color_matrix=bt601:out_color_matrix=bt709:flags=lanczos,format=yuv420p`,
+      '-c:v', 'libx264', '-preset', 'slow', '-crf', String(crf), '-profile:v', 'high', '-level', '4.1', '-r', String(FPS),
+      '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
+      '-an', '-metadata', `title=Clarevo: ${def.titulo} (demonstração com dados fictícios)`, '-movflags', '+faststart', mp4]);
+    if (fs.statSync(mp4).size <= limiteBytes) break;
+  }
+  if (fs.statSync(mp4).size > limiteBytes) throw new Error(`${def.id}: o MP4 ficou com ${(fs.statSync(mp4).size / 1e6).toFixed(1)} MB, acima do limite de ${def.limiteMB} MB, mesmo com CRF 30`);
 
   // Legenda, capa e quadros de conferência, tirados do próprio MP4.
   const duracao = t1 - t0;
-  const { srt, lentas } = montarSrt(falas.map((b) => ({ ...b, em: b.em - t0 })), duracao - 0.2);
-  fs.writeFileSync(path.join(saida, `${def.slug}.srt`), srt);
-  if (lentas.length) console.warn(`aviso: ${def.id}: legenda rápida demais para ler em: ${lentas.join('; ')}`);
+  if (!def.apresentacao) {
+    const { srt, lentas } = montarSrt(falas.map((b) => ({ ...b, em: b.em - t0 })), duracao - 0.2);
+    fs.writeFileSync(path.join(saida, `${def.slug}.srt`), srt);
+    if (lentas.length) console.warn(`aviso: ${def.id}: legenda rápida demais para ler em: ${lentas.join('; ')}`);
+  }
   const tirar = (quando, destino) => {
     executar(FFMPEG, ['-y', '-v', 'error', '-ss', Math.max(0, Math.min(duracao - 0.1, quando - t0)).toFixed(3), '-i', mp4, '-frames:v', '1', destino]);
     const d = dimensoesPng(destino);
-    if (d.largura !== 1080 || d.altura !== 1920) throw new Error(`${destino} saiu ${d.largura} x ${d.altura}`);
+    if (d.largura !== W || d.altura !== H) throw new Error(`${destino} saiu ${d.largura} x ${d.altura}`);
   };
   const capa = pontos.find((x) => x.tipo === 'capa');
   const conferencia = pontos.filter((x) => x.tipo === 'conferencia');
-  if (!capa || conferencia.length !== 3) throw new Error(`${def.id}: preciso de 1 capa e 3 quadros de conferência (achei ${capa ? 1 : 0} e ${conferencia.length})`);
-  const arqCapa = path.join(saida, `${def.slug}-capa.png`);
+  if (def.apresentacao) {
+    // Clipe da apresentação: só a capa (o quadro parado do mesmo tamanho). Sem o quadro, não há o que entregar.
+    if (!capa) throw new Error(`${def.id}: preciso do quadro de capa`);
+  } else if (!capa || conferencia.length !== 3) throw new Error(`${def.id}: preciso de 1 capa e 3 quadros de conferência (achei ${capa ? 1 : 0} e ${conferencia.length})`);
+  const arqCapa = path.join(saida, def.apresentacao ? `${def.slug}-quadro.png` : `${def.slug}-capa.png`);
   tirar(capa.em, arqCapa);
-  const arqConf = conferencia.map((x, i) => {
+  const arqConf = (def.apresentacao ? [] : conferencia).map((x, i) => {
     const a = path.join(saida, `${def.slug}-conferencia-${i + 1}.png`);
     tirar(x.em, a);
     return { arquivo: path.basename(a), em: Number((x.em - t0).toFixed(1)) };
@@ -441,8 +503,35 @@ async function gravarVideo(browser, servidor, def, saida, manifesto, problemas) 
   const audio = sonda.streams.some((s) => s.codec_type === 'audio');
   const cabeca = fs.readFileSync(mp4).subarray(0, 4096);
   const faststart = cabeca.indexOf('moov') > 0 && (cabeca.indexOf('mdat') < 0 || cabeca.indexOf('moov') < cabeca.indexOf('mdat'));
-  if (v.codec_name !== 'h264' || v.pix_fmt !== 'yuv420p' || v.width !== 1080 || v.height !== 1920 || audio || !faststart) {
+  if (v.codec_name !== 'h264' || v.pix_fmt !== 'yuv420p' || v.width !== W || v.height !== H || audio || !faststart) {
     throw new Error(`${def.id}: o MP4 não está no formato pedido: ${JSON.stringify({ codec: v.codec_name, pix: v.pix_fmt, w: v.width, h: v.height, audio, faststart })}`);
+  }
+  if (def.apresentacao) {
+    const seg = Number(sonda.format.duration);
+    if (seg < 18 || seg > 35 || (def.duracaoMax && seg > def.duracaoMax) || (def.duracaoMin && seg < def.duracaoMin)) fs.rmSync(dirQuadros, { recursive: true, force: true });
+    if (seg < 18 || seg > 35 || (def.duracaoMax && seg > def.duracaoMax) || (def.duracaoMin && seg < def.duracaoMin)) throw new Error(`${def.id}: o clipe tem ${seg.toFixed(1)} s, fora da faixa pedida (${def.duracaoMin || 18} a ${def.duracaoMax || 35} s)`);
+    manifesto.clipes.push({
+      id: def.id,
+      arquivo: `${def.slug}.mp4`,
+      quadro: path.basename(arqCapa),
+      legenda: def.legenda,
+      duracaoSegundos: Number(seg.toFixed(1)),
+      tamanhoMB: Number((Number(sonda.format.size) / 1e6).toFixed(2)),
+      tamanhoBytes: Number(sonda.format.size),
+      dimensoes: `${v.width}x${v.height}`,
+      formato: `${v.codec_name} ${v.profile} ${v.pix_fmt} ${v.r_frame_rate} fps, sem áudio, +faststart, crf ${crfUsado}`,
+      mostra: def.mostra,
+      faltou: def.faltou || null,
+      numerosLidosDaTela: c.numeros,
+    });
+    console.log(`${def.id}: ${def.slug}.mp4 (${seg.toFixed(1)} s, ${(Number(sonda.format.size) / 1e6).toFixed(2)} MB, ${v.width}x${v.height}, crf ${crfUsado}, ${quadros.length} quadros capturados)`);
+    if (argv.includes('--manter-quadros')) {
+      const destino = path.join(saida, 'quadros-brutos', def.id);
+      fs.mkdirSync(destino, { recursive: true });
+      for (const q of quadros) fs.copyFileSync(q.arq, path.join(destino, path.basename(q.arq)));
+    }
+    fs.rmSync(dirQuadros, { recursive: true, force: true });
+    return;
   }
   manifesto.videos.push({
     id: def.id,
@@ -711,6 +800,308 @@ const VIDEOS = [
 ];
 
 // ---------------------------------------------------------------------------------------------------------------------
+// Os cinco clipes da apresentação (`--apresentacao`): funcionalidades reais da demonstração, sem narração, para slides 16:9.
+// ---------------------------------------------------------------------------------------------------------------------
+/** O painel da instituição é visto como na web: 1280 x 720 pontos ampliados 1,5 vez = 1920 x 1080 (16:9). */
+const TELA_PAINEL = { largura: 1280, altura: 720, escala: 1.5, desktop: true };
+const SENHA_FICTICIA = 'senha1234';
+
+/** Roteiros auxiliares da Família: contas simuladas na memória da página (a demonstração com dados fictícios não tem Família, D-055). */
+function auxiliaresDaFamilia(c) {
+  const { p, texto, esperar } = c;
+  const bt = (n) => p.getByRole('button', { name: n, exact: true }).filter({ visible: true }).first();
+  const campoDe = (n) => p.getByLabel(n, { exact: true }).filter({ visible: true }).first();
+  const corpo = () => p.locator('body').innerText();
+  const aConta = async () => {
+    for (let i = 0; i < 6 && (await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).count()) === 0; i++) { await bt('Voltar').click(); await p.waitForTimeout(400); }
+    await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click();
+    await esperar('Diferença do mês');
+    await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click();
+    await esperar('Privacidade neste aparelho');
+  };
+  const aFamilia = async () => {
+    await aConta();
+    await p.getByRole('button', { name: /^(Criar Família|Abrir Família)/ }).filter({ visible: true }).first().click();
+    await p.waitForTimeout(600);
+  };
+  const criarConta = async (nome, email) => {
+    await bt('Criar conta').click(); await esperar('Nome de apresentação');
+    await campoDe('Nome de apresentação').fill(nome); await campoDe('E-mail').fill(email); await campoDe('Senha').fill(SENHA_FICTICIA);
+    await bt('Criar conta').click(); await esperar('Confira seu e-mail');
+    await bt('Simular abertura do link').click(); await bt('Já confirmei meu e-mail').click(); await esperar('Sua primeira conta');
+    await bt('Começar meu mês').click(); await esperar('Diferença do mês'); await p.waitForTimeout(500);
+  };
+  const entrar = async (email) => {
+    await bt('Entrar').click(); await esperar('Esqueci minha senha');
+    await campoDe('E-mail').fill(email); await campoDe('Senha').fill(SENHA_FICTICIA);
+    await bt('Entrar').click(); await esperar('Diferença do mês'); await p.waitForTimeout(500);
+  };
+  const sair = async () => { await aConta(); await bt('Sair deste aparelho').click(); await esperar('Seu dinheiro'); };
+  /** A conta titular gera um convite com o papel dado e devolve o link (só para as outras contas aceitarem; o link nunca é mostrado legível no vídeo). */
+  const convidar = async (papel) => {
+    await bt('Convidar').click(); await esperar('O que a pessoa poderá fazer');
+    await p.getByRole('radio', { name: papel, exact: true }).filter({ visible: true }).first().click();
+    await bt('Gerar link').click(); await esperar('Link do convite'); await p.waitForTimeout(400);
+    const m = (await corpo()).match(/https?:\/\/[^\s]+\/convite\/[0-9a-f]{32}/);
+    if (!m) throw new Error('não achei o link do convite na tela');
+    await bt('Concluir').click(); await esperar('Seu papel: Titular');
+    return m[0];
+  };
+  const aceitar = async (link) => {
+    await aFamilia();
+    await campoDe('Link do convite').fill(link); await bt('Ver convite').click(); await esperar('Aceitar convite');
+    await bt('Aceitar convite').click(); await esperar('Você entrou na Família'); await p.waitForTimeout(400);
+  };
+  return { aConta, aFamilia, criarConta, entrar, sair, convidar, aceitar, texto };
+}
+
+const CLIPES = [
+  {
+    id: 'clipe-1',
+    slug: 'clipe-1-resumo',
+    titulo: 'Resumo do mês',
+    apresentacao: true,
+    limiteMB: 12,
+    duracaoMin: 20,
+    duracaoMax: 25,
+    legenda: 'Resumo de outubro: o que entrou, o que saiu, a diferença do mês (que não é saldo), o que ainda falta pagar e a renda comprometida.',
+    mostra: 'Resumo da demonstração: Diferença do mês, Recebido, Pago, "Ainda a pagar neste mês" e a renda comprometida, aberta em detalhe.',
+    preparar: async (c) => { await c.rolarPara(0, 0); await c.pausa(500); },
+    roteiro: async (c) => {
+      const { botao, esperar, pausa, rolarAte, rolarPara, tocar, texto } = c;
+      await pausa(900);
+      await c.quadro('capa', 0.2);
+      await pausa(5200); // Diferença do mês (não é saldo), Recebido e Pago
+      await rolarPara(150, 1600);
+      await pausa(4600); // Ainda a pagar e a Renda comprometida
+      await tocar(botao(/^Renda comprometida em outubro/), { antes: 500 });
+      await esperar('Seu limite');
+      c.numeros = { rendaComprometida: await texto('52,5%', true).innerText() };
+      await pausa(3600); // o percentual e o que entra na conta
+      await rolarAte(texto('Composição', true), 1500, 130);
+      await pausa(3600);
+    },
+  },
+  {
+    id: 'clipe-2',
+    slug: 'clipe-2-contas-a-pagar',
+    titulo: 'contas a pagar e gastos fixos',
+    apresentacao: true,
+    limiteMB: 12,
+    legenda: 'Contas a pagar: a lista do mês, uma conta marcada como paga com "Já paguei" e o novo total de "Ainda a pagar", além dos gastos fixos e parcelamentos.',
+    mostra: 'Ainda a pagar neste mês, a lista "A vencer em outubro", "Já paguei" na conta Internet (formulário e confirmação), a lista depois do pagamento (Ainda a pagar de R$ 650,00 para R$ 500,00, Internet em "Pagas") e Gastos fixos e parcelamentos.',
+    faltou: 'Lembretes de vencimento (aviso no dia anterior) existem só no app de celular: na demonstração web a tela de Conta diz "Lembretes estão disponíveis no app para celular", então não há o que gravar.',
+    preparar: async (c) => { await c.rolarPara(0, 0); await c.pausa(600); },
+    roteiro: async (c) => {
+      const { p, botao, esperar, pausa, rolarAte, rolarPara, tocar, texto } = c;
+      await pausa(1000);
+      const antes = await c.lerValorDoResumo('Ainda a pagar neste mês');
+      await rolarPara(150, 1300);
+      await pausa(900);
+      await tocar(p.getByRole('button', { name: /^Ainda a pagar neste mês, R\$/ }).filter({ visible: true }).first(), { antes: 400 });
+      await esperar('A vencer em outubro de 2026');
+      await pausa(900);
+      await c.quadro('capa', 0.2);
+      await pausa(2900); // a lista do mês: Internet e Condomínio, cada uma com "Já paguei"
+      await tocar(botao(/^Já paguei Internet, vence 15\/10/), { antes: 500 });
+      await esperar('Confirmar pagamento');
+      await pausa(2800); // o formulário: valor, data do pagamento e de onde saiu
+      await tocar(botao('Confirmar pagamento'), { antes: 500 });
+      await esperar('Internet marcada como paga.');
+      await esperar('R$ 500,00');
+      c.numeros = { ainda_a_pagar_antes: antes, conta_paga: 'Internet, R$ 150,00', ainda_a_pagar_depois: 'R$ 500,00' };
+      await pausa(3300); // Ainda a pagar caiu e a Internet saiu da lista a vencer
+      await rolarAte(texto('Pagas', true), 1400, 190);
+      await pausa(2600); // a Internet entre as pagas
+      await tocar(botao(/^Gastos fixos e parcelamentos/), { antes: 500 });
+      await esperar('Parcelamentos');
+      await pausa(2200);
+      await rolarAte(texto('Parcelamentos', true), 1500, 120);
+      await pausa(2800); // Financiamento do carro: parcela 13 de 48
+      await rolarAte(texto('Contas do ano', true), 1500, 120);
+      await pausa(2400);
+    },
+  },
+  {
+    id: 'clipe-3',
+    slug: 'clipe-3-familia',
+    titulo: 'Família: pessoas, papéis e convite por link',
+    apresentacao: true,
+    limiteMB: 12,
+    legenda: 'Família: as pessoas e o papel de cada uma (titular, anota e vê, só vê) e o convite por link, que o app mostra uma única vez.',
+    mostra: 'Conta, Família com três pessoas (titular, "Anota e vê" e "Só vê"), "Gerenciar", Convidar com o papel "Só vê" e o link do convite desfocado.',
+    faltou: 'A demonstração com dados fictícios não tem Família (D-055). A Família gravada vem de três contas simuladas na memória da página (a conta titular e duas contas que aceitam o convite), criadas antes da gravação e fora do vídeo. O link do convite aparece desfocado.',
+    // A página começa na tela de entrada: as contas simuladas são criadas aqui, fora da gravação.
+    entrar: async (c) => {
+      await c.p.goto(`${c.base}/`);
+      await c.esperar('Seu dinheiro');
+    },
+    preparar: async (c) => {
+      const f = auxiliaresDaFamilia(c);
+      const { p, esperar } = c;
+      const bt = (n) => p.getByRole('button', { name: n, exact: true }).filter({ visible: true }).first();
+      await f.criarConta('Vera Lima', 'vera.apresentacao@exemplo.com');
+      await f.aConta();
+      await bt('Criar Família').click(); await esperar('Anotar a casa em conjunto');
+      await bt('Criar Família').click(); await esperar('Nome da Família');
+      await c.campo('Nome da Família').fill('Família Exemplo');
+      await bt('Criar Família').click(); await esperar('Seu papel: Titular');
+      const linkMembro = await f.convidar('Anota e vê');
+      const linkLeitor = await f.convidar('Só vê');
+      await f.sair();
+      await f.criarConta('Mauro Dias', 'mauro.apresentacao@exemplo.com');
+      await f.aceitar(linkMembro);
+      await f.sair();
+      await f.criarConta('Lia Souza', 'lia.apresentacao@exemplo.com');
+      await f.aceitar(linkLeitor);
+      await f.sair();
+      await f.entrar('vera.apresentacao@exemplo.com');
+      // Com a Família criada o Resumo ganha o seletor "Pessoal | Família": a conta titular o deixa na Família, e "Quem vê estes dados?" mostra as pessoas.
+      await p.getByRole('tab', { name: 'Ver dados de Família', exact: true }).filter({ visible: true }).first().click();
+      await c.pausa(700);
+      await f.aConta();
+      await c.rolarPara(0, 0);
+      await c.pausa(700);
+    },
+    roteiro: async (c) => {
+      const { p, botao, esperar, pausa, rolarAte, tocar, texto } = c;
+      await pausa(900);
+      await c.quadro('conferencia', 0); // a Conta, com o aviso de demonstração à vista
+      await pausa(900);
+      await tocar(p.getByRole('button', { name: /^Abrir Família/ }).filter({ visible: true }).first(), { antes: 500 });
+      await esperar('Seu papel: Titular');
+      await pausa(3700); // Família Exemplo, "Seu papel: Titular" e as pessoas com o papel de cada uma
+      await tocar(p.getByRole('button', { name: /^Gerenciar Mauro, Anota e vê/ }).filter({ visible: true }).first(), { antes: 500 });
+      await esperar('Mudar para "Só vê"');
+      await pausa(2400); // o que o titular pode fazer com cada pessoa
+      await tocar(botao('Cancelar'), { antes: 400 });
+      await pausa(600);
+      await rolarAte(texto('Convites', true), 1400, 120);
+      await pausa(900);
+      await tocar(botao('Convidar'), { antes: 500 });
+      await esperar('O que a pessoa poderá fazer');
+      await pausa(1100);
+      await tocar(p.getByRole('radio', { name: 'Só vê', exact: true }).filter({ visible: true }).first(), { antes: 400 });
+      await pausa(1500); // "Só vê. Não anota nem altera nada."
+      await tocar(botao('Gerar link'), { antes: 500 });
+      await esperar('Link do convite');
+      await pausa(3200); // o link (desfocado), a validade e "Ele aparece só agora"
+      await tocar(botao('Concluir'), { antes: 400 });
+      await esperar('Seu papel: Titular');
+      await rolarAte(texto('Convites', true), 1300, 120);
+      await pausa(2200); // o convite pendente na lista e as vagas
+      await tocar(botao('Quem vê estes dados?'), { antes: 500 });
+      await esperar('Estas pessoas veem os registros da Família');
+      await pausa(1000);
+      await c.quadro('capa', 0.2);
+      await pausa(3400); // as pessoas, o papel de cada uma e o que cada papel pode fazer
+    },
+  },
+  {
+    id: 'clipe-4',
+    slug: 'clipe-4-aprender-e-calculadora',
+    titulo: 'Aprender e calculadora',
+    apresentacao: true,
+    limiteMB: 12,
+    legenda: 'Aprender: o tema "Rotativo do cartão e parcelamento da fatura", com exemplo e fontes, e a calculadora "Quanto custa uma dívida?" com os números do exemplo.',
+    mostra: 'Aba Aprender, tema do rotativo (exemplo calculado e fontes), "Fazer a conta com os seus números" e a calculadora "Quanto custa uma dívida?" preenchida com R$ 700,00 e 14% ao mês, e a pergunta "E se parcelar a fatura?".',
+    preparar: async (c) => { await c.rolarPara(0, 0); await c.pausa(500); },
+    roteiro: async (c) => {
+      const { p, botao, aba, campo, esperar, pausa, rolarAte, rolarPara, tocar, texto, digitar } = c;
+      await pausa(800);
+      await tocar(aba('Aprender e dúvidas'), { antes: 300 });
+      await esperar('Comece por aqui');
+      await pausa(800);
+      // O quadro de capa fica aqui: a aba Aprender traz o selo "Demonstração" no alto. As telas de tema e de calculadora não têm selo no app.
+      await c.quadro('capa', 0.3);
+      await pausa(1300); // a aba Aprender: busca, Como usar, Calculadoras, Neste mês
+      await tocar(botao('Ir para Juros e crédito'), { antes: 400 });
+      await pausa(800);
+      await tocar(botao(/^Rotativo do cartão e parcelamento da fatura\./), { antes: 500 });
+      await esperar('Ver a conta');
+      await pausa(2200); // o resumo do tema
+      await tocar(botao('Ver a conta', true), { antes: 400 });
+      await pausa(600);
+      await rolarAte(texto('Parcela: 798,00', false), 1300, 200);
+      await pausa(2000); // o exemplo calculado, passo a passo
+      await rolarAte(texto('Fontes', true), 1400, 130);
+      await pausa(1700); // as fontes, com a data da consulta
+      await rolarAte(botao('Fazer a conta com os seus números'), 1200, 260);
+      await pausa(400);
+      await tocar(botao('Fazer a conta com os seus números'), { antes: 400 });
+      await esperar('Valor da dívida');
+      await pausa(700);
+      // Os números do exemplo do tema: R$ 700,00 no rotativo, 14% ao mês; depois o parcelamento a 8% ao mês em 24 vezes.
+      await digitar(campo('Valor da dívida'), '700', 100);
+      await digitar(campo('Taxa de juros ao mês (%)'), '14', 100);
+      await esperar('Isso equivale a');
+      await rolarAte(texto('Com estes números', false), 1200, 140);
+      await pausa(2700); // R$ 98,00 de juros, R$ 798,00 e 381,79% ao ano
+      await rolarAte(texto('E se parcelar a fatura?', true), 1300, 120);
+      await digitar(campo('Taxa do parcelamento ao mês (%)'), '8', 100);
+      await digitar(campo('Em quantas parcelas'), '24', 100);
+      await p.getByText(/1\.818,96/).filter({ visible: true }).first().waitFor({ timeout: 8000 });
+      await rolarPara('fim', 1200);
+      await pausa(2400);
+    },
+  },
+  {
+    id: 'clipe-5',
+    slug: 'clipe-5-painel-da-instituicao',
+    titulo: 'painel da instituição e quem vê estes dados',
+    apresentacao: true,
+    limiteMB: 12,
+    tela: TELA_PAINEL,
+    legenda: 'Painel da empresa (web): contrato e vagas, convite de pessoas e licenças, sem acesso a finanças; e a tela "Quem vê estes dados?" do app.',
+    mostra: 'Painel da "Empresa Exemplo (demonstração)": contrato e vagas, convite por e-mail (links desfocados), licenças ativas, "Uso do app" só com contagens, e a tela "Quem vê estes dados?".',
+    preparar: async (c) => {
+      const { p, botao, esperar } = c;
+      await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click();
+      await esperar('Abrir painel da empresa');
+      await botao('Abrir painel da empresa').click();
+      await esperar('Empresa Exemplo (demonstração)');
+      await c.rolarPara(0, 0);
+      await c.pausa(700);
+    },
+    roteiro: async (c) => {
+      const { p, botao, aba, campo, esperar, pausa, rolarAte, rolarPara, tocar, texto } = c;
+      await pausa(800);
+      await c.quadro('capa', 0.2);
+      await pausa(3000); // Empresa Exemplo, plano, vagas e situação do contrato
+      await rolarAte(texto('Convidar pessoas', true), 1200, 70);
+      await pausa(500);
+      const emails = campo('E-mails');
+      await emails.click();
+      await emails.pressSequentially('pessoa.nova1@empresa-exemplo.example\npessoa.nova2@empresa-exemplo.example', { delay: 22 });
+      await texto('2 e-mails válidos para convidar', false).waitFor({ timeout: 8000 });
+      await pausa(1100); // a conferência da lista
+      await tocar(botao(/^Convidar 2 pessoas/), { antes: 400 });
+      await esperar('2 convites criados.');
+      await pausa(900);
+      await rolarAte(texto('Links para enviar', true), 1200, 70);
+      await pausa(1500); // os links, desfocados: o código nunca fica legível
+      await rolarAte(texto('Licenças', true), 1300, 70);
+      await pausa(500);
+      await tocar(p.getByRole('radio', { name: /^Ativas/ }).or(p.getByRole('button', { name: /^Ativas/ })).filter({ visible: true }).first(), { antes: 400 });
+      await pausa(1900); // as licenças ativas (e-mails fictícios)
+      await rolarAte(texto('Uso do app', true), 1400, 70);
+      await pausa(3000); // só contagens; a empresa não vê finanças
+      await tocar(aba('Resumo'), { antes: 400 });
+      await esperar('Diferença do mês');
+      await rolarPara('fim', 1000);
+      await pausa(300);
+      await tocar(botao('Quem vê estes dados?'), { antes: 300 });
+      await esperar('Única pessoa do app que vê, anota, edita e exclui');
+      await pausa(800);
+      await c.quadro('conferencia', 0);
+      await pausa(2200); // a pessoa vê tudo; a empresa só administra o acesso
+      await rolarPara(150, 1800);
+      await pausa(2200); // o que a empresa vê (e-mails e situação) e o que não vê (finanças)
+    },
+  },
+];
+
+// ---------------------------------------------------------------------------------------------------------------------
 // Capturas estáticas 1080 x 1350 (4:5): a tela como o app a mostra, sem montagem de arte.
 // ---------------------------------------------------------------------------------------------------------------------
 async function gravarCapturas(browser, servidor, saida, manifesto, problemas) {
@@ -840,21 +1231,36 @@ async function montagem(browser, saida, manifesto) {
     gravadoEmUtc: new Date().toISOString(),
     versao: { commit: git.status === 0 ? git.stdout.trim() : 'desconhecido', appVersion: versaoDoApp, appSemMudancasNaoCommitadas: sujo.status === 0 ? sujo.stdout.trim() === '' : null },
     demonstracao: 'conta de demonstração do app (dados fictícios, 07/10/2026), build de `export:demo`',
-    videos: [],
-    capturas: [],
+    ...(APRESENTACAO ? { apresentacao: true, clipes: [] } : { videos: [], capturas: [] }),
   };
   const problemas = [];
-  const comZoom = await servir(true);
-  const semZoom = await servir(false);
   const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
-  try {
-    for (const def of VIDEOS) if (SO.includes(def.id)) await gravarVideo(browser, comZoom, def, SAIDA, manifesto, problemas);
-    if (SO.includes('capturas')) await gravarCapturas(browser, semZoom, SAIDA, manifesto, problemas);
-    if (manifesto.videos.length && manifesto.capturas.length) await montagem(browser, SAIDA, manifesto);
-  } finally {
-    await browser.close();
-    comZoom.fechar();
-    semZoom.fechar();
+  if (APRESENTACAO) {
+    // O aparelho (360 x 640 pontos ampliados 3 vezes) na porta pedida; o painel (1280 x 720 pontos ampliados 1,5 vez), em uma porta livre.
+    const aparelho = await servir(true, PORTA);
+    const painel = await servir({ largura: TELA_PAINEL.largura, escala: TELA_PAINEL.escala }, 0);
+    try {
+      for (const def of CLIPES) {
+        if (PROIBIDO.test(def.legenda)) throw new Error(`${def.id}: a legenda tem travessão ou a expressão proibida: ${def.legenda}`);
+        if (SO.includes(def.id)) await gravarVideo(browser, def.tela && def.tela.desktop ? painel : aparelho, def, SAIDA, manifesto, problemas);
+      }
+    } finally {
+      await browser.close();
+      aparelho.fechar();
+      painel.fechar();
+    }
+  } else {
+    const comZoom = await servir(true);
+    const semZoom = await servir(false);
+    try {
+      for (const def of VIDEOS) if (SO.includes(def.id)) await gravarVideo(browser, comZoom, def, SAIDA, manifesto, problemas);
+      if (SO.includes('capturas')) await gravarCapturas(browser, semZoom, SAIDA, manifesto, problemas);
+      if (manifesto.videos.length && manifesto.capturas.length) await montagem(browser, SAIDA, manifesto);
+    } finally {
+      await browser.close();
+      comZoom.fechar();
+      semZoom.fechar();
+    }
   }
   fs.writeFileSync(path.join(SAIDA, 'manifesto.json'), `${JSON.stringify(manifesto, null, 2)}\n`);
   if (problemas.length) throw new Error(`problemas na gravação:\n- ${problemas.join('\n- ')}`);
