@@ -12,11 +12,11 @@
 |---|---|---|
 | Nome (Apple e Google) | 7 caracteres | 30 |
 | Nome, alternativa | 26 caracteres | 30 |
-| Subtítulo (Apple) | 26 caracteres | 30 |
+| Subtítulo (Apple) | 25 caracteres | 30 |
 | Texto promocional (Apple) | 167 caracteres | 170 |
 | Palavras-chave (Apple) | 98 bytes | 100 bytes |
 | Descrição (Apple) | 2692 caracteres | 4000 |
-| Descrição curta (Google) | 76 caracteres | 80 (a conferir) |
+| Descrição curta (Google) | 79 caracteres | 80 (a conferir) |
 | Descrição completa (Google) | 2692 caracteres | 4000 (a conferir) |
 | Notas da versão (Google) | 94 caracteres | 500 (a conferir) |
 | Notas para a revisão (Apple) | 940 bytes | 4000 bytes |
@@ -27,9 +27,11 @@
 |---|---|---|---|---|
 | Nome | Apple e Google | 30 | Clarevo | 7 |
 | Nome, alternativa se "Clarevo" já estiver em uso na Apple | Apple | 30 | Clarevo: finanças pessoais | 26 |
-| Subtítulo | Apple | 30 | Organize seu mês e aprenda | 26 |
+| Subtítulo | Apple | 30 | Mais clareza para decidir | 25 |
 | Categoria principal | Apple e Google | | Finanças | |
 | Categoria secundária (opcional) | Apple | | Educação | |
+
+**Frase de marca (24/10/2026).** "Mais clareza para decidir" substituiu a frase anterior do Clarevo: é o subtítulo da Apple e abre a descrição curta do Google. Ela acompanha a marca e não substitui a explicação do que o app faz, que continua logo abaixo, nas descrições. O gráfico de recursos do Google Play e a imagem de compartilhamento do site leem o subtítulo deste arquivo.
 
 <!-- campo: apple-nome | limite: 30 | unidade: caracteres -->
 ```
@@ -43,7 +45,7 @@ Clarevo: finanças pessoais
 
 <!-- campo: apple-subtitulo | limite: 30 | unidade: caracteres -->
 ```
-Organize seu mês e aprenda
+Mais clareza para decidir
 ```
 
 ## 2. Texto promocional (Apple, até 170)
@@ -106,7 +108,7 @@ O Clarevo é uma ferramenta de organização e de educação financeira. Não é
 
 <!-- campo: google-descricao-curta | limite: 80 | unidade: caracteres -->
 ```
-Anote gastos, veja contas e cartões e aprenda. Sem ligar a contas bancárias.
+Mais clareza para decidir. Anote gastos e contas. Sem ligar a contas bancárias.
 ```
 
 **Gráfico de recursos (Google Play, 1024 x 500): feito** (D-064). `apps/app/assets/loja/grafico-recursos-1024x500.png`, gerado por `node scripts/gerar-grafico-loja.js` com o logotipo oficial, o subtítulo desta ficha e a tela Resumo da demonstração (`docs/16`, seção 6). Não leva preço, ranking, "melhor", "grátis" nem selos das lojas.

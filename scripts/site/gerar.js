@@ -15,6 +15,7 @@ const { imagensDoSite } = require('./imagens');
 const { linksQuebrados, problemasFinaisDaPagina } = require('./verificacoes');
 const { caminhoLimpo, cabecalhosDoTexto } = require('./util');
 const { paginaInicial } = require('./paginas/inicio');
+const { paginaComece } = require('./paginas/comece');
 const { paginaApp } = require('./paginas/app');
 const { paginaEmpresas } = require('./paginas/empresas');
 const { paginasAprender } = require('./paginas/aprender');
@@ -111,6 +112,7 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
   const juntar = (pg) => paginas.push(pg);
 
   juntar(paginaInicial(ctx));
+  juntar(paginaComece(ctx));
   juntar(paginaApp(ctx));
   juntar(paginaEmpresas(ctx));
   paginasAprender(ctx).forEach(juntar);

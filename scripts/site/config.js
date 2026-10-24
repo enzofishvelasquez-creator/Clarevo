@@ -17,6 +17,9 @@ const TELAS = path.join(RAIZ, 'docs', 'telas');
 /** O app web de hoje. Com o domínio (P-006) o app iria para `app.` do domínio (a confirmar): troque aqui e em `docs/07`. */
 const URL_APP = 'https://clarevo.pages.dev';
 const HOST_APP = 'clarevo.pages.dev';
+/** A demonstração do app (dados fictícios, nada é gravado fora do aparelho): o destino de "Ver a demonstração" na página Comece aqui. */
+const URL_DEMO = 'https://clarevo-demo.pages.dev';
+const HOST_DEMO = 'clarevo-demo.pages.dev';
 /** Fontes do site: o corpo (500), o negrito (700) e os títulos (800). Subconjuntos Latin do app, com a licença OFL. */
 const PESOS_FONTE = ['500Medium', '700Bold', '800ExtraBold'];
 
@@ -26,7 +29,7 @@ const MARCADORES_EMAIL = new Set(['E-MAIL DE PRIVACIDADE', 'E-MAIL DE SUPORTE', 
  * Links de texto, sem carregar nada, que as páginas podem ter além dos das fontes do catálogo de Aprender: o app web e páginas oficiais
  * que os textos jurídicos citam. Os endereços das fontes do catálogo entram em `hostsDeFontes` (catalogo.js).
  */
-const HOSTS_BASE = [HOST_APP, 'www.gov.br', 'www.planalto.gov.br'];
+const HOSTS_BASE = [HOST_APP, HOST_DEMO, 'www.gov.br', 'www.planalto.gov.br'];
 
 /** As páginas que vêm de `docs/legal/`, na ordem do rodapé. */
 const PAGINAS_LEGAIS = [
@@ -56,6 +59,7 @@ const RODAPE_COLUNAS = [
     titulo: 'Clarevo',
     links: [
       { arquivo: 'index.html', rotulo: 'Início' },
+      { arquivo: 'comece.html', rotulo: 'Comece aqui' },
       { arquivo: 'app/index.html', rotulo: 'O app' },
       { arquivo: 'empresas/index.html', rotulo: 'Para empresas' },
       { arquivo: 'sobre.html', rotulo: 'Sobre' },
@@ -100,6 +104,8 @@ module.exports = {
   TELAS,
   URL_APP,
   HOST_APP,
+  URL_DEMO,
+  HOST_DEMO,
   PESOS_FONTE,
   MARCADORES,
   MARCADORES_EMAIL,

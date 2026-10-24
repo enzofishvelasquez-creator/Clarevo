@@ -8,7 +8,7 @@ const { catalogo } = require('../catalogo');
 const { valorDe } = require('../texto');
 
 const ARQUIVO = 'index.html';
-const DESCRICAO = 'O Clarevo é um organizador de finanças pessoais e da família. Anote gastos e recebimentos, acompanhe contas a pagar e cartões e aprenda o essencial.';
+const DESCRICAO = 'Mais clareza para decidir. O Clarevo é um organizador de finanças pessoais e da família: anote gastos e recebimentos, acompanhe contas a pagar e cartões e aprenda.';
 
 function paginaInicial({ valores, img }) {
   const u = (d) => rel(ARQUIVO, d);
@@ -33,7 +33,7 @@ ${celular(img[r.id], ARQUIVO)}
 
   const capa = `<div class="capa-grade">
 <div>
-<h1>Organize seu mês e aprenda</h1>
+<h1>Mais clareza para decidir</h1>
 <p class="lead">O Clarevo é um organizador de finanças pessoais e da família. Você anota o que recebe e o que paga, e o app mostra quanto entrou, quanto saiu e quanto ainda vai vencer, cada coisa separada da outra. Pode ser oferecido pela empresa como benefício.</p>
 <div class="acoes">
 <a class="botao botao-principal" href="${esc(URL_APP)}" rel="noopener noreferrer">Abrir a versão web</a>
@@ -126,7 +126,7 @@ ${mini}
   const fonte = brutas.join('\n') + capa;
   return montarPagina({
     arquivo: ARQUIVO,
-    titulo: 'Clarevo: organize seu mês e aprenda',
+    titulo: 'Clarevo: mais clareza para decidir',
     tituloCompleto: true,
     descricao: DESCRICAO,
     capa,

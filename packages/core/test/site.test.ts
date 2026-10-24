@@ -93,6 +93,7 @@ const POSTS = [
 ];
 const PAGINAS_BASE = [
   'index.html',
+  'comece.html',
   'app/index.html',
   'empresas/index.html',
   'aprender/index.html',
@@ -286,7 +287,7 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
     else if (/^(aprender|calculadoras|novidades|ajuda)\//.test(nome)) expect(cabecalho.match(/class="secao-atual"/g)?.length, `${nome}: seção atual`).toBe(2);
     // Rodapé em todas: todas as seções, as páginas legais e "[RAZÃO SOCIAL] · CNPJ [CNPJ]" (com os valores, quando houver).
     const rodape = /<footer class="rodape">([\s\S]*?)<\/footer>/.exec(html)?.[1] ?? '';
-    for (const p of ['index.html', 'app/index.html', 'empresas/index.html', 'aprender/index.html', 'aprender/agenda.html', 'calculadoras/index.html', 'novidades/index.html', 'novidades/como-escrevemos.html', 'ajuda/index.html', 'seguranca.html', 'sobre.html', 'imprensa.html', 'suporte.html', 'privacidade.html', 'termos.html', 'excluir-conta.html']) {
+    for (const p of ['index.html', 'comece.html', 'app/index.html', 'empresas/index.html', 'aprender/index.html', 'aprender/agenda.html', 'calculadoras/index.html', 'novidades/index.html', 'novidades/como-escrevemos.html', 'ajuda/index.html', 'seguranca.html', 'sobre.html', 'imprensa.html', 'suporte.html', 'privacidade.html', 'termos.html', 'excluir-conta.html']) {
       expect(rodape, `${nome}: rodapé sem ${p}`).toContain(`<a href="${visto(nome, p)}">`);
     }
     expect(rodape, `${nome}: rodapé`).toMatch(/·\s*CNPJ\s/);
@@ -702,7 +703,10 @@ describe('site público: as páginas geradas', () => {
 
   it('a página inicial traz o que o Clarevo é, recursos com captura, a empresa que nunca vê finanças, o que ele não é, o app web e o aviso das lojas (sem selos)', () => {
     const h = html('index.html');
-    expect(h).toContain('<h1>Organize seu mês e aprenda</h1>');
+    expect(h).toContain('<h1>Mais clareza para decidir</h1>');
+    expect(h).not.toContain('Organize seu mês e aprenda');
+    // A frase de marca acompanha o herói, e logo abaixo vem o texto que diz o que o Clarevo é (ela não substitui a explicação).
+    expect(h.indexOf('<p class="lead">O Clarevo é um organizador de finanças pessoais e da família', h.indexOf('<h1>Mais clareza para decidir</h1>'))).toBeGreaterThan(0);
     expect(h).toContain('organizador de finanças pessoais e da família');
     expect(h).toContain('Pode ser oferecido pela empresa como benefício');
     expect(h).toContain('A empresa nunca vê suas finanças');
@@ -734,6 +738,41 @@ describe('site público: as páginas geradas', () => {
     expect(h).not.toMatch(/<img[^>]*(apple|google|store|play)/i);
     expect(h).not.toMatch(/R\$\s?\d{2,}[^\w]*\/|gr[áa]tis|depoimento|milh[õo]es|\d+\s*mil\s+(pessoas|usu)|melhor|pr[êe]mio|nossos clientes/i);
     expect(h).not.toMatch(/Download on the|App Store badge|Get it on/i);
+  });
+
+  it('Comece aqui (o link da bio, D-067): o que é o Clarevo em duas frases, o estado real do acesso e os seis caminhos, sem espera, sem data, sem script e sem rastreamento', () => {
+    const h = html('comece.html');
+    const principal = /<main[\s\S]*<\/main>/.exec(h)![0];
+    expect(h).toContain('<h1>Comece aqui</h1>');
+    // O que é o Clarevo, em duas frases (o primeiro parágrafo de apresentação), e a frase de marca depois da explicação.
+    const lead = /<p class="lead">([^<]+)<\/p>/.exec(h)![1]!;
+    expect(lead.split(/(?<=\.)\s+/).filter(Boolean).length).toBe(2);
+    expect(lead).toContain('aplicativo de finanças pessoais e da família');
+    expect(lead).toContain('Não é banco, não movimenta dinheiro e não recomenda produtos financeiros.');
+    expect(h.indexOf('Mais clareza para decidir.</p>')).toBeGreaterThan(h.indexOf(lead));
+    // O estado do acesso de hoje (cadastro de pessoas reais só no piloto, D-064), sem lista de espera nem data.
+    expect(h).toContain('O Clarevo está em fase de testes. A versão para pessoas e empresas abre no piloto; acompanhe as <a href="novidades/index.html">Novidades</a>.');
+    expect(principal).not.toMatch(/lista de espera|cadastre-se|inscreva|em breve|a partir de \d|dia \d|janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro|gr[áa]tis|teste gratuito/i);
+    // Os seis caminhos, nesta ordem; a demonstração é o endereço combinado, com noopener, e nenhum link leva parâmetro de rastreamento.
+    const links = [...h.matchAll(/<a class="cartao" href="([^"]+)"[^>]*><span class="titulo-cartao">([^<]+)<\/span>/g)].map((m) => [m[2], m[1]]);
+    expect(links).toEqual([
+      ['O app', 'app/index.html'],
+      ['Ver a demonstração', 'https://clarevo-demo.pages.dev'],
+      ['Aprender', 'aprender/index.html'],
+      ['Calculadoras', 'calculadoras/index.html'],
+      ['Para empresas', 'empresas/index.html'],
+      ['Ajuda', 'ajuda/index.html'],
+    ]);
+    expect(h).toContain('<a class="cartao" href="https://clarevo-demo.pages.dev" rel="noopener noreferrer">');
+    expect(h).toContain('Abra o app com dados fictícios, no navegador. Nada é gravado fora do seu aparelho.');
+    for (const m of h.matchAll(/\s(?:href|src)="([^"]*)"/g)) expect(m[1], `link com parâmetro: ${m[1]}`).not.toMatch(/[?&]|utm_|fbclid|gclid|igshid/i);
+    // Nenhum script (só dados estruturados, se houver), nenhum formulário e nenhum recurso de fora.
+    expect([...h.matchAll(/<script\b([^>]*)>/g)].filter((m) => !/application\/ld\+json/.test(m[1]!))).toEqual([]);
+    expect(h).not.toMatch(/<form\b/);
+    // O rodapé leva a ela, e ela entra no mapa do site quando há domínio.
+    expect(html('index.html')).toContain('<a href="comece.html">Comece aqui</a>');
+    const g = gerarSite({ dados: PREENCHIDOS, referencia: '2026-10-23' });
+    expect(texto(g.arquivos.get('sitemap.xml'))).toContain('<loc>https://exemplo.test/comece</loc>');
   });
 
   it('O app passeia por todos os recursos pedidos, cada um com a captura da demonstração e o texto do guia de uso do app', () => {
@@ -1710,7 +1749,8 @@ describe('gráfico de recursos do Google Play (scripts/gerar-grafico-loja.js)', 
     expect(script).toContain('o desenho invade as zonas livres do gráfico');
     expect(existsSync(join(ROOT, 'docs', 'lojas', 'capturas', 'google-play-celular-1080x1920', '01_resumo.png'))).toBe(true);
     const ficha = readFileSync(join(ROOT, 'docs', 'lojas', 'ficha.md'), 'utf8');
-    expect(ficha).toContain('Organize seu mês e aprenda');
+    expect(ficha).toContain('Mais clareza para decidir');
+    expect(ficha).not.toContain('Organize seu mês e aprenda');
     const textoDoGrafico = [...script.matchAll(/<(?:h1|p)>([^<]*)<\/p>|<h1>([^<]*)<\/h1>/g)].map((m) => m[1] ?? m[2]).join(' ');
     expect(textoDoGrafico).not.toMatch(/gr[áa]tis|melhor|baixe|download|R\$|ranking|#1|\bn[úu]mero 1\b/i);
   });
