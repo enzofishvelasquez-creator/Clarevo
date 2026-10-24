@@ -104,6 +104,7 @@ Quando o acesso abrir, mudam juntos: o texto de `ACESSO` em `scripts/site/pagina
 node scripts/gravar-redes.js --saida <pasta>            grava tudo
 node scripts/gravar-redes.js --so p02,p05,capturas ...   só estas peças (p02, p05, p08, p11, capturas)
 node scripts/gravar-redes.js --build                     refaz o build de demonstração antes
+node scripts/gravar-redes.js --apresentacao              só os cinco clipes da apresentação (seção 2.7)
 ```
 
 O script usa `apps/app/dist` (o build de `export:demo`, o mesmo de `scripts/video-demonstracao.js`), sobe um servidor local, não faz nenhum pedido para fora de `localhost` (falha se algum tentar), grava o fluxo no Chromium do Playwright e converte com o `ffmpeg` que já existe. A demonstração aceita escrita (o gasto, o orçamento e a meta ficam só na memória da página, que é recriada a cada gravação), então **os quatro fluxos foram gravados até o fim**. A narração é montada com os números **lidos da tela** na hora da gravação, e o script falha se a tela não tiver o que a peça mostra. A pasta de saída desta gravação ficou em `/tmp/claude-0/-home-user/1580a5fb-b479-5b5b-aff6-916ff9dc81be/scratchpad/redes/` (os arquivos de mídia não vão para o repositório; a equipe copia para o lugar combinado). Ela também traz `manifesto.json` (versão, números lidos e narração) e `montagem.png`, uma folha de conferência com a capa e um quadro de cada vídeo e as capturas 4:5.
@@ -192,9 +193,23 @@ A tela de 4:5 é de 400 x 500 pontos na escala 2,7, um pouco mais de área que o
 ### 2.6 O que a gravação não cobre
 
 - **Telas de conta real:** o piloto ainda não começou; não há conta real nem dados reais. Tudo vem da demonstração (inclusive a conta nova simulada, que não foi gravada).
-- **Família:** a demonstração não tem Família de exemplo, então não há gravação (seção 1.2).
+- **Família:** a demonstração não tem Família de exemplo, então as peças das redes não têm gravação dela (seção 1.2). O clipe 3 da apresentação (seção 2.7) usa contas simuladas criadas só para ele.
 - **Lembretes, widget e biometria:** só existem no app das lojas; não aparecem na versão web.
 - **Evolução, Aprender e Cartões:** não foram pedidos para as peças P01 a P12; já há vídeo de demonstração completo (`scripts/video-demonstracao.js`, `docs/17`).
+
+### 2.7 Clipes para uma apresentação (`--apresentacao`)
+
+Cinco clipes de funcionalidades reais da demonstração, sem narração, para slides 16:9 (tocam dentro de um quadro de celular ou de tela). A mesma gravação das peças acima (captura de tela do Chromium, dados fictícios, toque em círculo lima), com `manifesto.json` próprio (arquivo, quadro, legenda, duração, tamanho e dimensões de cada clipe) e, para cada um, um quadro parado em PNG do mesmo tamanho. Os quatro primeiros saem em 1080 x 1920 e o painel, em 1920 x 1080 (o app visto como na web, a 1280 x 720 pontos ampliados 1,5 vez); de 18 a 35 s, até 12 MB cada (o script sobe o CRF até caber e falha se não couber).
+
+| Clipe | Mostra |
+|---|---|
+| `clipe-1-resumo` | Resumo: Diferença do mês ("não é saldo"), Recebido, Pago, "Ainda a pagar neste mês" e a renda comprometida, aberta em detalhe |
+| `clipe-2-contas-a-pagar` | Contas a pagar: a lista do mês, "Já paguei" na Internet (Ainda a pagar vai de R$ 650,00 a R$ 500,00), gastos fixos e parcelamentos |
+| `clipe-3-familia` | Família: pessoas com os papéis Titular, "Anota e vê" e "Só vê", "Gerenciar", convite por link (desfocado) e "Quem vê estes dados?" |
+| `clipe-4-aprender-e-calculadora` | Aprender: tema "Rotativo do cartão e parcelamento da fatura", com exemplo e fontes, e a calculadora "Quanto custa uma dívida?" com os números do exemplo |
+| `clipe-5-painel-da-instituicao` | Painel da "Empresa Exemplo (demonstração)": contrato e vagas, convidar pessoas, licenças, uso do app só com contagens, e "Quem vê estes dados?" |
+
+Limites, para dizer na apresentação: (1) a demonstração com dados fictícios não tem Família, então o clipe 3 cria, antes de gravar e fora do vídeo, três contas simuladas na memória da página (a conta titular e duas contas que aceitam o convite); (2) os links de convite da Família e da empresa saem desfocados no vídeo, o código nunca fica legível; (3) as telas de Família, de tema e de calculadora não têm o selo "Demonstração" no cabeçalho (o app só o põe em algumas telas), então o quadro de cada clipe é escolhido numa tela que o tem; (4) lembretes de vencimento existem só no app de celular e não aparecem na demonstração web, então não há clipe deles; (5) o painel da empresa só existe na web, e o app limita o conteúdo a uma coluna centralizada, por isso o quadro 16:9 traz margens vazias dos dois lados.
 
 ## 3. Regras de gráficos do Guia v2.0: o que o app e o site já cumprem
 
