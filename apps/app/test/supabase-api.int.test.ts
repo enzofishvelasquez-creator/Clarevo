@@ -9288,3 +9288,216 @@ describe('API real: Renda variável (Ciclo V, D-062)', () => {
     expect(await err(loadIncomeAverage(otto, fam, NOW, 3))).toBe('sem_permissao');
   });
 });
+
+describe('API real: Como você conheceu o Clarevo? (D-067, item 2)', () => {
+  // Sofia (responde e muda), Tiago (outra pessoa, que não lê a resposta dela), Úrsula (nunca criou o espaço pessoal), Vera (repetição com
+  // a resposta perdida) e Wagner (exclui a conta). A pergunta é opcional, só da própria pessoa, não conta como anotação e só entra em
+  // contagens da equipe, que o app não executa. Roda no fim: nada dos blocos anteriores depende destas pessoas. Pessoas FICTÍCIAS.
+  // Hoje é 07/10/2026.
+  const TODAY = '2026-10-07';
+  const SOFIA = '00000000-0000-0000-0000-0000000005a1';
+  const TIAGO = '00000000-0000-0000-0000-0000000005b1';
+  const URSULA = '00000000-0000-0000-0000-0000000005c1';
+  const VERA = '00000000-0000-0000-0000-0000000005d1';
+  const WAGNER = '00000000-0000-0000-0000-0000000005e1';
+  const sofia = repoFor(SOFIA);
+  const tiago = repoFor(TIAGO);
+  const ursula = repoFor(URSULA);
+  const fail = async (p: Promise<unknown>) => (await p.then(() => null, (e: unknown) => e)) as RepoError;
+  // A resposta da pessoa, direto na tabela (sem a RLS): "origem vversão" ou "-".
+  const stored = (id: string) => adminSql(`select coalesce((select source || ' v' || version from public.signup_sources where person_id = '${id}'), '-')`);
+  const operations = (id: string) => Number(adminSql(`select count(*) from public.record_operations where actor_id = '${id}' and action = 'responder_origem_cadastro'`));
+
+  beforeAll(async () => {
+    adminSql(
+      `insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
+         ('${SOFIA}', 'sofia@exemplo.test', now(), '{"display_name":"Sofia Lima"}'),
+         ('${TIAGO}', 'tiago@exemplo.test', now(), '{"display_name":"Tiago Lima"}'),
+         ('${URSULA}', 'ursula@exemplo.test', now(), '{"display_name":"Úrsula Reis"}'),
+         ('${VERA}', 'vera@exemplo.test', now(), '{"display_name":"Vera Reis"}'),
+         ('${WAGNER}', 'wagner@exemplo.test', now(), '{"display_name":"Wagner Reis"}')`,
+    );
+    for (const r of [sofia, tiago, repoFor(VERA), repoFor(WAGNER)]) await r.ensurePersonalSpace('Conta principal');
+  });
+
+  it('1. conta nova: nenhuma resposta de exemplo, para ninguém', async () => {
+    expect(await sofia.getSignupSource()).toBeNull();
+    expect(await tiago.getSignupSource()).toBeNull();
+    expect(Number(adminSql('select count(*) from public.signup_sources'))).toBe(0);
+  });
+
+  it('2. responder: devolve a resposta, a leitura traz a mesma, e não é anotação nem muda nenhum registro', async () => {
+    const space = (await sofia.getSpace())!;
+    await sofia.createRecord(newOperationKey(), space.personalContextId, 'despesa', { accountId: space.accounts[0]!.id, amountCents: 4500, occurredOn: TODAY, description: 'Café', category: null });
+    const activityBefore = await sofia.getReturnReviewState(space.personalContextId);
+    expect(activityBefore.activity).toMatchObject({ lastWriteOn: TODAY });
+    const recordsBefore = JSON.stringify(await sofia.listRecords(space.personalContextId, '2026-10'));
+    // Em outro dia, para que uma anotação mudasse a última data da atividade.
+    const later = repoFor(SOFIA, '2026-10-12');
+    const key = newOperationKey();
+    const written = await later.setSignupSource(key, 0, 'instagram');
+    expect(written).toMatchObject({ source: 'instagram', version: 1 });
+    expect(Date.parse(written.answeredAt)).toBeGreaterThan(0);
+    expect(written.updatedAt).toBe(written.answeredAt);
+    expect(await sofia.getSignupSource()).toEqual(written);
+    expect(stored(SOFIA)).toBe('instagram v1');
+    expect(await sofia.getReturnReviewState(space.personalContextId)).toEqual(activityBefore);
+    expect(JSON.stringify(await sofia.listRecords(space.personalContextId, '2026-10'))).toBe(recordsBefore);
+    // A operação fica no Pessoal, sem alvo.
+    expect(adminSql(`select action || ' ' || (context_id = '${space.personalContextId}')::text || ' ' || (record_id is null and commitment_id is null and target_id is null)::text from public.record_operations where actor_id = '${SOFIA}' and idempotency_key = '${key}'`)).toBe('responder_origem_cadastro true true');
+    // Repetir a mesma chave devolve a mesma resposta; outro pedido com a chave é reutilizado.
+    expect(await later.setSignupSource(key, 0, 'instagram')).toEqual(written);
+    expect(await err(later.setSignupSource(key, 0, 'busca'))).toBe('chave_reutilizada');
+    expect(operations(SOFIA)).toBe(1);
+  });
+
+  it('3. mudar: a versão sobe de 1 em 1; versão antiga é recusada com a atual; a mesma origem não grava', async () => {
+    const changed = await sofia.setSignupSource(newOperationKey(), 1, 'busca');
+    expect(changed).toMatchObject({ source: 'busca', version: 2 });
+    const stale = await fail(sofia.setSignupSource(newOperationKey(), 1, 'outro'));
+    expect([stale.code, stale.detail]).toEqual(['versao_desatualizada', 'versao_atual=2']);
+    expect(await err(sofia.setSignupSource(newOperationKey(), 0, 'outro'))).toBe('versao_desatualizada');
+    expect(await err(sofia.setSignupSource(newOperationKey(), 3, 'outro'))).toBe('versao_desatualizada');
+    const same = await sofia.setSignupSource(newOperationKey(), 2, 'busca');
+    expect(same).toEqual(changed);
+    expect(stored(SOFIA)).toBe('busca v2');
+    // As seis origens são aceitas, e a versão acompanha.
+    let version = 2;
+    for (const source of ['instagram', 'indicacao', 'empresa', 'outro', 'prefiro_nao_dizer'] as const) {
+      expect(await sofia.setSignupSource(newOperationKey(), version, source)).toMatchObject({ source, version: version + 1 });
+      version += 1;
+    }
+    expect(stored(SOFIA)).toBe('prefiro_nao_dizer v7');
+  });
+
+  it('4. recusas: origem fora da lista, sem espaço pessoal, sem sessão; nada é gravado', async () => {
+    const before = adminSql('select count(*) from public.signup_sources');
+    for (const bad of ['Instagram', 'facebook', '', ' busca', 'outro: um amigo']) {
+      expect(await err(tiago.setSignupSource(newOperationKey(), 0, bad as never)), JSON.stringify(bad)).toBe('origem_invalida');
+    }
+    expect(await err(ursula.setSignupSource(newOperationKey(), 0, 'instagram'))).toBe('sem_permissao');
+    const anon = new SupabaseRepository(clientFor(null), { id: TIAGO });
+    expect(await err(anon.setSignupSource(newOperationKey(), 0, 'instagram'))).toBe('sem_permissao');
+    expect(await err(anon.getSignupSource())).toBe('sem_permissao');
+    expect(await tiago.getSignupSource()).toBeNull();
+    expect(adminSql('select count(*) from public.signup_sources')).toBe(before);
+    // A chave de uma recusa serve de novo.
+    const key = newOperationKey();
+    expect(await err(tiago.setSignupSource(key, 0, 'facebook' as never))).toBe('origem_invalida');
+    expect(await tiago.setSignupSource(key, 0, 'empresa')).toMatchObject({ source: 'empresa', version: 1 });
+  });
+
+  it('5. só a própria pessoa lê; ninguém grava direto; a função da equipe não é chamada pelo app', async () => {
+    // Tiago lê só a dele, e Sofia só a dela.
+    expect(await tiago.getSignupSource()).toMatchObject({ source: 'empresa' });
+    expect(await sofia.getSignupSource()).toMatchObject({ source: 'prefiro_nao_dizer' });
+    const all = await clientFor(TIAGO).from('signup_sources').select('person_id, source');
+    expect(all.error).toBeNull();
+    expect(all.data).toEqual([{ person_id: TIAGO, source: 'empresa' }]);
+    // Sem texto livre e sem outras colunas além das quatro que o app lê.
+    const cols = await clientFor(TIAGO).from('signup_sources').select('*');
+    expect(Object.keys(cols.data![0]!).sort()).toEqual(['answered_at', 'person_id', 'source', 'updated_at', 'version']);
+    // Escrita direta: recusada para todas as formas.
+    const db = clientFor(TIAGO);
+    expect((await db.from('signup_sources').insert({ person_id: TIAGO, source: 'busca' })).error?.code).toBe('42501');
+    expect((await db.from('signup_sources').update({ source: 'busca' }).eq('person_id', TIAGO)).error?.code).toBe('42501');
+    expect((await db.from('signup_sources').delete().eq('person_id', TIAGO)).error?.code).toBe('42501');
+    expect((await clientFor(null).from('signup_sources').select('source')).error?.code).toBe('42501');
+    expect(stored(TIAGO)).toBe('empresa v1');
+    // As contagens da equipe e as auxiliares não existem para quem tem sessão (nem anônima).
+    for (const client of [clientFor(TIAGO), clientFor(null)]) {
+      const staff = await client.rpc('clarevo_staff_signup_metrics', { p_from: '2026-08-01', p_to: '2026-10-07' });
+      expect(staff.error?.code).toBe('42501');
+      expect(staff.data).toBeNull();
+      expect((await client.rpc('clarevo_signup_source_result', { p_person: TIAGO })).error?.code).toBe('42501');
+    }
+  });
+
+  it('6. a resposta se perde (gravou, a rede caiu): repetir a mesma chave reconcilia, sem versão a mais', async () => {
+    const lost = new SupabaseRepository(clientFor(VERA, undefined, lostResponse), { id: VERA });
+    const key = newOperationKey();
+    expect(await err(lost.setSignupSource(key, 0, 'indicacao'))).toBe('rede');
+    expect(stored(VERA)).toBe('indicacao v1');
+    const again = await repoFor(VERA).setSignupSource(key, 0, 'indicacao');
+    expect(again).toMatchObject({ source: 'indicacao', version: 1 });
+    expect(stored(VERA)).toBe('indicacao v1');
+    expect(operations(VERA)).toBe(1);
+  });
+
+  it('7. excluir a conta apaga a resposta e o rastro; a conta excluída não responde com o token ainda válido', async () => {
+    const wagner = repoFor(WAGNER);
+    await wagner.setSignupSource(newOperationKey(), 0, 'outro');
+    expect(stored(WAGNER)).toBe('outro v1');
+    await wagner.deleteMyAccount(DELETE_CONFIRMATION_WORD, newOperationKey());
+    expect(stored(WAGNER)).toBe('-');
+    expect(operations(WAGNER)).toBe(0);
+    expect(await err(wagner.setSignupSource(newOperationKey(), 0, 'instagram'))).toBe('sem_permissao');
+    expect(stored(WAGNER)).toBe('-');
+    // As outras respostas seguem.
+    expect(stored(SOFIA)).toBe('prefiro_nao_dizer v7');
+    expect(stored(VERA)).toBe('indicacao v1');
+  });
+});
+
+describe('conversor da resposta de "Como você conheceu o Clarevo?"', () => {
+  // O repositório de verdade, com um cliente que devolve o que o teste manda: a leitura e o resultado de set_signup_source passam pela
+  // mesma conferência e nunca viram uma resposta inventada.
+  const chain = (row: unknown, error: unknown = null) => {
+    const q: Record<string, unknown> = {};
+    for (const m of ['select', 'eq']) q[m] = () => q;
+    q.maybeSingle = async () => ({ data: row, error });
+    return q;
+  };
+  const repoWith = (row: unknown, rpcData: unknown = row, rpcError: unknown = null) => {
+    const rpcCalls: unknown[][] = [];
+    const client = {
+      from: (table: string) => {
+        expect(table).toBe('signup_sources');
+        return chain(row);
+      },
+      rpc: async (fn: string, args: unknown) => {
+        rpcCalls.push([fn, args]);
+        return { data: rpcData, error: rpcError };
+      },
+    } as unknown as SupabaseClient;
+    return { repo: new SupabaseRepository(client, { id: 'p1' }), rpcCalls };
+  };
+  const good = { source: 'instagram', version: 2, answered_at: '2026-10-07T12:00:00+00:00', updated_at: '2026-10-09T12:00:00+00:00' };
+
+  it('a leitura devolve a resposta no formato do app, ou nulo sem linha', async () => {
+    expect(await repoWith(good).repo.getSignupSource()).toEqual({ source: 'instagram', version: 2, answeredAt: '2026-10-07T12:00:00+00:00', updatedAt: '2026-10-09T12:00:00+00:00' });
+    expect(await repoWith(null).repo.getSignupSource()).toBeNull();
+  });
+
+  it('o set_signup_source recebe a origem, a chave e a versão, pelos nomes do banco', async () => {
+    const { repo, rpcCalls } = repoWith(null, good);
+    expect(await repo.setSignupSource('chave-9001', 1, 'instagram')).toMatchObject({ source: 'instagram', version: 2 });
+    expect(rpcCalls).toEqual([['set_signup_source', { p_source: 'instagram', p_key: 'chave-9001', p_version: 1 }]]);
+  });
+
+  it('resposta fora da forma (origem desconhecida, versão zero, sem datas, sem dado) nunca vira uma resposta inventada', async () => {
+    for (const bad of [
+      { ...good, source: 'tiktok' },
+      { ...good, source: null },
+      { ...good, version: 0 },
+      { ...good, answered_at: null },
+      { ...good, updated_at: null },
+      { source: null, version: 0, answered_at: null, updated_at: null },
+    ]) {
+      expect(await err(repoWith(bad).repo.getSignupSource()), JSON.stringify(bad)).toBe('desconhecido');
+      expect(await err(repoWith(null, bad).repo.setSignupSource('chave-9002', 0, 'instagram')), JSON.stringify(bad)).toBe('desconhecido');
+    }
+    expect(await err(repoWith(null, null).repo.setSignupSource('chave-9003', 0, 'instagram'))).toBe('desconhecido');
+  });
+
+  it('os códigos do banco voltam com o nome, e a versão atual vem no detalhe', async () => {
+    for (const code of ['origem_invalida', 'sem_permissao', 'chave_reutilizada', 'nao_autenticado'] as const) {
+      const out = await err(repoWith(null, null, { message: code, code: 'PT409', details: null }).repo.setSignupSource('chave-9004', 0, 'instagram'));
+      expect(out, code).toBe(code);
+    }
+    const stale = await repoWith(null, null, { message: 'versao_desatualizada', code: 'PT409', details: 'versao_atual=3' })
+      .repo.setSignupSource('chave-9005', 0, 'instagram')
+      .catch((e: RepoError) => e);
+    expect([(stale as RepoError).code, (stale as RepoError).detail]).toEqual(['versao_desatualizada', 'versao_atual=3']);
+  });
+});

@@ -714,7 +714,7 @@ end $$;
 reset role;
 
 -- ---------------------------------------------------------------------------
--- 8. record_operations: as quatro ações novas apontam só para a linha (target_id); a lista vigente tem 65 ações.
+-- 8. record_operations: as quatro ações novas apontam só para a linha (target_id); a lista vigente tem 66 ações.
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -757,11 +757,11 @@ begin
             'excluir_lancamento_cartao', 'excluir_limite_comprometimento', 'excluir_meta', 'excluir_movimento_meta',
             'excluir_orcamento_categoria', 'excluir_renda_referencia', 'excluir_serie', 'importar_extrato', 'informar_ano',
             'marcar_assinatura', 'marcar_mes_conferido', 'pagar_compromisso', 'pagar_fatura', 'registrar_movimento_meta', 'remover_membro_familia',
-            'renovar_convite_licenca', 'responder_guardar', 'revisar_assinaturas', 'sair_familia', 'situacao_cartao',
+            'renovar_convite_licenca', 'responder_guardar', 'responder_origem_cadastro', 'revisar_assinaturas', 'sair_familia', 'situacao_cartao',
             'situacao_conta', 'situacao_meta', 'tirar_ano', 'transferir_titularidade_familia'],
-    'as 65 ações vigentes (com as 4 de orçamento e limite, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas; as outras, testadas em 30 a 70)';
+    'as 66 ações vigentes (com as 4 de orçamento e limite, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas; as outras, testadas em 30 a 70)';
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-           where c.conname = 'record_operations_action_check') = 65, '65 ações';
+           where c.conname = 'record_operations_action_check') = 66, '66 ações';
   -- Toda operação nova aponta para uma linha do mesmo contexto; a exclusão, para uma linha excluída.
   assert not exists (select 1 from public.record_operations o
                       where o.action in ('definir_orcamento_categoria', 'excluir_orcamento_categoria')
@@ -922,7 +922,7 @@ do $$ begin
             'months_overview', 'my_today', 'organization_usage', 'pay_commitment', 'pay_invoice', 'preview_family_invite',
             'preview_license_invite', 'remove_family_member', 'renew_license_invite', 'set_account_status', 'set_card_status',
             'set_category_budget', 'set_commitment_limit', 'set_default_account', 'set_goal_status', 'set_income_reference',
-            'set_member_role', 'set_month_check', 'set_savings_answer', 'set_series_subscription', 'skip_series_year', 'sync_series_occurrences',
+            'set_member_role', 'set_month_check', 'set_savings_answer', 'set_series_subscription', 'set_signup_source', 'skip_series_year', 'sync_series_occurrences',
             'transfer_family_ownership', 'undo_commitment_payment', 'undo_invoice_payment', 'update_account', 'update_card',
             'update_card_entry', 'update_commitment', 'update_goal', 'update_goal_movement', 'update_record',
             'update_series_from'],

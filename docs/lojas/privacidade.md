@@ -18,6 +18,7 @@
 | Dados financeiros digitados: valores (em centavos), datas, descrições (até 80 caracteres), categorias, contas a pagar, gastos fixos, parcelamentos e contas do ano, metas e aportes, renda de referência, limite e orçamento, contas de origem do dinheiro, cartões (apelido, 4 últimos dígitos se a pessoa quiser, dias de fechamento e vencimento, limite) e faturas | Digitados ou importados pela pessoa | `financial_records`, `commitments`, `commitment_series`, `goals`, `cards`, `card_entries`, `category_budgets` e as outras tabelas de `docs/05` |
 | Resumo SHA-256 da chave da nota fiscal e de cada linha importada | Calculado no aparelho | `receipt_key` e o resumo de cada linha importada. Só o resumo, nunca a chave, o CNPJ, o CPF nem o texto da nota |
 | Resposta do plano de guardar e datas da última anotação | Resposta da pessoa; atividade mantida por gatilho | `savings_checks`, `context_activity` (lidos só pela própria pessoa, sem ir à empresa) |
+| Resposta opcional de "Como você conheceu o Clarevo?" (D-067): uma de seis origens, sem texto livre, quando respondeu e a versão | Resposta da pessoa, opcional | `signup_sources` (lida só pela própria pessoa; a equipe só vê contagens por semana, sem identificar ninguém e com contagens de 1 a 4 escondidas; sai junto com a conta). Entra na declaração como outro conteúdo fornecido pela pessoa, ligado à conta, sem uso para rastreamento nem anúncio (pergunta 34 do resumo para o advogado) |
 | Família: vínculo, papel, convites (só o resumo SHA-256 do código) | Convite por link | `context_memberships`, `family_invites` |
 | Rastro técnico: quem fez qual operação e quando | Gravado pelas funções de escrita | `record_operations` (sai junto com a conta, D-058; a retenção dos registros excluídos que ficam na Família é P-010) |
 
@@ -27,7 +28,7 @@
 - Os PDFs de nota e de comprovante e os arquivos de extrato (OFX ou CSV): o texto é lido no aparelho e descartado; só o que a pessoa confirma vira lançamento.
 - A biometria: o sistema do aparelho decide e o app só recebe "sim" ou "não". Não há dado biométrico no app.
 - Os lembretes: são notificações locais agendadas no aparelho; o app não pede nem guarda token de notificação remota.
-- As preferências (ocultar valores, tema de bolhas ou barras, "Primeiros passos") e a memória de lojas e nomes (pelo resumo SHA-256 do CNPJ).
+- As preferências (ocultar valores, tema de bolhas ou barras, "Primeiros passos", o dia de primeiro uso e o "Agora não" da pergunta "Como você conheceu o Clarevo?") e a memória de lojas e nomes (pelo resumo SHA-256 do CNPJ).
 - As buscas e as leituras de Aprender: o app não registra (CLAUDE.md).
 - A exportação: o arquivo CSV ou PDF vai ao compartilhamento do aparelho por ação da pessoa.
 - A leitura da página pública da Sefaz-RJ: o aparelho consulta o site do governo diretamente, a pedido da pessoa, sem servidor do Clarevo no meio (`apps/app/src/lib/sefaz-fetch.ts`). Não é coleta pelo Clarevo; o advogado confere se o texto da política precisa citar essa consulta.

@@ -204,6 +204,7 @@ import { GUIDE_ENTRIES, GUIDE_GROUPS, GUIDE_TEXT, HELP_TEXT, MANUAL_TEXT, TOUR_C
 import { COMPROVANTE_TEXT, comprovanteDraft, comprovanteErrorText, comprovanteGaps, comprovanteKindLabel, comprovanteKindPhrase, comprovanteMismatch, comprovanteReadLine, suggestComprovanteDescription } from '../src';
 import type { ComprovanteDirection, ComprovanteKind, ComprovanteReading } from '../src';
 import { SAVED_BEFORE_TEXT } from '../src';
+import { SIGNUP_SOURCES, SIGNUP_SOURCE_LABEL, SIGNUP_SOURCE_TEXT, signupSourceErrorText, signupSourceTextSamples } from '../src';
 import { SEU_MES_TEXT, WIDGET_TEXT, buildSeuMes, buildWidgetContent, loadInvoicesOfRecords, seuMesRowA11y, plannedForGoals, savedInMonth, type SeuMesInput } from '../src';
 
 /**
@@ -3630,5 +3631,48 @@ describe('textos de "Calcular pela média" (D-062 item 2)', () => {
     expect(source).not.toMatch(FORBIDDEN);
     expect(source).not.toMatch(FORBIDDEN_EXPANDED);
     expect(source).not.toMatch(JUDGMENT);
+  });
+});
+
+describe('"Como você conheceu o Clarevo?" (D-067, item 2)', () => {
+  it('todos os textos passam nas regras: sem travessão, sem a expressão proibida, sem produto financeiro e sem julgamento', () => {
+    const texts = signupSourceTextSamples();
+    expect(texts.length).toBeGreaterThan(20);
+    for (const text of texts) {
+      expect(text, text).not.toMatch(FORBIDDEN);
+      expect(text, text).not.toMatch(FORBIDDEN_EXPANDED);
+      expect(text, text).not.toMatch(JUDGMENT);
+    }
+  });
+
+  it('as frases pedidas, exatamente, e as seis opções na ordem', () => {
+    expect(SIGNUP_SOURCE_TEXT.title).toBe('Como você conheceu o Clarevo?');
+    expect(SIGNUP_SOURCE_TEXT.note).toBe('Opcional. Usamos só para contar, sem identificar ninguém, de onde as pessoas chegam.');
+    expect(SIGNUP_SOURCES.map((s) => SIGNUP_SOURCE_LABEL[s])).toEqual([
+      'Instagram',
+      'Indicação de alguém',
+      'Empresa onde trabalho',
+      'Busca na internet',
+      'Outro',
+      'Prefiro não dizer',
+    ]);
+    expect(SIGNUP_SOURCE_TEXT.notNow).toBe('Agora não');
+  });
+
+  it('a linha curta diz que é opcional e que não identifica ninguém, e nada promete nem exige a resposta', () => {
+    expect(SIGNUP_SOURCE_TEXT.note).toMatch(/^Opcional\./);
+    expect(SIGNUP_SOURCE_TEXT.note).toMatch(/sem identificar ninguém/);
+    for (const text of signupSourceTextSamples()) expect(text, text).not.toMatch(/obrigat|precisa responder|para continuar|ganhe|desconto|prêmio|brinde/i);
+  });
+
+  it('linguagem neutra de gênero: nenhum texto concorda no masculino ou no feminino com quem responde', () => {
+    for (const text of signupSourceTextSamples()) expect(text, text).not.toMatch(/\b(bem-vind[oa]|obrigad[oa]|um[a]? usuári[oa]|cadastrad[oa]|convidad[oa])\b/i);
+    expect(signupSourceErrorText('versao_desatualizada')).toMatch(/outro aparelho/);
+  });
+
+  it('o arquivo-fonte passa nas regras de texto', () => {
+    const source = readFileSync(join(CORE_SRC, 'signup-source.ts'), 'utf8');
+    expect(source).not.toMatch(FORBIDDEN);
+    expect(source).not.toMatch(FORBIDDEN_EXPANDED);
   });
 });

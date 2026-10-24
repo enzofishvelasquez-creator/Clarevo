@@ -23,9 +23,10 @@
 --     anon, authenticated nem service_role (só o dono do banco, no SQL Editor). Devolve contagens por semana inteira (segunda a domingo,
 --     fuso America/Sao_Paulo), nunca por dia nem por pessoa, e esconde toda contagem entre 1 e 4 (regra no cabeçalho da função).
 --
--- Esta migração cria uma tabela (signup_sources), um gatilho, três funções e recria duas (clarevo_track_activity e clarevo_erase_person,
--- só com a exceção e a linha nova). Os privilégios são concedidos só para o que é novo, no fim (a revogação geral das migrações
--- anteriores já vale para o resto, e as funções recriadas mantêm os privilégios que tinham).
+-- Esta migração cria uma tabela (signup_sources), um gatilho, quatro funções (a da guarda, o resultado, set_signup_source e a da
+-- equipe) e recria duas (clarevo_track_activity e clarevo_erase_person, só com a exceção e a linha nova). Os privilégios são
+-- concedidos só para o que é novo, no fim (a revogação geral das migrações anteriores já vale para o resto, e as funções recriadas
+-- mantêm os privilégios que tinham).
 
 -- ---------------------------------------------------------------------------
 -- A resposta

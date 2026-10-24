@@ -28,6 +28,7 @@ export * from './committed';
 export * from './reminders';
 export * from './goals';
 export * from './savings';
+export * from './signup-source';
 export * from './simulate';
 export * from './cards';
 export * from './cards-month';

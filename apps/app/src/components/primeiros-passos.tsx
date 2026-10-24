@@ -51,6 +51,13 @@ const STEPS: Step[] = [
   },
 ];
 
+/**
+ * Em que pé está o card, para o aviso seguinte esperar a vez ("Como você conheceu o Clarevo?" só aparece quando este não está na tela,
+ * nem prestes a aparecer): 'carregando' enquanto não se sabe, 'visivel' com o card na tela e 'oculto' quando ele não aparece (fechado,
+ * concluído, fora do Pessoal e do mês de hoje).
+ */
+export type PrimeirosPassosState = 'carregando' | 'visivel' | 'oculto';
+
 /** Fechar o card (três passos prontos ou "Agora não") é a única transição: esmaece em 240 ms (CL-V008). */
 const cardExit = FadeOut.duration(motion.confirm).reduceMotion(ReduceMotion.System);
 
@@ -63,7 +70,7 @@ const cardExit = FadeOut.duration(motion.confirm).reduceMotion(ReduceMotion.Syst
  * O 4º passo, "Planejar quanto guardar" (D-036), abre a aba Metas e conta como concluído com a resposta "consigo" ou
  * "agora não" ao plano de guardar. Se a resposta não carregar, o passo fica como não concluído (e o card continua).
  */
-export function PrimeirosPassos({ contextId }: { contextId: string | undefined }) {
+export function PrimeirosPassos({ contextId, onState }: { contextId: string | undefined; onState?: (state: PrimeirosPassosState) => void }) {
   const { user, auth } = useSession();
   const { space: kind, month, currentMonth } = useView();
   // Só a demonstração tem dados de exemplo: uma conta real com este e-mail continua vendo o card (CL-11).
@@ -85,6 +92,11 @@ export function PrimeirosPassos({ contextId }: { contextId: string | undefined }
   };
   const allDone = done.fixos && done.recebido && done.pago && done.guardar;
   const { close } = firstSteps;
+  const state: PrimeirosPassosState =
+    firstSteps.status === 'carregando' ? 'carregando' : !eligible ? 'oculto' : !ready ? 'carregando' : allDone ? 'oculto' : 'visivel';
+  useEffect(() => {
+    onState?.(state);
+  }, [state, onState]);
 
   useEffect(() => {
     if (ready && allDone) close('concluido');

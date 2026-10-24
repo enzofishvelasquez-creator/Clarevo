@@ -394,6 +394,15 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('tab', { name: 'Movimentações' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
   await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês'); await p.waitForTimeout(600);
   ok('"Agora não": o card não volta ao trocar de aba', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Agora não')) === 0);
+  // D-067 (item 2): a pergunta opcional "Como você conheceu o Clarevo?" é só de conta real. Na demonstração ela nunca aparece, nem no Resumo com
+  // os Primeiros passos fechados (a vez em que, numa conta real, ela entraria), nem em Conta, e nada dela é gravado no aparelho.
+  const origemAusente = async () => {
+    const txt = await body();
+    return !txt.includes('Como você conheceu o Clarevo?') && !txt.includes('Usamos só para contar') && !txt.includes('Resposta guardada. Você pode mudar em Conta.') &&
+      !(await headingShown('Como você conheceu o Clarevo?')) && (await visibleCount('radio', /Instagram|Indicação de alguém|Empresa onde trabalho|Busca na internet|Prefiro não dizer/)) === 0 &&
+      (await visibleCount('radiogroup', /Como você conheceu/)) === 0;
+  };
+  ok('demonstração (D-067): o Resumo, com os Primeiros passos fechados, não pergunta "Como você conheceu o Clarevo?" nem mostra as seis opções', await origemAusente());
 
   // Sair limpa a sessão
   await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
@@ -401,6 +410,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await shot('05b_conta_seguranca', true);
   // Ciclo A2 (D-025): na web não há lembretes nem biometria (só no app para celular); "Ocultar valores ao abrir" existe
   // também na web e é só deste aparelho. Os dois interruptores de Conta na web são esse e "Mostrar valores no widget" (D-052, desligado).
+  ok('demonstração (D-067): Conta não tem o card "Como você conheceu o Clarevo?", nem as opções', await origemAusente());
   t = await body();
   const contaSwitches = await p.getByRole('switch').filter({ visible: true }).evaluateAll((els) => els.map((e) => [e.getAttribute('aria-label'), e.getAttribute('aria-checked')]));
   ok('Conta na web: "Lembretes estão disponíveis no app para celular.", sem interruptor de lembretes nem de biometria', t.includes('Lembretes') && t.includes('Lembretes estão disponíveis no app para celular.') &&
@@ -554,6 +564,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.reload(); await waitText('Seu dinheiro');
   const ppStored = await p.evaluate(() => { try { return Object.keys(localStorage).filter((k) => k.startsWith('clarevo.primeiros-passos')); } catch { return ['erro']; } });
   ok('demonstração: recarregar volta às boas-vindas, sem "Primeiros passos" gravado no aparelho', ppStored.length === 0 && (await visibleCount('button', 'Ver demonstração com dados fictícios')) === 1, ppStored.join(' | '));
+  const origemStored = await p.evaluate(() => { try { return Object.keys(localStorage).filter((k) => k.startsWith('clarevo.como-conheceu')); } catch { return ['erro']; } });
+  ok('demonstração (D-067): nada de "Como você conheceu o Clarevo?" gravado no aparelho (nem o dia de uso, nem o "Agora não")', origemStored.length === 0, origemStored.join(' | '));
 
   // 2. Conta de demonstração e sequência de aceite
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('R$ 2.100,00');
@@ -566,6 +578,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await logoChecks('Resumo: logotipo "clarevo." no cabeçalho azul, sem o símbolo C');
   await shot('06_resumo_demo');
   ok('primeiros passos: fora da conta de demonstração com dados', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Agora não')) === 0 && !t.includes('Quatro passos para o Clarevo'));
+  ok('demonstração com dados (D-067): o Resumo não pergunta "Como você conheceu o Clarevo?"', await origemAusente());
   // Ciclo A4: a demonstração padrão foi toda anotada em 07/10/2026 e não mostra a faixa; a ordem do Resumo não muda.
   ok('demonstração padrão: sem a faixa "Seus últimos meses" e com os títulos do Resumo na ordem de sempre', !(await bandShown()) && !t.includes('Sua última anotação') &&
     JSON.stringify(await headingList()) === JSON.stringify(['1:Outubro de 2026', '2:Pagamentos do mês']), JSON.stringify(await headingList()));

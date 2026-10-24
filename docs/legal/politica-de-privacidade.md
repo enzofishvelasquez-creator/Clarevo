@@ -120,6 +120,39 @@ Se você pedir para receber as Novidades por e-mail:
 - **Quem trata.** O Brevo, serviço de envio de e-mail, guarda o seu e-mail na lista e a confirmação do cadastro, e envia as Novidades. A Cloudflare recebe o pedido do formulário. Os dois tratam os dados a serviço do Clarevo, como operadores. O site não grava o e-mail. [A DEFINIR: rastreamento de abertura e clique desligado no Brevo] [A DEFINIR: confirmar o que o Brevo registra da confirmação (data, hora e IP), o país e o contrato]
 - **Cancelar.** Todo e-mail das Novidades traz um link para cancelar, do próprio Brevo. Você também pode pedir por [E-MAIL DE PRIVACIDADE]. [A DEFINIR: por quanto tempo o Brevo mantém o e-mail depois do cancelamento, e se ele é eliminado da lista]
 
+### 3.8 Como você conheceu o Clarevo? (pergunta opcional)
+
+[PROPOSTA: seção a incluir junto com a pergunta no app. A base legal e a guarda ainda não foram confirmadas juridicamente.]
+
+O app pode perguntar, depois do primeiro dia de uso, de onde você conheceu o Clarevo. Responder é opcional, e nada no app depende da resposta.
+
+- **Dado.** Uma entre seis opções: Instagram, Indicação de alguém, Empresa onde trabalho, Busca na internet, Outro e Prefiro não dizer. Não há campo de texto livre. Guardamos também quando você respondeu e um número de versão, que sobe quando você muda de opção.
+- **Para quê.** Só para contar, sem identificar ninguém, de onde as pessoas chegam. Não usamos a resposta para anúncio, para montar perfil, para decidir nada sobre você nem para falar com você.
+- **Base legal proposta.** Consentimento (LGPD, art. 7º, I): você escolhe se responde, pode tocar em "Agora não" (a pergunta some por 30 dias neste aparelho) e pode mudar a resposta, inclusive para "Prefiro não dizer", quando quiser, em Conta. [A DEFINIR: confirmar a base; alternativa, legítimo interesse (art. 7º, IX)]
+- **Quem vê.** Só você vê a sua resposta no app. A sua Família e a sua empresa não veem. A equipe do Clarevo vê apenas contagens por semana, sem identificar ninguém (seção 3.9).
+- **Por quanto tempo.** Enquanto a sua conta existir. Quando você exclui a conta, a resposta é apagada junto, e nenhuma contagem guardada a mantém, porque as contagens são refeitas do que existe no momento.
+- **No aparelho.** O app guarda neste aparelho só o dia em que você começou a usá-lo aqui e, se você tocar em "Agora não", até quando a pergunta fica escondida. A resposta em si não fica no aparelho.
+
+### 3.9 Contagens de cadastros e de uso, sem identificar ninguém
+
+[PROPOSTA: seção a incluir junto com as contagens da equipe. A base legal e o enquadramento ainda não foram confirmados juridicamente.]
+
+Para saber se o Clarevo está chegando às pessoas e sendo usado, a equipe faz contagens por semana, só no banco de dados:
+
+- quantas contas foram criadas na semana;
+- quantas dessas contas anotaram pelo menos um registro (gasto, recebimento, conta a pagar, gasto fixo, parcelamento ou compra no cartão) nos 7 primeiros dias;
+- quantas pessoas escolheram cada opção da pergunta da seção 3.8.
+
+Essas contagens:
+
+- **não identificam ninguém.** A equipe vê números por semana, nunca nome, e-mail, identificador, data de cadastro de uma pessoa nem valor financeiro;
+- **escondem os números pequenos.** Qualquer contagem de 1 a 4 pessoas não é mostrada, as semanas são sempre inteiras e não há total do período, para ninguém ser identificado por subtração;
+- **são consultadas só pela equipe**, direto no banco de dados. Nenhuma tela do app as mostra, e nem a sua Família nem a sua empresa as veem;
+- **não usam ferramenta de análise, cookie, rastreador nem endereço de campanha.** Saem das contas e dos registros que já existem. O Clarevo não registra o que você abre, lê ou busca no app;
+- **não guardam nada a mais.** A contagem é refeita do que existe no momento, então uma conta excluída deixa de contar.
+
+[PROPOSTA: legítimo interesse (art. 7º, IX), para saber se o serviço funciona e planejar o seu desenvolvimento, com dados agregados.] [A DEFINIR: confirmar se a contagem agregada, que não identifica ninguém, exige base própria, e fazer o teste de legítimo interesse]
+
 ## 4. O que não guardamos?
 
 - Número completo de cartão, código de segurança (CVV) e validade. O app recusa apelidos que pareçam número de cartão.
@@ -157,6 +190,8 @@ A leitura acontece no seu aparelho. O Clarevo não tem servidor que receba esses
 - Benefício pela empresa: execução de contrato com a pessoa, que aceita o convite, e com a empresa (art. 7º, V). Para o e-mail que a empresa informa no convite: [A DEFINIR: base e papéis, conforme o contrato com a empresa].
 - Contato pelo formulário do site (seção 3.6): [PROPOSTA: procedimentos preliminares relacionados a contrato, a pedido da pessoa (art. 7º, V); alternativa, legítimo interesse (art. 7º, IX)]. [A DEFINIR: confirmar a base]
 - Novidades por e-mail (seção 3.7): consentimento (art. 7º, I), que você pode revogar a qualquer momento, cancelando pelo link de qualquer e-mail (art. 8º, § 5º). [A DEFINIR: confirmar a base e a forma de registrar o consentimento]
+- Pergunta opcional "Como você conheceu o Clarevo?" (seção 3.8): [PROPOSTA: consentimento (art. 7º, I), que você pode retirar mudando a resposta para "Prefiro não dizer" ou excluindo a conta; alternativa, legítimo interesse (art. 7º, IX)]. [A DEFINIR: confirmar a base]
+- Contagens de cadastros e de uso, sem identificar ninguém (seção 3.9): [PROPOSTA: legítimo interesse (art. 7º, IX), com dados agregados]. [A DEFINIR: confirmar a base e fazer o teste de legítimo interesse]
 - Funções do aparelho (câmera, biometria e lembretes): você liga e pode desligar a qualquer momento, e os dados dessas funções não chegam ao Clarevo. [A DEFINIR: confirmar se precisam de base própria]
 
 Não tomamos decisões automatizadas sobre você, e o Clarevo não faz análise de crédito.
@@ -169,7 +204,7 @@ Não tomamos decisões automatizadas sobre você, e o Clarevo não faz análise 
 
 **A sua empresa, se ela oferecer o benefício.** A empresa vê só os e-mails que ela mesma convidou, a situação de cada licença (convite enviado, convite cancelado, ativa ou encerrada), as datas e as contagens (vagas, convites, licenças ativas e encerradas). A empresa não vê valores, categorias, metas, contas, cartões, a Família de ninguém, nem números somados, e não vê quando ou como você usa o app. O painel das empresas não lê nenhuma tabela de finanças.
 
-**A equipe do Clarevo.** O Clarevo não consulta o conteúdo financeiro de ninguém no dia a dia. [PROPOSTA: a equipe só acessa o conteúdo quando a lei exigir ou para resolver um problema que a própria pessoa pediu.] Tecnicamente, pessoas da equipe com acesso ao banco de dados conseguem chegar aos dados guardados. [A DEFINIR: regra interna escrita de quem acessa e em que situações (manutenção, segurança, pedido da própria pessoa, obrigação legal) e registro desses acessos, que hoje não existe]
+**A equipe do Clarevo.** O Clarevo não consulta o conteúdo financeiro de ninguém no dia a dia. [PROPOSTA: a equipe só acessa o conteúdo quando a lei exigir ou para resolver um problema que a própria pessoa pediu.] [PROPOSTA: a equipe também consulta, só no banco de dados, as contagens por semana das seções 3.8 e 3.9, sem identificar ninguém.] Tecnicamente, pessoas da equipe com acesso ao banco de dados conseguem chegar aos dados guardados. [A DEFINIR: regra interna escrita de quem acessa e em que situações (manutenção, segurança, pedido da própria pessoa, obrigação legal) e registro desses acessos, que hoje não existe]
 
 **Serviços que ajudam a operar o Clarevo.** Veja a seção 8.
 
@@ -201,7 +236,7 @@ Estão previstos, mas ainda não ligados:
 Estas informações ficam só no seu aparelho (no armazenamento do app, ou no navegador, na versão web) e não vão para o Clarevo:
 
 - a sessão, para você não precisar entrar toda vez;
-- as suas preferências: lembretes e horário, ocultar valores, biometria ao abrir, forma de apresentação das categorias, "Primeiros passos", a última forma de pagamento e a última conta usadas, e avisos que você dispensou;
+- as suas preferências: lembretes e horário, ocultar valores, biometria ao abrir, forma de apresentação das categorias, "Primeiros passos", a última forma de pagamento e a última conta usadas, e avisos que você dispensou (inclusive, [PROPOSTA: o dia em que você começou a usar o app neste aparelho e o "Agora não" da pergunta da seção 3.8]);
 - memórias para preencher mais rápido: a descrição e a categoria da última nota de cada loja (a loja é identificada pelo resumo do CNPJ, até 50 lojas), o mesmo para o nome lido de comprovantes (pelo resumo do nome, até 50) e as categorias que você escolheu na importação de extrato (até 300 entradas);
 - lembretes de contas a pagar, que são notificações agendadas no aparelho. Na tela bloqueada eles não mostram valor nem descrição, e o app não guarda token de notificação remota;
 - o widget da tela inicial, que está desligado. Se for ligado, o aparelho guardará um resumo para o widget, com os valores ocultos por padrão.
@@ -216,7 +251,7 @@ Ao sair da conta, essas preferências e memórias continuam no aparelho, ligadas
 
 O Clarevo não usa cookies de publicidade, não tem ferramenta de análise de uso escolhida por nós dentro do app e não faz rastreamento para publicidade.
 
-Nas páginas do site, não usamos cookies próprios, script de análise de acesso nem recurso de terceiros carregado no navegador. As calculadoras do site fazem a conta no seu navegador e não enviam nem guardam o que você digita, nem no armazenamento do navegador. [PROPOSTA: para saber quantas pessoas visitam o site, usamos só as estatísticas de tráfego que a própria Cloudflare mostra no painel da hospedagem. Elas são medidas no servidor, sem script na página e sem cookie, e não são usadas para publicidade.] [A DEFINIR: confirmar com a Cloudflare o que essas estatísticas guardam (por exemplo, IP) e por quanto tempo] A versão web guarda a sessão e as preferências no armazenamento local do navegador, que serve só para o app funcionar.
+Nas páginas do site, não usamos cookies próprios, script de análise de acesso nem recurso de terceiros carregado no navegador. As calculadoras do site fazem a conta no seu navegador e não enviam nem guardam o que você digita, nem no armazenamento do navegador. [PROPOSTA: para saber quantas pessoas visitam o site, usamos só as estatísticas de tráfego que a própria Cloudflare mostra no painel da hospedagem. Elas são medidas no servidor, sem script na página e sem cookie, e não são usadas para publicidade.] [A DEFINIR: confirmar com a Cloudflare o que essas estatísticas guardam (por exemplo, IP) e por quanto tempo] A versão web guarda a sessão e as preferências no armazenamento local do navegador, que serve só para o app funcionar. [PROPOSTA: as contagens de cadastros e de uso (seção 3.9) são feitas no banco de dados, sem ferramenta de análise, cookie, rastreador nem endereço de campanha, e não dependem de nada que o app ou o site leiam do seu aparelho.]
 
 A exceção é a leitura de código no Android: o componente do Google (ML Kit) pode enviar ao Google dados técnicos de uso e identificadores do aparelho, como descrito nas seções 5 e 8. Não usamos esses dados para publicidade. [A DEFINIR: confirmar que a hospedagem não define cookie técnico e confirmar na documentação do ML Kit o que o componente envia]
 
@@ -228,6 +263,7 @@ A exceção é a leitura de código no Android: o componente do Google (ML Kit) 
 - **Família encerrada.** Os dados ficam guardados, sem leitura por ninguém, até a regra de guarda. [A DEFINIR: prazo, P-010]
 - **Cópias de segurança.** O serviço de banco de dados pode manter cópias de segurança, e dados já apagados podem ficar nelas por um tempo. [A DEFINIR: prazo, previsto em 7 dias no plano contratado; confirmar no painel] Se uma cópia for restaurada, as contas excluídas depois dela serão excluídas de novo.
 - **Registros de acesso.** O Clarevo não cria registros de acesso próprios. Os do Supabase e da Cloudflare têm prazo curto, que depende do plano, e o registro de auditoria da autenticação pode manter e-mail e IP depois da exclusão da conta. [A DEFINIR: o que guardar, onde e por quanto tempo, frente à guarda de registros de acesso do Marco Civil da Internet, art. 15, e conferir nos painéis o que cada serviço mantém]
+- **Resposta de "Como você conheceu o Clarevo?"** (seção 3.8). [PROPOSTA: enquanto a conta existir; sai junto com a conta. As contagens da seção 3.9 não guardam histórico: são refeitas do que existe no momento.] [A DEFINIR: confirmar o prazo]
 - **Mensagem do formulário de contato** (seção 3.6). Fica na caixa de e-mail do Clarevo por [A DEFINIR: prazo na caixa de e-mail], e uma cópia fica nos registros do Resend por [A DEFINIR: prazo de guarda no Resend]. O site não a guarda.
 - **E-mail das Novidades** (seção 3.7). Fica no Brevo enquanto você não cancelar. [A DEFINIR: prazo depois do cancelamento]
 - **Contas sem uso.** Hoje o Clarevo não apaga contas por inatividade. [A DEFINIR: política para contas inativas]
@@ -249,7 +285,7 @@ Você tem direito, a qualquer momento, de pedir (LGPD, art. 18):
 
 **Como pedir.**
 
-- Dentro do app, você já pode: ver e corrigir o que anotou, em cada tela; ver quem acessa cada contexto em "Quem vê estes dados?"; exportar os seus gastos e recebimentos do Pessoal e as compras no cartão em planilha ou PDF, em Conta, "Exportar meus dados" (a exportação não inclui tudo o que guardamos); e excluir a conta, em Conta, no último item.
+- Dentro do app, você já pode: ver e corrigir o que anotou, em cada tela; ver quem acessa cada contexto em "Quem vê estes dados?"; exportar os seus gastos e recebimentos do Pessoal e as compras no cartão em planilha ou PDF, em Conta, "Exportar meus dados" (a exportação não inclui tudo o que guardamos); e excluir a conta, em Conta, no último item. [PROPOSTA: a resposta de "Como você conheceu o Clarevo?" (seção 3.8) você muda, ou troca por "Prefiro não dizer", em Conta; para apagar só a resposta, sem excluir a conta, peça pelo e-mail de privacidade da seção 16.]
 - Nas Novidades por e-mail, cancele pelo link de qualquer e-mail das Novidades.
 - Para os demais pedidos, escreva para [E-MAIL DE PRIVACIDADE], do e-mail cadastrado na sua conta.
 - Prazo de resposta: [A DEFINIR].

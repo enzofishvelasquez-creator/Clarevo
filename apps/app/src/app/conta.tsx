@@ -10,6 +10,7 @@ import { BenefitCard } from '@/components/benefit-card';
 import { PrivacyCard, RemindersCard, WidgetCard } from '@/components/device-settings';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { SubHeader } from '@/components/header';
+import { SignupSourceAccountCard } from '@/components/signup-source';
 import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Screen, Txt } from '@/components/ui';
 import { AuthError, RESEND_INTERVAL_SECONDS } from '@/lib/auth';
@@ -211,6 +212,9 @@ export default function ContaScreen() {
             plano. Seus registros financeiros têm permissões próprias.
           </Txt>
         </Card>
+
+        {/* "Como você conheceu o Clarevo?" (D-067): opcional, só em conta real; a pessoa vê e muda a resposta. */}
+        <SignupSourceAccountCard />
 
         {/* Privacidade e termos (D-064): só quando `EXPO_PUBLIC_SITE_URL` aponta para o site publicado; sem endereço, nada é desenhado. */}
         {SITE_URL ? (

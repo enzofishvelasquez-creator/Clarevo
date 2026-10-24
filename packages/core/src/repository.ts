@@ -47,6 +47,7 @@ import type { Benefit, BenefitPreview, CompanyOverview, CompanyUsage, License, L
 import type { FamilyInvite, FamilyInviteWrite, FamilyInvitePreview, FamilyJoin, FamilyOverview, InviteRole } from './family';
 import type { ImportDestination, ImportItem, ImportResult } from './importar/tipos';
 import type { RecordSearchFilter, SearchPage } from './search';
+import type { SignupSource, SignupSourceOption } from './signup-source';
 
 /**
  * Ações de conta a pagar gravadas em record_operations (mesmo espaço de chaves dos registros). 'criar_ocorrencia':
@@ -187,6 +188,12 @@ export type SubscriptionReviewAction = 'revisar_assinaturas';
  * está na operação). Como 'decidir_revisao' e 'responder_guardar', não contam como anotação na atividade (D-030).
  */
 export type MonthCheckAction = 'marcar_mes_conferido' | 'desmarcar_mes_conferido';
+
+/**
+ * "Como você conheceu o Clarevo?" (set_signup_source, D-067, migração 0018), gravada em record_operations sem alvo, no contexto Pessoal da
+ * pessoa. Como 'decidir_revisao' e 'responder_guardar', não conta como anotação na atividade (D-030).
+ */
+export type SignupSourceAction = 'responder_origem_cadastro';
 
 /**
  * Importar extrato ou fatura (import_records, D-048), gravada em record_operations com a conta ou o cartão de destino em
@@ -552,6 +559,21 @@ export interface RecordsRepository {
    * conteúdo ou outra ação: chave_reutilizada. Não conta como anotação na atividade. Reconciliação: repetir a chave.
    */
   setSavingsAnswer(key: string, contextId: string, expectedVersion: number, answer: SavingsAnswer, monthlyCents?: Cents | null): Promise<SavingsCheck>;
+
+  // "Como você conheceu o Clarevo?" (D-067, item 2; migração 0018). Pergunta opcional, só da própria pessoa: não é de nenhum contexto
+  // (a operação fica no Pessoal), não conta como anotação na atividade e só entra em contagens da equipe, nunca no app.
+
+  /** A resposta da própria pessoa (signup_sources) ou null (ainda não respondeu). Só a pessoa lê. */
+  getSignupSource(): Promise<SignupSource | null>;
+  /**
+   * set_signup_source. Grava (versão 0 = ainda não há resposta) ou muda a origem da própria pessoa. Ordem: repetição (chave_reutilizada se a
+   * ação ou o pedido mudam); sem_permissao (a pessoa precisa ter o Pessoal: conta sem espaço, excluída ou anônima não responde);
+   * origem_invalida (uma das seis, escrita exatamente como o banco guarda); versao_desatualizada (versão nula, negativa ou diferente da
+   * atual; RepoError.detail "versao_atual=N"). A primeira resposta vale 1 e cada mudança de origem soma 1; a mesma origem com a versão
+   * certa não grava nada (a versão não sobe) e devolve a resposta atual. Mesma chave e mesmo pedido: devolve a resposta de agora.
+   * Não conta como anotação na atividade. Reconciliação: repetir a chave.
+   */
+  setSignupSource(key: string, expectedVersion: number, source: SignupSourceOption): Promise<SignupSource>;
 
   // Cartões de crédito (D-037, Ciclo E). Regras e ordem das conferências em cards.ts (CARD_*_CODE_ORDER), iguais às da migração 0008.
 
