@@ -8,10 +8,14 @@ import {
   isRepoError,
   newOperationKey,
   shouldAskSignupSource,
+  SIGNUP_SOURCE_QUERY_KEY,
   signupSourceError,
   signupSourceErrorText,
   signupSourceNotNowUntil,
+  signupSourceRefused,
+  signupSourceSaved,
   signupSourceTextSamples,
+  type SignupSourceCache,
   type RepoError,
   type RepoErrorCode,
   type SignupSourceOption,
@@ -229,5 +233,78 @@ describe('textos', () => {
     expect(signupSourceErrorText('versao_desatualizada')).toBe(SIGNUP_SOURCE_TEXT.errors.versao_desatualizada);
     expect(signupSourceErrorText('coisa_estranha')).toBe(SIGNUP_SOURCE_TEXT.failed);
     expect(signupSourceTextSamples().length).toBeGreaterThan(20);
+  });
+});
+
+describe('nome acessível das opções', () => {
+  it('é só o nome da opção: o chip já anuncia se está marcada, então "escolhida" não se repete', () => {
+    for (const s of SIGNUP_SOURCES) {
+      expect(SIGNUP_SOURCE_TEXT.optionA11y(s)).toBe(SIGNUP_SOURCE_LABEL[s]);
+    }
+    expect(signupSourceTextSamples().filter((t) => /escolhid/i.test(t))).toEqual([]);
+  });
+});
+
+describe('a leitura recarrega quando a versão está velha (outro aparelho respondeu antes)', () => {
+  /** O cache de consultas do app, só com o que a gravação usa: guarda o dado e anota as invalidações. */
+  function fakeCache() {
+    const data = new Map<string, unknown>();
+    const invalidated: string[] = [];
+    const cache: SignupSourceCache = {
+      setQueryData: (queryKey, value) => data.set(JSON.stringify(queryKey), value),
+      invalidateQueries: ({ queryKey }) => invalidated.push(JSON.stringify(queryKey)),
+    };
+    return { cache, data, invalidated };
+  }
+
+  it('a chave da leitura é ["signupSource", pessoa]; confirmada, a resposta entra no cache', async () => {
+    const { repo } = await freshRepo();
+    const { cache, data, invalidated } = fakeCache();
+    const row = await repo.setSignupSource(key(), 0, 'instagram');
+    signupSourceSaved(cache, 'pessoa-teste', row);
+    expect(SIGNUP_SOURCE_QUERY_KEY).toBe('signupSource');
+    expect(data.get(JSON.stringify(['signupSource', 'pessoa-teste']))).toEqual(row);
+    expect(invalidated).toEqual([]);
+  });
+
+  it('só versao_desatualizada pede a recarga; os outros códigos deixam a leitura como está', () => {
+    const { cache, invalidated } = fakeCache();
+    for (const code of ['origem_invalida', 'sem_permissao', 'chave_reutilizada', 'nao_encontrado', 'rede', 'desconhecido', 'salvar_falhou']) {
+      expect(signupSourceRefused(cache, code), code).toBe(false);
+    }
+    expect(invalidated).toEqual([]);
+    expect(signupSourceRefused(cache, 'versao_desatualizada')).toBe(true);
+    expect(invalidated).toEqual([JSON.stringify(['signupSource'])]);
+  });
+
+  it('o fluxo da tela: o toque é recusado, a leitura recarrega com a resposta do outro aparelho e o toque seguinte grava', async () => {
+    const { repo } = await freshRepo();
+    const { cache, invalidated } = fakeCache();
+    // A tela leu "sem resposta" (versão 0); depois outro aparelho respondeu "busca".
+    let seen = await repo.getSignupSource();
+    expect(seen).toBeNull();
+    await repo.setSignupSource(key(), 0, 'busca');
+
+    // Um toque da tela de lá: a versão que ela leu é velha. A recusa chega com o código e a tela recarrega a leitura.
+    const tap = async (source: SignupSourceOption): Promise<string> => {
+      try {
+        const row = await repo.setSignupSource(key(), seen?.version ?? 0, source);
+        signupSourceSaved(cache, 'pessoa-teste', row);
+        seen = row;
+        return 'ok';
+      } catch (e) {
+        if (!isRepoError(e)) throw e;
+        if (signupSourceRefused(cache, e.code)) seen = await repo.getSignupSource();
+        return e.code;
+      }
+    };
+    expect(await tap('instagram')).toBe('versao_desatualizada');
+    expect(invalidated).toHaveLength(1);
+    expect(seen).toMatchObject({ source: 'busca', version: 1 });
+    // Sem a recarga o próximo toque repetiria a versão 0 e seria recusado de novo; com ela, grava.
+    expect(await tap('instagram')).toBe('ok');
+    expect(seen).toMatchObject({ source: 'instagram', version: 2 });
+    expect(await repo.getSignupSource()).toEqual(seen);
+    expect(invalidated).toHaveLength(1);
   });
 });

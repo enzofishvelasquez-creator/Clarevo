@@ -20,8 +20,9 @@
 --     saiu" (clarevo_erase_person apaga signup_sources explicitamente; a chave para persons também tem cascata, para a exclusão de
 --     usuário direto no painel). Nada da resposta fica em contagem anterior: a função da equipe sempre conta o que existe agora.
 -- S6. A função da equipe (clarevo_staff_signup_metrics) é a única que lê signup_sources fora da própria pessoa: sem execute para public,
---     anon, authenticated nem service_role (só o dono do banco, no SQL Editor). Devolve contagens por semana inteira (segunda a domingo,
---     fuso America/Sao_Paulo), nunca por dia nem por pessoa, e esconde toda contagem entre 1 e 4 (regra no cabeçalho da função).
+--     anon, authenticated nem service_role (só o dono do banco, no SQL Editor). Devolve contagens por semana inteira e já terminada
+--     (segunda a domingo, fuso America/Sao_Paulo; a semana em andamento sai sem contagem), nunca por dia nem por pessoa, e esconde toda
+--     contagem entre 1 e 4, também a que se deduziria por subtração de outra (regras no cabeçalho da função).
 --
 -- Esta migração cria uma tabela (signup_sources), um gatilho, quatro funções (a da guarda, o resultado, set_signup_source e a da
 -- equipe) e recria duas (clarevo_track_activity e clarevo_erase_person, só com a exceção e a linha nova). Os privilégios são
@@ -376,20 +377,41 @@ $$;
 --                               mudar: a contagem sempre mostra a resposta atual, na semana do cadastro. A pergunta é opcional, então a
 --                               soma das origens é menor que contas_criadas, e a diferença não é publicada (não há total de respostas).
 --
--- Regras de privacidade (supressão de células pequenas), válidas para toda a resposta:
---   1. Toda contagem entre 1 e 4 sai como total nulo, com a marca "menos de 5". Zero e 5 ou mais saem como são.
---   2. Só semanas inteiras (segunda a domingo, no fuso America/Sao_Paulo): p_from sobe para a segunda-feira da sua semana e p_to
---      para o domingo da sua semana. Nunca há contagem por dia, nem por parte de uma semana, porque duas consultas com cortes de dia
---      diferentes, subtraídas uma da outra, revelariam a contagem de um dia pequeno.
+-- Regras de privacidade (supressão de células pequenas), válidas para toda a resposta. O princípio de todas: nenhuma contagem de 1 a 4
+-- pode ser lida, nem calculada por subtração de outras contagens da resposta, nem estreitada (saber que vale "1 ou 2" já revela mais
+-- que "de 1 a 4"). A soma das origens mais quem não respondeu é contas_criadas, e quem não respondeu não é publicado, mas entra na conta.
+--   1. Toda contagem entre 1 e 4 sai como total nulo, com a marca "menos de 5". Zero e 5 ou mais saem como são, salvo nas regras 4 e 5.
+--   2. Só semanas inteiras e já terminadas (segunda a domingo, fuso America/Sao_Paulo): p_from sobe para a segunda-feira da sua semana e
+--      p_to para o domingo da sua semana. A semana que ainda não terminou (a de hoje, até o domingo, e as futuras) sai com TODAS as
+--      contagens nulas e a marca "semana em andamento", nunca com total parcial: duas consultas em dias seguidos, subtraídas uma da
+--      outra, revelariam quantas contas nasceram (ou quantas respostas chegaram) em um dia, que é uma contagem pequena. Também nunca há
+--      contagem por dia nem por parte de uma semana.
 --   3. Não há linha de total do período, nem total de respostas, nem soma de semanas: subtrair as semanas mostradas de um total
 --      revelaria a semana escondida. O período pedido tem no máximo 104 semanas.
---   4. A única medida que é parte de outra (contas_com_registro_7_dias dentro de contas_criadas) também sai escondida, com a marca
---      "complemento menor que 5", quando as contas SEM registro nessa semana forem de 1 a 4 (senão contas_criadas menos a medida revelaria
---      essa contagem pequena).
---   5. Marcas possíveis: "menos de 5" (a contagem real está entre 1 e 4), "complemento menor que 5" (regra 4), "janela aberta" (a janela
---      de 7 dias ainda não fechou) e "semana em andamento" (a semana ainda não terminou, a contagem pode crescer; o total aparece).
---   O que a regra protege é o que SAI do SQL Editor (planilha, relatório, print). Quem consulta várias vezes ao longo do dia vê a contagem
---   crescer, sem saber quem entrou.
+--   4. contas_com_registro_7_dias (R) é parte de contas_criadas (N); as contas sem registro são C = N - R. R sai escondida, com a marca
+--      "complemento menor que 5", quando R ou C está entre 1 e 4: N menos R revelaria C. Duas marcas diferentes ("R é pequena" e "C é
+--      pequena") também diriam qual das duas é pequena, e com N de 6 a 8 isso estreita o valor (com N = 6, "C de 1 a 4 e R fora de 1 a
+--      4" só cabe com R = 5 e C = 1; com N = 7, R é 5 ou 6). Por isso as duas causas saem com a MESMA marca, "complemento menor que 5",
+--      salvo quando N é 9 ou mais e R está entre 1 e 4: aí C é 5 ou mais, as duas causas não podem valer juntas, e R sai com "menos de 5".
+--   5. As seis origens são partes de contas_criadas, junto com quem não respondeu. Seja K o número de origens escondidas pela regra 1 e
+--      RESTO = contas criadas na semana menos a soma das origens que aparecem (as de zero e as de 5 ou mais). As K escondidas e quem
+--      não respondeu somam RESTO, e cada escondida vale pelo menos 1. Sem nenhuma escondida (K = 0), RESTO é exatamente quem não
+--      respondeu. Com escondidas, cada uma vale no máximo RESTO - (K - 1); se esse máximo é de 3 ou menos, o resto estreita o que a marca
+--      "menos de 5" promete (exemplo: 6 contas, instagram 5 e busca escondida: RESTO = 1, logo busca = 1). A regra esconde também quando o
+--      máximo é 4, que não estreita, por margem. Então, se RESTO está entre 1 e K + 3, ou entre 1 e 4 quando K é 0 ou 1 (K = 2: de 1 a 5;
+--      K = 6: de 1 a 9), TODAS as origens da semana saem nulas com a marca "complemento menor que 5", inclusive as de zero e as de 5 ou mais e
+--      as que sozinhas seriam "menos de 5": uma marca diferente por origem diria quais são pequenas (K) e reabriria a conta. Uma semana
+--      com contas_criadas de 1 a 4 sempre cai nesta regra (RESTO é contas_criadas), então a marca ali não diz nada além de que a semana é
+--      pequena. Fora dela (RESTO = 0, ou RESTO maior que esse limite), nenhuma escondida fica limitada a menos que "de 1 a 4", e quem não
+--      respondeu, quando aparece pela conta, é zero ou 5 ou mais.
+--   6. Marcas possíveis: "menos de 5" (a contagem real está entre 1 e 4), "complemento menor que 5" (a contagem ou o seu complemento,
+--      regras 4 e 5, está escondida porque o valor dela ou de outra contagem da semana poderia ser deduzido; a marca não diz qual),
+--      "janela aberta" (a semana terminou, mas a janela de 7 dias de contas_com_registro_7_dias ainda não fechou) e "semana em andamento"
+--      (regra 2: a semana não terminou e todas as suas contagens saem nulas).
+--   Limite conhecido: a resposta pode chegar depois do fim da semana (e uma conta pode ser excluída depois), então duas consultas em dias
+--   diferentes podem trazer valores diferentes para a mesma semana já terminada. A diferença é de respostas ou de contas, nunca de quem:
+--   a função não devolve quem respondeu, quem criou a conta nem quando. O que a regra protege é o que SAI do SQL Editor (planilha,
+--   relatório, print): não guarde nem repasse consultas de dias diferentes lado a lado para comparar semanas pequenas.
 --
 -- Colunas: week_start (a segunda-feira da semana), measure (a medida acima), total (a contagem, ou nulo quando escondida) e mark.
 -- O "hoje" é o do fuso America/Sao_Paulo (ou o clarevo.today dos testes). Contas de demonstração e de teste: a demonstração do app roda
@@ -461,37 +483,48 @@ begin
       from semanas sm
       left join por_pessoa pp on pp.w = sm.w
      group by sm.w
+  ),
+  -- Regra 5: k = origens escondidas (1 a 4); resto = contas da semana menos as origens que aparecem (zero ou 5 ou mais).
+  restos as (
+    select c.*,
+           (select count(*) from (values (c.o_instagram), (c.o_indicacao), (c.o_empresa), (c.o_busca), (c.o_outro), (c.o_prefiro)) o (x)
+             where o.x between 1 and 4)::int as k,
+           c.n - (select coalesce(sum(o.x), 0) from (values (c.o_instagram), (c.o_indicacao), (c.o_empresa), (c.o_busca), (c.o_outro), (c.o_prefiro)) o (x)
+                   where o.x >= 5)::int as resto
+      from contagens c
+  ),
+  -- A marca das seis origens é a mesma para a semana toda quando a semana está em andamento (regra 2) ou o resto limita alguma escondida
+  -- (regra 5); senão, cada origem tem a sua (regra 1).
+  semana as (
+    select t.*,
+           case when t.em_andamento then 'semana em andamento'
+                when t.resto between 1 and greatest(t.k, 1) + 3 then 'complemento menor que 5' end as marca_origens
+      from restos t
   )
-  select c.w, m.measure,
-         case when m.mark is not null and m.mark <> 'semana em andamento' then null else m.val end,
-         m.mark
-    from contagens c
+  select s.w, m.measure, case when m.mark is null then m.val end, m.mark
+    from semana s
     cross join lateral (
       values
-        (1, 'contas_criadas', c.n,
-         case when c.n between 1 and 4 then 'menos de 5' when c.em_andamento then 'semana em andamento' end),
-        (2, 'contas_com_registro_7_dias', c.r,
-         case when not c.janela_fechada then 'janela aberta'
-              when c.r between 1 and 4 then 'menos de 5'
-              when (c.n - c.r) between 1 and 4 then 'complemento menor que 5' end),
-        (3, 'origem_instagram', c.o_instagram,
-         case when c.o_instagram between 1 and 4 then 'menos de 5' when c.em_andamento then 'semana em andamento' end),
-        (4, 'origem_indicacao', c.o_indicacao,
-         case when c.o_indicacao between 1 and 4 then 'menos de 5' when c.em_andamento then 'semana em andamento' end),
-        (5, 'origem_empresa', c.o_empresa,
-         case when c.o_empresa between 1 and 4 then 'menos de 5' when c.em_andamento then 'semana em andamento' end),
-        (6, 'origem_busca', c.o_busca,
-         case when c.o_busca between 1 and 4 then 'menos de 5' when c.em_andamento then 'semana em andamento' end),
-        (7, 'origem_outro', c.o_outro,
-         case when c.o_outro between 1 and 4 then 'menos de 5' when c.em_andamento then 'semana em andamento' end),
-        (8, 'origem_prefiro_nao_dizer', c.o_prefiro,
-         case when c.o_prefiro between 1 and 4 then 'menos de 5' when c.em_andamento then 'semana em andamento' end)
+        (1, 'contas_criadas', s.n,
+         case when s.em_andamento then 'semana em andamento'
+              when s.n between 1 and 4 then 'menos de 5' end),
+        (2, 'contas_com_registro_7_dias', s.r,
+         case when s.em_andamento then 'semana em andamento'
+              when not s.janela_fechada then 'janela aberta'
+              when s.r between 1 and 4 and s.n >= 9 then 'menos de 5'
+              when s.r between 1 and 4 or (s.n - s.r) between 1 and 4 then 'complemento menor que 5' end),
+        (3, 'origem_instagram', s.o_instagram, coalesce(s.marca_origens, case when s.o_instagram between 1 and 4 then 'menos de 5' end)),
+        (4, 'origem_indicacao', s.o_indicacao, coalesce(s.marca_origens, case when s.o_indicacao between 1 and 4 then 'menos de 5' end)),
+        (5, 'origem_empresa', s.o_empresa, coalesce(s.marca_origens, case when s.o_empresa between 1 and 4 then 'menos de 5' end)),
+        (6, 'origem_busca', s.o_busca, coalesce(s.marca_origens, case when s.o_busca between 1 and 4 then 'menos de 5' end)),
+        (7, 'origem_outro', s.o_outro, coalesce(s.marca_origens, case when s.o_outro between 1 and 4 then 'menos de 5' end)),
+        (8, 'origem_prefiro_nao_dizer', s.o_prefiro, coalesce(s.marca_origens, case when s.o_prefiro between 1 and 4 then 'menos de 5' end))
     ) as m (ord, measure, val, mark)
-   order by c.w, m.ord;
+   order by s.w, m.ord;
 end;
 $$;
 comment on function public.clarevo_staff_signup_metrics(date, date) is
-  'Equipe Clarevo, só no SQL Editor: cadastros, contas com registro nos 7 primeiros dias e respostas de origem, por semana inteira, com supressão de contagens de 1 a 4 (mark "menos de 5"). Sem total do período. Regras no cabeçalho da migração 0018.';
+  'Equipe Clarevo, só no SQL Editor: cadastros, contas com registro nos 7 primeiros dias e respostas de origem, por semana inteira e já terminada (a semana em andamento sai sem contagem), com supressão de contagens de 1 a 4 (mark "menos de 5") e das que se deduziriam por subtração (mark "complemento menor que 5"). Sem total do período. Regras no cabeçalho da migração 0018.';
 
 -- ---------------------------------------------------------------------------
 -- Privilégios, só do que é novo. A tabela fica só com leitura (pela RLS); a função de responder é a única com execute para quem tem
