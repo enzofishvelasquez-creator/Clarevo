@@ -5,7 +5,8 @@
 -- sem espaço pessoal ou excluída recusada, operação gravada por último em record_operations e SEM contar como anotação para a atividade
 -- (D-030). A função da equipe só roda no SQL Editor (nunca authenticated, anon nem service_role) e devolve, por semana inteira
 -- (segunda a domingo, America/Sao_Paulo): contas criadas, contas com registro nos 7 primeiros dias e respostas por origem, com toda
--- contagem de 1 a 4 escondida ("menos de 5"), complemento escondido, janela aberta e sem total do período.
+-- contagem de 1 a 4 escondida ("menos de 5"), sem como deduzir uma contagem escondida por subtração de outra ("complemento menor que 5"),
+-- semana em andamento sem contagem nenhuma, janela aberta e sem total do período.
 -- Pessoas FICTÍCIAS: Ana, Bia, Caio, Dora (exclui a conta), Eli (membro da Família da Ana, exclui a conta e vira "Pessoa que saiu"),
 -- Gil (titular sozinho, exclui a conta), Hugo (nunca entrou no app), Iris (apagada direto em auth.users) e as coortes das semanas.
 -- Tudo em uma transação desfeita no fim.
@@ -558,6 +559,36 @@ insert into plan select 'w8_' || i, '2026-09-22 12:00:00-03'::timestamptz, 'regi
 insert into plan select 'w9_' || i, '2026-09-29 12:00:00-03'::timestamptz, case when i <= 2 then 'registro' end, interval '1 day', null from generate_series(1, 6) i;
 -- W10 (05/10): a semana de hoje: 5 contas, 5 respostas "instagram".
 insert into plan select 'w10_' || i, '2026-10-06 12:00:00-03'::timestamptz, null, interval '1 day', 'instagram' from generate_series(1, 5) i;
+-- Coortes das bordas da supressão por complemento (todas com a janela de 7 dias fechada). n = contas criadas, r = com registro,
+-- K = origens escondidas (1 a 4), resto = n menos as origens que aparecem; a regra esconde as origens quando resto vai de 1 a K + 3
+-- (de 1 a 4 se K é 0 ou 1).
+-- V1 (01/06): n=9, r=4 (complemento 5), instagram 5 e busca 1 (K=1), resto 4: borda de cima com K=1, esconde as origens.
+insert into plan select 'v1_' || i, '2026-06-02 12:00:00-03'::timestamptz, case when i <= 4 then 'registro' end, interval '1 day',
+       case when i <= 5 then 'instagram' when i = 6 then 'busca' end from generate_series(1, 9) i;
+-- V2 (08/06): n=10, r=5 (complemento 5), instagram 5 e busca 1, resto 5: um acima da borda, não esconde.
+insert into plan select 'v2_' || i, '2026-06-09 12:00:00-03'::timestamptz, case when i <= 5 then 'registro' end, interval '1 day',
+       case when i <= 5 then 'instagram' when i = 6 then 'busca' end from generate_series(1, 10) i;
+-- V3 (15/06): n=10, r=8 (complemento 2), instagram 6 e ninguém escondido (K=0), resto 4 = quem não respondeu: esconde as origens.
+insert into plan select 'v3_' || i, '2026-06-16 12:00:00-03'::timestamptz, case when i <= 8 then 'registro' end, interval '1 day',
+       case when i <= 6 then 'instagram' end from generate_series(1, 10) i;
+-- V4 (22/06): n=11, r=2, instagram 6 (K=0), resto 5: não esconde.
+insert into plan select 'v4_' || i, '2026-06-23 12:00:00-03'::timestamptz, case when i <= 2 then 'registro' end, interval '1 day',
+       case when i <= 6 then 'instagram' end from generate_series(1, 11) i;
+-- V5 (29/06): n=6, r=5 (complemento 1), todas responderam "instagram" (resto 0): origens aparecem; o registro fica escondido.
+insert into plan select 'v5_' || i, '2026-06-30 12:00:00-03'::timestamptz, case when i <= 5 then 'registro' end, interval '1 day', 'instagram'
+  from generate_series(1, 6) i;
+-- V6 (25/05): n=10, r=10, instagram 5, indicacao 1 e busca 1 (K=2), resto 5 = K + 3: borda de cima com K=2, esconde.
+insert into plan select 'v6_' || i, '2026-05-26 12:00:00-03'::timestamptz, 'registro', interval '1 day',
+       case when i <= 5 then 'instagram' when i = 6 then 'indicacao' when i = 7 then 'busca' end from generate_series(1, 10) i;
+-- V7 (18/05): n=11, r=0, as mesmas respostas (K=2), resto 6: um acima da borda, não esconde.
+insert into plan select 'v7_' || i, '2026-05-19 12:00:00-03'::timestamptz, null, interval '1 day',
+       case when i <= 5 then 'instagram' when i = 6 then 'indicacao' when i = 7 then 'busca' end from generate_series(1, 11) i;
+-- V8 (11/05): n=6, r=0, uma resposta em cada uma das seis origens (K=6, resto 6): cada uma só pode valer 1, esconde.
+insert into plan select 'v8_' || i, '2026-05-12 12:00:00-03'::timestamptz, null, interval '1 day',
+       (array['instagram', 'indicacao', 'empresa', 'busca', 'outro', 'prefiro_nao_dizer'])[i] from generate_series(1, 6) i;
+-- V9 (04/05): n=10, r=6 (complemento 4), as seis origens escondidas (prefiro_nao_dizer 2), resto 10 > K + 3 = 9: não esconde.
+insert into plan select 'v9_' || i, '2026-05-05 12:00:00-03'::timestamptz, case when i <= 6 then 'registro' end, interval '1 day',
+       (array['instagram', 'indicacao', 'empresa', 'busca', 'outro', 'prefiro_nao_dizer', 'prefiro_nao_dizer'])[i] from generate_series(1, 10) i;
 
 -- Cadastro dos espaços e do que cada pessoa faz (pelas funções do app), no dia fixo.
 insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data)
@@ -656,33 +687,108 @@ create function pg_temp.wk(p_week date) returns text language sql security defin
            || '=' || coalesce(t.total::text, '') || coalesce('[' || t.mark || ']', ''), ' ' order by t.rn)
     from public.clarevo_staff_signup_metrics(p_week, p_week) with ordinality as t(week_start, measure, total, mark, rn)
 $$;
+-- Quantas pessoas da semana têm a resposta (direto nas tabelas, sem a regra de esconder): o que a função da equipe esconde, o teste confere aqui.
+create function pg_temp.fonte(p_week date, p_source text) returns bigint language sql security definer set search_path = public, pg_temp as $$
+  select count(*) from public.signup_sources s join public.persons p on p.id = s.person_id and p.deleted_at is null
+   where s.source = p_source and date_trunc('week', p.created_at at time zone 'America/Sao_Paulo')::date = p_week
+$$;
 do $$ begin
   -- W0: 7 bases e 5 extras (12 contas, nenhuma com registro, e 12 - 0 não é pequeno). Respostas até aqui: 5 "instagram" (as extras), "empresa"
-  -- (Caio e Eli: 2), "busca" (Ana) e "prefiro_nao_dizer" (Bia): só o instagram aparece, e o zero de indicacao e de outro.
+  -- (Caio e Eli: 2), "busca" (Ana) e "prefiro_nao_dizer" (Bia). K=3 escondidas, resto 12 - 5 = 7, acima do limite 6: só o instagram
+  -- aparece, e o zero de indicacao e de outro.
   assert pg_temp.wk('2026-07-06') = 'n=12 r=0 ig=5 in=0 em=[menos de 5] bu=[menos de 5] ou=0 pr=[menos de 5]',
     'W0 antes: ' || pg_temp.wk('2026-07-06');
-  -- W1: 14 contas; 7 com registro (14 - 7 = 7, sem complemento pequeno); instagram 5; indicacao 3, busca 1 e outro 2 escondidos.
+  -- W1: 14 contas; 7 com registro (14 - 7 = 7, sem complemento pequeno); instagram 5; indicacao 3, busca 1 e outro 2 escondidos (K=3,
+  -- resto 9 > 6).
   assert pg_temp.wk('2026-08-03') = 'n=14 r=7 ig=5 in=[menos de 5] em=0 bu=[menos de 5] ou=[menos de 5] pr=0', 'W1: ' || pg_temp.wk('2026-08-03');
-  -- W2: 3 contas escondidas; as 3 com registro, escondidas; "outro" 3 escondido.
-  assert pg_temp.wk('2026-08-10') = 'n=[menos de 5] r=[menos de 5] ig=0 in=0 em=0 bu=0 ou=[menos de 5] pr=0', 'W2: ' || pg_temp.wk('2026-08-10');
+  -- W2: 3 contas (escondidas); as 3 com registro, escondidas (r e a diferença são pequenos, e n < 9 usa a marca única); com n de 1 a 4 as
+  -- seis origens saem sob a mesma marca (resto = n), até a que seria só "menos de 5" ("outro" 3).
+  assert pg_temp.wk('2026-08-10') = 'n=[menos de 5] r=[complemento menor que 5] ig=[complemento menor que 5] in=[complemento menor que 5] em=[complemento menor que 5] bu=[complemento menor que 5] ou=[complemento menor que 5] pr=[complemento menor que 5]',
+    'W2: ' || pg_temp.wk('2026-08-10');
   -- W3: 20 contas, 17 com registro, mas as 3 sem registro seriam reveladas por 20 - 17: o registro fica escondido (complemento).
+  -- Origens: instagram 6 e empresa 8, sem escondidas (K=0), resto 6: aparecem.
   assert pg_temp.wk('2026-08-17') = 'n=20 r=[complemento menor que 5] ig=6 in=0 em=8 bu=0 ou=0 pr=0', 'W3: ' || pg_temp.wk('2026-08-17');
-  -- W4: 6 contas, 1 com registro escondido; indicacao 5 (exatamente 5 aparece); busca 1 escondida.
-  assert pg_temp.wk('2026-08-24') = 'n=6 r=[menos de 5] ig=0 in=5 em=0 bu=[menos de 5] ou=0 pr=0', 'W4: ' || pg_temp.wk('2026-08-24');
-  -- W5: uma só conta (a das 23:30 de domingo em São Paulo, 02:30 UTC de segunda): n escondido e o registro (zero, com complemento 1) também.
-  assert pg_temp.wk('2026-08-31') = 'n=[menos de 5] r=[complemento menor que 5] ig=0 in=0 em=0 bu=0 ou=0 pr=0', 'W5: ' || pg_temp.wk('2026-08-31');
+  -- W4: 6 contas, 1 com registro (escondido; com n < 9 a marca é a única); indicacao 5 (exatamente 5 aparece) e busca 1 escondida: resto
+  -- 6 - 5 = 1, e a busca só poderia ser 1. Por isso TODAS as origens saem escondidas (o caso do complemento: 6 contas, instagram 5).
+  assert pg_temp.wk('2026-08-24') = 'n=6 r=[complemento menor que 5] ig=[complemento menor que 5] in=[complemento menor que 5] em=[complemento menor que 5] bu=[complemento menor que 5] ou=[complemento menor que 5] pr=[complemento menor que 5]',
+    'W4: ' || pg_temp.wk('2026-08-24');
+  -- W5: uma só conta (a das 23:30 de domingo em São Paulo, 02:30 UTC de segunda): n escondido, o registro (zero, com complemento 1) também,
+  -- e as origens (ninguém respondeu, resto 1) também.
+  assert pg_temp.wk('2026-08-31') = 'n=[menos de 5] r=[complemento menor que 5] ig=[complemento menor que 5] in=[complemento menor que 5] em=[complemento menor que 5] bu=[complemento menor que 5] ou=[complemento menor que 5] pr=[complemento menor que 5]',
+    'W5: ' || pg_temp.wk('2026-08-31');
   -- W6: 5 contas (a de segunda 00:00 e a de domingo 23:59:59 de São Paulo entram aqui), nenhuma com registro: zero aparece (complemento 5).
+  -- "outro" 2 escondida (K=1), resto 5, acima do limite 4: não esconde as outras.
   assert pg_temp.wk('2026-09-07') = 'n=5 r=0 ig=0 in=0 em=0 bu=0 ou=[menos de 5] pr=0', 'W6: ' || pg_temp.wk('2026-09-07');
-  -- W7: 8 contas, 4 com registro (escondido, 1 a 4); prefiro_nao_dizer 5 aparece; busca 3 escondida.
-  assert pg_temp.wk('2026-09-14') = 'n=8 r=[menos de 5] ig=0 in=0 em=0 bu=[menos de 5] ou=0 pr=5', 'W7: ' || pg_temp.wk('2026-09-14');
+  -- W7: 8 contas, 4 com registro (escondido, 1 a 4, e o complemento 4 também); prefiro_nao_dizer 5 e busca 3 escondida (K=1, resto 3):
+  -- as origens saem todas escondidas.
+  assert pg_temp.wk('2026-09-14') = 'n=8 r=[complemento menor que 5] ig=[complemento menor que 5] in=[complemento menor que 5] em=[complemento menor que 5] bu=[complemento menor que 5] ou=[complemento menor que 5] pr=[complemento menor que 5]',
+    'W7: ' || pg_temp.wk('2026-09-14');
   -- W8: 5 contas, 5 com registro (complemento zero): aparece. A janela fechou em 05/10.
   assert pg_temp.wk('2026-09-21') = 'n=5 r=5 ig=0 in=0 em=0 bu=0 ou=0 pr=0', 'W8: ' || pg_temp.wk('2026-09-21');
-  -- W9: a semana terminou, mas a janela de 7 dias fecha em 12/10: o registro sai sem valor.
+  -- W9: a semana terminou, mas a janela de 7 dias fecha em 12/10: o registro sai sem valor. As outras contagens aparecem.
   assert pg_temp.wk('2026-09-28') = 'n=6 r=[janela aberta] ig=0 in=0 em=0 bu=0 ou=0 pr=0', 'W9: ' || pg_temp.wk('2026-09-28');
-  -- W10: a semana de hoje: as contagens aparecem com a marca de semana em andamento; o registro, com a janela aberta.
-  assert pg_temp.wk('2026-10-05') = 'n=5[semana em andamento] r=[janela aberta] ig=5[semana em andamento] in=0[semana em andamento] em=0[semana em andamento] bu=0[semana em andamento] ou=0[semana em andamento] pr=0[semana em andamento]',
+  -- W10: a semana de hoje (quarta, 07/10) ainda não terminou: TODAS as contagens saem sem valor, com a marca de semana em andamento (nem o
+  -- total parcial, que duas consultas em dias seguidos revelariam por subtração).
+  assert pg_temp.wk('2026-10-05') = 'n=[semana em andamento] r=[semana em andamento] ig=[semana em andamento] in=[semana em andamento] em=[semana em andamento] bu=[semana em andamento] ou=[semana em andamento] pr=[semana em andamento]',
     'W10: ' || pg_temp.wk('2026-10-05');
+  -- As bordas da supressão por complemento (V1 a V9, ver o plano acima).
+  -- V1: n=9, instagram 5 e busca 1 (K=1): resto 4 = limite, esconde as origens; registro 4 com n >= 9 (complemento 5): "menos de 5".
+  assert pg_temp.wk('2026-06-01') = 'n=9 r=[menos de 5] ig=[complemento menor que 5] in=[complemento menor que 5] em=[complemento menor que 5] bu=[complemento menor que 5] ou=[complemento menor que 5] pr=[complemento menor que 5]',
+    'V1: ' || pg_temp.wk('2026-06-01');
+  -- V2: n=10, resto 5 = limite + 1: não esconde; registro 5 com complemento 5 aparece.
+  assert pg_temp.wk('2026-06-08') = 'n=10 r=5 ig=5 in=0 em=0 bu=[menos de 5] ou=0 pr=0', 'V2: ' || pg_temp.wk('2026-06-08');
+  -- V3: n=10, instagram 6, K=0: quem não respondeu (4) seria deduzido por 10 - 6, então as origens saem escondidas; registro 8 com complemento 2.
+  assert pg_temp.wk('2026-06-15') = 'n=10 r=[complemento menor que 5] ig=[complemento menor que 5] in=[complemento menor que 5] em=[complemento menor que 5] bu=[complemento menor que 5] ou=[complemento menor que 5] pr=[complemento menor que 5]',
+    'V3: ' || pg_temp.wk('2026-06-15');
+  -- V4: n=11, instagram 6, K=0: quem não respondeu é 5, aparece; registro 2 com n >= 9 e complemento 9: "menos de 5".
+  assert pg_temp.wk('2026-06-22') = 'n=11 r=[menos de 5] ig=6 in=0 em=0 bu=0 ou=0 pr=0', 'V4: ' || pg_temp.wk('2026-06-22');
+  -- V5: n=6, todas responderam (resto 0): as origens aparecem; registro 5 com complemento 1 (e n = 6): marca única, não "menos de 5".
+  assert pg_temp.wk('2026-06-29') = 'n=6 r=[complemento menor que 5] ig=6 in=0 em=0 bu=0 ou=0 pr=0', 'V5: ' || pg_temp.wk('2026-06-29');
+  -- V6: n=10, K=2, resto 5 = K + 3: esconde; registro 10 (complemento 0) aparece.
+  assert pg_temp.wk('2026-05-25') = 'n=10 r=10 ig=[complemento menor que 5] in=[complemento menor que 5] em=[complemento menor que 5] bu=[complemento menor que 5] ou=[complemento menor que 5] pr=[complemento menor que 5]',
+    'V6: ' || pg_temp.wk('2026-05-25');
+  -- V7: n=11, K=2, resto 6 = K + 4: não esconde.
+  assert pg_temp.wk('2026-05-18') = 'n=11 r=0 ig=5 in=[menos de 5] em=0 bu=[menos de 5] ou=0 pr=0', 'V7: ' || pg_temp.wk('2026-05-18');
+  -- V8: n=6, uma resposta em cada origem (K=6): cada uma só poderia valer 1, esconde tudo; registro zero (complemento 6) aparece.
+  assert pg_temp.wk('2026-05-11') = 'n=6 r=0 ig=[complemento menor que 5] in=[complemento menor que 5] em=[complemento menor que 5] bu=[complemento menor que 5] ou=[complemento menor que 5] pr=[complemento menor que 5]',
+    'V8: ' || pg_temp.wk('2026-05-11');
+  -- V9: n=10, K=6, resto 10 > 9: cada escondida ainda pode valer de 1 a 4; registro 6 com complemento 4 (n >= 9): marca de complemento.
+  assert pg_temp.wk('2026-05-04') = 'n=10 r=[complemento menor que 5] ig=[menos de 5] in=[menos de 5] em=[menos de 5] bu=[menos de 5] ou=[menos de 5] pr=[menos de 5]',
+    'V9: ' || pg_temp.wk('2026-05-04');
 end $$;
+
+-- 6d2. Semana em andamento: nada de total parcial, em nenhum dia da semana, e a semana só aparece inteira quando termina. Duas consultas em
+-- dias seguidos dão a mesma resposta, mesmo com contas e respostas novas entre elas (não há subtração que revele um dia).
+select pg_temp.today('2026-10-04');   -- domingo: a semana de 28/09 ainda não terminou
+do $$ begin
+  assert pg_temp.wk('2026-09-28') = 'n=[semana em andamento] r=[semana em andamento] ig=[semana em andamento] in=[semana em andamento] em=[semana em andamento] bu=[semana em andamento] ou=[semana em andamento] pr=[semana em andamento]',
+    'domingo: a semana de 28/09 ainda não terminou: ' || pg_temp.wk('2026-09-28');
+  assert pg_temp.wk('2026-09-21') = 'n=5 r=[janela aberta] ig=0 in=0 em=0 bu=0 ou=0 pr=0', 'domingo: a de 21/09 terminou, com a janela aberta: ' || pg_temp.wk('2026-09-21');
+end $$;
+select pg_temp.today('2026-10-05');   -- segunda: a semana de 28/09 terminou
+do $$ begin
+  assert pg_temp.wk('2026-09-28') = 'n=6 r=[janela aberta] ig=0 in=0 em=0 bu=0 ou=0 pr=0', 'segunda: a semana de 28/09 terminou: ' || pg_temp.wk('2026-09-28');
+  assert (select count(*) from public.clarevo_staff_signup_metrics('2026-10-05', '2026-10-05') where total is null and mark = 'semana em andamento') = 8,
+    'segunda: a semana nova está em andamento, as oito linhas';
+end $$;
+-- Uma conta nova e uma resposta nova entre duas consultas não aparecem em nenhuma das duas (a semana está em andamento).
+create temp table antes_dia as
+  select week_start, measure, total, mark from public.clarevo_staff_signup_metrics('2026-10-05', '2026-10-25');
+select pg_temp.today('2026-10-06');
+set session_replication_role = replica;
+insert into public.persons (id, display_name, created_at) values (md5('sx-hoje')::uuid, 'Pessoa de hoje', '2026-10-06 09:00:00-03');
+insert into public.signup_sources (person_id, source) values (md5('sx-hoje')::uuid, 'instagram');
+set session_replication_role = origin;
+do $$ begin
+  assert not exists ((select week_start, measure, total, mark from public.clarevo_staff_signup_metrics('2026-10-05', '2026-10-25')) except select * from antes_dia)
+     and not exists (select * from antes_dia except (select week_start, measure, total, mark from public.clarevo_staff_signup_metrics('2026-10-05', '2026-10-25'))),
+    'a conta e a resposta de hoje não mudam nada do que a consulta mostra';
+  -- Semanas futuras também saem sem contagem.
+  assert (select count(*) from public.clarevo_staff_signup_metrics('2026-10-12', '2026-10-25') where total is null and mark = 'semana em andamento') = 16, 'semanas futuras sem contagem';
+end $$;
+delete from public.persons where id = md5('sx-hoje')::uuid;
+drop table antes_dia;
+select pg_temp.today('2026-10-07');
 
 -- 6e. Uma consulta de várias semanas devolve as mesmas linhas das consultas de uma semana (cada semana é independente), nenhuma linha
 -- de total, e nada identifica ninguém.
@@ -712,6 +818,124 @@ begin
   assert (select count(*) from public.clarevo_staff_signup_metrics('2024-10-07', '2024-10-13') where total = 0) = 8, 'uma semana vazia: oito zeros';
 end $$;
 
+-- 6f. Propriedades gerais da supressão, em 208 semanas sintéticas (2020 a 2023, fora das semanas usadas acima), de tamanhos e respostas variados.
+-- As pessoas e as respostas entram direto nas tabelas (sem as funções do app, que não são o objeto deste teste), e cada propriedade lê só o que a
+-- função da equipe devolve, como a equipe leria: a partir do que sai, nenhuma contagem de 1 a 4 pode ser lida, deduzida por subtração nem
+-- estreitada. Depois, as pessoas sintéticas saem.
+select setseed(0.37);
+set session_replication_role = replica;
+do $$
+declare
+  w date;
+  i int;
+  n int;
+  p_resp numeric;
+  p_reg numeric;
+  skew numeric;
+  v_id uuid;
+  v_at timestamptz;
+  v_src text[] := array['instagram', 'indicacao', 'empresa', 'busca', 'outro', 'prefiro_nao_dizer'];
+begin
+  for w in select g::date from generate_series('2022-01-03'::date, '2023-12-25'::date, interval '7 days') g
+           union all select g::date from generate_series('2020-01-06'::date, '2021-12-27'::date, interval '7 days') g loop
+    n := floor(power(random(), 2) * 16)::int;                       -- de 0 a 15 contas, mais semanas pequenas
+    p_resp := (array[0, 0.3, 0.7, 0.95, 1])[1 + floor(random() * 5)::int];
+    p_reg := (array[0, 0.2, 0.5, 0.9, 1])[1 + floor(random() * 5)::int];
+    skew := (array[1, 2, 3])[1 + floor(random() * 3)::int];        -- quanto as respostas se concentram nas primeiras origens
+    for i in 1..n loop
+      v_id := md5('sx-' || w || '-' || i)::uuid;
+      v_at := ((w + 1)::timestamp + interval '12 hours') at time zone 'America/Sao_Paulo';
+      insert into public.persons (id, display_name, created_at) values (v_id, 'Pessoa sintetica', v_at);
+      if random() < p_resp then
+        insert into public.signup_sources (person_id, source) values (v_id, v_src[1 + least(floor(power(random(), skew) * 6), 5)::int]);
+      end if;
+      if random() < p_reg then
+        insert into public.financial_records (context_id, account_id, kind, amount_cents, currency, occurred_on, description, created_by, created_at)
+        values (md5('sx-ctx')::uuid, md5('sx-acc')::uuid, 'despesa', 100, 'BRL', w + 1, 'Teste', v_id, v_at + interval '1 hour');
+      end if;
+    end loop;
+  end loop;
+end $$;
+set session_replication_role = origin;
+create temp table sx_saida as
+  select * from public.clarevo_staff_signup_metrics('2022-01-03', '2023-12-31')
+  union all select * from public.clarevo_staff_signup_metrics('2020-01-06', '2022-01-02');
+-- Uma linha por semana: n e r (total e marca), as seis origens (totais e marcas, nesta ordem) e os números que a equipe consegue calcular.
+create temp table sx_semana as
+  select week_start,
+         max(total) filter (where measure = 'contas_criadas') as n,
+         max(mark) filter (where measure = 'contas_criadas') as n_mark,
+         max(total) filter (where measure = 'contas_com_registro_7_dias') as r,
+         max(mark) filter (where measure = 'contas_com_registro_7_dias') as r_mark,
+         count(*) filter (where measure like 'origem\_%' and mark = 'menos de 5') as k,
+         count(*) filter (where measure like 'origem\_%' and mark = 'complemento menor que 5') as tapadas,
+         count(*) filter (where measure like 'origem\_%' and total is not null) as visiveis,
+         coalesce(sum(total) filter (where measure like 'origem\_%'), 0) as soma_visiveis
+    from sx_saida group by week_start;
+do $$
+begin
+  assert (select count(*) from sx_semana) = 208 and (select count(*) from sx_saida) = 208 * 8, '208 semanas, 8 linhas cada';
+  -- Os números que aparecem são os verdadeiros (a supressão esconde, nunca troca o valor).
+  assert not exists (
+    select 1 from sx_semana x
+     where x.n is not null and x.n <> (select count(*) from public.persons p where p.display_name = 'Pessoa sintetica'
+                                        and date_trunc('week', p.created_at at time zone 'America/Sao_Paulo')::date = x.week_start)), 'n aparece com o valor verdadeiro';
+  assert not exists (
+    select 1 from sx_saida o
+     where o.measure like 'origem\_%' and o.total is not null
+       and o.total <> pg_temp.fonte(o.week_start, substr(o.measure, 8))), 'cada origem que aparece tem o valor verdadeiro';
+  assert not exists (
+    select 1 from sx_semana x
+     where x.r is not null and x.r <> (select count(*) from public.persons p
+                                        where p.display_name = 'Pessoa sintetica'
+                                          and date_trunc('week', p.created_at at time zone 'America/Sao_Paulo')::date = x.week_start
+                                          and exists (select 1 from public.financial_records f where f.created_by = p.id))), 'r aparece com o valor verdadeiro';
+  -- Cobertura: o teste só vale se todos os ramos da regra aparecem nas semanas sintéticas.
+  assert (select count(*) from sx_semana where n_mark = 'menos de 5') > 10, 'há semanas pequenas';
+  assert (select count(*) from sx_semana where n >= 9 and tapadas = 6) > 3, 'há semanas grandes com as origens escondidas por complemento';
+  assert (select count(*) from sx_semana where n >= 9 and k >= 1 and tapadas = 0) > 3, 'há semanas grandes com origem escondida só por ser pequena';
+  assert (select count(*) from sx_semana where n >= 5 and visiveis = 6 and tapadas = 0) > 3, 'há semanas com as seis origens à mostra';
+  assert (select count(*) from sx_semana where r_mark = 'menos de 5') > 3 and (select count(*) from sx_semana where r_mark = 'complemento menor que 5') > 10
+     and (select count(*) from sx_semana where r is not null) > 10, 'há de tudo na medida de registro';
+  -- Marcas das origens: ou nenhuma, ou a mesma nas seis (a marca não diz quais são pequenas).
+  assert not exists (select 1 from sx_semana where tapadas not in (0, 6)), 'as origens escondidas por complemento saem as seis juntas';
+  assert not exists (select 1 from sx_semana where tapadas = 6 and (k > 0 or visiveis > 0)), 'e nenhuma delas leva outra marca nem valor';
+  -- Uma origem escondida por ser pequena nunca pode ser estreitada pelo resto: o resto (contas menos as origens que aparecem) deixa
+  -- espaço para cada uma valer até 4, mesmo com as outras escondidas valendo 1.
+  assert not exists (select 1 from sx_semana where k >= 1 and (n is null or n - soma_visiveis - (k - 1) < 4)),
+    'nenhuma origem escondida fica limitada pelo resto a menos que 4';
+  -- Sem origem escondida e com as seis à mostra, quem não respondeu (n menos a soma) é zero ou 5 ou mais.
+  assert not exists (select 1 from sx_semana where visiveis = 6 and (n is null or n - soma_visiveis between 1 and 4)),
+    'quem não respondeu não sai por subtração com 1 a 4';
+  -- Com n escondido (1 a 4), todas as origens saem escondidas por complemento (n e as origens não se estreitam).
+  assert not exists (select 1 from sx_semana where n_mark = 'menos de 5' and tapadas <> 6), 'n pequeno: origens escondidas por complemento';
+  -- O registro: se aparece, n também, e a diferença não é de 1 a 4; "menos de 5" só com n >= 9 (a diferença é 5 ou mais).
+  assert not exists (select 1 from sx_semana where r is not null and (n is null or n - r between 1 and 4)), 'registro à mostra: a diferença não é de 1 a 4';
+  assert not exists (select 1 from sx_semana where r_mark = 'menos de 5' and (n is null or n < 9)), '"menos de 5" no registro só com 9 contas ou mais';
+  assert not exists (select 1 from sx_semana where r_mark = 'menos de 5' and n is not null
+                        and (select count(*) from public.persons p where p.display_name = 'Pessoa sintetica'
+                                and date_trunc('week', p.created_at at time zone 'America/Sao_Paulo')::date = week_start
+                                and not exists (select 1 from public.financial_records f where f.created_by = p.id)) between 1 and 4),
+    '"menos de 5" no registro: a diferença verdadeira nunca é de 1 a 4';
+  -- Toda linha: valor ou marca, nunca os dois, e só as quatro marcas.
+  assert not exists (select 1 from sx_saida where (total is null) = (mark is null)), 'valor ou marca, nunca os dois nem nenhum';
+  assert not exists (select 1 from sx_saida where total between 1 and 4), 'nenhuma contagem de 1 a 4 sai com valor';
+  assert not exists (select 1 from sx_saida where mark is not null and mark not in ('menos de 5', 'complemento menor que 5', 'janela aberta', 'semana em andamento')), 'só as quatro marcas';
+  assert not exists (select 1 from sx_saida where mark in ('janela aberta', 'semana em andamento')), 'semanas antigas: sem janela aberta nem em andamento';
+end $$;
+-- As pessoas sintéticas saem (as respostas vão por cascata) e o resto do teste segue com os dados de antes.
+set session_replication_role = replica;
+delete from public.financial_records where created_by in (select id from public.persons where display_name = 'Pessoa sintetica');
+set session_replication_role = origin;
+delete from public.persons where display_name = 'Pessoa sintetica';
+drop table sx_semana;
+drop table sx_saida;
+do $$ begin
+  assert not exists (select 1 from public.persons where display_name = 'Pessoa sintetica') and not exists (select 1 from public.financial_records where context_id = md5('sx-ctx')::uuid),
+    'as pessoas sintéticas saíram';
+  assert pg_temp.fonte('2022-01-03', 'instagram') = 0, 'e as respostas delas também';
+end $$;
+
 -- ---------------------------------------------------------------------------
 -- 7. Exclusão da conta (D-058): a resposta some com a conta, também quando a linha de persons continua como "Pessoa que saiu".
 -- ---------------------------------------------------------------------------
@@ -729,8 +953,12 @@ reset role;
 do $$ begin
   assert pg_temp.ans('gil') = 'indicacao v1' and pg_temp.ans('dora') = 'outro v1' and pg_temp.ans('iris') = 'instagram v1' and pg_temp.ans('eli') = 'empresa v1', 'as respostas de quem vai sair';
   assert pg_temp.nops('dora') = 1 and pg_temp.nops('eli') = 1 and pg_temp.nops('gil') = 1 and pg_temp.nops('iris') = 1, 'uma operação cada';
-  -- W0 com as respostas deles: instagram 6 (as 5 extras e a Iris); indicacao (Gil), outro (Dora), empresa (Caio e Eli), busca e prefiro, escondidos.
-  assert pg_temp.wk('2026-07-06') = 'n=12 r=0 ig=6 in=[menos de 5] em=[menos de 5] bu=[menos de 5] ou=[menos de 5] pr=[menos de 5]', 'W0 com todas as respostas: ' || pg_temp.wk('2026-07-06');
+  -- W0 com as respostas deles: instagram 6 (as 5 extras e a Iris); indicacao (Gil), outro (Dora), empresa (Caio e Eli), busca e prefiro, cinco
+  -- escondidas (K=5): o resto 12 - 6 = 6 limita cada uma a 2, então a semana inteira de origens sai escondida.
+  assert pg_temp.fonte('2026-07-06', 'instagram') = 6 and pg_temp.fonte('2026-07-06', 'indicacao') = 1 and pg_temp.fonte('2026-07-06', 'empresa') = 2
+     and pg_temp.fonte('2026-07-06', 'outro') = 1 and pg_temp.fonte('2026-07-06', 'busca') = 1 and pg_temp.fonte('2026-07-06', 'prefiro_nao_dizer') = 1, 'as respostas da W0 nas tabelas';
+  assert pg_temp.wk('2026-07-06') = 'n=12 r=0 ig=[complemento menor que 5] in=[complemento menor que 5] em=[complemento menor que 5] bu=[complemento menor que 5] ou=[complemento menor que 5] pr=[complemento menor que 5]',
+    'W0 com todas as respostas: ' || pg_temp.wk('2026-07-06');
 end $$;
 
 -- Dora (só o Pessoal) exclui a conta: a resposta, a operação e a pessoa somem.
@@ -812,8 +1040,12 @@ do $$ begin
   assert not exists (select 1 from public.signup_sources s left join public.persons p on p.id = s.person_id where p.id is null or p.deleted_at is not null),
     'nenhuma resposta de pessoa que já não existe';
   -- A coorte W0 depois das exclusões: Dora, Eli, Gil e Iris saíram da contagem (a pessoa anônima nunca conta): 12 - 4 = 8; instagram 6 - 1 = 5;
-  -- indicacao (Gil) e outro (Dora) voltam a zero e empresa (Eli) cai de 2 para 1, escondido.
-  assert pg_temp.wk('2026-07-06') = 'n=8 r=0 ig=5 in=0 em=[menos de 5] bu=[menos de 5] ou=0 pr=[menos de 5]', 'W0 depois: ' || pg_temp.wk('2026-07-06');
+  -- indicacao (Gil) e outro (Dora) voltam a zero e empresa (Eli) cai de 2 para 1. Nas tabelas: instagram 5, empresa 1, busca 1, prefiro 1. Na função:
+  -- K=3 escondidas e resto 8 - 5 = 3, que limitaria cada uma a 1 (as três valem exatamente 1), então a semana inteira de origens sai escondida.
+  assert pg_temp.fonte('2026-07-06', 'instagram') = 5 and pg_temp.fonte('2026-07-06', 'indicacao') = 0 and pg_temp.fonte('2026-07-06', 'empresa') = 1
+     and pg_temp.fonte('2026-07-06', 'outro') = 0 and pg_temp.fonte('2026-07-06', 'busca') = 1 and pg_temp.fonte('2026-07-06', 'prefiro_nao_dizer') = 1, 'as respostas da W0 depois';
+  assert pg_temp.wk('2026-07-06') = 'n=8 r=0 ig=[complemento menor que 5] in=[complemento menor que 5] em=[complemento menor que 5] bu=[complemento menor que 5] ou=[complemento menor que 5] pr=[complemento menor que 5]',
+    'W0 depois: ' || pg_temp.wk('2026-07-06');
 end $$;
 -- Excluir a conta de uma pessoa da coorte tira a pessoa da semana dela (e a resposta da origem).
 set role authenticated;

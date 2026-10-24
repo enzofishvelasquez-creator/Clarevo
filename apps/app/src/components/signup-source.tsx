@@ -32,7 +32,8 @@ import { colors, fonts, motion, space } from '@/theme/tokens';
  *
  * `useSignupSourceWriter` cuida da gravação: a chave da operação é a mesma enquanto o resultado é incerto (a conexão caiu depois de
  * enviar) e muda quando o servidor recusa ou confirma; a versão é a da resposta que a tela leu (0 sem resposta). Uma recusa por
- * versão antiga (outro aparelho respondeu antes) recarrega a leitura e explica em uma frase.
+ * versão antiga (outro aparelho respondeu antes) explica em uma frase, e a leitura é recarregada por `useSetSignupSource` (state/data.ts),
+ * de modo que o toque seguinte já manda a versão certa.
  */
 function useSignupSourceWriter(current: SignupSource | null) {
   const set = useSetSignupSource();
@@ -86,7 +87,7 @@ function SignupSourceChoices({
         <Chip
           key={s}
           label={busy === s ? SIGNUP_SOURCE_TEXT.saving : SIGNUP_SOURCE_LABEL[s]}
-          accessibilityLabel={SIGNUP_SOURCE_TEXT.optionA11y(s, selected === s)}
+          accessibilityLabel={SIGNUP_SOURCE_TEXT.optionA11y(s)}
           selected={selected === s}
           onPress={() => onChoose(s)}
         />

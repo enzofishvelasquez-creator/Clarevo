@@ -1,6 +1,7 @@
 import {
   ESSENTIAL_LOOKBACK_MONTHS,
   INSTALLMENT_NATURES,
+  SIGNUP_SOURCE_QUERY_KEY,
   activeAccounts,
   addDays,
   contextKindOfItem,
@@ -28,6 +29,8 @@ import {
   loadEvolutionGaps,
   loadInvoicesOfRecords,
   paidCategoryParts,
+  signupSourceRefused,
+  signupSourceSaved,
   phase3ClosedMonths,
   receiptKeyValid,
   receivedCategoryBreakdown,
@@ -1877,12 +1880,13 @@ export function useSetSavingsAnswer() {
 export function useSignupSource(enabled: boolean) {
   const repo = useRepo();
   const { user } = useSession();
-  return useQuery({ queryKey: ['signupSource', user?.id], queryFn: () => repo.getSignupSource(), enabled: enabled && Boolean(user) });
+  return useQuery({ queryKey: [SIGNUP_SOURCE_QUERY_KEY, user?.id], queryFn: () => repo.getSignupSource(), enabled: enabled && Boolean(user) });
 }
 
 /**
  * Responder ou mudar a origem (versão 0 = ainda não respondeu). Confirmada pelo servidor, a resposta entra na hora no cache (o cartão do
- * Resumo some e Conta mostra a escolha). Não é anotação: não mexe na revisão dos últimos meses.
+ * Resumo some e Conta mostra a escolha). Recusada por `versao_desatualizada` (outro aparelho respondeu antes), a leitura é recarregada,
+ * como nas metas e na conferência de mês, para o próximo toque mandar a versão certa. Não é anotação: não mexe na revisão dos últimos meses.
  */
 export function useSetSignupSource() {
   const repo = useRepo();
@@ -1890,8 +1894,9 @@ export function useSetSignupSource() {
   const { user } = useSession();
   return useMutation({
     mutationFn: (v: { key: string; expectedVersion: number; source: SignupSourceOption }) => repo.setSignupSource(v.key, v.expectedVersion, v.source),
-    onSuccess: (row) => {
-      qc.setQueryData(['signupSource', user?.id], row);
+    onSuccess: (row) => signupSourceSaved(qc, user?.id, row),
+    onError: (e) => {
+      if (isRepoError(e)) signupSourceRefused(qc, e.code);
     },
   });
 }

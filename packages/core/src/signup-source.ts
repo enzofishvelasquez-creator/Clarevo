@@ -100,8 +100,12 @@ export const SIGNUP_SOURCE_TEXT = {
   accountNone: 'Você ainda não respondeu.',
   accountChange: 'Você pode mudar a resposta quando quiser, inclusive para "Prefiro não dizer".',
   accountSaved: 'Resposta guardada.',
-  /** O nome acessível de uma opção, com a marca de escolhida. */
-  optionA11y: (source: SignupSourceOption, selected: boolean): string => `${SIGNUP_SOURCE_LABEL[source]}${selected ? ', escolhida' : ''}`,
+  /**
+   * O nome acessível de uma opção: só o nome dela. Quem lê a tela já ouve o estado marcado pelo próprio chip (papel de opção de escolha
+   * única, marcada ou não); repetir "escolhida" no nome dobraria o aviso. Fica explícito porque o rótulo visível vira "Salvando…" durante
+   * a gravação.
+   */
+  optionA11y: (source: SignupSourceOption): string => SIGNUP_SOURCE_LABEL[source],
   saving: 'Salvando…',
   /** Algo mudou em outro aparelho: a tela recarrega e a pessoa escolhe de novo. */
   changedElsewhere: 'Sua resposta mudou em outro aparelho. A tela foi atualizada; escolha de novo se quiser mudar.',
@@ -117,6 +121,31 @@ export const SIGNUP_SOURCE_TEXT = {
     nao_encontrado: ERROR_TEXT.nao_encontrado,
   },
 } as const;
+
+/** A chave da leitura da resposta no cache de consultas do app: ['signupSource', pessoa]. */
+export const SIGNUP_SOURCE_QUERY_KEY = 'signupSource';
+
+/** O que o app precisa do cache de consultas (o QueryClient do TanStack tem os dois métodos). */
+export interface SignupSourceCache {
+  setQueryData(queryKey: readonly unknown[], data: unknown): unknown;
+  invalidateQueries(filters: { queryKey: readonly unknown[] }): unknown;
+}
+
+/** Resposta confirmada pelo servidor: entra na hora na leitura (o cartão do Resumo some e Conta mostra a escolha). */
+export function signupSourceSaved(cache: SignupSourceCache, personId: string | undefined, row: SignupSource): void {
+  cache.setQueryData([SIGNUP_SOURCE_QUERY_KEY, personId], row);
+}
+
+/**
+ * Gravação recusada pelo servidor: com `versao_desatualizada` (outro aparelho respondeu ou mudou antes) a leitura é recarregada, para a
+ * tela mostrar o que vale e o próximo toque mandar a versão certa. Sem isso o app repetiria a versão velha e seria recusado de novo.
+ * Os outros códigos não mudam a leitura. Devolve se pediu a recarga.
+ */
+export function signupSourceRefused(cache: SignupSourceCache, code: string): boolean {
+  if (code !== 'versao_desatualizada') return false;
+  cache.invalidateQueries({ queryKey: [SIGNUP_SOURCE_QUERY_KEY] });
+  return true;
+}
 
 /** Texto de erro de uma escrita da resposta: o código conhecido, ou a falha genérica. */
 export function signupSourceErrorText(code: string): string {
@@ -145,6 +174,6 @@ export function signupSourceTextSamples(): string[] {
     t.uncertain,
     ...Object.values(t.errors),
     ...labels,
-    ...SIGNUP_SOURCES.flatMap((s) => [t.accountCurrent(s), t.optionA11y(s, true), t.optionA11y(s, false)]),
+    ...SIGNUP_SOURCES.flatMap((s) => [t.accountCurrent(s), t.optionA11y(s)]),
   ];
 }

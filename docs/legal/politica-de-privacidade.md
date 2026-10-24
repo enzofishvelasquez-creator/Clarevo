@@ -126,7 +126,7 @@ Se você pedir para receber as Novidades por e-mail:
 
 O app pode perguntar, depois do primeiro dia de uso, de onde você conheceu o Clarevo. Responder é opcional, e nada no app depende da resposta.
 
-- **Dado.** Uma entre seis opções: Instagram, Indicação de alguém, Empresa onde trabalho, Busca na internet, Outro e Prefiro não dizer. Não há campo de texto livre. Guardamos também quando você respondeu e um número de versão, que sobe quando você muda de opção.
+- **Dado.** Uma entre seis opções: Instagram, Indicação de alguém, Empresa onde trabalho, Busca na internet, Outro e Prefiro não dizer. Não há campo de texto livre. Guardamos também quando você respondeu, a data da última mudança da resposta e um número de versão, que sobe quando você muda de opção.
 - **Para quê.** Só para contar, sem identificar ninguém, de onde as pessoas chegam. Não usamos a resposta para anúncio, para montar perfil, para decidir nada sobre você nem para falar com você.
 - **Base legal proposta.** Consentimento (LGPD, art. 7º, I): você escolhe se responde, pode tocar em "Agora não" (a pergunta some por 30 dias neste aparelho) e pode mudar a resposta, inclusive para "Prefiro não dizer", quando quiser, em Conta. [A DEFINIR: confirmar a base; alternativa, legítimo interesse (art. 7º, IX)]
 - **Quem vê.** Só você vê a sua resposta no app. A sua Família e a sua empresa não veem. A equipe do Clarevo vê apenas contagens por semana, sem identificar ninguém (seção 3.9).
@@ -146,7 +146,7 @@ Para saber se o Clarevo está chegando às pessoas e sendo usado, a equipe faz c
 Essas contagens:
 
 - **não identificam ninguém.** A equipe vê números por semana, nunca nome, e-mail, identificador, data de cadastro de uma pessoa nem valor financeiro;
-- **escondem os números pequenos.** Qualquer contagem de 1 a 4 pessoas não é mostrada, as semanas são sempre inteiras e não há total do período, para ninguém ser identificado por subtração;
+- **escondem os números pequenos, e também os que dariam para descobrir por subtração.** Qualquer contagem de 1 a 4 pessoas não é mostrada. Quando uma contagem escondida poderia ser calculada a partir das outras da mesma semana (por exemplo, 6 contas criadas e 5 respostas "Instagram" deixariam descobrir que só uma pessoa escolheu outra opção), as contagens relacionadas também são escondidas. As semanas só aparecem inteiras e depois de terminarem: enquanto uma semana está em andamento, nenhuma contagem dela é mostrada, para que duas consultas em dias seguidos não revelem quantas contas foram criadas em um dia. Não há total do período, para ninguém ser identificado por subtração;
 - **são consultadas só pela equipe**, direto no banco de dados. Nenhuma tela do app as mostra, e nem a sua Família nem a sua empresa as veem;
 - **não usam ferramenta de análise, cookie, rastreador nem endereço de campanha.** Saem das contas e dos registros que já existem. O Clarevo não registra o que você abre, lê ou busca no app;
 - **não guardam nada a mais.** A contagem é refeita do que existe no momento, então uma conta excluída deixa de contar.
