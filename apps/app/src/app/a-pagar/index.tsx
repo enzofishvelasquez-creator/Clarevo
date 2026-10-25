@@ -62,8 +62,8 @@ const rowLayout = LinearTransition.duration(motion.detail).reduceMotion(ReduceMo
 /** "1 conta de gasto fixo que já venceu" ou "2 contas de gastos fixos que já venceram". */
 const createdOverdueText = (n: number) =>
   n === 1
-    ? 'O Clarevo criou 1 conta de gasto fixo que já venceu. Confira se você já pagou.'
-    : `O Clarevo criou ${n} contas de gastos fixos que já venceram. Confira se você já pagou.`;
+    ? 'A Clarevo criou 1 conta de gasto fixo que já venceu. Confira se você já pagou.'
+    : `A Clarevo criou ${n} contas de gastos fixos que já venceram. Confira se você já pagou.`;
 
 const registeredText = (n: number) => (n === 0 ? 'Nenhum cadastrado' : n === 1 ? '1 cadastrado' : `${n} cadastrados`);
 

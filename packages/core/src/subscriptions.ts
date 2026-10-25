@@ -71,14 +71,14 @@ export const SUBSCRIPTION_TEXT = {
   reviewTitle: 'Revisar assinaturas',
   reviewIntro: 'Vale olhar de tempos em tempos se cada uma ainda é usada.',
   reviewNote:
-    'Encerrar aqui só tira a assinatura do Clarevo a partir do mês escolhido. Para deixar de pagar, é preciso encerrar também com quem oferece o serviço.',
+    'Encerrar aqui só tira a assinatura da Clarevo a partir do mês escolhido. Para deixar de pagar, é preciso encerrar também com quem oferece o serviço.',
   endFrom: 'Encerrar a partir de…',
   keeps: 'Continua',
   keepsHint: 'Marca só para você acompanhar a lista; não é guardado.',
   keepsCount: (kept: number, total: number): string => `${kept} de ${total} marcadas como Continua`,
   reviewedButton: 'Revisei minhas assinaturas',
   reviewedDone: 'Revisão registrada.',
-  reviewFooter: 'O Clarevo guarda só a data da revisão.',
+  reviewFooter: 'A Clarevo guarda só a data da revisão.',
   lastReview: (reviewedOn: IsoDate | null): string =>
     reviewedOn === null ? 'Você ainda não registrou uma revisão.' : `Última revisão: ${formatDateBR(reviewedOn)}.`,
   empty: 'Nenhuma assinatura ativa. Marque um gasto fixo mensal como assinatura ao cadastrar ou editar.',

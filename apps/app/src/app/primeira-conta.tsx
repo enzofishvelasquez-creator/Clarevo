@@ -54,7 +54,7 @@ export default function PrimeiraConta() {
       <Card style={{ backgroundColor: colors.brandTint, gap: space[1] }}>
         <Txt variant="label">Saldo inicial não é obrigatório.</Txt>
         <Txt variant="caption" color={colors.textSecondary}>
-          Sem ele, o Clarevo mostra a diferença do mês, mas não calcula o saldo da conta.
+          Sem ele, a Clarevo mostra a diferença do mês, mas não calcula o saldo da conta.
         </Txt>
       </Card>
       {banner ? (

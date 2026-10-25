@@ -22,7 +22,7 @@ const ARQUIVO_FEED = 'novidades/feed.xml';
 
 /** O feed só existe com domínio (feedRss): sem ele, não há link para ele nas páginas. */
 const linkDoFeed = (arquivo, valores) =>
-  dominioDe(valores) ? `<link rel="alternate" type="application/rss+xml" title="Novidades do Clarevo" href="${rel(arquivo, ARQUIVO_FEED)}">` : '';
+  dominioDe(valores) ? `<link rel="alternate" type="application/rss+xml" title="Novidades da Clarevo" href="${rel(arquivo, ARQUIVO_FEED)}">` : '';
 
 /** Um campo de um tema do catálogo, em texto (ou `null` se o tema ou o campo não existem). */
 function campoDoTema(slug, campo) {
@@ -184,7 +184,7 @@ function feedRss(posts, valores) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
 <channel>
-<title>Novidades do Clarevo</title>
+<title>Novidades da Clarevo</title>
 <link>${esc(`${base}/novidades/`)}</link>
 <description>Textos curtos da Equipe Clarevo, com data e fontes.</description>
 <language>pt-BR</language>
@@ -209,7 +209,7 @@ function paginaComoEscrevemos({ valores }) {
   const pg = montarPagina({
     arquivo,
     titulo: meta.titulo || titulo || 'Como escrevemos',
-    descricao: meta.descricao || 'As regras editoriais do Clarevo: fonte oficial ou identificada, data, revisão, sem publicidade e sem recomendar produto financeiro.',
+    descricao: meta.descricao || 'As regras editoriais da Clarevo: fonte oficial ou identificada, data, revisão, sem publicidade e sem recomendar produto financeiro.',
     capa,
     corpo: colunaTexto(html, 'texto'),
     fonte: md,

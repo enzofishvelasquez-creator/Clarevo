@@ -20,7 +20,7 @@ export const ORGANIZAR_TOPICS: Topic[] = [
     paragraphs: [
       'Gasto fixo é o que se repete com valor igual ou quase igual todo mês, como aluguel, escola, internet e parcelas. Gasto variável muda conforme o uso ou as escolhas do mês, como mercado, luz, água e lazer.',
       'Alguns gastos chegam só em certas épocas, como impostos, seguros e matrícula. Como dá para saber que vão chegar, eles entram no planejamento do ano, e não na reserva para imprevistos (veja "Contas que chegam uma vez por ano").',
-      'Separar os dois tipos ajuda a ver o que já tem destino antes de o mês começar e onde há espaço para ajustes. No Clarevo, o que se repete todo mês pode virar um gasto fixo, que cria a conta a pagar de cada mês; contas que mudam de valor, como a de luz, entram com valor estimado até você informar o valor da conta.',
+      'Separar os dois tipos ajuda a ver o que já tem destino antes de o mês começar e onde há espaço para ajustes. Na Clarevo, o que se repete todo mês pode virar um gasto fixo, que cria a conta a pagar de cada mês; contas que mudam de valor, como a de luz, entram com valor estimado até você informar o valor da conta.',
     ],
     example:
       'Aluguel de R$ 2.500,00 e internet de R$ 120,00 somam R$ 2.620,00 em gastos fixos. Mercado de R$ 1.100,00 e luz de R$ 172,40 somam R$ 1.272,40 em gastos variáveis. O mês fica em R$ 3.892,40.',
@@ -53,7 +53,7 @@ export const ORGANIZAR_TOPICS: Topic[] = [
       'Uma forma de se preparar é somar o valor do ano e dividir por 12. Esse valor por mês mostra quanto da renda essas contas ocupam, mesmo nos meses em que nada vence.',
       'Como são previsíveis, essas contas não são imprevistos. O Portal do Investidor, da CVM, lembra que a reserva para imprevistos não serve para gastos de certa época do ano, como tributos e matrículas.',
       'As condições de pagamento à vista ou parcelado são definidas por cada estado ou prefeitura. Confira datas e condições no site oficial da Secretaria da Fazenda do seu estado ou da sua prefeitura.',
-      'No Clarevo, cadastre cada uma como conta do ano: o ano inteiro aparece em Contas a pagar dois meses antes do primeiro vencimento, e cada conta só entra em Ainda a pagar no mês em que vence.',
+      'Na Clarevo, cadastre cada uma como conta do ano: o ano inteiro aparece em Contas a pagar dois meses antes do primeiro vencimento, e cada conta só entra em Ainda a pagar no mês em que vence.',
     ],
     example:
       'IPVA de R$ 1.800,00, IPTU de R$ 1.200,00, matrícula de R$ 900,00 e material escolar de R$ 600,00 somam R$ 4.500,00 no ano, ou R$ 375,00 por mês.',
@@ -172,7 +172,7 @@ export const ORGANIZAR_TOPICS: Topic[] = [
     short:
       'A parte da renda que já tem destino: contas fixas, parcelas e outras contas a pagar do mês. Para dívidas, a Serasa usa como referência até 30% da renda líquida. É uma referência, não uma regra.',
     paragraphs: [
-      'Renda comprometida é a parte da renda que já tem destino antes de o mês começar: contas fixas, parcelas e outras contas a pagar. No Clarevo, a conta usa as contas que vencem no mês e a renda de referência que você informa.',
+      'Renda comprometida é a parte da renda que já tem destino antes de o mês começar: contas fixas, parcelas e outras contas a pagar. Na Clarevo, a conta usa as contas que vencem no mês e a renda de referência que você informa.',
       'Para dívidas (parcelas de empréstimos, financiamentos, compras parceladas e carnês), a Serasa usa como referência até 30% da renda líquida. É uma referência de mercado, não uma lei nem uma regra para a sua vida.',
       'Num indicador do Banco Central, comprometer mais de 50% da renda com dívidas é um dos quatro critérios de endividamento de risco, e o indicador só considera a situação quando há pelo menos dois critérios ao mesmo tempo. As bases de renda são diferentes, e os números não são diretamente comparáveis.',
       'Cada casa tem sua realidade. O número serve para planejar, não para julgar.',
@@ -233,7 +233,7 @@ export const ORGANIZAR_TOPICS: Topic[] = [
     paragraphs: [
       'Renda fixa é a que muda pouco, como salário, aposentadoria ou aluguel recebido. Renda variável muda de um mês para outro, como comissões por vendas ou aulas particulares. É a definição do material de educação financeira do Banco Central. Aqui, renda variável é o dinheiro que entra, não um tipo de aplicação.',
       'Para planejar, o Banco Central sugere estimar receitas e despesas usando os meses passados como base. A Susep orienta anotar só os valores que você tem certeza de receber, sem contar gorjetas e gratificações, porque não se deve contar com o que não é certo.',
-      'No Clarevo, a renda de referência é um valor por mês que você informa e pode mudar quando quiser. Com "Minha renda varia", o app pede uma revisão no começo de cada mês. A sugestão do app é a média dos meses fechados com recebimentos anotados, sem reembolsos; é uma escolha do Clarevo, não uma regra oficial. Para contar só com o que é certo, uma opção é usar o menor valor dos últimos meses.',
+      'Na Clarevo, a renda de referência é um valor por mês que você informa e pode mudar quando quiser. Com "Minha renda varia", o app pede uma revisão no começo de cada mês. A sugestão do app é a média dos meses fechados com recebimentos anotados, sem reembolsos; é uma escolha da Clarevo, não uma regra oficial. Para contar só com o que é certo, uma opção é usar o menor valor dos últimos meses.',
       'Renda que muda também pesa no tamanho da reserva para imprevistos. A CVM diz que o valor depende do tipo de renda, fixa ou variável, e a Susep cita de seis meses a um ano de renda guardada para quem trabalha por conta própria com receitas que mudam todo mês.',
     ],
     example:
@@ -272,7 +272,7 @@ export const ORGANIZAR_TOPICS: Topic[] = [
     paragraphs: [
       'Um aporte é o registro do dinheiro que você já separou para uma meta, como a reserva para imprevistos. Ele mostra o progresso da meta e não entra em Pago nem diminui a Diferença do mês, porque o dinheiro continua seu, só mudou de lugar. Intenção de guardar não é aporte: o valor que você pretende guardar por mês aparece só como plano.',
       'Se depois você usar o dinheiro guardado, anote o gasto normalmente, com a data em que pagou, e registre um resgate na meta. O gasto entra em Pago uma vez, e o resgate diminui o valor guardado. Resgate não é renda: ele não entra em Recebido.',
-      'Rendimento recebido e valorização são registros diferentes do aporte. Use Registrar rendimento recebido para o que apareceu no seu extrato e Atualizar valor guardado quando o valor que você tem guardado mudar. O Clarevo não estima rendimentos e não guarda nem movimenta dinheiro.',
+      'Rendimento recebido e valorização são registros diferentes do aporte. Use Registrar rendimento recebido para o que apareceu no seu extrato e Atualizar valor guardado quando o valor que você tem guardado mudar. A Clarevo não estima rendimentos e não guarda nem movimenta dinheiro.',
       'O Portal do Investidor, da CVM, sugere definir uma meta para a reserva, porque ela ajuda a manter o foco, e montar um plano para guardar uma parte da renda todo mês.',
     ],
     example:
@@ -298,11 +298,11 @@ export const ORGANIZAR_TOPICS: Topic[] = [
     subtitle: 'A base da reserva para imprevistos',
     question: 'Quais gastos contam como essenciais na reserva?',
     short:
-      'São os gastos ligados às necessidades, como moradia e mercado. No Clarevo, a reserva parte da média do que você pagou em Moradia, Mercado, Transporte, Saúde e Educação, e você ajusta o valor.',
+      'São os gastos ligados às necessidades, como moradia e mercado. Na Clarevo, a reserva parte da média do que você pagou em Moradia, Mercado, Transporte, Saúde e Educação, e você ajusta o valor.',
     paragraphs: [
       'O Banco Central chama de necessários os gastos ligados às necessidades, como alimentação, moradia e vestuário. A reserva para imprevistos parte desses gastos, e não da renda: o Portal do Investidor, da CVM, fala em meses de gastos.',
-      'No Clarevo, a sugestão olha os seis meses fechados mais recentes e usa até três deles, os mais recentes com gastos anotados. Soma o que você pagou em Moradia, Mercado, Transporte, Saúde e Educação em cada um e faz a média. Lazer e gastos sem categoria ficam fora. A lista de categorias é uma escolha do Clarevo, não uma regra oficial.',
-      'Pagamentos de contas do ano, como impostos e matrículas, também ficam fora da média. A CVM lembra que a reserva não é para gastos sazonais e previsíveis, como tributos e matrículas: eles ficam no planejamento do ano. Sem meses com gastos anotados, o Clarevo começa pelas contas a pagar do mês, e você completa o valor.',
+      'Na Clarevo, a sugestão olha os seis meses fechados mais recentes e usa até três deles, os mais recentes com gastos anotados. Soma o que você pagou em Moradia, Mercado, Transporte, Saúde e Educação em cada um e faz a média. Lazer e gastos sem categoria ficam fora. A lista de categorias é uma escolha da Clarevo, não uma regra oficial.',
+      'Pagamentos de contas do ano, como impostos e matrículas, também ficam fora da média. A CVM lembra que a reserva não é para gastos sazonais e previsíveis, como tributos e matrículas: eles ficam no planejamento do ano. Sem meses com gastos anotados, a Clarevo começa pelas contas a pagar do mês, e você completa o valor.',
       'O valor é sempre uma sugestão. Ajuste quando souber que algum mês foi diferente do comum, por exemplo com uma compra maior que a de costume.',
     ],
     example:
@@ -334,7 +334,7 @@ export const ORGANIZAR_TOPICS: Topic[] = [
     paragraphs: [
       'Para resumir vários valores em um número só, há duas medidas comuns, que o IBGE chama de medidas de tendência central. A média soma todos os valores e divide pela quantidade deles. A mediana põe os valores em ordem e pega o do meio; com quantidade par de valores, é a média dos dois do meio.',
       'A diferença aparece quando um valor foge dos outros. Todos os valores entram na média, então um mês bem maior ou bem menor puxa o resultado para o lado dele. A mediana depende da posição dos valores, e não do tamanho dos extremos: o IBGE diz que ela pode dar um valor típico do conjunto, porque não é afetada por valores extremos.',
-      'Na Evolução, o Clarevo mostra as duas lado a lado para o Recebido ou o Pago dos meses da comparação. Uma não é melhor que a outra: as duas respondem a perguntas diferentes. A média diz quanto cada mês teria se todos fossem iguais, e a mediana diz o valor do meio. Se as duas ficam distantes, olhe o mês que mais se afasta dos outros.',
+      'Na Evolução, a Clarevo mostra as duas lado a lado para o Recebido ou o Pago dos meses da comparação. Uma não é melhor que a outra: as duas respondem a perguntas diferentes. A média diz quanto cada mês teria se todos fossem iguais, e a mediana diz o valor do meio. Se as duas ficam distantes, olhe o mês que mais se afasta dos outros.',
       'Ao tirar um mês da comparação, as duas contas são refeitas sem ele, e nenhum lançamento muda. O mês em andamento e os meses sem registros ficam de fora; o mês conferido, sem lançamentos, entra como zero.',
     ],
     example:

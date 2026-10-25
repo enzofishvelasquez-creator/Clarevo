@@ -1,5 +1,8 @@
 'use strict';
-/** Início: o que é o Clarevo, para quem é, recursos com captura, "A empresa nunca vê suas finanças", o que ele não é e as chamadas. */
+/**
+ * Início: a mensagem central (D-068), o que é a Clarevo, o apoio prático do app (bem-estar financeiro, sem promessa de resultado nem de saúde),
+ * recursos com captura, para quem é, "A empresa nunca vê suas finanças", o que ela não é e as chamadas.
+ */
 const { URL_APP } = require('../config');
 const { esc } = require('../texto');
 const { rel } = require('../util');
@@ -8,7 +11,11 @@ const { catalogo } = require('../catalogo');
 const { valorDe } = require('../texto');
 
 const ARQUIVO = 'index.html';
-const DESCRICAO = 'Mais clareza para decidir. O Clarevo é um organizador de finanças pessoais e da família: anote gastos e recebimentos, acompanhe contas a pagar e cartões e aprenda.';
+/** A mensagem central (Manual v2.2, seção 19) e a frase de apoio: as mesmas de `docs/lojas/ficha.md` e das imagens de compartilhamento. */
+const MENSAGEM_CENTRAL = 'Cuidar da vida financeira faz parte de cuidar de você.';
+const FRASE_DE_APOIO = 'Mais clareza para decidir';
+const SUBTEXTO = 'A Clarevo ajuda a organizar o mês e acompanhar decisões financeiras pessoais e familiares, respeitando sua realidade.';
+const DESCRICAO = `${MENSAGEM_CENTRAL} ${SUBTEXTO} ${FRASE_DE_APOIO}.`;
 
 function paginaInicial({ valores, img }) {
   const u = (d) => rel(ARQUIVO, d);
@@ -33,11 +40,12 @@ ${celular(img[r.id], ARQUIVO)}
 
   const capa = `<div class="capa-grade">
 <div>
-<h1>Mais clareza para decidir</h1>
-<p class="lead">O Clarevo é um organizador de finanças pessoais e da família. Você anota o que recebe e o que paga, e o app mostra quanto entrou, quanto saiu e quanto ainda vai vencer, cada coisa separada da outra. Pode ser oferecido pela empresa como benefício.</p>
+<h1>${esc(MENSAGEM_CENTRAL)}</h1>
+<p class="lead">${esc(SUBTEXTO)}</p>
+<p class="frase-apoio">${esc(FRASE_DE_APOIO)}.</p>
 <div class="acoes">
-<a class="botao botao-principal" href="${esc(URL_APP)}" rel="noopener noreferrer">Abrir a versão web</a>
-<a class="botao botao-suave" href="${u('app/index.html')}">Conhecer o app</a>
+<a class="botao botao-principal" href="${u('app/index.html')}">Conheça a Clarevo</a>
+<a class="botao botao-suave" href="${esc(URL_APP)}" rel="noopener noreferrer">Abrir a versão web</a>
 </div>
 <p class="lojas">Em breve na App Store e no Google Play.</p>
 </div>
@@ -46,50 +54,66 @@ ${celular(img.resumo, ARQUIVO, { carregamento: 'eager' })}
 
   const brutas = [
     bloco(
-      `<h2 id="telas">O que o Clarevo faz</h2>
-<p class="lead-bloco">Telas da demonstração do Clarevo. Os dados são fictícios, e uma conta nova começa vazia.</p>
+      `<h2 id="bem-estar">Bem-estar financeiro, com apoio prático</h2>
+<p class="lead-bloco">Contas para lembrar, compras para decidir, planos para organizar: o dinheiro participa da rotina. A Clarevo trata a vida financeira como parte do cuidado com o bem-estar e oferece um app para organizar o mês, sem julgamento.</p>
+<div class="grade">
+<article class="cartao">
+<h3>O que a Clarevo oferece</h3>
+<p>Um app para anotar o que entra e o que sai, ver o que ainda vai vencer, acompanhar metas e aprender o essencial sobre contas e juros, com fonte e data de revisão. Ele parte do que você registra e respeita a sua realidade: renda, trabalho, saúde e responsabilidades da família também limitam as escolhas, e dificuldade financeira não é falta de disciplina.</p>
+</article>
+<article class="cartao">
+<h3>O que a Clarevo não promete</h3>
+<p>A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental, sono, produtividade ou tranquilidade. A vida financeira é uma dimensão do bem-estar, mas não é a causa única da saúde mental de ninguém, e o app não tem eficácia clínica comprovada.</p>
+</article>
+</div>`,
+      { rotulo: 'bem-estar' },
+    ),
+    bloco(
+      `<h2 id="telas">O que o app faz</h2>
+<p class="lead-bloco">Apoio prático para organizar o mês. Telas da demonstração da Clarevo: os dados são fictícios, e uma conta nova começa vazia.</p>
 <div class="mini">
 ${mini}
 </div>
 <p class="acoes"><a class="botao botao-principal" href="${u('app/index.html')}">Ver o app por dentro</a></p>`,
-      { rotulo: 'telas' },
+      { variante: 'alt', rotulo: 'telas' },
     ),
     bloco(
       `<h2 id="para-quem">Para quem é</h2>
 <div class="grade">
 <article class="cartao">
 <h3>Para pessoas</h3>
-<p>Use o Clarevo para entender para onde o dinheiro do mês foi e o que ainda vai vencer. Tudo o que aparece no app foi anotado ou importado por você ou pelas pessoas da sua Família. No seu Pessoal, só você anota e decide o que registrar.</p>
+<p>Use o app da Clarevo para entender para onde o dinheiro do mês foi e o que ainda vai vencer. Tudo o que aparece no app foi anotado ou importado por você ou pelas pessoas da sua Família. No seu Pessoal, só você anota e decide o que registrar.</p>
 <p>Dá para criar uma Família de até 6 pessoas, com convite por link, e sair ou encerrar quando quiser.</p>
 </article>
 <article class="cartao">
 <h3>Para empresas</h3>
-<p>A empresa pode oferecer o Clarevo como benefício. O painel das empresas existe só na web e mostra os e-mails convidados, a situação de cada convite ou licença, as datas e as contagens de vagas. Nunca mostra finanças.</p>
+<p>A empresa pode integrar o cuidado financeiro ao programa de bem-estar e oferecer a Clarevo como benefício. O painel das empresas existe só na web e mostra os e-mails convidados, a situação de cada convite ou licença, as datas e as contagens de vagas. Nunca mostra finanças.</p>
 <p><a href="${u('empresas/index.html')}">Veja como funciona para empresas</a>.</p>
 </article>
 </div>`,
-      { variante: 'alt', rotulo: 'para-quem' },
+      { rotulo: 'para-quem' },
     ),
     bloco(
       `<div class="destaque">
 <h2 id="empresa-nao-ve">A empresa nunca vê suas finanças</h2>
-<p>Se a sua empresa oferece o Clarevo, ela vê os e-mails que convidou, a situação de cada convite ou licença (convite enviado, convite cancelado, ativa ou encerrada), as datas (como a em que você aceitou o convite e a de encerramento) e as contagens de vagas e licenças. Nunca vê gastos, recebimentos, valores, categorias, metas, contas, cartões, a sua Família nem números somados. Também não vê quando você abre o app nem o que você anota.</p>
+<p>Se a sua empresa oferece a Clarevo, ela vê os e-mails que convidou, a situação de cada convite ou licença (convite enviado, convite cancelado, ativa ou encerrada), as datas (como a em que você aceitou o convite e a de encerramento) e as contagens de vagas e licenças. Nunca vê gastos, recebimentos, valores, categorias, metas, contas, cartões, a sua Família nem números somados. Também não vê quando você abre o app nem o que você anota.</p>
 <p>Se o benefício terminar, sua conta e seu histórico não são apagados.</p>
 <p><a href="${u('empresas/index.html')}">Para empresas</a> · <a href="${u('seguranca.html')}">Segurança e privacidade</a></p>
 </div>`,
-      { rotulo: 'empresa-nao-ve' },
+      { variante: 'alt', rotulo: 'empresa-nao-ve' },
     ),
     bloco(
-      `<h2 id="nao-e">O que o Clarevo não é</h2>
+      `<h2 id="nao-e">O que a Clarevo não é</h2>
 <ul class="nao-e">
 <li>Não é banco e não guarda o seu dinheiro.</li>
 <li>Não movimenta dinheiro: não faz pagamentos nem transferências.</li>
 <li>Não oferece crédito.</li>
 <li>Não recomenda produtos financeiros.</li>
 <li>Não se conecta a contas bancárias.</li>
+<li>Não é atendimento de saúde e não substitui o acompanhamento de profissionais.</li>
 </ul>
-<p class="nota">O Clarevo é uma ferramenta de organização e de educação financeira. As simulações são exemplos feitos com os números que você digita e não garantem resultado.</p>`,
-      { variante: 'alt', rotulo: 'nao-e' },
+<p class="nota">A Clarevo é uma ferramenta de organização e de educação financeira. Ela não promete resultado financeiro nem de saúde, e as simulações são exemplos feitos com os números que você digita.</p>`,
+      { rotulo: 'nao-e' },
     ),
     bloco(
       `<h2 id="mais">Aprender, calcular, ficar por dentro e tirar dúvidas</h2>
@@ -100,14 +124,14 @@ ${mini}
 <a class="cartao" href="${u('ajuda/index.html')}"><span class="titulo-cartao">Ajuda</span><p>Respostas por tema e busca no próprio navegador, sem enviar o que você digita.</p></a>
 <a class="cartao" href="${u('seguranca.html')}"><span class="titulo-cartao">Segurança e privacidade</span><p>O que guardamos, o que não guardamos e quem vê o quê, em linguagem simples.</p></a>
 </div>`,
-      { rotulo: 'mais' },
+      { variante: 'alt', rotulo: 'mais' },
     ),
     bloco(
       `<h2 id="dados">Seus dados</h2>
 <p>Sem anúncios, sem venda de dados e sem rastreamento para publicidade. A conexão é protegida. Você exclui a sua conta e os seus dados quando quiser, dentro do app, em Conta. Se não conseguir entrar no app, peça pela página <a href="${u('excluir-conta.html')}">Excluir conta</a>. Os detalhes estão na <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>
 <h2 id="contato">Contato</h2>
 <p>Para falar com a equipe, inclusive sobre o benefício para empresas: [E-MAIL DE CONTATO]. Para ajuda com o app, veja a <a href="${u('ajuda/index.html')}">Ajuda</a> e a página de <a href="${u('suporte.html')}">Suporte</a>.</p>`,
-      { variante: 'alt', rotulo: 'dados' },
+      { rotulo: 'dados' },
     ),
   ];
   const secoes = brutas.map((b) => marcadoresEmHtml(b, valores));
@@ -126,7 +150,7 @@ ${mini}
   const fonte = brutas.join('\n') + capa;
   return montarPagina({
     arquivo: ARQUIVO,
-    titulo: 'Clarevo: mais clareza para decidir',
+    titulo: 'Clarevo: bem-estar financeiro e mais clareza para decidir',
     tituloCompleto: true,
     descricao: DESCRICAO,
     capa,
@@ -137,4 +161,4 @@ ${mini}
   });
 }
 
-module.exports = { paginaInicial, DESCRICAO_INICIO: DESCRICAO };
+module.exports = { paginaInicial, DESCRICAO_INICIO: DESCRICAO, MENSAGEM_CENTRAL, FRASE_DE_APOIO };

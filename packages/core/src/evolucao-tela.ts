@@ -186,7 +186,7 @@ export const EVOLUTION_TEXT = {
     /** Nenhum mês dos exibidos tem lançamentos. */
     noRecordsTitle: 'Sem registros nestes meses',
     noRecordsBody: (metric: EvolutionMetric): string =>
-      `Mês sem anotação não quer dizer mês sem ${THINGS[metric]}: aqui aparece só o que está registrado no Clarevo.`,
+      `Mês sem anotação não quer dizer mês sem ${THINGS[metric]}: aqui aparece só o que está registrado na Clarevo.`,
     noRecordsAction: { recebido: 'Registrar recebimento', pago: 'Anotar gasto' } as Record<EvolutionMetric, string>,
     /** Com menos de 12 meses na janela: o convite a olhar mais meses (null com 12). */
     olderMonths: (windowMonths: EvolutionWindow): string | null =>
@@ -361,9 +361,9 @@ export const EVOLUTION_TEXT = {
       noBaseAction: 'Informar renda de referência',
       noRecordsTitle: 'Sem registros nestes meses',
       noRecordsBody:
-        'Mês sem conta anotada não quer dizer mês sem contas: aqui aparece só o que está registrado no Clarevo. Só meses já fechados entram aqui.',
+        'Mês sem conta anotada não quer dizer mês sem contas: aqui aparece só o que está registrado na Clarevo. Só meses já fechados entram aqui.',
       noRecordsAction: 'Anotar conta a pagar',
-      savingsBody: 'O Clarevo não tem meta criada nestes meses. Só meses já fechados entram aqui.',
+      savingsBody: 'A Clarevo não tem meta criada nestes meses. Só meses já fechados entram aqui.',
       savingsAction: 'Criar meta',
     },
   },

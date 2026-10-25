@@ -911,7 +911,7 @@ export const GOALS_TEXT = {
   /** Acréscimo em "Quem vê estes dados?" (Ciclos A a D). */
   whoSeesGoals:
     'Gastos fixos, renda de referência, renda comprometida, metas e simulações também ficam só no seu Pessoal, sem nenhuma outra pessoa do app ver. A empresa que oferece o benefício não vê nada disso, nem em números somados aos de outras pessoas.',
-  footer: 'O Clarevo não guarda nem movimenta dinheiro. Os valores mostram só o que você registrou.',
+  footer: 'A Clarevo não guarda nem movimenta dinheiro. Os valores mostram só o que você registrou.',
 
   // Calculadora da reserva (/reserva).
   reserve: {
@@ -944,7 +944,7 @@ export const GOALS_TEXT = {
     plannedQuestion: 'Quanto pretende guardar por mês? (opcional)',
     deadlineQuestion: 'Até quando? (opcional)',
     noteEmergency: 'A reserva para imprevistos é para emergências. Para aproveitar oportunidades, crie uma meta separada.',
-    noteNoProducts: 'O Clarevo não guarda nem aplica dinheiro e não indica produtos, bancos ou aplicações.',
+    noteNoProducts: 'A Clarevo não guarda nem aplica dinheiro e não indica produtos, bancos ou aplicações.',
     create: 'Criar reserva',
     save: 'Salvar reserva',
     created: 'Reserva criada.',
@@ -1041,7 +1041,7 @@ export const GOALS_TEXT = {
     },
     rendimento: {
       title: 'Registrar rendimento recebido',
-      help: 'Informe o rendimento que apareceu no seu extrato. O Clarevo não estima rendimentos.',
+      help: 'Informe o rendimento que apareceu no seu extrato. A Clarevo não estima rendimentos.',
       saved: 'Rendimento registrado.',
     },
     valorizacao: { saved: 'Valorização registrada.' },

@@ -101,7 +101,7 @@ export const JUROS_TOPICS: Topic[] = [
     paragraphs: [
       'Tarifa é cobrada por serviço, como um pacote de conta. Na conta corrente, pessoas físicas têm direito a serviços essenciais sem tarifa, como o cartão de débito, até quatro saques e duas transferências entre contas do mesmo banco por mês e consultas pela internet. Acima disso, o banco pode cobrar por serviço ou por pacote.',
       'Quando uma conta atrasa, entram encargos: multa, juros de mora e, em algumas contas, correção.',
-      'No Clarevo, tarifa, juros ou encargo que saiu da sua conta é um gasto: anote com a data da cobrança.',
+      'Na Clarevo, tarifa, juros ou encargo que saiu da sua conta é um gasto: anote com a data da cobrança.',
     ],
     example: null,
     calculation: null,
@@ -423,7 +423,7 @@ export const JUROS_TOPICS: Topic[] = [
       'O Código de Defesa do Consumidor (art. 52, § 2º) garante quitar uma dívida antes do prazo, no todo ou em parte, com redução proporcional dos juros e demais acréscimos.',
       'Em contratos de crédito de pessoas físicas com taxa prefixada, o valor para quitar é o valor presente das parcelas que faltam, calculado com a taxa de juros do próprio contrato (Resolução CMN nº 5.004/2022). Linhas com recursos direcionados ou taxas administradas, como o crédito rural e o financiamento pelo Sistema Financeiro da Habitação, podem seguir outra regra.',
       'Bancos e financeiras não podem cobrar tarifa por quitar antes em contratos de pessoas físicas assinados a partir de 10 de dezembro de 2007 (Resolução CMN nº 3.516/2007). A oferta de crédito também precisa informar o direito de quitar antes sem custo extra (Código de Defesa do Consumidor, art. 54-B).',
-      'Peça à instituição o valor atualizado para quitação; ele costuma ser menor que a soma das parcelas. Numa quitação parcial, as parcelas mais distantes são as que têm o maior desconto. Na calculadora do Clarevo, você vê uma estimativa com a taxa que digitar; o valor oficial é o que a instituição informar.',
+      'Peça à instituição o valor atualizado para quitação; ele costuma ser menor que a soma das parcelas. Numa quitação parcial, as parcelas mais distantes são as que têm o maior desconto. Na calculadora da Clarevo, você vê uma estimativa com a taxa que digitar; o valor oficial é o que a instituição informar.',
     ],
     example:
       'Faltam 36 parcelas de R$ 850,00, que somam R$ 30.600,00, com taxa de 1,5% ao mês no contrato. Para quitar tudo hoje, o valor seria R$ 23.511,58, um desconto de R$ 7.088,42. Antecipar só as 3 últimas custaria R$ 1.514,47, em vez de R$ 2.550,00.',
@@ -522,7 +522,7 @@ export const JUROS_TOPICS: Topic[] = [
       'Score é uma nota calculada por empresas de banco de dados de crédito para estimar a chance de uma pessoa pagar em dia. Mais de uma empresa calcula essa nota.',
       'Desde a Lei Complementar nº 166/2019, a inclusão no Cadastro Positivo é automática: o histórico de contas e créditos pagos pode compor a nota. Você pode pedir, de graça, o cancelamento ou a reabertura do cadastro.',
       'A Lei nº 12.414/2011 garante consultar de graça a sua nota e o seu histórico e conhecer os principais critérios usados, respeitado o segredo empresarial. Dados de origem social e étnica, saúde, informação genética, sexo e convicções políticas, religiosas ou filosóficas não podem entrar na nota.',
-      'Para ver os empréstimos e financiamentos registrados no seu CPF, o Banco Central oferece o Registrato, gratuito. O Clarevo não calcula nem prevê score.',
+      'Para ver os empréstimos e financiamentos registrados no seu CPF, o Banco Central oferece o Registrato, gratuito. A Clarevo não calcula nem prevê score.',
     ],
     example:
       'Das 12 contas pagas nos últimos 12 meses, 11 foram pagas em dia: 91,7% no prazo. Esse é um dado do histórico; a lei protege o segredo empresarial do cálculo, e nenhuma ação garante uma nota específica.',
@@ -530,7 +530,7 @@ export const JUROS_TOPICS: Topic[] = [
     hypotheses: 'Exemplo fictício. Não simula nem estima nota de crédito.',
     facts: [],
     keywords: ['pontuação de crédito', 'nota de crédito', 'cadastro positivo', 'registrato', 'histórico de pagamentos'],
-    related: ['superendividamento', 'o-que-o-clarevo-nao-faz'],
+    related: ['superendividamento', 'o-que-a-clarevo-nao-faz'],
     sources: [
       planalto(
         'Lei nº 12.414/2011 (Cadastro Positivo)',

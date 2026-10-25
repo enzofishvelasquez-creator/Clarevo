@@ -27,7 +27,7 @@ export const IMPORT_TEXT = {
   reading: 'Lendo o arquivo…',
   fileRead: (name: string) => `Arquivo lido: ${name}`,
   linesRead: (n: number) => `${num(n)} ${plural(n, 'linha lida', 'linhas lidas')}`,
-  balanceIgnored: 'O saldo que vem no arquivo é ignorado. O Clarevo não guarda saldo por conta.',
+  balanceIgnored: 'O saldo que vem no arquivo é ignorado. A Clarevo não guarda saldo por conta.',
   neverSaved: 'O arquivo em si não é guardado. Só as linhas que você confirmar são gravadas.',
   /** Escolha do destino. */
   destinationTitle: 'Para onde vão os lançamentos?',
@@ -149,7 +149,7 @@ export const IMPORT_ERROR_TEXT: Record<ImportErrorCode, string> = {
   linhas_demais: `O arquivo tem mais de ${IMPORT_MAX_LINES.toLocaleString('pt-BR')} linhas. Peça ao banco um período menor.`,
   formato_desconhecido: 'Não reconhecemos este arquivo. Use um OFX ou uma planilha CSV do banco.',
   sem_lancamentos: 'Não achamos lançamentos neste arquivo.',
-  moeda_diferente: 'Este arquivo não está em reais. O Clarevo importa só valores em reais.',
+  moeda_diferente: 'Este arquivo não está em reais. A Clarevo importa só valores em reais.',
   ofx_invalido: 'Este arquivo OFX não tem um extrato que possamos ler.',
   csv_invalido: 'Não conseguimos ler esta planilha. Confira se é um CSV do banco.',
 };

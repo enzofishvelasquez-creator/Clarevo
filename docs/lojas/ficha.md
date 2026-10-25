@@ -1,6 +1,6 @@
 # Ficha das lojas (pt-BR)
 
-19/10/2026 (Ciclo R, D-060 item 1). Textos prontos para colar no App Store Connect (Apple) e no Google Play Console. Cada campo tem o limite da loja e a contagem feita por script (`npm test` confere os limites e os termos proibidos em `packages/core/test/lojas.test.ts`). Nada aqui depende de conta de desenvolvedor, e nenhum identificador, senha ou chave foi escrito: o que for da conta de Enzo aparece entre colchetes, como "[preencher]".
+19/10/2026 (Ciclo R, D-060 item 1), revista em 25/10/2026 (Ciclo Marca 2.2, D-068: bem-estar financeiro e "a Clarevo"). Textos prontos para colar no App Store Connect (Apple) e no Google Play Console. Cada campo tem o limite da loja e a contagem feita por script (`npm test` confere os limites e os termos proibidos em `packages/core/test/lojas.test.ts`). Nada aqui depende de conta de desenvolvedor, e nenhum identificador, senha ou chave foi escrito: o que for da conta de Enzo aparece entre colchetes, como "[preencher]".
 
 **Limites.** Apple, conferidos em 19/10/2026 em `developer.apple.com/help/app-store-connect/reference/app-information/app-information` e `.../platform-version-information`: nome 30 caracteres, subtítulo 30, texto promocional 170, descrição 4000, palavras-chave 100 **bytes** (letra acentuada vale 2), notas para a revisão 4000 bytes. Google Play: título 30, descrição curta 80 e descrição completa 4000 caracteres são os limites que a página de ajuda do Play Console costuma trazer, **a conferir**: a rede desta sessão não abriu `support.google.com`, e esses valores não foram lidos da fonte oficial.
 
@@ -11,27 +11,31 @@
 | Campo | Contagem | Limite |
 |---|---|---|
 | Nome (Apple e Google) | 7 caracteres | 30 |
-| Nome, alternativa | 26 caracteres | 30 |
-| Subtítulo (Apple) | 25 caracteres | 30 |
-| Texto promocional (Apple) | 167 caracteres | 170 |
+| Nome, alternativa | 29 caracteres | 30 |
+| Subtítulo (Apple) | 20 caracteres | 30 |
+| Mensagem central (gráfico e imagem do site) | 54 caracteres | 60 |
+| Frase de apoio (gráfico e imagem do site) | 25 caracteres | 30 |
+| Texto promocional (Apple) | 165 caracteres | 170 |
 | Palavras-chave (Apple) | 98 bytes | 100 bytes |
-| Descrição (Apple) | 2692 caracteres | 4000 |
+| Descrição (Apple) | 3005 caracteres | 4000 |
 | Descrição curta (Google) | 79 caracteres | 80 (a conferir) |
-| Descrição completa (Google) | 2692 caracteres | 4000 (a conferir) |
+| Descrição completa (Google) | 3005 caracteres | 4000 (a conferir) |
 | Notas da versão (Google) | 94 caracteres | 500 (a conferir) |
-| Notas para a revisão (Apple) | 940 bytes | 4000 bytes |
+| Notas para a revisão (Apple) | 1004 bytes | 4000 bytes |
 
 ## 1. Nome, subtítulo e categoria
 
 | Campo | Loja | Limite | Texto | Contagem |
 |---|---|---|---|---|
 | Nome | Apple e Google | 30 | Clarevo | 7 |
-| Nome, alternativa se "Clarevo" já estiver em uso na Apple | Apple | 30 | Clarevo: finanças pessoais | 26 |
-| Subtítulo | Apple | 30 | Mais clareza para decidir | 25 |
+| Nome, alternativa se "Clarevo" já estiver em uso na Apple | Apple | 30 | Clarevo: bem-estar financeiro | 29 |
+| Subtítulo | Apple | 30 | Bem-estar financeiro | 20 |
+| Mensagem central (não vai à loja) | Gráfico do Google Play e imagem do site | 60 | Cuidar da vida financeira faz parte de cuidar de você. | 54 |
+| Frase de apoio (não vai à loja) | Gráfico do Google Play e imagem do site | 30 | Mais clareza para decidir | 25 |
 | Categoria principal | Apple e Google | | Finanças | |
 | Categoria secundária (opcional) | Apple | | Educação | |
 
-**Frase de marca (24/10/2026).** "Mais clareza para decidir" substituiu a frase anterior do Clarevo: é o subtítulo da Apple e abre a descrição curta do Google. Ela acompanha a marca e não substitui a explicação do que o app faz, que continua logo abaixo, nas descrições. O gráfico de recursos do Google Play e a imagem de compartilhamento do site leem o subtítulo deste arquivo.
+**Posicionamento (25/10/2026, D-068).** A Clarevo se apresenta como solução de bem-estar financeiro (Playbook e Manual v2.2): o subtítulo da Apple e o início da descrição curta do Google dizem isso, e a mensagem central do site, "Cuidar da vida financeira faz parte de cuidar de você.", é a do gráfico de recursos do Google Play e da imagem de compartilhamento do site, que leem os campos `mensagem-central` e `frase-de-apoio` deste arquivo. "Mais clareza para decidir" (24/10/2026) continua como expressão de apoio: está na descrição e nas duas imagens, sem substituir a explicação do que o app faz, que continua logo abaixo, nas descrições. A marca é tratada no feminino ("a Clarevo"); quando o texto fala do software como objeto, diz "o app da Clarevo". Os textos não prometem resultado financeiro nem de saúde mental, sono, produtividade ou tranquilidade, e dizem que a Clarevo não é atendimento de saúde (Playbook v2.2, "Bem-estar financeiro e saúde mental").
 
 <!-- campo: apple-nome | limite: 30 | unidade: caracteres -->
 ```
@@ -40,10 +44,20 @@ Clarevo
 
 <!-- campo: apple-nome-alternativo | limite: 30 | unidade: caracteres -->
 ```
-Clarevo: finanças pessoais
+Clarevo: bem-estar financeiro
 ```
 
 <!-- campo: apple-subtitulo | limite: 30 | unidade: caracteres -->
+```
+Bem-estar financeiro
+```
+
+<!-- campo: mensagem-central | limite: 60 | unidade: caracteres -->
+```
+Cuidar da vida financeira faz parte de cuidar de você.
+```
+
+<!-- campo: frase-de-apoio | limite: 30 | unidade: caracteres -->
 ```
 Mais clareza para decidir
 ```
@@ -54,7 +68,7 @@ Pode ser trocado a qualquer momento, sem nova versão.
 
 <!-- campo: apple-promocional | limite: 170 | unidade: caracteres -->
 ```
-Anote gastos e recebimentos, acompanhe contas a pagar e cartões e aprenda o essencial. O Clarevo não se conecta a contas bancárias, e sua empresa não vê suas finanças.
+Bem-estar financeiro com apoio prático: organize o mês e acompanhe contas e cartões. A Clarevo não se conecta a contas bancárias, e sua empresa não vê suas finanças.
 ```
 
 ## 3. Palavras-chave (Apple, até 100 bytes)
@@ -72,11 +86,11 @@ Texto simples, sem HTML. A mesma descrição serve de base para o Google (seçã
 
 <!-- campo: apple-descricao | limite: 4000 | unidade: caracteres -->
 ```
-O Clarevo ajuda você e sua família a organizar o dinheiro do mês e a entender melhor as próprias contas. Você anota o que recebe e o que paga, e o app mostra quanto entrou, quanto saiu e quanto ainda vai vencer, cada coisa separada da outra.
+A Clarevo é uma solução de bem-estar financeiro para pessoas e famílias, apoiada por um app de finanças pessoais e familiares. Cuidar da vida financeira faz parte de cuidar de você, e o app ajuda a organizar o mês e a acompanhar decisões, respeitando a sua realidade. Você anota o que recebe e o que paga, e o app mostra quanto entrou, quanto saiu e quanto ainda vai vencer, cada coisa separada da outra. Mais clareza para decidir.
 
-O Clarevo não se conecta a contas bancárias. Tudo o que aparece no app foi anotado ou importado por você, e é você quem decide o que registrar. Se sua empresa oferecer o Clarevo como benefício, ela vê o e-mail que convidou e a situação do convite ou da licença, com as datas: nunca vê seus gastos, seus valores nem o que você faz no app.
+A Clarevo não se conecta a contas bancárias. Tudo o que aparece no app foi anotado ou importado por você, e é você quem decide o que registrar. Se sua empresa oferecer a Clarevo como benefício, ela vê o e-mail que convidou e a situação do convite ou da licença, com as datas: nunca vê seus gastos, seus valores nem o que você faz no app.
 
-O QUE VOCÊ FAZ NO CLAREVO
+O QUE VOCÊ FAZ NA CLAREVO
 
 • Resumo do mês: Recebido, Pago, a diferença entre os dois e o que ainda falta pagar, com a explicação de cada número.
 • Anotar gasto e registrar recebimento em poucos toques, com rascunho preservado e aviso antes de descartar.
@@ -101,14 +115,14 @@ SEUS DADOS
 
 IMPORTANTE
 
-O Clarevo é uma ferramenta de organização e de educação financeira. Não é banco, não movimenta dinheiro, não oferece crédito e não indica produtos financeiros. As simulações são exemplos feitos com os números que você digita e não garantem resultado.
+A Clarevo é uma ferramenta de organização e de educação financeira. Não é banco, não movimenta dinheiro, não oferece crédito e não indica produtos financeiros. Não é atendimento de saúde, não substitui acompanhamento de profissionais e não promete resultado financeiro nem de saúde. As simulações são exemplos feitos com os números que você digita e não garantem resultado.
 ```
 
 ## 5. Google Play: descrição curta (até 80)
 
 <!-- campo: google-descricao-curta | limite: 80 | unidade: caracteres -->
 ```
-Mais clareza para decidir. Anote gastos e contas. Sem ligar a contas bancárias.
+Bem-estar financeiro: organize o mês e as contas. Sem ligar a contas bancárias.
 ```
 
 **Gráfico de recursos (Google Play, 1024 x 500): feito** (D-064). `apps/app/assets/loja/grafico-recursos-1024x500.png`, gerado por `node scripts/gerar-grafico-loja.js` com o logotipo oficial, o subtítulo desta ficha e a tela Resumo da demonstração (`docs/16`, seção 6). Não leva preço, ranking, "melhor", "grátis" nem selos das lojas.
@@ -117,11 +131,11 @@ Mais clareza para decidir. Anote gastos e contas. Sem ligar a contas bancárias.
 
 <!-- campo: google-descricao-completa | limite: 4000 | unidade: caracteres -->
 ```
-O Clarevo ajuda você e sua família a organizar o dinheiro do mês e a entender melhor as próprias contas. Você anota o que recebe e o que paga, e o app mostra quanto entrou, quanto saiu e quanto ainda vai vencer, cada coisa separada da outra.
+A Clarevo é uma solução de bem-estar financeiro para pessoas e famílias, apoiada por um app de finanças pessoais e familiares. Cuidar da vida financeira faz parte de cuidar de você, e o app ajuda a organizar o mês e a acompanhar decisões, respeitando a sua realidade. Você anota o que recebe e o que paga, e o app mostra quanto entrou, quanto saiu e quanto ainda vai vencer, cada coisa separada da outra. Mais clareza para decidir.
 
-O Clarevo não se conecta a contas bancárias. Tudo o que aparece no app foi anotado ou importado por você, e é você quem decide o que registrar. Se sua empresa oferecer o Clarevo como benefício, ela vê o e-mail que convidou e a situação do convite ou da licença, com as datas: nunca vê seus gastos, seus valores nem o que você faz no app.
+A Clarevo não se conecta a contas bancárias. Tudo o que aparece no app foi anotado ou importado por você, e é você quem decide o que registrar. Se sua empresa oferecer a Clarevo como benefício, ela vê o e-mail que convidou e a situação do convite ou da licença, com as datas: nunca vê seus gastos, seus valores nem o que você faz no app.
 
-O QUE VOCÊ FAZ NO CLAREVO
+O QUE VOCÊ FAZ NA CLAREVO
 
 • Resumo do mês: Recebido, Pago, a diferença entre os dois e o que ainda falta pagar, com a explicação de cada número.
 • Anotar gasto e registrar recebimento em poucos toques, com rascunho preservado e aviso antes de descartar.
@@ -146,7 +160,7 @@ SEUS DADOS
 
 IMPORTANTE
 
-O Clarevo é uma ferramenta de organização e de educação financeira. Não é banco, não movimenta dinheiro, não oferece crédito e não indica produtos financeiros. As simulações são exemplos feitos com os números que você digita e não garantem resultado.
+A Clarevo é uma ferramenta de organização e de educação financeira. Não é banco, não movimenta dinheiro, não oferece crédito e não indica produtos financeiros. Não é atendimento de saúde, não substitui acompanhamento de profissionais e não promete resultado financeiro nem de saúde. As simulações são exemplos feitos com os números que você digita e não garantem resultado.
 ```
 
 ## 7. Notas da versão 1.0.0
@@ -155,7 +169,7 @@ A Apple não mostra "O que há de novo" na primeira versão. No Google Play, o c
 
 <!-- campo: google-notas-da-versao | limite: 500 | unidade: caracteres -->
 ```
-Primeira versão do Clarevo: resumo do mês, contas a pagar, cartões, metas, Aprender e Família.
+Primeira versão da Clarevo: resumo do mês, contas a pagar, cartões, metas, Aprender e Família.
 ```
 
 ## 8. Contato, links e direitos (campos para Enzo)
@@ -175,7 +189,7 @@ Estes campos não podem ser inventados. As quatro URLs abaixo são as do site p�
 
 ## 9. Classificação etária (respostas do questionário)
 
-Resultado esperado: **4+** na Apple e a menor faixa na classificação do Google para o Brasil. Os textos exatos das perguntas mudam; confira a pergunta no momento de responder. O Clarevo não tem conteúdo sensível: as respostas são "não" ou "nenhum" em todos os itens abaixo.
+Resultado esperado: **4+** na Apple e a menor faixa na classificação do Google para o Brasil. Os textos exatos das perguntas mudam; confira a pergunta no momento de responder. A Clarevo não tem conteúdo sensível: as respostas são "não" ou "nenhum" em todos os itens abaixo.
 
 **Apple** (questionário de classificação do App Store Connect, valores de iOS 26 em diante, conferido em `.../reference/app-information/age-ratings-values-and-definitions` em 19/10/2026):
 
@@ -211,7 +225,7 @@ Resultado esperado: **4+** na Apple e a menor faixa na classificação do Google
 
 <!-- campo: apple-notas-da-revisao | limite: 4000 | unidade: bytes -->
 ```
-O Clarevo organiza o dinheiro do mês (gastos, recebimentos, contas a pagar, cartões, metas) e traz explicações de educação financeira. Não se conecta a contas bancárias, não movimenta dinheiro e não vende nada dentro do app.
+A Clarevo é uma solução de bem-estar financeiro apoiada por um app que organiza o dinheiro do mês (gastos, recebimentos, contas a pagar, cartões, metas) e traz explicações de educação financeira. Não se conecta a contas bancárias, não movimenta dinheiro e não vende nada dentro do app.
 
 Para entrar, use a conta de teste informada nos campos de acesso. Todos os dados dessa conta são fictícios e estão identificados como exemplo.
 
@@ -219,7 +233,7 @@ Permissões: a câmera é usada só para ler o QR Code da nota fiscal (nenhuma f
 
 Exclusão da conta: Conta, último item, "Excluir minha conta" (exige digitar EXCLUIR).
 
-Uma empresa pode oferecer o Clarevo como benefício. Ela vê os e-mails que convidou, a situação das licenças e as datas, e nunca vê gastos nem valores. O painel das empresas existe só na web.
+Uma empresa pode oferecer a Clarevo como benefício. Ela vê os e-mails que convidou, a situação das licenças e as datas, e nunca vê gastos nem valores. O painel das empresas existe só na web.
 ```
 
 **Google Play, "Acesso ao app".** Informar que o app exige login, e preencher as instruções de acesso com a conta de teste (nome de usuário e senha nos campos do Play Console, nunca no repositório). Texto das instruções: "Entre com o e-mail e a senha da conta de teste. Todos os dados são fictícios. A exclusão da conta fica em Conta, último item."

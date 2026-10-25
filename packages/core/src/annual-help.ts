@@ -32,7 +32,7 @@ const parts = ANNUAL_EXAMPLE_PARTS;
 export const ANNUAL_HELP_TEXT = {
   /** Topo do cadastro de uma conta do ano. */
   intro:
-    'Contas do ano são as que vêm uma vez por ano, como IPVA, IPTU, matrícula e seguro. Você cadastra uma vez; todo ano o Clarevo lembra e cria as contas do mês certo.',
+    'Contas do ano são as que vêm uma vez por ano, como IPVA, IPTU, matrícula e seguro. Você cadastra uma vez; todo ano a Clarevo lembra e cria as contas do mês certo.',
   whatIsThis: 'O que é isso?',
 
   /** "Como você paga?": cota única e parcelado, com exemplo numérico. */
@@ -51,20 +51,20 @@ export const ANNUAL_HELP_TEXT = {
 
   /** "O valor muda de um ano para outro?" */
   changesHint:
-    'Se muda, o Clarevo usa o valor que você cadastrou como estimativa. Quando o carnê ou o boleto do ano chegar, abra a conta do ano e informe o valor em Ano a ano.',
-  sameHint: 'Se é sempre o mesmo, o Clarevo repete o valor todo ano e você não precisa fazer nada.',
+    'Se muda, a Clarevo usa o valor que você cadastrou como estimativa. Quando o carnê ou o boleto do ano chegar, abra a conta do ano e informe o valor em Ano a ano.',
+  sameHint: 'Se é sempre o mesmo, a Clarevo repete o valor todo ano e você não precisa fazer nada.',
 
   /** "Primeiro ano" */
-  firstYearHint: 'O ano da primeira conta que o Clarevo vai criar. Dos anos seguintes ele cuida sozinho.',
+  firstYearHint: 'O ano da primeira conta que a Clarevo vai criar. Dos anos seguintes ela cuida sozinha.',
 
   /** Perto do fim do cadastro: o que acontece nos anos seguintes. */
   nextYearsTitle: 'E nos próximos anos?',
   nextYears:
-    'Todo ano, o Clarevo cria as contas do ano dois meses antes do primeiro vencimento. Se o valor mudou, abra a conta do ano e use Informar o valor em Ano a ano: só aquele ano muda. Se o valor é sempre o mesmo, não precisa fazer nada.',
+    'Todo ano, a Clarevo cria as contas do ano dois meses antes do primeiro vencimento. Se o valor mudou, abra a conta do ano e use Informar o valor em Ano a ano: só aquele ano muda. Se o valor é sempre o mesmo, não precisa fazer nada.',
 
   /** Lista de Gastos fixos, card "Contas do ano". */
   listIntro:
-    'Contas que vêm uma vez por ano, como IPVA, IPTU, matrícula e seguro. Você cadastra uma vez; todo ano o Clarevo cria a conta do mês certo, dois meses antes de vencer.',
+    'Contas que vêm uma vez por ano, como IPVA, IPTU, matrícula e seguro. Você cadastra uma vez; todo ano a Clarevo cria a conta do mês certo, dois meses antes de vencer.',
 
   /** Detalhe da conta do ano. */
   detailHowItWorks:
@@ -72,7 +72,7 @@ export const ANNUAL_HELP_TEXT = {
 
   /** "Ano a ano": legenda curta das palavras da lista. */
   yearByYearHelp: [
-    'Cada linha é um ano da conta. Previsto: o Clarevo ainda vai criar a conta, dois meses antes de vencer.',
+    'Cada linha é um ano da conta. Previsto: a Clarevo ainda vai criar a conta, dois meses antes de vencer.',
     'Quando o carnê ou o boleto de um ano chegar com outro valor, toque em Informar o valor desse ano. Só ele muda.',
     'Tirada: você marcou que aquela conta não houve.',
   ],

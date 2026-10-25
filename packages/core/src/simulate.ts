@@ -711,7 +711,7 @@ export const SIMULATE_TEXT = {
     monthsHint: 'De 1 a 600',
     monthly: 'Quanto vai guardar por mês',
     rate: 'Taxa de rendimento ao ano (%)',
-    rateHint: 'Você informa a taxa que quer testar. O Clarevo não sugere taxas, produtos nem instituições.',
+    rateHint: 'Você informa a taxa que quer testar. A Clarevo não sugere taxas, produtos nem instituições.',
     inflationToggle: 'Descontar inflação? (opcional)',
     inflation: 'Inflação ao ano (%)',
     inflationHint: 'Você informa a inflação que quer testar, de 0% a 30% ao ano.',

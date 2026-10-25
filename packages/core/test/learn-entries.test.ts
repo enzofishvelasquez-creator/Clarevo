@@ -36,7 +36,7 @@ function learnActions(): { slug: string; label: string; href: string }[] {
   }));
 }
 
-describe('ações "No Clarevo" dos temas (lib/learn.ts)', () => {
+describe('ações "Na Clarevo" dos temas (lib/learn.ts)', () => {
   it('lê as ações de verdade', () => {
     expect(learnActions().length).toBeGreaterThanOrEqual(9);
   });

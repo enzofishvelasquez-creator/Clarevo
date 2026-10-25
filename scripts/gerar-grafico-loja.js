@@ -6,7 +6,8 @@
  * O desenho é HTML e CSS no Chromium do Playwright, com o que já existe no repositório (nada é redesenhado):
  *   - fundo azul da marca (`#2457F5`);
  *   - logotipo reverso oficial `docs/marca/clarevo-logotipo-reverso.svg`;
- *   - o subtítulo da ficha (`docs/lojas/ficha.md`, campo `apple-subtitulo`), lido do arquivo, e uma linha de recursos;
+ *   - a mensagem central e a frase de apoio da ficha (`docs/lojas/ficha.md`, campos `mensagem-central` e `frase-de-apoio`, D-068), lidas
+ *     do arquivo, e uma linha de recursos;
  *   - a tela Resumo da demonstração (dados fictícios, com a etiqueta "Demonstração") de `docs/lojas/capturas/`, num aparelho simples
  *     desenhado em CSS, saindo pela borda de baixo.
  * Texto e aparelho ficam fora de duas zonas livres e longe das bordas (margens de 72 px dos lados e 44 px do alto): o Google pode
@@ -89,11 +90,11 @@ function codificarPngRgb(largura, altura, rgba) {
   ]);
 }
 
-/** O subtítulo da ficha das lojas (campo `apple-subtitulo`): o gráfico usa o texto aprovado, sem copiar. */
-function subtituloDaFicha() {
+/** Um campo da ficha das lojas (`docs/lojas/ficha.md`): o gráfico usa o texto aprovado, sem copiar. */
+function campoDaFicha(nome) {
   const ficha = fs.readFileSync(path.join(RAIZ, 'docs', 'lojas', 'ficha.md'), 'utf8');
-  const m = /<!-- campo: apple-subtitulo[^>]*-->\s*```\s*\n([^\n]+)\n```/.exec(ficha);
-  if (!m) throw new Error('não achei o campo apple-subtitulo em docs/lojas/ficha.md');
+  const m = new RegExp(`<!-- campo: ${nome}[^>]*-->\\s*\`\`\`\\s*\\n([^\\n]+)\\n\`\`\``).exec(ficha);
+  if (!m) throw new Error(`não achei o campo ${nome} em docs/lojas/ficha.md`);
   return m[1].trim();
 }
 
@@ -111,11 +112,12 @@ function montarHtml() {
 html,body{width:${LARGURA}px;height:${ALTURA}px;overflow:hidden;background:${AZUL}}
 body{position:relative;font-family:Manrope,sans-serif;color:#fff}
 .disco{position:absolute;left:560px;top:90px;width:520px;height:520px;border-radius:50%;background:#1D47CC}
-.texto{position:absolute;left:72px;top:72px;width:372px}
-.texto img{display:block;width:300px;height:auto}
-.barra{width:56px;height:8px;border-radius:4px;background:#D4F05B;margin:34px 0 20px}
-h1{font-weight:800;font-size:46px;line-height:1.12;letter-spacing:-.01em}
-p{margin-top:20px;max-width:268px;font-weight:600;font-size:21px;line-height:1.4;color:#EEF2FF}
+.texto{position:absolute;left:72px;top:60px;width:362px}
+.texto img{display:block;width:260px;height:auto}
+.barra{width:56px;height:8px;border-radius:4px;background:#D4F05B;margin:26px 0 18px}
+h1{font-weight:800;font-size:36px;line-height:1.14;letter-spacing:-.01em}
+p{margin-top:16px;max-width:268px;font-weight:600;font-size:19px;line-height:1.4;color:#EEF2FF}
+p.apoio{margin-top:18px;max-width:362px;font-weight:800;font-size:23px;color:#D4F05B}
 .aparelho{position:absolute;left:676px;top:44px;width:268px;padding:10px;border-radius:44px;background:#0B1330;box-shadow:0 26px 60px rgba(6,16,64,.5),inset 0 0 0 2px #3A4A86}
 .tela{width:100%;border-radius:34px 34px 0 0;overflow:hidden;background:#F6F8FC}
 .tela img{display:block;width:100%;height:auto}
@@ -124,10 +126,11 @@ p{margin-top:20px;max-width:268px;font-weight:600;font-size:21px;line-height:1.4
 <div class="texto" data-importante>
 <img src="data:image/svg+xml;base64,${logo}" alt="Clarevo">
 <div class="barra"></div>
-<h1>${esc(subtituloDaFicha())}</h1>
+<h1>${esc(campoDaFicha('mensagem-central'))}</h1>
+<p class="apoio">${esc(campoDaFicha('frase-de-apoio'))}.</p>
 <p>Contas a pagar, cartões, metas e Família.</p>
 </div>
-<div class="aparelho" data-importante><div class="tela"><img src="data:image/png;base64,${b64(CAPTURA)}" alt="Tela Resumo do Clarevo, com dados fictícios de demonstração"></div></div>
+<div class="aparelho" data-importante><div class="tela"><img src="data:image/png;base64,${b64(CAPTURA)}" alt="Tela Resumo da Clarevo, com dados fictícios de demonstração"></div></div>
 </body></html>`;
 }
 

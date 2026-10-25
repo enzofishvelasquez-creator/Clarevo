@@ -98,7 +98,7 @@ const LEGENDAS = {
   empresa: 'Painel da empresa (só na web): vagas e licenças, sem finanças',
   usoApp: 'Uso do app: só contagens de licenças, nenhum dado financeiro',
   relatorio: 'Relatório para o RH: só contagens de licenças, nada financeiro',
-  relatorioBaixado: 'O arquivo é montado no navegador, e o Clarevo não guarda cópia',
+  relatorioBaixado: 'O arquivo é montado no navegador, e a Clarevo não guarda cópia',
   quemVe: 'Quem vê estes dados?: só a própria pessoa, não a empresa',
 };
 
@@ -391,7 +391,7 @@ function instantesDosSinais(nome, esperados, achados) {
     };
     const entrar = async () => {
       await p.goto(base + (cenario ? `/?cenario=${cenario}` : '/'));
-      await esperar('Seu dinheiro');
+      await esperar('Mais clareza');
       const entrarNaDemo = botao('Ver demonstração com dados fictícios');
       await entrarNaDemo.waitFor({ timeout: 15000 }).catch(() => { throw new Error('o botão "Ver demonstração com dados fictícios" não apareceu: apps/app/dist não é um build de demonstração (rode com --build)'); });
       await entrarNaDemo.click();

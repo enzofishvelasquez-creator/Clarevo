@@ -34,7 +34,7 @@ function linksQuebrados(arquivos) {
  * tratada como os outros marcadores.
  */
 const MARCAS_DE_RASCUNHO = [
-  { re: /Rascunho preparado pela equipe do Clarevo/i, motivo: 'frase de rascunho ("Rascunho preparado pela equipe do Clarevo para revisão jurídica. Não é parecer jurídico.")', visivel: true },
+  { re: /Rascunho preparado pela equipe da Clarevo/i, motivo: 'frase de rascunho ("Rascunho preparado pela equipe da Clarevo para revisão jurídica. Não é parecer jurídico.")', visivel: true },
   { re: /\b[Pp]ropostas?\s*:/, motivo: 'texto de proposta ("Proposta:")', visivel: true },
   { re: /propostas?,?\s+ainda\s+sem\s+confirma/i, motivo: 'texto de proposta ("proposta, ainda sem confirmação")', visivel: true },
   { re: /[\u2013\u2014]/, motivo: 'travessão (a redação do produto não usa)', visivel: false },

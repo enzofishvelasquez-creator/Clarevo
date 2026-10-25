@@ -67,7 +67,7 @@ export const EXPORT_TEXT = {
   /** Tela. */
   title: 'Exportar meus dados',
   intro:
-    'Leve seus gastos e recebimentos para uma planilha ou guarde um resumo em PDF. O arquivo é montado neste aparelho, com os registros que o app já lê. O Clarevo não guarda cópia dele.',
+    'Leve seus gastos e recebimentos para uma planilha ou guarde um resumo em PDF. O arquivo é montado neste aparelho, com os registros que o app já lê. A Clarevo não guarda cópia dele.',
   portability: 'Poder levar seus dados com você se inspira na portabilidade prevista no art. 18, V, da LGPD. Esta tela não é parecer jurídico.',
   periodLabel: 'Período',
   periods: {
@@ -90,7 +90,7 @@ export const EXPORT_TEXT = {
     'Lançamentos: Data, Tipo, Descrição, Categoria, Valor (R$), Conta de origem e Origem. As compras no cartão vão em um segundo arquivo, à parte, porque o dinheiro só sai quando a fatura é paga.',
   contentPdf:
     'Resumo de cada mês e lista de lançamentos. As compras no cartão aparecem à parte e não entram em Pago, porque o dinheiro só sai quando a fatura é paga.',
-  notIncluded: 'Ficam de fora a chave da nota fiscal, o número do cartão (só o final aparece) e os códigos internos do Clarevo. Só entram os seus registros do contexto Pessoal.',
+  notIncluded: 'Ficam de fora a chave da nota fiscal, o número do cartão (só o final aparece) e os códigos internos da Clarevo. Só entram os seus registros do contexto Pessoal.',
   valuesNote: 'O arquivo mostra os valores, mesmo com Ocultar valores ligado.',
   sensitiveNote: 'O arquivo tem dados financeiros. Guarde-o e compartilhe só com quem você escolher.',
   prepare: 'Preparar arquivo',
@@ -104,8 +104,8 @@ export const EXPORT_TEXT = {
   emptyBody: 'Não há gasto, recebimento nem compra no cartão neste período. Escolha outro período.',
   readyTitle: 'Arquivo pronto',
   readyHint: {
-    web: 'Cada botão baixa um arquivo. Ele fica na pasta de downloads do navegador, e o Clarevo não guarda cópia.',
-    native: 'Cada botão abre o compartilhamento do aparelho. O Clarevo não guarda cópia: o arquivo temporário é apagado na próxima exportação ou quando esta tela é aberta.',
+    web: 'Cada botão baixa um arquivo. Ele fica na pasta de downloads do navegador, e a Clarevo não guarda cópia.',
+    native: 'Cada botão abre o compartilhamento do aparelho. A Clarevo não guarda cópia: o arquivo temporário é apagado na próxima exportação ou quando esta tela é aberta.',
   },
   readyCounts: (records: number, purchases: number): string => {
     const r = records === 1 ? '1 lançamento' : `${records} lançamentos`;
@@ -147,7 +147,7 @@ export const EXPORT_TEXT = {
       'Estas compras não entram em Pago: o dinheiro só sai quando a fatura é paga, e o pagamento da fatura já está nos lançamentos.',
     purchasesTotal: (count: number, cents: Cents): string => `${count === 1 ? '1 compra' : `${count} compras`} · ${formatBRL(cents)} no total das compras`,
     differenceNote: 'A diferença é Recebido menos Pago. Não é saldo da conta nem dinheiro disponível.',
-    footer: 'Gerado pelo Clarevo neste aparelho, com os valores que você anotou. Este arquivo tem dados financeiros: guarde-o e compartilhe só com quem você escolher.',
+    footer: 'Gerado pela Clarevo neste aparelho, com os valores que você anotou. Este arquivo tem dados financeiros: guarde-o e compartilhe só com quem você escolher.',
     columns: { date: 'Data', type: 'Tipo', description: 'Descrição', category: 'Categoria', account: 'Conta', value: 'Valor', card: 'Cartão', installments: 'Parcelas', total: 'Valor total', share: '%' },
   },
 } as const;

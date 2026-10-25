@@ -23,9 +23,9 @@ const TEMAS = [
   {
     id: 'comecar',
     titulo: 'Começar',
-    descricao: 'O que o Clarevo é, o que o Resumo mostra e como ler cada número.',
+    descricao: 'O que a Clarevo é, o que o Resumo mostra e como ler cada número.',
     guias: ['resumo', 'seu-mes', 'aprender', 'ajuda'],
-    topicos: ['diferenca', 'realizado-previsto', 'saldo', 'demonstracao', 'o-que-o-clarevo-nao-faz'],
+    topicos: ['diferenca', 'realizado-previsto', 'saldo', 'demonstracao', 'o-que-a-clarevo-nao-faz'],
   },
   {
     id: 'organizar',
@@ -256,11 +256,11 @@ ${comuns.map(linkDe).join('\n')}
     ),
   ];
   const capa = `<h1>Ajuda</h1>
-<p class="lead">Respostas por tema sobre como usar o Clarevo, com o passo a passo de cada função. A busca funciona no seu navegador e não envia o que você digita.</p>`;
+<p class="lead">Respostas por tema sobre como usar o app da Clarevo, com o passo a passo de cada função. A busca funciona no seu navegador e não envia o que você digita.</p>`;
   const pg = montarPagina({
     arquivo,
     titulo: 'Ajuda',
-    descricao: 'Central de dúvidas do Clarevo: respostas por tema, passo a passo de cada função e busca no próprio navegador.',
+    descricao: 'Central de dúvidas da Clarevo: respostas por tema, passo a passo de cada função e busca no próprio navegador.',
     capa,
     corpo: corpo.join('\n'),
     fonte: capa,

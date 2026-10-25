@@ -12,11 +12,12 @@ const { ligado } = require('../formularios');
 function paginaSobre({ valores }) {
   const arquivo = 'sobre.html';
   const u = (d) => rel(arquivo, d);
-  const capa = `<h1>Sobre o Clarevo</h1>
-<p class="lead">O que move o Clarevo e quem está por trás dele.</p>`;
+  const capa = `<h1>Sobre a Clarevo</h1>
+<p class="lead">O que move a Clarevo e quem está por trás dela.</p>`;
   const brutas = [
     bloco(
-      `<h2 id="move">O que move o Clarevo</h2>
+      `<h2 id="move">O que move a Clarevo</h2>
+<p class="lead-bloco">Cuidar da vida financeira faz parte de cuidar de você. A Clarevo oferece apoio prático para organizar o mês e acompanhar decisões, sem julgamento e sem prometer resultado financeiro nem de saúde.</p>
 <div class="grade">
 <article class="cartao">
 <h3>Clareza</h3>
@@ -24,7 +25,7 @@ function paginaSobre({ valores }) {
 </article>
 <article class="cartao">
 <h3>Sem anúncio</h3>
-<p>Não há anúncios no app nem neste site, e o Clarevo não ganha nada por mostrar um produto ou uma empresa a você.</p>
+<p>Não há anúncios no app nem neste site, e a Clarevo não ganha nada por mostrar um produto ou uma empresa a você.</p>
 </article>
 <article class="cartao">
 <h3>Sem venda de dados</h3>
@@ -42,14 +43,14 @@ function paginaSobre({ valores }) {
 <ul>
 <li>O app mostra o que você ou as pessoas da sua Família anotaram ou importaram. Ele não se conecta ao banco e não movimenta dinheiro.</li>
 <li>A privacidade vale no banco de dados, e não só na tela: quem pode ver cada dado é decidido a cada leitura.</li>
-<li>Uma empresa pode oferecer o Clarevo como benefício sem ver as finanças de ninguém. <a href="${u('empresas/index.html')}">Veja como</a>.</li>
+<li>Uma empresa pode integrar a Clarevo ao programa de bem-estar, como benefício, sem ver as finanças de ninguém. <a href="${u('empresas/index.html')}">Veja como</a>.</li>
 <li>Escrevemos de forma simples, com fonte e data, e corrigimos no próprio texto. <a href="${u('novidades/como-escrevemos.html')}">Veja como escrevemos</a>.</li>
 </ul>`,
       { variante: 'alt', rotulo: 'como' },
     ),
     bloco(
       `<h2 id="quem">Quem está por trás</h2>
-<p>O Clarevo é oferecido por [RAZÃO SOCIAL], CNPJ [CNPJ], com sede em [ENDEREÇO].</p>
+<p>A Clarevo é oferecida por [RAZÃO SOCIAL], CNPJ [CNPJ], com sede em [ENDEREÇO].</p>
 <p>Para falar com a equipe, escreva para [E-MAIL DE CONTATO]. Para ajuda com o app, veja a <a href="${u('ajuda/index.html')}">Ajuda</a> e o <a href="${u('suporte.html')}">Suporte</a>. Os dados pessoais são tratados como descreve a <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>`,
       { rotulo: 'quem' },
     ),
@@ -57,7 +58,7 @@ function paginaSobre({ valores }) {
   return montarPagina({
     arquivo,
     titulo: 'Sobre',
-    descricao: 'O que move o Clarevo: clareza, sem anúncio, sem venda de dados e sem recomendar produtos financeiros, e quem está por trás.',
+    descricao: 'O que move a Clarevo: cuidado com a vida financeira, clareza, sem anúncio, sem venda de dados e sem recomendar produtos financeiros, e quem está por trás.',
     capa,
     corpo: brutas.map((b) => marcadoresEmHtml(b, valores)).join('\n'),
     fonte: brutas.join('\n') + capa,
@@ -81,7 +82,7 @@ function paginaSuporte({ valores }) {
 <ul>
 <li>Suporte do app: [E-MAIL DE SUPORTE]</li>
 <li>Dúvidas sobre dados pessoais (acesso, correção e exclusão): [E-MAIL DE PRIVACIDADE]</li>
-<li>Responsável pelo Clarevo: [RAZÃO SOCIAL], CNPJ [CNPJ]</li>
+<li>Responsável pela Clarevo: [RAZÃO SOCIAL], CNPJ [CNPJ]</li>
 <li>Endereço: [ENDEREÇO]</li>
 </ul>
 <p>Para facilitar a resposta, conte o e-mail da sua conta, o aparelho (iPhone, Android ou navegador) e o que aconteceu. Não envie sua senha, número de cartão, dados bancários nem fotos de documentos: o suporte nunca pede essas informações.</p>
@@ -96,11 +97,11 @@ ${links}
 </ul>
 </section>`;
   const capa = `<h1>Suporte</h1>
-<p class="lead">Como falar com a equipe do Clarevo e onde achar respostas para as dúvidas mais comuns.</p>`;
+<p class="lead">Como falar com a equipe da Clarevo e onde achar respostas para as dúvidas mais comuns.</p>`;
   return montarPagina({
     arquivo,
     titulo: 'Suporte',
-    descricao: 'Como falar com o suporte do Clarevo e onde achar respostas para as perguntas mais frequentes.',
+    descricao: 'Como falar com o suporte da Clarevo e onde achar respostas para as perguntas mais frequentes.',
     capa,
     corpo: colunaTexto(marcadoresEmHtml(brutas, valores), 'texto'),
     fonte: brutas,
@@ -188,7 +189,7 @@ function pagina404({ valores }) {
 </ul>`,
     { rotulo: 'talvez' },
   );
-  return montarPagina({ arquivo, titulo: 'Página não encontrada', descricao: 'Esta página não existe no site do Clarevo.', capa, corpo, fonte: capa, valores, classeCapa: 'capa-simples', semIndexar: true });
+  return montarPagina({ arquivo, titulo: 'Página não encontrada', descricao: 'Esta página não existe no site da Clarevo.', capa, corpo, fonte: capa, valores, classeCapa: 'capa-simples', semIndexar: true });
 }
 
 module.exports = { paginaSobre, paginaSuporte, paginaLegal, pagina404, secoesDosFormularios, PAGINAS_LEGAIS };

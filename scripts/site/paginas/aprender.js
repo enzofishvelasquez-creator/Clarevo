@@ -19,7 +19,7 @@ const arquivoDoTema = (slug) => `aprender/${slug}.html`;
  * Como o site mostra uma fonte do tipo `clarevo` do catálogo ("Clarevo: D-011, D-053"): os códigos são referências internas do projeto e
  * não aparecem no site público. Fica só o rótulo, igual em Aprender, nos posts e na Ajuda.
  */
-const REGRA_DO_CLAREVO = 'Regra do próprio Clarevo';
+const REGRA_DO_CLAREVO = 'Regra da própria Clarevo';
 
 /** Um tema do catálogo cabe no site? Publicado, não legado e de uma das três seções. */
 const temasDoSite = () => catalogo().publicados.filter((t) => SECOES_DO_SITE.includes(t.section));

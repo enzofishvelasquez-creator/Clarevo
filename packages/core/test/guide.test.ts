@@ -286,7 +286,7 @@ describe('catálogo do guia (D-049)', () => {
     for (const query of ['empresa', 'rh', 'licença']) expect(searchGuide(query).map((e) => e.id), query).toContain('painel-da-empresa');
     for (const query of ['benefício', 'convite da empresa']) expect(searchGuide(query).map((e) => e.id), query).toContain('beneficio-da-empresa');
     // O guia não promete o que o painel não faz: nada de e-mail enviado pelo Clarevo nem de finanças vistas pela empresa.
-    expect(passos).toContain('O Clarevo não envia e-mail');
+    expect(passos).toContain('A Clarevo não envia e-mail');
     expect(passosBeneficio).toContain('Ela não vê seus registros');
   });
 
@@ -524,7 +524,7 @@ describe('tour de boas-vindas (D-049(2))', () => {
       expect(c.body.length, c.id).toBeLessThanOrEqual(190);
     }
     // O último cartão diz onde achar a ajuda.
-    expect(TOUR_CARDS[4]!.body).toContain('Aprender › Como usar o Clarevo');
+    expect(TOUR_CARDS[4]!.body).toContain('Aprender › Como usar o app da Clarevo');
     expect(TOUR_TEXT.skip).toBe('Pular');
     expect(TOUR_TEXT.next).toBe('Próximo');
     expect(TOUR_TEXT.start).toBe('Começar');

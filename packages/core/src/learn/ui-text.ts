@@ -14,7 +14,7 @@ export const LEARN_UI_TEXT = {
   tabLabel: 'Aprender',
   tabA11y: 'Aprender e dúvidas',
   title: 'Aprender e dúvidas',
-  intro: 'Explicações curtas sobre contas, juros e o próprio Clarevo, com exemplos fictícios e fontes.',
+  intro: 'Explicações curtas sobre contas, juros e o próprio app, com exemplos fictícios e fontes.',
   searchLabel: 'Buscar um tema ou uma função',
   searchHint: 'Ex.: juros, boleto, IPVA',
   clearSearch: 'Limpar busca',
@@ -31,7 +31,7 @@ export const LEARN_UI_TEXT = {
   rowA11y: (title: string, subtitle: string | null, n: number) =>
     `${title}${/[?!.]$/.test(title) ? '' : '.'}${subtitle ? ` ${subtitle}.` : ''} Leitura de ${minutes(n)}.`,
   faqReadMore: 'Ler resposta completa',
-  footer: 'Conteúdo educativo e geral, com exemplos fictícios. O Clarevo não oferece crédito nem indica investimentos.',
+  footer: 'Conteúdo educativo e geral, com exemplos fictícios. A Clarevo não oferece crédito nem indica investimentos.',
 
   /** Explicação (/explicacao/[tema]). */
   backHeader: 'Aprender',
@@ -41,7 +41,7 @@ export const LEARN_UI_TEXT = {
   example: 'Exemplo',
   showCalculation: 'Ver a conta',
   hypotheses: 'Hipóteses do exemplo',
-  inClarevo: 'No Clarevo',
+  inClarevo: 'Na Clarevo',
   calculatorAction: 'Fazer a conta com os seus números',
   related: 'Temas relacionados',
   sources: 'Fontes',

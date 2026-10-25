@@ -58,8 +58,8 @@ ${isca(p)}
 <aside class="privacidade-curta" aria-labelledby="priv-contato">
 <h3 id="priv-contato">O que acontece com a sua mensagem</h3>
 <ul>
-<li>Usamos o que você escreve só para responder sobre o Clarevo para empresas.</li>
-<li>O site não guarda a mensagem. Ela segue por e-mail para a equipe, por um serviço de envio de e-mail (Resend), e fica na caixa de e-mail do Clarevo. O Resend também guarda uma cópia nos registros dele, por [A DEFINIR: prazo de guarda no Resend]. O pedido passa pela Cloudflare, que hospeda o site.</li>
+<li>Usamos o que você escreve só para responder sobre a Clarevo para empresas.</li>
+<li>O site não guarda a mensagem. Ela segue por e-mail para a equipe, por um serviço de envio de e-mail (Resend), e fica na caixa de e-mail da Clarevo. O Resend também guarda uma cópia nos registros dele, por [A DEFINIR: prazo de guarda no Resend]. O pedido passa pela Cloudflare, que hospeda o site.</li>
 <li>Os detalhes, inclusive por quanto tempo a mensagem fica na caixa de e-mail, estão na <a href="${rel(arquivo, 'privacidade.html')}">Política de privacidade</a>, na seção sobre o contato pelo site.</li>
 </ul>
 </aside>
@@ -72,7 +72,7 @@ function formularioDaNewsletter(arquivo) {
   return `<div class="formulario-grade">
 <form class="formulario" method="post" action="/api/newsletter">
 <div class="campo"><label for="${p}-email">E-mail</label><input id="${p}-email" name="email" type="email" maxlength="${TAMANHOS.email}" required autocomplete="email"></div>
-<div class="consentimento"><input id="${p}-consentimento" name="consentimento" type="checkbox" value="sim" required><label for="${p}-consentimento">Quero receber as Novidades do Clarevo por e-mail. Posso cancelar quando quiser.</label></div>
+<div class="consentimento"><input id="${p}-consentimento" name="consentimento" type="checkbox" value="sim" required><label for="${p}-consentimento">Quero receber as Novidades da Clarevo por e-mail. Posso cancelar quando quiser.</label></div>
 ${isca(p)}
 <div><button class="botao botao-principal" type="submit">Quero receber as Novidades</button></div>
 </form>
@@ -144,10 +144,10 @@ function paginasDosFormularios({ valores }) {
       paginaDeResposta({
         arquivo: ARQUIVOS.contatoEnviado,
         titulo: 'Mensagem enviada',
-        lead: 'A sua mensagem foi enviada para a equipe do Clarevo, que responde pelo e-mail que você informou.',
+        lead: 'A sua mensagem foi enviada para a equipe da Clarevo, que responde pelo e-mail que você informou.',
         corpoHtml: `<p>O site não guarda a mensagem: ela seguiu por e-mail para a equipe. Se quiser complementar, escreva para [E-MAIL DE CONTATO].</p>
 <p><a href="${u(ARQUIVOS.contatoEnviado, 'empresas/index.html')}">Voltar para Para empresas</a> · <a href="${u(ARQUIVOS.contatoEnviado, 'index.html')}">Ir para o início</a></p>`,
-        descricao: 'A sua mensagem para a equipe do Clarevo foi enviada.',
+        descricao: 'A sua mensagem para a equipe da Clarevo foi enviada.',
         valores,
       }),
       paginaDeResposta({
@@ -156,7 +156,7 @@ function paginasDosFormularios({ valores }) {
         lead: 'A sua mensagem não saiu. Nada foi guardado, e você pode tentar de novo.',
         corpoHtml: `<p>Um campo pode estar vazio, grande demais ou fora do formato, ou o envio pode estar fora do ar por um momento. Confira o formulário e envie de novo, ou escreva direto para [E-MAIL DE CONTATO].</p>
 <p><a href="${u(ARQUIVOS.contatoErro, 'empresas/index.html#formulario-contato')}">Voltar para o formulário</a></p>`,
-        descricao: 'Não foi possível enviar a mensagem pelo formulário de contato do Clarevo.',
+        descricao: 'Não foi possível enviar a mensagem pelo formulário de contato da Clarevo.',
         valores,
       }),
       ...CAMPOS.contato.map((campo) => paginaDeErroDeCampo({ base: ARQUIVOS.contatoErro, campo, erros: ERROS_DO_CONTATO, voltar: 'empresas/index.html#formulario-contato', rotuloVoltar: 'Voltar para o formulário', alternativa: 'ou escreva direto para [E-MAIL DE CONTATO]', valores })),
@@ -167,7 +167,7 @@ function paginasDosFormularios({ valores }) {
     const a = ARQUIVOS.receber;
     const capa = `<p class="migalha"><a href="${u(a, 'novidades/index.html')}">Novidades</a></p>
 <h1>Receber as Novidades por e-mail</h1>
-<p class="lead">Os textos de Novidades do Clarevo, com data e fonte, na sua caixa de entrada. Só se você pedir, e com confirmação por e-mail.</p>`;
+<p class="lead">Os textos de Novidades da Clarevo, com data e fonte, na sua caixa de entrada. Só se você pedir, e com confirmação por e-mail.</p>`;
     const corpo = bloco(
       `<h2 id="inscricao">Inscrição</h2>
 ${formularioDaNewsletter(a)}`,
@@ -190,7 +190,7 @@ ${formularioDaNewsletter(a)}`,
       ...montarPagina({
         arquivo: a,
         titulo: 'Receber as Novidades por e-mail',
-        descricao: 'Receba as Novidades do Clarevo por e-mail, só se você quiser: confirmação por e-mail e cancelamento a qualquer momento.',
+        descricao: 'Receba as Novidades da Clarevo por e-mail, só se você quiser: confirmação por e-mail e cancelamento a qualquer momento.',
         capa,
         corpo,
         fonte: capa + corpo,
@@ -205,16 +205,16 @@ ${formularioDaNewsletter(a)}`,
         lead: 'Enviamos um e-mail para confirmar o seu cadastro. Abra a mensagem e clique no link.',
         corpoHtml: `<p>Até você confirmar, não enviamos as Novidades. Se a mensagem não chegar em alguns minutos, olhe a caixa de spam.</p>
 <p><a href="${u(ARQUIVOS.receberEnviado, 'novidades/index.html')}">Voltar para Novidades</a></p>`,
-        descricao: 'Falta confirmar o cadastro nas Novidades do Clarevo pelo e-mail que enviamos.',
+        descricao: 'Falta confirmar o cadastro nas Novidades da Clarevo pelo e-mail que enviamos.',
         valores,
       }),
       paginaDeResposta({
         arquivo: ARQUIVOS.receberConfirmado,
         titulo: 'Cadastro confirmado',
-        lead: 'Você vai receber as Novidades do Clarevo por e-mail.',
+        lead: 'Você vai receber as Novidades da Clarevo por e-mail.',
         corpoHtml: `<p>Para cancelar, use o link de cancelamento que vem em cada e-mail.</p>
 <p><a href="${u(ARQUIVOS.receberConfirmado, 'novidades/index.html')}">Ver as Novidades no site</a></p>`,
-        descricao: 'O seu cadastro nas Novidades do Clarevo foi confirmado.',
+        descricao: 'O seu cadastro nas Novidades da Clarevo foi confirmado.',
         valores,
       }),
       paginaDeResposta({
@@ -223,7 +223,7 @@ ${formularioDaNewsletter(a)}`,
         lead: 'O cadastro não foi feito. Nada foi guardado, e você pode tentar de novo.',
         corpoHtml: `<p>Confira se o e-mail está certo e se a caixa de consentimento está marcada. O envio também pode estar fora do ar por um momento.</p>
 <p><a href="${u(ARQUIVOS.receberErro, ARQUIVOS.receber)}">Voltar para a inscrição</a></p>`,
-        descricao: 'Não foi possível cadastrar o e-mail nas Novidades do Clarevo.',
+        descricao: 'Não foi possível cadastrar o e-mail nas Novidades da Clarevo.',
         valores,
       }),
       ...CAMPOS.newsletter.map((campo) => paginaDeErroDeCampo({ base: ARQUIVOS.receberErro, campo, erros: ERROS_DA_NEWSLETTER, voltar: ARQUIVOS.receber, rotuloVoltar: 'Voltar para a inscrição', alternativa: 'ou leia as Novidades direto no site, sem se cadastrar', valores })),

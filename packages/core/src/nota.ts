@@ -801,7 +801,7 @@ export const NOTA_TEXT = {
   scanButton: 'Escanear nota fiscal',
   scanTitle: 'Escanear nota fiscal',
   scanHint: 'Aponte a câmera para o QR da nota ou para o código de barras da chave de acesso.',
-  cameraPermission: 'O Clarevo usa a câmera só para ler o código da nota. Nada é gravado sem você tocar em Salvar.',
+  cameraPermission: 'A Clarevo usa a câmera só para ler o código da nota. Nada é gravado sem você tocar em Salvar.',
   cameraAllow: 'Permitir câmera',
   cameraDenied: 'Sem acesso à câmera. Você pode colar o link ou a chave da nota.',
   pasteLabel: 'Colar o link ou a chave da nota',

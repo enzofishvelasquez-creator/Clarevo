@@ -673,7 +673,7 @@ describe('site público: formulários prontos e desligados', () => {
     expect(form).toContain('type="submit">Enviar mensagem</button>');
     // O texto de privacidade vem junto: para que serve, que o site não guarda, e o link para a política.
     expect(e).toContain('O que acontece com a sua mensagem');
-    expect(e).toContain('só para responder sobre o Clarevo para empresas');
+    expect(e).toContain('só para responder sobre a Clarevo para empresas');
     expect(e).toContain('O site não guarda a mensagem');
     expect(e).toContain('Resend');
     expect(e).toContain('<a href="../privacidade.html">Política de privacidade</a>');
@@ -690,7 +690,7 @@ describe('site público: formulários prontos e desligados', () => {
       expect(form, nome).not.toBe('');
       expect(form).toMatch(/<input id="nv-consentimento" name="consentimento" type="checkbox" value="sim" required>/);
       expect(form).not.toMatch(/checked/);
-      expect(form).toContain('<label for="nv-consentimento">Quero receber as Novidades do Clarevo por e-mail. Posso cancelar quando quiser.</label>');
+      expect(form).toContain('<label for="nv-consentimento">Quero receber as Novidades da Clarevo por e-mail. Posso cancelar quando quiser.</label>');
       expect(form).toMatch(new RegExp(`name="email" type="email" maxlength="${formularios.TAMANHOS.email}" required`));
       expect(form).toContain(`name="${formularios.ISCA}"`);
       expect(p).toContain('Confirmação por e-mail');
@@ -1126,7 +1126,9 @@ describe('site público: kit de imprensa', () => {
     const palavras = (t: string) => t.trim().split(/\s+/).length;
     expect(palavras(descricao('cinquenta'))).toBe(50);
     expect(palavras(descricao('cem'))).toBe(100);
-    expect(descricao('uma-frase')).toMatch(/^O Clarevo é um aplicativo/);
+    // D-068: as três abrem com o posicionamento de bem-estar financeiro (Manual v2.2), sem prometer resultado de saúde.
+    for (const id of ['uma-frase', 'cinquenta', 'cem']) expect(descricao(id), id).toMatch(/^A Clarevo é uma solução de bem-estar financeiro para pessoas e empresas, apoiada por um aplicativo/);
+    expect(descricao('cem')).toContain('não é atendimento de saúde');
     expect(descricao('uma-frase').match(/\./g)).toHaveLength(1);
     expect(h).toContain('50 palavras</span>');
     expect(h).toContain('100 palavras</span>');
@@ -1186,7 +1188,7 @@ describe('site público: textos jurídicos propostos e documentação (D-066)', 
   it('a política tem a seção proposta do contato pelo site: dados, finalidade, base, Resend e Cloudflare como operadores, sem guarda no site e prazo a definir', () => {
     const s = secao(politica, '### 3.6 Contato pelo site');
     expect(s).toContain('[PROPOSTA:');
-    for (const trecho of ['Nome, e-mail, nome da empresa', 'faixa do número aproximado de pessoas', 'Para responder ao seu contato sobre o Clarevo para empresas', 'O site não guarda a mensagem', 'Cloudflare', 'Resend', 'operadores', '[A DEFINIR: prazo na caixa de e-mail]']) expect(s, trecho).toContain(trecho);
+    for (const trecho of ['Nome, e-mail, nome da empresa', 'faixa do número aproximado de pessoas', 'Para responder ao seu contato sobre a Clarevo para empresas', 'O site não guarda a mensagem', 'Cloudflare', 'Resend', 'operadores', '[A DEFINIR: prazo na caixa de e-mail]']) expect(s, trecho).toContain(trecho);
     // O Resend guarda uma cópia da mensagem nos registros dele: a seção diz isso, com o prazo a definir, e a seção de guarda também.
     expect(s).toContain('guarda uma cópia dela nos registros dele, por [A DEFINIR: prazo de guarda no Resend]');
     expect(s).toContain('e a cópia nos registros do Resend, por [A DEFINIR: prazo de guarda no Resend]');

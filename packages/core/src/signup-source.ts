@@ -84,18 +84,18 @@ export function shouldAskSignupSource(input: { answered: boolean; today: IsoDate
 /** Textos do cartão do Resumo, do card de Conta e dos anúncios. */
 export const SIGNUP_SOURCE_TEXT = {
   /** O título do cartão do Resumo e do card de Conta. */
-  title: 'Como você conheceu o Clarevo?',
+  title: 'Como você conheceu a Clarevo?',
   /** A linha curta ao lado: o que é, para que serve e que é opcional. */
   note: 'Opcional. Usamos só para contar, sem identificar ninguém, de onde as pessoas chegam.',
   /** O nome acessível do grupo de opções. */
-  groupA11y: 'Como você conheceu o Clarevo? Escolha uma opção. É opcional.',
+  groupA11y: 'Como você conheceu a Clarevo? Escolha uma opção. É opcional.',
   /** Fecha o cartão por 30 dias. */
   notNow: 'Agora não',
   notNowA11y: 'Agora não. A pergunta volta daqui a 30 dias.',
   /** Resumo, depois de responder (a faixa de confirmação) e o anúncio. */
   saved: 'Resposta guardada. Você pode mudar em Conta.',
   /** Conta: a resposta de agora e a ausência dela. */
-  accountTitle: 'Como você conheceu o Clarevo?',
+  accountTitle: 'Como você conheceu a Clarevo?',
   accountCurrent: (source: SignupSourceOption): string => `Sua resposta: ${SIGNUP_SOURCE_LABEL[source]}.`,
   accountNone: 'Você ainda não respondeu.',
   accountChange: 'Você pode mudar a resposta quando quiser, inclusive para "Prefiro não dizer".',

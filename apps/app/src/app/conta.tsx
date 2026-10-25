@@ -208,7 +208,7 @@ export default function ContaScreen() {
             </Txt>
           </View>
           <Txt variant="caption" color={colors.textSecondary}>
-            Quando uma empresa oferecer o Clarevo como benefício, a validade e a cobertura aparecem aqui. A empresa administra seu acesso ao
+            Quando uma empresa oferecer a Clarevo como benefício, a validade e a cobertura aparecem aqui. A empresa administra seu acesso ao
             plano. Seus registros financeiros têm permissões próprias.
           </Txt>
         </Card>

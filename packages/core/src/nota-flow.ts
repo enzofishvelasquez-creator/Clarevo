@@ -30,7 +30,7 @@ export const NOTA_FLOW_TEXT = {
   /** Folha do primeiro toque. */
   sheetTitle: 'Como você quer ler a nota?',
   /** Antes de pedir a câmera pela primeira vez. */
-  cameraIntro: 'O Clarevo usa a câmera só para ler o código da nota. Nenhuma foto é guardada.',
+  cameraIntro: 'A Clarevo usa a câmera só para ler o código da nota. Nenhuma foto é guardada.',
   cameraAim: 'Aponte para o QR code no rodapé do cupom. Compra on-line: o código de barras do DANFE.',
   /** Depois de uns 5 segundos sem ler (D-042): chegar mais perto, até o QR ocupar a moldura. */
   cameraCloser: 'Aproxime até o QR ocupar a moldura.',
@@ -61,7 +61,7 @@ export const NOTA_FLOW_TEXT = {
   /** NF-e (modelo 55) sem dados da loja além do CNPJ. */
   cnpjOnly: 'O código traz o CNPJ da loja, não o nome. Digite o nome na descrição.',
   /** Na web, nota do RJ com QR online: valor e data só vêm da página da Sefaz, que o celular lê. */
-  phoneReads: 'No celular, o Clarevo lê o valor e a data na página da Sefaz.',
+  phoneReads: 'No celular, a Clarevo lê o valor e a data na página da Sefaz.',
   /** Boleto colado no lugar da chave. */
   boleto: 'Este é o código de um boleto. Para anotar uma conta que ainda vai vencer, use Anotar conta a pagar.',
   boletoAction: 'Anotar conta a pagar',

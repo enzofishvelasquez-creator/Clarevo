@@ -399,7 +399,7 @@ export const APP_SCREENS: readonly AppScreen[] = [
     title: 'Excluir minha conta',
     caption: 'O que é apagado e o que continua, exportar antes e confirmar com a palavra EXCLUIR',
     href: '/conta/excluir',
-    keywords: ['excluir', 'excluir conta', 'apagar conta', 'apagar meus dados', 'excluir meus dados', 'deletar conta', 'encerrar conta', 'cancelar conta', 'sair do clarevo', 'lgpd', 'privacidade'],
+    keywords: ['excluir', 'excluir conta', 'apagar conta', 'apagar meus dados', 'excluir meus dados', 'deletar conta', 'encerrar conta', 'cancelar conta', 'sair da clarevo', 'sair do clarevo', 'lgpd', 'privacidade'],
   },
   {
     id: 'importar-extrato',

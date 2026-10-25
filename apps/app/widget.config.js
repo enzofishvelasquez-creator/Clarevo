@@ -60,7 +60,7 @@ function widgetPlugins() {
           {
             name: NAMES.androidSmall,
             label: 'Anotar gasto',
-            description: 'Abre o Clarevo direto no formulário de gasto.',
+            description: 'Abre o app da Clarevo direto no formulário de gasto.',
             minWidth: '110dp',
             minHeight: '110dp',
             targetCellWidth: 2,

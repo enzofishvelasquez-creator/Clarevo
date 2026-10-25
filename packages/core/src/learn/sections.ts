@@ -2,7 +2,7 @@ import type { LearnSection, LearnSectionId, TopicSlug } from './types';
 
 /** As cinco seções da aba, nesta ordem (D-031(2)). */
 export const LEARN_SECTIONS: readonly LearnSection[] = [
-  { id: 'usar', title: 'Usar o Clarevo', description: 'Como cada número do app é calculado.' },
+  { id: 'usar', title: 'Usar o app da Clarevo', description: 'Como cada número do app é calculado.' },
   { id: 'organizar', title: 'Organizar o mês', description: 'Gastos fixos e variáveis, contas do ano, renda comprometida, reserva, aportes e temas de época, como 13º e Imposto de Renda.' },
   { id: 'juros', title: 'Juros e crédito', description: 'Juros, taxas, CET, IOF, cartão, cheque especial e atraso.' },
   { id: 'tempo', title: 'Dinheiro no tempo', description: 'Inflação, Selic, liquidez, a garantia do FGC e como ler uma simulação.' },

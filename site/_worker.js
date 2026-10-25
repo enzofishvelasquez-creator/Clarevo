@@ -1,4 +1,4 @@
-// _worker.js do site do Clarevo (D-066), para o Cloudflare Pages em modo avançado. Gerado por scripts/gerar-site.js a partir de
+// _worker.js do site da Clarevo (D-066), para o Cloudflare Pages em modo avançado. Gerado por scripts/gerar-site.js a partir de
 // site-src/worker/worker.js: não edite o arquivo gerado.
 //
 // Só existe no projeto `clarevo-site` (a pasta `site/` é só dele). O app tem outro projeto e não é afetado.

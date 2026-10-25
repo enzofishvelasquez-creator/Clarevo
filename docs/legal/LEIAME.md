@@ -1,8 +1,8 @@
-Rascunho preparado pela equipe do Clarevo para revisão jurídica. Não é parecer jurídico.
+Rascunho preparado pela equipe da Clarevo para revisão jurídica. Não é parecer jurídico.
 
 # Ciclo Jurídico (D-064): rascunhos para revisão
 
-21/10/2026. Esta pasta reúne os rascunhos dos textos legais do Clarevo. A ideia é que a revisão jurídica parta de textos fiéis ao que o app faz, e que quem revisa corrija e responda perguntas objetivas, em vez de escrever do zero.
+21/10/2026. Esta pasta reúne os rascunhos dos textos legais da Clarevo. A ideia é que a revisão jurídica parta de textos fiéis ao que o app faz, e que quem revisa corrija e responda perguntas objetivas, em vez de escrever do zero.
 
 Os textos foram escritos a partir do código e das decisões do produto (`docs/00_VISAO_E_DECISOES.md`), não da memória. Onde um documento diverge do código, valeu o código, e a divergência está em `resumo-para-advogado.md`. Ninguém aqui é advogado: tudo o que não está decidido ficou como `[A DEFINIR: ...]`.
 
@@ -10,7 +10,7 @@ Os textos foram escritos a partir do código e das decisões do produto (`docs/0
 
 | Arquivo | O que é | Vai para o site? |
 |---|---|---|
-| `resumo-para-advogado.md` | Comece por ele. Até 4 páginas: o produto, o mapa de dados, os serviços de terceiros, o que já está decidido, 25 perguntas com a nossa proposta (mais as da seção h, sobre o site da segunda etapa, D-066), o escopo pedido e as referências | Não |
+| `resumo-para-advogado.md` | Comece por ele. Até 4 páginas: o produto, o mapa de dados, os serviços de terceiros, o que já está decidido, 25 perguntas com a nossa proposta (mais as da seção h, sobre o site da segunda etapa, D-066, a da seção i, sobre a pergunta de origem, D-067, e a da seção j, sobre a NR-1 em Para empresas, D-068), o escopo pedido e as referências | Não |
 | `politica-de-privacidade.md` | Política de Privacidade, em linguagem simples | Sim |
 | `termos-de-uso.md` | Termos de Uso | Sim |
 | `exclusao-de-conta.md` | Página pública de exclusão de conta e dos dados, exigida pelo Google Play | Sim |
@@ -18,7 +18,7 @@ Os textos foram escritos a partir do código e das decisões do produto (`docs/0
 
 ## O que a pessoa que revisa precisa fazer
 
-1. Ler `resumo-para-advogado.md` e responder as 25 perguntas da seção e e as da seção h (a partir da 26): confirmar a nossa proposta ou corrigir.
+1. Ler `resumo-para-advogado.md` e responder as 25 perguntas da seção e e as das seções h, i e j (da 26 à 35): confirmar a nossa proposta ou corrigir.
 2. Revisar os 4 textos: política, termos, página de exclusão e pontos do contrato. Corrigir a redação e resolver cada `[A DEFINIR]` de natureza jurídica.
 3. Devolver os textos corrigidos e as respostas. Os `[A DEFINIR]` de produto (por exemplo, aceite no cadastro) viram trabalho nosso, e a pessoa que revisa indica quais são.
 
@@ -26,7 +26,7 @@ O que não precisa: escrever do zero, redigir o contrato completo, revisar códi
 
 ## Convenções dos textos
 
-- Todo arquivo começa com a frase "Rascunho preparado pela equipe do Clarevo para revisão jurídica. Não é parecer jurídico." Essa frase sai quando o texto for aprovado.
+- Todo arquivo começa com a frase "Rascunho preparado pela equipe da Clarevo para revisão jurídica. Não é parecer jurídico." Essa frase sai quando o texto for aprovado.
 - Dados da empresa aparecem como marcadores fixos: `[RAZÃO SOCIAL]`, `[CNPJ]`, `[ENDEREÇO]`, `[E-MAIL DE PRIVACIDADE]`, `[E-MAIL DE SUPORTE]`, `[DOMÍNIO]` e `[DATA DE VIGÊNCIA]`. Eles são trocados todos de uma vez, quando a empresa e o domínio existirem (P-006).
 - `[A DEFINIR: ...]` marca o que não está decidido. Cada um ou é pergunta do resumo ou é uma pendência de produto.
 - `[PROPOSTA: ...]` marca o que a equipe propõe e ainda não tem confirmação jurídica (por exemplo, as bases legais da política). Some quando o texto é aprovado. Texto corrido que diga "Proposta:" ou "proposta, ainda sem confirmação" também não vai ao ar: use a marca ou resolva o trecho.
@@ -44,7 +44,7 @@ Nenhum destes textos é publicado, enviado às lojas ou ligado dentro do app ant
 
 - as páginas do site e as URLs de política, termos e exclusão que as lojas pedem (`docs/lojas/ficha.md`, seção 8);
 - o acesso à política dentro do app (Apple, App Review Guidelines 5.1.1(i)): o código já tem os links (cadastro e Conta), mas eles só aparecem quando `EXPO_PUBLIC_SITE_URL` aponta para o site publicado, e a variável só se configura depois da revisão (`docs/07` e `docs/16`);
-- qualquer mudança no texto da tela "Quem vê estes dados?" e da tela de exclusão de conta que dependa da revisão (D-058). O app já traz, sem publicar, a redação proposta sobre a equipe do Clarevo; se o advogado mudar a regra, o ajuste é pequeno.
+- qualquer mudança no texto da tela "Quem vê estes dados?" e da tela de exclusão de conta que dependa da revisão (D-058). O app já traz, sem publicar, a redação proposta sobre a equipe da Clarevo; se o advogado mudar a regra, o ajuste é pequeno.
 
 ## Quando o produto mudar, os textos mudam
 
@@ -55,7 +55,7 @@ Os textos descrevem o que o app faz hoje. Se uma destas coisas mudar, atualize o
 - o que a empresa vê (`organization_usage`, `licenses`, `packages/core/src/company.ts`);
 - Família: papéis, convites e o que fica de quem sai (`packages/core/src/family.ts`);
 - um serviço novo de terceiros (por exemplo Sentry ou provedor de e-mail, `docs/20_SENTRY_E_EMAIL.md`), o widget ligado (`docs/21_WIDGET_NATIVO.md`) ou cobrança (P-005);
-- o texto do cadastro, a seção "Privacidade e termos" de Conta e as frases sobre a equipe do Clarevo em "Quem vê estes dados?" (`packages/core/src/legal.ts`, `apps/app/src/lib/site.ts`): são a redação proposta na política e dependem das perguntas 14 e 25 do resumo;
+- o texto do cadastro, a seção "Privacidade e termos" de Conta e as frases sobre a equipe da Clarevo em "Quem vê estes dados?" (`packages/core/src/legal.ts`, `apps/app/src/lib/site.ts`): são a redação proposta na política e dependem das perguntas 14 e 25 do resumo;
 - o formulário de contato e as Novidades por e-mail do site, se forem ligados (D-066, seções 3.6 e 3.7 da política, `site/dados-da-empresa.json` e `docs/22_SITE.md`): quem liga um formulário confere antes se o texto da política vale;
 - as declarações das lojas (`docs/lojas/privacidade.md`): os textos novos não podem contradizê-las.
 

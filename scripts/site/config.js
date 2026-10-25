@@ -20,6 +20,8 @@ const HOST_APP = 'clarevo.pages.dev';
 /** A demonstração do app (dados fictícios, nada é gravado fora do aparelho): o destino de "Ver a demonstração" na página Comece aqui. */
 const URL_DEMO = 'https://clarevo-demo.pages.dev';
 const HOST_DEMO = 'clarevo-demo.pages.dev';
+/** A página oficial da NR-1 no site do Ministério do Trabalho e Emprego (D-068): a fonte do bloco "Bem-estar financeiro e a NR-1", em Para empresas. Endereço achado na busca de 25/10/2026 (título "Norma Regulamentadora No. 1 (NR-1)"). */
+const URL_NR1 = 'https://www.gov.br/trabalho-e-emprego/pt-br/acesso-a-informacao/participacao-social/conselhos-e-orgaos-colegiados/comissao-tripartite-partitaria-permanente/normas-regulamentadora/normas-regulamentadoras-vigentes/nr-1';
 /** Fontes do site: o corpo (500), o negrito (700) e os títulos (800). Subconjuntos Latin do app, com a licença OFL. */
 const PESOS_FONTE = ['500Medium', '700Bold', '800ExtraBold'];
 
@@ -33,9 +35,9 @@ const HOSTS_BASE = [HOST_APP, HOST_DEMO, 'www.gov.br', 'www.planalto.gov.br'];
 
 /** As páginas que vêm de `docs/legal/`, na ordem do rodapé. */
 const PAGINAS_LEGAIS = [
-  { arquivo: 'privacidade.html', md: 'politica-de-privacidade.md', titulo: 'Política de privacidade', rotulo: 'Privacidade', descricao: 'Como o Clarevo trata os dados pessoais de quem usa o app.' },
-  { arquivo: 'termos.html', md: 'termos-de-uso.md', titulo: 'Termos de uso', rotulo: 'Termos', descricao: 'As regras para usar o Clarevo, o aplicativo de organização de finanças pessoais e da família.' },
-  { arquivo: 'excluir-conta.html', md: 'exclusao-de-conta.md', titulo: 'Excluir conta e dados', rotulo: 'Excluir conta', descricao: 'Como pedir a exclusão da sua conta e dos seus dados do Clarevo.' },
+  { arquivo: 'privacidade.html', md: 'politica-de-privacidade.md', titulo: 'Política de privacidade', rotulo: 'Privacidade', descricao: 'Como a Clarevo trata os dados pessoais de quem usa o app.' },
+  { arquivo: 'termos.html', md: 'termos-de-uso.md', titulo: 'Termos de uso', rotulo: 'Termos', descricao: 'As regras para usar o app e o serviço da Clarevo, de organização de finanças pessoais e da família.' },
+  { arquivo: 'excluir-conta.html', md: 'exclusao-de-conta.md', titulo: 'Excluir conta e dados', rotulo: 'Excluir conta', descricao: 'Como pedir a exclusão da sua conta e dos seus dados da Clarevo.' },
 ];
 /** Links entre os textos jurídicos: o Markdown aponta para o arquivo, o site para a página. */
 const MAPA_LINKS_SITE = Object.fromEntries(PAGINAS_LEGAIS.map((p) => [p.md, p.arquivo]));
@@ -106,6 +108,7 @@ module.exports = {
   HOST_APP,
   URL_DEMO,
   HOST_DEMO,
+  URL_NR1,
   PESOS_FONTE,
   MARCADORES,
   MARCADORES_EMAIL,

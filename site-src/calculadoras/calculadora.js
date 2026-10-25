@@ -1,4 +1,4 @@
-// Calculadoras do Clarevo no navegador (D-066). A conta, as faixas de validação e todo texto de resultado vêm do MESMO código do
+// Calculadoras da Clarevo no navegador (D-066). A conta, as faixas de validação e todo texto de resultado vêm do MESMO código do
 // packages/core, transpilado em js/nucleo/ pelo gerador. Este arquivo só inicia a página: carrega o que a calculadora dela usa, monta a
 // tela, lê o que a pessoa digita e mostra o que o núcleo devolve. Nada sai do navegador: sem envio, sem armazenamento, sem cookie e sem
 // nada na URL (a página só lê "modo", o parâmetro que os temas de Aprender já usam).

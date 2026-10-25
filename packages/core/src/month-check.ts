@@ -81,7 +81,7 @@ export const MONTH_CHECK_TEXT = {
    * aparece só o que está registrado no Clarevo." Com a conferência, `done` toma o lugar dela.
    */
   unchecked: (kind: MonthCheckKind): string =>
-    `Mês sem anotação não quer dizer mês sem ${UNCHECKED_THINGS[kind]}: aqui aparece só o que está registrado no Clarevo.`,
+    `Mês sem anotação não quer dizer mês sem ${UNCHECKED_THINGS[kind]}: aqui aparece só o que está registrado na Clarevo.`,
   /** O botão de desfazer e o nome acessível dele. */
   undo: 'Desfazer a conferência',
   undoA11y: (kind: MonthCheckKind, month: IsoMonth): string => `Desfazer a conferência: não houve ${THINGS[kind]} em ${formatMonthYearBR(month)}`,

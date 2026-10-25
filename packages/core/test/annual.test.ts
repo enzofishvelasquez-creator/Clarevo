@@ -642,7 +642,7 @@ describe('contas do ano: totais, ano a ano, informar, tirar e sugestão', () => 
     expect([y0.count, y0.paidBefore, y0.open, y0.totalCents, y0.approximate]).toEqual([2, 8, 2, 36000, true]);
     expect(y0.texts).toEqual({
       line: '2026 · 2 parcelas · 2 em aberto · cerca de R$ 360,00',
-      paidBefore: '2026: parcelas 1 a 8 pagas antes do Clarevo (informado por você).',
+      paidBefore: '2026: parcelas 1 a 8 pagas antes da Clarevo (informado por você).',
       missing: null,
     });
 

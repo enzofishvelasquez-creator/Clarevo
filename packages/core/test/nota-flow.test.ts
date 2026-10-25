@@ -269,7 +269,7 @@ describe('valor, loja, data e forma de pagamento na linha da nota (D-042)', () =
   });
 });
 
-describe('dica "No celular, o Clarevo lê o valor e a data na página da Sefaz."', () => {
+describe('dica "No celular, a Clarevo lê o valor e a data na página da Sefaz."', () => {
   const online = `https://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode?p=${keyText('2610')}|2|1|1|ABCDEF0123456789ABCDEF0123456789ABCDEF01`;
   const contingency = `https://consultadfe.fazenda.rj.gov.br/consultaNFCe/QRCode?p=${keyText('2610')}|2|1|08|87.40|0123456789ABCDEF0123456789ABCDEF01234567|1|ABCDEF0123456789ABCDEF0123456789ABCDEF01`;
   const draftFrom = (url: string) => {
@@ -282,7 +282,7 @@ describe('dica "No celular, o Clarevo lê o valor e a data na página da Sefaz."
 
   it('na web, nota do RJ com QR online (sem valor nem dia): a dica aparece', () => {
     const { draft, issuedOn } = draftFrom(online);
-    expect(sefazPhoneHint(draft, issuedOn, true)).toBe('No celular, o Clarevo lê o valor e a data na página da Sefaz.');
+    expect(sefazPhoneHint(draft, issuedOn, true)).toBe('No celular, a Clarevo lê o valor e a data na página da Sefaz.');
   });
 
   it('no celular (a leitura está disponível), não aparece', () => {

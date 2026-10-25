@@ -15,12 +15,12 @@ export const GUIDE_GROUPS: readonly GuideGroup[] = [
  */
 export const GUIDE_TEXT = {
   /** Card no topo de Aprender, antes das calculadoras. */
-  cardTitle: 'Como usar o Clarevo',
+  cardTitle: 'Como usar o app da Clarevo',
   cardCaption: 'Onde fica cada função e como usar, passo a passo',
-  cardA11y: 'Como usar o Clarevo. Onde fica cada função e como usar, passo a passo.',
+  cardA11y: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.',
   /** Título da lista (/aprender/guia). */
-  screenTitle: 'Como usar o Clarevo',
-  intro: 'Cada função do Clarevo, com para que serve, onde fica e como usar. Nada do que você abre aqui é registrado.',
+  screenTitle: 'Como usar o app da Clarevo',
+  intro: 'Cada função da Clarevo, com para que serve, onde fica e como usar. Nada do que você abre aqui é registrado.',
   /** Seções de uma entrada. */
   purposeTitle: 'Para que serve',
   whereTitle: 'Onde fica',
@@ -85,7 +85,7 @@ export const TOUR_CARDS: readonly TourCard[] = [
     id: 'anotar',
     icon: 'anotar',
     title: 'Anotar um gasto',
-    body: 'Toque em Anotar gasto para registrar o que você pagou. Com uma nota fiscal, escaneie o QR code e confira o que o Clarevo preencheu.',
+    body: 'Toque em Anotar gasto para registrar o que você pagou. Com uma nota fiscal, escaneie o QR code e confira o que a Clarevo preencheu.',
   },
   {
     id: 'contas',
@@ -103,16 +103,16 @@ export const TOUR_CARDS: readonly TourCard[] = [
     id: 'ajuda',
     icon: 'ajuda',
     title: 'Onde achar ajuda',
-    body: 'Em Aprender › Como usar o Clarevo, cada função tem o passo a passo. Em várias telas, o botão ? no cabeçalho explica a tela.',
+    body: 'Em Aprender › Como usar o app da Clarevo, cada função tem o passo a passo. Em várias telas, o botão ? no cabeçalho explica a tela.',
   },
 ];
 
 /** Textos do tour: botões, progresso e nomes acessíveis. */
 export const TOUR_TEXT = {
   /** Nome acessível da janela. */
-  dialogLabel: 'Primeiros passos no Clarevo',
+  dialogLabel: 'Primeiros passos na Clarevo',
   skip: 'Pular',
-  skipHint: 'Fecha o tour. Você pode rever em Aprender, em Como usar o Clarevo.',
+  skipHint: 'Fecha o tour. Você pode rever em Aprender, em Como usar o app da Clarevo.',
   next: 'Próximo',
   start: 'Começar',
   /** "1 de 5", visível e lido com o título do cartão. */
@@ -123,12 +123,12 @@ export const TOUR_TEXT = {
 
 /** Textos do manual para compartilhar (docs/manual/index.html, gerado por scripts/gerar-manual.js). */
 export const MANUAL_TEXT = {
-  title: 'Como usar o Clarevo',
+  title: 'Como usar o app da Clarevo',
   subtitle: 'Manual de uso, com as funções, onde achar e como usar.',
   /** Faixa em toda captura de tela e na capa: as imagens são da demonstração. */
   demoBand: 'Dados fictícios de demonstração',
   intro:
-    'Este manual mostra, função por função, para que serve, onde fica e como usar. As telas são da demonstração do Clarevo, com dados fictícios. O mesmo texto está no app, em Aprender, em Como usar o Clarevo.',
+    'Este manual mostra, função por função, para que serve, onde fica e como usar. As telas são da demonstração da Clarevo, com dados fictícios. O mesmo texto está no app, em Aprender, em Como usar o app da Clarevo.',
   tocTitle: 'Sumário',
   figureAlt: (title: string): string => `Tela de exemplo: ${title}`,
   footer: 'Clarevo. Conteúdo educativo e geral, com dados fictícios de demonstração.',

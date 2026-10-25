@@ -286,7 +286,7 @@ describe('conteúdo de época: os quatro temas novos (D-053)', () => {
     expect(text).toContain('Confira os prazos do ano');
     // Sem número de faixa, alíquota ou tabela: o app só explica e não calcula imposto.
     expect(numbersInText(text).filter((n) => !n.startsWith('R$'))).toEqual([]);
-    expect(text).toContain('O Clarevo não calcula os descontos');
+    expect(text).toContain('A Clarevo não calcula os descontos');
   });
 
   it('férias: R$ 3.000,00 mais um terço (R$ 1.000,00) = R$ 4.000,00; liga "Juntar para um objetivo"', () => {
@@ -351,7 +351,7 @@ describe('conteúdo de época: os quatro temas novos (D-053)', () => {
       expect(first.locator).toContain('de 23 de março a 29 de maio');
     }
     // O Clarevo não calcula nem entrega a declaração.
-    expect(text).toContain('O Clarevo não calcula nem entrega a declaração');
+    expect(text).toContain('A Clarevo não calcula nem entrega a declaração');
   });
 
   it('toda data com dia e mês e todo ano escrito nos textos aparece no trecho de alguma fonte do tema (nada de data sem fonte)', () => {

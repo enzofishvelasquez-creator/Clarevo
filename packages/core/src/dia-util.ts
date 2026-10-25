@@ -295,10 +295,10 @@ export const DUE_DAY_TEXT = {
   learnMoreTitle: 'Vencimento em dia que não é útil',
   /** Corpo da explicação. */
   learnMoreParagraphs: [
-    'O Clarevo não muda a data de vencimento: ela segue como você anotou, ou como o dia escolhido do gasto fixo, do parcelamento ou da conta do ano a calcula. Quando essa data cai em sábado, domingo ou feriado nacional, a conta, o boleto ou a fatura aparece como "Vence terça, 13/10 (próximo dia útil)" e só passa a vencida depois que esse dia termina. Os totais, a ordem das contas e o lembrete seguem na data de vencimento.',
-    'A Lei nº 7.089/1983 proíbe bancos e instituições financeiras de cobrar juros de mora sobre título que vence em sábado, domingo ou feriado, desde que seja quitado no primeiro dia subsequente, que o STJ lê como o primeiro dia útil seguinte. A multa e as regras de cada cobrança podem variar, e o Clarevo não sabe qual vale para a sua conta. Por isso, confira com quem cobra antes de escolher a data do pagamento.',
+    'A Clarevo não muda a data de vencimento: ela segue como você anotou, ou como o dia escolhido do gasto fixo, do parcelamento ou da conta do ano a calcula. Quando essa data cai em sábado, domingo ou feriado nacional, a conta, o boleto ou a fatura aparece como "Vence terça, 13/10 (próximo dia útil)" e só passa a vencida depois que esse dia termina. Os totais, a ordem das contas e o lembrete seguem na data de vencimento.',
+    'A Lei nº 7.089/1983 proíbe bancos e instituições financeiras de cobrar juros de mora sobre título que vence em sábado, domingo ou feriado, desde que seja quitado no primeiro dia subsequente, que o STJ lê como o primeiro dia útil seguinte. A multa e as regras de cada cobrança podem variar, e a Clarevo não sabe qual vale para a sua conta. Por isso, confira com quem cobra antes de escolher a data do pagamento.',
     'Se o pagamento passar do primeiro dia útil, os juros podem contar desde a data original do vencimento: é o entendimento do STJ, que o tribunal divulgou em notícia sobre um caso de fatura de cartão.',
-    'Contas do ano, como IPVA, IPTU e matrícula, costumam ser tributos e não ganham essa tolerância no Clarevo: ficam vencidas a partir do dia seguinte ao vencimento. Impostos podem ter regra diferente. Confira a data no carnê ou no site do órgão.',
+    'Contas do ano, como IPVA, IPTU e matrícula, costumam ser tributos e não ganham essa tolerância na Clarevo: ficam vencidas a partir do dia seguinte ao vencimento. Impostos podem ter regra diferente. Confira a data no carnê ou no site do órgão.',
     'Contam só os feriados nacionais de data fixa definidos em lei federal: 1º de janeiro, 21 de abril, 1º de maio, 7 de setembro, 12 de outubro, 2 de novembro, 15 de novembro, 20 de novembro e 25 de dezembro. Carnaval, Sexta-feira Santa, Corpus Christi e os feriados de estados e municípios não entram. O dia de eleição cai sempre num domingo, que já é coberto pelo fim de semana. Quem cobra pode ter outro calendário.',
   ],
   /** Fonte e data da consulta, no fim da explicação. */
@@ -378,7 +378,7 @@ export function dueDayNotice(dueOn: IsoDate, kind: DueKind = 'conta'): DueDayNot
   const opening = `Vence ${onWeekday(dueOn)}, ${formatDateBR(dueOn)}, que não é dia útil${why}.`;
   const text = grace
     ? `${opening} O próximo dia útil é ${weekdayName(next)}, ${formatDateBR(next)}. Só depois desse dia ela passa a vencida.`
-    : `${opening} Em conta do ano, o Clarevo não usa o próximo dia útil: ela passa a vencida a partir do dia seguinte ao vencimento.`;
+    : `${opening} Em conta do ano, a Clarevo não usa o próximo dia útil: ela passa a vencida a partir do dia seguinte ao vencimento.`;
   const advice = grace ? DUE_DAY_TEXT.advice : DUE_DAY_TEXT.adviceYearBill;
   const registered = `${weekdayName(dueOn)}, ${formatDayMonth(dueOn)}`;
   return {

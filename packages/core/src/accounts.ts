@@ -43,13 +43,13 @@ export const ACCOUNTS_TEXT = {
   /** Card em Conta. */
   title: 'Suas contas',
   intro:
-    'Cadastre de onde sai o dinheiro, como a conta do banco ou a carteira, e escolha uma em cada gasto, pagamento e aporte. É só a origem informada: o Clarevo não guarda saldo nem movimenta dinheiro.',
+    'Cadastre de onde sai o dinheiro, como a conta do banco ou a carteira, e escolha uma em cada gasto, pagamento e aporte. É só a origem informada: a Clarevo não guarda saldo nem movimenta dinheiro.',
   principal: 'Principal',
   archived: 'Arquivada',
   add: 'Adicionar conta',
   manage: 'Gerenciar contas',
   limitNote: 'Você tem 10 contas ativas. Arquive uma para adicionar outra.',
-  balanceNote: 'O Clarevo não calcula saldo por conta.',
+  balanceNote: 'A Clarevo não calcula saldo por conta.',
   /** Seletores. */
   out: 'Saiu de',
   into: 'Entrou em',

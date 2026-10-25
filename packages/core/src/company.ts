@@ -441,8 +441,8 @@ export const COMPANY_TEXT = {
   accountTitle: 'Painel da empresa',
   accountHint: 'Convide pessoas para o benefício e acompanhe as vagas e as licenças.',
   accountOpen: 'Abrir painel da empresa',
-  webOnly: 'O painel da empresa está disponível só na web. Abra o Clarevo no navegador para usá-lo.',
-  notAdmin: 'Esta área é para quem administra o benefício de uma empresa. Se você deveria ter acesso, fale com a equipe do Clarevo.',
+  webOnly: 'O painel da empresa está disponível só na web. Abra o app da Clarevo no navegador para usá-lo.',
+  notAdmin: 'Esta área é para quem administra o benefício de uma empresa. Se você deveria ter acesso, fale com a equipe da Clarevo.',
   loading: 'Carregando o painel…',
   loadFailed: 'Não foi possível carregar o painel. Tente novamente.',
   demoBadge: 'Demonstração: empresa e pessoas fictícias. Nada é gravado fora deste aparelho.',
@@ -463,7 +463,7 @@ export const COMPANY_TEXT = {
   /** Convidar pessoas. */
   inviteTitle: 'Convidar pessoas',
   inviteHelp:
-    'Cole os e-mails, um por linha ou separados por vírgula ou ponto e vírgula. Cada pessoa recebe um link de uso único, que você envia pelo canal interno da empresa. O Clarevo não envia e-mail.',
+    'Cole os e-mails, um por linha ou separados por vírgula ou ponto e vírgula. Cada pessoa recebe um link de uso único, que você envia pelo canal interno da empresa. A Clarevo não envia e-mail.',
   inviteLabel: 'E-mails',
   invitePlaceholder: 'ana@empresa.com.br\nbruno@empresa.com.br',
   previewTitle: 'Conferência da lista',
@@ -477,8 +477,8 @@ export const COMPANY_TEXT = {
     vazia: 'Nenhum e-mail novo para convidar.',
     invalidos: 'Corrija ou retire os itens que não parecem um e-mail para continuar.',
     lote_grande: `Convide até ${LICENSE_BATCH_MAX} pessoas por vez.`,
-    sem_vagas: 'A lista tem mais pessoas novas do que vagas livres. Retire alguns e-mails ou fale com a equipe do Clarevo para ampliar as vagas.',
-    contrato_fora_da_vigencia: 'O contrato não está em vigor. Fale com a equipe do Clarevo.',
+    sem_vagas: 'A lista tem mais pessoas novas do que vagas livres. Retire alguns e-mails ou fale com a equipe da Clarevo para ampliar as vagas.',
+    contrato_fora_da_vigencia: 'O contrato não está em vigor. Fale com a equipe da Clarevo.',
   } as const,
   confirm: (n: number): string => (n === 1 ? 'Convidar 1 pessoa' : `Convidar ${n} pessoas`),
   confirmBusy: 'Convidando…',
@@ -557,19 +557,19 @@ const PROMO_BASE: readonly PromoText[] = [
     id: 'anuncio',
     title: 'Anúncio do benefício',
     text:
-      'Chegou um benefício para ajudar a organizar o dinheiro do mês: o Clarevo. É um app para anotar gastos e recebimentos, acompanhar contas a pagar e planejar o mês com calma. Para começar, use o link de convite que enviamos para o seu e-mail. A empresa não vê o que você anota: seus gastos, contas, metas e cartões ficam só com você.',
+      'Chegou um benefício para ajudar a organizar o dinheiro do mês: a Clarevo. É um app para anotar gastos e recebimentos, acompanhar contas a pagar e planejar o mês com calma. Para começar, use o link de convite que enviamos para o seu e-mail. A empresa não vê o que você anota: seus gastos, contas, metas e cartões ficam só com você.',
   },
   {
     id: 'como-entrar',
     title: 'Como entrar',
     text:
-      'Como começar no Clarevo: abra o link de convite que você recebeu, entre com o e-mail que a empresa usou no convite (ou crie sua conta com ele) e confira o nome da empresa antes de aceitar. O link serve uma única vez e só funciona com esse e-mail.',
+      'Como começar na Clarevo: abra o link de convite que você recebeu, entre com o e-mail que a empresa usou no convite (ou crie sua conta com ele) e confira o nome da empresa antes de aceitar. O link serve uma única vez e só funciona com esse e-mail.',
   },
   {
     id: 'lembrete',
     title: 'Lembrete para quem ainda não entrou',
     text:
-      'Ainda não ativou o benefício do Clarevo? O link de convite está no e-mail ou na mensagem que enviamos. Se ele não abrir, peça um novo link ao RH.',
+      'Ainda não ativou o benefício da Clarevo? O link de convite está no e-mail ou na mensagem que enviamos. Se ele não abrir, peça um novo link ao RH.',
   },
   {
     id: 'privacidade',
@@ -598,7 +598,7 @@ export function promoTexts(today: IsoDate): PromoText[] {
     {
       id: 'neste-mes',
       title: `Neste mês: ${card.monthName}`,
-      text: `Em ${card.monthName}, o Clarevo tem conteúdo sobre ${joinTitles(titles)}. Em Aprender, o card "Neste mês" reúne os temas e as calculadoras do período. É informação pública, com fonte e data de revisão, para quem quiser se organizar com antecedência.`,
+      text: `Em ${card.monthName}, a Clarevo tem conteúdo sobre ${joinTitles(titles)}. Em Aprender, o card "Neste mês" reúne os temas e as calculadoras do período. É informação pública, com fonte e data de revisão, para quem quiser se organizar com antecedência.`,
     },
   ];
 }
@@ -607,7 +607,7 @@ export function promoTexts(today: IsoDate): PromoText[] {
 export const BENEFIT_TEXT = {
   title: 'Benefício da empresa',
   signedOut:
-    'Você recebeu um convite da sua empresa para usar o Clarevo como benefício. Entre ou crie sua conta com o e-mail do convite para ver os detalhes e aceitar. Depois você volta para este convite.',
+    'Você recebeu um convite da sua empresa para usar o app da Clarevo como benefício. Entre ou crie sua conta com o e-mail do convite para ver os detalhes e aceitar. Depois você volta para este convite.',
   enter: 'Entrar',
   createAccount: 'Criar conta',
   loading: 'Conferindo o convite…',
@@ -627,7 +627,7 @@ export const BENEFIT_TEXT = {
   retry: 'Tentar de novo',
   /** Conta. */
   accountTitle: 'Benefício pela empresa',
-  accountNone: 'Se a sua empresa oferece o Clarevo como benefício, cole aqui o link do convite para ver os detalhes e aceitar.',
+  accountNone: 'Se a sua empresa oferece a Clarevo como benefício, cole aqui o link do convite para ver os detalhes e aceitar.',
   demoOnly: 'Na demonstração não há benefício de exemplo. Para receber o convite de uma empresa, entre com uma conta sua.',
   haveInvite: 'Tenho um convite da empresa',
   pasteLabel: 'Link do convite da empresa',
@@ -655,8 +655,8 @@ export const BENEFIT_TEXT = {
 export const COMPANY_ERROR_TEXT = {
   email_invalido: 'Um dos itens não parece um e-mail. Corrija a lista e tente de novo.',
   itens_invalidos: `Convide de 1 a ${LICENSE_BATCH_MAX} pessoas por vez.`,
-  contrato_nao_vigente: 'O contrato não está em vigor. Fale com a equipe do Clarevo.',
-  vagas_insuficientes: 'Não há vagas livres para todas as pessoas da lista. Retire alguns e-mails ou fale com a equipe do Clarevo.',
+  contrato_nao_vigente: 'O contrato não está em vigor. Fale com a equipe da Clarevo.',
+  vagas_insuficientes: 'Não há vagas livres para todas as pessoas da lista. Retire alguns e-mails ou fale com a equipe da Clarevo.',
   licenca_nao_convidada: 'Esta licença já não é um convite pendente. Atualize a tela.',
   licenca_nao_ativa: 'Esta licença já não está ativa. Atualize a tela.',
   convite_invalido: BENEFIT_TEXT.invalid,

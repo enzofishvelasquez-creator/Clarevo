@@ -447,7 +447,7 @@ function Occurrences({
             Parcelas
           </Txt>
           <Txt variant="label" style={tabular}>
-            Pagas antes do Clarevo: {progress.paidBefore} (informado por você) · Pagas no Clarevo: {progress.paidInApp}
+            Pagas antes da Clarevo: {progress.paidBefore} (informado por você) · Pagas na Clarevo: {progress.paidInApp}
             {missing.length > 0 ? ` · ${RETURN_TEXT.progressGaps(missing.length)}` : ''}
             {progress.remaining !== null ? ` · ${progress.remaining === 1 ? 'Falta 1' : `Faltam ${progress.remaining}`}` : ''}
           </Txt>

@@ -59,7 +59,7 @@ export const LEGAL_TEXT = {
   /** Conta: a seção "Privacidade e termos", só com o endereço do site. */
   account: {
     title: 'Privacidade e termos',
-    hint: 'Abrem o site do Clarevo no navegador.',
+    hint: 'Abrem o site da Clarevo no navegador.',
     privacy: 'Política de privacidade',
     terms: 'Termos de uso',
     deletion: 'Excluir conta: como funciona',
@@ -68,7 +68,7 @@ export const LEGAL_TEXT = {
   /** "Quem vê estes dados?": o Pessoal e a equipe do Clarevo (redação proposta na política, seção 7; pergunta 14 ao advogado). */
   whoSees: {
     personal: 'Única pessoa do app que vê, anota, edita e exclui registros em Pessoal.',
-    team: 'A equipe do Clarevo não olha os seus dados no dia a dia. Só acessa quando a lei exigir ou para resolver um problema que você pediu.',
+    team: 'A equipe da Clarevo não olha os seus dados no dia a dia. Só acessa quando a lei exigir ou para resolver um problema que você pediu.',
     security:
       'Seus registros ficam protegidos por permissões no servidor: entre as pessoas do app, só você vê o contexto Pessoal. Na Família, cada pessoa vê o que o papel dela permite.',
   },

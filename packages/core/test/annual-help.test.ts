@@ -28,7 +28,7 @@ describe('contas do ano explicadas (D-042)', () => {
 
   it('o texto do topo do cadastro é o pedido por Enzo', () => {
     expect(ANNUAL_HELP_TEXT.intro).toBe(
-      'Contas do ano são as que vêm uma vez por ano, como IPVA, IPTU, matrícula e seguro. Você cadastra uma vez; todo ano o Clarevo lembra e cria as contas do mês certo.',
+      'Contas do ano são as que vêm uma vez por ano, como IPVA, IPTU, matrícula e seguro. Você cadastra uma vez; todo ano a Clarevo lembra e cria as contas do mês certo.',
     );
     expect(ANNUAL_HELP_TEXT.whatIsThis).toBe('O que é isso?');
   });
@@ -61,7 +61,7 @@ describe('contas do ano explicadas (D-042)', () => {
   it('o que acontece nos próximos anos fala de informar o valor, em Ano a ano, sem mudar os outros anos', () => {
     expect(ANNUAL_HELP_TEXT.changesHint).toContain('informe o valor em Ano a ano');
     expect(ANNUAL_HELP_TEXT.changesHint).toBe(
-      'Se muda, o Clarevo usa o valor que você cadastrou como estimativa. Quando o carnê ou o boleto do ano chegar, abra a conta do ano e informe o valor em Ano a ano.',
+      'Se muda, a Clarevo usa o valor que você cadastrou como estimativa. Quando o carnê ou o boleto do ano chegar, abra a conta do ano e informe o valor em Ano a ano.',
     );
     expect(ANNUAL_HELP_TEXT.changesHint).not.toContain('ano passado');
     expect(ANNUAL_HELP_TEXT.sameHint).toContain('repete o valor todo ano');

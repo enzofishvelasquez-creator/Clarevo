@@ -1,5 +1,5 @@
 ---
-titulo: Como a empresa oferece o Clarevo sem ver suas finanças
+titulo: Como a empresa oferece a Clarevo sem ver suas finanças
 data: 2026-10-23
 resumo: O que o painel da empresa mostra, o que ele nunca mostra, como funciona o convite por link e o que acontece quando o benefício termina.
 autoria: Equipe Clarevo
@@ -9,7 +9,7 @@ fontes:
   - Segurança e privacidade | seguranca.html
   - Ajuda: A empresa que oferece o benefício vê meus gastos? | ajuda/beneficio.html#tema-empresa-ve
 ---
-Uma empresa pode oferecer o Clarevo como benefício a quem trabalha nela. Neste modelo, a empresa administra só o acesso das pessoas ao plano. Os registros financeiros de cada pessoa ficam fora do que ela pode ver.
+Uma empresa pode oferecer a Clarevo como benefício a quem trabalha nela. Neste modelo, a empresa administra só o acesso das pessoas ao plano. Os registros financeiros de cada pessoa ficam fora do que ela pode ver.
 
 ## O que a empresa vê
 
@@ -30,7 +30,7 @@ Uma empresa pode oferecer o Clarevo como benefício a quem trabalha nela. Neste 
 
 ## Como o convite funciona
 
-A equipe do Clarevo cadastra a empresa, o contrato e a primeira pessoa administradora. Depois, quem administra cola os e-mails no painel, que só existe na web, e cada e-mail ganha um link de uso único. A empresa envia o link pelo canal interno dela: o Clarevo não envia e-mail de convite. Para aceitar, a pessoa precisa ter conta no Clarevo com o mesmo e-mail do convite. Quem ativa a licença é a pessoa, ao aceitar.
+A equipe da Clarevo cadastra a empresa, o contrato e a primeira pessoa administradora. Depois, quem administra cola os e-mails no painel, que só existe na web, e cada e-mail ganha um link de uso único. A empresa envia o link pelo canal interno dela: a Clarevo não envia e-mail de convite. Para aceitar, a pessoa precisa ter conta na Clarevo com o mesmo e-mail do convite. Quem ativa a licença é a pessoa, ao aceitar.
 
 ## Quando o benefício termina
 

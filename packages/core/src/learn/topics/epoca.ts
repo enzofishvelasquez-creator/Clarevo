@@ -27,7 +27,7 @@ export const EPOCA_TOPICS: Topic[] = [
       'O 13º salário, ou gratificação natalina, é pago em duas parcelas. A primeira pode ser paga entre fevereiro e 30 de novembro e corresponde à metade do salário do mês anterior. A segunda é paga até 20 de dezembro e completa o valor do ano, descontada a primeira. Confira os prazos do ano no site do Ministério do Trabalho e Emprego.',
       'Quem trabalhou só parte do ano recebe o 13º proporcional: 1/12 da remuneração por mês de serviço, e uma fração de 15 dias ou mais conta como mês inteiro. A primeira parcela também pode vir junto com as férias, se a pessoa pedir em janeiro.',
       'Confira no contracheque quais descontos incidem em cada parcela. O INSS do 13º não se soma ao salário do mês para achar a faixa, e o Imposto de Renda é cobrado na fonte, à parte dos outros rendimentos. As faixas mudam com o tempo: confira as tabelas do ano.',
-      'O Clarevo não calcula os descontos. Para anotar, registre cada parcela como recebimento: ela entra no mês em que o valor chega.',
+      'A Clarevo não calcula os descontos. Para anotar, registre cada parcela como recebimento: ela entra no mês em que o valor chega.',
     ],
     example:
       'Com salário de R$ 3.000,00 e o ano inteiro de trabalho, a primeira parcela é de R$ 1.500,00 e a segunda, de R$ 1.500,00 antes dos descontos. Para quem trabalhou 7 meses, o proporcional é de R$ 250,00 por mês, ou R$ 1.750,00 no total.',
@@ -92,7 +92,7 @@ export const EPOCA_TOPICS: Topic[] = [
       'Depois de cada período de 12 meses de trabalho, quem tem carteira assinada tem direito a férias. São 30 dias corridos para quem não faltou mais de cinco vezes sem justificativa, e a Constituição garante o pagamento com pelo menos um terço a mais que o salário normal.',
       'O pagamento das férias deve ser feito até dois dias antes do início. A pessoa pode pedir para converter um terço das férias em dinheiro, o abono pecuniário, até 15 dias antes do fim do período aquisitivo, que são os 12 meses de trabalho que dão direito às férias.',
       'Com a concordância da pessoa, as férias podem ser divididas em até três períodos, e um deles precisa ter pelo menos 14 dias corridos. A primeira parcela do 13º salário pode vir junto com as férias, se a pessoa pedir em janeiro (veja "13º salário").',
-      'Se as férias já têm data, dá para somar o que se pretende gastar com viagem e passeios e dividir pelos meses que faltam. No Clarevo, a calculadora "Juntar para um objetivo" faz essa conta com os seus números.',
+      'Se as férias já têm data, dá para somar o que se pretende gastar com viagem e passeios e dividir pelos meses que faltam. Na Clarevo, a calculadora "Juntar para um objetivo" faz essa conta com os seus números.',
     ],
     example: 'Com salário de R$ 3.000,00, as férias de 30 dias pagam o salário mais um terço: R$ 3.000,00 mais R$ 1.000,00, ou seja, R$ 4.000,00 antes dos descontos.',
     calculation: '3.000,00 ÷ 3 = 1.000,00 · 3.000,00 + 1.000,00 = 4.000,00.',
@@ -145,7 +145,7 @@ export const EPOCA_TOPICS: Topic[] = [
       'Nas escolas particulares, o valor da anuidade vale por um ano e é dividido em 12 parcelas mensais iguais, ou em 6, no caso de semestralidade. A escola também pode oferecer outros planos de pagamento, desde que a soma não passe do valor total.',
       'O texto da proposta de contrato, o valor da anuidade e o número de vagas por sala precisam ser divulgados em local de fácil acesso pelo menos 45 dias antes do fim do prazo de matrícula. Com essas informações, dá para somar o ano e comparar antes de decidir.',
       'A lista de material pode pedir itens de uso individual. Itens de uso coletivo não podem entrar na lista: o custo deles já está na anuidade (Lei 12.886/2013). Segundo os Procons, a escola também não escolhe a marca nem o local de compra dos itens de uso individual.',
-      'Os Procons lembram que não é preciso comprar todo o material no começo do ano. No Clarevo, a parcela da escola pode ser um gasto fixo mensal, e a matrícula e a lista de material entram como conta do ano ou como gasto, na data em que forem pagas.',
+      'Os Procons lembram que não é preciso comprar todo o material no começo do ano. Na Clarevo, a parcela da escola pode ser um gasto fixo mensal, e a matrícula e a lista de material entram como conta do ano ou como gasto, na data em que forem pagas.',
     ],
     example:
       'Com anuidade de R$ 14.400,00 em 12 parcelas iguais, cada parcela é de R$ 1.200,00. Se a lista de material custar R$ 600,00 e for comprada no primeiro mês, as saídas desse mês somam R$ 1.800,00.',
@@ -199,7 +199,7 @@ export const EPOCA_TOPICS: Topic[] = [
       'Quem precisa declarar muda de um ano para o outro, e a Receita lista os critérios na página "Quem deve declarar". Para preencher, ajuda guardar durante o ano os informes de rendimentos, que as fontes pagadoras fornecem até o último dia útil de fevereiro, e os comprovantes de despesas.',
       'Quem precisa declarar e entrega depois do prazo paga multa de 1% ao mês ou fração de atraso sobre o imposto devido, com mínimo de R$ 165,74 e máximo de 20% do imposto.',
       'O imposto a pagar pode ser quitado de uma vez ou dividido em até 8 quotas mensais, e nenhuma quota pode ser menor que R$ 50,00. Imposto menor que R$ 100,00 é pago de uma só vez. A primeira quota, paga no prazo, não tem juros, e as demais recebem juros pela taxa Selic (veja "Selic, a taxa básica de juros").',
-      'O Clarevo não calcula nem entrega a declaração. Se houver imposto a pagar, cada quota pode ser anotada como conta a pagar, com o vencimento de cada mês.',
+      'A Clarevo não calcula nem entrega a declaração. Se houver imposto a pagar, cada quota pode ser anotada como conta a pagar, com o vencimento de cada mês.',
     ],
     example:
       'Com imposto a pagar de R$ 1.200,00, a quota única é de R$ 1.200,00. Em 8 quotas, cada uma é de R$ 150,00, acima do mínimo de R$ 50,00, sem contar os juros das quotas depois da primeira.',

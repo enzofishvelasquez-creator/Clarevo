@@ -173,7 +173,7 @@ describe('device-features: o widget da tela inicial', () => {
     }
   });
 
-  it('sair da conta: o widget passa a "Entre no Clarevo para ver", sem dado nenhum e sem ler as contas, e os lembretes são desligados', async () => {
+  it('sair da conta: o widget passa a "Entre na Clarevo para ver", sem dado nenhum e sem ler as contas, e os lembretes são desligados', async () => {
     await withDemoClock(async () => {
       const t = await setup({ prefs: { reminders: true, reminderHour: core.DEFAULT_REMINDER_HOUR, widgetShowValues: true } });
       expect(t.written()).toHaveLength(1);

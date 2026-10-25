@@ -1,7 +1,7 @@
 ---
 titulo: 13º salário: quando cai e como se organizar
 data: 2026-10-23
-resumo: As duas parcelas, o proporcional para quem trabalhou parte do ano, os descontos e um jeito de anotar o 13º no Clarevo.
+resumo: As duas parcelas, o proporcional para quem trabalhou parte do ano, os descontos e um jeito de anotar o 13º na Clarevo.
 autoria: Equipe Clarevo
 fontes:
   - tema: decimo-terceiro
@@ -29,7 +29,7 @@ Outubro, novembro e dezembro são os meses do 13º salário no calendário de Ap
 
 {{tema:decimo-terceiro:hipoteses}}
 
-## Como se organizar no Clarevo
+## Como se organizar na Clarevo
 
 {{tema:decimo-terceiro:p4}}
 

@@ -113,7 +113,7 @@ describe('textos de privacidade e termos no app', () => {
 
   it('"Quem vê estes dados?": diz "pessoa do app" no Pessoal e que a equipe não olha os dados no dia a dia, sem absoluto', () => {
     expect(LEGAL_TEXT.whoSees.personal).toBe('Única pessoa do app que vê, anota, edita e exclui registros em Pessoal.');
-    expect(LEGAL_TEXT.whoSees.team).toContain('A equipe do Clarevo não olha os seus dados no dia a dia');
+    expect(LEGAL_TEXT.whoSees.team).toContain('A equipe da Clarevo não olha os seus dados no dia a dia');
     expect(LEGAL_TEXT.whoSees.team).toContain('Só acessa quando a lei exigir ou para resolver um problema que você pediu.');
     expect(LEGAL_TEXT.whoSees.security).toContain('entre as pessoas do app, só você vê o contexto Pessoal');
     const tela = ler('apps/app/src/app/quem-ve.tsx');

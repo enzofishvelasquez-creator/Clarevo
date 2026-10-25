@@ -12,16 +12,16 @@ const ARQUIVO = 'seguranca.html';
 function paginaSeguranca({ valores, img }) {
   const u = (d) => rel(ARQUIVO, d);
   const capa = `<h1>Segurança e privacidade</h1>
-<p class="lead">O que o Clarevo guarda, o que não guarda e quem vê o quê, em linguagem simples. O texto completo e com valor de regra é a <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>`;
+<p class="lead">O que a Clarevo guarda, o que não guarda e quem vê o quê, em linguagem simples. O texto completo e com valor de regra é a <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>`;
 
   const brutas = [
     bloco(
       `<h2 id="essencial">O essencial</h2>
 <ul class="nao-e">
 <li>Guardamos só o que você, ou as pessoas da sua Família, anotam ou escolhem importar.</li>
-<li>O Clarevo não se conecta ao seu banco e não pede senha bancária.</li>
+<li>A Clarevo não se conecta ao seu banco e não pede senha bancária.</li>
 <li>Não guardamos número completo de cartão, código de segurança, validade, CPF de nota fiscal nem imagens de notas ou comprovantes.</li>
-<li>Se a sua empresa oferecer o Clarevo como benefício, ela nunca vê as suas finanças, nem somadas às de outras pessoas.</li>
+<li>Se a sua empresa oferecer a Clarevo como benefício, ela nunca vê as suas finanças, nem somadas às de outras pessoas.</li>
 <li>Sem anúncios, sem venda de dados e sem rastreamento para publicidade.</li>
 <li>Você pode excluir a sua conta dentro do app.</li>
 </ul>`,
@@ -29,7 +29,7 @@ function paginaSeguranca({ valores, img }) {
     ),
     bloco(
       `<h2 id="guardamos">O que guardamos</h2>
-<p class="lead-bloco">Tudo o que está na lista é digitado, importado ou confirmado por você ou pelas pessoas da sua Família. O Clarevo não busca esses dados em bancos.</p>
+<p class="lead-bloco">Tudo o que está na lista é digitado, importado ou confirmado por você ou pelas pessoas da sua Família. A Clarevo não busca esses dados em bancos.</p>
 <div class="grade">
 <article class="cartao">
 <h3>Cadastro e login</h3>
@@ -68,7 +68,7 @@ function paginaSeguranca({ valores, img }) {
 </ul>
 </div>
 <div class="cartao nunca-ve">
-<h3>Não chega ao Clarevo</h3>
+<h3>Não chega à Clarevo</h3>
 <ul>
 <li>fotos e imagens da câmera: ela só lê o código da nota;</li>
 <li>os arquivos que você escolhe ler: PDF de nota, PDF de comprovante, extrato e fatura;</li>
@@ -77,7 +77,7 @@ function paginaSeguranca({ valores, img }) {
 </ul>
 </div>
 </div>
-<p class="nota">A leitura de nota, de comprovante e de extrato acontece no seu aparelho: o Clarevo não tem servidor que receba esses arquivos. O app só preenche o formulário, e nada é gravado sem você tocar em "Salvar".</p>
+<p class="nota">A leitura de nota, de comprovante e de extrato acontece no seu aparelho: a Clarevo não tem servidor que receba esses arquivos. O app só preenche o formulário, e nada é gravado sem você tocar em "Salvar".</p>
 <p class="nota">No Android, a leitura do QR Code usa um componente do Google (ML Kit) incluído no app. A imagem é lida no aparelho, mas o componente pode enviar ao Google dados técnicos de uso e do aparelho. Os detalhes estão nas seções 5 e 8 da <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>`,
       { rotulo: 'nao-guardamos' },
     ),
@@ -98,11 +98,11 @@ ${celular(img['quem-ve'], ARQUIVO)}
 <p>Se ela oferecer o benefício, vê só os e-mails que convidou, a situação de cada licença, as datas e as contagens. Nunca vê valores, categorias, metas, contas, cartões, a Família de ninguém, nem números somados, e também não vê quando você abre o app nem o que você anota. <a href="${u('empresas/index.html')}">Veja Para empresas</a>.</p>
 </article>
 <article class="cartao">
-<h3>A equipe do Clarevo</h3>
-<p>O Clarevo não consulta o conteúdo financeiro de ninguém no dia a dia. Tecnicamente, pessoas da equipe com acesso ao banco de dados conseguem chegar aos dados guardados. As regras sobre isso estão na seção "Quem vê os seus dados" da <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>
+<h3>A equipe da Clarevo</h3>
+<p>A Clarevo não consulta o conteúdo financeiro de ninguém no dia a dia. Tecnicamente, pessoas da equipe com acesso ao banco de dados conseguem chegar aos dados guardados. As regras sobre isso estão na seção "Quem vê os seus dados" da <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>
 </article>
 </div>
-<p class="nota">O Clarevo não vende dados e não compartilha dados para publicidade.</p>`,
+<p class="nota">A Clarevo não vende dados e não compartilha dados para publicidade.</p>`,
       { variante: 'alt', rotulo: 'quem-ve' },
     ),
     bloco(
@@ -133,7 +133,7 @@ ${celular(img['quem-ve'], ARQUIVO)}
   return montarPagina({
     arquivo: ARQUIVO,
     titulo: 'Segurança e privacidade',
-    descricao: 'O que o Clarevo guarda e não guarda, quem vê os seus dados, como protegemos e como excluir a conta, em linguagem simples.',
+    descricao: 'O que a Clarevo guarda e não guarda, quem vê os seus dados, como protegemos e como excluir a conta, em linguagem simples.',
     capa,
     corpo: brutas.map((b) => marcadoresEmHtml(b, valores)).join('\n'),
     fonte: brutas.join('\n') + capa,

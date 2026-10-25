@@ -33,7 +33,7 @@ const LARGURA_LARGA = 960;
 
 /** `id` vira `imagens/<id>.png`. `alt` descreve a tela sem repetir a legenda. */
 const IMAGENS = [
-  { id: 'resumo', origem: `${LOJA}/01_resumo.png`, largura: LARGURA_CELULAR, alt: 'Tela Resumo do Clarevo, com a diferença do mês, o recebido, o pago, o que ainda vai vencer e o botão Anotar gasto.' },
+  { id: 'resumo', origem: `${LOJA}/01_resumo.png`, largura: LARGURA_CELULAR, alt: 'Tela Resumo da Clarevo, com a diferença do mês, o recebido, o pago, o que ainda vai vencer e o botão Anotar gasto.' },
   { id: 'anotar', origem: `${LOJA}/02_anotar_gasto.png`, largura: LARGURA_CELULAR, alt: 'Tela Anotar gasto, com descrição, valor, forma de pagamento, categoria e data.' },
   { id: 'contas', origem: `${LOJA}/03_contas_a_pagar.png`, largura: LARGURA_CELULAR, alt: 'Tela Contas a pagar, com as contas do mês, os vencimentos e o total que ainda falta pagar.' },
   { id: 'cartoes', origem: `${LOJA}/04_cartoes.png`, largura: LARGURA_CELULAR, alt: 'Tela de um cartão de crédito, com o limite usado, a fatura atual e as próximas faturas.' },

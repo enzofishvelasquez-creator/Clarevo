@@ -814,7 +814,7 @@ export const BUDGET_TEXT = {
 /** Textos do limite pessoal de comprometimento. Neutros: sem cor que julgue, sem julgamento. */
 export const LIMIT_TEXT = {
   title: 'Seu limite',
-  intro: 'Escolha até quanto da sua renda de referência você quer comprometer por mês com contas. É uma escolha sua: o Clarevo não sugere um valor.',
+  intro: 'Escolha até quanto da sua renda de referência você quer comprometer por mês com contas. É uma escolha sua: a Clarevo não sugere um valor.',
   noReference: 'Para escolher um limite, informe antes a sua renda de referência.',
   none: 'Você ainda não escolheu um limite.',
   choose: 'Escolher meu limite',

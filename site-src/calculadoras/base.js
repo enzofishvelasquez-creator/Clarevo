@@ -1,4 +1,4 @@
-// Peças comuns das calculadoras do Clarevo no navegador (D-066): como montar um elemento, um campo de texto, uma escolha, o cartão do
+// Peças comuns das calculadoras da Clarevo no navegador (D-066): como montar um elemento, um campo de texto, uma escolha, o cartão do
 // resultado e quando mostrar um erro (a mesma regra das calculadoras do app). Cada calculadora (definicoes/<slug>.js) importa só daqui e do
 // próprio módulo do núcleo; o que o core faz com `fields.js` (que importaria as dez calculadoras de uma vez) é refeito abaixo com os
 // mesmos dados. Nada sai do navegador: sem envio, sem armazenamento, sem cookie.

@@ -916,7 +916,7 @@ describe('a etiqueta "Vence terça, 13/10 (próximo dia útil)" (D-061)', () => 
     expect(ano.grace).toBe(false);
     expect(ano.lastOnTimeDay).toBe('2026-12-25');
     expect(ano.text).toBe(
-      'Vence na sexta, 25/12/2026, que não é dia útil (feriado nacional: Natal). Em conta do ano, o Clarevo não usa o próximo dia útil: ela passa a vencida a partir do dia seguinte ao vencimento.',
+      'Vence na sexta, 25/12/2026, que não é dia útil (feriado nacional: Natal). Em conta do ano, a Clarevo não usa o próximo dia útil: ela passa a vencida a partir do dia seguinte ao vencimento.',
     );
     expect(ano.advice).toBe('Impostos podem ter regra diferente. Confira a data no carnê ou no site do órgão.');
     expect(ano.a11y).toBe(`${ano.text} ${ano.advice}`);

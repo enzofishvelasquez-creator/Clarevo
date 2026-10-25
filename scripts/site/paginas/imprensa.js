@@ -54,21 +54,21 @@ const DESCRICOES = [
     titulo: 'Em uma frase',
     palavras: null,
     texto:
-      'O Clarevo é um aplicativo para organizar as finanças pessoais e da família: mostra o que entrou, o que saiu e o que ainda vai vencer, cada coisa separada da outra, e traz educação financeira com fonte.',
+      'A Clarevo é uma solução de bem-estar financeiro para pessoas e empresas, apoiada por um aplicativo que ajuda a organizar o mês e acompanhar decisões financeiras pessoais e familiares.',
   },
   {
     id: 'cinquenta',
     titulo: 'Em 50 palavras',
     palavras: 50,
     texto:
-      'O Clarevo é um aplicativo de organização de finanças pessoais e da família. Você anota o que recebe e o que paga, e ele mostra quanto entrou, quanto saiu e quanto ainda vai vencer, cada coisa separada da outra. Também traz educação financeira com fonte e não recomenda produtos financeiros.',
+      'A Clarevo é uma solução de bem-estar financeiro para pessoas e empresas, apoiada por um aplicativo de finanças pessoais e familiares. Você anota o que recebe e o que paga, e o app mostra quanto entrou, quanto saiu e quanto ainda vai vencer. Não é banco nem recomenda produtos financeiros.',
   },
   {
     id: 'cem',
     titulo: 'Em 100 palavras',
     palavras: 100,
     texto:
-      'O Clarevo é um aplicativo de organização de finanças pessoais e da família. Você anota o que recebe e o que paga, e ele mostra quanto entrou, quanto saiu e quanto ainda vai vencer, cada coisa separada da outra. Também reúne contas a pagar, cartões de crédito, metas e uma reserva para imprevistos. Uma Família pode ter até seis pessoas, e uma empresa pode oferecer o Clarevo como benefício sem ver as finanças de ninguém. O Clarevo não é banco, não movimenta dinheiro, não recomenda produtos financeiros, não tem anúncios e não vende dados. Explica juros e taxas com fonte.',
+      'A Clarevo é uma solução de bem-estar financeiro para pessoas e empresas, apoiada por um aplicativo de finanças pessoais e familiares. Você anota o que recebe e o que paga, e o app mostra quanto entrou, quanto saiu e quanto ainda vai vencer. Também reúne contas a pagar, cartões, metas e reserva. Uma Família pode ter até seis pessoas, e uma empresa pode oferecer o app como benefício de bem-estar, sem ver as finanças de ninguém. A Clarevo não é banco, não movimenta dinheiro, não recomenda produtos financeiros, não é atendimento de saúde, não tem anúncios e não vende dados.',
   },
 ];
 
@@ -113,7 +113,7 @@ function paginaImprensa({ valores, img }) {
   const { arquivos } = arquivosDaImprensa();
 
   const capa = `<h1>Kit de imprensa</h1>
-<p class="lead">Logotipo, cores, descrições prontas e capturas de tela do Clarevo, para quem vai escrever sobre ele. Tudo sai direto da marca e do produto, sem retoque.</p>
+<p class="lead">Logotipo, cores, descrições prontas e capturas de tela da Clarevo, para quem vai escrever sobre ela. Tudo sai direto da marca e do produto, sem retoque.</p>
 <div class="acoes">
 <a class="botao botao-principal" href="#descricoes">Descrições prontas</a>
 <a class="botao botao-suave" href="#logotipo">Logotipo e símbolo</a>
@@ -160,7 +160,7 @@ ${celular(img[c.id], ARQUIVO)}
   const brutas = [
     bloco(
       `<h2 id="descricoes">Descrições prontas</h2>
-<p class="lead-bloco">Textos para copiar, em três tamanhos. Eles só dizem o que o Clarevo faz hoje.</p>
+<p class="lead-bloco">Textos para copiar, em três tamanhos. Eles só dizem o que a Clarevo faz hoje.</p>
 <div class="grade grade-3">
 ${descricoes}
 </div>`,
@@ -173,7 +173,7 @@ ${descricoes}
 <li><strong>O que é:</strong> um aplicativo e uma versão web para organizar finanças pessoais e da família, com educação financeira com fonte.</li>
 <li><strong>O que não é:</strong> não é banco, não movimenta dinheiro, não oferece crédito, não recomenda produtos financeiros e não se conecta a contas bancárias.</li>
 <li><strong>Onde usar:</strong> na versão web. Os apps para iPhone e Android estão em breve na App Store e no Google Play.</li>
-<li><strong>Para empresas:</strong> uma empresa pode oferecer o Clarevo como benefício e nunca vê as finanças de ninguém. <a href="${u('empresas/index.html')}">Veja como funciona</a>.</li>
+<li><strong>Para empresas:</strong> uma empresa pode oferecer a Clarevo como benefício e nunca vê as finanças de ninguém. <a href="${u('empresas/index.html')}">Veja como funciona</a>.</li>
 <li><strong>Dados:</strong> sem anúncios, sem venda de dados e sem rastreamento para publicidade. <a href="${u('seguranca.html')}">Segurança e privacidade</a>.</li>
 <li><strong>Quem oferece:</strong> [RAZÃO SOCIAL], CNPJ [CNPJ].</li>
 </ul>
@@ -194,7 +194,7 @@ ${MARCAS.map(cartaoDaMarca).join('\n')}
 <div class="cartao ve">
 <h3>Pode</h3>
 <ul>
-<li>usar os arquivos desta página, sem mudança, para falar do Clarevo;</li>
+<li>usar os arquivos desta página, sem mudança, para falar da Clarevo;</li>
 <li>usar o logotipo reverso sobre o azul e o colorido sobre fundo claro;</li>
 <li>usar a versão de uma cor quando a cor não for possível;</li>
 <li>usar o símbolo como ícone ou em espaços pequenos;</li>
@@ -208,11 +208,11 @@ ${MARCAS.map(cartaoDaMarca).join('\n')}
 <li>tirar o ponto lima, trocar a cor dele ou usar o nome do logotipo sem o ponto;</li>
 <li>trocar as cores, esticar, girar ou aplicar sombra e outros efeitos;</li>
 <li>usar o símbolo no lugar do logotipo em cabeçalhos;</li>
-<li>sugerir que o Clarevo apoia, recomenda ou é apoiado por um produto, uma empresa ou uma marca.</li>
+<li>sugerir que a Clarevo apoia, recomenda ou é apoiado por um produto, uma empresa ou uma marca.</li>
 </ul>
 </div>
 </div>
-<p class="nota">Em fundo branco, o ponto lima tem pouco contraste. Ele é decorativo, e o nome continua legível. Para qualquer uso além de falar do Clarevo, como anúncio, parceria ou produto, escreva antes para [E-MAIL DE CONTATO].</p>`,
+<p class="nota">Em fundo branco, o ponto lima tem pouco contraste. Ele é decorativo, e o nome continua legível. Para qualquer uso além de falar da Clarevo, como anúncio, parceria ou produto, escreva antes para [E-MAIL DE CONTATO].</p>`,
       { variante: 'alt', rotulo: 'regras' },
     ),
     bloco(
@@ -229,7 +229,7 @@ ${cores}
     ),
     bloco(
       `<h2 id="capturas">Capturas de tela</h2>
-<p class="lead-bloco">Telas da demonstração do Clarevo. Os dados são fictícios, e a etiqueta "Demonstração" aparece no próprio app. Cite sempre como demonstração.</p>
+<p class="lead-bloco">Telas da demonstração da Clarevo. Os dados são fictícios, e a etiqueta "Demonstração" aparece no próprio app. Cite sempre como demonstração.</p>
 <div class="capturas-imprensa">
 ${capturas}
 </div>`,
@@ -244,7 +244,7 @@ ${capturas}
   const pg = montarPagina({
     arquivo: ARQUIVO,
     titulo: 'Kit de imprensa',
-    descricao: 'Logotipo, símbolo, cores, fonte, descrições prontas e capturas de tela do Clarevo para a imprensa, com as regras de uso da marca.',
+    descricao: 'Logotipo, símbolo, cores, fonte, descrições prontas e capturas de tela da Clarevo para a imprensa, com as regras de uso da marca.',
     capa,
     corpo: brutas.map((b) => marcadoresEmHtml(b, valores)).join('\n'),
     fonte: brutas.join('\n') + capa,

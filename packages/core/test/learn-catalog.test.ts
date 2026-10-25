@@ -137,7 +137,7 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
       'contei-duas-vezes': 'duvidas pergunta publicado',
       'voltei-depois': 'duvidas pergunta publicado',
       'apagar-dados': 'duvidas pergunta rascunho',
-      'o-que-o-clarevo-nao-faz': 'duvidas pergunta publicado',
+      'o-que-a-clarevo-nao-faz': 'duvidas pergunta publicado',
     };
     expect(Object.fromEntries(TOPICS.map((t) => [t.slug, `${t.section} ${t.kind} ${t.status}`]))).toEqual(table);
     expect(publishedTopics().length).toBe(45);
@@ -161,7 +161,7 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
         subtitle: 'O que já aconteceu e o que ainda vai acontecer',
         paragraphs: [
           'Realizado é o que já foi pago ou recebido. Previsto é uma conta a pagar que ainda não foi paga, como a internet que vence no dia 15.',
-          'Contas a pagar aparecem em "Ainda a pagar neste mês" e não entram em Recebido, Pago ou na diferença do mês. Quando você marca uma conta como paga, o Clarevo registra um gasto com o valor e a data do pagamento, e só esse gasto entra em Pago, no mês da data do pagamento.',
+          'Contas a pagar aparecem em "Ainda a pagar neste mês" e não entram em Recebido, Pago ou na diferença do mês. Quando você marca uma conta como paga, a Clarevo registra um gasto com o valor e a data do pagamento, e só esse gasto entra em Pago, no mês da data do pagamento.',
           'Uma conta vencida e ainda não paga continua em "Ainda a pagar" nos meses seguintes, até ser paga ou excluída. Se você anotou o pagamento como gasto em vez de marcar a conta como paga, exclua a conta a pagar para ela não continuar em "Ainda a pagar".',
         ],
         hypotheses: 'Exemplo fictício.',
@@ -171,7 +171,7 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
         subtitle: 'Por que são números diferentes',
         paragraphs: [
           'O saldo da conta depende do quanto havia antes do mês começar, de transferências e de outros movimentos. A diferença do mês olha só para recebimentos e pagamentos do período.',
-          'Por isso o Clarevo não chama a diferença do mês de saldo nem de dinheiro disponível. Sem saldo inicial informado, não mostramos um saldo calculado.',
+          'Por isso a Clarevo não chama a diferença do mês de saldo nem de dinheiro disponível. Sem saldo inicial informado, não mostramos um saldo calculado.',
         ],
         hypotheses: 'Exemplo fictício.',
       },
@@ -225,7 +225,7 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
     expect(est.example).toContain('R$ 172,40');
     expect(est.calculation).toBe('(165,30 + 180,00 + 171,90) ÷ 3 = 172,40.');
     expect(topicBySlug('contas-do-ano')!.paragraphs[4]).toBe(
-      'No Clarevo, cadastre cada uma como conta do ano: o ano inteiro aparece em Contas a pagar dois meses antes do primeiro vencimento, e cada conta só entra em Ainda a pagar no mês em que vence.',
+      'Na Clarevo, cadastre cada uma como conta do ano: o ano inteiro aparece em Contas a pagar dois meses antes do primeiro vencimento, e cada conta só entra em Ainda a pagar no mês em que vence.',
     );
   });
 
@@ -434,14 +434,14 @@ describe('temas dos Ciclos B, C e D (renda comprometida, renda que muda, aporte,
     expect(percentTenths(115_000, 600_000)).toBe(192);
   });
 
-  it('renda que muda: média e menor mês do exemplo; método do app dito como escolha do Clarevo; sem número de norma', () => {
+  it('renda que muda: média e menor mês do exemplo; método do app dito como escolha da Clarevo; sem número de norma', () => {
     const t = topic('renda-variavel');
     expect(t.facts).toEqual([]);
     const set = withFacts('renda-variavel');
     for (const n of ['R$ 4.300,00', 'R$ 6.200,00', 'R$ 5.100,00', 'R$ 15.600,00', 'R$ 5.200,00', 'R$ 3.150,00', '60,6%', '73,3%']) expect(set.has(canonicalNumber(n)!), n).toBe(true);
     expect(percentTenths(315_000, 520_000)).toBe(606);
     expect(percentTenths(315_000, 430_000)).toBe(733);
-    expect(t.paragraphs[2]).toContain('é uma escolha do Clarevo, não uma regra oficial');
+    expect(t.paragraphs[2]).toContain('é uma escolha da Clarevo, não uma regra oficial');
     // "Renda variável" aqui é dinheiro que entra, não aplicação: o texto diz isso e as palavras-chave ajudam a busca.
     expect(t.paragraphs[0]).toContain('não um tipo de aplicação');
     expect(t.keywords).toEqual(expect.arrayContaining(['renda que varia', 'trabalho autônomo', 'comissão']));
@@ -464,7 +464,7 @@ describe('temas dos Ciclos B, C e D (renda comprometida, renda que muda, aporte,
     expect(categories).toBe('Moradia, Mercado, Transporte, Saúde e Educação');
     expect(t.short).toContain(categories);
     expect(t.paragraphs[1]).toContain(categories);
-    expect(t.paragraphs[1]).toContain('escolha do Clarevo, não uma regra oficial');
+    expect(t.paragraphs[1]).toContain('escolha da Clarevo, não uma regra oficial');
     expect(t.paragraphs[2]).toContain('contas do ano');
     const set = withFacts('essenciais');
     for (const n of ['R$ 3.700,00', 'R$ 3.750,00', 'R$ 3.800,00', 'R$ 11.250,00', 'R$ 200,00', 'R$ 2.400,00', 'R$ 22.500,00']) expect(set.has(canonicalNumber(n)!), n).toBe(true);
@@ -490,7 +490,7 @@ describe('temas dos Ciclos B, C e D (renda comprometida, renda que muda, aporte,
     // A faixa digitada vem da decisão D-028 (fonte Clarevo, a última), e a taxa não é sugerida.
     expect(t.facts).toEqual([{ text: 'de 0% a 30%', source: 4 }]);
     expect(t.sources[4]).toEqual({ kind: 'clarevo', refs: ['D-028'] });
-    expect(t.paragraphs[0]).toContain('O Clarevo não sugere taxas, produtos nem instituições');
+    expect(t.paragraphs[0]).toContain('A Clarevo não sugere taxas, produtos nem instituições');
     expect(t.hypotheses).toContain('Não é uma taxa sugerida');
   });
 
@@ -572,7 +572,7 @@ describe('consulta ao catálogo', () => {
 
   it('seções na ordem da tela, com os temas publicados; Comece por aqui publicado', () => {
     const sections = topicsBySection();
-    expect(sections.map((s) => s.section.title)).toEqual(['Usar o Clarevo', 'Organizar o mês', 'Juros e crédito', 'Dinheiro no tempo', 'Dúvidas frequentes']);
+    expect(sections.map((s) => s.section.title)).toEqual(['Usar o app da Clarevo', 'Organizar o mês', 'Juros e crédito', 'Dinheiro no tempo', 'Dúvidas frequentes']);
     expect(sections.map((s) => s.topics.length)).toEqual([8, 12, 13, 5, 7]);
     expect(LEARN_SECTIONS.length).toBe(5);
     expect([...START_HERE]).toEqual(['diferenca', 'juros-simples-compostos', 'gasto-fixo']);

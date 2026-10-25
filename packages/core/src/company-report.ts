@@ -78,7 +78,7 @@ export const COMPANY_REPORT_TEXT = {
   /** Cartão do painel. */
   cardTitle: 'Relatório de adesão',
   cardIntro:
-    'Leve o resumo do benefício para uma reunião ou para o arquivo do RH: o contrato, as vagas e as contagens de licenças. O arquivo é montado neste navegador, e o Clarevo não guarda cópia dele.',
+    'Leve o resumo do benefício para uma reunião ou para o arquivo do RH: o contrato, as vagas e as contagens de licenças. O arquivo é montado neste navegador, e a Clarevo não guarda cópia dele.',
   includeLabel: 'Incluir a lista de licenças',
   includeHint: 'Leva o e-mail, a situação e a data de cada licença, como o painel mostra. Sem a lista, o arquivo tem só as contagens.',
   includeNote: 'Com a lista, o arquivo tem e-mails de pessoas. Compartilhe só com quem precisa.',

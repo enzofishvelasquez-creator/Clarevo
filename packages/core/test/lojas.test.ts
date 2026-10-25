@@ -39,6 +39,8 @@ const ESPERADOS = [
   'apple-nome',
   'apple-nome-alternativo',
   'apple-subtitulo',
+  'mensagem-central',
+  'frase-de-apoio',
   'apple-promocional',
   'apple-palavras-chave',
   'apple-descricao',
@@ -107,6 +109,26 @@ describe('ficha das lojas (docs/lojas/ficha.md)', () => {
     expect(t).toContain('nunca o número inteiro');
   });
 
+  it('o posicionamento é o de bem-estar financeiro (D-068): subtítulo, nome alternativo, descrição curta, mensagem central e frase de apoio, e a marca no feminino', () => {
+    const campo = (n: string) => todos.find((c) => c.nome === n)!.texto;
+    expect(campo('apple-subtitulo')).toBe('Bem-estar financeiro');
+    expect(campo('apple-nome-alternativo')).toBe('Clarevo: bem-estar financeiro');
+    expect(campo('google-descricao-curta')).toMatch(/^Bem-estar financeiro: /);
+    expect(campo('mensagem-central')).toBe('Cuidar da vida financeira faz parte de cuidar de você.');
+    expect(campo('frase-de-apoio')).toBe('Mais clareza para decidir');
+    for (const nome of ['apple-descricao', 'google-descricao-completa']) {
+      const d = campo(nome);
+      expect(d, nome).toContain('A Clarevo é uma solução de bem-estar financeiro para pessoas e famílias, apoiada por um app');
+      expect(d, nome).toContain('Cuidar da vida financeira faz parte de cuidar de você');
+      expect(d, nome).toContain('Mais clareza para decidir.');
+      expect(d, nome).toContain('O QUE VOCÊ FAZ NA CLAREVO');
+      // Sem promessa de saúde: a descrição diz que não é atendimento de saúde e não promete resultado financeiro nem de saúde.
+      expect(d, nome).toContain('Não é atendimento de saúde, não substitui acompanhamento de profissionais e não promete resultado financeiro nem de saúde.');
+      expect(d, nome).not.toMatch(/ansiedade|depress|terapia|tranquilidade|produtividade|sono\b|cura\b|trata(r|mento)\b/i);
+    }
+    for (const c of todos) expect(c.texto, c.nome).not.toMatch(/\b(?:o|O|do|no|ao|pelo|um)\s+Clarevo\b|NO CLAREVO/);
+  });
+
   it('as descrições da Apple e do Google contam a mesma história (mesmo corpo, de "O QUE VOCÊ FAZ" até o fim)', () => {
     const corpo = (n: string) => todos.find((c) => c.nome === n)!.texto;
     expect(corpo('google-descricao-completa')).toBe(corpo('apple-descricao'));
@@ -132,10 +154,10 @@ describe('configuração de publicação', () => {
 
   it('app.json: textos de permissão do iOS em português, sem microfone nem fotos (o app não usa)', () => {
     const plugins = Object.fromEntries((app.plugins as unknown[]).filter(Array.isArray).map((p) => [(p as unknown[])[0], (p as unknown[])[1]]));
-    expect(plugins['expo-camera'].cameraPermission).toMatch(/^O Clarevo usa a câmera só para ler o código da nota fiscal/);
+    expect(plugins['expo-camera'].cameraPermission).toMatch(/^A Clarevo usa a câmera só para ler o código da nota fiscal/);
     expect(plugins['expo-camera'].microphonePermission).toBe(false);
     expect(plugins['expo-camera'].recordAudioAndroid).toBe(false);
-    expect(plugins['expo-local-authentication'].faceIDPermission).toMatch(/^O Clarevo usa o Face ID só para desbloquear o app/);
+    expect(plugins['expo-local-authentication'].faceIDPermission).toMatch(/^A Clarevo usa o Face ID só para desbloquear o app/);
     expect(JSON.stringify(app)).not.toMatch(/NSPhotoLibrary|NSMicrophone|READ_MEDIA|ACCESS_FINE_LOCATION|RECORD_AUDIO/);
   });
 

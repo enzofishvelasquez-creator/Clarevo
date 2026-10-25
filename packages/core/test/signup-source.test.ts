@@ -223,7 +223,7 @@ describe('o repositório em memória (as regras de set_signup_source)', () => {
 
 describe('textos', () => {
   it('as frases pedidas, exatamente', () => {
-    expect(SIGNUP_SOURCE_TEXT.title).toBe('Como você conheceu o Clarevo?');
+    expect(SIGNUP_SOURCE_TEXT.title).toBe('Como você conheceu a Clarevo?');
     expect(SIGNUP_SOURCE_TEXT.note).toBe('Opcional. Usamos só para contar, sem identificar ninguém, de onde as pessoas chegam.');
     expect(SIGNUP_SOURCE_TEXT.notNow).toBe('Agora não');
     expect(SIGNUP_SOURCE_TEXT.accountCurrent('instagram')).toBe('Sua resposta: Instagram.');

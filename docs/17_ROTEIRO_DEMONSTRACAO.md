@@ -60,7 +60,7 @@ Não use `clarevo.pages.dev` na apresentação: é a versão com login real (`do
 | 8:50 | 10. Quem vê estes dados? | 0:30 |
 | 9:20 | Fechamento e perguntas | 0:40 |
 
-**Abertura (0:30).** Aba A, na tela "Seu dinheiro, mais claro".
+**Abertura (0:30).** Aba A, na tela "Mais clareza para decidir".
 - Diga: "O Clarevo ajuda a entender o próprio mês: o que entrou, o que foi pago, o que vence e o que é só previsão. Tudo o que vocês vão ver é fictício, e a tela diz isso."
 - Aponte a frase da tela: "Seus registros pessoais são só seus. Se uma empresa oferecer o plano, ela não vê suas finanças."
 - Toque em "Ver demonstração com dados fictícios" e, se aparecer o tour, em "Pular".

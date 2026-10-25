@@ -483,7 +483,7 @@ export const ANALYSES_TEXT = {
     bubblesLabel: 'Pago por categoria, em bolhas',
     /** "Nenhum gasto anotado em outubro de 2026." */
     empty: (month: IsoMonth): string => `Nenhum gasto anotado em ${formatMonthYearBR(month)}.`,
-    emptyBody: 'Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.',
+    emptyBody: 'Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado na Clarevo.',
     emptyAction: 'Anotar gasto',
     invoiceNote: CARDS_TEXT.screens.categoryInvoiceNote,
     selected: {

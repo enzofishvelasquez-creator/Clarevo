@@ -16,7 +16,7 @@ export const DUVIDAS_TOPICS: Topic[] = [
     question: null,
     short: 'No Pessoal, só você, entre as pessoas do app. As permissões são conferidas no servidor a cada leitura, não só escondidas na tela.',
     paragraphs: [
-      'Cada registro pertence a um espaço, Pessoal ou Família. Entre as pessoas do app, só você vê, anota, edita e exclui o que está no Pessoal. A equipe do Clarevo não olha os seus dados no dia a dia e só acessa quando a lei exigir ou para resolver um problema que você pediu.',
+      'Cada registro pertence a um espaço, Pessoal ou Família. Entre as pessoas do app, só você vê, anota, edita e exclui o que está no Pessoal. A equipe da Clarevo não olha os seus dados no dia a dia e só acessa quando a lei exigir ou para resolver um problema que você pediu.',
       'Quando houver convites para a Família, cada pessoa terá permissões próprias, e entrar numa família não mostra seu histórico pessoal.',
     ],
     example: null,
@@ -81,7 +81,7 @@ export const DUVIDAS_TOPICS: Topic[] = [
     title: 'Como marcar uma conta como paga?',
     subtitle: null,
     question: null,
-    short: 'Abra a conta em Contas a pagar e toque em Marcar como paga. Informe o valor e a data em que pagou: o Clarevo cria um único gasto em Pago.',
+    short: 'Abra a conta em Contas a pagar e toque em Marcar como paga. Informe o valor e a data em que pagou: a Clarevo cria um único gasto em Pago.',
     paragraphs: [
       'O valor pago pode ser diferente do previsto, por multa ou desconto. A conta fica quitada e o gasto entra em Pago no mês da data do pagamento.',
       'Errou? Abra a conta e toque em Desfazer pagamento: o gasto sai de Pago e a conta volta para Ainda a pagar.',
@@ -131,7 +131,7 @@ export const DUVIDAS_TOPICS: Topic[] = [
     subtitle: null,
     question: null,
     short:
-      'O Clarevo não cria contas antigas sozinho. Depois de um tempo sem anotar, o Resumo mostra a faixa Seus últimos meses, e você decide se atualiza ou segue adiante.',
+      'A Clarevo não cria contas antigas sozinha. Depois de um tempo sem anotar, o Resumo mostra a faixa Seus últimos meses, e você decide se atualiza ou segue adiante.',
     paragraphs: [
       'Gastos fixos e parcelamentos criam as contas do mês anterior ao seguinte, e contas do ano entram dois meses antes do primeiro vencimento. Meses mais antigos aparecem no detalhe como sem conta registrada.',
       'Na revisão dos últimos meses, você marca o que já pagou e o que não houve, e anota recebimentos e gastos de cada mês, se quiser. Seguir adiante não cria nem apaga nada.',
@@ -180,16 +180,18 @@ export const DUVIDAS_TOPICS: Topic[] = [
     pending: ['Definir o canal de pedidos de titular (P-023) e trocar {canal de P-023} no resumo.'],
   },
   {
-    slug: 'o-que-o-clarevo-nao-faz',
+    slug: 'o-que-a-clarevo-nao-faz',
+    // Slug antigo ("o Clarevo", antes de D-068) segue abrindo o tema.
+    aliases: ['o-que-o-clarevo-nao-faz'],
     section: 'duvidas',
     kind: 'pergunta',
     status: 'publicado',
-    title: 'O Clarevo se conecta ao meu banco ou indica investimentos?',
+    title: 'A Clarevo se conecta ao meu banco ou indica investimentos?',
     subtitle: null,
     question: null,
-    short: 'Não. O Clarevo funciona com o que você anota: não pede senha de banco, não movimenta dinheiro, não oferece crédito e não indica investimentos.',
+    short: 'Não. A Clarevo funciona com o que você anota: não pede senha de banco, não movimenta dinheiro, não oferece crédito e não indica investimentos.',
     paragraphs: [
-      'Se alguém pedir a senha do seu banco em nome do Clarevo, não informe.',
+      'Se alguém pedir a senha do seu banco em nome da Clarevo, não informe.',
       'Os conteúdos de Aprender são educativos e gerais, com exemplos fictícios. Para orientação individual, procure profissionais autorizados.',
       'As calculadoras fazem contas com os valores e as taxas que você digita e não indicam produto.',
     ],

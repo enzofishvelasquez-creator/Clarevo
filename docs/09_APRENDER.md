@@ -9,7 +9,7 @@
 - **Quem confere:** `npm test` roda a validação do catálogo (`learn-catalog.test.ts`): tamanhos, fontes, domínios, datas de consulta, decisões citadas (lidas deste repositório, em `docs/00`), prazos de revisão, números conferidos e hipóteses. `copy.test.ts` confere os termos proibidos, `learn-search.test.ts` a busca e `learn-links.test.ts` os links das telas. As regras estão em `docs/02_REGRAS_FINANCEIRAS.md`, seção "Aprender e dúvidas".
 - **Números:** todo "R$" e todo "%" de um tema publicado sai das contas de `learn/math.ts` (os resultados esperados ficam em `learn/examples.ts`) ou de um fato de norma declarado no tema, com a fonte (por exemplo, "8% ao mês" no cheque especial).
 - **Conteúdo de época (D-053):** o calendário fixo fica em `packages/core/src/learn/epoca.ts` (`SEASONAL_CALENDAR`: para cada mês do ano, de 0 a 3 temas do catálogo) e o card **"Neste mês"** de Aprender mostra os temas do mês de hoje, com a legenda "Temas para outubro", entre "Calculadoras" e "Comece por aqui", e a linha da calculadora ligada a eles (por exemplo, "Cota única ou parcelado?"). Mês sem tema (agosto e setembro) não tem card. O card só lê a data de hoje da sessão: não grava o que a pessoa abre, não envia nada e não há notificação. Os quatro temas novos (`decimo-terceiro`, `ferias`, `volta-as-aulas` e `imposto-de-renda`) são da seção "Organizar o mês" e seguem as mesmas regras de fonte, data de consulta e revisão; o que depende do ano (prazo do Imposto de Renda, IPVA e IPTU de cada estado e município, datas do 13º) é dito com "confira a data oficial do ano" e o link da fonte. O app só explica: não calcula INSS, Imposto de Renda nem a declaração. `learn-epoca.test.ts` confere o calendário (os 12 meses, todo tema citado publicado e com fonte e data de revisão), as contas dos exemplos e o texto de cada tema.
-- **Guia de uso (D-049):** o card "Como usar o Clarevo", no topo da aba antes das calculadoras, abre `/aprender/guia`: as funções do app por grupos, cada uma com "Para que serve", "Onde fica" e "Como usar". O catálogo fica em `packages/core/src/guide/catalog.ts`, **separado dos temas**: não tem fonte nem data de revisão, porque descreve telas do próprio app, e quem o confere é `guide.test.ts` (rotas, passos, nomes nas telas, cobertura) e `copy.test.ts`. Ao criar ou renomear uma tela, atualize a entrada junto. Na busca, o grupo "Como usar" (até 5 entradas, depois de "No app") olha só o título e as palavras de busca da entrada. O app não registra qual entrada a pessoa abre nem o que busca. O manual para compartilhar (`scripts/gerar-manual.js`, `docs/manual`) sai do mesmo catálogo. A entrada "Seu mês em 30 segundos" (D-052) é a 29ª e fica em "Dia a dia", logo depois de "Resumo do mês".
+- **Guia de uso (D-049):** o card "Como usar o app da Clarevo", no topo da aba antes das calculadoras, abre `/aprender/guia`: as funções do app por grupos, cada uma com "Para que serve", "Onde fica" e "Como usar". O catálogo fica em `packages/core/src/guide/catalog.ts`, **separado dos temas**: não tem fonte nem data de revisão, porque descreve telas do próprio app, e quem o confere é `guide.test.ts` (rotas, passos, nomes nas telas, cobertura) e `copy.test.ts`. Ao criar ou renomear uma tela, atualize a entrada junto. Na busca, o grupo "Como usar" (até 5 entradas, depois de "No app") olha só o título e as palavras de busca da entrada. O app não registra qual entrada a pessoa abre nem o que busca. O manual para compartilhar (`scripts/gerar-manual.js`, `docs/manual`) sai do mesmo catálogo. A entrada "Seu mês em 30 segundos" (D-052) é a 29ª e fica em "Dia a dia", logo depois de "Resumo do mês".
 - **Busca e o grupo "No app":** o campo da aba diz "Buscar um tema ou uma função" (exemplo "juros, boleto, IPVA"; `LEARN_UI_TEXT.searchLabel`). Com a busca ativa, os resultados começam pelo grupo "No app" (título de nível 2, até 5 telas) e seguem com os temas. O grupo vem de um índice fixo de 29 telas do app (a contagem de 23 não incluía "Orçamento por categoria", D-041) (a 21ª é "Em que ordem quitar as dívidas?", D-040, achada por "dívida", "quitar", "bola de neve" e "avalanche"; a 22ª é "Antes de financiar", D-044, achada por "financiar", "financiamento", "poder de compra", "entrada" e "à vista"; a 23ª é "Suas contas", D-043, achada por "contas", "origem do dinheiro", "saiu de", "carteira", "conta principal", "adicionar conta" e "arquivar conta", e abre Conta na seção das contas; a 25ª é "Buscar em Movimentações", D-045, achada por "buscar", "procurar", "pesquisar", "achar", "quanto paguei", "quanto gastei" e "luz", e abre a busca em todos os meses; a 26ª é "Revisar assinaturas", D-046, achada por "assinatura", "assinaturas", "streaming", "academia", "plano de celular", "clube", "aplicativo" e "mensalidade", e abre `/gastos-fixos/assinaturas`; a 27ª é "Exportar meus dados", D-047, achada por "exportar", "exportação", "planilha", "excel", "csv", "pdf", "backup", "baixar" e "relatório", e abre `/conta/exportar`; a 28ª é "Importar extrato ou fatura", D-048, achada por "importar", "importação", "extrato", "ofx", "banco", "planilha", "csv" e, pelo título, "fatura" (onde "Cartões" continua em primeiro), e abre `/importar`; a 29ª é "Seu mês em 30 segundos", D-052, achada por "seu mês", "mês em 30 segundos", "30 segundos", "revisão do mês", "balanço do mês", "o que entrou", "o que saiu", "resumo rápido" e "visão do mês" (nenhuma delas é "cartão", para "cartão" seguir levando só a Cartões e faturas), e abre `/seu-mes`) em `packages/core/src/navigation.ts` (`APP_SCREENS`), cada uma com título, legenda e palavras de busca, achado pelas mesmas regras dos temas (sem acento nem maiúsculas, palavras vazias fora, todas as palavras precisam casar). Não é conteúdo educativo: não está no catálogo, não tem fonte nem data de revisão, não recomenda produto e só leva a uma função ("Contas a pagar", "Escanear nota fiscal", "Metas e reserva"). A conta é feita no aparelho sobre texto fixo: o app não registra buscas nem leituras (D-032(6); decisão D-039(10)). "Lembretes de vencimento" e "Ocultar valores" abrem Conta, e não a seção. Quem criar uma tela com nome novo acrescenta a entrada ao índice; `navigation.test.ts` confere os títulos, as legendas, os endereços e a busca, e `copy.test.ts` os textos.
 
 ## 2. Catálogo
@@ -18,14 +18,14 @@
 
 | # | Slug | Título | Seção | Tipo | Situação | Revisar até | Leitura | Calculadora | Apelidos |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | `diferenca` | Diferença do mês | Usar o Clarevo | tema | publicado | - | 1 min (70 palavras) | - | - |
-| 2 | `realizado-previsto` | Realizado e previsto | Usar o Clarevo | tema | publicado | - | 1 min (143 palavras) | - | - |
-| 3 | `saldo` | Diferença do mês e saldo da conta | Usar o Clarevo | tema | publicado | - | 1 min (67 palavras) | - | - |
-| 4 | `fatura` | Fatura sem contar duas vezes | Usar o Clarevo | tema | publicado | - | 1 min (79 palavras) | - | - |
-| 5 | `gasto-fixo` | Gasto fixo, conta a pagar e gasto anotado | Usar o Clarevo | tema | publicado | - | 1 min (65 palavras) | - | - |
-| 6 | `estimativa` | Contas que mudam de valor | Usar o Clarevo | tema | publicado | - | 1 min (85 palavras) | - | - |
-| 7 | `parcelamentos` | Parcelamentos no Clarevo | Usar o Clarevo | tema | publicado | - | 1 min (123 palavras) | - | - |
-| 8 | `sem-registro` | Mês sem registro | Usar o Clarevo | tema | publicado | - | 1 min (99 palavras) | - | - |
+| 1 | `diferenca` | Diferença do mês | Usar o app da Clarevo | tema | publicado | - | 1 min (70 palavras) | - | - |
+| 2 | `realizado-previsto` | Realizado e previsto | Usar o app da Clarevo | tema | publicado | - | 1 min (143 palavras) | - | - |
+| 3 | `saldo` | Diferença do mês e saldo da conta | Usar o app da Clarevo | tema | publicado | - | 1 min (67 palavras) | - | - |
+| 4 | `fatura` | Fatura sem contar duas vezes | Usar o app da Clarevo | tema | publicado | - | 1 min (79 palavras) | - | - |
+| 5 | `gasto-fixo` | Gasto fixo, conta a pagar e gasto anotado | Usar o app da Clarevo | tema | publicado | - | 1 min (65 palavras) | - | - |
+| 6 | `estimativa` | Contas que mudam de valor | Usar o app da Clarevo | tema | publicado | - | 1 min (85 palavras) | - | - |
+| 7 | `parcelamentos` | Parcelamentos na Clarevo | Usar o app da Clarevo | tema | publicado | - | 1 min (123 palavras) | - | - |
+| 8 | `sem-registro` | Mês sem registro | Usar o app da Clarevo | tema | publicado | - | 1 min (99 palavras) | - | - |
 | 9 | `gasto-fixo-variavel` | Gasto fixo e gasto variável | Organizar o mês | tema | publicado | 09/10/2027 | 1 min (193 palavras) | - | - |
 | 10 | `contas-do-ano` | Contas que chegam uma vez por ano | Organizar o mês | tema | publicado | 09/10/2027 | 2 min (205 palavras) | `parcelado-ou-a-vista?modo=cota-unica` | - |
 | 11 | `orcamento-50-30-20` | Orçamento e a referência 50-30-20 | Organizar o mês | tema | rascunho | 09/10/2027 | 1 min (140 palavras) | - | - |
@@ -64,7 +64,7 @@
 | 44 | `contei-duas-vezes` | Anotei duas vezes. Como corrigir? | Dúvidas frequentes | pergunta | publicado | - | 1 min (64 palavras) | - | - |
 | 45 | `voltei-depois` | Fiquei um tempo sem abrir o app. O que acontece? | Dúvidas frequentes | pergunta | publicado | - | 1 min (87 palavras) | - | - |
 | 46 | `apagar-dados` | Como apagar meus dados? | Dúvidas frequentes | pergunta | rascunho | 09/10/2027 | 1 min (45 palavras) | - | - |
-| 47 | `o-que-o-clarevo-nao-faz` | O Clarevo se conecta ao meu banco ou indica investimentos? | Dúvidas frequentes | pergunta | publicado | - | 1 min (58 palavras) | - | - |
+| 47 | `o-que-a-clarevo-nao-faz` | A Clarevo se conecta ao meu banco ou indica investimentos? | Dúvidas frequentes | pergunta | publicado | - | 1 min (58 palavras) | - | - |
 
 Os slugs antigos abrem o tema novo pelos apelidos. `media-e-mediana` (17) entrou em 20/10/2026 com o Ciclo W (D-062), logo depois de `essenciais`: explica a média e a mediana da tela Evolução, com o caso de referência dela (seis meses de Pago, com o mês de abril fora do comum), e liga as duas telas nos dois sentidos (a ação "Ver na Evolução" no tema e o "O que é mediana?" na Evolução); não liga calculadora. Os quatro temas de época (18 a 21) entraram em 15/10/2026 com o Ciclo K2 (D-053); só `ferias` liga uma calculadora ("Juntar para um objetivo"), e o card "Neste mês" também mostra a de `contas-do-ano` ("Cota única ou parcelado?"). `imposto-de-renda` é o único de época com revisão a cada 6 meses, porque o prazo de cada ano só sai pouco antes de março. Os cinco últimos temas entraram em 09/10/2026 com os ciclos que eles explicam: `renda-comprometida` e `renda-variavel` (Ciclo B, D-026), `aporte` e `essenciais` (Ciclo C, D-027) e `simulacao` (Ciclo D, D-028). Nenhum deles liga uma calculadora em "Fazer a conta com os seus números"; as ações "No Clarevo" levam às telas do ciclo (renda comprometida, renda de referência, Metas, reserva e simulador).
 
@@ -72,21 +72,21 @@ Temas que citam só decisões do Clarevo (sem revisão periódica; números só 
 
 | Slug | Título | Seção | Decisões citadas |
 |---|---|---|---|
-| `diferenca` | Diferença do mês | Usar o Clarevo | D-005, D-011 |
-| `realizado-previsto` | Realizado e previsto | Usar o Clarevo | D-020, D-021 |
-| `saldo` | Diferença do mês e saldo da conta | Usar o Clarevo | D-011 |
-| `fatura` | Fatura sem contar duas vezes | Usar o Clarevo | D-020, D-037 |
-| `gasto-fixo` | Gasto fixo, conta a pagar e gasto anotado | Usar o Clarevo | D-024 |
-| `estimativa` | Contas que mudam de valor | Usar o Clarevo | D-024 |
-| `parcelamentos` | Parcelamentos no Clarevo | Usar o Clarevo | D-024 |
-| `sem-registro` | Mês sem registro | Usar o Clarevo | D-030 |
+| `diferenca` | Diferença do mês | Usar o app da Clarevo | D-005, D-011 |
+| `realizado-previsto` | Realizado e previsto | Usar o app da Clarevo | D-020, D-021 |
+| `saldo` | Diferença do mês e saldo da conta | Usar o app da Clarevo | D-011 |
+| `fatura` | Fatura sem contar duas vezes | Usar o app da Clarevo | D-020, D-037 |
+| `gasto-fixo` | Gasto fixo, conta a pagar e gasto anotado | Usar o app da Clarevo | D-024 |
+| `estimativa` | Contas que mudam de valor | Usar o app da Clarevo | D-024 |
+| `parcelamentos` | Parcelamentos na Clarevo | Usar o app da Clarevo | D-024 |
+| `sem-registro` | Mês sem registro | Usar o app da Clarevo | D-030 |
 | `quem-ve-meus-dados` | Quem vê meus dados? | Dúvidas frequentes | D-006, D-012 |
 | `empresa-ve` | A empresa que oferece o benefício vê meus gastos? | Dúvidas frequentes | D-006 |
 | `demonstracao` | O que é a demonstração? | Dúvidas frequentes | D-013, D-016 |
 | `marcar-como-paga` | Como marcar uma conta como paga? | Dúvidas frequentes | D-021 |
 | `contei-duas-vezes` | Anotei duas vezes. Como corrigir? | Dúvidas frequentes | D-021, D-024 |
 | `voltei-depois` | Fiquei um tempo sem abrir o app. O que acontece? | Dúvidas frequentes | D-024, D-029, D-030 |
-| `o-que-o-clarevo-nao-faz` | O Clarevo se conecta ao meu banco ou indica investimentos? | Dúvidas frequentes | D-008, D-023, D-034 |
+| `o-que-a-clarevo-nao-faz` | A Clarevo se conecta ao meu banco ou indica investimentos? | Dúvidas frequentes | D-008, D-023, D-034 |
 
 ## 3. Método de conferência das fontes
 
@@ -646,7 +646,7 @@ Depois do prazo, `npm test` reprova o tema, com o slug na mensagem, de propósit
 Em relação ao conteúdo checado da especificação de 08/10/2026 (Anexo A e textos de 3.4):
 
 - `voltei-depois`, resumo: "Se você passou mais de 45 dias sem anotar" virou "Depois de um tempo sem anotar" (os textos nunca contam dias sem anotar).
-- `o-que-o-clarevo-nao-faz`: parágrafo novo sobre as calculadoras ("fazem contas com os valores e as taxas que você digita e não indicam produto", D-034).
+- `o-que-a-clarevo-nao-faz`: parágrafo novo sobre as calculadoras ("fazem contas com os valores e as taxas que você digita e não indicam produto", D-034).
 - `reserva-imprevistos`: "Como meta inicial, o mesmo portal sugere 1, 3 ou 6 meses" virou "Como exemplo de meta para começar, o mesmo portal cita 1, 3 ou 6 meses de despesas" (a CVM escreve "por exemplo").
 - `taxa-e-tarifa`: "Na conta corrente, pessoas físicas têm direito..." e "Quando uma conta atrasa, entram encargos..."; sem marca de conferência pendente.
 - `cheque-especial`: "juros pelos dias de uso" virou "juros sobre o valor usado pelo tempo em que a conta fica negativa, conforme o contrato" (subtítulo e resumo também).

@@ -58,7 +58,7 @@ export default function QuemVeScreen() {
         </>
       ) : null}
       <Txt color={colors.textSecondary}>
-        Se uma empresa oferecer o Clarevo como benefício, ela administra seu acesso ao plano. Seus registros financeiros têm permissões
+        Se uma empresa oferecer a Clarevo como benefício, ela administra seu acesso ao plano. Seus registros financeiros têm permissões
         próprias e não ficam visíveis para a empresa.
       </Txt>
       {/* O que a empresa vê (D-056): e-mails que convidou, situação e datas das licenças; nunca finanças nem o uso do app. */}

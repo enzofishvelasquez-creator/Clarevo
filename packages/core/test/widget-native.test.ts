@@ -260,7 +260,7 @@ describe('widget do iOS: a função que a extensão executa', () => {
     expect(modifierArgs(small, 'accessibilityLabel')).toEqual([[snapshot.small.a11y]]);
   });
 
-  it('o dia seguinte: a entrada da virada mostra "Abra o Clarevo para atualizar", sem valor nem conta, e "Anotar gasto" continua abrindo a tela de anotar', async () => {
+  it('o dia seguinte: a entrada da virada mostra "Abra o app da Clarevo para atualizar", sem valor nem conta, e "Anotar gasto" continua abrindo a tela de anotar', async () => {
     const plan = writePlan(planWidgetSync(input({ toPay: await demoToPay(), showValues: true })));
     const medium = renderLayout(widget.layout, plan.afterMidnight, 'systemMedium');
     expect(texts(medium)).toEqual([WIDGET_TEXT.medium.noData]);
@@ -272,7 +272,7 @@ describe('widget do iOS: a função que a extensão executa', () => {
     expect(widgetContentToday(plan.json, addDays(DEMO_TODAY, 1)).medium).toEqual(plan.afterMidnight.medium);
   });
 
-  it('sem sessão: "Entre no Clarevo para ver" e os dois tamanhos abrem Entrar', () => {
+  it('sem sessão: "Entre na Clarevo para ver" e os dois tamanhos abrem Entrar', () => {
     const { snapshot } = writePlan(planWidgetSync(input({ signedIn: false })));
     const medium = renderLayout(widget.layout, snapshot, 'systemMedium');
     expect(texts(medium)).toEqual([WIDGET_TEXT.medium.signedOut]);
@@ -378,7 +378,7 @@ describe('widgets do Android', () => {
     expect(JSON.stringify(medium)).not.toContain('Internet');
   });
 
-  it('a tarefa em segundo plano lê o que está gravado e, em outro dia, mostra "Abra o Clarevo para atualizar"', async () => {
+  it('a tarefa em segundo plano lê o que está gravado e, em outro dia, mostra "Abra o app da Clarevo para atualizar"', async () => {
     const { mocks, store } = androidMocks();
     const mod = loadApp(file, { platform: 'android', mocks });
     const render = async (action: string, widgetName: string) => {

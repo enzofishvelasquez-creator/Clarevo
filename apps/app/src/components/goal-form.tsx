@@ -420,7 +420,7 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
         </Card>
 
         <Txt variant="label" color={colors.textSecondary}>
-          Uma meta mostra só o que você registrar como guardado. O Clarevo não guarda nem movimenta dinheiro.
+          Uma meta mostra só o que você registrar como guardado. A Clarevo não guarda nem movimenta dinheiro.
         </Txt>
       </Screen>
 

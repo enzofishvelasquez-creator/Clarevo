@@ -1019,7 +1019,7 @@ export function SeriesForm({
                     inputMode="numeric"
                     maxLength={3}
                     error={errors.firstNumberText}
-                    hint="Se você já pagou parcelas antes de usar o Clarevo, informe o número da próxima. As anteriores não viram gastos."
+                    hint="Se você já pagou parcelas antes de usar o app da Clarevo, informe o número da próxima. As anteriores não viram gastos."
                   />
                   <TermHint term="Parcelas pagas antes" slug="parcelamentos" />
                   <ChoiceGroup label="Mês da próxima parcela">{monthChips}</ChoiceGroup>

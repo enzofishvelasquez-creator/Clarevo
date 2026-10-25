@@ -277,7 +277,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const headingList = () => p.evaluate(() => [...document.querySelectorAll('[role=heading]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => `${e.getAttribute('aria-level')}:${e.textContent}`));
 
   // 1. Cadastro de uma conta nova (acesso simulado)
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
   await shot('01_boas_vindas');
   await btn('Criar conta').click(); await waitText('Nome de apresentação');
   // D-064 (privacidade e termos no app): o texto de aceite fica acima do botão "Criar conta", sem caixa de seleção. O build de demonstração
@@ -335,7 +335,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await waitText('Primeiros passos');
   t = await body();
   ok('primeiros passos: conta nova vê os quatro passos (o quarto é "Planejar quanto guardar"), nenhum concluído, e "Agora não"', await ppIs([PP.fixos, PP.recebido, PP.pago, PP.guardar])() &&
-    t.includes('Quatro passos para o Clarevo mostrar o seu mês de verdade.') && t.includes('R$ 0,00'), JSON.stringify(await ppRows()));
+    t.includes('Quatro passos para a Clarevo mostrar o seu mês de verdade.') && t.includes('R$ 0,00'), JSON.stringify(await ppRows()));
   const ppOrder = await p.evaluate(() => {
     const top = (e) => (e ? e.getBoundingClientRect().top : null);
     const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Primeiros passos' && e.getBoundingClientRect().width > 0);
@@ -398,11 +398,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // os Primeiros passos fechados (a vez em que, numa conta real, ela entraria), nem em Conta, e nada dela é gravado no aparelho.
   const origemAusente = async () => {
     const txt = await body();
-    return !txt.includes('Como você conheceu o Clarevo?') && !txt.includes('Usamos só para contar') && !txt.includes('Resposta guardada. Você pode mudar em Conta.') &&
-      !(await headingShown('Como você conheceu o Clarevo?')) && (await visibleCount('radio', /Instagram|Indicação de alguém|Empresa onde trabalho|Busca na internet|Prefiro não dizer/)) === 0 &&
+    return !txt.includes('Como você conheceu a Clarevo?') && !txt.includes('Usamos só para contar') && !txt.includes('Resposta guardada. Você pode mudar em Conta.') &&
+      !(await headingShown('Como você conheceu a Clarevo?')) && (await visibleCount('radio', /Instagram|Indicação de alguém|Empresa onde trabalho|Busca na internet|Prefiro não dizer/)) === 0 &&
       (await visibleCount('radiogroup', /Como você conheceu/)) === 0;
   };
-  ok('demonstração (D-067): o Resumo, com os Primeiros passos fechados, não pergunta "Como você conheceu o Clarevo?" nem mostra as seis opções', await origemAusente());
+  ok('demonstração (D-067): o Resumo, com os Primeiros passos fechados, não pergunta "Como você conheceu a Clarevo?" nem mostra as seis opções', await origemAusente());
 
   // Sair limpa a sessão
   await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
@@ -410,15 +410,15 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await shot('05b_conta_seguranca', true);
   // Ciclo A2 (D-025): na web não há lembretes nem biometria (só no app para celular); "Ocultar valores ao abrir" existe
   // também na web e é só deste aparelho. Os dois interruptores de Conta na web são esse e "Mostrar valores no widget" (D-052, desligado).
-  ok('demonstração (D-067): Conta não tem o card "Como você conheceu o Clarevo?", nem as opções', await origemAusente());
+  ok('demonstração (D-067): Conta não tem o card "Como você conheceu a Clarevo?", nem as opções', await origemAusente());
   t = await body();
   const contaSwitches = await p.getByRole('switch').filter({ visible: true }).evaluateAll((els) => els.map((e) => [e.getAttribute('aria-label'), e.getAttribute('aria-checked')]));
   ok('Conta na web: "Lembretes estão disponíveis no app para celular.", sem interruptor de lembretes nem de biometria', t.includes('Lembretes') && t.includes('Lembretes estão disponíveis no app para celular.') &&
     !t.includes('Pedir biometria ao abrir') && !t.includes('Avisar') && JSON.stringify(contaSwitches) === JSON.stringify([['Ocultar valores ao abrir', 'false'], ['Mostrar valores no widget', 'false']]), JSON.stringify(contaSwitches));
   ok('Conta: "Privacidade neste aparelho" com "Ocultar valores ao abrir" desligado por padrão e a legenda', t.includes('Privacidade neste aparelho') && t.includes('Ao abrir o app, os valores aparecem como R$ ••••. Vale só para este aparelho.'));
   await keepText();
-  await btn('Sair deste aparelho').click(); await waitText('Seu dinheiro');
-  ok('sair volta para boas-vindas', (await body()).includes('Seu dinheiro'));
+  await btn('Sair deste aparelho').click(); await waitText('Mais clareza');
+  ok('sair volta para boas-vindas', (await body()).includes('Mais clareza'));
 
   // Entrar com senha errada e certa
   await btn('Entrar').click(); await waitText('Esqueci minha senha');
@@ -441,7 +441,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await waitText('Ainda a pagar neste mês'); await p.waitForTimeout(800);
   ok('"Agora não": depois de sair e entrar de novo, o card continua fora', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Anotar gasto')) === 1);
   await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
-  await btn('Sair deste aparelho').click(); await waitText('Seu dinheiro');
+  await btn('Sair deste aparelho').click(); await waitText('Mais clareza');
 
   // Primeiros passos numa segunda conta nova: anotar um gasto marca o passo 3; com os três prontos, o card sai de vez.
   await btn('Criar conta').click(); await waitText('Nome de apresentação');
@@ -552,20 +552,20 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await waitUntil(async () => !(await headingShown('Primeiros passos')), 8000);
   ok('primeiros passos: com os quatro passos prontos ("Agora não" conta como resposta), o card sai', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Anotar gasto')) === 1);
   await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
-  await btn('Sair deste aparelho').click(); await waitText('Seu dinheiro');
+  await btn('Sair deste aparelho').click(); await waitText('Mais clareza');
   await btn('Entrar').click(); await waitText('Esqueci minha senha');
   await field('E-mail').fill('bia@exemplo.com'); await field('Senha').fill('senha1234'); await btn('Entrar').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês'); await p.waitForTimeout(800);
   ok('primeiros passos concluídos: o card não volta depois de entrar de novo', !(await headingShown('Primeiros passos')));
   await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
-  await btn('Sair deste aparelho').click(); await waitText('Seu dinheiro');
+  await btn('Sair deste aparelho').click(); await waitText('Mais clareza');
   // Na demonstração, as contas criadas existem só na memória da página: recarregar volta às boas-vindas e nada de
   // "Primeiros passos" fica gravado no aparelho (uma conta nova nunca herda o "Agora não" de outra com o mesmo identificador).
-  await p.reload(); await waitText('Seu dinheiro');
+  await p.reload(); await waitText('Mais clareza');
   const ppStored = await p.evaluate(() => { try { return Object.keys(localStorage).filter((k) => k.startsWith('clarevo.primeiros-passos')); } catch { return ['erro']; } });
   ok('demonstração: recarregar volta às boas-vindas, sem "Primeiros passos" gravado no aparelho', ppStored.length === 0 && (await visibleCount('button', 'Ver demonstração com dados fictícios')) === 1, ppStored.join(' | '));
   const origemStored = await p.evaluate(() => { try { return Object.keys(localStorage).filter((k) => k.startsWith('clarevo.como-conheceu')); } catch { return ['erro']; } });
-  ok('demonstração (D-067): nada de "Como você conheceu o Clarevo?" gravado no aparelho (nem o dia de uso, nem o "Agora não")', origemStored.length === 0, origemStored.join(' | '));
+  ok('demonstração (D-067): nada de "Como você conheceu a Clarevo?" gravado no aparelho (nem o dia de uso, nem o "Agora não")', origemStored.length === 0, origemStored.join(' | '));
 
   // 2. Conta de demonstração e sequência de aceite
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('R$ 2.100,00');
@@ -577,8 +577,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('base: sem valores estimados em outubro (a Luz estimada vence em novembro)', !t.includes('em valores estimados'));
   await logoChecks('Resumo: logotipo "clarevo." no cabeçalho azul, sem o símbolo C');
   await shot('06_resumo_demo');
-  ok('primeiros passos: fora da conta de demonstração com dados', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Agora não')) === 0 && !t.includes('Quatro passos para o Clarevo'));
-  ok('demonstração com dados (D-067): o Resumo não pergunta "Como você conheceu o Clarevo?"', await origemAusente());
+  ok('primeiros passos: fora da conta de demonstração com dados', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Agora não')) === 0 && !t.includes('Quatro passos para a Clarevo'));
+  ok('demonstração com dados (D-067): o Resumo não pergunta "Como você conheceu a Clarevo?"', await origemAusente());
   // Ciclo A4: a demonstração padrão foi toda anotada em 07/10/2026 e não mostra a faixa; a ordem do Resumo não muda.
   ok('demonstração padrão: sem a faixa "Seus últimos meses" e com os títulos do Resumo na ordem de sempre', !(await bandShown()) && !t.includes('Sua última anotação') &&
     JSON.stringify(await headingList()) === JSON.stringify(['1:Outubro de 2026', '2:Pagamentos do mês']), JSON.stringify(await headingList()));
@@ -981,7 +981,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Ciclo A5 (spec3 §3.7): o card termina com "Como se preparar para as contas do ano?", depois de "Nova conta do ano".
   ok('contas do ano: IPVA e IPTU com rótulos em texto, "Nova conta do ano" e o link de Aprender',
     JSON.stringify(await sectionRows('Contas do ano')) === JSON.stringify(['IPVA, cerca de R$ 2.400,00, todo ano em 20/01, valor muda, conta do ano', 'IPTU, 10 parcelas de cerca de R$ 180,00, fevereiro a novembro, dia 10, valor muda, conta do ano', 'Nova conta do ano', 'Como se preparar para as contas do ano?']) &&
-      ['Contas que vêm uma vez por ano, como IPVA, IPTU, matrícula e seguro. Você cadastra uma vez; todo ano o Clarevo cria a conta do mês certo, dois meses antes de vencer.', '≈ R$ 2.400,00 · todo ano em 20/01 · valor muda', '10 parcelas de ≈ R$ 180,00 · fevereiro a novembro, dia 10 · valor muda'].every((x) => t.includes(x)),
+      ['Contas que vêm uma vez por ano, como IPVA, IPTU, matrícula e seguro. Você cadastra uma vez; todo ano a Clarevo cria a conta do mês certo, dois meses antes de vencer.', '≈ R$ 2.400,00 · todo ano em 20/01 · valor muda', '10 parcelas de ≈ R$ 180,00 · fevereiro a novembro, dia 10 · valor muda'].every((x) => t.includes(x)),
     ((await sectionRows('Contas do ano')) ?? []).join(' | '));
   ok('contas do ano: "Contas do ano (IPVA, IPTU e outras)" com R$ 4.200,00 por ano, todo estimado, e o por mês continua R$ 3.668,90, sem elas (CL-08)',
     t.includes('Contas do ano (IPVA, IPTU e outras): R$ 4.200,00 por ano, se os valores não mudarem (valor estimado).') &&
@@ -1007,14 +1007,14 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await shot('37_conta_do_ano_prevista');
   await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
   await btn('Quem vê estes dados?').click(); await waitText('Gastos fixos e parcelamentos também ficam só no seu Pessoal');
-  ok('"Quem vê estes dados?": gastos fixos e parcelamentos também ficam só no Pessoal, sem outra pessoa do app, e a equipe do Clarevo não olha os dados no dia a dia', (await body()).includes('Gastos fixos e parcelamentos também ficam só no seu Pessoal, sem nenhuma outra pessoa do app ver. A empresa que oferece o benefício não vê nada disso, nem em números somados aos de outras pessoas.') && (await body()).includes('Única pessoa do app que vê, anota, edita e exclui registros em Pessoal.') && (await body()).includes('A equipe do Clarevo não olha os seus dados no dia a dia. Só acessa quando a lei exigir ou para resolver um problema que você pediu.'));
+  ok('"Quem vê estes dados?": gastos fixos e parcelamentos também ficam só no Pessoal, sem outra pessoa do app, e a equipe da Clarevo não olha os dados no dia a dia', (await body()).includes('Gastos fixos e parcelamentos também ficam só no seu Pessoal, sem nenhuma outra pessoa do app ver. A empresa que oferece o benefício não vê nada disso, nem em números somados aos de outras pessoas.') && (await body()).includes('Única pessoa do app que vê, anota, edita e exclui registros em Pessoal.') && (await body()).includes('A equipe da Clarevo não olha os seus dados no dia a dia. Só acessa quando a lei exigir ou para resolver um problema que você pediu.'));
   ok('"Quem vê estes dados?": contas do ano seguem a mesma regra', (await body()).includes('Contas do ano, como IPVA, IPTU e matrícula, seguem a mesma regra.'));
   await btn('Entendi').click(); await waitText('Por mês, se os valores não mudarem');
 
-  await openRow(/^Financiamento do carro, Parcela 13 de 48/); await waitText('Pagas antes do Clarevo');
+  await openRow(/^Financiamento do carro, Parcela 13 de 48/); await waitText('Pagas antes da Clarevo');
   t = await body();
   ok('parcelamento: progresso, última parcela e soma que não é o valor para quitar',
-    ['Parcelamento · financiamento · parcelas 13 a 48', 'R$ 850,00 por parcela', 'Pagas antes do Clarevo: 12 (informado por você) · Pagas no Clarevo: 0 · Faltam 36', 'Última parcela em 10/10/2029',
+    ['Parcelamento · financiamento · parcelas 13 a 48', 'R$ 850,00 por parcela', 'Pagas antes da Clarevo: 12 (informado por você) · Pagas na Clarevo: 0 · Faltam 36', 'Última parcela em 10/10/2029',
       'Soma das 36 parcelas que faltam: R$ 30.600,00. Não é o valor para quitar.', 'Quitar antes do prazo dá direito a desconto proporcional dos juros.'].every((x) => t.includes(x)) && !/saldo devedor/i.test(t));
   ok('parcelamento: barra de progresso com um único rótulo', (await visibleCount('progressbar', '12 de 48 pagas')) === 1);
   ok('parcelamento: a parcela 13 é conta a pagar e as seguintes são previstas', (await visibleCount('button', /^Financiamento do carro, vence em 10\/11\/2026, R\$ 850,00, parcela 13 de 48/)) === 1 && t.includes('Prevista · vence em 10/12/2026'));
@@ -1491,7 +1491,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const saldoHint = p.getByRole('button', { name: 'O que é isso? Saldo inicial', exact: true }).filter({ visible: true }).first();
   await saldoHint.waitFor({ timeout: 8000 }).catch(() => {});
   ok('/conta: "O que é isso?" de "Saldo inicial", fechado, com alvo de 44 px', (await saldoHint.getAttribute('aria-expanded')) === 'false' && ((await saldoHint.boundingBox())?.height ?? 0) >= 43.5 &&
-    (await body()).includes('O Clarevo não calcula saldo por conta.'));
+    (await body()).includes('A Clarevo não calcula saldo por conta.'));
   await saldoHint.click(); await waitText('Ler explicação completa');
   ok('/conta: o resumo abre no lugar, sem sair da tela', (await saldoHint.getAttribute('aria-expanded')) === 'true' && new URL(p.url()).pathname === '/conta');
   await saldoHint.evaluate((e) => e.scrollIntoView({ block: 'center' }));
@@ -1504,7 +1504,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     (await p.locator('h1').filter({ hasText: /^Diferença do mês e saldo da conta$/ }).count()) === 1, p.url());
   await btn('Voltar à tarefa').click(); await waitText('Acesso ao plano');
   ok('"Voltar à tarefa" volta para a Conta, com o resumo ainda aberto', new URL(p.url()).pathname === '/conta' && (await saldoHint.getAttribute('aria-expanded')) === 'true', p.url());
-  await btn('Sair deste aparelho').click(); await waitText('Seu dinheiro');
+  await btn('Sair deste aparelho').click(); await waitText('Mais clareza');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await expectTotals('depois de entrar de novo: outubro na base', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
   await openToPay(); await waitText('Próximos meses');
@@ -2014,7 +2014,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar').click(); await waitText('Ano a ano');
   await btn('Voltar').click(); await waitText('Por ano, se os valores não mudarem');
   // Financiamento: parcela, parcelas que faltam e os vencimentos que a série já calcula.
-  await openRow(/^Financiamento do carro, Parcela 13 de 48/); await waitText('Pagas antes do Clarevo');
+  await openRow(/^Financiamento do carro, Parcela 13 de 48/); await waitText('Pagas antes da Clarevo');
   await btn('Quanto economizo se quitar antes?').click(); await waitText('Parcelas que faltam');
   await typeIn('Taxa de juros ao mês do contrato (%)', '1,5');
   ok('financiamento: "Quitar antes" com 850,00 e 36 parcelas, contadas pelos vencimentos (R$ 23.389,42)', (await h1Name()) === 'Quitar antes ou adiantar parcelas' &&
@@ -2022,7 +2022,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     (await shows('Valor estimado para quitar hoje: R$ 23.389,42', 'Prazos contados pelos vencimentos das parcelas, com 30 dias por mês.')));
   await calcShot('66_calc_quitar_financiamento');
   await keepResult();
-  await btn('Voltar').click(); await waitText('Pagas antes do Clarevo');
+  await btn('Voltar').click(); await waitText('Pagas antes da Clarevo');
   await btn('Voltar').click(); await waitText('Por ano, se os valores não mudarem');
   // Gasto fixo mensal (Aluguel): "Quanto custa por ano?" com o valor e "Por mês", sem "Anotar como gasto fixo".
   await openRow(/^Aluguel, R\$ [\d.]+,\d\d, todo dia 5/); await waitText('Próximas contas');
@@ -2262,7 +2262,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     return main.slice(0, 2).map((e) => e.getAttribute('aria-label') || e.textContent);
   });
   // D-049: o card "Como usar o Clarevo" vem primeiro; o card "Calculadoras" (A6) continua logo depois, antes dos temas.
-  ok('Aprender: card "Calculadoras" logo depois do card "Como usar o Clarevo", no topo', learnFirst[0] === 'Como usar o Clarevo. Onde fica cada função e como usar, passo a passo.' &&
+  ok('Aprender: card "Calculadoras" logo depois do card "Como usar o app da Clarevo", no topo', learnFirst[0] === 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.' &&
     learnFirst[1] === 'Calculadoras. Parcelado ou à vista, dívidas, reserva e outras contas com os seus números', JSON.stringify(learnFirst));
   await layoutChecks('aprender com as calculadoras 390px');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
@@ -2275,7 +2275,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // Ciclo A5 · Aprender e dúvidas (D-031, D-032). Conteúdo educativo no aparelho: nada vai para a rede nem fica gravado.
   // Topo da aba (spec5_notes §2): título, introdução, busca, card "Calculadoras", "Comece por aqui", atalhos e as seções.
-  const LEARN_SECTIONS = ['Usar o Clarevo', 'Organizar o mês', 'Juros e crédito', 'Dinheiro no tempo', 'Dúvidas frequentes'];
+  const LEARN_SECTIONS = ['Usar o app da Clarevo', 'Organizar o mês', 'Juros e crédito', 'Dinheiro no tempo', 'Dúvidas frequentes'];
   const learnH2 = () => p.evaluate(() => [...document.querySelectorAll('h2, [role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
   // Linhas de tema visíveis (nome acessível "{título}. {subtítulo}. Leitura de N minuto(s)."), de cima para baixo.
   const topicRows = () => p.evaluate(() => [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && / Leitura de \d+ minutos?\.$/.test(e.getAttribute('aria-label') || ''))
@@ -2288,18 +2288,18 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Aprender: título "Aprender e dúvidas", aba "Aprender" com o nome "Aprender e dúvidas" e a introdução', (await h1Name()) === 'Aprender e dúvidas' &&
     (await p.getByRole('tab', { name: 'Aprender e dúvidas', exact: true }).filter({ visible: true }).count()) === 1 &&
     (await p.getByRole('tab', { name: 'Aprender e dúvidas', exact: true }).filter({ visible: true }).first().innerText()).trim() === 'Aprender' &&
-    t.includes('Explicações curtas sobre contas, juros e o próprio Clarevo, com exemplos fictícios e fontes.'), await h1Name());
+    t.includes('Explicações curtas sobre contas, juros e o próprio app, com exemplos fictícios e fontes.'), await h1Name());
   ok('Aprender: busca, card "Calculadoras", card "Neste mês" (D-053), "Comece por aqui", "Ir para" e as cinco seções, nessa ordem', learnOrder.every((v, i, a) => v >= 0 && (i === 0 || v > a[i - 1])) &&
     JSON.stringify(await learnH2()) === JSON.stringify(['Neste mês', 'Comece por aqui', ...LEARN_SECTIONS]), `${learnOrder.join(',')} ${JSON.stringify(await learnH2())}`);
   ok('Aprender: "Comece por aqui" com Diferença do mês, Juros simples e compostos e Gasto fixo', JSON.stringify((await cardButtons('Comece por aqui')).slice(0, 3).map((x) => x.split('. ')[0])) ===
     JSON.stringify(['Diferença do mês', 'Juros simples e juros compostos', 'Gasto fixo, conta a pagar e gasto anotado']), JSON.stringify(await cardButtons('Comece por aqui')));
   ok('Aprender: linha de tema com título, subtítulo e tempo de leitura no nome; rascunhos fora da lista', (await visibleCount('button', 'Diferença do mês. Como um registro entra no mês. Leitura de 1 minuto.')) >= 1 &&
-    !t.includes('Orçamento e a referência 50-30-20') && !t.includes('Como apagar meus dados?') && t.includes('Conteúdo educativo e geral, com exemplos fictícios. O Clarevo não oferece crédito nem indica investimentos.'));
+    !t.includes('Orçamento e a referência 50-30-20') && !t.includes('Como apagar meus dados?') && t.includes('Conteúdo educativo e geral, com exemplos fictícios. A Clarevo não oferece crédito nem indica investimentos.'));
   ok('Aprender: sem o desenho do símbolo C', (await symbolCount()) === 0);
   await keepText();
   await layoutChecks('aprender e dúvidas 390px');
   await shot('86_aprender');
-  await p.getByRole('heading', { name: 'Usar o Clarevo', exact: true }).filter({ visible: true }).first().evaluate((e) => e.scrollIntoView({ block: 'start' }));
+  await p.getByRole('heading', { name: 'Usar o app da Clarevo', exact: true }).filter({ visible: true }).first().evaluate((e) => e.scrollIntoView({ block: 'start' }));
   await shot('86_aprender_secoes');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
   await layoutChecks('aprender e dúvidas 320px');
@@ -2309,7 +2309,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Ir para Dinheiro no tempo').click(); await p.waitForTimeout(900);
   const timeTop = await p.evaluate(() => [...document.querySelectorAll('h2, [role=heading][aria-level="2"]')].find((e) => e.textContent === 'Dinheiro no tempo' && e.getBoundingClientRect().width > 0)?.getBoundingClientRect().top ?? null);
   ok('"Ir para Dinheiro no tempo": a seção sobe para o topo e o foco vai para o título dela', timeTop !== null && timeTop >= 0 && timeTop < 200 &&
-    (await p.evaluate(() => (document.activeElement?.textContent || '').startsWith('Dinheiro no tempo'))) && (await body()).includes('Usar o Clarevo'), String(timeTop));
+    (await p.evaluate(() => (document.activeElement?.textContent || '').startsWith('Dinheiro no tempo'))) && (await body()).includes('Usar o app da Clarevo'), String(timeTop));
 
   // Busca no aparelho: "juros" e "JÚROS" põem "Juros simples e juros compostos" primeiro; nenhuma requisição de rede.
   const learnRequests = [];
@@ -2534,7 +2534,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await p.getByRole('button', { name: /^Gastos fixos e parcelamentos, / }).filter({ visible: true }).first().click(); await waitText('Por mês, se os valores não mudarem'); await p.waitForTimeout(300);
     await innerChecks(`gastos fixos ${w}px`);
     if (w === 320) await shot('35_gastos_fixos_320px', true);
-    await openRow(/^Financiamento do carro, Parcela 13 de 48/); await waitText('Pagas antes do Clarevo'); await p.waitForTimeout(300);
+    await openRow(/^Financiamento do carro, Parcela 13 de 48/); await waitText('Pagas antes da Clarevo'); await p.waitForTimeout(300);
     await innerChecks(`parcelamento ${w}px`);
     if (w === 320) await shot('35_parcelamento_320px', true);
     await btn('Encerrar parcelamento').click(); await waitText('Qual é a última conta?');
@@ -2543,11 +2543,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await innerChecks(`encerrar parcelamento ${w}px`);
     if (w === 320) await shot('35_encerrar_parcelamento_320px', true);
     await btn('Cancelar').click(); await waitText('Descartar o preenchimento?');
-    await btn('Descartar alterações').click(); await waitText('Pagas antes do Clarevo');
+    await btn('Descartar alterações').click(); await waitText('Pagas antes da Clarevo');
     await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await waitText('Valor da parcela'); await p.waitForTimeout(300);
     await innerChecks(`editar parcelamento ${w}px`);
     if (w === 320) await shot('35_editar_parcelamento_320px', true);
-    await btn('Cancelar').click(); await waitText('Pagas antes do Clarevo');
+    await btn('Cancelar').click(); await waitText('Pagas antes da Clarevo');
     await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
     await btn('Novo gasto fixo ou parcelamento').click(); await waitText('Demonstração · Pessoal');
     await radio('Parcelado').click(); await waitText('Total de parcelas');
@@ -2606,7 +2606,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     ['Anotar gasto', '/registro/novo?tipo=despesa', 1], ['Registrar recebimento', '/registro/novo?tipo=receita', 1], ['Contas a pagar', '/a-pagar', 1], ['Calculadoras', '/calcular', 1]]) &&
     manifest.icons.length > 0 && manifest.icons.every(Boolean), JSON.stringify(manifest));
   const viaEntry = async (url, ready) => {
-    await p.goto(`http://localhost:${PORT}${url}`); await waitText('Seu dinheiro');
+    await p.goto(`http://localhost:${PORT}${url}`); await waitText('Mais clareza');
     const atEntry = new URL(p.url()).pathname;
     await btn('Ver demonstração com dados fictícios').click(); await waitText(ready, 12000).catch(() => {});
     return atEntry;
@@ -2669,7 +2669,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // a composição, "Fora dos compromissos" (sem "sobra", "disponível" nem "saldo"), os próximos meses e, nas dívidas, a
   // referência de mercado com a fonte. Falha de carga mostra erro, nunca 0%.
   const freshDemo = async () => {
-    await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+    await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
     await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('R$ 2.100,00'); await p.waitForTimeout(400);
   };
   const rcRow = () => p.getByRole('button', { name: /^Renda comprometida em / }).filter({ visible: true }).first();
@@ -3113,7 +3113,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // Conta nova: "Sim, consigo" cria a reserva pelo plano.
   const newAcct = async (name, email) => {
-    await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+    await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
     await btn('Criar conta').click(); await waitText('Nome de apresentação');
     await field('Nome de apresentação').fill(name); await field('E-mail').fill(email); await field('Senha').fill('senha1234');
     await btn('Criar conta').click(); await waitText('Confira seu e-mail');
@@ -3158,7 +3158,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await body();
   ok('C "Criar reserva" abre /reserva com os números da calculadora (3.750,00, 6 meses, 3.500,00 guardados e 500,00 por mês) e o valor da reserva', new URL(p.url()).pathname === '/reserva' && t.includes('Seus gastos essenciais por mês') && t.includes('R$ 3.750,00') &&
     (await radio('6 meses').getAttribute('aria-checked')) === 'true' && t.includes('Valor da reserva: R$ 22.500,00 (6 × R$ 3.750,00)') && t.includes('A reserva para imprevistos é para emergências. Para aproveitar oportunidades, crie uma meta separada.') &&
-    t.includes('O Clarevo não guarda nem aplica dinheiro e não indica produtos, bancos ou aplicações.'), new URL(p.url()).pathname);
+    t.includes('A Clarevo não guarda nem aplica dinheiro e não indica produtos, bancos ou aplicações.'), new URL(p.url()).pathname);
   await keepText();
   await innerChecks('reserva 390px');
   await shot('126_reserva');
@@ -3219,8 +3219,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await radio('Quanto guardar por mês').click(); await waitText('Quanto quer juntar'); await p.waitForTimeout(300);
   t = await body();
   ok('D modo "Quanto guardar por mês": campos de alvo, já tem, meses e taxa; sem o campo do aporte', t.includes('Quanto quer juntar') && t.includes('Quanto já tem (opcional)') && t.includes('Em quantos meses') && t.includes('Taxa de rendimento ao ano (%)') && !t.includes('Quanto vai guardar por mês'));
-  ok('D a taxa vem vazia, sem exemplo, e a dica diz que o Clarevo não sugere taxas, produtos nem instituições', (await simRate().inputValue()) === '' && ((await simRate().getAttribute('placeholder')) || '') === '' &&
-    t.includes('Você informa a taxa que quer testar. O Clarevo não sugere taxas, produtos nem instituições.'));
+  ok('D a taxa vem vazia, sem exemplo, e a dica diz que a Clarevo não sugere taxas, produtos nem instituições', (await simRate().inputValue()) === '' && ((await simRate().getAttribute('placeholder')) || '') === '' &&
+    t.includes('Você informa a taxa que quer testar. A Clarevo não sugere taxas, produtos nem instituições.'));
   await simulate(); await waitText('Digite quanto quer juntar');
   t = await body();
   ok('D campos vazios: os três erros ("Digite quanto quer juntar, como 22.500,00.", meses e a taxa) e nenhum resultado com rendimento', t.includes('Digite quanto quer juntar, como 22.500,00.') && t.includes('Digite em quantos meses, de 1 a 600.') &&
@@ -3380,11 +3380,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('button', { name: /Simular um plano/ }).filter({ visible: true }).first().click(); await waitText('Faça contas com hipóteses suas');
   ok('D a ação do tema abre /simular', new URL(p.url()).pathname === '/simular', p.url());
   // Endereço direto (versão web instalada): valores do link; a taxa vinda do endereço nunca é lida; lixo é ignorado.
-  await p.goto(`http://localhost:${PORT}/simular?modo=em-quanto-tempo&alvo=2250000&inicial=450000&mensal=100000&taxa=10`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/simular?modo=em-quanto-tempo&alvo=2250000&inicial=450000&mensal=100000&taxa=10`); await waitText('Mais clareza');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(300);
   const direct = await formValues();
   ok('D endereço direto: os valores do link (22.500,00 e 1.000,00) e a taxa do endereço não é lida', direct.includes('Quanto quer juntar=22.500,00') && direct.includes('Quanto vai guardar por mês=1.000,00') && direct.includes('Taxa de rendimento ao ano (%)='), JSON.stringify(direct));
-  await p.goto(`http://localhost:${PORT}/simular?modo=xyz&alvo=abc&meses=9999&inicial=-1`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/simular?modo=xyz&alvo=abc&meses=9999&inicial=-1`); await waitText('Mais clareza');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(300);
   ok('D endereço com valores inválidos: ignorados (campos vazios)', (await formValues()).length === 0, JSON.stringify(await formValues()));
 
@@ -3644,7 +3644,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await waitInvoice('Aberta');
   await btn('Informar encargos').click(); await waitText('Tipo do encargo'); await p.waitForTimeout(400); t = await body();
   ok('E Informar encargos: tipos (juros, multa, IOF, anuidade, tarifa), a explicação de que o app não calcula juros e o valor', (await h1Name()) === 'Informar encargos' && ['Juros', 'Multa', 'IOF', 'Anuidade', 'Tarifa'].length === 5 &&
-    t.includes('Juros, multa, IOF, anuidade ou tarifa que o banco cobrou nesta fatura. O Clarevo não calcula juros sozinho.') && t.includes('Fatura de novembro · Cartão Exemplo') && (await visibleCount('radio', /^(Juros|Multa|IOF|Anuidade|Tarifa)$/)) === 5);
+    t.includes('Juros, multa, IOF, anuidade ou tarifa que o banco cobrou nesta fatura. A Clarevo não calcula juros sozinha.') && t.includes('Fatura de novembro · Cartão Exemplo') && (await visibleCount('radio', /^(Juros|Multa|IOF|Anuidade|Tarifa)$/)) === 5);
   await keepText();
   await innerChecks('informar encargos 390px');
   await shot('140_informar_encargos');
@@ -3763,10 +3763,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await freshDemo();
   const invoiceCommitmentId = await otherDevice(async (repo, ctx) => { const c = (await repo.listCards(ctx)).find((x) => x.name === 'Cartão Exemplo'); return (await repo.listInvoiceCommitments(c.id)).find((i) => i.invoice.month === '2026-11').id; });
   const exemploIdDeep = await cardIdOf('Cartão Exemplo');
-  await p.goto(`http://localhost:${PORT}/a-pagar/${invoiceCommitmentId}`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/a-pagar/${invoiceCommitmentId}`); await waitText('Mais clareza');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Lançamentos', 12000).catch(() => {}); await p.waitForTimeout(600);
   ok('E o endereço da conta de fatura (/a-pagar/<id>) abre a fatura (e não o detalhe da conta), sem "Já paguei"', urlPath() === `/cartoes/${exemploIdDeep}/fatura/2026-11` && (await h1Name()) === 'Fatura' && (await visibleCount('button', 'Já paguei')) === 0, urlPath());
-  await p.goto(`http://localhost:${PORT}/cartoes/${exemploIdDeep}/fatura/2026-12`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/cartoes/${exemploIdDeep}/fatura/2026-12`); await waitText('Mais clareza');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Lançamentos', 12000).catch(() => {}); await p.waitForTimeout(600);
   ok('E o endereço direto da fatura (/cartoes/<id>/fatura/2026-12) abre a fatura de dezembro', urlPath() === `/cartoes/${exemploIdDeep}/fatura/2026-12` && (await body()).includes('Fatura de dezembro'), urlPath());
 
@@ -4076,8 +4076,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     (await activeTag()) !== 'INPUT' && (await activeTag()) !== 'TEXTAREA', `${await activeTag()} ${t.slice(0, 300)}`);
   ok('N mesma loja (mesmo CNPJ) já anotada neste aparelho: descrição e categoria da última vez, com a legenda "Como da última vez nesta loja"',
     (await field('Descrição').inputValue()) === 'Mercado' && (await radio('Mercado').getAttribute('aria-checked')) === 'true' && t.includes('Como da última vez nesta loja'));
-  ok('N com o endereço oficial do RJ: "Ver a nota no site da Sefaz" no bloco e, na web, o aviso de que o Clarevo não lê a página (só o link)', (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 1 &&
-    t.includes('Neste navegador, a página da Sefaz não pode ser lida pelo Clarevo. Abra a nota no site da Sefaz e digite o total.') && !t.includes('Lendo a página da Sefaz'));
+  ok('N com o endereço oficial do RJ: "Ver a nota no site da Sefaz" no bloco e, na web, o aviso de que a Clarevo não lê a página (só o link)', (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 1 &&
+    t.includes('Neste navegador, a página da Sefaz não pode ser lida pela Clarevo. Abra a nota no site da Sefaz e digite o total.') && !t.includes('Lendo a página da Sefaz'));
   const [tab] = await Promise.all([ctx.waitForEvent('page'), btn('Ver a nota no site da Sefaz').click()]);
   await tab.waitForURL(/consultadfe\.fazenda\.rj\.gov\.br/, { timeout: 8000 }).catch(() => {});
   const tabUrl = tab.url(); await tab.close();
@@ -4221,7 +4221,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('N a segunda parcela cai na fatura de dezembro (R$ 350,00 + R$ 150,00 = R$ 500,00)', (await heroTotalN()) === 'R$ 500,00' && (await visibleCount('button', 'Loja Exemplo (2x) · parcela 2 de 2 · R$ 150,00')) === 1, `${await heroTotalN()}`);
 
   // B2 · Seus últimos meses: a conta de fatura abre a fatura (como em Contas a pagar), sem "Já paguei" nem "Não houve".
-  await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Mais clareza');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('Sua última anotação foi em 20/05/2026.', 12000).catch(() => {});
   await otherDevice(async (repo, ctx) => {
     const k = () => `e2e-${Math.random()}`;
@@ -4257,7 +4257,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // montagem da sequência R anotada em 20/05/2026 (Aluguel, Luz estimada e Financiamento do carro desde maio, contas de
   // maio pagas, Salário e Mercado) e aberta em 07/10/2026. Cada entrada recarrega a página e recomeça o cenário.
   const enterReturnDemo = async () => {
-    await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Seu dinheiro');
+    await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Mais clareza');
     await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
     await waitText('Sua última anotação foi em 20/05/2026.', 12000).catch(() => {});
   };
@@ -4314,15 +4314,15 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('retorno: a faixa só aparece no mês atual', !(await bandShown()));
   await monthForward('Outubro de 2026'); await waitText('Seus últimos meses');
   // Contas a pagar: com a faixa ativa, o aviso das contas criadas já vencidas leva ao resumo dos últimos meses.
-  await openToPay(); await waitText('O Clarevo criou');
+  await openToPay(); await waitText('A Clarevo criou');
   const createdBox = await p.evaluate(() => {
-    const e = [...document.querySelectorAll('div[dir="auto"]')].find((x) => x.textContent.startsWith('O Clarevo criou') && x.getBoundingClientRect().width > 0);
+    const e = [...document.querySelectorAll('div[dir="auto"]')].find((x) => x.textContent.startsWith('A Clarevo criou') && x.getBoundingClientRect().width > 0);
     let box = e?.parentElement;
     while (box && !box.querySelector('[role=button]')) box = box.parentElement;
     return box ? { text: e.textContent, buttons: [...box.querySelectorAll('[role=button]')].map((x) => x.getAttribute('aria-label') || x.textContent) } : null;
   });
   ok('retorno: em Contas a pagar, o aviso das contas criadas vencidas troca "Revisar vencidas" por "Ver resumo dos últimos meses"', createdBox !== null &&
-    createdBox.text === 'O Clarevo criou 4 contas de gastos fixos que já venceram. Confira se você já pagou.' && JSON.stringify(createdBox.buttons) === JSON.stringify(['Ver resumo dos últimos meses']), JSON.stringify(createdBox));
+    createdBox.text === 'A Clarevo criou 4 contas de gastos fixos que já venceram. Confira se você já pagou.' && JSON.stringify(createdBox.buttons) === JSON.stringify(['Ver resumo dos últimos meses']), JSON.stringify(createdBox));
   await btn('Ver resumo dos últimos meses').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos.');
   ok('"Ver resumo dos últimos meses" abre /retomar', new URL(p.url()).pathname === '/retomar' && (await h1Name()) === 'Seus últimos meses', p.url());
   await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
@@ -4333,7 +4333,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await body();
   const retCards = await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
   ok('/retomar: abertura com a última anotação e o período, e a nota', t.includes('Sua última anotação foi em 20/05/2026. Abaixo, o que está registrado de maio a setembro de 2026 e as contas vencidas deste mês.') &&
-    t.includes('Mês sem anotação não quer dizer mês sem gastos. Aqui aparece só o que está registrado no Clarevo.'), t.slice(0, 300));
+    t.includes('Mês sem anotação não quer dizer mês sem gastos. Aqui aparece só o que está registrado na Clarevo.'), t.slice(0, 300));
   ok('/retomar: cartões de maio a setembro e "Outubro de 2026 (este mês)"', JSON.stringify(retCards) === JSON.stringify(['Maio de 2026', 'Junho de 2026', 'Julho de 2026', 'Agosto de 2026', 'Setembro de 2026']) &&
     t.includes('Outubro de 2026 (este mês) · 1 conta vencida em aberto: Aluguel, R$ 2.500,00, venceu em 05/10.'), retCards.join(' | '));
   ok('/retomar: maio compacto, com o que foi anotado', (await monthCardText('Maio de 2026'))?.includes('Recebido: R$ 6.000,00 · 1 recebimento · Pago: R$ 4.765,30 · 4 gastos'), await monthCardText('Maio de 2026'));
@@ -4521,9 +4521,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   for (const m of ['Julho de 2026', 'Agosto de 2026', 'Setembro de 2026', 'Outubro de 2026']) await monthForward(m);
   await p.getByRole('tab', { name: 'Movimentações' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
   await p.getByRole('button', { name: /^Gastos fixos e parcelamentos, / }).filter({ visible: true }).first().click(); await waitText('Por mês, se os valores não mudarem');
-  await openRow(/^Financiamento do carro, Parcela 13 de 48/); await waitText('Pagas antes do Clarevo');
+  await openRow(/^Financiamento do carro, Parcela 13 de 48/); await waitText('Pagas antes da Clarevo');
   t = await body();
-  ok('carro depois da revisão: "Pagas no Clarevo: 5" e "Faltam 36", sem meses sem conta registrada', t.includes('Pagas antes do Clarevo: 7 (informado por você) · Pagas no Clarevo: 5 · Faltam 36') &&
+  ok('carro depois da revisão: "Pagas na Clarevo: 5" e "Faltam 36", sem meses sem conta registrada', t.includes('Pagas antes da Clarevo: 7 (informado por você) · Pagas na Clarevo: 5 · Faltam 36') &&
     !t.includes('sem conta registrada') && t.includes('Última parcela em 10/09/2029'), (t.match(/Pagas antes[^\n]*/) ?? [''])[0]);
   await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
   await btn('Voltar').click(); await waitText('Registrar recebimento');
@@ -4539,7 +4539,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('"Seguir adiante": o card de Primeiros passos não aparece na demonstração com dados', !(await headingShown('Primeiros passos')));
   await keepReturnText();
   await shot('82_seguir_adiante');
-  await openToPay(); await waitText('O Clarevo criou');
+  await openToPay(); await waitText('A Clarevo criou');
   ok('depois de seguir adiante, o aviso das contas criadas volta a "Revisar vencidas"', (await visibleCount('button', 'Ver resumo dos últimos meses')) === 0 && (await visibleCount('button', 'Revisar vencidas')) === 2);
   await btn('Voltar').click(); await waitText('Diferença do mês');
   await monthBack('Setembro de 2026'); await monthBack('Agosto de 2026'); await monthBack('Julho de 2026'); await monthBack('Junho de 2026');
@@ -4552,7 +4552,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await openRow(/^Financiamento do carro, Parcela/); await waitText('Meses sem conta registrada');
   t = await body();
   ok('carro depois de seguir adiante: julho e agosto sem conta registrada, "Registrar esta parcela" e "Sem conta registrada: 2"', t.includes('Julho de 2026: sem conta registrada.') && t.includes('Agosto de 2026: sem conta registrada.') &&
-    t.includes('Pagas no Clarevo: 1 · Sem conta registrada: 2 · Faltam 38') && (await visibleCount('button', 'Registrar esta parcela: Financiamento do carro de julho')) === 1, (t.match(/Pagas antes[^\n]*/) ?? [''])[0]);
+    t.includes('Pagas na Clarevo: 1 · Sem conta registrada: 2 · Faltam 38') && (await visibleCount('button', 'Registrar esta parcela: Financiamento do carro de julho')) === 1, (t.match(/Pagas antes[^\n]*/) ?? [''])[0]);
   await keepText();
   await innerChecks('detalhe do parcelamento com meses sem conta 390px');
   await scrollTo('Meses sem conta registrada');
@@ -4656,7 +4656,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   }, withLooseJuly);
   await enterReturnDemo();
   const annual = await makeAnnual(false);
-  await openToPay(); await waitText('O Clarevo criou').catch(() => {});
+  await openToPay(); await waitText('A Clarevo criou').catch(() => {});
   await p.getByRole('button', { name: /^Gastos fixos e parcelamentos, \d+ cadastrados/ }).filter({ visible: true }).first().click(); await waitText('Por mês, se os valores não mudarem');
   await openRow(/^Taxa do condomínio/); await waitText('Ano a ano'); await waitText('2026/2027: parcelas 1 a 3 sem conta registrada.');
   t = await body();
@@ -4711,9 +4711,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Registrar esta parcela: Financiamento do carro de julho').click(); await waitText('Já paguei: Financiamento do carro de julho', 4000).catch(() => {});
   await btn('Já paguei: Financiamento do carro de julho').click(); await waitText('Marcar como paga?');
   await confirmIn('Confirmar'); await waitText('Pagamento registrado: Financiamento do carro de julho.');
-  await waitText('Pagas no Clarevo: 2 · Sem conta registrada: 1');
+  await waitText('Pagas na Clarevo: 2 · Sem conta registrada: 1');
   ok('"Registrar esta parcela" > "Já paguei": a folha fecha, com o aviso de pagamento e o detalhe atualizado (2 pagas, 1 sem conta)', (await visibleCount('button', 'Ainda não paguei: Financiamento do carro de julho')) === 0 &&
-    (await body()).includes('Pagas no Clarevo: 2 · Sem conta registrada: 1'));
+    (await body()).includes('Pagas na Clarevo: 2 · Sem conta registrada: 1'));
 
   // g) "Já paguei" numa conta que outro aparelho registrou E pagou: ninguém paga de novo. A revisão mostra a conta como
   // paga, com o aviso "Esta conta já foi paga em outro aparelho." (uma só vez na tela, sem o texto de pagamento feito aqui).
@@ -4801,7 +4801,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(350);
   };
   const demoHome = async () => {
-    await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+    await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
     await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
     await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   };
@@ -5661,8 +5661,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.evaluate(() => { delete window.__clarevoSefazFetch; });
   await d42AnnotarGasto();
   await d42Read(d42Keys.pix, null); t = await body();
-  ok('D42 na web, nota do RJ com QR online (sem valor nem data): "No celular, o Clarevo lê o valor e a data na página da Sefaz." junto do aviso do navegador',
-    t.includes('No celular, o Clarevo lê o valor e a data na página da Sefaz.') && t.includes('Neste navegador, a página da Sefaz não pode ser lida pelo Clarevo.') && t.includes('O valor não vem no código desta nota.'));
+  ok('D42 na web, nota do RJ com QR online (sem valor nem data): "No celular, a Clarevo lê o valor e a data na página da Sefaz." junto do aviso do navegador',
+    t.includes('No celular, a Clarevo lê o valor e a data na página da Sefaz.') && t.includes('Neste navegador, a página da Sefaz não pode ser lida pela Clarevo.') && t.includes('O valor não vem no código desta nota.'));
   await keepText();
   await d42ToBlock(); await shot('214_nota_web_dica_do_celular');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
@@ -5671,9 +5671,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   await d42Read(d42Key(7010), null);
   await d42OpenPaste(); await field('Colar o link ou a chave da nota').fill(d42QrCont(d42Key(7011), '06', '45.90')); await btn('Ler a nota').click(); await waitText('Nota lida:'); await p.waitForTimeout(600); t = await body();
-  ok('D42 QR em contingência (valor e dia no código): sem a dica do celular, e a linha traz o valor', !t.includes('No celular, o Clarevo lê o valor e a data') && t.includes('Nota lida: CNPJ 12.345.678/0001-95 · RJ · R$ 45,90 · 06/10/2026'));
+  ok('D42 QR em contingência (valor e dia no código): sem a dica do celular, e a linha traz o valor', !t.includes('No celular, a Clarevo lê o valor e a data') && t.includes('Nota lida: CNPJ 12.345.678/0001-95 · RJ · R$ 45,90 · 06/10/2026'));
   await d42Paste(D42_NFE);
-  ok('D42 só a chave (NF-e): sem a dica do celular', !(await body()).includes('No celular, o Clarevo lê o valor e a data'));
+  ok('D42 só a chave (NF-e): sem a dica do celular', !(await body()).includes('No celular, a Clarevo lê o valor e a data'));
   await d42Leave();
 
   // ---- G2.7 · Valores ocultos: o valor da linha "Nota lida" também vira "R$ ••••" ----
@@ -5812,7 +5812,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await demoHome();
   await d42GoTab('Movimentações'); await waitText('Registrar recebimento'); await openSeriesList(); t = await body();
   ok('D42 lista de Gastos fixos: o card "Contas do ano" explica o que são e quando entram em Contas a pagar',
-    t.includes('Contas que vêm uma vez por ano, como IPVA, IPTU, matrícula e seguro. Você cadastra uma vez; todo ano o Clarevo cria a conta do mês certo, dois meses antes de vencer.'));
+    t.includes('Contas que vêm uma vez por ano, como IPVA, IPTU, matrícula e seguro. Você cadastra uma vez; todo ano a Clarevo cria a conta do mês certo, dois meses antes de vencer.'));
   await keepText();
   await scrollTo('Contas do ano');
   await shot('221_contas_do_ano_lista');
@@ -5823,8 +5823,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
 
   await btn('Nova conta do ano').click(); await waitText('Como você paga?'); await p.waitForTimeout(500); t = await body();
-  ok('D42 cadastro de conta do ano: a explicação curta no topo (uma vez por ano, cadastra uma vez, o Clarevo lembra e cria as contas do mês certo) e "O que é isso?"',
-    t.includes('Contas do ano são as que vêm uma vez por ano, como IPVA, IPTU, matrícula e seguro. Você cadastra uma vez; todo ano o Clarevo lembra e cria as contas do mês certo.') && (await visibleCount('button', 'O que é isso?')) === 1 &&
+  ok('D42 cadastro de conta do ano: a explicação curta no topo (uma vez por ano, cadastra uma vez, a Clarevo lembra e cria as contas do mês certo) e "O que é isso?"',
+    t.includes('Contas do ano são as que vêm uma vez por ano, como IPVA, IPTU, matrícula e seguro. Você cadastra uma vez; todo ano a Clarevo lembra e cria as contas do mês certo.') && (await visibleCount('button', 'O que é isso?')) === 1 &&
     t.indexOf('Contas do ano são as que vêm') < t.indexOf('Descrição'), t.slice(0, 400));
   await keepText();
   await scrollTo('Com que frequência?');
@@ -5837,16 +5837,16 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     t.includes('Cota única: o valor do ano sai de uma vez. Ex.: IPVA de R$ 2.400,00, que vence em janeiro.') && t.includes('Em parcelas: o valor do ano é dividido em vezes. Ex.: IPTU de R$ 1.800,00 em 10 parcelas de R$ 180,00, de fevereiro a novembro.'));
   ok('D42 cadastro de conta do ano: exemplos no mês, no dia e no valor (cota única)', t.includes('Em que mês a conta vence. Ex.: IPVA em janeiro.') && t.includes('De 1 a 31. Ex.: dia 20 para uma conta que vence em 20/01.') && t.includes('Ex.: IPVA de R$ 2.400,00.'));
   ok('D42 cadastro de conta do ano: o que acontece nos anos seguintes (valor que muda: estimativa e "Informar o valor"; valor igual: nada a fazer)',
-    t.includes('Se muda, o Clarevo usa o valor que você cadastrou como estimativa. Quando o carnê ou o boleto do ano chegar, abra a conta do ano e informe o valor em Ano a ano.') && t.includes('E nos próximos anos?') &&
-    t.includes('Todo ano, o Clarevo cria as contas do ano dois meses antes do primeiro vencimento. Se o valor mudou, abra a conta do ano e use Informar o valor em Ano a ano: só aquele ano muda. Se o valor é sempre o mesmo, não precisa fazer nada.'));
+    t.includes('Se muda, a Clarevo usa o valor que você cadastrou como estimativa. Quando o carnê ou o boleto do ano chegar, abra a conta do ano e informe o valor em Ano a ano.') && t.includes('E nos próximos anos?') &&
+    t.includes('Todo ano, a Clarevo cria as contas do ano dois meses antes do primeiro vencimento. Se o valor mudou, abra a conta do ano e use Informar o valor em Ano a ano: só aquele ano muda. Se o valor é sempre o mesmo, não precisa fazer nada.'));
   await radio('Não, é sempre o mesmo').click(); await p.waitForTimeout(300);
-  ok('D42 "Não, é sempre o mesmo": a dica passa a dizer que o Clarevo repete o valor todo ano', (await body()).includes('Se é sempre o mesmo, o Clarevo repete o valor todo ano e você não precisa fazer nada.'));
+  ok('D42 "Não, é sempre o mesmo": a dica passa a dizer que a Clarevo repete o valor todo ano', (await body()).includes('Se é sempre o mesmo, a Clarevo repete o valor todo ano e você não precisa fazer nada.'));
   await radio('Em parcelas no ano').click(); await p.waitForTimeout(300); t = await body();
   ok('D42 cadastro em parcelas: os exemplos mudam para o mês da primeira parcela e o valor da parcela', t.includes('Em que mês vence a primeira parcela. Ex.: IPTU começa em fevereiro.') && t.includes('Ex.: a parcela de R$ 180,00 do IPTU.'));
   await radio('Sim, muda todo ano (como IPVA e IPTU)').click(); await p.waitForTimeout(300);
   ok('D42 cadastro em parcelas, valor que muda: a dica antiga continua e ganha o exemplo da parcela', (await body()).includes('Use o valor do último ano. Ele aparece como estimado até você informar o valor do ano. Ex.: a parcela de R$ 180,00 do IPTU.'));
   await radio('Dezembro').click(); await field('Dia do vencimento').fill('10'); await field('Quantas parcelas por ano?').fill('4'); await p.waitForTimeout(400);
-  ok('D42 cadastro em parcelas: "Primeiro ano" ganha a explicação de que o Clarevo cuida dos anos seguintes', (await body()).includes('O ano da primeira conta que o Clarevo vai criar. Dos anos seguintes ele cuida sozinho.'));
+  ok('D42 cadastro em parcelas: "Primeiro ano" ganha a explicação de que a Clarevo cuida dos anos seguintes', (await body()).includes('O ano da primeira conta que a Clarevo vai criar. Dos anos seguintes ela cuida sozinha.'));
   await keepText();
   await scrollTo('Como você paga?');
   await shot('223_conta_do_ano_cadastro_como_paga');
@@ -5878,7 +5878,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('D42 detalhe da conta do ano: a regra dos dois meses antes continua, e agora diz como informar o valor de um ano, com "O que é isso?"',
     t.includes('Cada ano entra em Contas a pagar dois meses antes do primeiro vencimento e só entra em Ainda a pagar no mês em que vence.') &&
     t.includes('Quando o valor de um ano mudar, use Informar o valor daquele ano, em Ano a ano. Só ele muda; os outros continuam com a referência.') && (await visibleCount('button', 'O que é isso?')) === 1);
-  ok('D42 "Ano a ano": legenda com previsto, informar o valor e tirada', t.includes('Cada linha é um ano da conta. Previsto: o Clarevo ainda vai criar a conta, dois meses antes de vencer.') &&
+  ok('D42 "Ano a ano": legenda com previsto, informar o valor e tirada', t.includes('Cada linha é um ano da conta. Previsto: a Clarevo ainda vai criar a conta, dois meses antes de vencer.') &&
     t.includes('Quando o carnê ou o boleto de um ano chegar com outro valor, toque em Informar o valor desse ano. Só ele muda.') && t.includes('Tirada: você marcou que aquela conta não houve.'));
   ok('D42 "Ano a ano": o botão do ano em aberto é "Informar o valor de 2026"', (await visibleCount('button', 'Informar o valor de 2026')) === 1);
   await keepText();
@@ -6640,8 +6640,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const g1Initial = await g1Rows();
   ok('G1 Conta: "Suas contas" lista a Conta principal (Conta bancária, Principal) e a Carteira (Dinheiro), nessa ordem',
     JSON.stringify(g1Initial) === JSON.stringify(['Conta principal, Conta bancária · Principal. Abrir a conta.', 'Carteira, Dinheiro. Abrir a conta.']), JSON.stringify(g1Initial));
-  ok('G1 Conta: o card diz que é só a origem (sem saldo) e que o Clarevo não calcula saldo por conta; o antigo "Nome da conta" saiu',
-    t.includes('É só a origem informada: o Clarevo não guarda saldo nem movimenta dinheiro.') && t.includes('O Clarevo não calcula saldo por conta.') &&
+  ok('G1 Conta: o card diz que é só a origem (sem saldo) e que a Clarevo não calcula saldo por conta; o antigo "Nome da conta" saiu',
+    t.includes('É só a origem informada: a Clarevo não guarda saldo nem movimenta dinheiro.') && t.includes('A Clarevo não calcula saldo por conta.') &&
     (await visibleCount('textbox', 'Nome da conta')) === 0 && (await visibleCount('button', 'Salvar nome')) === 0 && (await visibleCount('button', 'Adicionar conta')) === 1);
   ok('G1 Conta: a demonstração guarda a Carteira como dinheiro e o mercado pago nela (Mercado de setembro e de outubro)',
     (await g1Accounts()) === 'Conta principal|banco|ativa|principal;Carteira|dinheiro|ativa|-' && (await g1Records('Mercado')) === 'Mercado|Carteira|125000;Mercado|Carteira|140000', await g1Records('Mercado'));
@@ -6652,7 +6652,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await g1Keep();
   ok('G1 Nova conta: título, nome, tipo (Conta bancária marcada), a nota do saldo e o rodapé fixo',
     (await h1Name()) === 'Nova conta' && urlPath() === '/contas/nova' && (await visibleCount('textbox', 'Nome da conta')) === 1 && (await g1Checked('Conta bancária')) && (await visibleCount('radio', /^(Dinheiro|Outra)$/)) === 2 &&
-    t.includes('Por exemplo: Carteira ou Conta do banco.') && t.includes('O Clarevo não calcula saldo por conta.') && (await visibleCount('button', 'Adicionar conta')) === 1 && (await visibleCount('button', 'Excluir conta')) === 0);
+    t.includes('Por exemplo: Carteira ou Conta do banco.') && t.includes('A Clarevo não calcula saldo por conta.') && (await visibleCount('button', 'Adicionar conta')) === 1 && (await visibleCount('button', 'Excluir conta')) === 0);
   await atWidths(async (w) => { await innerChecks(`G1 Nova conta ${w}px`); if (w === 390) await shot('241_nova_conta'); });
   await g1Save('Adicionar conta');
   ok('G1 Nova conta sem nome: "Dê um nome de 1 a 40 caracteres para a conta." e nada gravado', (await body()).includes('Dê um nome de 1 a 40 caracteres para a conta.') && urlPath() === '/contas/nova' && (await g1Accounts()).split(';').length === 2);
@@ -7213,8 +7213,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('H2 Revisar assinaturas: cada uma com valor por mês e por ano, "Continua", "Encerrar a partir de…" e a calculadora; "Revisei minhas assinaturas" no fim',
     t.includes('R$ 99,00 por mês · R$ 1.188,00 por ano · todo dia 5') && t.includes('R$ 39,90 por mês · R$ 478,80 por ano · todo dia 10') &&
     (await visibleCount('button', /^Continua: /)) === 2 && (await visibleCount('button', /^Encerrar a partir de… /)) === 2 && (await visibleCount('button', /^Quanto custa por ano\? /)) === 2 &&
-    (await visibleCount('button', 'Revisei minhas assinaturas')) === 1 && t.includes('O Clarevo guarda só a data da revisão.'));
-  ok('H2 Revisar assinaturas: o aviso de que encerrar aqui só tira a assinatura do Clarevo', t.includes('Encerrar aqui só tira a assinatura do Clarevo a partir do mês escolhido.') && t.includes('é preciso encerrar também com quem oferece o serviço.'));
+    (await visibleCount('button', 'Revisei minhas assinaturas')) === 1 && t.includes('A Clarevo guarda só a data da revisão.'));
+  ok('H2 Revisar assinaturas: o aviso de que encerrar aqui só tira a assinatura da Clarevo', t.includes('Encerrar aqui só tira a assinatura da Clarevo a partir do mês escolhido.') && t.includes('é preciso encerrar também com quem oferece o serviço.'));
   await checkBar('H2 Revisar assinaturas', 'Movimentações');
   await atWidths(async (w) => { await innerChecks(`H2 Revisar assinaturas ${w}px`); if (w === 390) await shot('272_revisar_assinaturas'); if (w === 320) await shot('272_revisar_assinaturas_320px'); });
   // "Continua" é só para acompanhar a lista: marca e desmarca, com contagem, e não grava nada.
@@ -7348,7 +7348,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Cancelar').click(); await waitText('Descartar o preenchimento?'); await confirmIn('Descartar alterações'); await p.waitForTimeout(500);
 
   // ---- 10. O lembrete (cenário ?cenario=assinaturas: cadastradas em 30/06/2026 e nunca revisadas) ----
-  await p.goto(`http://localhost:${PORT}/?cenario=assinaturas`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/?cenario=assinaturas`); await waitText('Mais clareza');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   ok('H2 cenário "assinaturas": o Resumo tem os totais de outubro de sempre e nenhuma faixa de "Seus últimos meses"', !(await bandShown()));
@@ -7370,7 +7370,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('H2 "Agora não": o aviso não volta ao sair e voltar para Gastos fixos', !(await body()).includes('Faz tempo que você não revisa suas assinaturas.'));
   ok('H2 "Agora não" é só do aparelho: nenhuma escrita sai pela rede e a série não muda', writes.slice(h2Writes0).length === 0 && (await h2Series()).filter((s) => s[1]).every((s) => s[2] === null && s[3] === 2));
   // Outra visita (a demonstração recomeça): "Revisar agora" leva à tela e "Revisei" faz o aviso sumir de vez.
-  await p.goto(`http://localhost:${PORT}/?cenario=assinaturas`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/?cenario=assinaturas`); await waitText('Mais clareza');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   await h2OpenFixos();
@@ -7479,8 +7479,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // ---- 2. A tela: consulta com barra, período (12 meses) e formato (planilha) marcados, avisos à vista ----
   t = await h3Keep();
-  ok('H3 a tela: título "Exportar meus dados" em /conta/exportar, contexto Pessoal e a introdução (montado neste aparelho, sem cópia no Clarevo)',
-    urlPath() === '/conta/exportar' && (await h1Name()) === 'Exportar meus dados' && t.includes('Pessoal') && t.includes('O arquivo é montado neste aparelho') && t.includes('O Clarevo não guarda cópia dele.'), t.slice(0, 500));
+  ok('H3 a tela: título "Exportar meus dados" em /conta/exportar, contexto Pessoal e a introdução (montado neste aparelho, sem cópia na Clarevo)',
+    urlPath() === '/conta/exportar' && (await h1Name()) === 'Exportar meus dados' && t.includes('Pessoal') && t.includes('O arquivo é montado neste aparelho') && t.includes('A Clarevo não guarda cópia dele.'), t.slice(0, 500));
   ok('H3 a portabilidade da LGPD (art. 18, V) só como referência, sem parecer jurídico', t.includes('art. 18, V, da LGPD') && t.includes('Esta tela não é parecer jurídico.'));
   ok('H3 períodos: Este mês, Últimos 3, 6 e 12 meses, Este ano, Ano passado e Tudo; "Últimos 12 meses" marcado',
     JSON.stringify(await p.evaluate(() => [...document.querySelectorAll('[role=radio]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent))) ===
@@ -7488,7 +7488,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     JSON.stringify(await h3Checked()) === JSON.stringify(['Últimos 12 meses', 'Planilha (CSV)']), JSON.stringify(await h3Checked()));
   ok('H3 formato Planilha (CSV): explica as colunas, o segundo arquivo das compras no cartão e o que fica de fora (chave da nota, número do cartão, códigos internos)',
     t.includes('Abre no Excel e no Google Planilhas') && t.includes('Data, Tipo, Descrição, Categoria, Valor (R$), Conta de origem e Origem') && t.includes('segundo arquivo') &&
-    t.includes('Ficam de fora a chave da nota fiscal, o número do cartão (só o final aparece) e os códigos internos do Clarevo.'));
+    t.includes('Ficam de fora a chave da nota fiscal, o número do cartão (só o final aparece) e os códigos internos da Clarevo.'));
   ok('H3 o aviso dos valores: "O arquivo mostra os valores, mesmo com Ocultar valores ligado." e o de dados financeiros', t.includes('O arquivo mostra os valores, mesmo com Ocultar valores ligado.') && t.includes('O arquivo tem dados financeiros.'));
   ok('H3 nenhum arquivo antes de pedir: sem "Arquivo pronto" e com o botão "Preparar arquivo"', !t.includes('Arquivo pronto') && (await visibleCount('button', 'Preparar arquivo')) === 1);
   await checkBar('H3 Exportar meus dados');
@@ -7742,7 +7742,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await i1Open();
   await i1Pick(i1Ofx); await waitText('Arquivo lido: extrato.ofx', 12000); await p.waitForTimeout(400);
   t1 = await i1Keep();
-  ok('I1 OFX: "Arquivo lido", 7 linhas, o saldo do arquivo é ignorado e a conta já vem como destino (a principal marcada)', t1.includes('Arquivo lido: extrato.ofx') && t1.includes('7 linhas lidas') && t1.includes('O saldo que vem no arquivo é ignorado. O Clarevo não guarda saldo por conta.') &&
+  ok('I1 OFX: "Arquivo lido", 7 linhas, o saldo do arquivo é ignorado e a conta já vem como destino (a principal marcada)', t1.includes('Arquivo lido: extrato.ofx') && t1.includes('7 linhas lidas') && t1.includes('O saldo que vem no arquivo é ignorado. A Clarevo não guarda saldo por conta.') &&
     (await radio('Conta').getAttribute('aria-checked')) === 'true' && (await radio('Conta principal').getAttribute('aria-checked')) === 'true' && (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'false' && !t1.includes('R$ 1.234,56'));
   await atWidths(async (w) => { await innerChecks(`I1 destino ${w}px`); if (w === 390) await shot('302_importar_destino'); if (w === 320) await shot('302_importar_destino_320px'); });
   await radio('Carteira').click(); await radio('Conta principal').click();
@@ -8010,17 +8010,17 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(350);
   };
   const j1TourOn = () => p.evaluate(() => { window.__clarevoSemTour = false; });
-  const j1TOUR = 'Primeiros passos no Clarevo';
+  const j1TOUR = 'Primeiros passos na Clarevo';
   const j1Dialog = (name) => p.getByRole('dialog', { name, exact: true }).filter({ visible: true });
   const j1Tab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
   const j1Demo = async (query = '') => {
-    await p.goto(`http://localhost:${PORT}/${query}`); await waitText('Seu dinheiro');
+    await p.goto(`http://localhost:${PORT}/${query}`); await waitText('Mais clareza');
     await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
     await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   };
   // Conta nova com o tour ligado (a página recarrega e o roteiro o desligaria): a marca é desfeita antes de entrar no Resumo.
   const j1NewAccount = async (name, email) => {
-    await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro'); await j1TourOn();
+    await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza'); await j1TourOn();
     await btn('Criar conta').click(); await waitText('Nome de apresentação');
     await field('Nome de apresentação').fill(name); await field('E-mail').fill(email); await field('Senha').fill('senha1234');
     await btn('Criar conta').click(); await waitText('Confira seu e-mail');
@@ -8049,7 +8049,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await j1NewAccount('Jo Tutorial', 'jo@exemplo.com');
   await j1Dialog(j1TOUR).first().waitFor({ timeout: 8000 });
   let j1s = await j1TourState();
-  ok('Tutorial tour: a janela tem o nome "Primeiros passos no Clarevo", é modal, mostra o cartão 1 de 5 ("Resumo do mês") com título de nível 2, "Pular" e "Próximo", sem "Começar"',
+  ok('Tutorial tour: a janela tem o nome "Primeiros passos na Clarevo", é modal, mostra o cartão 1 de 5 ("Resumo do mês") com título de nível 2, "Pular" e "Próximo", sem "Começar"',
     j1s !== null && j1s.modal === 'true' && j1s.title === 'Resumo do mês' && j1s.level === '2' && j1s.text.includes('1 de 5') && j1s.buttons.includes('Pular') && j1s.buttons.includes('Próximo') && !j1s.buttons.includes('Começar') &&
     j1s.text.includes('Veja o que você recebeu, o que pagou e o que ainda vai vencer no mês.'), JSON.stringify(j1s));
   ok('Tutorial tour: o foco já está dentro da janela e os botões têm 44 px ou mais', j1s !== null && j1s.focusInside && j1s.minH >= 44, JSON.stringify(j1s));
@@ -8059,7 +8059,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     ['Anotar um gasto', '2 de 5', 'Toque em Anotar gasto para registrar o que você pagou.'],
     ['Contas a pagar e lembretes', '3 de 5', 'Anote as contas que ainda vão vencer e toque em Já paguei na hora de pagar.'],
     ['Metas e calculadoras', '4 de 5', 'Em Metas, acompanhe o que você guarda e veja um plano.'],
-    ['Onde achar ajuda', '5 de 5', 'Em Aprender › Como usar o Clarevo, cada função tem o passo a passo.'],
+    ['Onde achar ajuda', '5 de 5', 'Em Aprender › Como usar o app da Clarevo, cada função tem o passo a passo.'],
   ];
   for (const [i, [title, pos, text]] of j1Cards.entries()) {
     await j1Next();
@@ -8081,12 +8081,12 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // ---- 2. "Ver o tour de novo" no guia: mostra os cinco cartões outra vez, mesmo já visto ----
   await j1Tab('Aprender e dúvidas').click(); await waitText('Comece por aqui');
-  await p.getByRole('button', { name: 'Como usar o Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
+  await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
   await btn('Ver o tour de novo').click(); await j1Dialog(j1TOUR).first().waitFor({ timeout: 6000 });
   j1s = await j1TourState();
   ok('Tutorial tour: "Ver o tour de novo" abre o cartão 1 de 5 depois de já visto', j1s !== null && j1s.title === 'Resumo do mês' && j1s.text.includes('1 de 5'), JSON.stringify(j1s));
   await j1Dialog(j1TOUR).getByRole('button', { name: 'Pular', exact: true }).click();
-  ok('Tutorial tour: "Pular" fecha o tour revisto, e o guia continua aberto', (await j1TourGone()) && j1Path() === '/aprender/guia' && (await h1Name()) === 'Como usar o Clarevo');
+  ok('Tutorial tour: "Pular" fecha o tour revisto, e o guia continua aberto', (await j1TourGone()) && j1Path() === '/aprender/guia' && (await h1Name()) === 'Como usar o app da Clarevo');
 
   // ---- 3. Outra conta nova: "Pular" no primeiro cartão fecha e o tour não volta; Esc também pula; o foco fica na janela ----
   await j1NewAccount('Kai Tutorial', 'kai@exemplo.com');
@@ -8106,7 +8106,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Tutorial tour: depois de Esc, não volta', await j1TourGone());
 
   // ---- 4. Demonstração: o tour também abre (sempre pulável); a demonstração não muda ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro'); await j1TourOn();
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza'); await j1TourOn();
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await j1Dialog(j1TOUR).first().waitFor({ timeout: 8000 }).catch(() => {});
   j1s = await j1TourState();
@@ -8115,13 +8115,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Tutorial tour: a demonstração segue com os títulos de sempre', (await j1TourGone()) && JSON.stringify(await headingList()) === JSON.stringify(['1:Outubro de 2026', '2:Pagamentos do mês']), JSON.stringify(await headingList()));
 
   // ---- 5. Nunca sobre "Seus últimos meses" (D-030) nem sobre formulários ----
-  await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Seu dinheiro'); await j1TourOn();
+  await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Mais clareza'); await j1TourOn();
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await waitText('Sua última anotação foi em 20/05/2026.', 12000).catch(() => {}); await p.waitForTimeout(1500);
   ok('Tutorial tour: com a faixa "Seus últimos meses" no Resumo, o tour não abre', (await headingShown('Seus últimos meses')) && (await j1Dialog(j1TOUR).count()) === 0);
   await btn('Seguir adiante').click(); await waitText('Combinado.'); await p.waitForTimeout(1200);
   ok('Tutorial tour: nem logo depois de a faixa sair (a faixa foi vista neste Resumo)', !(await headingShown('Seus últimos meses')) && (await j1Dialog(j1TOUR).count()) === 0);
-  await p.goto(`http://localhost:${PORT}/registro/novo?tipo=despesa`); await waitText('Seu dinheiro'); await j1TourOn();
+  await p.goto(`http://localhost:${PORT}/registro/novo?tipo=despesa`); await waitText('Mais clareza'); await j1TourOn();
   await btn('Criar conta').click(); await waitText('Nome de apresentação');
   await field('Nome de apresentação').fill('Noa Tutorial'); await field('E-mail').fill('noa@exemplo.com'); await field('Senha').fill('senha1234');
   await btn('Criar conta').click(); await waitText('Confira seu e-mail');
@@ -8141,18 +8141,18 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     return shown.filter((e) => !e.closest('[role=tablist]')).sort((a, b) => top(a) - top(b)).slice(0, 2).map((e) => e.getAttribute('aria-label') || e.textContent);
   });
   const j1H2 = await p.evaluate(() => [...document.querySelectorAll('h2, [role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
-  ok('Tutorial Aprender: o card "Como usar o Clarevo" é o primeiro botão, e o card "Calculadoras" vem logo depois', j1First[0] === 'Como usar o Clarevo. Onde fica cada função e como usar, passo a passo.' &&
+  ok('Tutorial Aprender: o card "Como usar o app da Clarevo" é o primeiro botão, e o card "Calculadoras" vem logo depois', j1First[0] === 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.' &&
     j1First[1] === 'Calculadoras. Parcelado ou à vista, dívidas, reserva e outras contas com os seus números', JSON.stringify(j1First));
-  ok('Tutorial Aprender: o card não é título (os títulos de Aprender seguem os mesmos, com "Neste mês" do conteúdo de época, D-053)', JSON.stringify(j1H2) === JSON.stringify(['Neste mês', 'Comece por aqui', 'Usar o Clarevo', 'Organizar o mês', 'Juros e crédito', 'Dinheiro no tempo', 'Dúvidas frequentes']), JSON.stringify(j1H2));
+  ok('Tutorial Aprender: o card não é título (os títulos de Aprender seguem os mesmos, com "Neste mês" do conteúdo de época, D-053)', JSON.stringify(j1H2) === JSON.stringify(['Neste mês', 'Comece por aqui', 'Usar o app da Clarevo', 'Organizar o mês', 'Juros e crédito', 'Dinheiro no tempo', 'Dúvidas frequentes']), JSON.stringify(j1H2));
   await j1Keep();
   await j1Widths(async (w) => { await layoutChecks(`tutorial aprender com o guia ${w}px`); await shot(w === 390 ? '320_aprender_como_usar' : '320_aprender_como_usar_320px'); });
 
   // ---- 7. A lista do guia: cinco grupos, trinta e cinco entradas (28 do D-049, "Seu mês em 30 segundos", D-052, "Evolução", D-057, "Análises", D-059, "Família", D-055, "Painel da empresa" e "Benefício pela empresa", D-056, e "Excluir minha conta", D-058) ----
-  await p.getByRole('button', { name: 'Como usar o Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
+  await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
   const j1Groups = () => p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((h) => h.getBoundingClientRect().width > 0).map((h) => ({
     title: h.textContent, rows: [...h.parentElement.parentElement.querySelectorAll('[role=button]')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.getAttribute('aria-label') || b.textContent) })));
   const j1G = await j1Groups();
-  ok('Tutorial guia: /aprender/guia com o título "Como usar o Clarevo", a barra inferior (Aprender marcada) e o botão "Ver o tour de novo"', j1Path() === '/aprender/guia' && (await h1Name()) === 'Como usar o Clarevo' &&
+  ok('Tutorial guia: /aprender/guia com o título "Como usar o app da Clarevo", a barra inferior (Aprender marcada) e o botão "Ver o tour de novo"', j1Path() === '/aprender/guia' && (await h1Name()) === 'Como usar o app da Clarevo' &&
     (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1 && (await visibleCount('button', 'Ver o tour de novo')) === 1);
   ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 10, 7, 8, 2 e 8 entradas (Dia a dia ganhou "Seu mês em 30 segundos", "Evolução" e "Análises" e Conta e privacidade ganhou "Família", "Painel da empresa" e "Benefício pela empresa")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
     JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([10, 7, 8, 2, 8]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
@@ -8198,7 +8198,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     // De volta à lista: a aba Aprender e o card do guia (as abas não deixam a entrada na pilha).
     for (let i = 0; i < 6 && (await p.getByRole('tab', { name: 'Aprender e dúvidas' }).filter({ visible: true }).count()) === 0; i++) { await btn('Voltar').click(); await p.waitForTimeout(400); }
     await j1Tab('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await p.waitForTimeout(300);
-    await p.getByRole('button', { name: 'Como usar o Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
+    await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
   }
   await j1Entry('Importar extrato ou fatura').click(); await waitText('Também em');
   ok('Tutorial guia: "Importar extrato ou fatura" tem "Também em: Conta › Suas contas › Importar extrato"', (await body()).includes('Conta › Suas contas › Importar extrato'));
@@ -8215,10 +8215,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar').click(); await waitText('Uma por uma'); await btn('Voltar').click(); await waitText('Ver o tour de novo');
 
   // ---- 9. Endereços do guia abertos direto (ENTRY_PATH) e entrada que não existe ----
-  await p.goto(`http://localhost:${PORT}/aprender/guia/cartoes`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/aprender/guia/cartoes`); await waitText('Mais clareza');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Para que serve', 12000); await p.waitForTimeout(400);
   ok('Tutorial guia: o endereço /aprender/guia/cartoes aberto direto, depois de entrar, mostra a entrada', j1Path() === '/aprender/guia/cartoes' && (await h1Name()) === 'Cartões e faturas', p.url());
-  await p.goto(`http://localhost:${PORT}/aprender/guia/nao-existe`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/aprender/guia/nao-existe`); await waitText('Mais clareza');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Esta função não está no guia.', 12000);
   ok('Tutorial guia: uma entrada que não existe mostra "Esta função não está no guia." com "Ver o guia"', (await visibleCount('button', 'Ver o guia')) === 1);
   await btn('Ver o guia').click(); await waitText('Ver o tour de novo');
@@ -8839,7 +8839,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar').click(); await waitText('Diferença do mês');
 
   // ---- 13. Conta nova: nada de exemplo; o comprovante vira o primeiro registro ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
   await btn('Criar conta').click(); await waitText('Nome de apresentação');
   await field('Nome de apresentação').fill('Pat Comprovante'); await field('E-mail').fill('pat@exemplo.com'); await field('Senha').fill('senha1234');
   await btn('Criar conta').click(); await waitText('Confira seu e-mail');
@@ -9026,17 +9026,17 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await waitText('Nada anotado em março'); await p.waitForTimeout(400);
   t = await k1Keep();
   ok('K1 março de 2025 (voltando pelo seletor): estado vazio "Nada anotado em março" com o aviso de mês fechado, o botão "Anotar gasto", sem cartões, sem Metas e sem valores',
-    t.includes('Pessoal · Março de 2025') && t.includes('Nada anotado em março') && t.includes('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.') &&
+    t.includes('Pessoal · Março de 2025') && t.includes('Nada anotado em março') && t.includes('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado na Clarevo.') &&
     (await visibleCount('button', 'Anotar gasto')) === 1 && (await k1Progress()) === null && (await visibleCount('button', 'Próximo')) === 0 && !t.includes('Guardado em') && !/R\$ \d/.test(t), t.slice(0, 300));
   await p.getByRole('button', { name: 'Voltar para outubro de 2026', exact: true }).filter({ visible: true }).first().click(); await waitText('Entrou e saiu'); await p.waitForTimeout(500);
   await btn('Voltar').click(); await p.waitForTimeout(500);
 
   // ---- 6. Endereços: /seu-mes?mes=AAAA-MM aberto direto, e meses que não valem ----
-  await p.goto(`http://localhost:${PORT}/seu-mes?mes=2026-09`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/seu-mes?mes=2026-09`); await waitText('Mais clareza');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Entrou e saiu', 12000); await p.waitForTimeout(500);
   ok('K1 endereço: /seu-mes?mes=2026-09 aberto direto, depois de entrar, mostra setembro', k1Path() === '/seu-mes' && (await body()).includes('Pessoal · Setembro de 2026'), p.url());
   for (const bad of ['2026-11', 'banana']) {
-    await p.goto(`http://localhost:${PORT}/seu-mes?mes=${bad}`); await waitText('Seu dinheiro');
+    await p.goto(`http://localhost:${PORT}/seu-mes?mes=${bad}`); await waitText('Mais clareza');
     await btn('Ver demonstração com dados fictícios').click(); await waitText('Entrou e saiu', 12000); await p.waitForTimeout(400);
     ok(`K1 endereço: ?mes=${bad} não vale e a tela abre em outubro (o mês de hoje)`, (await body()).includes('Pessoal · Outubro de 2026'), p.url());
   }
@@ -9076,14 +9076,14 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     return { title: h.textContent, moving };
   });
   await k1Rp.goto(`http://localhost:${PORT}/seu-mes`);
-  await k1Rp.getByText('Seu dinheiro').first().waitFor();
+  await k1Rp.getByText('Mais clareza').first().waitFor();
   await k1Rp.getByRole('button', { name: 'Ver demonstração com dados fictícios', exact: true }).click();
   await k1Rp.getByText('Entrou e saiu').first().waitFor({ timeout: 12000 }); await k1Rp.waitForTimeout(700);
   const k1RmSample = await k1Sample(k1Rp);
   ok('K1 movimento reduzido: o cartão 2 aparece já inteiro (opacidade 1, sem deslocamento nem animação)', k1RmSample.title === 'Para onde foi' && k1RmSample.moving.length === 0, JSON.stringify(k1RmSample));
   await k1Rm.close();
   // Com movimento normal, o mesmo clique desliza e esmaece o cartão novo (a conferência acima não é vazia).
-  await p.goto(`http://localhost:${PORT}/seu-mes`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/seu-mes`); await waitText('Mais clareza');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Entrou e saiu', 12000); await p.waitForTimeout(700);
   const k1Normal = await k1Sample(p);
   ok('K1 movimento normal: o cartão novo entra deslizando e esmaecendo (a animação existe)', k1Normal.title === 'Para onde foi' && k1Normal.moving.length > 0, JSON.stringify(k1Normal));
@@ -9108,7 +9108,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('K1 conta vencida: o cartão 3 mostra Ainda a pagar R$ 690,00, "1 conta vencida" com R$ 40,00 à parte e as próximas contas só de hoje em diante', t.includes('Ainda a pagar\nR$ 690,00') && t.includes('1 conta vencida\nR$ 40,00') && t.includes('Internet\nVence 15/10') && !t.includes('Gás\nVence'), t.slice(0, 500));
 
   // ---- 11. Conta nova: nada de exemplo; o estado vazio, e depois os cartões que existem ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
   await btn('Criar conta').click(); await waitText('Nome de apresentação');
   await field('Nome de apresentação').fill('Kai Mês'); await field('E-mail').fill('kai@exemplo.com'); await field('Senha').fill('senha1234');
   await btn('Criar conta').click(); await waitText('Confira seu e-mail');
@@ -9176,7 +9176,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('K1 aberta pela busca, a tela mostra a aba de Aprender marcada (a de onde a pessoa veio)', (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1);
   await btn('Voltar').click(); await waitText('Buscar um tema ou uma função'); await k1Box().fill('');
   // O guia: a entrada, "Onde fica" e "Abrir Seu mês em 30 segundos".
-  await p.getByRole('button', { name: 'Como usar o Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
+  await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
   await p.getByRole('button', { name: /^Seu mês em 30 segundos\. Resume o mês/ }).filter({ visible: true }).first().click(); await waitText('Para que serve'); await p.waitForTimeout(400);
   t = await k1Keep();
   ok('K1 guia: a entrada "Seu mês em 30 segundos" (/aprender/guia/seu-mes) tem as três seções, "Movimentos › Seu mês em 30 segundos", seis passos e o botão "Abrir Seu mês em 30 segundos"', k1Path() === '/aprender/guia/seu-mes' && (await h1Name()) === 'Seu mês em 30 segundos' &&
@@ -9277,13 +9277,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const k2Notification0 = await k2Notification();
   await k2Tab('Aprender e dúvidas').click(); await waitText('Neste mês'); await p.waitForTimeout(400);
   t = await k2Keep(true);
-  const k2Order = ['Como usar o Clarevo', 'Calculadoras', 'Neste mês', 'Comece por aqui', 'Ir para', ...LEARN_SECTIONS].map((x) => t.indexOf(x));
-  ok('K2 Aprender: o card "Neste mês" vem depois de "Como usar o Clarevo" e de "Calculadoras" e antes de "Comece por aqui", dos atalhos e das seções', k2Order.every((v, i, a) => v >= 0 && (i === 0 || v > a[i - 1])), k2Order.join(','));
+  const k2Order = ['Como usar o app da Clarevo', 'Calculadoras', 'Neste mês', 'Comece por aqui', 'Ir para', ...LEARN_SECTIONS].map((x) => t.indexOf(x));
+  ok('K2 Aprender: o card "Neste mês" vem depois de "Como usar o app da Clarevo" e de "Calculadoras" e antes de "Comece por aqui", dos atalhos e das seções', k2Order.every((v, i, a) => v >= 0 && (i === 0 || v > a[i - 1])), k2Order.join(','));
   ok('K2 Aprender: "Neste mês" é título de nível 2, e os títulos de Aprender são os de sempre mais ele', JSON.stringify(await learnH2()) === JSON.stringify(['Neste mês', 'Comece por aqui', ...LEARN_SECTIONS]), JSON.stringify(await learnH2()));
   ok('K2 Aprender (outubro): a legenda diz "Temas para outubro"', t.includes('Neste mês\nTemas para outubro'), t.slice(t.indexOf('Neste mês') - 20, t.indexOf('Neste mês') + 120));
   const k2Rows = await cardButtons('Neste mês');
   ok('K2 Aprender (outubro): o card tem 13º salário, Contas que chegam uma vez por ano e a calculadora "Cota única ou parcelado?", cada linha com o nome acessível completo', JSON.stringify(k2Rows) === JSON.stringify([k2Row13, k2RowContas, k2RowCalc]), JSON.stringify(k2Rows));
-  ok('K2 Aprender: sem símbolo C, sem nada anotado pela pessoa (só conteúdo público) e o rodapé educativo segue', (await symbolCount()) === 0 && t.includes('Conteúdo educativo e geral, com exemplos fictícios. O Clarevo não oferece crédito nem indica investimentos.'));
+  ok('K2 Aprender: sem símbolo C, sem nada anotado pela pessoa (só conteúdo público) e o rodapé educativo segue', (await symbolCount()) === 0 && t.includes('Conteúdo educativo e geral, com exemplos fictícios. A Clarevo não oferece crédito nem indica investimentos.'));
   await k2Shots('380_aprender_neste_mes', [390, 360, 320], () => scrollTo('Calculadoras'));
   await k2Tab('Aprender e dúvidas').click(); await p.waitForTimeout(300);
 
@@ -9297,12 +9297,12 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     t.includes('Organizar o mês · 2 min de leitura') && t.includes('Duas parcelas, o proporcional e os descontos'), JSON.stringify(await k2H1s()));
   ok('K2 13º salário: os prazos da lei (entre fevereiro e 30 de novembro; até 20 de dezembro), o proporcional (1/12 por mês, 15 dias ou mais) e os descontos sem afirmar em qual parcela (confira o contracheque)', k2.includes('entre fevereiro e 30 de novembro') && k2.includes('até 20 de dezembro') &&
     k2.includes('1/12 da remuneração por mês de serviço') && k2.includes('uma fração de 15 dias ou mais conta como mês inteiro') && k2.includes('Confira no contracheque quais descontos incidem em cada parcela.') && !k2.includes('sai sem desconto') && !k2.includes('Na segunda entram') &&
-    k2.includes('Confira os prazos do ano no site do Ministério do Trabalho e Emprego') && k2.includes('O Clarevo não calcula os descontos'), k2.slice(0, 300));
+    k2.includes('Confira os prazos do ano no site do Ministério do Trabalho e Emprego') && k2.includes('A Clarevo não calcula os descontos'), k2.slice(0, 300));
   ok('K2 13º salário: o exemplo com R$ 3.000,00, R$ 1.500,00, R$ 250,00 e R$ 1.750,00 (7 meses) e as hipóteses fictícias', k2.includes('R$ 3.000,00') && k2.includes('a primeira parcela é de R$ 1.500,00 e a segunda, de R$ 1.500,00 antes dos descontos') &&
     k2.includes('o proporcional é de R$ 250,00 por mês, ou R$ 1.750,00 no total') && k2.includes('Hipóteses do exemplo') && k2.includes('Exemplo fictício: salário fixo de R$ 3.000,00'), k2.slice(k2.indexOf('Exemplo') - 10, k2.indexOf('Exemplo') + 300));
   await btn('Ver a conta').click(); await waitText('250,00 × 7 = 1.750,00'); t = await k2Keep();
   ok('K2 13º salário: "Ver a conta" mostra os quatro passos, até 250,00 × 7 = 1.750,00', ['3.000,00 ÷ 2 = 1.500,00', '3.000,00 − 1.500,00 = 1.500,00', '3.000,00 ÷ 12 = 250,00', '250,00 × 7 = 1.750,00'].every((x) => t.includes(x)));
-  ok('K2 13º salário: sem a seção "No Clarevo" (nenhuma calculadora nem tela ligada)', !t.includes('No Clarevo') && !t.includes('Fazer a conta com os seus números'));
+  ok('K2 13º salário: sem a seção "Na Clarevo" (nenhuma calculadora nem tela ligada)', !t.includes('Na Clarevo') && !t.includes('Fazer a conta com os seus números'));
   ok('K2 13º salário: "Temas relacionados" com Férias, Declaração do Imposto de Renda e Contas que chegam uma vez por ano, nessa ordem', JSON.stringify((await cardButtons('Temas relacionados')).map((x) => x.split('. ')[0])) ===
     JSON.stringify(['Férias: pagamento, um terço e abono', 'Declaração do Imposto de Renda', 'Contas que chegam uma vez por ano']), JSON.stringify(await cardButtons('Temas relacionados')));
   ok('K2 13º salário: "Revisado em 15/10/2026" e cada fonte com "Consultada em 15/10/2026"', t.includes('Revisado em 15/10/2026') && (t.match(/Consultada em 15\/10\/2026/g) ?? []).length === 6 && t.includes('Clarevo: D-011, D-053'));
@@ -9319,7 +9319,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     k2.includes('com pelo menos um terço a mais que o salário normal') && k2.includes('O pagamento das férias deve ser feito até dois dias antes do início') && k2.includes('até 15 dias antes do fim do período aquisitivo') &&
     k2.includes('até três períodos, e um deles precisa ter pelo menos 14 dias corridos') && k2.includes('se a pessoa pedir em janeiro'), k2.slice(0, 300));
   ok('K2 Férias: o exemplo R$ 3.000,00 mais R$ 1.000,00 é R$ 4.000,00 antes dos descontos, com a conta e as hipóteses', k2.includes('R$ 3.000,00 mais R$ 1.000,00, ou seja, R$ 4.000,00 antes dos descontos') && k2.includes('Exemplo fictício: salário fixo, 30 dias de férias'));
-  ok('K2 Férias: "No Clarevo" com "Fazer a conta com os seus números", ligado a "Juntar para um objetivo"', t.includes('No Clarevo') && (await visibleCount('button', 'Fazer a conta com os seus números')) === 1);
+  ok('K2 Férias: "Na Clarevo" com "Fazer a conta com os seus números", ligado a "Juntar para um objetivo"', t.includes('Na Clarevo') && (await visibleCount('button', 'Fazer a conta com os seus números')) === 1);
   const k2SrcFerias = await k2Sources('ferias');
   ok('K2 Férias: quatro fontes oficiais com "Consultada em 15/10/2026" e domínio permitido', k2SrcFerias.n === 4 && k2SrcFerias.bad.length === 0, `${k2SrcFerias.n} ${k2SrcFerias.bad.join(' | ')}`);
   await k2Shots('383_epoca_ferias', [390, 320], () => scrollTo('Férias: pagamento, um terço e abono'));
@@ -9348,7 +9348,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     k2.includes('em 2026, o prazo foi de 23 de março a 29 de maio') && k2.includes('Confira a data oficial do ano no site da Receita') && !/2027|2028/.test(k2.split('Fontes')[0]), k2.slice(0, 300));
   ok('K2 Imposto de Renda: a multa (1% ao mês ou fração, mínimo de R$ 165,74 e máximo de 20%) e as quotas (até 8, nenhuma menor que R$ 50,00, imposto abaixo de R$ 100,00 de uma vez)', k2.includes('Quem precisa declarar e entrega depois do prazo paga multa de 1% ao mês ou fração de atraso sobre o imposto devido, com mínimo de R$ 165,74 e máximo de 20% do imposto') &&
     k2.includes('dividido em até 8 quotas mensais, e nenhuma quota pode ser menor que R$ 50,00') && k2.includes('Imposto menor que R$ 100,00 é pago de uma só vez') && k2.includes('A primeira quota, paga no prazo, não tem juros'));
-  ok('K2 Imposto de Renda: o exemplo R$ 1.200,00 em 8 quotas de R$ 150,00 e o aviso de que o Clarevo não calcula nem entrega a declaração', k2.includes('Com imposto a pagar de R$ 1.200,00, a quota única é de R$ 1.200,00. Em 8 quotas, cada uma é de R$ 150,00') && k2.includes('O Clarevo não calcula nem entrega a declaração'));
+  ok('K2 Imposto de Renda: o exemplo R$ 1.200,00 em 8 quotas de R$ 150,00 e o aviso de que a Clarevo não calcula nem entrega a declaração', k2.includes('Com imposto a pagar de R$ 1.200,00, a quota única é de R$ 1.200,00. Em 8 quotas, cada uma é de R$ 150,00') && k2.includes('A Clarevo não calcula nem entrega a declaração'));
   const k2SrcIR = await k2Sources('imposto-de-renda');
   ok('K2 Imposto de Renda: seis fontes oficiais (Receita Federal e Planalto) com "Consultada em 15/10/2026" e domínio permitido', k2SrcIR.n === 6 && k2SrcIR.bad.length === 0, `${k2SrcIR.n} ${k2SrcIR.bad.join(' | ')}`);
   await btn('Ver a conta').click(); await waitText('24 quotas possíveis, limitadas a 8'); t = await k2Keep();
@@ -9388,8 +9388,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('K2 busca: ao limpar, o card "Neste mês" volta com as mesmas três linhas', JSON.stringify(await cardButtons('Neste mês')) === JSON.stringify([k2Row13, k2RowContas, k2RowCalc]), JSON.stringify(await cardButtons('Neste mês')));
 
   // ---- 6. O guia (D-049): a entrada "Aprender" ganhou o passo ----
-  await p.getByRole('button', { name: 'Como usar o Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
-  await p.getByRole('button', { name: /^Aprender\. Explicações curtas sobre contas, juros e o próprio Clarevo/ }).filter({ visible: true }).first().click(); await waitText('Para que serve'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
+  await p.getByRole('button', { name: /^Aprender\. Explicações curtas sobre contas, juros e o próprio app/ }).filter({ visible: true }).first().click(); await waitText('Para que serve'); await p.waitForTimeout(400);
   t = await k2Keep();
   ok('K2 guia: a entrada "Aprender" tem o passo "Neste mês" (13º salário, volta às aulas, Imposto de Renda e férias, e o card que some nos meses sem tema) e seis passos', k2Path() === '/aprender/guia/aprender' &&
     t.includes('Em "Neste mês", veja os temas do mês: 13º salário e contas do começo do ano no fim do ano, volta às aulas no começo, Imposto de Renda de fevereiro a maio e férias em junho e julho. O card some nos meses sem tema.') &&
@@ -9399,7 +9399,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar').click(); await waitText('Neste mês');
 
   // ---- 7. Conta nova: o mesmo card (conteúdo público; nada de exemplo da pessoa) ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
   await btn('Criar conta').click(); await waitText('Nome de apresentação');
   await field('Nome de apresentação').fill('Kai Época'); await field('E-mail').fill('kai.epoca@exemplo.com'); await field('Senha').fill('senha1234');
   await btn('Criar conta').click(); await waitText('Confira seu e-mail');
@@ -9501,7 +9501,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await p.getByRole('button', { name: new RegExp(`^Fatura de ${month}, `) }).filter({ visible: true }).first().click(); await waitText('Lançamentos'); await p.waitForTimeout(500);
   };
   const d54NewAccount = async (name, email) => {
-    await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+    await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
     await btn('Criar conta').click(); await waitText('Nome de apresentação');
     await field('Nome de apresentação').fill(name); await field('E-mail').fill(email); await field('Senha').fill('senha1234');
     await btn('Criar conta').click(); await waitText('Confira seu e-mail');
@@ -9726,8 +9726,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('D54 conta nova: "Dispensar aviso" tira o aviso do card, sem nenhuma escrita na rede e sem dado financeiro no armazenamento do aparelho', !(await body()).includes('Chegou a 85% do orçamento.') && writes.length === d54Writes3 && !/Mercado|85000|Feira/.test(await d54Store()) && (await d54Store()).length >= d54Store1.length - 1, `${(await d54Store()).slice(0, 200)}`);
 
   // ---- 8. O guia (D-049): os passos que mudaram ----
-  await d54Tab('Aprender e dúvidas').click(); await waitText('Como usar o Clarevo'); await p.waitForTimeout(400);
-  await p.getByRole('button', { name: 'Como usar o Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
+  await d54Tab('Aprender e dúvidas').click(); await waitText('Como usar o app da Clarevo'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
   const d54Guide = async (name, text) => {
     await p.getByRole('button', { name }).filter({ visible: true }).first().click(); await waitText('Para que serve'); await p.waitForTimeout(400);
     const x = await d54Keep();
@@ -9790,7 +9790,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await tab().first().click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
   };
   const famConta = async () => { await famGoResumo(); await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho'); };
-  const famSignOut = async () => { await famConta(); await btn('Sair deste aparelho').click(); await waitText('Seu dinheiro'); };
+  const famSignOut = async () => { await famConta(); await btn('Sair deste aparelho').click(); await waitText('Mais clareza'); };
   const famTab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
   const famGoFamilia = async () => { await famConta(); await p.getByRole('button', { name: /^(Criar Família|Abrir Família)/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(500); };
   const famSelectorCount = () => p.getByRole('tab', { name: /^Ver dados de / }).filter({ visible: true }).count();
@@ -9804,7 +9804,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const famKeep = async () => { famTexts.push(await body()); await keepText(); };
   const famWrites0 = writes.length;
 
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
 
   // ---- 1. Vera cria a conta: sem Família, o Resumo não tem seletor e o Pessoal é o único contexto ----
   await famCreateAccount('Vera Lima', 'vera.familia@exemplo.com');
@@ -9941,7 +9941,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Convidar: o link aparece (endereço do app mais /convite/ e 32 caracteres), com a validade, "Compartilhar", "Copiar link" e a regra de ver o link só agora', famLink1 !== null && famLink1.startsWith(`http://localhost:${PORT}/convite/`) &&
     t.includes('Anota e vê · vale até 14/10') && (await visibleCount('button', 'Compartilhar')) === 1 && (await visibleCount('button', 'Copiar link')) === 1 && t.includes('Ele aparece só agora'), `${famLink1} ${t.slice(0, 200)}`);
   const shared1 = await p.evaluate(() => window.__shared);
-  ok('Convidar: o compartilhamento do aparelho abriu sozinho com a mensagem e o link', shared1.length === 1 && shared1[0].text === `Convite para a Família Casa Lima no Clarevo: ${famLink1}` && shared1[0].title === 'Convite para a Família', JSON.stringify(shared1));
+  ok('Convidar: o compartilhamento do aparelho abriu sozinho com a mensagem e o link', shared1.length === 1 && shared1[0].text === `Convite para a Família Casa Lima na Clarevo: ${famLink1}` && shared1[0].title === 'Convite para a Família', JSON.stringify(shared1));
   await btn('Compartilhar').click(); await p.waitForTimeout(300);
   ok('Convidar: "Compartilhar" abre o compartilhamento de novo', (await p.evaluate(() => window.__shared.length)) === 2);
   await btn('Copiar link').click(); await waitText('Link copiado.').catch(() => {}); await p.waitForTimeout(300);
@@ -10026,7 +10026,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await famSignOut();
   // Sem recarregar a página (recarregar zera o acesso simulado): o endereço do convite entra pelo histórico, como um link aberto no app.
   await p.evaluate((path) => { history.pushState({}, '', path); window.dispatchEvent(new PopStateEvent('popstate')); }, new URL(famLink3).pathname);
-  await waitText('Você recebeu um convite para uma Família no Clarevo.'); await p.waitForTimeout(400);
+  await waitText('Você recebeu um convite para uma Família na Clarevo.'); await p.waitForTimeout(400);
   t = await body();
   ok('Convite sem conta: explica, oferece "Criar conta" e "Entrar" e diz que o Pessoal de ninguém fica visível', famPath() === new URL(famLink3).pathname && (await famH1()) === 'Convite para a Família' &&
     t.includes('Entre ou crie sua conta para ver quem convidou e aceitar. Depois você volta para este convite.') && (await visibleCount('button', 'Criar conta')) === 1 && (await visibleCount('button', 'Entrar')) === 1 &&
@@ -10066,7 +10066,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await body();
   ok('Quem vê estes dados? na Família: "Casa Lima", as três pessoas com o papel de cada uma e o que cada papel pode fazer', famPath() === '/quem-ve' && t.includes('Casa Lima') && t.includes('Vera') && t.includes('Mauro') && t.includes('Lia (você)') &&
     t.includes('Vê, anota e edita o que é de outras pessoas.') && t.includes('Vê e anota. Altera só o que anotou.') && t.includes('Só vê. Não anota nem altera nada.') && t.includes('Demonstração · Família'), t.slice(0, 500));
-  ok('Quem vê estes dados? na Família: o Pessoal de ninguém aparece, a empresa não vê e os textos do Pessoal ("só no seu Pessoal") não valem aqui', t.includes('O Pessoal de cada pessoa continua só dela') && t.includes('Se uma empresa oferecer o Clarevo como benefício') && !t.includes('Única pessoa do app que vê, anota, edita e exclui') && !t.includes('Gastos fixos e parcelamentos também ficam só no seu Pessoal.'));
+  ok('Quem vê estes dados? na Família: o Pessoal de ninguém aparece, a empresa não vê e os textos do Pessoal ("só no seu Pessoal") não valem aqui', t.includes('O Pessoal de cada pessoa continua só dela') && t.includes('Se uma empresa oferecer a Clarevo como benefício') && !t.includes('Única pessoa do app que vê, anota, edita e exclui') && !t.includes('Gastos fixos e parcelamentos também ficam só no seu Pessoal.'));
   await famKeep();
   await famShots('412_quem_ve_familia');
   await btn('Entendi').click(); await p.waitForTimeout(400);
@@ -10147,7 +10147,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Encerrada: o seletor some', (await famSelectorCount()) === 0);
 
   // ---- 9. A demonstração com dados fictícios: sem Família de exemplo, sem seletor e sem criar ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   ok('Demonstração: o Resumo não tem o seletor "Pessoal | Família" e os totais seguem 6.000 / 3.900 / 2.100', (await famSelectorCount()) === 0 && (await body()).includes('R$ 6.000,00') && (await body()).includes('R$ 3.900,00') && (await body()).includes('R$ 2.100,00'));
@@ -10210,7 +10210,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const empPush = (pathname) => p.evaluate((path) => { history.pushState({}, '', path); window.dispatchEvent(new PopStateEvent('popstate')); }, pathname);
 
   // ---- 1. Demonstração (investidor): Conta, o painel da "Empresa Exemplo (demonstração)", fictícia e identificada ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   await empStubClipboard();
@@ -10240,7 +10240,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     t.includes('A empresa não vê valores, categorias, metas, contas, cartões nem a Família de ninguém, nem somados.'), `${await empRow('Vagas contratadas')}`);
   ok('Painel: Textos para divulgar (4 fixos mais "Neste mês: outubro"), cada um com "Copiar texto"; nenhum leva e-mail nem valor',
     (await headingShown('Textos para divulgar')) && ['Anúncio do benefício', 'Como entrar', 'Lembrete para quem ainda não entrou', 'O que a empresa vê', 'Neste mês: outubro'].every((x) => t.includes(x)) &&
-    (await visibleCount('button', /^Copiar o texto /)) === 5 && t.includes('Em outubro, o Clarevo tem conteúdo sobre 13º salário e'), t.slice(-900));
+    (await visibleCount('button', /^Copiar o texto /)) === 5 && t.includes('Em outubro, a Clarevo tem conteúdo sobre 13º salário e'), t.slice(-900));
   await empKeep();
   await empShots('421_empresa_painel', { wide: true });
   // Licenças: 22 (12 ativas, 6 com convite, 3 encerradas e 1 convite cancelado), com filtro por situação.
@@ -10313,10 +10313,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await empShots('426_empresa_uso', { scroll: empScroll('Uso do app') });
   await empShots('427_empresa_textos', { scroll: empScroll('Textos para divulgar') });
   await btn('Copiar o texto Anúncio do benefício').click(); await waitText('Texto copiado.'); await p.waitForTimeout(200);
-  ok('"Copiar texto": copia o texto pronto, sem e-mail nem número de ninguém', await (async () => { const c = await p.evaluate(() => window.__copied.at(-1)); return c.startsWith('Chegou um benefício para ajudar a organizar o dinheiro do mês: o Clarevo.') && !/@|R\$\s?\d/.test(c); })());
+  ok('"Copiar texto": copia o texto pronto, sem e-mail nem número de ninguém', await (async () => { const c = await p.evaluate(() => window.__copied.at(-1)); return c.startsWith('Chegou um benefício para ajudar a organizar o dinheiro do mês: a Clarevo.') && !/@|R\$\s?\d/.test(c); })());
   ok('Painel da demonstração: nenhuma escrita na rede (a empresa de exemplo vive só na memória)', writes.length === empWrites0, writes.slice(empWrites0).join(' | '));
   // A demonstração de novo: nada do que foi feito fica (cada visita refaz a empresa de exemplo) e os totais não mudam.
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   ok('Demonstração de novo: os totais de outubro seguem 6.000 / 3.900 / 2.100 e o Resumo não ganhou nada da empresa', (await body()).includes('R$ 6.000,00') && (await body()).includes('R$ 3.900,00') && (await body()).includes('R$ 2.100,00') && !(await body()).includes('Empresa Exemplo'));
@@ -10324,13 +10324,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Demonstração de novo: a empresa de exemplo volta como era (22 licenças, nenhum convite do roteiro anterior)', (await empChip('Todas, 22').count()) === 1 && !(await body()).includes('nova.pessoa@'));
 
   // ---- 4. Conta nova de RH (Rita): sem empresa, sem painel; depois que a equipe cadastra a empresa, o painel aparece ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
   await empStubClipboard();
   await famCreateAccount('Rita Prado', 'rita.empresa@exemplo.com');
   await famConta(); await waitText('Tenho um convite da empresa'); await p.waitForTimeout(300);
   t = await body();
   ok('Conta nova: sem empresa, não há "Painel da empresa"; "Benefício pela empresa" oferece "Tenho um convite da empresa" (nada de exemplo)', (await visibleCount('button', 'Abrir painel da empresa')) === 0 && !(await headingShown('Painel da empresa')) &&
-    (await headingShown('Benefício pela empresa')) && t.includes('Se a sua empresa oferece o Clarevo como benefício, cole aqui o link do convite para ver os detalhes e aceitar.') && t.includes('Tenho um convite da empresa') && !t.includes('Empresa Exemplo'), t.slice(0, 400));
+    (await headingShown('Benefício pela empresa')) && t.includes('Se a sua empresa oferece a Clarevo como benefício, cole aqui o link do convite para ver os detalhes e aceitar.') && t.includes('Tenho um convite da empresa') && !t.includes('Empresa Exemplo'), t.slice(0, 400));
   await empKeep();
   await empShots('429_conta_convite_empresa', { scroll: empScroll('Benefício pela empresa') });
   // A equipe Clarevo cadastra a empresa (no banco de verdade, pelo SQL Editor; aqui, no hub da memória).
@@ -10401,7 +10401,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('button', { name: 'Quem vê estes dados?' }).filter({ visible: true }).first().click(); await waitText('Entendi'); await p.waitForTimeout(400);
   t = await body();
   ok('Quem vê estes dados?: explica o que a empresa vê (e-mails que convidou, situação e datas) e o que nunca vê (nem se ou quando a pessoa usa o app)', t.includes('A empresa que oferece o benefício vê os e-mails que ela mesma convidou, a situação de cada convite ou licença (convite enviado, convite cancelado, ativa ou encerrada) e as datas.') &&
-    t.includes('Ela não vê se ou quando você usa o app depois de aceitar.') && !/quantas entraram no app|5 pessoas ativas/.test(t) && t.includes('A empresa não vê valores, categorias, metas, contas, cartões nem a Família de ninguém, nem somados.') && t.includes('Se uma empresa oferecer o Clarevo como benefício'), t.slice(0, 600));
+    t.includes('Ela não vê se ou quando você usa o app depois de aceitar.') && !/quantas entraram no app|5 pessoas ativas/.test(t) && t.includes('A empresa não vê valores, categorias, metas, contas, cartões nem a Família de ninguém, nem somados.') && t.includes('Se uma empresa oferecer a Clarevo como benefício'), t.slice(0, 600));
   await empKeep();
   await empShots('435_quem_ve_empresa');
   await btn('Entendi').click(); await waitText('Diferença do mês');
@@ -10409,7 +10409,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // ---- 6. Caio abre o link sem ter conta: entra pela criação da conta e volta ao convite ----
   await famSignOut();
   await empPush(new URL(empCaio).pathname);
-  await waitText('Você recebeu um convite da sua empresa para usar o Clarevo como benefício.'); await p.waitForTimeout(400);
+  await waitText('Você recebeu um convite da sua empresa para usar o app da Clarevo como benefício.'); await p.waitForTimeout(400);
   t = await body();
   ok('Convite da empresa sem conta: explica, oferece "Criar conta" e "Entrar", e nada do convite (empresa, plano) aparece antes de entrar', famPath() === new URL(empCaio).pathname && (await famH1()) === 'Benefício da empresa' &&
     t.includes('Entre ou crie sua conta com o e-mail do convite para ver os detalhes e aceitar. Depois você volta para este convite.') && (await visibleCount('button', 'Criar conta')) === 1 && (await visibleCount('button', 'Entrar')) === 1 && !t.includes('Empresa Alfa') && !t.includes('Plano individual'), `${famPath()} ${t.slice(0, 300)}`);
@@ -10520,7 +10520,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   };
   const evEnter = async (scenario) => {
-    await p.goto(`http://localhost:${PORT}/${scenario ? `?cenario=${scenario}` : ''}`); await waitText('Seu dinheiro');
+    await p.goto(`http://localhost:${PORT}/${scenario ? `?cenario=${scenario}` : ''}`); await waitText('Mais clareza');
     await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
     await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   };
@@ -10745,7 +10745,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('button', { name: /^Evolução\. Recebido e pago mês a mês/ }).filter({ visible: true }).first().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(500);
   ok('Evolução busca: a linha "No app" abre /evolucao, com a aba de Aprender marcada (a de onde a pessoa veio)', evPath() === '/evolucao' && (await h1Name()) === 'Evolução' && (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1, evPath());
   await btn('Voltar').click(); await waitText('Buscar um tema ou uma função'); await evBox().fill('');
-  await p.getByRole('button', { name: 'Como usar o Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
+  await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
   await p.getByRole('button', { name: /^Evolução\. Mostra o Recebido ou o Pago/ }).filter({ visible: true }).first().click(); await waitText('Para que serve'); await p.waitForTimeout(400);
   t = await evKeep();
   ok('Evolução guia: a entrada "Evolução" (/aprender/guia/evolucao) tem as três seções, "Movimentos › Evolução", seis passos e o botão "Abrir Evolução"', evPath() === '/aprender/guia/evolucao' && (await h1Name()) === 'Evolução' &&
@@ -10757,7 +10757,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar').click(); await waitText('Ver o tour de novo');
 
   // ---- 8. O endereço direto: /evolucao aberto direto, depois de entrar, abre a tela ----
-  await p.goto(`http://localhost:${PORT}/evolucao`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/evolucao`); await waitText('Mais clareza');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Valores registrados, pela data do pagamento', 12000); await p.waitForTimeout(700);
   ok('Evolução endereço: /evolucao aberto direto, depois de entrar, mostra a tela, de consulta, por cima do Resumo (com a barra inferior e o botão "Voltar")', evPath() === '/evolucao' && (await h1Name()) === 'Evolução' && (await evNames()).length === 6 &&
     (await p.getByRole('tab').filter({ visible: true }).count()) === 4 && (await visibleCount('button', 'Voltar')) === 1, p.url());
@@ -11211,11 +11211,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Evolução lacuna: sem a conta em aberto, o aviso de março some', names[4] === 'Março de 2026, R$ 3.300,00, na comparação' && !(await body()).includes('Pode faltar algo'), JSON.stringify(names.slice(2, 8)));
 
   // ---- 19. Conta nova (T19): nada de exemplo, e a seleção de outra pessoa nunca passa ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
   await famCreateAccount('Eva Lima', 'eva.evolucao@exemplo.com');
   await evOpen();
   t = await evKeep();
-  ok('Evolução conta nova: "Sem registros nestes meses", a frase de mês sem anotação, o botão "Anotar gasto" e nenhum gráfico, nenhuma média e nenhum valor de exemplo', t.includes('Sem registros nestes meses') && t.includes('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.') &&
+  ok('Evolução conta nova: "Sem registros nestes meses", a frase de mês sem anotação, o botão "Anotar gasto" e nenhum gráfico, nenhuma média e nenhum valor de exemplo', t.includes('Sem registros nestes meses') && t.includes('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado na Clarevo.') &&
     (await visibleCount('button', 'Anotar gasto')) === 1 && (await evNames()).length === 0 && !/R\$ \d/.test(t) && !t.includes('Média dos meses'), t.slice(0, 300));
   await evShots('455_evolucao_conta_nova');
   await radio('Recebido').click(); await p.waitForTimeout(500);
@@ -11693,7 +11693,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('button', { name: /^Análises\. Categorias em barras ou bolhas/ }).filter({ visible: true }).first().click(); await waitText('Consulte o mês escolhido'); await p.waitForTimeout(600);
   ok('Análises busca: a linha "No app" abre /analises, com a aba de Aprender marcada (a de onde a pessoa veio)', anPath() === '/analises' && (await h1Name()) === 'Análises' && (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1);
   await btn('Voltar').click(); await waitText('Buscar um tema ou uma função'); await evBox().fill('');
-  await p.getByRole('button', { name: 'Como usar o Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
+  await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
   await p.getByRole('button', { name: /^Análises\. Reúne, em quatro abas/ }).filter({ visible: true }).first().click(); await waitText('Para que serve'); await p.waitForTimeout(400);
   t = await anKeep();
   ok('Análises guia: a entrada "Análises" (/aprender/guia/analises) tem as três seções, "Movimentos › Análises", seis passos e o botão "Abrir Análises"', anPath() === '/aprender/guia/analises' && (await h1Name()) === 'Análises' &&
@@ -11702,16 +11702,16 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await anShots('496_analises_guia', { tab: true });
   await btn('Abrir Análises').click(); await waitText('Consulte o mês escolhido'); await p.waitForTimeout(500);
   ok('Análises guia: "Abrir Análises" abre a tela (/analises)', anPath() === '/analises' && (await h1Name()) === 'Análises');
-  await p.goto(`http://localhost:${PORT}/analises`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/analises`); await waitText('Mais clareza');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Consulte o mês escolhido', 12000); await p.waitForTimeout(900);
   ok('Análises endereço: /analises aberto direto, depois de entrar, mostra a tela, de consulta, por cima do Resumo (com a barra inferior e o botão "Voltar")', anPath() === '/analises' && (await h1Name()) === 'Análises' && (await anTabs()).length === 4 &&
     (await p.getByRole('tab').filter({ visible: true }).count()) === 8 && (await visibleCount('button', 'Voltar')) === 1, p.url());
-  await p.goto(`http://localhost:${PORT}/analises?aba=orcamento&mes=2026-09`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/analises?aba=orcamento&mes=2026-09`); await waitText('Mais clareza');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Consulte o mês escolhido', 12000); await p.waitForTimeout(900);
   ok('Análises endereço: ?aba=orcamento&mes=2026-09 abre na aba Orçamento, em setembro de 2026', (await anTabs()).map((x) => x.selected).join() === 'false,false,false,true' && (await anMonthLabel()).includes('Setembro de 2026'));
 
   // ---- 12. Conta nova (nada de exemplo), Família e o que fica no aparelho ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
   await famCreateAccount('Ivo Lima', 'ivo.analises@exemplo.com');
   await anOpen();
   t = await anKeep();
@@ -11815,7 +11815,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // "Excluir minha conta" é também o nome do cabeçalho e do título do card de Conta; o botão final é o único botão com este nome na tela.
   const delFinalEnabled = async () => (await visibleCount('button', 'Excluir minha conta')) === 1 && !(await delFinal().isDisabled());
 
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
 
   // ---- 1. Iris, conta nova sem Família: o card em Conta é o último item, sem destaque de alerta ----
   await famCreateAccount('Iris Neves', 'iris.exclusao@exemplo.com');
@@ -11972,8 +11972,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Criar uma conta').click(); await waitText('Nome de apresentação'); await p.waitForTimeout(300);
   ok('Sua conta foi excluída: "Criar uma conta" abre o cadastro', (await body()).includes('Nome de apresentação'));
   await p.goto(`http://localhost:${PORT}/conta-excluida`); await waitText('Sua conta foi excluída');
-  await btn('Voltar ao início').click(); await waitText('Seu dinheiro'); await p.waitForTimeout(300);
-  ok('Sua conta foi excluída: "Voltar ao início" leva à boas-vindas', (await body()).includes('Seu dinheiro'));
+  await btn('Voltar ao início').click(); await waitText('Mais clareza'); await p.waitForTimeout(300);
+  ok('Sua conta foi excluída: "Voltar ao início" leva à boas-vindas', (await body()).includes('Mais clareza'));
 
   // ---- 11b. A resposta da exclusão se perdeu e a sessão caiu, sem a confirmação do servidor: o app diz que não foi possível confirmar ----
   // O roteador abre esta tela (estado=nao-confirmada) depois de limpar o aparelho; a decisão é coberta pelos testes do core
@@ -11989,12 +11989,12 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Entrar').click(); await waitText('Esqueci minha senha'); await p.waitForTimeout(300);
   ok('Resposta perdida: "Entrar" abre a entrada, para conferir se a conta ainda existe', (await body()).includes('Esqueci minha senha'));
   await p.goto(`http://localhost:${PORT}/conta-excluida?estado=nao-confirmada`); await waitText('Não foi possível confirmar a exclusão');
-  await btn('Voltar ao início').click(); await waitText('Seu dinheiro'); await p.waitForTimeout(300);
-  ok('Resposta perdida: "Voltar ao início" leva à boas-vindas', (await body()).includes('Seu dinheiro'));
+  await btn('Voltar ao início').click(); await waitText('Mais clareza'); await p.waitForTimeout(300);
+  ok('Resposta perdida: "Voltar ao início" leva à boas-vindas', (await body()).includes('Mais clareza'));
   // Sem o parâmetro (ou com outro valor), a tela é a de sempre: "Sua conta foi excluída".
   await p.goto(`http://localhost:${PORT}/conta-excluida?estado=qualquer`); await waitText('Sua conta foi excluída');
   ok('Sua conta foi excluída: um estado desconhecido cai na tela de sempre', (await famH1()) === 'Sua conta foi excluída' && !(await body()).includes('Não foi possível confirmar'));
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro'); await p.waitForTimeout(300);
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza'); await p.waitForTimeout(300);
 
   // ---- 12. A demonstração com dados fictícios: a tela abre e explica, o botão final diz que nada é apagado e os totais não mudam ----
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
@@ -12070,7 +12070,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const DU_YEAR_ADVICE = 'Impostos podem ter regra diferente. Confira a data no carnê ou no site do órgão.';
 
   // ---- 1. A demonstração: nada em outubro cai em dia que não é útil; em "Próximos meses", as faturas do Cartão Exemplo de 10/01, 10/04 e 10/07/2027 (domingo e sábados) levam o aviso ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('R$ 2.100,00'); await p.waitForTimeout(400);
   t = await body();
   const duResumoSemVencida = !/vencida/i.test(t);
@@ -12135,20 +12135,20 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await duMoreButton().first().click(); await waitText('Contam só os feriados nacionais de data fixa definidos em lei federal'); await p.waitForTimeout(400);
   t = await body();
   ok('Dia útil, "Saiba mais": a data não muda, os nove feriados nacionais de data fixa, o que não entra (Carnaval, Sexta-feira Santa, Corpus Christi, estados e municípios), o dia de eleição (domingo) e "confira com quem cobra"',
-    t.includes('O Clarevo não muda a data de vencimento') && ['1º de janeiro', '21 de abril', '1º de maio', '7 de setembro', '12 de outubro', '2 de novembro', '15 de novembro', '20 de novembro', '25 de dezembro'].every((x) => t.includes(x)) &&
+    t.includes('A Clarevo não muda a data de vencimento') && ['1º de janeiro', '21 de abril', '1º de maio', '7 de setembro', '12 de outubro', '2 de novembro', '15 de novembro', '20 de novembro', '25 de dezembro'].every((x) => t.includes(x)) &&
     t.includes('Carnaval, Sexta-feira Santa, Corpus Christi e os feriados de estados e municípios não entram.') && t.includes('O dia de eleição cai sempre num domingo, que já é coberto pelo fim de semana.') && t.includes('Quem cobra pode ter outro calendário.') && t.includes('confira com quem cobra'), t.slice(300, 1500));
   ok('Dia útil, "Saiba mais": a fonte lista as três leis e a data da consulta (19/10/2026), e o botão passa a aria-expanded=true',
     t.includes('Fontes: Lei nº 662/1949, com a redação da Lei nº 10.607/2002; Lei nº 6.802/1980; Lei nº 14.759/2023; Lei nº 7.089/1983; notícia do STJ sobre o REsp 1.954.924. Consultadas em 19/10/2026.') && (await duMoreButton().first().getAttribute('aria-expanded')) === 'true');
   ok('Dia útil, "Saiba mais" (D-061): cita a Lei nº 7.089/1983, diz que a multa e as regras de cada cobrança podem variar (confira com quem cobra), que passar do primeiro dia útil pode contar juros desde a data original (entendimento do STJ) e que conta do ano não ganha a tolerância',
     t.includes('A Lei nº 7.089/1983 proíbe bancos e instituições financeiras de cobrar juros de mora sobre título que vence em sábado, domingo ou feriado, desde que seja quitado no primeiro dia subsequente, que o STJ lê como o primeiro dia útil seguinte.') &&
-    t.includes('A multa e as regras de cada cobrança podem variar, e o Clarevo não sabe qual vale para a sua conta. Por isso, confira com quem cobra antes de escolher a data do pagamento.') &&
+    t.includes('A multa e as regras de cada cobrança podem variar, e a Clarevo não sabe qual vale para a sua conta. Por isso, confira com quem cobra antes de escolher a data do pagamento.') &&
     t.includes('Se o pagamento passar do primeiro dia útil, os juros podem contar desde a data original do vencimento: é o entendimento do STJ') &&
-    t.includes('Contas do ano, como IPVA, IPTU e matrícula, costumam ser tributos e não ganham essa tolerância no Clarevo') && t.includes(DU_YEAR_ADVICE) &&
+    t.includes('Contas do ano, como IPVA, IPTU e matrícula, costumam ser tributos e não ganham essa tolerância na Clarevo') && t.includes(DU_YEAR_ADVICE) &&
     t.includes('"Vence terça, 13/10 (próximo dia útil)" e só passa a vencida depois que esse dia termina.'), t.slice(300, 2400));
   ok('Dia útil, "Saiba mais": nenhuma promessa de ausência de encargos (sem "sem multa", "sem juros", "sem encargos", "garantido" nem "não há multa")', !/sem (multa|juros|encargos?)|garant|n[aã]o (h[aá]|tem|cobra|cobram) (multa|juros|encargos?)/i.test(t));
   await duKeep();
   await duShots('522_dia_util_saiba_mais', duScroll('Vencimento em dia que não é útil'));
-  await duShots('528_dia_util_saiba_mais_lei_7089', duScroll('A Lei nº 7.089/1983 proíbe bancos e instituições financeiras de cobrar juros de mora sobre título que vence em sábado, domingo ou feriado, desde que seja quitado no primeiro dia subsequente, que o STJ lê como o primeiro dia útil seguinte. A multa e as regras de cada cobrança podem variar, e o Clarevo não sabe qual vale para a sua conta. Por isso, confira com quem cobra antes de escolher a data do pagamento.'));
+  await duShots('528_dia_util_saiba_mais_lei_7089', duScroll('A Lei nº 7.089/1983 proíbe bancos e instituições financeiras de cobrar juros de mora sobre título que vence em sábado, domingo ou feriado, desde que seja quitado no primeiro dia subsequente, que o STJ lê como o primeiro dia útil seguinte. A multa e as regras de cada cobrança podem variar, e a Clarevo não sabe qual vale para a sua conta. Por isso, confira com quem cobra antes de escolher a data do pagamento.'));
   await duMoreButton().first().click(); await p.waitForTimeout(400);
   ok('Dia útil, "Saiba mais": tocar de novo recolhe a explicação', !(await body()).includes('Contam só os feriados nacionais de data fixa definidos em lei federal') && (await duMoreButton().first().getAttribute('aria-expanded')) === 'false');
   await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(300);
@@ -12215,10 +12215,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('button', { name: /^Seguro do ano \(exemplo\), vence em 25\/12\/2026/ }).filter({ visible: true }).first().click(); await waitText('Vencimento'); await p.waitForTimeout(600);
   t = await body();
   ok('Dia útil, detalhe da conta do ano (D-061): "Vence em 25/12/2026" (sem etiqueta de próximo dia útil), o aviso diz que passa a vencida no dia seguinte e "Impostos podem ter regra diferente. Confira a data no carnê ou no site do órgão.", sem a frase de quem cobra',
-    t.includes('Vence em 25/12/2026') && !t.includes('(próximo dia útil)') && t.includes('Vence na sexta, 25/12/2026, que não é dia útil (feriado nacional: Natal). Em conta do ano, o Clarevo não usa o próximo dia útil: ela passa a vencida a partir do dia seguinte ao vencimento.') &&
+    t.includes('Vence em 25/12/2026') && !t.includes('(próximo dia útil)') && t.includes('Vence na sexta, 25/12/2026, que não é dia útil (feriado nacional: Natal). Em conta do ano, a Clarevo não usa o próximo dia útil: ela passa a vencida a partir do dia seguinte ao vencimento.') &&
     t.includes(DU_YEAR_ADVICE) && !t.includes(DU_ADVICE) && /Vencimento\n?\s*25\/12\/2026/.test(t), t.slice(0, 900));
   await duKeep();
-  await duShots('530_dia_util_conta_do_ano_sem_tolerancia', duScroll('Vence na sexta, 25/12/2026, que não é dia útil (feriado nacional: Natal). Em conta do ano, o Clarevo não usa o próximo dia útil: ela passa a vencida a partir do dia seguinte ao vencimento.'));
+  await duShots('530_dia_util_conta_do_ano_sem_tolerancia', duScroll('Vence na sexta, 25/12/2026, que não é dia útil (feriado nacional: Natal). Em conta do ano, a Clarevo não usa o próximo dia útil: ela passa a vencida a partir do dia seguinte ao vencimento.'));
   await btn('Voltar').click(); await waitText('Ano a ano'); await p.waitForTimeout(400);
 
   // ---- 9. Fatura da demonstração que vence em 10/01/2027 (domingo): o aviso no detalhe da fatura ----
@@ -12409,9 +12409,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Mês conferido, Pago de setembro (conferido): a frase "Você conferiu: não houve pagamentos em setembro de 2026." toma o lugar de "Mês sem anotação não quer dizer mês sem gastos", com "Desfazer a conferência"', mcPath() === '/composicao' && t.includes('Nenhum registro neste critério') && t.includes('Você conferiu: não houve pagamentos em setembro de 2026.') &&
     !t.includes('Mês sem anotação não quer dizer mês sem gastos') && (await visibleCount('button', 'Desfazer a conferência: não houve pagamentos em setembro de 2026')) === 1, t.slice(0, 900));
   await evShots('503_conferi_pago_conferido');
-  await btn('Desfazer a conferência: não houve pagamentos em setembro de 2026').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.'); await p.waitForTimeout(600);
+  await btn('Desfazer a conferência: não houve pagamentos em setembro de 2026').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado na Clarevo.'); await p.waitForTimeout(600);
   t = await mcKeep();
-  ok('Mês conferido, Pago de setembro (a conferir): a frase de mês sem anotação, "Conferi: não houve pagamentos em setembro de 2026" e "Anotar gasto"', t.includes('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.') &&
+  ok('Mês conferido, Pago de setembro (a conferir): a frase de mês sem anotação, "Conferi: não houve pagamentos em setembro de 2026" e "Anotar gasto"', t.includes('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado na Clarevo.') &&
     (await visibleCount('button', 'Conferi: não houve pagamentos em setembro de 2026')) === 1 && (await visibleCount('button', 'Anotar gasto')) === 1 && !t.includes('Você conferiu'), t.slice(0, 900));
   await evShots('504_conferi_pago_a_conferir');
   await btn('Conferi: não houve pagamentos em setembro de 2026').click(); await waitText('Você conferiu: não houve pagamentos em setembro de 2026.'); await p.waitForTimeout(500);
@@ -12424,7 +12424,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('button', { name: /^Recebido, R\$/ }).filter({ visible: true }).first().click(); await waitText('Recebimentos realizados com data de recebimento neste mês.'); await p.waitForTimeout(500);
   t = await mcKeep();
   ok('Mês conferido, Recebido de setembro (já conferido na Evolução): "Você conferiu: não houve recebimentos em setembro de 2026."', t.includes('Você conferiu: não houve recebimentos em setembro de 2026.') && !t.includes('Mês sem anotação não quer dizer mês sem recebimentos') && (await visibleCount('button', 'Desfazer a conferência: não houve recebimentos em setembro de 2026')) === 1, t.slice(0, 700));
-  await btn('Desfazer a conferência: não houve recebimentos em setembro de 2026').click(); await waitText('Mês sem anotação não quer dizer mês sem recebimentos: aqui aparece só o que está registrado no Clarevo.'); await p.waitForTimeout(500);
+  await btn('Desfazer a conferência: não houve recebimentos em setembro de 2026').click(); await waitText('Mês sem anotação não quer dizer mês sem recebimentos: aqui aparece só o que está registrado na Clarevo.'); await p.waitForTimeout(500);
   ok('Mês conferido, Recebido de setembro (a conferir): "Conferi: não houve recebimentos em setembro de 2026" e "Registrar recebimento"', (await visibleCount('button', 'Conferi: não houve recebimentos em setembro de 2026')) === 1 && (await visibleCount('button', 'Registrar recebimento')) === 1);
   await evShots('505_conferi_recebido_a_conferir');
   // No mês atual não há botão: outubro ainda não terminou.
@@ -12444,13 +12444,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Mês conferido, Análises (setembro, Pago conferido): "Nenhum gasto anotado em setembro de 2026." e a frase "Você conferiu: não houve pagamentos em setembro de 2026." no lugar de "Mês sem anotação não quer dizer mês sem gastos"', t.includes('Nenhum gasto anotado em setembro de 2026.') && t.includes('Você conferiu: não houve pagamentos em setembro de 2026.') &&
     !t.includes('Mês sem anotação não quer dizer mês sem gastos') && (await visibleCount('button', 'Desfazer a conferência: não houve pagamentos em setembro de 2026')) === 1 && (await visibleCount('button', 'Anotar gasto')) === 0, t.slice(0, 900));
   await evShots('506_conferi_analises');
-  await btn('Desfazer a conferência: não houve pagamentos em setembro de 2026').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.'); await p.waitForTimeout(500);
+  await btn('Desfazer a conferência: não houve pagamentos em setembro de 2026').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado na Clarevo.'); await p.waitForTimeout(500);
   ok('Mês conferido, Análises (a conferir): a frase de mês sem anotação, "Conferi: não houve pagamentos em setembro de 2026" e "Anotar gasto"', (await visibleCount('button', 'Conferi: não houve pagamentos em setembro de 2026')) === 1 && (await visibleCount('button', 'Anotar gasto')) === 1);
   await btn('Conferi: não houve pagamentos em setembro de 2026').click(); await waitText('Você conferiu: não houve pagamentos em setembro de 2026.'); await p.waitForTimeout(500);
   ok('Mês conferido: nenhuma escrita na rede até aqui (a demonstração grava só na memória) e os totais da demonstração não mudaram', writes.length === mcWrites0, writes.slice(mcWrites0).join(' | '));
 
   // ---- 8. "Seus últimos meses": o mês conferido deixa de ser lacuna ----
-  await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Mais clareza');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('Sua última anotação foi em 20/05/2026.', 12000).catch(() => {});
   await evSpyStart();
   const mcBand = async () => p.evaluate(() => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Seus últimos meses' && e.getBoundingClientRect().width > 0); let box = h?.parentElement; while (box && !box.querySelector('[role=button]')) box = box.parentElement; return box ? box.innerText.replace(/ /g, ' ') : null; });
@@ -12497,7 +12497,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await evShots('509_conferi_revisao_resumo', { tab: true });
 
   // ---- 9. Família: quem só lê vê, quem escreve marca e desmarca ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
   await famCreateAccount('Vera Conferi', 'vera.conferi@exemplo.com');
   await famGoFamilia();
   await btn('Criar Família').click(); await waitText('Nome da Família'); await field('Nome da Família').fill('Casa Conferi');
@@ -12526,7 +12526,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await mcResumoMonth('Setembro de 2026');
   await p.getByRole('button', { name: /^Pago, R\$/ }).filter({ visible: true }).first().click(); await waitText('Gastos pagos com data de pagamento neste mês.'); await p.waitForTimeout(500);
   t = await mcKeep();
-  ok('Mês conferido, Família (só lê): a composição de Pago de setembro mostra "Mês sem anotação não quer dizer mês sem gastos", sem "Conferi" e sem "Desfazer"', t.includes('Demonstração · Família') && t.includes('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.') &&
+  ok('Mês conferido, Família (só lê): a composição de Pago de setembro mostra "Mês sem anotação não quer dizer mês sem gastos", sem "Conferi" e sem "Desfazer"', t.includes('Demonstração · Família') && t.includes('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado na Clarevo.') &&
     (await mcConferiBtns()) === 0 && (await visibleCount('button', /^Desfazer a conferência/)) === 0, t.slice(0, 700));
   await evShots('510_conferi_familia_leitor');
   await famGoResumo(); await famSignOut();
@@ -12540,7 +12540,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('button', { name: 'Seu mês em 30 segundos. O que entrou, saiu e vence, em cartões curtos.', exact: true }).filter({ visible: true }).first().click(); await waitText('Nada anotado em outubro ainda'); await p.waitForTimeout(500);
   await p.getByRole('button', { name: /^Mês anterior: / }).filter({ visible: true }).first().click(); await waitText('Nada anotado em setembro'); await p.getByRole('button', { name: /^Mês anterior: / }).filter({ visible: true }).first().click(); await waitText('Nada anotado em agosto'); await p.waitForTimeout(500);
   t = await mcKeep();
-  ok('Mês conferido, Seu mês (agosto, vazio, sem conferir): segue "Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo."', t.includes('Pessoal · Agosto de 2026') && t.includes('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.') && !t.includes('Você conferiu'), t.slice(0, 600));
+  ok('Mês conferido, Seu mês (agosto, vazio, sem conferir): segue "Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado na Clarevo."', t.includes('Pessoal · Agosto de 2026') && t.includes('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado na Clarevo.') && !t.includes('Você conferiu'), t.slice(0, 600));
   await otherDevice(async (repo, ctx) => repo.setMonthCheck('e2e-conferi-seumes', ctx, '2026-08', 'pagamentos', 0));
   await p.waitForTimeout(900);
   t = await mcKeep();
@@ -12652,7 +12652,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     (await visibleCount('button', 'Voltar à tarefa')) === 1 && (await visibleCount('button', 'Voltar para Aprender')) === 0, `${mmPath()} ${JSON.stringify(await mmH1s())}`);
   ok('Média e mediana, tema: o resumo e os parágrafos dizem o que é cada uma, a diferença com um mês muito diferente dos outros e o que a Evolução faz',
     t.includes(mmShort) && t.includes('A média soma todos os valores e divide pela quantidade deles.') && t.includes('com quantidade par de valores, é a média dos dois do meio') && t.includes('medidas de tendência central') &&
-    t.includes('porque não é afetada por valores extremos') && t.includes('Na Evolução, o Clarevo mostra as duas lado a lado') && t.includes('Uma não é melhor que a outra') && t.includes('o mês conferido, sem lançamentos, entra como zero'));
+    t.includes('porque não é afetada por valores extremos') && t.includes('Na Evolução, a Clarevo mostra as duas lado a lado') && t.includes('Uma não é melhor que a outra') && t.includes('o mês conferido, sem lançamentos, entra como zero'));
   ok('Média e mediana, tema: o exemplo traz os seis meses, a média R$ 4.125,00 e a mediana R$ 3.425,00 e, sem abril, R$ 3.390,00 e R$ 3.400,00, e as hipóteses dizem que é fictício',
     ['R$ 3.200,00', 'R$ 3.400,00', 'R$ 3.300,00', 'R$ 7.800,00', 'R$ 3.450,00', 'R$ 3.600,00', 'A média é R$ 4.125,00', 'a mediana é R$ 3.425,00', 'Sem abril, a média é R$ 3.390,00 e a mediana, R$ 3.400,00'].every((x) => t.includes(x)) && /fict[ií]cio/i.test(t), t.slice(t.indexOf('Exemplo'), t.indexOf('Exemplo') + 700));
   await mmShots('562_media_mediana_tema');
@@ -12661,8 +12661,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Média e mediana, tema: "Ver a conta" mostra a soma, a divisão, os valores em ordem, os dois do meio e as contas sem abril',
     ['3.200,00 + 3.400,00 + 3.300,00 + 7.800,00 + 3.450,00 + 3.600,00 = 24.750,00', '24.750,00 ÷ 6 = 4.125,00', 'em ordem: 3.200,00, 3.300,00, 3.400,00, 3.450,00, 3.600,00 e 7.800,00', '(3.400,00 + 3.450,00) ÷ 2 = 3.425,00', 'sem abril: 16.950,00 ÷ 5 = 3.390,00',
       'o valor do meio de 3.200,00, 3.300,00, 3.400,00, 3.450,00 e 3.600,00 é 3.400,00'].every((x) => t.includes(x)));
-  const mmNoClarevo = async () => { await scrollTo('No Clarevo'); };
-  ok('Média e mediana, tema: "No Clarevo" (título de nível 2) traz o botão "Ver na Evolução"', (await learnH2()).includes('No Clarevo') && (await visibleCount('button', 'Ver na Evolução')) === 1, JSON.stringify(await learnH2()));
+  const mmNoClarevo = async () => { await scrollTo('Na Clarevo'); };
+  ok('Média e mediana, tema: "Na Clarevo" (título de nível 2) traz o botão "Ver na Evolução"', (await learnH2()).includes('Na Clarevo') && (await visibleCount('button', 'Ver na Evolução')) === 1, JSON.stringify(await learnH2()));
   const mmRelated = (await topicRows()).map((r) => r.split('. ')[0]);
   ok('Média e mediana, tema: "Temas relacionados" são "Quando a renda muda todo mês", "Gastos essenciais" e "Mês sem registro", nessa ordem', (await learnH2()).includes('Temas relacionados') && JSON.stringify(mmRelated) === JSON.stringify(['Quando a renda muda todo mês', 'Gastos essenciais', 'Mês sem registro']), JSON.stringify(mmRelated));
   await mmShots('563_media_mediana_tema_conta', mmNoClarevo);
@@ -12740,7 +12740,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Média e mediana, Aprender: nenhuma escrita direta na rede durante a leitura e a busca', writes.length === mmWrites0, writes.slice(mmWrites0).join(' | '));
 
   // ---- 7. Conta nova: o tema é igual (conteúdo público) e a Evolução vazia não mostra o "O que é mediana?" ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
   await btn('Criar conta').click(); await waitText('Nome de apresentação');
   await field('Nome de apresentação').fill('Mia Mediana'); await field('E-mail').fill('mia.mediana@exemplo.com'); await field('Senha').fill('senha1234');
   await btn('Criar conta').click(); await waitText('Confira seu e-mail');
@@ -12876,7 +12876,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Renda variável: a referência salva é de outubro, no valor exato da média, e não tem a marca "Minha renda varia" porque a pessoa não a escolheu', JSON.stringify(await otherDevice(async (repo, ctx) => (await repo.listIncomeReferences(ctx)).map((r) => [r.fromMonth, r.amountCents, r.varies]))) === JSON.stringify([['2026-10', 382500, false]]));
 
   // ---- 3. Conta nova: nada de exemplo, e a explicação de que precisa de um mês com recebimentos ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
   await famCreateAccount('Rui Renda', 'rui.renda@exemplo.com');
   await rvOpenForm();
   t = await rvKeep();
@@ -12984,8 +12984,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const rhHeads = await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
   ok('Relatório do RH, demonstração: o painel tem o cartão "Relatório de adesão" entre "Uso do app" e "Textos para divulgar"',
     rhHeads.indexOf('Uso do app') >= 0 && rhHeads.indexOf('Relatório de adesão') === rhHeads.indexOf('Uso do app') + 1 && rhHeads.indexOf('Textos para divulgar') === rhHeads.indexOf('Relatório de adesão') + 1, JSON.stringify(rhHeads));
-  ok('Relatório do RH: o cartão explica o que leva (contrato, vagas e contagens), que o arquivo é montado no navegador e que o Clarevo não guarda cópia',
-    t.includes('Leve o resumo do benefício para uma reunião ou para o arquivo do RH: o contrato, as vagas e as contagens de licenças. O arquivo é montado neste navegador, e o Clarevo não guarda cópia dele.'));
+  ok('Relatório do RH: o cartão explica o que leva (contrato, vagas e contagens), que o arquivo é montado no navegador e que a Clarevo não guarda cópia',
+    t.includes('Leve o resumo do benefício para uma reunião ou para o arquivo do RH: o contrato, as vagas e as contagens de licenças. O arquivo é montado neste navegador, e a Clarevo não guarda cópia dele.'));
   ok('Relatório do RH: a caixa "Incluir a lista de licenças" começa desmarcada (a lista é opcional), com a explicação do que a lista leva; os dois botões de download à vista',
     (await visibleCount('checkbox', /^Incluir a lista de licenças/)) === 1 && !(await rhChecked()) &&
     t.includes('Leva o e-mail, a situação e a data de cada licença, como o painel mostra. Sem a lista, o arquivo tem só as contagens.') && !t.includes('Com a lista, o arquivo tem e-mails de pessoas.') &&
@@ -13078,7 +13078,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     rhCsv3.lines.includes('nova.pessoa@empresa-exemplo.example;Convite enviado;07/10/2026') && (rhCsv3.text.match(/@empresa-exemplo\.example/g) ?? []).length === 23, rhCsv3.lines.slice(8, 12).join(' | '));
 
   // ---- 8. Uma empresa de verdade (da memória): nome com ponto e vírgula, aspas e "=", contrato com fim; o nome é protegido na planilha e escapado na página ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
   await famCreateAccount('Rita Relatório', 'rita.relatorio@exemplo.com');
   await p.evaluate(() => window.__e2e.company().staffCreateOrganization({ name: '=Alfa; "Beta" <b>Ltda</b> & Cia &amp; Co', seats: 8, plan: 'familiar', startsOn: '2026-10-01', endsOn: '2027-09-30', adminEmail: 'rita.relatorio@exemplo.com' }));
   await p.evaluate(() => window.__e2e.refresh()); await p.waitForTimeout(600);
@@ -13128,7 +13128,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await waitText('Esta área é para quem administra o benefício de uma empresa.');
   ok('Relatório do RH, conta sem empresa: o endereço é /empresa', famPath() === '/empresa', p.url());
   t = await rhKeep();
-  ok('Relatório do RH, conta sem empresa: /empresa mostra só o aviso "Esta área é para quem administra o benefício de uma empresa. Se você deveria ter acesso, fale com a equipe do Clarevo." e nada de relatório, de contrato nem de download', t.includes('Esta área é para quem administra o benefício de uma empresa. Se você deveria ter acesso, fale com a equipe do Clarevo.') &&
+  ok('Relatório do RH, conta sem empresa: /empresa mostra só o aviso "Esta área é para quem administra o benefício de uma empresa. Se você deveria ter acesso, fale com a equipe da Clarevo." e nada de relatório, de contrato nem de download', t.includes('Esta área é para quem administra o benefício de uma empresa. Se você deveria ter acesso, fale com a equipe da Clarevo.') &&
     !(await headingShown('Relatório de adesão')) && !(await headingShown('Contrato')) && (await visibleCount('button', /^Baixar relatório/)) === 0 && (await visibleCount('checkbox', /^Incluir a lista/)) === 0, t.slice(0, 300));
   await famSignOut();
 
@@ -13233,7 +13233,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const f3Names0 = await evNames();
   const f3C6 = await f3ReadsOf(f3R0, 'listCommitments');
   ok('Evolução fase 3, Renda comprometida na demonstração: "Sem registros nestes meses" (setembro tem a renda de referência e nenhuma conta; antes dela é sem base), sem gráfico, sem percentual e sem zero', (await radio('Renda comprometida').getAttribute('aria-checked')) === 'true' &&
-    t.includes('Sem registros nestes meses') && t.includes('Mês sem conta anotada não quer dizer mês sem contas: aqui aparece só o que está registrado no Clarevo. Só meses já fechados entram aqui.') && f3Names0.length === 0 && !/\d%/.test(t.replace(/\b6 meses\b|\b12 meses\b|\b3 meses\b/g, '')) && !/R\$ \d/.test(t) && !t.includes('Média dos meses'), t.slice(0, 500));
+    t.includes('Sem registros nestes meses') && t.includes('Mês sem conta anotada não quer dizer mês sem contas: aqui aparece só o que está registrado na Clarevo. Só meses já fechados entram aqui.') && f3Names0.length === 0 && !/\d%/.test(t.replace(/\b6 meses\b|\b12 meses\b|\b3 meses\b/g, '')) && !/R\$ \d/.test(t) && !t.includes('Média dos meses'), t.slice(0, 500));
   ok('Evolução fase 3, subtítulo: a base própria ("Percentual da renda de referência ligado a contas do mês") e "Só meses já fechados", em vez da base de Pago', t.includes(F3_BASE.comprometida) && t.includes(F3_CLOSED) && !t.includes('Valores registrados, pela data do pagamento'));
   ok('Evolução fase 3, leituras: 6 meses leem as contas dos 5 meses fechados (maio a setembro), uma vez cada, e nunca as de outubro (o mês atual), dentro do limite de 12 por janela', JSON.stringify(f3Months(f3C6)) === JSON.stringify(f3Closed(5, 9)) && f3C6.length <= 12, JSON.stringify(f3C6));
   ok('Evolução fase 3, ação: com escrita no contexto, o botão "Anotar conta a pagar"', (await visibleCount('button', 'Anotar conta a pagar')) === 1 && (await visibleCount('button', 'Informar renda de referência')) === 0);
@@ -13255,7 +13255,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await f3Keep();
   const f3GReads = await f3ReadsOf(f3G0, 'listGoalMovementsInMonth');
   ok('Evolução fase 3, Guardado em metas na demonstração: "Sem registros nestes meses" (as metas são de outubro, o mês atual), a base "Aportes menos resgates nas metas", "Só meses já fechados" e o botão "Criar meta"', t.includes('Sem registros nestes meses') &&
-    t.includes('O Clarevo não tem meta criada nestes meses. Só meses já fechados entram aqui.') && t.includes(F3_BASE.guardado) && t.includes(F3_CLOSED) && (await visibleCount('button', 'Criar meta')) === 1 && (await evNames()).length === 0 && !/R\$ \d/.test(t) && !t.includes('Total dos meses exibidos'), t.slice(0, 500));
+    t.includes('A Clarevo não tem meta criada nestes meses. Só meses já fechados entram aqui.') && t.includes(F3_BASE.guardado) && t.includes(F3_CLOSED) && (await visibleCount('button', 'Criar meta')) === 1 && (await evNames()).length === 0 && !/R\$ \d/.test(t) && !t.includes('Total dos meses exibidos'), t.slice(0, 500));
   ok('Evolução fase 3, leituras: os movimentos das metas são lidos por mês fechado (maio a setembro), nunca o de outubro', JSON.stringify(f3Months(f3GReads)) === JSON.stringify(f3Closed(5, 9)), JSON.stringify(f3GReads));
   await evShots('572_evolucao_f3_guardado_sem_registros');
   await btn('Criar meta').click(); await waitText('Nova meta'); await p.waitForTimeout(500);
@@ -13455,7 +13455,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await evShots('583_evolucao_f3_comprometida_valores_ocultos', { scroll: evScroll('Julho de 2026') });
 
   // ---- 6. Conta nova: nada de exemplo; e a Família, que lê os dados da casa e não os do Pessoal ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Seu dinheiro');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
   await famCreateAccount('Rui Metas', 'rui.metas@exemplo.com');
   await evOpen();
   await f3Pick('Renda comprometida');
@@ -13478,7 +13478,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await radio('6 meses').click(); await p.waitForTimeout(700);
   await f3Pick('Guardado em metas');
   t = await f3Keep();
-  ok('Evolução fase 3, conta nova, Guardado em metas: "Sem registros nestes meses", "nenhuma meta criada", o botão "Criar meta", sem total e sem R$ 0,00 de exemplo', t.includes('Sem registros nestes meses') && t.includes('O Clarevo não tem meta criada nestes meses.') && (await visibleCount('button', 'Criar meta')) === 1 && !t.includes('Total dos meses exibidos') && !t.includes('R$ 0,00') && (await evNames()).length === 0);
+  ok('Evolução fase 3, conta nova, Guardado em metas: "Sem registros nestes meses", "nenhuma meta criada", o botão "Criar meta", sem total e sem R$ 0,00 de exemplo', t.includes('Sem registros nestes meses') && t.includes('A Clarevo não tem meta criada nestes meses.') && (await visibleCount('button', 'Criar meta')) === 1 && !t.includes('Total dos meses exibidos') && !t.includes('R$ 0,00') && (await evNames()).length === 0);
   await evShots('585_evolucao_f3_conta_nova_guardado');
   // Família: a casa tem renda de referência desde agosto (R$ 8.000,00), contas em agosto e setembro e uma meta com saldo inicial em agosto e aporte em setembro; o Pessoal, só uma conta em setembro.
   await famGoFamilia();
@@ -13847,7 +13847,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     const c2 = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, reducedMotion: reduce ? 'reduce' : 'no-preference' });
     await c2.addInitScript(() => { window.__clarevoSemTour = true; });
     const q = await c2.newPage();
-    await q.goto(`http://localhost:${PORT}/`); await q.getByText('Seu dinheiro', { exact: false }).filter({ visible: true }).first().waitFor({ timeout: 15000 });
+    await q.goto(`http://localhost:${PORT}/`); await q.getByText('Mais clareza', { exact: false }).filter({ visible: true }).first().waitFor({ timeout: 15000 });
     await q.getByRole('button', { name: 'Ver demonstração com dados fictícios', exact: true }).filter({ visible: true }).first().click();
     await q.getByText('Diferença do mês', { exact: false }).filter({ visible: true }).first().waitFor({ timeout: 15000 });
     await q.waitForTimeout(1500);

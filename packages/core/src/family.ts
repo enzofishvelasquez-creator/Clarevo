@@ -322,7 +322,7 @@ export const FAMILY_TEXT = {
   copy: 'Copiar link',
   copied: 'Link copiado.',
   shareFailed: 'Não foi possível abrir o compartilhamento. Copie o link e envie como preferir.',
-  shareMessage: (familyName: string, link: string): string => `Convite para a Família ${familyName} no Clarevo: ${link}`,
+  shareMessage: (familyName: string, link: string): string => `Convite para a Família ${familyName} na Clarevo: ${link}`,
   shareTitle: 'Convite para a Família',
   cancelInvite: 'Cancelar convite',
   cancelInviteA11y: (role: InviteRole, expiryDay: IsoDate): string => `Cancelar convite para ${FAMILY_ROLE_LABEL[role]}, que vale até ${formatDateBR(expiryDay)}`,
@@ -373,7 +373,7 @@ export const FAMILY_TEXT = {
 export const INVITE_TEXT = {
   title: 'Convite para a Família',
   signedOut:
-    'Você recebeu um convite para uma Família no Clarevo. Entre ou crie sua conta para ver quem convidou e aceitar. Depois você volta para este convite.',
+    'Você recebeu um convite para uma Família na Clarevo. Entre ou crie sua conta para ver quem convidou e aceitar. Depois você volta para este convite.',
   enter: 'Entrar',
   createAccount: 'Criar conta',
   loading: 'Conferindo o convite…',

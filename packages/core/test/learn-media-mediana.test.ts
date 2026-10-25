@@ -200,7 +200,7 @@ describe('Média e mediana: o tema no catálogo', () => {
       'com quantidade par de valores, é a média dos dois do meio',
       'medidas de tendência central',
       'não é afetada por valores extremos',
-      'Na Evolução, o Clarevo mostra as duas lado a lado',
+      'Na Evolução, a Clarevo mostra as duas lado a lado',
       'Uma não é melhor que a outra',
       'nenhum lançamento muda',
       'O mês em andamento e os meses sem registros ficam de fora',
@@ -232,7 +232,7 @@ describe('Média e mediana: o tema no catálogo', () => {
 
 describe('Média e mediana: a ligação nos dois sentidos', () => {
   // Estes dois testes conferem o código-fonte (as ligações escritas nos arquivos); o comportamento, abrir o painel e levar ao tema, é coberto pelo e2e.
-  it('código-fonte: o tema tem a ação "Ver na Evolução", que abre /evolucao, na seção "No Clarevo"', () => {
+  it('código-fonte: o tema tem a ação "Ver na Evolução", que abre /evolucao, na seção "Na Clarevo"', () => {
     const learn = read('lib/learn.ts');
     expect(learn).toContain("'media-e-mediana': [{ label: 'Ver na Evolução', href: '/evolucao' }]");
     // A tela de explicação desenha as ações de topicActions sob "No Clarevo".

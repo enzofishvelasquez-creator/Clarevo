@@ -425,7 +425,7 @@ function roteiros(CALC) {
       const p = await pagina();
       await p.goto(`${origem}/comece`);
       ok('comece aqui: título, estado do acesso e seis caminhos', (await p.textContent('h1')) === 'Comece aqui' &&
-        (await p.textContent('main')).includes('O Clarevo está em fase de testes. A versão para pessoas e empresas abre no piloto; acompanhe as Novidades.') &&
+        (await p.textContent('main')).includes('A Clarevo está em fase de testes. A versão para pessoas e empresas abre no piloto; acompanhe as Novidades.') &&
         (await p.$$eval('main a.cartao', (as) => as.map((a) => a.querySelector('.titulo-cartao').textContent))).join('|') === 'O app|Ver a demonstração|Aprender|Calculadoras|Para empresas|Ajuda');
       const demo = await p.$eval('main a.cartao[href^="https://"]', (a) => ({ href: a.href, rel: a.rel }));
       const comParametro = await p.$$eval('a[href]', (as) => as.map((a) => a.getAttribute('href')).filter((h) => /[?&]|utm_|fbclid|igshid/i.test(h)));

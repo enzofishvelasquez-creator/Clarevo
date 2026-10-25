@@ -214,7 +214,7 @@ describe('regras puras das contas (D-043)', () => {
     expect(ACCOUNTS_TEXT.single(ACCOUNTS_TEXT.out, 'Conta principal')).toBe('Saiu de: Conta principal');
     expect(ACCOUNTS_TEXT.leavingFrom('Carteira')).toBe('saindo da conta Carteira');
     // Nenhum saldo por conta: o aviso não sugere que há saldo inicial a informar.
-    expect(ACCOUNTS_TEXT.balanceNote).toBe('O Clarevo não calcula saldo por conta.');
+    expect(ACCOUNTS_TEXT.balanceNote).toBe('A Clarevo não calcula saldo por conta.');
     expect(accountErrorText('conta_com_lancamentos')).toBe(ACCOUNT_ERROR_TEXT.conta_com_lancamentos);
     expect(accountErrorText('qualquer_coisa')).toBe(ACCOUNT_ERROR_TEXT.salvar_falhou);
   });

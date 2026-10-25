@@ -42,7 +42,7 @@ export const USAR_TOPICS: Topic[] = [
     short: 'Realizado é o que já foi pago ou recebido. Previsto é uma conta a pagar que ainda não foi paga.',
     paragraphs: [
       'Realizado é o que já foi pago ou recebido. Previsto é uma conta a pagar que ainda não foi paga, como a internet que vence no dia 15.',
-      'Contas a pagar aparecem em "Ainda a pagar neste mês" e não entram em Recebido, Pago ou na diferença do mês. Quando você marca uma conta como paga, o Clarevo registra um gasto com o valor e a data do pagamento, e só esse gasto entra em Pago, no mês da data do pagamento.',
+      'Contas a pagar aparecem em "Ainda a pagar neste mês" e não entram em Recebido, Pago ou na diferença do mês. Quando você marca uma conta como paga, a Clarevo registra um gasto com o valor e a data do pagamento, e só esse gasto entra em Pago, no mês da data do pagamento.',
       'Uma conta vencida e ainda não paga continua em "Ainda a pagar" nos meses seguintes, até ser paga ou excluída. Se você anotou o pagamento como gasto em vez de marcar a conta como paga, exclua a conta a pagar para ela não continuar em "Ainda a pagar".',
     ],
     example: null,
@@ -66,7 +66,7 @@ export const USAR_TOPICS: Topic[] = [
     short: 'O saldo depende do que já havia na conta. A diferença do mês olha só para o que entrou e saiu no período.',
     paragraphs: [
       'O saldo da conta depende do quanto havia antes do mês começar, de transferências e de outros movimentos. A diferença do mês olha só para recebimentos e pagamentos do período.',
-      'Por isso o Clarevo não chama a diferença do mês de saldo nem de dinheiro disponível. Sem saldo inicial informado, não mostramos um saldo calculado.',
+      'Por isso a Clarevo não chama a diferença do mês de saldo nem de dinheiro disponível. Sem saldo inicial informado, não mostramos um saldo calculado.',
     ],
     example: null,
     calculation: null,
@@ -134,13 +134,13 @@ export const USAR_TOPICS: Topic[] = [
     subtitle: 'Luz, água e gás',
     question: 'O que é um valor estimado?',
     short:
-      'Até a conta chegar, o Clarevo usa o valor de referência que você informou, marcado como estimado. Nada é inventado nem alterado sozinho.',
+      'Até a conta chegar, a Clarevo usa o valor de referência que você informou, marcado como estimado. Nada é inventado nem alterado sozinho.',
     paragraphs: [
       'Usamos o valor de referência que você informou, marcado como estimado, até você informar o valor de cada conta.',
       'Quando houver contas pagas, mostramos a média das últimas três como sugestão, e você decide se usa.',
     ],
     example:
-      'Se as três últimas contas de luz pagas foram de R$ 165,30, R$ 180,00 e R$ 171,90, a média é R$ 172,40. O Clarevo mostra esse valor como sugestão, e você decide se o usa como novo valor de referência.',
+      'Se as três últimas contas de luz pagas foram de R$ 165,30, R$ 180,00 e R$ 171,90, a média é R$ 172,40. A Clarevo mostra esse valor como sugestão, e você decide se o usa como novo valor de referência.',
     calculation: '(165,30 + 180,00 + 171,90) ÷ 3 = 172,40.',
     hypotheses: 'Contas fictícias de R$ 165,30, R$ 180,00 e R$ 171,90: média de R$ 172,40.',
     facts: [],
@@ -155,17 +155,17 @@ export const USAR_TOPICS: Topic[] = [
     section: 'usar',
     kind: 'tema',
     status: 'publicado',
-    title: 'Parcelamentos no Clarevo',
+    title: 'Parcelamentos na Clarevo',
     subtitle: 'Parcela 13 de 48 e o que falta',
     question: 'Como anotar um parcelamento que já começou?',
-    short: 'Você informa qual é a próxima parcela; as anteriores ficam como pagas antes do Clarevo. A soma das que faltam não é o valor para quitar.',
+    short: 'Você informa qual é a próxima parcela; as anteriores ficam como pagas antes da Clarevo. A soma das que faltam não é o valor para quitar.',
     paragraphs: [
-      'Ao cadastrar um parcelamento, você informa o total de parcelas e a próxima a pagar. As anteriores aparecem como pagas antes do Clarevo, informadas por você, e não viram gastos.',
+      'Ao cadastrar um parcelamento, você informa o total de parcelas e a próxima a pagar. As anteriores aparecem como pagas antes da Clarevo, informadas por você, e não viram gastos.',
       'Cada mês vira uma conta a pagar com o rótulo da parcela, como Parcela 13 de 48. O detalhe mostra quantas faltam, a soma delas e quando vence a última.',
       'Em financiamentos e compras parceladas, a soma das parcelas que faltam inclui juros futuros. Para quitar antes, peça o valor atualizado a quem concedeu o crédito.',
     ],
     example:
-      'Financiamento do carro com 48 parcelas de R$ 850,00, 12 pagas antes do Clarevo: faltam 36, que somam R$ 30.600,00, e a última vence em 10/10/2029.',
+      'Financiamento do carro com 48 parcelas de R$ 850,00, 12 pagas antes da Clarevo: faltam 36, que somam R$ 30.600,00, e a última vence em 10/10/2029.',
     calculation: '48 - 12 = 36 parcelas · 36 × 850,00 = 30.600,00 · a 13ª vence em 10/11/2026 e a 48ª, 35 meses depois, em 10/10/2029.',
     hypotheses: 'Exemplo fictício: 48 parcelas iguais de R$ 850,00; a próxima é a 13ª, em 10/11/2026.',
     facts: [],
@@ -186,9 +186,9 @@ export const USAR_TOPICS: Topic[] = [
     short:
       'Um mês sem anotações aparece com R$ 0,00, mas isso não quer dizer que não houve gastos ou recebimentos. Você decide se atualiza; nada é preenchido sozinho.',
     paragraphs: [
-      'O Clarevo soma só o que foi anotado. Um mês sem anotações aparece com R$ 0,00, mas isso não quer dizer que não houve gastos ou recebimentos.',
+      'A Clarevo soma só o que foi anotado. Um mês sem anotações aparece com R$ 0,00, mas isso não quer dizer que não houve gastos ou recebimentos.',
       'Quando você passa um tempo sem anotar, mostramos o que ficou sem registro e você decide se atualiza. Contas de gastos fixos marcadas como pagas entram no mês da data do pagamento, e as parcelas pagas contam no progresso do parcelamento.',
-      'Se preferir seguir adiante, o Clarevo não preenche nada por conta própria: os meses continuam marcados como sem registro.',
+      'Se preferir seguir adiante, a Clarevo não preenche nada por conta própria: os meses continuam marcados como sem registro.',
     ],
     example: null,
     calculation: null,

@@ -447,16 +447,16 @@ Em **Authentication**:
 
 ### Textos dos e-mails (Authentication → Emails → Templates)
 
-**Confirmar cadastro** · assunto: `Confirme seu e-mail no Clarevo`
+**Confirmar cadastro** · assunto: `Confirme seu e-mail na Clarevo`
 
 ```html
 <p>Olá!</p>
-<p>Para liberar sua conta no Clarevo, confirme este endereço de e-mail.</p>
+<p>Para liberar sua conta na Clarevo, confirme este endereço de e-mail.</p>
 <p><a href="{{ .ConfirmationURL }}">Confirmar meu e-mail</a></p>
 <p>Se você não pediu esta conta, ignore esta mensagem.</p>
 ```
 
-**Recuperar senha** · assunto: `Defina uma nova senha no Clarevo`
+**Recuperar senha** · assunto: `Defina uma nova senha na Clarevo`
 
 ```html
 <p>Recebemos um pedido para recuperar o acesso à sua conta.</p>

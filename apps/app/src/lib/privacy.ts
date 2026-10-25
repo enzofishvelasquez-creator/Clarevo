@@ -34,7 +34,7 @@ export const PRIVACY_TEXT = {
   lockCaption: 'Ao abrir o app, o aparelho pede a biometria ou, se ela falhar, a senha do aparelho. Sair da conta nunca depende dela.',
   lockConfirmPrompt: 'Confirme para pedir biometria ao abrir',
   lockConfirmFailed: 'Não foi possível confirmar. A biometria continua desligada.',
-  lockTitle: 'Desbloquear o Clarevo',
+  lockTitle: 'Desbloquear o app da Clarevo',
   lockBody: 'Use a biometria ou a senha do aparelho para ver seus dados.',
   unlock: 'Desbloquear',
   unlockFailed: 'Não foi possível confirmar agora. Tente de novo.',

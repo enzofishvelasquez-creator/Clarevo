@@ -163,7 +163,7 @@ ${m.imagem ? celular(img[m.imagem], ARQUIVO) : ''}
 </article>`;
   }).join('\n');
 
-  const capa = `<h1>O Clarevo por dentro</h1>
+  const capa = `<h1>A Clarevo por dentro</h1>
 <p class="lead">Um passeio pelos recursos do app, com telas da demonstração. Os dados nas telas são fictícios, e uma conta nova começa vazia.</p>
 <div class="acoes">
 <a class="botao botao-principal" href="${esc(URL_APP)}" rel="noopener noreferrer">Abrir a versão web</a>
@@ -177,7 +177,7 @@ ${m.imagem ? celular(img[m.imagem], ARQUIVO) : ''}
 <div class="grade">
 <article class="cartao">
 <h3>Na web, hoje</h3>
-<p>A versão web do Clarevo já funciona no navegador do celular ou do computador. <a href="${esc(URL_APP)}" rel="noopener noreferrer">Abrir a versão web</a>.</p>
+<p>A versão web da Clarevo já funciona no navegador do celular ou do computador. <a href="${esc(URL_APP)}" rel="noopener noreferrer">Abrir a versão web</a>.</p>
 </article>
 <article class="cartao">
 <h3>No celular, em breve</h3>
@@ -219,7 +219,7 @@ ${mais}
   return montarPagina({
     arquivo: ARQUIVO,
     titulo: 'O app',
-    descricao: 'Um passeio pelos recursos do Clarevo: Resumo, anotar gasto, contas a pagar, cartões, metas, Família e Aprender, com telas da demonstração.',
+    descricao: 'Um passeio pelos recursos da Clarevo: Resumo, anotar gasto, contas a pagar, cartões, metas, Família e Aprender, com telas da demonstração.',
     capa,
     corpo: brutas.map((b) => marcadoresEmHtml(b, valores)).join('\n'),
     fonte: brutas.join('\n') + capa,

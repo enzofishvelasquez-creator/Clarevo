@@ -6,7 +6,7 @@
 
 ## 1. O que o app coleta de fato
 
-"Coletar", para a Apple, é enviar o dado para fora do aparelho de um jeito que o Clarevo (ou um parceiro) possa acessar por mais tempo do que o pedido exige. Tudo o que vai ao Supabase (autenticação e banco, projeto `clarevo-producao`, região São Paulo, `docs/05`) conta como coletado. O que fica só no aparelho não conta.
+"Coletar", para a Apple, é enviar o dado para fora do aparelho de um jeito que a Clarevo (ou um parceiro) possa acessar por mais tempo do que o pedido exige. Tudo o que vai ao Supabase (autenticação e banco, projeto `clarevo-producao`, região São Paulo, `docs/05`) conta como coletado. O que fica só no aparelho não conta.
 
 **Vai para o servidor, ligado à conta da pessoa**
 
@@ -18,7 +18,7 @@
 | Dados financeiros digitados: valores (em centavos), datas, descrições (até 80 caracteres), categorias, contas a pagar, gastos fixos, parcelamentos e contas do ano, metas e aportes, renda de referência, limite e orçamento, contas de origem do dinheiro, cartões (apelido, 4 últimos dígitos se a pessoa quiser, dias de fechamento e vencimento, limite) e faturas | Digitados ou importados pela pessoa | `financial_records`, `commitments`, `commitment_series`, `goals`, `cards`, `card_entries`, `category_budgets` e as outras tabelas de `docs/05` |
 | Resumo SHA-256 da chave da nota fiscal e de cada linha importada | Calculado no aparelho | `receipt_key` e o resumo de cada linha importada. Só o resumo, nunca a chave, o CNPJ, o CPF nem o texto da nota |
 | Resposta do plano de guardar e datas da última anotação | Resposta da pessoa; atividade mantida por gatilho | `savings_checks`, `context_activity` (lidos só pela própria pessoa, sem ir à empresa) |
-| Resposta opcional de "Como você conheceu o Clarevo?" (D-067): uma de seis origens, sem texto livre, quando respondeu e a versão | Resposta da pessoa, opcional | `signup_sources` (lida só pela própria pessoa; a equipe só vê contagens por semana, sem identificar ninguém e com contagens de 1 a 4 escondidas; sai junto com a conta). Entra na declaração como outro conteúdo fornecido pela pessoa, ligado à conta, sem uso para rastreamento nem anúncio (pergunta 34 do resumo para o advogado) |
+| Resposta opcional de "Como você conheceu a Clarevo?" (D-067): uma de seis origens, sem texto livre, quando respondeu e a versão | Resposta da pessoa, opcional | `signup_sources` (lida só pela própria pessoa; a equipe só vê contagens por semana, sem identificar ninguém e com contagens de 1 a 4 escondidas; sai junto com a conta). Entra na declaração como outro conteúdo fornecido pela pessoa, ligado à conta, sem uso para rastreamento nem anúncio (pergunta 34 do resumo para o advogado) |
 | Família: vínculo, papel, convites (só o resumo SHA-256 do código) | Convite por link | `context_memberships`, `family_invites` |
 | Rastro técnico: quem fez qual operação e quando | Gravado pelas funções de escrita | `record_operations` (sai junto com a conta, D-058; a retenção dos registros excluídos que ficam na Família é P-010) |
 
@@ -28,12 +28,12 @@
 - Os PDFs de nota e de comprovante e os arquivos de extrato (OFX ou CSV): o texto é lido no aparelho e descartado; só o que a pessoa confirma vira lançamento.
 - A biometria: o sistema do aparelho decide e o app só recebe "sim" ou "não". Não há dado biométrico no app.
 - Os lembretes: são notificações locais agendadas no aparelho; o app não pede nem guarda token de notificação remota.
-- As preferências (ocultar valores, tema de bolhas ou barras, "Primeiros passos", o dia de primeiro uso e o "Agora não" da pergunta "Como você conheceu o Clarevo?") e a memória de lojas e nomes (pelo resumo SHA-256 do CNPJ).
+- As preferências (ocultar valores, tema de bolhas ou barras, "Primeiros passos", o dia de primeiro uso e o "Agora não" da pergunta "Como você conheceu a Clarevo?") e a memória de lojas e nomes (pelo resumo SHA-256 do CNPJ).
 - As buscas e as leituras de Aprender: o app não registra (CLAUDE.md).
 - A exportação: o arquivo CSV ou PDF vai ao compartilhamento do aparelho por ação da pessoa.
-- A leitura da página pública da Sefaz-RJ: o aparelho consulta o site do governo diretamente, a pedido da pessoa, sem servidor do Clarevo no meio (`apps/app/src/lib/sefaz-fetch.ts`). Não é coleta pelo Clarevo; o advogado confere se o texto da política precisa citar essa consulta.
+- A leitura da página pública da Sefaz-RJ: o aparelho consulta o site do governo diretamente, a pedido da pessoa, sem servidor da Clarevo no meio (`apps/app/src/lib/sefaz-fetch.ts`). Não é coleta pela Clarevo; o advogado confere se o texto da política precisa citar essa consulta.
 
-**Não existe no app:** anúncios, SDK de anúncio ou de análise de uso escolhido pelo Clarevo, identificador de publicidade, localização, contatos, fotos da galeria, microfone, saúde, histórico de navegação, compras dentro do app (cobrança está fora do ciclo atual) e venda ou cessão de dados.
+**Não existe no app:** anúncios, SDK de anúncio ou de análise de uso escolhido pela Clarevo, identificador de publicidade, localização, contatos, fotos da galeria, microfone, saúde, histórico de navegação, compras dentro do app (cobrança está fora do ciclo atual) e venda ou cessão de dados.
 
 **Exceção no Android: SDK do Google na leitura de código.** O `expo-camera` inclui `com.google.android.gms:play-services-code-scanner` e `com.google.mlkit:barcode-scanning` (`node_modules/expo-camera/android/build.gradle`, linhas 43 e 44). A imagem é lida no aparelho, mas esses SDKs do Google podem enviar métricas de uso e de desempenho com identificadores do aparelho. Por isso a seção 3 declara, por precaução, identificadores do aparelho e diagnósticos; **confirmar na documentação do ML Kit antes de enviar**. No iOS o `expo-camera` lê o código com o leitor do sistema (VisionKit e AVFoundation) e, para PDF417, Code 39 e Codabar, com a biblioteca de decodificação ZXingObjC (`node_modules/expo-camera/ios/ExpoCameraBarcodeScanning.podspec`); o app só pede QR Code e Code 128 (`apps/app/src/components/receipt-scan.tsx`, linha 266). Nenhum SDK do Google entra no iOS, e a resposta da Apple não muda.
 
@@ -58,7 +58,7 @@
 
 **Links.** URL da política de privacidade: obrigatória (campo para Enzo em `docs/lojas/ficha.md`, seção 8). URL de opções de privacidade: opcional; a página de exclusão da conta pode ocupar este campo.
 
-**Pontos de atenção da Apple.** (1) "Coletar" não inclui o que é enviado só para atender o pedido e descartado; este caso não existe no Clarevo (tudo que é enviado fica na conta). (2) O IP: se o Clarevo guardar o endereço IP das pessoas, a Apple manda declará-lo conforme o uso (a página cita localização, ID do dispositivo ou diagnósticos). O Supabase pode guardar IP e agente do navegador nos registros de autenticação: **conferir no painel do Supabase** e decidir com o advogado se entra como "Outros dados de diagnóstico". (3) O Clarevo não instala SDK de anúncio nem de análise (conferido em `apps/app/package.json`), mas as bibliotecas do Expo trazem SDKs e manifestos de privacidade próprios. No iOS, o único caso a olhar é a leitura de código: usa o leitor do sistema e a ZXingObjC, sem SDK do Google (seção 1), então a tabela acima não muda. Conferir no primeiro envio ao TestFlight se a Apple reclama de algum manifesto (ver `docs/16`, "Conferir no primeiro build").
+**Pontos de atenção da Apple.** (1) "Coletar" não inclui o que é enviado só para atender o pedido e descartado; este caso não existe na Clarevo (tudo que é enviado fica na conta). (2) O IP: se a Clarevo guardar o endereço IP das pessoas, a Apple manda declará-lo conforme o uso (a página cita localização, ID do dispositivo ou diagnósticos). O Supabase pode guardar IP e agente do navegador nos registros de autenticação: **conferir no painel do Supabase** e decidir com o advogado se entra como "Outros dados de diagnóstico". (3) A Clarevo não instala SDK de anúncio nem de análise (conferido em `apps/app/package.json`), mas as bibliotecas do Expo trazem SDKs e manifestos de privacidade próprios. No iOS, o único caso a olhar é a leitura de código: usa o leitor do sistema e a ZXingObjC, sem SDK do Google (seção 1), então a tabela acima não muda. Conferir no primeiro envio ao TestFlight se a Apple reclama de algum manifesto (ver `docs/16`, "Conferir no primeiro build").
 
 ## 3. Google Play: Segurança dos dados (Data safety)
 
@@ -87,14 +87,14 @@
 | Dispositivo ou outros IDs › ID do dispositivo ou outros IDs | **Sim, por precaução** (SDK de leitura de código do Google, só no Android) | Não | Opcional (só quando a pessoa abre o leitor da nota) | Finalidade provável: análises e funcionalidade do app, só do SDK; **nenhum uso para anúncios**. Mesma evidência da linha acima. **Confirmar na documentação do ML Kit antes de enviar** |
 | Localização, mensagens, fotos e vídeos, áudio, arquivos e documentos, agenda, contatos, saúde e condicionamento, navegação na web | Não | | | Os arquivos que a pessoa escolhe (PDF, OFX, CSV) são lidos no aparelho e não são enviados, e o app não pede acesso ao armazenamento: por isso "arquivos e documentos" não é coletado |
 
-**Compartilhamento: nenhum.** O Supabase hospeda a autenticação e o banco em nome do Clarevo (prestador de serviço), o que o Google não conta como compartilhamento; **conferir o enquadramento na tela do formulário** e, no texto da política, nomear o prestador. A Família mostra o que a pessoa lança às outras pessoas da mesma Família, por escolha dela (convite por link). A empresa que oferece o Clarevo como benefício nunca lê finanças, nem somadas (D-056, M-5).
+**Compartilhamento: nenhum.** O Supabase hospeda a autenticação e o banco em nome da Clarevo (prestador de serviço), o que o Google não conta como compartilhamento; **conferir o enquadramento na tela do formulário** e, no texto da política, nomear o prestador. A Família mostra o que a pessoa lança às outras pessoas da mesma Família, por escolha dela (convite por link). A empresa que oferece a Clarevo como benefício nunca lê finanças, nem somadas (D-056, M-5).
 
 ## 4. O que depende do advogado, de Enzo ou do Sentry
 
 | Item | Depende de | O que muda nas respostas |
 |---|---|---|
 | Prazos de guarda e texto final da exclusão da conta (D-058), inclusive por quanto tempo as cópias de segurança do Supabase guardam dado já apagado | Advogado | O texto da política e a frase "A exclusão da conta e dos dados é feita por você" da ficha. As respostas de coleta não mudam |
-| Papel da empresa que paga a licença e papel do Clarevo como controlador dos dados financeiros (M-5, `docs/13`) | Advogado, antes do primeiro contrato | Confirma "compartilhamento: nenhum" e o texto sobre empresas |
+| Papel da empresa que paga a licença e papel da Clarevo como controladora dos dados financeiros (M-5, `docs/13`) | Advogado, antes do primeiro contrato | Confirma "compartilhamento: nenhum" e o texto sobre empresas |
 | Retenção do rastro técnico de registros excluídos que ficam na Família (P-010) | Assessoria de privacidade | Texto da política |
 | Canal para pedidos de titular da LGPD, art. 18 (P-023), e a página de exclusão exigida pelo Google | Domínio e e-mail próprios (P-006) | URL de exclusão e de suporte |
 | Os 4 últimos dígitos do cartão: declarar "informações de pagamento" (Apple) e "informações de pagamento do usuário" (Google), ou tirar o campo | Enzo e advogado | As duas tabelas acima |

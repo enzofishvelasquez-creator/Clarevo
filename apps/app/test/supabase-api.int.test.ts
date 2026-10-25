@@ -9289,7 +9289,7 @@ describe('API real: Renda variável (Ciclo V, D-062)', () => {
   });
 });
 
-describe('API real: Como você conheceu o Clarevo? (D-067, item 2)', () => {
+describe('API real: Como você conheceu a Clarevo? (D-067, item 2)', () => {
   // Sofia (responde e muda), Tiago (outra pessoa, que não lê a resposta dela), Úrsula (nunca criou o espaço pessoal), Vera (repetição com
   // a resposta perdida) e Wagner (exclui a conta). A pergunta é opcional, só da própria pessoa, não conta como anotação e só entra em
   // contagens da equipe, que o app não executa. Roda no fim: nada dos blocos anteriores depende destas pessoas. Pessoas FICTÍCIAS.
@@ -9439,7 +9439,7 @@ describe('API real: Como você conheceu o Clarevo? (D-067, item 2)', () => {
   });
 });
 
-describe('conversor da resposta de "Como você conheceu o Clarevo?"', () => {
+describe('conversor da resposta de "Como você conheceu a Clarevo?"', () => {
   // O repositório de verdade, com um cliente que devolve o que o teste manda: a leitura e o resultado de set_signup_source passam pela
   // mesma conferência e nunca viram uma resposta inventada.
   const chain = (row: unknown, error: unknown = null) => {

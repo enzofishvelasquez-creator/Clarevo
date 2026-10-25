@@ -1512,8 +1512,8 @@ export function annualYearSummary(
     paidBefore === 0
       ? null
       : paidBefore === 1
-        ? `${Y}: parcela 1 paga antes do Clarevo (informado por você).`
-        : `${Y}: parcelas 1 a ${paidBefore} pagas antes do Clarevo (informado por você).`;
+        ? `${Y}: parcela 1 paga antes da Clarevo (informado por você).`
+        : `${Y}: parcelas 1 a ${paidBefore} pagas antes da Clarevo (informado por você).`;
   return {
     year,
     count,

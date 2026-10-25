@@ -1255,7 +1255,7 @@ describe('textos das telas de notas fiscais (Ciclo E, passo 3)', () => {
     }
     // A privacidade da nota é dita em NOTA_TEXT.privacy (único texto que cita CPF).
     expect(NOTA_TEXT.privacy).toMatch(/Não guardamos CPF/);
-    expect(NOTA_FLOW_TEXT.cameraIntro).toBe('O Clarevo usa a câmera só para ler o código da nota. Nenhuma foto é guardada.');
+    expect(NOTA_FLOW_TEXT.cameraIntro).toBe('A Clarevo usa a câmera só para ler o código da nota. Nenhuma foto é guardada.');
     for (const file of ['sefaz-page.ts', 'nota-flow.ts']) {
       const source = readFileSync(join(CORE_SRC, file), 'utf8');
       expect(source, file).not.toMatch(FORBIDDEN);
@@ -1606,7 +1606,7 @@ describe('textos dos ajustes de 10/10/2026 (D-042)', () => {
     expect(NOTA_PAYMENT_TEXT.creditNoCard).toBe('A nota diz cartão de crédito. Cadastre o cartão para anotar a compra na fatura.');
     expect(NOTA_PAYMENT_TEXT.multiple).toBe('Pagamento em mais de uma forma');
     expect(NOTA_FLOW_TEXT.cameraCloser).toBe('Aproxime até o QR ocupar a moldura.');
-    expect(NOTA_FLOW_TEXT.phoneReads).toBe('No celular, o Clarevo lê o valor e a data na página da Sefaz.');
+    expect(NOTA_FLOW_TEXT.phoneReads).toBe('No celular, a Clarevo lê o valor e a data na página da Sefaz.');
   });
 
   it('faturas do mês nos cartões: título, regra, ligação com a renda comprometida e próximas faturas', () => {
@@ -2061,9 +2061,9 @@ describe('textos das assinaturas (D-046)', () => {
 
   it('o que a tela promete e o que ela não promete', () => {
     expect(SUBSCRIPTION_TEXT.reviewIntro).toBe('Vale olhar de tempos em tempos se cada uma ainda é usada.');
-    expect(SUBSCRIPTION_TEXT.reviewNote).toContain('só tira a assinatura do Clarevo');
+    expect(SUBSCRIPTION_TEXT.reviewNote).toContain('só tira a assinatura da Clarevo');
     expect(SUBSCRIPTION_TEXT.reviewNote).toContain('encerrar também com quem oferece o serviço');
-    expect(SUBSCRIPTION_TEXT.reviewFooter).toBe('O Clarevo guarda só a data da revisão.');
+    expect(SUBSCRIPTION_TEXT.reviewFooter).toBe('A Clarevo guarda só a data da revisão.');
     expect(SUBSCRIPTION_TEXT.reminderLaterHint).toContain('só neste aparelho');
     expect(SUBSCRIPTION_TEXT.keepsHint).toContain('não é guardado');
   });
@@ -2351,7 +2351,7 @@ describe('textos do guia, da ajuda no lugar, do tour e do manual (D-049)', () =>
 
   it('GUIDE_TEXT, HELP_TEXT, TOUR_TEXT e MANUAL_TEXT inteiros e os textos montados', () => {
     check([...staticStrings(GUIDE_TEXT), ...staticStrings(HELP_TEXT), ...staticStrings(TOUR_TEXT), ...staticStrings(MANUAL_TEXT), ...guideFunctions]);
-    expect(GUIDE_TEXT.cardTitle).toBe('Como usar o Clarevo');
+    expect(GUIDE_TEXT.cardTitle).toBe('Como usar o app da Clarevo');
     expect(GUIDE_TEXT.tourAgain).toBe('Ver o tour de novo');
     expect(GUIDE_TEXT.purposeTitle).toBe('Para que serve');
     expect(GUIDE_TEXT.whereTitle).toBe('Onde fica');
@@ -2668,7 +2668,7 @@ describe('textos do widget e de "Seu mês em 30 segundos" (D-052)', () => {
     check(texts);
     // O estado vazio e o sem sessão têm as frases pedidas.
     expect(texts).toContain('Nada em aberto neste mês');
-    expect(texts).toContain('Entre no Clarevo para ver');
+    expect(texts).toContain('Entre na Clarevo para ver');
   });
 
   it('os arquivos-fonte novos do core passam pelas regras de texto', () => {
@@ -2719,7 +2719,7 @@ describe('textos de conteúdo de época (D-053)', () => {
     for (const bad of ['Cuidado com o prazo', 'Não perca', 'Aproveite!', 'Peça um empréstimo', 'O trabalhador recebe', 'a empregada', 'investimento']) {
       expect(ALARM.test(bad) || GENDERED.test(bad) || PRODUCTS.test(bad), bad).toBe(true);
     }
-    for (const ok of ['Quem trabalha com carteira assinada recebe o 13º salário em duas parcelas.', 'Confira a data oficial do ano no site da Receita.', 'O Clarevo não calcula nem entrega a declaração.']) {
+    for (const ok of ['Quem trabalha com carteira assinada recebe o 13º salário em duas parcelas.', 'Confira a data oficial do ano no site da Receita.', 'A Clarevo não calcula nem entrega a declaração.']) {
       expect(ALARM.test(ok) || GENDERED.test(ok) || PRODUCTS.test(ok), ok).toBe(false);
     }
   });
@@ -2757,11 +2757,11 @@ describe('textos de conteúdo de época (D-053)', () => {
     }
   });
 
-  it('o 13º, as férias e o Imposto de Renda dizem o que o Clarevo não faz: não calcula desconto nem entrega a declaração', () => {
+  it('o 13º, as férias e o Imposto de Renda dizem o que a Clarevo não faz: não calcula desconto nem entrega a declaração', () => {
     const decimo = topicFieldTexts(TOPICS.find((t) => t.slug === 'decimo-terceiro')!).join(' ');
-    expect(decimo).toContain('O Clarevo não calcula os descontos');
+    expect(decimo).toContain('A Clarevo não calcula os descontos');
     const ir = topicFieldTexts(TOPICS.find((t) => t.slug === 'imposto-de-renda')!).join(' ');
-    expect(ir).toContain('O Clarevo não calcula nem entrega a declaração');
+    expect(ir).toContain('A Clarevo não calcula nem entrega a declaração');
     expect(ir).toContain('Confira a data oficial do ano no site da Receita');
   });
 });
@@ -3487,7 +3487,7 @@ describe('textos do aviso de dia útil (D-060) e do próximo dia útil (D-061)',
         expect(n.a11y.endsWith('Confira com quem cobra se o pagamento pode ser feito no próximo dia útil.'), n.dueOn).toBe(true);
         expect(n.signLine, n.dueOn).toMatch(/^Não é dia útil · vencimento anotado: [a-zçáéíóú]+, \d{2}\/\d{2}$/);
       } else {
-        expect(n.text, n.dueOn).toMatch(/\. Em conta do ano, o Clarevo não usa o próximo dia útil: ela passa a vencida a partir do dia seguinte ao vencimento\.$/);
+        expect(n.text, n.dueOn).toMatch(/\. Em conta do ano, a Clarevo não usa o próximo dia útil: ela passa a vencida a partir do dia seguinte ao vencimento\.$/);
         expect(n.a11y.endsWith('Impostos podem ter regra diferente. Confira a data no carnê ou no site do órgão.'), n.dueOn).toBe(true);
         expect(n.signLine, n.dueOn).toBe('Não é dia útil · confira a data no carnê ou no site do órgão');
       }
@@ -3634,7 +3634,7 @@ describe('textos de "Calcular pela média" (D-062 item 2)', () => {
   });
 });
 
-describe('"Como você conheceu o Clarevo?" (D-067, item 2)', () => {
+describe('"Como você conheceu a Clarevo?" (D-067, item 2)', () => {
   it('todos os textos passam nas regras: sem travessão, sem a expressão proibida, sem produto financeiro e sem julgamento', () => {
     const texts = signupSourceTextSamples();
     expect(texts.length).toBeGreaterThan(20);
@@ -3646,7 +3646,7 @@ describe('"Como você conheceu o Clarevo?" (D-067, item 2)', () => {
   });
 
   it('as frases pedidas, exatamente, e as seis opções na ordem', () => {
-    expect(SIGNUP_SOURCE_TEXT.title).toBe('Como você conheceu o Clarevo?');
+    expect(SIGNUP_SOURCE_TEXT.title).toBe('Como você conheceu a Clarevo?');
     expect(SIGNUP_SOURCE_TEXT.note).toBe('Opcional. Usamos só para contar, sem identificar ninguém, de onde as pessoas chegam.');
     expect(SIGNUP_SOURCES.map((s) => SIGNUP_SOURCE_LABEL[s])).toEqual([
       'Instagram',

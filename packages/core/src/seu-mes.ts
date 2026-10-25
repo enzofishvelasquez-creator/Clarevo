@@ -131,7 +131,7 @@ export const SEU_MES_TEXT = {
     titleCurrent: (month: IsoMonth): string => `Nada anotado em ${formatMonthName(month)} ainda`,
     titlePast: (month: IsoMonth): string => `Nada anotado em ${formatMonthName(month)}`,
     bodyCurrent: 'Anote um gasto ou um recebimento e volte aqui para ver o mês em poucos passos.',
-    bodyPast: 'Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.',
+    bodyPast: 'Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado na Clarevo.',
     action: 'Anotar gasto',
   },
 } as const;

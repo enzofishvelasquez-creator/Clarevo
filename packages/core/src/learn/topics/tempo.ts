@@ -73,7 +73,7 @@ export const TEMPO_TOPICS: Topic[] = [
       'A Selic é a taxa básica de juros da economia e influencia as outras taxas de juros do país. Quando ela sobe ou desce, crédito e aplicações tendem a acompanhar, em ritmo e intensidade diferentes.',
       'O Comitê de Política Monetária (Copom), do Banco Central, define a meta da Selic em oito reuniões ordinárias por ano, cerca de uma a cada 45 dias. A Selic é o principal instrumento do Banco Central para levar a inflação à meta.',
       'A taxa cobrada num empréstimo fica acima do custo de captação do dinheiro pela instituição. Essa diferença se chama spread e inclui o risco de não pagamento, as despesas administrativas, os tributos e a margem da instituição.',
-      'O Clarevo não prevê a Selic nem usa a taxa atual nos cálculos. O valor vigente e o calendário das reuniões ficam no site do Banco Central.',
+      'A Clarevo não prevê a Selic nem usa a taxa atual nos cálculos. O valor vigente e o calendário das reuniões ficam no site do Banco Central.',
     ],
     example:
       'Uma taxa básica fictícia de 10% ao ano equivale a 0,80% ao mês. Um empréstimo fictício a 3% ao mês equivale a 42,58% ao ano. A diferença entre a taxa do empréstimo e o custo de captação da instituição é o spread.',
@@ -118,11 +118,11 @@ export const TEMPO_TOPICS: Topic[] = [
     subtitle: 'Três perguntas antes de guardar dinheiro',
     question: 'O que é liquidez?',
     short:
-      'Retorno é quanto o dinheiro pode render; risco, a chance de o resultado ser diferente; liquidez, a facilidade de virar dinheiro a um valor justo. O Clarevo não indica produtos.',
+      'Retorno é quanto o dinheiro pode render; risco, a chance de o resultado ser diferente; liquidez, a facilidade de virar dinheiro a um valor justo. A Clarevo não indica produtos.',
     paragraphs: [
       'Retorno é quanto o dinheiro pode render; no começo, ele é só uma expectativa. Risco é a chance de o resultado ser diferente do esperado, inclusive de perder parte do valor. Liquidez é a facilidade e a rapidez de transformar o que foi guardado em dinheiro, a um valor justo.',
       'Segundo a CVM, todo investimento tem algum risco, e retornos esperados maiores costumam vir com riscos maiores. A CVM também alerta que promessas de ganho muito acima do comum podem ser sinal de fraude.',
-      'Não existe uma opção melhor para todo mundo: o adequado depende do objetivo e do prazo. A reserva para imprevistos precisa de liquidez; um objetivo de longo prazo pode conviver com mais oscilação, se a pessoa aceitar esse risco. O Clarevo não indica produtos nem instituições.',
+      'Não existe uma opção melhor para todo mundo: o adequado depende do objetivo e do prazo. A reserva para imprevistos precisa de liquidez; um objetivo de longo prazo pode conviver com mais oscilação, se a pessoa aceitar esse risco. A Clarevo não indica produtos nem instituições.',
     ],
     example:
       'Um bem que vale R$ 20.000,00 precisa ser vendido em poucos dias, e a única oferta é 10% abaixo do valor: R$ 18.000,00. A falta de liquidez custou R$ 2.000,00.',
@@ -130,7 +130,7 @@ export const TEMPO_TOPICS: Topic[] = [
     hypotheses: 'Exemplo fictício, sem taxas de venda.',
     facts: [],
     keywords: ['liquidez', 'risco', 'retorno', 'rentabilidade', 'resgate', 'fraude'],
-    related: ['reserva-imprevistos', 'fgc', 'o-que-o-clarevo-nao-faz'],
+    related: ['reserva-imprevistos', 'fgc', 'o-que-a-clarevo-nao-faz'],
     sources: [
       cvm(
         'Liquidez',
@@ -219,7 +219,7 @@ export const TEMPO_TOPICS: Topic[] = [
     short:
       'Uma simulação mostra um caminho possível com a taxa, o prazo e os valores que você informou. Não é promessa: na vida real a taxa muda, e o resultado sem rendimento aparece sempre ao lado.',
     paragraphs: [
-      'No simulador, você informa quanto já tem, quanto vai guardar por mês, o prazo e a taxa ao ano que quer testar, de 0% a 30%. O Clarevo não sugere taxas, produtos nem instituições. A taxa ao ano vira uma taxa ao mês equivalente, e o rendimento de cada mês passa a render nos meses seguintes: são os juros compostos, ou juros sobre juros, como diz o Banco Central.',
+      'No simulador, você informa quanto já tem, quanto vai guardar por mês, o prazo e a taxa ao ano que quer testar, de 0% a 30%. A Clarevo não sugere taxas, produtos nem instituições. A taxa ao ano vira uma taxa ao mês equivalente, e o rendimento de cada mês passa a render nos meses seguintes: são os juros compostos, ou juros sobre juros, como diz o Banco Central.',
       'Leia o resultado junto com as hipóteses: a mesma taxa em cada mês, aporte no início de cada mês e valores brutos, sem imposto de renda, IOF ou taxas. É a mesma convenção da Calculadora do Cidadão, do Banco Central, para depósitos regulares: o aporte do mês já rende naquele mês.',
       'Na vida real, as taxas mudam com o tempo, e a CVM lembra que há risco em qualquer investimento. Uma simulação mostra um caminho possível, não um resultado certo. Por isso o resultado sem rendimento aparece sempre ao lado, porque depende só do que você guardar.',
       'Inflação é o aumento dos preços de produtos e serviços, como define o IBGE: com o tempo, o mesmo dinheiro compra menos. Se você informar uma inflação ao ano, o simulador mostra também o valor final em dinheiro de hoje, já descontada essa inflação.',

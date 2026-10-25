@@ -212,7 +212,7 @@ function paginaDaCalculadora(info, { valores }) {
 
   const sem = `<noscript>
 <div class="calc-sem-js">
-<p><strong>Esta calculadora precisa de JavaScript</strong> para fazer a conta no seu navegador, sem enviar nada. Sem ele, veja o exemplo mais abaixo e a lista do que ela pede, ou use a <a href="${esc(URL_APP)}" rel="noopener noreferrer">versão web</a> do Clarevo.</p>
+<p><strong>Esta calculadora precisa de JavaScript</strong> para fazer a conta no seu navegador, sem enviar nada. Sem ele, veja o exemplo mais abaixo e a lista do que ela pede, ou use a <a href="${esc(URL_APP)}" rel="noopener noreferrer">versão web</a> da Clarevo.</p>
 <h3>O que ela pede</h3>
 <ul>
 ${listaDeCampos(info.slug)}
@@ -249,7 +249,7 @@ ${temas.map((t) => cartaoDoTema(arquivo, t)).join('\n')}
       `<h2 id="calcular">Faça a conta</h2>
 <div class="aviso-edu calc-aviso"><p>${esc(c.CALC_UI.disclaimer)} ${esc(AVISO_EXTRA)}</p></div>
 <div class="calc" data-calculadora="${esc(info.slug)}">
-<p class="calc-carregando">Carregando a calculadora. Se ela não aparecer, o seu navegador pode estar bloqueando o JavaScript deste site. Você também pode usar a <a href="${esc(URL_APP)}" rel="noopener noreferrer">versão web</a> do Clarevo.</p>
+<p class="calc-carregando">Carregando a calculadora. Se ela não aparecer, o seu navegador pode estar bloqueando o JavaScript deste site. Você também pode usar a <a href="${esc(URL_APP)}" rel="noopener noreferrer">versão web</a> da Clarevo.</p>
 </div>
 ${sem}`,
       { rotulo: 'calcular' },

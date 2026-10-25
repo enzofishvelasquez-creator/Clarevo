@@ -248,11 +248,11 @@ describe('widget: estados', () => {
     expect(buildWidgetContent(input({ toPay: paid })).medium.state).toBe('vazio');
   });
 
-  it('sem sessão: "Entre no Clarevo para ver", sem nenhum dado, mesmo que a leitura venha preenchida', async () => {
+  it('sem sessão: "Entre na Clarevo para ver", sem nenhum dado, mesmo que a leitura venha preenchida', async () => {
     const toPay = await demoToPay();
     const { small, medium } = buildWidgetContent(input({ signedIn: false, toPay, showValues: true }));
-    expect(medium).toMatchObject({ state: 'sem_sessao', message: 'Entre no Clarevo para ver', title: null, value: null, next: null, overdue: null, route: '/entrar' });
-    expect(medium.a11y).toBe('Entre no Clarevo para ver.');
+    expect(medium).toMatchObject({ state: 'sem_sessao', message: 'Entre na Clarevo para ver', title: null, value: null, next: null, overdue: null, route: '/entrar' });
+    expect(medium.a11y).toBe('Entre na Clarevo para ver.');
     expect(small.route).toBe('/entrar');
     expect(small.label).toBe('Anotar gasto');
     const json = JSON.stringify(buildWidgetSnapshot(input({ signedIn: false, toPay, showValues: true })));
@@ -262,12 +262,12 @@ describe('widget: estados', () => {
   it('sem dados (ainda não lidos) ou de outro mês: pede para abrir o app, sem valor', async () => {
     for (const toPay of [null, summarizeToPay([], 'ctx', '2026-11', DEMO_TODAY)]) {
       const m = buildWidgetContent(input({ toPay, showValues: true })).medium;
-      expect(m).toMatchObject({ state: 'sem_dados', message: 'Abra o Clarevo para atualizar', value: null, next: null });
+      expect(m).toMatchObject({ state: 'sem_dados', message: 'Abra o app da Clarevo para atualizar', value: null, next: null });
     }
   });
 
   it('a demonstração sem sessão e a vazia também levam o selo', () => {
-    expect(buildWidgetContent(input({ signedIn: false, demo: true })).medium.a11y).toBe('Demonstração. Entre no Clarevo para ver.');
+    expect(buildWidgetContent(input({ signedIn: false, demo: true })).medium.a11y).toBe('Demonstração. Entre na Clarevo para ver.');
     expect(buildWidgetContent(input({ toPay: toPayOf([]), demo: true })).medium.a11y).toBe('Demonstração. Ainda a pagar em outubro. Nada em aberto neste mês.');
   });
 });
@@ -279,7 +279,7 @@ describe('widget pequeno', () => {
       size: 'pequeno',
       label: 'Anotar gasto',
       route: WIDGET_ROUTES.note,
-      a11y: 'Anotar gasto. Abre o Clarevo no formulário de gasto.',
+      a11y: 'Anotar gasto. Abre o app da Clarevo no formulário de gasto.',
       badge: null,
     });
     expect(WIDGET_ROUTES.note).toBe('/registro/novo?tipo=despesa');
@@ -310,7 +310,7 @@ describe('o que o widget nativo lê', () => {
     expect(isWidgetSnapshotFresh(newYearsEve, '2026-12-31')).toBe(true);
     expect(isWidgetSnapshotFresh(newYearsEve, '2027-01-01')).toBe(false);
     // O estado que o widget nativo mostra quando não vale mais.
-    expect(WIDGET_TEXT.medium.noData).toBe('Abra o Clarevo para atualizar');
+    expect(WIDGET_TEXT.medium.noData).toBe('Abra o app da Clarevo para atualizar');
   });
 
   it('é puro: a mesma entrada dá a mesma saída e nada da entrada muda', async () => {

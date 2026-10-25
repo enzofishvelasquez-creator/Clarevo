@@ -4,8 +4,8 @@
  * `site-src/imagens/og-clarevo-1200x630.png`, que `scripts/gerar-site.js` copia para `site/og/clarevo.png`.
  *
  * No mesmo padrão de `scripts/gerar-grafico-loja.js` (nada é redesenhado): HTML e CSS no Chromium do Playwright, fundo azul da marca
- * (`#2457F5`), logotipo reverso oficial `docs/marca/clarevo-logotipo-reverso.svg`, o subtítulo da ficha das lojas
- * (`docs/lojas/ficha.md`, campo `apple-subtitulo`, lido do arquivo) e a tela Resumo da demonstração (dados fictícios, com a etiqueta
+ * (`#2457F5`), logotipo reverso oficial `docs/marca/clarevo-logotipo-reverso.svg`, a mensagem central e a frase de apoio da ficha
+ * das lojas (`docs/lojas/ficha.md`, campos `mensagem-central` e `frase-de-apoio`, lidos do arquivo; D-068) e a tela Resumo da demonstração (dados fictícios, com a etiqueta
  * "Demonstração") num aparelho simples desenhado em CSS. Sem preço, ranking, "melhor", "grátis" nem selos das lojas. O script
  * confere que o texto e o aparelho ficam longe das bordas, e recusa o desenho se algo encostar.
  * Fonte: Manrope (OFL), de `apps/app/assets/fonts`, embutida no HTML.
@@ -28,10 +28,11 @@ const AZUL = '#2457F5';
 const MARGEM = { x: 64, topo: 48 };
 const CAPTURA = path.join(RAIZ, 'docs', 'lojas', 'capturas', 'apple-iphone-6-3pol-1206x2622', '01_resumo.png');
 
-function subtituloDaFicha() {
+/** Um campo da ficha das lojas (`docs/lojas/ficha.md`): a imagem usa o texto aprovado, sem copiar. */
+function campoDaFicha(nome) {
   const ficha = fs.readFileSync(path.join(RAIZ, 'docs', 'lojas', 'ficha.md'), 'utf8');
-  const m = /<!-- campo: apple-subtitulo[^>]*-->\s*```\s*\n([^\n]+)\n```/.exec(ficha);
-  if (!m) throw new Error('não achei o campo apple-subtitulo em docs/lojas/ficha.md');
+  const m = new RegExp(`<!-- campo: ${nome}[^>]*-->\\s*\`\`\`\\s*\\n([^\\n]+)\\n\`\`\``).exec(ficha);
+  if (!m) throw new Error(`não achei o campo ${nome} em docs/lojas/ficha.md`);
   return m[1].trim();
 }
 
@@ -51,11 +52,12 @@ function montarHtml() {
 html,body{width:${LARGURA}px;height:${ALTURA}px;overflow:hidden;background:${AZUL}}
 body{position:relative;font-family:Manrope,sans-serif;color:#fff}
 .disco{position:absolute;left:640px;top:60px;width:720px;height:720px;border-radius:50%;background:#1D47CC}
-.texto{position:absolute;left:${MARGEM.x}px;top:76px;width:640px}
+.texto{position:absolute;left:${MARGEM.x}px;top:68px;width:660px}
 .texto img{display:block;width:320px;height:auto}
-.barra{width:72px;height:10px;border-radius:5px;background:#D4F05B;margin:48px 0 30px}
-h1{font-weight:800;font-size:68px;line-height:1.08;letter-spacing:-.015em;max-width:560px}
-p{margin-top:28px;max-width:560px;font-weight:600;font-size:29px;line-height:1.38;color:#EEF2FF}
+.barra{width:72px;height:10px;border-radius:5px;background:#D4F05B;margin:38px 0 26px}
+h1{font-weight:800;font-size:56px;line-height:1.1;letter-spacing:-.015em;max-width:590px}
+p{margin-top:24px;max-width:560px;font-weight:600;font-size:27px;line-height:1.38;color:#EEF2FF}
+p.apoio{margin-top:26px;font-weight:800;font-size:31px;color:#D4F05B}
 .aparelho{position:absolute;left:810px;top:56px;width:312px;padding:11px;border-radius:50px;background:#0B1330;box-shadow:0 30px 70px rgba(6,16,64,.5),inset 0 0 0 2px #3A4A86}
 .tela{width:100%;border-radius:40px 40px 0 0;overflow:hidden;background:#F6F8FC}
 .tela img{display:block;width:100%;height:auto}
@@ -64,10 +66,11 @@ p{margin-top:28px;max-width:560px;font-weight:600;font-size:29px;line-height:1.3
 <div class="texto" data-importante>
 <img src="data:image/svg+xml;base64,${logo}" alt="Clarevo">
 <div class="barra"></div>
-<h1>${esc(subtituloDaFicha())}</h1>
-<p>Contas a pagar, cartões, metas e Família, com fonte e sem anúncios.</p>
+<h1>${esc(campoDaFicha('mensagem-central'))}</h1>
+<p class="apoio">${esc(campoDaFicha('frase-de-apoio'))}.</p>
+<p>Contas a pagar, cartões, metas e Família, sem anúncios.</p>
 </div>
-<div class="aparelho" data-importante><div class="tela"><img src="data:image/png;base64,${tela}" alt="Tela Resumo do Clarevo, com dados fictícios de demonstração"></div></div>
+<div class="aparelho" data-importante><div class="tela"><img src="data:image/png;base64,${tela}" alt="Tela Resumo da Clarevo, com dados fictícios de demonstração"></div></div>
 </body></html>`;
 }
 

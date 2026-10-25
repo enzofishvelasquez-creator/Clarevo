@@ -358,7 +358,7 @@ describe('Seu mês, o que pula e o estado vazio', () => {
     });
     const past = buildSeuMes(await readInput(repo, '2026-09'));
     expect(past.empty?.title).toBe('Nada anotado em setembro');
-    expect(past.empty?.body).toBe('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.');
+    expect(past.empty?.body).toBe('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado na Clarevo.');
   });
 
   it('mês que passou, vazio e conferido ("Conferi este mês", D-060): a frase de mês sem anotação vira a de mês conferido', async () => {
@@ -366,7 +366,7 @@ describe('Seu mês, o que pula e o estado vazio', () => {
     const space = await repo.ensurePersonalSpace('Conta principal');
     const unchecked = await readInput(repo, '2026-09');
     // O input do app traz a marca de pagamentos do mês (months_overview): sem ela, a frase de sempre.
-    expect(buildSeuMes({ ...unchecked, paidChecked: false }).empty?.body).toBe('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.');
+    expect(buildSeuMes({ ...unchecked, paidChecked: false }).empty?.body).toBe('Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado na Clarevo.');
     await repo.setMonthCheck('chave-seu-mes-0001', space.personalContextId, '2026-09', 'pagamentos', 0);
     const row = (await repo.monthsOverview(space.personalContextId, '2026-09', '2026-09'))[0]!;
     expect(row.paidChecked).toBe(true);
@@ -393,7 +393,7 @@ describe('Seu mês, o que pula e o estado vazio', () => {
     expect(view.cards).toEqual([]);
     expect(view.empty).toEqual({
       title: 'Nada anotado em março',
-      body: 'Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado no Clarevo.',
+      body: 'Mês sem anotação não quer dizer mês sem gastos: aqui aparece só o que está registrado na Clarevo.',
       action: { label: 'Anotar gasto', href: '/registro/novo?tipo=despesa' },
     });
     // Com aporte no mês, o mês tem anotação e o estado vazio não aparece.

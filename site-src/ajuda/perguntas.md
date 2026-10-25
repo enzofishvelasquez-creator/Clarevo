@@ -21,7 +21,7 @@ No app, abra Conta e, no último item, toque em "Excluir minha conta". Para conf
 - tema: conta
 - id: levar
 
-Pode levar os seus gastos e recebimentos do Pessoal, e as compras no cartão à parte, em planilha (CSV) ou em resumo em PDF, escolhendo o período, em Conta, "Exportar meus dados". A exportação não leva tudo o que o Clarevo guarda, como metas e contas a pagar em aberto, e o arquivo é montado no seu aparelho.
+Pode levar os seus gastos e recebimentos do Pessoal, e as compras no cartão à parte, em planilha (CSV) ou em resumo em PDF, escolhendo o período, em Conta, "Exportar meus dados". A exportação não leva tudo o que a Clarevo guarda, como metas e contas a pagar em aberto, e o arquivo é montado no seu aparelho.
 
 ## Como funciona a Família?
 
@@ -30,7 +30,7 @@ Pode levar os seus gastos e recebimentos do Pessoal, e as compras no cartão à 
 
 A Família reúne até 6 pessoas. Quem cria é a pessoa titular e convida as outras por um link de uso único, válido por 7 dias, com o papel de quem anota e vê ou de quem só vê. O Pessoal de cada pessoa continua separado e nunca é copiado para a Família. Quem quiser pode sair, e a pessoa titular pode encerrar a Família.
 
-## Recebi o Clarevo da minha empresa. Como ativo o benefício?
+## Recebi a Clarevo da minha empresa. Como ativo o benefício?
 
 - tema: beneficio
 - id: ativar
@@ -51,7 +51,7 @@ Os e-mails que ela convidou, a situação de cada convite ou licença (convite e
 
 Em um serviço de banco de dados e de autenticação, com conexão protegida e regras de acesso que valem no próprio banco. O app não guarda o número completo do cartão, o código de segurança, a validade nem fotos de notas fiscais. Quais serviços recebem dados e onde ficam estão na [Política de privacidade](privacidade.html). Um resumo em linguagem simples está em [Segurança e privacidade](seguranca.html).
 
-## O Clarevo se conecta ao meu banco?
+## A Clarevo se conecta ao meu banco?
 
 - tema: comecar
 - id: banco

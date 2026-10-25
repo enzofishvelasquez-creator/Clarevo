@@ -30,6 +30,8 @@ function razaoSocialDoSite(): string {
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const SITE = join(ROOT, 'site');
 const SCRIPT = join(ROOT, 'scripts', 'gerar-site.js');
+/** Frases que a comunicação de bem-estar financeiro não pode usar (Playbook v2.2, "Bem-estar financeiro e saúde mental" e "Proposta empresarial e comunicação sobre NR 1"). */
+const PROMESSAS_PROIBIDAS = /ninguém prospera no caos|não adianta fazer terapia|acaba com a ansiedade|app certificado|redução garantida de afastamentos|sua empresa adequada/i;
 const require = createRequire(import.meta.url);
 
 interface GerarOpcoes {
@@ -87,9 +89,9 @@ const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;'
 const TEMAS_DO_SITE = publishedTopics().filter((t) => !t.legacy && ['organizar', 'juros', 'tempo'].includes(t.section));
 const TEMAS_DA_AJUDA = ['comecar', 'organizar', 'contas', 'familia', 'beneficio', 'privacidade', 'conta'];
 const POSTS = [
-  'novidades/2026-10-23-conheca-o-clarevo.html',
+  'novidades/2026-10-23-conheca-a-clarevo.html',
   'novidades/2026-10-23-13o-salario-quando-cai-e-como-se-organizar.html',
-  'novidades/2026-10-23-como-a-empresa-oferece-o-clarevo-sem-ver-suas-financas.html',
+  'novidades/2026-10-23-como-a-empresa-oferece-a-clarevo-sem-ver-suas-financas.html',
 ];
 const PAGINAS_BASE = [
   'index.html',
@@ -666,7 +668,7 @@ describe('site público: as páginas geradas', () => {
       expect(robots).toContain('Sitemap: https://exemplo.test/sitemap.xml');
       expect(robots).not.toContain('Disallow');
       const feed = texto(g.arquivos.get('novidades/feed.xml'));
-      expect(feed).toContain('<link>https://exemplo.test/novidades/2026-10-23-conheca-o-clarevo</link>');
+      expect(feed).toContain('<link>https://exemplo.test/novidades/2026-10-23-conheca-a-clarevo</link>');
       expect(feed).toContain('<atom:link href="https://exemplo.test/novidades/feed.xml" rel="self" type="application/rss+xml"/>');
       const org = /<script type="application\/ld\+json">(\{[^<]*"Organization"[^<]*\})<\/script>/.exec(texto(g.arquivos.get('index.html')));
       expect(JSON.parse(org![1]!)).toMatchObject({ '@type': 'Organization', name: 'Clarevo', legalName: 'Empresa Exemplo Ltda', url: 'https://exemplo.test/' });
@@ -701,16 +703,25 @@ describe('site público: as páginas geradas', () => {
     }
   });
 
-  it('a página inicial traz o que o Clarevo é, recursos com captura, a empresa que nunca vê finanças, o que ele não é, o app web e o aviso das lojas (sem selos)', () => {
+  it('a página inicial traz a mensagem central, o apoio prático do app, recursos com captura, a empresa que nunca vê finanças, o que a Clarevo não é, o app web e o aviso das lojas (sem selos)', () => {
     const h = html('index.html');
-    expect(h).toContain('<h1>Mais clareza para decidir</h1>');
+    // D-068: o título é a mensagem central do Manual v2.2 (seção 19); "Mais clareza para decidir" fica como apoio, e o subtexto diz o que a Clarevo faz.
+    expect(h).toContain('<h1>Cuidar da vida financeira faz parte de cuidar de você.</h1>');
+    expect(h).not.toContain('<h1>Mais clareza para decidir</h1>');
     expect(h).not.toContain('Organize seu mês e aprenda');
-    // A frase de marca acompanha o herói, e logo abaixo vem o texto que diz o que o Clarevo é (ela não substitui a explicação).
-    expect(h.indexOf('<p class="lead">O Clarevo é um organizador de finanças pessoais e da família', h.indexOf('<h1>Mais clareza para decidir</h1>'))).toBeGreaterThan(0);
-    expect(h).toContain('organizador de finanças pessoais e da família');
-    expect(h).toContain('Pode ser oferecido pela empresa como benefício');
-    expect(h).toContain('A empresa nunca vê suas finanças');
-    for (const frase of ['Não é banco', 'Não movimenta dinheiro', 'Não oferece crédito', 'Não recomenda produtos financeiros']) expect(h, frase).toContain(frase);
+    const h1 = h.indexOf('<h1>Cuidar da vida financeira faz parte de cuidar de você.</h1>');
+    const lead = '<p class="lead">A Clarevo ajuda a organizar o mês e acompanhar decisões financeiras pessoais e familiares, respeitando sua realidade.</p>';
+    expect(h.indexOf(lead, h1)).toBeGreaterThan(h1);
+    expect(h.indexOf('<p class="frase-apoio">Mais clareza para decidir.</p>', h1)).toBeGreaterThan(h.indexOf(lead, h1));
+    // A chamada é "Conheça a Clarevo" e leva a O app.
+    expect(h).toContain('<a class="botao botao-principal" href="app/index.html">Conheça a Clarevo</a>');
+    // O resto fala de bem-estar financeiro com apoio prático, sem prometer resultado de saúde (Playbook v2.2, "Bem-estar financeiro e saúde mental").
+    expect(h).toContain('Bem-estar financeiro, com apoio prático');
+    expect(h).toContain('A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental, sono, produtividade ou tranquilidade.');
+    expect(h).toContain('não é a causa única da saúde mental de ninguém, e o app não tem eficácia clínica comprovada');
+    expect(h).toContain('dificuldade financeira não é falta de disciplina');
+    expect(h).not.toMatch(PROMESSAS_PROIBIDAS);
+    for (const frase of ['Não é banco', 'Não movimenta dinheiro', 'Não oferece crédito', 'Não recomenda produtos financeiros', 'Não é atendimento de saúde e não substitui o acompanhamento de profissionais']) expect(h, frase).toContain(frase);
     expect(h).toContain('href="https://clarevo.pages.dev"');
     expect(h).toContain('Em breve na App Store e no Google Play.');
     expect(h).toMatch(/Para pessoas/);
@@ -740,7 +751,7 @@ describe('site público: as páginas geradas', () => {
     expect(h).not.toMatch(/Download on the|App Store badge|Get it on/i);
   });
 
-  it('Comece aqui (o link da bio, D-067): o que é o Clarevo em duas frases, o estado real do acesso e os seis caminhos, sem espera, sem data, sem script e sem rastreamento', () => {
+  it('Comece aqui (o link da bio, D-067): o que é a Clarevo em duas frases, o estado real do acesso e os seis caminhos, sem espera, sem data, sem script e sem rastreamento', () => {
     const h = html('comece.html');
     const principal = /<main[\s\S]*<\/main>/.exec(h)![0];
     expect(h).toContain('<h1>Comece aqui</h1>');
@@ -751,7 +762,7 @@ describe('site público: as páginas geradas', () => {
     expect(lead).toContain('Não é banco, não movimenta dinheiro e não recomenda produtos financeiros.');
     expect(h.indexOf('Mais clareza para decidir.</p>')).toBeGreaterThan(h.indexOf(lead));
     // O estado do acesso de hoje (cadastro de pessoas reais só no piloto, D-064), sem lista de espera nem data.
-    expect(h).toContain('O Clarevo está em fase de testes. A versão para pessoas e empresas abre no piloto; acompanhe as <a href="novidades/index.html">Novidades</a>.');
+    expect(h).toContain('A Clarevo está em fase de testes. A versão para pessoas e empresas abre no piloto; acompanhe as <a href="novidades/index.html">Novidades</a>.');
     expect(principal).not.toMatch(/lista de espera|cadastre-se|inscreva|em breve|a partir de \d|dia \d|janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro|gr[áa]tis|teste gratuito/i);
     // Os seis caminhos, nesta ordem; a demonstração é o endereço combinado, com noopener, e nenhum link leva parâmetro de rastreamento.
     const links = [...h.matchAll(/<a class="cartao" href="([^"]+)"[^>]*><span class="titulo-cartao">([^<]+)<\/span>/g)].map((m) => [m[2], m[1]]);
@@ -777,7 +788,7 @@ describe('site público: as páginas geradas', () => {
 
   it('O app passeia por todos os recursos pedidos, cada um com a captura da demonstração e o texto do guia de uso do app', () => {
     const h = html('app/index.html');
-    expect(h).toContain('<h1>O Clarevo por dentro</h1>');
+    expect(h).toContain('<h1>A Clarevo por dentro</h1>');
     for (const titulo of ['Resumo do mês', 'Anotar gasto e recebimento', 'Leitura de nota fiscal', 'Contas a pagar e gastos fixos', 'Cartões e faturas', 'Metas e reserva', 'Família', 'Aprender e calculadoras', 'Lembretes']) expect(h, titulo).toContain(`>${titulo}</h`);
     for (const id of ['resumo', 'anotar-gasto', 'nota-fiscal', 'contas-a-pagar', 'cartoes', 'metas', 'familia', 'aprender']) {
       const e = GUIDE_ENTRIES.find((x) => x.id === id)!;
@@ -801,15 +812,38 @@ describe('site público: as páginas geradas', () => {
     expect(h).not.toMatch(/gr[áa]tis|R\$\s?\d+,\d{2}\s*(por|\/)\s*m[eê]s/i);
   });
 
-  it('Para empresas explica o benefício, o que a empresa vê e nunca vê (como no código e nos textos jurídicos), o painel só na web, o fim do benefício e o piloto, sem preço', () => {
+  it('Para empresas abre com a proposta de bem-estar financeiro, diz o que não está incluído, traz o bloco da NR-1 e explica o benefício, o que a empresa vê e nunca vê (como no código e nos textos jurídicos), o painel só na web, o fim do benefício e a apresentação, sem preço', () => {
     const h = html('empresas/index.html');
-    for (const frase of ['Como funciona', 'A empresa vê', 'A empresa nunca vê', 'O painel, só na web', 'Quando o benefício acaba', 'Falar sobre um piloto']) expect(h, frase).toContain(frase);
+    // D-068: o herói é o do Manual v2.2 (seção 19), com o subtexto sem "colaboradores" (linguagem neutra) e a chamada "Solicitar apresentação".
+    expect(h).toContain('<h1>Bem-estar financeiro também faz parte do cuidado com sua equipe.</h1>');
+    expect(h).toContain('<p class="lead">Conheça a proposta da Clarevo para apoiar a organização financeira das pessoas da equipe e integrar esse cuidado ao programa de bem-estar da empresa.</p>');
+    expect(h).toContain('<a class="botao botao-principal" href="#apresentacao">Solicitar apresentação</a>');
+    expect(h).toContain('<h2 id="apresentacao">Solicitar apresentação</h2>');
+    expect(h).not.toContain('Falar sobre um piloto');
+    // Nada de psicologia, mentoria, palestras, laudos, PGR ou relatórios de risco como incluídos: a página diz que não fazem parte.
+    expect(h).toContain('Atendimento psicológico, mentoria, palestras, laudos, PGR e relatórios de risco não fazem parte do que a Clarevo oferece hoje.');
+    expect(h).toContain('não promete redução de absenteísmo, de estresse nem de adoecimento');
+    // O bloco da NR-1 (Manual v2.2, seção 12): a norma não exige app financeiro, a proposta é ação complementar, a contratação isolada não comprova nada.
+    expect(h).toContain('<h2 id="nr-1">Bem-estar financeiro e a NR-1</h2>');
+    for (const frase of [
+      'A NR-1 trata dos fatores de risco psicossociais relacionados ao trabalho, dentro do gerenciamento de riscos ocupacionais.',
+      'A NR-1 não exige a contratação de um aplicativo financeiro.',
+      'pode ser considerada como ação complementar, conforme a avaliação técnica da empresa.',
+      'Contratar a Clarevo, sozinha, não comprova atendimento à norma.',
+      'não substitui as ações sobre a organização do trabalho, como sobrecarga e assédio',
+      'não equivale a uma avaliação clínica individual',
+      'Portaria MTE nº 1.419/2024',
+    ]) expect(h, frase).toContain(frase);
+    expect(h).toContain('href="https://www.gov.br/trabalho-e-emprego/pt-br/acesso-a-informacao/participacao-social/conselhos-e-orgaos-colegiados/comissao-tripartite-partitaria-permanente/normas-regulamentadora/normas-regulamentadoras-vigentes/nr-1" rel="noopener noreferrer"');
+    expect(h).not.toMatch(PROMESSAS_PROIBIDAS);
+    expect(h).not.toMatch(/colaboradores/i);
+    for (const frase of ['Como funciona', 'A empresa vê', 'A empresa nunca vê', 'O painel, só na web', 'Quando o benefício acaba', 'Solicitar apresentação']) expect(h, frase).toContain(frase);
     expect(h).toContain('os e-mails que ela mesma convidou');
     expect(h).toContain('convite enviado, convite cancelado, ativa ou encerrada');
     for (const nunca of ['gastos, recebimentos e valores', 'categorias, metas, contas a pagar e cartões', 'a Família da pessoa', 'números somados de finanças']) expect(h, nunca).toContain(nunca);
     expect(h).toContain('de 1 a 500 por vez');
     expect(h).toContain('link de uso único');
-    expect(h).toContain('o Clarevo não envia e-mail de convite');
+    expect(h).toContain('a Clarevo não envia e-mail de convite');
     // O fim do benefício: só o que o código garante (nada é apagado; 30 dias de acesso pleno, o prazo de `BENEFIT_GRACE_DAYS` e da migração
     // de empresas). O plano gratuito é [A DEFINIR] (P-005) nos termos e não é afirmado como fato.
     expect(h).toContain('O acesso pleno continua por 30 dias, contados do encerramento da licença ou do fim do contrato');
@@ -849,7 +883,7 @@ describe('site público: as páginas geradas', () => {
     expect(h).not.toContain('[PROPOSTA');
   });
 
-  it('Sobre fala do que move o Clarevo e de quem está por trás, sem nomes de pessoas, fotos nem números de uso', () => {
+  it('Sobre fala do que move a Clarevo e de quem está por trás, sem nomes de pessoas, fotos nem números de uso', () => {
     const h = html('sobre.html');
     for (const frase of ['Clareza', 'Sem anúncio', 'Sem venda de dados', 'Sem recomendar produtos']) expect(h, frase).toContain(frase);
     expect(h).toContain(razaoSocialDoSite());
@@ -968,7 +1002,7 @@ describe('site público: Aprender (o catálogo do app, uma fonte de verdade)', (
         expect(pagina, `fonte ${i + 1}`).toContain(`id="fonte-${i + 1}"`);
         if (s.kind === 'clarevo') {
           // As referências internas do projeto ("Clarevo: D-011") não aparecem no site público: só "Regra do próprio Clarevo".
-          expect(pagina).toContain(`id="fonte-${i + 1}">Regra do próprio Clarevo<`);
+          expect(pagina).toContain(`id="fonte-${i + 1}">Regra da própria Clarevo<`);
           expect(pagina).not.toContain(esc(LEARN_UI_TEXT.sourceLine(s)));
           for (const ref of s.refs) expect(pagina, `código ${ref}`).not.toContain(ref);
         } else expect(pagina).toContain(esc(LEARN_UI_TEXT.sourceLine(s)));
@@ -1089,7 +1123,7 @@ describe('site público: Ajuda, busca e perguntas do suporte', () => {
     for (const t of publishedTopics().filter((x) => (x.section === 'usar' || x.section === 'duvidas') && !x.legacy)) {
       const arquivo = TEMAS_DA_AJUDA.find((a) => new RegExp(`id="tema-${t.slug}"`).test(h(`ajuda/${a}.html`)))!;
       const r = resposta(arquivo, t.slug);
-      expect(r, t.slug).toContain(`Revisado em ${formatDateBR(t.reviewedOn)}. Fonte: Regra do próprio Clarevo.`);
+      expect(r, t.slug).toContain(`Revisado em ${formatDateBR(t.reviewedOn)}. Fonte: Regra da própria Clarevo.`);
       for (const s of t.sources) if (s.kind === 'clarevo') for (const ref of s.refs) expect(r, `${t.slug}: ${ref}`).not.toContain(ref);
     }
     expect(JSON.stringify(indice)).not.toMatch(/\bD-\d{3}\b/);
@@ -1215,10 +1249,10 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     }
   });
 
-  it('"Conheça o Clarevo" só afirma o que o produto faz e manda para as páginas do site como fonte', () => {
+  it('"Conheça a Clarevo" só afirma o que o produto faz e manda para as páginas do site como fonte', () => {
     const p = h(POSTS[0]!);
-    expect(p).toContain('<h1>Conheça o Clarevo</h1>');
-    expect(p).toContain('O Clarevo não é banco');
+    expect(p).toContain('<h1>Conheça a Clarevo</h1>');
+    expect(p).toContain('A Clarevo não é banco');
     expect(p).toContain('tudo o que aparece no app foi anotado ou importado por você ou pelas pessoas da sua Família');
     expect(p).toContain('href="../app/index.html"');
     expect(p).toContain('href="../seguranca.html"');
@@ -1235,7 +1269,7 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     expect(p).toContain(`<p>${esc(t.hypotheses!)}</p>`);
     for (const s of t.sources) {
       if (s.kind === 'clarevo') {
-        expect(p).toContain('Regra do próprio Clarevo');
+        expect(p).toContain('Regra da própria Clarevo');
         expect(p).not.toContain(esc(LEARN_UI_TEXT.sourceLine(s)));
       } else expect(p).toContain(esc(LEARN_UI_TEXT.sourceLine(s)));
       if (s.kind === 'oficial') expect(p).toContain(`href="${esc(s.url)}"`);
@@ -1248,12 +1282,12 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     }
   });
 
-  it('"Como a empresa oferece o Clarevo sem ver suas finanças" bate com a página Para empresas e com o texto jurídico', () => {
+  it('"Como a empresa oferece a Clarevo sem ver suas finanças" bate com a página Para empresas e com o texto jurídico', () => {
     const p = h(POSTS[2]!);
     expect(p).toContain('os e-mails que ela mesma convidou');
     expect(p).toContain('convite enviado, convite cancelado, ativa ou encerrada');
     expect(p).toContain('números somados de finanças');
-    expect(p).toContain('o Clarevo não envia e-mail de convite');
+    expect(p).toContain('a Clarevo não envia e-mail de convite');
     expect(p).toContain('href="../ajuda/beneficio.html#tema-empresa-ve"');
     expect(p).toContain('O banco de dados nega a leitura a quem administra o benefício, e isso é testado.');
     // O fim do benefício diz só o que o código garante: nada é apagado e 30 dias de acesso pleno. O plano gratuito é [A DEFINIR] e não aparece.
@@ -1284,8 +1318,8 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     const comDominio = gerarSite({ dados: PREENCHIDOS, referencia: '2026-10-23' });
     const ic = texto(comDominio.arquivos.get('novidades/index.html'));
     expect(ic).toContain('href="feed.xml">Feed RSS</a>');
-    expect(ic).toContain('<link rel="alternate" type="application/rss+xml" title="Novidades do Clarevo" href="feed.xml">');
-    for (const nome of POSTS) expect(texto(comDominio.arquivos.get(nome)), nome).toContain('<link rel="alternate" type="application/rss+xml" title="Novidades do Clarevo" href="feed.xml">');
+    expect(ic).toContain('<link rel="alternate" type="application/rss+xml" title="Novidades da Clarevo" href="feed.xml">');
+    for (const nome of POSTS) expect(texto(comDominio.arquivos.get(nome)), nome).toContain('<link rel="alternate" type="application/rss+xml" title="Novidades da Clarevo" href="feed.xml">');
   });
 
   it('o feed RSS (só com domínio) é XML bem formado, com um item por post, data, descrição e endereços completos, nunca relativos', () => {
@@ -1383,13 +1417,18 @@ describe('site público: imagens, tamanho e Open Graph', () => {
     expect((gerado.arquivos.get('og/clarevo.png') as Buffer).equals(bytes)).toBe(true);
     const script = readFileSync(join(ROOT, 'scripts', 'gerar-og-site.js'), 'utf8');
     expect(script).toContain('clarevo-logotipo-reverso.svg');
-    expect(script).toContain('apple-subtitulo');
+    // D-068: a imagem mostra a mensagem central e a frase de apoio, lidas da ficha das lojas.
+    expect(script).toContain('mensagem-central');
+    expect(script).toContain('frase-de-apoio');
     expect(script).toContain('01_resumo.png');
-    // O texto que o desenho mostra (o subtítulo da ficha e a linha de recursos), sem preço, ranking, "melhor", "grátis" nem selos.
+    // O texto que o desenho mostra (a mensagem central, a frase de apoio e a linha de recursos), sem preço, ranking, "melhor", "grátis" nem selos.
     const ficha = readFileSync(join(ROOT, 'docs', 'lojas', 'ficha.md'), 'utf8');
     const textoDoDesenho = [...script.matchAll(/<p>([^<$]*)<\/p>/g)].map((m) => m[1]).join(' ');
     expect(textoDoDesenho.length).toBeGreaterThan(20);
-    expect(`${textoDoDesenho} ${ficha.match(/apple-subtitulo[^\n]*\n```\n([^\n]+)/)?.[1] ?? ''}`).not.toMatch(/gr[áa]tis|melhor|baixe|download|R\$|ranking|#1|\bn[úu]mero 1\b/i);
+    const campo = (nome: string) => ficha.match(new RegExp(`${nome}[^\\n]*\\n\`\`\`\\n([^\\n]+)`))?.[1] ?? '';
+    expect(campo('mensagem-central')).toBe('Cuidar da vida financeira faz parte de cuidar de você.');
+    expect(campo('frase-de-apoio')).toBe('Mais clareza para decidir');
+    expect(`${textoDoDesenho} ${campo('mensagem-central')} ${campo('frase-de-apoio')}`).not.toMatch(/gr[áa]tis|melhor|baixe|download|R\$|ranking|#1|\bn[úu]mero 1\b/i);
   });
 });
 
@@ -1428,7 +1467,8 @@ describe('site público: contraste das cores (a regra de src/contrast.ts, 4,5:1 
     ['foco', 'fundo', 'anel de foco sobre o fundo'],
     ['foco', 'superficie', 'anel de foco sobre os cartões'],
     ['foco-topo', 'topo', 'anel de foco sobre o azul'],
-    ['lima', 'topo', 'sublinhado da página atual e botão principal sobre o azul'],
+    ['lima', 'topo', 'sublinhado da página atual, botão principal e frase de apoio da capa (20 px em negrito, texto grande) sobre o azul'],
+    ['lima', 'disco', 'frase de apoio da capa sobre o disco decorativo'],
     ['sobre-topo', 'topo', 'contorno do botão suave e do botão do menu'],
     ['link', 'fundo', 'contorno do botão suave e dos temas da Ajuda'],
     ['contorno', 'fundo', 'contorno do campo de busca'],
@@ -1524,7 +1564,7 @@ describe('site público: gerar-site.js na linha de comando', () => {
   it('--final recusa cada caso de rascunho (marca, proposta, travessão, link interno quebrado, expressão proibida) e, sem --final, os mesmos casos só viram aviso ou ficam visíveis', () => {
     const pastas: string[] = [];
     try {
-      const FRASE = 'Rascunho preparado pela equipe do Clarevo para revisão jurídica. Não é parecer jurídico.';
+      const FRASE = 'Rascunho preparado pela equipe da Clarevo para revisão jurídica. Não é parecer jurídico.';
       const casos: [string, (md: Record<string, string>) => void, string[]][] = [
         ['a frase de rascunho', (md) => (md['termos-de-uso.md'] = `${FRASE}\n\n${md['termos-de-uso.md']}`), ['termos.html: frase de rascunho']],
         ['"Proposta:"', (md) => (md['exclusao-de-conta.md'] += '\nProposta: pedir a confirmação pelo e-mail.\n'), ['excluir-conta.html: texto de proposta ("Proposta:")']],
@@ -1738,10 +1778,11 @@ describe('gráfico de recursos do Google Play (scripts/gerar-grafico-loja.js)', 
     expect(png.length).toBeGreaterThan(10_000);
   });
 
-  it('usa o subtítulo aprovado da ficha, o logotipo reverso oficial e a captura da demonstração, sem texto de preço nem selos', () => {
+  it('usa a mensagem central e a frase de apoio aprovadas da ficha, o logotipo reverso oficial e a captura da demonstração, sem texto de preço nem selos', () => {
     const script = readFileSync(join(ROOT, 'scripts', 'gerar-grafico-loja.js'), 'utf8');
     expect(script).toContain('clarevo-logotipo-reverso.svg');
-    expect(script).toContain('apple-subtitulo');
+    expect(script).toContain('mensagem-central');
+    expect(script).toContain('frase-de-apoio');
     expect(script).toContain('01_resumo.png');
     // Nada importante no centro nem na faixa de baixo ao meio (onde o Google pode sobrepor o botão de vídeo): o script mede e recusa o desenho.
     expect(script).toContain('ZONAS_LIVRES');

@@ -58,7 +58,7 @@ export const TOPIC_SLUGS = [
   'contei-duas-vezes',
   'voltei-depois',
   'apagar-dados',
-  'o-que-o-clarevo-nao-faz',
+  'o-que-a-clarevo-nao-faz',
 ] as const;
 
 export type TopicSlug = (typeof TOPIC_SLUGS)[number];

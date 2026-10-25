@@ -396,7 +396,7 @@ describe('Empresas: telas do app (lidas como código-fonte)', () => {
     const hooks = appFile('state/company.ts');
     expect(hooks).toMatch(/Platform\.OS === 'web'/);
     expect(COMPANY_TEXT.webOnly).toContain('só na web');
-    expect(COMPANY_TEXT.notAdmin).toContain('equipe do Clarevo');
+    expect(COMPANY_TEXT.notAdmin).toContain('equipe da Clarevo');
   });
 
   it('as rotas: o painel está entre as telas protegidas e o convite da empresa abre com ou sem conta, sem barra', () => {

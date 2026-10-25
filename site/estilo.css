@@ -1,4 +1,4 @@
-/* Estilo do site do Clarevo. Fonte em site-src/estilo.css; o gerador copia para site/estilo.css. Identidade: azul #2457F5, lima #D4F05B, texto #17223B. */
+/* Estilo do site da Clarevo. Fonte em site-src/estilo.css; o gerador copia para site/estilo.css. Identidade: azul #2457F5, lima #D4F05B, texto #17223B. */
 @font-face{font-family:Manrope;font-weight:500;font-style:normal;font-display:swap;src:url(fontes/Manrope_500Medium.ttf) format("truetype")}
 @font-face{font-family:Manrope;font-weight:700;font-style:normal;font-display:swap;src:url(fontes/Manrope_700Bold.ttf) format("truetype")}
 @font-face{font-family:Manrope;font-weight:800;font-style:normal;font-display:swap;src:url(fontes/Manrope_800ExtraBold.ttf) format("truetype")}
@@ -116,6 +116,7 @@ main:focus{outline:none}
 .botao-suave{border-color:var(--link);color:var(--link)}
 .capa .botao-suave{border-color:var(--sobre-topo);color:var(--sobre-topo)}
 .botao:hover{text-decoration:underline;text-underline-offset:.2em}
+.frase-apoio{margin:0 0 1.25rem;font-weight:800;font-size:1.25rem;line-height:1.3;color:var(--lima)}
 .lojas{margin:.5rem 0 0;color:var(--sobre-topo-suave);font-size:.9375rem}
 .migalha{margin:0 0 .75rem;font-size:.9375rem;color:var(--sobre-topo-suave)}
 .migalha a{color:var(--sobre-topo)}
@@ -403,7 +404,7 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
   body{background:#fff;color:#000}
   .topo,.capa{background:#fff;color:#000;border-radius:0}
   .capa::before{display:none}
-  .capa h1,.capa .lead,.capa a,.meta-tema,.migalha,.migalha a{color:#000}
+  .capa h1,.capa .lead,.capa .frase-apoio,.capa a,.meta-tema,.migalha,.migalha a{color:#000}
   .marca .logo-tela{display:none}
   .marca .logo-papel{display:block}
   .rodape{background:#fff;color:#000}

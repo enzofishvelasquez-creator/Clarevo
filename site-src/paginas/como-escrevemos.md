@@ -1,11 +1,11 @@
 ---
 titulo: Como escrevemos
-descricao: As regras editoriais do Clarevo: fonte oficial ou identificada, data, revisão, sem publicidade e sem recomendar produto financeiro.
+descricao: As regras editoriais da Clarevo: fonte oficial ou identificada, data, revisão, sem publicidade e sem recomendar produto financeiro.
 lead: As regras que a Equipe Clarevo segue em tudo o que publica aqui e em Aprender.
 ---
 # Como escrevemos
 
-Este site ensina educação financeira e conta o que acontece com o Clarevo. Para você poder conferir o que lê, seguimos estas regras.
+Este site ensina educação financeira e conta o que acontece com a Clarevo. Para você poder conferir o que lê, seguimos estas regras.
 
 ## Toda informação tem fonte
 

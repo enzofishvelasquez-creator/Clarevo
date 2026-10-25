@@ -740,7 +740,7 @@ export const RETURN_TEXT = {
   /** "o que está registrado de maio a setembro de 2026" */
   openingMonths: (from: IsoMonth, to: IsoMonth) => `o que está registrado ${formatMonthSpanBR(from, to)}`,
   openingCurrent: 'as contas vencidas deste mês',
-  note: 'Mês sem anotação não quer dizer mês sem gastos. Aqui aparece só o que está registrado no Clarevo.',
+  note: 'Mês sem anotação não quer dizer mês sem gastos. Aqui aparece só o que está registrado na Clarevo.',
   learnMore: 'Entenda',
   learnMoreA11y: 'Entenda o mês sem registro',
   monthTitle: (month: IsoMonth) => formatMonthBR(month),

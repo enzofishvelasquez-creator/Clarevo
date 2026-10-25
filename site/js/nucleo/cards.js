@@ -842,7 +842,7 @@ export const CARDS_TEXT = {
         paid: 'Fatura paga.',
         paidPartial: 'Pagamento registrado.',
         addCharges: 'Informar encargos',
-        chargesHint: 'Juros, multa, IOF, anuidade ou tarifa que o banco cobrou nesta fatura. O Clarevo não calcula juros sozinho.',
+        chargesHint: 'Juros, multa, IOF, anuidade ou tarifa que o banco cobrou nesta fatura. A Clarevo não calcula juros sozinha.',
         chargeType: 'Tipo do encargo',
         chargeAmount: 'Valor do encargo',
         addRefund: 'Registrar estorno',
@@ -881,7 +881,7 @@ export const CARDS_TEXT = {
     chargesCategory: CARD_CHARGES_CATEGORY,
     recordLine: (cardName, month, paidOn) => invoiceRecordDescription(cardName, month, paidOn),
     topicParagraph: 'Com o cartão cadastrado, as compras vão para a fatura e só contam em Pago quando a fatura é paga. Sem cartão cadastrado, anotar a fatura como conta a pagar continua valendo.',
-    rotativoParagraph: 'No Clarevo, se você paga só uma parte da fatura, o que ficou aparece como saldo anterior na fatura seguinte, sem juros. Os juros e encargos entram quando você informar a fatura do banco. O Clarevo não calcula juros sozinho.',
+    rotativoParagraph: 'Na Clarevo, se você paga só uma parte da fatura, o que ficou aparece como saldo anterior na fatura seguinte, sem juros. Os juros e encargos entram quando você informar a fatura do banco. A Clarevo não calcula juros sozinha.',
     links: {
         calculator: 'Quanto custa pagar só uma parte?',
         whoSees: 'Quem vê estes dados?',

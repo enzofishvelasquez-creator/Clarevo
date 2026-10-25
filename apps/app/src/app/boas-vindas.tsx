@@ -16,9 +16,9 @@ export default function BoasVindas() {
   return (
     <AuthShell art={<View style={{ alignItems: 'center', marginVertical: space[2] }}><WelcomeArt /></View>}>
       <Txt variant="hero" style={{ fontSize: 34, lineHeight: 42 }} accessibilityRole="header">
-        Seu dinheiro,{'\n'}mais claro.
+        Mais clareza{'\n'}para decidir.
       </Txt>
-      <Txt color={colors.textSecondary}>Acompanhe o seu mês e construa planos para você e sua família.</Txt>
+      <Txt color={colors.textSecondary}>Cuidar da vida financeira faz parte de cuidar de você.</Txt>
       <View style={{ flexDirection: 'row', gap: space[2], alignItems: 'flex-start' }}>
         <ShieldCheck size={18} color={colors.success} style={{ marginTop: 2 }} />
         <Txt variant="caption" color={colors.textSecondary} style={{ flex: 1 }}>

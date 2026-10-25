@@ -521,7 +521,7 @@ describe('formulário e textos (spec2 §4.7)', () => {
     expect(Object.keys(SIMULATE_ERROR_TEXT.rateText).sort()).toEqual(['casas_demais', 'fora_da_faixa', 'invalido', 'vazio']);
     expect(T.modes).toEqual({ 'quanto-guardar': 'Quanto guardar por mês', 'em-quanto-tempo': 'Em quanto tempo', 'quanto-ter': 'Quanto posso ter' });
     expect(T.fields.rate).toBe('Taxa de rendimento ao ano (%)');
-    expect(T.fields.rateHint).toBe('Você informa a taxa que quer testar. O Clarevo não sugere taxas, produtos nem instituições.');
+    expect(T.fields.rateHint).toBe('Você informa a taxa que quer testar. A Clarevo não sugere taxas, produtos nem instituições.');
     expect(T.intro).toBe('Faça contas com hipóteses suas. Nada aqui é gravado até você escolher criar uma meta.');
     // Taxa sem valor padrão nem exemplo: nenhuma mensagem de taxa ou inflação sugere um número para digitar.
     for (const text of [...Object.values(SIMULATE_ERROR_TEXT.rateText), ...Object.values(SIMULATE_ERROR_TEXT.inflationText), T.fields.rateHint, T.fields.inflationHint]) {

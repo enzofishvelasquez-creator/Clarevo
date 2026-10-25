@@ -50,7 +50,7 @@ function rodapeHtml(arquivo, valores) {
   return `<footer class="rodape">
 <div class="miolo">
 <nav class="rodape-grade" aria-label="Rodapé">
-<div class="rodape-marca"><a href="${rel(arquivo, 'index.html')}" aria-label="Clarevo, página inicial"><img src="${rel(arquivo, 'marca/clarevo-logotipo-reverso.svg')}" alt="" width="130" height="26"></a><p>Mais clareza para decidir. Sem anúncios, sem venda de dados e sem recomendar produtos financeiros.</p></div>
+<div class="rodape-marca"><a href="${rel(arquivo, 'index.html')}" aria-label="Clarevo, página inicial"><img src="${rel(arquivo, 'marca/clarevo-logotipo-reverso.svg')}" alt="" width="130" height="26"></a><p>Cuidar da vida financeira faz parte de cuidar de você. Sem anúncios, sem venda de dados e sem recomendar produtos financeiros.</p></div>
 ${colunas}
 </nav>
 <div class="rodape-fim"><p>${legal}</p></div>
@@ -87,7 +87,7 @@ function montarPagina({ arquivo, titulo, descricao, capa, corpo, fonte, valores,
       `<meta property="og:image" content="${esc(`https://${dominio}/og/clarevo.png`)}">`,
       '<meta property="og:image:width" content="1200">',
       '<meta property="og:image:height" content="630">',
-      '<meta property="og:image:alt" content="Clarevo: mais clareza para decidir, com a tela Resumo do app">',
+      '<meta property="og:image:alt" content="Clarevo: cuidar da vida financeira faz parte de cuidar de você, mais clareza para decidir, com a tela Resumo do app">',
       '<meta name="twitter:card" content="summary_large_image">',
     );
   }

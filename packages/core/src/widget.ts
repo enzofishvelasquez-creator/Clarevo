@@ -51,15 +51,15 @@ export const WIDGET_TEXT = {
   /** Widget pequeno. */
   small: {
     label: 'Anotar gasto',
-    a11y: 'Anotar gasto. Abre o Clarevo no formulário de gasto.',
-    a11ySignedOut: 'Anotar gasto. Abre o Clarevo para você entrar.',
+    a11y: 'Anotar gasto. Abre o app da Clarevo no formulário de gasto.',
+    a11ySignedOut: 'Anotar gasto. Abre o app da Clarevo para você entrar.',
   },
   /** Widget médio. */
   medium: {
     title: (month: IsoMonth): string => `Ainda a pagar em ${formatMonthName(month)}`,
     empty: 'Nada em aberto neste mês',
-    signedOut: 'Entre no Clarevo para ver',
-    noData: 'Abra o Clarevo para atualizar',
+    signedOut: 'Entre na Clarevo para ver',
+    noData: 'Abra o app da Clarevo para atualizar',
     /** "1 vencida", "2 vencidas". */
     overdue: (n: number): string => (n === 1 ? '1 vencida' : `${n} vencidas`),
     estimated: 'estimado',

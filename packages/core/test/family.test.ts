@@ -145,7 +145,7 @@ describe('Família: código e link do convite', () => {
     expect(inviteLink(code)).toBe(`https://clarevo.pages.dev/convite/${code}`);
     expect(inviteLink(code, 'http://localhost:8199/')).toBe(`http://localhost:8199/convite/${code}`);
     expect(inviteCodeFromText(inviteLink(code))).toBe(code);
-    expect(inviteCodeFromText(`Convite para a Família Casa no Clarevo: ${inviteLink(code)} obrigado`)).toBe(code);
+    expect(inviteCodeFromText(`Convite para a Família Casa na Clarevo: ${inviteLink(code)} obrigado`)).toBe(code);
     expect(inviteCodeFromText(code)).toBe(code);
     expect(inviteCodeFromText(`https://clarevo.pages.dev/convite/${code.toUpperCase()}`)).toBe(code);
     expect(inviteCodeFromText('https://clarevo.pages.dev/convite/abc')).toBeNull();
@@ -324,7 +324,7 @@ describe('Família: textos', () => {
     expect(FAMILY_TEXT.seats(0)).toContain('completa');
     expect(FAMILY_TEXT.seats(1)).toBe('Cabe mais 1 pessoa, contando os convites pendentes.');
     expect(FAMILY_TEXT.seats(4)).toBe('Cabem mais 4 pessoas, contando os convites pendentes.');
-    expect(FAMILY_TEXT.shareMessage('Casa', 'https://x.test/convite/abc')).toBe('Convite para a Família Casa no Clarevo: https://x.test/convite/abc');
+    expect(FAMILY_TEXT.shareMessage('Casa', 'https://x.test/convite/abc')).toBe('Convite para a Família Casa na Clarevo: https://x.test/convite/abc');
     expect(FAMILY_TEXT.yourRole('leitor')).toBe('Seu papel: Só vê');
     // O nome acessível de um botão contém o rótulo que se vê (WCAG 2.5.3).
     expect(FAMILY_TEXT.manageA11y('Mauro', 'leitor')).toContain(FAMILY_TEXT.manage);

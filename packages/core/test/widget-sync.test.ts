@@ -98,7 +98,7 @@ describe('ponte do widget: o que é gravado', () => {
     expect(plan.snapshot.medium.next?.name).toBe('Internet');
   });
 
-  it('sem sessão: grava só o estado "Entre no Clarevo para ver", sem nenhum dado, mesmo que a leitura venha preenchida', async () => {
+  it('sem sessão: grava só o estado "Entre na Clarevo para ver", sem nenhum dado, mesmo que a leitura venha preenchida', async () => {
     const toPay = await demoToPay();
     const plan = planWidgetSync(input({ toPay, signedIn: false, showValues: true }));
     if (!plan.write) throw new Error('esperava gravar');
@@ -132,7 +132,7 @@ describe('ponte do widget: o que é gravado', () => {
 });
 
 describe('ponte do widget: o dia seguinte não tem dados', () => {
-  it('a virada do dia vem pronta: "Abra o Clarevo para atualizar", com o prazo de hoje já vencido', async () => {
+  it('a virada do dia vem pronta: "Abra o app da Clarevo para atualizar", com o prazo de hoje já vencido', async () => {
     const plan = planWidgetSync(input({ toPay: await demoToPay(), showValues: true }));
     if (!plan.write) throw new Error('esperava gravar');
     expect(plan.afterMidnight.builtOn).toBe(addDays(DEMO_TODAY, 1));

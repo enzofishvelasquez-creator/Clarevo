@@ -258,7 +258,7 @@ function ferramentas(p, { altura, largura = LARGURA, ritmo = 1 }) {
 /** Entra na demonstração (a mesma que `video-demonstracao.js` usa) e espera o Resumo de outubro. */
 async function entrarNaDemo(p, base, f) {
   await p.goto(`${base}/`);
-  await f.esperar('Seu dinheiro');
+  await f.esperar('Mais clareza');
   const entrar = f.botao('Ver demonstração com dados fictícios');
   await entrar.waitFor({ timeout: 15000 }).catch(() => { throw new Error('o botão "Ver demonstração com dados fictícios" não apareceu: apps/app/dist não é um build de demonstração (rode com --build)'); });
   await entrar.click();
@@ -605,7 +605,7 @@ const VIDEOS = [
       await rolarAte(texto('O orçamento conta o usado no mês.'), 1700, 190);
       await s.fim();
       // De volta ao topo, com o total do mês.
-      s = await c.fala('O Clarevo mostra essa comparação em Orçamento por categoria. Para conhecer o acesso, veja o fixado Como acessar.');
+      s = await c.fala('A Clarevo mostra essa comparação em Orçamento por categoria. Para conhecer o acesso, veja o fixado Como acessar.');
       await rolarPara(0, 1700);
       await pausa(1500);
       await c.quadro('conferencia', 0);
@@ -663,7 +663,7 @@ const VIDEOS = [
       await pausa(900);
       await c.quadro('capa', 0);
       await s.fim();
-      s = await c.fala('Depois, é preciso conferir os registros da categoria. Para saber como acessar o Clarevo, consulte o link da bio.');
+      s = await c.fala('Depois, é preciso conferir os registros da categoria. Para saber como acessar a Clarevo, consulte o link da bio.');
       await rolarPara(0, 1500);
       await pausa(1500);
       await c.quadro('conferencia', 0);
@@ -725,13 +725,13 @@ const VIDEOS = [
       await pausa(1200);
       await c.quadro('capa', 0);
       await s.fim();
-      s = await c.fala(`Com ${plano[3]} por mês, a meta chega em ${plano[5]}, sem rendimentos. O Clarevo não guarda nem movimenta dinheiro.`);
+      s = await c.fala(`Com ${plano[3]} por mês, a meta chega em ${plano[5]}, sem rendimentos. A Clarevo não guarda nem movimenta dinheiro.`);
       await rolarAte(texto('Já guardado ao criar:'), 1700, 200);
       await pausa(900);
       await c.quadro('conferencia', 0);
       await s.fim();
       // Fecho.
-      s = await c.fala('Veja no perfil como acessar o Clarevo.', { min: 3.5 });
+      s = await c.fala('Veja no perfil como acessar a Clarevo.', { min: 3.5 });
       await rolarPara(0, 1400);
       await s.fim();
     },
@@ -749,7 +749,7 @@ const VIDEOS = [
       const pagoAntes = await c.lerValorDoResumo('Pago');
       const diferencaAntes = await c.lerValorDoResumo('Diferença do mês');
       // O Resumo e o botão "Anotar gasto".
-      let s = await c.fala('Seu primeiro registro no Clarevo.', { min: 3.8 });
+      let s = await c.fala('Seu primeiro registro na Clarevo.', { min: 3.8 });
       await c.quadro('conferencia', 0.8);
       await pausa(1800);
       await tocar(botao('Anotar gasto'), { antes: 400 });
@@ -836,7 +836,7 @@ function auxiliaresDaFamilia(c) {
     await campoDe('E-mail').fill(email); await campoDe('Senha').fill(SENHA_FICTICIA);
     await bt('Entrar').click(); await esperar('Diferença do mês'); await p.waitForTimeout(500);
   };
-  const sair = async () => { await aConta(); await bt('Sair deste aparelho').click(); await esperar('Seu dinheiro'); };
+  const sair = async () => { await aConta(); await bt('Sair deste aparelho').click(); await esperar('Mais clareza'); };
   /** A conta titular gera um convite com o papel dado e devolve o link (só para as outras contas aceitarem; o link nunca é mostrado legível no vídeo). */
   const convidar = async (papel) => {
     await bt('Convidar').click(); await esperar('O que a pessoa poderá fazer');
@@ -934,7 +934,7 @@ const CLIPES = [
     // A página começa na tela de entrada: as contas simuladas são criadas aqui, fora da gravação.
     entrar: async (c) => {
       await c.p.goto(`${c.base}/`);
-      await c.esperar('Seu dinheiro');
+      await c.esperar('Mais clareza');
     },
     preparar: async (c) => {
       const f = auxiliaresDaFamilia(c);

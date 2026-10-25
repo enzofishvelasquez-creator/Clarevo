@@ -112,7 +112,7 @@ export function PrimeirosPassos({ contextId, onState }: { contextId: string | un
             Primeiros passos
           </Txt>
           <Txt variant="caption" color={colors.textSecondary}>
-            Quatro passos para o Clarevo mostrar o seu mês de verdade.
+            Quatro passos para a Clarevo mostrar o seu mês de verdade.
           </Txt>
         </View>
         <View>
