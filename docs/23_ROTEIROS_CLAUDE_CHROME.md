@@ -54,12 +54,25 @@ Regras: não pagar nada à Dun & Bradstreet; não digitar CPF nem senha.
 
 Os e-mails ficam no Zoho Mail, numa organização só da Clarevo, separada da Finan Velasquez (D-070). O Email Routing da Cloudflare **não** é ativado: ele troca os registros MX e conflita com o Zoho. Plano B, só se o plano gratuito do Zoho não estiver disponível: Email Routing da Cloudflare, só para receber, encaminhando para uma caixa que Enzo indicar.
 
+Registrado em 25/10/2026, válido até 24/10/2027 (renovação de R$ 40 por ano, avisada pelo Registro.br por e-mail). Rodar depois do e-mail de confirmação do pagamento.
+
 ```
-Tarefa no painel da Cloudflare (dash.cloudflare.com), com a conta da empresa aberta. Regras: não ler, copiar nem criar chaves de API ou tokens; não mexer em Billing; plano Free; não ativar o Email Routing.
-Parte A, domínio:
-1. "Add a domain" com clarevo.app.br, plano Free. Pule a importação de registros se não houver.
-2. Anote os dois "nameservers" que a Cloudflare mostrar e pare: a troca no Registro.br é a Parte B.
-Parte B, no Registro.br (sessão de quem registrou): em clarevo.app.br > DNS > "Alterar servidores DNS", troque pelos dois nameservers anotados e salve. Pare e me diga quando a Cloudflare mostrar o domínio como "Active" (pode levar horas).
+Tarefa na Cloudflare (dash.cloudflare.com) e no Registro.br (https://registro.br), com as duas sessões já abertas neste Chrome. Use a mesma conta da Cloudflare onde estão os projetos clarevo, clarevo-demo e clarevo-site.
+Regras: não ler, copiar nem criar chaves de API ou tokens; não mexer em Billing; plano Free; não ativar o Email Routing; não digitar senhas nem códigos de verificação; se a tela pedir um dado que você não tenha, pare e me pergunte.
+
+Parte A, conferir o registro (só leitura):
+1. No Registro.br, abra clarevo.app.br e anote: o nome do titular (deve ser CLAREVO INOVA SIMPLES (I.S.)), a situação do domínio e se o pagamento aparece como confirmado. Se o titular não for a empresa, pare e me avise.
+
+Parte B, Cloudflare:
+2. Em "Add a domain", informe clarevo.app.br e escolha o plano Free. Se a Cloudflare oferecer a varredura de registros, aceite, mas não crie nenhum registro além dos que ela encontrar.
+3. Anote os dois nameservers que a Cloudflare mostrar.
+
+Parte C, servidores DNS no Registro.br:
+4. Em clarevo.app.br > DNS > "Alterar servidores DNS", troque pelos dois nameservers da Cloudflare e salve. Se o Registro.br não deixar porque o pagamento ainda não foi confirmado, pare e me avise.
+5. Depois de salvar, se a tela de DNSSEC do clarevo.app.br ainda mostrar registros DS, remova-os: eles são do DNS do Registro.br e deixam de valer com a Cloudflare (o DNSSEC da Cloudflare fica para depois).
+6. Volte à Cloudflare e clique em "Check nameservers" (ou equivalente).
+
+Relatório: titular e situação do domínio, os dois nameservers, o que a tela de DNSSEC mostrou, se a troca foi salva e a situação na Cloudflare (Pending ou Active).
 ```
 
 **O que a pessoa faz no Zoho**, porque pede senha e confirmação pelo celular: em `zoho.com/mail`, criar uma conta nova, só da Clarevo, no plano gratuito se aparecer (limites a conferir), com a opção de usar um domínio que já tem (`clarevo.app.br`). O primeiro usuário, que administra a conta, é `contato@clarevo.app.br`; a pessoa define a senha e liga a verificação em duas etapas.
