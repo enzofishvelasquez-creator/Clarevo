@@ -391,7 +391,7 @@ function instantesDosSinais(nome, esperados, achados) {
     };
     const entrar = async () => {
       await p.goto(base + (cenario ? `/?cenario=${cenario}` : '/'));
-      await esperar('Mais clareza');
+      await esperar('Cuidar da vida financeira');
       const entrarNaDemo = botao('Ver demonstração com dados fictícios');
       await entrarNaDemo.waitFor({ timeout: 15000 }).catch(() => { throw new Error('o botão "Ver demonstração com dados fictícios" não apareceu: apps/app/dist não é um build de demonstração (rode com --build)'); });
       await entrarNaDemo.click();

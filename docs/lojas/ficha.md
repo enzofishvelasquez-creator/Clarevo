@@ -125,7 +125,7 @@ A Clarevo é uma ferramenta de organização e de educação financeira. Não é
 Bem-estar financeiro: organize o mês e as contas. Sem ligar a contas bancárias.
 ```
 
-**Gráfico de recursos (Google Play, 1024 x 500): feito** (D-064). `apps/app/assets/loja/grafico-recursos-1024x500.png`, gerado por `node scripts/gerar-grafico-loja.js` com o logotipo oficial, o subtítulo desta ficha e a tela Resumo da demonstração (`docs/16`, seção 6). Não leva preço, ranking, "melhor", "grátis" nem selos das lojas.
+**Gráfico de recursos (Google Play, 1024 x 500): feito** (D-064). `apps/app/assets/loja/grafico-recursos-1024x500.png`, gerado por `node scripts/gerar-grafico-loja.js` com o logotipo oficial, a mensagem central e a frase de apoio desta ficha (campos `mensagem-central` e `frase-de-apoio`) e a tela Resumo da demonstração (`docs/16`, seção 6). Não leva preço, ranking, "melhor", "grátis" nem selos das lojas.
 
 ## 6. Google Play: descrição completa (até 4000)
 

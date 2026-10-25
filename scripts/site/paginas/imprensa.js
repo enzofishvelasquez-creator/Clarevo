@@ -208,7 +208,7 @@ ${MARCAS.map(cartaoDaMarca).join('\n')}
 <li>tirar o ponto lima, trocar a cor dele ou usar o nome do logotipo sem o ponto;</li>
 <li>trocar as cores, esticar, girar ou aplicar sombra e outros efeitos;</li>
 <li>usar o símbolo no lugar do logotipo em cabeçalhos;</li>
-<li>sugerir que a Clarevo apoia, recomenda ou é apoiado por um produto, uma empresa ou uma marca.</li>
+<li>sugerir que a Clarevo apoia, recomenda ou é apoiada por um produto, uma empresa ou uma marca.</li>
 </ul>
 </div>
 </div>

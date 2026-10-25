@@ -155,19 +155,19 @@ O Playbook e o Manual de Redes Sociais v2.2 (24/10/2026) passaram a tratar o bem
 
 - **Para empresas (site).** A proposta passa a ser apresentada como integração do cuidado financeiro ao programa de bem-estar da empresa, e a página ganha um bloco curto, "Bem-estar financeiro e a NR-1". Como o site inteiro só vai ao ar depois desta revisão (o `--final` recusa a frase de rascunho dos textos legais), a resposta à pergunta 35 faz parte do que libera a publicação; se o advogado pedir mudança, o ajuste é em `scripts/site/paginas/empresas.js`.
 - **O que a página diz que não está incluído.** Atendimento psicológico, mentoria, palestras, laudos, PGR e relatórios de risco. Só entrariam em uma proposta com escopo e contratação confirmados.
-- **Saúde.** "A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental, sono, produtividade ou tranquilidade." O Playbook manda distinguir associação de causalidade: a página diz que a vida financeira é uma dimensão do bem-estar, mas não a causa única da saúde mental de ninguém, e que o app não tem eficácia clínica comprovada.
+- **Saúde.** "A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental, sono, produtividade ou tranquilidade." O Playbook manda distinguir associação de causalidade: a página diz que a vida financeira é uma dimensão do bem-estar, entre outras, e que o app não tem eficácia clínica comprovada, sem supor que ela cause ou resolva algo na saúde mental.
 
-**Redação proposta para o bloco da NR-1 (cinco itens e uma nota)**
+**Redação proposta para o bloco da NR-1 (seis itens e uma nota)**
 
-1. A NR-1 trata dos fatores de risco psicossociais relacionados ao trabalho, dentro do gerenciamento de riscos ocupacionais.
+1. A NR-1 trata dos fatores de risco psicossociais relacionados ao trabalho, dentro do gerenciamento de riscos ocupacionais. (É a abertura do bloco; os itens de 2 a 6 são a lista.)
 2. A NR-1 não exige a contratação de um aplicativo financeiro.
 3. A proposta da Clarevo pode ser considerada como ação complementar, conforme a avaliação técnica da empresa.
 4. Contratar a Clarevo, sozinha, não comprova atendimento à norma.
 5. A Clarevo não substitui as ações sobre a organização do trabalho, como sobrecarga e assédio, nem o gerenciamento de riscos da empresa.
-6. O endividamento pessoal não é, por si só, um risco ocupacional: a avaliação considera as condições e a organização do trabalho e não equivale a uma avaliação clínica individual.
+6. O endividamento pessoal não deve ser classificado automaticamente como risco ocupacional: a avaliação considera as condições e a organização do trabalho e não equivale a uma avaliação clínica individual.
 7. Nota: a Clarevo não se apresenta como aplicativo certificado, não promete adequação da empresa à norma nem redução de afastamentos e não oferece laudos, PGR nem painéis de risco. Prazos, fiscalização e sanções mudam, e a página manda conferir a fonte oficial.
 
-Fonte citada na página: Ministério do Trabalho e Emprego, Norma Regulamentadora nº 1 (NR-1), capítulo 1.5, na redação da Portaria MTE nº 1.419/2024, com o link da página oficial da norma. A frase dos itens 2 e 6 vem do Manual v2.2 de Enzo, que as atribui ao MTE; **a equipe não conseguiu abrir a página do MTE nesta sessão** (o endereço foi confirmado só pelo resultado de busca), então a conferência das frases com o texto oficial fica com a revisão jurídica.
+Fonte citada na página: Ministério do Trabalho e Emprego, Norma Regulamentadora nº 1 (NR-1), capítulo 1.5, na redação da Portaria MTE nº 1.419/2024, com o link da página oficial da norma e a data "consultada em 24/10/2026", que é a data que o Playbook v2.2 dá às fontes oficiais que ele cita (não é uma consulta nossa). A frase dos itens 2 e 6 vem do Manual e do Playbook v2.2 de Enzo, que as atribuem ao MTE (o item 6 segue a redação do Playbook, "não classificar endividamento pessoal automaticamente como risco ocupacional"); **a equipe não conseguiu abrir a página do MTE nesta sessão** (o endereço foi confirmado só pelo resultado de busca), então a conferência das frases com o texto oficial fica com a revisão jurídica.
 
 **Perguntas novas**
 

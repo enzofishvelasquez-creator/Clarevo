@@ -92,7 +92,7 @@ function dimensoesPng(arquivo) {
       // A demonstração é recriada a cada carga da página: cada captura parte do mesmo Resumo (07/10/2026).
       const entrar = async (cenario) => {
         await p.goto(base + (cenario ? `/?cenario=${cenario}` : '/'));
-        await esperar('Mais clareza');
+        await esperar('Cuidar da vida financeira');
         await botao('Ver demonstração com dados fictícios').click();
         await esperar('Diferença do mês');
         if (!cenario) await esperar('R$ 2.100,00');

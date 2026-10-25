@@ -63,7 +63,7 @@ ${celular(img.resumo, ARQUIVO, { carregamento: 'eager' })}
 </article>
 <article class="cartao">
 <h3>O que a Clarevo não promete</h3>
-<p>A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental, sono, produtividade ou tranquilidade. A vida financeira é uma dimensão do bem-estar, mas não é a causa única da saúde mental de ninguém, e o app não tem eficácia clínica comprovada.</p>
+<p>A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental, sono, produtividade ou tranquilidade. A vida financeira é uma dimensão do bem-estar, entre outras, e o app não tem eficácia clínica comprovada.</p>
 </article>
 </div>`,
       { rotulo: 'bem-estar' },

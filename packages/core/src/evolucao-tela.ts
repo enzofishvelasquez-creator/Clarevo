@@ -363,7 +363,7 @@ export const EVOLUTION_TEXT = {
       noRecordsBody:
         'Mês sem conta anotada não quer dizer mês sem contas: aqui aparece só o que está registrado na Clarevo. Só meses já fechados entram aqui.',
       noRecordsAction: 'Anotar conta a pagar',
-      savingsBody: 'A Clarevo não tem meta criada nestes meses. Só meses já fechados entram aqui.',
+      savingsBody: 'Não há meta criada nestes meses. Só meses já fechados entram aqui.',
       savingsAction: 'Criar meta',
     },
   },

@@ -258,7 +258,7 @@ function ferramentas(p, { altura, largura = LARGURA, ritmo = 1 }) {
 /** Entra na demonstração (a mesma que `video-demonstracao.js` usa) e espera o Resumo de outubro. */
 async function entrarNaDemo(p, base, f) {
   await p.goto(`${base}/`);
-  await f.esperar('Mais clareza');
+  await f.esperar('Cuidar da vida financeira');
   const entrar = f.botao('Ver demonstração com dados fictícios');
   await entrar.waitFor({ timeout: 15000 }).catch(() => { throw new Error('o botão "Ver demonstração com dados fictícios" não apareceu: apps/app/dist não é um build de demonstração (rode com --build)'); });
   await entrar.click();
@@ -836,7 +836,7 @@ function auxiliaresDaFamilia(c) {
     await campoDe('E-mail').fill(email); await campoDe('Senha').fill(SENHA_FICTICIA);
     await bt('Entrar').click(); await esperar('Diferença do mês'); await p.waitForTimeout(500);
   };
-  const sair = async () => { await aConta(); await bt('Sair deste aparelho').click(); await esperar('Mais clareza'); };
+  const sair = async () => { await aConta(); await bt('Sair deste aparelho').click(); await esperar('Cuidar da vida financeira'); };
   /** A conta titular gera um convite com o papel dado e devolve o link (só para as outras contas aceitarem; o link nunca é mostrado legível no vídeo). */
   const convidar = async (papel) => {
     await bt('Convidar').click(); await esperar('O que a pessoa poderá fazer');
@@ -934,7 +934,7 @@ const CLIPES = [
     // A página começa na tela de entrada: as contas simuladas são criadas aqui, fora da gravação.
     entrar: async (c) => {
       await c.p.goto(`${c.base}/`);
-      await c.esperar('Mais clareza');
+      await c.esperar('Cuidar da vida financeira');
     },
     preparar: async (c) => {
       const f = auxiliaresDaFamilia(c);

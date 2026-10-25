@@ -557,7 +557,7 @@ describe('a visão do Guardado em metas', () => {
     expect(view.situation).toBe('sem_registros');
     expect(phase3Empty(view, true)).toEqual({
       title: 'Sem registros nestes meses',
-      body: 'A Clarevo não tem meta criada nestes meses. Só meses já fechados entram aqui.',
+      body: 'Não há meta criada nestes meses. Só meses já fechados entram aqui.',
       action: { kind: 'meta', label: 'Criar meta' },
     });
     expect(phase3Empty(view, false).action).toBeNull();

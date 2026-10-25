@@ -15,10 +15,10 @@ export default function BoasVindas() {
   const [opening, setOpening] = useState(false);
   return (
     <AuthShell art={<View style={{ alignItems: 'center', marginVertical: space[2] }}><WelcomeArt /></View>}>
-      <Txt variant="hero" style={{ fontSize: 34, lineHeight: 42 }} accessibilityRole="header">
-        Mais clareza{'\n'}para decidir.
+      <Txt variant="hero" style={{ fontSize: 28, lineHeight: 36 }} accessibilityRole="header">
+        Cuidar da vida financeira faz parte de cuidar de você.
       </Txt>
-      <Txt color={colors.textSecondary}>Cuidar da vida financeira faz parte de cuidar de você.</Txt>
+      <Txt color={colors.textSecondary}>Acompanhe o seu mês e construa planos para você e sua família.</Txt>
       <View style={{ flexDirection: 'row', gap: space[2], alignItems: 'flex-start' }}>
         <ShieldCheck size={18} color={colors.success} style={{ marginTop: 2 }} />
         <Txt variant="caption" color={colors.textSecondary} style={{ flex: 1 }}>

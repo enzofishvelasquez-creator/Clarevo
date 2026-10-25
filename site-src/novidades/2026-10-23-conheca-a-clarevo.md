@@ -9,7 +9,7 @@ fontes:
   - Para empresas | empresas/index.html
   - Política de privacidade | privacidade.html
 ---
-A Clarevo é uma solução de bem-estar financeiro para pessoas e empresas, apoiada por um aplicativo de finanças pessoais e da família. Cuidar da vida financeira faz parte de cuidar de você: você anota o que recebe e o que paga, e o app mostra quanto entrou, quanto saiu e quanto ainda vai vencer, cada coisa separada da outra.
+A Clarevo é uma solução de bem-estar financeiro para pessoas e empresas, apoiada por um aplicativo de finanças pessoais e da família. Cuidar da vida financeira faz parte de cuidar de você. No app, você anota o que recebe e o que paga, e ele mostra quanto entrou, quanto saiu e quanto ainda vai vencer, cada coisa separada da outra.
 
 ## O que dá para fazer
 

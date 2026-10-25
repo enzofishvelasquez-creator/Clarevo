@@ -277,7 +277,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const headingList = () => p.evaluate(() => [...document.querySelectorAll('[role=heading]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => `${e.getAttribute('aria-level')}:${e.textContent}`));
 
   // 1. Cadastro de uma conta nova (acesso simulado)
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
   await shot('01_boas_vindas');
   await btn('Criar conta').click(); await waitText('Nome de apresentação');
   // D-064 (privacidade e termos no app): o texto de aceite fica acima do botão "Criar conta", sem caixa de seleção. O build de demonstração
@@ -417,8 +417,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     !t.includes('Pedir biometria ao abrir') && !t.includes('Avisar') && JSON.stringify(contaSwitches) === JSON.stringify([['Ocultar valores ao abrir', 'false'], ['Mostrar valores no widget', 'false']]), JSON.stringify(contaSwitches));
   ok('Conta: "Privacidade neste aparelho" com "Ocultar valores ao abrir" desligado por padrão e a legenda', t.includes('Privacidade neste aparelho') && t.includes('Ao abrir o app, os valores aparecem como R$ ••••. Vale só para este aparelho.'));
   await keepText();
-  await btn('Sair deste aparelho').click(); await waitText('Mais clareza');
-  ok('sair volta para boas-vindas', (await body()).includes('Mais clareza'));
+  await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
+  ok('sair volta para boas-vindas', (await body()).includes('Cuidar da vida financeira'));
 
   // Entrar com senha errada e certa
   await btn('Entrar').click(); await waitText('Esqueci minha senha');
@@ -441,7 +441,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await waitText('Ainda a pagar neste mês'); await p.waitForTimeout(800);
   ok('"Agora não": depois de sair e entrar de novo, o card continua fora', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Anotar gasto')) === 1);
   await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
-  await btn('Sair deste aparelho').click(); await waitText('Mais clareza');
+  await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
 
   // Primeiros passos numa segunda conta nova: anotar um gasto marca o passo 3; com os três prontos, o card sai de vez.
   await btn('Criar conta').click(); await waitText('Nome de apresentação');
@@ -552,16 +552,16 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await waitUntil(async () => !(await headingShown('Primeiros passos')), 8000);
   ok('primeiros passos: com os quatro passos prontos ("Agora não" conta como resposta), o card sai', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Anotar gasto')) === 1);
   await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
-  await btn('Sair deste aparelho').click(); await waitText('Mais clareza');
+  await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
   await btn('Entrar').click(); await waitText('Esqueci minha senha');
   await field('E-mail').fill('bia@exemplo.com'); await field('Senha').fill('senha1234'); await btn('Entrar').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês'); await p.waitForTimeout(800);
   ok('primeiros passos concluídos: o card não volta depois de entrar de novo', !(await headingShown('Primeiros passos')));
   await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
-  await btn('Sair deste aparelho').click(); await waitText('Mais clareza');
+  await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
   // Na demonstração, as contas criadas existem só na memória da página: recarregar volta às boas-vindas e nada de
   // "Primeiros passos" fica gravado no aparelho (uma conta nova nunca herda o "Agora não" de outra com o mesmo identificador).
-  await p.reload(); await waitText('Mais clareza');
+  await p.reload(); await waitText('Cuidar da vida financeira');
   const ppStored = await p.evaluate(() => { try { return Object.keys(localStorage).filter((k) => k.startsWith('clarevo.primeiros-passos')); } catch { return ['erro']; } });
   ok('demonstração: recarregar volta às boas-vindas, sem "Primeiros passos" gravado no aparelho', ppStored.length === 0 && (await visibleCount('button', 'Ver demonstração com dados fictícios')) === 1, ppStored.join(' | '));
   const origemStored = await p.evaluate(() => { try { return Object.keys(localStorage).filter((k) => k.startsWith('clarevo.como-conheceu')); } catch { return ['erro']; } });
@@ -1504,7 +1504,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     (await p.locator('h1').filter({ hasText: /^Diferença do mês e saldo da conta$/ }).count()) === 1, p.url());
   await btn('Voltar à tarefa').click(); await waitText('Acesso ao plano');
   ok('"Voltar à tarefa" volta para a Conta, com o resumo ainda aberto', new URL(p.url()).pathname === '/conta' && (await saldoHint.getAttribute('aria-expanded')) === 'true', p.url());
-  await btn('Sair deste aparelho').click(); await waitText('Mais clareza');
+  await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await expectTotals('depois de entrar de novo: outubro na base', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
   await openToPay(); await waitText('Próximos meses');
@@ -2606,7 +2606,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     ['Anotar gasto', '/registro/novo?tipo=despesa', 1], ['Registrar recebimento', '/registro/novo?tipo=receita', 1], ['Contas a pagar', '/a-pagar', 1], ['Calculadoras', '/calcular', 1]]) &&
     manifest.icons.length > 0 && manifest.icons.every(Boolean), JSON.stringify(manifest));
   const viaEntry = async (url, ready) => {
-    await p.goto(`http://localhost:${PORT}${url}`); await waitText('Mais clareza');
+    await p.goto(`http://localhost:${PORT}${url}`); await waitText('Cuidar da vida financeira');
     const atEntry = new URL(p.url()).pathname;
     await btn('Ver demonstração com dados fictícios').click(); await waitText(ready, 12000).catch(() => {});
     return atEntry;
@@ -2669,7 +2669,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // a composição, "Fora dos compromissos" (sem "sobra", "disponível" nem "saldo"), os próximos meses e, nas dívidas, a
   // referência de mercado com a fonte. Falha de carga mostra erro, nunca 0%.
   const freshDemo = async () => {
-    await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+    await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
     await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('R$ 2.100,00'); await p.waitForTimeout(400);
   };
   const rcRow = () => p.getByRole('button', { name: /^Renda comprometida em / }).filter({ visible: true }).first();
@@ -3113,7 +3113,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // Conta nova: "Sim, consigo" cria a reserva pelo plano.
   const newAcct = async (name, email) => {
-    await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+    await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
     await btn('Criar conta').click(); await waitText('Nome de apresentação');
     await field('Nome de apresentação').fill(name); await field('E-mail').fill(email); await field('Senha').fill('senha1234');
     await btn('Criar conta').click(); await waitText('Confira seu e-mail');
@@ -3380,11 +3380,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('button', { name: /Simular um plano/ }).filter({ visible: true }).first().click(); await waitText('Faça contas com hipóteses suas');
   ok('D a ação do tema abre /simular', new URL(p.url()).pathname === '/simular', p.url());
   // Endereço direto (versão web instalada): valores do link; a taxa vinda do endereço nunca é lida; lixo é ignorado.
-  await p.goto(`http://localhost:${PORT}/simular?modo=em-quanto-tempo&alvo=2250000&inicial=450000&mensal=100000&taxa=10`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/simular?modo=em-quanto-tempo&alvo=2250000&inicial=450000&mensal=100000&taxa=10`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(300);
   const direct = await formValues();
   ok('D endereço direto: os valores do link (22.500,00 e 1.000,00) e a taxa do endereço não é lida', direct.includes('Quanto quer juntar=22.500,00') && direct.includes('Quanto vai guardar por mês=1.000,00') && direct.includes('Taxa de rendimento ao ano (%)='), JSON.stringify(direct));
-  await p.goto(`http://localhost:${PORT}/simular?modo=xyz&alvo=abc&meses=9999&inicial=-1`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/simular?modo=xyz&alvo=abc&meses=9999&inicial=-1`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(300);
   ok('D endereço com valores inválidos: ignorados (campos vazios)', (await formValues()).length === 0, JSON.stringify(await formValues()));
 
@@ -3763,10 +3763,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await freshDemo();
   const invoiceCommitmentId = await otherDevice(async (repo, ctx) => { const c = (await repo.listCards(ctx)).find((x) => x.name === 'Cartão Exemplo'); return (await repo.listInvoiceCommitments(c.id)).find((i) => i.invoice.month === '2026-11').id; });
   const exemploIdDeep = await cardIdOf('Cartão Exemplo');
-  await p.goto(`http://localhost:${PORT}/a-pagar/${invoiceCommitmentId}`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/a-pagar/${invoiceCommitmentId}`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Lançamentos', 12000).catch(() => {}); await p.waitForTimeout(600);
   ok('E o endereço da conta de fatura (/a-pagar/<id>) abre a fatura (e não o detalhe da conta), sem "Já paguei"', urlPath() === `/cartoes/${exemploIdDeep}/fatura/2026-11` && (await h1Name()) === 'Fatura' && (await visibleCount('button', 'Já paguei')) === 0, urlPath());
-  await p.goto(`http://localhost:${PORT}/cartoes/${exemploIdDeep}/fatura/2026-12`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/cartoes/${exemploIdDeep}/fatura/2026-12`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Lançamentos', 12000).catch(() => {}); await p.waitForTimeout(600);
   ok('E o endereço direto da fatura (/cartoes/<id>/fatura/2026-12) abre a fatura de dezembro', urlPath() === `/cartoes/${exemploIdDeep}/fatura/2026-12` && (await body()).includes('Fatura de dezembro'), urlPath());
 
@@ -4221,7 +4221,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('N a segunda parcela cai na fatura de dezembro (R$ 350,00 + R$ 150,00 = R$ 500,00)', (await heroTotalN()) === 'R$ 500,00' && (await visibleCount('button', 'Loja Exemplo (2x) · parcela 2 de 2 · R$ 150,00')) === 1, `${await heroTotalN()}`);
 
   // B2 · Seus últimos meses: a conta de fatura abre a fatura (como em Contas a pagar), sem "Já paguei" nem "Não houve".
-  await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('Sua última anotação foi em 20/05/2026.', 12000).catch(() => {});
   await otherDevice(async (repo, ctx) => {
     const k = () => `e2e-${Math.random()}`;
@@ -4257,7 +4257,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // montagem da sequência R anotada em 20/05/2026 (Aluguel, Luz estimada e Financiamento do carro desde maio, contas de
   // maio pagas, Salário e Mercado) e aberta em 07/10/2026. Cada entrada recarrega a página e recomeça o cenário.
   const enterReturnDemo = async () => {
-    await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Mais clareza');
+    await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Cuidar da vida financeira');
     await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
     await waitText('Sua última anotação foi em 20/05/2026.', 12000).catch(() => {});
   };
@@ -4801,7 +4801,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(350);
   };
   const demoHome = async () => {
-    await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+    await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
     await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
     await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   };
@@ -7348,7 +7348,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Cancelar').click(); await waitText('Descartar o preenchimento?'); await confirmIn('Descartar alterações'); await p.waitForTimeout(500);
 
   // ---- 10. O lembrete (cenário ?cenario=assinaturas: cadastradas em 30/06/2026 e nunca revisadas) ----
-  await p.goto(`http://localhost:${PORT}/?cenario=assinaturas`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/?cenario=assinaturas`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   ok('H2 cenário "assinaturas": o Resumo tem os totais de outubro de sempre e nenhuma faixa de "Seus últimos meses"', !(await bandShown()));
@@ -7370,7 +7370,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('H2 "Agora não": o aviso não volta ao sair e voltar para Gastos fixos', !(await body()).includes('Faz tempo que você não revisa suas assinaturas.'));
   ok('H2 "Agora não" é só do aparelho: nenhuma escrita sai pela rede e a série não muda', writes.slice(h2Writes0).length === 0 && (await h2Series()).filter((s) => s[1]).every((s) => s[2] === null && s[3] === 2));
   // Outra visita (a demonstração recomeça): "Revisar agora" leva à tela e "Revisei" faz o aviso sumir de vez.
-  await p.goto(`http://localhost:${PORT}/?cenario=assinaturas`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/?cenario=assinaturas`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   await h2OpenFixos();
@@ -8014,13 +8014,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const j1Dialog = (name) => p.getByRole('dialog', { name, exact: true }).filter({ visible: true });
   const j1Tab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
   const j1Demo = async (query = '') => {
-    await p.goto(`http://localhost:${PORT}/${query}`); await waitText('Mais clareza');
+    await p.goto(`http://localhost:${PORT}/${query}`); await waitText('Cuidar da vida financeira');
     await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
     await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   };
   // Conta nova com o tour ligado (a página recarrega e o roteiro o desligaria): a marca é desfeita antes de entrar no Resumo.
   const j1NewAccount = async (name, email) => {
-    await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza'); await j1TourOn();
+    await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira'); await j1TourOn();
     await btn('Criar conta').click(); await waitText('Nome de apresentação');
     await field('Nome de apresentação').fill(name); await field('E-mail').fill(email); await field('Senha').fill('senha1234');
     await btn('Criar conta').click(); await waitText('Confira seu e-mail');
@@ -8106,7 +8106,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Tutorial tour: depois de Esc, não volta', await j1TourGone());
 
   // ---- 4. Demonstração: o tour também abre (sempre pulável); a demonstração não muda ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza'); await j1TourOn();
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira'); await j1TourOn();
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await j1Dialog(j1TOUR).first().waitFor({ timeout: 8000 }).catch(() => {});
   j1s = await j1TourState();
@@ -8115,13 +8115,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Tutorial tour: a demonstração segue com os títulos de sempre', (await j1TourGone()) && JSON.stringify(await headingList()) === JSON.stringify(['1:Outubro de 2026', '2:Pagamentos do mês']), JSON.stringify(await headingList()));
 
   // ---- 5. Nunca sobre "Seus últimos meses" (D-030) nem sobre formulários ----
-  await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Mais clareza'); await j1TourOn();
+  await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Cuidar da vida financeira'); await j1TourOn();
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await waitText('Sua última anotação foi em 20/05/2026.', 12000).catch(() => {}); await p.waitForTimeout(1500);
   ok('Tutorial tour: com a faixa "Seus últimos meses" no Resumo, o tour não abre', (await headingShown('Seus últimos meses')) && (await j1Dialog(j1TOUR).count()) === 0);
   await btn('Seguir adiante').click(); await waitText('Combinado.'); await p.waitForTimeout(1200);
   ok('Tutorial tour: nem logo depois de a faixa sair (a faixa foi vista neste Resumo)', !(await headingShown('Seus últimos meses')) && (await j1Dialog(j1TOUR).count()) === 0);
-  await p.goto(`http://localhost:${PORT}/registro/novo?tipo=despesa`); await waitText('Mais clareza'); await j1TourOn();
+  await p.goto(`http://localhost:${PORT}/registro/novo?tipo=despesa`); await waitText('Cuidar da vida financeira'); await j1TourOn();
   await btn('Criar conta').click(); await waitText('Nome de apresentação');
   await field('Nome de apresentação').fill('Noa Tutorial'); await field('E-mail').fill('noa@exemplo.com'); await field('Senha').fill('senha1234');
   await btn('Criar conta').click(); await waitText('Confira seu e-mail');
@@ -8215,10 +8215,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar').click(); await waitText('Uma por uma'); await btn('Voltar').click(); await waitText('Ver o tour de novo');
 
   // ---- 9. Endereços do guia abertos direto (ENTRY_PATH) e entrada que não existe ----
-  await p.goto(`http://localhost:${PORT}/aprender/guia/cartoes`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/aprender/guia/cartoes`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Para que serve', 12000); await p.waitForTimeout(400);
   ok('Tutorial guia: o endereço /aprender/guia/cartoes aberto direto, depois de entrar, mostra a entrada', j1Path() === '/aprender/guia/cartoes' && (await h1Name()) === 'Cartões e faturas', p.url());
-  await p.goto(`http://localhost:${PORT}/aprender/guia/nao-existe`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/aprender/guia/nao-existe`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Esta função não está no guia.', 12000);
   ok('Tutorial guia: uma entrada que não existe mostra "Esta função não está no guia." com "Ver o guia"', (await visibleCount('button', 'Ver o guia')) === 1);
   await btn('Ver o guia').click(); await waitText('Ver o tour de novo');
@@ -8839,7 +8839,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar').click(); await waitText('Diferença do mês');
 
   // ---- 13. Conta nova: nada de exemplo; o comprovante vira o primeiro registro ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
   await btn('Criar conta').click(); await waitText('Nome de apresentação');
   await field('Nome de apresentação').fill('Pat Comprovante'); await field('E-mail').fill('pat@exemplo.com'); await field('Senha').fill('senha1234');
   await btn('Criar conta').click(); await waitText('Confira seu e-mail');
@@ -9032,11 +9032,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar').click(); await p.waitForTimeout(500);
 
   // ---- 6. Endereços: /seu-mes?mes=AAAA-MM aberto direto, e meses que não valem ----
-  await p.goto(`http://localhost:${PORT}/seu-mes?mes=2026-09`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/seu-mes?mes=2026-09`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Entrou e saiu', 12000); await p.waitForTimeout(500);
   ok('K1 endereço: /seu-mes?mes=2026-09 aberto direto, depois de entrar, mostra setembro', k1Path() === '/seu-mes' && (await body()).includes('Pessoal · Setembro de 2026'), p.url());
   for (const bad of ['2026-11', 'banana']) {
-    await p.goto(`http://localhost:${PORT}/seu-mes?mes=${bad}`); await waitText('Mais clareza');
+    await p.goto(`http://localhost:${PORT}/seu-mes?mes=${bad}`); await waitText('Cuidar da vida financeira');
     await btn('Ver demonstração com dados fictícios').click(); await waitText('Entrou e saiu', 12000); await p.waitForTimeout(400);
     ok(`K1 endereço: ?mes=${bad} não vale e a tela abre em outubro (o mês de hoje)`, (await body()).includes('Pessoal · Outubro de 2026'), p.url());
   }
@@ -9076,14 +9076,14 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     return { title: h.textContent, moving };
   });
   await k1Rp.goto(`http://localhost:${PORT}/seu-mes`);
-  await k1Rp.getByText('Mais clareza').first().waitFor();
+  await k1Rp.getByText('Cuidar da vida financeira').first().waitFor();
   await k1Rp.getByRole('button', { name: 'Ver demonstração com dados fictícios', exact: true }).click();
   await k1Rp.getByText('Entrou e saiu').first().waitFor({ timeout: 12000 }); await k1Rp.waitForTimeout(700);
   const k1RmSample = await k1Sample(k1Rp);
   ok('K1 movimento reduzido: o cartão 2 aparece já inteiro (opacidade 1, sem deslocamento nem animação)', k1RmSample.title === 'Para onde foi' && k1RmSample.moving.length === 0, JSON.stringify(k1RmSample));
   await k1Rm.close();
   // Com movimento normal, o mesmo clique desliza e esmaece o cartão novo (a conferência acima não é vazia).
-  await p.goto(`http://localhost:${PORT}/seu-mes`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/seu-mes`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Entrou e saiu', 12000); await p.waitForTimeout(700);
   const k1Normal = await k1Sample(p);
   ok('K1 movimento normal: o cartão novo entra deslizando e esmaecendo (a animação existe)', k1Normal.title === 'Para onde foi' && k1Normal.moving.length > 0, JSON.stringify(k1Normal));
@@ -9108,7 +9108,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('K1 conta vencida: o cartão 3 mostra Ainda a pagar R$ 690,00, "1 conta vencida" com R$ 40,00 à parte e as próximas contas só de hoje em diante', t.includes('Ainda a pagar\nR$ 690,00') && t.includes('1 conta vencida\nR$ 40,00') && t.includes('Internet\nVence 15/10') && !t.includes('Gás\nVence'), t.slice(0, 500));
 
   // ---- 11. Conta nova: nada de exemplo; o estado vazio, e depois os cartões que existem ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
   await btn('Criar conta').click(); await waitText('Nome de apresentação');
   await field('Nome de apresentação').fill('Kai Mês'); await field('E-mail').fill('kai@exemplo.com'); await field('Senha').fill('senha1234');
   await btn('Criar conta').click(); await waitText('Confira seu e-mail');
@@ -9399,7 +9399,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar').click(); await waitText('Neste mês');
 
   // ---- 7. Conta nova: o mesmo card (conteúdo público; nada de exemplo da pessoa) ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
   await btn('Criar conta').click(); await waitText('Nome de apresentação');
   await field('Nome de apresentação').fill('Kai Época'); await field('E-mail').fill('kai.epoca@exemplo.com'); await field('Senha').fill('senha1234');
   await btn('Criar conta').click(); await waitText('Confira seu e-mail');
@@ -9501,7 +9501,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await p.getByRole('button', { name: new RegExp(`^Fatura de ${month}, `) }).filter({ visible: true }).first().click(); await waitText('Lançamentos'); await p.waitForTimeout(500);
   };
   const d54NewAccount = async (name, email) => {
-    await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+    await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
     await btn('Criar conta').click(); await waitText('Nome de apresentação');
     await field('Nome de apresentação').fill(name); await field('E-mail').fill(email); await field('Senha').fill('senha1234');
     await btn('Criar conta').click(); await waitText('Confira seu e-mail');
@@ -9790,7 +9790,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await tab().first().click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
   };
   const famConta = async () => { await famGoResumo(); await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho'); };
-  const famSignOut = async () => { await famConta(); await btn('Sair deste aparelho').click(); await waitText('Mais clareza'); };
+  const famSignOut = async () => { await famConta(); await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira'); };
   const famTab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
   const famGoFamilia = async () => { await famConta(); await p.getByRole('button', { name: /^(Criar Família|Abrir Família)/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(500); };
   const famSelectorCount = () => p.getByRole('tab', { name: /^Ver dados de / }).filter({ visible: true }).count();
@@ -9804,7 +9804,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const famKeep = async () => { famTexts.push(await body()); await keepText(); };
   const famWrites0 = writes.length;
 
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
 
   // ---- 1. Vera cria a conta: sem Família, o Resumo não tem seletor e o Pessoal é o único contexto ----
   await famCreateAccount('Vera Lima', 'vera.familia@exemplo.com');
@@ -10147,7 +10147,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Encerrada: o seletor some', (await famSelectorCount()) === 0);
 
   // ---- 9. A demonstração com dados fictícios: sem Família de exemplo, sem seletor e sem criar ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   ok('Demonstração: o Resumo não tem o seletor "Pessoal | Família" e os totais seguem 6.000 / 3.900 / 2.100', (await famSelectorCount()) === 0 && (await body()).includes('R$ 6.000,00') && (await body()).includes('R$ 3.900,00') && (await body()).includes('R$ 2.100,00'));
@@ -10210,7 +10210,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const empPush = (pathname) => p.evaluate((path) => { history.pushState({}, '', path); window.dispatchEvent(new PopStateEvent('popstate')); }, pathname);
 
   // ---- 1. Demonstração (investidor): Conta, o painel da "Empresa Exemplo (demonstração)", fictícia e identificada ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   await empStubClipboard();
@@ -10316,7 +10316,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('"Copiar texto": copia o texto pronto, sem e-mail nem número de ninguém', await (async () => { const c = await p.evaluate(() => window.__copied.at(-1)); return c.startsWith('Chegou um benefício para ajudar a organizar o dinheiro do mês: a Clarevo.') && !/@|R\$\s?\d/.test(c); })());
   ok('Painel da demonstração: nenhuma escrita na rede (a empresa de exemplo vive só na memória)', writes.length === empWrites0, writes.slice(empWrites0).join(' | '));
   // A demonstração de novo: nada do que foi feito fica (cada visita refaz a empresa de exemplo) e os totais não mudam.
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   ok('Demonstração de novo: os totais de outubro seguem 6.000 / 3.900 / 2.100 e o Resumo não ganhou nada da empresa', (await body()).includes('R$ 6.000,00') && (await body()).includes('R$ 3.900,00') && (await body()).includes('R$ 2.100,00') && !(await body()).includes('Empresa Exemplo'));
@@ -10324,7 +10324,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Demonstração de novo: a empresa de exemplo volta como era (22 licenças, nenhum convite do roteiro anterior)', (await empChip('Todas, 22').count()) === 1 && !(await body()).includes('nova.pessoa@'));
 
   // ---- 4. Conta nova de RH (Rita): sem empresa, sem painel; depois que a equipe cadastra a empresa, o painel aparece ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
   await empStubClipboard();
   await famCreateAccount('Rita Prado', 'rita.empresa@exemplo.com');
   await famConta(); await waitText('Tenho um convite da empresa'); await p.waitForTimeout(300);
@@ -10520,7 +10520,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   };
   const evEnter = async (scenario) => {
-    await p.goto(`http://localhost:${PORT}/${scenario ? `?cenario=${scenario}` : ''}`); await waitText('Mais clareza');
+    await p.goto(`http://localhost:${PORT}/${scenario ? `?cenario=${scenario}` : ''}`); await waitText('Cuidar da vida financeira');
     await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
     await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   };
@@ -10757,7 +10757,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar').click(); await waitText('Ver o tour de novo');
 
   // ---- 8. O endereço direto: /evolucao aberto direto, depois de entrar, abre a tela ----
-  await p.goto(`http://localhost:${PORT}/evolucao`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/evolucao`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Valores registrados, pela data do pagamento', 12000); await p.waitForTimeout(700);
   ok('Evolução endereço: /evolucao aberto direto, depois de entrar, mostra a tela, de consulta, por cima do Resumo (com a barra inferior e o botão "Voltar")', evPath() === '/evolucao' && (await h1Name()) === 'Evolução' && (await evNames()).length === 6 &&
     (await p.getByRole('tab').filter({ visible: true }).count()) === 4 && (await visibleCount('button', 'Voltar')) === 1, p.url());
@@ -11211,7 +11211,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Evolução lacuna: sem a conta em aberto, o aviso de março some', names[4] === 'Março de 2026, R$ 3.300,00, na comparação' && !(await body()).includes('Pode faltar algo'), JSON.stringify(names.slice(2, 8)));
 
   // ---- 19. Conta nova (T19): nada de exemplo, e a seleção de outra pessoa nunca passa ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
   await famCreateAccount('Eva Lima', 'eva.evolucao@exemplo.com');
   await evOpen();
   t = await evKeep();
@@ -11702,16 +11702,16 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await anShots('496_analises_guia', { tab: true });
   await btn('Abrir Análises').click(); await waitText('Consulte o mês escolhido'); await p.waitForTimeout(500);
   ok('Análises guia: "Abrir Análises" abre a tela (/analises)', anPath() === '/analises' && (await h1Name()) === 'Análises');
-  await p.goto(`http://localhost:${PORT}/analises`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/analises`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Consulte o mês escolhido', 12000); await p.waitForTimeout(900);
   ok('Análises endereço: /analises aberto direto, depois de entrar, mostra a tela, de consulta, por cima do Resumo (com a barra inferior e o botão "Voltar")', anPath() === '/analises' && (await h1Name()) === 'Análises' && (await anTabs()).length === 4 &&
     (await p.getByRole('tab').filter({ visible: true }).count()) === 8 && (await visibleCount('button', 'Voltar')) === 1, p.url());
-  await p.goto(`http://localhost:${PORT}/analises?aba=orcamento&mes=2026-09`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/analises?aba=orcamento&mes=2026-09`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Consulte o mês escolhido', 12000); await p.waitForTimeout(900);
   ok('Análises endereço: ?aba=orcamento&mes=2026-09 abre na aba Orçamento, em setembro de 2026', (await anTabs()).map((x) => x.selected).join() === 'false,false,false,true' && (await anMonthLabel()).includes('Setembro de 2026'));
 
   // ---- 12. Conta nova (nada de exemplo), Família e o que fica no aparelho ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
   await famCreateAccount('Ivo Lima', 'ivo.analises@exemplo.com');
   await anOpen();
   t = await anKeep();
@@ -11815,7 +11815,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // "Excluir minha conta" é também o nome do cabeçalho e do título do card de Conta; o botão final é o único botão com este nome na tela.
   const delFinalEnabled = async () => (await visibleCount('button', 'Excluir minha conta')) === 1 && !(await delFinal().isDisabled());
 
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
 
   // ---- 1. Iris, conta nova sem Família: o card em Conta é o último item, sem destaque de alerta ----
   await famCreateAccount('Iris Neves', 'iris.exclusao@exemplo.com');
@@ -11972,8 +11972,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Criar uma conta').click(); await waitText('Nome de apresentação'); await p.waitForTimeout(300);
   ok('Sua conta foi excluída: "Criar uma conta" abre o cadastro', (await body()).includes('Nome de apresentação'));
   await p.goto(`http://localhost:${PORT}/conta-excluida`); await waitText('Sua conta foi excluída');
-  await btn('Voltar ao início').click(); await waitText('Mais clareza'); await p.waitForTimeout(300);
-  ok('Sua conta foi excluída: "Voltar ao início" leva à boas-vindas', (await body()).includes('Mais clareza'));
+  await btn('Voltar ao início').click(); await waitText('Cuidar da vida financeira'); await p.waitForTimeout(300);
+  ok('Sua conta foi excluída: "Voltar ao início" leva à boas-vindas', (await body()).includes('Cuidar da vida financeira'));
 
   // ---- 11b. A resposta da exclusão se perdeu e a sessão caiu, sem a confirmação do servidor: o app diz que não foi possível confirmar ----
   // O roteador abre esta tela (estado=nao-confirmada) depois de limpar o aparelho; a decisão é coberta pelos testes do core
@@ -11989,12 +11989,12 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Entrar').click(); await waitText('Esqueci minha senha'); await p.waitForTimeout(300);
   ok('Resposta perdida: "Entrar" abre a entrada, para conferir se a conta ainda existe', (await body()).includes('Esqueci minha senha'));
   await p.goto(`http://localhost:${PORT}/conta-excluida?estado=nao-confirmada`); await waitText('Não foi possível confirmar a exclusão');
-  await btn('Voltar ao início').click(); await waitText('Mais clareza'); await p.waitForTimeout(300);
-  ok('Resposta perdida: "Voltar ao início" leva à boas-vindas', (await body()).includes('Mais clareza'));
+  await btn('Voltar ao início').click(); await waitText('Cuidar da vida financeira'); await p.waitForTimeout(300);
+  ok('Resposta perdida: "Voltar ao início" leva à boas-vindas', (await body()).includes('Cuidar da vida financeira'));
   // Sem o parâmetro (ou com outro valor), a tela é a de sempre: "Sua conta foi excluída".
   await p.goto(`http://localhost:${PORT}/conta-excluida?estado=qualquer`); await waitText('Sua conta foi excluída');
   ok('Sua conta foi excluída: um estado desconhecido cai na tela de sempre', (await famH1()) === 'Sua conta foi excluída' && !(await body()).includes('Não foi possível confirmar'));
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza'); await p.waitForTimeout(300);
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira'); await p.waitForTimeout(300);
 
   // ---- 12. A demonstração com dados fictícios: a tela abre e explica, o botão final diz que nada é apagado e os totais não mudam ----
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
@@ -12070,7 +12070,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const DU_YEAR_ADVICE = 'Impostos podem ter regra diferente. Confira a data no carnê ou no site do órgão.';
 
   // ---- 1. A demonstração: nada em outubro cai em dia que não é útil; em "Próximos meses", as faturas do Cartão Exemplo de 10/01, 10/04 e 10/07/2027 (domingo e sábados) levam o aviso ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('R$ 2.100,00'); await p.waitForTimeout(400);
   t = await body();
   const duResumoSemVencida = !/vencida/i.test(t);
@@ -12450,7 +12450,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Mês conferido: nenhuma escrita na rede até aqui (a demonstração grava só na memória) e os totais da demonstração não mudaram', writes.length === mcWrites0, writes.slice(mcWrites0).join(' | '));
 
   // ---- 8. "Seus últimos meses": o mês conferido deixa de ser lacuna ----
-  await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('Sua última anotação foi em 20/05/2026.', 12000).catch(() => {});
   await evSpyStart();
   const mcBand = async () => p.evaluate(() => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Seus últimos meses' && e.getBoundingClientRect().width > 0); let box = h?.parentElement; while (box && !box.querySelector('[role=button]')) box = box.parentElement; return box ? box.innerText.replace(/ /g, ' ') : null; });
@@ -12497,7 +12497,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await evShots('509_conferi_revisao_resumo', { tab: true });
 
   // ---- 9. Família: quem só lê vê, quem escreve marca e desmarca ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
   await famCreateAccount('Vera Conferi', 'vera.conferi@exemplo.com');
   await famGoFamilia();
   await btn('Criar Família').click(); await waitText('Nome da Família'); await field('Nome da Família').fill('Casa Conferi');
@@ -12740,7 +12740,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Média e mediana, Aprender: nenhuma escrita direta na rede durante a leitura e a busca', writes.length === mmWrites0, writes.slice(mmWrites0).join(' | '));
 
   // ---- 7. Conta nova: o tema é igual (conteúdo público) e a Evolução vazia não mostra o "O que é mediana?" ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
   await btn('Criar conta').click(); await waitText('Nome de apresentação');
   await field('Nome de apresentação').fill('Mia Mediana'); await field('E-mail').fill('mia.mediana@exemplo.com'); await field('Senha').fill('senha1234');
   await btn('Criar conta').click(); await waitText('Confira seu e-mail');
@@ -12876,7 +12876,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Renda variável: a referência salva é de outubro, no valor exato da média, e não tem a marca "Minha renda varia" porque a pessoa não a escolheu', JSON.stringify(await otherDevice(async (repo, ctx) => (await repo.listIncomeReferences(ctx)).map((r) => [r.fromMonth, r.amountCents, r.varies]))) === JSON.stringify([['2026-10', 382500, false]]));
 
   // ---- 3. Conta nova: nada de exemplo, e a explicação de que precisa de um mês com recebimentos ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
   await famCreateAccount('Rui Renda', 'rui.renda@exemplo.com');
   await rvOpenForm();
   t = await rvKeep();
@@ -13078,7 +13078,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     rhCsv3.lines.includes('nova.pessoa@empresa-exemplo.example;Convite enviado;07/10/2026') && (rhCsv3.text.match(/@empresa-exemplo\.example/g) ?? []).length === 23, rhCsv3.lines.slice(8, 12).join(' | '));
 
   // ---- 8. Uma empresa de verdade (da memória): nome com ponto e vírgula, aspas e "=", contrato com fim; o nome é protegido na planilha e escapado na página ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
   await famCreateAccount('Rita Relatório', 'rita.relatorio@exemplo.com');
   await p.evaluate(() => window.__e2e.company().staffCreateOrganization({ name: '=Alfa; "Beta" <b>Ltda</b> & Cia &amp; Co', seats: 8, plan: 'familiar', startsOn: '2026-10-01', endsOn: '2027-09-30', adminEmail: 'rita.relatorio@exemplo.com' }));
   await p.evaluate(() => window.__e2e.refresh()); await p.waitForTimeout(600);
@@ -13255,7 +13255,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await f3Keep();
   const f3GReads = await f3ReadsOf(f3G0, 'listGoalMovementsInMonth');
   ok('Evolução fase 3, Guardado em metas na demonstração: "Sem registros nestes meses" (as metas são de outubro, o mês atual), a base "Aportes menos resgates nas metas", "Só meses já fechados" e o botão "Criar meta"', t.includes('Sem registros nestes meses') &&
-    t.includes('A Clarevo não tem meta criada nestes meses. Só meses já fechados entram aqui.') && t.includes(F3_BASE.guardado) && t.includes(F3_CLOSED) && (await visibleCount('button', 'Criar meta')) === 1 && (await evNames()).length === 0 && !/R\$ \d/.test(t) && !t.includes('Total dos meses exibidos'), t.slice(0, 500));
+    t.includes('Não há meta criada nestes meses. Só meses já fechados entram aqui.') && t.includes(F3_BASE.guardado) && t.includes(F3_CLOSED) && (await visibleCount('button', 'Criar meta')) === 1 && (await evNames()).length === 0 && !/R\$ \d/.test(t) && !t.includes('Total dos meses exibidos'), t.slice(0, 500));
   ok('Evolução fase 3, leituras: os movimentos das metas são lidos por mês fechado (maio a setembro), nunca o de outubro', JSON.stringify(f3Months(f3GReads)) === JSON.stringify(f3Closed(5, 9)), JSON.stringify(f3GReads));
   await evShots('572_evolucao_f3_guardado_sem_registros');
   await btn('Criar meta').click(); await waitText('Nova meta'); await p.waitForTimeout(500);
@@ -13455,7 +13455,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await evShots('583_evolucao_f3_comprometida_valores_ocultos', { scroll: evScroll('Julho de 2026') });
 
   // ---- 6. Conta nova: nada de exemplo; e a Família, que lê os dados da casa e não os do Pessoal ----
-  await p.goto(`http://localhost:${PORT}/`); await waitText('Mais clareza');
+  await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
   await famCreateAccount('Rui Metas', 'rui.metas@exemplo.com');
   await evOpen();
   await f3Pick('Renda comprometida');
@@ -13478,7 +13478,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await radio('6 meses').click(); await p.waitForTimeout(700);
   await f3Pick('Guardado em metas');
   t = await f3Keep();
-  ok('Evolução fase 3, conta nova, Guardado em metas: "Sem registros nestes meses", "nenhuma meta criada", o botão "Criar meta", sem total e sem R$ 0,00 de exemplo', t.includes('Sem registros nestes meses') && t.includes('A Clarevo não tem meta criada nestes meses.') && (await visibleCount('button', 'Criar meta')) === 1 && !t.includes('Total dos meses exibidos') && !t.includes('R$ 0,00') && (await evNames()).length === 0);
+  ok('Evolução fase 3, conta nova, Guardado em metas: "Sem registros nestes meses", "nenhuma meta criada", o botão "Criar meta", sem total e sem R$ 0,00 de exemplo', t.includes('Sem registros nestes meses') && t.includes('Não há meta criada nestes meses.') && (await visibleCount('button', 'Criar meta')) === 1 && !t.includes('Total dos meses exibidos') && !t.includes('R$ 0,00') && (await evNames()).length === 0);
   await evShots('585_evolucao_f3_conta_nova_guardado');
   // Família: a casa tem renda de referência desde agosto (R$ 8.000,00), contas em agosto e setembro e uma meta com saldo inicial em agosto e aporte em setembro; o Pessoal, só uma conta em setembro.
   await famGoFamilia();
@@ -13847,7 +13847,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     const c2 = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, reducedMotion: reduce ? 'reduce' : 'no-preference' });
     await c2.addInitScript(() => { window.__clarevoSemTour = true; });
     const q = await c2.newPage();
-    await q.goto(`http://localhost:${PORT}/`); await q.getByText('Mais clareza', { exact: false }).filter({ visible: true }).first().waitFor({ timeout: 15000 });
+    await q.goto(`http://localhost:${PORT}/`); await q.getByText('Cuidar da vida financeira', { exact: false }).filter({ visible: true }).first().waitFor({ timeout: 15000 });
     await q.getByRole('button', { name: 'Ver demonstração com dados fictícios', exact: true }).filter({ visible: true }).first().click();
     await q.getByText('Diferença do mês', { exact: false }).filter({ visible: true }).first().waitFor({ timeout: 15000 });
     await q.waitForTimeout(1500);

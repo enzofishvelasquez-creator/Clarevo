@@ -718,7 +718,7 @@ describe('site público: as páginas geradas', () => {
     // O resto fala de bem-estar financeiro com apoio prático, sem prometer resultado de saúde (Playbook v2.2, "Bem-estar financeiro e saúde mental").
     expect(h).toContain('Bem-estar financeiro, com apoio prático');
     expect(h).toContain('A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental, sono, produtividade ou tranquilidade.');
-    expect(h).toContain('não é a causa única da saúde mental de ninguém, e o app não tem eficácia clínica comprovada');
+    expect(h).toContain('é uma dimensão do bem-estar, entre outras, e o app não tem eficácia clínica comprovada');
     expect(h).toContain('dificuldade financeira não é falta de disciplina');
     expect(h).not.toMatch(PROMESSAS_PROIBIDAS);
     for (const frase of ['Não é banco', 'Não movimenta dinheiro', 'Não oferece crédito', 'Não recomenda produtos financeiros', 'Não é atendimento de saúde e não substitui o acompanhamento de profissionais']) expect(h, frase).toContain(frase);
@@ -831,9 +831,14 @@ describe('site público: as páginas geradas', () => {
       'pode ser considerada como ação complementar, conforme a avaliação técnica da empresa.',
       'Contratar a Clarevo, sozinha, não comprova atendimento à norma.',
       'não substitui as ações sobre a organização do trabalho, como sobrecarga e assédio',
+      'O endividamento pessoal não deve ser classificado automaticamente como risco ocupacional',
       'não equivale a uma avaliação clínica individual',
+      'Veja como a proposta se relaciona com a norma.',
       'Portaria MTE nº 1.419/2024',
+      'consultada em 24/10/2026.',
     ]) expect(h, frase).toContain(frase);
+    expect(h).not.toContain('pode e o que não pode dizer');
+    expect(h).not.toContain('por si só, um risco ocupacional');
     expect(h).toContain('href="https://www.gov.br/trabalho-e-emprego/pt-br/acesso-a-informacao/participacao-social/conselhos-e-orgaos-colegiados/comissao-tripartite-partitaria-permanente/normas-regulamentadora/normas-regulamentadoras-vigentes/nr-1" rel="noopener noreferrer"');
     expect(h).not.toMatch(PROMESSAS_PROIBIDAS);
     expect(h).not.toMatch(/colaboradores/i);

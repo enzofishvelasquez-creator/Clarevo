@@ -44,15 +44,15 @@ function paginaEmpresas({ valores, img }) {
     ),
     bloco(
       `<h2 id="nr-1">Bem-estar financeiro e a NR-1</h2>
-<p class="lead-bloco">A NR-1 trata dos fatores de risco psicossociais relacionados ao trabalho, dentro do gerenciamento de riscos ocupacionais. Veja o que a Clarevo pode e o que não pode dizer sobre isso.</p>
+<p class="lead-bloco">A NR-1 trata dos fatores de risco psicossociais relacionados ao trabalho, dentro do gerenciamento de riscos ocupacionais. Veja como a proposta se relaciona com a norma.</p>
 <ul>
 <li>A NR-1 não exige a contratação de um aplicativo financeiro.</li>
 <li>A proposta da Clarevo pode ser considerada como ação complementar, conforme a avaliação técnica da empresa.</li>
 <li>Contratar a Clarevo, sozinha, não comprova atendimento à norma.</li>
 <li>A Clarevo não substitui as ações sobre a organização do trabalho, como sobrecarga e assédio, nem o gerenciamento de riscos da empresa.</li>
-<li>O endividamento pessoal não é, por si só, um risco ocupacional: a avaliação considera as condições e a organização do trabalho e não equivale a uma avaliação clínica individual.</li>
+<li>O endividamento pessoal não deve ser classificado automaticamente como risco ocupacional: a avaliação considera as condições e a organização do trabalho e não equivale a uma avaliação clínica individual.</li>
 </ul>
-<p class="nota">A Clarevo não se apresenta como aplicativo certificado, não promete adequação da empresa à norma e não oferece laudos, PGR nem painéis de risco. Prazos, fiscalização e sanções mudam: confira a página oficial antes de decidir. Fonte: <a href="${esc(URL_NR1)}" rel="noopener noreferrer">Ministério do Trabalho e Emprego, NR-1</a> (capítulo 1.5, na redação da Portaria MTE nº 1.419/2024), consultada em 25/10/2026.</p>`,
+<p class="nota">A Clarevo não se apresenta como aplicativo certificado, não promete adequação da empresa à norma e não oferece laudos, PGR nem painéis de risco. Prazos, fiscalização e sanções mudam: confira a página oficial antes de decidir. Fonte: <a href="${esc(URL_NR1)}" rel="noopener noreferrer">Ministério do Trabalho e Emprego, NR-1</a> (capítulo 1.5, na redação da Portaria MTE nº 1.419/2024), consultada em 24/10/2026.</p>`,
       { variante: 'alt', rotulo: 'nr-1' },
     ),
     bloco(

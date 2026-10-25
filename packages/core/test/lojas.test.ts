@@ -129,6 +129,17 @@ describe('ficha das lojas (docs/lojas/ficha.md)', () => {
     for (const c of todos) expect(c.texto, c.nome).not.toMatch(/\b(?:o|O|do|no|ao|pelo|um)\s+Clarevo\b|NO CLAREVO/);
   });
 
+  it('a tela de boas-vindas do app tem a mensagem central da ficha como título, seguida da linha prática de antes, sem texto a mais', () => {
+    const tela = ler('apps/app/src/app/boas-vindas.tsx');
+    const central = todos.find((c) => c.nome === 'mensagem-central')!.texto;
+    expect(tela).toMatch(new RegExp(`accessibilityRole="header">\\s*${central.replace(/\./g, '\\.')}\\s*</Txt>`));
+    expect(tela).toContain('Acompanhe o seu mês e construa planos para você e sua família.');
+    expect(tela).not.toContain('Mais clareza');
+    expect(tela).not.toContain('Seu dinheiro,');
+    // A estrutura de antes: o título, uma linha, a nota de privacidade, os dois botões e a demonstração.
+    expect(tela.match(/<Txt\b/g)).toHaveLength(3);
+  });
+
   it('as descrições da Apple e do Google contam a mesma história (mesmo corpo, de "O QUE VOCÊ FAZ" até o fim)', () => {
     const corpo = (n: string) => todos.find((c) => c.nome === n)!.texto;
     expect(corpo('google-descricao-completa')).toBe(corpo('apple-descricao'));
