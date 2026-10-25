@@ -1,12 +1,12 @@
 # Roteiros para o Claude Chrome: contas da empresa, domínio, e-mail e site
 
-Versão de 23/10/2026 (D-064 e D-065). Cada roteiro é colado no Claude Chrome por Enzo, com a sessão da pessoa certa já aberta no navegador. Regras que valem para todos:
+Versão de 25/10/2026 (D-064, D-065 e D-070). Cada roteiro é colado no Claude Chrome por Enzo, com a sessão da pessoa certa já aberta no navegador. Regras que valem para todos:
 
 - O Claude Chrome **não digita senhas, códigos de verificação, CPF nem dados de cartão**: quando a tela pedir, ele para e a própria pessoa digita.
 - **Pagamento, assinatura e envio final** são sempre feitos pela pessoa, depois de conferir o resumo.
 - Nenhuma chave de API, token ou senha vai para o chat nem para o repositório; segredos só no painel do próprio serviço.
-- Dados da empresa: **CLAREVO INOVA SIMPLES (I.S.)**, CNPJ **69.771.864/0001-03**. Representante: Cristina (depois da alteração RJS2637008253 concluída).
-- Os passos 2 a 6 dependem da alteração do quadro de integrantes estar **concluída**, porque bancos, a Dun & Bradstreet e o Registro.br conferem o representante no cadastro da Receita.
+- Dados da empresa: **CLAREVO INOVA SIMPLES (I.S.)**, CNPJ **69.771.864/0001-03**. Representante: Cristina. A alteração RJS2637008253 foi concluída (certificado do Inova Simples emitido em 25/10/2026: Cristina e Bernardo no quadro). Endereço da sede: o do certificado, copiado exatamente como está lá.
+- Domínio escolhido (D-070): **clarevo.app.br**, para o site, o app e os e-mails. Ordem: roteiro 2, roteiro 4 (Cloudflare e Zoho), roteiro 3 (D-U-N-S, já com o contato@clarevo.app.br) e roteiro 6.
 
 ## 1. Domínio: quem tem o clarevo.com.br e o que está livre (só leitura, pode rodar já)
 
@@ -18,42 +18,73 @@ Tarefa só de leitura no Registro.br. Não registrar, não pagar e não criar co
 4. Relatório em tabela.
 ```
 
-## 2. Registrar o domínio escolhido (Enzo ou a Cristina pagam)
+## 2. Registrar o clarevo.app.br (R$ 40 por 1 ano; a pessoa paga)
+
+Antes: quem registra entra no Registro.br com a própria conta. A criação da conta pede CPF, senha e confirmação por e-mail, e essas partes ficam com a pessoa.
 
 ```
-Tarefa no Registro.br, com a sessão da Cristina aberta (conta do Registro.br em nome da empresa, CNPJ 69.771.864/0001-03).
-1. Pesquise o domínio [DOMÍNIO ESCOLHIDO] e confira que está disponível.
-2. Escolha 1 ano. Titular: a empresa (CNPJ). Não marque serviços extras pagos.
-3. Em DNS, deixe o padrão por enquanto (vamos trocar para a Cloudflare no roteiro 4).
-4. Pare na tela de pagamento e me diga o valor total e as opções. O pagamento é feito pela pessoa.
+Tarefa no Registro.br (https://registro.br), com a sessão da pessoa já aberta neste Chrome.
+Regras: não digitar senhas, códigos de verificação nem CPF; não marcar nenhum serviço extra pago; não pagar; se a tela pedir um dado que você não tenha, pare e me pergunte.
+
+1. Pesquise o domínio clarevo.app.br e confira que aparece como disponível. Se não estiver, pare e me avise.
+2. Clique em Registrar.
+3. Titular do domínio: a empresa, como pessoa jurídica, com o CNPJ 69.771.864/0001-03. Confira se o nome que aparece é CLAREVO INOVA SIMPLES (I.S.). Se o sistema pedir o nome do responsável pela empresa ou outro dado da empresa que não esteja preenchido, pare e me pergunte.
+4. Contatos (administrativo, técnico e de cobrança): use a conta que está logada, se o sistema oferecer essa opção.
+5. Servidores DNS: deixe a opção padrão do Registro.br (vamos trocar depois para a Cloudflare).
+6. Período: 1 ano (R$ 40,00). Não escolha 2 ou 5 anos.
+7. Siga até a tela de pagamento e PARE. Não pague.
+8. Me mande o relatório: o resumo do pedido (domínio, titular, período, valor total), as formas de pagamento oferecidas e qualquer aviso que tenha aparecido.
 ```
+
+Depois: a pessoa confere o resumo e paga (pelo Pix costuma confirmar mais rápido que pelo boleto).
 
 ## 3. Número D-U-N-S (grátis, pela Apple)
 
 ```
 Tarefa em https://developer.apple.com/enroll/duns-lookup/, com a conta Apple da Cristina já aberta (verificação em dois fatores ativa).
 Regras: não pagar nada à Dun & Bradstreet; não digitar CPF nem senha.
-1. Preencha os dados da organização exatamente como no cartão CNPJ: razão social CLAREVO INOVA SIMPLES (I.S.), endereço da sede e telefone da empresa. Se não tiver algum desses dados, pare e me peça.
-2. Contato: nome, cargo e e-mail da Cristina (ela digita, se a tela exigir confirmação).
+1. Preencha os dados da organização exatamente como no certificado do Inova Simples: razão social CLAREVO INOVA SIMPLES (I.S.), endereço da sede (rua, número, complemento, bairro, cidade, UF e CEP) e telefone da empresa. Se não tiver algum desses dados, pare e me peça.
+2. Contato: nome e cargo da Cristina, com o e-mail contato@clarevo.app.br (ela digita, se a tela exigir confirmação).
 3. Clique para buscar. Se a empresa aparecer, anote o número D-U-N-S e pare.
 4. Se não aparecer, pare na tela de envio dos dados à Dun & Bradstreet e me diga o que ela pede. O envio é feito pela pessoa.
 5. Relatório: número encontrado, ou o que a tela pede para solicitar.
 ```
 
-## 4. Cloudflare: domínio, e-mails do domínio e site (grátis)
+## 4. Cloudflare e Zoho: domínio e e-mails (grátis)
+
+Os e-mails ficam no Zoho Mail, numa organização só da Clarevo, separada da Finan Velasquez (D-070). O Email Routing da Cloudflare **não** é ativado: ele troca os registros MX e conflita com o Zoho. Plano B, só se o plano gratuito do Zoho não estiver disponível: Email Routing da Cloudflare, só para receber, encaminhando para uma caixa que Enzo indicar.
 
 ```
-Tarefa no painel da Cloudflare (dash.cloudflare.com), com a conta da empresa aberta. Regras: não ler, copiar nem criar chaves de API ou tokens; não mexer em Billing; plano Free.
+Tarefa no painel da Cloudflare (dash.cloudflare.com), com a conta da empresa aberta. Regras: não ler, copiar nem criar chaves de API ou tokens; não mexer em Billing; plano Free; não ativar o Email Routing.
 Parte A, domínio:
-1. "Add a domain" com [DOMÍNIO ESCOLHIDO], plano Free. Pule a importação de registros se não houver.
+1. "Add a domain" com clarevo.app.br, plano Free. Pule a importação de registros se não houver.
 2. Anote os dois "nameservers" que a Cloudflare mostrar e pare: a troca no Registro.br é a Parte B.
-Parte B, no Registro.br (sessão da Cristina): em [DOMÍNIO ESCOLHIDO] > DNS > "Alterar servidores DNS", troque pelos dois nameservers anotados e salve. Pare e me diga quando a Cloudflare mostrar o domínio como "Active" (pode levar horas).
-Parte C, e-mails (Email Routing):
-1. Em [DOMÍNIO ESCOLHIDO] > Email > Email Routing, ative e aceite os registros DNS que a própria Cloudflare propõe.
-2. Crie os endereços contato@, suporte@ e privacidade@ encaminhando para o e-mail que Enzo indicar ([E-MAIL DE DESTINO]).
-3. O e-mail de destino recebe um pedido de confirmação: a pessoa confirma na caixa dela.
-4. Relatório: endereços criados e situação de cada um.
+Parte B, no Registro.br (sessão de quem registrou): em clarevo.app.br > DNS > "Alterar servidores DNS", troque pelos dois nameservers anotados e salve. Pare e me diga quando a Cloudflare mostrar o domínio como "Active" (pode levar horas).
 ```
+
+**O que a pessoa faz no Zoho**, porque pede senha e confirmação pelo celular: em `zoho.com/mail`, criar uma conta nova, só da Clarevo, no plano gratuito se aparecer (limites a conferir), com a opção de usar um domínio que já tem (`clarevo.app.br`). O primeiro usuário, que administra a conta, é `contato@clarevo.app.br`; a pessoa define a senha e liga a verificação em duas etapas.
+
+```
+Tarefa no painel do Zoho Mail (Admin Console) e no painel da Cloudflare, com as sessões já abertas neste Chrome.
+Regras: não digitar nem copiar senhas, códigos de verificação ou chaves; não mexer em Billing nem em planos pagos; não ativar o Email Routing da Cloudflare (ele conflita com o Zoho); se a tela pedir um dado que você não tenha, pare e me pergunte.
+
+Parte A, verificar o domínio:
+1. No Zoho Admin Console, em Domínios, abra clarevo.app.br e veja o registro de verificação pedido (TXT ou CNAME). Anote só o tipo, o nome e o valor.
+2. Na Cloudflare, em clarevo.app.br > DNS > Records, crie esse registro exatamente como o Zoho mostrou (Proxy desligado, "DNS only").
+3. Volte ao Zoho e clique em Verificar. Se falhar, espere 10 minutos e tente de novo; me avise se continuar falhando.
+
+Parte B, entrega de e-mail:
+4. Na Cloudflare, crie os registros MX que o Zoho indicar na configuração de e-mail (normalmente mx.zoho.com prioridade 10, mx2.zoho.com prioridade 20 e mx3.zoho.com prioridade 50; use os que o Zoho mostrar). Apague qualquer MX antigo que não seja do Zoho.
+5. Crie o registro TXT de SPF que o Zoho indicar (normalmente "v=spf1 include:zoho.com ~all"). Se já existir um SPF, me avise antes de mudar.
+6. No Zoho, em DKIM, crie a chave do domínio e copie o registro TXT que ele mostrar para a Cloudflare. Volte e clique em Verificar.
+7. Crie um TXT de DMARC com nome _dmarc e valor "v=DMARC1; p=none; rua=mailto:privacidade@clarevo.app.br".
+
+Parte C, caixas:
+8. No Zoho, em Usuários, crie: suporte@clarevo.app.br, privacidade@clarevo.app.br e marketing@clarevo.app.br (contato@ já existe como administrador). Quando o Zoho pedir senha para cada uma, pare: a pessoa define as senhas.
+9. Relatório: o que foi verificado (domínio, MX, SPF, DKIM, DMARC), as caixas criadas e qualquer aviso.
+```
+
+Depois: um e-mail de teste de um Gmail para `contato@clarevo.app.br` e outro de volta, para conferir que chega e sai. Em seguida, `site/dados-da-empresa.json` recebe o domínio e os e-mails, e a política de privacidade passa a citar o Zoho entre os serviços usados.
 
 ## 5. Publicar o site (projeto clarevo-site, depois da revisão do advogado)
 
@@ -63,8 +94,8 @@ Antes: `node scripts/gerar-site.js --final` precisa passar (dados da empresa, do
 Tarefa no painel da Cloudflare, conta da empresa. Regras: não ler nem criar chaves; plano Free; não ativar Web Analytics.
 1. Workers & Pages > Create > Pages > Connect to Git: repositório da Clarevo no GitHub, ramo main.
 2. Nome do projeto: clarevo-site. Framework preset: None. Comando de build: vazio. Pasta de saída: site.
-3. Depois do primeiro deploy, em Custom domains, acrescente [DOMÍNIO ESCOLHIDO] (e www.[DOMÍNIO ESCOLHIDO], se a tela sugerir).
-4. Em Settings, confira que Web Analytics está desligado. Em [DOMÍNIO ESCOLHIDO] > Scrape Shield, desligue "Email Address Obfuscation".
+3. Depois do primeiro deploy, em Custom domains, acrescente clarevo.app.br (e www.clarevo.app.br, se a tela sugerir).
+4. Em Settings, confira que Web Analytics está desligado. Em clarevo.app.br > Scrape Shield, desligue "Email Address Obfuscation".
 5. Relatório: endereço do projeto (.pages.dev), situação do domínio e o que a tela mostrou em cada passo.
 ```
 
