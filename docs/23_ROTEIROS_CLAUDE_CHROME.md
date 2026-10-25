@@ -54,7 +54,7 @@ Regras: não pagar nada à Dun & Bradstreet; não digitar CPF nem senha.
 
 Os e-mails ficam no Zoho Mail, numa organização só da Clarevo, separada da Finan Velasquez (D-070). O Email Routing da Cloudflare **não** é ativado: ele troca os registros MX e conflita com o Zoho. Plano B, só se o plano gratuito do Zoho não estiver disponível: Email Routing da Cloudflare, só para receber, encaminhando para uma caixa que Enzo indicar.
 
-Registrado em 25/10/2026, válido até 24/10/2027 (renovação de R$ 40 por ano, avisada pelo Registro.br por e-mail). Rodar depois do e-mail de confirmação do pagamento.
+Registrado em 25/10/2026 em nome da empresa, expira em 25/10/2027 no painel (renovação de R$ 40 por ano, avisada pelo Registro.br por e-mail). Feito em 25/10/2026: zona na Cloudflare (nameservers harlee e jaziel), sem DNSSEC. A Cloudflare importou os registros de proteção que o Registro.br publica para domínio sem e-mail (MX nulo ".", SPF "v=spf1 -all" e DMARC "p=reject"); eles ficam até o Zoho e são trocados no roteiro abaixo.
 
 ```
 Tarefa na Cloudflare (dash.cloudflare.com) e no Registro.br (https://registro.br), com as duas sessões já abertas neste Chrome. Use a mesma conta da Cloudflare onde estão os projetos clarevo, clarevo-demo e clarevo-site.
@@ -79,6 +79,7 @@ Relatório: titular e situação do domínio, os dois nameservers, o que a tela 
 
 ```
 Tarefa no painel do Zoho Mail (Admin Console) e no painel da Cloudflare, com as sessões já abertas neste Chrome.
+Antes: a zona clarevo.app.br precisa aparecer como "Active" na Cloudflare.
 Regras: não digitar nem copiar senhas, códigos de verificação ou chaves; não mexer em Billing nem em planos pagos; não ativar o Email Routing da Cloudflare (ele conflita com o Zoho); se a tela pedir um dado que você não tenha, pare e me pergunte.
 
 Parte A, verificar o domínio:
@@ -87,10 +88,10 @@ Parte A, verificar o domínio:
 3. Volte ao Zoho e clique em Verificar. Se falhar, espere 10 minutos e tente de novo; me avise se continuar falhando.
 
 Parte B, entrega de e-mail:
-4. Na Cloudflare, crie os registros MX que o Zoho indicar na configuração de e-mail (normalmente mx.zoho.com prioridade 10, mx2.zoho.com prioridade 20 e mx3.zoho.com prioridade 50; use os que o Zoho mostrar). Apague qualquer MX antigo que não seja do Zoho.
-5. Crie o registro TXT de SPF que o Zoho indicar (normalmente "v=spf1 include:zoho.com ~all"). Se já existir um SPF, me avise antes de mudar.
+4. Na Cloudflare, crie os registros MX que o Zoho indicar na configuração de e-mail (normalmente mx.zoho.com prioridade 10, mx2.zoho.com prioridade 20 e mx3.zoho.com prioridade 50; use os que o Zoho mostrar). Apague o MX nulo (".", prioridade 0) que veio do Registro.br e qualquer outro MX que não seja do Zoho.
+5. Edite o TXT de SPF que já existe na raiz ("v=spf1 -all") e troque o valor pelo que o Zoho indicar (normalmente "v=spf1 include:zoho.com ~all"). Deve ficar um único SPF na raiz.
 6. No Zoho, em DKIM, crie a chave do domínio e copie o registro TXT que ele mostrar para a Cloudflare. Volte e clique em Verificar.
-7. Crie um TXT de DMARC com nome _dmarc e valor "v=DMARC1; p=none; rua=mailto:privacidade@clarevo.app.br".
+7. Edite o TXT _dmarc que já existe ("v=DMARC1; p=reject;") e troque o valor por "v=DMARC1; p=none; rua=mailto:privacidade@clarevo.app.br". Deve ficar um único _dmarc.
 
 Parte C, caixas:
 8. No Zoho, em Usuários, crie: suporte@clarevo.app.br, privacidade@clarevo.app.br e marketing@clarevo.app.br (contato@ já existe como administrador). Quando o Zoho pedir senha para cada uma, pare: a pessoa define as senhas.
