@@ -100,6 +100,43 @@ function conferirRegrasDasPecas(pecas = PECAS) {
     if (!/avaliação técnica/.test(txt)) erros.push('B01: falta "avaliação técnica"');
     for (const re of [/certificad/i, /conformidade/i, /laudo/i, /\bPGR\b/, /psicolog/i, /mentoria/i, /palestra/i, /absente[ií]smo/i]) if (re.test(txt)) erros.push(`B01: não pode anunciar ${re}`);
   }
+  const por = (id) => pecas.find((x) => x.id === id);
+  const frase = 'Na sua conta, o primeiro registro começa do zero.';
+  const p11 = por('P11');
+  if (p11) {
+    // A gravação usa a demonstração, que já tem registros: a peça diz que numa conta nova o primeiro registro começa do zero.
+    if (!p11.legenda.includes(frase)) erros.push('P11: a legenda precisa dizer "' + frase + '"');
+    if (!p11.roteiro.some((x) => x.fala.includes(frase))) erros.push('P11: a narração (roteiro e srt) precisa dizer "' + frase + '"');
+    if (!p11.roteiro.some((x) => x.tela.includes(frase))) erros.push('P11: o texto na tela precisa dizer "' + frase + '"');
+  }
+  // Acesso em preparação (D-067): os quatro Reels mandam ver no perfil as informações de acesso, sem sugerir acesso aberto.
+  for (const id of ['P02', 'P05', 'P08', 'P11']) {
+    const r = por(id);
+    if (!r) continue;
+    const comAcesso = r.roteiro.filter((x) => /acesso/i.test(x.tela) || /acesso/i.test(x.fala));
+    if (comAcesso.length === 0 || !comAcesso.every((x) => /Veja no perfil as informações de acesso/.test(x.fala) && (!/acesso/i.test(x.tela) || /Veja no perfil as informações de acesso/.test(x.tela)))) erros.push(id + ': o fim do Reel diz "Veja no perfil as informações de acesso" na narração e no texto na tela');
+    if (id !== 'P11' && !/Veja no perfil as informações de acesso\./.test(r.legenda)) erros.push(id + ': a legenda diz "Veja no perfil as informações de acesso."');
+  }
+  const p02 = por('P02');
+  if (p02) {
+    const trecho = p02.roteiro.find((x) => /saldo/.test(x.tela));
+    if (!trecho || !/^A diferença do orçamento não é saldo nem autorização para gastar/.test(trecho.tela)) erros.push('P02: a frase "não é saldo nem autorização para gastar" precisa de sujeito no texto na tela');
+  }
+  const b01Txt = b01 ? t(b01) : '';
+  if (b01 && !/A empresa nunca vê as finanças de ninguém, nem somadas\./.test(b01Txt)) erros.push('B01: falta "A empresa nunca vê as finanças de ninguém, nem somadas." (D-056)');
+  const t01 = por('T01');
+  if (t01) {
+    const pg3 = t01.paginas[2];
+    if (!pg3 || !/R\$ 50 × 12 = R\$ 600/.test(pg3.numero) || !/Exemplo fictício/.test(pg3.nota || '')) erros.push('T01: a página 3 precisa de "Exemplo fictício" junto de "R$ 50 × 12 = R$ 600"');
+  }
+  const b = por('B');
+  if (b) {
+    const ultima = JSON.stringify(b.paginas[4]);
+    if (!/Parcelado ou à vista\?/.test(ultima) || /Antes de financiar/.test(JSON.stringify([b.paginas, b.legenda, b.alt]))) erros.push('B: a página 5 cita a calculadora "Parcelado ou à vista?", e não "Antes de financiar"');
+  }
+  const r01 = por('R01');
+  if (r01 && (/necessariamente/i.test(t(r01)) || !/Não é saldo disponível\./.test(t(r01)))) erros.push('R01: a página 4 diz "Não é saldo disponível.", sem "necessariamente"');
+  for (const p of pecas) if (p.legenda && /\[[^\]]*\]/.test(p.legenda)) erros.push(p.id + ': a legenda tem um campo entre colchetes; legenda pronta não pode ter marcador a preencher');
   for (const p of pecas) {
     const txt = t(p);
     if (/\bsaldo\b/i.test(txt) && !['P02', 'P03', 'P04', 'R01', 'P11'].includes(p.id)) erros.push(`${p.id}: cita "saldo"; só as peças que explicam que a diferença não é saldo podem`);

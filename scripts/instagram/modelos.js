@@ -379,7 +379,7 @@ ${corpoTxt(d.corpo, { max: 38, min: 34, linhas: 2 })}</div>${rodape({ n: c.n, to
     const [conta, res] = d.numero.split(' = ');
     return pagina({
       classe: 'branco',
-      corpo: `${cabecalhoPost(c.a)}<div style="position:absolute;left:80px;right:80px;top:250px;bottom:80px;display:flex;flex-direction:column;justify-content:center;gap:40px">${titulo(d.titulo, { max: 56, min: 56, linhas: 3, tag: 'h2' })}<div data-c style="display:flex;flex-direction:column;gap:6px"><span class="num" style="font-size:104px">${esc(conta)}</span><span class="num" style="font-size:104px">= ${esc(res)}</span></div>${corpoTxt(d.corpo, { max: 36, min: 34, linhas: 4 })}</div>`,
+      corpo: `${cabecalhoPost(c.a)}<div style="position:absolute;left:80px;right:80px;top:250px;bottom:80px;display:flex;flex-direction:column;justify-content:center;gap:40px">${titulo(d.titulo, { max: 56, min: 56, linhas: 3, tag: 'h2' })}<div data-c style="display:flex;flex-direction:column;gap:6px"><span class="num" style="font-size:104px">${esc(conta)}</span><span class="num" style="font-size:104px">= ${esc(res)}</span>${d.nota ? `<span data-c style="font-size:32px;color:var(--cinza);margin-top:14px">${esc(d.nota)}</span>` : ''}</div>${corpoTxt(d.corpo, { max: 36, min: 34, linhas: 4 })}</div>`,
     });
   },
 };
@@ -434,20 +434,25 @@ const ICONES = {
   bandeira: '<path d="M34 104V20"/><path d="M34 26h56l-14 20 14 20H34"/>',
   tela: '<rect x="36" y="12" width="48" height="96" rx="12"/><path d="M50 62l8 8 14-16"/><path d="M52 96h16"/>',
   pergunta: '<circle cx="60" cy="60" r="46"/><path d="M45 48c0-10 7-16 15-16s15 6 15 14c0 8-6 10-11 13-3 2-4 4-4 9"/><circle cx="60" cy="88" r="3" fill="#17223B"/>',
-  pessoas: '<circle cx="44" cy="42" r="14"/><path d="M18 96c0-17 11-28 26-28s26 11 26 28"/><circle cx="82" cy="46" r="11"/><path d="M76 70c14 0 24 9 26 24"/>',
+  pessoas: '<circle cx="44" cy="38" r="15"/><path d="M14 98V90a22 22 0 0 1 22-22h16a22 22 0 0 1 22 22v8"/><circle cx="88" cy="46" r="11"/><path d="M90 68a20 20 0 0 1 16 20v10"/>',
   boia: '<circle cx="60" cy="60" r="46"/><circle cx="60" cy="60" r="19"/><path d="M28 28l15 15M92 28L77 43M28 92l15-15M92 92L77 77"/>',
   predio: '<rect x="30" y="14" width="60" height="92" rx="6"/><path d="M46 34h8M66 34h8M46 54h8M66 54h8M46 74h8M66 74h8"/><path d="M52 106V90h16v16"/>',
 };
 
-/** Capa de destaque: ícone simples sobre um disco lima e o nome. O que importa fica no círculo central que o Instagram recorta. */
+/**
+ * Capa de destaque: só o ícone, grande e centrado, sobre um disco lima. Sem o nome: o Instagram já mostra o rótulo do destaque embaixo do
+ * círculo, e um texto dentro dele ficaria ilegível a 110 px (a capa de 1080 px de largura vira cerca de 10 vezes menor). O Instagram recorta
+ * a capa em círculo no centro (aqui, em 540 x 960 px); o disco e o ícone ficam centrados nesse ponto e dentro do recorte.
+ */
 function capaDestaque({ nome, icone }) {
+  const disco = 720;
+  const icone_ = 540;
   return pagina({
     largura: 1080,
     altura: 1920,
     classe: 'azul',
     corpo: `<div data-zona style="position:absolute;left:0;top:0;width:1080px;height:1920px">
-<div style="position:absolute;left:220px;top:530px;width:640px;height:640px;border-radius:50%;background:var(--lima);display:flex;align-items:center;justify-content:center"><svg data-c viewBox="0 0 120 120" width="430" height="430" fill="none" stroke="#17223B" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONES[icone]}</svg></div>
-<h1 data-c data-livre="1" data-auto data-max="112" data-min="88" data-linhas="1" class="titulo" style="position:absolute;left:100px;right:100px;top:1230px;text-align:center;font-size:112px;letter-spacing:-.01em">${esc(nome)}</h1></div>`,
+<div style="position:absolute;left:${(1080 - disco) / 2}px;top:${(1920 - disco) / 2}px;width:${disco}px;height:${disco}px;border-radius:50%;background:var(--lima);display:flex;align-items:center;justify-content:center"><svg data-c role="img" aria-label="${esc(nome)}" viewBox="0 0 120 120" width="${icone_}" height="${icone_}" fill="none" stroke="#17223B" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round">${ICONES[icone]}</svg></div></div>`,
   });
 }
 

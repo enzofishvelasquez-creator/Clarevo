@@ -36,7 +36,16 @@ const conteudo = require(join(ROOT, 'scripts', 'instagram', 'conteudo.js')) as {
   PERFIL: { nome: string; bio: string[]; bioAcessoAberto: string[]; link: string };
   DESTAQUES: { id: string; nome: string }[];
   TERMOS_DO_APP: string[];
-  PECAS: { id: string; paginas?: { modelo: string }[]; formato: string; legenda?: string; alt?: unknown; semArte?: boolean }[];
+  PECAS: {
+    id: string;
+    paginas?: { modelo: string; nota?: string; numero?: string; corpo?: string }[];
+    formato: string;
+    legenda?: string;
+    alt?: unknown;
+    semArte?: boolean;
+    roteiro?: { em?: number; tela?: string; fala: string }[];
+    depende?: string[];
+  }[];
   CALENDARIO: { dia: number; peca: string }[];
 };
 const validar = require(join(ROOT, 'scripts', 'instagram', 'validar.js')) as {
@@ -172,7 +181,10 @@ describe('Instagram: redação de tudo o que sai', () => {
     expect(ruim('Teste grátis por 7 dias')).toBe(1);
     expect(ruim('Entre na lista de espera')).toBe(1);
     expect(ruim('Isso é o seu saldo disponível')).toBe(1);
-    expect(ruim('Não é necessariamente saldo disponível.')).toBe(0);
+    expect(ruim('Não é saldo disponível.')).toBe(0);
+    expect(ruim('Veja como acessar a Clarevo')).toBe(1);
+    expect(ruim('Para conhecer o acesso, veja o fixado Como acessar.')).toBeGreaterThanOrEqual(1);
+    expect(ruim('Veja no perfil as informações de acesso.')).toBe(0);
     expect(ruim('A Clarevo acaba com a ansiedade')).toBe(1);
     expect(ruim('Sem lista de espera nem data de abertura.')).toBe(0);
   });
@@ -204,6 +216,62 @@ describe('Instagram: redação de tudo o que sai', () => {
   it('as peças com número dizem "exemplo fictício" e as de comparação de compra nunca chamam a diferença de juros nem de CET', () => {
     expect(validar.conferirRegrasDasPecas()).toEqual([]);
   });
+
+  it('a B01 diz, como D-056, que a empresa nunca vê as finanças de ninguém, nem somadas (página 2 e legenda)', () => {
+    const b01 = peca('B01');
+    expect(b01.paginas?.[1]?.corpo).toBe('A empresa nunca vê as finanças de ninguém, nem somadas.');
+    expect(b01.legenda).toContain('A empresa nunca vê as finanças de ninguém, nem somadas.');
+    expect(Array.isArray(b01.alt) ? b01.alt[1] : '').toContain('nunca vê as finanças de ninguém, nem somadas');
+  });
+
+  it('a P11 avisa que, numa conta nova, o primeiro registro começa do zero (a gravação usa a demonstração, que já tem registros)', () => {
+    const p11 = peca('P11');
+    const frase = 'Na sua conta, o primeiro registro começa do zero.';
+    expect(p11.legenda).toContain(frase);
+    expect(p11.roteiro?.some((t) => t.fala.includes(frase))).toBe(true);
+    expect(p11.roteiro?.some((t) => (t.tela ?? '').includes(frase))).toBe(true);
+    // A frase vem depois do resultado no Resumo e cabe nos segundos finais da gravação (35,6 s).
+    const ultimo = p11.roteiro?.[p11.roteiro.length - 1];
+    expect(ultimo?.fala).toBe(frase);
+    expect(ultimo?.em).toBeLessThan(35.6 - 3);
+  });
+
+  it('os Reels mandam ver no perfil as informações de acesso (acesso em preparação), nunca o fixado "Como acessar" nem "saber como acessar"', () => {
+    for (const id of ['P02', 'P05', 'P08', 'P11']) {
+      const p = peca(id);
+      const todos = JSON.stringify([p.roteiro, p.legenda, p.alt]);
+      expect(todos, id).toContain('Veja no perfil as informações de acesso');
+      expect(todos, id).not.toMatch(/fixado Como acessar|como acessar|conhecer o acesso|link da bio/i);
+    }
+  });
+
+  it('a P02 dá sujeito à frase "não é saldo nem autorização para gastar" no texto na tela dos 17 aos 24 s', () => {
+    const t = peca('P02').roteiro?.find((x) => x.em === 17.4);
+    expect(t?.tela).toBe('A diferença do orçamento não é saldo nem autorização para gastar');
+  });
+
+  it('a página 3 da T01 traz "Exemplo fictício" junto de "R$ 50 × 12 = R$ 600"', () => {
+    const pg = peca('T01').paginas?.[2];
+    expect(pg?.numero).toBe('R$ 50 × 12 = R$ 600');
+    expect(pg?.nota).toBe('Exemplo fictício.');
+  });
+
+  it('a R01 diz "Não é saldo disponível." (sem "necessariamente"), e a B cita a calculadora "Parcelado ou à vista?" na página 5', () => {
+    const r01 = JSON.stringify(peca('R01'));
+    expect(r01).toContain('Não é saldo disponível.');
+    expect(r01).not.toMatch(/necessariamente/i);
+    const b = peca('B');
+    const ultima = JSON.stringify(b.paginas?.[4]);
+    expect(ultima).toContain('Parcelado ou à vista?');
+    expect(JSON.stringify([b.paginas, b.legenda, b.alt])).not.toContain('Antes de financiar');
+  });
+
+  it('nenhuma legenda tem campo entre colchetes (legenda dita pronta), inclusive a da P12; o que depende da equipe fica na ficha', () => {
+    for (const p of conteudo.PECAS) expect(p.legenda ?? '', p.id).not.toMatch(/\[[^\]]*\]/);
+    const p12 = peca('P12');
+    expect(p12.legenda).toContain('A dúvida de hoje é sobre o acesso.');
+    expect((p12.depende ?? []).join('\n')).toMatch(/legenda\.txt/);
+  });
 });
 
 describe('Instagram: estrutura das peças e do calendário', () => {
@@ -215,7 +283,7 @@ describe('Instagram: estrutura das peças e do calendário', () => {
     }
   });
 
-  it('os quatro Reels do calendário (P02, P05, P08, P11) têm roteiro de 6 trechos e os vídeos com integrante só têm roteiro e capa', () => {
+  it('os quatro Reels do calendário (P02, P05, P08, P11) têm roteiro (de 6 trechos, 7 na P11) e os vídeos com integrante só têm roteiro e capa', () => {
     for (const id of ['P02', 'P05', 'P08', 'P11']) expect(peca(id).formato).toBe('reel');
     for (const id of ['P06', 'P09', 'P12']) expect(peca(id).formato).toBe('video-integrante');
     expect(peca('T02').semArte).toBe(true);
@@ -256,10 +324,9 @@ describe('Instagram: o que as artes dizem do app existe no app de hoje', () => {
     expect(fonte).toContain(termo);
   });
 
-  it('a calculadora "Antes de financiar" e "Parcelado ou à vista?" existem no catálogo do core', () => {
+  it('a calculadora "Parcelado ou à vista?" (a que a reserva B cita) existe no catálogo do core, com esse título', () => {
     const catalogo = readFileSync(join(ROOT, 'packages', 'core', 'src', 'calculators', 'catalog.ts'), 'utf8');
-    expect(catalogo).toContain("slug: 'antes-de-financiar'");
-    expect(catalogo).toContain("slug: 'parcelado-ou-a-vista'");
+    expect(catalogo).toContain("slug: 'parcelado-ou-a-vista', title: 'Parcelado ou à vista?'");
   });
 });
 

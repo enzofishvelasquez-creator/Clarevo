@@ -26,7 +26,7 @@ Saída em `--saida <pasta>` (nesta rodada, uma pasta fora do repositório). Quan
 
 Total da primeira geração: 160 arquivos (82 PNG, 8 MP4 e os textos), 26 MB.
 
-**Foto real.** Onde o Playbook pede foto (capa da P01, a página 5 da P01 e as capas de F01 e F02) o quadro traz a moldura e a indicação "[Foto real: ...cena sugerida...]". Nenhum rosto foi gerado, nenhuma foto de banco foi baixada e nenhuma foto foi inventada. A equipe escolhe foto própria ou licenciada, com autorização de imagem, e troca no Canva.
+**Foto real.** Onde o Playbook pede foto (capa da P01, a página 5 da P01 e as capas de F01 e F02) o quadro traz a moldura e a indicação "[Foto real: ...cena sugerida...]". Nenhum rosto foi gerado, nenhuma foto de banco foi baixada e nenhuma foto foi inventada. A equipe escolhe foto própria ou licenciada, com autorização de imagem, e troca no Canva. O texto alternativo dessas páginas (P01 páginas 1 e 5, capas de F01 e F02) descreve só o quadro e a cena sugerida: a `ficha.md` de cada peça diz que a equipe o reescreve, antes de publicar, para descrever o que a foto escolhida realmente mostra.
 
 **Telas do app.** Só de captura ou gravação real da demonstração (dados fictícios, etiqueta "Demonstração"), recortadas e ampliadas sem redesenhar: as capturas 4:5 e as gravações de `scripts/gravar-redes.js` (`docs/24`, seção 2). As páginas que mostram tela levam o aviso "Exemplo fictício" ou "Dados fictícios".
 
@@ -47,7 +47,7 @@ node scripts/gerar-instagram.js --saida <pasta> --redes <pasta> --sem-video
 
 ### O que o gerador recusa
 
-Antes de desenhar, ele confere o conteúdo e **não gera** se algo falhar: travessão, a expressão que o `CLAUDE.md` proíbe, a marca no masculino, nome de pessoa real, termo de promessa (grátis, lista de espera, "saldo disponível" afirmado, "acaba com a ansiedade", "certificado pela NR-1"...), valor em reais que não seja de um exemplo conferido, número de páginas diferente do Playbook, nome ou bio acima dos limites e contraste abaixo do mínimo. Em **cada página desenhada**, no navegador, confere ainda: margens laterais de 80 px; nada sobre o rodapé; nas artes 9:16, o conteúdo entre 250 px do topo e 350 px do rodapé; rótulo de 24 px ou mais, título de 56 a 72 px e corpo de 32 a 40 px; contraste real de cada texto (nunca branco sobre lima; lima sobre azul só em texto grande e em negrito); texto que não rola nem é cortado. O teste `packages/core/test/instagram.test.ts` roda a parte pura (limites do perfil, somas dos exemplos, contrastes do Manual, redação, estrutura e que cada nome de tela do app citado existe no app).
+Antes de desenhar, ele confere o conteúdo e **não gera** se algo falhar: travessão, a expressão que o `CLAUDE.md` proíbe, a marca no masculino, nome de pessoa real, termo de promessa (grátis, lista de espera, "saldo disponível" afirmado, "acaba com a ansiedade", "certificado pela NR-1"...), chamada que sugira acesso aberto ("como acessar", "conhecer o acesso", "fixado Como acessar", cadastro, download: o acesso está em preparação, D-067), legenda com campo entre colchetes ("legenda pronta" não tem marcador a preencher), valor em reais que não seja de um exemplo conferido, número de páginas diferente do Playbook, nome ou bio acima dos limites e contraste abaixo do mínimo. Confere também pontos que a revisão pediu: a P11 dizer que na conta nova o primeiro registro começa do zero, a frase "não é saldo nem autorização para gastar" da P02 ter sujeito, a B01 dizer que a empresa nunca vê as finanças de ninguém, nem somadas (D-056), e a T01 página 3, a B página 5 e a R01 página 4 com o texto fixado. Em **cada página desenhada**, no navegador, confere ainda: margens laterais de 80 px; nada sobre o rodapé; nas artes 9:16, o conteúdo entre 250 px do topo e 350 px do rodapé; rótulo de 24 px ou mais, título de 56 a 72 px e corpo de 32 a 40 px; contraste real de cada texto (nunca branco sobre lima; lima sobre azul só em texto grande e em negrito); texto que não rola nem é cortado. O teste `packages/core/test/instagram.test.ts` roda a parte pura (limites do perfil, somas dos exemplos, contrastes do Manual, redação, estrutura e que cada nome de tela do app citado existe no app).
 
 ## 3. Identidade do perfil
 
@@ -62,7 +62,7 @@ Antes de desenhar, ele confere o conteúdo e **não gera** se algo falhar: trave
 - **Link da bio:** `clarevo-site.pages.dev/comece.html`, sem parâmetro de rastreamento (D-067). É a versão preliminar do site, sem domínio próprio e sem indexação: testar no navegador do Instagram e no celular antes de abrir o perfil.
 - **Identificador:** o `@` só aparece depois de confirmado o identificador real; a prévia mostra "@identificador a confirmar".
 - **Avatar:** o ícone oficial C, o mesmo de `docs/marca/icone-app.svg`, nos 1080 px. A 110 px (perfil) e a 44 px (feed) o C e o crescente lima continuam legíveis (conferência em `perfil/avatar-conferencia.png`). A assinatura "clarevo." nunca vai no avatar.
-- **Destaques (nesta ordem):** Comece aqui, Na prática, Dúvidas, Quem faz, Ajuda e Para empresas. As seis capas têm o mesmo desenho (disco lima com um ícone simples em traço marinho sobre o azul, e o nome). O conteúdo de cada destaque está em `perfil/nome-e-bio.txt`. **Para empresas** só entra com a apresentação e o canal comercial conferidos, como o Playbook manda; na prévia aparece esmaecido e tracejado.
+- **Destaques (nesta ordem):** Comece aqui, Na prática, Dúvidas, Quem faz, Ajuda e Para empresas. As seis capas têm o mesmo desenho: só um ícone simples em traço marinho, grande e centrado, sobre um disco lima no fundo azul, **sem o nome** (o Instagram já mostra o rótulo do destaque, e o texto dentro do círculo ficaria ilegível a 110 px). O disco e o ícone ficam no centro da arte, que é onde o Instagram recorta o círculo; a prévia do perfil usa o mesmo recorte central. O conteúdo de cada destaque está em `perfil/nome-e-bio.txt`. **Para empresas** só entra com a apresentação e o canal comercial conferidos, como o Playbook manda; na prévia aparece esmaecido e tracejado.
 - **Fixados:** P01, P02 e P03, nessa ordem. Na grade, os três fixados vêm primeiro e, depois, as peças mais novas primeiro (a prévia usa P09 no D20 e P06 no D13, as alternativas perenes).
 
 ## 4. Peças do primeiro mês
@@ -72,19 +72,19 @@ Na ordem do calendário do Playbook v2.2. O detalhe de cada peça (objetivo, aç
 | Dia | Peça | Formato | Ação principal | Arte gerada |
 |---|---|---|---|---|
 | D5 | P01 O que é a Clarevo | Carrossel fixado, 6 páginas | Ver o fixado Clarevo na prática | 6 páginas; capa e página 5 com quadro de foto real; página 4 com a tela de Orçamento por categoria |
-| D6 | P02 Clarevo na prática | Reel fixado | Consultar o fixado Como acessar | Capa, rascunho em MP4 (33 s) com Mercado e Lazer |
+| D6 | P02 Clarevo na prática | Reel fixado | Ver no perfil as informações de acesso (fixado P03) | Capa, rascunho em MP4 (33 s) com Mercado e Lazer |
 | D7 | P03 Como acessar | Carrossel fixado, 5 páginas | Acompanhar o perfil e ver a demonstração pelo link da bio | 5 páginas, "versão com acesso em preparação" (sem lista de espera, data nem preço); página 4 com o Resumo |
 | D9 | P04 Saldo e compromissos do mês | Carrossel, 5 páginas | Salvar a sequência de conferência | 5 páginas em fundo claro, valores em reais, barras a partir de zero |
-| D11 | P05 Planejar uma categoria | Reel | Conhecer o acesso e começar se o fluxo estiver validado | Capa, rascunho em MP4 (34 s): Transporte, R$ 600,00 |
+| D11 | P05 Planejar uma categoria | Reel | Ver no perfil as informações de acesso | Capa, rascunho em MP4 (34 s): Transporte, R$ 600,00 |
 | D13 | P06 ou T01 | Vídeo com integrante ou trend (posição flexível) | Uma pergunta específica | P06: capa e roteiro. T01: carrossel de 5 páginas no visual de post reproduzido |
 | D16 | P07 Parcela e total da compra | Carrossel, 5 páginas | Guardar o roteiro de perguntas | 5 páginas: o mesmo produto em 6 x R$ 120 e à vista, e a linha dos meses |
-| D18 | P08 Uma meta com próximo passo | Reel | Conhecer o acesso validado | Capa, rascunho em MP4 (36 s): meta Estudos |
+| D18 | P08 Uma meta com próximo passo | Reel | Ver no perfil as informações de acesso | Capa, rascunho em MP4 (36 s): meta Estudos |
 | D20 | P09 ou T02 | Vídeo com integrante ou trend (posição flexível) | Escolher uma pergunta para a próxima compra | P09: capa e roteiro. T02: só a ficha (a referência é escolhida na revisão semanal) |
 | D23 | P10 Revisão do mês | Carrossel, 6 páginas | Fazer a revisão com os próprios registros | 6 páginas; página 3 com a tela do orçamento |
-| D25 | P11 Primeiro registro de despesa | Reel | Concluir a primeira tarefa | Capa, rascunho em MP4 (36 s): Farmácia, R$ 35,00 |
-| D27 | B01 Bem-estar financeiro nas empresas | Carrossel, 5 páginas | Solicitar apresentação pelo canal conferido | 5 páginas, com a ressalva da NR-1; **bloqueada** (seção 6) |
-| Stories e destaque Ajuda | P12 Dúvida de acesso | Vídeo com integrante | Acessar ou pedir orientação pelo canal confirmado | Capa, roteiro, sequência de Stories e respostas-base |
-| Reserva | R01, B (Manual), F01, F02 | Carrosséis | Ver cada `ficha.md` | R01 (calendário visual e a barra de 100% do Manual), B (à vista ou em 10 parcelas), F01 (5 perguntas) e F02 (conversa sobre as contas da casa) |
+| D25 | P11 Primeiro registro de despesa | Reel | Concluir a primeira tarefa | Capa, rascunho em MP4 (36 s, 7 trechos): Farmácia, R$ 35,00; o último avisa que, na conta da pessoa, o primeiro registro começa do zero |
+| D27 | B01 Bem-estar financeiro nas empresas | Carrossel, 5 páginas | Solicitar apresentação pelo canal conferido | 5 páginas, com a ressalva da NR-1 e a frase de D-056 (a empresa nunca vê as finanças de ninguém, nem somadas); **bloqueada** (seção 6) |
+| Stories e destaque Ajuda | P12 Dúvida de acesso | Vídeo com integrante | Acessar ou pedir orientação pelo canal confirmado | Capa, roteiro (com [pergunta real] e [resposta conferida] para a equipe), legenda completa, sequência de Stories e respostas-base |
+| Reserva | R01, B (Manual), F01, F02 | Carrosséis | Ver cada `ficha.md` | R01 (calendário visual e a barra de 100% do Manual; a página 4 diz "Não é saldo disponível."), B (à vista ou em 10 parcelas; a página 5 cita a calculadora "Parcelado ou à vista?"), F01 (5 perguntas) e F02 (conversa sobre as contas da casa) |
 
 ### Os rascunhos em vídeo
 
@@ -114,7 +114,7 @@ A peça só entra na agenda quando as perguntas do Playbook estiverem respondida
 ## 7. O que fica para a equipe no Canva
 
 - **Montar cada arte como design nativo do Canva**, com texto, avatar, imagens e números em camadas separadas e a fonte DM Sans (títulos em negrito, corpo sem negrito nem itálico). Os PNG daqui são o desenho de referência; o Playbook não converte nada automaticamente em Canva. Usar a assinatura "clarevo." pelo ativo original de `docs/marca` e o ícone C só no avatar.
-- **Fotos reais** (P01 capa e página 5, F01 e F02 quando forem usadas): escolher, ter a autorização e trocar o quadro. Não associar a foto a depoimento nem a resultado de saúde.
+- **Fotos reais** (P01 capa e página 5, F01 e F02 quando forem usadas): escolher, ter a autorização e trocar o quadro. Reescrever o texto alternativo dessas páginas depois da escolha, para descrever o que a foto mostra (o `alt.txt` descreve só o quadro). Não associar a foto a depoimento nem a resultado de saúde.
 - **Vídeos com integrante** (P06, P09 e P12): gravar, revisar a fala com a pessoa, legendar no Edits e montar a capa no Canva no lugar do quadro "[Gravação com integrante real]".
 - **Reels** (P02, P05, P08 e P11): edição final no Edits a partir de `gravacao-limpa.mp4`, com pergunta na tela, legendas revisadas, "Exemplo fictício" enquanto os valores aparecerem e trilha só com direitos de uso. O `rascunho.mp4` serve de referência de posição e de texto.
 - **Trends** (T01 e T02): decidir na revisão semanal, preencher a ficha de referência externa e manter a alternativa perene pronta.
@@ -127,6 +127,12 @@ A peça só entra na agenda quando as perguntas do Playbook estiverem respondida
 - **P03** é a versão "com acesso em preparação" do Playbook (D-067), com o texto de `docs/24`, seção 1.3.
 - **Pessoas.** As peças P06, P09 e P12 do Playbook citam integrantes pelo nome; aqui a legenda diz "uma pessoa da equipe" e o nome e a função só entram depois de confirmados com a própria pessoa.
 - **P11, legenda.** Sem citar o canal de ajuda (ainda a definir): "Se precisar de orientação, veja o destaque Ajuda."
+- **P11, conta nova.** A gravação usa a demonstração, que já tem registros; por isso o roteiro (um sétimo trecho, nos 3,8 s finais), a legenda e o texto na tela dizem "Na sua conta, o primeiro registro começa do zero." Para caber no tempo da gravação, a narração do fim perdeu "É o primeiro passo para acompanhar".
+- **Acesso em preparação nos Reels.** P02, P05, P08 e P11 terminam com "Veja no perfil as informações de acesso" (texto na tela, narração e legenda), em vez de "fixado Como acessar", "como acessar a Clarevo" ou "condições atuais": nada sugere acesso aberto, em coerência com a P03 e a bio. Quando o acesso abrir, a frase muda junto com a P03, a bio e o destaque Comece aqui.
+- **P02, 17 a 24 s.** O texto na tela diz "A diferença do orçamento não é saldo nem autorização para gastar", com sujeito, para a frase não ficar solta sobre os valores de Mercado e Lazer.
+- **P12, legenda.** A legenda-base do Playbook traz o campo [tema]; o `legenda.txt` sai completo, com "o acesso", e a troca do tema (se a dúvida recebida for outra) fica na ficha, em "O que depende da equipe". Só o `roteiro.md` mantém [pergunta real] e [resposta conferida], que a equipe preenche antes de gravar.
+- **B01.** A página 2 e a legenda trazem "A empresa nunca vê as finanças de ninguém, nem somadas.", frase que o Playbook não tem e que repete D-056 (o RH vê vagas, convites e licenças e só as contagens de licenças). A frase fala de finanças, e não de "dados", porque o RH vê o e-mail de cada licença.
+- **T01, B e R01.** A página 3 da T01 leva "Exemplo fictício" logo abaixo de "R$ 50 × 12 = R$ 600", como a página 2. A página 5 da B cita a calculadora "Parcelado ou à vista?" (a que compara à vista e parcelado), e não "Antes de financiar". A página 4 da R01 diz "Não é saldo disponível.", sem "necessariamente".
 - **P12** fica nos Stories e no destaque Ajuda (v2.2), sem arte além da capa e do roteiro.
 - **B01.** A legenda é nova (o Playbook só traz as páginas), só com frases do Playbook e do Manual. "Colaboradores" virou "pessoas da equipe".
 - **Tamanhos.** Títulos de 56 a 72 px (o Manual admite até 90 px na capa), corpo de 32 a 40 px, rótulos de 24 px ou mais, números protagonistas de 104 a 140 px. No vídeo, o texto na tela tem 50 px em negrito.

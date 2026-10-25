@@ -189,7 +189,12 @@ function fichaMd(p) {
   if (p.alternativaDe) l.push(`- **Alternativa perene de:** ${p.alternativaDe}`);
   if (p.alternativaPerene) l.push(`- **Alternativa perene:** ${p.alternativaPerene}`);
   l.push(`- **Objetivo:** ${p.objetivo}`, `- **Ação principal:** ${p.acao}`, '');
-  l.push('## O que depende da equipe', '', ...p.depende.map((d) => `- ${d}`), '');
+  const comFoto = (p.paginas || []).map((pg, i) => (['capaFoto', 'fotoTexto'].includes(pg.modelo) ? i + 1 : 0)).filter(Boolean);
+  const dependeTodos = [...p.depende];
+  if (comFoto.length > 0) {
+    dependeTodos.push(`Texto alternativo ${comFoto.length > 1 ? `das páginas ${comFoto.join(' e ')}` : `da página ${comFoto[0]}`} (as que levam foto real): o \`alt.txt\` descreve só o quadro e a cena sugerida. Depois de escolhida a foto, a equipe reescreve esse texto, antes de publicar, para descrever o que a foto realmente mostra.`);
+  }
+  l.push('## O que depende da equipe', '', ...dependeTodos.map((d) => `- ${d}`), '');
   if (p.conferencia) {
     l.push('## Conferência da ficha de afirmações (`docs/24_REDES_SOCIAIS.md`, seção 1)', '', 'Versão do app conferida: a da ficha (demonstração de 07/10/2026, gravações de 23/10/2026). O responsável pelo produto, a designar, refaz o teste na versão que for ao ar antes de publicar.', '');
     l.push('| Afirmação | Situação | Evidência e cuidado |', '|---|---|---|', ...p.conferencia.map((c) => `| ${c.afirmacao} | ${c.situacao} | ${c.nota} |`), '');
@@ -219,6 +224,7 @@ function roteiroMd(p) {
   } else {
     l.push(`Vídeo com integrante real. A capa deste rascunho traz o quadro "${PESSOA}": a gravação é da equipe, com autorização de imagem e de fala, e a própria pessoa revisa o texto antes de gravar.`, '');
     l.push('## Fala', '', ...p.roteiro.map((t) => `> ${t.fala}`), '');
+    if (p.roteiro.some((t) => /\[[^\]]+\]/.test(t.fala))) l.push('Os campos entre colchetes são de produção: a equipe troca pela dúvida real recebida e pela resposta conferida antes de gravar. A legenda (`legenda.txt`) já está completa.', '');
     if (p.stories) l.push('## Sequência de Stories para apoiar uma peça', '', ...p.stories.map((s, i) => `${i + 1}. ${s}`), '');
     if (p.respostas) l.push('## Respostas para a equipe adaptar', '', '| Situação | Resposta base |', '|---|---|', ...p.respostas.map((r) => `| ${r.situacao} | ${r.resposta} |`), '', 'Definir uma rotina de leitura em dias úteis e informar o horário real de atendimento. Não prometer resposta imediata. Dúvidas recorrentes viram pauta; dados de pessoas ficam fora do relatório público.', '');
   }
@@ -517,7 +523,7 @@ Reserva, fora do calendário (ciclo seguinte ou no lugar de uma peça repetida):
 O QUE CADA PASTA CONTÉM
 perfil/                avatar-1080.png (ícone C), avatar-conferencia.png (110 px e 44 px), destaques/ (6 capas 1080 x 1920), previa-do-perfil.png, nome-e-bio.txt
 D05-P01 e demais       carrosséis: pagina-1.png em diante (1080 x 1350); Reels: capa.png (1080 x 1920), rascunho.mp4 (gravação real com o texto na tela do roteiro), rascunho-conferencia.png, gravacao-limpa.mp4 (para editar no Edits), legendas.srt (narração); vídeos com integrante: capa.png e roteiro.md
-em todas as peças      legenda.txt (pronta para colar), alt.txt (texto alternativo), ficha.md (ação principal, o que depende da equipe, conferência das afirmações sobre o app e lista de conferência antes de publicar); Reels e vídeos também têm roteiro.md
+em todas as peças      legenda.txt (pronta para colar, sem campos a preencher), alt.txt (texto alternativo; nas páginas com foto real a equipe reescreve depois de escolher a foto, como diz a ficha.md), ficha.md (ação principal, o que depende da equipe, conferência das afirmações sobre o app e lista de conferência antes de publicar); Reels e vídeos também têm roteiro.md
 calendario.md/.png     D1 a D30: dia, peça, formato, objetivo, ação e o que depende da equipe
 montagem.png           folha de contato com todas as páginas e capas, para revisar de uma vez
 
@@ -528,6 +534,9 @@ BLOQUEIOS CONHECIDOS (conferir antes de publicar)
 - Link da bio (clarevo-site.pages.dev/comece.html): testar no navegador do Instagram; o site ainda é preliminar.
 - Identificador e nome de exibição: conferir o limite na conta; o @ só aparece depois de confirmado.
 - Todas as peças de produto: responsável pelo produto (a designar) refaz o teste na versão que for ao ar.
+
+O QUE FALTA PREENCHER (só no roteiro, nunca nas legendas)
+- P12 (stories-e-ajuda-P12-...): o roteiro.md traz [pergunta real] e [resposta conferida], para a equipe trocar pela dúvida recebida e pela resposta conferida antes de gravar. A legenda.txt já está completa (tema "o acesso"); trocar o tema só se a dúvida recebida for outra (está na ficha.md).
 `;
 }
 

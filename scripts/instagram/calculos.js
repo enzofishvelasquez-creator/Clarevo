@@ -193,11 +193,18 @@ const PROMESSAS = [
   /adequada com uma assinatura/i,
   /redu[çc][ãa]o garantida/i,
   /garantid[oa]\b/i,
+  // Acesso em preparação (D-067): nada que sugira acesso aberto ("como acessar", "conhecer o acesso", cadastro, download).
+  /fixado Como acessar/i,
+  /(?:saber|ver|veja) como acessar/i,
+  /conhecer o acesso/i,
+  /(?:comece|come[çc]ar) (?:a usar|agora)/i,
+  /baix(?:e|ar) (?:o|a) (?:app|aplicativo)/i,
+  /cadastr(?:e-se|ar-se)/i,
 ];
 
 /**
  * Devolve os problemas de redação de um texto (lista vazia quando está de acordo). `origem` identifica o texto na mensagem. Um termo de
- * promessa só passa quando a própria frase o nega ("não é necessariamente saldo disponível", "sem lista de espera").
+ * promessa só passa quando a própria frase o nega ("não é saldo disponível", "sem lista de espera").
  */
 function conferirRedacao(texto, origem) {
   const erros = [];
