@@ -132,6 +132,60 @@ Regras: não ler, copiar nem criar chaves de API ou tokens; não mexer em Billin
 
 Feito em 26/10/2026: os dois endereços ficaram ativos, com "Always Use HTTPS" ligado e "Email Address Obfuscation" desligado. Depois: `site/dados-da-empresa.json` recebe `DOMÍNIO` = `clarevo.app.br` (link canônico, sitemap e Open Graph com endereço completo), e o site é gerado de novo e publicado. Se o formulário de contato for ligado um dia, a variável `SITE_HOST` do projeto passa a ser `clarevo.app.br` (`docs/22_SITE.md`, seção 9).
 
+## 5b. Endereços oficiais do app e da demonstração (26/10/2026)
+
+`app.clarevo.app.br` passa a abrir o app com login (projeto `clarevo`) e `demo.clarevo.app.br`, a demonstração com dados fictícios (projeto `clarevo-demo`). Os endereços `.pages.dev` continuam funcionando, então nada quebra durante a troca. Depois do relatório, a equipe troca os links do app (convites da Família e das empresas), do site e da apresentação para os endereços novos.
+
+```
+Tarefa no painel da Cloudflare (dash.cloudflare.com) e no painel do Supabase (supabase.com/dashboard), com as duas sessões já abertas neste Chrome.
+Regras: não ler, copiar nem criar chaves de API, tokens ou senhas; no Supabase, não abrir as telas de API Keys, Database password nem Billing; não alterar nem apagar registros MX, TXT, SPF, DKIM ou DMARC; não mexer nas variáveis de ambiente dos projetos; se a tela pedir um dado que você não tenha, pare e me pergunte.
+
+Parte A, Cloudflare:
+1. Workers & Pages > clarevo > Custom domains > "Set up a custom domain": app.clarevo.app.br. Aceite o registro que a Cloudflare propõe.
+2. Workers & Pages > clarevo-demo > Custom domains > "Set up a custom domain": demo.clarevo.app.br. Aceite o registro que a Cloudflare propõe.
+3. Espere os dois aparecerem como "Active". Se algum der erro, pare e me diga a mensagem exata.
+
+Parte B, Supabase (projeto do app):
+4. Authentication > URL Configuration.
+5. Site URL: troque para https://app.clarevo.app.br e salve.
+6. Redirect URLs: acrescente https://app.clarevo.app.br/** e mantenha as que já existem (inclusive https://clarevo.pages.dev/**). Salve.
+
+Parte C, conferência:
+7. Abra https://app.clarevo.app.br numa aba nova: deve aparecer a tela de entrada da Clarevo. Não entre em nenhuma conta.
+8. Abra https://demo.clarevo.app.br: deve aparecer o app com "Demonstração" no alto.
+9. Relatório: situação dos dois domínios, o Site URL e a lista de Redirect URLs depois da mudança, e o que as duas abas mostraram.
+```
+
+## 5c. E-mails do app com a marca (Resend, 26/10/2026)
+
+Os e-mails de confirmação de cadastro e de nova senha passam a sair de `nao-responda@clarevo.app.br`, com o nome "Clarevo", pelo Resend (plano gratuito: 3.000 e-mails por mês e 100 por dia, a conferir). O Resend usa o subdomínio `send.clarevo.app.br` e a chave `resend._domainkey`, então os registros do Zoho (MX, SPF e DKIM da raiz) **não mudam**. A chave de envio do Resend é criada e colada no Supabase **pela própria pessoa**, nunca no chat nem no repositório.
+
+**Antes, a pessoa:** cria a conta em resend.com com o contato@clarevo.app.br (senha e confirmação por e-mail são dela).
+
+```
+Tarefa no painel do Resend (resend.com), na Cloudflare e no Supabase, com as três sessões já abertas neste Chrome.
+Regras: não criar, ler nem copiar chaves de API, tokens ou senhas (a pessoa faz isso); não mexer em Billing nem em planos pagos; na Cloudflare, não alterar nem apagar os registros MX, SPF, DKIM (zmail._domainkey) e DMARC que já existem: só acrescentar os do Resend; se a tela pedir um dado que você não tenha, pare e me pergunte.
+
+Parte A, domínio no Resend:
+1. Domains > Add Domain: clarevo.app.br. Se pedir região, escolha São Paulo (sa-east-1), se houver; senão, a padrão, e me diga qual ficou.
+2. Anote os registros que o Resend pedir (tipo, nome, valor e prioridade).
+3. Na Cloudflare, em clarevo.app.br > DNS > Records, crie cada um exatamente como o Resend mostrou, com Proxy desligado ("DNS only"). Normalmente são: um MX e um TXT de SPF no nome "send", e um TXT de DKIM no nome "resend._domainkey". Se algum registro pedido for na raiz (clarevo.app.br) e já existir um parecido, pare e me avise antes.
+4. Volte ao Resend e clique em Verify. Se ficar pendente, espere 10 minutos e tente de novo.
+
+Parte B, a pessoa cria a chave:
+5. Pare e peça para a pessoa criar, em API Keys, uma chave só de envio ("Sending access"), restrita ao domínio clarevo.app.br, e deixar a chave copiada. Não olhe nem copie a chave.
+
+Parte C, SMTP no Supabase (projeto do app):
+6. Authentication > Emails > SMTP Settings: ligue o SMTP próprio ("Enable Custom SMTP").
+7. Preencha: Sender email nao-responda@clarevo.app.br; Sender name Clarevo; Host smtp.resend.com; Port 465; Username resend.
+8. No campo Password, pare: a pessoa cola a chave do passo 5. Depois que ela avisar, salve.
+9. Authentication > Emails > Templates: veja se os modelos estão em português (por exemplo, o assunto de "Confirm signup"). Não altere; só me diga o assunto de cada modelo.
+
+Relatório: região e situação do domínio no Resend, os registros criados na Cloudflare (tipo, nome e valor resumido), o que ficou salvo no SMTP (sem a senha) e os assuntos dos modelos.
+```
+
+**Depois, a pessoa:** cria uma conta de teste no app com um e-mail próprio e confere que o e-mail de confirmação chega de "Clarevo <nao-responda@clarevo.app.br>", fora do spam, e que o link abre o app. Em seguida, a equipe atualiza a política de privacidade (provedor de e-mail escolhido: Resend, P-008), `docs/05`, `docs/07` e `docs/16`.
+
 ## 6. Conta PJ (a própria pessoa abre)
 
 Abertura de conta é feita pela representante no app do banco escolhido (sugestão em D-064: Inter Empresas; alternativa C6 Empresas), com os documentos da empresa e dela. Conferir antes: se o banco aceita empresa do Inova Simples, se o cartão aceita compra internacional (Apple e Google cobram em dólar) e quantos boletos grátis por mês.

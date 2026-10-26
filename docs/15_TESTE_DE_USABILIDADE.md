@@ -1,5 +1,7 @@
 # Clarevo · Teste de usabilidade (CL-13)
 
+> Kit prático do teste com 5 pessoas no app com login real, com contas de teste e valores inventados (D-064, etapa 1): `docs/27_TESTE_COM_5_PESSOAS.md`.
+
 16/10/2026. Roteiro do teste com 5 pessoas e 5 tarefas, antes das lojas (D-054(8); `docs/12_RESPOSTA_REVISAO_V09.md`, CL-13). É um roteiro de papel: não muda o app, não coleta nada dentro dele e não grava tela com dados reais. A conta de demonstração do app (hoje 07/10/2026, com dados fictícios identificados) é o cenário de todas as tarefas, e é só ela que aparece na tela durante a sessão.
 
 ## 1. Para que serve
@@ -69,7 +71,7 @@ Cenário que se lê antes da primeira: "Imagine que você acabou de instalar est
 | 2 | "Descubra quanto ainda falta pagar neste mês." | A pessoa diz R$ 650,00 (ou mostra o card "Ainda a pagar neste mês") e, se quiser, abre a lista com as 2 contas | Resumo › card "Ainda a pagar neste mês" › "Ver contas" |
 | 3 | "Todo mês você paga R$ 120,00 de internet, com vencimento no dia 10. Cadastre essa conta para o aplicativo lembrar todo mês." | Gasto fixo criado com a descrição, o valor de R$ 120,00 e o vencimento no dia 10, repetindo todo mês, e a conta de outubro (ou do mês seguinte) aparece em Contas a pagar | Movimentos › Organizar › "Gastos fixos e parcelamentos" › "Novo gasto fixo ou parcelamento" › "Todo mês" › "Salvar gasto fixo" |
 | 4 | "Você usa um cartão de crédito. Veja quanto vai ser a próxima fatura dele." | A pessoa abre a fatura de novembro do "Cartão Exemplo" e diz R$ 550,00, ou aponta o total da fatura | Movimentos › Organizar › "Cartões" › "Cartão Exemplo" › "Fatura de novembro" |
-| 5 | "Você quer juntar R$ 3.000,00 para uma viagem. Crie uma meta para isso." | Meta criada com um nome (por exemplo, Viagem) e o valor de R$ 3.000,00; o prazo é opcional | Metas › "Nova meta" › nome e valor › "Salvar meta" |
+| 5 | "Você quer juntar R$ 3.000,00 para uma viagem. Crie uma meta para isso." | Meta criada com um nome (por exemplo, Viagem) e o valor de R$ 3.000,00; o prazo é opcional | Metas › "Nova meta" › nome e valor › "Criar meta" |
 
 Quem conduz pode trocar valores e nomes (R$ 45,00, internet, viagem) por outros do mesmo tipo, desde que a troca seja igual para as 5 pessoas.
 
