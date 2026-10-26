@@ -1230,7 +1230,7 @@ describe('site público: textos jurídicos propostos e documentação (D-066)', 
     expect(/^33\. \*\*[^\n]*$/m.exec(perguntas)![0]).toContain('[A DEFINIR: rastreamento de abertura e clique desligado no Brevo]');
     // A seção e vai até a 25 e não foi renumerada.
     expect([...secao(resumo, '## e) Perguntas ao advogado').matchAll(/^(\d+)\. \*\*/gm)].map((m) => Number(m[1]))).toEqual(Array.from({ length: 25 }, (_, i) => i + 1));
-    expect(resumo).toContain('responder as 25 perguntas da seção e e as da seção h');
+    expect(resumo).toContain('responder as 25 perguntas da seção e e as das seções h a k (26 a 40)');
     for (const assunto of ['Formulário de contato', 'Prazo da mensagem', 'consentimento', 'Descadastro', 'Transferência internacional', 'Estatísticas de tráfego', 'Marca e kit de imprensa']) expect(resumo.toLowerCase(), assunto).toContain(assunto.toLowerCase());
   });
 

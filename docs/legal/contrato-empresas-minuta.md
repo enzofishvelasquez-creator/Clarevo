@@ -16,7 +16,7 @@ De um lado, **[RAZÃO SOCIAL]**, CNPJ [CNPJ], com sede em [ENDEREÇO], neste con
 - **Licença:** o acesso de uma pessoa beneficiária ao plano contratado, ativado quando ela aceita o convite.
 - **Convite:** o link de uso único que a CLAREVO gera para cada e-mail informado pela EMPRESA.
 - **Painel:** a área web em que as pessoas administradoras da EMPRESA convidam e acompanham as licenças.
-- **Família:** o espaço compartilhado do Aplicativo em que a pessoa beneficiária organiza as finanças da casa com até 5 outras pessoas que ela mesma convida.
+- **Família:** o espaço compartilhado do Aplicativo em que até 6 pessoas, contando quem é titular, organizam as finanças da casa. A pessoa beneficiária pode criar a própria Família ou participar da Família de outra pessoa.
 
 ## Cláusula 2. Objeto
 
@@ -56,6 +56,8 @@ De um lado, **[RAZÃO SOCIAL]**, CNPJ [CNPJ], com sede em [ENDEREÇO], neste con
 
 5.5. Pagar o preço nas condições da Cláusula 8.
 
+5.6. [PROPOSTA: reconhecer que a licença da Clarevo não é medida de conformidade com a NR-1 nem com outra norma de saúde e segurança do trabalho e não substitui as obrigações da EMPRESA, pergunta 35 do resumo.]
+
 ## Cláusula 6. Obrigações da CLAREVO
 
 6.1. Manter o Aplicativo e o Painel disponíveis, com as funções descritas neste contrato, e prestar suporte pelo e-mail [E-MAIL DE SUPORTE], com primeira resposta em até [PROPOSTA: 2 dias úteis].
@@ -84,7 +86,7 @@ De um lado, **[RAZÃO SOCIAL]**, CNPJ [CNPJ], com sede em [ENDEREÇO], neste con
 
 8.4. Em caso de atraso, incidem multa de [PROPOSTA: 2%] e juros de [PROPOSTA: 1% ao mês], proporcionais aos dias. Atraso de mais de [PROPOSTA: 30 dias], depois de aviso por escrito, permite à CLAREVO rescindir o contrato, e as licenças seguem a Cláusula 11: as pessoas beneficiárias não perdem o acesso de uma hora para outra.
 
-8.5. Se o Anexo I prever pagamento anual antecipado, vale o desconto nele indicado.
+8.5. Se o Anexo I prever pagamento anual antecipado, vale o desconto nele indicado. Na rescisão antecipada, a CLAREVO devolve os meses não usados, depois de recalcular os meses usados pelo preço mensal sem o desconto.
 
 ## Cláusula 9. Proteção de dados pessoais
 
@@ -94,7 +96,7 @@ De um lado, **[RAZÃO SOCIAL]**, CNPJ [CNPJ], com sede em [ENDEREÇO], neste con
 
 9.3. A CLAREVO comunica à EMPRESA, em até [A DEFINIR: prazo], qualquer incidente de segurança que afete as informações deste contrato, como a lista de e-mails convidados.
 
-9.4. A CLAREVO usa serviços de terceiros para operar o Aplicativo (hospedagem, banco de dados, e-mail e monitoramento técnico) e responde por eles perante a EMPRESA nos termos deste contrato. A lista dos serviços e dos países está na Política de Privacidade. [A DEFINIR: transferência internacional, perguntas 9 e 30 do resumo.]
+9.4. A CLAREVO usa serviços de terceiros para operar o Aplicativo (hospedagem, banco de dados e, no futuro, envio de e-mail e monitoramento técnico) e responde por eles perante a EMPRESA nos termos deste contrato. A lista dos serviços e dos países está na Política de Privacidade. [A DEFINIR: transferência internacional, perguntas 9 e 30 do resumo.]
 
 9.5. As pessoas beneficiárias usam o Aplicativo pelos Termos de Uso e pela Política de Privacidade da Clarevo, que valem entre a CLAREVO e cada pessoa.
 
@@ -112,11 +114,11 @@ De um lado, **[RAZÃO SOCIAL]**, CNPJ [CNPJ], com sede em [ENDEREÇO], neste con
 
 ## Cláusula 12. Prazo e rescisão
 
-12.1. O contrato vale por 12 meses a partir da data de início do Anexo I e se renova por períodos iguais, salvo aviso de qualquer parte com [PROPOSTA: 30 dias] de antecedência do fim do período.
+12.1. O contrato vale por 12 meses a partir da data de início do Anexo I ou, se houver piloto, a partir do fim do piloto, e se renova por períodos iguais, salvo aviso de qualquer parte com [PROPOSTA: 30 dias] de antecedência do fim do período.
 
-12.2. Qualquer parte pode rescindir o contrato a qualquer momento com aviso de [PROPOSTA: 60 dias], pagando a EMPRESA as vagas até o fim do aviso. [A DEFINIR: multa por rescisão antecipada no período de 12 meses; PROPOSTA: nenhuma.]
+12.2. Qualquer parte pode rescindir o contrato a qualquer momento com aviso de [PROPOSTA: 60 dias], pagando a EMPRESA as vagas até o fim do aviso, sem multa. [A DEFINIR: se haverá multa por rescisão antecipada dentro dos 12 meses; PROPOSTA: nenhuma, para facilitar a primeira contratação.]
 
-12.3. O descumprimento da Cláusula 4 ou da Cláusula 5.2 permite à CLAREVO a rescisão imediata. O descumprimento da Cláusula 6.3 ou da Cláusula 9 permite à EMPRESA a rescisão imediata.
+12.3. O descumprimento das Cláusulas 5.1 ou 5.2 permite à CLAREVO a rescisão imediata. O descumprimento da Cláusula 6.3 ou da Cláusula 9 permite à EMPRESA a rescisão imediata.
 
 ## Cláusula 13. Propriedade intelectual e uso de marca
 

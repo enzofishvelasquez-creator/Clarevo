@@ -23,9 +23,9 @@ Cooperação técnica para oferecer, em caráter de piloto, o aplicativo da Clar
 
 | Meta | Indicador | Como se mede |
 |---|---|---|
-| Convidar o grupo piloto | Convites enviados | Painel da instituição (contagem) |
-| Adesão do grupo | Convites aceitos e licenças ativas ao fim do piloto | Painel da instituição (contagem) |
-| Percepção de utilidade | Respostas da pesquisa voluntária e anônima | [A DEFINIR: ferramenta e perguntas, aprovadas pelo ÓRGÃO] |
+| Convidar o grupo piloto | Vagas em uso (convites pendentes mais licenças ativas) | Painel da empresa, área web de administração do benefício (contagens) |
+| Adesão do grupo | Licenças ativas ao fim do piloto | Painel da empresa (contagens) e relatório de adesão baixado pelo ÓRGÃO |
+| Percepção de utilidade | Respostas de uma pesquisa voluntária e anônima | [A DEFINIR: se haverá pesquisa, a ferramenta, as perguntas e o tratamento dos dados, aprovados pelo ÓRGÃO; pergunta 40 do resumo] |
 | Apoio às pessoas | Dúvidas recebidas e respondidas | Registro do suporte da CLAREVO, sem dados financeiros |
 
 Nenhum indicador mostra dados financeiros, nem somados, nem o uso individual do aplicativo. [A DEFINIR: metas numéricas, como o percentual de adesão esperado, se o ÓRGÃO quiser.]
@@ -37,34 +37,35 @@ Nenhum indicador mostra dados financeiros, nem somados, nem o uso individual do 
 | Semanas 1 e 2 | Preparação | Grupo piloto definido; requisitos de segurança do ÓRGÃO conferidos; pessoas administradoras cadastradas; material de lançamento |
 | Semanas 3 e 4 | Convites | Links de uso único enviados pelo ÓRGÃO pelos canais internos; oficina de primeiros passos, presencial ou on-line |
 | Semanas 5 a 12 | Uso acompanhado | Suporte às pessoas; conteúdo de apoio; ajustes a partir do que o grupo relatar |
-| Semana 13 | Avaliação | Relatório de adesão; resultado da pesquisa voluntária; recomendação conjunta sobre a continuidade |
+| Semana 13 | Avaliação | Relatório de adesão, baixado pelo ÓRGÃO no painel; resultado da pesquisa voluntária, se houver; avaliação conjunta, com a decisão sobre a continuidade só do ÓRGÃO |
 
 Cronograma ilustrativo, a ajustar com o ÓRGÃO. [A DEFINIR: data de início e tamanho do grupo.]
 
 ## 6. Responsabilidades
 
 **Da CLAREVO:**
-- Disponibilizar o aplicativo e o painel da instituição sem custo durante o piloto.
+- Disponibilizar o aplicativo e o painel da empresa sem custo durante o piloto.
 - Cadastrar o ÓRGÃO e as pessoas administradoras indicadas.
 - Dar suporte às pessoas pelo e-mail [E-MAIL DE SUPORTE] e conduzir a oficina de primeiros passos.
-- Preparar o relatório de adesão e consolidar a pesquisa voluntária.
+- Consolidar a pesquisa voluntária, se houver, e apresentar a avaliação do piloto.
 - Cumprir a Lei Geral de Proteção de Dados e as regras de segurança acordadas.
 
 **Do ÓRGÃO:**
 - Definir o grupo piloto e indicar as pessoas administradoras.
 - Informar no painel só o e-mail de cada pessoa convidada e enviar os links pelos canais internos.
 - Não pedir às pessoas que mostrem dados da Clarevo e não condicionar nada à adesão.
+- Baixar no painel o relatório de adesão ao fim do piloto.
 - Indicar a equipe que acompanha o piloto e participar da avaliação.
 
 ## 7. Dados pessoais e segurança
 
-- A CLAREVO é a controladora dos dados tratados na conta de cada pessoa, inclusive os financeiros. O ÓRGÃO vê só os e-mails convidados, a situação de cada convite e as contagens de licenças.
+- A CLAREVO é a controladora dos dados tratados na conta de cada pessoa, inclusive os financeiros. O ÓRGÃO vê só os e-mails que convidou, a situação de cada convite e de cada licença, as datas correspondentes e as contagens de licenças.
 - A adesão é voluntária, e cada pessoa aceita os Termos de Uso e a Política de Privacidade da Clarevo ao criar a conta.
 - [A DEFINIR: requisitos de segurança da informação do ÓRGÃO, por exemplo localização dos dados e normas internas, e como a CLAREVO os atende.]
 
 ## 8. Recursos
 
-Não há repasse de recursos entre as partes. Cada parte arca com os próprios custos para cumprir este plano.
+Não há repasse de recursos entre as partes. Cada parte arca com os próprios custos para cumprir este plano. O acordo não tem exclusividade e não cria compromisso de contratação futura.
 
 ## 9. Vigência e encerramento
 

@@ -8,9 +8,9 @@ Versão de 26/10/2026. Proposta da equipe para Enzo e o investidor decidirem (P-
 |---|---|
 | Quem paga | A empresa ou o órgão. A pessoa não paga nada pelo benefício |
 | Unidade de cobrança | Vaga por mês (uma vaga por pessoa que recebe o benefício) |
-| Plano | Um só para empresas, com a Família incluída: a pessoa beneficiária pode montar a Família com até 5 pessoas da casa, sem vaga extra |
+| Plano | Um só para empresas, com a Família incluída: a pessoa beneficiária organiza a casa na Família, de até 6 pessoas contando quem é titular, sem vaga extra para as outras |
 | Preço | De R$ 12,00 a R$ 8,00 por vaga por mês, conforme o número de vagas (seção 3), com impostos incluídos |
-| Mínimo | 30 vagas e 12 meses |
+| Mínimo e prazo | 30 vagas; contrato de 12 meses, contados do fim do piloto, com saída antecipada por aviso de 60 dias, sem multa |
 | Pagamento | Mensal, por boleto ou Pix, com nota fiscal; na empresa privada, pagamento anual antecipado com 10% de desconto (órgão público, em regra, não paga antecipado) |
 | Reajuste | Anual, pelo IPCA |
 | Piloto | 90 dias sem custo: até 100 vagas na empresa privada; no órgão público, pelo acordo de cooperação técnica, com o grupo definido no plano de trabalho |
@@ -49,9 +49,9 @@ Na troca de faixa, quem fica logo abaixo do limite pode pagar mais no total do q
 
 ## 4. Como o preço se compara
 
-- **Orçamento de bem-estar.** As empresas da 32ª Pesquisa de Benefícios Corporativos da Mercer Marsh destinaram, em média, R$ 409,69 por funcionário em 2024 a iniciativas de qualidade de vida e bem-estar. R$ 120,00 por ano (a faixa de R$ 10,00) são cerca de 29% desse valor.
-- **Plano de saúde.** A Marsh projetou o custo médio do plano de saúde corporativo em cerca de R$ 709,50 por funcionário por mês em 2025. R$ 10,00 por mês são cerca de 1,4% disso.
-- **Mercado internacional.** Plataformas de bem-estar financeiro nos Estados Unidos publicam preços de cerca de US$ 3 a US$ 6 por funcionário por mês. Mesmo com o dólar a R$ 5,00, US$ 3 já são R$ 15,00, acima da faixa mais alta proposta. Os produtos e o poder de compra são diferentes, e a comparação serve só de referência.
+- **Orçamento de bem-estar.** As empresas da 32ª Pesquisa de Benefícios Corporativos da Mercer Marsh destinaram, em média, R$ 409,69 por pessoa empregada em 2024 a iniciativas de qualidade de vida e bem-estar. R$ 120,00 por ano (a faixa de R$ 10,00) são cerca de 29% desse valor.
+- **Plano de saúde.** A Marsh projetou o custo médio do plano de saúde corporativo em cerca de R$ 709,50 por pessoa empregada por mês em 2025. R$ 10,00 por mês são cerca de 1,4% disso.
+- **Mercado internacional.** Plataformas de bem-estar financeiro nos Estados Unidos publicam preços de cerca de US$ 3 a US$ 6 por pessoa empregada por mês. Mesmo com o dólar a R$ 5,00, US$ 3 já são R$ 15,00, acima da faixa mais alta proposta. Os produtos e o poder de compra são diferentes, e a comparação serve só de referência.
 
 Essas comparações vão para a conversa como contexto, nunca como promessa de economia ou de resultado.
 
@@ -60,7 +60,7 @@ Essas comparações vão para a conversa como contexto, nunca como promessa de e
 O caminho proposto, na ordem:
 
 1. **Piloto pelo acordo de cooperação técnica (ACT):** 90 dias, sem repasse de recursos e sem custo para o órgão (Lei 14.133/2021, art. 184; Decreto 11.531/2023). O Parecer AGU 2/2026/CNCIC/CGU/AGU admite acordo com empresa com fins lucrativos, com plano de trabalho e, em regra, chamamento público. Rascunho do plano de trabalho: `docs/legal/plano-de-trabalho-piloto.md`.
-2. **Depois do piloto, contratação de menor valor (dispensa por valor):** até R$ 65.492,11 em 2026 (Lei 14.133/2021, art. 75, II; Decreto 12.807/2025). Com a tabela da seção 3, cabem até **545 vagas a R$ 10,00** (545 × R$ 120,00 = R$ 65.400,00) ou até **682 vagas a R$ 8,00** (682 × R$ 96,00 = R$ 65.472,00) num contrato de 12 meses. O limite soma todas as compras da mesma natureza do órgão no ano, então a área de contratos confirma o espaço disponível.
+2. **Depois do piloto, contratação de menor valor (dispensa por valor):** até R$ 65.492,11 em 2026 (Lei 14.133/2021, art. 75, II; Decreto 12.807/2025). Com a tabela da seção 3, num contrato de 12 meses, cabem até **500 vagas a R$ 10,00** (500 × R$ 120,00 = R$ 60.000,00) ou até **682 vagas a R$ 8,00**, a faixa de 501 vagas em diante (682 × R$ 96,00 = R$ 65.472,00). O limite soma todas as compras da mesma natureza do órgão no ano, então a área de contratos confirma o espaço disponível.
 3. **Para escala maior:** Contrato Público para Solução Inovadora (Lei Complementar 182/2021, arts. 13 a 15), com teste de até 12 meses, prorrogáveis por mais 12, até R$ 1,6 milhão.
 
 O formato é sempre definido pela assessoria jurídica e pela área de contratos do órgão. O órgão usa os próprios modelos de instrumento (em geral, os da AGU); a minuta de `docs/legal/` serve para empresas privadas.
@@ -68,31 +68,31 @@ O formato é sempre definido pela assessoria jurídica e pela área de contratos
 ## 6. Limites da Clarevo hoje (Inova Simples)
 
 - **Faturamento.** Pelo regime do Inova Simples, a empresa pode fazer comercialização experimental até o limite do MEI (Lei Complementar 123/2006, art. 65-A, § 10), hoje de **R$ 81.000,00 por ano**, somando todos os clientes. Na faixa de R$ 10,00, isso dá cerca de 675 vagas pagas ao longo de um ano. O contrato de 1.000 vagas do exemplo (R$ 96.000,00 por ano) já passa do limite.
-- **O que fazer antes de passar do limite:** transformar a empresa em microempresa (ME) ou sociedade limitada, com o contador, antes de assinar o contrato que ultrapasse o teto. Passar do limite sem isso deixa a empresa irregular.
-- **A confirmar com o contador:** como emitir a nota fiscal de serviço pela empresa do Inova Simples no Rio de Janeiro, qual tributo incide sobre a comercialização experimental, a opção pelo Simples Nacional (Resolução CGSN 171/2022, segundo as fontes consultadas) e as certidões de regularidade que um órgão público vai pedir para contratar.
+- **O que fazer antes de passar do limite:** transformar a empresa em microempresa (ME) ou sociedade limitada, com a contabilidade, antes de assinar o contrato que ultrapasse o teto. Passar do limite sem isso deixa a empresa irregular.
+- **A confirmar com a contabilidade:** como emitir a nota fiscal de serviço pela empresa do Inova Simples no Rio de Janeiro, qual tributo incide sobre a comercialização experimental, a opção pelo Simples Nacional (Resolução CGSN 171/2022, segundo as fontes consultadas) e as certidões de regularidade que um órgão público vai pedir para contratar.
 - O piloto pelo ACT não tem pagamento e não conta para esse limite.
 
 ## 7. Custo de operar
 
-O custo fixo de infraestrutura no piloto é baixo (`docs/18`): Supabase Pro a partir de US$ 25 por mês, mais cerca de US$ 10 pelo projeto de teste; domínio de R$ 40 por ano; e-mail, site e monitoramento nos planos gratuitos. Um contrato de 50 vagas (R$ 600,00 por mês) já cobre essa infraestrutura. O custo que cresce com os clientes é o de pessoas (suporte, oficinas e desenvolvimento), que o preço precisa pagar quando a Clarevo crescer.
+O custo fixo de infraestrutura no piloto é baixo (`docs/18`): Supabase Pro a partir de US$ 25 por mês, mais cerca de US$ 10 pelo projeto de teste; domínio clarevo.app.br, R$ 40 por ano, pago em 25/10/2026; e-mail, site e monitoramento nos planos gratuitos. Um contrato de 50 vagas (R$ 600,00 por mês) já cobre essa infraestrutura. O custo que cresce com os clientes é o de pessoas (suporte, oficinas e desenvolvimento), que o preço precisa pagar quando a Clarevo crescer.
 
 ## 8. Fontes (consultadas em 26/10/2026)
 
-- Mercer Marsh Benefícios, 32ª Pesquisa de Benefícios Corporativos, por notícia do Medicina S/A (R$ 409,69 por funcionário em 2024): https://medicinasa.com.br/?p=146904
-- Marsh, comunicado de setembro de 2025 sobre custos corporativos (plano de saúde de cerca de R$ 709,50 por funcionário por mês em 2025): https://www.marsh.com/pt-br/about/media/increasing-in-corporate-costs-in-2025.html
-- Preços de plataformas nos Estados Unidos, páginas dos próprios fornecedores e diretórios: Origin, US$ 6 por funcionário por mês (https://coverager.com/origin-raises-12-million/); Waterfall Planning, US$ 4 a US$ 6 (https://vendordirectory.shrm.org/company/938841/products/250090/waterfall-planning-employee-financial-wellness-platform); Savology, a partir de US$ 3 (https://www.capterra.com.au/software/212223/savology-for-employers).
+- Mercer Marsh Benefícios, 32ª Pesquisa de Benefícios Corporativos, por notícia do Medicina S/A (R$ 409,69 por pessoa empregada em 2024): https://medicinasa.com.br/?p=146904
+- Marsh, comunicado de setembro de 2025 sobre custos corporativos (plano de saúde de cerca de R$ 709,50 por pessoa empregada por mês em 2025): https://www.marsh.com/pt-br/about/media/increasing-in-corporate-costs-in-2025.html
+- Preços de plataformas nos Estados Unidos, páginas dos próprios fornecedores e diretórios: Origin, US$ 6 por pessoa empregada por mês (https://coverager.com/origin-raises-12-million/); Waterfall Planning, US$ 4 a US$ 6 (https://vendordirectory.shrm.org/company/938841/products/250090/waterfall-planning-employee-financial-wellness-platform); Savology, a partir de US$ 3 (https://www.capterra.com.au/software/212223/savology-for-employers).
 - Plataforma que se apresenta com soluções de crédito para colaboradores: https://mundorh.com.br/tudonobolso-revoluciona-o-bem-estar-financeiro-dos-colaboradores-com-solucoes-de-credito-e-beneficios-dinamicos
 - Inova Simples e comercialização experimental (LC 123/2006, art. 65-A, § 10): Consultor Jurídico, Daniel Zanetti, 12/09/2022, https://www.conjur.com.br/2022-set-12/daniel-zanetti-apontamentos-inova-simples
 - Limite do MEI em 2026 (R$ 81 mil, sem mudança aprovada; propostas de aumento em tramitação): https://www.contabilizei.com.br/contabilidade-online/faturamento-mei-2026/
-- Lei 14.133/2021, LC 182/2021, Decreto 11.531/2023, Decreto 12.807/2025 e Parecer AGU 2/2026: os mesmos da apresentação para a Marinha (slide "Caminhos possíveis para começar").
+- Lei 14.133/2021, LC 182/2021, Decreto 11.531/2023, Decreto 12.807/2025 e Parecer AGU 2/2026/CNCIC/CGU/AGU: os mesmos citados na apresentação para a Marinha (slide "Caminhos possíveis para começar"), a conferir no texto oficial.
 
-As fontes do mercado são, em boa parte, notícias e páginas de fornecedores. Os limites legais (Inova Simples, MEI e dispensa) precisam ser conferidos no texto oficial e com o contador antes do primeiro contrato pago.
+As fontes do mercado são, em boa parte, notícias e páginas de fornecedores. Os limites legais (Inova Simples, MEI, dispensa e Contrato Público para Solução Inovadora) e o Parecer AGU precisam ser conferidos no texto oficial, com a contabilidade e com a revisão jurídica, antes do primeiro contrato.
 
 ## 9. O que falta decidir
 
 1. Os preços da tabela e o piso das grandes contas (Enzo e o investidor).
 2. Cobrança por vaga contratada (proposta) ou por licença ativa (alternativa da seção 2).
 3. Um plano só, com a Família incluída (proposta), ou dois planos, individual e familiar, como o contrato permite (D-056).
-4. Desconto do pagamento anual (10% proposto) e o mínimo de 30 vagas.
-5. Com o contador: nota fiscal, tributos e a mudança de regime antes de passar de R$ 81.000,00 no ano.
-6. Com o advogado: a minuta do contrato e o plano de trabalho (perguntas 36 a 40 do resumo).
+4. Desconto do pagamento anual (10% proposto), o mínimo de 30 vagas e a saída antecipada sem multa.
+5. Com a contabilidade: nota fiscal, tributos e a mudança de regime antes de passar de R$ 81.000,00 no ano.
+6. Com a revisão jurídica: a minuta do contrato e o plano de trabalho (perguntas 36 a 40 do resumo).
