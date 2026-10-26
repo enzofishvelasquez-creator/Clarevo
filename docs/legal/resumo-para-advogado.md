@@ -41,6 +41,7 @@ Rascunho preparado pela equipe da Clarevo para revisão jurídica. Não é parec
 | Sentry | Relatório de falhas | Só o erro técnico, IP desligado | A escolher | Previsto, não ligado |
 | Provedor de e-mail (Resend sugerido) | E-mails de confirmação e nova senha | E-mail e conteúdo da mensagem | A escolher | Previsto (P-008) |
 | Site da Fazenda do RJ | Leitura opcional da nota, feita pelo aparelho | Endereço da nota e IP | Brasil | Direto da pessoa, sem a Clarevo |
+| Zoho Mail | Caixas de e-mail da Clarevo (contato@, suporte@, privacidade@ e marketing@clarevo.app.br) | O que a pessoa escreve para a Clarevo e o e-mail dela | Conta criada em zoho.com; país a confirmar | Em uso desde 26/10/2026 |
 
 ## d) Já decidido e implementado (conferido no código)
 
@@ -181,6 +182,8 @@ Para a primeira conversa com empresas e com um órgão público, a equipe prepar
 - `plano-de-trabalho-piloto.md`: o rascunho do plano de trabalho do acordo de cooperação técnica para um piloto de 90 dias com órgão público, sem repasse de recursos, para acompanhar o modelo de acordo do próprio órgão.
 
 Com isso, o pedido da seção f muda num ponto: em vez de só validar os pontos, pedimos a revisão da minuta.
+
+Também desde 26/10/2026, os e-mails da Clarevo ficam no Zoho Mail, no domínio clarevo.app.br. Ele entrou na tabela da seção c e na seção 8 da política, e a pergunta 9 (transferência internacional) vale também para ele.
 
 **Perguntas novas**
 

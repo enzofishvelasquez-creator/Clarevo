@@ -1111,7 +1111,8 @@ describe('site público: kit de imprensa', () => {
     expect(h).toContain('Manrope');
     expect(h).toContain('SIL Open Font License 1.1');
     expect(h).toContain('href="fontes/OFL.txt"');
-    expect(h).toContain('[E-MAIL DE CONTATO]');
+    const dados = JSON.parse(readFileSync(join(SITE, 'dados-da-empresa.json'), 'utf8')) as Record<string, string>;
+    expect(h).toContain(dados['E-MAIL DE CONTATO'] || '[E-MAIL DE CONTATO]');
     expect(h).toContain('tirar o ponto lima, trocar a cor dele ou usar o nome do logotipo sem o ponto');
     expect(h).toContain('redesenhar o logotipo');
     expect(h).toContain('usar o símbolo no lugar do logotipo em cabeçalhos');

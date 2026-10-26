@@ -22,9 +22,12 @@ import { LEARN_SECTIONS, LEARN_UI_TEXT, SEASONAL_CALENDAR, publishedTopics, rela
  * a imagem de compartilhamento e o gráfico de recursos do Google Play.
  */
 /** A razão social como aparece no site gravado: o valor de `site/dados-da-empresa.json` ou, vazio, o marcador. */
-function razaoSocialDoSite(): string {
+function dadoDoSite(nome: string): string {
   const dados = JSON.parse(readFileSync(join(SITE, 'dados-da-empresa.json'), 'utf8')) as Record<string, string>;
-  return dados['RAZÃO SOCIAL'] || '[RAZÃO SOCIAL]';
+  return dados[nome] || `[${nome}]`;
+}
+function razaoSocialDoSite(): string {
+  return dadoDoSite('RAZÃO SOCIAL');
 }
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -734,8 +737,8 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain('quando cabe, um exemplo calculado');
     expect(h).not.toMatch(/cada um com exemplo calculado/);
     // O contato de empresas é o [E-MAIL DE CONTATO]; o suporte do app fica na página Suporte.
-    expect(h).toContain('[E-MAIL DE CONTATO]');
-    expect(h).not.toContain('[E-MAIL DE SUPORTE]');
+    expect(h).toContain(dadoDoSite('E-MAIL DE CONTATO'));
+    expect(h).not.toContain(dadoDoSite('E-MAIL DE SUPORTE'));
     // A empresa não vê quando a pessoa abre o app nem o que anota; vê a data do aceite e a do encerramento.
     expect(h).toContain('a em que você aceitou o convite e a de encerramento');
     expect(h).toContain('Também não vê quando você abre o app nem o que você anota.');
@@ -859,7 +862,7 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain('a de quando a pessoa aceitou ("Ativa desde") e a do encerramento');
     expect(h).toContain('quando a pessoa abre o app e o que ela anota nele: o painel mostra só a data em que ela aceitou o convite e a do encerramento');
     expect(h).not.toContain('o painel não mostra quem entrou no app');
-    expect(h).toContain('[E-MAIL DE CONTATO]');
+    expect(h).toContain(dadoDoSite('E-MAIL DE CONTATO'));
     expect(h).toContain('Ainda não há tabela de preços');
     expect(h).toContain('src="../imagens/empresa-painel.png"');
     expect(h).toContain('Dados fictícios de demonstração');
@@ -892,15 +895,15 @@ describe('site público: as páginas geradas', () => {
     const h = html('sobre.html');
     for (const frase of ['Clareza', 'Sem anúncio', 'Sem venda de dados', 'Sem recomendar produtos']) expect(h, frase).toContain(frase);
     expect(h).toContain(razaoSocialDoSite());
-    expect(h).toContain('[E-MAIL DE CONTATO]');
+    expect(h).toContain(dadoDoSite('E-MAIL DE CONTATO'));
     expect(h).not.toMatch(/<img[^>]*(foto|retrato|equipe)/i);
     expect(h).not.toMatch(/fundador|fundadora|CEO|\d+\s*mil\s+(pessoas|usu)|milh[õo]es/i);
   });
 
   it('Suporte continua sendo a página de contato que as lojas citam, com a Ajuda e as perguntas mais comuns', () => {
     const h = html('suporte.html');
-    expect(h).toContain('[E-MAIL DE SUPORTE]');
-    expect(h).toContain('[E-MAIL DE PRIVACIDADE]');
+    expect(h).toContain(dadoDoSite('E-MAIL DE SUPORTE'));
+    expect(h).toContain(dadoDoSite('E-MAIL DE PRIVACIDADE'));
     expect(h).toContain('href="privacidade.html"');
     expect(h).toContain('href="ajuda/index.html"');
     for (const p of conteudo.lerPerguntas(join(ROOT, 'site-src', 'ajuda', 'perguntas.md'))) expect(h, p.pergunta).toContain(esc(p.pergunta));
@@ -1348,7 +1351,7 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     const p = h('novidades/como-escrevemos.html');
     expect(p).toContain('<h1>Como escrevemos</h1>');
     for (const regra of ['Toda informação tem fonte', 'Toda informação tem data', 'a cada 6 ou 12 meses', 'Não recomendamos produto financeiro', 'Não há publicidade', 'Corrigimos no próprio texto', 'Não apagamos o erro em silêncio']) expect(p, regra).toContain(regra);
-    expect(p).toContain('[E-MAIL DE CONTATO]');
+    expect(p).toContain(dadoDoSite('E-MAIL DE CONTATO'));
   });
 });
 
@@ -1622,11 +1625,11 @@ describe('site público: gerar-site.js na linha de comando', () => {
     try {
       const r = rodar(['--final', '--saida', join(dir, 'site')]);
       const atuais = JSON.parse(readFileSync(join(SITE, 'dados-da-empresa.json'), 'utf8')) as Record<string, string>;
-      const algumVazio = MARCADORES.some((m) => !(atuais[m] ?? '').trim());
-      if (algumVazio) {
+      const vazio = MARCADORES.find((m) => !(atuais[m] ?? '').trim());
+      if (vazio) {
         expect(r.status).toBe(1);
         expect(r.stderr).toContain('Falta preencher');
-        expect(r.stderr).toContain('[E-MAIL DE CONTATO]');
+        expect(r.stderr).toContain(`[${vazio}]`);
       }
     } finally {
       rmSync(dir, { recursive: true, force: true });
