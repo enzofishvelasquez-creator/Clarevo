@@ -40,8 +40,9 @@
  *                                              `[DOMÍNIO]`) e as seções 3.6 e 3.7 da política sem o formulário ligado (ou o formulário
  *                                              ligado sem a seção). Sem `--final`, tudo isso continua só como aviso no console
  *   node scripts/gerar-site.js --pdf <arquivo> também gera, com o Chromium do Playwright, o PDF A4 "Pacote para revisão jurídica" (resumo
- *                                              para o advogado, privacidade, termos, exclusão de conta e pontos do contrato com
- *                                              empresas, nesta ordem, com os marcadores visíveis). O PDF não vai para o repositório.
+ *                                              para o advogado, privacidade, termos, exclusão de conta, pontos do contrato com
+ *                                              empresas, minuta do contrato e plano de trabalho do piloto, nesta ordem, com os
+ *                                              marcadores visíveis). O PDF não vai para o repositório.
  *   --referencia <AAAA-MM-DD>  data de referência dos posts de Novidades: nenhum pode ter data depois dela (padrão: hoje, em Brasília)
  *   --novidades <pasta>  lê os posts de outra pasta (padrão: site-src/novidades)
  *   --legal <pasta>   lê os Markdown de outra pasta (padrão: docs/legal)

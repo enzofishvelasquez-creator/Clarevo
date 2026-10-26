@@ -1,7 +1,7 @@
 'use strict';
 /**
  * PDF A4 "Pacote para revisão jurídica" (`--pdf`): o resumo para o advogado, a política de privacidade, os termos, a exclusão de
- * conta e os pontos do contrato com empresas, nesta ordem, com os marcadores visíveis. Usa o Chromium do Playwright (ou CHROMIUM_PATH).
+ * conta, os pontos do contrato com empresas, a minuta do contrato e o plano de trabalho do piloto, nesta ordem, com os marcadores visíveis. Usa o Chromium do Playwright (ou CHROMIUM_PATH).
  * O PDF não vai para o repositório.
  */
 const fs = require('node:fs');

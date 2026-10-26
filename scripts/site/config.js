@@ -42,7 +42,7 @@ const PAGINAS_LEGAIS = [
 /** Links entre os textos jurídicos: o Markdown aponta para o arquivo, o site para a página. */
 const MAPA_LINKS_SITE = Object.fromEntries(PAGINAS_LEGAIS.map((p) => [p.md, p.arquivo]));
 /** O pacote do advogado, na ordem pedida. */
-const DOCUMENTOS_DO_PACOTE = ['resumo-para-advogado.md', 'politica-de-privacidade.md', 'termos-de-uso.md', 'exclusao-de-conta.md', 'empresas-pontos-do-contrato.md'];
+const DOCUMENTOS_DO_PACOTE = ['resumo-para-advogado.md', 'politica-de-privacidade.md', 'termos-de-uso.md', 'exclusao-de-conta.md', 'empresas-pontos-do-contrato.md', 'contrato-empresas-minuta.md', 'plano-de-trabalho-piloto.md'];
 
 /** O menu principal (cabeçalho). `pasta` marca a seção quando a página é uma das filhas dela. */
 const MENU = [
