@@ -130,7 +130,7 @@ Regras: não ler, copiar nem criar chaves de API ou tokens; não mexer em Billin
 7. Relatório: situação dos dois domínios, o que foi ligado ou desligado nos passos 4 e 5, os registros DNS da zona depois da mudança (tipo, nome e valor) e o que as duas abas mostraram.
 ```
 
-Depois: `site/dados-da-empresa.json` recebe `DOMÍNIO` = `clarevo.app.br` (link canônico, sitemap e Open Graph com endereço completo), e o site é gerado de novo e publicado. Se o formulário de contato for ligado um dia, a variável `SITE_HOST` do projeto passa a ser `clarevo.app.br` (`docs/22_SITE.md`, seção 9).
+Feito em 26/10/2026: os dois endereços ficaram ativos, com "Always Use HTTPS" ligado e "Email Address Obfuscation" desligado. Depois: `site/dados-da-empresa.json` recebe `DOMÍNIO` = `clarevo.app.br` (link canônico, sitemap e Open Graph com endereço completo), e o site é gerado de novo e publicado. Se o formulário de contato for ligado um dia, a variável `SITE_HOST` do projeto passa a ser `clarevo.app.br` (`docs/22_SITE.md`, seção 9).
 
 ## 6. Conta PJ (a própria pessoa abre)
 
