@@ -95,7 +95,7 @@ Rascunho preparado pela equipe da Clarevo para revisão jurídica. Não é parec
 
 **Pedimos:** responder as 25 perguntas da seção e e as da seção h; revisar e corrigir a política, os termos, a página de exclusão e os pontos do contrato; resolver o que é [A DEFINIR] jurídico; indicar quais ajustes viram trabalho de produto (aceite no cadastro, rotina de eliminação, registro de acesso interno). Uma rodada de ajustes depois da nossa resposta.
 
-**Não precisa:** escrever os textos do zero; redigir a minuta completa do contrato com empresas (basta validar os pontos); parecer sobre integração bancária, cobrança ou inteligência artificial (fora do ciclo atual); revisar código; preencher as declarações das lojas (a equipe preenche e ajusta ao que for decidido); redigir o conteúdo do site.
+**Não precisa:** escrever os textos do zero; redigir a minuta do contrato com empresas do zero (desde 26/10/2026 ela existe, seção k); parecer sobre integração bancária, cobrança ou inteligência artificial (fora do ciclo atual); revisar código; preencher as declarações das lojas (a equipe preenche e ajusta ao que for decidido); redigir o conteúdo do site.
 
 ## g) Referências (usadas em 21/10/2026)
 
@@ -172,3 +172,20 @@ Fonte citada na página: Ministério do Trabalho e Emprego, Norma Regulamentador
 **Perguntas novas**
 
 35. **NR-1 em Para empresas.** (a) A redação acima é segura para um texto público de apresentação a empresas? Em especial os itens 2 ("não exige a contratação de um aplicativo financeiro"), 3 ("pode ser considerada como ação complementar, conforme a avaliação técnica da empresa") e 4 ("não comprova atendimento à norma"). (b) O item 6, sobre endividamento pessoal e risco ocupacional, pode ser afirmado assim, ou deve sair? Proposta: manter só se o texto oficial o sustentar. (c) Citar a Portaria nº 1.419/2024 e o capítulo 1.5 basta, sem datas de vigência, fiscalização nem sanções? Proposta: sim, porque o Manual manda consultar a fonte oficial antes de qualquer campanha com data. (d) O contrato com empresas (`empresas-pontos-do-contrato.md`) precisa de uma cláusula dizendo que a licença não é medida de conformidade com a NR-1 nem substitui obrigações da empresa? Proposta: sim, uma cláusula curta, na lista de obrigações da EMPRESA. (e) O mesmo texto vai ser repetido, em outras palavras, em peças de Instagram (B01) e em e-mail comercial: vale a mesma revisão ou cada peça precisa da sua?
+
+## k) Minuta do contrato com empresas e plano de trabalho do piloto (26/10/2026)
+
+Para a primeira conversa com empresas e com um órgão público, a equipe preparou dois textos novos, a partir das regras do produto (D-056) e dos pontos do contrato já enviados:
+
+- `contrato-empresas-minuta.md`: o contrato completo com empresas privadas, que desenvolve os 17 pontos de `empresas-pontos-do-contrato.md` e acrescenta preço e pagamento, piloto sem custo, obrigações da Clarevo (inclusive não oferecer crédito, não vender produto financeiro e não exibir anúncio), propriedade intelectual, integridade, comunicações e o Anexo I com os dados de cada contrato. Valores em reais ficam fora dos textos legais: a proposta de preço está em `docs/26_PRECO_E_CONTRATACAO.md`.
+- `plano-de-trabalho-piloto.md`: o rascunho do plano de trabalho do acordo de cooperação técnica para um piloto de 90 dias com órgão público, sem repasse de recursos, para acompanhar o modelo de acordo do próprio órgão.
+
+Com isso, o pedido da seção f muda num ponto: em vez de só validar os pontos, pedimos a revisão da minuta.
+
+**Perguntas novas**
+
+36. **Minuta completa.** A minuta pode ser a base do contrato com empresas privadas, no lugar dos pontos? Pedimos a revisão da redação e de cada `[PROPOSTA]`, em especial a vigência de 12 meses com renovação, o aviso de 60 dias para rescisão sem multa e a rescisão imediata quando a empresa pede dados das pessoas (cláusulas 5.2 e 12).
+37. **Limite de responsabilidade (cláusula 14).** Entre empresas, é válido limitar a responsabilidade ao total pago nos últimos 12 meses, sem esse limite para dolo, sigilo e incidente de dados por culpa, e sem afastar a responsabilidade perante as pessoas beneficiárias (Termos de Uso e CDC)? Proposta: sim.
+38. **Preço, atraso e proteção das pessoas (cláusula 8).** Multa de 2%, juros de 1% ao mês, reajuste anual pelo IPCA e rescisão depois de 30 dias de atraso com aviso, mantendo para as pessoas os 30 dias de acesso pleno e o plano gratuito. Está adequado? Proposta: sim.
+39. **Assinatura eletrônica (cláusula 17.3).** Que forma basta entre empresas: plataforma de assinatura eletrônica avançada, assinatura gov.br ou certificado ICP-Brasil? Proposta: assinatura eletrônica aceita pelas partes, com base na MP 2.200-2/2001, art. 10, § 2º.
+40. **Acordo de cooperação técnica com órgão público.** (a) O plano de trabalho cobre o que o Decreto 11.531/2023 e o Parecer AGU 2/2026/CNCIC/CGU/AGU pedem para acordo com empresa com fins lucrativos? (b) Uma empresa no regime do Inova Simples pode celebrar o acordo? (c) Oferecer o piloto sem custo cria algum risco de vantagem indevida ou de compromisso de contratação futura? Proposta: (a) sim, com os ajustes do modelo do órgão; (b) sim; (c) não, porque o acordo é sem exclusividade, sem compromisso de contratação e, quando o órgão exigir, precedido de chamamento público.

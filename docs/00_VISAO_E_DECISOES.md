@@ -92,7 +92,7 @@ D-058 é a exclusão da conta pelo app (Ciclo P, D-054 item 7), com as regras "a
 | P-001 | Lançar primeiro em iOS, Android, web ou todos? | Android + iOS via lojas, web para demonstração ao investidor. Mesmo código. | Publicação |
 | P-002 | Faixa etária mínima e participação de menores na família | 18+ no lançamento; menores em fase posterior com consentimento do responsável | Convites, LGPD |
 | P-003 | Papéis familiares: além de titular e membro, haverá "somente leitura"? | Titular, membro (anota) e leitor | Permissões |
-| P-005 | Preços e limites dos planos individual e familiar | Definir com o investidor | Cobrança |
+| P-005 | Preços e limites dos planos individual e familiar | Definir com o investidor. Proposta de 26/10/2026 em `docs/26_PRECO_E_CONTRATACAO.md` (por vaga por mês, de R$ 12,00 a R$ 8,00 conforme o volume, um plano com a Família incluída, piloto de 90 dias sem custo), com a minuta do contrato com empresas e o plano de trabalho do piloto com órgão público em `docs/legal/`; nada decidido | Cobrança |
 | P-006 | Nome de domínio e contas nas lojas (Apple/Google) em nome de qual empresa | Criar CNPJ/contas já; aprovação na Apple pode levar dias. O passo a passo de cada loja, os documentos da empresa e as decisões de Enzo estão em `docs/16_PUBLICACAO_LOJAS.md` (19/10/2026) | Lançamento |
 | P-008 | Provedor de e-mail para confirmação e recuperação (Resend, Amazon SES ou outro) | Resend, pela simplicidade | Lançamento |
 | P-009 | Fonte definitiva do nome "clarevo" no logo | Manter Lexend ou encomendar desenho próprio | Marca |

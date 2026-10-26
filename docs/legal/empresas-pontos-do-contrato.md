@@ -2,6 +2,8 @@ Rascunho preparado pela equipe da Clarevo para revisão jurídica. Não é parec
 
 # Pontos essenciais do contrato com as empresas
 
+A minuta completa, de 26/10/2026, está em `contrato-empresas-minuta.md`; este arquivo fica como resumo das regras em que ela se apoia.
+
 Este arquivo não é um contrato completo. Ele lista as cláusulas essenciais para a minuta do contrato com empresas que oferecem a Clarevo como benefício, cada uma com um texto proposto curto. A minuta final fica com quem faz a revisão jurídica.
 
 Fatos em que as cláusulas se apoiam (todos conferidos no código e nas decisões do produto):

@@ -15,6 +15,8 @@ Os textos foram escritos a partir do código e das decisões do produto (`docs/0
 | `termos-de-uso.md` | Termos de Uso | Sim |
 | `exclusao-de-conta.md` | Página pública de exclusão de conta e dos dados, exigida pelo Google Play | Sim |
 | `empresas-pontos-do-contrato.md` | Cláusulas essenciais para a minuta com as empresas, cada uma com texto proposto curto. Não é contrato completo | Não |
+| `contrato-empresas-minuta.md` | Minuta completa do contrato com empresas privadas (26/10/2026), que desenvolve os pontos acima, com o Anexo I de cada contrato | Não |
+| `plano-de-trabalho-piloto.md` | Rascunho do plano de trabalho do acordo de cooperação técnica para o piloto de 90 dias com órgão público, sem repasse de recursos (26/10/2026) | Não |
 
 ## O que a pessoa que revisa precisa fazer
 
@@ -34,7 +36,7 @@ O que não precisa: escrever do zero, redigir o contrato completo, revisar códi
 
 ## Como os textos viram páginas do site
 
-O script `scripts/gerar-site.js` (feito em paralelo por outro agente) lê `politica-de-privacidade.md`, `termos-de-uso.md` e `exclusao-de-conta.md` e gera as páginas públicas do site. O resumo, o LEIAME e os pontos do contrato não vão ao site.
+O script `scripts/gerar-site.js` (feito em paralelo por outro agente) lê `politica-de-privacidade.md`, `termos-de-uso.md` e `exclusao-de-conta.md` e gera as páginas públicas do site. O resumo, o LEIAME, os pontos do contrato, a minuta e o plano de trabalho não vão ao site.
 
 Para a geração ser segura, o texto aprovado precisa passar por esta checagem, e o script a faz: `node scripts/gerar-site.js --final` recusa (código 1, com a lista por página) a versão de produção se encontrar a frase de rascunho, qualquer `[A DEFINIR: ...]` ou `[PROPOSTA: ...]`, texto de proposta ("Proposta:", "proposta, ainda sem confirmação"), qualquer um dos sete marcadores fixos sem valor em `site/dados-da-empresa.json`, travessão, a expressão proibida, título fora de ordem ou link interno quebrado. Sem `--final`, o script gera só a versão de prévia, claramente marcada como rascunho (faixa "Versão preliminar, em revisão" e `noindex`), e esses pontos viram avisos. O teste `packages/core/test/site.test.ts` confere cada um desses casos.
 
