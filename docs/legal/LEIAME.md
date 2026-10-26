@@ -17,6 +17,7 @@ Os textos foram escritos a partir do código e das decisões do produto (`docs/0
 | `empresas-pontos-do-contrato.md` | Cláusulas essenciais para a minuta com as empresas, cada uma com texto proposto curto. Não é contrato completo | Não |
 | `contrato-empresas-minuta.md` | Minuta completa do contrato com empresas privadas (26/10/2026), que desenvolve os pontos acima, com o Anexo I de cada contrato | Não |
 | `plano-de-trabalho-piloto.md` | Rascunho do plano de trabalho do acordo de cooperação técnica para o piloto de 90 dias com órgão público, sem repasse de recursos (26/10/2026) | Não |
+| `acordo-de-socios-minuta.md` | Minuta do acordo entre as 5 pessoas que constroem a Clarevo (26/10/2026): funções, dedicação, caixa de 30%, distribuição por contribuição, decisões, propriedade intelectual e saída. Primeiro como memorando de entendimentos, depois no contrato social | Não |
 
 ## O que a pessoa que revisa precisa fazer
 
@@ -32,11 +33,11 @@ O que não precisa: escrever do zero, redigir o contrato completo, revisar códi
 - Dados da empresa aparecem como marcadores fixos: `[RAZÃO SOCIAL]`, `[CNPJ]`, `[ENDEREÇO]`, `[E-MAIL DE PRIVACIDADE]`, `[E-MAIL DE SUPORTE]`, `[DOMÍNIO]` e `[DATA DE VIGÊNCIA]`. Eles são trocados todos de uma vez, quando a empresa e o domínio existirem (P-006).
 - `[A DEFINIR: ...]` marca o que não está decidido. Cada um ou é pergunta do resumo ou é uma pendência de produto.
 - `[PROPOSTA: ...]` marca o que a equipe propõe e ainda não tem confirmação jurídica (por exemplo, as bases legais da política). Some quando o texto é aprovado. Texto corrido que diga "Proposta:" ou "proposta, ainda sem confirmação" também não vai ao ar: use a marca ou resolva o trecho.
-- Os textos usam português do Brasil, linguagem neutra de gênero e frases curtas. Eles não prometem nada que o app não faça. Não há nome de pessoa real nem valor em reais.
+- Os textos usam português do Brasil, linguagem neutra de gênero e frases curtas. Eles não prometem nada que o app não faça. Não há nome de pessoa real nem valor em reais, exceto no acordo de sócios, onde os valores aparecem só como proposta ou exemplo fictício.
 
 ## Como os textos viram páginas do site
 
-O script `scripts/gerar-site.js` (feito em paralelo por outro agente) lê `politica-de-privacidade.md`, `termos-de-uso.md` e `exclusao-de-conta.md` e gera as páginas públicas do site. O resumo, o LEIAME, os pontos do contrato, a minuta e o plano de trabalho não vão ao site.
+O script `scripts/gerar-site.js` (feito em paralelo por outro agente) lê `politica-de-privacidade.md`, `termos-de-uso.md` e `exclusao-de-conta.md` e gera as páginas públicas do site. O resumo, o LEIAME, os pontos do contrato, a minuta, o plano de trabalho e o acordo de sócios não vão ao site.
 
 Para a geração ser segura, o texto aprovado precisa passar por esta checagem, e o script a faz: `node scripts/gerar-site.js --final` recusa (código 1, com a lista por página) a versão de produção se encontrar a frase de rascunho, qualquer `[A DEFINIR: ...]` ou `[PROPOSTA: ...]`, texto de proposta ("Proposta:", "proposta, ainda sem confirmação"), qualquer um dos sete marcadores fixos sem valor em `site/dados-da-empresa.json`, travessão, a expressão proibida, título fora de ordem ou link interno quebrado. Sem `--final`, o script gera só a versão de prévia, claramente marcada como rascunho (faixa "Versão preliminar, em revisão" e `noindex`), e esses pontos viram avisos. O teste `packages/core/test/site.test.ts` confere cada um desses casos.
 
