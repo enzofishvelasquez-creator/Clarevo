@@ -113,6 +113,25 @@ Tarefa no painel da Cloudflare, conta da empresa. Regras: não ler nem criar cha
 5. Relatório: endereço do projeto (.pages.dev), situação do domínio e o que a tela mostrou em cada passo.
 ```
 
+## 5a. clarevo.app.br no site preliminar (D-071, 26/10/2026)
+
+O site continua com a faixa "Versão preliminar" e sem indexação enquanto houver marcador sem valor; o domínio só troca o endereço `clarevo-site.pages.dev` pelo oficial (a Apple pede um site no cadastro). Os registros de e-mail do Zoho (MX, SPF, DKIM e DMARC) não mudam: o domínio do site usa só o registro do próprio endereço.
+
+```
+Tarefa no painel da Cloudflare (dash.cloudflare.com), na conta onde estão os projetos clarevo, clarevo-demo e clarevo-site.
+Regras: não ler, copiar nem criar chaves de API ou tokens; não mexer em Billing; não alterar nem apagar registros MX, TXT, SPF, DKIM ou DMARC; não mexer nas variáveis de ambiente do projeto; se a tela pedir um dado que você não tenha, pare e me pergunte.
+
+1. Workers & Pages > clarevo-site > Custom domains > "Set up a custom domain": informe clarevo.app.br e confirme. A Cloudflare cria sozinha o registro do endereço na zona clarevo.app.br; aceite.
+2. Repita para www.clarevo.app.br.
+3. Espere os dois aparecerem como "Active" (pode levar alguns minutos). Se algum ficar com erro, pare e me diga a mensagem exata.
+4. Em clarevo.app.br > SSL/TLS > Edge Certificates, confira que "Always Use HTTPS" está ligado (ligue, se estiver desligado).
+5. Em clarevo.app.br > Scrape Shield, desligue "Email Address Obfuscation".
+6. Abra https://clarevo.app.br e https://www.clarevo.app.br em abas novas e confira que aparece o site da Clarevo com a faixa "Versão preliminar".
+7. Relatório: situação dos dois domínios, o que foi ligado ou desligado nos passos 4 e 5, os registros DNS da zona depois da mudança (tipo, nome e valor) e o que as duas abas mostraram.
+```
+
+Depois: `site/dados-da-empresa.json` recebe `DOMÍNIO` = `clarevo.app.br` (link canônico, sitemap e Open Graph com endereço completo), e o site é gerado de novo e publicado. Se o formulário de contato for ligado um dia, a variável `SITE_HOST` do projeto passa a ser `clarevo.app.br` (`docs/22_SITE.md`, seção 9).
+
 ## 6. Conta PJ (a própria pessoa abre)
 
 Abertura de conta é feita pela representante no app do banco escolhido (sugestão em D-064: Inter Empresas; alternativa C6 Empresas), com os documentos da empresa e dela. Conferir antes: se o banco aceita empresa do Inova Simples, se o cartão aceita compra internacional (Apple e Google cobram em dólar) e quantos boletos grátis por mês.
