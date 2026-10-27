@@ -73,7 +73,7 @@ describe('Família: constantes e validação', () => {
     expect(FAMILY_MAX_PEOPLE).toBe(6);
     expect(INVITE_VALID_DAYS).toBe(7);
     expect(FAMILY_NAME_MAX).toBe(60);
-    expect(INVITE_BASE_URL).toBe('https://clarevo.pages.dev');
+    expect(INVITE_BASE_URL).toBe('https://app.clarevo.app.br');
   });
 
   it('nome da Família: de 1 a 60 caracteres, sem os espaços das pontas (a mesma regra do banco)', () => {
@@ -142,7 +142,7 @@ describe('Família: código e link do convite', () => {
   });
 
   it('o link é o endereço do app mais /convite/<código>, e o código sai de um link colado', () => {
-    expect(inviteLink(code)).toBe(`https://clarevo.pages.dev/convite/${code}`);
+    expect(inviteLink(code)).toBe(`https://app.clarevo.app.br/convite/${code}`);
     expect(inviteLink(code, 'http://localhost:8199/')).toBe(`http://localhost:8199/convite/${code}`);
     expect(inviteCodeFromText(inviteLink(code))).toBe(code);
     expect(inviteCodeFromText(`Convite para a Família Casa na Clarevo: ${inviteLink(code)} obrigado`)).toBe(code);

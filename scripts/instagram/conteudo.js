@@ -233,7 +233,7 @@ const PECAS = [
     ],
     conferencia: [
       { afirmacao: 'A Clarevo está em fase de testes. A versão para pessoas e empresas abre no piloto.', situacao: 'Confirmado', nota: 'D-064: cadastro de pessoas reais só no piloto; nada está nas lojas; preço indefinido (P-005). Mesmo texto da página Comece aqui.' },
-      { afirmacao: 'Dá para ver a demonstração, com dados fictícios, pelo link da bio.', situacao: 'Confirmado', nota: 'comece.html leva à demonstração (https://clarevo-demo.pages.dev), com a etiqueta "Demonstração" em cada tela. Depende de o site estar no ar.' },
+      { afirmacao: 'Dá para ver a demonstração, com dados fictícios, pelo link da bio.', situacao: 'Confirmado', nota: 'comece.html leva à demonstração (https://demo.clarevo.app.br), com a etiqueta "Demonstração" em cada tela. Depende de o site estar no ar.' },
       { afirmacao: 'Sem cadastro, lista de espera, data de abertura, preço, "grátis" ou plataforma.', situacao: COM_ACESSO_EM_PREPARACAO, nota: 'Playbook: "não simular cadastro, lista de espera ou data de liberação que ainda não exista".' },
     ],
   },

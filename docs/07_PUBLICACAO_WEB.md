@@ -6,8 +6,8 @@
 
 | Projeto (Cloudflare Pages) | Endereço | O que mostra |
 |---|---|---|
-| `clarevo` | https://clarevo.pages.dev | App com login real no projeto Supabase |
-| `clarevo-demo` | https://clarevo-demo.pages.dev | Só demonstração, com dados fictícios (para apresentações) |
+| `clarevo` | https://app.clarevo.app.br (desde 27/10/2026; https://clarevo.pages.dev continua respondendo) | App com login real no projeto Supabase |
+| `clarevo-demo` | https://demo.clarevo.app.br (desde 27/10/2026; https://clarevo-demo.pages.dev continua respondendo) | Só demonstração, com dados fictícios (para apresentações) |
 | `clarevo-site` | https://clarevo-site.pages.dev (criado por Enzo em 23/10/2026, ramo `main`, sem build, pasta `site`, sem variáveis, Web Analytics desligado na aba Metrics; **versão preliminar**, com a faixa "em revisão" e sem indexação, até o domínio e a revisão do advogado; seção "Site público", abaixo, e `docs/22_SITE.md`) | Site público: início, o app, para empresas, Aprender, calculadoras, Novidades, Ajuda, segurança, sobre, imprensa, suporte, privacidade, termos e excluir conta (e, em modo avançado, `_worker.js` para o formulário de contato e as Novidades por e-mail, desligados até Enzo ligar) |
 
 Os dois são publicados sozinhos a cada atualização da branch `main` do GitHub. Implantações de prévia (outras branches) estão desligadas.
@@ -32,8 +32,8 @@ Os dois são publicados sozinhos a cada atualização da branch `main` do GitHub
 
 ## Supabase (Authentication → URL Configuration)
 
-- Site URL: `https://clarevo.pages.dev`
-- Redirect URLs: `clarevo://**`, `exp://**`, `http://localhost:8081/**` e `https://clarevo.pages.dev/**`
+- Site URL: `https://app.clarevo.app.br` (conferido em 27/10/2026)
+- Redirect URLs: `clarevo://**`, `exp://**`, `http://localhost:8081/**`, `https://clarevo.pages.dev/**` e `https://app.clarevo.app.br/**`
 - Antes de publicar nas lojas, retirar `exp://**` (aceita qualquer endereço do Expo e só serve para desenvolvimento).
 
 ## Pendências antes de abrir para outras pessoas

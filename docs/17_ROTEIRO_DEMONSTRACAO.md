@@ -10,11 +10,11 @@ A versão gravada, de cerca de 2 min 55 s (175 s, 13,9 MB, 12 passos), para envi
 
 | O quê | Endereço | Observação |
 |---|---|---|
-| Demonstração | https://clarevo-demo.pages.dev | Dados fictícios e identificados ("Demonstração · Pessoal" no alto de cada tela). É a única que se usa na apresentação. |
-| Cenário da Evolução | https://clarevo-demo.pages.dev/?cenario=evolucao | Pago de janeiro a junho de 2026, com o "Reparo do carro" de R$ 4.400,00 em abril. Serve só para a tela Evolução: nele o Resumo de outubro fica zerado. |
+| Demonstração | https://demo.clarevo.app.br (ou https://clarevo-demo.pages.dev) | Dados fictícios e identificados ("Demonstração · Pessoal" no alto de cada tela). É a única que se usa na apresentação. |
+| Cenário da Evolução | https://demo.clarevo.app.br/?cenario=evolucao | Pago de janeiro a junho de 2026, com o "Reparo do carro" de R$ 4.400,00 em abril. Serve só para a tela Evolução: nele o Resumo de outubro fica zerado. |
 | Painel da empresa | sem endereço próprio | Resumo › avatar "MA" (canto superior direito) › Conta › "Abrir painel da empresa". Só existe na web, e a demonstração mostra a "Empresa Exemplo (demonstração)". |
 
-Não use `clarevo.pages.dev` na apresentação: é a versão com login real (`docs/07_PUBLICACAO_WEB.md`).
+Não use `app.clarevo.app.br` (nem `clarevo.pages.dev`) na apresentação: é a versão com login real (`docs/07_PUBLICACAO_WEB.md`).
 
 ### Celular ou computador
 

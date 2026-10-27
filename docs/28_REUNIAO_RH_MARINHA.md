@@ -1,6 +1,6 @@
 # Reunião com o RH da Marinha: resumo para deixar e perguntas prováveis
 
-26/10/2026. Apoio para a reunião de apresentação ao RH (apresentação "Clarevo para a Marinha do Brasil", artifact de slides). Dois materiais: o **resumo de uma página** para deixar com o RH (PDF gerado fora do repositório, a partir da seção 1) e as **perguntas prováveis com as respostas** (seção 2), só para quem apresenta. Tudo aqui segue o que o app faz hoje e as decisões D-055, D-056, D-064, D-068 e D-071. Antes de imprimir, conferir se `demo.clarevo.app.br` já abre (roteiro 5b de `docs/23`); se não abrir, usar `clarevo-demo.pages.dev`.
+26/10/2026. Apoio para a reunião de apresentação ao RH (apresentação "Clarevo para a Marinha do Brasil", artifact de slides). Dois materiais: o **resumo de uma página** para deixar com o RH (PDF gerado fora do repositório, a partir da seção 1) e as **perguntas prováveis com as respostas** (seção 2), só para quem apresenta. Tudo aqui segue o que o app faz hoje e as decisões D-055, D-056, D-064, D-068 e D-071. Os endereços `clarevo.app.br` e `demo.clarevo.app.br` estão ativos desde 27/10/2026.
 
 ## 1. Resumo de uma página (texto do PDF)
 

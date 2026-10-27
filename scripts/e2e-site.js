@@ -429,7 +429,7 @@ function roteiros(CALC) {
         (await p.$$eval('main a.cartao', (as) => as.map((a) => a.querySelector('.titulo-cartao').textContent))).join('|') === 'O app|Ver a demonstração|Aprender|Calculadoras|Para empresas|Ajuda');
       const demo = await p.$eval('main a.cartao[href^="https://"]', (a) => ({ href: a.href, rel: a.rel }));
       const comParametro = await p.$$eval('a[href]', (as) => as.map((a) => a.getAttribute('href')).filter((h) => /[?&]|utm_|fbclid|igshid/i.test(h)));
-      ok('comece aqui: a demonstração é link de texto com noopener, e nenhum link leva parâmetro', demo.href === 'https://clarevo-demo.pages.dev/' && /noopener/.test(demo.rel) && comParametro.length === 0, JSON.stringify({ demo, comParametro }));
+      ok('comece aqui: a demonstração é link de texto com noopener, e nenhum link leva parâmetro', demo.href === 'https://demo.clarevo.app.br/' && /noopener/.test(demo.rel) && comParametro.length === 0, JSON.stringify({ demo, comParametro }));
       ok('comece aqui: sem script (só dados estruturados, se houver) e sem formulário', (await p.$$eval('script', (ss) => ss.filter((x) => x.type !== 'application/ld+json').length)) === 0 && (await p.$$('form')).length === 0);
       await p.close();
     }

@@ -7069,7 +7069,7 @@ describe('API real: Família (Ciclo L, D-055)', () => {
     expect(await err(ana.createFamilyInvite(key, fam, 'leitor'))).toBe('chave_reutilizada');
     // O titular lê os convites válidos; quem não é titular, não. O resumo do código não é lido por ninguém.
     expect((await ana.getFamily())!.invites).toEqual([w.invite]);
-    expect(inviteLink(w.code!)).toBe(`https://clarevo.pages.dev/convite/${w.code}`);
+    expect(inviteLink(w.code!)).toBe(`https://app.clarevo.app.br/convite/${w.code}`);
     const direct = await sql(ANA).from('family_invites').select('id, role, used_at');
     expect(direct.error).toBeNull();
     expect(direct.data).toEqual([{ id: w.invite.id, role: 'membro', used_at: null }]);
@@ -7716,7 +7716,7 @@ describe('API real: Empresas (Ciclo M, D-056)', () => {
       expect(count(`select count(*) from public.record_operations o where o::text like '%${r.code}%'`)).toBe(0);
     }
     expect(new Set(Object.values(codes)).size).toBe(4);
-    expect(licenseLink(codes.bruno!)).toBe(`https://clarevo.pages.dev/beneficio/${codes.bruno}`);
+    expect(licenseLink(codes.bruno!)).toBe(`https://app.clarevo.app.br/beneficio/${codes.bruno}`);
 
     // Repetir a chave: as mesmas licenças, sem código algum; outra lista com a mesma chave é recusada.
     const again = await ana.inviteLicenses(key, alfa.contract, emails);

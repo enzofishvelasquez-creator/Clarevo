@@ -725,7 +725,7 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain('dificuldade financeira não é falta de disciplina');
     expect(h).not.toMatch(PROMESSAS_PROIBIDAS);
     for (const frase of ['Não é banco', 'Não movimenta dinheiro', 'Não oferece crédito', 'Não recomenda produtos financeiros', 'Não é atendimento de saúde e não substitui o acompanhamento de profissionais']) expect(h, frase).toContain(frase);
-    expect(h).toContain('href="https://clarevo.pages.dev"');
+    expect(h).toContain('href="https://app.clarevo.app.br"');
     expect(h).toContain('Em breve na App Store e no Google Play.');
     expect(h).toMatch(/Para pessoas/);
     expect(h).toMatch(/Para empresas/);
@@ -771,13 +771,13 @@ describe('site público: as páginas geradas', () => {
     const links = [...h.matchAll(/<a class="cartao" href="([^"]+)"[^>]*><span class="titulo-cartao">([^<]+)<\/span>/g)].map((m) => [m[2], m[1]]);
     expect(links).toEqual([
       ['O app', 'app/index.html'],
-      ['Ver a demonstração', 'https://clarevo-demo.pages.dev'],
+      ['Ver a demonstração', 'https://demo.clarevo.app.br'],
       ['Aprender', 'aprender/index.html'],
       ['Calculadoras', 'calculadoras/index.html'],
       ['Para empresas', 'empresas/index.html'],
       ['Ajuda', 'ajuda/index.html'],
     ]);
-    expect(h).toContain('<a class="cartao" href="https://clarevo-demo.pages.dev" rel="noopener noreferrer">');
+    expect(h).toContain('<a class="cartao" href="https://demo.clarevo.app.br" rel="noopener noreferrer">');
     expect(h).toContain('Abra o app com dados fictícios, no navegador. Nada é gravado fora do seu aparelho.');
     for (const m of h.matchAll(/\s(?:href|src)="([^"]*)"/g)) expect(m[1], `link com parâmetro: ${m[1]}`).not.toMatch(/[?&]|utm_|fbclid|gclid|igshid/i);
     // Nenhum script (só dados estruturados, se houver), nenhum formulário e nenhum recurso de fora.

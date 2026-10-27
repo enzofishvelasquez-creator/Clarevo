@@ -1,13 +1,13 @@
 # Clarevo · Kit do teste com 5 pessoas (D-064, etapa 1)
 
-26/10/2026. Kit para Enzo conduzir nesta semana o teste da etapa 1 do D-064: cada pessoa cria uma conta de teste no app com login real (https://clarevo.pages.dev), usa só valores inventados e apaga a conta no fim. Valem as regras de condução e de resumo de `docs/15_TESTE_DE_USABILIDADE.md`; a diferença é que aqui a pessoa começa do cadastro, numa conta vazia, e não na demonstração. O banco está no plano gratuito do Supabase, sem cópia de segurança: só dados de teste.
+26/10/2026. Kit para Enzo conduzir nesta semana o teste da etapa 1 do D-064: cada pessoa cria uma conta de teste no app com login real (https://app.clarevo.app.br), usa só valores inventados e apaga a conta no fim. Valem as regras de condução e de resumo de `docs/15_TESTE_DE_USABILIDADE.md`; a diferença é que aqui a pessoa começa do cadastro, numa conta vazia, e não na demonstração. O banco está no plano gratuito do Supabase, sem cópia de segurança: só dados de teste.
 
 ## 1. Antes da primeira sessão
 
 1. **E-mail de confirmação.** O cadastro só termina com o link enviado por e-mail, e o envio padrão do Supabase manda poucos e-mails por hora e só para membros da organização (`docs/07`). Ligue o SMTP próprio com o domínio clarevo.app.br (`docs/20`, seção 2) e crie uma conta com um e-mail de fora da equipe: o link precisa chegar em poucos minutos. Depois, exclua essa conta (seção 4.4).
-2. **Plano B, sem SMTP pronto:** faça as tarefas 1 a 7 em https://clarevo-demo.pages.dev, com "Criar conta" (não "Ver demonstração com dados fictícios") e, em "Confira seu e-mail", "Simular abertura do link". A conta começa vazia e fica só naquela aba, o app considera hoje 07/10/2026 e a tarefa 8 fica de fora.
-3. **Projeto ativo.** O plano gratuito pausa o projeto depois de dias sem uso: na véspera de cada sessão, entre em https://clarevo.pages.dev com a sua conta de teste e confira que o Resumo abre.
-4. **Endereço.** Use https://clarevo.pages.dev (app.clarevo.app.br ainda não está ativo) e mande o link só no começo da sessão: o primeiro contato faz parte do teste.
+2. **Plano B, sem SMTP pronto:** faça as tarefas 1 a 7 em https://demo.clarevo.app.br, com "Criar conta" (não "Ver demonstração com dados fictícios") e, em "Confira seu e-mail", "Simular abertura do link". A conta começa vazia e fica só naquela aba, o app considera hoje 07/10/2026 e a tarefa 8 fica de fora.
+3. **Projeto ativo.** O plano gratuito pausa o projeto depois de dias sem uso: na véspera de cada sessão, entre em https://app.clarevo.app.br com a sua conta de teste e confira que o Resumo abre.
+4. **Endereço.** Use https://app.clarevo.app.br e mande o link só no começo da sessão: o primeiro contato faz parte do teste.
 5. **Material.** Uma ficha da seção 5 por pessoa, caneta e o cronômetro do celular.
 
 ## 2. Convite para o WhatsApp

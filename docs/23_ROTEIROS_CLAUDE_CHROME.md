@@ -134,7 +134,7 @@ Feito em 26/10/2026: os dois endereços ficaram ativos, com "Always Use HTTPS" l
 
 ## 5b. Endereços oficiais do app e da demonstração (26/10/2026)
 
-`app.clarevo.app.br` passa a abrir o app com login (projeto `clarevo`) e `demo.clarevo.app.br`, a demonstração com dados fictícios (projeto `clarevo-demo`). Os endereços `.pages.dev` continuam funcionando, então nada quebra durante a troca. Depois do relatório, a equipe troca os links do app (convites da Família e das empresas), do site e da apresentação para os endereços novos.
+Feito e conferido em 27/10/2026: os dois domínios ativos, Site URL `https://app.clarevo.app.br` e as Redirect URLs com `https://app.clarevo.app.br/**`. `app.clarevo.app.br` abre o app com login (projeto `clarevo`) e `demo.clarevo.app.br`, a demonstração com dados fictícios (projeto `clarevo-demo`). Os endereços `.pages.dev` continuam funcionando, então nada quebra durante a troca. Depois do relatório, a equipe troca os links do app (convites da Família e das empresas), do site e da apresentação para os endereços novos.
 
 ```
 Tarefa no painel da Cloudflare (dash.cloudflare.com) e no painel do Supabase (supabase.com/dashboard), com as duas sessões já abertas neste Chrome.
@@ -159,6 +159,8 @@ Parte C, conferência:
 ## 5c. E-mails do app com a marca (Resend, 26/10/2026)
 
 Os e-mails de confirmação de cadastro e de nova senha passam a sair de `nao-responda@clarevo.app.br`, com o nome "Clarevo", pelo Resend (plano gratuito: 3.000 e-mails por mês e 100 por dia, a conferir). O Resend usa o subdomínio `send.clarevo.app.br` e a chave `resend._domainkey`, então os registros do Zoho (MX, SPF e DKIM da raiz) **não mudam**. A chave de envio do Resend é criada e colada no Supabase **pela própria pessoa**, nunca no chat nem no repositório.
+
+Feito em 27/10/2026: domínio verificado no Resend, região São Paulo (sa-east-1), com os registros que o painel pediu (CNAME `send`, CNAME `rsend` e TXT `resend._domainkey`). O MX na raiz que o Resend pede só para **receber** e-mails **não** foi criado, porque conflita com o Zoho; o recebimento do Resend fica desligado. Falta salvar o SMTP no Supabase com a chave (passos 5 a 8) e colar os modelos em português de `docs/05`, seção 3 (o Supabase só deixa editar os modelos com o SMTP próprio ligado).
 
 **Antes, a pessoa:** cria a conta em resend.com com o contato@clarevo.app.br (senha e confirmação por e-mail são dela).
 
