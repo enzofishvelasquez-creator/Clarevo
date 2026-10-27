@@ -40,6 +40,8 @@ Depois: a pessoa confere o resumo e paga (pelo Pix costuma confirmar mais rápid
 
 ## 3. Número D-U-N-S (grátis, pela Apple)
 
+Pedido enviado em 27/10/2026 pela conta Apple da Cristina, com contato@clarevo.app.br (a ferramenta da Apple estava fora do ar em 26/10/2026). A confirmação e o número chegam por e-mail da Dun & Bradstreet nesse endereço, em alguns dias úteis; o número pode levar até cerca de duas semanas para aparecer na busca da Apple. Não pagar nenhuma opção de agilizar.
+
 ```
 Tarefa em https://developer.apple.com/enroll/duns-lookup/, com a conta Apple da Cristina já aberta (verificação em dois fatores ativa).
 Regras: não pagar nada à Dun & Bradstreet; não digitar CPF nem senha.
