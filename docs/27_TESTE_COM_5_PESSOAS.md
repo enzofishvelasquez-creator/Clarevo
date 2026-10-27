@@ -4,8 +4,8 @@
 
 ## 1. Antes da primeira sessão
 
-1. **E-mail de confirmação.** O cadastro só termina com o link enviado por e-mail, e o envio padrão do Supabase manda poucos e-mails por hora e só para membros da organização (`docs/07`). Ligue o SMTP próprio com o domínio clarevo.app.br (`docs/20`, seção 2) e crie uma conta com um e-mail de fora da equipe: o link precisa chegar em poucos minutos. Depois, exclua essa conta (seção 4.4).
-2. **Plano B, sem SMTP pronto:** faça as tarefas 1 a 7 em https://demo.clarevo.app.br, com "Criar conta" (não "Ver demonstração com dados fictícios") e, em "Confira seu e-mail", "Simular abertura do link". A conta começa vazia e fica só naquela aba, o app considera hoje 07/10/2026 e a tarefa 8 fica de fora.
+1. **E-mail de confirmação.** Pronto desde 27/10/2026: o cadastro manda o link de confirmação de "Clarevo" (nao-responda@clarevo.app.br), em português. Antes da primeira sessão, crie uma conta de teste com um e-mail seu e confira que o e-mail chega fora do spam. O limite é de 30 e-mails de cadastro por hora, o bastante para o teste.
+2. **Plano B, se o e-mail não chegar:** faça as tarefas 1 a 7 em https://demo.clarevo.app.br, com "Criar conta" (não "Ver demonstração com dados fictícios") e, em "Confira seu e-mail", "Simular abertura do link". A conta começa vazia e fica só naquela aba, o app considera hoje 07/10/2026 e a tarefa 8 fica de fora.
 3. **Projeto ativo.** O plano gratuito pausa o projeto depois de dias sem uso: na véspera de cada sessão, entre em https://app.clarevo.app.br com a sua conta de teste e confira que o Resumo abre.
 4. **Endereço.** Use https://app.clarevo.app.br e mande o link só no começo da sessão: o primeiro contato faz parte do teste.
 5. **Material.** Uma ficha da seção 5 por pessoa, caneta e o cronômetro do celular.

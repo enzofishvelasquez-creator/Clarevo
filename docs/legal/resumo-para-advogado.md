@@ -39,7 +39,7 @@ Rascunho preparado pela equipe da Clarevo para revisão jurídica. Não é parec
 | Expo (EAS) | Gerar os builds | Código do app; nenhum dado de quem usa (sem atualização remota nem push) | Sede no exterior (confirmar) | Quando houver builds |
 | Google, no Android | Leitura de código (ML Kit) | Possíveis dados técnicos do aparelho e de uso | Exterior | Embutido no app; a confirmar |
 | Sentry | Relatório de falhas | Só o erro técnico, IP desligado | A escolher | Previsto, não ligado |
-| Provedor de e-mail (Resend sugerido) | E-mails de confirmação e nova senha | E-mail e conteúdo da mensagem | A escolher | Previsto (P-008) |
+| Resend | E-mails de confirmação de cadastro e de nova senha, de nao-responda@clarevo.app.br | E-mail e conteúdo da mensagem; registros do envio | Envio pela região de São Paulo (sa-east-1); sede no exterior (confirmar) | Em uso desde 27/10/2026 (P-008) |
 | Site da Fazenda do RJ | Leitura opcional da nota, feita pelo aparelho | Endereço da nota e IP | Brasil | Direto da pessoa, sem a Clarevo |
 | Zoho Mail | Caixas de e-mail da Clarevo (contato@, suporte@, privacidade@ e marketing@clarevo.app.br) | O que a pessoa escreve para a Clarevo e o e-mail dela | Conta criada em zoho.com; país a confirmar | Em uso desde 26/10/2026 |
 
@@ -183,7 +183,7 @@ Para a primeira conversa com empresas e com um órgão público, a equipe prepar
 
 Com isso, o pedido da seção f muda num ponto: em vez de só validar os pontos, pedimos a revisão da minuta.
 
-Também desde 26/10/2026, os e-mails da Clarevo ficam no Zoho Mail, no domínio clarevo.app.br. Ele entrou na tabela da seção c e na seção 8 da política, e a pergunta 9 (transferência internacional) vale também para ele.
+Também desde 26/10/2026, os e-mails da Clarevo ficam no Zoho Mail, no domínio clarevo.app.br. Ele entrou na tabela da seção c e na seção 8 da política, e a pergunta 9 (transferência internacional) vale também para ele. Desde 27/10/2026, os e-mails de confirmação de cadastro e de nova senha saem pelo Resend, com remetente nao-responda@clarevo.app.br; ele passou para "Hoje usamos" na seção 8, e as perguntas 9 e 30 valem para ele.
 
 **Perguntas novas**
 
