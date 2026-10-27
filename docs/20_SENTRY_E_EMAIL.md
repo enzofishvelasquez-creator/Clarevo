@@ -20,6 +20,8 @@ Versão de 20/10/2026 (D-062 itens 6 e 7). Os dois dependem de contas em nome da
 
 ## 2. E-mails de confirmação e recuperação com a marca
 
+**Feito em 27/10/2026** pelo roteiro 5c de `docs/23`: Resend com o domínio clarevo.app.br verificado (região São Paulo), SMTP salvo no Supabase e os dois modelos em português. Os passos abaixo ficam como referência.
+
 **Para quê:** hoje o Supabase envia os e-mails de confirmar conta e de nova senha pelo serviço padrão, que tem limite baixo e serve só para testes (`docs/05`, seção 3). Para pessoas reais, os e-mails precisam sair de um endereço do domínio do Clarevo.
 
 **O que Enzo faz (cerca de 30 minutos, depois de ter o domínio):**

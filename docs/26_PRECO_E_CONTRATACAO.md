@@ -74,9 +74,31 @@ O formato é sempre definido pela assessoria jurídica e pela área de contratos
 - **A confirmar com a contabilidade:** como emitir a nota fiscal de serviço pela empresa do Inova Simples no Rio de Janeiro, qual tributo incide sobre a comercialização experimental, a opção pelo Simples Nacional (Resolução CGSN 171/2022, segundo as fontes consultadas) e as certidões de regularidade que um órgão público vai pedir para contratar.
 - O piloto pelo ACT não tem pagamento e não conta para esse limite.
 
-## 7. Custo de operar
+## 7. Custo de operar e quanto sobra
 
-O custo fixo de infraestrutura no piloto é baixo (`docs/18`): Supabase Pro a partir de US$ 25 por mês, mais cerca de US$ 10 pelo projeto de teste; domínio clarevo.app.br, R$ 40 por ano, pago em 25/10/2026; e-mail, site e monitoramento nos planos gratuitos. Um contrato de 50 vagas (R$ 995,00 por mês) já cobre essa infraestrutura. O custo que cresce com os clientes é o de pessoas (suporte, oficinas e desenvolvimento), que o preço precisa pagar quando a Clarevo crescer.
+Resposta à pergunta do investidor (26/10/2026): os preços cobrem impostos, plataforma e ferramentas com folga; o que decide a viabilidade é o número de pessoas pagantes para pagar uma equipe. As premissas abaixo são estimativas, a conferir com a contabilidade e nos painéis dos fornecedores.
+
+**Premissas**
+- **Impostos:** no Simples Nacional, de 6% (anexo III, primeira faixa) a 15,5% (anexo V, primeira faixa) da receita, conforme o anexo da atividade e a folha de pagamento (fator R). No Inova Simples, a tributação da comercialização experimental ainda está a confirmar (seção 6).
+- **Plataforma:** no piloto, cerca de US$ 35 por mês (Supabase Pro e projeto de teste, `docs/18`); com alguns milhares de pessoas, cerca de US$ 150 por mês (banco maior, envio de e-mail, monitoramento de falhas e builds pagos). Apple, US$ 99 por ano, a partir da etapa 3. Com o dólar a R$ 5,50 (referência), de cerca de R$ 200 a R$ 850 por mês.
+- **Outros custos fixos:** contabilidade (orçamento a pedir; exemplo de R$ 300 por mês), domínio (R$ 40 por ano) e tarifas de boleto ou Pix, por contrato e não por pessoa.
+
+**O que sobra por pessoa, por mês, depois dos impostos**
+
+| Faixa | Impostos (6% a 15,5%) | Sobra por pessoa |
+|---|---|---|
+| R$ 19,90 | R$ 1,19 a R$ 3,08 | R$ 16,82 a R$ 18,71 |
+| R$ 14,90 | R$ 0,89 a R$ 2,31 | R$ 12,59 a R$ 14,01 |
+| R$ 9,90 | R$ 0,59 a R$ 1,53 | R$ 8,37 a R$ 9,31 |
+
+A plataforma custa centavos por pessoa a partir de algumas centenas de pessoas, então a margem antes de pessoas fica entre 80% e 90%.
+
+**Quantas pessoas pagantes**
+- **Operação sem equipe** (plataforma, contabilidade e ferramentas, de cerca de R$ 600 a R$ 1.300 por mês): de 50 a 100 pessoas na faixa de R$ 14,90.
+- **Cada R$ 10.000 por mês de equipe** (desenvolvimento, suporte, oficinas e vendas): cerca de 700 a 800 pessoas na faixa de R$ 14,90, ou de 1.100 a 1.200 na de R$ 9,90.
+- **Teto do Inova Simples:** R$ 81.000,00 por ano são R$ 6.750,00 de receita por mês. Isso cobre a operação, mas não uma equipe remunerada. Pagar equipe pede escala e a mudança para ME (seção 6).
+
+**O que não está nas contas:** salário e pró-labore, o custo de conquistar cada cliente (vendas e viagens), o tempo da equipe nas oficinas e na implantação, que estão incluídos no preço, e reservas para imprevistos. Esses itens dependem do plano do investidor e entram no plano de negócios.
 
 ## 8. Fontes (consultadas em 26/10/2026)
 

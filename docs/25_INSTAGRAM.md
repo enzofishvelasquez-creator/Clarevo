@@ -59,7 +59,7 @@ Antes de desenhar, ele confere o conteúdo e **não gera** se algo falhar: trave
   Acompanhe as informações de acesso ↓
   ```
   Quando o acesso abrir, a terceira linha volta a ser "Conheça a Clarevo ↓" (102 caracteres), junto com a P03 e o destaque Comece aqui.
-- **Link da bio:** `clarevo-site.pages.dev/comece.html`, sem parâmetro de rastreamento (D-067). É a versão preliminar do site, sem domínio próprio e sem indexação: testar no navegador do Instagram e no celular antes de abrir o perfil.
+- **Link da bio:** `clarevo.app.br/comece.html`, sem parâmetro de rastreamento (D-067). É a versão preliminar do site, sem indexação: testar no navegador do Instagram e no celular antes de abrir o perfil.
 - **Identificador:** o `@` só aparece depois de confirmado o identificador real; a prévia mostra "@identificador a confirmar".
 - **Avatar:** o ícone oficial C, o mesmo de `docs/marca/icone-app.svg`, nos 1080 px. A 110 px (perfil) e a 44 px (feed) o C e o crescente lima continuam legíveis (conferência em `perfil/avatar-conferencia.png`). A assinatura "clarevo." nunca vai no avatar.
 - **Destaques (nesta ordem):** Comece aqui, Na prática, Dúvidas, Quem faz, Ajuda e Para empresas. As seis capas têm o mesmo desenho: só um ícone simples em traço marinho, grande e centrado, sobre um disco lima no fundo azul, **sem o nome** (o Instagram já mostra o rótulo do destaque, e o texto dentro do círculo ficaria ilegível a 110 px). O disco e o ícone ficam no centro da arte, que é onde o Instagram recorta o círculo; a prévia do perfil usa o mesmo recorte central. O conteúdo de cada destaque está em `perfil/nome-e-bio.txt`. **Para empresas** só entra com a apresentação e o canal comercial conferidos, como o Playbook manda; na prévia aparece esmaecido e tracejado.
@@ -106,7 +106,7 @@ A peça só entra na agenda quando as perguntas do Playbook estiverem respondida
    - **B01 e o destaque Para empresas:** canal comercial conferido (hoje o contato é marcador), revisão técnica de saúde e NR-1 e a resposta da pergunta 35 ao advogado (`docs/legal/resumo-para-advogado.md`). Uma arte com aparência de botão não cria acesso clicável. A legenda da B01 só mantém a última frase com o canal existindo.
    - **P11 e o destaque Ajuda:** canal de ajuda e horário real de atendimento (o e-mail de suporte ainda é marcador).
    - **P03, bio e destaque Comece aqui:** mudam juntos quando o acesso abrir (texto de `ACESSO` em `scripts/site/paginas/comece.js`).
-   - **Link da bio:** o site é preliminar (sem domínio e sem indexação).
+   - **Link da bio:** o site é preliminar (sem indexação).
    - **F02:** se passar a citar a Família da Clarevo, conferir antes: a demonstração não tem Família de exemplo.
 6. **Leitura e acessibilidade.** Conferir a prévia no aplicativo do Instagram (o recorte da grade e a interface podem mudar), a leitura no celular e com o som desligado, as legendas automáticas dos vídeos e o texto alternativo (`alt.txt`, uma linha por página). Contraste forte; a cor nunca é a única diferença entre valores.
 7. **Registro.** Código da peça, formato, data, horário, URL publicada e janela de leitura no relatório semanal; sem parâmetro de rastreamento nos links; números do painel do Instagram anotados à mão; "não medido" onde não houver captura (`docs/24`, seção 4).

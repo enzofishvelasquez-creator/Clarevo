@@ -14,12 +14,12 @@ const FONTES = path.join(RAIZ, 'apps', 'app', 'assets', 'fonts');
 const CAPTURAS_LOJAS = path.join(RAIZ, 'docs', 'lojas', 'capturas');
 const TELAS = path.join(RAIZ, 'docs', 'telas');
 
-/** O app web de hoje. Com o domínio (P-006) o app iria para `app.` do domínio (a confirmar): troque aqui e em `docs/07`. */
-const URL_APP = 'https://clarevo.pages.dev';
-const HOST_APP = 'clarevo.pages.dev';
+/** O app web, no endereço oficial desde 27/10/2026 (D-070); `clarevo.pages.dev` continua respondendo. Troque aqui e em `docs/07`. */
+const URL_APP = 'https://app.clarevo.app.br';
+const HOST_APP = 'app.clarevo.app.br';
 /** A demonstração do app (dados fictícios, nada é gravado fora do aparelho): o destino de "Ver a demonstração" na página Comece aqui. */
-const URL_DEMO = 'https://clarevo-demo.pages.dev';
-const HOST_DEMO = 'clarevo-demo.pages.dev';
+const URL_DEMO = 'https://demo.clarevo.app.br';
+const HOST_DEMO = 'demo.clarevo.app.br';
 /** A página oficial da NR-1 no site do Ministério do Trabalho e Emprego (D-068): a fonte do bloco "Bem-estar financeiro e a NR-1", em Para empresas. Endereço achado na busca de 25/10/2026 (título "Norma Regulamentadora No. 1 (NR-1)"). */
 const URL_NR1 = 'https://www.gov.br/trabalho-e-emprego/pt-br/acesso-a-informacao/participacao-social/conselhos-e-orgaos-colegiados/comissao-tripartite-partitaria-permanente/normas-regulamentadora/normas-regulamentadoras-vigentes/nr-1';
 /** Fontes do site: o corpo (500), o negrito (700) e os títulos (800). Subconjuntos Latin do app, com a licença OFL. */

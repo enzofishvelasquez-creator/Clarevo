@@ -260,7 +260,7 @@ ${c(bio2)} caracteres.
 
 LINK DA BIO
 ${PERFIL.linkCompleto}
-Versão preliminar do site (sem domínio próprio e sem indexação): testar no navegador do Instagram e no celular antes de abrir o perfil. Sem parâmetro de rastreamento (D-067).
+Versão preliminar do site (sem indexação): testar no navegador do Instagram e no celular antes de abrir o perfil. Sem parâmetro de rastreamento (D-067).
 
 IDENTIFICADOR
 Só exibir o @ depois de confirmado o identificador real.
@@ -531,7 +531,7 @@ BLOQUEIOS CONHECIDOS (conferir antes de publicar)
 - B01 e o destaque Para empresas: canal comercial conferido, revisão técnica de saúde e NR-1 e a pergunta 35 ao advogado.
 - P11 e o destaque Ajuda: canal de ajuda e horário real de atendimento (hoje o e-mail de suporte é marcador).
 - P03 e a bio: acesso em preparação (sem data, sem lista de espera, sem preço). Mudam juntos quando o acesso abrir.
-- Link da bio (clarevo-site.pages.dev/comece.html): testar no navegador do Instagram; o site ainda é preliminar.
+- Link da bio (clarevo.app.br/comece.html): testar no navegador do Instagram; o site ainda é preliminar.
 - Identificador e nome de exibição: conferir o limite na conta; o @ só aparece depois de confirmado.
 - Todas as peças de produto: responsável pelo produto (a designar) refaz o teste na versão que for ao ar.
 

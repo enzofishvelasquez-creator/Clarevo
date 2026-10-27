@@ -221,13 +221,13 @@ Hoje usamos:
 - **Google (ML Kit), só no Android.** Componente de leitura de código incluído no app, usado quando você lê o QR Code da nota. A imagem é lida no aparelho, mas o componente pode enviar ao Google dados técnicos de uso e identificadores do aparelho, para fins de diagnóstico e funcionamento. Não recebe o que você anota. [A DEFINIR: confirmar na documentação do fornecedor o que é enviado, para quê e onde é tratado]
 - **Expo** (geração dos builds do app). Recebe o código do app. Não recebe dados de quem usa o app.
 - **Zoho Mail** (caixas de e-mail da Clarevo, como [E-MAIL DE SUPORTE] e [E-MAIL DE PRIVACIDADE]). Quando você escreve para a Clarevo, a sua mensagem e o seu e-mail ficam nessas caixas. [A DEFINIR: país do tratamento e contrato; a conta foi criada em zoho.com]
+- **Resend** (envio dos e-mails de confirmação de cadastro e de nova senha, com o nome da Clarevo, a partir de um endereço do domínio da Clarevo). Recebe o seu e-mail e o conteúdo dessas mensagens e guarda registros do envio. O envio sai pela região de São Paulo do Resend. [A DEFINIR: país da sede, prazo de guarda dos registros e contrato]
 - **Apple App Store e Google Play** (distribuição). Tratam os dados de download e de conta nas lojas, conforme as políticas delas.
 
 Estão previstos, mas ainda não ligados:
 
 - **Sentry** (relatório de falhas do app). Se for ligado, receberá só o erro técnico, sem valores, descrições, e-mails ou dados financeiros, com coleta de IP desligada. Esta política será atualizada antes.
-- **Provedor de e-mail** (confirmação de cadastro e nova senha, com o nome da Clarevo). Receberá o seu e-mail e o conteúdo da mensagem do serviço. [A DEFINIR: provedor escolhido, P-008]
-- **Resend** (envio da mensagem do formulário de contato do site, seção 3.6, se for ligado). Receberá o que você escrever no formulário e guarda uma cópia nos registros dele. [A DEFINIR: país, contrato e se também será o provedor dos e-mails de confirmação de cadastro e de nova senha, P-008]
+- **Resend** (envio da mensagem do formulário de contato do site, seção 3.6, se for ligado). Receberá o que você escrever no formulário e guarda uma cópia nos registros dele. [A DEFINIR: país e contrato; é o mesmo serviço dos e-mails de cadastro, acima]
 - **Brevo** (Novidades por e-mail, seção 3.7, se forem ligadas). Receberá o seu e-mail e a confirmação do cadastro. [A DEFINIR: país e contrato]
 
 **Transferência internacional.** Alguns desses serviços são prestados por empresas com sede fora do Brasil, e parte do tratamento pode ocorrer fora do país. [A DEFINIR: para cada serviço, país da sede e local do tratamento, mecanismo de transferência (LGPD, art. 33) e contrato com cada fornecedor]

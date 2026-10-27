@@ -41,7 +41,7 @@ export const INVITE_VALID_DAYS = 7;
 /** Tamanho do nome da Família. */
 export const FAMILY_NAME_MAX = 60;
 /** Endereço do app na web: o link do convite abre aqui e funciona no navegador e no app. */
-export const INVITE_BASE_URL = 'https://clarevo.pages.dev';
+export const INVITE_BASE_URL = 'https://app.clarevo.app.br';
 /** O código tem 128 bits em 32 hexadecimais minúsculos. */
 export const INVITE_CODE_PATTERN = /^[0-9a-f]{32}$/;
 

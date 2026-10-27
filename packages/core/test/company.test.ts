@@ -260,7 +260,7 @@ describe('Empresas: código, link, lista e CSV', () => {
   });
 
   it('o link é o endereço do app mais /beneficio/<código>, e o código sai de um link colado (e não de um link da Família)', () => {
-    expect(licenseLink(code)).toBe(`https://clarevo.pages.dev/beneficio/${code}`);
+    expect(licenseLink(code)).toBe(`https://app.clarevo.app.br/beneficio/${code}`);
     expect(licenseLink(code, 'http://localhost:8199/')).toBe(`http://localhost:8199/beneficio/${code}`);
     expect(licenseCodeFromText(licenseLink(code))).toBe(code);
     expect(licenseCodeFromText(`Seu convite: ${licenseLink(code)}. Abra e aceite.`)).toBe(code);
@@ -288,7 +288,7 @@ describe('Empresas: código, link, lista e CSV', () => {
 
   it('"Copiar todos": uma linha por pessoa, com o e-mail e o link', () => {
     const rows = inviteLinkRows(results);
-    expect(buildInviteListText(rows)).toBe(`ana@x.com: https://clarevo.pages.dev/beneficio/${code}\ncaio+rh@x.com: https://clarevo.pages.dev/beneficio/fedcba9876543210fedcba9876543210`);
+    expect(buildInviteListText(rows)).toBe(`ana@x.com: https://app.clarevo.app.br/beneficio/${code}\ncaio+rh@x.com: https://app.clarevo.app.br/beneficio/fedcba9876543210fedcba9876543210`);
     expect(buildInviteListText([])).toBe('');
   });
 
@@ -299,7 +299,7 @@ describe('Empresas: código, link, lista e CSV', () => {
     expect(lines[0]).toBe(CSV_INVITE_HEADER.join(';'));
     expect(CSV_INVITE_HEADER).toEqual(['E-mail', 'Link']);
     expect(lines).toHaveLength(4);
-    expect(lines[1]).toBe(`ana@x.com;https://clarevo.pages.dev/beneficio/${code}`);
+    expect(lines[1]).toBe(`ana@x.com;https://app.clarevo.app.br/beneficio/${code}`);
     expect(lines[3]).toBe('');
     // Fórmula em planilha: e-mail que começa com + ou - ganha o apóstrofo de proteção.
     const risky = buildInviteCsv([{ email: '+55@x.com', link: 'https://clarevo.pages.dev/beneficio/aa' }, { email: '-a@x.com', link: 'https://clarevo.pages.dev/beneficio/bb' }]);

@@ -22,8 +22,8 @@ const PERFIL = {
   bio: ['Cuidar da vida financeira faz parte de cuidar de você.', 'App para organizar seu mês.', 'Acompanhe as informações de acesso ↓'],
   /** A bio do Playbook v2.2 para quando o acesso abrir. */
   bioAcessoAberto: ['Cuidar da vida financeira faz parte de cuidar de você.', 'App para organizar seu mês.', 'Conheça a Clarevo ↓'],
-  link: 'clarevo-site.pages.dev/comece.html',
-  linkCompleto: 'https://clarevo-site.pages.dev/comece.html',
+  link: 'clarevo.app.br/comece.html',
+  linkCompleto: 'https://clarevo.app.br/comece.html',
   /** O @ só aparece depois de confirmado (Playbook, "Identificação e autoria"). */
   identificador: '@identificador a confirmar',
   categoria: 'Bem-estar financeiro',
@@ -227,13 +227,13 @@ const PECAS = [
       'Quando o acesso abrir, mudam juntos: o texto de `ACESSO` em `scripts/site/paginas/comece.js`, a página Comece aqui, esta peça, a bio e o destaque Comece aqui.',
     ],
     depende: [
-      'Confirmar que o link da bio funciona no navegador do Instagram e no celular (a página Comece aqui ainda é a versão preliminar do site, sem domínio próprio).',
+      'Confirmar que o link da bio funciona no navegador do Instagram e no celular (a página Comece aqui ainda é a versão preliminar do site, sem indexação).',
       'Produto e proprietária preenchem a ficha de acesso do Playbook (destino, dispositivos testados, preço, primeira tarefa e canal de ajuda, versão e responsável): hoje a resposta é "em preparação" e sem preço.',
       'Se qualquer informação de acesso mudar, refazer a peça, a bio e o destaque no mesmo dia.',
     ],
     conferencia: [
       { afirmacao: 'A Clarevo está em fase de testes. A versão para pessoas e empresas abre no piloto.', situacao: 'Confirmado', nota: 'D-064: cadastro de pessoas reais só no piloto; nada está nas lojas; preço indefinido (P-005). Mesmo texto da página Comece aqui.' },
-      { afirmacao: 'Dá para ver a demonstração, com dados fictícios, pelo link da bio.', situacao: 'Confirmado', nota: 'comece.html leva à demonstração (https://clarevo-demo.pages.dev), com a etiqueta "Demonstração" em cada tela. Depende de o site estar no ar.' },
+      { afirmacao: 'Dá para ver a demonstração, com dados fictícios, pelo link da bio.', situacao: 'Confirmado', nota: 'comece.html leva à demonstração (https://demo.clarevo.app.br), com a etiqueta "Demonstração" em cada tela. Depende de o site estar no ar.' },
       { afirmacao: 'Sem cadastro, lista de espera, data de abertura, preço, "grátis" ou plataforma.', situacao: COM_ACESSO_EM_PREPARACAO, nota: 'Playbook: "não simular cadastro, lista de espera ou data de liberação que ainda não exista".' },
     ],
   },

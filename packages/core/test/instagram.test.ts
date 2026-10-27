@@ -83,7 +83,7 @@ describe('Instagram: perfil (D-069)', () => {
     expect(conteudo.PERFIL.bio[1]).toBe('App para organizar seu mês.');
     expect(conteudo.PERFIL.bio[2]).toBe('Acompanhe as informações de acesso ↓');
     expect(conteudo.PERFIL.bioAcessoAberto[2]).toBe('Conheça a Clarevo ↓');
-    expect(conteudo.PERFIL.link).toBe('clarevo-site.pages.dev/comece.html');
+    expect(conteudo.PERFIL.link).toBe('clarevo.app.br/comece.html');
     expect(conteudo.PERFIL.link).not.toMatch(/[?&#]|utm_/);
   });
 

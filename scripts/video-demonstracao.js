@@ -430,7 +430,7 @@ function instantesDosSinais(nome, esperados, achados) {
 
   const INTRO = { logo: true, linhas: ['Demonstração com dados fictícios', 'Nada é gravado fora do aparelho'] };
   const ENTRE = { logo: false, linhas: [] };
-  const FIM = { logo: true, linhas: ['Demonstração com dados fictícios', 'clarevo-demo.pages.dev'], destaque: true };
+  const FIM = { logo: true, linhas: ['Demonstração com dados fictícios', 'demo.clarevo.app.br'], destaque: true };
 
   try {
     // ---------------------------------------------------------------------------------------------------------------

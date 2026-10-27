@@ -443,7 +443,7 @@ Em **Authentication**:
   - *Site URL*: o endereço da versão web quando publicada (por enquanto, `http://localhost:8081`).
   - *Redirect URLs*: adicione `clarevo://**`, `exp://**` (para testar no Expo Go) e `http://localhost:8081/**`.
 - **Rate limits**: mantenha os limites padrão contra tentativas abusivas.
-- **Emails → SMTP**: o envio padrão do Supabase tem limite baixo e serve só para testes. Antes do lançamento, configure um provedor de e-mail próprio (por exemplo, Resend ou Amazon SES) com o domínio do Clarevo.
+- **Emails → SMTP**: o envio padrão do Supabase tem limite baixo e serve só para testes. No projeto da Clarevo, o SMTP próprio está ligado desde 27/10/2026: Resend, remetente `nao-responda@clarevo.app.br`, nome Clarevo, servidor `smtp.resend.com`, porta 465 (roteiro 5c de `docs/23`). Com SMTP próprio, o limite padrão é de 30 e-mails de autenticação por hora (Rate Limits).
 
 ### Textos dos e-mails (Authentication → Emails → Templates)
 
