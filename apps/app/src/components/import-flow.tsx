@@ -671,6 +671,7 @@ export function ImportFlow() {
           error={saveError}
           onCancel={backToDestination}
           cancelLabel={IMPORT_TEXT.back}
+          cancelAccessibilityLabel={IMPORT_TEXT.backA11y}
           submitLabel={IMPORT_TEXT.importButton(counts.included)}
           onSubmit={runImport}
           busy={saving}

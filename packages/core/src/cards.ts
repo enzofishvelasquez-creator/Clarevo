@@ -1271,7 +1271,7 @@ export function cardSummaryTexts(s: CardSummary, today: IsoDate): CardSummaryTex
 /** Mensagens de erro de cartões, faturas e lançamentos (códigos do banco). Sem "disponível" nem julgamento. */
 export const CARD_ERROR_TEXT = {
   ...ERROR_TEXT,
-  apelido_invalido: 'Dê um apelido de 1 a 30 caracteres, como Nubank.',
+  apelido_invalido: 'Dê um apelido de 1 a 30 caracteres, como Cartão principal.',
   final_invalido: 'Informe só os 4 últimos dígitos, sem o número completo.',
   dia_de_fechamento_invalido: 'Informe o dia do fechamento, de 1 a 31.',
   dia_de_vencimento_invalido: 'Informe o dia do vencimento, de 1 a 31.',
@@ -1342,7 +1342,7 @@ export const CARDS_TEXT = {
     newTitle: 'Novo cartão',
     editTitle: 'Editar cartão',
     name: 'Apelido do cartão',
-    nameHint: 'Por exemplo: Nubank ou Cartão do mercado',
+    nameHint: 'Por exemplo: Cartão principal ou Cartão do mercado',
     nameHasNumber: 'Não use o número do cartão no apelido. Use os 4 últimos dígitos no campo próprio.',
     lastDigits: 'Últimos 4 dígitos (opcional)',
     lastDigitsHint: 'Só os 4 últimos dígitos. Nunca o número completo, o código de segurança nem a validade.',

@@ -66,7 +66,7 @@ export const DELETE_TEXT = {
     'O benefício pela empresa, se você tem um: a licença termina na hora e os seus direitos ao plano são apagados. A empresa vê só que a licença terminou.',
   ],
   keptTitle: 'O que continua',
-  keptNone: 'Nada é guardado por garantia.',
+  keptNone: 'Nada fica guardado para uso depois. As cópias de segurança do banco de dados podem manter dados apagados por um tempo; se uma for restaurada, a exclusão é feita de novo.',
   /** A Família de quem excluiu, conforme o papel. */
   familyTitle: 'Sua Família',
   familyNone: 'Você não está em nenhuma Família.',
@@ -80,7 +80,7 @@ export const DELETE_TEXT = {
   familyBlockedHow: `Na Família, toque em "${FAMILY_TEXT.manage}" ao lado de uma pessoa e escolha "${FAMILY_TEXT.transfer}" ou "${FAMILY_TEXT.remove}".`,
   familyOpen: 'Abrir a Família',
   familyGeneral:
-    'Se você é membro ou só vê, sai da Família e o que anotou continua, com a autoria "Pessoa que saiu". Se é titular com outras pessoas, passa a titularidade antes. Se é titular sem mais ninguém, a Família é apagada junto.',
+    'Se você anota e vê ou só vê, sai da Família e o que anotou continua, com a autoria "Pessoa que saiu". Se é titular com outras pessoas, passa a titularidade antes. Se é titular sem mais ninguém, a Família é apagada junto.',
   /** Exportar antes (D-047). */
   exportTitle: 'Antes de excluir',
   exportHint: 'Depois de excluir, não há como recuperar. Se quiser guardar uma cópia, exporte os seus dados antes.',

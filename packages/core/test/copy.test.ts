@@ -1662,7 +1662,7 @@ describe('textos de "Antes de financiar" (D-044)', () => {
     for (const bad of ['É a melhor opção', 'a pior', 'Você deveria juntar', 'recomendamos', 'Invista', 'aplique em', 'vale a pena', 'a — b', 'a – b', proibida, 'consórcio'])
       expect(ANTES_VETOED.test(bad), bad).toBe(true);
     for (const bad of ['Obrigado', 'bem-vinda', 'você está pronto', 'o(a) cliente']) expect(GENDERED.test(bad), bad).toBe(true);
-    for (const ok of [CALC_DISCLAIMER, ANTES_ESTIMATE_TEXT, 'Financiando: você usa o bem agora e paga R$ 1,00 de juros.', 'Seu comprometido iria de 52,5% para 66,7% enquanto durar o financiamento.']) {
+    for (const ok of [CALC_DISCLAIMER, ANTES_ESTIMATE_TEXT, 'Financiando: você usa o bem agora e paga R$ 1,00 de juros.', 'Sua renda comprometida iria de 52,5% para 66,7% enquanto durar o financiamento.']) {
       expect(ANTES_VETOED.test(ok), ok).toBe(false);
       expect(GENDERED.test(ok), ok).toBe(false);
     }
@@ -3093,7 +3093,7 @@ describe('textos da Evolução (D-057)', () => {
     expect(EVOLUTION_TEXT.stats.average).toBe('Média dos meses na comparação');
     expect(EVOLUTION_TEXT.stats.median).toBe('Mediana dos meses na comparação');
     expect(EVOLUTION_TEXT.stats.total).toBe('Total dos meses exibidos');
-    expect(EVOLUTION_TEXT.table.show).toBe('Ver valores mês a mês');
+    expect(EVOLUTION_TEXT.table.show).toBe('Ver tabela mês a mês');
     expect(EVOLUTION_TEXT.table.columns.included).toBe('Na comparação?');
     expect(EVOLUTION_TEXT.panel.switchLabel).toBe('Mostrar este mês na comparação');
     expect(EVOLUTION_TEXT.panel.switchCaption).toBe('Tirar da comparação não apaga nem muda nenhum lançamento.');

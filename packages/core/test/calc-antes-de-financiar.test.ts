@@ -167,7 +167,7 @@ describe('10. Antes de financiar (D-044)', () => {
       expect(r.committedAfterPermille).toBe(272);
       expect(r.resultLines.slice(4)).toEqual([
         'A parcela seria 2,2% da sua renda.',
-        'Seu comprometido iria de 25,0% para 27,2% enquanto durar o financiamento.',
+        'Sua renda comprometida iria de 25,0% para 27,2% enquanto durar o financiamento.',
       ]);
       // A referência de 30% é só referência, com a fonte, como na tela da renda.
       expect(r.notes).toHaveLength(2);
@@ -187,7 +187,7 @@ describe('10. Antes de financiar (D-044)', () => {
     it('sem renda e com o comprometido: só valores em reais; sem nenhum dos dois, nenhuma linha de impacto', () => {
       const r = run({ comprometidoCents: 100_000 });
       expect(r.parcelaPermille).toBeNull();
-      expect(r.resultLines[4]).toBe('Seu comprometido do mês iria de R$ 1.000,00 para R$ 1.088,85 enquanto durar o financiamento.');
+      expect(r.resultLines[4]).toBe('O total comprometido por mês iria de R$ 1.000,00 para R$ 1.088,85 enquanto durar o financiamento.');
       expect(r.notes).toEqual([ANTES_ESTIMATE_TEXT]);
       const none = run();
       expect(none.resultLines).toHaveLength(4);
@@ -195,7 +195,7 @@ describe('10. Antes de financiar (D-044)', () => {
       expect(run({ comprometidoCents: 0 }).resultLines).toHaveLength(4);
       expect(run({ comprometidoCents: 0, renda: '4.000,00' }).resultLines.slice(4)).toEqual([
         'A parcela seria 2,2% da sua renda.',
-        'Seu comprometido iria de 0,0% para 2,2% enquanto durar o financiamento.',
+        'Sua renda comprometida iria de 0,0% para 2,2% enquanto durar o financiamento.',
       ]);
       // Com renda e sem o comprometido (ainda lendo, ou com falha): só o peso da parcela.
       const onlyIncome = run({ renda: '4.000,00', comprometidoCents: null });

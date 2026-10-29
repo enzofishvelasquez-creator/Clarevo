@@ -377,12 +377,12 @@ export function calcAntesDeFinanciar(input: AntesInput, today?: IsoDate): CalcOu
       beforePermille = percentTenths(committed, renda);
       afterPermille = percentTenths(committed + parcela, renda);
       resultLines.push(
-        `Seu comprometido iria de ${formatPermille(beforePermille, committed)} para ${formatPermille(afterPermille, committed + parcela)} enquanto durar o financiamento.`,
+        `Sua renda comprometida iria de ${formatPermille(beforePermille, committed)} para ${formatPermille(afterPermille, committed + parcela)} enquanto durar o financiamento.`,
       );
     }
     notes.push(`${COMMITTED_TEXT.debtReference} ${COMMITTED_TEXT.debtReferenceSource}`);
   } else if (showImpact && committed !== null && committed > 0) {
-    resultLines.push(`Seu comprometido do mês iria de ${brl(committed)} para ${brl(committed + parcela)} enquanto durar o financiamento.`);
+    resultLines.push(`O total comprometido por mês iria de ${brl(committed)} para ${brl(committed + parcela)} enquanto durar o financiamento.`);
   }
 
   // 3. Juntar antes

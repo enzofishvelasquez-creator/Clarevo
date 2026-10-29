@@ -47,7 +47,7 @@ function files(dir: string, ext: RegExp, skip: (path: string) => boolean = () =>
 /** Telas do app (arquivos de src/app): o padrão com colchetes e um endereço de exemplo ([id] vira "abc", [mes] vira "2026-10"). */
 function appRoutes(): { pattern: string; sample: string }[] {
   return files(APP_DIR, /\.tsx$/)
-    .filter((f) => !relative(APP_DIR, f).split('/').pop()!.startsWith('_'))
+    .filter((f) => !/^[_+]/.test(relative(APP_DIR, f).split('/').pop()!)) // _layout, _sitemap e +not-found não são telas do guia
     .map((file) => {
       const parts = relative(APP_DIR, file)
         .replace(/\.tsx$/, '')
@@ -240,7 +240,7 @@ describe('catálogo do guia (D-049)', () => {
     expect(guideWhere(entry.where)).toBe('Movimentos › Evolução');
     expect(entry.screenshot).toBe('443_evolucao_abril_fora.png');
     const steps = entry.steps.join(' ');
-    for (const name of ['"Seu mês em 30 segundos"', '"Evolução"', '"Recebido"', '"Pago"', '"3 meses"', '"6 meses"', '"12 meses"', '"Mostrar este mês na comparação"', '"Restaurar todos"', '"Média dos meses na comparação"', '"Mediana dos meses na comparação"', '"Total dos meses exibidos"', '"Ver valores mês a mês"']) {
+    for (const name of ['"Seu mês em 30 segundos"', '"Evolução"', '"Recebido"', '"Pago"', '"3 meses"', '"6 meses"', '"12 meses"', '"Mostrar este mês na comparação"', '"Restaurar todos"', '"Média dos meses na comparação"', '"Mediana dos meses na comparação"', '"Total dos meses exibidos"', '"Ver tabela mês a mês"']) {
       expect(steps, name).toContain(name);
     }
     expect(steps).toContain('não apaga nem muda lançamento');

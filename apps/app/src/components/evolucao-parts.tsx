@@ -831,7 +831,7 @@ function StatCard({ title, cents, text, unit, caption, stacked }: { title: strin
 // ---------------------------------------------------------------------------------------------------------------------
 
 /**
- * "Ver valores mês a mês": a mesma informação do gráfico em texto, um bloco por mês, com o mês, o valor, o estado e "Na comparação?"
+ * "Ver tabela mês a mês": a mesma informação do gráfico em texto, um bloco por mês, com o mês, o valor, o estado e "Na comparação?"
  * ("Sim" ou "Fora da comparação"), e o aviso de lacuna do mês fechado de Pago. Cada bloco é um botão (44 px ou mais) que escolhe o mês
  * e leva o foco ao painel: é o caminho de toque largo com 12 meses, em que a coluna do gráfico fica estreita. Começa fechada; a
  * escolha de abrir vale só enquanto a tela está aberta.

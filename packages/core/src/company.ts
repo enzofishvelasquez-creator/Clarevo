@@ -2,6 +2,7 @@ import type { IsoDate } from './dates';
 import { formatDateBR, todayIn } from './dates';
 import { CSV_BOM, CSV_EOL, csvCell, csvText } from './export';
 import { INVITE_BASE_URL, INVITE_CODE_PATTERN, normalizeInviteCode } from './family';
+import { CONTACT_EMAIL, SUPPORT_EMAIL } from './legal';
 import { seasonalCard } from './learn/epoca';
 import type { RepoErrorCode } from './repository';
 import { sha256Hex } from './sha256';
@@ -452,7 +453,7 @@ export const COMPANY_TEXT = {
   accountHint: 'Convide pessoas para o benefício e acompanhe as vagas e as licenças.',
   accountOpen: 'Abrir painel da empresa',
   webOnly: 'O painel da empresa está disponível só na web. Abra o app da Clarevo no navegador para usá-lo.',
-  notAdmin: 'Esta área é para quem administra o benefício de uma empresa. Se você deveria ter acesso, fale com a equipe da Clarevo.',
+  notAdmin: `Esta área é para quem administra o benefício de uma empresa. Se a sua empresa contratou a Clarevo e você administra o benefício, escreva para ${SUPPORT_EMAIL}.`,
   loading: 'Carregando o painel…',
   loadFailed: 'Não foi possível carregar o painel. Tente novamente.',
   demoBadge: 'Demonstração: empresa e pessoas fictícias. Nada é gravado fora deste aparelho.',
@@ -487,8 +488,8 @@ export const COMPANY_TEXT = {
     vazia: 'Nenhum e-mail novo para convidar.',
     invalidos: 'Corrija ou retire os itens que não parecem um e-mail para continuar.',
     lote_grande: `Convide até ${LICENSE_BATCH_MAX} pessoas por vez.`,
-    sem_vagas: 'A lista tem mais pessoas novas do que vagas livres. Retire alguns e-mails ou fale com a equipe da Clarevo para ampliar as vagas.',
-    contrato_fora_da_vigencia: 'O contrato não está em vigor. Fale com a equipe da Clarevo.',
+    sem_vagas: `A lista tem mais pessoas novas do que vagas livres. Retire alguns e-mails ou escreva para ${CONTACT_EMAIL} para ampliar as vagas.`,
+    contrato_fora_da_vigencia: `O contrato não está em vigor. Escreva para ${CONTACT_EMAIL}.`,
   } as const,
   confirm: (n: number): string => (n === 1 ? 'Convidar 1 pessoa' : `Convidar ${n} pessoas`),
   confirmBusy: 'Convidando…',
@@ -665,8 +666,8 @@ export const BENEFIT_TEXT = {
 export const COMPANY_ERROR_TEXT = {
   email_invalido: 'Um dos itens não parece um e-mail. Corrija a lista e tente de novo.',
   itens_invalidos: `Convide de 1 a ${LICENSE_BATCH_MAX} pessoas por vez.`,
-  contrato_nao_vigente: 'O contrato não está em vigor. Fale com a equipe da Clarevo.',
-  vagas_insuficientes: 'Não há vagas livres para todas as pessoas da lista. Retire alguns e-mails ou fale com a equipe da Clarevo.',
+  contrato_nao_vigente: `O contrato não está em vigor. Escreva para ${CONTACT_EMAIL}.`,
+  vagas_insuficientes: `Não há vagas livres para todas as pessoas da lista. Retire alguns e-mails ou escreva para ${CONTACT_EMAIL} para ampliar as vagas.`,
   licenca_nao_convidada: 'Esta licença já não é um convite pendente. Atualize a tela.',
   licenca_nao_ativa: 'Esta licença já não está ativa. Atualize a tela.',
   convite_invalido: BENEFIT_TEXT.invalid,

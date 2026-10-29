@@ -119,7 +119,9 @@ export const IMPORT_TEXT = {
   seeInMovements: 'Ver em Movimentos',
   seeInCard: 'Ver o cartão',
   importAnother: 'Importar outro arquivo',
-  back: 'Voltar ao destino',
+  /** Rodapé da revisão: rótulo curto (cabe ao lado do botão principal em 320 px) e o nome acessível completo. */
+  back: 'Voltar',
+  backA11y: 'Voltar ao destino',
   /** Falha no meio: o que entrou fica, e repetir é seguro. */
   partial: (done: number, total: number) =>
     `${num(done)} de ${num(total)} ${plural(total, 'lançamento foi importado', 'lançamentos foram importados')} antes da falha. Tente de novo: o que já entrou não é repetido.`,

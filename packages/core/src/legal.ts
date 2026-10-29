@@ -11,6 +11,19 @@
  * como `[A DEFINIR]`, então usa a redação que a política de privacidade propõe.
  */
 
+/** E-mail de suporte: o mesmo de "E-MAIL DE SUPORTE" em `site/dados-da-empresa.json` (D-070; teste em legal.test). */
+export const SUPPORT_EMAIL = 'suporte@clarevo.app.br';
+/** E-mail de contato, para empresas e vagas: o mesmo de "E-MAIL DE CONTATO" em `site/dados-da-empresa.json` (D-070). */
+export const CONTACT_EMAIL = 'contato@clarevo.app.br';
+
+/** Card "Ajuda e contato" de Conta: o canal para dúvidas, problemas e pedidos sobre os dados, com ou sem o site. */
+export const SUPPORT_TEXT = {
+  title: 'Ajuda e contato',
+  hint: `Dúvidas sobre o app, um problema ou um pedido sobre os seus dados: escreva para ${SUPPORT_EMAIL}.`,
+  write: 'Escrever para o suporte',
+  writeFailed: `Não foi possível abrir o e-mail neste aparelho. Escreva para ${SUPPORT_EMAIL}.`,
+} as const;
+
 /** As páginas do site que o app abre, com o arquivo de cada uma (fixos: as URLs que as lojas e a política citam). */
 export const SITE_PAGES = {
   privacidade: 'privacidade.html',
