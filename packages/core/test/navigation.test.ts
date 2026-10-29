@@ -67,7 +67,7 @@ describe('barra inferior (D-039)', () => {
       '/conta/exportar',
       // Orçamento por categoria (D-041): a lista é de consulta; o formulário de uma categoria, não.
       '/orcamento',
-      // Buscar em Movimentações (D-045): tela de consulta, com a barra.
+      // Buscar em Movimentos (D-045): tela de consulta, com a barra.
       '/movimentacoes/buscar',
       // Revisar assinaturas (D-046): tela de consulta, com a barra (a rota estática vem antes de gastos-fixos/[id]).
       '/gastos-fixos/assinaturas',
@@ -254,7 +254,7 @@ describe('busca de Aprender: grupo "No app" (D-039)', () => {
     expect(first('financiar')).toBe('antes-de-financiar');
     expect(first('poder de compra')).toBe('antes-de-financiar');
     expect(ids('consórcio')).not.toContain('antes-de-financiar');
-    // Buscar em Movimentações (D-045): as palavras que a pessoa usa para achar um gasto antigo.
+    // Buscar em Movimentos (D-045): as palavras que a pessoa usa para achar um gasto antigo.
     for (const query of ['buscar', 'procurar', 'pesquisar', 'achar um gasto', 'quanto paguei', 'quanto gastei', 'gasto antigo', 'luz']) expect(ids(query), query).toContain('buscar-movimentos');
     expect(first('buscar')).toBe('buscar-movimentos');
     expect(first('procurar')).toBe('buscar-movimentos');

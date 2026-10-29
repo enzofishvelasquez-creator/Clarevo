@@ -11,7 +11,7 @@ import { colors, space } from '@/theme/tokens';
  * (resgate) e "Entrou em" (recebimento). Mostra os chips das contas ativas, a principal primeiro e já marcada na abertura (quem
  * abre o formulário escolhe a inicial com `chooseAccountId`). Com uma conta só, mostra o nome como texto ("Saiu de: Conta principal"),
  * sem chip, a menos que haja o que escolher: `allowNone` junta "Sem conta" (aporte e resgate são informativos: a conta é opcional) e
- * um valor que não é a primeira conta (a arquivada de um registro antigo) também mostra os chips. O atalho "Gerenciar contas" leva
+ * um valor que não é a primeira conta (a arquivada de um registro antigo) também mostra os chips. O atalho "Gerenciar contas de origem" leva
  * a Conta, onde se cadastra, renomeia, arquiva e escolhe a principal; os formulários abertos continuam como estão.
  * A conta só informa a origem: não existe saldo por conta, e nada aqui muda Recebido, Pago nem Ainda a pagar.
  */

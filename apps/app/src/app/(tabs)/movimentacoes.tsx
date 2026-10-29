@@ -156,7 +156,7 @@ export default function MovimentacoesScreen() {
 
   const header = (
     <>
-      <AppHeader title="Movimentações">
+      <AppHeader title="Movimentos">
         <ContextSwitch />
         <MonthSwitcher />
       </AppHeader>
@@ -241,7 +241,7 @@ export default function MovimentacoesScreen() {
   const card = (
     <Card>
       {records.isPending ? (
-        <View style={{ gap: space[3] }} accessibilityRole="progressbar" accessibilityLabel="Carregando movimentações">
+        <View style={{ gap: space[3] }} accessibilityRole="progressbar" accessibilityLabel="Carregando movimentos">
           <Skeleton width={80} height={14} />
           <Skeleton width="100%" height={44} />
           <Skeleton width="100%" height={44} />

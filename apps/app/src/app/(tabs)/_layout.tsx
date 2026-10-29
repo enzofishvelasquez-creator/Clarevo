@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { TABS, TabBar, TabButton } from '@/components/tab-bar';
 import { colors } from '@/theme/tokens';
 
-/** Quatro destinos: Resumo, Movimentações, Metas e Aprender. Conta fica no avatar. */
+/** Quatro destinos: Resumo, Movimentos, Metas e Aprender. Conta fica no avatar. */
 export default function TabsLayout() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

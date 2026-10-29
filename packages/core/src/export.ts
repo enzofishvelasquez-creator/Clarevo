@@ -18,7 +18,7 @@ import { accountNameOf } from './accounts';
  * (CSV) ou guarda um resumo em PDF. Regras puras: montagem das linhas, CSV (UTF-8 com BOM, ponto e vírgula, vírgula decimal,
  * datas dd/mm/aaaa, proteção contra injeção de fórmula), totais por mês iguais aos do Resumo e o HTML do PDF. Nada aqui grava.
  *
- * A leitura é a de sempre (a mesma da busca em Movimentações, D-045, com o limite maior): sem migração, sem função nova no
+ * A leitura é a de sempre (a mesma da busca em Movimentos, D-045, com o limite maior): sem migração, sem função nova no
  * banco. O arquivo nunca leva a chave da nota fiscal, o número do cartão (só o final) nem identificadores internos, e só traz
  * registros do contexto Pessoal da própria pessoa. O app monta o arquivo no aparelho e não guarda cópia dele.
  */
@@ -90,7 +90,7 @@ export const EXPORT_TEXT = {
     'Lançamentos: Data, Tipo, Descrição, Categoria, Valor (R$), Conta de origem e Origem. As compras no cartão vão em um segundo arquivo, à parte, porque o dinheiro só sai quando a fatura é paga.',
   contentPdf:
     'Resumo de cada mês e lista de lançamentos. As compras no cartão aparecem à parte e não entram em Pago, porque o dinheiro só sai quando a fatura é paga.',
-  notIncluded: 'Ficam de fora a chave da nota fiscal, o número do cartão (só o final aparece) e os códigos internos da Clarevo. Só entram os seus registros do contexto Pessoal.',
+  notIncluded: 'Ficam de fora a chave da nota fiscal, o número do cartão (só o final aparece) e os códigos internos da Clarevo. Só entram os seus registros do espaço Pessoal.',
   valuesNote: 'O arquivo mostra os valores, mesmo com Ocultar valores ligado.',
   sensitiveNote: 'O arquivo tem dados financeiros. Guarde-o e compartilhe só com quem você escolher.',
   prepare: 'Preparar arquivo',

@@ -7,7 +7,7 @@ import { moneyA11y, useValuesHidden } from '@/lib/privacy';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
 /**
- * Entrada da busca em Movimentações (D-045): parece um campo "Buscar" com a lupa, mas é um botão que abre a tela de consulta
+ * Entrada da busca em Movimentos (D-045): parece um campo "Buscar" com a lupa, mas é um botão que abre a tela de consulta
  * (`/movimentacoes/buscar`). Nada é digitado nem guardado aqui.
  */
 export function SearchEntry({ onPress }: { onPress: () => void }) {

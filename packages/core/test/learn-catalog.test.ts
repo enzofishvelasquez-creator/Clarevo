@@ -154,7 +154,7 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
           'A diferença do mês é o total recebido menos o total pago no período. Entra no mês a data do pagamento ou do recebimento, não a data da compra.',
           'Exemplo: com R$ 6.000 recebidos e R$ 3.900 pagos em outubro, a diferença é R$ 2.100. Um gasto de R$ 80 pago em 7 de outubro muda o total pago para R$ 3.980.',
         ],
-        hypotheses: 'Exemplo fictício. Considera apenas registros realizados no mesmo contexto.',
+        hypotheses: 'Exemplo fictício. Considera apenas registros realizados no mesmo espaço.',
       },
       'realizado-previsto': {
         title: 'Realizado e previsto',

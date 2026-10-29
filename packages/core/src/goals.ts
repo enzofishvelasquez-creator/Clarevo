@@ -1013,7 +1013,7 @@ export const GOALS_TEXT = {
     conclude: 'Concluir meta',
     reachedBadge: 'Meta alcançada',
     reachedBody: 'Você pode concluir ou continuar guardando.',
-    historyTitle: 'Movimentos',
+    historyTitle: 'Histórico da meta',
     historyEmpty: 'Nenhum movimento registrado.',
     /** "Excluir Viagem de férias?" */
     deleteTitle: (name: string) => `Excluir ${name}?`,

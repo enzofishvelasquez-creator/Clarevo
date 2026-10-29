@@ -327,7 +327,7 @@ export const APP_SCREENS: readonly AppScreen[] = [
   },
   {
     id: 'buscar-movimentos',
-    title: 'Buscar em Movimentações',
+    title: 'Buscar em Movimentos',
     caption: 'Achar um gasto ou recebimento em todos os meses e ver quanto deu no período',
     href: '/movimentacoes/buscar',
     keywords: ['buscar', 'busca', 'procurar', 'pesquisar', 'achar', 'encontrar', 'quanto paguei', 'quanto gastei', 'gasto antigo', 'registro antigo', 'luz'],
@@ -366,7 +366,7 @@ export const APP_SCREENS: readonly AppScreen[] = [
   {
     id: 'ocultar-valores',
     title: 'Ocultar valores',
-    caption: 'Esconder os valores na tela, em Conta e no olho do cabeçalho',
+    caption: 'Ocultar os valores na tela, em Conta e no olho do cabeçalho',
     href: '/conta',
     keywords: ['ocultar', 'esconder', 'valores', 'privacidade', 'biometria', 'digital', 'rosto', 'olho'],
   },
@@ -386,7 +386,7 @@ export const APP_SCREENS: readonly AppScreen[] = [
   },
   {
     id: 'contas',
-    title: 'Suas contas',
+    title: 'Contas de origem',
     caption: 'De onde sai o dinheiro dos gastos, pagamentos e aportes',
     href: '/conta?secao=contas',
     keywords: ['contas', 'suas contas', 'origem do dinheiro', 'saiu de', 'carteira', 'conta principal', 'adicionar conta', 'arquivar conta'],

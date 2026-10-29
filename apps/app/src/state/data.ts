@@ -285,7 +285,7 @@ export function useMonthRecords(contextId: string | undefined, month: IsoMonth) 
 }
 
 /**
- * Buscar em Movimentações (D-045). Dois pedidos só de leitura: os registros (gastos, recebimentos e pagamentos de conta e de
+ * Buscar em Movimentos (D-045). Dois pedidos só de leitura: os registros (gastos, recebimentos e pagamentos de conta e de
  * fatura) e, quando a busca olha o cartão, as compras no cartão, cada um com até 1.000 linhas. A chave leva o filtro do servidor
  * (período, tipo, categoria, conta e valor) e nunca o texto buscado, que é filtrado no aparelho e fica só na memória da tela.
  * `params` nulo (valor digitado inválido) não consulta. As chaves começam por 'records' e 'cards', então toda escrita de

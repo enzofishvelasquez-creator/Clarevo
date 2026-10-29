@@ -85,7 +85,7 @@ export const LEGAL_TEXT = {
     personal: 'Única pessoa do app que vê, anota, edita e exclui registros em Pessoal.',
     team: 'A equipe da Clarevo não olha os seus dados no dia a dia. Só acessa quando a lei exigir ou para resolver um problema que você pediu.',
     security:
-      'Seus registros ficam protegidos por permissões no servidor: entre as pessoas do app, só você vê o contexto Pessoal. Na Família, cada pessoa vê o que o papel dela permite.',
+      'Seus registros ficam protegidos por permissões no servidor: entre as pessoas do app, só você vê o espaço Pessoal. Na Família, cada pessoa vê o que o papel dela permite.',
   },
 } as const;
 

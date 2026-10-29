@@ -269,7 +269,7 @@ export interface RecordsRepository {
   listRecords(contextId: string, month: IsoMonth): Promise<FinancialRecord[]>;
   getRecord(id: string): Promise<FinancialRecord | null>;
 
-  // Buscar em Movimentações (D-045, Ciclo H1). Só leitura (a mesma que a RLS já permite): nada é gravado e o app não registra buscas.
+  // Buscar em Movimentos (D-045, Ciclo H1). Só leitura (a mesma que a RLS já permite): nada é gravado e o app não registra buscas.
   // O texto da descrição não vai ao servidor: é filtrado no aparelho (search.ts), sem diferenciar maiúsculas nem acentos.
 
   /**

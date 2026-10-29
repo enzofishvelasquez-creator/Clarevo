@@ -11,14 +11,14 @@ import { setBrowseBarInset } from '@/lib/bar-inset';
 import { colors, fonts, radius } from '@/theme/tokens';
 
 /**
- * Navegação: Resumo, Movimentações, Metas e Aprender. "Movimentos" é o rótulo compacto; o nome acessível o contém
- * ("Movimentos: movimentações do mês"; WCAG 2.5.3, rótulo no nome).
+ * Navegação: Resumo, Movimentos, Metas e Aprender. "Movimentos" é o rótulo compacto; o nome acessível o contém
+ * ("Movimentos do mês"; WCAG 2.5.3, rótulo no nome).
  * Aprender mantém o rótulo curto (quatro destinos do Primeiro Ciclo) e o nome acessível "Aprender e dúvidas", que
  * contém o rótulo visível (D-031(1); WCAG 2.5.3).
  */
 export const TABS: { name: string; href: '/' | '/movimentacoes' | '/metas' | '/aprender'; label: string; a11y: string; icon: LucideIcon }[] = [
   { name: 'index', href: '/', label: 'Resumo', a11y: 'Resumo', icon: House },
-  { name: 'movimentacoes', href: '/movimentacoes', label: 'Movimentos', a11y: 'Movimentos: movimentações do mês', icon: ArrowLeftRight },
+  { name: 'movimentacoes', href: '/movimentacoes', label: 'Movimentos', a11y: 'Movimentos do mês', icon: ArrowLeftRight },
   { name: 'metas', href: '/metas', label: 'Metas', a11y: 'Metas', icon: Flag },
   { name: 'aprender', href: '/aprender', label: LEARN_UI_TEXT.tabLabel, a11y: LEARN_UI_TEXT.tabA11y, icon: BookOpen },
 ];

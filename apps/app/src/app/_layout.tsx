@@ -206,7 +206,7 @@ function Navigation() {
           <Stack.Screen name="registro/novo" />
           <Stack.Screen name="registro/[id]/index" />
           <Stack.Screen name="registro/[id]/editar" />
-          {/* Buscar em Movimentações (D-045): tela de consulta, com a barra inferior. */}
+          {/* Buscar em Movimentos (D-045): tela de consulta, com a barra inferior. */}
           <Stack.Screen name="movimentacoes/buscar" />
           {/* Seu mês em 30 segundos (D-052): cartões curtos do mês; tela de consulta, com a barra inferior. */}
           <Stack.Screen name="seu-mes" />

@@ -51,7 +51,7 @@ function useDebounced<V>(value: V, ms: number): V {
 }
 
 /**
- * Buscar em Movimentações (D-045): gastos e recebimentos de todos os meses, por texto (sem diferenciar maiúsculas nem acentos),
+ * Buscar em Movimentos (D-045): gastos e recebimentos de todos os meses, por texto (sem diferenciar maiúsculas nem acentos),
  * tipo, período, categoria, conta e valor. O servidor filtra (o texto, por um filtro mais largo) e devolve até 1.000 linhas; a conferência
  * exata do texto é feita aqui, no aparelho. O texto fica só na memória desta tela e na chave do cache em memória (nada é gravado
  * em armazenamento nem registrado). Compras no cartão ficam num grupo à parte e não

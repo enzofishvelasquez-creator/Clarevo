@@ -1518,7 +1518,7 @@ export class SupabaseRepository implements RecordsRepository {
   }
 
   /**
-   * Buscar em Movimentações (D-045): período, tipo, categoria, conta e valor no servidor, do mais recente ao mais antigo, até 1.000
+   * Buscar em Movimentos (D-045): período, tipo, categoria, conta e valor no servidor, do mais recente ao mais antigo, até 1.000
    * linhas (ou `limit`, que a exportação de dados, D-047, eleva a 20.000). O texto da descrição entra como filtro mais largo (ILIKE por palavra, `_` no lugar das letras que podem ter acento) e o
    * aparelho confere o resto, sem diferenciar acentos. Só leitura, na mesma tabela que listRecords.
    */

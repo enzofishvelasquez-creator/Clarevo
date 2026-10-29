@@ -23,7 +23,7 @@ export const USAR_TOPICS: Topic[] = [
     example:
       'Com R$ 6.000 recebidos e R$ 3.900 pagos em outubro, a diferença é R$ 2.100. Um gasto de R$ 80 pago em 7 de outubro muda o total pago para R$ 3.980.',
     calculation: '6.000,00 - 3.900,00 = 2.100,00 · 3.900,00 + 80,00 = 3.980,00.',
-    hypotheses: 'Exemplo fictício. Considera apenas registros realizados no mesmo contexto.',
+    hypotheses: 'Exemplo fictício. Considera apenas registros realizados no mesmo espaço.',
     facts: [],
     keywords: ['resultado do mês', 'sobra do mês', 'recebido', 'pago', 'data do pagamento'],
     related: ['saldo', 'realizado-previsto'],

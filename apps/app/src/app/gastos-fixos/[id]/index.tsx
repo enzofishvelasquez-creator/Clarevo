@@ -354,7 +354,7 @@ function Overview({ series: s, today }: { series: CommitmentSeries; today: IsoDa
           </>
         ) : null}
         <View>
-          <Row label="Contexto" value={by.contextName} />
+          <Row label="Espaço" value={by.contextName} />
           {s.kind === 'parcelada' ? <Row label="Tipo" value={SERIES_NATURE_LABEL[s.nature]} /> : null}
           {by.kind === 'familia' ? <Row label="Criado por" value={by.by} /> : null}
           <Row label="Categoria" value={term.category ?? NO_CATEGORY_LABEL} last />
@@ -514,7 +514,7 @@ function Occurrences({
           {paid.map((c, i) => (
             <PaidRow key={c.id} commitment={c} today={today} last={i === paid.length - 1} />
           ))}
-          <LinkButton label="Ver em Movimentações" style={styles.inlineLink} onPress={() => router.navigate('/movimentacoes')} />
+          <LinkButton label="Ver em Movimentos" style={styles.inlineLink} onPress={() => router.navigate('/movimentacoes')} />
         </Card>
       ) : null}
 

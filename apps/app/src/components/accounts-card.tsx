@@ -13,7 +13,7 @@ import { colors, fonts, radius, space } from '@/theme/tokens';
 const ICON: Record<AccountKind, LucideIcon> = { banco: Landmark, dinheiro: Wallet, outra: Coins };
 
 /**
- * "Suas contas" em Conta (D-043): as contas de onde sai o dinheiro, com o tipo e a marca "Principal" ou "Arquivada". Tocar numa conta
+ * "Contas de origem" em Conta (D-043): as contas de onde sai o dinheiro, com o tipo e a marca "Principal" ou "Arquivada". Tocar numa conta
  * abre o formulário (renomear, mudar o tipo, tornar principal, arquivar ou reativar, excluir); "Adicionar conta" abre o cadastro. A conta
  * só informa a origem: o Clarevo não guarda saldo por conta nem movimenta dinheiro.
  */

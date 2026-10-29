@@ -194,7 +194,7 @@ describe('catálogo do guia (D-049)', () => {
     expect(importar.href).toBe('/importar');
     expect(importar.steps.join(' ')).toContain('"Escolher o arquivo"');
     expect(importar.steps.join(' ')).toContain('"Revisar as linhas"');
-    expect(importar.alsoWhere?.map(guideWhere)).toContain('Conta › Suas contas › Importar extrato');
+    expect(importar.alsoWhere?.map(guideWhere)).toContain('Conta › Contas de origem › Importar extrato');
   });
 
   it('"Escanear nota fiscal" cita o comprovante de Pix e de pagamento em um passo (D-051), com o nome real da opção, e a busca acha por "pix", "ted" e "boleto"', () => {

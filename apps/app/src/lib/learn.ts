@@ -74,7 +74,7 @@ export interface LearnAction {
 export const LEARN_ACTIONS: Partial<Record<TopicSlug, readonly LearnAction[]>> = {
   'quem-ve-meus-dados': [{ label: 'Ver quem vê estes dados', href: '/quem-ve' }],
   'marcar-como-paga': [{ label: 'Abrir Contas a pagar', href: '/a-pagar' }],
-  'contei-duas-vezes': [{ label: 'Ver Movimentações', href: '/movimentacoes' }],
+  'contei-duas-vezes': [{ label: 'Ver Movimentos', href: '/movimentacoes' }],
   'voltei-depois': [{ label: 'Revisar contas vencidas', href: '/a-pagar/vencidas' }],
   // Ciclos B, C e D: cada tema dos novos leva à tela do app em que o assunto aparece.
   'renda-comprometida': [{ label: 'Ver minha renda comprometida', href: '/renda-comprometida' }],
