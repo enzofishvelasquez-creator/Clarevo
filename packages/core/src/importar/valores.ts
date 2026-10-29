@@ -49,7 +49,7 @@ export function parseAmountCents(raw: string, decimal: '.' | ',' | 'auto' = 'aut
   if (decimal !== 'auto') sep = decimal;
   else if (lastDot >= 0 && lastComma >= 0) sep = lastDot > lastComma ? '.' : ',';
   else if (lastComma >= 0) sep = ',';
-  else if (lastDot >= 0) sep = /^\d{1,3}(\.\d{3})+$/.test(text) ? null : '.';
+  else if (lastDot >= 0) sep = /^[1-9]\d{0,2}(\.\d{3})+$/.test(text) ? null : '.';
   else sep = null;
   const thousands = sep === '.' ? ',' : '.';
   let intPart = text;
@@ -63,7 +63,7 @@ export function parseAmountCents(raw: string, decimal: '.' | ',' | 'auto' = 'aut
   }
   // O que sobra à esquerda: só dígitos, ou grupos de três separados pelo outro separador.
   if (intPart.includes(thousands)) {
-    if (!/^\d{1,3}(?:[.,]\d{3})+$/.test(intPart) || intPart.split(thousands).length !== intPart.split(/[.,]/).length) return null;
+    if (!/^[1-9]\d{0,2}(?:[.,]\d{3})+$/.test(intPart) || intPart.split(thousands).length !== intPart.split(/[.,]/).length) return null;
     intPart = intPart.split(thousands).join('');
   }
   if (intPart === '' && decPart === '') return null;

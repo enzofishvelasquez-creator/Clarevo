@@ -430,9 +430,12 @@ export function buildInvoices(card, entries, commitments, today) {
                 addMix(buckets, { category: l.category, charges: false }, l.amountCents);
             else if (l.kind === 'encargo')
                 addMix(buckets, { category: null, charges: true }, l.amountCents);
-            else if (l.kind === 'credito_anterior')
-                addMix(buckets, { category: null, charges: false }, l.amountCents);
         }
+        const creditCents = lines.filter((l) => l.kind === 'credito_anterior').reduce((acc, l) => acc + l.amountCents, 0);
+        if (creditCents < 0)
+            buckets.set('\u0000credito', { category: null, charges: false, cents: creditCents });
+        else if (creditCents > 0)
+            addMix(buckets, { category: null, charges: false }, creditCents);
         if (balanceCents > 0) {
             const inherited = previous && previous.remainingCents === balanceCents && previous.month === addMonths(month, -1) ? previous.unpaidMix : null;
             if (inherited)

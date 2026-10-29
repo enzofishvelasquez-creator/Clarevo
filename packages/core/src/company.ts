@@ -181,18 +181,28 @@ export function sameEmail(a: unknown, b: unknown): boolean {
 
 /**
  * Divide o texto colado em itens: um por linha, ou separados por vírgula ou ponto e vírgula. "Nome <email>" vale como o e-mail
- * dentro dos sinais. Itens vazios saem; o resto fica como a pessoa digitou, sem os espaços das pontas.
+ * dentro dos sinais, também no formato do Outlook, em que o nome tem vírgula ("Silva, Ana <ana@x.com>; Souza, Bia <bia@x.com>"):
+ * o nome vai do último ponto e vírgula ou quebra de linha até o sinal, e dele só fica o que tiver arroba. Itens vazios saem; o
+ * resto fica como a pessoa digitou, sem os espaços das pontas.
  */
 export function splitEmailList(text: unknown): string[] {
   if (typeof text !== 'string') return [];
-  return text
-    .split(/[\r\n,;]+/)
-    .map((raw) => {
-      const item = raw.trim();
-      const inside = /<([^<>]*)>\s*$/.exec(item);
-      return (inside ? inside[1]! : item).trim();
-    })
-    .filter((item) => item !== '');
+  const items: string[] = [];
+  const plain = (chunk: string) => {
+    for (const raw of chunk.split(/[\r\n,;]+/)) if (raw.trim() !== '') items.push(raw.trim());
+  };
+  const angle = /<([^<>]*)>/g;
+  let last = 0;
+  for (let m = angle.exec(text); m !== null; m = angle.exec(text)) {
+    const before = text.slice(last, m.index);
+    const cut = Math.max(before.lastIndexOf(';'), before.lastIndexOf('\n'), before.lastIndexOf('\r'));
+    plain(before.slice(0, cut + 1));
+    for (const raw of before.slice(cut + 1).split(',')) if (raw.includes('@') && raw.trim() !== '') items.push(raw.trim());
+    if (m[1]!.trim() !== '') items.push(m[1]!.trim());
+    last = m.index + m[0].length;
+  }
+  plain(text.slice(last));
+  return items;
 }
 
 /** O que a pessoa colou: válidos (únicos), repetidos na lista e inválidos. */

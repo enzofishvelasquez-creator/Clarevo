@@ -3,7 +3,7 @@ import { formatDateBR, todayIn } from './dates';
 import type { ContextKind } from './records';
 import type { RepoErrorCode } from './repository';
 import { sha256Hex } from './sha256';
-import { ERROR_TEXT } from './validation';
+import { charCount, ERROR_TEXT } from './validation';
 
 /**
  * Família (D-055, Ciclo L; docs/13). Regras puras, repetidas no banco pelas funções create_family, create_family_invite,
@@ -164,10 +164,11 @@ export function normalizeFamilyName(name: string): string {
   return typeof name === 'string' ? name.trim() : '';
 }
 
-/** Nome de 1 a 60 caracteres (depois de tirar os espaços das pontas). */
+/** Nome de 1 a 60 caracteres (depois de tirar os espaços das pontas), contados como o banco conta (char_length). */
 export function familyNameError(name: string): 'nome_da_familia_invalido' | null {
   const n = normalizeFamilyName(name);
-  return n.length >= 1 && n.length <= FAMILY_NAME_MAX ? null : 'nome_da_familia_invalido';
+  const size = charCount(n);
+  return size >= 1 && size <= FAMILY_NAME_MAX ? null : 'nome_da_familia_invalido';
 }
 
 export function isInviteRole(role: unknown): role is InviteRole {

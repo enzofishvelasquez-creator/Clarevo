@@ -229,7 +229,7 @@ export function subscriptionRows(list: readonly SubscriptionSeries[], today: Iso
   return list
     .filter((s) => isActiveSubscription(s, today))
     .map((s) => subscriptionRow(s, today))
-    .sort((a, b) => b.monthlyCents - a.monthlyCents || a.name.localeCompare(b.name, 'pt-BR') || a.id.localeCompare(b.id));
+    .sort((a, b) => b.yearlyCents - a.yearlyCents || b.monthlyCents - a.monthlyCents || a.name.localeCompare(b.name, 'pt-BR') || a.id.localeCompare(b.id));
 }
 
 export interface SubscriptionTotals {

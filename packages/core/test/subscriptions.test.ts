@@ -131,6 +131,18 @@ describe('assinaturas: quais são e quanto custam (D-046)', () => {
     expect(subscriptionRows(list, DEMO_TODAY).map((r) => r.name)).toEqual(['Academia', 'Clube', 'Revista']);
   });
 
+  it('a ordem é pelo custo no ano: a que termina logo fica depois da que custa menos por mês e segue o ano todo', () => {
+    const list = [
+      sub({ id: 'a', name: 'Curso', amountCents: 9900, lastNumber: 2 }), // outubro e novembro: R$ 198,00 no ano
+      sub({ id: 'b', name: 'Streaming', amountCents: 3990 }), // R$ 478,80 no ano
+    ];
+    const rows = subscriptionRows(list, DEMO_TODAY);
+    expect(rows.map((r) => [r.name, r.monthlyCents, r.yearlyCents])).toEqual([
+      ['Streaming', 3990, 47880],
+      ['Curso', 9900, 19800],
+    ]);
+  });
+
   it('totais: soma dos valores vigentes das ativas, por ano × 12, e a parte estimada', () => {
     const list = [sub({ id: 'a', amountCents: 3990 }), sub({ id: 'b', name: 'Academia', amountCents: 9900, mode: 'variavel' }), sub({ id: 'c', subscription: false })];
     expect(subscriptionTotals(list, DEMO_TODAY)).toEqual({ count: 2, monthlyCents: 13890, yearlyCents: 166680, estimatedMonthlyCents: 9900, endingCount: 0 });

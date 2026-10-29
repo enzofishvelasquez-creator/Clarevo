@@ -18,7 +18,7 @@ export function parseBRL(input) {
         return null;
     let intPart;
     let decPart = '';
-    const brl = /^(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?$/.exec(raw);
+    const brl = /^([1-9]\d{0,2}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?$/.exec(raw);
     const dotDecimal = /^(\d+)\.(\d{1,2})$/.exec(raw);
     if (brl) {
         intPart = brl[1].replace(/\./g, '');
